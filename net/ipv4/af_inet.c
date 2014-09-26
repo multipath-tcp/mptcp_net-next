@@ -609,7 +609,7 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	timeo = sock_sndtimeo(sk, flags & O_NONBLOCK);
 
 	if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
-		int writebias = (sk->sk_protocol == IPPROTO_TCP) &&
+		int writebias = sk->sk_protocol == IPPROTO_TCP &&
 				tcp_sk(sk)->fastopen_req &&
 				tcp_sk(sk)->fastopen_req->data ? 1 : 0;
 
@@ -1014,6 +1014,15 @@ static struct inet_protosw inetsw_array[] =
 		.type =       SOCK_STREAM,
 		.protocol =   IPPROTO_TCP,
 		.prot =       &tcp_prot,
+		.ops =        &inet_stream_ops,
+		.flags =      INET_PROTOSW_PERMANENT |
+			      INET_PROTOSW_ICSK,
+	},
+
+	{
+		.type =       SOCK_STREAM,
+		.protocol =   IPPROTO_MPTCP,
+		.prot =       &mptcp_prot,
 		.ops =        &inet_stream_ops,
 		.flags =      INET_PROTOSW_PERMANENT |
 			      INET_PROTOSW_ICSK,
@@ -1524,6 +1533,15 @@ static const struct net_protocol tcp_protocol = {
 	.icmp_strict_tag_validation = 1,
 };
 
+static const struct net_protocol mptcp_protocol = {
+	.early_demux	=	tcp_v4_early_demux,
+	.handler	=	tcp_v4_rcv,
+	.err_handler	=	tcp_v4_err,
+	.no_policy	=	1,
+	.netns_ok	=	1,
+	.icmp_strict_tag_validation = 1,
+};
+
 static const struct net_protocol udp_protocol = {
 	.early_demux =	udp_v4_early_demux,
 	.handler =	udp_rcv,
@@ -1703,6 +1721,10 @@ static int __init inet_init(void)
 	if (rc)
 		goto out;
 
+	rc = proto_register(&mptcp_prot, 1);
+	if (rc)
+		goto out_unregister_mptcp_proto;
+
 	rc = proto_register(&udp_prot, 1);
 	if (rc)
 		goto out_unregister_tcp_proto;
@@ -1735,6 +1757,8 @@ static int __init inet_init(void)
 		pr_crit("%s: Cannot add UDP protocol\n", __func__);
 	if (inet_add_protocol(&tcp_protocol, IPPROTO_TCP) < 0)
 		pr_crit("%s: Cannot add TCP protocol\n", __func__);
+	if (inet_add_protocol(&mptcp_protocol, IPPROTO_MPTCP) < 0)
+		pr_crit("%s: Cannot add MPTCP protocol\n", __func__);
 #ifdef CONFIG_IP_MULTICAST
 	if (inet_add_protocol(&igmp_protocol, IPPROTO_IGMP) < 0)
 		pr_crit("%s: Cannot add IGMP protocol\n", __func__);
@@ -1760,7 +1784,7 @@ static int __init inet_init(void)
 	ip_init();
 
 	/* We must initialize MPTCP before TCP. */
-	mptcp_init();
+	mptcp_init(&mptcp_prot);
 
 	tcp_v4_init();
 
@@ -1812,6 +1836,8 @@ out_unregister_raw_proto:
 	proto_unregister(&raw_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udp_prot);
+out_unregister_mptcp_proto:
+	proto_unregister(&mptcp_prot);
 out_unregister_tcp_proto:
 	proto_unregister(&tcp_prot);
 	goto out;

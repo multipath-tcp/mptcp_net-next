@@ -447,6 +447,19 @@ void mptcp_connect_init(struct sock *sk)
 	rcu_read_unlock_bh();
 }
 
+int mptcp_v4_init_sock(struct sock *sk) {
+	struct inet_connection_sock *icsk = inet_csk(sk);
+
+	tcp_v4_init_sock(sk);
+
+#ifdef CONFIG_MPTCP
+	if (is_mptcp_enabled(sk))
+		icsk->icsk_af_ops = &mptcp_v4_specific;
+#endif
+
+	return 0;
+}
+
 /**
  * This function increments the refcount of the mpcb struct.
  * It is the responsibility of the caller to decrement when releasing
@@ -1446,7 +1459,7 @@ void mptcp_sub_close_wq(struct work_struct *work)
 	if (meta_sk->sk_shutdown == SHUTDOWN_MASK || sk->sk_state == TCP_CLOSE) {
 		tp->closing = 1;
 		sock_rps_reset_flow(sk);
-		tcp_close(sk, 0);
+		mptcp_close(sk, 0);
 	} else if (tcp_close_state(sk)) {
 		sk->sk_shutdown |= SEND_SHUTDOWN;
 		tcp_send_fin(sk);
@@ -1502,7 +1515,7 @@ void mptcp_sub_close(struct sock *sk, unsigned long delay)
 			    sk->sk_state == TCP_CLOSE) {
 				tp->closing = 1;
 				sock_rps_reset_flow(sk);
-				tcp_close(sk, 0);
+				mptcp_close(sk, 0);
 			} else if (tcp_close_state(sk)) {
 				sk->sk_shutdown |= SEND_SHUTDOWN;
 				tcp_send_fin(sk);
@@ -1586,6 +1599,11 @@ void mptcp_close(struct sock *meta_sk, long timeout)
 	struct sk_buff *skb;
 	int data_was_unread = 0;
 	int state;
+
+	if (!is_meta_sk(meta_sk)) {
+                tcp_close(meta_sk, timeout);
+                return;
+        }
 
 	mptcp_debug("%s: Close of meta_sk with tok %#x\n",
 		    __func__, mpcb->mptcp_loc_token);
@@ -2406,7 +2424,7 @@ static struct pernet_operations mptcp_pm_proc_ops = {
 };
 
 /* General initialization of mptcp */
-void __init mptcp_init(void)
+void __init mptcp_init(struct proto *proto)
 {
 	int i;
 	struct ctl_table_header *mptcp_sysctl;
@@ -2453,8 +2471,7 @@ void __init mptcp_init(void)
 	if (mptcp_pm_v6_init())
 		goto mptcp_pm_v6_failed;
 #endif
-	if (mptcp_pm_v4_init())
-		goto mptcp_pm_v4_failed;
+	mptcp_pm_v4_init(proto);
 
 	mptcp_sysctl = register_net_sysctl(&init_net, "net/mptcp", mptcp_table);
 	if (!mptcp_sysctl)
@@ -2477,8 +2494,6 @@ register_sched_failed:
 register_pm_failed:
 	unregister_net_sysctl_table(mptcp_sysctl);
 register_sysctl_failed:
-	mptcp_pm_v4_undo();
-mptcp_pm_v4_failed:
 #if IS_ENABLED(CONFIG_IPV6)
 	mptcp_pm_v6_undo();
 mptcp_pm_v6_failed:

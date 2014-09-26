@@ -776,7 +776,7 @@ int mptcp_check_rtt(const struct tcp_sock *tp, int time);
 int mptcp_check_snd_buf(const struct tcp_sock *tp);
 int mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 			 const struct sk_buff *skb);
-void __init mptcp_init(void);
+void __init mptcp_init(struct proto *proto);
 int mptcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len);
 void mptcp_destroy_sock(struct sock *sk);
 int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
@@ -784,6 +784,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				    const struct mptcp_options_received *mopt);
 unsigned int mptcp_xmit_size_goal(const struct sock *meta_sk, u32 mss_now,
 				  int large_allowed);
+int mptcp_v4_init_sock(struct sock *sk);
 int mptcp_init_tw_sock(struct sock *sk, struct tcp_timewait_sock *tw);
 void mptcp_twsk_destructor(struct tcp_timewait_sock *tw);
 void mptcp_time_wait(struct sock *sk, int state, int timeo);
@@ -998,8 +999,9 @@ static inline int is_meta_tp(const struct tcp_sock *tp)
 
 static inline int is_meta_sk(const struct sock *sk)
 {
-	return sk->sk_type == SOCK_STREAM  && sk->sk_protocol == IPPROTO_TCP &&
-	       mptcp(tcp_sk(sk)) && mptcp_meta_sk(sk) == sk;
+	return sk->sk_type == SOCK_STREAM  && (sk->sk_protocol == IPPROTO_TCP ||
+	       sk->sk_protocol == IPPROTO_MPTCP) &&  mptcp(tcp_sk(sk)) &&
+	       mptcp_meta_sk(sk) == sk;
 }
 
 static inline int is_master_tp(const struct tcp_sock *tp)

@@ -1386,6 +1386,11 @@ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
 	BUILD_BUG_ON(SOCK_CLOEXEC & SOCK_TYPE_MASK);
 	BUILD_BUG_ON(SOCK_NONBLOCK & SOCK_TYPE_MASK);
 
+	if (protocol == IPPROTO_TCP) {
+		printk(KERN_INFO "IPPROTO_TCP->IPPROTO_MPTCP");
+		protocol = IPPROTO_MPTCP;
+	}
+
 	flags = type & ~SOCK_TYPE_MASK;
 	if (flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
 		return -EINVAL;

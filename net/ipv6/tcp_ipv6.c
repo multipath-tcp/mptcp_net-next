@@ -1985,7 +1985,7 @@ static void tcp_v6_clear_sk(struct sock *sk, int size)
 struct proto tcpv6_prot = {
 	.name			= "TCPv6",
 	.owner			= THIS_MODULE,
-	.close			= tcp_close,
+	.close			= mptcp_close,
 	.connect		= tcp_v6_connect,
 	.disconnect		= tcp_disconnect,
 	.accept			= inet_csk_accept,
