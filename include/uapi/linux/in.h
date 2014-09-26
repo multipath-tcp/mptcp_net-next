@@ -33,6 +33,8 @@ enum {
 #define IPPROTO_IPIP		IPPROTO_IPIP
   IPPROTO_TCP = 6,		/* Transmission Control Protocol	*/
 #define IPPROTO_TCP		IPPROTO_TCP
+  IPPROTO_MPTCP = 7,		/* Multipath Transmission Control Protocol */
+#define IPPROTO_MPTCP		IPPROTO_MPTCP
   IPPROTO_EGP = 8,		/* Exterior Gateway Protocol		*/
 #define IPPROTO_EGP		IPPROTO_EGP
   IPPROTO_PUP = 12,		/* PUP protocol				*/
