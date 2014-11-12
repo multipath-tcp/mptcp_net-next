@@ -1709,6 +1709,7 @@ SYSCALL_DEFINE3(connect, int, fd, struct sockaddr __user *, uservaddr,
 	if (err)
 		goto out_put;
 
+	printk(KERN_INFO "sock->ops->connect \n");
 	err = sock->ops->connect(sock, (struct sockaddr *)&address, addrlen,
 				 sock->file->f_flags);
 out_put:

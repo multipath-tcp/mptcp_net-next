@@ -5453,11 +5453,9 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_fastopen_cookie foc = { .len = -1 };
 	int saved_clamp = tp->rx_opt.mss_clamp;
-	struct mptcp_options_received mopt;
-	mptcp_init_mp_opt(&mopt);
 
 	tcp_parse_options(skb, &tp->rx_opt,
-			  mptcp(tp) ? &tp->mptcp->rx_opt : &mopt, 0, &foc);
+			  mptcp(tp) ? &tp->mptcp->rx_opt : NULL, 0, &foc);
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr)
 		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 
@@ -5490,6 +5488,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		 */
 
 		if (th->rst) {
+			printk(KERN_INFO "RST + ACK \n");
 			tcp_reset(sk);
 			goto discard;
 		}
@@ -5516,29 +5515,14 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 		tcp_ack(sk, skb, FLAG_SLOWPATH);
 
-		if (tp->request_mptcp || mptcp(tp)) {
-			int ret;
-			ret = mptcp_rcv_synsent_state_process(sk, &sk,
-							      skb, &mopt);
-
-			/* May have changed if we support MPTCP */
-			tp = tcp_sk(sk);
-			icsk = inet_csk(sk);
-
-			if (ret == 1)
-				goto reset_and_undo;
-			if (ret == 2)
-				goto discard;
-		}
-
-		if (mptcp(tp) && !is_master_tp(tp)) {
-			/* Timer for repeating the ACK until an answer
-			 * arrives. Used only when establishing an additional
-			 * subflow inside of an MPTCP connection.
-			 */
-			sk_reset_timer(sk, &tp->mptcp->mptcp_ack_timer,
-				       jiffies + icsk->icsk_rto);
-		}
+		printk(KERN_INFO "before mptcp_rcv_synsent_state_process \n");
+		if (mptcp(tp)) {
+                        int ret;
+                        ret = mptcp_rcv_synsent_state_process(sk, &sk,
+                                                              skb, &tp->mptcp->rx_opt);
+                        if (ret == 1)
+                                goto reset_and_undo;
+                }
 
 		/* Ok.. it's good. Set up sequence numbers and
 		 * move to established.
@@ -5585,6 +5569,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		smp_mb();
 
+		printk(KERN_INFO "before tcp_finish_connect \n");
 		tcp_finish_connect(sk, skb);
 
 		if ((tp->syn_fastopen || tp->syn_data) &&
@@ -5767,11 +5752,9 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 		goto discard;
 
 	case TCP_SYN_SENT:
+		printk(KERN_INFO "case TCP_SYN_SENT \n");
 		queued = tcp_rcv_synsent_state_process(sk, skb, th, len);
-		if (is_meta_sk(sk)) {
-			sk = tcp_sk(sk)->mpcb->master_sk;
-			tp = tcp_sk(sk);
-
+		if (is_master_tp(tp) && tp->mpcb->meta_ready == 1) {
 			/* Need to call it here, because it will announce new
 			 * addresses, which can only be done after the third ack
 			 * of the 3-way handshake.
@@ -5785,8 +5768,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_urg(sk, skb, th);
 		__kfree_skb(skb);
 		tcp_data_snd_check(sk);
-		if (mptcp(tp) && is_master_tp(tp))
-			bh_unlock_sock(sk);
 		return 0;
 	}
 

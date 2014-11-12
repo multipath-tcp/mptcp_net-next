@@ -139,6 +139,27 @@ int tcp_twsk_unique(struct sock *sk, struct sock *sktw, void *twp)
 }
 EXPORT_SYMBOL_GPL(tcp_twsk_unique);
 
+int mptcp_v4_connect(struct sock *meta_sk, struct sockaddr *uaddr, int addr_len) {
+	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
+	struct mptcp_cb *mpcb = meta_tp->mpcb;
+	struct sock *master_sk = mpcb->master_sk;
+	struct socket *master_sock = master_sk->sk_socket;
+	struct socket *meta_sock = meta_sk->sk_socket;
+	int err;
+
+	printk(KERN_INFO "mptcp_v4_connect start \n");
+	meta_sk->sk_state = TCP_SYN_SENT;
+	err = inet_stream_connect(master_sock, uaddr, addr_len, meta_sock->file->f_flags);
+	if (err) {
+		printk(KERN_INFO "error connecting on master \n");
+		return err;
+	}
+
+	printk(KERN_INFO "mptcp_v4_connect finished %i \n", err);
+
+	return err;
+}
+
 /* This will initiate an outgoing connection. */
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
@@ -251,6 +272,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
+	printk(KERN_INFO "end tcp_v4_connect \n");
 	return 0;
 
 failure:
@@ -258,6 +280,7 @@ failure:
 	 * This unhashes the socket and releases the local port,
 	 * if necessary.
 	 */
+	printk(KERN_INFO "failure \n");
 	tcp_set_state(sk, TCP_CLOSE);
 	ip_rt_put(rt);
 	sk->sk_route_caps = 0;
@@ -1473,6 +1496,17 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct sock *rsk;
 
+#ifdef CONFIG_TCP_MD5SIG
+	/*
+	 * We really want to reject the packet as early as possible
+	 * if:
+	 *  o We're expecting an MD5'd packet and this is no MD5 tcp option
+	 *  o There is an MD5 option and we're not expecting one
+	 */
+	if (tcp_v4_inbound_md5_hash(sk, skb))
+		goto discard;
+#endif
+
 	if (is_meta_sk(sk))
 		return mptcp_v4_do_rcv(sk, skb);
 
@@ -1582,12 +1616,18 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	if (sysctl_tcp_low_latency || !tp->ucopy.task)
+	printk(KERN_INFO "tcp prequeue \n");
+
+	if (sysctl_tcp_low_latency || !tp->ucopy.task) {
+		printk(KERN_INFO "tcp prequeue false 1 \n");
 		return false;
+	}
 
 	if (skb->len <= tcp_hdrlen(skb) &&
-	    skb_queue_len(&tp->ucopy.prequeue) == 0)
+	    skb_queue_len(&tp->ucopy.prequeue) == 0) {
+		printk(KERN_INFO "tcp prequeue false 2\n");
 		return false;
+	}
 
 	/* Before escaping RCU protected region, we need to take care of skb
 	 * dst. Prequeue is only enabled for established sockets.
@@ -1622,6 +1662,7 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 						  (3 * tcp_rto_min(sk)) / 4,
 						  TCP_RTO_MAX);
 	}
+	printk(KERN_INFO "prequeue success \n");
 	return true;
 }
 EXPORT_SYMBOL(tcp_prequeue);
@@ -1653,6 +1694,9 @@ int tcp_v4_rcv(struct sk_buff *skb)
 		goto bad_packet;
 	if (!pskb_may_pull(skb, th->doff * 4))
 		goto discard_it;
+
+	if (th->syn && th->ack)
+		printk(KERN_INFO "SYN_ACK \n");
 
 	/* An explanation is required here, I think.
 	 * Packet length and doff are validated by header prediction,
@@ -1739,7 +1783,8 @@ process:
 	sk_mark_napi_id(sk, skb);
 	skb->dev = NULL;
 
-	if (mptcp(tcp_sk(sk))) {
+	if (mptcp(tcp_sk(sk)) && tcp_sk(sk)->mpcb->meta_ready == 1) {
+		printk(KERN_INFO "meta lock /n");
 		meta_sk = mptcp_meta_sk(sk);
 
 		bh_lock_sock_nested(meta_sk);
@@ -1760,6 +1805,7 @@ process:
 		NET_INC_STATS_BH(net, LINUX_MIB_TCPBACKLOGDROP);
 		goto discard_and_relse;
 	}
+	printk(KERN_INFO "unlock meta \n");
 	bh_unlock_sock(meta_sk);
 
 	sock_put(sk);
@@ -2550,7 +2596,7 @@ struct proto mptcp_prot = {
 	.name			= "MPTCP",
 	.owner			= THIS_MODULE,
 	.close			= mptcp_close,
-	.connect		= tcp_v4_connect,
+	.connect		= mptcp_v4_connect,
 	.disconnect		= tcp_disconnect,
 	.accept			= inet_csk_accept,
 	.ioctl			= tcp_ioctl,

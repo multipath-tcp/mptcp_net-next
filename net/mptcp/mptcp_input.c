@@ -2201,8 +2201,13 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				    const struct mptcp_options_received *mopt)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct mptcp_cb *mpcb = tp->mpcb;
+	struct sock *meta_sk = tp->meta_sk;
+	struct tcp_sock *meta_tp = mptcp_meta_tp(tp);
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	u64 idsn;
 
-	if (mptcp(tp)) {
+	if (mpcb->mptcp_rem_key) {
 		u8 hash_mac_check[20];
 		struct mptcp_cb *mpcb = tp->mpcb;
 
@@ -2214,6 +2219,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		if (memcmp(hash_mac_check,
 			   (char *)&tp->mptcp->rx_opt.mptcp_recv_tmac, 8)) {
 			mptcp_sub_force_close(sk);
+			printk(KERN_INFO "discard \n");
 			return 1;
 		}
 
@@ -2228,17 +2234,39 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				(u8 *)&tp->mptcp->mptcp_loc_nonce,
 				(u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
 				(u32 *)&tp->mptcp->sender_mac[0]);
+	}
+	else if (mopt->saw_mpc) {
+		 /* Generate Initial data-sequence-numbers */
+		mptcp_key_sha1(mpcb->mptcp_loc_key, NULL, &idsn);
+		idsn = ntohll(idsn) + 1;
+		mpcb->snd_high_order[0] = idsn >> 32;
+		mpcb->snd_high_order[1] = mpcb->snd_high_order[0] - 1;
 
-	} else if (mopt->saw_mpc) {
-		struct sock *meta_sk = sk;
+		meta_tp->write_seq = (u32)idsn;
+		meta_tp->snd_sml = meta_tp->write_seq;
+		meta_tp->snd_una = meta_tp->write_seq;
+		meta_tp->snd_nxt = meta_tp->write_seq;
+		meta_tp->pushed_seq = meta_tp->write_seq;
+		meta_tp->snd_up = meta_tp->write_seq;
 
-		if (mptcp_create_master_sk(sk, mopt->mptcp_key,
-					   ntohs(tcp_hdr(skb)->window)))
-			return 2;
+		mpcb->mptcp_rem_key = mopt->mptcp_key;
+		mptcp_key_sha1(mpcb->mptcp_rem_key, &mpcb->mptcp_rem_token, &idsn);
+		idsn = ntohll(idsn) + 1;
+		mpcb->rcv_high_order[0] = idsn >> 32;
+		mpcb->rcv_high_order[1] = mpcb->rcv_high_order[0] + 1;
+		meta_tp->copied_seq = (u32) idsn;
+		meta_tp->rcv_nxt = (u32) idsn;
+		meta_tp->rcv_wup = (u32) idsn;
 
-		sk = tcp_sk(sk)->mpcb->master_sk;
-		*skptr = sk;
-		tp = tcp_sk(sk);
+		meta_tp->snd_wl1 = meta_tp->rcv_nxt - 1;
+		meta_tp->snd_wnd = ntohs(tcp_hdr(skb)->window);
+		mpcb->meta_ready = 1;
+
+		printk(KERN_INFO "mptcp_rcv_synsent_state_process, SYN+ACK+MP_CAPABLE \n");
+		((struct inet_sock *)meta_tp)->inet_saddr = ((struct inet_sock *)tp)->inet_saddr;
+		((struct inet_sock *)meta_tp)->inet_daddr = ((struct inet_sock *)tp)->inet_daddr;
+		((struct inet_sock *)meta_tp)->inet_sport = ((struct inet_sock *)tp)->inet_sport;
+		((struct inet_sock *)meta_tp)->inet_dport = ((struct inet_sock *)tp)->inet_dport;
 
 		/* If fastopen was used data might be in the send queue. We
 		 * need to update their sequence number to MPTCP-level seqno.
@@ -2264,18 +2292,25 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		sk_set_socket(sk, mptcp_meta_sk(sk)->sk_socket);
 		sk->sk_wq = mptcp_meta_sk(sk)->sk_wq;
-
-		 /* hold in sk_clone_lock due to initialization to 2 */
-		sock_put(sk);
 	} else {
+		/* TODO */
 		tp->request_mptcp = 0;
 
 		if (tp->inside_tk_table)
 			mptcp_hash_remove(tp);
-	}
 
-	if (mptcp(tp))
-		tp->mptcp->rcv_isn = TCP_SKB_CB(skb)->seq;
+		return 1;
+	}
+	tp->mptcp->rcv_isn = TCP_SKB_CB(skb)->seq;
+
+	if (!is_master_tp(tp)) {
+                       /* Timer for repeating the ACK until an answer
+                        * arrives. Used only when establishing an additional
+                        * subflow inside of an MPTCP connection.
+                        */
+                       sk_reset_timer(sk, &tp->mptcp->mptcp_ack_timer,
+                                      jiffies + icsk->icsk_rto);
+        }
 
 	return 0;
 }

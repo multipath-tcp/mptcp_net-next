@@ -3122,8 +3122,10 @@ void tcp_done(struct sock *sk)
 
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	if (!sock_flag(sk, SOCK_DEAD))
+	if (!sock_flag(sk, SOCK_DEAD)) {
+		printk(KERN_INFO "tcp done \n");
 		sk->sk_state_change(sk);
+	}
 	else
 		inet_csk_destroy_sock(sk);
 }

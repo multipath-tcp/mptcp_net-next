@@ -1551,15 +1551,54 @@ out_reset_timer:
 void mptcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 				__u32 *window_clamp, int wscale_ok,
 				__u8 *rcv_wscale, __u32 init_rcv_wnd,
-				 const struct sock *sk)
+				struct sock *sk)
 {
 	struct mptcp_cb *mpcb = tcp_sk(sk)->mpcb;
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_sock *meta_tp = mptcp_meta_tp(tp);
+	struct inet_sock *inet = inet_sk(sk);
+	int mpcb_window_clamp = mpcb->orig_window_clamp;
 
-	*window_clamp = mpcb->orig_window_clamp;
-	__space = tcp_win_from_space(mpcb->orig_sk_rcvbuf);
+	if (mpcb->orig_window_clamp == -1 && sysctl_mptcp_enabled && mptcp_doit(sk)) {
+		tcp_select_initial_window(__space, mss, rcv_wnd, window_clamp,
+				wscale_ok, rcv_wscale, init_rcv_wnd, sk);
 
-	tcp_select_initial_window(__space, mss, rcv_wnd, window_clamp,
-				  wscale_ok, rcv_wscale, init_rcv_wnd, sk);
+		mpcb->orig_window_clamp = *window_clamp;
+		tp->request_mptcp = 1;
+		mptcp_connect_init(sk);
+
+		/* Store the keys */
+		mpcb->mptcp_loc_key = tp->mptcp_loc_key;
+		mpcb->mptcp_loc_token = tp->mptcp_loc_token;
+		/* TODO: Do we need this initialisation anymore? */
+		meta_tp->mptcp_loc_key = tp->mptcp_loc_key;
+		meta_tp->mptcp_loc_key = tp->mptcp_loc_token;
+	}
+	else {
+		*window_clamp = mpcb->orig_window_clamp;
+		__space = tcp_win_from_space(mpcb->orig_sk_rcvbuf);
+
+		tcp_select_initial_window(__space, mss, rcv_wnd, window_clamp,
+				wscale_ok, rcv_wscale, init_rcv_wnd, sk);
+
+		if (sysctl_mptcp_enabled && mptcp_doit(sk))
+			tp->mptcp->snt_isn = tp->write_seq;
+			tp->mptcp->init_rcv_wnd = tp->rcv_wnd;
+			if (sk->sk_family == AF_INET)
+                                tp->mptcp->mptcp_loc_nonce = mptcp_v4_get_nonce(
+                                                        inet->inet_saddr,
+                                                        inet->inet_daddr,
+                                                        inet->inet_sport,
+                                                        inet->inet_dport);
+#if IS_ENABLED(CONFIG_IPV6)
+                        else
+                                tp->mptcp->mptcp_loc_nonce = mptcp_v6_get_nonce(
+                                                inet6_sk(sk)->saddr.s6_addr32,
+                                                sk->sk_v6_daddr.s6_addr32,
+                                                inet->inet_sport,
+                                                inet->inet_dport);
+#endif
+	}
 }
 
 static inline u64 mptcp_calc_rate(const struct sock *meta_sk, unsigned int mss,
