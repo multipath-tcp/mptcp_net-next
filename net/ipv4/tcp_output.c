@@ -217,7 +217,7 @@ u32 tcp_default_init_rwnd(u32 mss)
 void tcp_select_initial_window(int __space, __u32 mss,
 			       __u32 *rcv_wnd, __u32 *window_clamp,
 			       int wscale_ok, __u8 *rcv_wscale,
-			       __u32 init_rcv_wnd, const struct sock *sk)
+			       __u32 init_rcv_wnd, struct sock *sk)
 {
 	unsigned int space = (__space < 0 ? 0 : __space);
 
@@ -2984,7 +2984,7 @@ static void tcp_connect_init(struct sock *sk)
 	inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;
 	inet_csk(sk)->icsk_retransmits = 0;
 	tcp_clear_retrans(tp);
-
+/*
 #ifdef CONFIG_MPTCP
 	if (sysctl_mptcp_enabled && mptcp_doit(sk)) {
 		if (is_master_tp(tp)) {
@@ -2996,7 +2996,7 @@ static void tcp_connect_init(struct sock *sk)
 			tp->mptcp->snt_isn	= tp->write_seq;
 			tp->mptcp->init_rcv_wnd	= tp->rcv_wnd;
 
-			/* Set nonce for new subflows */
+			//Set nonce for new subflows
 			if (sk->sk_family == AF_INET)
 				tp->mptcp->mptcp_loc_nonce = mptcp_v4_get_nonce(
 							inet->inet_saddr,
@@ -3014,6 +3014,7 @@ static void tcp_connect_init(struct sock *sk)
 		}
 	}
 #endif
+*/
 }
 
 static void tcp_connect_queue_skb(struct sock *sk, struct sk_buff *skb)

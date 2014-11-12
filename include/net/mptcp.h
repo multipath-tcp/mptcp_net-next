@@ -339,6 +339,9 @@ struct mptcp_cb {
 
 	/* Timer for retransmitting SYN/ACK+MP_JOIN */
 	struct timer_list synack_timer;
+
+	/* we received SYN+ACK+MP_CAPABLE */
+	u16 meta_ready:1;
 };
 
 #define MPTCP_SUB_CAPABLE			0
@@ -713,6 +716,7 @@ void mptcp_write_space(struct sock *sk);
 
 void mptcp_add_meta_ofo_queue(const struct sock *meta_sk, struct sk_buff *skb,
 			      struct sock *sk);
+int mptcp_create_master_sk_early(struct sock *meta_sk, struct sock *master_sk);
 void mptcp_ofo_queue(struct sock *meta_sk);
 void mptcp_purge_ofo_queue(struct tcp_sock *meta_tp);
 void mptcp_cleanup_rbuf(struct sock *meta_sk, int copied);
@@ -756,7 +760,7 @@ u32 __mptcp_select_window(struct sock *sk);
 void mptcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 					__u32 *window_clamp, int wscale_ok,
 					__u8 *rcv_wscale, __u32 init_rcv_wnd,
-					const struct sock *sk);
+					struct sock *sk);
 unsigned int mptcp_current_mss(struct sock *meta_sk);
 int mptcp_select_size(const struct sock *meta_sk, bool sg);
 void mptcp_key_sha1(u64 key, u32 *token, u64 *idsn);
