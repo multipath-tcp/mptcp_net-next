@@ -1548,6 +1548,7 @@ static const struct net_protocol mptcp_protocol = {
 	.icmp_strict_tag_validation = 1,
 };
 
+
 static const struct net_protocol udp_protocol = {
 	.early_demux =	udp_v4_early_demux,
 	.handler =	udp_rcv,
@@ -1763,8 +1764,6 @@ static int __init inet_init(void)
 		pr_crit("%s: Cannot add UDP protocol\n", __func__);
 	if (inet_add_protocol(&tcp_protocol, IPPROTO_TCP) < 0)
 		pr_crit("%s: Cannot add TCP protocol\n", __func__);
-	if (inet_add_protocol(&mptcp_protocol, IPPROTO_MPTCP) < 0)
-		pr_crit("%s: Cannot add MPTCP protocol\n", __func__);
 #ifdef CONFIG_IP_MULTICAST
 	if (inet_add_protocol(&igmp_protocol, IPPROTO_IGMP) < 0)
 		pr_crit("%s: Cannot add IGMP protocol\n", __func__);

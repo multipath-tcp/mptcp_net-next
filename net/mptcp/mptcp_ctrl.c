@@ -450,6 +450,7 @@ void mptcp_connect_init(struct sock *sk)
 int mptcp_v4_init_sock(struct sock *meta_sk) {
 	struct inet_connection_sock *icsk = inet_csk(meta_sk);
 	struct socket *master_sock;
+
 	int err = 0;
 
 	err = tcp_v4_init_sock(meta_sk);
@@ -699,13 +700,9 @@ static void mptcp_set_state(struct sock *sk)
 		tcp_set_state(meta_sk, TCP_ESTABLISHED);
 
 		if (!sock_flag(meta_sk, SOCK_DEAD)) {
-			printk(KERN_INFO "change state \n");
-			meta_sk->sk_state_change(sk);
-			/*
 			printk(KERN_INFO "wake up meta \n");
 			meta_sk->sk_state_change(meta_sk);
 			sk_wake_async(meta_sk, SOCK_WAKE_IO, POLL_OUT);
-			*/
 		}
 
 	}

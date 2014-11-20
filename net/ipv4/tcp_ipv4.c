@@ -143,13 +143,11 @@ int mptcp_v4_connect(struct sock *meta_sk, struct sockaddr *uaddr, int addr_len)
 	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
 	struct mptcp_cb *mpcb = meta_tp->mpcb;
 	struct sock *master_sk = mpcb->master_sk;
-	struct socket *master_sock = master_sk->sk_socket;
-	struct socket *meta_sock = meta_sk->sk_socket;
 	int err;
 
 	printk(KERN_INFO "mptcp_v4_connect start \n");
 	meta_sk->sk_state = TCP_SYN_SENT;
-	err = inet_stream_connect(master_sock, uaddr, addr_len, meta_sock->file->f_flags);
+	err = master_sk->sk_prot->connect(master_sk, uaddr, addr_len);
 	if (err) {
 		printk(KERN_INFO "error connecting on master \n");
 		return err;

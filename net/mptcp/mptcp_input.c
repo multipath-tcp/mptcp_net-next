@@ -2291,6 +2291,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		tp->fastopen_req = NULL;
 
 		sk_set_socket(sk, mptcp_meta_sk(sk)->sk_socket);
+		sk->sk_wq = mptcp_meta_sk(sk)->sk_wq;
 	} else {
 		/* TODO */
 		tp->request_mptcp = 0;
