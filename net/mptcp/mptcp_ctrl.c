@@ -700,7 +700,7 @@ static void mptcp_set_state(struct sock *sk)
 		tcp_set_state(meta_sk, TCP_ESTABLISHED);
 
 		if (!sock_flag(meta_sk, SOCK_DEAD)) {
-			printk(KERN_INFO "wake up meta \n");
+			printk(KERN_INFO "wake up meta\n");
 			meta_sk->sk_state_change(meta_sk);
 			sk_wake_async(meta_sk, SOCK_WAKE_IO, POLL_OUT);
 		}
@@ -1252,9 +1252,9 @@ static int mptcp_alloc_mpcb_early(struct sock *meta_sk, struct sock *master_sk)
 	}
 #endif
 
-        sock_lock_init_class_and_name(master_sk, "slock-AF_INET-MPTCP",
-                                      &meta_slock_key, "sk_lock-AF_INET-MPTCP",
-                                      &meta_key);
+	sock_lock_init_class_and_name(master_sk, "slock-AF_INET-MPTCP",
+				      &meta_slock_key, "sk_lock-AF_INET-MPTCP",
+				      &meta_key);
 	meta_tp->mptcp = NULL;
 
 	meta_tp->retrans_stamp = 0; /* Set in tcp_connect() */

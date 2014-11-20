@@ -5515,14 +5515,12 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 		tcp_ack(sk, skb, FLAG_SLOWPATH);
 
-		printk(KERN_INFO "before mptcp_rcv_synsent_state_process \n");
+		printk(KERN_INFO "before mptcp_rcv_synsent_state_process\n");
 		if (mptcp(tp)) {
-                        int ret;
-                        ret = mptcp_rcv_synsent_state_process(sk, &sk,
-                                                              skb, &tp->mptcp->rx_opt);
-                        if (ret == 1)
-                                goto reset_and_undo;
-                }
+			if (mptcp_rcv_synsent_state_process(sk, &sk, skb,
+							    &tp->mptcp->rx_opt) == 1)
+			goto reset_and_undo;
+		}
 
 		/* Ok.. it's good. Set up sequence numbers and
 		 * move to established.
@@ -5569,7 +5567,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		smp_mb();
 
-		printk(KERN_INFO "before tcp_finish_connect \n");
+		printk(KERN_INFO "before tcp_finish_connect\n");
 		tcp_finish_connect(sk, skb);
 
 		if ((tp->syn_fastopen || tp->syn_data) &&

@@ -145,11 +145,11 @@ int mptcp_v4_connect(struct sock *meta_sk, struct sockaddr *uaddr, int addr_len)
 	struct sock *master_sk = mpcb->master_sk;
 	int err;
 
-	printk(KERN_INFO "mptcp_v4_connect start \n");
+	printk(KERN_INFO "mptcp_v4_connect start\n");
 	meta_sk->sk_state = TCP_SYN_SENT;
 	err = master_sk->sk_prot->connect(master_sk, uaddr, addr_len);
 	if (err) {
-		printk(KERN_INFO "error connecting on master \n");
+		printk(KERN_INFO "error connecting on master\n");
 		return err;
 	}
 
