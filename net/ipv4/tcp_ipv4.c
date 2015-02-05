@@ -1781,30 +1781,31 @@ process:
 	sk_mark_napi_id(sk, skb);
 	skb->dev = NULL;
 
-	if (mptcp(tcp_sk(sk)) && tcp_sk(sk)->mpcb->meta_ready == 1) {
-		printk(KERN_INFO "meta lock /n");
-		meta_sk = mptcp_meta_sk(sk);
-
-		bh_lock_sock_nested(meta_sk);
-		if (sock_owned_by_user(meta_sk))
-			skb->sk = sk;
-	} else {
-		meta_sk = sk;
-		bh_lock_sock_nested(sk);
-	}
+	bh_lock_sock_nested(sk);
 
 	ret = 0;
-	if (!sock_owned_by_user(meta_sk)) {
-		if (!tcp_prequeue(meta_sk, skb))
+
+	if (!sock_owned_by_user(sk)) {
+#ifdef CONFIG_NET_DMA
+		struct tcp_sock *tp = tcp_sk(meta_sk);
+		if (!tp->ucopy.dma_chan && tp->ucopy.pinned_list)
+			tp->ucopy.dma_chan = net_dma_find_channel();
+		if (tp->ucopy.dma_chan)
 			ret = tcp_v4_do_rcv(sk, skb);
-	} else if (unlikely(sk_add_backlog(meta_sk, skb,
-					   meta_sk->sk_rcvbuf + meta_sk->sk_sndbuf))) {
-		bh_unlock_sock(meta_sk);
+		else
+#endif
+		{
+			if (!tcp_prequeue(sk, skb))
+				ret = tcp_v4_do_rcv(sk, skb);
+		}
+	} else if (unlikely(sk_add_backlog(sk, skb,
+					   sk->sk_rcvbuf + sk->sk_sndbuf))) {
+		bh_unlock_sock(sk);
 		NET_INC_STATS_BH(net, LINUX_MIB_TCPBACKLOGDROP);
 		goto discard_and_relse;
 	}
-	printk(KERN_INFO "unlock meta \n");
-	bh_unlock_sock(meta_sk);
+	printk(KERN_INFO "unlock subflow \n");
+	bh_unlock_sock(sk);
 
 	sock_put(sk);
 
@@ -2603,7 +2604,7 @@ struct proto mptcp_prot = {
 	.shutdown		= tcp_shutdown,
 	.setsockopt		= tcp_setsockopt,
 	.getsockopt		= tcp_getsockopt,
-	.recvmsg		= tcp_recvmsg,
+	.recvmsg		= mptcp_recvmsg,
 	.sendmsg		= tcp_sendmsg,
 	.sendpage		= tcp_sendpage,
 	.backlog_rcv		= tcp_v4_do_rcv,
