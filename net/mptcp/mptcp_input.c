@@ -1077,7 +1077,6 @@ restart:
 			else {
 				set_bit(tcp_sk(sk)->mptcp->path_index - 1,
 					&mpcb->subflow_ready_bits);
-				release_sock(sk);
 				wake_up_interruptible(&mpcb->app_wq);
 				return;
 			}
@@ -1093,7 +1092,6 @@ exit:
 		tcp_send_ack(sk);
 		tcp_sk(sk)->ops->time_wait(sk, TCP_TIME_WAIT, 0);
 	}
-	release_sock(sk);
 }
 
 int mptcp_check_req(struct sk_buff *skb, struct net *net)
