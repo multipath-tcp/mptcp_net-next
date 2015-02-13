@@ -1658,19 +1658,18 @@ int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	struct sock *sub_sk, *meta_sk = sk;
 	struct tcp_sock *sub_tp;
 	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
-	unsigned long subflow_ready_bits = mpcb->subflow_ready_bits;
 	read_descriptor_t rd_desc;
 	int sub_copied, queued = 0, copied = 0;
 	u8 i;
 
 	/* wait for wake-up from sk_data_ready callback */
-	wait_event_interruptible(mpcb->app_wq, subflow_ready_bits > 0);
+	wait_event_interruptible(mpcb->app_wq, mpcb->subflow_ready_bits != 0);
 
 	/* look up for sockets with data in the receive queue */
-	for_each_set_bit(i, &subflow_ready_bits, 32) {
+	for_each_set_bit(i, &(mpcb->subflow_ready_bits), 32) {
 		mptcp_for_each_sk(mpcb, sub_sk) {
 			sub_tp = tcp_sk(sub_sk);
-			if (sub_tp->mptcp->path_index != i)
+			if (sub_tp->mptcp->path_index - 1 != i)
 				continue;
 
 			lock_sock(meta_sk);
@@ -1688,8 +1687,7 @@ int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				tcp_sk(sub_sk)->ops->time_wait(sub_sk, TCP_TIME_WAIT, 0);
 			}
 
-			clear_bit(sub_tp->mptcp->path_index-1,
-				  &mpcb->subflow_ready_bits);
+			clear_bit(i, &mpcb->subflow_ready_bits);
 
 			release_sock(sub_sk);
 			release_sock(meta_sk);

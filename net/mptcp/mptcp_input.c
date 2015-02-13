@@ -984,7 +984,8 @@ int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 
 		if (!eaten) {
 			skb_cloned = skb_clone(skb, GFP_ATOMIC);
-			eaten = tcp_queue_rcv(meta_sk, skb, 0, &fragstolen);
+			eaten = tcp_queue_rcv(meta_sk, skb_cloned, 0,
+					      &fragstolen);
 		}
 
 		meta_tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
