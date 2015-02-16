@@ -910,33 +910,35 @@ int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 	struct sock *meta_sk = mptcp_meta_sk(sk);
 	struct mptcp_cb *mpcb = tp->mpcb;
 	u64 rcv_nxt64 = mptcp_get_rcv_nxt_64(meta_tp);
-
-	struct sk_buff *tmp, *skb_cloned = NULL;
+	struct sk_buff *skb_cloned = NULL, *skb_next = NULL;
 
 	/* Have we not yet received the full mapping? */
 	if (!tp->mptcp->mapping_present)
 		return -1;
 
+	if (!skb_queue_is_last(&sk->sk_receive_queue, skb))
+		skb_next = skb_queue_next(&sk->sk_receive_queue, skb);
+
 	if (before64(rcv_nxt64, tp->mptcp->map_data_seq)) {
-		/* Seg's have to go to the meta-ofo-queue */
-		mptcp_prepare_skb(skb, sk);
+		rd_desc->error += len;
+
 		/* MUST be done here, because fragstolen may be true later.
-		 * Then, kfree_skb_partial will not account the memory.
+		 * Then, kfree_skb_paritial will not account the memory.
 		 */
 		skb_orphan(skb);
 
+		skb_cloned = skb_clone(skb, GFP_ATOMIC);
+		/* Seg's have to go to the meta-ofo-queue */
+		mptcp_prepare_skb(skb_cloned, sk);
+
 		/* In time-wait, do not receive data */
-		if (!mpcb->in_time_wait) {
-			skb_cloned = skb_clone(skb, GFP_ATOMIC);
+		if (!mpcb->in_time_wait)
 			mptcp_add_meta_ofo_queue(meta_sk, skb_cloned, sk);
-		}
 
-		rd_desc->count += len;
-
-		if (!skb_queue_is_last(&sk->sk_receive_queue, skb) &&
-		    !before(TCP_SKB_CB(tmp)->seq,
-			    tp->mptcp->map_subseq + tp->mptcp->map_data_len)) {
+		if (!skb_next || !before(TCP_SKB_CB(skb_next)->seq,
+		    tp->mptcp->map_subseq + tp->mptcp->map_data_len)) {
 			tcp_enter_quickack_mode(sk);
+			rd_desc->count = 0;
 			goto exit;
 		}
 		return len;
@@ -947,53 +949,53 @@ int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		bool fragstolen = false;
 		u32 old_rcv_nxt = meta_tp->rcv_nxt;
 
-		mptcp_prepare_skb(skb, sk);
 		/* MUST be done here, because fragstolen may be true.
 		 * Then, kfree_skb_partial will not account the memory.
 		*/
 		skb_orphan(skb);
 
+		skb_cloned = skb_clone(skb, GFP_ATOMIC);
+		mptcp_prepare_skb(skb_cloned, sk);
+
 		/* This segment has already been received */
-		if (!after(TCP_SKB_CB(skb)->end_seq, meta_tp->rcv_nxt)) {
-			rd_desc->count += len;
+		if (!after(TCP_SKB_CB(skb_cloned)->end_seq, meta_tp->rcv_nxt)) {
+			rd_desc->error += len;
 			goto next;
 		}
 
 #ifdef CONFIG_NET_DMA
-		if (TCP_SKB_CB(skb)->seq == meta_tp->rcv_nxt  &&
+		if (TCP_SKB_CB(skb_cloned)->seq == meta_tp->rcv_nxt  &&
 		    meta_tp->ucopy.task == current &&
 		    meta_tp->copied_seq == meta_tp->rcv_nxt &&
-		    skb->len <= meta_tp->ucopy.len &&
+		    skb_cloned->len <= meta_tp->ucopy.len &&
 		    sock_owned_by_user(meta_sk) &&
-		    tcp_dma_try_early_copy(meta_sk, skb, 0)) {
+		    tcp_dma_try_early_copy(meta_sk, skb_cloned, 0)) {
 			copied_early = true;
 			eaten = 1;
 		}
 #endif
 
 		/* Is direct copy possible ? */
-		if (TCP_SKB_CB(skb)->seq == meta_tp->rcv_nxt &&
+		if (TCP_SKB_CB(skb_cloned)->seq == meta_tp->rcv_nxt &&
 		    meta_tp->ucopy.task == current &&
 		    meta_tp->copied_seq == meta_tp->rcv_nxt &&
 		    meta_tp->ucopy.len && sock_owned_by_user(meta_sk) &&
 		    !copied_early)
-			eaten = mptcp_direct_copy(skb, meta_sk);
+			eaten = mptcp_direct_copy(skb_cloned, meta_sk);
 
 		if (mpcb->in_time_wait) /* In time-wait, do not receive data */
 			eaten = 1;
 
-		if (!eaten) {
-			skb_cloned = skb_clone(skb, GFP_ATOMIC);
+		if (!eaten)
 			eaten = tcp_queue_rcv(meta_sk, skb_cloned, 0,
 					      &fragstolen);
-		}
 
-		meta_tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+		meta_tp->rcv_nxt = TCP_SKB_CB(skb_cloned)->end_seq;
 		mptcp_check_rcvseq_wrap(meta_tp, old_rcv_nxt);
 
 #ifdef CONFIG_NET_DMA
 		if (copied_early)
-			meta_tp->cleanup_rbuf(meta_sk, skb->len);
+			meta_tp->cleanup_rbuf(meta_sk, skb_cloned->len);
 #endif
 
 			if ((TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN) &&
@@ -1007,16 +1009,18 @@ int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 #ifdef CONFIG_NET_DMA
 		if (copied_early)
 			__skb_queue_tail(&meta_sk->sk_async_wait_queue,
-					 skb);
+					 skb_cloned);
 		else
 #endif
 		if (eaten)
-			kfree_skb_partial(skb, fragstolen);
+			kfree_skb_partial(skb_cloned, fragstolen);
+
 next:
-		if (skb_queue_is_last(&sk->sk_receive_queue, skb) ||
-		    !before(TCP_SKB_CB(tmp)->seq,
-			    tp->mptcp->map_subseq + tp->mptcp->map_data_len))
+		if (!skb_next || !before(TCP_SKB_CB(skb_next)->seq,
+		    tp->mptcp->map_subseq + tp->mptcp->map_data_len)) {
+			rd_desc->count = 0;
 			goto exit;
+		}
 		return len;
 	}
 

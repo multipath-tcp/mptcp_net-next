@@ -1556,7 +1556,9 @@ static struct sk_buff *tcp_recv_skb(struct sock *sk, u32 seq, u32 *off)
 		offset = seq - TCP_SKB_CB(skb)->seq;
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)
 			offset--;
-		if (offset < skb->len || (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)) {
+
+		if (offset < skb->len || tcp_hdr(skb)->fin ||
+		    mptcp_is_data_fin(skb)) {
 			*off = offset;
 			return skb;
 		}
@@ -1592,7 +1594,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
 	while ((skb = tcp_recv_skb(sk, seq, &offset)) != NULL) {
-		if (offset < skb->len) {
+		if (offset < skb->len || mptcp_is_data_fin(skb)) {
 			int used;
 			size_t len;
 
@@ -1662,8 +1664,14 @@ int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	int sub_copied, queued = 0, copied = 0;
 	u8 i;
 
+restart:
 	/* wait for wake-up from sk_data_ready callback */
-	wait_event_interruptible(mpcb->app_wq, mpcb->subflow_ready_bits != 0);
+	wait_event_interruptible(mpcb->app_wq, mpcb->subflow_ready_bits != 0 ||
+				 meta_sk->sk_shutdown & RCV_SHUTDOWN ||
+				 sock_flag(meta_sk, SOCK_DONE) ||
+				 !skb_queue_empty(&meta_sk->sk_receive_queue));
+
+	queued = 0;
 
 	/* look up for sockets with data in the receive queue */
 	for_each_set_bit(i, &(mpcb->subflow_ready_bits), 32) {
@@ -1676,11 +1684,11 @@ int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			lock_sock(sub_sk);
 
 			rd_desc.arg.data = sub_sk;
-			rd_desc.count = 0;
-			queued = 0;
+			rd_desc.error = 0;
+			rd_desc.count = 1;
 			sub_copied = tcp_read_sock(sub_sk, &rd_desc,
 						   subflow_to_meta_data_rcv);
-			queued += (sub_copied - rd_desc.count);
+			queued += (sub_copied - rd_desc.error);
 
 			if (tcp_sk(sub_sk)->close_it) {
 				tcp_send_ack(sub_sk);
@@ -1694,8 +1702,13 @@ int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		}
 	}
 
-	 /* pass data to user-buffer */
-	if (queued > 0 && !sock_flag(meta_sk, SOCK_DEAD))
+	if (skb_queue_empty(&meta_sk->sk_receive_queue) &&
+	    !queued && !(meta_sk->sk_shutdown & RCV_SHUTDOWN)) {
+		goto restart;
+	}
+
+	/* pass data to user-buffer */
+	if (!sock_flag(meta_sk, SOCK_DEAD))
 		copied = tcp_recvmsg(iocb, meta_sk, msg, len, 1,
 				     flags, addr_len);
 	return copied;
