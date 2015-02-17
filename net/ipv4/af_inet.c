@@ -1019,6 +1019,17 @@ static struct inet_protosw inetsw_array[] =
 			      INET_PROTOSW_ICSK,
 	},
 
+#ifdef CONFIG_MPTCP
+	{
+		.type =       SOCK_STREAM,
+		.protocol =   IPPROTO_TCP | TCPEXT_MPTCP,
+		.prot =       &mptcp_prot,
+		.ops =        &inet_stream_ops,
+		.flags =      INET_PROTOSW_PERMANENT |
+			      INET_PROTOSW_ICSK,
+	},
+#endif
+
 	{
 		.type =       SOCK_DGRAM,
 		.protocol =   IPPROTO_UDP,
@@ -1702,10 +1713,15 @@ static int __init inet_init(void)
 	rc = proto_register(&tcp_prot, 1);
 	if (rc)
 		goto out;
+#ifdef CONFIG_MPTCP
+	rc = proto_register(&mptcp_prot, 1);
+	if (rc)
+		goto out_unregister_tcp_proto;
+#endif
 
 	rc = proto_register(&udp_prot, 1);
 	if (rc)
-		goto out_unregister_tcp_proto;
+		goto out_unregister_mptcp_proto;
 
 	rc = proto_register(&raw_prot, 1);
 	if (rc)
@@ -1812,7 +1828,11 @@ out_unregister_raw_proto:
 	proto_unregister(&raw_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udp_prot);
+out_unregister_mptcp_proto:
+#ifdef CONFIG_MPTCP
+	proto_unregister(&mptcp_prot);
 out_unregister_tcp_proto:
+#endif
 	proto_unregister(&tcp_prot);
 	goto out;
 }

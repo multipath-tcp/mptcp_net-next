@@ -44,6 +44,7 @@ extern struct tcp_request_sock_ops mptcp_join_request_sock_ipv4_ops;
 
 #ifdef CONFIG_MPTCP
 
+int mptcp_v4_init_sock(struct sock *sk);
 int mptcp_v4_do_rcv(struct sock *meta_sk, struct sk_buff *skb);
 struct sock *mptcp_v4_search_req(const __be16 rport, const __be32 raddr,
 				 const __be32 laddr, const struct net *net);

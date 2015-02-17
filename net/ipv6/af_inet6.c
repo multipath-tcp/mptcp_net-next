@@ -854,6 +854,12 @@ static int __init inet6_init(void)
 	if (err)
 		goto out_unregister_ping_proto;
 
+#ifdef CONFIG_MPTCP
+	err = proto_register(&mptcpv6_prot, 1);
+	if (err)
+		goto out_unregister_mptcp_proto;
+#endif
+
 	/* We MUST register RAW sockets before we create the ICMP6,
 	 * IGMP6, or NDISC control sockets.
 	 */
@@ -1010,6 +1016,10 @@ register_pernet_fail:
 	rtnl_unregister_all(PF_INET6);
 out_sock_register_fail:
 	rawv6_exit();
+#ifdef CONFIG_MPTCP
+out_unregister_mptcp_proto:
+	proto_unregister(&mptcpv6_prot);
+#endif
 out_unregister_ping_proto:
 	proto_unregister(&pingv6_prot);
 out_unregister_raw_proto:

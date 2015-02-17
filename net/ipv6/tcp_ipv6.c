@@ -2029,6 +2029,56 @@ struct proto tcpv6_prot = {
 	.clear_sk		= tcp_v6_clear_sk,
 };
 
+#ifdef CONFIG_MPTCP
+struct proto mptcpv6_prot = {
+	.name                   = "MPTCPv6",
+	.owner                  = THIS_MODULE,
+	.close                  = tcp_close,
+	.connect                = tcp_v6_connect,
+	.disconnect             = tcp_disconnect,
+	.accept                 = inet_csk_accept,
+	.ioctl                  = tcp_ioctl,
+	.init                   = mptcp_v6_init_sock,
+	.destroy                = tcp_v6_destroy_sock,
+	.shutdown               = tcp_shutdown,
+	.setsockopt             = tcp_setsockopt,
+	.getsockopt             = tcp_getsockopt,
+	.recvmsg                = tcp_recvmsg,
+	.sendmsg                = tcp_sendmsg,
+	.sendpage               = tcp_sendpage,
+	.backlog_rcv            = tcp_v6_do_rcv,
+	.release_cb             = tcp_release_cb,
+	.mtu_reduced            = tcp_v6_mtu_reduced,
+	.hash                   = tcp_v6_hash,
+	.unhash                 = inet_unhash,
+	.get_port               = inet_csk_get_port,
+	.enter_memory_pressure  = tcp_enter_memory_pressure,
+	.stream_memory_free     = tcp_stream_memory_free,
+	.sockets_allocated      = &tcp_sockets_allocated,
+	.memory_allocated       = &tcp_memory_allocated,
+	.memory_pressure        = &tcp_memory_pressure,
+	.orphan_count           = &tcp_orphan_count,
+	.sysctl_mem             = sysctl_tcp_mem,
+	.sysctl_wmem            = sysctl_tcp_wmem,
+	.sysctl_rmem            = sysctl_tcp_rmem,
+	.max_header             = MAX_TCP_HEADER,
+	.obj_size               = sizeof(struct tcp6_sock),
+	.slab_flags             = SLAB_DESTROY_BY_RCU,
+	.twsk_prot              = &tcp6_timewait_sock_ops,
+	.rsk_prot               = &tcp6_request_sock_ops,
+	.h.hashinfo             = &tcp_hashinfo,
+	.no_autobind            = true,
+#ifdef CONFIG_COMPAT
+	.compat_setsockopt      = compat_tcp_setsockopt,
+	.compat_getsockopt      = compat_tcp_getsockopt,
+#endif
+#ifdef CONFIG_MEMCG_KMEM
+	.proto_cgroup           = tcp_proto_cgroup,
+#endif
+	.clear_sk               = tcp_v6_clear_sk,
+};
+#endif
+
 static const struct inet6_protocol tcpv6_protocol = {
 	.early_demux	=	tcp_v6_early_demux,
 	.handler	=	tcp_v6_rcv,
@@ -2044,6 +2094,17 @@ static struct inet_protosw tcpv6_protosw = {
 	.flags		=	INET_PROTOSW_PERMANENT |
 				INET_PROTOSW_ICSK,
 };
+
+#ifdef CONFIG_MPTCP
+static struct inet_protosw mptcpv6_protosw = {
+	.type           =       SOCK_STREAM,
+	.protocol       =       IPPROTO_TCP | TCPEXT_MPTCP,
+	.prot           =       &mptcpv6_prot,
+	.ops            =       &inet6_stream_ops,
+	.flags          =       INET_PROTOSW_PERMANENT |
+				INET_PROTOSW_ICSK,
+};
+#endif
 
 static int __net_init tcpv6_net_init(struct net *net)
 {
@@ -2080,13 +2141,23 @@ int __init tcpv6_init(void)
 	if (ret)
 		goto out_tcpv6_protocol;
 
-	ret = register_pernet_subsys(&tcpv6_net_ops);
+#ifdef CONFIG_MPTCP
+	ret = inet6_register_protosw(&mptcpv6_protosw);
 	if (ret)
 		goto out_tcpv6_protosw;
+#endif
+
+	ret = register_pernet_subsys(&tcpv6_net_ops);
+	if (ret)
+		goto out_mptcpv6_protosw;
 out:
 	return ret;
 
+out_mptcpv6_protosw:
+#ifdef CONFIG_MPTCP
+	inet6_unriegister_protosw(&mptcpv6_protosw);
 out_tcpv6_protosw:
+#endif
 	inet6_unregister_protosw(&tcpv6_protosw);
 out_tcpv6_protocol:
 	inet6_del_protocol(&tcpv6_protocol, IPPROTO_TCP);

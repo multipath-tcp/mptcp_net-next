@@ -433,6 +433,21 @@ error:
 }
 EXPORT_SYMBOL(mptcp_init6_subsockets);
 
+int mptcp_v6_init_sock(struct sock *sk)
+{
+	/* Need to change the protocol to TCP otherwise the IP
+	* stack will generate an IP packet with an unknown
+	* protocol number.
+	*/
+	sk->sk_protocol = IPPROTO_TCP;
+
+	/* Set this socket to be MPTCP */
+	sock_set_flag(sk, SOCK_MPTCP);
+	tcp_v6_init_sock(sk);
+
+	return 0;
+}
+
 const struct inet_connection_sock_af_ops mptcp_v6_specific = {
 	.queue_xmit	   = inet6_csk_xmit,
 	.send_check	   = tcp_v6_send_check,

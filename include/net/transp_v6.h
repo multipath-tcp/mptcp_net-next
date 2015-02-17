@@ -8,6 +8,7 @@ extern struct proto rawv6_prot;
 extern struct proto udpv6_prot;
 extern struct proto udplitev6_prot;
 extern struct proto tcpv6_prot;
+extern struct proto mptcpv6_prot;
 extern struct proto pingv6_prot;
 
 struct flowi6;
