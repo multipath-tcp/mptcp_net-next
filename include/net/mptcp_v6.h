@@ -43,6 +43,7 @@ extern struct request_sock_ops mptcp6_request_sock_ops;
 extern struct tcp_request_sock_ops mptcp_request_sock_ipv6_ops;
 extern struct tcp_request_sock_ops mptcp_join_request_sock_ipv6_ops;
 
+int mptcp_v6_init_sock(struct sock *sk);
 int mptcp_v6_do_rcv(struct sock *meta_sk, struct sk_buff *skb);
 struct sock *mptcp_v6_search_req(const __be16 rport, const struct in6_addr *raddr,
 				 const struct in6_addr *laddr, const struct net *net);

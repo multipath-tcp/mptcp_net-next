@@ -357,6 +357,7 @@ static inline bool tcp_synq_no_recent_overflow(const struct sock *sk)
 }
 
 extern struct proto tcp_prot;
+extern struct proto mptcp_prot;
 
 #define TCP_INC_STATS(net, field)	SNMP_INC_STATS((net)->mib.tcp_statistics, field)
 #define TCP_INC_STATS_BH(net, field)	SNMP_INC_STATS_BH((net)->mib.tcp_statistics, field)
@@ -419,6 +420,7 @@ int tcp_v4_send_synack(struct sock *sk, struct dst_entry *dst,
 void tcp_v4_send_reset(struct sock *sk, struct sk_buff *skb);
 struct sock *tcp_v4_hnd_req(struct sock *sk, struct sk_buff *skb);
 void tcp_v4_reqsk_destructor(struct request_sock *req);
+int tcp_v4_init_sock(struct sock *sk);
 
 void tcp_v6_reqsk_send_ack(struct sock *sk, struct sk_buff *skb,
 			   struct request_sock *req);
@@ -437,6 +439,7 @@ struct sock *tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 			          struct request_sock *req,
 				  struct dst_entry *dst);
 void tcp_v6_reqsk_destructor(struct request_sock *req);
+int tcp_v6_init_sock(struct sock *sk);
 
 unsigned int tcp_xmit_size_goal(struct sock *sk, u32 mss_now,
 				       int large_allowed);

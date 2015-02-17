@@ -1889,7 +1889,7 @@ static const struct tcp_sock_af_ops tcp_sock_ipv4_specific = {
 /* NOTE: A lot of things set to zero explicitly by call to
  *       sk_alloc() so need not be done here.
  */
-static int tcp_v4_init_sock(struct sock *sk)
+int tcp_v4_init_sock(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -2545,6 +2545,58 @@ struct proto tcp_prot = {
 #endif
 };
 EXPORT_SYMBOL(tcp_prot);
+
+#ifdef CONFIG_MPTCP
+struct proto mptcp_prot = {
+	.name                   = "MPTCP",
+	.owner                  = THIS_MODULE,
+	.close                  = tcp_close,
+	.connect                = tcp_v4_connect,
+	.disconnect             = tcp_disconnect,
+	.accept                 = inet_csk_accept,
+	.ioctl                  = tcp_ioctl,
+	.init                   = mptcp_v4_init_sock,
+	.destroy                = tcp_v4_destroy_sock,
+	.shutdown               = tcp_shutdown,
+	.setsockopt             = tcp_setsockopt,
+	.getsockopt             = tcp_getsockopt,
+	.recvmsg                = tcp_recvmsg,
+	.sendmsg                = tcp_sendmsg,
+	.sendpage               = tcp_sendpage,
+	.backlog_rcv            = tcp_v4_do_rcv,
+	.release_cb             = tcp_release_cb,
+	.hash                   = inet_hash,
+	.unhash                 = inet_unhash,
+	.get_port               = inet_csk_get_port,
+	.enter_memory_pressure  = tcp_enter_memory_pressure,
+	.stream_memory_free     = tcp_stream_memory_free,
+	.sockets_allocated      = &tcp_sockets_allocated,
+	.orphan_count           = &tcp_orphan_count,
+	.memory_allocated       = &tcp_memory_allocated,
+	.memory_pressure        = &tcp_memory_pressure,
+	.sysctl_mem             = sysctl_tcp_mem,
+	.sysctl_wmem            = sysctl_tcp_wmem,
+	.sysctl_rmem            = sysctl_tcp_rmem,
+	.max_header             = MAX_TCP_HEADER,
+	.obj_size               = sizeof(struct tcp_sock),
+	.slab_flags             = SLAB_DESTROY_BY_RCU,
+	.twsk_prot              = &tcp_timewait_sock_ops,
+	.rsk_prot               = &tcp_request_sock_ops,
+	.h.hashinfo             = &tcp_hashinfo,
+	.no_autobind            = true,
+#ifdef CONFIG_COMPAT
+	.compat_setsockopt      = compat_tcp_setsockopt,
+	.compat_getsockopt      = compat_tcp_getsockopt,
+#endif
+#ifdef CONFIG_MEMCG_KMEM
+	.init_cgroup            = tcp_init_cgroup,
+	.destroy_cgroup         = tcp_destroy_cgroup,
+	.proto_cgroup           = tcp_proto_cgroup,
+#endif
+	.clear_sk               = tcp_v4_clear_sk,
+};
+EXPORT_SYMBOL(mptcp_prot);
+#endif
 
 static int __net_init tcp_sk_init(struct net *net)
 {
