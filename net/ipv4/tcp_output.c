@@ -2012,7 +2012,6 @@ bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
-
 		tso_segs = tcp_init_tso_segs(sk, skb, mss_now);
 		BUG_ON(!tso_segs);
 

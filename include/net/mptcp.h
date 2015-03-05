@@ -261,6 +261,11 @@ struct mptcp_cb {
 	/* list of sockets that need a call to release_cb */
 	struct hlist_head callback_list;
 
+	/* the app will sleep on this wait queue */
+	wait_queue_head_t app_wq;
+	/* set bit if we have data at subflow level */
+	unsigned long subflow_ready_bits;
+
 	/* High-order bits of 64-bit sequence numbers */
 	u32 snd_high_order[2];
 	u32 rcv_high_order[2];
@@ -845,6 +850,12 @@ static inline void mptcp_init_tcp_sock(struct sock *sk)
 	if (!mptcp_init_failed && sysctl_mptcp_enabled == MPTCP_SYSCTL)
 		mptcp_enable_sock(sk);
 }
+
+int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
+				unsigned int offset, size_t len);
+int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+			size_t len, int nonblock, int flags, int *addr_len);
+
 
 static inline void mptcp_reset_synack_timer(struct sock *meta_sk,
 					    unsigned long len)

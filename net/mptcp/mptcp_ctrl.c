@@ -1104,6 +1104,8 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key, u32 window)
 
 	mutex_init(&mpcb->mpcb_mutex);
 
+	init_waitqueue_head(&mpcb->app_wq);
+
 	/* Init the accept_queue structure, we support a queue of 32 pending
 	 * connections, it does not need to be huge, since we only store  here
 	 * pending subflow creations.
@@ -1124,7 +1126,6 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key, u32 window)
 	meta_tp->mpc = 1;
 	meta_tp->ops = &mptcp_meta_specific;
 
-	meta_sk->sk_backlog_rcv = mptcp_backlog_rcv;
 	meta_sk->sk_destruct = mptcp_sock_destruct;
 
 	/* Meta-level retransmit timer */
