@@ -997,7 +997,8 @@ int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 			meta_tp->cleanup_rbuf(meta_sk, skb_cloned->len);
 #endif
 
-		if (tcp_hdr(skb_cloned)->fin && !mpcb->in_time_wait)
+		if ((TCP_SKB_CB(skb_cloned)->tcp_flags & TCPHDR_FIN) &&
+		    !mpcb->in_time_wait)
 			mptcp_fin(meta_sk);
 
 		/* Check if this fills a gap in the ofo queue */
