@@ -417,19 +417,37 @@ error:
 }
 EXPORT_SYMBOL(mptcp_init4_subsockets);
 
-int mptcp_v4_init_sock(struct sock *sk)
+int mptcp_v4_init_sock(struct sock *meta_sk)
 {
+	struct inet_connection_sock *icsk = inet_csk(meta_sk);
+	struct socket *master_sock;
+	int err = 0;
+
 	/* Need to change the protocol to TCP otherwise the IP
 	* stack will generate an IP packet with an unknown
 	* protocol number.
 	*/
-	sk->sk_protocol = IPPROTO_TCP;
-
+	meta_sk->sk_protocol = IPPROTO_TCP;
 	/* Set this socket to be MPTCP */
-	sock_set_flag(sk, SOCK_MPTCP);
-	tcp_v4_init_sock(sk);
+	sock_set_flag(meta_sk, SOCK_MPTCP);
 
-	return 0;
+	err = tcp_v4_init_sock(meta_sk);
+	if (err)
+		return err;
+
+	icsk->icsk_af_ops = &mptcp_v4_specific;
+
+	/* create the master socket */
+	err = sock_create_kern(AF_INET, SOCK_STREAM, IPPROTO_TCP, &master_sock);
+	if (err)
+		return err;
+
+	/* allocate the mpcb, meta-socket and master-socket */
+	err = mptcp_create_master_sk_early(meta_sk, master_sock->sk);
+	if (err)
+		sock_release(master_sock);
+
+	return err;
 }
 
 const struct inet_connection_sock_af_ops mptcp_v4_specific = {

@@ -2207,20 +2207,17 @@ static void mptcp_rcv_synsent_fastopen(struct sock *meta_sk)
 	meta_sk->sk_send_head = tcp_write_queue_head(meta_sk);
 }
 
-/* The skptr is needed, because if we become MPTCP-capable, we have to switch
- * from meta-socket to master-socket.
- *
+/*
  * @return: 1 - we want to reset this connection
- *	    2 - we want to discard the received syn/ack
  *	    0 - everything is fine - continue
  */
-int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
-				    const struct sk_buff *skb,
+int mptcp_rcv_synsent_state_process(struct sock *sk, const struct sk_buff *skb,
 				    const struct mptcp_options_received *mopt)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct mptcp_cb *mpcb = tp->mpcb;
 
-	if (mptcp(tp)) {
+	if (mpcb->mptcp_rem_key) {
 		u8 hash_mac_check[20];
 		struct mptcp_cb *mpcb = tp->mpcb;
 
@@ -2248,15 +2245,64 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				(u32 *)&tp->mptcp->sender_mac[0]);
 
 	} else if (mopt->saw_mpc) {
-		struct sock *meta_sk = sk;
+		struct sock *master_sk = sk;
+		struct tcp_sock *master_tp = tp;
+		struct tcp_sock *meta_tp = mptcp_meta_tp(master_tp);
+		struct sock *meta_sk = master_tp->meta_sk;
+		struct inet_connection_sock *meta_icsk = inet_csk(meta_sk);
+		struct inet_connection_sock *master_icsk = inet_csk(master_sk);
+		__u64 remote_key = mopt->mptcp_key;
+		u32 window = ntohs(tcp_hdr(skb)->window);
+		u64 idsn;
 
-		if (mptcp_create_master_sk(sk, mopt->mptcp_key,
-					   ntohs(tcp_hdr(skb)->window)))
-			return 2;
+		/* The meta get the advertised MSS from the master */
+		meta_tp->advmss = master_tp->advmss;
 
-		sk = tcp_sk(sk)->mpcb->master_sk;
-		*skptr = sk;
-		tp = tcp_sk(sk);
+		/* Source/desstination address will be used in
+		 * full_mesh_new_session
+		 */
+		inet_sk(meta_sk)->inet_saddr = inet_sk(master_sk)->inet_saddr;
+		inet_sk(meta_sk)->inet_daddr = inet_sk(master_sk)->inet_daddr;
+
+		/* Store the keys and generate the peer's token */
+		mpcb->mptcp_loc_key = master_tp->mptcp_loc_key;
+		mpcb->mptcp_loc_token = master_tp->mptcp_loc_token;
+
+		/* Generate Initial data-sequence-numbers */
+		mptcp_key_sha1(mpcb->mptcp_loc_key, NULL, &idsn);
+		idsn = ntohll(idsn) + 1;
+		mpcb->snd_high_order[0] = idsn >> 32;
+		mpcb->snd_high_order[1] = mpcb->snd_high_order[0] - 1;
+
+		meta_tp->write_seq = (u32)idsn;
+		meta_tp->snd_sml = meta_tp->write_seq;
+		meta_tp->snd_una = meta_tp->write_seq;
+		meta_tp->snd_nxt = meta_tp->write_seq;
+		meta_tp->pushed_seq = meta_tp->write_seq;
+		meta_tp->snd_up = meta_tp->write_seq;
+
+		mpcb->mptcp_rem_key = remote_key;
+		mptcp_key_sha1(mpcb->mptcp_rem_key, &mpcb->mptcp_rem_token, &idsn);
+		idsn = ntohll(idsn) + 1;
+		mpcb->rcv_high_order[0] = idsn >> 32;
+		mpcb->rcv_high_order[1] = mpcb->rcv_high_order[0] + 1;
+		meta_tp->copied_seq = (u32)idsn;
+		meta_tp->rcv_nxt = (u32)idsn;
+		meta_tp->rcv_wup = (u32)idsn;
+
+		meta_tp->snd_wl1 = meta_tp->rcv_nxt - 1;
+		meta_tp->snd_wnd = window;
+
+		/* Meta-level retransmit timer
+		 * Double of initial - rto
+		 */
+		meta_icsk->icsk_rto = master_icsk->icsk_rto * 2;
+
+		mpcb->orig_sk_rcvbuf = master_sk->sk_rcvbuf;
+		mpcb->orig_sk_sndbuf = master_sk->sk_sndbuf;
+		mpcb->orig_window_clamp = master_tp->window_clamp;
+
+		/* TODO: solve the fastopen functionality */
 
 		/* If fastopen was used data might be in the send queue. We
 		 * need to update their sequence number to MPTCP-level seqno.
@@ -2283,9 +2329,9 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		sk_set_socket(sk, mptcp_meta_sk(sk)->sk_socket);
 		sk->sk_wq = mptcp_meta_sk(sk)->sk_wq;
 
-		 /* hold in sk_clone_lock due to initialization to 2 */
-		sock_put(sk);
+		mpcb->meta_ready = 1;
 	} else {
+		/* TODO: solve the fallback MPTCP->TCP */
 		tp->request_mptcp = 0;
 
 		if (tp->inside_tk_table)
@@ -2366,6 +2412,9 @@ void mptcp_init_buffer_space(struct sock *sk)
 	int space;
 
 	tcp_init_buffer_space(sk);
+
+	if (!tp->mpcb->meta_ready)
+		return;
 
 	if (is_master_tp(tp)) {
 		meta_tp->rcvq_space.space = meta_tp->rcv_wnd;

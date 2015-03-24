@@ -344,6 +344,8 @@ struct mptcp_cb {
 
 	/* Timer for retransmitting SYN/ACK+MP_JOIN */
 	struct timer_list synack_timer;
+
+	u16 meta_ready;
 };
 
 #define MPTCP_SUB_CAPABLE			0
@@ -749,6 +751,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 void mptcp_close(struct sock *meta_sk, long timeout);
 int mptcp_doit(struct sock *sk);
 int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key, u32 window);
+int mptcp_create_master_sk_early(struct sock *meta_sk, struct sock *master_sk);
 int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req);
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
 			   struct request_sock *req,
@@ -761,7 +764,7 @@ u32 __mptcp_select_window(struct sock *sk);
 void mptcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 					__u32 *window_clamp, int wscale_ok,
 					__u8 *rcv_wscale, __u32 init_rcv_wnd,
-					const struct sock *sk);
+					struct sock *sk);
 unsigned int mptcp_current_mss(struct sock *meta_sk);
 int mptcp_select_size(const struct sock *meta_sk, bool sg);
 void mptcp_key_sha1(u64 key, u32 *token, u64 *idsn);
@@ -784,8 +787,7 @@ int mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 void __init mptcp_init(void);
 int mptcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len);
 void mptcp_destroy_sock(struct sock *sk);
-int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
-				    const struct sk_buff *skb,
+int mptcp_rcv_synsent_state_process(struct sock *sk, const struct sk_buff *skb,
 				    const struct mptcp_options_received *mopt);
 unsigned int mptcp_xmit_size_goal(const struct sock *meta_sk, u32 mss_now,
 				  int large_allowed);
@@ -1015,7 +1017,8 @@ static inline int is_meta_sk(const struct sock *sk)
 
 static inline int is_master_tp(const struct tcp_sock *tp)
 {
-	return !mptcp(tp) || (!tp->mptcp->slave_sk && !is_meta_tp(tp));
+	return !mptcp(tp) || !tp->mpcb->meta_ready ||
+	       (!tp->mptcp->slave_sk && !is_meta_tp(tp));
 }
 
 static inline void mptcp_hash_request_remove(struct request_sock *req)
@@ -1430,7 +1433,6 @@ static inline unsigned int mptcp_xmit_size_goal(const struct sock *meta_sk,
 }
 static inline void mptcp_destroy_sock(struct sock *sk) {}
 static inline int mptcp_rcv_synsent_state_process(struct sock *sk,
-						  struct sock **skptr,
 						  struct sk_buff *skb,
 						  const struct mptcp_options_received *mopt)
 {

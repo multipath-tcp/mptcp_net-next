@@ -139,6 +139,21 @@ int tcp_twsk_unique(struct sock *sk, struct sock *sktw, void *twp)
 }
 EXPORT_SYMBOL_GPL(tcp_twsk_unique);
 
+int mptcp_v4_connect(struct sock *meta_sk, struct sockaddr *uaddr,
+		     int addr_len) {
+	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
+	struct mptcp_cb *mpcb = meta_tp->mpcb;
+	struct sock *master_sk = mpcb->master_sk;
+	int err;
+
+	meta_sk->sk_state = TCP_SYN_SENT;
+	err = master_sk->sk_prot->connect(master_sk, uaddr, addr_len);
+	if (err)
+		return err;
+
+	return err;
+}
+
 /* This will initiate an outgoing connection. */
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
@@ -2543,7 +2558,7 @@ struct proto mptcp_prot = {
 	.name                   = "MPTCP",
 	.owner                  = THIS_MODULE,
 	.close                  = tcp_close,
-	.connect                = tcp_v4_connect,
+	.connect                = mptcp_v4_connect,
 	.disconnect             = tcp_disconnect,
 	.accept                 = inet_csk_accept,
 	.ioctl                  = tcp_ioctl,

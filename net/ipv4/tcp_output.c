@@ -3028,36 +3028,6 @@ static void tcp_connect_init(struct sock *sk)
 	inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;
 	inet_csk(sk)->icsk_retransmits = 0;
 	tcp_clear_retrans(tp);
-
-#ifdef CONFIG_MPTCP
-	if (sock_flag(sk, SOCK_MPTCP) && mptcp_doit(sk)) {
-		if (is_master_tp(tp)) {
-			tp->request_mptcp = 1;
-			mptcp_connect_init(sk);
-		} else if (tp->mptcp) {
-			struct inet_sock *inet	= inet_sk(sk);
-
-			tp->mptcp->snt_isn	= tp->write_seq;
-			tp->mptcp->init_rcv_wnd	= tp->rcv_wnd;
-
-			/* Set nonce for new subflows */
-			if (sk->sk_family == AF_INET)
-				tp->mptcp->mptcp_loc_nonce = mptcp_v4_get_nonce(
-							inet->inet_saddr,
-							inet->inet_daddr,
-							inet->inet_sport,
-							inet->inet_dport);
-#if IS_ENABLED(CONFIG_IPV6)
-			else
-				tp->mptcp->mptcp_loc_nonce = mptcp_v6_get_nonce(
-						inet6_sk(sk)->saddr.s6_addr32,
-						sk->sk_v6_daddr.s6_addr32,
-						inet->inet_sport,
-						inet->inet_dport);
-#endif
-		}
-	}
-#endif
 }
 
 static void tcp_connect_queue_skb(struct sock *sk, struct sk_buff *skb)

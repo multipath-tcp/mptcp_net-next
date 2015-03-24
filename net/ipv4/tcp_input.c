@@ -5518,17 +5518,10 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		if (tp->request_mptcp || mptcp(tp)) {
 			int ret;
-			ret = mptcp_rcv_synsent_state_process(sk, &sk,
-							      skb, &mopt);
-
-			/* May have changed if we support MPTCP */
-			tp = tcp_sk(sk);
-			icsk = inet_csk(sk);
-
+			ret = mptcp_rcv_synsent_state_process(sk, skb,
+						&tp->mptcp->rx_opt);
 			if (ret == 1)
 				goto reset_and_undo;
-			if (ret == 2)
-				goto discard;
 		}
 
 		if (mptcp(tp) && !is_master_tp(tp)) {
@@ -5768,16 +5761,12 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 
 	case TCP_SYN_SENT:
 		queued = tcp_rcv_synsent_state_process(sk, skb, th, len);
-		if (is_meta_sk(sk)) {
-			sk = tcp_sk(sk)->mpcb->master_sk;
-			tp = tcp_sk(sk);
-
+		if (mptcp(tcp_sk(sk)) && tcp_sk(sk)->mpcb->meta_ready)
 			/* Need to call it here, because it will announce new
 			 * addresses, which can only be done after the third ack
 			 * of the 3-way handshake.
 			 */
 			mptcp_update_metasocket(sk, tp->meta_sk);
-		}
 		if (queued >= 0)
 			return queued;
 
@@ -5785,8 +5774,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_urg(sk, skb, th);
 		__kfree_skb(skb);
 		tcp_data_snd_check(sk);
-		if (mptcp(tp) && is_master_tp(tp))
-			bh_unlock_sock(sk);
 		return 0;
 	}
 

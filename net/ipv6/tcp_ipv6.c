@@ -1753,7 +1753,7 @@ static const struct tcp_sock_af_ops tcp_sock_ipv6_mapped_specific = {
 /* NOTE: A lot of things set to zero explicitly by call to
  *       sk_alloc() so need not be done here.
  */
-static int tcp_v6_init_sock(struct sock *sk)
+int tcp_v6_init_sock(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -2048,7 +2048,6 @@ struct proto mptcpv6_prot = {
 	.sendpage               = tcp_sendpage,
 	.backlog_rcv            = tcp_v6_do_rcv,
 	.release_cb             = tcp_release_cb,
-	.mtu_reduced            = tcp_v6_mtu_reduced,
 	.hash                   = tcp_v6_hash,
 	.unhash                 = inet_unhash,
 	.get_port               = inet_csk_get_port,
@@ -2155,7 +2154,7 @@ out:
 
 out_mptcpv6_protosw:
 #ifdef CONFIG_MPTCP
-	inet6_unriegister_protosw(&mptcpv6_protosw);
+	inet6_unregister_protosw(&mptcpv6_protosw);
 out_tcpv6_protosw:
 #endif
 	inet6_unregister_protosw(&tcpv6_protosw);
