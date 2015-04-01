@@ -139,25 +139,6 @@ int tcp_twsk_unique(struct sock *sk, struct sock *sktw, void *twp)
 }
 EXPORT_SYMBOL_GPL(tcp_twsk_unique);
 
-int mptcp_v4_connect(struct sock *meta_sk, struct sockaddr *uaddr, int addr_len) {
-	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
-	struct mptcp_cb *mpcb = meta_tp->mpcb;
-	struct sock *master_sk = mpcb->master_sk;
-	int err;
-
-	printk(KERN_INFO "mptcp_v4_connect start\n");
-	meta_sk->sk_state = TCP_SYN_SENT;
-	err = master_sk->sk_prot->connect(master_sk, uaddr, addr_len);
-	if (err) {
-		printk(KERN_INFO "error connecting on master\n");
-		return err;
-	}
-
-	printk(KERN_INFO "mptcp_v4_connect finished %i \n", err);
-
-	return err;
-}
-
 /* This will initiate an outgoing connection. */
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
@@ -270,7 +251,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
-	printk(KERN_INFO "end tcp_v4_connect \n");
 	return 0;
 
 failure:
@@ -278,7 +258,6 @@ failure:
 	 * This unhashes the socket and releases the local port,
 	 * if necessary.
 	 */
-	printk(KERN_INFO "failure \n");
 	tcp_set_state(sk, TCP_CLOSE);
 	ip_rt_put(rt);
 	sk->sk_route_caps = 0;
@@ -1494,17 +1473,6 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct sock *rsk;
 
-#ifdef CONFIG_TCP_MD5SIG
-	/*
-	 * We really want to reject the packet as early as possible
-	 * if:
-	 *  o We're expecting an MD5'd packet and this is no MD5 tcp option
-	 *  o There is an MD5 option and we're not expecting one
-	 */
-	if (tcp_v4_inbound_md5_hash(sk, skb))
-		goto discard;
-#endif
-
 	if (is_meta_sk(sk))
 		return mptcp_v4_do_rcv(sk, skb);
 
@@ -1614,18 +1582,12 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	printk(KERN_INFO "tcp prequeue \n");
-
-	if (sysctl_tcp_low_latency || !tp->ucopy.task) {
-		printk(KERN_INFO "tcp prequeue false 1 \n");
+	if (sysctl_tcp_low_latency || !tp->ucopy.task)
 		return false;
-	}
 
 	if (skb->len <= tcp_hdrlen(skb) &&
-	    skb_queue_len(&tp->ucopy.prequeue) == 0) {
-		printk(KERN_INFO "tcp prequeue false 2\n");
+	    skb_queue_len(&tp->ucopy.prequeue) == 0)
 		return false;
-	}
 
 	/* Before escaping RCU protected region, we need to take care of skb
 	 * dst. Prequeue is only enabled for established sockets.
@@ -1660,7 +1622,6 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 						  (3 * tcp_rto_min(sk)) / 4,
 						  TCP_RTO_MAX);
 	}
-	printk(KERN_INFO "prequeue success \n");
 	return true;
 }
 EXPORT_SYMBOL(tcp_prequeue);
@@ -1692,9 +1653,6 @@ int tcp_v4_rcv(struct sk_buff *skb)
 		goto bad_packet;
 	if (!pskb_may_pull(skb, th->doff * 4))
 		goto discard_it;
-
-	if (th->syn && th->ack)
-		printk(KERN_INFO "SYN_ACK \n");
 
 	/* An explanation is required here, I think.
 	 * Packet length and doff are validated by header prediction,
@@ -1781,31 +1739,28 @@ process:
 	sk_mark_napi_id(sk, skb);
 	skb->dev = NULL;
 
-	bh_lock_sock_nested(sk);
+	if (mptcp(tcp_sk(sk))) {
+		meta_sk = mptcp_meta_sk(sk);
+
+		bh_lock_sock_nested(meta_sk);
+		if (sock_owned_by_user(meta_sk))
+			skb->sk = sk;
+	} else {
+		meta_sk = sk;
+		bh_lock_sock_nested(sk);
+	}
 
 	ret = 0;
-
-	if (!sock_owned_by_user(sk)) {
-#ifdef CONFIG_NET_DMA
-		struct tcp_sock *tp = tcp_sk(meta_sk);
-		if (!tp->ucopy.dma_chan && tp->ucopy.pinned_list)
-			tp->ucopy.dma_chan = net_dma_find_channel();
-		if (tp->ucopy.dma_chan)
+	if (!sock_owned_by_user(meta_sk)) {
+		if (!tcp_prequeue(meta_sk, skb))
 			ret = tcp_v4_do_rcv(sk, skb);
-		else
-#endif
-		{
-			if (!tcp_prequeue(sk, skb))
-				ret = tcp_v4_do_rcv(sk, skb);
-		}
-	} else if (unlikely(sk_add_backlog(sk, skb,
-					   sk->sk_rcvbuf + sk->sk_sndbuf))) {
-		bh_unlock_sock(sk);
+	} else if (unlikely(sk_add_backlog(meta_sk, skb,
+					   meta_sk->sk_rcvbuf + meta_sk->sk_sndbuf))) {
+		bh_unlock_sock(meta_sk);
 		NET_INC_STATS_BH(net, LINUX_MIB_TCPBACKLOGDROP);
 		goto discard_and_relse;
 	}
-	printk(KERN_INFO "unlock subflow \n");
-	bh_unlock_sock(sk);
+	bh_unlock_sock(meta_sk);
 
 	sock_put(sk);
 
@@ -1934,7 +1889,7 @@ static const struct tcp_sock_af_ops tcp_sock_ipv4_specific = {
 /* NOTE: A lot of things set to zero explicitly by call to
  *       sk_alloc() so need not be done here.
  */
-int tcp_v4_init_sock(struct sock *sk)
+static int tcp_v4_init_sock(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -2590,59 +2545,6 @@ struct proto tcp_prot = {
 #endif
 };
 EXPORT_SYMBOL(tcp_prot);
-
-struct proto mptcp_prot = {
-	.name			= "MPTCP",
-	.owner			= THIS_MODULE,
-	.close			= mptcp_close,
-	.connect		= mptcp_v4_connect,
-	.disconnect		= tcp_disconnect,
-	.accept			= inet_csk_accept,
-	.ioctl			= tcp_ioctl,
-	.init			= mptcp_v4_init_sock,
-	.destroy		= tcp_v4_destroy_sock,
-	.shutdown		= tcp_shutdown,
-	.setsockopt		= tcp_setsockopt,
-	.getsockopt		= tcp_getsockopt,
-	.recvmsg		= mptcp_recvmsg,
-	.sendmsg		= tcp_sendmsg,
-	.sendpage		= tcp_sendpage,
-	.backlog_rcv		= tcp_v4_do_rcv,
-	.release_cb		= tcp_release_cb,
-	.mtu_reduced		= tcp_v4_mtu_reduced,
-	.hash			= inet_hash,
-	.unhash			= inet_unhash,
-	.get_port		= inet_csk_get_port,
-	.enter_memory_pressure	= tcp_enter_memory_pressure,
-	.stream_memory_free	= tcp_stream_memory_free,
-	.sockets_allocated	= &tcp_sockets_allocated,
-	.orphan_count		= &tcp_orphan_count,
-	.memory_allocated	= &tcp_memory_allocated,
-	.memory_pressure	= &tcp_memory_pressure,
-	.sysctl_mem		= sysctl_tcp_mem,
-	.sysctl_wmem		= sysctl_tcp_wmem,
-	.sysctl_rmem		= sysctl_tcp_rmem,
-	.max_header		= MAX_TCP_HEADER,
-	.obj_size		= sizeof(struct tcp_sock),
-	.slab_flags		= SLAB_DESTROY_BY_RCU,
-	.twsk_prot		= &tcp_timewait_sock_ops,
-	.rsk_prot		= &mptcp_request_sock_ops,
-	.h.hashinfo		= &tcp_hashinfo,
-	.no_autobind		= true,
-#ifdef CONFIG_COMPAT
-	.compat_setsockopt	= compat_tcp_setsockopt,
-	.compat_getsockopt	= compat_tcp_getsockopt,
-#endif
-#ifdef CONFIG_MEMCG_KMEM
-	.init_cgroup		= tcp_init_cgroup,
-	.destroy_cgroup		= tcp_destroy_cgroup,
-	.proto_cgroup		= tcp_proto_cgroup,
-#endif
-#ifdef CONFIG_MPTCP
-	.clear_sk		= tcp_v4_clear_sk,
-#endif
-};
-EXPORT_SYMBOL(mptcp_prot);
 
 static int __net_init tcp_sk_init(struct net *net)
 {

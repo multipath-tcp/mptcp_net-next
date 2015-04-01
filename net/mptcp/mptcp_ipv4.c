@@ -441,12 +441,44 @@ struct tcp_request_sock_ops mptcp_request_sock_ipv4_ops;
 struct tcp_request_sock_ops mptcp_join_request_sock_ipv4_ops;
 
 /* General initialization of IPv4 for MPTCP */
-void mptcp_pm_v4_init(struct proto *proto)
+int mptcp_pm_v4_init(void)
 {
+	int ret = 0;
+	struct request_sock_ops *ops = &mptcp_request_sock_ops;
+
 	mptcp_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	mptcp_request_sock_ipv4_ops.init_req = mptcp_v4_init_req;
 
 	mptcp_join_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	mptcp_join_request_sock_ipv4_ops.init_req = mptcp_v4_join_init_req;
 	mptcp_join_request_sock_ipv4_ops.queue_hash_add = mptcp_v4_reqsk_queue_hash_add;
+
+	ops->slab_name = kasprintf(GFP_KERNEL, "request_sock_%s", "MPTCP");
+	if (ops->slab_name == NULL) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ops->slab = kmem_cache_create(ops->slab_name, ops->obj_size, 0,
+				      SLAB_DESTROY_BY_RCU|SLAB_HWCACHE_ALIGN,
+				      NULL);
+
+	if (ops->slab == NULL) {
+		ret =  -ENOMEM;
+		goto err_reqsk_create;
+	}
+
+out:
+	return ret;
+
+err_reqsk_create:
+	kfree(ops->slab_name);
+	ops->slab_name = NULL;
+	goto out;
+}
+
+void mptcp_pm_v4_undo(void)
+{
+	kmem_cache_destroy(mptcp_request_sock_ops.slab);
+	kfree(mptcp_request_sock_ops.slab_name);
 }

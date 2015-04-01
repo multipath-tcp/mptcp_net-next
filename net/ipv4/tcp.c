@@ -1556,9 +1556,7 @@ static struct sk_buff *tcp_recv_skb(struct sock *sk, u32 seq, u32 *off)
 		offset = seq - TCP_SKB_CB(skb)->seq;
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)
 			offset--;
-
-		if (offset < skb->len || tcp_hdr(skb)->fin ||
-		    mptcp_is_data_fin(skb)) {
+		if (offset < skb->len || (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)) {
 			*off = offset;
 			return skb;
 		}
@@ -1594,7 +1592,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
 	while ((skb = tcp_recv_skb(sk, seq, &offset)) != NULL) {
-		if (offset < skb->len || mptcp_is_data_fin(skb)) {
+		if (offset < skb->len) {
 			int used;
 			size_t len;
 
@@ -1653,66 +1651,6 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	return copied;
 }
 EXPORT_SYMBOL(tcp_read_sock);
-
-int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		  size_t len, int nonblock, int flags, int *addr_len)
-{
-	struct sock *sub_sk, *meta_sk = sk;
-	struct tcp_sock *sub_tp;
-	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
-	read_descriptor_t rd_desc;
-	int sub_copied, queued = 0, copied = 0;
-	u8 i;
-
-restart:
-	/* wait for wake-up from sk_data_ready callback */
-	wait_event_interruptible(mpcb->app_wq, mpcb->subflow_ready_bits != 0 ||
-				 meta_sk->sk_shutdown & RCV_SHUTDOWN ||
-				 sock_flag(meta_sk, SOCK_DONE) ||
-				 !skb_queue_empty(&meta_sk->sk_receive_queue));
-
-	queued = 0;
-
-	/* look up for sockets with data in the receive queue */
-	for_each_set_bit(i, &(mpcb->subflow_ready_bits), 32) {
-		mptcp_for_each_sk(mpcb, sub_sk) {
-			sub_tp = tcp_sk(sub_sk);
-			if (sub_tp->mptcp->path_index - 1 != i)
-				continue;
-
-			lock_sock(meta_sk);
-			lock_sock(sub_sk);
-
-			rd_desc.arg.data = sub_sk;
-			rd_desc.error = 0;
-			rd_desc.count = 1;
-			sub_copied = tcp_read_sock(sub_sk, &rd_desc,
-						   subflow_to_meta_data_rcv);
-			queued += (sub_copied - rd_desc.error);
-
-			if (tcp_sk(sub_sk)->close_it) {
-				tcp_send_ack(sub_sk);
-				tcp_sk(sub_sk)->ops->time_wait(sub_sk, TCP_TIME_WAIT, 0);
-			}
-
-			clear_bit(i, &mpcb->subflow_ready_bits);
-
-			release_sock(sub_sk);
-			release_sock(meta_sk);
-		}
-	}
-
-	if (skb_queue_empty(&meta_sk->sk_receive_queue) &&
-	    !queued && !(meta_sk->sk_shutdown & RCV_SHUTDOWN)) {
-		goto restart;
-	}
-
-	/* pass data to user-buffer */
-	if (!sock_flag(meta_sk, SOCK_DEAD))
-		copied = tcp_recvmsg(iocb, meta_sk, msg, len, 1,
-				     flags, addr_len);
-	return copied;
-}
 
 /*
  *	This routine copies from a sock struct into the user buffer.
@@ -2174,6 +2112,11 @@ void tcp_close(struct sock *sk, long timeout)
 	struct sk_buff *skb;
 	int data_was_unread = 0;
 	int state;
+
+	if (is_meta_sk(sk)) {
+		mptcp_close(sk, timeout);
+		return;
+	}
 
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
@@ -3184,10 +3127,8 @@ void tcp_done(struct sock *sk)
 
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	if (!sock_flag(sk, SOCK_DEAD)) {
-		printk(KERN_INFO "tcp done \n");
+	if (!sock_flag(sk, SOCK_DEAD))
 		sk->sk_state_change(sk);
-	}
 	else
 		inet_csk_destroy_sock(sk);
 }

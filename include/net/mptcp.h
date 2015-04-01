@@ -261,11 +261,6 @@ struct mptcp_cb {
 	/* list of sockets that need a call to release_cb */
 	struct hlist_head callback_list;
 
-	/* the app will sleep on this wait queue */
-	wait_queue_head_t app_wq;
-	/* set bit if we have data at subflow level */
-	unsigned long subflow_ready_bits;
-
 	/* High-order bits of 64-bit sequence numbers */
 	u32 snd_high_order[2];
 	u32 rcv_high_order[2];
@@ -344,9 +339,6 @@ struct mptcp_cb {
 
 	/* Timer for retransmitting SYN/ACK+MP_JOIN */
 	struct timer_list synack_timer;
-
-	/* we received SYN+ACK+MP_CAPABLE */
-	u16 meta_ready:1;
 };
 
 #define MPTCP_SUB_CAPABLE			0
@@ -721,7 +713,6 @@ void mptcp_write_space(struct sock *sk);
 
 void mptcp_add_meta_ofo_queue(const struct sock *meta_sk, struct sk_buff *skb,
 			      struct sock *sk);
-int mptcp_create_master_sk_early(struct sock *meta_sk, struct sock *master_sk);
 void mptcp_ofo_queue(struct sock *meta_sk);
 void mptcp_purge_ofo_queue(struct tcp_sock *meta_tp);
 void mptcp_cleanup_rbuf(struct sock *meta_sk, int copied);
@@ -765,7 +756,7 @@ u32 __mptcp_select_window(struct sock *sk);
 void mptcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 					__u32 *window_clamp, int wscale_ok,
 					__u8 *rcv_wscale, __u32 init_rcv_wnd,
-					struct sock *sk);
+					const struct sock *sk);
 unsigned int mptcp_current_mss(struct sock *meta_sk);
 int mptcp_select_size(const struct sock *meta_sk, bool sg);
 void mptcp_key_sha1(u64 key, u32 *token, u64 *idsn);
@@ -785,7 +776,7 @@ int mptcp_check_rtt(const struct tcp_sock *tp, int time);
 int mptcp_check_snd_buf(const struct tcp_sock *tp);
 int mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 			 const struct sk_buff *skb);
-void __init mptcp_init(struct proto *proto);
+void __init mptcp_init(void);
 int mptcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len);
 void mptcp_destroy_sock(struct sock *sk);
 int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
@@ -793,7 +784,6 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				    const struct mptcp_options_received *mopt);
 unsigned int mptcp_xmit_size_goal(const struct sock *meta_sk, u32 mss_now,
 				  int large_allowed);
-int mptcp_v4_init_sock(struct sock *sk);
 int mptcp_init_tw_sock(struct sock *sk, struct tcp_timewait_sock *tw);
 void mptcp_twsk_destructor(struct tcp_timewait_sock *tw);
 void mptcp_time_wait(struct sock *sk, int state, int timeo);
@@ -849,18 +839,12 @@ void mptcp_get_default_scheduler(char *name);
 int mptcp_set_default_scheduler(const char *name);
 extern struct mptcp_sched_ops mptcp_sched_default;
 
-<<<<<<< HEAD
 /* Initializes function-pointers and MPTCP-flags */
 static inline void mptcp_init_tcp_sock(struct sock *sk)
 {
 	if (!mptcp_init_failed && sysctl_mptcp_enabled == MPTCP_SYSCTL)
 		mptcp_enable_sock(sk);
 }
-
-int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
-				unsigned int offset, size_t len);
-int mptcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-			size_t len, int nonblock, int flags, int *addr_len);
 
 static inline void mptcp_reset_synack_timer(struct sock *meta_sk,
 					    unsigned long len)
@@ -1014,9 +998,8 @@ static inline int is_meta_tp(const struct tcp_sock *tp)
 
 static inline int is_meta_sk(const struct sock *sk)
 {
-	return sk->sk_type == SOCK_STREAM  && (sk->sk_protocol == IPPROTO_TCP ||
-	       sk->sk_protocol == IPPROTO_MPTCP) &&  mptcp(tcp_sk(sk)) &&
-	       mptcp_meta_sk(sk) == sk;
+	return sk->sk_type == SOCK_STREAM  && sk->sk_protocol == IPPROTO_TCP &&
+	       mptcp(tcp_sk(sk)) && mptcp_meta_sk(sk) == sk;
 }
 
 static inline int is_master_tp(const struct tcp_sock *tp)

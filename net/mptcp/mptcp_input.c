@@ -451,7 +451,7 @@ static inline void mptcp_reset_mapping(struct tcp_sock *tp)
 /* The DSS-mapping received on the sk only covers the second half of the skb
  * (cut at seq). We trim the head from the skb.
  * Data will be freed upon kfree().
-*
+ *
  * Inspired by tcp_trim_head().
  */
 static void mptcp_skb_trim_head(struct sk_buff *skb, struct sock *sk, u32 seq)
@@ -847,14 +847,16 @@ static int mptcp_validate_mapping(struct sock *sk, struct sk_buff *skb)
 /* @return: 0  everything is fine. Just continue processing
  *	    1  subflow is broken stop everything
  *	    -1 this mapping has been put in the meta-receive-queue
- *	    -2 wake up the application to consume the mapping
+ *	    -2 this mapping has been eaten by the application
  */
 static int mptcp_queue_skb(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk), *meta_tp = mptcp_meta_tp(tp);
+	struct sock *meta_sk = mptcp_meta_sk(sk);
 	struct mptcp_cb *mpcb = tp->mpcb;
 	struct sk_buff *tmp, *tmp1;
 	u64 rcv_nxt64 = mptcp_get_rcv_nxt_64(meta_tp);
+	bool data_queued = false;
 
 	/* Have we not yet received the full mapping? */
 	if (!tp->mptcp->mapping_present ||
@@ -900,142 +902,121 @@ static int mptcp_queue_skb(struct sock *sk)
 		}
 	}
 
-	return -2;
-}
-
-int subflow_to_meta_data_rcv(read_descriptor_t *rd_desc, struct sk_buff *skb,
-			     unsigned int offset, size_t len) {
-	struct sock *sk = rd_desc->arg.data;
-	struct tcp_sock *tp = tcp_sk(sk), *meta_tp = mptcp_meta_tp(tp);
-	struct sock *meta_sk = mptcp_meta_sk(sk);
-	struct mptcp_cb *mpcb = tp->mpcb;
-	u64 rcv_nxt64 = mptcp_get_rcv_nxt_64(meta_tp);
-	struct sk_buff *skb_cloned = NULL, *skb_next = NULL;
-
-	/* Have we not yet received the full mapping? */
-	if (!tp->mptcp->mapping_present)
-		return -1;
-
-	if (!skb_queue_is_last(&sk->sk_receive_queue, skb))
-		skb_next = skb_queue_next(&sk->sk_receive_queue, skb);
-
 	if (before64(rcv_nxt64, tp->mptcp->map_data_seq)) {
-		rd_desc->error += len;
-
-		/* MUST be done here, because fragstolen may be true later.
-		 * Then, kfree_skb_paritial will not account the memory.
-		 */
-		skb_orphan(skb);
-
-		skb_cloned = skb_clone(skb, GFP_ATOMIC);
 		/* Seg's have to go to the meta-ofo-queue */
-		mptcp_prepare_skb(skb_cloned, sk);
+		skb_queue_walk_safe(&sk->sk_receive_queue, tmp1, tmp) {
+			tp->copied_seq = TCP_SKB_CB(tmp1)->end_seq;
+			mptcp_prepare_skb(tmp1, sk);
+			__skb_unlink(tmp1, &sk->sk_receive_queue);
+			/* MUST be done here, because fragstolen may be true later.
+			 * Then, kfree_skb_partial will not account the memory.
+			 */
+			skb_orphan(tmp1);
 
-		/* In time-wait, do not receive data */
-		if (!mpcb->in_time_wait)
-			mptcp_add_meta_ofo_queue(meta_sk, skb_cloned, sk);
+			if (!mpcb->in_time_wait) /* In time-wait, do not receive data */
+				mptcp_add_meta_ofo_queue(meta_sk, tmp1, sk);
+			else
+				__kfree_skb(tmp1);
 
-		if (!skb_next || !before(TCP_SKB_CB(skb_next)->seq,
-		    tp->mptcp->map_subseq + tp->mptcp->map_data_len)) {
-			tcp_enter_quickack_mode(sk);
-			rd_desc->count = 0;
-			goto exit;
+			if (!skb_queue_empty(&sk->sk_receive_queue) &&
+			    !before(TCP_SKB_CB(tmp)->seq,
+				    tp->mptcp->map_subseq + tp->mptcp->map_data_len))
+				break;
 		}
-		return len;
+		tcp_enter_quickack_mode(sk);
 	} else {
 		/* Ready for the meta-rcv-queue */
-		int eaten = 0;
-		const bool copied_early = false;
-		bool fragstolen = false;
-		u32 old_rcv_nxt = meta_tp->rcv_nxt;
+		skb_queue_walk_safe(&sk->sk_receive_queue, tmp1, tmp) {
+			int eaten = 0;
+			const bool copied_early = false;
+			bool fragstolen = false;
+			u32 old_rcv_nxt = meta_tp->rcv_nxt;
 
-		/* MUST be done here, because fragstolen may be true.
-		 * Then, kfree_skb_partial will not account the memory.
-		*/
-		skb_orphan(skb);
+			tp->copied_seq = TCP_SKB_CB(tmp1)->end_seq;
+			mptcp_prepare_skb(tmp1, sk);
+			__skb_unlink(tmp1, &sk->sk_receive_queue);
+			/* MUST be done here, because fragstolen may be true.
+			 * Then, kfree_skb_partial will not account the memory.
+			 */
+			skb_orphan(tmp1);
 
-		skb_cloned = skb_clone(skb, GFP_ATOMIC);
-		mptcp_prepare_skb(skb_cloned, sk);
-
-		/* This segment has already been received */
-		if (!after(TCP_SKB_CB(skb_cloned)->end_seq, meta_tp->rcv_nxt)) {
-			rd_desc->error += len;
-			goto next;
-		}
-
-#ifdef CONFIG_NET_DMA
-		if (TCP_SKB_CB(skb_cloned)->seq == meta_tp->rcv_nxt  &&
-		    meta_tp->ucopy.task == current &&
-		    meta_tp->copied_seq == meta_tp->rcv_nxt &&
-		    skb_cloned->len <= meta_tp->ucopy.len &&
-		    sock_owned_by_user(meta_sk) &&
-		    tcp_dma_try_early_copy(meta_sk, skb_cloned, 0)) {
-			copied_early = true;
-			eaten = 1;
-		}
-#endif
-
-		/* Is direct copy possible ? */
-		if (TCP_SKB_CB(skb_cloned)->seq == meta_tp->rcv_nxt &&
-		    meta_tp->ucopy.task == current &&
-		    meta_tp->copied_seq == meta_tp->rcv_nxt &&
-		    meta_tp->ucopy.len && sock_owned_by_user(meta_sk) &&
-		    !copied_early)
-			eaten = mptcp_direct_copy(skb_cloned, meta_sk);
-
-		if (mpcb->in_time_wait) /* In time-wait, do not receive data */
-			eaten = 1;
-
-		if (!eaten)
-			eaten = tcp_queue_rcv(meta_sk, skb_cloned, 0,
-					      &fragstolen);
-
-		meta_tp->rcv_nxt = TCP_SKB_CB(skb_cloned)->end_seq;
-		mptcp_check_rcvseq_wrap(meta_tp, old_rcv_nxt);
+			/* This segment has already been received */
+			if (!after(TCP_SKB_CB(tmp1)->end_seq, meta_tp->rcv_nxt)) {
+				__kfree_skb(tmp1);
+				goto next;
+			}
 
 #ifdef CONFIG_NET_DMA
-		if (copied_early)
-			meta_tp->cleanup_rbuf(meta_sk, skb_cloned->len);
+			if (TCP_SKB_CB(tmp1)->seq == meta_tp->rcv_nxt  &&
+			    meta_tp->ucopy.task == current &&
+			    meta_tp->copied_seq == meta_tp->rcv_nxt &&
+			    tmp1->len <= meta_tp->ucopy.len &&
+			    sock_owned_by_user(meta_sk) &&
+			    tcp_dma_try_early_copy(meta_sk, tmp1, 0)) {
+				copied_early = true;
+				eaten = 1;
+			}
 #endif
 
-			if ((TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN) &&
+			/* Is direct copy possible ? */
+			if (TCP_SKB_CB(tmp1)->seq == meta_tp->rcv_nxt &&
+			    meta_tp->ucopy.task == current &&
+			    meta_tp->copied_seq == meta_tp->rcv_nxt &&
+			    meta_tp->ucopy.len && sock_owned_by_user(meta_sk) &&
+			    !copied_early)
+				eaten = mptcp_direct_copy(tmp1, meta_sk);
+
+			if (mpcb->in_time_wait) /* In time-wait, do not receive data */
+				eaten = 1;
+
+			if (!eaten)
+				eaten = tcp_queue_rcv(meta_sk, tmp1, 0, &fragstolen);
+
+			meta_tp->rcv_nxt = TCP_SKB_CB(tmp1)->end_seq;
+			mptcp_check_rcvseq_wrap(meta_tp, old_rcv_nxt);
+
+#ifdef CONFIG_NET_DMA
+			if (copied_early)
+				meta_tp->cleanup_rbuf(meta_sk, tmp1->len);
+#endif
+
+			if ((TCP_SKB_CB(tmp1)->tcp_flags & TCPHDR_FIN) &&
 			    !mpcb->in_time_wait)
 				mptcp_fin(meta_sk);
 
-		/* Check if this fills a gap in the ofo queue */
-		if (!skb_queue_empty(&meta_tp->out_of_order_queue))
-			mptcp_ofo_queue(meta_sk);
+			/* Check if this fills a gap in the ofo queue */
+			if (!skb_queue_empty(&meta_tp->out_of_order_queue))
+				mptcp_ofo_queue(meta_sk);
 
 #ifdef CONFIG_NET_DMA
-		if (copied_early)
-			__skb_queue_tail(&meta_sk->sk_async_wait_queue,
-					 skb_cloned);
-		else
+			if (copied_early)
+				__skb_queue_tail(&meta_sk->sk_async_wait_queue,
+						 tmp1);
+			else
 #endif
-		if (eaten)
-			kfree_skb_partial(skb_cloned, fragstolen);
+			if (eaten)
+				kfree_skb_partial(tmp1, fragstolen);
 
+			data_queued = true;
 next:
-		if (!skb_next || !before(TCP_SKB_CB(skb_next)->seq,
-		    tp->mptcp->map_subseq + tp->mptcp->map_data_len)) {
-			rd_desc->count = 0;
-			goto exit;
+			if (!skb_queue_empty(&sk->sk_receive_queue) &&
+			    !before(TCP_SKB_CB(tmp)->seq,
+				    tp->mptcp->map_subseq + tp->mptcp->map_data_len))
+				break;
 		}
-		return len;
 	}
 
-exit:
 	inet_csk(meta_sk)->icsk_ack.lrcvtime = tcp_time_stamp;
 	mptcp_reset_mapping(tp);
 
-	return len;
+	return data_queued ? -1 : -2;
 }
 
 void mptcp_data_ready(struct sock *sk)
 {
 	struct sock *meta_sk = mptcp_meta_sk(sk);
-	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
 	struct sk_buff *skb, *tmp;
+	int queued = 0;
 
 	/* restart before the check, because mptcp_fin might have changed the
 	 * state.
@@ -1078,13 +1059,8 @@ restart:
 		ret = mptcp_queue_skb(sk);
 		if (ret < 0) {
 			if (ret == -1)
-				goto restart;
-			else {
-				set_bit(tcp_sk(sk)->mptcp->path_index - 1,
-					&mpcb->subflow_ready_bits);
-				wake_up_interruptible(&mpcb->app_wq);
-				return;
-			}
+				queued = ret;
+			goto restart;
 		} else if (ret == 0) {
 			continue;
 		} else { /* ret == 1 */
@@ -1097,7 +1073,11 @@ exit:
 		tcp_send_ack(sk);
 		tcp_sk(sk)->ops->time_wait(sk, TCP_TIME_WAIT, 0);
 	}
+
+	if (queued == -1 && !sock_flag(meta_sk, SOCK_DEAD))
+		meta_sk->sk_data_ready(meta_sk);
 }
+
 
 int mptcp_check_req(struct sk_buff *skb, struct net *net)
 {
@@ -2221,13 +2201,8 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				    const struct mptcp_options_received *mopt)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct mptcp_cb *mpcb = tp->mpcb;
-	struct sock *meta_sk = tp->meta_sk;
-	struct tcp_sock *meta_tp = mptcp_meta_tp(tp);
-	struct inet_connection_sock *icsk = inet_csk(sk);
-	u64 idsn;
 
-	if (mpcb->mptcp_rem_key) {
+	if (mptcp(tp)) {
 		u8 hash_mac_check[20];
 		struct mptcp_cb *mpcb = tp->mpcb;
 
@@ -2239,7 +2214,6 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		if (memcmp(hash_mac_check,
 			   (char *)&tp->mptcp->rx_opt.mptcp_recv_tmac, 8)) {
 			mptcp_sub_force_close(sk);
-			printk(KERN_INFO "discard \n");
 			return 1;
 		}
 
@@ -2254,39 +2228,17 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 				(u8 *)&tp->mptcp->mptcp_loc_nonce,
 				(u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
 				(u32 *)&tp->mptcp->sender_mac[0]);
-	}
-	else if (mopt->saw_mpc) {
-		 /* Generate Initial data-sequence-numbers */
-		mptcp_key_sha1(mpcb->mptcp_loc_key, NULL, &idsn);
-		idsn = ntohll(idsn) + 1;
-		mpcb->snd_high_order[0] = idsn >> 32;
-		mpcb->snd_high_order[1] = mpcb->snd_high_order[0] - 1;
 
-		meta_tp->write_seq = (u32)idsn;
-		meta_tp->snd_sml = meta_tp->write_seq;
-		meta_tp->snd_una = meta_tp->write_seq;
-		meta_tp->snd_nxt = meta_tp->write_seq;
-		meta_tp->pushed_seq = meta_tp->write_seq;
-		meta_tp->snd_up = meta_tp->write_seq;
+	} else if (mopt->saw_mpc) {
+		struct sock *meta_sk = sk;
 
-		mpcb->mptcp_rem_key = mopt->mptcp_key;
-		mptcp_key_sha1(mpcb->mptcp_rem_key, &mpcb->mptcp_rem_token, &idsn);
-		idsn = ntohll(idsn) + 1;
-		mpcb->rcv_high_order[0] = idsn >> 32;
-		mpcb->rcv_high_order[1] = mpcb->rcv_high_order[0] + 1;
-		meta_tp->copied_seq = (u32) idsn;
-		meta_tp->rcv_nxt = (u32) idsn;
-		meta_tp->rcv_wup = (u32) idsn;
+		if (mptcp_create_master_sk(sk, mopt->mptcp_key,
+					   ntohs(tcp_hdr(skb)->window)))
+			return 2;
 
-		meta_tp->snd_wl1 = meta_tp->rcv_nxt - 1;
-		meta_tp->snd_wnd = ntohs(tcp_hdr(skb)->window);
-		mpcb->meta_ready = 1;
-
-		printk(KERN_INFO "mptcp_rcv_synsent_state_process, SYN+ACK+MP_CAPABLE \n");
-		((struct inet_sock *)meta_tp)->inet_saddr = ((struct inet_sock *)tp)->inet_saddr;
-		((struct inet_sock *)meta_tp)->inet_daddr = ((struct inet_sock *)tp)->inet_daddr;
-		((struct inet_sock *)meta_tp)->inet_sport = ((struct inet_sock *)tp)->inet_sport;
-		((struct inet_sock *)meta_tp)->inet_dport = ((struct inet_sock *)tp)->inet_dport;
+		sk = tcp_sk(sk)->mpcb->master_sk;
+		*skptr = sk;
+		tp = tcp_sk(sk);
 
 		/* If fastopen was used data might be in the send queue. We
 		 * need to update their sequence number to MPTCP-level seqno.
@@ -2312,25 +2264,18 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		sk_set_socket(sk, mptcp_meta_sk(sk)->sk_socket);
 		sk->sk_wq = mptcp_meta_sk(sk)->sk_wq;
+
+		 /* hold in sk_clone_lock due to initialization to 2 */
+		sock_put(sk);
 	} else {
-		/* TODO */
 		tp->request_mptcp = 0;
 
 		if (tp->inside_tk_table)
 			mptcp_hash_remove(tp);
-
-		return 1;
 	}
-	tp->mptcp->rcv_isn = TCP_SKB_CB(skb)->seq;
 
-	if (!is_master_tp(tp)) {
-                       /* Timer for repeating the ACK until an answer
-                        * arrives. Used only when establishing an additional
-                        * subflow inside of an MPTCP connection.
-                        */
-                       sk_reset_timer(sk, &tp->mptcp->mptcp_ack_timer,
-                                      jiffies + icsk->icsk_rto);
-        }
+	if (mptcp(tp))
+		tp->mptcp->rcv_isn = TCP_SKB_CB(skb)->seq;
 
 	return 0;
 }

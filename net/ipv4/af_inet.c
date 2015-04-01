@@ -567,7 +567,6 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	int err;
 	long timeo;
 
-	printk(KERN_INFO "__inet_stream_connect \n");
 	if (addr_len < sizeof(uaddr->sa_family))
 		return -EINVAL;
 
@@ -593,7 +592,6 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		if (sk->sk_state != TCP_CLOSE)
 			goto out;
 
-		printk(KERN_INFO "sk->sk_prot_connect \n");
 		err = sk->sk_prot->connect(sk, uaddr, addr_len);
 		if (err < 0)
 			goto out;
@@ -607,13 +605,11 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		err = -EINPROGRESS;
 		break;
 	}
-	printk(KERN_INFO "after sk->sk_prot->connect");
 
 	timeo = sock_sndtimeo(sk, flags & O_NONBLOCK);
 
 	if ((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV)) {
-		printk(KERN_INFO "timeo \n");
-		int writebias = sk->sk_protocol == IPPROTO_TCP &&
+		int writebias = (sk->sk_protocol == IPPROTO_TCP) &&
 				tcp_sk(sk)->fastopen_req &&
 				tcp_sk(sk)->fastopen_req->data ? 1 : 0;
 
@@ -625,8 +621,6 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		if (signal_pending(current))
 			goto out;
 	}
-
-	printk(KERN_INFO "after timeo \n");
 
 	/* Connection was closed by RST, timeout, ICMP error
 	 * or another process disconnected us.
@@ -1020,15 +1014,6 @@ static struct inet_protosw inetsw_array[] =
 		.type =       SOCK_STREAM,
 		.protocol =   IPPROTO_TCP,
 		.prot =       &tcp_prot,
-		.ops =        &inet_stream_ops,
-		.flags =      INET_PROTOSW_PERMANENT |
-			      INET_PROTOSW_ICSK,
-	},
-
-	{
-		.type =       SOCK_STREAM,
-		.protocol =   IPPROTO_MPTCP,
-		.prot =       &mptcp_prot,
 		.ops =        &inet_stream_ops,
 		.flags =      INET_PROTOSW_PERMANENT |
 			      INET_PROTOSW_ICSK,
@@ -1539,16 +1524,6 @@ static const struct net_protocol tcp_protocol = {
 	.icmp_strict_tag_validation = 1,
 };
 
-static const struct net_protocol mptcp_protocol = {
-	.early_demux	=	tcp_v4_early_demux,
-	.handler	=	tcp_v4_rcv,
-	.err_handler	=	tcp_v4_err,
-	.no_policy	=	1,
-	.netns_ok	=	1,
-	.icmp_strict_tag_validation = 1,
-};
-
-
 static const struct net_protocol udp_protocol = {
 	.early_demux =	udp_v4_early_demux,
 	.handler =	udp_rcv,
@@ -1728,10 +1703,6 @@ static int __init inet_init(void)
 	if (rc)
 		goto out;
 
-	rc = proto_register(&mptcp_prot, 1);
-	if (rc)
-		goto out_unregister_mptcp_proto;
-
 	rc = proto_register(&udp_prot, 1);
 	if (rc)
 		goto out_unregister_tcp_proto;
@@ -1789,7 +1760,7 @@ static int __init inet_init(void)
 	ip_init();
 
 	/* We must initialize MPTCP before TCP. */
-	mptcp_init(&mptcp_prot);
+	mptcp_init();
 
 	tcp_v4_init();
 
@@ -1841,8 +1812,6 @@ out_unregister_raw_proto:
 	proto_unregister(&raw_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udp_prot);
-out_unregister_mptcp_proto:
-	proto_unregister(&mptcp_prot);
 out_unregister_tcp_proto:
 	proto_unregister(&tcp_prot);
 	goto out;

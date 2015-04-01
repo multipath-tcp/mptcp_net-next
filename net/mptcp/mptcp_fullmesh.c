@@ -557,17 +557,12 @@ static int mptcp_find_address(const struct mptcp_loc_addr *mptcp_local,
 	u8 loc_bits;
 	bool found = false;
 
-	if (family == AF_INET) {
+	if (family == AF_INET)
 		loc_bits = mptcp_local->loc4_bits;
-		printk(KERN_INFO "loc4_bits");
-	}
 	else
 		loc_bits = mptcp_local->loc6_bits;
 
 	mptcp_for_each_bit_set(loc_bits, i) {
-		printk(KERN_INFO "%i  mptcp_for_each_bit_set \n", i);
-		printk(KERN_INFO "%08x, %08x \n", mptcp_local->locaddr4[i].addr.s_addr,
-					   addr->in.s_addr);
 		if (family == AF_INET &&
 		    mptcp_local->locaddr4[i].addr.s_addr == addr->in.s_addr) {
 			found = true;
@@ -1170,7 +1165,6 @@ static void full_mesh_new_session(const struct sock *meta_sk)
 	sa_family_t family;
 	bool meta_v4 = meta_sk->sk_family == AF_INET;
 
-	printk(KERN_INFO "full_mesh_new_session \n");
 	/* Init local variables necessary for the rest */
 	if (meta_sk->sk_family == AF_INET || mptcp_v6_is_v4_mapped(meta_sk)) {
 		saddr.ip = inet_sk(meta_sk)->inet_saddr;
@@ -1252,10 +1246,10 @@ skip_ipv6:
 
 	if (master_tp->mptcp->send_mp_prio)
 		tcp_send_ack(mpcb->master_sk);
+
 	return;
 
 fallback:
-	printk(KERN_INFO "full_mesh_new session fallback");
 	rcu_read_unlock();
 	mptcp_fallback_default(mpcb);
 	return;

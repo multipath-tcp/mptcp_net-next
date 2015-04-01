@@ -357,7 +357,6 @@ static inline bool tcp_synq_no_recent_overflow(const struct sock *sk)
 }
 
 extern struct proto tcp_prot;
-extern struct proto mptcp_prot;
 
 #define TCP_INC_STATS(net, field)	SNMP_INC_STATS((net)->mib.tcp_statistics, field)
 #define TCP_INC_STATS_BH(net, field)	SNMP_INC_STATS_BH((net)->mib.tcp_statistics, field)
@@ -1241,7 +1240,7 @@ u32 tcp_default_init_rwnd(u32 mss);
 void tcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 			       __u32 *window_clamp, int wscale_ok,
 			       __u8 *rcv_wscale, __u32 init_rcv_wnd,
-			       struct sock *sk);
+			       const struct sock *sk);
 
 static inline int tcp_win_from_space(int space)
 {
@@ -1740,7 +1739,6 @@ void tcp_proc_unregister(struct net *net, struct tcp_seq_afinfo *afinfo);
 extern struct request_sock_ops tcp_request_sock_ops;
 extern struct request_sock_ops tcp6_request_sock_ops;
 
-int tcp_v4_init_sock(struct sock *sk);
 void tcp_v4_destroy_sock(struct sock *sk);
 
 struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
@@ -1796,7 +1794,7 @@ struct tcp_sock_ops {
 	void (*select_initial_window)(int __space, __u32 mss, __u32 *rcv_wnd,
 				      __u32 *window_clamp, int wscale_ok,
 				      __u8 *rcv_wscale, __u32 init_rcv_wnd,
-				      struct sock *sk);
+				      const struct sock *sk);
 	void (*init_buffer_space)(struct sock *sk);
 	void (*set_rto)(struct sock *sk);
 	bool (*should_expand_sndbuf)(const struct sock *sk);
