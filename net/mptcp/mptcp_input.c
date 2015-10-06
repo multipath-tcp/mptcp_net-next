@@ -1903,6 +1903,17 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 	sa_family_t family;
 
 	if (mpadd->ipver == 4) {
+		u8 hash_mac_check[20];
+
+		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
+			(u8 *)&mpcb->mptcp_rem_key,
+			(u8 *)&mpadd->u.v4.addr.s_addr,
+			(u8 *)&mpadd->u.v4.addr.s_addr,
+			(u32 *)hash_mac_check);
+		if (memcmp(hash_mac_check, (char *)&mpadd->u.v4.mac, 8)!=0) {
+			/* hash_mac check failed, ADD_ADDR_2 discarded */
+			return;
+		}
 		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2)
 			port  = mpadd->u.v4.port;
 		family = AF_INET;

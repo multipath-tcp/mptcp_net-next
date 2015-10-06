@@ -1077,6 +1077,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 			mpadd->ipver = 4;
 			mpadd->addr_id = opts->add_addr4.addr_id;
 			mpadd->u.v4.addr = opts->add_addr4.addr;
+			mpadd->u.v4.mac = opts->add_addr4.sender_truncated_mac;
 			ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN >> 2;
 		} else if (opts->add_addr_v6) {
 			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6;
