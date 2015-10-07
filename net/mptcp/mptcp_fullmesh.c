@@ -1550,7 +1550,10 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR4_ALIGN) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
 		u8 mptcp_hash_mac[20];
+		u8 addr_id_4bytes[4];
 
+		*(u32 *)addr_id_4bytes = 0;
+		addr_id_4bytes[0] = mptcp_local->locaddr4[ind].loc4_id;
 		opts->options |= OPTION_MPTCP;
 		opts->mptcp_options |= OPTION_ADD_ADDR;
 		opts->add_addr4.addr_id = mptcp_local->locaddr4[ind].loc4_id;
@@ -1559,7 +1562,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 			(u8 *)&mpcb->mptcp_loc_key,
 			(u8 *)&opts->add_addr4.addr.s_addr,
-			(u8 *)&opts->add_addr4.addr.s_addr,
+			(u8 *)addr_id_4bytes,
 			(u32 *)mptcp_hash_mac);
 		opts->add_addr4.sender_truncated_mac = *(u64 *)mptcp_hash_mac;
 

@@ -1904,11 +1904,14 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 
 	if (mpadd->ipver == 4) {
 		u8 hash_mac_check[20];
+		u8 addr_id_4bytes[4];
 
+		*(u32 *)addr_id_4bytes = 0;
+		addr_id_4bytes[0] = mpadd->addr_id;
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 			(u8 *)&mpcb->mptcp_rem_key,
 			(u8 *)&mpadd->u.v4.addr.s_addr,
-			(u8 *)&mpadd->u.v4.addr.s_addr,
+			(u8 *)addr_id_4bytes,
 			(u32 *)hash_mac_check);
 		if (memcmp(hash_mac_check, (char *)&mpadd->u.v4.mac, 8)!=0) {
 			/* hash_mac check failed, ADD_ADDR_2 discarded */
