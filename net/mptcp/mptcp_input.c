@@ -1913,7 +1913,7 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 			(u8 *)&mpadd->u.v4.addr.s_addr,
 			(u8 *)addr_id_4bytes,
 			(u32 *)hash_mac_check);
-		if (memcmp(hash_mac_check, (char *)&mpadd->u.v4.mac, 8)!=0) {
+		if (memcmp(hash_mac_check, mpadd->u.v4.mac, 8) != 0) {
 			/* hash_mac check failed, ADD_ADDR_2 discarded */
 			return;
 		}

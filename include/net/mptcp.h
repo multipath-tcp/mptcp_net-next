@@ -389,9 +389,9 @@ struct mptcp_cb {
 				  MPTCP_SUB_LEN_ACK_ALIGN)
 
 #define MPTCP_SUB_ADD_ADDR		3
-#define MPTCP_SUB_LEN_ADD_ADDR4		16
-#define MPTCP_SUB_LEN_ADD_ADDR6		20
-#define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN	20
+#define MPTCP_SUB_LEN_ADD_ADDR4	16
+#define MPTCP_SUB_LEN_ADD_ADDR6	20
+#define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN	16
 #define MPTCP_SUB_LEN_ADD_ADDR6_ALIGN	20
 
 #define MPTCP_SUB_REMOVE_ADDR	4
@@ -554,8 +554,8 @@ struct mp_add_addr {
 	union {
 		struct {
 			struct in_addr	addr;
+			__u8		mac[8];
 			__be16		port;
-			__u64	mac;
 		} v4;
 		struct {
 			struct in6_addr	addr;
