@@ -875,6 +875,7 @@ void mptcp_synack_options(struct request_sock *req,
 	if (!mtreq->is_sub) {
 		opts->mptcp_options |= OPTION_MP_CAPABLE | OPTION_TYPE_SYNACK;
 		opts->mp_capable.sender_key = mtreq->mptcp_loc_key;
+		opts->mptcp_ver = mtreq->mptcp_ver;
 		opts->dss_csum = !!sysctl_mptcp_checksum || mtreq->dss_csum;
 		*remaining -= MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN;
 	} else {
@@ -952,6 +953,7 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		*size += MPTCP_SUB_LEN_CAPABLE_ACK_ALIGN;
 		opts->mp_capable.sender_key = mpcb->mptcp_loc_key;
 		opts->mp_capable.receiver_key = mpcb->mptcp_rem_key;
+		opts->mptcp_ver = mpcb->mptcp_ver;
 		opts->dss_csum = mpcb->dss_csum;
 
 		if (skb)
@@ -1018,20 +1020,25 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 		mpc->kind = TCPOPT_MPTCP;
 
-		if ((OPTION_TYPE_SYN & opts->mptcp_options) ||
-		    (OPTION_TYPE_SYNACK & opts->mptcp_options)) {
+		if (OPTION_TYPE_SYN & opts->mptcp_options) {
 			mpc->sender_key = opts->mp_capable.sender_key;
 			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
+			mpc->ver = MPTCP_VERSION;/* Always advertise the latest version */
+			ptr += MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN >> 2;
+		} else if (OPTION_TYPE_SYNACK & opts->mptcp_options) {
+			mpc->sender_key = opts->mp_capable.sender_key;
+			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
+			mpc->ver = opts->mptcp_ver;
 			ptr += MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN >> 2;
 		} else if (OPTION_TYPE_ACK & opts->mptcp_options) {
 			mpc->sender_key = opts->mp_capable.sender_key;
 			mpc->receiver_key = opts->mp_capable.receiver_key;
 			mpc->len = MPTCP_SUB_LEN_CAPABLE_ACK;
+			mpc->ver = opts->mptcp_ver;
 			ptr += MPTCP_SUB_LEN_CAPABLE_ACK_ALIGN >> 2;
 		}
 
 		mpc->sub = MPTCP_SUB_CAPABLE;
-		mpc->ver = 0;
 		mpc->a = opts->dss_csum;
 		mpc->b = 0;
 		mpc->rsv = 0;
@@ -1069,6 +1076,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	}
 	if (unlikely(OPTION_ADD_ADDR & opts->mptcp_options)) {
 		struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
+		struct mptcp_cb *mpcb = tp->mpcb;
 
 		mpadd->kind = TCPOPT_MPTCP;
 		if (opts->add_addr_v4) {
@@ -1077,8 +1085,13 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 			mpadd->ipver = 4;
 			mpadd->addr_id = opts->add_addr4.addr_id;
 			mpadd->u.v4.addr = opts->add_addr4.addr;
-			memcpy(mpadd->u.v4.mac, (char *)&opts->add_addr4.sender_truncated_mac, 8);
-			ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN >> 2;
+			if (mpcb->mptcp_ver == 1) {
+				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4_VER1;
+				memcpy(mpadd->u.v4.mac, (char *)&opts->add_addr4.sender_truncated_mac, 8);
+				ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 >> 2;
+			} else if (mpcb->mptcp_ver == 0) {
+				ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN >> 2;
+			}
 		} else if (opts->add_addr_v6) {
 			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6;
 			mpadd->sub = MPTCP_SUB_ADD_ADDR;

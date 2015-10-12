@@ -1649,6 +1649,7 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		if (opsize == MPTCP_SUB_LEN_CAPABLE_ACK)
 			mopt->mptcp_receiver_key = mpcapable->receiver_key;
 
+		mopt->mptcp_ver = mpcapable->ver;
 		break;
 	}
 	case MPTCP_SUB_JOIN:
@@ -1759,12 +1760,16 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		const struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
 
 		if ((mpadd->ipver == 4 && opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-		     opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
+		     opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2 &&
+				 opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
+	 			 opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2) ||
 		    (mpadd->ipver == 6 && opsize != MPTCP_SUB_LEN_ADD_ADDR6 &&
 		     opsize != MPTCP_SUB_LEN_ADD_ADDR6 + 2)) {
 #else
 		if (opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-		    opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) {
+				opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2 &&
+				opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
+				opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2) {
 #endif /* CONFIG_IPV6 */
 			mptcp_debug("%s: mp_add_addr: bad option size %d\n",
 				    __func__, opsize);
@@ -1901,23 +1906,25 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 	__be16 port = 0;
 	union inet_addr addr;
 	sa_family_t family;
-
 	if (mpadd->ipver == 4) {
-		u8 hash_mac_check[20];
-		u8 addr_id_4bytes[4];
+		if (mpcb->mptcp_ver >= 1) {
+			u8 hash_mac_check[20];
+			u8 addr_id_4bytes[4];
 
-		*(u32 *)addr_id_4bytes = 0;
-		addr_id_4bytes[0] = mpadd->addr_id;
-		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
-			(u8 *)&mpcb->mptcp_rem_key,
-			(u8 *)&mpadd->u.v4.addr.s_addr,
-			(u8 *)addr_id_4bytes,
-			(u32 *)hash_mac_check);
-		if (memcmp(hash_mac_check, mpadd->u.v4.mac, 8) != 0) {
-			/* hash_mac check failed, ADD_ADDR_2 discarded */
-			return;
+			*(u32 *)addr_id_4bytes = 0;
+			addr_id_4bytes[0] = mpadd->addr_id;
+			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
+				(u8 *)&mpcb->mptcp_rem_key,
+				(u8 *)&mpadd->u.v4.addr.s_addr,
+				(u8 *)addr_id_4bytes,
+				(u32 *)hash_mac_check);
+			if (memcmp(hash_mac_check, mpadd->u.v4.mac, 8) != 0) {
+				/* hash_mac check failed, ADD_ADDR_2 discarded */
+				return;
+			}
 		}
-		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2)
+		if ((mpcb->mptcp_ver == 0 && mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
+		    (mpcb->mptcp_ver == 1 && mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2))
 			port  = mpadd->u.v4.port;
 		family = AF_INET;
 		addr.in = mpadd->u.v4.addr;
@@ -1989,12 +1996,15 @@ static void mptcp_parse_addropt(const struct sk_buff *skb, struct sock *sk)
 				if ((mpadd->ipver == 4 && opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
 				     opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
 				    (mpadd->ipver == 6 && opsize != MPTCP_SUB_LEN_ADD_ADDR6 &&
-				     opsize != MPTCP_SUB_LEN_ADD_ADDR6 + 2))
+				     opsize != MPTCP_SUB_LEN_ADD_ADDR6 + 2)) {
 #else
-				if (opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-				    opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2)
+				if ((opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
+				    opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) &&
+						(opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
+						opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2)) {
 #endif /* CONFIG_IPV6 */
 					goto cont;
+				}
 
 				mptcp_handle_add_addr(ptr, sk);
 			}
@@ -2261,7 +2271,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		struct sock *meta_sk = sk;
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
-		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key,
+		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key, mopt->mptcp_ver,
 					   ntohs(tcp_hdr(skb)->window)))
 			return 2;
 
