@@ -1925,17 +1925,19 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 			*(u32 *)addr_id_4bytes = 0;
 			addr_id_4bytes[0] = mpadd->addr_id;
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
-				(u8 *)&mpcb->mptcp_rem_key,
-				(u8 *)&mpadd->u.v4.addr.s_addr,
-				(u8 *)addr_id_4bytes,
-				(u32 *)hash_mac_check);
+					(u8 *)&mpcb->mptcp_rem_key,
+					(u8 *)&mpadd->u.v4.addr.s_addr,
+					(u8 *)addr_id_4bytes,
+					(u32 *)hash_mac_check);
 			if (memcmp(hash_mac_check, mpadd->u.v4.mac, 8) != 0) {
-				/* hash_mac check failed, ADD_ADDR_2 discarded */
+				/* ADD_ADDR2 discarded */
 				return;
 			}
 		}
-		if ((mpcb->mptcp_ver == 0 && mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
-		    (mpcb->mptcp_ver == 1 && mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2))
+		if ((mpcb->mptcp_ver == 0 &&
+		     mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
+		     (mpcb->mptcp_ver == 1 &&
+		     mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2))
 			port  = mpadd->u.v4.port;
 		family = AF_INET;
 		addr.in = mpadd->u.v4.addr;
@@ -2274,7 +2276,8 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		struct sock *meta_sk = sk;
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
-		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key, mopt->mptcp_ver,
+		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key,
+					   mopt->mptcp_ver,
 					   ntohs(tcp_hdr(skb)->window)))
 			return 2;
 

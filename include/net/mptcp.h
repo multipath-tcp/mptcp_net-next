@@ -395,9 +395,9 @@ struct mptcp_cb {
 				  MPTCP_SUB_LEN_ACK_ALIGN)
 
 #define MPTCP_SUB_ADD_ADDR		3
-#define MPTCP_SUB_LEN_ADD_ADDR4	8
+#define MPTCP_SUB_LEN_ADD_ADDR4		8
 #define MPTCP_SUB_LEN_ADD_ADDR4_VER1	16
-#define MPTCP_SUB_LEN_ADD_ADDR6	20
+#define MPTCP_SUB_LEN_ADD_ADDR6		20
 #define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN	8
 #define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1	16
 #define MPTCP_SUB_LEN_ADD_ADDR6_ALIGN	20
@@ -562,8 +562,8 @@ struct mp_add_addr {
 	union {
 		struct {
 			struct in_addr	addr;
-			__u8	mac[8];
-			__be16	port;
+			__u8		mac[8];
+			__be16		port;
 		} v4;
 		struct {
 			struct in6_addr	addr;
@@ -808,7 +808,8 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 			 struct sk_buff *skb);
 void mptcp_close(struct sock *meta_sk, long timeout);
 int mptcp_doit(struct sock *sk);
-int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key, __u8 mptcp_ver, u32 window);
+int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key,
+			   __u8 mptcp_ver, u32 window);
 int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req);
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
 			   struct request_sock *req, int drop);
