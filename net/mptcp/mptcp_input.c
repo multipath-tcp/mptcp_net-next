@@ -1603,6 +1603,29 @@ static void mptcp_send_reset_rem_id(const struct mptcp_cb *mpcb, u8 rem_id)
 	}
 }
 
+static inline bool valid_addropt_opsize(u8 mptcp_ver,
+					struct mp_add_addr *mpadd,
+					int opsize)
+{
+#if IS_ENABLED(CONFIG_IPV6)
+	if (mptcp_ver < 1 && mpadd->ipver == 6) {
+		return opsize == MPTCP_SUB_LEN_ADD_ADDR6 ||
+		       opsize == MPTCP_SUB_LEN_ADD_ADDR6 + 2;
+	}
+	if (mptcp_ver >= 1 && mpadd->ipver == 6)
+		return false; /* Not supported yet */
+#endif
+	if (mptcp_ver < 1 && mpadd->ipver == 4) {
+		return opsize == MPTCP_SUB_LEN_ADD_ADDR4 ||
+		       opsize == MPTCP_SUB_LEN_ADD_ADDR4 + 2;
+	}
+	if (mptcp_ver >= 1 && mpadd->ipver == 4) {
+		return opsize == MPTCP_SUB_LEN_ADD_ADDR4_VER1 ||
+		       opsize == MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2;
+	}
+	return false;
+}
+
 void mptcp_parse_options(const uint8_t *ptr, int opsize,
 			 struct mptcp_options_received *mopt,
 			 const struct sk_buff *skb)
@@ -1756,21 +1779,9 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 	}
 	case MPTCP_SUB_ADD_ADDR:
 	{
-#if IS_ENABLED(CONFIG_IPV6)
-		const struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
+		struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
 
-		if ((mpadd->ipver == 4 && opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-		     opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2 &&
-				 opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
-	 			 opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2) ||
-		    (mpadd->ipver == 6 && opsize != MPTCP_SUB_LEN_ADD_ADDR6 &&
-		     opsize != MPTCP_SUB_LEN_ADD_ADDR6 + 2)) {
-#else
-		if (opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-				opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2 &&
-				opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
-				opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2) {
-#endif /* CONFIG_IPV6 */
+		if (!valid_addropt_opsize(mopt->mptcp_ver, mpadd, opsize)) {
 			mptcp_debug("%s: mp_add_addr: bad option size %d\n",
 				    __func__, opsize);
 			break;
@@ -1991,20 +2002,12 @@ static void mptcp_parse_addropt(const struct sk_buff *skb, struct sock *sk)
 				return;  /* don't parse partial options */
 			if (opcode == TCPOPT_MPTCP &&
 			    ((struct mptcp_option *)ptr)->sub == MPTCP_SUB_ADD_ADDR) {
-#if IS_ENABLED(CONFIG_IPV6)
+				u8 mptcp_ver = tcp_sk(sk)->mpcb->mptcp_ver;
 				struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
-				if ((mpadd->ipver == 4 && opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-				     opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
-				    (mpadd->ipver == 6 && opsize != MPTCP_SUB_LEN_ADD_ADDR6 &&
-				     opsize != MPTCP_SUB_LEN_ADD_ADDR6 + 2)) {
-#else
-				if ((opsize != MPTCP_SUB_LEN_ADD_ADDR4 &&
-				    opsize != MPTCP_SUB_LEN_ADD_ADDR4 + 2) &&
-						(opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 &&
-						opsize != MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2)) {
-#endif /* CONFIG_IPV6 */
+
+				if (!valid_addropt_opsize(mptcp_ver, mpadd,
+							  opsize))
 					goto cont;
-				}
 
 				mptcp_handle_add_addr(ptr, sk);
 			}
