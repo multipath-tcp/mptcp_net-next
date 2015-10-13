@@ -102,13 +102,13 @@ struct mptcp_request_sock {
 		};
 	};
 
-	u8				mptcp_ver;
 	u8				loc_id;
 	u8				rem_id; /* Address-id in the MP_JOIN */
 	u8				dss_csum:1,
 					is_sub:1, /* Is this a new subflow? */
 					low_prio:1, /* Interface set to low-prio? */
-					rcv_low_prio:1;
+					rcv_low_prio:1,
+					mptcp_ver:4;
 };
 
 struct mptcp_options_received {
