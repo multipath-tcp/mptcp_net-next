@@ -2276,6 +2276,10 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		struct sock *meta_sk = sk;
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
+		if (mopt->mptcp_ver > MPTCP_VERSION)
+			/* TODO Consider adding new MPTCP_INC_STATS entry */
+			goto fallback;
+
 		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key,
 					   mopt->mptcp_ver,
 					   ntohs(tcp_hdr(skb)->window)))
@@ -2316,6 +2320,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		 /* hold in sk_clone_lock due to initialization to 2 */
 		sock_put(sk);
 	} else {
+fallback:
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
 
 		tp->request_mptcp = 0;
