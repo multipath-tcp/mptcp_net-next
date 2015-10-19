@@ -562,12 +562,13 @@ struct mp_add_addr {
 	union {
 		struct {
 			struct in_addr	addr;
-			__u8		mac[8];
 			__be16		port;
+			__u8		mac[8];
 		} v4;
 		struct {
 			struct in6_addr	addr;
 			__be16		port;
+			__u8		mac[8];
 		} v6;
 	} u;
 } __attribute__((__packed__));

@@ -1077,22 +1077,54 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	if (unlikely(OPTION_ADD_ADDR & opts->mptcp_options)) {
 		struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
 		struct mptcp_cb *mpcb = tp->mpcb;
+		int len_align;
+		char *padd_area;
 
 		mpadd->kind = TCPOPT_MPTCP;
 		if (opts->add_addr_v4) {
-			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4;
 			mpadd->sub = MPTCP_SUB_ADD_ADDR;
 			mpadd->ipver = 4;
 			mpadd->addr_id = opts->add_addr4.addr_id;
 			mpadd->u.v4.addr = opts->add_addr4.addr;
-			if (mpcb->mptcp_ver == 1) {
-				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4_VER1;
-				memcpy(mpadd->u.v4.mac,
-				       (char *)&opts->add_addr4.trunc_mac, 8);
-				ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 >> 2;
-			} else if (mpcb->mptcp_ver == 0) {
-				ptr += MPTCP_SUB_LEN_ADD_ADDR4_ALIGN >> 2;
+			len_align = MPTCP_SUB_LEN_ADD_ADDR4_ALIGN >> 2;
+			if (!opts->add_addr_port) {
+				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4;
+				goto no_port_v4;
 			}
+			mpadd->u.v4.port = opts->add_addr4.port;
+			if (mpcb->mptcp_ver < 1) {
+				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4 + 2;
+				/* Add padding at the end of option */
+				padd_area = (char *)&mpadd->u.v4.port;
+				padd_area += sizeof(mpadd->u.v4.port);
+				*(padd_area++) = TCPOPT_NOP;
+				*(padd_area++) = TCPOPT_NOP;
+				/* Adding 4 due to port and two NOP's */
+				len_align =
+				(MPTCP_SUB_LEN_ADD_ADDR4_ALIGN + 4) >> 2;
+				goto next_phase_v4;
+			}
+			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2;
+			memcpy(mpadd->u.v4.mac,
+			       (char *)&opts->add_addr4.trunc_mac, 8);
+			/* Add padding at the end of option */
+			padd_area = (char *)&mpadd->u.v4.mac;
+			padd_area += sizeof(mpadd->u.v4.mac);
+			*(padd_area++) = TCPOPT_NOP;
+			*(padd_area++) = TCPOPT_NOP;
+			/* Adding 4 due to port and two NOP's */
+			len_align =
+			(MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 + 4) >> 2;
+			goto next_phase_v4;
+no_port_v4:
+			if (mpcb->mptcp_ver < 1)
+				goto next_phase_v4;
+			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4_VER1;
+			memcpy((char *)mpadd->u.v4.mac - 2,
+			       (char *)&opts->add_addr4.trunc_mac, 8);
+			len_align = MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 >> 2;
+next_phase_v4:
+			ptr += len_align;
 		} else if (opts->add_addr_v6) {
 			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6;
 			mpadd->sub = MPTCP_SUB_ADD_ADDR;

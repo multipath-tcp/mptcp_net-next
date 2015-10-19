@@ -1545,6 +1545,12 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 		goto skip_ipv4;
 
 	/* IPv4 */
+	/* TODO Add case for port advertisement here and include the option
+	 * opts->add_addr_port = 1 to signal mptcp_output.c. It is
+	 * necessary to increase *size by four, too (since we are adding
+	 * the port value and two NOP's).
+	 */
+
 	unannouncedv4 = (~fmp->announced_addrs_v4) & mptcp_local->loc4_bits;
 	if (unannouncedv4 &&
 	    ((mpcb->mptcp_ver == 0 &&
