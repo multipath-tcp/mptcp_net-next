@@ -2267,7 +2267,6 @@ void mptcp_reqsk_init(struct request_sock *req, const struct sk_buff *skb,
 	struct mptcp_request_sock *mreq = mptcp_rsk(req);
 
 	mptcp_init_mp_opt(&mopt);
-	mopt.mptcp_ver = mreq->mptcp_ver; /* Passing MPTCP version along */
 	tcp_parse_mptcp_options(skb, &mopt);
 
 	mreq->dss_csum = mopt.dss_csum;
