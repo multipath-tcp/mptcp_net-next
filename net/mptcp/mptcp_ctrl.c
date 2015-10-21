@@ -2264,12 +2264,12 @@ void mptcp_reqsk_init(struct request_sock *req, const struct sk_buff *skb,
 		      bool want_cookie)
 {
 	struct mptcp_options_received mopt;
-	struct mptcp_request_sock *mreq = mptcp_rsk(req);
+	struct mptcp_request_sock *mtreq = mptcp_rsk(req);
 
 	mptcp_init_mp_opt(&mopt);
 	tcp_parse_mptcp_options(skb, &mopt);
 
-	mreq->dss_csum = mopt.dss_csum;
+	mtreq->dss_csum = mopt.dss_csum;
 
 	if (want_cookie) {
 		if (!mptcp_reqsk_new_cookie(req, &mopt, skb))

@@ -1084,6 +1084,8 @@ static inline void mptcp_hash_request_remove(struct request_sock *req)
 
 static inline void mptcp_init_mp_opt(struct mptcp_options_received *mopt)
 {
+	mopt->mptcp_ver = 0;
+
 	mopt->saw_mpc = 0;
 	mopt->dss_csum = 0;
 	mopt->drop_me = 0;
