@@ -1548,7 +1548,9 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	/* TODO Add case for port advertisement here and include the option
 	 * opts->add_addr_port = 1 to signal mptcp_output.c. It is
 	 * necessary to increase *size by four, too (since we are adding
-	 * the port value and two NOP's).
+	 * the port value and two NOP's). Finally, set
+	 * (u16 *)&addrid_port[1] = <advertised port> for correct
+	 * hmac computation as described in RFC6824bis-04.
 	 */
 
 	unannouncedv4 = (~fmp->announced_addrs_v4) & mptcp_local->loc4_bits;
@@ -1560,10 +1562,10 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	    MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1))) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
 		u8 mptcp_hash_mac[20];
-		u8 addr_id_4bytes[4];
+		u8 addrid_port[4];
 
-		*(u32 *)addr_id_4bytes = 0;
-		addr_id_4bytes[0] = mptcp_local->locaddr4[ind].loc4_id;
+		*(u32 *)addrid_port = 0;
+		addrid_port[0] = mptcp_local->locaddr4[ind].loc4_id;
 		opts->options |= OPTION_MPTCP;
 		opts->mptcp_options |= OPTION_ADD_ADDR;
 		opts->add_addr4.addr_id = mptcp_local->locaddr4[ind].loc4_id;
@@ -1573,7 +1575,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 					(u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)&opts->add_addr4.addr.s_addr,
-					(u8 *)addr_id_4bytes,
+					(u8 *)addrid_port,
 					(u32 *)mptcp_hash_mac);
 			opts->add_addr4.trunc_mac = *(u64 *)mptcp_hash_mac;
 		}

@@ -1917,25 +1917,27 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 	__be16 port = 0;
 	union inet_addr addr;
 	sa_family_t family;
-	char *hmac_pointer;
+	char *recv_hmac_pointer;
 
 	if (mpadd->ipver == 4) {
 		if (mpcb->mptcp_ver >= 1) {
 			u8 hash_mac_check[20];
-			u8 addr_id_4bytes[4];
+			u8 addrid_port[4];
+			*(u32 *)addrid_port = 0;
 
-			*(u32 *)addr_id_4bytes = 0;
-			addr_id_4bytes[0] = mpadd->addr_id;
+			addrid_port[0] = mpadd->addr_id;
+			recv_hmac_pointer = (char *)mpadd->u.v4.mac;
+			if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1)
+				recv_hmac_pointer -= sizeof(mpadd->u.v4.port);
+			else
+				*(u16 *)&addrid_port[1] = mpadd->u.v4.port;
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)&mpcb->mptcp_rem_key,
 					(u8 *)&mpadd->u.v4.addr.s_addr,
-					(u8 *)addr_id_4bytes,
+					(u8 *)addrid_port,
 					(u32 *)hash_mac_check);
 
-			hmac_pointer = (char *)mpadd->u.v4.mac;
-			if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1)
-				hmac_pointer -= sizeof(mpadd->u.v4.port);
-			if (memcmp(hash_mac_check, hmac_pointer, 8) != 0) {
+			if (memcmp(hash_mac_check, recv_hmac_pointer, 8) != 0) {
 				/* ADD_ADDR2 discarded */
 				return;
 			}
