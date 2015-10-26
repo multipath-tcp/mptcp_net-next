@@ -144,9 +144,9 @@ struct mptcp_options_received {
 	u32	data_seq;
 	u16	data_len;
 
-	u32	mptcp_rem_token;/* Remote token */
+	u32	mptcp_rem_token; /* Remote token */
 
-	u8	mptcp_ver;/* MPTCP version */
+	u8	mptcp_ver; /* MPTCP version */
 
 	/* Key inside the option (from mp_capable or fast_close) */
 	u64	mptcp_sender_key;
@@ -1085,8 +1085,6 @@ static inline void mptcp_hash_request_remove(struct request_sock *req)
 
 static inline void mptcp_init_mp_opt(struct mptcp_options_received *mopt)
 {
-	mopt->mptcp_ver = 0;
-
 	mopt->saw_mpc = 0;
 	mopt->dss_csum = 0;
 	mopt->drop_me = 0;

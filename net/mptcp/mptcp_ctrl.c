@@ -1061,7 +1061,7 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key,
 
 	meta_tp->mptcp = NULL;
 
-	/* Store the version agreed on initial handshake */
+	/* Store the mptcp version agreed on initial handshake */
 	mpcb->mptcp_ver = mptcp_ver;
 
 	/* Store the keys and generate the peer's token */

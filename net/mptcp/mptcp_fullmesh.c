@@ -1549,15 +1549,16 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	 * opts->add_addr_port = 1 to signal mptcp_output.c. It is
 	 * necessary to increase *size by four, too (since we are adding
 	 * the port value and two NOP's). Finally, set
-	 * (u16 *)&addrid_port[1] = <advertised port> for correct
+	 * (u16 *)&addrid_port[1] = htons(<advertised port>) for correct
 	 * hmac computation as described in RFC6824bis-04.
+	 * Important: always use htons() with 2 bytes port value.
 	 */
 
 	unannouncedv4 = (~fmp->announced_addrs_v4) & mptcp_local->loc4_bits;
 	if (unannouncedv4 &&
 	    ((mpcb->mptcp_ver == 0 &&
 	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR4_ALIGN) ||
-	    (mpcb->mptcp_ver == 1 &&
+	    (mpcb->mptcp_ver >= 1 &&
 	    MAX_TCP_OPTION_SPACE - *size >=
 	    MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1))) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
@@ -1571,7 +1572,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 		opts->add_addr4.addr_id = mptcp_local->locaddr4[ind].loc4_id;
 		opts->add_addr4.addr = mptcp_local->locaddr4[ind].addr;
 		opts->add_addr_v4 = 1;
-		if (mpcb->mptcp_ver == 1) {
+		if (mpcb->mptcp_ver >= 1) {
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 					(u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)&opts->add_addr4.addr.s_addr,
