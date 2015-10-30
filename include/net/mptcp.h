@@ -396,8 +396,10 @@ struct mptcp_cb {
 
 #define MPTCP_SUB_ADD_ADDR		3
 #define MPTCP_SUB_LEN_ADD_ADDR4		8
+#define MPTCP_SUB_LEN_ADD_ADDR4_VER1	16
 #define MPTCP_SUB_LEN_ADD_ADDR6		20
 #define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN	8
+#define MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1	16
 #define MPTCP_SUB_LEN_ADD_ADDR6_ALIGN	20
 
 #define MPTCP_SUB_REMOVE_ADDR	4
@@ -561,6 +563,7 @@ struct mp_add_addr {
 		struct {
 			struct in_addr	addr;
 			__be16		port;
+			__u8		mac[8];
 		} v4;
 		struct {
 			struct in6_addr	addr;
