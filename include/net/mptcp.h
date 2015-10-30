@@ -107,7 +107,8 @@ struct mptcp_request_sock {
 	u8				dss_csum:1,
 					is_sub:1, /* Is this a new subflow? */
 					low_prio:1, /* Interface set to low-prio? */
-					rcv_low_prio:1;
+					rcv_low_prio:1,
+					mptcp_ver:4;
 };
 
 struct mptcp_options_received {
@@ -143,7 +144,9 @@ struct mptcp_options_received {
 	u32	data_seq;
 	u16	data_len;
 
-	u32	mptcp_rem_token;/* Remote token */
+	u32	mptcp_rem_token; /* Remote token */
+
+	u8	mptcp_ver; /* MPTCP version */
 
 	/* Key inside the option (from mp_capable or fast_close) */
 	u64	mptcp_sender_key;
@@ -318,6 +321,7 @@ struct mptcp_cb {
 	 */
 	struct sock *master_sk;
 
+	__u8	mptcp_ver;
 	__u64	mptcp_loc_key;
 	__u64	mptcp_rem_key;
 	__u32	mptcp_loc_token;
@@ -339,6 +343,8 @@ struct mptcp_cb {
 	int orig_sk_sndbuf;
 	u32 orig_window_clamp;
 };
+
+#define MPTCP_VERSION 1
 
 #define MPTCP_SUB_CAPABLE			0
 #define MPTCP_SUB_LEN_CAPABLE_SYN		12
@@ -799,7 +805,8 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 			 struct sk_buff *skb);
 void mptcp_close(struct sock *meta_sk, long timeout);
 int mptcp_doit(struct sock *sk);
-int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key, u32 window);
+int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key,
+			   __u8 mptcp_ver, u32 window);
 int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req);
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
 			   struct request_sock *req, int drop);

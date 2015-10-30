@@ -298,6 +298,12 @@ static void mptcp_reqsk_new_mptcp(struct request_sock *req,
 
 	inet_rsk(req)->saw_mpc = 1;
 
+	/* MPTCP version agreement */
+	if (mopt->mptcp_ver >= MPTCP_VERSION)
+		mtreq->mptcp_ver = MPTCP_VERSION;
+	else
+		mtreq->mptcp_ver = mopt->mptcp_ver;
+
 	rcu_read_lock();
 	spin_lock(&mptcp_tk_hashlock);
 	do {
@@ -990,7 +996,8 @@ static const struct tcp_sock_ops mptcp_sub_specific = {
 	.cleanup_rbuf			= tcp_cleanup_rbuf,
 };
 
-static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key, u32 window)
+static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key,
+			    __u8 mptcp_ver, u32 window)
 {
 	struct mptcp_cb *mpcb;
 	struct sock *master_sk;
@@ -1053,6 +1060,9 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key, u32 window)
 #endif
 
 	meta_tp->mptcp = NULL;
+
+	/* Store the mptcp version agreed on initial handshake */
+	mpcb->mptcp_ver = mptcp_ver;
 
 	/* Store the keys and generate the peer's token */
 	mpcb->mptcp_loc_key = meta_tp->mptcp_loc_key;
@@ -1814,12 +1824,13 @@ int mptcp_doit(struct sock *sk)
 	return 1;
 }
 
-int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key, u32 window)
+int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key,
+			   __u8 mptcp_ver, u32 window)
 {
 	struct tcp_sock *master_tp;
 	struct sock *master_sk;
 
-	if (mptcp_alloc_mpcb(meta_sk, remote_key, window))
+	if (mptcp_alloc_mpcb(meta_sk, remote_key, mptcp_ver, window))
 		goto err_alloc_mpcb;
 
 	master_sk = tcp_sk(meta_sk)->mpcb->master_sk;
@@ -1887,7 +1898,7 @@ static int __mptcp_check_req_master(struct sock *child,
 	child_tp->mptcp_loc_token = mtreq->mptcp_loc_token;
 
 	if (mptcp_create_master_sk(meta_sk, mtreq->mptcp_rem_key,
-				   child_tp->snd_wnd))
+				   mtreq->mptcp_ver, child_tp->snd_wnd))
 		return -ENOBUFS;
 
 	child = tcp_sk(child)->mpcb->master_sk;
@@ -2253,12 +2264,12 @@ void mptcp_reqsk_init(struct request_sock *req, const struct sk_buff *skb,
 		      bool want_cookie)
 {
 	struct mptcp_options_received mopt;
-	struct mptcp_request_sock *mreq = mptcp_rsk(req);
+	struct mptcp_request_sock *mtreq = mptcp_rsk(req);
 
 	mptcp_init_mp_opt(&mopt);
 	tcp_parse_mptcp_options(skb, &mopt);
 
-	mreq->dss_csum = mopt.dss_csum;
+	mtreq->dss_csum = mopt.dss_csum;
 
 	if (want_cookie) {
 		if (!mptcp_reqsk_new_cookie(req, &mopt, skb))

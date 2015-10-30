@@ -85,7 +85,8 @@ struct tcp_out_options {
 	u16	mptcp_options;	/* bit field of MPTCP related OPTION_* */
 	u8	dss_csum:1,
 		add_addr_v4:1,
-		add_addr_v6:1;	/* dss-checksum required? */
+		add_addr_v6:1,	/* dss-checksum required? */
+		mptcp_ver:4;
 
 	union {
 		struct {

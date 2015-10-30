@@ -1649,6 +1649,7 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		if (opsize == MPTCP_SUB_LEN_CAPABLE_ACK)
 			mopt->mptcp_receiver_key = mpcapable->receiver_key;
 
+		mopt->mptcp_ver = mpcapable->ver;
 		break;
 	}
 	case MPTCP_SUB_JOIN:
@@ -2247,7 +2248,12 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		struct sock *meta_sk = sk;
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
+		if (mopt->mptcp_ver > MPTCP_VERSION)
+			/* TODO Consider adding new MPTCP_INC_STATS entry */
+			goto fallback;
+
 		if (mptcp_create_master_sk(sk, mopt->mptcp_sender_key,
+					   mopt->mptcp_ver,
 					   ntohs(tcp_hdr(skb)->window)))
 			return 2;
 
@@ -2287,7 +2293,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		sock_put(sk);
 	} else {
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
-
+fallback:
 		tp->request_mptcp = 0;
 
 		if (tp->inside_tk_table)
