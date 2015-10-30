@@ -849,6 +849,7 @@ void mptcp_syn_options(const struct sock *sk, struct tcp_out_options *opts,
 	opts->options |= OPTION_MPTCP;
 	if (is_master_tp(tp)) {
 		opts->mptcp_options |= OPTION_MP_CAPABLE | OPTION_TYPE_SYN;
+		opts->mptcp_ver = MPTCP_VERSION;
 		*remaining -= MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN;
 		opts->mp_capable.sender_key = tp->mptcp_loc_key;
 		opts->dss_csum = !!sysctl_mptcp_checksum;
@@ -874,6 +875,7 @@ void mptcp_synack_options(struct request_sock *req,
 	/* MPCB not yet set - thus it's a new MPTCP-session */
 	if (!mtreq->is_sub) {
 		opts->mptcp_options |= OPTION_MP_CAPABLE | OPTION_TYPE_SYNACK;
+		opts->mptcp_ver = mtreq->mptcp_ver;
 		opts->mp_capable.sender_key = mtreq->mptcp_loc_key;
 		opts->dss_csum = !!sysctl_mptcp_checksum || mtreq->dss_csum;
 		*remaining -= MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN;
@@ -950,6 +952,7 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		opts->mptcp_options |= OPTION_MP_CAPABLE |
 				       OPTION_TYPE_ACK;
 		*size += MPTCP_SUB_LEN_CAPABLE_ACK_ALIGN;
+		opts->mptcp_ver = mpcb->mptcp_ver;
 		opts->mp_capable.sender_key = mpcb->mptcp_loc_key;
 		opts->mp_capable.receiver_key = mpcb->mptcp_rem_key;
 		opts->dss_csum = mpcb->dss_csum;
@@ -1018,20 +1021,25 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 		mpc->kind = TCPOPT_MPTCP;
 
-		if ((OPTION_TYPE_SYN & opts->mptcp_options) ||
-		    (OPTION_TYPE_SYNACK & opts->mptcp_options)) {
+		if (OPTION_TYPE_SYN & opts->mptcp_options) {
 			mpc->sender_key = opts->mp_capable.sender_key;
 			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
+			mpc->ver = opts->mptcp_ver;
+			ptr += MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN >> 2;
+		} else if (OPTION_TYPE_SYNACK & opts->mptcp_options) {
+			mpc->sender_key = opts->mp_capable.sender_key;
+			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
+			mpc->ver = opts->mptcp_ver;
 			ptr += MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN >> 2;
 		} else if (OPTION_TYPE_ACK & opts->mptcp_options) {
 			mpc->sender_key = opts->mp_capable.sender_key;
 			mpc->receiver_key = opts->mp_capable.receiver_key;
 			mpc->len = MPTCP_SUB_LEN_CAPABLE_ACK;
+			mpc->ver = opts->mptcp_ver;
 			ptr += MPTCP_SUB_LEN_CAPABLE_ACK_ALIGN >> 2;
 		}
 
 		mpc->sub = MPTCP_SUB_CAPABLE;
-		mpc->ver = 0;
 		mpc->a = opts->dss_csum;
 		mpc->b = 0;
 		mpc->rsv = 0;

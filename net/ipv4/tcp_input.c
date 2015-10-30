@@ -3813,6 +3813,9 @@ static bool tcp_fast_parse_options(const struct sk_buff *skb,
 		if (tcp_parse_aligned_timestamp(tp, th))
 			return true;
 	}
+	/* Add mptcp version to received options before processing them */
+	if (mptcp(tp))
+		tp->mptcp->rx_opt.mptcp_ver = tp->mpcb->mptcp_ver;
 	tcp_parse_options(skb, &tp->rx_opt, mptcp(tp) ? &tp->mptcp->rx_opt : NULL,
 			  1, NULL);
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr)
