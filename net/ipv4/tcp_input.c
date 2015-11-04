@@ -4262,6 +4262,14 @@ bool tcp_try_coalesce(struct sock *sk, struct sk_buff *to, struct sk_buff *from,
 	return true;
 }
 
+static void tcp_recv_queue_added(struct sock *sk, struct sk_buff *skb)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	if (unlikely(tp->recv_queue_added))
+		tp->recv_queue_added(sk, skb);
+}
+
 /* This one checks to see if we can put data from the
  * out_of_order queue into the receive_queue.
  */
@@ -4300,8 +4308,10 @@ static void tcp_ofo_queue(struct sock *sk)
 		tail = skb_peek_tail(&sk->sk_receive_queue);
 		eaten = tail && tcp_try_coalesce(sk, tail, skb, &fragstolen);
 		tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
-		if (!eaten)
+		if (!eaten) {
 			__skb_queue_tail(&sk->sk_receive_queue, skb);
+			tcp_recv_queue_added(sk, skb);
+		}
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
 			tcp_fin(sk);
 		if (eaten)
@@ -4477,6 +4487,7 @@ int __must_check tcp_queue_rcv(struct sock *sk, struct sk_buff *skb, int hdrlen,
 	tcp_rcv_nxt_update(tcp_sk(sk), TCP_SKB_CB(skb)->end_seq);
 	if (!eaten) {
 		__skb_queue_tail(&sk->sk_receive_queue, skb);
+		tcp_recv_queue_added(sk, skb);
 		skb_set_owner_r(skb, sk);
 	}
 	return eaten;

@@ -413,6 +413,9 @@ struct tcp_sock {
 	struct hlist_nulls_node tk_table;
 	u32		mptcp_loc_token;
 	u64		mptcp_loc_key;
+
+	/* Called when an skb is added to the receive queue. */
+	void (*recv_queue_added)(struct sock *sk, struct sk_buff *skb);
 #endif /* CONFIG_MPTCP */
 };
 
