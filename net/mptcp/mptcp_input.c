@@ -2287,7 +2287,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		struct sock *meta_sk = sk;
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
-		if (mopt->mptcp_ver > MPTCP_VERSION)
+		if (mopt->mptcp_ver > sysctl_mptcp_version)
 			/* TODO Consider adding new MPTCP_INC_STATS entry */
 			goto fallback;
 
