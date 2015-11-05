@@ -344,8 +344,6 @@ struct mptcp_cb {
 	u32 orig_window_clamp;
 };
 
-#define MPTCP_VERSION 1
-
 #define MPTCP_SUB_CAPABLE			0
 #define MPTCP_SUB_LEN_CAPABLE_SYN		12
 #define MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN		12
@@ -647,6 +645,7 @@ static inline int mptcp_sub_len_dss(const struct mp_dss *m, const int csum)
 #define MPTCP_SYSCTL	1
 
 extern int sysctl_mptcp_enabled;
+extern int sysctl_mptcp_version;
 extern int sysctl_mptcp_checksum;
 extern int sysctl_mptcp_debug;
 extern int sysctl_mptcp_syn_retries;

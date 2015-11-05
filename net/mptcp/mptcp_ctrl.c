@@ -63,6 +63,7 @@ static struct kmem_cache *mptcp_cb_cache __read_mostly;
 static struct kmem_cache *mptcp_tw_cache __read_mostly;
 
 int sysctl_mptcp_enabled __read_mostly = 1;
+int sysctl_mptcp_version __read_mostly;
 int sysctl_mptcp_checksum __read_mostly = 1;
 int sysctl_mptcp_debug __read_mostly;
 EXPORT_SYMBOL(sysctl_mptcp_debug);
@@ -118,6 +119,13 @@ static struct ctl_table mptcp_table[] = {
 		.maxlen = sizeof(int),
 		.mode = 0644,
 		.proc_handler = &proc_dointvec
+	},
+	{
+		.procname = "mptcp_version",
+		.data = &sysctl_mptcp_version,
+		.mode = 0644,
+		.maxlen = sizeof(int),
+		.proc_handler = &proc_dointvec,
 	},
 	{
 		.procname = "mptcp_checksum",
@@ -299,8 +307,8 @@ static void mptcp_reqsk_new_mptcp(struct request_sock *req,
 	inet_rsk(req)->saw_mpc = 1;
 
 	/* MPTCP version agreement */
-	if (mopt->mptcp_ver >= MPTCP_VERSION)
-		mtreq->mptcp_ver = MPTCP_VERSION;
+	if (mopt->mptcp_ver >= sysctl_mptcp_version)
+		mtreq->mptcp_ver = sysctl_mptcp_version;
 	else
 		mtreq->mptcp_ver = mopt->mptcp_ver;
 
