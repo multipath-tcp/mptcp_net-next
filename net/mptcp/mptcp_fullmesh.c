@@ -1555,12 +1555,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	 */
 
 	unannouncedv4 = (~fmp->announced_addrs_v4) & mptcp_local->loc4_bits;
-	if (unannouncedv4 &&
-	    ((mpcb->mptcp_ver == 0 &&
-	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR4_ALIGN) ||
-	    (mpcb->mptcp_ver >= 1 &&
-	    MAX_TCP_OPTION_SPACE - *size >=
-	    MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1))) {
+	if (unannouncedv4) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
 
 		opts->options |= OPTION_MPTCP;
@@ -1600,12 +1595,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 skip_ipv4:
 	/* IPv6 */
 	unannouncedv6 = (~fmp->announced_addrs_v6) & mptcp_local->loc6_bits;
-	if (unannouncedv6 &&
-	    ((mpcb->mptcp_ver == 0 &&
-	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR6_ALIGN) ||
-	    (mpcb->mptcp_ver >= 1 &&
-	    MAX_TCP_OPTION_SPACE - *size >=
-	    MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1))) {
+	if (unannouncedv6) {
 		int ind = mptcp_find_free_index(~unannouncedv6);
 
 		opts->options |= OPTION_MPTCP;
