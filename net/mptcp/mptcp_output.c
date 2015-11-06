@@ -1045,7 +1045,6 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		mpc->rsv = 0;
 		mpc->h = 1;
 	}
-
 	if (unlikely(OPTION_MP_JOIN & opts->mptcp_options)) {
 		struct mp_join *mpj = (struct mp_join *)ptr;
 
@@ -1127,13 +1126,49 @@ no_port_v4:
 next_phase_v4:
 			ptr += len_align;
 		} else if (opts->add_addr_v6) {
-			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6;
 			mpadd->sub = MPTCP_SUB_ADD_ADDR;
 			mpadd->ipver = 6;
 			mpadd->addr_id = opts->add_addr6.addr_id;
-			memcpy(&mpadd->u.v6.addr, &opts->add_addr6.addr,
-			       sizeof(mpadd->u.v6.addr));
-			ptr += MPTCP_SUB_LEN_ADD_ADDR6_ALIGN >> 2;
+			mpadd->u.v6.addr = opts->add_addr6.addr;
+			len_align = MPTCP_SUB_LEN_ADD_ADDR6_ALIGN >> 2;
+			if (!opts->add_addr_port) {
+				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6;
+				goto no_port_v6;
+			}
+			mpadd->u.v6.port = opts->add_addr6.port;
+			if (mpcb->mptcp_ver < 1) {
+				mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6 + 2;
+				/* Add padding at the end of option */
+				padd_area = (char *)&mpadd->u.v6.port;
+				padd_area += sizeof(mpadd->u.v6.port);
+				*(padd_area++) = TCPOPT_NOP;
+				*(padd_area++) = TCPOPT_NOP;
+				/* Adding 4 due to port and two NOP's */
+				len_align =
+				(MPTCP_SUB_LEN_ADD_ADDR6_ALIGN + 4) >> 2;
+				goto next_phase_v4;
+			}
+			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6_VER1 + 2;
+			memcpy(mpadd->u.v6.mac,
+			       (char *)&opts->add_addr6.trunc_mac, 8);
+			/* Add padding at the end of option */
+			padd_area = (char *)&mpadd->u.v6.mac;
+			padd_area += sizeof(mpadd->u.v6.mac);
+			*(padd_area++) = TCPOPT_NOP;
+			*(padd_area++) = TCPOPT_NOP;
+			/* Adding 4 due to port and two NOP's */
+			len_align =
+			(MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1 + 4) >> 2;
+			goto next_phase_v6;
+no_port_v6:
+			if (mpcb->mptcp_ver < 1)
+				goto next_phase_v6;
+			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR6_VER1;
+			memcpy((char *)mpadd->u.v6.mac - 2,
+			       (char *)&opts->add_addr6.trunc_mac, 8);
+			len_align = MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1 >> 2;
+next_phase_v6:
+			ptr += len_align;
 		}
 
 		MPTCP_INC_STATS(sock_net((struct sock *)tp), MPTCP_MIB_ADDADDRTX);

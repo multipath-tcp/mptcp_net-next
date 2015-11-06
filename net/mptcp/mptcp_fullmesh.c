@@ -1597,12 +1597,15 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 
 	if (meta_v4)
 		goto skip_ipv6;
-
 skip_ipv4:
 	/* IPv6 */
 	unannouncedv6 = (~fmp->announced_addrs_v6) & mptcp_local->loc6_bits;
 	if (unannouncedv6 &&
-	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR6_ALIGN) {
+	    ((mpcb->mptcp_ver == 0 &&
+	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR6_ALIGN) ||
+	    (mpcb->mptcp_ver >= 1 &&
+	    MAX_TCP_OPTION_SPACE - *size >=
+	    MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1))) {
 		int ind = mptcp_find_free_index(~unannouncedv6);
 
 		opts->options |= OPTION_MPTCP;
@@ -1610,12 +1613,39 @@ skip_ipv4:
 		opts->add_addr6.addr_id = mptcp_local->locaddr6[ind].loc6_id;
 		opts->add_addr6.addr = mptcp_local->locaddr6[ind].addr;
 		opts->add_addr_v6 = 1;
+		if (mpcb->mptcp_ver >= 1) {
+			u8 mptcp_hash_mac[20];
+			u8 no_key[8];
+			u32 ip6_address[4];
+			int i;
+
+			*(u32 *)mptcp_hash_mac = 0;
+			*(u64 *)no_key = 0;
+			/* For the first cycle, use 'hash_mac_check' to provide
+			 * addrress_id and port value as HMAC message
+			 */
+			mptcp_hash_mac[0] = mptcp_local->locaddr6[ind].loc6_id;
+			memcpy((char *)ip6_address,
+			       (u8 *)&opts->add_addr6.addr.s6_addr, 16);
+			for (i = 0; i < 4; i++) {
+				mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
+						(u8 *)no_key,
+						(u8 *)&ip6_address[i],
+						(u8 *)mptcp_hash_mac,
+						(u32 *)mptcp_hash_mac);
+			}
+			opts->add_addr6.trunc_mac = *(u64 *)mptcp_hash_mac;
+		}
 
 		if (skb) {
 			fmp->announced_addrs_v6 |= (1 << ind);
 			fmp->add_addr--;
 		}
-		*size += MPTCP_SUB_LEN_ADD_ADDR6_ALIGN;
+
+		if (mpcb->mptcp_ver < 1)
+			*size += MPTCP_SUB_LEN_ADD_ADDR6_ALIGN;
+		if (mpcb->mptcp_ver >= 1)
+			*size += MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1;
 	}
 
 skip_ipv6:

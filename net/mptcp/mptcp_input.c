@@ -1613,7 +1613,8 @@ static inline bool is_valid_addropt_opsize(u8 mptcp_ver,
 		       opsize == MPTCP_SUB_LEN_ADD_ADDR6 + 2;
 	}
 	if (mptcp_ver >= 1 && mpadd->ipver == 6)
-		return false; /* Not supported yet */
+		return opsize == MPTCP_SUB_LEN_ADD_ADDR6_VER1 ||
+		       opsize == MPTCP_SUB_LEN_ADD_ADDR6_VER1 + 2;
 #endif
 	if (mptcp_ver < 1 && mpadd->ipver == 4) {
 		return opsize == MPTCP_SUB_LEN_ADD_ADDR4 ||
@@ -1925,7 +1926,7 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 		u8 no_key[8];
 
 		if (mpcb->mptcp_ver < 1)
-			goto skip_hmac;
+			goto skip_hmac_v4;
 
 		*(u32 *)addrid_port = 0;
 		*(u64 *)no_key = 0;
@@ -1944,7 +1945,7 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 		if (memcmp(hash_mac_check, recv_hmac_pointer, 8) != 0)
 			/* ADD_ADDR2 discarded */
 			return;
-skip_hmac:
+skip_hmac_v4:
 		if ((mpcb->mptcp_ver == 0 &&
 		     mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4 + 2) ||
 		     (mpcb->mptcp_ver == 1 &&
@@ -1954,7 +1955,44 @@ skip_hmac:
 		addr.in = mpadd->u.v4.addr;
 #if IS_ENABLED(CONFIG_IPV6)
 	} else if (mpadd->ipver == 6) {
-		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6 + 2)
+		char *recv_hmac_pointer;
+		u8 hash_mac_check[20];
+		u8 no_key[8];
+		u32 ip6_address[4];
+		int i;
+
+		if (mpcb->mptcp_ver < 1)
+			goto skip_hmac_v6;
+
+		*(u32 *)hash_mac_check = 0;
+		*(u64 *)no_key = 0;
+		/* For the first cycle, use 'hash_mac_check' to provide
+		 * addrress_id and port value as HMAC message
+		 */
+		hash_mac_check[0] = mpadd->addr_id;
+		memcpy((char *)ip6_address,
+		       (u8 *)&mpadd->u.v6.addr.s6_addr, 16);
+		recv_hmac_pointer = (char *)mpadd->u.v6.mac;
+		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6_VER1)
+			recv_hmac_pointer -= sizeof(mpadd->u.v6.port);
+		else
+			*(u16 *)&hash_mac_check[1] = mpadd->u.v6.port;
+		for (i = 0; i < 4; i++) {
+			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
+					(u8 *)no_key,
+					(u8 *)&ip6_address[i],
+					(u8 *)hash_mac_check,
+					(u32 *)hash_mac_check);
+		}
+
+		if (memcmp(hash_mac_check, recv_hmac_pointer, 8) != 0)
+			/* ADD_ADDR2 discarded */
+			return;
+skip_hmac_v6:
+		if ((mpcb->mptcp_ver == 0 &&
+		     mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6 + 2) ||
+		     (mpcb->mptcp_ver == 1 &&
+		     mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6_VER1 + 2))
 			port  = mpadd->u.v6.port;
 		family = AF_INET6;
 		addr.in6 = mpadd->u.v6.addr;
