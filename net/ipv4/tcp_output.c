@@ -698,7 +698,16 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 #else
 	*md5 = NULL;
 #endif
-
+	if (mptcp(tp)) {
+		struct mptcp_cb *mpcb = tp->mpcb;
+		/* It is recommended to use duplicate ACKs with no other
+		 * payload or options when transmitting ADD_ADDR2.
+		 */
+		if (unlikely(mpcb->addr_signal)) {
+			mptcp_established_options(sk, skb, opts, &size);
+			return size;
+		}
+	}
 	if (likely(tp->rx_opt.tstamp_ok)) {
 		opts->options |= OPTION_TS;
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
