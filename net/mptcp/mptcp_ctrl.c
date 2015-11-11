@@ -64,6 +64,8 @@ static struct kmem_cache *mptcp_tw_cache __read_mostly;
 
 int sysctl_mptcp_enabled __read_mostly = 1;
 int sysctl_mptcp_version __read_mostly;
+static int min_mptcp_version;
+static int max_mptcp_version = 1;
 int sysctl_mptcp_checksum __read_mostly = 1;
 int sysctl_mptcp_debug __read_mostly;
 EXPORT_SYMBOL(sysctl_mptcp_debug);
@@ -125,7 +127,9 @@ static struct ctl_table mptcp_table[] = {
 		.data = &sysctl_mptcp_version,
 		.mode = 0644,
 		.maxlen = sizeof(int),
-		.proc_handler = &proc_dointvec,
+		.proc_handler = &proc_dointvec_minmax,
+		.extra1 = &min_mptcp_version,
+		.extra2 = &max_mptcp_version,
 	},
 	{
 		.procname = "mptcp_checksum",
