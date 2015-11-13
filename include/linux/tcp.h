@@ -83,10 +83,10 @@ struct tcp_out_options {
 	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
 #ifdef CONFIG_MPTCP
 	u16	mptcp_options;	/* bit field of MPTCP related OPTION_* */
-	u8	dss_csum:1,
+	u8	dss_csum:1, /* dss-checksum required? */
 		add_addr_port:1,
 		add_addr_v4:1,
-		add_addr_v6:1,	/* dss-checksum required? */
+		add_addr_v6:1,
 		mptcp_ver:4;
 
 	union {

@@ -1021,12 +1021,8 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 		mpc->kind = TCPOPT_MPTCP;
 
-		if (OPTION_TYPE_SYN & opts->mptcp_options) {
-			mpc->sender_key = opts->mp_capable.sender_key;
-			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
-			mpc->ver = opts->mptcp_ver;
-			ptr += MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN >> 2;
-		} else if (OPTION_TYPE_SYNACK & opts->mptcp_options) {
+		if ((OPTION_TYPE_SYN & opts->mptcp_options) ||
+		    (OPTION_TYPE_SYNACK & opts->mptcp_options)) {
 			mpc->sender_key = opts->mp_capable.sender_key;
 			mpc->len = MPTCP_SUB_LEN_CAPABLE_SYN;
 			mpc->ver = opts->mptcp_ver;
@@ -1100,8 +1096,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 				*(padd_area++) = TCPOPT_NOP;
 				*(padd_area++) = TCPOPT_NOP;
 				/* Adding 4 due to port and two NOP's */
-				len_align =
-				(MPTCP_SUB_LEN_ADD_ADDR4_ALIGN + 4) >> 2;
+				len_align = (MPTCP_SUB_LEN_ADD_ADDR4_ALIGN + 4) >> 2;
 				goto next_phase_v4;
 			}
 			mpadd->len = MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2;
@@ -1113,8 +1108,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 			*(padd_area++) = TCPOPT_NOP;
 			*(padd_area++) = TCPOPT_NOP;
 			/* Adding 4 due to port and two NOP's */
-			len_align =
-			(MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 + 4) >> 2;
+			len_align = (MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1 + 4) >> 2;
 			goto next_phase_v4;
 no_port_v4:
 			if (mpcb->mptcp_ver < 1)
