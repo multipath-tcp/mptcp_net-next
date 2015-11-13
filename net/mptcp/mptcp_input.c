@@ -1629,7 +1629,8 @@ static inline bool is_valid_addropt_opsize(u8 mptcp_ver,
 
 void mptcp_parse_options(const uint8_t *ptr, int opsize,
 			 struct mptcp_options_received *mopt,
-			 const struct sk_buff *skb)
+			 const struct sk_buff *skb,
+			 struct tcp_sock *tp)
 {
 	const struct mptcp_option *mp_opt = (struct mptcp_option *)ptr;
 
@@ -1782,7 +1783,8 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 	{
 		struct mp_add_addr *mpadd = (struct mp_add_addr *)ptr;
 
-		if (!is_valid_addropt_opsize(mopt->mptcp_ver, mpadd, opsize)) {
+		if (!is_valid_addropt_opsize(tp->mpcb->mptcp_ver,
+					     mpadd, opsize)) {
 			mptcp_debug("%s: mp_add_addr: bad option size %d\n",
 				    __func__, opsize);
 			break;
@@ -1882,7 +1884,7 @@ void tcp_parse_mptcp_options(const struct sk_buff *skb,
 			if (opsize > length)
 				return;	/* don't parse partial options */
 			if (opcode == TCPOPT_MPTCP)
-				mptcp_parse_options(ptr - 2, opsize, mopt, skb);
+				mptcp_parse_options(ptr - 2, opsize, mopt, skb, NULL);
 		}
 		ptr += opsize - 2;
 		length -= opsize;
