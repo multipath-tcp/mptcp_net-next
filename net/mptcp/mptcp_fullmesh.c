@@ -1544,16 +1544,12 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	if (!meta_v4 && meta_sk->sk_ipv6only)
 		goto skip_ipv4;
 
-	/* IPv4 */
-	/* TODO Add case for port advertisement here and include the option
-	 * opts->add_addr_port = 1 to signal mptcp_output.c. It is
-	 * necessary to increase *size by four, too (since we are adding
-	 * the port value and two NOP's). Finally, set
-	 * (u16 *)&addrid_port[1] = htons(<advertised port>) for correct
-	 * hmac computation as described in RFC6824bis-04.
-	 * Important: always use htons() with 2 bytes port value.
+	/* TODO Add case for port advertisement and include the option
+	 * opts->add_addr_port = 1 to signal mptcp_output.c, for both
+	 * IPv4 and IPv6.
 	 */
 
+	/* IPv4 */
 	unannouncedv4 = (~fmp->announced_addrs_v4) & mptcp_local->loc4_bits;
 	if (unannouncedv4) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
@@ -1565,17 +1561,14 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 		opts->add_addr_v4 = 1;
 		if (mpcb->mptcp_ver >= 1) {
 			u8 mptcp_hash_mac[20];
-			u8 addrid_port[4];
 			u8 no_key[8];
 
-			*(u32 *)addrid_port = 0;
 			*(u64 *)no_key = 0;
-			addrid_port[0] = mptcp_local->locaddr4[ind].loc4_id;
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)no_key,
-					(u8 *)&opts->add_addr4.addr.s_addr,
-					(u8 *)addrid_port,
-					(u32 *)mptcp_hash_mac);
+					(u32 *)mptcp_hash_mac, 2,
+					1, (u8 *)&mptcp_local->locaddr4[ind].loc4_id,
+					4, (u8 *)&opts->add_addr4.addr.s_addr);
 			opts->add_addr4.trunc_mac = *(u64 *)mptcp_hash_mac;
 		}
 
@@ -1606,24 +1599,13 @@ skip_ipv4:
 		if (mpcb->mptcp_ver >= 1) {
 			u8 mptcp_hash_mac[20];
 			u8 no_key[8];
-			u32 ip6_address[4];
-			int i;
 
-			*(u32 *)mptcp_hash_mac = 0;
 			*(u64 *)no_key = 0;
-			/* For the first cycle, use 'hash_mac_check' to provide
-			 * addrress_id and port value as HMAC message
-			 */
-			mptcp_hash_mac[0] = mptcp_local->locaddr6[ind].loc6_id;
-			memcpy((char *)ip6_address,
-			       (u8 *)&opts->add_addr6.addr.s6_addr, 16);
-			for (i = 0; i < 4; i++) {
-				mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
-						(u8 *)no_key,
-						(u8 *)&ip6_address[i],
-						(u8 *)mptcp_hash_mac,
-						(u32 *)mptcp_hash_mac);
-			}
+			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
+					(u8 *)no_key,
+					(u32 *)mptcp_hash_mac, 2,
+					1, (u8 *)&mptcp_local->locaddr6[ind].loc6_id,
+					16, (u8 *)&opts->add_addr6.addr.s6_addr);
 			opts->add_addr6.trunc_mac = *(u64 *)mptcp_hash_mac;
 		}
 

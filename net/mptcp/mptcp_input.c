@@ -1924,26 +1924,26 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 	if (mpadd->ipver == 4) {
 		char *recv_hmac_pointer;
 		u8 hash_mac_check[20];
-		u8 addrid_port[4];
 		u8 no_key[8];
+		int msg_parts;
 
 		if (mpcb->mptcp_ver < 1)
 			goto skip_hmac_v4;
 
-		*(u32 *)addrid_port = 0;
 		*(u64 *)no_key = 0;
-		addrid_port[0] = mpadd->addr_id;
 		recv_hmac_pointer = (char *)mpadd->u.v4.mac;
-		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1)
+		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1) {
 			recv_hmac_pointer -= sizeof(mpadd->u.v4.port);
-		else
-			*(u16 *)&addrid_port[1] = mpadd->u.v4.port;
+			msg_parts = 2;
+		} else if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR4_VER1 + 2) {
+			msg_parts = 3;
+		}
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 				(u8 *)no_key,
-				(u8 *)&mpadd->u.v4.addr.s_addr,
-				(u8 *)addrid_port,
-				(u32 *)hash_mac_check);
-
+				(u32 *)hash_mac_check, msg_parts,
+				1, (u8 *)&mpadd->addr_id,
+				4, (u8 *)&mpadd->u.v4.addr.s_addr,
+				2, (u8 *)&mpadd->u.v4.port);
 		if (memcmp(hash_mac_check, recv_hmac_pointer, 8) != 0)
 			/* ADD_ADDR2 discarded */
 			return;
@@ -1960,33 +1960,25 @@ skip_hmac_v4:
 		char *recv_hmac_pointer;
 		u8 hash_mac_check[20];
 		u8 no_key[8];
-		u32 ip6_address[4];
-		int i;
+		int msg_parts;
 
 		if (mpcb->mptcp_ver < 1)
 			goto skip_hmac_v6;
 
-		*(u32 *)hash_mac_check = 0;
 		*(u64 *)no_key = 0;
-		/* For the first cycle, use 'hash_mac_check' to provide
-		 * addrress_id and port value as HMAC message
-		 */
-		hash_mac_check[0] = mpadd->addr_id;
-		memcpy((char *)ip6_address,
-		       (u8 *)&mpadd->u.v6.addr.s6_addr, 16);
 		recv_hmac_pointer = (char *)mpadd->u.v6.mac;
-		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6_VER1)
+		if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6_VER1) {
 			recv_hmac_pointer -= sizeof(mpadd->u.v6.port);
-		else
-			*(u16 *)&hash_mac_check[1] = mpadd->u.v6.port;
-		for (i = 0; i < 4; i++) {
-			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
-					(u8 *)no_key,
-					(u8 *)&ip6_address[i],
-					(u8 *)hash_mac_check,
-					(u32 *)hash_mac_check);
+			msg_parts = 2;
+		} else if (mpadd->len == MPTCP_SUB_LEN_ADD_ADDR6_VER1 + 2) {
+			msg_parts = 3;
 		}
-
+		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
+				(u8 *)no_key,
+				(u32 *)hash_mac_check, msg_parts,
+				1, (u8 *)&mpadd->addr_id,
+				16, (u8 *)&mpadd->u.v6.addr.s6_addr,
+				2, (u8 *)&mpadd->u.v6.port);
 		if (memcmp(hash_mac_check, recv_hmac_pointer, 8) != 0)
 			/* ADD_ADDR2 discarded */
 			return;
@@ -2300,9 +2292,9 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 				(u8 *)&mpcb->mptcp_loc_key,
-				(u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
-				(u8 *)&tp->mptcp->mptcp_loc_nonce,
-				(u32 *)hash_mac_check);
+				(u32 *)hash_mac_check, 2,
+				4, (u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
+				4, (u8 *)&tp->mptcp->mptcp_loc_nonce);
 		if (memcmp(hash_mac_check,
 			   (char *)&tp->mptcp->rx_opt.mptcp_recv_tmac, 8)) {
 			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_JOINSYNACKMAC);
@@ -2318,9 +2310,9 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 				(u8 *)&mpcb->mptcp_rem_key,
-				(u8 *)&tp->mptcp->mptcp_loc_nonce,
-				(u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
-				(u32 *)&tp->mptcp->sender_mac[0]);
+				(u32 *)&tp->mptcp->sender_mac[0], 2,
+				4, (u8 *)&tp->mptcp->mptcp_loc_nonce,
+				4, (u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce);
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_JOINSYNACKRX);
 	} else if (mopt->saw_mpc) {
