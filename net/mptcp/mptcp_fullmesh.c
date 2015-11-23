@@ -1555,8 +1555,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 	    ((mpcb->mptcp_ver == 0 &&
 	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR4_ALIGN) ||
 	    (mpcb->mptcp_ver >= 1 &&
-	    MAX_TCP_OPTION_SPACE - *size >=
-	    MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1))) {
+	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR4_ALIGN_VER1))) {
 		int ind = mptcp_find_free_index(~unannouncedv4);
 
 		opts->options |= OPTION_MPTCP;
@@ -1597,8 +1596,7 @@ skip_ipv4:
 	    ((mpcb->mptcp_ver == 0 &&
 	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR6_ALIGN) ||
 	    (mpcb->mptcp_ver >= 1 &&
-	    MAX_TCP_OPTION_SPACE - *size >=
-	    MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1))) {
+	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_ADD_ADDR6_ALIGN_VER1))) {
 		int ind = mptcp_find_free_index(~unannouncedv6);
 
 		opts->options |= OPTION_MPTCP;

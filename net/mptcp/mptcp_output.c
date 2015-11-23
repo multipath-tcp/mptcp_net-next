@@ -960,10 +960,18 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		if (skb)
 			tp->mptcp->include_mpc = 0;
 	}
+
 	if (unlikely(tp->mptcp->pre_established)) {
 		opts->options |= OPTION_MPTCP;
 		opts->mptcp_options |= OPTION_MP_JOIN | OPTION_TYPE_ACK;
 		*size += MPTCP_SUB_LEN_JOIN_ACK_ALIGN;
+	}
+
+	if (unlikely(mpcb->addr_signal) && mpcb->pm_ops->addr_signal) {
+		mpcb->pm_ops->addr_signal(sk, size, opts, skb);
+		if (opts->add_addr_v6)
+			/* Skip subsequent options */
+			return;
 	}
 
 	if (!tp->mptcp->include_mpc && !tp->mptcp->pre_established) {
@@ -984,9 +992,6 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 		*size += MPTCP_SUB_LEN_DSS_ALIGN;
 	}
-
-	if (unlikely(mpcb->addr_signal) && mpcb->pm_ops->addr_signal)
-		mpcb->pm_ops->addr_signal(sk, size, opts, skb);
 
 	if (unlikely(tp->mptcp->send_mp_prio) &&
 	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_PRIO_ALIGN) {
