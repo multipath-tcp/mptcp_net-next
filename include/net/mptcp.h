@@ -157,15 +157,20 @@ struct mptcp_options_received {
 	u8	mptcp_recv_mac[20];
 };
 
+struct mptcp_mapping {
+	struct list_head list;
+	u64 map_data_seq;
+	u32 map_subseq;
+	u16 map_data_len;
+	bool map_data_fin;
+};
+
 struct mptcp_tcp_sock {
 	struct tcp_sock	*next;		/* Next subflow socket */
 	struct hlist_node cb_list;
 	struct mptcp_options_received rx_opt;
 
-	 /* Those three fields record the current mapping */
-	u64	map_data_seq;
-	u32	map_subseq;
-	u16	map_data_len;
+	struct list_head mapping_list;
 	u16	slave_sk:1,
 		fully_established:1,
 		establish_increased:1,
@@ -173,8 +178,6 @@ struct mptcp_tcp_sock {
 		attached:1,
 		send_mp_fail:1,
 		include_mpc:1,
-		mapping_present:1,
-		map_data_fin:1,
 		low_prio:1, /* use this socket as backup */
 		rcv_low_prio:1, /* Peer sent low-prio option to us */
 		send_mp_prio:1, /* Trigger to send mp_prio on this socket */
@@ -663,6 +666,8 @@ extern int sysctl_mptcp_syn_retries;
 
 extern struct workqueue_struct *mptcp_wq;
 
+extern struct kmem_cache *mptcp_mapping_cache;
+
 #define mptcp_debug(fmt, args...)					\
 	do {								\
 		if (unlikely(sysctl_mptcp_debug))			\
@@ -781,6 +786,7 @@ extern spinlock_t mptcp_tk_hashlock;	/* hashtable protection */
 
 
 void mptcp_data_ready(struct sock *sk);
+void mptcp_data_ready_inf(struct sock *sk);
 void mptcp_write_space(struct sock *sk);
 
 void mptcp_add_meta_ofo_queue(const struct sock *meta_sk, struct sk_buff *skb,
@@ -793,6 +799,7 @@ int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 void mptcp_del_sock(struct sock *sk);
 void mptcp_update_metasocket(struct sock *sock, const struct sock *meta_sk);
 void mptcp_reinject_data(struct sock *orig_sk, int clone_it);
+void mptcp_recv_queue_added(struct sock *sk, struct sk_buff *skb);
 void mptcp_update_sndbuf(const struct tcp_sock *tp);
 void mptcp_send_fin(struct sock *meta_sk);
 void mptcp_send_active_reset(struct sock *meta_sk, gfp_t priority);
@@ -1295,6 +1302,8 @@ static inline bool mptcp_fallback_infinite(struct sock *sk, int flag)
 	mpcb->infinite_mapping_rcv = 1;
 	mpcb->infinite_rcv_seq = mptcp_get_rcv_nxt_64(mptcp_meta_tp(tp));
 	tp->mptcp->fully_established = 1;
+
+	sk->sk_data_ready = mptcp_data_ready_inf;
 
 	mptcp_sub_force_close_all(mpcb, sk);
 

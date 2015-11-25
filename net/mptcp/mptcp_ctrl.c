@@ -61,6 +61,7 @@
 static struct kmem_cache *mptcp_sock_cache __read_mostly;
 static struct kmem_cache *mptcp_cb_cache __read_mostly;
 static struct kmem_cache *mptcp_tw_cache __read_mostly;
+struct kmem_cache *mptcp_mapping_cache __read_mostly;
 
 int sysctl_mptcp_enabled __read_mostly = 1;
 int sysctl_mptcp_version __read_mostly = 0;
@@ -642,6 +643,12 @@ static void mptcp_mpcb_put(struct mptcp_cb *mpcb)
 void mptcp_sock_destruct(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct mptcp_mapping *mapping, *tmp;
+
+	if (tp->mptcp)
+		list_for_each_entry_safe(mapping, tmp,
+					 &tp->mptcp->mapping_list, list)
+			kmem_cache_free(mptcp_mapping_cache, mapping);
 
 	if (!is_meta_sk(sk) && !tp->was_meta_sk) {
 		BUG_ON(!hlist_unhashed(&tp->mptcp->cb_list));
@@ -1240,6 +1247,7 @@ int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 	}
 
 	INIT_HLIST_NODE(&tp->mptcp->cb_list);
+	INIT_LIST_HEAD(&tp->mptcp->mapping_list);
 
 	tp->mptcp->tp = tp;
 	tp->mpcb = mpcb;
@@ -1252,6 +1260,7 @@ int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 
 	tp->mpc = 1;
 	tp->ops = &mptcp_sub_specific;
+	tp->recv_queue_added = mptcp_recv_queue_added;
 
 	tp->mptcp->loc_id = loc_id;
 	tp->mptcp->rem_id = rem_id;
@@ -2618,6 +2627,11 @@ void __init mptcp_init(void)
 	if (!mptcp_tw_cache)
 		goto mptcp_tw_cache_failed;
 
+	mptcp_mapping_cache = kmem_cache_create("mptcp_mapping", sizeof(struct mptcp_mapping),
+						0, SLAB_HWCACHE_ALIGN, NULL);
+	if (!mptcp_mapping_cache)
+		goto mptcp_mapping_cache_failed;
+
 	get_random_bytes(mptcp_secret, sizeof(mptcp_secret));
 
 	mptcp_wq = alloc_workqueue("mptcp_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 8);
@@ -2675,6 +2689,8 @@ mptcp_pm_v6_failed:
 pernet_failed:
 	destroy_workqueue(mptcp_wq);
 alloc_workqueue_failed:
+	kmem_cache_destroy(mptcp_mapping_cache);
+mptcp_mapping_cache_failed:
 	kmem_cache_destroy(mptcp_tw_cache);
 mptcp_tw_cache_failed:
 	kmem_cache_destroy(mptcp_cb_cache);

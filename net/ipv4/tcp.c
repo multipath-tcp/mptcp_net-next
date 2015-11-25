@@ -1514,7 +1514,8 @@ static struct sk_buff *tcp_recv_skb(struct sock *sk, u32 seq, u32 *off)
 		offset = seq - TCP_SKB_CB(skb)->seq;
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)
 			offset--;
-		if (offset < skb->len || (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)) {
+		if (offset < skb->len || (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN) ||
+		    mptcp_is_data_fin(skb)) {
 			*off = offset;
 			return skb;
 		}
@@ -1550,7 +1551,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
 	while ((skb = tcp_recv_skb(sk, seq, &offset)) != NULL) {
-		if (offset < skb->len) {
+		if (offset < skb->len || mptcp_is_data_fin(skb)) {
 			int used;
 			size_t len;
 
