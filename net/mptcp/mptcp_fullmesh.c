@@ -1570,7 +1570,7 @@ static void full_mesh_addr_signal(struct sock *sk, unsigned *size,
 			*(u64 *)no_key = 0;
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)no_key,
-					(u32 *)mptcp_hash_mac, 2,
+					(u8 *)mptcp_hash_mac, 2,
 					1, (u8 *)&mptcp_local->locaddr4[ind].loc4_id,
 					4, (u8 *)&opts->add_addr4.addr.s_addr);
 			opts->add_addr4.trunc_mac = *(u64 *)mptcp_hash_mac;
@@ -1611,7 +1611,7 @@ skip_ipv4:
 			*(u64 *)no_key = 0;
 			mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 					(u8 *)no_key,
-					(u32 *)mptcp_hash_mac, 2,
+					(u8 *)mptcp_hash_mac, 2,
 					1, (u8 *)&mptcp_local->locaddr6[ind].loc6_id,
 					16, (u8 *)&opts->add_addr6.addr.s6_addr);
 			opts->add_addr6.trunc_mac = *(u64 *)mptcp_hash_mac;

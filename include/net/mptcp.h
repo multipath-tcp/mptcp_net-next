@@ -344,6 +344,10 @@ struct mptcp_cb {
 	u32 orig_window_clamp;
 };
 
+struct mptcp_hmacsha1_pool {
+	struct hash_desc	hmacsha1_desc;
+};
+
 #define MPTCP_SUB_CAPABLE			0
 #define MPTCP_SUB_LEN_CAPABLE_SYN		12
 #define MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN		12
@@ -826,8 +830,9 @@ void mptcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 					const struct sock *sk);
 unsigned int mptcp_current_mss(struct sock *meta_sk);
 int mptcp_select_size(const struct sock *meta_sk, bool sg);
+void mptcp_alloc_hmacsha1_pool(void);
 void mptcp_key_sha1(u64 key, u32 *token, u64 *idsn);
-void mptcp_hmac_sha1(u8 *key_1, u8 *key_2, u32 *hash_out, int arg_num, ...);
+void mptcp_hmac_sha1(u8 *key_1, u8 *key_2, u8 *hash_out, int arg_num, ...);
 void mptcp_clean_rtx_infinite(const struct sk_buff *skb, struct sock *sk);
 void mptcp_fin(struct sock *meta_sk);
 void mptcp_retransmit_timer(struct sock *meta_sk);
@@ -905,6 +910,11 @@ void mptcp_cleanup_scheduler(struct mptcp_cb *mpcb);
 void mptcp_get_default_scheduler(char *name);
 int mptcp_set_default_scheduler(const char *name);
 extern struct mptcp_sched_ops mptcp_sched_default;
+
+static inline void mptcp_put_hmacsha1_pool(void)
+{
+	local_bh_enable();
+}
 
 /* Initializes function-pointers and MPTCP-flags */
 static inline void mptcp_init_tcp_sock(struct sock *sk)

@@ -1940,7 +1940,7 @@ static void mptcp_handle_add_addr(const unsigned char *ptr, struct sock *sk)
 		}
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 				(u8 *)no_key,
-				(u32 *)hash_mac_check, msg_parts,
+				(u8 *)hash_mac_check, msg_parts,
 				1, (u8 *)&mpadd->addr_id,
 				4, (u8 *)&mpadd->u.v4.addr.s_addr,
 				2, (u8 *)&mpadd->u.v4.port);
@@ -1975,7 +1975,7 @@ skip_hmac_v4:
 		}
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 				(u8 *)no_key,
-				(u32 *)hash_mac_check, msg_parts,
+				(u8 *)hash_mac_check, msg_parts,
 				1, (u8 *)&mpadd->addr_id,
 				16, (u8 *)&mpadd->u.v6.addr.s6_addr,
 				2, (u8 *)&mpadd->u.v6.port);
@@ -2292,7 +2292,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_rem_key,
 				(u8 *)&mpcb->mptcp_loc_key,
-				(u32 *)hash_mac_check, 2,
+				(u8 *)hash_mac_check, 2,
 				4, (u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce,
 				4, (u8 *)&tp->mptcp->mptcp_loc_nonce);
 		if (memcmp(hash_mac_check,
@@ -2310,7 +2310,7 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 				(u8 *)&mpcb->mptcp_rem_key,
-				(u32 *)&tp->mptcp->sender_mac[0], 2,
+				(u8 *)&tp->mptcp->sender_mac[0], 2,
 				4, (u8 *)&tp->mptcp->mptcp_loc_nonce,
 				4, (u8 *)&tp->mptcp->rx_opt.mptcp_recv_nonce);
 
