@@ -443,7 +443,6 @@ void tcp_init_sock(struct sock *sk)
 
 	/* Initialize MPTCP-specific stuff and function-pointers */
 	mptcp_init_tcp_sock(sk);
-	mptcp_alloc_hmacsha1_pool();
 
 	local_bh_disable();
 	sock_update_memcg(sk);

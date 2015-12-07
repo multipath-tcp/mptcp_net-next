@@ -391,11 +391,26 @@ static void __mptcp_alloc_hmacsha1_pool(void)
 	for_each_possible_cpu(cpu) {
 		if (!per_cpu(mptcp_hmacsha1_pool, cpu).hmacsha1_desc.tfm) {
 			struct crypto_hash *hash;
+			unsigned int keylen = MPTCP_HMACSHA1_KEYLEN;
+			unsigned long absize;
+			unsigned long alignmask;
+			u8 *buffer;
+			u8 *alignbuffer;
 
+			/* Allocating crypto_hash */
 			hash = crypto_alloc_hash("hmac(sha1)", 0, CRYPTO_ALG_ASYNC);
 			if (IS_ERR_OR_NULL(hash))
 				return;
 			per_cpu(mptcp_hmacsha1_pool, cpu).hmacsha1_desc.tfm = hash;
+
+			/* Allocating aligned key_placeholder */
+			alignmask = crypto_hash_alignmask(hash);
+			absize = keylen + (alignmask & ~(crypto_tfm_ctx_alignment() - 1));
+			buffer = kmalloc(absize, GFP_KERNEL);
+			if (!buffer)
+				return;
+			alignbuffer = (u8 *)ALIGN((unsigned long)buffer, alignmask + 1);
+			per_cpu(mptcp_hmacsha1_pool, cpu).key_placeholder = alignbuffer;
 		}
 	}
 	/* before setting mptcp_hmacsha1_pool_populated, we must commit all
@@ -489,6 +504,7 @@ void mptcp_disable_static_key(void)
 
 void mptcp_enable_sock(struct sock *sk)
 {
+	mptcp_alloc_hmacsha1_pool();
 	if (!sock_flag(sk, SOCK_MPTCP)) {
 		sock_set_flag(sk, SOCK_MPTCP);
 
@@ -850,7 +866,7 @@ void mptcp_hmac_sha1(u8 *key_1, u8 *key_2, u8 *hash_out, int arg_num, ...)
 {
 	struct mptcp_hmacsha1_pool *sp;
 	struct scatterlist sg;
-	u8 key[16];
+	u8 *key;
 	int i;
 	int length;
 	u8 *msg;
@@ -860,6 +876,7 @@ void mptcp_hmac_sha1(u8 *key_1, u8 *key_2, u8 *hash_out, int arg_num, ...)
 	if (!sp)
 		goto clear_hmac_noput;
 	sp->hmacsha1_desc.flags = 0;
+	key = sp->key_placeholder;
 
 	memcpy(&key[0], key_1, 8);
 	memcpy(&key[8], key_2, 8);

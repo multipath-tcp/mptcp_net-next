@@ -346,7 +346,10 @@ struct mptcp_cb {
 
 struct mptcp_hmacsha1_pool {
 	struct hash_desc	hmacsha1_desc;
+	u8	*key_placeholder;
 };
+
+#define MPTCP_HMACSHA1_KEYLEN		16
 
 #define MPTCP_SUB_CAPABLE			0
 #define MPTCP_SUB_LEN_CAPABLE_SYN		12
