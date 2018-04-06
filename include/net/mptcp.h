@@ -821,7 +821,7 @@ void mptcp_select_initial_window(const struct sock *sk, int __space, __u32 mss,
 				 int wscale_ok, __u8 *rcv_wscale,
 				 __u32 init_rcv_wnd);
 unsigned int mptcp_current_mss(struct sock *meta_sk);
-int mptcp_select_size(const struct sock *meta_sk, bool sg, bool first_skb, bool zc);
+int mptcp_select_size(const struct sock *meta_sk, bool first_skb, bool zc);
 void mptcp_key_sha1(u64 key, u32 *token, u64 *idsn);
 void mptcp_hmac_sha1(const u8 *key_1, const u8 *key_2, u32 *hash_out,
 		     int arg_num, ...);
@@ -943,8 +943,7 @@ static inline bool mptcp_can_sendpage(struct sock *sk)
 		return false;
 
 	mptcp_for_each_sk(tcp_sk(sk)->mpcb, sk_it) {
-		if (!(sk_it->sk_route_caps & NETIF_F_SG) ||
-		    !sk_check_csum_caps(sk_it))
+		if (!(sk_it->sk_route_caps & NETIF_F_SG))
 			return false;
 	}
 
@@ -1161,23 +1160,6 @@ static inline int mptcp_sk_can_send_ack(const struct sock *sk)
 	return !((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV |
 					TCPF_CLOSE | TCPF_LISTEN)) &&
 	       !tcp_sk(sk)->mptcp->pre_established;
-}
-
-/* Only support GSO if all subflows supports it */
-static inline bool mptcp_sk_can_gso(const struct sock *meta_sk)
-{
-	struct sock *sk;
-
-	if (tcp_sk(meta_sk)->mpcb->dss_csum)
-		return false;
-
-	mptcp_for_each_sk(tcp_sk(meta_sk)->mpcb, sk) {
-		if (!mptcp_sk_can_send(sk))
-			continue;
-		if (!sk_can_gso(sk))
-			return false;
-	}
-	return true;
 }
 
 static inline bool mptcp_can_sg(const struct sock *meta_sk)
@@ -1453,10 +1435,6 @@ static inline bool mptcp_handle_options(struct sock *sk,
 }
 static inline void mptcp_reset_mopt(struct tcp_sock *tp) {}
 static inline void  __init mptcp_init(void) {}
-static inline bool mptcp_sk_can_gso(const struct sock *sk)
-{
-	return false;
-}
 static inline bool mptcp_can_sg(const struct sock *meta_sk)
 {
 	return false;

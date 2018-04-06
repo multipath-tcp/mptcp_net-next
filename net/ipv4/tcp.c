@@ -1170,7 +1170,7 @@ int linear_payload_sz(bool first_skb)
 	return 0;
 }
 
-static int select_size(bool first_skb, bool zc)
+int select_size(const struct sock *sk, bool first_skb, bool zc)
 {
 	if (zc)
 		return 0;
@@ -1350,7 +1350,7 @@ new_segment:
 				goto restart;
 			}
 			first_skb = tcp_rtx_and_write_queues_empty(sk);
-			linear = tp->ops->select_size(first_skb, zc);
+			linear = tp->ops->select_size(sk, first_skb, zc);
 			skb = sk_stream_alloc_skb(sk, linear, sk->sk_allocation,
 						  first_skb);
 			if (!skb)
