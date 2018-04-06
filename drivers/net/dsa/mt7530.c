@@ -604,7 +604,7 @@ mt7530_get_ethtool_stats(struct dsa_switch *ds, int port,
 }
 
 static int
-mt7530_get_sset_count(struct dsa_switch *ds)
+mt7530_get_sset_count(struct dsa_switch *ds, int port)
 {
 	return ARRAY_SIZE(mt7530_mib);
 }
@@ -1409,6 +1409,7 @@ static const struct of_device_id mt7530_of_match[] = {
 	{ .compatible = "mediatek,mt7530" },
 	{ /* sentinel */ },
 };
+MODULE_DEVICE_TABLE(of, mt7530_of_match);
 
 static struct mdio_driver mt7530_mdio_driver = {
 	.probe  = mt7530_probe,
@@ -1424,4 +1425,3 @@ mdio_module_driver(mt7530_mdio_driver);
 MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
 MODULE_DESCRIPTION("Driver for Mediatek MT7530 Switch");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:mediatek-mt7530");
