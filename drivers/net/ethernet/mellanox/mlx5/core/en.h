@@ -53,6 +53,8 @@
 #include "mlx5_core.h"
 #include "en_stats.h"
 
+struct page_pool;
+
 #define MLX5_SET_CFG(p, f, v) MLX5_SET(create_flow_group_in, p, f, v)
 
 #define MLX5E_ETH_HARD_MTU (ETH_HLEN + VLAN_HLEN + ETH_FCS_LEN)
@@ -239,6 +241,7 @@ struct mlx5e_params {
 	bool vlan_strip_disable;
 	bool scatter_fcs_en;
 	bool rx_dim_enabled;
+	bool tx_dim_enabled;
 	u32 lro_timeout;
 	u32 pflags;
 	struct bpf_prog *xdp_prog;
@@ -328,6 +331,7 @@ enum {
 	MLX5E_SQ_STATE_ENABLED,
 	MLX5E_SQ_STATE_RECOVERING,
 	MLX5E_SQ_STATE_IPSEC,
+	MLX5E_SQ_STATE_AM,
 };
 
 struct mlx5e_sq_wqe_info {
@@ -340,6 +344,7 @@ struct mlx5e_txqsq {
 	/* dirtied @completion */
 	u16                        cc;
 	u32                        dma_fifo_cc;
+	struct net_dim             dim; /* Adaptive Moderation */
 
 	/* dirtied @xmit */
 	u16                        pc ____cacheline_aligned_in_smp;
@@ -392,6 +397,7 @@ struct mlx5e_xdpsq {
 	struct {
 		struct mlx5e_dma_info     *di;
 		bool                       doorbell;
+		bool                       redirect_flush;
 	} db;
 
 	/* read only */
@@ -533,6 +539,7 @@ struct mlx5e_rq {
 	unsigned int           hw_mtu;
 	struct mlx5e_xdpsq     xdpsq;
 	DECLARE_BITMAP(flags, 8);
+	struct page_pool      *page_pool;
 
 	/* control */
 	struct mlx5_wq_ctrl    wq_ctrl;
@@ -1107,4 +1114,5 @@ void mlx5e_build_nic_params(struct mlx5_core_dev *mdev,
 			    u16 max_channels, u16 mtu);
 u8 mlx5e_params_calculate_tx_min_inline(struct mlx5_core_dev *mdev);
 void mlx5e_rx_dim_work(struct work_struct *work);
+void mlx5e_tx_dim_work(struct work_struct *work);
 #endif /* __MLX5_EN_H__ */

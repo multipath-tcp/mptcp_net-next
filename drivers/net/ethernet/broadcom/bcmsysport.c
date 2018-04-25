@@ -654,7 +654,7 @@ static int bcm_sysport_set_coalesce(struct net_device *dev,
 	pkts = priv->rx_max_coalesced_frames;
 
 	if (ec->use_adaptive_rx_coalesce && !priv->dim.use_dim) {
-		moder = net_dim_get_def_profile(priv->dim.dim.mode);
+		moder = net_dim_get_def_rx_moderation(priv->dim.dim.mode);
 		usecs = moder.usec;
 		pkts = moder.pkts;
 	}
@@ -1064,7 +1064,7 @@ static void bcm_sysport_dim_work(struct work_struct *work)
 	struct bcm_sysport_priv *priv =
 			container_of(ndim, struct bcm_sysport_priv, dim);
 	struct net_dim_cq_moder cur_profile =
-				net_dim_get_profile(dim->mode, dim->profile_ix);
+			net_dim_get_rx_moderation(dim->mode, dim->profile_ix);
 
 	bcm_sysport_set_rx_coalesce(priv, cur_profile.usec, cur_profile.pkts);
 	dim->state = NET_DIM_START_MEASURE;
@@ -1192,7 +1192,7 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 	u32 csum_info;
 	u8 ip_proto;
 	u16 csum_start;
-	u16 ip_ver;
+	__be16 ip_ver;
 
 	/* Re-allocate SKB if needed */
 	if (unlikely(skb_headroom(skb) < sizeof(*tsb))) {
@@ -1211,12 +1211,12 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 	memset(tsb, 0, sizeof(*tsb));
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		ip_ver = htons(skb->protocol);
+		ip_ver = skb->protocol;
 		switch (ip_ver) {
-		case ETH_P_IP:
+		case htons(ETH_P_IP):
 			ip_proto = ip_hdr(skb)->protocol;
 			break;
-		case ETH_P_IPV6:
+		case htons(ETH_P_IPV6):
 			ip_proto = ipv6_hdr(skb)->nexthdr;
 			break;
 		default:
@@ -1230,7 +1230,8 @@ static struct sk_buff *bcm_sysport_insert_tsb(struct sk_buff *skb,
 
 		if (ip_proto == IPPROTO_TCP || ip_proto == IPPROTO_UDP) {
 			csum_info |= L4_LENGTH_VALID;
-			if (ip_proto == IPPROTO_UDP && ip_ver == ETH_P_IP)
+			if (ip_proto == IPPROTO_UDP &&
+			    ip_ver == htons(ETH_P_IP))
 				csum_info |= L4_UDP;
 		} else {
 			csum_info = 0;
@@ -1436,7 +1437,7 @@ static void bcm_sysport_init_rx_coalesce(struct bcm_sysport_priv *priv)
 
 	/* If DIM was enabled, re-apply default parameters */
 	if (dim->use_dim) {
-		moder = net_dim_get_def_profile(dim->dim.mode);
+		moder = net_dim_get_def_rx_moderation(dim->dim.mode);
 		usecs = moder.usec;
 		pkts = moder.pkts;
 	}

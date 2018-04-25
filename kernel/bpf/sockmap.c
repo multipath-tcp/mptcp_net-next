@@ -182,8 +182,10 @@ static void bpf_tcp_release(struct sock *sk)
 		psock->cork = NULL;
 	}
 
-	sk->sk_prot = psock->sk_proto;
-	psock->sk_proto = NULL;
+	if (psock->sk_proto) {
+		sk->sk_prot = psock->sk_proto;
+		psock->sk_proto = NULL;
+	}
 out:
 	rcu_read_unlock();
 }
@@ -211,6 +213,12 @@ static void bpf_tcp_close(struct sock *sk, long timeout)
 	close_fun = psock->save_close;
 
 	write_lock_bh(&sk->sk_callback_lock);
+	if (psock->cork) {
+		free_start_sg(psock->sock, psock->cork);
+		kfree(psock->cork);
+		psock->cork = NULL;
+	}
+
 	list_for_each_entry_safe(md, mtmp, &psock->ingress, list) {
 		list_del(&md->list);
 		free_start_sg(psock->sock, md);
@@ -1433,9 +1441,6 @@ static struct bpf_map *sock_map_alloc(union bpf_attr *attr)
 	if (attr->max_entries == 0 || attr->key_size != 4 ||
 	    attr->value_size != 4 || attr->map_flags & ~SOCK_CREATE_FLAG_MASK)
 		return ERR_PTR(-EINVAL);
-
-	if (attr->value_size > KMALLOC_MAX_SIZE)
-		return ERR_PTR(-E2BIG);
 
 	err = bpf_tcp_ulp_register();
 	if (err && err != -EEXIST)

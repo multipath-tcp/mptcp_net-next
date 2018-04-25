@@ -461,21 +461,13 @@ of ftrace. Here is a list of some of the key files:
 		and ticks at the same rate as the hardware clocksource.
 
 	boot:
-		This is the boot clock (CLOCK_BOOTTIME) and is based on the
-		fast monotonic clock, but also accounts for time spent in
-		suspend. Since the clock access is designed for use in
-		tracing in the suspend path, some side effects are possible
-		if clock is accessed after the suspend time is accounted before
-		the fast mono clock is updated. In this case, the clock update
-		appears to happen slightly sooner than it normally would have.
-		Also on 32-bit systems, it's possible that the 64-bit boot offset
-		sees a partial update. These effects are rare and post
-		processing should be able to handle them. See comments in the
-		ktime_get_boot_fast_ns() function for more information.
+		Same as mono. Used to be a separate clock which accounted
+		for the time spent in suspend while CLOCK_MONOTONIC did
+		not.
 
-		To set a clock, simply echo the clock name into this file::
+	To set a clock, simply echo the clock name into this file::
 
-		  echo global > trace_clock
+	  # echo global > trace_clock
 
   trace_marker:
 
@@ -550,6 +542,30 @@ of ftrace. Here is a list of some of the key files:
 	A list of events that can be enabled in tracing.
 
 	See events.txt for more information.
+
+  timestamp_mode:
+
+	Certain tracers may change the timestamp mode used when
+	logging trace events into the event buffer.  Events with
+	different modes can coexist within a buffer but the mode in
+	effect when an event is logged determines which timestamp mode
+	is used for that event.  The default timestamp mode is
+	'delta'.
+
+	Usual timestamp modes for tracing:
+
+	  # cat timestamp_mode
+	  [delta] absolute
+
+	  The timestamp mode with the square brackets around it is the
+	  one in effect.
+
+	  delta: Default timestamp mode - timestamp is a delta against
+	         a per-buffer timestamp.
+
+	  absolute: The timestamp is a full timestamp, not a delta
+                 against some other value.  As such it takes up more
+                 space and is less efficient.
 
   hwlat_detector:
 

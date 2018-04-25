@@ -1406,7 +1406,7 @@ static void nfp_net_rx_csum(struct nfp_net_dp *dp,
 		skb->ip_summed = meta->csum_type;
 		skb->csum = meta->csum;
 		u64_stats_update_begin(&r_vec->rx_sync);
-		r_vec->hw_csum_rx_ok++;
+		r_vec->hw_csum_rx_complete++;
 		u64_stats_update_end(&r_vec->rx_sync);
 		return;
 	}
@@ -1722,7 +1722,7 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 
 			act = bpf_prog_run_xdp(xdp_prog, &xdp);
 
-			pkt_len -= xdp.data - orig_data;
+			pkt_len = xdp.data_end - xdp.data;
 			pkt_off += xdp.data - orig_data;
 
 			switch (act) {

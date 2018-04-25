@@ -1681,7 +1681,8 @@ discard:
 	kfree_skb(skb);
 }
 
-void tipc_node_apply_tolerance(struct net *net, struct tipc_bearer *b)
+void tipc_node_apply_property(struct net *net, struct tipc_bearer *b,
+			      int prop)
 {
 	struct tipc_net *tn = tipc_net(net);
 	int bearer_id = b->identity;
@@ -1696,8 +1697,13 @@ void tipc_node_apply_tolerance(struct net *net, struct tipc_bearer *b)
 	list_for_each_entry_rcu(n, &tn->node_list, list) {
 		tipc_node_write_lock(n);
 		e = &n->links[bearer_id];
-		if (e->link)
-			tipc_link_set_tolerance(e->link, b->tolerance, &xmitq);
+		if (e->link) {
+			if (prop == TIPC_NLA_PROP_TOL)
+				tipc_link_set_tolerance(e->link, b->tolerance,
+							&xmitq);
+			else if (prop == TIPC_NLA_PROP_MTU)
+				tipc_link_set_mtu(e->link, b->mtu);
+		}
 		tipc_node_write_unlock(n);
 		tipc_bearer_xmit(net, bearer_id, &xmitq, &e->maddr);
 	}
@@ -2232,8 +2238,8 @@ int tipc_nl_node_dump_monitor(struct sk_buff *skb, struct netlink_callback *cb)
 	struct net *net = sock_net(skb->sk);
 	u32 prev_bearer = cb->args[0];
 	struct tipc_nl_msg msg;
+	int bearer_id;
 	int err;
-	int i;
 
 	if (prev_bearer == MAX_BEARERS)
 		return 0;
@@ -2243,16 +2249,13 @@ int tipc_nl_node_dump_monitor(struct sk_buff *skb, struct netlink_callback *cb)
 	msg.seq = cb->nlh->nlmsg_seq;
 
 	rtnl_lock();
-	for (i = prev_bearer; i < MAX_BEARERS; i++) {
-		prev_bearer = i;
+	for (bearer_id = prev_bearer; bearer_id < MAX_BEARERS; bearer_id++) {
 		err = __tipc_nl_add_monitor(net, &msg, prev_bearer);
 		if (err)
-			goto out;
+			break;
 	}
-
-out:
 	rtnl_unlock();
-	cb->args[0] = prev_bearer;
+	cb->args[0] = bearer_id;
 
 	return skb->len;
 }

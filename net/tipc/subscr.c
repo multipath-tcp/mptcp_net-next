@@ -145,13 +145,18 @@ struct tipc_subscription *tipc_sub_subscribe(struct net *net,
 		pr_warn("Subscription rejected, no memory\n");
 		return NULL;
 	}
+	INIT_LIST_HEAD(&sub->service_list);
+	INIT_LIST_HEAD(&sub->sub_list);
 	sub->net = net;
 	sub->conid = conid;
 	sub->inactive = false;
 	memcpy(&sub->evt.s, s, sizeof(*s));
 	spin_lock_init(&sub->lock);
 	kref_init(&sub->kref);
-	tipc_nametbl_subscribe(sub);
+	if (!tipc_nametbl_subscribe(sub)) {
+		kfree(sub);
+		return NULL;
+	}
 	timer_setup(&sub->timer, tipc_sub_timeout, 0);
 	timeout = tipc_sub_read(&sub->evt.s, timeout);
 	if (timeout != TIPC_WAIT_FOREVER)

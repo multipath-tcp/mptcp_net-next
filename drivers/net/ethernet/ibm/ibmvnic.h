@@ -1035,7 +1035,6 @@ struct ibmvnic_adapter {
 
 	struct ibmvnic_sub_crq_queue **tx_scrq;
 	struct ibmvnic_sub_crq_queue **rx_scrq;
-	bool renegotiate;
 
 	/* rx structs */
 	struct napi_struct *napi;
@@ -1108,6 +1107,7 @@ struct ibmvnic_adapter {
 	bool napi_enabled, from_passive_init;
 
 	bool mac_change_pending;
+	bool failover_pending;
 
 	struct ibmvnic_tunables desired;
 	struct ibmvnic_tunables fallback;

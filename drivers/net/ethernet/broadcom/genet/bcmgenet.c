@@ -652,7 +652,7 @@ static void bcmgenet_set_ring_rx_coalesce(struct bcmgenet_rx_ring *ring,
 	pkts = ring->rx_max_coalesced_frames;
 
 	if (ec->use_adaptive_rx_coalesce && !ring->dim.use_dim) {
-		moder = net_dim_get_def_profile(ring->dim.dim.mode);
+		moder = net_dim_get_def_rx_moderation(ring->dim.dim.mode);
 		usecs = moder.usec;
 		pkts = moder.pkts;
 	}
@@ -1489,7 +1489,7 @@ static struct sk_buff *bcmgenet_put_tx_csum(struct net_device *dev,
 	struct sk_buff *new_skb;
 	u16 offset;
 	u8 ip_proto;
-	u16 ip_ver;
+	__be16 ip_ver;
 	u32 tx_csum_info;
 
 	if (unlikely(skb_headroom(skb) < sizeof(*status))) {
@@ -1509,12 +1509,12 @@ static struct sk_buff *bcmgenet_put_tx_csum(struct net_device *dev,
 	status = (struct status_64 *)skb->data;
 
 	if (skb->ip_summed  == CHECKSUM_PARTIAL) {
-		ip_ver = htons(skb->protocol);
+		ip_ver = skb->protocol;
 		switch (ip_ver) {
-		case ETH_P_IP:
+		case htons(ETH_P_IP):
 			ip_proto = ip_hdr(skb)->protocol;
 			break;
-		case ETH_P_IPV6:
+		case htons(ETH_P_IPV6):
 			ip_proto = ipv6_hdr(skb)->nexthdr;
 			break;
 		default:
@@ -1530,7 +1530,8 @@ static struct sk_buff *bcmgenet_put_tx_csum(struct net_device *dev,
 		 */
 		if (ip_proto == IPPROTO_TCP || ip_proto == IPPROTO_UDP) {
 			tx_csum_info |= STATUS_TX_CSUM_LV;
-			if (ip_proto == IPPROTO_UDP && ip_ver == ETH_P_IP)
+			if (ip_proto == IPPROTO_UDP &&
+			    ip_ver == htons(ETH_P_IP))
 				tx_csum_info |= STATUS_TX_CSUM_PROTO_UDP;
 		} else {
 			tx_csum_info = 0;
@@ -1924,7 +1925,7 @@ static void bcmgenet_dim_work(struct work_struct *work)
 	struct bcmgenet_rx_ring *ring =
 			container_of(ndim, struct bcmgenet_rx_ring, dim);
 	struct net_dim_cq_moder cur_profile =
-			net_dim_get_profile(dim->mode, dim->profile_ix);
+			net_dim_get_rx_moderation(dim->mode, dim->profile_ix);
 
 	bcmgenet_set_rx_coalesce(ring, cur_profile.usec, cur_profile.pkts);
 	dim->state = NET_DIM_START_MEASURE;
@@ -2101,7 +2102,7 @@ static void bcmgenet_init_rx_coalesce(struct bcmgenet_rx_ring *ring)
 
 	/* If DIM was enabled, re-apply default parameters */
 	if (dim->use_dim) {
-		moder = net_dim_get_def_profile(dim->dim.mode);
+		moder = net_dim_get_def_rx_moderation(dim->dim.mode);
 		usecs = moder.usec;
 		pkts = moder.pkts;
 	}

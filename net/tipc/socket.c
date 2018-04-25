@@ -1278,7 +1278,7 @@ static int __tipc_sendmsg(struct socket *sock, struct msghdr *m, size_t dlen)
 	struct tipc_msg *hdr = &tsk->phdr;
 	struct tipc_name_seq *seq;
 	struct sk_buff_head pkts;
-	u32 dnode, dport;
+	u32 dport, dnode = 0;
 	u32 type, inst;
 	int mtu, rc;
 
@@ -1348,6 +1348,8 @@ static int __tipc_sendmsg(struct socket *sock, struct msghdr *m, size_t dlen)
 		msg_set_destnode(hdr, dnode);
 		msg_set_destport(hdr, dest->addr.id.ref);
 		msg_set_hdr_sz(hdr, BASIC_H_SIZE);
+	} else {
+		return -EINVAL;
 	}
 
 	/* Block or return if destination link is congested */
@@ -3257,8 +3259,8 @@ out:
 }
 EXPORT_SYMBOL(tipc_nl_sk_walk);
 
-int tipc_sk_fill_sock_diag(struct sk_buff *skb, struct tipc_sock *tsk,
-			   u32 sk_filter_state,
+int tipc_sk_fill_sock_diag(struct sk_buff *skb, struct netlink_callback *cb,
+			   struct tipc_sock *tsk, u32 sk_filter_state,
 			   u64 (*tipc_diag_gen_cookie)(struct sock *sk))
 {
 	struct sock *sk = &tsk->sk;
@@ -3280,7 +3282,8 @@ int tipc_sk_fill_sock_diag(struct sk_buff *skb, struct tipc_sock *tsk,
 	    nla_put_u32(skb, TIPC_NLA_SOCK_TIPC_STATE, (u32)sk->sk_state) ||
 	    nla_put_u32(skb, TIPC_NLA_SOCK_INO, sock_i_ino(sk)) ||
 	    nla_put_u32(skb, TIPC_NLA_SOCK_UID,
-			from_kuid_munged(sk_user_ns(sk), sock_i_uid(sk))) ||
+			from_kuid_munged(sk_user_ns(NETLINK_CB(cb->skb).sk),
+					 sock_i_uid(sk))) ||
 	    nla_put_u64_64bit(skb, TIPC_NLA_SOCK_COOKIE,
 			      tipc_diag_gen_cookie(sk),
 			      TIPC_NLA_SOCK_PAD))

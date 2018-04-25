@@ -34,7 +34,6 @@
 #define GMAC_PCS_BASE			0x000000e0
 #define GMAC_PHYIF_CONTROL_STATUS	0x000000f8
 #define GMAC_PMT			0x000000c0
-#define GMAC_VERSION			0x00000110
 #define GMAC_DEBUG			0x00000114
 #define GMAC_HW_FEATURE0		0x0000011c
 #define GMAC_HW_FEATURE1		0x00000120
@@ -347,7 +346,7 @@ enum power_event {
 #define MTL_RX_OVERFLOW_INT		BIT(16)
 
 /* Default operating mode of the MAC */
-#define GMAC_CORE_INIT (GMAC_CONFIG_JD | GMAC_CONFIG_PS | GMAC_CONFIG_ACS | \
+#define GMAC_CORE_INIT (GMAC_CONFIG_JD | GMAC_CONFIG_PS | \
 			GMAC_CONFIG_BE | GMAC_CONFIG_DCRS)
 
 /* To dump the core regs excluding  the Address Registers */

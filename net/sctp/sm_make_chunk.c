@@ -779,10 +779,9 @@ struct sctp_chunk *sctp_make_datafrag_empty(const struct sctp_association *asoc,
  * association.  This reports on which TSN's we've seen to date,
  * including duplicates and gaps.
  */
-struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
+struct sctp_chunk *sctp_make_sack(struct sctp_association *asoc)
 {
 	struct sctp_tsnmap *map = (struct sctp_tsnmap *)&asoc->peer.tsn_map;
-	struct sctp_association *aptr = (struct sctp_association *)asoc;
 	struct sctp_gap_ack_block gabs[SCTP_MAX_GABS];
 	__u16 num_gabs, num_dup_tsns;
 	struct sctp_transport *trans;
@@ -857,7 +856,7 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 
 	/* Add the duplicate TSN information.  */
 	if (num_dup_tsns) {
-		aptr->stats.idupchunks += num_dup_tsns;
+		asoc->stats.idupchunks += num_dup_tsns;
 		sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
 				 sctp_tsnmap_get_dups(map));
 	}
@@ -869,11 +868,11 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 	 * association so no transport will match after a wrap event like this,
 	 * Until the next sack
 	 */
-	if (++aptr->peer.sack_generation == 0) {
+	if (++asoc->peer.sack_generation == 0) {
 		list_for_each_entry(trans, &asoc->peer.transport_addr_list,
 				    transports)
 			trans->sack_generation = 0;
-		aptr->peer.sack_generation = 1;
+		asoc->peer.sack_generation = 1;
 	}
 nodata:
 	return retval;
@@ -3098,6 +3097,12 @@ static __be16 sctp_process_asconf_param(struct sctp_association *asoc,
 		if (af->is_any(&addr))
 			memcpy(&addr, &asconf->source, sizeof(addr));
 
+		if (security_sctp_bind_connect(asoc->ep->base.sk,
+					       SCTP_PARAM_ADD_IP,
+					       (struct sockaddr *)&addr,
+					       af->sockaddr_len))
+			return SCTP_ERROR_REQ_REFUSED;
+
 		/* ADDIP 4.3 D9) If an endpoint receives an ADD IP address
 		 * request and does not have the local resources to add this
 		 * new address to the association, it MUST return an Error
@@ -3163,6 +3168,12 @@ static __be16 sctp_process_asconf_param(struct sctp_association *asoc,
 		 */
 		if (af->is_any(&addr))
 			memcpy(&addr.v4, sctp_source(asconf), sizeof(addr));
+
+		if (security_sctp_bind_connect(asoc->ep->base.sk,
+					       SCTP_PARAM_SET_PRIMARY,
+					       (struct sockaddr *)&addr,
+					       af->sockaddr_len))
+			return SCTP_ERROR_REQ_REFUSED;
 
 		peer = sctp_assoc_lookup_paddr(asoc, &addr);
 		if (!peer)

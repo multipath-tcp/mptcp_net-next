@@ -241,8 +241,7 @@ struct ixgbe_tx_buffer {
 	unsigned long time_stamp;
 	union {
 		struct sk_buff *skb;
-		/* XDP uses address ptr on irq_clean */
-		void *data;
+		struct xdp_frame *xdpf;
 	};
 	unsigned int bytecount;
 	unsigned short gso_segs;
@@ -306,7 +305,6 @@ enum ixgbe_ring_state_t {
 struct ixgbe_fwd_adapter {
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
 	struct net_device *netdev;
-	struct ixgbe_adapter *real_adapter;
 	unsigned int tx_base_queue;
 	unsigned int rx_base_queue;
 	int pool;

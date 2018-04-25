@@ -1437,7 +1437,7 @@ config PERF_USE_VMALLOC
 	  See tools/perf/design.txt for details
 
 config PC104
-	bool "PC/104 support"
+	bool "PC/104 support" if EXPERT
 	help
 	  Expose PC/104 form factor device drivers and options available for
 	  selection and configuration. Enable this option if your target
@@ -1923,3 +1923,13 @@ source "kernel/Kconfig.locks"
 
 config ARCH_HAS_SYNC_CORE_BEFORE_USERMODE
 	bool
+
+# It may be useful for an architecture to override the definitions of the
+# SYSCALL_DEFINE() and __SYSCALL_DEFINEx() macros in <linux/syscalls.h>
+# and the COMPAT_ variants in <linux/compat.h>, in particular to use a
+# different calling convention for syscalls. They can also override the
+# macros for not-implemented syscalls in kernel/sys_ni.c and
+# kernel/time/posix-stubs.c. All these overrides need to be available in
+# <asm/syscall_wrapper.h>.
+config ARCH_HAS_SYSCALL_WRAPPER
+	def_bool n
