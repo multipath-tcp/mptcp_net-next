@@ -688,14 +688,6 @@ config TCP_CONG_LIA
 	MultiPath TCP Linked Increase Congestion Control
 	To enable it, just put 'lia' in tcp_congestion_control
 
-config TCP_CONG_OLIA
-	tristate "MPTCP Opportunistic Linked Increase"
-	depends on MPTCP
-	default n
-	---help---
-	MultiPath TCP Opportunistic Linked Increase Congestion Control
-	To enable it, just put 'olia' in tcp_congestion_control
-
 config TCP_CONG_MCTCPDESYNC
 	tristate "DESYNCHRONIZED MCTCP CONGESTION CONTROL (EXPERIMENTAL)"
 	depends on MPTCP
