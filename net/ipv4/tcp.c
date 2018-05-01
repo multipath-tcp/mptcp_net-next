@@ -3932,7 +3932,7 @@ int tcp_abort(struct sock *sk, int err)
 
 	bh_unlock_sock(meta_sk);
 	local_bh_enable();
-	tcp_write_queue_purge(meta_sk);
+	tcp_write_queue_purge(sk);
 	release_sock(meta_sk);
 	return 0;
 }
