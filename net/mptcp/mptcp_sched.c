@@ -15,7 +15,7 @@ static struct defsched_priv *defsched_get_priv(const struct tcp_sock *tp)
 	return (struct defsched_priv *)&tp->mptcp->mptcp_sched[0];
 }
 
-bool mptcp_is_def_unavailable(struct sock *sk)
+static bool mptcp_is_def_unavailable(struct sock *sk)
 {
 	const struct tcp_sock *tp = tcp_sk(sk);
 
@@ -34,7 +34,6 @@ bool mptcp_is_def_unavailable(struct sock *sk)
 
 	return false;
 }
-EXPORT_SYMBOL_GPL(mptcp_is_def_unavailable);
 
 static bool mptcp_is_temp_unavailable(struct sock *sk,
 				      const struct sk_buff *skb,
@@ -96,13 +95,12 @@ static bool mptcp_is_temp_unavailable(struct sock *sk,
 }
 
 /* Is the sub-socket sk available to send the skb? */
-bool mptcp_is_available(struct sock *sk, const struct sk_buff *skb,
-			bool zero_wnd_test)
+static bool mptcp_is_available(struct sock *sk, const struct sk_buff *skb,
+			       bool zero_wnd_test)
 {
 	return !mptcp_is_def_unavailable(sk) &&
 	       !mptcp_is_temp_unavailable(sk, skb, zero_wnd_test);
 }
-EXPORT_SYMBOL_GPL(mptcp_is_available);
 
 /* Are we not allowed to reinject this skb on tp? */
 static int mptcp_dont_reinject_skb(const struct tcp_sock *tp, const struct sk_buff *skb)
@@ -115,17 +113,15 @@ static int mptcp_dont_reinject_skb(const struct tcp_sock *tp, const struct sk_bu
 		mptcp_pi_to_flag(tp->mptcp->path_index) & TCP_SKB_CB(skb)->path_mask;
 }
 
-bool subflow_is_backup(const struct tcp_sock *tp)
+static bool subflow_is_backup(const struct tcp_sock *tp)
 {
 	return tp->mptcp->rcv_low_prio || tp->mptcp->low_prio;
 }
-EXPORT_SYMBOL_GPL(subflow_is_backup);
 
-bool subflow_is_active(const struct tcp_sock *tp)
+static bool subflow_is_active(const struct tcp_sock *tp)
 {
 	return !tp->mptcp->rcv_low_prio && !tp->mptcp->low_prio;
 }
-EXPORT_SYMBOL_GPL(subflow_is_active);
 
 /* Generic function to iterate over used and unused subflows and to select the
  * best one
@@ -212,8 +208,9 @@ static struct sock
  *
  * Additionally, this function is aware of the backup-subflows.
  */
-struct sock *get_available_subflow(struct sock *meta_sk, struct sk_buff *skb,
-				   bool zero_wnd_test)
+static struct sock *get_available_subflow(struct sock *meta_sk,
+					  struct sk_buff *skb,
+					  bool zero_wnd_test)
 {
 	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
 	struct sock *sk;
@@ -258,7 +255,6 @@ struct sock *get_available_subflow(struct sock *meta_sk, struct sk_buff *skb,
 		TCP_SKB_CB(skb)->path_mask = 0;
 	return sk;
 }
-EXPORT_SYMBOL_GPL(get_available_subflow);
 
 static struct sk_buff *mptcp_rcv_buf_optimization(struct sock *sk, int penal)
 {

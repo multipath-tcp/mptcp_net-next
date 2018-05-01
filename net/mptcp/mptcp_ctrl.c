@@ -1412,9 +1412,6 @@ void mptcp_del_sock(struct sock *sk)
 	mpcb = tp->mpcb;
 	tp_prev = mpcb->connection_list;
 
-	if (mpcb->sched_ops->release)
-		mpcb->sched_ops->release(sk);
-
 	if (mpcb->pm_ops->delete_subflow)
 		mpcb->pm_ops->delete_subflow(sk);
 
