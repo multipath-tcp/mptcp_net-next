@@ -704,14 +704,6 @@ config TCP_CONG_WVEGAS
 	wVegas congestion control for MPTCP
 	To enable it, just put 'wvegas' in tcp_congestion_control
 
-config TCP_CONG_BALIA
-	tristate "MPTCP BALIA CONGESTION CONTROL"
-	depends on MPTCP
-	default n
-	---help---
-	Multipath TCP Balanced Linked Adaptation Congestion Control
-	To enable it, just put 'balia' in tcp_congestion_control
-
 config TCP_CONG_MCTCPDESYNC
 	tristate "DESYNCHRONIZED MCTCP CONGESTION CONTROL (EXPERIMENTAL)"
 	depends on MPTCP
