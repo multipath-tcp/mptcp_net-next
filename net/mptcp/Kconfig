@@ -78,13 +78,6 @@ menuconfig MPTCP_SCHED_ADVANCED
 
 if MPTCP_SCHED_ADVANCED
 
-config MPTCP_ROUNDROBIN
-	tristate "MPTCP Round-Robin"
-	depends on (MPTCP=y)
-	---help---
-	  This is a very simple round-robin scheduler. Probably has bad performance
-	  but might be interesting for researchers.
-
 choice
 	prompt "Default MPTCP Scheduler"
 	default DEFAULT
@@ -96,12 +89,6 @@ choice
 		---help---
 		  This is the default scheduler, sending first on the subflow
 		  with the lowest RTT.
-
-	config DEFAULT_ROUNDROBIN
-		bool "Round-Robin" if MPTCP_ROUNDROBIN=y
-		---help---
-		  This is the round-rob scheduler, sending in a round-robin
-		  fashion..
 
 endchoice
 endif
