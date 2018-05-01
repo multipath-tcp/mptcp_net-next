@@ -680,19 +680,6 @@ config TCP_CONG_BBR
 	bufferbloat, policers, or AQM schemes that do not provide a delay
 	signal. It requires the fq ("Fair Queue") pacing packet scheduler.
 
-config TCP_CONG_MCTCPDESYNC
-	tristate "DESYNCHRONIZED MCTCP CONGESTION CONTROL (EXPERIMENTAL)"
-	depends on MPTCP
-	default n
-	---help---
-	Desynchronized MultiChannel TCP Congestion Control. This is experimental
-	code that only supports single path and must have set mptcp_ndiffports
-	larger than one.
-	To enable it, just put 'mctcpdesync' in tcp_congestion_control
-	For further details see:
-	  http://ieeexplore.ieee.org/abstract/document/6911722/
-	  https://doi.org/10.1016/j.comcom.2015.07.010
-
 choice
 	prompt "Default TCP congestion control"
 	default DEFAULT_CUBIC
