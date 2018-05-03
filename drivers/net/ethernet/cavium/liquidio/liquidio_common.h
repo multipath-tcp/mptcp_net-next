@@ -84,6 +84,7 @@ enum octeon_tag_type {
 #define OPCODE_NIC_IF_CFG              0x09
 #define OPCODE_NIC_VF_DRV_NOTICE       0x0A
 #define OPCODE_NIC_INTRMOD_PARAMS      0x0B
+#define OPCODE_NIC_QCOUNT_UPDATE       0x12
 #define OPCODE_NIC_SET_TRUSTED_VF	0x13
 #define OPCODE_NIC_SYNC_OCTEON_TIME	0x14
 #define VF_DRV_LOADED                  1
@@ -802,6 +803,9 @@ struct nic_rx_stats {
 	u64 fw_total_rcvd;
 	u64 fw_total_fwd;
 	u64 fw_total_fwd_bytes;
+	u64 fw_total_mcast;
+	u64 fw_total_bcast;
+
 	u64 fw_err_pko;
 	u64 fw_err_link;
 	u64 fw_err_drop;
@@ -858,6 +862,8 @@ struct nic_tx_stats {
 	u64 fw_total_sent;
 	u64 fw_total_fwd;
 	u64 fw_total_fwd_bytes;
+	u64 fw_total_mcast_sent;
+	u64 fw_total_bcast_sent;
 	u64 fw_err_pko;
 	u64 fw_err_link;
 	u64 fw_err_drop;
