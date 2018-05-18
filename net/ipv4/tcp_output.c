@@ -813,12 +813,25 @@ static void tcp_tsq_write(struct sock *sk)
 
 static void tcp_tsq_handler(struct sock *sk)
 {
-	bh_lock_sock(sk);
-	if (!sock_owned_by_user(sk))
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct sock *meta_sk = mptcp(tp) ? mptcp_meta_sk(sk) : sk;
+
+	bh_lock_sock(meta_sk);
+
+	if (!sock_owned_by_user(meta_sk)) {
 		tcp_tsq_write(sk);
-	else if (!test_and_set_bit(TCP_TSQ_DEFERRED, &sk->sk_tsq_flags))
-		sock_hold(sk);
-	bh_unlock_sock(sk);
+
+		if (mptcp(tp))
+			tcp_tsq_write(meta_sk);
+	} else {
+		if (!test_and_set_bit(TCP_TSQ_DEFERRED, &meta_sk->sk_tsq_flags))
+			sock_hold(meta_sk);
+
+		if ((mptcp(tp)) && (sk->sk_state != TCP_CLOSE))
+			mptcp_tsq_flags(sk);
+	}
+
+	bh_unlock_sock(meta_sk);
 }
 /*
  * One tasklet per cpu tries to send more skbs.
@@ -833,7 +846,7 @@ static void tcp_tasklet_func(unsigned long data)
 	unsigned long flags;
 	struct list_head *q, *n;
 	struct tcp_sock *tp;
-	struct sock *sk, *meta_sk;
+	struct sock *sk;
 
 	local_irq_save(flags);
 	list_splice_init(&tsq->head, &list);
@@ -880,6 +893,9 @@ void tcp_release_cb(struct sock *sk)
 	if (flags & TCPF_TSQ_DEFERRED) {
 		tcp_tsq_write(sk);
 		__sock_put(sk);
+
+		if (mptcp(tcp_sk(sk)))
+			tcp_tsq_write(mptcp_meta_sk(sk));
 	}
 	/* Here begins the tricky part :
 	 * We are called from release_sock() with :
