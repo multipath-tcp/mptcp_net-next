@@ -135,7 +135,7 @@ struct fib6_nh {
 
 struct fib6_info {
 	struct fib6_table		*fib6_table;
-	struct fib6_info __rcu		*rt6_next;
+	struct fib6_info __rcu		*fib6_next;
 	struct fib6_node __rcu		*fib6_node;
 
 	/* Multipath routes:
@@ -192,11 +192,11 @@ struct rt6_info {
 
 #define for_each_fib6_node_rt_rcu(fn)					\
 	for (rt = rcu_dereference((fn)->leaf); rt;			\
-	     rt = rcu_dereference(rt->rt6_next))
+	     rt = rcu_dereference(rt->fib6_next))
 
 #define for_each_fib6_walker_rt(w)					\
 	for (rt = (w)->leaf; rt;					\
-	     rt = rcu_dereference_protected(rt->rt6_next, 1))
+	     rt = rcu_dereference_protected(rt->fib6_next, 1))
 
 static inline struct inet6_dev *ip6_dst_idev(struct dst_entry *dst)
 {
@@ -376,9 +376,24 @@ struct dst_entry *fib6_rule_lookup(struct net *net, struct flowi6 *fl6,
 				   const struct sk_buff *skb,
 				   int flags, pol_lookup_t lookup);
 
-struct fib6_node *fib6_lookup(struct fib6_node *root,
-			      const struct in6_addr *daddr,
-			      const struct in6_addr *saddr);
+/* called with rcu lock held; can return error pointer
+ * caller needs to select path
+ */
+struct fib6_info *fib6_lookup(struct net *net, int oif, struct flowi6 *fl6,
+			      int flags);
+
+/* called with rcu lock held; caller needs to select path */
+struct fib6_info *fib6_table_lookup(struct net *net, struct fib6_table *table,
+				    int oif, struct flowi6 *fl6, int strict);
+
+struct fib6_info *fib6_multipath_select(const struct net *net,
+					struct fib6_info *match,
+					struct flowi6 *fl6, int oif,
+					const struct sk_buff *skb, int strict);
+
+struct fib6_node *fib6_node_lookup(struct fib6_node *root,
+				   const struct in6_addr *daddr,
+				   const struct in6_addr *saddr);
 
 struct fib6_node *fib6_locate(struct fib6_node *root,
 			      const struct in6_addr *daddr, int dst_len,

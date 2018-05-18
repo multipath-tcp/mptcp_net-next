@@ -354,6 +354,13 @@ struct dst_entry *fib6_rule_lookup(struct net *net, struct flowi6 *fl6,
 	return &rt->dst;
 }
 
+/* called with rcu lock held; no reference taken on fib6_info */
+struct fib6_info *fib6_lookup(struct net *net, int oif, struct flowi6 *fl6,
+			      int flags)
+{
+	return fib6_table_lookup(net, net->ipv6.fib6_main_tbl, oif, fl6, flags);
+}
+
 static void __net_init fib6_tables_init(struct net *net)
 {
 	fib6_link_table(net, net->ipv6.fib6_main_tbl);
@@ -945,7 +952,7 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct fib6_info *rt,
 	ins = &fn->leaf;
 
 	for (iter = leaf; iter;
-	     iter = rcu_dereference_protected(iter->rt6_next,
+	     iter = rcu_dereference_protected(iter->fib6_next,
 				lockdep_is_held(&rt->fib6_table->tb6_lock))) {
 		/*
 		 *	Search for duplicates
@@ -1002,7 +1009,7 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct fib6_info *rt,
 			break;
 
 next_iter:
-		ins = &iter->rt6_next;
+		ins = &iter->fib6_next;
 	}
 
 	if (fallback_ins && !found) {
@@ -1031,7 +1038,7 @@ next_iter:
 					      &sibling->fib6_siblings);
 				break;
 			}
-			sibling = rcu_dereference_protected(sibling->rt6_next,
+			sibling = rcu_dereference_protected(sibling->fib6_next,
 				    lockdep_is_held(&rt->fib6_table->tb6_lock));
 		}
 		/* For each sibling in the list, increment the counter of
@@ -1065,7 +1072,7 @@ add:
 		if (err)
 			return err;
 
-		rcu_assign_pointer(rt->rt6_next, iter);
+		rcu_assign_pointer(rt->fib6_next, iter);
 		atomic_inc(&rt->fib6_ref);
 		rcu_assign_pointer(rt->fib6_node, fn);
 		rcu_assign_pointer(*ins, rt);
@@ -1096,7 +1103,7 @@ add:
 
 		atomic_inc(&rt->fib6_ref);
 		rcu_assign_pointer(rt->fib6_node, fn);
-		rt->rt6_next = iter->rt6_next;
+		rt->fib6_next = iter->fib6_next;
 		rcu_assign_pointer(*ins, rt);
 		if (!info->skip_notify)
 			inet6_rt_notify(RTM_NEWROUTE, rt, info, NLM_F_REPLACE);
@@ -1113,14 +1120,14 @@ add:
 
 		if (nsiblings) {
 			/* Replacing an ECMP route, remove all siblings */
-			ins = &rt->rt6_next;
+			ins = &rt->fib6_next;
 			iter = rcu_dereference_protected(*ins,
 				    lockdep_is_held(&rt->fib6_table->tb6_lock));
 			while (iter) {
 				if (iter->fib6_metric > rt->fib6_metric)
 					break;
 				if (rt6_qualify_for_ecmp(iter)) {
-					*ins = iter->rt6_next;
+					*ins = iter->fib6_next;
 					iter->fib6_node = NULL;
 					fib6_purge_rt(iter, fn, info->nl_net);
 					if (rcu_access_pointer(fn->rr_ptr) == iter)
@@ -1129,7 +1136,7 @@ add:
 					nsiblings--;
 					info->nl_net->ipv6.rt6_stats->fib_rt_entries--;
 				} else {
-					ins = &iter->rt6_next;
+					ins = &iter->fib6_next;
 				}
 				iter = rcu_dereference_protected(*ins,
 					lockdep_is_held(&rt->fib6_table->tb6_lock));
@@ -1354,8 +1361,8 @@ struct lookup_args {
 	const struct in6_addr	*addr;		/* search key			*/
 };
 
-static struct fib6_node *fib6_lookup_1(struct fib6_node *root,
-				       struct lookup_args *args)
+static struct fib6_node *fib6_node_lookup_1(struct fib6_node *root,
+					    struct lookup_args *args)
 {
 	struct fib6_node *fn;
 	__be32 dir;
@@ -1400,7 +1407,8 @@ static struct fib6_node *fib6_lookup_1(struct fib6_node *root,
 #ifdef CONFIG_IPV6_SUBTREES
 				if (subtree) {
 					struct fib6_node *sfn;
-					sfn = fib6_lookup_1(subtree, args + 1);
+					sfn = fib6_node_lookup_1(subtree,
+								 args + 1);
 					if (!sfn)
 						goto backtrack;
 					fn = sfn;
@@ -1422,8 +1430,9 @@ backtrack:
 
 /* called with rcu_read_lock() held
  */
-struct fib6_node *fib6_lookup(struct fib6_node *root, const struct in6_addr *daddr,
-			      const struct in6_addr *saddr)
+struct fib6_node *fib6_node_lookup(struct fib6_node *root,
+				   const struct in6_addr *daddr,
+				   const struct in6_addr *saddr)
 {
 	struct fib6_node *fn;
 	struct lookup_args args[] = {
@@ -1442,7 +1451,7 @@ struct fib6_node *fib6_lookup(struct fib6_node *root, const struct in6_addr *dad
 		}
 	};
 
-	fn = fib6_lookup_1(root, daddr ? args : args + 1);
+	fn = fib6_node_lookup_1(root, daddr ? args : args + 1);
 	if (!fn || fn->fn_flags & RTN_TL_ROOT)
 		fn = root;
 
@@ -1712,7 +1721,7 @@ static void fib6_del_route(struct fib6_table *table, struct fib6_node *fn,
 	RT6_TRACE("fib6_del_route\n");
 
 	/* Unlink it */
-	*rtp = rt->rt6_next;
+	*rtp = rt->fib6_next;
 	rt->fib6_node = NULL;
 	net->ipv6.rt6_stats->fib_rt_entries--;
 	net->ipv6.rt6_stats->fib_discarded_routes++;
@@ -1741,7 +1750,7 @@ static void fib6_del_route(struct fib6_table *table, struct fib6_node *fn,
 	FOR_WALKERS(net, w) {
 		if (w->state == FWS_C && w->leaf == rt) {
 			RT6_TRACE("walker %p adjusted by delroute\n", w);
-			w->leaf = rcu_dereference_protected(rt->rt6_next,
+			w->leaf = rcu_dereference_protected(rt->fib6_next,
 					    lockdep_is_held(&table->tb6_lock));
 			if (!w->leaf)
 				w->state = FWS_U;
@@ -1795,7 +1804,7 @@ int fib6_del(struct fib6_info *rt, struct nl_info *info)
 			fib6_del_route(table, fn, rtp, info);
 			return 0;
 		}
-		rtp_next = &cur->rt6_next;
+		rtp_next = &cur->fib6_next;
 	}
 	return -ENOENT;
 }
@@ -2279,7 +2288,7 @@ static int ipv6_route_yield(struct fib6_walker *w)
 
 	do {
 		iter->w.leaf = rcu_dereference_protected(
-				iter->w.leaf->rt6_next,
+				iter->w.leaf->fib6_next,
 				lockdep_is_held(&iter->tbl->tb6_lock));
 		iter->skip--;
 		if (!iter->skip && iter->w.leaf)
@@ -2345,7 +2354,7 @@ static void *ipv6_route_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	if (!v)
 		goto iter_table;
 
-	n = rcu_dereference_bh(((struct fib6_info *)v)->rt6_next);
+	n = rcu_dereference_bh(((struct fib6_info *)v)->fib6_next);
 	if (n) {
 		++*pos;
 		return n;
