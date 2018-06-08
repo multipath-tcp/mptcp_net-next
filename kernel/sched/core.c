@@ -881,6 +881,33 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
 }
 
 #ifdef CONFIG_SMP
+
+static inline bool is_per_cpu_kthread(struct task_struct *p)
+{
+	if (!(p->flags & PF_KTHREAD))
+		return false;
+
+	if (p->nr_cpus_allowed != 1)
+		return false;
+
+	return true;
+}
+
+/*
+ * Per-CPU kthreads are allowed to run on !actie && online CPUs, see
+ * __set_cpus_allowed_ptr() and select_fallback_rq().
+ */
+static inline bool is_cpu_allowed(struct task_struct *p, int cpu)
+{
+	if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
+		return false;
+
+	if (is_per_cpu_kthread(p))
+		return cpu_online(cpu);
+
+	return cpu_active(cpu);
+}
+
 /*
  * This is how migration works:
  *
@@ -938,16 +965,8 @@ struct migration_arg {
 static struct rq *__migrate_task(struct rq *rq, struct rq_flags *rf,
 				 struct task_struct *p, int dest_cpu)
 {
-	if (p->flags & PF_KTHREAD) {
-		if (unlikely(!cpu_online(dest_cpu)))
-			return rq;
-	} else {
-		if (unlikely(!cpu_active(dest_cpu)))
-			return rq;
-	}
-
 	/* Affinity changed (again). */
-	if (!cpumask_test_cpu(dest_cpu, &p->cpus_allowed))
+	if (!is_cpu_allowed(p, dest_cpu))
 		return rq;
 
 	update_rq_clock(rq);
@@ -1476,10 +1495,9 @@ static int select_fallback_rq(int cpu, struct task_struct *p)
 	for (;;) {
 		/* Any allowed, online CPU? */
 		for_each_cpu(dest_cpu, &p->cpus_allowed) {
-			if (!(p->flags & PF_KTHREAD) && !cpu_active(dest_cpu))
+			if (!is_cpu_allowed(p, dest_cpu))
 				continue;
-			if (!cpu_online(dest_cpu))
-				continue;
+
 			goto out;
 		}
 
@@ -1542,8 +1560,7 @@ int select_task_rq(struct task_struct *p, int cpu, int sd_flags, int wake_flags)
 	 * [ this allows ->select_task() to simply return task_cpu(p) and
 	 *   not worry about this generic constraint ]
 	 */
-	if (unlikely(!cpumask_test_cpu(cpu, &p->cpus_allowed) ||
-		     !cpu_online(cpu)))
+	if (unlikely(!is_cpu_allowed(p, cpu)))
 		cpu = select_fallback_rq(task_cpu(p), p);
 
 	return cpu;
@@ -2177,27 +2194,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
 #endif
 
-#ifdef CONFIG_NUMA_BALANCING
-	if (p->mm && atomic_read(&p->mm->mm_users) == 1) {
-		p->mm->numa_next_scan = jiffies + msecs_to_jiffies(sysctl_numa_balancing_scan_delay);
-		p->mm->numa_scan_seq = 0;
-	}
-
-	if (clone_flags & CLONE_VM)
-		p->numa_preferred_nid = current->numa_preferred_nid;
-	else
-		p->numa_preferred_nid = -1;
-
-	p->node_stamp = 0ULL;
-	p->numa_scan_seq = p->mm ? p->mm->numa_scan_seq : 0;
-	p->numa_scan_period = sysctl_numa_balancing_scan_delay;
-	p->numa_work.next = &p->numa_work;
-	p->numa_faults = NULL;
-	p->last_task_numa_placement = 0;
-	p->last_sum_exec_runtime = 0;
-
-	p->numa_group = NULL;
-#endif /* CONFIG_NUMA_BALANCING */
+	init_numa_balancing(clone_flags, p);
 }
 
 DEFINE_STATIC_KEY_FALSE(sched_numa_balancing);
@@ -4033,6 +4030,23 @@ int idle_cpu(int cpu)
 }
 
 /**
+ * available_idle_cpu - is a given CPU idle for enqueuing work.
+ * @cpu: the CPU in question.
+ *
+ * Return: 1 if the CPU is currently idle. 0 otherwise.
+ */
+int available_idle_cpu(int cpu)
+{
+	if (!idle_cpu(cpu))
+		return 0;
+
+	if (vcpu_is_preempted(cpu))
+		return 0;
+
+	return 1;
+}
+
+/**
  * idle_task - return the idle task for a given CPU.
  * @cpu: the processor in question.
  *
@@ -5007,20 +5021,6 @@ int __cond_resched_lock(spinlock_t *lock)
 	return ret;
 }
 EXPORT_SYMBOL(__cond_resched_lock);
-
-int __sched __cond_resched_softirq(void)
-{
-	BUG_ON(!in_softirq());
-
-	if (should_resched(SOFTIRQ_DISABLE_OFFSET)) {
-		local_bh_enable();
-		preempt_schedule_common();
-		local_bh_disable();
-		return 1;
-	}
-	return 0;
-}
-EXPORT_SYMBOL(__cond_resched_softirq);
 
 /**
  * yield - yield the current processor to other threads.

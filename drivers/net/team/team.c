@@ -1004,7 +1004,8 @@ static void team_port_disable(struct team *team,
 static void __team_compute_features(struct team *team)
 {
 	struct team_port *port;
-	u32 vlan_features = TEAM_VLAN_FEATURES & NETIF_F_ALL_FOR_ALL;
+	netdev_features_t vlan_features = TEAM_VLAN_FEATURES &
+					  NETIF_F_ALL_FOR_ALL;
 	netdev_features_t enc_features  = TEAM_ENC_FEATURES;
 	unsigned short max_hard_header_len = ETH_HLEN;
 	unsigned int dst_release_flag = IFF_XMIT_DST_RELEASE |
@@ -1129,6 +1130,7 @@ static int team_upper_dev_link(struct team *team, struct team_port *port,
 	int err;
 
 	lag_upper_info.tx_type = team->mode->lag_tx_type;
+	lag_upper_info.hash_type = NETDEV_LAG_HASH_UNKNOWN;
 	err = netdev_master_upper_dev_link(port->dev, team->dev, NULL,
 					   &lag_upper_info, extack);
 	if (err)
@@ -2425,7 +2427,6 @@ send_done:
 nla_put_failure:
 	err = -EMSGSIZE;
 errout:
-	genlmsg_cancel(skb, hdr);
 	nlmsg_free(skb);
 	return err;
 }
@@ -2719,7 +2720,6 @@ send_done:
 nla_put_failure:
 	err = -EMSGSIZE;
 errout:
-	genlmsg_cancel(skb, hdr);
 	nlmsg_free(skb);
 	return err;
 }

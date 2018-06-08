@@ -37,8 +37,13 @@ enum xdp_mem_type {
 	MEM_TYPE_PAGE_SHARED = 0, /* Split-page refcnt based model */
 	MEM_TYPE_PAGE_ORDER0,     /* Orig XDP full page model */
 	MEM_TYPE_PAGE_POOL,
+	MEM_TYPE_ZERO_COPY,
 	MEM_TYPE_MAX,
 };
+
+/* XDP flags for ndo_xdp_xmit */
+#define XDP_XMIT_FLUSH		(1U << 0)	/* doorbell signal consumer */
+#define XDP_XMIT_FLAGS_MASK	XDP_XMIT_FLUSH
 
 struct xdp_mem_info {
 	u32 type; /* enum xdp_mem_type, but known size type */
@@ -46,6 +51,10 @@ struct xdp_mem_info {
 };
 
 struct page_pool;
+
+struct zero_copy_allocator {
+	void (*free)(struct zero_copy_allocator *zca, unsigned long handle);
+};
 
 struct xdp_rxq_info {
 	struct net_device *dev;
@@ -59,6 +68,7 @@ struct xdp_buff {
 	void *data_end;
 	void *data_meta;
 	void *data_hard_start;
+	unsigned long handle;
 	struct xdp_rxq_info *rxq;
 };
 
@@ -82,6 +92,10 @@ struct xdp_frame *convert_to_xdp_frame(struct xdp_buff *xdp)
 	int metasize;
 	int headroom;
 
+	/* TODO: implement clone, copy, use "native" MEM_TYPE */
+	if (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY)
+		return NULL;
+
 	/* Assure headroom is available for storing info */
 	headroom = xdp->data - xdp->data_hard_start;
 	metasize = xdp->data - xdp->data_meta;
@@ -104,6 +118,7 @@ struct xdp_frame *convert_to_xdp_frame(struct xdp_buff *xdp)
 }
 
 void xdp_return_frame(struct xdp_frame *xdpf);
+void xdp_return_frame_rx_napi(struct xdp_frame *xdpf);
 void xdp_return_buff(struct xdp_buff *xdp);
 
 int xdp_rxq_info_reg(struct xdp_rxq_info *xdp_rxq,

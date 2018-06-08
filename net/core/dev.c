@@ -2883,11 +2883,7 @@ void netdev_rx_csum_fault(struct net_device *dev)
 EXPORT_SYMBOL(netdev_rx_csum_fault);
 #endif
 
-/* Actually, we should eliminate this check as soon as we know, that:
- * 1. IOMMU is present and allows to map all the memory.
- * 2. No high memory really exists on this machine.
- */
-
+/* XXX: check that highmem exists at all on the given machine. */
 static int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 {
 #ifdef CONFIG_HIGHMEM
@@ -2898,20 +2894,6 @@ static int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			if (PageHighMem(skb_frag_page(frag)))
-				return 1;
-		}
-	}
-
-	if (PCI_DMA_BUS_IS_PHYS) {
-		struct device *pdev = dev->dev.parent;
-
-		if (!pdev)
-			return 0;
-		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-			dma_addr_t addr = page_to_phys(skb_frag_page(frag));
-
-			if (!pdev->dma_mask || addr + PAGE_SIZE - 1 > *pdev->dma_mask)
 				return 1;
 		}
 	}
@@ -6803,15 +6785,15 @@ static int __dev_set_promiscuity(struct net_device *dev, int inc, bool notify)
 			dev->flags & IFF_PROMISC ? "entered" : "left");
 		if (audit_enabled) {
 			current_uid_gid(&uid, &gid);
-			audit_log(current->audit_context, GFP_ATOMIC,
-				AUDIT_ANOM_PROMISCUOUS,
-				"dev=%s prom=%d old_prom=%d auid=%u uid=%u gid=%u ses=%u",
-				dev->name, (dev->flags & IFF_PROMISC),
-				(old_flags & IFF_PROMISC),
-				from_kuid(&init_user_ns, audit_get_loginuid(current)),
-				from_kuid(&init_user_ns, uid),
-				from_kgid(&init_user_ns, gid),
-				audit_get_sessionid(current));
+			audit_log(audit_context(), GFP_ATOMIC,
+				  AUDIT_ANOM_PROMISCUOUS,
+				  "dev=%s prom=%d old_prom=%d auid=%u uid=%u gid=%u ses=%u",
+				  dev->name, (dev->flags & IFF_PROMISC),
+				  (old_flags & IFF_PROMISC),
+				  from_kuid(&init_user_ns, audit_get_loginuid(current)),
+				  from_kuid(&init_user_ns, uid),
+				  from_kgid(&init_user_ns, gid),
+				  audit_get_sessionid(current));
 		}
 
 		dev_change_rx_flags(dev, IFF_PROMISC);

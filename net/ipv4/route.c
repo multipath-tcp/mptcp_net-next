@@ -360,18 +360,6 @@ static int rt_acct_proc_show(struct seq_file *m, void *v)
 	kfree(dst);
 	return 0;
 }
-
-static int rt_acct_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, rt_acct_proc_show, NULL);
-}
-
-static const struct file_operations rt_acct_proc_fops = {
-	.open		= rt_acct_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 #endif
 
 static int __net_init ip_rt_do_proc_init(struct net *net)
@@ -389,7 +377,8 @@ static int __net_init ip_rt_do_proc_init(struct net *net)
 		goto err2;
 
 #ifdef CONFIG_IP_ROUTE_CLASSID
-	pde = proc_create("rt_acct", 0, net->proc_net, &rt_acct_proc_fops);
+	pde = proc_create_single("rt_acct", 0, net->proc_net,
+			rt_acct_proc_show);
 	if (!pde)
 		goto err3;
 #endif
@@ -1350,6 +1339,37 @@ static struct fib_nh_exception *find_exception(struct fib_nh *nh, __be32 daddr)
 		}
 	}
 	return NULL;
+}
+
+/* MTU selection:
+ * 1. mtu on route is locked - use it
+ * 2. mtu from nexthop exception
+ * 3. mtu from egress device
+ */
+
+u32 ip_mtu_from_fib_result(struct fib_result *res, __be32 daddr)
+{
+	struct fib_info *fi = res->fi;
+	struct fib_nh *nh = &fi->fib_nh[res->nh_sel];
+	struct net_device *dev = nh->nh_dev;
+	u32 mtu = 0;
+
+	if (dev_net(dev)->ipv4.sysctl_ip_fwd_use_pmtu ||
+	    fi->fib_metrics->metrics[RTAX_LOCK - 1] & (1 << RTAX_MTU))
+		mtu = fi->fib_mtu;
+
+	if (likely(!mtu)) {
+		struct fib_nh_exception *fnhe;
+
+		fnhe = find_exception(nh, daddr);
+		if (fnhe && !time_after_eq(jiffies, fnhe->fnhe_expires))
+			mtu = fnhe->fnhe_pmtu;
+	}
+
+	if (likely(!mtu))
+		mtu = min(READ_ONCE(dev->mtu), IP_MAX_MTU);
+
+	return mtu - lwtunnel_headroom(nh->nh_lwtstate, mtu);
 }
 
 static bool rt_bind_exception(struct rtable *rt, struct fib_nh_exception *fnhe,

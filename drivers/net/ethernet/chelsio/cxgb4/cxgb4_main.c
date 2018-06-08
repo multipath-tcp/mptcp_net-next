@@ -465,7 +465,7 @@ static int link_start(struct net_device *dev)
 				    &pi->link_cfg);
 	if (ret == 0) {
 		local_bh_disable();
-		ret = t4_enable_vi_params(pi->adapter, mb, pi->viid, true,
+		ret = t4_enable_pi_params(pi->adapter, mb, pi, true,
 					  true, CXGB4_DCB_ENABLED);
 		local_bh_enable();
 	}
@@ -2344,7 +2344,8 @@ static int cxgb_close(struct net_device *dev)
 
 	netif_tx_stop_all_queues(dev);
 	netif_carrier_off(dev);
-	ret = t4_enable_vi(adapter, adapter->pf, pi->viid, false, false);
+	ret = t4_enable_pi_params(adapter, adapter->pf, pi,
+				  false, false, false);
 #ifdef CONFIG_CHELSIO_T4_DCB
 	cxgb4_dcb_reset(dev);
 	dcb_tx_queue_prio_enable(dev, false);
@@ -4140,6 +4141,10 @@ static int adap_init0(struct adapter *adap)
 		 * card
 		 */
 		card_fw = kvzalloc(sizeof(*card_fw), GFP_KERNEL);
+		if (!card_fw) {
+			ret = -ENOMEM;
+			goto bye;
+		}
 
 		/* Get FW from from /lib/firmware/ */
 		ret = request_firmware(&fw, fw_info->fw_mod_name,
@@ -5061,79 +5066,6 @@ static int init_rss(struct adapter *adap)
 	return 0;
 }
 
-static int cxgb4_get_pcie_dev_link_caps(struct adapter *adap,
-					enum pci_bus_speed *speed,
-					enum pcie_link_width *width)
-{
-	u32 lnkcap1, lnkcap2;
-	int err1, err2;
-
-#define  PCIE_MLW_CAP_SHIFT 4   /* start of MLW mask in link capabilities */
-
-	*speed = PCI_SPEED_UNKNOWN;
-	*width = PCIE_LNK_WIDTH_UNKNOWN;
-
-	err1 = pcie_capability_read_dword(adap->pdev, PCI_EXP_LNKCAP,
-					  &lnkcap1);
-	err2 = pcie_capability_read_dword(adap->pdev, PCI_EXP_LNKCAP2,
-					  &lnkcap2);
-	if (!err2 && lnkcap2) { /* PCIe r3.0-compliant */
-		if (lnkcap2 & PCI_EXP_LNKCAP2_SLS_8_0GB)
-			*speed = PCIE_SPEED_8_0GT;
-		else if (lnkcap2 & PCI_EXP_LNKCAP2_SLS_5_0GB)
-			*speed = PCIE_SPEED_5_0GT;
-		else if (lnkcap2 & PCI_EXP_LNKCAP2_SLS_2_5GB)
-			*speed = PCIE_SPEED_2_5GT;
-	}
-	if (!err1) {
-		*width = (lnkcap1 & PCI_EXP_LNKCAP_MLW) >> PCIE_MLW_CAP_SHIFT;
-		if (!lnkcap2) { /* pre-r3.0 */
-			if (lnkcap1 & PCI_EXP_LNKCAP_SLS_5_0GB)
-				*speed = PCIE_SPEED_5_0GT;
-			else if (lnkcap1 & PCI_EXP_LNKCAP_SLS_2_5GB)
-				*speed = PCIE_SPEED_2_5GT;
-		}
-	}
-
-	if (*speed == PCI_SPEED_UNKNOWN || *width == PCIE_LNK_WIDTH_UNKNOWN)
-		return err1 ? err1 : err2 ? err2 : -EINVAL;
-	return 0;
-}
-
-static void cxgb4_check_pcie_caps(struct adapter *adap)
-{
-	enum pcie_link_width width, width_cap;
-	enum pci_bus_speed speed, speed_cap;
-
-#define PCIE_SPEED_STR(speed) \
-	(speed == PCIE_SPEED_8_0GT ? "8.0GT/s" : \
-	 speed == PCIE_SPEED_5_0GT ? "5.0GT/s" : \
-	 speed == PCIE_SPEED_2_5GT ? "2.5GT/s" : \
-	 "Unknown")
-
-	if (cxgb4_get_pcie_dev_link_caps(adap, &speed_cap, &width_cap)) {
-		dev_warn(adap->pdev_dev,
-			 "Unable to determine PCIe device BW capabilities\n");
-		return;
-	}
-
-	if (pcie_get_minimum_link(adap->pdev, &speed, &width) ||
-	    speed == PCI_SPEED_UNKNOWN || width == PCIE_LNK_WIDTH_UNKNOWN) {
-		dev_warn(adap->pdev_dev,
-			 "Unable to determine PCI Express bandwidth.\n");
-		return;
-	}
-
-	dev_info(adap->pdev_dev, "PCIe link speed is %s, device supports %s\n",
-		 PCIE_SPEED_STR(speed), PCIE_SPEED_STR(speed_cap));
-	dev_info(adap->pdev_dev, "PCIe link width is x%d, device supports x%d\n",
-		 width, width_cap);
-	if (speed < speed_cap || width < width_cap)
-		dev_info(adap->pdev_dev,
-			 "A slot with more lanes and/or higher speed is "
-			 "suggested for optimal performance.\n");
-}
-
 /* Dump basic information about the adapter */
 static void print_adapter_info(struct adapter *adapter)
 {
@@ -5236,14 +5168,11 @@ static void free_some_resources(struct adapter *adapter)
 		   NETIF_F_IPV6_CSUM | NETIF_F_HIGHDMA)
 #define SEGMENT_SIZE 128
 
-static int get_chip_type(struct pci_dev *pdev, u32 pl_rev)
+static int t4_get_chip_type(struct adapter *adap, int ver)
 {
-	u16 device_id;
+	u32 pl_rev = REV_G(t4_read_reg(adap, PL_REV_A));
 
-	/* Retrieve adapter's device ID */
-	pci_read_config_word(pdev, PCI_DEVICE_ID, &device_id);
-
-	switch (device_id >> 12) {
+	switch (ver) {
 	case CHELSIO_T4:
 		return CHELSIO_CHIP_CODE(CHELSIO_T4, pl_rev);
 	case CHELSIO_T5:
@@ -5251,8 +5180,7 @@ static int get_chip_type(struct pci_dev *pdev, u32 pl_rev)
 	case CHELSIO_T6:
 		return CHELSIO_CHIP_CODE(CHELSIO_T6, pl_rev);
 	default:
-		dev_err(&pdev->dev, "Device %d is not supported\n",
-			device_id);
+		break;
 	}
 	return -EINVAL;
 }
@@ -5422,15 +5350,18 @@ static int cxgb4_iov_configure(struct pci_dev *pdev, int num_vfs)
 
 static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	int func, i, err, s_qpp, qpp, num_seg;
+	struct net_device *netdev;
+	struct adapter *adapter;
+	static int adap_idx = 1;
+	int s_qpp, qpp, num_seg;
 	struct port_info *pi;
 	bool highdma = false;
-	struct adapter *adapter = NULL;
-	struct net_device *netdev;
-	void __iomem *regs;
-	u32 whoami, pl_rev;
 	enum chip_type chip;
-	static int adap_idx = 1;
+	void __iomem *regs;
+	int func, chip_ver;
+	u16 device_id;
+	int i, err;
+	u32 whoami;
 
 	printk_once(KERN_INFO "%s - version %s\n", DRV_DESC, DRV_VERSION);
 
@@ -5466,11 +5397,17 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto out_free_adapter;
 
 	/* We control everything through one PF */
-	whoami = readl(regs + PL_WHOAMI_A);
-	pl_rev = REV_G(readl(regs + PL_REV_A));
-	chip = get_chip_type(pdev, pl_rev);
-	func = CHELSIO_CHIP_VERSION(chip) <= CHELSIO_T5 ?
-		SOURCEPF_G(whoami) : T6_SOURCEPF_G(whoami);
+	whoami = t4_read_reg(adapter, PL_WHOAMI_A);
+	pci_read_config_word(pdev, PCI_DEVICE_ID, &device_id);
+	chip = t4_get_chip_type(adapter, CHELSIO_PCI_ID_VER(device_id));
+	if (chip < 0) {
+		dev_err(&pdev->dev, "Device %d is not supported\n", device_id);
+		err = chip;
+		goto out_free_adapter;
+	}
+	chip_ver = CHELSIO_CHIP_VERSION(chip);
+	func = chip_ver <= CHELSIO_T5 ?
+	       SOURCEPF_G(whoami) : T6_SOURCEPF_G(whoami);
 
 	adapter->pdev = pdev;
 	adapter->pdev_dev = &pdev->dev;
@@ -5636,7 +5573,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
 			NETIF_F_HW_TC;
 
-		if (CHELSIO_CHIP_VERSION(chip) > CHELSIO_T5) {
+		if (chip_ver > CHELSIO_T5) {
 			netdev->hw_enc_features |= NETIF_F_IP_CSUM |
 						   NETIF_F_IPV6_CSUM |
 						   NETIF_F_RXCSUM |
@@ -5716,7 +5653,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		dev_warn(&pdev->dev, "could not allocate MPS Encap entries, continuing\n");
 
 #if IS_ENABLED(CONFIG_IPV6)
-	if ((CHELSIO_CHIP_VERSION(adapter->params.chip) <= CHELSIO_T5) &&
+	if (chip_ver <= CHELSIO_T5 &&
 	    (!(t4_read_reg(adapter, LE_DB_CONFIG_A) & ASLIPCOMPEN_F))) {
 		/* CLIP functionality is not present in hardware,
 		 * hence disable all offload features
@@ -5788,7 +5725,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* check for PCI Express bandwidth capabiltites */
-	cxgb4_check_pcie_caps(adapter);
+	pcie_print_link_status(pdev);
 
 	err = init_rss(adapter);
 	if (err)

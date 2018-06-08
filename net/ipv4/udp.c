@@ -544,9 +544,7 @@ EXPORT_SYMBOL_GPL(udp4_lib_lookup_skb);
 /* Must be called under rcu_read_lock().
  * Does increment socket refcount.
  */
-#if IS_ENABLED(CONFIG_NETFILTER_XT_MATCH_SOCKET) || \
-    IS_ENABLED(CONFIG_NETFILTER_XT_TARGET_TPROXY) || \
-    IS_ENABLED(CONFIG_NF_SOCKET_IPV4)
+#if IS_ENABLED(CONFIG_NF_TPROXY_IPV4) || IS_ENABLED(CONFIG_NF_SOCKET_IPV4)
 struct sock *udp4_lib_lookup(struct net *net, __be32 saddr, __be16 sport,
 			     __be32 daddr, __be16 dport, int dif)
 {
@@ -901,6 +899,7 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct udp_sock *up = udp_sk(sk);
+	DECLARE_SOCKADDR(struct sockaddr_in *, usin, msg->msg_name);
 	struct flowi4 fl4_stack;
 	struct flowi4 *fl4;
 	int ulen = len;
@@ -955,8 +954,7 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	/*
 	 *	Get and verify the address.
 	 */
-	if (msg->msg_name) {
-		DECLARE_SOCKADDR(struct sockaddr_in *, usin, msg->msg_name);
+	if (usin) {
 		if (msg->msg_namelen < sizeof(*usin))
 			return -EINVAL;
 		if (usin->sin_family != AF_INET) {
@@ -1008,6 +1006,22 @@ int udp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			ipc.opt = &opt_copy.opt;
 		}
 		rcu_read_unlock();
+	}
+
+	if (cgroup_bpf_enabled && !connected) {
+		err = BPF_CGROUP_RUN_PROG_UDP4_SENDMSG_LOCK(sk,
+					    (struct sockaddr *)usin, &ipc.addr);
+		if (err)
+			goto out_free;
+		if (usin) {
+			if (usin->sin_port == 0) {
+				/* BPF program set invalid port. Reject it. */
+				err = -EINVAL;
+				goto out_free;
+			}
+			daddr = usin->sin_addr.s_addr;
+			dport = usin->sin_port;
+		}
 	}
 
 	saddr = ipc.addr;
@@ -2577,7 +2591,7 @@ int compat_udp_getsockopt(struct sock *sk, int level, int optname,
  * 	udp_poll - wait for a UDP event.
  *	@file - file struct
  *	@sock - socket
- *	@wait - poll table
+ *	@events - events to wait for
  *
  *	This is same as datagram poll, except for the special case of
  *	blocking sockets. If application is using a blocking fd
@@ -2586,23 +2600,23 @@ int compat_udp_getsockopt(struct sock *sk, int level, int optname,
  *	but then block when reading it. Add special case code
  *	to work around these arguably broken applications.
  */
-__poll_t udp_poll(struct file *file, struct socket *sock, poll_table *wait)
+__poll_t udp_poll_mask(struct socket *sock, __poll_t events)
 {
-	__poll_t mask = datagram_poll(file, sock, wait);
+	__poll_t mask = datagram_poll_mask(sock, events);
 	struct sock *sk = sock->sk;
 
 	if (!skb_queue_empty(&udp_sk(sk)->reader_queue))
 		mask |= EPOLLIN | EPOLLRDNORM;
 
 	/* Check for false positives due to checksum errors */
-	if ((mask & EPOLLRDNORM) && !(file->f_flags & O_NONBLOCK) &&
+	if ((mask & EPOLLRDNORM) && !(sock->file->f_flags & O_NONBLOCK) &&
 	    !(sk->sk_shutdown & RCV_SHUTDOWN) && first_packet_length(sk) == -1)
 		mask &= ~(EPOLLIN | EPOLLRDNORM);
 
 	return mask;
 
 }
-EXPORT_SYMBOL(udp_poll);
+EXPORT_SYMBOL(udp_poll_mask);
 
 int udp_abort(struct sock *sk, int err)
 {
@@ -2658,12 +2672,13 @@ EXPORT_SYMBOL(udp_prot);
 static struct sock *udp_get_first(struct seq_file *seq, int start)
 {
 	struct sock *sk;
+	struct udp_seq_afinfo *afinfo = PDE_DATA(file_inode(seq->file));
 	struct udp_iter_state *state = seq->private;
 	struct net *net = seq_file_net(seq);
 
-	for (state->bucket = start; state->bucket <= state->udp_table->mask;
+	for (state->bucket = start; state->bucket <= afinfo->udp_table->mask;
 	     ++state->bucket) {
-		struct udp_hslot *hslot = &state->udp_table->hash[state->bucket];
+		struct udp_hslot *hslot = &afinfo->udp_table->hash[state->bucket];
 
 		if (hlist_empty(&hslot->head))
 			continue;
@@ -2672,7 +2687,7 @@ static struct sock *udp_get_first(struct seq_file *seq, int start)
 		sk_for_each(sk, &hslot->head) {
 			if (!net_eq(sock_net(sk), net))
 				continue;
-			if (sk->sk_family == state->family)
+			if (sk->sk_family == afinfo->family)
 				goto found;
 		}
 		spin_unlock_bh(&hslot->lock);
@@ -2684,16 +2699,17 @@ found:
 
 static struct sock *udp_get_next(struct seq_file *seq, struct sock *sk)
 {
+	struct udp_seq_afinfo *afinfo = PDE_DATA(file_inode(seq->file));
 	struct udp_iter_state *state = seq->private;
 	struct net *net = seq_file_net(seq);
 
 	do {
 		sk = sk_next(sk);
-	} while (sk && (!net_eq(sock_net(sk), net) || sk->sk_family != state->family));
+	} while (sk && (!net_eq(sock_net(sk), net) || sk->sk_family != afinfo->family));
 
 	if (!sk) {
-		if (state->bucket <= state->udp_table->mask)
-			spin_unlock_bh(&state->udp_table->hash[state->bucket].lock);
+		if (state->bucket <= afinfo->udp_table->mask)
+			spin_unlock_bh(&afinfo->udp_table->hash[state->bucket].lock);
 		return udp_get_first(seq, state->bucket + 1);
 	}
 	return sk;
@@ -2709,15 +2725,16 @@ static struct sock *udp_get_idx(struct seq_file *seq, loff_t pos)
 	return pos ? NULL : sk;
 }
 
-static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
+void *udp_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct udp_iter_state *state = seq->private;
 	state->bucket = MAX_UDP_PORTS;
 
 	return *pos ? udp_get_idx(seq, *pos-1) : SEQ_START_TOKEN;
 }
+EXPORT_SYMBOL(udp_seq_start);
 
-static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock *sk;
 
@@ -2729,56 +2746,17 @@ static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	return sk;
 }
+EXPORT_SYMBOL(udp_seq_next);
 
-static void udp_seq_stop(struct seq_file *seq, void *v)
+void udp_seq_stop(struct seq_file *seq, void *v)
 {
+	struct udp_seq_afinfo *afinfo = PDE_DATA(file_inode(seq->file));
 	struct udp_iter_state *state = seq->private;
 
-	if (state->bucket <= state->udp_table->mask)
-		spin_unlock_bh(&state->udp_table->hash[state->bucket].lock);
+	if (state->bucket <= afinfo->udp_table->mask)
+		spin_unlock_bh(&afinfo->udp_table->hash[state->bucket].lock);
 }
-
-int udp_seq_open(struct inode *inode, struct file *file)
-{
-	struct udp_seq_afinfo *afinfo = PDE_DATA(inode);
-	struct udp_iter_state *s;
-	int err;
-
-	err = seq_open_net(inode, file, &afinfo->seq_ops,
-			   sizeof(struct udp_iter_state));
-	if (err < 0)
-		return err;
-
-	s = ((struct seq_file *)file->private_data)->private;
-	s->family		= afinfo->family;
-	s->udp_table		= afinfo->udp_table;
-	return err;
-}
-EXPORT_SYMBOL(udp_seq_open);
-
-/* ------------------------------------------------------------------------ */
-int udp_proc_register(struct net *net, struct udp_seq_afinfo *afinfo)
-{
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	afinfo->seq_ops.start		= udp_seq_start;
-	afinfo->seq_ops.next		= udp_seq_next;
-	afinfo->seq_ops.stop		= udp_seq_stop;
-
-	p = proc_create_data(afinfo->name, 0444, net->proc_net,
-			     afinfo->seq_fops, afinfo);
-	if (!p)
-		rc = -ENOMEM;
-	return rc;
-}
-EXPORT_SYMBOL(udp_proc_register);
-
-void udp_proc_unregister(struct net *net, struct udp_seq_afinfo *afinfo)
-{
-	remove_proc_entry(afinfo->name, net->proc_net);
-}
-EXPORT_SYMBOL(udp_proc_unregister);
+EXPORT_SYMBOL(udp_seq_stop);
 
 /* ------------------------------------------------------------------------ */
 static void udp4_format_sock(struct sock *sp, struct seq_file *f,
@@ -2818,32 +2796,30 @@ int udp4_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static const struct file_operations udp_afinfo_seq_fops = {
-	.open     = udp_seq_open,
-	.read     = seq_read,
-	.llseek   = seq_lseek,
-	.release  = seq_release_net
+const struct seq_operations udp_seq_ops = {
+	.start		= udp_seq_start,
+	.next		= udp_seq_next,
+	.stop		= udp_seq_stop,
+	.show		= udp4_seq_show,
 };
+EXPORT_SYMBOL(udp_seq_ops);
 
-/* ------------------------------------------------------------------------ */
 static struct udp_seq_afinfo udp4_seq_afinfo = {
-	.name		= "udp",
 	.family		= AF_INET,
 	.udp_table	= &udp_table,
-	.seq_fops	= &udp_afinfo_seq_fops,
-	.seq_ops	= {
-		.show		= udp4_seq_show,
-	},
 };
 
 static int __net_init udp4_proc_init_net(struct net *net)
 {
-	return udp_proc_register(net, &udp4_seq_afinfo);
+	if (!proc_create_net_data("udp", 0444, net->proc_net, &udp_seq_ops,
+			sizeof(struct udp_iter_state), &udp4_seq_afinfo))
+		return -ENOMEM;
+	return 0;
 }
 
 static void __net_exit udp4_proc_exit_net(struct net *net)
 {
-	udp_proc_unregister(net, &udp4_seq_afinfo);
+	remove_proc_entry("udp", net->proc_net);
 }
 
 static struct pernet_operations udp4_net_ops = {

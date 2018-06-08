@@ -41,18 +41,6 @@ static inline struct netns_ipvs *net_ipvs(struct net* net)
 	return net->ipvs;
 }
 
-/* This one needed for single_open_net since net is stored directly in
- * private not as a struct i.e. seq_file_net can't be used.
- */
-static inline struct net *seq_file_single_net(struct seq_file *seq)
-{
-#ifdef CONFIG_NET_NS
-	return (struct net *)seq->private;
-#else
-	return &init_net;
-#endif
-}
-
 /* Connections' size value needed by ip_vs_ctl.c */
 extern int ip_vs_conn_tab_size;
 
@@ -763,14 +751,14 @@ struct ip_vs_app {
 	 *	   2=Mangled but checksum was not updated
 	 */
 	int (*pkt_out)(struct ip_vs_app *, struct ip_vs_conn *,
-		       struct sk_buff *, int *diff);
+		       struct sk_buff *, int *diff, struct ip_vs_iphdr *ipvsh);
 
 	/* input hook: Process packet in outin direction, diff set for TCP.
 	 * Return: 0=Error, 1=Payload Not Mangled/Mangled but checksum is ok,
 	 *	   2=Mangled but checksum was not updated
 	 */
 	int (*pkt_in)(struct ip_vs_app *, struct ip_vs_conn *,
-		      struct sk_buff *, int *diff);
+		      struct sk_buff *, int *diff, struct ip_vs_iphdr *ipvsh);
 
 	/* ip_vs_app initializer */
 	int (*init_conn)(struct ip_vs_app *, struct ip_vs_conn *);
@@ -1328,8 +1316,10 @@ int register_ip_vs_app_inc(struct netns_ipvs *ipvs, struct ip_vs_app *app, __u16
 int ip_vs_app_inc_get(struct ip_vs_app *inc);
 void ip_vs_app_inc_put(struct ip_vs_app *inc);
 
-int ip_vs_app_pkt_out(struct ip_vs_conn *, struct sk_buff *skb);
-int ip_vs_app_pkt_in(struct ip_vs_conn *, struct sk_buff *skb);
+int ip_vs_app_pkt_out(struct ip_vs_conn *, struct sk_buff *skb,
+		      struct ip_vs_iphdr *ipvsh);
+int ip_vs_app_pkt_in(struct ip_vs_conn *, struct sk_buff *skb,
+		     struct ip_vs_iphdr *ipvsh);
 
 int register_ip_vs_pe(struct ip_vs_pe *pe);
 int unregister_ip_vs_pe(struct ip_vs_pe *pe);

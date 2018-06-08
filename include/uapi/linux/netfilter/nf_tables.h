@@ -856,6 +856,8 @@ enum nft_hash_types {
  * @NFTA_HASH_SEED: seed value (NLA_U32)
  * @NFTA_HASH_OFFSET: add this offset value to hash result (NLA_U32)
  * @NFTA_HASH_TYPE: hash operation (NLA_U32: nft_hash_types)
+ * @NFTA_HASH_SET_NAME: name of the map to lookup (NLA_STRING)
+ * @NFTA_HASH_SET_ID: id of the map (NLA_U32)
  */
 enum nft_hash_attributes {
 	NFTA_HASH_UNSPEC,
@@ -866,6 +868,8 @@ enum nft_hash_attributes {
 	NFTA_HASH_SEED,
 	NFTA_HASH_OFFSET,
 	NFTA_HASH_TYPE,
+	NFTA_HASH_SET_NAME,
+	NFTA_HASH_SET_ID,
 	__NFTA_HASH_MAX,
 };
 #define NFTA_HASH_MAX	(__NFTA_HASH_MAX - 1)
@@ -899,6 +903,31 @@ enum nft_rt_attributes {
 	__NFTA_RT_MAX
 };
 #define NFTA_RT_MAX		(__NFTA_RT_MAX - 1)
+
+/**
+ * enum nft_socket_attributes - nf_tables socket expression netlink attributes
+ *
+ * @NFTA_SOCKET_KEY: socket key to match
+ * @NFTA_SOCKET_DREG: destination register
+ */
+enum nft_socket_attributes {
+	NFTA_SOCKET_UNSPEC,
+	NFTA_SOCKET_KEY,
+	NFTA_SOCKET_DREG,
+	__NFTA_SOCKET_MAX
+};
+#define NFTA_SOCKET_MAX		(__NFTA_SOCKET_MAX - 1)
+
+/*
+ * enum nft_socket_keys - nf_tables socket expression keys
+ *
+ * @NFT_SOCKET_TRANSPARENT: Value of the IP(V6)_TRANSPARENT socket option_
+ */
+enum nft_socket_keys {
+	NFT_SOCKET_TRANSPARENT,
+	__NFT_SOCKET_MAX
+};
+#define NFT_SOCKET_MAX	(__NFT_SOCKET_MAX - 1)
 
 /**
  * enum nft_ct_keys - nf_tables ct expression keys
@@ -1014,6 +1043,24 @@ enum nft_limit_attributes {
 };
 #define NFTA_LIMIT_MAX		(__NFTA_LIMIT_MAX - 1)
 
+enum nft_connlimit_flags {
+	NFT_CONNLIMIT_F_INV	= (1 << 0),
+};
+
+/**
+ * enum nft_connlimit_attributes - nf_tables connlimit expression netlink attributes
+ *
+ * @NFTA_CONNLIMIT_COUNT: number of connections (NLA_U32)
+ * @NFTA_CONNLIMIT_FLAGS: flags (NLA_U32: enum nft_connlimit_flags)
+ */
+enum nft_connlimit_attributes {
+	NFTA_CONNLIMIT_UNSPEC,
+	NFTA_CONNLIMIT_COUNT,
+	NFTA_CONNLIMIT_FLAGS,
+	__NFTA_CONNLIMIT_MAX
+};
+#define NFTA_CONNLIMIT_MAX	(__NFTA_CONNLIMIT_MAX - 1)
+
 /**
  * enum nft_counter_attributes - nf_tables counter expression netlink attributes
  *
@@ -1050,6 +1097,11 @@ enum nft_log_attributes {
 	__NFTA_LOG_MAX
 };
 #define NFTA_LOG_MAX		(__NFTA_LOG_MAX - 1)
+
+/**
+ * LOGLEVEL_AUDIT - a pseudo log level enabling audit logging
+ */
+#define LOGLEVEL_AUDIT		8
 
 /**
  * enum nft_queue_attributes - nf_tables queue expression netlink attributes
@@ -1226,10 +1278,14 @@ enum nft_dup_attributes {
  * enum nft_fwd_attributes - nf_tables fwd expression netlink attributes
  *
  * @NFTA_FWD_SREG_DEV: source register of output interface (NLA_U32: nft_register)
+ * @NFTA_FWD_SREG_ADDR: source register of destination address (NLA_U32: nft_register)
+ * @NFTA_FWD_NFPROTO: layer 3 family of source register address (NLA_U32: enum nfproto)
  */
 enum nft_fwd_attributes {
 	NFTA_FWD_UNSPEC,
 	NFTA_FWD_SREG_DEV,
+	NFTA_FWD_SREG_ADDR,
+	NFTA_FWD_NFPROTO,
 	__NFTA_FWD_MAX
 };
 #define NFTA_FWD_MAX	(__NFTA_FWD_MAX - 1)
@@ -1319,7 +1375,8 @@ enum nft_ct_helper_attributes {
 #define NFT_OBJECT_QUOTA	2
 #define NFT_OBJECT_CT_HELPER	3
 #define NFT_OBJECT_LIMIT	4
-#define __NFT_OBJECT_MAX	5
+#define NFT_OBJECT_CONNLIMIT	5
+#define __NFT_OBJECT_MAX	6
 #define NFT_OBJECT_MAX		(__NFT_OBJECT_MAX - 1)
 
 /**

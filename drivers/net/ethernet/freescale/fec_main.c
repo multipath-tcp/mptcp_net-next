@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * Fast Ethernet Controller (FEC) driver for Motorola MPC8xx.
  * Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
@@ -3513,7 +3514,7 @@ fec_probe(struct platform_device *pdev)
 		goto failed_init;
 
 	for (i = 0; i < irq_cnt; i++) {
-		sprintf(irq_name, "int%d", i);
+		snprintf(irq_name, sizeof(irq_name), "int%d", i);
 		irq = platform_get_irq_byname(pdev, irq_name);
 		if (irq < 0)
 			irq = platform_get_irq(pdev, i);

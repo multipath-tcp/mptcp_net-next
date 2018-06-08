@@ -85,6 +85,8 @@ struct Qdisc {
 	struct net_rate_estimator __rcu *rate_est;
 	struct gnet_stats_basic_cpu __percpu *cpu_bstats;
 	struct gnet_stats_queue	__percpu *cpu_qstats;
+	int			padded;
+	refcount_t		refcnt;
 
 	/*
 	 * For performance sake on SMP, we put highly modified fields at the end
@@ -97,8 +99,6 @@ struct Qdisc {
 	unsigned long		state;
 	struct Qdisc            *next_sched;
 	struct sk_buff_head	skb_bad_txq;
-	int			padded;
-	refcount_t		refcnt;
 
 	spinlock_t		busylock ____cacheline_aligned_in_smp;
 	spinlock_t		seqlock;
@@ -350,14 +350,14 @@ static inline int qdisc_qlen(const struct Qdisc *q)
 
 static inline int qdisc_qlen_sum(const struct Qdisc *q)
 {
-	__u32 qlen = 0;
+	__u32 qlen = q->qstats.qlen;
 	int i;
 
 	if (q->flags & TCQ_F_NOLOCK) {
 		for_each_possible_cpu(i)
 			qlen += per_cpu_ptr(q->cpu_qstats, i)->qlen;
 	} else {
-		qlen = q->q.qlen;
+		qlen += q->q.qlen;
 	}
 
 	return qlen;

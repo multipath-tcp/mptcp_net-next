@@ -59,6 +59,19 @@ struct in6_validator_info {
 	struct netlink_ext_ack	*extack;
 };
 
+struct ifa6_config {
+	const struct in6_addr	*pfx;
+	unsigned int		plen;
+
+	const struct in6_addr	*peer_pfx;
+
+	u32			rt_priority;
+	u32			ifa_flags;
+	u32			preferred_lft;
+	u32			valid_lft;
+	u16			scope;
+};
+
 int addrconf_init(void);
 void addrconf_cleanup(void);
 
@@ -236,6 +249,8 @@ struct ipv6_stub {
 						   struct flowi6 *fl6, int oif,
 						   const struct sk_buff *skb,
 						   int strict);
+	u32 (*ip6_mtu_from_fib6)(struct fib6_info *f6i, struct in6_addr *daddr,
+				 struct in6_addr *saddr);
 
 	void (*udpv6_encap_enable)(void);
 	void (*ndisc_send_na)(struct net_device *dev, const struct in6_addr *daddr,

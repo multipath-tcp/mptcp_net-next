@@ -3941,6 +3941,7 @@ static fw_port_cap32_t fwcaps16_to_caps32(fw_port_cap16_t caps16)
 	CAP16_TO_CAP32(FC_RX);
 	CAP16_TO_CAP32(FC_TX);
 	CAP16_TO_CAP32(ANEG);
+	CAP16_TO_CAP32(FORCE_PAUSE);
 	CAP16_TO_CAP32(MDIAUTO);
 	CAP16_TO_CAP32(MDISTRAIGHT);
 	CAP16_TO_CAP32(FEC_RS);
@@ -3982,6 +3983,7 @@ static fw_port_cap16_t fwcaps32_to_caps16(fw_port_cap32_t caps32)
 	CAP32_TO_CAP16(802_3_PAUSE);
 	CAP32_TO_CAP16(802_3_ASM_DIR);
 	CAP32_TO_CAP16(ANEG);
+	CAP32_TO_CAP16(FORCE_PAUSE);
 	CAP32_TO_CAP16(MDIAUTO);
 	CAP32_TO_CAP16(MDISTRAIGHT);
 	CAP32_TO_CAP16(FEC_RS);
@@ -4014,6 +4016,8 @@ static inline fw_port_cap32_t cc_to_fwcap_pause(enum cc_pause cc_pause)
 		fw_pause |= FW_PORT_CAP32_FC_RX;
 	if (cc_pause & PAUSE_TX)
 		fw_pause |= FW_PORT_CAP32_FC_TX;
+	if (!(cc_pause & PAUSE_AUTONEG))
+		fw_pause |= FW_PORT_CAP32_FORCE_PAUSE;
 
 	return fw_pause;
 }
@@ -4066,6 +4070,7 @@ int t4_link_l1cfg_core(struct adapter *adapter, unsigned int mbox,
 	fw_port_cap32_t fw_fc, cc_fec, fw_fec, rcap;
 	struct fw_port_cmd cmd;
 	unsigned int fw_mdi;
+	int ret;
 
 	fw_mdi = (FW_PORT_CAP32_MDI_V(FW_PORT_CAP32_MDI_AUTO) & lc->pcaps);
 	/* Convert driver coding of Pause Frame Flow Control settings into the
@@ -4100,6 +4105,17 @@ int t4_link_l1cfg_core(struct adapter *adapter, unsigned int mbox,
 		rcap = lc->acaps | fw_fc | fw_fec | fw_mdi;
 	}
 
+	/* Note that older Firmware doesn't have FW_PORT_CAP32_FORCE_PAUSE, so
+	 * we need to exclude this from this check in order to maintain
+	 * compatibility ...
+	 */
+	if ((rcap & ~lc->pcaps) & ~FW_PORT_CAP32_FORCE_PAUSE) {
+		dev_err(adapter->pdev_dev,
+			"Requested Port Capabilities %#x exceed Physical Port Capabilities %#x\n",
+			rcap, lc->pcaps);
+		return -EINVAL;
+	}
+
 	/* And send that on to the Firmware ...
 	 */
 	memset(&cmd, 0, sizeof(cmd));
@@ -4110,13 +4126,21 @@ int t4_link_l1cfg_core(struct adapter *adapter, unsigned int mbox,
 		cpu_to_be32(FW_PORT_CMD_ACTION_V(fw_caps == FW_CAPS16
 						 ? FW_PORT_ACTION_L1_CFG
 						 : FW_PORT_ACTION_L1_CFG32) |
-			    FW_LEN16(cmd));
+						 FW_LEN16(cmd));
 	if (fw_caps == FW_CAPS16)
 		cmd.u.l1cfg.rcap = cpu_to_be32(fwcaps32_to_caps16(rcap));
 	else
 		cmd.u.l1cfg32.rcap32 = cpu_to_be32(rcap);
-	return t4_wr_mbox_meat_timeout(adapter, mbox, &cmd, sizeof(cmd), NULL,
-				       sleep_ok, timeout);
+
+	ret = t4_wr_mbox_meat_timeout(adapter, mbox, &cmd, sizeof(cmd), NULL,
+				      sleep_ok, timeout);
+	if (ret) {
+		dev_err(adapter->pdev_dev,
+			"Requested Port Capabilities %#x rejected, error %d\n",
+			rcap, -ret);
+		return ret;
+	}
+	return ret;
 }
 
 /**
@@ -7998,6 +8022,34 @@ int t4_enable_vi(struct adapter *adap, unsigned int mbox, unsigned int viid,
 }
 
 /**
+ *	t4_enable_pi_params - enable/disable a Port's Virtual Interface
+ *      @adap: the adapter
+ *      @mbox: mailbox to use for the FW command
+ *      @pi: the Port Information structure
+ *      @rx_en: 1=enable Rx, 0=disable Rx
+ *      @tx_en: 1=enable Tx, 0=disable Tx
+ *      @dcb_en: 1=enable delivery of Data Center Bridging messages.
+ *
+ *      Enables/disables a Port's Virtual Interface.  Note that setting DCB
+ *	Enable only makes sense when enabling a Virtual Interface ...
+ *	If the Virtual Interface enable/disable operation is successful,
+ *	we notify the OS-specific code of a potential Link Status change
+ *	via the OS Contract API t4_os_link_changed().
+ */
+int t4_enable_pi_params(struct adapter *adap, unsigned int mbox,
+			struct port_info *pi,
+			bool rx_en, bool tx_en, bool dcb_en)
+{
+	int ret = t4_enable_vi_params(adap, mbox, pi->viid,
+				      rx_en, tx_en, dcb_en);
+	if (ret)
+		return ret;
+	t4_os_link_changed(adap, pi->port_id,
+			   rx_en && tx_en && pi->link_cfg.link_ok);
+	return 0;
+}
+
+/**
  *	t4_identify_port - identify a VI's port by blinking its LED
  *	@adap: the adapter
  *	@mbox: mailbox to use for the FW command
@@ -8395,7 +8447,9 @@ void t4_handle_get_port_info(struct port_info *pi, const __be64 *rpl)
 		lc->lpacaps = lpacaps;
 		lc->acaps = acaps & ADVERT_MASK;
 
-		if (lc->acaps & FW_PORT_CAP32_ANEG) {
+		if (!(lc->acaps & FW_PORT_CAP32_ANEG)) {
+			lc->autoneg = AUTONEG_DISABLE;
+		} else if (lc->acaps & FW_PORT_CAP32_ANEG) {
 			lc->autoneg = AUTONEG_ENABLE;
 		} else {
 			/* When Autoneg is disabled, user needs to set
@@ -8600,6 +8654,13 @@ static void init_link_config(struct link_config *lc, fw_port_cap32_t pcaps,
 	lc->requested_fec = FEC_AUTO;
 	lc->fec = fwcap_to_cc_fec(lc->def_acaps);
 
+	/* If the Port is capable of Auto-Negtotiation, initialize it as
+	 * "enabled" and copy over all of the Physical Port Capabilities
+	 * to the Advertised Port Capabilities.  Otherwise mark it as
+	 * Auto-Negotiate disabled and select the highest supported speed
+	 * for the link.  Note parallel structure in t4_link_l1cfg_core()
+	 * and t4_handle_get_port_info().
+	 */
 	if (lc->pcaps & FW_PORT_CAP32_ANEG) {
 		lc->acaps = lc->pcaps & ADVERT_MASK;
 		lc->autoneg = AUTONEG_ENABLE;
@@ -8607,6 +8668,7 @@ static void init_link_config(struct link_config *lc, fw_port_cap32_t pcaps,
 	} else {
 		lc->acaps = 0;
 		lc->autoneg = AUTONEG_DISABLE;
+		lc->speed_caps = fwcap_to_fwspeed(acaps);
 	}
 }
 

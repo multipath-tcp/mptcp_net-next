@@ -791,6 +791,7 @@ enum tc_setup_type {
 	TC_SETUP_QDISC_CBS,
 	TC_SETUP_QDISC_RED,
 	TC_SETUP_QDISC_PRIO,
+	TC_SETUP_QDISC_MQ,
 };
 
 /* These structures hold the attributes of bpf state that are being passed
@@ -817,10 +818,13 @@ enum bpf_netdev_command {
 	BPF_OFFLOAD_DESTROY,
 	BPF_OFFLOAD_MAP_ALLOC,
 	BPF_OFFLOAD_MAP_FREE,
+	XDP_QUERY_XSK_UMEM,
+	XDP_SETUP_XSK_UMEM,
 };
 
 struct bpf_prog_offload_ops;
 struct netlink_ext_ack;
+struct xdp_umem;
 
 struct netdev_bpf {
 	enum bpf_netdev_command command;
@@ -851,6 +855,11 @@ struct netdev_bpf {
 		struct {
 			struct bpf_offloaded_map *offmap;
 		};
+		/* XDP_SETUP_XSK_UMEM */
+		struct {
+			struct xdp_umem *umem;
+			u16 queue_id;
+		} xsk;
 	};
 };
 
@@ -1185,12 +1194,13 @@ struct dev_ifalias {
  *	This function is used to set or query state related to XDP on the
  *	netdevice and manage BPF offload. See definition of
  *	enum bpf_netdev_command for details.
- * int (*ndo_xdp_xmit)(struct net_device *dev, struct xdp_frame *xdp);
- *	This function is used to submit a XDP packet for transmit on a
- *	netdevice.
- * void (*ndo_xdp_flush)(struct net_device *dev);
- *	This function is used to inform the driver to flush a particular
- *	xdp tx queue. Must be called on same CPU as xdp_xmit.
+ * int (*ndo_xdp_xmit)(struct net_device *dev, int n, struct xdp_frame **xdp,
+ *			u32 flags);
+ *	This function is used to submit @n XDP packets for transmit on a
+ *	netdevice. Returns number of frames successfully transmitted, frames
+ *	that got dropped are freed/returned via xdp_return_frame().
+ *	Returns negative number, means general error invoking ndo, meaning
+ *	no frames were xmit'ed and core-caller will free all frames.
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
@@ -1375,9 +1385,11 @@ struct net_device_ops {
 						       int needed_headroom);
 	int			(*ndo_bpf)(struct net_device *dev,
 					   struct netdev_bpf *bpf);
-	int			(*ndo_xdp_xmit)(struct net_device *dev,
-						struct xdp_frame *xdp);
-	void			(*ndo_xdp_flush)(struct net_device *dev);
+	int			(*ndo_xdp_xmit)(struct net_device *dev, int n,
+						struct xdp_frame **xdp,
+						u32 flags);
+	int			(*ndo_xsk_async_xmit)(struct net_device *dev,
+						      u32 queue_id);
 };
 
 /**
@@ -1421,6 +1433,8 @@ struct net_device_ops {
  *	entity (i.e. the master device for bridged veth)
  * @IFF_MACSEC: device is a MACsec device
  * @IFF_NO_RX_HANDLER: device doesn't support the rx_handler hook
+ * @IFF_FAILOVER: device is a failover master device
+ * @IFF_FAILOVER_SLAVE: device is lower dev of a failover master device
  */
 enum netdev_priv_flags {
 	IFF_802_1Q_VLAN			= 1<<0,
@@ -1450,6 +1464,8 @@ enum netdev_priv_flags {
 	IFF_PHONY_HEADROOM		= 1<<24,
 	IFF_MACSEC			= 1<<25,
 	IFF_NO_RX_HANDLER		= 1<<26,
+	IFF_FAILOVER			= 1<<27,
+	IFF_FAILOVER_SLAVE		= 1<<28,
 };
 
 #define IFF_802_1Q_VLAN			IFF_802_1Q_VLAN
@@ -1478,6 +1494,8 @@ enum netdev_priv_flags {
 #define IFF_RXFH_CONFIGURED		IFF_RXFH_CONFIGURED
 #define IFF_MACSEC			IFF_MACSEC
 #define IFF_NO_RX_HANDLER		IFF_NO_RX_HANDLER
+#define IFF_FAILOVER			IFF_FAILOVER
+#define IFF_FAILOVER_SLAVE		IFF_FAILOVER_SLAVE
 
 /**
  *	struct net_device - The DEVICE structure.
@@ -2328,8 +2346,19 @@ enum netdev_lag_tx_type {
 	NETDEV_LAG_TX_TYPE_HASH,
 };
 
+enum netdev_lag_hash {
+	NETDEV_LAG_HASH_NONE,
+	NETDEV_LAG_HASH_L2,
+	NETDEV_LAG_HASH_L34,
+	NETDEV_LAG_HASH_L23,
+	NETDEV_LAG_HASH_E23,
+	NETDEV_LAG_HASH_E34,
+	NETDEV_LAG_HASH_UNKNOWN,
+};
+
 struct netdev_lag_upper_info {
 	enum netdev_lag_tx_type tx_type;
+	enum netdev_lag_hash hash_type;
 };
 
 struct netdev_lag_lower_state_info {
@@ -4319,6 +4348,16 @@ static inline bool netif_is_lag_port(const struct net_device *dev)
 static inline bool netif_is_rxfh_configured(const struct net_device *dev)
 {
 	return dev->priv_flags & IFF_RXFH_CONFIGURED;
+}
+
+static inline bool netif_is_failover(const struct net_device *dev)
+{
+	return dev->priv_flags & IFF_FAILOVER;
+}
+
+static inline bool netif_is_failover_slave(const struct net_device *dev)
+{
+	return dev->priv_flags & IFF_FAILOVER_SLAVE;
 }
 
 /* This device needs to keep skb dst for qdisc enqueue or ndo_start_xmit() */

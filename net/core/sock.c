@@ -733,9 +733,22 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 			sock_valbool_flag(sk, SOCK_DBG, valbool);
 		break;
 	case SO_REUSEADDR:
-		sk->sk_reuse = (valbool ? SK_CAN_REUSE : SK_NO_REUSE);
+		val = (valbool ? SK_CAN_REUSE : SK_NO_REUSE);
+		if ((sk->sk_family == PF_INET || sk->sk_family == PF_INET6) &&
+		    inet_sk(sk)->inet_num &&
+		    (sk->sk_reuse != val)) {
+			ret = (sk->sk_state == TCP_ESTABLISHED) ? -EISCONN : -EUCLEAN;
+			break;
+		}
+		sk->sk_reuse = val;
 		break;
 	case SO_REUSEPORT:
+		if ((sk->sk_family == PF_INET || sk->sk_family == PF_INET6) &&
+		    inet_sk(sk)->inet_num &&
+		    (sk->sk_reuseport != valbool)) {
+			ret = (sk->sk_state == TCP_ESTABLISHED) ? -EISCONN : -EUCLEAN;
+			break;
+		}
 		sk->sk_reuseport = valbool;
 		break;
 	case SO_TYPE:
@@ -2601,12 +2614,6 @@ int sock_no_getname(struct socket *sock, struct sockaddr *saddr,
 }
 EXPORT_SYMBOL(sock_no_getname);
 
-__poll_t sock_no_poll(struct file *file, struct socket *sock, poll_table *pt)
-{
-	return 0;
-}
-EXPORT_SYMBOL(sock_no_poll);
-
 int sock_no_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	return -EOPNOTSUPP;
@@ -3473,22 +3480,10 @@ static const struct seq_operations proto_seq_ops = {
 	.show   = proto_seq_show,
 };
 
-static int proto_seq_open(struct inode *inode, struct file *file)
-{
-	return seq_open_net(inode, file, &proto_seq_ops,
-			    sizeof(struct seq_net_private));
-}
-
-static const struct file_operations proto_seq_fops = {
-	.open		= proto_seq_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release_net,
-};
-
 static __net_init int proto_init_net(struct net *net)
 {
-	if (!proc_create("protocols", 0444, net->proc_net, &proto_seq_fops))
+	if (!proc_create_net("protocols", 0444, net->proc_net, &proto_seq_ops,
+			sizeof(struct seq_net_private)))
 		return -ENOMEM;
 
 	return 0;

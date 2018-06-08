@@ -70,6 +70,7 @@
 #include <net/netns/generic.h>
 #include <net/rtnetlink.h>
 #include <net/sock.h>
+#include <net/xdp.h>
 #include <linux/seq_file.h>
 #include <linux/uio.h>
 #include <linux/skb_array.h>
@@ -79,6 +80,9 @@
 
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
+
+static void tun_default_link_ksettings(struct net_device *dev,
+				       struct ethtool_link_ksettings *cmd);
 
 /* Uncomment to enable debugging */
 /* #define TUN_DEBUG 1 */
@@ -241,6 +245,7 @@ struct tun_struct {
 	struct bpf_prog __rcu *xdp_prog;
 	struct tun_prog __rcu *steering_prog;
 	struct tun_prog __rcu *filter_prog;
+	struct ethtool_link_ksettings link_ksettings;
 };
 
 struct veth {
@@ -1284,34 +1289,59 @@ static const struct net_device_ops tun_netdev_ops = {
 	.ndo_get_stats64	= tun_net_get_stats64,
 };
 
-static int tun_xdp_xmit(struct net_device *dev, struct xdp_frame *frame)
+static void __tun_xdp_flush_tfile(struct tun_file *tfile)
+{
+	/* Notify and wake up reader process */
+	if (tfile->flags & TUN_FASYNC)
+		kill_fasync(&tfile->fasync, SIGIO, POLL_IN);
+	tfile->socket.sk->sk_data_ready(tfile->socket.sk);
+}
+
+static int tun_xdp_xmit(struct net_device *dev, int n,
+			struct xdp_frame **frames, u32 flags)
 {
 	struct tun_struct *tun = netdev_priv(dev);
 	struct tun_file *tfile;
 	u32 numqueues;
-	int ret = 0;
+	int drops = 0;
+	int cnt = n;
+	int i;
+
+	if (unlikely(flags & ~XDP_XMIT_FLAGS_MASK))
+		return -EINVAL;
 
 	rcu_read_lock();
 
 	numqueues = READ_ONCE(tun->numqueues);
 	if (!numqueues) {
-		ret = -ENOSPC;
-		goto out;
+		rcu_read_unlock();
+		return -ENXIO; /* Caller will free/return all frames */
 	}
 
 	tfile = rcu_dereference(tun->tfiles[smp_processor_id() %
 					    numqueues]);
-	/* Encode the XDP flag into lowest bit for consumer to differ
-	 * XDP buffer from sk_buff.
-	 */
-	if (ptr_ring_produce(&tfile->tx_ring, tun_xdp_to_ptr(frame))) {
-		this_cpu_inc(tun->pcpu_stats->tx_dropped);
-		ret = -ENOSPC;
-	}
 
-out:
+	spin_lock(&tfile->tx_ring.producer_lock);
+	for (i = 0; i < n; i++) {
+		struct xdp_frame *xdp = frames[i];
+		/* Encode the XDP flag into lowest bit for consumer to differ
+		 * XDP buffer from sk_buff.
+		 */
+		void *frame = tun_xdp_to_ptr(xdp);
+
+		if (__ptr_ring_produce(&tfile->tx_ring, frame)) {
+			this_cpu_inc(tun->pcpu_stats->tx_dropped);
+			xdp_return_frame_rx_napi(xdp);
+			drops++;
+		}
+	}
+	spin_unlock(&tfile->tx_ring.producer_lock);
+
+	if (flags & XDP_XMIT_FLUSH)
+		__tun_xdp_flush_tfile(tfile);
+
 	rcu_read_unlock();
-	return ret;
+	return cnt - drops;
 }
 
 static int tun_xdp_tx(struct net_device *dev, struct xdp_buff *xdp)
@@ -1321,30 +1351,7 @@ static int tun_xdp_tx(struct net_device *dev, struct xdp_buff *xdp)
 	if (unlikely(!frame))
 		return -EOVERFLOW;
 
-	return tun_xdp_xmit(dev, frame);
-}
-
-static void tun_xdp_flush(struct net_device *dev)
-{
-	struct tun_struct *tun = netdev_priv(dev);
-	struct tun_file *tfile;
-	u32 numqueues;
-
-	rcu_read_lock();
-
-	numqueues = READ_ONCE(tun->numqueues);
-	if (!numqueues)
-		goto out;
-
-	tfile = rcu_dereference(tun->tfiles[smp_processor_id() %
-					    numqueues]);
-	/* Notify and wake up reader process */
-	if (tfile->flags & TUN_FASYNC)
-		kill_fasync(&tfile->fasync, SIGIO, POLL_IN);
-	tfile->socket.sk->sk_data_ready(tfile->socket.sk);
-
-out:
-	rcu_read_unlock();
+	return tun_xdp_xmit(dev, 1, &frame, XDP_XMIT_FLUSH);
 }
 
 static const struct net_device_ops tap_netdev_ops = {
@@ -1365,7 +1372,6 @@ static const struct net_device_ops tap_netdev_ops = {
 	.ndo_get_stats64	= tun_net_get_stats64,
 	.ndo_bpf		= tun_xdp,
 	.ndo_xdp_xmit		= tun_xdp_xmit,
-	.ndo_xdp_flush		= tun_xdp_flush,
 };
 
 static void tun_flow_init(struct tun_struct *tun)
@@ -1425,6 +1431,13 @@ static void tun_net_init(struct net_device *dev)
 	dev->max_mtu = MAX_MTU - dev->hard_header_len;
 }
 
+static bool tun_sock_writeable(struct tun_struct *tun, struct tun_file *tfile)
+{
+	struct sock *sk = tfile->socket.sk;
+
+	return (tun->dev->flags & IFF_UP) && sock_writeable(sk);
+}
+
 /* Character device part */
 
 /* Poll */
@@ -1447,10 +1460,14 @@ static __poll_t tun_chr_poll(struct file *file, poll_table *wait)
 	if (!ptr_ring_empty(&tfile->tx_ring))
 		mask |= EPOLLIN | EPOLLRDNORM;
 
-	if (tun->dev->flags & IFF_UP &&
-	    (sock_writeable(sk) ||
-	     (!test_and_set_bit(SOCKWQ_ASYNC_NOSPACE, &sk->sk_socket->flags) &&
-	      sock_writeable(sk))))
+	/* Make sure SOCKWQ_ASYNC_NOSPACE is set if not writable to
+	 * guarantee EPOLLOUT to be raised by either here or
+	 * tun_sock_write_space(). Then process could get notification
+	 * after it writes to a down device and meets -EIO.
+	 */
+	if (tun_sock_writeable(tun, tfile) ||
+	    (!test_and_set_bit(SOCKWQ_ASYNC_NOSPACE, &sk->sk_socket->flags) &&
+	     tun_sock_writeable(tun, tfile)))
 		mask |= EPOLLOUT | EPOLLWRNORM;
 
 	if (tun->dev->reg_state != NETREG_REGISTERED)
@@ -1641,7 +1658,7 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 	else
 		*skb_xdp = 0;
 
-	preempt_disable();
+	local_bh_disable();
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(tun->xdp_prog);
 	if (xdp_prog && !*skb_xdp) {
@@ -1666,16 +1683,15 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 			if (err)
 				goto err_redirect;
 			rcu_read_unlock();
-			preempt_enable();
+			local_bh_enable();
 			return NULL;
 		case XDP_TX:
 			get_page(alloc_frag->page);
 			alloc_frag->offset += buflen;
 			if (tun_xdp_tx(tun->dev, &xdp))
 				goto err_redirect;
-			tun_xdp_flush(tun->dev);
 			rcu_read_unlock();
-			preempt_enable();
+			local_bh_enable();
 			return NULL;
 		case XDP_PASS:
 			delta = orig_data - xdp.data;
@@ -1695,7 +1711,7 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 	skb = build_skb(buf, buflen);
 	if (!skb) {
 		rcu_read_unlock();
-		preempt_enable();
+		local_bh_enable();
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -1705,7 +1721,7 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 	alloc_frag->offset += buflen;
 
 	rcu_read_unlock();
-	preempt_enable();
+	local_bh_enable();
 
 	return skb;
 
@@ -1713,7 +1729,7 @@ err_redirect:
 	put_page(alloc_frag->page);
 err_xdp:
 	rcu_read_unlock();
-	preempt_enable();
+	local_bh_enable();
 	this_cpu_inc(tun->pcpu_stats->rx_dropped);
 	return NULL;
 }
@@ -1909,16 +1925,19 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 		struct bpf_prog *xdp_prog;
 		int ret;
 
+		local_bh_disable();
 		rcu_read_lock();
 		xdp_prog = rcu_dereference(tun->xdp_prog);
 		if (xdp_prog) {
 			ret = do_xdp_generic(xdp_prog, skb);
 			if (ret != XDP_PASS) {
 				rcu_read_unlock();
+				local_bh_enable();
 				return total_len;
 			}
 		}
 		rcu_read_unlock();
+		local_bh_enable();
 	}
 
 	/* Compute the costly rx hash only if needed for flow updates.
@@ -2270,6 +2289,7 @@ static void tun_setup(struct net_device *dev)
 
 	tun->owner = INVALID_UID;
 	tun->group = INVALID_GID;
+	tun_default_link_ksettings(dev, &tun->link_ksettings);
 
 	dev->ethtool_ops = &tun_ethtool_ops;
 	dev->needs_free_netdev = true;
@@ -3301,8 +3321,8 @@ static struct miscdevice tun_miscdev = {
 
 /* ethtool interface */
 
-static int tun_get_link_ksettings(struct net_device *dev,
-				  struct ethtool_link_ksettings *cmd)
+static void tun_default_link_ksettings(struct net_device *dev,
+				       struct ethtool_link_ksettings *cmd)
 {
 	ethtool_link_ksettings_zero_link_mode(cmd, supported);
 	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
@@ -3311,6 +3331,23 @@ static int tun_get_link_ksettings(struct net_device *dev,
 	cmd->base.port		= PORT_TP;
 	cmd->base.phy_address	= 0;
 	cmd->base.autoneg	= AUTONEG_DISABLE;
+}
+
+static int tun_get_link_ksettings(struct net_device *dev,
+				  struct ethtool_link_ksettings *cmd)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+
+	memcpy(cmd, &tun->link_ksettings, sizeof(*cmd));
+	return 0;
+}
+
+static int tun_set_link_ksettings(struct net_device *dev,
+				  const struct ethtool_link_ksettings *cmd)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+
+	memcpy(&tun->link_ksettings, cmd, sizeof(*cmd));
 	return 0;
 }
 
@@ -3381,6 +3418,7 @@ static const struct ethtool_ops tun_ethtool_ops = {
 	.get_coalesce   = tun_get_coalesce,
 	.set_coalesce   = tun_set_coalesce,
 	.get_link_ksettings = tun_get_link_ksettings,
+	.set_link_ksettings = tun_set_link_ksettings,
 };
 
 static int tun_queue_resize(struct tun_struct *tun)

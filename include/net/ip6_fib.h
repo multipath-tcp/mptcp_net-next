@@ -412,6 +412,12 @@ static inline struct net_device *fib6_info_nh_dev(const struct fib6_info *f6i)
 	return f6i->fib6_nh.nh_dev;
 }
 
+static inline
+struct lwtunnel_state *fib6_info_nh_lwt(const struct fib6_info *f6i)
+{
+	return f6i->fib6_nh.nh_lwtstate;
+}
+
 void inet6_rt_notify(int event, struct fib6_info *rt, struct nl_info *info,
 		     unsigned int flags);
 
@@ -421,7 +427,15 @@ void fib6_gc_cleanup(void);
 
 int fib6_init(void);
 
-int ipv6_route_open(struct inode *inode, struct file *file);
+struct ipv6_route_iter {
+	struct seq_net_private p;
+	struct fib6_walker w;
+	loff_t skip;
+	struct fib6_table *tbl;
+	int sernum;
+};
+
+extern const struct seq_operations ipv6_route_seq_ops;
 
 int call_fib6_notifier(struct notifier_block *nb, struct net *net,
 		       enum fib_event_type event_type,

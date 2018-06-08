@@ -340,6 +340,31 @@ tunnel_destroy()
 	ip link del dev $name
 }
 
+vlan_create()
+{
+	local if_name=$1; shift
+	local vid=$1; shift
+	local vrf=$1; shift
+	local ips=("${@}")
+	local name=$if_name.$vid
+
+	ip link add name $name link $if_name type vlan id $vid
+	if [ "$vrf" != "" ]; then
+		ip link set dev $name master $vrf
+	fi
+	ip link set dev $name up
+	__addr_add_del $name add "${ips[@]}"
+}
+
+vlan_destroy()
+{
+	local if_name=$1; shift
+	local vid=$1; shift
+	local name=$if_name.$vid
+
+	ip link del dev $name
+}
+
 master_name_get()
 {
 	local if_name=$1
@@ -423,26 +448,35 @@ tc_offload_check()
 	return 0
 }
 
-slow_path_trap_install()
+trap_install()
 {
 	local dev=$1; shift
 	local direction=$1; shift
 
+	# For slow-path testing, we need to install a trap to get to
+	# slow path the packets that would otherwise be switched in HW.
+	tc filter add dev $dev $direction pref 1 flower skip_sw action trap
+}
+
+trap_uninstall()
+{
+	local dev=$1; shift
+	local direction=$1; shift
+
+	tc filter del dev $dev $direction pref 1 flower skip_sw
+}
+
+slow_path_trap_install()
+{
 	if [ "${tcflags/skip_hw}" != "$tcflags" ]; then
-		# For slow-path testing, we need to install a trap to get to
-		# slow path the packets that would otherwise be switched in HW.
-		tc filter add dev $dev $direction pref 1 \
-		   flower skip_sw action trap
+		trap_install "$@"
 	fi
 }
 
 slow_path_trap_uninstall()
 {
-	local dev=$1; shift
-	local direction=$1; shift
-
 	if [ "${tcflags/skip_hw}" != "$tcflags" ]; then
-		tc filter del dev $dev $direction pref 1 flower skip_sw
+		trap_uninstall "$@"
 	fi
 }
 
@@ -478,6 +512,29 @@ icmp6_capture_install()
 icmp6_capture_uninstall()
 {
 	__icmp_capture_add_del del 100 v6 "$@"
+}
+
+__vlan_capture_add_del()
+{
+	local add_del=$1; shift
+	local pref=$1; shift
+	local dev=$1; shift
+	local filter=$1; shift
+
+	tc filter $add_del dev "$dev" ingress \
+	   proto 802.1q pref $pref \
+	   flower $filter \
+	   action pass
+}
+
+vlan_capture_install()
+{
+	__vlan_capture_add_del add 100 "$@"
+}
+
+vlan_capture_uninstall()
+{
+	__vlan_capture_add_del del 100 "$@"
 }
 
 matchall_sink_create()

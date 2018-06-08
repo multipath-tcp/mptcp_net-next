@@ -428,16 +428,6 @@ static void pppol2tp_put_sk(struct rcu_head *head)
  */
 static void pppol2tp_session_close(struct l2tp_session *session)
 {
-	struct pppol2tp_session *ps;
-
-	ps = l2tp_session_priv(session);
-	mutex_lock(&ps->sk_lock);
-	ps->__sk = rcu_dereference_protected(ps->sk,
-					     lockdep_is_held(&ps->sk_lock));
-	RCU_INIT_POINTER(ps->sk, NULL);
-	if (ps->__sk)
-		call_rcu(&ps->rcu, pppol2tp_put_sk);
-	mutex_unlock(&ps->sk_lock);
 }
 
 /* Really kill the session socket. (Called from sock_put() if
@@ -480,15 +470,24 @@ static int pppol2tp_release(struct socket *sock)
 	sock_orphan(sk);
 	sock->sk = NULL;
 
-	/* If the socket is associated with a session,
-	 * l2tp_session_delete will call pppol2tp_session_close which
-	 * will drop the session's ref on the socket.
-	 */
 	session = pppol2tp_sock_to_session(sk);
 	if (session) {
+		struct pppol2tp_session *ps;
+
 		l2tp_session_delete(session);
-		/* drop the ref obtained by pppol2tp_sock_to_session */
-		sock_put(sk);
+
+		ps = l2tp_session_priv(session);
+		mutex_lock(&ps->sk_lock);
+		ps->__sk = rcu_dereference_protected(ps->sk,
+						     lockdep_is_held(&ps->sk_lock));
+		RCU_INIT_POINTER(ps->sk, NULL);
+		mutex_unlock(&ps->sk_lock);
+		call_rcu(&ps->rcu, pppol2tp_put_sk);
+
+		/* Rely on the sock_put() call at the end of the function for
+		 * dropping the reference held by pppol2tp_sock_to_session().
+		 * The last reference will be dropped by pppol2tp_put_sk().
+		 */
 	}
 
 	release_sock(sk);
@@ -742,7 +741,8 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 		 */
 		mutex_lock(&ps->sk_lock);
 		if (rcu_dereference_protected(ps->sk,
-					      lockdep_is_held(&ps->sk_lock))) {
+					      lockdep_is_held(&ps->sk_lock)) ||
+		    ps->__sk) {
 			mutex_unlock(&ps->sk_lock);
 			error = -EEXIST;
 			goto end;
@@ -803,7 +803,6 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 
 out_no_ppp:
 	/* This is how we get the session context from the socket. */
-	sock_hold(sk);
 	sk->sk_user_data = session;
 	rcu_assign_pointer(ps->sk, sk);
 	mutex_unlock(&ps->sk_lock);
@@ -1747,24 +1746,6 @@ static const struct seq_operations pppol2tp_seq_ops = {
 	.stop		= pppol2tp_seq_stop,
 	.show		= pppol2tp_seq_show,
 };
-
-/* Called when our /proc file is opened. We allocate data for use when
- * iterating our tunnel / session contexts and store it in the private
- * data of the seq_file.
- */
-static int pppol2tp_proc_open(struct inode *inode, struct file *file)
-{
-	return seq_open_net(inode, file, &pppol2tp_seq_ops,
-			    sizeof(struct pppol2tp_seq_data));
-}
-
-static const struct file_operations pppol2tp_proc_fops = {
-	.open		= pppol2tp_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release_net,
-};
-
 #endif /* CONFIG_PROC_FS */
 
 /*****************************************************************************
@@ -1776,8 +1757,8 @@ static __net_init int pppol2tp_init_net(struct net *net)
 	struct proc_dir_entry *pde;
 	int err = 0;
 
-	pde = proc_create("pppol2tp", 0444, net->proc_net,
-			  &pppol2tp_proc_fops);
+	pde = proc_create_net("pppol2tp", 0444, net->proc_net,
+			&pppol2tp_seq_ops, sizeof(struct pppol2tp_seq_data));
 	if (!pde) {
 		err = -ENOMEM;
 		goto out;
@@ -1811,7 +1792,7 @@ static const struct proto_ops pppol2tp_ops = {
 	.socketpair	= sock_no_socketpair,
 	.accept		= sock_no_accept,
 	.getname	= pppol2tp_getname,
-	.poll		= datagram_poll,
+	.poll_mask	= datagram_poll_mask,
 	.listen		= sock_no_listen,
 	.shutdown	= sock_no_shutdown,
 	.setsockopt	= pppol2tp_setsockopt,

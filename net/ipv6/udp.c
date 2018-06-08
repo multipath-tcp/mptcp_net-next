@@ -285,9 +285,7 @@ EXPORT_SYMBOL_GPL(udp6_lib_lookup_skb);
 /* Must be called under rcu_read_lock().
  * Does increment socket refcount.
  */
-#if IS_ENABLED(CONFIG_NETFILTER_XT_MATCH_SOCKET) || \
-    IS_ENABLED(CONFIG_NETFILTER_XT_TARGET_TPROXY) || \
-    IS_ENABLED(CONFIG_NF_SOCKET_IPV6)
+#if IS_ENABLED(CONFIG_NF_TPROXY_IPV6) || IS_ENABLED(CONFIG_NF_SOCKET_IPV6)
 struct sock *udp6_lib_lookup(struct net *net, const struct in6_addr *saddr, __be16 sport,
 			     const struct in6_addr *daddr, __be16 dport, int dif)
 {
@@ -1316,6 +1314,29 @@ do_udp_sendmsg:
 		fl6.saddr = np->saddr;
 	fl6.fl6_sport = inet->inet_sport;
 
+	if (cgroup_bpf_enabled && !connected) {
+		err = BPF_CGROUP_RUN_PROG_UDP6_SENDMSG_LOCK(sk,
+					   (struct sockaddr *)sin6, &fl6.saddr);
+		if (err)
+			goto out_no_dst;
+		if (sin6) {
+			if (ipv6_addr_v4mapped(&sin6->sin6_addr)) {
+				/* BPF program rewrote IPv6-only by IPv4-mapped
+				 * IPv6. It's currently unsupported.
+				 */
+				err = -ENOTSUPP;
+				goto out_no_dst;
+			}
+			if (sin6->sin6_port == 0) {
+				/* BPF program set invalid port. Reject it. */
+				err = -EINVAL;
+				goto out_no_dst;
+			}
+			fl6.fl6_dport = sin6->sin6_port;
+			fl6.daddr = sin6->sin6_addr;
+		}
+	}
+
 	final_p = fl6_update_dst(&fl6, opt, &final);
 	if (final_p)
 		connected = false;
@@ -1395,6 +1416,7 @@ do_append_data:
 
 out:
 	dst_release(dst);
+out_no_dst:
 	fl6_sock_release(flowlabel);
 	txopt_put(opt_to_free);
 	if (!err)
@@ -1506,31 +1528,30 @@ int udp6_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static const struct file_operations udp6_afinfo_seq_fops = {
-	.open     = udp_seq_open,
-	.read     = seq_read,
-	.llseek   = seq_lseek,
-	.release  = seq_release_net
+const struct seq_operations udp6_seq_ops = {
+	.start		= udp_seq_start,
+	.next		= udp_seq_next,
+	.stop		= udp_seq_stop,
+	.show		= udp6_seq_show,
 };
+EXPORT_SYMBOL(udp6_seq_ops);
 
 static struct udp_seq_afinfo udp6_seq_afinfo = {
-	.name		= "udp6",
 	.family		= AF_INET6,
 	.udp_table	= &udp_table,
-	.seq_fops	= &udp6_afinfo_seq_fops,
-	.seq_ops	= {
-		.show		= udp6_seq_show,
-	},
 };
 
 int __net_init udp6_proc_init(struct net *net)
 {
-	return udp_proc_register(net, &udp6_seq_afinfo);
+	if (!proc_create_net_data("udp6", 0444, net->proc_net, &udp6_seq_ops,
+			sizeof(struct udp_iter_state), &udp6_seq_afinfo))
+		return -ENOMEM;
+	return 0;
 }
 
 void udp6_proc_exit(struct net *net)
 {
-	udp_proc_unregister(net, &udp6_seq_afinfo);
+	remove_proc_entry("udp6", net->proc_net);
 }
 #endif /* CONFIG_PROC_FS */
 

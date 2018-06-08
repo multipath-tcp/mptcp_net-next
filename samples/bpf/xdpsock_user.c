@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2017 - 2018 Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- */
+/* Copyright(c) 2017 - 2018 Intel Corporation. */
 
 #include <assert.h>
 #include <errno.h>
@@ -56,6 +46,7 @@
 
 #define NUM_FRAMES 131072
 #define FRAME_HEADROOM 0
+#define FRAME_SHIFT 11
 #define FRAME_SIZE 2048
 #define NUM_DESCS 1024
 #define BATCH_SIZE 16
@@ -65,6 +56,7 @@
 
 #define DEBUG_HEXDUMP 0
 
+typedef __u64 u64;
 typedef __u32 u32;
 
 static unsigned long prev_time;
@@ -83,17 +75,21 @@ static int opt_queue;
 static int opt_poll;
 static int opt_shared_packet_buffer;
 static int opt_interval = 1;
+static u32 opt_xdp_bind_flags;
 
 struct xdp_umem_uqueue {
 	u32 cached_prod;
 	u32 cached_cons;
 	u32 mask;
 	u32 size;
-	struct xdp_umem_ring *ring;
+	u32 *producer;
+	u32 *consumer;
+	u64 *ring;
+	void *map;
 };
 
 struct xdp_umem {
-	char (*frames)[FRAME_SIZE];
+	char *frames;
 	struct xdp_umem_uqueue fq;
 	struct xdp_umem_uqueue cq;
 	int fd;
@@ -104,7 +100,10 @@ struct xdp_uqueue {
 	u32 cached_cons;
 	u32 mask;
 	u32 size;
-	struct xdp_rxtx_ring *ring;
+	u32 *producer;
+	u32 *consumer;
+	struct xdp_desc *ring;
+	void *map;
 };
 
 struct xdpsock {
@@ -159,15 +158,15 @@ static const char pkt_data[] =
 
 static inline u32 umem_nb_free(struct xdp_umem_uqueue *q, u32 nb)
 {
-	u32 free_entries = q->size - (q->cached_prod - q->cached_cons);
+	u32 free_entries = q->cached_cons - q->cached_prod;
 
 	if (free_entries >= nb)
 		return free_entries;
 
 	/* Refresh the local tail pointer */
-	q->cached_cons = q->ring->ptrs.consumer;
+	q->cached_cons = *q->consumer + q->size;
 
-	return q->size - (q->cached_prod - q->cached_cons);
+	return q->cached_cons - q->cached_prod;
 }
 
 static inline u32 xq_nb_free(struct xdp_uqueue *q, u32 ndescs)
@@ -178,7 +177,7 @@ static inline u32 xq_nb_free(struct xdp_uqueue *q, u32 ndescs)
 		return free_entries;
 
 	/* Refresh the local tail pointer */
-	q->cached_cons = q->ring->ptrs.consumer + q->size;
+	q->cached_cons = *q->consumer + q->size;
 	return q->cached_cons - q->cached_prod;
 }
 
@@ -187,7 +186,7 @@ static inline u32 umem_nb_avail(struct xdp_umem_uqueue *q, u32 nb)
 	u32 entries = q->cached_prod - q->cached_cons;
 
 	if (entries == 0) {
-		q->cached_prod = q->ring->ptrs.producer;
+		q->cached_prod = *q->producer;
 		entries = q->cached_prod - q->cached_cons;
 	}
 
@@ -199,7 +198,7 @@ static inline u32 xq_nb_avail(struct xdp_uqueue *q, u32 ndescs)
 	u32 entries = q->cached_prod - q->cached_cons;
 
 	if (entries == 0) {
-		q->cached_prod = q->ring->ptrs.producer;
+		q->cached_prod = *q->producer;
 		entries = q->cached_prod - q->cached_cons;
 	}
 
@@ -218,17 +217,17 @@ static inline int umem_fill_to_kernel_ex(struct xdp_umem_uqueue *fq,
 	for (i = 0; i < nb; i++) {
 		u32 idx = fq->cached_prod++ & fq->mask;
 
-		fq->ring->desc[idx] = d[i].idx;
+		fq->ring[idx] = d[i].addr;
 	}
 
 	u_smp_wmb();
 
-	fq->ring->ptrs.producer = fq->cached_prod;
+	*fq->producer = fq->cached_prod;
 
 	return 0;
 }
 
-static inline int umem_fill_to_kernel(struct xdp_umem_uqueue *fq, u32 *d,
+static inline int umem_fill_to_kernel(struct xdp_umem_uqueue *fq, u64 *d,
 				      size_t nb)
 {
 	u32 i;
@@ -239,18 +238,18 @@ static inline int umem_fill_to_kernel(struct xdp_umem_uqueue *fq, u32 *d,
 	for (i = 0; i < nb; i++) {
 		u32 idx = fq->cached_prod++ & fq->mask;
 
-		fq->ring->desc[idx] = d[i];
+		fq->ring[idx] = d[i];
 	}
 
 	u_smp_wmb();
 
-	fq->ring->ptrs.producer = fq->cached_prod;
+	*fq->producer = fq->cached_prod;
 
 	return 0;
 }
 
 static inline size_t umem_complete_from_kernel(struct xdp_umem_uqueue *cq,
-					       u32 *d, size_t nb)
+					       u64 *d, size_t nb)
 {
 	u32 idx, i, entries = umem_nb_avail(cq, nb);
 
@@ -258,29 +257,28 @@ static inline size_t umem_complete_from_kernel(struct xdp_umem_uqueue *cq,
 
 	for (i = 0; i < entries; i++) {
 		idx = cq->cached_cons++ & cq->mask;
-		d[i] = cq->ring->desc[idx];
+		d[i] = cq->ring[idx];
 	}
 
 	if (entries > 0) {
 		u_smp_wmb();
 
-		cq->ring->ptrs.consumer = cq->cached_cons;
+		*cq->consumer = cq->cached_cons;
 	}
 
 	return entries;
 }
 
-static inline void *xq_get_data(struct xdpsock *xsk, __u32 idx, __u32 off)
+static inline void *xq_get_data(struct xdpsock *xsk, u64 addr)
 {
-	lassert(idx < NUM_FRAMES);
-	return &xsk->umem->frames[idx][off];
+	return &xsk->umem->frames[addr];
 }
 
 static inline int xq_enq(struct xdp_uqueue *uq,
 			 const struct xdp_desc *descs,
 			 unsigned int ndescs)
 {
-	struct xdp_rxtx_ring *r = uq->ring;
+	struct xdp_desc *r = uq->ring;
 	unsigned int i;
 
 	if (xq_nb_free(uq, ndescs) < ndescs)
@@ -289,21 +287,20 @@ static inline int xq_enq(struct xdp_uqueue *uq,
 	for (i = 0; i < ndescs; i++) {
 		u32 idx = uq->cached_prod++ & uq->mask;
 
-		r->desc[idx].idx = descs[i].idx;
-		r->desc[idx].len = descs[i].len;
-		r->desc[idx].offset = descs[i].offset;
+		r[idx].addr = descs[i].addr;
+		r[idx].len = descs[i].len;
 	}
 
 	u_smp_wmb();
 
-	r->ptrs.producer = uq->cached_prod;
+	*uq->producer = uq->cached_prod;
 	return 0;
 }
 
 static inline int xq_enq_tx_only(struct xdp_uqueue *uq,
-				 __u32 idx, unsigned int ndescs)
+				 unsigned int id, unsigned int ndescs)
 {
-	struct xdp_rxtx_ring *q = uq->ring;
+	struct xdp_desc *r = uq->ring;
 	unsigned int i;
 
 	if (xq_nb_free(uq, ndescs) < ndescs)
@@ -312,14 +309,13 @@ static inline int xq_enq_tx_only(struct xdp_uqueue *uq,
 	for (i = 0; i < ndescs; i++) {
 		u32 idx = uq->cached_prod++ & uq->mask;
 
-		q->desc[idx].idx	= idx + i;
-		q->desc[idx].len	= sizeof(pkt_data) - 1;
-		q->desc[idx].offset	= 0;
+		r[idx].addr	= (id + i) << FRAME_SHIFT;
+		r[idx].len	= sizeof(pkt_data) - 1;
 	}
 
 	u_smp_wmb();
 
-	q->ptrs.producer = uq->cached_prod;
+	*uq->producer = uq->cached_prod;
 	return 0;
 }
 
@@ -327,7 +323,7 @@ static inline int xq_deq(struct xdp_uqueue *uq,
 			 struct xdp_desc *descs,
 			 int ndescs)
 {
-	struct xdp_rxtx_ring *r = uq->ring;
+	struct xdp_desc *r = uq->ring;
 	unsigned int idx;
 	int i, entries;
 
@@ -337,13 +333,13 @@ static inline int xq_deq(struct xdp_uqueue *uq,
 
 	for (i = 0; i < entries; i++) {
 		idx = uq->cached_cons++ & uq->mask;
-		descs[i] = r->desc[idx];
+		descs[i] = r[idx];
 	}
 
 	if (entries > 0) {
 		u_smp_wmb();
 
-		r->ptrs.consumer = uq->cached_cons;
+		*uq->consumer = uq->cached_cons;
 	}
 
 	return entries;
@@ -361,17 +357,21 @@ static void swap_mac_addresses(void *data)
 	*dst_addr = tmp;
 }
 
-#if DEBUG_HEXDUMP
-static void hex_dump(void *pkt, size_t length, const char *prefix)
+static void hex_dump(void *pkt, size_t length, u64 addr)
 {
-	int i = 0;
 	const unsigned char *address = (unsigned char *)pkt;
 	const unsigned char *line = address;
 	size_t line_size = 32;
 	unsigned char c;
+	char buf[32];
+	int i = 0;
 
+	if (!DEBUG_HEXDUMP)
+		return;
+
+	sprintf(buf, "addr=%llu", addr);
 	printf("length = %zu\n", length);
-	printf("%s | ", prefix);
+	printf("%s | ", buf);
 	while (length-- > 0) {
 		printf("%02X ", *address++);
 		if (!(++i % line_size) || (length == 0 && i % line_size)) {
@@ -386,12 +386,11 @@ static void hex_dump(void *pkt, size_t length, const char *prefix)
 			}
 			printf("\n");
 			if (length > 0)
-				printf("%s | ", prefix);
+				printf("%s | ", buf);
 		}
 	}
 	printf("\n");
 }
-#endif
 
 static size_t gen_eth_frame(char *frame)
 {
@@ -402,8 +401,10 @@ static size_t gen_eth_frame(char *frame)
 static struct xdp_umem *xdp_umem_configure(int sfd)
 {
 	int fq_size = FQ_NUM_DESCS, cq_size = CQ_NUM_DESCS;
+	struct xdp_mmap_offsets off;
 	struct xdp_umem_reg mr;
 	struct xdp_umem *umem;
+	socklen_t optlen;
 	void *bufs;
 
 	umem = calloc(1, sizeof(*umem));
@@ -414,8 +415,8 @@ static struct xdp_umem *xdp_umem_configure(int sfd)
 
 	mr.addr = (__u64)bufs;
 	mr.len = NUM_FRAMES * FRAME_SIZE;
-	mr.frame_size = FRAME_SIZE;
-	mr.frame_headroom = FRAME_HEADROOM;
+	mr.chunk_size = FRAME_SIZE;
+	mr.headroom = FRAME_HEADROOM;
 
 	lassert(setsockopt(sfd, SOL_XDP, XDP_UMEM_REG, &mr, sizeof(mr)) == 0);
 	lassert(setsockopt(sfd, SOL_XDP, XDP_UMEM_FILL_RING, &fq_size,
@@ -423,34 +424,45 @@ static struct xdp_umem *xdp_umem_configure(int sfd)
 	lassert(setsockopt(sfd, SOL_XDP, XDP_UMEM_COMPLETION_RING, &cq_size,
 			   sizeof(int)) == 0);
 
-	umem->fq.ring = mmap(0, sizeof(struct xdp_umem_ring) +
-			     FQ_NUM_DESCS * sizeof(u32),
-			     PROT_READ | PROT_WRITE,
-			     MAP_SHARED | MAP_POPULATE, sfd,
-			     XDP_UMEM_PGOFF_FILL_RING);
-	lassert(umem->fq.ring != MAP_FAILED);
+	optlen = sizeof(off);
+	lassert(getsockopt(sfd, SOL_XDP, XDP_MMAP_OFFSETS, &off,
+			   &optlen) == 0);
+
+	umem->fq.map = mmap(0, off.fr.desc +
+			    FQ_NUM_DESCS * sizeof(u64),
+			    PROT_READ | PROT_WRITE,
+			    MAP_SHARED | MAP_POPULATE, sfd,
+			    XDP_UMEM_PGOFF_FILL_RING);
+	lassert(umem->fq.map != MAP_FAILED);
 
 	umem->fq.mask = FQ_NUM_DESCS - 1;
 	umem->fq.size = FQ_NUM_DESCS;
+	umem->fq.producer = umem->fq.map + off.fr.producer;
+	umem->fq.consumer = umem->fq.map + off.fr.consumer;
+	umem->fq.ring = umem->fq.map + off.fr.desc;
+	umem->fq.cached_cons = FQ_NUM_DESCS;
 
-	umem->cq.ring = mmap(0, sizeof(struct xdp_umem_ring) +
-			     CQ_NUM_DESCS * sizeof(u32),
+	umem->cq.map = mmap(0, off.cr.desc +
+			     CQ_NUM_DESCS * sizeof(u64),
 			     PROT_READ | PROT_WRITE,
 			     MAP_SHARED | MAP_POPULATE, sfd,
 			     XDP_UMEM_PGOFF_COMPLETION_RING);
-	lassert(umem->cq.ring != MAP_FAILED);
+	lassert(umem->cq.map != MAP_FAILED);
 
 	umem->cq.mask = CQ_NUM_DESCS - 1;
 	umem->cq.size = CQ_NUM_DESCS;
+	umem->cq.producer = umem->cq.map + off.cr.producer;
+	umem->cq.consumer = umem->cq.map + off.cr.consumer;
+	umem->cq.ring = umem->cq.map + off.cr.desc;
 
-	umem->frames = (char (*)[FRAME_SIZE])bufs;
+	umem->frames = bufs;
 	umem->fd = sfd;
 
 	if (opt_bench == BENCH_TXONLY) {
 		int i;
 
-		for (i = 0; i < NUM_FRAMES; i++)
-			(void)gen_eth_frame(&umem->frames[i][0]);
+		for (i = 0; i < NUM_FRAMES * FRAME_SIZE; i += FRAME_SIZE)
+			(void)gen_eth_frame(&umem->frames[i]);
 	}
 
 	return umem;
@@ -459,10 +471,12 @@ static struct xdp_umem *xdp_umem_configure(int sfd)
 static struct xdpsock *xsk_configure(struct xdp_umem *umem)
 {
 	struct sockaddr_xdp sxdp = {};
+	struct xdp_mmap_offsets off;
 	int sfd, ndescs = NUM_DESCS;
 	struct xdpsock *xsk;
 	bool shared = true;
-	u32 i;
+	socklen_t optlen;
+	u64 i;
 
 	sfd = socket(PF_XDP, SOCK_RAW, 0);
 	lassert(sfd >= 0);
@@ -484,43 +498,56 @@ static struct xdpsock *xsk_configure(struct xdp_umem *umem)
 			   &ndescs, sizeof(int)) == 0);
 	lassert(setsockopt(sfd, SOL_XDP, XDP_TX_RING,
 			   &ndescs, sizeof(int)) == 0);
+	optlen = sizeof(off);
+	lassert(getsockopt(sfd, SOL_XDP, XDP_MMAP_OFFSETS, &off,
+			   &optlen) == 0);
 
 	/* Rx */
-	xsk->rx.ring = mmap(NULL,
-			    sizeof(struct xdp_ring) +
-			    NUM_DESCS * sizeof(struct xdp_desc),
-			    PROT_READ | PROT_WRITE,
-			    MAP_SHARED | MAP_POPULATE, sfd,
-			    XDP_PGOFF_RX_RING);
-	lassert(xsk->rx.ring != MAP_FAILED);
+	xsk->rx.map = mmap(NULL,
+			   off.rx.desc +
+			   NUM_DESCS * sizeof(struct xdp_desc),
+			   PROT_READ | PROT_WRITE,
+			   MAP_SHARED | MAP_POPULATE, sfd,
+			   XDP_PGOFF_RX_RING);
+	lassert(xsk->rx.map != MAP_FAILED);
 
 	if (!shared) {
-		for (i = 0; i < NUM_DESCS / 2; i++)
+		for (i = 0; i < NUM_DESCS * FRAME_SIZE; i += FRAME_SIZE)
 			lassert(umem_fill_to_kernel(&xsk->umem->fq, &i, 1)
 				== 0);
 	}
 
 	/* Tx */
-	xsk->tx.ring = mmap(NULL,
-			 sizeof(struct xdp_ring) +
-			 NUM_DESCS * sizeof(struct xdp_desc),
-			 PROT_READ | PROT_WRITE,
-			 MAP_SHARED | MAP_POPULATE, sfd,
-			 XDP_PGOFF_TX_RING);
-	lassert(xsk->tx.ring != MAP_FAILED);
+	xsk->tx.map = mmap(NULL,
+			   off.tx.desc +
+			   NUM_DESCS * sizeof(struct xdp_desc),
+			   PROT_READ | PROT_WRITE,
+			   MAP_SHARED | MAP_POPULATE, sfd,
+			   XDP_PGOFF_TX_RING);
+	lassert(xsk->tx.map != MAP_FAILED);
 
 	xsk->rx.mask = NUM_DESCS - 1;
 	xsk->rx.size = NUM_DESCS;
+	xsk->rx.producer = xsk->rx.map + off.rx.producer;
+	xsk->rx.consumer = xsk->rx.map + off.rx.consumer;
+	xsk->rx.ring = xsk->rx.map + off.rx.desc;
 
 	xsk->tx.mask = NUM_DESCS - 1;
 	xsk->tx.size = NUM_DESCS;
+	xsk->tx.producer = xsk->tx.map + off.tx.producer;
+	xsk->tx.consumer = xsk->tx.map + off.tx.consumer;
+	xsk->tx.ring = xsk->tx.map + off.tx.desc;
+	xsk->tx.cached_cons = NUM_DESCS;
 
 	sxdp.sxdp_family = PF_XDP;
 	sxdp.sxdp_ifindex = opt_ifindex;
 	sxdp.sxdp_queue_id = opt_queue;
+
 	if (shared) {
 		sxdp.sxdp_flags = XDP_SHARED_UMEM;
 		sxdp.sxdp_shared_umem_fd = umem->fd;
+	} else {
+		sxdp.sxdp_flags = opt_xdp_bind_flags;
 	}
 
 	lassert(bind(sfd, (struct sockaddr *)&sxdp, sizeof(sxdp)) == 0);
@@ -676,6 +703,7 @@ static void parse_command_line(int argc, char **argv)
 			break;
 		case 'S':
 			opt_xdp_flags |= XDP_FLAGS_SKB_MODE;
+			opt_xdp_bind_flags |= XDP_COPY;
 			break;
 		case 'N':
 			opt_xdp_flags |= XDP_FLAGS_DRV_MODE;
@@ -708,7 +736,7 @@ static void kick_tx(int fd)
 
 static inline void complete_tx_l2fwd(struct xdpsock *xsk)
 {
-	u32 descs[BATCH_SIZE];
+	u64 descs[BATCH_SIZE];
 	unsigned int rcvd;
 	size_t ndescs;
 
@@ -730,7 +758,7 @@ static inline void complete_tx_l2fwd(struct xdpsock *xsk)
 
 static inline void complete_tx_only(struct xdpsock *xsk)
 {
-	u32 descs[BATCH_SIZE];
+	u64 descs[BATCH_SIZE];
 	unsigned int rcvd;
 
 	if (!xsk->outstanding_tx)
@@ -755,17 +783,9 @@ static void rx_drop(struct xdpsock *xsk)
 		return;
 
 	for (i = 0; i < rcvd; i++) {
-		u32 idx = descs[i].idx;
+		char *pkt = xq_get_data(xsk, descs[i].addr);
 
-		lassert(idx < NUM_FRAMES);
-#if DEBUG_HEXDUMP
-		char *pkt;
-		char buf[32];
-
-		pkt = xq_get_data(xsk, idx, descs[i].offset);
-		sprintf(buf, "idx=%d", idx);
-		hex_dump(pkt, descs[i].len, buf);
-#endif
+		hex_dump(pkt, descs[i].len, descs[i].addr);
 	}
 
 	xsk->rx_npkts += rcvd;
@@ -848,17 +868,11 @@ static void l2fwd(struct xdpsock *xsk)
 		}
 
 		for (i = 0; i < rcvd; i++) {
-			char *pkt = xq_get_data(xsk, descs[i].idx,
-						descs[i].offset);
+			char *pkt = xq_get_data(xsk, descs[i].addr);
 
 			swap_mac_addresses(pkt);
-#if DEBUG_HEXDUMP
-			char buf[32];
-			u32 idx = descs[i].idx;
 
-			sprintf(buf, "idx=%d", idx);
-			hex_dump(pkt, descs[i].len, buf);
-#endif
+			hex_dump(pkt, descs[i].len, descs[i].addr);
 		}
 
 		xsk->rx_npkts += rcvd;

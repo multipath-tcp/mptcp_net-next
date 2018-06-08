@@ -26,7 +26,7 @@ ip_no_pmtu_disc - INTEGER
 	discarded. Outgoing frames are handled the same as in mode 1,
 	implicitly setting IP_PMTUDISC_DONT on every created socket.
 
-	Mode 3 is a hardend pmtu discover mode. The kernel will only
+	Mode 3 is a hardened pmtu discover mode. The kernel will only
 	accept fragmentation-needed errors if the underlying protocol
 	can verify them besides a plain socket lookup. Current
 	protocols for which pmtu events will be honored are TCP, SCTP
@@ -667,11 +667,15 @@ tcp_tso_win_divisor - INTEGER
 	building larger TSO frames.
 	Default: 3
 
-tcp_tw_reuse - BOOLEAN
-	Allow to reuse TIME-WAIT sockets for new connections when it is
-	safe from protocol viewpoint. Default value is 0.
+tcp_tw_reuse - INTEGER
+	Enable reuse of TIME-WAIT sockets for new connections when it is
+	safe from protocol viewpoint.
+	0 - disable
+	1 - global enable
+	2 - enable for loopback traffic only
 	It should not be changed without advice/request of technical
 	experts.
+	Default: 2
 
 tcp_window_scaling - BOOLEAN
 	Enable window scaling as defined in RFC1323.

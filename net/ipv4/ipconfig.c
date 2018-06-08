@@ -1318,18 +1318,6 @@ static int pnp_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static int pnp_seq_open(struct inode *indoe, struct file *file)
-{
-	return single_open(file, pnp_seq_show, NULL);
-}
-
-static const struct file_operations pnp_seq_fops = {
-	.open		= pnp_seq_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
 /* Create the /proc/net/ipconfig directory */
 static int __init ipconfig_proc_net_init(void)
 {
@@ -1469,7 +1457,7 @@ static int __init ip_auto_config(void)
 	}
 
 #ifdef CONFIG_PROC_FS
-	proc_create("pnp", 0444, init_net.proc_net, &pnp_seq_fops);
+	proc_create_single("pnp", 0444, init_net.proc_net, pnp_seq_show);
 
 	if (ipconfig_proc_net_init() == 0)
 		ipconfig_proc_net_create("ntp_servers", &ntp_servers_seq_fops);

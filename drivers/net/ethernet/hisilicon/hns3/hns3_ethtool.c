@@ -95,7 +95,7 @@ static int hns3_lp_setup(struct net_device *ndev, enum hnae3_loop loop, bool en)
 	if (ret)
 		return ret;
 
-	h->ae_algo->ops->set_promisc_mode(h, en);
+	h->ae_algo->ops->set_promisc_mode(h, en, en);
 
 	return ret;
 }
@@ -107,6 +107,10 @@ static int hns3_lp_up(struct net_device *ndev, enum hnae3_loop loop_mode)
 
 	if (!h->ae_algo->ops->start)
 		return -EOPNOTSUPP;
+
+	ret = hns3_nic_reset_all_ring(h);
+	if (ret)
+		return ret;
 
 	ret = h->ae_algo->ops->start(h);
 	if (ret) {

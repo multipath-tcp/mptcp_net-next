@@ -33,7 +33,7 @@ struct tcf_block_ext_info {
 };
 
 struct tcf_block_cb;
-bool tcf_queue_work(struct work_struct *work);
+bool tcf_queue_work(struct rcu_work *rwork, work_func_t func);
 
 #ifdef CONFIG_NET_CLS
 struct tcf_chain *tcf_chain_get(struct tcf_block *block, u32 chain_index,
@@ -776,6 +776,18 @@ struct tc_cookie {
 struct tc_qopt_offload_stats {
 	struct gnet_stats_basic_packed *bstats;
 	struct gnet_stats_queue *qstats;
+};
+
+enum tc_mq_command {
+	TC_MQ_CREATE,
+	TC_MQ_DESTROY,
+	TC_MQ_STATS,
+};
+
+struct tc_mq_qopt_offload {
+	enum tc_mq_command command;
+	u32 handle;
+	struct tc_qopt_offload_stats stats;
 };
 
 enum tc_red_command {

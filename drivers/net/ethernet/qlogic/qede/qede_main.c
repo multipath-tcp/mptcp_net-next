@@ -347,6 +347,7 @@ void qede_fill_by_demand_stats(struct qede_dev *edev)
 	p_common->rx_bcast_pkts = stats.common.rx_bcast_pkts;
 	p_common->mftag_filter_discards = stats.common.mftag_filter_discards;
 	p_common->mac_filter_discards = stats.common.mac_filter_discards;
+	p_common->gft_filter_drop = stats.common.gft_filter_drop;
 
 	p_common->tx_ucast_bytes = stats.common.tx_ucast_bytes;
 	p_common->tx_mcast_bytes = stats.common.tx_mcast_bytes;
@@ -398,6 +399,7 @@ void qede_fill_by_demand_stats(struct qede_dev *edev)
 	p_common->brb_truncates = stats.common.brb_truncates;
 	p_common->brb_discards = stats.common.brb_discards;
 	p_common->tx_mac_ctrl_frames = stats.common.tx_mac_ctrl_frames;
+	p_common->link_change_count = stats.common.link_change_count;
 
 	if (QEDE_IS_BB(edev)) {
 		struct qede_stats_bb *p_bb = &edev->stats.bb;

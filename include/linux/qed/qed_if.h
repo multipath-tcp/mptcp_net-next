@@ -1129,6 +1129,7 @@ struct qed_eth_stats_common {
 	u64	rx_bcast_pkts;
 	u64	mftag_filter_discards;
 	u64	mac_filter_discards;
+	u64	gft_filter_drop;
 	u64	tx_ucast_bytes;
 	u64	tx_mcast_bytes;
 	u64	tx_bcast_bytes;
@@ -1179,6 +1180,7 @@ struct qed_eth_stats_common {
 	u64	tx_mac_mc_packets;
 	u64	tx_mac_bc_packets;
 	u64	tx_mac_ctrl_frames;
+	u64	link_change_count;
 };
 
 struct qed_eth_stats_bb {

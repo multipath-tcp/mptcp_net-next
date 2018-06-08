@@ -52,6 +52,7 @@
 #include "eswitch.h"
 #include "vxlan.h"
 #include "fs_core.h"
+#include "en/port.h"
 
 struct mlx5_nic_flow_attr {
 	u32 action;
@@ -74,12 +75,14 @@ enum {
 	MLX5E_TC_FLOW_HAIRPIN_RSS = BIT(MLX5E_TC_FLOW_BASE + 4),
 };
 
+#define MLX5E_TC_MAX_SPLITS 1
+
 struct mlx5e_tc_flow {
 	struct rhash_head	node;
 	struct mlx5e_priv	*priv;
 	u64			cookie;
 	u8			flags;
-	struct mlx5_flow_handle *rule;
+	struct mlx5_flow_handle *rule[MLX5E_TC_MAX_SPLITS + 1];
 	struct list_head	encap;   /* flows sharing the same encap ID */
 	struct list_head	mod_hdr; /* flows sharing the same mod hdr ID */
 	struct list_head	hairpin; /* flows sharing the same hairpin */
@@ -613,7 +616,7 @@ static int mlx5e_hairpin_flow_add(struct mlx5e_priv *priv,
 
 	params.q_counter = priv->q_counter;
 	/* set hairpin pair per each 50Gbs share of the link */
-	mlx5e_get_max_linkspeed(priv->mdev, &link_speed);
+	mlx5e_port_max_linkspeed(priv->mdev, &link_speed);
 	link_speed = max_t(u32, link_speed, 50000);
 	link_speed64 = link_speed;
 	do_div(link_speed64, 50000);
@@ -793,8 +796,8 @@ static void mlx5e_tc_del_nic_flow(struct mlx5e_priv *priv,
 	struct mlx5_nic_flow_attr *attr = flow->nic_attr;
 	struct mlx5_fc *counter = NULL;
 
-	counter = mlx5_flow_rule_counter(flow->rule);
-	mlx5_del_flow_rules(flow->rule);
+	counter = mlx5_flow_rule_counter(flow->rule[0]);
+	mlx5_del_flow_rules(flow->rule[0]);
 	mlx5_fc_destroy(priv->mdev, counter);
 
 	if (!mlx5e_tc_num_filters(priv) && priv->fs.tc.t) {
@@ -843,8 +846,8 @@ mlx5e_tc_add_fdb_flow(struct mlx5e_priv *priv,
 		}
 		out_priv = netdev_priv(encap_dev);
 		rpriv = out_priv->ppriv;
-		attr->out_rep = rpriv->rep;
-		attr->out_mdev = out_priv->mdev;
+		attr->out_rep[attr->out_count] = rpriv->rep;
+		attr->out_mdev[attr->out_count++] = out_priv->mdev;
 	}
 
 	err = mlx5_eswitch_add_vlan_action(esw, attr);
@@ -869,9 +872,18 @@ mlx5e_tc_add_fdb_flow(struct mlx5e_priv *priv,
 		rule = mlx5_eswitch_add_offloaded_rule(esw, &parse_attr->spec, attr);
 		if (IS_ERR(rule))
 			goto err_add_rule;
+
+		if (attr->mirror_count) {
+			flow->rule[1] = mlx5_eswitch_add_fwd_rule(esw, &parse_attr->spec, attr);
+			if (IS_ERR(flow->rule[1]))
+				goto err_fwd_rule;
+		}
 	}
 	return rule;
 
+err_fwd_rule:
+	mlx5_eswitch_del_offloaded_rule(esw, rule, attr);
+	rule = flow->rule[1];
 err_add_rule:
 	if (attr->action & MLX5_FLOW_CONTEXT_ACTION_MOD_HDR)
 		mlx5e_detach_mod_hdr(priv, flow);
@@ -892,7 +904,9 @@ static void mlx5e_tc_del_fdb_flow(struct mlx5e_priv *priv,
 
 	if (flow->flags & MLX5E_TC_FLOW_OFFLOADED) {
 		flow->flags &= ~MLX5E_TC_FLOW_OFFLOADED;
-		mlx5_eswitch_del_offloaded_rule(esw, flow->rule, attr);
+		if (attr->mirror_count)
+			mlx5_eswitch_del_offloaded_rule(esw, flow->rule[1], attr);
+		mlx5_eswitch_del_offloaded_rule(esw, flow->rule[0], attr);
 	}
 
 	mlx5_eswitch_del_vlan_action(esw, attr);
@@ -928,13 +942,25 @@ void mlx5e_tc_encap_flows_add(struct mlx5e_priv *priv,
 	list_for_each_entry(flow, &e->flows, encap) {
 		esw_attr = flow->esw_attr;
 		esw_attr->encap_id = e->encap_id;
-		flow->rule = mlx5_eswitch_add_offloaded_rule(esw, &esw_attr->parse_attr->spec, esw_attr);
-		if (IS_ERR(flow->rule)) {
-			err = PTR_ERR(flow->rule);
+		flow->rule[0] = mlx5_eswitch_add_offloaded_rule(esw, &esw_attr->parse_attr->spec, esw_attr);
+		if (IS_ERR(flow->rule[0])) {
+			err = PTR_ERR(flow->rule[0]);
 			mlx5_core_warn(priv->mdev, "Failed to update cached encapsulation flow, %d\n",
 				       err);
 			continue;
 		}
+
+		if (esw_attr->mirror_count) {
+			flow->rule[1] = mlx5_eswitch_add_fwd_rule(esw, &esw_attr->parse_attr->spec, esw_attr);
+			if (IS_ERR(flow->rule[1])) {
+				mlx5_eswitch_del_offloaded_rule(esw, flow->rule[0], esw_attr);
+				err = PTR_ERR(flow->rule[1]);
+				mlx5_core_warn(priv->mdev, "Failed to update cached mirror flow, %d\n",
+					       err);
+				continue;
+			}
+		}
+
 		flow->flags |= MLX5E_TC_FLOW_OFFLOADED;
 	}
 }
@@ -947,8 +973,12 @@ void mlx5e_tc_encap_flows_del(struct mlx5e_priv *priv,
 
 	list_for_each_entry(flow, &e->flows, encap) {
 		if (flow->flags & MLX5E_TC_FLOW_OFFLOADED) {
+			struct mlx5_esw_flow_attr *attr = flow->esw_attr;
+
 			flow->flags &= ~MLX5E_TC_FLOW_OFFLOADED;
-			mlx5_eswitch_del_offloaded_rule(esw, flow->rule, flow->esw_attr);
+			if (attr->mirror_count)
+				mlx5_eswitch_del_offloaded_rule(esw, flow->rule[1], attr);
+			mlx5_eswitch_del_offloaded_rule(esw, flow->rule[0], attr);
 		}
 	}
 
@@ -983,7 +1013,7 @@ void mlx5e_tc_update_neigh_used_value(struct mlx5e_neigh_hash_entry *nhe)
 			continue;
 		list_for_each_entry(flow, &e->flows, encap) {
 			if (flow->flags & MLX5E_TC_FLOW_OFFLOADED) {
-				counter = mlx5_flow_rule_counter(flow->rule);
+				counter = mlx5_flow_rule_counter(flow->rule[0]);
 				mlx5_fc_query_cached(counter, &bytes, &packets, &lastuse);
 				if (time_after((unsigned long)lastuse, nhe->reported_lastuse)) {
 					neigh_used = true;
@@ -2536,6 +2566,7 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 				return err;
 
 			action |= MLX5_FLOW_CONTEXT_ACTION_MOD_HDR;
+			attr->mirror_count = attr->out_count;
 			continue;
 		}
 
@@ -2547,11 +2578,17 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 			return -EOPNOTSUPP;
 		}
 
-		if (is_tcf_mirred_egress_redirect(a)) {
-			struct net_device *out_dev;
+		if (is_tcf_mirred_egress_redirect(a) || is_tcf_mirred_egress_mirror(a)) {
 			struct mlx5e_priv *out_priv;
+			struct net_device *out_dev;
 
 			out_dev = tcf_mirred_dev(a);
+
+			if (attr->out_count >= MLX5_MAX_FLOW_FWD_VPORTS) {
+				pr_err("can't support more than %d output ports, can't offload forwarding\n",
+				       attr->out_count);
+				return -EOPNOTSUPP;
+			}
 
 			if (switchdev_port_same_parent_id(priv->netdev,
 							  out_dev) ||
@@ -2560,8 +2597,8 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 					  MLX5_FLOW_CONTEXT_ACTION_COUNT;
 				out_priv = netdev_priv(out_dev);
 				rpriv = out_priv->ppriv;
-				attr->out_rep = rpriv->rep;
-				attr->out_mdev = out_priv->mdev;
+				attr->out_rep[attr->out_count] = rpriv->rep;
+				attr->out_mdev[attr->out_count++] = out_priv->mdev;
 			} else if (encap) {
 				parse_attr->mirred_ifindex = out_dev->ifindex;
 				parse_attr->tun_info = *info;
@@ -2584,6 +2621,7 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 				encap = true;
 			else
 				return -EOPNOTSUPP;
+			attr->mirror_count = attr->out_count;
 			continue;
 		}
 
@@ -2605,6 +2643,7 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 			} else { /* action is TCA_VLAN_ACT_MODIFY */
 				return -EOPNOTSUPP;
 			}
+			attr->mirror_count = attr->out_count;
 			continue;
 		}
 
@@ -2619,6 +2658,11 @@ static int parse_tc_fdb_actions(struct mlx5e_priv *priv, struct tcf_exts *exts,
 	attr->action = action;
 	if (!actions_match_supported(priv, exts, parse_attr, flow))
 		return -EOPNOTSUPP;
+
+	if (attr->out_count > 1 && !mlx5_esw_has_fwd_fdb(priv->mdev)) {
+		netdev_warn_once(priv->netdev, "current firmware doesn't support split rule for port mirroring\n");
+		return -EOPNOTSUPP;
+	}
 
 	return 0;
 }
@@ -2699,16 +2743,16 @@ int mlx5e_configure_flower(struct mlx5e_priv *priv,
 		err = parse_tc_fdb_actions(priv, f->exts, parse_attr, flow);
 		if (err < 0)
 			goto err_free;
-		flow->rule = mlx5e_tc_add_fdb_flow(priv, parse_attr, flow);
+		flow->rule[0] = mlx5e_tc_add_fdb_flow(priv, parse_attr, flow);
 	} else {
 		err = parse_tc_nic_actions(priv, f->exts, parse_attr, flow);
 		if (err < 0)
 			goto err_free;
-		flow->rule = mlx5e_tc_add_nic_flow(priv, parse_attr, flow);
+		flow->rule[0] = mlx5e_tc_add_nic_flow(priv, parse_attr, flow);
 	}
 
-	if (IS_ERR(flow->rule)) {
-		err = PTR_ERR(flow->rule);
+	if (IS_ERR(flow->rule[0])) {
+		err = PTR_ERR(flow->rule[0]);
 		if (err != -EAGAIN)
 			goto err_free;
 	}
@@ -2781,7 +2825,7 @@ int mlx5e_stats_flower(struct mlx5e_priv *priv,
 	if (!(flow->flags & MLX5E_TC_FLOW_OFFLOADED))
 		return 0;
 
-	counter = mlx5_flow_rule_counter(flow->rule);
+	counter = mlx5_flow_rule_counter(flow->rule[0]);
 	if (!counter)
 		return 0;
 
@@ -2831,4 +2875,11 @@ int mlx5e_tc_esw_init(struct rhashtable *tc_ht)
 void mlx5e_tc_esw_cleanup(struct rhashtable *tc_ht)
 {
 	rhashtable_free_and_destroy(tc_ht, _mlx5e_tc_del_flow, NULL);
+}
+
+int mlx5e_tc_num_filters(struct mlx5e_priv *priv)
+{
+	struct rhashtable *tc_ht = get_tc_ht(priv);
+
+	return atomic_read(&tc_ht->nelems);
 }

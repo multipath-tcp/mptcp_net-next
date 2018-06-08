@@ -278,9 +278,6 @@ config HAVE_CLK
 	  The <linux/clk.h> calls support software clock gating and
 	  thus are a key power management tool on many systems.
 
-config HAVE_DMA_API_DEBUG
-	bool
-
 config HAVE_HW_BREAKPOINT
 	bool
 	depends on PERF_EVENTS
@@ -600,21 +597,6 @@ config CC_STACKPROTECTOR_AUTO
 
 endchoice
 
-config LD_DEAD_CODE_DATA_ELIMINATION
-	bool
-	help
-	  Select this if the architecture wants to do dead code and
-	  data elimination with the linker by compiling with
-	  -ffunction-sections -fdata-sections and linking with
-	  --gc-sections.
-
-	  This requires that the arch annotates or otherwise protects
-	  its external entry points from being discarded. Linker scripts
-	  must also merge .text.*, .data.*, and .bss.* correctly into
-	  output sections. Care must be taken not to pull in unrelated
-	  sections (e.g., '.text.init'). Typically '.' in section names
-	  is used to distinguish them from label names / C identifiers.
-
 config HAVE_ARCH_WITHIN_STACK_FRAMES
 	bool
 	help
@@ -689,12 +671,6 @@ config MODULES_USE_ELF_REL
 	help
 	  Modules only use ELF REL relocations.  Modules with ELF RELA
 	  relocations will give an error.
-
-config HAVE_UNDERSCORE_SYMBOL_PREFIX
-	bool
-	help
-	  Some architectures generate an _ in front of C symbols; things like
-	  module loading and assembly files need to know about this.
 
 config HAVE_IRQ_EXIT_ON_IRQ_STACK
 	bool
@@ -873,6 +849,21 @@ config OLD_SIGACTION
 
 config COMPAT_OLD_SIGACTION
 	bool
+
+config 64BIT_TIME
+	def_bool ARCH_HAS_64BIT_TIME
+	help
+	  This should be selected by all architectures that need to support
+	  new system calls with a 64-bit time_t. This is relevant on all 32-bit
+	  architectures, and 64-bit architectures as part of compat syscall
+	  handling.
+
+config COMPAT_32BIT_TIME
+	def_bool (!64BIT && 64BIT_TIME) || COMPAT
+	help
+	  This enables 32 bit time_t support in addition to 64 bit time_t support.
+	  This is relevant on all 32-bit architectures, and 64-bit architectures
+	  as part of compat syscall handling.
 
 config ARCH_NO_COHERENT_DMA_MMAP
 	bool

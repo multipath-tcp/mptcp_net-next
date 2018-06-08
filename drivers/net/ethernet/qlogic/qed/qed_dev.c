@@ -1098,7 +1098,7 @@ int qed_final_cleanup(struct qed_hwfn *p_hwfn,
 	}
 
 	DP_VERBOSE(p_hwfn, QED_MSG_IOV,
-		   "Sending final cleanup for PFVF[%d] [Command %08x\n]",
+		   "Sending final cleanup for PFVF[%d] [Command %08x]\n",
 		   id, command);
 
 	qed_wr(p_hwfn, p_ptt, XSDM_REG_OPERATION_GEN, command);
@@ -2792,7 +2792,7 @@ static void qed_hw_info_port_num_bb(struct qed_hwfn *p_hwfn,
 {
 	u32 port_mode;
 
-	port_mode = qed_rd(p_hwfn, p_ptt, CNIG_REG_NW_PORT_MODE_BB_B0);
+	port_mode = qed_rd(p_hwfn, p_ptt, CNIG_REG_NW_PORT_MODE_BB);
 
 	if (port_mode < 3) {
 		p_hwfn->cdev->num_ports_in_engine = 1;

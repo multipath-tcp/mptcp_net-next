@@ -55,7 +55,7 @@ obj-$(CONFIG_NF_LOG_COMMON) += nf_log_common.o
 obj-$(CONFIG_NF_LOG_NETDEV) += nf_log_netdev.o
 
 obj-$(CONFIG_NF_NAT) += nf_nat.o
-obj-$(CONFIG_NF_NAT_REDIRECT) += nf_nat_redirect.o
+nf_nat-$(CONFIG_NF_NAT_REDIRECT) += nf_nat_redirect.o
 
 # NAT helpers
 obj-$(CONFIG_NF_NAT_AMANDA) += nf_nat_amanda.o
@@ -80,6 +80,7 @@ nf_tables-objs := nf_tables_core.o nf_tables_api.o nft_chain_filter.o \
 
 obj-$(CONFIG_NF_TABLES)		+= nf_tables.o
 obj-$(CONFIG_NFT_COMPAT)	+= nft_compat.o
+obj-$(CONFIG_NFT_CONNLIMIT)	+= nft_connlimit.o
 obj-$(CONFIG_NFT_NUMGEN)	+= nft_numgen.o
 obj-$(CONFIG_NFT_CT)		+= nft_ct.o
 obj-$(CONFIG_NFT_FLOW_OFFLOAD)	+= nft_flow_offload.o
@@ -102,6 +103,7 @@ obj-$(CONFIG_NFT_FIB)		+= nft_fib.o
 obj-$(CONFIG_NFT_FIB_INET)	+= nft_fib_inet.o
 obj-$(CONFIG_NFT_FIB_NETDEV)	+= nft_fib_netdev.o
 obj-$(CONFIG_NF_OSF)		+= nf_osf.o
+obj-$(CONFIG_NFT_SOCKET)	+= nft_socket.o
 
 # nf_tables netdev
 obj-$(CONFIG_NFT_DUP_NETDEV)	+= nft_dup_netdev.o
