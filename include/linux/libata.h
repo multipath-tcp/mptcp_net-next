@@ -210,6 +210,7 @@ enum {
 	ATA_FLAG_SLAVE_POSS	= (1 << 0), /* host supports slave dev */
 					    /* (doesn't imply presence) */
 	ATA_FLAG_SATA		= (1 << 1),
+	ATA_FLAG_NO_LPM		= (1 << 2), /* host not happy with LPM */
 	ATA_FLAG_NO_LOG_PAGE	= (1 << 5), /* do not issue log page read */
 	ATA_FLAG_NO_ATAPI	= (1 << 6), /* No ATAPI support */
 	ATA_FLAG_PIO_DMA	= (1 << 7), /* PIO cmds via DMA */
@@ -1130,6 +1131,8 @@ extern void ata_sas_async_probe(struct ata_port *ap);
 extern int ata_sas_sync_probe(struct ata_port *ap);
 extern int ata_sas_port_init(struct ata_port *);
 extern int ata_sas_port_start(struct ata_port *ap);
+extern int ata_sas_tport_add(struct device *parent, struct ata_port *ap);
+extern void ata_sas_tport_delete(struct ata_port *ap);
 extern void ata_sas_port_stop(struct ata_port *ap);
 extern int ata_sas_slave_configure(struct scsi_device *, struct ata_port *);
 extern int ata_sas_queuecmd(struct scsi_cmnd *cmd, struct ata_port *ap);
@@ -1492,6 +1495,29 @@ static inline bool ata_tag_valid(unsigned int tag)
 {
 	return tag < ATA_MAX_QUEUE || ata_tag_internal(tag);
 }
+
+#define __ata_qc_for_each(ap, qc, tag, max_tag, fn)		\
+	for ((tag) = 0; (tag) < (max_tag) &&			\
+	     ({ qc = fn((ap), (tag)); 1; }); (tag)++)		\
+
+/*
+ * Internal use only, iterate commands ignoring error handling and
+ * status of 'qc'.
+ */
+#define ata_qc_for_each_raw(ap, qc, tag)					\
+	__ata_qc_for_each(ap, qc, tag, ATA_MAX_QUEUE, __ata_qc_from_tag)
+
+/*
+ * Iterate all potential commands that can be queued
+ */
+#define ata_qc_for_each(ap, qc, tag)					\
+	__ata_qc_for_each(ap, qc, tag, ATA_MAX_QUEUE, ata_qc_from_tag)
+
+/*
+ * Like ata_qc_for_each, but with the internal tag included
+ */
+#define ata_qc_for_each_with_internal(ap, qc, tag)			\
+	__ata_qc_for_each(ap, qc, tag, ATA_MAX_QUEUE + 1, ata_qc_from_tag)
 
 /*
  * device helpers

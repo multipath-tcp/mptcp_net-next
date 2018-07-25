@@ -2022,7 +2022,8 @@ static void hns_nic_get_stats64(struct net_device *ndev,
 
 static u16
 hns_nic_select_queue(struct net_device *ndev, struct sk_buff *skb,
-		     void *accel_priv, select_queue_fallback_t fallback)
+		     struct net_device *sb_dev,
+		     select_queue_fallback_t fallback)
 {
 	struct ethhdr *eth_hdr = (struct ethhdr *)skb->data;
 	struct hns_nic_priv *priv = netdev_priv(ndev);
@@ -2032,7 +2033,7 @@ hns_nic_select_queue(struct net_device *ndev, struct sk_buff *skb,
 	    is_multicast_ether_addr(eth_hdr->h_dest))
 		return 0;
 	else
-		return fallback(ndev, skb);
+		return fallback(ndev, skb, NULL);
 }
 
 static const struct net_device_ops hns_nic_netdev_ops = {
@@ -2197,7 +2198,8 @@ static int hns_nic_init_ring_data(struct hns_nic_priv *priv)
 		return -EINVAL;
 	}
 
-	priv->ring_data = kzalloc(h->q_num * sizeof(*priv->ring_data) * 2,
+	priv->ring_data = kzalloc(array3_size(h->q_num,
+					      sizeof(*priv->ring_data), 2),
 				  GFP_KERNEL);
 	if (!priv->ring_data)
 		return -ENOMEM;

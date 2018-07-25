@@ -9,6 +9,7 @@
  *
  */
 
+#include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -2268,7 +2269,8 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	strcpy(card->name, id);
 	card->contrnr = contr;
 	card->nbchan = profp->nbchannel;
-	card->bchans = kmalloc(sizeof(capidrv_bchan) * card->nbchan, GFP_ATOMIC);
+	card->bchans = kmalloc_array(card->nbchan, sizeof(capidrv_bchan),
+				     GFP_ATOMIC);
 	if (!card->bchans) {
 		printk(KERN_WARNING
 		       "capidrv: (%s) Could not allocate bchan-structs.\n", id);
@@ -2450,7 +2452,7 @@ lower_callback(struct notifier_block *nb, unsigned long val, void *v)
  * /proc/capi/capidrv:
  * nrecvctlpkt nrecvdatapkt nsendctlpkt nsenddatapkt
  */
-static int capidrv_proc_show(struct seq_file *m, void *v)
+static int __maybe_unused capidrv_proc_show(struct seq_file *m, void *v)
 {
 	seq_printf(m, "%lu %lu %lu %lu\n",
 		   global.ap.nrecvctlpkt,

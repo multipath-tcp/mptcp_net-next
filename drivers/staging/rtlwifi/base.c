@@ -1,18 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
 /******************************************************************************
  *
  * Copyright(c) 2009-2012  Realtek Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * The full GNU General Public License is included in this distribution in the
- * file called LICENSE.
  *
  * Contact Information:
  * wlanfae <wlanfae@realtek.com>
@@ -1849,7 +1838,7 @@ void rtl_rx_ampdu_apply(struct rtl_priv *rtlpriv)
 		 reject_agg, ctrl_agg_size, agg_size);
 
 	rtlpriv->hw->max_rx_aggregation_subframes =
-		(ctrl_agg_size ? agg_size : IEEE80211_MAX_AMPDU_BUF);
+		(ctrl_agg_size ? agg_size : IEEE80211_MAX_AMPDU_BUF_HT);
 }
 
 /*********************************************************

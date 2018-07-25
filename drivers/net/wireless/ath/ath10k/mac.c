@@ -6058,8 +6058,19 @@ static void ath10k_sta_rc_update_wk(struct work_struct *wk)
 			   ath10k_mac_max_vht_nss(vht_mcs_mask)));
 
 	if (changed & IEEE80211_RC_BW_CHANGED) {
-		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac update sta %pM peer bw %d\n",
-			   sta->addr, bw);
+		enum wmi_phy_mode mode;
+
+		mode = chan_to_phymode(&def);
+		ath10k_dbg(ar, ATH10K_DBG_MAC, "mac update sta %pM peer bw %d phymode %d\n",
+				sta->addr, bw, mode);
+
+		err = ath10k_wmi_peer_set_param(ar, arvif->vdev_id, sta->addr,
+				WMI_PEER_PHYMODE, mode);
+		if (err) {
+			ath10k_warn(ar, "failed to update STA %pM peer phymode %d: %d\n",
+					sta->addr, mode, err);
+			goto exit;
+		}
 
 		err = ath10k_wmi_peer_set_param(ar, arvif->vdev_id, sta->addr,
 						WMI_PEER_CHAN_WIDTH, bw);
@@ -6100,6 +6111,7 @@ static void ath10k_sta_rc_update_wk(struct work_struct *wk)
 				    sta->addr);
 	}
 
+exit:
 	mutex_unlock(&ar->conf_mutex);
 }
 
@@ -7725,7 +7737,7 @@ static void ath10k_sta_statistics(struct ieee80211_hw *hw,
 		return;
 
 	sinfo->rx_duration = arsta->rx_duration;
-	sinfo->filled |= 1ULL << NL80211_STA_INFO_RX_DURATION;
+	sinfo->filled |= BIT_ULL(NL80211_STA_INFO_RX_DURATION);
 
 	if (!arsta->txrate.legacy && !arsta->txrate.nss)
 		return;
@@ -7738,7 +7750,7 @@ static void ath10k_sta_statistics(struct ieee80211_hw *hw,
 		sinfo->txrate.bw = arsta->txrate.bw;
 	}
 	sinfo->txrate.flags = arsta->txrate.flags;
-	sinfo->filled |= 1ULL << NL80211_STA_INFO_TX_BITRATE;
+	sinfo->filled |= BIT_ULL(NL80211_STA_INFO_TX_BITRATE);
 }
 
 static const struct ieee80211_ops ath10k_ops = {
@@ -7858,6 +7870,9 @@ static const struct ieee80211_channel ath10k_5ghz_channels[] = {
 	CHAN5G(161, 5805, 0),
 	CHAN5G(165, 5825, 0),
 	CHAN5G(169, 5845, 0),
+	CHAN5G(173, 5865, 0),
+	/* If you add more, you may need to change ATH10K_MAX_5G_CHAN */
+	/* And you will definitely need to change ATH10K_NUM_CHANS in core.h */
 };
 
 struct ath10k *ath10k_mac_create(size_t priv_size)

@@ -330,6 +330,12 @@ static int hclgevf_set_handle_info(struct hclgevf_dev *hdev)
 
 static void hclgevf_free_vector(struct hclgevf_dev *hdev, int vector_id)
 {
+	if (hdev->vector_status[vector_id] == HCLGEVF_INVALID_VPORT) {
+		dev_warn(&hdev->pdev->dev,
+			 "vector(vector_id %d) has been freed.\n", vector_id);
+		return;
+	}
+
 	hdev->vector_status[vector_id] = HCLGEVF_INVALID_VPORT;
 	hdev->num_msi_left += 1;
 	hdev->num_msi_used -= 1;
@@ -444,12 +450,12 @@ static int hclgevf_set_rss_tc_mode(struct hclgevf_dev *hdev,  u16 rss_size)
 
 	hclgevf_cmd_setup_basic_desc(&desc, HCLGEVF_OPC_RSS_TC_MODE, false);
 	for (i = 0; i < HCLGEVF_MAX_TC_NUM; i++) {
-		hnae_set_bit(req->rss_tc_mode[i], HCLGEVF_RSS_TC_VALID_B,
-			     (tc_valid[i] & 0x1));
-		hnae_set_field(req->rss_tc_mode[i], HCLGEVF_RSS_TC_SIZE_M,
-			       HCLGEVF_RSS_TC_SIZE_S, tc_size[i]);
-		hnae_set_field(req->rss_tc_mode[i], HCLGEVF_RSS_TC_OFFSET_M,
-			       HCLGEVF_RSS_TC_OFFSET_S, tc_offset[i]);
+		hnae3_set_bit(req->rss_tc_mode[i], HCLGEVF_RSS_TC_VALID_B,
+			      (tc_valid[i] & 0x1));
+		hnae3_set_field(req->rss_tc_mode[i], HCLGEVF_RSS_TC_SIZE_M,
+				HCLGEVF_RSS_TC_SIZE_S, tc_size[i]);
+		hnae3_set_field(req->rss_tc_mode[i], HCLGEVF_RSS_TC_OFFSET_M,
+				HCLGEVF_RSS_TC_OFFSET_S, tc_offset[i]);
 	}
 	status = hclgevf_cmd_send(&hdev->hw, &desc, 1);
 	if (status)
@@ -547,24 +553,18 @@ static int hclgevf_get_tc_size(struct hnae3_handle *handle)
 }
 
 static int hclgevf_bind_ring_to_vector(struct hnae3_handle *handle, bool en,
-				       int vector,
+				       int vector_id,
 				       struct hnae3_ring_chain_node *ring_chain)
 {
 	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
 	struct hnae3_ring_chain_node *node;
 	struct hclge_mbx_vf_to_pf_cmd *req;
 	struct hclgevf_desc desc;
-	int i = 0, vector_id;
+	int i = 0;
 	int status;
 	u8 type;
 
 	req = (struct hclge_mbx_vf_to_pf_cmd *)desc.data;
-	vector_id = hclgevf_get_vector_index(hdev, vector);
-	if (vector_id < 0) {
-		dev_err(&handle->pdev->dev,
-			"Get vector index fail. ret =%d\n", vector_id);
-		return vector_id;
-	}
 
 	for (node = ring_chain; node; node = node->next) {
 		int idx_offset = HCLGE_MBX_RING_MAP_BASIC_MSG_NUM +
@@ -582,11 +582,11 @@ static int hclgevf_bind_ring_to_vector(struct hnae3_handle *handle, bool en,
 		}
 
 		req->msg[idx_offset] =
-				hnae_get_bit(node->flag, HNAE3_RING_TYPE_B);
+				hnae3_get_bit(node->flag, HNAE3_RING_TYPE_B);
 		req->msg[idx_offset + 1] = node->tqp_index;
-		req->msg[idx_offset + 2] = hnae_get_field(node->int_gl_idx,
-							  HNAE3_RING_GL_IDX_M,
-							  HNAE3_RING_GL_IDX_S);
+		req->msg[idx_offset + 2] = hnae3_get_field(node->int_gl_idx,
+							   HNAE3_RING_GL_IDX_M,
+							   HNAE3_RING_GL_IDX_S);
 
 		i++;
 		if ((i == (HCLGE_MBX_VF_MSG_DATA_NUM -
@@ -617,7 +617,17 @@ static int hclgevf_bind_ring_to_vector(struct hnae3_handle *handle, bool en,
 static int hclgevf_map_ring_to_vector(struct hnae3_handle *handle, int vector,
 				      struct hnae3_ring_chain_node *ring_chain)
 {
-	return hclgevf_bind_ring_to_vector(handle, true, vector, ring_chain);
+	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+	int vector_id;
+
+	vector_id = hclgevf_get_vector_index(hdev, vector);
+	if (vector_id < 0) {
+		dev_err(&handle->pdev->dev,
+			"Get vector index fail. ret =%d\n", vector_id);
+		return vector_id;
+	}
+
+	return hclgevf_bind_ring_to_vector(handle, true, vector_id, ring_chain);
 }
 
 static int hclgevf_unmap_ring_from_vector(
@@ -635,7 +645,7 @@ static int hclgevf_unmap_ring_from_vector(
 		return vector_id;
 	}
 
-	ret = hclgevf_bind_ring_to_vector(handle, false, vector, ring_chain);
+	ret = hclgevf_bind_ring_to_vector(handle, false, vector_id, ring_chain);
 	if (ret)
 		dev_err(&handle->pdev->dev,
 			"Unmap ring from vector fail. vector=%d, ret =%d\n",
@@ -648,8 +658,17 @@ static int hclgevf_unmap_ring_from_vector(
 static int hclgevf_put_vector(struct hnae3_handle *handle, int vector)
 {
 	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+	int vector_id;
 
-	hclgevf_free_vector(hdev, vector);
+	vector_id = hclgevf_get_vector_index(hdev, vector);
+	if (vector_id < 0) {
+		dev_err(&handle->pdev->dev,
+			"hclgevf_put_vector get vector index fail. ret =%d\n",
+			vector_id);
+		return vector_id;
+	}
+
+	hclgevf_free_vector(hdev, vector_id);
 
 	return 0;
 }
@@ -990,8 +1009,8 @@ static int hclgevf_reset_wait(struct hclgevf_dev *hdev)
 
 	/* wait to check the hardware reset completion status */
 	val = hclgevf_read_dev(&hdev->hw, HCLGEVF_FUN_RST_ING);
-	while (hnae_get_bit(val, HCLGEVF_FUN_RST_ING_B) &&
-			    (cnt < HCLGEVF_RESET_WAIT_CNT)) {
+	while (hnae3_get_bit(val, HCLGEVF_FUN_RST_ING_B) &&
+	       (cnt < HCLGEVF_RESET_WAIT_CNT)) {
 		msleep(HCLGEVF_RESET_WAIT_MS);
 		val = hclgevf_read_dev(&hdev->hw, HCLGEVF_FUN_RST_ING);
 		cnt++;
@@ -1582,9 +1601,10 @@ static void hclgevf_misc_irq_uninit(struct hclgevf_dev *hdev)
 	hclgevf_free_vector(hdev, 0);
 }
 
-static int hclgevf_init_instance(struct hclgevf_dev *hdev,
-				 struct hnae3_client *client)
+static int hclgevf_init_client_instance(struct hnae3_client *client,
+					struct hnae3_ae_dev *ae_dev)
 {
+	struct hclgevf_dev *hdev = ae_dev->priv;
 	int ret;
 
 	switch (client->type) {
@@ -1635,9 +1655,11 @@ static int hclgevf_init_instance(struct hclgevf_dev *hdev,
 	return 0;
 }
 
-static void hclgevf_uninit_instance(struct hclgevf_dev *hdev,
-				    struct hnae3_client *client)
+static void hclgevf_uninit_client_instance(struct hnae3_client *client,
+					   struct hnae3_ae_dev *ae_dev)
 {
+	struct hclgevf_dev *hdev = ae_dev->priv;
+
 	/* un-init roce, if it exists */
 	if (hdev->roce_client)
 		hdev->roce_client->ops->uninit_instance(&hdev->roce, 0);
@@ -1646,22 +1668,6 @@ static void hclgevf_uninit_instance(struct hclgevf_dev *hdev,
 	if ((client->ops->uninit_instance) &&
 	    (client->type != HNAE3_CLIENT_ROCE))
 		client->ops->uninit_instance(&hdev->nic, 0);
-}
-
-static int hclgevf_register_client(struct hnae3_client *client,
-				   struct hnae3_ae_dev *ae_dev)
-{
-	struct hclgevf_dev *hdev = ae_dev->priv;
-
-	return hclgevf_init_instance(hdev, client);
-}
-
-static void hclgevf_unregister_client(struct hnae3_client *client,
-				      struct hnae3_ae_dev *ae_dev)
-{
-	struct hclgevf_dev *hdev = ae_dev->priv;
-
-	hclgevf_uninit_instance(hdev, client);
 }
 
 static int hclgevf_pci_init(struct hclgevf_dev *hdev)
@@ -1924,8 +1930,8 @@ void hclgevf_update_speed_duplex(struct hclgevf_dev *hdev, u32 speed,
 static const struct hnae3_ae_ops hclgevf_ops = {
 	.init_ae_dev = hclgevf_init_ae_dev,
 	.uninit_ae_dev = hclgevf_uninit_ae_dev,
-	.init_client_instance = hclgevf_register_client,
-	.uninit_client_instance = hclgevf_unregister_client,
+	.init_client_instance = hclgevf_init_client_instance,
+	.uninit_client_instance = hclgevf_uninit_client_instance,
 	.start = hclgevf_ae_start,
 	.stop = hclgevf_ae_stop,
 	.map_ring_to_vector = hclgevf_map_ring_to_vector,
@@ -1962,7 +1968,6 @@ static const struct hnae3_ae_ops hclgevf_ops = {
 
 static struct hnae3_ae_algo ae_algovf = {
 	.ops = &hclgevf_ops,
-	.name = HCLGEVF_NAME,
 	.pdev_id_table = ae_algovf_pci_tbl,
 };
 

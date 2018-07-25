@@ -4975,6 +4975,24 @@ static struct bpf_test tests[] = {
 		.prog_type = BPF_PROG_TYPE_LWT_XMIT,
 	},
 	{
+		"make headroom for LWT_XMIT",
+		.insns = {
+			BPF_MOV64_REG(BPF_REG_6, BPF_REG_1),
+			BPF_MOV64_IMM(BPF_REG_2, 34),
+			BPF_MOV64_IMM(BPF_REG_3, 0),
+			BPF_EMIT_CALL(BPF_FUNC_skb_change_head),
+			/* split for s390 to succeed */
+			BPF_MOV64_REG(BPF_REG_1, BPF_REG_6),
+			BPF_MOV64_IMM(BPF_REG_2, 42),
+			BPF_MOV64_IMM(BPF_REG_3, 0),
+			BPF_EMIT_CALL(BPF_FUNC_skb_change_head),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.result = ACCEPT,
+		.prog_type = BPF_PROG_TYPE_LWT_XMIT,
+	},
+	{
 		"invalid access of tc_classid for LWT_IN",
 		.insns = {
 			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_1,
@@ -8647,7 +8665,7 @@ static struct bpf_test tests[] = {
 				    offsetof(struct __sk_buff, mark)),
 			BPF_EXIT_INSN(),
 		},
-		.errstr = "dereference of modified ctx ptr R1 off=68+8, ctx+const is allowed, ctx+const+const is not",
+		.errstr = "dereference of modified ctx ptr",
 		.result = REJECT,
 		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
 	},
@@ -11987,6 +12005,46 @@ static struct bpf_test tests[] = {
 		.prog_type = BPF_PROG_TYPE_XDP,
 	},
 	{
+		"xadd/w check whether src/dst got mangled, 1",
+		.insns = {
+			BPF_MOV64_IMM(BPF_REG_0, 1),
+			BPF_MOV64_REG(BPF_REG_6, BPF_REG_0),
+			BPF_MOV64_REG(BPF_REG_7, BPF_REG_10),
+			BPF_STX_MEM(BPF_DW, BPF_REG_10, BPF_REG_0, -8),
+			BPF_STX_XADD(BPF_DW, BPF_REG_10, BPF_REG_0, -8),
+			BPF_STX_XADD(BPF_DW, BPF_REG_10, BPF_REG_0, -8),
+			BPF_JMP_REG(BPF_JNE, BPF_REG_6, BPF_REG_0, 3),
+			BPF_JMP_REG(BPF_JNE, BPF_REG_7, BPF_REG_10, 2),
+			BPF_LDX_MEM(BPF_DW, BPF_REG_0, BPF_REG_10, -8),
+			BPF_EXIT_INSN(),
+			BPF_MOV64_IMM(BPF_REG_0, 42),
+			BPF_EXIT_INSN(),
+		},
+		.result = ACCEPT,
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.retval = 3,
+	},
+	{
+		"xadd/w check whether src/dst got mangled, 2",
+		.insns = {
+			BPF_MOV64_IMM(BPF_REG_0, 1),
+			BPF_MOV64_REG(BPF_REG_6, BPF_REG_0),
+			BPF_MOV64_REG(BPF_REG_7, BPF_REG_10),
+			BPF_STX_MEM(BPF_W, BPF_REG_10, BPF_REG_0, -8),
+			BPF_STX_XADD(BPF_W, BPF_REG_10, BPF_REG_0, -8),
+			BPF_STX_XADD(BPF_W, BPF_REG_10, BPF_REG_0, -8),
+			BPF_JMP_REG(BPF_JNE, BPF_REG_6, BPF_REG_0, 3),
+			BPF_JMP_REG(BPF_JNE, BPF_REG_7, BPF_REG_10, 2),
+			BPF_LDX_MEM(BPF_W, BPF_REG_0, BPF_REG_10, -8),
+			BPF_EXIT_INSN(),
+			BPF_MOV64_IMM(BPF_REG_0, 42),
+			BPF_EXIT_INSN(),
+		},
+		.result = ACCEPT,
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.retval = 3,
+	},
+	{
 		"bpf_get_stack return R0 within range",
 		.insns = {
 			BPF_MOV64_REG(BPF_REG_6, BPF_REG_1),
@@ -12258,6 +12316,62 @@ static struct bpf_test tests[] = {
 		.result = ACCEPT,
 		.retval = 5,
 	},
+	{
+		"pass unmodified ctx pointer to helper",
+		.insns = {
+			BPF_MOV64_IMM(BPF_REG_2, 0),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_csum_update),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.result = ACCEPT,
+	},
+	{
+		"pass modified ctx pointer to helper, 1",
+		.insns = {
+			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -612),
+			BPF_MOV64_IMM(BPF_REG_2, 0),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_csum_update),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.result = REJECT,
+		.errstr = "dereference of modified ctx ptr",
+	},
+	{
+		"pass modified ctx pointer to helper, 2",
+		.insns = {
+			BPF_ALU64_IMM(BPF_ADD, BPF_REG_1, -612),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_get_socket_cookie),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.result_unpriv = REJECT,
+		.result = REJECT,
+		.errstr_unpriv = "dereference of modified ctx ptr",
+		.errstr = "dereference of modified ctx ptr",
+	},
+	{
+		"pass modified ctx pointer to helper, 3",
+		.insns = {
+			BPF_LDX_MEM(BPF_W, BPF_REG_3, BPF_REG_1, 0),
+			BPF_ALU64_IMM(BPF_AND, BPF_REG_3, 4),
+			BPF_ALU64_REG(BPF_ADD, BPF_REG_1, BPF_REG_3),
+			BPF_MOV64_IMM(BPF_REG_2, 0),
+			BPF_RAW_INSN(BPF_JMP | BPF_CALL, 0, 0, 0,
+				     BPF_FUNC_csum_update),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.result = REJECT,
+		.errstr = "variable ctx access var_off=(0x0; 0x4)",
+	},
 };
 
 static int probe_filter_length(const struct bpf_insn *fp)
@@ -12498,8 +12612,11 @@ static void do_test_single(struct bpf_test *test, bool unpriv,
 	}
 
 	if (fd_prog >= 0) {
+		__u8 tmp[TEST_DATA_LEN << 2];
+		__u32 size_tmp = sizeof(tmp);
+
 		err = bpf_prog_test_run(fd_prog, 1, test->data,
-					sizeof(test->data), NULL, NULL,
+					sizeof(test->data), tmp, &size_tmp,
 					&retval, NULL);
 		if (err && errno != 524/*ENOTSUPP*/ && errno != EPERM) {
 			printf("Unexpected bpf_prog_test_run error\n");

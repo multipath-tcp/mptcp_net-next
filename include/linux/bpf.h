@@ -85,6 +85,7 @@ struct bpf_map {
 	char name[BPF_OBJ_NAME_LEN];
 };
 
+struct bpf_offload_dev;
 struct bpf_offloaded_map;
 
 struct bpf_map_dev_ops {
@@ -352,7 +353,7 @@ struct bpf_prog_array {
 	struct bpf_prog *progs[0];
 };
 
-struct bpf_prog_array __rcu *bpf_prog_array_alloc(u32 prog_cnt, gfp_t flags);
+struct bpf_prog_array *bpf_prog_array_alloc(u32 prog_cnt, gfp_t flags);
 void bpf_prog_array_free(struct bpf_prog_array __rcu *progs);
 int bpf_prog_array_length(struct bpf_prog_array __rcu *progs);
 int bpf_prog_array_copy_to_user(struct bpf_prog_array __rcu *progs,
@@ -488,12 +489,15 @@ void bpf_patch_call_args(struct bpf_insn *insn, u32 stack_depth);
 
 /* Map specifics */
 struct xdp_buff;
+struct sk_buff;
 
 struct bpf_dtab_netdev *__dev_map_lookup_elem(struct bpf_map *map, u32 key);
 void __dev_map_insert_ctx(struct bpf_map *map, u32 index);
 void __dev_map_flush(struct bpf_map *map);
 int dev_map_enqueue(struct bpf_dtab_netdev *dst, struct xdp_buff *xdp,
 		    struct net_device *dev_rx);
+int dev_map_generic_redirect(struct bpf_dtab_netdev *dst, struct sk_buff *skb,
+			     struct bpf_prog *xdp_prog);
 
 struct bpf_cpu_map_entry *__cpu_map_lookup_elem(struct bpf_map *map, u32 key);
 void __cpu_map_insert_ctx(struct bpf_map *map, u32 index);
@@ -586,6 +590,15 @@ int dev_map_enqueue(struct bpf_dtab_netdev *dst, struct xdp_buff *xdp,
 	return 0;
 }
 
+struct sk_buff;
+
+static inline int dev_map_generic_redirect(struct bpf_dtab_netdev *dst,
+					   struct sk_buff *skb,
+					   struct bpf_prog *xdp_prog)
+{
+	return 0;
+}
+
 static inline
 struct bpf_cpu_map_entry *__cpu_map_lookup_elem(struct bpf_map *map, u32 key)
 {
@@ -636,7 +649,15 @@ int bpf_map_offload_delete_elem(struct bpf_map *map, void *key);
 int bpf_map_offload_get_next_key(struct bpf_map *map,
 				 void *key, void *next_key);
 
-bool bpf_offload_dev_match(struct bpf_prog *prog, struct bpf_map *map);
+bool bpf_offload_prog_map_match(struct bpf_prog *prog, struct bpf_map *map);
+
+struct bpf_offload_dev *bpf_offload_dev_create(void);
+void bpf_offload_dev_destroy(struct bpf_offload_dev *offdev);
+int bpf_offload_dev_netdev_register(struct bpf_offload_dev *offdev,
+				    struct net_device *netdev);
+void bpf_offload_dev_netdev_unregister(struct bpf_offload_dev *offdev,
+				       struct net_device *netdev);
+bool bpf_offload_dev_match(struct bpf_prog *prog, struct net_device *netdev);
 
 #if defined(CONFIG_NET) && defined(CONFIG_BPF_SYSCALL)
 int bpf_prog_offload_init(struct bpf_prog *prog, union bpf_attr *attr);
@@ -684,6 +705,8 @@ static inline void bpf_map_offload_map_free(struct bpf_map *map)
 struct sock  *__sock_map_lookup_elem(struct bpf_map *map, u32 key);
 struct sock  *__sock_hash_lookup_elem(struct bpf_map *map, void *key);
 int sock_map_prog(struct bpf_map *map, struct bpf_prog *prog, u32 type);
+int sockmap_get_from_fd(const union bpf_attr *attr, int type,
+			struct bpf_prog *prog);
 #else
 static inline struct sock  *__sock_map_lookup_elem(struct bpf_map *map, u32 key)
 {
@@ -701,6 +724,12 @@ static inline int sock_map_prog(struct bpf_map *map,
 				u32 type)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int sockmap_get_from_fd(const union bpf_attr *attr, int type,
+				      struct bpf_prog *prog)
+{
+	return -EINVAL;
 }
 #endif
 

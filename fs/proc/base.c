@@ -205,171 +205,147 @@ static int proc_root_link(struct dentry *dentry, struct path *path)
 	return result;
 }
 
+static ssize_t get_mm_cmdline(struct mm_struct *mm, char __user *buf,
+			      size_t count, loff_t *ppos)
+{
+	unsigned long arg_start, arg_end, env_start, env_end;
+	unsigned long pos, len;
+	char *page;
+
+	/* Check if process spawned far enough to have cmdline. */
+	if (!mm->env_end)
+		return 0;
+
+	spin_lock(&mm->arg_lock);
+	arg_start = mm->arg_start;
+	arg_end = mm->arg_end;
+	env_start = mm->env_start;
+	env_end = mm->env_end;
+	spin_unlock(&mm->arg_lock);
+
+	if (arg_start >= arg_end)
+		return 0;
+
+	/*
+	 * We have traditionally allowed the user to re-write
+	 * the argument strings and overflow the end result
+	 * into the environment section. But only do that if
+	 * the environment area is contiguous to the arguments.
+	 */
+	if (env_start != arg_end || env_start >= env_end)
+		env_start = env_end = arg_end;
+
+	/* .. and limit it to a maximum of one page of slop */
+	if (env_end >= arg_end + PAGE_SIZE)
+		env_end = arg_end + PAGE_SIZE - 1;
+
+	/* We're not going to care if "*ppos" has high bits set */
+	pos = arg_start + *ppos;
+
+	/* .. but we do check the result is in the proper range */
+	if (pos < arg_start || pos >= env_end)
+		return 0;
+
+	/* .. and we never go past env_end */
+	if (env_end - pos < count)
+		count = env_end - pos;
+
+	page = (char *)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	len = 0;
+	while (count) {
+		int got;
+		size_t size = min_t(size_t, PAGE_SIZE, count);
+		long offset;
+
+		/*
+		 * Are we already starting past the official end?
+		 * We always include the last byte that is *supposed*
+		 * to be NUL
+		 */
+		offset = (pos >= arg_end) ? pos - arg_end + 1 : 0;
+
+		got = access_remote_vm(mm, pos - offset, page, size + offset, FOLL_ANON);
+		if (got <= offset)
+			break;
+		got -= offset;
+
+		/* Don't walk past a NUL character once you hit arg_end */
+		if (pos + got >= arg_end) {
+			int n = 0;
+
+			/*
+			 * If we started before 'arg_end' but ended up
+			 * at or after it, we start the NUL character
+			 * check at arg_end-1 (where we expect the normal
+			 * EOF to be).
+			 *
+			 * NOTE! This is smaller than 'got', because
+			 * pos + got >= arg_end
+			 */
+			if (pos < arg_end)
+				n = arg_end - pos - 1;
+
+			/* Cut off at first NUL after 'n' */
+			got = n + strnlen(page+n, offset+got-n);
+			if (got < offset)
+				break;
+			got -= offset;
+
+			/* Include the NUL if it existed */
+			if (got < size)
+				got++;
+		}
+
+		got -= copy_to_user(buf, page+offset, got);
+		if (unlikely(!got)) {
+			if (!len)
+				len = -EFAULT;
+			break;
+		}
+		pos += got;
+		buf += got;
+		len += got;
+		count -= got;
+	}
+
+	free_page((unsigned long)page);
+	return len;
+}
+
+static ssize_t get_task_cmdline(struct task_struct *tsk, char __user *buf,
+				size_t count, loff_t *pos)
+{
+	struct mm_struct *mm;
+	ssize_t ret;
+
+	mm = get_task_mm(tsk);
+	if (!mm)
+		return 0;
+
+	ret = get_mm_cmdline(mm, buf, count, pos);
+	mmput(mm);
+	return ret;
+}
+
 static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
-				     size_t _count, loff_t *pos)
+				     size_t count, loff_t *pos)
 {
 	struct task_struct *tsk;
-	struct mm_struct *mm;
-	char *page;
-	unsigned long count = _count;
-	unsigned long arg_start, arg_end, env_start, env_end;
-	unsigned long len1, len2, len;
-	unsigned long p;
-	char c;
-	ssize_t rv;
+	ssize_t ret;
 
 	BUG_ON(*pos < 0);
 
 	tsk = get_proc_task(file_inode(file));
 	if (!tsk)
 		return -ESRCH;
-	mm = get_task_mm(tsk);
+	ret = get_task_cmdline(tsk, buf, count, pos);
 	put_task_struct(tsk);
-	if (!mm)
-		return 0;
-	/* Check if process spawned far enough to have cmdline. */
-	if (!mm->env_end) {
-		rv = 0;
-		goto out_mmput;
-	}
-
-	page = (char *)__get_free_page(GFP_KERNEL);
-	if (!page) {
-		rv = -ENOMEM;
-		goto out_mmput;
-	}
-
-	down_read(&mm->mmap_sem);
-	arg_start = mm->arg_start;
-	arg_end = mm->arg_end;
-	env_start = mm->env_start;
-	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
-
-	BUG_ON(arg_start > arg_end);
-	BUG_ON(env_start > env_end);
-
-	len1 = arg_end - arg_start;
-	len2 = env_end - env_start;
-
-	/* Empty ARGV. */
-	if (len1 == 0) {
-		rv = 0;
-		goto out_free_page;
-	}
-	/*
-	 * Inherently racy -- command line shares address space
-	 * with code and data.
-	 */
-	rv = access_remote_vm(mm, arg_end - 1, &c, 1, FOLL_ANON);
-	if (rv <= 0)
-		goto out_free_page;
-
-	rv = 0;
-
-	if (c == '\0') {
-		/* Command line (set of strings) occupies whole ARGV. */
-		if (len1 <= *pos)
-			goto out_free_page;
-
-		p = arg_start + *pos;
-		len = len1 - *pos;
-		while (count > 0 && len > 0) {
-			unsigned int _count;
-			int nr_read;
-
-			_count = min3(count, len, PAGE_SIZE);
-			nr_read = access_remote_vm(mm, p, page, _count, FOLL_ANON);
-			if (nr_read < 0)
-				rv = nr_read;
-			if (nr_read <= 0)
-				goto out_free_page;
-
-			if (copy_to_user(buf, page, nr_read)) {
-				rv = -EFAULT;
-				goto out_free_page;
-			}
-
-			p	+= nr_read;
-			len	-= nr_read;
-			buf	+= nr_read;
-			count	-= nr_read;
-			rv	+= nr_read;
-		}
-	} else {
-		/*
-		 * Command line (1 string) occupies ARGV and
-		 * extends into ENVP.
-		 */
-		struct {
-			unsigned long p;
-			unsigned long len;
-		} cmdline[2] = {
-			{ .p = arg_start, .len = len1 },
-			{ .p = env_start, .len = len2 },
-		};
-		loff_t pos1 = *pos;
-		unsigned int i;
-
-		i = 0;
-		while (i < 2 && pos1 >= cmdline[i].len) {
-			pos1 -= cmdline[i].len;
-			i++;
-		}
-		while (i < 2) {
-			p = cmdline[i].p + pos1;
-			len = cmdline[i].len - pos1;
-			while (count > 0 && len > 0) {
-				unsigned int _count, l;
-				int nr_read;
-				bool final;
-
-				_count = min3(count, len, PAGE_SIZE);
-				nr_read = access_remote_vm(mm, p, page, _count, FOLL_ANON);
-				if (nr_read < 0)
-					rv = nr_read;
-				if (nr_read <= 0)
-					goto out_free_page;
-
-				/*
-				 * Command line can be shorter than whole ARGV
-				 * even if last "marker" byte says it is not.
-				 */
-				final = false;
-				l = strnlen(page, nr_read);
-				if (l < nr_read) {
-					nr_read = l;
-					final = true;
-				}
-
-				if (copy_to_user(buf, page, nr_read)) {
-					rv = -EFAULT;
-					goto out_free_page;
-				}
-
-				p	+= nr_read;
-				len	-= nr_read;
-				buf	+= nr_read;
-				count	-= nr_read;
-				rv	+= nr_read;
-
-				if (final)
-					goto out_free_page;
-			}
-
-			/* Only first chunk can be read partially. */
-			pos1 = 0;
-			i++;
-		}
-	}
-
-out_free_page:
-	free_page((unsigned long)page);
-out_mmput:
-	mmput(mm);
-	if (rv > 0)
-		*pos += rv;
-	return rv;
+	if (ret > 0)
+		*pos += ret;
+	return ret;
 }
 
 static const struct file_operations proc_pid_cmdline_ops = {
@@ -430,9 +406,9 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 	struct stack_trace trace;
 	unsigned long *entries;
 	int err;
-	int i;
 
-	entries = kmalloc(MAX_STACK_TRACE_DEPTH * sizeof(*entries), GFP_KERNEL);
+	entries = kmalloc_array(MAX_STACK_TRACE_DEPTH, sizeof(*entries),
+				GFP_KERNEL);
 	if (!entries)
 		return -ENOMEM;
 
@@ -443,6 +419,8 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 
 	err = lock_trace(task);
 	if (!err) {
+		unsigned int i;
+
 		save_stack_trace_tsk(task, &trace);
 
 		for (i = 0; i < trace.nr_entries; i++) {
@@ -927,10 +905,10 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	if (!mmget_not_zero(mm))
 		goto free;
 
-	down_read(&mm->mmap_sem);
+	spin_lock(&mm->arg_lock);
 	env_start = mm->env_start;
 	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
+	spin_unlock(&mm->arg_lock);
 
 	while (count > 0) {
 		size_t this_len, max_len;
@@ -1784,9 +1762,9 @@ int pid_getattr(const struct path *path, struct kstat *stat,
 
 	generic_fillattr(inode, stat);
 
-	rcu_read_lock();
 	stat->uid = GLOBAL_ROOT_UID;
 	stat->gid = GLOBAL_ROOT_GID;
+	rcu_read_lock();
 	task = pid_task(proc_pid(inode), PIDTYPE_PID);
 	if (task) {
 		if (!has_pid_permissions(pid, task, HIDEPID_INVISIBLE)) {
@@ -1875,7 +1853,7 @@ const struct dentry_operations pid_dentry_operations =
  * by stat.
  */
 bool proc_fill_cache(struct file *file, struct dir_context *ctx,
-	const char *name, int len,
+	const char *name, unsigned int len,
 	instantiate_t instantiate, struct task_struct *task, const void *ptr)
 {
 	struct dentry *child, *dir = file->f_path.dentry;
@@ -1894,19 +1872,19 @@ bool proc_fill_cache(struct file *file, struct dir_context *ctx,
 			struct dentry *res;
 			res = instantiate(child, task, ptr);
 			d_lookup_done(child);
-			if (IS_ERR(res))
-				goto end_instantiate;
 			if (unlikely(res)) {
 				dput(child);
 				child = res;
+				if (IS_ERR(child))
+					goto end_instantiate;
 			}
 		}
 	}
 	inode = d_inode(child);
 	ino = inode->i_ino;
 	type = inode->i_mode >> 12;
-end_instantiate:
 	dput(child);
+end_instantiate:
 	return dir_emit(ctx, name, len, ino, type);
 }
 
@@ -2479,14 +2457,11 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 	for (p = ents; p < last; p++) {
 		if (p->len != dentry->d_name.len)
 			continue;
-		if (!memcmp(dentry->d_name.name, p->name, p->len))
+		if (!memcmp(dentry->d_name.name, p->name, p->len)) {
+			res = proc_pident_instantiate(dentry, task, p);
 			break;
+		}
 	}
-	if (p >= last)
-		goto out;
-
-	res = proc_pident_instantiate(dentry, task, p);
-out:
 	put_task_struct(task);
 out_no_task:
 	return res;
@@ -3251,7 +3226,7 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 	     iter.task;
 	     iter.tgid += 1, iter = next_tgid(ns, iter)) {
 		char name[10 + 1];
-		int len;
+		unsigned int len;
 
 		cond_resched();
 		if (!has_pid_permissions(ns, iter.task, HIDEPID_INVISIBLE))
@@ -3578,7 +3553,7 @@ static int proc_task_readdir(struct file *file, struct dir_context *ctx)
 	     task;
 	     task = next_tid(task), ctx->pos++) {
 		char name[10 + 1];
-		int len;
+		unsigned int len;
 		tid = task_pid_nr_ns(task, ns);
 		len = snprintf(name, sizeof(name), "%u", tid);
 		if (!proc_fill_cache(file, ctx, name, len,

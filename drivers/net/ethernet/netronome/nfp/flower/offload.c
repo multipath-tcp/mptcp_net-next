@@ -264,6 +264,14 @@ nfp_flower_calculate_key_layers(struct nfp_app *app,
 		case cpu_to_be16(ETH_P_ARP):
 			return -EOPNOTSUPP;
 
+		case cpu_to_be16(ETH_P_MPLS_UC):
+		case cpu_to_be16(ETH_P_MPLS_MC):
+			if (!(key_layer & NFP_FLOWER_LAYER_MAC)) {
+				key_layer |= NFP_FLOWER_LAYER_MAC;
+				key_size += sizeof(struct nfp_flower_mac_mpls);
+			}
+			break;
+
 		/* Will be included in layer 2. */
 		case cpu_to_be16(ETH_P_8021Q):
 			break;
@@ -576,9 +584,9 @@ nfp_flower_repr_offload(struct nfp_app *app, struct net_device *netdev,
 		return nfp_flower_del_offload(app, netdev, flower, egress);
 	case TC_CLSFLOWER_STATS:
 		return nfp_flower_get_stats(app, netdev, flower, egress);
+	default:
+		return -EOPNOTSUPP;
 	}
-
-	return -EOPNOTSUPP;
 }
 
 int nfp_flower_setup_tc_egress_cb(enum tc_setup_type type, void *type_data,
@@ -627,7 +635,7 @@ static int nfp_flower_setup_tc_block(struct net_device *netdev,
 	case TC_BLOCK_BIND:
 		return tcf_block_cb_register(f->block,
 					     nfp_flower_setup_tc_block_cb,
-					     repr, repr);
+					     repr, repr, f->extack);
 	case TC_BLOCK_UNBIND:
 		tcf_block_cb_unregister(f->block,
 					nfp_flower_setup_tc_block_cb,

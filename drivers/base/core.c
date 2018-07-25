@@ -236,6 +236,13 @@ struct device_link *device_link_add(struct device *consumer,
 			link->rpm_active = true;
 		}
 		pm_runtime_new_link(consumer);
+		/*
+		 * If the link is being added by the consumer driver at probe
+		 * time, balance the decrementation of the supplier's runtime PM
+		 * usage counter after consumer probe in driver_probe_device().
+		 */
+		if (consumer->links.status == DL_DEV_PROBING)
+			pm_runtime_get_noresume(supplier);
 	}
 	get_device(supplier);
 	link->supplier = supplier;
@@ -255,12 +262,12 @@ struct device_link *device_link_add(struct device *consumer,
 			switch (consumer->links.status) {
 			case DL_DEV_PROBING:
 				/*
-				 * Balance the decrementation of the supplier's
-				 * runtime PM usage counter after consumer probe
-				 * in driver_probe_device().
+				 * Some callers expect the link creation during
+				 * consumer driver probe to resume the supplier
+				 * even without DL_FLAG_RPM_ACTIVE.
 				 */
 				if (flags & DL_FLAG_PM_RUNTIME)
-					pm_runtime_get_sync(supplier);
+					pm_runtime_resume(supplier);
 
 				link->status = DL_STATE_CONSUMER_PROBE;
 				break;
@@ -859,10 +866,19 @@ static const void *device_namespace(struct kobject *kobj)
 	return ns;
 }
 
+static void device_get_ownership(struct kobject *kobj, kuid_t *uid, kgid_t *gid)
+{
+	struct device *dev = kobj_to_dev(kobj);
+
+	if (dev->class && dev->class->get_ownership)
+		dev->class->get_ownership(dev, uid, gid);
+}
+
 static struct kobj_type device_ktype = {
 	.release	= device_release,
 	.sysfs_ops	= &dev_sysfs_ops,
 	.namespace	= device_namespace,
+	.get_ownership	= device_get_ownership,
 };
 
 

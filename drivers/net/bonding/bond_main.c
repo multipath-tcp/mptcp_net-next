@@ -2418,7 +2418,7 @@ struct bond_vlan_tag *bond_verify_device_path(struct net_device *start_dev,
 	struct list_head  *iter;
 
 	if (start_dev == end_dev) {
-		tags = kzalloc(sizeof(*tags) * (level + 1), GFP_ATOMIC);
+		tags = kcalloc(level + 1, sizeof(*tags), GFP_ATOMIC);
 		if (!tags)
 			return ERR_PTR(-ENOMEM);
 		tags[level].vlan_proto = VLAN_N_VID;
@@ -4094,7 +4094,8 @@ static inline int bond_slave_override(struct bonding *bond,
 
 
 static u16 bond_select_queue(struct net_device *dev, struct sk_buff *skb,
-			     void *accel_priv, select_queue_fallback_t fallback)
+			     struct net_device *sb_dev,
+			     select_queue_fallback_t fallback)
 {
 	/* This helper function exists to help dev_pick_tx get the correct
 	 * destination queue.  Using a helper function skips a call to

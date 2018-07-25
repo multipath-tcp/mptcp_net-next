@@ -15,6 +15,10 @@ Contents:
    kapi
    z8530book
    msg_zerocopy
+   failover
+   net_failover
+   alias
+   bridge
 
 .. only::  subproject
 

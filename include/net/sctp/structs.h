@@ -48,7 +48,7 @@
 #define __sctp_structs_h__
 
 #include <linux/ktime.h>
-#include <linux/rhashtable.h>
+#include <linux/rhashtable-types.h>
 #include <linux/socket.h>	/* linux/in.h needs this!!    */
 #include <linux/in.h>		/* We get struct sockaddr_in. */
 #include <linux/in6.h>		/* We get struct in6_addr     */
@@ -193,6 +193,9 @@ struct sctp_sock {
 	/* This is the max_retrans value for new associations. */
 	__u16 pathmaxrxt;
 
+	__u32 flowlabel;
+	__u8  dscp;
+
 	/* The initial Path MTU to use for new associations. */
 	__u32 pathmtu;
 
@@ -220,6 +223,7 @@ struct sctp_sock {
 	__u32 adaptation_ind;
 	__u32 pd_point;
 	__u16	nodelay:1,
+		reuse:1,
 		disable_fragments:1,
 		v4mapped:1,
 		frag_interleave:1,
@@ -894,6 +898,9 @@ struct sctp_transport {
 	 */
 	__u16 pathmaxrxt;
 
+	__u32 flowlabel;
+	__u8  dscp;
+
 	/* This is the partially failed retrans value for the transport
 	 * and will be initialized from the assocs value.  This can be changed
 	 * using the SCTP_PEER_ADDR_THLDS socket option
@@ -1132,6 +1139,11 @@ struct sctp_input_cb {
 	struct sctp_af *af;
 };
 #define SCTP_INPUT_CB(__skb)	((struct sctp_input_cb *)&((__skb)->cb[0]))
+
+struct sctp_output_cb {
+	struct sk_buff *last;
+};
+#define SCTP_OUTPUT_CB(__skb)	((struct sctp_output_cb *)&((__skb)->cb[0]))
 
 static inline const struct sk_buff *sctp_gso_headskb(const struct sk_buff *skb)
 {
@@ -1765,6 +1777,9 @@ struct sctp_association {
 	 * association.
 	 */
 	__u16 pathmaxrxt;
+
+	__u32 flowlabel;
+	__u8  dscp;
 
 	/* Flag that path mtu update is pending */
 	__u8   pmtu_pending;

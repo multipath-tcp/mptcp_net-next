@@ -300,6 +300,7 @@ __be32 fib_compute_spec_dst(struct sk_buff *skb)
 	if (!ipv4_is_zeronet(ip_hdr(skb)->saddr)) {
 		struct flowi4 fl4 = {
 			.flowi4_iif = LOOPBACK_IFINDEX,
+			.flowi4_oif = l3mdev_master_ifindex_rcu(dev),
 			.daddr = ip_hdr(skb)->saddr,
 			.flowi4_tos = RT_TOS(ip_hdr(skb)->tos),
 			.flowi4_scope = scope,
@@ -567,7 +568,7 @@ static int rtentry_to_fib_config(struct net *net, int cmd, struct rtentry *rt,
 		struct nlattr *mx;
 		int len = 0;
 
-		mx = kzalloc(3 * nla_total_size(4), GFP_KERNEL);
+		mx = kcalloc(3, nla_total_size(4), GFP_KERNEL);
 		if (!mx)
 			return -ENOMEM;
 

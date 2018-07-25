@@ -2493,6 +2493,9 @@ int ata_dev_configure(struct ata_device *dev)
 	    (id[ATA_ID_SATA_CAPABILITY] & 0xe) == 0x2)
 		dev->horkage |= ATA_HORKAGE_NOLPM;
 
+	if (ap->flags & ATA_FLAG_NO_LPM)
+		dev->horkage |= ATA_HORKAGE_NOLPM;
+
 	if (dev->horkage & ATA_HORKAGE_NOLPM) {
 		ata_dev_warn(dev, "LPM support broken, forcing max_power\n");
 		dev->link->ap->target_lpm_policy = ATA_LPM_MAX_POWER;
@@ -6987,7 +6990,7 @@ static void __init ata_parse_force_param(void)
 		if (*p == ',')
 			size++;
 
-	ata_force_tbl = kzalloc(sizeof(ata_force_tbl[0]) * size, GFP_KERNEL);
+	ata_force_tbl = kcalloc(size, sizeof(ata_force_tbl[0]), GFP_KERNEL);
 	if (!ata_force_tbl) {
 		printk(KERN_WARNING "ata: failed to extend force table, "
 		       "libata.force ignored\n");

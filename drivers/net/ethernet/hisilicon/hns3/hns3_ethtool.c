@@ -1,11 +1,5 @@
-/*
- * Copyright (c) 2016~2017 Hisilicon Limited.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- */
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2016-2017 Hisilicon Limited.
 
 #include <linux/etherdevice.h>
 #include <linux/string.h>
@@ -201,7 +195,9 @@ static u32 hns3_lb_check_rx_ring(struct hns3_nic_priv *priv, u32 budget)
 		rx_group = &ring->tqp_vector->rx_group;
 		pre_rx_pkt = rx_group->total_packets;
 
+		preempt_disable();
 		hns3_clean_rx_ring(ring, budget, hns3_lb_check_skb_data);
+		preempt_enable();
 
 		rcv_good_pkt_total += (rx_group->total_packets - pre_rx_pkt);
 		rx_group->total_packets = pre_rx_pkt;

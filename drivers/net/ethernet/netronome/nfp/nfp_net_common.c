@@ -945,11 +945,12 @@ err_free:
 
 /**
  * nfp_net_tx_complete() - Handled completed TX packets
- * @tx_ring:   TX ring structure
+ * @tx_ring:	TX ring structure
+ * @budget:	NAPI budget (only used as bool to determine if in NAPI context)
  *
  * Return: Number of completed TX descriptors
  */
-static void nfp_net_tx_complete(struct nfp_net_tx_ring *tx_ring)
+static void nfp_net_tx_complete(struct nfp_net_tx_ring *tx_ring, int budget)
 {
 	struct nfp_net_r_vector *r_vec = tx_ring->r_vec;
 	struct nfp_net_dp *dp = &r_vec->nfp_net->dp;
@@ -999,7 +1000,7 @@ static void nfp_net_tx_complete(struct nfp_net_tx_ring *tx_ring)
 
 		/* check for last gather fragment */
 		if (fidx == nr_frags - 1)
-			dev_consume_skb_any(skb);
+			napi_consume_skb(skb, budget);
 
 		tx_ring->txbufs[idx].dma_addr = 0;
 		tx_ring->txbufs[idx].skb = NULL;
@@ -1077,7 +1078,7 @@ static bool nfp_net_xdp_complete(struct nfp_net_tx_ring *tx_ring)
  * @dp:		NFP Net data path struct
  * @tx_ring:	TX ring structure
  *
- * Assumes that the device is stopped
+ * Assumes that the device is stopped, must be idempotent.
  */
 static void
 nfp_net_tx_ring_reset(struct nfp_net_dp *dp, struct nfp_net_tx_ring *tx_ring)
@@ -1279,12 +1280,17 @@ static void nfp_net_rx_give_one(const struct nfp_net_dp *dp,
  * nfp_net_rx_ring_reset() - Reflect in SW state of freelist after disable
  * @rx_ring:	RX ring structure
  *
- * Warning: Do *not* call if ring buffers were never put on the FW freelist
- *	    (i.e. device was not enabled)!
+ * Assumes that the device is stopped, must be idempotent.
  */
 static void nfp_net_rx_ring_reset(struct nfp_net_rx_ring *rx_ring)
 {
 	unsigned int wr_idx, last_idx;
+
+	/* wr_p == rd_p means ring was never fed FL bufs.  RX rings are always
+	 * kept at cnt - 1 FL bufs.
+	 */
+	if (rx_ring->wr_p == 0 && rx_ring->rd_p == 0)
+		return;
 
 	/* Move the empty entry to the end of the list */
 	wr_idx = D_IDX(rx_ring, rx_ring->wr_p);
@@ -1709,8 +1715,7 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 			}
 		}
 
-		if (xdp_prog && !(rxd->rxd.flags & PCIE_DESC_RX_BPF &&
-				  dp->bpf_offload_xdp) && !meta.portid) {
+		if (xdp_prog && !meta.portid) {
 			void *orig_data = rxbuf->frag + pkt_off;
 			unsigned int dma_off;
 			int act;
@@ -1828,7 +1833,7 @@ static int nfp_net_poll(struct napi_struct *napi, int budget)
 	unsigned int pkts_polled = 0;
 
 	if (r_vec->tx_ring)
-		nfp_net_tx_complete(r_vec->tx_ring);
+		nfp_net_tx_complete(r_vec->tx_ring, budget);
 	if (r_vec->rx_ring)
 		pkts_polled = nfp_net_rx(r_vec->rx_ring, budget);
 
@@ -2062,7 +2067,7 @@ static void nfp_ctrl_poll(unsigned long arg)
 	struct nfp_net_r_vector *r_vec = (void *)arg;
 
 	spin_lock_bh(&r_vec->lock);
-	nfp_net_tx_complete(r_vec->tx_ring);
+	nfp_net_tx_complete(r_vec->tx_ring, 0);
 	__nfp_ctrl_tx_queued(r_vec);
 	spin_unlock_bh(&r_vec->lock);
 
@@ -2508,6 +2513,8 @@ static void nfp_net_vec_clear_ring_data(struct nfp_net *nn, unsigned int idx)
 /**
  * nfp_net_clear_config_and_disable() - Clear control BAR and disable NFP
  * @nn:      NFP Net device to reconfigure
+ *
+ * Warning: must be fully idempotent.
  */
 static void nfp_net_clear_config_and_disable(struct nfp_net *nn)
 {
@@ -3115,13 +3122,28 @@ nfp_net_vlan_rx_kill_vid(struct net_device *netdev, __be16 proto, u16 vid)
 	return nfp_net_reconfig_mbox(nn, NFP_NET_CFG_MBOX_CMD_CTAG_FILTER_KILL);
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void nfp_net_netpoll(struct net_device *netdev)
+{
+	struct nfp_net *nn = netdev_priv(netdev);
+	int i;
+
+	/* nfp_net's NAPIs are statically allocated so even if there is a race
+	 * with reconfig path this will simply try to schedule some disabled
+	 * NAPI instances.
+	 */
+	for (i = 0; i < nn->dp.num_stack_tx_rings; i++)
+		napi_schedule_irqoff(&nn->r_vecs[i].napi);
+}
+#endif
+
 static void nfp_net_stat64(struct net_device *netdev,
 			   struct rtnl_link_stats64 *stats)
 {
 	struct nfp_net *nn = netdev_priv(netdev);
 	int r;
 
-	for (r = 0; r < nn->dp.num_r_vecs; r++) {
+	for (r = 0; r < nn->max_r_vecs; r++) {
 		struct nfp_net_r_vector *r_vec = &nn->r_vecs[r];
 		u64 data[3];
 		unsigned int start;
@@ -3286,7 +3308,7 @@ nfp_net_get_phys_port_name(struct net_device *netdev, char *name, size_t len)
 	if (nn->port)
 		return nfp_port_get_phys_port_name(netdev, name, len);
 
-	if (nn->dp.is_vf)
+	if (nn->dp.is_vf || nn->vnic_no_name)
 		return -EOPNOTSUPP;
 
 	n = snprintf(name, len, "n%d", nn->id);
@@ -3377,14 +3399,18 @@ static void nfp_net_del_vxlan_port(struct net_device *netdev,
 		nfp_net_set_vxlan_port(nn, idx, 0);
 }
 
-static int
-nfp_net_xdp_setup_drv(struct nfp_net *nn, struct bpf_prog *prog,
-		      struct netlink_ext_ack *extack)
+static int nfp_net_xdp_setup_drv(struct nfp_net *nn, struct netdev_bpf *bpf)
 {
+	struct bpf_prog *prog = bpf->prog;
 	struct nfp_net_dp *dp;
+	int err;
+
+	if (!xdp_attachment_flags_ok(&nn->xdp, bpf))
+		return -EBUSY;
 
 	if (!prog == !nn->dp.xdp_prog) {
 		WRITE_ONCE(nn->dp.xdp_prog, prog);
+		xdp_attachment_setup(&nn->xdp, bpf);
 		return 0;
 	}
 
@@ -3398,38 +3424,26 @@ nfp_net_xdp_setup_drv(struct nfp_net *nn, struct bpf_prog *prog,
 	dp->rx_dma_off = prog ? XDP_PACKET_HEADROOM - nn->dp.rx_offset : 0;
 
 	/* We need RX reconfig to remap the buffers (BIDIR vs FROM_DEV) */
-	return nfp_net_ring_reconfig(nn, dp, extack);
-}
-
-static int
-nfp_net_xdp_setup(struct nfp_net *nn, struct bpf_prog *prog, u32 flags,
-		  struct netlink_ext_ack *extack)
-{
-	struct bpf_prog *drv_prog, *offload_prog;
-	int err;
-
-	if (nn->xdp_prog && (flags ^ nn->xdp_flags) & XDP_FLAGS_MODES)
-		return -EBUSY;
-
-	/* Load both when no flags set to allow easy activation of driver path
-	 * when program is replaced by one which can't be offloaded.
-	 */
-	drv_prog     = flags & XDP_FLAGS_HW_MODE  ? NULL : prog;
-	offload_prog = flags & XDP_FLAGS_DRV_MODE ? NULL : prog;
-
-	err = nfp_net_xdp_setup_drv(nn, drv_prog, extack);
+	err = nfp_net_ring_reconfig(nn, dp, bpf->extack);
 	if (err)
 		return err;
 
-	err = nfp_app_xdp_offload(nn->app, nn, offload_prog, extack);
-	if (err && flags & XDP_FLAGS_HW_MODE)
+	xdp_attachment_setup(&nn->xdp, bpf);
+	return 0;
+}
+
+static int nfp_net_xdp_setup_hw(struct nfp_net *nn, struct netdev_bpf *bpf)
+{
+	int err;
+
+	if (!xdp_attachment_flags_ok(&nn->xdp_hw, bpf))
+		return -EBUSY;
+
+	err = nfp_app_xdp_offload(nn->app, nn, bpf->prog, bpf->extack);
+	if (err)
 		return err;
 
-	if (nn->xdp_prog)
-		bpf_prog_put(nn->xdp_prog);
-	nn->xdp_prog = prog;
-	nn->xdp_flags = flags;
-
+	xdp_attachment_setup(&nn->xdp_hw, bpf);
 	return 0;
 }
 
@@ -3439,16 +3453,13 @@ static int nfp_net_xdp(struct net_device *netdev, struct netdev_bpf *xdp)
 
 	switch (xdp->command) {
 	case XDP_SETUP_PROG:
+		return nfp_net_xdp_setup_drv(nn, xdp);
 	case XDP_SETUP_PROG_HW:
-		return nfp_net_xdp_setup(nn, xdp->prog, xdp->flags,
-					 xdp->extack);
+		return nfp_net_xdp_setup_hw(nn, xdp);
 	case XDP_QUERY_PROG:
-		xdp->prog_attached = !!nn->xdp_prog;
-		if (nn->dp.bpf_offload_xdp)
-			xdp->prog_attached = XDP_ATTACHED_HW;
-		xdp->prog_id = nn->xdp_prog ? nn->xdp_prog->aux->id : 0;
-		xdp->prog_flags = nn->xdp_prog ? nn->xdp_flags : 0;
-		return 0;
+		return xdp_attachment_query(&nn->xdp, xdp);
+	case XDP_QUERY_PROG_HW:
+		return xdp_attachment_query(&nn->xdp_hw, xdp);
 	default:
 		return nfp_app_bpf(nn->app, nn, xdp);
 	}
@@ -3476,12 +3487,17 @@ static int nfp_net_set_mac_address(struct net_device *netdev, void *addr)
 }
 
 const struct net_device_ops nfp_net_netdev_ops = {
+	.ndo_init		= nfp_app_ndo_init,
+	.ndo_uninit		= nfp_app_ndo_uninit,
 	.ndo_open		= nfp_net_netdev_open,
 	.ndo_stop		= nfp_net_netdev_close,
 	.ndo_start_xmit		= nfp_net_tx,
 	.ndo_get_stats64	= nfp_net_stat64,
 	.ndo_vlan_rx_add_vid	= nfp_net_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= nfp_net_vlan_rx_kill_vid,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= nfp_net_netpoll,
+#endif
 	.ndo_set_vf_mac         = nfp_app_set_vf_mac,
 	.ndo_set_vf_vlan        = nfp_app_set_vf_vlan,
 	.ndo_set_vf_spoofchk    = nfp_app_set_vf_spoofchk,

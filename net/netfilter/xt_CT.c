@@ -93,7 +93,7 @@ xt_ct_set_helper(struct nf_conn *ct, const char *helper_name,
 		return -ENOENT;
 	}
 
-	help = nf_ct_helper_ext_add(ct, helper, GFP_KERNEL);
+	help = nf_ct_helper_ext_add(ct, GFP_KERNEL);
 	if (help == NULL) {
 		nf_conntrack_helper_put(helper);
 		return -ENOMEM;
@@ -245,12 +245,22 @@ static int xt_ct_tg_check(const struct xt_tgchk_param *par,
 	}
 
 	if (info->helper[0]) {
+		if (strnlen(info->helper, sizeof(info->helper)) == sizeof(info->helper)) {
+			ret = -ENAMETOOLONG;
+			goto err3;
+		}
+
 		ret = xt_ct_set_helper(ct, info->helper, par);
 		if (ret < 0)
 			goto err3;
 	}
 
 	if (info->timeout[0]) {
+		if (strnlen(info->timeout, sizeof(info->timeout)) == sizeof(info->timeout)) {
+			ret = -ENAMETOOLONG;
+			goto err4;
+		}
+
 		ret = xt_ct_set_timeout(ct, par, info->timeout);
 		if (ret < 0)
 			goto err4;

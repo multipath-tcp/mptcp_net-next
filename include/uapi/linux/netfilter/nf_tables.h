@@ -266,7 +266,7 @@ enum nft_rule_compat_attributes {
  * @NFT_SET_INTERVAL: set contains intervals
  * @NFT_SET_MAP: set is used as a dictionary
  * @NFT_SET_TIMEOUT: set uses timeouts
- * @NFT_SET_EVAL: set contains expressions for evaluation
+ * @NFT_SET_EVAL: set can be updated from the evaluation path
  * @NFT_SET_OBJECT: set contains stateful objects
  */
 enum nft_set_flags {
@@ -921,10 +921,12 @@ enum nft_socket_attributes {
 /*
  * enum nft_socket_keys - nf_tables socket expression keys
  *
- * @NFT_SOCKET_TRANSPARENT: Value of the IP(V6)_TRANSPARENT socket option_
+ * @NFT_SOCKET_TRANSPARENT: Value of the IP(V6)_TRANSPARENT socket option
+ * @NFT_SOCKET_MARK: Value of the socket mark
  */
 enum nft_socket_keys {
 	NFT_SOCKET_TRANSPARENT,
+	NFT_SOCKET_MARK,
 	__NFT_SOCKET_MAX
 };
 #define NFT_SOCKET_MAX	(__NFT_SOCKET_MAX - 1)
@@ -1099,9 +1101,31 @@ enum nft_log_attributes {
 #define NFTA_LOG_MAX		(__NFTA_LOG_MAX - 1)
 
 /**
- * LOGLEVEL_AUDIT - a pseudo log level enabling audit logging
+ * enum nft_log_level - nf_tables log levels
+ *
+ * @NFT_LOGLEVEL_EMERG: system is unusable
+ * @NFT_LOGLEVEL_ALERT: action must be taken immediately
+ * @NFT_LOGLEVEL_CRIT: critical conditions
+ * @NFT_LOGLEVEL_ERR: error conditions
+ * @NFT_LOGLEVEL_WARNING: warning conditions
+ * @NFT_LOGLEVEL_NOTICE: normal but significant condition
+ * @NFT_LOGLEVEL_INFO: informational
+ * @NFT_LOGLEVEL_DEBUG: debug-level messages
+ * @NFT_LOGLEVEL_AUDIT: enabling audit logging
  */
-#define LOGLEVEL_AUDIT		8
+enum nft_log_level {
+	NFT_LOGLEVEL_EMERG,
+	NFT_LOGLEVEL_ALERT,
+	NFT_LOGLEVEL_CRIT,
+	NFT_LOGLEVEL_ERR,
+	NFT_LOGLEVEL_WARNING,
+	NFT_LOGLEVEL_NOTICE,
+	NFT_LOGLEVEL_INFO,
+	NFT_LOGLEVEL_DEBUG,
+	NFT_LOGLEVEL_AUDIT,
+	__NFT_LOGLEVEL_MAX
+};
+#define NFT_LOGLEVEL_MAX	(__NFT_LOGLEVEL_MAX + 1)
 
 /**
  * enum nft_queue_attributes - nf_tables queue expression netlink attributes

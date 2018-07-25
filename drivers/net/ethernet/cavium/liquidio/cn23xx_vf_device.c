@@ -165,6 +165,9 @@ static void cn23xx_vf_setup_global_output_regs(struct octeon_device *oct)
 		reg_val =
 		    octeon_read_csr(oct, CN23XX_VF_SLI_OQ_PKT_CONTROL(q_no));
 
+		/* clear IPTR */
+		reg_val &= ~CN23XX_PKT_OUTPUT_CTL_IPTR;
+
 		/* set DPTR */
 		reg_val |= CN23XX_PKT_OUTPUT_CTL_DPTR;
 
@@ -379,7 +382,7 @@ void cn23xx_vf_ask_pf_to_do_flr(struct octeon_device *oct)
 	mbox_cmd.recv_len = 0;
 	mbox_cmd.recv_status = 0;
 	mbox_cmd.fn = NULL;
-	mbox_cmd.fn_arg = 0;
+	mbox_cmd.fn_arg = NULL;
 
 	octeon_mbox_write(oct, &mbox_cmd);
 }

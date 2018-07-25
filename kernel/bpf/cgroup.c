@@ -95,7 +95,7 @@ static int compute_effective_progs(struct cgroup *cgrp,
 				   enum bpf_attach_type type,
 				   struct bpf_prog_array __rcu **array)
 {
-	struct bpf_prog_array __rcu *progs;
+	struct bpf_prog_array *progs;
 	struct bpf_prog_list *pl;
 	struct cgroup *p = cgrp;
 	int cnt = 0;
@@ -120,13 +120,12 @@ static int compute_effective_progs(struct cgroup *cgrp,
 					    &p->bpf.progs[type], node) {
 				if (!pl->prog)
 					continue;
-				rcu_dereference_protected(progs, 1)->
-					progs[cnt++] = pl->prog;
+				progs->progs[cnt++] = pl->prog;
 			}
 		p = cgroup_parent(p);
 	} while (p);
 
-	*array = progs;
+	rcu_assign_pointer(*array, progs);
 	return 0;
 }
 
@@ -425,6 +424,60 @@ int __cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 				break;
 		}
 	}
+	return ret;
+}
+
+int cgroup_bpf_prog_attach(const union bpf_attr *attr,
+			   enum bpf_prog_type ptype, struct bpf_prog *prog)
+{
+	struct cgroup *cgrp;
+	int ret;
+
+	cgrp = cgroup_get_from_fd(attr->target_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+
+	ret = cgroup_bpf_attach(cgrp, prog, attr->attach_type,
+				attr->attach_flags);
+	cgroup_put(cgrp);
+	return ret;
+}
+
+int cgroup_bpf_prog_detach(const union bpf_attr *attr, enum bpf_prog_type ptype)
+{
+	struct bpf_prog *prog;
+	struct cgroup *cgrp;
+	int ret;
+
+	cgrp = cgroup_get_from_fd(attr->target_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+
+	prog = bpf_prog_get_type(attr->attach_bpf_fd, ptype);
+	if (IS_ERR(prog))
+		prog = NULL;
+
+	ret = cgroup_bpf_detach(cgrp, prog, attr->attach_type, 0);
+	if (prog)
+		bpf_prog_put(prog);
+
+	cgroup_put(cgrp);
+	return ret;
+}
+
+int cgroup_bpf_prog_query(const union bpf_attr *attr,
+			  union bpf_attr __user *uattr)
+{
+	struct cgroup *cgrp;
+	int ret;
+
+	cgrp = cgroup_get_from_fd(attr->query.target_fd);
+	if (IS_ERR(cgrp))
+		return PTR_ERR(cgrp);
+
+	ret = cgroup_bpf_query(cgrp, attr, uattr);
+
+	cgroup_put(cgrp);
 	return ret;
 }
 

@@ -569,7 +569,7 @@ const struct proto_ops inet6_stream_ops = {
 	.socketpair	   = sock_no_socketpair,	/* a do nothing	*/
 	.accept		   = inet_accept,		/* ok		*/
 	.getname	   = inet6_getname,
-	.poll_mask	   = tcp_poll_mask,		/* ok		*/
+	.poll		   = tcp_poll,			/* ok		*/
 	.ioctl		   = inet6_ioctl,		/* must change  */
 	.listen		   = inet_listen,		/* ok		*/
 	.shutdown	   = inet_shutdown,		/* ok		*/
@@ -602,7 +602,7 @@ const struct proto_ops inet6_dgram_ops = {
 	.socketpair	   = sock_no_socketpair,	/* a do nothing	*/
 	.accept		   = sock_no_accept,		/* a do nothing	*/
 	.getname	   = inet6_getname,
-	.poll_mask	   = udp_poll_mask,		/* ok		*/
+	.poll		   = udp_poll,			/* ok		*/
 	.ioctl		   = inet6_ioctl,		/* must change  */
 	.listen		   = sock_no_listen,		/* ok		*/
 	.shutdown	   = inet_shutdown,		/* ok		*/
@@ -763,6 +763,7 @@ EXPORT_SYMBOL_GPL(ipv6_opt_accepted);
 static struct packet_type ipv6_packet_type __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IPV6),
 	.func = ipv6_rcv,
+	.list_func = ipv6_list_rcv,
 };
 
 static int __init ipv6_packet_init(void)

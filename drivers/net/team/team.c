@@ -41,11 +41,6 @@
 
 #define team_port_exists(dev) (dev->priv_flags & IFF_TEAM_PORT)
 
-static struct team_port *team_port_get_rcu(const struct net_device *dev)
-{
-	return rcu_dereference(dev->rx_handler_data);
-}
-
 static struct team_port *team_port_get_rtnl(const struct net_device *dev)
 {
 	struct team_port *port = rtnl_dereference(dev->rx_handler_data);
@@ -280,7 +275,7 @@ static int __team_options_register(struct team *team,
 	struct team_option **dst_opts;
 	int err;
 
-	dst_opts = kzalloc(sizeof(struct team_option *) * option_count,
+	dst_opts = kcalloc(option_count, sizeof(struct team_option *),
 			   GFP_KERNEL);
 	if (!dst_opts)
 		return -ENOMEM;
@@ -791,7 +786,8 @@ static int team_queue_override_init(struct team *team)
 
 	if (!queue_cnt)
 		return 0;
-	listarr = kmalloc(sizeof(struct list_head) * queue_cnt, GFP_KERNEL);
+	listarr = kmalloc_array(queue_cnt, sizeof(struct list_head),
+				GFP_KERNEL);
 	if (!listarr)
 		return -ENOMEM;
 	team->qom_lists = listarr;
@@ -1706,7 +1702,8 @@ static netdev_tx_t team_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 static u16 team_select_queue(struct net_device *dev, struct sk_buff *skb,
-			     void *accel_priv, select_queue_fallback_t fallback)
+			     struct net_device *sb_dev,
+			     select_queue_fallback_t fallback)
 {
 	/*
 	 * This helper function exists to help dev_pick_tx get the correct

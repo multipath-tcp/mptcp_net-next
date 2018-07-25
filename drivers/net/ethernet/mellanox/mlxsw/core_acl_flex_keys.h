@@ -42,16 +42,20 @@
 
 enum mlxsw_afk_element {
 	MLXSW_AFK_ELEMENT_SRC_SYS_PORT,
-	MLXSW_AFK_ELEMENT_DMAC,
-	MLXSW_AFK_ELEMENT_SMAC,
+	MLXSW_AFK_ELEMENT_DMAC_32_47,
+	MLXSW_AFK_ELEMENT_DMAC_0_31,
+	MLXSW_AFK_ELEMENT_SMAC_32_47,
+	MLXSW_AFK_ELEMENT_SMAC_0_31,
 	MLXSW_AFK_ELEMENT_ETHERTYPE,
 	MLXSW_AFK_ELEMENT_IP_PROTO,
-	MLXSW_AFK_ELEMENT_SRC_IP4,
-	MLXSW_AFK_ELEMENT_DST_IP4,
-	MLXSW_AFK_ELEMENT_SRC_IP6_HI,
-	MLXSW_AFK_ELEMENT_SRC_IP6_LO,
-	MLXSW_AFK_ELEMENT_DST_IP6_HI,
-	MLXSW_AFK_ELEMENT_DST_IP6_LO,
+	MLXSW_AFK_ELEMENT_SRC_IP_96_127,
+	MLXSW_AFK_ELEMENT_SRC_IP_64_95,
+	MLXSW_AFK_ELEMENT_SRC_IP_32_63,
+	MLXSW_AFK_ELEMENT_SRC_IP_0_31,
+	MLXSW_AFK_ELEMENT_DST_IP_96_127,
+	MLXSW_AFK_ELEMENT_DST_IP_64_95,
+	MLXSW_AFK_ELEMENT_DST_IP_32_63,
+	MLXSW_AFK_ELEMENT_DST_IP_0_31,
 	MLXSW_AFK_ELEMENT_DST_L4_PORT,
 	MLXSW_AFK_ELEMENT_SRC_L4_PORT,
 	MLXSW_AFK_ELEMENT_VID,
@@ -99,9 +103,11 @@ struct mlxsw_afk_element_info {
  * define an internal storage geometry.
  */
 static const struct mlxsw_afk_element_info mlxsw_afk_element_infos[] = {
-	MLXSW_AFK_ELEMENT_INFO_U32(SRC_SYS_PORT, 0x00, 16, 16),
-	MLXSW_AFK_ELEMENT_INFO_BUF(DMAC, 0x04, 6),
-	MLXSW_AFK_ELEMENT_INFO_BUF(SMAC, 0x0A, 6),
+	MLXSW_AFK_ELEMENT_INFO_U32(SRC_SYS_PORT, 0x00, 16, 8),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DMAC_32_47, 0x04, 2),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DMAC_0_31, 0x06, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SMAC_32_47, 0x0A, 2),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SMAC_0_31, 0x0C, 4),
 	MLXSW_AFK_ELEMENT_INFO_U32(ETHERTYPE, 0x00, 0, 16),
 	MLXSW_AFK_ELEMENT_INFO_U32(IP_PROTO, 0x10, 0, 8),
 	MLXSW_AFK_ELEMENT_INFO_U32(VID, 0x10, 8, 12),
@@ -112,12 +118,14 @@ static const struct mlxsw_afk_element_info mlxsw_afk_element_infos[] = {
 	MLXSW_AFK_ELEMENT_INFO_U32(IP_TTL_, 0x18, 0, 8),
 	MLXSW_AFK_ELEMENT_INFO_U32(IP_ECN, 0x18, 9, 2),
 	MLXSW_AFK_ELEMENT_INFO_U32(IP_DSCP, 0x18, 11, 6),
-	MLXSW_AFK_ELEMENT_INFO_U32(SRC_IP4, 0x20, 0, 32),
-	MLXSW_AFK_ELEMENT_INFO_U32(DST_IP4, 0x24, 0, 32),
-	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP6_HI, 0x20, 8),
-	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP6_LO, 0x28, 8),
-	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP6_HI, 0x30, 8),
-	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP6_LO, 0x38, 8),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP_96_127, 0x20, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP_64_95, 0x24, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP_32_63, 0x28, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(SRC_IP_0_31, 0x2C, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP_96_127, 0x30, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP_64_95, 0x34, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP_32_63, 0x38, 4),
+	MLXSW_AFK_ELEMENT_INFO_BUF(DST_IP_0_31, 0x3C, 4),
 };
 
 #define MLXSW_AFK_ELEMENT_STORAGE_SIZE 0x40
@@ -208,9 +216,14 @@ mlxsw_afk_element_usage_subset(struct mlxsw_afk_element_usage *elusage_small,
 
 struct mlxsw_afk;
 
+struct mlxsw_afk_ops {
+	const struct mlxsw_afk_block *blocks;
+	unsigned int blocks_count;
+	void (*encode_block)(char *block, int block_index, char *output);
+};
+
 struct mlxsw_afk *mlxsw_afk_create(unsigned int max_blocks,
-				   const struct mlxsw_afk_block *blocks,
-				   unsigned int blocks_count);
+				   const struct mlxsw_afk_ops *ops);
 void mlxsw_afk_destroy(struct mlxsw_afk *mlxsw_afk);
 
 struct mlxsw_afk_key_info;
@@ -243,7 +256,8 @@ void mlxsw_afk_values_add_buf(struct mlxsw_afk_element_values *values,
 			      enum mlxsw_afk_element element,
 			      const char *key_value, const char *mask_value,
 			      unsigned int len);
-void mlxsw_afk_encode(struct mlxsw_afk_key_info *key_info,
+void mlxsw_afk_encode(struct mlxsw_afk *mlxsw_afk,
+		      struct mlxsw_afk_key_info *key_info,
 		      struct mlxsw_afk_element_values *values,
 		      char *key, char *mask);
 

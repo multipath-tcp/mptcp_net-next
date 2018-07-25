@@ -1630,17 +1630,42 @@ static enum dc_status read_hpd_rx_irq_data(
 	struct dc_link *link,
 	union hpd_irq_data *irq_data)
 {
+	static enum dc_status retval;
+
 	/* The HW reads 16 bytes from 200h on HPD,
 	 * but if we get an AUX_DEFER, the HW cannot retry
 	 * and this causes the CTS tests 4.3.2.1 - 3.2.4 to
 	 * fail, so we now explicitly read 6 bytes which is
 	 * the req from the above mentioned test cases.
+	 *
+	 * For DP 1.4 we need to read those from 2002h range.
 	 */
-	return core_link_read_dpcd(
-	link,
-	DP_SINK_COUNT,
-	irq_data->raw,
-	sizeof(union hpd_irq_data));
+	if (link->dpcd_caps.dpcd_rev.raw < DPCD_REV_14)
+		retval = core_link_read_dpcd(
+			link,
+			DP_SINK_COUNT,
+			irq_data->raw,
+			sizeof(union hpd_irq_data));
+	else {
+		/* Read 2 bytes at this location,... */
+		retval = core_link_read_dpcd(
+			link,
+			DP_SINK_COUNT_ESI,
+			irq_data->raw,
+			2);
+
+		if (retval != DC_OK)
+			return retval;
+
+		/* ... then read remaining 4 at the other location */
+		retval = core_link_read_dpcd(
+			link,
+			DP_LANE0_1_STATUS_ESI,
+			&irq_data->raw[2],
+			4);
+	}
+
+	return retval;
 }
 
 static bool allow_hpd_rx_irq(const struct dc_link *link)
@@ -1742,12 +1767,10 @@ static void dp_test_send_link_training(struct dc_link *link)
 	dp_retrain_link_dp_test(link, &link_settings, false);
 }
 
-/* TODO hbr2 compliance eye output is unstable
+/* TODO Raven hbr2 compliance eye output is unstable
  * (toggling on and off) with debugger break
  * This caueses intermittent PHY automation failure
  * Need to look into the root cause */
-static uint8_t force_tps4_for_cp2520 = 1;
-
 static void dp_test_send_phy_test_pattern(struct dc_link *link)
 {
 	union phy_test_pattern dpcd_test_pattern;
@@ -1807,13 +1830,13 @@ static void dp_test_send_phy_test_pattern(struct dc_link *link)
 		break;
 	case PHY_TEST_PATTERN_CP2520_1:
 		/* CP2520 pattern is unstable, temporarily use TPS4 instead */
-		test_pattern = (force_tps4_for_cp2520 == 1) ?
+		test_pattern = (link->dc->caps.force_dp_tps4_for_cp2520 == 1) ?
 				DP_TEST_PATTERN_TRAINING_PATTERN4 :
 				DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE;
 		break;
 	case PHY_TEST_PATTERN_CP2520_2:
 		/* CP2520 pattern is unstable, temporarily use TPS4 instead */
-		test_pattern = (force_tps4_for_cp2520 == 1) ?
+		test_pattern = (link->dc->caps.force_dp_tps4_for_cp2520 == 1) ?
 				DP_TEST_PATTERN_TRAINING_PATTERN4 :
 				DP_TEST_PATTERN_HBR2_COMPLIANCE_EYE;
 		break;
@@ -2278,7 +2301,7 @@ static void dp_wa_power_up_0010FA(struct dc_link *link, uint8_t *dpcd_data,
 
 static bool retrieve_link_cap(struct dc_link *link)
 {
-	uint8_t dpcd_data[DP_TRAINING_AUX_RD_INTERVAL - DP_DPCD_REV + 1];
+	uint8_t dpcd_data[DP_ADAPTER_CAP - DP_DPCD_REV + 1];
 
 	union down_stream_port_count down_strm_port_count;
 	union edp_configuration_cap edp_config_cap;

@@ -927,7 +927,6 @@ tx_err:
 static netdev_tx_t ip6erspan_tunnel_xmit(struct sk_buff *skb,
 					 struct net_device *dev)
 {
-	struct ipv6hdr *ipv6h = ipv6_hdr(skb);
 	struct ip6_tnl *t = netdev_priv(dev);
 	struct dst_entry *dst = skb_dst(skb);
 	struct net_device_stats *stats;
@@ -990,6 +989,8 @@ static netdev_tx_t ip6erspan_tunnel_xmit(struct sk_buff *skb,
 		fl6.flowi6_uid = sock_net_uid(dev_net(dev), NULL);
 
 		dsfield = key->tos;
+		if (!(tun_info->key.tun_flags & TUNNEL_ERSPAN_OPT))
+			goto tx_err;
 		md = ip_tunnel_info_opts(tun_info);
 		if (!md)
 			goto tx_err;
@@ -1010,6 +1011,8 @@ static netdev_tx_t ip6erspan_tunnel_xmit(struct sk_buff *skb,
 			goto tx_err;
 		}
 	} else {
+		struct ipv6hdr *ipv6h = ipv6_hdr(skb);
+
 		switch (skb->protocol) {
 		case htons(ETH_P_IP):
 			memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));

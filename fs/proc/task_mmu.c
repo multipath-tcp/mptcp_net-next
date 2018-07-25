@@ -831,7 +831,8 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 		SEQ_PUT_DEC(" kB\nSwap:           ", mss->swap);
 		SEQ_PUT_DEC(" kB\nSwapPss:        ",
 						mss->swap_pss >> PSS_SHIFT);
-		SEQ_PUT_DEC(" kB\nLocked:         ", mss->pss >> PSS_SHIFT);
+		SEQ_PUT_DEC(" kB\nLocked:         ",
+						mss->pss_locked >> PSS_SHIFT);
 		seq_puts(m, " kB\n");
 	}
 	if (!rollup_mode) {
@@ -1259,8 +1260,9 @@ static pagemap_entry_t pte_to_pagemap_entry(struct pagemapread *pm,
 		if (pte_swp_soft_dirty(pte))
 			flags |= PM_SOFT_DIRTY;
 		entry = pte_to_swp_entry(pte);
-		frame = swp_type(entry) |
-			(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
+		if (pm->show_pfn)
+			frame = swp_type(entry) |
+				(swp_offset(entry) << MAX_SWAPFILES_SHIFT);
 		flags |= PM_SWAP;
 		if (is_migration_entry(entry))
 			page = migration_entry_to_page(entry);
@@ -1311,11 +1313,14 @@ static int pagemap_pmd_range(pmd_t *pmdp, unsigned long addr, unsigned long end,
 #ifdef CONFIG_ARCH_ENABLE_THP_MIGRATION
 		else if (is_swap_pmd(pmd)) {
 			swp_entry_t entry = pmd_to_swp_entry(pmd);
-			unsigned long offset = swp_offset(entry);
+			unsigned long offset;
 
-			offset += (addr & ~PMD_MASK) >> PAGE_SHIFT;
-			frame = swp_type(entry) |
-				(offset << MAX_SWAPFILES_SHIFT);
+			if (pm->show_pfn) {
+				offset = swp_offset(entry) +
+					((addr & ~PMD_MASK) >> PAGE_SHIFT);
+				frame = swp_type(entry) |
+					(offset << MAX_SWAPFILES_SHIFT);
+			}
 			flags |= PM_SWAP;
 			if (pmd_swp_soft_dirty(pmd))
 				flags |= PM_SOFT_DIRTY;
@@ -1333,10 +1338,12 @@ static int pagemap_pmd_range(pmd_t *pmdp, unsigned long addr, unsigned long end,
 			err = add_to_pagemap(addr, &pme, pm);
 			if (err)
 				break;
-			if (pm->show_pfn && (flags & PM_PRESENT))
-				frame++;
-			else if (flags & PM_SWAP)
-				frame += (1 << MAX_SWAPFILES_SHIFT);
+			if (pm->show_pfn) {
+				if (flags & PM_PRESENT)
+					frame++;
+				else if (flags & PM_SWAP)
+					frame += (1 << MAX_SWAPFILES_SHIFT);
+			}
 		}
 		spin_unlock(ptl);
 		return err;
@@ -1467,7 +1474,7 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 	pm.show_pfn = file_ns_capable(file, &init_user_ns, CAP_SYS_ADMIN);
 
 	pm.len = (PAGEMAP_WALK_SIZE >> PAGE_SHIFT);
-	pm.buffer = kmalloc(pm.len * PM_ENTRY_BYTES, GFP_KERNEL);
+	pm.buffer = kmalloc_array(pm.len, PM_ENTRY_BYTES, GFP_KERNEL);
 	ret = -ENOMEM;
 	if (!pm.buffer)
 		goto out_mm;

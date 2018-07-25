@@ -981,18 +981,18 @@
  *	only the %NL80211_ATTR_IE data is used and updated with this command.
  *
  * @NL80211_CMD_SET_PMK: For offloaded 4-Way handshake, set the PMK or PMK-R0
- *	for the given authenticator address (specified with &NL80211_ATTR_MAC).
- *	When &NL80211_ATTR_PMKR0_NAME is set, &NL80211_ATTR_PMK specifies the
+ *	for the given authenticator address (specified with %NL80211_ATTR_MAC).
+ *	When %NL80211_ATTR_PMKR0_NAME is set, %NL80211_ATTR_PMK specifies the
  *	PMK-R0, otherwise it specifies the PMK.
  * @NL80211_CMD_DEL_PMK: For offloaded 4-Way handshake, delete the previously
  *	configured PMK for the authenticator address identified by
- *	&NL80211_ATTR_MAC.
+ *	%NL80211_ATTR_MAC.
  * @NL80211_CMD_PORT_AUTHORIZED: An event that indicates that the 4 way
  *	handshake was completed successfully by the driver. The BSSID is
- *	specified with &NL80211_ATTR_MAC. Drivers that support 4 way handshake
+ *	specified with %NL80211_ATTR_MAC. Drivers that support 4 way handshake
  *	offload should send this event after indicating 802.11 association with
- *	&NL80211_CMD_CONNECT or &NL80211_CMD_ROAM. If the 4 way handshake failed
- *	&NL80211_CMD_DISCONNECT should be indicated instead.
+ *	%NL80211_CMD_CONNECT or %NL80211_CMD_ROAM. If the 4 way handshake failed
+ *	%NL80211_CMD_DISCONNECT should be indicated instead.
  *
  * @NL80211_CMD_CONTROL_PORT_FRAME: Control Port (e.g. PAE) frame TX request
  *	and RX notification.  This command is used both as a request to transmit
@@ -1029,9 +1029,9 @@
  *	initiated the connection through the connect request.
  *
  * @NL80211_CMD_STA_OPMODE_CHANGED: An event that notify station's
- *	ht opmode or vht opmode changes using any of &NL80211_ATTR_SMPS_MODE,
- *	&NL80211_ATTR_CHANNEL_WIDTH,&NL80211_ATTR_NSS attributes with its
- *	address(specified in &NL80211_ATTR_MAC).
+ *	ht opmode or vht opmode changes using any of %NL80211_ATTR_SMPS_MODE,
+ *	%NL80211_ATTR_CHANNEL_WIDTH,%NL80211_ATTR_NSS attributes with its
+ *	address(specified in %NL80211_ATTR_MAC).
  *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
@@ -2218,7 +2218,7 @@ enum nl80211_commands {
  * @NL80211_ATTR_EXTERNAL_AUTH_ACTION: Identify the requested external
  *     authentication operation (u32 attribute with an
  *     &enum nl80211_external_auth_action value). This is used with the
- *     &NL80211_CMD_EXTERNAL_AUTH request event.
+ *     %NL80211_CMD_EXTERNAL_AUTH request event.
  * @NL80211_ATTR_EXTERNAL_AUTH_SUPPORT: Flag attribute indicating that the user
  *     space supports external authentication. This attribute shall be used
  *     only with %NL80211_CMD_CONNECT request. The driver may offload
@@ -2237,6 +2237,9 @@ enum nl80211_commands {
  *      enforced.
  * @NL80211_ATTR_TXQ_QUANTUM: TXQ scheduler quantum (bytes). Number of bytes
  *      a flow is assigned on each round of the DRR scheduler.
+ * @NL80211_ATTR_HE_CAPABILITY: HE Capability information element (from
+ *	association request when used with NL80211_CMD_NEW_STATION). Can be set
+ *	only if %NL80211_STA_FLAG_WME is set.
  *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
@@ -2677,6 +2680,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_TXQ_MEMORY_LIMIT,
 	NL80211_ATTR_TXQ_QUANTUM,
 
+	NL80211_ATTR_HE_CAPABILITY,
+
 	/* add attributes here, update the policy in nl80211.c */
 
 	__NL80211_ATTR_AFTER_LAST,
@@ -2726,7 +2731,8 @@ enum nl80211_attrs {
 #define NL80211_TKIP_DATA_OFFSET_RX_MIC_KEY	24
 #define NL80211_HT_CAPABILITY_LEN		26
 #define NL80211_VHT_CAPABILITY_LEN		12
-
+#define NL80211_HE_MIN_CAPABILITY_LEN           16
+#define NL80211_HE_MAX_CAPABILITY_LEN           51
 #define NL80211_MAX_NR_CIPHER_SUITES		5
 #define NL80211_MAX_NR_AKM_SUITES		2
 
@@ -2854,6 +2860,38 @@ struct nl80211_sta_flag_update {
 } __attribute__((packed));
 
 /**
+ * enum nl80211_he_gi - HE guard interval
+ * @NL80211_RATE_INFO_HE_GI_0_8: 0.8 usec
+ * @NL80211_RATE_INFO_HE_GI_1_6: 1.6 usec
+ * @NL80211_RATE_INFO_HE_GI_3_2: 3.2 usec
+ */
+enum nl80211_he_gi {
+	NL80211_RATE_INFO_HE_GI_0_8,
+	NL80211_RATE_INFO_HE_GI_1_6,
+	NL80211_RATE_INFO_HE_GI_3_2,
+};
+
+/**
+ * enum nl80211_he_ru_alloc - HE RU allocation values
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_26: 26-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_52: 52-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_106: 106-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_242: 242-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_484: 484-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_996: 996-tone RU allocation
+ * @NL80211_RATE_INFO_HE_RU_ALLOC_2x996: 2x996-tone RU allocation
+ */
+enum nl80211_he_ru_alloc {
+	NL80211_RATE_INFO_HE_RU_ALLOC_26,
+	NL80211_RATE_INFO_HE_RU_ALLOC_52,
+	NL80211_RATE_INFO_HE_RU_ALLOC_106,
+	NL80211_RATE_INFO_HE_RU_ALLOC_242,
+	NL80211_RATE_INFO_HE_RU_ALLOC_484,
+	NL80211_RATE_INFO_HE_RU_ALLOC_996,
+	NL80211_RATE_INFO_HE_RU_ALLOC_2x996,
+};
+
+/**
  * enum nl80211_rate_info - bitrate information
  *
  * These attribute types are used with %NL80211_STA_INFO_TXRATE
@@ -2885,6 +2923,13 @@ struct nl80211_sta_flag_update {
  * @NL80211_RATE_INFO_5_MHZ_WIDTH: 5 MHz width - note that this is
  *	a legacy rate and will be reported as the actual bitrate, i.e.
  *	a quarter of the base (20 MHz) rate
+ * @NL80211_RATE_INFO_HE_MCS: HE MCS index (u8, 0-11)
+ * @NL80211_RATE_INFO_HE_NSS: HE NSS value (u8, 1-8)
+ * @NL80211_RATE_INFO_HE_GI: HE guard interval identifier
+ *	(u8, see &enum nl80211_he_gi)
+ * @NL80211_RATE_INFO_HE_DCM: HE DCM value (u8, 0/1)
+ * @NL80211_RATE_INFO_RU_ALLOC: HE RU allocation, if not present then
+ *	non-OFDMA was used (u8, see &enum nl80211_he_ru_alloc)
  * @__NL80211_RATE_INFO_AFTER_LAST: internal use
  */
 enum nl80211_rate_info {
@@ -2901,6 +2946,11 @@ enum nl80211_rate_info {
 	NL80211_RATE_INFO_160_MHZ_WIDTH,
 	NL80211_RATE_INFO_10_MHZ_WIDTH,
 	NL80211_RATE_INFO_5_MHZ_WIDTH,
+	NL80211_RATE_INFO_HE_MCS,
+	NL80211_RATE_INFO_HE_NSS,
+	NL80211_RATE_INFO_HE_GI,
+	NL80211_RATE_INFO_HE_DCM,
+	NL80211_RATE_INFO_HE_RU_ALLOC,
 
 	/* keep last */
 	__NL80211_RATE_INFO_AFTER_LAST,
@@ -3167,6 +3217,38 @@ enum nl80211_mpath_info {
 };
 
 /**
+ * enum nl80211_band_iftype_attr - Interface type data attributes
+ *
+ * @__NL80211_BAND_IFTYPE_ATTR_INVALID: attribute number 0 is reserved
+ * @NL80211_BAND_IFTYPE_ATTR_IFTYPES: nested attribute containing a flag attribute
+ *     for each interface type that supports the band data
+ * @NL80211_BAND_IFTYPE_ATTR_HE_CAP_MAC: HE MAC capabilities as in HE
+ *     capabilities IE
+ * @NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY: HE PHY capabilities as in HE
+ *     capabilities IE
+ * @NL80211_BAND_IFTYPE_ATTR_HE_CAP_MCS_SET: HE supported NSS/MCS as in HE
+ *     capabilities IE
+ * @NL80211_BAND_IFTYPE_ATTR_HE_CAP_PPE: HE PPE thresholds information as
+ *     defined in HE capabilities IE
+ * @NL80211_BAND_IFTYPE_ATTR_MAX: highest band HE capability attribute currently
+ *     defined
+ * @__NL80211_BAND_IFTYPE_ATTR_AFTER_LAST: internal use
+ */
+enum nl80211_band_iftype_attr {
+	__NL80211_BAND_IFTYPE_ATTR_INVALID,
+
+	NL80211_BAND_IFTYPE_ATTR_IFTYPES,
+	NL80211_BAND_IFTYPE_ATTR_HE_CAP_MAC,
+	NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY,
+	NL80211_BAND_IFTYPE_ATTR_HE_CAP_MCS_SET,
+	NL80211_BAND_IFTYPE_ATTR_HE_CAP_PPE,
+
+	/* keep last */
+	__NL80211_BAND_IFTYPE_ATTR_AFTER_LAST,
+	NL80211_BAND_IFTYPE_ATTR_MAX = __NL80211_BAND_IFTYPE_ATTR_AFTER_LAST - 1
+};
+
+/**
  * enum nl80211_band_attr - band attributes
  * @__NL80211_BAND_ATTR_INVALID: attribute number 0 is reserved
  * @NL80211_BAND_ATTR_FREQS: supported frequencies in this band,
@@ -3181,6 +3263,8 @@ enum nl80211_mpath_info {
  * @NL80211_BAND_ATTR_VHT_MCS_SET: 32-byte attribute containing the MCS set as
  *	defined in 802.11ac
  * @NL80211_BAND_ATTR_VHT_CAPA: VHT capabilities, as in the HT information IE
+ * @NL80211_BAND_ATTR_IFTYPE_DATA: nested array attribute, with each entry using
+ *	attributes from &enum nl80211_band_iftype_attr
  * @NL80211_BAND_ATTR_MAX: highest band attribute currently defined
  * @__NL80211_BAND_ATTR_AFTER_LAST: internal use
  */
@@ -3196,6 +3280,7 @@ enum nl80211_band_attr {
 
 	NL80211_BAND_ATTR_VHT_MCS_SET,
 	NL80211_BAND_ATTR_VHT_CAPA,
+	NL80211_BAND_ATTR_IFTYPE_DATA,
 
 	/* keep last */
 	__NL80211_BAND_ATTR_AFTER_LAST,
@@ -3491,7 +3576,7 @@ enum nl80211_sched_scan_match_attr {
  * @NL80211_RRF_AUTO_BW: maximum available bandwidth should be calculated
  *	base on contiguous rules and wider channels will be allowed to cross
  *	multiple contiguous/overlapping frequency ranges.
- * @NL80211_RRF_IR_CONCURRENT: See &NL80211_FREQUENCY_ATTR_IR_CONCURRENT
+ * @NL80211_RRF_IR_CONCURRENT: See %NL80211_FREQUENCY_ATTR_IR_CONCURRENT
  * @NL80211_RRF_NO_HT40MINUS: channels can't be used in HT40- operation
  * @NL80211_RRF_NO_HT40PLUS: channels can't be used in HT40+ operation
  * @NL80211_RRF_NO_80MHZ: 80MHz operation not allowed
@@ -5133,6 +5218,11 @@ enum nl80211_feature_flags {
  *	support to nl80211.
  * @NL80211_EXT_FEATURE_TXQS: Driver supports FQ-CoDel-enabled intermediate
  *      TXQs.
+ * @NL80211_EXT_FEATURE_SCAN_RANDOM_SN: Driver/device supports randomizing the
+ *	SN in probe request frames if requested by %NL80211_SCAN_FLAG_RANDOM_SN.
+ * @NL80211_EXT_FEATURE_SCAN_MIN_PREQ_CONTENT: Driver/device can omit all data
+ *	except for supported rates from the probe request content if requested
+ *	by the %NL80211_SCAN_FLAG_MIN_PREQ_CONTENT flag.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -5167,6 +5257,8 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211,
 	NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT,
 	NL80211_EXT_FEATURE_TXQS,
+	NL80211_EXT_FEATURE_SCAN_RANDOM_SN,
+	NL80211_EXT_FEATURE_SCAN_MIN_PREQ_CONTENT,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
@@ -5272,6 +5364,12 @@ enum nl80211_timeout_reason {
  *	possible scan results. This flag hints the driver to use the best
  *	possible scan configuration to improve the accuracy in scanning.
  *	Latency and power use may get impacted with this flag.
+ * @NL80211_SCAN_FLAG_RANDOM_SN: randomize the sequence number in probe
+ *	request frames from this scan to avoid correlation/tracking being
+ *	possible.
+ * @NL80211_SCAN_FLAG_MIN_PREQ_CONTENT: minimize probe request content to
+ *	only have supported rates and no additional capabilities (unless
+ *	added by userspace explicitly.)
  */
 enum nl80211_scan_flags {
 	NL80211_SCAN_FLAG_LOW_PRIORITY				= 1<<0,
@@ -5285,6 +5383,8 @@ enum nl80211_scan_flags {
 	NL80211_SCAN_FLAG_LOW_SPAN				= 1<<8,
 	NL80211_SCAN_FLAG_LOW_POWER				= 1<<9,
 	NL80211_SCAN_FLAG_HIGH_ACCURACY				= 1<<10,
+	NL80211_SCAN_FLAG_RANDOM_SN				= 1<<11,
+	NL80211_SCAN_FLAG_MIN_PREQ_CONTENT			= 1<<12,
 };
 
 /**
@@ -5643,11 +5743,11 @@ enum nl80211_nan_func_attributes {
  * @NL80211_NAN_SRF_INCLUDE: present if the include bit of the SRF set.
  *	This is a flag.
  * @NL80211_NAN_SRF_BF: Bloom Filter. Present if and only if
- *	&NL80211_NAN_SRF_MAC_ADDRS isn't present. This attribute is binary.
+ *	%NL80211_NAN_SRF_MAC_ADDRS isn't present. This attribute is binary.
  * @NL80211_NAN_SRF_BF_IDX: index of the Bloom Filter. Mandatory if
- *	&NL80211_NAN_SRF_BF is present. This is a u8.
+ *	%NL80211_NAN_SRF_BF is present. This is a u8.
  * @NL80211_NAN_SRF_MAC_ADDRS: list of MAC addresses for the SRF. Present if
- *	and only if &NL80211_NAN_SRF_BF isn't present. This is a nested
+ *	and only if %NL80211_NAN_SRF_BF isn't present. This is a nested
  *	attribute. Each nested attribute is a MAC address.
  * @NUM_NL80211_NAN_SRF_ATTR: internal
  * @NL80211_NAN_SRF_ATTR_MAX: highest NAN SRF attribute

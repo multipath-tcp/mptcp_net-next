@@ -607,7 +607,8 @@ static u16 tun_ebpf_select_queue(struct tun_struct *tun, struct sk_buff *skb)
 }
 
 static u16 tun_select_queue(struct net_device *dev, struct sk_buff *skb,
-			    void *accel_priv, select_queue_fallback_t fallback)
+			    struct net_device *sb_dev,
+			    select_queue_fallback_t fallback)
 {
 	struct tun_struct *tun = netdev_priv(dev);
 	u16 ret;
@@ -1268,7 +1269,6 @@ static int tun_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 		return tun_xdp_set(dev, xdp->prog, xdp->extack);
 	case XDP_QUERY_PROG:
 		xdp->prog_id = tun_xdp_query(dev);
-		xdp->prog_attached = !!xdp->prog_id;
 		return 0;
 	default:
 		return -EINVAL;
@@ -1688,7 +1688,7 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 		case XDP_TX:
 			get_page(alloc_frag->page);
 			alloc_frag->offset += buflen;
-			if (tun_xdp_tx(tun->dev, &xdp))
+			if (tun_xdp_tx(tun->dev, &xdp) < 0)
 				goto err_redirect;
 			rcu_read_unlock();
 			local_bh_enable();
@@ -2089,7 +2089,8 @@ static ssize_t tun_put_user(struct tun_struct *tun,
 			return -EINVAL;
 
 		if (virtio_net_hdr_from_skb(skb, &gso,
-					    tun_is_little_endian(tun), true)) {
+					    tun_is_little_endian(tun), true,
+					    vlan_hlen)) {
 			struct skb_shared_info *sinfo = skb_shinfo(skb);
 			pr_err("unexpected GSO type: "
 			       "0x%x, gso_size %d, hdr_len %d\n",

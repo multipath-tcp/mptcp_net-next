@@ -654,8 +654,7 @@ qtnf_disconnect(struct wiphy *wiphy, struct net_device *dev,
 	vif = qtnf_mac_get_base_vif(mac);
 	if (!vif) {
 		pr_err("MAC%u: primary VIF is not configured\n", mac->macid);
-		ret = -EFAULT;
-		goto out;
+		return -EFAULT;
 	}
 
 	if (vif->wdev.iftype != NL80211_IFTYPE_STATION) {
@@ -1013,6 +1012,9 @@ int qtnf_wiphy_register(struct qtnf_hw_info *hw_info, struct qtnf_wmac *mac)
 
 	if (hw_info->hw_capab & QLINK_HW_CAPAB_STA_INACT_TIMEOUT)
 		wiphy->features |= NL80211_FEATURE_INACTIVITY_TIMER;
+
+	if (hw_info->hw_capab & QLINK_HW_CAPAB_SCAN_RANDOM_MAC_ADDR)
+		wiphy->features |= NL80211_FEATURE_SCAN_RANDOM_MAC_ADDR;
 
 	if (hw_info->hw_capab & QLINK_HW_CAPAB_REG_UPDATE) {
 		wiphy->regulatory_flags |= REGULATORY_STRICT_REG |

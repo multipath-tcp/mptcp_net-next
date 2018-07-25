@@ -24,7 +24,6 @@
 #include <linux/rtnetlink.h>
 
 #include <net/netfilter/nf_conntrack.h>
-#include <net/netfilter/nf_conntrack_l3proto.h>
 #include <net/netfilter/nf_conntrack_l4proto.h>
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <net/netfilter/nf_conntrack_core.h>
@@ -193,8 +192,7 @@ void nf_conntrack_helper_put(struct nf_conntrack_helper *helper)
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_put);
 
 struct nf_conn_help *
-nf_ct_helper_ext_add(struct nf_conn *ct,
-		     struct nf_conntrack_helper *helper, gfp_t gfp)
+nf_ct_helper_ext_add(struct nf_conn *ct, gfp_t gfp)
 {
 	struct nf_conn_help *help;
 
@@ -263,7 +261,7 @@ int __nf_ct_try_assign_helper(struct nf_conn *ct, struct nf_conn *tmpl,
 	}
 
 	if (help == NULL) {
-		help = nf_ct_helper_ext_add(ct, helper, flags);
+		help = nf_ct_helper_ext_add(ct, flags);
 		if (help == NULL)
 			return -ENOMEM;
 	} else {
@@ -465,6 +463,11 @@ void nf_conntrack_helper_unregister(struct nf_conntrack_helper *me)
 
 	nf_ct_expect_iterate_destroy(expect_iter_me, NULL);
 	nf_ct_iterate_destroy(unhelp, me);
+
+	/* Maybe someone has gotten the helper already when unhelp above.
+	 * So need to wait it.
+	 */
+	synchronize_rcu();
 }
 EXPORT_SYMBOL_GPL(nf_conntrack_helper_unregister);
 

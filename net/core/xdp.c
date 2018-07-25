@@ -3,8 +3,11 @@
  * Copyright (c) 2017 Jesper Dangaard Brouer, Red Hat Inc.
  * Released under terms in GPL version 2.  See COPYING.
  */
+#include <linux/bpf.h>
+#include <linux/filter.h>
 #include <linux/types.h>
 #include <linux/mm.h>
+#include <linux/netdevice.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
 #include <linux/rhashtable.h>
@@ -45,8 +48,8 @@ static u32 xdp_mem_id_hashfn(const void *data, u32 len, u32 seed)
 	BUILD_BUG_ON(FIELD_SIZEOF(struct xdp_mem_allocator, mem.id)
 		     != sizeof(u32));
 
-	/* Use cyclic increasing ID as direct hash key, see rht_bucket_index */
-	return key << RHT_HASH_RESERVED_SPACE;
+	/* Use cyclic increasing ID as direct hash key */
+	return key;
 }
 
 static int xdp_mem_id_cmp(struct rhashtable_compare_arg *arg,
@@ -370,3 +373,34 @@ void xdp_return_buff(struct xdp_buff *xdp)
 	__xdp_return(xdp->data, &xdp->rxq->mem, true, xdp->handle);
 }
 EXPORT_SYMBOL_GPL(xdp_return_buff);
+
+int xdp_attachment_query(struct xdp_attachment_info *info,
+			 struct netdev_bpf *bpf)
+{
+	bpf->prog_id = info->prog ? info->prog->aux->id : 0;
+	bpf->prog_flags = info->prog ? info->flags : 0;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(xdp_attachment_query);
+
+bool xdp_attachment_flags_ok(struct xdp_attachment_info *info,
+			     struct netdev_bpf *bpf)
+{
+	if (info->prog && (bpf->flags ^ info->flags) & XDP_FLAGS_MODES) {
+		NL_SET_ERR_MSG(bpf->extack,
+			       "program loaded with different flags");
+		return false;
+	}
+	return true;
+}
+EXPORT_SYMBOL_GPL(xdp_attachment_flags_ok);
+
+void xdp_attachment_setup(struct xdp_attachment_info *info,
+			  struct netdev_bpf *bpf)
+{
+	if (info->prog)
+		bpf_prog_put(info->prog);
+	info->prog = bpf->prog;
+	info->flags = bpf->flags;
+}
+EXPORT_SYMBOL_GPL(xdp_attachment_setup);

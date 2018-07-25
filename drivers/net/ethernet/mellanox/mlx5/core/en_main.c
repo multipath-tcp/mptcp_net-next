@@ -270,12 +270,9 @@ void mlx5e_update_stats_work(struct work_struct *work)
 	struct delayed_work *dwork = to_delayed_work(work);
 	struct mlx5e_priv *priv = container_of(dwork, struct mlx5e_priv,
 					       update_stats_work);
+
 	mutex_lock(&priv->state_lock);
-	if (test_bit(MLX5E_STATE_OPENED, &priv->state)) {
-		priv->profile->update_stats(priv);
-		queue_delayed_work(priv->wq, dwork,
-				   msecs_to_jiffies(MLX5E_UPDATE_STATS_INTERVAL));
-	}
+	priv->profile->update_stats(priv);
 	mutex_unlock(&priv->state_lock);
 }
 
@@ -352,8 +349,9 @@ static int mlx5e_rq_alloc_mpwqe_info(struct mlx5e_rq *rq,
 {
 	int wq_sz = mlx5_wq_ll_get_size(&rq->mpwqe.wq);
 
-	rq->mpwqe.info = kzalloc_node(wq_sz * sizeof(*rq->mpwqe.info),
-				      GFP_KERNEL, cpu_to_node(c->cpu));
+	rq->mpwqe.info = kvzalloc_node(array_size(wq_sz,
+						  sizeof(*rq->mpwqe.info)),
+				       GFP_KERNEL, cpu_to_node(c->cpu));
 	if (!rq->mpwqe.info)
 		return -ENOMEM;
 
@@ -448,7 +446,7 @@ static int mlx5e_init_di_list(struct mlx5e_rq *rq,
 {
 	int len = wq_sz << rq->wqe.info.log_num_frags;
 
-	rq->wqe.di = kvzalloc_node(len * sizeof(*rq->wqe.di),
+	rq->wqe.di = kvzalloc_node(array_size(len, sizeof(*rq->wqe.di)),
 				   GFP_KERNEL, cpu_to_node(cpu));
 	if (!rq->wqe.di)
 		return -ENOMEM;
@@ -563,8 +561,8 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 
 		rq->wqe.info = rqp->frags_info;
 		rq->wqe.frags =
-			kvzalloc_node((wq_sz << rq->wqe.info.log_num_frags) *
-				      sizeof(*rq->wqe.frags),
+			kvzalloc_node(array_size(sizeof(*rq->wqe.frags),
+					(wq_sz << rq->wqe.info.log_num_frags)),
 				      GFP_KERNEL, cpu_to_node(c->cpu));
 		if (!rq->wqe.frags) {
 			err = -ENOMEM;
@@ -670,7 +668,7 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 err_free:
 	switch (rq->wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
-		kfree(rq->mpwqe.info);
+		kvfree(rq->mpwqe.info);
 		mlx5_core_destroy_mkey(mdev, &rq->umr_mkey);
 		break;
 	default: /* MLX5_WQ_TYPE_CYCLIC */
@@ -702,7 +700,7 @@ static void mlx5e_free_rq(struct mlx5e_rq *rq)
 
 	switch (rq->wq_type) {
 	case MLX5_WQ_TYPE_LINKED_LIST_STRIDING_RQ:
-		kfree(rq->mpwqe.info);
+		kvfree(rq->mpwqe.info);
 		mlx5_core_destroy_mkey(rq->mdev, &rq->umr_mkey);
 		break;
 	default: /* MLX5_WQ_TYPE_CYCLIC */
@@ -965,15 +963,15 @@ static void mlx5e_close_rq(struct mlx5e_rq *rq)
 
 static void mlx5e_free_xdpsq_db(struct mlx5e_xdpsq *sq)
 {
-	kfree(sq->db.di);
+	kvfree(sq->db.di);
 }
 
 static int mlx5e_alloc_xdpsq_db(struct mlx5e_xdpsq *sq, int numa)
 {
 	int wq_sz = mlx5_wq_cyc_get_size(&sq->wq);
 
-	sq->db.di = kzalloc_node(sizeof(*sq->db.di) * wq_sz,
-				     GFP_KERNEL, numa);
+	sq->db.di = kvzalloc_node(array_size(wq_sz, sizeof(*sq->db.di)),
+				  GFP_KERNEL, numa);
 	if (!sq->db.di) {
 		mlx5e_free_xdpsq_db(sq);
 		return -ENOMEM;
@@ -1024,15 +1022,16 @@ static void mlx5e_free_xdpsq(struct mlx5e_xdpsq *sq)
 
 static void mlx5e_free_icosq_db(struct mlx5e_icosq *sq)
 {
-	kfree(sq->db.ico_wqe);
+	kvfree(sq->db.ico_wqe);
 }
 
 static int mlx5e_alloc_icosq_db(struct mlx5e_icosq *sq, int numa)
 {
 	u8 wq_sz = mlx5_wq_cyc_get_size(&sq->wq);
 
-	sq->db.ico_wqe = kzalloc_node(sizeof(*sq->db.ico_wqe) * wq_sz,
-				      GFP_KERNEL, numa);
+	sq->db.ico_wqe = kvzalloc_node(array_size(wq_sz,
+						  sizeof(*sq->db.ico_wqe)),
+				       GFP_KERNEL, numa);
 	if (!sq->db.ico_wqe)
 		return -ENOMEM;
 
@@ -1077,8 +1076,8 @@ static void mlx5e_free_icosq(struct mlx5e_icosq *sq)
 
 static void mlx5e_free_txqsq_db(struct mlx5e_txqsq *sq)
 {
-	kfree(sq->db.wqe_info);
-	kfree(sq->db.dma_fifo);
+	kvfree(sq->db.wqe_info);
+	kvfree(sq->db.dma_fifo);
 }
 
 static int mlx5e_alloc_txqsq_db(struct mlx5e_txqsq *sq, int numa)
@@ -1086,10 +1085,12 @@ static int mlx5e_alloc_txqsq_db(struct mlx5e_txqsq *sq, int numa)
 	int wq_sz = mlx5_wq_cyc_get_size(&sq->wq);
 	int df_sz = wq_sz * MLX5_SEND_WQEBB_NUM_DS;
 
-	sq->db.dma_fifo = kzalloc_node(df_sz * sizeof(*sq->db.dma_fifo),
-					   GFP_KERNEL, numa);
-	sq->db.wqe_info = kzalloc_node(wq_sz * sizeof(*sq->db.wqe_info),
-					   GFP_KERNEL, numa);
+	sq->db.dma_fifo = kvzalloc_node(array_size(df_sz,
+						   sizeof(*sq->db.dma_fifo)),
+					GFP_KERNEL, numa);
+	sq->db.wqe_info = kvzalloc_node(array_size(wq_sz,
+						   sizeof(*sq->db.wqe_info)),
+					GFP_KERNEL, numa);
 	if (!sq->db.dma_fifo || !sq->db.wqe_info) {
 		mlx5e_free_txqsq_db(sq);
 		return -ENOMEM;
@@ -1893,7 +1894,7 @@ static int mlx5e_open_channel(struct mlx5e_priv *priv, int ix,
 	int err;
 	int eqn;
 
-	c = kzalloc_node(sizeof(*c), GFP_KERNEL, cpu_to_node(cpu));
+	c = kvzalloc_node(sizeof(*c), GFP_KERNEL, cpu_to_node(cpu));
 	if (!c)
 		return -ENOMEM;
 
@@ -1979,7 +1980,7 @@ err_close_icosq_cq:
 
 err_napi_del:
 	netif_napi_del(&c->napi);
-	kfree(c);
+	kvfree(c);
 
 	return err;
 }
@@ -2018,7 +2019,7 @@ static void mlx5e_close_channel(struct mlx5e_channel *c)
 	mlx5e_close_cq(&c->icosq.cq);
 	netif_napi_del(&c->napi);
 
-	kfree(c);
+	kvfree(c);
 }
 
 #define DEFAULT_FRAG_SIZE (2048)
@@ -2276,7 +2277,7 @@ int mlx5e_open_channels(struct mlx5e_priv *priv,
 	chs->num = chs->params.num_channels;
 
 	chs->c = kcalloc(chs->num, sizeof(struct mlx5e_channel *), GFP_KERNEL);
-	cparam = kzalloc(sizeof(struct mlx5e_channel_param), GFP_KERNEL);
+	cparam = kvzalloc(sizeof(struct mlx5e_channel_param), GFP_KERNEL);
 	if (!chs->c || !cparam)
 		goto err_free;
 
@@ -2287,7 +2288,7 @@ int mlx5e_open_channels(struct mlx5e_priv *priv,
 			goto err_close_channels;
 	}
 
-	kfree(cparam);
+	kvfree(cparam);
 	return 0;
 
 err_close_channels:
@@ -2296,7 +2297,7 @@ err_close_channels:
 
 err_free:
 	kfree(chs->c);
-	kfree(cparam);
+	kvfree(cparam);
 	chs->num = 0;
 	return err;
 }
@@ -2846,7 +2847,7 @@ void mlx5e_activate_priv_channels(struct mlx5e_priv *priv)
 	mlx5e_activate_channels(&priv->channels);
 	netif_tx_start_all_queues(priv->netdev);
 
-	if (MLX5_VPORT_MANAGER(priv->mdev))
+	if (MLX5_ESWITCH_MANAGER(priv->mdev))
 		mlx5e_add_sqs_fwd_rules(priv);
 
 	mlx5e_wait_channels_min_rx_wqes(&priv->channels);
@@ -2857,7 +2858,7 @@ void mlx5e_deactivate_priv_channels(struct mlx5e_priv *priv)
 {
 	mlx5e_redirect_rqts_to_drop(priv);
 
-	if (MLX5_VPORT_MANAGER(priv->mdev))
+	if (MLX5_ESWITCH_MANAGER(priv->mdev))
 		mlx5e_remove_sqs_fwd_rules(priv);
 
 	/* FIXME: This is a W/A only for tx timeout watch dog false alarm when
@@ -3371,7 +3372,7 @@ static int mlx5e_setup_tc_block(struct net_device *dev,
 	switch (f->command) {
 	case TC_BLOCK_BIND:
 		return tcf_block_cb_register(f->block, mlx5e_setup_tc_block_cb,
-					     priv, priv);
+					     priv, priv, f->extack);
 	case TC_BLOCK_UNBIND:
 		tcf_block_cb_unregister(f->block, mlx5e_setup_tc_block_cb,
 					priv);
@@ -3404,6 +3405,9 @@ mlx5e_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	struct mlx5e_sw_stats *sstats = &priv->stats.sw;
 	struct mlx5e_vport_stats *vstats = &priv->stats.vport;
 	struct mlx5e_pport_stats *pstats = &priv->stats.pport;
+
+	/* update HW stats in background for next time */
+	queue_delayed_work(priv->wq, &priv->update_stats_work, 0);
 
 	if (mlx5e_is_uplink_rep(priv)) {
 		stats->rx_packets = PPORT_802_3_GET(pstats, a_frames_received_ok);
@@ -4192,7 +4196,6 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 		return mlx5e_xdp_set(dev, xdp->prog);
 	case XDP_QUERY_PROG:
 		xdp->prog_id = mlx5e_xdp_query(dev);
-		xdp->prog_attached = !!xdp->prog_id;
 		return 0;
 	default:
 		return -EINVAL;
@@ -4535,7 +4538,6 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 	netdev->hw_features      |= NETIF_F_HW_VLAN_STAG_TX;
 
 	if (mlx5e_vxlan_allowed(mdev) || MLX5_CAP_ETH(mdev, tunnel_stateless_gre)) {
-		netdev->hw_features     |= NETIF_F_GSO_PARTIAL;
 		netdev->hw_enc_features |= NETIF_F_IP_CSUM;
 		netdev->hw_enc_features |= NETIF_F_IPV6_CSUM;
 		netdev->hw_enc_features |= NETIF_F_TSO;
@@ -4559,6 +4561,11 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 		netdev->gso_partial_features |= NETIF_F_GSO_GRE |
 						NETIF_F_GSO_GRE_CSUM;
 	}
+
+	netdev->hw_features	                 |= NETIF_F_GSO_PARTIAL;
+	netdev->gso_partial_features             |= NETIF_F_GSO_UDP_L4;
+	netdev->hw_features                      |= NETIF_F_GSO_UDP_L4;
+	netdev->features                         |= NETIF_F_GSO_UDP_L4;
 
 	mlx5_query_port_fcs(mdev, &fcs_supported, &fcs_enabled);
 
@@ -4597,7 +4604,7 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 	mlx5e_set_netdev_dev_addr(netdev);
 
 #if IS_ENABLED(CONFIG_MLX5_ESWITCH)
-	if (MLX5_VPORT_MANAGER(mdev))
+	if (MLX5_ESWITCH_MANAGER(mdev))
 		netdev->switchdev_ops = &mlx5e_switchdev_ops;
 #endif
 
@@ -4753,7 +4760,7 @@ static void mlx5e_nic_enable(struct mlx5e_priv *priv)
 
 	mlx5e_enable_async_events(priv);
 
-	if (MLX5_VPORT_MANAGER(priv->mdev))
+	if (MLX5_ESWITCH_MANAGER(priv->mdev))
 		mlx5e_register_vport_reps(priv);
 
 	if (netdev->reg_state != NETREG_REGISTERED)
@@ -4788,7 +4795,7 @@ static void mlx5e_nic_disable(struct mlx5e_priv *priv)
 
 	queue_work(priv->wq, &priv->set_rx_mode_work);
 
-	if (MLX5_VPORT_MANAGER(priv->mdev))
+	if (MLX5_ESWITCH_MANAGER(priv->mdev))
 		mlx5e_unregister_vport_reps(priv);
 
 	mlx5e_disable_async_events(priv);
@@ -4972,7 +4979,7 @@ static void *mlx5e_add(struct mlx5_core_dev *mdev)
 		return NULL;
 
 #ifdef CONFIG_MLX5_ESWITCH
-	if (MLX5_VPORT_MANAGER(mdev)) {
+	if (MLX5_ESWITCH_MANAGER(mdev)) {
 		rpriv = mlx5e_alloc_nic_rep_priv(mdev);
 		if (!rpriv) {
 			mlx5_core_warn(mdev, "Failed to alloc NIC rep priv data\n");

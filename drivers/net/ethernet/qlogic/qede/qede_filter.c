@@ -342,8 +342,9 @@ int qede_alloc_arfs(struct qede_dev *edev)
 	for (i = 0; i <= QEDE_RFS_FLW_MASK; i++)
 		INIT_HLIST_HEAD(QEDE_ARFS_BUCKET_HEAD(edev, i));
 
-	edev->arfs->arfs_fltr_bmap = vzalloc(BITS_TO_LONGS(QEDE_RFS_MAX_FLTR) *
-					     sizeof(long));
+	edev->arfs->arfs_fltr_bmap =
+		vzalloc(array_size(sizeof(long),
+				   BITS_TO_LONGS(QEDE_RFS_MAX_FLTR)));
 	if (!edev->arfs->arfs_fltr_bmap) {
 		vfree(edev->arfs);
 		edev->arfs = NULL;
@@ -1115,7 +1116,6 @@ int qede_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	case XDP_SETUP_PROG:
 		return qede_xdp_set(edev, xdp->prog);
 	case XDP_QUERY_PROG:
-		xdp->prog_attached = !!edev->xdp_prog;
 		xdp->prog_id = edev->xdp_prog ? edev->xdp_prog->aux->id : 0;
 		return 0;
 	default:

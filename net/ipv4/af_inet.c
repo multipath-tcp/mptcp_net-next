@@ -233,6 +233,7 @@ int inet_listen(struct socket *sock, int backlog)
 		err = inet_csk_listen_start(sk, backlog);
 		if (err)
 			goto out;
+		tcp_call_bpf(sk, BPF_SOCK_OPS_TCP_LISTEN_CB, 0, NULL);
 	}
 	sk->sk_max_ack_backlog = backlog;
 	err = 0;
@@ -1006,7 +1007,7 @@ const struct proto_ops inet_stream_ops = {
 	.socketpair	   = sock_no_socketpair,
 	.accept		   = inet_accept,
 	.getname	   = inet_getname,
-	.poll_mask	   = tcp_poll_mask,
+	.poll		   = tcp_poll,
 	.ioctl		   = inet_ioctl,
 	.listen		   = inet_listen,
 	.shutdown	   = inet_shutdown,
@@ -1041,7 +1042,7 @@ const struct proto_ops inet_dgram_ops = {
 	.socketpair	   = sock_no_socketpair,
 	.accept		   = sock_no_accept,
 	.getname	   = inet_getname,
-	.poll_mask	   = udp_poll_mask,
+	.poll		   = udp_poll,
 	.ioctl		   = inet_ioctl,
 	.listen		   = sock_no_listen,
 	.shutdown	   = inet_shutdown,
@@ -1062,7 +1063,7 @@ EXPORT_SYMBOL(inet_dgram_ops);
 
 /*
  * For SOCK_RAW sockets; should be the same as inet_dgram_ops but without
- * udp_poll_mask
+ * udp_poll
  */
 static const struct proto_ops inet_sockraw_ops = {
 	.family		   = PF_INET,
@@ -1073,7 +1074,7 @@ static const struct proto_ops inet_sockraw_ops = {
 	.socketpair	   = sock_no_socketpair,
 	.accept		   = sock_no_accept,
 	.getname	   = inet_getname,
-	.poll_mask	   = datagram_poll_mask,
+	.poll		   = datagram_poll,
 	.ioctl		   = inet_ioctl,
 	.listen		   = sock_no_listen,
 	.shutdown	   = inet_shutdown,
@@ -1404,12 +1405,12 @@ out:
 }
 EXPORT_SYMBOL(inet_gso_segment);
 
-struct sk_buff **inet_gro_receive(struct sk_buff **head, struct sk_buff *skb)
+struct sk_buff *inet_gro_receive(struct list_head *head, struct sk_buff *skb)
 {
 	const struct net_offload *ops;
-	struct sk_buff **pp = NULL;
-	struct sk_buff *p;
+	struct sk_buff *pp = NULL;
 	const struct iphdr *iph;
+	struct sk_buff *p;
 	unsigned int hlen;
 	unsigned int off;
 	unsigned int id;
@@ -1445,7 +1446,7 @@ struct sk_buff **inet_gro_receive(struct sk_buff **head, struct sk_buff *skb)
 	flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id & ~IP_DF));
 	id >>= 16;
 
-	for (p = *head; p; p = p->next) {
+	list_for_each_entry(p, head, list) {
 		struct iphdr *iph2;
 		u16 flush_id;
 
@@ -1525,8 +1526,8 @@ out:
 }
 EXPORT_SYMBOL(inet_gro_receive);
 
-static struct sk_buff **ipip_gro_receive(struct sk_buff **head,
-					 struct sk_buff *skb)
+static struct sk_buff *ipip_gro_receive(struct list_head *head,
+					struct sk_buff *skb)
 {
 	if (NAPI_GRO_CB(skb)->encap_mark) {
 		NAPI_GRO_CB(skb)->flush = 1;
@@ -1902,6 +1903,7 @@ fs_initcall(ipv4_offload_init);
 static struct packet_type ip_packet_type __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IP),
 	.func = ip_rcv,
+	.list_func = ip_list_rcv,
 };
 
 static int __init inet_init(void)

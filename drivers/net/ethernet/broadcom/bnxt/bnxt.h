@@ -1287,9 +1287,6 @@ struct bnxt {
 	dma_addr_t		hwrm_short_cmd_req_dma_addr;
 	void			*hwrm_cmd_resp_addr;
 	dma_addr_t		hwrm_cmd_resp_dma_addr;
-	void			*hwrm_dbg_resp_addr;
-	dma_addr_t		hwrm_dbg_resp_dma_addr;
-#define HWRM_DBG_REG_BUF_SIZE	128
 
 	struct rx_port_stats	*hw_rx_port_stats;
 	struct tx_port_stats	*hw_tx_port_stats;
@@ -1470,7 +1467,6 @@ void bnxt_set_max_func_stat_ctxs(struct bnxt *bp, unsigned int max);
 unsigned int bnxt_get_max_func_cp_rings(struct bnxt *bp);
 void bnxt_set_max_func_cp_rings(struct bnxt *bp, unsigned int max);
 unsigned int bnxt_get_max_func_irqs(struct bnxt *bp);
-void bnxt_set_max_func_irqs(struct bnxt *bp, unsigned int max);
 int bnxt_get_avail_msix(struct bnxt *bp, int num);
 int bnxt_reserve_rings(struct bnxt *bp);
 void bnxt_tx_disable(struct bnxt *bp);

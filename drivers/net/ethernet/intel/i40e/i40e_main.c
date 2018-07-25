@@ -7522,7 +7522,7 @@ static int i40e_setup_tc_cls_flower(struct i40e_netdev_priv *np,
 	case TC_CLSFLOWER_STATS:
 		return -EOPNOTSUPP;
 	default:
-		return -EINVAL;
+		return -EOPNOTSUPP;
 	}
 }
 
@@ -7554,7 +7554,7 @@ static int i40e_setup_tc_block(struct net_device *dev,
 	switch (f->command) {
 	case TC_BLOCK_BIND:
 		return tcf_block_cb_register(f->block, i40e_setup_tc_block_cb,
-					     np, np);
+					     np, np, f->extack);
 	case TC_BLOCK_UNBIND:
 		tcf_block_cb_unregister(f->block, i40e_setup_tc_block_cb, np);
 		return 0;
@@ -11841,7 +11841,6 @@ static int i40e_xdp(struct net_device *dev,
 	case XDP_SETUP_PROG:
 		return i40e_xdp_setup(vsi, xdp->prog);
 	case XDP_QUERY_PROG:
-		xdp->prog_attached = i40e_enabled_xdp_vsi(vsi);
 		xdp->prog_id = vsi->xdp_prog ? vsi->xdp_prog->aux->id : 0;
 		return 0;
 	default:
@@ -11978,7 +11977,7 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 		snprintf(netdev->name, IFNAMSIZ, "%.*sv%%d",
 			 IFNAMSIZ - 4,
 			 pf->vsi[pf->lan_vsi]->netdev->name);
-		random_ether_addr(mac_addr);
+		eth_random_addr(mac_addr);
 
 		spin_lock_bh(&vsi->mac_filter_hash_lock);
 		i40e_add_mac_filter(vsi, mac_addr);

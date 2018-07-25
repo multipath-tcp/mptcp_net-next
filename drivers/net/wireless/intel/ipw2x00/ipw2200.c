@@ -3208,13 +3208,13 @@ static int ipw_load_firmware(struct ipw_priv *priv, u8 * data, size_t len)
 
 	IPW_DEBUG_TRACE("<< :\n");
 
-	virts = kmalloc(sizeof(void *) * CB_NUMBER_OF_ELEMENTS_SMALL,
-			GFP_KERNEL);
+	virts = kmalloc_array(CB_NUMBER_OF_ELEMENTS_SMALL, sizeof(void *),
+			      GFP_KERNEL);
 	if (!virts)
 		return -ENOMEM;
 
-	phys = kmalloc(sizeof(dma_addr_t) * CB_NUMBER_OF_ELEMENTS_SMALL,
-			GFP_KERNEL);
+	phys = kmalloc_array(CB_NUMBER_OF_ELEMENTS_SMALL, sizeof(dma_addr_t),
+			     GFP_KERNEL);
 	if (!phys) {
 		kfree(virts);
 		return -ENOMEM;
@@ -3782,7 +3782,7 @@ static int ipw_queue_tx_init(struct ipw_priv *priv,
 {
 	struct pci_dev *dev = priv->pci_dev;
 
-	q->txb = kmalloc(sizeof(q->txb[0]) * count, GFP_KERNEL);
+	q->txb = kmalloc_array(count, sizeof(q->txb[0]), GFP_KERNEL);
 	if (!q->txb) {
 		IPW_ERROR("vmalloc for auxiliary BD structures failed\n");
 		return -ENOMEM;
@@ -7112,7 +7112,7 @@ static u32 ipw_qos_get_burst_duration(struct ipw_priv *priv)
 {
 	u32 ret = 0;
 
-	if ((priv == NULL))
+	if (!priv)
 		return 0;
 
 	if (!(priv->ieee->modulation & LIBIPW_OFDM_MODULATION))
@@ -11888,7 +11888,7 @@ static int ipw_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, pci_choose_state(pdev, state));
 
-	priv->suspend_at = get_seconds();
+	priv->suspend_at = ktime_get_boottime_seconds();
 
 	return 0;
 }
@@ -11925,7 +11925,7 @@ static int ipw_pci_resume(struct pci_dev *pdev)
 	 * the queue of needed */
 	netif_device_attach(dev);
 
-	priv->suspend_time = get_seconds() - priv->suspend_at;
+	priv->suspend_time = ktime_get_boottime_seconds() - priv->suspend_at;
 
 	/* Bring the device back up */
 	schedule_work(&priv->up);

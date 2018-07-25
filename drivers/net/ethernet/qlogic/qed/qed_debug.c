@@ -6617,7 +6617,8 @@ static enum dbg_status qed_mcp_trace_alloc_meta(struct qed_hwfn *p_hwfn,
 
 	/* Read no. of modules and allocate memory for their pointers */
 	meta->modules_num = qed_read_byte_from_buf(meta_buf_bytes, &offset);
-	meta->modules = kzalloc(meta->modules_num * sizeof(char *), GFP_KERNEL);
+	meta->modules = kcalloc(meta->modules_num, sizeof(char *),
+				GFP_KERNEL);
 	if (!meta->modules)
 		return DBG_STATUS_VIRT_MEM_ALLOC_FAILED;
 
@@ -6645,7 +6646,7 @@ static enum dbg_status qed_mcp_trace_alloc_meta(struct qed_hwfn *p_hwfn,
 
 	/* Read number of formats and allocate memory for all formats */
 	meta->formats_num = qed_read_dword_from_buf(meta_buf_bytes, &offset);
-	meta->formats = kzalloc(meta->formats_num *
+	meta->formats = kcalloc(meta->formats_num,
 				sizeof(struct mcp_trace_format),
 				GFP_KERNEL);
 	if (!meta->formats)
@@ -6722,7 +6723,7 @@ static enum dbg_status qed_parse_mcp_trace_buf(u8 *trace_buf,
 		format_idx = header & MFW_TRACE_EVENTID_MASK;
 
 		/* Skip message if its index doesn't exist in the meta data */
-		if (format_idx > s_mcp_trace_meta.formats_num) {
+		if (format_idx >= s_mcp_trace_meta.formats_num) {
 			u8 format_size =
 				(u8)((header & MFW_TRACE_PRM_SIZE_MASK) >>
 				     MFW_TRACE_PRM_SIZE_SHIFT);

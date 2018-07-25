@@ -1046,6 +1046,7 @@ iomap_dio_actor(struct inode *inode, loff_t pos, loff_t length,
 		bio_set_dev(bio, iomap->bdev);
 		bio->bi_iter.bi_sector = iomap_sector(iomap, pos);
 		bio->bi_write_hint = dio->iocb->ki_hint;
+		bio->bi_ioprio = dio->iocb->ki_ioprio;
 		bio->bi_private = dio;
 		bio->bi_end_io = iomap_dio_bio_end_io;
 
@@ -1387,7 +1388,11 @@ int iomap_swapfile_activate(struct swap_info_struct *sis,
 	loff_t len = ALIGN_DOWN(i_size_read(inode), PAGE_SIZE);
 	loff_t ret;
 
-	ret = filemap_write_and_wait(inode->i_mapping);
+	/*
+	 * Persist all file mapping metadata so that we won't have any
+	 * IOMAP_F_DIRTY iomaps.
+	 */
+	ret = vfs_fsync(swap_file, 1);
 	if (ret)
 		return ret;
 

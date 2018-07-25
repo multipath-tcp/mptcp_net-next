@@ -39,6 +39,7 @@
 #ifndef _MLXSW_REG_H
 #define _MLXSW_REG_H
 
+#include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/bitops.h>
 #include <linux/if_vlan.h>
@@ -1943,6 +1944,28 @@ static inline void mlxsw_reg_cwtpm_pack(char *payload, u8 local_port,
 	mlxsw_reg_cwtpm_ntcp_r_set(payload, profile);
 }
 
+/* PGCR - Policy-Engine General Configuration Register
+ * ---------------------------------------------------
+ * This register configures general Policy-Engine settings.
+ */
+#define MLXSW_REG_PGCR_ID 0x3001
+#define MLXSW_REG_PGCR_LEN 0x20
+
+MLXSW_REG_DEFINE(pgcr, MLXSW_REG_PGCR_ID, MLXSW_REG_PGCR_LEN);
+
+/* reg_pgcr_default_action_pointer_base
+ * Default action pointer base. Each region has a default action pointer
+ * which is equal to default_action_pointer_base + region_id.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pgcr, default_action_pointer_base, 0x1C, 0, 24);
+
+static inline void mlxsw_reg_pgcr_pack(char *payload, u32 pointer_base)
+{
+	MLXSW_REG_ZERO(pgcr, payload);
+	mlxsw_reg_pgcr_default_action_pointer_base_set(payload, pointer_base);
+}
+
 /* PPBT - Policy-Engine Port Binding Table
  * ---------------------------------------
  * This register is used for configuration of the Port Binding Table.
@@ -2132,14 +2155,18 @@ MLXSW_ITEM32(reg, ptar, op, 0x00, 28, 4);
 
 /* reg_ptar_action_set_type
  * Type of action set to be used on this region.
- * For Spectrum, this is always type 2 - "flexible"
+ * For Spectrum and Spectrum-2, this is always type 2 - "flexible"
  * Access: WO
  */
 MLXSW_ITEM32(reg, ptar, action_set_type, 0x00, 16, 8);
 
+enum mlxsw_reg_ptar_key_type {
+	MLXSW_REG_PTAR_KEY_TYPE_FLEX = 0x50, /* Spetrum */
+	MLXSW_REG_PTAR_KEY_TYPE_FLEX2 = 0x51, /* Spectrum-2 */
+};
+
 /* reg_ptar_key_type
  * TCAM key type for the region.
- * For Spectrum, this is always type 0x50 - "FLEX_KEY"
  * Access: WO
  */
 MLXSW_ITEM32(reg, ptar, key_type, 0x00, 0, 8);
@@ -2182,13 +2209,14 @@ MLXSW_ITEM8_INDEXED(reg, ptar, flexible_key_id, 0x20, 0, 8,
 		    MLXSW_REG_PTAR_KEY_ID_LEN, 0x00, false);
 
 static inline void mlxsw_reg_ptar_pack(char *payload, enum mlxsw_reg_ptar_op op,
+				       enum mlxsw_reg_ptar_key_type key_type,
 				       u16 region_size, u16 region_id,
 				       const char *tcam_region_info)
 {
 	MLXSW_REG_ZERO(ptar, payload);
 	mlxsw_reg_ptar_op_set(payload, op);
 	mlxsw_reg_ptar_action_set_type_set(payload, 2); /* "flexible" */
-	mlxsw_reg_ptar_key_type_set(payload, 0x50); /* "FLEX_KEY" */
+	mlxsw_reg_ptar_key_type_set(payload, key_type);
 	mlxsw_reg_ptar_region_size_set(payload, region_size);
 	mlxsw_reg_ptar_region_id_set(payload, region_id);
 	mlxsw_reg_ptar_tcam_region_info_memcpy_to(payload, tcam_region_info);
@@ -2327,6 +2355,23 @@ MLXSW_REG_DEFINE(pefa, MLXSW_REG_PEFA_ID, MLXSW_REG_PEFA_LEN);
  */
 MLXSW_ITEM32(reg, pefa, index, 0x00, 0, 24);
 
+/* reg_pefa_a
+ * Index in the KVD Linear Centralized Database.
+ * Activity
+ * For a new entry: set if ca=0, clear if ca=1
+ * Set if a packet lookup has hit on the specific entry
+ * Access: RO
+ */
+MLXSW_ITEM32(reg, pefa, a, 0x04, 29, 1);
+
+/* reg_pefa_ca
+ * Clear activity
+ * When write: activity is according to this field
+ * When read: after reading the activity is cleared according to ca
+ * Access: OP
+ */
+MLXSW_ITEM32(reg, pefa, ca, 0x04, 24, 1);
+
 #define MLXSW_REG_FLEX_ACTION_SET_LEN 0xA8
 
 /* reg_pefa_flex_action_set
@@ -2336,12 +2381,20 @@ MLXSW_ITEM32(reg, pefa, index, 0x00, 0, 24);
  */
 MLXSW_ITEM_BUF(reg, pefa, flex_action_set, 0x08, MLXSW_REG_FLEX_ACTION_SET_LEN);
 
-static inline void mlxsw_reg_pefa_pack(char *payload, u32 index,
+static inline void mlxsw_reg_pefa_pack(char *payload, u32 index, bool ca,
 				       const char *flex_action_set)
 {
 	MLXSW_REG_ZERO(pefa, payload);
 	mlxsw_reg_pefa_index_set(payload, index);
-	mlxsw_reg_pefa_flex_action_set_memcpy_to(payload, flex_action_set);
+	mlxsw_reg_pefa_ca_set(payload, ca);
+	if (flex_action_set)
+		mlxsw_reg_pefa_flex_action_set_memcpy_to(payload,
+							 flex_action_set);
+}
+
+static inline void mlxsw_reg_pefa_unpack(char *payload, bool *p_a)
+{
+	*p_a = mlxsw_reg_pefa_a_get(payload);
 }
 
 /* PTCE-V2 - Policy-Engine TCAM Entry Register Version 2
@@ -2397,6 +2450,15 @@ MLXSW_ITEM32(reg, ptce2, op, 0x00, 20, 3);
  */
 MLXSW_ITEM32(reg, ptce2, offset, 0x00, 0, 16);
 
+/* reg_ptce2_priority
+ * Priority of the rule, higher values win. The range is 1..cap_kvd_size-1.
+ * Note: priority does not have to be unique per rule.
+ * Within a region, higher priority should have lower offset (no limitation
+ * between regions in a multi-region).
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, ptce2, priority, 0x04, 0, 24);
+
 /* reg_ptce2_tcam_region_info
  * Opaque object that represents the TCAM region.
  * Access: Index
@@ -2432,13 +2494,242 @@ MLXSW_ITEM_BUF(reg, ptce2, flex_action_set, 0xE0,
 static inline void mlxsw_reg_ptce2_pack(char *payload, bool valid,
 					enum mlxsw_reg_ptce2_op op,
 					const char *tcam_region_info,
-					u16 offset)
+					u16 offset, u32 priority)
 {
 	MLXSW_REG_ZERO(ptce2, payload);
 	mlxsw_reg_ptce2_v_set(payload, valid);
 	mlxsw_reg_ptce2_op_set(payload, op);
 	mlxsw_reg_ptce2_offset_set(payload, offset);
+	mlxsw_reg_ptce2_priority_set(payload, priority);
 	mlxsw_reg_ptce2_tcam_region_info_memcpy_to(payload, tcam_region_info);
+}
+
+/* PERAR - Policy-Engine Region Association Register
+ * -------------------------------------------------
+ * This register associates a hw region for region_id's. Changing on the fly
+ * is supported by the device.
+ */
+#define MLXSW_REG_PERAR_ID 0x3026
+#define MLXSW_REG_PERAR_LEN 0x08
+
+MLXSW_REG_DEFINE(perar, MLXSW_REG_PERAR_ID, MLXSW_REG_PERAR_LEN);
+
+/* reg_perar_region_id
+ * Region identifier
+ * Range 0 .. cap_max_regions-1
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, perar, region_id, 0x00, 0, 16);
+
+static inline unsigned int
+mlxsw_reg_perar_hw_regions_needed(unsigned int block_num)
+{
+	return DIV_ROUND_UP(block_num, 4);
+}
+
+/* reg_perar_hw_region
+ * HW Region
+ * Range 0 .. cap_max_regions-1
+ * Default: hw_region = region_id
+ * For a 8 key block region, 2 consecutive regions are used
+ * For a 12 key block region, 3 consecutive regions are used
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, perar, hw_region, 0x04, 0, 16);
+
+static inline void mlxsw_reg_perar_pack(char *payload, u16 region_id,
+					u16 hw_region)
+{
+	MLXSW_REG_ZERO(perar, payload);
+	mlxsw_reg_perar_region_id_set(payload, region_id);
+	mlxsw_reg_perar_hw_region_set(payload, hw_region);
+}
+
+/* PERCR - Policy-Engine Region Configuration Register
+ * ---------------------------------------------------
+ * This register configures the region parameters. The region_id must be
+ * allocated.
+ */
+#define MLXSW_REG_PERCR_ID 0x302A
+#define MLXSW_REG_PERCR_LEN 0x80
+
+MLXSW_REG_DEFINE(percr, MLXSW_REG_PERCR_ID, MLXSW_REG_PERCR_LEN);
+
+/* reg_percr_region_id
+ * Region identifier.
+ * Range 0..cap_max_regions-1
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, percr, region_id, 0x00, 0, 16);
+
+/* reg_percr_atcam_ignore_prune
+ * Ignore prune_vector by other A-TCAM rules. Used e.g., for a new rule.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, percr, atcam_ignore_prune, 0x04, 25, 1);
+
+/* reg_percr_ctcam_ignore_prune
+ * Ignore prune_ctcam by other A-TCAM rules. Used e.g., for a new rule.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, percr, ctcam_ignore_prune, 0x04, 24, 1);
+
+/* reg_percr_bf_bypass
+ * Bloom filter bypass.
+ * 0 - Bloom filter is used (default)
+ * 1 - Bloom filter is bypassed. The bypass is an OR condition of
+ * region_id or eRP. See PERPT.bf_bypass
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, percr, bf_bypass, 0x04, 16, 1);
+
+/* reg_percr_master_mask
+ * Master mask. Logical OR mask of all masks of all rules of a region
+ * (both A-TCAM and C-TCAM). When there are no eRPs
+ * (erpt_pointer_valid = 0), then this provides the mask.
+ * Access: RW
+ */
+MLXSW_ITEM_BUF(reg, percr, master_mask, 0x20, 96);
+
+static inline void mlxsw_reg_percr_pack(char *payload, u16 region_id)
+{
+	MLXSW_REG_ZERO(percr, payload);
+	mlxsw_reg_percr_region_id_set(payload, region_id);
+	mlxsw_reg_percr_atcam_ignore_prune_set(payload, false);
+	mlxsw_reg_percr_ctcam_ignore_prune_set(payload, false);
+	mlxsw_reg_percr_bf_bypass_set(payload, true);
+	memset(payload + 0x20, 0xff, 96);
+}
+
+/* PERERP - Policy-Engine Region eRP Register
+ * ------------------------------------------
+ * This register configures the region eRP. The region_id must be
+ * allocated.
+ */
+#define MLXSW_REG_PERERP_ID 0x302B
+#define MLXSW_REG_PERERP_LEN 0x1C
+
+MLXSW_REG_DEFINE(pererp, MLXSW_REG_PERERP_ID, MLXSW_REG_PERERP_LEN);
+
+/* reg_pererp_region_id
+ * Region identifier.
+ * Range 0..cap_max_regions-1
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, pererp, region_id, 0x00, 0, 16);
+
+/* reg_pererp_ctcam_le
+ * C-TCAM lookup enable. Reserved when erpt_pointer_valid = 0.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pererp, ctcam_le, 0x04, 28, 1);
+
+/* reg_pererp_erpt_pointer_valid
+ * erpt_pointer is valid.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pererp, erpt_pointer_valid, 0x10, 31, 1);
+
+/* reg_pererp_erpt_bank_pointer
+ * Pointer to eRP table bank. May be modified at any time.
+ * Range 0..cap_max_erp_table_banks-1
+ * Reserved when erpt_pointer_valid = 0
+ */
+MLXSW_ITEM32(reg, pererp, erpt_bank_pointer, 0x10, 16, 4);
+
+/* reg_pererp_erpt_pointer
+ * Pointer to eRP table within the eRP bank. Can be changed for an
+ * existing region.
+ * Range 0..cap_max_erp_table_size-1
+ * Reserved when erpt_pointer_valid = 0
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pererp, erpt_pointer, 0x10, 0, 8);
+
+/* reg_pererp_erpt_vector
+ * Vector of allowed eRP indexes starting from erpt_pointer within the
+ * erpt_bank_pointer. Next entries will be in next bank.
+ * Note that eRP index is used and not eRP ID.
+ * Reserved when erpt_pointer_valid = 0
+ * Access: RW
+ */
+MLXSW_ITEM_BIT_ARRAY(reg, pererp, erpt_vector, 0x14, 4, 1);
+
+/* reg_pererp_master_rp_id
+ * Master RP ID. When there are no eRPs, then this provides the eRP ID
+ * for the lookup. Can be changed for an existing region.
+ * Reserved when erpt_pointer_valid = 1
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, pererp, master_rp_id, 0x18, 0, 4);
+
+static inline void mlxsw_reg_pererp_pack(char *payload, u16 region_id)
+{
+	MLXSW_REG_ZERO(pererp, payload);
+	mlxsw_reg_pererp_region_id_set(payload, region_id);
+	mlxsw_reg_pererp_ctcam_le_set(payload, true);
+	mlxsw_reg_pererp_erpt_pointer_valid_set(payload, true);
+}
+
+/* IEDR - Infrastructure Entry Delete Register
+ * ----------------------------------------------------
+ * This register is used for deleting entries from the entry tables.
+ * It is legitimate to attempt to delete a nonexisting entry (the device will
+ * respond as a good flow).
+ */
+#define MLXSW_REG_IEDR_ID 0x3804
+#define MLXSW_REG_IEDR_BASE_LEN 0x10 /* base length, without records */
+#define MLXSW_REG_IEDR_REC_LEN 0x8 /* record length */
+#define MLXSW_REG_IEDR_REC_MAX_COUNT 64
+#define MLXSW_REG_IEDR_LEN (MLXSW_REG_IEDR_BASE_LEN +	\
+			    MLXSW_REG_IEDR_REC_LEN *	\
+			    MLXSW_REG_IEDR_REC_MAX_COUNT)
+
+MLXSW_REG_DEFINE(iedr, MLXSW_REG_IEDR_ID, MLXSW_REG_IEDR_LEN);
+
+/* reg_iedr_num_rec
+ * Number of records.
+ * Access: OP
+ */
+MLXSW_ITEM32(reg, iedr, num_rec, 0x00, 0, 8);
+
+/* reg_iedr_rec_type
+ * Resource type.
+ * Access: OP
+ */
+MLXSW_ITEM32_INDEXED(reg, iedr, rec_type, MLXSW_REG_IEDR_BASE_LEN, 24, 8,
+		     MLXSW_REG_IEDR_REC_LEN, 0x00, false);
+
+/* reg_iedr_rec_size
+ * Size of entries do be deleted. The unit is 1 entry, regardless of entry type.
+ * Access: OP
+ */
+MLXSW_ITEM32_INDEXED(reg, iedr, rec_size, MLXSW_REG_IEDR_BASE_LEN, 0, 11,
+		     MLXSW_REG_IEDR_REC_LEN, 0x00, false);
+
+/* reg_iedr_rec_index_start
+ * Resource index start.
+ * Access: OP
+ */
+MLXSW_ITEM32_INDEXED(reg, iedr, rec_index_start, MLXSW_REG_IEDR_BASE_LEN, 0, 24,
+		     MLXSW_REG_IEDR_REC_LEN, 0x04, false);
+
+static inline void mlxsw_reg_iedr_pack(char *payload)
+{
+	MLXSW_REG_ZERO(iedr, payload);
+}
+
+static inline void mlxsw_reg_iedr_rec_pack(char *payload, int rec_index,
+					   u8 rec_type, u16 rec_size,
+					   u32 rec_index_start)
+{
+	u8 num_rec = mlxsw_reg_iedr_num_rec_get(payload);
+
+	if (rec_index >= num_rec)
+		mlxsw_reg_iedr_num_rec_set(payload, rec_index + 1);
+	mlxsw_reg_iedr_rec_type_set(payload, rec_index, rec_type);
+	mlxsw_reg_iedr_rec_size_set(payload, rec_index, rec_size);
+	mlxsw_reg_iedr_rec_index_start_set(payload, rec_index, rec_index_start);
 }
 
 /* QPCR - QoS Policer Configuration Register
@@ -3350,6 +3641,7 @@ MLXSW_ITEM32(reg, ppcnt, pnat, 0x00, 14, 2);
 
 enum mlxsw_reg_ppcnt_grp {
 	MLXSW_REG_PPCNT_IEEE_8023_CNT = 0x0,
+	MLXSW_REG_PPCNT_RFC_2819_CNT = 0x2,
 	MLXSW_REG_PPCNT_EXT_CNT = 0x5,
 	MLXSW_REG_PPCNT_PRIO_CNT = 0x10,
 	MLXSW_REG_PPCNT_TC_CNT = 0x11,
@@ -3507,6 +3799,68 @@ MLXSW_ITEM64(reg, ppcnt, a_pause_mac_ctrl_frames_received,
  */
 MLXSW_ITEM64(reg, ppcnt, a_pause_mac_ctrl_frames_transmitted,
 	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x90, 0, 64);
+
+/* Ethernet RFC 2819 Counter Group */
+
+/* reg_ppcnt_ether_stats_pkts64octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts64octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x58, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts65to127octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts65to127octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x60, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts128to255octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts128to255octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x68, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts256to511octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts256to511octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x70, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts512to1023octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts512to1023octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x78, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts1024to1518octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts1024to1518octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x80, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts1519to2047octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts1519to2047octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x88, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts2048to4095octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts2048to4095octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x90, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts4096to8191octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts4096to8191octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0x98, 0, 64);
+
+/* reg_ppcnt_ether_stats_pkts8192to10239octets
+ * Access: RO
+ */
+MLXSW_ITEM64(reg, ppcnt, ether_stats_pkts8192to10239octets,
+	     MLXSW_REG_PPCNT_COUNTERS_OFFSET + 0xA0, 0, 64);
 
 /* Ethernet Extended Counter Group Counters */
 
@@ -4337,6 +4691,20 @@ MLXSW_ITEM32(reg, ritr, if_swid, 0x08, 24, 8);
  * Access: RW
  */
 MLXSW_ITEM_BUF(reg, ritr, if_mac, 0x12, 6);
+
+/* reg_ritr_if_vrrp_id_ipv6
+ * VRRP ID for IPv6
+ * Note: Reserved for RIF types other than VLAN, FID and Sub-port.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, ritr, if_vrrp_id_ipv6, 0x1C, 8, 8);
+
+/* reg_ritr_if_vrrp_id_ipv4
+ * VRRP ID for IPv4
+ * Note: Reserved for RIF types other than VLAN, FID and Sub-port.
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, ritr, if_vrrp_id_ipv4, 0x1C, 0, 8);
 
 /* VLAN Interface */
 
@@ -7871,6 +8239,7 @@ static const struct mlxsw_reg_info *mlxsw_reg_infos[] = {
 	MLXSW_REG(spvmlr),
 	MLXSW_REG(cwtp),
 	MLXSW_REG(cwtpm),
+	MLXSW_REG(pgcr),
 	MLXSW_REG(ppbt),
 	MLXSW_REG(pacl),
 	MLXSW_REG(pagt),
@@ -7879,6 +8248,10 @@ static const struct mlxsw_reg_info *mlxsw_reg_infos[] = {
 	MLXSW_REG(prcr),
 	MLXSW_REG(pefa),
 	MLXSW_REG(ptce2),
+	MLXSW_REG(perar),
+	MLXSW_REG(percr),
+	MLXSW_REG(pererp),
+	MLXSW_REG(iedr),
 	MLXSW_REG(qpcr),
 	MLXSW_REG(qtct),
 	MLXSW_REG(qeec),

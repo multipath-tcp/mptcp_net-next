@@ -873,7 +873,7 @@ static int cctrl_tbl_show(struct seq_file *seq, void *v)
 	u16 (*incr)[NCCTRL_WIN];
 	struct adapter *adap = seq->private;
 
-	incr = kmalloc(sizeof(*incr) * NMTUS, GFP_KERNEL);
+	incr = kmalloc_array(NMTUS, sizeof(*incr), GFP_KERNEL);
 	if (!incr)
 		return -ENOMEM;
 
@@ -2414,6 +2414,44 @@ static const struct file_operations rss_vf_config_debugfs_fops = {
 	.release = seq_release_private
 };
 
+static int resources_show(struct seq_file *seq, void *v)
+{
+	struct adapter *adapter = seq->private;
+	struct pf_resources *pfres = &adapter->params.pfres;
+
+	#define S(desc, fmt, var) \
+		seq_printf(seq, "%-60s " fmt "\n", \
+			   desc " (" #var "):", pfres->var)
+
+	S("Virtual Interfaces", "%d", nvi);
+	S("Egress Queues", "%d", neq);
+	S("Ethernet Control", "%d", nethctrl);
+	S("Ingress Queues/w Free Lists/Interrupts", "%d", niqflint);
+	S("Ingress Queues", "%d", niq);
+	S("Traffic Class", "%d", tc);
+	S("Port Access Rights Mask", "%#x", pmask);
+	S("MAC Address Filters", "%d", nexactf);
+	S("Firmware Command Read Capabilities", "%#x", r_caps);
+	S("Firmware Command Write/Execute Capabilities", "%#x", wx_caps);
+
+	#undef S
+
+	return 0;
+}
+
+static int resources_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, resources_show, inode->i_private);
+}
+
+static const struct file_operations resources_debugfs_fops = {
+	.owner   = THIS_MODULE,
+	.open    = resources_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
 /**
  * ethqset2pinfo - return port_info of an Ethernet Queue Set
  * @adap: the adapter
@@ -2851,15 +2889,17 @@ static int meminfo_show(struct seq_file *seq, void *v)
 	mem_region_show(seq, "uP Extmem2:", meminfo.up_extmem2_lo,
 			meminfo.up_extmem2_hi);
 
-	seq_printf(seq, "\n%u Rx pages of size %uKiB for %u channels\n",
-		   meminfo.rx_pages_data[0], meminfo.rx_pages_data[1],
-		   meminfo.rx_pages_data[2]);
+	seq_printf(seq, "\n%u Rx pages (%u free) of size %uKiB for %u channels\n",
+		   meminfo.rx_pages_data[0], meminfo.free_rx_cnt,
+		   meminfo.rx_pages_data[1], meminfo.rx_pages_data[2]);
 
-	seq_printf(seq, "%u Tx pages of size %u%ciB for %u channels\n",
-		   meminfo.tx_pages_data[0], meminfo.tx_pages_data[1],
-		   meminfo.tx_pages_data[2], meminfo.tx_pages_data[3]);
+	seq_printf(seq, "%u Tx pages (%u free) of size %u%ciB for %u channels\n",
+		   meminfo.tx_pages_data[0], meminfo.free_tx_cnt,
+		   meminfo.tx_pages_data[1], meminfo.tx_pages_data[2],
+		   meminfo.tx_pages_data[3]);
 
-	seq_printf(seq, "%u p-structs\n\n", meminfo.p_structs);
+	seq_printf(seq, "%u p-structs (%u free)\n\n",
+		   meminfo.p_structs, meminfo.p_structs_free_cnt);
 
 	for (i = 0; i < 4; i++)
 		/* For T6 these are MAC buffer groups */
@@ -2924,6 +2964,169 @@ static const struct file_operations chcr_stats_debugfs_fops = {
         .llseek  = seq_lseek,
         .release = single_release,
 };
+
+#define PRINT_ADAP_STATS(string, value) \
+	seq_printf(seq, "%-25s %-20llu\n", (string), \
+		   (unsigned long long)(value))
+
+#define PRINT_CH_STATS(string, value) \
+do { \
+	seq_printf(seq, "%-25s ", (string)); \
+	for (i = 0; i < adap->params.arch.nchan; i++) \
+		seq_printf(seq, "%-20llu ", \
+			   (unsigned long long)stats.value[i]); \
+	seq_printf(seq, "\n"); \
+} while (0)
+
+#define PRINT_CH_STATS2(string, value) \
+do { \
+	seq_printf(seq, "%-25s ", (string)); \
+	for (i = 0; i < adap->params.arch.nchan; i++) \
+		seq_printf(seq, "%-20llu ", \
+			   (unsigned long long)stats[i].value); \
+	seq_printf(seq, "\n"); \
+} while (0)
+
+static void show_tcp_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_tcp_stats v4, v6;
+
+	spin_lock(&adap->stats_lock);
+	t4_tp_get_tcp_stats(adap, &v4, &v6, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_ADAP_STATS("tcp_ipv4_out_rsts:", v4.tcp_out_rsts);
+	PRINT_ADAP_STATS("tcp_ipv4_in_segs:", v4.tcp_in_segs);
+	PRINT_ADAP_STATS("tcp_ipv4_out_segs:", v4.tcp_out_segs);
+	PRINT_ADAP_STATS("tcp_ipv4_retrans_segs:", v4.tcp_retrans_segs);
+	PRINT_ADAP_STATS("tcp_ipv6_out_rsts:", v6.tcp_out_rsts);
+	PRINT_ADAP_STATS("tcp_ipv6_in_segs:", v6.tcp_in_segs);
+	PRINT_ADAP_STATS("tcp_ipv6_out_segs:", v6.tcp_out_segs);
+	PRINT_ADAP_STATS("tcp_ipv6_retrans_segs:", v6.tcp_retrans_segs);
+}
+
+static void show_ddp_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_usm_stats stats;
+
+	spin_lock(&adap->stats_lock);
+	t4_get_usm_stats(adap, &stats, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_ADAP_STATS("usm_ddp_frames:", stats.frames);
+	PRINT_ADAP_STATS("usm_ddp_octets:", stats.octets);
+	PRINT_ADAP_STATS("usm_ddp_drops:", stats.drops);
+}
+
+static void show_rdma_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_rdma_stats stats;
+
+	spin_lock(&adap->stats_lock);
+	t4_tp_get_rdma_stats(adap, &stats, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_ADAP_STATS("rdma_no_rqe_mod_defer:", stats.rqe_dfr_mod);
+	PRINT_ADAP_STATS("rdma_no_rqe_pkt_defer:", stats.rqe_dfr_pkt);
+}
+
+static void show_tp_err_adapter_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_err_stats stats;
+
+	spin_lock(&adap->stats_lock);
+	t4_tp_get_err_stats(adap, &stats, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_ADAP_STATS("tp_err_ofld_no_neigh:", stats.ofld_no_neigh);
+	PRINT_ADAP_STATS("tp_err_ofld_cong_defer:", stats.ofld_cong_defer);
+}
+
+static void show_cpl_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_cpl_stats stats;
+	u8 i;
+
+	spin_lock(&adap->stats_lock);
+	t4_tp_get_cpl_stats(adap, &stats, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_CH_STATS("tp_cpl_requests:", req);
+	PRINT_CH_STATS("tp_cpl_responses:", rsp);
+}
+
+static void show_tp_err_channel_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_err_stats stats;
+	u8 i;
+
+	spin_lock(&adap->stats_lock);
+	t4_tp_get_err_stats(adap, &stats, false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_CH_STATS("tp_mac_in_errs:", mac_in_errs);
+	PRINT_CH_STATS("tp_hdr_in_errs:", hdr_in_errs);
+	PRINT_CH_STATS("tp_tcp_in_errs:", tcp_in_errs);
+	PRINT_CH_STATS("tp_tcp6_in_errs:", tcp6_in_errs);
+	PRINT_CH_STATS("tp_tnl_cong_drops:", tnl_cong_drops);
+	PRINT_CH_STATS("tp_tnl_tx_drops:", tnl_tx_drops);
+	PRINT_CH_STATS("tp_ofld_vlan_drops:", ofld_vlan_drops);
+	PRINT_CH_STATS("tp_ofld_chan_drops:", ofld_chan_drops);
+}
+
+static void show_fcoe_stats(struct seq_file *seq)
+{
+	struct adapter *adap = seq->private;
+	struct tp_fcoe_stats stats[NCHAN];
+	u8 i;
+
+	spin_lock(&adap->stats_lock);
+	for (i = 0; i < adap->params.arch.nchan; i++)
+		t4_get_fcoe_stats(adap, i, &stats[i], false);
+	spin_unlock(&adap->stats_lock);
+
+	PRINT_CH_STATS2("fcoe_octets_ddp", octets_ddp);
+	PRINT_CH_STATS2("fcoe_frames_ddp", frames_ddp);
+	PRINT_CH_STATS2("fcoe_frames_drop", frames_drop);
+}
+
+#undef PRINT_CH_STATS2
+#undef PRINT_CH_STATS
+#undef PRINT_ADAP_STATS
+
+static int tp_stats_show(struct seq_file *seq, void *v)
+{
+	struct adapter *adap = seq->private;
+
+	seq_puts(seq, "\n--------Adapter Stats--------\n");
+	show_tcp_stats(seq);
+	show_ddp_stats(seq);
+	show_rdma_stats(seq);
+	show_tp_err_adapter_stats(seq);
+
+	seq_puts(seq, "\n-------- Channel Stats --------\n");
+	if (adap->params.arch.nchan == NCHAN)
+		seq_printf(seq, "%-25s %-20s %-20s %-20s %-20s\n",
+			   " ", "channel 0", "channel 1",
+			   "channel 2", "channel 3");
+	else
+		seq_printf(seq, "%-25s %-20s %-20s\n",
+			   " ", "channel 0", "channel 1");
+	show_cpl_stats(seq);
+	show_tp_err_channel_stats(seq);
+	show_fcoe_stats(seq);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_DEBUGFS_FILE(tp_stats);
+
 /* Add an array of Debug FS files.
  */
 void add_debugfs_files(struct adapter *adap,
@@ -2973,6 +3176,7 @@ int t4_setup_debugfs(struct adapter *adap)
 		{ "rss_key", &rss_key_debugfs_fops, 0400, 0 },
 		{ "rss_pf_config", &rss_pf_config_debugfs_fops, 0400, 0 },
 		{ "rss_vf_config", &rss_vf_config_debugfs_fops, 0400, 0 },
+		{ "resources", &resources_debugfs_fops, 0400, 0 },
 		{ "sge_qinfo", &sge_qinfo_debugfs_fops, 0400, 0 },
 		{ "ibq_tp0",  &cim_ibq_fops, 0400, 0 },
 		{ "ibq_tp1",  &cim_ibq_fops, 0400, 1 },
@@ -2999,6 +3203,7 @@ int t4_setup_debugfs(struct adapter *adap)
 		{ "blocked_fl", &blocked_fl_fops, 0600, 0 },
 		{ "meminfo", &meminfo_fops, 0400, 0 },
 		{ "crypto", &chcr_stats_debugfs_fops, 0400, 0 },
+		{ "tp_stats", &tp_stats_debugfs_fops, 0400, 0 },
 	};
 
 	/* Debug FS nodes common to all T5 and later adapters.

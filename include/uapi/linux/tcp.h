@@ -140,6 +140,10 @@ enum {
 
 #define MPTCP_INFO_FLAG_SAVE_MASTER	0x01
 
+#define TCP_REPAIR_ON		1
+#define TCP_REPAIR_OFF		0
+#define TCP_REPAIR_OFF_NO_WP	-1	/* Turn off without window probes */
+
 struct tcp_repair_opt {
 	__u32	opt_code;
 	__u32	opt_val;

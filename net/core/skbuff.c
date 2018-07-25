@@ -858,6 +858,7 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	n->cloned = 1;
 	n->nohdr = 0;
 	n->peeked = 0;
+	C(pfmemalloc);
 	n->destructor = NULL;
 	C(tail);
 	C(end);
@@ -3719,6 +3720,7 @@ normal:
 				net_warn_ratelimited(
 					"skb_segment: too many frags: %u %u\n",
 					pos, mss);
+				err = -EINVAL;
 				goto err;
 			}
 
@@ -3752,11 +3754,10 @@ skip_fraglist:
 
 perform_csum_check:
 		if (!csum) {
-			if (skb_has_shared_frag(nskb)) {
-				err = __skb_linearize(nskb);
-				if (err)
-					goto err;
-			}
+			if (skb_has_shared_frag(nskb) &&
+			    __skb_linearize(nskb))
+				goto err;
+
 			if (!nskb->remcsum_offload)
 				nskb->ip_summed = CHECKSUM_NONE;
 			SKB_GSO_CB(nskb)->csum =
@@ -3815,14 +3816,14 @@ err:
 }
 EXPORT_SYMBOL_GPL(skb_segment);
 
-int skb_gro_receive(struct sk_buff **head, struct sk_buff *skb)
+int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 {
 	struct skb_shared_info *pinfo, *skbinfo = skb_shinfo(skb);
 	unsigned int offset = skb_gro_offset(skb);
 	unsigned int headlen = skb_headlen(skb);
 	unsigned int len = skb_gro_len(skb);
-	struct sk_buff *lp, *p = *head;
 	unsigned int delta_truesize;
+	struct sk_buff *lp;
 
 	if (unlikely(p->len + len >= 65536))
 		return -E2BIG;
@@ -4898,7 +4899,6 @@ EXPORT_SYMBOL(skb_try_coalesce);
  */
 void skb_scrub_packet(struct sk_buff *skb, bool xnet)
 {
-	skb->tstamp = 0;
 	skb->pkt_type = PACKET_HOST;
 	skb->skb_iif = 0;
 	skb->ignore_df = 0;
@@ -4911,8 +4911,8 @@ void skb_scrub_packet(struct sk_buff *skb, bool xnet)
 		return;
 
 	ipvs_reset(skb);
-	skb_orphan(skb);
 	skb->mark = 0;
+	skb->tstamp = 0;
 }
 EXPORT_SYMBOL_GPL(skb_scrub_packet);
 
@@ -5276,8 +5276,7 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 			if (npages >= 1 << order) {
 				page = alloc_pages((gfp_mask & ~__GFP_DIRECT_RECLAIM) |
 						   __GFP_COMP |
-						   __GFP_NOWARN |
-						   __GFP_NORETRY,
+						   __GFP_NOWARN,
 						   order);
 				if (page)
 					goto fill_page;

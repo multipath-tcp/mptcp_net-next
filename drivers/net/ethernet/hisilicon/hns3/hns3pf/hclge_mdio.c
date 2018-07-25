@@ -1,11 +1,5 @@
-/*
- * Copyright (c) 2016~2017 Hisilicon Limited.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- */
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (c) 2016-2017 Hisilicon Limited.
 
 #include <linux/etherdevice.h>
 #include <linux/kernel.h>
@@ -67,16 +61,16 @@ static int hclge_mdio_write(struct mii_bus *bus, int phyid, int regnum,
 
 	mdio_cmd = (struct hclge_mdio_cfg_cmd *)desc.data;
 
-	hnae_set_field(mdio_cmd->phyid, HCLGE_MDIO_PHYID_M,
-		       HCLGE_MDIO_PHYID_S, phyid);
-	hnae_set_field(mdio_cmd->phyad, HCLGE_MDIO_PHYREG_M,
-		       HCLGE_MDIO_PHYREG_S, regnum);
+	hnae3_set_field(mdio_cmd->phyid, HCLGE_MDIO_PHYID_M,
+			HCLGE_MDIO_PHYID_S, phyid);
+	hnae3_set_field(mdio_cmd->phyad, HCLGE_MDIO_PHYREG_M,
+			HCLGE_MDIO_PHYREG_S, regnum);
 
-	hnae_set_bit(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_START_B, 1);
-	hnae_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_ST_M,
-		       HCLGE_MDIO_CTRL_ST_S, 1);
-	hnae_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_OP_M,
-		       HCLGE_MDIO_CTRL_OP_S, HCLGE_MDIO_C22_WRITE);
+	hnae3_set_bit(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_START_B, 1);
+	hnae3_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_ST_M,
+			HCLGE_MDIO_CTRL_ST_S, 1);
+	hnae3_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_OP_M,
+			HCLGE_MDIO_CTRL_OP_S, HCLGE_MDIO_C22_WRITE);
 
 	mdio_cmd->data_wr = cpu_to_le16(data);
 
@@ -105,16 +99,16 @@ static int hclge_mdio_read(struct mii_bus *bus, int phyid, int regnum)
 
 	mdio_cmd = (struct hclge_mdio_cfg_cmd *)desc.data;
 
-	hnae_set_field(mdio_cmd->phyid, HCLGE_MDIO_PHYID_M,
-		       HCLGE_MDIO_PHYID_S, phyid);
-	hnae_set_field(mdio_cmd->phyad, HCLGE_MDIO_PHYREG_M,
-		       HCLGE_MDIO_PHYREG_S, regnum);
+	hnae3_set_field(mdio_cmd->phyid, HCLGE_MDIO_PHYID_M,
+			HCLGE_MDIO_PHYID_S, phyid);
+	hnae3_set_field(mdio_cmd->phyad, HCLGE_MDIO_PHYREG_M,
+			HCLGE_MDIO_PHYREG_S, regnum);
 
-	hnae_set_bit(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_START_B, 1);
-	hnae_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_ST_M,
-		       HCLGE_MDIO_CTRL_ST_S, 1);
-	hnae_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_OP_M,
-		       HCLGE_MDIO_CTRL_OP_S, HCLGE_MDIO_C22_READ);
+	hnae3_set_bit(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_START_B, 1);
+	hnae3_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_ST_M,
+			HCLGE_MDIO_CTRL_ST_S, 1);
+	hnae3_set_field(mdio_cmd->ctrl_bit, HCLGE_MDIO_CTRL_OP_M,
+			HCLGE_MDIO_CTRL_OP_S, HCLGE_MDIO_C22_READ);
 
 	/* Read out phy data */
 	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
@@ -125,7 +119,7 @@ static int hclge_mdio_read(struct mii_bus *bus, int phyid, int regnum)
 		return ret;
 	}
 
-	if (hnae_get_bit(le16_to_cpu(mdio_cmd->sta), HCLGE_MDIO_STA_B)) {
+	if (hnae3_get_bit(le16_to_cpu(mdio_cmd->sta), HCLGE_MDIO_STA_B)) {
 		dev_err(&hdev->pdev->dev, "mdio read data error\n");
 		return -EIO;
 	}

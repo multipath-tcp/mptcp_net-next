@@ -216,6 +216,8 @@ struct rmap_item {
 #define SEQNR_MASK	0x0ff	/* low bits of unstable tree seqnr */
 #define UNSTABLE_FLAG	0x100	/* is a node of the unstable tree */
 #define STABLE_FLAG	0x200	/* is listed from the stable tree */
+#define KSM_FLAG_MASK	(SEQNR_MASK|UNSTABLE_FLAG|STABLE_FLAG)
+				/* to mask all the flags */
 
 /* The stable and unstable tree heads */
 static struct rb_root one_stable_tree[1] = { RB_ROOT };
@@ -838,6 +840,17 @@ static int unmerge_ksm_pages(struct vm_area_struct *vma,
 			err = break_ksm(vma, addr);
 	}
 	return err;
+}
+
+static inline struct stable_node *page_stable_node(struct page *page)
+{
+	return PageKsm(page) ? page_rmapping(page) : NULL;
+}
+
+static inline void set_page_stable_node(struct page *page,
+					struct stable_node *stable_node)
+{
+	page->mapping = (void *)((unsigned long)stable_node | PAGE_MAPPING_KSM);
 }
 
 #ifdef CONFIG_SYSFS
@@ -2587,10 +2600,15 @@ again:
 		anon_vma_lock_read(anon_vma);
 		anon_vma_interval_tree_foreach(vmac, &anon_vma->rb_root,
 					       0, ULONG_MAX) {
+			unsigned long addr;
+
 			cond_resched();
 			vma = vmac->vma;
-			if (rmap_item->address < vma->vm_start ||
-			    rmap_item->address >= vma->vm_end)
+
+			/* Ignore the stable/unstable/sqnr flags */
+			addr = rmap_item->address & ~KSM_FLAG_MASK;
+
+			if (addr < vma->vm_start || addr >= vma->vm_end)
 				continue;
 			/*
 			 * Initially we examine only the vma which covers this
@@ -2604,8 +2622,7 @@ again:
 			if (rwc->invalid_vma && rwc->invalid_vma(vma, rwc->arg))
 				continue;
 
-			if (!rwc->rmap_one(page, vma,
-					rmap_item->address, rwc->arg)) {
+			if (!rwc->rmap_one(page, vma, addr, rwc->arg)) {
 				anon_vma_unlock_read(anon_vma);
 				return;
 			}

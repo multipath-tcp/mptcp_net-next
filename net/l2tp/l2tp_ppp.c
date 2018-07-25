@@ -424,12 +424,6 @@ static void pppol2tp_put_sk(struct rcu_head *head)
 	sock_put(ps->__sk);
 }
 
-/* Called by l2tp_core when a session socket is being closed.
- */
-static void pppol2tp_session_close(struct l2tp_session *session)
-{
-}
-
 /* Really kill the session socket. (Called from sock_put() if
  * refcnt == 0.)
  */
@@ -573,7 +567,6 @@ static void pppol2tp_session_init(struct l2tp_session *session)
 	struct dst_entry *dst;
 
 	session->recv_skb = pppol2tp_recv;
-	session->session_close = pppol2tp_session_close;
 #if IS_ENABLED(CONFIG_L2TP_DEBUGFS)
 	session->show = pppol2tp_show;
 #endif
@@ -595,38 +588,113 @@ static void pppol2tp_session_init(struct l2tp_session *session)
 	}
 }
 
+struct l2tp_connect_info {
+	u8 version;
+	int fd;
+	u32 tunnel_id;
+	u32 peer_tunnel_id;
+	u32 session_id;
+	u32 peer_session_id;
+};
+
+static int pppol2tp_sockaddr_get_info(const void *sa, int sa_len,
+				      struct l2tp_connect_info *info)
+{
+	switch (sa_len) {
+	case sizeof(struct sockaddr_pppol2tp):
+	{
+		const struct sockaddr_pppol2tp *sa_v2in4 = sa;
+
+		if (sa_v2in4->sa_protocol != PX_PROTO_OL2TP)
+			return -EINVAL;
+
+		info->version = 2;
+		info->fd = sa_v2in4->pppol2tp.fd;
+		info->tunnel_id = sa_v2in4->pppol2tp.s_tunnel;
+		info->peer_tunnel_id = sa_v2in4->pppol2tp.d_tunnel;
+		info->session_id = sa_v2in4->pppol2tp.s_session;
+		info->peer_session_id = sa_v2in4->pppol2tp.d_session;
+
+		break;
+	}
+	case sizeof(struct sockaddr_pppol2tpv3):
+	{
+		const struct sockaddr_pppol2tpv3 *sa_v3in4 = sa;
+
+		if (sa_v3in4->sa_protocol != PX_PROTO_OL2TP)
+			return -EINVAL;
+
+		info->version = 3;
+		info->fd = sa_v3in4->pppol2tp.fd;
+		info->tunnel_id = sa_v3in4->pppol2tp.s_tunnel;
+		info->peer_tunnel_id = sa_v3in4->pppol2tp.d_tunnel;
+		info->session_id = sa_v3in4->pppol2tp.s_session;
+		info->peer_session_id = sa_v3in4->pppol2tp.d_session;
+
+		break;
+	}
+	case sizeof(struct sockaddr_pppol2tpin6):
+	{
+		const struct sockaddr_pppol2tpin6 *sa_v2in6 = sa;
+
+		if (sa_v2in6->sa_protocol != PX_PROTO_OL2TP)
+			return -EINVAL;
+
+		info->version = 2;
+		info->fd = sa_v2in6->pppol2tp.fd;
+		info->tunnel_id = sa_v2in6->pppol2tp.s_tunnel;
+		info->peer_tunnel_id = sa_v2in6->pppol2tp.d_tunnel;
+		info->session_id = sa_v2in6->pppol2tp.s_session;
+		info->peer_session_id = sa_v2in6->pppol2tp.d_session;
+
+		break;
+	}
+	case sizeof(struct sockaddr_pppol2tpv3in6):
+	{
+		const struct sockaddr_pppol2tpv3in6 *sa_v3in6 = sa;
+
+		if (sa_v3in6->sa_protocol != PX_PROTO_OL2TP)
+			return -EINVAL;
+
+		info->version = 3;
+		info->fd = sa_v3in6->pppol2tp.fd;
+		info->tunnel_id = sa_v3in6->pppol2tp.s_tunnel;
+		info->peer_tunnel_id = sa_v3in6->pppol2tp.d_tunnel;
+		info->session_id = sa_v3in6->pppol2tp.s_session;
+		info->peer_session_id = sa_v3in6->pppol2tp.d_session;
+
+		break;
+	}
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /* connect() handler. Attach a PPPoX socket to a tunnel UDP socket
  */
 static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 			    int sockaddr_len, int flags)
 {
 	struct sock *sk = sock->sk;
-	struct sockaddr_pppol2tp *sp = (struct sockaddr_pppol2tp *) uservaddr;
 	struct pppox_sock *po = pppox_sk(sk);
 	struct l2tp_session *session = NULL;
+	struct l2tp_connect_info info;
 	struct l2tp_tunnel *tunnel;
 	struct pppol2tp_session *ps;
 	struct l2tp_session_cfg cfg = { 0, };
-	int error = 0;
-	u32 tunnel_id, peer_tunnel_id;
-	u32 session_id, peer_session_id;
 	bool drop_refcnt = false;
 	bool drop_tunnel = false;
-	int ver = 2;
-	int fd;
+	bool new_session = false;
+	bool new_tunnel = false;
+	int error;
+
+	error = pppol2tp_sockaddr_get_info(uservaddr, sockaddr_len, &info);
+	if (error < 0)
+		return error;
 
 	lock_sock(sk);
-
-	error = -EINVAL;
-
-	if (sockaddr_len != sizeof(struct sockaddr_pppol2tp) &&
-	    sockaddr_len != sizeof(struct sockaddr_pppol2tpv3) &&
-	    sockaddr_len != sizeof(struct sockaddr_pppol2tpin6) &&
-	    sockaddr_len != sizeof(struct sockaddr_pppol2tpv3in6))
-		goto end;
-
-	if (sp->sa_protocol != PX_PROTO_OL2TP)
-		goto end;
 
 	/* Check for already bound sockets */
 	error = -EBUSY;
@@ -638,56 +706,12 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	if (sk->sk_user_data)
 		goto end; /* socket is already attached */
 
-	/* Get params from socket address. Handle L2TPv2 and L2TPv3.
-	 * This is nasty because there are different sockaddr_pppol2tp
-	 * structs for L2TPv2, L2TPv3, over IPv4 and IPv6. We use
-	 * the sockaddr size to determine which structure the caller
-	 * is using.
-	 */
-	peer_tunnel_id = 0;
-	if (sockaddr_len == sizeof(struct sockaddr_pppol2tp)) {
-		fd = sp->pppol2tp.fd;
-		tunnel_id = sp->pppol2tp.s_tunnel;
-		peer_tunnel_id = sp->pppol2tp.d_tunnel;
-		session_id = sp->pppol2tp.s_session;
-		peer_session_id = sp->pppol2tp.d_session;
-	} else if (sockaddr_len == sizeof(struct sockaddr_pppol2tpv3)) {
-		struct sockaddr_pppol2tpv3 *sp3 =
-			(struct sockaddr_pppol2tpv3 *) sp;
-		ver = 3;
-		fd = sp3->pppol2tp.fd;
-		tunnel_id = sp3->pppol2tp.s_tunnel;
-		peer_tunnel_id = sp3->pppol2tp.d_tunnel;
-		session_id = sp3->pppol2tp.s_session;
-		peer_session_id = sp3->pppol2tp.d_session;
-	} else if (sockaddr_len == sizeof(struct sockaddr_pppol2tpin6)) {
-		struct sockaddr_pppol2tpin6 *sp6 =
-			(struct sockaddr_pppol2tpin6 *) sp;
-		fd = sp6->pppol2tp.fd;
-		tunnel_id = sp6->pppol2tp.s_tunnel;
-		peer_tunnel_id = sp6->pppol2tp.d_tunnel;
-		session_id = sp6->pppol2tp.s_session;
-		peer_session_id = sp6->pppol2tp.d_session;
-	} else if (sockaddr_len == sizeof(struct sockaddr_pppol2tpv3in6)) {
-		struct sockaddr_pppol2tpv3in6 *sp6 =
-			(struct sockaddr_pppol2tpv3in6 *) sp;
-		ver = 3;
-		fd = sp6->pppol2tp.fd;
-		tunnel_id = sp6->pppol2tp.s_tunnel;
-		peer_tunnel_id = sp6->pppol2tp.d_tunnel;
-		session_id = sp6->pppol2tp.s_session;
-		peer_session_id = sp6->pppol2tp.d_session;
-	} else {
-		error = -EINVAL;
-		goto end; /* bad socket address */
-	}
-
 	/* Don't bind if tunnel_id is 0 */
 	error = -EINVAL;
-	if (tunnel_id == 0)
+	if (!info.tunnel_id)
 		goto end;
 
-	tunnel = l2tp_tunnel_get(sock_net(sk), tunnel_id);
+	tunnel = l2tp_tunnel_get(sock_net(sk), info.tunnel_id);
 	if (tunnel)
 		drop_tunnel = true;
 
@@ -695,13 +719,26 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 	 * peer_session_id is 0. Otherwise look up tunnel using supplied
 	 * tunnel id.
 	 */
-	if ((session_id == 0) && (peer_session_id == 0)) {
+	if (!info.session_id && !info.peer_session_id) {
 		if (tunnel == NULL) {
 			struct l2tp_tunnel_cfg tcfg = {
 				.encap = L2TP_ENCAPTYPE_UDP,
 				.debug = 0,
 			};
-			error = l2tp_tunnel_create(sock_net(sk), fd, ver, tunnel_id, peer_tunnel_id, &tcfg, &tunnel);
+
+			/* Prevent l2tp_tunnel_register() from trying to set up
+			 * a kernel socket.
+			 */
+			if (info.fd < 0) {
+				error = -EBADF;
+				goto end;
+			}
+
+			error = l2tp_tunnel_create(sock_net(sk), info.fd,
+						   info.version,
+						   info.tunnel_id,
+						   info.peer_tunnel_id, &tcfg,
+						   &tunnel);
 			if (error < 0)
 				goto end;
 
@@ -713,6 +750,7 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 				goto end;
 			}
 			drop_tunnel = true;
+			new_tunnel = true;
 		}
 	} else {
 		/* Error if we can't find the tunnel */
@@ -729,11 +767,17 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 		tunnel->recv_payload_hook = pppol2tp_recv_payload_hook;
 
 	if (tunnel->peer_tunnel_id == 0)
-		tunnel->peer_tunnel_id = peer_tunnel_id;
+		tunnel->peer_tunnel_id = info.peer_tunnel_id;
 
-	session = l2tp_session_get(sock_net(sk), tunnel, session_id);
+	session = l2tp_session_get(sock_net(sk), tunnel, info.session_id);
 	if (session) {
 		drop_refcnt = true;
+
+		if (session->pwtype != L2TP_PWTYPE_PPP) {
+			error = -EPROTOTYPE;
+			goto end;
+		}
+
 		ps = l2tp_session_priv(session);
 
 		/* Using a pre-existing session is fine as long as it hasn't
@@ -751,10 +795,11 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 		/* Default MTU must allow space for UDP/L2TP/PPP headers */
 		cfg.mtu = 1500 - PPPOL2TP_HEADER_OVERHEAD;
 		cfg.mru = cfg.mtu;
+		cfg.pw_type = L2TP_PWTYPE_PPP;
 
 		session = l2tp_session_create(sizeof(struct pppol2tp_session),
-					      tunnel, session_id,
-					      peer_session_id, &cfg);
+					      tunnel, info.session_id,
+					      info.peer_session_id, &cfg);
 		if (IS_ERR(session)) {
 			error = PTR_ERR(session);
 			goto end;
@@ -772,6 +817,7 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 			goto end;
 		}
 		drop_refcnt = true;
+		new_session = true;
 	}
 
 	/* Special case: if source & dest session_id == 0x0000, this
@@ -818,6 +864,12 @@ out_no_ppp:
 		  session->name);
 
 end:
+	if (error) {
+		if (new_session)
+			l2tp_session_delete(session);
+		if (new_tunnel)
+			l2tp_tunnel_delete(tunnel);
+	}
 	if (drop_refcnt)
 		l2tp_session_dec_refcount(session);
 	if (drop_tunnel)
@@ -1175,7 +1227,7 @@ static int pppol2tp_tunnel_ioctl(struct l2tp_tunnel *tunnel,
 				l2tp_session_get(sock_net(sk), tunnel,
 						 stats.session_id);
 
-			if (session) {
+			if (session && session->pwtype == L2TP_PWTYPE_PPP) {
 				err = pppol2tp_session_ioctl(session, cmd,
 							     arg);
 				l2tp_session_dec_refcount(session);
@@ -1792,7 +1844,7 @@ static const struct proto_ops pppol2tp_ops = {
 	.socketpair	= sock_no_socketpair,
 	.accept		= sock_no_accept,
 	.getname	= pppol2tp_getname,
-	.poll_mask	= datagram_poll_mask,
+	.poll		= datagram_poll,
 	.listen		= sock_no_listen,
 	.shutdown	= sock_no_shutdown,
 	.setsockopt	= pppol2tp_setsockopt,

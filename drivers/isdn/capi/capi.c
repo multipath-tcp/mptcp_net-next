@@ -9,6 +9,7 @@
  *
  */
 
+#include <linux/compiler.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -1260,7 +1261,7 @@ static int __init capinc_tty_init(void)
 	if (capi_ttyminors <= 0)
 		capi_ttyminors = CAPINC_NR_PORTS;
 
-	capiminors = kzalloc(sizeof(struct capiminor *) * capi_ttyminors,
+	capiminors = kcalloc(capi_ttyminors, sizeof(struct capiminor *),
 			     GFP_KERNEL);
 	if (!capiminors)
 		return -ENOMEM;
@@ -1321,7 +1322,7 @@ static inline void capinc_tty_exit(void) { }
  * /proc/capi/capi20:
  *  minor applid nrecvctlpkt nrecvdatapkt nsendctlpkt nsenddatapkt
  */
-static int capi20_proc_show(struct seq_file *m, void *v)
+static int __maybe_unused capi20_proc_show(struct seq_file *m, void *v)
 {
 	struct capidev *cdev;
 	struct list_head *l;
@@ -1344,7 +1345,7 @@ static int capi20_proc_show(struct seq_file *m, void *v)
  * /proc/capi/capi20ncci:
  *  applid ncci
  */
-static int capi20ncci_proc_show(struct seq_file *m, void *v)
+static int __maybe_unused capi20ncci_proc_show(struct seq_file *m, void *v)
 {
 	struct capidev *cdev;
 	struct capincci *np;

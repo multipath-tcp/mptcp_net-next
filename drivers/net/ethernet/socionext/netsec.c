@@ -780,11 +780,9 @@ static int netsec_process_rx(struct netsec_priv *priv, int budget)
 static int netsec_napi_poll(struct napi_struct *napi, int budget)
 {
 	struct netsec_priv *priv;
-	struct net_device *ndev;
 	int tx, rx, done, todo;
 
 	priv = container_of(napi, struct netsec_priv, napi);
-	ndev = priv->ndev;
 
 	todo = budget;
 	do {
@@ -973,7 +971,7 @@ static int netsec_alloc_dring(struct netsec_priv *priv, enum ring_id id)
 		goto err;
 	}
 
-	dring->desc = kzalloc(DESC_NUM * sizeof(*dring->desc), GFP_KERNEL);
+	dring->desc = kcalloc(DESC_NUM, sizeof(*dring->desc), GFP_KERNEL);
 	if (!dring->desc) {
 		ret = -ENOMEM;
 		goto err;
