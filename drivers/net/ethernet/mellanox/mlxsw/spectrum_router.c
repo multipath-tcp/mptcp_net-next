@@ -1,39 +1,5 @@
-/*
- * drivers/net/ethernet/mellanox/mlxsw/spectrum_router.c
- * Copyright (c) 2016-2018 Mellanox Technologies. All rights reserved.
- * Copyright (c) 2016 Jiri Pirko <jiri@mellanox.com>
- * Copyright (c) 2016 Ido Schimmel <idosch@mellanox.com>
- * Copyright (c) 2016 Yotam Gigi <yotamg@mellanox.com>
- * Copyright (c) 2017-2018 Petr Machata <petrm@mellanox.com>
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the names of the copyright holders nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL") version 2 as published by the Free
- * Software Foundation.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+// SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0
+/* Copyright (c) 2016-2018 Mellanox Technologies. All rights reserved */
 
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -2436,17 +2402,48 @@ static void mlxsw_sp_router_mp_hash_event_work(struct work_struct *work)
 	kfree(net_work);
 }
 
+static int __mlxsw_sp_router_init(struct mlxsw_sp *mlxsw_sp);
+
+static void mlxsw_sp_router_update_priority_work(struct work_struct *work)
+{
+	struct mlxsw_sp_netevent_work *net_work =
+		container_of(work, struct mlxsw_sp_netevent_work, work);
+	struct mlxsw_sp *mlxsw_sp = net_work->mlxsw_sp;
+
+	__mlxsw_sp_router_init(mlxsw_sp);
+	kfree(net_work);
+}
+
+static int mlxsw_sp_router_schedule_work(struct net *net,
+					 struct notifier_block *nb,
+					 void (*cb)(struct work_struct *))
+{
+	struct mlxsw_sp_netevent_work *net_work;
+	struct mlxsw_sp_router *router;
+
+	if (!net_eq(net, &init_net))
+		return NOTIFY_DONE;
+
+	net_work = kzalloc(sizeof(*net_work), GFP_ATOMIC);
+	if (!net_work)
+		return NOTIFY_BAD;
+
+	router = container_of(nb, struct mlxsw_sp_router, netevent_nb);
+	INIT_WORK(&net_work->work, cb);
+	net_work->mlxsw_sp = router->mlxsw_sp;
+	mlxsw_core_schedule_work(&net_work->work);
+	return NOTIFY_DONE;
+}
+
 static int mlxsw_sp_router_netevent_event(struct notifier_block *nb,
 					  unsigned long event, void *ptr)
 {
 	struct mlxsw_sp_netevent_work *net_work;
 	struct mlxsw_sp_port *mlxsw_sp_port;
-	struct mlxsw_sp_router *router;
 	struct mlxsw_sp *mlxsw_sp;
 	unsigned long interval;
 	struct neigh_parms *p;
 	struct neighbour *n;
-	struct net *net;
 
 	switch (event) {
 	case NETEVENT_DELAY_PROBE_TIME_UPDATE:
@@ -2500,20 +2497,12 @@ static int mlxsw_sp_router_netevent_event(struct notifier_block *nb,
 		break;
 	case NETEVENT_IPV4_MPATH_HASH_UPDATE:
 	case NETEVENT_IPV6_MPATH_HASH_UPDATE:
-		net = ptr;
+		return mlxsw_sp_router_schedule_work(ptr, nb,
+				mlxsw_sp_router_mp_hash_event_work);
 
-		if (!net_eq(net, &init_net))
-			return NOTIFY_DONE;
-
-		net_work = kzalloc(sizeof(*net_work), GFP_ATOMIC);
-		if (!net_work)
-			return NOTIFY_BAD;
-
-		router = container_of(nb, struct mlxsw_sp_router, netevent_nb);
-		INIT_WORK(&net_work->work, mlxsw_sp_router_mp_hash_event_work);
-		net_work->mlxsw_sp = router->mlxsw_sp;
-		mlxsw_core_schedule_work(&net_work->work);
-		break;
+	case NETEVENT_IPV4_FWD_UPDATE_PRIORITY_UPDATE:
+		return mlxsw_sp_router_schedule_work(ptr, nb,
+				mlxsw_sp_router_update_priority_work);
 	}
 
 	return NOTIFY_DONE;
@@ -7382,6 +7371,7 @@ static int mlxsw_sp_dscp_init(struct mlxsw_sp *mlxsw_sp)
 
 static int __mlxsw_sp_router_init(struct mlxsw_sp *mlxsw_sp)
 {
+	bool usp = init_net.ipv4.sysctl_ip_fwd_update_priority;
 	char rgcr_pl[MLXSW_REG_RGCR_LEN];
 	u64 max_rifs;
 	int err;
@@ -7392,7 +7382,7 @@ static int __mlxsw_sp_router_init(struct mlxsw_sp *mlxsw_sp)
 
 	mlxsw_reg_rgcr_pack(rgcr_pl, true, true);
 	mlxsw_reg_rgcr_max_router_interfaces_set(rgcr_pl, max_rifs);
-	mlxsw_reg_rgcr_usp_set(rgcr_pl, true);
+	mlxsw_reg_rgcr_usp_set(rgcr_pl, usp);
 	err = mlxsw_reg_write(mlxsw_sp->core, MLXSW_REG(rgcr), rgcr_pl);
 	if (err)
 		return err;

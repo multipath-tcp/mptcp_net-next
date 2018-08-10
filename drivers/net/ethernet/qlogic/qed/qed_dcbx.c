@@ -208,7 +208,7 @@ qed_dcbx_set_params(struct qed_dcbx_results *p_data,
 
 	/* QM reconf data */
 	if (p_info->personality == personality)
-		p_info->offload_tc = tc;
+		qed_hw_info_set_offload_tc(p_info, tc);
 }
 
 /* Update app protocol data and hw_info fields with the TLV info */
@@ -867,7 +867,7 @@ static int qed_dcbx_read_mib(struct qed_hwfn *p_hwfn,
 	return rc;
 }
 
-void qed_dcbx_aen(struct qed_hwfn *hwfn, u32 mib_type)
+static void qed_dcbx_aen(struct qed_hwfn *hwfn, u32 mib_type)
 {
 	struct qed_common_cb_ops *op = hwfn->cdev->protocol_ops.common;
 	void *cookie = hwfn->cdev->ops_cookie;
@@ -987,6 +987,24 @@ void qed_dcbx_set_pf_update_params(struct qed_dcbx_results *p_src,
 	qed_dcbx_update_protocol_data(p_dcb_data, p_src, DCBX_PROTOCOL_ISCSI);
 	p_dcb_data = &p_dest->eth_dcb_data;
 	qed_dcbx_update_protocol_data(p_dcb_data, p_src, DCBX_PROTOCOL_ETH);
+}
+
+u8 qed_dcbx_get_priority_tc(struct qed_hwfn *p_hwfn, u8 pri)
+{
+	struct qed_dcbx_get *dcbx_info = &p_hwfn->p_dcbx_info->get;
+
+	if (pri >= QED_MAX_PFC_PRIORITIES) {
+		DP_ERR(p_hwfn, "Invalid priority %d\n", pri);
+		return QED_DCBX_DEFAULT_TC;
+	}
+
+	if (!dcbx_info->operational.valid) {
+		DP_VERBOSE(p_hwfn, QED_MSG_DCB,
+			   "Dcbx parameters not available\n");
+		return QED_DCBX_DEFAULT_TC;
+	}
+
+	return dcbx_info->operational.params.ets_pri_tc_tbl[pri];
 }
 
 #ifdef CONFIG_DCB

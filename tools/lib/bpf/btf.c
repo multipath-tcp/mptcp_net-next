@@ -2,7 +2,6 @@
 /* Copyright (c) 2018 Facebook */
 
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -32,9 +31,9 @@ struct btf {
 	struct btf_type **types;
 	const char *strings;
 	void *nohdr_data;
-	uint32_t nr_types;
-	uint32_t types_size;
-	uint32_t data_size;
+	__u32 nr_types;
+	__u32 types_size;
+	__u32 data_size;
 	int fd;
 };
 
@@ -42,7 +41,7 @@ static int btf_add_type(struct btf *btf, struct btf_type *t)
 {
 	if (btf->types_size - btf->nr_types < 2) {
 		struct btf_type **new_types;
-		u32 expand_by, new_size;
+		__u32 expand_by, new_size;
 
 		if (btf->types_size == BTF_MAX_NR_TYPES)
 			return -E2BIG;
@@ -69,7 +68,7 @@ static int btf_add_type(struct btf *btf, struct btf_type *t)
 static int btf_parse_hdr(struct btf *btf, btf_print_fn_t err_log)
 {
 	const struct btf_header *hdr = btf->hdr;
-	u32 meta_left;
+	__u32 meta_left;
 
 	if (btf->data_size < sizeof(struct btf_header)) {
 		elog("BTF header not found\n");
@@ -148,7 +147,7 @@ static int btf_parse_type_sec(struct btf *btf, btf_print_fn_t err_log)
 
 	while (next_type < end_type) {
 		struct btf_type *t = next_type;
-		uint16_t vlen = BTF_INFO_VLEN(t->info);
+		__u16 vlen = BTF_INFO_VLEN(t->info);
 		int err;
 
 		next_type += sizeof(*t);
@@ -187,6 +186,14 @@ static int btf_parse_type_sec(struct btf *btf, btf_print_fn_t err_log)
 	return 0;
 }
 
+const struct btf_type *btf__type_by_id(const struct btf *btf, __u32 type_id)
+{
+	if (type_id > btf->nr_types)
+		return NULL;
+
+	return btf->types[type_id];
+}
+
 static bool btf_type_is_void(const struct btf_type *t)
 {
 	return t == &btf_void || BTF_INFO_KIND(t->info) == BTF_KIND_FWD;
@@ -197,7 +204,7 @@ static bool btf_type_is_void_or_null(const struct btf_type *t)
 	return !t || btf_type_is_void(t);
 }
 
-static int64_t btf_type_size(const struct btf_type *t)
+static __s64 btf_type_size(const struct btf_type *t)
 {
 	switch (BTF_INFO_KIND(t->info)) {
 	case BTF_KIND_INT:
@@ -214,12 +221,12 @@ static int64_t btf_type_size(const struct btf_type *t)
 
 #define MAX_RESOLVE_DEPTH 32
 
-int64_t btf__resolve_size(const struct btf *btf, uint32_t type_id)
+__s64 btf__resolve_size(const struct btf *btf, __u32 type_id)
 {
 	const struct btf_array *array;
 	const struct btf_type *t;
-	uint32_t nelems = 1;
-	int64_t size = -1;
+	__u32 nelems = 1;
+	__s64 size = -1;
 	int i;
 
 	t = btf__type_by_id(btf, type_id);
@@ -279,9 +286,9 @@ int btf__resolve_type(const struct btf *btf, __u32 type_id)
 	return type_id;
 }
 
-int32_t btf__find_by_name(const struct btf *btf, const char *type_name)
+__s32 btf__find_by_name(const struct btf *btf, const char *type_name)
 {
-	uint32_t i;
+	__u32 i;
 
 	if (!strcmp(type_name, "void"))
 		return 0;
@@ -310,10 +317,9 @@ void btf__free(struct btf *btf)
 	free(btf);
 }
 
-struct btf *btf__new(uint8_t *data, uint32_t size,
-		     btf_print_fn_t err_log)
+struct btf *btf__new(__u8 *data, __u32 size, btf_print_fn_t err_log)
 {
-	uint32_t log_buf_size = 0;
+	__u32 log_buf_size = 0;
 	char *log_buf = NULL;
 	struct btf *btf;
 	int err;
@@ -386,13 +392,4 @@ const char *btf__name_by_offset(const struct btf *btf, __u32 offset)
 		return &btf->strings[offset];
 	else
 		return NULL;
-}
-
-const struct btf_type *btf__type_by_id(const struct btf *btf,
-				       __u32 type_id)
-{
-	if (type_id > btf->nr_types)
-		return NULL;
-
-	return btf->types[type_id];
 }

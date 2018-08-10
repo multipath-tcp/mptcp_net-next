@@ -2176,6 +2176,7 @@ static void netif_reset_xps_queues(struct net_device *dev, u16 offset,
 	if (!static_key_false(&xps_needed))
 		return;
 
+	cpus_read_lock();
 	mutex_lock(&xps_map_mutex);
 
 	if (static_key_false(&xps_rxqs_needed)) {
@@ -2199,10 +2200,11 @@ static void netif_reset_xps_queues(struct net_device *dev, u16 offset,
 
 out_no_maps:
 	if (static_key_enabled(&xps_rxqs_needed))
-		static_key_slow_dec(&xps_rxqs_needed);
+		static_key_slow_dec_cpuslocked(&xps_rxqs_needed);
 
-	static_key_slow_dec(&xps_needed);
+	static_key_slow_dec_cpuslocked(&xps_needed);
 	mutex_unlock(&xps_map_mutex);
+	cpus_read_unlock();
 }
 
 static void netif_reset_xps_queues_gt(struct net_device *dev, u16 index)
@@ -2250,6 +2252,7 @@ static struct xps_map *expand_xps_map(struct xps_map *map, int attr_index,
 	return new_map;
 }
 
+/* Must be called under cpus_read_lock */
 int __netif_set_xps_queue(struct net_device *dev, const unsigned long *mask,
 			  u16 index, bool is_rxqs_map)
 {
@@ -2317,9 +2320,9 @@ int __netif_set_xps_queue(struct net_device *dev, const unsigned long *mask,
 	if (!new_dev_maps)
 		goto out_no_new_maps;
 
-	static_key_slow_inc(&xps_needed);
+	static_key_slow_inc_cpuslocked(&xps_needed);
 	if (is_rxqs_map)
-		static_key_slow_inc(&xps_rxqs_needed);
+		static_key_slow_inc_cpuslocked(&xps_rxqs_needed);
 
 	for (j = -1; j = netif_attrmask_next(j, possible_mask, nr_ids),
 	     j < nr_ids;) {
@@ -2448,11 +2451,18 @@ error:
 	kfree(new_dev_maps);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL_GPL(__netif_set_xps_queue);
 
 int netif_set_xps_queue(struct net_device *dev, const struct cpumask *mask,
 			u16 index)
 {
-	return __netif_set_xps_queue(dev, cpumask_bits(mask), index, false);
+	int ret;
+
+	cpus_read_lock();
+	ret =  __netif_set_xps_queue(dev, cpumask_bits(mask), index, false);
+	cpus_read_unlock();
+
+	return ret;
 }
 EXPORT_SYMBOL(netif_set_xps_queue);
 
@@ -4252,7 +4262,7 @@ static u32 netif_receive_generic_xdp(struct sk_buff *skb,
 	/* Reinjected packets coming from act_mirred or similar should
 	 * not get XDP generic processing.
 	 */
-	if (skb_cloned(skb))
+	if (skb_cloned(skb) || skb_is_tc_redirected(skb))
 		return XDP_PASS;
 
 	/* XDP packets must be linear and must have sufficient headroom
@@ -4601,6 +4611,10 @@ sch_handle_ingress(struct sk_buff *skb, struct packet_type **pt_prev, int *ret,
 		 */
 		__skb_push(skb, skb->mac_len);
 		skb_do_redirect(skb);
+		return NULL;
+	case TC_ACT_REINSERT:
+		/* this does not scrub the packet, and updates stats on error */
+		skb_tc_reinsert(skb, &cl_res);
 		return NULL;
 	default:
 		break;
@@ -7523,13 +7537,15 @@ int __dev_set_mtu(struct net_device *dev, int new_mtu)
 EXPORT_SYMBOL(__dev_set_mtu);
 
 /**
- *	dev_set_mtu - Change maximum transfer unit
+ *	dev_set_mtu_ext - Change maximum transfer unit
  *	@dev: device
  *	@new_mtu: new transfer unit
+ *	@extack: netlink extended ack
  *
  *	Change the maximum transfer size of the network device.
  */
-int dev_set_mtu(struct net_device *dev, int new_mtu)
+int dev_set_mtu_ext(struct net_device *dev, int new_mtu,
+		    struct netlink_ext_ack *extack)
 {
 	int err, orig_mtu;
 
@@ -7538,14 +7554,12 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 
 	/* MTU must be positive, and in range */
 	if (new_mtu < 0 || new_mtu < dev->min_mtu) {
-		net_err_ratelimited("%s: Invalid MTU %d requested, hw min %d\n",
-				    dev->name, new_mtu, dev->min_mtu);
+		NL_SET_ERR_MSG(extack, "mtu less than device minimum");
 		return -EINVAL;
 	}
 
 	if (dev->max_mtu > 0 && new_mtu > dev->max_mtu) {
-		net_err_ratelimited("%s: Invalid MTU %d requested, hw max %d\n",
-				    dev->name, new_mtu, dev->max_mtu);
+		NL_SET_ERR_MSG(extack, "mtu greater than device maximum");
 		return -EINVAL;
 	}
 
@@ -7573,6 +7587,18 @@ int dev_set_mtu(struct net_device *dev, int new_mtu)
 	}
 	return err;
 }
+
+int dev_set_mtu(struct net_device *dev, int new_mtu)
+{
+	struct netlink_ext_ack extack;
+	int err;
+
+	memset(&extack, 0, sizeof(extack));
+	err = dev_set_mtu_ext(dev, new_mtu, &extack);
+	if (err && extack._msg)
+		net_err_ratelimited("%s: %s\n", dev->name, extack._msg);
+	return err;
+}
 EXPORT_SYMBOL(dev_set_mtu);
 
 /**
@@ -7592,16 +7618,19 @@ int dev_change_tx_queue_len(struct net_device *dev, unsigned long new_len)
 		dev->tx_queue_len = new_len;
 		res = call_netdevice_notifiers(NETDEV_CHANGE_TX_QUEUE_LEN, dev);
 		res = notifier_to_errno(res);
-		if (res) {
-			netdev_err(dev,
-				   "refused to change device tx_queue_len\n");
-			dev->tx_queue_len = orig_len;
-			return res;
-		}
-		return dev_qdisc_change_tx_queue_len(dev);
+		if (res)
+			goto err_rollback;
+		res = dev_qdisc_change_tx_queue_len(dev);
+		if (res)
+			goto err_rollback;
 	}
 
 	return 0;
+
+err_rollback:
+	netdev_err(dev, "refused to change device tx_queue_len\n");
+	dev->tx_queue_len = orig_len;
+	return res;
 }
 
 /**

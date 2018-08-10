@@ -5176,6 +5176,7 @@ bool igb_has_link(struct igb_adapter *adapter)
 	case e1000_media_type_copper:
 		if (!hw->mac.get_link_status)
 			return true;
+		/* fall through */
 	case e1000_media_type_internal_serdes:
 		hw->mac.ops.check_for_link(hw);
 		link_active = !hw->mac.get_link_status;
@@ -5836,6 +5837,7 @@ csum_failed:
 			type_tucmd = E1000_ADVTXD_TUCMD_L4T_SCTP;
 			break;
 		}
+		/* fall through */
 	default:
 		skb_checksum_help(skb);
 		goto csum_failed;
@@ -6031,7 +6033,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
 	 * We also need this memory barrier to make certain all of the
 	 * status bits have been updated before next_to_watch is written.
 	 */
-	wmb();
+	dma_wmb();
 
 	/* set next_to_watch value indicating a packet is present */
 	first->next_to_watch = tx_desc;
@@ -8531,7 +8533,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
 		 * applicable for weak-ordered memory model archs,
 		 * such as IA-64).
 		 */
-		wmb();
+		dma_wmb();
 		writel(i, rx_ring->tail);
 	}
 }

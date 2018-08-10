@@ -263,7 +263,7 @@ static int zerocopy_from_iter(struct sock *sk, struct iov_iter *from,
 			      int length, int *pages_used,
 			      unsigned int *size_used,
 			      struct scatterlist *to, int to_max_pages,
-			      bool charge, bool revert)
+			      bool charge)
 {
 	struct page *pages[MAX_SKB_FRAGS];
 
@@ -311,11 +311,14 @@ static int zerocopy_from_iter(struct sock *sk, struct iov_iter *from,
 		}
 	}
 
+	/* Mark the end in the last sg entry if newly added */
+	if (num_elem > *pages_used)
+		sg_mark_end(&to[num_elem - 1]);
 out:
+	if (rc)
+		iov_iter_revert(from, size - *size_used);
 	*size_used = size;
 	*pages_used = num_elem;
-	if (revert)
-		iov_iter_revert(from, size);
 
 	return rc;
 }
@@ -362,6 +365,7 @@ int tls_sw_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	int record_room;
 	bool full_record;
 	int orig_size;
+	bool is_kvec = msg->msg_iter.type & ITER_KVEC;
 
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
 		return -ENOTSUPP;
@@ -410,28 +414,23 @@ alloc_encrypted:
 			try_to_copy -= required_size - ctx->sg_encrypted_size;
 			full_record = true;
 		}
-
-		if (full_record || eor) {
+		if (!is_kvec && (full_record || eor)) {
 			ret = zerocopy_from_iter(sk, &msg->msg_iter,
 				try_to_copy, &ctx->sg_plaintext_num_elem,
 				&ctx->sg_plaintext_size,
 				ctx->sg_plaintext_data,
 				ARRAY_SIZE(ctx->sg_plaintext_data),
-				true, false);
+				true);
 			if (ret)
 				goto fallback_to_reg_send;
 
 			copied += try_to_copy;
 			ret = tls_push_record(sk, msg->msg_flags, record_type);
-			if (!ret)
-				continue;
-			if (ret < 0)
+			if (ret)
 				goto send_end;
+			continue;
 
-			copied -= try_to_copy;
 fallback_to_reg_send:
-			iov_iter_revert(&msg->msg_iter,
-					ctx->sg_plaintext_size - orig_size);
 			trim_sg(sk, ctx->sg_plaintext_data,
 				&ctx->sg_plaintext_num_elem,
 				&ctx->sg_plaintext_size,
@@ -779,6 +778,7 @@ int tls_sw_recvmsg(struct sock *sk,
 	bool cmsg = false;
 	int target, err = 0;
 	long timeo;
+	bool is_kvec = msg->msg_iter.type & ITER_KVEC;
 
 	flags |= nonblock;
 
@@ -822,7 +822,7 @@ int tls_sw_recvmsg(struct sock *sk,
 			page_count = iov_iter_npages(&msg->msg_iter,
 						     MAX_SKB_FRAGS);
 			to_copy = rxm->full_len - tls_ctx->rx.overhead_size;
-			if (to_copy <= len && page_count < MAX_SKB_FRAGS &&
+			if (!is_kvec && to_copy <= len && page_count < MAX_SKB_FRAGS &&
 			    likely(!(flags & MSG_PEEK)))  {
 				struct scatterlist sgin[MAX_SKB_FRAGS + 1];
 				int pages = 0;
@@ -835,7 +835,7 @@ int tls_sw_recvmsg(struct sock *sk,
 				err = zerocopy_from_iter(sk, &msg->msg_iter,
 							 to_copy, &pages,
 							 &chunk, &sgin[1],
-							 MAX_SKB_FRAGS,	false, true);
+							 MAX_SKB_FRAGS,	false);
 				if (err < 0)
 					goto fallback_to_reg_recv;
 
@@ -1031,7 +1031,7 @@ static void tls_queue(struct strparser *strp, struct sk_buff *skb)
 	ctx->recv_pkt = skb;
 	strp_pause(strp);
 
-	strp->sk->sk_state_change(strp->sk);
+	ctx->saved_data_ready(strp->sk);
 }
 
 static void tls_data_ready(struct sock *sk)
@@ -1047,8 +1047,7 @@ void tls_sw_free_resources_tx(struct sock *sk)
 	struct tls_context *tls_ctx = tls_get_ctx(sk);
 	struct tls_sw_context_tx *ctx = tls_sw_ctx_tx(tls_ctx);
 
-	if (ctx->aead_send)
-		crypto_free_aead(ctx->aead_send);
+	crypto_free_aead(ctx->aead_send);
 	tls_free_both_sg(sk);
 
 	kfree(ctx);
@@ -1060,10 +1059,8 @@ void tls_sw_release_resources_rx(struct sock *sk)
 	struct tls_sw_context_rx *ctx = tls_sw_ctx_rx(tls_ctx);
 
 	if (ctx->aead_recv) {
-		if (ctx->recv_pkt) {
-			kfree_skb(ctx->recv_pkt);
-			ctx->recv_pkt = NULL;
-		}
+		kfree_skb(ctx->recv_pkt);
+		ctx->recv_pkt = NULL;
 		crypto_free_aead(ctx->aead_recv);
 		strp_stop(&ctx->strp);
 		write_lock_bh(&sk->sk_callback_lock);
@@ -1179,12 +1176,11 @@ int tls_set_sw_offload(struct sock *sk, struct tls_context *ctx, int tx)
 	memcpy(cctx->iv, gcm_128_info->salt, TLS_CIPHER_AES_GCM_128_SALT_SIZE);
 	memcpy(cctx->iv + TLS_CIPHER_AES_GCM_128_SALT_SIZE, iv, iv_size);
 	cctx->rec_seq_size = rec_seq_size;
-	cctx->rec_seq = kmalloc(rec_seq_size, GFP_KERNEL);
+	cctx->rec_seq = kmemdup(rec_seq, rec_seq_size, GFP_KERNEL);
 	if (!cctx->rec_seq) {
 		rc = -ENOMEM;
 		goto free_iv;
 	}
-	memcpy(cctx->rec_seq, rec_seq, rec_seq_size);
 
 	if (sw_ctx_tx) {
 		sg_init_table(sw_ctx_tx->sg_encrypted_data,

@@ -232,19 +232,6 @@ static void tcf_chain0_head_change(struct tcf_chain *chain,
 		tcf_chain_head_change_item(item, tp_head);
 }
 
-static void tcf_chain_flush(struct tcf_chain *chain)
-{
-	struct tcf_proto *tp = rtnl_dereference(chain->filter_chain);
-
-	tcf_chain0_head_change(chain, NULL);
-	while (tp) {
-		RCU_INIT_POINTER(chain->filter_chain, tp->next);
-		tcf_proto_destroy(tp, NULL);
-		tp = rtnl_dereference(chain->filter_chain);
-		tcf_chain_put(chain);
-	}
-}
-
 static void tcf_chain_destroy(struct tcf_chain *chain)
 {
 	struct tcf_block *block = chain->block;
@@ -262,6 +249,14 @@ static void tcf_chain_hold(struct tcf_chain *chain)
 	++chain->refcnt;
 }
 
+static bool tcf_chain_held_by_acts_only(struct tcf_chain *chain)
+{
+	/* In case all the references are action references, this
+	 * chain should not be shown to the user.
+	 */
+	return chain->refcnt == chain->action_refcnt;
+}
+
 static struct tcf_chain *tcf_chain_lookup(struct tcf_block *block,
 					  u32 chain_index)
 {
@@ -277,43 +272,95 @@ static struct tcf_chain *tcf_chain_lookup(struct tcf_block *block,
 static int tc_chain_notify(struct tcf_chain *chain, struct sk_buff *oskb,
 			   u32 seq, u16 flags, int event, bool unicast);
 
-struct tcf_chain *tcf_chain_get(struct tcf_block *block, u32 chain_index,
-				bool create)
+static struct tcf_chain *__tcf_chain_get(struct tcf_block *block,
+					 u32 chain_index, bool create,
+					 bool by_act)
 {
 	struct tcf_chain *chain = tcf_chain_lookup(block, chain_index);
 
 	if (chain) {
 		tcf_chain_hold(chain);
-		return chain;
+	} else {
+		if (!create)
+			return NULL;
+		chain = tcf_chain_create(block, chain_index);
+		if (!chain)
+			return NULL;
 	}
 
-	if (!create)
-		return NULL;
-	chain = tcf_chain_create(block, chain_index);
-	if (!chain)
-		return NULL;
-	tc_chain_notify(chain, NULL, 0, NLM_F_CREATE | NLM_F_EXCL,
-			RTM_NEWCHAIN, false);
+	if (by_act)
+		++chain->action_refcnt;
+
+	/* Send notification only in case we got the first
+	 * non-action reference. Until then, the chain acts only as
+	 * a placeholder for actions pointing to it and user ought
+	 * not know about them.
+	 */
+	if (chain->refcnt - chain->action_refcnt == 1 && !by_act)
+		tc_chain_notify(chain, NULL, 0, NLM_F_CREATE | NLM_F_EXCL,
+				RTM_NEWCHAIN, false);
+
 	return chain;
 }
-EXPORT_SYMBOL(tcf_chain_get);
+
+static struct tcf_chain *tcf_chain_get(struct tcf_block *block, u32 chain_index,
+				       bool create)
+{
+	return __tcf_chain_get(block, chain_index, create, false);
+}
+
+struct tcf_chain *tcf_chain_get_by_act(struct tcf_block *block, u32 chain_index)
+{
+	return __tcf_chain_get(block, chain_index, true, true);
+}
+EXPORT_SYMBOL(tcf_chain_get_by_act);
 
 static void tc_chain_tmplt_del(struct tcf_chain *chain);
 
-void tcf_chain_put(struct tcf_chain *chain)
+static void __tcf_chain_put(struct tcf_chain *chain, bool by_act)
 {
-	if (--chain->refcnt == 0) {
+	if (by_act)
+		chain->action_refcnt--;
+	chain->refcnt--;
+
+	/* The last dropped non-action reference will trigger notification. */
+	if (chain->refcnt - chain->action_refcnt == 0 && !by_act)
 		tc_chain_notify(chain, NULL, 0, 0, RTM_DELCHAIN, false);
+
+	if (chain->refcnt == 0) {
 		tc_chain_tmplt_del(chain);
 		tcf_chain_destroy(chain);
 	}
 }
-EXPORT_SYMBOL(tcf_chain_put);
+
+static void tcf_chain_put(struct tcf_chain *chain)
+{
+	__tcf_chain_put(chain, false);
+}
+
+void tcf_chain_put_by_act(struct tcf_chain *chain)
+{
+	__tcf_chain_put(chain, true);
+}
+EXPORT_SYMBOL(tcf_chain_put_by_act);
 
 static void tcf_chain_put_explicitly_created(struct tcf_chain *chain)
 {
 	if (chain->explicitly_created)
 		tcf_chain_put(chain);
+}
+
+static void tcf_chain_flush(struct tcf_chain *chain)
+{
+	struct tcf_proto *tp = rtnl_dereference(chain->filter_chain);
+
+	tcf_chain0_head_change(chain, NULL);
+	while (tp) {
+		RCU_INIT_POINTER(chain->filter_chain, tp->next);
+		tcf_proto_destroy(tp, NULL);
+		tp = rtnl_dereference(chain->filter_chain);
+		tcf_chain_put(chain);
+	}
 }
 
 static bool tcf_block_offload_in_use(struct tcf_block *block)
@@ -733,6 +780,8 @@ void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 		block->refcnt--;
 		if (list_empty(&block->chain_list))
 			kfree(block);
+	} else {
+		block->refcnt--;
 	}
 }
 EXPORT_SYMBOL(tcf_block_put_ext);
@@ -1342,6 +1391,13 @@ static int tc_del_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	}
 	chain = tcf_chain_get(block, chain_index, false);
 	if (!chain) {
+		/* User requested flush on non-existent chain. Nothing to do,
+		 * so just return success.
+		 */
+		if (prio == 0) {
+			err = 0;
+			goto errout;
+		}
 		NL_SET_ERR_MSG(extack, "Cannot find specified filter chain");
 		err = -EINVAL;
 		goto errout;
@@ -1803,20 +1859,28 @@ replay:
 	chain = tcf_chain_lookup(block, chain_index);
 	if (n->nlmsg_type == RTM_NEWCHAIN) {
 		if (chain) {
-			NL_SET_ERR_MSG(extack, "Filter chain already exists");
-			return -EEXIST;
-		}
-		if (!(n->nlmsg_flags & NLM_F_CREATE)) {
-			NL_SET_ERR_MSG(extack, "Need both RTM_NEWCHAIN and NLM_F_CREATE to create a new chain");
-			return -ENOENT;
-		}
-		chain = tcf_chain_create(block, chain_index);
-		if (!chain) {
-			NL_SET_ERR_MSG(extack, "Failed to create filter chain");
-			return -ENOMEM;
+			if (tcf_chain_held_by_acts_only(chain)) {
+				/* The chain exists only because there is
+				 * some action referencing it.
+				 */
+				tcf_chain_hold(chain);
+			} else {
+				NL_SET_ERR_MSG(extack, "Filter chain already exists");
+				return -EEXIST;
+			}
+		} else {
+			if (!(n->nlmsg_flags & NLM_F_CREATE)) {
+				NL_SET_ERR_MSG(extack, "Need both RTM_NEWCHAIN and NLM_F_CREATE to create a new chain");
+				return -ENOENT;
+			}
+			chain = tcf_chain_create(block, chain_index);
+			if (!chain) {
+				NL_SET_ERR_MSG(extack, "Failed to create filter chain");
+				return -ENOMEM;
+			}
 		}
 	} else {
-		if (!chain) {
+		if (!chain || tcf_chain_held_by_acts_only(chain)) {
 			NL_SET_ERR_MSG(extack, "Cannot find specified filter chain");
 			return -EINVAL;
 		}
@@ -1844,9 +1908,9 @@ replay:
 		 * to the chain previously taken during addition.
 		 */
 		tcf_chain_put_explicitly_created(chain);
+		chain->explicitly_created = false;
 		break;
 	case RTM_GETCHAIN:
-		break;
 		err = tc_chain_notify(chain, skb, n->nlmsg_seq,
 				      n->nlmsg_seq, n->nlmsg_type, true);
 		if (err < 0)
@@ -1944,6 +2008,8 @@ static int tc_dump_chain(struct sk_buff *skb, struct netlink_callback *cb)
 			index++;
 			continue;
 		}
+		if (tcf_chain_held_by_acts_only(chain))
+			continue;
 		err = tc_chain_fill_node(chain, net, skb, block,
 					 NETLINK_CB(cb->skb).portid,
 					 cb->nlh->nlmsg_seq, NLM_F_MULTI,

@@ -53,6 +53,8 @@
 #include <linux/interrupt.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <linux/mm.h>
+#include <linux/overflow.h>
 #include <linux/page_ref.h>
 #include <linux/pci.h>
 #include <linux/pci_regs.h>
@@ -1120,7 +1122,7 @@ nfp_net_tx_ring_reset(struct nfp_net_dp *dp, struct nfp_net_tx_ring *tx_ring)
 		tx_ring->rd_p++;
 	}
 
-	memset(tx_ring->txds, 0, sizeof(*tx_ring->txds) * tx_ring->cnt);
+	memset(tx_ring->txds, 0, tx_ring->size);
 	tx_ring->wr_p = 0;
 	tx_ring->rd_p = 0;
 	tx_ring->qcp_rd_p = 0;
@@ -1300,7 +1302,7 @@ static void nfp_net_rx_ring_reset(struct nfp_net_rx_ring *rx_ring)
 	rx_ring->rxbufs[last_idx].dma_addr = 0;
 	rx_ring->rxbufs[last_idx].frag = NULL;
 
-	memset(rx_ring->rxds, 0, sizeof(*rx_ring->rxds) * rx_ring->cnt);
+	memset(rx_ring->rxds, 0, rx_ring->size);
 	rx_ring->wr_p = 0;
 	rx_ring->rd_p = 0;
 }
@@ -1757,6 +1759,29 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 			}
 		}
 
+		if (likely(!meta.portid)) {
+			netdev = dp->netdev;
+		} else if (meta.portid == NFP_META_PORT_ID_CTRL) {
+			struct nfp_net *nn = netdev_priv(dp->netdev);
+
+			nfp_app_ctrl_rx_raw(nn->app, rxbuf->frag + pkt_off,
+					    pkt_len);
+			nfp_net_rx_give_one(dp, rx_ring, rxbuf->frag,
+					    rxbuf->dma_addr);
+			continue;
+		} else {
+			struct nfp_net *nn;
+
+			nn = netdev_priv(dp->netdev);
+			netdev = nfp_app_repr_get(nn->app, meta.portid);
+			if (unlikely(!netdev)) {
+				nfp_net_rx_drop(dp, r_vec, rx_ring, rxbuf,
+						NULL);
+				continue;
+			}
+			nfp_repr_inc_rx_stats(netdev, pkt_len);
+		}
+
 		skb = build_skb(rxbuf->frag, true_bufsz);
 		if (unlikely(!skb)) {
 			nfp_net_rx_drop(dp, r_vec, rx_ring, rxbuf, NULL);
@@ -1771,20 +1796,6 @@ static int nfp_net_rx(struct nfp_net_rx_ring *rx_ring, int budget)
 		nfp_net_dma_unmap_rx(dp, rxbuf->dma_addr);
 
 		nfp_net_rx_give_one(dp, rx_ring, new_frag, new_dma_addr);
-
-		if (likely(!meta.portid)) {
-			netdev = dp->netdev;
-		} else {
-			struct nfp_net *nn;
-
-			nn = netdev_priv(dp->netdev);
-			netdev = nfp_app_repr_get(nn->app, meta.portid);
-			if (unlikely(!netdev)) {
-				nfp_net_rx_drop(dp, r_vec, rx_ring, NULL, skb);
-				continue;
-			}
-			nfp_repr_inc_rx_stats(netdev, pkt_len);
-		}
 
 		skb_reserve(skb, pkt_off);
 		skb_put(skb, pkt_len);
@@ -2126,7 +2137,7 @@ static void nfp_net_tx_ring_free(struct nfp_net_tx_ring *tx_ring)
 	struct nfp_net_r_vector *r_vec = tx_ring->r_vec;
 	struct nfp_net_dp *dp = &r_vec->nfp_net->dp;
 
-	kfree(tx_ring->txbufs);
+	kvfree(tx_ring->txbufs);
 
 	if (tx_ring->txds)
 		dma_free_coherent(dp->dev, tx_ring->size,
@@ -2150,18 +2161,17 @@ static int
 nfp_net_tx_ring_alloc(struct nfp_net_dp *dp, struct nfp_net_tx_ring *tx_ring)
 {
 	struct nfp_net_r_vector *r_vec = tx_ring->r_vec;
-	int sz;
 
 	tx_ring->cnt = dp->txd_cnt;
 
-	tx_ring->size = sizeof(*tx_ring->txds) * tx_ring->cnt;
+	tx_ring->size = array_size(tx_ring->cnt, sizeof(*tx_ring->txds));
 	tx_ring->txds = dma_zalloc_coherent(dp->dev, tx_ring->size,
 					    &tx_ring->dma, GFP_KERNEL);
 	if (!tx_ring->txds)
 		goto err_alloc;
 
-	sz = sizeof(*tx_ring->txbufs) * tx_ring->cnt;
-	tx_ring->txbufs = kzalloc(sz, GFP_KERNEL);
+	tx_ring->txbufs = kvcalloc(tx_ring->cnt, sizeof(*tx_ring->txbufs),
+				   GFP_KERNEL);
 	if (!tx_ring->txbufs)
 		goto err_alloc;
 
@@ -2275,7 +2285,7 @@ static void nfp_net_rx_ring_free(struct nfp_net_rx_ring *rx_ring)
 
 	if (dp->netdev)
 		xdp_rxq_info_unreg(&rx_ring->xdp_rxq);
-	kfree(rx_ring->rxbufs);
+	kvfree(rx_ring->rxbufs);
 
 	if (rx_ring->rxds)
 		dma_free_coherent(dp->dev, rx_ring->size,
@@ -2298,7 +2308,7 @@ static void nfp_net_rx_ring_free(struct nfp_net_rx_ring *rx_ring)
 static int
 nfp_net_rx_ring_alloc(struct nfp_net_dp *dp, struct nfp_net_rx_ring *rx_ring)
 {
-	int sz, err;
+	int err;
 
 	if (dp->netdev) {
 		err = xdp_rxq_info_reg(&rx_ring->xdp_rxq, dp->netdev,
@@ -2308,14 +2318,14 @@ nfp_net_rx_ring_alloc(struct nfp_net_dp *dp, struct nfp_net_rx_ring *rx_ring)
 	}
 
 	rx_ring->cnt = dp->rxd_cnt;
-	rx_ring->size = sizeof(*rx_ring->rxds) * rx_ring->cnt;
+	rx_ring->size = array_size(rx_ring->cnt, sizeof(*rx_ring->rxds));
 	rx_ring->rxds = dma_zalloc_coherent(dp->dev, rx_ring->size,
 					    &rx_ring->dma, GFP_KERNEL);
 	if (!rx_ring->rxds)
 		goto err_alloc;
 
-	sz = sizeof(*rx_ring->rxbufs) * rx_ring->cnt;
-	rx_ring->rxbufs = kzalloc(sz, GFP_KERNEL);
+	rx_ring->rxbufs = kvcalloc(rx_ring->cnt, sizeof(*rx_ring->rxbufs),
+				   GFP_KERNEL);
 	if (!rx_ring->rxbufs)
 		goto err_alloc;
 
@@ -3855,6 +3865,9 @@ int nfp_net_init(struct nfp_net *nn)
 	else
 		nn->dp.mtu = NFP_NET_DEFAULT_MTU;
 	nn->dp.fl_bufsz = nfp_net_calc_fl_bufsz(&nn->dp);
+
+	if (nfp_app_ctrl_uses_data_vnics(nn->app))
+		nn->dp.ctrl |= nn->cap & NFP_NET_CFG_CTRL_CMSG_DATA;
 
 	if (nn->cap & NFP_NET_CFG_CTRL_RSS_ANY) {
 		nfp_net_rss_init(nn);

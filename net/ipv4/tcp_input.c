@@ -227,8 +227,15 @@ static void tcp_ecn_queue_cwr(struct tcp_sock *tp)
 
 static void tcp_ecn_accept_cwr(struct tcp_sock *tp, const struct sk_buff *skb)
 {
-	if (tcp_hdr(skb)->cwr)
+	if (tcp_hdr(skb)->cwr) {
 		tp->ecn_flags &= ~TCP_ECN_DEMAND_CWR;
+
+		/* If the sender is telling us it has entered CWR, then its
+		 * cwnd may be very low (even just 1 packet), so we should ACK
+		 * immediately.
+		 */
+		tcp_enter_quickack_mode((struct sock *)tp, 2);
+	}
 }
 
 static void tcp_ecn_withdraw_cwr(struct tcp_sock *tp)
@@ -874,6 +881,7 @@ static void tcp_dsack_seen(struct tcp_sock *tp)
 {
 	tp->rx_opt.sack_ok |= TCP_DSACK_SEEN;
 	tp->rack.dsack_seen = 1;
+	tp->dsack_dups++;
 }
 
 /* It's reordering when higher sequence was delivered (i.e. sacked) before
@@ -905,8 +913,8 @@ static void tcp_check_sack_reordering(struct sock *sk, const u32 low_seq,
 				       sock_net(sk)->ipv4.sysctl_tcp_max_reordering);
 	}
 
-	tp->rack.reord = 1;
 	/* This exciting event is worth to be remembered. 8) */
+	tp->reord_seen++;
 	NET_INC_STATS(sock_net(sk),
 		      ts ? LINUX_MIB_TCPTSREORDER : LINUX_MIB_TCPSACKREORDER);
 }
@@ -1877,6 +1885,7 @@ static void tcp_check_reno_reordering(struct sock *sk, const int addend)
 
 	tp->reordering = min_t(u32, tp->packets_out + addend,
 			       sock_net(sk)->ipv4.sysctl_tcp_max_reordering);
+	tp->reord_seen++;
 	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRENOREORDER);
 }
 

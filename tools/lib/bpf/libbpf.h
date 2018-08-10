@@ -86,6 +86,9 @@ const char *bpf_object__name(struct bpf_object *obj);
 unsigned int bpf_object__kversion(struct bpf_object *obj);
 int bpf_object__btf_fd(const struct bpf_object *obj);
 
+struct bpf_program *
+bpf_object__find_program_by_title(struct bpf_object *obj, const char *title);
+
 struct bpf_object *bpf_object__next(struct bpf_object *prev);
 #define bpf_object__for_each_safe(pos, tmp)			\
 	for ((pos) = bpf_object__next(NULL),		\
@@ -254,8 +257,8 @@ bpf_map__next(struct bpf_map *map, struct bpf_object *obj);
 int bpf_map__fd(struct bpf_map *map);
 const struct bpf_map_def *bpf_map__def(struct bpf_map *map);
 const char *bpf_map__name(struct bpf_map *map);
-uint32_t bpf_map__btf_key_type_id(const struct bpf_map *map);
-uint32_t bpf_map__btf_value_type_id(const struct bpf_map *map);
+__u32 bpf_map__btf_key_type_id(const struct bpf_map *map);
+__u32 bpf_map__btf_value_type_id(const struct bpf_map *map);
 
 typedef void (*bpf_map_clear_priv_t)(struct bpf_map *, void *);
 int bpf_map__set_priv(struct bpf_map *map, void *priv,

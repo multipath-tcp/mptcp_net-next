@@ -463,6 +463,7 @@ nf_ct_frag6_reasm(struct frag_queue *fq, struct sk_buff *prev,  struct net_devic
 					  head->csum);
 
 	fq->q.fragments = NULL;
+	fq->q.rb_fragments = RB_ROOT;
 	fq->q.fragments_tail = NULL;
 
 	return true;
@@ -556,6 +557,10 @@ int nf_ct_frag6_gather(struct net *net, struct sk_buff *skb, u32 user)
 	skb_set_transport_header(skb, fhoff);
 	hdr = ipv6_hdr(skb);
 	fhdr = (struct frag_hdr *)skb_transport_header(skb);
+
+	if (skb->len - skb_network_offset(skb) < IPV6_MIN_MTU &&
+	    fhdr->frag_off & htons(IP6_MF))
+		return -EINVAL;
 
 	skb_orphan(skb);
 	fq = fq_find(net, fhdr->identification, user, hdr,

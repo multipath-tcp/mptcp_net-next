@@ -1242,6 +1242,8 @@ static int lan78xx_link_reset(struct lan78xx_net *dev)
 			mod_timer(&dev->stat_monitor,
 				  jiffies + STAT_UPDATE_TIMER);
 		}
+
+		tasklet_schedule(&dev->bh);
 	}
 
 	return ret;
@@ -1647,7 +1649,7 @@ lan78xx_get_regs(struct net_device *netdev, struct ethtool_regs *regs,
 	struct lan78xx_net *dev = netdev_priv(netdev);
 
 	/* Read Device/MAC registers */
-	for (i = 0; i < (sizeof(lan78xx_regs) / sizeof(u32)); i++)
+	for (i = 0; i < ARRAY_SIZE(lan78xx_regs); i++)
 		lan78xx_read_reg(dev, lan78xx_regs[i], &data[i]);
 
 	if (!netdev->phydev)

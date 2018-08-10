@@ -405,6 +405,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *prev,
 	__IP6_INC_STATS(net, __in6_dev_get(dev), IPSTATS_MIB_REASMOKS);
 	rcu_read_unlock();
 	fq->q.fragments = NULL;
+	fq->q.rb_fragments = RB_ROOT;
 	fq->q.fragments_tail = NULL;
 	return 1;
 
@@ -454,6 +455,10 @@ static int ipv6_frag_rcv(struct sk_buff *skb)
 		IP6CB(skb)->flags |= IP6SKB_FRAGMENTED;
 		return 1;
 	}
+
+	if (skb->len - skb_network_offset(skb) < IPV6_MIN_MTU &&
+	    fhdr->frag_off & htons(IP6_MF))
+		goto fail_hdr;
 
 	iif = skb->dev ? skb->dev->ifindex : 0;
 	fq = fq_find(net, fhdr->identification, hdr, iif);

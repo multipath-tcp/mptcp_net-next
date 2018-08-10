@@ -267,7 +267,7 @@ static void dcb_tx_queue_prio_enable(struct net_device *dev, int enable)
 	}
 }
 
-static int cxgb4_dcb_enabled(const struct net_device *dev)
+int cxgb4_dcb_enabled(const struct net_device *dev)
 {
 	struct port_info *pi = netdev_priv(dev);
 
@@ -554,10 +554,9 @@ static int fwevtq_handler(struct sge_rspq *q, const __be64 *rsp,
 
 			dev = q->adap->port[q->adap->chan_map[port]];
 			dcbxdis = (action == FW_PORT_ACTION_GET_PORT_INFO
-				   ? !!(pcmd->u.info.dcbxdis_pkd &
-					FW_PORT_CMD_DCBXDIS_F)
-				   : !!(pcmd->u.info32.lstatus32_to_cbllen32 &
-					FW_PORT_CMD_DCBXDIS32_F));
+			  ? !!(pcmd->u.info.dcbxdis_pkd & FW_PORT_CMD_DCBXDIS_F)
+			  : !!(be32_to_cpu(pcmd->u.info32.lstatus32_to_cbllen32)
+			       & FW_PORT_CMD_DCBXDIS32_F));
 			state_input = (dcbxdis
 				       ? CXGB4_DCB_INPUT_FW_DISABLED
 				       : CXGB4_DCB_INPUT_FW_ENABLED);
@@ -3074,6 +3073,7 @@ static void cxgb_del_udp_tunnel(struct net_device *netdev,
 
 		adapter->geneve_port = 0;
 		t4_write_reg(adapter, MPS_RX_GENEVE_TYPE_A, 0);
+		break;
 	default:
 		return;
 	}
@@ -3159,6 +3159,7 @@ static void cxgb_add_udp_tunnel(struct net_device *netdev,
 
 		t4_write_reg(adapter, MPS_RX_GENEVE_TYPE_A,
 			     GENEVE_V(be16_to_cpu(ti->port)) | GENEVE_EN_F);
+		break;
 	default:
 		return;
 	}
@@ -5657,6 +5658,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 #ifdef CONFIG_CHELSIO_T4_DCB
 		netdev->dcbnl_ops = &cxgb4_dcb_ops;
 		cxgb4_dcb_state_init(netdev);
+		cxgb4_dcb_version_init(netdev);
 #endif
 		cxgb4_set_ethtool_ops(netdev);
 	}
