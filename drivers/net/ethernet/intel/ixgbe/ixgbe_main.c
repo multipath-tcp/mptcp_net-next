@@ -6201,7 +6201,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter,
 
 	adapter->mac_table = kcalloc(hw->mac.num_rar_entries,
 				     sizeof(struct ixgbe_mac_addr),
-				     GFP_ATOMIC);
+				     GFP_KERNEL);
 	if (!adapter->mac_table)
 		return -ENOMEM;
 
@@ -6620,8 +6620,18 @@ static int ixgbe_change_mtu(struct net_device *netdev, int new_mtu)
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
 	if (adapter->xdp_prog) {
-		e_warn(probe, "MTU cannot be changed while XDP program is loaded\n");
-		return -EPERM;
+		int new_frame_size = new_mtu + ETH_HLEN + ETH_FCS_LEN +
+				     VLAN_HLEN;
+		int i;
+
+		for (i = 0; i < adapter->num_rx_queues; i++) {
+			struct ixgbe_ring *ring = adapter->rx_ring[i];
+
+			if (new_frame_size > ixgbe_rx_bufsz(ring)) {
+				e_warn(probe, "Requested MTU size is not supported with XDP\n");
+				return -EINVAL;
+			}
+		}
 	}
 
 	/*
@@ -7765,6 +7775,33 @@ static void ixgbe_reset_subtask(struct ixgbe_adapter *adapter)
 }
 
 /**
+ * ixgbe_check_fw_error - Check firmware for errors
+ * @adapter: the adapter private structure
+ *
+ * Check firmware errors in register FWSM
+ */
+static bool ixgbe_check_fw_error(struct ixgbe_adapter *adapter)
+{
+	struct ixgbe_hw *hw = &adapter->hw;
+	u32 fwsm;
+
+	/* read fwsm.ext_err_ind register and log errors */
+	fwsm = IXGBE_READ_REG(hw, IXGBE_FWSM(hw));
+
+	if (fwsm & IXGBE_FWSM_EXT_ERR_IND_MASK ||
+	    !(fwsm & IXGBE_FWSM_FW_VAL_BIT))
+		e_dev_warn("Warning firmware error detected FWSM: 0x%08X\n",
+			   fwsm);
+
+	if (hw->mac.ops.fw_recovery_mode && hw->mac.ops.fw_recovery_mode(hw)) {
+		e_dev_err("Firmware recovery mode detected. Limiting functionality. Refer to the Intel(R) Ethernet Adapters and Devices User Guide for details on firmware recovery mode.\n");
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * ixgbe_service_task - manages and runs subtasks
  * @work: pointer to work_struct containing our data
  **/
@@ -7777,6 +7814,15 @@ static void ixgbe_service_task(struct work_struct *work)
 		if (!test_bit(__IXGBE_DOWN, &adapter->state)) {
 			rtnl_lock();
 			ixgbe_down(adapter);
+			rtnl_unlock();
+		}
+		ixgbe_service_event_complete(adapter);
+		return;
+	}
+	if (ixgbe_check_fw_error(adapter)) {
+		if (!test_bit(__IXGBE_DOWN, &adapter->state)) {
+			rtnl_lock();
+			unregister_netdev(adapter->netdev);
 			rtnl_unlock();
 		}
 		ixgbe_service_event_complete(adapter);
@@ -8983,6 +9029,15 @@ int ixgbe_setup_tc(struct net_device *dev, u8 tc)
 
 #ifdef CONFIG_IXGBE_DCB
 	if (tc) {
+		if (adapter->xdp_prog) {
+			e_warn(probe, "DCB is not supported with XDP\n");
+
+			ixgbe_init_interrupt_scheme(adapter);
+			if (netif_running(dev))
+				ixgbe_open(dev);
+			return -EINVAL;
+		}
+
 		netdev_set_num_tc(dev, tc);
 		ixgbe_set_prio_tc_map(adapter);
 
@@ -9171,14 +9226,12 @@ static int parse_tc_actions(struct ixgbe_adapter *adapter,
 			    struct tcf_exts *exts, u64 *action, u8 *queue)
 {
 	const struct tc_action *a;
-	LIST_HEAD(actions);
+	int i;
 
 	if (!tcf_exts_has_actions(exts))
 		return -EINVAL;
 
-	tcf_exts_to_list(exts, &actions);
-	list_for_each_entry(a, &actions, list) {
-
+	tcf_exts_for_each_action(i, a, exts) {
 		/* Drop action */
 		if (is_tcf_gact_shot(a)) {
 			*action = IXGBE_FDIR_DROP_QUEUE;
@@ -9935,6 +9988,11 @@ static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 	struct ixgbe_fwd_adapter *accel;
 	int tcs = adapter->hw_tcs ? : 1;
 	int pool, err;
+
+	if (adapter->xdp_prog) {
+		e_warn(probe, "L2FW offload is not supported with XDP\n");
+		return ERR_PTR(-EINVAL);
+	}
 
 	/* The hardware supported by ixgbe only filters on the destination MAC
 	 * address. In order to avoid issues we only support offloading modes
@@ -10693,6 +10751,11 @@ skip_sriov:
 		netdev->hw_features |= NETIF_F_LRO;
 	if (adapter->flags2 & IXGBE_FLAG2_RSC_ENABLED)
 		netdev->features |= NETIF_F_LRO;
+
+	if (ixgbe_check_fw_error(adapter)) {
+		err = -EIO;
+		goto err_sw_init;
+	}
 
 	/* make sure the EEPROM is good */
 	if (hw->eeprom.ops.validate_checksum(hw, NULL) < 0) {

@@ -34,9 +34,14 @@ static inline bool ice_is_tc_ena(u8 bitmap, u8 tc)
 enum ice_aq_res_ids {
 	ICE_NVM_RES_ID = 1,
 	ICE_SPD_RES_ID,
-	ICE_GLOBAL_CFG_LOCK_RES_ID,
-	ICE_CHANGE_LOCK_RES_ID
+	ICE_CHANGE_LOCK_RES_ID,
+	ICE_GLOBAL_CFG_LOCK_RES_ID
 };
+
+/* FW update timeout definitions are in milliseconds */
+#define ICE_NVM_TIMEOUT			180000
+#define ICE_CHANGE_LOCK_TIMEOUT		1000
+#define ICE_GLOBAL_CFG_LOCK_TIMEOUT	3000
 
 enum ice_aq_res_access_type {
 	ICE_RES_READ = 1,
@@ -83,7 +88,7 @@ struct ice_link_status {
 	u64 phy_type_low;
 	u16 max_frame_size;
 	u16 link_speed;
-	bool lse_ena;	/* Link Status Event notification */
+	u8 lse_ena;	/* Link Status Event notification */
 	u8 link_info;
 	u8 an_info;
 	u8 ext_info;
@@ -101,7 +106,7 @@ struct ice_phy_info {
 	struct ice_link_status link_info_old;
 	u64 phy_type_low;
 	enum ice_media_type media_type;
-	bool get_link_info;
+	u8 get_link_info;
 };
 
 /* Common HW capabilities for SW use */
@@ -144,9 +149,10 @@ struct ice_mac_info {
 
 /* Various RESET request, These are not tied with HW reset types */
 enum ice_reset_req {
-	ICE_RESET_PFR	= 0,
-	ICE_RESET_CORER	= 1,
-	ICE_RESET_GLOBR	= 2,
+	ICE_RESET_INVAL	= 0,
+	ICE_RESET_PFR	= 1,
+	ICE_RESET_CORER	= 2,
+	ICE_RESET_GLOBR	= 3,
 };
 
 /* Bus parameters */
@@ -167,7 +173,7 @@ struct ice_nvm_info {
 	u32 oem_ver;              /* OEM version info */
 	u16 sr_words;             /* Shadow RAM size in words */
 	u16 ver;                  /* NVM package version */
-	bool blank_nvm_mode;      /* is NVM empty (no FW present) */
+	u8 blank_nvm_mode;        /* is NVM empty (no FW present) */
 };
 
 /* Max number of port to queue branches w.r.t topology */
@@ -181,7 +187,7 @@ struct ice_sched_node {
 	struct ice_aqc_txsched_elem_data info;
 	u32 agg_id;			/* aggregator group id */
 	u16 vsi_id;
-	bool in_use;			/* suspended or in use */
+	u8 in_use;			/* suspended or in use */
 	u8 tx_sched_layer;		/* Logical Layer (1-9) */
 	u8 num_children;
 	u8 tc_num;
@@ -204,6 +210,7 @@ enum ice_agg_type {
 };
 
 #define ICE_SCHED_DFLT_RL_PROF_ID	0
+#define ICE_SCHED_DFLT_BW_WT		1
 
 /* vsi type list entry to locate corresponding vsi/ag nodes */
 struct ice_sched_vsi_info {
@@ -218,7 +225,7 @@ struct ice_sched_vsi_info {
 struct ice_sched_tx_policy {
 	u16 max_num_vsis;
 	u8 max_num_lan_qs_per_tc[ICE_MAX_TRAFFIC_CLASS];
-	bool rdma_ena;
+	u8 rdma_ena;
 };
 
 struct ice_port_info {
@@ -243,23 +250,30 @@ struct ice_port_info {
 	struct list_head agg_list;	/* lists all aggregator */
 	u8 lport;
 #define ICE_LPORT_MASK		0xff
-	bool is_vf;
+	u8 is_vf;
 };
 
 struct ice_switch_info {
-	/* Switch VSI lists to MAC/VLAN translation */
-	struct mutex mac_list_lock;		/* protect MAC list */
-	struct list_head mac_list_head;
-	struct mutex vlan_list_lock;		/* protect VLAN list */
-	struct list_head vlan_list_head;
-	struct mutex eth_m_list_lock;	/* protect ethtype list */
-	struct list_head eth_m_list_head;
-	struct mutex promisc_list_lock;	/* protect promisc mode list */
-	struct list_head promisc_list_head;
-	struct mutex mac_vlan_list_lock;	/* protect MAC-VLAN list */
-	struct list_head mac_vlan_list_head;
-
 	struct list_head vsi_list_map_head;
+	struct ice_sw_recipe *recp_list;
+};
+
+/* FW logging configuration */
+struct ice_fw_log_evnt {
+	u8 cfg : 4;	/* New event enables to configure */
+	u8 cur : 4;	/* Current/active event enables */
+};
+
+struct ice_fw_log_cfg {
+	u8 cq_en : 1;    /* FW logging is enabled via the control queue */
+	u8 uart_en : 1;  /* FW logging is enabled via UART for all PFs */
+	u8 actv_evnts;   /* Cumulation of currently enabled log events */
+
+#define ICE_FW_LOG_EVNT_INFO	(ICE_AQC_FW_LOG_INFO_EN >> ICE_AQC_FW_LOG_EN_S)
+#define ICE_FW_LOG_EVNT_INIT	(ICE_AQC_FW_LOG_INIT_EN >> ICE_AQC_FW_LOG_EN_S)
+#define ICE_FW_LOG_EVNT_FLOW	(ICE_AQC_FW_LOG_FLOW_EN >> ICE_AQC_FW_LOG_EN_S)
+#define ICE_FW_LOG_EVNT_ERR	(ICE_AQC_FW_LOG_ERR_EN >> ICE_AQC_FW_LOG_EN_S)
+	struct ice_fw_log_evnt evnts[ICE_AQC_FW_LOG_ID_MAX];
 };
 
 /* Port hardware description */
@@ -286,8 +300,11 @@ struct ice_hw {
 	u8 flattened_layers;
 	u8 max_cgds;
 	u8 sw_entry_point_layer;
+	u16 max_children[ICE_AQC_TOPO_MAX_LEVEL_NUM];
 
-	bool evb_veb;		/* true for VEB, false for VEPA */
+	struct ice_vsi_ctx *vsi_ctx[ICE_MAX_VSI];
+	u8 evb_veb;		/* true for VEB, false for VEPA */
+	u8 reset_ongoing;	/* true if hw is in reset, false otherwise */
 	struct ice_bus_info bus;
 	struct ice_nvm_info nvm;
 	struct ice_hw_dev_caps dev_caps;	/* device capabilities */
@@ -308,6 +325,7 @@ struct ice_hw {
 	u8 fw_patch;		/* firmware patch version */
 	u32 fw_build;		/* firmware build number */
 
+	struct ice_fw_log_cfg fw_log;
 	/* minimum allowed value for different speeds */
 #define ICE_ITR_GRAN_MIN_200	1
 #define ICE_ITR_GRAN_MIN_100	1
@@ -318,7 +336,7 @@ struct ice_hw {
 	u8 itr_gran_100;
 	u8 itr_gran_50;
 	u8 itr_gran_25;
-	bool ucast_shared;	/* true if VSIs can share unicast addr */
+	u8 ucast_shared;	/* true if VSIs can share unicast addr */
 
 };
 

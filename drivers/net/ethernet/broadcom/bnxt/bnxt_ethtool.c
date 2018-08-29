@@ -2823,7 +2823,7 @@ bnxt_fill_coredump_seg_hdr(struct bnxt *bp,
 			   int status, u32 duration, u32 instance)
 {
 	memset(seg_hdr, 0, sizeof(*seg_hdr));
-	strcpy(seg_hdr->signature, "sEgM");
+	memcpy(seg_hdr->signature, "sEgM", 4);
 	if (seg_rec) {
 		seg_hdr->component_id = (__force __le32)seg_rec->component_id;
 		seg_hdr->segment_id = (__force __le32)seg_rec->segment_id;
@@ -2855,13 +2855,13 @@ bnxt_fill_coredump_record(struct bnxt *bp, struct bnxt_coredump_record *record,
 
 	time64_to_tm(start, 0, &tm);
 	memset(record, 0, sizeof(*record));
-	strcpy(record->signature, "cOrE");
+	memcpy(record->signature, "cOrE", 4);
 	record->flags = 0;
 	record->low_version = 0;
 	record->high_version = 1;
 	record->asic_state = 0;
-	strncpy(record->system_name, utsname()->nodename,
-		strlen(utsname()->nodename));
+	strlcpy(record->system_name, utsname()->nodename,
+		sizeof(record->system_name));
 	record->year = cpu_to_le16(tm.tm_year);
 	record->month = cpu_to_le16(tm.tm_mon);
 	record->day = cpu_to_le16(tm.tm_mday);
@@ -2876,7 +2876,7 @@ bnxt_fill_coredump_record(struct bnxt *bp, struct bnxt_coredump_record *record,
 	record->os_ver_major = cpu_to_le32(os_ver_major);
 	record->os_ver_minor = cpu_to_le32(os_ver_minor);
 
-	strcpy(record->os_name, utsname()->sysname);
+	strlcpy(record->os_name, utsname()->sysname, 32);
 	time64_to_tm(end, 0, &tm);
 	record->end_year = cpu_to_le16(tm.tm_year + 1900);
 	record->end_month = cpu_to_le16(tm.tm_mon + 1);
@@ -2900,7 +2900,6 @@ static int bnxt_get_coredump(struct bnxt *bp, void *buf, u32 *dump_len)
 	struct coredump_segment_record *seg_record = NULL;
 	u32 offset = 0, seg_hdr_len, seg_record_len;
 	struct bnxt_coredump_segment_hdr seg_hdr;
-	struct bnxt_coredump_record coredump_rec;
 	struct bnxt_coredump coredump = {NULL};
 	time64_t start_time;
 	u16 start_utc;
@@ -2976,14 +2975,12 @@ next_seg:
 	}
 
 err:
-	if (buf) {
-		bnxt_fill_coredump_record(bp, &coredump_rec, start_time,
+	if (buf)
+		bnxt_fill_coredump_record(bp, buf + offset, start_time,
 					  start_utc, coredump.total_segs + 1,
 					  rc);
-		memcpy(buf + offset, &coredump_rec, sizeof(coredump_rec));
-	}
 	kfree(coredump.data);
-	*dump_len += sizeof(coredump_rec);
+	*dump_len += sizeof(struct bnxt_coredump_record);
 
 	return rc;
 }

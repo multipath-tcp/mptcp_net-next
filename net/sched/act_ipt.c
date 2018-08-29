@@ -222,8 +222,8 @@ static int tcf_xt_init(struct net *net, struct nlattr *nla,
 			      bind);
 }
 
-static int tcf_ipt(struct sk_buff *skb, const struct tc_action *a,
-		   struct tcf_result *res)
+static int tcf_ipt_act(struct sk_buff *skb, const struct tc_action *a,
+		       struct tcf_result *res)
 {
 	int ret = 0, result = 0;
 	struct tcf_ipt *ipt = to_ipt(a);
@@ -288,6 +288,7 @@ static int tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind,
 	 * for foolproof you need to not assume this
 	 */
 
+	spin_lock_bh(&ipt->tcf_lock);
 	t = kmemdup(ipt->tcfi_t, ipt->tcfi_t->u.user.target_size, GFP_ATOMIC);
 	if (unlikely(!t))
 		goto nla_put_failure;
@@ -307,10 +308,12 @@ static int tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind,
 	if (nla_put_64bit(skb, TCA_IPT_TM, sizeof(tm), &tm, TCA_IPT_PAD))
 		goto nla_put_failure;
 
+	spin_unlock_bh(&ipt->tcf_lock);
 	kfree(t);
 	return skb->len;
 
 nla_put_failure:
+	spin_unlock_bh(&ipt->tcf_lock);
 	nlmsg_trim(skb, b);
 	kfree(t);
 	return -1;
@@ -334,24 +337,16 @@ static int tcf_ipt_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
-static int tcf_ipt_delete(struct net *net, u32 index)
-{
-	struct tc_action_net *tn = net_generic(net, ipt_net_id);
-
-	return tcf_idr_delete_index(tn, index);
-}
-
 static struct tc_action_ops act_ipt_ops = {
 	.kind		=	"ipt",
 	.type		=	TCA_ACT_IPT,
 	.owner		=	THIS_MODULE,
-	.act		=	tcf_ipt,
+	.act		=	tcf_ipt_act,
 	.dump		=	tcf_ipt_dump,
 	.cleanup	=	tcf_ipt_release,
 	.init		=	tcf_ipt_init,
 	.walk		=	tcf_ipt_walker,
 	.lookup		=	tcf_ipt_search,
-	.delete		=	tcf_ipt_delete,
 	.size		=	sizeof(struct tcf_ipt),
 };
 
@@ -392,24 +387,16 @@ static int tcf_xt_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
-static int tcf_xt_delete(struct net *net, u32 index)
-{
-	struct tc_action_net *tn = net_generic(net, xt_net_id);
-
-	return tcf_idr_delete_index(tn, index);
-}
-
 static struct tc_action_ops act_xt_ops = {
 	.kind		=	"xt",
 	.type		=	TCA_ACT_XT,
 	.owner		=	THIS_MODULE,
-	.act		=	tcf_ipt,
+	.act		=	tcf_ipt_act,
 	.dump		=	tcf_ipt_dump,
 	.cleanup	=	tcf_ipt_release,
 	.init		=	tcf_xt_init,
 	.walk		=	tcf_xt_walker,
 	.lookup		=	tcf_xt_search,
-	.delete		=	tcf_xt_delete,
 	.size		=	sizeof(struct tcf_ipt),
 };
 

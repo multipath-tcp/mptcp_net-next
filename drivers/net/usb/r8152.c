@@ -4415,7 +4415,6 @@ out1:
 static int rtl8152_system_suspend(struct r8152 *tp)
 {
 	struct net_device *netdev = tp->netdev;
-	int ret = 0;
 
 	netif_device_detach(netdev);
 
@@ -4430,7 +4429,7 @@ static int rtl8152_system_suspend(struct r8152 *tp)
 		napi_enable(napi);
 	}
 
-	return ret;
+	return 0;
 }
 
 static int rtl8152_suspend(struct usb_interface *intf, pm_message_t message)
@@ -5218,8 +5217,8 @@ static int rtl8152_probe(struct usb_interface *intf,
 		netdev->hw_features &= ~NETIF_F_RXCSUM;
 	}
 
-	if (le16_to_cpu(udev->descriptor.bcdDevice) == 0x3011 &&
-	    udev->serial && !strcmp(udev->serial, "000001000000")) {
+	if (le16_to_cpu(udev->descriptor.bcdDevice) == 0x3011 && udev->serial &&
+	    (!strcmp(udev->serial, "000001000000") || !strcmp(udev->serial, "000002000000"))) {
 		dev_info(&udev->dev, "Dell TB16 Dock, disable RX aggregation");
 		set_bit(DELL_TB_RX_AGG_BUG, &tp->flags);
 	}

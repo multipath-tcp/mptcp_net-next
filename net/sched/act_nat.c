@@ -93,8 +93,8 @@ static int tcf_nat_init(struct net *net, struct nlattr *nla, struct nlattr *est,
 	return ret;
 }
 
-static int tcf_nat(struct sk_buff *skb, const struct tc_action *a,
-		   struct tcf_result *res)
+static int tcf_nat_act(struct sk_buff *skb, const struct tc_action *a,
+		       struct tcf_result *res)
 {
 	struct tcf_nat *p = to_tcf_nat(a);
 	struct iphdr *iph;
@@ -300,23 +300,15 @@ static int tcf_nat_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
-static int tcf_nat_delete(struct net *net, u32 index)
-{
-	struct tc_action_net *tn = net_generic(net, nat_net_id);
-
-	return tcf_idr_delete_index(tn, index);
-}
-
 static struct tc_action_ops act_nat_ops = {
 	.kind		=	"nat",
 	.type		=	TCA_ACT_NAT,
 	.owner		=	THIS_MODULE,
-	.act		=	tcf_nat,
+	.act		=	tcf_nat_act,
 	.dump		=	tcf_nat_dump,
 	.init		=	tcf_nat_init,
 	.walk		=	tcf_nat_walker,
 	.lookup		=	tcf_nat_search,
-	.delete		=	tcf_nat_delete,
 	.size		=	sizeof(struct tcf_nat),
 };
 

@@ -98,23 +98,15 @@ static void __xdp_rxq_info_unreg_mem_model(struct xdp_rxq_info *xdp_rxq)
 {
 	struct xdp_mem_allocator *xa;
 	int id = xdp_rxq->mem.id;
-	int err;
 
 	if (id == 0)
 		return;
 
 	mutex_lock(&mem_id_lock);
 
-	xa = rhashtable_lookup(mem_id_ht, &id, mem_id_rht_params);
-	if (!xa) {
-		mutex_unlock(&mem_id_lock);
-		return;
-	}
-
-	err = rhashtable_remove_fast(mem_id_ht, &xa->node, mem_id_rht_params);
-	WARN_ON(err);
-
-	call_rcu(&xa->rcu, __xdp_mem_allocator_rcu_free);
+	xa = rhashtable_lookup_fast(mem_id_ht, &id, mem_id_rht_params);
+	if (xa && !rhashtable_remove_fast(mem_id_ht, &xa->node, mem_id_rht_params))
+		call_rcu(&xa->rcu, __xdp_mem_allocator_rcu_free);
 
 	mutex_unlock(&mem_id_lock);
 }
@@ -330,10 +322,12 @@ static void __xdp_return(void *data, struct xdp_mem_info *mem, bool napi_direct,
 		/* mem->id is valid, checked in xdp_rxq_info_reg_mem_model() */
 		xa = rhashtable_lookup(mem_id_ht, &mem->id, mem_id_rht_params);
 		page = virt_to_head_page(data);
-		if (xa)
+		if (xa) {
+			napi_direct &= !xdp_return_frame_no_direct();
 			page_pool_put_page(xa->page_pool, page, napi_direct);
-		else
+		} else {
 			put_page(page);
+		}
 		rcu_read_unlock();
 		break;
 	case MEM_TYPE_PAGE_SHARED:
@@ -348,8 +342,7 @@ static void __xdp_return(void *data, struct xdp_mem_info *mem, bool napi_direct,
 		rcu_read_lock();
 		/* mem->id is valid, checked in xdp_rxq_info_reg_mem_model() */
 		xa = rhashtable_lookup(mem_id_ht, &mem->id, mem_id_rht_params);
-		if (!WARN_ON_ONCE(!xa))
-			xa->zc_alloc->free(xa->zc_alloc, handle);
+		xa->zc_alloc->free(xa->zc_alloc, handle);
 		rcu_read_unlock();
 	default:
 		/* Not possible, checked in xdp_rxq_info_reg_mem_model() */

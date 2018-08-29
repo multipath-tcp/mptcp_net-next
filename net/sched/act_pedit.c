@@ -187,43 +187,37 @@ static int tcf_pedit_init(struct net *net, struct nlattr *nla,
 			tcf_idr_cleanup(tn, parm->index);
 			goto out_free;
 		}
-		p = to_pedit(*a);
-		keys = kmalloc(ksize, GFP_KERNEL);
-		if (!keys) {
-			tcf_idr_release(*a, bind);
-			ret = -ENOMEM;
-			goto out_free;
-		}
 		ret = ACT_P_CREATED;
 	} else if (err > 0) {
 		if (bind)
 			goto out_free;
 		if (!ovr) {
-			tcf_idr_release(*a, bind);
 			ret = -EEXIST;
-			goto out_free;
-		}
-		p = to_pedit(*a);
-		if (p->tcfp_nkeys && p->tcfp_nkeys != parm->nkeys) {
-			keys = kmalloc(ksize, GFP_KERNEL);
-			if (!keys) {
-				ret = -ENOMEM;
-				goto out_free;
-			}
+			goto out_release;
 		}
 	} else {
 		return err;
 	}
 
+	p = to_pedit(*a);
 	spin_lock_bh(&p->tcf_lock);
-	p->tcfp_flags = parm->flags;
-	p->tcf_action = parm->action;
-	if (keys) {
+
+	if (ret == ACT_P_CREATED ||
+	    (p->tcfp_nkeys && p->tcfp_nkeys != parm->nkeys)) {
+		keys = kmalloc(ksize, GFP_ATOMIC);
+		if (!keys) {
+			spin_unlock_bh(&p->tcf_lock);
+			ret = -ENOMEM;
+			goto out_release;
+		}
 		kfree(p->tcfp_keys);
 		p->tcfp_keys = keys;
 		p->tcfp_nkeys = parm->nkeys;
 	}
 	memcpy(p->tcfp_keys, parm->keys, ksize);
+
+	p->tcfp_flags = parm->flags;
+	p->tcf_action = parm->action;
 
 	kfree(p->tcfp_keys_ex);
 	p->tcfp_keys_ex = keys_ex;
@@ -232,6 +226,9 @@ static int tcf_pedit_init(struct net *net, struct nlattr *nla,
 	if (ret == ACT_P_CREATED)
 		tcf_idr_insert(tn, *a);
 	return ret;
+
+out_release:
+	tcf_idr_release(*a, bind);
 out_free:
 	kfree(keys_ex);
 	return ret;
@@ -291,8 +288,8 @@ static int pedit_skb_hdr_offset(struct sk_buff *skb,
 	return ret;
 }
 
-static int tcf_pedit(struct sk_buff *skb, const struct tc_action *a,
-		     struct tcf_result *res)
+static int tcf_pedit_act(struct sk_buff *skb, const struct tc_action *a,
+			 struct tcf_result *res)
 {
 	struct tcf_pedit *p = to_pedit(a);
 	int i;
@@ -410,6 +407,7 @@ static int tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,
 	if (unlikely(!opt))
 		return -ENOBUFS;
 
+	spin_lock_bh(&p->tcf_lock);
 	memcpy(opt->keys, p->tcfp_keys,
 	       p->tcfp_nkeys * sizeof(struct tc_pedit_key));
 	opt->index = p->tcf_index;
@@ -432,11 +430,13 @@ static int tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,
 	tcf_tm_dump(&t, &p->tcf_tm);
 	if (nla_put_64bit(skb, TCA_PEDIT_TM, sizeof(t), &t, TCA_PEDIT_PAD))
 		goto nla_put_failure;
+	spin_unlock_bh(&p->tcf_lock);
 
 	kfree(opt);
 	return skb->len;
 
 nla_put_failure:
+	spin_unlock_bh(&p->tcf_lock);
 	nlmsg_trim(skb, b);
 	kfree(opt);
 	return -1;
@@ -460,24 +460,16 @@ static int tcf_pedit_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
-static int tcf_pedit_delete(struct net *net, u32 index)
-{
-	struct tc_action_net *tn = net_generic(net, pedit_net_id);
-
-	return tcf_idr_delete_index(tn, index);
-}
-
 static struct tc_action_ops act_pedit_ops = {
 	.kind		=	"pedit",
 	.type		=	TCA_ACT_PEDIT,
 	.owner		=	THIS_MODULE,
-	.act		=	tcf_pedit,
+	.act		=	tcf_pedit_act,
 	.dump		=	tcf_pedit_dump,
 	.cleanup	=	tcf_pedit_cleanup,
 	.init		=	tcf_pedit_init,
 	.walk		=	tcf_pedit_walker,
 	.lookup		=	tcf_pedit_search,
-	.delete		=	tcf_pedit_delete,
 	.size		=	sizeof(struct tcf_pedit),
 };
 

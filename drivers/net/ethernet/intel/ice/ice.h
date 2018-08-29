@@ -62,6 +62,7 @@ extern const char ice_drv_ver[];
 #define ICE_RES_VALID_BIT	0x8000
 #define ICE_RES_MISC_VEC_ID	(ICE_RES_VALID_BIT - 1)
 #define ICE_INVAL_Q_INDEX	0xffff
+#define ICE_INVAL_VFID		256
 
 #define ICE_VSIQF_HKEY_ARRAY_SIZE	((VSIQF_HKEY_MAX_INDEX + 1) *	4)
 
@@ -89,6 +90,13 @@ extern const char ice_drv_ver[];
 #define ice_for_each_rxq(vsi, i) \
 	for ((i) = 0; (i) < (vsi)->num_rxq; (i)++)
 
+/* Macros for each allocated tx/rx ring whether used or not in a VSI */
+#define ice_for_each_alloc_txq(vsi, i) \
+	for ((i) = 0; (i) < (vsi)->alloc_txq; (i)++)
+
+#define ice_for_each_alloc_rxq(vsi, i) \
+	for ((i) = 0; (i) < (vsi)->alloc_rxq; (i)++)
+
 struct ice_tc_info {
 	u16 qoffset;
 	u16 qcount;
@@ -115,6 +123,7 @@ struct ice_sw {
 enum ice_state {
 	__ICE_DOWN,
 	__ICE_NEEDS_RESTART,
+	__ICE_PREPARED_FOR_RESET,	/* set by driver when prepared */
 	__ICE_RESET_RECOVERY_PENDING,	/* set by driver when reset starts */
 	__ICE_PFR_REQ,			/* set by driver and peers */
 	__ICE_CORER_REQ,		/* set by driver and peers */
@@ -125,9 +134,11 @@ enum ice_state {
 	__ICE_SUSPENDED,		/* set on module remove path */
 	__ICE_RESET_FAILED,		/* set by reset/rebuild */
 	__ICE_ADMINQ_EVENT_PENDING,
+	__ICE_MDD_EVENT_PENDING,
 	__ICE_FLTR_OVERFLOW_PROMISC,
 	__ICE_CFG_BUSY,
 	__ICE_SERVICE_SCHED,
+	__ICE_SERVICE_DIS,
 	__ICE_STATE_NBITS		/* must be last */
 };
 
@@ -189,9 +200,9 @@ struct ice_vsi {
 	struct list_head tmp_sync_list;		/* MAC filters to be synced */
 	struct list_head tmp_unsync_list;	/* MAC filters to be unsynced */
 
-	bool irqs_ready;
-	bool current_isup;		 /* Sync 'link up' logging */
-	bool stat_offsets_loaded;
+	u8 irqs_ready;
+	u8 current_isup;		 /* Sync 'link up' logging */
+	u8 stat_offsets_loaded;
 
 	/* queue information */
 	u8 tx_mapping_mode;		 /* ICE_MAP_MODE_[CONTIG|SCATTER] */
@@ -262,7 +273,10 @@ struct ice_pf {
 	struct ice_hw_port_stats stats;
 	struct ice_hw_port_stats stats_prev;
 	struct ice_hw hw;
-	bool stat_prev_loaded;	/* has previous stats been loaded */
+	u8 stat_prev_loaded;	/* has previous stats been loaded */
+	u32 tx_timeout_count;
+	unsigned long tx_timeout_last_recovery;
+	u32 tx_timeout_recovery_level;
 	char int_name[ICE_INT_NAME_STR_LEN];
 };
 

@@ -28,8 +28,8 @@ static unsigned int simp_net_id;
 static struct tc_action_ops act_simp_ops;
 
 #define SIMP_MAX_DATA	32
-static int tcf_simp(struct sk_buff *skb, const struct tc_action *a,
-		    struct tcf_result *res)
+static int tcf_simp_act(struct sk_buff *skb, const struct tc_action *a,
+			struct tcf_result *res)
 {
 	struct tcf_defact *d = to_defact(a);
 
@@ -156,10 +156,11 @@ static int tcf_simp_dump(struct sk_buff *skb, struct tc_action *a,
 		.index   = d->tcf_index,
 		.refcnt  = refcount_read(&d->tcf_refcnt) - ref,
 		.bindcnt = atomic_read(&d->tcf_bindcnt) - bind,
-		.action  = d->tcf_action,
 	};
 	struct tcf_t t;
 
+	spin_lock_bh(&d->tcf_lock);
+	opt.action = d->tcf_action;
 	if (nla_put(skb, TCA_DEF_PARMS, sizeof(opt), &opt) ||
 	    nla_put_string(skb, TCA_DEF_DATA, d->tcfd_defdata))
 		goto nla_put_failure;
@@ -167,9 +168,12 @@ static int tcf_simp_dump(struct sk_buff *skb, struct tc_action *a,
 	tcf_tm_dump(&t, &d->tcf_tm);
 	if (nla_put_64bit(skb, TCA_DEF_TM, sizeof(t), &t, TCA_DEF_PAD))
 		goto nla_put_failure;
+	spin_unlock_bh(&d->tcf_lock);
+
 	return skb->len;
 
 nla_put_failure:
+	spin_unlock_bh(&d->tcf_lock);
 	nlmsg_trim(skb, b);
 	return -1;
 }
@@ -192,24 +196,16 @@ static int tcf_simp_search(struct net *net, struct tc_action **a, u32 index,
 	return tcf_idr_search(tn, a, index);
 }
 
-static int tcf_simp_delete(struct net *net, u32 index)
-{
-	struct tc_action_net *tn = net_generic(net, simp_net_id);
-
-	return tcf_idr_delete_index(tn, index);
-}
-
 static struct tc_action_ops act_simp_ops = {
 	.kind		=	"simple",
 	.type		=	TCA_ACT_SIMP,
 	.owner		=	THIS_MODULE,
-	.act		=	tcf_simp,
+	.act		=	tcf_simp_act,
 	.dump		=	tcf_simp_dump,
 	.cleanup	=	tcf_simp_release,
 	.init		=	tcf_simp_init,
 	.walk		=	tcf_simp_walker,
 	.lookup		=	tcf_simp_search,
-	.delete		=	tcf_simp_delete,
 	.size		=	sizeof(struct tcf_defact),
 };
 

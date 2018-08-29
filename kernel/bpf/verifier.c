@@ -1310,6 +1310,7 @@ static bool may_access_direct_pkt_data(struct bpf_verifier_env *env,
 	case BPF_PROG_TYPE_LWT_IN:
 	case BPF_PROG_TYPE_LWT_OUT:
 	case BPF_PROG_TYPE_LWT_SEG6LOCAL:
+	case BPF_PROG_TYPE_SK_REUSEPORT:
 		/* dst_input() and dst_output() can't write for now */
 		if (t == BPF_WRITE)
 			return false;
@@ -2166,6 +2167,10 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 		    func_id != BPF_FUNC_msg_redirect_hash)
 			goto error;
 		break;
+	case BPF_MAP_TYPE_REUSEPORT_SOCKARRAY:
+		if (func_id != BPF_FUNC_sk_select_reuseport)
+			goto error;
+		break;
 	default:
 		break;
 	}
@@ -2215,6 +2220,10 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 		break;
 	case BPF_FUNC_get_local_storage:
 		if (map->map_type != BPF_MAP_TYPE_CGROUP_STORAGE)
+			goto error;
+		break;
+	case BPF_FUNC_sk_select_reuseport:
+		if (map->map_type != BPF_MAP_TYPE_REUSEPORT_SOCKARRAY)
 			goto error;
 		break;
 	default:
@@ -5835,27 +5844,6 @@ static int fixup_bpf_calls(struct bpf_verifier_env *env)
 			goto patch_call_imm;
 		}
 
-		if (insn->imm == BPF_FUNC_redirect_map) {
-			/* Note, we cannot use prog directly as imm as subsequent
-			 * rewrites would still change the prog pointer. The only
-			 * stable address we can use is aux, which also works with
-			 * prog clones during blinding.
-			 */
-			u64 addr = (unsigned long)prog->aux;
-			struct bpf_insn r4_ld[] = {
-				BPF_LD_IMM64(BPF_REG_4, addr),
-				*insn,
-			};
-			cnt = ARRAY_SIZE(r4_ld);
-
-			new_prog = bpf_patch_insn_data(env, i + delta, r4_ld, cnt);
-			if (!new_prog)
-				return -ENOMEM;
-
-			delta    += cnt - 1;
-			env->prog = prog = new_prog;
-			insn      = new_prog->insnsi + i + delta;
-		}
 patch_call_imm:
 		fn = env->ops->get_func_proto(insn->imm, env->prog);
 		/* all functions that have prototype and verifier allowed
