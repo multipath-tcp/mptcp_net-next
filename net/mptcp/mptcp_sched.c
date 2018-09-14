@@ -215,7 +215,7 @@ static struct sock *get_available_subflow(struct sock *meta_sk,
 {
 	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
 	struct sock *sk;
-	bool force;
+	bool looping = false, force;
 
 	/* Answer data_fin on same subflow!!! */
 	if (meta_sk->sk_shutdown & RCV_SHUTDOWN &&
@@ -232,6 +232,7 @@ static struct sock *get_available_subflow(struct sock *meta_sk,
 	}
 
 	/* Find the best subflow */
+restart:
 	sk = get_subflow_from_selectors(mpcb, skb, &subflow_is_active,
 					zero_wnd_test, &force);
 	if (force)
@@ -242,7 +243,7 @@ static struct sock *get_available_subflow(struct sock *meta_sk,
 
 	sk = get_subflow_from_selectors(mpcb, skb, &subflow_is_backup,
 					zero_wnd_test, &force);
-	if (!force && skb)
+	if (!force && skb) {
 		/* one used backup sk or one NULL sk where there is no one
 		 * temporally unavailable unused backup sk
 		 *
@@ -250,6 +251,12 @@ static struct sock *get_available_subflow(struct sock *meta_sk,
 		 * sks, so clean the path mask
 		 */
 		TCP_SKB_CB(skb)->path_mask = 0;
+
+		if (!looping) {
+			looping = true;
+			goto restart;
+		}
+	}
 	return sk;
 }
 
