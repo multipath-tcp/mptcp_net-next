@@ -823,9 +823,11 @@ ssize_t tcp_splice_read(struct socket *sock, loff_t *ppos,
 
 #ifdef CONFIG_MPTCP
 	if (mptcp(tcp_sk(sk))) {
-		struct sock *sk_it;
-		mptcp_for_each_sk(tcp_sk(sk)->mpcb, sk_it)
-			sock_rps_record_flow(sk_it);
+		struct mptcp_tcp_sock *mptcp;
+
+		mptcp_for_each_sub(tcp_sk(sk)->mpcb, mptcp) {
+			sock_rps_record_flow(mptcp_to_sock(mptcp));
+		}
 	}
 #endif
 
@@ -993,7 +995,7 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 	}
 
 	if (mptcp(tp)) {
-		struct sock *sk_it = sk;
+		struct mptcp_tcp_sock *mptcp;
 
 		/* We must check this with socket-lock hold because we iterate
 		 * over the subflows.
@@ -1008,8 +1010,9 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 			return ret;
 		}
 
-		mptcp_for_each_sk(tp->mpcb, sk_it)
-			sock_rps_record_flow(sk_it);
+		mptcp_for_each_sub(tp->mpcb, mptcp) {
+			sock_rps_record_flow(mptcp_to_sock(mptcp));
+		}
 	}
 
 	sk_clear_bit(SOCKWQ_ASYNC_NOSPACE, sk);
@@ -1288,9 +1291,11 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 	}
 
 	if (mptcp(tp)) {
-		struct sock *sk_it = sk;
-		mptcp_for_each_sk(tp->mpcb, sk_it)
-			sock_rps_record_flow(sk_it);
+		struct mptcp_tcp_sock *mptcp;
+
+		mptcp_for_each_sub(tp->mpcb, mptcp) {
+			sock_rps_record_flow(mptcp_to_sock(mptcp));
+		}
 	}
 
 	if (unlikely(tp->repair)) {
@@ -2006,9 +2011,11 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 
 #ifdef CONFIG_MPTCP
 	if (mptcp(tp)) {
-		struct sock *sk_it;
-		mptcp_for_each_sk(tp->mpcb, sk_it)
-			sock_rps_record_flow(sk_it);
+		struct mptcp_tcp_sock *mptcp;
+
+		mptcp_for_each_sub(tp->mpcb, mptcp) {
+			sock_rps_record_flow(mptcp_to_sock(mptcp));
+		}
 	}
 #endif
 
