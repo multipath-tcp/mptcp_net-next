@@ -102,8 +102,7 @@ struct mptcp_request_sock {
 
 	u8				loc_id;
 	u8				rem_id; /* Address-id in the MP_JOIN */
-	u8				dss_csum:1,
-					is_sub:1, /* Is this a new subflow? */
+	u8				is_sub:1, /* Is this a new subflow? */
 					low_prio:1, /* Interface set to low-prio? */
 					rcv_low_prio:1,
 					mptcp_ver:4;
@@ -111,7 +110,6 @@ struct mptcp_request_sock {
 
 struct mptcp_options_received {
 	u16	saw_mpc:1,
-		dss_csum:1,
 		drop_me:1,
 
 		is_mp_join:1,
@@ -168,7 +166,6 @@ struct mptcp_tcp_sock {
 		fully_established:1,
 		second_packet:1,
 		attached:1,
-		send_mp_fail:1,
 		include_mpc:1,
 		mapping_present:1,
 		map_data_fin:1,
@@ -269,7 +266,6 @@ struct mptcp_cb {
 		in_time_wait:1,
 		list_rcvd:1, /* XXX TO REMOVE */
 		addr_signal:1, /* Path-manager wants us to call addr_signal */
-		dss_csum:1,
 		server_side:1,
 		infinite_mapping_rcv:1,
 		infinite_mapping_snd:1,
@@ -288,7 +284,6 @@ struct mptcp_cb {
 	 * accessed. Thus, the whole data-path is on a single cache-line.
 	 */
 
-	u64	csum_cutoff_seq;
 	u64	infinite_rcv_seq;
 
 	/***** Start of fields, used for connection closure */
@@ -364,11 +359,9 @@ struct mptcp_cb {
  * To get the total length, just add the different options together.
  */
 #define MPTCP_SUB_LEN_SEQ	10
-#define MPTCP_SUB_LEN_SEQ_CSUM	12
 #define MPTCP_SUB_LEN_SEQ_ALIGN	12
 
 #define MPTCP_SUB_LEN_SEQ_64		14
-#define MPTCP_SUB_LEN_SEQ_CSUM_64	16
 #define MPTCP_SUB_LEN_SEQ_64_ALIGN	16
 
 #define MPTCP_SUB_LEN_ACK	4
@@ -434,10 +427,9 @@ extern bool mptcp_init_failed;
 #define OPTION_DATA_ACK		(1 << 4)
 #define OPTION_ADD_ADDR		(1 << 5)
 #define OPTION_MP_JOIN		(1 << 6)
-#define OPTION_MP_FAIL		(1 << 7)
-#define OPTION_MP_FCLOSE	(1 << 8)
-#define OPTION_REMOVE_ADDR	(1 << 9)
-#define OPTION_MP_PRIO		(1 << 10)
+#define OPTION_MP_FCLOSE	(1 << 7)
+#define OPTION_REMOVE_ADDR	(1 << 8)
+#define OPTION_MP_PRIO		(1 << 9)
 
 /* MPTCP flags: both TX and RX */
 #define MPTCPHDR_SEQ		0x01 /* DSS.M option is present */
@@ -447,7 +439,6 @@ extern bool mptcp_init_failed;
 #define MPTCPHDR_ACK		0x08
 #define MPTCPHDR_SEQ64_SET	0x10 /* Did we received a 64-bit seq number?  */
 #define MPTCPHDR_SEQ64_OFO	0x20 /* Is it not in our circular array? */
-#define MPTCPHDR_DSS_CSUM	0x40
 /* MPTCP flags: TX only */
 #define MPTCPHDR_INF		0x08
 #define MPTCP_REINJECT		0x10 /* Did we reinject this segment? */
@@ -640,16 +631,15 @@ struct mp_prio {
 	__u8	addr_id;
 } __attribute__((__packed__));
 
-static inline int mptcp_sub_len_dss(const struct mp_dss *m, const int csum)
+static inline int mptcp_sub_len_dss(const struct mp_dss *m)
 {
-	return 4 + m->A * (4 + m->a * 4) + m->M * (10 + m->m * 4 + csum * 2);
+	return 4 + m->A * (4 + m->a * 4) + m->M * (10 + m->m * 4);
 }
 
 #define MPTCP_SYSCTL	1
 
 extern int sysctl_mptcp_enabled;
 extern int sysctl_mptcp_version;
-extern int sysctl_mptcp_checksum;
 extern int sysctl_mptcp_debug;
 extern int sysctl_mptcp_syn_retries;
 
@@ -693,10 +683,8 @@ enum
 	MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK,/* Server-side fallback during 3-way handshake */
 	MPTCP_MIB_MPCAPABLEACTIVEFALLBACK, /* Client-side fallback during 3-way handshake */
 	MPTCP_MIB_MPCAPABLERETRANSFALLBACK,/* Client-side stopped sending MP_CAPABLE after too many SYN-retransmissions */
-	MPTCP_MIB_CSUMENABLED,		/* Created MPTCP-connection with DSS-checksum enabled */
 	MPTCP_MIB_RETRANSSEGS,		/* Segments retransmitted at the MPTCP-level */
 	MPTCP_MIB_MPFAILRX,		/* Received an MP_FAIL */
-	MPTCP_MIB_CSUMFAIL,		/* Received segment with invalid checksum */
 	MPTCP_MIB_FASTCLOSERX,		/* Recevied a FAST_CLOSE */
 	MPTCP_MIB_FASTCLOSETX,		/* Sent a FAST_CLOSE */
 	MPTCP_MIB_FBACKSUB,		/* Fallback upon ack without data-ack on new subflow */
@@ -921,9 +909,6 @@ static inline bool mptcp_can_sendpage(struct sock *sk)
 {
 	struct mptcp_tcp_sock *mptcp;
 
-	if (tcp_sk(sk)->mpcb->dss_csum)
-		return false;
-
 	mptcp_for_each_sub(tcp_sk(sk)->mpcb, mptcp) {
 		struct sock *sk_it = mptcp_to_sock(mptcp);
 
@@ -1058,7 +1043,6 @@ static inline int is_master_tp(const struct tcp_sock *tp)
 static inline void mptcp_init_mp_opt(struct mptcp_options_received *mopt)
 {
 	mopt->saw_mpc = 0;
-	mopt->dss_csum = 0;
 	mopt->drop_me = 0;
 
 	mopt->is_mp_join = 0;
@@ -1152,9 +1136,6 @@ static inline int mptcp_sk_can_send_ack(const struct sock *sk)
 static inline bool mptcp_can_sg(const struct sock *meta_sk)
 {
 	struct mptcp_tcp_sock *mptcp;
-
-	if (tcp_sk(meta_sk)->mpcb->dss_csum)
-		return false;
 
 	mptcp_for_each_sub(tcp_sk(meta_sk)->mpcb, mptcp) {
 		struct sock *sk = mptcp_to_sock(mptcp);
