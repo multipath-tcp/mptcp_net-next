@@ -744,12 +744,6 @@ int inet_accept(struct socket *sock, struct socket *newsock, int flags,
 	sock_rps_record_flow(sk2);
 
 	if (sk2->sk_protocol == IPPROTO_TCP && mptcp(tcp_sk(sk2))) {
-		struct mptcp_tcp_sock *mptcp;
-
-		mptcp_for_each_sub(tcp_sk(sk2)->mpcb, mptcp) {
-			sock_rps_record_flow(mptcp_to_sock(mptcp));
-		}
-
 		if (tcp_sk(sk2)->mpcb->master_sk) {
 			struct sock *sk_it = tcp_sk(sk2)->mpcb->master_sk;
 
