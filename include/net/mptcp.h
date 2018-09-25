@@ -265,12 +265,6 @@ struct mptcp_cb {
 	u8 mptcp_sched[MPTCP_SCHED_DATA_SIZE] __aligned(8);
 	struct mptcp_sched_ops *sched_ops;
 
-	struct sk_buff_head reinject_queue;
-	/* First cache-line boundary is here minus 8 bytes. But from the
-	 * reinject-queue only the next and prev pointers are regularly
-	 * accessed. Thus, the whole data-path is on a single cache-line.
-	 */
-
 	u64	infinite_rcv_seq;
 
 	/***** Start of fields, used for connection closure */
@@ -422,7 +416,6 @@ extern bool mptcp_init_failed;
 #define MPTCPHDR_SEQ64_OFO	0x20 /* Is it not in our circular array? */
 /* MPTCP flags: TX only */
 #define MPTCPHDR_INF		0x08
-#define MPTCP_REINJECT		0x10 /* Did we reinject this segment? */
 
 struct mptcp_option {
 	__u8	kind;
@@ -720,7 +713,6 @@ int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 		   gfp_t flags);
 void mptcp_del_sock(struct sock *sk);
 void mptcp_update_metasocket(const struct sock *meta_sk);
-void mptcp_reinject_data(struct sock *orig_sk, int clone_it);
 void mptcp_update_sndbuf(const struct tcp_sock *tp);
 void mptcp_send_fin(struct sock *meta_sk);
 void mptcp_send_active_reset(struct sock *meta_sk, gfp_t priority);
@@ -1257,7 +1249,6 @@ static inline int is_master_tp(const struct tcp_sock *tp)
 }
 static inline void mptcp_del_sock(const struct sock *sk) {}
 static inline void mptcp_update_metasocket(const struct sock *meta_sk) {}
-static inline void mptcp_reinject_data(struct sock *orig_sk, int clone_it) {}
 static inline void mptcp_update_sndbuf(const struct tcp_sock *tp) {}
 static inline void mptcp_clean_rtx_infinite(const struct sk_buff *skb,
 					    const struct sock *sk) {}

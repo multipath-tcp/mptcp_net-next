@@ -92,7 +92,7 @@ static inline int mptcp_tso_acked_reinject(const struct sock *meta_sk,
 /* Cleans the meta-socket retransmission queue and the reinject-queue. */
 static void mptcp_clean_rtx_queue(struct sock *meta_sk, u32 prior_snd_una)
 {
-	struct sk_buff *skb, *tmp, *next;
+	struct sk_buff *skb, *next;
 	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
 	struct mptcp_cb *mpcb = meta_tp->mpcb;
 	bool acked = false;
@@ -148,20 +148,6 @@ static void mptcp_clean_rtx_queue(struct sock *meta_sk, u32 prior_snd_una)
 			}
 		}
 		sk_wmem_free_skb(meta_sk, skb);
-	}
-	/* Remove acknowledged data from the reinject queue */
-	skb_queue_walk_safe(&mpcb->reinject_queue, skb, tmp) {
-		if (before(meta_tp->snd_una, TCP_SKB_CB(skb)->end_seq)) {
-			if (tcp_skb_pcount(skb) == 1 ||
-			    !after(meta_tp->snd_una, TCP_SKB_CB(skb)->seq))
-				break;
-
-			mptcp_tso_acked_reinject(meta_sk, skb);
-			break;
-		}
-
-		__skb_unlink(skb, &mpcb->reinject_queue);
-		__kfree_skb(skb);
 	}
 
 	if (likely(between(meta_tp->snd_up, prior_snd_una, meta_tp->snd_una)))
@@ -1242,9 +1228,6 @@ static void mptcp_data_ack(struct sock *sk, const struct sk_buff *skb)
 	u32 nwin, data_ack, data_seq;
 	u16 data_len = 0;
 
-	/* A valid packet came in - subflow is operational again */
-	tp->pf = 0;
-
 	/* Even if there is no data-ack, we stop retransmitting.
 	 * Except if this is a SYN/ACK. Then it is just a retransmission
 	 */
@@ -1400,7 +1383,6 @@ static void mptcp_send_reset_rem_id(const struct mptcp_cb *mpcb, u8 rem_id)
 		struct sock *sk_it = mptcp_to_sock(mptcp);
 
 		if (tcp_sk(sk_it)->mptcp->rem_id == rem_id) {
-			mptcp_reinject_data(sk_it, 0);
 			mptcp_send_reset(sk_it);
 		}
 	}

@@ -29,7 +29,7 @@ static bool mptcp_is_def_unavailable(struct sock *sk)
 	if (tp->mptcp->pre_established)
 		return true;
 
-	if (tp->pf)
+	if (inet_csk(sk)->icsk_ca_state == TCP_CA_Loss)
 		return true;
 
 	return false;
@@ -338,25 +338,19 @@ static struct sk_buff *__mptcp_next_segment(struct sock *meta_sk, int *reinject)
 	if (mpcb->infinite_mapping_snd || mpcb->send_infinite_mapping)
 		return tcp_send_head(meta_sk);
 
-	skb = skb_peek(&mpcb->reinject_queue);
+	skb = tcp_send_head(meta_sk);
 
-	if (skb) {
-		*reinject = 1;
-	} else {
-		skb = tcp_send_head(meta_sk);
+	if (!skb && meta_sk->sk_socket &&
+	    test_bit(SOCK_NOSPACE, &meta_sk->sk_socket->flags) &&
+	    sk_stream_wspace(meta_sk) < sk_stream_min_wspace(meta_sk)) {
+		struct sock *subsk = get_available_subflow(meta_sk, NULL,
+							   false);
+		if (!subsk)
+			return NULL;
 
-		if (!skb && meta_sk->sk_socket &&
-		    test_bit(SOCK_NOSPACE, &meta_sk->sk_socket->flags) &&
-		    sk_stream_wspace(meta_sk) < sk_stream_min_wspace(meta_sk)) {
-			struct sock *subsk = get_available_subflow(meta_sk, NULL,
-								   false);
-			if (!subsk)
-				return NULL;
-
-			skb = mptcp_rcv_buf_optimization(subsk, 0);
-			if (skb)
-				*reinject = -1;
-		}
+		skb = mptcp_rcv_buf_optimization(subsk, 0);
+		if (skb)
+			*reinject = -1;
 	}
 	return skb;
 }
