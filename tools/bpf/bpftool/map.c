@@ -68,8 +68,10 @@ static const char * const map_type_name[] = {
 	[BPF_MAP_TYPE_DEVMAP]		= "devmap",
 	[BPF_MAP_TYPE_SOCKMAP]		= "sockmap",
 	[BPF_MAP_TYPE_CPUMAP]		= "cpumap",
+	[BPF_MAP_TYPE_XSKMAP]           = "xskmap",
 	[BPF_MAP_TYPE_SOCKHASH]		= "sockhash",
 	[BPF_MAP_TYPE_CGROUP_STORAGE]	= "cgroup_storage",
+	[BPF_MAP_TYPE_REUSEPORT_SOCKARRAY] = "reuseport_sockarray",
 };
 
 static bool map_is_per_cpu(__u32 type)
@@ -169,9 +171,28 @@ static int do_dump_btf(const struct btf_dumper *d,
 	if (ret)
 		goto err_end_obj;
 
-	jsonw_name(d->jw, "value");
+	if (!map_is_per_cpu(map_info->type)) {
+		jsonw_name(d->jw, "value");
+		ret = btf_dumper_type(d, map_info->btf_value_type_id, value);
+	} else {
+		unsigned int i, n, step;
 
-	ret = btf_dumper_type(d, map_info->btf_value_type_id, value);
+		jsonw_name(d->jw, "values");
+		jsonw_start_array(d->jw);
+		n = get_possible_cpus();
+		step = round_up(map_info->value_size, 8);
+		for (i = 0; i < n; i++) {
+			jsonw_start_object(d->jw);
+			jsonw_int_field(d->jw, "cpu", i);
+			jsonw_name(d->jw, "value");
+			ret = btf_dumper_type(d, map_info->btf_value_type_id,
+					      value + i * step);
+			jsonw_end_object(d->jw);
+			if (ret)
+				break;
+		}
+		jsonw_end_array(d->jw);
+	}
 
 err_end_obj:
 	/* end of key-value pair */
@@ -298,6 +319,16 @@ static void print_entry_json(struct bpf_map_info *info, unsigned char *key,
 			jsonw_end_object(json_wtr);
 		}
 		jsonw_end_array(json_wtr);
+		if (btf) {
+			struct btf_dumper d = {
+				.btf = btf,
+				.jw = json_wtr,
+				.is_plain_text = false,
+			};
+
+			jsonw_name(json_wtr, "formatted");
+			do_dump_btf(&d, info, key, value);
+		}
 	}
 
 	jsonw_end_object(json_wtr);
@@ -643,12 +674,6 @@ static int do_dump(int argc, char **argv)
 	if (fd < 0)
 		return -1;
 
-	if (map_is_map_of_maps(info.type) || map_is_map_of_progs(info.type)) {
-		p_err("Dumping maps of maps and program maps not supported");
-		close(fd);
-		return -1;
-	}
-
 	key = malloc(info.key_size);
 	value = alloc_value(&info);
 	if (!key || !value) {
@@ -702,7 +727,9 @@ static int do_dump(int argc, char **argv)
 				} else {
 					print_entry_plain(&info, key, value);
 				}
-		} else {
+			num_elems++;
+		} else if (!map_is_map_of_maps(info.type) &&
+			   !map_is_map_of_progs(info.type)) {
 			if (json_output) {
 				jsonw_name(json_wtr, "key");
 				print_hex_data_json(key, info.key_size);
@@ -719,7 +746,6 @@ static int do_dump(int argc, char **argv)
 		}
 
 		prev_key = key;
-		num_elems++;
 	}
 
 	if (json_output)

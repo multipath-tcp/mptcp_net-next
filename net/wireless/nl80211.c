@@ -669,13 +669,13 @@ static int nl80211_msg_put_wmm_rules(struct sk_buff *msg,
 			goto nla_put_failure;
 
 		if (nla_put_u16(msg, NL80211_WMMR_CW_MIN,
-				rule->wmm_rule->client[j].cw_min) ||
+				rule->wmm_rule.client[j].cw_min) ||
 		    nla_put_u16(msg, NL80211_WMMR_CW_MAX,
-				rule->wmm_rule->client[j].cw_max) ||
+				rule->wmm_rule.client[j].cw_max) ||
 		    nla_put_u8(msg, NL80211_WMMR_AIFSN,
-			       rule->wmm_rule->client[j].aifsn) ||
-		    nla_put_u8(msg, NL80211_WMMR_TXOP,
-			       rule->wmm_rule->client[j].cot))
+			       rule->wmm_rule.client[j].aifsn) ||
+		    nla_put_u16(msg, NL80211_WMMR_TXOP,
+			        rule->wmm_rule.client[j].cot))
 			goto nla_put_failure;
 
 		nla_nest_end(msg, nl_wmm_rule);
@@ -766,9 +766,9 @@ static int nl80211_msg_put_channel(struct sk_buff *msg, struct wiphy *wiphy,
 
 	if (large) {
 		const struct ieee80211_reg_rule *rule =
-			freq_reg_info(wiphy, chan->center_freq);
+			freq_reg_info(wiphy, MHZ_TO_KHZ(chan->center_freq));
 
-		if (!IS_ERR(rule) && rule->wmm_rule) {
+		if (!IS_ERR_OR_NULL(rule) && rule->has_wmm) {
 			if (nl80211_msg_put_wmm_rules(msg, rule))
 				goto nla_put_failure;
 		}
@@ -4095,6 +4095,9 @@ static void nl80211_calculate_ap_params(struct cfg80211_ap_settings *params)
 	cap = cfg80211_find_ie(WLAN_EID_VHT_CAPABILITY, ies, ies_len);
 	if (cap && cap[1] >= sizeof(*params->vht_cap))
 		params->vht_cap = (void *)(cap + 2);
+	cap = cfg80211_find_ext_ie(WLAN_EID_EXT_HE_CAPABILITY, ies, ies_len);
+	if (cap && cap[1] >= sizeof(*params->he_cap) + 1)
+		params->he_cap = (void *)(cap + 3);
 }
 
 static bool nl80211_get_ap_channel(struct cfg80211_registered_device *rdev,
@@ -4724,10 +4727,11 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 	PUT_SINFO_U64(RX_DROP_MISC, rx_dropped_misc);
 	PUT_SINFO_U64(BEACON_RX, rx_beacon);
 	PUT_SINFO(BEACON_SIGNAL_AVG, rx_beacon_signal_avg, u8);
-	PUT_SINFO(ACK_SIGNAL, ack_signal, u8);
 	if (wiphy_ext_feature_isset(&rdev->wiphy,
-				    NL80211_EXT_FEATURE_DATA_ACK_SIGNAL_SUPPORT))
-		PUT_SINFO(DATA_ACK_SIGNAL_AVG, avg_ack_signal, s8);
+				    NL80211_EXT_FEATURE_ACK_SIGNAL_SUPPORT)) {
+		PUT_SINFO(ACK_SIGNAL, ack_signal, u8);
+		PUT_SINFO(ACK_SIGNAL_AVG, avg_ack_signal, s8);
+	}
 
 #undef PUT_SINFO
 #undef PUT_SINFO_U64
@@ -12205,6 +12209,7 @@ static int nl80211_update_ft_ies(struct sk_buff *skb, struct genl_info *info)
 		return -EOPNOTSUPP;
 
 	if (!info->attrs[NL80211_ATTR_MDID] ||
+	    !info->attrs[NL80211_ATTR_IE] ||
 	    !is_valid_ie_attr(info->attrs[NL80211_ATTR_IE]))
 		return -EINVAL;
 

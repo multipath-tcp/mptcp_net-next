@@ -574,11 +574,6 @@ static int netlink_insert(struct sock *sk, u32 portid)
 	if (nlk_sk(sk)->bound)
 		goto err;
 
-	err = -ENOMEM;
-	if (BITS_PER_LONG > 32 &&
-	    unlikely(atomic_read(&table->hash.nelems) >= UINT_MAX))
-		goto err;
-
 	nlk_sk(sk)->portid = portid;
 	sock_hold(sk);
 
@@ -993,7 +988,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 	struct netlink_sock *nlk = nlk_sk(sk);
 	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
 	int err = 0;
-	long unsigned int groups = nladdr->nl_groups;
+	unsigned long groups = nladdr->nl_groups;
 	bool bound;
 
 	if (addr_len < sizeof(struct sockaddr_nl))
@@ -1011,9 +1006,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 			return err;
 	}
 
-	if (nlk->ngroups == 0)
-		groups = 0;
-	else if (nlk->ngroups < 8*sizeof(groups))
+	if (nlk->ngroups < BITS_PER_LONG)
 		groups &= (1UL << nlk->ngroups) - 1;
 
 	bound = nlk->bound;

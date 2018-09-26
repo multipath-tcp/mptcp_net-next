@@ -861,6 +861,8 @@ void phy_stop(struct phy_device *phydev)
 out_unlock:
 	mutex_unlock(&phydev->lock);
 
+	phy_state_machine(&phydev->state_queue.work);
+
 	/* Cannot call flush_scheduled_work() here as desired because
 	 * of rtnl_lock(), but PHY_HALTED shall guarantee phy_change()
 	 * will not reenable interrupts.
@@ -1121,9 +1123,13 @@ void phy_state_machine(struct work_struct *work)
 
 	/* Only re-schedule a PHY state machine change if we are polling the
 	 * PHY, if PHY_IGNORE_INTERRUPT is set, then we will be moving
-	 * between states from phy_mac_interrupt()
+	 * between states from phy_mac_interrupt().
+	 *
+	 * In state PHY_HALTED the PHY gets suspended, so rescheduling the
+	 * state machine would be pointless and possibly error prone when
+	 * called from phy_disconnect() synchronously.
 	 */
-	if (phy_polling_mode(phydev))
+	if (phy_polling_mode(phydev) && old_state != PHY_HALTED)
 		queue_delayed_work(system_power_efficient_wq, &phydev->state_queue,
 				   PHY_STATE_TIME * HZ);
 }

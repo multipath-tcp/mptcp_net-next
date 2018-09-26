@@ -79,6 +79,7 @@ struct fl_flow_tmplt {
 	struct fl_flow_key mask;
 	struct flow_dissector dissector;
 	struct tcf_chain *chain;
+	struct rcu_work rwork;
 };
 
 struct cls_fl_head {
@@ -98,7 +99,7 @@ struct cls_fl_filter {
 	struct list_head list;
 	u32 handle;
 	u32 flags;
-	unsigned int in_hw_count;
+	u32 in_hw_count;
 	struct rcu_work rwork;
 	struct net_device *hw_dev;
 };
@@ -993,7 +994,7 @@ static int fl_init_mask_hashtable(struct fl_flow_mask *mask)
 }
 
 #define FL_KEY_MEMBER_OFFSET(member) offsetof(struct fl_flow_key, member)
-#define FL_KEY_MEMBER_SIZE(member) (sizeof(((struct fl_flow_key *) 0)->member))
+#define FL_KEY_MEMBER_SIZE(member) FIELD_SIZEOF(struct fl_flow_key, member)
 
 #define FL_KEY_IS_MASKED(mask, member)						\
 	memchr_inv(((char *)mask) + FL_KEY_MEMBER_OFFSET(member),		\
@@ -1437,12 +1438,20 @@ errout_tb:
 	return ERR_PTR(err);
 }
 
+static void fl_tmplt_destroy_work(struct work_struct *work)
+{
+	struct fl_flow_tmplt *tmplt = container_of(to_rcu_work(work),
+						 struct fl_flow_tmplt, rwork);
+
+	fl_hw_destroy_tmplt(tmplt->chain, tmplt);
+	kfree(tmplt);
+}
+
 static void fl_tmplt_destroy(void *tmplt_priv)
 {
 	struct fl_flow_tmplt *tmplt = tmplt_priv;
 
-	fl_hw_destroy_tmplt(tmplt->chain, tmplt);
-	kfree(tmplt);
+	tcf_queue_work(&tmplt->rwork, fl_tmplt_destroy_work);
 }
 
 static int fl_dump_key_val(struct sk_buff *skb,
@@ -1878,6 +1887,9 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, void *fh,
 		fl_hw_update_stats(tp, f);
 
 	if (f->flags && nla_put_u32(skb, TCA_FLOWER_FLAGS, f->flags))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, TCA_FLOWER_IN_HW_COUNT, f->in_hw_count))
 		goto nla_put_failure;
 
 	if (tcf_exts_dump(skb, &f->exts))

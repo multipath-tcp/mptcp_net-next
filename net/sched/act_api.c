@@ -81,6 +81,7 @@ static void tcf_set_action_cookie(struct tc_cookie __rcu **old_cookie,
 static void free_tcf(struct tc_action *p)
 {
 	free_percpu(p->cpu_bstats);
+	free_percpu(p->cpu_bstats_hw);
 	free_percpu(p->cpu_qstats);
 
 	tcf_set_action_cookie(&p->act_cookie, NULL);
@@ -246,6 +247,20 @@ nla_put_failure:
 	goto done;
 }
 
+static int tcf_idr_release_unsafe(struct tc_action *p)
+{
+	if (atomic_read(&p->tcfa_bindcnt) > 0)
+		return -EPERM;
+
+	if (refcount_dec_and_test(&p->tcfa_refcnt)) {
+		idr_remove(&p->idrinfo->action_idr, p->tcfa_index);
+		tcf_action_cleanup(p);
+		return ACT_P_DELETED;
+	}
+
+	return 0;
+}
+
 static int tcf_del_walker(struct tcf_idrinfo *idrinfo, struct sk_buff *skb,
 			  const struct tc_action_ops *ops)
 {
@@ -262,15 +277,19 @@ static int tcf_del_walker(struct tcf_idrinfo *idrinfo, struct sk_buff *skb,
 	if (nla_put_string(skb, TCA_KIND, ops->kind))
 		goto nla_put_failure;
 
+	spin_lock(&idrinfo->lock);
 	idr_for_each_entry_ul(idr, p, id) {
-		ret = __tcf_idr_release(p, false, true);
+		ret = tcf_idr_release_unsafe(p);
 		if (ret == ACT_P_DELETED) {
 			module_put(ops->owner);
 			n_i++;
 		} else if (ret < 0) {
+			spin_unlock(&idrinfo->lock);
 			goto nla_put_failure;
 		}
 	}
+	spin_unlock(&idrinfo->lock);
+
 	if (nla_put_u32(skb, TCA_FCNT, n_i))
 		goto nla_put_failure;
 	nla_nest_end(skb, nest);
@@ -372,9 +391,12 @@ int tcf_idr_create(struct tc_action_net *tn, u32 index, struct nlattr *est,
 		p->cpu_bstats = netdev_alloc_pcpu_stats(struct gnet_stats_basic_cpu);
 		if (!p->cpu_bstats)
 			goto err1;
+		p->cpu_bstats_hw = netdev_alloc_pcpu_stats(struct gnet_stats_basic_cpu);
+		if (!p->cpu_bstats_hw)
+			goto err2;
 		p->cpu_qstats = alloc_percpu(struct gnet_stats_queue);
 		if (!p->cpu_qstats)
-			goto err2;
+			goto err3;
 	}
 	spin_lock_init(&p->tcfa_lock);
 	p->tcfa_index = index;
@@ -386,15 +408,17 @@ int tcf_idr_create(struct tc_action_net *tn, u32 index, struct nlattr *est,
 					&p->tcfa_rate_est,
 					&p->tcfa_lock, NULL, est);
 		if (err)
-			goto err3;
+			goto err4;
 	}
 
 	p->idrinfo = idrinfo;
 	p->ops = ops;
 	*a = p;
 	return 0;
-err3:
+err4:
 	free_percpu(p->cpu_qstats);
+err3:
+	free_percpu(p->cpu_bstats_hw);
 err2:
 	free_percpu(p->cpu_bstats);
 err1:
@@ -662,6 +686,13 @@ int tcf_action_destroy(struct tc_action *actions[], int bind)
 	return ret;
 }
 
+static int tcf_action_destroy_1(struct tc_action *a, int bind)
+{
+	struct tc_action *actions[] = { a, NULL };
+
+	return tcf_action_destroy(actions, bind);
+}
+
 static int tcf_action_put(struct tc_action *p)
 {
 	return __tcf_action_put(p, false);
@@ -881,17 +912,16 @@ struct tc_action *tcf_action_init_1(struct net *net, struct tcf_proto *tp,
 	if (TC_ACT_EXT_CMP(a->tcfa_action, TC_ACT_GOTO_CHAIN)) {
 		err = tcf_action_goto_chain_init(a, tp);
 		if (err) {
-			struct tc_action *actions[] = { a, NULL };
-
-			tcf_action_destroy(actions, bind);
+			tcf_action_destroy_1(a, bind);
 			NL_SET_ERR_MSG(extack, "Failed to init TC action chain");
 			return ERR_PTR(err);
 		}
 	}
 
 	if (!tcf_action_valid(a->tcfa_action)) {
-		NL_SET_ERR_MSG(extack, "invalid action value, using TC_ACT_UNSPEC instead");
-		a->tcfa_action = TC_ACT_UNSPEC;
+		tcf_action_destroy_1(a, bind);
+		NL_SET_ERR_MSG(extack, "Invalid control action value");
+		return ERR_PTR(-EINVAL);
 	}
 
 	return a;
@@ -973,6 +1003,8 @@ int tcf_action_copy_stats(struct sk_buff *skb, struct tc_action *p,
 		goto errout;
 
 	if (gnet_stats_copy_basic(NULL, &d, p->cpu_bstats, &p->tcfa_bstats) < 0 ||
+	    gnet_stats_copy_basic_hw(NULL, &d, p->cpu_bstats_hw,
+				     &p->tcfa_bstats_hw) < 0 ||
 	    gnet_stats_copy_rate_est(&d, &p->tcfa_rate_est) < 0 ||
 	    gnet_stats_copy_queue(&d, p->cpu_qstats,
 				  &p->tcfa_qstats,
@@ -1067,12 +1099,14 @@ static struct tc_action *tcf_action_get_1(struct net *net, struct nlattr *nla,
 	err = -EINVAL;
 	ops = tc_lookup_action(tb[TCA_ACT_KIND]);
 	if (!ops) { /* could happen in batch of actions */
-		NL_SET_ERR_MSG(extack, "Specified TC action not found");
+		NL_SET_ERR_MSG(extack, "Specified TC action kind not found");
 		goto err_out;
 	}
 	err = -ENOENT;
-	if (ops->lookup(net, &a, index, extack) == 0)
+	if (ops->lookup(net, &a, index) == 0) {
+		NL_SET_ERR_MSG(extack, "TC action with specified index not found");
 		goto err_mod;
+	}
 
 	module_put(ops->owner);
 	return a;
@@ -1173,6 +1207,7 @@ static int tcf_action_delete(struct net *net, struct tc_action *actions[])
 		struct tcf_idrinfo *idrinfo = a->idrinfo;
 		u32 act_index = a->tcfa_index;
 
+		actions[i] = NULL;
 		if (tcf_action_put(a)) {
 			/* last reference, action was deleted concurrently */
 			module_put(ops->owner);
@@ -1184,7 +1219,6 @@ static int tcf_action_delete(struct net *net, struct tc_action *actions[])
 			if (ret < 0)
 				return ret;
 		}
-		actions[i] = NULL;
 	}
 	return 0;
 }

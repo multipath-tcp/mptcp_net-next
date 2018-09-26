@@ -113,7 +113,6 @@ do {								\
 } while (0)
 #endif
 
-#define TUN_HEADROOM 256
 #define TUN_RX_PAD (NET_IP_ALIGN + NET_SKB_PAD)
 
 /* TUN device flags */
@@ -869,6 +868,9 @@ static int tun_attach(struct tun_struct *tun, struct file *file,
 		tun_napi_init(tun, tfile, napi);
 	}
 
+	if (rtnl_dereference(tun->xdp_prog))
+		sock_set_flag(&tfile->sk, SOCK_XDP);
+
 	tun_set_real_num_queues(tun);
 
 	/* device is allowed to go away first, so no need to hold extra
@@ -1153,43 +1155,6 @@ static netdev_features_t tun_net_fix_features(struct net_device *dev,
 
 	return (features & tun->set_features) | (features & ~TUN_USER_FEATURES);
 }
-#ifdef CONFIG_NET_POLL_CONTROLLER
-static void tun_poll_controller(struct net_device *dev)
-{
-	/*
-	 * Tun only receives frames when:
-	 * 1) the char device endpoint gets data from user space
-	 * 2) the tun socket gets a sendmsg call from user space
-	 * If NAPI is not enabled, since both of those are synchronous
-	 * operations, we are guaranteed never to have pending data when we poll
-	 * for it so there is nothing to do here but return.
-	 * We need this though so netpoll recognizes us as an interface that
-	 * supports polling, which enables bridge devices in virt setups to
-	 * still use netconsole
-	 * If NAPI is enabled, however, we need to schedule polling for all
-	 * queues unless we are using napi_gro_frags(), which we call in
-	 * process context and not in NAPI context.
-	 */
-	struct tun_struct *tun = netdev_priv(dev);
-
-	if (tun->flags & IFF_NAPI) {
-		struct tun_file *tfile;
-		int i;
-
-		if (tun_napi_frags_enabled(tun))
-			return;
-
-		rcu_read_lock();
-		for (i = 0; i < tun->numqueues; i++) {
-			tfile = rcu_dereference(tun->tfiles[i]);
-			if (tfile->napi_enabled)
-				napi_schedule(&tfile->napi);
-		}
-		rcu_read_unlock();
-	}
-	return;
-}
-#endif
 
 static void tun_set_headroom(struct net_device *dev, int new_hr)
 {
@@ -1241,12 +1206,28 @@ static int tun_xdp_set(struct net_device *dev, struct bpf_prog *prog,
 		       struct netlink_ext_ack *extack)
 {
 	struct tun_struct *tun = netdev_priv(dev);
+	struct tun_file *tfile;
 	struct bpf_prog *old_prog;
+	int i;
 
 	old_prog = rtnl_dereference(tun->xdp_prog);
 	rcu_assign_pointer(tun->xdp_prog, prog);
 	if (old_prog)
 		bpf_prog_put(old_prog);
+
+	for (i = 0; i < tun->numqueues; i++) {
+		tfile = rtnl_dereference(tun->tfiles[i]);
+		if (prog)
+			sock_set_flag(&tfile->sk, SOCK_XDP);
+		else
+			sock_reset_flag(&tfile->sk, SOCK_XDP);
+	}
+	list_for_each_entry(tfile, &tun->disabled, next) {
+		if (prog)
+			sock_set_flag(&tfile->sk, SOCK_XDP);
+		else
+			sock_reset_flag(&tfile->sk, SOCK_XDP);
+	}
 
 	return 0;
 }
@@ -1283,9 +1264,6 @@ static const struct net_device_ops tun_netdev_ops = {
 	.ndo_start_xmit		= tun_net_xmit,
 	.ndo_fix_features	= tun_net_fix_features,
 	.ndo_select_queue	= tun_select_queue,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller	= tun_poll_controller,
-#endif
 	.ndo_set_rx_headroom	= tun_set_headroom,
 	.ndo_get_stats64	= tun_net_get_stats64,
 };
@@ -1365,9 +1343,6 @@ static const struct net_device_ops tap_netdev_ops = {
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_select_queue	= tun_select_queue,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller	= tun_poll_controller,
-#endif
 	.ndo_features_check	= passthru_features_check,
 	.ndo_set_rx_headroom	= tun_set_headroom,
 	.ndo_get_stats64	= tun_net_get_stats64,
@@ -1617,6 +1592,55 @@ static bool tun_can_build_skb(struct tun_struct *tun, struct tun_file *tfile,
 	return true;
 }
 
+static struct sk_buff *__tun_build_skb(struct page_frag *alloc_frag, char *buf,
+				       int buflen, int len, int pad)
+{
+	struct sk_buff *skb = build_skb(buf, buflen);
+
+	if (!skb)
+		return ERR_PTR(-ENOMEM);
+
+	skb_reserve(skb, pad);
+	skb_put(skb, len);
+
+	get_page(alloc_frag->page);
+	alloc_frag->offset += buflen;
+
+	return skb;
+}
+
+static int tun_xdp_act(struct tun_struct *tun, struct bpf_prog *xdp_prog,
+		       struct xdp_buff *xdp, u32 act)
+{
+	int err;
+
+	switch (act) {
+	case XDP_REDIRECT:
+		err = xdp_do_redirect(tun->dev, xdp, xdp_prog);
+		if (err)
+			return err;
+		break;
+	case XDP_TX:
+		err = tun_xdp_tx(tun->dev, xdp);
+		if (err < 0)
+			return err;
+		break;
+	case XDP_PASS:
+		break;
+	default:
+		bpf_warn_invalid_xdp_action(act);
+		/* fall through */
+	case XDP_ABORTED:
+		trace_xdp_exception(tun->dev, xdp_prog, act);
+		/* fall through */
+	case XDP_DROP:
+		this_cpu_inc(tun->pcpu_stats->rx_dropped);
+		break;
+	}
+
+	return act;
+}
+
 static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 				     struct tun_file *tfile,
 				     struct iov_iter *from,
@@ -1624,18 +1648,17 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 				     int len, int *skb_xdp)
 {
 	struct page_frag *alloc_frag = &current->task_frag;
-	struct sk_buff *skb;
 	struct bpf_prog *xdp_prog;
 	int buflen = SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-	unsigned int delta = 0;
 	char *buf;
 	size_t copied;
-	int err, pad = TUN_RX_PAD;
+	int pad = TUN_RX_PAD;
+	int err = 0;
 
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(tun->xdp_prog);
 	if (xdp_prog)
-		pad += TUN_HEADROOM;
+		pad += XDP_PACKET_HEADROOM;
 	buflen += SKB_DATA_ALIGN(len + pad);
 	rcu_read_unlock();
 
@@ -1654,17 +1677,18 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 	 * of xdp_prog above, this should be rare and for simplicity
 	 * we do XDP on skb in case the headroom is not enough.
 	 */
-	if (hdr->gso_type || !xdp_prog)
+	if (hdr->gso_type || !xdp_prog) {
 		*skb_xdp = 1;
-	else
-		*skb_xdp = 0;
+		return __tun_build_skb(alloc_frag, buf, buflen, len, pad);
+	}
+
+	*skb_xdp = 0;
 
 	local_bh_disable();
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(tun->xdp_prog);
-	if (xdp_prog && !*skb_xdp) {
+	if (xdp_prog) {
 		struct xdp_buff xdp;
-		void *orig_data;
 		u32 act;
 
 		xdp.data_hard_start = buf;
@@ -1672,66 +1696,33 @@ static struct sk_buff *tun_build_skb(struct tun_struct *tun,
 		xdp_set_data_meta_invalid(&xdp);
 		xdp.data_end = xdp.data + len;
 		xdp.rxq = &tfile->xdp_rxq;
-		orig_data = xdp.data;
+
 		act = bpf_prog_run_xdp(xdp_prog, &xdp);
-
-		switch (act) {
-		case XDP_REDIRECT:
+		if (act == XDP_REDIRECT || act == XDP_TX) {
 			get_page(alloc_frag->page);
 			alloc_frag->offset += buflen;
-			err = xdp_do_redirect(tun->dev, &xdp, xdp_prog);
-			xdp_do_flush_map();
-			if (err)
-				goto err_redirect;
-			rcu_read_unlock();
-			local_bh_enable();
-			return NULL;
-		case XDP_TX:
-			get_page(alloc_frag->page);
-			alloc_frag->offset += buflen;
-			if (tun_xdp_tx(tun->dev, &xdp) < 0)
-				goto err_redirect;
-			rcu_read_unlock();
-			local_bh_enable();
-			return NULL;
-		case XDP_PASS:
-			delta = orig_data - xdp.data;
-			len = xdp.data_end - xdp.data;
-			break;
-		default:
-			bpf_warn_invalid_xdp_action(act);
-			/* fall through */
-		case XDP_ABORTED:
-			trace_xdp_exception(tun->dev, xdp_prog, act);
-			/* fall through */
-		case XDP_DROP:
-			goto err_xdp;
 		}
+		err = tun_xdp_act(tun, xdp_prog, &xdp, act);
+		if (err < 0)
+			goto err_xdp;
+		if (err == XDP_REDIRECT)
+			xdp_do_flush_map();
+		if (err != XDP_PASS)
+			goto out;
+
+		pad = xdp.data - xdp.data_hard_start;
+		len = xdp.data_end - xdp.data;
 	}
-
-	skb = build_skb(buf, buflen);
-	if (!skb) {
-		rcu_read_unlock();
-		local_bh_enable();
-		return ERR_PTR(-ENOMEM);
-	}
-
-	skb_reserve(skb, pad - delta);
-	skb_put(skb, len);
-	get_page(alloc_frag->page);
-	alloc_frag->offset += buflen;
-
 	rcu_read_unlock();
 	local_bh_enable();
 
-	return skb;
+	return __tun_build_skb(alloc_frag, buf, buflen, len, pad);
 
-err_redirect:
-	put_page(alloc_frag->page);
 err_xdp:
+	put_page(alloc_frag->page);
+out:
 	rcu_read_unlock();
 	local_bh_enable();
-	this_cpu_inc(tun->pcpu_stats->rx_dropped);
 	return NULL;
 }
 
@@ -2392,18 +2383,133 @@ static void tun_sock_write_space(struct sock *sk)
 	kill_fasync(&tfile->fasync, SIGIO, POLL_OUT);
 }
 
+static int tun_xdp_one(struct tun_struct *tun,
+		       struct tun_file *tfile,
+		       struct xdp_buff *xdp, int *flush)
+{
+	struct tun_xdp_hdr *hdr = xdp->data_hard_start;
+	struct virtio_net_hdr *gso = &hdr->gso;
+	struct tun_pcpu_stats *stats;
+	struct bpf_prog *xdp_prog;
+	struct sk_buff *skb = NULL;
+	u32 rxhash = 0, act;
+	int buflen = hdr->buflen;
+	int err = 0;
+	bool skb_xdp = false;
+
+	xdp_prog = rcu_dereference(tun->xdp_prog);
+	if (xdp_prog) {
+		if (gso->gso_type) {
+			skb_xdp = true;
+			goto build;
+		}
+		xdp_set_data_meta_invalid(xdp);
+		xdp->rxq = &tfile->xdp_rxq;
+
+		act = bpf_prog_run_xdp(xdp_prog, xdp);
+		err = tun_xdp_act(tun, xdp_prog, xdp, act);
+		if (err < 0) {
+			put_page(virt_to_head_page(xdp->data));
+			return err;
+		}
+
+		switch (err) {
+		case XDP_REDIRECT:
+			*flush = true;
+			/* fall through */
+		case XDP_TX:
+			return 0;
+		case XDP_PASS:
+			break;
+		default:
+			put_page(virt_to_head_page(xdp->data));
+			return 0;
+		}
+	}
+
+build:
+	skb = build_skb(xdp->data_hard_start, buflen);
+	if (!skb) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	skb_reserve(skb, xdp->data - xdp->data_hard_start);
+	skb_put(skb, xdp->data_end - xdp->data);
+
+	if (virtio_net_hdr_to_skb(skb, gso, tun_is_little_endian(tun))) {
+		this_cpu_inc(tun->pcpu_stats->rx_frame_errors);
+		kfree_skb(skb);
+		err = -EINVAL;
+		goto out;
+	}
+
+	skb->protocol = eth_type_trans(skb, tun->dev);
+	skb_reset_network_header(skb);
+	skb_probe_transport_header(skb, 0);
+
+	if (skb_xdp) {
+		err = do_xdp_generic(xdp_prog, skb);
+		if (err != XDP_PASS)
+			goto out;
+	}
+
+	if (!rcu_dereference(tun->steering_prog))
+		rxhash = __skb_get_hash_symmetric(skb);
+
+	netif_receive_skb(skb);
+
+	stats = get_cpu_ptr(tun->pcpu_stats);
+	u64_stats_update_begin(&stats->syncp);
+	stats->rx_packets++;
+	stats->rx_bytes += skb->len;
+	u64_stats_update_end(&stats->syncp);
+	put_cpu_ptr(stats);
+
+	if (rxhash)
+		tun_flow_update(tun, rxhash, tfile);
+
+out:
+	return err;
+}
+
 static int tun_sendmsg(struct socket *sock, struct msghdr *m, size_t total_len)
 {
-	int ret;
+	int ret, i;
 	struct tun_file *tfile = container_of(sock, struct tun_file, socket);
 	struct tun_struct *tun = tun_get(tfile);
+	struct tun_msg_ctl *ctl = m->msg_control;
+	struct xdp_buff *xdp;
 
 	if (!tun)
 		return -EBADFD;
 
-	ret = tun_get_user(tun, tfile, m->msg_control, &m->msg_iter,
+	if (ctl && (ctl->type == TUN_MSG_PTR)) {
+		int n = ctl->num;
+		int flush = 0;
+
+		local_bh_disable();
+		rcu_read_lock();
+
+		for (i = 0; i < n; i++) {
+			xdp = &((struct xdp_buff *)ctl->ptr)[i];
+			tun_xdp_one(tun, tfile, xdp, &flush);
+		}
+
+		if (flush)
+			xdp_do_flush_map();
+
+		rcu_read_unlock();
+		local_bh_enable();
+
+		ret = total_len;
+		goto out;
+	}
+
+	ret = tun_get_user(tun, tfile, ctl ? ctl->ptr : NULL, &m->msg_iter,
 			   m->msg_flags & MSG_DONTWAIT,
 			   m->msg_flags & MSG_MORE);
+out:
 	tun_put(tun);
 	return ret;
 }

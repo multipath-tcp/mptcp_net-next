@@ -44,8 +44,8 @@
 #define MLXSW_SP_FWREV_MINOR_TO_BRANCH(minor) ((minor) / 100)
 
 #define MLXSW_SP1_FWREV_MAJOR 13
-#define MLXSW_SP1_FWREV_MINOR 1702
-#define MLXSW_SP1_FWREV_SUBMINOR 6
+#define MLXSW_SP1_FWREV_MINOR 1703
+#define MLXSW_SP1_FWREV_SUBMINOR 4
 #define MLXSW_SP1_FWREV_CAN_RESET_MINOR 1702
 
 static const struct mlxsw_fw_rev mlxsw_sp1_fw_rev = {
@@ -331,7 +331,10 @@ static int mlxsw_sp_fw_rev_validate(struct mlxsw_sp *mlxsw_sp)
 		return -EINVAL;
 	}
 	if (MLXSW_SP_FWREV_MINOR_TO_BRANCH(rev->minor) ==
-	    MLXSW_SP_FWREV_MINOR_TO_BRANCH(req_rev->minor))
+	    MLXSW_SP_FWREV_MINOR_TO_BRANCH(req_rev->minor) &&
+	    (rev->minor > req_rev->minor ||
+	     (rev->minor == req_rev->minor &&
+	      rev->subminor >= req_rev->subminor)))
 		return 0;
 
 	dev_info(mlxsw_sp->bus_info->dev, "The firmware version %d.%d.%d is incompatible with the driver\n",
@@ -2801,6 +2804,13 @@ static int mlxsw_sp_port_ets_init(struct mlxsw_sp_port *mlxsw_sp_port)
 		err = mlxsw_sp_port_ets_maxrate_set(mlxsw_sp_port,
 						    MLXSW_REG_QEEC_HIERARCY_TC,
 						    i, i,
+						    MLXSW_REG_QEEC_MAS_DIS);
+		if (err)
+			return err;
+
+		err = mlxsw_sp_port_ets_maxrate_set(mlxsw_sp_port,
+						    MLXSW_REG_QEEC_HIERARCY_TC,
+						    i + 8, i,
 						    MLXSW_REG_QEEC_MAS_DIS);
 		if (err)
 			return err;

@@ -1247,7 +1247,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 
 	flags = msg->msg_flags;
 
-	if (flags & MSG_ZEROCOPY && size) {
+	if (flags & MSG_ZEROCOPY && size && sock_flag(sk, SOCK_ZEROCOPY)) {
 		if (sk->sk_state != TCP_ESTABLISHED) {
 			err = -EINVAL;
 			goto out_err;
@@ -1366,7 +1366,7 @@ new_segment:
 			copy = size_goal;
 
 			/* All packets are restored as if they have
-			 * already been sent. skb_mstamp isn't set to
+			 * already been sent. skb_mstamp_ns isn't set to
 			 * avoid wrong rtt estimation.
 			 */
 			if (tp->repair)
@@ -2680,6 +2680,8 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->compressed_ack = 0;
 	tp->bytes_sent = 0;
 	tp->bytes_retrans = 0;
+	tp->duplicate_sack[0].start_seq = 0;
+	tp->duplicate_sack[0].end_seq = 0;
 	tp->dsack_dups = 0;
 	tp->reord_seen = 0;
 

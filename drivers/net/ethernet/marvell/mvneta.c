@@ -1890,8 +1890,8 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 		if (!data || !(rx_desc->buf_phys_addr))
 			continue;
 
-		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
-				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+		dma_unmap_page(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+			       PAGE_SIZE, DMA_FROM_DEVICE);
 		__free_page(data);
 	}
 }
@@ -2008,8 +2008,8 @@ static int mvneta_rx_swbm(struct napi_struct *napi,
 				skb_add_rx_frag(rxq->skb, frag_num, page,
 						frag_offset, frag_size,
 						PAGE_SIZE);
-				dma_unmap_single(dev->dev.parent, phys_addr,
-						 PAGE_SIZE, DMA_FROM_DEVICE);
+				dma_unmap_page(dev->dev.parent, phys_addr,
+					       PAGE_SIZE, DMA_FROM_DEVICE);
 				rxq->left_size -= frag_size;
 			}
 		} else {
@@ -2039,9 +2039,8 @@ static int mvneta_rx_swbm(struct napi_struct *napi,
 						frag_offset, frag_size,
 						PAGE_SIZE);
 
-				dma_unmap_single(dev->dev.parent, phys_addr,
-						 PAGE_SIZE,
-						 DMA_FROM_DEVICE);
+				dma_unmap_page(dev->dev.parent, phys_addr,
+					       PAGE_SIZE, DMA_FROM_DEVICE);
 
 				rxq->left_size -= frag_size;
 			}
@@ -2065,10 +2064,7 @@ static int mvneta_rx_swbm(struct napi_struct *napi,
 		/* Linux processing */
 		rxq->skb->protocol = eth_type_trans(rxq->skb, dev);
 
-		if (dev->features & NETIF_F_GRO)
-			napi_gro_receive(napi, rxq->skb);
-		else
-			netif_receive_skb(rxq->skb);
+		napi_gro_receive(napi, rxq->skb);
 
 		/* clean uncomplete skb pointer in queue */
 		rxq->skb = NULL;
@@ -2396,7 +2392,7 @@ error:
 }
 
 /* Main tx processing */
-static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
+static netdev_tx_t mvneta_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 	u16 txq_id = skb_get_queue_mapping(skb);
@@ -2510,12 +2506,13 @@ static void mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done)
 {
 	struct mvneta_tx_queue *txq;
 	struct netdev_queue *nq;
+	int cpu = smp_processor_id();
 
 	while (cause_tx_done) {
 		txq = mvneta_tx_done_policy(pp, cause_tx_done);
 
 		nq = netdev_get_tx_queue(pp->dev, txq->id);
-		__netif_tx_lock(nq, smp_processor_id());
+		__netif_tx_lock(nq, cpu);
 
 		if (txq->count)
 			mvneta_txq_done(pp, txq);
@@ -3793,9 +3790,6 @@ static int mvneta_open(struct net_device *dev)
 			goto err_free_online_hp;
 	}
 
-	/* In default link is down */
-	netif_carrier_off(pp->dev);
-
 	ret = mvneta_mdio_probe(pp);
 	if (ret < 0) {
 		netdev_err(dev, "cannot probe MDIO bus\n");
@@ -4598,7 +4592,8 @@ static int mvneta_probe(struct platform_device *pdev)
 		}
 	}
 
-	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
+	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+			NETIF_F_TSO | NETIF_F_RXCSUM;
 	dev->hw_features |= dev->features;
 	dev->vlan_features |= dev->features;
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;

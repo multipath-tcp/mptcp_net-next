@@ -800,6 +800,7 @@ enum sock_flags {
 	SOCK_SELECT_ERR_QUEUE, /* Wake select on error queue */
 	SOCK_RCU_FREE, /* wait rcu grace period in sk_destruct() */
 	SOCK_TXTIME,
+	SOCK_XDP, /* XDP is attached */
 	SOCK_MPTCP, /* MPTCP set on this socket */
 };
 

@@ -1180,6 +1180,12 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		lladdr = neigh->ha;
 	}
 
+	/* Update confirmed timestamp for neighbour entry after we
+	 * received ARP packet even if it doesn't change IP to MAC binding.
+	 */
+	if (new & NUD_CONNECTED)
+		neigh->confirmed = jiffies;
+
 	/* If entry was valid and address is not changed,
 	   do not change entry state, if new one is STALE.
 	 */
@@ -1201,15 +1207,12 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		}
 	}
 
-	/* Update timestamps only once we know we will make a change to the
+	/* Update timestamp only once we know we will make a change to the
 	 * neighbour entry. Otherwise we risk to move the locktime window with
 	 * noop updates and ignore relevant ARP updates.
 	 */
-	if (new != old || lladdr != neigh->ha) {
-		if (new & NUD_CONNECTED)
-			neigh->confirmed = jiffies;
+	if (new != old || lladdr != neigh->ha)
 		neigh->updated = jiffies;
-	}
 
 	if (new != old) {
 		neigh_del_timer(neigh);
@@ -1277,11 +1280,8 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		neigh->arp_queue_len_bytes = 0;
 	}
 out:
-	if (update_isrouter) {
-		neigh->flags = (flags & NEIGH_UPDATE_F_ISROUTER) ?
-			(neigh->flags | NTF_ROUTER) :
-			(neigh->flags & ~NTF_ROUTER);
-	}
+	if (update_isrouter)
+		neigh_update_is_router(neigh, flags, &notify);
 	write_unlock_bh(&neigh->lock);
 
 	if (notify)
@@ -1709,7 +1709,8 @@ out:
 static int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 		     struct netlink_ext_ack *extack)
 {
-	int flags = NEIGH_UPDATE_F_ADMIN | NEIGH_UPDATE_F_OVERRIDE;
+	int flags = NEIGH_UPDATE_F_ADMIN | NEIGH_UPDATE_F_OVERRIDE |
+		NEIGH_UPDATE_F_OVERRIDE_ISROUTER;
 	struct net *net = sock_net(skb->sk);
 	struct ndmsg *ndm;
 	struct nlattr *tb[NDA_MAX+1];
@@ -1784,11 +1785,15 @@ static int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 		}
 
 		if (!(nlh->nlmsg_flags & NLM_F_REPLACE))
-			flags &= ~NEIGH_UPDATE_F_OVERRIDE;
+			flags &= ~(NEIGH_UPDATE_F_OVERRIDE |
+				   NEIGH_UPDATE_F_OVERRIDE_ISROUTER);
 	}
 
 	if (ndm->ndm_flags & NTF_EXT_LEARNED)
 		flags |= NEIGH_UPDATE_F_EXT_LEARNED;
+
+	if (ndm->ndm_flags & NTF_ROUTER)
+		flags |= NEIGH_UPDATE_F_ISROUTER;
 
 	if (ndm->ndm_flags & NTF_USE) {
 		neigh_event_send(neigh, NULL);

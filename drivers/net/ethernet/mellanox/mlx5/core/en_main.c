@@ -3049,8 +3049,8 @@ static int mlx5e_alloc_drop_cq(struct mlx5_core_dev *mdev,
 	return mlx5e_alloc_cq_common(mdev, param, cq);
 }
 
-static int mlx5e_open_drop_rq(struct mlx5e_priv *priv,
-			      struct mlx5e_rq *drop_rq)
+int mlx5e_open_drop_rq(struct mlx5e_priv *priv,
+		       struct mlx5e_rq *drop_rq)
 {
 	struct mlx5_core_dev *mdev = priv->mdev;
 	struct mlx5e_cq_param cq_param = {};
@@ -3094,7 +3094,7 @@ err_free_cq:
 	return err;
 }
 
-static void mlx5e_close_drop_rq(struct mlx5e_rq *drop_rq)
+void mlx5e_close_drop_rq(struct mlx5e_rq *drop_rq)
 {
 	mlx5e_destroy_rq(drop_rq);
 	mlx5e_free_rq(drop_rq);
@@ -4315,22 +4315,6 @@ static int mlx5e_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	}
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-/* Fake "interrupt" called by netpoll (eg netconsole) to send skbs without
- * reenabling interrupts.
- */
-static void mlx5e_netpoll(struct net_device *dev)
-{
-	struct mlx5e_priv *priv = netdev_priv(dev);
-	struct mlx5e_channels *chs = &priv->channels;
-
-	int i;
-
-	for (i = 0; i < chs->num; i++)
-		napi_schedule(&chs->c[i]->napi);
-}
-#endif
-
 static const struct net_device_ops mlx5e_netdev_ops = {
 	.ndo_open                = mlx5e_open,
 	.ndo_stop                = mlx5e_close,
@@ -4355,9 +4339,6 @@ static const struct net_device_ops mlx5e_netdev_ops = {
 	.ndo_xdp_xmit            = mlx5e_xdp_xmit,
 #ifdef CONFIG_MLX5_EN_ARFS
 	.ndo_rx_flow_steer	 = mlx5e_rx_flow_steer,
-#endif
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller     = mlx5e_netpoll,
 #endif
 #ifdef CONFIG_MLX5_ESWITCH
 	/* SRIOV E-Switch NDOs */
@@ -4726,7 +4707,7 @@ static void mlx5e_build_nic_netdev(struct net_device *netdev)
 	mlx5e_tls_build_netdev(priv);
 }
 
-static void mlx5e_create_q_counters(struct mlx5e_priv *priv)
+void mlx5e_create_q_counters(struct mlx5e_priv *priv)
 {
 	struct mlx5_core_dev *mdev = priv->mdev;
 	int err;
@@ -4744,7 +4725,7 @@ static void mlx5e_create_q_counters(struct mlx5e_priv *priv)
 	}
 }
 
-static void mlx5e_destroy_q_counters(struct mlx5e_priv *priv)
+void mlx5e_destroy_q_counters(struct mlx5e_priv *priv)
 {
 	if (priv->q_counter)
 		mlx5_core_dealloc_q_counter(priv->mdev, priv->q_counter);
@@ -4783,9 +4764,17 @@ static int mlx5e_init_nic_rx(struct mlx5e_priv *priv)
 	struct mlx5_core_dev *mdev = priv->mdev;
 	int err;
 
+	mlx5e_create_q_counters(priv);
+
+	err = mlx5e_open_drop_rq(priv, &priv->drop_rq);
+	if (err) {
+		mlx5_core_err(mdev, "open drop rq failed, %d\n", err);
+		goto err_destroy_q_counters;
+	}
+
 	err = mlx5e_create_indirect_rqt(priv);
 	if (err)
-		return err;
+		goto err_close_drop_rq;
 
 	err = mlx5e_create_direct_rqts(priv);
 	if (err)
@@ -4821,6 +4810,10 @@ err_destroy_direct_rqts:
 	mlx5e_destroy_direct_rqts(priv);
 err_destroy_indirect_rqts:
 	mlx5e_destroy_rqt(priv, &priv->indir_rqt);
+err_close_drop_rq:
+	mlx5e_close_drop_rq(&priv->drop_rq);
+err_destroy_q_counters:
+	mlx5e_destroy_q_counters(priv);
 	return err;
 }
 
@@ -4832,6 +4825,8 @@ static void mlx5e_cleanup_nic_rx(struct mlx5e_priv *priv)
 	mlx5e_destroy_indirect_tirs(priv);
 	mlx5e_destroy_direct_rqts(priv);
 	mlx5e_destroy_rqt(priv, &priv->indir_rqt);
+	mlx5e_close_drop_rq(&priv->drop_rq);
+	mlx5e_destroy_q_counters(priv);
 }
 
 static int mlx5e_init_nic_tx(struct mlx5e_priv *priv)
@@ -4975,7 +4970,6 @@ err_cleanup_nic:
 
 int mlx5e_attach_netdev(struct mlx5e_priv *priv)
 {
-	struct mlx5_core_dev *mdev = priv->mdev;
 	const struct mlx5e_profile *profile;
 	int err;
 
@@ -4986,28 +4980,16 @@ int mlx5e_attach_netdev(struct mlx5e_priv *priv)
 	if (err)
 		goto out;
 
-	mlx5e_create_q_counters(priv);
-
-	err = mlx5e_open_drop_rq(priv, &priv->drop_rq);
-	if (err) {
-		mlx5_core_err(mdev, "open drop rq failed, %d\n", err);
-		goto err_destroy_q_counters;
-	}
-
 	err = profile->init_rx(priv);
 	if (err)
-		goto err_close_drop_rq;
+		goto err_cleanup_tx;
 
 	if (profile->enable)
 		profile->enable(priv);
 
 	return 0;
 
-err_close_drop_rq:
-	mlx5e_close_drop_rq(&priv->drop_rq);
-
-err_destroy_q_counters:
-	mlx5e_destroy_q_counters(priv);
+err_cleanup_tx:
 	profile->cleanup_tx(priv);
 
 out:
@@ -5025,8 +5007,6 @@ void mlx5e_detach_netdev(struct mlx5e_priv *priv)
 	flush_workqueue(priv->wq);
 
 	profile->cleanup_rx(priv);
-	mlx5e_close_drop_rq(&priv->drop_rq);
-	mlx5e_destroy_q_counters(priv);
 	profile->cleanup_tx(priv);
 	cancel_delayed_work_sync(&priv->update_stats_work);
 }

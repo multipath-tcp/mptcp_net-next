@@ -24,6 +24,7 @@
 #include <linux/filter.h>
 #include <linux/ptr_ring.h>
 #include <linux/bpf_trace.h>
+#include <linux/net_tstamp.h>
 
 #define DRV_NAME	"veth"
 #define DRV_VERSION	"1.0"
@@ -35,12 +36,6 @@
 /* Separating two types of XDP xmit */
 #define VETH_XDP_TX		BIT(0)
 #define VETH_XDP_REDIR		BIT(1)
-
-struct pcpu_vstats {
-	u64			packets;
-	u64			bytes;
-	struct u64_stats_sync	syncp;
-};
 
 struct veth_rq {
 	struct napi_struct	xdp_napi;
@@ -114,6 +109,18 @@ static void veth_get_ethtool_stats(struct net_device *dev,
 	data[0] = peer ? peer->ifindex : 0;
 }
 
+static int veth_get_ts_info(struct net_device *dev,
+			    struct ethtool_ts_info *info)
+{
+	info->so_timestamping =
+		SOF_TIMESTAMPING_TX_SOFTWARE |
+		SOF_TIMESTAMPING_RX_SOFTWARE |
+		SOF_TIMESTAMPING_SOFTWARE;
+	info->phc_index = -1;
+
+	return 0;
+}
+
 static const struct ethtool_ops veth_ethtool_ops = {
 	.get_drvinfo		= veth_get_drvinfo,
 	.get_link		= ethtool_op_get_link,
@@ -121,6 +128,7 @@ static const struct ethtool_ops veth_ethtool_ops = {
 	.get_sset_count		= veth_get_sset_count,
 	.get_ethtool_stats	= veth_get_ethtool_stats,
 	.get_link_ksettings	= veth_get_link_ksettings,
+	.get_ts_info		= veth_get_ts_info,
 };
 
 /* general routines */
@@ -201,8 +209,9 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 			skb_record_rx_queue(skb, rxq);
 	}
 
+	skb_tx_timestamp(skb);
 	if (likely(veth_forward_skb(rcv, skb, rq, rcv_xdp) == NET_RX_SUCCESS)) {
-		struct pcpu_vstats *stats = this_cpu_ptr(dev->vstats);
+		struct pcpu_lstats *stats = this_cpu_ptr(dev->lstats);
 
 		u64_stats_update_begin(&stats->syncp);
 		stats->bytes += length;
@@ -221,7 +230,7 @@ drop:
 	return NETDEV_TX_OK;
 }
 
-static u64 veth_stats_one(struct pcpu_vstats *result, struct net_device *dev)
+static u64 veth_stats_one(struct pcpu_lstats *result, struct net_device *dev)
 {
 	struct veth_priv *priv = netdev_priv(dev);
 	int cpu;
@@ -229,7 +238,7 @@ static u64 veth_stats_one(struct pcpu_vstats *result, struct net_device *dev)
 	result->packets = 0;
 	result->bytes = 0;
 	for_each_possible_cpu(cpu) {
-		struct pcpu_vstats *stats = per_cpu_ptr(dev->vstats, cpu);
+		struct pcpu_lstats *stats = per_cpu_ptr(dev->lstats, cpu);
 		u64 packets, bytes;
 		unsigned int start;
 
@@ -249,7 +258,7 @@ static void veth_get_stats64(struct net_device *dev,
 {
 	struct veth_priv *priv = netdev_priv(dev);
 	struct net_device *peer;
-	struct pcpu_vstats one;
+	struct pcpu_lstats one;
 
 	tot->tx_dropped = veth_stats_one(&one, dev);
 	tot->tx_bytes = one.bytes;
@@ -463,6 +472,8 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq, struct sk_buff *skb,
 	int mac_len, delta, off;
 	struct xdp_buff xdp;
 
+	skb_orphan(skb);
+
 	rcu_read_lock();
 	xdp_prog = rcu_dereference(rq->xdp_prog);
 	if (unlikely(!xdp_prog)) {
@@ -508,8 +519,6 @@ static struct sk_buff *veth_xdp_rcv_skb(struct veth_rq *rq, struct sk_buff *skb,
 		skb_copy_header(nskb, skb);
 		head_off = skb_headroom(nskb) - skb_headroom(skb);
 		skb_headers_offset_update(nskb, head_off);
-		if (skb->sk)
-			skb_set_owner_w(nskb, skb->sk);
 		consume_skb(skb);
 		skb = nskb;
 	}
@@ -815,13 +824,13 @@ static int veth_dev_init(struct net_device *dev)
 {
 	int err;
 
-	dev->vstats = netdev_alloc_pcpu_stats(struct pcpu_vstats);
-	if (!dev->vstats)
+	dev->lstats = netdev_alloc_pcpu_stats(struct pcpu_lstats);
+	if (!dev->lstats)
 		return -ENOMEM;
 
 	err = veth_alloc_queues(dev);
 	if (err) {
-		free_percpu(dev->vstats);
+		free_percpu(dev->lstats);
 		return err;
 	}
 
@@ -831,7 +840,7 @@ static int veth_dev_init(struct net_device *dev)
 static void veth_dev_free(struct net_device *dev)
 {
 	veth_free_queues(dev);
-	free_percpu(dev->vstats);
+	free_percpu(dev->lstats);
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER

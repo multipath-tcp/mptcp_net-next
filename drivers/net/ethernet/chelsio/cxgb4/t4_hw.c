@@ -3889,7 +3889,7 @@ int t4_fwcache(struct adapter *adap, enum fw_params_param_dev_fwcache op)
 	c.param[0].mnem =
 		cpu_to_be32(FW_PARAMS_MNEM_V(FW_PARAMS_MNEM_DEV) |
 			    FW_PARAMS_PARAM_X_V(FW_PARAMS_PARAM_DEV_FWCACHE));
-	c.param[0].val = (__force __be32)op;
+	c.param[0].val = cpu_to_be32(op);
 
 	return t4_wr_mbox(adap, adap->mbox, &c, sizeof(c), NULL);
 }
@@ -10209,7 +10209,9 @@ int t4_set_vlan_acl(struct adapter *adap, unsigned int mbox, unsigned int vf,
 					 FW_ACL_VLAN_CMD_VFN_V(vf));
 	vlan_cmd.en_to_len16 = cpu_to_be32(enable | FW_LEN16(vlan_cmd));
 	/* Drop all packets that donot match vlan id */
-	vlan_cmd.dropnovlan_fm = FW_ACL_VLAN_CMD_FM_F;
+	vlan_cmd.dropnovlan_fm = (enable
+				  ? (FW_ACL_VLAN_CMD_DROPNOVLAN_F |
+				     FW_ACL_VLAN_CMD_FM_F) : 0);
 	if (enable != 0) {
 		vlan_cmd.nvlan = 1;
 		vlan_cmd.vlanid[0] = cpu_to_be16(vlan);

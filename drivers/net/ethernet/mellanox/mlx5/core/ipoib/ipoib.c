@@ -45,6 +45,7 @@ static int mlx5i_change_mtu(struct net_device *netdev, int new_mtu);
 static const struct net_device_ops mlx5i_netdev_ops = {
 	.ndo_open                = mlx5i_open,
 	.ndo_stop                = mlx5i_close,
+	.ndo_get_stats64         = mlx5i_get_stats,
 	.ndo_init                = mlx5i_dev_init,
 	.ndo_uninit              = mlx5i_dev_cleanup,
 	.ndo_change_mtu          = mlx5i_change_mtu,
@@ -83,6 +84,7 @@ void mlx5i_init(struct mlx5_core_dev *mdev,
 	priv->netdev      = netdev;
 	priv->profile     = profile;
 	priv->ppriv       = ppriv;
+	priv->max_opened_tc = 1;
 	mutex_init(&priv->state_lock);
 
 	mlx5_query_port_max_mtu(mdev, &max_mtu, 1);
@@ -112,6 +114,47 @@ void mlx5i_init(struct mlx5_core_dev *mdev,
 static void mlx5i_cleanup(struct mlx5e_priv *priv)
 {
 	/* Do nothing .. */
+}
+
+static void mlx5i_grp_sw_update_stats(struct mlx5e_priv *priv)
+{
+	struct mlx5e_sw_stats s = { 0 };
+	int i, j;
+
+	for (i = 0; i < priv->profile->max_nch(priv->mdev); i++) {
+		struct mlx5e_channel_stats *channel_stats;
+		struct mlx5e_rq_stats *rq_stats;
+
+		channel_stats = &priv->channel_stats[i];
+		rq_stats = &channel_stats->rq;
+
+		s.rx_packets += rq_stats->packets;
+		s.rx_bytes   += rq_stats->bytes;
+
+		for (j = 0; j < priv->max_opened_tc; j++) {
+			struct mlx5e_sq_stats *sq_stats = &channel_stats->sq[j];
+
+			s.tx_packets           += sq_stats->packets;
+			s.tx_bytes             += sq_stats->bytes;
+			s.tx_queue_dropped     += sq_stats->dropped;
+		}
+	}
+
+	memcpy(&priv->stats.sw, &s, sizeof(s));
+}
+
+void mlx5i_get_stats(struct net_device *dev, struct rtnl_link_stats64 *stats)
+{
+	struct mlx5e_priv     *priv   = mlx5i_epriv(dev);
+	struct mlx5e_sw_stats *sstats = &priv->stats.sw;
+
+	mlx5i_grp_sw_update_stats(priv);
+
+	stats->rx_packets = sstats->rx_packets;
+	stats->rx_bytes   = sstats->rx_bytes;
+	stats->tx_packets = sstats->tx_packets;
+	stats->tx_bytes   = sstats->tx_bytes;
+	stats->tx_dropped = sstats->tx_queue_dropped;
 }
 
 int mlx5i_init_underlay_qp(struct mlx5e_priv *priv)
@@ -306,11 +349,20 @@ static void mlx5i_destroy_flow_steering(struct mlx5e_priv *priv)
 
 static int mlx5i_init_rx(struct mlx5e_priv *priv)
 {
+	struct mlx5_core_dev *mdev = priv->mdev;
 	int err;
+
+	mlx5e_create_q_counters(priv);
+
+	err = mlx5e_open_drop_rq(priv, &priv->drop_rq);
+	if (err) {
+		mlx5_core_err(mdev, "open drop rq failed, %d\n", err);
+		goto err_destroy_q_counters;
+	}
 
 	err = mlx5e_create_indirect_rqt(priv);
 	if (err)
-		return err;
+		goto err_close_drop_rq;
 
 	err = mlx5e_create_direct_rqts(priv);
 	if (err)
@@ -338,6 +390,10 @@ err_destroy_direct_rqts:
 	mlx5e_destroy_direct_rqts(priv);
 err_destroy_indirect_rqts:
 	mlx5e_destroy_rqt(priv, &priv->indir_rqt);
+err_close_drop_rq:
+	mlx5e_close_drop_rq(&priv->drop_rq);
+err_destroy_q_counters:
+	mlx5e_destroy_q_counters(priv);
 	return err;
 }
 
@@ -348,6 +404,8 @@ static void mlx5i_cleanup_rx(struct mlx5e_priv *priv)
 	mlx5e_destroy_indirect_tirs(priv);
 	mlx5e_destroy_direct_rqts(priv);
 	mlx5e_destroy_rqt(priv, &priv->indir_rqt);
+	mlx5e_close_drop_rq(&priv->drop_rq);
+	mlx5e_destroy_q_counters(priv);
 }
 
 static const struct mlx5e_profile mlx5i_nic_profile = {

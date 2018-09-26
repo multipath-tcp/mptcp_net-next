@@ -220,7 +220,8 @@ ieee80211_determine_chantype(struct ieee80211_sub_if_data *sdata,
 		memcpy(&he_oper_vht_cap, he_oper->optional, 3);
 		he_oper_vht_cap.basic_mcs_set = cpu_to_le16(0);
 
-		if (!ieee80211_chandef_vht_oper(&he_oper_vht_cap,
+		if (!ieee80211_chandef_vht_oper(&sdata->local->hw,
+						&he_oper_vht_cap, ht_oper,
 						&vht_chandef)) {
 			if (!(ifmgd->flags & IEEE80211_STA_DISABLE_HE))
 				sdata_info(sdata,
@@ -228,7 +229,8 @@ ieee80211_determine_chantype(struct ieee80211_sub_if_data *sdata,
 			ret = IEEE80211_STA_DISABLE_HE;
 			goto out;
 		}
-	} else if (!ieee80211_chandef_vht_oper(vht_oper, &vht_chandef)) {
+	} else if (!ieee80211_chandef_vht_oper(&sdata->local->hw, vht_oper,
+					       ht_oper, &vht_chandef)) {
 		if (!(ifmgd->flags & IEEE80211_STA_DISABLE_VHT))
 			sdata_info(sdata,
 				   "AP VHT information is invalid, disable VHT\n");
@@ -1073,6 +1075,10 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 	 */
 
 	if (sdata->reserved_chanctx) {
+		struct ieee80211_supported_band *sband = NULL;
+		struct sta_info *mgd_sta = NULL;
+		enum ieee80211_sta_rx_bandwidth bw = IEEE80211_STA_RX_BW_20;
+
 		/*
 		 * with multi-vif csa driver may call ieee80211_csa_finish()
 		 * many times while waiting for other interfaces to use their
@@ -1080,6 +1086,48 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 		 */
 		if (sdata->reserved_ready)
 			goto out;
+
+		if (sdata->vif.bss_conf.chandef.width !=
+		    sdata->csa_chandef.width) {
+			/*
+			 * For managed interface, we need to also update the AP
+			 * station bandwidth and align the rate scale algorithm
+			 * on the bandwidth change. Here we only consider the
+			 * bandwidth of the new channel definition (as channel
+			 * switch flow does not have the full HT/VHT/HE
+			 * information), assuming that if additional changes are
+			 * required they would be done as part of the processing
+			 * of the next beacon from the AP.
+			 */
+			switch (sdata->csa_chandef.width) {
+			case NL80211_CHAN_WIDTH_20_NOHT:
+			case NL80211_CHAN_WIDTH_20:
+			default:
+				bw = IEEE80211_STA_RX_BW_20;
+				break;
+			case NL80211_CHAN_WIDTH_40:
+				bw = IEEE80211_STA_RX_BW_40;
+				break;
+			case NL80211_CHAN_WIDTH_80:
+				bw = IEEE80211_STA_RX_BW_80;
+				break;
+			case NL80211_CHAN_WIDTH_80P80:
+			case NL80211_CHAN_WIDTH_160:
+				bw = IEEE80211_STA_RX_BW_160;
+				break;
+			}
+
+			mgd_sta = sta_info_get(sdata, ifmgd->bssid);
+			sband =
+				local->hw.wiphy->bands[sdata->csa_chandef.chan->band];
+		}
+
+		if (sdata->vif.bss_conf.chandef.width >
+		    sdata->csa_chandef.width) {
+			mgd_sta->sta.bandwidth = bw;
+			rate_control_rate_update(local, sband, mgd_sta,
+						 IEEE80211_RC_BW_CHANGED);
+		}
 
 		ret = ieee80211_vif_use_reserved_context(sdata);
 		if (ret) {
@@ -1089,6 +1137,13 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 			ieee80211_queue_work(&sdata->local->hw,
 					     &ifmgd->csa_connection_drop_work);
 			goto out;
+		}
+
+		if (sdata->vif.bss_conf.chandef.width <
+		    sdata->csa_chandef.width) {
+			mgd_sta->sta.bandwidth = bw;
+			rate_control_rate_update(local, sband, mgd_sta,
+						 IEEE80211_RC_BW_CHANGED);
 		}
 
 		goto out;
@@ -1312,6 +1367,16 @@ ieee80211_sta_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 					 cbss->beacon_interval));
 	return;
  drop_connection:
+	/*
+	 * This is just so that the disconnect flow will know that
+	 * we were trying to switch channel and failed. In case the
+	 * mode is 1 (we are not allowed to Tx), we will know not to
+	 * send a deauthentication frame. Those two fields will be
+	 * reset when the disconnection worker runs.
+	 */
+	sdata->vif.csa_active = true;
+	sdata->csa_block_tx = csa_ie.mode;
+
 	ieee80211_queue_work(&local->hw, &ifmgd->csa_connection_drop_work);
 	mutex_unlock(&local->chanctx_mtx);
 	mutex_unlock(&local->mtx);
@@ -2522,12 +2587,15 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	u8 frame_buf[IEEE80211_DEAUTH_FRAME_LEN];
+	bool tx;
 
 	sdata_lock(sdata);
 	if (!ifmgd->associated) {
 		sdata_unlock(sdata);
 		return;
 	}
+
+	tx = !sdata->csa_block_tx;
 
 	/* AP is probably out of range (or not reachable for another reason) so
 	 * remove the bss struct for that AP.
@@ -2536,7 +2604,7 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 
 	ieee80211_set_disassoc(sdata, IEEE80211_STYPE_DEAUTH,
 			       WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY,
-			       true, frame_buf);
+			       tx, frame_buf);
 	mutex_lock(&local->mtx);
 	sdata->vif.csa_active = false;
 	ifmgd->csa_waiting_bcn = false;
@@ -2547,7 +2615,7 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 	}
 	mutex_unlock(&local->mtx);
 
-	ieee80211_report_disconnect(sdata, frame_buf, sizeof(frame_buf), true,
+	ieee80211_report_disconnect(sdata, frame_buf, sizeof(frame_buf), tx,
 				    WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY);
 
 	sdata_unlock(sdata);
@@ -3171,19 +3239,16 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 	}
 
 	if (bss_conf->he_support) {
-		u32 he_oper_params =
-			le32_to_cpu(elems.he_operation->he_oper_params);
+		bss_conf->bss_color =
+			le32_get_bits(elems.he_operation->he_oper_params,
+				      IEEE80211_HE_OPERATION_BSS_COLOR_MASK);
 
-		bss_conf->bss_color = he_oper_params &
-				      IEEE80211_HE_OPERATION_BSS_COLOR_MASK;
 		bss_conf->htc_trig_based_pkt_ext =
-			(he_oper_params &
-			 IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK) <<
-			IEEE80211_HE_OPERATION_DFLT_PE_DURATION_OFFSET;
+			le32_get_bits(elems.he_operation->he_oper_params,
+			      IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK);
 		bss_conf->frame_time_rts_th =
-			(he_oper_params &
-			 IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK) <<
-			IEEE80211_HE_OPERATION_RTS_THRESHOLD_OFFSET;
+			le32_get_bits(elems.he_operation->he_oper_params,
+			      IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK);
 
 		bss_conf->multi_sta_back_32bit =
 			sta->sta.he_cap.he_cap_elem.mac_cap_info[2] &

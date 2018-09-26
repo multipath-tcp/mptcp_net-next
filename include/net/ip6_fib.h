@@ -182,7 +182,6 @@ struct rt6_info {
 	struct in6_addr			rt6i_gateway;
 	struct inet6_dev		*rt6i_idev;
 	u32				rt6i_flags;
-	struct rt6key			rt6i_prefsrc;
 
 	struct list_head		rt6i_uncached;
 	struct uncached_list		*rt6i_uncached_list;
@@ -412,6 +411,25 @@ void fib6_clean_all(struct net *net, int (*func)(struct fib6_info *, void *arg),
 int fib6_add(struct fib6_node *root, struct fib6_info *rt,
 	     struct nl_info *info, struct netlink_ext_ack *extack);
 int fib6_del(struct fib6_info *rt, struct nl_info *info);
+
+static inline
+void rt6_get_prefsrc(const struct rt6_info *rt, struct in6_addr *addr)
+{
+	const struct fib6_info *from;
+
+	rcu_read_lock();
+
+	from = rcu_dereference(rt->from);
+	if (from) {
+		*addr = from->fib6_prefsrc.addr;
+	} else {
+		struct in6_addr in6_zero = {};
+
+		*addr = in6_zero;
+	}
+
+	rcu_read_unlock();
+}
 
 static inline struct net_device *fib6_info_nh_dev(const struct fib6_info *f6i)
 {

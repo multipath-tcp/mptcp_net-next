@@ -533,6 +533,13 @@ enum {
 };
 
 enum {
+	MAX_TXQ_DESC_SIZE      = 64,
+	MAX_RXQ_DESC_SIZE      = 128,
+	MAX_FL_DESC_SIZE       = 8,
+	MAX_CTRL_TXQ_DESC_SIZE = 64,
+};
+
+enum {
 	INGQ_EXTRAS = 2,        /* firmware event queue and */
 				/*   forwarded interrupts */
 	MAX_INGQ = MAX_ETH_QSETS + INGQ_EXTRAS,
@@ -685,6 +692,7 @@ struct sge_eth_stats {              /* Ethernet queue statistics */
 	unsigned long rx_cso;       /* # of Rx checksum offloads */
 	unsigned long vlan_ex;      /* # of Rx VLAN extractions */
 	unsigned long rx_drops;     /* # of packets dropped due to no mem */
+	unsigned long bad_rx_pkts;  /* # of packets with err_vec!=0 */
 };
 
 struct sge_eth_rxq {                /* SW Ethernet Rx queue */
