@@ -32,12 +32,8 @@
 
 #include <linux/compiler.h>
 
-enum {
-	MPTCP_PM_FULLMESH = 0,
-	MPTCP_PM_MAX
-};
-
 struct mptcp_mib;
+struct mptcp_fm_ns;
 
 struct netns_mptcp {
 	DEFINE_SNMP_STAT(struct mptcp_mib, mptcp_statistics);
@@ -46,7 +42,7 @@ struct netns_mptcp {
 	struct proc_dir_entry *proc_net_mptcp;
 #endif
 
-	void *path_managers[MPTCP_PM_MAX];
+	struct mptcp_fm_ns *fm_ns;
 };
 
 #endif /* __NETNS_MPTCP_H__ */
