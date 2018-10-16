@@ -1,3 +1,8 @@
 # UUID      	Group Name
 #
-user:matttbe	user/Matthieu Baerts (matttbe)
+60e1ea5fa14a8bc6d9cd4de1a17c46290c4e2f36	mptcp_net-next-admin
+05e947292b7a218d97f005ab653703e67007ae33	mptcp_net-next-devs
+62f66eb5f609d0981c98536d3568094eb44f853f	mptcp_net-next-qa
+global:Project-Owners                   	Project Owners
+global:Registered-Users				Registered Users
+user:matttbe					user/Matthieu Baerts (matttbe)
