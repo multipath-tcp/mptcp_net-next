@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 4
 PATCHLEVEL = 19
-SUBLEVEL = 0
-EXTRAVERSION = -rc5
+SUBLEVEL = 1
+EXTRAVERSION = -rc65
 NAME = Merciless Moray
 
 # *DOCUMENTATION*
