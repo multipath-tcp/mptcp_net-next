@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LGPL-2.1
+// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 
 /*
  * common eBPF ELF operations.
@@ -276,6 +276,18 @@ int bpf_map_lookup_elem(int fd, const void *key, void *value)
 	attr.value = ptr_to_u64(value);
 
 	return sys_bpf(BPF_MAP_LOOKUP_ELEM, &attr, sizeof(attr));
+}
+
+int bpf_map_lookup_and_delete_elem(int fd, const void *key, void *value)
+{
+	union bpf_attr attr;
+
+	bzero(&attr, sizeof(attr));
+	attr.map_fd = fd;
+	attr.key = ptr_to_u64(key);
+	attr.value = ptr_to_u64(value);
+
+	return sys_bpf(BPF_MAP_LOOKUP_AND_DELETE_ELEM, &attr, sizeof(attr));
 }
 
 int bpf_map_delete_elem(int fd, const void *key)

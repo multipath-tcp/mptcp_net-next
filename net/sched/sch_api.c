@@ -1318,6 +1318,17 @@ check_loop_fn(struct Qdisc *q, unsigned long cl, struct qdisc_walker *w)
 	return 0;
 }
 
+const struct nla_policy rtm_tca_policy[TCA_MAX + 1] = {
+	[TCA_KIND]		= { .type = NLA_STRING },
+	[TCA_RATE]		= { .type = NLA_BINARY,
+				    .len = sizeof(struct tc_estimator) },
+	[TCA_STAB]		= { .type = NLA_NESTED },
+	[TCA_DUMP_INVISIBLE]	= { .type = NLA_FLAG },
+	[TCA_CHAIN]		= { .type = NLA_U32 },
+	[TCA_INGRESS_BLOCK]	= { .type = NLA_U32 },
+	[TCA_EGRESS_BLOCK]	= { .type = NLA_U32 },
+};
+
 /*
  * Delete/get qdisc.
  */
@@ -1338,7 +1349,8 @@ static int tc_get_qdisc(struct sk_buff *skb, struct nlmsghdr *n,
 	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, rtm_tca_policy,
+			  extack);
 	if (err < 0)
 		return err;
 
@@ -1422,7 +1434,8 @@ static int tc_modify_qdisc(struct sk_buff *skb, struct nlmsghdr *n,
 
 replay:
 	/* Reinit, just in case something touches this. */
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, rtm_tca_policy,
+			  extack);
 	if (err < 0)
 		return err;
 
@@ -1656,7 +1669,8 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 	idx = 0;
 	ASSERT_RTNL();
 
-	err = nlmsg_parse(nlh, sizeof(struct tcmsg), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(nlh, sizeof(struct tcmsg), tca, TCA_MAX,
+			  rtm_tca_policy, cb->extack);
 	if (err < 0)
 		return err;
 
@@ -1875,7 +1889,8 @@ static int tc_ctl_tclass(struct sk_buff *skb, struct nlmsghdr *n,
 	    !netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
-	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*tcm), tca, TCA_MAX, rtm_tca_policy,
+			  extack);
 	if (err < 0)
 		return err;
 
@@ -2054,7 +2069,8 @@ static int tc_dump_tclass_root(struct Qdisc *root, struct sk_buff *skb,
 
 	if (tcm->tcm_parent) {
 		q = qdisc_match_from_root(root, TC_H_MAJ(tcm->tcm_parent));
-		if (q && tc_dump_tclass_qdisc(q, skb, tcm, cb, t_p, s_t) < 0)
+		if (q && q != root &&
+		    tc_dump_tclass_qdisc(q, skb, tcm, cb, t_p, s_t) < 0)
 			return -1;
 		return 0;
 	}

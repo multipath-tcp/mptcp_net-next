@@ -87,6 +87,8 @@ struct ice_aqc_list_caps {
 /* Device/Function buffer entry, repeated per reported capability */
 struct ice_aqc_list_caps_elem {
 	__le16 cap;
+#define ICE_AQC_CAPS_SRIOV				0x0012
+#define ICE_AQC_CAPS_VF					0x0013
 #define ICE_AQC_CAPS_VSI				0x0017
 #define ICE_AQC_CAPS_RSS				0x0040
 #define ICE_AQC_CAPS_RXQS				0x0041
@@ -736,6 +738,10 @@ struct ice_aqc_add_elem {
 	struct ice_aqc_txsched_elem_data generic[1];
 };
 
+struct ice_aqc_get_elem {
+	struct ice_aqc_txsched_elem_data generic[1];
+};
+
 struct ice_aqc_get_topo_elem {
 	struct ice_aqc_txsched_topo_grp_info_hdr hdr;
 	struct ice_aqc_txsched_elem_data
@@ -1071,6 +1077,19 @@ struct ice_aqc_nvm {
 	__le32 addr_low;
 };
 
+/**
+ * Send to PF command (indirect 0x0801) id is only used by PF
+ *
+ * Send to VF command (indirect 0x0802) id is only used by PF
+ *
+ */
+struct ice_aqc_pf_vf_msg {
+	__le32 id;
+	u32 reserved;
+	__le32 addr_high;
+	__le32 addr_low;
+};
+
 /* Get/Set RSS key (indirect 0x0B04/0x0B02) */
 struct ice_aqc_get_set_rss_key {
 #define ICE_AQC_GSET_RSS_KEY_VSI_VALID	BIT(15)
@@ -1328,6 +1347,7 @@ struct ice_aq_desc {
 		struct ice_aqc_query_txsched_res query_sched_res;
 		struct ice_aqc_add_move_delete_elem add_move_delete_elem;
 		struct ice_aqc_nvm nvm;
+		struct ice_aqc_pf_vf_msg virt;
 		struct ice_aqc_get_set_rss_lut get_set_rss_lut;
 		struct ice_aqc_get_set_rss_key get_set_rss_key;
 		struct ice_aqc_add_txqs add_txqs;
@@ -1409,6 +1429,7 @@ enum ice_adminq_opc {
 	/* transmit scheduler commands */
 	ice_aqc_opc_get_dflt_topo			= 0x0400,
 	ice_aqc_opc_add_sched_elems			= 0x0401,
+	ice_aqc_opc_get_sched_elems			= 0x0404,
 	ice_aqc_opc_suspend_sched_elems			= 0x0409,
 	ice_aqc_opc_resume_sched_elems			= 0x040A,
 	ice_aqc_opc_delete_sched_elems			= 0x040F,
@@ -1423,6 +1444,10 @@ enum ice_adminq_opc {
 
 	/* NVM commands */
 	ice_aqc_opc_nvm_read				= 0x0701,
+
+	/* PF/VF mailbox commands */
+	ice_mbx_opc_send_msg_to_pf			= 0x0801,
+	ice_mbx_opc_send_msg_to_vf			= 0x0802,
 
 	/* RSS commands */
 	ice_aqc_opc_set_rss_key				= 0x0B02,

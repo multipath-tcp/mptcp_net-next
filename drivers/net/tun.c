@@ -180,6 +180,7 @@ struct tun_file {
 	};
 	struct napi_struct napi;
 	bool napi_enabled;
+	bool napi_frags_enabled;
 	struct mutex napi_mutex;	/* Protects access to the above napi */
 	struct list_head next;
 	struct tun_struct *detached;
@@ -312,32 +313,32 @@ static int tun_napi_poll(struct napi_struct *napi, int budget)
 }
 
 static void tun_napi_init(struct tun_struct *tun, struct tun_file *tfile,
-			  bool napi_en)
+			  bool napi_en, bool napi_frags)
 {
 	tfile->napi_enabled = napi_en;
+	tfile->napi_frags_enabled = napi_en && napi_frags;
 	if (napi_en) {
 		netif_napi_add(tun->dev, &tfile->napi, tun_napi_poll,
 			       NAPI_POLL_WEIGHT);
 		napi_enable(&tfile->napi);
-		mutex_init(&tfile->napi_mutex);
 	}
 }
 
-static void tun_napi_disable(struct tun_struct *tun, struct tun_file *tfile)
+static void tun_napi_disable(struct tun_file *tfile)
 {
 	if (tfile->napi_enabled)
 		napi_disable(&tfile->napi);
 }
 
-static void tun_napi_del(struct tun_struct *tun, struct tun_file *tfile)
+static void tun_napi_del(struct tun_file *tfile)
 {
 	if (tfile->napi_enabled)
 		netif_napi_del(&tfile->napi);
 }
 
-static bool tun_napi_frags_enabled(const struct tun_struct *tun)
+static bool tun_napi_frags_enabled(const struct tun_file *tfile)
 {
-	return READ_ONCE(tun->flags) & IFF_NAPI_FRAGS;
+	return tfile->napi_frags_enabled;
 }
 
 #ifdef CONFIG_TUN_VNET_CROSS_LE
@@ -561,12 +562,11 @@ static inline void tun_flow_save_rps_rxhash(struct tun_flow_entry *e, u32 hash)
 		e->rps_rxhash = hash;
 }
 
-/* We try to identify a flow through its rxhash first. The reason that
+/* We try to identify a flow through its rxhash. The reason that
  * we do not check rxq no. is because some cards(e.g 82599), chooses
  * the rxq based on the txq where the last packet of the flow comes. As
  * the userspace application move between processors, we may get a
- * different rxq no. here. If we could not get rxhash, then we would
- * hope the rxq no. may help here.
+ * different rxq no. here.
  */
 static u16 tun_automq_select_queue(struct tun_struct *tun, struct sk_buff *skb)
 {
@@ -577,18 +577,13 @@ static u16 tun_automq_select_queue(struct tun_struct *tun, struct sk_buff *skb)
 	numqueues = READ_ONCE(tun->numqueues);
 
 	txq = __skb_get_hash_symmetric(skb);
-	if (txq) {
-		e = tun_flow_find(&tun->flows[tun_hashfn(txq)], txq);
-		if (e) {
-			tun_flow_save_rps_rxhash(e, txq);
-			txq = e->queue_index;
-		} else
-			/* use multiply and shift instead of expensive divide */
-			txq = ((u64)txq * numqueues) >> 32;
-	} else if (likely(skb_rx_queue_recorded(skb))) {
-		txq = skb_get_rx_queue(skb);
-		while (unlikely(txq >= numqueues))
-			txq -= numqueues;
+	e = tun_flow_find(&tun->flows[tun_hashfn(txq)], txq);
+	if (e) {
+		tun_flow_save_rps_rxhash(e, txq);
+		txq = e->queue_index;
+	} else {
+		/* use multiply and shift instead of expensive divide */
+		txq = ((u64)txq * numqueues) >> 32;
 	}
 
 	return txq;
@@ -689,8 +684,8 @@ static void __tun_detach(struct tun_file *tfile, bool clean)
 	tun = rtnl_dereference(tfile->tun);
 
 	if (tun && clean) {
-		tun_napi_disable(tun, tfile);
-		tun_napi_del(tun, tfile);
+		tun_napi_disable(tfile);
+		tun_napi_del(tfile);
 	}
 
 	if (tun && !tfile->detached) {
@@ -757,7 +752,7 @@ static void tun_detach_all(struct net_device *dev)
 	for (i = 0; i < n; i++) {
 		tfile = rtnl_dereference(tun->tfiles[i]);
 		BUG_ON(!tfile);
-		tun_napi_disable(tun, tfile);
+		tun_napi_disable(tfile);
 		tfile->socket.sk->sk_shutdown = RCV_SHUTDOWN;
 		tfile->socket.sk->sk_data_ready(tfile->socket.sk);
 		RCU_INIT_POINTER(tfile->tun, NULL);
@@ -773,7 +768,7 @@ static void tun_detach_all(struct net_device *dev)
 	synchronize_net();
 	for (i = 0; i < n; i++) {
 		tfile = rtnl_dereference(tun->tfiles[i]);
-		tun_napi_del(tun, tfile);
+		tun_napi_del(tfile);
 		/* Drop read queue */
 		tun_queue_purge(tfile);
 		xdp_rxq_info_unreg(&tfile->xdp_rxq);
@@ -792,7 +787,7 @@ static void tun_detach_all(struct net_device *dev)
 }
 
 static int tun_attach(struct tun_struct *tun, struct file *file,
-		      bool skip_filter, bool napi)
+		      bool skip_filter, bool napi, bool napi_frags)
 {
 	struct tun_file *tfile = file->private_data;
 	struct net_device *dev = tun->dev;
@@ -865,7 +860,7 @@ static int tun_attach(struct tun_struct *tun, struct file *file,
 		tun_enable_queue(tfile);
 	} else {
 		sock_hold(&tfile->sk);
-		tun_napi_init(tun, tfile, napi);
+		tun_napi_init(tun, tfile, napi, napi_frags);
 	}
 
 	if (rtnl_dereference(tun->xdp_prog))
@@ -1046,16 +1041,13 @@ static void tun_automq_xmit(struct tun_struct *tun, struct sk_buff *skb)
 		/* Select queue was not called for the skbuff, so we extract the
 		 * RPS hash and save it into the flow_table here.
 		 */
+		struct tun_flow_entry *e;
 		__u32 rxhash;
 
 		rxhash = __skb_get_hash_symmetric(skb);
-		if (rxhash) {
-			struct tun_flow_entry *e;
-			e = tun_flow_find(&tun->flows[tun_hashfn(rxhash)],
-					rxhash);
-			if (e)
-				tun_flow_save_rps_rxhash(e, rxhash);
-		}
+		e = tun_flow_find(&tun->flows[tun_hashfn(rxhash)], rxhash);
+		if (e)
+			tun_flow_save_rps_rxhash(e, rxhash);
 	}
 #endif
 }
@@ -1743,7 +1735,7 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 	int err;
 	u32 rxhash = 0;
 	int skb_xdp = 1;
-	bool frags = tun_napi_frags_enabled(tun);
+	bool frags = tun_napi_frags_enabled(tfile);
 
 	if (!(tun->dev->flags & IFF_UP))
 		return -EIO;
@@ -2297,6 +2289,8 @@ static void tun_setup(struct net_device *dev)
 static int tun_validate(struct nlattr *tb[], struct nlattr *data[],
 			struct netlink_ext_ack *extack)
 {
+	if (!data)
+		return 0;
 	return -EINVAL;
 }
 
@@ -2683,7 +2677,8 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 			return err;
 
 		err = tun_attach(tun, file, ifr->ifr_flags & IFF_NOFILTER,
-				 ifr->ifr_flags & IFF_NAPI);
+				 ifr->ifr_flags & IFF_NAPI,
+				 ifr->ifr_flags & IFF_NAPI_FRAGS);
 		if (err < 0)
 			return err;
 
@@ -2781,7 +2776,8 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 			      (ifr->ifr_flags & TUN_FEATURES);
 
 		INIT_LIST_HEAD(&tun->disabled);
-		err = tun_attach(tun, file, false, ifr->ifr_flags & IFF_NAPI);
+		err = tun_attach(tun, file, false, ifr->ifr_flags & IFF_NAPI,
+				 ifr->ifr_flags & IFF_NAPI_FRAGS);
 		if (err < 0)
 			goto err_free_flow;
 
@@ -2930,7 +2926,8 @@ static int tun_set_queue(struct file *file, struct ifreq *ifr)
 		ret = security_tun_dev_attach_queue(tun->security);
 		if (ret < 0)
 			goto unlock;
-		ret = tun_attach(tun, file, false, tun->flags & IFF_NAPI);
+		ret = tun_attach(tun, file, false, tun->flags & IFF_NAPI,
+				 tun->flags & IFF_NAPI_FRAGS);
 	} else if (ifr->ifr_flags & IFF_DETACH_QUEUE) {
 		tun = rtnl_dereference(tfile->tun);
 		if (!tun || !(tun->flags & IFF_MULTI_QUEUE) || tfile->detached)
@@ -3348,6 +3345,7 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 		return -ENOMEM;
 	}
 
+	mutex_init(&tfile->napi_mutex);
 	RCU_INIT_POINTER(tfile->tun, NULL);
 	tfile->flags = 0;
 	tfile->ifindex = 0;

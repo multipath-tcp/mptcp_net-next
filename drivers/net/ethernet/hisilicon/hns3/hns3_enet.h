@@ -419,8 +419,7 @@ struct hns3_nic_ring_data {
 
 struct hns3_nic_ops {
 	int (*fill_desc)(struct hns3_enet_ring *ring, void *priv,
-			 int size, dma_addr_t dma, int frag_end,
-			 enum hns_desc_type type);
+			 int size, int frag_end, enum hns_desc_type type);
 	int (*maybe_stop_tx)(struct sk_buff **out_skb,
 			     int *bnum, struct hns3_enet_ring *ring);
 	void (*get_rxd_bnum)(u32 bnum_flag, int *out_bnum);
@@ -543,6 +542,8 @@ struct hns3_nic_priv {
 	/* Vxlan/Geneve information */
 	struct hns3_udp_tunnel udp_tnl[HNS3_UDP_TNL_MAX];
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
+	struct hns3_enet_coalesce tx_coal;
+	struct hns3_enet_coalesce rx_coal;
 };
 
 union l3_hdr_info {
@@ -581,6 +582,11 @@ static inline void hns3_write_reg(void __iomem *base, u32 reg, u32 value)
 	u8 __iomem *reg_addr = READ_ONCE(base);
 
 	writel(value, reg_addr + reg);
+}
+
+static inline bool hns3_dev_ongoing_func_reset(struct hnae3_ae_dev *ae_dev)
+{
+	return (ae_dev && (ae_dev->reset_type == HNAE3_FUNC_RESET));
 }
 
 #define hns3_write_dev(a, reg, value) \
@@ -632,6 +638,9 @@ void hns3_set_vector_coalesce_tx_gl(struct hns3_enet_tqp_vector *tqp_vector,
 				    u32 gl_value);
 void hns3_set_vector_coalesce_rl(struct hns3_enet_tqp_vector *tqp_vector,
 				 u32 rl_value);
+
+void hns3_enable_vlan_filter(struct net_device *netdev, bool enable);
+int hns3_update_promisc_mode(struct net_device *netdev, u8 promisc_flags);
 
 #ifdef CONFIG_HNS3_DCB
 void hns3_dcbnl_setup(struct hnae3_handle *handle);

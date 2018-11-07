@@ -1,35 +1,5 @@
-/*
- * Copyright (C) 2015-2017 Netronome Systems, Inc.
- *
- * This software is dual licensed under the GNU General License Version 2,
- * June 1991 as shown in the file COPYING in the top-level directory of this
- * source tree or the BSD 2-Clause License provided below.  You have the
- * option to license this software under the complete terms of either license.
- *
- * The BSD 2-Clause License:
- *
- *     Redistribution and use in source and binary forms, with or
- *     without modification, are permitted provided that the following
- *     conditions are met:
- *
- *      1. Redistributions of source code must retain the above
- *         copyright notice, this list of conditions and the following
- *         disclaimer.
- *
- *      2. Redistributions in binary form must reproduce the above
- *         copyright notice, this list of conditions and the following
- *         disclaimer in the documentation and/or other materials
- *         provided with the distribution.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+/* Copyright (C) 2015-2018 Netronome Systems, Inc. */
 
 /*
  * nfp_net_common.c
@@ -2077,14 +2047,17 @@ nfp_ctrl_rx_one(struct nfp_net *nn, struct nfp_net_dp *dp,
 	return true;
 }
 
-static void nfp_ctrl_rx(struct nfp_net_r_vector *r_vec)
+static bool nfp_ctrl_rx(struct nfp_net_r_vector *r_vec)
 {
 	struct nfp_net_rx_ring *rx_ring = r_vec->rx_ring;
 	struct nfp_net *nn = r_vec->nfp_net;
 	struct nfp_net_dp *dp = &nn->dp;
+	unsigned int budget = 512;
 
-	while (nfp_ctrl_rx_one(nn, dp, r_vec, rx_ring))
+	while (nfp_ctrl_rx_one(nn, dp, r_vec, rx_ring) && budget--)
 		continue;
+
+	return budget;
 }
 
 static void nfp_ctrl_poll(unsigned long arg)
@@ -2096,9 +2069,13 @@ static void nfp_ctrl_poll(unsigned long arg)
 	__nfp_ctrl_tx_queued(r_vec);
 	spin_unlock(&r_vec->lock);
 
-	nfp_ctrl_rx(r_vec);
-
-	nfp_net_irq_unmask(r_vec->nfp_net, r_vec->irq_entry);
+	if (nfp_ctrl_rx(r_vec)) {
+		nfp_net_irq_unmask(r_vec->nfp_net, r_vec->irq_entry);
+	} else {
+		tasklet_schedule(&r_vec->tasklet);
+		nn_dp_warn(&r_vec->nfp_net->dp,
+			   "control message budget exceeded!\n");
+	}
 }
 
 /* Setup and Configuration
@@ -3877,10 +3854,20 @@ int nfp_net_init(struct nfp_net *nn)
 		return err;
 
 	/* Set default MTU and Freelist buffer size */
-	if (nn->max_mtu < NFP_NET_DEFAULT_MTU)
+	if (!nfp_net_is_data_vnic(nn) && nn->app->ctrl_mtu) {
+		if (nn->app->ctrl_mtu <= nn->max_mtu) {
+			nn->dp.mtu = nn->app->ctrl_mtu;
+		} else {
+			if (nn->app->ctrl_mtu != NFP_APP_CTRL_MTU_MAX)
+				nn_warn(nn, "app requested MTU above max supported %u > %u\n",
+					nn->app->ctrl_mtu, nn->max_mtu);
+			nn->dp.mtu = nn->max_mtu;
+		}
+	} else if (nn->max_mtu < NFP_NET_DEFAULT_MTU) {
 		nn->dp.mtu = nn->max_mtu;
-	else
+	} else {
 		nn->dp.mtu = NFP_NET_DEFAULT_MTU;
+	}
 	nn->dp.fl_bufsz = nfp_net_calc_fl_bufsz(&nn->dp);
 
 	if (nfp_app_ctrl_uses_data_vnics(nn->app))

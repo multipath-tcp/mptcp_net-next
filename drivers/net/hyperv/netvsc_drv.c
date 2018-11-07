@@ -226,6 +226,7 @@ static inline void *init_ppi_data(struct rndis_message *msg,
 
 	ppi->size = ppi_size;
 	ppi->type = pkt_type;
+	ppi->internal = 0;
 	ppi->ppi_offset = sizeof(struct rndis_per_packet_info);
 
 	rndis_pkt->per_pkt_info_len += ppi_size;
@@ -1564,26 +1565,6 @@ netvsc_set_rxnfc(struct net_device *ndev, struct ethtool_rxnfc *info)
 	return -EOPNOTSUPP;
 }
 
-#ifdef CONFIG_NET_POLL_CONTROLLER
-static void netvsc_poll_controller(struct net_device *dev)
-{
-	struct net_device_context *ndc = netdev_priv(dev);
-	struct netvsc_device *ndev;
-	int i;
-
-	rcu_read_lock();
-	ndev = rcu_dereference(ndc->nvdev);
-	if (ndev) {
-		for (i = 0; i < ndev->num_chn; i++) {
-			struct netvsc_channel *nvchan = &ndev->chan_table[i];
-
-			napi_schedule(&nvchan->napi);
-		}
-	}
-	rcu_read_unlock();
-}
-#endif
-
 static u32 netvsc_get_rxfh_key_size(struct net_device *dev)
 {
 	return NETVSC_HASH_KEYLEN;
@@ -1811,9 +1792,6 @@ static const struct net_device_ops device_ops = {
 	.ndo_set_mac_address =		netvsc_set_mac_addr,
 	.ndo_select_queue =		netvsc_select_queue,
 	.ndo_get_stats64 =		netvsc_get_stats64,
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	.ndo_poll_controller =		netvsc_poll_controller,
-#endif
 };
 
 /*
@@ -2052,14 +2030,15 @@ static void netvsc_vf_setup(struct work_struct *w)
 	rtnl_unlock();
 }
 
-/* Find netvsc by VMBus serial number.
- * The PCI hyperv controller records the serial number as the slot.
+/* Find netvsc by VF serial number.
+ * The PCI hyperv controller records the serial number as the slot kobj name.
  */
 static struct net_device *get_netvsc_byslot(const struct net_device *vf_netdev)
 {
 	struct device *parent = vf_netdev->dev.parent;
 	struct net_device_context *ndev_ctx;
 	struct pci_dev *pdev;
+	u32 serial;
 
 	if (!parent || !dev_is_pci(parent))
 		return NULL; /* not a PCI device */
@@ -2070,16 +2049,22 @@ static struct net_device *get_netvsc_byslot(const struct net_device *vf_netdev)
 		return NULL;
 	}
 
+	if (kstrtou32(pci_slot_name(pdev->slot), 10, &serial)) {
+		netdev_notice(vf_netdev, "Invalid vf serial:%s\n",
+			      pci_slot_name(pdev->slot));
+		return NULL;
+	}
+
 	list_for_each_entry(ndev_ctx, &netvsc_dev_list, list) {
 		if (!ndev_ctx->vf_alloc)
 			continue;
 
-		if (ndev_ctx->vf_serial == pdev->slot->number)
+		if (ndev_ctx->vf_serial == serial)
 			return hv_get_drvdata(ndev_ctx->device_ctx);
 	}
 
 	netdev_notice(vf_netdev,
-		      "no netdev found for slot %u\n", pdev->slot->number);
+		      "no netdev found for vf serial:%u\n", serial);
 	return NULL;
 }
 

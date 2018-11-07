@@ -31,6 +31,8 @@
 #include <net/pkt_sched.h>
 #include <net/pkt_cls.h>
 
+extern const struct nla_policy rtm_tca_policy[TCA_MAX + 1];
+
 /* The list of all installed classifier types */
 static LIST_HEAD(tcf_proto_base);
 
@@ -717,8 +719,10 @@ static struct tcf_block *tcf_block_find(struct net *net, struct Qdisc **q,
 errout_rcu:
 	rcu_read_unlock();
 errout_qdisc:
-	if (*q)
+	if (*q) {
 		qdisc_put(*q);
+		*q = NULL;
+	}
 	return ERR_PTR(err);
 }
 
@@ -1302,7 +1306,7 @@ static int tc_new_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 replay:
 	tp_created = 0;
 
-	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, rtm_tca_policy, extack);
 	if (err < 0)
 		return err;
 
@@ -1452,7 +1456,7 @@ static int tc_del_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	if (!netlink_ns_capable(skb, net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 
-	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, rtm_tca_policy, extack);
 	if (err < 0)
 		return err;
 
@@ -1568,7 +1572,7 @@ static int tc_get_tfilter(struct sk_buff *skb, struct nlmsghdr *n,
 	void *fh = NULL;
 	int err;
 
-	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, rtm_tca_policy, extack);
 	if (err < 0)
 		return err;
 
@@ -1725,7 +1729,8 @@ static int tc_dump_tfilter(struct sk_buff *skb, struct netlink_callback *cb)
 	if (nlmsg_len(cb->nlh) < sizeof(*tcm))
 		return skb->len;
 
-	err = nlmsg_parse(cb->nlh, sizeof(*tcm), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(cb->nlh, sizeof(*tcm), tca, TCA_MAX, NULL,
+			  cb->extack);
 	if (err)
 		return err;
 
@@ -1934,7 +1939,7 @@ static int tc_ctl_chain(struct sk_buff *skb, struct nlmsghdr *n,
 		return -EPERM;
 
 replay:
-	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, NULL, extack);
+	err = nlmsg_parse(n, sizeof(*t), tca, TCA_MAX, rtm_tca_policy, extack);
 	if (err < 0)
 		return err;
 
@@ -2052,7 +2057,8 @@ static int tc_dump_chain(struct sk_buff *skb, struct netlink_callback *cb)
 	if (nlmsg_len(cb->nlh) < sizeof(*tcm))
 		return skb->len;
 
-	err = nlmsg_parse(cb->nlh, sizeof(*tcm), tca, TCA_MAX, NULL, NULL);
+	err = nlmsg_parse(cb->nlh, sizeof(*tcm), tca, TCA_MAX, rtm_tca_policy,
+			  cb->extack);
 	if (err)
 		return err;
 

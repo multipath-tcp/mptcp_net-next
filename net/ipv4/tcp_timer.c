@@ -376,7 +376,7 @@ static void tcp_probe_timer(struct sock *sk)
 	 */
 	start_ts = tcp_skb_timestamp(skb);
 	if (!start_ts)
-		skb->skb_mstamp_ns = tp->tcp_wstamp_ns;
+		skb->skb_mstamp_ns = tp->tcp_clock_cache;
 	else if (icsk->icsk_user_timeout &&
 		 (s32)(tcp_time_stamp(tp) - start_ts) > icsk->icsk_user_timeout)
 		goto abort;
@@ -793,7 +793,7 @@ void tcp_init_xmit_timers(struct sock *sk)
 {
 	inet_csk_init_xmit_timers(sk, &tcp_write_timer, &tcp_delack_timer,
 				  &tcp_keepalive_timer);
-	hrtimer_init(&tcp_sk(sk)->pacing_timer, CLOCK_TAI,
+	hrtimer_init(&tcp_sk(sk)->pacing_timer, CLOCK_MONOTONIC,
 		     HRTIMER_MODE_ABS_PINNED_SOFT);
 	tcp_sk(sk)->pacing_timer.function = tcp_pace_kick;
 

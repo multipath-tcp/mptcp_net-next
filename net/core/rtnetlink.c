@@ -59,7 +59,7 @@
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
 
-#define RTNL_MAX_TYPE		48
+#define RTNL_MAX_TYPE		49
 #define RTNL_SLAVE_MAX_TYPE	36
 
 struct rtnl_link {
@@ -1878,8 +1878,52 @@ struct net *rtnl_get_net_ns_capable(struct sock *sk, int netnsid)
 }
 EXPORT_SYMBOL_GPL(rtnl_get_net_ns_capable);
 
+static int rtnl_valid_dump_ifinfo_req(const struct nlmsghdr *nlh,
+				      bool strict_check, struct nlattr **tb,
+				      struct netlink_ext_ack *extack)
+{
+	int hdrlen;
+
+	if (strict_check) {
+		struct ifinfomsg *ifm;
+
+		if (nlh->nlmsg_len < nlmsg_msg_size(sizeof(*ifm))) {
+			NL_SET_ERR_MSG(extack, "Invalid header for link dump");
+			return -EINVAL;
+		}
+
+		ifm = nlmsg_data(nlh);
+		if (ifm->__ifi_pad || ifm->ifi_type || ifm->ifi_flags ||
+		    ifm->ifi_change) {
+			NL_SET_ERR_MSG(extack, "Invalid values in header for link dump request");
+			return -EINVAL;
+		}
+		if (ifm->ifi_index) {
+			NL_SET_ERR_MSG(extack, "Filter by device index not supported for link dumps");
+			return -EINVAL;
+		}
+
+		return nlmsg_parse_strict(nlh, sizeof(*ifm), tb, IFLA_MAX,
+					  ifla_policy, extack);
+	}
+
+	/* A hack to preserve kernel<->userspace interface.
+	 * The correct header is ifinfomsg. It is consistent with rtnl_getlink.
+	 * However, before Linux v3.9 the code here assumed rtgenmsg and that's
+	 * what iproute2 < v3.9.0 used.
+	 * We can detect the old iproute2. Even including the IFLA_EXT_MASK
+	 * attribute, its netlink message is shorter than struct ifinfomsg.
+	 */
+	hdrlen = nlmsg_len(nlh) < sizeof(struct ifinfomsg) ?
+		 sizeof(struct rtgenmsg) : sizeof(struct ifinfomsg);
+
+	return nlmsg_parse(nlh, hdrlen, tb, IFLA_MAX, ifla_policy, extack);
+}
+
 static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 {
+	struct netlink_ext_ack *extack = cb->extack;
+	const struct nlmsghdr *nlh = cb->nlh;
 	struct net *net = sock_net(skb->sk);
 	struct net *tgt_net = net;
 	int h, s_h;
@@ -1892,46 +1936,54 @@ static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 	unsigned int flags = NLM_F_MULTI;
 	int master_idx = 0;
 	int netnsid = -1;
-	int err;
-	int hdrlen;
+	int err, i;
 
 	s_h = cb->args[0];
 	s_idx = cb->args[1];
 
-	/* A hack to preserve kernel<->userspace interface.
-	 * The correct header is ifinfomsg. It is consistent with rtnl_getlink.
-	 * However, before Linux v3.9 the code here assumed rtgenmsg and that's
-	 * what iproute2 < v3.9.0 used.
-	 * We can detect the old iproute2. Even including the IFLA_EXT_MASK
-	 * attribute, its netlink message is shorter than struct ifinfomsg.
-	 */
-	hdrlen = nlmsg_len(cb->nlh) < sizeof(struct ifinfomsg) ?
-		 sizeof(struct rtgenmsg) : sizeof(struct ifinfomsg);
+	err = rtnl_valid_dump_ifinfo_req(nlh, cb->strict_check, tb, extack);
+	if (err < 0) {
+		if (cb->strict_check)
+			return err;
 
-	if (nlmsg_parse(cb->nlh, hdrlen, tb, IFLA_MAX,
-			ifla_policy, NULL) >= 0) {
-		if (tb[IFLA_TARGET_NETNSID]) {
-			netnsid = nla_get_s32(tb[IFLA_TARGET_NETNSID]);
-			tgt_net = rtnl_get_net_ns_capable(skb->sk, netnsid);
-			if (IS_ERR(tgt_net)) {
-				tgt_net = net;
-				netnsid = -1;
-			}
-		}
-
-		if (tb[IFLA_EXT_MASK])
-			ext_filter_mask = nla_get_u32(tb[IFLA_EXT_MASK]);
-
-		if (tb[IFLA_MASTER])
-			master_idx = nla_get_u32(tb[IFLA_MASTER]);
-
-		if (tb[IFLA_LINKINFO])
-			kind_ops = linkinfo_to_kind_ops(tb[IFLA_LINKINFO]);
-
-		if (master_idx || kind_ops)
-			flags |= NLM_F_DUMP_FILTERED;
+		goto walk_entries;
 	}
 
+	for (i = 0; i <= IFLA_MAX; ++i) {
+		if (!tb[i])
+			continue;
+
+		/* new attributes should only be added with strict checking */
+		switch (i) {
+		case IFLA_TARGET_NETNSID:
+			netnsid = nla_get_s32(tb[i]);
+			tgt_net = rtnl_get_net_ns_capable(skb->sk, netnsid);
+			if (IS_ERR(tgt_net)) {
+				NL_SET_ERR_MSG(extack, "Invalid target network namespace id");
+				return PTR_ERR(tgt_net);
+			}
+			break;
+		case IFLA_EXT_MASK:
+			ext_filter_mask = nla_get_u32(tb[i]);
+			break;
+		case IFLA_MASTER:
+			master_idx = nla_get_u32(tb[i]);
+			break;
+		case IFLA_LINKINFO:
+			kind_ops = linkinfo_to_kind_ops(tb[i]);
+			break;
+		default:
+			if (cb->strict_check) {
+				NL_SET_ERR_MSG(extack, "Unsupported attribute in link dump request");
+				return -EINVAL;
+			}
+		}
+	}
+
+	if (master_idx || kind_ops)
+		flags |= NLM_F_DUMP_FILTERED;
+
+walk_entries:
 	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
 		idx = 0;
 		head = &tgt_net->dev_index_head[h];
@@ -1943,8 +1995,7 @@ static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 			err = rtnl_fill_ifinfo(skb, dev, net,
 					       RTM_NEWLINK,
 					       NETLINK_CB(cb->skb).portid,
-					       cb->nlh->nlmsg_seq, 0,
-					       flags,
+					       nlh->nlmsg_seq, 0, flags,
 					       ext_filter_mask, 0, NULL, 0,
 					       netnsid);
 
@@ -2834,9 +2885,11 @@ int rtnl_configure_link(struct net_device *dev, const struct ifinfomsg *ifm)
 }
 EXPORT_SYMBOL(rtnl_configure_link);
 
-struct net_device *rtnl_create_link(struct net *net,
-	const char *ifname, unsigned char name_assign_type,
-	const struct rtnl_link_ops *ops, struct nlattr *tb[])
+struct net_device *rtnl_create_link(struct net *net, const char *ifname,
+				    unsigned char name_assign_type,
+				    const struct rtnl_link_ops *ops,
+				    struct nlattr *tb[],
+				    struct netlink_ext_ack *extack)
 {
 	struct net_device *dev;
 	unsigned int num_tx_queues = 1;
@@ -2851,6 +2904,16 @@ struct net_device *rtnl_create_link(struct net *net,
 		num_rx_queues = nla_get_u32(tb[IFLA_NUM_RX_QUEUES]);
 	else if (ops->get_num_rx_queues)
 		num_rx_queues = ops->get_num_rx_queues();
+
+	if (num_tx_queues < 1 || num_tx_queues > 4096) {
+		NL_SET_ERR_MSG(extack, "Invalid number of transmit queues");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (num_rx_queues < 1 || num_rx_queues > 4096) {
+		NL_SET_ERR_MSG(extack, "Invalid number of receive queues");
+		return ERR_PTR(-EINVAL);
+	}
 
 	dev = alloc_netdev_mqs(ops->priv_size, ifname, name_assign_type,
 			       ops->setup, num_tx_queues, num_rx_queues);
@@ -2991,7 +3054,7 @@ replay:
 			if (ops->maxtype && linkinfo[IFLA_INFO_DATA]) {
 				err = nla_parse_nested(attr, ops->maxtype,
 						       linkinfo[IFLA_INFO_DATA],
-						       ops->policy, NULL);
+						       ops->policy, extack);
 				if (err < 0)
 					return err;
 				data = attr;
@@ -3013,7 +3076,7 @@ replay:
 						       m_ops->slave_maxtype,
 						       linkinfo[IFLA_INFO_SLAVE_DATA],
 						       m_ops->slave_policy,
-						       NULL);
+						       extack);
 				if (err < 0)
 					return err;
 				slave_data = slave_attr;
@@ -3077,6 +3140,7 @@ replay:
 					goto replay;
 			}
 #endif
+			NL_SET_ERR_MSG(extack, "Unknown device type");
 			return -EOPNOTSUPP;
 		}
 
@@ -3097,6 +3161,7 @@ replay:
 
 			link_net = get_net_ns_by_id(dest_net, id);
 			if (!link_net) {
+				NL_SET_ERR_MSG(extack, "Unknown network namespace id");
 				err =  -EINVAL;
 				goto out;
 			}
@@ -3106,7 +3171,7 @@ replay:
 		}
 
 		dev = rtnl_create_link(link_net ? : dest_net, ifname,
-				       name_assign_type, ops, tb);
+				       name_assign_type, ops, tb, extack);
 		if (IS_ERR(dev)) {
 			err = PTR_ERR(dev);
 			goto out;
@@ -3276,6 +3341,7 @@ static int rtnl_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 	int idx;
 	int s_idx = cb->family;
 	int type = cb->nlh->nlmsg_type - RTM_BASE;
+	int ret = 0;
 
 	if (s_idx == 0)
 		s_idx = 1;
@@ -3308,12 +3374,13 @@ static int rtnl_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 			cb->prev_seq = 0;
 			cb->seq = 0;
 		}
-		if (dumpit(skb, cb))
+		ret = dumpit(skb, cb);
+		if (ret)
 			break;
 	}
 	cb->family = idx;
 
-	return skb->len;
+	return skb->len ? : ret;
 }
 
 struct sk_buff *rtmsg_ifinfo_build_skb(int type, struct net_device *dev,
@@ -3541,6 +3608,11 @@ static int rtnl_fdb_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 		return -EINVAL;
 	}
 
+	if (dev->type != ARPHRD_ETHER) {
+		NL_SET_ERR_MSG(extack, "FDB add only supported for Ethernet devices");
+		return -EINVAL;
+	}
+
 	addr = nla_data(tb[NDA_LLADDR]);
 
 	err = fdb_vid_parse(tb[NDA_VLAN], &vid, extack);
@@ -3645,6 +3717,11 @@ static int rtnl_fdb_del(struct sk_buff *skb, struct nlmsghdr *nlh,
 		return -EINVAL;
 	}
 
+	if (dev->type != ARPHRD_ETHER) {
+		NL_SET_ERR_MSG(extack, "FDB delete only supported for Ethernet devices");
+		return -EINVAL;
+	}
+
 	addr = nla_data(tb[NDA_LLADDR]);
 
 	err = fdb_vid_parse(tb[NDA_VLAN], &vid, extack);
@@ -3742,14 +3819,100 @@ out:
 }
 EXPORT_SYMBOL(ndo_dflt_fdb_dump);
 
+static int valid_fdb_dump_strict(const struct nlmsghdr *nlh,
+				 int *br_idx, int *brport_idx,
+				 struct netlink_ext_ack *extack)
+{
+	struct nlattr *tb[NDA_MAX + 1];
+	struct ndmsg *ndm;
+	int err, i;
+
+	if (nlh->nlmsg_len < nlmsg_msg_size(sizeof(*ndm))) {
+		NL_SET_ERR_MSG(extack, "Invalid header for fdb dump request");
+		return -EINVAL;
+	}
+
+	ndm = nlmsg_data(nlh);
+	if (ndm->ndm_pad1  || ndm->ndm_pad2  || ndm->ndm_state ||
+	    ndm->ndm_flags || ndm->ndm_type) {
+		NL_SET_ERR_MSG(extack, "Invalid values in header for fbd dump request");
+		return -EINVAL;
+	}
+
+	err = nlmsg_parse_strict(nlh, sizeof(struct ndmsg), tb, NDA_MAX,
+				 NULL, extack);
+	if (err < 0)
+		return err;
+
+	*brport_idx = ndm->ndm_ifindex;
+	for (i = 0; i <= NDA_MAX; ++i) {
+		if (!tb[i])
+			continue;
+
+		switch (i) {
+		case NDA_IFINDEX:
+			if (nla_len(tb[i]) != sizeof(u32)) {
+				NL_SET_ERR_MSG(extack, "Invalid IFINDEX attribute in fdb dump request");
+				return -EINVAL;
+			}
+			*brport_idx = nla_get_u32(tb[NDA_IFINDEX]);
+			break;
+		case NDA_MASTER:
+			if (nla_len(tb[i]) != sizeof(u32)) {
+				NL_SET_ERR_MSG(extack, "Invalid MASTER attribute in fdb dump request");
+				return -EINVAL;
+			}
+			*br_idx = nla_get_u32(tb[NDA_MASTER]);
+			break;
+		default:
+			NL_SET_ERR_MSG(extack, "Unsupported attribute in fdb dump request");
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int valid_fdb_dump_legacy(const struct nlmsghdr *nlh,
+				 int *br_idx, int *brport_idx,
+				 struct netlink_ext_ack *extack)
+{
+	struct nlattr *tb[IFLA_MAX+1];
+	int err;
+
+	/* A hack to preserve kernel<->userspace interface.
+	 * Before Linux v4.12 this code accepted ndmsg since iproute2 v3.3.0.
+	 * However, ndmsg is shorter than ifinfomsg thus nlmsg_parse() bails.
+	 * So, check for ndmsg with an optional u32 attribute (not used here).
+	 * Fortunately these sizes don't conflict with the size of ifinfomsg
+	 * with an optional attribute.
+	 */
+	if (nlmsg_len(nlh) != sizeof(struct ndmsg) &&
+	    (nlmsg_len(nlh) != sizeof(struct ndmsg) +
+	     nla_attr_size(sizeof(u32)))) {
+		struct ifinfomsg *ifm;
+
+		err = nlmsg_parse(nlh, sizeof(struct ifinfomsg), tb, IFLA_MAX,
+				  ifla_policy, extack);
+		if (err < 0) {
+			return -EINVAL;
+		} else if (err == 0) {
+			if (tb[IFLA_MASTER])
+				*br_idx = nla_get_u32(tb[IFLA_MASTER]);
+		}
+
+		ifm = nlmsg_data(nlh);
+		*brport_idx = ifm->ifi_index;
+	}
+	return 0;
+}
+
 static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct net_device *dev;
-	struct nlattr *tb[IFLA_MAX+1];
 	struct net_device *br_dev = NULL;
 	const struct net_device_ops *ops = NULL;
 	const struct net_device_ops *cops = NULL;
-	struct ifinfomsg *ifm = nlmsg_data(cb->nlh);
 	struct net *net = sock_net(skb->sk);
 	struct hlist_head *head;
 	int brport_idx = 0;
@@ -3759,16 +3922,14 @@ static int rtnl_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb)
 	int err = 0;
 	int fidx = 0;
 
-	err = nlmsg_parse(cb->nlh, sizeof(struct ifinfomsg), tb,
-			  IFLA_MAX, ifla_policy, NULL);
-	if (err < 0) {
-		return -EINVAL;
-	} else if (err == 0) {
-		if (tb[IFLA_MASTER])
-			br_idx = nla_get_u32(tb[IFLA_MASTER]);
-	}
-
-	brport_idx = ifm->ifi_index;
+	if (cb->strict_check)
+		err = valid_fdb_dump_strict(cb->nlh, &br_idx, &brport_idx,
+					    cb->extack);
+	else
+		err = valid_fdb_dump_legacy(cb->nlh, &br_idx, &brport_idx,
+					    cb->extack);
+	if (err < 0)
+		return err;
 
 	if (br_idx) {
 		br_dev = __dev_get_by_index(net, br_idx);
@@ -3953,28 +4114,72 @@ nla_put_failure:
 }
 EXPORT_SYMBOL_GPL(ndo_dflt_bridge_getlink);
 
+static int valid_bridge_getlink_req(const struct nlmsghdr *nlh,
+				    bool strict_check, u32 *filter_mask,
+				    struct netlink_ext_ack *extack)
+{
+	struct nlattr *tb[IFLA_MAX+1];
+	int err, i;
+
+	if (strict_check) {
+		struct ifinfomsg *ifm;
+
+		if (nlh->nlmsg_len < nlmsg_msg_size(sizeof(*ifm))) {
+			NL_SET_ERR_MSG(extack, "Invalid header for bridge link dump");
+			return -EINVAL;
+		}
+
+		ifm = nlmsg_data(nlh);
+		if (ifm->__ifi_pad || ifm->ifi_type || ifm->ifi_flags ||
+		    ifm->ifi_change || ifm->ifi_index) {
+			NL_SET_ERR_MSG(extack, "Invalid values in header for bridge link dump request");
+			return -EINVAL;
+		}
+
+		err = nlmsg_parse_strict(nlh, sizeof(struct ifinfomsg), tb,
+					 IFLA_MAX, ifla_policy, extack);
+	} else {
+		err = nlmsg_parse(nlh, sizeof(struct ifinfomsg), tb,
+				  IFLA_MAX, ifla_policy, extack);
+	}
+	if (err < 0)
+		return err;
+
+	/* new attributes should only be added with strict checking */
+	for (i = 0; i <= IFLA_MAX; ++i) {
+		if (!tb[i])
+			continue;
+
+		switch (i) {
+		case IFLA_EXT_MASK:
+			*filter_mask = nla_get_u32(tb[i]);
+			break;
+		default:
+			if (strict_check) {
+				NL_SET_ERR_MSG(extack, "Unsupported attribute in bridge link dump request");
+				return -EINVAL;
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int rtnl_bridge_getlink(struct sk_buff *skb, struct netlink_callback *cb)
 {
+	const struct nlmsghdr *nlh = cb->nlh;
 	struct net *net = sock_net(skb->sk);
 	struct net_device *dev;
 	int idx = 0;
 	u32 portid = NETLINK_CB(cb->skb).portid;
-	u32 seq = cb->nlh->nlmsg_seq;
+	u32 seq = nlh->nlmsg_seq;
 	u32 filter_mask = 0;
 	int err;
 
-	if (nlmsg_len(cb->nlh) > sizeof(struct ifinfomsg)) {
-		struct nlattr *extfilt;
-
-		extfilt = nlmsg_find_attr(cb->nlh, sizeof(struct ifinfomsg),
-					  IFLA_EXT_MASK);
-		if (extfilt) {
-			if (nla_len(extfilt) < sizeof(filter_mask))
-				return -EINVAL;
-
-			filter_mask = nla_get_u32(extfilt);
-		}
-	}
+	err = valid_bridge_getlink_req(nlh, cb->strict_check, &filter_mask,
+				       cb->extack);
+	if (err < 0 && cb->strict_check)
+		return err;
 
 	rcu_read_lock();
 	for_each_netdev_rcu(net, dev) {
@@ -4568,6 +4773,7 @@ static int rtnl_stats_get(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 static int rtnl_stats_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
+	struct netlink_ext_ack *extack = cb->extack;
 	int h, s_h, err, s_idx, s_idxattr, s_prividx;
 	struct net *net = sock_net(skb->sk);
 	unsigned int flags = NLM_F_MULTI;
@@ -4584,13 +4790,32 @@ static int rtnl_stats_dump(struct sk_buff *skb, struct netlink_callback *cb)
 
 	cb->seq = net->dev_base_seq;
 
-	if (nlmsg_len(cb->nlh) < sizeof(*ifsm))
+	if (nlmsg_len(cb->nlh) < sizeof(*ifsm)) {
+		NL_SET_ERR_MSG(extack, "Invalid header for stats dump");
 		return -EINVAL;
+	}
 
 	ifsm = nlmsg_data(cb->nlh);
+
+	/* only requests using strict checks can pass data to influence
+	 * the dump. The legacy exception is filter_mask.
+	 */
+	if (cb->strict_check) {
+		if (ifsm->pad1 || ifsm->pad2 || ifsm->ifindex) {
+			NL_SET_ERR_MSG(extack, "Invalid values in header for stats dump request");
+			return -EINVAL;
+		}
+		if (nlmsg_attrlen(cb->nlh, sizeof(*ifsm))) {
+			NL_SET_ERR_MSG(extack, "Invalid attributes after stats header");
+			return -EINVAL;
+		}
+	}
+
 	filter_mask = ifsm->filter_mask;
-	if (!filter_mask)
+	if (!filter_mask) {
+		NL_SET_ERR_MSG(extack, "Filter mask must be set for stats dump");
 		return -EINVAL;
+	}
 
 	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
 		idx = 0;

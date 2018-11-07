@@ -504,6 +504,7 @@ static struct net_bridge_fdb_entry *fdb_create(struct net_bridge *br,
 		fdb->added_by_user = 0;
 		fdb->added_by_external_learn = 0;
 		fdb->offloaded = 0;
+		fdb->is_sticky = 0;
 		fdb->updated = fdb->used = jiffies;
 		if (rhashtable_lookup_insert_fast(&br->fdb_hash_tbl,
 						  &fdb->rhnode,
@@ -1151,7 +1152,7 @@ int br_fdb_external_learn_del(struct net_bridge *br, struct net_bridge_port *p,
 }
 
 void br_fdb_offloaded_set(struct net_bridge *br, struct net_bridge_port *p,
-			  const unsigned char *addr, u16 vid)
+			  const unsigned char *addr, u16 vid, bool offloaded)
 {
 	struct net_bridge_fdb_entry *fdb;
 
@@ -1159,7 +1160,7 @@ void br_fdb_offloaded_set(struct net_bridge *br, struct net_bridge_port *p,
 
 	fdb = br_fdb_find(br, addr, vid);
 	if (fdb)
-		fdb->offloaded = 1;
+		fdb->offloaded = offloaded;
 
 	spin_unlock_bh(&br->hash_lock);
 }

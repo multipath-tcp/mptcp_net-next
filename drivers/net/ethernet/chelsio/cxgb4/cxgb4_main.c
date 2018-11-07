@@ -4767,7 +4767,6 @@ static pci_ers_result_t eeh_slot_reset(struct pci_dev *pdev)
 	pci_set_master(pdev);
 	pci_restore_state(pdev);
 	pci_save_state(pdev);
-	pci_cleanup_aer_uncorrect_error_status(pdev);
 
 	if (t4_wait_dev_ready(adap->regs) < 0)
 		return PCI_ERS_RESULT_DISCONNECT;
@@ -5864,6 +5863,10 @@ fw_attach_fail:
 	if (!is_t4(adapter->params.chip))
 		cxgb4_ptp_init(adapter);
 
+	if (IS_ENABLED(CONFIG_THERMAL) &&
+	    !is_t4(adapter->params.chip) && (adapter->flags & FW_OK))
+		cxgb4_thermal_init(adapter);
+
 	print_adapter_info(adapter);
 	return 0;
 
@@ -5929,6 +5932,8 @@ static void remove_one(struct pci_dev *pdev)
 
 		if (!is_t4(adapter->params.chip))
 			cxgb4_ptp_stop(adapter);
+		if (IS_ENABLED(CONFIG_THERMAL))
+			cxgb4_thermal_remove(adapter);
 
 		/* If we allocated filters, free up state associated with any
 		 * valid filters ...

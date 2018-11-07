@@ -320,6 +320,7 @@ enum net_bridge_opts {
 	BROPT_HAS_IPV6_ADDR,
 	BROPT_NEIGH_SUPPRESS_ENABLED,
 	BROPT_MTU_SET_BY_USER,
+	BROPT_VLAN_STATS_PER_PORT,
 };
 
 struct net_bridge {
@@ -573,7 +574,7 @@ int br_fdb_external_learn_del(struct net_bridge *br, struct net_bridge_port *p,
 			      const unsigned char *addr, u16 vid,
 			      bool swdev_notify);
 void br_fdb_offloaded_set(struct net_bridge *br, struct net_bridge_port *p,
-			  const unsigned char *addr, u16 vid);
+			  const unsigned char *addr, u16 vid, bool offloaded);
 
 /* br_forward.c */
 enum br_pkt_type {
@@ -859,6 +860,7 @@ int br_vlan_filter_toggle(struct net_bridge *br, unsigned long val);
 int __br_vlan_set_proto(struct net_bridge *br, __be16 proto);
 int br_vlan_set_proto(struct net_bridge *br, unsigned long val);
 int br_vlan_set_stats(struct net_bridge *br, unsigned long val);
+int br_vlan_set_stats_per_port(struct net_bridge *br, unsigned long val);
 int br_vlan_init(struct net_bridge *br);
 int br_vlan_set_default_pvid(struct net_bridge *br, unsigned long val);
 int __br_vlan_set_default_pvid(struct net_bridge *br, u16 pvid);

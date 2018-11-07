@@ -1755,7 +1755,7 @@ static void mvpp2_txq_desc_put(struct mvpp2_tx_queue *txq)
 }
 
 /* Set Tx descriptors fields relevant for CSUM calculation */
-static u32 mvpp2_txq_desc_csum(int l3_offs, int l3_proto,
+static u32 mvpp2_txq_desc_csum(int l3_offs, __be16 l3_proto,
 			       int ip_hdr_len, int l4_proto)
 {
 	u32 command;
@@ -2645,14 +2645,15 @@ static u32 mvpp2_skb_tx_csum(struct mvpp2_port *port, struct sk_buff *skb)
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		int ip_hdr_len = 0;
 		u8 l4_proto;
+		__be16 l3_proto = vlan_get_protocol(skb);
 
-		if (skb->protocol == htons(ETH_P_IP)) {
+		if (l3_proto == htons(ETH_P_IP)) {
 			struct iphdr *ip4h = ip_hdr(skb);
 
 			/* Calculate IPv4 checksum and L4 checksum */
 			ip_hdr_len = ip4h->ihl;
 			l4_proto = ip4h->protocol;
-		} else if (skb->protocol == htons(ETH_P_IPV6)) {
+		} else if (l3_proto == htons(ETH_P_IPV6)) {
 			struct ipv6hdr *ip6h = ipv6_hdr(skb);
 
 			/* Read l4_protocol from one of IPv6 extra headers */
@@ -2664,7 +2665,7 @@ static u32 mvpp2_skb_tx_csum(struct mvpp2_port *port, struct sk_buff *skb)
 		}
 
 		return mvpp2_txq_desc_csum(skb_network_offset(skb),
-				skb->protocol, ip_hdr_len, l4_proto);
+					   l3_proto, ip_hdr_len, l4_proto);
 	}
 
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
@@ -3297,24 +3298,30 @@ static int mvpp2_irqs_init(struct mvpp2_port *port)
 	for (i = 0; i < port->nqvecs; i++) {
 		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
-		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE)
+		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE) {
+			qv->mask = kzalloc(cpumask_size(), GFP_KERNEL);
+			if (!qv->mask) {
+				err = -ENOMEM;
+				goto err;
+			}
+
 			irq_set_status_flags(qv->irq, IRQ_NO_BALANCING);
+		}
 
 		err = request_irq(qv->irq, mvpp2_isr, 0, port->dev->name, qv);
 		if (err)
 			goto err;
 
 		if (qv->type == MVPP2_QUEUE_VECTOR_PRIVATE) {
-			unsigned long mask = 0;
 			unsigned int cpu;
 
 			for_each_present_cpu(cpu) {
 				if (mvpp2_cpu_to_thread(port->priv, cpu) ==
 				    qv->sw_thread_id)
-					mask |= BIT(cpu);
+					cpumask_set_cpu(cpu, qv->mask);
 			}
 
-			irq_set_affinity_hint(qv->irq, to_cpumask(&mask));
+			irq_set_affinity_hint(qv->irq, qv->mask);
 		}
 	}
 
@@ -3324,6 +3331,8 @@ err:
 		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
 		irq_set_affinity_hint(qv->irq, NULL);
+		kfree(qv->mask);
+		qv->mask = NULL;
 		free_irq(qv->irq, qv);
 	}
 
@@ -3338,6 +3347,8 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 		struct mvpp2_queue_vector *qv = port->qvecs + i;
 
 		irq_set_affinity_hint(qv->irq, NULL);
+		kfree(qv->mask);
+		qv->mask = NULL;
 		irq_clear_status_flags(qv->irq, IRQ_NO_BALANCING);
 		free_irq(qv->irq, qv);
 	}

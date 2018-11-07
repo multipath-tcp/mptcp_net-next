@@ -394,7 +394,7 @@ static int tipc_conn_rcv_from_sock(struct tipc_conn *con)
 	iov.iov_base = &s;
 	iov.iov_len = sizeof(s);
 	msg.msg_name = NULL;
-	iov_iter_kvec(&msg.msg_iter, READ | ITER_KVEC, &iov, 1, iov.iov_len);
+	iov_iter_kvec(&msg.msg_iter, READ, &iov, 1, iov.iov_len);
 	ret = sock_recvmsg(con->sock, &msg, MSG_DONTWAIT);
 	if (ret == -EWOULDBLOCK)
 		return -EWOULDBLOCK;
@@ -651,7 +651,7 @@ int tipc_topsrv_start(struct net *net)
 	srv->max_rcvbuf_size = sizeof(struct tipc_subscr);
 	INIT_WORK(&srv->awork, tipc_topsrv_accept);
 
-	strncpy(srv->name, name, strlen(name) + 1);
+	strscpy(srv->name, name, sizeof(srv->name));
 	tn->topsrv = srv;
 	atomic_set(&tn->subscription_count, 0);
 

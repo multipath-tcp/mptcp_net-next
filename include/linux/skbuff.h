@@ -1082,11 +1082,6 @@ static inline int skb_pad(struct sk_buff *skb, int pad)
 }
 #define dev_kfree_skb(a)	consume_skb(a)
 
-int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
-			    int getfrag(void *from, char *to, int offset,
-					int len, int odd, struct sk_buff *skb),
-			    void *from, int length);
-
 int skb_append_pagefrags(struct sk_buff *skb, struct page *page,
 			 int offset, size_t size);
 
@@ -2513,10 +2508,8 @@ int ___pskb_trim(struct sk_buff *skb, unsigned int len);
 
 static inline void __skb_set_length(struct sk_buff *skb, unsigned int len)
 {
-	if (unlikely(skb_is_nonlinear(skb))) {
-		WARN_ON(1);
+	if (WARN_ON(skb_is_nonlinear(skb)))
 		return;
-	}
 	skb->len = len;
 	skb_set_tail_pointer(skb, len);
 }
@@ -3515,13 +3508,19 @@ static inline bool __skb_metadata_differs(const struct sk_buff *skb_a,
 #define __it(x, op) (x -= sizeof(u##op))
 #define __it_diff(a, b, op) (*(u##op *)__it(a, op)) ^ (*(u##op *)__it(b, op))
 	case 32: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case 24: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case 16: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case  8: diffs |= __it_diff(a, b, 64);
 		break;
 	case 28: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case 20: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case 12: diffs |= __it_diff(a, b, 64);
+		 /* fall through */
 	case  4: diffs |= __it_diff(a, b, 32);
 		break;
 	}

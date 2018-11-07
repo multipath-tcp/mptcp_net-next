@@ -53,7 +53,7 @@ static const struct hns3_stats hns3_rxq_stats[] = {
 
 #define HNS3_TQP_STATS_COUNT (HNS3_TXQ_STATS_COUNT + HNS3_RXQ_STATS_COUNT)
 
-#define HNS3_SELF_TEST_TYPE_NUM		2
+#define HNS3_SELF_TEST_TYPE_NUM         3
 #define HNS3_NIC_LB_TEST_PKT_NUM	1
 #define HNS3_NIC_LB_TEST_RING_ID	0
 #define HNS3_NIC_LB_TEST_PACKET_SIZE	128
@@ -71,6 +71,7 @@ struct hns3_link_mode_mapping {
 static int hns3_lp_setup(struct net_device *ndev, enum hnae3_loop loop, bool en)
 {
 	struct hnae3_handle *h = hns3_get_handle(ndev);
+	bool vlan_filter_enable;
 	int ret;
 
 	if (!h->ae_algo->ops->set_loopback ||
@@ -78,8 +79,9 @@ static int hns3_lp_setup(struct net_device *ndev, enum hnae3_loop loop, bool en)
 		return -EOPNOTSUPP;
 
 	switch (loop) {
-	case HNAE3_MAC_INTER_LOOP_SERDES:
-	case HNAE3_MAC_INTER_LOOP_MAC:
+	case HNAE3_LOOP_SERIAL_SERDES:
+	case HNAE3_LOOP_PARALLEL_SERDES:
+	case HNAE3_LOOP_APP:
 		ret = h->ae_algo->ops->set_loopback(h, loop, en);
 		break;
 	default:
@@ -90,7 +92,14 @@ static int hns3_lp_setup(struct net_device *ndev, enum hnae3_loop loop, bool en)
 	if (ret)
 		return ret;
 
-	h->ae_algo->ops->set_promisc_mode(h, en, en);
+	if (en) {
+		h->ae_algo->ops->set_promisc_mode(h, true, true);
+	} else {
+		/* recover promisc mode before loopback test */
+		hns3_update_promisc_mode(ndev, h->netdev_flags);
+		vlan_filter_enable = ndev->flags & IFF_PROMISC ? false : true;
+		hns3_enable_vlan_filter(ndev, vlan_filter_enable);
+	}
 
 	return ret;
 }
@@ -286,13 +295,18 @@ static void hns3_self_test(struct net_device *ndev,
 	if (eth_test->flags != ETH_TEST_FL_OFFLINE)
 		return;
 
-	st_param[HNAE3_MAC_INTER_LOOP_MAC][0] = HNAE3_MAC_INTER_LOOP_MAC;
-	st_param[HNAE3_MAC_INTER_LOOP_MAC][1] =
-			h->flags & HNAE3_SUPPORT_MAC_LOOPBACK;
+	st_param[HNAE3_LOOP_APP][0] = HNAE3_LOOP_APP;
+	st_param[HNAE3_LOOP_APP][1] =
+			h->flags & HNAE3_SUPPORT_APP_LOOPBACK;
 
-	st_param[HNAE3_MAC_INTER_LOOP_SERDES][0] = HNAE3_MAC_INTER_LOOP_SERDES;
-	st_param[HNAE3_MAC_INTER_LOOP_SERDES][1] =
-			h->flags & HNAE3_SUPPORT_SERDES_LOOPBACK;
+	st_param[HNAE3_LOOP_SERIAL_SERDES][0] = HNAE3_LOOP_SERIAL_SERDES;
+	st_param[HNAE3_LOOP_SERIAL_SERDES][1] =
+			h->flags & HNAE3_SUPPORT_SERDES_SERIAL_LOOPBACK;
+
+	st_param[HNAE3_LOOP_PARALLEL_SERDES][0] =
+			HNAE3_LOOP_PARALLEL_SERDES;
+	st_param[HNAE3_LOOP_PARALLEL_SERDES][1] =
+			h->flags & HNAE3_SUPPORT_SERDES_PARALLEL_LOOPBACK;
 
 	if (if_running)
 		ndev->netdev_ops->ndo_stop(ndev);
@@ -672,12 +686,13 @@ static int hns3_set_rss(struct net_device *netdev, const u32 *indir,
 	if (!h->ae_algo || !h->ae_algo->ops || !h->ae_algo->ops->set_rss)
 		return -EOPNOTSUPP;
 
-	/* currently we only support Toeplitz hash */
-	if ((hfunc != ETH_RSS_HASH_NO_CHANGE) && (hfunc != ETH_RSS_HASH_TOP)) {
-		netdev_err(netdev,
-			   "hash func not supported (only Toeplitz hash)\n");
+	if ((h->pdev->revision == 0x20 &&
+	     hfunc != ETH_RSS_HASH_TOP) || (hfunc != ETH_RSS_HASH_NO_CHANGE &&
+	     hfunc != ETH_RSS_HASH_TOP && hfunc != ETH_RSS_HASH_XOR)) {
+		netdev_err(netdev, "hash func not supported\n");
 		return -EOPNOTSUPP;
 	}
+
 	if (!indir) {
 		netdev_err(netdev,
 			   "set rss failed for indir is empty\n");
@@ -693,20 +708,33 @@ static int hns3_get_rxnfc(struct net_device *netdev,
 {
 	struct hnae3_handle *h = hns3_get_handle(netdev);
 
-	if (!h->ae_algo || !h->ae_algo->ops || !h->ae_algo->ops->get_rss_tuple)
+	if (!h->ae_algo || !h->ae_algo->ops)
 		return -EOPNOTSUPP;
 
 	switch (cmd->cmd) {
 	case ETHTOOL_GRXRINGS:
-		cmd->data = h->kinfo.rss_size;
-		break;
+		cmd->data = h->kinfo.num_tqps;
+		return 0;
 	case ETHTOOL_GRXFH:
-		return h->ae_algo->ops->get_rss_tuple(h, cmd);
+		if (h->ae_algo->ops->get_rss_tuple)
+			return h->ae_algo->ops->get_rss_tuple(h, cmd);
+		return -EOPNOTSUPP;
+	case ETHTOOL_GRXCLSRLCNT:
+		if (h->ae_algo->ops->get_fd_rule_cnt)
+			return h->ae_algo->ops->get_fd_rule_cnt(h, cmd);
+		return -EOPNOTSUPP;
+	case ETHTOOL_GRXCLSRULE:
+		if (h->ae_algo->ops->get_fd_rule_info)
+			return h->ae_algo->ops->get_fd_rule_info(h, cmd);
+		return -EOPNOTSUPP;
+	case ETHTOOL_GRXCLSRLALL:
+		if (h->ae_algo->ops->get_fd_all_rules)
+			return h->ae_algo->ops->get_fd_all_rules(h, cmd,
+								 rule_locs);
+		return -EOPNOTSUPP;
 	default:
 		return -EOPNOTSUPP;
 	}
-
-	return 0;
 }
 
 static int hns3_change_all_ring_bd_num(struct hns3_nic_priv *priv,
@@ -789,12 +817,22 @@ static int hns3_set_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd)
 {
 	struct hnae3_handle *h = hns3_get_handle(netdev);
 
-	if (!h->ae_algo || !h->ae_algo->ops || !h->ae_algo->ops->set_rss_tuple)
+	if (!h->ae_algo || !h->ae_algo->ops)
 		return -EOPNOTSUPP;
 
 	switch (cmd->cmd) {
 	case ETHTOOL_SRXFH:
-		return h->ae_algo->ops->set_rss_tuple(h, cmd);
+		if (h->ae_algo->ops->set_rss_tuple)
+			return h->ae_algo->ops->set_rss_tuple(h, cmd);
+		return -EOPNOTSUPP;
+	case ETHTOOL_SRXCLSRLINS:
+		if (h->ae_algo->ops->add_fd_entry)
+			return h->ae_algo->ops->add_fd_entry(h, cmd);
+		return -EOPNOTSUPP;
+	case ETHTOOL_SRXCLSRLDEL:
+		if (h->ae_algo->ops->del_fd_entry)
+			return h->ae_algo->ops->del_fd_entry(h, cmd);
+		return -EOPNOTSUPP;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -1048,6 +1086,7 @@ static const struct ethtool_ops hns3vf_ethtool_ops = {
 	.get_ethtool_stats = hns3_get_stats,
 	.get_sset_count = hns3_get_sset_count,
 	.get_rxnfc = hns3_get_rxnfc,
+	.set_rxnfc = hns3_set_rxnfc,
 	.get_rxfh_key_size = hns3_get_rss_key_size,
 	.get_rxfh_indir_size = hns3_get_rss_indir_size,
 	.get_rxfh = hns3_get_rss,

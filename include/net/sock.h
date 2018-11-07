@@ -422,8 +422,8 @@ struct sock {
 	struct timer_list	sk_timer;
 	__u32			sk_priority;
 	__u32			sk_mark;
-	u32			sk_pacing_rate; /* bytes per second */
-	u32			sk_max_pacing_rate;
+	unsigned long		sk_pacing_rate; /* bytes per second */
+	unsigned long		sk_max_pacing_rate;
 	struct page_frag	sk_frag;
 	netdev_features_t	sk_route_caps;
 	netdev_features_t	sk_route_nocaps;
@@ -1494,6 +1494,7 @@ static inline void lock_sock(struct sock *sk)
 	lock_sock_nested(sk, 0);
 }
 
+void __release_sock(struct sock *sk);
 void release_sock(struct sock *sk);
 
 /* BH context may only use the following locking interface. */
@@ -2060,14 +2061,20 @@ static inline bool skwq_has_sleeper(struct socket_wq *wq)
 /**
  * sock_poll_wait - place memory barrier behind the poll_wait call.
  * @filp:           file
+ * @sock:           socket to wait on
  * @p:              poll_table
  *
  * See the comments in the wq_has_sleeper function.
+ *
+ * Do not derive sock from filp->private_data here. An SMC socket establishes
+ * an internal TCP socket that is used in the fallback case. All socket
+ * operations on the SMC socket are then forwarded to the TCP socket. In case of
+ * poll, the filp->private_data pointer references the SMC socket because the
+ * TCP socket has no file assigned.
  */
-static inline void sock_poll_wait(struct file *filp, poll_table *p)
+static inline void sock_poll_wait(struct file *filp, struct socket *sock,
+				  poll_table *p)
 {
-	struct socket *sock = filp->private_data;
-
 	if (!poll_does_not_wait(p)) {
 		poll_wait(filp, &sock->wq->wait, p);
 		/* We need to be sure we are in sync with the
@@ -2214,10 +2221,6 @@ static inline struct page_frag *sk_page_frag(struct sock *sk)
 }
 
 bool sk_page_frag_refill(struct sock *sk, struct page_frag *pfrag);
-
-int sk_alloc_sg(struct sock *sk, int len, struct scatterlist *sg,
-		int sg_start, int *sg_curr, unsigned int *sg_size,
-		int first_coalesce);
 
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO

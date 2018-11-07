@@ -58,9 +58,8 @@ void tcp_mstamp_refresh(struct tcp_sock *tp)
 {
 	u64 val = tcp_clock_ns();
 
-	/* departure time for next data packet */
-	if (val > tp->tcp_wstamp_ns)
-		tp->tcp_wstamp_ns = val;
+	if (val > tp->tcp_clock_cache)
+		tp->tcp_clock_cache = val;
 
 	val = div_u64(val, NSEC_PER_USEC);
 	if (val > tp->tcp_mstamp)
@@ -198,21 +197,6 @@ static inline void tcp_event_ack_sent(struct sock *sk, unsigned int pkts,
 	inet_csk_clear_xmit_timer(sk, ICSK_TIME_DACK);
 }
 
-
-u32 tcp_default_init_rwnd(u32 mss)
-{
-	/* Initial receive window should be twice of TCP_INIT_CWND to
-	 * enable proper sending of new unsent data during fast recovery
-	 * (RFC 3517, Section 4, NextSeg() rule (2)). Further place a
-	 * limit when mss is larger than 1460.
-	 */
-	u32 init_rwnd = TCP_INIT_CWND * 2;
-
-	if (mss > 1460)
-		init_rwnd = max((1460 * init_rwnd) / mss, 2U);
-	return init_rwnd;
-}
-
 /* Determine a window scaling and initial window to offer.
  * Based on the assumption that the given amount of space
  * will be offered. Store the results in the tp structure.
@@ -247,7 +231,10 @@ void tcp_select_initial_window(const struct sock *sk, int __space, __u32 mss,
 	if (sock_net(sk)->ipv4.sysctl_tcp_workaround_signed_windows)
 		(*rcv_wnd) = min(space, MAX_TCP_WINDOW);
 	else
-		(*rcv_wnd) = space;
+		(*rcv_wnd) = min_t(u32, space, U16_MAX);
+
+	if (init_rcv_wnd)
+		*rcv_wnd = min(*rcv_wnd, init_rcv_wnd * mss);
 
 	(*rcv_wscale) = 0;
 	if (wscale_ok) {
@@ -260,11 +247,6 @@ void tcp_select_initial_window(const struct sock *sk, int __space, __u32 mss,
 			(*rcv_wscale)++;
 		}
 	}
-
-	if (!init_rcv_wnd) /* Use default unless specified otherwise */
-		init_rcv_wnd = tcp_default_init_rwnd(mss);
-	*rcv_wnd = min(*rcv_wnd, init_rcv_wnd * mss);
-
 	/* Set the clamp no higher than max representable value */
 	(*window_clamp) = min_t(__u32, U16_MAX << (*rcv_wscale), *window_clamp);
 }
@@ -1030,32 +1012,26 @@ enum hrtimer_restart tcp_pace_kick(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
-static void tcp_internal_pacing(struct sock *sk)
-{
-	if (!tcp_needs_internal_pacing(sk))
-		return;
-	hrtimer_start(&tcp_sk(sk)->pacing_timer,
-		      ns_to_ktime(tcp_sk(sk)->tcp_wstamp_ns),
-		      HRTIMER_MODE_ABS_PINNED_SOFT);
-	sock_hold(sk);
-}
-
-static void tcp_update_skb_after_send(struct sock *sk, struct sk_buff *skb)
+static void tcp_update_skb_after_send(struct sock *sk, struct sk_buff *skb,
+				      u64 prior_wstamp)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb->skb_mstamp_ns = tp->tcp_wstamp_ns;
 	if (sk->sk_pacing_status != SK_PACING_NONE) {
-		u32 rate = sk->sk_pacing_rate;
+		unsigned long rate = sk->sk_pacing_rate;
 
 		/* Original sch_fq does not pace first 10 MSS
 		 * Note that tp->data_segs_out overflows after 2^32 packets,
 		 * this is a minor annoyance.
 		 */
-		if (rate != ~0U && rate && tp->data_segs_out >= 10) {
-			tp->tcp_wstamp_ns += div_u64((u64)skb->len * NSEC_PER_SEC, rate);
+		if (rate != ~0UL && rate && tp->data_segs_out >= 10) {
+			u64 len_ns = div64_ul((u64)skb->len * NSEC_PER_SEC, rate);
+			u64 credit = tp->tcp_wstamp_ns - prior_wstamp;
 
-			tcp_internal_pacing(sk);
+			/* take into account OS jitter */
+			len_ns -= min_t(u64, len_ns / 2, credit);
+			tp->tcp_wstamp_ns += len_ns;
 		}
 	}
 	list_move_tail(&skb->tcp_tsorted_anchor, &tp->tsorted_sent_queue);
@@ -1084,6 +1060,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	struct sk_buff *oskb = NULL;
 	struct tcp_md5sig_key *md5;
 	struct tcphdr *th;
+	u64 prior_wstamp;
 	int err;
 
 	BUG_ON(!skb || !tcp_skb_pcount(skb));
@@ -1104,6 +1081,10 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		if (unlikely(!skb))
 			return -ENOBUFS;
 	}
+
+	prior_wstamp = tp->tcp_wstamp_ns;
+	tp->tcp_wstamp_ns = max(tp->tcp_wstamp_ns, tp->tcp_clock_cache);
+
 	skb->skb_mstamp_ns = tp->tcp_wstamp_ns;
 
 	inet = inet_sk(sk);
@@ -1220,7 +1201,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		err = net_xmit_eval(err);
 	}
 	if (!err && oskb) {
-		tcp_update_skb_after_send(sk, oskb);
+		tcp_update_skb_after_send(sk, oskb, prior_wstamp);
 		tcp_rate_skb_sent(sk, oskb);
 	}
 	return err;
@@ -1756,8 +1737,9 @@ static u32 tcp_tso_autosize(const struct sock *sk, unsigned int mss_now,
 {
 	u32 bytes, segs;
 
-	bytes = min(sk->sk_pacing_rate >> sk->sk_pacing_shift,
-		    sk->sk_gso_max_size - 1 - MAX_TCP_HEADER);
+	bytes = min_t(unsigned long,
+		      sk->sk_pacing_rate >> sk->sk_pacing_shift,
+		      sk->sk_gso_max_size - 1 - MAX_TCP_HEADER);
 
 	/* Goal is to send at least one packet per ms,
 	 * not one big TSO packet every 100 ms.
@@ -2231,10 +2213,23 @@ static int tcp_mtu_probe(struct sock *sk)
 	return -1;
 }
 
-static bool tcp_pacing_check(const struct sock *sk)
+static bool tcp_pacing_check(struct sock *sk)
 {
-	return tcp_needs_internal_pacing(sk) &&
-	       hrtimer_is_queued(&tcp_sk(sk)->pacing_timer);
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	if (!tcp_needs_internal_pacing(sk))
+		return false;
+
+	if (tp->tcp_wstamp_ns <= tp->tcp_clock_cache)
+		return false;
+
+	if (!hrtimer_is_queued(&tp->pacing_timer)) {
+		hrtimer_start(&tp->pacing_timer,
+			      ns_to_ktime(tp->tcp_wstamp_ns),
+			      HRTIMER_MODE_ABS_PINNED_SOFT);
+		sock_hold(sk);
+	}
+	return true;
 }
 
 /* TCP Small Queues :
@@ -2251,10 +2246,12 @@ static bool tcp_pacing_check(const struct sock *sk)
 static bool tcp_small_queue_check(struct sock *sk, const struct sk_buff *skb,
 				  unsigned int factor)
 {
-	unsigned int limit;
+	unsigned long limit;
 
-	limit = max(2 * skb->truesize, sk->sk_pacing_rate >> sk->sk_pacing_shift);
-	limit = min_t(u32, limit,
+	limit = max_t(unsigned long,
+		      2 * skb->truesize,
+		      sk->sk_pacing_rate >> sk->sk_pacing_shift);
+	limit = min_t(unsigned long, limit,
 		      sock_net(sk)->ipv4.sysctl_tcp_limit_output_bytes);
 	limit <<= factor;
 
@@ -2368,17 +2365,18 @@ bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
 
+		if (unlikely(tp->repair) && tp->repair_queue == TCP_SEND_QUEUE) {
+			/* "skb_mstamp_ns" is used as a start point for the retransmit timer */
+			skb->skb_mstamp_ns = tp->tcp_wstamp_ns = tp->tcp_clock_cache;
+			list_move_tail(&skb->tcp_tsorted_anchor, &tp->tsorted_sent_queue);
+			goto repair; /* Skip network transmission */
+		}
+
 		if (tcp_pacing_check(sk))
 			break;
 
 		tso_segs = tcp_init_tso_segs(skb, mss_now);
 		BUG_ON(!tso_segs);
-
-		if (unlikely(tp->repair) && tp->repair_queue == TCP_SEND_QUEUE) {
-			/* "skb_mstamp" is used as a start point for the retransmit timer */
-			tcp_update_skb_after_send(sk, skb);
-			goto repair; /* Skip network transmission */
-		}
 
 		cwnd_quota = tcp_cwnd_test(tp, skb);
 		if (!cwnd_quota) {
@@ -2502,8 +2500,8 @@ bool tcp_schedule_loss_probe(struct sock *sk, bool advancing_rto)
 	if (rto_delta_us > 0)
 		timeout = min_t(u32, timeout, usecs_to_jiffies(rto_delta_us));
 
-	inet_csk_reset_xmit_timer(sk, ICSK_TIME_LOSS_PROBE, timeout,
-				  TCP_RTO_MAX);
+	tcp_reset_xmit_timer(sk, ICSK_TIME_LOSS_PROBE, timeout,
+			     TCP_RTO_MAX, NULL);
 	return true;
 }
 
@@ -2957,7 +2955,7 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		} tcp_skb_tsorted_restore(skb);
 
 		if (!err) {
-			tcp_update_skb_after_send(sk, skb);
+			tcp_update_skb_after_send(sk, skb, tp->tcp_wstamp_ns);
 			tcp_rate_skb_sent(sk, skb);
 		}
 	} else {
@@ -3072,9 +3070,10 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 
 		if (skb == rtx_head &&
 		    icsk->icsk_pending != ICSK_TIME_REO_TIMEOUT)
-			inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
-						  inet_csk(sk)->icsk_rto,
-						  TCP_RTO_MAX);
+			tcp_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
+					     inet_csk(sk)->icsk_rto,
+					     TCP_RTO_MAX,
+					     skb);
 	}
 }
 
@@ -3834,9 +3833,10 @@ void tcp_send_probe0(struct sock *sk)
 			icsk->icsk_probes_out = 1;
 		probe_max = TCP_RESOURCE_PROBE_INTERVAL;
 	}
-	inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0,
-				  tcp_probe0_when(sk, probe_max),
-				  TCP_RTO_MAX);
+	tcp_reset_xmit_timer(sk, ICSK_TIME_PROBE0,
+			     tcp_probe0_when(sk, probe_max),
+			     TCP_RTO_MAX,
+			     NULL);
 }
 
 int tcp_rtx_synack(const struct sock *sk, struct request_sock *req)
