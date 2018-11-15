@@ -617,6 +617,7 @@ void skb_release_head_state(struct sk_buff *skb)
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
 	nf_bridge_put(skb->nf_bridge);
 #endif
+	skb_ext_put(skb);
 }
 
 /* Free everything but the sk_buff shell. */
@@ -796,6 +797,7 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->dev		= old->dev;
 	memcpy(new->cb, old->cb, sizeof(old->cb));
 	skb_dst_copy(new, old);
+	__skb_ext_copy(new, old);
 #ifdef CONFIG_XFRM
 	new->sp			= secpath_get(old->sp);
 #endif
@@ -5554,3 +5556,134 @@ void skb_condense(struct sk_buff *skb)
 	 */
 	skb->truesize = SKB_TRUESIZE(skb_end_offset(skb));
 }
+
+#ifdef CONFIG_SKB_EXTENSIONS
+#define SKB_EXT_ALIGN_VALUE	8
+#define SKB_EXT_CHUNKSIZEOF(x)	(ALIGN((sizeof(x)), SKB_EXT_ALIGN_VALUE) / SKB_EXT_ALIGN_VALUE)
+
+static const u8 skb_ext_type_len[] = {
+#if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
+	[SKB_EXT_BRIDGE_NF] = SKB_EXT_CHUNKSIZEOF(struct nf_bridge_info),
+#endif
+};
+
+static void *skb_ext_get_ptr(struct skb_ext *ext, enum skb_ext_id id)
+{
+	return (void *)ext + (ext->offset[id] * SKB_EXT_ALIGN_VALUE);
+}
+
+static struct skb_ext *skb_ext_cow(unsigned int len,
+				   struct skb_ext *old)
+{
+	struct skb_ext *new = kmalloc(len, GFP_ATOMIC);
+
+	if (!new)
+		return NULL;
+
+	if (!old) {
+		memset(new->offset, 0, sizeof(new->offset));
+		refcount_set(&new->refcnt, 1);
+		return new;
+	}
+
+	memcpy(new, old, old->chunks * SKB_EXT_ALIGN_VALUE);
+	refcount_set(&new->refcnt, 1);
+	__skb_ext_put(old);
+	return new;
+}
+
+static __always_inline unsigned int skb_ext_total_length(void)
+{
+	return 0 +
+#if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
+		skb_ext_type_len[SKB_EXT_BRIDGE_NF] +
+#endif
+		0;
+}
+
+/**
+ * skb_ext_add - allocate space for given extension, COW if needed
+ * @skb: buffer
+ * @id: extension to allocate space for
+ *
+ * Allocates enough space for the given extension.
+ * If the extension is already present, a pointer to that extension
+ * is returned.
+ *
+ * If the skb was cloned, COW applies and the returned memory can be
+ * modified without changing the extension space of clones buffers.
+ *
+ * Returns pointer to the extenion or NULL on allocation failure.
+ */
+void *skb_ext_add(struct sk_buff *skb, enum skb_ext_id id)
+{
+	struct skb_ext *new, *old = NULL;
+	unsigned int newlen, newoff;
+	bool cow_needed = true;
+
+	BUILD_BUG_ON(SKB_EXT_NUM >= 8);
+	BUILD_BUG_ON(skb_ext_total_length() > 255);
+
+	if (skb->active_extensions) {
+		old = skb->extensions;
+
+		cow_needed = refcount_read(&old->refcnt) > 1;
+
+		if (__skb_ext_exist(old, id)) {
+			if (!cow_needed) {
+				new = old;
+				goto set_active;
+			}
+
+			/* extension was allocated previously and it
+			 * might be used by a cloned skb. COW needed.
+			 */
+			new = skb_ext_cow(old->chunks * SKB_EXT_ALIGN_VALUE, old);
+			if (!new)
+				return NULL;
+
+			skb->extensions = new;
+			goto set_active;
+		}
+		newoff = old->chunks;
+	} else {
+		newoff = SKB_EXT_CHUNKSIZEOF(*new);
+	}
+
+	newlen = newoff + skb_ext_type_len[id];
+
+	if (cow_needed)
+		new = skb_ext_cow(newlen * SKB_EXT_ALIGN_VALUE, old);
+	else
+		new = krealloc(old, newlen * SKB_EXT_ALIGN_VALUE, GFP_ATOMIC);
+	if (!new)
+		return NULL;
+
+	new->offset[id] = newoff;
+	new->chunks = newlen;
+	skb->extensions = new;
+set_active:
+	skb->active_extensions |= 1 << id;
+	return skb_ext_get_ptr(new, id);
+}
+EXPORT_SYMBOL(skb_ext_add);
+
+void __skb_ext_del(struct sk_buff *skb, enum skb_ext_id id)
+{
+	struct skb_ext *ext;
+
+	skb->active_extensions &= ~(1 << id);
+	if (skb->active_extensions == 0) {
+		ext = skb->extensions;
+		skb->extensions = NULL;
+		__skb_ext_put(ext);
+	}
+}
+EXPORT_SYMBOL(__skb_ext_del);
+
+void __skb_ext_free(struct skb_ext *ext)
+{
+	kfree(ext);
+}
+EXPORT_SYMBOL(__skb_ext_free);
+#endif /* CONFIG_SKB_EXTENSIONS */
