@@ -41,6 +41,8 @@ struct mptcp_sock {
 	struct	inet_connection_sock sk;
 	u64	local_key;
 	u64	remote_key;
+	u64	write_seq;
+	u64	ack_seq;
 	u32	token;
 	struct	socket *connection_list; /* @@ needs to be a list */
 	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
@@ -51,13 +53,38 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
+/* MPTCP sk_buff private control buffer */
+struct mptcp_skb_cb {
+	refcount_t	refcnt;
+	u64		data_ack;
+	u64		data_seq;
+	u32		subflow_seq;
+	u16		dll;
+	__sum16		checksum;
+	u8		use_map:1,
+			dsn64:1,
+			use_checksum:1,
+			data_fin:1,
+			use_ack:1,
+			ack64:1,
+			__unused:2;
+};
+
+static inline struct mptcp_skb_cb *mptcp_skb_priv_cb(struct sk_buff *skb)
+{
+	BUG_ON(!skb->priv_used);
+	return (struct mptcp_skb_cb *)skb->priv;
+}
+
 /* MPTCP subflow sock structure */
 struct subflow_sock {
 	/* tcp_sock must be the first member */
 	struct	tcp_sock sk;
 	u64	local_key;
-	u64	remote_key;
 	u32	token;
+	u64	idsn;
+	u64	remote_key;
+	u32	rel_write_seq;
 	bool	request_mptcp;	// send MP_CAPABLE
 	bool	checksum;
 	bool	version;
@@ -79,8 +106,9 @@ struct subflow_request_sock {
 		backup : 1,
 		version : 4;
 	u64	local_key;
-	u64	remote_key;
 	u32	token;
+	u64	idsn;
+	u64	remote_key;
 };
 
 static inline
@@ -107,6 +135,8 @@ void mptcp_subflow_exit(void);
 
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *options);
+
+void mptcp_cb_copy(const struct sk_buff *from, struct sk_buff *to);
 
 extern const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops;
 
@@ -161,6 +191,10 @@ static inline unsigned int mptcp_established_options(struct sock *sk,
 						     u64 *remote_key)
 {
 	return 0;
+}
+
+void mptcp_cb_copy(const struct sk_buff *from, struct sk_buff *to)
+{
 }
 
 #endif /* CONFIG_MPTCP */
