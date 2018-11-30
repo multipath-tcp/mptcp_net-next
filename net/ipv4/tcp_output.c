@@ -416,7 +416,6 @@ static inline bool tcp_urg_mode(const struct tcp_sock *tp)
 
 /* MPTCP option subtypes */
 #define OPTION_MPTCP_MPC_SYN	(1 << 0)
-#define OPTION_MPTCP_MPC_SYNACK	(1 << 1)
 #define OPTION_MPTCP_MPC_ACK	(1 << 2)
 
 struct tcp_out_options {
@@ -440,7 +439,6 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 		return;
 
 	if ((OPTION_MPTCP_MPC_SYN |
-	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 		u8 len;
 		__be64 key;
@@ -448,7 +446,7 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 		if (OPTION_MPTCP_MPC_SYN & opts->suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYN;
 		else
-			len = TCPOLEN_MPTCP_MPC_SYNACK;
+			len = TCPOLEN_MPTCP_MPC_ACK;
 
 		*ptr++ = htonl((0x1e << 24) | // TCP option: Multipath TCP
 			       (len << 16)  | // length
@@ -457,8 +455,7 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 		key = cpu_to_be64(opts->sndr_key);
 		memcpy((u8 *) ptr, (u8 *) &key, 8);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
 			key = cpu_to_be64(opts->rcvr_key);
 			memcpy((u8 *) ptr, (u8 *) &key, 8);
 			ptr += 2;
@@ -695,6 +692,16 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 
 	smc_set_option(tp, opts, &remaining);
 
+	if (tp->is_mptcp) {
+		u64 local_key;
+		if (mptcp_syn_options(sk, &local_key)) {
+			opts->options |= OPTION_MPTCP;
+			opts->suboptions = OPTION_MPTCP_MPC_SYN;
+			opts->sndr_key = local_key;
+			remaining -= TCPOLEN_MPTCP_MPC_SYN;
+		}
+	}
+
 	return MAX_TCP_OPTION_SPACE - remaining;
 }
 
@@ -800,6 +807,22 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 			      TCPOLEN_SACK_PERBLOCK);
 		size += TCPOLEN_SACK_BASE_ALIGNED +
 			opts->num_sack_blocks * TCPOLEN_SACK_PERBLOCK;
+	}
+
+	if (tp->is_mptcp) {
+		unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
+		u64 local_key;
+		u64 remote_key;
+
+		if (mptcp_established_options(sk, &local_key, &remote_key)) {
+			if (remaining >= TCPOLEN_MPTCP_MPC_ACK) {
+				opts->options |= OPTION_MPTCP;
+				opts->suboptions = OPTION_MPTCP_MPC_ACK;
+				opts->sndr_key = local_key;
+				opts->rcvr_key = remote_key;
+				size += TCPOLEN_MPTCP_MPC_ACK;
+			}
+		}
 	}
 
 	return size;
