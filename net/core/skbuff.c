@@ -611,6 +611,10 @@ void skb_release_head_state(struct sk_buff *skb)
 		WARN_ON(in_irq());
 		skb->destructor(skb);
 	}
+	if (skb->priv_used && skb->priv_destructor) {
+		WARN_ON(in_irq());
+		skb->priv_destructor(skb);
+	}
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
 	nf_conntrack_put(skb_nfct(skb));
 #endif
@@ -859,6 +863,7 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	n->nohdr = 0;
 	n->peeked = 0;
 	C(pfmemalloc);
+	n->priv_used = 0;
 	n->destructor = NULL;
 	C(tail);
 	C(end);
