@@ -633,6 +633,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@queue_mapping: Queue mapping for multiqueue devices
  *	@xmit_more: More SKBs are pending for this queue
  *	@pfmemalloc: skbuff was allocated from PFMEMALLOC reserves
+ *	@priv_used: priv and priv_destructor contain valid data
  *	@ndisc_nodetype: router type (from link layer)
  *	@ooo_okay: allow the mapping of a socket to a queue to be changed
  *	@l4_hash: indicate hash is a canonical 4-tuple hash over transport
@@ -662,6 +663,8 @@ typedef unsigned char *sk_buff_data_t;
  *	@data: Data head pointer
  *	@truesize: Buffer size
  *	@users: User count - see {datagram,tcp}.c
+ *	@priv: Optional pointer to skb private data
+ *	@priv_destructor: Private data destruct function
  */
 
 struct sk_buff {
@@ -743,7 +746,8 @@ struct sk_buff {
 				peeked:1,
 				head_frag:1,
 				xmit_more:1,
-				pfmemalloc:1;
+				pfmemalloc:1,
+				priv_used:1;
 
 	/* fields enclosed in headers_start/headers_end are copied
 	 * using a single memcpy() in __copy_skb_header()
@@ -866,6 +870,13 @@ struct sk_buff {
 				*data;
 	unsigned int		truesize;
 	refcount_t		users;
+
+	/* Uninitialized private pointers. At the very end so they do not
+	 * affect cache behavior of the rest of struct sk_buff when left
+	 * unused. All three must be initialized when priv_used is set.
+	 */
+	void			*priv;
+	void			(*priv_destructor)(struct sk_buff *skb);
 };
 
 #ifdef __KERNEL__
