@@ -79,8 +79,10 @@ struct vxlan_fdb {
 	u8		  eth_addr[ETH_ALEN];
 	u16		  state;	/* see ndm_state */
 	__be32		  vni;
-	u8		  flags;	/* see ndm_flags */
+	u16		  flags;	/* see ndm_flags and below */
 };
+
+#define NTF_VXLAN_ADDED_BY_USER 0x100
 
 /* salt for hash table */
 static u32 vxlan_salt __read_mostly;
@@ -376,6 +378,7 @@ static void vxlan_fdb_switchdev_call_notifiers(struct vxlan_dev *vxlan,
 		.remote_ifindex = rd->remote_ifindex,
 		.vni = fdb->vni,
 		.offloaded = rd->offloaded,
+		.added_by_user = fdb->flags & NTF_VXLAN_ADDED_BY_USER,
 	};
 	memcpy(info.eth_addr, fdb->eth_addr, ETH_ALEN);
 
@@ -384,15 +387,19 @@ static void vxlan_fdb_switchdev_call_notifiers(struct vxlan_dev *vxlan,
 }
 
 static void vxlan_fdb_notify(struct vxlan_dev *vxlan, struct vxlan_fdb *fdb,
-			     struct vxlan_rdst *rd, int type)
+			     struct vxlan_rdst *rd, int type, bool swdev_notify)
 {
-	switch (type) {
-	case RTM_NEWNEIGH:
-		vxlan_fdb_switchdev_call_notifiers(vxlan, fdb, rd, true);
-		break;
-	case RTM_DELNEIGH:
-		vxlan_fdb_switchdev_call_notifiers(vxlan, fdb, rd, false);
-		break;
+	if (swdev_notify) {
+		switch (type) {
+		case RTM_NEWNEIGH:
+			vxlan_fdb_switchdev_call_notifiers(vxlan, fdb, rd,
+							   true);
+			break;
+		case RTM_DELNEIGH:
+			vxlan_fdb_switchdev_call_notifiers(vxlan, fdb, rd,
+							   false);
+			break;
+		}
 	}
 
 	__vxlan_fdb_notify(vxlan, fdb, rd, type);
@@ -409,7 +416,7 @@ static void vxlan_ip_miss(struct net_device *dev, union vxlan_addr *ipa)
 		.remote_vni = cpu_to_be32(VXLAN_N_VID),
 	};
 
-	vxlan_fdb_notify(vxlan, &f, &remote, RTM_GETNEIGH);
+	vxlan_fdb_notify(vxlan, &f, &remote, RTM_GETNEIGH, true);
 }
 
 static void vxlan_fdb_miss(struct vxlan_dev *vxlan, const u8 eth_addr[ETH_ALEN])
@@ -421,7 +428,7 @@ static void vxlan_fdb_miss(struct vxlan_dev *vxlan, const u8 eth_addr[ETH_ALEN])
 
 	memcpy(f.eth_addr, eth_addr, ETH_ALEN);
 
-	vxlan_fdb_notify(vxlan, &f, &remote, RTM_GETNEIGH);
+	vxlan_fdb_notify(vxlan, &f, &remote, RTM_GETNEIGH, true);
 }
 
 /* Hash Ethernet address */
@@ -540,6 +547,7 @@ int vxlan_fdb_find_uc(struct net_device *dev, const u8 *mac, __be32 vni,
 	fdb_info->remote_ifindex = rdst->remote_ifindex;
 	fdb_info->vni = vni;
 	fdb_info->offloaded = rdst->offloaded;
+	fdb_info->added_by_user = f->flags & NTF_VXLAN_ADDED_BY_USER;
 	ether_addr_copy(fdb_info->eth_addr, mac);
 
 out:
@@ -700,7 +708,7 @@ static int vxlan_gro_complete(struct sock *sk, struct sk_buff *skb, int nhoff)
 
 static struct vxlan_fdb *vxlan_fdb_alloc(struct vxlan_dev *vxlan,
 					 const u8 *mac, __u16 state,
-					 __be32 src_vni, __u8 ndm_flags)
+					 __be32 src_vni, __u16 ndm_flags)
 {
 	struct vxlan_fdb *f;
 
@@ -720,7 +728,7 @@ static struct vxlan_fdb *vxlan_fdb_alloc(struct vxlan_dev *vxlan,
 static int vxlan_fdb_create(struct vxlan_dev *vxlan,
 			    const u8 *mac, union vxlan_addr *ip,
 			    __u16 state, __be16 port, __be32 src_vni,
-			    __be32 vni, __u32 ifindex, __u8 ndm_flags,
+			    __be32 vni, __u32 ifindex, __u16 ndm_flags,
 			    struct vxlan_fdb **fdb)
 {
 	struct vxlan_rdst *rd = NULL;
@@ -756,9 +764,10 @@ static int vxlan_fdb_update(struct vxlan_dev *vxlan,
 			    const u8 *mac, union vxlan_addr *ip,
 			    __u16 state, __u16 flags,
 			    __be16 port, __be32 src_vni, __be32 vni,
-			    __u32 ifindex, __u8 ndm_flags)
+			    __u32 ifindex, __u16 ndm_flags,
+			    bool swdev_notify)
 {
-	__u8 fdb_flags = (ndm_flags & ~NTF_USE);
+	__u16 fdb_flags = (ndm_flags & ~NTF_USE);
 	struct vxlan_rdst *rd = NULL;
 	struct vxlan_fdb *f;
 	int notify = 0;
@@ -771,16 +780,24 @@ static int vxlan_fdb_update(struct vxlan_dev *vxlan,
 				   "lost race to create %pM\n", mac);
 			return -EEXIST;
 		}
-		if (f->state != state) {
-			f->state = state;
-			f->updated = jiffies;
-			notify = 1;
+
+		/* Do not allow an externally learned entry to take over an
+		 * entry added by the user.
+		 */
+		if (!(fdb_flags & NTF_EXT_LEARNED) ||
+		    !(f->flags & NTF_VXLAN_ADDED_BY_USER)) {
+			if (f->state != state) {
+				f->state = state;
+				f->updated = jiffies;
+				notify = 1;
+			}
+			if (f->flags != fdb_flags) {
+				f->flags = fdb_flags;
+				f->updated = jiffies;
+				notify = 1;
+			}
 		}
-		if (f->flags != fdb_flags) {
-			f->flags = fdb_flags;
-			f->updated = jiffies;
-			notify = 1;
-		}
+
 		if ((flags & NLM_F_REPLACE)) {
 			/* Only change unicasts */
 			if (!(is_multicast_ether_addr(f->eth_addr) ||
@@ -822,7 +839,7 @@ static int vxlan_fdb_update(struct vxlan_dev *vxlan,
 	if (notify) {
 		if (rd == NULL)
 			rd = first_remote_rtnl(f);
-		vxlan_fdb_notify(vxlan, f, rd, RTM_NEWNEIGH);
+		vxlan_fdb_notify(vxlan, f, rd, RTM_NEWNEIGH, swdev_notify);
 	}
 
 	return 0;
@@ -841,7 +858,7 @@ static void vxlan_fdb_free(struct rcu_head *head)
 }
 
 static void vxlan_fdb_destroy(struct vxlan_dev *vxlan, struct vxlan_fdb *f,
-			      bool do_notify)
+			      bool do_notify, bool swdev_notify)
 {
 	struct vxlan_rdst *rd;
 
@@ -851,7 +868,8 @@ static void vxlan_fdb_destroy(struct vxlan_dev *vxlan, struct vxlan_fdb *f,
 	--vxlan->addrcnt;
 	if (do_notify)
 		list_for_each_entry(rd, &f->remotes, list)
-			vxlan_fdb_notify(vxlan, f, rd, RTM_DELNEIGH);
+			vxlan_fdb_notify(vxlan, f, rd, RTM_DELNEIGH,
+					 swdev_notify);
 
 	hlist_del_rcu(&f->hlist);
 	call_rcu(&f->rcu, vxlan_fdb_free);
@@ -866,10 +884,10 @@ static void vxlan_dst_free(struct rcu_head *head)
 }
 
 static void vxlan_fdb_dst_destroy(struct vxlan_dev *vxlan, struct vxlan_fdb *f,
-				  struct vxlan_rdst *rd)
+				  struct vxlan_rdst *rd, bool swdev_notify)
 {
 	list_del_rcu(&rd->list);
-	vxlan_fdb_notify(vxlan, f, rd, RTM_DELNEIGH);
+	vxlan_fdb_notify(vxlan, f, rd, RTM_DELNEIGH, swdev_notify);
 	call_rcu(&rd->rcu, vxlan_dst_free);
 }
 
@@ -968,7 +986,9 @@ static int vxlan_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 
 	spin_lock_bh(&vxlan->hash_lock);
 	err = vxlan_fdb_update(vxlan, addr, &ip, ndm->ndm_state, flags,
-			       port, src_vni, vni, ifindex, ndm->ndm_flags);
+			       port, src_vni, vni, ifindex,
+			       ndm->ndm_flags | NTF_VXLAN_ADDED_BY_USER,
+			       true);
 	spin_unlock_bh(&vxlan->hash_lock);
 
 	return err;
@@ -977,7 +997,7 @@ static int vxlan_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 static int __vxlan_fdb_delete(struct vxlan_dev *vxlan,
 			      const unsigned char *addr, union vxlan_addr ip,
 			      __be16 port, __be32 src_vni, __be32 vni,
-			      u32 ifindex, u16 vid)
+			      u32 ifindex, bool swdev_notify)
 {
 	struct vxlan_fdb *f;
 	struct vxlan_rdst *rd = NULL;
@@ -997,11 +1017,11 @@ static int __vxlan_fdb_delete(struct vxlan_dev *vxlan,
 	 * otherwise destroy the fdb entry
 	 */
 	if (rd && !list_is_singular(&f->remotes)) {
-		vxlan_fdb_dst_destroy(vxlan, f, rd);
+		vxlan_fdb_dst_destroy(vxlan, f, rd, swdev_notify);
 		goto out;
 	}
 
-	vxlan_fdb_destroy(vxlan, f, true);
+	vxlan_fdb_destroy(vxlan, f, true, swdev_notify);
 
 out:
 	return 0;
@@ -1025,7 +1045,7 @@ static int vxlan_fdb_delete(struct ndmsg *ndm, struct nlattr *tb[],
 
 	spin_lock_bh(&vxlan->hash_lock);
 	err = __vxlan_fdb_delete(vxlan, addr, ip, port, src_vni, vni, ifindex,
-				 vid);
+				 true);
 	spin_unlock_bh(&vxlan->hash_lock);
 
 	return err;
@@ -1103,7 +1123,7 @@ static bool vxlan_snoop(struct net_device *dev,
 
 		rdst->remote_ip = *src_ip;
 		f->updated = jiffies;
-		vxlan_fdb_notify(vxlan, f, rdst, RTM_NEWNEIGH);
+		vxlan_fdb_notify(vxlan, f, rdst, RTM_NEWNEIGH, true);
 	} else {
 		/* learned new entry */
 		spin_lock(&vxlan->hash_lock);
@@ -1116,7 +1136,7 @@ static bool vxlan_snoop(struct net_device *dev,
 					 vxlan->cfg.dst_port,
 					 vni,
 					 vxlan->default_dst.remote_vni,
-					 ifindex, NTF_SELF);
+					 ifindex, NTF_SELF, true);
 		spin_unlock(&vxlan->hash_lock);
 	}
 
@@ -1549,6 +1569,34 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 drop:
 	/* Consume bad packet */
 	kfree_skb(skb);
+	return 0;
+}
+
+/* Callback from net/ipv{4,6}/udp.c to check that we have a VNI for errors */
+static int vxlan_err_lookup(struct sock *sk, struct sk_buff *skb)
+{
+	struct vxlan_dev *vxlan;
+	struct vxlan_sock *vs;
+	struct vxlanhdr *hdr;
+	__be32 vni;
+
+	if (skb->len < VXLAN_HLEN)
+		return -EINVAL;
+
+	hdr = vxlan_hdr(skb);
+
+	if (!(hdr->vx_flags & VXLAN_HF_VNI))
+		return -EINVAL;
+
+	vs = rcu_dereference_sk_user_data(sk);
+	if (!vs)
+		return -ENOENT;
+
+	vni = vxlan_vni(hdr->vx_vni);
+	vxlan = vxlan_vs_find_vni(vs, skb->dev->ifindex, vni);
+	if (!vxlan)
+		return -ENOENT;
+
 	return 0;
 }
 
@@ -2250,13 +2298,24 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 			goto tx_error;
 		}
 
-		/* Bypass encapsulation if the destination is local */
 		if (!info) {
+			/* Bypass encapsulation if the destination is local */
 			err = encap_bypass_if_local(skb, dev, vxlan, dst,
 						    dst_port, ifindex, vni,
 						    &rt->dst, rt->rt_flags);
 			if (err)
 				goto out_unlock;
+
+			if (vxlan->cfg.df == VXLAN_DF_SET) {
+				df = htons(IP_DF);
+			} else if (vxlan->cfg.df == VXLAN_DF_INHERIT) {
+				struct ethhdr *eth = eth_hdr(skb);
+
+				if (ntohs(eth->h_proto) == ETH_P_IPV6 ||
+				    (ntohs(eth->h_proto) == ETH_P_IP &&
+				     old_iph->frag_off & htons(IP_DF)))
+					df = htons(IP_DF);
+			}
 		} else if (info->key.tun_flags & TUNNEL_DONT_FRAGMENT) {
 			df = htons(IP_DF);
 		}
@@ -2461,7 +2520,7 @@ static void vxlan_cleanup(struct timer_list *t)
 					   "garbage collect %pM\n",
 					   f->eth_addr);
 				f->state = NUD_STALE;
-				vxlan_fdb_destroy(vxlan, f, true);
+				vxlan_fdb_destroy(vxlan, f, true, true);
 			} else if (time_before(timeout, next_timer))
 				next_timer = timeout;
 		}
@@ -2512,7 +2571,7 @@ static void vxlan_fdb_delete_default(struct vxlan_dev *vxlan, __be32 vni)
 	spin_lock_bh(&vxlan->hash_lock);
 	f = __vxlan_find_mac(vxlan, all_zeros_mac, vni);
 	if (f)
-		vxlan_fdb_destroy(vxlan, f, true);
+		vxlan_fdb_destroy(vxlan, f, true, true);
 	spin_unlock_bh(&vxlan->hash_lock);
 }
 
@@ -2566,7 +2625,7 @@ static void vxlan_flush(struct vxlan_dev *vxlan, bool do_all)
 				continue;
 			/* the all_zeros_mac entry is deleted at vxlan_uninit */
 			if (!is_zero_ether_addr(f->eth_addr))
-				vxlan_fdb_destroy(vxlan, f, true);
+				vxlan_fdb_destroy(vxlan, f, true, true);
 		}
 	}
 	spin_unlock_bh(&vxlan->hash_lock);
@@ -2809,6 +2868,7 @@ static const struct nla_policy vxlan_policy[IFLA_VXLAN_MAX + 1] = {
 	[IFLA_VXLAN_GPE]	= { .type = NLA_FLAG, },
 	[IFLA_VXLAN_REMCSUM_NOPARTIAL]	= { .type = NLA_FLAG },
 	[IFLA_VXLAN_TTL_INHERIT]	= { .type = NLA_FLAG },
+	[IFLA_VXLAN_DF]		= { .type = NLA_U8 },
 };
 
 static int vxlan_validate(struct nlattr *tb[], struct nlattr *data[],
@@ -2861,6 +2921,16 @@ static int vxlan_validate(struct nlattr *tb[], struct nlattr *data[],
 		if (ntohs(p->high) < ntohs(p->low)) {
 			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_PORT_RANGE],
 					    "Invalid source port range");
+			return -EINVAL;
+		}
+	}
+
+	if (data[IFLA_VXLAN_DF]) {
+		enum ifla_vxlan_df df = nla_get_u8(data[IFLA_VXLAN_DF]);
+
+		if (df < 0 || df > VXLAN_DF_MAX) {
+			NL_SET_ERR_MSG_ATTR(extack, tb[IFLA_VXLAN_DF],
+					    "Invalid DF attribute");
 			return -EINVAL;
 		}
 	}
@@ -2948,6 +3018,7 @@ static struct vxlan_sock *vxlan_socket_create(struct net *net, bool ipv6,
 	tunnel_cfg.sk_user_data = vs;
 	tunnel_cfg.encap_type = 1;
 	tunnel_cfg.encap_rcv = vxlan_rcv;
+	tunnel_cfg.encap_err_lookup = vxlan_err_lookup;
 	tunnel_cfg.encap_destroy = NULL;
 	tunnel_cfg.gro_receive = vxlan_gro_receive;
 	tunnel_cfg.gro_complete = vxlan_gro_complete;
@@ -3292,13 +3363,14 @@ static int __vxlan_dev_create(struct net *net, struct net_device *dev,
 
 	/* notify default fdb entry */
 	if (f)
-		vxlan_fdb_notify(vxlan, f, first_remote_rtnl(f), RTM_NEWNEIGH);
+		vxlan_fdb_notify(vxlan, f, first_remote_rtnl(f), RTM_NEWNEIGH,
+				 true);
 
 	list_add(&vxlan->next, &vn->vxlan_list);
 	return 0;
 errout:
 	if (f)
-		vxlan_fdb_destroy(vxlan, f, false);
+		vxlan_fdb_destroy(vxlan, f, false, false);
 	return err;
 }
 
@@ -3386,11 +3458,8 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 		conf->flags |= VXLAN_F_LEARN;
 	}
 
-	if (data[IFLA_VXLAN_AGEING]) {
-		if (changelink)
-			return -EOPNOTSUPP;
+	if (data[IFLA_VXLAN_AGEING])
 		conf->age_interval = nla_get_u32(data[IFLA_VXLAN_AGEING]);
-	}
 
 	if (data[IFLA_VXLAN_PROXY]) {
 		if (changelink)
@@ -3509,6 +3578,9 @@ static int vxlan_nl2conf(struct nlattr *tb[], struct nlattr *data[],
 		conf->mtu = nla_get_u32(tb[IFLA_MTU]);
 	}
 
+	if (data[IFLA_VXLAN_DF])
+		conf->df = nla_get_u8(data[IFLA_VXLAN_DF]);
+
 	return 0;
 }
 
@@ -3532,6 +3604,7 @@ static int vxlan_changelink(struct net_device *dev, struct nlattr *tb[],
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
 	struct vxlan_rdst *dst = &vxlan->default_dst;
+	unsigned long old_age_interval;
 	struct vxlan_rdst old_dst;
 	struct vxlan_config conf;
 	struct vxlan_fdb *f = NULL;
@@ -3542,11 +3615,15 @@ static int vxlan_changelink(struct net_device *dev, struct nlattr *tb[],
 	if (err)
 		return err;
 
+	old_age_interval = vxlan->cfg.age_interval;
 	memcpy(&old_dst, dst, sizeof(struct vxlan_rdst));
 
 	err = vxlan_dev_configure(vxlan->net, dev, &conf, true, extack);
 	if (err)
 		return err;
+
+	if (old_age_interval != vxlan->cfg.age_interval)
+		mod_timer(&vxlan->age_timer, jiffies);
 
 	/* handle default dst entry */
 	if (!vxlan_addr_equal(&dst->remote_ip, &old_dst.remote_ip)) {
@@ -3557,7 +3634,8 @@ static int vxlan_changelink(struct net_device *dev, struct nlattr *tb[],
 					   vxlan->cfg.dst_port,
 					   old_dst.remote_vni,
 					   old_dst.remote_vni,
-					   old_dst.remote_ifindex, 0);
+					   old_dst.remote_ifindex,
+					   true);
 
 		if (!vxlan_addr_any(&dst->remote_ip)) {
 			err = vxlan_fdb_create(vxlan, all_zeros_mac,
@@ -3572,7 +3650,8 @@ static int vxlan_changelink(struct net_device *dev, struct nlattr *tb[],
 				spin_unlock_bh(&vxlan->hash_lock);
 				return err;
 			}
-			vxlan_fdb_notify(vxlan, f, first_remote_rtnl(f), RTM_NEWNEIGH);
+			vxlan_fdb_notify(vxlan, f, first_remote_rtnl(f),
+					 RTM_NEWNEIGH, true);
 		}
 		spin_unlock_bh(&vxlan->hash_lock);
 	}
@@ -3601,6 +3680,7 @@ static size_t vxlan_get_size(const struct net_device *dev)
 		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_TTL */
 		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_TTL_INHERIT */
 		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_TOS */
+		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_DF */
 		nla_total_size(sizeof(__be32)) + /* IFLA_VXLAN_LABEL */
 		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_LEARNING */
 		nla_total_size(sizeof(__u8)) +	/* IFLA_VXLAN_PROXY */
@@ -3667,6 +3747,7 @@ static int vxlan_fill_info(struct sk_buff *skb, const struct net_device *dev)
 	    nla_put_u8(skb, IFLA_VXLAN_TTL_INHERIT,
 		       !!(vxlan->cfg.flags & VXLAN_F_TTL_INHERIT)) ||
 	    nla_put_u8(skb, IFLA_VXLAN_TOS, vxlan->cfg.tos) ||
+	    nla_put_u8(skb, IFLA_VXLAN_DF, vxlan->cfg.df) ||
 	    nla_put_be32(skb, IFLA_VXLAN_LABEL, vxlan->cfg.label) ||
 	    nla_put_u8(skb, IFLA_VXLAN_LEARNING,
 			!!(vxlan->cfg.flags & VXLAN_F_LEARN)) ||
@@ -3844,18 +3925,89 @@ out:
 	spin_unlock_bh(&vxlan->hash_lock);
 }
 
+static int
+vxlan_fdb_external_learn_add(struct net_device *dev,
+			     struct switchdev_notifier_vxlan_fdb_info *fdb_info)
+{
+	struct vxlan_dev *vxlan = netdev_priv(dev);
+	int err;
+
+	spin_lock_bh(&vxlan->hash_lock);
+	err = vxlan_fdb_update(vxlan, fdb_info->eth_addr, &fdb_info->remote_ip,
+			       NUD_REACHABLE,
+			       NLM_F_CREATE | NLM_F_REPLACE,
+			       fdb_info->remote_port,
+			       fdb_info->vni,
+			       fdb_info->remote_vni,
+			       fdb_info->remote_ifindex,
+			       NTF_USE | NTF_SELF | NTF_EXT_LEARNED,
+			       false);
+	spin_unlock_bh(&vxlan->hash_lock);
+
+	return err;
+}
+
+static int
+vxlan_fdb_external_learn_del(struct net_device *dev,
+			     struct switchdev_notifier_vxlan_fdb_info *fdb_info)
+{
+	struct vxlan_dev *vxlan = netdev_priv(dev);
+	struct vxlan_fdb *f;
+	int err = 0;
+
+	spin_lock_bh(&vxlan->hash_lock);
+
+	f = vxlan_find_mac(vxlan, fdb_info->eth_addr, fdb_info->vni);
+	if (!f)
+		err = -ENOENT;
+	else if (f->flags & NTF_EXT_LEARNED)
+		err = __vxlan_fdb_delete(vxlan, fdb_info->eth_addr,
+					 fdb_info->remote_ip,
+					 fdb_info->remote_port,
+					 fdb_info->vni,
+					 fdb_info->remote_vni,
+					 fdb_info->remote_ifindex,
+					 false);
+
+	spin_unlock_bh(&vxlan->hash_lock);
+
+	return err;
+}
+
 static int vxlan_switchdev_event(struct notifier_block *unused,
 				 unsigned long event, void *ptr)
 {
 	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
+	struct switchdev_notifier_vxlan_fdb_info *fdb_info;
+	int err = 0;
 
 	switch (event) {
 	case SWITCHDEV_VXLAN_FDB_OFFLOADED:
 		vxlan_fdb_offloaded_set(dev, ptr);
 		break;
+	case SWITCHDEV_VXLAN_FDB_ADD_TO_BRIDGE:
+		fdb_info = ptr;
+		err = vxlan_fdb_external_learn_add(dev, fdb_info);
+		if (err) {
+			err = notifier_from_errno(err);
+			break;
+		}
+		fdb_info->offloaded = true;
+		vxlan_fdb_offloaded_set(dev, fdb_info);
+		break;
+	case SWITCHDEV_VXLAN_FDB_DEL_TO_BRIDGE:
+		fdb_info = ptr;
+		err = vxlan_fdb_external_learn_del(dev, fdb_info);
+		if (err) {
+			err = notifier_from_errno(err);
+			break;
+		}
+		fdb_info->offloaded = false;
+		vxlan_fdb_offloaded_set(dev, fdb_info);
+		break;
 	}
 
-	return 0;
+	return err;
 }
 
 static struct notifier_block vxlan_switchdev_notifier_block __read_mostly = {

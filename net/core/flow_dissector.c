@@ -952,8 +952,7 @@ proto_again:
 
 			if (!vlan) {
 				key_vlan->vlan_id = skb_vlan_tag_get_id(skb);
-				key_vlan->vlan_priority =
-					(skb_vlan_tag_get_prio(skb) >> VLAN_PRIO_SHIFT);
+				key_vlan->vlan_priority = skb_vlan_tag_get_prio(skb);
 			} else {
 				key_vlan->vlan_id = ntohs(vlan->h_vlan_TCI) &
 					VLAN_VID_MASK;
@@ -1166,8 +1165,8 @@ ip_proto_again:
 		break;
 	}
 
-	if (dissector_uses_key(flow_dissector,
-			       FLOW_DISSECTOR_KEY_PORTS)) {
+	if (dissector_uses_key(flow_dissector, FLOW_DISSECTOR_KEY_PORTS) &&
+	    !(key_control->flags & FLOW_DIS_IS_FRAGMENT)) {
 		key_ports = skb_flow_dissector_target(flow_dissector,
 						      FLOW_DISSECTOR_KEY_PORTS,
 						      target_container);

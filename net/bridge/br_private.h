@@ -102,12 +102,18 @@ struct br_tunnel_info {
 	struct metadata_dst	*tunnel_dst;
 };
 
+/* private vlan flags */
+enum {
+	BR_VLFLAG_PER_PORT_STATS = BIT(0),
+};
+
 /**
  * struct net_bridge_vlan - per-vlan entry
  *
  * @vnode: rhashtable member
  * @vid: VLAN id
  * @flags: bridge vlan flags
+ * @priv_flags: private (in-kernel) bridge vlan flags
  * @stats: per-cpu VLAN statistics
  * @br: if MASTER flag set, this points to a bridge struct
  * @port: if MASTER flag unset, this points to a port struct
@@ -127,6 +133,7 @@ struct net_bridge_vlan {
 	struct rhash_head		tnode;
 	u16				vid;
 	u16				flags;
+	u16				priv_flags;
 	struct br_vlan_stats __percpu	*stats;
 	union {
 		struct net_bridge	*br;
@@ -321,6 +328,7 @@ enum net_bridge_opts {
 	BROPT_NEIGH_SUPPRESS_ENABLED,
 	BROPT_MTU_SET_BY_USER,
 	BROPT_VLAN_STATS_PER_PORT,
+	BROPT_NO_LL_LEARN,
 };
 
 struct net_bridge {
@@ -500,6 +508,14 @@ static inline int br_opt_get(const struct net_bridge *br,
 	return test_bit(opt, &br->options);
 }
 
+int br_boolopt_toggle(struct net_bridge *br, enum br_boolopt_id opt, bool on,
+		      struct netlink_ext_ack *extack);
+int br_boolopt_get(const struct net_bridge *br, enum br_boolopt_id opt);
+int br_boolopt_multi_toggle(struct net_bridge *br,
+			    struct br_boolopt_multi *bm,
+			    struct netlink_ext_ack *extack);
+void br_boolopt_multi_get(const struct net_bridge *br,
+			  struct br_boolopt_multi *bm);
 void br_opt_toggle(struct net_bridge *br, enum net_bridge_opts opt, bool on);
 
 /* br_device.c */
@@ -905,7 +921,7 @@ static inline int br_vlan_get_tag(const struct sk_buff *skb, u16 *vid)
 	int err = 0;
 
 	if (skb_vlan_tag_present(skb)) {
-		*vid = skb_vlan_tag_get(skb) & VLAN_VID_MASK;
+		*vid = skb_vlan_tag_get_id(skb);
 	} else {
 		*vid = 0;
 		err = -EINVAL;

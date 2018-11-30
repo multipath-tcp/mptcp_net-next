@@ -92,12 +92,12 @@ struct ice_link_status {
 	u64 phy_type_low;
 	u16 max_frame_size;
 	u16 link_speed;
+	u16 req_speeds;
 	u8 lse_ena;	/* Link Status Event notification */
 	u8 link_info;
 	u8 an_info;
 	u8 ext_info;
 	u8 pacing;
-	u8 req_speeds;
 	/* Refer to #define from module_type[ICE_MODULE_TYPE_TOTAL_BYTE] of
 	 * ice_aqc_get_phy_caps structure
 	 */
@@ -124,6 +124,8 @@ struct ice_phy_info {
 
 /* Common HW capabilities for SW use */
 struct ice_hw_common_caps {
+	u32 valid_functions;
+
 	/* TX/RX queues */
 	u16 num_rxq;		/* Number/Total RX queues */
 	u16 rxq_first_id;	/* First queue ID for RX queues */
@@ -150,7 +152,7 @@ struct ice_hw_func_caps {
 	struct ice_hw_common_caps common_cap;
 	u32 num_allocd_vfs;		/* Number of allocated VFs */
 	u32 vf_base_id;			/* Logical ID of the first VF */
-	u32 guaranteed_num_vsi;
+	u32 guar_num_vsi;
 };
 
 /* Device wide capabilities */

@@ -279,7 +279,7 @@ int nfp_net_reconfig(struct nfp_net *nn, u32 update)
  *
  * Return: Negative errno on error, 0 on success
  */
-static int nfp_net_reconfig_mbox(struct nfp_net *nn, u32 mbox_cmd)
+int nfp_net_reconfig_mbox(struct nfp_net *nn, u32 mbox_cmd)
 {
 	u32 mbox = nn->tlv_caps.mbox_off;
 	int ret;
@@ -890,8 +890,6 @@ static int nfp_net_tx(struct sk_buff *skb, struct net_device *netdev)
 		u64_stats_update_end(&r_vec->tx_sync);
 	}
 
-	netdev_tx_sent_queue(nd_q, txbuf->real_len);
-
 	skb_tx_timestamp(skb);
 
 	tx_ring->wr_p += nr_frags + 1;
@@ -899,7 +897,7 @@ static int nfp_net_tx(struct sk_buff *skb, struct net_device *netdev)
 		nfp_net_tx_ring_stop(nd_q, tx_ring);
 
 	tx_ring->wr_ptr_add += nr_frags + 1;
-	if (!skb->xmit_more || netif_xmit_stopped(nd_q))
+	if (__netdev_tx_sent_queue(nd_q, txbuf->real_len, skb->xmit_more))
 		nfp_net_tx_xmit_more_flush(tx_ring);
 
 	return NETDEV_TX_OK;
@@ -3560,6 +3558,7 @@ void nfp_net_info(struct nfp_net *nn)
 /**
  * nfp_net_alloc() - Allocate netdev and related structure
  * @pdev:         PCI device
+ * @ctrl_bar:     PCI IOMEM with vNIC config memory
  * @needs_netdev: Whether to allocate a netdev for this vNIC
  * @max_tx_rings: Maximum number of TX rings supported by device
  * @max_rx_rings: Maximum number of RX rings supported by device
@@ -3570,11 +3569,12 @@ void nfp_net_info(struct nfp_net *nn)
  *
  * Return: NFP Net device structure, or ERR_PTR on error.
  */
-struct nfp_net *nfp_net_alloc(struct pci_dev *pdev, bool needs_netdev,
-			      unsigned int max_tx_rings,
-			      unsigned int max_rx_rings)
+struct nfp_net *
+nfp_net_alloc(struct pci_dev *pdev, void __iomem *ctrl_bar, bool needs_netdev,
+	      unsigned int max_tx_rings, unsigned int max_rx_rings)
 {
 	struct nfp_net *nn;
+	int err;
 
 	if (needs_netdev) {
 		struct net_device *netdev;
@@ -3594,6 +3594,7 @@ struct nfp_net *nfp_net_alloc(struct pci_dev *pdev, bool needs_netdev,
 	}
 
 	nn->dp.dev = &pdev->dev;
+	nn->dp.ctrl_bar = ctrl_bar;
 	nn->pdev = pdev;
 
 	nn->max_tx_rings = max_tx_rings;
@@ -3616,7 +3617,19 @@ struct nfp_net *nfp_net_alloc(struct pci_dev *pdev, bool needs_netdev,
 
 	timer_setup(&nn->reconfig_timer, nfp_net_reconfig_timer, 0);
 
+	err = nfp_net_tlv_caps_parse(&nn->pdev->dev, nn->dp.ctrl_bar,
+				     &nn->tlv_caps);
+	if (err)
+		goto err_free_nn;
+
 	return nn;
+
+err_free_nn:
+	if (nn->dp.netdev)
+		free_netdev(nn->dp.netdev);
+	else
+		vfree(nn);
+	return ERR_PTR(err);
 }
 
 /**
@@ -3888,11 +3901,6 @@ int nfp_net_init(struct nfp_net *nn)
 		nfp_net_irqmod_init(nn);
 		nn->dp.ctrl |= NFP_NET_CFG_CTRL_IRQMOD;
 	}
-
-	err = nfp_net_tlv_caps_parse(&nn->pdev->dev, nn->dp.ctrl_bar,
-				     &nn->tlv_caps);
-	if (err)
-		return err;
 
 	if (nn->dp.netdev)
 		nfp_net_netdev_init(nn);

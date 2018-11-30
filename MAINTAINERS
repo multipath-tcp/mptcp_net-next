@@ -180,6 +180,7 @@ F:	drivers/net/hamradio/6pack.c
 
 8169 10/100/1000 GIGABIT ETHERNET DRIVER
 M:	Realtek linux nic maintainers <nic_swsd@realtek.com>
+M:	Heiner Kallweit <hkallweit1@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/realtek/r8169.c
@@ -717,7 +718,7 @@ F:	include/linux/mfd/altera-a10sr.h
 F:	include/dt-bindings/reset/altr,rst-mgr-a10sr.h
 
 ALTERA TRIPLE SPEED ETHERNET DRIVER
-M:	Vince Bridgers <vbridger@opensource.altera.com>
+M:	Thor Thayer <thor.thayer@linux.intel.com>
 L:	netdev@vger.kernel.org
 L:	nios2-dev@lists.rocketboards.org (moderated for non-subscribers)
 S:	Maintained
@@ -2800,7 +2801,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf.git
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git
 Q:	https://patchwork.ozlabs.org/project/netdev/list/?delegate=77147
 S:	Supported
-F:	arch/x86/net/bpf_jit*
+F:	arch/*/net/*
 F:	Documentation/networking/filter.txt
 F:	Documentation/bpf/
 F:	include/linux/bpf*
@@ -2819,6 +2820,67 @@ F:	samples/bpf/
 F:	tools/bpf/
 F:	tools/lib/bpf/
 F:	tools/testing/selftests/bpf/
+
+BPF JIT for ARM
+M:	Shubham Bansal <illusionist.neo@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/arm/net/
+
+BPF JIT for ARM64
+M:	Daniel Borkmann <daniel@iogearbox.net>
+M:	Alexei Starovoitov <ast@kernel.org>
+M:	Zi Shen Lim <zlim.lnx@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	arch/arm64/net/
+
+BPF JIT for MIPS (32-BIT AND 64-BIT)
+M:	Paul Burton <paul.burton@mips.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/mips/net/
+
+BPF JIT for NFP NICs
+M:	Jakub Kicinski <jakub.kicinski@netronome.com>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	drivers/net/ethernet/netronome/nfp/bpf/
+
+BPF JIT for POWERPC (32-BIT AND 64-BIT)
+M:	Naveen N. Rao <naveen.n.rao@linux.ibm.com>
+M:	Sandipan Das <sandipan@linux.ibm.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/powerpc/net/
+
+BPF JIT for S390
+M:	Martin Schwidefsky <schwidefsky@de.ibm.com>
+M:	Heiko Carstens <heiko.carstens@de.ibm.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/s390/net/
+X:	arch/s390/net/pnet.c
+
+BPF JIT for SPARC (32-BIT AND 64-BIT)
+M:	David S. Miller <davem@davemloft.net>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/sparc/net/
+
+BPF JIT for X86 32-BIT
+M:	Wang YanQing <udknight@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/x86/net/bpf_jit_comp32.c
+
+BPF JIT for X86 64-BIT
+M:	Alexei Starovoitov <ast@kernel.org>
+M:	Daniel Borkmann <daniel@iogearbox.net>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	arch/x86/net/
+X:	arch/x86/net/bpf_jit_comp32.c
 
 BROADCOM B44 10/100 ETHERNET DRIVER
 M:	Michael Chan <michael.chan@broadcom.com>
@@ -3275,6 +3337,12 @@ F:	drivers/net/caif/
 F:	include/uapi/linux/caif/
 F:	include/net/caif/
 F:	net/caif/
+
+CAKE QDISC
+M:	Toke Høiland-Jørgensen <toke@toke.dk>
+L:	cake@lists.bufferbloat.net (moderated for non-subscribers)
+S:	Maintained
+F:	net/sched/sch_cake.c
 
 CALGARY x86-64 IOMMU
 M:	Muli Ben-Yehuda <mulix@mulix.org>
@@ -5528,6 +5596,7 @@ F:	net/bridge/
 ETHERNET PHY LIBRARY
 M:	Andrew Lunn <andrew@lunn.ch>
 M:	Florian Fainelli <f.fainelli@gmail.com>
+M:	Heiner Kallweit <hkallweit1@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	Documentation/ABI/testing/sysfs-bus-mdio
@@ -6299,6 +6368,7 @@ F:	tools/testing/selftests/gpio/
 
 GPIO SUBSYSTEM
 M:	Linus Walleij <linus.walleij@linaro.org>
+M:	Bartosz Golaszewski <bgolaszewski@baylibre.com>
 L:	linux-gpio@vger.kernel.org
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
 S:	Maintained
@@ -6607,9 +6677,9 @@ F:	arch/*/include/asm/suspend*.h
 
 HID CORE LAYER
 M:	Jiri Kosina <jikos@kernel.org>
-R:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
+M:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
 L:	linux-input@vger.kernel.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/hid/hid.git
 S:	Maintained
 F:	drivers/hid/
 F:	include/linux/hid*
@@ -6860,6 +6930,13 @@ L:	linux-i2c@vger.kernel.org
 L:	linux-acpi@vger.kernel.org
 S:	Maintained
 F:	drivers/i2c/i2c-core-acpi.c
+
+I2C CONTROLLER DRIVER FOR NVIDIA GPU
+M:	Ajay Gupta <ajayg@nvidia.com>
+L:	linux-i2c@vger.kernel.org
+S:	Maintained
+F:	Documentation/i2c/busses/i2c-nvidia-gpu
+F:	drivers/i2c/busses/i2c-nvidia-gpu.c
 
 I2C MUXES
 M:	Peter Rosin <peda@axentia.se>
@@ -7429,6 +7506,20 @@ S:	Maintained
 F:	Documentation/fb/intelfb.txt
 F:	drivers/video/fbdev/intelfb/
 
+INTEL GPIO DRIVERS
+M:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+L:	linux-gpio@vger.kernel.org
+S:	Maintained
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/andy/linux-gpio-intel.git
+F:	drivers/gpio/gpio-ich.c
+F:	drivers/gpio/gpio-intel-mid.c
+F:	drivers/gpio/gpio-lynxpoint.c
+F:	drivers/gpio/gpio-merrifield.c
+F:	drivers/gpio/gpio-ml-ioh.c
+F:	drivers/gpio/gpio-pch.c
+F:	drivers/gpio/gpio-sch.c
+F:	drivers/gpio/gpio-sodaville.c
+
 INTEL GVT-g DRIVERS (Intel GPU Virtualization)
 M:	Zhenyu Wang <zhenyuw@linux.intel.com>
 M:	Zhi Wang <zhi.a.wang@intel.com>
@@ -7438,12 +7529,6 @@ W:	https://01.org/igvt-g
 T:	git https://github.com/intel/gvt-linux.git
 S:	Supported
 F:	drivers/gpu/drm/i915/gvt/
-
-INTEL PMIC GPIO DRIVER
-R:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-S:	Maintained
-F:	drivers/gpio/gpio-*cove.c
-F:	drivers/gpio/gpio-msic.c
 
 INTEL HID EVENT DRIVER
 M:	Alex Hung <alex.hung@canonical.com>
@@ -7532,12 +7617,6 @@ W:	https://01.org/linux-acpi
 S:	Supported
 F:	drivers/platform/x86/intel_menlow.c
 
-INTEL MERRIFIELD GPIO DRIVER
-M:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-L:	linux-gpio@vger.kernel.org
-S:	Maintained
-F:	drivers/gpio/gpio-merrifield.c
-
 INTEL MIC DRIVERS (mic)
 M:	Sudeep Dutt <sudeep.dutt@intel.com>
 M:	Ashutosh Dixit <ashutosh.dixit@intel.com>
@@ -7569,6 +7648,13 @@ F:	drivers/platform/x86/intel_pmc_ipc.c
 F:	drivers/platform/x86/intel_punit_ipc.c
 F:	arch/x86/include/asm/intel_pmc_ipc.h
 F:	arch/x86/include/asm/intel_punit_ipc.h
+
+INTEL PMIC GPIO DRIVERS
+M:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+S:	Maintained
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/andy/linux-gpio-intel.git
+F:	drivers/gpio/gpio-*cove.c
+F:	drivers/gpio/gpio-msic.c
 
 INTEL MULTIFUNCTION PMIC DEVICE DRIVERS
 R:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
@@ -8360,7 +8446,7 @@ F:	drivers/media/dvb-frontends/lgdt3305.*
 LIBATA PATA ARASAN COMPACT FLASH CONTROLLER
 M:	Viresh Kumar <vireshk@kernel.org>
 L:	linux-ide@vger.kernel.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/axboe/linux-block.git
 S:	Maintained
 F:	include/linux/pata_arasan_cf_data.h
 F:	drivers/ata/pata_arasan_cf.c
@@ -8377,7 +8463,7 @@ F:	drivers/ata/ata_generic.c
 LIBATA PATA FARADAY FTIDE010 AND GEMINI SATA BRIDGE DRIVERS
 M:	Linus Walleij <linus.walleij@linaro.org>
 L:	linux-ide@vger.kernel.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/axboe/linux-block.git
 S:	Maintained
 F:	drivers/ata/pata_ftide010.c
 F:	drivers/ata/sata_gemini.c
@@ -8396,7 +8482,7 @@ F:	include/linux/ahci_platform.h
 LIBATA SATA PROMISE TX2/TX4 CONTROLLER DRIVER
 M:	Mikael Pettersson <mikpelinux@gmail.com>
 L:	linux-ide@vger.kernel.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tj/libata.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/axboe/linux-block.git
 S:	Maintained
 F:	drivers/ata/sata_promise.*
 
@@ -10672,6 +10758,14 @@ L:	linux-nfc@lists.01.org (moderated for non-subscribers)
 S:	Supported
 F:	drivers/nfc/nxp-nci
 
+OBJAGG
+M:	Jiri Pirko <jiri@mellanox.com>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	lib/objagg.c
+F:	lib/test_objagg.c
+F:	include/linux/objagg.h
+
 OBJTOOL
 M:	Josh Poimboeuf <jpoimboe@redhat.com>
 M:	Peter Zijlstra <peterz@infradead.org>
@@ -10777,6 +10871,14 @@ L:	linux-omap@vger.kernel.org
 S:	Maintained
 F:	arch/arm/mach-omap2/omap_hwmod.*
 
+OMAP I2C DRIVER
+M:	Vignesh R <vigneshr@ti.com>
+L:	linux-omap@vger.kernel.org
+L:	linux-i2c@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/i2c/i2c-omap.txt
+F:	drivers/i2c/busses/i2c-omap.c
+
 OMAP IMAGING SUBSYSTEM (OMAP3 ISP and OMAP4 ISS)
 M:	Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 L:	linux-media@vger.kernel.org
@@ -10786,9 +10888,9 @@ F:	drivers/media/platform/omap3isp/
 F:	drivers/staging/media/omap4iss/
 
 OMAP MMC SUPPORT
-M:	Jarkko Lavinen <jarkko.lavinen@nokia.com>
+M:	Aaro Koskinen <aaro.koskinen@iki.fi>
 L:	linux-omap@vger.kernel.org
-S:	Maintained
+S:	Odd Fixes
 F:	drivers/mmc/host/omap.c
 
 OMAP POWER MANAGEMENT SUPPORT
@@ -11723,6 +11825,7 @@ F:	Documentation/devicetree/bindings/pinctrl/fsl,*
 PIN CONTROLLER - INTEL
 M:	Mika Westerberg <mika.westerberg@linux.intel.com>
 M:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/intel.git
 S:	Maintained
 F:	drivers/pinctrl/intel/
 
@@ -13955,11 +14058,10 @@ F:	drivers/tty/serial/sunzilog.h
 F:	drivers/tty/vcc.c
 
 SPARSE CHECKER
-M:	"Christopher Li" <sparse@chrisli.org>
+M:	"Luc Van Oostenryck" <luc.vanoostenryck@gmail.com>
 L:	linux-sparse@vger.kernel.org
 W:	https://sparse.wiki.kernel.org/
 T:	git git://git.kernel.org/pub/scm/devel/sparse/sparse.git
-T:	git git://git.kernel.org/pub/scm/devel/sparse/chrisl/sparse.git
 S:	Maintained
 F:	include/linux/compiler.h
 
@@ -14056,6 +14158,7 @@ F:	Documentation/devicetree/bindings/iio/proximity/vl53l0x.txt
 
 STABLE BRANCH
 M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+M:	Sasha Levin <sashal@kernel.org>
 L:	stable@vger.kernel.org
 S:	Supported
 F:	Documentation/process/stable-kernel-rules.rst
@@ -15429,9 +15532,9 @@ F:	include/linux/usb/gadget*
 
 USB HID/HIDBP DRIVERS (USB KEYBOARDS, MICE, REMOTE CONTROLS, ...)
 M:	Jiri Kosina <jikos@kernel.org>
-R:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
+M:	Benjamin Tissoires <benjamin.tissoires@redhat.com>
 L:	linux-usb@vger.kernel.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/hid/hid.git
 S:	Maintained
 F:	Documentation/hid/hiddev.txt
 F:	drivers/hid/usbhid/

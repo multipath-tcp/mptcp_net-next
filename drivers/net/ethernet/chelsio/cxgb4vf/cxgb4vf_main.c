@@ -722,6 +722,7 @@ static int adapter_up(struct adapter *adapter)
 
 		if (adapter->flags & USING_MSIX)
 			name_msix_vecs(adapter);
+
 		adapter->flags |= FULL_INIT_DONE;
 	}
 
@@ -747,8 +748,6 @@ static int adapter_up(struct adapter *adapter)
 	enable_rx(adapter);
 	t4vf_sge_start(adapter);
 
-	/* Initialize hash mac addr list*/
-	INIT_LIST_HEAD(&adapter->mac_hlist);
 	return 0;
 }
 
@@ -3036,6 +3035,9 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
 	if (err)
 		goto err_unmap_bar;
 
+	/* Initialize hash mac addr list */
+	INIT_LIST_HEAD(&adapter->mac_hlist);
+
 	/*
 	 * Allocate our "adapter ports" and stitch everything together.
 	 */
@@ -3287,6 +3289,7 @@ err_disable_device:
 static void cxgb4vf_pci_remove(struct pci_dev *pdev)
 {
 	struct adapter *adapter = pci_get_drvdata(pdev);
+	struct hash_mac_addr *entry, *tmp;
 
 	/*
 	 * Tear down driver state associated with device.
@@ -3337,6 +3340,11 @@ static void cxgb4vf_pci_remove(struct pci_dev *pdev)
 		if (!is_t4(adapter->params.chip))
 			iounmap(adapter->bar2);
 		kfree(adapter->mbox_log);
+		list_for_each_entry_safe(entry, tmp, &adapter->mac_hlist,
+					 list) {
+			list_del(&entry->list);
+			kfree(entry);
+		}
 		kfree(adapter);
 	}
 

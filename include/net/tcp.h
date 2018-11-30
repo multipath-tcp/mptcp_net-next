@@ -429,7 +429,7 @@ int linear_payload_sz(bool first_skb);
 
 void tcp_tasklet_init(void);
 
-void tcp_v4_err(struct sk_buff *skb, u32);
+int tcp_v4_err(struct sk_buff *skb, u32);
 
 void tcp_shutdown(struct sock *sk, int how);
 
@@ -1457,33 +1457,16 @@ static inline __sum16 tcp_v4_check(int len, __be32 saddr,
 	return csum_tcpudp_magic(saddr,daddr,len,IPPROTO_TCP,base);
 }
 
-static inline __sum16 __tcp_checksum_complete(struct sk_buff *skb)
-{
-	return __skb_checksum_complete(skb);
-}
-
 static inline bool tcp_checksum_complete(struct sk_buff *skb)
 {
 	return !skb_csum_unnecessary(skb) &&
-		__tcp_checksum_complete(skb);
+		__skb_checksum_complete(skb);
 }
 
 bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb);
 int tcp_filter(struct sock *sk, struct sk_buff *skb);
-
-#undef STATE_TRACE
-
-#ifdef STATE_TRACE
-static const char *statename[]={
-	"Unused","Established","Syn Sent","Syn Recv",
-	"Fin Wait 1","Fin Wait 2","Time Wait", "Close",
-	"Close Wait","Last ACK","Listen","Closing"
-};
-#endif
 void tcp_set_state(struct sock *sk, int state);
-
 void tcp_done(struct sock *sk);
-
 int tcp_abort(struct sock *sk, int err);
 
 static inline void tcp_sack_reset(struct tcp_options_received *rx_opt)

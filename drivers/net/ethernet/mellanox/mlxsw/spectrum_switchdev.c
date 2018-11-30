@@ -1968,8 +1968,6 @@ static struct mlxsw_sp_port *mlxsw_sp_lag_rep_port(struct mlxsw_sp *mlxsw_sp,
 static const struct switchdev_ops mlxsw_sp_port_switchdev_ops = {
 	.switchdev_port_attr_get	= mlxsw_sp_port_attr_get,
 	.switchdev_port_attr_set	= mlxsw_sp_port_attr_set,
-	.switchdev_port_obj_add		= mlxsw_sp_port_obj_add,
-	.switchdev_port_obj_del		= mlxsw_sp_port_obj_del,
 };
 
 static int
@@ -2312,6 +2310,71 @@ void mlxsw_sp_bridge_vxlan_leave(struct mlxsw_sp *mlxsw_sp,
 }
 
 static void
+mlxsw_sp_switchdev_vxlan_addr_convert(const union vxlan_addr *vxlan_addr,
+				      enum mlxsw_sp_l3proto *proto,
+				      union mlxsw_sp_l3addr *addr)
+{
+	if (vxlan_addr->sa.sa_family == AF_INET) {
+		addr->addr4 = vxlan_addr->sin.sin_addr.s_addr;
+		*proto = MLXSW_SP_L3_PROTO_IPV4;
+	} else {
+		addr->addr6 = vxlan_addr->sin6.sin6_addr;
+		*proto = MLXSW_SP_L3_PROTO_IPV6;
+	}
+}
+
+static void
+mlxsw_sp_switchdev_addr_vxlan_convert(enum mlxsw_sp_l3proto proto,
+				      const union mlxsw_sp_l3addr *addr,
+				      union vxlan_addr *vxlan_addr)
+{
+	switch (proto) {
+	case MLXSW_SP_L3_PROTO_IPV4:
+		vxlan_addr->sa.sa_family = AF_INET;
+		vxlan_addr->sin.sin_addr.s_addr = addr->addr4;
+		break;
+	case MLXSW_SP_L3_PROTO_IPV6:
+		vxlan_addr->sa.sa_family = AF_INET6;
+		vxlan_addr->sin6.sin6_addr = addr->addr6;
+		break;
+	}
+}
+
+static void mlxsw_sp_fdb_vxlan_call_notifiers(struct net_device *dev,
+					      const char *mac,
+					      enum mlxsw_sp_l3proto proto,
+					      union mlxsw_sp_l3addr *addr,
+					      __be32 vni, bool adding)
+{
+	struct switchdev_notifier_vxlan_fdb_info info;
+	struct vxlan_dev *vxlan = netdev_priv(dev);
+	enum switchdev_notifier_type type;
+
+	type = adding ? SWITCHDEV_VXLAN_FDB_ADD_TO_BRIDGE :
+			SWITCHDEV_VXLAN_FDB_DEL_TO_BRIDGE;
+	mlxsw_sp_switchdev_addr_vxlan_convert(proto, addr, &info.remote_ip);
+	info.remote_port = vxlan->cfg.dst_port;
+	info.remote_vni = vni;
+	info.remote_ifindex = 0;
+	ether_addr_copy(info.eth_addr, mac);
+	info.vni = vni;
+	info.offloaded = adding;
+	call_switchdev_notifiers(type, dev, &info.info);
+}
+
+static void mlxsw_sp_fdb_nve_call_notifiers(struct net_device *dev,
+					    const char *mac,
+					    enum mlxsw_sp_l3proto proto,
+					    union mlxsw_sp_l3addr *addr,
+					    __be32 vni,
+					    bool adding)
+{
+	if (netif_is_vxlan(dev))
+		mlxsw_sp_fdb_vxlan_call_notifiers(dev, mac, proto, addr, vni,
+						  adding);
+}
+
+static void
 mlxsw_sp_fdb_call_notifiers(enum switchdev_notifier_type type,
 			    const char *mac, u16 vid,
 			    struct net_device *dev, bool offloaded)
@@ -2419,7 +2482,8 @@ static void mlxsw_sp_fdb_notify_mac_lag_process(struct mlxsw_sp *mlxsw_sp,
 
 	bridge_device = bridge_port->bridge_device;
 	vid = bridge_device->vlan_enabled ? mlxsw_sp_port_vlan->vid : 0;
-	lag_vid = mlxsw_sp_port_vlan->vid;
+	lag_vid = mlxsw_sp_fid_lag_vid_valid(mlxsw_sp_port_vlan->fid) ?
+		  mlxsw_sp_port_vlan->vid : 0;
 
 do_fdb_op:
 	err = mlxsw_sp_port_fdb_uc_lag_op(mlxsw_sp, lag_id, mac, fid, lag_vid,
@@ -2442,6 +2506,122 @@ just_remove:
 	goto do_fdb_op;
 }
 
+static int
+__mlxsw_sp_fdb_notify_mac_uc_tunnel_process(struct mlxsw_sp *mlxsw_sp,
+					    const struct mlxsw_sp_fid *fid,
+					    bool adding,
+					    struct net_device **nve_dev,
+					    u16 *p_vid, __be32 *p_vni)
+{
+	struct mlxsw_sp_bridge_device *bridge_device;
+	struct net_device *br_dev, *dev;
+	int nve_ifindex;
+	int err;
+
+	err = mlxsw_sp_fid_nve_ifindex(fid, &nve_ifindex);
+	if (err)
+		return err;
+
+	err = mlxsw_sp_fid_vni(fid, p_vni);
+	if (err)
+		return err;
+
+	dev = __dev_get_by_index(&init_net, nve_ifindex);
+	if (!dev)
+		return -EINVAL;
+	*nve_dev = dev;
+
+	if (!netif_running(dev))
+		return -EINVAL;
+
+	if (adding && !br_port_flag_is_set(dev, BR_LEARNING))
+		return -EINVAL;
+
+	if (adding && netif_is_vxlan(dev)) {
+		struct vxlan_dev *vxlan = netdev_priv(dev);
+
+		if (!(vxlan->cfg.flags & VXLAN_F_LEARN))
+			return -EINVAL;
+	}
+
+	br_dev = netdev_master_upper_dev_get(dev);
+	if (!br_dev)
+		return -EINVAL;
+
+	bridge_device = mlxsw_sp_bridge_device_find(mlxsw_sp->bridge, br_dev);
+	if (!bridge_device)
+		return -EINVAL;
+
+	*p_vid = bridge_device->ops->fid_vid(bridge_device, fid);
+
+	return 0;
+}
+
+static void mlxsw_sp_fdb_notify_mac_uc_tunnel_process(struct mlxsw_sp *mlxsw_sp,
+						      char *sfn_pl,
+						      int rec_index,
+						      bool adding)
+{
+	enum mlxsw_reg_sfn_uc_tunnel_protocol sfn_proto;
+	enum switchdev_notifier_type type;
+	struct net_device *nve_dev;
+	union mlxsw_sp_l3addr addr;
+	struct mlxsw_sp_fid *fid;
+	char mac[ETH_ALEN];
+	u16 fid_index, vid;
+	__be32 vni;
+	u32 uip;
+	int err;
+
+	mlxsw_reg_sfn_uc_tunnel_unpack(sfn_pl, rec_index, mac, &fid_index,
+				       &uip, &sfn_proto);
+
+	fid = mlxsw_sp_fid_lookup_by_index(mlxsw_sp, fid_index);
+	if (!fid)
+		goto err_fid_lookup;
+
+	err = mlxsw_sp_nve_learned_ip_resolve(mlxsw_sp, uip,
+					      (enum mlxsw_sp_l3proto) sfn_proto,
+					      &addr);
+	if (err)
+		goto err_ip_resolve;
+
+	err = __mlxsw_sp_fdb_notify_mac_uc_tunnel_process(mlxsw_sp, fid, adding,
+							  &nve_dev, &vid, &vni);
+	if (err)
+		goto err_fdb_process;
+
+	err = mlxsw_sp_port_fdb_tunnel_uc_op(mlxsw_sp, mac, fid_index,
+					     (enum mlxsw_sp_l3proto) sfn_proto,
+					     &addr, adding, true);
+	if (err)
+		goto err_fdb_op;
+
+	mlxsw_sp_fdb_nve_call_notifiers(nve_dev, mac,
+					(enum mlxsw_sp_l3proto) sfn_proto,
+					&addr, vni, adding);
+
+	type = adding ? SWITCHDEV_FDB_ADD_TO_BRIDGE :
+			SWITCHDEV_FDB_DEL_TO_BRIDGE;
+	mlxsw_sp_fdb_call_notifiers(type, mac, vid, nve_dev, adding);
+
+	mlxsw_sp_fid_put(fid);
+
+	return;
+
+err_fdb_op:
+err_fdb_process:
+err_ip_resolve:
+	mlxsw_sp_fid_put(fid);
+err_fid_lookup:
+	/* Remove an FDB entry in case we cannot process it. Otherwise the
+	 * device will keep sending the same notification over and over again.
+	 */
+	mlxsw_sp_port_fdb_tunnel_uc_op(mlxsw_sp, mac, fid_index,
+				       (enum mlxsw_sp_l3proto) sfn_proto, &addr,
+				       false, true);
+}
+
 static void mlxsw_sp_fdb_notify_rec_process(struct mlxsw_sp *mlxsw_sp,
 					    char *sfn_pl, int rec_index)
 {
@@ -2461,6 +2641,14 @@ static void mlxsw_sp_fdb_notify_rec_process(struct mlxsw_sp *mlxsw_sp,
 	case MLXSW_REG_SFN_REC_TYPE_AGED_OUT_MAC_LAG:
 		mlxsw_sp_fdb_notify_mac_lag_process(mlxsw_sp, sfn_pl,
 						    rec_index, false);
+		break;
+	case MLXSW_REG_SFN_REC_TYPE_LEARNED_UNICAST_TUNNEL:
+		mlxsw_sp_fdb_notify_mac_uc_tunnel_process(mlxsw_sp, sfn_pl,
+							  rec_index, true);
+		break;
+	case MLXSW_REG_SFN_REC_TYPE_AGED_OUT_UNICAST_TUNNEL:
+		mlxsw_sp_fdb_notify_mac_uc_tunnel_process(mlxsw_sp, sfn_pl,
+							  rec_index, false);
 		break;
 	}
 }
@@ -2515,20 +2703,6 @@ struct mlxsw_sp_switchdev_event_work {
 	struct net_device *dev;
 	unsigned long event;
 };
-
-static void
-mlxsw_sp_switchdev_vxlan_addr_convert(const union vxlan_addr *vxlan_addr,
-				      enum mlxsw_sp_l3proto *proto,
-				      union mlxsw_sp_l3addr *addr)
-{
-	if (vxlan_addr->sa.sa_family == AF_INET) {
-		addr->addr4 = vxlan_addr->sin.sin_addr.s_addr;
-		*proto = MLXSW_SP_L3_PROTO_IPV4;
-	} else {
-		addr->addr6 = vxlan_addr->sin6.sin6_addr;
-		*proto = MLXSW_SP_L3_PROTO_IPV6;
-	}
-}
 
 static void
 mlxsw_sp_switchdev_bridge_vxlan_fdb_event(struct mlxsw_sp *mlxsw_sp,
@@ -2595,7 +2769,8 @@ mlxsw_sp_switchdev_bridge_nve_fdb_event(struct mlxsw_sp_switchdev_event_work *
 	    switchdev_work->event != SWITCHDEV_FDB_DEL_TO_DEVICE)
 		return;
 
-	if (!switchdev_work->fdb_info.added_by_user)
+	if (switchdev_work->event == SWITCHDEV_FDB_ADD_TO_DEVICE &&
+	    !switchdev_work->fdb_info.added_by_user)
 		return;
 
 	if (!netif_running(dev))
@@ -2942,6 +3117,32 @@ static struct notifier_block mlxsw_sp_switchdev_notifier = {
 	.notifier_call = mlxsw_sp_switchdev_event,
 };
 
+static int mlxsw_sp_switchdev_blocking_event(struct notifier_block *unused,
+					     unsigned long event, void *ptr)
+{
+	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
+	int err;
+
+	switch (event) {
+	case SWITCHDEV_PORT_OBJ_ADD:
+		err = switchdev_handle_port_obj_add(dev, ptr,
+						    mlxsw_sp_port_dev_check,
+						    mlxsw_sp_port_obj_add);
+		return notifier_from_errno(err);
+	case SWITCHDEV_PORT_OBJ_DEL:
+		err = switchdev_handle_port_obj_del(dev, ptr,
+						    mlxsw_sp_port_dev_check,
+						    mlxsw_sp_port_obj_del);
+		return notifier_from_errno(err);
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block mlxsw_sp_switchdev_blocking_notifier = {
+	.notifier_call = mlxsw_sp_switchdev_blocking_event,
+};
+
 u8
 mlxsw_sp_bridge_port_stp_state(struct mlxsw_sp_bridge_port *bridge_port)
 {
@@ -2951,6 +3152,7 @@ mlxsw_sp_bridge_port_stp_state(struct mlxsw_sp_bridge_port *bridge_port)
 static int mlxsw_sp_fdb_init(struct mlxsw_sp *mlxsw_sp)
 {
 	struct mlxsw_sp_bridge *bridge = mlxsw_sp->bridge;
+	struct notifier_block *nb;
 	int err;
 
 	err = mlxsw_sp_ageing_set(mlxsw_sp, MLXSW_SP_DEFAULT_AGEING_TIME);
@@ -2965,17 +3167,33 @@ static int mlxsw_sp_fdb_init(struct mlxsw_sp *mlxsw_sp)
 		return err;
 	}
 
+	nb = &mlxsw_sp_switchdev_blocking_notifier;
+	err = register_switchdev_blocking_notifier(nb);
+	if (err) {
+		dev_err(mlxsw_sp->bus_info->dev, "Failed to register switchdev blocking notifier\n");
+		goto err_register_switchdev_blocking_notifier;
+	}
+
 	INIT_DELAYED_WORK(&bridge->fdb_notify.dw, mlxsw_sp_fdb_notify_work);
 	bridge->fdb_notify.interval = MLXSW_SP_DEFAULT_LEARNING_INTERVAL;
 	mlxsw_sp_fdb_notify_work_schedule(mlxsw_sp);
 	return 0;
+
+err_register_switchdev_blocking_notifier:
+	unregister_switchdev_notifier(&mlxsw_sp_switchdev_notifier);
+	return err;
 }
 
 static void mlxsw_sp_fdb_fini(struct mlxsw_sp *mlxsw_sp)
 {
-	cancel_delayed_work_sync(&mlxsw_sp->bridge->fdb_notify.dw);
-	unregister_switchdev_notifier(&mlxsw_sp_switchdev_notifier);
+	struct notifier_block *nb;
 
+	cancel_delayed_work_sync(&mlxsw_sp->bridge->fdb_notify.dw);
+
+	nb = &mlxsw_sp_switchdev_blocking_notifier;
+	unregister_switchdev_blocking_notifier(nb);
+
+	unregister_switchdev_notifier(&mlxsw_sp_switchdev_notifier);
 }
 
 int mlxsw_sp_switchdev_init(struct mlxsw_sp *mlxsw_sp)

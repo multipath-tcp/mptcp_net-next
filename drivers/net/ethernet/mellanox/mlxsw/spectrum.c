@@ -1876,7 +1876,37 @@ static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_stats[] = {
 
 #define MLXSW_SP_PORT_HW_STATS_LEN ARRAY_SIZE(mlxsw_sp_port_hw_stats)
 
+static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_rfc_2863_stats[] = {
+	{
+		.str = "if_in_discards",
+		.getter = mlxsw_reg_ppcnt_if_in_discards_get,
+	},
+	{
+		.str = "if_out_discards",
+		.getter = mlxsw_reg_ppcnt_if_out_discards_get,
+	},
+	{
+		.str = "if_out_errors",
+		.getter = mlxsw_reg_ppcnt_if_out_errors_get,
+	},
+};
+
+#define MLXSW_SP_PORT_HW_RFC_2863_STATS_LEN \
+	ARRAY_SIZE(mlxsw_sp_port_hw_rfc_2863_stats)
+
 static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_rfc_2819_stats[] = {
+	{
+		.str = "ether_stats_undersize_pkts",
+		.getter = mlxsw_reg_ppcnt_ether_stats_undersize_pkts_get,
+	},
+	{
+		.str = "ether_stats_oversize_pkts",
+		.getter = mlxsw_reg_ppcnt_ether_stats_oversize_pkts_get,
+	},
+	{
+		.str = "ether_stats_fragments",
+		.getter = mlxsw_reg_ppcnt_ether_stats_fragments_get,
+	},
 	{
 		.str = "ether_pkts64octets",
 		.getter = mlxsw_reg_ppcnt_ether_stats_pkts64octets_get,
@@ -1921,6 +1951,82 @@ static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_rfc_2819_stats[] = {
 
 #define MLXSW_SP_PORT_HW_RFC_2819_STATS_LEN \
 	ARRAY_SIZE(mlxsw_sp_port_hw_rfc_2819_stats)
+
+static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_rfc_3635_stats[] = {
+	{
+		.str = "dot3stats_fcs_errors",
+		.getter = mlxsw_reg_ppcnt_dot3stats_fcs_errors_get,
+	},
+	{
+		.str = "dot3stats_symbol_errors",
+		.getter = mlxsw_reg_ppcnt_dot3stats_symbol_errors_get,
+	},
+	{
+		.str = "dot3control_in_unknown_opcodes",
+		.getter = mlxsw_reg_ppcnt_dot3control_in_unknown_opcodes_get,
+	},
+	{
+		.str = "dot3in_pause_frames",
+		.getter = mlxsw_reg_ppcnt_dot3in_pause_frames_get,
+	},
+};
+
+#define MLXSW_SP_PORT_HW_RFC_3635_STATS_LEN \
+	ARRAY_SIZE(mlxsw_sp_port_hw_rfc_3635_stats)
+
+static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_discard_stats[] = {
+	{
+		.str = "discard_ingress_general",
+		.getter = mlxsw_reg_ppcnt_ingress_general_get,
+	},
+	{
+		.str = "discard_ingress_policy_engine",
+		.getter = mlxsw_reg_ppcnt_ingress_policy_engine_get,
+	},
+	{
+		.str = "discard_ingress_vlan_membership",
+		.getter = mlxsw_reg_ppcnt_ingress_vlan_membership_get,
+	},
+	{
+		.str = "discard_ingress_tag_frame_type",
+		.getter = mlxsw_reg_ppcnt_ingress_tag_frame_type_get,
+	},
+	{
+		.str = "discard_egress_vlan_membership",
+		.getter = mlxsw_reg_ppcnt_egress_vlan_membership_get,
+	},
+	{
+		.str = "discard_loopback_filter",
+		.getter = mlxsw_reg_ppcnt_loopback_filter_get,
+	},
+	{
+		.str = "discard_egress_general",
+		.getter = mlxsw_reg_ppcnt_egress_general_get,
+	},
+	{
+		.str = "discard_egress_hoq",
+		.getter = mlxsw_reg_ppcnt_egress_hoq_get,
+	},
+	{
+		.str = "discard_egress_policy_engine",
+		.getter = mlxsw_reg_ppcnt_egress_policy_engine_get,
+	},
+	{
+		.str = "discard_ingress_tx_link_down",
+		.getter = mlxsw_reg_ppcnt_ingress_tx_link_down_get,
+	},
+	{
+		.str = "discard_egress_stp_filter",
+		.getter = mlxsw_reg_ppcnt_egress_stp_filter_get,
+	},
+	{
+		.str = "discard_egress_sll",
+		.getter = mlxsw_reg_ppcnt_egress_sll_get,
+	},
+};
+
+#define MLXSW_SP_PORT_HW_DISCARD_STATS_LEN \
+	ARRAY_SIZE(mlxsw_sp_port_hw_discard_stats)
 
 static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_prio_stats[] = {
 	{
@@ -1974,7 +2080,10 @@ static struct mlxsw_sp_port_hw_stats mlxsw_sp_port_hw_tc_stats[] = {
 #define MLXSW_SP_PORT_HW_TC_STATS_LEN ARRAY_SIZE(mlxsw_sp_port_hw_tc_stats)
 
 #define MLXSW_SP_PORT_ETHTOOL_STATS_LEN (MLXSW_SP_PORT_HW_STATS_LEN + \
+					 MLXSW_SP_PORT_HW_RFC_2863_STATS_LEN + \
 					 MLXSW_SP_PORT_HW_RFC_2819_STATS_LEN + \
+					 MLXSW_SP_PORT_HW_RFC_3635_STATS_LEN + \
+					 MLXSW_SP_PORT_HW_DISCARD_STATS_LEN + \
 					 (MLXSW_SP_PORT_HW_PRIO_STATS_LEN * \
 					  IEEE_8021QAZ_MAX_TCS) + \
 					 (MLXSW_SP_PORT_HW_TC_STATS_LEN * \
@@ -2015,8 +2124,27 @@ static void mlxsw_sp_port_get_strings(struct net_device *dev,
 			       ETH_GSTRING_LEN);
 			p += ETH_GSTRING_LEN;
 		}
+
+		for (i = 0; i < MLXSW_SP_PORT_HW_RFC_2863_STATS_LEN; i++) {
+			memcpy(p, mlxsw_sp_port_hw_rfc_2863_stats[i].str,
+			       ETH_GSTRING_LEN);
+			p += ETH_GSTRING_LEN;
+		}
+
 		for (i = 0; i < MLXSW_SP_PORT_HW_RFC_2819_STATS_LEN; i++) {
 			memcpy(p, mlxsw_sp_port_hw_rfc_2819_stats[i].str,
+			       ETH_GSTRING_LEN);
+			p += ETH_GSTRING_LEN;
+		}
+
+		for (i = 0; i < MLXSW_SP_PORT_HW_RFC_3635_STATS_LEN; i++) {
+			memcpy(p, mlxsw_sp_port_hw_rfc_3635_stats[i].str,
+			       ETH_GSTRING_LEN);
+			p += ETH_GSTRING_LEN;
+		}
+
+		for (i = 0; i < MLXSW_SP_PORT_HW_DISCARD_STATS_LEN; i++) {
+			memcpy(p, mlxsw_sp_port_hw_discard_stats[i].str,
 			       ETH_GSTRING_LEN);
 			p += ETH_GSTRING_LEN;
 		}
@@ -2063,9 +2191,21 @@ mlxsw_sp_get_hw_stats_by_group(struct mlxsw_sp_port_hw_stats **p_hw_stats,
 		*p_hw_stats = mlxsw_sp_port_hw_stats;
 		*p_len = MLXSW_SP_PORT_HW_STATS_LEN;
 		break;
+	case MLXSW_REG_PPCNT_RFC_2863_CNT:
+		*p_hw_stats = mlxsw_sp_port_hw_rfc_2863_stats;
+		*p_len = MLXSW_SP_PORT_HW_RFC_2863_STATS_LEN;
+		break;
 	case MLXSW_REG_PPCNT_RFC_2819_CNT:
 		*p_hw_stats = mlxsw_sp_port_hw_rfc_2819_stats;
 		*p_len = MLXSW_SP_PORT_HW_RFC_2819_STATS_LEN;
+		break;
+	case MLXSW_REG_PPCNT_RFC_3635_CNT:
+		*p_hw_stats = mlxsw_sp_port_hw_rfc_3635_stats;
+		*p_len = MLXSW_SP_PORT_HW_RFC_3635_STATS_LEN;
+		break;
+	case MLXSW_REG_PPCNT_DISCARD_CNT:
+		*p_hw_stats = mlxsw_sp_port_hw_discard_stats;
+		*p_len = MLXSW_SP_PORT_HW_DISCARD_STATS_LEN;
 		break;
 	case MLXSW_REG_PPCNT_PRIO_CNT:
 		*p_hw_stats = mlxsw_sp_port_hw_prio_stats;
@@ -2116,10 +2256,25 @@ static void mlxsw_sp_port_get_stats(struct net_device *dev,
 				  data, data_index);
 	data_index = MLXSW_SP_PORT_HW_STATS_LEN;
 
+	/* RFC 2863 Counters */
+	__mlxsw_sp_port_get_stats(dev, MLXSW_REG_PPCNT_RFC_2863_CNT, 0,
+				  data, data_index);
+	data_index += MLXSW_SP_PORT_HW_RFC_2863_STATS_LEN;
+
 	/* RFC 2819 Counters */
 	__mlxsw_sp_port_get_stats(dev, MLXSW_REG_PPCNT_RFC_2819_CNT, 0,
 				  data, data_index);
 	data_index += MLXSW_SP_PORT_HW_RFC_2819_STATS_LEN;
+
+	/* RFC 3635 Counters */
+	__mlxsw_sp_port_get_stats(dev, MLXSW_REG_PPCNT_RFC_3635_CNT, 0,
+				  data, data_index);
+	data_index += MLXSW_SP_PORT_HW_RFC_3635_STATS_LEN;
+
+	/* Discard Counters */
+	__mlxsw_sp_port_get_stats(dev, MLXSW_REG_PPCNT_DISCARD_CNT, 0,
+				  data, data_index);
+	data_index += MLXSW_SP_PORT_HW_DISCARD_STATS_LEN;
 
 	/* Per-Priority Counters */
 	for (i = 0; i < IEEE_8021QAZ_MAX_TCS; i++) {
@@ -3956,16 +4111,20 @@ static void mlxsw_sp_fini(struct mlxsw_core *mlxsw_core)
 	mlxsw_sp_kvdl_fini(mlxsw_sp);
 }
 
+/* Per-FID flood tables are used for both "true" 802.1D FIDs and emulated
+ * 802.1Q FIDs
+ */
+#define MLXSW_SP_FID_FLOOD_TABLE_SIZE	(MLXSW_SP_FID_8021D_MAX + \
+					 VLAN_VID_MASK - 1)
+
 static const struct mlxsw_config_profile mlxsw_sp1_config_profile = {
 	.used_max_mid			= 1,
 	.max_mid			= MLXSW_SP_MID_MAX,
 	.used_flood_tables		= 1,
 	.used_flood_mode		= 1,
 	.flood_mode			= 3,
-	.max_fid_offset_flood_tables	= 3,
-	.fid_offset_flood_table_size	= VLAN_N_VID - 1,
 	.max_fid_flood_tables		= 3,
-	.fid_flood_table_size		= MLXSW_SP_FID_8021D_MAX,
+	.fid_flood_table_size		= MLXSW_SP_FID_FLOOD_TABLE_SIZE,
 	.used_max_ib_mc			= 1,
 	.max_ib_mc			= 0,
 	.used_max_pkey			= 1,
@@ -3988,10 +4147,8 @@ static const struct mlxsw_config_profile mlxsw_sp2_config_profile = {
 	.used_flood_tables		= 1,
 	.used_flood_mode		= 1,
 	.flood_mode			= 3,
-	.max_fid_offset_flood_tables	= 3,
-	.fid_offset_flood_table_size	= VLAN_N_VID - 1,
 	.max_fid_flood_tables		= 3,
-	.fid_flood_table_size		= MLXSW_SP_FID_8021D_MAX,
+	.fid_flood_table_size		= MLXSW_SP_FID_FLOOD_TABLE_SIZE,
 	.used_max_ib_mc			= 1,
 	.max_ib_mc			= 0,
 	.used_max_pkey			= 1,

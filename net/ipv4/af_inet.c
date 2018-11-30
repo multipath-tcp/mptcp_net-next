@@ -212,6 +212,7 @@ int inet_listen(struct socket *sock, int backlog)
 	if (!((1 << old_state) & (TCPF_CLOSE | TCPF_LISTEN)))
 		goto out;
 
+	sk->sk_max_ack_backlog = backlog;
 	/* Really, if the socket is already in listen state
 	 * we can only allow the backlog to be adjusted.
 	 */
@@ -235,7 +236,6 @@ int inet_listen(struct socket *sock, int backlog)
 			goto out;
 		tcp_call_bpf(sk, BPF_SOCK_OPS_TCP_LISTEN_CB, 0, NULL);
 	}
-	sk->sk_max_ack_backlog = backlog;
 	err = 0;
 
 out:
@@ -1987,6 +1987,8 @@ static int __init inet_init(void)
 
 	/* Add UDP-Lite (RFC 3828) */
 	udplite4_register();
+
+	raw_init();
 
 	ping_init();
 

@@ -7,8 +7,7 @@
 #include <linux/rbtree.h>
 #include <linux/slab.h>
 
-DEFINE_PER_CPU(struct bpf_cgroup_storage*,
-	       bpf_cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE]);
+DEFINE_PER_CPU(struct bpf_cgroup_storage*, bpf_cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE]);
 
 #ifdef CONFIG_CGROUP_BPF
 
@@ -139,7 +138,8 @@ static int cgroup_storage_update_elem(struct bpf_map *map, void *_key,
 		return -ENOENT;
 
 	new = kmalloc_node(sizeof(struct bpf_storage_buffer) +
-			   map->value_size, __GFP_ZERO | GFP_USER,
+			   map->value_size,
+			   __GFP_ZERO | GFP_ATOMIC | __GFP_NOWARN,
 			   map->numa_node);
 	if (!new)
 		return -ENOMEM;

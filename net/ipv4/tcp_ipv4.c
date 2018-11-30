@@ -425,7 +425,7 @@ EXPORT_SYMBOL(tcp_req_err);
  *
  */
 
-void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
+int tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 {
 	const struct iphdr *iph = (const struct iphdr *)icmp_skb->data;
 	struct tcphdr *th = (struct tcphdr *)(icmp_skb->data + (iph->ihl << 2));
@@ -448,20 +448,21 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 				       inet_iif(icmp_skb), 0);
 	if (!sk) {
 		__ICMP_INC_STATS(net, ICMP_MIB_INERRORS);
-		return;
+		return -ENOENT;
 	}
 	if (sk->sk_state == TCP_TIME_WAIT) {
 		inet_twsk_put(inet_twsk(sk));
-		return;
+		return 0;
 	}
 	seq = ntohl(th->seq);
-	if (sk->sk_state == TCP_NEW_SYN_RECV)
-		return tcp_req_err(sk, seq,
-				  type == ICMP_PARAMETERPROB ||
-				  type == ICMP_TIME_EXCEEDED ||
-				  (type == ICMP_DEST_UNREACH &&
-				   (code == ICMP_NET_UNREACH ||
-				    code == ICMP_HOST_UNREACH)));
+	if (sk->sk_state == TCP_NEW_SYN_RECV) {
+		tcp_req_err(sk, seq, type == ICMP_PARAMETERPROB ||
+				     type == ICMP_TIME_EXCEEDED ||
+				     (type == ICMP_DEST_UNREACH &&
+				      (code == ICMP_NET_UNREACH ||
+				       code == ICMP_HOST_UNREACH)));
+		return 0;
+	}
 
 	tp = tcp_sk(sk);
 	if (mptcp(tp))
@@ -550,7 +551,6 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 		icsk->icsk_rto = inet_csk_rto_backoff(icsk, TCP_RTO_MAX);
 
 		skb = tcp_rtx_queue_head(sk);
-		BUG_ON(!skb);
 
 		tcp_mstamp_refresh(tp);
 		delta_us = (u32)(tp->tcp_mstamp - tcp_skb_timestamp_us(skb));
@@ -622,6 +622,7 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 out:
 	bh_unlock_sock(meta_sk);
 	sock_put(sk);
+	return 0;
 }
 
 void __tcp_v4_send_check(struct sk_buff *skb, __be32 saddr, __be32 daddr)
@@ -1675,6 +1676,8 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 	 */
 	skb_condense(skb);
 
+	skb_dst_drop(skb);
+
 	if (unlikely(sk_add_backlog(sk, skb, limit))) {
 		bh_unlock_sock(sk);
 		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
@@ -2671,8 +2674,8 @@ static int __net_init tcp_sk_init(struct net *net)
 	 * which are too large can cause TCP streams to be bursty.
 	 */
 	net->ipv4.sysctl_tcp_tso_win_divisor = 3;
-	/* Default TSQ limit of four TSO segments */
-	net->ipv4.sysctl_tcp_limit_output_bytes = 262144;
+	/* Default TSQ limit of 16 TSO segments */
+	net->ipv4.sysctl_tcp_limit_output_bytes = 16 * 65536;
 	/* rfc5961 challenge ack rate limiting */
 	net->ipv4.sysctl_tcp_challenge_ack_limit = 1000;
 	net->ipv4.sysctl_tcp_min_tso_segs = 2;

@@ -42,7 +42,8 @@ MAP COMMANDS
 |		| **percpu_array** | **stack_trace** | **cgroup_array** | **lru_hash**
 |		| **lru_percpu_hash** | **lpm_trie** | **array_of_maps** | **hash_of_maps**
 |		| **devmap** | **sockmap** | **cpumap** | **xskmap** | **sockhash**
-|		| **cgroup_storage** | **reuseport_sockarray** | **percpu_cgroup_storage** }
+|		| **cgroup_storage** | **reuseport_sockarray** | **percpu_cgroup_storage**
+|		| **queue** | **stack** }
 
 DESCRIPTION
 ===========
@@ -171,4 +172,10 @@ The following three commands are equivalent:
 
 SEE ALSO
 ========
-	**bpftool**\ (8), **bpftool-prog**\ (8), **bpftool-cgroup**\ (8)
+	**bpf**\ (2),
+	**bpf-helpers**\ (7),
+	**bpftool**\ (8),
+	**bpftool-prog**\ (8),
+	**bpftool-cgroup**\ (8),
+	**bpftool-net**\ (8),
+	**bpftool-perf**\ (8)
