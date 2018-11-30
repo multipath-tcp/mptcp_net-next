@@ -37,6 +37,7 @@
 #define pr_fmt(fmt) "TCP: " fmt
 
 #include <net/tcp.h>
+#include <net/mptcp.h>
 
 #include <linux/compiler.h>
 #include <linux/gfp.h>
@@ -411,6 +412,60 @@ static inline bool tcp_urg_mode(const struct tcp_sock *tp)
 #define OPTION_WSCALE		(1 << 3)
 #define OPTION_FAST_OPEN_COOKIE	(1 << 8)
 #define OPTION_SMC		(1 << 9)
+#define OPTION_MPTCP		(1 << 10)
+
+/* MPTCP option subtypes */
+#define OPTION_MPTCP_MPC_SYN	(1 << 0)
+#define OPTION_MPTCP_MPC_SYNACK	(1 << 1)
+#define OPTION_MPTCP_MPC_ACK	(1 << 2)
+
+struct tcp_out_options {
+	u16 options;		/* bit field of OPTION_* */
+	u16 mss;		/* 0 to disable */
+	u8 ws;			/* window scale, 0 to disable */
+	u8 num_sack_blocks;	/* number of SACK blocks to include */
+	u8 hash_size;		/* bytes in hash_location */
+	__u8 *hash_location;	/* temporary pointer, overloaded */
+	__u32 tsval, tsecr;	/* need to include OPTION_TS */
+	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
+	u16 suboptions;         /* MPTCP sub-options */
+	u64 sndr_key;
+	u64 rcvr_key;
+};
+
+static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
+{
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (!(OPTION_MPTCP & opts->options))
+		return;
+
+	if ((OPTION_MPTCP_MPC_SYN |
+	     OPTION_MPTCP_MPC_SYNACK |
+	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		u8 len;
+		__be64 key;
+
+		if (OPTION_MPTCP_MPC_SYN & opts->suboptions)
+			len = TCPOLEN_MPTCP_MPC_SYN;
+		else
+			len = TCPOLEN_MPTCP_MPC_SYNACK;
+
+		*ptr++ = htonl((0x1e << 24) | // TCP option: Multipath TCP
+			       (len << 16)  | // length
+			       (0 <<  8)    | // subtype=MP_CAPABLE | version=0
+			       (0x1));        // flags=HMAC-SHA1
+		key = cpu_to_be64(opts->sndr_key);
+		memcpy((u8 *) ptr, (u8 *) &key, 8);
+		ptr += 2;
+		if ((OPTION_MPTCP_MPC_SYNACK |
+		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+			key = cpu_to_be64(opts->rcvr_key);
+			memcpy((u8 *) ptr, (u8 *) &key, 8);
+			ptr += 2;
+		}
+	}
+#endif
+}
 
 static void smc_options_write(__be32 *ptr, u16 *options)
 {
@@ -426,17 +481,6 @@ static void smc_options_write(__be32 *ptr, u16 *options)
 	}
 #endif
 }
-
-struct tcp_out_options {
-	u16 options;		/* bit field of OPTION_* */
-	u16 mss;		/* 0 to disable */
-	u8 ws;			/* window scale, 0 to disable */
-	u8 num_sack_blocks;	/* number of SACK blocks to include */
-	u8 hash_size;		/* bytes in hash_location */
-	__u8 *hash_location;	/* temporary pointer, overloaded */
-	__u32 tsval, tsecr;	/* need to include OPTION_TS */
-	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
-};
 
 /* Write previously computed TCP options to the packet.
  *
@@ -546,6 +590,8 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	}
 
 	smc_options_write(ptr, &options);
+
+	mptcp_options_write(ptr, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,
@@ -709,7 +755,6 @@ static unsigned int tcp_synack_options(const struct sock *sk,
 			remaining -= need;
 		}
 	}
-
 	smc_set_option_cond(tcp_sk(sk), ireq, opts, &remaining);
 
 	return MAX_TCP_OPTION_SPACE - remaining;
