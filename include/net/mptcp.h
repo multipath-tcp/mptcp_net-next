@@ -195,27 +195,50 @@ struct mptcp_tw {
 	   in_list:1;
 };
 
-#define MPTCP_PM_NAME_MAX 16
-struct mptcp_pm_ops {
-	struct list_head list;
+struct fullmesh_rem4 {
+	u8		rem4_id;
+	u8		bitfield;
+	u8		retry_bitfield;
+	__be16		port;
+	struct in_addr	addr;
+};
 
-	/* Signal the creation of a new MPTCP-session. */
-	void (*new_session)(const struct sock *meta_sk);
-	void (*release_sock)(struct sock *meta_sk);
-	void (*fully_established)(struct sock *meta_sk);
-	void (*new_remote_address)(struct sock *meta_sk);
-	void (*subflow_error)(struct sock *meta_sk, struct sock *sk);
-	int  (*get_local_id)(sa_family_t family, union inet_addr *addr,
-			     struct net *net);
-	void (*addr_signal)(struct sock *sk, unsigned *size,
-			    struct tcp_out_options *opts, struct sk_buff *skb);
-	void (*add_raddr)(struct mptcp_cb *mpcb, const union inet_addr *addr,
-			  sa_family_t family, __be16 port, u8 id);
-	void (*rem_raddr)(struct mptcp_cb *mpcb, u8 rem_id);
-	void (*delete_subflow)(struct sock *sk);
+struct fullmesh_rem6 {
+	u8		rem6_id;
+	u8		bitfield;
+	u8		retry_bitfield;
+	__be16		port;
+	struct in6_addr	addr;
+};
 
-	char		name[MPTCP_PM_NAME_MAX];
-	struct module	*owner;
+/* Max number of local or remote addresses we can store.
+ * When changing, see the bitfield below in fullmesh_rem4/6.
+ */
+#define MPTCP_MAX_ADDR	8
+
+struct fullmesh_priv {
+	/* Worker struct for subflow establishment */
+	struct work_struct subflow_work;
+	/* Delayed worker, when the routing-tables are not yet ready. */
+	struct delayed_work subflow_retry_work;
+
+	/* Remote addresses */
+	struct fullmesh_rem4 remaddr4[MPTCP_MAX_ADDR];
+	struct fullmesh_rem6 remaddr6[MPTCP_MAX_ADDR];
+
+	struct mptcp_cb *mpcb;
+
+	u16 remove_addrs; /* Addresses to remove */
+	u8 announced_addrs_v4; /* IPv4 Addresses we did announce */
+	u8 announced_addrs_v6; /* IPv6 Addresses we did announce */
+
+	u8	add_addr; /* Are we sending an add_addr? */
+
+	u8 rem4_bits;
+	u8 rem6_bits;
+
+	/* Have we established the additional subflows for primary pair? */
+	u8 first_pair:1;
 };
 
 struct mptcp_cb {
@@ -273,9 +296,7 @@ struct mptcp_cb {
 	__u32	mptcp_loc_token;
 	__u32	mptcp_rem_token;
 
-#define MPTCP_PM_SIZE 608
-	u8 mptcp_pm[MPTCP_PM_SIZE] __aligned(8);
-	struct mptcp_pm_ops *pm_ops;
+	struct fullmesh_priv fmp;
 
 	unsigned long path_index_bits;
 
@@ -690,7 +711,6 @@ void mptcp_cleanup_rbuf(struct sock *meta_sk, int copied);
 int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 		   gfp_t flags);
 void mptcp_del_sock(struct sock *sk);
-void mptcp_update_metasocket(const struct sock *meta_sk);
 void mptcp_update_sndbuf(const struct tcp_sock *tp);
 void mptcp_send_fin(struct sock *meta_sk);
 void mptcp_send_active_reset(struct sock *meta_sk, gfp_t priority);
@@ -793,16 +813,19 @@ int mptcp_finish_handshake(struct sock *child, struct sk_buff *skb);
 int mptcp_get_info(const struct sock *meta_sk, char __user *optval, int optlen);
 void mptcp_clear_sk(struct sock *sk, int size);
 
-/* MPTCP-path-manager registration/initialization functions */
-int mptcp_register_path_manager(struct mptcp_pm_ops *pm);
-void mptcp_unregister_path_manager(struct mptcp_pm_ops *pm);
-void mptcp_init_path_manager(struct mptcp_cb *mpcb);
-void mptcp_cleanup_path_manager(struct mptcp_cb *mpcb);
-void mptcp_fallback_default(struct mptcp_cb *mpcb);
-void mptcp_get_default_path_manager(char *name);
-int mptcp_set_path_manager(struct sock *sk, const char *name);
-int mptcp_set_default_path_manager(const char *name);
-extern struct mptcp_pm_ops mptcp_pm_default;
+int __init full_mesh_register(void);
+void full_mesh_new_session(const struct sock *meta_sk);
+void full_mesh_release_sock(struct sock *meta_sk);
+void full_mesh_create_subflows(struct sock *meta_sk);
+int full_mesh_get_local_id(sa_family_t family, union inet_addr *addr,
+			   struct net *net);
+void full_mesh_addr_signal(struct sock *sk, unsigned *size,
+			   struct tcp_out_options *opts,
+			   struct sk_buff *skb);
+void full_mesh_add_raddr(struct mptcp_cb *mpcb,
+			 const union inet_addr *addr,
+			 sa_family_t family, __be16 port, u8 id);
+void full_mesh_rem_raddr(struct mptcp_cb *mpcb, u8 rem_id);
 
 void mptcp_sched_init(struct sock *sk);
 struct sock *mptcp_get_available_subflow(struct sock *meta_sk,
@@ -1223,7 +1246,6 @@ static inline int is_master_tp(const struct tcp_sock *tp)
 	return 0;
 }
 static inline void mptcp_del_sock(const struct sock *sk) {}
-static inline void mptcp_update_metasocket(const struct sock *meta_sk) {}
 static inline void mptcp_update_sndbuf(const struct tcp_sock *tp) {}
 static inline void mptcp_clean_rtx_infinite(const struct sk_buff *skb,
 					    const struct sock *sk) {}
@@ -1336,6 +1358,8 @@ static inline bool mptcp_can_new_subflow(const struct sock *meta_sk)
 {
 	return false;
 }
+static inline void full_mesh_new_session(const struct sock *meta_sk) {}
+static inline void full_mesh_release_sock(struct sock *meta_sk) {}
 
 #endif /* CONFIG_MPTCP */
 

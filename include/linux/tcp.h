@@ -476,15 +476,12 @@ struct tcp_sock {
 		close_it:1,	/* Must close socket in mptcp_data_ready? */
 		closing:1,
 		mptcp_ver:4,
-		mptcp_pm_setsockopt:1,
 		record_master_info:1;
 	struct mptcp_tcp_sock *mptcp;
 #ifdef CONFIG_MPTCP
-#define MPTCP_PM_NAME_MAX 16
 	struct hlist_nulls_node tk_table;
 	u32		mptcp_loc_token;
 	u64		mptcp_loc_key;
-	char		mptcp_pm_name[MPTCP_PM_NAME_MAX];
 #endif /* CONFIG_MPTCP */
 };
 

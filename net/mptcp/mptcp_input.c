@@ -44,15 +44,6 @@ static inline bool before64(const u64 seq1, const u64 seq2)
 /* is seq1 > seq2 ? */
 #define after64(seq1, seq2)	before64(seq2, seq1)
 
-static inline void mptcp_become_fully_estab(struct sock *sk)
-{
-	tcp_sk(sk)->mptcp->fully_established = 1;
-
-	if (is_master_tp(tcp_sk(sk)) &&
-	    tcp_sk(sk)->mpcb->pm_ops->fully_established)
-		tcp_sk(sk)->mpcb->pm_ops->fully_established(mptcp_meta_sk(sk));
-}
-
 /* Similar to tcp_tso_acked without any memory accounting */
 static inline int mptcp_tso_acked_reinject(const struct sock *meta_sk,
 					   struct sk_buff *skb)
@@ -428,6 +419,7 @@ static int mptcp_prevalidate_skb(struct sock *sk, struct sk_buff *skb)
 		/* We do a seamless fallback and should not send a inf.mapping. */
 		mpcb->send_infinite_mapping = 0;
 		tp->mptcp->fully_established = 1;
+		full_mesh_create_subflows(tp->meta_sk);
 	}
 
 	/* Receiver-side becomes fully established when a whole rcv-window has
@@ -436,8 +428,10 @@ static int mptcp_prevalidate_skb(struct sock *sk, struct sk_buff *skb)
 	 */
 	if (!tp->mptcp->fully_established) {
 		tp->mptcp->init_rcv_wnd -= skb->len;
-		if (tp->mptcp->init_rcv_wnd < 0)
-			mptcp_become_fully_estab(sk);
+		if (tp->mptcp->init_rcv_wnd < 0) {
+			tp->mptcp->fully_established = 1;
+			full_mesh_create_subflows(tp->meta_sk);
+		}
 	}
 
 	return 0;
@@ -1247,7 +1241,7 @@ static void mptcp_data_ack(struct sock *sk, const struct sk_buff *skb)
 		/* As soon as a subflow-data-ack (not acking syn, thus snt_isn + 1)
 		 * includes a data-ack, we are fully established
 		 */
-		mptcp_become_fully_estab(sk);
+		tp->mptcp->fully_established = 1;
 
 	/* After we did the subflow-only processing (stopping timer and marking
 	 * subflow as established), check if we can proceed with MPTCP-level
@@ -1757,8 +1751,7 @@ skip_hmac_v6:
 		return;
 	}
 
-	if (mpcb->pm_ops->add_raddr)
-		mpcb->pm_ops->add_raddr(mpcb, &addr, family, port, mpadd->addr_id);
+	full_mesh_add_raddr(mpcb, &addr, family, port, mpadd->addr_id);
 
 	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDRRX);
 }
@@ -1773,8 +1766,7 @@ static void mptcp_handle_rem_addr(const unsigned char *ptr, struct sock *sk)
 	for (i = 0; i <= mprem->len - MPTCP_SUB_LEN_REMOVE_ADDR; i++) {
 		rem_id = (&mprem->addrs_id)[i];
 
-		if (mpcb->pm_ops->rem_raddr)
-			mpcb->pm_ops->rem_raddr(mpcb, rem_id);
+		full_mesh_rem_raddr(mpcb, rem_id);
 		mptcp_send_reset_rem_id(mpcb, rem_id);
 
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_REMADDRSUB);
@@ -1877,8 +1869,7 @@ static inline void mptcp_path_array_check(struct sock *meta_sk)
 
 	if (unlikely(mpcb->list_rcvd)) {
 		mpcb->list_rcvd = 0;
-		if (mpcb->pm_ops->new_remote_address)
-			mpcb->pm_ops->new_remote_address(meta_sk);
+		full_mesh_create_subflows(meta_sk);
 	}
 }
 

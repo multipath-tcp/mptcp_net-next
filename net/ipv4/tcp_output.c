@@ -921,8 +921,7 @@ void tcp_release_cb(struct sock *sk)
 		__sock_put(sk);
 	}
 	if (flags & TCPF_PATH_MANAGER_DEFERRED) {
-		if (tcp_sk(sk)->mpcb->pm_ops->release_sock)
-			tcp_sk(sk)->mpcb->pm_ops->release_sock(sk);
+		full_mesh_release_sock(sk);
 		__sock_put(sk);
 	}
 	if (flags & TCPF_SUB_DEFERRED)
