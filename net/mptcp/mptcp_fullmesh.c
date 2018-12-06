@@ -923,12 +923,6 @@ duno:
 					    !ipv6_addr_equal(&inet6_sk(sk)->saddr, &event->addr.in6))
 						continue;
 
-					/* Reinject, so that pf = 1 and so we
-					 * won't select this one as the
-					 * ack-sock.
-					 */
-					mptcp_reinject_data(sk, 0);
-
 					/* We announce the removal of this id */
 					announce_remove_addr(tcp_sk(sk)->mptcp->loc_id, meta_sk);
 
@@ -1438,12 +1432,6 @@ removal:
 		}
 
 		if (shall_remove) {
-			/* Reinject, so that pf = 1 and so we
-			 * won't select this one as the
-			 * ack-sock.
-			 */
-			mptcp_reinject_data(sk, 0);
-
 			announce_remove_addr(tcp_sk(sk)->mptcp->loc_id,
 					     meta_sk);
 

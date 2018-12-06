@@ -562,7 +562,7 @@ struct sock *mptcp_select_ack_sock(const struct sock *meta_sk)
 		struct tcp_sock *tp = tcp_sk(sk);
 		u32 elapsed;
 
-		if (!mptcp_sk_can_send_ack(sk) || tp->pf)
+		if (!mptcp_sk_can_send_ack(sk) || inet_csk(sk)->icsk_ca_state == TCP_CA_Loss)
 			continue;
 
 		elapsed = keepalive_time_elapsed(tp);
@@ -693,8 +693,6 @@ void mptcp_destroy_sock(struct sock *sk)
 	if (is_meta_sk(sk)) {
 		struct mptcp_tcp_sock *mptcp;
 		struct hlist_node *tmp;
-
-		__skb_queue_purge(&tcp_sk(sk)->mpcb->reinject_queue);
 
 		/* We have to close all remaining subflows. Normally, they
 		 * should all be about to get closed. But, if the kernel is
@@ -1231,7 +1229,6 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key,
 	meta_tp->was_meta_sk = 0;
 
 	/* Initialize the queues */
-	skb_queue_head_init(&mpcb->reinject_queue);
 	master_tp->out_of_order_queue = RB_ROOT;
 	master_sk->tcp_rtx_queue = RB_ROOT;
 	INIT_LIST_HEAD(&master_tp->tsq_node);
@@ -1461,9 +1458,6 @@ void mptcp_del_sock(struct sock *sk)
 
 	tp->mptcp->attached = 0;
 	mpcb->path_index_bits &= ~(1 << tp->mptcp->path_index);
-
-	if (!tcp_write_queue_empty(sk) || !tcp_rtx_queue_empty(sk))
-		mptcp_reinject_data(sk, 0);
 
 	if (is_master_tp(tp)) {
 		struct sock *meta_sk = mptcp_meta_sk(sk);
@@ -1921,8 +1915,6 @@ void mptcp_disconnect(struct sock *sk)
 	struct mptcp_tcp_sock *mptcp;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct hlist_node *tmp;
-
-	__skb_queue_purge(&tp->mpcb->reinject_queue);
 
 	if (tp->inside_tk_table)
 		mptcp_hash_remove_bh(tp);

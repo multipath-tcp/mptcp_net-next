@@ -470,9 +470,6 @@ struct tcp_sock {
 		request_mptcp:1, /* Did we send out an MP_CAPABLE?
 				  * (this speeds up mptcp_doit() in tcp_recvmsg)
 				  */
-		pf:1, /* Potentially Failed state: when this flag is set, we
-		       * stop using the subflow
-		       */
 		mp_killed:1, /* Killed with a tcp_done in mptcp? */
 		was_meta_sk:1,	/* This was a meta sk (in case of reuse) */
 		is_master_sk:1,
