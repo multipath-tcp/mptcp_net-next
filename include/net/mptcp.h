@@ -869,20 +869,6 @@ struct request_sock *rev_mptcp_rsk(const struct mptcp_request_sock *req)
 	return (struct request_sock *)req;
 }
 
-static inline bool mptcp_can_sendpage(struct sock *sk)
-{
-	struct mptcp_tcp_sock *mptcp;
-
-	mptcp_for_each_sub(tcp_sk(sk)->mpcb, mptcp) {
-		struct sock *sk_it = mptcp_to_sock(mptcp);
-
-		if (!(sk_it->sk_route_caps & NETIF_F_SG))
-			return false;
-	}
-
-	return true;
-}
-
 static inline void mptcp_push_pending_frames(struct sock *meta_sk)
 {
 	/* We check packets out and send-head here. TCP only checks the
@@ -1366,10 +1352,6 @@ static inline int mptcp_rcv_synsent_state_process(struct sock *sk,
 						  const struct mptcp_options_received *mopt)
 {
 	return 0;
-}
-static inline bool mptcp_can_sendpage(struct sock *sk)
-{
-	return false;
 }
 static inline int mptcp_init_tw_sock(struct sock *sk,
 				     struct tcp_timewait_sock *tw)

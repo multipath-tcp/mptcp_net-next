@@ -977,26 +977,10 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 	 * is fully established.
 	 */
 	if (((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) &&
-	    !tcp_passive_fastopen(mptcp(tp) && tp->mpcb->master_sk ?
-				  tp->mpcb->master_sk : sk)) {
+	    !tcp_passive_fastopen(sk)) {
 		err = sk_stream_wait_connect(sk, &timeo);
 		if (err != 0)
 			goto out_err;
-	}
-
-	if (mptcp(tp)) {
-		/* We must check this with socket-lock hold because we iterate
-		 * over the subflows.
-		 */
-		if (!mptcp_can_sendpage(sk)) {
-			ssize_t ret;
-
-			release_sock(sk);
-			ret = sock_no_sendpage(sk->sk_socket, page, offset,
-					       size, flags);
-			lock_sock(sk);
-			return ret;
-		}
 	}
 
 	sk_clear_bit(SOCKWQ_ASYNC_NOSPACE, sk);
@@ -1117,8 +1101,7 @@ EXPORT_SYMBOL_GPL(do_tcp_sendpages);
 int tcp_sendpage_locked(struct sock *sk, struct page *page, int offset,
 			size_t size, int flags)
 {
-	/* If MPTCP is enabled, we check it later after establishment */
-	if (!mptcp(tcp_sk(sk)) && !(sk->sk_route_caps & NETIF_F_SG))
+	if (!(sk->sk_route_caps & NETIF_F_SG) || mptcp(tcp_sk(sk)))
 		return sock_no_sendpage_locked(sk, page, offset, size, flags);
 
 	tcp_rate_check_app_limited(sk);  /* is sending application-limited? */
