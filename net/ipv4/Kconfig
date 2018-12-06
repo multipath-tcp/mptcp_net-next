@@ -717,21 +717,6 @@ choice
 	config DEFAULT_BBR
 		bool "BBR" if TCP_CONG_BBR=y
 
-	config DEFAULT_LIA
-		bool "Lia" if TCP_CONG_LIA=y
-
-	config DEFAULT_OLIA
-		bool "Olia" if TCP_CONG_OLIA=y
-
-	config DEFAULT_WVEGAS
-		bool "Wvegas" if TCP_CONG_WVEGAS=y
-
-	config DEFAULT_BALIA
-		bool "Balia" if TCP_CONG_BALIA=y
-
-	config DEFAULT_MCTCPDESYNC
-		bool "Mctcpdesync (EXPERIMENTAL)" if TCP_CONG_MCTCPDESYNC=y
-
 	config DEFAULT_RENO
 		bool "Reno"
 endchoice
@@ -752,10 +737,6 @@ config DEFAULT_TCP_CONG
 	default "vegas" if DEFAULT_VEGAS
 	default "westwood" if DEFAULT_WESTWOOD
 	default "veno" if DEFAULT_VENO
-	default "lia" if DEFAULT_LIA
-	default "olia" if DEFAULT_OLIA
-	default "wvegas" if DEFAULT_WVEGAS
-	default "balia" if DEFAULT_BALIA
 	default "reno" if DEFAULT_RENO
 	default "dctcp" if DEFAULT_DCTCP
 	default "cdg" if DEFAULT_CDG
