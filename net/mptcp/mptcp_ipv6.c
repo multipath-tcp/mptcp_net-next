@@ -133,7 +133,6 @@ static int mptcp_v6_join_init_req(struct request_sock *req, const struct sock *m
 	const struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
 	union inet_addr addr;
 	int loc_id;
-	bool low_prio = false;
 
 	/* We need to do this as early as possible. Because, if we fail later
 	 * (e.g., get_local_id), then reqsk_free tries to remove the
@@ -149,11 +148,10 @@ static int mptcp_v6_join_init_req(struct request_sock *req, const struct sock *m
 						    tcp_hdr(skb)->source,
 						    tcp_hdr(skb)->dest);
 	addr.in6 = inet_rsk(req)->ir_v6_loc_addr;
-	loc_id = mpcb->pm_ops->get_local_id(AF_INET6, &addr, sock_net(meta_sk), &low_prio);
+	loc_id = mpcb->pm_ops->get_local_id(AF_INET6, &addr, sock_net(meta_sk));
 	if (loc_id == -1)
 		return -1;
 	mtreq->loc_id = loc_id;
-	mtreq->low_prio = low_prio;
 
 	mptcp_join_reqsk_init(mpcb, req, skb);
 
@@ -319,7 +317,6 @@ int mptcp_init6_subsockets(struct sock *meta_sk, const struct mptcp_loc6 *loc,
 	}
 
 	tp->mptcp->slave_sk = 1;
-	tp->mptcp->low_prio = loc->low_prio;
 
 	/* Initializing the timer for an MPTCP subflow */
 	timer_setup(&tp->mptcp->mptcp_ack_timer, mptcp_ack_handler, 0);

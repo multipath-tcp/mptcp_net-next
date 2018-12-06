@@ -1503,14 +1503,12 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		case MPTCP_SUB_LEN_JOIN_SYN:
 			mopt->is_mp_join = 1;
 			mopt->saw_mpc = 1;
-			mopt->low_prio = mpjoin->b;
 			mopt->rem_id = mpjoin->addr_id;
 			mopt->mptcp_rem_token = mpjoin->u.syn.token;
 			mopt->mptcp_recv_nonce = mpjoin->u.syn.nonce;
 			break;
 		case MPTCP_SUB_LEN_JOIN_SYNACK:
 			mopt->saw_mpc = 1;
-			mopt->low_prio = mpjoin->b;
 			mopt->rem_id = mpjoin->addr_id;
 			mopt->mptcp_recv_tmac = mpjoin->u.synack.mac;
 			mopt->mptcp_recv_nonce = mpjoin->u.synack.nonce;
@@ -1613,26 +1611,6 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		mopt->saw_rem_addr = 1;
 		mopt->rem_addr_ptr = ptr;
 		break;
-	case MPTCP_SUB_PRIO:
-	{
-		const struct mp_prio *mpprio = (struct mp_prio *)ptr;
-
-		if (opsize != MPTCP_SUB_LEN_PRIO &&
-		    opsize != MPTCP_SUB_LEN_PRIO_ADDR) {
-			mptcp_debug("%s: mp_prio: bad option size %d\n",
-				    __func__, opsize);
-			break;
-		}
-
-		mopt->saw_low_prio = 1;
-		mopt->low_prio = mpprio->b;
-
-		if (opsize == MPTCP_SUB_LEN_PRIO_ADDR) {
-			mopt->saw_low_prio = 2;
-			mopt->prio_addr_id = mpprio->addr_id;
-		}
-		break;
-	}
 	case MPTCP_SUB_FAIL:
 		if (opsize != MPTCP_SUB_LEN_FAIL) {
 			mptcp_debug("%s: mp_fail: bad option size %d\n",
@@ -1963,19 +1941,6 @@ bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 		mopt->more_rem_addr = 0;
 		mopt->saw_rem_addr = 0;
 	}
-	if (mopt->saw_low_prio) {
-		if (mopt->saw_low_prio == 1) {
-			tp->mptcp->rcv_low_prio = mopt->low_prio;
-		} else {
-			struct mptcp_tcp_sock *mptcp;
-
-			mptcp_for_each_sub(tp->mpcb, mptcp) {
-				if (mptcp->rem_id == mopt->prio_addr_id)
-					mptcp->rcv_low_prio = mopt->low_prio;
-			}
-		}
-		mopt->saw_low_prio = 0;
-	}
 
 	mptcp_data_ack(sk, skb);
 
@@ -2077,7 +2042,6 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		 * until the 4th ack arrives.
 		 */
 		tp->mptcp->pre_established = 1;
-		tp->mptcp->rcv_low_prio = tp->mptcp->rx_opt.low_prio;
 
 		mptcp_hmac_sha1((u8 *)&mpcb->mptcp_loc_key,
 				(u8 *)&mpcb->mptcp_rem_key,

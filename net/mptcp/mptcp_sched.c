@@ -113,22 +113,11 @@ static int mptcp_dont_reinject_skb(const struct tcp_sock *tp, const struct sk_bu
 		mptcp_pi_to_flag(tp->mptcp->path_index) & TCP_SKB_CB(skb)->path_mask;
 }
 
-static bool subflow_is_backup(const struct tcp_sock *tp)
-{
-	return tp->mptcp->rcv_low_prio || tp->mptcp->low_prio;
-}
-
-static bool subflow_is_active(const struct tcp_sock *tp)
-{
-	return !tp->mptcp->rcv_low_prio && !tp->mptcp->low_prio;
-}
-
 /* Generic function to iterate over used and unused subflows and to select the
  * best one
  */
 static struct sock
 *get_subflow_from_selectors(struct mptcp_cb *mpcb, struct sk_buff *skb,
-			    bool (*selector)(const struct tcp_sock *),
 			    bool zero_wnd_test, bool *force)
 {
 	struct sock *bestsk = NULL;
@@ -141,10 +130,6 @@ static struct sock
 		struct sock *sk = mptcp_to_sock(mptcp);
 		struct tcp_sock *tp = tcp_sk(sk);
 		bool unused = false;
-
-		/* First, we choose only the wanted sks */
-		if (!(*selector)(tp))
-			continue;
 
 		if (!mptcp_dont_reinject_skb(tp, skb))
 			unused = true;
@@ -233,16 +218,13 @@ static struct sock *get_available_subflow(struct sock *meta_sk,
 
 	/* Find the best subflow */
 restart:
-	sk = get_subflow_from_selectors(mpcb, skb, &subflow_is_active,
-					zero_wnd_test, &force);
+	sk = get_subflow_from_selectors(mpcb, skb, zero_wnd_test, &force);
 	if (force)
 		/* one unused active sk or one NULL sk when there is at least
 		 * one temporally unavailable unused active sk
 		 */
 		return sk;
 
-	sk = get_subflow_from_selectors(mpcb, skb, &subflow_is_backup,
-					zero_wnd_test, &force);
 	if (!force && skb) {
 		/* one used backup sk or one NULL sk where there is no one
 		 * temporally unavailable unused backup sk

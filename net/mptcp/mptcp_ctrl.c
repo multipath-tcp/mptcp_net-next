@@ -2218,11 +2218,6 @@ struct sock *mptcp_check_req_child(struct sock *meta_sk,
 		goto teardown;
 	}
 
-	/* The child is a clone of the meta socket, we must now reset
-	 * some of the fields
-	 */
-	child_tp->mptcp->rcv_low_prio = mtreq->rcv_low_prio;
-
 	/* We should allow proper increase of the snd/rcv-buffers. Thus, we
 	 * use the original values instead of the bloated up ones from the
 	 * clone.
@@ -2438,7 +2433,6 @@ void mptcp_join_reqsk_init(const struct mptcp_cb *mpcb,
 	mtreq->mptcp_hash_tmac = *(u64 *)mptcp_hash_mac;
 
 	mtreq->rem_id = mopt.rem_id;
-	mtreq->rcv_low_prio = mopt.low_prio;
 	inet_rsk(req)->saw_mpc = 1;
 
 	MPTCP_INC_STATS(sock_net(mpcb->meta_sk), MPTCP_MIB_JOINSYNRX);

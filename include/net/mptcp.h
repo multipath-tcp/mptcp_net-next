@@ -56,7 +56,6 @@
 
 struct mptcp_loc4 {
 	u8		loc4_id;
-	u8		low_prio:1;
 	int		if_idx;
 	struct in_addr	addr;
 };
@@ -69,7 +68,6 @@ struct mptcp_rem4 {
 
 struct mptcp_loc6 {
 	u8		loc6_id;
-	u8		low_prio:1;
 	int		if_idx;
 	struct in6_addr	addr;
 };
@@ -103,8 +101,6 @@ struct mptcp_request_sock {
 	u8				loc_id;
 	u8				rem_id; /* Address-id in the MP_JOIN */
 	u8				is_sub:1, /* Is this a new subflow? */
-					low_prio:1, /* Interface set to low-prio? */
-					rcv_low_prio:1,
 					mptcp_ver:4;
 };
 
@@ -114,11 +110,6 @@ struct mptcp_options_received {
 
 		is_mp_join:1,
 		join_ack:1,
-
-		saw_low_prio:2, /* 0x1 - low-prio set for this subflow
-				 * 0x2 - low-prio set for another subflow
-				 */
-		low_prio:1,
 
 		saw_add_addr:2, /* Saw at least one add_addr option:
 				 * 0x1: IPv4 - 0x2: IPv6
@@ -131,7 +122,6 @@ struct mptcp_options_received {
 		mp_fail:1,
 		mp_fclose:1;
 	u8	rem_id;		/* Address-id in the MP_JOIN */
-	u8	prio_addr_id;	/* Address-id in the MP_PRIO */
 
 	const unsigned char *add_addr_ptr; /* Pointer to add-address option */
 	const unsigned char *rem_addr_ptr; /* Pointer to rem-address option */
@@ -169,9 +159,6 @@ struct mptcp_tcp_sock {
 		include_mpc:1,
 		mapping_present:1,
 		map_data_fin:1,
-		low_prio:1, /* use this socket as backup */
-		rcv_low_prio:1, /* Peer sent low-prio option to us */
-		send_mp_prio:1, /* Trigger to send mp_prio on this socket */
 		pre_established:1; /* State between sending 3rd ACK and
 				    * receiving the fourth ack of new subflows.
 				    */
@@ -220,7 +207,7 @@ struct mptcp_pm_ops {
 	void (*new_remote_address)(struct sock *meta_sk);
 	void (*subflow_error)(struct sock *meta_sk, struct sock *sk);
 	int  (*get_local_id)(sa_family_t family, union inet_addr *addr,
-			     struct net *net, bool *low_prio);
+			     struct net *net);
 	void (*addr_signal)(struct sock *sk, unsigned *size,
 			    struct tcp_out_options *opts, struct sk_buff *skb);
 	void (*add_raddr)(struct mptcp_cb *mpcb, const union inet_addr *addr,
@@ -395,11 +382,6 @@ struct mptcp_cb {
 #define MPTCP_SUB_REMOVE_ADDR	4
 #define MPTCP_SUB_LEN_REMOVE_ADDR	4
 
-#define MPTCP_SUB_PRIO		5
-#define MPTCP_SUB_LEN_PRIO	3
-#define MPTCP_SUB_LEN_PRIO_ADDR	4
-#define MPTCP_SUB_LEN_PRIO_ALIGN	4
-
 #define MPTCP_SUB_FAIL		6
 #define MPTCP_SUB_LEN_FAIL	12
 #define MPTCP_SUB_LEN_FAIL_ALIGN	12
@@ -429,7 +411,6 @@ extern bool mptcp_init_failed;
 #define OPTION_MP_JOIN		(1 << 6)
 #define OPTION_MP_FCLOSE	(1 << 7)
 #define OPTION_REMOVE_ADDR	(1 << 8)
-#define OPTION_MP_PRIO		(1 << 9)
 
 /* MPTCP flags: both TX and RX */
 #define MPTCPHDR_SEQ		0x01 /* DSS.M option is present */
@@ -612,23 +593,6 @@ struct mp_fclose {
 #error	"Adjust your <asm/byteorder.h> defines"
 #endif
 	__u64	key;
-} __attribute__((__packed__));
-
-struct mp_prio {
-	__u8	kind;
-	__u8	len;
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-	__u8	b:1,
-		rsv:3,
-		sub:4;
-#elif defined(__BIG_ENDIAN_BITFIELD)
-	__u8	sub:4,
-		rsv:3,
-		b:1;
-#else
-#error	"Adjust your <asm/byteorder.h> defines"
-#endif
-	__u8	addr_id;
 } __attribute__((__packed__));
 
 static inline int mptcp_sub_len_dss(const struct mp_dss *m)
@@ -1048,9 +1012,6 @@ static inline void mptcp_init_mp_opt(struct mptcp_options_received *mopt)
 	mopt->is_mp_join = 0;
 	mopt->join_ack = 0;
 
-	mopt->saw_low_prio = 0;
-	mopt->low_prio = 0;
-
 	mopt->saw_add_addr = 0;
 	mopt->more_add_addr = 0;
 
@@ -1065,7 +1026,6 @@ static inline void mptcp_reset_mopt(struct tcp_sock *tp)
 {
 	struct mptcp_options_received *mopt = &tp->mptcp->rx_opt;
 
-	mopt->saw_low_prio = 0;
 	mopt->saw_add_addr = 0;
 	mopt->more_add_addr = 0;
 	mopt->saw_rem_addr = 0;
