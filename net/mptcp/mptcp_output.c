@@ -306,7 +306,7 @@ int mptcp_write_wakeup(struct sock *meta_sk, int mib)
 	    before(TCP_SKB_CB(skb)->seq, tcp_wnd_end(meta_tp))) {
 		unsigned int mss;
 		unsigned int seg_size = tcp_wnd_end(meta_tp) - TCP_SKB_CB(skb)->seq;
-		struct sock *subsk = meta_tp->mpcb->sched_ops->get_subflow(meta_sk, skb, true);
+		struct sock *subsk = mptcp_get_available_subflow(meta_sk, skb, true);
 		struct tcp_sock *subtp;
 
 		WARN_ON(TCP_SKB_CB(skb)->sacked);
@@ -395,8 +395,7 @@ bool mptcp_write_xmit(struct sock *meta_sk, unsigned int mss_now, int nonagle,
 
 	tcp_mstamp_refresh(meta_tp);
 
-	while ((skb = mpcb->sched_ops->next_segment(meta_sk, &reinject, &subsk,
-						    &sublimit))) {
+	while ((skb = mptcp_next_segment(meta_sk, &reinject, &subsk, &sublimit))) {
 		enum tcp_queue tcp_queue = TCP_FRAG_IN_WRITE_QUEUE;
 		unsigned int limit;
 
@@ -1111,7 +1110,7 @@ int mptcp_retransmit_skb(struct sock *meta_sk, struct sk_buff *skb)
 	/* We need to make sure that the retransmitted segment can be sent on a
 	 * subflow right now. If it is too big, it needs to be fragmented.
 	 */
-	subsk = meta_tp->mpcb->sched_ops->get_subflow(meta_sk, skb, false);
+	subsk = mptcp_get_available_subflow(meta_sk, skb, false);
 	if (!subsk) {
 		/* We want to increase icsk_retransmits, thus return 0, so that
 		 * mptcp_meta_retransmit_timer enters the desired branch.
