@@ -407,22 +407,7 @@ static int mptcp_write_dss_mapping(const struct tcp_sock *tp, const struct sk_bu
 	else
 		data_len = tcb->end_seq - tcb->seq;
 
-	if (tp->mpcb->dss_csum && data_len) {
-		__be16 *p16 = (__be16 *)ptr;
-		__be32 hdseq = mptcp_get_highorder_sndbits(skb, tp->mpcb);
-		__wsum csum;
-
-		*ptr = htonl(((data_len) << 16) |
-			     (TCPOPT_EOL << 8) |
-			     (TCPOPT_EOL));
-		csum = csum_partial(ptr - 2, 12, skb->csum);
-		p16++;
-		*p16++ = csum_fold(csum_partial(&hdseq, sizeof(hdseq), csum));
-	} else {
-		*ptr++ = htonl(((data_len) << 16) |
-			       (TCPOPT_NOP << 8) |
-			       (TCPOPT_NOP));
-	}
+	*ptr++ = htonl(((data_len) << 16) | (TCPOPT_NOP << 8) | (TCPOPT_NOP));
 
 	return ptr - start;
 }
@@ -442,7 +427,7 @@ static int mptcp_write_dss_data_ack(const struct tcp_sock *tp, const struct sk_b
 	mdss->M = mptcp_is_data_seq(skb) ? 1 : 0;
 	mdss->a = 0;
 	mdss->A = 1;
-	mdss->len = mptcp_sub_len_dss(mdss, tp->mpcb->dss_csum);
+	mdss->len = mptcp_sub_len_dss(mdss);
 	ptr++;
 
 	*ptr++ = htonl(mptcp_meta_tp(tp)->rcv_nxt);
@@ -455,10 +440,6 @@ static int mptcp_write_dss_data_ack(const struct tcp_sock *tp, const struct sk_b
  * they are in the retransmission queue (due to SACK or ACKs) and that
  * arguably means that we would change the mapping (e.g. it splits it,
  * our sends out a subset of the initial mapping).
- *
- * Furthermore, the skb checksum is not always preserved across splits
- * (e.g. mptcp_fragment) which would mean that we need to recompute
- * the DSS checksum in this case.
  *
  * To avoid this we save the initial DSS mapping which allows us to
  * send the same DSS mapping even for fragmented retransmits.
@@ -518,10 +499,6 @@ static bool mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
 	tcp_skb_pcount_set(subskb, 0);
 
 	TCP_SKB_CB(skb)->path_mask |= mptcp_pi_to_flag(tp->mptcp->path_index);
-
-	/* Compute checksum */
-	if (tp->mpcb->dss_csum)
-		subskb->csum = skb->csum = skb_checksum(skb, 0, skb->len, 0);
 
 	tcb = TCP_SKB_CB(subskb);
 
@@ -977,7 +954,6 @@ void mptcp_syn_options(const struct sock *sk, struct tcp_out_options *opts,
 		opts->mptcp_ver = tcp_sk(sk)->mptcp_ver;
 		*remaining -= MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN;
 		opts->mp_capable.sender_key = tp->mptcp_loc_key;
-		opts->dss_csum = !!sysctl_mptcp_checksum;
 	} else {
 		const struct mptcp_cb *mpcb = tp->mpcb;
 
@@ -1002,7 +978,6 @@ void mptcp_synack_options(struct request_sock *req,
 		opts->mptcp_options |= OPTION_MP_CAPABLE | OPTION_TYPE_SYNACK;
 		opts->mptcp_ver = mtreq->mptcp_ver;
 		opts->mp_capable.sender_key = mtreq->mptcp_loc_key;
-		opts->dss_csum = !!sysctl_mptcp_checksum || mtreq->dss_csum;
 		*remaining -= MPTCP_SUB_LEN_CAPABLE_SYN_ALIGN;
 	} else {
 		opts->mptcp_options |= OPTION_MP_JOIN | OPTION_TYPE_SYNACK;
@@ -1070,7 +1045,6 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		opts->mptcp_ver = mpcb->mptcp_ver;
 		opts->mp_capable.sender_key = mpcb->mptcp_loc_key;
 		opts->mp_capable.receiver_key = mpcb->mptcp_rem_key;
-		opts->dss_csum = mpcb->dss_csum;
 
 		if (skb)
 			tp->mptcp->include_mpc = 0;
@@ -1100,24 +1074,11 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		if (skb && !mptcp_is_data_seq(skb)) {
 			*size += MPTCP_SUB_LEN_ACK_ALIGN;
 		} else {
-			/* Doesn't matter, if csum included or not. It will be
-			 * either 10 or 12, and thus aligned = 12
-			 */
 			*size += MPTCP_SUB_LEN_ACK_ALIGN +
 				 MPTCP_SUB_LEN_SEQ_ALIGN;
 		}
 
 		*size += MPTCP_SUB_LEN_DSS_ALIGN;
-	}
-
-	/* In fallback mp_fail-mode, we have to repeat it until the fallback
-	 * has been done by the sender
-	 */
-	if (unlikely(tp->mptcp->send_mp_fail) && skb &&
-	    MAX_TCP_OPTION_SPACE - *size >= MPTCP_SUB_LEN_FAIL) {
-		opts->options |= OPTION_MPTCP;
-		opts->mptcp_options |= OPTION_MP_FAIL;
-		*size += MPTCP_SUB_LEN_FAIL;
 	}
 
 	if (unlikely(mpcb->addr_signal) && mpcb->pm_ops->addr_signal &&
@@ -1172,7 +1133,7 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		}
 
 		mpc->sub = MPTCP_SUB_CAPABLE;
-		mpc->a = opts->dss_csum;
+		mpc->a = 0;
 		mpc->b = 0;
 		mpc->rsv = 0;
 		mpc->h = 1;
@@ -1271,18 +1232,6 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		ptr += len_align >> 2;
 
 		MPTCP_INC_STATS(sock_net((struct sock *)tp), MPTCP_MIB_REMADDRTX);
-	}
-	if (unlikely(OPTION_MP_FAIL & opts->mptcp_options)) {
-		struct mp_fail *mpfail = (struct mp_fail *)ptr;
-
-		mpfail->kind = TCPOPT_MPTCP;
-		mpfail->len = MPTCP_SUB_LEN_FAIL;
-		mpfail->sub = MPTCP_SUB_FAIL;
-		mpfail->rsv1 = 0;
-		mpfail->rsv2 = 0;
-		mpfail->data_seq = htonll(tp->mpcb->csum_cutoff_seq);
-
-		ptr += MPTCP_SUB_LEN_FAIL_ALIGN >> 2;
 	}
 	if (unlikely(OPTION_MP_FCLOSE & opts->mptcp_options)) {
 		struct mp_fclose *mpfclose = (struct mp_fclose *)ptr;
@@ -1848,15 +1797,7 @@ int mptcp_select_size(const struct sock *meta_sk, bool first_skb, bool zc)
 		if (zc)
 			return 0;
 
-		if (!tcp_sk(meta_sk)->mpcb->dss_csum) {
-			mss = linear_payload_sz(first_skb);
-		} else {
-			int pgbreak = SKB_MAX_HEAD(MAX_TCP_HEADER);
-
-			if (mss >= pgbreak &&
-			    mss <= pgbreak + (MAX_SKB_FRAGS - 1) * PAGE_SIZE)
-				mss = pgbreak;
-		}
+		mss = linear_payload_sz(first_skb);
 	}
 
 	return !mss ? tcp_sk(meta_sk)->mss_cache : mss;
@@ -1893,7 +1834,7 @@ unsigned int mptcp_xmit_size_goal(const struct sock *meta_sk, u32 mss_now,
 {
 	u32 xmit_size_goal = 0;
 
-	if (large_allowed && !tcp_sk(meta_sk)->mpcb->dss_csum) {
+	if (large_allowed) {
 		struct mptcp_tcp_sock *mptcp;
 
 		mptcp_for_each_sub(tcp_sk(meta_sk)->mpcb, mptcp) {
