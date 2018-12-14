@@ -189,3 +189,18 @@ unsigned int mptcp_established_options(struct sock *sk, u64 *local_key,
 	}
 	return 0;
 }
+
+unsigned int mptcp_synack_options(struct request_sock *req, u64 *local_key,
+				  u64 *remote_key)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	pr_debug("subflow_req=%p", subflow_req);
+	if (subflow_req->mp_capable) {
+		*local_key = subflow_req->local_key;
+		*remote_key = subflow_req->remote_key;
+		pr_debug("local_key=%llu", *local_key);
+		pr_debug("remote_key=%llu", *remote_key);
+	}
+	return subflow_req->mp_capable;
+}
