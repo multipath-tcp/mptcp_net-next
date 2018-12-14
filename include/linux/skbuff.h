@@ -3908,6 +3908,9 @@ enum skb_ext_id {
 #ifdef CONFIG_XFRM
 	SKB_EXT_SEC_PATH,
 #endif
+#if IS_ENABLED(CONFIG_MPTCP)
+	SKB_EXT_MPTCP,
+#endif
 	SKB_EXT_NUM, /* must be last */
 };
 

@@ -70,6 +70,7 @@
 #include <net/checksum.h>
 #include <net/ip6_checksum.h>
 #include <net/xfrm.h>
+#include <net/mptcp.h>
 
 #include <linux/uaccess.h>
 #include <trace/events/skb.h>
@@ -5561,6 +5562,9 @@ static const u8 skb_ext_type_len[] = {
 #ifdef CONFIG_XFRM
 	[SKB_EXT_SEC_PATH] = SKB_EXT_CHUNKSIZEOF(struct sec_path),
 #endif
+#if IS_ENABLED(CONFIG_MPTCP)
+	[SKB_EXT_MPTCP] = sizeof(struct mptcp_skb_cb),
+#endif
 };
 
 static void *skb_ext_get_ptr(struct skb_ext *ext, enum skb_ext_id id)
@@ -5607,6 +5611,9 @@ static __always_inline unsigned int skb_ext_total_length(void)
 #endif
 #ifdef CONFIG_XFRM
 		skb_ext_type_len[SKB_EXT_SEC_PATH] +
+#endif
+#if IS_ENABLED(CONFIG_MPTCP)
+		skb_ext_type_len[SKB_EXT_MPTCP] +
 #endif
 		0;
 }

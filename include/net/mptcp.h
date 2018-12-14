@@ -51,6 +51,23 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
+/* MPTCP sk_buff private control buffer */
+struct mptcp_skb_cb {
+	refcount_t	refcnt;
+	u64		data_ack;
+	u64		data_seq;
+	u32		subflow_seq;
+	u16		dll;
+	__sum16		checksum;
+	u8		use_map:1,
+			dsn64:1,
+			use_checksum:1,
+			data_fin:1,
+			use_ack:1,
+			ack64:1,
+			__unused:2;
+};
+
 /* MPTCP subflow sock structure */
 struct subflow_sock {
 	/* tcp_sock must be the first member */
