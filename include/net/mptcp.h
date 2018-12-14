@@ -16,8 +16,6 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
-#include <linux/tcp.h>
-
 /* MPTCP option subtypes */
 
 #define MPTCPOPT_MP_CAPABLE	0
@@ -125,6 +123,11 @@ void mptcp_subflow_exit(void);
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *options);
 
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return skb_ext_exist(skb, SKB_EXT_MPTCP);
+}
+
 extern const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops;
 
 void token_init(void);
@@ -178,6 +181,11 @@ static inline unsigned int mptcp_established_options(struct sock *sk,
 						     u64 *remote_key)
 {
 	return 0;
+}
+
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return false;
 }
 
 #endif /* CONFIG_MPTCP */
