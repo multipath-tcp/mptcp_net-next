@@ -39,6 +39,8 @@ struct mptcp_sock {
 	struct	inet_connection_sock sk;
 	u64	local_key;
 	u64	remote_key;
+	u64	write_seq;
+	u64	ack_seq;
 	u32	token;
 	struct	socket *connection_list; /* @@ needs to be a list */
 	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
@@ -71,8 +73,10 @@ struct subflow_sock {
 	/* tcp_sock must be the first member */
 	struct	tcp_sock sk;
 	u64	local_key;
-	u64	remote_key;
 	u32	token;
+	u64	idsn;
+	u64	remote_key;
+	u32	rel_write_seq;
 	bool	request_mptcp;	// send MP_CAPABLE
 	bool	checksum;
 	bool	version;
@@ -94,8 +98,9 @@ struct subflow_request_sock {
 		backup : 1,
 		version : 4;
 	u64	local_key;
-	u64	remote_key;
 	u32	token;
+	u64	idsn;
+	u64	remote_key;
 };
 
 static inline
@@ -105,6 +110,11 @@ struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
 }
 
 #ifdef CONFIG_MPTCP
+
+static inline struct mptcp_skb_cb *mptcp_skb_priv_cb(struct sk_buff *skb)
+{
+	return (struct mptcp_skb_cb *)skb_ext_find(skb, SKB_EXT_MPTCP);
+}
 
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx);
