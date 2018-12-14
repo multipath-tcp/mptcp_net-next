@@ -78,6 +78,8 @@ enum {
 #define IPPROTO_MPLS		IPPROTO_MPLS
   IPPROTO_RAW = 255,		/* Raw IP packets			*/
 #define IPPROTO_RAW		IPPROTO_RAW
+  IPPROTO_SUBFLOW = 262,	/* Multipath TCP (IPPROTO_TCP | 0x100)	*/
+#define IPPROTO_SUBFLOW		IPPROTO_SUBFLOW
   IPPROTO_MAX
 };
 #endif
