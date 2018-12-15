@@ -181,6 +181,7 @@ struct esw_mc_addr { /* SRIOV only */
 
 struct mlx5_eswitch {
 	struct mlx5_core_dev    *dev;
+	struct mlx5_nb          nb;
 	struct mlx5_eswitch_fdb fdb_table;
 	struct hlist_head       mc_table[MLX5_L2_ADDR_HASH_SIZE];
 	struct workqueue_struct *work_queue;
@@ -211,7 +212,6 @@ int esw_offloads_init_reps(struct mlx5_eswitch *esw);
 /* E-Switch API */
 int mlx5_eswitch_init(struct mlx5_core_dev *dev);
 void mlx5_eswitch_cleanup(struct mlx5_eswitch *esw);
-void mlx5_eswitch_vport_event(struct mlx5_eswitch *esw, struct mlx5_eqe *eqe);
 int mlx5_eswitch_enable_sriov(struct mlx5_eswitch *esw, int nvfs, int mode);
 void mlx5_eswitch_disable_sriov(struct mlx5_eswitch *esw);
 int mlx5_eswitch_set_vport_mac(struct mlx5_eswitch *esw,
@@ -281,13 +281,16 @@ enum mlx5_flow_match_level {
 /* current maximum for flow based vport multicasting */
 #define MLX5_MAX_FLOW_FWD_VPORTS 2
 
+enum {
+	MLX5_ESW_DEST_ENCAP         = BIT(0),
+	MLX5_ESW_DEST_ENCAP_VALID   = BIT(1),
+};
+
 struct mlx5_esw_flow_attr {
 	struct mlx5_eswitch_rep *in_rep;
-	struct mlx5_eswitch_rep *out_rep[MLX5_MAX_FLOW_FWD_VPORTS];
-	struct mlx5_core_dev	*out_mdev[MLX5_MAX_FLOW_FWD_VPORTS];
 	struct mlx5_core_dev	*in_mdev;
 
-	int mirror_count;
+	int split_count;
 	int out_count;
 
 	int	action;
@@ -296,7 +299,12 @@ struct mlx5_esw_flow_attr {
 	u8	vlan_prio[MLX5_FS_VLAN_DEPTH];
 	u8	total_vlan;
 	bool	vlan_handled;
-	u32	encap_id;
+	struct {
+		u32 flags;
+		struct mlx5_eswitch_rep *rep;
+		struct mlx5_core_dev *mdev;
+		u32 encap_id;
+	} dests[MLX5_MAX_FLOW_FWD_VPORTS];
 	u32	mod_hdr_id;
 	u8	match_level;
 	struct mlx5_fc *counter;
@@ -352,7 +360,6 @@ static inline bool mlx5_eswitch_vlan_actions_supported(struct mlx5_core_dev *dev
 /* eswitch API stubs */
 static inline int  mlx5_eswitch_init(struct mlx5_core_dev *dev) { return 0; }
 static inline void mlx5_eswitch_cleanup(struct mlx5_eswitch *esw) {}
-static inline void mlx5_eswitch_vport_event(struct mlx5_eswitch *esw, struct mlx5_eqe *eqe) {}
 static inline int  mlx5_eswitch_enable_sriov(struct mlx5_eswitch *esw, int nvfs, int mode) { return 0; }
 static inline void mlx5_eswitch_disable_sriov(struct mlx5_eswitch *esw) {}
 

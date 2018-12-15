@@ -594,7 +594,8 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 
 	*md5 = NULL;
 #ifdef CONFIG_TCP_MD5SIG
-	if (unlikely(rcu_access_pointer(tp->md5sig_info))) {
+	if (static_key_false(&tcp_md5_needed) &&
+	    rcu_access_pointer(tp->md5sig_info)) {
 		*md5 = tp->af_specific->md5_lookup(sk, sk);
 		if (*md5) {
 			opts->options |= OPTION_MD5;
@@ -730,7 +731,8 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 
 	*md5 = NULL;
 #ifdef CONFIG_TCP_MD5SIG
-	if (unlikely(rcu_access_pointer(tp->md5sig_info))) {
+	if (static_key_false(&tcp_md5_needed) &&
+	    rcu_access_pointer(tp->md5sig_info)) {
 		*md5 = tp->af_specific->md5_lookup(sk, sk);
 		if (*md5) {
 			opts->options |= OPTION_MD5;
@@ -1902,7 +1904,9 @@ static int tso_fragment(struct sock *sk, enum tcp_queue tcp_queue,
  * This algorithm is from John Heffner.
  */
 static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
-				 bool *is_cwnd_limited, u32 max_segs)
+				 bool *is_cwnd_limited,
+				 bool *is_rwnd_limited,
+				 u32 max_segs)
 {
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	u32 send_win, cong_win, limit, in_flight;
@@ -1910,9 +1914,6 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	struct sk_buff *head;
 	int win_divisor;
 	s64 delta;
-
-	if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
-		goto send_now;
 
 	if (icsk->icsk_ca_state >= TCP_CA_Recovery)
 		goto send_now;
@@ -1946,10 +1947,6 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	if ((skb != tcp_write_queue_tail(sk)) && (limit >= skb->len))
 		goto send_now;
 
-	/* If this packet won't get more data, do not wait. */
-	if (TCP_SKB_CB(skb)->eor)
-		goto send_now;
-
 	win_divisor = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_tso_win_divisor);
 	if (win_divisor) {
 		u32 chunk = min(tp->snd_wnd, tp->snd_cwnd * tp->mss_cache);
@@ -1979,10 +1976,28 @@ static bool tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb,
 	if ((s64)(delta - (u64)NSEC_PER_USEC * (tp->srtt_us >> 4)) < 0)
 		goto send_now;
 
-	/* Ok, it looks like it is advisable to defer. */
+	/* Ok, it looks like it is advisable to defer.
+	 * Three cases are tracked :
+	 * 1) We are cwnd-limited
+	 * 2) We are rwnd-limited
+	 * 3) We are application limited.
+	 */
+	if (cong_win < send_win) {
+		if (cong_win <= skb->len) {
+			*is_cwnd_limited = true;
+			return true;
+		}
+	} else {
+		if (send_win <= skb->len) {
+			*is_rwnd_limited = true;
+			return true;
+		}
+	}
 
-	if (cong_win < send_win && cong_win <= skb->len)
-		*is_cwnd_limited = true;
+	/* If this packet won't get more data, do not wait. */
+	if ((TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN) ||
+	    TCP_SKB_CB(skb)->eor)
+		goto send_now;
 
 	return true;
 
@@ -2363,7 +2378,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		} else {
 			if (!push_one &&
 			    tcp_tso_should_defer(sk, skb, &is_cwnd_limited,
-						 max_segs))
+						 &is_rwnd_limited, max_segs))
 				break;
 		}
 
@@ -2501,13 +2516,16 @@ void tcp_send_loss_probe(struct sock *sk)
 		goto rearm_timer;
 	}
 	skb = skb_rb_last(&sk->tcp_rtx_queue);
+	if (unlikely(!skb)) {
+		WARN_ONCE(tp->packets_out,
+			  "invalid inflight: %u state %u cwnd %u mss %d\n",
+			  tp->packets_out, sk->sk_state, tp->snd_cwnd, mss);
+		inet_csk(sk)->icsk_pending = 0;
+		return;
+	}
 
 	/* At most one outstanding TLP retransmission. */
 	if (tp->tlp_high_seq)
-		goto rearm_timer;
-
-	/* Retransmit last segment. */
-	if (WARN_ON(!skb))
 		goto rearm_timer;
 
 	if (skb_still_in_host_queue(sk, skb))
@@ -2927,7 +2945,7 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		TCP_SKB_CB(skb)->sacked |= TCPCB_EVER_RETRANS;
 		trace_tcp_retransmit_skb(sk, skb);
 	} else if (err != -EBUSY) {
-		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRETRANSFAIL);
+		NET_ADD_STATS(sock_net(sk), LINUX_MIB_TCPRETRANSFAIL, segs);
 	}
 	return err;
 }

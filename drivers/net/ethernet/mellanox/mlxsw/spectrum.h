@@ -8,6 +8,7 @@
 #include <linux/netdevice.h>
 #include <linux/rhashtable.h>
 #include <linux/bitops.h>
+#include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/list.h>
 #include <linux/dcbnl.h>
@@ -80,6 +81,10 @@ enum mlxsw_sp_fid_type {
 	MLXSW_SP_FID_TYPE_MAX,
 };
 
+enum mlxsw_sp_nve_type {
+	MLXSW_SP_NVE_TYPE_VXLAN,
+};
+
 struct mlxsw_sp_mid {
 	struct list_head list;
 	unsigned char addr[ETH_ALEN];
@@ -127,6 +132,7 @@ struct mlxsw_sp {
 	struct mlxsw_core *core;
 	const struct mlxsw_bus_info *bus_info;
 	unsigned char base_mac[ETH_ALEN];
+	const unsigned char *mac_mask;
 	struct mlxsw_sp_upper *lags;
 	int *port_to_module;
 	struct mlxsw_sp_sb *sb;
@@ -261,6 +267,26 @@ static inline bool mlxsw_sp_bridge_has_vxlan(struct net_device *br_dev)
 	return !!mlxsw_sp_bridge_vxlan_dev_find(br_dev);
 }
 
+static inline int
+mlxsw_sp_vxlan_mapped_vid(const struct net_device *vxlan_dev, u16 *p_vid)
+{
+	struct bridge_vlan_info vinfo;
+	u16 vid = 0;
+	int err;
+
+	err = br_vlan_get_pvid(vxlan_dev, &vid);
+	if (err || !vid)
+		goto out;
+
+	err = br_vlan_get_info(vxlan_dev, vid, &vinfo);
+	if (err || !(vinfo.flags & BRIDGE_VLAN_INFO_UNTAGGED))
+		vid = 0;
+
+out:
+	*p_vid = vid;
+	return err;
+}
+
 static inline bool
 mlxsw_sp_port_is_pause_en(const struct mlxsw_sp_port *mlxsw_sp_port)
 {
@@ -358,11 +384,11 @@ bool mlxsw_sp_bridge_device_is_offloaded(const struct mlxsw_sp *mlxsw_sp,
 					 const struct net_device *br_dev);
 int mlxsw_sp_bridge_vxlan_join(struct mlxsw_sp *mlxsw_sp,
 			       const struct net_device *br_dev,
-			       const struct net_device *vxlan_dev,
+			       const struct net_device *vxlan_dev, u16 vid,
 			       struct netlink_ext_ack *extack);
 void mlxsw_sp_bridge_vxlan_leave(struct mlxsw_sp *mlxsw_sp,
-				 const struct net_device *br_dev,
 				 const struct net_device *vxlan_dev);
+extern struct notifier_block mlxsw_sp_switchdev_notifier;
 
 /* spectrum.c */
 int mlxsw_sp_port_ets_set(struct mlxsw_sp_port *mlxsw_sp_port,
@@ -429,7 +455,8 @@ union mlxsw_sp_l3addr {
 
 int mlxsw_sp_router_init(struct mlxsw_sp *mlxsw_sp);
 void mlxsw_sp_router_fini(struct mlxsw_sp *mlxsw_sp);
-int mlxsw_sp_netdevice_router_port_event(struct net_device *dev);
+int mlxsw_sp_netdevice_router_port_event(struct net_device *dev,
+					 unsigned long event, void *ptr);
 void mlxsw_sp_rif_macvlan_del(struct mlxsw_sp *mlxsw_sp,
 			      const struct net_device *macvlan_dev);
 int mlxsw_sp_inetaddr_event(struct notifier_block *unused,
@@ -538,6 +565,7 @@ struct mlxsw_sp_acl_rule_info {
 	unsigned int priority;
 	struct mlxsw_afk_element_values values;
 	struct mlxsw_afa_block *act_block;
+	u8 action_created:1;
 	unsigned int counter_index;
 };
 
@@ -547,6 +575,7 @@ struct mlxsw_sp_acl_ruleset;
 /* spectrum_acl.c */
 enum mlxsw_sp_acl_profile {
 	MLXSW_SP_ACL_PROFILE_FLOWER,
+	MLXSW_SP_ACL_PROFILE_MR,
 };
 
 struct mlxsw_afk *mlxsw_sp_acl_afk(struct mlxsw_sp_acl *acl);
@@ -581,7 +610,8 @@ void mlxsw_sp_acl_ruleset_put(struct mlxsw_sp *mlxsw_sp,
 u16 mlxsw_sp_acl_ruleset_group_id(struct mlxsw_sp_acl_ruleset *ruleset);
 
 struct mlxsw_sp_acl_rule_info *
-mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl);
+mlxsw_sp_acl_rulei_create(struct mlxsw_sp_acl *acl,
+			  struct mlxsw_afa_block *afa_block);
 void mlxsw_sp_acl_rulei_destroy(struct mlxsw_sp_acl_rule_info *rulei);
 int mlxsw_sp_acl_rulei_commit(struct mlxsw_sp_acl_rule_info *rulei);
 void mlxsw_sp_acl_rulei_priority(struct mlxsw_sp_acl_rule_info *rulei,
@@ -625,6 +655,7 @@ struct mlxsw_sp_acl_rule *
 mlxsw_sp_acl_rule_create(struct mlxsw_sp *mlxsw_sp,
 			 struct mlxsw_sp_acl_ruleset *ruleset,
 			 unsigned long cookie,
+			 struct mlxsw_afa_block *afa_block,
 			 struct netlink_ext_ack *extack);
 void mlxsw_sp_acl_rule_destroy(struct mlxsw_sp *mlxsw_sp,
 			       struct mlxsw_sp_acl_rule *rule);
@@ -632,6 +663,9 @@ int mlxsw_sp_acl_rule_add(struct mlxsw_sp *mlxsw_sp,
 			  struct mlxsw_sp_acl_rule *rule);
 void mlxsw_sp_acl_rule_del(struct mlxsw_sp *mlxsw_sp,
 			   struct mlxsw_sp_acl_rule *rule);
+int mlxsw_sp_acl_rule_action_replace(struct mlxsw_sp *mlxsw_sp,
+				     struct mlxsw_sp_acl_rule *rule,
+				     struct mlxsw_afa_block *afa_block);
 struct mlxsw_sp_acl_rule *
 mlxsw_sp_acl_rule_lookup(struct mlxsw_sp *mlxsw_sp,
 			 struct mlxsw_sp_acl_ruleset *ruleset,
@@ -676,6 +710,10 @@ struct mlxsw_sp_acl_tcam_ops {
 	void (*entry_del)(struct mlxsw_sp *mlxsw_sp,
 			  void *region_priv, void *chunk_priv,
 			  void *entry_priv);
+	int (*entry_action_replace)(struct mlxsw_sp *mlxsw_sp,
+				    void *region_priv, void *chunk_priv,
+				    void *entry_priv,
+				    struct mlxsw_sp_acl_rule_info *rulei);
 	int (*entry_activity_get)(struct mlxsw_sp *mlxsw_sp,
 				  void *region_priv, void *entry_priv,
 				  bool *activity);
@@ -725,6 +763,8 @@ bool mlxsw_sp_fid_lag_vid_valid(const struct mlxsw_sp_fid *fid);
 struct mlxsw_sp_fid *mlxsw_sp_fid_lookup_by_index(struct mlxsw_sp *mlxsw_sp,
 						  u16 fid_index);
 int mlxsw_sp_fid_nve_ifindex(const struct mlxsw_sp_fid *fid, int *nve_ifindex);
+int mlxsw_sp_fid_nve_type(const struct mlxsw_sp_fid *fid,
+			  enum mlxsw_sp_nve_type *p_type);
 struct mlxsw_sp_fid *mlxsw_sp_fid_lookup_by_vni(struct mlxsw_sp *mlxsw_sp,
 						__be32 vni);
 int mlxsw_sp_fid_vni(const struct mlxsw_sp_fid *fid, __be32 *vni);
@@ -732,9 +772,12 @@ int mlxsw_sp_fid_nve_flood_index_set(struct mlxsw_sp_fid *fid,
 				     u32 nve_flood_index);
 void mlxsw_sp_fid_nve_flood_index_clear(struct mlxsw_sp_fid *fid);
 bool mlxsw_sp_fid_nve_flood_index_is_set(const struct mlxsw_sp_fid *fid);
-int mlxsw_sp_fid_vni_set(struct mlxsw_sp_fid *fid, __be32 vni, int nve_ifindex);
+int mlxsw_sp_fid_vni_set(struct mlxsw_sp_fid *fid, enum mlxsw_sp_nve_type type,
+			 __be32 vni, int nve_ifindex);
 void mlxsw_sp_fid_vni_clear(struct mlxsw_sp_fid *fid);
 bool mlxsw_sp_fid_vni_is_set(const struct mlxsw_sp_fid *fid);
+void mlxsw_sp_fid_fdb_clear_offload(const struct mlxsw_sp_fid *fid,
+				    const struct net_device *nve_dev);
 int mlxsw_sp_fid_flood_set(struct mlxsw_sp_fid *fid,
 			   enum mlxsw_sp_flood_type packet_type, u8 local_port,
 			   bool member);
@@ -753,6 +796,8 @@ u16 mlxsw_sp_fid_8021q_vid(const struct mlxsw_sp_fid *fid);
 struct mlxsw_sp_fid *mlxsw_sp_fid_8021q_get(struct mlxsw_sp *mlxsw_sp, u16 vid);
 struct mlxsw_sp_fid *mlxsw_sp_fid_8021d_get(struct mlxsw_sp *mlxsw_sp,
 					    int br_ifindex);
+struct mlxsw_sp_fid *mlxsw_sp_fid_8021q_lookup(struct mlxsw_sp *mlxsw_sp,
+					       u16 vid);
 struct mlxsw_sp_fid *mlxsw_sp_fid_8021d_lookup(struct mlxsw_sp *mlxsw_sp,
 					       int br_ifindex);
 struct mlxsw_sp_fid *mlxsw_sp_fid_rfid_get(struct mlxsw_sp *mlxsw_sp,
@@ -801,10 +846,6 @@ extern const struct mlxsw_sp_mr_tcam_ops mlxsw_sp1_mr_tcam_ops;
 extern const struct mlxsw_sp_mr_tcam_ops mlxsw_sp2_mr_tcam_ops;
 
 /* spectrum_nve.c */
-enum mlxsw_sp_nve_type {
-	MLXSW_SP_NVE_TYPE_VXLAN,
-};
-
 struct mlxsw_sp_nve_params {
 	enum mlxsw_sp_nve_type type;
 	__be32 vni;

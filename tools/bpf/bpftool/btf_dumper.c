@@ -32,7 +32,7 @@ static void btf_dumper_ptr(const void *data, json_writer_t *jw,
 }
 
 static int btf_dumper_modifier(const struct btf_dumper *d, __u32 type_id,
-			       const void *data)
+			       __u8 bit_offset, const void *data)
 {
 	int actual_type_id;
 
@@ -40,7 +40,7 @@ static int btf_dumper_modifier(const struct btf_dumper *d, __u32 type_id,
 	if (actual_type_id < 0)
 		return actual_type_id;
 
-	return btf_dumper_do_type(d, actual_type_id, 0, data);
+	return btf_dumper_do_type(d, actual_type_id, bit_offset, data);
 }
 
 static void btf_dumper_enum(const void *data, json_writer_t *jw)
@@ -237,7 +237,7 @@ static int btf_dumper_do_type(const struct btf_dumper *d, __u32 type_id,
 	case BTF_KIND_VOLATILE:
 	case BTF_KIND_CONST:
 	case BTF_KIND_RESTRICT:
-		return btf_dumper_modifier(d, type_id, data);
+		return btf_dumper_modifier(d, type_id, bit_offset, data);
 	default:
 		jsonw_printf(d->jw, "(unsupported-kind");
 		return -EINVAL;
@@ -384,4 +384,68 @@ void btf_dumper_type_only(const struct btf *btf, __u32 type_id, char *func_sig,
 	err = __btf_dumper_type_only(btf, type_id, func_sig, 0, size);
 	if (err < 0)
 		func_sig[0] = '\0';
+}
+
+static const char *ltrim(const char *s)
+{
+	while (isspace(*s))
+		s++;
+
+	return s;
+}
+
+void btf_dump_linfo_plain(const struct btf *btf,
+			  const struct bpf_line_info *linfo,
+			  const char *prefix, bool linum)
+{
+	const char *line = btf__name_by_offset(btf, linfo->line_off);
+
+	if (!line)
+		return;
+	line = ltrim(line);
+
+	if (!prefix)
+		prefix = "";
+
+	if (linum) {
+		const char *file = btf__name_by_offset(btf, linfo->file_name_off);
+
+		/* More forgiving on file because linum option is
+		 * expected to provide more info than the already
+		 * available src line.
+		 */
+		if (!file)
+			file = "";
+
+		printf("%s%s [file:%s line_num:%u line_col:%u]\n",
+		       prefix, line, file,
+		       BPF_LINE_INFO_LINE_NUM(linfo->line_col),
+		       BPF_LINE_INFO_LINE_COL(linfo->line_col));
+	} else {
+		printf("%s%s\n", prefix, line);
+	}
+}
+
+void btf_dump_linfo_json(const struct btf *btf,
+			 const struct bpf_line_info *linfo, bool linum)
+{
+	const char *line = btf__name_by_offset(btf, linfo->line_off);
+
+	if (line)
+		jsonw_string_field(json_wtr, "src", ltrim(line));
+
+	if (linum) {
+		const char *file = btf__name_by_offset(btf, linfo->file_name_off);
+
+		if (file)
+			jsonw_string_field(json_wtr, "file", file);
+
+		if (BPF_LINE_INFO_LINE_NUM(linfo->line_col))
+			jsonw_int_field(json_wtr, "line_num",
+					BPF_LINE_INFO_LINE_NUM(linfo->line_col));
+
+		if (BPF_LINE_INFO_LINE_COL(linfo->line_col))
+			jsonw_int_field(json_wtr, "line_col",
+					BPF_LINE_INFO_LINE_COL(linfo->line_col));
+	}
 }

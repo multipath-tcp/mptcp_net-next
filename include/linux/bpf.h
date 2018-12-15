@@ -299,7 +299,8 @@ struct bpf_prog_aux {
 	u32 max_pkt_offset;
 	u32 stack_depth;
 	u32 id;
-	u32 func_cnt;
+	u32 func_cnt; /* used by non-func prog as the number of func progs */
+	u32 func_idx; /* 0 for non-func prog, the index in func array for func prog */
 	bool offload_requested;
 	struct bpf_prog **func;
 	void *jit_data; /* JIT specific data. arch dependent */
@@ -317,7 +318,29 @@ struct bpf_prog_aux {
 #endif
 	struct bpf_prog_offload *offload;
 	struct btf *btf;
-	u32 type_id; /* type id for this prog/func */
+	struct bpf_func_info *func_info;
+	/* bpf_line_info loaded from userspace.  linfo->insn_off
+	 * has the xlated insn offset.
+	 * Both the main and sub prog share the same linfo.
+	 * The subprog can access its first linfo by
+	 * using the linfo_idx.
+	 */
+	struct bpf_line_info *linfo;
+	/* jited_linfo is the jited addr of the linfo.  It has a
+	 * one to one mapping to linfo:
+	 * jited_linfo[i] is the jited addr for the linfo[i]->insn_off.
+	 * Both the main and sub prog share the same jited_linfo.
+	 * The subprog can access its first jited_linfo by
+	 * using the linfo_idx.
+	 */
+	void **jited_linfo;
+	u32 func_info_cnt;
+	u32 nr_linfo;
+	/* subprog can use linfo_idx to access its first linfo and
+	 * jited_linfo.
+	 * main prog always has linfo_idx == 0
+	 */
+	u32 linfo_idx;
 	union {
 		struct work_struct work;
 		struct rcu_head	rcu;

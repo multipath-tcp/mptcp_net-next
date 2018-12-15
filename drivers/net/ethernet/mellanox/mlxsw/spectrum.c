@@ -65,6 +65,13 @@ static const char mlxsw_sp1_driver_name[] = "mlxsw_spectrum";
 static const char mlxsw_sp2_driver_name[] = "mlxsw_spectrum2";
 static const char mlxsw_sp_driver_version[] = "1.0";
 
+static const unsigned char mlxsw_sp1_mac_mask[ETH_ALEN] = {
+	0xff, 0xff, 0xff, 0xff, 0xfc, 0x00
+};
+static const unsigned char mlxsw_sp2_mac_mask[ETH_ALEN] = {
+	0xff, 0xff, 0xff, 0xff, 0xf0, 0x00
+};
+
 /* tx_hdr_version
  * Tx header version.
  * Must be set to 1.
@@ -318,11 +325,21 @@ static int mlxsw_sp_fw_rev_validate(struct mlxsw_sp *mlxsw_sp)
 	const struct mlxsw_fw_rev *rev = &mlxsw_sp->bus_info->fw_rev;
 	const struct mlxsw_fw_rev *req_rev = mlxsw_sp->req_rev;
 	const char *fw_filename = mlxsw_sp->fw_filename;
+	union devlink_param_value value;
 	const struct firmware *firmware;
 	int err;
 
 	/* Don't check if driver does not require it */
 	if (!req_rev || !fw_filename)
+		return 0;
+
+	/* Don't check if devlink 'fw_load_policy' param is 'flash' */
+	err = devlink_param_driverinit_value_get(priv_to_devlink(mlxsw_sp->core),
+						 DEVLINK_PARAM_GENERIC_ID_FW_LOAD_POLICY,
+						 &value);
+	if (err)
+		return err;
+	if (value.vu8 == DEVLINK_PARAM_FW_LOAD_POLICY_VALUE_FLASH)
 		return 0;
 
 	/* Validate driver & FW are compatible */
@@ -3544,10 +3561,10 @@ static void mlxsw_sp_rx_listener_mark_func(struct sk_buff *skb, u8 local_port,
 	return mlxsw_sp_rx_listener_no_mark_func(skb, local_port, priv);
 }
 
-static void mlxsw_sp_rx_listener_mr_mark_func(struct sk_buff *skb,
+static void mlxsw_sp_rx_listener_l3_mark_func(struct sk_buff *skb,
 					      u8 local_port, void *priv)
 {
-	skb->offload_mr_fwd_mark = 1;
+	skb->offload_l3_fwd_mark = 1;
 	skb->offload_fwd_mark = 1;
 	return mlxsw_sp_rx_listener_no_mark_func(skb, local_port, priv);
 }
@@ -3595,8 +3612,8 @@ out:
 	MLXSW_RXL(mlxsw_sp_rx_listener_mark_func, _trap_id, _action,	\
 		_is_ctrl, SP_##_trap_group, DISCARD)
 
-#define MLXSW_SP_RXL_MR_MARK(_trap_id, _action, _trap_group, _is_ctrl)	\
-	MLXSW_RXL(mlxsw_sp_rx_listener_mr_mark_func, _trap_id, _action,	\
+#define MLXSW_SP_RXL_L3_MARK(_trap_id, _action, _trap_group, _is_ctrl)	\
+	MLXSW_RXL(mlxsw_sp_rx_listener_l3_mark_func, _trap_id, _action,	\
 		_is_ctrl, SP_##_trap_group, DISCARD)
 
 #define MLXSW_SP_EVENTL(_func, _trap_id)		\
@@ -3629,7 +3646,7 @@ static const struct mlxsw_listener mlxsw_sp_listener[] = {
 	/* L3 traps */
 	MLXSW_SP_RXL_MARK(MTUERROR, TRAP_TO_CPU, ROUTER_EXP, false),
 	MLXSW_SP_RXL_MARK(TTLERROR, TRAP_TO_CPU, ROUTER_EXP, false),
-	MLXSW_SP_RXL_MARK(LBERROR, TRAP_TO_CPU, ROUTER_EXP, false),
+	MLXSW_SP_RXL_L3_MARK(LBERROR, MIRROR_TO_CPU, LBERROR, false),
 	MLXSW_SP_RXL_MARK(IP2ME, TRAP_TO_CPU, IP2ME, false),
 	MLXSW_SP_RXL_MARK(IPV6_UNSPECIFIED_ADDRESS, TRAP_TO_CPU, ROUTER_EXP,
 			  false),
@@ -3673,7 +3690,7 @@ static const struct mlxsw_listener mlxsw_sp_listener[] = {
 	MLXSW_SP_RXL_MARK(IPV6_PIM, TRAP_TO_CPU, PIM, false),
 	MLXSW_SP_RXL_MARK(RPF, TRAP_TO_CPU, RPF, false),
 	MLXSW_SP_RXL_MARK(ACL1, TRAP_TO_CPU, MULTICAST, false),
-	MLXSW_SP_RXL_MR_MARK(ACL2, TRAP_TO_CPU, MULTICAST, false),
+	MLXSW_SP_RXL_L3_MARK(ACL2, TRAP_TO_CPU, MULTICAST, false),
 	/* NVE traps */
 	MLXSW_SP_RXL_MARK(NVE_ENCAP_ARP, TRAP_TO_CPU, ARP, false),
 };
@@ -3703,6 +3720,7 @@ static int mlxsw_sp_cpu_policers_set(struct mlxsw_core *mlxsw_core)
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_OSPF:
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_PIM:
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_RPF:
+		case MLXSW_REG_HTGT_TRAP_GROUP_SP_LBERROR:
 			rate = 128;
 			burst_size = 7;
 			break;
@@ -3788,6 +3806,7 @@ static int mlxsw_sp_trap_groups_set(struct mlxsw_core *mlxsw_core)
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_ROUTER_EXP:
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_REMOTE_ROUTE:
 		case MLXSW_REG_HTGT_TRAP_GROUP_SP_MULTICAST:
+		case MLXSW_REG_HTGT_TRAP_GROUP_SP_LBERROR:
 			priority = 1;
 			tc = 1;
 			break;
@@ -3990,6 +4009,12 @@ static int mlxsw_sp_init(struct mlxsw_core *mlxsw_core,
 		goto err_nve_init;
 	}
 
+	err = mlxsw_sp_acl_init(mlxsw_sp);
+	if (err) {
+		dev_err(mlxsw_sp->bus_info->dev, "Failed to initialize ACL\n");
+		goto err_acl_init;
+	}
+
 	err = mlxsw_sp_router_init(mlxsw_sp);
 	if (err) {
 		dev_err(mlxsw_sp->bus_info->dev, "Failed to initialize router\n");
@@ -4005,12 +4030,6 @@ static int mlxsw_sp_init(struct mlxsw_core *mlxsw_core,
 	if (err) {
 		dev_err(mlxsw_sp->bus_info->dev, "Failed to register netdev notifier\n");
 		goto err_netdev_notifier;
-	}
-
-	err = mlxsw_sp_acl_init(mlxsw_sp);
-	if (err) {
-		dev_err(mlxsw_sp->bus_info->dev, "Failed to initialize ACL\n");
-		goto err_acl_init;
 	}
 
 	err = mlxsw_sp_dpipe_init(mlxsw_sp);
@@ -4030,12 +4049,12 @@ static int mlxsw_sp_init(struct mlxsw_core *mlxsw_core,
 err_ports_create:
 	mlxsw_sp_dpipe_fini(mlxsw_sp);
 err_dpipe_init:
-	mlxsw_sp_acl_fini(mlxsw_sp);
-err_acl_init:
 	unregister_netdevice_notifier(&mlxsw_sp->netdevice_nb);
 err_netdev_notifier:
 	mlxsw_sp_router_fini(mlxsw_sp);
 err_router_init:
+	mlxsw_sp_acl_fini(mlxsw_sp);
+err_acl_init:
 	mlxsw_sp_nve_fini(mlxsw_sp);
 err_nve_init:
 	mlxsw_sp_afa_fini(mlxsw_sp);
@@ -4071,6 +4090,7 @@ static int mlxsw_sp1_init(struct mlxsw_core *mlxsw_core,
 	mlxsw_sp->mr_tcam_ops = &mlxsw_sp1_mr_tcam_ops;
 	mlxsw_sp->acl_tcam_ops = &mlxsw_sp1_acl_tcam_ops;
 	mlxsw_sp->nve_ops_arr = mlxsw_sp1_nve_ops_arr;
+	mlxsw_sp->mac_mask = mlxsw_sp1_mac_mask;
 
 	return mlxsw_sp_init(mlxsw_core, mlxsw_bus_info);
 }
@@ -4086,6 +4106,7 @@ static int mlxsw_sp2_init(struct mlxsw_core *mlxsw_core,
 	mlxsw_sp->mr_tcam_ops = &mlxsw_sp2_mr_tcam_ops;
 	mlxsw_sp->acl_tcam_ops = &mlxsw_sp2_acl_tcam_ops;
 	mlxsw_sp->nve_ops_arr = mlxsw_sp2_nve_ops_arr;
+	mlxsw_sp->mac_mask = mlxsw_sp2_mac_mask;
 
 	return mlxsw_sp_init(mlxsw_core, mlxsw_bus_info);
 }
@@ -4096,9 +4117,9 @@ static void mlxsw_sp_fini(struct mlxsw_core *mlxsw_core)
 
 	mlxsw_sp_ports_remove(mlxsw_sp);
 	mlxsw_sp_dpipe_fini(mlxsw_sp);
-	mlxsw_sp_acl_fini(mlxsw_sp);
 	unregister_netdevice_notifier(&mlxsw_sp->netdevice_nb);
 	mlxsw_sp_router_fini(mlxsw_sp);
+	mlxsw_sp_acl_fini(mlxsw_sp);
 	mlxsw_sp_nve_fini(mlxsw_sp);
 	mlxsw_sp_afa_fini(mlxsw_sp);
 	mlxsw_sp_counter_pool_fini(mlxsw_sp);
@@ -4328,6 +4349,52 @@ static int mlxsw_sp_kvd_sizes_get(struct mlxsw_core *mlxsw_core,
 	return 0;
 }
 
+static int
+mlxsw_sp_devlink_param_fw_load_policy_validate(struct devlink *devlink, u32 id,
+					       union devlink_param_value val,
+					       struct netlink_ext_ack *extack)
+{
+	if ((val.vu8 != DEVLINK_PARAM_FW_LOAD_POLICY_VALUE_DRIVER) &&
+	    (val.vu8 != DEVLINK_PARAM_FW_LOAD_POLICY_VALUE_FLASH)) {
+		NL_SET_ERR_MSG_MOD(extack, "'fw_load_policy' must be 'driver' or 'flash'");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static const struct devlink_param mlxsw_sp_devlink_params[] = {
+	DEVLINK_PARAM_GENERIC(FW_LOAD_POLICY,
+			      BIT(DEVLINK_PARAM_CMODE_DRIVERINIT),
+			      NULL, NULL,
+			      mlxsw_sp_devlink_param_fw_load_policy_validate),
+};
+
+static int mlxsw_sp_params_register(struct mlxsw_core *mlxsw_core)
+{
+	struct devlink *devlink = priv_to_devlink(mlxsw_core);
+	union devlink_param_value value;
+	int err;
+
+	err = devlink_params_register(devlink, mlxsw_sp_devlink_params,
+				      ARRAY_SIZE(mlxsw_sp_devlink_params));
+	if (err)
+		return err;
+
+	value.vu8 = DEVLINK_PARAM_FW_LOAD_POLICY_VALUE_DRIVER;
+	devlink_param_driverinit_value_set(devlink,
+					   DEVLINK_PARAM_GENERIC_ID_FW_LOAD_POLICY,
+					   value);
+	return 0;
+}
+
+static void mlxsw_sp_params_unregister(struct mlxsw_core *mlxsw_core)
+{
+	devlink_params_unregister(priv_to_devlink(mlxsw_core),
+				  mlxsw_sp_devlink_params,
+				  ARRAY_SIZE(mlxsw_sp_devlink_params));
+}
+
 static struct mlxsw_driver mlxsw_sp1_driver = {
 	.kind				= mlxsw_sp1_driver_name,
 	.priv_size			= sizeof(struct mlxsw_sp),
@@ -4349,6 +4416,8 @@ static struct mlxsw_driver mlxsw_sp1_driver = {
 	.txhdr_construct		= mlxsw_sp_txhdr_construct,
 	.resources_register		= mlxsw_sp1_resources_register,
 	.kvd_sizes_get			= mlxsw_sp_kvd_sizes_get,
+	.params_register		= mlxsw_sp_params_register,
+	.params_unregister		= mlxsw_sp_params_unregister,
 	.txhdr_len			= MLXSW_TXHDR_LEN,
 	.profile			= &mlxsw_sp1_config_profile,
 	.res_query_enabled		= true,
@@ -4374,6 +4443,8 @@ static struct mlxsw_driver mlxsw_sp2_driver = {
 	.sb_occ_tc_port_bind_get	= mlxsw_sp_sb_occ_tc_port_bind_get,
 	.txhdr_construct		= mlxsw_sp_txhdr_construct,
 	.resources_register		= mlxsw_sp2_resources_register,
+	.params_register		= mlxsw_sp_params_register,
+	.params_unregister		= mlxsw_sp_params_unregister,
 	.txhdr_len			= MLXSW_TXHDR_LEN,
 	.profile			= &mlxsw_sp2_config_profile,
 	.res_query_enabled		= true,
@@ -4782,6 +4853,30 @@ static bool mlxsw_sp_bridge_has_multiple_vxlans(struct net_device *br_dev)
 	return num_vxlans > 1;
 }
 
+static bool mlxsw_sp_bridge_vxlan_vlan_is_valid(struct net_device *br_dev)
+{
+	DECLARE_BITMAP(vlans, VLAN_N_VID) = {0};
+	struct net_device *dev;
+	struct list_head *iter;
+
+	netdev_for_each_lower_dev(br_dev, dev, iter) {
+		u16 pvid;
+		int err;
+
+		if (!netif_is_vxlan(dev))
+			continue;
+
+		err = mlxsw_sp_vxlan_mapped_vid(dev, &pvid);
+		if (err || !pvid)
+			continue;
+
+		if (test_and_set_bit(pvid, vlans))
+			return false;
+	}
+
+	return true;
+}
+
 static bool mlxsw_sp_bridge_vxlan_is_valid(struct net_device *br_dev,
 					   struct netlink_ext_ack *extack)
 {
@@ -4790,13 +4885,15 @@ static bool mlxsw_sp_bridge_vxlan_is_valid(struct net_device *br_dev,
 		return false;
 	}
 
-	if (br_vlan_enabled(br_dev)) {
-		NL_SET_ERR_MSG_MOD(extack, "VLAN filtering can not be enabled on a bridge with a VxLAN device");
+	if (!br_vlan_enabled(br_dev) &&
+	    mlxsw_sp_bridge_has_multiple_vxlans(br_dev)) {
+		NL_SET_ERR_MSG_MOD(extack, "Multiple VxLAN devices are not supported in a VLAN-unaware bridge");
 		return false;
 	}
 
-	if (mlxsw_sp_bridge_has_multiple_vxlans(br_dev)) {
-		NL_SET_ERR_MSG_MOD(extack, "Multiple VxLAN devices are not supported in a VLAN-unaware bridge");
+	if (br_vlan_enabled(br_dev) &&
+	    !mlxsw_sp_bridge_vxlan_vlan_is_valid(br_dev)) {
+		NL_SET_ERR_MSG_MOD(extack, "Multiple VxLAN devices cannot have the same VLAN as PVID and egress untagged");
 		return false;
 	}
 
@@ -5171,10 +5268,21 @@ static int mlxsw_sp_netdevice_vxlan_event(struct mlxsw_sp *mlxsw_sp,
 		if (cu_info->linking) {
 			if (!netif_running(dev))
 				return 0;
+			/* When the bridge is VLAN-aware, the VNI of the VxLAN
+			 * device needs to be mapped to a VLAN, but at this
+			 * point no VLANs are configured on the VxLAN device
+			 */
+			if (br_vlan_enabled(upper_dev))
+				return 0;
 			return mlxsw_sp_bridge_vxlan_join(mlxsw_sp, upper_dev,
-							  dev, extack);
+							  dev, 0, extack);
 		} else {
-			mlxsw_sp_bridge_vxlan_leave(mlxsw_sp, upper_dev, dev);
+			/* VLANs were already flushed, which triggered the
+			 * necessary cleanup
+			 */
+			if (br_vlan_enabled(upper_dev))
+				return 0;
+			mlxsw_sp_bridge_vxlan_leave(mlxsw_sp, dev);
 		}
 		break;
 	case NETDEV_PRE_UP:
@@ -5185,7 +5293,7 @@ static int mlxsw_sp_netdevice_vxlan_event(struct mlxsw_sp *mlxsw_sp,
 			return 0;
 		if (!mlxsw_sp_lower_get(upper_dev))
 			return 0;
-		return mlxsw_sp_bridge_vxlan_join(mlxsw_sp, upper_dev, dev,
+		return mlxsw_sp_bridge_vxlan_join(mlxsw_sp, upper_dev, dev, 0,
 						  extack);
 	case NETDEV_DOWN:
 		upper_dev = netdev_master_upper_dev_get(dev);
@@ -5195,7 +5303,7 @@ static int mlxsw_sp_netdevice_vxlan_event(struct mlxsw_sp *mlxsw_sp,
 			return 0;
 		if (!mlxsw_sp_lower_get(upper_dev))
 			return 0;
-		mlxsw_sp_bridge_vxlan_leave(mlxsw_sp, upper_dev, dev);
+		mlxsw_sp_bridge_vxlan_leave(mlxsw_sp, dev);
 		break;
 	}
 
@@ -5226,8 +5334,10 @@ static int mlxsw_sp_netdevice_event(struct notifier_block *nb,
 	else if (mlxsw_sp_netdev_is_ipip_ul(mlxsw_sp, dev))
 		err = mlxsw_sp_netdevice_ipip_ul_event(mlxsw_sp, dev,
 						       event, ptr);
-	else if (event == NETDEV_CHANGEADDR || event == NETDEV_CHANGEMTU)
-		err = mlxsw_sp_netdevice_router_port_event(dev);
+	else if (event == NETDEV_PRE_CHANGEADDR ||
+		 event == NETDEV_CHANGEADDR ||
+		 event == NETDEV_CHANGEMTU)
+		err = mlxsw_sp_netdevice_router_port_event(dev, event, ptr);
 	else if (mlxsw_sp_is_vrf_event(event, ptr))
 		err = mlxsw_sp_netdevice_vrf_event(dev, event, ptr);
 	else if (mlxsw_sp_port_dev_check(dev))

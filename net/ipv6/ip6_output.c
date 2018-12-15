@@ -195,37 +195,37 @@ int ip6_xmit(const struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
 	const struct ipv6_pinfo *np = inet6_sk(sk);
 	struct in6_addr *first_hop = &fl6->daddr;
 	struct dst_entry *dst = skb_dst(skb);
+	unsigned int head_room;
 	struct ipv6hdr *hdr;
 	u8  proto = fl6->flowi6_proto;
 	int seg_len = skb->len;
 	int hlimit = -1;
 	u32 mtu;
 
-	if (opt) {
-		unsigned int head_room;
+	head_room = sizeof(struct ipv6hdr) + LL_RESERVED_SPACE(dst->dev);
+	if (opt)
+		head_room += opt->opt_nflen + opt->opt_flen;
 
-		/* First: exthdrs may take lots of space (~8K for now)
-		   MAX_HEADER is not enough.
-		 */
-		head_room = opt->opt_nflen + opt->opt_flen;
-		seg_len += head_room;
-		head_room += sizeof(struct ipv6hdr) + LL_RESERVED_SPACE(dst->dev);
-
-		if (skb_headroom(skb) < head_room) {
-			struct sk_buff *skb2 = skb_realloc_headroom(skb, head_room);
-			if (!skb2) {
-				IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
-					      IPSTATS_MIB_OUTDISCARDS);
-				kfree_skb(skb);
-				return -ENOBUFS;
-			}
-			if (skb->sk)
-				skb_set_owner_w(skb2, skb->sk);
-			consume_skb(skb);
-			skb = skb2;
+	if (unlikely(skb_headroom(skb) < head_room)) {
+		struct sk_buff *skb2 = skb_realloc_headroom(skb, head_room);
+		if (!skb2) {
+			IP6_INC_STATS(net, ip6_dst_idev(skb_dst(skb)),
+				      IPSTATS_MIB_OUTDISCARDS);
+			kfree_skb(skb);
+			return -ENOBUFS;
 		}
+		if (skb->sk)
+			skb_set_owner_w(skb2, skb->sk);
+		consume_skb(skb);
+		skb = skb2;
+	}
+
+	if (opt) {
+		seg_len += opt->opt_nflen + opt->opt_flen;
+
 		if (opt->opt_flen)
 			ipv6_push_frag_opts(skb, opt, &proto);
+
 		if (opt->opt_nflen)
 			ipv6_push_nfrag_opts(skb, opt, &proto, &first_hop,
 					     &fl6->saddr);
@@ -377,6 +377,13 @@ static inline int ip6_forward_finish(struct net *net, struct sock *sk,
 
 	__IP6_INC_STATS(net, ip6_dst_idev(dst), IPSTATS_MIB_OUTFORWDATAGRAMS);
 	__IP6_ADD_STATS(net, ip6_dst_idev(dst), IPSTATS_MIB_OUTOCTETS, skb->len);
+
+#ifdef CONFIG_NET_SWITCHDEV
+	if (skb->offload_l3_fwd_mark) {
+		consume_skb(skb);
+		return 0;
+	}
+#endif
 
 	return dst_output(net, sk, skb);
 }
@@ -1245,6 +1252,7 @@ static int __ip6_append_data(struct sock *sk,
 {
 	struct sk_buff *skb, *skb_prev = NULL;
 	unsigned int maxfraglen, fragheaderlen, mtu, orig_mtu, pmtu;
+	struct ubuf_info *uarg = NULL;
 	int exthdrlen = 0;
 	int dst_exthdrlen = 0;
 	int hh_len;
@@ -1257,7 +1265,7 @@ static int __ip6_append_data(struct sock *sk,
 	int csummode = CHECKSUM_NONE;
 	unsigned int maxnonfragsize, headersize;
 	unsigned int wmem_alloc_delta = 0;
-	bool paged;
+	bool paged, extra_uref;
 
 	skb = skb_peek_tail(queue);
 	if (!skb) {
@@ -1321,6 +1329,20 @@ emsgsize:
 	    (!(flags & MSG_MORE) || cork->gso_size) &&
 	    rt->dst.dev->features & (NETIF_F_IPV6_CSUM | NETIF_F_HW_CSUM))
 		csummode = CHECKSUM_PARTIAL;
+
+	if (flags & MSG_ZEROCOPY && length && sock_flag(sk, SOCK_ZEROCOPY)) {
+		uarg = sock_zerocopy_realloc(sk, length, skb_zcopy(skb));
+		if (!uarg)
+			return -ENOBUFS;
+		extra_uref = true;
+		if (rt->dst.dev->features & NETIF_F_SG &&
+		    csummode == CHECKSUM_PARTIAL) {
+			paged = true;
+		} else {
+			uarg->zerocopy = 0;
+			skb_zcopy_set(skb, uarg, &extra_uref);
+		}
+	}
 
 	/*
 	 * Let's try using as much space as possible.
@@ -1440,12 +1462,6 @@ alloc_new_skb:
 			skb_reserve(skb, hh_len + sizeof(struct frag_hdr) +
 				    dst_exthdrlen);
 
-			/* Only the initial fragment is time stamped */
-			skb_shinfo(skb)->tx_flags = cork->tx_flags;
-			cork->tx_flags = 0;
-			skb_shinfo(skb)->tskey = tskey;
-			tskey = 0;
-
 			/*
 			 *	Find where to start putting bytes
 			 */
@@ -1477,6 +1493,13 @@ alloc_new_skb:
 			exthdrlen = 0;
 			dst_exthdrlen = 0;
 
+			/* Only the initial fragment is time stamped */
+			skb_shinfo(skb)->tx_flags = cork->tx_flags;
+			cork->tx_flags = 0;
+			skb_shinfo(skb)->tskey = tskey;
+			tskey = 0;
+			skb_zcopy_set(skb, uarg, &extra_uref);
+
 			if ((flags & MSG_CONFIRM) && !skb_prev)
 				skb_set_dst_pending_confirm(skb, 1);
 
@@ -1506,7 +1529,7 @@ alloc_new_skb:
 				err = -EFAULT;
 				goto error;
 			}
-		} else {
+		} else if (!uarg || !uarg->zerocopy) {
 			int i = skb_shinfo(skb)->nr_frags;
 
 			err = -ENOMEM;
@@ -1536,6 +1559,10 @@ alloc_new_skb:
 			skb->data_len += copy;
 			skb->truesize += copy;
 			wmem_alloc_delta += copy;
+		} else {
+			err = skb_zerocopy_iter_dgram(skb, from, copy);
+			if (err < 0)
+				goto error;
 		}
 		offset += copy;
 		length -= copy;
@@ -1548,6 +1575,8 @@ alloc_new_skb:
 error_efault:
 	err = -EFAULT;
 error:
+	if (uarg)
+		sock_zerocopy_put_abort(uarg, extra_uref);
 	cork->length -= length;
 	IP6_INC_STATS(sock_net(sk), rt->rt6i_idev, IPSTATS_MIB_OUTDISCARDS);
 	refcount_add(wmem_alloc_delta, &sk->sk_wmem_alloc);

@@ -773,11 +773,8 @@ static void release_napi(struct ibmvnic_adapter *adapter)
 		return;
 
 	for (i = 0; i < adapter->num_active_rx_napi; i++) {
-		if (&adapter->napi[i]) {
-			netdev_dbg(adapter->netdev,
-				   "Releasing napi[%d]\n", i);
-			netif_napi_del(&adapter->napi[i]);
-		}
+		netdev_dbg(adapter->netdev, "Releasing napi[%d]\n", i);
+		netif_napi_del(&adapter->napi[i]);
 	}
 
 	kfree(adapter->napi);
@@ -1859,7 +1856,7 @@ static int do_reset(struct ibmvnic_adapter *adapter,
 
 	if (adapter->reset_reason != VNIC_RESET_FAILOVER &&
 	    adapter->reset_reason != VNIC_RESET_CHANGE_PARAM)
-		netdev_notify_peers(netdev);
+		call_netdevice_notifiers(NETDEV_NOTIFY_PEERS, netdev);
 
 	netif_carrier_on(netdev);
 

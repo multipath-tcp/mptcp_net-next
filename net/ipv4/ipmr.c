@@ -506,7 +506,7 @@ static struct net_device *ipmr_new_tunnel(struct net *net, struct vifctl *v)
 			dev->flags |= IFF_MULTICAST;
 			if (!ipmr_init_vif_indev(dev))
 				goto failure;
-			if (dev_open(dev))
+			if (dev_open(dev, NULL))
 				goto failure;
 			dev_hold(dev);
 		}
@@ -589,7 +589,7 @@ static struct net_device *ipmr_reg_vif(struct net *net, struct mr_table *mrt)
 
 	if (!ipmr_init_vif_indev(dev))
 		goto failure;
-	if (dev_open(dev))
+	if (dev_open(dev, NULL))
 		goto failure;
 
 	dev_hold(dev);
@@ -1802,7 +1802,7 @@ static bool ipmr_forward_offloaded(struct sk_buff *skb, struct mr_table *mrt,
 	struct vif_device *out_vif = &mrt->vif_table[out_vifi];
 	struct vif_device *in_vif = &mrt->vif_table[in_vifi];
 
-	if (!skb->offload_mr_fwd_mark)
+	if (!skb->offload_l3_fwd_mark)
 		return false;
 	if (!out_vif->dev_parent_id.id_len || !in_vif->dev_parent_id.id_len)
 		return false;

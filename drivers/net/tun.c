@@ -201,7 +201,7 @@ struct tun_flow_entry {
 	u32 rxhash;
 	u32 rps_rxhash;
 	int queue_index;
-	unsigned long updated;
+	unsigned long updated ____cacheline_aligned_in_smp;
 };
 
 #define TUN_NUM_FLOW_ENTRIES 1024
@@ -529,18 +529,17 @@ static void tun_flow_update(struct tun_struct *tun, u32 rxhash,
 	unsigned long delay = tun->ageing_time;
 	u16 queue_index = tfile->queue_index;
 
-	if (!rxhash)
-		return;
-	else
-		head = &tun->flows[tun_hashfn(rxhash)];
+	head = &tun->flows[tun_hashfn(rxhash)];
 
 	rcu_read_lock();
 
 	e = tun_flow_find(head, rxhash);
 	if (likely(e)) {
 		/* TODO: keep queueing to old queue until it's empty? */
-		e->queue_index = queue_index;
-		e->updated = jiffies;
+		if (e->queue_index != queue_index)
+			e->queue_index = queue_index;
+		if (e->updated != jiffies)
+			e->updated = jiffies;
 		sock_rps_record_flow_hash(e->rps_rxhash);
 	} else {
 		spin_lock_bh(&tun->lock);
@@ -1254,6 +1253,21 @@ static int tun_xdp(struct net_device *dev, struct netdev_bpf *xdp)
 	}
 }
 
+static int tun_net_change_carrier(struct net_device *dev, bool new_carrier)
+{
+	if (new_carrier) {
+		struct tun_struct *tun = netdev_priv(dev);
+
+		if (!tun->numqueues)
+			return -EPERM;
+
+		netif_carrier_on(dev);
+	} else {
+		netif_carrier_off(dev);
+	}
+	return 0;
+}
+
 static const struct net_device_ops tun_netdev_ops = {
 	.ndo_uninit		= tun_net_uninit,
 	.ndo_open		= tun_net_open,
@@ -1263,6 +1277,7 @@ static const struct net_device_ops tun_netdev_ops = {
 	.ndo_select_queue	= tun_select_queue,
 	.ndo_set_rx_headroom	= tun_set_headroom,
 	.ndo_get_stats64	= tun_net_get_stats64,
+	.ndo_change_carrier	= tun_net_change_carrier,
 };
 
 static void __tun_xdp_flush_tfile(struct tun_file *tfile)
@@ -1345,6 +1360,7 @@ static const struct net_device_ops tap_netdev_ops = {
 	.ndo_get_stats64	= tun_net_get_stats64,
 	.ndo_bpf		= tun_xdp,
 	.ndo_xdp_xmit		= tun_xdp_xmit,
+	.ndo_change_carrier	= tun_net_change_carrier,
 };
 
 static void tun_flow_init(struct tun_struct *tun)
@@ -2297,9 +2313,9 @@ static void tun_setup(struct net_device *dev)
 static int tun_validate(struct nlattr *tb[], struct nlattr *data[],
 			struct netlink_ext_ack *extack)
 {
-	if (!data)
-		return 0;
-	return -EINVAL;
+	NL_SET_ERR_MSG(extack,
+		       "tun/tap creation via rtnetlink is not supported.");
+	return -EOPNOTSUPP;
 }
 
 static size_t tun_get_size(const struct net_device *dev)
@@ -2396,6 +2412,7 @@ static int tun_xdp_one(struct tun_struct *tun,
 		       struct xdp_buff *xdp, int *flush,
 		       struct tun_page *tpage)
 {
+	unsigned int datasize = xdp->data_end - xdp->data;
 	struct tun_xdp_hdr *hdr = xdp->data_hard_start;
 	struct virtio_net_hdr *gso = &hdr->gso;
 	struct tun_pcpu_stats *stats;
@@ -2478,12 +2495,14 @@ build:
 	skb_record_rx_queue(skb, tfile->queue_index);
 	netif_receive_skb(skb);
 
-	stats = get_cpu_ptr(tun->pcpu_stats);
+	/* No need for get_cpu_ptr() here since this function is
+	 * always called with bh disabled
+	 */
+	stats = this_cpu_ptr(tun->pcpu_stats);
 	u64_stats_update_begin(&stats->syncp);
 	stats->rx_packets++;
-	stats->rx_bytes += skb->len;
+	stats->rx_bytes += datasize;
 	u64_stats_update_end(&stats->syncp);
-	put_cpu_ptr(stats);
 
 	if (rxhash)
 		tun_flow_update(tun, rxhash, tfile);
@@ -3002,12 +3021,12 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 	struct net *net = sock_net(&tfile->sk);
 	struct tun_struct *tun;
 	void __user* argp = (void __user*)arg;
+	unsigned int ifindex, carrier;
 	struct ifreq ifr;
 	kuid_t owner;
 	kgid_t group;
 	int sndbuf;
 	int vnet_hdr_sz;
-	unsigned int ifindex;
 	int le;
 	int ret;
 	bool do_notify = false;
@@ -3185,7 +3204,7 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		tun_debug(KERN_DEBUG, tun, "set hw address: %pM\n",
 			  ifr.ifr_hwaddr.sa_data);
 
-		ret = dev_set_mac_address(tun->dev, &ifr.ifr_hwaddr);
+		ret = dev_set_mac_address(tun->dev, &ifr.ifr_hwaddr, NULL);
 		break;
 
 	case TUNGETSNDBUF:
@@ -3289,6 +3308,14 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 
 	case TUNSETFILTEREBPF:
 		ret = tun_set_ebpf(tun, &tun->filter_prog, argp);
+		break;
+
+	case TUNSETCARRIER:
+		ret = -EFAULT;
+		if (copy_from_user(&carrier, argp, sizeof(carrier)))
+			goto unlock;
+
+		ret = tun_net_change_carrier(tun->dev, (bool)carrier);
 		break;
 
 	default:

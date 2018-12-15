@@ -700,6 +700,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 		break;
 	case SO_DONTROUTE:
 		sock_valbool_flag(sk, SOCK_LOCALROUTE, valbool);
+		sk_dst_reset(sk);
 		break;
 	case SO_BROADCAST:
 		sock_valbool_flag(sk, SOCK_BROADCAST, valbool);
@@ -1018,7 +1019,10 @@ set_rcvbuf:
 
 	case SO_ZEROCOPY:
 		if (sk->sk_family == PF_INET || sk->sk_family == PF_INET6) {
-			if (sk->sk_protocol != IPPROTO_TCP)
+			if (!((sk->sk_type == SOCK_STREAM &&
+			       sk->sk_protocol == IPPROTO_TCP) ||
+			      (sk->sk_type == SOCK_DGRAM &&
+			       sk->sk_protocol == IPPROTO_UDP)))
 				ret = -ENOTSUPP;
 		} else if (sk->sk_family != PF_RDS) {
 			ret = -ENOTSUPP;

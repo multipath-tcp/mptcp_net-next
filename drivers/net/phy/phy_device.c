@@ -605,7 +605,21 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
 	 * driver will get bored and give up as soon as it finds that
 	 * there's no driver _already_ loaded.
 	 */
-	request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT, MDIO_ID_ARGS(phy_id));
+	if (is_c45 && c45_ids) {
+		const int num_ids = ARRAY_SIZE(c45_ids->device_ids);
+		int i;
+
+		for (i = 1; i < num_ids; i++) {
+			if (!(c45_ids->devices_in_package & (1 << i)))
+				continue;
+
+			request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
+				       MDIO_ID_ARGS(c45_ids->device_ids[i]));
+		}
+	} else {
+		request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
+			       MDIO_ID_ARGS(phy_id));
+	}
 
 	device_initialize(&mdiodev->dev);
 
@@ -1725,8 +1739,8 @@ int genphy_read_status(struct phy_device *phydev)
 				return -ENOLINK;
 			}
 
-			mii_stat1000_to_linkmode_lpa_t(phydev->lp_advertising,
-						       lpagb);
+			mii_stat1000_mod_linkmode_lpa_t(phydev->lp_advertising,
+							lpagb);
 			common_adv_gb = lpagb & adv << 2;
 		}
 
@@ -1734,7 +1748,7 @@ int genphy_read_status(struct phy_device *phydev)
 		if (lpa < 0)
 			return lpa;
 
-		mii_lpa_to_linkmode_lpa_t(phydev->lp_advertising, lpa);
+		mii_lpa_mod_linkmode_lpa_t(phydev->lp_advertising, lpa);
 
 		adv = phy_read(phydev, MII_ADVERTISE);
 		if (adv < 0)
@@ -1898,37 +1912,23 @@ EXPORT_SYMBOL(genphy_loopback);
 
 static int __set_phy_supported(struct phy_device *phydev, u32 max_speed)
 {
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(speeds) = { 0, };
-
-	linkmode_set_bit_array(phy_10_100_features_array,
-			       ARRAY_SIZE(phy_10_100_features_array),
-			       speeds);
-	linkmode_set_bit_array(phy_gbit_features_array,
-			       ARRAY_SIZE(phy_gbit_features_array),
-			       speeds);
-
-	linkmode_andnot(phydev->supported, phydev->supported, speeds);
-
 	switch (max_speed) {
-	default:
-		return -ENOTSUPP;
-	case SPEED_1000:
-		linkmode_set_bit(ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
-				 phydev->supported);
-		linkmode_set_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-				 phydev->supported);
+	case SPEED_10:
+		linkmode_clear_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
+				   phydev->supported);
+		linkmode_clear_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+				   phydev->supported);
 		/* fall through */
 	case SPEED_100:
-		linkmode_set_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
-				 phydev->supported);
-		linkmode_set_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
-				 phydev->supported);
-		/* fall through */
-	case SPEED_10:
-		linkmode_set_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
-				 phydev->supported);
-		linkmode_set_bit(ETHTOOL_LINK_MODE_10baseT_Full_BIT,
-				 phydev->supported);
+		linkmode_clear_bit(ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
+				   phydev->supported);
+		linkmode_clear_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+				   phydev->supported);
+		break;
+	case SPEED_1000:
+		break;
+	default:
+		return -ENOTSUPP;
 	}
 
 	return 0;

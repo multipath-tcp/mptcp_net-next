@@ -1423,7 +1423,7 @@ do_error:
 	if (copied + copied_syn)
 		goto out;
 out_err:
-	sock_zerocopy_put_abort(uarg);
+	sock_zerocopy_put_abort(uarg, true);
 	err = sk_stream_error(sk, flags, err);
 	/* make sure we wake any epoll edge trigger waiter */
 	if (unlikely(skb_queue_len(&sk->sk_write_queue) == 0 &&
@@ -2088,7 +2088,7 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 		}
 		continue;
 
-	found_ok_skb:
+found_ok_skb:
 		/* Ok so how much can we use? */
 		used = skb->len - offset;
 		if (len < used)
@@ -2147,7 +2147,7 @@ skip_copy:
 			sk_eat_skb(sk, skb);
 		continue;
 
-	found_fin_ok:
+found_fin_ok:
 		/* Process the FIN. */
 		++*seq;
 		if (!(flags & MSG_PEEK))
@@ -3656,8 +3656,11 @@ bool tcp_alloc_md5sig_pool(void)
 	if (unlikely(!tcp_md5sig_pool_populated)) {
 		mutex_lock(&tcp_md5sig_mutex);
 
-		if (!tcp_md5sig_pool_populated)
+		if (!tcp_md5sig_pool_populated) {
 			__tcp_alloc_md5sig_pool();
+			if (tcp_md5sig_pool_populated)
+				static_key_slow_inc(&tcp_md5_needed);
+		}
 
 		mutex_unlock(&tcp_md5sig_mutex);
 	}

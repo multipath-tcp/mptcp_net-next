@@ -154,6 +154,7 @@ struct neighbour {
 	struct hh_cache		hh;
 	int			(*output)(struct neighbour *, struct sk_buff *);
 	const struct neigh_ops	*ops;
+	struct list_head	gc_list;
 	struct rcu_head		rcu;
 	struct net_device	*dev;
 	u8			primary_key[0];
@@ -214,6 +215,8 @@ struct neigh_table {
 	struct timer_list 	proxy_timer;
 	struct sk_buff_head	proxy_queue;
 	atomic_t		entries;
+	atomic_t		gc_entries;
+	struct list_head	gc_list;
 	rwlock_t		lock;
 	unsigned long		last_rand;
 	struct neigh_statistics	__percpu *stats;
@@ -454,6 +457,7 @@ static inline int neigh_hh_bridge(struct hh_cache *hh, struct sk_buff *skb)
 
 static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb)
 {
+	unsigned int hh_alen = 0;
 	unsigned int seq;
 	unsigned int hh_len;
 
@@ -461,16 +465,33 @@ static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb
 		seq = read_seqbegin(&hh->hh_lock);
 		hh_len = hh->hh_len;
 		if (likely(hh_len <= HH_DATA_MOD)) {
-			/* this is inlined by gcc */
-			memcpy(skb->data - HH_DATA_MOD, hh->hh_data, HH_DATA_MOD);
-		} else {
-			unsigned int hh_alen = HH_DATA_ALIGN(hh_len);
+			hh_alen = HH_DATA_MOD;
 
-			memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
+			/* skb_push() would proceed silently if we have room for
+			 * the unaligned size but not for the aligned size:
+			 * check headroom explicitly.
+			 */
+			if (likely(skb_headroom(skb) >= HH_DATA_MOD)) {
+				/* this is inlined by gcc */
+				memcpy(skb->data - HH_DATA_MOD, hh->hh_data,
+				       HH_DATA_MOD);
+			}
+		} else {
+			hh_alen = HH_DATA_ALIGN(hh_len);
+
+			if (likely(skb_headroom(skb) >= hh_alen)) {
+				memcpy(skb->data - hh_alen, hh->hh_data,
+				       hh_alen);
+			}
 		}
 	} while (read_seqretry(&hh->hh_lock, seq));
 
-	skb_push(skb, hh_len);
+	if (WARN_ON_ONCE(skb_headroom(skb) < hh_alen)) {
+		kfree_skb(skb);
+		return NET_XMIT_DROP;
+	}
+
+	__skb_push(skb, hh_len);
 	return dev_queue_xmit(skb);
 }
 
@@ -526,24 +547,6 @@ static inline void neigh_ha_snapshot(char *dst, const struct neighbour *n,
 		seq = read_seqbegin(&n->ha_lock);
 		memcpy(dst, n->ha, dev->addr_len);
 	} while (read_seqretry(&n->ha_lock, seq));
-}
-
-static inline void neigh_update_ext_learned(struct neighbour *neigh, u32 flags,
-					    int *notify)
-{
-	u8 ndm_flags = 0;
-
-	if (!(flags & NEIGH_UPDATE_F_ADMIN))
-		return;
-
-	ndm_flags |= (flags & NEIGH_UPDATE_F_EXT_LEARNED) ? NTF_EXT_LEARNED : 0;
-	if ((neigh->flags ^ ndm_flags) & NTF_EXT_LEARNED) {
-		if (ndm_flags & NTF_EXT_LEARNED)
-			neigh->flags |= NTF_EXT_LEARNED;
-		else
-			neigh->flags &= ~NTF_EXT_LEARNED;
-		*notify = 1;
-	}
 }
 
 static inline void neigh_update_is_router(struct neighbour *neigh, u32 flags,

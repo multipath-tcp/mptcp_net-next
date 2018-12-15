@@ -554,9 +554,9 @@ static inline void mlx5e_poll_ico_single_cqe(struct mlx5e_cq *cq,
 
 	mlx5_cqwq_pop(&cq->wq);
 
-	if (unlikely((cqe->op_own >> 4) != MLX5_CQE_REQ)) {
+	if (unlikely(get_cqe_opcode(cqe) != MLX5_CQE_REQ)) {
 		netdev_WARN_ONCE(cq->channel->netdev,
-				 "Bad OP in ICOSQ CQE: 0x%x\n", cqe->op_own);
+				 "Bad OP in ICOSQ CQE: 0x%x\n", get_cqe_opcode(cqe));
 		return;
 	}
 
@@ -724,9 +724,9 @@ static u32 mlx5e_get_fcs(const struct sk_buff *skb)
 	return __get_unaligned_cpu32(fcs_bytes);
 }
 
-static u8 get_ip_proto(struct sk_buff *skb, __be16 proto)
+static u8 get_ip_proto(struct sk_buff *skb, int network_depth, __be16 proto)
 {
-	void *ip_p = skb->data + sizeof(struct ethhdr);
+	void *ip_p = skb->data + network_depth;
 
 	return (proto == htons(ETH_P_IP)) ? ((struct iphdr *)ip_p)->protocol :
 					    ((struct ipv6hdr *)ip_p)->nexthdr;
@@ -755,7 +755,7 @@ static inline void mlx5e_handle_csum(struct net_device *netdev,
 		goto csum_unnecessary;
 
 	if (likely(is_last_ethertype_ip(skb, &network_depth, &proto))) {
-		if (unlikely(get_ip_proto(skb, proto) == IPPROTO_SCTP))
+		if (unlikely(get_ip_proto(skb, network_depth, proto) == IPPROTO_SCTP))
 			goto csum_unnecessary;
 
 		skb->ip_summed = CHECKSUM_COMPLETE;
@@ -898,7 +898,7 @@ mlx5e_skb_from_cqe_linear(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe,
 	prefetchw(va); /* xdp_frame data area */
 	prefetch(data);
 
-	if (unlikely((cqe->op_own >> 4) != MLX5_CQE_RESP_SEND)) {
+	if (unlikely(get_cqe_opcode(cqe) != MLX5_CQE_RESP_SEND)) {
 		rq->stats->wqe_err++;
 		return NULL;
 	}
@@ -930,7 +930,7 @@ mlx5e_skb_from_cqe_nonlinear(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe,
 	u16 byte_cnt     = cqe_bcnt - headlen;
 	struct sk_buff *skb;
 
-	if (unlikely((cqe->op_own >> 4) != MLX5_CQE_RESP_SEND)) {
+	if (unlikely(get_cqe_opcode(cqe) != MLX5_CQE_RESP_SEND)) {
 		rq->stats->wqe_err++;
 		return NULL;
 	}
@@ -1154,7 +1154,7 @@ void mlx5e_handle_rx_cqe_mpwrq(struct mlx5e_rq *rq, struct mlx5_cqe64 *cqe)
 
 	wi->consumed_strides += cstrides;
 
-	if (unlikely((cqe->op_own >> 4) != MLX5_CQE_RESP_SEND)) {
+	if (unlikely(get_cqe_opcode(cqe) != MLX5_CQE_RESP_SEND)) {
 		rq->stats->wqe_err++;
 		goto mpwrq_cqe_out;
 	}
