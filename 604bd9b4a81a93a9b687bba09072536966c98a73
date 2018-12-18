@@ -1,0 +1,78 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dcaf7581_6e1472e7",
+        "filename": "net/mptcp/mptcp_ctrl.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T12:45:49Z",
+      "side": 1,
+      "message": "detail: I guess this is a left-over from a previous refactoring but I guess we don\u0027t need this #include here.\nNo need to change this in this commit then!",
+      "revId": "604bd9b4a81a93a9b687bba09072536966c98a73",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d90efc02_c100a260",
+        "filename": "net/mptcp/mptcp_input.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1458,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T12:45:49Z",
+      "side": 1,
+      "message": "because this DSS-checksums option is negotiated, can we not \"just\" ignore it?\nOr does the negotiation will fail if A ask for it but B doesn\u0027t support it? (sorry I don\u0027t remember)\n\nEDIT: ok found:\n\n\u003e    For the Checksum Required bit (labeled \"A\"), if either host\n   requires the use of checksums, checksums MUST be used.  In other\n   words, the only way for checksums not to be used is if both hosts in\n   their SYNs set A\u003d0.  This decision is confirmed by the setting of the\n   \"A\" bit in the third packet (the ACK) of the handshake.  For example,\n   if the initiator sets A\u003d0 in the SYN, but the responder sets A\u003d1 in\n   the SYN/ACK, checksums MUST be used in both directions, and the\n   initiator will set A\u003d1 in the ACK.  The decision whether to use\n   checksums will be stored by an implementation in a per-connection\n   binary state variable.\n\nSo yes, we should not continue. → Ack",
+      "revId": "604bd9b4a81a93a9b687bba09072536966c98a73",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9b0a3257_10fded11",
+        "filename": "net/mptcp/mptcp_input.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1471,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T12:45:49Z",
+      "side": 1,
+      "message": "\u003e and bits \"C\" through \"G\" to 0.\n\nhehe, we don\u0027t check that :)",
+      "revId": "604bd9b4a81a93a9b687bba09072536966c98a73",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "65107124_758ef9f8",
+        "filename": "net/mptcp/mptcp_output.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 410,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T12:45:49Z",
+      "side": 1,
+      "message": "That\u0027s our NOP NOP NOP NOP we discussed last week :-)\nhttps://media.giphy.com/media/6h4z4b3v6XWxO/giphy.gif",
+      "range": {
+        "startLine": 410,
+        "startChar": 58,
+        "endLine": 410,
+        "endChar": 68
+      },
+      "revId": "604bd9b4a81a93a9b687bba09072536966c98a73",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
