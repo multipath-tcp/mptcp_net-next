@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7134bccd_c08af0a8",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T14:13:55Z",
+      "side": 1,
+      "message": "can we have a \"conflict\" between sysctl\u0027s? I mean: if we want to use TCP SYN-cookies and MPTCP, can we have a warning somewhere? Maybe it is OK to just add a note in the Documentation?",
+      "revId": "f1fb147d31381cf09ef02631381c105967410d83",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
