@@ -2075,59 +2075,6 @@ static int __mptcp_check_req_master(struct sock *child,
 	return 0;
 }
 
-int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req)
-{
-	struct sock *meta_sk = child, *master_sk;
-	struct sk_buff *skb;
-	u32 new_mapping;
-	int ret;
-
-	ret = __mptcp_check_req_master(child, req);
-	if (ret)
-		return ret;
-
-	master_sk = tcp_sk(meta_sk)->mpcb->master_sk;
-
-	/* We need to rewind copied_seq as it is set to IDSN + 1 and as we have
-	 * pre-MPTCP data in the receive queue.
-	 */
-	tcp_sk(meta_sk)->copied_seq -= tcp_sk(master_sk)->rcv_nxt -
-				       tcp_rsk(req)->rcv_isn - 1;
-
-	/* Map subflow sequence number to data sequence numbers. We need to map
-	 * these data to [IDSN - len - 1, IDSN[.
-	 */
-	new_mapping = tcp_sk(meta_sk)->copied_seq - tcp_rsk(req)->rcv_isn - 1;
-
-	/* There should be only one skb: the SYN + data. */
-	skb_queue_walk(&meta_sk->sk_receive_queue, skb) {
-		TCP_SKB_CB(skb)->seq += new_mapping;
-		TCP_SKB_CB(skb)->end_seq += new_mapping;
-	}
-
-	/* With fastopen we change the semantics of the relative subflow
-	 * sequence numbers to deal with middleboxes that could add/remove
-	 * multiple bytes in the SYN. We chose to start counting at rcv_nxt - 1
-	 * instead of the regular TCP ISN.
-	 */
-	tcp_sk(master_sk)->mptcp->rcv_isn = tcp_sk(master_sk)->rcv_nxt - 1;
-
-	/* We need to update copied_seq of the master_sk to account for the
-	 * already moved data to the meta receive queue.
-	 */
-	tcp_sk(master_sk)->copied_seq = tcp_sk(master_sk)->rcv_nxt;
-
-	/* Handled by the master_sk */
-	tcp_sk(meta_sk)->fastopen_rsk = NULL;
-
-	/* Subflow establishment is now lockless, drop the lock here it will
-	 * be taken again in tcp_child_process().
-	 */
-	bh_unlock_sock(meta_sk);
-
-	return 0;
-}
-
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
 			   struct request_sock *req, const struct sk_buff *skb,
 			   int drop)
