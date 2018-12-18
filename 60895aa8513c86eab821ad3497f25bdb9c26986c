@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "34e61c27_5e2582c8",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T14:04:59Z",
+      "side": 1,
+      "message": "from what I understood, we still support reinjections if a path has been marked as failed (inet_csk(sk)-\u003eicsk_ca_state \u003d\u003d TCP_CA_Loss) but we no longer \"preventively\" reinject to optimise perfs, right? :)\n\nI mean: I guess we still manage the case where a packet is added to the send-queue (or sent to the NIC), the link is set as down, these packets are sent through other available subflows.",
+      "revId": "60895aa8513c86eab821ad3497f25bdb9c26986c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
