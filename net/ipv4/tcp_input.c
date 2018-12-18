@@ -5784,16 +5784,9 @@ static bool tcp_rcv_fastopen_synack(struct sock *sk, struct sk_buff *synack,
 				    struct tcp_fastopen_cookie *cookie)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *data = NULL;
+	struct sk_buff *data = tp->syn_data ? tcp_rtx_queue_head(sk) : NULL;
 	u16 mss = tp->rx_opt.mss_clamp, try_exp = 0;
 	bool syn_drop = false;
-
-	if (tp->syn_data) {
-		if (mptcp(tp))
-			data = tcp_write_queue_head(mptcp_meta_sk(sk));
-		else
-			data = tcp_rtx_queue_head(sk);
-	}
 
 	if (mss == tp->rx_opt.user_mss) {
 		struct tcp_options_received opt;
@@ -5825,11 +5818,7 @@ static bool tcp_rcv_fastopen_synack(struct sock *sk, struct sk_buff *synack,
 
 	tcp_fastopen_cache_set(sk, mss, cookie, syn_drop, try_exp);
 
-	/* In mptcp case, we do not rely on "retransmit", but instead on
-	 * "transmit", because if fastopen data is not acked, the retransmission
-	 * becomes the first MPTCP data (see mptcp_rcv_synsent_fastopen).
-	 */
-	if (data && !mptcp(tp)) { /* Retransmit unacked data in SYN */
+	if (data) { /* Retransmit unacked data in SYN */
 		skb_rbtree_walk_from(data) {
 			if (__tcp_retransmit_skb(sk, data, 1))
 				break;
@@ -6689,18 +6678,12 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 		fastopen_sk = tcp_try_fastopen(sk, skb, req, &foc, dst);
 	}
 	if (fastopen_sk) {
-		struct sock *meta_sk = fastopen_sk;
-
-		if (mptcp(tcp_sk(fastopen_sk)))
-			meta_sk = mptcp_meta_sk(fastopen_sk);
 		af_ops->send_synack(fastopen_sk, dst, &fl, req,
 				    &foc, TCP_SYNACK_FASTOPEN);
 		/* Add the child socket directly into the accept queue */
-		inet_csk_reqsk_queue_add(sk, req, meta_sk);
+		inet_csk_reqsk_queue_add(sk, req, fastopen_sk);
 		sk->sk_data_ready(sk);
 		bh_unlock_sock(fastopen_sk);
-		if (meta_sk != fastopen_sk)
-			bh_unlock_sock(meta_sk);
 		sock_put(fastopen_sk);
 	} else {
 		tcp_rsk(req)->tfo_listener = false;
