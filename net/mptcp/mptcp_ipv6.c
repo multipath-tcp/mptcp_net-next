@@ -111,20 +111,6 @@ static int mptcp_v6_init_req(struct request_sock *req, const struct sock *sk,
 	return 0;
 }
 
-#ifdef CONFIG_SYN_COOKIES
-static u32 mptcp_v6_cookie_init_seq(struct request_sock *req, const struct sock *sk,
-				    const struct sk_buff *skb, __u16 *mssp)
-{
-	__u32 isn = cookie_v6_init_sequence(req, sk, skb, mssp);
-
-	tcp_rsk(req)->snt_isn = isn;
-
-	mptcp_reqsk_init(req, sk, skb, true);
-
-	return isn;
-}
-#endif
-
 /* May be called without holding the meta-level lock */
 static int mptcp_v6_join_init_req(struct request_sock *req, const struct sock *meta_sk,
 				  struct sk_buff *skb, bool want_cookie)
@@ -427,9 +413,6 @@ int mptcp_pm_v6_init(void)
 
 	mptcp_request_sock_ipv6_ops = tcp_request_sock_ipv6_ops;
 	mptcp_request_sock_ipv6_ops.init_req = mptcp_v6_init_req;
-#ifdef CONFIG_SYN_COOKIES
-	mptcp_request_sock_ipv6_ops.cookie_init_seq = mptcp_v6_cookie_init_seq;
-#endif
 
 	mptcp_join_request_sock_ipv6_ops = tcp_request_sock_ipv6_ops;
 	mptcp_join_request_sock_ipv6_ops.init_req = mptcp_v6_join_init_req;
