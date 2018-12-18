@@ -1,19 +1,5 @@
-/* MPTCP Scheduler module selector. Highly inspired by tcp_cong.c */
-
 #include <linux/module.h>
 #include <net/mptcp.h>
-
-static DEFINE_SPINLOCK(mptcp_sched_list_lock);
-static LIST_HEAD(mptcp_sched_list);
-
-struct defsched_priv {
-	u32	last_rbuf_opti;
-};
-
-static struct defsched_priv *defsched_get_priv(const struct tcp_sock *tp)
-{
-	return (struct defsched_priv *)&tp->mptcp->mptcp_sched[0];
-}
 
 static bool mptcp_is_def_unavailable(struct sock *sk)
 {
@@ -194,9 +180,9 @@ static struct sock
  *
  * Additionally, this function is aware of the backup-subflows.
  */
-static struct sock *get_available_subflow(struct sock *meta_sk,
-					  struct sk_buff *skb,
-					  bool zero_wnd_test)
+struct sock *mptcp_get_available_subflow(struct sock *meta_sk,
+					 struct sk_buff *skb,
+					 bool zero_wnd_test)
 {
 	struct mptcp_cb *mpcb = tcp_sk(meta_sk)->mpcb;
 	struct sock *sk;
@@ -244,11 +230,10 @@ restart:
 
 static struct sk_buff *mptcp_rcv_buf_optimization(struct sock *sk, int penal)
 {
-	struct sock *meta_sk;
 	const struct tcp_sock *tp = tcp_sk(sk);
 	struct mptcp_tcp_sock *mptcp;
 	struct sk_buff *skb_head;
-	struct defsched_priv *dsp = defsched_get_priv(tp);
+	struct sock *meta_sk;
 
 	meta_sk = mptcp_meta_sk(sk);
 	skb_head = tcp_rtx_queue_head(meta_sk);
@@ -265,7 +250,7 @@ static struct sk_buff *mptcp_rcv_buf_optimization(struct sock *sk, int penal)
 		goto retrans;
 
 	/* Only penalize again after an RTT has elapsed */
-	if (tcp_jiffies32 - dsp->last_rbuf_opti < usecs_to_jiffies(tp->srtt_us >> 3))
+	if (tcp_jiffies32 - tp->mptcp->last_rbuf_opti < usecs_to_jiffies(tp->srtt_us >> 3))
 		goto retrans;
 
 	/* Half the cwnd of the slow flow */
@@ -283,7 +268,7 @@ static struct sk_buff *mptcp_rcv_buf_optimization(struct sock *sk, int penal)
 				if (prior_cwnd >= tp_it->snd_ssthresh)
 					tp_it->snd_ssthresh = max(tp_it->snd_ssthresh >> 1U, 2U);
 
-				dsp->last_rbuf_opti = tcp_jiffies32;
+				tp->mptcp->last_rbuf_opti = tcp_jiffies32;
 			}
 			break;
 		}
@@ -343,8 +328,8 @@ static struct sk_buff *__mptcp_next_segment(struct sock *meta_sk, int *reinject)
 	if (!skb && meta_sk->sk_socket &&
 	    test_bit(SOCK_NOSPACE, &meta_sk->sk_socket->flags) &&
 	    sk_stream_wspace(meta_sk) < sk_stream_min_wspace(meta_sk)) {
-		struct sock *subsk = get_available_subflow(meta_sk, NULL,
-							   false);
+		struct sock *subsk = mptcp_get_available_subflow(meta_sk, NULL,
+								 false);
 		if (!subsk)
 			return NULL;
 
@@ -355,10 +340,10 @@ static struct sk_buff *__mptcp_next_segment(struct sock *meta_sk, int *reinject)
 	return skb;
 }
 
-static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
-					  int *reinject,
-					  struct sock **subsk,
-					  unsigned int *limit)
+struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
+				   int *reinject,
+				   struct sock **subsk,
+				   unsigned int *limit)
 {
 	struct sk_buff *skb = __mptcp_next_segment(meta_sk, reinject);
 	unsigned int mss_now;
@@ -372,7 +357,7 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 	if (!skb)
 		return NULL;
 
-	*subsk = get_available_subflow(meta_sk, skb, false);
+	*subsk = mptcp_get_available_subflow(meta_sk, skb, false);
 	if (!*subsk)
 		return NULL;
 
@@ -420,185 +405,7 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 	return skb;
 }
 
-static void defsched_init(struct sock *sk)
+void mptcp_sched_init(struct sock *sk)
 {
-	struct defsched_priv *dsp = defsched_get_priv(tcp_sk(sk));
-
-	dsp->last_rbuf_opti = tcp_jiffies32;
+	tcp_sk(sk)->mptcp->last_rbuf_opti = tcp_jiffies32;
 }
-
-struct mptcp_sched_ops mptcp_sched_default = {
-	.get_subflow = get_available_subflow,
-	.next_segment = mptcp_next_segment,
-	.init = defsched_init,
-	.name = "default",
-	.owner = THIS_MODULE,
-};
-
-static struct mptcp_sched_ops *mptcp_sched_find(const char *name)
-{
-	struct mptcp_sched_ops *e;
-
-	list_for_each_entry_rcu(e, &mptcp_sched_list, list) {
-		if (strcmp(e->name, name) == 0)
-			return e;
-	}
-
-	return NULL;
-}
-
-int mptcp_register_scheduler(struct mptcp_sched_ops *sched)
-{
-	int ret = 0;
-
-	if (!sched->get_subflow || !sched->next_segment)
-		return -EINVAL;
-
-	spin_lock(&mptcp_sched_list_lock);
-	if (mptcp_sched_find(sched->name)) {
-		pr_notice("%s already registered\n", sched->name);
-		ret = -EEXIST;
-	} else {
-		list_add_tail_rcu(&sched->list, &mptcp_sched_list);
-		pr_info("%s registered\n", sched->name);
-	}
-	spin_unlock(&mptcp_sched_list_lock);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(mptcp_register_scheduler);
-
-void mptcp_unregister_scheduler(struct mptcp_sched_ops *sched)
-{
-	spin_lock(&mptcp_sched_list_lock);
-	list_del_rcu(&sched->list);
-	spin_unlock(&mptcp_sched_list_lock);
-
-	/* Wait for outstanding readers to complete before the
-	 * module gets removed entirely.
-	 *
-	 * A try_module_get() should fail by now as our module is
-	 * in "going" state since no refs are held anymore and
-	 * module_exit() handler being called.
-	 */
-	synchronize_rcu();
-}
-EXPORT_SYMBOL_GPL(mptcp_unregister_scheduler);
-
-void mptcp_get_default_scheduler(char *name)
-{
-	struct mptcp_sched_ops *sched;
-
-	BUG_ON(list_empty(&mptcp_sched_list));
-
-	rcu_read_lock();
-	sched = list_entry(mptcp_sched_list.next, struct mptcp_sched_ops, list);
-	strncpy(name, sched->name, MPTCP_SCHED_NAME_MAX);
-	rcu_read_unlock();
-}
-
-int mptcp_set_default_scheduler(const char *name)
-{
-	struct mptcp_sched_ops *sched;
-	int ret = -ENOENT;
-
-	spin_lock(&mptcp_sched_list_lock);
-	sched = mptcp_sched_find(name);
-#ifdef CONFIG_MODULES
-	if (!sched && capable(CAP_NET_ADMIN)) {
-		spin_unlock(&mptcp_sched_list_lock);
-
-		request_module("mptcp_%s", name);
-		spin_lock(&mptcp_sched_list_lock);
-		sched = mptcp_sched_find(name);
-	}
-#endif
-
-	if (sched) {
-		list_move(&sched->list, &mptcp_sched_list);
-		ret = 0;
-	} else {
-		pr_info("%s is not available\n", name);
-	}
-	spin_unlock(&mptcp_sched_list_lock);
-
-	return ret;
-}
-
-/* Must be called with rcu lock held */
-static struct mptcp_sched_ops *__mptcp_sched_find_autoload(const char *name)
-{
-	struct mptcp_sched_ops *sched = mptcp_sched_find(name);
-#ifdef CONFIG_MODULES
-	if (!sched && capable(CAP_NET_ADMIN)) {
-		rcu_read_unlock();
-		request_module("mptcp_%s", name);
-		rcu_read_lock();
-		sched = mptcp_sched_find(name);
-	}
-#endif
-	return sched;
-}
-
-void mptcp_init_scheduler(struct mptcp_cb *mpcb)
-{
-	struct mptcp_sched_ops *sched;
-	struct sock *meta_sk = mpcb->meta_sk;
-	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
-
-	rcu_read_lock();
-	/* if scheduler was set using socket option */
-	if (meta_tp->mptcp_sched_setsockopt) {
-		sched = __mptcp_sched_find_autoload(meta_tp->mptcp_sched_name);
-		if (sched && try_module_get(sched->owner)) {
-			mpcb->sched_ops = sched;
-			goto out;
-		}
-	}
-
-	list_for_each_entry_rcu(sched, &mptcp_sched_list, list) {
-		if (try_module_get(sched->owner)) {
-			mpcb->sched_ops = sched;
-			break;
-		}
-	}
-out:
-	rcu_read_unlock();
-}
-
-/* Change scheduler for socket */
-int mptcp_set_scheduler(struct sock *sk, const char *name)
-{
-	struct mptcp_sched_ops *sched;
-	int err = 0;
-
-	rcu_read_lock();
-	sched = __mptcp_sched_find_autoload(name);
-
-	if (!sched) {
-		err = -ENOENT;
-	} else if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)) {
-		err = -EPERM;
-	} else {
-		strcpy(tcp_sk(sk)->mptcp_sched_name, name);
-		tcp_sk(sk)->mptcp_sched_setsockopt = 1;
-	}
-	rcu_read_unlock();
-
-	return err;
-}
-
-/* Manage refcounts on socket close. */
-void mptcp_cleanup_scheduler(struct mptcp_cb *mpcb)
-{
-	module_put(mpcb->sched_ops->owner);
-}
-
-/* Set default value from kernel configuration at bootup */
-static int __init mptcp_scheduler_default(void)
-{
-	BUILD_BUG_ON(sizeof(struct defsched_priv) > MPTCP_SCHED_SIZE);
-
-	return mptcp_set_default_scheduler(CONFIG_DEFAULT_MPTCP_SCHED);
-}
-late_initcall(mptcp_scheduler_default);

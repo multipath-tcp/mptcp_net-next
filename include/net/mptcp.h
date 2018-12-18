@@ -170,8 +170,7 @@ struct mptcp_tcp_sock {
 	u8	loc_id;
 	u8	rem_id;
 
-#define MPTCP_SCHED_SIZE 4
-	u8	mptcp_sched[MPTCP_SCHED_SIZE] __aligned(8);
+	u32	last_rbuf_opti;
 
 	int	init_rcv_wnd;
 	u32	infinite_cutoff_seq;
@@ -219,23 +218,6 @@ struct mptcp_pm_ops {
 	struct module	*owner;
 };
 
-#define MPTCP_SCHED_NAME_MAX 16
-struct mptcp_sched_ops {
-	struct list_head list;
-
-	struct sock *		(*get_subflow)(struct sock *meta_sk,
-					       struct sk_buff *skb,
-					       bool zero_wnd_test);
-	struct sk_buff *	(*next_segment)(struct sock *meta_sk,
-						int *reinject,
-						struct sock **subsk,
-						unsigned int *limit);
-	void			(*init)(struct sock *sk);
-
-	char			name[MPTCP_SCHED_NAME_MAX];
-	struct module		*owner;
-};
-
 struct mptcp_cb {
 	/* list of sockets in this multipath connection */
 	struct hlist_head conn_list;
@@ -260,10 +242,6 @@ struct mptcp_cb {
 		passive_close:1,
 		snd_hiseq_index:1, /* Index in snd_high_order of snd_nxt */
 		rcv_hiseq_index:1; /* Index in rcv_high_order of rcv_nxt */
-
-#define MPTCP_SCHED_DATA_SIZE 8
-	u8 mptcp_sched[MPTCP_SCHED_DATA_SIZE] __aligned(8);
-	struct mptcp_sched_ops *sched_ops;
 
 	u64	infinite_rcv_seq;
 
@@ -822,19 +800,18 @@ void mptcp_init_path_manager(struct mptcp_cb *mpcb);
 void mptcp_cleanup_path_manager(struct mptcp_cb *mpcb);
 void mptcp_fallback_default(struct mptcp_cb *mpcb);
 void mptcp_get_default_path_manager(char *name);
-int mptcp_set_scheduler(struct sock *sk, const char *name);
 int mptcp_set_path_manager(struct sock *sk, const char *name);
 int mptcp_set_default_path_manager(const char *name);
 extern struct mptcp_pm_ops mptcp_pm_default;
 
-/* MPTCP-scheduler registration/initialization functions */
-int mptcp_register_scheduler(struct mptcp_sched_ops *sched);
-void mptcp_unregister_scheduler(struct mptcp_sched_ops *sched);
-void mptcp_init_scheduler(struct mptcp_cb *mpcb);
-void mptcp_cleanup_scheduler(struct mptcp_cb *mpcb);
-void mptcp_get_default_scheduler(char *name);
-int mptcp_set_default_scheduler(const char *name);
-extern struct mptcp_sched_ops mptcp_sched_default;
+void mptcp_sched_init(struct sock *sk);
+struct sock *mptcp_get_available_subflow(struct sock *meta_sk,
+					 struct sk_buff *skb,
+					 bool zero_wnd_test);
+struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
+				   int *reinject,
+				   struct sock **subsk,
+				   unsigned int *limit);
 
 /* Initializes function-pointers and MPTCP-flags */
 static inline void mptcp_init_tcp_sock(struct sock *sk)
