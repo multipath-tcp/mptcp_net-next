@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "39e446fd_7a4e73ba",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 401,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 0,
+      "message": "should we not keep these ones? That\u0027s the number defined in the RFC, no?\n\nWe kept MPTCP_SUB_LEN_FAIL_ALIGN just below but we should no longer send mp_fail.",
+      "revId": "84ec59859bef59f3ec61c7f3d95d195d4b9a7589",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "613da2e8_fdbd8f39",
+        "filename": "include/uapi/linux/if.h",
+        "patchSetId": 2
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 0,
+      "message": "(detail: should we not continue to \"book\" this value? Maybe not needed)",
+      "revId": "84ec59859bef59f3ec61c7f3d95d195d4b9a7589",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "21d1e583_6e64ed75",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1040,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "should we also integrate this code in mptcp_trunk? I mean: is it a fix? I don\u0027t think we managed this case before, did we?",
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dfdafffa_4d7429fc",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1469,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "detail: should we remove this comment?",
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "261f1031_3180550c",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1694,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "I guess we should remove this column (Backup) here",
+      "range": {
+        "startLine": 1694,
+        "startChar": 37,
+        "endLine": 1694,
+        "endChar": 43
+      },
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bb65a082_99e8d2e5",
+        "filename": "net/mptcp/mptcp_output.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1141,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "detail: should we comment here and below that it is the \u0027backup\u0027/\u0027low-prio\u0027 bit?",
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cf768ab7_92b1382e",
+        "filename": "net/mptcp/mptcp_sched.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 195,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "was :-)",
+      "range": {
+        "startLine": 195,
+        "startChar": 31,
+        "endLine": 195,
+        "endChar": 33
+      },
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "daa4331b_a6487d3a",
+        "filename": "net/mptcp/mptcp_sched.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 229,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T13:37:21Z",
+      "side": 1,
+      "message": "not sure we should but do we need to adapt this comment?",
+      "revId": "07dcc4c31a0b715bbbdeb35c6082d94fe4370dda",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
