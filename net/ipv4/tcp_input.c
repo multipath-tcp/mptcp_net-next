@@ -6177,7 +6177,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			 * addresses, which can only be done after the third ack
 			 * of the 3-way handshake.
 			 */
-			mptcp_update_metasocket(tp->meta_sk);
+			full_mesh_new_session(tp->meta_sk);
 		}
 		if (queued >= 0)
 			return queued;
@@ -6280,7 +6280,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		 */
 		if (mptcp(tp)) {
 			if (is_master_tp(tp))
-				mptcp_update_metasocket(mptcp_meta_sk(sk));
+				full_mesh_new_session(mptcp_meta_sk(sk));
 			else
 				tcp_send_ack(sk);
 		}
