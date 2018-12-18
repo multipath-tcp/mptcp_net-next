@@ -307,41 +307,6 @@ static void mptcp_reqsk_new_mptcp(struct request_sock *req,
 	mtreq->mptcp_rem_key = mopt->mptcp_sender_key;
 }
 
-static int mptcp_reqsk_new_cookie(struct request_sock *req,
-				  const struct sock *sk,
-				  const struct mptcp_options_received *mopt,
-				  const struct sk_buff *skb)
-{
-	struct mptcp_request_sock *mtreq = mptcp_rsk(req);
-
-	/* MPTCP version agreement */
-	if (mopt->mptcp_ver >= tcp_sk(sk)->mptcp_ver)
-		mtreq->mptcp_ver = tcp_sk(sk)->mptcp_ver;
-	else
-		mtreq->mptcp_ver = mopt->mptcp_ver;
-
-	rcu_read_lock_bh();
-	spin_lock(&mptcp_tk_hashlock);
-
-	mptcp_set_key_reqsk(req, skb, tcp_rsk(req)->snt_isn);
-
-	if (mptcp_reqsk_find_tk(mtreq->mptcp_loc_token) ||
-	    mptcp_find_token(mtreq->mptcp_loc_token)) {
-		spin_unlock(&mptcp_tk_hashlock);
-		rcu_read_unlock_bh();
-		return false;
-	}
-
-	inet_rsk(req)->saw_mpc = 1;
-
-	spin_unlock(&mptcp_tk_hashlock);
-	rcu_read_unlock_bh();
-
-	mtreq->mptcp_rem_key = mopt->mptcp_sender_key;
-
-	return true;
-}
-
 static void mptcp_set_key_sk(const struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -2128,8 +2093,7 @@ int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req)
 }
 
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
-			   struct request_sock *req, const struct sk_buff *skb,
-			   int drop)
+			   struct request_sock *req, const struct sk_buff *skb)
 {
 	struct sock *meta_sk = child;
 	int ret;
@@ -2141,17 +2105,8 @@ int mptcp_check_req_master(struct sock *sk, struct sock *child,
 
 	sock_rps_save_rxhash(child, skb);
 
-	/* drop indicates that we come from tcp_check_req and thus need to
-	 * handle the request-socket fully.
-	 */
-	if (drop) {
-		tcp_synack_rtt_meas(child, req);
-		inet_csk_complete_hashdance(sk, meta_sk, req, true);
-	} else {
-		/* Thus, we come from syn-cookies */
-		refcount_set(&req->rsk_refcnt, 1);
-		inet_csk_reqsk_queue_add(sk, req, meta_sk);
-	}
+	tcp_synack_rtt_meas(child, req);
+	inet_csk_complete_hashdance(sk, meta_sk, req, true);
 
 	/* Subflow establishment is now lockless, drop the lock here it will
 	 * be taken again in tcp_child_process().
@@ -2430,53 +2385,14 @@ void mptcp_join_reqsk_init(const struct mptcp_cb *mpcb,
 }
 
 void mptcp_reqsk_init(struct request_sock *req, const struct sock *sk,
-		      const struct sk_buff *skb, bool want_cookie)
+		      const struct sk_buff *skb)
 {
 	struct mptcp_options_received mopt;
 
 	mptcp_init_mp_opt(&mopt);
 	tcp_parse_mptcp_options(skb, &mopt);
 
-	if (want_cookie) {
-		if (!mptcp_reqsk_new_cookie(req, sk, &mopt, skb))
-			/* No key available - back to regular TCP */
-			inet_rsk(req)->mptcp_rqsk = 0;
-		return;
-	}
-
 	mptcp_reqsk_new_mptcp(req, sk, &mopt, skb);
-}
-
-void mptcp_cookies_reqsk_init(struct request_sock *req,
-			      struct mptcp_options_received *mopt,
-			      struct sk_buff *skb)
-{
-	struct mptcp_request_sock *mtreq = mptcp_rsk(req);
-
-	/* Absolutely need to always initialize this. */
-	mtreq->hash_entry.pprev = NULL;
-
-	mtreq->mptcp_rem_key = mopt->mptcp_sender_key;
-	mtreq->mptcp_loc_key = mopt->mptcp_receiver_key;
-
-	/* Generate the token */
-	mptcp_key_sha1(mtreq->mptcp_loc_key, &mtreq->mptcp_loc_token, NULL);
-
-	rcu_read_lock_bh();
-	spin_lock(&mptcp_tk_hashlock);
-
-	/* Check, if the key is still free */
-	if (mptcp_reqsk_find_tk(mtreq->mptcp_loc_token) ||
-	    mptcp_find_token(mtreq->mptcp_loc_token))
-		goto out;
-
-	inet_rsk(req)->saw_mpc = 1;
-	mtreq->is_sub = 0;
-	inet_rsk(req)->mptcp_rqsk = 1;
-
-out:
-	spin_unlock(&mptcp_tk_hashlock);
-	rcu_read_unlock_bh();
 }
 
 int mptcp_conn_request(struct sock *sk, struct sk_buff *skb)
