@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5a65bca8_05d93879",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T14:50:47Z",
+      "side": 1,
+      "message": "should we maintain a list of what is not/no longer supported? :)",
+      "revId": "1cfcec865c0f87d68f84fea2f550fe54551bc804",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
