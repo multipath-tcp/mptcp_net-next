@@ -269,133 +269,6 @@ static int mptcp_rcv_state_process(struct sock *meta_sk, struct sock *sk,
 	return 0;
 }
 
-/**
- * @return:
- *  i) 1: Everything's fine.
- *  ii) -1: A reset has been sent on the subflow - csum-failure
- *  iii) 0: csum-failure but no reset sent, because it's the last subflow.
- *	 Last packet should not be destroyed by the caller because it has
- *	 been done here.
- */
-static int mptcp_verif_dss_csum(struct sock *sk)
-{
-	struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *tmp, *tmp1, *last = NULL;
-	__wsum csum_tcp = 0; /* cumulative checksum of pld + mptcp-header */
-	int ans = 1, overflowed = 0, offset = 0, dss_csum_added = 0;
-	int iter = 0;
-
-	skb_queue_walk_safe(&sk->sk_receive_queue, tmp, tmp1) {
-		unsigned int csum_len;
-
-		if (before(tp->mptcp->map_subseq + tp->mptcp->map_data_len, TCP_SKB_CB(tmp)->end_seq))
-			/* Mapping ends in the middle of the packet -
-			 * csum only these bytes
-			 */
-			csum_len = tp->mptcp->map_subseq + tp->mptcp->map_data_len - TCP_SKB_CB(tmp)->seq;
-		else
-			csum_len = tmp->len;
-
-		offset = 0;
-		if (overflowed) {
-			char first_word[4];
-			first_word[0] = 0;
-			first_word[1] = 0;
-			first_word[2] = 0;
-			first_word[3] = *(tmp->data);
-			csum_tcp = csum_partial(first_word, 4, csum_tcp);
-			offset = 1;
-			csum_len--;
-			overflowed = 0;
-		}
-
-		csum_tcp = skb_checksum(tmp, offset, csum_len, csum_tcp);
-
-		/* Was it on an odd-length? Then we have to merge the next byte
-		 * correctly (see above)
-		 */
-		if (csum_len != (csum_len & (~1)))
-			overflowed = 1;
-
-		if (mptcp_is_data_seq(tmp) && !dss_csum_added) {
-			__be32 data_seq = htonl((u32)(tp->mptcp->map_data_seq >> 32));
-
-			/* If a 64-bit dss is present, we increase the offset
-			 * by 4 bytes, as the high-order 64-bits will be added
-			 * in the final csum_partial-call.
-			 */
-			u32 offset = skb_transport_offset(tmp) +
-				     TCP_SKB_CB(tmp)->dss_off;
-			if (TCP_SKB_CB(tmp)->mptcp_flags & MPTCPHDR_SEQ64_SET)
-				offset += 4;
-
-			csum_tcp = skb_checksum(tmp, offset,
-						MPTCP_SUB_LEN_SEQ_CSUM,
-						csum_tcp);
-
-			csum_tcp = csum_partial(&data_seq,
-						sizeof(data_seq), csum_tcp);
-
-			dss_csum_added = 1; /* Just do it once */
-		}
-		last = tmp;
-		iter++;
-
-		if (!skb_queue_is_last(&sk->sk_receive_queue, tmp) &&
-		    !before(TCP_SKB_CB(tmp1)->seq,
-			    tp->mptcp->map_subseq + tp->mptcp->map_data_len))
-			break;
-	}
-
-	/* Now, checksum must be 0 */
-	if (unlikely(csum_fold(csum_tcp))) {
-		struct mptcp_tcp_sock *mptcp;
-		struct sock *sk_it = NULL;
-
-		pr_err("%s csum is wrong: %#x tcp-seq %u dss_csum_added %d overflowed %d iterations %d\n",
-		       __func__, csum_fold(csum_tcp), TCP_SKB_CB(last)->seq,
-		       dss_csum_added, overflowed, iter);
-
-		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_CSUMFAIL);
-		tp->mptcp->send_mp_fail = 1;
-
-		/* map_data_seq is the data-seq number of the
-		 * mapping we are currently checking
-		 */
-		tp->mpcb->csum_cutoff_seq = tp->mptcp->map_data_seq;
-
-		/* Search for another subflow that is fully established */
-		mptcp_for_each_sub(tp->mpcb, mptcp) {
-			sk_it = mptcp_to_sock(mptcp);
-
-			if (sk_it != sk &&
-			    tcp_sk(sk_it)->mptcp->fully_established)
-				break;
-
-			sk_it = NULL;
-		}
-
-		if (sk_it) {
-			mptcp_send_reset(sk);
-			ans = -1;
-		} else {
-			tp->mpcb->send_infinite_mapping = 1;
-
-			/* Need to purge the rcv-queue as it's no more valid */
-			while ((tmp = __skb_dequeue(&sk->sk_receive_queue)) != NULL) {
-				tp->copied_seq = TCP_SKB_CB(tmp)->end_seq;
-				kfree_skb(tmp);
-			}
-
-			mptcp_sub_force_close_all(tp->mpcb, sk);
-
-			ans = 0;
-		}
-	}
-
-	return ans;
-}
-
 static inline void mptcp_prepare_skb(struct sk_buff *skb,
 				     const struct sock *sk)
 {
@@ -710,10 +583,6 @@ static int mptcp_detect_mapping(struct sock *sk, struct sk_buff *skb)
 		mpcb->infinite_mapping_rcv = 1;
 		mpcb->send_infinite_mapping = 1;
 		tp->mptcp->fully_established = 1;
-		/* We need to repeat mp_fail's until the sender felt
-		 * back to infinite-mapping - here we stop repeating it.
-		 */
-		tp->mptcp->send_mp_fail = 0;
 
 		/* We have to fixup data_len - it must be the same as skb->len */
 		data_len = skb->len + (mptcp_is_data_fin(skb) ? 1 : 0);
@@ -733,17 +602,6 @@ static int mptcp_detect_mapping(struct sock *sk, struct sk_buff *skb)
 
 		set_infinite_rcv = true;
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_INFINITEMAPRX);
-	}
-
-	/* We are sending mp-fail's and thus are in fallback mode.
-	 * Ignore packets which do not announce the fallback and still
-	 * want to provide a mapping.
-	 */
-	if (tp->mptcp->send_mp_fail) {
-		tp->copied_seq = TCP_SKB_CB(skb)->end_seq;
-		__skb_unlink(skb, &sk->sk_receive_queue);
-		__kfree_skb(skb);
-		return -1;
 	}
 
 	/* FIN increased the mapping-length by 1 */
@@ -955,16 +813,6 @@ static int mptcp_queue_skb(struct sock *sk)
 	if (tp->mptcp->map_data_fin) {
 		mpcb->dfin_path_index = tp->mptcp->path_index;
 		mpcb->dfin_combined = !!(sk->sk_shutdown & RCV_SHUTDOWN);
-	}
-
-	/* Verify the checksum */
-	if (mpcb->dss_csum && !mpcb->infinite_mapping_rcv) {
-		int ret = mptcp_verif_dss_csum(sk);
-
-		if (ret <= 0) {
-			mptcp_reset_mapping(tp, old_copied_seq);
-			return 1;
-		}
 	}
 
 	if (before64(rcv_nxt64, tp->mptcp->map_data_seq)) {
@@ -1605,6 +1453,10 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 			break;
 		}
 
+		/* We do not support DSS-checksums */
+		if (mpcapable->a)
+			break;
+
 		/* MPTCP-RFC 6824:
 		 * "If receiving a message with the 'B' flag set to 1, and this
 		 * is not understood, then this SYN MUST be silently ignored;
@@ -1622,7 +1474,6 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 			break;
 
 		mopt->saw_mpc = 1;
-		mopt->dss_csum = sysctl_mptcp_checksum || mpcapable->a;
 
 		if (opsize >= MPTCP_SUB_LEN_CAPABLE_SYN)
 			mopt->mptcp_sender_key = mpcapable->sender_key;
@@ -1677,15 +1528,7 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 		const struct mp_dss *mdss = (struct mp_dss *)ptr;
 		struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
 
-		/* We check opsize for the csum and non-csum case. We do this,
-		 * because the draft says that the csum SHOULD be ignored if
-		 * it has not been negotiated in the MP_CAPABLE but still is
-		 * present in the data.
-		 *
-		 * It will get ignored later in mptcp_queue_skb.
-		 */
-		if (opsize != mptcp_sub_len_dss(mdss, 0) &&
-		    opsize != mptcp_sub_len_dss(mdss, 1)) {
+		if (opsize != mptcp_sub_len_dss(mdss)) {
 			mptcp_debug("%s: mp_dss: bad option size %d\n",
 				    __func__, opsize);
 			break;
@@ -1722,10 +1565,6 @@ void mptcp_parse_options(const uint8_t *ptr, int opsize,
 			mopt->data_len = get_unaligned_be16(ptr);
 
 			tcb->mptcp_flags |= MPTCPHDR_SEQ;
-
-			/* Is a check-sum present? */
-			if (opsize == mptcp_sub_len_dss(mdss, 1))
-				tcb->mptcp_flags |= MPTCPHDR_DSS_CSUM;
 
 			/* DATA_FIN only possible with DSS-mapping */
 			if (mdss->F)
@@ -2101,16 +1940,6 @@ bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 	if (unlikely(mopt->mp_fail))
 		mptcp_mp_fail_rcvd(sk, th);
 
-	/* RFC 6824, Section 3.3:
-	 * If a checksum is not present when its use has been negotiated, the
-	 * receiver MUST close the subflow with a RST as it is considered broken.
-	 */
-	if (mptcp_is_data_seq(skb) && tp->mpcb->dss_csum &&
-	    !(TCP_SKB_CB(skb)->mptcp_flags & MPTCPHDR_DSS_CSUM)) {
-		mptcp_send_reset(sk);
-		return true;
-	}
-
 	/* We have to acknowledge retransmissions of the third
 	 * ack.
 	 */
@@ -2290,9 +2119,6 @@ int mptcp_rcv_synsent_state_process(struct sock *sk, struct sock **skptr,
 		 * is not part of any mapping.
 		 */
 		tp->mptcp->snt_isn = tp->snd_una - 1;
-		tp->mpcb->dss_csum = mopt->dss_csum;
-		if (tp->mpcb->dss_csum)
-			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_CSUMENABLED);
 
 		tp->mptcp->include_mpc = 1;
 

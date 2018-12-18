@@ -67,7 +67,6 @@ int sysctl_mptcp_enabled __read_mostly = 1;
 int sysctl_mptcp_version __read_mostly = 0;
 static int min_mptcp_version;
 static int max_mptcp_version = 1;
-int sysctl_mptcp_checksum __read_mostly = 1;
 int sysctl_mptcp_debug __read_mostly;
 EXPORT_SYMBOL(sysctl_mptcp_debug);
 int sysctl_mptcp_syn_retries __read_mostly = 3;
@@ -131,13 +130,6 @@ static struct ctl_table mptcp_table[] = {
 		.proc_handler = &proc_dointvec_minmax,
 		.extra1 = &min_mptcp_version,
 		.extra2 = &max_mptcp_version,
-	},
-	{
-		.procname = "mptcp_checksum",
-		.data = &sysctl_mptcp_checksum,
-		.maxlen = sizeof(int),
-		.mode = 0644,
-		.proc_handler = &proc_dointvec
 	},
 	{
 		.procname = "mptcp_debug",
@@ -2078,7 +2070,6 @@ static int __mptcp_check_req_master(struct sock *child,
 	child_tp->mptcp->snt_isn = tcp_rsk(req)->snt_isn;
 	child_tp->mptcp->rcv_isn = tcp_rsk(req)->rcv_isn;
 
-	mpcb->dss_csum = mtreq->dss_csum;
 	mpcb->server_side = 1;
 
 	/* Needs to be done here additionally, because when accepting a
@@ -2457,12 +2448,9 @@ void mptcp_reqsk_init(struct request_sock *req, const struct sock *sk,
 		      const struct sk_buff *skb, bool want_cookie)
 {
 	struct mptcp_options_received mopt;
-	struct mptcp_request_sock *mtreq = mptcp_rsk(req);
 
 	mptcp_init_mp_opt(&mopt);
 	tcp_parse_mptcp_options(skb, &mopt);
-
-	mtreq->dss_csum = mopt.dss_csum;
 
 	if (want_cookie) {
 		if (!mptcp_reqsk_new_cookie(req, sk, &mopt, skb))
@@ -2500,7 +2488,6 @@ void mptcp_cookies_reqsk_init(struct request_sock *req,
 	inet_rsk(req)->saw_mpc = 1;
 	mtreq->is_sub = 0;
 	inet_rsk(req)->mptcp_rqsk = 1;
-	mtreq->dss_csum = mopt->dss_csum;
 
 out:
 	spin_unlock(&mptcp_tk_hashlock);
@@ -2771,10 +2758,8 @@ static const struct snmp_mib mptcp_snmp_list[] = {
 	SNMP_MIB_ITEM("MPCapableFallbackACK", MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK),
 	SNMP_MIB_ITEM("MPCapableFallbackSYNACK", MPTCP_MIB_MPCAPABLEACTIVEFALLBACK),
 	SNMP_MIB_ITEM("MPCapableRetransFallback", MPTCP_MIB_MPCAPABLERETRANSFALLBACK),
-	SNMP_MIB_ITEM("MPTCPCsumEnabled", MPTCP_MIB_CSUMENABLED),
 	SNMP_MIB_ITEM("MPTCPRetrans", MPTCP_MIB_RETRANSSEGS),
 	SNMP_MIB_ITEM("MPFailRX", MPTCP_MIB_MPFAILRX),
-	SNMP_MIB_ITEM("MPCsumFail", MPTCP_MIB_CSUMFAIL),
 	SNMP_MIB_ITEM("MPFastcloseRX", MPTCP_MIB_FASTCLOSERX),
 	SNMP_MIB_ITEM("MPFastcloseTX", MPTCP_MIB_FASTCLOSETX),
 	SNMP_MIB_ITEM("MPFallbackAckSub", MPTCP_MIB_FBACKSUB),
