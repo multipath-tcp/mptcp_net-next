@@ -1,0 +1,112 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "23d538ef_7441cbb9",
+        "filename": "net/mptcp/Kconfig",
+        "patchSetId": 2
+      },
+      "lineNbr": 32,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "we finally remove these MPTCP options not prefixed with MPTCP \\o/",
+      "range": {
+        "startLine": 32,
+        "startChar": 8,
+        "endLine": 32,
+        "endChar": 24
+      },
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "21c749ff_b338e532",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 400,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "I guess you remove this not to depend on num_subflows parameter, right?",
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5aaf5fd9_c4e13012",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 485,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "that\u0027s also linked to \u0027num_subflows\u0027 parameter, right?",
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "682f1b89_dfe33902",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1307,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "do we need to remove this? Do you see that more as an optimisation or because here we were using it only if one parameter was set? (create_on_err)",
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "929e408a_44b7c957",
+        "filename": "net/mptcp/mptcp_fullmesh.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1613,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "why can we remove this one? Because it depends on \u0027create_on_err\u0027?",
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ecab6c89_4a7cf218",
+        "filename": "net/mptcp/mptcp_input.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 47,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-18T16:03:00Z",
+      "side": 0,
+      "message": "(detail: can we not keep this function? It might help understanding the code here :) )",
+      "revId": "5e5270586ec06b9aa97590616ddb45be4cb847aa",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
