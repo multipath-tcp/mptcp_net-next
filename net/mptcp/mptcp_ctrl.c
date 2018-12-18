@@ -76,25 +76,6 @@ bool mptcp_init_failed __read_mostly;
 struct static_key mptcp_static_key = STATIC_KEY_INIT_FALSE;
 EXPORT_SYMBOL(mptcp_static_key);
 
-static int proc_mptcp_path_manager(struct ctl_table *ctl, int write,
-				   void __user *buffer, size_t *lenp,
-				   loff_t *ppos)
-{
-	char val[MPTCP_PM_NAME_MAX];
-	struct ctl_table tbl = {
-		.data = val,
-		.maxlen = MPTCP_PM_NAME_MAX,
-	};
-	int ret;
-
-	mptcp_get_default_path_manager(val);
-
-	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
-	if (write && ret == 0)
-		ret = mptcp_set_default_path_manager(val);
-	return ret;
-}
-
 static struct ctl_table mptcp_table[] = {
 	{
 		.procname = "mptcp_enabled",
@@ -125,12 +106,6 @@ static struct ctl_table mptcp_table[] = {
 		.maxlen = sizeof(int),
 		.mode = 0644,
 		.proc_handler = &proc_dointvec
-	},
-	{
-		.procname	= "mptcp_path_manager",
-		.mode		= 0644,
-		.maxlen		= MPTCP_PM_NAME_MAX,
-		.proc_handler	= proc_mptcp_path_manager,
 	},
 	{ }
 };
@@ -604,9 +579,6 @@ static void mptcp_sock_def_error_report(struct sock *sk)
 			tcp_done(meta_sk);
 	}
 
-	if (mpcb->pm_ops->subflow_error)
-		mpcb->pm_ops->subflow_error(meta_sk, sk);
-
 	sk->sk_err = 0;
 	return;
 }
@@ -614,7 +586,6 @@ static void mptcp_sock_def_error_report(struct sock *sk)
 static void mptcp_mpcb_put(struct mptcp_cb *mpcb)
 {
 	if (refcount_dec_and_test(&mpcb->mpcb_refcnt)) {
-		mptcp_cleanup_path_manager(mpcb);
 		kfree(mpcb->master_info);
 		kmem_cache_free(mptcp_cb_cache, mpcb);
 	}
@@ -1285,8 +1256,6 @@ static int mptcp_alloc_mpcb(struct sock *meta_sk, __u64 remote_key,
 	/* The meta is directly linked - set refcnt to 1 */
 	refcount_set(&mpcb->mpcb_refcnt, 1);
 
-	mptcp_init_path_manager(mpcb);
-
 	if (!try_module_get(inet_csk(master_sk)->icsk_ca_ops->owner))
 		tcp_assign_congestion_control(master_sk);
 
@@ -1417,9 +1386,6 @@ void mptcp_del_sock(struct sock *sk)
 
 	mpcb = tp->mpcb;
 
-	if (mpcb->pm_ops->delete_subflow)
-		mpcb->pm_ops->delete_subflow(sk);
-
 	mptcp_debug("%s: Removing subsock tok %#x pi:%d state %d is_meta? %d\n",
 		    __func__, mpcb->mptcp_loc_token, tp->mptcp->path_index,
 		    sk->sk_state, is_meta_sk(sk));
@@ -1450,15 +1416,6 @@ void mptcp_del_sock(struct sock *sk)
 	}
 
 	rcu_assign_pointer(inet_sk(sk)->inet_opt, NULL);
-}
-
-/* Updates the MPTCP-session based on path-manager information (e.g., addresses,
- * low-prio flows,...).
- */
-void mptcp_update_metasocket(const struct sock *meta_sk)
-{
-	if (tcp_sk(meta_sk)->mpcb->pm_ops->new_session)
-		tcp_sk(meta_sk)->mpcb->pm_ops->new_session(meta_sk);
 }
 
 /* Clean up the receive buffer for full frames taken by the user,
@@ -2879,8 +2836,8 @@ void __init mptcp_init(void)
 	if (!mptcp_sysctl)
 		goto register_sysctl_failed;
 
-	if (mptcp_register_path_manager(&mptcp_pm_default))
-		goto register_pm_failed;
+	if (full_mesh_register())
+		goto register_full_mesh_failed;
 
 	pr_info("MPTCP: Unstable branch");
 
@@ -2888,7 +2845,7 @@ void __init mptcp_init(void)
 
 	return;
 
-register_pm_failed:
+register_full_mesh_failed:
 	unregister_net_sysctl_table(mptcp_sysctl);
 register_sysctl_failed:
 	mptcp_pm_v4_undo();
