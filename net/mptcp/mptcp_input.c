@@ -114,7 +114,6 @@ static void mptcp_clean_rtx_queue(struct sock *meta_sk, u32 prior_snd_una)
 			break;
 
 		next = skb_rb_next(skb);
-		tcp_rtx_queue_unlink(skb, meta_sk);
 
 		if (mptcp_is_data_fin(skb)) {
 			struct mptcp_tcp_sock *mptcp;
@@ -138,7 +137,7 @@ static void mptcp_clean_rtx_queue(struct sock *meta_sk, u32 prior_snd_una)
 				mptcp_sub_close(sk_it, delay);
 			}
 		}
-		sk_wmem_free_skb(meta_sk, skb);
+		tcp_rtx_queue_unlink_and_free(skb, meta_sk);
 	}
 
 	if (likely(between(meta_tp->snd_up, prior_snd_una, meta_tp->snd_una)))
@@ -448,6 +447,7 @@ static void mptcp_restart_sending(struct sock *meta_sk)
 	 */
 	wq_head = tcp_write_queue_head(meta_sk);
 	skb_rbtree_walk_safe(skb, &meta_sk->tcp_rtx_queue, tmp) {
+		list_del(&skb->tcp_tsorted_anchor);
 		tcp_rtx_queue_unlink(skb, meta_sk);
 
 		if (wq_head)

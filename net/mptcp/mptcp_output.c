@@ -901,8 +901,8 @@ void mptcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 /* Sends the datafin */
 void mptcp_send_fin(struct sock *meta_sk)
 {
+	struct sk_buff *skb, *tskb = tcp_write_queue_tail(meta_sk);
 	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
-	struct sk_buff *skb = tcp_write_queue_tail(meta_sk);
 	int mss_now;
 
 	if ((1 << meta_sk->sk_state) & (TCPF_CLOSE_WAIT | TCPF_LAST_ACK))
@@ -914,9 +914,9 @@ void mptcp_send_fin(struct sock *meta_sk)
 	 */
 	mss_now = mptcp_current_mss(meta_sk);
 
-	if (tcp_send_head(meta_sk) != NULL) {
-		TCP_SKB_CB(skb)->mptcp_flags |= MPTCPHDR_FIN;
-		TCP_SKB_CB(skb)->end_seq++;
+	if (tskb) {
+		TCP_SKB_CB(tskb)->mptcp_flags |= MPTCPHDR_FIN;
+		TCP_SKB_CB(tskb)->end_seq++;
 		meta_tp->write_seq++;
 	} else {
 		/* Socket is locked, keep trying until memory is available. */
@@ -928,6 +928,7 @@ void mptcp_send_fin(struct sock *meta_sk)
 			yield();
 		}
 		/* Reserve space for headers and prepare control bits. */
+		INIT_LIST_HEAD(&skb->tcp_tsorted_anchor);
 		skb_reserve(skb, MAX_TCP_HEADER);
 
 		tcp_init_nondata_skb(skb, meta_tp->write_seq, TCPHDR_ACK);
