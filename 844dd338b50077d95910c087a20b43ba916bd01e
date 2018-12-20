@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "58222409_5cc5e89b",
+        "filename": "net/ipv4/tcp.c",
+        "patchSetId": 3
+      },
+      "lineNbr": 3664,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2018-12-20T22:45:21Z",
+      "side": 0,
+      "message": "Can remove this symbol from include/uapi/linux/tcp.h too",
+      "range": {
+        "startLine": 3664,
+        "startChar": 6,
+        "endLine": 3664,
+        "endChar": 24
+      },
+      "revId": "844dd338b50077d95910c087a20b43ba916bd01e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
