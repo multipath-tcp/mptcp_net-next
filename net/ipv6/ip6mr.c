@@ -52,6 +52,8 @@
 #include <net/ip6_checksum.h>
 #include <linux/netconf.h>
 
+#include <linux/nospec.h>
+
 struct ip6mr_rule {
 	struct fib_rule		common;
 };
@@ -655,7 +657,7 @@ static struct net_device *ip6mr_reg_vif(struct net *net, struct mr_table *mrt)
 		return NULL;
 	}
 
-	if (dev_open(dev))
+	if (dev_open(dev, NULL))
 		goto failure;
 
 	dev_hold(dev);
@@ -1841,6 +1843,7 @@ int ip6mr_ioctl(struct sock *sk, int cmd, void __user *arg)
 			return -EFAULT;
 		if (vr.mifi >= mrt->maxvif)
 			return -EINVAL;
+		vr.mifi = array_index_nospec(vr.mifi, mrt->maxvif);
 		read_lock(&mrt_lock);
 		vif = &mrt->vif_table[vr.mifi];
 		if (VIF_EXISTS(mrt, vr.mifi)) {
@@ -1915,6 +1918,7 @@ int ip6mr_compat_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
 			return -EFAULT;
 		if (vr.mifi >= mrt->maxvif)
 			return -EINVAL;
+		vr.mifi = array_index_nospec(vr.mifi, mrt->maxvif);
 		read_lock(&mrt_lock);
 		vif = &mrt->vif_table[vr.mifi];
 		if (VIF_EXISTS(mrt, vr.mifi)) {
@@ -1968,7 +1972,7 @@ static inline int ip6mr_forward2_finish(struct net *net, struct sock *sk, struct
  */
 
 static int ip6mr_forward2(struct net *net, struct mr_table *mrt,
-			  struct sk_buff *skb, struct mfc6_cache *c, int vifi)
+			  struct sk_buff *skb, int vifi)
 {
 	struct ipv6hdr *ipv6h;
 	struct vif_device *vif = &mrt->vif_table[vifi];
@@ -2134,15 +2138,14 @@ forward:
 			if (psend != -1) {
 				struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 				if (skb2)
-					ip6mr_forward2(net, mrt, skb2,
-						       c, psend);
+					ip6mr_forward2(net, mrt, skb2, psend);
 			}
 			psend = ct;
 		}
 	}
 last_forward:
 	if (psend != -1) {
-		ip6mr_forward2(net, mrt, skb, c, psend);
+		ip6mr_forward2(net, mrt, skb, psend);
 		return;
 	}
 

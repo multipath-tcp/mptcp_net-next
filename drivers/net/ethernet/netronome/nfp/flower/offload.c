@@ -343,13 +343,29 @@ nfp_flower_calculate_key_layers(struct nfp_app *app,
 		    !(tcp_flags & (TCPHDR_FIN | TCPHDR_SYN | TCPHDR_RST)))
 			return -EOPNOTSUPP;
 
-		/* We need to store TCP flags in the IPv4 key space, thus
-		 * we need to ensure we include a IPv4 key layer if we have
-		 * not done so already.
+		/* We need to store TCP flags in the either the IPv4 or IPv6 key
+		 * space, thus we need to ensure we include a IPv4/IPv6 key
+		 * layer if we have not done so already.
 		 */
-		if (!(key_layer & NFP_FLOWER_LAYER_IPV4)) {
-			key_layer |= NFP_FLOWER_LAYER_IPV4;
-			key_size += sizeof(struct nfp_flower_ipv4);
+		if (!key_basic)
+			return -EOPNOTSUPP;
+
+		if (!(key_layer & NFP_FLOWER_LAYER_IPV4) &&
+		    !(key_layer & NFP_FLOWER_LAYER_IPV6)) {
+			switch (key_basic->n_proto) {
+			case cpu_to_be16(ETH_P_IP):
+				key_layer |= NFP_FLOWER_LAYER_IPV4;
+				key_size += sizeof(struct nfp_flower_ipv4);
+				break;
+
+			case cpu_to_be16(ETH_P_IPV6):
+				key_layer |= NFP_FLOWER_LAYER_IPV6;
+				key_size += sizeof(struct nfp_flower_ipv6);
+				break;
+
+			default:
+				return -EOPNOTSUPP;
+			}
 		}
 	}
 
@@ -460,16 +476,16 @@ nfp_flower_add_offload(struct nfp_app *app, struct net_device *netdev,
 	if (err)
 		goto err_destroy_flow;
 
-	err = nfp_flower_xmit_flow(app, flow_pay,
-				   NFP_FLOWER_CMSG_TYPE_FLOW_ADD);
-	if (err)
-		goto err_destroy_flow;
-
 	flow_pay->tc_flower_cookie = flow->cookie;
 	err = rhashtable_insert_fast(&priv->flow_table, &flow_pay->fl_node,
 				     nfp_flower_table_params);
 	if (err)
-		goto err_destroy_flow;
+		goto err_release_metadata;
+
+	err = nfp_flower_xmit_flow(app, flow_pay,
+				   NFP_FLOWER_CMSG_TYPE_FLOW_ADD);
+	if (err)
+		goto err_remove_rhash;
 
 	if (port)
 		port->tc_offload_cnt++;
@@ -479,6 +495,12 @@ nfp_flower_add_offload(struct nfp_app *app, struct net_device *netdev,
 
 	return 0;
 
+err_remove_rhash:
+	WARN_ON_ONCE(rhashtable_remove_fast(&priv->flow_table,
+					    &flow_pay->fl_node,
+					    nfp_flower_table_params));
+err_release_metadata:
+	nfp_modify_flow_metadata(app, flow_pay);
 err_destroy_flow:
 	kfree(flow_pay->action_data);
 	kfree(flow_pay->mask_data);
@@ -712,7 +734,7 @@ nfp_flower_setup_indr_tc_block(struct net_device *netdev, struct nfp_app *app,
 
 		err = tcf_block_cb_register(f->block,
 					    nfp_flower_setup_indr_block_cb,
-					    netdev, cb_priv, f->extack);
+					    cb_priv, cb_priv, f->extack);
 		if (err) {
 			list_del(&cb_priv->list);
 			kfree(cb_priv);
@@ -720,13 +742,15 @@ nfp_flower_setup_indr_tc_block(struct net_device *netdev, struct nfp_app *app,
 
 		return err;
 	case TC_BLOCK_UNBIND:
-		tcf_block_cb_unregister(f->block,
-					nfp_flower_setup_indr_block_cb, netdev);
 		cb_priv = nfp_flower_indr_block_cb_priv_lookup(app, netdev);
-		if (cb_priv) {
-			list_del(&cb_priv->list);
-			kfree(cb_priv);
-		}
+		if (!cb_priv)
+			return -ENOENT;
+
+		tcf_block_cb_unregister(f->block,
+					nfp_flower_setup_indr_block_cb,
+					cb_priv);
+		list_del(&cb_priv->list);
+		kfree(cb_priv);
 
 		return 0;
 	default:
@@ -760,15 +784,14 @@ int nfp_flower_reg_indir_block_handler(struct nfp_app *app,
 	if (event == NETDEV_REGISTER) {
 		err = __tc_indr_block_cb_register(netdev, app,
 						  nfp_flower_indr_setup_tc_cb,
-						  netdev);
+						  app);
 		if (err)
 			nfp_flower_cmsg_warn(app,
 					     "Indirect block reg failed - %s\n",
 					     netdev->name);
 	} else if (event == NETDEV_UNREGISTER) {
 		__tc_indr_block_cb_unregister(netdev,
-					      nfp_flower_indr_setup_tc_cb,
-					      netdev);
+					      nfp_flower_indr_setup_tc_cb, app);
 	}
 
 	return NOTIFY_OK;

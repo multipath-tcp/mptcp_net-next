@@ -126,7 +126,9 @@ nfp_abm_spawn_repr(struct nfp_app *app, struct nfp_abm_link *alink,
 
 	reprs = nfp_reprs_get_locked(app, rtype);
 	WARN(nfp_repr_get_locked(app, reprs, alink->id), "duplicate repr");
+	rtnl_lock();
 	rcu_assign_pointer(reprs->reprs[alink->id], netdev);
+	rtnl_unlock();
 
 	nfp_info(app->cpp, "%s Port %d Representor(%s) created\n",
 		 ptype == NFP_PORT_PF_PORT ? "PCIe" : "Phys",
@@ -152,7 +154,9 @@ nfp_abm_kill_repr(struct nfp_app *app, struct nfp_abm_link *alink,
 	netdev = nfp_repr_get_locked(app, reprs, alink->id);
 	if (!netdev)
 		return;
+	rtnl_lock();
 	rcu_assign_pointer(reprs->reprs[alink->id], NULL);
+	rtnl_unlock();
 	synchronize_rcu();
 	/* Cast to make sure nfp_repr_clean_and_free() takes a nfp_repr */
 	nfp_repr_clean_and_free((struct nfp_repr *)netdev_priv(netdev));
@@ -202,6 +206,9 @@ static int nfp_abm_eswitch_set_switchdev(struct nfp_abm *abm)
 	struct nfp_pf *pf = app->pf;
 	struct nfp_net *nn;
 	int err;
+
+	if (!abm->red_support)
+		return -EOPNOTSUPP;
 
 	err = nfp_abm_ctrl_qm_enable(abm);
 	if (err)
@@ -414,12 +421,26 @@ nfp_abm_port_get_stats_strings(struct nfp_app *app, struct nfp_port *port,
 	return data;
 }
 
+static int nfp_abm_fw_init_reset(struct nfp_abm *abm)
+{
+	unsigned int i;
+
+	if (!abm->red_support)
+		return 0;
+
+	for (i = 0; i < abm->num_bands * NFP_NET_MAX_RX_RINGS; i++) {
+		__nfp_abm_ctrl_set_q_lvl(abm, i, NFP_ABM_LVL_INFINITY);
+		__nfp_abm_ctrl_set_q_act(abm, i, NFP_ABM_ACT_DROP);
+	}
+
+	return nfp_abm_ctrl_qm_disable(abm);
+}
+
 static int nfp_abm_init(struct nfp_app *app)
 {
 	struct nfp_pf *pf = app->pf;
 	struct nfp_reprs *reprs;
 	struct nfp_abm *abm;
-	unsigned int i;
 	int err;
 
 	if (!pf->eth_tbl) {
@@ -456,18 +477,14 @@ static int nfp_abm_init(struct nfp_app *app)
 				   sizeof(*abm->thresholds), GFP_KERNEL);
 	if (!abm->thresholds)
 		goto err_free_thresh_umap;
-	for (i = 0; i < abm->num_bands * NFP_NET_MAX_RX_RINGS; i++)
-		__nfp_abm_ctrl_set_q_lvl(abm, i, NFP_ABM_LVL_INFINITY);
 
 	abm->actions = kvcalloc(abm->num_thresholds, sizeof(*abm->actions),
 				GFP_KERNEL);
 	if (!abm->actions)
 		goto err_free_thresh;
-	for (i = 0; i < abm->num_bands * NFP_NET_MAX_RX_RINGS; i++)
-		__nfp_abm_ctrl_set_q_act(abm, i, NFP_ABM_ACT_DROP);
 
 	/* We start in legacy mode, make sure advanced queuing is disabled */
-	err = nfp_abm_ctrl_qm_disable(abm);
+	err = nfp_abm_fw_init_reset(abm);
 	if (err)
 		goto err_free_act;
 

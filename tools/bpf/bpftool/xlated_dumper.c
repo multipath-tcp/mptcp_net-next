@@ -1,39 +1,5 @@
 // SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
-/*
- * Copyright (C) 2018 Netronome Systems, Inc.
- *
- * This software is dual licensed under the GNU General License Version 2,
- * June 1991 as shown in the file COPYING in the top-level directory of this
- * source tree or the BSD 2-Clause License provided below.  You have the
- * option to license this software under the complete terms of either license.
- *
- * The BSD 2-Clause License:
- *
- *     Redistribution and use in source and binary forms, with or
- *     without modification, are permitted provided that the following
- *     conditions are met:
- *
- *      1. Redistributions of source code must retain the above
- *         copyright notice, this list of conditions and the following
- *         disclaimer.
- *
- *      2. Redistributions in binary form must reproduce the above
- *         copyright notice, this list of conditions and the following
- *         disclaimer in the documentation and/or other materials
- *         provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
+/* Copyright (C) 2018 Netronome Systems, Inc. */
 
 #define _GNU_SOURCE
 #include <stdarg.h>
@@ -41,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <libbpf.h>
 
 #include "disasm.h"
 #include "json_writer.h"
@@ -114,7 +81,7 @@ struct kernel_sym *kernel_syms_search(struct dump_data *dd,
 		       sizeof(*dd->sym_mapping), kernel_syms_cmp) : NULL;
 }
 
-static void print_insn(void *private_data, const char *fmt, ...)
+static void __printf(2, 3) print_insn(void *private_data, const char *fmt, ...)
 {
 	va_list args;
 
@@ -123,7 +90,7 @@ static void print_insn(void *private_data, const char *fmt, ...)
 	va_end(args);
 }
 
-static void
+static void __printf(2, 3)
 print_insn_for_graph(void *private_data, const char *fmt, ...)
 {
 	char buf[64], *p;
@@ -154,7 +121,8 @@ print_insn_for_graph(void *private_data, const char *fmt, ...)
 	printf("%s", buf);
 }
 
-static void print_insn_json(void *private_data, const char *fmt, ...)
+static void __printf(2, 3)
+print_insn_json(void *private_data, const char *fmt, ...)
 {
 	unsigned int l = strlen(fmt);
 	char chomped_fmt[l];
@@ -234,8 +202,9 @@ static const char *print_imm(void *private_data,
 }
 
 void dump_xlated_json(struct dump_data *dd, void *buf, unsigned int len,
-		      bool opcodes)
+		      bool opcodes, bool linum)
 {
+	const struct bpf_prog_linfo *prog_linfo = dd->prog_linfo;
 	const struct bpf_insn_cbs cbs = {
 		.cb_print	= print_insn_json,
 		.cb_call	= print_call,
@@ -246,6 +215,7 @@ void dump_xlated_json(struct dump_data *dd, void *buf, unsigned int len,
 	struct bpf_insn *insn = buf;
 	struct btf *btf = dd->btf;
 	bool double_insn = false;
+	unsigned int nr_skip = 0;
 	char func_sig[1024];
 	unsigned int i;
 
@@ -261,7 +231,7 @@ void dump_xlated_json(struct dump_data *dd, void *buf, unsigned int len,
 		jsonw_start_object(json_wtr);
 
 		if (btf && record) {
-			if (record->insn_offset == i) {
+			if (record->insn_off == i) {
 				btf_dumper_type_only(btf, record->type_id,
 						     func_sig,
 						     sizeof(func_sig));
@@ -270,6 +240,16 @@ void dump_xlated_json(struct dump_data *dd, void *buf, unsigned int len,
 					jsonw_string(json_wtr, func_sig);
 				}
 				record = (void *)record + dd->finfo_rec_size;
+			}
+		}
+
+		if (prog_linfo) {
+			const struct bpf_line_info *linfo;
+
+			linfo = bpf_prog_linfo__lfind(prog_linfo, i, nr_skip);
+			if (linfo) {
+				btf_dump_linfo_json(btf, linfo, linum);
+				nr_skip++;
 			}
 		}
 
@@ -307,8 +287,9 @@ void dump_xlated_json(struct dump_data *dd, void *buf, unsigned int len,
 }
 
 void dump_xlated_plain(struct dump_data *dd, void *buf, unsigned int len,
-		       bool opcodes)
+		       bool opcodes, bool linum)
 {
+	const struct bpf_prog_linfo *prog_linfo = dd->prog_linfo;
 	const struct bpf_insn_cbs cbs = {
 		.cb_print	= print_insn,
 		.cb_call	= print_call,
@@ -318,6 +299,7 @@ void dump_xlated_plain(struct dump_data *dd, void *buf, unsigned int len,
 	struct bpf_func_info *record;
 	struct bpf_insn *insn = buf;
 	struct btf *btf = dd->btf;
+	unsigned int nr_skip = 0;
 	bool double_insn = false;
 	char func_sig[1024];
 	unsigned int i;
@@ -330,13 +312,24 @@ void dump_xlated_plain(struct dump_data *dd, void *buf, unsigned int len,
 		}
 
 		if (btf && record) {
-			if (record->insn_offset == i) {
+			if (record->insn_off == i) {
 				btf_dumper_type_only(btf, record->type_id,
 						     func_sig,
 						     sizeof(func_sig));
 				if (func_sig[0] != '\0')
 					printf("%s:\n", func_sig);
 				record = (void *)record + dd->finfo_rec_size;
+			}
+		}
+
+		if (prog_linfo) {
+			const struct bpf_line_info *linfo;
+
+			linfo = bpf_prog_linfo__lfind(prog_linfo, i, nr_skip);
+			if (linfo) {
+				btf_dump_linfo_plain(btf, linfo, "; ",
+						     linum);
+				nr_skip++;
 			}
 		}
 

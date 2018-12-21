@@ -140,7 +140,7 @@ Maintainers List (try to look for most precise areas first)
 M:	Steffen Klassert <klassert@kernel.org>
 L:	netdev@vger.kernel.org
 S:	Odd Fixes
-F:	Documentation/networking/vortex.txt
+F:	Documentation/networking/device_drivers/3com/vortex.txt
 F:	drivers/net/ethernet/3com/3c59x.c
 
 3CR990 NETWORK DRIVER
@@ -740,7 +740,7 @@ R:	Saeed Bishara <saeedb@amazon.com>
 R:	Zorik Machulsky <zorik@amazon.com>
 L:	netdev@vger.kernel.org
 S:	Supported
-F:	Documentation/networking/ena.txt
+F:	Documentation/networking/device_drivers/amazon/ena.txt
 F:	drivers/net/ethernet/amazon/
 
 AMD CRYPTOGRAPHIC COPROCESSOR (CCP) DRIVER
@@ -1472,6 +1472,7 @@ F:	drivers/clk/sirf/
 F:	drivers/clocksource/timer-prima2.c
 F:	drivers/clocksource/timer-atlas7.c
 N:	[^a-z]sirf
+X:	drivers/gnss
 
 ARM/EBSA110 MACHINE SUPPORT
 M:	Russell King <linux@armlinux.org.uk>
@@ -1738,13 +1739,17 @@ ARM/Mediatek SoC support
 M:	Matthias Brugger <matthias.bgg@gmail.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	linux-mediatek@lists.infradead.org (moderated for non-subscribers)
+W:	https://mtk.bcnfs.org/
+C:	irc://chat.freenode.net/linux-mediatek
 S:	Maintained
 F:	arch/arm/boot/dts/mt6*
 F:	arch/arm/boot/dts/mt7*
 F:	arch/arm/boot/dts/mt8*
 F:	arch/arm/mach-mediatek/
 F:	arch/arm64/boot/dts/mediatek/
+F:	drivers/soc/mediatek/
 N:	mtk
+N:	mt[678]
 K:	mediatek
 
 ARM/Mediatek USB3 PHY DRIVER
@@ -1923,7 +1928,6 @@ ARM/QUALCOMM SUPPORT
 M:	Andy Gross <andy.gross@linaro.org>
 M:	David Brown <david.brown@linaro.org>
 L:	linux-arm-msm@vger.kernel.org
-L:	linux-soc@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/soc/qcom/
 F:	arch/arm/boot/dts/qcom-*.dts
@@ -2491,7 +2495,7 @@ F:	drivers/net/wireless/ath/*
 ATHEROS ATH5K WIRELESS DRIVER
 M:	Jiri Slaby <jirislaby@gmail.com>
 M:	Nick Kossifidis <mickflemm@gmail.com>
-M:	"Luis R. Rodriguez" <mcgrof@do-not-panic.com>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 L:	linux-wireless@vger.kernel.org
 W:	http://wireless.kernel.org/en/users/Drivers/ath5k
 S:	Maintained
@@ -2922,7 +2926,7 @@ F:	drivers/staging/vc04_services
 BROADCOM BCM47XX MIPS ARCHITECTURE
 M:	Hauke Mehrtens <hauke@hauke-m.de>
 M:	Rafał Miłecki <zajec5@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/mips/brcm/
 F:	arch/mips/bcm47xx/*
@@ -2931,7 +2935,6 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
 BROADCOM BCM5301X ARM ARCHITECTURE
 M:	Hauke Mehrtens <hauke@hauke-m.de>
 M:	Rafał Miłecki <zajec5@gmail.com>
-M:	Jon Mason <jonmason@broadcom.com>
 M:	bcm-kernel-feedback-list@broadcom.com
 L:	linux-arm-kernel@lists.infradead.org
 S:	Maintained
@@ -2986,7 +2989,7 @@ F:	drivers/cpufreq/bmips-cpufreq.c
 BROADCOM BMIPS MIPS ARCHITECTURE
 M:	Kevin Cernekee <cernekee@gmail.com>
 M:	Florian Fainelli <f.fainelli@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 T:	git git://github.com/broadcom/stblinux.git
 S:	Maintained
 F:	arch/mips/bmips/*
@@ -3077,7 +3080,6 @@ F:	drivers/net/ethernet/broadcom/genet/
 BROADCOM IPROC ARM ARCHITECTURE
 M:	Ray Jui <rjui@broadcom.com>
 M:	Scott Branden <sbranden@broadcom.com>
-M:	Jon Mason <jonmason@broadcom.com>
 M:	bcm-kernel-feedback-list@broadcom.com
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 T:	git git://github.com/broadcom/cygnus-linux.git
@@ -3124,7 +3126,7 @@ F:	include/uapi/rdma/bnxt_re-abi.h
 
 BROADCOM NVRAM DRIVER
 M:	Rafał Miłecki <zajec5@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	drivers/firmware/broadcom/*
 
@@ -3274,11 +3276,16 @@ S:	Maintained
 F:	sound/pci/oxygen/
 
 C-SKY ARCHITECTURE
-M:	Guo Ren <ren_guo@c-sky.com>
+M:	Guo Ren <guoren@kernel.org>
 T:	git https://github.com/c-sky/csky-linux.git
 S:	Supported
 F:	arch/csky/
 F:	Documentation/devicetree/bindings/csky/
+F:	drivers/irqchip/irq-csky-*
+F:	Documentation/devicetree/bindings/interrupt-controller/csky,*
+F:	drivers/clocksource/timer-gx6605s.c
+F:	drivers/clocksource/timer-mp-csky.c
+F:	Documentation/devicetree/bindings/timer/csky,*
 K:	csky
 N:	csky
 
@@ -4187,7 +4194,7 @@ F:	net/ax25/sysctl_net_ax25.c
 DAVICOM FAST ETHERNET (DMFE) NETWORK DRIVER
 L:	netdev@vger.kernel.org
 S:	Orphan
-F:	Documentation/networking/dmfe.txt
+F:	Documentation/networking/device_drivers/dec/dmfe.txt
 F:	drivers/net/ethernet/dec/tulip/dmfe.c
 
 DC390/AM53C974 SCSI driver
@@ -4226,7 +4233,7 @@ F:	net/decnet/
 
 DECSTATION PLATFORM SUPPORT
 M:	"Maciej W. Rozycki" <macro@linux-mips.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 W:	http://www.linux-mips.org/wiki/DECstation
 S:	Maintained
 F:	arch/mips/dec/
@@ -4840,6 +4847,7 @@ F:	include/uapi/drm/vmwgfx_drm.h
 
 DRM DRIVERS
 M:	David Airlie <airlied@linux.ie>
+M:	Daniel Vetter <daniel@ffwll.ch>
 L:	dri-devel@lists.freedesktop.org
 T:	git git://anongit.freedesktop.org/drm/drm
 B:	https://bugs.freedesktop.org/
@@ -5317,7 +5325,7 @@ EDAC-CAVIUM OCTEON
 M:	Ralf Baechle <ralf@linux-mips.org>
 M:	David Daney <david.daney@cavium.com>
 L:	linux-edac@vger.kernel.org
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Supported
 F:	drivers/edac/octeon_edac*
 
@@ -5610,6 +5618,7 @@ F:	include/linux/of_net.h
 F:	include/linux/phy.h
 F:	include/linux/phy_fixed.h
 F:	include/linux/platform_data/mdio-bcm-unimac.h
+F:	include/linux/platform_data/mdio-gpio.h
 F:	include/trace/events/mdio.h
 F:	include/uapi/linux/mdio.h
 F:	include/uapi/linux/mii.h
@@ -5835,7 +5844,7 @@ F:	include/uapi/linux/firewire*.h
 F:	tools/firewire/
 
 FIRMWARE LOADER (request_firmware)
-M:	Luis R. Rodriguez <mcgrof@kernel.org>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	Documentation/firmware_class/
@@ -6319,6 +6328,7 @@ F:	include/uapi/linux/gigaset_dev.h
 
 GNSS SUBSYSTEM
 M:	Johan Hovold <johan@kernel.org>
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/johan/gnss.git
 S:	Maintained
 F:	Documentation/ABI/testing/sysfs-class-gnss
 F:	Documentation/devicetree/bindings/gnss/
@@ -6897,9 +6907,11 @@ Hyper-V CORE AND DRIVERS
 M:	"K. Y. Srinivasan" <kys@microsoft.com>
 M:	Haiyang Zhang <haiyangz@microsoft.com>
 M:	Stephen Hemminger <sthemmin@microsoft.com>
+M:	Sasha Levin <sashal@kernel.org>
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/hyperv/linux.git
 L:	devel@linuxdriverproject.org
-S:	Maintained
-F:	Documentation/networking/netvsc.txt
+S:	Supported
+F:	Documentation/networking/device_drivers/microsoft/netvsc.txt
 F:	arch/x86/include/asm/mshyperv.h
 F:	arch/x86/include/asm/trace/hyperv.h
 F:	arch/x86/include/asm/hyperv-tlfs.h
@@ -7483,18 +7495,18 @@ Q:	http://patchwork.ozlabs.org/project/intel-wired-lan/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jkirsher/net-queue.git
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jkirsher/next-queue.git
 S:	Supported
-F:	Documentation/networking/e100.rst
-F:	Documentation/networking/e1000.rst
-F:	Documentation/networking/e1000e.rst
-F:	Documentation/networking/fm10k.rst
-F:	Documentation/networking/igb.rst
-F:	Documentation/networking/igbvf.rst
-F:	Documentation/networking/ixgb.rst
-F:	Documentation/networking/ixgbe.rst
-F:	Documentation/networking/ixgbevf.rst
-F:	Documentation/networking/i40e.rst
-F:	Documentation/networking/iavf.rst
-F:	Documentation/networking/ice.rst
+F:	Documentation/networking/device_drivers/intel/e100.rst
+F:	Documentation/networking/device_drivers/intel/e1000.rst
+F:	Documentation/networking/device_drivers/intel/e1000e.rst
+F:	Documentation/networking/device_drivers/intel/fm10k.rst
+F:	Documentation/networking/device_drivers/intel/igb.rst
+F:	Documentation/networking/device_drivers/intel/igbvf.rst
+F:	Documentation/networking/device_drivers/intel/ixgb.rst
+F:	Documentation/networking/device_drivers/intel/ixgbe.rst
+F:	Documentation/networking/device_drivers/intel/ixgbevf.rst
+F:	Documentation/networking/device_drivers/intel/i40e.rst
+F:	Documentation/networking/device_drivers/intel/iavf.rst
+F:	Documentation/networking/device_drivers/intel/ice.rst
 F:	drivers/net/ethernet/intel/
 F:	drivers/net/ethernet/intel/*/
 F:	include/linux/avf/virtchnl.h
@@ -7668,8 +7680,8 @@ INTEL PRO/WIRELESS 2100, 2200BG, 2915ABG NETWORK CONNECTION SUPPORT
 M:	Stanislav Yakovlev <stas.yakovlev@gmail.com>
 L:	linux-wireless@vger.kernel.org
 S:	Maintained
-F:	Documentation/networking/README.ipw2100
-F:	Documentation/networking/README.ipw2200
+F:	Documentation/networking/device_drivers/intel/ipw2100.txt
+F:	Documentation/networking/device_drivers/intel/ipw2200.txt
 F:	drivers/net/wireless/intel/ipw2x00/
 
 INTEL PSTATE DRIVER
@@ -7764,7 +7776,7 @@ F:	Documentation/devicetree/bindings/iio/gyroscope/invensense,mpu3050.txt
 
 IOC3 ETHERNET DRIVER
 M:	Ralf Baechle <ralf@linux-mips.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/sgi/ioc3-eth.c
 
@@ -8128,7 +8140,7 @@ F:	tools/testing/selftests/
 F:	Documentation/dev-tools/kselftest*
 
 KERNEL USERMODE HELPER
-M:	"Luis R. Rodriguez" <mcgrof@kernel.org>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	kernel/umh.c
@@ -8185,7 +8197,7 @@ F:	arch/arm64/kvm/
 
 KERNEL VIRTUAL MACHINE FOR MIPS (KVM/mips)
 M:	James Hogan <jhogan@kernel.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Supported
 F:	arch/mips/include/uapi/asm/kvm*
 F:	arch/mips/include/asm/kvm*
@@ -8304,7 +8316,7 @@ F:	mm/kmemleak.c
 F:	mm/kmemleak-test.c
 
 KMOD KERNEL MODULE LOADER - USERMODE HELPER
-M:	"Luis R. Rodriguez" <mcgrof@kernel.org>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	kernel/kmod.c
@@ -8358,7 +8370,7 @@ F:	drivers/net/dsa/lantiq_gswip.c
 
 LANTIQ MIPS ARCHITECTURE
 M:	John Crispin <john@phrozen.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/lantiq
 F:	drivers/soc/lantiq
@@ -8921,13 +8933,13 @@ S:	Maintained
 
 MARDUK (CREATOR CI40) DEVICE TREE SUPPORT
 M:	Rahul Bedarkar <rahulbedarkar89@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/boot/dts/img/pistachio_marduk.dts
 
 MARVELL 88E6XXX ETHERNET SWITCH FABRIC DRIVER
 M:	Andrew Lunn <andrew@lunn.ch>
-M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+M:	Vivien Didelot <vivien.didelot@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/dsa/mv88e6xxx/
@@ -9432,6 +9444,13 @@ F:	drivers/media/platform/mtk-vpu/
 F:	Documentation/devicetree/bindings/media/mediatek-vcodec.txt
 F:	Documentation/devicetree/bindings/media/mediatek-vpu.txt
 
+MEDIATEK MT76 WIRELESS LAN DRIVER
+M:	Felix Fietkau <nbd@nbd.name>
+M:	Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>
+L:	linux-wireless@vger.kernel.org
+S:	Maintained
+F:	drivers/net/wireless/mediatek/mt76/
+
 MEDIATEK MT7601U WIRELESS LAN DRIVER
 M:	Jakub Kicinski <kubakici@wp.pl>
 L:	linux-wireless@vger.kernel.org
@@ -9880,7 +9899,7 @@ F:	drivers/dma/at_xdmac.c
 
 MICROSEMI MIPS SOCS
 M:	Alexandre Belloni <alexandre.belloni@bootlin.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/generic/board-ocelot.c
 F:	arch/mips/configs/generic/board-ocelot.config
@@ -9901,6 +9920,7 @@ F:	Documentation/scsi/smartpqi.txt
 
 MICROSEMI ETHERNET SWITCH DRIVER
 M:	Alexandre Belloni <alexandre.belloni@bootlin.com>
+M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/mscc/
@@ -9920,7 +9940,7 @@ MIPS
 M:	Ralf Baechle <ralf@linux-mips.org>
 M:	Paul Burton <paul.burton@mips.com>
 M:	James Hogan <jhogan@kernel.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 W:	http://www.linux-mips.org/
 T:	git git://git.linux-mips.org/pub/scm/ralf/linux.git
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mips/linux.git
@@ -9933,7 +9953,7 @@ F:	drivers/platform/mips/
 
 MIPS BOSTON DEVELOPMENT BOARD
 M:	Paul Burton <paul.burton@mips.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/clock/img,boston-clock.txt
 F:	arch/mips/boot/dts/img/boston.dts
@@ -9943,7 +9963,7 @@ F:	include/dt-bindings/clock/boston-clock.h
 
 MIPS GENERIC PLATFORM
 M:	Paul Burton <paul.burton@mips.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Supported
 F:	Documentation/devicetree/bindings/power/mti,mips-cpc.txt
 F:	arch/mips/generic/
@@ -9951,7 +9971,7 @@ F:	arch/mips/tools/generic-board-config.sh
 
 MIPS/LOONGSON1 ARCHITECTURE
 M:	Keguang Zhang <keguang.zhang@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/loongson32/
 F:	arch/mips/include/asm/mach-loongson32/
@@ -9960,7 +9980,7 @@ F:	drivers/*/*/*loongson1*
 
 MIPS/LOONGSON2 ARCHITECTURE
 M:	Jiaxun Yang <jiaxun.yang@flygoat.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/loongson64/fuloong-2e/
 F:	arch/mips/loongson64/lemote-2f/
@@ -9970,7 +9990,7 @@ F:	drivers/*/*/*loongson2*
 
 MIPS/LOONGSON3 ARCHITECTURE
 M:	Huacai Chen <chenhc@lemote.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/loongson64/
 F:	arch/mips/include/asm/mach-loongson64/
@@ -9980,7 +10000,7 @@ F:	drivers/*/*/*loongson3*
 
 MIPS RINT INSTRUCTION EMULATION
 M:	Aleksandar Markovic <aleksandar.markovic@mips.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Supported
 F:	arch/mips/math-emu/sp_rint.c
 F:	arch/mips/math-emu/dp_rint.c
@@ -9994,12 +10014,9 @@ S:	Odd Fixes
 F:	drivers/media/radio/radio-miropcm20*
 
 MMP SUPPORT
-M:	Eric Miao <eric.y.miao@gmail.com>
-M:	Haojian Zhuang <haojian.zhuang@gmail.com>
+R:	Lubomir Rintel <lkundrak@v3.sk>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
-T:	git git://github.com/hzhuang1/linux.git
-T:	git git://git.linaro.org/people/ycmiao/pxa-linux.git
-S:	Maintained
+S:	Odd Fixes
 F:	arch/arm/boot/dts/mmp*
 F:	arch/arm/mach-mmp/
 
@@ -10315,8 +10332,8 @@ NETERION 10GbE DRIVERS (s2io/vxge)
 M:	Jon Mason <jdmason@kudzu.us>
 L:	netdev@vger.kernel.org
 S:	Supported
-F:	Documentation/networking/s2io.txt
-F:	Documentation/networking/vxge.txt
+F:	Documentation/networking/device_drivers/neterion/s2io.txt
+F:	Documentation/networking/device_drivers/neterion/vxge.txt
 F:	drivers/net/ethernet/neterion/
 
 NETFILTER
@@ -10405,7 +10422,7 @@ F:	drivers/net/wireless/
 
 NETWORKING [DSA]
 M:	Andrew Lunn <andrew@lunn.ch>
-M:	Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+M:	Vivien Didelot <vivien.didelot@gmail.com>
 M:	Florian Fainelli <f.fainelli@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/dsa/
@@ -10973,7 +10990,7 @@ F:	include/linux/platform_data/i2c-omap.h
 
 ONION OMEGA2+ BOARD
 M:	Harvey Hunt <harveyhuntnexus@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/boot/dts/ralink/omega2p.dts
 
@@ -11882,7 +11899,7 @@ F:	drivers/pinctrl/spear/
 
 PISTACHIO SOC SUPPORT
 M:	James Hartley <james.hartley@sondrel.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Odd Fixes
 F:	arch/mips/pistachio/
 F:	arch/mips/include/asm/mach-pistachio/
@@ -12062,7 +12079,7 @@ F:	kernel/printk/
 F:	include/linux/printk.h
 
 PRISM54 WIRELESS DRIVER
-M:	"Luis R. Rodriguez" <mcgrof@gmail.com>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 L:	linux-wireless@vger.kernel.org
 W:	http://wireless.kernel.org/en/users/Drivers/p54
 S:	Obsolete
@@ -12076,9 +12093,10 @@ S:	Maintained
 F:	fs/proc/
 F:	include/linux/proc_fs.h
 F:	tools/testing/selftests/proc/
+F:	Documentation/filesystems/proc.txt
 
 PROC SYSCTL
-M:	"Luis R. Rodriguez" <mcgrof@kernel.org>
+M:	Luis Chamberlain <mcgrof@kernel.org>
 M:	Kees Cook <keescook@chromium.org>
 L:	linux-kernel@vger.kernel.org
 L:	linux-fsdevel@vger.kernel.org
@@ -12325,7 +12343,7 @@ QLOGIC QLA3XXX NETWORK DRIVER
 M:	Dept-GELinuxNICDev@cavium.com
 L:	netdev@vger.kernel.org
 S:	Supported
-F:	Documentation/networking/LICENSE.qla3xxx
+F:	Documentation/networking/device_drivers/qlogic/LICENSE.qla3xxx
 F:	drivers/net/ethernet/qlogic/qla3xxx.*
 
 QLOGIC QLA4XXX iSCSI DRIVER
@@ -12377,7 +12395,7 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	drivers/bus/fsl-mc/
 F:	Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-F:	Documentation/networking/dpaa2/overview.rst
+F:	Documentation/networking/device_drivers/freescale/dpaa2/overview.rst
 
 QT1010 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
@@ -12541,7 +12559,7 @@ F:	drivers/media/usb/rainshadow-cec/*
 
 RALINK MIPS ARCHITECTURE
 M:	John Crispin <john@phrozen.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/ralink
 
@@ -12561,7 +12579,7 @@ F:	drivers/block/brd.c
 
 RANCHU VIRTUAL BOARD FOR MIPS
 M:	Miodrag Dinic <miodrag.dinic@mips.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Supported
 F:	arch/mips/generic/board-ranchu.c
 F:	arch/mips/configs/generic/board-ranchu.config
@@ -13886,6 +13904,13 @@ F:	drivers/md/raid*
 F:	include/linux/raid/
 F:	include/uapi/linux/raid/
 
+SOCIONEXT (SNI) AVE NETWORK DRIVER
+M:	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/ethernet/socionext/sni_ave.c
+F:	Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
+
 SOCIONEXT (SNI) NETSEC NETWORK DRIVER
 M:	Jassi Brar <jaswinder.singh@linaro.org>
 L:	netdev@vger.kernel.org
@@ -14011,6 +14036,7 @@ S:	Supported
 F:	Documentation/devicetree/bindings/sound/
 F:	Documentation/sound/soc/
 F:	sound/soc/
+F:	include/dt-bindings/sound/
 F:	include/sound/soc*
 
 SOUNDWIRE SUBSYSTEM
@@ -14109,7 +14135,7 @@ SPIDERNET NETWORK DRIVER for CELL
 M:	Ishizaki Kou <kou.ishizaki@toshiba.co.jp>
 L:	netdev@vger.kernel.org
 S:	Supported
-F:	Documentation/networking/spider_net.txt
+F:	Documentation/networking/device_drivers/toshiba/spider_net.txt
 F:	drivers/net/ethernet/toshiba/spider_net*
 
 SPMI SUBSYSTEM
@@ -15099,7 +15125,7 @@ M:	Samuel Chessman <chessman@tux.org>
 L:	tlan-devel@lists.sourceforge.net (subscribers-only)
 W:	http://sourceforge.net/projects/tlan/
 S:	Maintained
-F:	Documentation/networking/tlan.txt
+F:	Documentation/networking/device_drivers/ti/tlan.txt
 F:	drivers/net/ethernet/ti/tlan.*
 
 TM6000 VIDEO4LINUX DRIVER
@@ -15296,7 +15322,7 @@ F:	arch/um/os-Linux/drivers/
 TURBOCHANNEL SUBSYSTEM
 M:	"Maciej W. Rozycki" <macro@linux-mips.org>
 M:	Ralf Baechle <ralf@linux-mips.org>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 Q:	http://patchwork.linux-mips.org/project/linux-mips/list/
 S:	Maintained
 F:	drivers/tc/
@@ -16117,7 +16143,7 @@ F:	drivers/net/vmxnet3/
 
 VOCORE VOCORE2 BOARD
 M:	Harvey Hunt <harveyhuntnexus@gmail.com>
-L:	linux-mips@linux-mips.org
+L:	linux-mips@vger.kernel.org
 S:	Maintained
 F:	arch/mips/boot/dts/ralink/vocore2.dts
 

@@ -137,15 +137,6 @@ static void ib_umem_notifier_release(struct mmu_notifier *mn,
 	up_read(&per_mm->umem_rwsem);
 }
 
-static int invalidate_page_trampoline(struct ib_umem_odp *item, u64 start,
-				      u64 end, void *cookie)
-{
-	ib_umem_notifier_start_account(item);
-	item->umem.context->invalidate_range(item, start, start + PAGE_SIZE);
-	ib_umem_notifier_end_account(item);
-	return 0;
-}
-
 static int invalidate_range_start_trampoline(struct ib_umem_odp *item,
 					     u64 start, u64 end, void *cookie)
 {
@@ -553,12 +544,13 @@ out:
 		put_page(page);
 
 	if (remove_existing_mapping && umem->context->invalidate_range) {
-		invalidate_page_trampoline(
+		ib_umem_notifier_start_account(umem_odp);
+		umem->context->invalidate_range(
 			umem_odp,
-			ib_umem_start(umem) + (page_index >> umem->page_shift),
-			ib_umem_start(umem) + ((page_index + 1) >>
-					       umem->page_shift),
-			NULL);
+			ib_umem_start(umem) + (page_index << umem->page_shift),
+			ib_umem_start(umem) +
+				((page_index + 1) << umem->page_shift));
+		ib_umem_notifier_end_account(umem_odp);
 		ret = -EAGAIN;
 	}
 
@@ -655,8 +647,13 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 				flags, local_page_list, NULL, NULL);
 		up_read(&owning_mm->mmap_sem);
 
-		if (npages < 0)
+		if (npages < 0) {
+			if (npages != -EAGAIN)
+				pr_warn("fail to get %zu user pages with error %d\n", gup_num_pages, npages);
+			else
+				pr_debug("fail to get %zu user pages with error %d\n", gup_num_pages, npages);
 			break;
+		}
 
 		bcnt -= min_t(size_t, npages << PAGE_SHIFT, bcnt);
 		mutex_lock(&umem_odp->umem_mutex);
@@ -674,8 +671,13 @@ int ib_umem_odp_map_dma_pages(struct ib_umem_odp *umem_odp, u64 user_virt,
 			ret = ib_umem_odp_map_dma_single_page(
 					umem_odp, k, local_page_list[j],
 					access_mask, current_seq);
-			if (ret < 0)
+			if (ret < 0) {
+				if (ret != -EAGAIN)
+					pr_warn("ib_umem_odp_map_dma_single_page failed with error %d\n", ret);
+				else
+					pr_debug("ib_umem_odp_map_dma_single_page failed with error %d\n", ret);
 				break;
+			}
 
 			p = page_to_phys(local_page_list[j]);
 			k++;

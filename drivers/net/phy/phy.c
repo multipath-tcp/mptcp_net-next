@@ -437,8 +437,8 @@ int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd)
 				}
 				break;
 			case MII_ADVERTISE:
-				mii_adv_to_linkmode_adv_t(phydev->advertising,
-							  val);
+				mii_adv_mod_linkmode_adv_t(phydev->advertising,
+							   val);
 				change_autoneg = true;
 				break;
 			default:
@@ -543,6 +543,13 @@ int phy_start_aneg(struct phy_device *phydev)
 
 	mutex_lock(&phydev->lock);
 
+	if (!__phy_is_started(phydev)) {
+		WARN(1, "called from state %s\n",
+		     phy_state_to_str(phydev->state));
+		err = -EBUSY;
+		goto out_unlock;
+	}
+
 	if (AUTONEG_DISABLE == phydev->autoneg)
 		phy_sanitize_settings(phydev);
 
@@ -553,13 +560,11 @@ int phy_start_aneg(struct phy_device *phydev)
 	if (err < 0)
 		goto out_unlock;
 
-	if (phydev->state != PHY_HALTED) {
-		if (AUTONEG_ENABLE == phydev->autoneg) {
-			err = phy_check_link_status(phydev);
-		} else {
-			phydev->state = PHY_FORCING;
-			phydev->link_timeout = PHY_FORCE_TIMEOUT;
-		}
+	if (phydev->autoneg == AUTONEG_ENABLE) {
+		err = phy_check_link_status(phydev);
+	} else {
+		phydev->state = PHY_FORCING;
+		phydev->link_timeout = PHY_FORCE_TIMEOUT;
 	}
 
 out_unlock:
@@ -709,7 +714,7 @@ void phy_stop_machine(struct phy_device *phydev)
 	cancel_delayed_work_sync(&phydev->state_queue);
 
 	mutex_lock(&phydev->lock);
-	if (phydev->state > PHY_UP && phydev->state != PHY_HALTED)
+	if (__phy_is_started(phydev))
 		phydev->state = PHY_UP;
 	mutex_unlock(&phydev->lock);
 }
@@ -725,6 +730,8 @@ void phy_stop_machine(struct phy_device *phydev)
  */
 static void phy_error(struct phy_device *phydev)
 {
+	WARN_ON(1);
+
 	mutex_lock(&phydev->lock);
 	phydev->state = PHY_HALTED;
 	mutex_unlock(&phydev->lock);
@@ -760,7 +767,7 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 {
 	struct phy_device *phydev = phy_dat;
 
-	if (PHY_HALTED == phydev->state)
+	if (!phy_is_started(phydev))
 		return IRQ_NONE;		/* It can't be ours.  */
 
 	if (phydev->drv->did_interrupt && !phydev->drv->did_interrupt(phydev))
@@ -842,15 +849,18 @@ void phy_stop(struct phy_device *phydev)
 {
 	mutex_lock(&phydev->lock);
 
-	if (PHY_HALTED == phydev->state)
-		goto out_unlock;
+	if (!__phy_is_started(phydev)) {
+		WARN(1, "called from state %s\n",
+		     phy_state_to_str(phydev->state));
+		mutex_unlock(&phydev->lock);
+		return;
+	}
 
 	if (phy_interrupt_is_valid(phydev))
 		phy_disable_interrupts(phydev);
 
 	phydev->state = PHY_HALTED;
 
-out_unlock:
 	mutex_unlock(&phydev->lock);
 
 	phy_state_machine(&phydev->state_queue.work);
@@ -984,7 +994,7 @@ void phy_state_machine(struct work_struct *work)
 	 * state machine would be pointless and possibly error prone when
 	 * called from phy_disconnect() synchronously.
 	 */
-	if (phy_polling_mode(phydev) && old_state != PHY_HALTED)
+	if (phy_polling_mode(phydev) && phy_is_started(phydev))
 		phy_queue_state_machine(phydev, PHY_STATE_TIME);
 }
 
@@ -1144,12 +1154,15 @@ int phy_ethtool_get_eee(struct phy_device *phydev, struct ethtool_eee *data)
 	if (val < 0)
 		return val;
 	data->advertised = mmd_eee_adv_to_ethtool_adv_t(val);
+	data->eee_enabled = !!data->advertised;
 
 	/* Get LP advertisement EEE */
 	val = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_AN_EEE_LPABLE);
 	if (val < 0)
 		return val;
 	data->lp_advertised = mmd_eee_adv_to_ethtool_adv_t(val);
+
+	data->eee_active = !!(data->advertised & data->lp_advertised);
 
 	return 0;
 }
@@ -1164,7 +1177,7 @@ EXPORT_SYMBOL(phy_ethtool_get_eee);
  */
 int phy_ethtool_set_eee(struct phy_device *phydev, struct ethtool_eee *data)
 {
-	int cap, old_adv, adv, ret;
+	int cap, old_adv, adv = 0, ret;
 
 	if (!phydev->drv)
 		return -EIO;
@@ -1178,10 +1191,12 @@ int phy_ethtool_set_eee(struct phy_device *phydev, struct ethtool_eee *data)
 	if (old_adv < 0)
 		return old_adv;
 
-	adv = ethtool_adv_to_mmd_eee_adv_t(data->advertised) & cap;
-
-	/* Mask prohibited EEE modes */
-	adv &= ~phydev->eee_broken_modes;
+	if (data->eee_enabled) {
+		adv = !data->advertised ? cap :
+		      ethtool_adv_to_mmd_eee_adv_t(data->advertised) & cap;
+		/* Mask prohibited EEE modes */
+		adv &= ~phydev->eee_broken_modes;
+	}
 
 	if (old_adv != adv) {
 		ret = phy_write_mmd(phydev, MDIO_MMD_AN, MDIO_AN_EEE_ADV, adv);

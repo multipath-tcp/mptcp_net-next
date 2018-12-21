@@ -30,6 +30,7 @@ struct mlxsw_sp_fid {
 	struct rhash_head ht_node;
 
 	struct rhash_head vni_ht_node;
+	enum mlxsw_sp_nve_type nve_type;
 	__be32 vni;
 	u32 nve_flood_index;
 	int nve_ifindex;
@@ -84,6 +85,8 @@ struct mlxsw_sp_fid_ops {
 	int (*nve_flood_index_set)(struct mlxsw_sp_fid *fid,
 				   u32 nve_flood_index);
 	void (*nve_flood_index_clear)(struct mlxsw_sp_fid *fid);
+	void (*fdb_clear_offload)(const struct mlxsw_sp_fid *fid,
+				  const struct net_device *nve_dev);
 };
 
 struct mlxsw_sp_fid_family {
@@ -151,6 +154,17 @@ int mlxsw_sp_fid_nve_ifindex(const struct mlxsw_sp_fid *fid, int *nve_ifindex)
 	return 0;
 }
 
+int mlxsw_sp_fid_nve_type(const struct mlxsw_sp_fid *fid,
+			  enum mlxsw_sp_nve_type *p_type)
+{
+	if (!fid->vni_valid)
+		return -EINVAL;
+
+	*p_type = fid->nve_type;
+
+	return 0;
+}
+
 struct mlxsw_sp_fid *mlxsw_sp_fid_lookup_by_vni(struct mlxsw_sp *mlxsw_sp,
 						__be32 vni)
 {
@@ -211,7 +225,8 @@ bool mlxsw_sp_fid_nve_flood_index_is_set(const struct mlxsw_sp_fid *fid)
 	return fid->nve_flood_index_valid;
 }
 
-int mlxsw_sp_fid_vni_set(struct mlxsw_sp_fid *fid, __be32 vni, int nve_ifindex)
+int mlxsw_sp_fid_vni_set(struct mlxsw_sp_fid *fid, enum mlxsw_sp_nve_type type,
+			 __be32 vni, int nve_ifindex)
 {
 	struct mlxsw_sp_fid_family *fid_family = fid->fid_family;
 	const struct mlxsw_sp_fid_ops *ops = fid_family->ops;
@@ -221,6 +236,7 @@ int mlxsw_sp_fid_vni_set(struct mlxsw_sp_fid *fid, __be32 vni, int nve_ifindex)
 	if (WARN_ON(!ops->vni_set || fid->vni_valid))
 		return -EINVAL;
 
+	fid->nve_type = type;
 	fid->nve_ifindex = nve_ifindex;
 	fid->vni = vni;
 	err = rhashtable_lookup_insert_fast(&mlxsw_sp->fid_core->vni_ht,
@@ -261,6 +277,16 @@ void mlxsw_sp_fid_vni_clear(struct mlxsw_sp_fid *fid)
 bool mlxsw_sp_fid_vni_is_set(const struct mlxsw_sp_fid *fid)
 {
 	return fid->vni_valid;
+}
+
+void mlxsw_sp_fid_fdb_clear_offload(const struct mlxsw_sp_fid *fid,
+				    const struct net_device *nve_dev)
+{
+	struct mlxsw_sp_fid_family *fid_family = fid->fid_family;
+	const struct mlxsw_sp_fid_ops *ops = fid_family->ops;
+
+	if (ops->fdb_clear_offload)
+		ops->fdb_clear_offload(fid, nve_dev);
 }
 
 static const struct mlxsw_sp_flood_table *
@@ -323,11 +349,6 @@ void mlxsw_sp_fid_port_vid_unmap(struct mlxsw_sp_fid *fid,
 	fid->fid_family->ops->port_vid_unmap(fid, mlxsw_sp_port, vid);
 }
 
-enum mlxsw_sp_rif_type mlxsw_sp_fid_rif_type(const struct mlxsw_sp_fid *fid)
-{
-	return fid->fid_family->rif_type;
-}
-
 u16 mlxsw_sp_fid_index(const struct mlxsw_sp_fid *fid)
 {
 	return fid->fid_index;
@@ -341,6 +362,11 @@ enum mlxsw_sp_fid_type mlxsw_sp_fid_type(const struct mlxsw_sp_fid *fid)
 void mlxsw_sp_fid_rif_set(struct mlxsw_sp_fid *fid, struct mlxsw_sp_rif *rif)
 {
 	fid->rif = rif;
+}
+
+struct mlxsw_sp_rif *mlxsw_sp_fid_rif(const struct mlxsw_sp_fid *fid)
+{
+	return fid->rif;
 }
 
 enum mlxsw_sp_rif_type
@@ -752,6 +778,13 @@ static void mlxsw_sp_fid_8021d_nve_flood_index_clear(struct mlxsw_sp_fid *fid)
 			    fid->vni_valid, 0, false);
 }
 
+static void
+mlxsw_sp_fid_8021d_fdb_clear_offload(const struct mlxsw_sp_fid *fid,
+				     const struct net_device *nve_dev)
+{
+	br_fdb_clear_offload(nve_dev, 0);
+}
+
 static const struct mlxsw_sp_fid_ops mlxsw_sp_fid_8021d_ops = {
 	.setup			= mlxsw_sp_fid_8021d_setup,
 	.configure		= mlxsw_sp_fid_8021d_configure,
@@ -765,6 +798,7 @@ static const struct mlxsw_sp_fid_ops mlxsw_sp_fid_8021d_ops = {
 	.vni_clear		= mlxsw_sp_fid_8021d_vni_clear,
 	.nve_flood_index_set	= mlxsw_sp_fid_8021d_nve_flood_index_set,
 	.nve_flood_index_clear	= mlxsw_sp_fid_8021d_nve_flood_index_clear,
+	.fdb_clear_offload	= mlxsw_sp_fid_8021d_fdb_clear_offload,
 };
 
 static const struct mlxsw_sp_flood_table mlxsw_sp_fid_8021d_flood_tables[] = {
@@ -801,6 +835,13 @@ static const struct mlxsw_sp_fid_family mlxsw_sp_fid_8021d_family = {
 	.lag_vid_valid		= 1,
 };
 
+static void
+mlxsw_sp_fid_8021q_fdb_clear_offload(const struct mlxsw_sp_fid *fid,
+				     const struct net_device *nve_dev)
+{
+	br_fdb_clear_offload(nve_dev, mlxsw_sp_fid_8021q_vid(fid));
+}
+
 static const struct mlxsw_sp_fid_ops mlxsw_sp_fid_8021q_emu_ops = {
 	.setup			= mlxsw_sp_fid_8021q_setup,
 	.configure		= mlxsw_sp_fid_8021d_configure,
@@ -814,6 +855,7 @@ static const struct mlxsw_sp_fid_ops mlxsw_sp_fid_8021q_emu_ops = {
 	.vni_clear		= mlxsw_sp_fid_8021d_vni_clear,
 	.nve_flood_index_set	= mlxsw_sp_fid_8021d_nve_flood_index_set,
 	.nve_flood_index_clear	= mlxsw_sp_fid_8021d_nve_flood_index_clear,
+	.fdb_clear_offload	= mlxsw_sp_fid_8021q_fdb_clear_offload,
 };
 
 /* There are 4K-2 emulated 802.1Q FIDs, starting right after the 802.1D FIDs */
@@ -1041,20 +1083,16 @@ void mlxsw_sp_fid_put(struct mlxsw_sp_fid *fid)
 	struct mlxsw_sp_fid_family *fid_family = fid->fid_family;
 	struct mlxsw_sp *mlxsw_sp = fid_family->mlxsw_sp;
 
-	if (--fid->ref_count == 1 && fid->rif) {
-		/* Destroy the associated RIF and let it drop the last
-		 * reference on the FID.
-		 */
-		return mlxsw_sp_rif_destroy(fid->rif);
-	} else if (fid->ref_count == 0) {
-		list_del(&fid->list);
-		rhashtable_remove_fast(&mlxsw_sp->fid_core->fid_ht,
-				       &fid->ht_node, mlxsw_sp_fid_ht_params);
-		fid->fid_family->ops->deconfigure(fid);
-		__clear_bit(fid->fid_index - fid_family->start_index,
-			    fid_family->fids_bitmap);
-		kfree(fid);
-	}
+	if (--fid->ref_count != 0)
+		return;
+
+	list_del(&fid->list);
+	rhashtable_remove_fast(&mlxsw_sp->fid_core->fid_ht,
+			       &fid->ht_node, mlxsw_sp_fid_ht_params);
+	fid->fid_family->ops->deconfigure(fid);
+	__clear_bit(fid->fid_index - fid_family->start_index,
+		    fid_family->fids_bitmap);
+	kfree(fid);
 }
 
 struct mlxsw_sp_fid *mlxsw_sp_fid_8021q_get(struct mlxsw_sp *mlxsw_sp, u16 vid)
@@ -1066,6 +1104,12 @@ struct mlxsw_sp_fid *mlxsw_sp_fid_8021d_get(struct mlxsw_sp *mlxsw_sp,
 					    int br_ifindex)
 {
 	return mlxsw_sp_fid_get(mlxsw_sp, MLXSW_SP_FID_TYPE_8021D, &br_ifindex);
+}
+
+struct mlxsw_sp_fid *mlxsw_sp_fid_8021q_lookup(struct mlxsw_sp *mlxsw_sp,
+					       u16 vid)
+{
+	return mlxsw_sp_fid_lookup(mlxsw_sp, MLXSW_SP_FID_TYPE_8021Q, &vid);
 }
 
 struct mlxsw_sp_fid *mlxsw_sp_fid_8021d_lookup(struct mlxsw_sp *mlxsw_sp,

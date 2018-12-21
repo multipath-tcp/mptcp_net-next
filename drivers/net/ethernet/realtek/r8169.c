@@ -6405,8 +6405,9 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 {
 	struct rtl8169_private *tp = dev_instance;
 	u16 status = rtl_get_events(tp);
+	u16 irq_mask = RTL_R16(tp, IntrMask);
 
-	if (status == 0xffff || !(status & tp->irq_mask))
+	if (status == 0xffff || !(status & irq_mask))
 		return IRQ_NONE;
 
 	if (unlikely(status & SYSErr)) {
@@ -6414,7 +6415,7 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 		goto out;
 	}
 
-	if (status & LinkChg)
+	if (status & LinkChg && tp->dev->phydev)
 		phy_mac_interrupt(tp->dev->phydev);
 
 	if (unlikely(status & RxFIFOOver &&

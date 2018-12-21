@@ -23,6 +23,58 @@ static const struct pci_device_id ae_algovf_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, ae_algovf_pci_tbl);
 
+static const u32 cmdq_reg_addr_list[] = {HCLGEVF_CMDQ_TX_ADDR_L_REG,
+					 HCLGEVF_CMDQ_TX_ADDR_H_REG,
+					 HCLGEVF_CMDQ_TX_DEPTH_REG,
+					 HCLGEVF_CMDQ_TX_TAIL_REG,
+					 HCLGEVF_CMDQ_TX_HEAD_REG,
+					 HCLGEVF_CMDQ_RX_ADDR_L_REG,
+					 HCLGEVF_CMDQ_RX_ADDR_H_REG,
+					 HCLGEVF_CMDQ_RX_DEPTH_REG,
+					 HCLGEVF_CMDQ_RX_TAIL_REG,
+					 HCLGEVF_CMDQ_RX_HEAD_REG,
+					 HCLGEVF_VECTOR0_CMDQ_SRC_REG,
+					 HCLGEVF_CMDQ_INTR_STS_REG,
+					 HCLGEVF_CMDQ_INTR_EN_REG,
+					 HCLGEVF_CMDQ_INTR_GEN_REG};
+
+static const u32 common_reg_addr_list[] = {HCLGEVF_MISC_VECTOR_REG_BASE,
+					   HCLGEVF_RST_ING,
+					   HCLGEVF_GRO_EN_REG};
+
+static const u32 ring_reg_addr_list[] = {HCLGEVF_RING_RX_ADDR_L_REG,
+					 HCLGEVF_RING_RX_ADDR_H_REG,
+					 HCLGEVF_RING_RX_BD_NUM_REG,
+					 HCLGEVF_RING_RX_BD_LENGTH_REG,
+					 HCLGEVF_RING_RX_MERGE_EN_REG,
+					 HCLGEVF_RING_RX_TAIL_REG,
+					 HCLGEVF_RING_RX_HEAD_REG,
+					 HCLGEVF_RING_RX_FBD_NUM_REG,
+					 HCLGEVF_RING_RX_OFFSET_REG,
+					 HCLGEVF_RING_RX_FBD_OFFSET_REG,
+					 HCLGEVF_RING_RX_STASH_REG,
+					 HCLGEVF_RING_RX_BD_ERR_REG,
+					 HCLGEVF_RING_TX_ADDR_L_REG,
+					 HCLGEVF_RING_TX_ADDR_H_REG,
+					 HCLGEVF_RING_TX_BD_NUM_REG,
+					 HCLGEVF_RING_TX_PRIORITY_REG,
+					 HCLGEVF_RING_TX_TC_REG,
+					 HCLGEVF_RING_TX_MERGE_EN_REG,
+					 HCLGEVF_RING_TX_TAIL_REG,
+					 HCLGEVF_RING_TX_HEAD_REG,
+					 HCLGEVF_RING_TX_FBD_NUM_REG,
+					 HCLGEVF_RING_TX_OFFSET_REG,
+					 HCLGEVF_RING_TX_EBD_NUM_REG,
+					 HCLGEVF_RING_TX_EBD_OFFSET_REG,
+					 HCLGEVF_RING_TX_BD_ERR_REG,
+					 HCLGEVF_RING_EN_REG};
+
+static const u32 tqp_intr_reg_addr_list[] = {HCLGEVF_TQP_INTR_CTRL_REG,
+					     HCLGEVF_TQP_INTR_GL0_REG,
+					     HCLGEVF_TQP_INTR_GL1_REG,
+					     HCLGEVF_TQP_INTR_GL2_REG,
+					     HCLGEVF_TQP_INTR_RL_REG};
+
 static inline struct hclgevf_dev *hclgevf_ae_get_hdev(
 	struct hnae3_handle *handle)
 {
@@ -202,6 +254,23 @@ static int hclgevf_get_queue_info(struct hclgevf_dev *hdev)
 	memcpy(&hdev->rx_buf_len, &resp_msg[6], sizeof(u16));
 
 	return 0;
+}
+
+static u16 hclgevf_get_qid_global(struct hnae3_handle *handle, u16 queue_id)
+{
+	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+	u8 msg_data[2], resp_data[2];
+	u16 qid_in_pf = 0;
+	int ret;
+
+	memcpy(&msg_data[0], &queue_id, sizeof(queue_id));
+
+	ret = hclgevf_send_mbx_msg(hdev, HCLGE_MBX_GET_QID_IN_PF, 0, msg_data,
+				   2, true, resp_data, 2);
+	if (!ret)
+		qid_in_pf = *(u16 *)resp_data;
+
+	return qid_in_pf;
 }
 
 static int hclgevf_alloc_tqps(struct hclgevf_dev *hdev)
@@ -1273,6 +1342,9 @@ static int hclgevf_reset(struct hclgevf_dev *hdev)
 
 	rtnl_unlock();
 
+	hdev->last_reset_time = jiffies;
+	ae_dev->reset_type = HNAE3_NONE_RESET;
+
 	return ret;
 err_reset_lock:
 	rtnl_unlock();
@@ -1649,7 +1721,7 @@ static int hclgevf_configure(struct hclgevf_dev *hdev)
 static int hclgevf_alloc_hdev(struct hnae3_ae_dev *ae_dev)
 {
 	struct pci_dev *pdev = ae_dev->pdev;
-	struct hclgevf_dev *hdev = ae_dev->priv;
+	struct hclgevf_dev *hdev;
 
 	hdev = devm_kzalloc(&pdev->dev, sizeof(*hdev), GFP_KERNEL);
 	if (!hdev)
@@ -1768,6 +1840,19 @@ static int hclgevf_init_vlan_config(struct hclgevf_dev *hdev)
 				       false);
 }
 
+static void hclgevf_set_timer_task(struct hnae3_handle *handle, bool enable)
+{
+	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+
+	if (enable) {
+		mod_timer(&hdev->service_timer, jiffies + HZ);
+	} else {
+		del_timer_sync(&hdev->service_timer);
+		cancel_work_sync(&hdev->service_task);
+		clear_bit(HCLGEVF_STATE_SERVICE_SCHED, &hdev->state);
+	}
+}
+
 static int hclgevf_ae_start(struct hnae3_handle *handle)
 {
 	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
@@ -1778,7 +1863,6 @@ static int hclgevf_ae_start(struct hnae3_handle *handle)
 	hclgevf_request_link_info(hdev);
 
 	clear_bit(HCLGEVF_STATE_DOWN, &hdev->state);
-	mod_timer(&hdev->service_timer, jiffies + HZ);
 
 	return 0;
 }
@@ -1786,14 +1870,15 @@ static int hclgevf_ae_start(struct hnae3_handle *handle)
 static void hclgevf_ae_stop(struct hnae3_handle *handle)
 {
 	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+	int i;
 
 	set_bit(HCLGEVF_STATE_DOWN, &hdev->state);
 
+	for (i = 0; i < handle->kinfo.num_tqps; i++)
+		hclgevf_reset_tqp(handle, i);
+
 	/* reset tqp stats */
 	hclgevf_reset_tqp_stats(handle);
-	del_timer_sync(&hdev->service_timer);
-	cancel_work_sync(&hdev->service_task);
-	clear_bit(HCLGEVF_STATE_SERVICE_SCHED, &hdev->state);
 	hclgevf_update_link_status(hdev, 0);
 }
 
@@ -2332,9 +2417,9 @@ static void hclgevf_uninit_hdev(struct hclgevf_dev *hdev)
 	if (test_bit(HCLGEVF_STATE_IRQ_INITED, &hdev->state)) {
 		hclgevf_misc_irq_uninit(hdev);
 		hclgevf_uninit_msi(hdev);
-		hclgevf_pci_uninit(hdev);
 	}
 
+	hclgevf_pci_uninit(hdev);
 	hclgevf_cmd_uninit(hdev);
 }
 
@@ -2473,6 +2558,72 @@ static unsigned long hclgevf_ae_dev_reset_cnt(struct hnae3_handle *handle)
 	return hdev->reset_count;
 }
 
+#define MAX_SEPARATE_NUM	4
+#define SEPARATOR_VALUE		0xFFFFFFFF
+#define REG_NUM_PER_LINE	4
+#define REG_LEN_PER_LINE	(REG_NUM_PER_LINE * sizeof(u32))
+
+static int hclgevf_get_regs_len(struct hnae3_handle *handle)
+{
+	int cmdq_lines, common_lines, ring_lines, tqp_intr_lines;
+	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+
+	cmdq_lines = sizeof(cmdq_reg_addr_list) / REG_LEN_PER_LINE + 1;
+	common_lines = sizeof(common_reg_addr_list) / REG_LEN_PER_LINE + 1;
+	ring_lines = sizeof(ring_reg_addr_list) / REG_LEN_PER_LINE + 1;
+	tqp_intr_lines = sizeof(tqp_intr_reg_addr_list) / REG_LEN_PER_LINE + 1;
+
+	return (cmdq_lines + common_lines + ring_lines * hdev->num_tqps +
+		tqp_intr_lines * (hdev->num_msi_used - 1)) * REG_LEN_PER_LINE;
+}
+
+static void hclgevf_get_regs(struct hnae3_handle *handle, u32 *version,
+			     void *data)
+{
+	struct hclgevf_dev *hdev = hclgevf_ae_get_hdev(handle);
+	int i, j, reg_um, separator_num;
+	u32 *reg = data;
+
+	*version = hdev->fw_version;
+
+	/* fetching per-VF registers values from VF PCIe register space */
+	reg_um = sizeof(cmdq_reg_addr_list) / sizeof(u32);
+	separator_num = MAX_SEPARATE_NUM - reg_um % REG_NUM_PER_LINE;
+	for (i = 0; i < reg_um; i++)
+		*reg++ = hclgevf_read_dev(&hdev->hw, cmdq_reg_addr_list[i]);
+	for (i = 0; i < separator_num; i++)
+		*reg++ = SEPARATOR_VALUE;
+
+	reg_um = sizeof(common_reg_addr_list) / sizeof(u32);
+	separator_num = MAX_SEPARATE_NUM - reg_um % REG_NUM_PER_LINE;
+	for (i = 0; i < reg_um; i++)
+		*reg++ = hclgevf_read_dev(&hdev->hw, common_reg_addr_list[i]);
+	for (i = 0; i < separator_num; i++)
+		*reg++ = SEPARATOR_VALUE;
+
+	reg_um = sizeof(ring_reg_addr_list) / sizeof(u32);
+	separator_num = MAX_SEPARATE_NUM - reg_um % REG_NUM_PER_LINE;
+	for (j = 0; j < hdev->num_tqps; j++) {
+		for (i = 0; i < reg_um; i++)
+			*reg++ = hclgevf_read_dev(&hdev->hw,
+						  ring_reg_addr_list[i] +
+						  0x200 * j);
+		for (i = 0; i < separator_num; i++)
+			*reg++ = SEPARATOR_VALUE;
+	}
+
+	reg_um = sizeof(tqp_intr_reg_addr_list) / sizeof(u32);
+	separator_num = MAX_SEPARATE_NUM - reg_um % REG_NUM_PER_LINE;
+	for (j = 0; j < hdev->num_msi_used - 1; j++) {
+		for (i = 0; i < reg_um; i++)
+			*reg++ = hclgevf_read_dev(&hdev->hw,
+						  tqp_intr_reg_addr_list[i] +
+						  4 * j);
+		for (i = 0; i < separator_num; i++)
+			*reg++ = SEPARATOR_VALUE;
+	}
+}
+
 static const struct hnae3_ae_ops hclgevf_ops = {
 	.init_ae_dev = hclgevf_init_ae_dev,
 	.uninit_ae_dev = hclgevf_uninit_ae_dev,
@@ -2514,6 +2665,8 @@ static const struct hnae3_ae_ops hclgevf_ops = {
 	.set_default_reset_request = hclgevf_set_def_reset_request,
 	.get_channels = hclgevf_get_channels,
 	.get_tqps_and_rss_info = hclgevf_get_tqps_and_rss_info,
+	.get_regs_len = hclgevf_get_regs_len,
+	.get_regs = hclgevf_get_regs,
 	.get_status = hclgevf_get_status,
 	.get_ksettings_an_result = hclgevf_get_ksettings_an_result,
 	.get_media_type = hclgevf_get_media_type,
@@ -2522,6 +2675,8 @@ static const struct hnae3_ae_ops hclgevf_ops = {
 	.ae_dev_reset_cnt = hclgevf_ae_dev_reset_cnt,
 	.set_gro_en = hclgevf_gro_en,
 	.set_mtu = hclgevf_set_mtu,
+	.get_global_queue_id = hclgevf_get_qid_global,
+	.set_timer_task = hclgevf_set_timer_task,
 };
 
 static struct hnae3_ae_algo ae_algovf = {

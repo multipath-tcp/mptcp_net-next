@@ -6,7 +6,8 @@
 
 lib_dir=$(dirname $0)/../../../net/forwarding
 
-ALL_TESTS="sanitization_test offload_indication_test"
+ALL_TESTS="sanitization_test offload_indication_test \
+	sanitization_vlan_aware_test offload_indication_vlan_aware_test"
 NUM_NETIFS=2
 source $lib_dir/lib.sh
 
@@ -81,7 +82,7 @@ sanitization_single_dev_vlan_aware_test()
 	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
 		ttl 20 tos inherit local 198.51.100.1 dstport 4789
 
-	sanitization_single_dev_test_fail
+	sanitization_single_dev_test_pass
 
 	ip link del dev vxlan0
 	ip link del dev br0
@@ -646,12 +647,450 @@ offload_indication_decap_route_test()
 		noudpcsum ttl 20 tos inherit local 198.51.100.1 dstport 4789
 }
 
+check_fdb_offloaded()
+{
+	local mac=00:11:22:33:44:55
+	local zmac=00:00:00:00:00:00
+
+	bridge fdb show dev vxlan0 | grep $mac | grep self | grep -q offload
+	check_err $?
+	bridge fdb show dev vxlan0 | grep $mac | grep master | grep -q offload
+	check_err $?
+
+	bridge fdb show dev vxlan0 | grep $zmac | grep self | grep -q offload
+	check_err $?
+}
+
+check_vxlan_fdb_not_offloaded()
+{
+	local mac=00:11:22:33:44:55
+	local zmac=00:00:00:00:00:00
+
+	bridge fdb show dev vxlan0 | grep $mac | grep -q self
+	check_err $?
+	bridge fdb show dev vxlan0 | grep $mac | grep self | grep -q offload
+	check_fail $?
+
+	bridge fdb show dev vxlan0 | grep $zmac | grep -q self
+	check_err $?
+	bridge fdb show dev vxlan0 | grep $zmac | grep self | grep -q offload
+	check_fail $?
+}
+
+check_bridge_fdb_not_offloaded()
+{
+	local mac=00:11:22:33:44:55
+	local zmac=00:00:00:00:00:00
+
+	bridge fdb show dev vxlan0 | grep $mac | grep -q master
+	check_err $?
+	bridge fdb show dev vxlan0 | grep $mac | grep master | grep -q offload
+	check_fail $?
+}
+
+__offload_indication_join_vxlan_first()
+{
+	local vid=$1; shift
+
+	local mac=00:11:22:33:44:55
+	local zmac=00:00:00:00:00:00
+
+	bridge fdb append $zmac dev vxlan0 self dst 198.51.100.2
+
+	ip link set dev vxlan0 master br0
+	bridge fdb add dev vxlan0 $mac self master static dst 198.51.100.2
+
+	RET=0
+	check_vxlan_fdb_not_offloaded
+	ip link set dev $swp1 master br0
+	sleep .1
+	check_fdb_offloaded
+	log_test "offload indication - attach vxlan first"
+
+	RET=0
+	ip link set dev vxlan0 down
+	check_vxlan_fdb_not_offloaded
+	check_bridge_fdb_not_offloaded
+	log_test "offload indication - set vxlan down"
+
+	RET=0
+	ip link set dev vxlan0 up
+	sleep .1
+	check_fdb_offloaded
+	log_test "offload indication - set vxlan up"
+
+	if [[ ! -z $vid ]]; then
+		RET=0
+		bridge vlan del dev vxlan0 vid $vid
+		check_vxlan_fdb_not_offloaded
+		check_bridge_fdb_not_offloaded
+		log_test "offload indication - delete VLAN"
+
+		RET=0
+		bridge vlan add dev vxlan0 vid $vid
+		check_vxlan_fdb_not_offloaded
+		check_bridge_fdb_not_offloaded
+		log_test "offload indication - add tagged VLAN"
+
+		RET=0
+		bridge vlan add dev vxlan0 vid $vid pvid untagged
+		sleep .1
+		check_fdb_offloaded
+		log_test "offload indication - add pvid/untagged VLAN"
+	fi
+
+	RET=0
+	ip link set dev $swp1 nomaster
+	check_vxlan_fdb_not_offloaded
+	log_test "offload indication - detach port"
+}
+
+offload_indication_join_vxlan_first()
+{
+	ip link add dev br0 up type bridge mcast_snooping 0
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	__offload_indication_join_vxlan_first
+
+	ip link del dev vxlan0
+	ip link del dev br0
+}
+
+__offload_indication_join_vxlan_last()
+{
+	local zmac=00:00:00:00:00:00
+
+	RET=0
+
+	bridge fdb append $zmac dev vxlan0 self dst 198.51.100.2
+
+	ip link set dev $swp1 master br0
+
+	bridge fdb show dev vxlan0 | grep $zmac | grep self | grep -q offload
+	check_fail $?
+
+	ip link set dev vxlan0 master br0
+
+	bridge fdb show dev vxlan0 | grep $zmac | grep self | grep -q offload
+	check_err $?
+
+	log_test "offload indication - attach vxlan last"
+}
+
+offload_indication_join_vxlan_last()
+{
+	ip link add dev br0 up type bridge mcast_snooping 0
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	__offload_indication_join_vxlan_last
+
+	ip link del dev vxlan0
+	ip link del dev br0
+}
+
 offload_indication_test()
 {
 	offload_indication_setup_create
 	offload_indication_fdb_test
 	offload_indication_decap_route_test
 	offload_indication_setup_destroy
+
+	log_info "offload indication - replay & cleanup"
+	offload_indication_join_vxlan_first
+	offload_indication_join_vxlan_last
+}
+
+sanitization_vlan_aware_test()
+{
+	RET=0
+
+	ip link add dev br0 type bridge mcast_snooping 0 vlan_filtering 1
+
+	ip link add name vxlan10 up master br0 type vxlan id 10 nolearning \
+		noudpcsum ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	ip link add name vxlan20 up master br0 type vxlan id 20 nolearning \
+		noudpcsum ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	# Test that when each VNI is mapped to a different VLAN we can enslave
+	# a port to the bridge
+	bridge vlan add vid 10 dev vxlan10 pvid untagged
+	bridge vlan add vid 20 dev vxlan20 pvid untagged
+
+	ip link set dev $swp1 master br0
+	check_err $?
+
+	log_test "vlan-aware - enslavement to vlan-aware bridge"
+
+	# Try to map both VNIs to the same VLAN and make sure configuration
+	# fails
+	RET=0
+
+	bridge vlan add vid 10 dev vxlan20 pvid untagged &> /dev/null
+	check_fail $?
+
+	log_test "vlan-aware - two vnis mapped to the same vlan"
+
+	# Test that enslavement of a port to a bridge fails when two VNIs
+	# are mapped to the same VLAN
+	RET=0
+
+	ip link set dev $swp1 nomaster
+
+	bridge vlan del vid 20 dev vxlan20 pvid untagged
+	bridge vlan add vid 10 dev vxlan20 pvid untagged
+
+	ip link set dev $swp1 master br0 &> /dev/null
+	check_fail $?
+
+	log_test "vlan-aware - failed enslavement to vlan-aware bridge"
+
+	ip link del dev vxlan20
+	ip link del dev vxlan10
+	ip link del dev br0
+}
+
+offload_indication_vlan_aware_setup_create()
+{
+	# Create a simple setup with two VxLAN devices and a single VLAN-aware
+	# bridge
+	ip link add name br0 up type bridge mcast_snooping 0 vlan_filtering 1 \
+		vlan_default_pvid 0
+
+	ip link set dev $swp1 master br0
+
+	bridge vlan add vid 10 dev $swp1
+	bridge vlan add vid 20 dev $swp1
+
+	ip address add 198.51.100.1/32 dev lo
+
+	ip link add name vxlan10 up master br0 type vxlan id 10 nolearning \
+		noudpcsum ttl 20 tos inherit local 198.51.100.1 dstport 4789
+	ip link add name vxlan20 up master br0 type vxlan id 20 nolearning \
+		noudpcsum ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	bridge vlan add vid 10 dev vxlan10 pvid untagged
+	bridge vlan add vid 20 dev vxlan20 pvid untagged
+}
+
+offload_indication_vlan_aware_setup_destroy()
+{
+	bridge vlan del vid 20 dev vxlan20
+	bridge vlan del vid 10 dev vxlan10
+
+	ip link del dev vxlan20
+	ip link del dev vxlan10
+
+	ip address del 198.51.100.1/32 dev lo
+
+	bridge vlan del vid 20 dev $swp1
+	bridge vlan del vid 10 dev $swp1
+
+	ip link set dev $swp1 nomaster
+
+	ip link del dev br0
+}
+
+offload_indication_vlan_aware_fdb_test()
+{
+	RET=0
+
+	log_info "vxlan entry offload indication - vlan-aware"
+
+	bridge fdb add de:ad:be:ef:13:37 dev vxlan10 self master static \
+		dst 198.51.100.2 vlan 10
+
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep self \
+		| grep -q offload
+	check_err $?
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep -v self \
+		| grep -q offload
+	check_err $?
+
+	log_test "vxlan entry offload indication - initial state"
+
+	# Remove FDB entry from the bridge driver and check that corresponding
+	# entry in the VxLAN driver is not marked as offloaded
+	RET=0
+
+	bridge fdb del de:ad:be:ef:13:37 dev vxlan10 master vlan 10
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep self \
+		| grep -q offload
+	check_fail $?
+
+	log_test "vxlan entry offload indication - after removal from bridge"
+
+	# Add the FDB entry back to the bridge driver and make sure it is
+	# marked as offloaded in both drivers
+	RET=0
+
+	bridge fdb add de:ad:be:ef:13:37 dev vxlan10 master static vlan 10
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep self \
+		| grep -q offload
+	check_err $?
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep -v self \
+		| grep -q offload
+	check_err $?
+
+	log_test "vxlan entry offload indication - after re-add to bridge"
+
+	# Remove FDB entry from the VxLAN driver and check that corresponding
+	# entry in the bridge driver is not marked as offloaded
+	RET=0
+
+	bridge fdb del de:ad:be:ef:13:37 dev vxlan10 self
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep -v self \
+		| grep -q offload
+	check_fail $?
+
+	log_test "vxlan entry offload indication - after removal from vxlan"
+
+	# Add the FDB entry back to the VxLAN driver and make sure it is
+	# marked as offloaded in both drivers
+	RET=0
+
+	bridge fdb add de:ad:be:ef:13:37 dev vxlan10 self dst 198.51.100.2
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep self \
+		| grep -q offload
+	check_err $?
+	bridge fdb show brport vxlan10 | grep de:ad:be:ef:13:37 | grep -v self \
+		| grep -q offload
+	check_err $?
+
+	log_test "vxlan entry offload indication - after re-add to vxlan"
+
+	bridge fdb del de:ad:be:ef:13:37 dev vxlan10 self master vlan 10
+}
+
+offload_indication_vlan_aware_decap_route_test()
+{
+	RET=0
+
+	ip route show table local | grep 198.51.100.1 | grep -q offload
+	check_err $?
+
+	# Toggle PVID flag on one VxLAN device and make sure route is still
+	# marked as offloaded
+	bridge vlan add vid 10 dev vxlan10 untagged
+
+	ip route show table local | grep 198.51.100.1 | grep -q offload
+	check_err $?
+
+	# Toggle PVID flag on second VxLAN device and make sure route is no
+	# longer marked as offloaded
+	bridge vlan add vid 20 dev vxlan20 untagged
+
+	ip route show table local | grep 198.51.100.1 | grep -q offload
+	check_fail $?
+
+	# Toggle PVID flag back and make sure route is marked as offloaded
+	bridge vlan add vid 10 dev vxlan10 pvid untagged
+	bridge vlan add vid 20 dev vxlan20 pvid untagged
+
+	ip route show table local | grep 198.51.100.1 | grep -q offload
+	check_err $?
+
+	log_test "vxlan decap route - vni map/unmap"
+}
+
+offload_indication_vlan_aware_join_vxlan_first()
+{
+	ip link add dev br0 up type bridge mcast_snooping 0 \
+		vlan_filtering 1 vlan_default_pvid 1
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	__offload_indication_join_vxlan_first 1
+
+	ip link del dev vxlan0
+	ip link del dev br0
+}
+
+offload_indication_vlan_aware_join_vxlan_last()
+{
+	ip link add dev br0 up type bridge mcast_snooping 0 \
+		vlan_filtering 1 vlan_default_pvid 1
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	__offload_indication_join_vxlan_last
+
+	ip link del dev vxlan0
+	ip link del dev br0
+}
+
+offload_indication_vlan_aware_l3vni_test()
+{
+	local zmac=00:00:00:00:00:00
+
+	RET=0
+
+	sysctl_set net.ipv6.conf.default.disable_ipv6 1
+	ip link add dev br0 up type bridge mcast_snooping 0 \
+		vlan_filtering 1 vlan_default_pvid 0
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	ip link set dev $swp1 master br0
+
+	# The test will use the offload indication on the FDB entry to
+	# understand if the tunnel is offloaded or not
+	bridge fdb append $zmac dev vxlan0 self dst 192.0.2.1
+
+	ip link set dev vxlan0 master br0
+	bridge vlan add dev vxlan0 vid 10 pvid untagged
+
+	# No local port or router port is member in the VLAN, so tunnel should
+	# not be offloaded
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded when should not"
+
+	# Configure a VLAN interface and make sure tunnel is offloaded
+	ip link add link br0 name br10 up type vlan id 10
+	sysctl_set net.ipv6.conf.br10.disable_ipv6 0
+	ip -6 address add 2001:db8:1::1/64 dev br10
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_err $? "vxlan tunnel not offloaded when should"
+
+	# Unlink the VXLAN device, make sure tunnel is no longer offloaded,
+	# then add it back to the bridge and make sure it is offloaded
+	ip link set dev vxlan0 nomaster
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded after unlinked from bridge"
+
+	ip link set dev vxlan0 master br0
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded despite no matching vid"
+
+	bridge vlan add dev vxlan0 vid 10 pvid untagged
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_err $? "vxlan tunnel not offloaded after adding vid"
+
+	log_test "vxlan - l3 vni"
+
+	ip link del dev vxlan0
+	ip link del dev br0
+	sysctl_restore net.ipv6.conf.default.disable_ipv6
+}
+
+offload_indication_vlan_aware_test()
+{
+	offload_indication_vlan_aware_setup_create
+	offload_indication_vlan_aware_fdb_test
+	offload_indication_vlan_aware_decap_route_test
+	offload_indication_vlan_aware_setup_destroy
+
+	log_info "offload indication - replay & cleanup - vlan aware"
+	offload_indication_vlan_aware_join_vxlan_first
+	offload_indication_vlan_aware_join_vxlan_last
+	offload_indication_vlan_aware_l3vni_test
 }
 
 trap cleanup EXIT
