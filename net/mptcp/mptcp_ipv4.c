@@ -71,30 +71,16 @@ static int mptcp_v4_init_req(struct request_sock *req, const struct sock *sk,
 
 	mptcp_rsk(req)->hash_entry.pprev = NULL;
 	mptcp_rsk(req)->is_sub = 0;
-	inet_rsk(req)->mptcp_rqsk = 1;
+	inet_rsk(req)->mptcp_rqsk = 0;
 
-	/* In case of SYN-cookies, we wait for the isn to be generated - it is
-	 * input to the key-generation.
-	 */
-	if (!want_cookie)
-		mptcp_reqsk_init(req, sk, skb, false);
+	/* SYN-cookies are not supported */
+	if (!want_cookie) {
+		inet_rsk(req)->mptcp_rqsk = 1;
+		mptcp_reqsk_init(req, sk, skb);
+	}
 
 	return 0;
 }
-
-#ifdef CONFIG_SYN_COOKIES
-static u32 mptcp_v4_cookie_init_seq(struct request_sock *req, const struct sock *sk,
-				    const struct sk_buff *skb, __u16 *mssp)
-{
-	__u32 isn = cookie_v4_init_sequence(req, sk, skb, mssp);
-
-	tcp_rsk(req)->snt_isn = isn;
-
-	mptcp_reqsk_init(req, sk, skb, true);
-
-	return isn;
-}
-#endif
 
 /* May be called without holding the meta-level lock */
 static int mptcp_v4_join_init_req(struct request_sock *req, const struct sock *meta_sk,
@@ -381,9 +367,6 @@ int mptcp_pm_v4_init(void)
 
 	mptcp_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	mptcp_request_sock_ipv4_ops.init_req = mptcp_v4_init_req;
-#ifdef CONFIG_SYN_COOKIES
-	mptcp_request_sock_ipv4_ops.cookie_init_seq = mptcp_v4_cookie_init_seq;
-#endif
 	mptcp_join_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	mptcp_join_request_sock_ipv4_ops.init_req = mptcp_v4_join_init_req;
 

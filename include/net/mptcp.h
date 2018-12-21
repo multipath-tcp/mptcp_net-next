@@ -739,8 +739,7 @@ int mptcp_create_master_sk(struct sock *meta_sk, __u64 remote_key,
 			   __u8 mptcp_ver, u32 window);
 int mptcp_check_req_fastopen(struct sock *child, struct request_sock *req);
 int mptcp_check_req_master(struct sock *sk, struct sock *child,
-			   struct request_sock *req, const struct sk_buff *skb,
-			   int drop);
+			   struct request_sock *req, const struct sk_buff *skb);
 struct sock *mptcp_check_req_child(struct sock *meta_sk,
 				   struct sock *child,
 				   struct request_sock *req,
@@ -802,14 +801,11 @@ void mptcp_join_reqsk_init(const struct mptcp_cb *mpcb,
 			   const struct request_sock *req,
 			   struct sk_buff *skb);
 void mptcp_reqsk_init(struct request_sock *req, const struct sock *sk,
-		      const struct sk_buff *skb, bool want_cookie);
+		      const struct sk_buff *skb);
 int mptcp_conn_request(struct sock *sk, struct sk_buff *skb);
 void mptcp_enable_sock(struct sock *sk);
 void mptcp_disable_sock(struct sock *sk);
 void mptcp_disable_static_key(void);
-void mptcp_cookies_reqsk_init(struct request_sock *req,
-			      struct mptcp_options_received *mopt,
-			      struct sk_buff *skb);
 void mptcp_sock_destruct(struct sock *sk);
 int mptcp_finish_handshake(struct sock *child, struct sk_buff *skb);
 int mptcp_get_info(const struct sock *meta_sk, char __user *optval, int optlen);
@@ -1285,8 +1281,7 @@ static inline int mptcp_check_req_fastopen(struct sock *child,
 static inline int mptcp_check_req_master(const struct sock *sk,
 					 const struct sock *child,
 					 const struct request_sock *req,
-					 const struct sk_buff *skb,
-					 int drop)
+					 const struct sk_buff *skb)
 {
 	return 1;
 }
@@ -1357,9 +1352,6 @@ static inline void mptcp_remove_shortcuts(const struct mptcp_cb *mpcb,
 					  const struct sk_buff *skb) {}
 static inline void mptcp_init_tcp_sock(struct sock *sk) {}
 static inline void mptcp_disable_static_key(void) {}
-static inline void mptcp_cookies_reqsk_init(struct request_sock *req,
-					    struct mptcp_options_received *mopt,
-					    struct sk_buff *skb) {}
 static inline void mptcp_fin(struct sock *meta_sk) {}
 static inline bool mptcp_can_new_subflow(const struct sock *meta_sk)
 {
