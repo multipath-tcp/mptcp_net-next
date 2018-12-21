@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b6c38f76_971408cf",
+        "filename": "include/uapi/linux/tcp.h",
+        "patchSetId": 3
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2018-12-21T16:29:22Z",
+      "side": 1,
+      "message": "good catch :-)",
+      "revId": "506b51c0611c4fac51b2be69ac0c33b05ef4b9ba",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    }
+  ]
+}
