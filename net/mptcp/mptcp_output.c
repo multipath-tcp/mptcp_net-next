@@ -1292,12 +1292,9 @@ out_reset_timer:
 
 void mptcp_sub_retransmit_timer(struct sock *sk)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
-
 	tcp_retransmit_timer(sk);
 
-	if (!tp->fastopen_rsk)
-		mptcp_set_rto(sk);
+	mptcp_set_rto(sk);
 }
 
 /* Modify values to an mptcp-level for the initial window of new subflows */
