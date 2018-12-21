@@ -134,7 +134,6 @@ enum {
 #define TCP_CM_INQ		TCP_INQ
 
 #define MPTCP_ENABLED		42
-#define MPTCP_PATH_MANAGER	44
 #define MPTCP_INFO		45
 
 #define MPTCP_INFO_FLAG_SAVE_MASTER	0x01
