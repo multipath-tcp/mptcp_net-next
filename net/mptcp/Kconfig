@@ -57,35 +57,3 @@ config DEFAULT_MPTCP_PM
 	default "ndiffports" if DEFAULT_NDIFFPORTS
 	default "default"
 
-menuconfig MPTCP_SCHED_ADVANCED
-	bool "MPTCP: advanced scheduler control"
-	depends on MPTCP=y
-	---help---
-	  Support for selection of different schedulers. You should choose 'Y' here,
-	  if you want to choose a different scheduler than the default one.
-
-if MPTCP_SCHED_ADVANCED
-
-choice
-	prompt "Default MPTCP Scheduler"
-	default DEFAULT
-	help
-	  Select the Scheduler of your choice
-
-	config DEFAULT_SCHEDULER
-		bool "Default"
-		---help---
-		  This is the default scheduler, sending first on the subflow
-		  with the lowest RTT.
-
-endchoice
-endif
-
-config DEFAULT_MPTCP_SCHED
-	string
-	depends on (MPTCP=y)
-	default "default" if DEFAULT_SCHEDULER
-	default "roundrobin" if DEFAULT_ROUNDROBIN
-	default "redundant" if DEFAULT_REDUNDANT
-	default "default"
-
