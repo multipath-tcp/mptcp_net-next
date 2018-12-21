@@ -2147,8 +2147,6 @@ int mptcp_check_req_master(struct sock *sk, struct sock *child,
 		return ret;
 	child = tcp_sk(child)->mpcb->master_sk;
 
-	sock_rps_save_rxhash(child, skb);
-
 	/* drop indicates that we come from tcp_check_req and thus need to
 	 * handle the request-socket fully.
 	 */
@@ -2236,7 +2234,6 @@ struct sock *mptcp_check_req_child(struct sock *meta_sk,
 
 	child->sk_tsq_flags = 0;
 
-	sock_rps_save_rxhash(child, skb);
 	tcp_synack_rtt_meas(child, req);
 
 	/* Subflows do not use the accept queue, as they
