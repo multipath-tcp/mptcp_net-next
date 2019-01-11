@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ac315127_464a2878",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-11T18:15:48Z",
+      "side": 1,
+      "message": "Another approach (totally optional) allows fetching without the need to configure or use a remote:\n\ngit fetch ${GIT_REMOTE_NET_NEXT_URL) ${GIT_REMOTE_NET_NEXT_BRANCH}\n\nThen you can \u0027git merge FETCH_HEAD\u0027",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9fdc3cd4_a200d286",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-11T18:15:48Z",
+      "side": 1,
+      "message": "An additional \u0027git clean -fdx\u0027 would ensure there aren\u0027t any extra files in the working directory.",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "386cdf8c_8772c66c",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-11T18:15:48Z",
+      "side": 1,
+      "message": "How about pushing to a different branch, like \"ci-merge\"?",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
