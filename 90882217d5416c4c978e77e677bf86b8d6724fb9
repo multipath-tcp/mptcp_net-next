@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "7f4bbecc_b5ffa602",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 29,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-12T08:13:00Z",
+      "side": 1,
+      "message": "indeed, good idea I don\u0027t really need the remote, only one branch from it!\nI was worry about having to re-download everything but that\u0027s fine because the last fetch has been integrated in this repo (except in case of merge-error)",
+      "parentUuid": "ac315127_464a2878",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9fdc3cd4_a200d286",
         "filename": "ci/update-tg-tree.sh",
         "patchSetId": 2
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "889cced6_99abdff5",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 33,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-12T08:13:00Z",
+      "side": 1,
+      "message": "good point. In my CI, I configured it to already be on net-next and do this clean. But I should have added a comment about that. On the other hand, an extra \u0027git clean\u0027 would not hurt :-)",
+      "parentUuid": "9fdc3cd4_a200d286",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "386cdf8c_8772c66c",
         "filename": "ci/update-tg-tree.sh",
         "patchSetId": 2
@@ -47,6 +83,24 @@
       "writtenOn": "2019-01-11T18:15:48Z",
       "side": 1,
       "message": "How about pushing to a different branch, like \"ci-merge\"?",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "be5b5d96_b251f3ab",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-12T08:13:00Z",
+      "side": 1,
+      "message": "here, it is the base of the tree which is Davem\u0027s net-next without any modification from our side.\nDo you prefer me to do a \"reset --hard\" instead of a pull?",
+      "parentUuid": "386cdf8c_8772c66c",
       "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
