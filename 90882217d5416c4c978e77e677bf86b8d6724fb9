@@ -104,6 +104,24 @@
       "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "0848fb82_9fa35c6b",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-14T19:24:39Z",
+      "side": 1,
+      "message": "I had misread the goal of the script and thought the idea was to update mptcp_net-next rather than the base branch. That\u0027s much simpler, I\u0027ll reply in the patch-level discussion.",
+      "parentUuid": "be5b5d96_b251f3ab",
+      "revId": "90882217d5416c4c978e77e677bf86b8d6724fb9",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     }
   ]
 }
