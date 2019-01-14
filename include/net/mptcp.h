@@ -36,14 +36,14 @@
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
-	struct	inet_connection_sock sk;
-	u64	local_key;
-	u64	remote_key;
-	u64	write_seq;
-	u64	ack_seq;
-	u32	token;
-	struct	socket *connection_list; /* @@ needs to be a list */
-	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
+	struct inet_connection_sock sk;
+	u64		local_key;
+	u64		remote_key;
+	u64		write_seq;
+	atomic64_t	ack_seq;
+	u32		token;
+	struct socket	*connection_list; /* @@ needs to be a list */
+	struct socket	*subflow; /* outgoing connect, listener or !mp_capable */
 };
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
@@ -73,21 +73,38 @@ struct subflow_sock {
 	/* tcp_sock must be the first member */
 	struct	tcp_sock sk;
 	u64	local_key;
+	u64	map_seq;
+	u32	map_subflow_seq;
 	u32	token;
 	u64	idsn;
 	u64	remote_key;
 	u32	rel_write_seq;
+	u32	ssn_offset;
+	u16	map_dll;
 	bool	request_mptcp;	// send MP_CAPABLE
 	bool	checksum;
 	bool	version;
 	bool	mp_capable;	// remote is MPTCP capable
 	bool	fourth_ack;	// send initial DSS
+	bool	conn_finished;
+	bool	map_valid;
 	struct	sock *conn;	// parent mptcp_sock
+	void	(*tcp_sk_data_ready)(struct sock *sk);
 };
 
 static inline struct subflow_sock *subflow_sk(const struct sock *sk)
 {
 	return (struct subflow_sock *)sk;
+}
+
+static inline struct subflow_sock *subflow_tp(const struct tcp_sock *tp)
+{
+	return (struct subflow_sock *)tp;
+}
+
+static inline struct sock *sock_sk(const struct subflow_sock *sk)
+{
+	return (struct sock *)sk;
 }
 
 struct subflow_request_sock {
@@ -101,6 +118,7 @@ struct subflow_request_sock {
 	u32	token;
 	u64	idsn;
 	u64	remote_key;
+	u32	ssn_offset;
 };
 
 static inline
@@ -132,6 +150,9 @@ void mptcp_subflow_exit(void);
 
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *options);
+
+void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+		      struct tcp_options_received *opt_rx);
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
@@ -191,6 +212,11 @@ static inline unsigned int mptcp_established_options(struct sock *sk,
 						     u64 *remote_key)
 {
 	return 0;
+}
+
+static inline void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+				    struct tcp_options_received *opt_rx)
+{
 }
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
