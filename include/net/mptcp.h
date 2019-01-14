@@ -55,6 +55,8 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *options);
 
+extern const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops;
+
 #else
 
 static inline void mptcp_parse_option(const unsigned char *ptr, int opsize,
