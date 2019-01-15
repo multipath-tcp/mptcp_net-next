@@ -7,6 +7,7 @@ TEST_PROGS := txtimestamp.sh
 all: $(TEST_PROGS)
 
 top_srcdir = ../../../../..
+KSFT_KHDR_INSTALL := 1
 include ../../lib.mk
 
 clean:
