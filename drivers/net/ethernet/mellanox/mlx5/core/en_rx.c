@@ -1190,7 +1190,6 @@ mpwrq_cqe_out:
 int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 {
 	struct mlx5e_rq *rq = container_of(cq, struct mlx5e_rq, cq);
-	struct mlx5e_xdpsq *xdpsq;
 	struct mlx5_cqe64 *cqe;
 	int work_done = 0;
 
@@ -1201,10 +1200,11 @@ int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 		work_done += mlx5e_decompress_cqes_cont(rq, cq, 0, budget);
 
 	cqe = mlx5_cqwq_get_cqe(&cq->wq);
-	if (!cqe)
+	if (!cqe) {
+		if (unlikely(work_done))
+			goto out;
 		return 0;
-
-	xdpsq = &rq->xdpsq;
+	}
 
 	do {
 		if (mlx5_get_cqe_format(cqe) == MLX5_COMPRESSED) {
@@ -1219,15 +1219,9 @@ int mlx5e_poll_rx_cq(struct mlx5e_cq *cq, int budget)
 		rq->handle_rx_cqe(rq, cqe);
 	} while ((++work_done < budget) && (cqe = mlx5_cqwq_get_cqe(&cq->wq)));
 
-	if (xdpsq->doorbell) {
-		mlx5e_xmit_xdp_doorbell(xdpsq);
-		xdpsq->doorbell = false;
-	}
-
-	if (xdpsq->redirect_flush) {
-		xdp_do_flush_map();
-		xdpsq->redirect_flush = false;
-	}
+out:
+	if (rq->xdp_prog)
+		mlx5e_xdp_rx_poll_complete(rq);
 
 	mlx5_cqwq_update_db_record(&cq->wq);
 

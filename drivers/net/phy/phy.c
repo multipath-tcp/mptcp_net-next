@@ -13,8 +13,6 @@
  *
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -35,8 +33,6 @@
 #include <linux/io.h>
 #include <linux/uaccess.h>
 #include <linux/atomic.h>
-
-#include <asm/irq.h>
 
 #define PHY_STATE_STR(_state)			\
 	case PHY_##_state:			\
@@ -814,8 +810,7 @@ int phy_start_interrupts(struct phy_device *phydev)
 	if (request_threaded_irq(phydev->irq, NULL, phy_interrupt,
 				 IRQF_ONESHOT | IRQF_SHARED,
 				 phydev_name(phydev), phydev) < 0) {
-		pr_warn("%s: Can't get IRQ %d (PHY)\n",
-			phydev->mdio.bus->name, phydev->irq);
+		phydev_warn(phydev, "Can't get IRQ %d\n", phydev->irq);
 		phydev->irq = PHY_POLL;
 		return 0;
 	}

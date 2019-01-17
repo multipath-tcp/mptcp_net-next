@@ -5270,7 +5270,6 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 	unsigned long chunk;
 	struct sk_buff *skb;
 	struct page *page;
-	gfp_t gfp_head;
 	int i;
 
 	*errcode = -EMSGSIZE;
@@ -5280,12 +5279,8 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 	if (npages > MAX_SKB_FRAGS)
 		return NULL;
 
-	gfp_head = gfp_mask;
-	if (gfp_head & __GFP_DIRECT_RECLAIM)
-		gfp_head |= __GFP_RETRY_MAYFAIL;
-
 	*errcode = -ENOBUFS;
-	skb = alloc_skb(header_len, gfp_head);
+	skb = alloc_skb(header_len, gfp_mask);
 	if (!skb)
 		return NULL;
 
@@ -5666,13 +5661,10 @@ void *skb_ext_add(struct sk_buff *skb, enum skb_ext_id id)
 		if (!new)
 			return NULL;
 
-		if (__skb_ext_exist(old, id)) {
-			if (old != new)
-				skb->extensions = new;
+		if (__skb_ext_exist(new, id))
 			goto set_active;
-		}
 
-		newoff = old->chunks;
+		newoff = new->chunks;
 	} else {
 		newoff = SKB_EXT_CHUNKSIZEOF(*new);
 
@@ -5684,8 +5676,8 @@ void *skb_ext_add(struct sk_buff *skb, enum skb_ext_id id)
 	newlen = newoff + skb_ext_type_len[id];
 	new->chunks = newlen;
 	new->offset[id] = newoff;
-	skb->extensions = new;
 set_active:
+	skb->extensions = new;
 	skb->active_extensions |= 1 << id;
 	return skb_ext_get_ptr(new, id);
 }

@@ -12,6 +12,7 @@
 #include "transaction.h"
 #include "print-tree.h"
 #include "locking.h"
+#include "volumes.h"
 
 static int split_node(struct btrfs_trans_handle *trans, struct btrfs_root
 		      *root, struct btrfs_path *path, int level);
@@ -224,7 +225,7 @@ int btrfs_copy_root(struct btrfs_trans_handle *trans,
 	else
 		btrfs_set_header_owner(cow, new_root_objectid);
 
-	write_extent_buffer_fsid(cow, fs_info->fsid);
+	write_extent_buffer_fsid(cow, fs_info->fs_devices->metadata_uuid);
 
 	WARN_ON(btrfs_header_generation(buf) > trans->transid);
 	if (new_root_objectid == BTRFS_TREE_RELOC_OBJECTID)
@@ -1015,19 +1016,21 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 		parent_start = parent->start;
 
 	/*
-	 * If we are COWing a node/leaf from the extent, chunk or device trees,
-	 * make sure that we do not finish block group creation of pending block
-	 * groups. We do this to avoid a deadlock.
+	 * If we are COWing a node/leaf from the extent, chunk, device or free
+	 * space trees, make sure that we do not finish block group creation of
+	 * pending block groups. We do this to avoid a deadlock.
 	 * COWing can result in allocation of a new chunk, and flushing pending
 	 * block groups (btrfs_create_pending_block_groups()) can be triggered
 	 * when finishing allocation of a new chunk. Creation of a pending block
-	 * group modifies the extent, chunk and device trees, therefore we could
-	 * deadlock with ourselves since we are holding a lock on an extent
-	 * buffer that btrfs_create_pending_block_groups() may try to COW later.
+	 * group modifies the extent, chunk, device and free space trees,
+	 * therefore we could deadlock with ourselves since we are holding a
+	 * lock on an extent buffer that btrfs_create_pending_block_groups() may
+	 * try to COW later.
 	 */
 	if (root == fs_info->extent_root ||
 	    root == fs_info->chunk_root ||
-	    root == fs_info->dev_root)
+	    root == fs_info->dev_root ||
+	    root == fs_info->free_space_root)
 		trans->can_flush_pending_bgs = false;
 
 	cow = btrfs_alloc_tree_block(trans, root, parent_start,
@@ -1050,7 +1053,7 @@ static noinline int __btrfs_cow_block(struct btrfs_trans_handle *trans,
 	else
 		btrfs_set_header_owner(cow, root->root_key.objectid);
 
-	write_extent_buffer_fsid(cow, fs_info->fsid);
+	write_extent_buffer_fsid(cow, fs_info->fs_devices->metadata_uuid);
 
 	ret = update_ref_for_cow(trans, root, buf, cow, &last_ref);
 	if (ret) {
@@ -1290,7 +1293,6 @@ tree_mod_log_rewind(struct btrfs_fs_info *fs_info, struct btrfs_path *path,
 	btrfs_tree_read_unlock_blocking(eb);
 	free_extent_buffer(eb);
 
-	extent_buffer_get(eb_rewin);
 	btrfs_tree_read_lock(eb_rewin);
 	__tree_mod_log_rewind(fs_info, eb_rewin, time_seq, tm);
 	WARN_ON(btrfs_header_nritems(eb_rewin) >
@@ -1362,7 +1364,6 @@ get_old_root(struct btrfs_root *root, u64 time_seq)
 
 	if (!eb)
 		return NULL;
-	extent_buffer_get(eb);
 	btrfs_tree_read_lock(eb);
 	if (old_root) {
 		btrfs_set_header_bytenr(eb, eb->start);
@@ -1415,7 +1416,7 @@ static inline int should_cow_block(struct btrfs_trans_handle *trans,
 	 *
 	 * What is forced COW:
 	 *    when we create snapshot during committing the transaction,
-	 *    after we've finished coping src root, we must COW the shared
+	 *    after we've finished copying src root, we must COW the shared
 	 *    block to ensure the metadata consistency.
 	 */
 	if (btrfs_header_generation(buf) == trans->transid &&
@@ -1440,6 +1441,10 @@ noinline int btrfs_cow_block(struct btrfs_trans_handle *trans,
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	u64 search_start;
 	int ret;
+
+	if (test_bit(BTRFS_ROOT_DELETING, &root->state))
+		btrfs_err(fs_info,
+			"COW'ing blocks on a fs root that's being dropped");
 
 	if (trans->transaction != fs_info->running_transaction)
 		WARN(1, KERN_CRIT "trans %llu running %llu\n",
@@ -2584,14 +2589,27 @@ static struct extent_buffer *btrfs_search_slot_get_root(struct btrfs_root *root,
 	root_lock = BTRFS_READ_LOCK;
 
 	if (p->search_commit_root) {
-		/* The commit roots are read only so we always do read locks */
-		if (p->need_commit_sem)
+		/*
+		 * The commit roots are read only so we always do read locks,
+		 * and we always must hold the commit_root_sem when doing
+		 * searches on them, the only exception is send where we don't
+		 * want to block transaction commits for a long time, so
+		 * we need to clone the commit root in order to avoid races
+		 * with transaction commits that create a snapshot of one of
+		 * the roots used by a send operation.
+		 */
+		if (p->need_commit_sem) {
 			down_read(&fs_info->commit_root_sem);
-		b = root->commit_root;
-		extent_buffer_get(b);
-		level = btrfs_header_level(b);
-		if (p->need_commit_sem)
+			b = btrfs_clone_extent_buffer(root->commit_root);
 			up_read(&fs_info->commit_root_sem);
+			if (!b)
+				return ERR_PTR(-ENOMEM);
+
+		} else {
+			b = root->commit_root;
+			extent_buffer_get(b);
+		}
+		level = btrfs_header_level(b);
 		/*
 		 * Ensure that all callers have set skip_locking when
 		 * p->search_commit_root = 1.
@@ -2717,6 +2735,10 @@ int btrfs_search_slot(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 again:
 	prev_cmp = -1;
 	b = btrfs_search_slot_get_root(root, p, write_lock_level);
+	if (IS_ERR(b)) {
+		ret = PTR_ERR(b);
+		goto done;
+	}
 
 	while (b) {
 		level = btrfs_header_level(b);
@@ -3751,7 +3773,7 @@ static int push_leaf_right(struct btrfs_trans_handle *trans, struct btrfs_root
 		/* Key greater than all keys in the leaf, right neighbor has
 		 * enough room for it and we're not emptying our leaf to delete
 		 * it, therefore use right neighbor to insert the new item and
-		 * no need to touch/dirty our left leaft. */
+		 * no need to touch/dirty our left leaf. */
 		btrfs_tree_unlock(left);
 		free_extent_buffer(left);
 		path->nodes[0] = right;
@@ -5390,7 +5412,6 @@ int btrfs_compare_trees(struct btrfs_root *left_root,
 		ret = -ENOMEM;
 		goto out;
 	}
-	extent_buffer_get(left_path->nodes[left_level]);
 
 	right_level = btrfs_header_level(right_root->commit_root);
 	right_root_level = right_level;
@@ -5401,7 +5422,6 @@ int btrfs_compare_trees(struct btrfs_root *left_root,
 		ret = -ENOMEM;
 		goto out;
 	}
-	extent_buffer_get(right_path->nodes[right_level]);
 	up_read(&fs_info->commit_root_sem);
 
 	if (left_level == 0)

@@ -267,8 +267,8 @@ mlxsw_sp_nve_mc_record_create(struct mlxsw_sp *mlxsw_sp,
 	struct mlxsw_sp_nve_mc_record *mc_record;
 	int err;
 
-	mc_record = kzalloc(sizeof(*mc_record) + num_max_entries *
-			    sizeof(struct mlxsw_sp_nve_mc_entry), GFP_KERNEL);
+	mc_record = kzalloc(struct_size(mc_record, entries, num_max_entries),
+			    GFP_KERNEL);
 	if (!mc_record)
 		return ERR_PTR(-ENOMEM);
 
@@ -816,14 +816,14 @@ int mlxsw_sp_nve_fid_enable(struct mlxsw_sp *mlxsw_sp, struct mlxsw_sp_fid *fid,
 	ops = nve->nve_ops_arr[params->type];
 
 	if (!ops->can_offload(nve, params->dev, extack))
-		return -EOPNOTSUPP;
+		return -EINVAL;
 
 	memset(&config, 0, sizeof(config));
 	ops->nve_config(nve, params->dev, &config);
 	if (nve->num_nve_tunnels &&
 	    memcmp(&config, &nve->config, sizeof(config))) {
 		NL_SET_ERR_MSG_MOD(extack, "Conflicting NVE tunnels configuration");
-		return -EOPNOTSUPP;
+		return -EINVAL;
 	}
 
 	err = mlxsw_sp_nve_tunnel_init(mlxsw_sp, &config);
@@ -1033,6 +1033,6 @@ void mlxsw_sp_nve_fini(struct mlxsw_sp *mlxsw_sp)
 {
 	WARN_ON(mlxsw_sp->nve->num_nve_tunnels);
 	rhashtable_destroy(&mlxsw_sp->nve->mc_list_ht);
-	mlxsw_sp->nve = NULL;
 	kfree(mlxsw_sp->nve);
+	mlxsw_sp->nve = NULL;
 }

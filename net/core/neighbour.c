@@ -18,6 +18,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/slab.h>
+#include <linux/kmemleak.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -443,12 +444,14 @@ static struct neigh_hash_table *neigh_hash_alloc(unsigned int shift)
 	ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
 	if (!ret)
 		return NULL;
-	if (size <= PAGE_SIZE)
+	if (size <= PAGE_SIZE) {
 		buckets = kzalloc(size, GFP_ATOMIC);
-	else
+	} else {
 		buckets = (struct neighbour __rcu **)
 			  __get_free_pages(GFP_ATOMIC | __GFP_ZERO,
 					   get_order(size));
+		kmemleak_alloc(buckets, size, 0, GFP_ATOMIC);
+	}
 	if (!buckets) {
 		kfree(ret);
 		return NULL;
@@ -468,10 +471,12 @@ static void neigh_hash_free_rcu(struct rcu_head *head)
 	size_t size = (1 << nht->hash_shift) * sizeof(struct neighbour *);
 	struct neighbour __rcu **buckets = nht->hash_buckets;
 
-	if (size <= PAGE_SIZE)
+	if (size <= PAGE_SIZE) {
 		kfree(buckets);
-	else
+	} else {
+		kmemleak_free(buckets);
 		free_pages((unsigned long)buckets, get_order(size));
+	}
 	kfree(nht);
 }
 
@@ -725,6 +730,7 @@ struct pneigh_entry * pneigh_lookup(struct neigh_table *tbl,
 	if (!n)
 		goto out;
 
+	n->protocol = 0;
 	write_pnet(&n->net, net);
 	memcpy(n->key, pkey, key_len);
 	n->dev = dev;
@@ -1761,6 +1767,7 @@ const struct nla_policy nda_policy[NDA_MAX+1] = {
 	[NDA_VNI]		= { .type = NLA_U32 },
 	[NDA_IFINDEX]		= { .type = NLA_U32 },
 	[NDA_MASTER]		= { .type = NLA_U32 },
+	[NDA_PROTOCOL]		= { .type = NLA_U8 },
 };
 
 static int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh,
@@ -1844,7 +1851,7 @@ static int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 	int err;
 
 	ASSERT_RTNL();
-	err = nlmsg_parse(nlh, sizeof(*ndm), tb, NDA_MAX, NULL, extack);
+	err = nlmsg_parse(nlh, sizeof(*ndm), tb, NDA_MAX, nda_policy, extack);
 	if (err < 0)
 		goto out;
 
@@ -1880,13 +1887,8 @@ static int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh,
 	dst = nla_data(tb[NDA_DST]);
 	lladdr = tb[NDA_LLADDR] ? nla_data(tb[NDA_LLADDR]) : NULL;
 
-	if (tb[NDA_PROTOCOL]) {
-		if (nla_len(tb[NDA_PROTOCOL]) != sizeof(u8)) {
-			NL_SET_ERR_MSG(extack, "Invalid protocol attribute");
-			goto out;
-		}
+	if (tb[NDA_PROTOCOL])
 		protocol = nla_get_u8(tb[NDA_PROTOCOL]);
-	}
 
 	if (ndm->ndm_flags & NTF_PROXY) {
 		struct pneigh_entry *pn;
@@ -2632,16 +2634,21 @@ static int neigh_valid_dump_req(const struct nlmsghdr *nlh,
 
 		ndm = nlmsg_data(nlh);
 		if (ndm->ndm_pad1  || ndm->ndm_pad2  || ndm->ndm_ifindex ||
-		    ndm->ndm_state || ndm->ndm_flags || ndm->ndm_type) {
+		    ndm->ndm_state || ndm->ndm_type) {
 			NL_SET_ERR_MSG(extack, "Invalid values in header for neighbor dump request");
 			return -EINVAL;
 		}
 
+		if (ndm->ndm_flags & ~NTF_PROXY) {
+			NL_SET_ERR_MSG(extack, "Invalid flags in header for neighbor dump request");
+			return -EINVAL;
+		}
+
 		err = nlmsg_parse_strict(nlh, sizeof(struct ndmsg), tb, NDA_MAX,
-					 NULL, extack);
+					 nda_policy, extack);
 	} else {
 		err = nlmsg_parse(nlh, sizeof(struct ndmsg), tb, NDA_MAX,
-				  NULL, extack);
+				  nda_policy, extack);
 	}
 	if (err < 0)
 		return err;
@@ -2653,17 +2660,9 @@ static int neigh_valid_dump_req(const struct nlmsghdr *nlh,
 		/* all new attributes should require strict_check */
 		switch (i) {
 		case NDA_IFINDEX:
-			if (nla_len(tb[i]) != sizeof(u32)) {
-				NL_SET_ERR_MSG(extack, "Invalid IFINDEX attribute in neighbor dump request");
-				return -EINVAL;
-			}
 			filter->dev_idx = nla_get_u32(tb[i]);
 			break;
 		case NDA_MASTER:
-			if (nla_len(tb[i]) != sizeof(u32)) {
-				NL_SET_ERR_MSG(extack, "Invalid MASTER attribute in neighbor dump request");
-				return -EINVAL;
-			}
 			filter->master_idx = nla_get_u32(tb[i]);
 			break;
 		default:
@@ -2817,7 +2816,7 @@ errout:
 static inline size_t pneigh_nlmsg_size(void)
 {
 	return NLMSG_ALIGN(sizeof(struct ndmsg))
-	       + nla_total_size(MAX_ADDR_LEN); /* NDA_DST */
+	       + nla_total_size(MAX_ADDR_LEN) /* NDA_DST */
 	       + nla_total_size(1); /* NDA_PROTOCOL */
 }
 

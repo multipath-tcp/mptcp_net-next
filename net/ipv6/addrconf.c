@@ -4736,8 +4736,8 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh,
 			 IFA_F_MCAUTOJOIN | IFA_F_OPTIMISTIC;
 
 	idev = ipv6_find_idev(dev);
-	if (IS_ERR(idev))
-		return PTR_ERR(idev);
+	if (!idev)
+		return -ENOBUFS;
 
 	if (!ipv6_allow_optimistic_dad(net, idev))
 		cfg.ifa_flags &= ~IFA_F_OPTIMISTIC;
@@ -5154,7 +5154,7 @@ put_tgt_net:
 	if (fillargs.netnsid >= 0)
 		put_net(tgt_net);
 
-	return err < 0 ? err : skb->len;
+	return skb->len ? : err;
 }
 
 static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)

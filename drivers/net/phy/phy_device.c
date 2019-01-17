@@ -37,8 +37,6 @@
 #include <linux/uaccess.h>
 #include <linux/of.h>
 
-#include <asm/irq.h>
-
 MODULE_DESCRIPTION("PHY library");
 MODULE_AUTHOR("Andy Fleming");
 MODULE_LICENSE("GPL");
@@ -315,11 +313,8 @@ static int mdio_bus_phy_restore(struct device *dev)
 	if (ret < 0)
 		return ret;
 
-	/* The PHY needs to renegotiate. */
-	phydev->link = 0;
-	phydev->state = PHY_UP;
-
-	phy_start_machine(phydev);
+	if (phydev->attached_dev && phydev->adjust_link)
+		phy_start_machine(phydev);
 
 	return 0;
 }
@@ -822,13 +817,13 @@ int phy_device_register(struct phy_device *phydev)
 	/* Run all of the fixups for this PHY */
 	err = phy_scan_fixups(phydev);
 	if (err) {
-		pr_err("PHY %d failed to initialize\n", phydev->mdio.addr);
+		phydev_err(phydev, "failed to initialize\n");
 		goto out;
 	}
 
 	err = device_add(&phydev->mdio.dev);
 	if (err) {
-		pr_err("PHY %d failed to add\n", phydev->mdio.addr);
+		phydev_err(phydev, "failed to add\n");
 		goto out;
 	}
 
@@ -2252,14 +2247,6 @@ int phy_driver_register(struct phy_driver *new_driver, struct module *owner)
 	new_driver->mdiodrv.driver.probe = phy_probe;
 	new_driver->mdiodrv.driver.remove = phy_remove;
 	new_driver->mdiodrv.driver.owner = owner;
-
-	/* The following works around an issue where the PHY driver doesn't bind
-	 * to the device, resulting in the genphy driver being used instead of
-	 * the dedicated driver. The root cause of the issue isn't known yet
-	 * and seems to be in the base driver core. Once this is fixed we may
-	 * remove this workaround.
-	 */
-	new_driver->mdiodrv.driver.probe_type = PROBE_FORCE_SYNCHRONOUS;
 
 	retval = driver_register(&new_driver->mdiodrv.driver);
 	if (retval) {

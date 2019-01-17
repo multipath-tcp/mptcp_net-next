@@ -847,6 +847,24 @@ sanitization_vlan_aware_test()
 
 	log_test "vlan-aware - failed enslavement to vlan-aware bridge"
 
+	bridge vlan del vid 10 dev vxlan20
+	bridge vlan add vid 20 dev vxlan20 pvid untagged
+
+	# Test that offloading of an unsupported tunnel fails when it is
+	# triggered by addition of VLAN to a local port
+	RET=0
+
+	# TOS must be set to inherit
+	ip link set dev vxlan10 type vxlan tos 42
+
+	ip link set dev $swp1 master br0
+	bridge vlan add vid 10 dev $swp1 &> /dev/null
+	check_fail $?
+
+	log_test "vlan-aware - failed vlan addition to a local port"
+
+	ip link set dev vxlan10 type vxlan tos inherit
+
 	ip link del dev vxlan20
 	ip link del dev vxlan10
 	ip link del dev br0
@@ -1021,6 +1039,65 @@ offload_indication_vlan_aware_join_vxlan_last()
 	ip link del dev br0
 }
 
+offload_indication_vlan_aware_l3vni_test()
+{
+	local zmac=00:00:00:00:00:00
+
+	RET=0
+
+	sysctl_set net.ipv6.conf.default.disable_ipv6 1
+	ip link add dev br0 up type bridge mcast_snooping 0 \
+		vlan_filtering 1 vlan_default_pvid 0
+	ip link add name vxlan0 up type vxlan id 10 nolearning noudpcsum \
+		ttl 20 tos inherit local 198.51.100.1 dstport 4789
+
+	ip link set dev $swp1 master br0
+
+	# The test will use the offload indication on the FDB entry to
+	# understand if the tunnel is offloaded or not
+	bridge fdb append $zmac dev vxlan0 self dst 192.0.2.1
+
+	ip link set dev vxlan0 master br0
+	bridge vlan add dev vxlan0 vid 10 pvid untagged
+
+	# No local port or router port is member in the VLAN, so tunnel should
+	# not be offloaded
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded when should not"
+
+	# Configure a VLAN interface and make sure tunnel is offloaded
+	ip link add link br0 name br10 up type vlan id 10
+	sysctl_set net.ipv6.conf.br10.disable_ipv6 0
+	ip -6 address add 2001:db8:1::1/64 dev br10
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_err $? "vxlan tunnel not offloaded when should"
+
+	# Unlink the VXLAN device, make sure tunnel is no longer offloaded,
+	# then add it back to the bridge and make sure it is offloaded
+	ip link set dev vxlan0 nomaster
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded after unlinked from bridge"
+
+	ip link set dev vxlan0 master br0
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_fail $? "vxlan tunnel offloaded despite no matching vid"
+
+	bridge vlan add dev vxlan0 vid 10 pvid untagged
+	bridge fdb show brport vxlan0 | grep $zmac | grep self \
+		| grep -q offload
+	check_err $? "vxlan tunnel not offloaded after adding vid"
+
+	log_test "vxlan - l3 vni"
+
+	ip link del dev vxlan0
+	ip link del dev br0
+	sysctl_restore net.ipv6.conf.default.disable_ipv6
+}
+
 offload_indication_vlan_aware_test()
 {
 	offload_indication_vlan_aware_setup_create
@@ -1031,6 +1108,7 @@ offload_indication_vlan_aware_test()
 	log_info "offload indication - replay & cleanup - vlan aware"
 	offload_indication_vlan_aware_join_vxlan_first
 	offload_indication_vlan_aware_join_vxlan_last
+	offload_indication_vlan_aware_l3vni_test
 }
 
 trap cleanup EXIT

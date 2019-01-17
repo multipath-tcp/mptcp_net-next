@@ -3339,6 +3339,9 @@ static inline int skb_copy_datagram_msg(const struct sk_buff *from, int offset,
 }
 int skb_copy_and_csum_datagram_msg(struct sk_buff *skb, int hlen,
 				   struct msghdr *msg);
+int skb_copy_and_hash_datagram_iter(const struct sk_buff *skb, int offset,
+			   struct iov_iter *to, int len,
+			   struct ahash_request *hash);
 int skb_copy_datagram_from_iter(struct sk_buff *skb, int offset,
 				 struct iov_iter *from, int len);
 int zerocopy_sg_from_iter(struct sk_buff *skb, struct iov_iter *frm);
@@ -3938,16 +3941,6 @@ static inline void skb_ext_put(struct sk_buff *skb)
 		__skb_ext_put(skb->extensions);
 }
 
-static inline void skb_ext_get(struct sk_buff *skb)
-{
-	if (skb->active_extensions) {
-		struct skb_ext *ext = skb->extensions;
-
-		if (ext)
-			refcount_inc(&ext->refcnt);
-	}
-}
-
 static inline void __skb_ext_copy(struct sk_buff *dst,
 				  const struct sk_buff *src)
 {
@@ -3995,7 +3988,6 @@ static inline void *skb_ext_find(const struct sk_buff *skb, enum skb_ext_id id)
 }
 #else
 static inline void skb_ext_put(struct sk_buff *skb) {}
-static inline void skb_ext_get(struct sk_buff *skb) {}
 static inline void skb_ext_del(struct sk_buff *skb, int unused) {}
 static inline void __skb_ext_copy(struct sk_buff *d, const struct sk_buff *s) {}
 static inline void skb_ext_copy(struct sk_buff *dst, const struct sk_buff *s) {}

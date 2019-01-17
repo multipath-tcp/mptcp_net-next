@@ -580,15 +580,22 @@ int mlx5_core_disable_hca(struct mlx5_core_dev *dev, u16 func_id)
 	return mlx5_cmd_exec(dev, in, sizeof(in), out, sizeof(out));
 }
 
-u64 mlx5_read_internal_timer(struct mlx5_core_dev *dev)
+u64 mlx5_read_internal_timer(struct mlx5_core_dev *dev,
+			     struct ptp_system_timestamp *sts)
 {
 	u32 timer_h, timer_h1, timer_l;
 
 	timer_h = ioread32be(&dev->iseg->internal_timer_h);
+	ptp_read_system_prets(sts);
 	timer_l = ioread32be(&dev->iseg->internal_timer_l);
+	ptp_read_system_postts(sts);
 	timer_h1 = ioread32be(&dev->iseg->internal_timer_h);
-	if (timer_h != timer_h1) /* wrap around */
+	if (timer_h != timer_h1) {
+		/* wrap around */
+		ptp_read_system_prets(sts);
 		timer_l = ioread32be(&dev->iseg->internal_timer_l);
+		ptp_read_system_postts(sts);
+	}
 
 	return (u64)timer_l | (u64)timer_h1 << 32;
 }
@@ -662,11 +669,9 @@ static int mlx5_pci_init(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 
 	priv->numa_node = dev_to_node(&dev->pdev->dev);
 
-	priv->dbg_root = debugfs_create_dir(dev_name(&pdev->dev), mlx5_debugfs_root);
-	if (!priv->dbg_root) {
-		dev_err(&pdev->dev, "Cannot create debugfs dir, aborting\n");
-		return -ENOMEM;
-	}
+	if (mlx5_debugfs_root)
+		priv->dbg_root =
+			debugfs_create_dir(pci_name(pdev), mlx5_debugfs_root);
 
 	err = mlx5_pci_enable_device(dev);
 	if (err) {
