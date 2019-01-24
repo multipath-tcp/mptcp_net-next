@@ -118,6 +118,12 @@ static const struct hclge_comm_stats_str g_mac_stats_string[] = {
 		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_mac_pause_num)},
 	{"mac_rx_mac_pause_num",
 		HCLGE_MAC_STATS_FIELD_OFF(mac_rx_mac_pause_num)},
+	{"mac_tx_control_pkt_num",
+		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_ctrl_pkt_num)},
+	{"mac_rx_control_pkt_num",
+		HCLGE_MAC_STATS_FIELD_OFF(mac_rx_ctrl_pkt_num)},
+	{"mac_tx_pfc_pkt_num",
+		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_pfc_pause_pkt_num)},
 	{"mac_tx_pfc_pri0_pkt_num",
 		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_pfc_pri0_pkt_num)},
 	{"mac_tx_pfc_pri1_pkt_num",
@@ -134,6 +140,8 @@ static const struct hclge_comm_stats_str g_mac_stats_string[] = {
 		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_pfc_pri6_pkt_num)},
 	{"mac_tx_pfc_pri7_pkt_num",
 		HCLGE_MAC_STATS_FIELD_OFF(mac_tx_pfc_pri7_pkt_num)},
+	{"mac_rx_pfc_pkt_num",
+		HCLGE_MAC_STATS_FIELD_OFF(mac_rx_pfc_pause_pkt_num)},
 	{"mac_rx_pfc_pri0_pkt_num",
 		HCLGE_MAC_STATS_FIELD_OFF(mac_rx_pfc_pri0_pkt_num)},
 	{"mac_rx_pfc_pri1_pkt_num",
@@ -287,10 +295,9 @@ static const struct hclge_mac_mgr_tbl_entry_cmd hclge_mgr_table[] = {
 	},
 };
 
-static int hclge_mac_update_stats(struct hclge_dev *hdev)
+static int hclge_mac_update_stats_defective(struct hclge_dev *hdev)
 {
 #define HCLGE_MAC_CMD_NUM 21
-#define HCLGE_RTN_DATA_NUM 4
 
 	u64 *data = (u64 *)(&hdev->hw_stats.mac_stats);
 	struct hclge_desc desc[HCLGE_MAC_CMD_NUM];
@@ -308,20 +315,100 @@ static int hclge_mac_update_stats(struct hclge_dev *hdev)
 	}
 
 	for (i = 0; i < HCLGE_MAC_CMD_NUM; i++) {
+		/* for special opcode 0032, only the first desc has the head */
 		if (unlikely(i == 0)) {
 			desc_data = (__le64 *)(&desc[i].data[0]);
-			n = HCLGE_RTN_DATA_NUM - 2;
+			n = HCLGE_RD_FIRST_STATS_NUM;
 		} else {
 			desc_data = (__le64 *)(&desc[i]);
-			n = HCLGE_RTN_DATA_NUM;
+			n = HCLGE_RD_OTHER_STATS_NUM;
 		}
+
 		for (k = 0; k < n; k++) {
-			*data++ += le64_to_cpu(*desc_data);
+			*data += le64_to_cpu(*desc_data);
+			data++;
 			desc_data++;
 		}
 	}
 
 	return 0;
+}
+
+static int hclge_mac_update_stats_complete(struct hclge_dev *hdev, u32 desc_num)
+{
+	u64 *data = (u64 *)(&hdev->hw_stats.mac_stats);
+	struct hclge_desc *desc;
+	__le64 *desc_data;
+	u16 i, k, n;
+	int ret;
+
+	desc = kcalloc(desc_num, sizeof(struct hclge_desc), GFP_KERNEL);
+	hclge_cmd_setup_basic_desc(&desc[0], HCLGE_OPC_STATS_MAC_ALL, true);
+	ret = hclge_cmd_send(&hdev->hw, desc, desc_num);
+	if (ret) {
+		kfree(desc);
+		return ret;
+	}
+
+	for (i = 0; i < desc_num; i++) {
+		/* for special opcode 0034, only the first desc has the head */
+		if (i == 0) {
+			desc_data = (__le64 *)(&desc[i].data[0]);
+			n = HCLGE_RD_FIRST_STATS_NUM;
+		} else {
+			desc_data = (__le64 *)(&desc[i]);
+			n = HCLGE_RD_OTHER_STATS_NUM;
+		}
+
+		for (k = 0; k < n; k++) {
+			*data += le64_to_cpu(*desc_data);
+			data++;
+			desc_data++;
+		}
+	}
+
+	kfree(desc);
+
+	return 0;
+}
+
+static int hclge_mac_query_reg_num(struct hclge_dev *hdev, u32 *desc_num)
+{
+	struct hclge_desc desc;
+	__le32 *desc_data;
+	u32 reg_num;
+	int ret;
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_QUERY_MAC_REG_NUM, true);
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret)
+		return ret;
+
+	desc_data = (__le32 *)(&desc.data[0]);
+	reg_num = le32_to_cpu(*desc_data);
+
+	*desc_num = 1 + ((reg_num - 3) >> 2) +
+		    (u32)(((reg_num - 3) & 0x3) ? 1 : 0);
+
+	return 0;
+}
+
+static int hclge_mac_update_stats(struct hclge_dev *hdev)
+{
+	u32 desc_num;
+	int ret;
+
+	ret = hclge_mac_query_reg_num(hdev, &desc_num);
+
+	/* The firmware supports the new statistics acquisition method */
+	if (!ret)
+		ret = hclge_mac_update_stats_complete(hdev, desc_num);
+	else if (ret == -EOPNOTSUPP)
+		ret = hclge_mac_update_stats_defective(hdev);
+	else
+		dev_err(&hdev->pdev->dev, "query mac reg num fail!\n");
+
+	return ret;
 }
 
 static int hclge_tqps_update_stats(struct hnae3_handle *handle)
@@ -461,26 +548,6 @@ static u8 *hclge_comm_get_strings(u32 stringset,
 	return (u8 *)buff;
 }
 
-static void hclge_update_netstat(struct hclge_hw_stats *hw_stats,
-				 struct net_device_stats *net_stats)
-{
-	net_stats->tx_dropped = 0;
-	net_stats->rx_errors = hw_stats->mac_stats.mac_rx_oversize_pkt_num;
-	net_stats->rx_errors += hw_stats->mac_stats.mac_rx_undersize_pkt_num;
-	net_stats->rx_errors += hw_stats->mac_stats.mac_rx_fcs_err_pkt_num;
-
-	net_stats->multicast = hw_stats->mac_stats.mac_tx_multi_pkt_num;
-	net_stats->multicast += hw_stats->mac_stats.mac_rx_multi_pkt_num;
-
-	net_stats->rx_crc_errors = hw_stats->mac_stats.mac_rx_fcs_err_pkt_num;
-	net_stats->rx_length_errors =
-		hw_stats->mac_stats.mac_rx_undersize_pkt_num;
-	net_stats->rx_length_errors +=
-		hw_stats->mac_stats.mac_rx_oversize_pkt_num;
-	net_stats->rx_over_errors =
-		hw_stats->mac_stats.mac_rx_oversize_pkt_num;
-}
-
 static void hclge_update_stats_for_all(struct hclge_dev *hdev)
 {
 	struct hnae3_handle *handle;
@@ -500,8 +567,6 @@ static void hclge_update_stats_for_all(struct hclge_dev *hdev)
 	if (status)
 		dev_err(&hdev->pdev->dev,
 			"Update MAC stats fail, status = %d.\n", status);
-
-	hclge_update_netstat(&hdev->hw_stats, &handle->kinfo.netdev->stats);
 }
 
 static void hclge_update_stats(struct hnae3_handle *handle,
@@ -509,7 +574,6 @@ static void hclge_update_stats(struct hnae3_handle *handle,
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
-	struct hclge_hw_stats *hw_stats = &hdev->hw_stats;
 	int status;
 
 	if (test_and_set_bit(HCLGE_STATE_STATISTICS_UPDATING, &hdev->state))
@@ -526,8 +590,6 @@ static void hclge_update_stats(struct hnae3_handle *handle,
 		dev_err(&hdev->pdev->dev,
 			"Update TQPS stats fail, status = %d.\n",
 			status);
-
-	hclge_update_netstat(hw_stats, net_stats);
 
 	clear_bit(HCLGE_STATE_STATISTICS_UPDATING, &hdev->state);
 }
@@ -1068,14 +1130,14 @@ static int hclge_map_tqps_to_func(struct hclge_dev *hdev, u16 func_id,
 	return ret;
 }
 
-static int  hclge_assign_tqp(struct hclge_vport *vport)
+static int  hclge_assign_tqp(struct hclge_vport *vport, u16 num_tqps)
 {
 	struct hnae3_knic_private_info *kinfo = &vport->nic.kinfo;
 	struct hclge_dev *hdev = vport->back;
 	int i, alloced;
 
 	for (i = 0, alloced = 0; i < hdev->num_tqps &&
-	     alloced < kinfo->num_tqps; i++) {
+	     alloced < num_tqps; i++) {
 		if (!hdev->htqp[i].alloced) {
 			hdev->htqp[i].q.handle = &vport->nic;
 			hdev->htqp[i].q.tqp_index = alloced;
@@ -1085,7 +1147,9 @@ static int  hclge_assign_tqp(struct hclge_vport *vport)
 			alloced++;
 		}
 	}
-	vport->alloc_tqps = kinfo->num_tqps;
+	vport->alloc_tqps = alloced;
+	kinfo->rss_size = min_t(u16, hdev->rss_size_max,
+				vport->alloc_tqps / hdev->tm_info.num_tc);
 
 	return 0;
 }
@@ -1096,36 +1160,17 @@ static int hclge_knic_setup(struct hclge_vport *vport,
 	struct hnae3_handle *nic = &vport->nic;
 	struct hnae3_knic_private_info *kinfo = &nic->kinfo;
 	struct hclge_dev *hdev = vport->back;
-	int i, ret;
+	int ret;
 
 	kinfo->num_desc = num_desc;
 	kinfo->rx_buf_len = hdev->rx_buf_len;
-	kinfo->num_tc = min_t(u16, num_tqps, hdev->tm_info.num_tc);
-	kinfo->rss_size
-		= min_t(u16, hdev->rss_size_max, num_tqps / kinfo->num_tc);
-	kinfo->num_tqps = kinfo->rss_size * kinfo->num_tc;
 
-	for (i = 0; i < HNAE3_MAX_TC; i++) {
-		if (hdev->hw_tc_map & BIT(i)) {
-			kinfo->tc_info[i].enable = true;
-			kinfo->tc_info[i].tqp_offset = i * kinfo->rss_size;
-			kinfo->tc_info[i].tqp_count = kinfo->rss_size;
-			kinfo->tc_info[i].tc = i;
-		} else {
-			/* Set to default queue if TC is disable */
-			kinfo->tc_info[i].enable = false;
-			kinfo->tc_info[i].tqp_offset = 0;
-			kinfo->tc_info[i].tqp_count = 1;
-			kinfo->tc_info[i].tc = 0;
-		}
-	}
-
-	kinfo->tqp = devm_kcalloc(&hdev->pdev->dev, kinfo->num_tqps,
+	kinfo->tqp = devm_kcalloc(&hdev->pdev->dev, num_tqps,
 				  sizeof(struct hnae3_queue *), GFP_KERNEL);
 	if (!kinfo->tqp)
 		return -ENOMEM;
 
-	ret = hclge_assign_tqp(vport);
+	ret = hclge_assign_tqp(vport, num_tqps);
 	if (ret)
 		dev_err(&hdev->pdev->dev, "fail to assign TQPs %d.\n", ret);
 
@@ -1140,7 +1185,7 @@ static int hclge_map_tqp_to_vport(struct hclge_dev *hdev,
 	u16 i;
 
 	kinfo = &nic->kinfo;
-	for (i = 0; i < kinfo->num_tqps; i++) {
+	for (i = 0; i < vport->alloc_tqps; i++) {
 		struct hclge_tqp *q =
 			container_of(kinfo->tqp[i], struct hclge_tqp, q);
 		bool is_pf;
@@ -2122,7 +2167,9 @@ static int hclge_get_mac_phy_link(struct hclge_dev *hdev)
 
 static void hclge_update_link_status(struct hclge_dev *hdev)
 {
+	struct hnae3_client *rclient = hdev->roce_client;
 	struct hnae3_client *client = hdev->nic_client;
+	struct hnae3_handle *rhandle;
 	struct hnae3_handle *handle;
 	int state;
 	int i;
@@ -2134,6 +2181,10 @@ static void hclge_update_link_status(struct hclge_dev *hdev)
 		for (i = 0; i < hdev->num_vmdq_vport + 1; i++) {
 			handle = &hdev->vport[i].nic;
 			client->ops->link_status_change(handle, state);
+			rhandle = &hdev->vport[i].roce;
+			if (rclient && rclient->ops->link_status_change)
+				rclient->ops->link_status_change(rhandle,
+								 state);
 		}
 		hdev->hw.mac.link = state;
 	}
@@ -2418,8 +2469,8 @@ static void hclge_misc_irq_uninit(struct hclge_dev *hdev)
 	hclge_free_vector(hdev, 0);
 }
 
-static int hclge_notify_client(struct hclge_dev *hdev,
-			       enum hnae3_reset_notify_type type)
+int hclge_notify_client(struct hclge_dev *hdev,
+			enum hnae3_reset_notify_type type)
 {
 	struct hnae3_client *client = hdev->nic_client;
 	u16 i;
@@ -2880,6 +2931,10 @@ static void hclge_reset(struct hclge_dev *hdev)
 		goto err_reset_lock;
 
 	ret = hclge_notify_client(hdev, HNAE3_INIT_CLIENT);
+	if (ret)
+		goto err_reset_lock;
+
+	ret = hclge_notify_client(hdev, HNAE3_RESTORE_CLIENT);
 	if (ret)
 		goto err_reset_lock;
 
@@ -5258,6 +5313,7 @@ static int hclge_set_loopback(struct hnae3_handle *handle,
 			      enum hnae3_loop loop_mode, bool en)
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
+	struct hnae3_knic_private_info *kinfo;
 	struct hclge_dev *hdev = vport->back;
 	int i, ret;
 
@@ -5276,7 +5332,8 @@ static int hclge_set_loopback(struct hnae3_handle *handle,
 		break;
 	}
 
-	for (i = 0; i < vport->alloc_tqps; i++) {
+	kinfo = &vport->nic.kinfo;
+	for (i = 0; i < kinfo->num_tqps; i++) {
 		ret = hclge_tqp_enable(hdev, i, 0, en);
 		if (ret)
 			return ret;
@@ -5288,11 +5345,13 @@ static int hclge_set_loopback(struct hnae3_handle *handle,
 static void hclge_reset_tqp_stats(struct hnae3_handle *handle)
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
+	struct hnae3_knic_private_info *kinfo;
 	struct hnae3_queue *queue;
 	struct hclge_tqp *tqp;
 	int i;
 
-	for (i = 0; i < vport->alloc_tqps; i++) {
+	kinfo = &vport->nic.kinfo;
+	for (i = 0; i < kinfo->num_tqps; i++) {
 		queue = handle->kinfo.tqp[i];
 		tqp = container_of(queue, struct hclge_tqp, q);
 		memset(&tqp->tqp_stats, 0, sizeof(tqp->tqp_stats));
@@ -7456,7 +7515,7 @@ static int hclge_reset_ae_dev(struct hnae3_ae_dev *ae_dev)
 		return ret;
 	}
 
-	ret = hclge_tm_init_hw(hdev);
+	ret = hclge_tm_init_hw(hdev, true);
 	if (ret) {
 		dev_err(&pdev->dev, "tm init hw fail, ret =%d\n", ret);
 		return ret;
@@ -7523,18 +7582,17 @@ static u32 hclge_get_max_channels(struct hnae3_handle *handle)
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hclge_dev *hdev = vport->back;
 
-	return min_t(u32, hdev->rss_size_max * kinfo->num_tc, hdev->num_tqps);
+	return min_t(u32, hdev->rss_size_max,
+		     vport->alloc_tqps / kinfo->num_tc);
 }
 
 static void hclge_get_channels(struct hnae3_handle *handle,
 			       struct ethtool_channels *ch)
 {
-	struct hclge_vport *vport = hclge_get_vport(handle);
-
 	ch->max_combined = hclge_get_max_channels(handle);
 	ch->other_count = 1;
 	ch->max_other = 1;
-	ch->combined_count = vport->alloc_tqps;
+	ch->combined_count = handle->kinfo.rss_size;
 }
 
 static void hclge_get_tqps_and_rss_info(struct hnae3_handle *handle,
@@ -7547,26 +7605,8 @@ static void hclge_get_tqps_and_rss_info(struct hnae3_handle *handle,
 	*max_rss_size = hdev->rss_size_max;
 }
 
-static void hclge_release_tqp(struct hclge_vport *vport)
-{
-	struct hnae3_knic_private_info *kinfo = &vport->nic.kinfo;
-	struct hclge_dev *hdev = vport->back;
-	int i;
-
-	for (i = 0; i < kinfo->num_tqps; i++) {
-		struct hclge_tqp *tqp =
-			container_of(kinfo->tqp[i], struct hclge_tqp, q);
-
-		tqp->q.handle = NULL;
-		tqp->q.tqp_index = 0;
-		tqp->alloced = false;
-	}
-
-	devm_kfree(&hdev->pdev->dev, kinfo->tqp);
-	kinfo->tqp = NULL;
-}
-
-static int hclge_set_channels(struct hnae3_handle *handle, u32 new_tqps_num)
+static int hclge_set_channels(struct hnae3_handle *handle, u32 new_tqps_num,
+			      bool rxfh_configured)
 {
 	struct hclge_vport *vport = hclge_get_vport(handle);
 	struct hnae3_knic_private_info *kinfo = &vport->nic.kinfo;
@@ -7580,24 +7620,11 @@ static int hclge_set_channels(struct hnae3_handle *handle, u32 new_tqps_num)
 	u32 *rss_indir;
 	int ret, i;
 
-	/* Free old tqps, and reallocate with new tqp number when nic setup */
-	hclge_release_tqp(vport);
+	kinfo->req_rss_size = new_tqps_num;
 
-	ret = hclge_knic_setup(vport, new_tqps_num, kinfo->num_desc);
+	ret = hclge_tm_vport_map_update(hdev);
 	if (ret) {
-		dev_err(&hdev->pdev->dev, "setup nic fail, ret =%d\n", ret);
-		return ret;
-	}
-
-	ret = hclge_map_tqp_to_vport(hdev, vport);
-	if (ret) {
-		dev_err(&hdev->pdev->dev, "map vport tqp fail, ret =%d\n", ret);
-		return ret;
-	}
-
-	ret = hclge_tm_schd_init(hdev);
-	if (ret) {
-		dev_err(&hdev->pdev->dev, "tm schd init fail, ret =%d\n", ret);
+		dev_err(&hdev->pdev->dev, "tm vport map fail, ret =%d\n", ret);
 		return ret;
 	}
 
@@ -7618,6 +7645,10 @@ static int hclge_set_channels(struct hnae3_handle *handle, u32 new_tqps_num)
 	if (ret)
 		return ret;
 
+	/* RSS indirection table has been configuared by user */
+	if (rxfh_configured)
+		goto out;
+
 	/* Reinitializes the rss indirect table according to the new RSS size */
 	rss_indir = kcalloc(HCLGE_RSS_IND_TBL_SIZE, sizeof(u32), GFP_KERNEL);
 	if (!rss_indir)
@@ -7633,6 +7664,7 @@ static int hclge_set_channels(struct hnae3_handle *handle, u32 new_tqps_num)
 
 	kfree(rss_indir);
 
+out:
 	if (!ret)
 		dev_info(&hdev->pdev->dev,
 			 "Channels changed, rss_size from %d to %d, tqps from %d to %d",

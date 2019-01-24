@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0+
 /* Framework for configuring and reading PHY devices
  * Based on code in sungem_phy.c and gianfar_phy.c
  *
@@ -5,12 +6,6 @@
  *
  * Copyright (c) 2004 Freescale Semiconductor, Inc.
  * Copyright (c) 2006, 2007  Maciej W. Rozycki
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
- *
  */
 
 #include <linux/kernel.h>
@@ -47,7 +42,6 @@ static const char *phy_state_to_str(enum phy_state st)
 	PHY_STATE_STR(RUNNING)
 	PHY_STATE_STR(NOLINK)
 	PHY_STATE_STR(FORCING)
-	PHY_STATE_STR(CHANGELINK)
 	PHY_STATE_STR(HALTED)
 	PHY_STATE_STR(RESUMING)
 	}
@@ -539,13 +533,6 @@ int phy_start_aneg(struct phy_device *phydev)
 
 	mutex_lock(&phydev->lock);
 
-	if (!__phy_is_started(phydev)) {
-		WARN(1, "called from state %s\n",
-		     phy_state_to_str(phydev->state));
-		err = -EBUSY;
-		goto out_unlock;
-	}
-
 	if (AUTONEG_DISABLE == phydev->autoneg)
 		phy_sanitize_settings(phydev);
 
@@ -556,11 +543,13 @@ int phy_start_aneg(struct phy_device *phydev)
 	if (err < 0)
 		goto out_unlock;
 
-	if (phydev->autoneg == AUTONEG_ENABLE) {
-		err = phy_check_link_status(phydev);
-	} else {
-		phydev->state = PHY_FORCING;
-		phydev->link_timeout = PHY_FORCE_TIMEOUT;
+	if (__phy_is_started(phydev)) {
+		if (phydev->autoneg == AUTONEG_ENABLE) {
+			err = phy_check_link_status(phydev);
+		} else {
+			phydev->state = PHY_FORCING;
+			phydev->link_timeout = PHY_FORCE_TIMEOUT;
+		}
 	}
 
 out_unlock:
@@ -820,23 +809,6 @@ int phy_start_interrupts(struct phy_device *phydev)
 EXPORT_SYMBOL(phy_start_interrupts);
 
 /**
- * phy_stop_interrupts - disable interrupts from a PHY device
- * @phydev: target phy_device struct
- */
-int phy_stop_interrupts(struct phy_device *phydev)
-{
-	int err = phy_disable_interrupts(phydev);
-
-	if (err)
-		phy_error(phydev);
-
-	free_irq(phydev->irq, phydev);
-
-	return err;
-}
-EXPORT_SYMBOL(phy_stop_interrupts);
-
-/**
  * phy_stop - Bring down the PHY link, and stop checking the status
  * @phydev: target phy_device struct
  */
@@ -859,6 +831,7 @@ void phy_stop(struct phy_device *phydev)
 	mutex_unlock(&phydev->lock);
 
 	phy_state_machine(&phydev->state_queue.work);
+	phy_stop_machine(phydev);
 
 	/* Cannot call flush_scheduled_work() here as desired because
 	 * of rtnl_lock(), but PHY_HALTED shall guarantee irq handler
@@ -939,7 +912,6 @@ void phy_state_machine(struct work_struct *work)
 		break;
 	case PHY_NOLINK:
 	case PHY_RUNNING:
-	case PHY_CHANGELINK:
 	case PHY_RESUMING:
 		err = phy_check_link_status(phydev);
 		break;

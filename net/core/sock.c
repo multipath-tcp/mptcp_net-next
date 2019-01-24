@@ -520,6 +520,34 @@ struct dst_entry *sk_dst_check(struct sock *sk, u32 cookie)
 }
 EXPORT_SYMBOL(sk_dst_check);
 
+static int sock_setbindtodevice_locked(struct sock *sk, int ifindex)
+{
+	int ret = -ENOPROTOOPT;
+#ifdef CONFIG_NETDEVICES
+	struct net *net = sock_net(sk);
+
+	/* Sorry... */
+	ret = -EPERM;
+	if (!ns_capable(net->user_ns, CAP_NET_RAW))
+		goto out;
+
+	ret = -EINVAL;
+	if (ifindex < 0)
+		goto out;
+
+	sk->sk_bound_dev_if = ifindex;
+	if (sk->sk_prot->rehash)
+		sk->sk_prot->rehash(sk);
+	sk_dst_reset(sk);
+
+	ret = 0;
+
+out:
+#endif
+
+	return ret;
+}
+
 static int sock_setbindtodevice(struct sock *sk, char __user *optval,
 				int optlen)
 {
@@ -528,11 +556,6 @@ static int sock_setbindtodevice(struct sock *sk, char __user *optval,
 	struct net *net = sock_net(sk);
 	char devname[IFNAMSIZ];
 	int index;
-
-	/* Sorry... */
-	ret = -EPERM;
-	if (!ns_capable(net->user_ns, CAP_NET_RAW))
-		goto out;
 
 	ret = -EINVAL;
 	if (optlen < 0)
@@ -566,13 +589,8 @@ static int sock_setbindtodevice(struct sock *sk, char __user *optval,
 	}
 
 	lock_sock(sk);
-	sk->sk_bound_dev_if = index;
-	if (sk->sk_prot->rehash)
-		sk->sk_prot->rehash(sk);
-	sk_dst_reset(sk);
+	ret = sock_setbindtodevice_locked(sk, index);
 	release_sock(sk);
-
-	ret = 0;
 
 out:
 #endif
@@ -1055,6 +1073,10 @@ set_rcvbuf:
 		}
 		break;
 
+	case SO_BINDTOIFINDEX:
+		ret = sock_setbindtodevice_locked(sk, val);
+		break;
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1399,6 +1421,10 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 				  SOF_TXTIME_REPORT_ERRORS : 0;
 		break;
 
+	case SO_BINDTOIFINDEX:
+		v.val = sk->sk_bound_dev_if;
+		break;
+
 	default:
 		/* We implement the SO_SNDLOWAT etc to not be settable
 		 * (1003.1g 7).
@@ -1726,7 +1752,6 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		newsk->sk_err_soft = 0;
 		newsk->sk_priority = 0;
 		newsk->sk_incoming_cpu = raw_smp_processor_id();
-		atomic64_set(&newsk->sk_cookie, 0);
 		if (likely(newsk->sk_net_refcnt))
 			sock_inuse_add(sock_net(newsk), 1);
 
