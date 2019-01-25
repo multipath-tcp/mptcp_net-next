@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a7003d32_50af0aad",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 6
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-25T22:26:09Z",
+      "side": 1,
+      "message": "I need to fix the outdated info (and typo) in this commit message. In this revision MPTCP information is propagated using skb extensions, not the error queue, and skbs are checked for DSS information after being pulled from the subflow queue.",
+      "revId": "234ee10a1927253ec1ed756d2c48faba8083283f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
