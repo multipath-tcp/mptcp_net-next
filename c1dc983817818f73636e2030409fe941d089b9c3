@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "f8e30e7e_46607e4d",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T17:05:19Z",
+      "side": 1,
+      "message": "should we not declare this in net/tcp.h?",
+      "revId": "c1dc983817818f73636e2030409fe941d089b9c3",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
