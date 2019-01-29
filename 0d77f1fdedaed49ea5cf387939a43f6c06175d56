@@ -1,0 +1,186 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5b96a68f_cf2ef4ee",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "do you already want some comments about the code design?\nWe will need to fix them at some points but that\u0027s not a priority and `checkpatch.pl` can already been used to fix most of them :)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1d4dfbf7_458aa909",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 422,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(detail: maybe better not to move it but place mptcp_options_write under it?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "db2bbe3c_a08cae14",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "should we not use a pointer to a structure like it is done for TFO?",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "81346069_11d87807",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 439,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(detail: should we use \u0027likely\u0027 here?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "71444cf1_a8ddbe50",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 453,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(detail: I guess we can have a look at the style later? Except if we want to merge stuff ASAP in our topgit. I mean we don\u0027t have to wait for the full patch-set to be ready to integrate it in the repo somehow, e.g. in new topgit topic)",
+      "range": {
+        "startLine": 453,
+        "startChar": 32,
+        "endLine": 453,
+        "endChar": 60
+      },
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b71abc76_6f2b298f",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 453,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(details: I guess we will want to define and use some TCPOPT_MPTCP_XXX names)",
+      "range": {
+        "startLine": 453,
+        "startChar": 18,
+        "endLine": 453,
+        "endChar": 22
+      },
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "85ec993e_2ff374fa",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "should we not check opsize before to know if it is at least \u003e\u003d2?\n\nEDIT: I see that we already do \"if (opsize \u003c 2) return;\" in mptcp_get_options() but not from tcp_parse_options()",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eed139c4_7d27f5ab",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 35,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(details: same here to add some #define but that\u0027s not the most important now)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f2bc417d_743cd3d5",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "should we not check:\n\n    opsize \u003c TCPOLEN_MPTCP_MPC_SYN + 8\n\nAlso can we still compare opsize to TCPOLEN_MPTCP_MPC_SYN while we did a \u0027-\u003d 2\u0027 above?",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1f754bb2_84806d19",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 1,
+      "message": "(detail: it is currently not used outside this file. Should it be moved to another future commit?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}

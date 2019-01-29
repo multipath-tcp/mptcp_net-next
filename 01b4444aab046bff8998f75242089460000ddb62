@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9b8b61cf_d0637940",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 713,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T16:53:25Z",
+      "side": 0,
+      "message": "detail: I also don\u0027t know if you want comments for these details (line that should not be removed) now :)",
+      "revId": "01b4444aab046bff8998f75242089460000ddb62",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
