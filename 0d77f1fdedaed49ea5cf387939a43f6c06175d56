@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "5daab7b7_94e2a70e",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-29T19:47:05Z",
+      "side": 1,
+      "message": "I\u0027ll run the patch set through checkpatch and clear up the warnings",
+      "parentUuid": "5b96a68f_cf2ef4ee",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "1d4dfbf7_458aa909",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
@@ -30,6 +48,24 @@
       "writtenOn": "2019-01-29T16:53:25Z",
       "side": 1,
       "message": "(detail: maybe better not to move it but place mptcp_options_write under it?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d7568fb0_4918632c",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 422,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-29T19:47:05Z",
+      "side": 1,
+      "message": "Gerrit presents it as moving tcp_out_options, but you could also think of the change as moving smc_write_options down :)",
+      "parentUuid": "1d4dfbf7_458aa909",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "e61b19b1_1bd63c43",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-29T19:47:05Z",
+      "side": 1,
+      "message": "This struct is typically on the stack, and the fastopen cookie is assigned to a struct that\u0027s already allocated somewhere. I think a pointer is used here because of the existing separate struct, not to save space in this struct",
+      "parentUuid": "db2bbe3c_a08cae14",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "81346069_11d87807",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
@@ -64,6 +118,24 @@
       "writtenOn": "2019-01-29T16:53:25Z",
       "side": 1,
       "message": "(detail: should we use \u0027likely\u0027 here?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "09d2f34e_b17f9ab3",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 439,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-29T19:47:05Z",
+      "side": 1,
+      "message": "Good idea",
+      "parentUuid": "81346069_11d87807",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
