@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "27aa8b16_9c31466a",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 6
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-29T17:03:52Z",
+      "side": 1,
+      "message": "detail: Should we not rename this to IPPROTO_MPTCP_SUBFLOW (with MPTCP as it is specific to MPTCP). We already discussed about that I think but I don\u0027t remember what were the conclusions.",
+      "range": {
+        "startLine": 7,
+        "startChar": 9,
+        "endLine": 7,
+        "endChar": 24
+      },
+      "revId": "8dbca5c989c25e6696c128a8d564e5f1f768ae9a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
