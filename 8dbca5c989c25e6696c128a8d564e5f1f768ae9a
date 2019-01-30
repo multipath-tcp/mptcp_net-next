@@ -46,6 +46,30 @@
       "revId": "8dbca5c989c25e6696c128a8d564e5f1f768ae9a",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4b92beba_f50224d2",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 6
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-30T09:43:21Z",
+      "side": 1,
+      "message": "That\u0027s right, I remember that.\nLooking forward to see these new patches then :-)",
+      "parentUuid": "c938efe4_7435f1fc",
+      "range": {
+        "startLine": 7,
+        "startChar": 9,
+        "endLine": 7,
+        "endChar": 24
+      },
+      "revId": "8dbca5c989c25e6696c128a8d564e5f1f768ae9a",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
