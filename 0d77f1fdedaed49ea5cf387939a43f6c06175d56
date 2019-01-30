@@ -161,6 +161,24 @@
     },
     {
       "key": {
+        "uuid": "e9fa1d52_d4e4f9ec",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-30T22:03:21Z",
+      "side": 1,
+      "message": "We should definitely have a CONFIG_MPTCP conditional around the MPTCP values. I\u0027m neutral on wrapping the MPTCP values in a nested struct (maybe one declared inline here).",
+      "parentUuid": "e9c40dfd_6bb3b87d",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "81346069_11d87807",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
