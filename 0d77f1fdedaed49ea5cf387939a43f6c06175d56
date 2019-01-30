@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "fe0c077b_beb3b06f",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-30T09:55:18Z",
+      "side": 1,
+      "message": "Thank you!\n\n(just to be clear: I didn\u0027t say there were a lot of issues but just a few that would need to be fixed at some points :) )",
+      "parentUuid": "5daab7b7_94e2a70e",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "1d4dfbf7_458aa909",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
@@ -72,6 +90,24 @@
     },
     {
       "key": {
+        "uuid": "4644d268_c6f57189",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 422,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-30T09:55:18Z",
+      "side": 1,
+      "message": ":-)\n\nI think we should not move smc_options_write() then :-P",
+      "parentUuid": "d7568fb0_4918632c",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "db2bbe3c_a08cae14",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
@@ -101,6 +137,24 @@
       "side": 1,
       "message": "This struct is typically on the stack, and the fastopen cookie is assigned to a struct that\u0027s already allocated somewhere. I think a pointer is used here because of the existing separate struct, not to save space in this struct",
       "parentUuid": "db2bbe3c_a08cae14",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e9c40dfd_6bb3b87d",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-01-30T09:55:18Z",
+      "side": 1,
+      "message": "I see, thank you for your comment.\n\nThen should we not create a structure and include it here? Just to make it clear that the new variables are linked to MPTCP (only).\n\nWe could even have an empty structure if MPTCP is not enabled in the kconfig!",
+      "parentUuid": "e61b19b1_1bd63c43",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
