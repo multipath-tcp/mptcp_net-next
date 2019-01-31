@@ -1,0 +1,67 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "97812c70_da95df36",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-31T22:29:06Z",
+      "side": 1,
+      "message": "Recommend different name that doesn\u0027t bring to mind skb-\u003ecb (Florian)",
+      "range": {
+        "startLine": 55,
+        "startChar": 7,
+        "endLine": 55,
+        "endChar": 19
+      },
+      "revId": "e935e17271fff2b916f2720994c77549594f5f6f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cd0fff5c_887722a1",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 6
+      },
+      "lineNbr": 56,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-31T22:29:06Z",
+      "side": 1,
+      "message": "Remove old refcount (Florian)",
+      "revId": "e935e17271fff2b916f2720994c77549594f5f6f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "24eee3c7_6e9f1a0a",
+        "filename": "net/core/skbuff.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 3916,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-01-31T22:29:06Z",
+      "side": 1,
+      "message": "This should be SKB_EXT_CHUNKSIZEOF (Florian)",
+      "range": {
+        "startLine": 3916,
+        "startChar": 19,
+        "endLine": 3916,
+        "endChar": 25
+      },
+      "revId": "e935e17271fff2b916f2720994c77549594f5f6f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
