@@ -179,6 +179,24 @@
     },
     {
       "key": {
+        "uuid": "1114ace7_c3c17a3e",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-01T15:23:28Z",
+      "side": 1,
+      "message": "\u003e I\u0027m neutral on wrapping the MPTCP values in a nested struct (maybe one declared inline here).\n\nI think it would be clearer in term of code readability: when you have `opts-\u003emptcp.sndr_key` (or `opts-\u003emptcp_sndr_key`) in the code, that\u0027s quite clear it is linked to an MPTCP option :)",
+      "parentUuid": "e9fa1d52_d4e4f9ec",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "81346069_11d87807",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
