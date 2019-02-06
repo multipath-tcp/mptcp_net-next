@@ -126,6 +126,24 @@
     },
     {
       "key": {
+        "uuid": "aaf3824c_aea1f081",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 422,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-02-06T22:38:01Z",
+      "side": 1,
+      "message": "I agree mptcp_write_options() should be below smc_write_options() in this file.",
+      "parentUuid": "4644d268_c6f57189",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "db2bbe3c_a08cae14",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 6
@@ -209,6 +227,24 @@
       "side": 1,
       "message": "\u003e I\u0027m neutral on wrapping the MPTCP values in a nested struct (maybe one declared inline here).\n\nI think it would be clearer in term of code readability: when you have `opts-\u003emptcp.sndr_key` (or `opts-\u003emptcp_sndr_key`) in the code, that\u0027s quite clear it is linked to an MPTCP option :)",
       "parentUuid": "e9fa1d52_d4e4f9ec",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "647fb641_a12b9d6a",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 433,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-02-06T22:38:01Z",
+      "side": 1,
+      "message": "I am fine with with all the mptcp elements here being enclosed in a nested structure.",
+      "parentUuid": "1114ace7_c3c17a3e",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -314,6 +350,54 @@
     },
     {
       "key": {
+        "uuid": "c78b6c30_700ddf32",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 453,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-02-06T22:38:01Z",
+      "side": 1,
+      "message": "Should add TCPOPT_MPTCP to include/net/tcp.h and use that here.",
+      "parentUuid": "71444cf1_a8ddbe50",
+      "range": {
+        "startLine": 453,
+        "startChar": 32,
+        "endLine": 453,
+        "endChar": 60
+      },
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f9bfcb07_cdca109e",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 453,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-02-06T22:38:01Z",
+      "side": 1,
+      "message": "The suboptions flags (OPTION_MPTCP_xxx) are defined in this file, mot sure what you mean here.",
+      "parentUuid": "b71abc76_6f2b298f",
+      "range": {
+        "startLine": 453,
+        "startChar": 18,
+        "endLine": 453,
+        "endChar": 22
+      },
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "85ec993e_2ff374fa",
         "filename": "net/mptcp/options.c",
         "patchSetId": 6
@@ -377,6 +461,24 @@
       "writtenOn": "2019-01-29T16:53:25Z",
       "side": 1,
       "message": "should we not check:\n\n    opsize \u003c TCPOLEN_MPTCP_MPC_SYN + 8\n\nAlso can we still compare opsize to TCPOLEN_MPTCP_MPC_SYN while we did a \u0027-\u003d 2\u0027 above?",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dd22f0ea_dc5e8ef2",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 44,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-02-06T22:38:01Z",
+      "side": 1,
+      "message": "Actually we should probably check (opsize \u003d\u003d TCPOLEN_xxx + 8).",
+      "parentUuid": "f2bc417d_743cd3d5",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
