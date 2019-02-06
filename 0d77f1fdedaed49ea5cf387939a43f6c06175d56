@@ -331,6 +331,24 @@
     },
     {
       "key": {
+        "uuid": "7b432569_7d40aa6c",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-06T01:41:48Z",
+      "side": 1,
+      "message": "This gets changed in a later commit, but I\u0027ll clean it up",
+      "parentUuid": "85ec993e_2ff374fa",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "eed139c4_7d27f5ab",
         "filename": "net/mptcp/options.c",
         "patchSetId": 6
@@ -376,6 +394,24 @@
       "writtenOn": "2019-01-29T16:53:25Z",
       "side": 1,
       "message": "(detail: it is currently not used outside this file. Should it be moved to another future commit?)",
+      "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4932e180_a1e9daed",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 6
+      },
+      "lineNbr": 120,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-06T01:41:48Z",
+      "side": 1,
+      "message": "Yes, this can be moved a few commits later.",
+      "parentUuid": "1f754bb2_84806d19",
       "revId": "0d77f1fdedaed49ea5cf387939a43f6c06175d56",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
