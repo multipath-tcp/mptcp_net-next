@@ -2907,6 +2907,12 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	arch/powerpc/net/
 
+BPF JIT for RISC-V (RV64G)
+M:	Björn Töpel <bjorn.topel@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	arch/riscv/net/
+
 BPF JIT for S390
 M:	Martin Schwidefsky <schwidefsky@de.ibm.com>
 M:	Heiko Carstens <heiko.carstens@de.ibm.com>
@@ -3052,8 +3058,8 @@ F:	include/linux/bcm963xx_nvram.h
 F:	include/linux/bcm963xx_tag.h
 
 BROADCOM BNX2 GIGABIT ETHERNET DRIVER
-M:	Rasesh Mody <rasesh.mody@cavium.com>
-M:	Dept-GELinuxNICDev@cavium.com
+M:	Rasesh Mody <rmody@marvell.com>
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/broadcom/bnx2.*
@@ -3072,9 +3078,9 @@ S:	Supported
 F:	drivers/scsi/bnx2i/
 
 BROADCOM BNX2X 10 GIGABIT ETHERNET DRIVER
-M:	Ariel Elior <ariel.elior@cavium.com>
-M:	Sudarsana Kalluru <sudarsana.kalluru@cavium.com>
-M:	everest-linux-l2@cavium.com
+M:	Ariel Elior <aelior@marvell.com>
+M:	Sudarsana Kalluru <skalluru@marvell.com>
+M:	GR-everest-linux-l2@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/broadcom/bnx2x/
@@ -3249,9 +3255,9 @@ S:	Supported
 F:	drivers/scsi/bfa/
 
 BROCADE BNA 10 GIGABIT ETHERNET DRIVER
-M:	Rasesh Mody <rasesh.mody@cavium.com>
-M:	Sudarsana Kalluru <sudarsana.kalluru@cavium.com>
-M:	Dept-GELinuxNICDev@cavium.com
+M:	Rasesh Mody <rmody@marvell.com>
+M:	Sudarsana Kalluru <skalluru@marvell.com>
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/brocade/bna/
@@ -3978,6 +3984,7 @@ F:	drivers/cpufreq/arm_big_little.c
 CPU POWER MONITORING SUBSYSTEM
 M:	Thomas Renninger <trenn@suse.com>
 M:	Shuah Khan <shuah@kernel.org>
+M:	Shuah Khan <skhan@linuxfoundation.org>
 L:	linux-pm@vger.kernel.org
 S:	Maintained
 F:	tools/power/cpupower/
@@ -4122,7 +4129,7 @@ S:	Maintained
 F:	drivers/media/dvb-frontends/cxd2820r*
 
 CXGB3 ETHERNET DRIVER (CXGB3)
-M:	Arjun Vynipadath <arjun@chelsio.com>
+M:	Vishal Kulkarni <vishal@chelsio.com>
 L:	netdev@vger.kernel.org
 W:	http://www.chelsio.com
 S:	Supported
@@ -4151,7 +4158,7 @@ S:	Supported
 F:	drivers/crypto/chelsio
 
 CXGB4 ETHERNET DRIVER (CXGB4)
-M:	Arjun Vynipadath <arjun@chelsio.com>
+M:	Vishal Kulkarni <vishal@chelsio.com>
 L:	netdev@vger.kernel.org
 W:	http://www.chelsio.com
 S:	Supported
@@ -6022,6 +6029,12 @@ M:	Zhang Wei <zw@zh-kernel.org>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Maintained
 F:	drivers/dma/fsldma.*
+
+FREESCALE ENETC ETHERNET DRIVERS
+M:	Claudiu Manoil <claudiu.manoil@nxp.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/ethernet/freescale/enetc/
 
 FREESCALE eTSEC ETHERNET DRIVER (GIANFAR)
 M:	Claudiu Manoil <claudiu.manoil@nxp.com>
@@ -8259,6 +8272,7 @@ F:	include/uapi/linux/sunrpc/
 
 KERNEL SELFTEST FRAMEWORK
 M:	Shuah Khan <shuah@kernel.org>
+M:	Shuah Khan <skhan@linuxfoundation.org>
 L:	linux-kselftest@vger.kernel.org
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shuah/linux-kselftest.git
 Q:	https://patchwork.kernel.org/project/linux-kselftest/list/
@@ -10690,9 +10704,9 @@ S:	Maintained
 F:	drivers/net/netdevsim/*
 
 NETXEN (1/10) GbE SUPPORT
-M:	Manish Chopra <manish.chopra@cavium.com>
-M:	Rahul Verma <rahul.verma@cavium.com>
-M:	Dept-GELinuxNICDev@cavium.com
+M:	Manish Chopra <manishc@marvell.com>
+M:	Rahul Verma <rahulv@marvell.com>
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/qlogic/netxen/
@@ -12476,8 +12490,8 @@ S:	Supported
 F:	drivers/scsi/qedi/
 
 QLOGIC QL4xxx ETHERNET DRIVER
-M:	Ariel Elior <Ariel.Elior@cavium.com>
-M:	everest-linux-l2@cavium.com
+M:	Ariel Elior <aelior@marvell.com>
+M:	GR-everest-linux-l2@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/qlogic/qed/
@@ -12485,8 +12499,8 @@ F:	include/linux/qed/
 F:	drivers/net/ethernet/qlogic/qede/
 
 QLOGIC QL4xxx RDMA DRIVER
-M:	Michal Kalderon <Michal.Kalderon@cavium.com>
-M:	Ariel Elior <Ariel.Elior@cavium.com>
+M:	Michal Kalderon <mkalderon@marvell.com>
+M:	Ariel Elior <aelior@marvell.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/hw/qedr/
@@ -12506,7 +12520,7 @@ F:	Documentation/scsi/LICENSE.qla2xxx
 F:	drivers/scsi/qla2xxx/
 
 QLOGIC QLA3XXX NETWORK DRIVER
-M:	Dept-GELinuxNICDev@cavium.com
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	Documentation/networking/device_drivers/qlogic/LICENSE.qla3xxx
@@ -12520,16 +12534,16 @@ F:	Documentation/scsi/LICENSE.qla4xxx
 F:	drivers/scsi/qla4xxx/
 
 QLOGIC QLCNIC (1/10)Gb ETHERNET DRIVER
-M:	Shahed Shaikh <Shahed.Shaikh@cavium.com>
-M:	Manish Chopra <manish.chopra@cavium.com>
-M:	Dept-GELinuxNICDev@cavium.com
+M:	Shahed Shaikh <shshaikh@marvell.com>
+M:	Manish Chopra <manishc@marvell.com>
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/qlogic/qlcnic/
 
 QLOGIC QLGE 10Gb ETHERNET DRIVER
-M:	Manish Chopra <manish.chopra@cavium.com>
-M:	Dept-GELinuxNICDev@cavium.com
+M:	Manish Chopra <manishc@marvell.com>
+M:	GR-Linux-NIC-Dev@marvell.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/qlogic/qlge/
@@ -15851,6 +15865,7 @@ F:	drivers/usb/common/usb-otg-fsm.c
 USB OVER IP DRIVER
 M:	Valentina Manea <valentina.manea.m@gmail.com>
 M:	Shuah Khan <shuah@kernel.org>
+M:	Shuah Khan <skhan@linuxfoundation.org>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
 F:	Documentation/usb/usbip_protocol.txt
@@ -16679,6 +16694,24 @@ W:	https://linuxtv.org
 T:	git git://linuxtv.org/media_tree.git
 S:	Maintained
 F:	drivers/media/tuners/tuner-xc2028.*
+
+XDP (eXpress Data Path)
+M:	Alexei Starovoitov <ast@kernel.org>
+M:	Daniel Borkmann <daniel@iogearbox.net>
+M:	David S. Miller <davem@davemloft.net>
+M:	Jakub Kicinski <jakub.kicinski@netronome.com>
+M:	Jesper Dangaard Brouer <hawk@kernel.org>
+M:	John Fastabend <john.fastabend@gmail.com>
+L:	netdev@vger.kernel.org
+L:	xdp-newbies@vger.kernel.org
+S:	Supported
+F:	net/core/xdp.c
+F:	include/net/xdp.h
+F:	kernel/bpf/devmap.c
+F:	kernel/bpf/cpumap.c
+F:	include/trace/events/xdp.h
+K:	xdp
+N:	xdp
 
 XDP SOCKETS (AF_XDP)
 M:	Björn Töpel <bjorn.topel@intel.com>

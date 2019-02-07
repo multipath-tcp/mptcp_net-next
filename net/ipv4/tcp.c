@@ -1127,7 +1127,8 @@ void tcp_free_fastopen_req(struct tcp_sock *tp)
 }
 
 static int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
-				int *copied, size_t size)
+				int *copied, size_t size,
+				struct ubuf_info *uarg)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_sock *inet = inet_sk(sk);
@@ -1147,6 +1148,7 @@ static int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 		return -ENOBUFS;
 	tp->fastopen_req->data = msg;
 	tp->fastopen_req->size = size;
+	tp->fastopen_req->uarg = uarg;
 
 	if (inet->defer_connect) {
 		err = tcp_connect(sk);
@@ -1186,11 +1188,6 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 	flags = msg->msg_flags;
 
 	if (flags & MSG_ZEROCOPY && size && sock_flag(sk, SOCK_ZEROCOPY)) {
-		if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
-			err = -EINVAL;
-			goto out_err;
-		}
-
 		skb = tcp_write_queue_tail(sk);
 		uarg = sock_zerocopy_realloc(sk, size, skb_zcopy(skb));
 		if (!uarg) {
@@ -1205,7 +1202,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 
 	if (unlikely(flags & MSG_FASTOPEN || inet_sk(sk)->defer_connect) &&
 	    !tp->repair) {
-		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size);
+		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn, size, uarg);
 		if (err == -EINPROGRESS && copied_syn > 0)
 			goto out;
 		else if (err)
@@ -1554,7 +1551,7 @@ static void tcp_cleanup_rbuf(struct sock *sk, int copied)
 		    (copied > 0 &&
 		     ((icsk->icsk_ack.pending & ICSK_ACK_PUSHED2) ||
 		      ((icsk->icsk_ack.pending & ICSK_ACK_PUSHED) &&
-		       !icsk->icsk_ack.pingpong)) &&
+		       !inet_csk_in_pingpong_mode(sk))) &&
 		      !atomic_read(&sk->sk_rmem_alloc)))
 			time_to_ack = true;
 	}
@@ -1847,57 +1844,78 @@ out:
 #endif
 
 static void tcp_update_recv_tstamps(struct sk_buff *skb,
-				    struct scm_timestamping *tss)
+				    struct scm_timestamping_internal *tss)
 {
 	if (skb->tstamp)
-		tss->ts[0] = ktime_to_timespec(skb->tstamp);
+		tss->ts[0] = ktime_to_timespec64(skb->tstamp);
 	else
-		tss->ts[0] = (struct timespec) {0};
+		tss->ts[0] = (struct timespec64) {0};
 
 	if (skb_hwtstamps(skb)->hwtstamp)
-		tss->ts[2] = ktime_to_timespec(skb_hwtstamps(skb)->hwtstamp);
+		tss->ts[2] = ktime_to_timespec64(skb_hwtstamps(skb)->hwtstamp);
 	else
-		tss->ts[2] = (struct timespec) {0};
+		tss->ts[2] = (struct timespec64) {0};
 }
 
 /* Similar to __sock_recv_timestamp, but does not require an skb */
 static void tcp_recv_timestamp(struct msghdr *msg, const struct sock *sk,
-			       struct scm_timestamping *tss)
+			       struct scm_timestamping_internal *tss)
 {
-	struct timeval tv;
+	int new_tstamp = sock_flag(sk, SOCK_TSTAMP_NEW);
 	bool has_timestamping = false;
 
 	if (tss->ts[0].tv_sec || tss->ts[0].tv_nsec) {
 		if (sock_flag(sk, SOCK_RCVTSTAMP)) {
 			if (sock_flag(sk, SOCK_RCVTSTAMPNS)) {
-				put_cmsg(msg, SOL_SOCKET, SCM_TIMESTAMPNS,
-					 sizeof(tss->ts[0]), &tss->ts[0]);
-			} else {
-				tv.tv_sec = tss->ts[0].tv_sec;
-				tv.tv_usec = tss->ts[0].tv_nsec / 1000;
+				if (new_tstamp) {
+					struct __kernel_timespec kts = {tss->ts[0].tv_sec, tss->ts[0].tv_nsec};
 
-				put_cmsg(msg, SOL_SOCKET, SCM_TIMESTAMP,
-					 sizeof(tv), &tv);
+					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMPNS_NEW,
+						 sizeof(kts), &kts);
+				} else {
+					struct timespec ts_old = timespec64_to_timespec(tss->ts[0]);
+
+					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMPNS_OLD,
+						 sizeof(ts_old), &ts_old);
+				}
+			} else {
+				if (new_tstamp) {
+					struct __kernel_sock_timeval stv;
+
+					stv.tv_sec = tss->ts[0].tv_sec;
+					stv.tv_usec = tss->ts[0].tv_nsec / 1000;
+					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP_NEW,
+						 sizeof(stv), &stv);
+				} else {
+					struct __kernel_old_timeval tv;
+
+					tv.tv_sec = tss->ts[0].tv_sec;
+					tv.tv_usec = tss->ts[0].tv_nsec / 1000;
+					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP_OLD,
+						 sizeof(tv), &tv);
+				}
 			}
 		}
 
 		if (sk->sk_tsflags & SOF_TIMESTAMPING_SOFTWARE)
 			has_timestamping = true;
 		else
-			tss->ts[0] = (struct timespec) {0};
+			tss->ts[0] = (struct timespec64) {0};
 	}
 
 	if (tss->ts[2].tv_sec || tss->ts[2].tv_nsec) {
 		if (sk->sk_tsflags & SOF_TIMESTAMPING_RAW_HARDWARE)
 			has_timestamping = true;
 		else
-			tss->ts[2] = (struct timespec) {0};
+			tss->ts[2] = (struct timespec64) {0};
 	}
 
 	if (has_timestamping) {
-		tss->ts[1] = (struct timespec) {0};
-		put_cmsg(msg, SOL_SOCKET, SCM_TIMESTAMPING,
-			 sizeof(*tss), tss);
+		tss->ts[1] = (struct timespec64) {0};
+		if (sock_flag(sk, SOCK_TSTAMP_NEW))
+			put_cmsg_scm_timestamping64(msg, tss);
+		else
+			put_cmsg_scm_timestamping(msg, tss);
 	}
 }
 
@@ -1938,7 +1956,7 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 	long timeo;
 	struct sk_buff *skb, *last;
 	u32 urg_hole = 0;
-	struct scm_timestamping tss;
+	struct scm_timestamping_internal tss;
 	bool has_tss = false;
 	bool has_cmsg;
 
@@ -2987,16 +3005,16 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 
 	case TCP_QUICKACK:
 		if (!val) {
-			icsk->icsk_ack.pingpong = 1;
+			inet_csk_enter_pingpong_mode(sk);
 		} else {
-			icsk->icsk_ack.pingpong = 0;
+			inet_csk_exit_pingpong_mode(sk);
 			if ((1 << sk->sk_state) &
 			    (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT) &&
 			    inet_csk_ack_scheduled(sk)) {
 				icsk->icsk_ack.pending |= ICSK_ACK_PUSHED;
 				tcp_cleanup_rbuf(sk, 1);
 				if (!(val & 1))
-					icsk->icsk_ack.pingpong = 1;
+					inet_csk_enter_pingpong_mode(sk);
 			}
 		}
 		break;
@@ -3410,7 +3428,7 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 		return 0;
 	}
 	case TCP_QUICKACK:
-		val = !icsk->icsk_ack.pingpong;
+		val = !inet_csk_in_pingpong_mode(sk);
 		break;
 
 	case TCP_CONGESTION:

@@ -203,12 +203,11 @@ static int hclge_map_unmap_ring_to_vf_vector(struct hclge_vport *vport, bool en,
 static int hclge_set_vf_promisc_mode(struct hclge_vport *vport,
 				     struct hclge_mbx_vf_to_pf_cmd *req)
 {
-	bool en_uc = req->msg[1] ? true : false;
-	bool en_mc = req->msg[2] ? true : false;
+	bool en_bc = req->msg[1] ? true : false;
 	struct hclge_promisc_param param;
 
-	/* always enable broadcast promisc bit */
-	hclge_promisc_param_init(&param, en_uc, en_mc, true, vport->vport_id);
+	/* vf is not allowed to enable unicast/multicast broadcast */
+	hclge_promisc_param_init(&param, false, false, en_bc, vport->vport_id);
 	return hclge_cmd_set_promisc_mode(vport->back, &param);
 }
 
@@ -320,10 +319,14 @@ static int hclge_get_vf_tcinfo(struct hclge_vport *vport,
 			       struct hclge_mbx_vf_to_pf_cmd *mbx_req,
 			       bool gen_resp)
 {
-	struct hclge_dev *hdev = vport->back;
-	int ret;
+	struct hnae3_knic_private_info *kinfo = &vport->nic.kinfo;
+	u8 vf_tc_map = 0;
+	int i, ret;
 
-	ret = hclge_gen_resp_to_vf(vport, mbx_req, 0, &hdev->hw_tc_map,
+	for (i = 0; i < kinfo->num_tc; i++)
+		vf_tc_map |= BIT(i);
+
+	ret = hclge_gen_resp_to_vf(vport, mbx_req, 0, &vf_tc_map,
 				   sizeof(u8));
 
 	return ret;
@@ -352,21 +355,47 @@ static int hclge_get_link_info(struct hclge_vport *vport,
 {
 	struct hclge_dev *hdev = vport->back;
 	u16 link_status;
-	u8 msg_data[8];
+	u8 msg_data[10];
+	u16 media_type;
 	u8 dest_vfid;
 	u16 duplex;
 
 	/* mac.link can only be 0 or 1 */
 	link_status = (u16)hdev->hw.mac.link;
 	duplex = hdev->hw.mac.duplex;
+	media_type = hdev->hw.mac.media_type;
 	memcpy(&msg_data[0], &link_status, sizeof(u16));
 	memcpy(&msg_data[2], &hdev->hw.mac.speed, sizeof(u32));
 	memcpy(&msg_data[6], &duplex, sizeof(u16));
+	memcpy(&msg_data[8], &media_type, sizeof(u16));
 	dest_vfid = mbx_req->mbx_src_vfid;
 
 	/* send this requested info to VF */
 	return hclge_send_mbx_msg(vport, msg_data, sizeof(msg_data),
 				  HCLGE_MBX_LINK_STAT_CHANGE, dest_vfid);
+}
+
+static void hclge_get_link_mode(struct hclge_vport *vport,
+				struct hclge_mbx_vf_to_pf_cmd *mbx_req)
+{
+#define HCLGE_SUPPORTED   1
+	struct hclge_dev *hdev = vport->back;
+	unsigned long advertising;
+	unsigned long supported;
+	unsigned long send_data;
+	u8 msg_data[10];
+	u8 dest_vfid;
+
+	advertising = hdev->hw.mac.advertising[0];
+	supported = hdev->hw.mac.supported[0];
+	dest_vfid = mbx_req->mbx_src_vfid;
+	msg_data[0] = mbx_req->msg[2];
+
+	send_data = msg_data[0] == HCLGE_SUPPORTED ? supported : advertising;
+
+	memcpy(&msg_data[2], &send_data, sizeof(unsigned long));
+	hclge_send_mbx_msg(vport, msg_data, sizeof(msg_data),
+			   HCLGE_MBX_LINK_STAT_MODE, dest_vfid);
 }
 
 static void hclge_mbx_reset_vf_queue(struct hclge_vport *vport,
@@ -552,6 +581,9 @@ void hclge_mbx_handler(struct hclge_dev *hdev)
 				dev_err(&hdev->pdev->dev,
 					"PF failed(%d) to get qid for VF\n",
 					ret);
+			break;
+		case HCLGE_MBX_GET_LINK_MODE:
+			hclge_get_link_mode(vport, req);
 			break;
 		default:
 			dev_err(&hdev->pdev->dev,

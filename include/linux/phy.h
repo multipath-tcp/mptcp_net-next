@@ -693,17 +693,6 @@ static inline bool phy_is_started(struct phy_device *phydev)
 void phy_resolve_aneg_linkmode(struct phy_device *phydev);
 
 /**
- * phy_read_mmd - Convenience function for reading a register
- * from an MMD on a given PHY.
- * @phydev: The phy_device struct
- * @devad: The MMD to read from
- * @regnum: The register on the MMD to read
- *
- * Same rules as for phy_read();
- */
-int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
-
-/**
  * phy_read - Convenience function for reading a given PHY register
  * @phydev: the phy_device struct
  * @regnum: register number to read
@@ -758,8 +747,59 @@ static inline int __phy_write(struct phy_device *phydev, u32 regnum, u16 val)
 			       val);
 }
 
+/**
+ * phy_read_mmd - Convenience function for reading a register
+ * from an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: The register on the MMD to read
+ *
+ * Same rules as for phy_read();
+ */
+int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
+
+/**
+ * __phy_read_mmd - Convenience function for reading a register
+ * from an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to read from
+ * @regnum: The register on the MMD to read
+ *
+ * Same rules as for __phy_read();
+ */
+int __phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
+
+/**
+ * phy_write_mmd - Convenience function for writing a register
+ * on an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to write to
+ * @regnum: The register on the MMD to read
+ * @val: value to write to @regnum
+ *
+ * Same rules as for phy_write();
+ */
+int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val);
+
+/**
+ * __phy_write_mmd - Convenience function for writing a register
+ * on an MMD on a given PHY.
+ * @phydev: The phy_device struct
+ * @devad: The MMD to write to
+ * @regnum: The register on the MMD to read
+ * @val: value to write to @regnum
+ *
+ * Same rules as for __phy_write();
+ */
+int __phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val);
+
 int __phy_modify(struct phy_device *phydev, u32 regnum, u16 mask, u16 set);
 int phy_modify(struct phy_device *phydev, u32 regnum, u16 mask, u16 set);
+
+int __phy_modify_mmd(struct phy_device *phydev, int devad, u32 regnum,
+		u16 mask, u16 set);
+int phy_modify_mmd(struct phy_device *phydev, int devad, u32 regnum,
+		u16 mask, u16 set);
 
 /**
  * __phy_set_bits - Convenience function for setting bits in a PHY register
@@ -808,6 +848,66 @@ static inline int phy_set_bits(struct phy_device *phydev, u32 regnum, u16 val)
 static inline int phy_clear_bits(struct phy_device *phydev, u32 regnum, u16 val)
 {
 	return phy_modify(phydev, regnum, val, 0);
+}
+
+/**
+ * __phy_set_bits_mmd - Convenience function for setting bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to set
+ *
+ * The caller must have taken the MDIO bus lock.
+ */
+static inline int __phy_set_bits_mmd(struct phy_device *phydev, int devad,
+		u32 regnum, u16 val)
+{
+	return __phy_modify_mmd(phydev, devad, regnum, 0, val);
+}
+
+/**
+ * __phy_clear_bits_mmd - Convenience function for clearing bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to clear
+ *
+ * The caller must have taken the MDIO bus lock.
+ */
+static inline int __phy_clear_bits_mmd(struct phy_device *phydev, int devad,
+		u32 regnum, u16 val)
+{
+	return __phy_modify_mmd(phydev, devad, regnum, val, 0);
+}
+
+/**
+ * phy_set_bits_mmd - Convenience function for setting bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to set
+ */
+static inline int phy_set_bits_mmd(struct phy_device *phydev, int devad,
+		u32 regnum, u16 val)
+{
+	return phy_modify_mmd(phydev, devad, regnum, 0, val);
+}
+
+/**
+ * phy_clear_bits_mmd - Convenience function for clearing bits in a register
+ * on MMD
+ * @phydev: the phy_device struct
+ * @devad: the MMD containing register to modify
+ * @regnum: register number to modify
+ * @val: bits to clear
+ */
+static inline int phy_clear_bits_mmd(struct phy_device *phydev, int devad,
+		u32 regnum, u16 val)
+{
+	return phy_modify_mmd(phydev, devad, regnum, val, 0);
 }
 
 /**
@@ -885,18 +985,6 @@ static inline bool phy_is_pseudo_fixed_link(struct phy_device *phydev)
 {
 	return phydev->is_pseudo_fixed_link;
 }
-
-/**
- * phy_write_mmd - Convenience function for writing a register
- * on an MMD on a given PHY.
- * @phydev: The phy_device struct
- * @devad: The MMD to read from
- * @regnum: The register on the MMD to read
- * @val: value to write to @regnum
- *
- * Same rules as for phy_write();
- */
-int phy_write_mmd(struct phy_device *phydev, int devad, u32 regnum, u16 val);
 
 int phy_save_page(struct phy_device *phydev);
 int phy_select_page(struct phy_device *phydev, int page);
@@ -1047,7 +1135,7 @@ void phy_ethtool_ksettings_get(struct phy_device *phydev,
 int phy_ethtool_ksettings_set(struct phy_device *phydev,
 			      const struct ethtool_link_ksettings *cmd);
 int phy_mii_ioctl(struct phy_device *phydev, struct ifreq *ifr, int cmd);
-int phy_start_interrupts(struct phy_device *phydev);
+void phy_request_interrupt(struct phy_device *phydev);
 void phy_print_status(struct phy_device *phydev);
 int phy_set_max_speed(struct phy_device *phydev, u32 max_speed);
 void phy_remove_link_mode(struct phy_device *phydev, u32 link_mode);

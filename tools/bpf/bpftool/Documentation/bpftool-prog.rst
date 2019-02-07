@@ -18,7 +18,7 @@ SYNOPSIS
 	{ **show** | **list** | **dump xlated** | **dump jited** | **pin** | **load**
 	| **loadall** | **help** }
 
-MAP COMMANDS
+PROG COMMANDS
 =============
 
 |	**bpftool** **prog { show | list }** [*PROG*]
@@ -258,5 +258,6 @@ SEE ALSO
 	**bpftool**\ (8),
 	**bpftool-map**\ (8),
 	**bpftool-cgroup**\ (8),
+	**bpftool-feature**\ (8),
 	**bpftool-net**\ (8),
 	**bpftool-perf**\ (8)

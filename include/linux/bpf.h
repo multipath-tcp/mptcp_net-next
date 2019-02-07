@@ -72,14 +72,15 @@ struct bpf_map {
 	u32 value_size;
 	u32 max_entries;
 	u32 map_flags;
-	u32 pages;
+	int spin_lock_off; /* >=0 valid offset, <0 error */
 	u32 id;
 	int numa_node;
 	u32 btf_key_type_id;
 	u32 btf_value_type_id;
 	struct btf *btf;
+	u32 pages;
 	bool unpriv_array;
-	/* 55 bytes hole */
+	/* 51 bytes hole */
 
 	/* The 3rd and 4th cacheline with misc members to avoid false sharing
 	 * particularly with refcounting.
@@ -90,6 +91,36 @@ struct bpf_map {
 	struct work_struct work;
 	char name[BPF_OBJ_NAME_LEN];
 };
+
+static inline bool map_value_has_spin_lock(const struct bpf_map *map)
+{
+	return map->spin_lock_off >= 0;
+}
+
+static inline void check_and_init_map_lock(struct bpf_map *map, void *dst)
+{
+	if (likely(!map_value_has_spin_lock(map)))
+		return;
+	*(struct bpf_spin_lock *)(dst + map->spin_lock_off) =
+		(struct bpf_spin_lock){};
+}
+
+/* copy everything but bpf_spin_lock */
+static inline void copy_map_value(struct bpf_map *map, void *dst, void *src)
+{
+	if (unlikely(map_value_has_spin_lock(map))) {
+		u32 off = map->spin_lock_off;
+
+		memcpy(dst, src, off);
+		memcpy(dst + off + sizeof(struct bpf_spin_lock),
+		       src + off + sizeof(struct bpf_spin_lock),
+		       map->value_size - off - sizeof(struct bpf_spin_lock));
+	} else {
+		memcpy(dst, src, map->value_size);
+	}
+}
+void copy_map_value_locked(struct bpf_map *map, void *dst, void *src,
+			   bool lock_src);
 
 struct bpf_offload_dev;
 struct bpf_offloaded_map;
@@ -162,6 +193,7 @@ enum bpf_arg_type {
 	ARG_PTR_TO_CTX,		/* pointer to context */
 	ARG_ANYTHING,		/* any (initialized) argument is ok */
 	ARG_PTR_TO_SOCKET,	/* pointer to bpf_sock */
+	ARG_PTR_TO_SPIN_LOCK,	/* pointer to bpf_spin_lock */
 };
 
 /* type of values returned from helper functions */
@@ -268,9 +300,15 @@ struct bpf_verifier_ops {
 };
 
 struct bpf_prog_offload_ops {
+	/* verifier basic callbacks */
 	int (*insn_hook)(struct bpf_verifier_env *env,
 			 int insn_idx, int prev_insn_idx);
 	int (*finalize)(struct bpf_verifier_env *env);
+	/* verifier optimization callbacks (called after .finalize) */
+	int (*replace_insn)(struct bpf_verifier_env *env, u32 off,
+			    struct bpf_insn *insn);
+	int (*remove_insns)(struct bpf_verifier_env *env, u32 off, u32 cnt);
+	/* program management callbacks */
 	int (*prepare)(struct bpf_prog *prog);
 	int (*translate)(struct bpf_prog *prog);
 	void (*destroy)(struct bpf_prog *prog);
@@ -283,6 +321,7 @@ struct bpf_prog_offload {
 	void			*dev_priv;
 	struct list_head	offloads;
 	bool			dev_state;
+	bool			opt_failed;
 	void			*jited_image;
 	u32			jited_len;
 };
@@ -397,6 +436,9 @@ int bpf_prog_test_run_xdp(struct bpf_prog *prog, const union bpf_attr *kattr,
 			  union bpf_attr __user *uattr);
 int bpf_prog_test_run_skb(struct bpf_prog *prog, const union bpf_attr *kattr,
 			  union bpf_attr __user *uattr);
+int bpf_prog_test_run_flow_dissector(struct bpf_prog *prog,
+				     const union bpf_attr *kattr,
+				     union bpf_attr __user *uattr);
 
 /* an array of programs to be executed under rcu_lock.
  *
@@ -869,7 +911,8 @@ extern const struct bpf_func_proto bpf_msg_redirect_hash_proto;
 extern const struct bpf_func_proto bpf_msg_redirect_map_proto;
 extern const struct bpf_func_proto bpf_sk_redirect_hash_proto;
 extern const struct bpf_func_proto bpf_sk_redirect_map_proto;
-
+extern const struct bpf_func_proto bpf_spin_lock_proto;
+extern const struct bpf_func_proto bpf_spin_unlock_proto;
 extern const struct bpf_func_proto bpf_get_local_storage_proto;
 
 /* Shared helpers among cBPF and eBPF. */

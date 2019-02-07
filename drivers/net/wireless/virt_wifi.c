@@ -14,11 +14,6 @@
 #include <linux/etherdevice.h>
 #include <linux/module.h>
 
-#include <net/cfg80211.h>
-#include <net/rtnetlink.h>
-#include <linux/etherdevice.h>
-#include <linux/module.h>
-
 static struct wiphy *common_wiphy;
 
 struct virt_wifi_wiphy_priv {
@@ -429,13 +424,11 @@ static int virt_wifi_net_device_open(struct net_device *dev)
 static int virt_wifi_net_device_stop(struct net_device *dev)
 {
 	struct virt_wifi_netdev_priv *n_priv = netdev_priv(dev);
-	struct virt_wifi_wiphy_priv *w_priv;
 
 	n_priv->is_up = false;
 
 	if (!dev->ieee80211_ptr)
 		return 0;
-	w_priv = wiphy_priv(dev->ieee80211_ptr->wiphy);
 
 	virt_wifi_cancel_scan(dev->ieee80211_ptr->wiphy);
 	virt_wifi_cancel_connect(dev);
@@ -530,8 +523,10 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	SET_NETDEV_DEV(dev, &priv->lowerdev->dev);
 	dev->ieee80211_ptr = kzalloc(sizeof(*dev->ieee80211_ptr), GFP_KERNEL);
 
-	if (!dev->ieee80211_ptr)
+	if (!dev->ieee80211_ptr) {
+		err = -ENOMEM;
 		goto remove_handler;
+	}
 
 	dev->ieee80211_ptr->iftype = NL80211_IFTYPE_STATION;
 	dev->ieee80211_ptr->wiphy = common_wiphy;

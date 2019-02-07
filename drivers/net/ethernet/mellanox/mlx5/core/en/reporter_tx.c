@@ -1,5 +1,5 @@
-/* SPDX-License-Identifier: GPL-2.0 OR Linux-OpenIB */
-/* Copyright (c) 2018 Mellanox Technologies. */
+/* SPDX-License-Identifier: GPL-2.0 */
+/* Copyright (c) 2019 Mellanox Technologies. */
 
 #include <net/devlink.h>
 #include "reporter.h"
@@ -86,7 +86,7 @@ static int mlx5e_tx_reporter_err_cqe_recover(struct mlx5e_txqsq *sq)
 		return err;
 	}
 
-	if (state != MLX5_RQC_STATE_ERR) {
+	if (state != MLX5_SQC_STATE_ERR) {
 		netdev_err(dev, "SQ 0x%x not in ERROR state\n", sq->sqn);
 		return -EINVAL;
 	}
@@ -99,7 +99,7 @@ static int mlx5e_tx_reporter_err_cqe_recover(struct mlx5e_txqsq *sq)
 
 	/* At this point, no new packets will arrive from the stack as TXQ is
 	 * marked with QUEUE_STATE_DRV_XOFF. In addition, NAPI cleared all
-	 * pending WQEs.  SQ can safely reset the SQ.
+	 * pending WQEs. SQ can safely reset the SQ.
 	 */
 
 	err = mlx5e_sq_to_ready(sq, state);
@@ -130,26 +130,28 @@ static int mlx5e_tx_reporter_timeout_recover(struct mlx5e_txqsq *sq)
 {
 	struct mlx5_eq_comp *eq = sq->cq.mcq.eq;
 	u32 eqe_count;
+	int ret;
 
 	netdev_err(sq->channel->netdev, "EQ 0x%x: Cons = 0x%x, irqn = 0x%x\n",
 		   eq->core.eqn, eq->core.cons_index, eq->core.irqn);
 
 	eqe_count = mlx5_eq_poll_irq_disabled(eq);
+	ret = eqe_count ? true : false;
 	if (!eqe_count) {
 		clear_bit(MLX5E_SQ_STATE_ENABLED, &sq->state);
-		return 1;
+		return ret;
 	}
 
 	netdev_err(sq->channel->netdev, "Recover %d eqes on EQ 0x%x\n",
 		   eqe_count, eq->core.eqn);
 	sq->channel->stats->eq_rearm++;
-	return 0;
+	return ret;
 }
 
-void mlx5e_tx_reporter_timeout(struct mlx5e_txqsq *sq)
+int mlx5e_tx_reporter_timeout(struct mlx5e_txqsq *sq)
 {
-	struct mlx5e_tx_err_ctx err_ctx;
 	char err_str[MLX5E_TX_REPORTER_PER_SQ_MAX_LEN];
+	struct mlx5e_tx_err_ctx err_ctx;
 
 	err_ctx.sq       = sq;
 	err_ctx.recover  = mlx5e_tx_reporter_timeout_recover;
@@ -157,8 +159,9 @@ void mlx5e_tx_reporter_timeout(struct mlx5e_txqsq *sq)
 		"TX timeout on queue: %d, SQ: 0x%x, CQ: 0x%x, SQ Cons: 0x%x SQ Prod: 0x%x, usecs since last trans: %u\n",
 		sq->channel->ix, sq->sqn, sq->cq.mcq.cqn, sq->cc, sq->pc,
 		jiffies_to_usecs(jiffies - sq->txq->trans_start));
-	devlink_health_report(sq->channel->priv->tx_reporter, err_str,
-			      &err_ctx);
+
+	return devlink_health_report(sq->channel->priv->tx_reporter, err_str,
+				     &err_ctx);
 }
 
 /* state lock cannot be grabbed within this function.
@@ -173,10 +176,12 @@ static int mlx5e_tx_reporter_recover_all(struct mlx5e_priv *priv)
 {
 	int err;
 
+	rtnl_lock();
 	mutex_lock(&priv->state_lock);
 	mlx5e_close_locked(priv->netdev);
 	err = mlx5e_open_locked(priv->netdev);
 	mutex_unlock(&priv->state_lock);
+	rtnl_unlock();
 
 	return err;
 }
@@ -192,119 +197,51 @@ static int mlx5e_tx_reporter_recover(struct devlink_health_reporter *reporter,
 }
 
 static int
-mlx5e_tx_reporter_build_diagnose_output(struct devlink_health_buffer *buffer,
-					u32 sqn, u8 state, u8 stopped)
+mlx5e_tx_reporter_build_diagnose_output(struct devlink_fmsg *fmsg,
+					u32 sqn, u8 state, bool stopped)
 {
-	int err, i;
-	int nest = 0;
-	char name[20];
+	int err;
 
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT);
+	err = devlink_fmsg_obj_nest_start(fmsg);
 	if (err)
-		goto buffer_error;
-	nest++;
+		return err;
 
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_PAIR);
+	err = devlink_fmsg_u32_pair_put(fmsg, "sqn", sqn);
 	if (err)
-		goto buffer_error;
-	nest++;
+		return err;
 
-	sprintf(name, "SQ 0x%x", sqn);
-	err = devlink_health_buffer_put_object_name(buffer, name);
+	err = devlink_fmsg_u8_pair_put(fmsg, "HW state", state);
 	if (err)
-		goto buffer_error;
+		return err;
 
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_VALUE);
+	err = devlink_fmsg_bool_pair_put(fmsg, "stopped", stopped);
 	if (err)
-		goto buffer_error;
-	nest++;
+		return err;
 
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT);
+	err = devlink_fmsg_obj_nest_end(fmsg);
 	if (err)
-		goto buffer_error;
-	nest++;
-
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_PAIR);
-	if (err)
-		goto buffer_error;
-	nest++;
-
-	err = devlink_health_buffer_put_object_name(buffer, "HW state");
-	if (err)
-		goto buffer_error;
-
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_VALUE);
-	if (err)
-		goto buffer_error;
-	nest++;
-
-	err = devlink_health_buffer_put_value_u8(buffer, state);
-	if (err)
-		goto buffer_error;
-
-	devlink_health_buffer_nest_end(buffer); /* DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_VALUE */
-	nest--;
-
-	devlink_health_buffer_nest_end(buffer); /* DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_PAIR */
-	nest--;
-
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_PAIR);
-	if (err)
-		goto buffer_error;
-	nest++;
-
-	err = devlink_health_buffer_put_object_name(buffer, "stopped");
-	if (err)
-		goto buffer_error;
-
-	err = devlink_health_buffer_nest_start(buffer,
-					       DEVLINK_ATTR_HEALTH_BUFFER_OBJECT_VALUE);
-	if (err)
-		goto buffer_error;
-	nest++;
-
-	err = devlink_health_buffer_put_value_u8(buffer, stopped);
-	if (err)
-		goto buffer_error;
-
-	for (i = 0; i < nest; i++)
-		devlink_health_buffer_nest_end(buffer);
+		return err;
 
 	return 0;
-
-buffer_error:
-	for (i = 0; i < nest; i++)
-		devlink_health_buffer_nest_cancel(buffer);
-	return err;
 }
 
 static int mlx5e_tx_reporter_diagnose(struct devlink_health_reporter *reporter,
-				      struct devlink_health_buffer **buffers_array,
-				      unsigned int buffer_size,
-				      unsigned int num_buffers)
+				      struct devlink_fmsg *fmsg)
 {
 	struct mlx5e_priv *priv = devlink_health_reporter_priv(reporter);
-	unsigned int buff = 0;
-	int i = 0, err = 0;
-
-	if (buffer_size < MLX5E_TX_REPORTER_PER_SQ_MAX_LEN)
-		return -ENOMEM;
+	int i, err = 0;
 
 	mutex_lock(&priv->state_lock);
 
-	if (!test_bit(MLX5E_STATE_OPENED, &priv->state)) {
-		mutex_unlock(&priv->state_lock);
-		return 0;
-	}
+	if (!test_bit(MLX5E_STATE_OPENED, &priv->state))
+		goto unlock;
 
-	while (i < priv->channels.num * priv->channels.params.num_tc) {
+	err = devlink_fmsg_arr_pair_nest_start(fmsg, "SQs");
+	if (err)
+		goto unlock;
+
+	for (i = 0; i < priv->channels.num * priv->channels.params.num_tc;
+	     i++) {
 		struct mlx5e_txqsq *sq = priv->txq2sq[i];
 		u8 state;
 
@@ -312,32 +249,29 @@ static int mlx5e_tx_reporter_diagnose(struct devlink_health_reporter *reporter,
 		if (err)
 			break;
 
-		err = mlx5e_tx_reporter_build_diagnose_output(buffers_array[buff],
-							      sq->sqn, state,
+		err = mlx5e_tx_reporter_build_diagnose_output(fmsg, sq->sqn,
+							      state,
 							      netif_xmit_stopped(sq->txq));
-		if (err) {
-			if (++buff == num_buffers)
-				break;
-		} else {
-			i++;
-		}
+		if (err)
+			break;
 	}
+	err = devlink_fmsg_arr_pair_nest_end(fmsg);
+	if (err)
+		goto unlock;
 
+unlock:
 	mutex_unlock(&priv->state_lock);
 	return err;
 }
 
 static const struct devlink_health_reporter_ops mlx5_tx_reporter_ops = {
-		.name = "TX",
+		.name = "tx",
 		.recover = mlx5e_tx_reporter_recover,
-		.diagnose_size = MLX5E_MAX_NUM_CHANNELS * MLX5E_MAX_NUM_TC *
-				 MLX5E_TX_REPORTER_PER_SQ_MAX_LEN,
 		.diagnose = mlx5e_tx_reporter_diagnose,
-		.dump_size = 0,
-		.dump = NULL,
 };
 
 #define MLX5_REPORTER_TX_GRACEFUL_PERIOD 500
+
 int mlx5e_tx_reporter_create(struct mlx5e_priv *priv)
 {
 	struct mlx5_core_dev *mdev = priv->mdev;
@@ -347,10 +281,17 @@ int mlx5e_tx_reporter_create(struct mlx5e_priv *priv)
 		devlink_health_reporter_create(devlink, &mlx5_tx_reporter_ops,
 					       MLX5_REPORTER_TX_GRACEFUL_PERIOD,
 					       true, priv);
+	if (IS_ERR_OR_NULL(priv->tx_reporter))
+		netdev_warn(priv->netdev,
+			    "Failed to create tx reporter, err = %ld\n",
+			    PTR_ERR(priv->tx_reporter));
 	return PTR_ERR_OR_ZERO(priv->tx_reporter);
 }
 
 void mlx5e_tx_reporter_destroy(struct mlx5e_priv *priv)
 {
+	if (IS_ERR_OR_NULL(priv->tx_reporter))
+		return;
+
 	devlink_health_reporter_destroy(priv->tx_reporter);
 }

@@ -451,11 +451,6 @@ static int mlxsw_sp_port_attr_get(struct net_device *dev,
 	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
 
 	switch (attr->id) {
-	case SWITCHDEV_ATTR_ID_PORT_PARENT_ID:
-		attr->u.ppid.id_len = sizeof(mlxsw_sp->base_mac);
-		memcpy(&attr->u.ppid.id, &mlxsw_sp->base_mac,
-		       attr->u.ppid.id_len);
-		break;
 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
 		mlxsw_sp_port_bridge_flags_get(mlxsw_sp->bridge, attr->orig_dev,
 					       &attr->u.brport_flags);
@@ -2027,6 +2022,7 @@ mlxsw_sp_bridge_8021q_vxlan_join(struct mlxsw_sp_bridge_device *bridge_device,
 		return 0;
 
 	if (mlxsw_sp_fid_vni_is_set(fid)) {
+		NL_SET_ERR_MSG_MOD(extack, "VNI is already set on FID");
 		err = -EINVAL;
 		goto err_vni_exists;
 	}
@@ -2213,10 +2209,13 @@ mlxsw_sp_bridge_8021d_vxlan_join(struct mlxsw_sp_bridge_device *bridge_device,
 	int err;
 
 	fid = mlxsw_sp_fid_8021d_lookup(mlxsw_sp, bridge_device->dev->ifindex);
-	if (!fid)
+	if (!fid) {
+		NL_SET_ERR_MSG_MOD(extack, "Did not find a corresponding FID");
 		return -EINVAL;
+	}
 
 	if (mlxsw_sp_fid_vni_is_set(fid)) {
+		NL_SET_ERR_MSG_MOD(extack, "VNI is already set on FID");
 		err = -EINVAL;
 		goto err_vni_exists;
 	}
@@ -3231,8 +3230,10 @@ mlxsw_sp_switchdev_vxlan_vlan_add(struct mlxsw_sp *mlxsw_sp,
 	 * the lookup function to return 'vxlan_dev'
 	 */
 	if (flag_untagged && flag_pvid &&
-	    mlxsw_sp_bridge_8021q_vxlan_dev_find(bridge_device->dev, vid))
+	    mlxsw_sp_bridge_8021q_vxlan_dev_find(bridge_device->dev, vid)) {
+		NL_SET_ERR_MSG_MOD(extack, "VLAN already mapped to a different VNI");
 		return -EINVAL;
+	}
 
 	if (!netif_running(vxlan_dev))
 		return 0;
