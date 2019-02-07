@@ -34,6 +34,24 @@
       "revId": "a90b396ec41ef406e6cda99f633304ba639b3933",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "13faadde_656a4bbe",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 6
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-07T14:43:23Z",
+      "side": 1,
+      "message": "a detail but if you want, you can go in your profile settings and enable \"Publish comments on push\" option. Then these \"Done\" comments that you add when you fix something in your code will be published automatically when you send a new version for review :)",
+      "parentUuid": "9a99f69b_e9601817",
+      "revId": "a90b396ec41ef406e6cda99f633304ba639b3933",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     }
   ]
 }
