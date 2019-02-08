@@ -413,6 +413,8 @@ struct tcp_sock {
 	 */
 	struct request_sock *fastopen_rsk;
 	u32	*saved_syn;
+
+	bool	is_mptcp;
 };
 
 enum tsq_enum {

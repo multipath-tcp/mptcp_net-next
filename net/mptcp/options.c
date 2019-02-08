@@ -109,3 +109,43 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		break;
 	}
 }
+
+unsigned int mptcp_syn_options(struct sock *sk, u64 *local_key)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	if (subflow->request_mptcp) {
+		pr_debug("local_key=%llu", subflow->local_key);
+		*local_key = subflow->local_key;
+	}
+	return subflow->request_mptcp;
+}
+
+void mptcp_rcv_synsent(struct sock *sk)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	pr_debug("subflow=%p", subflow);
+	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
+		subflow->mp_capable = 1;
+		subflow->remote_key = tp->rx_opt.mptcp.sndr_key;
+	}
+}
+
+unsigned int mptcp_established_options(struct sock *sk, u64 *local_key,
+				       u64 *remote_key)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	pr_debug("subflow=%p", subflow);
+	if (subflow->mp_capable && !subflow->fourth_ack) {
+		subflow->fourth_ack = 1;
+		*local_key = subflow->local_key;
+		*remote_key = subflow->remote_key;
+		pr_debug("local_key=%llu", *local_key);
+		pr_debug("remote_key=%llu", *remote_key);
+		return 1;
+	}
+	return 0;
+}
