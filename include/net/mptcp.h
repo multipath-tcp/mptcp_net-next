@@ -35,6 +35,7 @@ struct mptcp_sock {
 	struct	inet_connection_sock sk;
 	u64	local_key;
 	u64	remote_key;
+	u32	token;
 	struct	socket *connection_list; /* @@ needs to be a list */
 	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
 };
@@ -50,6 +51,7 @@ struct subflow_sock {
 	struct	tcp_sock sk;
 	u64	local_key;
 	u64	remote_key;
+	u32	token;
 	bool	request_mptcp;	// send MP_CAPABLE
 	bool	checksum;
 	bool	version;
@@ -72,6 +74,7 @@ struct subflow_request_sock {
 		version : 4;
 	u64	local_key;
 	u64	remote_key;
+	u32	token;
 };
 
 static inline
@@ -98,6 +101,29 @@ void mptcp_subflow_exit(void);
 
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
+
+void token_init(void);
+void token_new_request(struct request_sock *req, const struct sk_buff *skb);
+void token_destroy_request(u32 token);
+void token_new_connect(struct sock *sk);
+void token_new_accept(struct sock *sk);
+void token_update_accept(struct sock *sk, struct sock *conn);
+void token_destroy(u32 token);
+
+void crypto_init(void);
+u32 crypto_v4_get_nonce(__be32 saddr, __be32 daddr,
+			__be16 sport, __be16 dport);
+u64 crypto_v4_get_key(__be32 saddr, __be32 daddr,
+			__be16 sport, __be16 dport);
+u64 crypto_v6_get_key(const struct in6_addr *saddr,
+		      const struct in6_addr *daddr,
+		      __be16 sport, __be16 dport);
+u32 crypto_v6_get_nonce(const struct in6_addr *saddr,
+			const struct in6_addr *daddr,
+			__be16 sport, __be16 dport);
+void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
+void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
+		     int arg_num, ...);
 
 #else
 
