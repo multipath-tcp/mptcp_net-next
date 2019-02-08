@@ -8,6 +8,8 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
+#include <linux/spinlock.h>
+
 /* MPTCP option subtypes */
 
 #define MPTCPOPT_MP_CAPABLE	0
@@ -36,9 +38,13 @@ struct mptcp_sock {
 	u64		write_seq;
 	atomic64_t	ack_seq;
 	u32		token;
-	struct socket	*connection_list; /* @@ needs to be a list */
+	spinlock_t	conn_list_lock;
+	struct hlist_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
+
+#define mptcp_for_each_subflow(__msk, __subflow)			\
+	hlist_for_each_entry_rcu(__subflow, &((__msk)->conn_list), node)
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 {
@@ -65,6 +71,7 @@ struct mptcp_ext {
 struct subflow_sock {
 	/* tcp_sock must be the first member */
 	struct	tcp_sock sk;
+	struct	hlist_node node;// conn_list of subflows
 	u64	local_key;
 	u64	map_seq;
 	u32	map_subflow_seq;
