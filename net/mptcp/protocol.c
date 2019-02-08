@@ -248,6 +248,25 @@ int mptcp_stream_accept(struct socket *sock, struct socket *newsock, int flags,
 	return inet_accept(sock, newsock, flags, kern);
 }
 
+int mptcp_stream_shutdown(struct socket *sock, int how)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	int ret = 0;
+
+	pr_debug("sk=%p, how=%d", msk, how);
+
+	if (msk->subflow) {
+		pr_debug("subflow=%p", msk->subflow->sk);
+		ret = kernel_sock_shutdown(msk->subflow, how);
+	}
+	if (msk->connection_list) {
+		pr_debug("conn_list->subflow=%p", msk->connection_list->sk);
+		ret = kernel_sock_shutdown(msk->connection_list, how);
+	}
+
+	return ret;
+}
+
 static struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
@@ -277,7 +296,7 @@ const struct proto_ops mptcp_stream_ops = {
 	.poll		   = tcp_poll,
 	.ioctl		   = inet_ioctl,
 	.listen		   = mptcp_stream_listen,
-	.shutdown	   = inet_shutdown,
+	.shutdown	   = mptcp_stream_shutdown,
 	.setsockopt	   = sock_common_setsockopt,
 	.getsockopt	   = sock_common_getsockopt,
 	.sendmsg	   = inet_sendmsg,
