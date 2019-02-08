@@ -421,6 +421,8 @@ static inline bool tcp_urg_mode(const struct tcp_sock *tp)
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
 #define OPTION_MPTCP_MPC_SYNACK	BIT(1)
 #define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_MPC_DSS_MAP	BIT(3)
+#define OPTION_MPTCP_MPC_DSS_ACK	BIT(4)
 
 static void smc_options_write(__be32 *ptr, u16 *options)
 {
@@ -455,9 +457,13 @@ struct tcp_out_options {
 #endif
 };
 
-static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
+static void mptcp_options_write(__be32 *ptr, struct sk_buff *skb,
+				struct tcp_sock *tp,
+				struct tcp_out_options *opts)
 {
 #if IS_ENABLED(CONFIG_MPTCP)
+	struct mptcp_ext *mpext;
+
 	if (likely(!(OPTION_MPTCP & opts->options)))
 		return;
 
@@ -488,6 +494,71 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 			ptr += 2;
 		}
 	}
+
+	mpext = mptcp_get_ext(skb);
+
+	if (((OPTION_MPTCP_MPC_DSS_MAP | OPTION_MPTCP_MPC_DSS_ACK) &
+	     opts->mptcp.suboptions) && mpext) {
+		bool write_ack =
+			(OPTION_MPTCP_MPC_DSS_ACK & opts->mptcp.suboptions) &&
+			mpext && mpext->use_ack;
+		bool write_map =
+			(OPTION_MPTCP_MPC_DSS_MAP & opts->mptcp.suboptions) &&
+			mpext && mpext->use_map;
+		u8 flags = 0;
+		u8 len = 4;
+		u8 *p = (u8 *)ptr;
+
+		WARN_ON(!write_ack && !write_map);
+
+		if (write_ack) {
+			len += 8;
+			flags = 0x03;
+		}
+
+		if (write_map) {
+			len += 14;
+
+			if (mpext->use_checksum)
+				len += 2;
+
+			/* Use only 64-bit mapping flags for now, add
+			 * support for optional 32-bit mappings later.
+			 */
+			flags |= 0x0c;
+			if (mpext->data_fin)
+				flags |= 0x10;
+		}
+
+		*p++ = 0x1e; // TCP option: Multipath TCP
+		*p++ = len;  // length
+		*p++ = 0x20; // subtype=DSS
+		*p++ = flags;
+
+		if (write_ack) {
+			*(__be64 *)p = cpu_to_be64(mpext->data_ack);
+			p += 8;
+		}
+
+		if (write_map) {
+			*(__be64 *)p = cpu_to_be64(mpext->data_seq);
+			p += 8;
+
+			*(__be32 *)p = htonl(mpext->subflow_seq);
+			p += 4;
+
+			*(__be16 *)p = htons(mpext->dll);
+			p += 2;
+
+			if (mpext->use_checksum) {
+				*(__be16 *)p = htons(mpext->checksum);
+				p += 2;
+			} else {
+				*p++ = TCPOPT_NOP;
+				*p++ = TCPOPT_NOP;
+			}
+		}
+	}
 #endif
 }
 
@@ -504,8 +575,8 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
  * At least SACK_PERM as the first option is known to lead to a disaster
  * (but it may well be that other scenarios fail similarly).
  */
-static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
-			      struct tcp_out_options *opts)
+static void tcp_options_write(__be32 *ptr, struct sk_buff *skb,
+			      struct tcp_sock *tp, struct tcp_out_options *opts)
 {
 	u16 options = opts->options;	/* mungable copy */
 
@@ -600,7 +671,7 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 	smc_options_write(ptr, &options);
 
-	mptcp_options_write(ptr, opts);
+	mptcp_options_write(ptr, skb, tp, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,
@@ -833,17 +904,6 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
 
-	eff_sacks = tp->rx_opt.num_sacks + tp->rx_opt.dsack;
-	if (unlikely(eff_sacks)) {
-		const unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
-		opts->num_sack_blocks =
-			min_t(unsigned int, eff_sacks,
-			      (remaining - TCPOLEN_SACK_BASE_ALIGNED) /
-			      TCPOLEN_SACK_PERBLOCK);
-		size += TCPOLEN_SACK_BASE_ALIGNED +
-			opts->num_sack_blocks * TCPOLEN_SACK_PERBLOCK;
-	}
-
 #if IS_ENABLED(CONFIG_MPTCP)
 	if (tp->is_mptcp) {
 		unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
@@ -858,9 +918,68 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 				opts->mptcp.rcvr_key = remote_key;
 				size += TCPOLEN_MPTCP_MPC_ACK;
 			}
+		} else if (subflow_sk(sk)->mp_capable && skb) {
+			unsigned int dss_size = 0;
+			struct mptcp_ext *mpext;
+			u16 options = 0;
+
+			mpext = mptcp_get_ext(skb);
+
+			if (mpext && mpext->use_map) {
+				unsigned int map_size = 18;
+
+				if (mpext->use_checksum)
+					map_size += 2;
+
+				if (map_size <= remaining) {
+					remaining -= map_size;
+					dss_size = map_size;
+					opts->options |= OPTION_MPTCP;
+					opts->mptcp.suboptions =
+						OPTION_MPTCP_MPC_DSS_MAP;
+				} else {
+					WARN(1, "MPTCP: Map dropped");
+				}
+			}
+
+			if (mpext && mpext->use_ack) {
+				unsigned int ack_size = 8;
+
+				/* Add kind/length/subtype/flag
+				 * overhead if mapping not populated
+				 */
+				if (dss_size == 0)
+					ack_size += 4;
+
+				if (ack_size <= remaining) {
+					dss_size += ack_size;
+					opts->options |= OPTION_MPTCP;
+					opts->mptcp.suboptions |=
+						OPTION_MPTCP_MPC_DSS_ACK;
+				} else {
+					WARN(1, "MPTCP: Ack dropped");
+				}
+			}
+
+			if (dss_size) {
+				size += ALIGN(dss_size, 4);
+				opts->options |= options;
+			}
 		}
 	}
 #endif
+
+	eff_sacks = tp->rx_opt.num_sacks + tp->rx_opt.dsack;
+	if (unlikely(eff_sacks)) {
+		const unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
+
+		opts->num_sack_blocks =
+			min_t(unsigned int, eff_sacks,
+			      (remaining - TCPOLEN_SACK_BASE_ALIGNED) /
+			      TCPOLEN_SACK_PERBLOCK);
+		size += TCPOLEN_SACK_BASE_ALIGNED +
+			opts->num_sack_blocks * TCPOLEN_SACK_PERBLOCK;
+	}
 
 	return size;
 }
@@ -1158,6 +1277,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	else
 		tcp_options_size = tcp_established_options(sk, skb, &opts,
 							   &md5);
+
 	tcp_header_size = tcp_options_size + sizeof(struct tcphdr);
 
 	/* if no packet is in qdisc/device queue, then allow XPS to select
@@ -1210,7 +1330,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		}
 	}
 
-	tcp_options_write((__be32 *)(th + 1), tp, &opts);
+	tcp_options_write((__be32 *)(th + 1), skb, tp, &opts);
 	skb_shinfo(skb)->gso_type = sk->sk_gso_type;
 	if (likely(!(tcb->tcp_flags & TCPHDR_SYN))) {
 		th->window      = htons(tcp_select_window(sk));
@@ -3382,7 +3502,7 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 
 	/* RFC1323: The window in SYN & SYN/ACK segments is never scaled. */
 	th->window = htons(min(req->rsk_rcv_wnd, 65535U));
-	tcp_options_write((__be32 *)(th + 1), NULL, &opts);
+	tcp_options_write((__be32 *)(th + 1), skb, NULL, &opts);
 	th->doff = (tcp_header_size >> 2);
 	__TCP_INC_STATS(sock_net(sk), TCP_MIB_OUTSEGS);
 
