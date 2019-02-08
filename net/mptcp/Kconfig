@@ -2,6 +2,7 @@
 config MPTCP
 	bool "Multipath TCP"
 	depends on INET
+	select SKB_EXTENSIONS
 	help
 	  Multipath TCP (MPTCP) connections send and receive data over multiple
 	  subflows in order to utilize multiple network paths. Each subflow
