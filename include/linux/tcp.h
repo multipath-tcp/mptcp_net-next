@@ -149,6 +149,7 @@ struct tcp_request_sock {
 						  * FastOpen it's the seq#
 						  * after data-in-SYN.
 						  */
+	bool				is_mptcp;
 };
 
 static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)

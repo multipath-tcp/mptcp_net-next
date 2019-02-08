@@ -45,6 +45,40 @@ static int subflow_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
 }
 
+static void subflow_v4_init_req(struct request_sock *req,
+				const struct sock *sk_listener,
+				struct sk_buff *skb)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct subflow_sock *listener = subflow_sk(sk_listener);
+	struct tcp_options_received rx_opt;
+
+	tcp_rsk(req)->is_mptcp = 1;
+	pr_debug("subflow_req=%p, listener=%p", subflow_req, listener);
+
+	tcp_request_sock_ipv4_ops.init_req(req, sk_listener, skb);
+
+	rx_opt.mptcp.flags = 0;
+	rx_opt.mptcp.mp_capable = 0;
+	rx_opt.mptcp.mp_join = 0;
+	rx_opt.mptcp.dss = 0;
+	mptcp_get_options(skb, &rx_opt);
+
+	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
+		subflow_req->mp_capable = 1;
+		if (rx_opt.mptcp.version >= listener->version)
+			subflow_req->version = listener->version;
+		else
+			subflow_req->version = rx_opt.mptcp.version;
+		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
+		    listener->checksum)
+			subflow_req->checksum = 1;
+		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
+	} else {
+		subflow_req->mp_capable = 0;
+	}
+}
+
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
 	struct subflow_sock *subflow = subflow_sk(sk);
@@ -60,13 +94,66 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 	}
 }
 
+static struct request_sock_ops subflow_request_sock_ops;
+static struct tcp_request_sock_ops subflow_request_sock_ipv4_ops;
+
+static int subflow_conn_request(struct sock *sk, struct sk_buff *skb)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	pr_debug("subflow=%p", subflow);
+
+	/* Never answer to SYNs sent to broadcast or multicast */
+	if (skb_rtable(skb)->rt_flags & (RTCF_BROADCAST | RTCF_MULTICAST))
+		goto drop;
+
+	return tcp_conn_request(&subflow_request_sock_ops,
+				&subflow_request_sock_ipv4_ops,
+				sk, skb);
+drop:
+	tcp_listendrop(sk);
+	return 0;
+}
+
+static struct sock *subflow_syn_recv_sock(const struct sock *sk,
+					  struct sk_buff *skb,
+					  struct request_sock *req,
+					  struct dst_entry *dst,
+					  struct request_sock *req_unhash,
+					  bool *own_req)
+{
+	struct subflow_sock *listener = subflow_sk(sk);
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct sock *child;
+
+	pr_debug("listener=%p, req=%p, conn=%p", sk, req, listener->conn);
+
+	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
+
+	if (child) {
+		struct subflow_sock *subflow = subflow_sk(child);
+
+		pr_debug("child=%p", child);
+		if (subflow_req->mp_capable) {
+			subflow->mp_capable = 1;
+			subflow->fourth_ack = 1;
+			subflow->remote_key = subflow_req->remote_key;
+			subflow->local_key = subflow_req->local_key;
+		} else {
+			subflow->mp_capable = 0;
+		}
+	}
+
+	return child;
+}
+
 const struct inet_connection_sock_af_ops subflow_specific = {
 	.queue_xmit	   = ip_queue_xmit,
 	.send_check	   = tcp_v4_send_check,
 	.rebuild_header	   = inet_sk_rebuild_header,
 	.sk_rx_dst_set	   = subflow_finish_connect,
-	.conn_request	   = tcp_v4_conn_request,
-	.syn_recv_sock	   = tcp_v4_syn_recv_sock,
+	.conn_request	   = subflow_conn_request,
+	.syn_recv_sock	   = subflow_syn_recv_sock,
 	.net_header_len	   = sizeof(struct iphdr),
 	.setsockopt	   = ip_setsockopt,
 	.getsockopt	   = ip_getsockopt,
@@ -104,6 +191,21 @@ static void subflow_close(struct sock *sk, long timeout)
 	tcp_close(sk, timeout);
 }
 
+static struct sock *subflow_accept(struct sock *sk, int flags, int *err,
+				   bool kern)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+	struct sock *child;
+
+	pr_debug("subflow=%p, conn=%p", subflow, subflow->conn);
+
+	child = inet_csk_accept(sk, flags, err, kern);
+
+	pr_debug("child=%p", child);
+
+	return child;
+}
+
 static void subflow_destroy(struct sock *sk)
 {
 	pr_debug("subflow=%p", sk);
@@ -117,7 +219,7 @@ static struct proto subflow_prot = {
 	.close		= subflow_close,
 	.connect	= subflow_connect,
 	.disconnect	= tcp_disconnect,
-	.accept		= inet_csk_accept,
+	.accept		= subflow_accept,
 	.ioctl		= tcp_ioctl,
 	.init		= subflow_init_sock,
 	.destroy	= subflow_destroy,
@@ -161,7 +263,14 @@ int mptcp_subflow_init(void)
 
 	/* TODO: Register path manager callbacks. */
 
+	subflow_request_sock_ops = tcp_request_sock_ops;
+	subflow_request_sock_ops.obj_size = sizeof(struct subflow_request_sock),
+
+	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
+	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
+
 	subflow_prot.twsk_prot		= tcp_prot.twsk_prot;
+	subflow_prot.rsk_prot		= &subflow_request_sock_ops;
 	subflow_prot.h.hashinfo		= tcp_prot.h.hashinfo;
 	err = proto_register(&subflow_prot, 1);
 	if (err)
