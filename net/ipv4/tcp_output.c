@@ -37,6 +37,7 @@
 #define pr_fmt(fmt) "TCP: " fmt
 
 #include <net/tcp.h>
+#include <net/mptcp.h>
 
 #include <linux/compiler.h>
 #include <linux/gfp.h>
@@ -414,6 +415,12 @@ static inline bool tcp_urg_mode(const struct tcp_sock *tp)
 #define OPTION_WSCALE		(1 << 3)
 #define OPTION_FAST_OPEN_COOKIE	(1 << 8)
 #define OPTION_SMC		(1 << 9)
+#define OPTION_MPTCP		(1 << 10)
+
+/* MPTCP option subtypes */
+#define OPTION_MPTCP_MPC_SYN	BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
+#define OPTION_MPTCP_MPC_ACK	BIT(2)
 
 static void smc_options_write(__be32 *ptr, u16 *options)
 {
@@ -439,7 +446,48 @@ struct tcp_out_options {
 	__u8 *hash_location;	/* temporary pointer, overloaded */
 	__u32 tsval, tsecr;	/* need to include OPTION_TS */
 	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
+#if IS_ENABLED(CONFIG_MPTCP)
+	struct {
+		u16 suboptions;
+		u64 sndr_key;
+		u64 rcvr_key;
+	} mptcp;
+#endif
 };
+
+static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
+{
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (likely(!(OPTION_MPTCP & opts->options)))
+		return;
+
+	if ((OPTION_MPTCP_MPC_SYN |
+	     OPTION_MPTCP_MPC_SYNACK |
+	     OPTION_MPTCP_MPC_ACK) & opts->mptcp.suboptions) {
+		__be64 key;
+		u8 len;
+
+		if (OPTION_MPTCP_MPC_SYN & opts->mptcp.suboptions)
+			len = TCPOLEN_MPTCP_MPC_SYN;
+		else
+			len = TCPOLEN_MPTCP_MPC_SYNACK;
+
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) | (len << 16) |
+			       (MPTCPOPT_MP_CAPABLE << 20) |
+			       ((MPTCPOPT_VERSION_MASK & 0) << 16) |
+			       MPTCP_CAP_HMAC_SHA1);
+		key = cpu_to_be64(opts->mptcp.sndr_key);
+		memcpy(ptr, &key, 8);
+		ptr += 2;
+		if ((OPTION_MPTCP_MPC_SYNACK |
+		     OPTION_MPTCP_MPC_ACK) & opts->mptcp.suboptions) {
+			key = cpu_to_be64(opts->mptcp.rcvr_key);
+			memcpy(ptr, &key, 8);
+			ptr += 2;
+		}
+	}
+#endif
+}
 
 /* Write previously computed TCP options to the packet.
  *
@@ -549,6 +597,8 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	}
 
 	smc_options_write(ptr, &options);
+
+	mptcp_options_write(ptr, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,

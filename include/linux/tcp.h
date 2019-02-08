@@ -104,6 +104,16 @@ struct tcp_options_received {
 	u8	num_sacks;	/* Number of SACK blocks		*/
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
+	struct {
+		u8      mp_capable : 1,
+			mp_join : 1,
+			dss : 1,
+			version : 4;
+		u8      flags;
+		u64     sndr_key;
+		u64     rcvr_key;
+	} mptcp;
+
 };
 
 static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
@@ -113,6 +123,8 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 #if IS_ENABLED(CONFIG_SMC)
 	rx_opt->smc_ok = 0;
 #endif
+	rx_opt->mptcp.mp_capable = rx_opt->mptcp.mp_join = 0;
+	rx_opt->mptcp.dss = 0;
 }
 
 /* This is the max number of SACKS that we'll generate and process. It's safe
