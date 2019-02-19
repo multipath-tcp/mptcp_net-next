@@ -23,6 +23,7 @@ TG_SETUP_PREFIX="build"
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
+TG_EXPORT_BRANCH="export"
 
 
 ###########
@@ -183,6 +184,13 @@ tg_push_tree() {
 	tg push -r "${GIT_REMOTE_GERRITHUB_NAME}"
 }
 
+tg_export() {
+	git_checkout "${TG_TOPIC_TOP}"
+
+	tg export --linearize --force "${TG_EXPORT_BRANCH}"
+	git push --force "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_EXPORT_BRANCH}"
+}
+
 
 ##########
 ## Main ##
@@ -195,3 +203,4 @@ trap 'tg_trap_reset "${?}"' EXIT
 tg_update_tree || exit_err "Unable to update the topgit tree"
 validation || exit_err "Unexpected error during the validation phase"
 tg_push_tree || exit_err "Unable to push the update of the Topgit tree"
+tg_export || exit_err "Unable to export the TopGit tree"
