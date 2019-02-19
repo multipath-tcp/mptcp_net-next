@@ -102,9 +102,32 @@ tg_update_base() {
 }
 
 
+################
+## Validation ##
+################
+
+generate_config() {
+	make defconfig
+
+	cat <<EOF >> .config
+CONFIG_MPTCP=y
+EOF
+}
+
+check_compilation() {
+	generate_config
+	make -j"$(nproc)" -l"$(nproc)"
+}
+
+validation() {
+	check_compilation || exit_err "Unable to compile the new version"
+}
+
+
 ##########
 ## Main ##
 ##########
 
 tg_setup || exit_err "Unable to setup topgit"
 tg_update_base || exit_err "Unable to update the topgit base"
+validation || exit_err "Unexpected error during the validation phase"
