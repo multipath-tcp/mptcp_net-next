@@ -101,6 +101,33 @@ tg_update_base() {
 	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_TOPIC_BASE}"
 }
 
+tg_get_all_topics() {
+	git for-each-ref --format="%(refname)" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/" | \
+		sed -e "s#refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/\\(.*\\)#\\1#g"
+}
+
+tg_reset() { local topic
+	for topic in $(tg_get_all_topics); do
+		git update-ref "refs/top-bases/${topic}" \
+			"refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/${topic}"
+		git update-ref "refs/heads/${topic}" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/${topic}"
+	done
+	# the base should be already up to date anyway.
+	git update-ref "refs/heads/${TG_TOPIC_BASE}" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/${TG_TOPIC_BASE}"
+}
+
+# $1: last return code
+tg_trap_reset() { local rc
+	rc="${1}"
+
+	# check return code: if different than 0, we exit with an error: reset
+	[ "${rc}" -eq 0 ] && return 0
+
+	tg_reset
+
+	exit "${rc}"
+}
+
 
 ################
 ## Validation ##
@@ -130,4 +157,5 @@ validation() {
 
 tg_setup || exit_err "Unable to setup topgit"
 tg_update_base || exit_err "Unable to update the topgit base"
+trap 'tg_trap_reset "${?}"' EXIT
 validation || exit_err "Unexpected error during the validation phase"
