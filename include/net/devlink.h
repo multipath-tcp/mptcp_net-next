@@ -358,6 +358,7 @@ struct devlink_param_item {
 	const struct devlink_param *param;
 	union devlink_param_value driverinit_value;
 	bool driverinit_value_valid;
+	bool published;
 };
 
 enum devlink_param_generic_id {
@@ -369,15 +370,10 @@ enum devlink_param_generic_id {
 	DEVLINK_PARAM_GENERIC_ID_MSIX_VEC_PER_PF_MAX,
 	DEVLINK_PARAM_GENERIC_ID_MSIX_VEC_PER_PF_MIN,
 	DEVLINK_PARAM_GENERIC_ID_FW_LOAD_POLICY,
-	DEVLINK_PARAM_GENERIC_ID_WOL,
 
 	/* add new param generic ids above here*/
 	__DEVLINK_PARAM_GENERIC_ID_MAX,
 	DEVLINK_PARAM_GENERIC_ID_MAX = __DEVLINK_PARAM_GENERIC_ID_MAX - 1,
-};
-
-enum devlink_param_wol_types {
-	DEVLINK_PARAM_WAKE_MAGIC = (1 << 0),
 };
 
 #define DEVLINK_PARAM_GENERIC_INT_ERR_RESET_NAME "internal_error_reset"
@@ -403,9 +399,6 @@ enum devlink_param_wol_types {
 
 #define DEVLINK_PARAM_GENERIC_FW_LOAD_POLICY_NAME "fw_load_policy"
 #define DEVLINK_PARAM_GENERIC_FW_LOAD_POLICY_TYPE DEVLINK_PARAM_TYPE_U8
-
-#define DEVLINK_PARAM_GENERIC_WOL_NAME "wake_on_lan"
-#define DEVLINK_PARAM_GENERIC_WOL_TYPE DEVLINK_PARAM_TYPE_U8
 
 #define DEVLINK_PARAM_GENERIC(_id, _cmodes, _get, _set, _validate)	\
 {									\
@@ -434,6 +427,8 @@ enum devlink_param_wol_types {
 #define DEVLINK_INFO_VERSION_GENERIC_BOARD_ID	"board.id"
 /* Revision of board design */
 #define DEVLINK_INFO_VERSION_GENERIC_BOARD_REV	"board.rev"
+/* Maker of the board */
+#define DEVLINK_INFO_VERSION_GENERIC_BOARD_MANUFACTURE	"board.manufacture"
 
 /* Control processor FW version */
 #define DEVLINK_INFO_VERSION_GENERIC_FW_MGMT	"fw.mgmt"
@@ -526,6 +521,9 @@ struct devlink_ops {
 				      struct netlink_ext_ack *extack);
 	int (*info_get)(struct devlink *devlink, struct devlink_info_req *req,
 			struct netlink_ext_ack *extack);
+	int (*flash_update)(struct devlink *devlink, const char *file_name,
+			    const char *component,
+			    struct netlink_ext_ack *extack);
 };
 
 static inline void *devlink_priv(struct devlink *devlink)
@@ -618,6 +616,8 @@ int devlink_params_register(struct devlink *devlink,
 void devlink_params_unregister(struct devlink *devlink,
 			       const struct devlink_param *params,
 			       size_t params_count);
+void devlink_params_publish(struct devlink *devlink);
+void devlink_params_unpublish(struct devlink *devlink);
 int devlink_port_params_register(struct devlink_port *devlink_port,
 				 const struct devlink_param *params,
 				 size_t params_count);
@@ -721,6 +721,14 @@ static inline int devlink_register(struct devlink *devlink, struct device *dev)
 }
 
 static inline void devlink_unregister(struct devlink *devlink)
+{
+}
+
+static inline void devlink_params_publish(struct devlink *devlink)
+{
+}
+
+static inline void devlink_params_unpublish(struct devlink *devlink)
 {
 }
 
@@ -1187,10 +1195,17 @@ devlink_health_report(struct devlink_health_reporter *reporter,
 #if IS_REACHABLE(CONFIG_NET_DEVLINK)
 void devlink_compat_running_version(struct net_device *dev,
 				    char *buf, size_t len);
+int devlink_compat_flash_update(struct net_device *dev, const char *file_name);
 #else
 static inline void
 devlink_compat_running_version(struct net_device *dev, char *buf, size_t len)
 {
+}
+
+static inline int
+devlink_compat_flash_update(struct net_device *dev, const char *file_name)
+{
+	return -EOPNOTSUPP;
 }
 #endif
 

@@ -141,10 +141,9 @@ static int mv3310_hwmon_config(struct phy_device *phydev, bool enable)
 		return ret;
 
 	val = enable ? MV_V2_TEMP_CTRL_SAMPLE : MV_V2_TEMP_CTRL_DISABLE;
-	ret = phy_modify_mmd(phydev, MDIO_MMD_VEND2, MV_V2_TEMP_CTRL,
-			     MV_V2_TEMP_CTRL_MASK, val);
 
-	return ret < 0 ? ret : 0;
+	return phy_modify_mmd(phydev, MDIO_MMD_VEND2, MV_V2_TEMP_CTRL,
+			      MV_V2_TEMP_CTRL_MASK, val);
 }
 
 static void mv3310_hwmon_disable(void *data)
@@ -234,8 +233,7 @@ static int mv3310_resume(struct phy_device *phydev)
 
 static int mv3310_config_init(struct phy_device *phydev)
 {
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = { 0, };
-	int val;
+	int ret, val;
 
 	/* Check that the PHY interface type is compatible */
 	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
@@ -244,83 +242,19 @@ static int mv3310_config_init(struct phy_device *phydev)
 	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
 		return -ENODEV;
 
-	__set_bit(ETHTOOL_LINK_MODE_Pause_BIT, supported);
-	__set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, supported);
-
 	if (phydev->c45_ids.devices_in_package & MDIO_DEVS_AN) {
 		val = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_STAT1);
 		if (val < 0)
 			return val;
 
 		if (val & MDIO_AN_STAT1_ABLE)
-			__set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, supported);
+			__set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
+				  phydev->supported);
 	}
 
-	val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_STAT2);
-	if (val < 0)
-		return val;
-
-	/* Ethtool does not support the WAN mode bits */
-	if (val & (MDIO_PMA_STAT2_10GBSR | MDIO_PMA_STAT2_10GBLR |
-		   MDIO_PMA_STAT2_10GBER | MDIO_PMA_STAT2_10GBLX4 |
-		   MDIO_PMA_STAT2_10GBSW | MDIO_PMA_STAT2_10GBLW |
-		   MDIO_PMA_STAT2_10GBEW))
-		__set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, supported);
-	if (val & MDIO_PMA_STAT2_10GBSR)
-		__set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, supported);
-	if (val & MDIO_PMA_STAT2_10GBLR)
-		__set_bit(ETHTOOL_LINK_MODE_10000baseLR_Full_BIT, supported);
-	if (val & MDIO_PMA_STAT2_10GBER)
-		__set_bit(ETHTOOL_LINK_MODE_10000baseER_Full_BIT, supported);
-
-	if (val & MDIO_PMA_STAT2_EXTABLE) {
-		val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_PMA_EXTABLE);
-		if (val < 0)
-			return val;
-
-		if (val & (MDIO_PMA_EXTABLE_10GBT | MDIO_PMA_EXTABLE_1000BT |
-			   MDIO_PMA_EXTABLE_100BTX | MDIO_PMA_EXTABLE_10BT))
-			__set_bit(ETHTOOL_LINK_MODE_TP_BIT, supported);
-		if (val & MDIO_PMA_EXTABLE_10GBLRM)
-			__set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, supported);
-		if (val & (MDIO_PMA_EXTABLE_10GBKX4 | MDIO_PMA_EXTABLE_10GBKR |
-			   MDIO_PMA_EXTABLE_1000BKX))
-			__set_bit(ETHTOOL_LINK_MODE_Backplane_BIT, supported);
-		if (val & MDIO_PMA_EXTABLE_10GBLRM)
-			__set_bit(ETHTOOL_LINK_MODE_10000baseLRM_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_10GBT)
-			__set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_10GBKX4)
-			__set_bit(ETHTOOL_LINK_MODE_10000baseKX4_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_10GBKR)
-			__set_bit(ETHTOOL_LINK_MODE_10000baseKR_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_1000BT)
-			__set_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_1000BKX)
-			__set_bit(ETHTOOL_LINK_MODE_1000baseKX_Full_BIT,
-				  supported);
-		if (val & MDIO_PMA_EXTABLE_100BTX) {
-			__set_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
-				  supported);
-			__set_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
-				  supported);
-		}
-		if (val & MDIO_PMA_EXTABLE_10BT) {
-			__set_bit(ETHTOOL_LINK_MODE_10baseT_Full_BIT,
-				  supported);
-			__set_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
-				  supported);
-		}
-	}
-
-	linkmode_copy(phydev->supported, supported);
-	linkmode_and(phydev->advertising, phydev->advertising,
-		     phydev->supported);
+	ret = genphy_c45_pma_read_abilities(phydev);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -342,39 +276,32 @@ static int mv3310_config_aneg(struct phy_device *phydev)
 		return genphy_c45_an_disable_aneg(phydev);
 	}
 
-	linkmode_and(phydev->advertising, phydev->advertising,
-		     phydev->supported);
-
-	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_ADVERTISE,
-			     ADVERTISE_ALL | ADVERTISE_100BASE4 |
-			     ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM,
-			     linkmode_adv_to_mii_adv_t(phydev->advertising));
+	ret = genphy_c45_an_config_aneg(phydev);
 	if (ret < 0)
 		return ret;
 	if (ret > 0)
 		changed = true;
 
+	/* Clause 45 has no standardized support for 1000BaseT, therefore
+	 * use vendor registers for this mode.
+	 */
 	reg = linkmode_adv_to_mii_ctrl1000_t(phydev->advertising);
-	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MV_AN_CTRL1000,
+	ret = phy_modify_mmd_changed(phydev, MDIO_MMD_AN, MV_AN_CTRL1000,
 			     ADVERTISE_1000FULL | ADVERTISE_1000HALF, reg);
 	if (ret < 0)
 		return ret;
 	if (ret > 0)
 		changed = true;
 
-	/* 10G control register */
-	if (linkmode_test_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
-			      phydev->advertising))
-		reg = MDIO_AN_10GBT_CTRL_ADV10G;
-	else
-		reg = 0;
+	if (!changed) {
+		/* Configure and restart aneg if it wasn't set before */
+		ret = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_CTRL1);
+		if (ret < 0)
+			return ret;
 
-	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_10GBT_CTRL,
-			     MDIO_AN_10GBT_CTRL_ADV10G, reg);
-	if (ret < 0)
-		return ret;
-	if (ret > 0)
-		changed = true;
+		if (!(ret & MDIO_AN_CTRL1_ENABLE))
+			changed = 1;
+	}
 
 	if (changed)
 		ret = genphy_c45_restart_aneg(phydev);
@@ -428,15 +355,7 @@ static int mv3310_read_10gbr_status(struct phy_device *phydev)
 
 static int mv3310_read_status(struct phy_device *phydev)
 {
-	u32 mmd_mask = phydev->c45_ids.devices_in_package;
 	int val;
-
-	/* The vendor devads do not report link status.  Avoid the PHYXS
-	 * instance as there are three, and its status depends on the MAC
-	 * being appropriately configured for the negotiated speed.
-	 */
-	mmd_mask &= ~(BIT(MDIO_MMD_VEND1) | BIT(MDIO_MMD_VEND2) |
-		      BIT(MDIO_MMD_PHYXS));
 
 	phydev->speed = SPEED_UNKNOWN;
 	phydev->duplex = DUPLEX_UNKNOWN;
@@ -453,7 +372,7 @@ static int mv3310_read_status(struct phy_device *phydev)
 	if (val & MDIO_STAT1_LSTATUS)
 		return mv3310_read_10gbr_status(phydev);
 
-	val = genphy_c45_read_link(phydev, mmd_mask);
+	val = genphy_c45_read_link(phydev);
 	if (val < 0)
 		return val;
 

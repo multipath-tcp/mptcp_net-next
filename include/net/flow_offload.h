@@ -171,7 +171,7 @@ static inline bool flow_action_has_entries(const struct flow_action *action)
 }
 
 #define flow_action_for_each(__i, __act, __actions)			\
-        for (__i = 0, __act = &(__actions)->entries[0]; __i < (__actions)->num_entries; __act = &(__actions)->entries[__i++])
+        for (__i = 0, __act = &(__actions)->entries[0]; __i < (__actions)->num_entries; __act = &(__actions)->entries[++__i])
 
 struct flow_rule {
 	struct flow_match	match;
@@ -195,9 +195,9 @@ struct flow_stats {
 static inline void flow_stats_update(struct flow_stats *flow_stats,
 				     u64 bytes, u64 pkts, u64 lastused)
 {
-	flow_stats->pkts	= pkts;
-	flow_stats->bytes	= bytes;
-	flow_stats->lastused	= lastused;
+	flow_stats->pkts	+= pkts;
+	flow_stats->bytes	+= bytes;
+	flow_stats->lastused	= max_t(u64, flow_stats->lastused, lastused);
 }
 
 #endif /* _NET_FLOW_OFFLOAD_H */

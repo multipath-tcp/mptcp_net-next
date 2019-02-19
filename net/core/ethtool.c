@@ -2038,11 +2038,17 @@ static noinline_for_stack int ethtool_flash_device(struct net_device *dev,
 
 	if (copy_from_user(&efl, useraddr, sizeof(efl)))
 		return -EFAULT;
-
-	if (!dev->ethtool_ops->flash_device)
-		return -EOPNOTSUPP;
-
 	efl.data[ETHTOOL_FLASH_MAX_FILENAME - 1] = 0;
+
+	if (!dev->ethtool_ops->flash_device) {
+		int ret;
+
+		rtnl_unlock();
+		ret = devlink_compat_flash_update(dev, efl.data);
+		rtnl_lock();
+
+		return ret;
+	}
 
 	return dev->ethtool_ops->flash_device(dev, &efl);
 }
@@ -3020,17 +3026,15 @@ ethtool_rx_flow_rule_create(const struct ethtool_rx_flow_spec_input *input)
 		const struct ethtool_flow_ext *ext_h_spec = &fs->h_ext;
 		const struct ethtool_flow_ext *ext_m_spec = &fs->m_ext;
 
-		if (ext_m_spec->h_dest) {
-			memcpy(match->key.eth_addrs.dst, ext_h_spec->h_dest,
-			       ETH_ALEN);
-			memcpy(match->mask.eth_addrs.dst, ext_m_spec->h_dest,
-			       ETH_ALEN);
+		memcpy(match->key.eth_addrs.dst, ext_h_spec->h_dest,
+		       ETH_ALEN);
+		memcpy(match->mask.eth_addrs.dst, ext_m_spec->h_dest,
+		       ETH_ALEN);
 
-			match->dissector.used_keys |=
-				BIT(FLOW_DISSECTOR_KEY_ETH_ADDRS);
-			match->dissector.offset[FLOW_DISSECTOR_KEY_ETH_ADDRS] =
-				offsetof(struct ethtool_rx_flow_key, eth_addrs);
-		}
+		match->dissector.used_keys |=
+			BIT(FLOW_DISSECTOR_KEY_ETH_ADDRS);
+		match->dissector.offset[FLOW_DISSECTOR_KEY_ETH_ADDRS] =
+			offsetof(struct ethtool_rx_flow_key, eth_addrs);
 	}
 
 	act = &flow->rule->action.entries[0];

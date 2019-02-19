@@ -116,6 +116,8 @@ static struct devlink *devlink_get_from_attrs(struct net *net,
 	busname = nla_data(attrs[DEVLINK_ATTR_BUS_NAME]);
 	devname = nla_data(attrs[DEVLINK_ATTR_DEV_NAME]);
 
+	lockdep_assert_held(&devlink_mutex);
+
 	list_for_each_entry(devlink, &devlink_list, list) {
 		if (strcmp(devlink->dev->bus->name, busname) == 0 &&
 		    strcmp(dev_name(devlink->dev), devname) == 0 &&
@@ -2660,6 +2662,27 @@ static int devlink_nl_cmd_reload(struct sk_buff *skb, struct genl_info *info)
 	return devlink->ops->reload(devlink, info->extack);
 }
 
+static int devlink_nl_cmd_flash_update(struct sk_buff *skb,
+				       struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	const char *file_name, *component;
+	struct nlattr *nla_component;
+
+	if (!devlink->ops->flash_update)
+		return -EOPNOTSUPP;
+
+	if (!info->attrs[DEVLINK_ATTR_FLASH_UPDATE_FILE_NAME])
+		return -EINVAL;
+	file_name = nla_data(info->attrs[DEVLINK_ATTR_FLASH_UPDATE_FILE_NAME]);
+
+	nla_component = info->attrs[DEVLINK_ATTR_FLASH_UPDATE_COMPONENT];
+	component = nla_component ? nla_data(nla_component) : NULL;
+
+	return devlink->ops->flash_update(devlink, file_name, component,
+					  info->extack);
+}
+
 static const struct devlink_param devlink_param_generic[] = {
 	{
 		.id = DEVLINK_PARAM_GENERIC_ID_INT_ERR_RESET,
@@ -2700,11 +2723,6 @@ static const struct devlink_param devlink_param_generic[] = {
 		.id = DEVLINK_PARAM_GENERIC_ID_FW_LOAD_POLICY,
 		.name = DEVLINK_PARAM_GENERIC_FW_LOAD_POLICY_NAME,
 		.type = DEVLINK_PARAM_GENERIC_FW_LOAD_POLICY_TYPE,
-	},
-	{
-		.id = DEVLINK_PARAM_GENERIC_ID_WOL,
-		.name = DEVLINK_PARAM_GENERIC_WOL_NAME,
-		.type = DEVLINK_PARAM_GENERIC_WOL_TYPE,
 	},
 };
 
@@ -2858,6 +2876,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 				 u32 portid, u32 seq, int flags)
 {
 	union devlink_param_value param_value[DEVLINK_PARAM_CMODE_MAX + 1];
+	bool param_value_set[DEVLINK_PARAM_CMODE_MAX + 1] = {};
 	const struct devlink_param *param = param_item->param;
 	struct devlink_param_gset_ctx ctx;
 	struct nlattr *param_values_list;
@@ -2876,12 +2895,15 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 				return -EOPNOTSUPP;
 			param_value[i] = param_item->driverinit_value;
 		} else {
+			if (!param_item->published)
+				continue;
 			ctx.cmode = i;
 			err = devlink_param_get(devlink, param, &ctx);
 			if (err)
 				return err;
 			param_value[i] = ctx.val;
 		}
+		param_value_set[i] = true;
 	}
 
 	hdr = genlmsg_put(msg, portid, seq, &devlink_nl_family, flags, cmd);
@@ -2916,7 +2938,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 		goto param_nest_cancel;
 
 	for (i = 0; i <= DEVLINK_PARAM_CMODE_MAX; i++) {
-		if (!devlink_param_cmode_is_supported(param, i))
+		if (!param_value_set[i])
 			continue;
 		err = devlink_nl_param_value_fill_one(msg, param->type,
 						      i, param_value[i]);
@@ -3625,44 +3647,56 @@ static int devlink_nl_cmd_region_read_dumpit(struct sk_buff *skb,
 					     struct netlink_callback *cb)
 {
 	u64 ret_offset, start_offset, end_offset = 0;
-	struct nlattr *attrs[DEVLINK_ATTR_MAX + 1];
 	const struct genl_ops *ops = cb->data;
 	struct devlink_region *region;
 	struct nlattr *chunks_attr;
 	const char *region_name;
 	struct devlink *devlink;
+	struct nlattr **attrs;
 	bool dump = true;
 	void *hdr;
 	int err;
 
 	start_offset = *((u64 *)&cb->args[0]);
 
+	attrs = kmalloc_array(DEVLINK_ATTR_MAX + 1, sizeof(*attrs), GFP_KERNEL);
+	if (!attrs)
+		return -ENOMEM;
+
 	err = nlmsg_parse(cb->nlh, GENL_HDRLEN + devlink_nl_family.hdrsize,
 			  attrs, DEVLINK_ATTR_MAX, ops->policy, cb->extack);
 	if (err)
-		goto out;
-
-	devlink = devlink_get_from_attrs(sock_net(cb->skb->sk), attrs);
-	if (IS_ERR(devlink))
-		goto out;
+		goto out_free;
 
 	mutex_lock(&devlink_mutex);
+	devlink = devlink_get_from_attrs(sock_net(cb->skb->sk), attrs);
+	if (IS_ERR(devlink)) {
+		err = PTR_ERR(devlink);
+		goto out_dev;
+	}
+
 	mutex_lock(&devlink->lock);
 
 	if (!attrs[DEVLINK_ATTR_REGION_NAME] ||
-	    !attrs[DEVLINK_ATTR_REGION_SNAPSHOT_ID])
+	    !attrs[DEVLINK_ATTR_REGION_SNAPSHOT_ID]) {
+		err = -EINVAL;
 		goto out_unlock;
+	}
 
 	region_name = nla_data(attrs[DEVLINK_ATTR_REGION_NAME]);
 	region = devlink_region_get_by_name(devlink, region_name);
-	if (!region)
+	if (!region) {
+		err = -EINVAL;
 		goto out_unlock;
+	}
 
 	hdr = genlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			  &devlink_nl_family, NLM_F_ACK | NLM_F_MULTI,
 			  DEVLINK_CMD_REGION_READ);
-	if (!hdr)
+	if (!hdr) {
+		err = -EMSGSIZE;
 		goto out_unlock;
+	}
 
 	err = devlink_nl_put_handle(skb, devlink);
 	if (err)
@@ -3673,8 +3707,10 @@ static int devlink_nl_cmd_region_read_dumpit(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	chunks_attr = nla_nest_start(skb, DEVLINK_ATTR_REGION_CHUNKS);
-	if (!chunks_attr)
+	if (!chunks_attr) {
+		err = -EMSGSIZE;
 		goto nla_put_failure;
+	}
 
 	if (attrs[DEVLINK_ATTR_REGION_CHUNK_ADDR] &&
 	    attrs[DEVLINK_ATTR_REGION_CHUNK_LEN]) {
@@ -3697,8 +3733,10 @@ static int devlink_nl_cmd_region_read_dumpit(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	/* Check if there was any progress done to prevent infinite loop */
-	if (ret_offset == start_offset)
+	if (ret_offset == start_offset) {
+		err = -EINVAL;
 		goto nla_put_failure;
+	}
 
 	*((u64 *)&cb->args[0]) = ret_offset;
 
@@ -3706,6 +3744,7 @@ static int devlink_nl_cmd_region_read_dumpit(struct sk_buff *skb,
 	genlmsg_end(skb, hdr);
 	mutex_unlock(&devlink->lock);
 	mutex_unlock(&devlink_mutex);
+	kfree(attrs);
 
 	return skb->len;
 
@@ -3713,9 +3752,11 @@ nla_put_failure:
 	genlmsg_cancel(skb, hdr);
 out_unlock:
 	mutex_unlock(&devlink->lock);
+out_dev:
 	mutex_unlock(&devlink_mutex);
-out:
-	return 0;
+out_free:
+	kfree(attrs);
+	return err;
 }
 
 struct devlink_info_req {
@@ -4351,11 +4392,8 @@ static int devlink_fmsg_snd(struct devlink_fmsg *fmsg,
 		err = -EMSGSIZE;
 		goto nla_put_failure;
 	}
-	err = genlmsg_reply(skb, info);
-	if (err)
-		return err;
 
-	return 0;
+	return genlmsg_reply(skb, info);
 
 nla_put_failure:
 	nlmsg_free(skb);
@@ -4866,6 +4904,8 @@ static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1] = {
 	[DEVLINK_ATTR_HEALTH_REPORTER_NAME] = { .type = NLA_NUL_STRING },
 	[DEVLINK_ATTR_HEALTH_REPORTER_GRACEFUL_PERIOD] = { .type = NLA_U64 },
 	[DEVLINK_ATTR_HEALTH_REPORTER_AUTO_RECOVER] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_FLASH_UPDATE_FILE_NAME] = { .type = NLA_NUL_STRING },
+	[DEVLINK_ATTR_FLASH_UPDATE_COMPONENT] = { .type = NLA_NUL_STRING },
 };
 
 static const struct genl_ops devlink_nl_ops[] = {
@@ -5154,6 +5194,13 @@ static const struct genl_ops devlink_nl_ops[] = {
 		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK |
 				  DEVLINK_NL_FLAG_NO_LOCK,
 	},
+	{
+		.cmd = DEVLINK_CMD_FLASH_UPDATE,
+		.doit = devlink_nl_cmd_flash_update,
+		.policy = devlink_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
+	},
 };
 
 static struct genl_family devlink_nl_family __ro_after_init = {
@@ -5237,6 +5284,14 @@ EXPORT_SYMBOL_GPL(devlink_unregister);
  */
 void devlink_free(struct devlink *devlink)
 {
+	WARN_ON(!list_empty(&devlink->reporter_list));
+	WARN_ON(!list_empty(&devlink->region_list));
+	WARN_ON(!list_empty(&devlink->param_list));
+	WARN_ON(!list_empty(&devlink->resource_list));
+	WARN_ON(!list_empty(&devlink->dpipe_table_list));
+	WARN_ON(!list_empty(&devlink->sb_list));
+	WARN_ON(!list_empty(&devlink->port_list));
+
 	kfree(devlink);
 }
 EXPORT_SYMBOL_GPL(devlink_free);
@@ -5887,6 +5942,48 @@ void devlink_params_unregister(struct devlink *devlink,
 EXPORT_SYMBOL_GPL(devlink_params_unregister);
 
 /**
+ *	devlink_params_publish - publish configuration parameters
+ *
+ *	@devlink: devlink
+ *
+ *	Publish previously registered configuration parameters.
+ */
+void devlink_params_publish(struct devlink *devlink)
+{
+	struct devlink_param_item *param_item;
+
+	list_for_each_entry(param_item, &devlink->param_list, list) {
+		if (param_item->published)
+			continue;
+		param_item->published = true;
+		devlink_param_notify(devlink, 0, param_item,
+				     DEVLINK_CMD_PARAM_NEW);
+	}
+}
+EXPORT_SYMBOL_GPL(devlink_params_publish);
+
+/**
+ *	devlink_params_unpublish - unpublish configuration parameters
+ *
+ *	@devlink: devlink
+ *
+ *	Unpublish previously registered configuration parameters.
+ */
+void devlink_params_unpublish(struct devlink *devlink)
+{
+	struct devlink_param_item *param_item;
+
+	list_for_each_entry(param_item, &devlink->param_list, list) {
+		if (!param_item->published)
+			continue;
+		param_item->published = false;
+		devlink_param_notify(devlink, 0, param_item,
+				     DEVLINK_CMD_PARAM_DEL);
+	}
+}
+EXPORT_SYMBOL_GPL(devlink_params_unpublish);
+
+/**
  *	devlink_port_params_register - register port configuration parameters
  *
  *	@devlink_port: devlink port
@@ -6339,7 +6436,7 @@ void devlink_compat_running_version(struct net_device *dev,
 	list_for_each_entry(devlink, &devlink_list, list) {
 		mutex_lock(&devlink->lock);
 		list_for_each_entry(devlink_port, &devlink->port_list, list) {
-			if (devlink_port->type == DEVLINK_PORT_TYPE_ETH ||
+			if (devlink_port->type == DEVLINK_PORT_TYPE_ETH &&
 			    devlink_port->type_dev == dev) {
 				__devlink_compat_running_version(devlink,
 								 buf, len);
@@ -6351,6 +6448,36 @@ void devlink_compat_running_version(struct net_device *dev,
 	}
 out:
 	mutex_unlock(&devlink_mutex);
+}
+
+int devlink_compat_flash_update(struct net_device *dev, const char *file_name)
+{
+	struct devlink_port *devlink_port;
+	struct devlink *devlink;
+
+	mutex_lock(&devlink_mutex);
+	list_for_each_entry(devlink, &devlink_list, list) {
+		mutex_lock(&devlink->lock);
+		list_for_each_entry(devlink_port, &devlink->port_list, list) {
+			int ret = -EOPNOTSUPP;
+
+			if (devlink_port->type != DEVLINK_PORT_TYPE_ETH ||
+			    devlink_port->type_dev != dev)
+				continue;
+
+			mutex_unlock(&devlink_mutex);
+			if (devlink->ops->flash_update)
+				ret = devlink->ops->flash_update(devlink,
+								 file_name,
+								 NULL, NULL);
+			mutex_unlock(&devlink->lock);
+			return ret;
+		}
+		mutex_unlock(&devlink->lock);
+	}
+	mutex_unlock(&devlink_mutex);
+
+	return -EOPNOTSUPP;
 }
 
 static int __init devlink_module_init(void)
