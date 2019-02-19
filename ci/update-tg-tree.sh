@@ -45,16 +45,27 @@ git_clean() {
 	git clean -fd
 }
 
+# [ $1: ref, default: HEAD ]
+git_get_sha() {
+	git rev-parse "${1:-HEAD}"
+}
+
 
 ###############
 ## TG Update ##
 ###############
 
-tg_update_base() {
+tg_update_base() { local sha_before_update
 	git_checkout "${TG_TOPIC_BASE}"
+	sha_before_update=$(git_get_sha HEAD)
 
 	# this branch has to be in sync with upstream, no merge
 	git pull --ff-only "${GIT_REMOTE_NET_NEXT_URL}" "${GIT_REMOTE_NET_NEXT_BRANCH}"
+	if [ "${sha_before_update}" = "$(git_get_sha HEAD)" ]; then
+		echo "Already sync with ${GIT_REMOTE_NET_NEXT_URL} (${sha_before_update})"
+		exit 0
+	fi
+
 	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_TOPIC_BASE}"
 }
 
