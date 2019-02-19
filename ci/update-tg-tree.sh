@@ -22,6 +22,7 @@ TG_SETUP_PREFIX="build"
 
 # Local repo
 TG_TOPIC_BASE="net-next"
+TG_TOPIC_TOP="t/upstream"
 
 
 ###########
@@ -35,12 +36,14 @@ exit_err() {
 }
 
 # $1: branch ;  [ $2: remote, default: origin ]
-git_checkout_clean() { local branch remote
+git_checkout() { local branch remote
 	branch="${1}"
 	remote="${2:-${GIT_REMOTE_GERRITHUB_NAME}}"
 
 	git checkout -f "${branch}" || git checkout -b "${branch}" "${remote}/${branch}"
+}
 
+git_clean() {
 	# no need to remove .gitignored files, should be handle by git and we might
 	# need these files (.config, scripts, etc.)
 	git clean -fd
@@ -94,11 +97,30 @@ tg_setup() {
 ###############
 
 tg_update_base() {
-	git_checkout_clean "${TG_TOPIC_BASE}"
+	git_checkout "${TG_TOPIC_BASE}"
 
 	# this branch has to be in sync with upstream, no merge
 	git pull --ff-only "${GIT_REMOTE_NET_NEXT_URL}" "${GIT_REMOTE_NET_NEXT_BRANCH}"
 	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_TOPIC_BASE}"
+}
+
+tg_update() { local rc=0
+	tg update || rc="${?}"
+
+	if [ "${rc}" != 0 ]; then
+		tg update --abort
+	fi
+
+	return "${rc}"
+}
+
+tg_update_tree() {
+	git_checkout "${TG_TOPIC_TOP}"
+
+	git fetch "${GIT_REMOTE_GERRITHUB_NAME}"
+	tg remote "${GIT_REMOTE_GERRITHUB_NAME}" --populate
+
+	tg_update
 }
 
 tg_get_all_topics() {
@@ -151,11 +173,25 @@ validation() {
 }
 
 
+############
+## TG End ##
+############
+
+tg_push_tree() {
+	git_checkout "${TG_TOPIC_TOP}"
+
+	tg push -r "${GIT_REMOTE_GERRITHUB_NAME}"
+}
+
+
 ##########
 ## Main ##
 ##########
 
+git_clean || exit_err "Unable to clean the environment"
 tg_setup || exit_err "Unable to setup topgit"
 tg_update_base || exit_err "Unable to update the topgit base"
 trap 'tg_trap_reset "${?}"' EXIT
+tg_update_tree || exit_err "Unable to update the topgit tree"
 validation || exit_err "Unexpected error during the validation phase"
+tg_push_tree || exit_err "Unable to push the update of the Topgit tree"
