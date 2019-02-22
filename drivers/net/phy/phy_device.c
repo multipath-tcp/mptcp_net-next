@@ -1575,7 +1575,7 @@ static int genphy_config_advert(struct phy_device *phydev)
  *   efficent ethernet modes. Returns 0 if the PHY's advertisement hasn't
  *   changed, and 1 if it has changed.
  */
-static int genphy_config_eee_advert(struct phy_device *phydev)
+int genphy_config_eee_advert(struct phy_device *phydev)
 {
 	int err;
 
@@ -1588,6 +1588,7 @@ static int genphy_config_eee_advert(struct phy_device *phydev)
 	/* If the call failed, we assume that EEE is not supported */
 	return err < 0 ? 0 : err;
 }
+EXPORT_SYMBOL(genphy_config_eee_advert);
 
 /**
  * genphy_setup_forced - configures/forces speed/duplex from @phydev
@@ -1785,12 +1786,8 @@ int genphy_read_status(struct phy_device *phydev)
 
 		mii_lpa_mod_linkmode_lpa_t(phydev->lp_advertising, lpa);
 
-		adv = phy_read(phydev, MII_ADVERTISE);
-		if (adv < 0)
-			return adv;
-
-		phydev->speed = SPEED_10;
-		phydev->duplex = DUPLEX_HALF;
+		phydev->speed = SPEED_UNKNOWN;
+		phydev->duplex = DUPLEX_UNKNOWN;
 		phydev->pause = 0;
 		phydev->asym_pause = 0;
 

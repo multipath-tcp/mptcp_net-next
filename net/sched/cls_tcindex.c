@@ -48,7 +48,7 @@ struct tcindex_data {
 	u32 hash;		/* hash table size; 0 if undefined */
 	u32 alloc_hash;		/* allocated size */
 	u32 fall_through;	/* 0: only classify if explicit match */
-	struct rcu_head rcu;
+	struct rcu_work rwork;
 };
 
 static inline int tcindex_filter_is_set(struct tcindex_filter_result *r)
@@ -221,17 +221,11 @@ found:
 	return 0;
 }
 
-static int tcindex_destroy_element(struct tcf_proto *tp,
-				   void *arg, struct tcf_walker *walker)
+static void tcindex_destroy_work(struct work_struct *work)
 {
-	bool last;
-
-	return tcindex_delete(tp, arg, &last, false, NULL);
-}
-
-static void __tcindex_destroy(struct rcu_head *head)
-{
-	struct tcindex_data *p = container_of(head, struct tcindex_data, rcu);
+	struct tcindex_data *p = container_of(to_rcu_work(work),
+					      struct tcindex_data,
+					      rwork);
 
 	kfree(p->perfect);
 	kfree(p->h);
@@ -258,9 +252,11 @@ static int tcindex_filter_result_init(struct tcindex_filter_result *r)
 	return tcf_exts_init(&r->exts, TCA_TCINDEX_ACT, TCA_TCINDEX_POLICE);
 }
 
-static void __tcindex_partial_destroy(struct rcu_head *head)
+static void tcindex_partial_destroy_work(struct work_struct *work)
 {
-	struct tcindex_data *p = container_of(head, struct tcindex_data, rcu);
+	struct tcindex_data *p = container_of(to_rcu_work(work),
+					      struct tcindex_data,
+					      rwork);
 
 	kfree(p->perfect);
 	kfree(p);
@@ -480,7 +476,7 @@ tcindex_set_parms(struct net *net, struct tcf_proto *tp, unsigned long base,
 	}
 
 	if (oldp)
-		call_rcu(&oldp->rcu, __tcindex_partial_destroy);
+		tcf_queue_work(&oldp->rwork, tcindex_partial_destroy_work);
 	return 0;
 
 errout_alloc:
@@ -564,15 +560,34 @@ static void tcindex_destroy(struct tcf_proto *tp, bool rtnl_held,
 			    struct netlink_ext_ack *extack)
 {
 	struct tcindex_data *p = rtnl_dereference(tp->root);
-	struct tcf_walker walker;
+	int i;
 
 	pr_debug("tcindex_destroy(tp %p),p %p\n", tp, p);
-	walker.count = 0;
-	walker.skip = 0;
-	walker.fn = tcindex_destroy_element;
-	tcindex_walk(tp, &walker, true);
 
-	call_rcu(&p->rcu, __tcindex_destroy);
+	if (p->perfect) {
+		for (i = 0; i < p->hash; i++) {
+			struct tcindex_filter_result *r = p->perfect + i;
+
+			tcf_unbind_filter(tp, &r->res);
+			if (tcf_exts_get_net(&r->exts))
+				tcf_queue_work(&r->rwork,
+					       tcindex_destroy_rexts_work);
+			else
+				__tcindex_destroy_rexts(r);
+		}
+	}
+
+	for (i = 0; p->h && i < p->hash; i++) {
+		struct tcindex_filter *f, *next;
+		bool last;
+
+		for (f = rtnl_dereference(p->h[i]); f; f = next) {
+			next = rtnl_dereference(f->next);
+			tcindex_delete(tp, &f->result, &last, rtnl_held, NULL);
+		}
+	}
+
+	tcf_queue_work(&p->rwork, tcindex_destroy_work);
 }
 
 

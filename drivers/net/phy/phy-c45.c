@@ -70,7 +70,11 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
 	if (ret < 0)
 		return ret;
 
-	return phy_write_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_CTRL2, ctrl2);
+	ret = phy_write_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_CTRL2, ctrl2);
+	if (ret < 0)
+		return ret;
+
+	return genphy_c45_an_disable_aneg(phydev);
 }
 EXPORT_SYMBOL_GPL(genphy_c45_pma_setup_forced);
 
@@ -85,11 +89,13 @@ EXPORT_SYMBOL_GPL(genphy_c45_pma_setup_forced);
  */
 int genphy_c45_an_config_aneg(struct phy_device *phydev)
 {
-	int changed = 0, ret;
+	int changed, ret;
 	u32 adv;
 
 	linkmode_and(phydev->advertising, phydev->advertising,
 		     phydev->supported);
+
+	changed = genphy_config_eee_advert(phydev);
 
 	adv = linkmode_adv_to_mii_adv_t(phydev->advertising);
 
@@ -149,6 +155,36 @@ int genphy_c45_restart_aneg(struct phy_device *phydev)
 				MDIO_AN_CTRL1_ENABLE | MDIO_AN_CTRL1_RESTART);
 }
 EXPORT_SYMBOL_GPL(genphy_c45_restart_aneg);
+
+/**
+ * genphy_c45_check_and_restart_aneg - Enable and restart auto-negotiation
+ * @phydev: target phy_device struct
+ * @restart: whether aneg restart is requested
+ *
+ * This assumes that the auto-negotiation MMD is present.
+ *
+ * Check, and restart auto-negotiation if needed.
+ */
+int genphy_c45_check_and_restart_aneg(struct phy_device *phydev, bool restart)
+{
+	int ret = 0;
+
+	if (!restart) {
+		/* Configure and restart aneg if it wasn't set before */
+		ret = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_CTRL1);
+		if (ret < 0)
+			return ret;
+
+		if (!(ret & MDIO_AN_CTRL1_ENABLE))
+			restart = true;
+	}
+
+	if (restart)
+		ret = genphy_c45_restart_aneg(phydev);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(genphy_c45_check_and_restart_aneg);
 
 /**
  * genphy_c45_aneg_done - return auto-negotiation complete status
