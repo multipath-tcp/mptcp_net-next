@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1e6f7313_3853c184",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-25T21:05:30Z",
+      "side": 1,
+      "message": "The way topgit stores top-bases is changing (see https://github.com/mackyle/topgit#tg-migrate-bases), which could break this in the future.\n\nDoes the documented \"tg tag\" / \"tg revert\" technique work to restore the topic branches? Or maybe delete all the local topic branches and redo the \"tg remote $url --populate\" command?",
+      "revId": "2a295092360079fd67781a72a1f7efe03ebc7be0",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
