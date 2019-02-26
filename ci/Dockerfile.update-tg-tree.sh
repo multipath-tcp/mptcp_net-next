@@ -48,6 +48,7 @@ EOF
 docker build -t "${DOCKER_NAME}" -f "${DOCKERFILE}" "${DOCKER_DIR}"
 # ssh and gitconfig is needed to create commits and pull/push
 docker run \
+    -e "UPD_TG_FORCE_SYNC=${UPD_TG_FORCE_SYNC}" \
     -v "${PWD}:${PWD}" \
     -v "${HOME}/.ssh:${HOME}/.ssh" \
     -v "${HOME}/.gitconfig:${HOME}/.gitconfig:ro" \
