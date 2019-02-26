@@ -129,9 +129,10 @@ tg_trap_reset() { local rc
 generate_config() {
 	make defconfig
 
-	cat <<EOF >> .config
-CONFIG_MPTCP=y
-EOF
+	echo | scripts/config --enable MPTCP
+
+	# We don't want to run 'make olddefconfig' here to have a failure if
+	# some new MPTCP options are available.
 }
 
 check_compilation() {
