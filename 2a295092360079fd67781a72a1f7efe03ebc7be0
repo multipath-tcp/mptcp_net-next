@@ -34,6 +34,24 @@
       "revId": "2a295092360079fd67781a72a1f7efe03ebc7be0",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8526ee45_f952ffb1",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-26T16:05:02Z",
+      "side": 1,
+      "message": "\u003e \u003e The way topgit stores top-bases is changing (see https://github.com/mackyle/topgit#tg-migrate-bases), which could break this in the future.\n\n\u003e I missed that! I will fix the top-bases config in a new commit to explain this change :)\n\u003e I would prefer to keep this \"old way\" because the Gerrit config use these refs/top-bases\n\nFixed in https://review.gerrithub.io/c/multipath-tcp/mptcp_net-next/+/446294/1",
+      "parentUuid": "b4290931_712c475d",
+      "revId": "2a295092360079fd67781a72a1f7efe03ebc7be0",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
