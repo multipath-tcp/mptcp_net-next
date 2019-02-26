@@ -61,7 +61,8 @@ tg_update_base() { local sha_before_update
 
 	# this branch has to be in sync with upstream, no merge
 	git pull --ff-only "${GIT_REMOTE_NET_NEXT_URL}" "${GIT_REMOTE_NET_NEXT_BRANCH}"
-	if [ "${sha_before_update}" = "$(git_get_sha HEAD)" ]; then
+	if [ "${UPD_TG_FORCE_SYNC}" != 1 ] && \
+	   [ "${sha_before_update}" = "$(git_get_sha HEAD)" ]; then
 		echo "Already sync with ${GIT_REMOTE_NET_NEXT_URL} (${sha_before_update})"
 		exit 0
 	fi
