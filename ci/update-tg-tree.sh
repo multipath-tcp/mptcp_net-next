@@ -83,6 +83,12 @@ tg_update_tree() {
 	git_checkout "${TG_TOPIC_TOP}"
 
 	git fetch "${GIT_REMOTE_GERRITHUB_NAME}"
+
+	# force to add TG refs in refs/top-bases/, Gerrit is configured for a
+	# use with these refs and here below, we also use them.
+	git config --local topgit.top-bases refs
+
+	# fetch and update-ref will be done
 	tg remote "${GIT_REMOTE_GERRITHUB_NAME}" --populate
 
 	tg_update
