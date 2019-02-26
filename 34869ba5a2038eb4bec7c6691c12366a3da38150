@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "e405f6d8_304c5b60",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 112,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-26T15:09:21Z",
+      "side": 1,
+      "message": "good idea, that\u0027s cleaner!\nI will do that in a new commit if you don\u0027t mind!",
+      "parentUuid": "70fffd75_bc949a21",
+      "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "bcc79427_f4d80f45",
         "filename": "ci/update-tg-tree.sh",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2019-02-25T21:10:59Z",
       "side": 1,
       "message": "After updating .config, \u0027make olddefconfig\u0027 will resolve any config dependencies without any interactive prompts",
+      "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f968f9e1_a443b44d",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-26T15:09:21Z",
+      "side": 1,
+      "message": "I thought about that but we might miss new choices/dependences, no?\n\nI mean: if we add a new CONFIG_MPTCP_XXX in the code, we might forget to add it here.\nWDYT?",
+      "parentUuid": "bcc79427_f4d80f45",
       "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
