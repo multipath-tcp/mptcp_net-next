@@ -16,6 +16,24 @@
       "revId": "2a295092360079fd67781a72a1f7efe03ebc7be0",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b4290931_712c475d",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-26T15:00:21Z",
+      "side": 1,
+      "message": "Thank you for this note!\n\n\u003e The way topgit stores top-bases is changing (see https://github.com/mackyle/topgit#tg-migrate-bases), which could break this in the future.\n\nI missed that! I will fix the top-bases config in a new commit to explain this change :)\nI would prefer to keep this \"old way\" because the Gerrit config use these refs/top-bases\n\n\u003e Does the documented \"tg tag\" / \"tg revert\" technique work to restore the topic branches? Or maybe delete all the local topic branches and redo the \"tg remote $url --populate\" command?\n\nYes, both should work. I am not a big fan of the \"tg tag\" / \"tg revert\" because we might have other issues (what about old tags, etc.). I can also delete all local topic branches but while doing that, is it not better to directly link them to the remote refs?",
+      "parentUuid": "1e6f7313_3853c184",
+      "revId": "2a295092360079fd67781a72a1f7efe03ebc7be0",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
