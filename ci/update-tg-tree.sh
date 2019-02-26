@@ -129,9 +129,11 @@ tg_trap_reset() { local rc
 generate_config() {
 	make defconfig
 
-	cat <<EOF >> .config
-CONFIG_MPTCP=y
-EOF
+	echo | scripts/config --enable MPTCP
+
+	# Here, we want to have a failure if some new MPTCP options are
+	# available not to forget to enable them. We then don't want to run
+	# 'make olddefconfig' which will silently disable these new options.
 }
 
 check_compilation() {
