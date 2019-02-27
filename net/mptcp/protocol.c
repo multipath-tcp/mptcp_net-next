@@ -24,14 +24,35 @@ static inline bool before64(__u64 seq1, __u64 seq2)
 
 #define after64(seq2, seq1)	before64(seq1, seq2)
 
+static bool mptcp_subflow_hold(struct subflow_sock *sk)
+{
+	struct sock *_sk = (struct sock *)sk;
+
+	return refcount_inc_not_zero(&_sk->sk_refcnt);
+}
+
+static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
+{
+	struct subflow_sock *subflow;
+
+	rcu_read_lock();
+	mptcp_for_each_subflow(msk, subflow) {
+		if (mptcp_subflow_hold(subflow)) {
+			rcu_read_unlock();
+			return (struct sock *)subflow;
+		}
+	}
+
+	rcu_read_unlock();
+	return NULL;
+}
+
 static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	int mss_now, size_goal, poffset, ret;
 	struct mptcp_ext *mpext = NULL;
-	struct subflow_sock *subflow;
 	struct page *page = NULL;
-	struct hlist_node *node;
 	struct sk_buff *skb;
 	struct sock *ssk;
 	size_t psize;
@@ -42,20 +63,17 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		return sock_sendmsg(msk->subflow, msg);
 	}
 
-	rcu_read_lock();
-	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
-	subflow = hlist_entry(node, struct subflow_sock, node);
-	ssk = sock_sk(subflow);
-	sock_hold(ssk);
-	rcu_read_unlock();
+	ssk = mptcp_subflow_get_ref(msk);
+	if (!ssk)
+		return -ENOTCONN;
 
 	if (!msg_data_left(msg)) {
 		pr_debug("empty send");
-		ret = sock_sendmsg(sock_sk(subflow)->sk_socket, msg);
+		ret = sock_sendmsg(ssk->sk_socket, msg);
 		goto put_out;
 	}
 
-	pr_debug("conn_list->subflow=%p", subflow);
+	pr_debug("conn_list->subflow=%p", ssk);
 
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL)) {
 		ret = -ENOTSUPP;
@@ -282,7 +300,6 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct subflow_sock *subflow;
 	struct mptcp_read_arg arg;
-	struct hlist_node *node;
 	read_descriptor_t desc;
 	struct tcp_sock *tp;
 	struct sock *ssk;
@@ -294,13 +311,11 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		return sock_recvmsg(msk->subflow, msg, flags);
 	}
 
-	rcu_read_lock();
-	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
-	subflow = hlist_entry(node, struct subflow_sock, node);
-	ssk = sock_sk(subflow);
-	sock_hold(ssk);
-	rcu_read_unlock();
+	ssk = mptcp_subflow_get_ref(msk);
+	if (!ssk)
+		return -ENOTCONN;
 
+	subflow = subflow_sk(ssk);
 	tp = tcp_sk(ssk);
 
 	desc.arg.data = &arg;
@@ -723,8 +738,6 @@ int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 int mptcp_stream_getname(struct socket *sock, struct sockaddr *uaddr, int peer)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
-	struct subflow_sock *subflow;
-	struct hlist_node *node;
 	struct sock *ssk;
 	int ret;
 
@@ -739,14 +752,12 @@ int mptcp_stream_getname(struct socket *sock, struct sockaddr *uaddr, int peer)
 	 * is connected and there are multiple subflows is not defined.
 	 * For now just use the first subflow on the list.
 	 */
-	rcu_read_lock();
-	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
-	subflow = hlist_entry(node, struct subflow_sock, node);
-	ssk = sock_sk(subflow);
-	sock_hold(ssk);
-	rcu_read_unlock();
 
-	ret = inet_getname(sock_sk(subflow)->sk_socket, uaddr, peer);
+	ssk = mptcp_subflow_get_ref(msk);
+	if (!ssk)
+		return -ENOTCONN;
+
+	ret = inet_getname(ssk->sk_socket, uaddr, peer);
 	sock_put(ssk);
 	return ret;
 }
@@ -782,26 +793,44 @@ int mptcp_stream_accept(struct socket *sock, struct socket *newsock, int flags,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
+	struct subflow_sock *subflow, *tmp;
 	const struct mptcp_sock *msk;
-	struct subflow_sock *subflow;
 	struct sock *sk = sock->sk;
-	struct hlist_node *node;
-	struct sock *ssk;
-	__poll_t ret;
+	__poll_t ret = 0;
+	unsigned int i;
 
 	msk = mptcp_sk(sk);
 	if (msk->subflow)
 		return tcp_poll(file, msk->subflow, wait);
 
-	rcu_read_lock();
-	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
-	subflow = hlist_entry(node, struct subflow_sock, node);
-	ssk = sock_sk(subflow);
-	sock_hold(ssk);
-	rcu_read_unlock();
+	i = 0;
+	for (;;) {
+		int j = 0;
+		tmp = NULL;
 
-	ret = tcp_poll(file, ssk->sk_socket, wait);
-	sock_put(ssk);
+		rcu_read_lock();
+		mptcp_for_each_subflow(msk, subflow) {
+			if (j < i) {
+				j++;
+				continue;
+			}
+
+			if (!mptcp_subflow_hold(subflow))
+				continue;
+
+			tmp = subflow;
+			i++;
+			break;
+		}
+		rcu_read_unlock();
+
+		if (!tmp)
+			break;
+
+		ret |= tcp_poll(file, sock_sk(tmp)->sk_socket, wait);
+		sock_put(sock_sk(tmp));
+	}
+
 	return ret;
 }
 
