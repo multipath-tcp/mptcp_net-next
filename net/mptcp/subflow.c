@@ -45,6 +45,29 @@ static int subflow_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	return tcp_recvmsg(sk, msg, len, nonblock, flags, addr_len);
 }
 
+static int subflow_rebuild_header(struct sock *sk)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	if (subflow->request_mptcp && !subflow->token) {
+		pr_debug("subflow=%p", sk);
+		token_new_connect(sk);
+	}
+
+	return inet_sk_rebuild_header(sk);
+}
+
+static void subflow_req_destructor(struct request_sock *req)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	pr_debug("subflow_req=%p", subflow_req);
+
+	if (subflow_req->mp_capable)
+		token_destroy_request(subflow_req->token);
+	tcp_request_sock_ops.destructor(req);
+}
+
 static void subflow_v4_init_req(struct request_sock *req,
 				const struct sock *sk_listener,
 				struct sk_buff *skb)
@@ -74,6 +97,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 		    listener->checksum)
 			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
+		pr_debug("remote_key=%llu", subflow_req->remote_key);
+		token_new_request(req, skb);
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -139,6 +164,9 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			subflow->fourth_ack = 1;
 			subflow->remote_key = subflow_req->remote_key;
 			subflow->local_key = subflow_req->local_key;
+			subflow->token = subflow_req->token;
+			pr_debug("token=%u", subflow->token);
+			token_new_accept(child);
 		} else {
 			subflow->mp_capable = 0;
 		}
@@ -150,7 +178,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 const struct inet_connection_sock_af_ops subflow_specific = {
 	.queue_xmit	   = ip_queue_xmit,
 	.send_check	   = tcp_v4_send_check,
-	.rebuild_header	   = inet_sk_rebuild_header,
+	.rebuild_header	   = subflow_rebuild_header,
 	.sk_rx_dst_set	   = subflow_finish_connect,
 	.conn_request	   = subflow_conn_request,
 	.syn_recv_sock	   = subflow_syn_recv_sock,
@@ -265,6 +293,7 @@ int mptcp_subflow_init(void)
 
 	subflow_request_sock_ops = tcp_request_sock_ops;
 	subflow_request_sock_ops.obj_size = sizeof(struct subflow_request_sock),
+	subflow_request_sock_ops.destructor = subflow_req_destructor;
 
 	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
