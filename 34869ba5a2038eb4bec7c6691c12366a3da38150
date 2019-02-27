@@ -87,6 +87,24 @@
       "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b95579f2_a99dfe82",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-27T18:04:47Z",
+      "side": 1,
+      "message": "The idea was to guarantee the build won\u0027t get mysteriously stuck waiting for an interactive response. \n\nIf we add new options, they\u0027ll have a default that should get set by the \u0027make defconfig\u0027 above - so that shouldn\u0027t cause a failure here. \u0027make listnewconfig\u0027 shouldn\u0027t show any new options, and similarly there should not be any prompts when the kernel is built, so in practice, it probably doesn\u0027t matter much.",
+      "parentUuid": "f968f9e1_a443b44d",
+      "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
