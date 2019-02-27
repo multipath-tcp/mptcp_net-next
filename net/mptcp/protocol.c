@@ -72,6 +72,45 @@ static void mptcp_close(struct sock *sk, long timeout)
 	}
 }
 
+static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
+				 bool kern)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct socket *listener = msk->subflow;
+	struct socket *new_sock;
+	struct socket *mp;
+	struct subflow_sock *subflow;
+
+	pr_debug("msk=%p, listener=%p", msk, listener->sk);
+	*err = kernel_accept(listener, &new_sock, flags);
+	if (*err < 0)
+		return NULL;
+
+	subflow = subflow_sk(new_sock->sk);
+	pr_debug("new_sock=%p", subflow);
+
+	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP, &mp);
+	if (*err < 0) {
+		kernel_sock_shutdown(new_sock, SHUT_RDWR);
+		sock_release(new_sock);
+		return NULL;
+	}
+
+	msk = mptcp_sk(mp->sk);
+	pr_debug("msk=%p", msk);
+	subflow->conn = mp->sk;
+
+	if (subflow->mp_capable) {
+		msk->remote_key = subflow->remote_key;
+		msk->local_key = subflow->local_key;
+		msk->connection_list = new_sock;
+	} else {
+		msk->subflow = new_sock;
+	}
+
+	return mp->sk;
+}
+
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -122,11 +161,16 @@ static int subflow_create(struct sock *sock)
 int mptcp_stream_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
-	struct socket *subflow = msk->subflow;
+	int err;
 
-	pr_debug("msk=%p, subflow=%p", msk, subflow->sk);
+	pr_debug("msk=%p", msk);
 
-	return inet_bind(subflow, uaddr, addr_len);
+	if (!msk->subflow) {
+		err = subflow_create(sock->sk);
+		if (err)
+			return err;
+	}
+	return inet_bind(msk->subflow, uaddr, addr_len);
 }
 
 int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
@@ -144,6 +188,50 @@ int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	}
 
 	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
+}
+
+int mptcp_stream_getname(struct socket *sock, struct sockaddr *uaddr, int peer)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	struct socket *subflow;
+	int err = -EPERM;
+
+	if (msk->connection_list)
+		subflow = msk->connection_list;
+	else
+		subflow = msk->subflow;
+
+	err = inet_getname(subflow, uaddr, peer);
+
+	return err;
+}
+
+int mptcp_stream_listen(struct socket *sock, int backlog)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	int err;
+
+	pr_debug("msk=%p", msk);
+
+	if (!msk->subflow) {
+		err = subflow_create(sock->sk);
+		if (err)
+			return err;
+	}
+	return inet_listen(msk->subflow, backlog);
+}
+
+int mptcp_stream_accept(struct socket *sock, struct socket *newsock, int flags,
+			bool kern)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+
+	pr_debug("msk=%p", msk);
+
+	if (!msk->subflow)
+		return -EINVAL;
+
+	return inet_accept(sock, newsock, flags, kern);
 }
 
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
@@ -164,7 +252,7 @@ static struct proto mptcp_prot = {
 	.owner		= THIS_MODULE,
 	.init		= mptcp_init_sock,
 	.close		= mptcp_close,
-	.accept		= inet_csk_accept,
+	.accept		= mptcp_accept,
 	.shutdown	= tcp_shutdown,
 	.sendmsg	= mptcp_sendmsg,
 	.recvmsg	= mptcp_recvmsg,
@@ -182,11 +270,11 @@ const struct proto_ops mptcp_stream_ops = {
 	.bind		   = mptcp_stream_bind,
 	.connect	   = mptcp_stream_connect,
 	.socketpair	   = sock_no_socketpair,
-	.accept		   = inet_accept,
-	.getname	   = inet_getname,
+	.accept		   = mptcp_stream_accept,
+	.getname	   = mptcp_stream_getname,
 	.poll		   = mptcp_poll,
 	.ioctl		   = inet_ioctl,
-	.listen		   = inet_listen,
+	.listen		   = mptcp_stream_listen,
 	.shutdown	   = inet_shutdown,
 	.setsockopt	   = sock_common_setsockopt,
 	.getsockopt	   = sock_common_getsockopt,

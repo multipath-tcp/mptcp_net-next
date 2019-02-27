@@ -462,12 +462,15 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 		return;
 
 	if ((OPTION_MPTCP_MPC_SYN |
+	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->mptcp.suboptions) {
 		__be64 key;
 		u8 len;
 
 		if (OPTION_MPTCP_MPC_SYN & opts->mptcp.suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYN;
+		else if (OPTION_MPTCP_MPC_SYNACK & opts->mptcp.suboptions)
+			len = TCPOLEN_MPTCP_MPC_SYNACK;
 		else
 			len = TCPOLEN_MPTCP_MPC_ACK;
 
@@ -478,7 +481,8 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
 		key = cpu_to_be64(opts->mptcp.sndr_key);
 		memcpy(ptr, &key, 8);
 		ptr += 2;
-		if (OPTION_MPTCP_MPC_ACK & opts->mptcp.suboptions) {
+		if ((OPTION_MPTCP_MPC_SYNACK |
+		     OPTION_MPTCP_MPC_ACK) & opts->mptcp.suboptions) {
 			key = cpu_to_be64(opts->mptcp.rcvr_key);
 			memcpy(ptr, &key, 8);
 			ptr += 2;
@@ -774,6 +778,23 @@ static unsigned int tcp_synack_options(const struct sock *sk,
 			remaining -= need;
 		}
 	}
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (tcp_rsk(req)->is_mptcp) {
+		u64 local_key;
+		u64 remote_key;
+
+		if (mptcp_synack_options(req, &local_key, &remote_key)) {
+			if (remaining >= TCPOLEN_MPTCP_MPC_SYNACK) {
+				opts->options |= OPTION_MPTCP;
+				opts->mptcp.suboptions =
+					OPTION_MPTCP_MPC_SYNACK;
+				opts->mptcp.sndr_key = local_key;
+				opts->mptcp.rcvr_key = remote_key;
+				remaining -= TCPOLEN_MPTCP_MPC_SYNACK;
+			}
+		}
+	}
+#endif
 
 	smc_set_option_cond(tcp_sk(sk), ireq, opts, &remaining);
 

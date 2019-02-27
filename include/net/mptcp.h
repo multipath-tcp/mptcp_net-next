@@ -63,6 +63,23 @@ static inline struct subflow_sock *subflow_sk(const struct sock *sk)
 	return (struct subflow_sock *)sk;
 }
 
+struct subflow_request_sock {
+	struct	tcp_request_sock sk;
+	u8	mp_capable : 1,
+		mp_join : 1,
+		checksum : 1,
+		backup : 1,
+		version : 4;
+	u64	local_key;
+	u64	remote_key;
+};
+
+static inline
+struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
+{
+	return (struct subflow_request_sock *)rsk;
+}
+
 #ifdef CONFIG_MPTCP
 
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
@@ -71,11 +88,16 @@ unsigned int mptcp_syn_options(struct sock *sk, u64 *local_key);
 void mptcp_rcv_synsent(struct sock *sk);
 unsigned int mptcp_established_options(struct sock *sk, u64 *local_key,
 				       u64 *remote_key);
+unsigned int mptcp_synack_options(struct request_sock *req,
+				  u64 *local_key, u64 *remote_key);
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
 
 int mptcp_subflow_init(void);
 void mptcp_subflow_exit(void);
+
+void mptcp_get_options(const struct sk_buff *skb,
+		       struct tcp_options_received *opt_rx);
 
 #else
 
@@ -91,6 +113,13 @@ static inline unsigned int mptcp_syn_options(struct sock *sk, u64 *local_key)
 
 static inline void mptcp_rcv_synsent(struct sock *sk)
 {
+}
+
+static inline unsigned int mptcp_synack_options(struct request_sock *sk,
+						u64 *local_key,
+						u64 *remote_key)
+{
+	return 0;
 }
 
 static inline unsigned int mptcp_established_options(struct sock *sk,
