@@ -19,6 +19,7 @@ GIT_REMOTE_NET_NEXT_BRANCH="master"
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
 TG_EXPORT_BRANCH="export"
+TG_FOR_REVIEW_BRANCH="for-review"
 
 
 ###########
@@ -164,6 +165,26 @@ tg_export() {
 	git push --force "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_EXPORT_BRANCH}"
 }
 
+tg_for_review() { local tg_conflict_files
+	git_checkout "${TG_FOR_REVIEW_BRANCH}"
+
+	git pull "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
+
+	if ! git merge --no-edit --signoff "${TG_TOPIC_TOP}"; then
+		# the only possible conflict would be with the topgit files, manage this
+		tg_conflict_files=$(git status --porcelain | grep -E "^DU\\s.top(deps|msg)$")
+		if [ -n "${tg_conflict_files}" ]; then
+			echo "${tg_conflict_files}" | awk '{ print $2 }' | xargs git rm
+			git commit -s --no-edit || \
+				exit_err "Unexpected other conflicts: ${tg_conflict_files}"
+		else
+			exit_err "Unexpected conflicts when updating ${TG_FOR_REVIEW_BRANCH}"
+		fi
+	fi
+
+	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
+}
+
 
 ##########
 ## Main ##
@@ -176,3 +197,4 @@ tg_update_tree || exit_err "Unable to update the topgit tree"
 validation || exit_err "Unexpected error during the validation phase"
 tg_push_tree || exit_err "Unable to push the update of the Topgit tree"
 tg_export || exit_err "Unable to export the TopGit tree"
+tg_for_review || exit_err "Unable to update the ${TG_FOR_REVIEW_BRANCH} branch"
