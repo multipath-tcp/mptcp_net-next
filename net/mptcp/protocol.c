@@ -123,6 +123,52 @@ static void mptcp_destroy(struct sock *sk)
 	token_destroy(msk->token);
 }
 
+static int mptcp_setsockopt(struct sock *sk, int level, int optname,
+			    char __user *uoptval, unsigned int optlen)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct socket *subflow;
+	char __kernel *optval;
+
+	pr_debug("msk=%p", msk);
+	if (msk->connection_list) {
+		subflow = msk->connection_list;
+		pr_debug("conn_list->subflow=%p", subflow->sk);
+	} else {
+		subflow = msk->subflow;
+		pr_debug("subflow=%p", subflow->sk);
+	}
+
+	/* will be treated as __user in subflow_setsockopt */
+	optval = (char __kernel __force *)uoptval;
+
+	return kernel_setsockopt(subflow, level, optname, optval, optlen);
+}
+
+static int mptcp_getsockopt(struct sock *sk, int level, int optname,
+			    char __user *uoptval, int __user *uoption)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct socket *subflow;
+	char __kernel *optval;
+	int __kernel *option;
+
+	pr_debug("msk=%p", msk);
+	if (msk->connection_list) {
+		subflow = msk->connection_list;
+		pr_debug("conn_list->subflow=%p", subflow->sk);
+	} else {
+		subflow = msk->subflow;
+		pr_debug("subflow=%p", subflow->sk);
+	}
+
+	/* will be treated as __user in subflow_getsockopt */
+	optval = (char __kernel __force *)uoptval;
+	option = (int __kernel __force *)uoption;
+
+	return kernel_getsockopt(subflow, level, optname, optval, option);
+}
+
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -288,6 +334,8 @@ static struct proto mptcp_prot = {
 	.accept		= mptcp_accept,
 	.shutdown	= tcp_shutdown,
 	.destroy	= mptcp_destroy,
+	.setsockopt	= mptcp_setsockopt,
+	.getsockopt	= mptcp_getsockopt,
 	.sendmsg	= mptcp_sendmsg,
 	.recvmsg	= mptcp_recvmsg,
 	.hash		= inet_hash,
