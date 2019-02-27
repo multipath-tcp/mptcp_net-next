@@ -13,6 +13,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx)
 {
 	u8 subtype = *ptr >> 4;
+	int expected_opsize;
 
 	switch (subtype) {
 	/* MPTCPOPT_MP_CAPABLE
@@ -74,6 +75,69 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
 		opt_rx->mptcp.dss = 1;
+		ptr++;
+
+		opt_rx->mptcp.flags = (*ptr++) & 0x1F;
+		opt_rx->mptcp.data_fin = (opt_rx->mptcp.flags & 0x10) != 0;
+		opt_rx->mptcp.dsn64 = (opt_rx->mptcp.flags & 0x08) != 0;
+		opt_rx->mptcp.use_map = (opt_rx->mptcp.flags & 0x04) != 0;
+		opt_rx->mptcp.ack64 = (opt_rx->mptcp.flags & 0x02) != 0;
+		opt_rx->mptcp.use_ack = (opt_rx->mptcp.flags & 0x01);
+
+		pr_debug("data_fin=%d dsn64=%d use_map=%d ack64=%d use_ack=%d",
+			 opt_rx->mptcp.data_fin, opt_rx->mptcp.dsn64,
+			 opt_rx->mptcp.use_map, opt_rx->mptcp.ack64,
+			 opt_rx->mptcp.use_ack);
+
+		expected_opsize = 0;
+
+		if (opt_rx->mptcp.use_ack) {
+			expected_opsize = 4;
+			if (opt_rx->mptcp.ack64)
+				expected_opsize += 4;
+
+			if (opsize < expected_opsize)
+				break;
+
+			if (opt_rx->mptcp.ack64) {
+				opt_rx->mptcp.ack = get_unaligned_be64(ptr);
+				ptr += 8;
+			} else {
+				opt_rx->mptcp.ack = get_unaligned_be32(ptr);
+				ptr += 4;
+			}
+
+			pr_debug("ack=%llu", opt_rx->mptcp.ack);
+		}
+
+		if (opt_rx->mptcp.use_map) {
+			expected_opsize += 12;
+			if (opt_rx->mptcp.dsn64)
+				expected_opsize += 4;
+
+			if (opsize < expected_opsize)
+				break;
+
+			if (opt_rx->mptcp.dsn64) {
+				opt_rx->mptcp.seq = get_unaligned_be64(ptr);
+				ptr += 8;
+			} else {
+				opt_rx->mptcp.seq = get_unaligned_be32(ptr);
+				ptr += 4;
+			}
+
+			opt_rx->mptcp.subflow_seq = get_unaligned_be32(ptr);
+			ptr += 4;
+
+			opt_rx->mptcp.dll = get_unaligned_be16(ptr);
+			ptr += 2;
+
+			opt_rx->mptcp.checksum = get_unaligned_be16(ptr);
+
+			pr_debug("seq=%llu subflow_seq=%u dll=%u ck=%u",
+				 opt_rx->mptcp.seq, opt_rx->mptcp.subflow_seq,
+				 opt_rx->mptcp.dll, opt_rx->mptcp.checksum);
+		}
 		break;
 
 	/* MPTCPOPT_ADD_ADDR
@@ -196,4 +260,37 @@ unsigned int mptcp_synack_options(struct request_sock *req, u64 *local_key,
 		pr_debug("remote_key=%llu", *remote_key);
 	}
 	return subflow_req->mp_capable;
+}
+
+void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+		      struct tcp_options_received *opt_rx)
+{
+	struct mptcp_ext *mpext;
+
+	if (!opt_rx->mptcp.dss)
+		return;
+
+	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
+	if (!mpext)
+		return;
+
+	memset(mpext, 0, sizeof(*mpext));
+
+	if (opt_rx->mptcp.use_map) {
+		mpext->data_seq = opt_rx->mptcp.seq;
+		mpext->subflow_seq = opt_rx->mptcp.subflow_seq;
+		mpext->dll = opt_rx->mptcp.dll;
+		mpext->checksum = opt_rx->mptcp.checksum;
+		mpext->use_map = 1;
+		mpext->dsn64 = opt_rx->mptcp.dsn64;
+		mpext->use_checksum = opt_rx->mptcp.use_checksum;
+	}
+
+	if (opt_rx->mptcp.use_ack) {
+		mpext->data_ack = opt_rx->mptcp.ack;
+		mpext->use_ack = 1;
+		mpext->ack64 = opt_rx->mptcp.ack64;
+	}
+
+	mpext->data_fin = opt_rx->mptcp.data_fin;
 }

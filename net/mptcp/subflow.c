@@ -99,6 +99,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 		pr_debug("remote_key=%llu", subflow_req->remote_key);
 		token_new_request(req, skb);
+		pr_debug("syn seq=%u", TCP_SKB_CB(skb)->seq);
+		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -112,10 +114,15 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 	pr_debug("subflow=%p", subflow);
 
-	if (subflow->conn) {
+	if (subflow->conn && !subflow->conn_finished) {
 		pr_debug("remote_key=%llu", subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
-		subflow->conn = NULL;
+		subflow->conn_finished = 1;
+
+		if (skb) {
+			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
+			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
+		}
 	}
 }
 
@@ -164,7 +171,9 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			subflow->fourth_ack = 1;
 			subflow->remote_key = subflow_req->remote_key;
 			subflow->local_key = subflow_req->local_key;
+			subflow->ssn_offset = subflow_req->ssn_offset;
 			subflow->token = subflow_req->token;
+			subflow->idsn = subflow_req->idsn;
 			pr_debug("token=%u", subflow->token);
 			token_new_accept(child);
 		} else {
@@ -194,6 +203,20 @@ const struct inet_connection_sock_af_ops subflow_specific = {
 	.mtu_reduced	   = tcp_v4_mtu_reduced,
 };
 
+static void subflow_data_ready(struct sock *sk)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+	struct sock *parent = subflow->conn;
+
+	pr_debug("sk=%p", sk);
+	subflow->tcp_sk_data_ready(sk);
+
+	if (parent) {
+		pr_debug("parent=%p", parent);
+		parent->sk_data_ready(parent);
+	}
+}
+
 static int subflow_init_sock(struct sock *sk)
 {
 	struct subflow_sock *subflow = subflow_sk(sk);
@@ -207,6 +230,8 @@ static int subflow_init_sock(struct sock *sk)
 	if (!err) { // @@ AND mptcp is enabled
 		tsk->is_mptcp = 1;
 		icsk->icsk_af_ops = &subflow_specific;
+		subflow->tcp_sk_data_ready = sk->sk_data_ready;
+		sk->sk_data_ready = subflow_data_ready;
 	}
 
 	return err;
