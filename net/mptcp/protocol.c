@@ -18,17 +18,104 @@
 static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *subflow;
+	int mss_now, size_goal, poffset, ret;
+	struct mptcp_ext *mpext = NULL;
+	struct page *page = NULL;
+	struct sk_buff *skb;
+	struct sock *ssk;
+	size_t psize;
 
-	if (msk->connection_list) {
-		subflow = msk->connection_list;
-		pr_debug("conn_list->subflow=%p", subflow->sk);
-	} else {
-		subflow = msk->subflow;
-		pr_debug("subflow=%p", subflow->sk);
+	pr_debug("msk=%p", msk);
+	if (!msk->connection_list && msk->subflow) {
+		pr_debug("fallback passthrough");
+		return sock_sendmsg(msk->subflow, msg);
 	}
 
-	return sock_sendmsg(subflow, msg);
+	if (!msg_data_left(msg)) {
+		pr_debug("empty send");
+		return sock_sendmsg(msk->connection_list, msg);
+	}
+
+	ssk = msk->connection_list->sk;
+
+	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
+		return -ENOTSUPP;
+
+	/* Initial experiment: new page per send.  Real code will
+	 * maintain list of active pages and DSS mappings, append to the
+	 * end and honor zerocopy
+	 */
+	page = alloc_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	/* Copy to page */
+	poffset = 0;
+	pr_debug("left=%zu", msg_data_left(msg));
+	psize = copy_page_from_iter(page, poffset,
+				    min_t(size_t, msg_data_left(msg),
+					  PAGE_SIZE),
+				    &msg->msg_iter);
+	pr_debug("left=%zu", msg_data_left(msg));
+
+	if (!psize) {
+		put_page(page);
+		return -EINVAL;
+	}
+
+	lock_sock(sk);
+	lock_sock(ssk);
+
+	/* Mark the end of the previous write so the beginning of the
+	 * next write (with its own mptcp skb extension data) is not
+	 * collapsed.
+	 */
+	skb = tcp_write_queue_tail(ssk);
+	if (skb)
+		TCP_SKB_CB(skb)->eor = 1;
+
+	mss_now = tcp_send_mss(ssk, &size_goal, msg->msg_flags);
+
+	ret = do_tcp_sendpages(ssk, page, poffset, min_t(int, size_goal, psize),
+			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
+	put_page(page);
+	if (ret <= 0)
+		goto error_out;
+
+	if (skb == tcp_write_queue_tail(ssk))
+		pr_err("no new skb %p/%p", sk, ssk);
+
+	skb = tcp_write_queue_tail(ssk);
+
+	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
+
+	if (mpext) {
+		memset(mpext, 0, sizeof(*mpext));
+		mpext->data_ack = msk->ack_seq;
+		mpext->data_seq = msk->write_seq;
+		mpext->subflow_seq = subflow_sk(ssk)->rel_write_seq;
+		mpext->dll = ret;
+		mpext->checksum = 0xbeef;
+		mpext->use_map = 1;
+		mpext->dsn64 = 1;
+		mpext->use_ack = 1;
+		mpext->ack64 = 1;
+
+		pr_debug("data_seq=%llu subflow_seq=%u dll=%u checksum=%u, dsn64=%d",
+			 mpext->data_seq, mpext->subflow_seq, mpext->dll,
+			 mpext->checksum, mpext->dsn64);
+	} /* TODO: else fallback */
+
+	msk->write_seq += ret;
+	subflow_sk(ssk)->rel_write_seq += ret;
+
+	tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle, size_goal);
+
+error_out:
+	release_sock(ssk);
+	release_sock(sk);
+
+	return ret;
 }
 
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
@@ -101,11 +188,14 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	subflow->conn = mp->sk;
 
 	if (subflow->mp_capable) {
-		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
-		pr_debug("token=%u", msk->token);
 		token_update_accept(new_sock->sk, mp->sk);
+		msk->write_seq = subflow->idsn + 1;
+		subflow->rel_write_seq = 1;
+		msk->remote_key = subflow->remote_key;
+		crypto_key_sha1(msk->remote_key, NULL, &msk->ack_seq);
+		msk->ack_seq++;
 		msk->connection_list = new_sock;
 	} else {
 		msk->subflow = new_sock;
@@ -187,10 +277,13 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	pr_debug("msk=%p", msk);
 
 	if (mp_capable) {
-		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
-		pr_debug("token=%u", msk->token);
+		msk->write_seq = subflow->idsn + 1;
+		subflow->rel_write_seq = 1;
+		msk->remote_key = subflow->remote_key;
+		crypto_key_sha1(msk->remote_key, NULL, &msk->ack_seq);
+		msk->ack_seq++;
 		msk->connection_list = msk->subflow;
 		msk->subflow = NULL;
 	}
