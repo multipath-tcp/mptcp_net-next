@@ -1,0 +1,296 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b1753952_cd853bd9",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 417,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: I guess this will become something else than a bool later (probably a bit I suppose).",
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f8dc6447_1a258acc",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 39,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "should we not rename this one? It might be a bit confusing to see \"subflow\" and \"connection_list\" which should also be a \"list of subflows\".\nIs it suppose to be the master/initial subflow?",
+      "range": {
+        "startLine": 39,
+        "startChar": 16,
+        "endLine": 39,
+        "endChar": 23
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6d0ad444_fd508b16",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 48,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: should we not prepend all functions/structures here with mptcp_ to avoid confusions elsewhere.\nI mean if in a file linked to TCP you see \"struct subflow_sock\", it is not clear it is linked to MPTCP.",
+      "range": {
+        "startLine": 48,
+        "startChar": 7,
+        "endLine": 48,
+        "endChar": 19
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d4c48c9d_ffc2a6bf",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: I guess here too and below we will use bits. Because it is easy to change, should we maybe directly switch to bits to avoid comments on that?",
+      "range": {
+        "startLine": 53,
+        "startChar": 1,
+        "endLine": 53,
+        "endChar": 5
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "10b2051e_c3c1a14f",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: I guess we will have to fix these comments (// ... → /* ... */) at some points.",
+      "range": {
+        "startLine": 53,
+        "startChar": 21,
+        "endLine": 53,
+        "endChar": 39
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "34165dcd_851aacb0",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "why a boolean for a version?",
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ca865556_305a63ef",
+        "filename": "net/ipv4/tcp_input.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 5855,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: I don\u0027t think we do but should we not use the same names as for TCP for the function name?\n\n  mptcp_rcv_synsent_state_process()",
+      "range": {
+        "startLine": 5855,
+        "startChar": 3,
+        "endLine": 5855,
+        "endChar": 20
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "06075dbb_eaa9bf69",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 708,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "should we not do like for smc and their:\n\n  smc_set_option(tp, opts, \u0026remaining);\n\nwe would then have here in tcp_output.c file only:\n\n  mptcp_set_option(tp, sk, opts, \u0026remaining);",
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9ca4ebe0_7decd8e5",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 826,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "same here, should we not add this code in options.c file?",
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "cb5e7c7c_f3774f81",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "should this go in the new subflow.c file?",
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "eec03f6a_bf94805e",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: should we always prefix the functions with \"mptcp_\"? (easier for the kprobe with BPF :-) )\nor only for the non static functions?",
+      "range": {
+        "startLine": 101,
+        "startChar": 11,
+        "endLine": 101,
+        "endChar": 25
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a84b7f88_87eab001",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 104,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "tiny detail: should we stick on one name to identify a subflow? Currently we have:\n\n  struct sock *subflow\n  struct subflow_sock *subflow\n  struct socket *sf;\n\n(but that\u0027s really a detail :-) )",
+      "range": {
+        "startLine": 104,
+        "startChar": 16,
+        "endLine": 104,
+        "endChar": 18
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b7287096_ac8e2060",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 92,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "do we need to check that?",
+      "range": {
+        "startLine": 92,
+        "startChar": 13,
+        "endLine": 92,
+        "endChar": 39
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b44891f3_3c072dda",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T16:55:37Z",
+      "side": 1,
+      "message": "detail: MPTCP_SUBFLOW?",
+      "range": {
+        "startLine": 115,
+        "startChar": 11,
+        "endLine": 115,
+        "endChar": 18
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
