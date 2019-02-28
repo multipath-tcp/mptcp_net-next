@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "aa203448_716f0b84",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T12:44:44Z",
+      "side": 1,
+      "message": "do we need a:\n\n  #if IS_ENABLED(CONFIG_MPTCP)\n\nhere?",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3e1ca401_ea6e6b35",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 458,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T12:44:44Z",
+      "side": 1,
+      "message": "should we not move this in a mptcp-specific file? (net/mptcp/options.c)\n\n(I know it is not done like that with smc, it is fine for me to keep it here, I don\u0027t know what the maintainers will want but for mptcp, we already have a dedicated file for the options)",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
