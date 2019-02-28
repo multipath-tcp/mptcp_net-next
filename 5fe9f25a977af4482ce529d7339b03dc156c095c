@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "82f12a89_84d28ae5",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 126,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-28T16:57:01Z",
+      "side": 1,
+      "message": "Yes, I\u0027ll add that",
+      "parentUuid": "aa203448_716f0b84",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "3e1ca401_ea6e6b35",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -30,6 +48,24 @@
       "writtenOn": "2019-02-28T12:44:44Z",
       "side": 1,
       "message": "should we not move this in a mptcp-specific file? (net/mptcp/options.c)\n\n(I know it is not done like that with smc, it is fine for me to keep it here, I don\u0027t know what the maintainers will want but for mptcp, we already have a dedicated file for the options)",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a38f628a_956949dd",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 458,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-02-28T16:57:01Z",
+      "side": 1,
+      "message": "That would also require moving the struct tcp_out_options declaration to a public header",
+      "parentUuid": "3e1ca401_ea6e6b35",
       "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
