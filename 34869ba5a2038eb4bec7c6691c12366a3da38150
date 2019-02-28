@@ -105,6 +105,24 @@
       "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "73b5d061_ea5529ec",
+        "filename": "ci/update-tg-tree.sh",
+        "patchSetId": 1
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-02-28T10:02:42Z",
+      "side": 1,
+      "message": "OK thank you, I see what you mean.\n\nWe should not have any issue because there is no pseudo TTY on my CI but I should then probably not use the options -t (Allocate a pseudo-TTY) and -i (Keep STDIN open even if not attached) with \u0027docker run\u0027. I will add an extra commit for this, good catch!",
+      "parentUuid": "b95579f2_a99dfe82",
+      "revId": "34869ba5a2038eb4bec7c6691c12366a3da38150",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
