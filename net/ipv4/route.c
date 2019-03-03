@@ -1820,7 +1820,7 @@ out:
 int fib_multipath_hash(const struct net *net, const struct flowi4 *fl4,
 		       const struct sk_buff *skb, struct flow_keys *flkeys)
 {
-	u32 multipath_hash = fl4->flowi4_multipath_hash;
+	u32 multipath_hash = fl4 ? fl4->flowi4_multipath_hash : 0;
 	struct flow_keys hash_keys;
 	u32 mhash;
 
@@ -2876,7 +2876,7 @@ static int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh,
 
 	if (tb[RTA_IP_PROTO]) {
 		err = rtm_getroute_parse_ip_proto(tb[RTA_IP_PROTO],
-						  &ip_proto, extack);
+						  &ip_proto, AF_INET, extack);
 		if (err)
 			return err;
 	}
