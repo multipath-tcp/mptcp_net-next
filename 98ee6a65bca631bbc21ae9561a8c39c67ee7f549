@@ -1,0 +1,169 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "03556b43_dc57c9d0",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 509,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "I guess you will want to use #define\u0027s to explain the hard coded values for the length and flags here and below.",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6d7da556_a599ad38",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 512,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "are `opts-\u003emptcp.suboptions` filled from info coming from the other host? If yes, I guess we don\u0027t want a warn here.",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e501e97c_b05bf137",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 533,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "detail: I don\u0027t know if they accept this kind of comments: // ... → /* ... */",
+      "range": {
+        "startLine": 533,
+        "startChar": 15,
+        "endLine": 533,
+        "endChar": 43
+      },
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "422f8fd2_44391d95",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 929,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "I guess here too you will use #define\u0027s to describe these hardcoded values :)",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d5838bf4_e8b2ea41",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 941,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "I guess it is temporary, right?",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "60cf20e8_af3c003e",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 960,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "I guess it is temporary, right?",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d4af54a2_f6440f9e",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 972,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "detail: could you please just comment why we need to do the MPTCP options before the SACK ones?",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a5b5be15_e22631eb",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 1280,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "(detail: I guess you will remove this line)",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5b2f5890_a477e1d9",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:13:30Z",
+      "side": 1,
+      "message": "what does ssk stand for? subflow_sk? sf_sk?",
+      "range": {
+        "startLine": 25,
+        "startChar": 14,
+        "endLine": 25,
+        "endChar": 17
+      },
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
