@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "985afb35_4113e974",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T14:46:53Z",
+      "side": 1,
+      "message": "should be static and maybe without \"stream\" in the function name?",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8b77f317_02e70eb8",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 274,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T14:46:53Z",
+      "side": 1,
+      "message": "(detail: feel free to add a new empty line here not to think that what is following is the continuation → a \u0027else if\u0027)",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dc8426b8_5421f834",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T14:46:53Z",
+      "side": 1,
+      "message": "should we not close the subflows first and then the \"meta\"? I think Christoph already talked about that. If we should do that in this order to avoid creation of new subflows (or another reason), please add a comment :)",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
