@@ -87,6 +87,24 @@
       "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "e410e2de_9a708bf1",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 458,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T14:03:51Z",
+      "side": 1,
+      "message": "now that we have a sub-structure for mptcp in `struct tcp_out_options`, should we not expose this sub-structure (struct mptcp_out_options) and move mptcp_options_write in net/mptcp/options.c? Or at least everything after:\n\n    if (likely(!(OPTION_MPTCP \u0026 opts-\u003eoptions)))\n\nMore a detail but could maybe be cleaner.",
+      "parentUuid": "dcc70a8a_ad56ea0e",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
