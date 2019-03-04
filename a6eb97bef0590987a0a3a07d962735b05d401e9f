@@ -1,0 +1,175 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "795f60f0_8db8c62d",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "should we prepend with \"use_\"/\"has_\" for all these bits here and above? It is strange to see \"!\u003d 0\" in the code when this prefix is not there, e.g.\n\n  opt_rx-\u003emptcp.data_fin \u003d (opt_rx-\u003emptcp.flags \u0026 0x10) !\u003d 0;",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5f44c4fa_def24dd0",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 506,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "why do you need extra parenthesis here? (\"!!\" not needed?)",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "21245b10_ab16df6a",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 530,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "maybe a fix for a parent commit?",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "79152bc0_4a36d559",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 266,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "we could also here work with the MPTCP sub-structure here",
+      "range": {
+        "startLine": 266,
+        "startChar": 8,
+        "endLine": 266,
+        "endChar": 35
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2198b4ff_6100d9dc",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "(detail: already discussed in another Change but should we prefix all functions/struct with \u0027mptcp_\u0027 to recognise in stacktraces/ftrace debugging?)",
+      "range": {
+        "startLine": 131,
+        "startChar": 11,
+        "endLine": 131,
+        "endChar": 21
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8f42f372_d2579a59",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "(I am a bit tired but where do you manage a possible \"overflow\" for the seq number? I guess in mptcp_recvmsg())",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9b297574_7cbbab49",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "detail: maybe better to use U64_MAX",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6d78c278_42ca6bdd",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "yes, it\u0027s FULL :-)",
+      "range": {
+        "startLine": 137,
+        "startChar": 42,
+        "endLine": 137,
+        "endChar": 55
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "79248bc4_43397b41",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 138,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T16:37:50Z",
+      "side": 1,
+      "message": "note for myself: I have to stop here :)",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    }
+  ]
+}
