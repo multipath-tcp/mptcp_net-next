@@ -15,6 +15,9 @@ GIT_REMOTE_GERRITHUB_NAME="origin"
 GIT_REMOTE_NET_NEXT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
 GIT_REMOTE_NET_NEXT_BRANCH="master"
 
+# Github remote
+GIT_REMOTE_GITHUB_URL="git@github.com:multipath-tcp/mptcp_net-next.git"
+
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
@@ -163,6 +166,10 @@ tg_export() {
 
 	tg export --linearize --force "${TG_EXPORT_BRANCH}"
 	git push --force "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_EXPORT_BRANCH}"
+
+	# also send to Github: because we rewrite the history, Gerrithub stops the
+	# sync with Github for this branch.
+	git push --force "${GIT_REMOTE_GITHUB_URL}" "${TG_EXPORT_BRANCH}"
 }
 
 tg_for_review() { local tg_conflict_files
