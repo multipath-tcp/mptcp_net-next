@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8c19cf86_c223bbef",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 1
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T12:11:14Z",
+      "side": 1,
+      "message": "(detail: I don\u0027t know if we should keep this in the message for upstream)",
+      "revId": "ff766c86842204c6af77af15faa75a351562436b",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
