@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "169b8085_f494c8e8",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T15:02:29Z",
+      "side": 1,
+      "message": "detail: I don\u0027t know if we really have to set `inline`. The compiler would threat it as an `inline`d function anyway I guess",
+      "range": {
+        "startLine": 119,
+        "startChar": 7,
+        "endLine": 119,
+        "endChar": 13
+      },
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4ef8365e_f1adce51",
+        "filename": "net/ipv4/tcp_input.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 4867,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T15:02:29Z",
+      "side": 1,
+      "message": "do you mean: if not mptcp? or \"mptcp only\")",
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}

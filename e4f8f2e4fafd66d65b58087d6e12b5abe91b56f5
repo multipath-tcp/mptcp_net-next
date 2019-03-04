@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ea57648a_524165c5",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T15:02:29Z",
+      "side": 0,
+      "message": "should we maybe remove it from the commit which introduced that?",
+      "revId": "e4f8f2e4fafd66d65b58087d6e12b5abe91b56f5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
