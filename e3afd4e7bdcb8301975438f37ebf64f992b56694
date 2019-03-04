@@ -271,6 +271,75 @@
     },
     {
       "key": {
+        "uuid": "a1dbc3fd_54bf8607",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T13:56:49Z",
+      "side": 1,
+      "message": "should be static",
+      "range": {
+        "startLine": 122,
+        "startChar": 0,
+        "endLine": 122,
+        "endChar": 3
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "41b76e09_7363977c",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T13:56:49Z",
+      "side": 1,
+      "message": "detail: why do you need to add \"stream\" in the name? (same below with the connect)",
+      "range": {
+        "startLine": 122,
+        "startChar": 10,
+        "endLine": 122,
+        "endChar": 16
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c3671097_62d8ab35",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T13:56:49Z",
+      "side": 1,
+      "message": "should be static",
+      "range": {
+        "startLine": 132,
+        "startChar": 0,
+        "endLine": 132,
+        "endChar": 3
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b7287096_ac8e2060",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
