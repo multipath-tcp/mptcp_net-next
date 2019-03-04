@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "f6f8f2f0_f6008a35",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-04T23:43:18Z",
+      "side": 1,
+      "message": "I don\u0027t think the shorter name loses much - other users of skb extension have names like \"nf_bridge_info\" and \"sec_path\". Is there another MPTCP \"extension\" or similar that people would get confused with this name?",
+      "parentUuid": "a8cf32df_2a448d5f",
+      "range": {
+        "startLine": 49,
+        "startChar": 7,
+        "endLine": 49,
+        "endChar": 16
+      },
+      "revId": "e4f8f2e4fafd66d65b58087d6e12b5abe91b56f5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b774f742_fd40d64b",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -36,6 +60,30 @@
       "writtenOn": "2019-03-04T14:52:17Z",
       "side": 1,
       "message": "what does \u0027dll\u0027 stand for? (I mean I guess it is not the libs which cause Windows to crash :-) )",
+      "range": {
+        "startLine": 53,
+        "startChar": 6,
+        "endLine": 53,
+        "endChar": 9
+      },
+      "revId": "e4f8f2e4fafd66d65b58087d6e12b5abe91b56f5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a49e9c19_09a2c10a",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-04T23:43:18Z",
+      "side": 1,
+      "message": "It\u0027s the \"Data-Level Length\" from the DSS option. I thought that abbreviation was used in the RFC, but it looks like it is not!",
+      "parentUuid": "b774f742_fd40d64b",
       "range": {
         "startLine": 53,
         "startChar": 6,
