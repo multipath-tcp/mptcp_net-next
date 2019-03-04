@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "14b11db6_6e118c51",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-04T23:58:18Z",
+      "side": 1,
+      "message": "To declare a function in a header file like this, it\u0027s needed.",
+      "parentUuid": "169b8085_f494c8e8",
+      "range": {
+        "startLine": 119,
+        "startChar": 7,
+        "endLine": 119,
+        "endChar": 13
+      },
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4ef8365e_f1adce51",
         "filename": "net/ipv4/tcp_input.c",
         "patchSetId": 8
@@ -36,6 +60,24 @@
       "writtenOn": "2019-03-04T15:02:29Z",
       "side": 1,
       "message": "do you mean: if not mptcp? or \"mptcp only\")",
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6809f69b_1c816946",
+        "filename": "net/ipv4/tcp_input.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 4867,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-04T23:58:18Z",
+      "side": 1,
+      "message": "This wording is from my previous attempt at skb-extension-like functionality. Should be \"does not have MPTCP extended data\". MPTCP packets can be collapsed if they did not contain an MPTCP option header.",
+      "parentUuid": "4ef8365e_f1adce51",
       "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
