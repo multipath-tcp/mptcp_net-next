@@ -185,6 +185,29 @@
     },
     {
       "key": {
+        "uuid": "f71774ec_d75a4054",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-04T13:38:59Z",
+      "side": 1,
+      "message": "detail: is it not more common to return a signed number, -1 in case of error, 0 if it is OK, no?\n\nthen we can use if `mptcp_established_options() \u003c 0 { error }` to avoid any confusion.",
+      "range": {
+        "startLine": 136,
+        "startChar": 0,
+        "endLine": 136,
+        "endChar": 8
+      },
+      "revId": "e3afd4e7bdcb8301975438f37ebf64f992b56694",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "cb5e7c7c_f3774f81",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
