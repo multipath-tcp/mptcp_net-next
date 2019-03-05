@@ -99,10 +99,10 @@ int genphy_c45_an_config_aneg(struct phy_device *phydev)
 
 	adv = linkmode_adv_to_mii_adv_t(phydev->advertising);
 
-	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_ADVERTISE,
-			     ADVERTISE_ALL | ADVERTISE_100BASE4 |
-			     ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM,
-			     adv);
+	ret = phy_modify_mmd_changed(phydev, MDIO_MMD_AN, MDIO_AN_ADVERTISE,
+				     ADVERTISE_ALL | ADVERTISE_100BASE4 |
+				     ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM,
+				     adv);
 	if (ret < 0)
 		return ret;
 	if (ret > 0)
@@ -110,11 +110,10 @@ int genphy_c45_an_config_aneg(struct phy_device *phydev)
 
 	adv = linkmode_adv_to_mii_10gbt_adv_t(phydev->advertising);
 
-	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_10GBT_CTRL,
-			     MDIO_AN_10GBT_CTRL_ADV10G |
-			     MDIO_AN_10GBT_CTRL_ADV5G |
-			     MDIO_AN_10GBT_CTRL_ADV2_5G,
-			     adv);
+	ret = phy_modify_mmd_changed(phydev, MDIO_MMD_AN, MDIO_AN_10GBT_CTRL,
+				     MDIO_AN_10GBT_CTRL_ADV10G |
+				     MDIO_AN_10GBT_CTRL_ADV5G |
+				     MDIO_AN_10GBT_CTRL_ADV2_5G, adv);
 	if (ret < 0)
 		return ret;
 	if (ret > 0)
@@ -499,7 +498,7 @@ int gen10g_config_aneg(struct phy_device *phydev)
 }
 EXPORT_SYMBOL_GPL(gen10g_config_aneg);
 
-int gen10g_read_status(struct phy_device *phydev)
+static int gen10g_read_status(struct phy_device *phydev)
 {
 	/* For now just lie and say it's 10G all the time */
 	phydev->speed = SPEED_10000;
@@ -507,49 +506,13 @@ int gen10g_read_status(struct phy_device *phydev)
 
 	return genphy_c45_read_link(phydev);
 }
-EXPORT_SYMBOL_GPL(gen10g_read_status);
-
-int gen10g_no_soft_reset(struct phy_device *phydev)
-{
-	/* Do nothing for now */
-	return 0;
-}
-EXPORT_SYMBOL_GPL(gen10g_no_soft_reset);
-
-int gen10g_config_init(struct phy_device *phydev)
-{
-	/* Temporarily just say we support everything */
-	linkmode_zero(phydev->supported);
-
-	linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
-			 phydev->supported);
-	linkmode_copy(phydev->advertising, phydev->supported);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(gen10g_config_init);
-
-int gen10g_suspend(struct phy_device *phydev)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(gen10g_suspend);
-
-int gen10g_resume(struct phy_device *phydev)
-{
-	return 0;
-}
-EXPORT_SYMBOL_GPL(gen10g_resume);
 
 struct phy_driver genphy_10g_driver = {
 	.phy_id         = 0xffffffff,
 	.phy_id_mask    = 0xffffffff,
 	.name           = "Generic 10G PHY",
-	.soft_reset	= gen10g_no_soft_reset,
-	.config_init    = gen10g_config_init,
+	.soft_reset	= genphy_no_soft_reset,
 	.features       = PHY_10GBIT_FEATURES,
 	.config_aneg    = gen10g_config_aneg,
 	.read_status    = gen10g_read_status,
-	.suspend        = gen10g_suspend,
-	.resume         = gen10g_resume,
 };
