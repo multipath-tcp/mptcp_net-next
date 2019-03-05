@@ -49,6 +49,30 @@
     },
     {
       "key": {
+        "uuid": "75cbd9ac_1170d8c5",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 119,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-05T08:59:30Z",
+      "side": 1,
+      "message": "my bad. I don\u0027t know why I didn\u0027t see I was in a header file! Sorry for the noise! :)",
+      "parentUuid": "14b11db6_6e118c51",
+      "range": {
+        "startLine": 119,
+        "startChar": 7,
+        "endLine": 119,
+        "endChar": 13
+      },
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "4ef8365e_f1adce51",
         "filename": "net/ipv4/tcp_input.c",
         "patchSetId": 8
@@ -78,6 +102,24 @@
       "side": 1,
       "message": "This wording is from my previous attempt at skb-extension-like functionality. Should be \"does not have MPTCP extended data\". MPTCP packets can be collapsed if they did not contain an MPTCP option header.",
       "parentUuid": "4ef8365e_f1adce51",
+      "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "92abe3d0_aa9cfddc",
+        "filename": "net/ipv4/tcp_input.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 4867,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-05T08:59:30Z",
+      "side": 1,
+      "message": "it would make more sense :)\n(but again, that\u0027s a detail :) )",
+      "parentUuid": "6809f69b_1c816946",
       "revId": "bc2e69f3100af49e59dfda0ec5aafbb9aaf51224",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
