@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "20cad43a_8e652cd2",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 509,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Yes",
+      "parentUuid": "03556b43_dc57c9d0",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "6d7da556_a599ad38",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -30,6 +48,24 @@
       "writtenOn": "2019-03-04T16:13:30Z",
       "side": 1,
       "message": "are `opts-\u003emptcp.suboptions` filled from info coming from the other host? If yes, I guess we don\u0027t want a warn here.",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9cb58078_4a5e9493",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 512,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "The opts-\u003emptcp.suboptions flags are set in tcp_options_write, so there isn\u0027t a problem with trusting flags from another host.\n\nLooking at how the suboption flags are set, I don\u0027t think it\u0027s necessary to double check and warn here. I can also simplify lines 502-507 because it\u0027s guaranteed that mpext is non-NULL.",
+      "parentUuid": "6d7da556_a599ad38",
       "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -59,6 +95,30 @@
     },
     {
       "key": {
+        "uuid": "28df1326_7bd8a768",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 533,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Using #defines for the values will document what\u0027s going on, so the comments won\u0027t be needed.",
+      "parentUuid": "e501e97c_b05bf137",
+      "range": {
+        "startLine": 533,
+        "startChar": 15,
+        "endLine": 533,
+        "endChar": 43
+      },
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "422f8fd2_44391d95",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -70,6 +130,24 @@
       "writtenOn": "2019-03-04T16:13:30Z",
       "side": 1,
       "message": "I guess here too you will use #define\u0027s to describe these hardcoded values :)",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "026d2219_8bd9d953",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 929,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Agreed",
+      "parentUuid": "422f8fd2_44391d95",
       "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -93,6 +171,24 @@
     },
     {
       "key": {
+        "uuid": "818069c9_c47cd9a4",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 941,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Are you asking if the warning is here for development purposes? The warning is here for now as a way to get feedback when other TCP options are not leaving sufficient space.\n\nSince our MPTCP-level socket is in charge of setting socket options for each subflow, we can be sure that TCP_MD5 is not enabled. As the code exists now, we would then only have to account for a possible timestamp. I don\u0027t know how paranoid we need to be about future non-MPTCP changes that might try to write other TCP options. For our \"final\" code we could trigger a fallback if there was not enough space for a mapping.",
+      "parentUuid": "d5838bf4_e8b2ea41",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "60cf20e8_af3c003e",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -104,6 +200,24 @@
       "writtenOn": "2019-03-04T16:13:30Z",
       "side": 1,
       "message": "I guess it is temporary, right?",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3e36a03e_b7987cc8",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 960,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Skipping a DSS_ACK is not a huge problem, and the warning is only here for development purposes. The DSS_ACK will be included in any outgoing packet (including TCP ACKs), so the information will likely get to the other host.\n\nIt would make sense to split debug code like this in to separate commits that can be easily dropped from the series.",
+      "parentUuid": "60cf20e8_af3c003e",
       "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -127,6 +241,24 @@
     },
     {
       "key": {
+        "uuid": "9dea3575_194a0892",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 972,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Good idea, we want to be clear that SACK is a lower priority when allocating the limited option space.",
+      "parentUuid": "d4af54a2_f6440f9e",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "a5b5be15_e22631eb",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -144,6 +276,24 @@
     },
     {
       "key": {
+        "uuid": "ab8c8baf_17029c73",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 1280,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "Yes",
+      "parentUuid": "a5b5be15_e22631eb",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5b2f5890_a477e1d9",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -155,6 +305,30 @@
       "writtenOn": "2019-03-04T16:13:30Z",
       "side": 1,
       "message": "what does ssk stand for? subflow_sk? sf_sk?",
+      "range": {
+        "startLine": 25,
+        "startChar": 14,
+        "endLine": 25,
+        "endChar": 17
+      },
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "24db1002_dc4d0da9",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-05T21:35:13Z",
+      "side": 1,
+      "message": "subflow sk",
+      "parentUuid": "5b2f5890_a477e1d9",
       "range": {
         "startLine": 25,
         "startChar": 14,
