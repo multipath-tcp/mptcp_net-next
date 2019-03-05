@@ -49,6 +49,30 @@
     },
     {
       "key": {
+        "uuid": "75353b65_3f93b4f4",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 49,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-05T08:53:38Z",
+      "side": 1,
+      "message": "my point was more that it could be seen as an extension of the protocol, or any other kind of extensions.\nI agree that both \"nf_bridge_info\" and \"sec_path\" names don\u0027t mention \"skb_ext\" but they were already there before the creation of this SKB extension, no?\n\nBut that\u0027s a detail :)\nFor me it would have maybe been clearer to mention \"skb_ext\" while it is still possible to \"easily\" change but I am fine without it if it is OK for everybody of course :)",
+      "parentUuid": "f6f8f2f0_f6008a35",
+      "range": {
+        "startLine": 49,
+        "startChar": 7,
+        "endLine": 49,
+        "endChar": 16
+      },
+      "revId": "e4f8f2e4fafd66d65b58087d6e12b5abe91b56f5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b774f742_fd40d64b",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -84,6 +108,30 @@
       "side": 1,
       "message": "It\u0027s the \"Data-Level Length\" from the DSS option. I thought that abbreviation was used in the RFC, but it looks like it is not!",
       "parentUuid": "b774f742_fd40d64b",
+      "range": {
+        "startLine": 53,
+        "startChar": 6,
+        "endLine": 53,
+        "endChar": 9
+      },
+      "revId": "e4f8f2e4fafd66d65b58087d6e12b5abe91b56f5",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ca09b7be_e60b769c",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-05T08:53:38Z",
+      "side": 1,
+      "message": "I see. Could we use data_len you think? But again, that\u0027s a detail.",
+      "parentUuid": "a49e9c19_09a2c10a",
       "range": {
         "startLine": 53,
         "startChar": 6,
