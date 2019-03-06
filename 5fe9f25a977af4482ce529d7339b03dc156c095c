@@ -105,6 +105,24 @@
       "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f30c9b36_43fc1749",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 458,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T03:03:19Z",
+      "side": 1,
+      "message": "smc_options_write() remains in this file, so it was here to stay with that pattern.",
+      "parentUuid": "e410e2de_9a708bf1",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
