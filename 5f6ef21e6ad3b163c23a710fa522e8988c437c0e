@@ -49,6 +49,30 @@
     },
     {
       "key": {
+        "uuid": "b4c8be0d_80eff290",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "For me, it makes no attempt to save space because all other variables use full words. Now that we have another bit, we have a reason to save space, no? :)\n\nBut that\u0027s a detail.",
+      "parentUuid": "cebf7d39_12b42222",
+      "range": {
+        "startLine": 152,
+        "startChar": 1,
+        "endLine": 152,
+        "endChar": 5
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d98001ca_acd34006",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -101,6 +125,24 @@
       "side": 1,
       "message": "No. These fields are specific to the options captured on an incoming connection req.",
       "parentUuid": "eebd9616_a15cbef9",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6aa56a68_96af3ba7",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "sorry, I mean: having a sub-structure with all common info. But not if it adds more complexities which will certainly be the case. It was just an idea :-)",
+      "parentUuid": "bab80672_600ccc37",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -236,6 +278,30 @@
     },
     {
       "key": {
+        "uuid": "b762ae8b_6438784e",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 140,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "fine for me!",
+      "parentUuid": "cc6deb14_68ed0070",
+      "range": {
+        "startLine": 140,
+        "startChar": 19,
+        "endLine": 140,
+        "endChar": 20
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "542a73d0_beaed525",
         "filename": "net/mptcp/options.c",
         "patchSetId": 8
@@ -271,6 +337,30 @@
       "side": 1,
       "message": "There is not an error being returned, the meaning of the return is \u0027was an MP_CAPABLE option found?\u0027. Also see above tcp_established_options(), same pattern.",
       "parentUuid": "542a73d0_beaed525",
+      "range": {
+        "startLine": 186,
+        "startChar": 0,
+        "endLine": 186,
+        "endChar": 8
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fa7ce1e7_19f44fca",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "I see, thank you.\n\nShould we not use \u0027bool\u0027 instead maybe? (again, a detail)",
+      "parentUuid": "2a9c1b92_0601f97e",
       "range": {
         "startLine": 186,
         "startChar": 0,
@@ -330,6 +420,30 @@
     },
     {
       "key": {
+        "uuid": "ebac0c05_4ab79d79",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "then maybe \"new_mp_sock\"? (not to \"conflict\" with \u0027struct mptcp_sock *msk\u0027)\n\n(and maybe also `new_subflow_sock`?)",
+      "parentUuid": "3a58e026_f7f49619",
+      "range": {
+        "startLine": 81,
+        "startChar": 16,
+        "endLine": 81,
+        "endChar": 18
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "eab52c0c_ab42faad",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -365,6 +479,30 @@
       "side": 1,
       "message": "Well, new_sock is the subflow sock, but I get your point. Will change.",
       "parentUuid": "eab52c0c_ab42faad",
+      "range": {
+        "startLine": 90,
+        "startChar": 11,
+        "endLine": 90,
+        "endChar": 19
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "961c3d41_1181388f",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "thank you",
+      "parentUuid": "71e84a6a_80772f11",
       "range": {
         "startLine": 90,
         "startChar": 11,
@@ -424,6 +562,30 @@
     },
     {
       "key": {
+        "uuid": "76a39240_4d7c8c74",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "good idea!\n\nI know it is more details but should we maybe agree on the naming? It\u0027s mainly for later but it is not to mix the different structures we have. But really a detail. We can also simply follow what has been done here :-)",
+      "parentUuid": "5e49e18d_6d217911",
+      "range": {
+        "startLine": 101,
+        "startChar": 10,
+        "endLine": 101,
+        "endChar": 14
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b0ab80f6_e91139e8",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -453,6 +615,24 @@
       "side": 1,
       "message": "Will change to static. stream because it is used/related to the mtpcp_stream_ops struct.",
       "parentUuid": "b0ab80f6_e91139e8",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "aa69c063_ce3e2f8d",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "ok for stream",
+      "parentUuid": "9677d521_852c9b19",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -494,6 +674,24 @@
     },
     {
       "key": {
+        "uuid": "70c0ef1f_553cc26b",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 209,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "ok for stream\n\n(I should have said \"same below\" :-) )",
+      "parentUuid": "7d96ea97_80d02c62",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e5e84f49_4f57ae1a",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -523,6 +721,24 @@
       "side": 1,
       "message": "Ditto.",
       "parentUuid": "e5e84f49_4f57ae1a",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "409fda86_d5a83cd2",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 224,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "ok for stream",
+      "parentUuid": "25ba34a0_68ce4348",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -611,6 +827,30 @@
     },
     {
       "key": {
+        "uuid": "8f119034_e0bfdaf5",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "indeed, you are right!",
+      "parentUuid": "19990aad_c69738ea",
+      "range": {
+        "startLine": 61,
+        "startChar": 8,
+        "endLine": 61,
+        "endChar": 13
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "a4ed8a3d_cc2b23cf",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
@@ -643,6 +883,24 @@
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bc8405c7_b40aeb66",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T10:28:39Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "edb91b8f_7d3490c9",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     }
   ]
 }
