@@ -37,6 +37,24 @@
     },
     {
       "key": {
+        "uuid": "e00d3157_21bb6b77",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "personally, I know that we will store the ACK32 and ACK64 in the same variable (ack) but if in the code we have \"if (mptcp.ack64) { ... }\" or \"mptcp.ack64 \u003d (opt_rx-\u003emptcp.flags \u0026 0x02) !\u003d 0\" that might looks strange, maybe clearer with \"if (mptcp.is_ack64) { ... }\" and \"mptcp.is_ack64 \u003d !!(opt_rx-\u003emptcp.flags \u0026 0x02)\".\n\nSo yes, also clearer with !!.\nI don\u0027t know if we have to use the exact same names from RFC6824, maybe the context was different and it was clear there that it was a \"boolean\" (bit) while in the code it might be less obvious.\n\nBut that\u0027s a detail, I am fine without the is_/has_/use_.",
+      "parentUuid": "76db0712_4ac3d407",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5f44c4fa_def24dd0",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -66,6 +84,24 @@
       "side": 1,
       "message": "I liked the way it made line 506 wrap :)\n\nI\u0027ll find a prettier way to handle these assignments.",
       "parentUuid": "5f44c4fa_def24dd0",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "da1756d8_7e1fab3e",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 506,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "we can also keep the parenthesis, it doesn\u0027t hurt. That\u0027s a detail as well.",
+      "parentUuid": "17a0c10f_1dcf7469",
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -154,6 +190,30 @@
     },
     {
       "key": {
+        "uuid": "26c26dde_d36fc73c",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 266,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "\u003e It\u0027s a little complicated given the way the sub-structure is declared.\n\nSorry I didn\u0027t give enough references to a previous comment. We can declare the sub-structure in mptcp.h to expose it and it within tcp_options_received.\n\nWe can also use \"struct mptcp_(skb_)_ext\" here indeed. Something exposed, only to work with the MPTCP part here, not touching the other options.",
+      "parentUuid": "3c3054e3_5926b58e",
+      "range": {
+        "startLine": 266,
+        "startChar": 8,
+        "endLine": 266,
+        "endChar": 35
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "2198b4ff_6100d9dc",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -201,6 +261,30 @@
     },
     {
       "key": {
+        "uuid": "49597e5a_c21832b7",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "yes, I understand. Personally in different projects, I use to start static functions with \"_\" and the non static ones with the name of the file, e.g. mptcp_protocol_.  Like that, it is easy to recognise in the code if it is an utility functions, internal to the current file or something exposed where error management could be different, we know from which file it comes, etc. But in the kernel, that\u0027s different of course.\n\nI am of course fine not to prefix these utility functions, especially these ones that will probably been inlined by the compiler.\nIt is just not to have many of these static functions in /sys/kernel/debug/tracing/available_filter_functions, maybe \"conflicting\" with others. I don\u0027t know if since FTrace and KProbe (via BPF) are more popular, maintainers prefer having more prefixes.",
+      "parentUuid": "0a3cabef_3989c31e",
+      "range": {
+        "startLine": 131,
+        "startChar": 11,
+        "endLine": 131,
+        "endChar": 21
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8f42f372_d2579a59",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -233,6 +317,24 @@
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dafc8587_52f34e07",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "OK thank you!",
+      "parentUuid": "946b8e92_28f564f3",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
@@ -288,6 +390,48 @@
       "side": 1,
       "message": "~0xFFFFFFFFULL \u003d\u003d 0xFFFFFFFF00000000ULL",
       "parentUuid": "9b297574_7cbbab49",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e761a1cb_8a96d74e",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "Ack",
+      "parentUuid": "6d78c278_42ca6bdd",
+      "range": {
+        "startLine": 137,
+        "startChar": 42,
+        "endLine": 137,
+        "endChar": 55
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "b77a60ba_3f995a5f",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T09:59:46Z",
+      "side": 1,
+      "message": "good point! Is it then ~U32_MAX? Or U32_MAX \u003c\u003c 32\n\nbut that\u0027s also fine, I just didn\u0027t get you wanted to work with the first half.",
+      "parentUuid": "644472b3_e81e4c77",
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
