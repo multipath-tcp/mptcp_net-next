@@ -72,6 +72,24 @@
     },
     {
       "key": {
+        "uuid": "d4d6bcb4_4a612365",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 512,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T08:08:10Z",
+      "side": 1,
+      "message": "That would be nice indeed. Feel free to also add a comment that these fields have been previously set by us :)",
+      "parentUuid": "9cb58078_4a5e9493",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e501e97c_b05bf137",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -189,6 +207,24 @@
     },
     {
       "key": {
+        "uuid": "657396c6_35ecfb5d",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 941,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T08:08:10Z",
+      "side": 1,
+      "message": "\u003e Are you asking if the warning is here for development purposes? The warning is here for now as a way to get feedback when other TCP options are not leaving sufficient space.\n\nOK good to know.\n\n\u003e Since our MPTCP-level socket is in charge of setting socket options for each subflow, we can be sure that TCP_MD5 is not enabled. As the code exists now, we would then only have to account for a possible timestamp. I don\u0027t know how paranoid we need to be about future non-MPTCP changes that might try to write other TCP options. For our \"final\" code we could trigger a fallback if there was not enough space for a mapping.\n\nOK great, not an urgent task indeed.",
+      "parentUuid": "818069c9_c47cd9a4",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "60cf20e8_af3c003e",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -218,6 +254,24 @@
       "side": 1,
       "message": "Skipping a DSS_ACK is not a huge problem, and the warning is only here for development purposes. The DSS_ACK will be included in any outgoing packet (including TCP ACKs), so the information will likely get to the other host.\n\nIt would make sense to split debug code like this in to separate commits that can be easily dropped from the series.",
       "parentUuid": "60cf20e8_af3c003e",
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3f32699c_e8d0f0b3",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 960,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T08:08:10Z",
+      "side": 1,
+      "message": "that\u0027s a good idea!\n\nOr just a pr_debug(\"WARN: (...)\")?",
+      "parentUuid": "3e36a03e_b7987cc8",
       "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -329,6 +383,30 @@
       "side": 1,
       "message": "subflow sk",
       "parentUuid": "5b2f5890_a477e1d9",
+      "range": {
+        "startLine": 25,
+        "startChar": 14,
+        "endLine": 25,
+        "endChar": 17
+      },
+      "revId": "98ee6a65bca631bbc21ae9561a8c39c67ee7f549",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "50f0b932_14c90848",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T08:08:10Z",
+      "side": 1,
+      "message": "should we use \"longer\" name to avoid confusions? It is just to avoid having only very short names :) (sk, msk, ssk, skb) mainly to help people who doesn\u0027t know about MPTCP, having clear variable names might help them.\n\nbut that\u0027s a detail ;-)",
+      "parentUuid": "24db1002_dc4d0da9",
       "range": {
         "startLine": 25,
         "startChar": 14,
