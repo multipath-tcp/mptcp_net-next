@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "76db0712_4ac3d407",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 125,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "Most of the names are exactly the bit names from RFC6824. I added a few more bits to represent information that\u0027s handled some other way in the MPTCP option encoding - use_ack/use_map indicate whether the ack and map-related fields are valid, and ack64/dsn64 for how to interpret the length. Another way to extract the data_fin flag would be:\n\n  opt_rx-\u003emptcp.data_fin \u003d !!(opt_rx-\u003emptcp.flags \u0026 MPTCP_FLAG_DATA_FIN);\n\nIs that any better?",
+      "parentUuid": "795f60f0_8db8c62d",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "5f44c4fa_def24dd0",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -30,6 +48,24 @@
       "writtenOn": "2019-03-04T16:37:50Z",
       "side": 1,
       "message": "why do you need extra parenthesis here? (\"!!\" not needed?)",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "17a0c10f_1dcf7469",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 506,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "I liked the way it made line 506 wrap :)\n\nI\u0027ll find a prettier way to handle these assignments.",
+      "parentUuid": "5f44c4fa_def24dd0",
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -53,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "1744e2e2_74466799",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 530,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "Yes",
+      "parentUuid": "21245b10_ab16df6a",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "79152bc0_4a36d559",
         "filename": "net/mptcp/options.c",
         "patchSetId": 8
@@ -64,6 +118,30 @@
       "writtenOn": "2019-03-04T16:37:50Z",
       "side": 1,
       "message": "we could also here work with the MPTCP sub-structure here",
+      "range": {
+        "startLine": 266,
+        "startChar": 8,
+        "endLine": 266,
+        "endChar": 35
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3c3054e3_5926b58e",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 266,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "It\u0027s a little complicated given the way the sub-structure is declared. I might use struct mptcp_ext within tcp_options_received so it can be passed in here and easily copied.",
+      "parentUuid": "79152bc0_4a36d559",
       "range": {
         "startLine": 266,
         "startChar": 8,
@@ -99,6 +177,30 @@
     },
     {
       "key": {
+        "uuid": "0a3cabef_3989c31e",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "I do try to use the mptcp_ prefix with larger functions, but it\u0027s common to not prefix little utility functions like this within file scope (see tcp.c)",
+      "parentUuid": "2198b4ff_6100d9dc",
+      "range": {
+        "startLine": 131,
+        "startChar": 11,
+        "endLine": 131,
+        "endChar": 21
+      },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8f42f372_d2579a59",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -110,6 +212,24 @@
       "writtenOn": "2019-03-04T16:37:50Z",
       "side": 1,
       "message": "(I am a bit tired but where do you manage a possible \"overflow\" for the seq number? I guess in mptcp_recvmsg())",
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "946b8e92_28f564f3",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 136,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "Line 137 builds the 64-bit sequence number from the lower 32 bits of \u0027seq\u0027, and the upper 32 bits of old_seq+old_dll+1\n\nThe \"+ 1\" is there to make the overflow happen, at least for the case where the beginning of the new mapping is right after the old mapping. This needs some work to use with multiple subflows where we might encounter a mapping that is from earlier or later in the sequence space.",
+      "parentUuid": "8f42f372_d2579a59",
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -150,6 +270,24 @@
         "endLine": 137,
         "endChar": 55
       },
+      "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "644472b3_e81e4c77",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 137,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-06T00:08:06Z",
+      "side": 1,
+      "message": "~0xFFFFFFFFULL \u003d\u003d 0xFFFFFFFF00000000ULL",
+      "parentUuid": "9b297574_7cbbab49",
       "revId": "a6eb97bef0590987a0a3a07d962735b05d401e9f",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
