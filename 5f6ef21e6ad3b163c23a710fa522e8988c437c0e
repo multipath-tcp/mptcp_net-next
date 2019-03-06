@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "cebf7d39_12b42222",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "tfo_listener makes no attempt to save space (bool between u64 and u32) so not thinking we need to worry about space here. Will move it to be next to tfo_listener. Naming is to stay consistent with similiar field in tcp_sock, with the meaning \u0027this is the mptcp version of this structure\u0027.",
+      "parentUuid": "05b600b4_9c7f5d1e",
+      "range": {
+        "startLine": 152,
+        "startChar": 1,
+        "endLine": 152,
+        "endChar": 5
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d98001ca_acd34006",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -65,6 +89,24 @@
     },
     {
       "key": {
+        "uuid": "bab80672_600ccc37",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "No. These fields are specific to the options captured on an incoming connection req.",
+      "parentUuid": "eebd9616_a15cbef9",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "c6875439_cf92caff",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -82,6 +124,24 @@
     },
     {
       "key": {
+        "uuid": "39d76bfe_05695c9c",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 799,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Sure, will do.",
+      "parentUuid": "c6875439_cf92caff",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "324cba8a_268f4e4a",
         "filename": "net/mptcp/options.c",
         "patchSetId": 8
@@ -93,6 +153,30 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "here, we could also receive only the mptcp sub-structure and send that to mptcp_parse_option() (see the discussion in https://review.gerrithub.io/c/multipath-tcp/mptcp_net-next/+/437391/8 )",
+      "range": {
+        "startLine": 114,
+        "startChar": 9,
+        "endLine": 114,
+        "endChar": 44
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e463e9db_4b458b46",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Sure, will do.",
+      "parentUuid": "324cba8a_268f4e4a",
       "range": {
         "startLine": 114,
         "startChar": 9,
@@ -128,6 +212,30 @@
     },
     {
       "key": {
+        "uuid": "cc6deb14_68ed0070",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 140,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "I think it is clear there are already 2 \u0027++\u0027 operations on ptr in this loop.",
+      "parentUuid": "213aaaa5_4e0451f6",
+      "range": {
+        "startLine": 140,
+        "startChar": 19,
+        "endLine": 140,
+        "endChar": 20
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "542a73d0_beaed525",
         "filename": "net/mptcp/options.c",
         "patchSetId": 8
@@ -139,6 +247,30 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "detail: is it not more common to return a signed number, -1 in case of error, 0 if it is OK, no?\n\nthen we can use if `mptcp_established_options() \u003c 0 { error }` to avoid any confusion.",
+      "range": {
+        "startLine": 186,
+        "startChar": 0,
+        "endLine": 186,
+        "endChar": 8
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2a9c1b92_0601f97e",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "There is not an error being returned, the meaning of the return is \u0027was an MP_CAPABLE option found?\u0027. Also see above tcp_established_options(), same pattern.",
+      "parentUuid": "542a73d0_beaed525",
       "range": {
         "startLine": 186,
         "startChar": 0,
@@ -174,6 +306,30 @@
     },
     {
       "key": {
+        "uuid": "3a58e026_f7f49619",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Will change. mptcp_sock?",
+      "parentUuid": "9307d15b_9c71b70a",
+      "range": {
+        "startLine": 81,
+        "startChar": 16,
+        "endLine": 81,
+        "endChar": 18
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "eab52c0c_ab42faad",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -185,6 +341,30 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "detail: here you don\u0027t print `new_sock` but `subflow_sk(new_sock-\u003esk)`",
+      "range": {
+        "startLine": 90,
+        "startChar": 11,
+        "endLine": 90,
+        "endChar": 19
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "71e84a6a_80772f11",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Well, new_sock is the subflow sock, but I get your point. Will change.",
+      "parentUuid": "eab52c0c_ab42faad",
       "range": {
         "startLine": 90,
         "startChar": 11,
@@ -220,6 +400,30 @@
     },
     {
       "key": {
+        "uuid": "5e49e18d_6d217911",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 101,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Agreed, this was meant to be short for \u0027the MPTCP connection sock\u0027. Maybe \u0027mptcp_conn\u0027?",
+      "parentUuid": "26b318ae_4cc8fbdb",
+      "range": {
+        "startLine": 101,
+        "startChar": 10,
+        "endLine": 101,
+        "endChar": 14
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "b0ab80f6_e91139e8",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -231,6 +435,24 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "should be static (and why do you have \"stream\" in the function name?)",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9677d521_852c9b19",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Will change to static. stream because it is used/related to the mtpcp_stream_ops struct.",
+      "parentUuid": "b0ab80f6_e91139e8",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -254,6 +476,24 @@
     },
     {
       "key": {
+        "uuid": "7d96ea97_80d02c62",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 209,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Ditto.",
+      "parentUuid": "1d7e8664_5e1c1306",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "e5e84f49_4f57ae1a",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -271,6 +511,24 @@
     },
     {
       "key": {
+        "uuid": "25ba34a0_68ce4348",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 224,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Ditto.",
+      "parentUuid": "e5e84f49_4f57ae1a",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "fcab246a_4d280723",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
@@ -282,6 +540,24 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "here, we could also work with the mptcp substructure from `struct tcp_options_received`, see https://review.gerrithub.io/c/multipath-tcp/mptcp_net-next/+/437391/8",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7f316b08_fb91167f",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Sure, will do.",
+      "parentUuid": "fcab246a_4d280723",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -311,6 +587,30 @@
     },
     {
       "key": {
+        "uuid": "19990aad_c69738ea",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "Or just zero out the couple that are needed. If they are set by mptcp_get_options() this implies other fields are valid.",
+      "parentUuid": "db1ccbb2_f41033e8",
+      "range": {
+        "startLine": 61,
+        "startChar": 8,
+        "endLine": 61,
+        "endChar": 13
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "a4ed8a3d_cc2b23cf",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
@@ -322,6 +622,24 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "no error in this case?",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "edb91b8f_7d3490c9",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T02:53:22Z",
+      "side": 1,
+      "message": "No. See same case in tcp_v4_conn_request().",
+      "parentUuid": "a4ed8a3d_cc2b23cf",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
