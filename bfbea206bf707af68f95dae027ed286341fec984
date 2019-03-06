@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "3afc956d_7ab3d9cf",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 264,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T00:59:58Z",
+      "side": 1,
+      "message": "Agree on static but I was naming all mtpcp routines in \u0027struct proto_ops mptcp_stream_ops\u0027 with the word mptcp_stream_xxx pattern for consistency.",
+      "parentUuid": "985afb35_4113e974",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "8b77f317_02e70eb8",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -36,6 +54,24 @@
     },
     {
       "key": {
+        "uuid": "67ae9143_268f2749",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 274,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T00:59:58Z",
+      "side": 1,
+      "message": "Will do.",
+      "parentUuid": "8b77f317_02e70eb8",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "dc8426b8_5421f834",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -47,6 +83,24 @@
       "writtenOn": "2019-03-04T14:46:53Z",
       "side": 1,
       "message": "should we not close the subflows first and then the \"meta\"? I think Christoph already talked about that. If we should do that in this order to avoid creation of new subflows (or another reason), please add a comment :)",
+      "revId": "bfbea206bf707af68f95dae027ed286341fec984",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8aed18b5_04e216e8",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 275,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-06T00:59:58Z",
+      "side": 1,
+      "message": "The field -\u003esubflow is perhaps poorly named here, it points to either a socket whose connection is in process, is not mp-capable (treat as tcp), or is the listening socket. -\u003econnection points at a connected mptcp socket. These two fields are never set at the same time, this code allows for shutdown() to be called both before and after the connection is established.\n\nAlos, at this point in the patch set there is only a single subflow connection possible, later when multiple subflows are allowed this code will change to shut them all down. There is not a \u0027meta\u0027 socket in the sense of the multipath-tcp.org implementation.",
+      "parentUuid": "dc8426b8_5421f834",
       "revId": "bfbea206bf707af68f95dae027ed286341fec984",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
