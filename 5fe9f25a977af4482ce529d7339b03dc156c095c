@@ -123,6 +123,24 @@
       "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c7b89f55_4ee122e1",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 458,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-06T11:25:41Z",
+      "side": 1,
+      "message": "I understand but smc options are not as complex as for MPTCP. They don\u0027t even have to store anything specific in tcp_out_options and in MPTCP, we already have mptcp/options.c :)\n\nif a `struct mptcp_out_options` is exposed in `mptcp.h`, we could easily move this function -- that will grow later -- to options.c, no?\n\nhere we would only have to call something like:\n\n    mptcp_options_write(\u003cptr\u003e, \u003coptions\u003e, \u003copts-\u003emptcp\u003e);\n\n(and move all the OPTION_MPTCP_* of course)\n\nIt would look cleaner for us and less \"impact\" in the existing TCP code. But I guess we could also keep this code here. It is just that it might be big to support all cases (and the new RFC?)",
+      "parentUuid": "f30c9b36_43fc1749",
+      "revId": "5fe9f25a977af4482ce529d7339b03dc156c095c",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
