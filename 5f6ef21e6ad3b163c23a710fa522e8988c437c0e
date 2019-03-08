@@ -73,6 +73,30 @@
     },
     {
       "key": {
+        "uuid": "4dade086_f48eea28",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Leaving it as it\u0027s own bool variable also makes it look like a one-line change with no change to existing TCP code, which is a good thing for the purposes of this patch set.",
+      "parentUuid": "b4c8be0d_80eff290",
+      "range": {
+        "startLine": 152,
+        "startChar": 1,
+        "endLine": 152,
+        "endChar": 5
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d98001ca_acd34006",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -84,6 +108,30 @@
       "writtenOn": "2019-03-04T14:18:59Z",
       "side": 1,
       "message": "detail: as for the change introducing subflow_sock, should we prepend the name of the structure here and the function below with \"mptcp_\" to make it clear it is linked to MPTCP.",
+      "range": {
+        "startLine": 66,
+        "startChar": 7,
+        "endLine": 66,
+        "endChar": 27
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7901f266_c79b5978",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Both subflow_sock and subflow_request_sock are defined in mtpcp.h and not referenced outside of net/mptcp, so I think their meaning is clear. I would consider adding a .h within net/mptcp to hold items which do not need to be visible outside of net/mptcp. This would also more clearly define the exact points of interaction between TCP and MPTCP.",
+      "parentUuid": "d98001ca_acd34006",
       "range": {
         "startLine": 66,
         "startChar": 7,
@@ -149,6 +197,24 @@
     },
     {
       "key": {
+        "uuid": "3950845b_c40cfa80",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 74,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "6aa56a68_96af3ba7",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "c6875439_cf92caff",
         "filename": "net/ipv4/tcp_output.c",
         "patchSetId": 8
@@ -178,6 +244,24 @@
       "side": 1,
       "message": "Sure, will do.",
       "parentUuid": "c6875439_cf92caff",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bfddb3a0_9128ec30",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 799,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Were you also suggesting the addition of a static key for mptcp, such as is used in smc_set_option_cond()? , or just suggesting putting the less likely option handling in a subroutine?",
+      "parentUuid": "39d76bfe_05695c9c",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -228,6 +312,30 @@
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f8b82497_b01bf508",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "e463e9db_4b458b46",
+      "range": {
+        "startLine": 114,
+        "startChar": 9,
+        "endLine": 114,
+        "endChar": 44
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
@@ -290,6 +398,30 @@
       "side": 1,
       "message": "fine for me!",
       "parentUuid": "cc6deb14_68ed0070",
+      "range": {
+        "startLine": 140,
+        "startChar": 19,
+        "endLine": 140,
+        "endChar": 20
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "900a2c5b_2476e62e",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 140,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "b762ae8b_6438784e",
       "range": {
         "startLine": 140,
         "startChar": 19,
@@ -373,6 +505,30 @@
     },
     {
       "key": {
+        "uuid": "05874fee_a6c833ec",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Would prefer to follow existing pattern.",
+      "parentUuid": "fa7ce1e7_19f44fca",
+      "range": {
+        "startLine": 186,
+        "startChar": 0,
+        "endLine": 186,
+        "endChar": 8
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "9307d15b_9c71b70a",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -444,6 +600,30 @@
     },
     {
       "key": {
+        "uuid": "ff8b2d36_eeeba135",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 81,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "ebac0c05_4ab79d79",
+      "range": {
+        "startLine": 81,
+        "startChar": 16,
+        "endLine": 81,
+        "endChar": 18
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "eab52c0c_ab42faad",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -512,6 +692,30 @@
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "bc015689_ee5412ed",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 90,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "961c3d41_1181388f",
+      "range": {
+        "startLine": 90,
+        "startChar": 11,
+        "endLine": 90,
+        "endChar": 19
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
@@ -639,6 +843,24 @@
     },
     {
       "key": {
+        "uuid": "34e6ed37_dab2995f",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 193,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "aa69c063_ce3e2f8d",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1d7e8664_5e1c1306",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 8
@@ -689,6 +911,24 @@
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "100e311b_23cd9303",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 209,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "70c0ef1f_553cc26b",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
@@ -745,6 +985,24 @@
     },
     {
       "key": {
+        "uuid": "336a3b7c_abe5349d",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 224,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "409fda86_d5a83cd2",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "fcab246a_4d280723",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
@@ -777,6 +1035,24 @@
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "34288b73_2800fb17",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "7f316b08_fb91167f",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
@@ -851,6 +1127,30 @@
     },
     {
       "key": {
+        "uuid": "5a50feed_1f55a38b",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "8f119034_e0bfdaf5",
+      "range": {
+        "startLine": 61,
+        "startChar": 8,
+        "endLine": 61,
+        "endChar": 13
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "a4ed8a3d_cc2b23cf",
         "filename": "net/mptcp/subflow.c",
         "patchSetId": 8
@@ -898,6 +1198,24 @@
       "side": 1,
       "message": "Ack",
       "parentUuid": "edb91b8f_7d3490c9",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0301d094_d467b304",
+        "filename": "net/mptcp/subflow.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-03-08T02:41:10Z",
+      "side": 1,
+      "message": "Done",
+      "parentUuid": "bc8405c7_b40aeb66",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": false
