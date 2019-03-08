@@ -97,6 +97,30 @@
     },
     {
       "key": {
+        "uuid": "a55d531d_d6c2ae28",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 152,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-08T14:44:28Z",
+      "side": 1,
+      "message": "ok for me, I don\u0027t really see that as a change to the existing TCP code, more an optimisation but that\u0027s a detail.\nIf it is a problem for upstream, that\u0027s easy to fix ;-)",
+      "parentUuid": "4dade086_f48eea28",
+      "range": {
+        "startLine": 152,
+        "startChar": 1,
+        "endLine": 152,
+        "endChar": 5
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "d98001ca_acd34006",
         "filename": "include/net/mptcp.h",
         "patchSetId": 8
@@ -132,6 +156,30 @@
       "side": 1,
       "message": "Both subflow_sock and subflow_request_sock are defined in mtpcp.h and not referenced outside of net/mptcp, so I think their meaning is clear. I would consider adding a .h within net/mptcp to hold items which do not need to be visible outside of net/mptcp. This would also more clearly define the exact points of interaction between TCP and MPTCP.",
       "parentUuid": "d98001ca_acd34006",
+      "range": {
+        "startLine": 66,
+        "startChar": 7,
+        "endLine": 66,
+        "endChar": 27
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "92bfe894_99293a1e",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 8
+      },
+      "lineNbr": 66,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-08T14:44:28Z",
+      "side": 1,
+      "message": "\u003e I would consider adding a .h within net/mptcp to hold items which do not need to be visible outside of net/mptcp.\n\ngood idea to have an \"internal\" header file!\n\n\u003e This would also more clearly define the exact points of interaction between TCP and MPTCP.\n\nIndeed!",
+      "parentUuid": "7901f266_c79b5978",
       "range": {
         "startLine": 66,
         "startChar": 7,
@@ -262,6 +310,24 @@
       "side": 1,
       "message": "Were you also suggesting the addition of a static key for mptcp, such as is used in smc_set_option_cond()? , or just suggesting putting the less likely option handling in a subroutine?",
       "parentUuid": "39d76bfe_05695c9c",
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1fdf3318_9f4b2946",
+        "filename": "net/ipv4/tcp_output.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 799,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-08T14:44:28Z",
+      "side": 1,
+      "message": "I guess at some points, we would need a static key for MPTCP but that\u0027s not a priority.\nBut yes, I was more suggesting moving the code to a new function to avoid all #ifdef and MPTCP-specific code here.",
+      "parentUuid": "bfddb3a0_9128ec30",
       "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -517,6 +583,30 @@
       "side": 1,
       "message": "Would prefer to follow existing pattern.",
       "parentUuid": "fa7ce1e7_19f44fca",
+      "range": {
+        "startLine": 186,
+        "startChar": 0,
+        "endLine": 186,
+        "endChar": 8
+      },
+      "revId": "5f6ef21e6ad3b163c23a710fa522e8988c437c0e",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "b19bac54_5a8c3e96",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 8
+      },
+      "lineNbr": 186,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-03-08T14:44:28Z",
+      "side": 1,
+      "message": "fine for me!",
+      "parentUuid": "05874fee_a6c833ec",
       "range": {
         "startLine": 186,
         "startChar": 0,
