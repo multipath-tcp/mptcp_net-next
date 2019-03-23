@@ -10,7 +10,7 @@
 #include <net/mptcp.h>
 
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
-			struct tcp_options_received *opt_rx)
+			struct mptcp_options_received *opt_rx)
 {
 	u8 subtype = *ptr >> 4;
 
@@ -27,16 +27,16 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			break;
 
 		pr_debug("MP_CAPABLE");
-		opt_rx->mptcp.mp_capable = 1;
-		opt_rx->mptcp.version = *ptr++ & 0x0F;
+		opt_rx->mp_capable = 1;
+		opt_rx->version = *ptr++ & 0x0F;
 		pr_debug("flags=%02x", *ptr);
-		opt_rx->mptcp.flags = *ptr++;
-		opt_rx->mptcp.sndr_key = get_unaligned_be64(ptr);
-		pr_debug("sndr_key=%llu", opt_rx->mptcp.sndr_key);
+		opt_rx->flags = *ptr++;
+		opt_rx->sndr_key = get_unaligned_be64(ptr);
+		pr_debug("sndr_key=%llu", opt_rx->sndr_key);
 		ptr += 8;
 		if (opsize == TCPOLEN_MPTCP_MPC_SYNACK) {
-			opt_rx->mptcp.rcvr_key = get_unaligned_be64(ptr);
-			pr_debug("rcvr_key=%llu", opt_rx->mptcp.rcvr_key);
+			opt_rx->rcvr_key = get_unaligned_be64(ptr);
+			pr_debug("rcvr_key=%llu", opt_rx->rcvr_key);
 			ptr += 8;
 		}
 		break;
@@ -73,7 +73,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
-		opt_rx->mptcp.dss = 1;
+		opt_rx->dss = 1;
 		break;
 
 	/* MPTCPOPT_ADD_ADDR
@@ -107,6 +107,39 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	default:
 		break;
+	}
+}
+
+void mptcp_get_options(const struct sk_buff *skb,
+		       struct mptcp_options_received *opt_rx)
+{
+	const unsigned char *ptr;
+	const struct tcphdr *th = tcp_hdr(skb);
+	int length = (th->doff * 4) - sizeof(struct tcphdr);
+
+	ptr = (const unsigned char *)(th + 1);
+
+	while (length > 0) {
+		int opcode = *ptr++;
+		int opsize;
+
+		switch (opcode) {
+		case TCPOPT_EOL:
+			return;
+		case TCPOPT_NOP:	/* Ref: RFC 793 section 3.1 */
+			length--;
+			continue;
+		default:
+			opsize = *ptr++;
+			if (opsize < 2) /* "silly options" */
+				return;
+			if (opsize > length)
+				return;	/* don't parse partial options */
+			if (opcode == TCPOPT_MPTCP)
+				mptcp_parse_option(ptr, opsize, opt_rx);
+			ptr += opsize - 2;
+			length -= opsize;
+		}
 	}
 }
 
@@ -150,15 +183,33 @@ unsigned int mptcp_established_options(struct sock *sk, u64 *local_key,
 	return 0;
 }
 
+unsigned int mptcp_synack_options(const struct request_sock *req,
+				  u64 *local_key, u64 *remote_key)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	pr_debug("subflow_req=%p", subflow_req);
+	if (subflow_req->mp_capable) {
+		*local_key = subflow_req->local_key;
+		*remote_key = subflow_req->remote_key;
+		pr_debug("local_key=%llu", *local_key);
+		pr_debug("remote_key=%llu", *remote_key);
+	}
+	return subflow_req->mp_capable;
+}
+
 void mptcp_options_write(__be32 *ptr, struct mptcp_out_options *opts)
 {
 #if IS_ENABLED(CONFIG_MPTCP)
 	if ((OPTION_MPTCP_MPC_SYN |
+	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 		u8 len;
 
 		if (OPTION_MPTCP_MPC_SYN & opts->suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYN;
+		else if (OPTION_MPTCP_MPC_SYNACK & opts->suboptions)
+			len = TCPOLEN_MPTCP_MPC_SYNACK;
 		else
 			len = TCPOLEN_MPTCP_MPC_ACK;
 
@@ -168,7 +219,8 @@ void mptcp_options_write(__be32 *ptr, struct mptcp_out_options *opts)
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
+		if ((OPTION_MPTCP_MPC_SYNACK |
+		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}

@@ -105,7 +105,7 @@ struct tcp_options_received {
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 #if IS_ENABLED(CONFIG_MPTCP)
-	struct {
+	struct mptcp_options_received {
 		u8      mp_capable : 1,
 			mp_join : 1,
 			dss : 1,
@@ -143,6 +143,7 @@ struct tcp_request_sock {
 	const struct tcp_request_sock_ops *af_specific;
 	u64				snt_synack; /* first SYNACK sent time */
 	bool				tfo_listener;
+	bool				is_mptcp;
 	u32				txhash;
 	u32				rcv_isn;
 	u32				snt_isn;

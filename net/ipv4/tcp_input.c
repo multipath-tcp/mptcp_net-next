@@ -3851,7 +3851,7 @@ void tcp_parse_options(const struct net *net,
 				break;
 #endif
 			case TCPOPT_MPTCP:
-				mptcp_parse_option(ptr, opsize, opt_rx);
+				mptcp_parse_option(ptr, opsize, &opt_rx->mptcp);
 				break;
 
 			case TCPOPT_FASTOPEN:
@@ -6432,6 +6432,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 
 	tcp_rsk(req)->af_specific = af_ops;
 	tcp_rsk(req)->ts_off = 0;
+	tcp_rsk(req)->is_mptcp = 0;
 
 	tcp_clear_options(&tmp_opt);
 	tmp_opt.mss_clamp = af_ops->mss_clamp;
