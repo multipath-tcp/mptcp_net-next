@@ -28,7 +28,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 
 		pr_debug("MP_CAPABLE");
 		opt_rx->mp_capable = 1;
-		opt_rx->version = *ptr++ & 0x0F;
+		opt_rx->version = *ptr++ & MPTCPOPT_VERSION_MASK;
 		pr_debug("flags=%02x", *ptr);
 		opt_rx->flags = *ptr++;
 		opt_rx->sndr_key = get_unaligned_be64(ptr);
@@ -198,9 +198,13 @@ unsigned int mptcp_synack_options(const struct request_sock *req,
 	return subflow_req->mp_capable;
 }
 
-void mptcp_options_write(__be32 *ptr, struct mptcp_out_options *opts)
+void mptcp_options_write(__be32 *ptr, struct sk_buff *skb,
+			 struct tcp_sock *tp,
+			 struct mptcp_out_options *opts)
 {
 #if IS_ENABLED(CONFIG_MPTCP)
+	struct mptcp_ext *mpext;
+
 	if ((OPTION_MPTCP_MPC_SYN |
 	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
@@ -223,6 +227,64 @@ void mptcp_options_write(__be32 *ptr, struct mptcp_out_options *opts)
 		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
+		}
+	}
+
+	mpext = mptcp_get_ext(skb);
+
+	if (((OPTION_MPTCP_DSS_MAP | OPTION_MPTCP_DSS_ACK) &
+	     opts->suboptions) && mpext) {
+		bool write_ack =
+			(OPTION_MPTCP_DSS_ACK & opts->suboptions) &&
+			mpext->use_ack;
+		bool write_map =
+			(OPTION_MPTCP_DSS_MAP & opts->suboptions) &&
+			mpext->use_map;
+		u8 flags = 0;
+		u8 len = TCPOLEN_MPTCP_DSS_BASE;
+
+		if (write_ack) {
+			len += TCPOLEN_MPTCP_DSS_ACK;
+			flags = MPTCP_DSS_HAS_ACK | MPTCP_DSS_ACK64;
+		}
+
+		if (write_map) {
+			len += TCPOLEN_MPTCP_DSS_MAP;
+
+			if (mpext->use_checksum)
+				len += TCPOLEN_MPTCP_DSS_CHECKSUM;
+
+			/* Use only 64-bit mapping flags for now, add
+			 * support for optional 32-bit mappings later.
+			 */
+			flags |= MPTCP_DSS_HAS_MAP | MPTCP_DSS_DSN64;
+			if (mpext->data_fin)
+				flags |= MPTCP_DSS_DATA_FIN;
+		}
+
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (len  << 16) |
+			       (MPTCPOPT_DSS << 12) |
+			       (flags));
+
+		if (write_ack) {
+			put_unaligned_be64(mpext->data_ack, ptr);
+			ptr += 2;
+		}
+
+		if (write_map) {
+			__sum16 checksum;
+
+			pr_debug("Writing map values");
+			put_unaligned_be64(mpext->data_seq, ptr);
+			ptr += 2;
+			*ptr++ = htonl(mpext->subflow_seq);
+
+			if (mpext->use_checksum)
+				checksum = mpext->checksum;
+			else
+				checksum = TCPOPT_NOP << 8 | TCPOPT_NOP;
+			*ptr = htonl(mpext->data_len << 16 | checksum);
 		}
 	}
 #endif
