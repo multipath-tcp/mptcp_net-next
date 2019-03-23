@@ -146,6 +146,19 @@ int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
 }
 
+static __poll_t mptcp_poll(struct file *file, struct socket *sock,
+			   struct poll_table_struct *wait)
+{
+	const struct mptcp_sock *msk;
+	struct sock *sk = sock->sk;
+
+	msk = mptcp_sk(sk);
+	if (msk->subflow)
+		return tcp_poll(file, msk->subflow, wait);
+
+	return tcp_poll(file, msk->connection_list, wait);
+}
+
 static struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
@@ -171,7 +184,7 @@ const struct proto_ops mptcp_stream_ops = {
 	.socketpair	   = sock_no_socketpair,
 	.accept		   = inet_accept,
 	.getname	   = inet_getname,
-	.poll		   = tcp_poll,
+	.poll		   = mptcp_poll,
 	.ioctl		   = inet_ioctl,
 	.listen		   = inet_listen,
 	.shutdown	   = inet_shutdown,
