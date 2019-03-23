@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <unistd.h>
 
 #include <sys/poll.h>
@@ -21,7 +22,7 @@
 
 extern int optind;
 
-#ifndef IPPROTO_MTPCP
+#ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 99
 #endif
 
@@ -29,10 +30,16 @@ extern int optind;
 #define IPPROTO_SUBFLOW (IPPROTO_TCP | 0x100)
 #endif
 
-static void die_usage(int x)
+static const char *cfg_host;
+static const char *cfg_port	= "12000";
+static int cfg_server_proto	= IPPROTO_MPTCP;
+static int cfg_client_proto	= IPPROTO_MPTCP;
+
+static void die_usage(void)
 {
-	fputs("Usage: mptcp_connect host port\n", x ? stderr : stdout);
-	exit(x);
+	fprintf(stderr, "Usage: mptcp_connect [-c MPTCP|TCP|SUBFLOW] [-p port] "
+	        "[-s MPTCP|TCP|SUBFLOW]\n");
+	exit(-1);
 }
 
 static const char *getxinfo_strerr(int err)
@@ -56,33 +63,6 @@ static void xgetaddrinfo(const char *node, const char *service,
 	}
 }
 
-static void xgetnameinfo(const struct sockaddr *sa, socklen_t salen,
-			char *host, size_t hostlen,
-			char *serv, size_t servlen, int flags)
-{
-	int err = getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
-	if (err) {
-		const char *errstr = getxinfo_strerr(err);
-
-		fprintf(stderr, "Fatal: getnameinfo(): %s\n", errstr);
-	        exit(1);
-	}
-}
-
-static void ipaddrtostr(const struct sockaddr *sa, socklen_t salen, char *resbuf, size_t reslen, char *port, size_t plen)
-{
-	xgetnameinfo(sa, salen, resbuf, reslen, port, plen, NI_NUMERICHOST|NI_NUMERICSERV);
-}
-
-static void logendpoint(struct sockaddr_storage *ss, socklen_t salen)
-{
-	char buf[INET6_ADDRSTRLEN];
-
-	ipaddrtostr((struct sockaddr *)ss, salen, buf, sizeof(buf), NULL, 0);
-
-	fprintf(stderr, "Handling connection from %s\n", buf);
-}
-
 static int sock_listen_mptcp(const char * const listenaddr, const char * const port)
 {
 	int sock;
@@ -100,7 +80,7 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 
 	for (a = addr; a != NULL ; a = a->ai_next) {
-		sock = socket(a->ai_family, a->ai_socktype, IPPROTO_MPTCP);
+		sock = socket(a->ai_family, a->ai_socktype, cfg_server_proto);
 		if (sock < 0) {
 			perror("socket");
 			continue;
@@ -228,19 +208,7 @@ int main_loop_s(int listensock)
 	struct sockaddr_storage ss;
 	socklen_t salen;
         int remotesock;
-	char buf[2];
 
-	salen = sizeof(ss);
-	while ((remotesock = accept(listensock, (struct sockaddr *)&ss, &salen)) < 0)
-		perror("accept");
-
-	logendpoint(&ss, salen);
-
-	/* deal with 'bogus' client first (plain tcp, not mptcp) */
-	if (read(remotesock, buf, sizeof(buf)) != 0)
-		return -1;
-
-	close(remotesock);
 	salen = sizeof(ss);
 	while ((remotesock = accept(listensock, (struct sockaddr *)&ss, &salen)) < 0)
 		perror("accept");
@@ -264,7 +232,7 @@ static void init_rng(void)
 	srand(foo);
 }
 
-int main_loop(const char *host, const char *port)
+int main_loop()
 {
 	int pollfds = 2, timeout = -1;
 	char start[32];
@@ -283,7 +251,7 @@ int main_loop(const char *host, const char *port)
 
 		init_rng();
 
-		fd = sock_listen_mptcp(NULL, port);
+		fd = sock_listen_mptcp(NULL, cfg_port);
 		if (fd < 0)
 			return -1;
 
@@ -308,17 +276,8 @@ int main_loop(const char *host, const char *port)
 	if (ret != 4 || strcmp(start, "RDY\n"))
 		return -1;
 
-	/* listener is ready.
-	 *
-	 * First connect with _SUBFLOW, used to trigger NULL deref in kernel.
-	 */
-	fd = sock_connect_mptcp(host, port, IPPROTO_SUBFLOW);
-	if (fd < 0)
-		return -1;
-
-	close(fd);
-
-	fd = sock_connect_mptcp(host, port, IPPROTO_MPTCP);
+	/* listener is ready. */
+	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_client_proto);
 	if (fd < 0)
 		return -1;
 
@@ -362,7 +321,8 @@ int main_loop(const char *host, const char *port)
 			}
 
 			write(1, buf, len);
-		} else if (fds[1].revents & POLLIN) {
+		}
+		if (fds[1].revents & POLLIN) {
 			len = read(0, buf, sizeof(buf));
 			if (len == 0) {
 				pollfds = 1;
@@ -382,22 +342,51 @@ int main_loop(const char *host, const char *port)
 	return 1;
 }
 
+int parse_proto(const char *proto)
+{
+	if (!strcasecmp(proto, "MPTCP"))
+		return IPPROTO_MPTCP;
+	if (!strcasecmp(proto, "TCP"))
+		return IPPROTO_TCP;
+	if (!strcasecmp(proto, "SUBFLOW"))
+		return IPPROTO_SUBFLOW;
+	die_usage();
+
+	/* silence compiler warning */
+	return 0;
+}
+
+static void parse_opts(int argc, char **argv)
+{
+	int c;
+
+	while ((c = getopt(argc, argv, "c:p:s:h")) != -1) {
+		switch (c) {
+		case 'c':
+			cfg_client_proto = parse_proto(optarg);
+			break;
+		case 'p':
+			cfg_port = optarg;
+			break;
+		case 's':
+			cfg_server_proto = parse_proto(optarg);
+			break;
+		case 'h':
+			die_usage();
+			break;
+		}
+	}
+
+	if (optind + 1 != argc)
+		die_usage();
+	cfg_host = argv[optind];
+}
+
+
 int main(int argc, char *argv[])
 {
-	const char *host, *port;
-
-	if (optind >= argc)
-		die_usage(1);
-
 	init_rng();
 
-	host = argv[optind];
-	argv++;
-	argc--;
-	if (optind < argc)
-		port = argv[optind];
-	else
-		port = "12000";
-
-	return main_loop(host, port);
+	parse_opts(argc, argv);
+	return main_loop();
 }
