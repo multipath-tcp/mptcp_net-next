@@ -661,6 +661,19 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 
 	smc_set_option(tp, opts, &remaining);
 
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (tp->is_mptcp) {
+		u64 local_key;
+
+		if (mptcp_syn_options(sk, &local_key)) {
+			opts->options |= OPTION_MPTCP;
+			opts->mptcp.suboptions = OPTION_MPTCP_MPC_SYN;
+			opts->mptcp.sndr_key = local_key;
+			remaining -= TCPOLEN_MPTCP_MPC_SYN;
+		}
+	}
+#endif
+
 	return MAX_TCP_OPTION_SPACE - remaining;
 }
 
@@ -758,6 +771,30 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->tsecr = tp->rx_opt.ts_recent;
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
+
+#if IS_ENABLED(CONFIG_MPTCP)
+	/* MPTCP options have precedence over SACK for the limited TCP
+	 * option space because a MPTCP connection would be forced to
+	 * fall back to regular TCP if a required multipath option is
+	 * missing. SACK still gets a chance to use whatever space is
+	 * left.
+	 */
+	if (tp->is_mptcp) {
+		unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
+		u64 local_key;
+		u64 remote_key;
+
+		if (mptcp_established_options(sk, &local_key, &remote_key)) {
+			if (remaining >= TCPOLEN_MPTCP_MPC_ACK) {
+				opts->options |= OPTION_MPTCP;
+				opts->mptcp.suboptions = OPTION_MPTCP_MPC_ACK;
+				opts->mptcp.sndr_key = local_key;
+				opts->mptcp.rcvr_key = remote_key;
+				size += TCPOLEN_MPTCP_MPC_ACK;
+			}
+		}
+	}
+#endif
 
 	eff_sacks = tp->rx_opt.num_sacks + tp->rx_opt.dsack;
 	if (unlikely(eff_sacks)) {
