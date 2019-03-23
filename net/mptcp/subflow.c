@@ -241,6 +241,26 @@ static void subflow_destroy(struct sock *sk)
 	tcp_v4_destroy_sock(sk);
 }
 
+static int subflow_setsockopt(struct sock *sk, int level, int optname,
+			      char __user *optval, unsigned int optlen)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	pr_debug("subflow=%p", subflow);
+
+	return tcp_setsockopt(sk, level, optname, optval, optlen);
+}
+
+static int subflow_getsockopt(struct sock *sk, int level, int optname,
+			      char __user *optval, int __user *option)
+{
+	struct subflow_sock *subflow = subflow_sk(sk);
+
+	pr_debug("subflow=%p", subflow);
+
+	return tcp_getsockopt(sk, level, optname, optval, option);
+}
+
 static struct proto subflow_prot = {
 	.name		= "SUBFLOW",
 	.owner		= THIS_MODULE,
@@ -252,6 +272,8 @@ static struct proto subflow_prot = {
 	.init		= subflow_init_sock,
 	.destroy	= subflow_destroy,
 	.shutdown	= tcp_shutdown,
+	.setsockopt	= subflow_setsockopt,
+	.getsockopt	= subflow_getsockopt,
 	.keepalive	= tcp_set_keepalive,
 	.recvmsg	= subflow_recvmsg,
 	.sendmsg	= subflow_sendmsg,
