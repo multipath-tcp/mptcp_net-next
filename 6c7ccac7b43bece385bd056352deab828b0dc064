@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1c65e0f2_f22874cd",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 9
+      },
+      "lineNbr": 218,
+      "author": {
+        "id": 1016239
+      },
+      "writtenOn": "2019-03-27T14:29:34Z",
+      "side": 1,
+      "message": "this is a typo, should be \"struct mptcp_out_options\"",
+      "revId": "6c7ccac7b43bece385bd056352deab828b0dc064",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
