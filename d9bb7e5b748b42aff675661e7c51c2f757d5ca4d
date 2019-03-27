@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e8349882_ebf3056e",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 9
+      },
+      "lineNbr": 108,
+      "author": {
+        "id": 1016239
+      },
+      "writtenOn": "2019-03-27T14:45:29Z",
+      "side": 1,
+      "message": "opts.mptcp is accessed also when CONFIG_MPTCP is unset (see tcp_input.c line 3854)",
+      "revId": "d9bb7e5b748b42aff675661e7c51c2f757d5ca4d",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "8af32a25_614b5ff6",
+        "filename": "net/ipv4/tcp_input.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 3854,
+      "author": {
+        "id": 1016239
+      },
+      "writtenOn": "2019-03-27T14:45:29Z",
+      "side": 1,
+      "message": "this line does not compile when CONFIG_MPTCP is unset (see comment at tcp.h)",
+      "revId": "d9bb7e5b748b42aff675661e7c51c2f757d5ca4d",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
