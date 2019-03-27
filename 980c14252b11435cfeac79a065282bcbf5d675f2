@@ -16,6 +16,23 @@
       "revId": "980c14252b11435cfeac79a065282bcbf5d675f2",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e34c7e25_8b8af1e1",
+        "filename": "net/mptcp/options.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 115,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-03-27T17:24:59Z",
+      "side": 1,
+      "message": "Conditional not needed in this file",
+      "revId": "980c14252b11435cfeac79a065282bcbf5d675f2",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
