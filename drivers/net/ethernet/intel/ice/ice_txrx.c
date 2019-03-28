@@ -282,8 +282,17 @@ void ice_clean_rx_ring(struct ice_ring *rx_ring)
 		if (!rx_buf->page)
 			continue;
 
-		dma_unmap_page(dev, rx_buf->dma, PAGE_SIZE, DMA_FROM_DEVICE);
-		__free_pages(rx_buf->page, 0);
+		/* Invalidate cache lines that may have been written to by
+		 * device so that we avoid corrupting memory.
+		 */
+		dma_sync_single_range_for_cpu(dev, rx_buf->dma,
+					      rx_buf->page_offset,
+					      ICE_RXBUF_2048, DMA_FROM_DEVICE);
+
+		/* free resources associated with mapping */
+		dma_unmap_page_attrs(dev, rx_buf->dma, PAGE_SIZE,
+				     DMA_FROM_DEVICE, ICE_RX_DMA_ATTR);
+		__page_frag_cache_drain(rx_buf->page, rx_buf->pagecnt_bias);
 
 		rx_buf->page = NULL;
 		rx_buf->page_offset = 0;
@@ -409,7 +418,8 @@ ice_alloc_mapped_page(struct ice_ring *rx_ring, struct ice_rx_buf *bi)
 	}
 
 	/* map page for use */
-	dma = dma_map_page(rx_ring->dev, page, 0, PAGE_SIZE, DMA_FROM_DEVICE);
+	dma = dma_map_page_attrs(rx_ring->dev, page, 0, PAGE_SIZE,
+				 DMA_FROM_DEVICE, ICE_RX_DMA_ATTR);
 
 	/* if mapping failed free memory back to system since
 	 * there isn't much point in holding memory we can't use
@@ -423,6 +433,8 @@ ice_alloc_mapped_page(struct ice_ring *rx_ring, struct ice_rx_buf *bi)
 	bi->dma = dma;
 	bi->page = page;
 	bi->page_offset = 0;
+	page_ref_add(page, USHRT_MAX - 1);
+	bi->pagecnt_bias = USHRT_MAX;
 
 	return true;
 }
@@ -451,6 +463,12 @@ bool ice_alloc_rx_bufs(struct ice_ring *rx_ring, u16 cleaned_count)
 	do {
 		if (!ice_alloc_mapped_page(rx_ring, bi))
 			goto no_bufs;
+
+		/* sync the buffer for use by the device */
+		dma_sync_single_range_for_device(rx_ring->dev, bi->dma,
+						 bi->page_offset,
+						 ICE_RXBUF_2048,
+						 DMA_FROM_DEVICE);
 
 		/* Refresh the desc even if buffer_addrs didn't change
 		 * because each write-back erases this info.
@@ -497,61 +515,43 @@ static bool ice_page_is_reserved(struct page *page)
 }
 
 /**
- * ice_add_rx_frag - Add contents of Rx buffer to sk_buff
- * @rx_buf: buffer containing page to add
- * @rx_desc: descriptor containing length of buffer written by hardware
- * @skb: sk_buf to place the data into
+ * ice_rx_buf_adjust_pg_offset - Prepare Rx buffer for reuse
+ * @rx_buf: Rx buffer to adjust
+ * @size: Size of adjustment
  *
- * This function will add the data contained in rx_buf->page to the skb.
- * This is done either through a direct copy if the data in the buffer is
- * less than the skb header size, otherwise it will just attach the page as
- * a frag to the skb.
- *
- * The function will then update the page offset if necessary and return
- * true if the buffer can be reused by the adapter.
+ * Update the offset within page so that Rx buf will be ready to be reused.
+ * For systems with PAGE_SIZE < 8192 this function will flip the page offset
+ * so the second half of page assigned to Rx buffer will be used, otherwise
+ * the offset is moved by the @size bytes
  */
-static bool
-ice_add_rx_frag(struct ice_rx_buf *rx_buf, union ice_32b_rx_flex_desc *rx_desc,
-		struct sk_buff *skb)
+static void
+ice_rx_buf_adjust_pg_offset(struct ice_rx_buf *rx_buf, unsigned int size)
 {
 #if (PAGE_SIZE < 8192)
-	unsigned int truesize = ICE_RXBUF_2048;
+	/* flip page offset to other buffer */
+	rx_buf->page_offset ^= size;
 #else
-	unsigned int last_offset = PAGE_SIZE - ICE_RXBUF_2048;
-	unsigned int truesize;
-#endif /* PAGE_SIZE < 8192) */
+	/* move offset up to the next cache line */
+	rx_buf->page_offset += size;
+#endif
+}
 
-	struct page *page;
-	unsigned int size;
-
-	size = le16_to_cpu(rx_desc->wb.pkt_len) &
-		ICE_RX_FLX_DESC_PKT_LEN_M;
-
-	page = rx_buf->page;
-
+/**
+ * ice_can_reuse_rx_page - Determine if page can be reused for another Rx
+ * @rx_buf: buffer containing the page
+ *
+ * If page is reusable, we have a green light for calling ice_reuse_rx_page,
+ * which will assign the current buffer to the buffer that next_to_alloc is
+ * pointing to; otherwise, the DMA mapping needs to be destroyed and
+ * page freed
+ */
+static bool ice_can_reuse_rx_page(struct ice_rx_buf *rx_buf)
+{
 #if (PAGE_SIZE >= 8192)
-	truesize = ALIGN(size, L1_CACHE_BYTES);
-#endif /* PAGE_SIZE >= 8192) */
-
-	/* will the data fit in the skb we allocated? if so, just
-	 * copy it as it is pretty small anyway
-	 */
-	if (size <= ICE_RX_HDR_SIZE && !skb_is_nonlinear(skb)) {
-		unsigned char *va = page_address(page) + rx_buf->page_offset;
-
-		memcpy(__skb_put(skb, size), va, ALIGN(size, sizeof(long)));
-
-		/* page is not reserved, we can reuse buffer as-is */
-		if (likely(!ice_page_is_reserved(page)))
-			return true;
-
-		/* this page cannot be reused so discard it */
-		__free_pages(page, 0);
-		return false;
-	}
-
-	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
-			rx_buf->page_offset, size, truesize);
+	unsigned int last_offset = PAGE_SIZE - ICE_RXBUF_2048;
+#endif
+	unsigned int pagecnt_bias = rx_buf->pagecnt_bias;
+	struct page *page = rx_buf->page;
 
 	/* avoid re-using remote pages */
 	if (unlikely(ice_page_is_reserved(page)))
@@ -559,25 +559,50 @@ ice_add_rx_frag(struct ice_rx_buf *rx_buf, union ice_32b_rx_flex_desc *rx_desc,
 
 #if (PAGE_SIZE < 8192)
 	/* if we are only owner of page we can reuse it */
-	if (unlikely(page_count(page) != 1))
+	if (unlikely((page_count(page) - pagecnt_bias) > 1))
 		return false;
-
-	/* flip page offset to other buffer */
-	rx_buf->page_offset ^= truesize;
 #else
-	/* move offset up to the next cache line */
-	rx_buf->page_offset += truesize;
-
 	if (rx_buf->page_offset > last_offset)
 		return false;
 #endif /* PAGE_SIZE < 8192) */
 
-	/* Even if we own the page, we are not allowed to use atomic_set()
-	 * This would break get_page_unless_zero() users.
+	/* If we have drained the page fragment pool we need to update
+	 * the pagecnt_bias and page count so that we fully restock the
+	 * number of references the driver holds.
 	 */
-	get_page(rx_buf->page);
+	if (unlikely(pagecnt_bias == 1)) {
+		page_ref_add(page, USHRT_MAX - 1);
+		rx_buf->pagecnt_bias = USHRT_MAX;
+	}
 
 	return true;
+}
+
+/**
+ * ice_add_rx_frag - Add contents of Rx buffer to sk_buff as a frag
+ * @rx_buf: buffer containing page to add
+ * @skb: sk_buff to place the data into
+ * @size: packet length from rx_desc
+ *
+ * This function will add the data contained in rx_buf->page to the skb.
+ * It will just attach the page as a frag to the skb.
+ * The function will then update the page offset.
+ */
+static void
+ice_add_rx_frag(struct ice_rx_buf *rx_buf, struct sk_buff *skb,
+		unsigned int size)
+{
+#if (PAGE_SIZE >= 8192)
+	unsigned int truesize = SKB_DATA_ALIGN(size);
+#else
+	unsigned int truesize = ICE_RXBUF_2048;
+#endif
+
+	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, rx_buf->page,
+			rx_buf->page_offset, size, truesize);
+
+	/* page is being used so we must update the page offset */
+	ice_rx_buf_adjust_pg_offset(rx_buf, truesize);
 }
 
 /**
@@ -599,121 +624,132 @@ ice_reuse_rx_page(struct ice_ring *rx_ring, struct ice_rx_buf *old_buf)
 	nta++;
 	rx_ring->next_to_alloc = (nta < rx_ring->count) ? nta : 0;
 
-	/* transfer page from old buffer to new buffer */
-	*new_buf = *old_buf;
+	/* Transfer page from old buffer to new buffer.
+	 * Move each member individually to avoid possible store
+	 * forwarding stalls and unnecessary copy of skb.
+	 */
+	new_buf->dma = old_buf->dma;
+	new_buf->page = old_buf->page;
+	new_buf->page_offset = old_buf->page_offset;
+	new_buf->pagecnt_bias = old_buf->pagecnt_bias;
 }
 
 /**
- * ice_fetch_rx_buf - Allocate skb and populate it
+ * ice_get_rx_buf - Fetch Rx buffer and synchronize data for use
  * @rx_ring: Rx descriptor ring to transact packets on
- * @rx_desc: descriptor containing info written by hardware
+ * @skb: skb to be used
+ * @size: size of buffer to add to skb
  *
- * This function allocates an skb on the fly, and populates it with the page
- * data from the current receive descriptor, taking care to set up the skb
- * correctly, as well as handling calling the page recycle function if
- * necessary.
+ * This function will pull an Rx buffer from the ring and synchronize it
+ * for use by the CPU.
  */
-static struct sk_buff *
-ice_fetch_rx_buf(struct ice_ring *rx_ring, union ice_32b_rx_flex_desc *rx_desc)
+static struct ice_rx_buf *
+ice_get_rx_buf(struct ice_ring *rx_ring, struct sk_buff **skb,
+	       const unsigned int size)
 {
 	struct ice_rx_buf *rx_buf;
-	struct sk_buff *skb;
-	struct page *page;
 
 	rx_buf = &rx_ring->rx_buf[rx_ring->next_to_clean];
-	page = rx_buf->page;
-	prefetchw(page);
+	prefetchw(rx_buf->page);
+	*skb = rx_buf->skb;
 
-	skb = rx_buf->skb;
+	/* we are reusing so sync this buffer for CPU use */
+	dma_sync_single_range_for_cpu(rx_ring->dev, rx_buf->dma,
+				      rx_buf->page_offset, size,
+				      DMA_FROM_DEVICE);
 
-	if (likely(!skb)) {
-		u8 *page_addr = page_address(page) + rx_buf->page_offset;
+	/* We have pulled a buffer for use, so decrement pagecnt_bias */
+	rx_buf->pagecnt_bias--;
 
-		/* prefetch first cache line of first page */
-		prefetch(page_addr);
+	return rx_buf;
+}
+
+/**
+ * ice_construct_skb - Allocate skb and populate it
+ * @rx_ring: Rx descriptor ring to transact packets on
+ * @rx_buf: Rx buffer to pull data from
+ * @size: the length of the packet
+ *
+ * This function allocates an skb. It then populates it with the page
+ * data from the current receive descriptor, taking care to set up the
+ * skb correctly.
+ */
+static struct sk_buff *
+ice_construct_skb(struct ice_ring *rx_ring, struct ice_rx_buf *rx_buf,
+		  unsigned int size)
+{
+	void *va = page_address(rx_buf->page) + rx_buf->page_offset;
+	unsigned int headlen;
+	struct sk_buff *skb;
+
+	/* prefetch first cache line of first page */
+	prefetch(va);
 #if L1_CACHE_BYTES < 128
-		prefetch((void *)(page_addr + L1_CACHE_BYTES));
+	prefetch((u8 *)va + L1_CACHE_BYTES);
 #endif /* L1_CACHE_BYTES */
 
-		/* allocate a skb to store the frags */
-		skb = __napi_alloc_skb(&rx_ring->q_vector->napi,
-				       ICE_RX_HDR_SIZE,
-				       GFP_ATOMIC | __GFP_NOWARN);
-		if (unlikely(!skb)) {
-			rx_ring->rx_stats.alloc_buf_failed++;
-			return NULL;
-		}
+	/* allocate a skb to store the frags */
+	skb = __napi_alloc_skb(&rx_ring->q_vector->napi, ICE_RX_HDR_SIZE,
+			       GFP_ATOMIC | __GFP_NOWARN);
+	if (unlikely(!skb))
+		return NULL;
 
-		/* we will be copying header into skb->data in
-		 * pskb_may_pull so it is in our interest to prefetch
-		 * it now to avoid a possible cache miss
+	skb_record_rx_queue(skb, rx_ring->q_index);
+	/* Determine available headroom for copy */
+	headlen = size;
+	if (headlen > ICE_RX_HDR_SIZE)
+		headlen = eth_get_headlen(va, ICE_RX_HDR_SIZE);
+
+	/* align pull length to size of long to optimize memcpy performance */
+	memcpy(__skb_put(skb, headlen), va, ALIGN(headlen, sizeof(long)));
+
+	/* if we exhaust the linear part then add what is left as a frag */
+	size -= headlen;
+	if (size) {
+#if (PAGE_SIZE >= 8192)
+		unsigned int truesize = SKB_DATA_ALIGN(size);
+#else
+		unsigned int truesize = ICE_RXBUF_2048;
+#endif
+		skb_add_rx_frag(skb, 0, rx_buf->page,
+				rx_buf->page_offset + headlen, size, truesize);
+		/* buffer is used by skb, update page_offset */
+		ice_rx_buf_adjust_pg_offset(rx_buf, truesize);
+	} else {
+		/* buffer is unused, reset bias back to rx_buf; data was copied
+		 * onto skb's linear part so there's no need for adjusting
+		 * page offset and we can reuse this buffer as-is
 		 */
-		prefetchw(skb->data);
-
-		skb_record_rx_queue(skb, rx_ring->q_index);
-	} else {
-		/* we are reusing so sync this buffer for CPU use */
-		dma_sync_single_range_for_cpu(rx_ring->dev, rx_buf->dma,
-					      rx_buf->page_offset,
-					      ICE_RXBUF_2048,
-					      DMA_FROM_DEVICE);
-
-		rx_buf->skb = NULL;
+		rx_buf->pagecnt_bias++;
 	}
-
-	/* pull page into skb */
-	if (ice_add_rx_frag(rx_buf, rx_desc, skb)) {
-		/* hand second half of page back to the ring */
-		ice_reuse_rx_page(rx_ring, rx_buf);
-		rx_ring->rx_stats.page_reuse_count++;
-	} else {
-		/* we are not reusing the buffer so unmap it */
-		dma_unmap_page(rx_ring->dev, rx_buf->dma, PAGE_SIZE,
-			       DMA_FROM_DEVICE);
-	}
-
-	/* clear contents of buffer_info */
-	rx_buf->page = NULL;
 
 	return skb;
 }
 
 /**
- * ice_pull_tail - ice specific version of skb_pull_tail
- * @skb: pointer to current skb being adjusted
+ * ice_put_rx_buf - Clean up used buffer and either recycle or free
+ * @rx_ring: Rx descriptor ring to transact packets on
+ * @rx_buf: Rx buffer to pull data from
  *
- * This function is an ice specific version of __pskb_pull_tail. The
- * main difference between this version and the original function is that
- * this function can make several assumptions about the state of things
- * that allow for significant optimizations versus the standard function.
- * As a result we can do things like drop a frag and maintain an accurate
- * truesize for the skb.
+ * This function will  clean up the contents of the rx_buf. It will
+ * either recycle the buffer or unmap it and free the associated resources.
  */
-static void ice_pull_tail(struct sk_buff *skb)
+static void ice_put_rx_buf(struct ice_ring *rx_ring, struct ice_rx_buf *rx_buf)
 {
-	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
-	unsigned int pull_len;
-	unsigned char *va;
+		/* hand second half of page back to the ring */
+	if (ice_can_reuse_rx_page(rx_buf)) {
+		ice_reuse_rx_page(rx_ring, rx_buf);
+		rx_ring->rx_stats.page_reuse_count++;
+	} else {
+		/* we are not reusing the buffer so unmap it */
+		dma_unmap_page_attrs(rx_ring->dev, rx_buf->dma, PAGE_SIZE,
+				     DMA_FROM_DEVICE, ICE_RX_DMA_ATTR);
+		__page_frag_cache_drain(rx_buf->page, rx_buf->pagecnt_bias);
+	}
 
-	/* it is valid to use page_address instead of kmap since we are
-	 * working with pages allocated out of the lomem pool per
-	 * alloc_page(GFP_ATOMIC)
-	 */
-	va = skb_frag_address(frag);
-
-	/* we need the header to contain the greater of either ETH_HLEN or
-	 * 60 bytes if the skb->len is less than 60 for skb_pad.
-	 */
-	pull_len = eth_get_headlen(va, ICE_RX_HDR_SIZE);
-
-	/* align pull length to size of long to optimize memcpy performance */
-	skb_copy_to_linear_data(skb, va, ALIGN(pull_len, sizeof(long)));
-
-	/* update all of the pointers */
-	skb_frag_size_sub(frag, pull_len);
-	frag->page_offset += pull_len;
-	skb->data_len -= pull_len;
-	skb->tail += pull_len;
+	/* clear contents of buffer_info */
+	rx_buf->page = NULL;
+	rx_buf->skb = NULL;
 }
 
 /**
@@ -730,10 +766,6 @@ static void ice_pull_tail(struct sk_buff *skb)
  */
 static bool ice_cleanup_headers(struct sk_buff *skb)
 {
-	/* place header in linear portion of buffer */
-	if (skb_is_nonlinear(skb))
-		ice_pull_tail(skb);
-
 	/* if eth_skb_pad returns an error the skb was freed */
 	if (eth_skb_pad(skb))
 		return true;
@@ -936,9 +968,8 @@ static void
 ice_receive_skb(struct ice_ring *rx_ring, struct sk_buff *skb, u16 vlan_tag)
 {
 	if ((rx_ring->netdev->features & NETIF_F_HW_VLAN_CTAG_RX) &&
-	    (vlan_tag & VLAN_VID_MASK)) {
+	    (vlan_tag & VLAN_VID_MASK))
 		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vlan_tag);
-	}
 	napi_gro_receive(&rx_ring->q_vector->napi, skb);
 }
 
@@ -963,7 +994,9 @@ static int ice_clean_rx_irq(struct ice_ring *rx_ring, int budget)
 	/* start the loop to process RX packets bounded by 'budget' */
 	while (likely(total_rx_pkts < (unsigned int)budget)) {
 		union ice_32b_rx_flex_desc *rx_desc;
+		struct ice_rx_buf *rx_buf;
 		struct sk_buff *skb;
+		unsigned int size;
 		u16 stat_err_bits;
 		u16 vlan_tag = 0;
 		u8 rx_ptype;
@@ -993,11 +1026,24 @@ static int ice_clean_rx_irq(struct ice_ring *rx_ring, int budget)
 		 */
 		dma_rmb();
 
-		/* allocate (if needed) and populate skb */
-		skb = ice_fetch_rx_buf(rx_ring, rx_desc);
-		if (!skb)
-			break;
+		size = le16_to_cpu(rx_desc->wb.pkt_len) &
+			ICE_RX_FLX_DESC_PKT_LEN_M;
 
+		rx_buf = ice_get_rx_buf(rx_ring, &skb, size);
+		/* allocate (if needed) and populate skb */
+		if (skb)
+			ice_add_rx_frag(rx_buf, skb, size);
+		else
+			skb = ice_construct_skb(rx_ring, rx_buf, size);
+
+		/* exit if we failed to retrieve a buffer */
+		if (!skb) {
+			rx_ring->rx_stats.alloc_buf_failed++;
+			rx_buf->pagecnt_bias++;
+			break;
+		}
+
+		ice_put_rx_buf(rx_ring, rx_buf);
 		cleaned_count++;
 
 		/* skip if it is NOP desc */
@@ -1050,17 +1096,256 @@ static int ice_clean_rx_irq(struct ice_ring *rx_ring, int budget)
 	return failure ? budget : (int)total_rx_pkts;
 }
 
+static unsigned int ice_itr_divisor(struct ice_port_info *pi)
+{
+	switch (pi->phy.link_info.link_speed) {
+	case ICE_AQ_LINK_SPEED_40GB:
+		return ICE_ITR_ADAPTIVE_MIN_INC * 1024;
+	case ICE_AQ_LINK_SPEED_25GB:
+	case ICE_AQ_LINK_SPEED_20GB:
+		return ICE_ITR_ADAPTIVE_MIN_INC * 512;
+	case ICE_AQ_LINK_SPEED_100MB:
+		return ICE_ITR_ADAPTIVE_MIN_INC * 32;
+	default:
+		return ICE_ITR_ADAPTIVE_MIN_INC * 256;
+	}
+}
+
+/**
+ * ice_update_itr - update the adaptive ITR value based on statistics
+ * @q_vector: structure containing interrupt and ring information
+ * @rc: structure containing ring performance data
+ *
+ * Stores a new ITR value based on packets and byte
+ * counts during the last interrupt.  The advantage of per interrupt
+ * computation is faster updates and more accurate ITR for the current
+ * traffic pattern.  Constants in this function were computed
+ * based on theoretical maximum wire speed and thresholds were set based
+ * on testing data as well as attempting to minimize response time
+ * while increasing bulk throughput.
+ */
+static void
+ice_update_itr(struct ice_q_vector *q_vector, struct ice_ring_container *rc)
+{
+	unsigned int avg_wire_size, packets, bytes, itr;
+	unsigned long next_update = jiffies;
+	bool container_is_rx;
+
+	if (!rc->ring || !ITR_IS_DYNAMIC(rc->itr_setting))
+		return;
+
+	/* If itr_countdown is set it means we programmed an ITR within
+	 * the last 4 interrupt cycles. This has a side effect of us
+	 * potentially firing an early interrupt. In order to work around
+	 * this we need to throw out any data received for a few
+	 * interrupts following the update.
+	 */
+	if (q_vector->itr_countdown) {
+		itr = rc->target_itr;
+		goto clear_counts;
+	}
+
+	container_is_rx = (&q_vector->rx == rc);
+	/* For Rx we want to push the delay up and default to low latency.
+	 * for Tx we want to pull the delay down and default to high latency.
+	 */
+	itr = container_is_rx ?
+		ICE_ITR_ADAPTIVE_MIN_USECS | ICE_ITR_ADAPTIVE_LATENCY :
+		ICE_ITR_ADAPTIVE_MAX_USECS | ICE_ITR_ADAPTIVE_LATENCY;
+
+	/* If we didn't update within up to 1 - 2 jiffies we can assume
+	 * that either packets are coming in so slow there hasn't been
+	 * any work, or that there is so much work that NAPI is dealing
+	 * with interrupt moderation and we don't need to do anything.
+	 */
+	if (time_after(next_update, rc->next_update))
+		goto clear_counts;
+
+	packets = rc->total_pkts;
+	bytes = rc->total_bytes;
+
+	if (container_is_rx) {
+		/* If Rx there are 1 to 4 packets and bytes are less than
+		 * 9000 assume insufficient data to use bulk rate limiting
+		 * approach unless Tx is already in bulk rate limiting. We
+		 * are likely latency driven.
+		 */
+		if (packets && packets < 4 && bytes < 9000 &&
+		    (q_vector->tx.target_itr & ICE_ITR_ADAPTIVE_LATENCY)) {
+			itr = ICE_ITR_ADAPTIVE_LATENCY;
+			goto adjust_by_size;
+		}
+	} else if (packets < 4) {
+		/* If we have Tx and Rx ITR maxed and Tx ITR is running in
+		 * bulk mode and we are receiving 4 or fewer packets just
+		 * reset the ITR_ADAPTIVE_LATENCY bit for latency mode so
+		 * that the Rx can relax.
+		 */
+		if (rc->target_itr == ICE_ITR_ADAPTIVE_MAX_USECS &&
+		    (q_vector->rx.target_itr & ICE_ITR_MASK) ==
+		    ICE_ITR_ADAPTIVE_MAX_USECS)
+			goto clear_counts;
+	} else if (packets > 32) {
+		/* If we have processed over 32 packets in a single interrupt
+		 * for Tx assume we need to switch over to "bulk" mode.
+		 */
+		rc->target_itr &= ~ICE_ITR_ADAPTIVE_LATENCY;
+	}
+
+	/* We have no packets to actually measure against. This means
+	 * either one of the other queues on this vector is active or
+	 * we are a Tx queue doing TSO with too high of an interrupt rate.
+	 *
+	 * Between 4 and 56 we can assume that our current interrupt delay
+	 * is only slightly too low. As such we should increase it by a small
+	 * fixed amount.
+	 */
+	if (packets < 56) {
+		itr = rc->target_itr + ICE_ITR_ADAPTIVE_MIN_INC;
+		if ((itr & ICE_ITR_MASK) > ICE_ITR_ADAPTIVE_MAX_USECS) {
+			itr &= ICE_ITR_ADAPTIVE_LATENCY;
+			itr += ICE_ITR_ADAPTIVE_MAX_USECS;
+		}
+		goto clear_counts;
+	}
+
+	if (packets <= 256) {
+		itr = min(q_vector->tx.current_itr, q_vector->rx.current_itr);
+		itr &= ICE_ITR_MASK;
+
+		/* Between 56 and 112 is our "goldilocks" zone where we are
+		 * working out "just right". Just report that our current
+		 * ITR is good for us.
+		 */
+		if (packets <= 112)
+			goto clear_counts;
+
+		/* If packet count is 128 or greater we are likely looking
+		 * at a slight overrun of the delay we want. Try halving
+		 * our delay to see if that will cut the number of packets
+		 * in half per interrupt.
+		 */
+		itr >>= 1;
+		itr &= ICE_ITR_MASK;
+		if (itr < ICE_ITR_ADAPTIVE_MIN_USECS)
+			itr = ICE_ITR_ADAPTIVE_MIN_USECS;
+
+		goto clear_counts;
+	}
+
+	/* The paths below assume we are dealing with a bulk ITR since
+	 * number of packets is greater than 256. We are just going to have
+	 * to compute a value and try to bring the count under control,
+	 * though for smaller packet sizes there isn't much we can do as
+	 * NAPI polling will likely be kicking in sooner rather than later.
+	 */
+	itr = ICE_ITR_ADAPTIVE_BULK;
+
+adjust_by_size:
+	/* If packet counts are 256 or greater we can assume we have a gross
+	 * overestimation of what the rate should be. Instead of trying to fine
+	 * tune it just use the formula below to try and dial in an exact value
+	 * gives the current packet size of the frame.
+	 */
+	avg_wire_size = bytes / packets;
+
+	/* The following is a crude approximation of:
+	 *  wmem_default / (size + overhead) = desired_pkts_per_int
+	 *  rate / bits_per_byte / (size + ethernet overhead) = pkt_rate
+	 *  (desired_pkt_rate / pkt_rate) * usecs_per_sec = ITR value
+	 *
+	 * Assuming wmem_default is 212992 and overhead is 640 bytes per
+	 * packet, (256 skb, 64 headroom, 320 shared info), we can reduce the
+	 * formula down to
+	 *
+	 *  (170 * (size + 24)) / (size + 640) = ITR
+	 *
+	 * We first do some math on the packet size and then finally bitshift
+	 * by 8 after rounding up. We also have to account for PCIe link speed
+	 * difference as ITR scales based on this.
+	 */
+	if (avg_wire_size <= 60) {
+		/* Start at 250k ints/sec */
+		avg_wire_size = 4096;
+	} else if (avg_wire_size <= 380) {
+		/* 250K ints/sec to 60K ints/sec */
+		avg_wire_size *= 40;
+		avg_wire_size += 1696;
+	} else if (avg_wire_size <= 1084) {
+		/* 60K ints/sec to 36K ints/sec */
+		avg_wire_size *= 15;
+		avg_wire_size += 11452;
+	} else if (avg_wire_size <= 1980) {
+		/* 36K ints/sec to 30K ints/sec */
+		avg_wire_size *= 5;
+		avg_wire_size += 22420;
+	} else {
+		/* plateau at a limit of 30K ints/sec */
+		avg_wire_size = 32256;
+	}
+
+	/* If we are in low latency mode halve our delay which doubles the
+	 * rate to somewhere between 100K to 16K ints/sec
+	 */
+	if (itr & ICE_ITR_ADAPTIVE_LATENCY)
+		avg_wire_size >>= 1;
+
+	/* Resultant value is 256 times larger than it needs to be. This
+	 * gives us room to adjust the value as needed to either increase
+	 * or decrease the value based on link speeds of 10G, 2.5G, 1G, etc.
+	 *
+	 * Use addition as we have already recorded the new latency flag
+	 * for the ITR value.
+	 */
+	itr += DIV_ROUND_UP(avg_wire_size,
+			    ice_itr_divisor(q_vector->vsi->port_info)) *
+	       ICE_ITR_ADAPTIVE_MIN_INC;
+
+	if ((itr & ICE_ITR_MASK) > ICE_ITR_ADAPTIVE_MAX_USECS) {
+		itr &= ICE_ITR_ADAPTIVE_LATENCY;
+		itr += ICE_ITR_ADAPTIVE_MAX_USECS;
+	}
+
+clear_counts:
+	/* write back value */
+	rc->target_itr = itr;
+
+	/* next update should occur within next jiffy */
+	rc->next_update = next_update + 1;
+
+	rc->total_bytes = 0;
+	rc->total_pkts = 0;
+}
+
 /**
  * ice_buildreg_itr - build value for writing to the GLINT_DYN_CTL register
  * @itr_idx: interrupt throttling index
- * @reg_itr: interrupt throttling value adjusted based on ITR granularity
+ * @itr: interrupt throttling value in usecs
  */
-static u32 ice_buildreg_itr(int itr_idx, u16 reg_itr)
+static u32 ice_buildreg_itr(u16 itr_idx, u16 itr)
 {
+	/* The itr value is reported in microseconds, and the register value is
+	 * recorded in 2 microsecond units. For this reason we only need to
+	 * shift by the GLINT_DYN_CTL_INTERVAL_S - ICE_ITR_GRAN_S to apply this
+	 * granularity as a shift instead of division. The mask makes sure the
+	 * ITR value is never odd so we don't accidentally write into the field
+	 * prior to the ITR field.
+	 */
+	itr &= ICE_ITR_MASK;
+
 	return GLINT_DYN_CTL_INTENA_M | GLINT_DYN_CTL_CLEARPBA_M |
 		(itr_idx << GLINT_DYN_CTL_ITR_INDX_S) |
-		(reg_itr << GLINT_DYN_CTL_INTERVAL_S);
+		(itr << (GLINT_DYN_CTL_INTERVAL_S - ICE_ITR_GRAN_S));
 }
+
+/* The act of updating the ITR will cause it to immediately trigger. In order
+ * to prevent this from throwing off adaptive update statistics we defer the
+ * update so that it can only happen so often. So after either Tx or Rx are
+ * updated we make the adaptive scheme wait until either the ITR completely
+ * expires via the next_update expiration or we have been through at least
+ * 3 interrupts.
+ */
+#define ITR_COUNTDOWN_START 3
 
 /**
  * ice_update_ena_itr - Update ITR and re-enable MSIX interrupt
@@ -1070,9 +1355,13 @@ static u32 ice_buildreg_itr(int itr_idx, u16 reg_itr)
 static void
 ice_update_ena_itr(struct ice_vsi *vsi, struct ice_q_vector *q_vector)
 {
-	struct ice_hw *hw = &vsi->back->hw;
-	struct ice_ring_container *rc;
+	struct ice_ring_container *tx = &q_vector->tx;
+	struct ice_ring_container *rx = &q_vector->rx;
 	u32 itr_val;
+
+	/* This will do nothing if dynamic updates are not enabled */
+	ice_update_itr(q_vector, tx);
+	ice_update_itr(q_vector, rx);
 
 	/* This block of logic allows us to get away with only updating
 	 * one ITR value with each interrupt. The idea is to perform a
@@ -1082,35 +1371,36 @@ ice_update_ena_itr(struct ice_vsi *vsi, struct ice_q_vector *q_vector)
 	 * 2. If we must reduce an ITR that is given highest priority.
 	 * 3. We then give priority to increasing ITR based on amount.
 	 */
-	if (q_vector->rx.target_itr < q_vector->rx.current_itr) {
-		rc = &q_vector->rx;
+	if (rx->target_itr < rx->current_itr) {
 		/* Rx ITR needs to be reduced, this is highest priority */
-		itr_val = ice_buildreg_itr(rc->itr_idx, rc->target_itr);
-		rc->current_itr = rc->target_itr;
-	} else if ((q_vector->tx.target_itr < q_vector->tx.current_itr) ||
-		   ((q_vector->rx.target_itr - q_vector->rx.current_itr) <
-		    (q_vector->tx.target_itr - q_vector->tx.current_itr))) {
-		rc = &q_vector->tx;
+		itr_val = ice_buildreg_itr(rx->itr_idx, rx->target_itr);
+		rx->current_itr = rx->target_itr;
+		q_vector->itr_countdown = ITR_COUNTDOWN_START;
+	} else if ((tx->target_itr < tx->current_itr) ||
+		   ((rx->target_itr - rx->current_itr) <
+		    (tx->target_itr - tx->current_itr))) {
 		/* Tx ITR needs to be reduced, this is second priority
 		 * Tx ITR needs to be increased more than Rx, fourth priority
 		 */
-		itr_val = ice_buildreg_itr(rc->itr_idx, rc->target_itr);
-		rc->current_itr = rc->target_itr;
-	} else if (q_vector->rx.current_itr != q_vector->rx.target_itr) {
-		rc = &q_vector->rx;
+		itr_val = ice_buildreg_itr(tx->itr_idx, tx->target_itr);
+		tx->current_itr = tx->target_itr;
+		q_vector->itr_countdown = ITR_COUNTDOWN_START;
+	} else if (rx->current_itr != rx->target_itr) {
 		/* Rx ITR needs to be increased, third priority */
-		itr_val = ice_buildreg_itr(rc->itr_idx, rc->target_itr);
-		rc->current_itr = rc->target_itr;
+		itr_val = ice_buildreg_itr(rx->itr_idx, rx->target_itr);
+		rx->current_itr = rx->target_itr;
+		q_vector->itr_countdown = ITR_COUNTDOWN_START;
 	} else {
 		/* Still have to re-enable the interrupts */
 		itr_val = ice_buildreg_itr(ICE_ITR_NONE, 0);
+		if (q_vector->itr_countdown)
+			q_vector->itr_countdown--;
 	}
 
-	if (!test_bit(__ICE_DOWN, vsi->state)) {
-		int vector = vsi->hw_base_vector + q_vector->v_idx;
-
-		wr32(hw, GLINT_DYN_CTL(vector), itr_val);
-	}
+	if (!test_bit(__ICE_DOWN, vsi->state))
+		wr32(&vsi->back->hw,
+		     GLINT_DYN_CTL(vsi->hw_base_vector + q_vector->v_idx),
+		     itr_val);
 }
 
 /**
