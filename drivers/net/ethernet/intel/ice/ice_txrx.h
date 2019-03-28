@@ -47,6 +47,9 @@
 #define ICE_TX_FLAGS_VLAN_M	0xffff0000
 #define ICE_TX_FLAGS_VLAN_S	16
 
+#define ICE_RX_DMA_ATTR \
+	(DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
+
 struct ice_tx_buf {
 	struct ice_tx_desc *next_to_watch;
 	struct sk_buff *skb;
@@ -73,6 +76,7 @@ struct ice_rx_buf {
 	dma_addr_t dma;
 	struct page *page;
 	unsigned int page_offset;
+	u16 pagecnt_bias;
 };
 
 struct ice_q_stats {
@@ -124,10 +128,16 @@ enum ice_rx_dtype {
 #define ICE_ITR_DYNAMIC	0x8000  /* used as flag for itr_setting */
 #define ITR_IS_DYNAMIC(setting) (!!((setting) & ICE_ITR_DYNAMIC))
 #define ITR_TO_REG(setting)	((setting) & ~ICE_ITR_DYNAMIC)
-#define ICE_ITR_GRAN_S		1	/* Assume ITR granularity is 2us */
+#define ICE_ITR_GRAN_S		1	/* ITR granularity is always 2us */
 #define ICE_ITR_GRAN_US		BIT(ICE_ITR_GRAN_S)
 #define ICE_ITR_MASK		0x1FFE	/* ITR register value alignment mask */
 #define ITR_REG_ALIGN(setting)	__ALIGN_MASK(setting, ~ICE_ITR_MASK)
+
+#define ICE_ITR_ADAPTIVE_MIN_INC	0x0002
+#define ICE_ITR_ADAPTIVE_MIN_USECS	0x0002
+#define ICE_ITR_ADAPTIVE_MAX_USECS	0x00FA
+#define ICE_ITR_ADAPTIVE_LATENCY	0x8000
+#define ICE_ITR_ADAPTIVE_BULK		0x0000
 
 #define ICE_DFLT_INTRL	0
 
@@ -174,21 +184,13 @@ struct ice_ring {
 	u16 next_to_alloc;
 } ____cacheline_internodealigned_in_smp;
 
-enum ice_latency_range {
-	ICE_LOWEST_LATENCY = 0,
-	ICE_LOW_LATENCY = 1,
-	ICE_BULK_LATENCY = 2,
-	ICE_ULTRA_LATENCY = 3,
-};
-
 struct ice_ring_container {
 	/* head of linked-list of rings */
 	struct ice_ring *ring;
 	unsigned long next_update;	/* jiffies value of next queue update */
 	unsigned int total_bytes;	/* total bytes processed this int */
 	unsigned int total_pkts;	/* total packets processed this int */
-	enum ice_latency_range latency_range;
-	int itr_idx;		/* index in the interrupt vector */
+	u16 itr_idx;		/* index in the interrupt vector */
 	u16 target_itr;		/* value in usecs divided by the hw->itr_gran */
 	u16 current_itr;	/* value in usecs divided by the hw->itr_gran */
 	/* high bit set means dynamic ITR, rest is used to store user
