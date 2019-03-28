@@ -608,11 +608,10 @@ err_scatter:
 
 /**
  * __ice_vsi_get_qs - helper function for assigning queues from PF to VSI
- * @qs_cfg: gathered variables needed for PF->VSI queues assignment
+ * @qs_cfg: gathered variables needed for pf->vsi queues assignment
  *
- * This is an internal function for assigning queues from the PF to VSI and
- * initially tries to find contiguous space.  If it is not successful to find
- * contiguous space, then it tries with the scatter approach.
+ * This function first tries to find contiguous space. If it is not successful,
+ * it tries with the scatter approach.
  *
  * Return 0 on success and -ENOMEM in case of no left space in PF queue bitmap
  */
@@ -856,7 +855,7 @@ static void ice_vsi_setup_q_map(struct ice_vsi *vsi, struct ice_vsi_ctx *ctxt)
 	/* find the (rounded up) power-of-2 of qcount */
 	pow = order_base_2(qcount_rx);
 
-	for (i = 0; i < ICE_MAX_TRAFFIC_CLASS; i++) {
+	ice_for_each_traffic_class(i) {
 		if (!(vsi->tc_cfg.ena_tc & BIT(i))) {
 			/* TC is not enabled */
 			vsi->tc_cfg.tc_info[i].qoffset = 0;
@@ -1689,7 +1688,7 @@ ice_vsi_cfg_txqs(struct ice_vsi *vsi, struct ice_ring **rings, int offset)
 	num_q_grps = 1;
 
 	/* set up and configure the Tx queues for each enabled TC */
-	for (tc = 0; tc < ICE_MAX_TRAFFIC_CLASS; tc++) {
+	ice_for_each_traffic_class(tc) {
 		if (!(vsi->tc_cfg.ena_tc & BIT(tc)))
 			break;
 
@@ -1820,7 +1819,6 @@ ice_cfg_itr(struct ice_hw *hw, struct ice_q_vector *q_vector, u16 vector)
 		rc->target_itr = ITR_TO_REG(rc->itr_setting);
 		rc->next_update = jiffies + 1;
 		rc->current_itr = rc->target_itr;
-		rc->latency_range = ICE_LOW_LATENCY;
 		wr32(hw, GLINT_ITR(rc->itr_idx, vector),
 		     ITR_REG_ALIGN(rc->current_itr) >> ICE_ITR_GRAN_S);
 	}
@@ -1835,7 +1833,6 @@ ice_cfg_itr(struct ice_hw *hw, struct ice_q_vector *q_vector, u16 vector)
 		rc->target_itr = ITR_TO_REG(rc->itr_setting);
 		rc->next_update = jiffies + 1;
 		rc->current_itr = rc->target_itr;
-		rc->latency_range = ICE_LOW_LATENCY;
 		wr32(hw, GLINT_ITR(rc->itr_idx, vector),
 		     ITR_REG_ALIGN(rc->current_itr) >> ICE_ITR_GRAN_S);
 	}
