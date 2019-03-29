@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b294734a_a03fca1b",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 122,
+      "author": {
+        "id": 1016247
+      },
+      "writtenOn": "2019-03-29T11:11:47Z",
+      "side": 1,
+      "message": "Looks like it\u0027s used only here, should be \u0027static\u0027 (currently causes a sparse warning)",
+      "range": {
+        "startLine": 122,
+        "startChar": 0,
+        "endLine": 122,
+        "endChar": 1
+      },
+      "revId": "1fef03d0ac7c381adb34d26c7af2c8863cf90c86",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b272ef66_ba72a346",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 132,
+      "author": {
+        "id": 1016247
+      },
+      "writtenOn": "2019-03-29T11:11:47Z",
+      "side": 1,
+      "message": "same as above",
+      "range": {
+        "startLine": 132,
+        "startChar": 4,
+        "endLine": 132,
+        "endChar": 24
+      },
+      "revId": "1fef03d0ac7c381adb34d26c7af2c8863cf90c86",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5b764011_05f96cb0",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 9
+      },
+      "lineNbr": 165,
+      "author": {
+        "id": 1016247
+      },
+      "writtenOn": "2019-03-29T11:11:47Z",
+      "side": 1,
+      "message": "same here",
+      "range": {
+        "startLine": 165,
+        "startChar": 0,
+        "endLine": 165,
+        "endChar": 8
+      },
+      "revId": "1fef03d0ac7c381adb34d26c7af2c8863cf90c86",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
