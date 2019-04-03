@@ -110,17 +110,56 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	}
 }
 
+unsigned int mptcp_syn_options(struct sock *sk, u64 *local_key)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	if (subflow->request_mptcp) {
+		pr_debug("local_key=%llu", subflow->local_key);
+		*local_key = subflow->local_key;
+	}
+	return subflow->request_mptcp;
+}
+
+void mptcp_rcv_synsent(struct sock *sk)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	pr_debug("subflow=%p", subflow);
+	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
+		subflow->mp_capable = 1;
+		subflow->remote_key = tp->rx_opt.mptcp.sndr_key;
+	}
+}
+
+unsigned int mptcp_established_options(struct sock *sk, u64 *local_key,
+				       u64 *remote_key)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	pr_debug("subflow=%p", subflow);
+	if (subflow->mp_capable && !subflow->fourth_ack) {
+		subflow->fourth_ack = 1;
+		*local_key = subflow->local_key;
+		*remote_key = subflow->remote_key;
+		pr_debug("local_key=%llu", *local_key);
+		pr_debug("remote_key=%llu", *remote_key);
+		return 1;
+	}
+	return 0;
+}
+
 void mptcp_write_option_header(__be32 *ptr, struct mptcp_out_options *opts)
 {
 	if ((OPTION_MPTCP_MPC_SYN |
-	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 		u8 len;
 
 		if (OPTION_MPTCP_MPC_SYN & opts->suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYN;
 		else
-			len = TCPOLEN_MPTCP_MPC_SYNACK;
+			len = TCPOLEN_MPTCP_MPC_ACK;
 
 		*ptr++ = htonl((TCPOPT_MPTCP << 24) | (len << 16) |
 			       (MPTCPOPT_MP_CAPABLE << 20) |
@@ -128,8 +167,7 @@ void mptcp_write_option_header(__be32 *ptr, struct mptcp_out_options *opts)
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}
