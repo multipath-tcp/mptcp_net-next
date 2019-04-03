@@ -15,6 +15,29 @@
 #include <net/tcp.h>
 #include <net/mptcp.h>
 
+static int subflow_rebuild_header(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	if (subflow->request_mptcp && !subflow->token) {
+		pr_debug("subflow=%p", sk);
+		token_new_connect(sk);
+	}
+
+	return inet_sk_rebuild_header(sk);
+}
+
+static void subflow_req_destructor(struct request_sock *req)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	pr_debug("subflow_req=%p", subflow_req);
+
+	if (subflow_req->mp_capable)
+		token_destroy_request(subflow_req->token);
+	tcp_request_sock_ops.destructor(req);
+}
+
 static void subflow_v4_init_req(struct request_sock *req,
 				const struct sock *sk_listener,
 				struct sk_buff *skb)
@@ -41,6 +64,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 		    listener->checksum)
 			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
+		pr_debug("remote_key=%llu", subflow_req->remote_key);
+		token_new_request(req, skb);
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -126,6 +151,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 	if (child) {
 		struct subflow_context *subflow = clone_ctx(sk, child);
+
 		if (subflow) {
 			pr_debug("child=%p", subflow);
 			if (subflow_req->mp_capable) {
@@ -133,6 +159,9 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 				subflow->fourth_ack = 1;
 				subflow->remote_key = subflow_req->remote_key;
 				subflow->local_key = subflow_req->local_key;
+				subflow->token = subflow_req->token;
+				pr_debug("token=%u", subflow->token);
+				token_new_accept(child);
 			} else {
 				subflow->mp_capable = 0;
 			}
@@ -220,6 +249,9 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	if (!subflow_ops->slab) {
 		return -ENOMEM;
 	}
+
+	subflow_ops->destructor = subflow_req_destructor;
+
 	return 0;
 }
 
@@ -239,6 +271,7 @@ int mptcp_subflow_init(void)
 	subflow_specific.conn_request = subflow_conn_request;
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
+	subflow_specific.rebuild_header = subflow_rebuild_header;
 
 	return tcp_register_ulp(&subflow_ulp_ops);
 }
