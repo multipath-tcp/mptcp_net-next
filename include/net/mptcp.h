@@ -27,12 +27,22 @@
 #define MPTCP_CAP_EXTENSIBILITY	(1 << 6)
 #define MPTCP_CAP_HMAC_SHA1	(1 << 0)
 
+/* MPTCP DSS flags */
+
+#define MPTCP_DSS_DATA_FIN	BIT(4)
+#define MPTCP_DSS_DSN64		BIT(3)
+#define MPTCP_DSS_HAS_MAP	BIT(2)
+#define MPTCP_DSS_ACK64		BIT(1)
+#define MPTCP_DSS_HAS_ACK	BIT(0)
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
 	struct	inet_connection_sock sk;
 	u64	local_key;
 	u64	remote_key;
+	u64	write_seq;
+	u64	ack_seq;
 	u32	token;
 	struct	socket *connection_list; /* @@ needs to be a list */
 	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
@@ -67,8 +77,9 @@ struct subflow_request_sock {
 		backup : 1,
 		version : 4;
 	u64	local_key;
-	u64	remote_key;
 	u32	token;
+	u64	idsn;
+	u64	remote_key;
 };
 
 static inline
@@ -81,6 +92,8 @@ struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
 #define OPTION_MPTCP_MPC_SYNACK	BIT(1)
 #define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_DSS_MAP	BIT(3)
+#define OPTION_MPTCP_DSS_ACK	BIT(4)
 
 struct mptcp_out_options {
 	u16 suboptions;
@@ -93,6 +106,8 @@ struct subflow_context {
 	u64	local_key;
 	u64	remote_key;
 	u32	token;
+	u32     rel_write_seq;
+	u64     idsn;
 	bool    request_mptcp;  /* send MP_CAPABLE */
 	bool    checksum;
 	bool    version;
@@ -119,6 +134,11 @@ void mptcp_subflow_exit(void);
 extern const struct inet_connection_sock_af_ops ipv4_specific;
 
 #ifdef CONFIG_MPTCP
+
+static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
+{
+	return (struct mptcp_ext *)skb_ext_find(skb, SKB_EXT_MPTCP);
+}
 
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx);
@@ -165,7 +185,8 @@ void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
 void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
 		     int arg_num, ...);
 
-void mptcp_write_option_header(__be32 *ptr, struct mptcp_out_options *opts);
+void mptcp_write_option_header(__be32 *ptr, struct sk_buff *skb,
+			       struct mptcp_out_options *opts);
 
 #else
 

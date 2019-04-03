@@ -446,11 +446,12 @@ struct tcp_out_options {
 #endif
 };
 
-static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
+static void mptcp_options_write(__be32 *ptr, struct sk_buff *skb,
+				struct tcp_out_options *opts)
 {
 #if IS_ENABLED(CONFIG_MPTCP)
 	if (unlikely(OPTION_MPTCP & opts->options))
-		mptcp_write_option_header(ptr, &opts->mptcp);
+		mptcp_write_option_header(ptr, skb, &opts->mptcp);
 #endif
 }
 
@@ -467,8 +468,8 @@ static void mptcp_options_write(__be32 *ptr, struct tcp_out_options *opts)
  * At least SACK_PERM as the first option is known to lead to a disaster
  * (but it may well be that other scenarios fail similarly).
  */
-static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
-			      struct tcp_out_options *opts)
+static void tcp_options_write(__be32 *ptr, struct sk_buff *skb,
+			      struct tcp_sock *tp, struct tcp_out_options *opts)
 {
 	u16 options = opts->options;	/* mungable copy */
 
@@ -563,7 +564,7 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 	smc_options_write(ptr, &options);
 
-	mptcp_options_write(ptr, opts);
+	mptcp_options_write(ptr, skb, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,
@@ -823,6 +824,53 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 				opts->mptcp.sndr_key = local_key;
 				opts->mptcp.rcvr_key = remote_key;
 				size += TCPOLEN_MPTCP_MPC_ACK;
+			}
+		} else if (subflow_ctx(sk)->mp_capable && skb) {
+			unsigned int dss_size = 0;
+			struct mptcp_ext *mpext;
+			u16 options = 0;
+
+			mpext = mptcp_get_ext(skb);
+
+			if (mpext && mpext->use_map) {
+				unsigned int map_size = 18;
+
+				if (mpext->use_checksum)
+					map_size += 2;
+
+				if (map_size <= remaining) {
+					remaining -= map_size;
+					dss_size = map_size;
+					opts->options |= OPTION_MPTCP;
+					opts->mptcp.suboptions =
+						OPTION_MPTCP_DSS_MAP;
+				} else {
+					WARN(1, "MPTCP: Map dropped");
+				}
+			}
+
+			if (mpext && mpext->use_ack) {
+				unsigned int ack_size = 8;
+
+				/* Add kind/length/subtype/flag
+				 * overhead if mapping not populated
+				 */
+				if (dss_size == 0)
+					ack_size += 4;
+
+				if (ack_size <= remaining) {
+					dss_size += ack_size;
+					opts->options |= OPTION_MPTCP;
+					opts->mptcp.suboptions |=
+						OPTION_MPTCP_DSS_ACK;
+				} else {
+					WARN(1, "MPTCP: Ack dropped");
+				}
+			}
+
+			if (dss_size) {
+				size += ALIGN(dss_size, 4);
+				opts->options |= options;
 			}
 		}
 	}
@@ -1187,7 +1235,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		}
 	}
 
-	tcp_options_write((__be32 *)(th + 1), tp, &opts);
+	tcp_options_write((__be32 *)(th + 1), skb, tp, &opts);
 	skb_shinfo(skb)->gso_type = sk->sk_gso_type;
 	if (likely(!(tcb->tcp_flags & TCPHDR_SYN))) {
 		th->window      = htons(tcp_select_window(sk));
@@ -3359,7 +3407,7 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 
 	/* RFC1323: The window in SYN & SYN/ACK segments is never scaled. */
 	th->window = htons(min(req->rsk_rcv_wnd, 65535U));
-	tcp_options_write((__be32 *)(th + 1), NULL, &opts);
+	tcp_options_write((__be32 *)(th + 1), skb, NULL, &opts);
 	th->doff = (tcp_header_size >> 2);
 	__TCP_INC_STATS(sock_net(sk), TCP_MIB_OUTSEGS);
 
