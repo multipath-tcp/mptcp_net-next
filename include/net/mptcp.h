@@ -8,6 +8,25 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
+/* MPTCP option subtypes */
+
+#define MPTCPOPT_MP_CAPABLE	0
+#define MPTCPOPT_MP_JOIN	1
+#define MPTCPOPT_DSS		2
+#define MPTCPOPT_ADD_ADDR	3
+#define MPTCPOPT_REMOVE_ADDR	4
+#define MPTCPOPT_MP_PRIO	5
+#define MPTCPOPT_MP_FAIL	6
+#define MPTCPOPT_MP_FASTCLOSE	7
+
+#define MPTCPOPT_VERSION_MASK	0x0F
+
+/* MPTCP handshake flags */
+
+#define MPTCP_CAP_CHECKSUM_REQD	(1 << 7)
+#define MPTCP_CAP_EXTENSIBILITY	(1 << 6)
+#define MPTCP_CAP_HMAC_SHA1	(1 << 0)
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
@@ -20,4 +39,29 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
+/* MPTCP option subtypes */
+#define OPTION_MPTCP_MPC_SYN	BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
+#define OPTION_MPTCP_MPC_ACK	BIT(2)
+
+struct mptcp_out_options {
+	u16 suboptions;
+	u64 sndr_key;
+	u64 rcvr_key;
+};
+
+#ifdef CONFIG_MPTCP
+
+void mptcp_parse_option(const unsigned char *ptr, int opsize,
+			struct tcp_options_received *opt_rx);
+void mptcp_write_option_header(__be32 *ptr, struct mptcp_out_options *opts);
+
+#else
+
+static inline void mptcp_parse_option(const unsigned char *ptr, int opsize,
+				      struct tcp_options_received *opt_rx)
+{
+}
+
+#endif /* CONFIG_MPTCP */
 #endif /* __NET_MPTCP_H */
