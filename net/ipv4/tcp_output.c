@@ -447,11 +447,12 @@ struct tcp_out_options {
 };
 
 static void mptcp_options_write(__be32 *ptr, struct sk_buff *skb,
+				struct tcp_sock *tp,
 				struct tcp_out_options *opts)
 {
 #if IS_ENABLED(CONFIG_MPTCP)
 	if (unlikely(OPTION_MPTCP & opts->options))
-		mptcp_write_option_header(ptr, skb, &opts->mptcp);
+		mptcp_write_option_header(ptr, skb, tp, &opts->mptcp);
 #endif
 }
 
@@ -564,7 +565,7 @@ static void tcp_options_write(__be32 *ptr, struct sk_buff *skb,
 
 	smc_options_write(ptr, &options);
 
-	mptcp_options_write(ptr, skb, opts);
+	mptcp_options_write(ptr, skb, tp, opts);
 }
 
 static void smc_set_option(const struct tcp_sock *tp,
@@ -827,8 +828,9 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 			}
 		} else if (subflow_ctx(sk)->mp_capable && skb) {
 			unsigned int dss_size = 0;
+			unsigned int ack_size = 8;
 			struct mptcp_ext *mpext;
-			u16 options = 0;
+			u16 suboptions = 0;
 
 			mpext = mptcp_get_ext(skb);
 
@@ -841,36 +843,29 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 				if (map_size <= remaining) {
 					remaining -= map_size;
 					dss_size = map_size;
-					opts->options |= OPTION_MPTCP;
-					opts->mptcp.suboptions =
-						OPTION_MPTCP_DSS_MAP;
+					suboptions = OPTION_MPTCP_DSS_MAP;
 				} else {
 					WARN(1, "MPTCP: Map dropped");
 				}
 			}
 
-			if (mpext && mpext->use_ack) {
-				unsigned int ack_size = 8;
+			/* Add kind/length/subtype/flag
+			 * overhead if mapping not populated
+			 */
+			if (dss_size == 0)
+				ack_size += 4;
 
-				/* Add kind/length/subtype/flag
-				 * overhead if mapping not populated
-				 */
-				if (dss_size == 0)
-					ack_size += 4;
-
-				if (ack_size <= remaining) {
-					dss_size += ack_size;
-					opts->options |= OPTION_MPTCP;
-					opts->mptcp.suboptions |=
-						OPTION_MPTCP_DSS_ACK;
-				} else {
-					WARN(1, "MPTCP: Ack dropped");
-				}
+			if (ack_size <= remaining) {
+				dss_size += ack_size;
+				suboptions |= OPTION_MPTCP_DSS_ACK;
+			} else {
+				WARN(1, "MPTCP: Ack dropped");
 			}
 
 			if (dss_size) {
 				size += ALIGN(dss_size, 4);
-				opts->options |= options;
+				opts->options |= OPTION_MPTCP;
+				opts->mptcp.suboptions = suboptions;
 			}
 		}
 	}
@@ -3774,6 +3769,9 @@ void __tcp_send_ack(struct sock *sk, u32 rcv_nxt)
 	skb_set_tcp_pure_ack(buff);
 
 	/* Send it off, this clears delayed acks for us. */
+	if (tcp_sk(sk)->is_mptcp)
+		pr_debug("mptcp sk=%p", sk);
+
 	__tcp_transmit_skb(sk, buff, 0, (__force gfp_t)0, rcv_nxt);
 }
 EXPORT_SYMBOL_GPL(__tcp_send_ack);

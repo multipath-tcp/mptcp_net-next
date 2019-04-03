@@ -113,6 +113,18 @@ struct tcp_options_received {
 		u8      flags;
 		u64     sndr_key;
 		u64     rcvr_key;
+		u64	data_ack;
+		u64	data_seq;
+		u32	subflow_seq;
+		u16	data_len;
+		__sum16	checksum;
+		u8	use_map:1,
+			dsn64:1,
+			use_checksum:1,
+			data_fin:1,
+			use_ack:1,
+			ack64:1,
+			__unused:2;
 	} mptcp;
 #endif
 };

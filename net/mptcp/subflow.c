@@ -66,6 +66,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 		pr_debug("remote_key=%llu", subflow_req->remote_key);
 		token_new_request(req, skb);
+		pr_debug("syn seq=%u", TCP_SKB_CB(skb)->seq);
+		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -79,10 +81,15 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 	pr_debug("subflow=%p", subflow_ctx(sk));
 
-	if (subflow->conn) {
+	if (subflow->conn && !subflow->conn_finished) {
 		pr_debug("remote_key=%llu", subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
-		subflow->conn = NULL;
+		subflow->conn_finished = 1;
+
+		if (skb) {
+			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
+			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
+		}
 	}
 }
 
@@ -109,6 +116,8 @@ drop:
 
 static struct subflow_context *clone_ctx(const struct sock *sk, struct sock *child)
 {
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct subflow_context *ctx = (struct subflow_context *) icsk->icsk_ulp_data;
 	struct inet_connection_sock *child_icsk = inet_csk(child);
 	struct subflow_context *child_ctx;
 
@@ -120,6 +129,7 @@ static struct subflow_context *clone_ctx(const struct sock *sk, struct sock *chi
 
 	child_ctx->sk = child;
 	child_ctx->conn = NULL;
+	child_ctx->tcp_sk_data_ready = ctx->tcp_sk_data_ready;
 
 	return child_ctx;
 }
@@ -160,6 +170,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 				subflow->remote_key = subflow_req->remote_key;
 				subflow->local_key = subflow_req->local_key;
 				subflow->token = subflow_req->token;
+				subflow->ssn_offset = subflow_req->ssn_offset;
+				subflow->idsn = subflow_req->idsn;
 				pr_debug("token=%u", subflow->token);
 				token_new_accept(child);
 			} else {
@@ -175,6 +187,20 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 }
 
 static struct inet_connection_sock_af_ops subflow_specific;
+
+static void subflow_data_ready(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct sock *parent = subflow->conn;
+
+	pr_debug("sk=%p", sk);
+	subflow->tcp_sk_data_ready(sk);
+
+	if (parent) {
+		pr_debug("parent=%p", parent);
+		parent->sk_data_ready(parent);
+	}
+}
 
 static struct subflow_context *subflow_create_ctx(struct sock *sk)
 {
@@ -210,6 +236,8 @@ static int subflow_init(struct sock *sk)
 
 	tsk->is_mptcp = 1;
 	icsk->icsk_af_ops = &subflow_specific;
+	ctx->tcp_sk_data_ready = sk->sk_data_ready;
+	sk->sk_data_ready = subflow_data_ready;
 out:
 	return err;
 }
