@@ -50,6 +50,29 @@ struct mptcp_out_options {
 	u64 rcvr_key;
 };
 
+/* MPTCP subflow context */
+struct subflow_context {
+	bool    request_mptcp;  /* send MP_CAPABLE */
+	bool    checksum;
+	bool    version;
+	struct  sock *sk;       /* underlying tcp_sock */
+	struct  sock *conn;     /* parent mptcp_sock */
+};
+
+static inline struct subflow_context *subflow_ctx(const struct sock *sk)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	return (struct subflow_context *)icsk->icsk_ulp_data;
+}
+
+static inline struct sock *sock_sk(const struct subflow_context *subflow)
+{
+	return subflow->sk;
+}
+
+int mptcp_subflow_init(void);
+void mptcp_subflow_exit(void);
+
 #ifdef CONFIG_MPTCP
 
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
