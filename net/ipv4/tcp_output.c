@@ -599,6 +599,29 @@ static void smc_set_option_cond(const struct tcp_sock *tp,
 #endif
 }
 
+static void mptcp_set_option_cond(const struct request_sock *req,
+				  struct tcp_out_options *opts,
+				  unsigned int *remaining)
+{
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (tcp_rsk(req)->is_mptcp) {
+		u64 local_key;
+		u64 remote_key;
+
+		if (mptcp_synack_options(req, &local_key, &remote_key)) {
+			if (*remaining >= TCPOLEN_MPTCP_MPC_SYNACK) {
+				opts->options |= OPTION_MPTCP;
+				opts->mptcp.suboptions =
+					OPTION_MPTCP_MPC_SYNACK;
+				opts->mptcp.sndr_key = local_key;
+				opts->mptcp.rcvr_key = remote_key;
+				*remaining -= TCPOLEN_MPTCP_MPC_SYNACK;
+			}
+		}
+	}
+#endif
+}
+
 /* Compute TCP options for SYN packets. This is not the final
  * network wire format yet.
  */
@@ -741,6 +764,8 @@ static unsigned int tcp_synack_options(const struct sock *sk,
 			remaining -= need;
 		}
 	}
+
+	mptcp_set_option_cond(req, opts, &remaining);
 
 	smc_set_option_cond(tcp_sk(sk), ireq, opts, &remaining);
 
