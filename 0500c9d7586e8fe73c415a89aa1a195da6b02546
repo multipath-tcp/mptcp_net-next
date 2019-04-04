@@ -22,6 +22,98 @@
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "83db8de7_13cc70c2",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 420,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:39:28Z",
+      "side": 1,
+      "message": "\u003e so that the compiler could optimize out the relevant branch at build time if MPTCP is not enabled\n\nsmart idea :)",
+      "parentUuid": "0d0cecef_e424bbc0",
+      "range": {
+        "startLine": 420,
+        "startChar": 6,
+        "endLine": 420,
+        "endChar": 14
+      },
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "df6133a9_d3f5336a",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:39:28Z",
+      "side": 1,
+      "message": "detail: should we move this to an \"internal\" header file? In net/mptcp/mptcp_internal.h?\nTo have what is exposed to the userspace in include/uapi, to the kernel in include/net and only to mptcp in net/mptcp?\n\nIf we want to keep it here, I would suggest to prefix everything here with \u0027mptcp_\u0027. (or should we even always prefix MPTCP related functions/variables with that → big detail :) )",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4564eff8_6e34e6d7",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:39:28Z",
+      "side": 1,
+      "message": "detail: this function seems not used.",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "dd3a99fe_f03983a0",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:39:28Z",
+      "side": 1,
+      "message": "if the bind() fails, should we clean the subflow that might have just been created?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9631bfd2_886711a8",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 153,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:39:28Z",
+      "side": 1,
+      "message": "if the connect() fails, should we clean the subflow that might have just been created?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
     }
   ]
 }
