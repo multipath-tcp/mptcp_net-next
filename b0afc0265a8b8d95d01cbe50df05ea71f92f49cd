@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "772560ce_3ae9e83f",
+        "filename": "tools/testing/selftests/net/mptcp/mptcp_connect.sh",
+        "patchSetId": 2
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 1016277
+      },
+      "writtenOn": "2019-04-04T12:43:48Z",
+      "side": 1,
+      "message": "this last line contains a syntax error, should be replaced with:\n\necho \" exit code $ret\"\nreturn",
+      "range": {
+        "startLine": 22,
+        "startChar": 16,
+        "endLine": 22,
+        "endChar": 20
+      },
+      "revId": "b0afc0265a8b8d95d01cbe50df05ea71f92f49cd",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
