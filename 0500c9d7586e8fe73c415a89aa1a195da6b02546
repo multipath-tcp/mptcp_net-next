@@ -66,6 +66,74 @@
     },
     {
       "key": {
+        "uuid": "25071709_a200f89f",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 55,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:49:42Z",
+      "side": 1,
+      "message": "I guess here and below we will use bits. Because it is easy to change, should we maybe directly switch to bits to avoid comments on that during reviews by others?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9cadbdbf_4da255b3",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:49:42Z",
+      "side": 1,
+      "message": "do you need a bool for the version?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "fbe9fe09_c5826581",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:49:42Z",
+      "side": 1,
+      "message": "should we call it tcp_sock?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "4f5c1e6f_4335ee26",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-04T15:49:42Z",
+      "side": 1,
+      "message": "should we then call it mptcp_sock then? :)",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4564eff8_6e34e6d7",
         "filename": "include/net/mptcp.h",
         "patchSetId": 1
