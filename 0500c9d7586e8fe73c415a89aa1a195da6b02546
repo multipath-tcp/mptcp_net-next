@@ -49,6 +49,30 @@
     },
     {
       "key": {
+        "uuid": "7fa41022_b2474f35",
+        "filename": "include/linux/tcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 420,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "Great idea, will do.",
+      "parentUuid": "83db8de7_13cc70c2",
+      "range": {
+        "startLine": 420,
+        "startChar": 6,
+        "endLine": 420,
+        "endChar": 14
+      },
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "df6133a9_d3f5336a",
         "filename": "include/net/mptcp.h",
         "patchSetId": 1
@@ -60,6 +84,24 @@
       "writtenOn": "2019-04-04T15:39:28Z",
       "side": 1,
       "message": "detail: should we move this to an \"internal\" header file? In net/mptcp/mptcp_internal.h?\nTo have what is exposed to the userspace in include/uapi, to the kernel in include/net and only to mptcp in net/mptcp?\n\nIf we want to keep it here, I would suggest to prefix everything here with \u0027mptcp_\u0027. (or should we even always prefix MPTCP related functions/variables with that → big detail :) )",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "09c014e4_ef17a9dd",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 54,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "Sure, I will re-factor this header file and add an internal header file.",
+      "parentUuid": "df6133a9_d3f5336a",
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -118,6 +160,24 @@
     },
     {
       "key": {
+        "uuid": "0d48ddc2_f17ff1b4",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "It is per-subflow. The most important field is of course the pointer the MPTCP \"connection\" socket.\n\nAnd yes, I will make the version a bit-field, and the checksum, etc.",
+      "parentUuid": "287577bb_ec804e6d",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "fbe9fe09_c5826581",
         "filename": "include/net/mptcp.h",
         "patchSetId": 1
@@ -129,6 +189,24 @@
       "writtenOn": "2019-04-04T15:49:42Z",
       "side": 1,
       "message": "should we call it tcp_sock?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "64557a80_9baa7e55",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "No, there is a structure named tcp_sock, so that is a bad name. I see many places where a \u0027struct sock *\u0027 is stored as \u0027sk\u0027, and then another name is used when it is cast to its actual type (inet_connection_sock, tcp_sock, etc.).",
+      "parentUuid": "fbe9fe09_c5826581",
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -152,6 +230,24 @@
     },
     {
       "key": {
+        "uuid": "a4149087_ae388984",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "No, there is a structure named mptcp_sock, so that would be confusing. It\u0027s the connection sock, conn is a good name.",
+      "parentUuid": "4f5c1e6f_4335ee26",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "4564eff8_6e34e6d7",
         "filename": "include/net/mptcp.h",
         "patchSetId": 1
@@ -163,6 +259,24 @@
       "writtenOn": "2019-04-04T15:39:28Z",
       "side": 1,
       "message": "detail: this function seems not used.",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "761c8115_423810a3",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 68,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "Maybe it needs to be moved to a later commit, I\u0027ll check.",
+      "parentUuid": "4564eff8_6e34e6d7",
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
@@ -186,6 +300,24 @@
     },
     {
       "key": {
+        "uuid": "cd004d85_889308e0",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 133,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "Definitely.",
+      "parentUuid": "dd3a99fe_f03983a0",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "9631bfd2_886711a8",
         "filename": "net/mptcp/protocol.c",
         "patchSetId": 1
@@ -197,6 +329,24 @@
       "writtenOn": "2019-04-04T15:39:28Z",
       "side": 1,
       "message": "if the connect() fails, should we clean the subflow that might have just been created?",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "d7c0a2fa_36ba8f19",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 153,
+      "author": {
+        "id": 1015766
+      },
+      "writtenOn": "2019-04-08T15:40:01Z",
+      "side": 1,
+      "message": "Ditto definitely.",
+      "parentUuid": "9631bfd2_886711a8",
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
