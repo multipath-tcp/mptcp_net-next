@@ -213,6 +213,24 @@
     },
     {
       "key": {
+        "uuid": "d3583716_9776b01f",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-08T16:02:19Z",
+      "side": 1,
+      "message": "it makes sense, thank you.",
+      "parentUuid": "64557a80_9baa7e55",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "4f5c1e6f_4335ee26",
         "filename": "include/net/mptcp.h",
         "patchSetId": 1
@@ -245,6 +263,24 @@
       "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
       "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "2915957c_3368feb1",
+        "filename": "include/net/mptcp.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 59,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-04-08T16:02:19Z",
+      "side": 1,
+      "message": "it was just to avoid the comment (parent) but I am fine with conn!",
+      "parentUuid": "a4149087_ae388984",
+      "revId": "0500c9d7586e8fe73c415a89aa1a195da6b02546",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": false
     },
     {
       "key": {
