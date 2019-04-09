@@ -225,7 +225,7 @@ static void phy_mdio_device_remove(struct mdio_device *mdiodev)
 }
 
 static struct phy_driver genphy_driver;
-extern struct phy_driver genphy_10g_driver;
+extern struct phy_driver genphy_c45_driver;
 
 static LIST_HEAD(phy_fixup_list);
 static DEFINE_MUTEX(phy_fixup_lock);
@@ -1174,7 +1174,7 @@ int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
 	 */
 	if (!d->driver) {
 		if (phydev->is_c45)
-			d->driver = &genphy_10g_driver.mdiodrv.driver;
+			d->driver = &genphy_c45_driver.mdiodrv.driver;
 		else
 			d->driver = &genphy_driver.mdiodrv.driver;
 
@@ -1335,7 +1335,7 @@ EXPORT_SYMBOL_GPL(phy_driver_is_genphy);
 bool phy_driver_is_genphy_10g(struct phy_device *phydev)
 {
 	return phy_driver_is_genphy_kind(phydev,
-					 &genphy_10g_driver.mdiodrv.driver);
+					 &genphy_c45_driver.mdiodrv.driver);
 }
 EXPORT_SYMBOL_GPL(phy_driver_is_genphy_10g);
 
@@ -1710,19 +1710,17 @@ int genphy_update_link(struct phy_device *phydev)
 	 */
 	if (!phy_polling_mode(phydev)) {
 		status = phy_read(phydev, MII_BMSR);
-		if (status < 0) {
+		if (status < 0)
 			return status;
-		} else if (status & BMSR_LSTATUS) {
-			phydev->link = 1;
-			return 0;
-		}
+		else if (status & BMSR_LSTATUS)
+			goto done;
 	}
 
 	/* Read link and autonegotiation status */
 	status = phy_read(phydev, MII_BMSR);
 	if (status < 0)
 		return status;
-
+done:
 	phydev->link = status & BMSR_LSTATUS ? 1 : 0;
 	phydev->autoneg_complete = status & BMSR_ANEGCOMPLETE ? 1 : 0;
 
@@ -1756,10 +1754,7 @@ int genphy_read_status(struct phy_device *phydev)
 	linkmode_zero(phydev->lp_advertising);
 
 	if (phydev->autoneg == AUTONEG_ENABLE && phydev->autoneg_complete) {
-		if (linkmode_test_bit(ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
-				      phydev->supported) ||
-		    linkmode_test_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-				      phydev->supported)) {
+		if (phydev->is_gigabit_capable) {
 			lpagb = phy_read(phydev, MII_STAT1000);
 			if (lpagb < 0)
 				return lpagb;
@@ -2154,6 +2149,13 @@ static int phy_probe(struct device *dev)
 	if (err)
 		goto out;
 
+	if (linkmode_test_bit(ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
+			      phydev->supported))
+		phydev->is_gigabit_capable = 1;
+	if (linkmode_test_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+			      phydev->supported))
+		phydev->is_gigabit_capable = 1;
+
 	of_set_phy_supported(phydev);
 	linkmode_copy(phydev->advertising, phydev->supported);
 
@@ -2304,14 +2306,14 @@ static int __init phy_init(void)
 
 	features_init();
 
-	rc = phy_driver_register(&genphy_10g_driver, THIS_MODULE);
+	rc = phy_driver_register(&genphy_c45_driver, THIS_MODULE);
 	if (rc)
-		goto err_10g;
+		goto err_c45;
 
 	rc = phy_driver_register(&genphy_driver, THIS_MODULE);
 	if (rc) {
-		phy_driver_unregister(&genphy_10g_driver);
-err_10g:
+		phy_driver_unregister(&genphy_c45_driver);
+err_c45:
 		mdio_bus_exit();
 	}
 
@@ -2320,7 +2322,7 @@ err_10g:
 
 static void __exit phy_exit(void)
 {
-	phy_driver_unregister(&genphy_10g_driver);
+	phy_driver_unregister(&genphy_c45_driver);
 	phy_driver_unregister(&genphy_driver);
 	mdio_bus_exit();
 }
