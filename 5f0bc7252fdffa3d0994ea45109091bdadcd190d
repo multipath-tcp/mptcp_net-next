@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ac8f6c1e_9cce7816",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 10
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1016239
+      },
+      "writtenOn": "2019-04-18T14:16:04Z",
+      "side": 1,
+      "message": "Since CONFIG_MPTCP is a boolean, we don\u0027t need these module alias: I think we should remove them. On the other hand, if we are keeping module aliases on purpose, i.e. we want to redefine CONFIG_MPTCP as a module in the future, we should add something like \n\nMODULE_ALIAS_TCP_ULP(\"mptcp\")\n\n\ncommit 037b0b86ecf5646f8eae777d8b52ff8b401692ec\nAuthor: Daniel Borkmann \u003cdaniel@iogearbox.net\u003e\nDate:   Thu Aug 16 21:49:06 2018 +0200\n\n    tcp, ulp: add alias for all ulp modules",
+      "range": {
+        "startLine": 129,
+        "startChar": 0,
+        "endLine": 131,
+        "endChar": 51
+      },
+      "revId": "5f0bc7252fdffa3d0994ea45109091bdadcd190d",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
