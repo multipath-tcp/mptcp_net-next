@@ -1164,6 +1164,25 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 
 			err = open_related_ns(&net->ns, get_net_ns);
 			break;
+		case SIOCGSTAMP_OLD:
+		case SIOCGSTAMPNS_OLD:
+			if (!sock->ops->gettstamp) {
+				err = -ENOIOCTLCMD;
+				break;
+			}
+			err = sock->ops->gettstamp(sock, argp,
+						   cmd == SIOCGSTAMP_OLD,
+						   !IS_ENABLED(CONFIG_64BIT));
+		case SIOCGSTAMP_NEW:
+		case SIOCGSTAMPNS_NEW:
+			if (!sock->ops->gettstamp) {
+				err = -ENOIOCTLCMD;
+				break;
+			}
+			err = sock->ops->gettstamp(sock, argp,
+						   cmd == SIOCGSTAMP_NEW,
+						   false);
+			break;
 		default:
 			err = sock_do_ioctl(net, sock, cmd, arg);
 			break;
@@ -2916,38 +2935,6 @@ void socket_seq_show(struct seq_file *seq)
 #endif				/* CONFIG_PROC_FS */
 
 #ifdef CONFIG_COMPAT
-static int do_siocgstamp(struct net *net, struct socket *sock,
-			 unsigned int cmd, void __user *up)
-{
-	mm_segment_t old_fs = get_fs();
-	struct timeval ktv;
-	int err;
-
-	set_fs(KERNEL_DS);
-	err = sock_do_ioctl(net, sock, cmd, (unsigned long)&ktv);
-	set_fs(old_fs);
-	if (!err)
-		err = compat_put_timeval(&ktv, up);
-
-	return err;
-}
-
-static int do_siocgstampns(struct net *net, struct socket *sock,
-			   unsigned int cmd, void __user *up)
-{
-	mm_segment_t old_fs = get_fs();
-	struct timespec kts;
-	int err;
-
-	set_fs(KERNEL_DS);
-	err = sock_do_ioctl(net, sock, cmd, (unsigned long)&kts);
-	set_fs(old_fs);
-	if (!err)
-		err = compat_put_timespec(&kts, up);
-
-	return err;
-}
-
 static int compat_dev_ifconf(struct net *net, struct compat_ifconf __user *uifc32)
 {
 	struct compat_ifconf ifc32;
@@ -3347,10 +3334,13 @@ static int compat_sock_ioctl_trans(struct file *file, struct socket *sock,
 	case SIOCADDRT:
 	case SIOCDELRT:
 		return routing_ioctl(net, sock, cmd, argp);
-	case SIOCGSTAMP:
-		return do_siocgstamp(net, sock, cmd, argp);
-	case SIOCGSTAMPNS:
-		return do_siocgstampns(net, sock, cmd, argp);
+	case SIOCGSTAMP_OLD:
+	case SIOCGSTAMPNS_OLD:
+		if (!sock->ops->gettstamp)
+			return -ENOIOCTLCMD;
+		return sock->ops->gettstamp(sock, argp, cmd == SIOCGSTAMP_OLD,
+					    !COMPAT_USE_64BIT_TIME);
+
 	case SIOCBONDSLAVEINFOQUERY:
 	case SIOCBONDINFOQUERY:
 	case SIOCSHWTSTAMP:
@@ -3368,6 +3358,8 @@ static int compat_sock_ioctl_trans(struct file *file, struct socket *sock,
 	case SIOCADDDLCI:
 	case SIOCDELDLCI:
 	case SIOCGSKNS:
+	case SIOCGSTAMP_NEW:
+	case SIOCGSTAMPNS_NEW:
 		return sock_ioctl(file, cmd, arg);
 
 	case SIOCGIFFLAGS:
