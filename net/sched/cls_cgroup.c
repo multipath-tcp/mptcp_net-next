@@ -104,8 +104,9 @@ static int cls_cgroup_change(struct net *net, struct sk_buff *in_skb,
 		goto errout;
 	new->handle = handle;
 	new->tp = tp;
-	err = nla_parse_nested(tb, TCA_CGROUP_MAX, tca[TCA_OPTIONS],
-			       cgroup_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, TCA_CGROUP_MAX,
+					  tca[TCA_OPTIONS], cgroup_policy,
+					  NULL);
 	if (err < 0)
 		goto errout;
 
@@ -176,7 +177,7 @@ static int cls_cgroup_dump(struct net *net, struct tcf_proto *tp, void *fh,
 
 	t->tcm_handle = head->handle;
 
-	nest = nla_nest_start(skb, TCA_OPTIONS);
+	nest = nla_nest_start_noflag(skb, TCA_OPTIONS);
 	if (nest == NULL)
 		goto nla_put_failure;
 
