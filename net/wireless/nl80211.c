@@ -703,9 +703,11 @@ int nl80211_prepare_wdev_dump(struct netlink_callback *cb,
 	int err;
 
 	if (!cb->args[0]) {
-		err = nlmsg_parse(cb->nlh, GENL_HDRLEN + nl80211_fam.hdrsize,
-				  genl_family_attrbuf(&nl80211_fam),
-				  nl80211_fam.maxattr, nl80211_policy, NULL);
+		err = nlmsg_parse_deprecated(cb->nlh,
+					     GENL_HDRLEN + nl80211_fam.hdrsize,
+					     genl_family_attrbuf(&nl80211_fam),
+					     nl80211_fam.maxattr,
+					     nl80211_policy, NULL);
 		if (err)
 			return err;
 
@@ -755,13 +757,13 @@ static int nl80211_msg_put_wmm_rules(struct sk_buff *msg,
 {
 	int j;
 	struct nlattr *nl_wmm_rules =
-		nla_nest_start(msg, NL80211_FREQUENCY_ATTR_WMM);
+		nla_nest_start_noflag(msg, NL80211_FREQUENCY_ATTR_WMM);
 
 	if (!nl_wmm_rules)
 		goto nla_put_failure;
 
 	for (j = 0; j < IEEE80211_NUM_ACS; j++) {
-		struct nlattr *nl_wmm_rule = nla_nest_start(msg, j);
+		struct nlattr *nl_wmm_rule = nla_nest_start_noflag(msg, j);
 
 		if (!nl_wmm_rule)
 			goto nla_put_failure;
@@ -890,7 +892,7 @@ static bool nl80211_put_txq_stats(struct sk_buff *msg,
 		return false;						  \
 	} while (0)
 
-	txqattr = nla_nest_start(msg, attrtype);
+	txqattr = nla_nest_start_noflag(msg, attrtype);
 	if (!txqattr)
 		return false;
 
@@ -925,8 +927,9 @@ static int nl80211_parse_key_new(struct genl_info *info, struct nlattr *key,
 				 struct key_parse *k)
 {
 	struct nlattr *tb[NL80211_KEY_MAX + 1];
-	int err = nla_parse_nested(tb, NL80211_KEY_MAX, key,
-				   nl80211_key_policy, info->extack);
+	int err = nla_parse_nested_deprecated(tb, NL80211_KEY_MAX, key,
+					      nl80211_key_policy,
+					      info->extack);
 	if (err)
 		return err;
 
@@ -962,10 +965,11 @@ static int nl80211_parse_key_new(struct genl_info *info, struct nlattr *key,
 	if (tb[NL80211_KEY_DEFAULT_TYPES]) {
 		struct nlattr *kdt[NUM_NL80211_KEY_DEFAULT_TYPES];
 
-		err = nla_parse_nested(kdt, NUM_NL80211_KEY_DEFAULT_TYPES - 1,
-				       tb[NL80211_KEY_DEFAULT_TYPES],
-				       nl80211_key_default_policy,
-				       info->extack);
+		err = nla_parse_nested_deprecated(kdt,
+						  NUM_NL80211_KEY_DEFAULT_TYPES - 1,
+						  tb[NL80211_KEY_DEFAULT_TYPES],
+						  nl80211_key_default_policy,
+						  info->extack);
 		if (err)
 			return err;
 
@@ -1012,11 +1016,11 @@ static int nl80211_parse_key_old(struct genl_info *info, struct key_parse *k)
 
 	if (info->attrs[NL80211_ATTR_KEY_DEFAULT_TYPES]) {
 		struct nlattr *kdt[NUM_NL80211_KEY_DEFAULT_TYPES];
-		int err = nla_parse_nested(kdt,
-					   NUM_NL80211_KEY_DEFAULT_TYPES - 1,
-					   info->attrs[NL80211_ATTR_KEY_DEFAULT_TYPES],
-					   nl80211_key_default_policy,
-					   info->extack);
+		int err = nla_parse_nested_deprecated(kdt,
+						      NUM_NL80211_KEY_DEFAULT_TYPES - 1,
+						      info->attrs[NL80211_ATTR_KEY_DEFAULT_TYPES],
+						      nl80211_key_default_policy,
+						      info->extack);
 		if (err)
 			return err;
 
@@ -1205,7 +1209,7 @@ static struct ieee80211_channel *nl80211_get_valid_chan(struct wiphy *wiphy,
 
 static int nl80211_put_iftypes(struct sk_buff *msg, u32 attr, u16 ifmodes)
 {
-	struct nlattr *nl_modes = nla_nest_start(msg, attr);
+	struct nlattr *nl_modes = nla_nest_start_noflag(msg, attr);
 	int i;
 
 	if (!nl_modes)
@@ -1233,8 +1237,8 @@ static int nl80211_put_iface_combinations(struct wiphy *wiphy,
 	struct nlattr *nl_combis;
 	int i, j;
 
-	nl_combis = nla_nest_start(msg,
-				NL80211_ATTR_INTERFACE_COMBINATIONS);
+	nl_combis = nla_nest_start_noflag(msg,
+					  NL80211_ATTR_INTERFACE_COMBINATIONS);
 	if (!nl_combis)
 		goto nla_put_failure;
 
@@ -1244,18 +1248,19 @@ static int nl80211_put_iface_combinations(struct wiphy *wiphy,
 
 		c = &wiphy->iface_combinations[i];
 
-		nl_combi = nla_nest_start(msg, i + 1);
+		nl_combi = nla_nest_start_noflag(msg, i + 1);
 		if (!nl_combi)
 			goto nla_put_failure;
 
-		nl_limits = nla_nest_start(msg, NL80211_IFACE_COMB_LIMITS);
+		nl_limits = nla_nest_start_noflag(msg,
+						  NL80211_IFACE_COMB_LIMITS);
 		if (!nl_limits)
 			goto nla_put_failure;
 
 		for (j = 0; j < c->n_limits; j++) {
 			struct nlattr *nl_limit;
 
-			nl_limit = nla_nest_start(msg, j + 1);
+			nl_limit = nla_nest_start_noflag(msg, j + 1);
 			if (!nl_limit)
 				goto nla_put_failure;
 			if (nla_put_u32(msg, NL80211_IFACE_LIMIT_MAX,
@@ -1308,7 +1313,8 @@ static int nl80211_send_wowlan_tcp_caps(struct cfg80211_registered_device *rdev,
 	if (!tcp)
 		return 0;
 
-	nl_tcp = nla_nest_start(msg, NL80211_WOWLAN_TRIG_TCP_CONNECTION);
+	nl_tcp = nla_nest_start_noflag(msg,
+				       NL80211_WOWLAN_TRIG_TCP_CONNECTION);
 	if (!nl_tcp)
 		return -ENOBUFS;
 
@@ -1348,7 +1354,8 @@ static int nl80211_send_wowlan(struct sk_buff *msg,
 	if (!rdev->wiphy.wowlan)
 		return 0;
 
-	nl_wowlan = nla_nest_start(msg, NL80211_ATTR_WOWLAN_TRIGGERS_SUPPORTED);
+	nl_wowlan = nla_nest_start_noflag(msg,
+					  NL80211_ATTR_WOWLAN_TRIGGERS_SUPPORTED);
 	if (!nl_wowlan)
 		return -ENOBUFS;
 
@@ -1477,7 +1484,8 @@ static int nl80211_send_band_rateinfo(struct sk_buff *msg,
 
 	if (sband->n_iftype_data) {
 		struct nlattr *nl_iftype_data =
-			nla_nest_start(msg, NL80211_BAND_ATTR_IFTYPE_DATA);
+			nla_nest_start_noflag(msg,
+					      NL80211_BAND_ATTR_IFTYPE_DATA);
 		int err;
 
 		if (!nl_iftype_data)
@@ -1486,7 +1494,7 @@ static int nl80211_send_band_rateinfo(struct sk_buff *msg,
 		for (i = 0; i < sband->n_iftype_data; i++) {
 			struct nlattr *iftdata;
 
-			iftdata = nla_nest_start(msg, i + 1);
+			iftdata = nla_nest_start_noflag(msg, i + 1);
 			if (!iftdata)
 				return -ENOBUFS;
 
@@ -1502,12 +1510,12 @@ static int nl80211_send_band_rateinfo(struct sk_buff *msg,
 	}
 
 	/* add bitrates */
-	nl_rates = nla_nest_start(msg, NL80211_BAND_ATTR_RATES);
+	nl_rates = nla_nest_start_noflag(msg, NL80211_BAND_ATTR_RATES);
 	if (!nl_rates)
 		return -ENOBUFS;
 
 	for (i = 0; i < sband->n_bitrates; i++) {
-		nl_rate = nla_nest_start(msg, i);
+		nl_rate = nla_nest_start_noflag(msg, i);
 		if (!nl_rate)
 			return -ENOBUFS;
 
@@ -1540,12 +1548,12 @@ nl80211_send_mgmt_stypes(struct sk_buff *msg,
 	if (!mgmt_stypes)
 		return 0;
 
-	nl_ifs = nla_nest_start(msg, NL80211_ATTR_TX_FRAME_TYPES);
+	nl_ifs = nla_nest_start_noflag(msg, NL80211_ATTR_TX_FRAME_TYPES);
 	if (!nl_ifs)
 		return -ENOBUFS;
 
 	for (ift = 0; ift < NUM_NL80211_IFTYPES; ift++) {
-		nl_ftypes = nla_nest_start(msg, ift);
+		nl_ftypes = nla_nest_start_noflag(msg, ift);
 		if (!nl_ftypes)
 			return -ENOBUFS;
 		i = 0;
@@ -1563,12 +1571,12 @@ nl80211_send_mgmt_stypes(struct sk_buff *msg,
 
 	nla_nest_end(msg, nl_ifs);
 
-	nl_ifs = nla_nest_start(msg, NL80211_ATTR_RX_FRAME_TYPES);
+	nl_ifs = nla_nest_start_noflag(msg, NL80211_ATTR_RX_FRAME_TYPES);
 	if (!nl_ifs)
 		return -ENOBUFS;
 
 	for (ift = 0; ift < NUM_NL80211_IFTYPES; ift++) {
-		nl_ftypes = nla_nest_start(msg, ift);
+		nl_ftypes = nla_nest_start_noflag(msg, ift);
 		if (!nl_ftypes)
 			return -ENOBUFS;
 		i = 0;
@@ -1686,7 +1694,7 @@ nl80211_send_pmsr_ftm_capa(const struct cfg80211_pmsr_capabilities *cap,
 	if (!cap->ftm.supported)
 		return 0;
 
-	ftm = nla_nest_start(msg, NL80211_PMSR_TYPE_FTM);
+	ftm = nla_nest_start_noflag(msg, NL80211_PMSR_TYPE_FTM);
 	if (!ftm)
 		return -ENOBUFS;
 
@@ -1734,7 +1742,7 @@ static int nl80211_send_pmsr_capa(struct cfg80211_registered_device *rdev,
 	 * will genlmsg_cancel() if we fail
 	 */
 
-	pmsr = nla_nest_start(msg, NL80211_ATTR_PEER_MEASUREMENTS);
+	pmsr = nla_nest_start_noflag(msg, NL80211_ATTR_PEER_MEASUREMENTS);
 	if (!pmsr)
 		return -ENOBUFS;
 
@@ -1749,7 +1757,7 @@ static int nl80211_send_pmsr_capa(struct cfg80211_registered_device *rdev,
 	    nla_put_flag(msg, NL80211_PMSR_ATTR_RANDOMIZE_MAC_ADDR))
 		return -ENOBUFS;
 
-	caps = nla_nest_start(msg, NL80211_PMSR_ATTR_TYPE_CAPA);
+	caps = nla_nest_start_noflag(msg, NL80211_PMSR_ATTR_TYPE_CAPA);
 	if (!caps)
 		return -ENOBUFS;
 
@@ -1910,7 +1918,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			break;
 		/* fall through */
 	case 3:
-		nl_bands = nla_nest_start(msg, NL80211_ATTR_WIPHY_BANDS);
+		nl_bands = nla_nest_start_noflag(msg,
+						 NL80211_ATTR_WIPHY_BANDS);
 		if (!nl_bands)
 			goto nla_put_failure;
 
@@ -1923,7 +1932,7 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			if (!sband)
 				continue;
 
-			nl_band = nla_nest_start(msg, band);
+			nl_band = nla_nest_start_noflag(msg, band);
 			if (!nl_band)
 				goto nla_put_failure;
 
@@ -1937,15 +1946,16 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 				/* fall through */
 			default:
 				/* add frequencies */
-				nl_freqs = nla_nest_start(
-					msg, NL80211_BAND_ATTR_FREQS);
+				nl_freqs = nla_nest_start_noflag(msg,
+								 NL80211_BAND_ATTR_FREQS);
 				if (!nl_freqs)
 					goto nla_put_failure;
 
 				for (i = state->chan_start - 1;
 				     i < sband->n_channels;
 				     i++) {
-					nl_freq = nla_nest_start(msg, i);
+					nl_freq = nla_nest_start_noflag(msg,
+									i);
 					if (!nl_freq)
 						goto nla_put_failure;
 
@@ -1990,7 +2000,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			break;
 		/* fall through */
 	case 4:
-		nl_cmds = nla_nest_start(msg, NL80211_ATTR_SUPPORTED_COMMANDS);
+		nl_cmds = nla_nest_start_noflag(msg,
+						NL80211_ATTR_SUPPORTED_COMMANDS);
 		if (!nl_cmds)
 			goto nla_put_failure;
 
@@ -2138,7 +2149,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			const struct nl80211_vendor_cmd_info *info;
 			struct nlattr *nested;
 
-			nested = nla_nest_start(msg, NL80211_ATTR_VENDOR_DATA);
+			nested = nla_nest_start_noflag(msg,
+						       NL80211_ATTR_VENDOR_DATA);
 			if (!nested)
 				goto nla_put_failure;
 
@@ -2154,8 +2166,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			const struct nl80211_vendor_cmd_info *info;
 			struct nlattr *nested;
 
-			nested = nla_nest_start(msg,
-						NL80211_ATTR_VENDOR_EVENTS);
+			nested = nla_nest_start_noflag(msg,
+						       NL80211_ATTR_VENDOR_EVENTS);
 			if (!nested)
 				goto nla_put_failure;
 
@@ -2192,7 +2204,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 			struct nlattr *nested;
 			u32 bss_select_support = rdev->wiphy.bss_select_support;
 
-			nested = nla_nest_start(msg, NL80211_ATTR_BSS_SELECT);
+			nested = nla_nest_start_noflag(msg,
+						       NL80211_ATTR_BSS_SELECT);
 			if (!nested)
 				goto nla_put_failure;
 
@@ -2214,8 +2227,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 		    rdev->wiphy.iftype_ext_capab) {
 			struct nlattr *nested_ext_capab, *nested;
 
-			nested = nla_nest_start(msg,
-						NL80211_ATTR_IFTYPE_EXT_CAPA);
+			nested = nla_nest_start_noflag(msg,
+						       NL80211_ATTR_IFTYPE_EXT_CAPA);
 			if (!nested)
 				goto nla_put_failure;
 
@@ -2225,7 +2238,8 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 
 				capab = &rdev->wiphy.iftype_ext_capab[i];
 
-				nested_ext_capab = nla_nest_start(msg, i);
+				nested_ext_capab = nla_nest_start_noflag(msg,
+									 i);
 				if (!nested_ext_capab ||
 				    nla_put_u32(msg, NL80211_ATTR_IFTYPE,
 						capab->iftype) ||
@@ -2307,8 +2321,10 @@ static int nl80211_dump_wiphy_parse(struct sk_buff *skb,
 				    struct nl80211_dump_wiphy_state *state)
 {
 	struct nlattr **tb = genl_family_attrbuf(&nl80211_fam);
-	int ret = nlmsg_parse(cb->nlh, GENL_HDRLEN + nl80211_fam.hdrsize, tb,
-			      nl80211_fam.maxattr, nl80211_policy, NULL);
+	int ret = nlmsg_parse_deprecated(cb->nlh,
+					 GENL_HDRLEN + nl80211_fam.hdrsize,
+					 tb, nl80211_fam.maxattr,
+					 nl80211_policy, NULL);
 	/* ignore parse errors for backward compatibility */
 	if (ret)
 		return 0;
@@ -2751,10 +2767,11 @@ static int nl80211_set_wiphy(struct sk_buff *skb, struct genl_info *info)
 		nla_for_each_nested(nl_txq_params,
 				    info->attrs[NL80211_ATTR_WIPHY_TXQ_PARAMS],
 				    rem_txq_params) {
-			result = nla_parse_nested(tb, NL80211_TXQ_ATTR_MAX,
-						  nl_txq_params,
-						  txq_params_policy,
-						  info->extack);
+			result = nla_parse_nested_deprecated(tb,
+							     NL80211_TXQ_ATTR_MAX,
+							     nl_txq_params,
+							     txq_params_policy,
+							     info->extack);
 			if (result)
 				return result;
 			result = parse_txq_params(tb, &txq_params);
@@ -3211,8 +3228,7 @@ static int parse_monitor_flags(struct nlattr *nla, u32 *mntrflags)
 	if (!nla)
 		return -EINVAL;
 
-	if (nla_parse_nested(flags, NL80211_MNTR_FLAG_MAX, nla,
-			     mntr_flags_policy, NULL))
+	if (nla_parse_nested_deprecated(flags, NL80211_MNTR_FLAG_MAX, nla, mntr_flags_policy, NULL))
 		return -EINVAL;
 
 	for (flag = 1; flag <= NL80211_MNTR_FLAG_MAX; flag++)
@@ -3539,7 +3555,7 @@ static void get_key_callback(void *c, struct key_params *params)
 			 params->cipher)))
 		goto nla_put_failure;
 
-	key = nla_nest_start(cookie->msg, NL80211_ATTR_KEY);
+	key = nla_nest_start_noflag(cookie->msg, NL80211_ATTR_KEY);
 	if (!key)
 		goto nla_put_failure;
 
@@ -4091,8 +4107,10 @@ static int nl80211_parse_tx_bitrate_mask(struct genl_info *info,
 		sband = rdev->wiphy.bands[band];
 		if (sband == NULL)
 			return -EINVAL;
-		err = nla_parse_nested(tb, NL80211_TXRATE_MAX, tx_rates,
-				       nl80211_txattr_policy, info->extack);
+		err = nla_parse_nested_deprecated(tb, NL80211_TXRATE_MAX,
+						  tx_rates,
+						  nl80211_txattr_policy,
+						  info->extack);
 		if (err)
 			return err;
 		if (tb[NL80211_TXRATE_LEGACY]) {
@@ -4260,9 +4278,10 @@ static int nl80211_parse_beacon(struct cfg80211_registered_device *rdev,
 	if (attrs[NL80211_ATTR_FTM_RESPONDER]) {
 		struct nlattr *tb[NL80211_FTM_RESP_ATTR_MAX + 1];
 
-		err = nla_parse_nested(tb, NL80211_FTM_RESP_ATTR_MAX,
-				       attrs[NL80211_ATTR_FTM_RESPONDER],
-				       NULL, NULL);
+		err = nla_parse_nested_deprecated(tb,
+						  NL80211_FTM_RESP_ATTR_MAX,
+						  attrs[NL80211_ATTR_FTM_RESPONDER],
+						  NULL, NULL);
 		if (err)
 			return err;
 
@@ -4670,8 +4689,7 @@ static int parse_station_flags(struct genl_info *info,
 	if (!nla)
 		return 0;
 
-	if (nla_parse_nested(flags, NL80211_STA_FLAG_MAX, nla,
-			     sta_flags_policy, info->extack))
+	if (nla_parse_nested_deprecated(flags, NL80211_STA_FLAG_MAX, nla, sta_flags_policy, info->extack))
 		return -EINVAL;
 
 	/*
@@ -4723,7 +4741,7 @@ bool nl80211_put_sta_rate(struct sk_buff *msg, struct rate_info *info, int attr)
 	u16 bitrate_compat;
 	enum nl80211_rate_info rate_flg;
 
-	rate = nla_nest_start(msg, attr);
+	rate = nla_nest_start_noflag(msg, attr);
 	if (!rate)
 		return false;
 
@@ -4810,7 +4828,7 @@ static bool nl80211_put_signal(struct sk_buff *msg, u8 mask, s8 *signal,
 	if (!mask)
 		return true;
 
-	attr = nla_nest_start(msg, id);
+	attr = nla_nest_start_noflag(msg, id);
 	if (!attr)
 		return false;
 
@@ -4845,7 +4863,7 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 	    nla_put_u32(msg, NL80211_ATTR_GENERATION, sinfo->generation))
 		goto nla_put_failure;
 
-	sinfoattr = nla_nest_start(msg, NL80211_ATTR_STA_INFO);
+	sinfoattr = nla_nest_start_noflag(msg, NL80211_ATTR_STA_INFO);
 	if (!sinfoattr)
 		goto nla_put_failure;
 
@@ -4934,7 +4952,8 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 	PUT_SINFO(CONNECTED_TO_GATE, connected_to_gate, u8);
 
 	if (sinfo->filled & BIT_ULL(NL80211_STA_INFO_BSS_PARAM)) {
-		bss_param = nla_nest_start(msg, NL80211_STA_INFO_BSS_PARAM);
+		bss_param = nla_nest_start_noflag(msg,
+						  NL80211_STA_INFO_BSS_PARAM);
 		if (!bss_param)
 			goto nla_put_failure;
 
@@ -4977,7 +4996,8 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 		struct nlattr *tidsattr;
 		int tid;
 
-		tidsattr = nla_nest_start(msg, NL80211_STA_INFO_TID_STATS);
+		tidsattr = nla_nest_start_noflag(msg,
+						 NL80211_STA_INFO_TID_STATS);
 		if (!tidsattr)
 			goto nla_put_failure;
 
@@ -4990,7 +5010,7 @@ static int nl80211_send_station(struct sk_buff *msg, u32 cmd, u32 portid,
 			if (!tidstats->filled)
 				continue;
 
-			tidattr = nla_nest_start(msg, tid + 1);
+			tidattr = nla_nest_start_noflag(msg, tid + 1);
 			if (!tidattr)
 				goto nla_put_failure;
 
@@ -5338,8 +5358,9 @@ static int nl80211_parse_sta_wme(struct genl_info *info,
 		return 0;
 
 	nla = info->attrs[NL80211_ATTR_STA_WME];
-	err = nla_parse_nested(tb, NL80211_STA_WME_MAX, nla,
-			       nl80211_sta_wme_policy, info->extack);
+	err = nla_parse_nested_deprecated(tb, NL80211_STA_WME_MAX, nla,
+					  nl80211_sta_wme_policy,
+					  info->extack);
 	if (err)
 		return err;
 
@@ -5875,7 +5896,7 @@ static int nl80211_send_mpath(struct sk_buff *msg, u32 portid, u32 seq,
 	    nla_put_u32(msg, NL80211_ATTR_GENERATION, pinfo->generation))
 		goto nla_put_failure;
 
-	pinfoattr = nla_nest_start(msg, NL80211_ATTR_MPATH_INFO);
+	pinfoattr = nla_nest_start_noflag(msg, NL80211_ATTR_MPATH_INFO);
 	if (!pinfoattr)
 		goto nla_put_failure;
 	if ((pinfo->filled & MPATH_INFO_FRAME_QLEN) &&
@@ -6326,7 +6347,7 @@ static int nl80211_get_mesh_config(struct sk_buff *skb,
 			     NL80211_CMD_GET_MESH_CONFIG);
 	if (!hdr)
 		goto out;
-	pinfoattr = nla_nest_start(msg, NL80211_ATTR_MESH_CONFIG);
+	pinfoattr = nla_nest_start_noflag(msg, NL80211_ATTR_MESH_CONFIG);
 	if (!pinfoattr)
 		goto nla_put_failure;
 	if (nla_put_u32(msg, NL80211_ATTR_IFINDEX, dev->ifindex) ||
@@ -6479,9 +6500,7 @@ do {									\
 
 	if (!info->attrs[NL80211_ATTR_MESH_CONFIG])
 		return -EINVAL;
-	if (nla_parse_nested(tb, NL80211_MESHCONF_ATTR_MAX,
-			     info->attrs[NL80211_ATTR_MESH_CONFIG],
-			     nl80211_meshconf_params_policy, info->extack))
+	if (nla_parse_nested_deprecated(tb, NL80211_MESHCONF_ATTR_MAX, info->attrs[NL80211_ATTR_MESH_CONFIG], nl80211_meshconf_params_policy, info->extack))
 		return -EINVAL;
 
 	/* This makes sure that there aren't more than 32 mesh config
@@ -6614,9 +6633,7 @@ static int nl80211_parse_mesh_setup(struct genl_info *info,
 
 	if (!info->attrs[NL80211_ATTR_MESH_SETUP])
 		return -EINVAL;
-	if (nla_parse_nested(tb, NL80211_MESH_SETUP_ATTR_MAX,
-			     info->attrs[NL80211_ATTR_MESH_SETUP],
-			     nl80211_mesh_setup_params_policy, info->extack))
+	if (nla_parse_nested_deprecated(tb, NL80211_MESH_SETUP_ATTR_MAX, info->attrs[NL80211_ATTR_MESH_SETUP], nl80211_mesh_setup_params_policy, info->extack))
 		return -EINVAL;
 
 	if (tb[NL80211_MESH_SETUP_ENABLE_VENDOR_SYNC])
@@ -6705,7 +6722,7 @@ static int nl80211_put_regdom(const struct ieee80211_regdomain *regdom,
 	     nla_put_u8(msg, NL80211_ATTR_DFS_REGION, regdom->dfs_region)))
 		goto nla_put_failure;
 
-	nl_reg_rules = nla_nest_start(msg, NL80211_ATTR_REG_RULES);
+	nl_reg_rules = nla_nest_start_noflag(msg, NL80211_ATTR_REG_RULES);
 	if (!nl_reg_rules)
 		goto nla_put_failure;
 
@@ -6720,7 +6737,7 @@ static int nl80211_put_regdom(const struct ieee80211_regdomain *regdom,
 		freq_range = &reg_rule->freq_range;
 		power_rule = &reg_rule->power_rule;
 
-		nl_reg_rule = nla_nest_start(msg, i);
+		nl_reg_rule = nla_nest_start_noflag(msg, i);
 		if (!nl_reg_rule)
 			goto nla_put_failure;
 
@@ -7000,9 +7017,9 @@ static int nl80211_set_reg(struct sk_buff *skb, struct genl_info *info)
 
 	nla_for_each_nested(nl_reg_rule, info->attrs[NL80211_ATTR_REG_RULES],
 			    rem_reg_rules) {
-		r = nla_parse_nested(tb, NL80211_REG_RULE_ATTR_MAX,
-				     nl_reg_rule, reg_rule_policy,
-				     info->extack);
+		r = nla_parse_nested_deprecated(tb, NL80211_REG_RULE_ATTR_MAX,
+						nl_reg_rule, reg_rule_policy,
+						info->extack);
 		if (r)
 			goto bad_reg;
 		r = parse_reg_rule(tb, &rd->reg_rules[rule_idx]);
@@ -7073,8 +7090,9 @@ static int parse_bss_select(struct nlattr *nla, struct wiphy *wiphy,
 	if (!nla_ok(nest, nla_len(nest)))
 		return -EINVAL;
 
-	err = nla_parse_nested(attr, NL80211_BSS_SELECT_ATTR_MAX, nest,
-			       nl80211_bss_select_policy, NULL);
+	err = nla_parse_nested_deprecated(attr, NL80211_BSS_SELECT_ATTR_MAX,
+					  nest, nl80211_bss_select_policy,
+					  NULL);
 	if (err)
 		return err;
 
@@ -7567,8 +7585,10 @@ nl80211_parse_sched_scan_plans(struct wiphy *wiphy, int n_plans,
 		if (WARN_ON(i >= n_plans))
 			return -EINVAL;
 
-		err = nla_parse_nested(plan, NL80211_SCHED_SCAN_PLAN_MAX,
-				       attr, nl80211_plan_policy, NULL);
+		err = nla_parse_nested_deprecated(plan,
+						  NL80211_SCHED_SCAN_PLAN_MAX,
+						  attr, nl80211_plan_policy,
+						  NULL);
 		if (err)
 			return err;
 
@@ -7689,10 +7709,11 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 				    tmp) {
 			struct nlattr *rssi;
 
-			err = nla_parse_nested(tb,
-					       NL80211_SCHED_SCAN_MATCH_ATTR_MAX,
-					       attr, nl80211_match_policy,
-					       NULL);
+			err = nla_parse_nested_deprecated(tb,
+							  NL80211_SCHED_SCAN_MATCH_ATTR_MAX,
+							  attr,
+							  nl80211_match_policy,
+							  NULL);
 			if (err)
 				return ERR_PTR(err);
 
@@ -7876,10 +7897,11 @@ nl80211_parse_sched_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 				    tmp) {
 			struct nlattr *ssid, *bssid, *rssi;
 
-			err = nla_parse_nested(tb,
-					       NL80211_SCHED_SCAN_MATCH_ATTR_MAX,
-					       attr, nl80211_match_policy,
-					       NULL);
+			err = nla_parse_nested_deprecated(tb,
+							  NL80211_SCHED_SCAN_MATCH_ATTR_MAX,
+							  attr,
+							  nl80211_match_policy,
+							  NULL);
 			if (err)
 				goto out_free;
 			ssid = tb[NL80211_SCHED_SCAN_MATCH_ATTR_SSID];
@@ -8263,9 +8285,9 @@ static int nl80211_channel_switch(struct sk_buff *skb, struct genl_info *info)
 	if (err)
 		return err;
 
-	err = nla_parse_nested(csa_attrs, NL80211_ATTR_MAX,
-			       info->attrs[NL80211_ATTR_CSA_IES],
-			       nl80211_policy, info->extack);
+	err = nla_parse_nested_deprecated(csa_attrs, NL80211_ATTR_MAX,
+					  info->attrs[NL80211_ATTR_CSA_IES],
+					  nl80211_policy, info->extack);
 	if (err)
 		return err;
 
@@ -8389,7 +8411,7 @@ static int nl80211_send_bss(struct sk_buff *msg, struct netlink_callback *cb,
 			      NL80211_ATTR_PAD))
 		goto nla_put_failure;
 
-	bss = nla_nest_start(msg, NL80211_ATTR_BSS);
+	bss = nla_nest_start_noflag(msg, NL80211_ATTR_BSS);
 	if (!bss)
 		goto nla_put_failure;
 	if ((!is_zero_ether_addr(res->bssid) &&
@@ -8566,7 +8588,7 @@ static int nl80211_send_survey(struct sk_buff *msg, u32 portid, u32 seq,
 	if (nla_put_u32(msg, NL80211_ATTR_IFINDEX, dev->ifindex))
 		goto nla_put_failure;
 
-	infoattr = nla_nest_start(msg, NL80211_ATTR_SURVEY_INFO);
+	infoattr = nla_nest_start_noflag(msg, NL80211_ATTR_SURVEY_INFO);
 	if (!infoattr)
 		goto nla_put_failure;
 
@@ -9407,7 +9429,7 @@ __cfg80211_alloc_vendor_skb(struct cfg80211_registered_device *rdev,
 			goto nla_put_failure;
 	}
 
-	data = nla_nest_start(skb, attr);
+	data = nla_nest_start_noflag(skb, attr);
 	if (!data)
 		goto nla_put_failure;
 
@@ -9540,9 +9562,10 @@ static int nl80211_testmode_dump(struct sk_buff *skb,
 	} else {
 		struct nlattr **attrbuf = genl_family_attrbuf(&nl80211_fam);
 
-		err = nlmsg_parse(cb->nlh, GENL_HDRLEN + nl80211_fam.hdrsize,
-				  attrbuf, nl80211_fam.maxattr,
-				  nl80211_policy, NULL);
+		err = nlmsg_parse_deprecated(cb->nlh,
+					     GENL_HDRLEN + nl80211_fam.hdrsize,
+					     attrbuf, nl80211_fam.maxattr,
+					     nl80211_policy, NULL);
 		if (err)
 			goto out_err;
 
@@ -9581,7 +9604,7 @@ static int nl80211_testmode_dump(struct sk_buff *skb,
 			break;
 		}
 
-		tmdata = nla_nest_start(skb, NL80211_ATTR_TESTDATA);
+		tmdata = nla_nest_start_noflag(skb, NL80211_ATTR_TESTDATA);
 		if (!tmdata) {
 			genlmsg_cancel(skb, hdr);
 			break;
@@ -10666,8 +10689,9 @@ static int nl80211_set_cqm(struct sk_buff *skb, struct genl_info *info)
 	if (!cqm)
 		return -EINVAL;
 
-	err = nla_parse_nested(attrs, NL80211_ATTR_CQM_MAX, cqm,
-			       nl80211_attr_cqm_policy, info->extack);
+	err = nla_parse_nested_deprecated(attrs, NL80211_ATTR_CQM_MAX, cqm,
+					  nl80211_attr_cqm_policy,
+					  info->extack);
 	if (err)
 		return err;
 
@@ -10859,12 +10883,12 @@ static int nl80211_send_wowlan_patterns(struct sk_buff *msg,
 	if (!wowlan->n_patterns)
 		return 0;
 
-	nl_pats = nla_nest_start(msg, NL80211_WOWLAN_TRIG_PKT_PATTERN);
+	nl_pats = nla_nest_start_noflag(msg, NL80211_WOWLAN_TRIG_PKT_PATTERN);
 	if (!nl_pats)
 		return -ENOBUFS;
 
 	for (i = 0; i < wowlan->n_patterns; i++) {
-		nl_pat = nla_nest_start(msg, i + 1);
+		nl_pat = nla_nest_start_noflag(msg, i + 1);
 		if (!nl_pat)
 			return -ENOBUFS;
 		pat_len = wowlan->patterns[i].pattern_len;
@@ -10890,7 +10914,8 @@ static int nl80211_send_wowlan_tcp(struct sk_buff *msg,
 	if (!tcp)
 		return 0;
 
-	nl_tcp = nla_nest_start(msg, NL80211_WOWLAN_TRIG_TCP_CONNECTION);
+	nl_tcp = nla_nest_start_noflag(msg,
+				       NL80211_WOWLAN_TRIG_TCP_CONNECTION);
 	if (!nl_tcp)
 		return -ENOBUFS;
 
@@ -10934,7 +10959,7 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 	if (!req)
 		return 0;
 
-	nd = nla_nest_start(msg, NL80211_WOWLAN_TRIG_NET_DETECT);
+	nd = nla_nest_start_noflag(msg, NL80211_WOWLAN_TRIG_NET_DETECT);
 	if (!nd)
 		return -ENOBUFS;
 
@@ -10960,7 +10985,7 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 			return -ENOBUFS;
 	}
 
-	freqs = nla_nest_start(msg, NL80211_ATTR_SCAN_FREQUENCIES);
+	freqs = nla_nest_start_noflag(msg, NL80211_ATTR_SCAN_FREQUENCIES);
 	if (!freqs)
 		return -ENOBUFS;
 
@@ -10972,12 +10997,13 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 	nla_nest_end(msg, freqs);
 
 	if (req->n_match_sets) {
-		matches = nla_nest_start(msg, NL80211_ATTR_SCHED_SCAN_MATCH);
+		matches = nla_nest_start_noflag(msg,
+						NL80211_ATTR_SCHED_SCAN_MATCH);
 		if (!matches)
 			return -ENOBUFS;
 
 		for (i = 0; i < req->n_match_sets; i++) {
-			match = nla_nest_start(msg, i);
+			match = nla_nest_start_noflag(msg, i);
 			if (!match)
 				return -ENOBUFS;
 
@@ -10990,12 +11016,12 @@ static int nl80211_send_wowlan_nd(struct sk_buff *msg,
 		nla_nest_end(msg, matches);
 	}
 
-	scan_plans = nla_nest_start(msg, NL80211_ATTR_SCHED_SCAN_PLANS);
+	scan_plans = nla_nest_start_noflag(msg, NL80211_ATTR_SCHED_SCAN_PLANS);
 	if (!scan_plans)
 		return -ENOBUFS;
 
 	for (i = 0; i < req->n_scan_plans; i++) {
-		scan_plan = nla_nest_start(msg, i + 1);
+		scan_plan = nla_nest_start_noflag(msg, i + 1);
 		if (!scan_plan)
 			return -ENOBUFS;
 
@@ -11044,7 +11070,8 @@ static int nl80211_get_wowlan(struct sk_buff *skb, struct genl_info *info)
 	if (rdev->wiphy.wowlan_config) {
 		struct nlattr *nl_wowlan;
 
-		nl_wowlan = nla_nest_start(msg, NL80211_ATTR_WOWLAN_TRIGGERS);
+		nl_wowlan = nla_nest_start_noflag(msg,
+						  NL80211_ATTR_WOWLAN_TRIGGERS);
 		if (!nl_wowlan)
 			goto nla_put_failure;
 
@@ -11102,8 +11129,8 @@ static int nl80211_parse_wowlan_tcp(struct cfg80211_registered_device *rdev,
 	if (!rdev->wiphy.wowlan->tcp)
 		return -EINVAL;
 
-	err = nla_parse_nested(tb, MAX_NL80211_WOWLAN_TCP, attr,
-			       nl80211_wowlan_tcp_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, MAX_NL80211_WOWLAN_TCP, attr,
+					  nl80211_wowlan_tcp_policy, NULL);
 	if (err)
 		return err;
 
@@ -11248,8 +11275,8 @@ static int nl80211_parse_wowlan_nd(struct cfg80211_registered_device *rdev,
 		goto out;
 	}
 
-	err = nla_parse_nested(tb, NL80211_ATTR_MAX, attr, nl80211_policy,
-			       NULL);
+	err = nla_parse_nested_deprecated(tb, NL80211_ATTR_MAX, attr,
+					  nl80211_policy, NULL);
 	if (err)
 		goto out;
 
@@ -11284,9 +11311,9 @@ static int nl80211_set_wowlan(struct sk_buff *skb, struct genl_info *info)
 		goto set_wakeup;
 	}
 
-	err = nla_parse_nested(tb, MAX_NL80211_WOWLAN_TRIG,
-			       info->attrs[NL80211_ATTR_WOWLAN_TRIGGERS],
-			       nl80211_wowlan_policy, info->extack);
+	err = nla_parse_nested_deprecated(tb, MAX_NL80211_WOWLAN_TRIG,
+					  info->attrs[NL80211_ATTR_WOWLAN_TRIGGERS],
+					  nl80211_wowlan_policy, info->extack);
 	if (err)
 		return err;
 
@@ -11368,9 +11395,11 @@ static int nl80211_set_wowlan(struct sk_buff *skb, struct genl_info *info)
 				    rem) {
 			u8 *mask_pat;
 
-			err = nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
-					       nl80211_packet_pattern_policy,
-					       info->extack);
+			err = nla_parse_nested_deprecated(pat_tb,
+							  MAX_NL80211_PKTPAT,
+							  pat,
+							  nl80211_packet_pattern_policy,
+							  info->extack);
 			if (err)
 				goto error;
 
@@ -11478,12 +11507,12 @@ static int nl80211_send_coalesce_rules(struct sk_buff *msg,
 	if (!rdev->coalesce->n_rules)
 		return 0;
 
-	nl_rules = nla_nest_start(msg, NL80211_ATTR_COALESCE_RULE);
+	nl_rules = nla_nest_start_noflag(msg, NL80211_ATTR_COALESCE_RULE);
 	if (!nl_rules)
 		return -ENOBUFS;
 
 	for (i = 0; i < rdev->coalesce->n_rules; i++) {
-		nl_rule = nla_nest_start(msg, i + 1);
+		nl_rule = nla_nest_start_noflag(msg, i + 1);
 		if (!nl_rule)
 			return -ENOBUFS;
 
@@ -11496,13 +11525,13 @@ static int nl80211_send_coalesce_rules(struct sk_buff *msg,
 				rule->condition))
 			return -ENOBUFS;
 
-		nl_pats = nla_nest_start(msg,
-				NL80211_ATTR_COALESCE_RULE_PKT_PATTERN);
+		nl_pats = nla_nest_start_noflag(msg,
+						NL80211_ATTR_COALESCE_RULE_PKT_PATTERN);
 		if (!nl_pats)
 			return -ENOBUFS;
 
 		for (j = 0; j < rule->n_patterns; j++) {
-			nl_pat = nla_nest_start(msg, j + 1);
+			nl_pat = nla_nest_start_noflag(msg, j + 1);
 			if (!nl_pat)
 				return -ENOBUFS;
 			pat_len = rule->patterns[j].pattern_len;
@@ -11583,8 +11612,8 @@ static int nl80211_parse_coalesce_rule(struct cfg80211_registered_device *rdev,
 	int rem, pat_len, mask_len, pkt_offset, n_patterns = 0;
 	struct nlattr *pat_tb[NUM_NL80211_PKTPAT];
 
-	err = nla_parse_nested(tb, NL80211_ATTR_COALESCE_RULE_MAX, rule,
-			       nl80211_coalesce_policy, NULL);
+	err = nla_parse_nested_deprecated(tb, NL80211_ATTR_COALESCE_RULE_MAX,
+					  rule, nl80211_coalesce_policy, NULL);
 	if (err)
 		return err;
 
@@ -11619,8 +11648,10 @@ static int nl80211_parse_coalesce_rule(struct cfg80211_registered_device *rdev,
 			    rem) {
 		u8 *mask_pat;
 
-		err = nla_parse_nested(pat_tb, MAX_NL80211_PKTPAT, pat,
-				       nl80211_packet_pattern_policy, NULL);
+		err = nla_parse_nested_deprecated(pat_tb, MAX_NL80211_PKTPAT,
+						  pat,
+						  nl80211_packet_pattern_policy,
+						  NULL);
 		if (err)
 			return err;
 
@@ -11742,9 +11773,9 @@ static int nl80211_set_rekey_data(struct sk_buff *skb, struct genl_info *info)
 	if (!info->attrs[NL80211_ATTR_REKEY_DATA])
 		return -EINVAL;
 
-	err = nla_parse_nested(tb, MAX_NL80211_REKEY_DATA,
-			       info->attrs[NL80211_ATTR_REKEY_DATA],
-			       nl80211_rekey_policy, info->extack);
+	err = nla_parse_nested_deprecated(tb, MAX_NL80211_REKEY_DATA,
+					  info->attrs[NL80211_ATTR_REKEY_DATA],
+					  nl80211_rekey_policy, info->extack);
 	if (err)
 		return err;
 
@@ -12056,9 +12087,10 @@ static int nl80211_nan_add_func(struct sk_buff *skb,
 	if (!info->attrs[NL80211_ATTR_NAN_FUNC])
 		return -EINVAL;
 
-	err = nla_parse_nested(tb, NL80211_NAN_FUNC_ATTR_MAX,
-			       info->attrs[NL80211_ATTR_NAN_FUNC],
-			       nl80211_nan_func_policy, info->extack);
+	err = nla_parse_nested_deprecated(tb, NL80211_NAN_FUNC_ATTR_MAX,
+					  info->attrs[NL80211_ATTR_NAN_FUNC],
+					  nl80211_nan_func_policy,
+					  info->extack);
 	if (err)
 		return err;
 
@@ -12154,9 +12186,11 @@ static int nl80211_nan_add_func(struct sk_buff *skb,
 	if (tb[NL80211_NAN_FUNC_SRF]) {
 		struct nlattr *srf_tb[NUM_NL80211_NAN_SRF_ATTR];
 
-		err = nla_parse_nested(srf_tb, NL80211_NAN_SRF_ATTR_MAX,
-				       tb[NL80211_NAN_FUNC_SRF],
-				       nl80211_nan_srf_policy, info->extack);
+		err = nla_parse_nested_deprecated(srf_tb,
+						  NL80211_NAN_SRF_ATTR_MAX,
+						  tb[NL80211_NAN_FUNC_SRF],
+						  nl80211_nan_srf_policy,
+						  info->extack);
 		if (err)
 			goto out;
 
@@ -12254,7 +12288,7 @@ out:
 			      NL80211_ATTR_PAD))
 		goto nla_put_failure;
 
-	func_attr = nla_nest_start(msg, NL80211_ATTR_NAN_FUNC);
+	func_attr = nla_nest_start_noflag(msg, NL80211_ATTR_NAN_FUNC);
 	if (!func_attr)
 		goto nla_put_failure;
 
@@ -12371,11 +12405,12 @@ void cfg80211_nan_match(struct wireless_dev *wdev,
 	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, match->addr))
 		goto nla_put_failure;
 
-	match_attr = nla_nest_start(msg, NL80211_ATTR_NAN_MATCH);
+	match_attr = nla_nest_start_noflag(msg, NL80211_ATTR_NAN_MATCH);
 	if (!match_attr)
 		goto nla_put_failure;
 
-	local_func_attr = nla_nest_start(msg, NL80211_NAN_MATCH_FUNC_LOCAL);
+	local_func_attr = nla_nest_start_noflag(msg,
+						NL80211_NAN_MATCH_FUNC_LOCAL);
 	if (!local_func_attr)
 		goto nla_put_failure;
 
@@ -12384,7 +12419,8 @@ void cfg80211_nan_match(struct wireless_dev *wdev,
 
 	nla_nest_end(msg, local_func_attr);
 
-	peer_func_attr = nla_nest_start(msg, NL80211_NAN_MATCH_FUNC_PEER);
+	peer_func_attr = nla_nest_start_noflag(msg,
+					       NL80211_NAN_MATCH_FUNC_PEER);
 	if (!peer_func_attr)
 		goto nla_put_failure;
 
@@ -12450,7 +12486,7 @@ void cfg80211_nan_func_terminated(struct wireless_dev *wdev,
 			      NL80211_ATTR_PAD))
 		goto nla_put_failure;
 
-	func_attr = nla_nest_start(msg, NL80211_ATTR_NAN_FUNC);
+	func_attr = nla_nest_start_noflag(msg, NL80211_ATTR_NAN_FUNC);
 	if (!func_attr)
 		goto nla_put_failure;
 
@@ -12687,8 +12723,10 @@ static int nl80211_prepare_vendor_dump(struct sk_buff *skb,
 		return 0;
 	}
 
-	err = nlmsg_parse(cb->nlh, GENL_HDRLEN + nl80211_fam.hdrsize, attrbuf,
-			  nl80211_fam.maxattr, nl80211_policy, NULL);
+	err = nlmsg_parse_deprecated(cb->nlh,
+				     GENL_HDRLEN + nl80211_fam.hdrsize,
+				     attrbuf, nl80211_fam.maxattr,
+				     nl80211_policy, NULL);
 	if (err)
 		return err;
 
@@ -12799,7 +12837,8 @@ static int nl80211_vendor_cmd_dump(struct sk_buff *skb,
 			break;
 		}
 
-		vendor_data = nla_nest_start(skb, NL80211_ATTR_VENDOR_DATA);
+		vendor_data = nla_nest_start_noflag(skb,
+						    NL80211_ATTR_VENDOR_DATA);
 		if (!vendor_data) {
 			genlmsg_cancel(skb, hdr);
 			break;
@@ -13343,7 +13382,8 @@ static int nl80211_get_ftm_responder_stats(struct sk_buff *skb,
 	if (nla_put_u32(msg, NL80211_ATTR_IFINDEX, dev->ifindex))
 		goto nla_put_failure;
 
-	ftm_stats_attr = nla_nest_start(msg, NL80211_ATTR_FTM_RESPONDER_STATS);
+	ftm_stats_attr = nla_nest_start_noflag(msg,
+					       NL80211_ATTR_FTM_RESPONDER_STATS);
 	if (!ftm_stats_attr)
 		goto nla_put_failure;
 
@@ -13551,6 +13591,7 @@ static void nl80211_post_doit(const struct genl_ops *ops, struct sk_buff *skb,
 static const struct genl_ops nl80211_ops[] = {
 	{
 		.cmd = NL80211_CMD_GET_WIPHY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_wiphy,
 		.dumpit = nl80211_dump_wiphy,
 		.done = nl80211_dump_wiphy_done,
@@ -13560,12 +13601,14 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_WIPHY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_wiphy,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
 	},
 	{
 		.cmd = NL80211_CMD_GET_INTERFACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_interface,
 		.dumpit = nl80211_dump_interface,
 		/* can be retrieved by unprivileged users */
@@ -13574,6 +13617,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_INTERFACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_interface,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13581,6 +13625,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_NEW_INTERFACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_new_interface,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -13588,6 +13633,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_INTERFACE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_interface,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV |
@@ -13595,6 +13641,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_KEY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_key,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13602,6 +13649,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_KEY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_key,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13610,6 +13658,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_NEW_KEY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_new_key,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13618,6 +13667,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_KEY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_key,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13625,6 +13675,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_BEACON,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.doit = nl80211_set_beacon,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13632,6 +13683,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_START_AP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.doit = nl80211_start_ap,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13639,6 +13691,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_STOP_AP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.doit = nl80211_stop_ap,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13646,6 +13699,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_STATION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_station,
 		.dumpit = nl80211_dump_station,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13653,6 +13707,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_STATION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_station,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13660,6 +13715,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_NEW_STATION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_new_station,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13667,6 +13723,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_STATION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_station,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13674,6 +13731,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_MPATH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_mpath,
 		.dumpit = nl80211_dump_mpath,
 		.flags = GENL_UNS_ADMIN_PERM,
@@ -13682,6 +13740,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_MPP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_mpp,
 		.dumpit = nl80211_dump_mpp,
 		.flags = GENL_UNS_ADMIN_PERM,
@@ -13690,6 +13749,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_MPATH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_mpath,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13697,6 +13757,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_NEW_MPATH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_new_mpath,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13704,6 +13765,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_MPATH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_mpath,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13711,6 +13773,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_BSS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_bss,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13718,6 +13781,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_REG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_reg_do,
 		.dumpit = nl80211_get_reg_dump,
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
@@ -13726,6 +13790,7 @@ static const struct genl_ops nl80211_ops[] = {
 #ifdef CONFIG_CFG80211_CRDA_SUPPORT
 	{
 		.cmd = NL80211_CMD_SET_REG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_reg,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_RTNL,
@@ -13733,16 +13798,19 @@ static const struct genl_ops nl80211_ops[] = {
 #endif
 	{
 		.cmd = NL80211_CMD_REQ_SET_REG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_req_set_reg,
 		.flags = GENL_ADMIN_PERM,
 	},
 	{
 		.cmd = NL80211_CMD_RELOAD_REGDB,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_reload_regdb,
 		.flags = GENL_ADMIN_PERM,
 	},
 	{
 		.cmd = NL80211_CMD_GET_MESH_CONFIG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_mesh_config,
 		/* can be retrieved by unprivileged users */
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13750,6 +13818,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_MESH_CONFIG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_update_mesh_config,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13757,6 +13826,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_TRIGGER_SCAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_trigger_scan,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13764,6 +13834,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_ABORT_SCAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_abort_scan,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13771,10 +13842,12 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_SCAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.dumpit = nl80211_dump_scan,
 	},
 	{
 		.cmd = NL80211_CMD_START_SCHED_SCAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_start_sched_scan,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13782,6 +13855,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_STOP_SCHED_SCAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_stop_sched_scan,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13789,6 +13863,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_AUTHENTICATE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_authenticate,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13797,6 +13872,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_ASSOCIATE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_associate,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13805,6 +13881,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEAUTHENTICATE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_deauthenticate,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13812,6 +13889,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DISASSOCIATE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_disassociate,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13819,6 +13897,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_JOIN_IBSS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_join_ibss,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13826,6 +13905,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_LEAVE_IBSS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_leave_ibss,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13834,6 +13914,7 @@ static const struct genl_ops nl80211_ops[] = {
 #ifdef CONFIG_NL80211_TESTMODE
 	{
 		.cmd = NL80211_CMD_TESTMODE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_testmode_do,
 		.dumpit = nl80211_testmode_dump,
 		.flags = GENL_UNS_ADMIN_PERM,
@@ -13843,6 +13924,7 @@ static const struct genl_ops nl80211_ops[] = {
 #endif
 	{
 		.cmd = NL80211_CMD_CONNECT,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_connect,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13851,6 +13933,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_UPDATE_CONNECT_PARAMS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_update_connect_params,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13859,6 +13942,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DISCONNECT,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_disconnect,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13866,6 +13950,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_WIPHY_NETNS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_wiphy_netns,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -13873,10 +13958,12 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_SURVEY,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.dumpit = nl80211_dump_survey,
 	},
 	{
 		.cmd = NL80211_CMD_SET_PMKSA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_setdel_pmksa,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13885,6 +13972,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_PMKSA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_setdel_pmksa,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13892,6 +13980,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_FLUSH_PMKSA,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_flush_pmksa,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13899,6 +13988,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_REMAIN_ON_CHANNEL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_remain_on_channel,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13906,6 +13996,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CANCEL_REMAIN_ON_CHANNEL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_cancel_remain_on_channel,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13913,6 +14004,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_TX_BITRATE_MASK,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_tx_bitrate_mask,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13920,6 +14012,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_REGISTER_FRAME,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_register_mgmt,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV |
@@ -13927,6 +14020,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_FRAME,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tx_mgmt,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13934,6 +14028,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_FRAME_WAIT_CANCEL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tx_mgmt_cancel_wait,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -13941,6 +14036,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_POWER_SAVE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_power_save,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13948,6 +14044,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_POWER_SAVE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_power_save,
 		/* can be retrieved by unprivileged users */
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13955,6 +14052,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_CQM,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_cqm,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13962,6 +14060,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_CHANNEL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_channel,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13969,6 +14068,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_WDS_PEER,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_wds_peer,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -13976,6 +14076,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_JOIN_MESH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_join_mesh,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13983,6 +14084,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_LEAVE_MESH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_leave_mesh,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13990,6 +14092,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_JOIN_OCB,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_join_ocb,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -13997,6 +14100,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_LEAVE_OCB,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_leave_ocb,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14005,6 +14109,7 @@ static const struct genl_ops nl80211_ops[] = {
 #ifdef CONFIG_PM
 	{
 		.cmd = NL80211_CMD_GET_WOWLAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_wowlan,
 		/* can be retrieved by unprivileged users */
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -14012,6 +14117,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_WOWLAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_wowlan,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -14020,6 +14126,7 @@ static const struct genl_ops nl80211_ops[] = {
 #endif
 	{
 		.cmd = NL80211_CMD_SET_REKEY_OFFLOAD,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_rekey_data,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14028,6 +14135,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_TDLS_MGMT,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tdls_mgmt,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14035,6 +14143,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_TDLS_OPER,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tdls_oper,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14042,6 +14151,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_UNEXPECTED_FRAME,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_register_unexpected_frame,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -14049,6 +14159,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_PROBE_CLIENT,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_probe_client,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14056,6 +14167,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_REGISTER_BEACONS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_register_beacons,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -14063,6 +14175,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_NOACK_MAP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_noack_map,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -14070,6 +14183,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_START_P2P_DEVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_start_p2p_device,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV |
@@ -14077,6 +14191,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_STOP_P2P_DEVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_stop_p2p_device,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14084,6 +14199,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_START_NAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_start_nan,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV |
@@ -14091,6 +14207,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_STOP_NAN,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_stop_nan,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14098,6 +14215,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_ADD_NAN_FUNCTION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_nan_add_func,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14105,6 +14223,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_NAN_FUNCTION,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_nan_del_func,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14112,6 +14231,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CHANGE_NAN_CONFIG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_nan_change_config,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14119,6 +14239,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_MCAST_RATE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_mcast_rate,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -14126,6 +14247,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_MAC_ACL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_mac_acl,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -14133,6 +14255,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_RADAR_DETECT,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_start_radar_detection,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14140,10 +14263,12 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_PROTOCOL_FEATURES,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_protocol_features,
 	},
 	{
 		.cmd = NL80211_CMD_UPDATE_FT_IES,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_update_ft_ies,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14151,6 +14276,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CRIT_PROTOCOL_START,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_crit_protocol_start,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14158,6 +14284,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CRIT_PROTOCOL_STOP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_crit_protocol_stop,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14165,12 +14292,14 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_COALESCE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_coalesce,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 	{
 		.cmd = NL80211_CMD_SET_COALESCE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_coalesce,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WIPHY |
@@ -14178,6 +14307,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CHANNEL_SWITCH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_channel_switch,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14185,6 +14315,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_VENDOR,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_vendor_cmd,
 		.dumpit = nl80211_vendor_cmd_dump,
 		.flags = GENL_UNS_ADMIN_PERM,
@@ -14194,6 +14325,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_QOS_MAP,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_qos_map,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14201,6 +14333,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_ADD_TX_TS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_add_tx_ts,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14208,6 +14341,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_TX_TS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_tx_ts,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14215,6 +14349,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_TDLS_CHANNEL_SWITCH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tdls_channel_switch,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14222,6 +14357,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_TDLS_CANCEL_CHANNEL_SWITCH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tdls_cancel_channel_switch,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14229,6 +14365,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_MULTICAST_TO_UNICAST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_multicast_to_unicast,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
@@ -14236,6 +14373,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_SET_PMK,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_set_pmk,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL |
@@ -14243,12 +14381,14 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_DEL_PMK,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_del_pmk,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 	{
 		.cmd = NL80211_CMD_EXTERNAL_AUTH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_external_auth,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14256,6 +14396,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_CONTROL_PORT_FRAME,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_tx_control_port,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14263,12 +14404,14 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_GET_FTM_RESPONDER_STATS,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_get_ftm_responder_stats,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV |
 				  NL80211_FLAG_NEED_RTNL,
 	},
 	{
 		.cmd = NL80211_CMD_PEER_MEASUREMENT_START,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_pmsr_start,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_WDEV_UP |
@@ -14276,6 +14419,7 @@ static const struct genl_ops nl80211_ops[] = {
 	},
 	{
 		.cmd = NL80211_CMD_NOTIFY_RADAR,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.doit = nl80211_notify_radar_detection,
 		.flags = GENL_UNS_ADMIN_PERM,
 		.internal_flags = NL80211_FLAG_NEED_NETDEV_UP |
@@ -14366,7 +14510,7 @@ static int nl80211_add_scan_req(struct sk_buff *msg,
 	if (WARN_ON(!req))
 		return 0;
 
-	nest = nla_nest_start(msg, NL80211_ATTR_SCAN_SSIDS);
+	nest = nla_nest_start_noflag(msg, NL80211_ATTR_SCAN_SSIDS);
 	if (!nest)
 		goto nla_put_failure;
 	for (i = 0; i < req->n_ssids; i++) {
@@ -14375,7 +14519,7 @@ static int nl80211_add_scan_req(struct sk_buff *msg,
 	}
 	nla_nest_end(msg, nest);
 
-	nest = nla_nest_start(msg, NL80211_ATTR_SCAN_FREQUENCIES);
+	nest = nla_nest_start_noflag(msg, NL80211_ATTR_SCAN_FREQUENCIES);
 	if (!nest)
 		goto nla_put_failure;
 	for (i = 0; i < req->n_channels; i++) {
@@ -14637,7 +14781,7 @@ static void nl80211_send_mlme_event(struct cfg80211_registered_device *rdev,
 
 	if (uapsd_queues >= 0) {
 		struct nlattr *nla_wmm =
-			nla_nest_start(msg, NL80211_ATTR_STA_WME);
+			nla_nest_start_noflag(msg, NL80211_ATTR_STA_WME);
 		if (!nla_wmm)
 			goto nla_put_failure;
 
@@ -15078,7 +15222,7 @@ void nl80211_send_beacon_hint_event(struct wiphy *wiphy,
 		goto nla_put_failure;
 
 	/* Before */
-	nl_freq = nla_nest_start(msg, NL80211_ATTR_FREQ_BEFORE);
+	nl_freq = nla_nest_start_noflag(msg, NL80211_ATTR_FREQ_BEFORE);
 	if (!nl_freq)
 		goto nla_put_failure;
 
@@ -15087,7 +15231,7 @@ void nl80211_send_beacon_hint_event(struct wiphy *wiphy,
 	nla_nest_end(msg, nl_freq);
 
 	/* After */
-	nl_freq = nla_nest_start(msg, NL80211_ATTR_FREQ_AFTER);
+	nl_freq = nla_nest_start_noflag(msg, NL80211_ATTR_FREQ_AFTER);
 	if (!nl_freq)
 		goto nla_put_failure;
 
@@ -15521,7 +15665,7 @@ static struct sk_buff *cfg80211_prepare_cqm(struct net_device *dev,
 	if (mac && nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, mac))
 		goto nla_put_failure;
 
-	cb[1] = nla_nest_start(msg, NL80211_ATTR_CQM);
+	cb[1] = nla_nest_start_noflag(msg, NL80211_ATTR_CQM);
 	if (!cb[1])
 		goto nla_put_failure;
 
@@ -15682,7 +15826,7 @@ static void nl80211_gtk_rekey_notify(struct cfg80211_registered_device *rdev,
 	    nla_put(msg, NL80211_ATTR_MAC, ETH_ALEN, bssid))
 		goto nla_put_failure;
 
-	rekey_attr = nla_nest_start(msg, NL80211_ATTR_REKEY_DATA);
+	rekey_attr = nla_nest_start_noflag(msg, NL80211_ATTR_REKEY_DATA);
 	if (!rekey_attr)
 		goto nla_put_failure;
 
@@ -15737,7 +15881,7 @@ nl80211_pmksa_candidate_notify(struct cfg80211_registered_device *rdev,
 	    nla_put_u32(msg, NL80211_ATTR_IFINDEX, netdev->ifindex))
 		goto nla_put_failure;
 
-	attr = nla_nest_start(msg, NL80211_ATTR_PMKSA_CANDIDATE);
+	attr = nla_nest_start_noflag(msg, NL80211_ATTR_PMKSA_CANDIDATE);
 	if (!attr)
 		goto nla_put_failure;
 
@@ -16047,15 +16191,15 @@ static int cfg80211_net_detect_results(struct sk_buff *msg,
 	struct nlattr *nl_results, *nl_match, *nl_freqs;
 	int i, j;
 
-	nl_results = nla_nest_start(
-		msg, NL80211_WOWLAN_TRIG_NET_DETECT_RESULTS);
+	nl_results = nla_nest_start_noflag(msg,
+					   NL80211_WOWLAN_TRIG_NET_DETECT_RESULTS);
 	if (!nl_results)
 		return -EMSGSIZE;
 
 	for (i = 0; i < nd->n_matches; i++) {
 		struct cfg80211_wowlan_nd_match *match = nd->matches[i];
 
-		nl_match = nla_nest_start(msg, i);
+		nl_match = nla_nest_start_noflag(msg, i);
 		if (!nl_match)
 			break;
 
@@ -16073,8 +16217,8 @@ static int cfg80211_net_detect_results(struct sk_buff *msg,
 		}
 
 		if (match->n_channels) {
-			nl_freqs = nla_nest_start(
-				msg, NL80211_ATTR_SCAN_FREQUENCIES);
+			nl_freqs = nla_nest_start_noflag(msg,
+							 NL80211_ATTR_SCAN_FREQUENCIES);
 			if (!nl_freqs) {
 				nla_nest_cancel(msg, nl_match);
 				goto out;
@@ -16133,7 +16277,8 @@ void cfg80211_report_wowlan_wakeup(struct wireless_dev *wdev,
 	if (wakeup) {
 		struct nlattr *reasons;
 
-		reasons = nla_nest_start(msg, NL80211_ATTR_WOWLAN_TRIGGERS);
+		reasons = nla_nest_start_noflag(msg,
+						NL80211_ATTR_WOWLAN_TRIGGERS);
 		if (!reasons)
 			goto free_msg;
 

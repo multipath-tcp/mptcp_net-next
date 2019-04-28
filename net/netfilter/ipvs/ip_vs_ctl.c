@@ -2916,7 +2916,7 @@ static const struct nla_policy ip_vs_dest_policy[IPVS_DEST_ATTR_MAX + 1] = {
 static int ip_vs_genl_fill_stats(struct sk_buff *skb, int container_type,
 				 struct ip_vs_kstats *kstats)
 {
-	struct nlattr *nl_stats = nla_nest_start(skb, container_type);
+	struct nlattr *nl_stats = nla_nest_start_noflag(skb, container_type);
 
 	if (!nl_stats)
 		return -EMSGSIZE;
@@ -2946,7 +2946,7 @@ nla_put_failure:
 static int ip_vs_genl_fill_stats64(struct sk_buff *skb, int container_type,
 				   struct ip_vs_kstats *kstats)
 {
-	struct nlattr *nl_stats = nla_nest_start(skb, container_type);
+	struct nlattr *nl_stats = nla_nest_start_noflag(skb, container_type);
 
 	if (!nl_stats)
 		return -EMSGSIZE;
@@ -2992,7 +2992,7 @@ static int ip_vs_genl_fill_service(struct sk_buff *skb,
 	struct ip_vs_kstats kstats;
 	char *sched_name;
 
-	nl_service = nla_nest_start(skb, IPVS_CMD_ATTR_SERVICE);
+	nl_service = nla_nest_start_noflag(skb, IPVS_CMD_ATTR_SERVICE);
 	if (!nl_service)
 		return -EMSGSIZE;
 
@@ -3116,8 +3116,7 @@ static int ip_vs_genl_parse_service(struct netns_ipvs *ipvs,
 
 	/* Parse mandatory identifying service fields first */
 	if (nla == NULL ||
-	    nla_parse_nested(attrs, IPVS_SVC_ATTR_MAX, nla,
-			     ip_vs_svc_policy, NULL))
+	    nla_parse_nested_deprecated(attrs, IPVS_SVC_ATTR_MAX, nla, ip_vs_svc_policy, NULL))
 		return -EINVAL;
 
 	nla_af		= attrs[IPVS_SVC_ATTR_AF];
@@ -3203,7 +3202,7 @@ static int ip_vs_genl_fill_dest(struct sk_buff *skb, struct ip_vs_dest *dest)
 	struct nlattr *nl_dest;
 	struct ip_vs_kstats kstats;
 
-	nl_dest = nla_nest_start(skb, IPVS_CMD_ATTR_DEST);
+	nl_dest = nla_nest_start_noflag(skb, IPVS_CMD_ATTR_DEST);
 	if (!nl_dest)
 		return -EMSGSIZE;
 
@@ -3279,8 +3278,7 @@ static int ip_vs_genl_dump_dests(struct sk_buff *skb,
 	mutex_lock(&__ip_vs_mutex);
 
 	/* Try to find the service for which to dump destinations */
-	if (nlmsg_parse(cb->nlh, GENL_HDRLEN, attrs, IPVS_CMD_ATTR_MAX,
-			ip_vs_cmd_policy, cb->extack))
+	if (nlmsg_parse_deprecated(cb->nlh, GENL_HDRLEN, attrs, IPVS_CMD_ATTR_MAX, ip_vs_cmd_policy, cb->extack))
 		goto out_err;
 
 
@@ -3316,8 +3314,7 @@ static int ip_vs_genl_parse_dest(struct ip_vs_dest_user_kern *udest,
 
 	/* Parse mandatory identifying destination fields first */
 	if (nla == NULL ||
-	    nla_parse_nested(attrs, IPVS_DEST_ATTR_MAX, nla,
-			     ip_vs_dest_policy, NULL))
+	    nla_parse_nested_deprecated(attrs, IPVS_DEST_ATTR_MAX, nla, ip_vs_dest_policy, NULL))
 		return -EINVAL;
 
 	nla_addr	= attrs[IPVS_DEST_ATTR_ADDR];
@@ -3373,7 +3370,7 @@ static int ip_vs_genl_fill_daemon(struct sk_buff *skb, __u32 state,
 {
 	struct nlattr *nl_daemon;
 
-	nl_daemon = nla_nest_start(skb, IPVS_CMD_ATTR_DAEMON);
+	nl_daemon = nla_nest_start_noflag(skb, IPVS_CMD_ATTR_DAEMON);
 	if (!nl_daemon)
 		return -EMSGSIZE;
 
@@ -3561,9 +3558,7 @@ static int ip_vs_genl_set_daemon(struct sk_buff *skb, struct genl_info *info)
 		struct nlattr *daemon_attrs[IPVS_DAEMON_ATTR_MAX + 1];
 
 		if (!info->attrs[IPVS_CMD_ATTR_DAEMON] ||
-		    nla_parse_nested(daemon_attrs, IPVS_DAEMON_ATTR_MAX,
-				     info->attrs[IPVS_CMD_ATTR_DAEMON],
-				     ip_vs_daemon_policy, info->extack))
+		    nla_parse_nested_deprecated(daemon_attrs, IPVS_DAEMON_ATTR_MAX, info->attrs[IPVS_CMD_ATTR_DAEMON], ip_vs_daemon_policy, info->extack))
 			goto out;
 
 		if (cmd == IPVS_CMD_NEW_DAEMON)
@@ -3807,82 +3802,98 @@ out:
 static const struct genl_ops ip_vs_genl_ops[] = {
 	{
 		.cmd	= IPVS_CMD_NEW_SERVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_SET_SERVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_DEL_SERVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_GET_SERVICE,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_get_cmd,
 		.dumpit	= ip_vs_genl_dump_services,
 	},
 	{
 		.cmd	= IPVS_CMD_NEW_DEST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_SET_DEST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_DEL_DEST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_GET_DEST,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.dumpit	= ip_vs_genl_dump_dests,
 	},
 	{
 		.cmd	= IPVS_CMD_NEW_DAEMON,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_daemon,
 	},
 	{
 		.cmd	= IPVS_CMD_DEL_DAEMON,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_daemon,
 	},
 	{
 		.cmd	= IPVS_CMD_GET_DAEMON,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.dumpit	= ip_vs_genl_dump_daemons,
 	},
 	{
 		.cmd	= IPVS_CMD_SET_CONFIG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_GET_CONFIG,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_get_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_GET_INFO,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_get_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_ZERO,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
 	{
 		.cmd	= IPVS_CMD_FLUSH,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags	= GENL_ADMIN_PERM,
 		.doit	= ip_vs_genl_set_cmd,
 	},
