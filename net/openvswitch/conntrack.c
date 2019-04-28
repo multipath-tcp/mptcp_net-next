@@ -1683,7 +1683,7 @@ static bool ovs_ct_nat_to_attr(const struct ovs_conntrack_info *info,
 {
 	struct nlattr *start;
 
-	start = nla_nest_start(skb, OVS_CT_ATTR_NAT);
+	start = nla_nest_start_noflag(skb, OVS_CT_ATTR_NAT);
 	if (!start)
 		return false;
 
@@ -1750,7 +1750,7 @@ int ovs_ct_action_to_attr(const struct ovs_conntrack_info *ct_info,
 {
 	struct nlattr *start;
 
-	start = nla_nest_start(skb, OVS_ACTION_ATTR_CT);
+	start = nla_nest_start_noflag(skb, OVS_ACTION_ATTR_CT);
 	if (!start)
 		return -EMSGSIZE;
 
@@ -2160,7 +2160,7 @@ static int ovs_ct_limit_cmd_get(struct sk_buff *skb, struct genl_info *info)
 	if (IS_ERR(reply))
 		return PTR_ERR(reply);
 
-	nla_reply = nla_nest_start(reply, OVS_CT_LIMIT_ATTR_ZONE_LIMIT);
+	nla_reply = nla_nest_start_noflag(reply, OVS_CT_LIMIT_ATTR_ZONE_LIMIT);
 
 	if (a[OVS_CT_LIMIT_ATTR_ZONE_LIMIT]) {
 		err = ovs_ct_limit_get_zone_limit(
@@ -2186,16 +2186,19 @@ exit_err:
 
 static struct genl_ops ct_limit_genl_ops[] = {
 	{ .cmd = OVS_CT_LIMIT_CMD_SET,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = GENL_ADMIN_PERM, /* Requires CAP_NET_ADMIN
 					   * privilege. */
 		.doit = ovs_ct_limit_cmd_set,
 	},
 	{ .cmd = OVS_CT_LIMIT_CMD_DEL,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = GENL_ADMIN_PERM, /* Requires CAP_NET_ADMIN
 					   * privilege. */
 		.doit = ovs_ct_limit_cmd_del,
 	},
 	{ .cmd = OVS_CT_LIMIT_CMD_GET,
+		.validate = GENL_DONT_VALIDATE_STRICT | GENL_DONT_VALIDATE_DUMP,
 		.flags = 0,		  /* OK for unprivileged users. */
 		.doit = ovs_ct_limit_cmd_get,
 	},
