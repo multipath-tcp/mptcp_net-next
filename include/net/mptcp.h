@@ -15,6 +15,7 @@
 #define MPTCP_DSS_HAS_MAP	BIT(2)
 #define MPTCP_DSS_ACK64		BIT(1)
 #define MPTCP_DSS_HAS_ACK	BIT(0)
+#define MPTCP_DSS_FLAG_MASK	(0x1F)
 
 /* MPTCP sk_buff extension data */
 struct mptcp_ext {
@@ -71,6 +72,9 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 bool mptcp_established_options(struct sock *sk, unsigned int *size,
 				       struct mptcp_out_options *opts);
 
+void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+		      struct tcp_options_received *opt_rx);
+
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return skb_ext_exist(skb, SKB_EXT_MPTCP);
@@ -126,6 +130,11 @@ static inline bool mptcp_established_options(struct sock *sk,
 					     struct mptcp_out_options *opts)
 {
 	return false;
+}
+
+static inline void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+				    struct tcp_options_received *opt_rx)
+{
 }
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
