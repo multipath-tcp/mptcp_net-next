@@ -179,6 +179,19 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
 }
 
+static __poll_t mptcp_poll(struct file *file, struct socket *sock,
+			   struct poll_table_struct *wait)
+{
+	const struct mptcp_sock *msk;
+	struct sock *sk = sock->sk;
+
+	msk = mptcp_sk(sk);
+	if (msk->subflow)
+		return tcp_poll(file, msk->subflow, wait);
+
+	return tcp_poll(file, msk->connection_list, wait);
+}
+
 static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
@@ -197,6 +210,7 @@ static int __init mptcp_init(void)
 	mptcp_stream_ops = inet_stream_ops;
 	mptcp_stream_ops.bind = mptcp_bind;
 	mptcp_stream_ops.connect = mptcp_stream_connect;
+	mptcp_stream_ops.poll = mptcp_poll;
 
 	err = subflow_init();
 	if (err)
