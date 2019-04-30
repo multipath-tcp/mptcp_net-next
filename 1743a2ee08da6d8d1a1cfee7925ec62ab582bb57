@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d4b7868e_ad5db19f",
+        "filename": "net/mptcp/token.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 131,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-04-30T20:44:30Z",
+      "side": 1,
+      "message": "From the 0day automated build: radix_tree_lookup_slot returns a void __rcu **, so the pointer it returns needs to be dereferenced with RCU in mind. Example usage: https://elixir.bootlin.com/linux/v5.1-rc5/source/arch/s390/mm/gmap.c#L1179",
+      "revId": "1743a2ee08da6d8d1a1cfee7925ec62ab582bb57",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
