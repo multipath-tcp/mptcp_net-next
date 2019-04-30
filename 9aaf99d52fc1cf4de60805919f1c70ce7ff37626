@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1bac2b1b_42d4b13d",
+        "filename": "net/mptcp/protocol.c",
+        "patchSetId": 11
+      },
+      "lineNbr": 99,
+      "author": {
+        "id": 1015456
+      },
+      "writtenOn": "2019-04-30T20:46:28Z",
+      "side": 1,
+      "message": "sparse is complaining about this assignment, I\u0027ll just remove it",
+      "revId": "9aaf99d52fc1cf4de60805919f1c70ce7ff37626",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
