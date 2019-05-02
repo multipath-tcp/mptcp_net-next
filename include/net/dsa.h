@@ -161,6 +161,7 @@ struct dsa_port {
 	const char		*mac;
 	struct device_node	*dn;
 	unsigned int		ageing_time;
+	bool			vlan_filtering;
 	u8			stp_state;
 	struct net_device	*bridge_dev;
 	struct devlink_port	devlink_port;
@@ -226,6 +227,16 @@ struct dsa_switch {
 
 	/* Number of switch port queues */
 	unsigned int		num_tx_queues;
+
+	/* Disallow bridge core from requesting different VLAN awareness
+	 * settings on ports if not hardware-supported
+	 */
+	bool			vlan_filtering_is_global;
+
+	/* In case vlan_filtering_is_global is set, the VLAN awareness state
+	 * should be retrieved from here and not from the per-port settings.
+	 */
+	bool			vlan_filtering;
 
 	unsigned long		*bitmap;
 	unsigned long		_bitmap;
@@ -294,18 +305,19 @@ static inline unsigned int dsa_upstream_port(struct dsa_switch *ds, int port)
 	return dsa_towards_port(ds, cpu_dp->ds->index, cpu_dp->index);
 }
 
+static inline bool dsa_port_is_vlan_filtering(const struct dsa_port *dp)
+{
+	const struct dsa_switch *ds = dp->ds;
+
+	if (ds->vlan_filtering_is_global)
+		return ds->vlan_filtering;
+	else
+		return dp->vlan_filtering;
+}
+
 typedef int dsa_fdb_dump_cb_t(const unsigned char *addr, u16 vid,
 			      bool is_static, void *data);
 struct dsa_switch_ops {
-#if IS_ENABLED(CONFIG_NET_DSA_LEGACY)
-	/*
-	 * Legacy probing.
-	 */
-	const char	*(*probe)(struct device *dsa_dev,
-				  struct device *host_dev, int sw_addr,
-				  void **priv);
-#endif
-
 	enum dsa_tag_protocol (*get_tag_protocol)(struct dsa_switch *ds,
 						  int port);
 
@@ -495,20 +507,6 @@ struct dsa_switch_driver {
 	const struct dsa_switch_ops *ops;
 };
 
-#if IS_ENABLED(CONFIG_NET_DSA_LEGACY)
-/* Legacy driver registration */
-void register_switch_driver(struct dsa_switch_driver *type);
-void unregister_switch_driver(struct dsa_switch_driver *type);
-struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev);
-
-#else
-static inline void register_switch_driver(struct dsa_switch_driver *type) { }
-static inline void unregister_switch_driver(struct dsa_switch_driver *type) { }
-static inline struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
-{
-	return NULL;
-}
-#endif
 struct net_device *dsa_dev_to_net_device(struct device *dev);
 
 /* Keep inline for faster access in hot path */
