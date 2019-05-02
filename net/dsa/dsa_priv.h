@@ -90,18 +90,6 @@ void dsa_tag_driver_put(const struct dsa_device_ops *ops);
 bool dsa_schedule_work(struct work_struct *work);
 const char *dsa_tag_protocol_to_str(const struct dsa_device_ops *ops);
 
-/* legacy.c */
-#if IS_ENABLED(CONFIG_NET_DSA_LEGACY)
-int dsa_legacy_register(void);
-void dsa_legacy_unregister(void);
-#else
-static inline int dsa_legacy_register(void)
-{
-	return 0;
-}
-
-static inline void dsa_legacy_unregister(void) { }
-#endif
 int dsa_legacy_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 		       struct net_device *dev,
 		       const unsigned char *addr, u16 vid,
@@ -171,6 +159,8 @@ int dsa_port_vlan_add(struct dsa_port *dp,
 		      struct switchdev_trans *trans);
 int dsa_port_vlan_del(struct dsa_port *dp,
 		      const struct switchdev_obj_port_vlan *vlan);
+int dsa_port_vid_add(struct dsa_port *dp, u16 vid, u16 flags);
+int dsa_port_vid_del(struct dsa_port *dp, u16 vid);
 int dsa_port_link_register_of(struct dsa_port *dp);
 void dsa_port_link_unregister_of(struct dsa_port *dp);
 
