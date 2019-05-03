@@ -43,4 +43,3 @@ Once above issues are fixed, this will be extended again to
 set different/varying MTU in ns1 and ns4.
 
 Signed-off-by: Florian Westphal <fw@strlen.de>
-Change-Id: Ia0505b87be107298e00ea437139481a1a0f7c3c6
