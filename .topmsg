@@ -1,5 +1,4 @@
 From: Peter Krystad <peter.krystad@linux.intel.com>
 Subject: [PATCH] mptcp: Make connection_list a real list of subflows
 
-Change-Id: I1c617d53f045ebb9fcf1af23a89b845752a58501
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
