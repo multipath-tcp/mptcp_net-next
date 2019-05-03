@@ -16,5 +16,4 @@ it works correctly with full buffers or under memory pressure.
 
 The MPTCP DSS checksum is not yet implemented.
 
-Change-Id: I2e48ec81a354593803e983f3f3f4a2ee40bf7a4a
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
