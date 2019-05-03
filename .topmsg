@@ -14,5 +14,4 @@ SYNs and the ACK to the response SYN.
 Add handling in tcp_output.c to add MP_CAPABLE to an outgoing
 SYN-ACK response for a subflow_request_sock.
 
-Change-Id: I1656dfc71ee13073b1b12cb2949238d443cc3411
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
