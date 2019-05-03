@@ -10,4 +10,3 @@ Call Trace:
  sock_poll+0x152/0x180
 
 Signed-off-by: Florian Westphal <fw@strlen.de>
-Change-Id: Ibf354be7630ecd44d82ff44a9b692e4862120229
