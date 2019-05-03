@@ -4,5 +4,4 @@ Subject: [PATCH] tcp: Export low-level TCP functions
 MPTCP will make use of tcp_send_mss() and tcp_push() when sending
 data to specific TCP subflows.
 
-Change-Id: I06d4cecd62051aef49b8338987ab5aceb7e26b70
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
