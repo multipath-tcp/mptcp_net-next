@@ -11,4 +11,3 @@ gives the ULP type an opportunity to set up the clone socket and its
 icsk_ulp_data.
 
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Change-Id: I380ce1411ccbaff50cb22b809e5b2ec5877fa1d2
