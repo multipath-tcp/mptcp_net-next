@@ -79,6 +79,7 @@
 #include <trace/events/tcp.h>
 #include <linux/static_key.h>
 #include <net/busy_poll.h>
+#include <net/mptcp.h>
 
 int sysctl_tcp_max_orphans __read_mostly = NR_FILE;
 
@@ -1395,7 +1396,7 @@ static struct sk_buff *tcp_shift_skb_data(struct sock *sk, struct sk_buff *skb,
 	if ((TCP_SKB_CB(prev)->sacked & TCPCB_TAGBITS) != TCPCB_SACKED_ACKED)
 		goto fallback;
 
-	if (!tcp_skb_can_collapse_to(prev))
+	if (!tcp_skb_can_collapse(prev, skb))
 		goto fallback;
 
 	in_sack = !after(start_seq, TCP_SKB_CB(skb)->seq) &&
@@ -3849,6 +3850,10 @@ void tcp_parse_options(const struct net *net,
 				 */
 				break;
 #endif
+			case TCPOPT_MPTCP:
+				mptcp_parse_option(ptr, opsize, opt_rx);
+				break;
+
 			case TCPOPT_FASTOPEN:
 				tcp_parse_fastopen_option(
 					opsize - TCPOLEN_FASTOPEN_BASE,
@@ -4347,6 +4352,9 @@ static bool tcp_try_coalesce(struct sock *sk,
 
 	/* Its possible this segment overlaps with prior segment in queue */
 	if (TCP_SKB_CB(from)->seq != TCP_SKB_CB(to)->end_seq)
+		return false;
+
+	if (mptcp_skb_ext_exist(from))
 		return false;
 
 #ifdef CONFIG_TLS_DEVICE
@@ -4856,10 +4864,12 @@ restart:
 
 		/* The first skb to collapse is:
 		 * - not SYN/FIN and
+		 * - does not include a MPTCP skb extension
 		 * - bloated or contains data before "start" or
 		 *   overlaps to the next one.
 		 */
 		if (!(TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)) &&
+		    !mptcp_skb_ext_exist(skb) &&
 		    (tcp_win_from_space(sk, skb->truesize) > skb->len ||
 		     before(TCP_SKB_CB(skb)->seq, start))) {
 			end_of_skbs = false;
@@ -4875,7 +4885,7 @@ restart:
 		/* Decided to skip this, advance start seq. */
 		start = TCP_SKB_CB(skb)->end_seq;
 	}
-	if (end_of_skbs ||
+	if (end_of_skbs || mptcp_skb_ext_exist(skb) ||
 	    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)))
 		return;
 
@@ -4918,6 +4928,7 @@ restart:
 				skb = tcp_collapse_one(sk, skb, list, root);
 				if (!skb ||
 				    skb == tail ||
+				    mptcp_skb_ext_exist(skb) ||
 				    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)))
 					goto end;
 #ifdef CONFIG_TLS_DEVICE
@@ -5631,6 +5642,10 @@ step5:
 	/* Process urgent data. */
 	tcp_urg(sk, skb, th);
 
+	/* Prepare MPTCP sequence data */
+	if (sk_is_mptcp(sk))
+		mptcp_attach_dss(sk, skb, &tp->rx_opt);
+
 	/* step 7: process the segment text */
 	tcp_data_queue(sk, skb);
 
@@ -5887,6 +5902,9 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
+
+		if (sk_is_mptcp(sk))
+			mptcp_rcv_synsent(sk);
 
 		/* Remember, tcp_poll() does not lock socket!
 		 * Change state from SYN-SENT only after copied_seq
@@ -6474,6 +6492,9 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 
 	tcp_rsk(req)->af_specific = af_ops;
 	tcp_rsk(req)->ts_off = 0;
+#if IS_ENABLED(CONFIG_MPTCP)
+	tcp_rsk(req)->is_mptcp = 0;
+#endif
 
 	tcp_clear_options(&tmp_opt);
 	tmp_opt.mss_clamp = af_ops->mss_clamp;
