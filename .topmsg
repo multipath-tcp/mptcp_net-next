@@ -1,5 +1,0 @@
-From: Peter Krystad <peter.krystad@linux.intel.com>
-Subject: [PATCH] mptcp: Add shutdown() socket operation
-
-Change-Id: I9cbb5f0c27882eb7d6914ba56739ed354e83f6ee
-Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
