@@ -1,4 +1,5 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Make-connection_list-a-real-list-of-subflows
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Make connection_list a real list of subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Change-Id: I1c617d53f045ebb9fcf1af23a89b845752a58501
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
