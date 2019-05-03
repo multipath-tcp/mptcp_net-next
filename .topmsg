@@ -12,5 +12,4 @@ allows sent packet headers to make use of the most up-to-date sequence
 number and allows the MPTCP ACK to be populated in TCP ACK packets that
 have no payload.
 
-Change-Id: I2617ad58ab378e0c8d58ed6f7b53d93724934471
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
