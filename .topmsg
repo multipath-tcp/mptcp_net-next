@@ -9,5 +9,4 @@ Use the .sk_rx_dst_set() handler in the subflow proto to capture
 when the responding SYN-ACK is received and notify the MPTCP
 connection layer.
 
-Change-Id: I7cfffe72ae027d80b5527e2d9b18dc697e916087
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
