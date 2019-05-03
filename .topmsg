@@ -1,9 +1,0 @@
-From: Peter Krystad <peter.krystad@linux.intel.com>
-Subject: [PATCH] mptcp: Add key generation and token tree
-
-Generate the local keys, IDSN, and token when creating a new
-socket. Introduce the token tree to track all tokens in use using
-a radix tree with the MPTCP token itself as the index.
-
-Change-Id: I1d80e443a53e151d647712f7bcfa375c6edfff99
-Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
