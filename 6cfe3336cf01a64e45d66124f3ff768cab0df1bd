@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ec5b694f_a85b74eb",
+        "filename": "tools/testing/selftests/net/mptcp/mptcp_connect.sh",
+        "patchSetId": 4
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 1015295
+      },
+      "writtenOn": "2019-05-03T12:42:22Z",
+      "side": 1,
+      "message": "from Paolo: https://review.gerrithub.io/c/multipath-tcp/mptcp_net-next/+/448886/2/tools/testing/selftests/net/mptcp/mptcp_connect.sh#22\n\n  this last line contains a syntax error, should be replaced with:\n\n  echo \" exit code $ret\"\n  return",
+      "revId": "6cfe3336cf01a64e45d66124f3ff768cab0df1bd",
+      "serverId": "d5d70762-12d0-45a1-890d-524b12d3f735",
+      "unresolved": true
+    }
+  ]
+}
