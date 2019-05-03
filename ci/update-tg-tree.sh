@@ -131,8 +131,12 @@ tg_trap_reset() { local rc
 ## Validation ##
 ################
 
-generate_config() {
+generate_config_no_mptcp() {
 	make defconfig
+}
+
+generate_config_mptcp() {
+	generate_config_no_mptcp
 
 	echo | scripts/config --enable MPTCP
 
@@ -141,9 +145,16 @@ generate_config() {
 	# 'make olddefconfig' which will silently disable these new options.
 }
 
-check_compilation() {
-	generate_config
+compile_kernel() {
 	make -j"$(nproc)" -l"$(nproc)"
+}
+
+check_compilation() {
+	generate_config_no_mptcp
+	compile_kernel || exit_err "Unable to compile the new version without CONFIG_MPTCP"
+
+	generate_config_mptcp
+	compile_kernel || exit_err "Unable to compile the new version with CONFIG_MPTCP"
 }
 
 validation() {
