@@ -1,4 +1,5 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Handle-MPTCP-TCP-options
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Handle MPTCP TCP options
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Change-Id: I450d06f1ef39c21351dda0c5f867d1081124e92c
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
