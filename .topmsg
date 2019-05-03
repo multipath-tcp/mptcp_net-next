@@ -3,5 +3,4 @@ Subject: [PATCH] mptcp: Add MPTCP to skb extensions
 
 Add enum value for MPTCP and update config dependencies
 
-Change-Id: I352466fbf7182b9e4570c7f820bea7f02a99f4b0
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
