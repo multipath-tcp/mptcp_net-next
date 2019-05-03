@@ -13,5 +13,4 @@ an MPTCP socket with:
 The resulting socket is simply a wrapper around a single regular TCP
 socket, without any of the MPTCP protocol implemented over the wire.
 
-Change-Id: Iaf63ea9b1fae236bd32f75f6a3c3840a00900747
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
