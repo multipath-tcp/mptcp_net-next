@@ -8,4 +8,3 @@ such socket in the mptcp subflow list.
 This is required to get rid of synchronize_rcu() from mptcp_close().
 
 Signed-off-by: Florian Westphal <fw@strlen.de>
-Change-Id: I568fb486b0003cf2a05933f36413d3270013050a
