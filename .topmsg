@@ -1,4 +1,5 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-setsockopt-getsockopt-socket-operations
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add setsockopt()/getsockopt() socket operations
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Change-Id: Ibd5154f9abe6ee0611759971dfffa06762e3d14e
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
