@@ -2428,6 +2428,9 @@ static void mv88e6xxx_port_disable(struct dsa_switch *ds, int port)
 
 	mutex_lock(&chip->reg_lock);
 
+	if (mv88e6xxx_port_set_state(chip, port, BR_STATE_DISABLED))
+		dev_err(chip->dev, "failed to disable port\n");
+
 	if (chip->info->ops->serdes_irq_free)
 		chip->info->ops->serdes_irq_free(chip, port);
 
@@ -2596,8 +2599,18 @@ static int mv88e6xxx_setup(struct dsa_switch *ds)
 
 	/* Setup Switch Port Registers */
 	for (i = 0; i < mv88e6xxx_num_ports(chip); i++) {
-		if (dsa_is_unused_port(ds, i))
+		if (dsa_is_unused_port(ds, i)) {
+			err = mv88e6xxx_port_set_state(chip, i,
+						       BR_STATE_DISABLED);
+			if (err)
+				goto unlock;
+
+			err = mv88e6xxx_serdes_power(chip, i, false);
+			if (err)
+				goto unlock;
+
 			continue;
+		}
 
 		err = mv88e6xxx_setup_port(chip, i);
 		if (err)
@@ -4881,11 +4894,16 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	if (err)
 		goto out;
 
-	chip->irq = of_irq_get(np, 0);
-	if (chip->irq == -EPROBE_DEFER) {
-		err = chip->irq;
-		goto out;
+	if (np) {
+		chip->irq = of_irq_get(np, 0);
+		if (chip->irq == -EPROBE_DEFER) {
+			err = chip->irq;
+			goto out;
+		}
 	}
+
+	if (pdata)
+		chip->irq = pdata->irq;
 
 	/* Has to be performed before the MDIO bus is created, because
 	 * the PHYs will link their interrupts to these interrupt
