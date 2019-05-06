@@ -775,9 +775,9 @@ static bool rtl_loop_wait(struct rtl8169_private *tp, const struct rtl_cond *c,
 	int i;
 
 	for (i = 0; i < n; i++) {
-		delay(d);
 		if (c->check(tp) == high)
 			return true;
+		delay(d);
 	}
 	netif_err(tp, drv, tp->dev, "%s == %d (loop: %d, delay: %d).\n",
 		  c->msg, !high, n, d);
@@ -6451,8 +6451,7 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	if (!tp->supports_gmii)
 		phy_set_max_speed(phydev, SPEED_100);
 
-	/* Ensure to advertise everything, incl. pause */
-	linkmode_copy(phydev->advertising, phydev->supported);
+	phy_support_asym_pause(phydev);
 
 	phy_attached_info(phydev);
 
