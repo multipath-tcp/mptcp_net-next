@@ -886,8 +886,10 @@ static irqreturn_t ll_temac_tx_irq(int irq, void *_ndev)
 
 	if (status & (IRQ_COAL | IRQ_DLY))
 		temac_start_xmit_done(lp->ndev);
-	if (status & 0x080)
-		dev_err(&ndev->dev, "DMA error 0x%x\n", status);
+	if (status & (IRQ_ERR | IRQ_DMAERR))
+		dev_err_ratelimited(&ndev->dev,
+				    "TX error 0x%x TX_CHNL_STS=0x%08x\n",
+				    status, lp->dma_in(lp, TX_CHNL_STS));
 
 	return IRQ_HANDLED;
 }
@@ -904,6 +906,10 @@ static irqreturn_t ll_temac_rx_irq(int irq, void *_ndev)
 
 	if (status & (IRQ_COAL | IRQ_DLY))
 		ll_temac_recv(lp->ndev);
+	if (status & (IRQ_ERR | IRQ_DMAERR))
+		dev_err_ratelimited(&ndev->dev,
+				    "RX error 0x%x RX_CHNL_STS=0x%08x\n",
+				    status, lp->dma_in(lp, RX_CHNL_STS));
 
 	return IRQ_HANDLED;
 }
@@ -1252,7 +1258,7 @@ static int temac_probe(struct platform_device *pdev)
 	if (temac_np) {
 		/* Retrieve the MAC address */
 		addr = of_get_mac_address(temac_np);
-		if (!addr) {
+		if (IS_ERR(addr)) {
 			dev_err(&pdev->dev, "could not find MAC address\n");
 			return -ENODEV;
 		}
