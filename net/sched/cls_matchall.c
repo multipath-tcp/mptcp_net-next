@@ -32,6 +32,9 @@ static int mall_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 {
 	struct cls_mall_head *head = rcu_dereference_bh(tp->root);
 
+	if (unlikely(!head))
+		return -1;
+
 	if (tc_skip_sw(head->flags))
 		return -1;
 
@@ -71,8 +74,7 @@ static void mall_destroy_hw_filter(struct tcf_proto *tp,
 	struct tc_cls_matchall_offload cls_mall = {};
 	struct tcf_block *block = tp->chain->block;
 
-	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, block,
-				   extack);
+	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, extack);
 	cls_mall.command = TC_CLSMATCHALL_DESTROY;
 	cls_mall.cookie = cookie;
 
@@ -94,8 +96,7 @@ static int mall_replace_hw_filter(struct tcf_proto *tp,
 	if (!cls_mall.rule)
 		return -ENOMEM;
 
-	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, block,
-				   extack);
+	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, extack);
 	cls_mall.command = TC_CLSMATCHALL_REPLACE;
 	cls_mall.cookie = cookie;
 
@@ -295,8 +296,7 @@ static int mall_reoffload(struct tcf_proto *tp, bool add, tc_setup_cb_t *cb,
 	if (!cls_mall.rule)
 		return -ENOMEM;
 
-	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, block,
-				   extack);
+	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, extack);
 	cls_mall.command = add ?
 		TC_CLSMATCHALL_REPLACE : TC_CLSMATCHALL_DESTROY;
 	cls_mall.cookie = (unsigned long)head;
@@ -331,8 +331,7 @@ static void mall_stats_hw_filter(struct tcf_proto *tp,
 	struct tc_cls_matchall_offload cls_mall = {};
 	struct tcf_block *block = tp->chain->block;
 
-	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, block,
-				   NULL);
+	tc_cls_common_offload_init(&cls_mall.common, tp, head->flags, NULL);
 	cls_mall.command = TC_CLSMATCHALL_STATS;
 	cls_mall.cookie = cookie;
 
