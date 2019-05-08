@@ -260,39 +260,42 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 }
 
 bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
-			unsigned int *size, unsigned int remaining,
-			struct mptcp_out_options *opts)
+				   unsigned int *size, unsigned int remaining,
+				   struct mptcp_out_options *opts)
 {
 	unsigned int dss_size = 0;
 	struct mptcp_ext *mpext;
 	unsigned int ack_size;
 
-	if (!subflow_ctx(sk)->mp_capable || !skb)
+	if (!subflow_ctx(sk)->mp_capable)
 		return false;
 
-	mpext = mptcp_get_ext(skb);
+	mpext = skb ? mptcp_get_ext(skb) : NULL;
 
-	if (mpext && mpext->use_map) {
+	if (!skb || (mpext && mpext->use_map)) {
 		unsigned int map_size;
-		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
+		bool use_csum;
 
-		if (mpext->use_checksum)
+		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
+		use_csum = subflow_ctx(sk)->use_checksum;
+		if (use_csum)
 			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
 		if (map_size <= remaining) {
 			remaining -= map_size;
 			dss_size = map_size;
-
-			opts->ext_copy.data_seq = mpext->data_seq;
-			opts->ext_copy.subflow_seq = mpext->subflow_seq;
-			opts->ext_copy.data_len = mpext->data_len;
-			opts->ext_copy.checksum = mpext->checksum;
-			opts->ext_copy.use_map = 1;
-			opts->ext_copy.dsn64 = mpext->dsn64;
-			opts->ext_copy.use_checksum = mpext->use_checksum;
+			if (mpext) {
+				opts->ext_copy.data_seq = mpext->data_seq;
+				opts->ext_copy.subflow_seq = mpext->subflow_seq;
+				opts->ext_copy.data_len = mpext->data_len;
+				opts->ext_copy.checksum = mpext->checksum;
+				opts->ext_copy.use_map = 1;
+				opts->ext_copy.dsn64 = mpext->dsn64;
+				opts->ext_copy.use_checksum = use_csum;
+			}
 		} else {
 			opts->ext_copy.use_map = 0;
-			WARN(1, "MPTCP: Map dropped");
+			WARN_ONCE(1, "MPTCP: Map dropped");
 		}
 	}
 
