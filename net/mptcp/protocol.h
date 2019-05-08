@@ -87,7 +87,9 @@ struct subflow_context {
 		fourth_ack : 1,     /* send initial DSS */
 		version : 4,
 		conn_finished : 1,
+		use_checksum : 1,
 		map_valid : 1;
+
 	struct  sock *sk;       /* underlying tcp_sock */
 	struct  sock *conn;     /* parent mptcp_sock */
 	void	(*tcp_sk_data_ready)(struct sock *sk);
