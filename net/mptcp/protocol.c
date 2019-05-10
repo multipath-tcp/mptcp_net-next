@@ -586,7 +586,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	} else {
 		msk->subflow = new_sock;
 	}
-	inet_sk_state_store(sk, TCP_ESTABLISHED);
+	inet_sk_state_store(new_mptcp_sock->sk, TCP_ESTABLISHED);
 
 	return new_mptcp_sock->sk;
 }
