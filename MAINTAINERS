@@ -745,6 +745,15 @@ S:	Supported
 F:	Documentation/networking/device_drivers/amazon/ena.txt
 F:	drivers/net/ethernet/amazon/
 
+AMAZON RDMA EFA DRIVER
+M:	Gal Pressman <galpress@amazon.com>
+R:	Yossi Leybovich <sleybo@amazon.com>
+L:	linux-rdma@vger.kernel.org
+Q:	https://patchwork.kernel.org/project/linux-rdma/list/
+S:	Supported
+F:	drivers/infiniband/hw/efa/
+F:	include/uapi/rdma/efa-abi.h
+
 AMD CRYPTOGRAPHIC COPROCESSOR (CCP) DRIVER
 M:	Tom Lendacky <thomas.lendacky@amd.com>
 M:	Gary Hook <gary.hook@amd.com>
@@ -816,6 +825,14 @@ F:	drivers/gpu/drm/amd/include/kgd_kfd_interface.h
 F:	drivers/gpu/drm/amd/include/vi_structs.h
 F:	drivers/gpu/drm/amd/include/v9_structs.h
 F:	include/uapi/linux/kfd_ioctl.h
+
+AMD MP2 I2C DRIVER
+M:	Elie Morisse <syniurge@gmail.com>
+M:	Nehal Shah <nehal-bakulchandra.shah@amd.com>
+M:	Shyam Sundar S K <shyam-sundar.s-k@amd.com>
+L:	linux-i2c@vger.kernel.org
+S:	Maintained
+F:	drivers/i2c/busses/i2c-amd-mp2*
 
 AMD POWERPLAY
 M:	Rex Zhu <rex.zhu@amd.com>
@@ -961,6 +978,12 @@ F:	drivers/iio/*/ad*
 F:	drivers/iio/adc/ltc2497*
 X:	drivers/iio/*/adjd*
 F:	drivers/staging/iio/*/ad*
+
+ANALOGBITS PLL LIBRARIES
+M:	Paul Walmsley <paul.walmsley@sifive.com>
+S:	Supported
+F:	drivers/clk/analogbits/*
+F:	include/linux/clk/analogbits*
 
 ANDES ARCHITECTURE
 M:	Greentime Hu <green.hu@gmail.com>
@@ -1169,7 +1192,7 @@ S:	Supported
 T:	git git://linux-arm.org/linux-ld.git for-upstream/mali-dp
 F:	drivers/gpu/drm/arm/display/include/
 F:	drivers/gpu/drm/arm/display/komeda/
-F:	Documentation/devicetree/bindings/display/arm/arm,komeda.txt
+F:	Documentation/devicetree/bindings/display/arm,komeda.txt
 F:	Documentation/gpu/komeda-kms.rst
 
 ARM MALI-DP DRM DRIVER
@@ -1181,6 +1204,15 @@ T:	git git://linux-arm.org/linux-ld.git for-upstream/mali-dp
 F:	drivers/gpu/drm/arm/
 F:	Documentation/devicetree/bindings/display/arm,malidp.txt
 F:	Documentation/gpu/afbc.rst
+
+ARM MALI PANFROST DRM DRIVER
+M:	Rob Herring <robh@kernel.org>
+M:	Tomeu Vizoso <tomeu.vizoso@collabora.com>
+L:	dri-devel@lists.freedesktop.org
+S:	Supported
+T:	git git://anongit.freedesktop.org/drm/drm-misc
+F:	drivers/gpu/drm/panfrost/
+F:	include/uapi/drm/panfrost_drm.h
 
 ARM MFM AND FLOPPY DRIVERS
 M:	Ian Molton <spyro@f2s.com>
@@ -1418,7 +1450,9 @@ M:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 F:	arch/arm64/boot/dts/bitmain/
+F:	drivers/pinctrl/pinctrl-bm1880.c
 F:	Documentation/devicetree/bindings/arm/bitmain.yaml
+F:	Documentation/devicetree/bindings/pinctrl/bitmain,bm1880-pinctrl.txt
 
 ARM/CALXEDA HIGHBANK ARCHITECTURE
 M:	Rob Herring <robh@kernel.org>
@@ -2562,7 +2596,7 @@ F:	include/linux/dmaengine.h
 F:	include/linux/async_tx.h
 
 AT24 EEPROM DRIVER
-M:	Bartosz Golaszewski <brgl@bgdev.pl>
+M:	Bartosz Golaszewski <bgolaszewski@baylibre.com>
 L:	linux-i2c@vger.kernel.org
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/brgl/linux.git
 S:	Maintained
@@ -3358,7 +3392,7 @@ F:	include/uapi/linux/bsg.h
 BT87X AUDIO DRIVER
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	Documentation/sound/cards/bt87x.rst
 F:	sound/pci/bt87x.c
@@ -3411,7 +3445,7 @@ F:	drivers/scsi/FlashPoint.*
 C-MEDIA CMI8788 DRIVER
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	sound/pci/oxygen/
 
@@ -3735,8 +3769,8 @@ F:	scripts/checkpatch.pl
 
 CHINESE DOCUMENTATION
 M:	Harry Wei <harryxiyou@gmail.com>
+M:	Alex Shi <alex.shi@linux.alibaba.com>
 L:	xiyoulinuxkernelgroup@googlegroups.com (subscribers-only)
-L:	linux-kernel@zh-kernel.org (moderated for non-subscribers)
 S:	Maintained
 F:	Documentation/translations/zh_CN/
 
@@ -3807,6 +3841,7 @@ F:	drivers/hwmon/lochnagar-hwmon.c
 F:	drivers/mfd/lochnagar-i2c.c
 F:	drivers/pinctrl/cirrus/pinctrl-lochnagar.c
 F:	drivers/regulator/lochnagar-regulator.c
+F:	sound/soc/codecs/lochnagar-sc.c
 F:	include/dt-bindings/clk/lochnagar.h
 F:	include/dt-bindings/pinctrl/lochnagar.h
 F:	include/linux/mfd/lochnagar*
@@ -3815,6 +3850,7 @@ F:	Documentation/devicetree/bindings/clock/cirrus,lochnagar.txt
 F:	Documentation/devicetree/bindings/hwmon/cirrus,lochnagar.txt
 F:	Documentation/devicetree/bindings/pinctrl/cirrus,lochnagar.txt
 F:	Documentation/devicetree/bindings/regulator/cirrus,lochnagar.txt
+F:	Documentation/devicetree/bindings/sound/cirrus,lochnagar.txt
 F:	Documentation/hwmon/lochnagar
 
 CISCO FCOE HBA DRIVER
@@ -4266,7 +4302,7 @@ S:	Supported
 F:	drivers/scsi/cxgbi/cxgb3i
 
 CXGB3 IWARP RNIC DRIVER (IW_CXGB3)
-M:	Steve Wise <swise@chelsio.com>
+M:	Potnuri Bharat Teja <bharat@chelsio.com>
 L:	linux-rdma@vger.kernel.org
 W:	http://www.openfabrics.org
 S:	Supported
@@ -4295,7 +4331,7 @@ S:	Supported
 F:	drivers/scsi/cxgbi/cxgb4i
 
 CXGB4 IWARP RNIC DRIVER (IW_CXGB4)
-M:	Steve Wise <swise@chelsio.com>
+M:	Potnuri Bharat Teja <bharat@chelsio.com>
 L:	linux-rdma@vger.kernel.org
 W:	http://www.openfabrics.org
 S:	Supported
@@ -4915,6 +4951,14 @@ M:	Dave Airlie <airlied@redhat.com>
 S:	Odd Fixes
 F:	drivers/gpu/drm/ast/
 
+DRM DRIVER FOR ASPEED BMC GFX
+M:	Joel Stanley <joel@jms.id.au>
+L:	linux-aspeed@lists.ozlabs.org
+T:	git git://anongit.freedesktop.org/drm/drm-misc
+S:	Supported
+F:	drivers/gpu/drm/aspeed/
+F:	Documentation/devicetree/bindings/gpu/aspeed-gfx.txt
+
 DRM DRIVER FOR BOCHS VIRTUAL GPU
 M:	Gerd Hoffmann <kraxel@redhat.com>
 L:	virtualization@lists.linux-foundation.org
@@ -4927,6 +4971,12 @@ M:	Linus Walleij <linus.walleij@linaro.org>
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 S:	Maintained
 F:	drivers/gpu/drm/tve200/
+
+DRM DRIVER FOR FEIYANG FY07024DI26A30-D MIPI-DSI LCD PANELS
+M:	Jagan Teki <jagan@amarulasolutions.com>
+S:	Maintained
+F:	drivers/gpu/drm/panel/panel-feiyang-fy07024di26a30d.c
+F:	Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
 
 DRM DRIVER FOR ILITEK ILI9225 PANELS
 M:	David Lechner <david@lechnology.com>
@@ -5019,6 +5069,12 @@ S:	Orphan / Obsolete
 F:	drivers/gpu/drm/r128/
 F:	include/uapi/drm/r128_drm.h
 
+DRM DRIVER FOR ROCKTECH JH057N00900 PANELS
+M:	Guido Günther <agx@sigxcpu.org>
+S:	Maintained
+F:	drivers/gpu/drm/panel/panel-rocktech-jh057n00900.c
+F:	Documentation/devicetree/bindings/display/panel/rocktech,jh057n00900.txt
+
 DRM DRIVER FOR SAVAGE VIDEO CARDS
 S:	Orphan / Obsolete
 F:	drivers/gpu/drm/savage/
@@ -5064,6 +5120,13 @@ R:	Sean Paul <sean@poorly.run>
 L:	dri-devel@lists.freedesktop.org
 S:	Odd Fixes
 F:	drivers/gpu/drm/udl/
+T:	git git://anongit.freedesktop.org/drm/drm-misc
+
+DRM DRIVER FOR VIRTUALBOX VIRTUAL GPU
+M:	Hans de Goede <hdegoede@redhat.com>
+L:	dri-devel@lists.freedesktop.org
+S:	Maintained
+F:	drivers/gpu/drm/vboxvideo/
 T:	git git://anongit.freedesktop.org/drm/drm-misc
 
 DRM DRIVER FOR VIRTUAL KERNEL MODESETTING (VKMS)
@@ -5199,6 +5262,15 @@ T:	git git://github.com/xin3liang/linux.git
 S:	Maintained
 F:	drivers/gpu/drm/hisilicon/
 F:	Documentation/devicetree/bindings/display/hisilicon/
+
+DRM DRIVERS FOR LIMA
+M:	Qiang Yu <yuq825@gmail.com>
+L:	dri-devel@lists.freedesktop.org
+L:	lima@lists.freedesktop.org (moderated for non-subscribers)
+S:	Maintained
+F:	drivers/gpu/drm/lima/
+F:	include/uapi/drm/lima_drm.h
+T:	git git://anongit.freedesktop.org/drm/drm-misc
 
 DRM DRIVERS FOR MEDIATEK
 M:	CK Hu <ck.hu@mediatek.com>
@@ -5723,7 +5795,7 @@ F:	drivers/edac/qcom_edac.c
 EDIROL UA-101/UA-1000 DRIVER
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	sound/usb/misc/ua101.c
 
@@ -6063,7 +6135,7 @@ F:	include/linux/f75375s.h
 FIREWIRE AUDIO DRIVERS
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	sound/firewire/
 
@@ -7678,6 +7750,10 @@ F:	drivers/infiniband/
 F:	include/uapi/linux/if_infiniband.h
 F:	include/uapi/rdma/
 F:	include/rdma/
+F:	include/trace/events/ib_mad.h
+F:	include/trace/events/ib_umad.h
+F:	samples/bpf/ibumad_kern.c
+F:	samples/bpf/ibumad_user.c
 
 INGENIC JZ4780 DMA Driver
 M:	Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
@@ -10088,6 +10164,7 @@ L:	linux-amlogic@lists.infradead.org
 W:	http://linux-meson.com/
 S:	Supported
 F:	drivers/media/platform/meson/ao-cec.c
+F:	drivers/media/platform/meson/ao-cec-g12a.c
 F:	Documentation/devicetree/bindings/media/meson-ao-cec.txt
 T:	git git://linuxtv.org/media_tree.git
 
@@ -10144,7 +10221,8 @@ MICROCHIP I2C DRIVER
 M:	Ludovic Desroches <ludovic.desroches@microchip.com>
 L:	linux-i2c@vger.kernel.org
 S:	Supported
-F:	drivers/i2c/busses/i2c-at91.c
+F:	drivers/i2c/busses/i2c-at91.h
+F:	drivers/i2c/busses/i2c-at91-*.c
 
 MICROCHIP ISC DRIVER
 M:	Eugen Hristev <eugen.hristev@microchip.com>
@@ -10466,7 +10544,7 @@ F:	include/uapi/linux/meye.h
 MOXA SMARTIO/INDUSTIO/INTELLIO SERIAL CARD
 M:	Jiri Slaby <jirislaby@gmail.com>
 S:	Maintained
-F:	Documentation/serial/moxa-smartio
+F:	Documentation/serial/moxa-smartio.rst
 F:	drivers/tty/mxser.*
 
 MR800 AVERMEDIA USB FM RADIO DRIVER
@@ -11652,7 +11730,7 @@ F:	Documentation/devicetree/bindings/opp/
 OPL4 DRIVER
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	sound/drivers/opl4/
 
@@ -13376,7 +13454,7 @@ ROCKETPORT DRIVER
 P:	Comtrol Corp.
 W:	http://www.comtrol.com
 S:	Maintained
-F:	Documentation/serial/rocket.txt
+F:	Documentation/serial/rocket.rst
 F:	drivers/tty/rocket*
 
 ROCKETPORT EXPRESS/INFINITY DRIVER
@@ -14399,9 +14477,8 @@ SOC-CAMERA V4L2 SUBSYSTEM
 L:	linux-media@vger.kernel.org
 T:	git git://linuxtv.org/media_tree.git
 S:	Orphan
-F:	include/media/soc*
-F:	drivers/media/i2c/soc_camera/
-F:	drivers/media/platform/soc_camera/
+F:	include/media/soc_camera.h
+F:	drivers/staging/media/soc_camera/
 
 SOCIONEXT SYNQUACER I2C DRIVER
 M:	Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -14563,7 +14640,6 @@ M:	Takashi Iwai <tiwai@suse.com>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
 W:	http://www.alsa-project.org/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
-T:	git git://git.alsa-project.org/alsa-kernel.git
 Q:	http://patchwork.kernel.org/project/alsa-devel/list/
 S:	Maintained
 F:	Documentation/sound/
@@ -14740,6 +14816,14 @@ W:	http://www.st.com/
 S:	Maintained
 F:	drivers/iio/imu/st_lsm6dsx/
 F:	Documentation/devicetree/bindings/iio/imu/st_lsm6dsx.txt
+
+ST MIPID02 CSI-2 TO PARALLEL BRIDGE DRIVER
+M:	Mickael Guene <mickael.guene@st.com>
+L:	linux-media@vger.kernel.org
+T:	git git://linuxtv.org/media_tree.git
+S:	Maintained
+F:	drivers/media/i2c/st-mipid02.c
+F:	Documentation/devicetree/bindings/media/i2c/st,st-mipid02.txt
 
 ST STM32 I2C/SMBUS DRIVER
 M:	Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
@@ -15376,6 +15460,11 @@ TEGRA SPI DRIVER
 M:	Laxman Dewangan <ldewangan@nvidia.com>
 S:	Supported
 F:	drivers/spi/spi-tegra*
+
+TEGRA XUSB PADCTL DRIVER
+M:	JC Kuo <jckuo@nvidia.com>
+S:	Supported
+F:	drivers/phy/tegra/xusb*
 
 TEHUTI ETHERNET DRIVER
 M:	Andy Gospodarek <andy@greyhouse.net>
@@ -16052,6 +16141,13 @@ L:	linux-scsi@vger.kernel.org
 S:	Supported
 F:	drivers/scsi/ufs/*dwc*
 
+UNIVERSAL FLASH STORAGE HOST CONTROLLER DRIVER MEDIATEK HOOKS
+M:	Stanley Chu <stanley.chu@mediatek.com>
+L:	linux-scsi@vger.kernel.org
+L:	linux-mediatek@lists.infradead.org (moderated for non-subscribers)
+S:	Maintained
+F:	drivers/scsi/ufs/ufs-mediatek*
+
 UNSORTED BLOCK IMAGES (UBI)
 M:	Artem Bityutskiy <dedekind1@gmail.com>
 M:	Richard Weinberger <richard@nod.at>
@@ -16155,6 +16251,14 @@ L:	linux-usb@vger.kernel.org
 S:	Maintained
 F:	drivers/usb/roles/intel-xhci-usb-role-switch.c
 
+USB IP DRIVER FOR HISILICON KIRIN
+M:	Yu Chen <chenyu56@huawei.com>
+M:	Binghui Wang <wangbinghui@hisilicon.com>
+L:	linux-usb@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/phy/phy-hi3660-usb3.txt
+F:	drivers/phy/hisilicon/phy-hi3660-usb3.c
+
 USB ISP116X DRIVER
 M:	Olav Kongas <ok@artecdesign.ee>
 L:	linux-usb@vger.kernel.org
@@ -16181,7 +16285,7 @@ F:	drivers/usb/storage/
 USB MIDI DRIVER
 M:	Clemens Ladisch <clemens@ladisch.de>
 L:	alsa-devel@alsa-project.org (moderated for non-subscribers)
-T:	git git://git.alsa-project.org/alsa-kernel.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
 S:	Maintained
 F:	sound/usb/midi.*
 
