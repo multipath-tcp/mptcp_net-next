@@ -37,12 +37,12 @@ struct mptcp_sock {
 	atomic64_t	ack_seq;
 	u32		token;
 	spinlock_t	conn_list_lock;
-	struct hlist_head conn_list;
+	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
-	hlist_for_each_entry_rcu(__subflow, &((__msk)->conn_list), node)
+	list_for_each_entry_rcu(__subflow, &((__msk)->conn_list), node)
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 {
@@ -71,7 +71,7 @@ struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
 
 /* MPTCP subflow context */
 struct subflow_context {
-	struct	hlist_node node;/* conn_list of subflows */
+	struct	list_head node;/* conn_list of subflows */
 	u64	local_key;
 	u64	remote_key;
 	u32	token;
