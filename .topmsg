@@ -3,10 +3,4 @@ Subject: [PATCH] mptcp: use sk_page_frag() in sendmsg
 
 This clean-up a bit the send path, and allows better performances.
 
-RFC -> v1:
- - use sk's page_frag
- - fix error handling on memory pressure
-
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
---
-can be squashed into commit cc0d09002896 ("mptcp: Implement MPTCP receive path")
