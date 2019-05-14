@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-sk_page_frag-in-sendmsg
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use sk_page_frag() in sendmsg
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This clean-up a bit the send path, and allows better performances.
+
+RFC -> v1:
+ - use sk's page_frag
+ - fix error handling on memory pressure
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+--
+can be squashed into commit cc0d09002896 ("mptcp: Implement MPTCP receive path")
