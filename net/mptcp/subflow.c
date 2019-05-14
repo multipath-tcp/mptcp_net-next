@@ -267,8 +267,8 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 {
 	subflow_ops->obj_size = sizeof(struct subflow_request_sock);
-	subflow_ops->slab = NULL;
 	subflow_ops->slab_name = NULL;
+	subflow_ops->slab = NULL;
 
 	subflow_ops->slab_name = kasprintf(GFP_KERNEL, "request_sock_subflow");
 	if (!subflow_ops->slab_name)
@@ -281,6 +281,7 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 					      NULL);
 
 	if (!subflow_ops->slab) {
+		kfree(subflow_ops->slab_name);
 		return -ENOMEM;
 	}
 
