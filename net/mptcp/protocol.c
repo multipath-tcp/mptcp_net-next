@@ -490,18 +490,31 @@ static int mptcp_init_sock(struct sock *sk)
 
 	pr_debug("msk=%p", msk);
 
-	INIT_HLIST_HEAD(&msk->conn_list);
+	INIT_LIST_HEAD_RCU(&msk->conn_list);
 	spin_lock_init(&msk->conn_list_lock);
 
 	return 0;
 }
 
+static void mptcp_flush_conn_list(struct sock *sk, struct list_head *list)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	INIT_LIST_HEAD_RCU(list);
+	spin_lock_bh(&msk->conn_list_lock);
+	list_splice_init(&msk->conn_list, list);
+	spin_unlock_bh(&msk->conn_list_lock);
+
+	if (!list_empty(list))
+		synchronize_rcu();
+}
+
 static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct hlist_node *node;
+	struct subflow_context *subflow, *tmp;
 	struct socket *ssk = NULL;
-	struct subflow_context *subflow;
+	struct list_head list;
 
 	spin_lock_bh(&msk->conn_list_lock);
 	if (msk->subflow) {
@@ -514,25 +527,18 @@ static void mptcp_close(struct sock *sk, long timeout)
 		sock_release(ssk);
 	}
 
-	do {
-		spin_lock_bh(&msk->conn_list_lock);
-		/* The spin lock was just acquired, so tell
-		 * rcu_dereference_check() this access to the list is properly
-		 * protected even though the rcu_read_lock is not held.
-		 */
-		node = rcu_dereference_check(hlist_first_rcu(&msk->conn_list),
-					spin_is_locked(&msk->conn_list_lock) ||
-					!IS_ENABLED(CONFIG_SMP));
-		if (!node)
-			break;
-		subflow = hlist_entry(node, struct subflow_context, node);
-		hlist_del_rcu(node);
-		spin_unlock_bh(&msk->conn_list_lock);
-		synchronize_rcu();
+	/* this is the only place where we can remove any entry from the
+	 * conn_list. Additionally acquiring the socket lock here
+	 * allows for mutual exclusion with mptcp_shutdown().
+	 */
+	lock_sock(sk);
+	mptcp_flush_conn_list(sk, &list);
+	release_sock(sk);
+
+	list_for_each_entry_safe(subflow, tmp, &list, node) {
 		pr_debug("conn_list->subflow=%p", subflow);
 		sock_release(sock_sk(subflow)->sk_socket);
-	} while (1);
-	spin_unlock_bh(&msk->conn_list_lock);
+	};
 }
 
 static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
@@ -571,7 +577,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		pr_debug("token=%u", msk->token);
 		token_update_accept(new_sock->sk, new_mptcp_sock->sk);
 		spin_lock_bh(&msk->conn_list_lock);
-		hlist_add_head_rcu(&subflow->node, &msk->conn_list);
+		list_add_rcu(&subflow->node, &msk->conn_list);
 		msk->subflow = NULL;
 		spin_unlock_bh(&msk->conn_list_lock);
 
@@ -670,7 +676,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->token = subflow->token;
 		pr_debug("token=%u", msk->token);
 		spin_lock_bh(&msk->conn_list_lock);
-		hlist_add_head_rcu(&subflow->node, &msk->conn_list);
+		list_add_rcu(&subflow->node, &msk->conn_list);
 		msk->subflow = NULL;
 		spin_unlock_bh(&msk->conn_list_lock);
 
@@ -881,12 +887,23 @@ static int mptcp_shutdown(struct socket *sock, int how)
 		return kernel_sock_shutdown(msk->subflow, how);
 	}
 
+	/* protect against concurrent mptcp_close(), so that nobody can
+	 * remove entries from the conn list and walking the list breaking
+	 * the RCU critical section is still safe. We need to release the
+	 * RCU lock to call the blocking kernel_sock_shutdown() primitive
+	 * Note: we can't use MPTCP socket lock to protect conn_list changes,
+	 * as we need to update it from the BH via the mptcp_finish_connect()
+	 */
+	lock_sock(sock->sk);
 	rcu_read_lock();
-	mptcp_for_each_subflow(msk, subflow) {
+	list_for_each_entry_rcu(subflow, &msk->conn_list, node) {
+		rcu_read_unlock();
 		pr_debug("conn_list->subflow=%p", subflow);
 		ret = kernel_sock_shutdown(sock_sk(subflow)->sk_socket, how);
+		rcu_read_lock();
 	}
 	rcu_read_unlock();
+	release_sock(sock->sk);
 
 	return ret;
 }
