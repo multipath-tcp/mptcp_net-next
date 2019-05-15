@@ -230,13 +230,16 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63,32));
 }
 
+static u64 get_map_offset(struct subflow_context *subflow)
+{
+	return tcp_sk(sock_sk(subflow))->copied_seq -
+			  subflow->ssn_offset -
+			  subflow->map_subflow_seq;
+}
+
 static u64 get_mapped_dsn(struct subflow_context *subflow)
 {
-	u32 map_offset = (tcp_sk(sock_sk(subflow))->copied_seq -
-			  subflow->ssn_offset -
-			  subflow->map_subflow_seq);
-
-	return subflow->map_seq + map_offset;
+	return subflow->map_seq + get_map_offset(subflow);
 }
 
 static int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
@@ -481,8 +484,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		}
 
 		/* Read mapped data */
-		map_remaining = (ssn - subflow->map_subflow_seq +
-				 subflow->map_data_len);
+		map_remaining = subflow->map_data_len - get_map_offset(subflow);
 		desc.count = min_t(size_t, len - copied, map_remaining);
 		arg.msg = msg;
 		bytes_read = tcp_read_sock(ssk, &desc, mptcp_read_actor);
