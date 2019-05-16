@@ -46,13 +46,13 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	rcu_read_lock();
 	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
 	subflow = hlist_entry(node, struct subflow_context, node);
-	ssk = sock_sk(subflow);
+	ssk = mptcp_subflow_tcp_socket(subflow)->sk;
 	sock_hold(ssk);
 	rcu_read_unlock();
 
 	if (!msg_data_left(msg)) {
 		pr_debug("empty send");
-		ret = sock_sendmsg(sock_sk(subflow)->sk_socket, msg);
+		ret = sock_sendmsg(mptcp_subflow_tcp_socket(subflow), msg);
 		goto put_out;
 	}
 
@@ -301,7 +301,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	rcu_read_lock();
 	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
 	subflow = hlist_entry(node, struct subflow_context, node);
-	ssk = sock_sk(subflow);
+	ssk = mptcp_subflow_tcp_socket(subflow)->sk;
 	sock_hold(ssk);
 	rcu_read_unlock();
 
@@ -526,7 +526,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 
 	list_for_each_entry_safe(subflow, tmp, &list, node) {
 		pr_debug("conn_list->subflow=%p", subflow);
-		sock_release(sock_sk(subflow)->sk_socket);
+		sock_release(mptcp_subflow_tcp_socket(subflow));
 	};
 
 	sock_orphan(sk);
@@ -791,11 +791,11 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 	rcu_read_lock();
 	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
 	subflow = hlist_entry(node, struct subflow_context, node);
-	ssk = sock_sk(subflow);
+	ssk = mptcp_subflow_tcp_socket(subflow)->sk;
 	sock_hold(ssk);
 	rcu_read_unlock();
 
-	ret = inet_getname(sock_sk(subflow)->sk_socket, uaddr, peer);
+	ret = inet_getname(mptcp_subflow_tcp_socket(subflow), uaddr, peer);
 	sock_put(ssk);
 	return ret;
 }
@@ -845,7 +845,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	rcu_read_lock();
 	node = rcu_dereference(hlist_first_rcu(&msk->conn_list));
 	subflow = hlist_entry(node, struct subflow_context, node);
-	ssk = sock_sk(subflow);
+	ssk = mptcp_subflow_tcp_socket(subflow)->sk;
 	sock_hold(ssk);
 	rcu_read_unlock();
 
@@ -877,9 +877,9 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	lock_sock(sock->sk);
 	rcu_read_lock();
 	list_for_each_entry_rcu(subflow, &msk->conn_list, node) {
-		rcu_read_unlock();
 		pr_debug("conn_list->subflow=%p", subflow);
-		ret = kernel_sock_shutdown(sock_sk(subflow)->sk_socket, how);
+		rcu_read_unlock();
+		ret = kernel_sock_shutdown(mptcp_subflow_tcp_socket(subflow), how);
 		rcu_read_lock();
 	}
 	rcu_read_unlock();
