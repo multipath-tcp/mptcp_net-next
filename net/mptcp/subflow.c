@@ -124,6 +124,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 static struct inet_connection_sock_af_ops subflow_specific;
 
 static struct subflow_context *subflow_create_ctx(struct sock *sk,
+						  struct socket *sock,
 						  gfp_t priority)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -137,7 +138,8 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk,
 
 	pr_debug("subflow=%p", ctx);
 
-	ctx->sk = sk;
+	/* might be NULL */
+	ctx->tcp_sock = sock;
 
 	return ctx;
 }
@@ -149,7 +151,7 @@ static int subflow_ulp_init(struct sock *sk)
 	struct subflow_context *ctx;
 	int err = 0;
 
-	ctx = subflow_create_ctx(sk, GFP_KERNEL);
+	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto out;
@@ -177,7 +179,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct subflow_context *subflow = subflow_create_ctx(newsk, priority);
+	struct subflow_context *subflow = subflow_create_ctx(newsk, NULL,
+							     priority);
 
 	if (!subflow)
 		return;
