@@ -16,7 +16,8 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
-static struct subflow_context *subflow_create_ctx(struct sock *sk)
+static struct subflow_context *subflow_create_ctx(struct sock *sk,
+						  struct socket *sock)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct subflow_context *ctx;
@@ -28,7 +29,8 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	icsk->icsk_ulp_data = ctx;
-	ctx->sk = sk;
+	/* might be NULL */
+	ctx->tcp_sock = sock;
 
 	return ctx;
 }
@@ -39,7 +41,7 @@ static int subflow_ulp_init(struct sock *sk)
 	struct subflow_context *ctx;
 	int err = 0;
 
-	ctx = subflow_create_ctx(sk);
+	ctx = subflow_create_ctx(sk, sk->sk_socket);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto out;
