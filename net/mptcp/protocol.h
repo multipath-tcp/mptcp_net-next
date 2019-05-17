@@ -77,8 +77,8 @@ struct subflow_context {
 		conn_finished : 1,
 		use_checksum : 1;
 
-	struct  sock *sk;       /* underlying tcp_sock */
-	struct  sock *conn;     /* parent mptcp_sock */
+	struct  socket *tcp_sock;  /* underlying tcp_sock */
+	struct  sock *conn;        /* parent mptcp_sock */
 };
 
 static inline struct subflow_context *subflow_ctx(const struct sock *sk)
@@ -87,9 +87,9 @@ static inline struct subflow_context *subflow_ctx(const struct sock *sk)
 	return (struct subflow_context *)icsk->icsk_ulp_data;
 }
 
-static inline struct sock *sock_sk(const struct subflow_context *subflow)
+static inline struct socket *mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
 {
-	return subflow->sk;
+	return subflow->tcp_sock;
 }
 
 int subflow_init(void);
