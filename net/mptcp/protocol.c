@@ -192,6 +192,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	msk = mptcp_sk(new_mptcp_sock->sk);
 	pr_debug("new msk=%p", msk);
 	subflow->conn = new_mptcp_sock->sk;
+	subflow->tcp_sock = new_sock;
 
 	if (subflow->mp_capable) {
 		msk->local_key = subflow->local_key;
