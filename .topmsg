@@ -14,3 +14,4 @@ The resulting socket is simply a wrapper around a single regular TCP
 socket, without any of the MPTCP protocol implemented over the wire.
 
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
