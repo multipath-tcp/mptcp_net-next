@@ -236,6 +236,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct subflow_context *new_ctx;
 
 	old_ctx = inet_csk(newsk)->icsk_ulp_data;
+
+	/* newsk->sk_socket is NULL at this point */
 	new_ctx = subflow_create_ctx(newsk, NULL, priority);
 
 	if (!new_ctx)
