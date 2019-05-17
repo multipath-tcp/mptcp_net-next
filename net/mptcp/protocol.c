@@ -541,7 +541,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	list_for_each_entry_safe(subflow, tmp, &list, node) {
 		pr_debug("conn_list->subflow=%p", subflow);
 		sock_release(mptcp_subflow_tcp_socket(subflow));
-	};
+	}
 
 	sock_orphan(sk);
 	sock_put(sk);
