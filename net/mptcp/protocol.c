@@ -27,7 +27,7 @@ static inline bool before64(__u64 seq1, __u64 seq2)
 
 static bool mptcp_subflow_hold(struct subflow_context *subflow)
 {
-	struct sock *sk = sock_sk(subflow);
+	struct sock *sk = mptcp_subflow_tcp_socket(subflow)->sk;
 
 	return refcount_inc_not_zero(&sk->sk_refcnt);
 }
@@ -40,7 +40,7 @@ static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 	mptcp_for_each_subflow(msk, subflow) {
 		if (mptcp_subflow_hold(subflow)) {
 			rcu_read_unlock();
-			return sock_sk(subflow);
+			return mptcp_subflow_tcp_socket(subflow)->sk;
 		}
 	}
 
@@ -232,9 +232,9 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 
 static u64 get_map_offset(struct subflow_context *subflow)
 {
-	return tcp_sk(sock_sk(subflow))->copied_seq -
-			  subflow->ssn_offset -
-			  subflow->map_subflow_seq;
+	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
+		      subflow->ssn_offset -
+		      subflow->map_subflow_seq;
 }
 
 static u64 get_mapped_dsn(struct subflow_context *subflow)
@@ -597,7 +597,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 
 	list_for_each_entry_safe(subflow, tmp, &list, node) {
 		pr_debug("conn_list->subflow=%p", subflow);
-		sock_release(sock_sk(subflow)->sk_socket);
+		sock_release(mptcp_subflow_tcp_socket(subflow));
 	};
 
 	sock_orphan(sk);
@@ -652,6 +652,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
 		subflow->conn = new_mptcp_sock->sk;
+		subflow->tcp_sock = new_sock;
 	} else {
 		msk->subflow = new_sock;
 	}
@@ -930,8 +931,8 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 		if (!tmp)
 			break;
 
-		ret |= tcp_poll(file, sock_sk(tmp)->sk_socket, wait);
-		sock_put(sock_sk(tmp));
+		ret |= tcp_poll(file, mptcp_subflow_tcp_socket(tmp), wait);
+		sock_put(mptcp_subflow_tcp_socket(tmp)->sk);
 	}
 
 	return ret;
@@ -960,9 +961,9 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	lock_sock(sock->sk);
 	rcu_read_lock();
 	list_for_each_entry_rcu(subflow, &msk->conn_list, node) {
-		rcu_read_unlock();
 		pr_debug("conn_list->subflow=%p", subflow);
-		ret = kernel_sock_shutdown(sock_sk(subflow)->sk_socket, how);
+		rcu_read_unlock();
+		ret = kernel_sock_shutdown(mptcp_subflow_tcp_socket(subflow), how);
 		rcu_read_lock();
 	}
 	rcu_read_unlock();
