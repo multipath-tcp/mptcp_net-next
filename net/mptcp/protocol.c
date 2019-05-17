@@ -533,6 +533,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	struct socket *ssk = NULL;
 	struct list_head list;
 
+	inet_sk_state_store(sk, TCP_CLOSE);
+
 	spin_lock_bh(&msk->conn_list_lock);
 	if (msk->subflow) {
 		ssk = msk->subflow;
@@ -556,6 +558,9 @@ static void mptcp_close(struct sock *sk, long timeout)
 		pr_debug("conn_list->subflow=%p", subflow);
 		sock_release(sock_sk(subflow)->sk_socket);
 	};
+
+	sock_orphan(sk);
+	sock_put(sk);
 }
 
 static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
