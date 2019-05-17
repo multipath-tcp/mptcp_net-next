@@ -172,8 +172,11 @@ tg_push_tree() {
 	tg push -r "${GIT_REMOTE_GERRITHUB_NAME}"
 }
 
-tg_export() {
+tg_export() { local current_date tag
 	git_checkout "${TG_TOPIC_TOP}"
+
+	current_date=$(date +%Y%m%dT%H%M%S)
+	tag="${TG_EXPORT_BRANCH}/${current_date}"
 
 	tg export --linearize --force "${TG_EXPORT_BRANCH}"
 	git push --force "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_EXPORT_BRANCH}"
@@ -181,6 +184,10 @@ tg_export() {
 	# also send to Github: because we rewrite the history, Gerrithub stops the
 	# sync with Github for this branch.
 	git push --force "${GIT_REMOTE_GITHUB_URL}" "${TG_EXPORT_BRANCH}"
+
+	# send a tag to Github to keep previous commits: we might have refs to them
+	git tag "${tag}" "${TG_EXPORT_BRANCH}"
+	git push "${GIT_REMOTE_GITHUB_URL}" "${tag}"
 }
 
 tg_for_review() { local tg_conflict_files
