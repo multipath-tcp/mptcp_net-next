@@ -13,7 +13,9 @@
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx)
 {
+	struct mptcp_options_received *mp_opt;
 	u8 subtype = *ptr >> 4;
+	int expected_opsize;
 
 	switch (subtype) {
 	/* MPTCPOPT_MP_CAPABLE
@@ -74,7 +76,74 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
-		opt_rx->mptcp.dss = 1;
+		mp_opt = &opt_rx->mptcp;
+		mp_opt->dss = 1;
+		ptr++;
+
+		mp_opt->flags = (*ptr++) & MPTCP_DSS_FLAG_MASK;
+		mp_opt->data_fin = (mp_opt->flags & MPTCP_DSS_DATA_FIN) != 0;
+		mp_opt->dsn64 = (mp_opt->flags & MPTCP_DSS_DSN64) != 0;
+		mp_opt->use_map = (mp_opt->flags & MPTCP_DSS_HAS_MAP) != 0;
+		mp_opt->ack64 = (mp_opt->flags & MPTCP_DSS_ACK64) != 0;
+		mp_opt->use_ack = (mp_opt->flags & MPTCP_DSS_HAS_ACK);
+
+		pr_debug("data_fin=%d dsn64=%d use_map=%d ack64=%d use_ack=%d",
+			 mp_opt->data_fin, mp_opt->dsn64,
+			 mp_opt->use_map, mp_opt->ack64,
+			 mp_opt->use_ack);
+
+		expected_opsize = TCPOLEN_MPTCP_DSS_BASE;
+
+		if (mp_opt->use_ack) {
+			if (mp_opt->ack64)
+				expected_opsize += TCPOLEN_MPTCP_DSS_ACK64;
+			else
+				expected_opsize += TCPOLEN_MPTCP_DSS_ACK32;
+
+			if (opsize < expected_opsize)
+				break;
+
+			if (mp_opt->ack64) {
+				mp_opt->data_ack = get_unaligned_be64(ptr);
+				ptr += 8;
+			} else {
+				mp_opt->data_ack = get_unaligned_be32(ptr);
+				ptr += 4;
+			}
+
+			pr_debug("data_ack=%llu", mp_opt->data_ack);
+		}
+
+		if (mp_opt->use_map) {
+			if (mp_opt->dsn64)
+				expected_opsize += TCPOLEN_MPTCP_DSS_MAP64;
+			else
+				expected_opsize += TCPOLEN_MPTCP_DSS_MAP32;
+
+			if (opsize < expected_opsize)
+				break;
+
+			if (mp_opt->dsn64) {
+				mp_opt->data_seq = get_unaligned_be64(ptr);
+				ptr += 8;
+			} else {
+				mp_opt->data_seq = get_unaligned_be32(ptr);
+				ptr += 4;
+			}
+
+			mp_opt->subflow_seq = get_unaligned_be32(ptr);
+			ptr += 4;
+
+			mp_opt->data_len = get_unaligned_be16(ptr);
+			ptr += 2;
+
+			/* Checksum not currently supported */
+			mp_opt->checksum = 0;
+
+			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u ck=%u",
+				 mp_opt->data_seq, mp_opt->subflow_seq,
+				 mp_opt->data_len, mp_opt->checksum);
+		}
 		break;
 
 	/* MPTCPOPT_ADD_ADDR
@@ -230,23 +299,31 @@ bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		}
 	}
 
-	if (mpext && mpext->use_ack) {
-		ack_size = TCPOLEN_MPTCP_DSS_ACK64;
+	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
 
-		/* Add kind/length/subtype/flag overhead if mapping not populated */
-		if (dss_size == 0)
-			ack_size += TCPOLEN_MPTCP_DSS_BASE;
+	/* Add kind/length/subtype/flag overhead if mapping not populated */
+	if (dss_size == 0)
+		ack_size += TCPOLEN_MPTCP_DSS_BASE;
 
-		if (ack_size <= remaining) {
-			dss_size += ack_size;
+	if (ack_size <= remaining) {
+		struct mptcp_sock *msk;
 
-			opts->ext_copy.data_ack = mpext->data_ack;
-			opts->ext_copy.ack64 = 1;
-			opts->ext_copy.use_ack = 1;
+		dss_size += ack_size;
+
+		msk = mptcp_sk(subflow_ctx(sk)->conn);
+		if (msk) {
+			opts->ext_copy.data_ack = atomic64_read(&msk->ack_seq);
 		} else {
-			opts->ext_copy.use_ack = 0;
-			WARN(1, "MPTCP: Ack dropped");
+			crypto_key_sha1(subflow_ctx(sk)->remote_key, NULL,
+					&opts->ext_copy.data_ack);
+			opts->ext_copy.data_ack++;
 		}
+
+		opts->ext_copy.ack64 = 1;
+		opts->ext_copy.use_ack = 1;
+	} else {
+		opts->ext_copy.use_ack = 0;
+		WARN(1, "MPTCP: Ack dropped");
 	}
 
 	*size = ALIGN(dss_size, 4);
@@ -269,6 +346,42 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 		return true;
 	}
 	return false;
+}
+
+void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+		      struct tcp_options_received *opt_rx)
+{
+	struct mptcp_options_received *mp_opt;
+	struct mptcp_ext *mpext;
+
+	mp_opt = &opt_rx->mptcp;
+
+	if (!mp_opt->dss)
+		return;
+
+	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
+	if (!mpext)
+		return;
+
+	memset(mpext, 0, sizeof(*mpext));
+
+	if (mp_opt->use_map) {
+		mpext->data_seq = mp_opt->data_seq;
+		mpext->subflow_seq = mp_opt->subflow_seq;
+		mpext->data_len = mp_opt->data_len;
+		mpext->checksum = mp_opt->checksum;
+		mpext->use_map = 1;
+		mpext->dsn64 = mp_opt->dsn64;
+		mpext->use_checksum = mp_opt->use_checksum;
+	}
+
+	if (mp_opt->use_ack) {
+		mpext->data_ack = mp_opt->data_ack;
+		mpext->use_ack = 1;
+		mpext->ack64 = mp_opt->ack64;
+	}
+
+	mpext->data_fin = mp_opt->data_fin;
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
@@ -309,6 +422,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		}
 
 		if (mpext->use_map) {
+			pr_debug("Updating DSS length and flags for map");
 			len += TCPOLEN_MPTCP_DSS_MAP64;
 
 			if (mpext->use_checksum)

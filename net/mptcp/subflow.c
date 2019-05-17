@@ -67,6 +67,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 		pr_debug("remote_key=%llu", subflow_req->remote_key);
 		token_new_request(req, skb);
+		pr_debug("syn seq=%u", TCP_SKB_CB(skb)->seq);
+		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -84,6 +86,11 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		pr_debug("remote_key=%llu", subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
 		subflow->conn_finished = 1;
+
+		if (skb) {
+			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
+			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
+		}
 	}
 }
 
@@ -152,6 +159,20 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 static struct inet_connection_sock_af_ops subflow_specific;
 
+static void subflow_data_ready(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct sock *parent = subflow->conn;
+
+	pr_debug("sk=%p", sk);
+	subflow->tcp_sk_data_ready(sk);
+
+	if (parent) {
+		pr_debug("parent=%p", parent);
+		parent->sk_data_ready(parent);
+	}
+}
+
 static struct subflow_context *subflow_create_ctx(struct sock *sk,
 						  gfp_t priority)
 {
@@ -188,7 +209,9 @@ static int subflow_ulp_init(struct sock *sk)
 
 	tp->is_mptcp = 1;
 	icsk->icsk_af_ops = &subflow_specific;
+	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	ctx->use_checksum = 0;
+	sk->sk_data_ready = subflow_data_ready;
 out:
 	return err;
 }
@@ -207,22 +230,29 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct subflow_context *subflow = subflow_create_ctx(newsk, priority);
+	struct subflow_context *old_ctx;
+	struct subflow_context *new_ctx;
 
-	if (!subflow)
+	old_ctx = inet_csk(newsk)->icsk_ulp_data;
+	new_ctx = subflow_create_ctx(newsk, priority);
+
+	if (!new_ctx)
 		return;
 
-	subflow->conn = NULL;
-	subflow->conn_finished = 1;
-	subflow->use_checksum = 0;
+	new_ctx->conn = NULL;
+	new_ctx->conn_finished = 1;
+	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
+	new_ctx->use_checksum = old_ctx->use_checksum;
 
 	if (subflow_req->mp_capable) {
-		subflow->mp_capable = 1;
-		subflow->fourth_ack = 1;
-		subflow->remote_key = subflow_req->remote_key;
-		subflow->local_key = subflow_req->local_key;
-		subflow->token = subflow_req->token;
-		pr_debug("token=%u", subflow->token);
+		new_ctx->mp_capable = 1;
+		new_ctx->fourth_ack = 1;
+		new_ctx->remote_key = subflow_req->remote_key;
+		new_ctx->local_key = subflow_req->local_key;
+		new_ctx->token = subflow_req->token;
+		new_ctx->ssn_offset = subflow_req->ssn_offset;
+		new_ctx->idsn = subflow_req->idsn;
+		pr_debug("token=%u", new_ctx->token);
 	}
 }
 
