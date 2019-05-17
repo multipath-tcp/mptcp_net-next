@@ -179,6 +179,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	/* newsk->sk_socket is NULL at this point */
 	struct subflow_context *subflow = subflow_create_ctx(newsk, NULL,
 							     priority);
 
