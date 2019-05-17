@@ -59,10 +59,15 @@ static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	inet_sk_state_store(sk, TCP_CLOSE);
+
 	if (msk->subflow) {
 		pr_debug("subflow=%p", msk->subflow->sk);
 		sock_release(msk->subflow);
 	}
+
+	sock_orphan(sk);
+	sock_put(sk);
 }
 
 static int mptcp_connect(struct sock *sk, struct sockaddr *saddr, int len)
