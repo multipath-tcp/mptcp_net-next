@@ -158,9 +158,9 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 
 static u64 get_map_offset(struct subflow_context *subflow)
 {
-	return tcp_sk(sock_sk(subflow))->copied_seq -
-			  subflow->ssn_offset -
-			  subflow->map_subflow_seq;
+	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
+		      subflow->ssn_offset -
+		      subflow->map_subflow_seq;
 }
 
 static u64 get_mapped_dsn(struct subflow_context *subflow)
@@ -581,6 +581,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
 		subflow->conn = new_mptcp_sock->sk;
+		subflow->tcp_sock = new_sock;
 	} else {
 		msk->subflow = new_sock;
 	}
