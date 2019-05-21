@@ -31,6 +31,17 @@ config X86_64
 	select SWIOTLB
 	select ARCH_HAS_SYSCALL_WRAPPER
 
+config FORCE_DYNAMIC_FTRACE
+	def_bool y
+	depends on X86_32
+	depends on FUNCTION_TRACER
+	select DYNAMIC_FTRACE
+	help
+	 We keep the static function tracing (!DYNAMIC_FTRACE) around
+	 in order to test the non static function tracing in the
+	 generic code, as other architectures still use it. But we
+	 only need to keep it around for x86_64. No need to keep it
+	 for x86_32. For x86_32, force DYNAMIC_FTRACE. 
 #
 # Arch settings
 #
@@ -259,9 +270,6 @@ config GENERIC_BUG
 config GENERIC_BUG_RELATIVE_POINTERS
 	bool
 
-config GENERIC_HWEIGHT
-	def_bool y
-
 config ARCH_MAY_HAVE_PC_FDC
 	def_bool y
 	depends on ISA_DMA_API
@@ -304,9 +312,6 @@ config ZONE_DMA32
 
 config AUDIT_ARCH
 	def_bool y if X86_64
-
-config ARCH_SUPPORTS_OPTIMIZED_INLINING
-	def_bool y
 
 config ARCH_SUPPORTS_DEBUG_PAGEALLOC
 	def_bool y
