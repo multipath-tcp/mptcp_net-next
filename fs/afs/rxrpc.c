@@ -188,7 +188,7 @@ void afs_put_call(struct afs_call *call)
 		if (call->type->destructor)
 			call->type->destructor(call);
 
-		afs_put_server(call->net, call->cm_server);
+		afs_put_server(call->net, call->server);
 		afs_put_cb_interest(call->net, call->cbi);
 		afs_put_addrlist(call->alist);
 		kfree(call->request);
@@ -417,6 +417,7 @@ void afs_make_call(struct afs_addr_cursor *ac, struct afs_call *call, gfp_t gfp)
 					  afs_wake_up_async_call :
 					  afs_wake_up_call_waiter),
 					 call->upgrade,
+					 call->intr,
 					 call->debug_id);
 	if (IS_ERR(rxcall)) {
 		ret = PTR_ERR(rxcall);
@@ -425,6 +426,10 @@ void afs_make_call(struct afs_addr_cursor *ac, struct afs_call *call, gfp_t gfp)
 	}
 
 	call->rxcall = rxcall;
+
+	if (call->max_lifespan)
+		rxrpc_kernel_set_max_life(call->net->socket, rxcall,
+					  call->max_lifespan);
 
 	/* send the request */
 	iov[0].iov_base	= call->request;
@@ -529,11 +534,11 @@ static void afs_deliver_to_call(struct afs_call *call)
 			return;
 		}
 
-		if (call->want_reply_time &&
+		if (!call->have_reply_time &&
 		    rxrpc_kernel_get_reply_time(call->net->socket,
 						call->rxcall,
 						&call->reply_time))
-			call->want_reply_time = false;
+			call->have_reply_time = true;
 
 		ret = call->type->deliver(call);
 		state = READ_ONCE(call->state);
@@ -648,7 +653,7 @@ long afs_wait_for_call_to_complete(struct afs_call *call,
 			break;
 		}
 
-		if (timeout == 0 &&
+		if (call->intr && timeout == 0 &&
 		    life == last_life && signal_pending(current)) {
 			if (stalled)
 				break;
@@ -691,10 +696,9 @@ long afs_wait_for_call_to_complete(struct afs_call *call,
 	ret = ac->error;
 	switch (ret) {
 	case 0:
-		if (call->ret_reply0) {
-			ret = (long)call->reply[0];
-			call->reply[0] = NULL;
-		}
+		ret = call->ret0;
+		call->ret0 = 0;
+
 		/* Fall through */
 	case -ECONNABORTED:
 		ac->responded = true;
