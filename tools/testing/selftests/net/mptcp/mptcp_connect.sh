@@ -45,8 +45,10 @@ for i in 1 2 3 4;do
 	ip -net ns$i link set lo up
 done
 
-#  ns1            ns2                 ns3             ns4
-# ns1eth2    ns2eth1 ns2eth3  ns3eth2   ns3eth4   ns4eth3
+#  ns1              ns2                    ns3                     ns4
+# ns1eth2    ns2eth1   ns2eth3      ns3eth2   ns3eth4       ns4eth3
+#                           - drop 1% ->            reorder 25%
+#                           <- TSO off -
 
 ip link add ns1eth2 netns ns1 type veth peer name ns2eth1 netns ns2
 ip link add ns2eth3 netns ns2 type veth peer name ns3eth2 netns ns3
@@ -62,6 +64,7 @@ ip -net ns2 link set ns2eth1 up
 ip -net ns2 addr add 10.0.2.1/24 dev ns2eth3
 ip -net ns2 link set ns2eth3 up
 ip -net ns2 route add default via 10.0.2.2
+tc -net ns2 qdisc add dev ns2eth3 root netem loss random 1
 ip netns exec ns2 sysctl -q net.ipv4.ip_forward=1
 
 ip -net ns3 addr add 10.0.2.2/24 dev ns3eth2
@@ -70,6 +73,8 @@ ip -net ns3 link set ns3eth2 up
 ip -net ns3 addr add 10.0.3.2/24 dev ns3eth4
 ip -net ns3 link set ns3eth4 up
 ip -net ns3 route add default via 10.0.2.1
+tc -net ns3 qdisc add dev ns3eth4 root netem delay 10ms reorder 25% 50% gap 5
+ip netns exec ns3 ethtook -K ns3eth2 tso off
 ip netns exec ns3 sysctl -q net.ipv4.ip_forward=1
 
 ip -net ns4 addr add 10.0.3.1/24 dev ns4eth3
