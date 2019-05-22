@@ -802,6 +802,15 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 				opts->options |= OPTION_MPTCP;
 				size += opt_size;
 			}
+		} else {
+			unsigned int dss_size;
+
+			if (mptcp_established_options_dss(sk, skb, &dss_size,
+							  remaining,
+							  &opts->mptcp)) {
+				opts->options |= OPTION_MPTCP;
+				size += dss_size;
+			}
 		}
 	}
 
