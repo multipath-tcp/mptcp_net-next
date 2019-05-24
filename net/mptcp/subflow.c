@@ -240,23 +240,15 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 {
 	subflow_ops->obj_size = sizeof(struct subflow_request_sock);
-	subflow_ops->slab_name = NULL;
-	subflow_ops->slab = NULL;
-
-	subflow_ops->slab_name = kasprintf(GFP_KERNEL, "request_sock_subflow");
-	if (!subflow_ops->slab_name)
-		return -ENOMEM;
+	subflow_ops->slab_name = "request_sock_subflow";
 
 	subflow_ops->slab = kmem_cache_create(subflow_ops->slab_name,
 					      subflow_ops->obj_size, 0,
 					      SLAB_ACCOUNT |
 					      SLAB_TYPESAFE_BY_RCU,
 					      NULL);
-
-	if (!subflow_ops->slab) {
-		kfree(subflow_ops->slab_name);
+	if (!subflow_ops->slab)
 		return -ENOMEM;
-	}
 
 	subflow_ops->destructor = subflow_req_destructor;
 
@@ -287,6 +279,7 @@ int subflow_init(void)
 void subflow_exit(void)
 {
 	tcp_unregister_ulp(&subflow_ulp_ops);
+	kmem_cache_destroy(subflow_request_sock_ops.slab);
 }
 
 MODULE_LICENSE("GPL");
