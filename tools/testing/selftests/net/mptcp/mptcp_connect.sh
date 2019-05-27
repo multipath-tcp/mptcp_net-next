@@ -74,7 +74,7 @@ ip -net ns3 addr add 10.0.3.2/24 dev ns3eth4
 ip -net ns3 link set ns3eth4 up
 ip -net ns3 route add default via 10.0.2.1
 tc -net ns3 qdisc add dev ns3eth4 root netem delay 10ms reorder 25% 50% gap 5
-ip netns exec ns3 ethtook -K ns3eth2 tso off
+ip netns exec ns3 ethtool -K ns3eth2 tso off
 ip netns exec ns3 sysctl -q net.ipv4.ip_forward=1
 
 ip -net ns4 addr add 10.0.3.1/24 dev ns4eth3
