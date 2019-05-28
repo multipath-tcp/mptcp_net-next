@@ -2,6 +2,9 @@
 #
 # Generate a Dockerfile, build it and run update-tg-tree.sh script
 
+# We should manage all errors in this script
+set -e
+
 SCRIPT="${1:-./update-tg-tree.sh}"
 if ! test -f "${SCRIPT}"; then
     echo "Unable to execute ${SCRIPT} from ${PWD}"
