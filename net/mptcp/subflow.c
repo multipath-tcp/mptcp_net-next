@@ -222,6 +222,11 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	return 0;
 }
 
+static void subflow_ops_exit(void)
+{
+	kmem_cache_destroy(subflow_request_sock_ops.slab);
+}
+
 int subflow_init(void)
 {
 	int ret;
@@ -239,11 +244,15 @@ int subflow_init(void)
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 
-	return tcp_register_ulp(&subflow_ulp_ops);
+	ret = tcp_register_ulp(&subflow_ulp_ops);
+	if (ret != 0)
+		subflow_ops_exit();
+
+	return ret;
 }
 
 void subflow_exit(void)
 {
 	tcp_unregister_ulp(&subflow_ulp_ops);
-	kmem_cache_destroy(subflow_request_sock_ops.slab);
+	subflow_ops_exit();
 }
