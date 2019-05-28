@@ -23,7 +23,8 @@ cat <<EOF > "${DOCKERFILE}"
 FROM ubuntu:latest
 
 # Use the same rights as the launcher
-RUN useradd -ms /bin/bash -u ${UID} -U ${USER} -d ${HOME}
+RUN mkdir -p "$(dirname "${HOME}")" && \
+    useradd -ms /bin/bash -u "${UID}" -U "${USER}" -d "${HOME}"
 
 # dependencies for the script
 RUN apt-get update && \
