@@ -181,7 +181,6 @@ void mptcp_init(void)
 	if (err)
 		goto subflow_failed;
 
-
 	err = proto_register(&mptcp_prot, 1);
 	if (err)
 		goto proto_failed;
