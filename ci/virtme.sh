@@ -20,13 +20,17 @@ SELFTESTS_DIR="tools/testing/selftests/net/mptcp"
 
 "${VIRTME_CONFIGKERNEL}" --arch=x86_64 --defconfig
 
-# Extra options are needed for MPTCP kselftests
-echo | scripts/config -e MPTCP -e VETH
+# Extra options are needed for MPTCP kselftests and debug
+echo | scripts/config -e MPTCP -e VETH -e NET_SCH_NETEM \
+                      -e KASAN -e KASAN_OUTLINE -d TEST_KASAN \
+                      -e PROVE_LOCKING -d DEBUG_LOCKDEP
 
 make -j"$(nproc)" -l"$(nproc)"
 make -j"$(nproc)" -l"$(nproc)" headers_install
 
 OUTPUT_SCRIPT=$(mktemp --tmpdir="${PWD}")
+OUTPUT_VIRTME=$(mktemp --tmpdir="${PWD}")
+
 mkdir -p "${VIRTME_SCRIPT_DIR}"
 cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
@@ -44,7 +48,7 @@ if [ "${1}" = "manual" ]; then
         exit
 fi
 
-trap 'rm -f "${OUTPUT_SCRIPT}"' EXIT
+trap 'rm -f "${OUTPUT_SCRIPT}" "${OUTPUT_VIRTME}"' EXIT
 
 cat <<EOF > "${VIRTME_RUN_SCRIPT}"
 #! /bin/bash -x
@@ -71,9 +75,12 @@ chmod +x "${VIRTME_RUN_EXPECT}"
 
 # for an unknown reason, we cannot use "--script-sh", qemu is not started, no
 # debug. As a workaround, we use expect
-"${VIRTME_RUN_EXPECT}"
+"${VIRTME_RUN_EXPECT}" | tee "${OUTPUT_VIRTME}"
 
-if grep -q "^ok [0-9]\+ selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
+if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
+        echo "Call Trace found"
+        exit 2
+elif grep -q "^ok [0-9]\+ selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
         echo "Selftests OK"
         exit 0
 else
