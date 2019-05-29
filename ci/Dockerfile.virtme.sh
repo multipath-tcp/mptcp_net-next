@@ -33,10 +33,12 @@ RUN mkdir -p "$(dirname "${HOME}")" && \
 
 # dependencies for the script
 RUN apt-get update && \
-    apt-get install -y build-essential libncurses5-dev gcc libssl-dev bc bison \
-                       libelf-dev flex git curl tar hashalot qemu-kvm sudo \
-                       python3 python3-pkg-resources busybox iproute2 \
-                       tcpdump iputils-ping ethtool klibc-utils && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends \
+                    build-essential libncurses5-dev gcc libssl-dev bc bison \
+                    libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
+                    python3 python3-pkg-resources busybox iproute2 tcpdump \
+                    iputils-ping ethtool klibc-utils && \
     apt-get clean
 
 # virtme and sudo rights (for kvm)

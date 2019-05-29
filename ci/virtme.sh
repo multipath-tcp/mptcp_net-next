@@ -12,6 +12,9 @@ VIRTME_RUN_OPTS=(--net --balloon --memory 512M --kdir "${PWD}" --rwdir "${PWD}" 
 
 VIRTME_SCRIPT_DIR="patches/virtme"
 VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/selftests.sh"
+VIRTME_SCRIPT_END="__VIRTME_END__"
+VIRTME_RUN_SCRIPT="${VIRTME_SCRIPT_DIR}/virtme.sh"
+VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
 
 SELFTESTS_DIR="tools/testing/selftests/net/mptcp"
 
@@ -31,8 +34,8 @@ make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${OUTPUT_SCRIPT}"
 # to avoid leaving files owned by root
 find . -user root -exec rm -rf "{}" \;
+echo "${VIRTME_SCRIPT_END}"
 EOF
-
 chmod +x "${VIRTME_SCRIPT}"
 
 # allow to launch anything else
@@ -43,17 +46,38 @@ fi
 
 trap 'rm -f "${OUTPUT_SCRIPT}"' EXIT
 
+cat <<EOF > "${VIRTME_RUN_SCRIPT}"
+#! /bin/bash -x
+sudo "${VIRTME_RUN}" ${VIRTME_RUN_OPTS[@]} 2>&1
+EOF
+chmod +x "${VIRTME_RUN_SCRIPT}"
+
+cat <<EOF > "${VIRTME_RUN_EXPECT}"
+#!/usr/bin/expect -f
+
+set timeout 900
+
+spawn "${VIRTME_RUN_SCRIPT}"
+
+expect "virtme-init: console is ttyS0\r"
+send -- "${VIRTME_SCRIPT}\r"
+
+expect "${VIRTME_SCRIPT_END}\r"
+send -- "/usr/lib/klibc/bin/poweroff\r"
+
+expect eof
+EOF
+chmod +x "${VIRTME_RUN_EXPECT}"
+
 # for an unknown reason, we cannot use "--script-sh", qemu is not started, no
-# debug. As a workaround, we wait for 10 seconds before launching the script
-# then we stop.
-{ sleep 10; echo "${VIRTME_SCRIPT}"; echo /usr/lib/klibc/bin/poweroff; } | \
-        sudo "${VIRTME_RUN}" "${VIRTME_RUN_OPTS[@]}"
+# debug. As a workaround, we use expect
+"${VIRTME_RUN_EXPECT}"
 
 if grep -q "^ok [0-9]\+ selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
         echo "Selftests OK"
         exit 0
 else
         echo "Error when launching selftests"
-        tail -n 20 "${OUTPUT_SCRIPT}"
+        grep -A 9999 "^# selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"
         exit 1
 fi
