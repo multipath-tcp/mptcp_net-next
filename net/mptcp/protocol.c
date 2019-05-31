@@ -110,28 +110,15 @@ static struct inet_protosw mptcp_protosw = {
 	.ops		= &inet_stream_ops,
 };
 
-static int __init mptcp_init(void)
+void mptcp_init(void)
 {
 	int err;
 
 	err = proto_register(&mptcp_prot, 1);
 	if (err)
-		return err;
+		return;
 
 	inet_register_protosw(&mptcp_protosw);
 
-	return 0;
+	return;
 }
-
-static void __exit mptcp_exit(void)
-{
-	inet_unregister_protosw(&mptcp_protosw);
-	proto_unregister(&mptcp_prot);
-}
-
-module_init(mptcp_init);
-module_exit(mptcp_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_ALIAS_NET_PF_PROTO(PF_INET, IPPROTO_MPTCP);
-MODULE_ALIAS_NET_PF_PROTO(PF_INET6, IPPROTO_MPTCP);
