@@ -1,0 +1,8 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Prevent coalesce/collapse when skb has MPTCP extensions
+
+The MPTCP extension data needs to be preserved as it passes through the TCP
+stack. Make sure that these skbs are not appended to others during coalesce or
+collapse, so the data remains associated with the payload of the given skb.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
