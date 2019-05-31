@@ -1,0 +1,6 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Add MPTCP to skb extensions
+
+Add enum value for MPTCP and update config dependencies
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
