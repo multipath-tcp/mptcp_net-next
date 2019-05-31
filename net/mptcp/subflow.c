@@ -247,5 +247,3 @@ void subflow_exit(void)
 	tcp_unregister_ulp(&subflow_ulp_ops);
 	kmem_cache_destroy(subflow_request_sock_ops.slab);
 }
-
-MODULE_LICENSE("GPL");
