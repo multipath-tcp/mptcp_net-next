@@ -96,6 +96,11 @@ tg_update_tree() {
 	# fetch and update-ref will be done
 	tg remote "${GIT_REMOTE_GERRITHUB_NAME}" --populate
 
+	# do that twice (if there is no error) just in case the base and the
+	# rest of the tree were not sync. It can happen if the tree has been
+	# updated by someone else and after, the base (only) has been updated.
+	# At the beginning of this script, we force an update of the base.
+	tg_update
 	tg_update
 }
 
