@@ -1138,12 +1138,12 @@ qed_llh_add_protocol_filter(struct qed_dev *cdev,
 	if (rc)
 		goto err;
 
+	rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
+	if (rc)
+		goto err;
+
 	/* Configure the LLH only in case of a new the filter */
 	if (ref_cnt == 1) {
-		rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
-		if (rc)
-			goto err;
-
 		rc = qed_llh_protocol_filter_to_hilo(cdev, type,
 						     source_port_or_eth_type,
 						     dest_port, &high, &low);
@@ -1195,12 +1195,12 @@ void qed_llh_remove_mac_filter(struct qed_dev *cdev,
 	if (rc)
 		goto err;
 
+	rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
+	if (rc)
+		goto err;
+
 	/* Remove from the LLH in case the filter is not in use */
 	if (!ref_cnt) {
-		rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
-		if (rc)
-			goto err;
-
 		rc = qed_llh_remove_filter(p_hwfn, p_ptt, abs_ppfid,
 					   filter_idx);
 		if (rc)
@@ -1253,12 +1253,12 @@ void qed_llh_remove_protocol_filter(struct qed_dev *cdev,
 	if (rc)
 		goto err;
 
+	rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
+	if (rc)
+		goto err;
+
 	/* Remove from the LLH in case the filter is not in use */
 	if (!ref_cnt) {
-		rc = qed_llh_abs_ppfid(cdev, ppfid, &abs_ppfid);
-		if (rc)
-			goto err;
-
 		rc = qed_llh_remove_filter(p_hwfn, p_ptt, abs_ppfid,
 					   filter_idx);
 		if (rc)
@@ -3836,7 +3836,7 @@ static int qed_hw_get_ppfid_bitmap(struct qed_hwfn *p_hwfn,
 
 	if (!(cdev->ppfid_bitmap & (0x1 << native_ppfid_idx))) {
 		DP_INFO(p_hwfn,
-			"Fix the PPFID bitmap to inculde the native PPFID [native_ppfid_idx %hhd, orig_bitmap 0x%hhx]\n",
+			"Fix the PPFID bitmap to include the native PPFID [native_ppfid_idx %hhd, orig_bitmap 0x%hhx]\n",
 			native_ppfid_idx, cdev->ppfid_bitmap);
 		cdev->ppfid_bitmap = 0x1 << native_ppfid_idx;
 	}
