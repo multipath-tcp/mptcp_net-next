@@ -169,7 +169,7 @@ static struct inet_protosw mptcp_protosw = {
 	.flags		= INET_PROTOSW_ICSK,
 };
 
-static int __init mptcp_init(void)
+void mptcp_init(void)
 {
 	int err;
 
@@ -181,33 +181,17 @@ static int __init mptcp_init(void)
 	if (err)
 		goto subflow_failed;
 
-
 	err = proto_register(&mptcp_prot, 1);
 	if (err)
 		goto proto_failed;
 
 	inet_register_protosw(&mptcp_protosw);
 
-	return 0;
+	return;
 
 proto_failed:
 	subflow_exit();
 
 subflow_failed:
-	return err;
+	return;
 }
-
-static void __exit mptcp_exit(void)
-{
-	inet_unregister_protosw(&mptcp_protosw);
-	proto_unregister(&mptcp_prot);
-
-	subflow_exit();
-}
-
-module_init(mptcp_init);
-module_exit(mptcp_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_ALIAS_NET_PF_PROTO(PF_INET, IPPROTO_MPTCP);
-MODULE_ALIAS_NET_PF_PROTO(PF_INET6, IPPROTO_MPTCP);
