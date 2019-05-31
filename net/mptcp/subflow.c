@@ -101,5 +101,3 @@ void subflow_exit(void)
 {
 	tcp_unregister_ulp(&subflow_ulp_ops);
 }
-
-MODULE_LICENSE("GPL");
