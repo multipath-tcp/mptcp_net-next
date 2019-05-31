@@ -222,19 +222,11 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	return 0;
 }
 
-static void subflow_ops_exit(void)
-{
-	kmem_cache_destroy(subflow_request_sock_ops.slab);
-}
-
 int subflow_init(void)
 {
-	int ret;
-
 	subflow_request_sock_ops = tcp_request_sock_ops;
-	ret = subflow_ops_init(&subflow_request_sock_ops);
-	if (ret != 0)
-		return ret;
+	if (subflow_ops_init(&subflow_request_sock_ops) != 0)
+		panic("MPTCP: failed to init subflow request sock ops");
 
 	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
@@ -246,12 +238,4 @@ int subflow_init(void)
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP");
-
-	return ret;
-}
-
-void subflow_exit(void)
-{
-	tcp_unregister_ulp(&subflow_ulp_ops);
-	subflow_ops_exit();
 }
