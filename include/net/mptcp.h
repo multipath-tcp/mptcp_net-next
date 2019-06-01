@@ -49,6 +49,8 @@ struct mptcp_out_options {
 
 #ifdef CONFIG_MPTCP
 
+void mptcp_init(void);
+
 static inline bool sk_is_mptcp(const struct sock *sk)
 {
 	return tcp_sk(sk)->is_mptcp;
@@ -83,6 +85,10 @@ static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
 #else
+
+static inline void mptcp_init(void)
+{
+}
 
 static inline bool sk_is_mptcp(const struct sock *sk)
 {
