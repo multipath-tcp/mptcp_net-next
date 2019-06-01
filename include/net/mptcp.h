@@ -21,11 +21,17 @@ struct mptcp_out_options {
 
 #ifdef CONFIG_MPTCP
 
+void mptcp_init(void);
+
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx);
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
 #else
+
+static inline void mptcp_init(void)
+{
+}
 
 static inline void mptcp_parse_option(const unsigned char *ptr, int opsize,
 				      struct tcp_options_received *opt_rx)
