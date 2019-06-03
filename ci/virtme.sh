@@ -144,5 +144,8 @@ if [ "${1}" = "manual" ]; then
         shift
         go_manual "${@}"
 else
+        # first with the minimum because configs like KASAN slow down the
+        # tests execution, it might hide bugs
+        go_expect "${@}"
         go_expect "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 fi
