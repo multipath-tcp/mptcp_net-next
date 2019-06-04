@@ -379,26 +379,26 @@ int mv88e6390_g1_mgmt_rsvd2cpu(struct mv88e6xxx_chip *chip)
 	u16 ptr;
 	int err;
 
-	/* 01:c2:80:00:00:00:00-01:c2:80:00:00:00:07 are Management */
-	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C280000000XLO;
+	/* 01:80:c2:00:00:00-01:80:c2:00:00:07 are Management */
+	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C200000XLO;
 	err = mv88e6390_g1_monitor_write(chip, ptr, 0xff);
 	if (err)
 		return err;
 
-	/* 01:c2:80:00:00:00:08-01:c2:80:00:00:00:0f are Management */
-	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C280000000XHI;
+	/* 01:80:c2:00:00:08-01:80:c2:00:00:0f are Management */
+	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C200000XHI;
 	err = mv88e6390_g1_monitor_write(chip, ptr, 0xff);
 	if (err)
 		return err;
 
-	/* 01:c2:80:00:00:00:20-01:c2:80:00:00:00:27 are Management */
-	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C280000002XLO;
+	/* 01:80:c2:00:00:20-01:80:c2:00:00:27 are Management */
+	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C200002XLO;
 	err = mv88e6390_g1_monitor_write(chip, ptr, 0xff);
 	if (err)
 		return err;
 
-	/* 01:c2:80:00:00:00:28-01:c2:80:00:00:00:2f are Management */
-	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C280000002XHI;
+	/* 01:80:c2:00:00:28-01:80:c2:00:00:2f are Management */
+	ptr = MV88E6390_G1_MONITOR_MGMT_CTL_PTR_0180C200002XHI;
 	err = mv88e6390_g1_monitor_write(chip, ptr, 0xff);
 	if (err)
 		return err;
@@ -465,7 +465,7 @@ int mv88e6xxx_g1_set_device_number(struct mv88e6xxx_chip *chip, int index)
 
 /* Offset 0x1d: Statistics Operation 2 */
 
-int mv88e6xxx_g1_stats_wait(struct mv88e6xxx_chip *chip)
+static int mv88e6xxx_g1_stats_wait(struct mv88e6xxx_chip *chip)
 {
 	return mv88e6xxx_g1_wait(chip, MV88E6XXX_G1_STATS_OP,
 				 MV88E6XXX_G1_STATS_OP_BUSY);
