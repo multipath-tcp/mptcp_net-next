@@ -95,5 +95,5 @@ void subflow_init(void)
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
-		panic("MPTCP: failed to register subflows to ULP");
+		panic("MPTCP: failed to register subflows to ULP\n");
 }
