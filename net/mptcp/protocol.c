@@ -1017,10 +1017,8 @@ static struct inet_protosw mptcp_protosw = {
 	.flags		= INET_PROTOSW_ICSK,
 };
 
-void mptcp_init(void)
+void __init mptcp_init(void)
 {
-	int err;
-
 	mptcp_prot.h.hashinfo = tcp_prot.h.hashinfo;
 	mptcp_stream_ops = inet_stream_ops;
 	mptcp_stream_ops.bind = mptcp_bind;
@@ -1033,22 +1031,12 @@ void mptcp_init(void)
 
 	token_init();
 	crypto_init();
+	subflow_init();
 
-	err = subflow_init();
-	if (err)
-		goto subflow_failed;
-
-	err = proto_register(&mptcp_prot, 1);
-	if (err)
-		goto proto_failed;
+	if (proto_register(&mptcp_prot, 1) != 0)
+		panic("Failed to register MPTCP proto.\n");
 
 	inet_register_protosw(&mptcp_protosw);
 
-	return;
-
-proto_failed:
-	subflow_exit();
-
-subflow_failed:
 	return;
 }
