@@ -395,6 +395,4 @@ void __init mptcp_init(void)
 		panic("Failed to register MPTCP proto.\n");
 
 	inet_register_protosw(&mptcp_protosw);
-
-	return;
 }
