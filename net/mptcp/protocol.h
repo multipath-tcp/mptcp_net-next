@@ -99,8 +99,7 @@ static inline struct socket *mptcp_subflow_tcp_socket(const struct subflow_conte
 	return subflow->tcp_sock;
 }
 
-int subflow_init(void);
-void subflow_exit(void);
+void subflow_init(void);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
 
