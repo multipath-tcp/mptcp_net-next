@@ -244,9 +244,8 @@ int subflow_init(void)
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 
-	ret = tcp_register_ulp(&subflow_ulp_ops);
-	if (ret != 0)
-		subflow_ops_exit();
+	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
+		panic("MPTCP: failed to register subflows to ULP");
 
 	return ret;
 }
