@@ -1,0 +1,13 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: selftests: Add capture option
+
+Added a "-c" command line option for mptcp_connect.sh to make it easier
+to capture packets from each test. The script will use tcpdump to create
+one .pcap file per test case, named according to the namespaces,
+protocols, and connect address in use. For example, the first test case
+writes the capture to ns1-ns1-MPTCP-MPTCP-10.0.1.1.pcap
+
+The stderr output from tcpdump is printed after the test completes to
+show tcpdump's "packets dropped by kernel" information.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
