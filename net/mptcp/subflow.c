@@ -76,7 +76,7 @@ int subflow_init(void)
 		panic("MPTCP: failed to register subflows to ULP");
 }
 
-void subflow_exit(void)
+int subflow_exit(void)
 {
 	tcp_unregister_ulp(&subflow_ulp_ops);
 }
