@@ -72,7 +72,8 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 
 int subflow_init(void)
 {
-	return tcp_register_ulp(&subflow_ulp_ops);
+	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
+		panic("MPTCP: failed to register subflows to ULP");
 }
 
 void subflow_exit(void)
