@@ -40,6 +40,23 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
+struct subflow_request_sock {
+	struct	tcp_request_sock sk;
+	u8	mp_capable : 1,
+		mp_join : 1,
+		checksum : 1,
+		backup : 1,
+		version : 4;
+	u64	local_key;
+	u64	remote_key;
+};
+
+static inline
+struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
+{
+	return (struct subflow_request_sock *)rsk;
+}
+
 /* MPTCP subflow context */
 struct subflow_context {
 	u64	local_key;
@@ -69,6 +86,9 @@ int subflow_init(void);
 void subflow_exit(void);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
+
+void mptcp_get_options(const struct sk_buff *skb,
+		       struct tcp_options_received *opt_rx);
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
 
