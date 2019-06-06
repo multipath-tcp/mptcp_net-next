@@ -169,7 +169,7 @@ static struct inet_protosw mptcp_protosw = {
 	.flags		= INET_PROTOSW_ICSK,
 };
 
-void mptcp_init(void)
+void __init mptcp_init(void)
 {
 	int err;
 
@@ -181,9 +181,8 @@ void mptcp_init(void)
 	if (err)
 		goto subflow_failed;
 
-	err = proto_register(&mptcp_prot, 1);
-	if (err)
-		goto proto_failed;
+	if (proto_register(&mptcp_prot, 1) != 0)
+		panic("Failed to register MPTCP proto.\n");
 
 	inet_register_protosw(&mptcp_protosw);
 
