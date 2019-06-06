@@ -94,7 +94,8 @@ int subflow_init(void)
 	subflow_specific = ipv4_specific;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 
-	return tcp_register_ulp(&subflow_ulp_ops);
+	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
+		panic("MPTCP: failed to register subflows to ULP");
 }
 
 void subflow_exit(void)
