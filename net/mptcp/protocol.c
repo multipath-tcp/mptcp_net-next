@@ -291,6 +291,7 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 	struct mptcp_ext *mpext;
 	enum mapping_status ret;
 	struct sk_buff *skb;
+	u64 map_seq;
 
 	skb = skb_peek(&ssk->sk_receive_queue);
 	if (!skb) {
@@ -325,18 +326,25 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 		goto del_out;
 	}
 
-	if (subflow->map_valid)
-		pr_warn("Replaced mapping before it was done");
-
 	if (!mpext->dsn64) {
-		subflow->map_seq = expand_seq(subflow->map_seq,
-					      subflow->map_data_len,
-					      mpext->data_seq);
+		map_seq = expand_seq(subflow->map_seq, subflow->map_data_len,
+				     mpext->data_seq);
 		pr_debug("expanded seq=%llu", subflow->map_seq);
 	} else {
-		subflow->map_seq = mpext->data_seq;
+		map_seq = mpext->data_seq;
 	}
 
+	if (subflow->map_valid) {
+		/* due to GSO/TSO we can receive the same mapping multiple
+		 * times, before it's expiration.
+		 */
+		if (subflow->map_seq != map_seq ||
+		    subflow->map_subflow_seq != mpext->subflow_seq ||
+		    subflow->map_data_len != mpext->data_len)
+			pr_warn("Replaced mapping before it was done");
+	}
+
+	subflow->map_seq = map_seq;
 	subflow->map_subflow_seq = mpext->subflow_seq;
 	subflow->map_data_len = mpext->data_len;
 	subflow->map_valid = 1;
