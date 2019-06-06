@@ -290,7 +290,7 @@ void subflow_init(void)
 {
 	subflow_request_sock_ops = tcp_request_sock_ops;
 	if (subflow_ops_init(&subflow_request_sock_ops) != 0)
-		panic("MPTCP: failed to init subflow request sock ops");
+		panic("MPTCP: failed to init subflow request sock ops\n");
 
 	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
@@ -302,5 +302,5 @@ void subflow_init(void)
 	subflow_specific.rebuild_header = subflow_rebuild_header;
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
-		panic("MPTCP: failed to register subflows to ULP");
+		panic("MPTCP: failed to register subflows to ULP\n");
 }
