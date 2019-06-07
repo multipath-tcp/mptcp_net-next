@@ -337,14 +337,14 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
 
-	pr_debug("subflow_req=%p", subflow_req);
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
 		opts->sndr_key = subflow_req->local_key;
 		opts->rcvr_key = subflow_req->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_SYNACK;
-		pr_debug("local_key=%llu", subflow_req->local_key);
-		pr_debug("remote_key=%llu", subflow_req->remote_key);
+		pr_debug("subflow_req=%p, local_key=%llu, remote_key=%llu",
+			 subflow_req, subflow_req->local_key,
+			 subflow_req->remote_key);
 		return true;
 	}
 	return false;
