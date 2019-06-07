@@ -34,9 +34,13 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		if (opt_rx->mptcp.version != 0)
 			break;
 
-		opt_rx->mptcp.mp_capable = 1;
 		pr_debug("flags=%02x", *ptr);
 		opt_rx->mptcp.flags = *ptr++;
+		if (!((opt_rx->mptcp.flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA1) ||
+		    (opt_rx->mptcp.flags & MPTCP_CAP_EXTENSIBILITY))
+			break;
+
+		opt_rx->mptcp.mp_capable = 1;
 		opt_rx->mptcp.sndr_key = get_unaligned_be64(ptr);
 		pr_debug("sndr_key=%llu", opt_rx->mptcp.sndr_key);
 		ptr += 8;
