@@ -629,8 +629,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	subflow = subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
-	pr_debug("new msk=%p", msk);
-
 	if (subflow->mp_capable) {
 		struct sock *new_mptcp_sock;
 		u64 ack_seq;
