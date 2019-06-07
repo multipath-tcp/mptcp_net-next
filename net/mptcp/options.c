@@ -83,12 +83,12 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		mp_opt->dss = 1;
 		ptr++;
 
-		mp_opt->flags = (*ptr++) & MPTCP_DSS_FLAG_MASK;
-		mp_opt->data_fin = (mp_opt->flags & MPTCP_DSS_DATA_FIN) != 0;
-		mp_opt->dsn64 = (mp_opt->flags & MPTCP_DSS_DSN64) != 0;
-		mp_opt->use_map = (mp_opt->flags & MPTCP_DSS_HAS_MAP) != 0;
-		mp_opt->ack64 = (mp_opt->flags & MPTCP_DSS_ACK64) != 0;
-		mp_opt->use_ack = (mp_opt->flags & MPTCP_DSS_HAS_ACK);
+		mp_opt->dss_flags = (*ptr++) & MPTCP_DSS_FLAG_MASK;
+		mp_opt->data_fin = (mp_opt->dss_flags & MPTCP_DSS_DATA_FIN) != 0;
+		mp_opt->dsn64 = (mp_opt->dss_flags & MPTCP_DSS_DSN64) != 0;
+		mp_opt->use_map = (mp_opt->dss_flags & MPTCP_DSS_HAS_MAP) != 0;
+		mp_opt->ack64 = (mp_opt->dss_flags & MPTCP_DSS_ACK64) != 0;
+		mp_opt->use_ack = (mp_opt->dss_flags & MPTCP_DSS_HAS_ACK);
 
 		pr_debug("data_fin=%d dsn64=%d use_map=%d ack64=%d use_ack=%d",
 			 mp_opt->data_fin, mp_opt->dsn64,
