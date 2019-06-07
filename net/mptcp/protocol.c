@@ -132,8 +132,6 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct subflow_context *subflow = subflow_ctx(msk->subflow->sk);
 
-	pr_debug("msk=%p", msk);
-
 	if (mp_capable) {
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
