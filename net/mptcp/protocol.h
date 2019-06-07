@@ -21,9 +21,10 @@
 #define MPTCPOPT_VERSION_MASK	0x0F
 
 /* MPTCP handshake flags */
-#define MPTCP_CAP_CHECKSUM_REQD	(1 << 7)
-#define MPTCP_CAP_EXTENSIBILITY	(1 << 6)
-#define MPTCP_CAP_HMAC_SHA1	(1 << 0)
+#define MPTCP_CAP_CHECKSUM_REQD	BIT(7)
+#define MPTCP_CAP_EXTENSIBILITY	BIT(6)
+#define MPTCP_CAP_HMAC_SHA1	BIT(0)
+#define MPTCP_CAP_FLAG_MASK	(0x3F)
 
 /* MPTCP connection sock */
 struct mptcp_sock {
