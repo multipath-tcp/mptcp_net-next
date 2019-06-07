@@ -8,15 +8,6 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
-/* MPTCP DSS flags */
-
-#define MPTCP_DSS_DATA_FIN	BIT(4)
-#define MPTCP_DSS_DSN64		BIT(3)
-#define MPTCP_DSS_HAS_MAP	BIT(2)
-#define MPTCP_DSS_ACK64		BIT(1)
-#define MPTCP_DSS_HAS_ACK	BIT(0)
-#define MPTCP_DSS_FLAG_MASK	(0x1F)
-
 /* MPTCP sk_buff extension data */
 struct mptcp_ext {
 	u64		data_ack;
