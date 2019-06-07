@@ -248,15 +248,14 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 
-	pr_debug("subflow=%p", subflow);
 	if (subflow->mp_capable && !subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_ACK;
 		subflow->fourth_ack = 1;
-		pr_debug("local_key=%llu", subflow->local_key);
-		pr_debug("remote_key=%llu", subflow->remote_key);
+		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu",
+			 subflow, subflow->local_key, subflow->remote_key);
 		return true;
 	}
 	return false;
