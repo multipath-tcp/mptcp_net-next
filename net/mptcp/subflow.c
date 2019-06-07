@@ -80,10 +80,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 	inet_sk_rx_dst_set(sk, skb);
 
-	pr_debug("subflow=%p", subflow_ctx(sk));
-
 	if (subflow->conn && !subflow->conn_finished) {
-		pr_debug("remote_key=%llu", subflow->remote_key);
+		pr_debug("subflow=%p, remote_key=%llu", subflow_ctx(sk),
+			 subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
 		subflow->conn_finished = 1;
 
