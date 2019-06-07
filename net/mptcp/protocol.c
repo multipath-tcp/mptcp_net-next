@@ -515,7 +515,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
-		pr_debug("token=%u", msk->token);
 		token_update_accept(new_sock->sk, new_mptcp_sock->sk);
 		msk->connection_list = new_sock;
 
@@ -611,7 +610,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
-		pr_debug("token=%u", msk->token);
+		pr_debug("msk=%p, token=%u", msk, msk->token);
 		msk->connection_list = msk->subflow;
 		msk->subflow = NULL;
 
