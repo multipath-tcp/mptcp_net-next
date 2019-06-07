@@ -118,6 +118,7 @@ struct tcp_options_received {
 			dss : 1,
 			version : 4;
 		u8      flags;
+		u8	dss_flags;
 		u8	use_map:1,
 			dsn64:1,
 			use_checksum:1,
