@@ -682,8 +682,6 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct subflow_context *subflow = subflow_ctx(msk->subflow->sk);
 
-	pr_debug("msk=%p", msk);
-
 	if (mp_capable) {
 		u64 ack_seq;
 
