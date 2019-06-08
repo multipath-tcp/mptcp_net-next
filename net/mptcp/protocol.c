@@ -110,12 +110,24 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	if (subflow->mp_capable) {
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		msk->token = subflow->token;
+		pr_debug("token=%u", msk->token);
+		token_update_accept(new_sock->sk, new_mptcp_sock->sk);
 		msk->connection_list = new_sock;
 	} else {
 		msk->subflow = new_sock;
 	}
 
 	return new_mptcp_sock->sk;
+}
+
+static void mptcp_destroy(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	pr_debug("msk=%p, subflow=%p", sk, msk->subflow->sk);
+
+	token_destroy(msk->token);
 }
 
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
@@ -135,6 +147,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	if (mp_capable) {
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		msk->token = subflow->token;
+		pr_debug("token=%u", msk->token);
 		msk->connection_list = msk->subflow;
 		msk->subflow = NULL;
 	}
@@ -148,6 +162,7 @@ static struct proto mptcp_prot = {
 	.close		= mptcp_close,
 	.accept		= mptcp_accept,
 	.shutdown	= tcp_shutdown,
+	.destroy	= mptcp_destroy,
 	.sendmsg	= mptcp_sendmsg,
 	.recvmsg	= mptcp_recvmsg,
 	.hash		= inet_hash,
@@ -301,6 +316,8 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.getname = mptcp_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
 
+	token_init();
+	crypto_init();
 	subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
