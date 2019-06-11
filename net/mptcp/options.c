@@ -247,12 +247,13 @@ void mptcp_rcv_synsent(struct sock *sk)
 	}
 }
 
-bool mptcp_established_options(struct sock *sk, unsigned int *size,
-			       struct mptcp_out_options *opts)
+static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
+					 unsigned int remaining,
+					 struct mptcp_out_options *opts)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 
-	if (subflow->mp_capable && !subflow->fourth_ack) {
+	if (!subflow->fourth_ack && remaining >= TCPOLEN_MPTCP_MPC_ACK) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
@@ -265,16 +266,14 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 	return false;
 }
 
-bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
-				   unsigned int *size, unsigned int remaining,
-				   struct mptcp_out_options *opts)
+static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
+					  unsigned int *size,
+					  unsigned int remaining,
+					  struct mptcp_out_options *opts)
 {
 	unsigned int dss_size = 0;
 	struct mptcp_ext *mpext;
 	unsigned int ack_size;
-
-	if (!subflow_ctx(sk)->mp_capable)
-		return false;
 
 	mpext = skb ? mptcp_get_ext(skb) : NULL;
 
@@ -334,6 +333,29 @@ bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	*size = ALIGN(dss_size, 4);
 	return true;
+}
+
+bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			       unsigned int *size, unsigned int remaining,
+			       struct mptcp_out_options *opts)
+{
+	unsigned int opt_size = 0;
+
+	if (!subflow_ctx(sk)->mp_capable)
+		return false;
+
+	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {
+		*size += opt_size;
+		remaining -= opt_size;
+		return true;
+	} else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
+					       opts)) {
+		*size += opt_size;
+		remaining -= opt_size;
+		return true;
+	}
+
+	return false;
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
