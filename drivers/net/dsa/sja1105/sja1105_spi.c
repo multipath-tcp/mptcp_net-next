@@ -285,20 +285,22 @@ static int sja1105_cold_reset(const struct sja1105_private *priv)
 	return priv->info->reset_cmd(priv, &reset);
 }
 
-static int sja1105_inhibit_tx(const struct sja1105_private *priv,
-			      const unsigned long *port_bitmap)
+int sja1105_inhibit_tx(const struct sja1105_private *priv,
+		       unsigned long port_bitmap, bool tx_inhibited)
 {
 	const struct sja1105_regs *regs = priv->info->regs;
 	u64 inhibit_cmd;
-	int port, rc;
+	int rc;
 
 	rc = sja1105_spi_send_int(priv, SPI_READ, regs->port_control,
 				  &inhibit_cmd, SJA1105_SIZE_PORT_CTRL);
 	if (rc < 0)
 		return rc;
 
-	for_each_set_bit(port, port_bitmap, SJA1105_NUM_PORTS)
-		inhibit_cmd |= BIT(port);
+	if (tx_inhibited)
+		inhibit_cmd |= port_bitmap;
+	else
+		inhibit_cmd &= ~port_bitmap;
 
 	return sja1105_spi_send_int(priv, SPI_WRITE, regs->port_control,
 				    &inhibit_cmd, SJA1105_SIZE_PORT_CTRL);
@@ -415,7 +417,7 @@ int sja1105_static_config_upload(struct sja1105_private *priv)
 	 * Tx on all ports and waiting for current packet to drain.
 	 * Otherwise, the PHY will see an unterminated Ethernet packet.
 	 */
-	rc = sja1105_inhibit_tx(priv, &port_bitmap);
+	rc = sja1105_inhibit_tx(priv, port_bitmap, true);
 	if (rc < 0) {
 		dev_err(dev, "Failed to inhibit Tx on ports\n");
 		return -ENXIO;
@@ -498,11 +500,10 @@ static struct sja1105_regs sja1105et_regs = {
 	.port_control = 0x11,
 	.config = 0x020000,
 	.rgu = 0x100440,
+	/* UM10944.pdf, Table 86, ACU Register overview */
 	.pad_mii_tx = {0x100800, 0x100802, 0x100804, 0x100806, 0x100808},
 	.rmii_pll1 = 0x10000A,
 	.cgu_idiv = {0x10000B, 0x10000C, 0x10000D, 0x10000E, 0x10000F},
-	/* UM10944.pdf, Table 86, ACU Register overview */
-	.rgmii_pad_mii_tx = {0x100800, 0x100802, 0x100804, 0x100806, 0x100808},
 	.mac = {0x200, 0x202, 0x204, 0x206, 0x208},
 	.mac_hl1 = {0x400, 0x410, 0x420, 0x430, 0x440},
 	.mac_hl2 = {0x600, 0x610, 0x620, 0x630, 0x640},
@@ -528,11 +529,11 @@ static struct sja1105_regs sja1105pqrs_regs = {
 	.port_control = 0x12,
 	.config = 0x020000,
 	.rgu = 0x100440,
+	/* UM10944.pdf, Table 86, ACU Register overview */
 	.pad_mii_tx = {0x100800, 0x100802, 0x100804, 0x100806, 0x100808},
+	.pad_mii_id = {0x100810, 0x100811, 0x100812, 0x100813, 0x100814},
 	.rmii_pll1 = 0x10000A,
 	.cgu_idiv = {0x10000B, 0x10000C, 0x10000D, 0x10000E, 0x10000F},
-	/* UM10944.pdf, Table 86, ACU Register overview */
-	.rgmii_pad_mii_tx = {0x100800, 0x100802, 0x100804, 0x100806, 0x100808},
 	.mac = {0x200, 0x202, 0x204, 0x206, 0x208},
 	.mac_hl1 = {0x400, 0x410, 0x420, 0x430, 0x440},
 	.mac_hl2 = {0x600, 0x610, 0x620, 0x630, 0x640},
@@ -587,6 +588,7 @@ struct sja1105_info sja1105p_info = {
 	.dyn_ops		= sja1105pqrs_dyn_ops,
 	.ptp_ts_bits		= 32,
 	.ptpegr_ts_bytes	= 8,
+	.setup_rgmii_delay	= sja1105pqrs_setup_rgmii_delay,
 	.reset_cmd		= sja1105pqrs_reset_cmd,
 	.fdb_add_cmd		= sja1105pqrs_fdb_add,
 	.fdb_del_cmd		= sja1105pqrs_fdb_del,
@@ -601,6 +603,7 @@ struct sja1105_info sja1105q_info = {
 	.dyn_ops		= sja1105pqrs_dyn_ops,
 	.ptp_ts_bits		= 32,
 	.ptpegr_ts_bytes	= 8,
+	.setup_rgmii_delay	= sja1105pqrs_setup_rgmii_delay,
 	.reset_cmd		= sja1105pqrs_reset_cmd,
 	.fdb_add_cmd		= sja1105pqrs_fdb_add,
 	.fdb_del_cmd		= sja1105pqrs_fdb_del,
@@ -615,6 +618,7 @@ struct sja1105_info sja1105r_info = {
 	.dyn_ops		= sja1105pqrs_dyn_ops,
 	.ptp_ts_bits		= 32,
 	.ptpegr_ts_bytes	= 8,
+	.setup_rgmii_delay	= sja1105pqrs_setup_rgmii_delay,
 	.reset_cmd		= sja1105pqrs_reset_cmd,
 	.fdb_add_cmd		= sja1105pqrs_fdb_add,
 	.fdb_del_cmd		= sja1105pqrs_fdb_del,
@@ -630,6 +634,7 @@ struct sja1105_info sja1105s_info = {
 	.regs			= &sja1105pqrs_regs,
 	.ptp_ts_bits		= 32,
 	.ptpegr_ts_bytes	= 8,
+	.setup_rgmii_delay	= sja1105pqrs_setup_rgmii_delay,
 	.reset_cmd		= sja1105pqrs_reset_cmd,
 	.fdb_add_cmd		= sja1105pqrs_fdb_add,
 	.fdb_del_cmd		= sja1105pqrs_fdb_del,
