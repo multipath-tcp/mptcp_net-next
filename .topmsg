@@ -1,0 +1,46 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: selftests: switch to netns+veth based tests
+
+... so we can exercise PMTU and MSS handling.
+MTU on lo is 64k, so we never had to deal with segmentation either.
+
+This also avoids problems with timewait state in inet_ns,
+all net namespaces are torn down before script exits.
+
+This uncovers several bugs:
+1. mptcp_init_sock() passes init_net instead of sock_net(sk), i.e.
+   network namespaces are not supported
+2. We corrupt tcp option space, I can see invalid tcp headers (too
+   short) in tcpdump, and receiver process hangs without getting the
+   data (poll timeout).
+   Seems to be gone after adding
+
+    if (size == MAX_TCP_OPTION_SPACE)
+          return size;
+
+    BUG(size > MAX_TCP_OPTION_SPACE);
+
+    in tcp_established_options() after writing mptcp options.
+    SACK writing doesn't handle 'no option space left' case.
+3. Several WARN_ON from networking core are triggered, e.g. due
+   to mem accouting being off.  Maybe fixed already with pending
+   locking fix in mptcp_recv.
+4. "Replaced mapping before it was done" in dmesg.
+5. receiver blocking in read(), while TCP socket is in CLOSE-WAIT.
+   wait_woken+0xd6/0x170
+   sk_wait_data+0x248/0x270
+   mptcp_recvmsg+0x5c0/0xd50
+6. kmemleak gets noisy, we probably leak a refcount somewhere (iirc
+   Davide is already working on this).
+7. crash on connect completion, probably same bug that Paolo reported
+   already.
+
+As the script did not yet turn up any problem when using only
+tcp, it appears these are MPTCP related bugs rather than with script
+or mptcp_connect.c .
+
+Once above issues are fixed, this will be extended again to
+set different/varying MTU in ns1 and ns4.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
