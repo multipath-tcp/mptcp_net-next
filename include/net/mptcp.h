@@ -65,13 +65,11 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 			       struct mptcp_out_options* opts);
 void mptcp_rcv_synsent(struct sock *sk);
-bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
-				   unsigned int *size, unsigned int remaining,
-				   struct mptcp_out_options* opts);
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts);
-bool mptcp_established_options(struct sock *sk, unsigned int *size,
-				       struct mptcp_out_options *opts);
+bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			       unsigned int *size, unsigned int remaining,
+			       struct mptcp_out_options* opts);
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
@@ -111,15 +109,6 @@ static inline void mptcp_rcv_synsent(struct sock *sk)
 {
 }
 
-static inline bool mptcp_established_options_dss(struct sock *sk,
-						 struct sk_buff *skb,
-						 unsigned int *size,
-						 unsigned int remaining,
-						 struct mptcp_out_options* opts)
-{
-	return false;
-}
-
 static inline bool mptcp_synack_options(const struct request_sock *req,
 					unsigned int *size,
 					struct mptcp_out_options *opts)
@@ -128,8 +117,10 @@ static inline bool mptcp_synack_options(const struct request_sock *req,
 }
 
 static inline bool mptcp_established_options(struct sock *sk,
+					     struct sk_buff *skb,
 					     unsigned int *size,
-					     struct mptcp_out_options *opts)
+					     unsigned int remaining,
+					     struct mptcp_out_options* opts);
 {
 	return false;
 }
