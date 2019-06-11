@@ -1,0 +1,8 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] tg: dedicated topic for the top of the tree
+
+This represents the top of our tree dedicated for the upstream.
+
+No modification should be linked to this topic.
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
