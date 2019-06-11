@@ -7,6 +7,7 @@ cin=""
 cout=""
 ksft_skip=4
 capture=0
+timeout=30
 
 TEST_COUNT=0
 
@@ -64,7 +65,6 @@ ip -net ns2 link set ns2eth1 up
 ip -net ns2 addr add 10.0.2.1/24 dev ns2eth3
 ip -net ns2 link set ns2eth3 up
 ip -net ns2 route add default via 10.0.2.2
-tc -net ns2 qdisc add dev ns2eth3 root netem loss random 1
 ip netns exec ns2 sysctl -q net.ipv4.ip_forward=1
 
 ip -net ns3 addr add 10.0.2.2/24 dev ns3eth2
@@ -73,8 +73,7 @@ ip -net ns3 link set ns3eth2 up
 ip -net ns3 addr add 10.0.3.2/24 dev ns3eth4
 ip -net ns3 link set ns3eth4 up
 ip -net ns3 route add default via 10.0.2.1
-tc -net ns3 qdisc add dev ns3eth4 root netem delay 10ms reorder 25% 50% gap 5
-ip netns exec ns3 ethtool -K ns3eth2 tso off
+ip netns exec ns3 ethtool -K ns3eth2 tso off 2>/dev/null
 ip netns exec ns3 sysctl -q net.ipv4.ip_forward=1
 
 ip -net ns4 addr add 10.0.3.1/24 dev ns4eth3
@@ -106,6 +105,19 @@ check_transfer()
 	return 0
 }
 
+do_ping()
+{
+	listener_ns="$1"
+	connector_ns="$2"
+	connect_addr="$3"
+
+	ip netns exec ${connector_ns} ping -q -c 1 $connect_addr >/dev/null
+	if [ $? -ne 0 ] ; then
+		echo "$listener_ns -> $connect_addr connectivity [ FAIL ]" 1>&2
+		ret=1
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -120,11 +132,6 @@ do_transfer()
 	:> "$cout"
 	:> "$sout"
 	:> "$capout"
-	ip netns exec ${connector_ns} ping -q -c 1 $connect_addr >/dev/null
-	if [ $? -ne 0 ] ; then
-		echo "$listener_ns -> $connect_addr connectivity [ FAIL ]" 1>&2
-		return 1
-	fi
 
 	printf "%-4s %-5s -> %-4s (%s:%d) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${connect_addr} ${port} ${srv_proto}
 
@@ -143,12 +150,12 @@ do_transfer()
 	    sleep 1
 	fi
 
-	ip netns exec ${listener_ns} ./mptcp_connect -t 10 -l -p $port -s ${srv_proto} 0.0.0.0 < "$sin" > "$sout" &
+	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} 0.0.0.0 < "$sin" > "$sout" &
 	spid=$!
 
 	sleep 1
 
-	ip netns exec ${connector_ns} ./mptcp_connect -t 10 -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
+	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
 	cpid=$!
 
 	wait $cpid
@@ -169,7 +176,6 @@ do_transfer()
 		ip netns exec ${connector_ns} ss -nita 1>&2 -o "dport = :$port"
 
 		cat "$capout"
-		ret=$rets
 		return 1
 	fi
 
@@ -209,19 +215,45 @@ make_file()
 
 run_tests()
 {
-        listener_ns="$1"
-        connector_ns="$2"
+	listener_ns="$1"
+	connector_ns="$2"
 	connect_addr="$3"
+	lret=0
 
-	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr}
-	[ $? -ne 0 ] && return
-	do_transfer ${listener_ns} ${connector_ns} MPTCP TCP ${connect_addr}
-	[ $? -ne 0 ] && return
+	for proto in MPTCP TCP;do
+		do_transfer ${listener_ns} ${connector_ns} MPTCP "$proto" ${connect_addr}
+		lret=$?
+		if [ $lret -ne 0 ]; then
+			ret=$lret
+			return
+		fi
+	done
+
 	do_transfer ${listener_ns} ${connector_ns} TCP MPTCP ${connect_addr}
+	lret=$?
+	if [ $lret -ne 0 ]; then
+		ret=$lret
+		return
+	fi
 }
 
 make_file "$cin" "client"
 make_file "$sin" "server"
+
+for sender in 1 2 3 4;do
+	do_ping ns1 ns$sender 10.0.1.1
+
+	do_ping ns2 ns$sender 10.0.1.2
+	do_ping ns2 ns$sender 10.0.2.1
+
+	do_ping ns3 ns$sender 10.0.2.2
+	do_ping ns3 ns$sender 10.0.3.2
+
+	do_ping ns4 ns$sender 10.0.3.1
+done
+
+tc -net ns2 qdisc add dev ns2eth3 root netem loss random 1
+tc -net ns3 qdisc add dev ns3eth4 root netem delay 10ms reorder 25% 50% gap 5
 
 for sender in 1 2 3 4;do
 	run_tests ns1 ns$sender 10.0.1.1
