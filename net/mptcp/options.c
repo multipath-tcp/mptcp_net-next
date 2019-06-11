@@ -13,6 +13,7 @@
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx)
 {
+	struct mptcp_options_received *mp_opt = &opt_rx->mptcp;
 	u8 subtype = *ptr >> 4;
 
 	switch (subtype) {
@@ -27,25 +28,28 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		    opsize != TCPOLEN_MPTCP_MPC_SYNACK)
 			break;
 
-		pr_debug("MP_CAPABLE");
-		opt_rx->mptcp.version = *ptr++ & 0x0F;
-		if (opt_rx->mptcp.version != 0)
+		mp_opt->version = *ptr++ & MPTCPOPT_VERSION_MASK;
+		if (mp_opt->version != 0)
 			break;
 
-		pr_debug("flags=%02x", *ptr);
-		opt_rx->mptcp.flags = *ptr++;
-		if (!((opt_rx->mptcp.flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA1) ||
-		    (opt_rx->mptcp.flags & MPTCP_CAP_EXTENSIBILITY))
+		mp_opt->flags = *ptr++;
+		if (!((mp_opt->flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA1) ||
+		    (mp_opt->flags & MPTCP_CAP_EXTENSIBILITY))
 			break;
 
-		opt_rx->mptcp.mp_capable = 1;
-		opt_rx->mptcp.sndr_key = get_unaligned_be64(ptr);
-		pr_debug("sndr_key=%llu", opt_rx->mptcp.sndr_key);
+		mp_opt->mp_capable = 1;
+		mp_opt->sndr_key = get_unaligned_be64(ptr);
 		ptr += 8;
+
 		if (opsize == TCPOLEN_MPTCP_MPC_SYNACK) {
-			opt_rx->mptcp.rcvr_key = get_unaligned_be64(ptr);
-			pr_debug("rcvr_key=%llu", opt_rx->mptcp.rcvr_key);
+			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
+			pr_debug("MP_CAPABLE flags=%x, sndr=%llu, rcvr=%llu",
+				 mp_opt->flags, mp_opt->sndr_key,
+				 mp_opt->rcvr_key);
+		} else {
+			pr_debug("MP_CAPABLE flags=%x, sndr=%llu",
+				 mp_opt->flags, mp_opt->sndr_key);
 		}
 		break;
 
@@ -81,7 +85,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
-		opt_rx->mptcp.dss = 1;
+		mp_opt->dss = 1;
 		break;
 
 	/* MPTCPOPT_ADD_ADDR
@@ -121,14 +125,13 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 {
 	if ((OPTION_MPTCP_MPC_SYN |
-	     OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 		u8 len;
 
 		if (OPTION_MPTCP_MPC_SYN & opts->suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYN;
 		else
-			len = TCPOLEN_MPTCP_MPC_SYNACK;
+			len = TCPOLEN_MPTCP_MPC_ACK;
 
 		*ptr++ = htonl((TCPOPT_MPTCP << 24) | (len << 16) |
 			       (MPTCPOPT_MP_CAPABLE << 12) |
@@ -136,8 +139,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}
