@@ -777,6 +777,27 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
 
+void mptcp_finish_join(struct sock *conn, struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(conn);
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	pr_debug("msk=%p, subflow=%p", msk, subflow);
+
+	local_bh_disable();
+	bh_lock_sock_nested(sk);
+	list_add_tail(&subflow->node, &msk->conn_list);
+	bh_unlock_sock(sk);
+	local_bh_enable();
+}
+
+bool mptcp_sk_is_subflow(const struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	return subflow->mp_join == 1;
+}
+
 static struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
