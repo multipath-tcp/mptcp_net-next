@@ -23,7 +23,7 @@
 extern int optind;
 
 #ifndef IPPROTO_MPTCP
-#define IPPROTO_MPTCP 99
+#define IPPROTO_MPTCP 262
 #endif
 
 static const char *cfg_host;
