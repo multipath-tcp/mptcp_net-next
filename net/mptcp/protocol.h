@@ -26,17 +26,25 @@
 #define MPTCP_CAP_HMAC_SHA1	BIT(0)
 #define MPTCP_CAP_FLAG_MASK	(0x3F)
 
+/* MPTCP DSS flags */
+#define MPTCP_DSS_DATA_FIN	BIT(4)
+#define MPTCP_DSS_DSN64		BIT(3)
+#define MPTCP_DSS_HAS_MAP	BIT(2)
+#define MPTCP_DSS_ACK64		BIT(1)
+#define MPTCP_DSS_HAS_ACK	BIT(0)
+#define MPTCP_DSS_FLAG_MASK	(0x1F)
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
-	struct	inet_connection_sock sk;
-	u64	local_key;
-	u64	remote_key;
-	u64	write_seq;
-	u64	ack_seq;
-	u32	token;
-	struct	socket *connection_list; /* @@ needs to be a list */
-	struct	socket *subflow; /* outgoing connect, listener or !mp_capable */
+	struct inet_connection_sock sk;
+	u64		local_key;
+	u64		remote_key;
+	u64		write_seq;
+	atomic64_t	ack_seq;
+	u32		token;
+	struct socket	*connection_list; /* @@ needs to be a list */
+	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
@@ -55,6 +63,7 @@ struct subflow_request_sock {
 	u64	remote_key;
 	u64	idsn;
 	u32	token;
+	u32	ssn_offset;
 };
 
 static inline
@@ -70,16 +79,22 @@ struct subflow_context {
 	u32	token;
 	u32     rel_write_seq;
 	u64     idsn;
-	u32	request_mptcp : 1,  /* send MP_CAPABLE */
+	u64	map_seq;
+	u32	map_subflow_seq;
+	u32	ssn_offset;
+	u16	map_data_len;
+	u16	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_cksum : 1,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		fourth_ack : 1,     /* send initial DSS */
 		version : 4,
 		conn_finished : 1,
-		use_checksum : 1;
+		use_checksum : 1,
+		map_valid : 1;
 
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
 	struct  sock *conn;        /* parent mptcp_sock */
+	void	(*tcp_sk_data_ready)(struct sock *sk);
 };
 
 static inline struct subflow_context *subflow_ctx(const struct sock *sk)
