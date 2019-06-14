@@ -1,0 +1,10 @@
+
+config MPTCP
+	bool "Multipath TCP"
+	depends on INET
+	help
+	  Multipath TCP (MPTCP) connections send and receive data over multiple
+	  subflows in order to utilize multiple network paths. Each subflow
+	  uses the TCP protocol, and TCP options carry header information for
+	  MPTCP.
+
