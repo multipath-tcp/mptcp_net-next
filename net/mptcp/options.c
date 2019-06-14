@@ -29,7 +29,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		    opsize != TCPOLEN_MPTCP_MPC_SYNACK)
 			break;
 
-		mp_opt->version = *ptr++ & MPTCPOPT_VERSION_MASK;
+		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
 		if (mp_opt->version != 0)
 			break;
 
@@ -430,7 +430,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 
 		*ptr++ = htonl((TCPOPT_MPTCP << 24) | (len << 16) |
 			       (MPTCPOPT_MP_CAPABLE << 12) |
-			       ((MPTCPOPT_VERSION_MASK & 0) << 8) |
+			       ((MPTCP_VERSION_MASK & 0) << 8) |
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
