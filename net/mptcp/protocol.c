@@ -847,7 +847,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct subflow_context *subflow, *tmp;
+	struct subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	__poll_t ret = 0;
@@ -859,8 +859,8 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 
 	i = 0;
 	for (;;) {
+		struct subflow_context *tmp = NULL;
 		int j = 0;
-		tmp = NULL;
 
 		rcu_read_lock();
 		mptcp_for_each_subflow(msk, subflow) {
