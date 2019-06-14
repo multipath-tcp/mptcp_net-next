@@ -380,7 +380,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		}
 
 		ssn = tcp_sk(ssk)->copied_seq - subflow->ssn_offset;
-		old_ack = atomic64_read(&msk->ack_seq);
+		old_ack = msk->ack_seq;
 
 		if (unlikely(before(ssn, subflow->map_subflow_seq))) {
 			/* Mapping covers data later in the subflow stream,
@@ -446,7 +446,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		ack_seq = get_mapped_dsn(subflow);
 
 		if (before64(old_ack, ack_seq))
-			atomic64_set(&msk->ack_seq, ack_seq);
+			msk->ack_seq = ack_seq;
 
 		if (!before(tcp_sk(ssk)->copied_seq - subflow->ssn_offset,
 			    subflow->map_subflow_seq + subflow->map_data_len)) {
@@ -597,7 +597,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
-		atomic64_set(&msk->ack_seq, ack_seq);
+		msk->ack_seq = ack_seq;
 		subflow->map_seq = ack_seq;
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
@@ -695,7 +695,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
-		atomic64_set(&msk->ack_seq, ack_seq);
+		msk->ack_seq = ack_seq;
 		subflow->map_seq = ack_seq;
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
