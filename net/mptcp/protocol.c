@@ -134,7 +134,7 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 		return old_seq;
 
 	/* Assume map covers data not mapped yet. */
-	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63,32));
+	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63, 32));
 }
 
 static u64 get_map_offset(struct subflow_context *subflow)
@@ -266,7 +266,7 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 
 del_out:
 	__skb_ext_del(skb, SKB_EXT_MPTCP);
-	return ret;;
+	return ret;
 }
 
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
@@ -282,7 +282,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	long timeo;
 
 	if (!msk->connection_list) {
-		pr_debug("fallback-read subflow=%p", subflow_ctx(msk->subflow->sk));
+		pr_debug("fallback-read subflow=%p",
+			 subflow_ctx(msk->subflow->sk));
 		return sock_recvmsg(msk->subflow, msg, flags);
 	}
 
