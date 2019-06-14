@@ -147,7 +147,7 @@ static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 	return false;
 }
 
-static inline book mptcp_sk_is_subflow(const struct sock *sk)
+static inline bool mptcp_sk_is_subflow(const struct sock *sk)
 {
 	return false;
 }
