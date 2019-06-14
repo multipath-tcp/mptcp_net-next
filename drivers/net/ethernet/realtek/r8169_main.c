@@ -643,9 +643,7 @@ struct rtl8169_private {
 	void *Rx_databuff[NUM_RX_DESC];	/* Rx data buffers */
 	struct ring_info tx_skb[NUM_TX_DESC];	/* Tx data buffers */
 	u16 cp_cmd;
-
 	u16 irq_mask;
-	const struct rtl_coalesce_info *coalesce_info;
 	struct clk *clk;
 
 	struct {
@@ -814,7 +812,7 @@ static void r8168_phy_ocp_write(struct rtl8169_private *tp, u32 reg, u32 data)
 	rtl_udelay_loop_wait_low(tp, &rtl_ocp_gphy_cond, 25, 10);
 }
 
-static u16 r8168_phy_ocp_read(struct rtl8169_private *tp, u32 reg)
+static int r8168_phy_ocp_read(struct rtl8169_private *tp, u32 reg)
 {
 	if (rtl_ocp_reg_failure(tp, reg))
 		return 0;
@@ -822,7 +820,7 @@ static u16 r8168_phy_ocp_read(struct rtl8169_private *tp, u32 reg)
 	RTL_W32(tp, GPHY_OCP, reg << 15);
 
 	return rtl_udelay_loop_wait_high(tp, &rtl_ocp_gphy_cond, 25, 10) ?
-		(RTL_R32(tp, GPHY_OCP) & 0xffff) : ~0;
+		(RTL_R32(tp, GPHY_OCP) & 0xffff) : -ETIMEDOUT;
 }
 
 static void r8168_mac_ocp_write(struct rtl8169_private *tp, u32 reg, u32 data)
@@ -905,7 +903,7 @@ static int r8169_mdio_read(struct rtl8169_private *tp, int reg)
 	RTL_W32(tp, PHYAR, 0x0 | (reg & 0x1f) << 16);
 
 	value = rtl_udelay_loop_wait_high(tp, &rtl_phyar_cond, 25, 20) ?
-		RTL_R32(tp, PHYAR) & 0xffff : ~0;
+		RTL_R32(tp, PHYAR) & 0xffff : -ETIMEDOUT;
 
 	/*
 	 * According to hardware specs a 20us delay is required after read
@@ -945,7 +943,7 @@ static int r8168dp_1_mdio_read(struct rtl8169_private *tp, int reg)
 	RTL_W32(tp, EPHY_RXER_NUM, 0);
 
 	return rtl_udelay_loop_wait_high(tp, &rtl_ocpar_cond, 1000, 100) ?
-		RTL_R32(tp, OCPDR) & OCPDR_DATA_MASK : ~0;
+		RTL_R32(tp, OCPDR) & OCPDR_DATA_MASK : -ETIMEDOUT;
 }
 
 #define R8168DP_1_MDIO_ACCESS_BIT	0x00020000
@@ -1785,18 +1783,16 @@ static const struct rtl_coalesce_info rtl_coalesce_info_8168_8136[] = {
 static const struct rtl_coalesce_info *rtl_coalesce_info(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct ethtool_link_ksettings ecmd;
 	const struct rtl_coalesce_info *ci;
-	int rc;
 
-	rc = phy_ethtool_get_link_ksettings(dev, &ecmd);
-	if (rc < 0)
-		return ERR_PTR(rc);
+	if (tp->mac_version <= RTL_GIGA_MAC_VER_06)
+		ci = rtl_coalesce_info_8169;
+	else
+		ci = rtl_coalesce_info_8168_8136;
 
-	for (ci = tp->coalesce_info; ci->speed != 0; ci++) {
-		if (ecmd.base.speed == ci->speed) {
+	for (; ci->speed; ci++) {
+		if (tp->phydev->speed == ci->speed)
 			return ci;
-		}
 	}
 
 	return ERR_PTR(-ELNRNG);
@@ -6828,11 +6824,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->max_mtu = jumbo_max;
 
 	rtl_set_irq_mask(tp);
-
-	if (tp->mac_version <= RTL_GIGA_MAC_VER_06)
-		tp->coalesce_info = rtl_coalesce_info_8169;
-	else
-		tp->coalesce_info = rtl_coalesce_info_8168_8136;
 
 	tp->fw_name = rtl_chip_infos[chipset].fw_name;
 
