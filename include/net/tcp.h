@@ -212,15 +212,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define TCPOLEN_MD5SIG_ALIGNED		20
 #define TCPOLEN_MSS_ALIGNED		4
 #define TCPOLEN_EXP_SMC_BASE_ALIGNED	8
-#define TCPOLEN_MPTCP_MPC_SYN		12
-#define TCPOLEN_MPTCP_MPC_SYNACK	20
-#define TCPOLEN_MPTCP_MPC_ACK		20
-#define TCPOLEN_MPTCP_DSS_BASE		4
 #define TCPOLEN_MPTCP_DSS_ACK32		4
-#define TCPOLEN_MPTCP_DSS_ACK64		8
 #define TCPOLEN_MPTCP_DSS_MAP32		10
-#define TCPOLEN_MPTCP_DSS_MAP64		14
-#define TCPOLEN_MPTCP_DSS_CHECKSUM	2
 
 /* Flags in tp->nonagle */
 #define TCP_NAGLE_OFF		1	/* Nagle's algo is disabled */
