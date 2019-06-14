@@ -122,7 +122,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 }
 
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-		       struct mptcp_out_options* opts)
+		       struct mptcp_out_options *opts)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 

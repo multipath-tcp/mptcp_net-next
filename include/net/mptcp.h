@@ -33,10 +33,10 @@ static inline bool sk_is_mptcp(const struct sock *sk)
 void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			struct tcp_options_received *opt_rx);
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-			       struct mptcp_out_options* opts);
+		       struct mptcp_out_options *opts);
 void mptcp_rcv_synsent(struct sock *sk);
 bool mptcp_established_options(struct sock *sk, unsigned int *size,
-				       struct mptcp_out_options *opts);
+			       struct mptcp_out_options *opts);
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
@@ -57,7 +57,7 @@ static inline void mptcp_parse_option(const unsigned char *ptr, int opsize,
 }
 
 static inline bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-				     struct mptcp_out_options* opts)
+				     struct mptcp_out_options *opts)
 {
 	return false;
 }
