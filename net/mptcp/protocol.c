@@ -519,7 +519,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 		msk->subflow = NULL;
 	}
 	spin_unlock_bh(&msk->conn_list_lock);
-	if (ssk != NULL) {
+	if (ssk) {
 		pr_debug("subflow=%p", ssk->sk);
 		sock_release(ssk);
 	}
@@ -885,7 +885,8 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	list_for_each_entry_rcu(subflow, &msk->conn_list, node) {
 		pr_debug("conn_list->subflow=%p", subflow);
 		rcu_read_unlock();
-		ret = kernel_sock_shutdown(mptcp_subflow_tcp_socket(subflow), how);
+		ret = kernel_sock_shutdown(mptcp_subflow_tcp_socket(subflow),
+					   how);
 		rcu_read_lock();
 	}
 	rcu_read_unlock();
