@@ -182,12 +182,13 @@ void mptcp_rcv_synsent(struct sock *sk)
 	}
 }
 
-bool mptcp_established_options(struct sock *sk, unsigned int *size,
-			       struct mptcp_out_options *opts)
+static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
+					 unsigned int remaining,
+					 struct mptcp_out_options *opts)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 
-	if (subflow->mp_capable && !subflow->fourth_ack) {
+	if (!subflow->fourth_ack && remaining >= TCPOLEN_MPTCP_MPC_ACK) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
@@ -197,6 +198,90 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 			 subflow, subflow->local_key, subflow->remote_key);
 		return true;
 	}
+	return false;
+}
+
+static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
+					  unsigned int *size,
+					  unsigned int remaining,
+					  struct mptcp_out_options *opts)
+{
+	unsigned int dss_size = 0;
+	struct mptcp_ext *mpext;
+	unsigned int ack_size;
+
+	mpext = skb ? mptcp_get_ext(skb) : NULL;
+
+	if (!skb || (mpext && mpext->use_map)) {
+		unsigned int map_size;
+		bool use_csum;
+
+		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
+		use_csum = subflow_ctx(sk)->use_checksum;
+		if (use_csum)
+			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
+
+		if (map_size <= remaining) {
+			remaining -= map_size;
+			dss_size = map_size;
+			if (mpext) {
+				opts->ext_copy.data_seq = mpext->data_seq;
+				opts->ext_copy.subflow_seq = mpext->subflow_seq;
+				opts->ext_copy.data_len = mpext->data_len;
+				opts->ext_copy.checksum = mpext->checksum;
+				opts->ext_copy.use_map = 1;
+				opts->ext_copy.dsn64 = mpext->dsn64;
+				opts->ext_copy.use_checksum = use_csum;
+			}
+		} else {
+			opts->ext_copy.use_map = 0;
+			WARN_ONCE(1, "MPTCP: Map dropped");
+		}
+	}
+
+	if (mpext && mpext->use_ack) {
+		ack_size = TCPOLEN_MPTCP_DSS_ACK64;
+
+		/* Add kind/length/subtype/flag overhead if mapping not populated */
+		if (dss_size == 0)
+			ack_size += TCPOLEN_MPTCP_DSS_BASE;
+
+		if (ack_size <= remaining) {
+			dss_size += ack_size;
+
+			opts->ext_copy.data_ack = mpext->data_ack;
+			opts->ext_copy.ack64 = 1;
+			opts->ext_copy.use_ack = 1;
+		} else {
+			opts->ext_copy.use_ack = 0;
+			WARN(1, "MPTCP: Ack dropped");
+		}
+	}
+
+	*size = ALIGN(dss_size, 4);
+	return true;
+}
+
+bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			       unsigned int *size, unsigned int remaining,
+			       struct mptcp_out_options *opts)
+{
+	unsigned int opt_size = 0;
+
+	if (!subflow_ctx(sk)->mp_capable)
+		return false;
+
+	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {
+		*size += opt_size;
+		remaining -= opt_size;
+		return true;
+	} else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
+					       opts)) {
+		*size += opt_size;
+		remaining -= opt_size;
+		return true;
+	}
+
 	return false;
 }
 
@@ -242,6 +327,56 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
+		}
+	}
+
+	if (opts->ext_copy.use_ack || opts->ext_copy.use_map) {
+		struct mptcp_ext *mpext = &opts->ext_copy;
+		u8 len = TCPOLEN_MPTCP_DSS_BASE;
+		u8 flags = 0;
+
+		if (mpext->use_ack) {
+			len += TCPOLEN_MPTCP_DSS_ACK64;
+			flags = MPTCP_DSS_HAS_ACK | MPTCP_DSS_ACK64;
+		}
+
+		if (mpext->use_map) {
+			len += TCPOLEN_MPTCP_DSS_MAP64;
+
+			if (mpext->use_checksum)
+				len += TCPOLEN_MPTCP_DSS_CHECKSUM;
+
+			/* Use only 64-bit mapping flags for now, add
+			 * support for optional 32-bit mappings later.
+			 */
+			flags |= MPTCP_DSS_HAS_MAP | MPTCP_DSS_DSN64;
+			if (mpext->data_fin)
+				flags |= MPTCP_DSS_DATA_FIN;
+		}
+
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (len  << 16) |
+			       (MPTCPOPT_DSS << 12) |
+			       (flags));
+
+		if (mpext->use_ack) {
+			put_unaligned_be64(mpext->data_ack, ptr);
+			ptr += 2;
+		}
+
+		if (mpext->use_map) {
+			__sum16 checksum;
+
+			pr_debug("Writing map values");
+			put_unaligned_be64(mpext->data_seq, ptr);
+			ptr += 2;
+			*ptr++ = htonl(mpext->subflow_seq);
+
+			if (mpext->use_checksum)
+				checksum = mpext->checksum;
+			else
+				checksum = TCPOPT_NOP << 8 | TCPOPT_NOP;
+			*ptr = htonl(mpext->data_len << 16 | checksum);
 		}
 	}
 }
