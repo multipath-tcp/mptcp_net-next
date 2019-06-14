@@ -319,7 +319,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 		msk = mptcp_sk(subflow_ctx(sk)->conn);
 		if (msk) {
-			opts->ext_copy.data_ack = atomic64_read(&msk->ack_seq);
+			opts->ext_copy.data_ack = msk->ack_seq;
 		} else {
 			crypto_key_sha1(subflow_ctx(sk)->remote_key, NULL,
 					&opts->ext_copy.data_ack);
