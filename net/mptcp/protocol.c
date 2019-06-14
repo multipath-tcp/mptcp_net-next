@@ -69,7 +69,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	}
 
 	if (msk->connection_list) {
-		pr_debug("conn_list->subflow=%p", subflow_ctx(msk->connection_list->sk));
+		pr_debug("conn_list->subflow=%p",
+			 subflow_ctx(msk->connection_list->sk));
 		sock_release(msk->connection_list);
 	}
 
@@ -94,7 +95,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	subflow = subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
-	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP, &new_mptcp_sock);
+	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP,
+			   &new_mptcp_sock);
 	if (*err < 0) {
 		kernel_sock_shutdown(new_sock, SHUT_RDWR);
 		sock_release(new_sock);
