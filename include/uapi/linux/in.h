@@ -64,8 +64,6 @@ enum {
 #define IPPROTO_BEETPH		IPPROTO_BEETPH
   IPPROTO_ENCAP = 98,		/* Encapsulation Header			*/
 #define IPPROTO_ENCAP		IPPROTO_ENCAP
-  IPPROTO_MPTCP = 99,		/* Multipath TCP connection 		*/
-#define IPPROTO_MPTCP		IPPROTO_MPTCP
   IPPROTO_PIM = 103,		/* Protocol Independent Multicast	*/
 #define IPPROTO_PIM		IPPROTO_PIM
   IPPROTO_COMP = 108,		/* Compression Header Protocol		*/
@@ -78,6 +76,8 @@ enum {
 #define IPPROTO_MPLS		IPPROTO_MPLS
   IPPROTO_RAW = 255,		/* Raw IP packets			*/
 #define IPPROTO_RAW		IPPROTO_RAW
+  IPPROTO_MPTCP = 262,		/* Multipath TCP connection 		*/
+#define IPPROTO_MPTCP		IPPROTO_MPTCP
   IPPROTO_MAX
 };
 #endif
