@@ -632,6 +632,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		token_update_accept(new_sock->sk, new_mptcp_sock);
 		msk->subflow = NULL;
 
+		pm_new_connection(msk);
+
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
@@ -757,6 +759,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->token = subflow->token;
 		pr_debug("msk=%p, token=%u", msk, msk->token);
 
+		pm_new_connection(msk);
+
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
@@ -771,6 +775,27 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		local_bh_enable();
 	}
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
+}
+
+void mptcp_finish_join(struct sock *conn, struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(conn);
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	pr_debug("msk=%p, subflow=%p", msk, subflow);
+
+	local_bh_disable();
+	bh_lock_sock_nested(sk);
+	list_add_tail(&subflow->node, &msk->conn_list);
+	bh_unlock_sock(sk);
+	local_bh_enable();
+}
+
+bool mptcp_sk_is_subflow(const struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	return subflow->mp_join == 1;
 }
 
 static struct proto mptcp_prot = {

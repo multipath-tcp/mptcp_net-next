@@ -112,8 +112,14 @@ struct tcp_options_received {
 		u8      mp_capable : 1,
 			mp_join : 1,
 			dss : 1,
+			backup : 1,
 			version : 4;
 		u8      flags;
+		u8      join_id;
+		u32     token;
+		u32     nonce;
+		u64     thmac;
+		u8      hmac[20];
 		u8	dss_flags;
 		u8	use_map:1,
 			dsn64:1,
@@ -122,6 +128,12 @@ struct tcp_options_received {
 			use_ack:1,
 			ack64:1,
 			__unused:2;
+		u8	add_addr : 1,
+			rm_addr : 1,
+			family : 4;
+		u8	addr_id;
+		struct	in_addr	addr;
+		struct	in6_addr addr6;
 	} mptcp;
 #endif
 };

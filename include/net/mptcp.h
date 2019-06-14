@@ -25,15 +25,30 @@ struct mptcp_ext {
 };
 
 /* MPTCP option subtypes */
-#define OPTION_MPTCP_MPC_SYN	BIT(0)
-#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
-#define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_MPC_SYN		BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK		BIT(1)
+#define OPTION_MPTCP_MPC_ACK		BIT(2)
+#define OPTION_MPTCP_MPJ_SYN		BIT(3)
+#define OPTION_MPTCP_MPJ_SYNACK		BIT(4)
+#define OPTION_MPTCP_MPJ_ACK		BIT(5)
+#define OPTION_MPTCP_ADD_ADDR		BIT(6)
+#define OPTION_MPTCP_ADD_ADDR6		BIT(7)
+#define OPTION_MPTCP_RM_ADDR		BIT(8)
 
 struct mptcp_out_options {
 #if IS_ENABLED(CONFIG_MPTCP)
 	u16 suboptions;
 	u64 sndr_key;
 	u64 rcvr_key;
+	struct in_addr addr;
+#if IS_ENABLED(CONFIG_IPV6)
+	struct in6_addr addr6;
+#endif
+	u8 addr_id;
+	u8 join_id;
+	u8 backup;
+	u32 nonce;
+	u64 thmac;
 	struct mptcp_ext ext_copy;
 #endif
 };
@@ -72,6 +87,8 @@ static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
+
+bool mptcp_sk_is_subflow(const struct sock *sk);
 
 #else
 
@@ -126,6 +143,11 @@ static inline void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
 }
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return false;
+}
+
+static inline book mptcp_sk_is_subflow(const struct sock *sk)
 {
 	return false;
 }

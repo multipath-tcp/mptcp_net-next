@@ -55,6 +55,15 @@ static bool find_token(u32 token)
 	return (used != NULL);
 }
 
+static struct sock *lookup_token(u32 token)
+{
+	void *conn;
+
+	pr_debug("token=%u", token);
+	conn = radix_tree_lookup(&token_tree, token);
+	return (struct sock *) conn;
+}
+
 static void new_req_token(struct request_sock *req,
 			  const struct sk_buff *skb)
 {
@@ -81,6 +90,56 @@ static void new_req_token(struct request_sock *req,
 	pr_debug("local_key=%llu, token=%u, idsn=%llu", subflow_req->local_key,
 		 subflow_req->token, subflow_req->idsn);
 }
+
+static void new_req_join(struct request_sock *req, struct sock *sk,
+			 const struct sk_buff *skb)
+{
+	const struct inet_request_sock *ireq = inet_rsk(req);
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	u32 nonce;
+
+	if (skb->protocol == htons(ETH_P_IP)) {
+		nonce = crypto_v4_get_nonce(ip_hdr(skb)->saddr,
+					    ip_hdr(skb)->daddr,
+					    htons(ireq->ir_num),
+					    ireq->ir_rmt_port);
+#if IS_ENABLED(CONFIG_IPV6)
+	} else {
+		nonce = crypto_v6_get_nonce(&ipv6_hdr(skb)->saddr,
+					    &ipv6_hdr(skb)->daddr,
+					    htons(ireq->ir_num),
+					    ireq->ir_rmt_port);
+#endif
+	}
+	subflow_req->local_nonce = nonce;
+
+	crypto_hmac_sha1(msk->local_key,
+			 msk->remote_key,
+			 (u32 *)hmac, 2,
+			 4, (u8 *)&subflow_req->local_nonce,
+			 4, (u8 *)&subflow_req->remote_nonce);
+	subflow_req->thmac = *(u64 *)hmac;
+	pr_debug("local_nonce=%u, thmac=%llu", subflow_req->local_nonce,
+		 subflow_req->thmac);
+}
+
+static int new_join_valid(struct request_sock *req, struct sock *sk,
+			  struct tcp_options_received *rx_opt)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+
+	crypto_hmac_sha1(msk->remote_key,
+			 msk->local_key,
+			 (u32 *)hmac, 2,
+			 4, (u8 *)&subflow_req->remote_nonce,
+			 4, (u8 *)&subflow_req->local_nonce);
+
+	return memcmp(hmac, (char *)rx_opt->mptcp.hmac, MPTCPOPT_HMAC_LEN);
+ }
 
 static void new_token(const struct sock *sk)
 {
@@ -178,6 +237,42 @@ void token_new_request(struct request_sock *req,
 	spin_unlock_bh(&token_tree_lock);
 }
 
+/* validate received token and create truncated hmac and nonce for SYN-ACK */
+int token_join_request(struct request_sock *req, const struct sk_buff *skb)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct sock *conn;
+
+	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
+	spin_lock_bh(&token_tree_lock);
+	conn = lookup_token(subflow_req->token);
+	spin_unlock_bh(&token_tree_lock);
+	if (conn != NULL) {
+		// @@ get real local address id for this skb->saddr
+		subflow_req->local_id = 0;
+		new_req_join(req, conn, skb);
+		return 0;
+	}
+	return -1;
+}
+
+/* validate hmac received in third ACK */
+int token_join_valid(struct request_sock *req,
+		     struct tcp_options_received *rx_opt)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct sock *conn;
+
+	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
+	spin_lock_bh(&token_tree_lock);
+	conn = lookup_token(subflow_req->token);
+	spin_unlock_bh(&token_tree_lock);
+	if (conn != NULL) {
+		return new_join_valid(req, conn, rx_opt);
+	}
+	return -1;
+}
+
 /* create new local key, idsn, and token for subflow */
 void token_new_connect(struct sock *sk)
 {
@@ -221,12 +316,41 @@ void token_update_accept(struct sock *sk, struct sock *conn)
 	spin_unlock_bh(&token_tree_lock);
 }
 
+int token_new_join(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct sock *conn;
+
+	spin_lock_bh(&token_tree_lock);
+	conn = lookup_token(subflow->token);
+	if (conn != NULL) {
+		sock_hold(conn);
+		spin_unlock_bh(&token_tree_lock);
+		subflow->conn = conn;
+		return 0;
+	}
+	spin_unlock_bh(&token_tree_lock);
+	return -1;
+}
+
 void token_destroy_request(u32 token)
 {
 	pr_debug("token=%u", token);
 
 	spin_lock_bh(&token_tree_lock);
 	destroy_req_token(token);
+	spin_unlock_bh(&token_tree_lock);
+}
+
+void token_release(u32 token)
+{
+	struct sock *conn;
+
+	pr_debug("token=%u", token);
+	spin_lock_bh(&token_tree_lock);
+	conn = lookup_token(token);
+	if (conn != NULL)
+		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
 }
 
