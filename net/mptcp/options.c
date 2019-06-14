@@ -241,7 +241,9 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 	if (mpext && mpext->use_ack) {
 		ack_size = TCPOLEN_MPTCP_DSS_ACK64;
 
-		/* Add kind/length/subtype/flag overhead if mapping not populated */
+		/* Add kind/lenght/subtype/flag overhead if mapping is not
+		 * populated
+		 */
 		if (dss_size == 0)
 			ack_size += TCPOLEN_MPTCP_DSS_BASE;
 

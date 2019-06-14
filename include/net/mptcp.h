@@ -120,7 +120,7 @@ static inline bool mptcp_established_options(struct sock *sk,
 					     struct sk_buff *skb,
 					     unsigned int *size,
 					     unsigned int remaining,
-					     struct mptcp_out_options* opts)
+					     struct mptcp_out_options *opts)
 {
 	return false;
 }
