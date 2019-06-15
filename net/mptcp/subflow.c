@@ -150,10 +150,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	} else if (subflow_req->mp_join) {
 		opt_rx.mptcp.mp_join = 0;
 		mptcp_get_options(skb, &opt_rx);
-		if ((!opt_rx.mptcp.mp_join) ||
-		    (token_join_valid(req, &opt_rx))) {
+		if (!opt_rx.mptcp.mp_join || token_join_valid(req, &opt_rx))
 			return NULL;
-		}
 	}
 
 	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
@@ -167,11 +165,10 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 		if (ctx->mp_capable) {
 			token_new_accept(child);
 		} else if (ctx->mp_join) {
-			if (token_new_join(child)) {
+			if (token_new_join(child))
 				goto close_child;
-			} else {
+			else
 				mptcp_finish_join(ctx->conn, child);
-			}
 		}
 	}
 
