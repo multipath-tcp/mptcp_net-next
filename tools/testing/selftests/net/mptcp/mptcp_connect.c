@@ -26,16 +26,19 @@ extern int optind;
 #define IPPROTO_MPTCP 262
 #endif
 
+static bool listen_mode;
+static int  poll_timeout;
+
 static const char *cfg_host;
 static const char *cfg_port	= "12000";
-static int cfg_server_proto	= IPPROTO_MPTCP;
-static int cfg_client_proto	= IPPROTO_MPTCP;
+static int cfg_sock_proto	= IPPROTO_MPTCP;
+
 
 static void die_usage(void)
 {
-	fprintf(stderr, "Usage: mptcp_connect [-c MPTCP|TCP] [-p port] "
-	        "[-s MPTCP|TCP]\n");
-	exit(-1);
+	fprintf(stderr, "Usage: mptcp_connect [-s MPTCP|TCP] [-p port] "
+		"[ -l ] [ -t timeout ] connect_address\n");
+	exit(1);
 }
 
 static const char *getxinfo_strerr(int err)
@@ -76,15 +79,12 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 
 	for (a = addr; a != NULL ; a = a->ai_next) {
-		sock = socket(a->ai_family, a->ai_socktype, cfg_server_proto);
-		if (sock < 0) {
-			perror("socket");
+		sock = socket(a->ai_family, a->ai_socktype, cfg_sock_proto);
+		if (sock < 0)
 			continue;
-		}
 
 		if (-1 == setsockopt(sock, SOL_SOCKET,SO_REUSEADDR,&one,sizeof one))
 			perror("setsockopt");
-
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
@@ -94,10 +94,19 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 		sock = -1;
 	}
 
-	if ((sock >= 0) && listen(sock ,20))
-		perror("listen");
-
 	freeaddrinfo(addr);
+
+	if (sock < 0) {
+		fprintf(stderr, "Could not create listen socket\n");
+		return sock;
+	}
+
+	if (listen(sock, 20)) {
+		perror("listen");
+		close(sock);
+		return -1;
+	}
+
 	return sock;
 }
 
@@ -132,7 +141,7 @@ static int sock_connect_mptcp(const char * const remoteaddr, const char * const 
 	return sock;
 }
 
-static size_t do_write(const int fd, char *buf, const size_t len)
+static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 {
 	size_t offset = 0;
 
@@ -157,62 +166,141 @@ static size_t do_write(const int fd, char *buf, const size_t len)
 	return offset;
 }
 
-static void copyfd_io(int peerfd)
+static size_t do_write(const int fd, char *buf, const size_t len)
 {
-	struct pollfd fds = { .events = POLLIN };
+	size_t offset = 0;
 
-	fds.fd = peerfd;
+	while (offset < len) {
+		size_t written;
+		ssize_t bw;
+
+		bw = write(fd, buf+offset, len - offset);
+		if (bw < 0 ) {
+			perror("write");
+			return 0;
+		}
+
+		written = (size_t) bw;
+		offset += written;
+	}
+
+	return offset;
+}
+
+static ssize_t do_rnd_read(const int fd, char *buf, const size_t len)
+{
+	size_t cap = rand();
+
+	cap &= 0xffff;
+
+	if (cap == 0)
+		cap = 1;
+	else if (cap > len)
+		cap = len;
+
+	return read(fd, buf, cap);
+}
+
+static int copyfd_io(int infd, int peerfd, int outfd)
+{
+	struct pollfd fds = {
+		.fd = peerfd,
+		.events = POLLIN | POLLOUT,
+	};
 
 	for (;;) {
-		char buf[4096];
+		char buf[8192];
 		ssize_t len;
 
-		switch(poll(&fds, 1, -1)) {
+		if (fds.events == 0)
+			break;
+
+		switch (poll(&fds, 1, poll_timeout)) {
 		case -1:
 			if (errno == EINTR)
 				continue;
 			perror("poll");
-			return;
+			return 1;
 		case 0:
-			/* should not happen, we requested infinite wait */
-			fputs("Timed out?!", stderr);
-			return;
+			fprintf(stderr, "%s: poll timed out (events: POLLIN %u, POLLOUT %u)\n",
+					__func__, fds.events & POLLIN, fds.events & POLLOUT);
+			return 2;
 		}
 
-		if ((fds.revents & POLLIN) == 0)
-			return;
+		if (fds.revents & POLLIN) {
+			len = do_rnd_read(peerfd, buf, sizeof(buf));
+			if (len == 0) {
+				/* no more data to receive: peer has closed its write side */
+				fds.events &= ~POLLIN;
 
-		len = read(peerfd, buf, sizeof(buf));
-		if (!len)
-			return;
-		if (len < 0) {
-			if (errno == EINTR)
-				continue;
+				if ((fds.events & POLLOUT) == 0)
+					break; /* and nothing more to send */
 
-			perror("read");
-			return;
+				/* Else, still have data to transmit */
+			} else if (len < 0) {
+				perror("read");
+				return 3;
+			}
+
+			do_write(outfd, buf, len);
 		}
 
-		if (!do_write(peerfd, buf, len))
-			return;
+		if (fds.revents & POLLOUT) {
+			len = do_rnd_read(infd, buf, sizeof(buf));
+			if (len > 0) {
+				if (!do_rnd_write(peerfd, buf, len))
+					return 111;
+			} else if (len == 0) {
+				/* We have no more data to send. */
+				fds.events &= ~POLLOUT;
 
+				if ((fds.events & POLLIN) == 0)
+					break; /* ... and peer also closed already */
+
+				/* ... but we still receive. Close our write side. */
+				shutdown(peerfd, SHUT_WR);
+			} else {
+				if (errno == EINTR)
+					continue;
+				perror("read");
+				return 4;
+			}
+		}
 	}
+
+	close(peerfd);
+	return 0;
 }
 
 int main_loop_s(int listensock)
 {
 	struct sockaddr_storage ss;
+	struct pollfd polls;
 	socklen_t salen;
         int remotesock;
 
+	polls.fd = listensock;
+	polls.events = POLLIN;
+
+	switch (poll(&polls, 1, poll_timeout)) {
+	case -1:
+		perror("poll");
+		return 1;
+	case 0:
+		fprintf(stderr, "%s: timed out\n", __func__);
+		close(listensock);
+		return 2;
+	}
+
 	salen = sizeof(ss);
-	while ((remotesock = accept(listensock, (struct sockaddr *)&ss, &salen)) < 0)
+	remotesock = accept(listensock, (struct sockaddr *)&ss, &salen);
+	if (remotesock >= 0) {
+		copyfd_io(0, remotesock, 1);
+		return 0;
+	} else {
 		perror("accept");
-
-	copyfd_io(remotesock);
-	close(remotesock);
-
-	return 0;
+		return 1;
+	}
 }
 
 static void init_rng(void)
@@ -221,7 +309,9 @@ static void init_rng(void)
 	unsigned int foo;
 
 	if (fd > 0) {
-		read(fd, &foo, sizeof(foo));
+		int ret = read(fd, &foo, sizeof(foo));
+		if (ret < 0)
+			srand(fd + foo);
 		close(fd);
 	}
 
@@ -230,112 +320,14 @@ static void init_rng(void)
 
 int main_loop()
 {
-	int pollfds = 2, timeout = -1;
-	char start[32];
-	int pipefd[2];
-	ssize_t ret;
 	int fd;
 
-	if (pipe(pipefd)) {
-		perror("pipe");
-		exit(1);
-	}
-
-	switch (fork()) {
-	case 0:
-		close(pipefd[0]);
-
-		init_rng();
-
-		fd = sock_listen_mptcp(NULL, cfg_port);
-		if (fd < 0)
-			return -1;
-
-		write(pipefd[1], "RDY\n", 4);
-		main_loop_s(fd);
-		exit(1);
-	case -1:
-		perror("fork");
-		return -1;
-	default:
-		close(pipefd[1]);
-		break;
-	}
-
-	init_rng();
-	ret = read(pipefd[0], start, (int)sizeof(start));
-	if (ret < 0) {
-		perror("read");
-		return -1;
-	}
-
-	if (ret != 4 || strcmp(start, "RDY\n"))
-		return -1;
-
 	/* listener is ready. */
-	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_client_proto);
+	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto);
 	if (fd < 0)
-		return -1;
+		return 2;
 
-	for (;;) {
-		struct pollfd fds[2];
-		char buf[4096];
-		ssize_t len;
-
-		fds[0].fd = fd;
-		fds[0].events = POLLIN;
-		fds[1].fd = 0;
-		fds[1].events = POLLIN;
-		fds[1].revents = 0;
-
-		switch (poll(fds, pollfds, timeout)) {
-		case -1:
-			if (errno == EINTR)
-				continue;
-			perror("poll");
-			return -1;
-		case 0:
-			close(fd);
-			return 0;
-		}
-
-		if (fds[0].revents & POLLIN) {
-			unsigned int blen = rand();
-
-			blen %= sizeof(buf);
-
-			++blen;
-			len = read(fd, buf, blen);
-			if (len < 0) {
-				perror("read");
-				return -1;
-			}
-
-			if (len > blen) {
-				fprintf(stderr, "read returned more data than buffer length\n");
-				len = blen;
-			}
-
-			write(1, buf, len);
-		}
-		if (fds[1].revents & POLLIN) {
-			len = read(0, buf, sizeof(buf));
-			if (len == 0) {
-				pollfds = 1;
-				timeout = 1000;
-				continue;
-			}
-
-			if (len < 0) {
-				perror("read");
-				break;
-			}
-
-			do_write(fd, buf, len);
-		}
-	}
-
-	return 1;
+	return copyfd_io(0, fd, 1);
 }
 
 int parse_proto(const char *proto)
@@ -344,6 +336,8 @@ int parse_proto(const char *proto)
 		return IPPROTO_MPTCP;
 	if (!strcasecmp(proto, "TCP"))
 		return IPPROTO_TCP;
+
+	fprintf(stderr, "Unknown protocol: %s.", proto);
 	die_usage();
 
 	/* silence compiler warning */
@@ -354,19 +348,24 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "c:p:s:h")) != -1) {
+	while ((c = getopt(argc, argv, "lp:s:ht:")) != -1) {
 		switch (c) {
-		case 'c':
-			cfg_client_proto = parse_proto(optarg);
+		case 'l':
+			listen_mode = true;
 			break;
 		case 'p':
 			cfg_port = optarg;
 			break;
 		case 's':
-			cfg_server_proto = parse_proto(optarg);
+			cfg_sock_proto = parse_proto(optarg);
 			break;
 		case 'h':
 			die_usage();
+			break;
+		case 't':
+			poll_timeout=atoi(optarg) * 1000;
+			if (poll_timeout <= 0)
+				poll_timeout = -1;
 			break;
 		}
 	}
@@ -376,11 +375,19 @@ static void parse_opts(int argc, char **argv)
 	cfg_host = argv[optind];
 }
 
-
 int main(int argc, char *argv[])
 {
 	init_rng();
 
 	parse_opts(argc, argv);
+
+	if (listen_mode) {
+		int fd = sock_listen_mptcp(cfg_host, cfg_port);
+		if (fd < 0)
+			return 1;
+
+		return main_loop_s(fd);
+	}
+
 	return main_loop();
 }
