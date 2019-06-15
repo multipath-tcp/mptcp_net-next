@@ -23,7 +23,7 @@ This uncovers several bugs:
     in tcp_established_options() after writing mptcp options.
     SACK writing doesn't handle 'no option space left' case.
 3. Several WARN_ON from networking core are triggered, e.g. due
-   to mem accouting being off.  Maybe fixed already with pending
+   to mem accounting being off.  Maybe fixed already with pending
    locking fix in mptcp_recv.
 4. "Replaced mapping before it was done" in dmesg.
 5. receiver blocking in read(), while TCP socket is in CLOSE-WAIT.

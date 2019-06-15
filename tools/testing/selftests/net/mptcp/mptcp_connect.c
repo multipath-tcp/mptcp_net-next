@@ -179,13 +179,13 @@ static size_t do_write(const int fd, char *buf, const size_t len)
 		size_t written;
 		ssize_t bw;
 
-		bw = write(fd, buf+offset, len - offset);
-		if (bw < 0 ) {
+		bw = write(fd, buf + offset, len - offset);
+		if (bw < 0) {
 			perror("write");
 			return 0;
 		}
 
-		written = (size_t) bw;
+		written = (size_t)bw;
 		offset += written;
 	}
 
@@ -227,21 +227,25 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 			perror("poll");
 			return 1;
 		case 0:
-			fprintf(stderr, "%s: poll timed out (events: POLLIN %u, POLLOUT %u)\n",
-					__func__, fds.events & POLLIN, fds.events & POLLOUT);
+			fprintf(stderr, "%s: poll timed out (events: "
+				"POLLIN %u, POLLOUT %u)\n", __func__,
+				fds.events & POLLIN, fds.events & POLLOUT);
 			return 2;
 		}
 
 		if (fds.revents & POLLIN) {
 			len = do_rnd_read(peerfd, buf, sizeof(buf));
 			if (len == 0) {
-				/* no more data to receive: peer has closed its write side */
+				/* no more data to receive:
+				 * peer has closed its write side
+				 */
 				fds.events &= ~POLLIN;
 
 				if ((fds.events & POLLOUT) == 0)
-					break; /* and nothing more to send */
+					/* and nothing more to send */
+					break;
 
-				/* Else, still have data to transmit */
+			/* Else, still have data to transmit */
 			} else if (len < 0) {
 				perror("read");
 				return 3;
@@ -260,9 +264,12 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 				fds.events &= ~POLLOUT;
 
 				if ((fds.events & POLLIN) == 0)
-					break; /* ... and peer also closed already */
+					/* ... and peer also closed already */
+					break;
 
-				/* ... but we still receive. Close our write side. */
+				/* ... but we still receive.
+				 * Close our write side.
+				 */
 				shutdown(peerfd, SHUT_WR);
 			} else {
 				if (errno == EINTR)
@@ -302,10 +309,11 @@ int main_loop_s(int listensock)
 	if (remotesock >= 0) {
 		copyfd_io(0, remotesock, 1);
 		return 0;
-	} else {
-		perror("accept");
-		return 1;
 	}
+
+	perror("accept");
+
+	return 1;
 }
 
 static void init_rng(void)
@@ -315,6 +323,7 @@ static void init_rng(void)
 
 	if (fd > 0) {
 		int ret = read(fd, &foo, sizeof(foo));
+
 		if (ret < 0)
 			srand(fd + foo);
 		close(fd);
@@ -368,7 +377,7 @@ static void parse_opts(int argc, char **argv)
 			die_usage();
 			break;
 		case 't':
-			poll_timeout=atoi(optarg) * 1000;
+			poll_timeout = atoi(optarg) * 1000;
 			if (poll_timeout <= 0)
 				poll_timeout = -1;
 			break;
@@ -388,6 +397,7 @@ int main(int argc, char *argv[])
 
 	if (listen_mode) {
 		int fd = sock_listen_mptcp(cfg_host, cfg_port);
+
 		if (fd < 0)
 			return 1;
 
