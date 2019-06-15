@@ -175,7 +175,7 @@ void pm_subflow_closed(struct mptcp_sock *msk, u8 id);
 void pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr, u8 id);
 void pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr, u8 id);
 void pm_rm_addr(struct mptcp_sock *msk, u8 id);
-bool pm_addr_signal(struct mptcp_sock *msk, unsigned *size,
+bool pm_addr_signal(struct mptcp_sock *msk, unsigned int *size,
 		    unsigned int remaining, struct mptcp_out_options *opts);
 
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
