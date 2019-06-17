@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
