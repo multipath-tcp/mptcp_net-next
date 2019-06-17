@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -157,7 +156,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	}
 
 	if (msk->connection_list) {
-		pr_debug("conn_list->subflow=%p", subflow_ctx(msk->connection_list->sk));
+		pr_debug("conn_list->subflow=%p",
+			 subflow_ctx(msk->connection_list->sk));
 		sock_release(msk->connection_list);
 	}
 
@@ -182,7 +182,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	subflow = subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
-	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP, &new_mptcp_sock);
+	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP,
+			   &new_mptcp_sock);
 	if (*err < 0) {
 		kernel_sock_shutdown(new_sock, SHUT_RDWR);
 		sock_release(new_sock);
@@ -351,9 +352,9 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-	        err = mptcp_subflow_create(sock->sk);
-	        if (err)
-	                return err;
+		err = mptcp_subflow_create(sock->sk);
+		if (err)
+			return err;
 	}
 	return inet_bind(msk->subflow, uaddr, addr_len);
 }
@@ -456,7 +457,7 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	return ret;
 }
 
-static struct proto_ops mptcp_stream_ops;
+static const struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
