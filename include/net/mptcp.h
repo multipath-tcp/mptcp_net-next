@@ -40,10 +40,12 @@ struct mptcp_out_options {
 	u16 suboptions;
 	u64 sndr_key;
 	u64 rcvr_key;
-	struct in_addr addr;
+	union {
+		struct in_addr addr;
 #if IS_ENABLED(CONFIG_IPV6)
-	struct in6_addr addr6;
+		struct in6_addr addr6;
 #endif
+	};
 	u8 addr_id;
 	u8 join_id;
 	u8 backup;
