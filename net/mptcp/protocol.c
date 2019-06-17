@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -153,7 +152,7 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 		return old_seq;
 
 	/* Assume map covers data not mapped yet. */
-	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63,32));
+	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63, 32));
 }
 
 static u64 get_map_offset(struct subflow_context *subflow)
@@ -285,7 +284,7 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 
 del_out:
 	__skb_ext_del(skb, SKB_EXT_MPTCP);
-	return ret;;
+	return ret;
 }
 
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
@@ -302,7 +301,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	long timeo;
 
 	if (msk->subflow) {
-		pr_debug("fallback-read subflow=%p", subflow_ctx(msk->subflow->sk));
+		pr_debug("fallback-read subflow=%p",
+			 subflow_ctx(msk->subflow->sk));
 		return sock_recvmsg(msk->subflow, msg, flags);
 	}
 
@@ -558,7 +558,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	subflow = subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
-	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP, &new_mptcp_sock);
+	*err = sock_create(PF_INET, SOCK_STREAM, IPPROTO_MPTCP,
+			   &new_mptcp_sock);
 	if (*err < 0) {
 		kernel_sock_shutdown(new_sock, SHUT_RDWR);
 		sock_release(new_sock);
@@ -746,9 +747,9 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-	        err = mptcp_subflow_create(sock->sk);
-	        if (err)
-	                return err;
+		err = mptcp_subflow_create(sock->sk);
+		if (err)
+			return err;
 	}
 	return inet_bind(msk->subflow, uaddr, addr_len);
 }
@@ -893,7 +894,7 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	return ret;
 }
 
-static struct proto_ops mptcp_stream_ops;
+static const struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
