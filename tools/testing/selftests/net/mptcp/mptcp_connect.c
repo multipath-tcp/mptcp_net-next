@@ -34,7 +34,7 @@ static int cfg_client_proto	= IPPROTO_MPTCP;
 static void die_usage(void)
 {
 	fprintf(stderr, "Usage: mptcp_connect [-c MPTCP|TCP] [-p port] "
-	        "[-s MPTCP|TCP]\n");
+		"[-s MPTCP|TCP]\n");
 	exit(-1);
 }
 
@@ -47,19 +47,22 @@ static const char *getxinfo_strerr(int err)
 }
 
 static void xgetaddrinfo(const char *node, const char *service,
-			const struct addrinfo *hints,
-			struct addrinfo **res)
+			 const struct addrinfo *hints,
+			 struct addrinfo **res)
 {
 	int err = getaddrinfo(node, service, hints, res);
+
 	if (err) {
 		const char *errstr = getxinfo_strerr(err);
 
-		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n", node ? node: "", service ? service: "", errstr);
-	        exit(1);
+		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n",
+			node ? node : "", service ? service : "", errstr);
+		exit(1);
 	}
 }
 
-static int sock_listen_mptcp(const char * const listenaddr, const char * const port)
+static int sock_listen_mptcp(const char * const listenaddr,
+			     const char * const port)
 {
 	int sock;
 	struct addrinfo hints = {
@@ -75,16 +78,16 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 
-	for (a = addr; a != NULL ; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, cfg_server_proto);
 		if (sock < 0) {
 			perror("socket");
 			continue;
 		}
 
-		if (-1 == setsockopt(sock, SOL_SOCKET,SO_REUSEADDR,&one,sizeof one))
+		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
+				     sizeof(one)))
 			perror("setsockopt");
-
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
@@ -94,14 +97,15 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 		sock = -1;
 	}
 
-	if ((sock >= 0) && listen(sock ,20))
+	if (sock >= 0 && listen(sock, 20))
 		perror("listen");
 
 	freeaddrinfo(addr);
 	return sock;
 }
 
-static int sock_connect_mptcp(const char * const remoteaddr, const char * const port, int proto)
+static int sock_connect_mptcp(const char * const remoteaddr,
+			      const char * const port, int proto)
 {
 	struct addrinfo hints = {
 		.ai_protocol = IPPROTO_TCP,
@@ -113,7 +117,7 @@ static int sock_connect_mptcp(const char * const remoteaddr, const char * const 
 	hints.ai_family = AF_INET;
 
 	xgetaddrinfo(remoteaddr, port, &hints, &addr);
-	for (a=addr; a != NULL; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, proto);
 		if (sock < 0) {
 			perror("socket");
@@ -145,13 +149,13 @@ static size_t do_write(const int fd, char *buf, const size_t len)
 		if (do_w == 0 || do_w > (len - offset))
 			do_w = len - offset;
 
-		bw = write(fd, buf+offset, do_w);
-		if (bw < 0 ) {
+		bw = write(fd, buf + offset, do_w);
+		if (bw < 0) {
 			perror("write");
 			return 0;
 		}
 
-		written = (size_t) bw;
+		written = (size_t)bw;
 		offset += written;
 	}
 	return offset;
@@ -167,7 +171,7 @@ static void copyfd_io(int peerfd)
 		char buf[4096];
 		ssize_t len;
 
-		switch(poll(&fds, 1, -1)) {
+		switch (poll(&fds, 1, -1)) {
 		case -1:
 			if (errno == EINTR)
 				continue;
@@ -195,7 +199,6 @@ static void copyfd_io(int peerfd)
 
 		if (!do_write(peerfd, buf, len))
 			return;
-
 	}
 }
 
@@ -203,10 +206,11 @@ int main_loop_s(int listensock)
 {
 	struct sockaddr_storage ss;
 	socklen_t salen;
-        int remotesock;
+	int remotesock;
 
 	salen = sizeof(ss);
-	while ((remotesock = accept(listensock, (struct sockaddr *)&ss, &salen)) < 0)
+	while ((remotesock = accept(listensock, (struct sockaddr *)&ss,
+				    &salen)) < 0)
 		perror("accept");
 
 	copyfd_io(remotesock);
@@ -228,7 +232,7 @@ static void init_rng(void)
 	srand(foo);
 }
 
-int main_loop()
+int main_loop(void)
 {
 	int pollfds = 2, timeout = -1;
 	char start[32];
@@ -312,7 +316,8 @@ int main_loop()
 			}
 
 			if (len > blen) {
-				fprintf(stderr, "read returned more data than buffer length\n");
+				fprintf(stderr, "read returned more data than "
+						"buffer length\n");
 				len = blen;
 			}
 
@@ -375,7 +380,6 @@ static void parse_opts(int argc, char **argv)
 		die_usage();
 	cfg_host = argv[optind];
 }
-
 
 int main(int argc, char *argv[])
 {
