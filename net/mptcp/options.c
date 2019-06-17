@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -178,7 +177,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			pr_debug("ADD_ADDR: addr=%x, id=%d",
 				 mp_opt->addr.s_addr, mp_opt->addr_id);
 		} else {
-			memcpy(mp_opt->addr6.s6_addr, (u8 *) ptr, 16);
+			memcpy(mp_opt->addr6.s6_addr, (u8 *)ptr, 16);
 			pr_debug("ADD_ADDR: addr6=, id=%d", mp_opt->addr_id);
 		}
 		break;
@@ -252,7 +251,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 }
 
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-		       struct mptcp_out_options* opts)
+		       struct mptcp_out_options *opts)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 
@@ -337,7 +336,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
 
-	/* Add kind/length/subtype/flag overhead if mapping not populated */
+	/* Add kind/length/subtype/flag overhead if mapping is not populated */
 	if (dss_size == 0)
 		ack_size += TCPOLEN_MPTCP_DSS_BASE;
 
@@ -374,9 +373,9 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	struct subflow_context *subflow = subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 
-	if (subflow->fourth_ack) {
+	if (subflow->fourth_ack)
 		return pm_addr_signal(msk, size, remaining, opts);
-	}
+
 	return false;
 }
 
@@ -506,7 +505,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			       (MPTCPOPT_ADD_ADDR << 12) |
 			       (MPTCP_ADDR_IPVERSION_6 <<  8) |
 			       (opts->addr_id));
-		memcpy((u8 *) ptr, opts->addr6.s6_addr, 16);
+		memcpy((u8 *)ptr, opts->addr6.s6_addr, 16);
 		ptr += 4;
 	}
 #endif

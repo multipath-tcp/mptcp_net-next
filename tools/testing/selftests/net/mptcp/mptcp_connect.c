@@ -50,19 +50,22 @@ static const char *getxinfo_strerr(int err)
 }
 
 static void xgetaddrinfo(const char *node, const char *service,
-			const struct addrinfo *hints,
-			struct addrinfo **res)
+			 const struct addrinfo *hints,
+			 struct addrinfo **res)
 {
 	int err = getaddrinfo(node, service, hints, res);
+
 	if (err) {
 		const char *errstr = getxinfo_strerr(err);
 
-		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n", node ? node: "", service ? service: "", errstr);
-	        exit(1);
+		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n",
+			node ? node : "", service ? service : "", errstr);
+		exit(1);
 	}
 }
 
-static int sock_listen_mptcp(const char * const listenaddr, const char * const port)
+static int sock_listen_mptcp(const char * const listenaddr,
+			     const char * const port)
 {
 	int sock;
 	struct addrinfo hints = {
@@ -78,12 +81,13 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 
-	for (a = addr; a != NULL ; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, cfg_sock_proto);
 		if (sock < 0)
 			continue;
 
-		if (-1 == setsockopt(sock, SOL_SOCKET,SO_REUSEADDR,&one,sizeof one))
+		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
+				     sizeof(one)))
 			perror("setsockopt");
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
@@ -110,7 +114,8 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 	return sock;
 }
 
-static int sock_connect_mptcp(const char * const remoteaddr, const char * const port, int proto)
+static int sock_connect_mptcp(const char * const remoteaddr,
+			      const char * const port, int proto)
 {
 	struct addrinfo hints = {
 		.ai_protocol = IPPROTO_TCP,
@@ -122,7 +127,7 @@ static int sock_connect_mptcp(const char * const remoteaddr, const char * const 
 	hints.ai_family = AF_INET;
 
 	xgetaddrinfo(remoteaddr, port, &hints, &addr);
-	for (a=addr; a != NULL; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, proto);
 		if (sock < 0) {
 			perror("socket");
@@ -154,13 +159,13 @@ static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 		if (do_w == 0 || do_w > (len - offset))
 			do_w = len - offset;
 
-		bw = write(fd, buf+offset, do_w);
-		if (bw < 0 ) {
+		bw = write(fd, buf + offset, do_w);
+		if (bw < 0) {
 			perror("write");
 			return 0;
 		}
 
-		written = (size_t) bw;
+		written = (size_t)bw;
 		offset += written;
 	}
 	return offset;
@@ -174,13 +179,13 @@ static size_t do_write(const int fd, char *buf, const size_t len)
 		size_t written;
 		ssize_t bw;
 
-		bw = write(fd, buf+offset, len - offset);
-		if (bw < 0 ) {
+		bw = write(fd, buf + offset, len - offset);
+		if (bw < 0) {
 			perror("write");
 			return 0;
 		}
 
-		written = (size_t) bw;
+		written = (size_t)bw;
 		offset += written;
 	}
 
@@ -222,21 +227,25 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 			perror("poll");
 			return 1;
 		case 0:
-			fprintf(stderr, "%s: poll timed out (events: POLLIN %u, POLLOUT %u)\n",
-					__func__, fds.events & POLLIN, fds.events & POLLOUT);
+			fprintf(stderr, "%s: poll timed out (events: "
+				"POLLIN %u, POLLOUT %u)\n", __func__,
+				fds.events & POLLIN, fds.events & POLLOUT);
 			return 2;
 		}
 
 		if (fds.revents & POLLIN) {
 			len = do_rnd_read(peerfd, buf, sizeof(buf));
 			if (len == 0) {
-				/* no more data to receive: peer has closed its write side */
+				/* no more data to receive:
+				 * peer has closed its write side
+				 */
 				fds.events &= ~POLLIN;
 
 				if ((fds.events & POLLOUT) == 0)
-					break; /* and nothing more to send */
+					/* and nothing more to send */
+					break;
 
-				/* Else, still have data to transmit */
+			/* Else, still have data to transmit */
 			} else if (len < 0) {
 				perror("read");
 				return 3;
@@ -255,9 +264,12 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 				fds.events &= ~POLLOUT;
 
 				if ((fds.events & POLLIN) == 0)
-					break; /* ... and peer also closed already */
+					/* ... and peer also closed already */
+					break;
 
-				/* ... but we still receive. Close our write side. */
+				/* ... but we still receive.
+				 * Close our write side.
+				 */
 				shutdown(peerfd, SHUT_WR);
 			} else {
 				if (errno == EINTR)
@@ -277,7 +289,7 @@ int main_loop_s(int listensock)
 	struct sockaddr_storage ss;
 	struct pollfd polls;
 	socklen_t salen;
-        int remotesock;
+	int remotesock;
 
 	polls.fd = listensock;
 	polls.events = POLLIN;
@@ -297,10 +309,11 @@ int main_loop_s(int listensock)
 	if (remotesock >= 0) {
 		copyfd_io(0, remotesock, 1);
 		return 0;
-	} else {
-		perror("accept");
-		return 1;
 	}
+
+	perror("accept");
+
+	return 1;
 }
 
 static void init_rng(void)
@@ -310,6 +323,7 @@ static void init_rng(void)
 
 	if (fd > 0) {
 		int ret = read(fd, &foo, sizeof(foo));
+
 		if (ret < 0)
 			srand(fd + foo);
 		close(fd);
@@ -318,7 +332,7 @@ static void init_rng(void)
 	srand(foo);
 }
 
-int main_loop()
+int main_loop(void)
 {
 	int fd;
 
@@ -363,7 +377,7 @@ static void parse_opts(int argc, char **argv)
 			die_usage();
 			break;
 		case 't':
-			poll_timeout=atoi(optarg) * 1000;
+			poll_timeout = atoi(optarg) * 1000;
 			if (poll_timeout <= 0)
 				poll_timeout = -1;
 			break;
@@ -383,6 +397,7 @@ int main(int argc, char *argv[])
 
 	if (listen_mode) {
 		int fd = sock_listen_mptcp(cfg_host, cfg_port);
+
 		if (fd < 0)
 			return 1;
 

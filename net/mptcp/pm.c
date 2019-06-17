@@ -48,7 +48,7 @@ void pm_rm_addr(struct mptcp_sock *msk, u8 id)
 	pr_debug("msk=%p", msk);
 }
 
-bool pm_addr_signal(struct mptcp_sock *msk, unsigned *size,
+bool pm_addr_signal(struct mptcp_sock *msk, unsigned int *size,
 		    unsigned int remaining, struct mptcp_out_options *opts)
 {
 	if (msk && msk->addr_signal) {
