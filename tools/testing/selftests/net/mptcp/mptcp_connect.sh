@@ -7,6 +7,7 @@ sout=""
 cin=""
 cout=""
 ksft_skip=4
+capture=0
 timeout=30
 
 TEST_COUNT=0
@@ -15,11 +16,18 @@ cleanup()
 {
 	rm -f "$cin" "$cout"
 	rm -f "$sin" "$sout"
+	rm -f "$capout"
 
 	for i in 1 2 3 4; do
 		ip netns del ns$i
 	done
 }
+
+for arg in "$@"; do
+    if [ "$arg" = "-c" ]; then
+	capture=1
+    fi
+done
 
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
@@ -31,6 +39,7 @@ sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)
 cout=$(mktemp)
+capout=$(mktemp)
 trap cleanup EXIT
 
 for i in 1 2 3 4;do
@@ -123,8 +132,24 @@ do_transfer()
 
 	:> "$cout"
 	:> "$sout"
+	:> "$capout"
 
 	printf "%-4s %-5s -> %-4s (%s:%d) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${connect_addr} ${port} ${srv_proto}
+
+	if [ $capture -eq 1 ]; then
+	    if [ -z $SUDO_USER ] ; then
+		capuser=""
+	    else
+		capuser="-Z $SUDO_USER"
+	    fi
+
+	    capfile="${listener_ns}-${connector_ns}-${cl_proto}-${srv_proto}-${connect_addr}.pcap"
+
+	    ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
+	    cappid=$!
+
+	    sleep 1
+	fi
 
 	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} 0.0.0.0 < "$sin" > "$sout" &
 	spid=$!
@@ -139,6 +164,11 @@ do_transfer()
 	wait $spid
 	rets=$?
 
+	if [ $capture -eq 1 ]; then
+	    sleep 1
+	    kill $cappid
+	fi
+
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
 		echo "[ FAIL ] client exit code $retc, server $rets" 1>&2
 		echo "\nnetns ${listener_ns} socket stat for $port:" 1>&2
@@ -146,6 +176,7 @@ do_transfer()
 		echo "\nnetns ${connector_ns} socket stat for $port:" 1>&2
 		ip netns exec ${connector_ns} ss -nita 1>&2 -o "dport = :$port"
 
+		cat "$capout"
 		return 1
 	fi
 
@@ -156,9 +187,11 @@ do_transfer()
 
 	if [ $retc -eq 0 ] && [ $rets -eq 0 ];then
 		echo "[ OK ]"
+		cat "$capout"
 		return 0
 	fi
 
+	cat "$capout"
 	return 1
 }
 
