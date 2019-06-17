@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -155,9 +154,9 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-	        err = mptcp_subflow_create(sock->sk);
-	        if (err)
-	                return err;
+		err = mptcp_subflow_create(sock->sk);
+		if (err)
+			return err;
 	}
 	return inet_bind(msk->subflow, uaddr, addr_len);
 }
@@ -182,7 +181,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
 }
 
-static struct proto_ops mptcp_stream_ops;
+static const struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
