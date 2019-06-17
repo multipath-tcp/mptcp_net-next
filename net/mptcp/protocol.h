@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -62,10 +61,12 @@ struct subflow_context {
 static inline struct subflow_context *subflow_ctx(const struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
+
 	return (struct subflow_context *)icsk->icsk_ulp_data;
 }
 
-static inline struct socket *mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
+static inline struct socket *
+mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
 {
 	return subflow->tcp_sock;
 }
