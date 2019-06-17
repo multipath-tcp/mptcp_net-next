@@ -54,24 +54,53 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		break;
 
 	/* MPTCPOPT_MP_JOIN
-	 *
 	 * Initial SYN
 	 * 0: 4MSB=subtype, 000, 1LSB=Backup
 	 * 1: Address ID
 	 * 2-5: Receiver token
 	 * 6-9: Sender random number
-	 *
 	 * SYN/ACK response
 	 * 0: 4MSB=subtype, 000, 1LSB=Backup
 	 * 1: Address ID
 	 * 2-9: Sender truncated HMAC
 	 * 10-13: Sender random number
-	 *
 	 * Third ACK
 	 * 0: 4MSB=subtype, 0000
 	 * 1: 0 (Reserved)
 	 * 2-21: Sender HMAC
 	 */
+	case MPTCPOPT_MP_JOIN:
+		mp_opt->mp_join = 1;
+		if (opsize == TCPOLEN_MPTCP_MPJ_SYN) {
+			mp_opt->backup = *ptr++ & MPTCPOPT_BACKUP;
+			mp_opt->join_id = *ptr++;
+			mp_opt->token = get_unaligned_be32(ptr);
+			ptr += 4;
+			mp_opt->nonce = get_unaligned_be32(ptr);
+			ptr += 4;
+			pr_debug("MP_JOIN bkup=%u, id=%u, token=%u, nonce=%u",
+				 mp_opt->backup, mp_opt->join_id,
+				 mp_opt->token, mp_opt->nonce);
+		} else if (opsize == TCPOLEN_MPTCP_MPJ_SYNACK) {
+			mp_opt->backup = *ptr++ & MPTCPOPT_BACKUP;
+			mp_opt->join_id = *ptr++;
+			mp_opt->thmac = get_unaligned_be64(ptr);
+			ptr += 8;
+			mp_opt->nonce = get_unaligned_be32(ptr);
+			ptr += 4;
+			pr_debug("MP_JOIN bkup=%u, id=%u, thmac=%llu, nonce=%u",
+				 mp_opt->backup, mp_opt->join_id,
+				 mp_opt->thmac, mp_opt->nonce);
+		} else if (opsize == TCPOLEN_MPTCP_MPJ_ACK) {
+			ptr++;
+			memcpy(mp_opt->hmac, ptr, MPTCPOPT_HMAC_LEN);
+			pr_debug("MP_JOIN hmac");
+		} else {
+			pr_warn("MP_JOIN bad option size");
+			mp_opt->mp_join = 0;
+		}
+		break;
+
 
 	/* MPTCPOPT_DSS
 	 * 0: 4MSB=subtype, 0000
@@ -418,9 +447,21 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 		opts->sndr_key = subflow_req->local_key;
 		opts->rcvr_key = subflow_req->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_SYNACK;
-		pr_debug("subflow_req=%p, local_key=%llu, remote_key=%llu",
+		pr_debug("req=%p, local_key=%llu, remote_key=%llu",
 			 subflow_req, subflow_req->local_key,
 			 subflow_req->remote_key);
+		return true;
+	}
+	if (subflow_req->mp_join) {
+		opts->suboptions = OPTION_MPTCP_MPJ_SYNACK;
+		opts->backup = subflow_req->backup;
+		opts->join_id = subflow_req->local_id;
+		opts->thmac = subflow_req->thmac;
+		opts->nonce = subflow_req->local_nonce;
+		pr_debug("req=%p, bkup=%u, id=%u, thmac=%llu, nonce=%u",
+			 subflow_req, opts->backup, opts->join_id,
+			 opts->thmac, opts->nonce);
+		*size = TCPOLEN_MPTCP_MPJ_SYNACK;
 		return true;
 	}
 	return false;
@@ -515,6 +556,18 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			       (TCPOLEN_MPTCP_RM_ADDR << 16) |
 			       (MPTCPOPT_RM_ADDR << 12) |
 			       (opts->addr_id));
+	}
+
+	if (OPTION_MPTCP_MPJ_SYNACK & opts->suboptions) {
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (TCPOLEN_MPTCP_MPJ_SYNACK << 16) |
+			       (MPTCPOPT_MP_JOIN << 12) |
+			       (opts->backup << 8) |
+			       opts->join_id);
+		put_unaligned_be64(opts->thmac, ptr);
+		ptr += 2;
+		put_unaligned_be32(opts->nonce, ptr);
+		ptr += 1;
 	}
 
 	if (opts->ext_copy.use_ack || opts->ext_copy.use_map) {
