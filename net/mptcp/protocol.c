@@ -158,7 +158,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
 }
 
-static const struct proto_ops mptcp_stream_ops;
+static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
