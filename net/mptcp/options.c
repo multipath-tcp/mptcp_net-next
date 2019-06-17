@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP
+/* Multipath TCP
  *
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
@@ -223,7 +222,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 }
 
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-		       struct mptcp_out_options* opts)
+		       struct mptcp_out_options *opts)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 
@@ -308,7 +307,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
 
-	/* Add kind/length/subtype/flag overhead if mapping not populated */
+	/* Add kind/length/subtype/flag overhead if mapping is not populated */
 	if (dss_size == 0)
 		ack_size += TCPOLEN_MPTCP_DSS_BASE;
 
