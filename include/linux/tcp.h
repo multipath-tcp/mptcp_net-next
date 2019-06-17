@@ -132,8 +132,12 @@ struct tcp_options_received {
 			rm_addr : 1,
 			family : 4;
 		u8	addr_id;
-		struct	in_addr	addr;
-		struct	in6_addr addr6;
+		union {
+			struct	in_addr	addr;
+#if IS_ENABLED(CONFIG_IPV6)
+			struct	in6_addr addr6;
+#endif
+		};
 	} mptcp;
 #endif
 };
@@ -147,6 +151,7 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 #endif
 #if IS_ENABLED(CONFIG_MPTCP)
 	rx_opt->mptcp.mp_capable = rx_opt->mptcp.mp_join = 0;
+	rx_opt->mptcp.add_addr = rx_opt->mptcp.rm_addr = 0;
 	rx_opt->mptcp.dss = 0;
 #endif
 }

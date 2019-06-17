@@ -54,6 +54,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 	memset(&rx_opt.mptcp, 0, sizeof(rx_opt.mptcp));
 	mptcp_get_options(skb, &rx_opt);
 
+	subflow_req->mp_capable = 0;
+	subflow_req->mp_join = 0;
+
+	if (rx_opt.mptcp.mp_capable && rx_opt.mptcp.mp_join)
+		return;
+
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		subflow_req->mp_capable = 1;
 		if (rx_opt.mptcp.version >= listener->version)
@@ -80,9 +86,6 @@ static void subflow_v4_init_req(struct request_sock *req,
 			subflow_req->mp_join = 0;
 			// @@ need to trigger RST
 		}
-	} else {
-		subflow_req->mp_capable = 0;
-		subflow_req->mp_join = 0;
 	}
 }
 
