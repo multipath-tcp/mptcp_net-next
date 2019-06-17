@@ -122,6 +122,12 @@ struct tcp_options_received {
 			use_ack:1,
 			ack64:1,
 			__unused:2;
+		u8	add_addr : 1,
+			rm_addr : 1,
+			family : 4;
+		u8	addr_id;
+		struct	in_addr	addr;
+		struct	in6_addr addr6;
 	} mptcp;
 #endif
 };
