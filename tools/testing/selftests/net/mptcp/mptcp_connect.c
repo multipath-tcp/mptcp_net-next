@@ -50,19 +50,22 @@ static const char *getxinfo_strerr(int err)
 }
 
 static void xgetaddrinfo(const char *node, const char *service,
-			const struct addrinfo *hints,
-			struct addrinfo **res)
+			 const struct addrinfo *hints,
+			 struct addrinfo **res)
 {
 	int err = getaddrinfo(node, service, hints, res);
+
 	if (err) {
 		const char *errstr = getxinfo_strerr(err);
 
-		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n", node ? node: "", service ? service: "", errstr);
-	        exit(1);
+		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n",
+			node ? node : "", service ? service : "", errstr);
+		exit(1);
 	}
 }
 
-static int sock_listen_mptcp(const char * const listenaddr, const char * const port)
+static int sock_listen_mptcp(const char * const listenaddr,
+			     const char * const port)
 {
 	int sock;
 	struct addrinfo hints = {
@@ -78,12 +81,13 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 
-	for (a = addr; a != NULL ; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, cfg_sock_proto);
 		if (sock < 0)
 			continue;
 
-		if (-1 == setsockopt(sock, SOL_SOCKET,SO_REUSEADDR,&one,sizeof one))
+		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
+				     sizeof(one)))
 			perror("setsockopt");
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
@@ -110,7 +114,8 @@ static int sock_listen_mptcp(const char * const listenaddr, const char * const p
 	return sock;
 }
 
-static int sock_connect_mptcp(const char * const remoteaddr, const char * const port, int proto)
+static int sock_connect_mptcp(const char * const remoteaddr,
+			      const char * const port, int proto)
 {
 	struct addrinfo hints = {
 		.ai_protocol = IPPROTO_TCP,
@@ -122,7 +127,7 @@ static int sock_connect_mptcp(const char * const remoteaddr, const char * const 
 	hints.ai_family = AF_INET;
 
 	xgetaddrinfo(remoteaddr, port, &hints, &addr);
-	for (a=addr; a != NULL; a = a->ai_next) {
+	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, proto);
 		if (sock < 0) {
 			perror("socket");
@@ -154,13 +159,13 @@ static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 		if (do_w == 0 || do_w > (len - offset))
 			do_w = len - offset;
 
-		bw = write(fd, buf+offset, do_w);
-		if (bw < 0 ) {
+		bw = write(fd, buf + offset, do_w);
+		if (bw < 0) {
 			perror("write");
 			return 0;
 		}
 
-		written = (size_t) bw;
+		written = (size_t)bw;
 		offset += written;
 	}
 	return offset;
@@ -277,7 +282,7 @@ int main_loop_s(int listensock)
 	struct sockaddr_storage ss;
 	struct pollfd polls;
 	socklen_t salen;
-        int remotesock;
+	int remotesock;
 
 	polls.fd = listensock;
 	polls.events = POLLIN;
@@ -318,7 +323,7 @@ static void init_rng(void)
 	srand(foo);
 }
 
-int main_loop()
+int main_loop(void)
 {
 	int fd;
 
