@@ -779,8 +779,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 
 void mptcp_finish_join(struct sock *conn, struct sock *sk)
 {
-	struct mptcp_sock *msk = mptcp_sk(conn);
 	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(conn);
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
 

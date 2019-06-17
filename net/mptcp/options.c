@@ -461,8 +461,7 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			 subflow_req, subflow_req->local_key,
 			 subflow_req->remote_key);
 		return true;
-	}
-	if (subflow_req->mp_join) {
+	} else if (subflow_req->mp_join) {
 		opts->suboptions = OPTION_MPTCP_MPJ_SYNACK;
 		opts->backup = subflow_req->backup;
 		opts->join_id = subflow_req->local_id;
@@ -560,11 +559,9 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 	}
 
 	if (OPTION_MPTCP_MPJ_SYNACK & opts->suboptions) {
-		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
-			       (TCPOLEN_MPTCP_MPJ_SYNACK << 16) |
-			       (MPTCPOPT_MP_JOIN << 12) |
-			       (opts->backup << 8) |
-			       opts->join_id);
+		*ptr++ = mptcp_option(MPTCPOPT_MP_JOIN,
+				      TCPOLEN_MPTCP_MPJ_SYNACK,
+				      opts->backup, opts->join_id);
 		put_unaligned_be64(opts->thmac, ptr);
 		ptr += 2;
 		put_unaligned_be32(opts->nonce, ptr);
