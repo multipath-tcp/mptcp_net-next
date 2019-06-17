@@ -922,7 +922,7 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	return ret;
 }
 
-static const struct proto_ops mptcp_stream_ops;
+static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
