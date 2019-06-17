@@ -61,6 +61,11 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 bool mptcp_established_options(struct sock *sk, unsigned int *size,
 				       struct mptcp_out_options *opts);
 
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return skb_ext_exist(skb, SKB_EXT_MPTCP);
+}
+
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
 #else
@@ -104,6 +109,11 @@ static inline bool mptcp_synack_options(const struct request_sock *req,
 static inline bool mptcp_established_options(struct sock *sk,
 					     unsigned int *size,
 					     struct mptcp_out_options *opts)
+{
+	return false;
+}
+
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return false;
 }
