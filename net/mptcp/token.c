@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP token management
+/* Multipath TCP token management
  * Copyright (c) 2017 - 2019, Intel Corporation.
  *
  * Note: This code is based on mptcp_ctrl.c from multipath-tcp.org,
@@ -43,7 +42,7 @@ static bool find_req_token(u32 token)
 
 	pr_debug("token=%u", token);
 	used = radix_tree_lookup(&token_req_tree, token);
-	return (used != NULL);
+	return used;
 }
 
 static bool find_token(u32 token)
@@ -52,7 +51,7 @@ static bool find_token(u32 token)
 
 	pr_debug("token=%u", token);
 	used = radix_tree_lookup(&token_tree, token);
-	return (used != NULL);
+	return used;
 }
 
 static void new_req_token(struct request_sock *req,
@@ -116,7 +115,7 @@ static int insert_token(u32 token, void *conn)
 {
 	void *used = &token_used;
 
-	if (conn != NULL)
+	if (conn)
 		used = conn;
 
 	pr_debug("token=%u, conn=%p", token, used);
@@ -129,7 +128,7 @@ static void update_token(u32 token, void *conn)
 
 	pr_debug("token=%u, conn=%p", token, conn);
 	slot = radix_tree_lookup_slot(&token_tree, token);
-	if (slot != NULL) {
+	if (slot) {
 		if (*slot != &token_used)
 			pr_err("slot ALREADY updated!");
 		*slot = conn;
@@ -153,7 +152,7 @@ static struct sock *destroy_token(u32 token)
 
 	pr_debug("token=%u", token);
 	conn = radix_tree_delete(&token_tree, token);
-	if ((conn != NULL) && (conn != &token_used))
+	if (conn && conn != &token_used)
 		return (struct sock *)conn;
 	return NULL;
 }
@@ -236,7 +235,7 @@ void token_destroy(u32 token)
 	pr_debug("token=%u", token);
 	spin_lock_bh(&token_tree_lock);
 	conn = destroy_token(token);
-	if (conn != NULL)
+	if (conn)
 		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
 }
