@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Multipath TCP token management
+/* Multipath TCP token management
  * Copyright (c) 2017 - 2019, Intel Corporation.
  *
  * Note: This code is based on mptcp_ctrl.c from multipath-tcp.org,
@@ -43,7 +42,7 @@ static bool find_req_token(u32 token)
 
 	pr_debug("token=%u", token);
 	used = radix_tree_lookup(&token_req_tree, token);
-	return (used != NULL);
+	return used;
 }
 
 static bool find_token(u32 token)
@@ -52,7 +51,7 @@ static bool find_token(u32 token)
 
 	pr_debug("token=%u", token);
 	used = radix_tree_lookup(&token_tree, token);
-	return (used != NULL);
+	return used;
 }
 
 static struct sock *lookup_token(u32 token)
@@ -61,7 +60,7 @@ static struct sock *lookup_token(u32 token)
 
 	pr_debug("token=%u", token);
 	conn = radix_tree_lookup(&token_tree, token);
-	return (struct sock *) conn;
+	return (struct sock *)conn;
 }
 
 static void new_req_token(struct request_sock *req,
@@ -139,7 +138,7 @@ static int new_join_valid(struct request_sock *req, struct sock *sk,
 			 4, (u8 *)&subflow_req->local_nonce);
 
 	return memcmp(hmac, (char *)rx_opt->mptcp.hmac, MPTCPOPT_HMAC_LEN);
- }
+}
 
 static void new_token(const struct sock *sk)
 {
@@ -176,7 +175,7 @@ static int insert_token(u32 token, void *conn)
 {
 	void *used = &token_used;
 
-	if (conn != NULL)
+	if (conn)
 		used = conn;
 
 	pr_debug("token=%u, conn=%p", token, used);
@@ -189,7 +188,7 @@ static void update_token(u32 token, void *conn)
 
 	pr_debug("token=%u, conn=%p", token, conn);
 	slot = radix_tree_lookup_slot(&token_tree, token);
-	if (slot != NULL) {
+	if (slot) {
 		if (*slot != &token_used)
 			pr_err("slot ALREADY updated!");
 		*slot = conn;
@@ -213,7 +212,7 @@ static struct sock *destroy_token(u32 token)
 
 	pr_debug("token=%u", token);
 	conn = radix_tree_delete(&token_tree, token);
-	if ((conn != NULL) && (conn != &token_used))
+	if (conn && conn != &token_used)
 		return (struct sock *)conn;
 	return NULL;
 }
@@ -247,7 +246,7 @@ int token_join_request(struct request_sock *req, const struct sk_buff *skb)
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(subflow_req->token);
 	spin_unlock_bh(&token_tree_lock);
-	if (conn != NULL) {
+	if (conn) {
 		// @@ get real local address id for this skb->saddr
 		subflow_req->local_id = 0;
 		new_req_join(req, conn, skb);
@@ -267,9 +266,9 @@ int token_join_valid(struct request_sock *req,
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(subflow_req->token);
 	spin_unlock_bh(&token_tree_lock);
-	if (conn != NULL) {
+	if (conn)
 		return new_join_valid(req, conn, rx_opt);
-	}
+
 	return -1;
 }
 
@@ -323,7 +322,7 @@ int token_new_join(struct sock *sk)
 
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(subflow->token);
-	if (conn != NULL) {
+	if (conn) {
 		sock_hold(conn);
 		spin_unlock_bh(&token_tree_lock);
 		subflow->conn = conn;
@@ -349,7 +348,7 @@ void token_release(u32 token)
 	pr_debug("token=%u", token);
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(token);
-	if (conn != NULL)
+	if (conn)
 		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
 }
@@ -361,7 +360,7 @@ void token_destroy(u32 token)
 	pr_debug("token=%u", token);
 	spin_lock_bh(&token_tree_lock);
 	conn = destroy_token(token);
-	if (conn != NULL)
+	if (conn)
 		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
 }
