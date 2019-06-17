@@ -296,7 +296,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	return tcp_poll(file, msk->connection_list, wait);
 }
 
-static const struct proto_ops mptcp_stream_ops;
+static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
