@@ -160,12 +160,41 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 * 4 or 16 bytes of address (depending on ip version)
 	 * 0 or 2 bytes of port (depending on length)
 	 */
+	case MPTCPOPT_ADD_ADDR:
+		if (opsize != TCPOLEN_MPTCP_ADD_ADDR &&
+		    opsize != TCPOLEN_MPTCP_ADD_ADDR6)
+			break;
 
-	/* MPTCPOPT_REMOVE_ADDR
+		mp_opt->family = *ptr++ & MPTCP_ADDR_FAMILY_MASK;
+		if (mp_opt->family != MPTCP_ADDR_IPVERSION_4 &&
+		    mp_opt->family != MPTCP_ADDR_IPVERSION_6)
+			break;
+
+		mp_opt->add_addr = 1;
+		mp_opt->addr_id = *ptr++;
+		if (opsize == TCPOLEN_MPTCP_ADD_ADDR) {
+			mp_opt->addr.s_addr = get_unaligned_be32(ptr);
+			pr_debug("ADD_ADDR: addr=%x, id=%d",
+				 mp_opt->addr.s_addr, mp_opt->addr_id);
+		} else {
+			memcpy(mp_opt->addr6.s6_addr, (u8 *)ptr, 16);
+			pr_debug("ADD_ADDR: addr6=, id=%d", mp_opt->addr_id);
+		}
+		break;
+
+	/* MPTCPOPT_RM_ADDR
 	 * 0: 4MSB=subtype, 0000
 	 * 1: Address ID
 	 * Additional bytes: More address IDs (depending on length)
 	 */
+	case MPTCPOPT_RM_ADDR:
+		if (opsize != TCPOLEN_MPTCP_RM_ADDR)
+			break;
+
+		mp_opt->rm_addr = 1;
+		mp_opt->addr_id = *ptr++;
+		pr_debug("RM_ADDR: id=%d", mp_opt->addr_id);
+		break;
 
 	/* MPTCPOPT_MP_PRIO
 	 * 0: 4MSB=subtype, 000, 1LSB=Backup
@@ -336,27 +365,47 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 	return true;
 }
 
+static bool mptcp_established_options_addr(struct sock *sk,
+					   unsigned int *size,
+					   unsigned int remaining,
+					   struct mptcp_out_options *opts)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+
+	if (subflow->fourth_ack)
+		return pm_addr_signal(msk, size, remaining, opts);
+
+	return false;
+}
+
 bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       unsigned int *size, unsigned int remaining,
 			       struct mptcp_out_options *opts)
 {
 	unsigned int opt_size = 0;
+	bool ret = false;
 
 	if (!subflow_ctx(sk)->mp_capable)
 		return false;
 
+	opts->suboptions = 0;
 	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {
 		*size += opt_size;
 		remaining -= opt_size;
-		return true;
+		ret = true;
 	} else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
-					       opts)) {
+						 opts)) {
 		*size += opt_size;
 		remaining -= opt_size;
-		return true;
+		ret = true;
 	}
-
-	return false;
+	if (mptcp_established_options_addr(sk, &opt_size, remaining, opts)) {
+		*size += opt_size;
+		remaining -= opt_size;
+		ret = true;
+	}
+	return ret;
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
@@ -438,6 +487,34 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}
+	}
+
+	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (TCPOLEN_MPTCP_ADD_ADDR << 16) |
+			       (MPTCPOPT_ADD_ADDR << 12) |
+			       (MPTCP_ADDR_IPVERSION_4 <<  8) |
+			       (opts->addr_id));
+		*ptr++ = htonl(opts->addr.s_addr);
+	}
+
+#if IS_ENABLED(CONFIG_MPTCP)
+	if (OPTION_MPTCP_ADD_ADDR6 & opts->suboptions) {
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (TCPOLEN_MPTCP_ADD_ADDR6 << 16) |
+			       (MPTCPOPT_ADD_ADDR << 12) |
+			       (MPTCP_ADDR_IPVERSION_6 <<  8) |
+			       (opts->addr_id));
+		memcpy((u8 *)ptr, opts->addr6.s6_addr, 16);
+		ptr += 4;
+	}
+#endif
+
+	if (OPTION_MPTCP_RM_ADDR & opts->suboptions) {
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (TCPOLEN_MPTCP_RM_ADDR << 16) |
+			       (MPTCPOPT_RM_ADDR << 12) |
+			       (opts->addr_id));
 	}
 
 	if (opts->ext_copy.use_ack || opts->ext_copy.use_map) {
