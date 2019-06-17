@@ -50,7 +50,9 @@ struct pm_data {
 	sa_family_t family;
 	union {
 		struct in_addr addr;
+#if IS_ENABLED(CONFIG_IPV6)
 		struct in6_addr addr6;
+#endif
 	};
 };
 
