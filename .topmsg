@@ -1,0 +1,42 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: accept: don't leak mptcp socket structure
+
+accept() is supposed to prepare and return a 'struct sock'.
+
+The caller holds a new inode/socket, and will associate the
+returned sock with it.
+
+mptcp_accept however will allocate it via 'struct socket', then
+returns socket->sk.
+This then leaks the outer socket struct inode returned by sock_create():
+
+unreferenced object 0xffff88810512e8c0 (size 936):
+  comm "mptcp_connect", [..]
+  backtrace:
+    [<00000000872561ba>] alloc_inode+0x35/0xe0
+    [<00000000646e04ed>] new_inode_pseudo+0x12/0x80
+    [<00000000e2e77036>] sock_alloc+0x26/0x100
+    [<00000000870a8688>] __sock_create+0x8f/0x3c0
+    [<000000000558b3fa>] mptcp_accept+0x140/0x530
+    [<0000000044718d60>] inet_accept+0xac/0x470
+    [<00000000da8f3979>] mptcp_stream_accept+0x62/0xa0
+    [<00000000c9010499>] __sys_accept4+0x228/0x3c0
+
+To fix this, make several (unfortunately, intrusive) changes:
+
+1. Instead of allocating a new mptcp socket, clone the
+   mptcp listen socket socket->sk.
+
+   This gives us a mptcp sock without the inode container.
+   We return this sock struct to the caller, the caller will then
+   complete creation of the mptcp socket.
+
+2. For the 'compat' (old tcp, not mp capable) case, return the
+   tcp socket directly and release the socket coming from
+   kernel_accept().
+
+   We can use mptcp_getname() to override the socket->ops to
+   tcp.  This will make mptcp_accept work like tcp accept, and
+   mptcp won't be involved anymore for the particular socket.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
