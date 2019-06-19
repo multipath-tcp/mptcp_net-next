@@ -52,6 +52,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)
 #define MAX_TCP_OPTION_SPACE 40
+#define TCP_MIN_SND_MSS		48
+#define TCP_MIN_GSO_SIZE	(TCP_MIN_SND_MSS - MAX_TCP_OPTION_SPACE)
 
 /*
  * Never offer a window over 32767 without using window scaling. Some
@@ -1641,9 +1643,9 @@ bool tcp_fastopen_defer_connect(struct sock *sk, int *err);
 
 /* Fastopen key context */
 struct tcp_fastopen_context {
-	struct crypto_cipher	*tfm[TCP_FASTOPEN_KEY_MAX];
-	__u8			key[TCP_FASTOPEN_KEY_BUF_LENGTH];
-	struct rcu_head		rcu;
+	__u8		key[TCP_FASTOPEN_KEY_MAX][TCP_FASTOPEN_KEY_LENGTH];
+	int		num;
+	struct rcu_head	rcu;
 };
 
 extern unsigned int sysctl_tcp_fastopen_blackhole_timeout;
@@ -1678,9 +1680,7 @@ bool tcp_fastopen_cookie_match(const struct tcp_fastopen_cookie *foc,
 static inline
 int tcp_fastopen_context_len(const struct tcp_fastopen_context *ctx)
 {
-	if (ctx->tfm[1])
-		return 2;
-	return 1;
+	return ctx->num;
 }
 
 /* Latencies incurred by various limits for a sender. They are
