@@ -1,0 +1,6 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Handle MPTCP TCP options
+
+Currently only MPTCP v0 is supported so ignore v1 MP_CAPABLE option.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
