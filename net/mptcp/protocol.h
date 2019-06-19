@@ -14,7 +14,7 @@
 #define MPTCPOPT_MP_JOIN	1
 #define MPTCPOPT_DSS		2
 #define MPTCPOPT_ADD_ADDR	3
-#define MPTCPOPT_REMOVE_ADDR	4
+#define MPTCPOPT_RM_ADDR	4
 #define MPTCPOPT_MP_PRIO	5
 #define MPTCPOPT_MP_FAIL	6
 #define MPTCPOPT_MP_FASTCLOSE	7
@@ -45,6 +45,17 @@
 #define MPTCP_DSS_HAS_ACK	BIT(0)
 #define MPTCP_DSS_FLAG_MASK	(0x1F)
 
+struct pm_data {
+	u8 addr_id;
+	sa_family_t family;
+	union {
+		struct in_addr addr;
+#if IS_ENABLED(CONFIG_IPV6)
+		struct in6_addr addr6;
+#endif
+	};
+};
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
@@ -56,6 +67,7 @@ struct mptcp_sock {
 	u32		token;
 	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
+	struct pm_data	pm;
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
@@ -156,6 +168,17 @@ u32 crypto_v6_get_nonce(const struct in6_addr *saddr,
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
 void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
 		      int arg_num, ...);
+
+void pm_new_connection(struct mptcp_sock *msk);
+void pm_fully_established(struct mptcp_sock *msk);
+void pm_connection_closed(struct mptcp_sock *msk);
+void pm_subflow_established(struct mptcp_sock *msk, u8 id);
+void pm_subflow_closed(struct mptcp_sock *msk, u8 id);
+void pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr, u8 id);
+void pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr, u8 id);
+void pm_rm_addr(struct mptcp_sock *msk, u8 id);
+bool pm_addr_signal(struct mptcp_sock *msk, unsigned int *size,
+		    unsigned int remaining, struct mptcp_out_options *opts);
 
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
