@@ -25,15 +25,25 @@ struct mptcp_ext {
 };
 
 /* MPTCP option subtypes */
-#define OPTION_MPTCP_MPC_SYN	BIT(0)
-#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
-#define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_MPC_SYN		BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK		BIT(1)
+#define OPTION_MPTCP_MPC_ACK		BIT(2)
+#define OPTION_MPTCP_ADD_ADDR		BIT(6)
+#define OPTION_MPTCP_ADD_ADDR6		BIT(7)
+#define OPTION_MPTCP_RM_ADDR		BIT(8)
 
 struct mptcp_out_options {
 #if IS_ENABLED(CONFIG_MPTCP)
 	u16 suboptions;
 	u64 sndr_key;
 	u64 rcvr_key;
+	union {
+		struct in_addr addr;
+#if IS_ENABLED(CONFIG_IPV6)
+		struct in6_addr addr6;
+#endif
+	};
+	u8 addr_id;
 	struct mptcp_ext ext_copy;
 #endif
 };
