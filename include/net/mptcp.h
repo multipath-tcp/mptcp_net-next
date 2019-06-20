@@ -24,10 +24,6 @@ struct mptcp_ext {
 			__unused:2;
 };
 
-#define OPTION_MPTCP_ADD_ADDR		BIT(6)
-#define OPTION_MPTCP_ADD_ADDR6		BIT(7)
-#define OPTION_MPTCP_RM_ADDR		BIT(8)
-
 struct mptcp_out_options {
 #if IS_ENABLED(CONFIG_MPTCP)
 	u16 suboptions;
