@@ -8,14 +8,6 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
-/* MPTCP DSS flags */
-
-#define MPTCP_DSS_DATA_FIN	BIT(4)
-#define MPTCP_DSS_DSN64		BIT(3)
-#define MPTCP_DSS_HAS_MAP	BIT(2)
-#define MPTCP_DSS_ACK64		BIT(1)
-#define MPTCP_DSS_HAS_ACK	BIT(0)
-
 /* MPTCP sk_buff extension data */
 struct mptcp_ext {
 	u64		data_ack;
@@ -71,6 +63,9 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       unsigned int *size, unsigned int remaining,
 			       struct mptcp_out_options *opts);
 
+void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+		      struct tcp_options_received *opt_rx);
+
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return skb_ext_exist(skb, SKB_EXT_MPTCP);
@@ -123,6 +118,11 @@ static inline bool mptcp_established_options(struct sock *sk,
 					     struct mptcp_out_options *opts)
 {
 	return false;
+}
+
+static inline void mptcp_attach_dss(struct sock *sk, struct sk_buff *skb,
+				    struct tcp_options_received *opt_rx)
+{
 }
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
