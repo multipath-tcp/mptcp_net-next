@@ -24,10 +24,6 @@ struct mptcp_ext {
 			__unused:2;
 };
 
-#define OPTION_MPTCP_MPJ_SYN		BIT(3)
-#define OPTION_MPTCP_MPJ_SYNACK		BIT(4)
-#define OPTION_MPTCP_MPJ_ACK		BIT(5)
-
 struct mptcp_out_options {
 #if IS_ENABLED(CONFIG_MPTCP)
 	u16 suboptions;
