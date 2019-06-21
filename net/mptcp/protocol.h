@@ -18,7 +18,6 @@
 #define OPTION_MPTCP_ADD_ADDR6	BIT(7)
 #define OPTION_MPTCP_RM_ADDR	BIT(8)
 
-
 /* MPTCP option subtypes */
 #define MPTCPOPT_MP_CAPABLE	0
 #define MPTCPOPT_MP_JOIN	1
