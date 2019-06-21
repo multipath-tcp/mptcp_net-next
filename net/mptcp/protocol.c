@@ -296,6 +296,26 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	return tcp_poll(file, msk->connection_list, wait);
 }
 
+static int mptcp_shutdown(struct socket *sock, int how)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	int ret = 0;
+
+	pr_debug("sk=%p, how=%d", msk, how);
+
+	if (msk->subflow) {
+		pr_debug("subflow=%p", msk->subflow->sk);
+		ret = kernel_sock_shutdown(msk->subflow, how);
+	}
+
+	if (msk->connection_list) {
+		pr_debug("conn_list->subflow=%p", msk->connection_list->sk);
+		ret = kernel_sock_shutdown(msk->connection_list, how);
+	}
+
+	return ret;
+}
+
 static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
@@ -316,6 +336,7 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.accept = mptcp_stream_accept;
 	mptcp_stream_ops.getname = mptcp_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
+	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
 	token_init();
 	crypto_init();
