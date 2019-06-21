@@ -74,10 +74,11 @@ static void new_req_token(struct request_sock *req,
 					      ireq->ir_rmt_port);
 #endif
 	}
-	pr_debug("local_key=%llu:%llx", local_key, local_key);
 	subflow_req->local_key = local_key;
-	crypto_key_sha1(subflow_req->local_key, &subflow_req->token, NULL);
-	pr_debug("token=%u", subflow_req->token);
+	crypto_key_sha1(subflow_req->local_key, &subflow_req->token,
+			&subflow_req->idsn);
+	pr_debug("local_key=%llu, token=%u, idsn=%llu", subflow_req->local_key,
+		 subflow_req->token, subflow_req->idsn);
 }
 
 static void new_token(const struct sock *sk)
@@ -98,9 +99,9 @@ static void new_token(const struct sock *sk)
 						       isk->inet_dport);
 #endif
 	}
-	pr_debug("local_key=%llu:%llx", subflow->local_key, subflow->local_key);
-	crypto_key_sha1(subflow->local_key, &subflow->token, NULL);
-	pr_debug("token=%u", subflow->token);
+	crypto_key_sha1(subflow->local_key, &subflow->token, &subflow->idsn);
+	pr_debug("local_key=%llu, token=%u, idsn=%llu", subflow->local_key,
+		 subflow->token, subflow->idsn);
 }
 
 static int insert_req_token(u32 token)
