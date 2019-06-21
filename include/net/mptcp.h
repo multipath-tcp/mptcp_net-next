@@ -24,16 +24,9 @@ struct mptcp_ext {
 			__unused:2;
 };
 
-/* MPTCP option subtypes */
-#define OPTION_MPTCP_MPC_SYN		BIT(0)
-#define OPTION_MPTCP_MPC_SYNACK		BIT(1)
-#define OPTION_MPTCP_MPC_ACK		BIT(2)
 #define OPTION_MPTCP_MPJ_SYN		BIT(3)
 #define OPTION_MPTCP_MPJ_SYNACK		BIT(4)
 #define OPTION_MPTCP_MPJ_ACK		BIT(5)
-#define OPTION_MPTCP_ADD_ADDR		BIT(6)
-#define OPTION_MPTCP_ADD_ADDR6		BIT(7)
-#define OPTION_MPTCP_RM_ADDR		BIT(8)
 
 struct mptcp_out_options {
 #if IS_ENABLED(CONFIG_MPTCP)

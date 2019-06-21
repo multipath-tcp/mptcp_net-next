@@ -10,6 +10,15 @@
 #include <linux/spinlock.h>
 #include <net/tcp.h>
 
+/* MPTCP option bits */
+#define OPTION_MPTCP_MPC_SYN	BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
+#define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_ADD_ADDR	BIT(6)
+#define OPTION_MPTCP_ADD_ADDR6	BIT(7)
+#define OPTION_MPTCP_RM_ADDR	BIT(8)
+
+
 /* MPTCP option subtypes */
 #define MPTCPOPT_MP_CAPABLE	0
 #define MPTCPOPT_MP_JOIN	1
