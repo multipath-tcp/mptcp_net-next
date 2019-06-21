@@ -9,6 +9,11 @@
 
 #include <linux/spinlock.h>
 
+/* MPTCP option bits */
+#define OPTION_MPTCP_MPC_SYN	BIT(0)
+#define OPTION_MPTCP_MPC_SYNACK	BIT(1)
+#define OPTION_MPTCP_MPC_ACK	BIT(2)
+
 /* MPTCP option subtypes */
 #define MPTCPOPT_MP_CAPABLE	0
 #define MPTCPOPT_MP_JOIN	1
