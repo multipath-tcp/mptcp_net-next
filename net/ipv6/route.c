@@ -3586,7 +3586,7 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 
 	rt->fib6_table = table;
 	rt->fib6_metric = cfg->fc_metric;
-	rt->fib6_type = cfg->fc_type;
+	rt->fib6_type = cfg->fc_type ? : RTN_UNICAST;
 	rt->fib6_flags = cfg->fc_flags & ~RTF_GATEWAY;
 
 	ipv6_addr_prefix(&rt->fib6_dst.addr, &cfg->fc_dst, cfg->fc_dst_len);
@@ -5041,6 +5041,12 @@ static int ip6_route_multipath_add(struct fib6_config *cfg,
 		}
 
 		rtnh = rtnh_next(rtnh, &remaining);
+	}
+
+	if (list_empty(&rt6_nh_list)) {
+		NL_SET_ERR_MSG(extack,
+			       "Invalid nexthop configuration - no valid nexthops");
+		return -EINVAL;
 	}
 
 	/* for add and replace send one notification with all nexthops.
