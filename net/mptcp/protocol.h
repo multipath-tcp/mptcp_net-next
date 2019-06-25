@@ -69,5 +69,6 @@ mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
 }
 
 void subflow_init(void);
+int subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 #endif /* __MPTCP_PROTOCOL_H */
