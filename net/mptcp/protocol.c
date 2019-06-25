@@ -780,33 +780,6 @@ static struct proto mptcp_prot = {
 	.no_autobind	= 1,
 };
 
-static int mptcp_subflow_create(struct sock *sk)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct net *net = sock_net(sk);
-	struct socket *sf;
-	int err;
-
-	pr_debug("msk=%p", msk);
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
-	if (!err) {
-		lock_sock(sf->sk);
-		err = tcp_set_ulp(sf->sk, "mptcp");
-		release_sock(sf->sk);
-		if (!err) {
-			struct subflow_context *subflow = subflow_ctx(sf->sk);
-
-			pr_debug("subflow=%p", subflow);
-			msk->subflow = sf;
-			subflow->conn = sk;
-			subflow->request_mptcp = 1; // @@ if MPTCP enabled
-			subflow->request_cksum = 1; // @@ if checksum enabled
-			subflow->version = 0;
-		}
-	}
-	return err;
-}
-
 static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
@@ -818,7 +791,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-		err = mptcp_subflow_create(sock->sk);
+		err = subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -837,7 +810,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		return err;
 
 	if (!msk->subflow) {
-		err = mptcp_subflow_create(sock->sk);
+		err = subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -880,7 +853,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	pr_debug("msk=%p", msk);
 
 	if (!msk->subflow) {
-		err = mptcp_subflow_create(sock->sk);
+		err = subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
