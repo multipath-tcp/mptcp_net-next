@@ -31,6 +31,36 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 static struct inet_connection_sock_af_ops subflow_specific;
 
+int subflow_create_socket(struct sock *sk, struct socket **new_sock)
+{
+	struct subflow_context *subflow;
+	struct net *net = sock_net(sk);
+	struct socket *sf;
+	int err;
+
+	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
+	if (err)
+		return err;
+
+	lock_sock(sf->sk);
+	err = tcp_set_ulp(sf->sk, "mptcp");
+	release_sock(sf->sk);
+
+	if (err)
+		return err;
+
+	subflow = subflow_ctx(sf->sk);
+	pr_debug("subflow=%p", subflow);
+
+	*new_sock = sf;
+	subflow->conn = sk;
+	subflow->request_mptcp = 1; // @@ if MPTCP enabled
+	subflow->request_cksum = 1; // @@ if checksum enabled
+	subflow->version = 0;
+
+	return 0;
+}
+
 static struct subflow_context *subflow_create_ctx(struct sock *sk,
 						  struct socket *sock)
 {
@@ -78,36 +108,6 @@ static void subflow_ulp_release(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	kfree(ctx);
-}
-
-int subflow_create_socket(struct sock *sk, struct socket **new_sock)
-{
-	struct subflow_context *subflow;
-	struct net *net = sock_net(sk);
-	struct socket *sf;
-	int err;
-
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
-	if (err)
-		return err;
-
-	lock_sock(sf->sk);
-	err = tcp_set_ulp(sf->sk, "mptcp");
-	release_sock(sf->sk);
-
-	if (err)
-		return err;
-
-	subflow = subflow_ctx(sf->sk);
-	pr_debug("subflow=%p", subflow);
-
-	*new_sock = sf;
-	subflow->conn = sk;
-	subflow->request_mptcp = 1; // @@ if MPTCP enabled
-	subflow->request_cksum = 1; // @@ if checksum enabled
-	subflow->version = 0;
-
-	return 0;
 }
 
 static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
