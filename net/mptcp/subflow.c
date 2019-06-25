@@ -54,6 +54,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 	memset(&rx_opt.mptcp, 0, sizeof(rx_opt.mptcp));
 	mptcp_get_options(skb, &rx_opt);
 
+	subflow_req->mp_capable = 0;
+	subflow_req->mp_join = 0;
+
+	if (rx_opt.mptcp.mp_capable && rx_opt.mptcp.mp_join)
+		return;
+
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		subflow_req->mp_capable = 1;
 		if (rx_opt.mptcp.version >= listener->version)
@@ -68,8 +74,18 @@ static void subflow_v4_init_req(struct request_sock *req,
 		token_new_request(req, skb);
 		pr_debug("syn seq=%u", TCP_SKB_CB(skb)->seq);
 		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
-	} else {
-		subflow_req->mp_capable = 0;
+	} else if (rx_opt.mptcp.mp_join && listener->request_mptcp) {
+		subflow_req->mp_join = 1;
+		subflow_req->backup = rx_opt.mptcp.backup;
+		subflow_req->remote_id = rx_opt.mptcp.join_id;
+		subflow_req->token = rx_opt.mptcp.token;
+		subflow_req->remote_nonce = rx_opt.mptcp.nonce;
+		pr_debug("token=%u, remote_nonce=%u", subflow_req->token,
+			 subflow_req->remote_nonce);
+		if (token_join_request(req, skb)) {
+			subflow_req->mp_join = 0;
+			// @@ need to trigger RST
+		}
 	}
 }
 
@@ -134,6 +150,11 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 		    subflow_req->local_key != opt_rx.mptcp.rcvr_key ||
 		    subflow_req->remote_key != opt_rx.mptcp.sndr_key)
 			return NULL;
+	} else if (subflow_req->mp_join) {
+		opt_rx.mptcp.mp_join = 0;
+		mptcp_get_options(skb, &opt_rx);
+		if (!opt_rx.mptcp.mp_join || token_join_valid(req, &opt_rx))
+			return NULL;
 	}
 
 	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
@@ -141,18 +162,27 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	if (child && *own_req) {
 		struct subflow_context *ctx = subflow_ctx(child);
 
-		if (!ctx) {
-			pr_debug("Closing child socket");
-			inet_sk_set_state(child, TCP_CLOSE);
-			sock_set_flag(child, SOCK_DEAD);
-			inet_csk_destroy_sock(child);
-			child = NULL;
-		} else if (ctx->mp_capable) {
+		if (!ctx)
+			goto close_child;
+
+		if (ctx->mp_capable) {
 			token_new_accept(child);
+		} else if (ctx->mp_join) {
+			if (token_new_join(child))
+				goto close_child;
+			else
+				mptcp_finish_join(ctx->conn, child);
 		}
 	}
 
 	return child;
+
+close_child:
+	pr_debug("closing child socket");
+	inet_sk_set_state(child, TCP_CLOSE);
+	sock_set_flag(child, SOCK_DEAD);
+	inet_csk_destroy_sock(child);
+	return NULL;
 }
 
 static struct inet_connection_sock_af_ops subflow_specific;
@@ -222,6 +252,8 @@ static void subflow_ulp_release(struct sock *sk)
 
 	pr_debug("subflow=%p", ctx);
 
+	token_release(ctx->token);
+
 	kfree(ctx);
 }
 
@@ -254,6 +286,14 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		new_ctx->token = subflow_req->token;
 		new_ctx->ssn_offset = subflow_req->ssn_offset;
 		new_ctx->idsn = subflow_req->idsn;
+		pr_debug("token=%u", new_ctx->token);
+	} else if (subflow_req->mp_join) {
+		new_ctx->mp_join = 1;
+		new_ctx->fourth_ack = 1;
+		new_ctx->backup = subflow_req->backup;
+		new_ctx->local_id = subflow_req->local_id;
+		new_ctx->token = subflow_req->token;
+		new_ctx->thmac = subflow_req->thmac;
 		pr_debug("token=%u", new_ctx->token);
 	}
 }
