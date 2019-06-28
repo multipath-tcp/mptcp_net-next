@@ -1,0 +1,8 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] tcp: Expose tcp struct and routine for MPTCP
+
+tcp_request_sock_ipv4_ops and tcp_v4_init_sock().
+
+This function is needed for MPTCP subflow initialization.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
