@@ -1,0 +1,21 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Write MPTCP DSS headers to outgoing data packets
+
+Per-packet metadata required to write the MPTCP DSS option is written to
+the skb_ext area. One write to the socket may contain more than one
+packet of data, in which case the DSS option in the first packet will
+have a mapping covering all of the data in that write. Packets after the
+first do not have a DSS option. This is complicated to handle under
+memory pressure, since the first packet (with the DSS mapping) is pushed
+to the TCP core before the remaining skbs are allocated.
+
+The current implementation is limited. It will only send up to one page
+of data. The number of bytes sent is returned so the caller knows which
+bytes were sent and which were not. More work is required to ensure that
+it works correctly with full buffers or under memory pressure.
+
+The MPTCP DSS checksum is not yet implemented.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
