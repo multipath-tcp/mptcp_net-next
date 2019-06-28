@@ -1,0 +1,12 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Make connection_list a real list of subflows
+
+Use the MPTCP socket lock to mutually exclude shutdown and close
+execution.
+
+Since mptcp_close() is the only code path that removes entries from
+conn_list, we can safely traverse the list while interrupting the RCU
+critical section.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
