@@ -5664,6 +5664,10 @@ step5:
 	/* Process urgent data. */
 	tcp_urg(sk, skb, th);
 
+	/* Prepare MPTCP sequence data */
+	if (sk_is_mptcp(sk))
+		mptcp_attach_dss(sk, skb, &tp->rx_opt);
+
 	/* step 7: process the segment text */
 	tcp_data_queue(sk, skb);
 
