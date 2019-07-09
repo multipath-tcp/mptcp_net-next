@@ -51,7 +51,16 @@ void pm_rm_addr(struct mptcp_sock *msk, u8 id)
 bool pm_addr_signal(struct mptcp_sock *msk, unsigned int *size,
 		    unsigned int remaining, struct mptcp_out_options *opts)
 {
-	pr_debug("msk=%p", msk);
+	if (!msk || !msk->addr_signal)
+		return false;
 
-	return false;
+	if (msk->pm.family == AF_INET && remaining < TCPOLEN_MPTCP_ADD_ADDR)
+		return false;
+
+	pr_debug("msk=%p", msk);
+	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
+	opts->addr_id = msk->pm.addr_id;
+	opts->addr.s_addr = msk->pm.addr.s_addr;
+
+	return true;
 }
