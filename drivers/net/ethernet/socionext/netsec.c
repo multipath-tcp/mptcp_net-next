@@ -743,9 +743,7 @@ static void *netsec_alloc_rx_data(struct netsec_priv *priv,
 	 */
 	*desc_len = PAGE_SIZE - NETSEC_RX_BUF_NON_DATA;
 	dma_dir = page_pool_get_dma_dir(dring->page_pool);
-	dma_sync_single_for_device(priv->dev,
-				   *dma_handle - NETSEC_RXBUF_HEADROOM,
-				   PAGE_SIZE, dma_dir);
+	dma_sync_single_for_device(priv->dev, *dma_handle, *desc_len, dma_dir);
 
 	return page_address(page);
 }
@@ -1214,15 +1212,11 @@ static void netsec_uninit_pkt_dring(struct netsec_priv *priv, int id)
 		}
 	}
 
-	/* Rx is currently using page_pool
-	 * since the pool is created during netsec_setup_rx_dring(), we need to
-	 * free the pool manually if the registration failed
-	 */
+	/* Rx is currently using page_pool */
 	if (id == NETSEC_RING_RX) {
 		if (xdp_rxq_info_is_reg(&dring->xdp_rxq))
 			xdp_rxq_info_unreg(&dring->xdp_rxq);
-		else
-			page_pool_free(dring->page_pool);
+		page_pool_destroy(dring->page_pool);
 	}
 
 	memset(dring->desc, 0, sizeof(struct netsec_desc) * DESC_NUM);
