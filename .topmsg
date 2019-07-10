@@ -1,0 +1,10 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Define IPPROTO_MPTCP
+
+To open a MPTCP socket with socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP),
+IPPROTO_MPTCP needs a value that differs from IPPROTO_TCP. The existing
+IPPROTO numbers mostly map directly to IANA-specified protocol numbers.
+MPTCP does not have a protocol number allocated because MPTCP packets
+use the TCP protocol number. Use private number not used OTA.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
