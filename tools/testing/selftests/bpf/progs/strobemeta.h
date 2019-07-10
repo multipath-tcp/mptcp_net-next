@@ -204,40 +204,40 @@ struct strobelight_bpf_sample {
 	char dummy_safeguard;
 };
 
-struct bpf_map_def SEC("maps") samples = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(int),
-	.value_size = sizeof(int),
-	.max_entries = 32,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, 32);
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(int));
+} samples SEC(".maps");
 
-struct bpf_map_def SEC("maps") stacks_0 = {
-	.type = BPF_MAP_TYPE_STACK_TRACE,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint64_t) * PERF_MAX_STACK_DEPTH,
-	.max_entries = 16,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(max_entries, 16);
+	__uint(key_size, sizeof(uint32_t));
+	__uint(value_size, sizeof(uint64_t) * PERF_MAX_STACK_DEPTH);
+} stacks_0 SEC(".maps");
 
-struct bpf_map_def SEC("maps") stacks_1 = {
-	.type = BPF_MAP_TYPE_STACK_TRACE,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(uint64_t) * PERF_MAX_STACK_DEPTH,
-	.max_entries = 16,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(max_entries, 16);
+	__uint(key_size, sizeof(uint32_t));
+	__uint(value_size, sizeof(uint64_t) * PERF_MAX_STACK_DEPTH);
+} stacks_1 SEC(".maps");
 
-struct bpf_map_def SEC("maps") sample_heap = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size = sizeof(uint32_t),
-	.value_size = sizeof(struct strobelight_bpf_sample),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, uint32_t);
+	__type(value, struct strobelight_bpf_sample);
+} sample_heap SEC(".maps");
 
-struct bpf_map_def SEC("maps") strobemeta_cfgs = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size = sizeof(pid_t),
-	.value_size = sizeof(struct strobemeta_cfg),
-	.max_entries = STROBE_MAX_CFGS,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, STROBE_MAX_CFGS);
+	__type(key, pid_t);
+	__type(value, struct strobemeta_cfg);
+} strobemeta_cfgs SEC(".maps");
 
 /* Type for the dtv.  */
 /* https://github.com/lattera/glibc/blob/master/nptl/sysdeps/x86_64/tls.h#L34 */
@@ -266,8 +266,8 @@ struct tls_index {
 	uint64_t offset;
 };
 
-static inline __attribute__((always_inline))
-void *calc_location(struct strobe_value_loc *loc, void *tls_base)
+static __always_inline void *calc_location(struct strobe_value_loc *loc,
+					   void *tls_base)
 {
 	/*
 	 * tls_mode value is:
@@ -327,10 +327,10 @@ void *calc_location(struct strobe_value_loc *loc, void *tls_base)
 		: NULL;
 }
 
-static inline __attribute__((always_inline))
-void read_int_var(struct strobemeta_cfg *cfg, size_t idx, void *tls_base,
-		  struct strobe_value_generic *value,
-		  struct strobemeta_payload *data)
+static __always_inline void read_int_var(struct strobemeta_cfg *cfg,
+					 size_t idx, void *tls_base,
+					 struct strobe_value_generic *value,
+					 struct strobemeta_payload *data)
 {
 	void *location = calc_location(&cfg->int_locs[idx], tls_base);
 	if (!location)
@@ -342,10 +342,11 @@ void read_int_var(struct strobemeta_cfg *cfg, size_t idx, void *tls_base,
 		data->int_vals_set_mask |= (1 << idx);
 }
 
-static inline __attribute__((always_inline))
-uint64_t read_str_var(struct strobemeta_cfg* cfg, size_t idx, void *tls_base,
-		      struct strobe_value_generic *value,
-		      struct strobemeta_payload *data, void *payload)
+static __always_inline uint64_t read_str_var(struct strobemeta_cfg *cfg,
+					     size_t idx, void *tls_base,
+					     struct strobe_value_generic *value,
+					     struct strobemeta_payload *data,
+					     void *payload)
 {
 	void *location;
 	uint32_t len;
@@ -371,10 +372,11 @@ uint64_t read_str_var(struct strobemeta_cfg* cfg, size_t idx, void *tls_base,
 	return len;
 }
 
-static inline __attribute__((always_inline))
-void *read_map_var(struct strobemeta_cfg *cfg, size_t idx, void *tls_base,
-		   struct strobe_value_generic *value,
-		   struct strobemeta_payload* data, void *payload)
+static __always_inline void *read_map_var(struct strobemeta_cfg *cfg,
+					  size_t idx, void *tls_base,
+					  struct strobe_value_generic *value,
+					  struct strobemeta_payload *data,
+					  void *payload)
 {
 	struct strobe_map_descr* descr = &data->map_descrs[idx];
 	struct strobe_map_raw map;
@@ -435,9 +437,9 @@ void *read_map_var(struct strobemeta_cfg *cfg, size_t idx, void *tls_base,
  * read_strobe_meta returns NULL, if no metadata was read; otherwise returns
  * pointer to *right after* payload ends
  */
-static inline __attribute__((always_inline))
-void *read_strobe_meta(struct task_struct* task,
-		       struct strobemeta_payload* data) {
+static __always_inline void *read_strobe_meta(struct task_struct *task,
+					      struct strobemeta_payload *data)
+{
 	pid_t pid = bpf_get_current_pid_tgid() >> 32;
 	struct strobe_value_generic value = {0};
 	struct strobemeta_cfg *cfg;
