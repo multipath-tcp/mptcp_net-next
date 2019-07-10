@@ -328,11 +328,6 @@ struct netsec_rx_pkt_info {
 	bool err_flag;
 };
 
-static void netsec_set_tx_de(struct netsec_priv *priv,
-			     struct netsec_desc_ring *dring,
-			     const struct netsec_tx_pkt_ctrl *tx_ctrl,
-			     const struct netsec_desc *desc, void *buf);
-
 static void netsec_write(struct netsec_priv *priv, u32 reg_addr, u32 val)
 {
 	writel(val, priv->ioaddr + reg_addr);
@@ -634,15 +629,14 @@ static void netsec_set_rx_de(struct netsec_priv *priv,
 static bool netsec_clean_tx_dring(struct netsec_priv *priv)
 {
 	struct netsec_desc_ring *dring = &priv->desc_ring[NETSEC_RING_TX];
-	unsigned int pkts, bytes;
 	struct netsec_de *entry;
 	int tail = dring->tail;
+	unsigned int bytes;
 	int cnt = 0;
 
 	if (dring->is_xdp)
 		spin_lock(&dring->lock);
 
-	pkts = 0;
 	bytes = 0;
 	entry = dring->vaddr + DESC_SZ * tail;
 
@@ -655,12 +649,12 @@ static bool netsec_clean_tx_dring(struct netsec_priv *priv)
 		eop = (entry->attr >> NETSEC_TX_LAST) & 1;
 		dma_rmb();
 
-		if (desc->buf_type == TYPE_NETSEC_SKB)
+		/* if buf_type is either TYPE_NETSEC_SKB or
+		 * TYPE_NETSEC_XDP_NDO we mapped it
+		 */
+		if (desc->buf_type != TYPE_NETSEC_XDP_TX)
 			dma_unmap_single(priv->dev, desc->dma_addr, desc->len,
 					 DMA_TO_DEVICE);
-		else if (desc->buf_type == TYPE_NETSEC_XDP_NDO)
-			dma_unmap_single(priv->dev, desc->dma_addr,
-					 desc->len, DMA_TO_DEVICE);
 
 		if (!eop)
 			goto next;
@@ -727,6 +721,7 @@ static void *netsec_alloc_rx_data(struct netsec_priv *priv,
 {
 
 	struct netsec_desc_ring *dring = &priv->desc_ring[NETSEC_RING_RX];
+	enum dma_data_direction dma_dir;
 	struct page *page;
 
 	page = page_pool_dev_alloc_pages(dring->page_pool);
@@ -742,6 +737,8 @@ static void *netsec_alloc_rx_data(struct netsec_priv *priv,
 	 * cases and reserve enough space for headroom + skb_shared_info
 	 */
 	*desc_len = PAGE_SIZE - NETSEC_RX_BUF_NON_DATA;
+	dma_dir = page_pool_get_dma_dir(dring->page_pool);
+	dma_sync_single_for_device(priv->dev, *dma_handle, *desc_len, dma_dir);
 
 	return page_address(page);
 }
@@ -774,6 +771,47 @@ static void netsec_finalize_xdp_rx(struct netsec_priv *priv, u32 xdp_res,
 
 	if (xdp_res & NETSEC_XDP_TX)
 		netsec_xdp_ring_tx_db(priv, pkts);
+}
+
+static void netsec_set_tx_de(struct netsec_priv *priv,
+			     struct netsec_desc_ring *dring,
+			     const struct netsec_tx_pkt_ctrl *tx_ctrl,
+			     const struct netsec_desc *desc, void *buf)
+{
+	int idx = dring->head;
+	struct netsec_de *de;
+	u32 attr;
+
+	de = dring->vaddr + (DESC_SZ * idx);
+
+	attr = (1 << NETSEC_TX_SHIFT_OWN_FIELD) |
+	       (1 << NETSEC_TX_SHIFT_PT_FIELD) |
+	       (NETSEC_RING_GMAC << NETSEC_TX_SHIFT_TDRID_FIELD) |
+	       (1 << NETSEC_TX_SHIFT_FS_FIELD) |
+	       (1 << NETSEC_TX_LAST) |
+	       (tx_ctrl->cksum_offload_flag << NETSEC_TX_SHIFT_CO) |
+	       (tx_ctrl->tcp_seg_offload_flag << NETSEC_TX_SHIFT_SO) |
+	       (1 << NETSEC_TX_SHIFT_TRS_FIELD);
+	if (idx == DESC_NUM - 1)
+		attr |= (1 << NETSEC_TX_SHIFT_LD_FIELD);
+
+	de->data_buf_addr_up = upper_32_bits(desc->dma_addr);
+	de->data_buf_addr_lw = lower_32_bits(desc->dma_addr);
+	de->buf_len_info = (tx_ctrl->tcp_seg_len << 16) | desc->len;
+	de->attr = attr;
+	/* under spin_lock if using XDP */
+	if (!dring->is_xdp)
+		dma_wmb();
+
+	dring->desc[idx] = *desc;
+	if (desc->buf_type == TYPE_NETSEC_SKB)
+		dring->desc[idx].skb = buf;
+	else if (desc->buf_type == TYPE_NETSEC_XDP_TX ||
+		 desc->buf_type == TYPE_NETSEC_XDP_NDO)
+		dring->desc[idx].xdpf = buf;
+
+	/* move head ahead */
+	dring->head = (dring->head + 1) % DESC_NUM;
 }
 
 /* The current driver only supports 1 Txq, this should run under spin_lock() */
@@ -1039,46 +1077,6 @@ static int netsec_napi_poll(struct napi_struct *napi, int budget)
 	return done;
 }
 
-static void netsec_set_tx_de(struct netsec_priv *priv,
-			     struct netsec_desc_ring *dring,
-			     const struct netsec_tx_pkt_ctrl *tx_ctrl,
-			     const struct netsec_desc *desc, void *buf)
-{
-	int idx = dring->head;
-	struct netsec_de *de;
-	u32 attr;
-
-	de = dring->vaddr + (DESC_SZ * idx);
-
-	attr = (1 << NETSEC_TX_SHIFT_OWN_FIELD) |
-	       (1 << NETSEC_TX_SHIFT_PT_FIELD) |
-	       (NETSEC_RING_GMAC << NETSEC_TX_SHIFT_TDRID_FIELD) |
-	       (1 << NETSEC_TX_SHIFT_FS_FIELD) |
-	       (1 << NETSEC_TX_LAST) |
-	       (tx_ctrl->cksum_offload_flag << NETSEC_TX_SHIFT_CO) |
-	       (tx_ctrl->tcp_seg_offload_flag << NETSEC_TX_SHIFT_SO) |
-	       (1 << NETSEC_TX_SHIFT_TRS_FIELD);
-	if (idx == DESC_NUM - 1)
-		attr |= (1 << NETSEC_TX_SHIFT_LD_FIELD);
-
-	de->data_buf_addr_up = upper_32_bits(desc->dma_addr);
-	de->data_buf_addr_lw = lower_32_bits(desc->dma_addr);
-	de->buf_len_info = (tx_ctrl->tcp_seg_len << 16) | desc->len;
-	de->attr = attr;
-	/* under spin_lock if using XDP */
-	if (!dring->is_xdp)
-		dma_wmb();
-
-	dring->desc[idx] = *desc;
-	if (desc->buf_type == TYPE_NETSEC_SKB)
-		dring->desc[idx].skb = buf;
-	else if (desc->buf_type == TYPE_NETSEC_XDP_TX ||
-		 desc->buf_type == TYPE_NETSEC_XDP_NDO)
-		dring->desc[idx].xdpf = buf;
-
-	/* move head ahead */
-	dring->head = (dring->head + 1) % DESC_NUM;
-}
 
 static int netsec_desc_used(struct netsec_desc_ring *dring)
 {
@@ -1210,15 +1208,11 @@ static void netsec_uninit_pkt_dring(struct netsec_priv *priv, int id)
 		}
 	}
 
-	/* Rx is currently using page_pool
-	 * since the pool is created during netsec_setup_rx_dring(), we need to
-	 * free the pool manually if the registration failed
-	 */
+	/* Rx is currently using page_pool */
 	if (id == NETSEC_RING_RX) {
 		if (xdp_rxq_info_is_reg(&dring->xdp_rxq))
 			xdp_rxq_info_unreg(&dring->xdp_rxq);
-		else
-			page_pool_free(dring->page_pool);
+		page_pool_destroy(dring->page_pool);
 	}
 
 	memset(dring->desc, 0, sizeof(struct netsec_desc) * DESC_NUM);
@@ -1311,6 +1305,15 @@ static int netsec_setup_rx_dring(struct netsec_priv *priv)
 		goto err_out;
 	}
 
+	err = xdp_rxq_info_reg(&dring->xdp_rxq, priv->ndev, 0);
+	if (err)
+		goto err_out;
+
+	err = xdp_rxq_info_reg_mem_model(&dring->xdp_rxq, MEM_TYPE_PAGE_POOL,
+					 dring->page_pool);
+	if (err)
+		goto err_out;
+
 	for (i = 0; i < DESC_NUM; i++) {
 		struct netsec_desc *desc = &dring->desc[i];
 		dma_addr_t dma_handle;
@@ -1329,14 +1332,6 @@ static int netsec_setup_rx_dring(struct netsec_priv *priv)
 	}
 
 	netsec_rx_fill(priv, 0, DESC_NUM);
-	err = xdp_rxq_info_reg(&dring->xdp_rxq, priv->ndev, 0);
-	if (err)
-		goto err_out;
-
-	err = xdp_rxq_info_reg_mem_model(&dring->xdp_rxq, MEM_TYPE_PAGE_POOL,
-					 dring->page_pool);
-	if (err)
-		goto err_out;
 
 	return 0;
 
