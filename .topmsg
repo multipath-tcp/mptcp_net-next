@@ -1,0 +1,7 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: sendmsg() do spool all the provided data
+
+This makes mptcp sendmsg() behaviour more consistent and
+improves xmit performances.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
