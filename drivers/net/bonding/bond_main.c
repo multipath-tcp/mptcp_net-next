@@ -796,6 +796,8 @@ static bool bond_should_notify_peers(struct bonding *bond)
 		   slave ? slave->dev->name : "NULL");
 
 	if (!slave || !bond->send_peer_notif ||
+	    bond->send_peer_notif %
+	    max(1, bond->params.peer_notif_delay) != 0 ||
 	    !netif_carrier_ok(bond->dev) ||
 	    test_bit(__LINK_STATE_LINKWATCH_PENDING, &slave->dev->state))
 		return false;
@@ -886,15 +888,18 @@ void bond_change_active_slave(struct bonding *bond, struct slave *new_active)
 
 			if (netif_running(bond->dev)) {
 				bond->send_peer_notif =
-					bond->params.num_peer_notif;
+					bond->params.num_peer_notif *
+					max(1, bond->params.peer_notif_delay);
 				should_notify_peers =
 					bond_should_notify_peers(bond);
 			}
 
 			call_netdevice_notifiers(NETDEV_BONDING_FAILOVER, bond->dev);
-			if (should_notify_peers)
+			if (should_notify_peers) {
+				bond->send_peer_notif--;
 				call_netdevice_notifiers(NETDEV_NOTIFY_PEERS,
 							 bond->dev);
+			}
 		}
 	}
 
@@ -2279,6 +2284,7 @@ static void bond_mii_monitor(struct work_struct *work)
 	struct bonding *bond = container_of(work, struct bonding,
 					    mii_work.work);
 	bool should_notify_peers = false;
+	bool commit;
 	unsigned long delay;
 	struct slave *slave;
 	struct list_head *iter;
@@ -2289,12 +2295,19 @@ static void bond_mii_monitor(struct work_struct *work)
 		goto re_arm;
 
 	rcu_read_lock();
-
 	should_notify_peers = bond_should_notify_peers(bond);
-
-	if (bond_miimon_inspect(bond)) {
+	commit = !!bond_miimon_inspect(bond);
+	if (bond->send_peer_notif) {
 		rcu_read_unlock();
+		if (rtnl_trylock()) {
+			bond->send_peer_notif--;
+			rtnl_unlock();
+		}
+	} else {
+		rcu_read_unlock();
+	}
 
+	if (commit) {
 		/* Race avoidance with bond_close cancel of workqueue */
 		if (!rtnl_trylock()) {
 			delay = 1;
@@ -2308,8 +2321,7 @@ static void bond_mii_monitor(struct work_struct *work)
 		bond_miimon_commit(bond);
 
 		rtnl_unlock();	/* might sleep, hold no other locks */
-	} else
-		rcu_read_unlock();
+	}
 
 re_arm:
 	if (bond->params.miimon)
@@ -3064,10 +3076,6 @@ static int bond_master_netdev_event(unsigned long event,
 		break;
 	case NETDEV_REGISTER:
 		bond_create_proc_entry(event_bond);
-		break;
-	case NETDEV_NOTIFY_PEERS:
-		if (event_bond->send_peer_notif)
-			event_bond->send_peer_notif--;
 		break;
 	default:
 		break;
@@ -3851,8 +3859,8 @@ static netdev_tx_t bond_xmit_roundrobin(struct sk_buff *skb,
 					struct net_device *bond_dev)
 {
 	struct bonding *bond = netdev_priv(bond_dev);
-	struct iphdr *iph = ip_hdr(skb);
 	struct slave *slave;
+	int slave_cnt;
 	u32 slave_id;
 
 	/* Start with the curr_active_slave that joined the bond as the
@@ -3861,23 +3869,32 @@ static netdev_tx_t bond_xmit_roundrobin(struct sk_buff *skb,
 	 * send the join/membership reports.  The curr_active_slave found
 	 * will send all of this type of traffic.
 	 */
-	if (iph->protocol == IPPROTO_IGMP && skb->protocol == htons(ETH_P_IP)) {
-		slave = rcu_dereference(bond->curr_active_slave);
-		if (slave)
-			bond_dev_queue_xmit(bond, skb, slave->dev);
-		else
-			bond_xmit_slave_id(bond, skb, 0);
-	} else {
-		int slave_cnt = READ_ONCE(bond->slave_cnt);
+	if (skb->protocol == htons(ETH_P_IP)) {
+		int noff = skb_network_offset(skb);
+		struct iphdr *iph;
 
-		if (likely(slave_cnt)) {
-			slave_id = bond_rr_gen_slave_id(bond);
-			bond_xmit_slave_id(bond, skb, slave_id % slave_cnt);
-		} else {
-			bond_tx_drop(bond_dev, skb);
+		if (unlikely(!pskb_may_pull(skb, noff + sizeof(*iph))))
+			goto non_igmp;
+
+		iph = ip_hdr(skb);
+		if (iph->protocol == IPPROTO_IGMP) {
+			slave = rcu_dereference(bond->curr_active_slave);
+			if (slave)
+				bond_dev_queue_xmit(bond, skb, slave->dev);
+			else
+				bond_xmit_slave_id(bond, skb, 0);
+			return NETDEV_TX_OK;
 		}
 	}
 
+non_igmp:
+	slave_cnt = READ_ONCE(bond->slave_cnt);
+	if (likely(slave_cnt)) {
+		slave_id = bond_rr_gen_slave_id(bond);
+		bond_xmit_slave_id(bond, skb, slave_id % slave_cnt);
+	} else {
+		bond_tx_drop(bond_dev, skb);
+	}
 	return NETDEV_TX_OK;
 }
 
@@ -4691,6 +4708,7 @@ static int bond_check_params(struct bond_params *params)
 	params->arp_all_targets = arp_all_targets_value;
 	params->updelay = updelay;
 	params->downdelay = downdelay;
+	params->peer_notif_delay = 0;
 	params->use_carrier = use_carrier;
 	params->lacp_fast = lacp_fast;
 	params->primary[0] = 0;
