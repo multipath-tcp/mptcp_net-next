@@ -1,0 +1,20 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Create SUBFLOW socket for incoming connections
+
+Add subflow_request_sock type that extends tcp_request_sock
+and add an is_mptcp flag to tcp_request_sock distinguish them.
+
+Override the listen() and accept() methods of the MPTCP
+socket proto_ops so they may act on the subflow socket.
+
+Override the conn_request() and syn_recv_sock() handlers
+in the inet_connection_sock to handle incoming MPTCP
+SYNs and the ACK to the response SYN.
+
+Add handling in tcp_output.c to add MP_CAPABLE to an outgoing
+SYN-ACK response for a subflow_request_sock.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
