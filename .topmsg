@@ -1,0 +1,12 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Handle MP_CAPABLE options for outgoing connections
+
+Add hooks to tcp_output.c to add MP_CAPABLE to an outgoing
+SYN request for a subflow socket and to the final ACK of the
+three-way handshake.
+
+Use the .sk_rx_dst_set() handler in the subflow proto to capture
+when the responding SYN-ACK is received and notify the MPTCP
+connection layer.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
