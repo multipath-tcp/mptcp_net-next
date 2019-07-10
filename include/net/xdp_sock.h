@@ -59,6 +59,11 @@ struct xdp_sock {
 	struct list_head flush_node;
 	u16 queue_id;
 	bool zc;
+	enum {
+		XSK_READY = 0,
+		XSK_BOUND,
+		XSK_UNBOUND,
+	} state;
 	/* Protects multiple processes in the control path */
 	struct mutex mutex;
 	struct xsk_queue *tx ____cacheline_aligned_in_smp;
@@ -67,6 +72,8 @@ struct xdp_sock {
 	 * in the SKB destructor callback.
 	 */
 	spinlock_t tx_completion_lock;
+	/* Protects generic receive. */
+	spinlock_t rx_lock;
 	u64 rx_dropped;
 };
 
