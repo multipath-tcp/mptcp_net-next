@@ -58,14 +58,6 @@ typedef struct {
 } Event;
 
 
-struct bpf_elf_map {
-	__u32 type;
-	__u32 size_key;
-	__u32 size_value;
-	__u32 max_elem;
-	__u32 flags;
-};
-
 typedef int pid_t;
 
 typedef struct {
@@ -75,8 +67,7 @@ typedef struct {
 	void* co_name; // PyCodeObject.co_name
 } FrameData;
 
-static inline __attribute__((__always_inline__)) void*
-get_thread_state(void* tls_base, PidData* pidData)
+static __always_inline void *get_thread_state(void *tls_base, PidData *pidData)
 {
 	void* thread_state;
 	int key;
@@ -87,8 +78,8 @@ get_thread_state(void* tls_base, PidData* pidData)
 	return thread_state;
 }
 
-static inline __attribute__((__always_inline__)) bool
-get_frame_data(void* frame_ptr, PidData* pidData, FrameData* frame, Symbol* symbol)
+static __always_inline bool get_frame_data(void *frame_ptr, PidData *pidData,
+					   FrameData *frame, Symbol *symbol)
 {
 	// read data from PyFrameObject
 	bpf_probe_read(&frame->f_back,
@@ -119,49 +110,49 @@ get_frame_data(void* frame_ptr, PidData* pidData, FrameData* frame, Symbol* symb
 	return true;
 }
 
-struct bpf_elf_map SEC("maps") pidmap = {
-	.type = BPF_MAP_TYPE_HASH,
-	.size_key = sizeof(int),
-	.size_value = sizeof(PidData),
-	.max_elem = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1);
+	__type(key, int);
+	__type(value, PidData);
+} pidmap SEC(".maps");
 
-struct bpf_elf_map SEC("maps") eventmap = {
-	.type = BPF_MAP_TYPE_HASH,
-	.size_key = sizeof(int),
-	.size_value = sizeof(Event),
-	.max_elem = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1);
+	__type(key, int);
+	__type(value, Event);
+} eventmap SEC(".maps");
 
-struct bpf_elf_map SEC("maps") symbolmap = {
-	.type = BPF_MAP_TYPE_HASH,
-	.size_key = sizeof(Symbol),
-	.size_value = sizeof(int),
-	.max_elem = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1);
+	__type(key, Symbol);
+	__type(value, int);
+} symbolmap SEC(".maps");
 
-struct bpf_elf_map SEC("maps") statsmap = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.size_key = sizeof(Stats),
-	.size_value = sizeof(int),
-	.max_elem = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, int);
+	__type(value, Stats);
+} statsmap SEC(".maps");
 
-struct bpf_elf_map SEC("maps") perfmap = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.size_key = sizeof(int),
-	.size_value = sizeof(int),
-	.max_elem = 32,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, 32);
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(int));
+} perfmap SEC(".maps");
 
-struct bpf_elf_map SEC("maps") stackmap = {
-	.type = BPF_MAP_TYPE_STACK_TRACE,
-	.size_key = sizeof(int),
-	.size_value = sizeof(long long) * 127,
-	.max_elem = 1000,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(max_entries, 1000);
+	__uint(key_size, sizeof(int));
+	__uint(value_size, sizeof(long long) * 127);
+} stackmap SEC(".maps");
 
-static inline __attribute__((__always_inline__)) int __on_event(struct pt_regs *ctx)
+static __always_inline int __on_event(struct pt_regs *ctx)
 {
 	uint64_t pid_tgid = bpf_get_current_pid_tgid();
 	pid_t pid = (pid_t)(pid_tgid >> 32);
