@@ -1,0 +1,19 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Add MPTCP socket stubs
+
+Implements the infrastructure for MPTCP sockets.
+
+MPTCP sockets open one in-kernel TCP socket per subflow. These subflow
+sockets are only managed by the MPTCP socket that owns them and are not
+visible from userspace. This commit allows a userspace program to open
+an MPTCP socket with:
+
+  sock = socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+
+The resulting socket is simply a wrapper around a single regular TCP
+socket, without any of the MPTCP protocol implemented over the wire.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
