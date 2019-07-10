@@ -61,7 +61,7 @@ static void tls_device_free_ctx(struct tls_context *ctx)
 	if (ctx->rx_conf == TLS_HW)
 		kfree(tls_offload_ctx_rx(ctx));
 
-	kfree(ctx);
+	tls_ctx_free(ctx);
 }
 
 static void tls_device_gc_task(struct work_struct *work)
@@ -214,6 +214,7 @@ static void tls_device_resync_tx(struct sock *sk, struct tls_context *tls_ctx,
 {
 	struct net_device *netdev;
 	struct sk_buff *skb;
+	int err = 0;
 	u8 *rcd_sn;
 
 	skb = tcp_write_queue_tail(sk);
@@ -225,9 +226,12 @@ static void tls_device_resync_tx(struct sock *sk, struct tls_context *tls_ctx,
 	down_read(&device_offload_lock);
 	netdev = tls_ctx->netdev;
 	if (netdev)
-		netdev->tlsdev_ops->tls_dev_resync(netdev, sk, seq, rcd_sn,
-						   TLS_OFFLOAD_CTX_DIR_TX);
+		err = netdev->tlsdev_ops->tls_dev_resync(netdev, sk, seq,
+							 rcd_sn,
+							 TLS_OFFLOAD_CTX_DIR_TX);
 	up_read(&device_offload_lock);
+	if (err)
+		return;
 
 	clear_bit_unlock(TLS_TX_SYNC_SCHED, &tls_ctx->flags);
 }
@@ -853,6 +857,11 @@ int tls_set_device_offload(struct sock *sk, struct tls_context *ctx)
 	}
 
 	crypto_info = &ctx->crypto_send.info;
+	if (crypto_info->version != TLS_1_2_VERSION) {
+		rc = -EOPNOTSUPP;
+		goto free_offload_ctx;
+	}
+
 	switch (crypto_info->cipher_type) {
 	case TLS_CIPHER_AES_GCM_128:
 		nonce_size = TLS_CIPHER_AES_GCM_128_IV_SIZE;
@@ -874,6 +883,8 @@ int tls_set_device_offload(struct sock *sk, struct tls_context *ctx)
 		goto free_offload_ctx;
 	}
 
+	prot->version = crypto_info->version;
+	prot->cipher_type = crypto_info->cipher_type;
 	prot->prepend_size = TLS_HEADER_SIZE + nonce_size;
 	prot->tag_size = tag_size;
 	prot->overhead_size = prot->prepend_size + prot->tag_size;
@@ -992,6 +1003,9 @@ int tls_set_device_offload_rx(struct sock *sk, struct tls_context *ctx)
 	struct tls_offload_context_rx *context;
 	struct net_device *netdev;
 	int rc = 0;
+
+	if (ctx->crypto_recv.info.version != TLS_1_2_VERSION)
+		return -EOPNOTSUPP;
 
 	/* We support starting offload on multiple sockets
 	 * concurrently, so we only need a read lock here.
