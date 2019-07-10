@@ -35,7 +35,8 @@ static void gve_get_stats(struct net_device *dev, struct rtnl_link_stats64 *s)
 	if (priv->rx) {
 		for (ring = 0; ring < priv->rx_cfg.num_queues; ring++) {
 			do {
-				u64_stats_fetch_begin(&priv->rx[ring].statss);
+				start =
+				  u64_stats_fetch_begin(&priv->rx[ring].statss);
 				s->rx_packets += priv->rx[ring].rpackets;
 				s->rx_bytes += priv->rx[ring].rbytes;
 			} while (u64_stats_fetch_retry(&priv->rx[ring].statss,
@@ -45,7 +46,8 @@ static void gve_get_stats(struct net_device *dev, struct rtnl_link_stats64 *s)
 	if (priv->tx) {
 		for (ring = 0; ring < priv->tx_cfg.num_queues; ring++) {
 			do {
-				u64_stats_fetch_begin(&priv->tx[ring].statss);
+				start =
+				  u64_stats_fetch_begin(&priv->tx[ring].statss);
 				s->tx_packets += priv->tx[ring].pkt_done;
 				s->tx_bytes += priv->tx[ring].bytes_done;
 			} while (u64_stats_fetch_retry(&priv->rx[ring].statss,
@@ -516,7 +518,7 @@ int gve_alloc_page(struct device *dev, struct page **page, dma_addr_t *dma,
 		   enum dma_data_direction dir)
 {
 	*page = alloc_page(GFP_KERNEL);
-	if (!page)
+	if (!*page)
 		return -ENOMEM;
 	*dma = dma_map_page(dev, *page, 0, PAGE_SIZE, dir);
 	if (dma_mapping_error(dev, *dma)) {
@@ -623,8 +625,10 @@ static int gve_alloc_qpls(struct gve_priv *priv)
 				     sizeof(unsigned long) * BITS_PER_BYTE;
 	priv->qpl_cfg.qpl_id_map = kvzalloc(BITS_TO_LONGS(num_qpls) *
 					    sizeof(unsigned long), GFP_KERNEL);
-	if (!priv->qpl_cfg.qpl_id_map)
+	if (!priv->qpl_cfg.qpl_id_map) {
+		err = -ENOMEM;
 		goto free_qpls;
+	}
 
 	return 0;
 
