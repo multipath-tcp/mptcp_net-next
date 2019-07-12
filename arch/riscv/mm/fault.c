@@ -169,7 +169,7 @@ bad_area:
 	up_read(&mm->mmap_sem);
 	/* User mode accesses just cause a SIGSEGV */
 	if (user_mode(regs)) {
-		do_trap(regs, SIGSEGV, code, addr, tsk);
+		do_trap(regs, SIGSEGV, code, addr);
 		return;
 	}
 
@@ -205,7 +205,7 @@ do_sigbus:
 	/* Kernel mode? Handle exceptions or die */
 	if (!user_mode(regs))
 		goto no_context;
-	do_trap(regs, SIGBUS, BUS_ADRERR, addr, tsk);
+	do_trap(regs, SIGBUS, BUS_ADRERR, addr);
 	return;
 
 vmalloc_fault:
@@ -219,7 +219,7 @@ vmalloc_fault:
 
 		/* User mode accesses just cause a SIGSEGV */
 		if (user_mode(regs))
-			return do_trap(regs, SIGSEGV, code, addr, tsk);
+			return do_trap(regs, SIGSEGV, code, addr);
 
 		/*
 		 * Synchronize this task's top level page-table
@@ -272,9 +272,6 @@ vmalloc_fault:
 		 * entries, but in RISC-V, SFENCE.VMA specifies an
 		 * ordering constraint, not a cache flush; it is
 		 * necessary even after writing invalid entries.
-		 * Relying on flush_tlb_fix_spurious_fault would
-		 * suffice, but the extra traps reduce
-		 * performance. So, eagerly SFENCE.VMA.
 		 */
 		local_flush_tlb_page(addr);
 
