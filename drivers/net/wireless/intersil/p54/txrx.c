@@ -383,7 +383,7 @@ static int p54_rx_data(struct p54_common *priv, struct sk_buff *skb)
 
 	fc = ((struct ieee80211_hdr *)skb->data)->frame_control;
 	if (ieee80211_is_probe_resp(fc) || ieee80211_is_beacon(fc))
-		rx_status->boottime_ns = ktime_get_boot_ns();
+		rx_status->boottime_ns = ktime_get_boottime_ns();
 
 	if (unlikely(priv->hw->conf.flags & IEEE80211_CONF_PS))
 		p54_pspoll_workaround(priv, skb);
