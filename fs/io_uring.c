@@ -399,7 +399,8 @@ static struct io_ring_ctx *io_ring_ctx_alloc(struct io_uring_params *p)
 	if (!ctx)
 		return NULL;
 
-	if (percpu_ref_init(&ctx->refs, io_ring_ctx_ref_free, 0, GFP_KERNEL)) {
+	if (percpu_ref_init(&ctx->refs, io_ring_ctx_ref_free,
+			    PERCPU_REF_ALLOW_REINIT, GFP_KERNEL)) {
 		kfree(ctx);
 		return NULL;
 	}
@@ -2399,7 +2400,6 @@ static int io_cqring_wait(struct io_ring_ctx *ctx, int min_events,
 			  const sigset_t __user *sig, size_t sigsz)
 {
 	struct io_cq_ring *ring = ctx->cq_ring;
-	sigset_t ksigmask, sigsaved;
 	int ret;
 
 	if (io_cqring_events(ring) >= min_events)
@@ -2409,21 +2409,17 @@ static int io_cqring_wait(struct io_ring_ctx *ctx, int min_events,
 #ifdef CONFIG_COMPAT
 		if (in_compat_syscall())
 			ret = set_compat_user_sigmask((const compat_sigset_t __user *)sig,
-						      &ksigmask, &sigsaved, sigsz);
+						      sigsz);
 		else
 #endif
-			ret = set_user_sigmask(sig, &ksigmask,
-					       &sigsaved, sigsz);
+			ret = set_user_sigmask(sig, sigsz);
 
 		if (ret)
 			return ret;
 	}
 
 	ret = wait_event_interruptible(ctx->wait, io_cqring_events(ring) >= min_events);
-
-	if (sig)
-		restore_user_sigmask(sig, &sigsaved, ret == -ERESTARTSYS);
-
+	restore_saved_sigmask_unless(ret == -ERESTARTSYS);
 	if (ret == -ERESTARTSYS)
 		ret = -EINTR;
 
