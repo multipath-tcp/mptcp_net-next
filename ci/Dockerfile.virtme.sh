@@ -38,7 +38,7 @@ RUN apt-get update && \
                     build-essential libncurses5-dev gcc libssl-dev bc bison \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
                     python3 python3-pkg-resources busybox iproute2 tcpdump \
-                    iputils-ping ethtool klibc-utils && \
+                    iputils-ping ethtool klibc-utils rsync && \
     apt-get clean
 
 # virtme and sudo rights (for kvm)
