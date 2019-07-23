@@ -138,6 +138,9 @@ tg_trap_reset() { local rc
 
 generate_config_no_mptcp() {
 	make defconfig
+
+	# no need to compile this GPU driver for our tests
+	echo | scripts/config --disable DRM_I915
 }
 
 generate_config_mptcp() {
