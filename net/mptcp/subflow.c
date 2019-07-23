@@ -143,14 +143,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
 
-	if (subflow_req->mp_capable) {
-		opt_rx.mptcp.mp_capable = 0;
-		mptcp_get_options(skb, &opt_rx);
-		if (!opt_rx.mptcp.mp_capable ||
-		    subflow_req->local_key != opt_rx.mptcp.rcvr_key ||
-		    subflow_req->remote_key != opt_rx.mptcp.sndr_key)
-			return NULL;
-	} else if (subflow_req->mp_join) {
+	/* if the sk is MP_CAPABLE, we already received the client key */
+	if (!subflow_req->mp_capable && subflow_req->mp_join) {
 		opt_rx.mptcp.mp_join = 0;
 		mptcp_get_options(skb, &opt_rx);
 		if (!opt_rx.mptcp.mp_join || token_join_valid(req, &opt_rx))
