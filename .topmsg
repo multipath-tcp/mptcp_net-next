@@ -1,4 +1,32 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-harmonize-locking-on-all-socket-operations
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: harmonize locking on all socket operations.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The locking schema implied by sendmsg(), recvmsg(), etc.
+requires acquiring the msk's socket lock before manipulating
+the msk internal status.
+
+Additionally, we can't acquire the msk->subflow socket lock while holding
+the msk lock, due to mptcp_finish_connect().
+
+Many socket operations do not enforce the required locking, e.g. we have
+several patterns alike:
+
+	if (msk->subflow)
+		// do something with msk->subflow
+
+or:
+
+	if (!msk->subflow)
+		// allocate msk->subflow
+
+all without any lock acquired.
+
+They can race with each other and with mptcp_finish_connect() causing
+UAF, null ptr dereference and/or memory leaks.
+
+This patch ensures that all mptcp socket operations access and manipulate
+msk->subflow under the msk socket lock. To avoid breaking the locking
+assumption introduced by mptcp_finish_connect(), while avoiding UAF
+issues, we acquire a reference to the msk->subflow, where needed.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
