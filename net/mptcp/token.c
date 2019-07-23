@@ -82,23 +82,8 @@ static void new_req_join(struct request_sock *req, struct sock *sk,
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	u8 hmac[MPTCPOPT_HMAC_LEN];
-	u32 nonce;
 
-	if (skb->protocol == htons(ETH_P_IP)) {
-		nonce = crypto_v4_get_nonce(ip_hdr(skb)->saddr,
-					    ip_hdr(skb)->daddr,
-					    htons(ireq->ir_num),
-					    ireq->ir_rmt_port);
-#if IS_ENABLED(CONFIG_IPV6)
-	} else {
-		nonce = crypto_v6_get_nonce(&ipv6_hdr(skb)->saddr,
-					    &ipv6_hdr(skb)->daddr,
-					    htons(ireq->ir_num),
-					    ireq->ir_rmt_port);
-#endif
-	}
-	subflow_req->local_nonce = nonce;
-
+	get_random_bytes(&subflow_req->local_nonce, sizeof(u32));
 	crypto_hmac_sha1(msk->local_key,
 			 msk->remote_key,
 			 (u32 *)hmac, 2,
