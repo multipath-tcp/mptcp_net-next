@@ -21,10 +21,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/netdevice.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/cryptohash.h>
 #include <linux/random.h>
 #include <linux/siphash.h>
