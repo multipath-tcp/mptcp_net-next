@@ -21,77 +21,10 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/netdevice.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/cryptohash.h>
 #include <linux/random.h>
 #include <linux/siphash.h>
 #include <asm/unaligned.h>
-
-static siphash_key_t crypto_key_secret __read_mostly;
-static hsiphash_key_t crypto_nonce_secret __read_mostly;
-static u32 crypto_seed;
-
-u32 crypto_v4_get_nonce(__be32 saddr, __be32 daddr, __be16 sport, __be16 dport)
-{
-	return hsiphash_4u32((__force u32)saddr, (__force u32)daddr,
-			    (__force u32)sport << 16 | (__force u32)dport,
-			    crypto_seed++, &crypto_nonce_secret);
-}
-
-u64 crypto_v4_get_key(__be32 saddr, __be32 daddr, __be16 sport, __be16 dport)
-{
-	pr_debug("src=%x:%d, dst=%x:%d", saddr, sport, daddr, dport);
-	return siphash_4u32((__force u32)saddr, (__force u32)daddr,
-			    (__force u32)sport << 16 | (__force u32)dport,
-			    crypto_seed++, &crypto_key_secret);
-}
-
-u32 crypto_v6_get_nonce(const struct in6_addr *saddr,
-			const struct in6_addr *daddr,
-			__be16 sport, __be16 dport)
-{
-	const struct {
-		struct in6_addr saddr;
-		struct in6_addr daddr;
-		u32 seed;
-		__be16 sport;
-		__be16 dport;
-	} __aligned(SIPHASH_ALIGNMENT) combined = {
-		.saddr = *saddr,
-		.daddr = *daddr,
-		.seed = crypto_seed++,
-		.sport = sport,
-		.dport = dport,
-	};
-
-	return hsiphash(&combined, offsetofend(typeof(combined), dport),
-			&crypto_nonce_secret);
-}
-
-u64 crypto_v6_get_key(const struct in6_addr *saddr,
-		      const struct in6_addr *daddr,
-		      __be16 sport, __be16 dport)
-{
-	const struct {
-		struct in6_addr saddr;
-		struct in6_addr daddr;
-		u32 seed;
-		__be16 sport;
-		__be16 dport;
-	} __aligned(SIPHASH_ALIGNMENT) combined = {
-		.saddr = *saddr,
-		.daddr = *daddr,
-		.seed = crypto_seed++,
-		.sport = sport,
-		.dport = dport,
-	};
-
-	return siphash(&combined, offsetofend(typeof(combined), dport),
-		       &crypto_key_secret);
-}
 
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn)
 {
@@ -194,13 +127,4 @@ void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
 
 	for (i = 0; i < 5; i++)
 		hash_out[i] = (__force u32)cpu_to_be32(hash_out[i]);
-}
-
-void crypto_init(void)
-{
-	get_random_bytes((void *)&crypto_key_secret,
-			 sizeof(crypto_key_secret));
-	get_random_bytes((void *)&crypto_nonce_secret,
-			 sizeof(crypto_nonce_secret));
-	crypto_seed = 0;
 }
