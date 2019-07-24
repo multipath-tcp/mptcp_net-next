@@ -59,24 +59,9 @@ static void new_req_token(struct request_sock *req,
 {
 	const struct inet_request_sock *ireq = inet_rsk(req);
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	u64 local_key;
 
-	if (!IS_ENABLED(CONFIG_IPV6) || skb->protocol == htons(ETH_P_IP)) {
-		local_key = crypto_v4_get_key(ip_hdr(skb)->saddr,
-					      ip_hdr(skb)->daddr,
-					      htons(ireq->ir_num),
-					      ireq->ir_rmt_port);
-#if IS_ENABLED(CONFIG_IPV6)
-	} else {
-		local_key = crypto_v6_get_key(&ipv6_hdr(skb)->saddr,
-					      &ipv6_hdr(skb)->daddr,
-					      htons(ireq->ir_num),
-					      ireq->ir_rmt_port);
-#endif
-	}
-	subflow_req->local_key = local_key;
-	crypto_key_sha1(subflow_req->local_key, &subflow_req->token,
-			&subflow_req->idsn);
+	crypto_key_gen_sha1(&subflow_req->local_key, &subflow_req->token,
+			    &subflow_req->idsn);
 	pr_debug("local_key=%llu, token=%u, idsn=%llu", subflow_req->local_key,
 		 subflow_req->token, subflow_req->idsn);
 }
@@ -86,20 +71,8 @@ static void new_token(const struct sock *sk)
 	struct subflow_context *subflow = subflow_ctx(sk);
 	const struct inet_sock *isk = inet_sk(sk);
 
-	if (sk->sk_family == AF_INET) {
-		subflow->local_key = crypto_v4_get_key(isk->inet_saddr,
-						       isk->inet_daddr,
-						       isk->inet_sport,
-						       isk->inet_dport);
-#if IS_ENABLED(CONFIG_IPV6)
-	} else {
-		subflow->local_key = crypto_v6_get_key(&inet6_sk(sk)->saddr,
-						       &sk->sk_v6_daddr,
-						       isk->inet_sport,
-						       isk->inet_dport);
-#endif
-	}
-	crypto_key_sha1(subflow->local_key, &subflow->token, &subflow->idsn);
+	crypto_key_gen_sha1(&subflow->local_key, &subflow->token,
+			    &subflow->idsn);
 	pr_debug("local_key=%llu, token=%u, idsn=%llu", subflow->local_key,
 		 subflow->token, subflow->idsn);
 }
