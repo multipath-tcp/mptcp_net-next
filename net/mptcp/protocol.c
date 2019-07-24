@@ -919,7 +919,6 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
 	token_init();
-	crypto_init();
 	subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
