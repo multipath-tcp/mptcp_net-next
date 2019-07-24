@@ -7,6 +7,8 @@
 #ifndef __MPTCP_PROTOCOL_H
 #define __MPTCP_PROTOCOL_H
 
+#include <linux/random.h>
+
 /* MPTCP option bits */
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
 #define OPTION_MPTCP_MPC_SYNACK	BIT(1)
@@ -114,19 +116,19 @@ void token_new_accept(struct sock *sk);
 void token_update_accept(struct sock *sk, struct sock *conn);
 void token_destroy(u32 token);
 
-void crypto_init(void);
-u32 crypto_v4_get_nonce(__be32 saddr, __be32 daddr,
-			__be16 sport, __be16 dport);
-u64 crypto_v4_get_key(__be32 saddr, __be32 daddr,
-		      __be16 sport, __be16 dport);
-u64 crypto_v6_get_key(const struct in6_addr *saddr,
-		      const struct in6_addr *daddr,
-		      __be16 sport, __be16 dport);
-u32 crypto_v6_get_nonce(const struct in6_addr *saddr,
-			const struct in6_addr *daddr,
-			__be16 sport, __be16 dport);
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
-void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
-		      int arg_num, ...);
+void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out, int arg_num, ...);
+
+static inline void crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
+{
+	/* we might consider a faster version that computes the key as a
+	 * hash of some information available in the MPTCP socket. Use
+	 * random data at the moment, as it's probably the safest option
+	 * in case multiple sockets are opened in different namespaces at
+	 * the same time.
+	 */
+	get_random_bytes(key, sizeof(u64));
+	crypto_key_sha1(*key, token, idsn);
+}
 
 #endif /* __MPTCP_PROTOCOL_H */
