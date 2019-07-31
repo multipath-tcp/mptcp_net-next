@@ -77,7 +77,6 @@ static void new_req_token(struct request_sock *req,
 static void new_req_join(struct request_sock *req, struct sock *sk,
 			 const struct sk_buff *skb)
 {
-	const struct inet_request_sock *ireq = inet_rsk(req);
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	u8 hmac[MPTCPOPT_HMAC_LEN];
