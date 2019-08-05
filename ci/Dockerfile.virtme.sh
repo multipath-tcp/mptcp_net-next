@@ -38,7 +38,7 @@ RUN apt-get update && \
                     build-essential libncurses5-dev gcc libssl-dev bc bison \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
                     python3 python3-pkg-resources busybox iproute2 tcpdump \
-                    iputils-ping ethtool klibc-utils rsync && \
+                    iputils-ping ethtool klibc-utils rsync ccache && \
     apt-get clean
 
 # virtme and sudo rights (for kvm)
@@ -46,6 +46,12 @@ RUN cd /tmp && \
     git clone "${VIRTME_GIT_URL}" && \
     usermod -a -G sudo "${USER}" && \
     echo "${USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# CCache for quicker builds with default colours
+# Note: use 'ccache -M xG' to increase max size, default is 5GB
+ENV PATH /usr/lib/ccache:\${PATH}
+ENV CCACHE_COMPRESS true
+ENV GCC_COLORS error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01
 
 # switch to the current user and current dir
 USER ${USER}
@@ -57,7 +63,9 @@ docker build -t "${DOCKER_NAME}" -f "${DOCKERFILE}" "${DOCKER_DIR}"
 
 # extra rights needed for KVM
 sudo docker run \
+    --init \
     -v "${PWD}:${PWD}" \
+    -v "${HOME}/.ccache:${HOME}/.ccache" \
     --privileged \
     --rm ${DOCKER_EXTRA_ARGS:+"${DOCKER_EXTRA_ARGS}"} \
     "${DOCKER_NAME}" \

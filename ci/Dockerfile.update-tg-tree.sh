@@ -32,7 +32,7 @@ RUN mkdir -p "$(dirname "${HOME}")" && \
 # dependencies for the script
 RUN apt-get update && \
     apt-get install -y build-essential libncurses5-dev gcc libssl-dev bc bison \
-                       libelf-dev flex git curl tar hashalot && \
+                       libelf-dev flex git curl tar hashalot ccache && \
     apt-get clean
 
 # TopGit
@@ -43,6 +43,12 @@ RUN curl -L "${TG_SETUP_URL}" -o "${TG_SETUP_TARBALL}" && \
     cd .. && \
     rm -rf "${TG_SETUP_TARBALL}" "topgit-"*
 
+# CCache for quicker builds with default colours
+# Note: use 'ccache -M xG' to increase max size, default is 5GB
+ENV PATH /usr/lib/ccache:\${PATH}
+ENV CCACHE_COMPRESS true
+ENV GCC_COLORS error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01
+
 # switch to the current user and current dir
 USER ${USER}
 VOLUME ${PWD}
@@ -52,9 +58,11 @@ EOF
 docker build -t "${DOCKER_NAME}" -f "${DOCKERFILE}" "${DOCKER_DIR}"
 # ssh and gitconfig is needed to create commits and pull/push
 docker run \
+    --init \
     -e "UPD_TG_FORCE_SYNC=${UPD_TG_FORCE_SYNC}" \
     -v "${PWD}:${PWD}" \
     -v "${HOME}/.ssh:${HOME}/.ssh" \
     -v "${HOME}/.gitconfig:${HOME}/.gitconfig:ro" \
+    -v "${HOME}/.ccache:${HOME}/.ccache" \
     --rm "${DOCKER_NAME}" \
     bash "-${-}" "${SCRIPT}" "${SCRIPT_OPTS[@]}"
