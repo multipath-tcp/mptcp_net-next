@@ -50,7 +50,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 struct subflow_context {
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_cksum : 1,
-		version : 4;
+		request_version : 4;
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
 	struct  sock *conn;        /* parent mptcp_sock */
 };
