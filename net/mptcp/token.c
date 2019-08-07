@@ -297,7 +297,7 @@ void token_new_subflow(struct sock *sk)
 	pr_debug("subflow=%p", subflow);
 
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(subflow->token);
+	conn = __token_lookup(subflow->token);
 	if (conn)
 		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
