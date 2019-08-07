@@ -33,8 +33,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		subflow_req->mp_capable = 1;
-		if (rx_opt.mptcp.version >= listener->version)
-			subflow_req->version = listener->version;
+		if (rx_opt.mptcp.version >= listener->request_version)
+			subflow_req->version = listener->request_version;
 		else
 			subflow_req->version = rx_opt.mptcp.version;
 		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
