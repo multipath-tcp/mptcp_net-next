@@ -355,8 +355,8 @@ struct sock *token_lookup_get(u32 token)
 	conn = lookup_token(token);
 	if (conn)
 		sock_hold(conn);
-
 	spin_unlock_bh(&token_tree_lock);
+
 	return conn;
 }
 
