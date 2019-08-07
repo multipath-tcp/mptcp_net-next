@@ -385,11 +385,29 @@ static bool mptcp_established_options_addr(struct sock *sk,
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+	struct sockaddr_storage saddr;
+	u8 id;
 
-	if (subflow->fourth_ack)
-		return pm_addr_signal(msk, size, remaining, opts);
+	if (!msk)
+		return false;
 
-	return false;
+	if (!msk->pm.fully_established || !msk->addr_signal)
+		return false;
+
+	if (pm_addr_signal(msk, &id, &saddr))
+		return false;
+
+	if (saddr.ss_family == AF_INET && remaining < TCPOLEN_MPTCP_ADD_ADDR)
+		return false;
+
+	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
+	opts->addr_id = id;
+	opts->addr.s_addr = ((struct sockaddr_in *)&saddr)->sin_addr.s_addr;
+	*size = TCPOLEN_MPTCP_ADD_ADDR;
+
+	msk->addr_signal = 0;
+
+	return true;
 }
 
 bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
