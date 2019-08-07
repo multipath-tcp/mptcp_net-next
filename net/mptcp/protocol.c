@@ -859,6 +859,7 @@ static struct proto mptcp_prot = {
 static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
+	struct subflow_context *subflow;
 	struct socket *ssock;
 	int err;
 
@@ -874,6 +875,11 @@ static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 	}
 
 	msk->subflow = ssock;
+	subflow = subflow_ctx(msk->subflow->sk);
+	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
+	subflow->request_cksum = 0; /* checksum not supported */
+	subflow->request_version = 0; /* only v0 supported */
+
 	sock_hold(ssock->sk);
 
 release:
