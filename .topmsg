@@ -1,0 +1,10 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add and use mptcp_subflow_hold
+
+subflow sockets already have lifetime managed by RCU, so we can
+switch to atomic_inc_not_zero and skip/pretend we did not find
+such socket in the mptcp subflow list.
+
+This is required to get rid of synchronize_rcu() from mptcp_close().
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
