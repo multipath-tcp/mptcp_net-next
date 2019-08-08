@@ -1,0 +1,17 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Implement MPTCP receive path
+
+Parses incoming DSS options and populates outgoing MPTCP ACK
+fields. MPTCP fields are parsed from the TCP option header and placed in
+an skb extension, allowing the upper MPTCP layer to access MPTCP
+options after the skb has gone through the TCP stack.
+
+Outgoing MPTCP ACK values are now populated from an atomic value stored
+in the connection socket rather than carried in an skb extension. This
+allows sent packet headers to make use of the most up-to-date sequence
+number and allows the MPTCP ACK to be populated in TCP ACK packets that
+have no payload.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
