@@ -1,0 +1,13 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add basic kselftest program
+
+create mptcp connection between two processes, xmit data back and
+forth.  Data is read from stdin and written (after traversing mtcp
+connection twice) to stdout.
+
+Wrapper script tests that data has passed un-altered.
+
+Will run automatically on "make kselftest".
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
