@@ -1,0 +1,4 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add setsockopt()/getsockopt() socket operations
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
