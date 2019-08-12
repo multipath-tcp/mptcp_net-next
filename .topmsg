@@ -30,3 +30,4 @@ assumption introduced by mptcp_finish_connect(), while avoiding UAF
 issues, we acquire a reference to the msk->subflow, where needed.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
