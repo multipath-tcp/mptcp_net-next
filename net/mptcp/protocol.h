@@ -210,7 +210,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
-void mptcp_finish_join(struct sock *conn, struct sock *sk);
+void mptcp_finish_join(struct sock *sk);
 
 void token_init(void);
 void token_new_request(struct request_sock *req, const struct sk_buff *skb);
