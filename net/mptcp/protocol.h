@@ -181,8 +181,6 @@ void token_update_accept(struct sock *sk, struct sock *conn);
 void token_destroy(u32 token);
 
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
-void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out, int arg_num, ...);
-
 static inline void crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
 {
 	/* we might consider a faster version that computes the key as a
@@ -194,6 +192,8 @@ static inline void crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
 	get_random_bytes(key, sizeof(u64));
 	crypto_key_sha1(*key, token, idsn);
 }
+void crypto_hmac_sha1(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
+		      u32 *hash_out);
 
 void pm_new_connection(struct mptcp_sock *msk);
 void pm_fully_established(struct mptcp_sock *msk);
