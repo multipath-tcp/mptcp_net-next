@@ -56,8 +56,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		subflow_req->mp_capable = 1;
-		if (rx_opt.mptcp.version >= listener->version)
-			subflow_req->version = listener->version;
+		if (rx_opt.mptcp.version >= listener->request_version)
+			subflow_req->version = listener->request_version;
 		else
 			subflow_req->version = rx_opt.mptcp.version;
 		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
@@ -168,7 +168,7 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	subflow->conn = sk;
 	subflow->request_mptcp = 1; // @@ if MPTCP enabled
 	subflow->request_cksum = 1; // @@ if checksum enabled
-	subflow->version = 0;
+	subflow->request_version = 0;
 
 	return 0;
 }
