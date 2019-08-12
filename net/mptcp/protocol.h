@@ -77,9 +77,9 @@ struct subflow_context {
 	u32	token;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_cksum : 1,
+		request_version : 4,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		fourth_ack : 1,     /* send initial DSS */
-		version : 4,
 		conn_finished : 1;
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
 	struct  sock *conn;        /* parent mptcp_sock */
