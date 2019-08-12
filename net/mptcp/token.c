@@ -82,12 +82,11 @@ static void new_req_join(struct request_sock *req, struct sock *sk,
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 
 	get_random_bytes(&subflow_req->local_nonce, sizeof(u32));
-	crypto_hmac_sha1(msk->local_key,
-			 msk->remote_key,
-			 (u32 *)hmac, 2,
-			 4, (u8 *)&subflow_req->local_nonce,
-			 4, (u8 *)&subflow_req->remote_nonce);
-	subflow_req->thmac = *(u64 *)hmac;
+	crypto_hmac_sha1(msk->local_key, msk->remote_key,
+			 subflow_req->local_nonce, subflow_req->remote_nonce,
+			 (u32 *)hmac);
+
+	subflow_req->thmac = get_unaligned_be64(hmac);
 	pr_debug("local_nonce=%u, thmac=%llu", subflow_req->local_nonce,
 		 subflow_req->thmac);
 }
@@ -99,11 +98,9 @@ static int new_join_valid(struct request_sock *req, struct sock *sk,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 
-	crypto_hmac_sha1(msk->remote_key,
-			 msk->local_key,
-			 (u32 *)hmac, 2,
-			 4, (u8 *)&subflow_req->remote_nonce,
-			 4, (u8 *)&subflow_req->local_nonce);
+	crypto_hmac_sha1(msk->remote_key, msk->local_key,
+			 subflow_req->remote_nonce, subflow_req->local_nonce,
+			 (u32 *)hmac);
 
 	return memcmp(hmac, (char *)rx_opt->mptcp.hmac, MPTCPOPT_HMAC_LEN);
 }
