@@ -259,6 +259,9 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		}
 	}
 
+	if (!dss_size)
+		return false;
+
 	*size = ALIGN(dss_size, 4);
 	return true;
 }
