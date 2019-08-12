@@ -400,6 +400,9 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		WARN(1, "MPTCP: Ack dropped");
 	}
 
+	if (!dss_size)
+		return false;
+
 	*size = ALIGN(dss_size, 4);
 	return true;
 }
