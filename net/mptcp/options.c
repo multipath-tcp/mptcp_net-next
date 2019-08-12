@@ -383,6 +383,8 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
 
@@ -414,6 +416,10 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	}
 
 	mpext->data_fin = mp_opt->data_fin;
+
+	if (msk)
+		pm_fully_established(msk);
+
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
