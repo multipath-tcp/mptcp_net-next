@@ -165,7 +165,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			if (token_new_join(child))
 				goto close_child;
 			else
-				mptcp_finish_join(ctx->conn, child);
+				mptcp_finish_join(child);
 		}
 	}
 
