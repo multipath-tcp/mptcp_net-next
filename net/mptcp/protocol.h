@@ -151,10 +151,10 @@ struct subflow_context {
 	u16	map_data_len;
 	u16	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_cksum : 1,
+		request_version : 4,
 		mp_capable : 1,     /* remote is MPTCP capable */
 		mp_join : 1,        /* remote is JOINing */
 		fourth_ack : 1,     /* send initial DSS */
-		version : 4,
 		conn_finished : 1,
 		use_checksum : 1,
 		map_valid : 1,
