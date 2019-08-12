@@ -51,23 +51,23 @@ void crypto_key_sha1(u64 key, u32 *token, u64 *idsn)
 		*idsn = ((u64)mptcp_hashed_key[3] << 32) + mptcp_hashed_key[4];
 }
 
-void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
-		      int arg_num, ...)
+void crypto_hmac_sha1(u64 key1, u64 key2, u32 nonce1, u32 nonce2, u32 *hash_out)
 {
 	u32 workspace[SHA_WORKSPACE_WORDS];
 	u8 input[128]; /* 2 512-bit blocks */
 	int i;
 	int index;
-	int length;
-	u8 *msg;
-	va_list list;
 	u8 key_1[8];
 	u8 key_2[8];
+	u8 nonce_1[4];
+	u8 nonce_2[4];
 
 	memset(workspace, 0, sizeof(workspace));
 
 	put_unaligned_be64(key1, key_1);
 	put_unaligned_be64(key2, key_2);
+	put_unaligned_be32(nonce1, nonce_1);
+	put_unaligned_be32(nonce2, nonce_2);
 
 	/* Generate key xored with ipad */
 	memset(input, 0x36, 64);
@@ -76,16 +76,11 @@ void crypto_hmac_sha1(u64 key1, u64 key2, u32 *hash_out,
 	for (i = 0; i < 8; i++)
 		input[i + 8] ^= key_2[i];
 
-	va_start(list, arg_num);
 	index = 64;
-	for (i = 0; i < arg_num; i++) {
-		length = va_arg(list, int);
-		msg = va_arg(list, u8 *);
-		WARN_ON(index + length > 125); /* Message is too long */
-		memcpy(&input[index], msg, length);
-		index += length;
-	}
-	va_end(list);
+	memcpy(&input[index], nonce_1, 4);
+	index = 68;
+	memcpy(&input[index], nonce_2, 4);
+	index = 72;
 
 	input[index] = 0x80; /* Padding: First bit after message = 1 */
 	memset(&input[index + 1], 0, (126 - index));
