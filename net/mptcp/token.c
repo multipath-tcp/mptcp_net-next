@@ -197,14 +197,22 @@ int token_join_request(struct request_sock *req, const struct sk_buff *skb)
 	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(subflow_req->token);
+	if (conn)
+		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
-	if (conn) {
-		// @@ get real local address id for this skb->saddr
-		subflow_req->local_id = 0;
-		new_req_join(req, conn, skb);
-		return 0;
+
+	if (!conn)
+		return -1;
+
+	if (pm_get_local_id(req, conn, skb)) {
+		sock_put(conn);
+		return -1;
 	}
-	return -1;
+
+	new_req_join(req, conn, skb);
+
+	sock_put(conn);
+	return 0;
 }
 
 /* validate hmac received in third ACK */
@@ -213,15 +221,20 @@ int token_join_valid(struct request_sock *req,
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
 	struct sock *conn;
+	int err;
 
 	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
 	spin_lock_bh(&token_tree_lock);
 	conn = lookup_token(subflow_req->token);
-	spin_unlock_bh(&token_tree_lock);
 	if (conn)
-		return new_join_valid(req, conn, rx_opt);
+		sock_hold(conn);
+	spin_unlock_bh(&token_tree_lock);
+	if (!conn)
+		return -1;
 
-	return -1;
+	err = new_join_valid(req, conn, rx_opt);
+	sock_put(conn);
+	return err;
 }
 
 /* create new local key, idsn, and token for subflow */
