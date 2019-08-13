@@ -257,6 +257,7 @@ int subflow_connect(struct sock *sk, struct sockaddr_in *local,
 	return err;
 
 failed:
+	sock_put(sf->sk);
 	sock_release(sf);
 	return err;
 }
