@@ -54,7 +54,7 @@ static bool find_token(u32 token)
 	return used;
 }
 
-static struct sock *lookup_token(u32 token)
+static struct sock *__token_lookup(u32 token)
 {
 	void *conn;
 
@@ -218,7 +218,7 @@ int token_join_request(struct request_sock *req, const struct sk_buff *skb)
 
 	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(subflow_req->token);
+	conn = __token_lookup(subflow_req->token);
 	if (conn)
 		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
@@ -256,7 +256,7 @@ int token_join_valid(struct request_sock *req,
 
 	pr_debug("subflow_req=%p, token=%u", subflow_req, subflow_req->token);
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(subflow_req->token);
+	conn = __token_lookup(subflow_req->token);
 	if (conn)
 		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
@@ -297,7 +297,7 @@ void token_new_subflow(struct sock *sk)
 	pr_debug("subflow=%p", subflow);
 
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(subflow->token);
+	conn = __token_lookup(subflow->token);
 	if (conn)
 		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
@@ -334,15 +334,17 @@ int token_new_join(struct sock *sk)
 	struct sock *conn;
 
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(subflow->token);
-	if (conn) {
+	conn = __token_lookup(subflow->token);
+	if (conn)
 		sock_hold(conn);
-		spin_unlock_bh(&token_tree_lock);
-		subflow->conn = conn;
-		return 0;
-	}
 	spin_unlock_bh(&token_tree_lock);
-	return -1;
+
+	if (!conn)
+		return -1;
+
+	subflow->conn = conn;
+
+	return 0;
 }
 
 struct sock *token_lookup_get(u32 token)
@@ -373,7 +375,7 @@ void token_release(u32 token)
 
 	pr_debug("token=%u", token);
 	spin_lock_bh(&token_tree_lock);
-	conn = lookup_token(token);
+	conn = __token_lookup(token);
 	if (conn)
 		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
