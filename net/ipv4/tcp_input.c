@@ -5711,6 +5711,10 @@ step5:
 	/* Process urgent data. */
 	tcp_urg(sk, skb, th);
 
+	/* Process MPTCP options */
+	if (sk_is_mptcp(sk))
+		mptcp_incoming_options(sk, skb, &tp->rx_opt);
+
 	/* step 7: process the segment text */
 	tcp_data_queue(sk, skb);
 
