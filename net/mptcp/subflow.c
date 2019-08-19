@@ -218,9 +218,6 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 
 	*new_sock = sf;
 	subflow->conn = sk;
-	subflow->request_mptcp = 1; // @@ if MPTCP enabled
-	subflow->request_cksum = 1; // @@ if checksum enabled
-	subflow->request_version = 0;
 
 	return 0;
 }
