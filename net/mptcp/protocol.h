@@ -237,6 +237,7 @@ void token_new_subflow(struct sock *sk);
 void token_new_accept(struct sock *sk);
 int token_new_join(struct sock *sk);
 void token_update_accept(struct sock *sk, struct sock *conn);
+struct sock *token_lookup_get(u32 token);
 void token_release(u32 token);
 void token_destroy(u32 token);
 
