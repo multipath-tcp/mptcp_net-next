@@ -39,13 +39,13 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 static int mptcp_init_sock(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct net *net = sock_net(sk);
 	struct socket *sf;
 	int err;
 
 	pr_debug("msk=%p", msk);
 
-	err = sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP,
-			       &sf);
+	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
 	if (!err) {
 		pr_debug("subflow=%p", sf->sk);
 		msk->subflow = sf;
