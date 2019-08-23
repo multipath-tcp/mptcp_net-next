@@ -45,6 +45,7 @@ trap cleanup EXIT
 for i in 1 2 3 4;do
 	ip netns add ns$i || exit $ksft_skip
 	ip -net ns$i link set lo up
+	ip netns exec ns$i sysctl -q net.mptcp.enabled=1
 done
 
 #  ns1              ns2                    ns3                     ns4
@@ -103,6 +104,27 @@ check_transfer()
 		return 1
 	fi
 
+	return 0
+}
+
+check_mptcp_disabled()
+{
+	disabled_ns="ns_disabled"
+	ip netns add ${disabled_ns} || exit $ksft_skip
+	# by default: sysctl net.mptcp.enabled=0
+
+	local err=0
+	LANG=C ip netns exec ${disabled_ns} ./mptcp_connect -t $timeout -p 10000 -s MPTCP 127.0.0.1 < "$cin" 2>&1 | \
+		grep -q "^socket: Protocol not available$" && err=1
+	ip netns delete ${disabled_ns}
+
+	if [ ${err} -eq 0 ]; then
+		echo -e "MPTCP is not disabled by default as expected\t[ FAIL ]"
+		ret=1
+		return 1
+	fi
+
+	echo -e "MPTCP is disabled by default as expected\t[ OK ]"
 	return 0
 }
 
@@ -240,6 +262,8 @@ run_tests()
 
 make_file "$cin" "client"
 make_file "$sin" "server"
+
+check_mptcp_disabled
 
 for sender in 1 2 3 4;do
 	do_ping ns1 ns$sender 10.0.1.1
