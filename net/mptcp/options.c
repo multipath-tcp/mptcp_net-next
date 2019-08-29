@@ -225,7 +225,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		mp_opt->addr_id = *ptr++;
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4) {
 			mp_opt->add_addr = 1;
-			mp_opt->addr.s_addr = get_unaligned_be32(ptr);
+			memcpy((u8 *)&mp_opt->addr.s_addr, (u8 *)ptr, 4);
 			pr_debug("ADD_ADDR: addr=%x, id=%d",
 				 mp_opt->addr.s_addr, mp_opt->addr_id);
 #if IS_ENABLED(CONFIG_IPV6)
@@ -619,7 +619,8 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
 		*ptr++ = mptcp_option(MPTCPOPT_ADD_ADDR, TCPOLEN_MPTCP_ADD_ADDR,
 				      MPTCP_ADDR_IPVERSION_4, opts->addr_id);
-		*ptr++ = htonl(opts->addr.s_addr);
+		memcpy((u8 *)ptr, (u8 *)&opts->addr.s_addr, 4);
+		ptr += 1;
 	}
 
 #if IS_ENABLED(CONFIG_IPV6)
