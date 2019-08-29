@@ -36,6 +36,22 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		    (mp_opt->flags & MPTCP_CAP_EXTENSIBILITY))
 			break;
 
+		/* RFC 6824, Section 3.1:
+		 * "For the Checksum Required bit (labeled "A"), if either
+		 * host requires the use of checksums, checksums MUST be used.
+		 * In other words, the only way for checksums not to be used
+		 * is if both hosts in their SYNs set A=0."
+		 *
+		 * Section 3.3.0:
+		 * "If a checksum is not present when its use has been
+		 * negotiated, the receiver MUST close the subflow with a RST as it is
+		 * considered broken."
+		 *
+		 * We don't implement DSS checksum - fall back to TCP.
+		 */
+		if (mp_opt->flags & MPTCP_CAP_CHECKSUM_REQD)
+			break;
+
 		mp_opt->mp_capable = 1;
 		mp_opt->sndr_key = get_unaligned_be64(ptr);
 		ptr += 8;
