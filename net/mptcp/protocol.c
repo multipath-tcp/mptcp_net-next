@@ -702,7 +702,7 @@ static void mptcp_destroy(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	pr_debug("msk=%p, subflow=%p", sk, msk->subflow->sk);
+	pr_debug("msk=%p", sk);
 
 	token_destroy(msk->token);
 }
