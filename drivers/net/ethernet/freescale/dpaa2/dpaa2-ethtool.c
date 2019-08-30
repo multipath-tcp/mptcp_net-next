@@ -78,71 +78,67 @@ static int
 dpaa2_eth_get_link_ksettings(struct net_device *net_dev,
 			     struct ethtool_link_ksettings *link_settings)
 {
-	struct dpni_link_state state = {0};
-	int err = 0;
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
 
-	err = dpni_get_link_state(priv->mc_io, 0, priv->mc_token, &state);
-	if (err) {
-		netdev_err(net_dev, "ERROR %d getting link state\n", err);
-		goto out;
-	}
-
-	/* At the moment, we have no way of interrogating the DPMAC
-	 * from the DPNI side - and for that matter there may exist
-	 * no DPMAC at all. So for now we just don't report anything
-	 * beyond the DPNI attributes.
-	 */
-	if (state.options & DPNI_LINK_OPT_AUTONEG)
-		link_settings->base.autoneg = AUTONEG_ENABLE;
-	if (!(state.options & DPNI_LINK_OPT_HALF_DUPLEX))
+	link_settings->base.autoneg = AUTONEG_DISABLE;
+	if (!(priv->link_state.options & DPNI_LINK_OPT_HALF_DUPLEX))
 		link_settings->base.duplex = DUPLEX_FULL;
-	link_settings->base.speed = state.rate;
+	link_settings->base.speed = priv->link_state.rate;
 
-out:
-	return err;
+	return 0;
 }
 
-#define DPNI_DYNAMIC_LINK_SET_VER_MAJOR		7
-#define DPNI_DYNAMIC_LINK_SET_VER_MINOR		1
-static int
-dpaa2_eth_set_link_ksettings(struct net_device *net_dev,
-			     const struct ethtool_link_ksettings *link_settings)
+static void dpaa2_eth_get_pauseparam(struct net_device *net_dev,
+				     struct ethtool_pauseparam *pause)
 {
-	struct dpni_link_cfg cfg = {0};
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-	int err = 0;
+	u64 link_options = priv->link_state.options;
 
-	/* If using an older MC version, the DPNI must be down
-	 * in order to be able to change link settings. Taking steps to let
-	 * the user know that.
-	 */
-	if (dpaa2_eth_cmp_dpni_ver(priv, DPNI_DYNAMIC_LINK_SET_VER_MAJOR,
-				   DPNI_DYNAMIC_LINK_SET_VER_MINOR) < 0) {
-		if (netif_running(net_dev)) {
-			netdev_info(net_dev, "Interface must be brought down first.\n");
-			return -EACCES;
-		}
+	pause->rx_pause = !!(link_options & DPNI_LINK_OPT_PAUSE);
+	pause->tx_pause = pause->rx_pause ^
+			  !!(link_options & DPNI_LINK_OPT_ASYM_PAUSE);
+	pause->autoneg = AUTONEG_DISABLE;
+}
+
+static int dpaa2_eth_set_pauseparam(struct net_device *net_dev,
+				    struct ethtool_pauseparam *pause)
+{
+	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+	struct dpni_link_cfg cfg = {0};
+	int err;
+
+	if (!dpaa2_eth_has_pause_support(priv)) {
+		netdev_info(net_dev, "No pause frame support for DPNI version < %d.%d\n",
+			    DPNI_PAUSE_VER_MAJOR, DPNI_PAUSE_VER_MINOR);
+		return -EOPNOTSUPP;
 	}
 
-	cfg.rate = link_settings->base.speed;
-	if (link_settings->base.autoneg == AUTONEG_ENABLE)
-		cfg.options |= DPNI_LINK_OPT_AUTONEG;
+	if (pause->autoneg)
+		return -EOPNOTSUPP;
+
+	cfg.rate = priv->link_state.rate;
+	cfg.options = priv->link_state.options;
+	if (pause->rx_pause)
+		cfg.options |= DPNI_LINK_OPT_PAUSE;
 	else
-		cfg.options &= ~DPNI_LINK_OPT_AUTONEG;
-	if (link_settings->base.duplex  == DUPLEX_HALF)
-		cfg.options |= DPNI_LINK_OPT_HALF_DUPLEX;
+		cfg.options &= ~DPNI_LINK_OPT_PAUSE;
+	if (!!pause->rx_pause ^ !!pause->tx_pause)
+		cfg.options |= DPNI_LINK_OPT_ASYM_PAUSE;
 	else
-		cfg.options &= ~DPNI_LINK_OPT_HALF_DUPLEX;
+		cfg.options &= ~DPNI_LINK_OPT_ASYM_PAUSE;
+
+	if (cfg.options == priv->link_state.options)
+		return 0;
 
 	err = dpni_set_link_cfg(priv->mc_io, 0, priv->mc_token, &cfg);
-	if (err)
-		/* ethtool will be loud enough if we return an error; no point
-		 * in putting our own error message on the console by default
-		 */
-		netdev_dbg(net_dev, "ERROR %d setting link cfg\n", err);
+	if (err) {
+		netdev_err(net_dev, "dpni_set_link_state failed\n");
+		return err;
+	}
 
-	return err;
+	priv->link_state.options = cfg.options;
+
+	return 0;
 }
 
 static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
@@ -721,7 +717,8 @@ const struct ethtool_ops dpaa2_ethtool_ops = {
 	.get_drvinfo = dpaa2_eth_get_drvinfo,
 	.get_link = ethtool_op_get_link,
 	.get_link_ksettings = dpaa2_eth_get_link_ksettings,
-	.set_link_ksettings = dpaa2_eth_set_link_ksettings,
+	.get_pauseparam = dpaa2_eth_get_pauseparam,
+	.set_pauseparam = dpaa2_eth_set_pauseparam,
 	.get_sset_count = dpaa2_eth_get_sset_count,
 	.get_ethtool_stats = dpaa2_eth_get_ethtool_stats,
 	.get_strings = dpaa2_eth_get_strings,
