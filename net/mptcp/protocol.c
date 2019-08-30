@@ -706,10 +706,10 @@ static int mptcp_getsockopt(struct sock *sk, int level, int optname,
 					 option);
 	}
 
-	/* @@ the meaning of setsockopt() when the socket is connected and
+	/* @@ the meaning of getsockopt() when the socket is connected and
 	 * there are multiple subflows is not defined.
 	 */
-	return 0;
+	return -EOPNOTSUPP;
 }
 
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
