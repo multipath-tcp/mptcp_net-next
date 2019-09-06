@@ -3669,6 +3669,16 @@ F:	include/uapi/linux/can/bcm.h
 F:	include/uapi/linux/can/raw.h
 F:	include/uapi/linux/can/gw.h
 
+CAN-J1939 NETWORK LAYER
+M:	Robin van der Gracht <robin@protonic.nl>
+M:	Oleksij Rempel <o.rempel@pengutronix.de>
+R:	Pengutronix Kernel Team <kernel@pengutronix.de>
+L:	linux-can@vger.kernel.org
+S:	Maintained
+F:	Documentation/networking/j1939.txt
+F:	net/can/j1939/
+F:	include/uapi/linux/can/j1939.h
+
 CAPABILITIES
 M:	Serge Hallyn <serge@hallyn.com>
 L:	linux-security-module@vger.kernel.org
@@ -12607,6 +12617,14 @@ M:	Hans de Goede <hdegoede@redhat.com>
 L:	platform-driver-x86@vger.kernel.org
 S:	Maintained
 F:	drivers/platform/x86/peaq-wmi.c
+
+PENSANDO ETHERNET DRIVERS
+M:	Shannon Nelson <snelson@pensando.io>
+M:	Pensando Drivers <drivers@pensando.io>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	Documentation/networking/device_drivers/pensando/ionic.rst
+F:	drivers/net/ethernet/pensando/
 
 PER-CPU MEMORY ALLOCATOR
 M:	Dennis Zhou <dennis@kernel.org>
