@@ -984,7 +984,6 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.listen = mptcp_listen;
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
-	token_init();
 	subflow_init();
 	pm_init();
 

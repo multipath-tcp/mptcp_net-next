@@ -170,7 +170,6 @@ void mptcp_get_options(const struct sk_buff *skb,
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
 
-void token_init(void);
 void token_new_request(struct request_sock *req, const struct sk_buff *skb);
 void token_destroy_request(u32 token);
 void token_new_connect(struct sock *sk);
