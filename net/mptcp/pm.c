@@ -13,7 +13,7 @@
 int pm_announce_addr(u32 token, sa_family_t family, u8 local_id,
 		     struct in_addr *addr)
 {
-	struct mptcp_sock *msk = mptcp_sk(token_lookup_get(token));
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	int err = 0;
 
 	if (!msk)
@@ -38,7 +38,7 @@ announce_put:
 
 int pm_remove_addr(u32 token, u8 local_id)
 {
-	struct mptcp_sock *msk = mptcp_sk(token_lookup_get(token));
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 
 	if (!msk)
 		return -EINVAL;
@@ -52,7 +52,7 @@ int pm_remove_addr(u32 token, u8 local_id)
 
 int pm_create_subflow(u32 token, u8 remote_id)
 {
-	struct mptcp_sock *msk = mptcp_sk(token_lookup_get(token));
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	struct sockaddr_in remote;
 	struct sockaddr_in local;
 	int err;
