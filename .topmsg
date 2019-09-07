@@ -1,0 +1,12 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add mptcp_poll
+
+Can't use tcp_poll directly:
+
+BUG: KASAN: slab-out-of-bounds in tcp_poll+0x17f/0x540
+Read of size 4 at addr ffff88806ac5e50c by task mptcp_connect/2085
+Call Trace:
+ tcp_poll+0x17f/0x540
+ sock_poll+0x152/0x180
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
