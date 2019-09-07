@@ -290,7 +290,6 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.getname = mptcp_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
 
-	token_init();
 	subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
