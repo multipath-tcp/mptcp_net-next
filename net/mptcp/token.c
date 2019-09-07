@@ -20,6 +20,8 @@
  *       Brandon Heller <brandonh@stanford.edu>
  */
 
+#define pr_fmt(fmt) "MPTCP: " fmt
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/radix-tree.h>
@@ -31,10 +33,10 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
-static struct radix_tree_root token_tree;
-static struct radix_tree_root token_req_tree;
-static spinlock_t token_tree_lock;
-static int token_used;
+static RADIX_TREE(token_tree, GFP_ATOMIC);
+static RADIX_TREE(token_req_tree, GFP_ATOMIC);
+static DEFINE_SPINLOCK(token_tree_lock);
+static int token_used __read_mostly;
 
 static bool find_req_token(u32 token)
 {
@@ -378,11 +380,4 @@ void token_destroy(u32 token)
 	if (conn)
 		sock_put(conn);
 	spin_unlock_bh(&token_tree_lock);
-}
-
-void token_init(void)
-{
-	INIT_RADIX_TREE(&token_tree, GFP_ATOMIC);
-	INIT_RADIX_TREE(&token_req_tree, GFP_ATOMIC);
-	spin_lock_init(&token_tree_lock);
 }
