@@ -697,7 +697,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
-		token_update_accept(new_sock->sk, new_mptcp_sock);
+		mptcp_token_update_accept(new_sock->sk, new_mptcp_sock);
 		msk->subflow = NULL;
 
 		pm_new_connection(msk, 1);
@@ -733,7 +733,7 @@ static void mptcp_destroy(struct sock *sk)
 
 	pr_debug("msk=%p", sk);
 
-	token_destroy(msk->token);
+	mptcp_token_destroy(msk->token);
 }
 
 static int mptcp_setsockopt(struct sock *sk, int level, int optname,
