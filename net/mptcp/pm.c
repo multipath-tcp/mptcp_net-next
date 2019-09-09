@@ -69,7 +69,7 @@ int pm_create_subflow(u32 token, u8 remote_id)
 
 	local.sin_family = AF_INET;
 	local.sin_port = 0;
-	local.sin_addr.s_addr = INADDR_ANY;
+	local.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	remote.sin_family = msk->pm.remote_family;
 	remote.sin_port = htons(msk->dport);
