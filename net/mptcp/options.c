@@ -385,7 +385,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		}
 
 		if (mpext->use_map) {
-			__sum16 checksum;
+			__u16 checksum;
 
 			pr_debug("Writing map values");
 			put_unaligned_be64(mpext->data_seq, ptr);
@@ -393,7 +393,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			*ptr++ = htonl(mpext->subflow_seq);
 
 			if (mpext->use_checksum)
-				checksum = mpext->checksum;
+				checksum = (u16 __force)mpext->checksum;
 			else
 				checksum = TCPOPT_NOP << 8 | TCPOPT_NOP;
 			*ptr = htonl(mpext->data_len << 16 | checksum);
