@@ -229,20 +229,14 @@ void mptcp_get_options(const struct sk_buff *skb,
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
 void mptcp_finish_join(struct sock *sk);
 
-void token_new_request(struct request_sock *req, const struct sk_buff *skb);
-int token_join_request(struct request_sock *req, const struct sk_buff *skb);
-int token_join_response(struct sock *sk);
-int token_join_valid(struct request_sock *req,
-		     struct tcp_options_received *rx_opt);
-void token_destroy_request(u32 token);
-void token_new_connect(struct sock *sk);
-void token_new_subflow(struct sock *sk);
-void token_new_accept(struct sock *sk);
-int token_new_join(struct sock *sk);
-void token_update_accept(struct sock *sk, struct sock *conn);
-struct sock *token_lookup_get(u32 token);
+int mptcp_token_new_request(struct request_sock *req);
+void mptcp_token_destroy_request(u32 token);
+int mptcp_token_new_connect(struct sock *sk);
+int mptcp_token_new_accept(u32 token);
+void mptcp_token_update_accept(struct sock *sk, struct sock *conn);
+struct mptcp_sock *mptcp_token_get_sock(u32 token);
 void token_release(u32 token);
-void token_destroy(u32 token);
+void mptcp_token_destroy(u32 token);
 
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
 static inline void crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
