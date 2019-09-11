@@ -697,6 +697,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
+		atomic64_set(&msk->snd_una, msk->write_seq);
 		ack_seq++;
 		msk->ack_seq = ack_seq;
 		subflow->map_seq = ack_seq;
@@ -829,6 +830,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 
 		crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
+		atomic64_set(&msk->snd_una, msk->write_seq);
 		ack_seq++;
 		msk->ack_seq = ack_seq;
 		subflow->map_seq = ack_seq;
