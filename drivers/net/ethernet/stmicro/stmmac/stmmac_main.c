@@ -1036,7 +1036,7 @@ static int stmmac_init_phy(struct net_device *dev)
 static int stmmac_phy_setup(struct stmmac_priv *priv)
 {
 	struct fwnode_handle *fwnode = of_fwnode_handle(priv->plat->phylink_node);
-	int mode = priv->plat->interface;
+	int mode = priv->plat->phy_interface;
 	struct phylink *phylink;
 
 	priv->phylink_config.dev = &priv->dev->dev;
@@ -3418,7 +3418,9 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv, u32 queue)
 		stmmac_refill_desc3(priv, rx_q, p);
 
 		rx_q->rx_count_frames++;
-		rx_q->rx_count_frames %= priv->rx_coal_frames;
+		rx_q->rx_count_frames += priv->rx_coal_frames;
+		if (rx_q->rx_count_frames > priv->rx_coal_frames)
+			rx_q->rx_count_frames = 0;
 		use_rx_wd = priv->use_riwt && rx_q->rx_count_frames;
 
 		dma_wmb();
