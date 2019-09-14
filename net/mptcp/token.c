@@ -93,6 +93,28 @@ static void new_req_join(struct request_sock *req, struct sock *sk,
 		 subflow_req->thmac);
 }
 
+static int new_rsp_join(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	u64 thmac;
+
+	crypto_hmac_sha1(subflow->remote_key, subflow->local_key,
+			 subflow->remote_nonce, subflow->local_nonce,
+			 (u32 *)hmac);
+
+	thmac = get_unaligned_be64(hmac);
+	pr_debug("thmac=%llu", thmac);
+	if (thmac != subflow->thmac)
+		return -1;
+
+	crypto_hmac_sha1(subflow->local_key, subflow->remote_key,
+			 subflow->local_nonce, subflow->remote_nonce,
+			 (u32 *)subflow->hmac);
+
+	return 0;
+}
+
 static int new_join_valid(struct request_sock *req, struct sock *sk,
 			  struct tcp_options_received *rx_opt)
 {
@@ -217,6 +239,15 @@ int token_join_request(struct request_sock *req, const struct sk_buff *skb)
 	return 0;
 }
 
+/* validate received truncated hmac and create hmac for third ACK */
+int token_join_response(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+
+	pr_debug("subflow=%p, token=%u", subflow, subflow->token);
+	return new_rsp_join(sk);
+}
+
 /* validate hmac received in third ACK */
 int token_join_valid(struct request_sock *req,
 		     struct tcp_options_received *rx_opt)
@@ -257,6 +288,23 @@ void token_new_connect(struct sock *sk)
 	insert_token(subflow->token, subflow->conn);
 	sock_hold(subflow->conn);
 	spin_unlock_bh(&token_tree_lock);
+}
+
+/* take reference to connection and create nonce for secondary subflow */
+void token_new_subflow(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct sock *conn;
+
+	pr_debug("subflow=%p", subflow);
+
+	spin_lock_bh(&token_tree_lock);
+	conn = __token_lookup(subflow->token);
+	if (conn)
+		sock_hold(conn);
+	spin_unlock_bh(&token_tree_lock);
+
+	get_random_bytes(&subflow->local_nonce, sizeof(u32));
 }
 
 void token_new_accept(struct sock *sk)
