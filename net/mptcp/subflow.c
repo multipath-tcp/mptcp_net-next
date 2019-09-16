@@ -4,9 +4,12 @@
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
 
+#define pr_fmt(fmt) "MPTCP: " fmt
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <crypto/algapi.h>
 #include <net/sock.h>
 #include <net/inet_common.h>
 #include <net/inet_hashtables.h>
@@ -18,14 +21,22 @@
 static int subflow_rebuild_header(struct sock *sk)
 {
 	struct subflow_context *subflow = subflow_ctx(sk);
+	int err = 0;
 
 	if (subflow->request_mptcp && !subflow->token) {
 		pr_debug("subflow=%p", sk);
-		token_new_connect(sk);
+		err = mptcp_token_new_connect(sk);
 	} else if (subflow->request_join && !subflow->local_nonce) {
 		pr_debug("subflow=%p", sk);
-		token_new_subflow(sk);
+		mptcp_token_get_sock(subflow->token);
+
+		do {
+			get_random_bytes(&subflow->local_nonce, sizeof(u32));
+		} while (!subflow->local_nonce);
 	}
+
+	if (err)
+		return err;
 
 	return inet_sk_rebuild_header(sk);
 }
@@ -37,8 +48,40 @@ static void subflow_req_destructor(struct request_sock *req)
 	pr_debug("subflow_req=%p", subflow_req);
 
 	if (subflow_req->mp_capable)
-		token_destroy_request(subflow_req->token);
+		mptcp_token_destroy_request(subflow_req->token);
 	tcp_request_sock_ops.destructor(req);
+}
+
+/* validate received token and create truncated hmac and nonce for SYN-ACK */
+static bool subflow_token_join_request(struct request_sock *req,
+				       const struct sk_buff *skb)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	struct mptcp_sock *msk;
+
+	msk = mptcp_token_get_sock(subflow_req->token);
+	if (!msk) {
+		pr_debug("subflow_req=%p, token=%u - not found\n",
+			 subflow_req, subflow_req->token);
+		return false;
+	}
+
+	if (pm_get_local_id(req, (struct sock *)msk, skb)) {
+		sock_put((struct sock *)msk);
+		return false;
+	}
+
+	get_random_bytes(&subflow_req->local_nonce, sizeof(u32));
+
+	crypto_hmac_sha1(msk->local_key, msk->remote_key,
+			 subflow_req->local_nonce, subflow_req->remote_nonce,
+			 (u32 *)hmac);
+
+	subflow_req->thmac = get_unaligned_be64(hmac);
+
+	sock_put((struct sock *)msk);
+	return true;
 }
 
 static void subflow_v4_init_req(struct request_sock *req,
@@ -64,7 +107,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 		return;
 
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
-		subflow_req->mp_capable = 1;
+		int err;
+
+		err = mptcp_token_new_request(req);
+		if (err == 0)
+			subflow_req->mp_capable = 1;
+
 		if (rx_opt.mptcp.version >= listener->request_version)
 			subflow_req->version = listener->request_version;
 		else
@@ -73,8 +121,6 @@ static void subflow_v4_init_req(struct request_sock *req,
 		    listener->request_cksum)
 			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
-		pr_debug("remote_key=%llu", subflow_req->remote_key);
-		token_new_request(req, skb);
 		pr_debug("syn seq=%u", TCP_SKB_CB(skb)->seq);
 		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else if (rx_opt.mptcp.mp_join && listener->request_mptcp) {
@@ -85,11 +131,30 @@ static void subflow_v4_init_req(struct request_sock *req,
 		subflow_req->remote_nonce = rx_opt.mptcp.nonce;
 		pr_debug("token=%u, remote_nonce=%u", subflow_req->token,
 			 subflow_req->remote_nonce);
-		if (token_join_request(req, skb)) {
+		if (!subflow_token_join_request(req, skb)) {
 			subflow_req->mp_join = 0;
 			// @@ need to trigger RST
 		}
 	}
+}
+
+/* validate received truncated hmac and create hmac for third ACK */
+static bool subflow_thmac_valid(struct subflow_context *subflow)
+{
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	u64 thmac;
+
+	crypto_hmac_sha1(subflow->remote_key, subflow->local_key,
+			 subflow->remote_nonce, subflow->local_nonce,
+			 (u32 *)hmac);
+
+	thmac = get_unaligned_be64(hmac);
+	pr_debug("subflow=%p, token=%u, thmac=%llu, subflow->thmac=%llu\n",
+		 subflow, subflow->token,
+		 (unsigned long long)thmac,
+		 (unsigned long long)subflow->thmac);
+
+	return thmac == subflow->thmac;
 }
 
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
@@ -115,13 +180,18 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u",
 			 subflow_ctx(sk), subflow->thmac,
 			 subflow->remote_nonce);
-		if (token_join_response(sk)) {
+		if (!subflow_thmac_valid(subflow)) {
 			subflow->mp_join = 0;
 			// @@ need to trigger RST
-		} else {
-			mptcp_finish_join(sk);
-			subflow->conn_finished = 1;
+			return;
 		}
+
+		crypto_hmac_sha1(subflow->local_key, subflow->remote_key,
+				 subflow->local_nonce, subflow->remote_nonce,
+				 (u32 *)subflow->hmac);
+
+		mptcp_finish_join(sk);
+		subflow->conn_finished = 1;
 	}
 }
 
@@ -146,6 +216,31 @@ drop:
 	return 0;
 }
 
+/* validate hmac received in third ACK */
+static bool subflow_hmac_valid(const struct request_sock *req,
+			       const struct tcp_options_received *rx_opt)
+{
+	const struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	struct mptcp_sock *msk;
+	bool ret;
+
+	msk = mptcp_token_get_sock(subflow_req->token);
+	if (!msk)
+		return false;
+
+	crypto_hmac_sha1(msk->remote_key, msk->local_key,
+			 subflow_req->remote_nonce, subflow_req->local_nonce,
+			 (u32 *)hmac);
+
+	ret = true;
+	if (crypto_memneq(hmac, rx_opt->mptcp.hmac, sizeof(hmac)))
+		ret = false;
+
+	sock_put((struct sock *)msk);
+	return ret;
+}
+
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct sk_buff *skb,
 					  struct request_sock *req,
@@ -164,7 +259,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	if (!subflow_req->mp_capable && subflow_req->mp_join) {
 		opt_rx.mptcp.mp_join = 0;
 		mptcp_get_options(skb, &opt_rx);
-		if (!opt_rx.mptcp.mp_join || token_join_valid(req, &opt_rx))
+		if (!opt_rx.mptcp.mp_join ||
+		    !subflow_hmac_valid(req, &opt_rx))
 			return NULL;
 	}
 
@@ -177,12 +273,17 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			goto close_child;
 
 		if (ctx->mp_capable) {
-			token_new_accept(child);
-		} else if (ctx->mp_join) {
-			if (token_new_join(child))
+			if (mptcp_token_new_accept(ctx->token))
 				goto close_child;
-			else
-				mptcp_finish_join(child);
+		} else if (ctx->mp_join) {
+			struct mptcp_sock *owner;
+
+			owner = mptcp_token_get_sock(ctx->token);
+			if (!owner)
+				goto close_child;
+
+			ctx->conn = (struct sock *)owner;
+			mptcp_finish_join(child);
 		}
 	}
 
