@@ -38,11 +38,6 @@ static RADIX_TREE(token_req_tree, GFP_ATOMIC);
 static DEFINE_SPINLOCK(token_tree_lock);
 static int token_used __read_mostly;
 
-static struct sock *__token_lookup(u32 token)
-{
-	return radix_tree_lookup(&token_tree, token);
-}
-
 /**
  * mptcp_token_new_request - create new key/idsn/token for subflow_request
  * @req - the request socket
@@ -126,8 +121,6 @@ int mptcp_token_new_connect(struct sock *sk)
 		spin_unlock_bh(&token_tree_lock);
 	}
 	err = radix_tree_insert(&token_tree, subflow->token, mptcp_sock);
-	if (err == 0)
-		sock_hold(mptcp_sock);
 	spin_unlock_bh(&token_tree_lock);
 
 	return err;
@@ -174,7 +167,6 @@ void mptcp_token_update_accept(struct sock *sk, struct sock *conn)
 	if (slot) {
 		WARN_ON_ONCE(*slot != &token_used);
 		*slot = conn;
-		sock_hold(conn);
 	}
 	spin_unlock_bh(&token_tree_lock);
 }
@@ -193,7 +185,7 @@ struct mptcp_sock *mptcp_token_get_sock(u32 token)
 	struct sock *conn;
 
 	spin_lock_bh(&token_tree_lock);
-	conn = __token_lookup(token);
+	conn = radix_tree_lookup(&token_tree, token);
 	if (conn)
 		sock_hold(conn);
 	spin_unlock_bh(&token_tree_lock);
@@ -215,33 +207,15 @@ void mptcp_token_destroy_request(u32 token)
 	spin_unlock_bh(&token_tree_lock);
 }
 
-void token_release(u32 token)
-{
-	struct sock *conn;
-
-	pr_debug("token=%u", token);
-	spin_lock_bh(&token_tree_lock);
-	conn = __token_lookup(token);
-	if (conn)
-		sock_put(conn);
-	spin_unlock_bh(&token_tree_lock);
-}
-
 /**
  * mptcp_token_destroy - remove mptcp connection/token
  * @token - token of mptcp connection to remove
  *
  * Remove the connection identified by @token.
- * If the connection isn't found, no action is taken.
  */
 void mptcp_token_destroy(u32 token)
 {
-	struct sock *conn;
-
 	spin_lock_bh(&token_tree_lock);
-	conn = radix_tree_delete(&token_tree, token);
+	radix_tree_delete(&token_tree, token);
 	spin_unlock_bh(&token_tree_lock);
-
-	if (conn && (int *)conn != &token_used)
-		sock_put(conn);
 }
