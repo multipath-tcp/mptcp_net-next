@@ -1,0 +1,24 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: clean ext on tx recycle
+
+Otherwise we will find stray/unexpected/old extensions
+value on next iteration.
+
+On tcp_write_xmit() we can end-up splitting an already queued
+skb in two parts, via tso_fragment(). The newly created skb
+can be allocated via the tx cache and the mptcp stack will not
+be aware of it, so nobody set properly the MPTCP ext.
+
+End result, we transmit the skb using an hold MPTCP DSS map
+and that confuses the rx side/corrupt the stream. It requires
+some concurrent conditions, so it's not deterministic.
+
+Resetting the ext on recycle fixes all the current mptcp self tests
+issues.
+
+Apparently only MPTCP has issues with this kind of stray ext,
+so an alternative would be add an additional mptcp hook in
+tso_fragment() or in sk_stream_alloc_skb() to always init
+the ext.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
