@@ -390,6 +390,7 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	pr_debug("subflow=%p", subflow);
 
 	*new_sock = sf;
+	sock_hold(sk);
 	subflow->conn = sk;
 
 	return 0;
@@ -444,7 +445,8 @@ static void subflow_ulp_release(struct sock *sk)
 {
 	struct subflow_context *ctx = subflow_ctx(sk);
 
-	pr_debug("subflow=%p", ctx);
+	if (ctx->conn)
+		sock_put(ctx->conn);
 
 	token_release(ctx->token);
 
