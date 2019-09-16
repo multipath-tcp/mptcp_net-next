@@ -235,7 +235,6 @@ int mptcp_token_new_connect(struct sock *sk);
 int mptcp_token_new_accept(u32 token);
 void mptcp_token_update_accept(struct sock *sk, struct sock *conn);
 struct mptcp_sock *mptcp_token_get_sock(u32 token);
-void token_release(u32 token);
 void mptcp_token_destroy(u32 token);
 
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
