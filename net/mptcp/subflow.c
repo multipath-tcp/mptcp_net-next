@@ -347,8 +347,6 @@ static void subflow_ulp_release(struct sock *sk)
 	if (ctx->conn)
 		sock_put(ctx->conn);
 
-	token_release(ctx->token);
-
 	kfree(ctx);
 }
 
