@@ -394,6 +394,13 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		if (arg.msg)
 			copied += bytes_read;
 
+		/* The 'wait_for_data' code path can terminate the receive loop
+		 * in a number of scenarios: check if more data is pending
+		 * before giving up.
+		 */
+		if (!skb_queue_empty(&ssk->sk_receive_queue))
+			continue;
+
 wait_for_data:
 		if (copied)
 			break;
