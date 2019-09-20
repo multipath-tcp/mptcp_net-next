@@ -8,6 +8,7 @@
 #define __MPTCP_PROTOCOL_H
 
 #include <linux/random.h>
+#include <linux/spinlock.h>
 
 /* MPTCP option bits */
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
@@ -59,9 +60,13 @@ struct mptcp_sock {
 	u64		write_seq;
 	u64		ack_seq;
 	u32		token;
-	struct socket	*connection_list; /* @@ needs to be a list */
+	spinlock_t	conn_list_lock;
+	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
+
+#define mptcp_for_each_subflow(__msk, __subflow)			\
+	list_for_each_entry_rcu(__subflow, &((__msk)->conn_list), node)
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 {
@@ -90,6 +95,7 @@ struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
 
 /* MPTCP subflow context */
 struct subflow_context {
+	struct	list_head node;/* conn_list of subflows */
 	u64	local_key;
 	u64	remote_key;
 	u32	token;
