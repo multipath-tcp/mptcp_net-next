@@ -17,13 +17,6 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
-static inline bool before64(__u64 seq1, __u64 seq2)
-{
-	return (__s64)(seq1 - seq2) < 0;
-}
-
-#define after64(seq2, seq1)	before64(seq1, seq2)
-
 static struct socket *__mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 {
 	sock_owned_by_me((const struct sock *)msk);
