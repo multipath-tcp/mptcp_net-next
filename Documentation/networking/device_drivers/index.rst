@@ -25,7 +25,7 @@ Contents:
    mellanox/mlx5
    pensando/ionic
 
-.. only::  subproject
+.. only::  subproject and html
 
    Indices
    =======
