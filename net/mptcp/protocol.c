@@ -217,19 +217,16 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 
 		/* Limit the write to the size available in the
 		 * current skb, if any, so that we create at most a new skb.
-		 * If we run out of space in the current skb (e.g. the window
-		 * size shrunk from last sent) a new skb will be allocated even
-		 * is collapsing was allowed: collapsing is effectively
-		 * disabled.
+		 * Explicitly tells TCP internals to avoid collapsing on later
+		 * queue management operation, to avoid breaking the ext <->
+		 * SSN association set here
 		 */
-		can_collapse = mptcp_skb_can_collapse_to(*write_seq, skb,
-							 mpext);
+		can_collapse = (size_goal - skb->len > 0) &&
+			      mptcp_skb_can_collapse_to(*write_seq, skb, mpext);
 		if (!can_collapse)
 			TCP_SKB_CB(skb)->eor = 1;
-		else if (size_goal - skb->len > 0)
-			avail_size = size_goal - skb->len;
 		else
-			can_collapse = false;
+			avail_size = size_goal - skb->len;
 	}
 
 	if (!retransmission) {
