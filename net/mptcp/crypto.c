@@ -26,6 +26,8 @@
 #include <linux/siphash.h>
 #include <asm/unaligned.h>
 
+#include "protocol.h"
+
 void crypto_key_sha1(u64 key, u32 *token, u64 *idsn)
 {
 	u32 workspace[SHA_WORKSPACE_WORDS];
