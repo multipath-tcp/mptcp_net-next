@@ -77,7 +77,7 @@
 /* MPTCP socket flags */
 #define MPTCP_DATA_READY	BIT(0)
 
-static inline u32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
+static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
 	return htonl((TCPOPT_MPTCP << 24) | (len << 16) | (subopt << 12) |
 		     ((nib & 0xF) << 8) | field);
