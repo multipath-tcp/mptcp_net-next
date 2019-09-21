@@ -284,17 +284,6 @@ static int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
 	return copy_len;
 }
 
-static int mptcp_flush_actor(read_descriptor_t *desc, struct sk_buff *skb,
-			     unsigned int offset, size_t len)
-{
-	pr_debug("Flushing one skb with %zu of %zu bytes remaining",
-		 len, len + offset);
-
-	desc->count = 0;
-
-	return len;
-}
-
 enum mapping_status {
 	MAPPING_ADDED,
 	MAPPING_MISSING,
@@ -400,6 +389,12 @@ static void mptcp_wait_data(struct sock *sk, long *timeo)
 	remove_wait_queue(sk_sleep(sk), &wait);
 }
 
+static void warn_bad_map(struct subflow_context *subflow, u32 ssn)
+{
+	WARN_ONCE(1, "Bad mapping: ssn=%d map_seq=%d map_data_len=%d",
+		  ssn, subflow->map_subflow_seq, subflow->map_data_len);
+}
+
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			 int nonblock, int flags, int *addr_len)
 {
@@ -443,7 +438,6 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 	while (copied < len) {
 		enum mapping_status status;
-		size_t discard_len = 0;
 		u32 map_remaining;
 		int bytes_read;
 		u64 ack_seq;
@@ -459,19 +453,26 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		if (status == MAPPING_ADDED) {
 			/* Common case, but nothing to do here */
 		} else if (status == MAPPING_MISSING) {
-			if (!subflow->map_valid) {
-				pr_debug("Mapping missing, trying next skb");
+			struct sk_buff *skb = skb_peek(&ssk->sk_receive_queue);
 
-				arg.msg = NULL;
-				desc.count = SIZE_MAX;
-
-				bytes_read = tcp_read_sock(ssk, &desc,
-							   mptcp_flush_actor);
-
-				if (bytes_read < 0)
-					break;
-
+			if (!skb->len) {
+				/* the TCP stack deliver 0 len FIN pkt
+				 * to the receive queue, that is the only
+				 * 0len pkts ever expected here, and we can
+				 * admit no mapping only for 0 len pkts
+				 */
+				if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN))
+					WARN_ONCE(1, "0len seq %d:%d flags %x",
+						  TCP_SKB_CB(skb)->seq,
+						  TCP_SKB_CB(skb)->end_seq,
+						  TCP_SKB_CB(skb)->tcp_flags);
+				sk_eat_skb(sk, skb);
 				continue;
+			}
+			if (!subflow->map_valid) {
+				WARN_ONCE(1, "corrupted stream: missing mapping");
+				copied = -EBADFD;
+				break;
 			}
 		} else if (status == MAPPING_EMPTY) {
 			goto wait_for_data;
@@ -490,60 +491,39 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		if (unlikely(before(ssn, subflow->map_subflow_seq))) {
 			/* Mapping covers data later in the subflow stream,
-			 * discard unmapped data.
+			 * currently unsupported.
 			 */
-			pr_debug("Mapping covers data later in stream");
-			discard_len = subflow->map_subflow_seq - ssn;
+			warn_bad_map(subflow, ssn);
+			copied = -EBADFD;
+			break;
 		} else if (unlikely(!before(ssn, (subflow->map_subflow_seq +
 						  subflow->map_data_len)))) {
 			/* Mapping ends earlier in the subflow stream.
-			 * Invalidate the mapping and try again.
+			 * Invalid
 			 */
-			subflow->map_valid = 0;
-			pr_debug("Invalid mapping ssn=%d map_seq=%d map_data_len=%d",
-				 ssn, subflow->map_subflow_seq,
-				 subflow->map_data_len);
-			continue;
-		} else {
-			ack_seq = get_mapped_dsn(subflow);
-
-			if (before64(ack_seq, old_ack)) {
-				/* Mapping covers data already received,
-				 * discard data in the current mapping
-				 * and invalidate the map
-				 */
-				u64 map_end_dsn = subflow->map_seq +
-					subflow->map_data_len;
-				discard_len = min(map_end_dsn - ack_seq,
-						  old_ack - ack_seq);
-				subflow->map_valid = 0;
-				pr_debug("Duplicate MPTCP data found");
-			}
+			warn_bad_map(subflow, ssn);
+			copied = -EBADFD;
+			break;
 		}
 
-		if (discard_len) {
-			/* Discard data for the current mapping.
+		ack_seq = get_mapped_dsn(subflow);
+		map_remaining = subflow->map_data_len - get_map_offset(subflow);
+
+		if (before64(ack_seq, old_ack)) {
+			/* Mapping covers data already received, discard data
+			 * in the current mapping
 			 */
-			pr_debug("Discard %zu bytes", discard_len);
-
 			arg.msg = NULL;
-			desc.count = discard_len;
-
-			bytes_read = tcp_read_sock(ssk, &desc,
-						   mptcp_read_actor);
-
-			if (bytes_read < 0)
-				break;
-			else if (bytes_read == discard_len)
-				continue;
-			else
-				goto wait_for_data;
+			desc.count = min_t(size_t, old_ack - ack_seq,
+					   map_remaining);
+			pr_debug("Dup data, map len=%d acked=%lld dropped=%ld",
+				 map_remaining, old_ack - ack_seq, desc.count);
+		} else {
+			arg.msg = msg;
+			desc.count = min_t(size_t, len - copied, map_remaining);
 		}
 
 		/* Read mapped data */
-		map_remaining = subflow->map_data_len - get_map_offset(subflow);
-		desc.count = min_t(size_t, len - copied, map_remaining);
-		arg.msg = msg;
 		bytes_read = tcp_read_sock(ssk, &desc, mptcp_read_actor);
 		if (bytes_read < 0)
 			break;
@@ -562,7 +542,15 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				 subflow->map_data_len);
 		}
 
-		copied += bytes_read;
+		if (arg.msg)
+			copied += bytes_read;
+
+		/* The 'wait_for_data' code path can terminate the receive loop
+		 * in a number of scenarios: check if more data is pending
+		 * before giving up.
+		 */
+		if (!skb_queue_empty(&ssk->sk_receive_queue))
+			continue;
 
 wait_for_data:
 		if (copied)
