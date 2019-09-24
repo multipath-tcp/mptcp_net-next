@@ -404,10 +404,9 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk,
 	struct subflow_context *ctx;
 
 	ctx = kzalloc(sizeof(*ctx), priority);
-	icsk->icsk_ulp_data = ctx;
-
 	if (!ctx)
 		return NULL;
+	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
 
 	pr_debug("subflow=%p", ctx);
 
@@ -445,10 +444,13 @@ static void subflow_ulp_release(struct sock *sk)
 {
 	struct subflow_context *ctx = subflow_ctx(sk);
 
+	if (!ctx)
+		return;
+
 	if (ctx->conn)
 		sock_put(ctx->conn);
 
-	kfree(ctx);
+	kfree_rcu(ctx, rcu);
 }
 
 static void subflow_ulp_clone(const struct request_sock *req,
@@ -459,7 +461,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct subflow_context *old_ctx;
 	struct subflow_context *new_ctx;
 
-	old_ctx = inet_csk(newsk)->icsk_ulp_data;
+	old_ctx = subflow_ctx(newsk);
 
 	/* newsk->sk_socket is NULL at this point */
 	new_ctx = subflow_create_ctx(newsk, NULL, priority);
