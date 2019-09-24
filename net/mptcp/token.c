@@ -349,6 +349,19 @@ int token_new_join(struct sock *sk)
 	return 0;
 }
 
+struct sock *token_lookup_get(u32 token)
+{
+	struct sock *conn;
+
+	spin_lock_bh(&token_tree_lock);
+	conn = __token_lookup(token);
+	if (conn)
+		sock_hold(conn);
+	spin_unlock_bh(&token_tree_lock);
+
+	return conn;
+}
+
 void token_destroy_request(u32 token)
 {
 	pr_debug("token=%u", token);
