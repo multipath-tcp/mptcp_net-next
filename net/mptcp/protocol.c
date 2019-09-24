@@ -61,6 +61,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	mptcp_token_destroy(msk->token);
 	inet_sk_state_store(sk, TCP_CLOSE);
 
 	if (msk->subflow) {
@@ -74,8 +75,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 		sock_release(msk->connection_list);
 	}
 
-	sock_orphan(sk);
-	sock_put(sk);
+	sk_common_release(sk);
 }
 
 static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
@@ -111,12 +111,20 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	if (subflow->mp_capable) {
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		msk->token = subflow->token;
+		pr_debug("token=%u", msk->token);
+		token_update_accept(new_sock->sk, new_mptcp_sock->sk);
 		msk->connection_list = new_sock;
 	} else {
 		msk->subflow = new_sock;
 	}
 
 	return new_mptcp_sock->sk;
+}
+
+static void mptcp_destroy(struct sock *sk)
+{
+
 }
 
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
@@ -136,6 +144,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	if (mp_capable) {
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		msk->token = subflow->token;
+		pr_debug("token=%u", msk->token);
 		msk->connection_list = msk->subflow;
 		msk->subflow = NULL;
 	}
@@ -149,6 +159,7 @@ static struct proto mptcp_prot = {
 	.close		= mptcp_close,
 	.accept		= mptcp_accept,
 	.shutdown	= tcp_shutdown,
+	.destroy	= mptcp_destroy,
 	.sendmsg	= mptcp_sendmsg,
 	.recvmsg	= mptcp_recvmsg,
 	.hash		= inet_hash,
