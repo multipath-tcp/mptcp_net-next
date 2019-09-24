@@ -60,6 +60,7 @@ docker build -t "${DOCKER_NAME}" -f "${DOCKERFILE}" "${DOCKER_DIR}"
 docker run \
     --init \
     -e "UPD_TG_FORCE_SYNC=${UPD_TG_FORCE_SYNC}" \
+    -e "UPD_TG_NOT_BASE=${UPD_TG_NOT_BASE}" \
     -v "${PWD}:${PWD}" \
     -v "${HOME}/.ssh:${HOME}/.ssh" \
     -v "${HOME}/.gitconfig:${HOME}/.gitconfig:ro" \

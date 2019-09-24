@@ -61,6 +61,13 @@ git_get_sha() {
 
 tg_update_base() { local sha_before_update
 	git_checkout "${TG_TOPIC_BASE}"
+
+	if [ "${UPD_TG_NOT_BASE}" = 1 ]; then
+		git pull --ff-only "${GIT_REMOTE_GERRITHUB_NAME}" \
+			"${TG_TOPIC_BASE}"
+		return 0
+	fi
+
 	sha_before_update=$(git_get_sha HEAD)
 
 	# this branch has to be in sync with upstream, no merge
