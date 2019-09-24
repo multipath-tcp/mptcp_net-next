@@ -193,13 +193,14 @@ struct subflow_context {
 	struct  sock *conn;        /* parent mptcp_sock */
 
 	void	(*tcp_sk_data_ready)(struct sock *sk);
+	struct	rcu_head rcu;
 };
 
 static inline struct subflow_context *subflow_ctx(const struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-
-	return (struct subflow_context *)icsk->icsk_ulp_data;
+	/* Use RCU on icsk_ulp_data only for sock diag code */
+	return (__force struct subflow_context *)icsk->icsk_ulp_data;
 }
 
 static inline struct socket *
