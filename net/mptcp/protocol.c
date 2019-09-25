@@ -258,9 +258,8 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 		goto del_out;
 	}
 
-	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u ck=%u",
-		 mpext->data_seq, mpext->dsn64, mpext->subflow_seq,
-		 mpext->data_len, mpext->checksum);
+	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u", mpext->data_seq,
+		 mpext->dsn64, mpext->subflow_seq, mpext->data_len);
 
 	if (mpext->data_len == 0) {
 		pr_err("Infinite mapping not handled");

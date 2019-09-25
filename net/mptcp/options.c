@@ -98,7 +98,6 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
-		mp_opt->dss = 1;
 		ptr++;
 
 		mp_opt->dss_flags = (*ptr++) & MPTCP_DSS_FLAG_MASK;
@@ -120,10 +119,27 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 				expected_opsize += TCPOLEN_MPTCP_DSS_ACK64;
 			else
 				expected_opsize += TCPOLEN_MPTCP_DSS_ACK32;
+		}
 
-			if (opsize < expected_opsize)
-				break;
+		if (mp_opt->use_map) {
+			if (mp_opt->dsn64)
+				expected_opsize += TCPOLEN_MPTCP_DSS_MAP64;
+			else
+				expected_opsize += TCPOLEN_MPTCP_DSS_MAP32;
+		}
 
+		/* RFC 6824, Section 3.3:
+		 * If a checksum is present, but its use had
+		 * not been negotiated in the MP_CAPABLE handshake,
+		 * the checksum field MUST be ignored.
+		 */
+		if (opsize != expected_opsize &&
+		    opsize != expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM)
+			break;
+
+		mp_opt->dss = 1;
+
+		if (mp_opt->use_ack) {
 			if (mp_opt->ack64) {
 				mp_opt->data_ack = get_unaligned_be64(ptr);
 				ptr += 8;
@@ -136,14 +152,6 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		}
 
 		if (mp_opt->use_map) {
-			if (mp_opt->dsn64)
-				expected_opsize += TCPOLEN_MPTCP_DSS_MAP64;
-			else
-				expected_opsize += TCPOLEN_MPTCP_DSS_MAP32;
-
-			if (opsize < expected_opsize)
-				break;
-
 			if (mp_opt->dsn64) {
 				mp_opt->data_seq = get_unaligned_be64(ptr);
 				ptr += 8;
@@ -158,13 +166,11 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			mp_opt->data_len = get_unaligned_be16(ptr);
 			ptr += 2;
 
-			/* Checksum not currently supported */
-			mp_opt->checksum = 0;
-
-			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u ck=%u",
+			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u",
 				 mp_opt->data_seq, mp_opt->subflow_seq,
-				 mp_opt->data_len, mp_opt->checksum);
+				 mp_opt->data_len);
 		}
+
 		break;
 
 	/* MPTCPOPT_ADD_ADDR
@@ -408,10 +414,8 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 		mpext->data_seq = mp_opt->data_seq;
 		mpext->subflow_seq = mp_opt->subflow_seq;
 		mpext->data_len = mp_opt->data_len;
-		mpext->checksum = mp_opt->checksum;
 		mpext->use_map = 1;
 		mpext->dsn64 = mp_opt->dsn64;
-		mpext->use_checksum = mp_opt->use_checksum;
 	}
 
 	if (mp_opt->use_ack) {
@@ -461,7 +465,6 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		}
 
 		if (mpext->use_map) {
-			pr_debug("Updating DSS length and flags for map");
 			len += TCPOLEN_MPTCP_DSS_MAP64;
 
 			/* Use only 64-bit mapping flags for now, add
