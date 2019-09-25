@@ -588,10 +588,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 				flags |= MPTCP_DSS_DATA_FIN;
 		}
 
-		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
-			       (len  << 16) |
-			       (MPTCPOPT_DSS << 12) |
-			       (flags));
+		*ptr++ = mptcp_option(MPTCPOPT_DSS, len, 0, flags);
 
 		if (mpext->use_ack) {
 			put_unaligned_be64(mpext->data_ack, ptr);
