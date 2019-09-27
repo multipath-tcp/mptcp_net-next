@@ -8,15 +8,12 @@
 # We should manage all errors in this script
 set -e
 
-# Gerrithub remote
-GIT_REMOTE_GERRITHUB_NAME="origin"
+# Github remote
+GIT_REMOTE_GITHUB_NAME="origin"
 
 # Davem remote
 GIT_REMOTE_NET_NEXT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
 GIT_REMOTE_NET_NEXT_BRANCH="master"
-
-# Github remote
-GIT_REMOTE_GITHUB_URL="git@github.com:multipath-tcp/mptcp_net-next.git"
 
 # Local repo
 TG_TOPIC_BASE="net-next"
@@ -38,7 +35,7 @@ exit_err() {
 # $1: branch ;  [ $2: remote, default: origin ]
 git_checkout() { local branch remote
 	branch="${1}"
-	remote="${2:-${GIT_REMOTE_GERRITHUB_NAME}}"
+	remote="${2:-${GIT_REMOTE_GITHUB_NAME}}"
 
 	git checkout -f "${branch}" || git checkout -b "${branch}" "${remote}/${branch}"
 }
@@ -63,7 +60,7 @@ tg_update_base() { local sha_before_update
 	git_checkout "${TG_TOPIC_BASE}"
 
 	if [ "${UPD_TG_NOT_BASE}" = 1 ]; then
-		git pull --ff-only "${GIT_REMOTE_GERRITHUB_NAME}" \
+		git pull --ff-only "${GIT_REMOTE_GITHUB_NAME}" \
 			"${TG_TOPIC_BASE}"
 		return 0
 	fi
@@ -78,7 +75,7 @@ tg_update_base() { local sha_before_update
 		exit 0
 	fi
 
-	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_TOPIC_BASE}"
+	git push "${GIT_REMOTE_GITHUB_NAME}" "${TG_TOPIC_BASE}"
 }
 
 tg_update() { local rc=0
@@ -94,14 +91,14 @@ tg_update() { local rc=0
 tg_update_tree() {
 	git_checkout "${TG_TOPIC_TOP}"
 
-	git fetch "${GIT_REMOTE_GERRITHUB_NAME}"
+	git fetch "${GIT_REMOTE_GITHUB_NAME}"
 
-	# force to add TG refs in refs/top-bases/, Gerrit is configured for a
+	# force to add TG refs in refs/top-bases/, errit is configured for a
 	# use with these refs and here below, we also use them.
 	git config --local topgit.top-bases refs
 
 	# fetch and update-ref will be done
-	tg remote "${GIT_REMOTE_GERRITHUB_NAME}" --populate
+	tg remote "${GIT_REMOTE_GITHUB_NAME}" --populate
 
 	# do that twice (if there is no error) just in case the base and the
 	# rest of the tree were not sync. It can happen if the tree has been
@@ -112,18 +109,18 @@ tg_update_tree() {
 }
 
 tg_get_all_topics() {
-	git for-each-ref --format="%(refname)" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/" | \
-		sed -e "s#refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/\\(.*\\)#\\1#g"
+	git for-each-ref --format="%(refname)" "refs/remotes/${GIT_REMOTE_GITHUB_NAME}/top-bases/" | \
+		sed -e "s#refs/remotes/${GIT_REMOTE_GITHUB_NAME}/top-bases/\\(.*\\)#\\1#g"
 }
 
 tg_reset() { local topic
 	for topic in $(tg_get_all_topics); do
 		git update-ref "refs/top-bases/${topic}" \
-			"refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/top-bases/${topic}"
-		git update-ref "refs/heads/${topic}" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/${topic}"
+			"refs/remotes/${GIT_REMOTE_GITHUB_NAME}/top-bases/${topic}"
+		git update-ref "refs/heads/${topic}" "refs/remotes/${GIT_REMOTE_GITHUB_NAME}/${topic}"
 	done
 	# the base should be already up to date anyway.
-	git update-ref "refs/heads/${TG_TOPIC_BASE}" "refs/remotes/${GIT_REMOTE_GERRITHUB_NAME}/${TG_TOPIC_BASE}"
+	git update-ref "refs/heads/${TG_TOPIC_BASE}" "refs/remotes/${GIT_REMOTE_GITHUB_NAME}/${TG_TOPIC_BASE}"
 }
 
 # $1: last return code
@@ -184,7 +181,7 @@ validation() {
 tg_push_tree() {
 	git_checkout "${TG_TOPIC_TOP}"
 
-	tg push -r "${GIT_REMOTE_GERRITHUB_NAME}"
+	tg push -r "${GIT_REMOTE_GITHUB_NAME}"
 }
 
 tg_export() { local current_date tag
@@ -194,21 +191,17 @@ tg_export() { local current_date tag
 	tag="${TG_EXPORT_BRANCH}/${current_date}"
 
 	tg export --linearize --force "${TG_EXPORT_BRANCH}"
-	git push --force "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_EXPORT_BRANCH}"
-
-	# also send to Github: because we rewrite the history, Gerrithub stops the
-	# sync with Github for this branch.
-	git push --force "${GIT_REMOTE_GITHUB_URL}" "${TG_EXPORT_BRANCH}"
+	git push --force "${GIT_REMOTE_GITHUB_NAME}" "${TG_EXPORT_BRANCH}"
 
 	# send a tag to Github to keep previous commits: we might have refs to them
 	git tag "${tag}" "${TG_EXPORT_BRANCH}"
-	git push "${GIT_REMOTE_GITHUB_URL}" "${tag}"
+	git push "${GIT_REMOTE_GITHUB_NAME}" "${tag}"
 }
 
 tg_for_review() { local tg_conflict_files
 	git_checkout "${TG_FOR_REVIEW_BRANCH}"
 
-	git pull "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
+	git pull "${GIT_REMOTE_GITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
 
 	if ! git merge --no-edit --signoff "${TG_TOPIC_TOP}"; then
 		# the only possible conflict would be with the topgit files, manage this
@@ -222,7 +215,7 @@ tg_for_review() { local tg_conflict_files
 		fi
 	fi
 
-	git push "${GIT_REMOTE_GERRITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
+	git push "${GIT_REMOTE_GITHUB_NAME}" "${TG_FOR_REVIEW_BRANCH}"
 }
 
 
