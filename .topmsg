@@ -1,7 +1,0 @@
-From: Peter Krystad <peter.krystad@linux.intel.com>
-Subject: [PATCH] mptcp: Add shutdown() socket operation
-
-Call shutdown on all subflows in use on the given socket, or on the
-fallback socket.
-
-Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
