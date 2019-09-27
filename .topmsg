@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-Export-low-level-TCP-functions
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Export low-level TCP functions
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+MPTCP will make use of tcp_send_mss() and tcp_push() when sending
+data to specific TCP subflows.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
