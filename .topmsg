@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-collapsing-consecutive-sendpages-on-the-same-substream
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: allow collapsing consecutive sendpages on the same substream
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If the current sendmsg() lands on the same subflow we used last, we
+can try to collapse the data.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+---
+v1 -> v2: rebased
