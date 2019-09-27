@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/net-Make-sock-protocol-value-checks-more-specific
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
