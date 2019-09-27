@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-sendmsg-do-spool-all-the-provided-data
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: sendmsg() do spool all the provided data
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This makes mptcp sendmsg() behaviour more consistent and
+improves xmit performances.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
