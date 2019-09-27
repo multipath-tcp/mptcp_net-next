@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-setsockopt-getsockopt-socket-operations
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add setsockopt()/getsockopt() socket operations
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+set/getsockopt behaviour with multiple subflows is undefined.
+Therefore, for now, we return -EOPNOTSUPP unless we're in fallback mode.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
