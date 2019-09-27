@@ -202,10 +202,14 @@ mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
 	return subflow->tcp_sock;
 }
 
+int mptcp_is_enabled(struct net *net);
+
 void subflow_init(void);
 int subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
+
+void mptcp_proto_init(void);
 
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
