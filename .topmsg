@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-sk_page_frag-in-sendmsg
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use sk_page_frag() in sendmsg
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This clean-up a bit the send path, and allows better performances.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+---
+v1 -> v2:
+ - drop stray lock_sock(ssk);
