@@ -4,6 +4,8 @@
  * Copyright (c) 2017 - 2019, Intel Corporation.
  */
 
+#define pr_fmt(fmt) "MPTCP: " fmt
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
@@ -14,6 +16,33 @@
 #include <net/tcp.h>
 #include <net/mptcp.h>
 #include "protocol.h"
+
+static int subflow_rebuild_header(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	int err = 0;
+
+	if (subflow->request_mptcp && !subflow->token) {
+		pr_debug("subflow=%p", sk);
+		err = mptcp_token_new_connect(sk);
+	}
+
+	if (err)
+		return err;
+
+	return inet_sk_rebuild_header(sk);
+}
+
+static void subflow_req_destructor(struct request_sock *req)
+{
+	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+
+	pr_debug("subflow_req=%p", subflow_req);
+
+	if (subflow_req->mp_capable)
+		mptcp_token_destroy_request(subflow_req->token);
+	tcp_request_sock_ops.destructor(req);
+}
 
 static void subflow_v4_init_req(struct request_sock *req,
 				const struct sock *sk_listener,
@@ -32,7 +61,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 	mptcp_get_options(skb, &rx_opt);
 
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
-		subflow_req->mp_capable = 1;
+		int err;
+
+		err = mptcp_token_new_request(req);
+		if (err == 0)
+			subflow_req->mp_capable = 1;
+
 		if (rx_opt.mptcp.version >= listener->request_version)
 			subflow_req->version = listener->request_version;
 		else
@@ -89,8 +123,6 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  bool *own_req)
 {
 	struct subflow_context *listener = subflow_ctx(sk);
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct tcp_options_received opt_rx;
 	struct sock *child;
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
@@ -100,16 +132,25 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
 
 	if (child && *own_req) {
-		if (!subflow_ctx(child)) {
-			pr_debug("Closing child socket");
-			inet_sk_set_state(child, TCP_CLOSE);
-			sock_set_flag(child, SOCK_DEAD);
-			inet_csk_destroy_sock(child);
-			child = NULL;
+		struct subflow_context *ctx = subflow_ctx(child);
+
+		if (!ctx)
+			goto close_child;
+
+		if (ctx->mp_capable) {
+			if (mptcp_token_new_accept(ctx->token))
+				goto close_child;
 		}
 	}
 
 	return child;
+
+close_child:
+	pr_debug("closing child socket");
+	inet_sk_set_state(child, TCP_CLOSE);
+	sock_set_flag(child, SOCK_DEAD);
+	inet_csk_destroy_sock(child);
+	return NULL;
 }
 
 static struct inet_connection_sock_af_ops subflow_specific;
@@ -136,6 +177,7 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	pr_debug("subflow=%p", subflow);
 
 	*new_sock = sf;
+	sock_hold(sk);
 	subflow->conn = sk;
 	subflow->request_mptcp = 1; // @@ if MPTCP enabled
 	subflow->request_cksum = 1; // @@ if checksum enabled
@@ -190,7 +232,8 @@ static void subflow_ulp_release(struct sock *sk)
 {
 	struct subflow_context *ctx = subflow_ctx(sk);
 
-	pr_debug("subflow=%p", ctx);
+	if (ctx->conn)
+		sock_put(ctx->conn);
 
 	kfree(ctx);
 }
@@ -215,6 +258,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		new_ctx->fourth_ack = 1;
 		new_ctx->remote_key = subflow_req->remote_key;
 		new_ctx->local_key = subflow_req->local_key;
+		new_ctx->token = subflow_req->token;
 	}
 }
 
@@ -239,6 +283,8 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	if (!subflow_ops->slab)
 		return -ENOMEM;
 
+	subflow_ops->destructor = subflow_req_destructor;
+
 	return 0;
 }
 
@@ -255,6 +301,7 @@ void subflow_init(void)
 	subflow_specific.conn_request = subflow_conn_request;
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
+	subflow_specific.rebuild_header = subflow_rebuild_header;
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP\n");
