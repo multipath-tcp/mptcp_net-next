@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rework-mptcp_sendmsg_frag-to-accept-optional-dfrag
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: rework mptcp_sendmsg_frag to accept optional dfrag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This will simplify mptcp-level retransmission implementation
+in the next patch. If dfrag is provided by the caller, skip
+kernel space memory allocation and use data and metadata
+provided by the dfrag itself.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
