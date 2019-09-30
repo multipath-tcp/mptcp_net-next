@@ -807,7 +807,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 
 void mptcp_finish_join(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
@@ -822,7 +822,7 @@ void mptcp_finish_join(struct sock *sk)
 
 bool mptcp_sk_is_subflow(const struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	return subflow->mp_join == 1;
 }

@@ -49,7 +49,7 @@ static void subflow_req_destructor(struct request_sock *req)
 static bool subflow_token_join_request(struct request_sock *req,
 				       const struct sk_buff *skb)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 	struct mptcp_sock *msk;
 
@@ -174,11 +174,12 @@ drop:
 static bool subflow_hmac_valid(const struct request_sock *req,
 			       const struct tcp_options_received *rx_opt)
 {
-	const struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	const struct mptcp_subflow_request_sock *subflow_req;
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 	struct mptcp_sock *msk;
 	bool ret;
 
+	subflow_req = mptcp_subflow_rsk(req);
 	msk = mptcp_token_get_sock(subflow_req->token);
 	if (!msk)
 		return false;
@@ -203,14 +204,14 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  bool *own_req)
 {
 	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk);
-	struct subflow_request_sock *subflow_req;
+	struct mptcp_subflow_request_sock *subflow_req;
 	struct tcp_options_received opt_rx;
 	struct sock *child;
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
 
 	/* if the sk is MP_CAPABLE, we already received the client key */
-	subflow_req = subflow_rsk(req);
+	subflow_req = mptcp_subflow_rsk(req);
 	if (!subflow_req->mp_capable && subflow_req->mp_join) {
 		opt_rx.mptcp.mp_join = 0;
 		mptcp_get_options(skb, &opt_rx);
