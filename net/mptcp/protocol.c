@@ -87,7 +87,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		pr_debug("fallback-read subflow=%p", subflow_ctx(ssock->sk));
+		pr_debug("fallback-read subflow=%p",
+			 mptcp_subflow_ctx(ssock->sk));
 		copied = sock_recvmsg(ssock, msg, flags);
 		sock_put(ssock->sk);
 		return copied;
@@ -167,8 +168,10 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable)
 {
-	struct mptcp_subflow_context *subflow = subflow_ctx(msk->subflow->sk);
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
 		/* sk (new subflow socket) is already locked, but we need
