@@ -80,7 +80,7 @@ static struct socket *mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 
 static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -282,7 +282,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	if (mpext) {
 		memset(mpext, 0, sizeof(*mpext));
 		mpext->data_seq = msk->write_seq;
-		mpext->subflow_seq = subflow_ctx(ssk)->rel_write_seq;
+		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
 		mpext->data_len = ret;
 		mpext->checksum = 0xbeef;
 		mpext->use_map = 1;
@@ -299,7 +299,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 out:
 	pfrag->offset += frag_truesize;
 	msk->write_seq += ret;
-	subflow_ctx(ssk)->rel_write_seq += ret;
+	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
 
 	return ret;
 }
@@ -387,14 +387,14 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63, 32));
 }
 
-static u64 get_map_offset(struct subflow_context *subflow)
+static u64 get_map_offset(struct mptcp_subflow_context *subflow)
 {
 	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
 		      subflow->ssn_offset -
 		      subflow->map_subflow_seq;
 }
 
-static u64 get_mapped_dsn(struct subflow_context *subflow)
+static u64 get_mapped_dsn(struct mptcp_subflow_context *subflow)
 {
 	return subflow->map_seq + get_map_offset(subflow);
 }
@@ -437,7 +437,7 @@ enum mapping_status {
 
 static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 {
-	struct subflow_context *subflow = subflow_ctx(ssk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_ext *mpext;
 	enum mapping_status ret;
 	struct sk_buff *skb;
@@ -533,7 +533,7 @@ static void mptcp_wait_data(struct sock *sk, long *timeo)
 	remove_wait_queue(sk_sleep(sk), &wait);
 }
 
-static void warn_bad_map(struct subflow_context *subflow, u32 ssn)
+static void warn_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
 {
 	WARN_ONCE(1, "Bad mapping: ssn=%d map_seq=%d map_data_len=%d",
 		  ssn, subflow->map_subflow_seq, subflow->map_data_len);
@@ -543,7 +543,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			 int nonblock, int flags, int *addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_read_arg arg;
 	read_descriptor_t desc;
 	struct socket *ssock;
@@ -556,7 +556,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		pr_debug("fallback-read subflow=%p", subflow_ctx(ssock->sk));
+		pr_debug("fallback-read subflow=%p",
+			 mptcp_subflow_ctx(ssock->sk));
 		copied = sock_recvmsg(ssock, msg, flags);
 		sock_put(ssock->sk);
 		return copied;
@@ -568,7 +569,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		return -ENOTCONN;
 	}
 
-	subflow = subflow_ctx(ssk);
+	subflow = mptcp_subflow_ctx(ssk);
 	tp = tcp_sk(ssk);
 
 	lock_sock(ssk);
@@ -801,8 +802,8 @@ static void __mptcp_clear_xmit(struct sock *sk)
 
 static void mptcp_close(struct sock *sk, long timeout)
 {
+	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow, *tmp;
 	struct socket *ssk = NULL;
 
 	mptcp_token_destroy(msk->token);
@@ -843,17 +844,19 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *listener = msk->subflow;
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *new_sock;
+	struct socket *listener;
 	struct sock *newsk;
 
-	pr_debug("msk=%p, listener=%p", msk, subflow_ctx(listener->sk));
+	listener = msk->subflow;
+
+	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
 	*err = kernel_accept(listener, &new_sock, flags);
 	if (*err < 0)
 		return NULL;
 
-	subflow = subflow_ctx(new_sock->sk);
+	subflow = mptcp_subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
 	if (subflow->mp_capable) {
@@ -998,15 +1001,18 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	pr_debug("msk=%p, subflow=%p", msk, subflow_ctx(msk->subflow->sk));
+	pr_debug("msk=%p, subflow=%p", msk,
+		 mptcp_subflow_ctx(msk->subflow->sk));
 
 	return inet_csk_get_port(msk->subflow->sk, snum);
 }
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable)
 {
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(msk->subflow->sk);
+
+	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
 		u64 ack_seq;
@@ -1060,7 +1066,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 
 void mptcp_finish_join(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
@@ -1075,7 +1081,7 @@ void mptcp_finish_join(struct sock *sk)
 
 bool mptcp_sk_is_subflow(const struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	return subflow->mp_join == 1;
 }
@@ -1108,8 +1114,8 @@ static struct proto mptcp_prot = {
 
 static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 {
+	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	struct subflow_context *subflow;
 	struct socket *ssock;
 	int err;
 
@@ -1118,14 +1124,14 @@ static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 	if (ssock)
 		goto release;
 
-	err = subflow_create_socket(sk, &ssock);
+	err = mptcp_subflow_create_socket(sk, &ssock);
 	if (err) {
 		ssock = ERR_PTR(err);
 		goto release;
 	}
 
 	msk->subflow = ssock;
-	subflow = subflow_ctx(msk->subflow->sk);
+	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
 	subflow->request_cksum = 0; /* checksum not supported */
 	subflow->request_version = 0; /* only v0 supported */
@@ -1258,7 +1264,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	struct socket *ssock;
@@ -1288,7 +1294,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 static int mptcp_shutdown(struct socket *sock, int how)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *ssock;
 	int ret = 0;
 
@@ -1341,7 +1347,7 @@ void mptcp_proto_init(void)
 	if (percpu_counter_init(&mptcp_sockets_allocated, 0, GFP_KERNEL))
 		panic("Failed to allocate MPTCP pcpu counter\n");
 
-	subflow_init();
+	mptcp_subflow_init();
 	pm_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
