@@ -396,7 +396,7 @@ static bool mptcp_established_options_addr(struct sock *sk,
 					   unsigned int remaining,
 					   struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct sockaddr_storage saddr;
 	u8 id;
