@@ -75,6 +75,7 @@ static void subflow_v4_init_req(struct request_sock *req,
 		    listener->request_cksum)
 			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
+		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else {
 		subflow_req->mp_capable = 0;
 	}
@@ -91,6 +92,11 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			 subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
 		subflow->conn_finished = 1;
+
+		if (skb) {
+			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
+			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
+		}
 	}
 }
 
@@ -155,6 +161,20 @@ close_child:
 
 static struct inet_connection_sock_af_ops subflow_specific;
 
+static void subflow_data_ready(struct sock *sk)
+{
+	struct subflow_context *subflow = subflow_ctx(sk);
+	struct sock *parent = subflow->conn;
+
+	pr_debug("sk=%p", sk);
+	subflow->tcp_sk_data_ready(sk);
+
+	if (parent) {
+		pr_debug("parent=%p", parent);
+		parent->sk_data_ready(parent);
+	}
+}
+
 int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
 	struct subflow_context *subflow;
@@ -194,10 +214,9 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk,
 	struct subflow_context *ctx;
 
 	ctx = kzalloc(sizeof(*ctx), priority);
-	icsk->icsk_ulp_data = ctx;
-
 	if (!ctx)
 		return NULL;
+	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
 
 	pr_debug("subflow=%p", ctx);
 
@@ -224,7 +243,9 @@ static int subflow_ulp_init(struct sock *sk)
 
 	tp->is_mptcp = 1;
 	icsk->icsk_af_ops = &subflow_specific;
+	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	ctx->use_checksum = 0;
+	sk->sk_data_ready = subflow_data_ready;
 out:
 	return err;
 }
@@ -233,10 +254,13 @@ static void subflow_ulp_release(struct sock *sk)
 {
 	struct subflow_context *ctx = subflow_ctx(sk);
 
+	if (!ctx)
+		return;
+
 	if (ctx->conn)
 		sock_put(ctx->conn);
 
-	kfree(ctx);
+	kfree_rcu(ctx, rcu);
 }
 
 static void subflow_ulp_clone(const struct request_sock *req,
@@ -244,6 +268,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct subflow_context *old_ctx = subflow_ctx(newsk);
 	struct subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
@@ -253,7 +278,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
-	new_ctx->use_checksum = 0;
+	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
+	new_ctx->use_checksum = old_ctx->use_checksum;
 
 	if (subflow_req->mp_capable) {
 		new_ctx->mp_capable = 1;
@@ -261,6 +287,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		new_ctx->remote_key = subflow_req->remote_key;
 		new_ctx->local_key = subflow_req->local_key;
 		new_ctx->token = subflow_req->token;
+		new_ctx->ssn_offset = subflow_req->ssn_offset;
+		new_ctx->idsn = subflow_req->idsn;
 	}
 }
 
