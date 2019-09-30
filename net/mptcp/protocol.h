@@ -52,7 +52,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
-struct subflow_request_sock {
+struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
 	u8	mp_capable : 1,
 		mp_join : 1,
@@ -63,10 +63,10 @@ struct subflow_request_sock {
 	u64	remote_key;
 };
 
-static inline
-struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
+static inline struct mptcp_subflow_request_sock *
+mptcp_subflow_rsk(const struct request_sock *rsk)
 {
-	return (struct subflow_request_sock *)rsk;
+	return (struct mptcp_subflow_request_sock *)rsk;
 }
 
 /* MPTCP subflow context */

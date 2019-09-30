@@ -215,7 +215,7 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;

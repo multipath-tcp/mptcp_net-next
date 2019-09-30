@@ -20,7 +20,7 @@ static void subflow_v4_init_req(struct request_sock *req,
 				struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk_listener);
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct tcp_options_received rx_opt;
 
 	tcp_rsk(req)->is_mptcp = 1;
@@ -197,7 +197,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      struct sock *newsk,
 			      const gfp_t priority)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
@@ -226,7 +226,7 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 {
-	subflow_ops->obj_size = sizeof(struct subflow_request_sock);
+	subflow_ops->obj_size = sizeof(struct mptcp_subflow_request_sock);
 	subflow_ops->slab_name = "request_sock_subflow";
 
 	subflow_ops->slab = kmem_cache_create(subflow_ops->slab_name,
