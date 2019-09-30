@@ -260,7 +260,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	struct socket *ssock;
