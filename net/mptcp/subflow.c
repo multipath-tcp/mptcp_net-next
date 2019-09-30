@@ -315,8 +315,8 @@ static void subflow_data_ready(struct sock *sk)
 	}
 }
 
-int subflow_connect(struct sock *sk, struct sockaddr_in *local,
-		    struct sockaddr_in *remote, u8 remote_id)
+int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
+			  struct sockaddr_in *remote, u8 remote_id)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;

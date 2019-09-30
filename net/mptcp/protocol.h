@@ -214,8 +214,8 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 int mptcp_is_enabled(struct net *net);
 
 void mptcp_subflow_init(void);
-int subflow_connect(struct sock *sk, struct sockaddr_in *local,
-		    struct sockaddr_in *remote, u8 remote_id);
+int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
+			  struct sockaddr_in *remote, u8 remote_id);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
