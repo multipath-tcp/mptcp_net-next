@@ -229,7 +229,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		bool use_csum;
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
-		use_csum = subflow_ctx(sk)->use_checksum;
+		use_csum = mptcp_subflow_ctx(sk)->use_checksum;
 		if (use_csum)
 			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
@@ -285,7 +285,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 {
 	unsigned int opt_size = 0;
 
-	if (!subflow_ctx(sk)->mp_capable)
+	if (!mptcp_subflow_ctx(sk)->mp_capable)
 		return false;
 
 	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {

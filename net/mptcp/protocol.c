@@ -147,7 +147,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		memset(mpext, 0, sizeof(*mpext));
 		mpext->data_ack = msk->ack_seq;
 		mpext->data_seq = msk->write_seq;
-		mpext->subflow_seq = subflow_ctx(ssk)->rel_write_seq;
+		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
 		mpext->data_len = ret;
 		mpext->checksum = 0xbeef;
 		mpext->use_map = 1;
@@ -161,7 +161,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	} /* TODO: else fallback */
 
 	msk->write_seq += ret;
-	subflow_ctx(ssk)->rel_write_seq += ret;
+	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
 
 	tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle, size_goal);
 
