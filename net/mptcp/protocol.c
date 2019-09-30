@@ -30,7 +30,7 @@ static struct socket *__mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 
 static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -87,7 +87,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		pr_debug("fallback-read subflow=%p", subflow_ctx(ssock->sk));
+		pr_debug("fallback-read subflow=%p",
+			 mptcp_subflow_ctx(ssock->sk));
 		copied = sock_recvmsg(ssock, msg, flags);
 		sock_put(ssock->sk);
 		return copied;
@@ -128,8 +129,8 @@ static int mptcp_init_sock(struct sock *sk)
 
 static void mptcp_close(struct sock *sk, long timeout)
 {
+	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow, *tmp;
 	struct socket *ssk = NULL;
 
 	mptcp_token_destroy(msk->token);
@@ -160,17 +161,19 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *listener = msk->subflow;
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *new_sock;
+	struct socket *listener;
 	struct sock *newsk;
 
-	pr_debug("msk=%p, listener=%p", msk, subflow_ctx(listener->sk));
+	listener = msk->subflow;
+
+	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
 	*err = kernel_accept(listener, &new_sock, flags);
 	if (*err < 0)
 		return NULL;
 
-	subflow = subflow_ctx(new_sock->sk);
+	subflow = mptcp_subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
 	if (subflow->mp_capable) {
@@ -225,15 +228,18 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	pr_debug("msk=%p, subflow=%p", msk, subflow_ctx(msk->subflow->sk));
+	pr_debug("msk=%p, subflow=%p", msk,
+		 mptcp_subflow_ctx(msk->subflow->sk));
 
 	return inet_csk_get_port(msk->subflow->sk, snum);
 }
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable)
 {
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(msk->subflow->sk);
+
+	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
 		/* sk (new subflow socket) is already locked, but we need
@@ -296,7 +302,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -313,7 +319,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -375,7 +381,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	pr_debug("msk=%p", msk);
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -398,7 +404,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	struct socket *ssock;
@@ -446,7 +452,7 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.getname = mptcp_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
 
-	subflow_init();
+	mptcp_subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
