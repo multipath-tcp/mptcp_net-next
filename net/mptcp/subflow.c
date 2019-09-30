@@ -224,6 +224,7 @@ static int subflow_ulp_init(struct sock *sk)
 
 	tp->is_mptcp = 1;
 	icsk->icsk_af_ops = &subflow_specific;
+	ctx->use_checksum = 0;
 out:
 	return err;
 }
@@ -252,6 +253,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
+	new_ctx->use_checksum = 0;
 
 	if (subflow_req->mp_capable) {
 		new_ctx->mp_capable = 1;
