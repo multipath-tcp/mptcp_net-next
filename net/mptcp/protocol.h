@@ -73,7 +73,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 	return (struct mptcp_sock *)sk;
 }
 
-struct subflow_request_sock {
+struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
 	u8	mp_capable : 1,
 		mp_join : 1,
@@ -87,14 +87,14 @@ struct subflow_request_sock {
 	u32	ssn_offset;
 };
 
-static inline
-struct subflow_request_sock *subflow_rsk(const struct request_sock *rsk)
+static inline struct mptcp_subflow_request_sock *
+mptcp_subflow_rsk(const struct request_sock *rsk)
 {
-	return (struct subflow_request_sock *)rsk;
+	return (struct mptcp_subflow_request_sock *)rsk;
 }
 
 /* MPTCP subflow context */
-struct subflow_context {
+struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
 	u64	local_key;
 	u64	remote_key;
@@ -120,21 +120,23 @@ struct subflow_context {
 	struct	rcu_head rcu;
 };
 
-static inline struct subflow_context *subflow_ctx(const struct sock *sk)
+static inline struct mptcp_subflow_context *
+mptcp_subflow_ctx(const struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
+
 	/* Use RCU on icsk_ulp_data only for sock diag code */
-	return (__force struct subflow_context *)icsk->icsk_ulp_data;
+	return (__force struct mptcp_subflow_context *)icsk->icsk_ulp_data;
 }
 
 static inline struct socket *
-mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
+mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 {
 	return subflow->tcp_sock;
 }
 
-void subflow_init(void);
-int subflow_create_socket(struct sock *sk, struct socket **new_sock);
+void mptcp_subflow_init(void);
+int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
 
