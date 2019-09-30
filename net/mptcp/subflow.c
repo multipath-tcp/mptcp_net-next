@@ -19,7 +19,7 @@
 
 static int subflow_rebuild_header(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	int err = 0;
 
 	if (subflow->request_mptcp && !subflow->token) {
@@ -35,7 +35,7 @@ static int subflow_rebuild_header(struct sock *sk)
 
 static void subflow_req_destructor(struct request_sock *req)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 
 	pr_debug("subflow_req=%p", subflow_req);
 
