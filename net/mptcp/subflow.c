@@ -33,7 +33,7 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	if (err)
 		return err;
 
-	subflow = subflow_ctx(sf->sk);
+	subflow = mptcp_subflow_ctx(sf->sk);
 	pr_debug("subflow=%p", subflow);
 
 	*new_sock = sf;
@@ -85,7 +85,7 @@ out:
 
 static void subflow_ulp_release(struct sock *sk)
 {
-	struct mptcp_subflow_context *ctx = subflow_ctx(sk);
+	struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(sk);
 
 	pr_debug("subflow=%p", ctx);
 
