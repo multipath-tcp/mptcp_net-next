@@ -57,7 +57,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	inet_sk_state_store(sk, TCP_CLOSE);
 
 	if (msk->subflow) {
-		pr_debug("subflow=%p", subflow_ctx(msk->subflow->sk));
+		pr_debug("subflow=%p", mptcp_subflow_ctx(msk->subflow->sk));
 		sock_release(msk->subflow);
 	}
 
@@ -72,7 +72,8 @@ static int mptcp_connect(struct sock *sk, struct sockaddr *saddr, int len)
 
 	saddr->sa_family = AF_INET;
 
-	pr_debug("msk=%p, subflow=%p", msk, subflow_ctx(msk->subflow->sk));
+	pr_debug("msk=%p, subflow=%p", msk,
+		 mptcp_subflow_ctx(msk->subflow->sk));
 
 	err = kernel_connect(msk->subflow, saddr, len, 0);
 
@@ -107,7 +108,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -124,7 +125,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -149,7 +150,7 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.bind = mptcp_bind;
 	mptcp_stream_ops.connect = mptcp_stream_connect;
 
-	subflow_init();
+	mptcp_subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
