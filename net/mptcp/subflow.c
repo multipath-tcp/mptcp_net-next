@@ -20,7 +20,7 @@
 
 static int subflow_rebuild_header(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	int err = 0;
 
 	if (subflow->request_mptcp && !subflow->token) {
@@ -36,7 +36,7 @@ static int subflow_rebuild_header(struct sock *sk)
 
 static void subflow_req_destructor(struct request_sock *req)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 
 	pr_debug("subflow_req=%p", subflow_req);
 
@@ -81,8 +81,8 @@ static void subflow_v4_init_req(struct request_sock *req,
 				const struct sock *sk_listener,
 				struct sk_buff *skb)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct subflow_context *listener = subflow_ctx(sk_listener);
+	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk_listener);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct tcp_options_received rx_opt;
 
 	tcp_rsk(req)->is_mptcp = 1;
@@ -132,12 +132,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	inet_sk_rx_dst_set(sk, skb);
 
 	if (subflow->conn && !subflow->conn_finished) {
-		pr_debug("subflow=%p, remote_key=%llu", subflow_ctx(sk),
+		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
 		subflow->conn_finished = 1;
@@ -154,7 +154,7 @@ static struct tcp_request_sock_ops subflow_request_sock_ipv4_ops;
 
 static int subflow_conn_request(struct sock *sk, struct sk_buff *skb)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	pr_debug("subflow=%p", subflow);
 
@@ -202,7 +202,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct request_sock *req_unhash,
 					  bool *own_req)
 {
-	struct subflow_context *listener = subflow_ctx(sk);
+	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk);
 	struct subflow_request_sock *subflow_req;
 	struct tcp_options_received opt_rx;
 	struct sock *child;
@@ -222,7 +222,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
 
 	if (child && *own_req) {
-		struct subflow_context *ctx = subflow_ctx(child);
+		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
 		if (!ctx)
 			goto close_child;
@@ -256,7 +256,7 @@ static struct inet_connection_sock_af_ops subflow_specific;
 
 static void subflow_data_ready(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *parent = subflow->conn;
 
 	pr_debug("sk=%p", sk);
@@ -268,9 +268,9 @@ static void subflow_data_ready(struct sock *sk)
 	}
 }
 
-int subflow_create_socket(struct sock *sk, struct socket **new_sock)
+int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct net *net = sock_net(sk);
 	struct socket *sf;
 	int err;
@@ -286,7 +286,7 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	if (err)
 		return err;
 
-	subflow = subflow_ctx(sf->sk);
+	subflow = mptcp_subflow_ctx(sf->sk);
 	pr_debug("subflow=%p", subflow);
 
 	*new_sock = sf;
@@ -299,12 +299,12 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	return 0;
 }
 
-static struct subflow_context *subflow_create_ctx(struct sock *sk,
-						  struct socket *sock,
-						  gfp_t priority)
+static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
+							struct socket *sock,
+							gfp_t priority)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct subflow_context *ctx;
+	struct mptcp_subflow_context *ctx;
 
 	ctx = kzalloc(sizeof(*ctx), priority);
 	if (!ctx)
@@ -321,9 +321,9 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk,
 
 static int subflow_ulp_init(struct sock *sk)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct subflow_context *ctx;
+	struct mptcp_subflow_context *ctx;
+	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
 
 	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
@@ -345,7 +345,7 @@ out:
 
 static void subflow_ulp_release(struct sock *sk)
 {
-	struct subflow_context *ctx = subflow_ctx(sk);
+	struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(sk);
 
 	if (!ctx)
 		return;
@@ -360,9 +360,9 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      struct sock *newsk,
 			      const gfp_t priority)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct subflow_context *old_ctx = subflow_ctx(newsk);
-	struct subflow_context *new_ctx;
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+	struct mptcp_subflow_context *old_ctx = mptcp_subflow_ctx(newsk);
+	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
 	new_ctx = subflow_create_ctx(newsk, NULL, priority);
@@ -402,7 +402,7 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 {
-	subflow_ops->obj_size = sizeof(struct subflow_request_sock);
+	subflow_ops->obj_size = sizeof(struct mptcp_subflow_request_sock);
 	subflow_ops->slab_name = "request_sock_subflow";
 
 	subflow_ops->slab = kmem_cache_create(subflow_ops->slab_name,
@@ -418,7 +418,7 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	return 0;
 }
 
-void subflow_init(void)
+void mptcp_subflow_init(void)
 {
 	subflow_request_sock_ops = tcp_request_sock_ops;
 	if (subflow_ops_init(&subflow_request_sock_ops) != 0)
