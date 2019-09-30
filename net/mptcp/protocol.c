@@ -434,7 +434,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 static int mptcp_shutdown(struct socket *sock, int how)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *ssock;
 	int ret = 0;
 
