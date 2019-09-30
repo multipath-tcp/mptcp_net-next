@@ -17,7 +17,7 @@
 
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = subflow_ctx(sk);
 
 	inet_sk_rx_dst_set(sk, skb);
 
@@ -31,9 +31,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 static struct inet_connection_sock_af_ops subflow_specific;
 
-int subflow_create_socket(struct sock *sk, struct socket **new_sock)
+int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct net *net = sock_net(sk);
 	struct socket *sf;
 	int err;
@@ -61,11 +61,11 @@ int subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	return 0;
 }
 
-static struct subflow_context *subflow_create_ctx(struct sock *sk,
-						  struct socket *sock)
+static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
+							struct socket *sock)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct subflow_context *ctx;
+	struct mptcp_subflow_context *ctx;
 
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
 	if (!ctx)
@@ -82,9 +82,9 @@ static struct subflow_context *subflow_create_ctx(struct sock *sk,
 
 static int subflow_ulp_init(struct sock *sk)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct subflow_context *ctx;
+	struct tcp_sock *tsk = tcp_sk(sk);
+	struct mptcp_subflow_context *ctx;
 	int err = 0;
 
 	ctx = subflow_create_ctx(sk, sk->sk_socket);
@@ -103,7 +103,7 @@ out:
 
 static void subflow_ulp_release(struct sock *sk)
 {
-	struct subflow_context *ctx = subflow_ctx(sk);
+	struct mptcp_subflow_context *ctx = subflow_ctx(sk);
 
 	pr_debug("subflow=%p", ctx);
 
@@ -117,7 +117,7 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 	.release	= subflow_ulp_release,
 };
 
-void subflow_init(void)
+void mptcp_subflow_init(void)
 {
 	subflow_specific = ipv4_specific;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
