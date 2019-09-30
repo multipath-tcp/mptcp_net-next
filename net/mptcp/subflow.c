@@ -138,7 +138,7 @@ static void subflow_v4_init_req(struct request_sock *req,
 }
 
 /* validate received truncated hmac and create hmac for third ACK */
-static bool subflow_thmac_valid(struct subflow_context *subflow)
+static bool subflow_thmac_valid(struct mptcp_subflow_context *subflow)
 {
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 	u64 thmac;
@@ -177,7 +177,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		}
 	} else if (subflow->mp_join && !subflow->conn_finished) {
 		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u",
-			 subflow_ctx(sk), subflow->thmac,
+			 subflow, subflow->thmac,
 			 subflow->remote_nonce);
 		if (!subflow_thmac_valid(subflow)) {
 			subflow->mp_join = 0;
@@ -319,19 +319,19 @@ int subflow_connect(struct sock *sk, struct sockaddr_in *local,
 		    struct sockaddr_in *remote, u8 remote_id)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *sf;
 	u32 remote_token;
 	int err;
 
 	lock_sock(sk);
-	err = subflow_create_socket(sk, &sf);
+	err = mptcp_subflow_create_socket(sk, &sf);
 	if (err) {
 		release_sock(sk);
 		return err;
 	}
 
-	subflow = subflow_ctx(sf->sk);
+	subflow = mptcp_subflow_ctx(sf->sk);
 	subflow->remote_key = msk->remote_key;
 	subflow->local_key = msk->local_key;
 	subflow->token = msk->token;
