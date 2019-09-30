@@ -329,11 +329,11 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 		dss_size += ack_size;
 
-		msk = mptcp_sk(subflow_ctx(sk)->conn);
+		msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
 		if (msk) {
 			opts->ext_copy.data_ack = msk->ack_seq;
 		} else {
-			mptcp_crypto_key_sha1(subflow_ctx(sk)->remote_key,
+			mptcp_crypto_key_sha1(mptcp_subflow_ctx(sk)->remote_key,
 					      NULL, &opts->ext_copy.data_ack);
 			opts->ext_copy.data_ack++;
 		}

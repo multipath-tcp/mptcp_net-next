@@ -185,14 +185,14 @@ static u64 expand_seq(u64 old_seq, u16 old_data_len, u64 seq)
 	return seq | ((old_seq + old_data_len + 1) & GENMASK_ULL(63, 32));
 }
 
-static u64 get_map_offset(struct subflow_context *subflow)
+static u64 get_map_offset(struct mptcp_subflow_context *subflow)
 {
 	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
 		      subflow->ssn_offset -
 		      subflow->map_subflow_seq;
 }
 
-static u64 get_mapped_dsn(struct subflow_context *subflow)
+static u64 get_mapped_dsn(struct mptcp_subflow_context *subflow)
 {
 	return subflow->map_seq + get_map_offset(subflow);
 }
@@ -235,7 +235,7 @@ enum mapping_status {
 
 static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 {
-	struct subflow_context *subflow = subflow_ctx(ssk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_ext *mpext;
 	enum mapping_status ret;
 	struct sk_buff *skb;
@@ -306,7 +306,7 @@ del_out:
 	return ret;
 }
 
-static void warn_bad_map(struct subflow_context *subflow, u32 ssn)
+static void warn_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
 {
 	WARN_ONCE(1, "Bad mapping: ssn=%d map_seq=%d map_data_len=%d",
 		  ssn, subflow->map_subflow_seq, subflow->map_data_len);
@@ -316,7 +316,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			 int nonblock, int flags, int *addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_read_arg arg;
 	read_descriptor_t desc;
 	struct socket *ssock;
@@ -342,7 +342,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		return -ENOTCONN;
 	}
 
-	subflow = subflow_ctx(ssk);
+	subflow = mptcp_subflow_ctx(ssk);
 	tp = tcp_sk(ssk);
 
 	lock_sock(ssk);

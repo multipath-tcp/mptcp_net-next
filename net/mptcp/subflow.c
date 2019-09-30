@@ -163,7 +163,7 @@ static struct inet_connection_sock_af_ops subflow_specific;
 
 static void subflow_data_ready(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *parent = subflow->conn;
 
 	pr_debug("sk=%p", sk);
