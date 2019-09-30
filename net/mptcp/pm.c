@@ -161,7 +161,7 @@ int pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 int pm_get_local_id(struct request_sock *req, struct sock *sk,
 		    const struct sk_buff *skb)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	if (!msk->pm.local_valid)
