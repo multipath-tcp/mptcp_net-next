@@ -30,7 +30,7 @@ static struct socket *__mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 
 static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -128,8 +128,8 @@ static int mptcp_init_sock(struct sock *sk)
 
 static void mptcp_close(struct sock *sk, long timeout)
 {
+	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow, *tmp;
 	struct socket *ssk = NULL;
 
 	inet_sk_state_store(sk, TCP_CLOSE);
@@ -159,17 +159,19 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *listener = msk->subflow;
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	struct socket *new_sock;
+	struct socket *listener;
 	struct sock *newsk;
 
-	pr_debug("msk=%p, listener=%p", msk, subflow_ctx(listener->sk));
+	listener = msk->subflow;
+
+	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
 	*err = kernel_accept(listener, &new_sock, flags);
 	if (*err < 0)
 		return NULL;
 
-	subflow = subflow_ctx(new_sock->sk);
+	subflow = mptcp_subflow_ctx(new_sock->sk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
 	if (subflow->mp_capable) {
@@ -223,8 +225,8 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable)
 {
+	struct mptcp_subflow_context *subflow = subflow_ctx(msk->subflow->sk);
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
 		/* sk (new subflow socket) is already locked, but we need
