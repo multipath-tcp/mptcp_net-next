@@ -75,7 +75,8 @@ int pm_create_subflow(u32 token, u8 remote_id)
 	remote.sin_port = htons(msk->dport);
 	remote.sin_addr.s_addr = msk->pm.remote_addr.s_addr;
 
-	err = subflow_connect((struct sock *)msk, &local, &remote, remote_id);
+	err = mptcp_subflow_connect((struct sock *)msk, &local, &remote,
+				    remote_id);
 
 create_put:
 	sock_put((struct sock *)msk);
