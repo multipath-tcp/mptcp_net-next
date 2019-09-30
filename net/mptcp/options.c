@@ -137,7 +137,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 		       struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = subflow_ctx(sk);
 
 	if (subflow->request_mptcp) {
 		pr_debug("local_key=%llu", subflow->local_key);
@@ -151,8 +151,8 @@ bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 
 void mptcp_rcv_synsent(struct sock *sk)
 {
+	struct mptcp_subflow_context *subflow = subflow_ctx(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(sk);
 
 	pr_debug("subflow=%p", subflow);
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
@@ -164,7 +164,7 @@ void mptcp_rcv_synsent(struct sock *sk)
 bool mptcp_established_options(struct sock *sk, unsigned int *size,
 			       struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = subflow_ctx(sk);
 
 	if (subflow->mp_capable && !subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
