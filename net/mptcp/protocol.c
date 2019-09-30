@@ -832,11 +832,11 @@ static void mptcp_retransmit(struct work_struct *work)
 	dfrag->offset = orig_offset;
 	dfrag->data_len = orig_len;
 
+	mptcp_set_timeout(sk, ssk);
 	release_sock(ssk);
 	sock_put(ssk);
 
 reset_unlock:
-	mptcp_set_timeout(sk, ssk);
 	if (!mptcp_timer_pending(sk))
 		mptcp_reset_timer(sk);
 
