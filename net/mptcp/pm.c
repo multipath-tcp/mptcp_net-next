@@ -75,7 +75,8 @@ int pm_create_subflow(u32 token, u8 remote_id)
 	remote.sin_port = htons(msk->dport);
 	remote.sin_addr.s_addr = msk->pm.remote_addr.s_addr;
 
-	err = subflow_connect((struct sock *)msk, &local, &remote, remote_id);
+	err = mptcp_subflow_connect((struct sock *)msk, &local, &remote,
+				    remote_id);
 
 create_put:
 	sock_put((struct sock *)msk);
@@ -161,7 +162,7 @@ int pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 int pm_get_local_id(struct request_sock *req, struct sock *sk,
 		    const struct sk_buff *skb)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	if (!msk->pm.local_valid)
