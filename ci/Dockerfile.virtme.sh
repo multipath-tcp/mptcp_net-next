@@ -20,6 +20,7 @@ if [ "${1}" = "manual" ]; then
 fi
 
 VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
+VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
 
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
@@ -41,10 +42,14 @@ RUN apt-get update && \
                     iputils-ping ethtool klibc-utils rsync ccache && \
     apt-get clean
 
-# virtme and sudo rights (for kvm)
+# virtme
 RUN cd /tmp && \
     git clone "${VIRTME_GIT_URL}" && \
-    usermod -a -G sudo "${USER}" && \
+    cd virtme && \
+    git checkout "${VIRTME_GIT_SHA}"
+
+# sudo rights (for kvm)
+RUN usermod -a -G sudo "${USER}" && \
     echo "${USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # CCache for quicker builds with default colours
