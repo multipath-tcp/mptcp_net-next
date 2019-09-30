@@ -48,12 +48,12 @@ static void subflow_v4_init_req(struct request_sock *req,
 
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	inet_sk_rx_dst_set(sk, skb);
 
 	if (subflow->conn && !subflow->conn_finished) {
-		pr_debug("subflow=%p, remote_key=%llu", subflow_ctx(sk),
+		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
 		subflow->conn_finished = 1;
@@ -132,7 +132,7 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	if (err)
 		return err;
 
-	subflow = subflow_ctx(sf->sk);
+	subflow = mptcp_subflow_ctx(sf->sk);
 	pr_debug("subflow=%p", subflow);
 
 	*new_sock = sf;
@@ -168,8 +168,8 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 static int subflow_ulp_init(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct tcp_sock *tsk = tcp_sk(sk);
 	struct mptcp_subflow_context *ctx;
+	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
 
 	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
@@ -188,7 +188,7 @@ out:
 
 static void subflow_ulp_release(struct sock *sk)
 {
-	struct mptcp_subflow_context *ctx = subflow_ctx(sk);
+	struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(sk);
 
 	pr_debug("subflow=%p", ctx);
 
