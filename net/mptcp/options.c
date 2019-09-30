@@ -170,7 +170,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 		       struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	if (subflow->request_mptcp) {
 		pr_debug("local_key=%llu", subflow->local_key);
@@ -184,8 +184,8 @@ bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 
 void mptcp_rcv_synsent(struct sock *sk)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(sk);
 
 	pr_debug("subflow=%p", subflow);
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
@@ -198,7 +198,7 @@ static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
 					 unsigned int remaining,
 					 struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	if (!subflow->fourth_ack && remaining >= TCPOLEN_MPTCP_MPC_ACK) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
@@ -229,7 +229,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		bool use_csum;
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
-		use_csum = subflow_ctx(sk)->use_checksum;
+		use_csum = mptcp_subflow_ctx(sk)->use_checksum;
 		if (use_csum)
 			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
@@ -285,7 +285,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 {
 	unsigned int opt_size = 0;
 
-	if (!subflow_ctx(sk)->mp_capable)
+	if (!mptcp_subflow_ctx(sk)->mp_capable)
 		return false;
 
 	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {
@@ -305,7 +305,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
