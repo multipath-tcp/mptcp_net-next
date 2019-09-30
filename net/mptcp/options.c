@@ -308,7 +308,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 		       struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	if (subflow->request_mptcp) {
 		pr_debug("local_key=%llu", subflow->local_key);
@@ -332,8 +332,8 @@ bool mptcp_syn_options(struct sock *sk, unsigned int *size,
 
 void mptcp_rcv_synsent(struct sock *sk)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct subflow_context *subflow = subflow_ctx(sk);
 
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
 		subflow->mp_capable = 1;
@@ -353,7 +353,7 @@ static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
 					 unsigned int remaining,
 					 struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	if (subflow->mp_capable && !subflow->fourth_ack &&
 	    remaining >= TCPOLEN_MPTCP_MPC_ACK) {
@@ -393,7 +393,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		bool use_csum;
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
-		use_csum = subflow_ctx(sk)->use_checksum;
+		use_csum = mptcp_subflow_ctx(sk)->use_checksum;
 		if (use_csum)
 			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
@@ -426,11 +426,11 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 		dss_size += ack_size;
 
-		msk = mptcp_sk(subflow_ctx(sk)->conn);
+		msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
 		if (msk) {
 			opts->ext_copy.data_ack = msk->ack_seq;
 		} else {
-			mptcp_crypto_key_sha1(subflow_ctx(sk)->remote_key,
+			mptcp_crypto_key_sha1(mptcp_subflow_ctx(sk)->remote_key,
 					      NULL, &opts->ext_copy.data_ack);
 			opts->ext_copy.data_ack++;
 		}
@@ -454,7 +454,7 @@ static bool mptcp_established_options_addr(struct sock *sk,
 					   unsigned int remaining,
 					   struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct sockaddr_storage saddr;
 	u8 id;
@@ -485,7 +485,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       unsigned int *size, unsigned int remaining,
 			       struct mptcp_out_options *opts)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	unsigned int opt_size = 0;
 	bool ret = false;
 
@@ -514,7 +514,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
@@ -576,7 +576,7 @@ void update_una(struct mptcp_sock *msk, struct mptcp_options_received *mp_opt)
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
