@@ -51,7 +51,7 @@ static int token_used __read_mostly;
  */
 int mptcp_token_new_request(struct request_sock *req)
 {
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	int err;
 
 	while (1) {
@@ -96,7 +96,7 @@ int mptcp_token_new_request(struct request_sock *req)
  */
 int mptcp_token_new_connect(struct sock *sk)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *mptcp_sock = subflow->conn;
 	int err;
 
@@ -154,7 +154,7 @@ int mptcp_token_new_accept(u32 token)
  */
 void mptcp_token_update_accept(struct sock *sk, struct sock *conn)
 {
-	struct subflow_context *subflow = subflow_ctx(sk);
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	void __rcu **slot;
 
 	spin_lock_bh(&token_tree_lock);
