@@ -87,7 +87,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		pr_debug("fallback-read subflow=%p", subflow_ctx(ssock->sk));
+		pr_debug("fallback-read subflow=%p",
+			 mptcp_subflow_ctx(ssock->sk));
 		copied = sock_recvmsg(ssock, msg, flags);
 		sock_put(ssock->sk);
 		return copied;
@@ -159,15 +160,18 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	pr_debug("msk=%p, subflow=%p", msk, subflow_ctx(msk->subflow->sk));
+	pr_debug("msk=%p, subflow=%p", msk,
+		 mptcp_subflow_ctx(msk->subflow->sk));
 
 	return inet_csk_get_port(msk->subflow->sk, snum);
 }
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable)
 {
-	struct mptcp_subflow_context *subflow = subflow_ctx(msk->subflow->sk);
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
 		/* sk (new subflow socket) is already locked, but we need
@@ -228,7 +232,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -245,7 +249,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		return err;
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
@@ -256,7 +260,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct subflow_context *subflow;
+	struct mptcp_subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	struct socket *ssock;
@@ -301,7 +305,7 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.connect = mptcp_stream_connect;
 	mptcp_stream_ops.poll = mptcp_poll;
 
-	subflow_init();
+	mptcp_subflow_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
