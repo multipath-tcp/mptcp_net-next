@@ -89,8 +89,6 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  bool *own_req)
 {
 	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk);
-	struct subflow_request_sock *subflow_req = subflow_rsk(req);
-	struct tcp_options_received opt_rx;
 	struct sock *child;
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);

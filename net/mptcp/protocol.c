@@ -370,7 +370,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	pr_debug("msk=%p", msk);
 
 	if (!msk->subflow) {
-		err = subflow_create_socket(sock->sk, &msk->subflow);
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
 		if (err)
 			return err;
 	}
