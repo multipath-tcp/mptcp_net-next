@@ -47,7 +47,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 }
 
 /* MPTCP subflow context */
-struct subflow_context {
+struct mptcp_subflow_context {
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_cksum : 1,
 		request_version : 4;
@@ -55,20 +55,21 @@ struct subflow_context {
 	struct  sock *conn;        /* parent mptcp_sock */
 };
 
-static inline struct subflow_context *subflow_ctx(const struct sock *sk)
+static inline struct mptcp_subflow_context *
+mptcp_subflow_ctx(const struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
-	return (struct subflow_context *)icsk->icsk_ulp_data;
+	return (struct mptcp_subflow_context *)icsk->icsk_ulp_data;
 }
 
 static inline struct socket *
-mptcp_subflow_tcp_socket(const struct subflow_context *subflow)
+mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 {
 	return subflow->tcp_sock;
 }
 
-void subflow_init(void);
-int subflow_create_socket(struct sock *sk, struct socket **new_sock);
+void mptcp_subflow_init(void);
+int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 #endif /* __MPTCP_PROTOCOL_H */
