@@ -37,9 +37,6 @@ static void subflow_v4_init_req(struct request_sock *req,
 			subflow_req->version = listener->request_version;
 		else
 			subflow_req->version = rx_opt.mptcp.version;
-		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
-		    listener->request_cksum)
-			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 	} else {
 		subflow_req->mp_capable = 0;
