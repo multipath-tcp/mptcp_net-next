@@ -49,7 +49,6 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
-		request_cksum : 1,
 		request_version : 4;
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
 	struct  sock *conn;        /* parent mptcp_sock */
