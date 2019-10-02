@@ -49,8 +49,10 @@
 #define TCPOLEN_MPTCP_ADD_ADDR6		20
 #define TCPOLEN_MPTCP_RM_ADDR		4
 
+/* MPTCP MP_JOIN flags */
 #define MPTCPOPT_BACKUP		BIT(0)
 #define MPTCPOPT_HMAC_LEN	20
+#define MPTCPOPT_THMAC_LEN	8
 
 /* MPTCP MP_CAPABLE flags */
 #define MPTCP_VERSION_MASK	(0x0F)
@@ -115,6 +117,7 @@ struct mptcp_sock {
 	u64		write_seq;
 	u64		ack_seq;
 	u32		token;
+	u16		dport;
 	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct mptcp_pm_data	pm;
@@ -166,6 +169,8 @@ struct mptcp_subflow_context {
 	u32	ssn_offset;
 	u16	map_data_len;
 	u16	request_mptcp : 1,  /* send MP_CAPABLE */
+		request_join : 1,   /* send MP_JOIN */
+		request_bkup : 1,
 		request_version : 4,
 		mp_capable : 1,     /* remote is MPTCP capable */
 		mp_join : 1,        /* remote is JOINing */
@@ -176,6 +181,8 @@ struct mptcp_subflow_context {
 	u32	remote_nonce;
 	u64	thmac;
 	u32	local_nonce;
+	u32	remote_token;
+	u8	hmac[MPTCPOPT_HMAC_LEN];
 	u8	local_id;
 	u8	remote_id;
 
@@ -204,6 +211,8 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 int mptcp_is_enabled(struct net *net);
 
 void mptcp_subflow_init(void);
+int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
+			  struct sockaddr_in *remote, u8 remote_id);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;

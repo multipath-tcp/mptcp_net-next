@@ -26,6 +26,13 @@ static int subflow_rebuild_header(struct sock *sk)
 	if (subflow->request_mptcp && !subflow->token) {
 		pr_debug("subflow=%p", sk);
 		err = mptcp_token_new_connect(sk);
+	} else if (subflow->request_join && !subflow->local_nonce) {
+		pr_debug("subflow=%p", sk);
+		mptcp_token_get_sock(subflow->token);
+
+		do {
+			get_random_bytes(&subflow->local_nonce, sizeof(u32));
+		} while (!subflow->local_nonce);
 	}
 
 	if (err)
@@ -127,13 +134,35 @@ static void subflow_v4_init_req(struct request_sock *req,
 	}
 }
 
+/* validate received truncated hmac and create hmac for third ACK */
+static bool subflow_thmac_valid(struct mptcp_subflow_context *subflow)
+{
+	u8 hmac[MPTCPOPT_HMAC_LEN];
+	u64 thmac;
+
+	mptcp_crypto_hmac_sha1(subflow->remote_key, subflow->local_key,
+			       subflow->remote_nonce, subflow->local_nonce,
+			       (u32 *)hmac);
+
+	thmac = get_unaligned_be64(hmac);
+	pr_debug("subflow=%p, token=%u, thmac=%llu, subflow->thmac=%llu\n",
+		 subflow, subflow->token,
+		 (unsigned long long)thmac,
+		 (unsigned long long)subflow->thmac);
+
+	return thmac == subflow->thmac;
+}
+
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
 	inet_sk_rx_dst_set(sk, skb);
 
-	if (subflow->conn && !subflow->conn_finished) {
+	if (!subflow->conn)
+		return;
+
+	if (subflow->mp_capable && !subflow->conn_finished) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
 		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
@@ -143,6 +172,23 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 		}
+	} else if (subflow->mp_join && !subflow->conn_finished) {
+		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u",
+			 subflow, subflow->thmac,
+			 subflow->remote_nonce);
+		if (!subflow_thmac_valid(subflow)) {
+			subflow->mp_join = 0;
+			// @@ need to trigger RST
+			return;
+		}
+
+		mptcp_crypto_hmac_sha1(subflow->local_key, subflow->remote_key,
+				       subflow->local_nonce,
+				       subflow->remote_nonce,
+				       (u32 *)subflow->hmac);
+
+		mptcp_finish_join(sk);
+		subflow->conn_finished = 1;
 	}
 }
 
@@ -264,6 +310,56 @@ static void subflow_data_ready(struct sock *sk)
 		pr_debug("parent=%p", parent);
 		parent->sk_data_ready(parent);
 	}
+}
+
+int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
+			  struct sockaddr_in *remote, u8 remote_id)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+	struct socket *sf;
+	u32 remote_token;
+	int err;
+
+	lock_sock(sk);
+	err = mptcp_subflow_create_socket(sk, &sf);
+	if (err) {
+		release_sock(sk);
+		return err;
+	}
+
+	subflow = mptcp_subflow_ctx(sf->sk);
+	subflow->remote_key = msk->remote_key;
+	subflow->local_key = msk->local_key;
+	subflow->token = msk->token;
+
+	sock_hold(sf->sk);
+	release_sock(sk);
+
+	err = kernel_bind(sf, (struct sockaddr *)local,
+			  sizeof(struct sockaddr_in));
+	if (err)
+		goto failed;
+
+	mptcp_crypto_key_sha1(subflow->remote_key, &remote_token, NULL);
+	pr_debug("msk=%p remote_token=%u", msk, remote_token);
+	subflow->remote_token = remote_token;
+	subflow->remote_id = remote_id;
+	subflow->request_join = 1;
+	subflow->request_bkup = 1;
+
+	err = kernel_connect(sf, (struct sockaddr *)remote,
+			     sizeof(struct sockaddr_in), O_NONBLOCK);
+	if (err && err != -EINPROGRESS)
+		goto failed;
+
+	sock_put(sf->sk);
+	return err;
+
+failed:
+	sock_put(sf->sk);
+	sock_release(sf);
+	return err;
 }
 
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
