@@ -58,10 +58,15 @@ static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 
 static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
+	int mss_now = 0, size_goal = 0, ret = 0;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct socket *ssock;
 	struct sock *ssk;
-	int ret;
+	struct mptcp_ext *mpext = NULL;
+	struct page *page = NULL;
+	struct sk_buff *skb;
+	size_t psize;
+	int poffset;
 
 	lock_sock(sk);
 	ssock = __mptcp_fallback_get_ref(msk);
@@ -79,8 +84,89 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		return -ENOTCONN;
 	}
 
-	ret = sock_sendmsg(ssk->sk_socket, msg);
+	if (!msg_data_left(msg)) {
+		pr_debug("empty send");
+		ret = sock_sendmsg(ssk->sk_socket, msg);
+		goto put_out;
+	}
 
+	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL)) {
+		ret = -ENOTSUPP;
+		goto put_out;
+	}
+
+	/* Initial experiment: new page per send.  Real code will
+	 * maintain list of active pages and DSS mappings, append to the
+	 * end and honor zerocopy
+	 */
+	page = alloc_page(GFP_KERNEL);
+	if (!page) {
+		ret = -ENOMEM;
+		goto put_out;
+	}
+
+	/* Copy to page */
+	poffset = 0;
+	pr_debug("left=%zu", msg_data_left(msg));
+	psize = copy_page_from_iter(page, poffset,
+				    min_t(size_t, msg_data_left(msg),
+					  PAGE_SIZE),
+				    &msg->msg_iter);
+	pr_debug("left=%zu", msg_data_left(msg));
+
+	if (!psize) {
+		ret = -EINVAL;
+		goto put_out;
+	}
+
+	lock_sock(ssk);
+
+	/* Mark the end of the previous write so the beginning of the
+	 * next write (with its own mptcp skb extension data) is not
+	 * collapsed.
+	 */
+	skb = tcp_write_queue_tail(ssk);
+	if (skb)
+		TCP_SKB_CB(skb)->eor = 1;
+
+	mss_now = tcp_send_mss(ssk, &size_goal, msg->msg_flags);
+
+	ret = do_tcp_sendpages(ssk, page, poffset, min_t(int, size_goal, psize),
+			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
+	if (ret <= 0)
+		goto put_out;
+
+	if (skb == tcp_write_queue_tail(ssk))
+		pr_err("no new skb %p/%p", sk, ssk);
+
+	skb = tcp_write_queue_tail(ssk);
+
+	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
+
+	if (mpext) {
+		memset(mpext, 0, sizeof(*mpext));
+		mpext->data_ack = msk->ack_seq;
+		mpext->data_seq = msk->write_seq;
+		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
+		mpext->data_len = ret;
+		mpext->use_map = 1;
+		mpext->dsn64 = 1;
+		mpext->use_ack = 1;
+		mpext->ack64 = 1;
+
+		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
+			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
+			 mpext->dsn64);
+	} /* TODO: else fallback */
+
+	msk->write_seq += ret;
+	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
+
+	tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle, size_goal);
+
+put_out:
+	if (page)
+		put_page(page);
 	release_sock(sk);
 	sock_put(ssk);
 	return ret;
@@ -189,6 +275,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 	if (subflow->mp_capable) {
 		struct sock *new_mptcp_sock;
+		u64 ack_seq;
 
 		lock_sock(sk);
 
@@ -214,6 +301,14 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 		mptcp_token_update_accept(new_sock->sk, new_mptcp_sock);
 		msk->subflow = NULL;
+
+		mptcp_crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
+		msk->write_seq = subflow->idsn + 1;
+		ack_seq++;
+		msk->ack_seq = ack_seq;
+		msk->remote_key = subflow->remote_key;
+		msk->ack_seq++;
+		subflow->rel_write_seq = 1;
 		newsk = new_mptcp_sock;
 		subflow->conn = new_mptcp_sock;
 		list_add(&subflow->node, &msk->conn_list);
@@ -307,6 +402,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
+		u64 ack_seq;
+
 		/* sk (new subflow socket) is already locked, but we need
 		 * to lock the parent (mptcp) socket now to add the tcp socket
 		 * to the subflow list.
@@ -333,6 +430,11 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
+		msk->write_seq = subflow->idsn + 1;
+		subflow->rel_write_seq = 1;
+		mptcp_crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
+		ack_seq++;
+		msk->ack_seq = ack_seq;
 		list_add(&subflow->node, &msk->conn_list);
 		msk->subflow = NULL;
 		bh_unlock_sock(sk);
