@@ -60,7 +60,7 @@ static bool subflow_token_join_request(struct request_sock *req,
 		return false;
 	}
 
-	if (pm_get_local_id(req, (struct sock *)msk, skb)) {
+	if (mptcp_pm_get_local_id(req, (struct sock *)msk, skb)) {
 		sock_put((struct sock *)msk);
 		return false;
 	}
