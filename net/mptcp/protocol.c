@@ -149,15 +149,14 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		mpext->data_seq = msk->write_seq;
 		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
 		mpext->data_len = ret;
-		mpext->checksum = 0xbeef;
 		mpext->use_map = 1;
 		mpext->dsn64 = 1;
 		mpext->use_ack = 1;
 		mpext->ack64 = 1;
 
-		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u checksum=%u, dsn64=%d",
+		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
 			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
-			 mpext->checksum, mpext->dsn64);
+			 mpext->dsn64);
 	} /* TODO: else fallback */
 
 	msk->write_seq += ret;
