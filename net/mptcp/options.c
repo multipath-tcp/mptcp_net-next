@@ -407,7 +407,7 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	if (!msk->pm.fully_established || !msk->addr_signal)
 		return false;
 
-	if (pm_addr_signal(msk, &id, &saddr))
+	if (mptcp_pm_addr_signal(msk, &id, &saddr))
 		return false;
 
 	if (saddr.ss_family == AF_INET && remaining < TCPOLEN_MPTCP_ADD_ADDR)
