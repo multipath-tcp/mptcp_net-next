@@ -653,7 +653,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		mptcp_token_update_accept(new_sock->sk, new_mptcp_sock);
 		msk->subflow = NULL;
 
-		pm_new_connection(msk, 1);
+		mptcp_pm_new_connection(msk, 1);
 
 		mptcp_crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
@@ -786,7 +786,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->token = subflow->token;
 		pr_debug("msk=%p, token=%u", msk, msk->token);
 
-		pm_new_connection(msk, 0);
+		mptcp_pm_new_connection(msk, 0);
 
 		mptcp_crypto_key_sha1(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
@@ -1076,7 +1076,7 @@ void mptcp_proto_init(void)
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
 	mptcp_subflow_init();
-	pm_init();
+	mptcp_pm_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
