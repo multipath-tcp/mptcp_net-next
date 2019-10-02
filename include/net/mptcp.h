@@ -22,10 +22,8 @@ struct mptcp_ext {
 	u64		data_seq;
 	u32		subflow_seq;
 	u16		data_len;
-	__sum16		checksum;
 	u8		use_map:1,
 			dsn64:1,
-			use_checksum:1,
 			data_fin:1,
 			use_ack:1,
 			ack64:1,
