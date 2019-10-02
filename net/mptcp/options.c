@@ -293,12 +293,8 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	if (!skb || (mpext && mpext->use_map)) {
 		unsigned int map_size;
-		bool use_csum;
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
-		use_csum = mptcp_subflow_ctx(sk)->use_checksum;
-		if (use_csum)
-			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
 		if (map_size <= remaining) {
 			remaining -= map_size;
@@ -307,10 +303,8 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 				opts->ext_copy.data_seq = mpext->data_seq;
 				opts->ext_copy.subflow_seq = mpext->subflow_seq;
 				opts->ext_copy.data_len = mpext->data_len;
-				opts->ext_copy.checksum = mpext->checksum;
 				opts->ext_copy.use_map = 1;
 				opts->ext_copy.dsn64 = mpext->dsn64;
-				opts->ext_copy.use_checksum = use_csum;
 			}
 		} else {
 			opts->ext_copy.use_map = 0;
@@ -470,9 +464,6 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			pr_debug("Updating DSS length and flags for map");
 			len += TCPOLEN_MPTCP_DSS_MAP64;
 
-			if (mpext->use_checksum)
-				len += TCPOLEN_MPTCP_DSS_CHECKSUM;
-
 			/* Use only 64-bit mapping flags for now, add
 			 * support for optional 32-bit mappings later.
 			 */
@@ -492,18 +483,12 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		}
 
 		if (mpext->use_map) {
-			__u16 checksum;
-
-			pr_debug("Writing map values");
 			put_unaligned_be64(mpext->data_seq, ptr);
 			ptr += 2;
-			*ptr++ = htonl(mpext->subflow_seq);
-
-			if (mpext->use_checksum)
-				checksum = (u16 __force)mpext->checksum;
-			else
-				checksum = TCPOPT_NOP << 8 | TCPOPT_NOP;
-			*ptr = htonl(mpext->data_len << 16 | checksum);
+			put_unaligned_be32(mpext->subflow_seq, ptr);
+			ptr += 1;
+			put_unaligned_be32(mpext->data_len << 16 |
+					   TCPOPT_NOP << 8 | TCPOPT_NOP, ptr);
 		}
 	}
 }
