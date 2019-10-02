@@ -19,6 +19,8 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
+static struct percpu_counter mptcp_sockets_allocated;
+
 static void mptcp_set_timeout(const struct sock *sk, const struct sock *ssk)
 {
 	unsigned long tout = ssk && inet_csk(ssk)->icsk_pending ?
@@ -112,9 +114,10 @@ static inline bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
 		df->data_seq + df->data_len == msk->write_seq;
 }
 
-static void dfrag_clear(struct mptcp_data_frag *dfrag)
+static void dfrag_clear(struct sock *sk, struct mptcp_data_frag *dfrag)
 {
 	list_del(&dfrag->list);
+	sk_mem_uncharge(sk, dfrag->data_len + dfrag->overhead);
 	put_page(dfrag->page);
 }
 
@@ -128,8 +131,9 @@ static void mptcp_clean_una(struct sock *sk)
 		if (after64(dfrag->data_seq + dfrag->data_len, snd_una))
 			break;
 
-		dfrag_clear(dfrag);
+		dfrag_clear(sk, dfrag);
 	}
+	sk_mem_reclaim_partial(sk);
 }
 
 /* ensure we get enough memory for the frag hdr, beyond some minimal amount of
@@ -236,6 +240,9 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	if (!psize)
 		return -EINVAL;
 
+	if (!sk_wmem_schedule(sk, psize + dfrag->overhead))
+		return -ENOMEM;
+
 	/* tell the TCP stack to delay the push so that we can safely
 	 * access the skb after the sendpages call
 	 */
@@ -256,6 +263,11 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		get_page(dfrag->page);
 		list_add_tail(&dfrag->list, &msk->rtx_queue);
 	}
+
+	/* charge data on mptcp rtx queue to the master socket
+	 * Note: we charge such data both to sk and ssk
+	 */
+	sk->sk_forward_alloc -= frag_truesize;
 
 	collapsed = skb == tcp_write_queue_tail(ssk);
 	if (collapsed) {
@@ -767,6 +779,8 @@ static int mptcp_init_sock(struct sock *sk)
 	if (ret)
 		return ret;
 
+	sk_sockets_allocated_inc(sk);
+
 	if (!mptcp_is_enabled(sock_net(sk)))
 		return -ENOPROTOOPT;
 
@@ -781,7 +795,7 @@ static void __mptcp_clear_xmit(struct sock *sk)
 	sk_stop_timer(sk, &msk->sk.icsk_retransmit_timer);
 
 	list_for_each_entry_safe(dfrag, dtmp, &msk->rtx_queue, list)
-		dfrag_clear(dfrag);
+		dfrag_clear(sk, dfrag);
 }
 
 static void mptcp_close(struct sock *sk, long timeout)
@@ -900,6 +914,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 static void mptcp_destroy(struct sock *sk)
 {
+	sk_sockets_allocated_dec(sk);
 }
 
 static int mptcp_setsockopt(struct sock *sk, int level, int optname,
@@ -1086,6 +1101,11 @@ static struct proto mptcp_prot = {
 	.hash		= inet_hash,
 	.unhash		= inet_unhash,
 	.get_port	= mptcp_get_port,
+	.sockets_allocated	= &mptcp_sockets_allocated,
+	.memory_allocated	= &tcp_memory_allocated,
+	.memory_pressure	= &tcp_memory_pressure,
+	.sysctl_wmem_offset	= offsetof(struct net, ipv4.sysctl_tcp_wmem),
+	.sysctl_mem	= sysctl_tcp_mem,
 	.obj_size	= sizeof(struct mptcp_sock),
 	.no_autobind	= 1,
 };
@@ -1320,6 +1340,9 @@ void mptcp_proto_init(void)
 	mptcp_stream_ops.getname = mptcp_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
+
+	if (percpu_counter_init(&mptcp_sockets_allocated, 0, GFP_KERNEL))
+		panic("Failed to allocate MPTCP pcpu counter\n");
 
 	mptcp_subflow_init();
 	mptcp_pm_init();
