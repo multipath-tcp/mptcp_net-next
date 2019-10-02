@@ -117,9 +117,6 @@ static void subflow_v4_init_req(struct request_sock *req,
 			subflow_req->version = listener->request_version;
 		else
 			subflow_req->version = rx_opt.mptcp.version;
-		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
-		    listener->request_cksum)
-			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else if (rx_opt.mptcp.mp_join && listener->request_mptcp) {
@@ -436,7 +433,6 @@ static int subflow_ulp_init(struct sock *sk)
 	tp->is_mptcp = 1;
 	icsk->icsk_af_ops = &subflow_specific;
 	ctx->tcp_sk_data_ready = sk->sk_data_ready;
-	ctx->use_checksum = 0;
 	sk->sk_data_ready = subflow_data_ready;
 out:
 	return err;
@@ -471,7 +467,6 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
 	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
-	new_ctx->use_checksum = old_ctx->use_checksum;
 
 	if (subflow_req->mp_capable) {
 		new_ctx->mp_capable = 1;
