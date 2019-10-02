@@ -492,6 +492,8 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 	.init		= subflow_ulp_init,
 	.release	= subflow_ulp_release,
 	.clone		= subflow_ulp_clone,
+	.get_info	= subflow_get_info,
+	.get_info_size	= subflow_get_info_size,
 };
 
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
