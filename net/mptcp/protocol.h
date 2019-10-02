@@ -109,7 +109,6 @@ struct mptcp_subflow_context {
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		fourth_ack : 1,     /* send initial DSS */
 		conn_finished : 1,
-		use_checksum : 1,
 		map_valid : 1;
 
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
