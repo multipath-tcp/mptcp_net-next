@@ -149,13 +149,12 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		mpext->data_seq = msk->write_seq;
 		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
 		mpext->data_len = ret;
-		mpext->checksum = 0xbeef;
 		mpext->use_map = 1;
 		mpext->dsn64 = 1;
 
-		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u checksum=%u, dsn64=%d",
+		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
 			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
-			 mpext->checksum, mpext->dsn64);
+			 mpext->dsn64);
 	}
 	/* TODO: else fallback; allocation can fail, but we can't easily retire
 	 * skbs from the write_queue, as we need to roll-back TCP status
@@ -319,9 +318,8 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 		goto del_out;
 	}
 
-	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u ck=%u",
-		 mpext->data_seq, mpext->dsn64, mpext->subflow_seq,
-		 mpext->data_len, mpext->checksum);
+	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u", mpext->data_seq,
+		 mpext->dsn64, mpext->subflow_seq, mpext->data_len);
 
 	if (mpext->data_len == 0) {
 		pr_err("Infinite mapping not handled");
