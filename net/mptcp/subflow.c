@@ -71,9 +71,6 @@ static void subflow_v4_init_req(struct request_sock *req,
 			subflow_req->version = listener->request_version;
 		else
 			subflow_req->version = rx_opt.mptcp.version;
-		if ((rx_opt.mptcp.flags & MPTCP_CAP_CHECKSUM_REQD) ||
-		    listener->request_cksum)
-			subflow_req->checksum = 1;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 	} else {
 		subflow_req->mp_capable = 0;
@@ -180,8 +177,7 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	sock_hold(sk);
 	subflow->conn = sk;
 	subflow->request_mptcp = 1; // @@ if MPTCP enabled
-	subflow->request_cksum = 1; // @@ if checksum enabled
-	subflow->request_version = 0;
+	subflow->request_version = 0; /* currently only v0 supported */
 
 	return 0;
 }
