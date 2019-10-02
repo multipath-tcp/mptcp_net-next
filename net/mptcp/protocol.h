@@ -133,7 +133,6 @@ struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
 	u8	mp_capable : 1,
 		mp_join : 1,
-		checksum : 1,
 		backup : 1,
 		version : 4;
 	u8	local_id;
@@ -167,13 +166,11 @@ struct mptcp_subflow_context {
 	u32	ssn_offset;
 	u16	map_data_len;
 	u16	request_mptcp : 1,  /* send MP_CAPABLE */
-		request_cksum : 1,
 		request_version : 4,
 		mp_capable : 1,     /* remote is MPTCP capable */
 		mp_join : 1,        /* remote is JOINing */
 		fourth_ack : 1,     /* send initial DSS */
 		conn_finished : 1,
-		use_checksum : 1,
 		map_valid : 1,
 		backup : 1;
 	u32	remote_nonce;
