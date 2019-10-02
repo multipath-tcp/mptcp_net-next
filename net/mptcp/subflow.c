@@ -308,6 +308,11 @@ static void subflow_data_ready(struct sock *sk)
 
 	if (parent) {
 		pr_debug("parent=%p", parent);
+
+		smp_mb__before_atomic();
+		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
+		smp_mb__after_atomic();
+
 		parent->sk_data_ready(parent);
 	}
 }
