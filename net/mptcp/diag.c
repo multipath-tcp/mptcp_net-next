@@ -15,7 +15,7 @@
 
 int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 {
-	struct subflow_context *sf;
+	struct mptcp_subflow_context *sf;
 	struct nlattr *start;
 	u32 flags = 0;
 	int err;
