@@ -290,8 +290,6 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	*new_sock = sf;
 	sock_hold(sk);
 	subflow->conn = sk;
-	subflow->request_mptcp = 1; // @@ if MPTCP enabled
-	subflow->request_version = 0; /* currently only v0 supported */
 
 	return 0;
 }
