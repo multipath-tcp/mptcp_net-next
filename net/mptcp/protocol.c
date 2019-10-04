@@ -57,7 +57,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	inet_sk_state_store(sk, TCP_CLOSE);
 
 	if (msk->subflow) {
-		pr_debug("subflow=%p", msk->subflow->sk);
+		pr_debug("subflow=%p", mptcp_subflow_ctx(msk->subflow->sk));
 		sock_release(msk->subflow);
 	}
 
@@ -72,7 +72,8 @@ static int mptcp_connect(struct sock *sk, struct sockaddr *saddr, int len)
 
 	saddr->sa_family = AF_INET;
 
-	pr_debug("msk=%p, subflow=%p", msk, msk->subflow->sk);
+	pr_debug("msk=%p, subflow=%p", msk,
+		 mptcp_subflow_ctx(msk->subflow->sk));
 
 	err = kernel_connect(msk->subflow, saddr, len, 0);
 
@@ -98,15 +99,59 @@ static struct proto mptcp_prot = {
 	.no_autobind	= 1,
 };
 
+static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	int err = -ENOTSUPP;
+
+	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
+		return err;
+
+	if (!msk->subflow) {
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
+		if (err)
+			return err;
+	}
+	return inet_bind(msk->subflow, uaddr, addr_len);
+}
+
+static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+				int addr_len, int flags)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	int err = -ENOTSUPP;
+
+	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
+		return err;
+
+	if (!msk->subflow) {
+		err = mptcp_subflow_create_socket(sock->sk, &msk->subflow);
+		if (err)
+			return err;
+	}
+
+	return inet_stream_connect(msk->subflow, uaddr, addr_len, flags);
+}
+
+static struct proto_ops mptcp_stream_ops;
+
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
 	.protocol	= IPPROTO_MPTCP,
 	.prot		= &mptcp_prot,
-	.ops		= &inet_stream_ops,
+	.ops		= &mptcp_stream_ops,
+	.flags		= INET_PROTOSW_ICSK,
 };
 
 void __init mptcp_init(void)
 {
+	mptcp_prot.h.hashinfo = tcp_prot.h.hashinfo;
+	mptcp_stream_ops = inet_stream_ops;
+	mptcp_stream_ops.bind = mptcp_bind;
+	mptcp_stream_ops.connect = mptcp_stream_connect;
+
+	mptcp_subflow_init();
+
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
 
