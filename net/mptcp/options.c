@@ -376,13 +376,8 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		if (map_size <= remaining) {
 			remaining -= map_size;
 			dss_size = map_size;
-			if (mpext) {
-				opts->ext_copy.data_seq = mpext->data_seq;
-				opts->ext_copy.subflow_seq = mpext->subflow_seq;
-				opts->ext_copy.data_len = mpext->data_len;
-				opts->ext_copy.use_map = 1;
-				opts->ext_copy.dsn64 = mpext->dsn64;
-			}
+			if (mpext)
+				opts->ext_copy = *mpext;
 		} else {
 			opts->ext_copy.use_map = 0;
 			WARN_ONCE(1, "MPTCP: Map dropped");
