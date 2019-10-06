@@ -58,17 +58,83 @@ static struct sock *mptcp_subflow_get_ref(const struct mptcp_sock *msk)
 	return NULL;
 }
 
-static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
+static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
+			      struct msghdr *msg, long *timeo)
 {
 	int mss_now = 0, size_goal = 0, ret = 0;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *ssock;
-	struct sock *ssk;
 	struct mptcp_ext *mpext = NULL;
 	struct page_frag *pfrag;
 	struct sk_buff *skb;
 	size_t psize;
-	int poffset;
+
+	/* use the mptcp page cache so that we can easily move the data
+	 * from one substream to another, but do per subflow memory accounting
+	 */
+	pfrag = sk_page_frag(sk);
+	while (!sk_page_frag_refill(ssk, pfrag)) {
+		ret = sk_stream_wait_memory(ssk, timeo);
+		if (ret)
+			return ret;
+	}
+
+	/* compute copy limit */
+	mss_now = tcp_send_mss(ssk, &size_goal, msg->msg_flags);
+	psize = min_t(int, pfrag->size - pfrag->offset, size_goal);
+
+	pr_debug("left=%zu", msg_data_left(msg));
+	psize = copy_page_from_iter(pfrag->page, pfrag->offset,
+				    min_t(size_t, msg_data_left(msg), psize),
+				    &msg->msg_iter);
+	pr_debug("left=%zu", msg_data_left(msg));
+	if (!psize)
+		return -EINVAL;
+
+	/* Mark the end of the previous write so the beginning of the
+	 * next write (with its own mptcp skb extension data) is not
+	 * collapsed.
+	 */
+	skb = tcp_write_queue_tail(ssk);
+	if (skb)
+		TCP_SKB_CB(skb)->eor = 1;
+
+	ret = do_tcp_sendpages(ssk, pfrag->page, pfrag->offset, psize,
+			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
+	if (ret <= 0)
+		return ret;
+	if (unlikely(ret < psize))
+		iov_iter_revert(&msg->msg_iter, psize - ret);
+
+	skb = tcp_write_queue_tail(ssk);
+	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
+	if (mpext) {
+		memset(mpext, 0, sizeof(*mpext));
+		mpext->data_seq = msk->write_seq;
+		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
+		mpext->data_len = ret;
+		mpext->use_map = 1;
+		mpext->dsn64 = 1;
+
+		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
+			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
+			 mpext->dsn64);
+	} /* TODO: else fallback */
+
+	pfrag->offset += ret;
+	msk->write_seq += ret;
+	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
+
+	tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle, size_goal);
+	return ret;
+}
+
+static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct socket *ssock;
+	size_t copied = 0;
+	struct sock *ssk;
+	int ret = 0;
 	long timeo;
 
 	lock_sock(sk);
@@ -93,6 +159,8 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		goto put_out;
 	}
 
+	pr_debug("conn_list->subflow=%p", ssk);
+
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL)) {
 		ret = -ENOTSUPP;
 		goto put_out;
@@ -100,70 +168,18 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 
 	lock_sock(ssk);
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
+	while (msg_data_left(msg)) {
+		ret = mptcp_sendmsg_frag(sk, ssk, msg, &timeo);
+		if (ret < 0)
+			break;
 
-	/* use the mptcp page cache so that we can easily move the data
-	 * from one substream to another, but do per subflow memory accounting
-	 */
-	pfrag = sk_page_frag(sk);
-	while (!sk_page_frag_refill(ssk, pfrag)) {
-		ret = sk_stream_wait_memory(ssk, &timeo);
-		if (ret)
-			goto put_out;
+		copied += ret;
 	}
 
-	/* Copy to page */
-	poffset = pfrag->offset;
-	pr_debug("left=%zu", msg_data_left(msg));
-	psize = copy_page_from_iter(pfrag->page, poffset,
-				    min_t(size_t, msg_data_left(msg),
-					  pfrag->size - poffset),
-				    &msg->msg_iter);
-	pr_debug("left=%zu", msg_data_left(msg));
-	if (!psize) {
-		ret = -EINVAL;
-		goto put_out;
-	}
+	if (copied > 0)
+		ret = copied;
 
-	/* Mark the end of the previous write so the beginning of the
-	 * next write (with its own mptcp skb extension data) is not
-	 * collapsed.
-	 */
-	skb = tcp_write_queue_tail(ssk);
-	if (skb)
-		TCP_SKB_CB(skb)->eor = 1;
-
-	mss_now = tcp_send_mss(ssk, &size_goal, msg->msg_flags);
-	psize = min_t(int, size_goal, psize);
-	ret = do_tcp_sendpages(ssk, pfrag->page, poffset, psize,
-			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
-	if (ret <= 0)
-		goto put_out;
-
-	if (skb == tcp_write_queue_tail(ssk))
-		pr_err("no new skb %p/%p", sk, ssk);
-
-	skb = tcp_write_queue_tail(ssk);
-
-	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
-
-	if (mpext) {
-		memset(mpext, 0, sizeof(*mpext));
-		mpext->data_seq = msk->write_seq;
-		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
-		mpext->data_len = ret;
-		mpext->use_map = 1;
-		mpext->dsn64 = 1;
-
-		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
-			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
-			 mpext->dsn64);
-	} /* TODO: else fallback */
-
-	pfrag->offset += ret;
-	msk->write_seq += ret;
-	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
-
-	tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle, size_goal);
+	release_sock(ssk);
 
 put_out:
 	release_sock(sk);
