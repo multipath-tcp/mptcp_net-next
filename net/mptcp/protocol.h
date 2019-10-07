@@ -31,7 +31,9 @@
 #define TCPOLEN_MPTCP_MPC_SYNACK	20
 #define TCPOLEN_MPTCP_MPC_ACK		20
 #define TCPOLEN_MPTCP_DSS_BASE		4
+#define TCPOLEN_MPTCP_DSS_ACK32		4
 #define TCPOLEN_MPTCP_DSS_ACK64		8
+#define TCPOLEN_MPTCP_DSS_MAP32		10
 #define TCPOLEN_MPTCP_DSS_MAP64		14
 #define TCPOLEN_MPTCP_DSS_CHECKSUM	2
 
@@ -48,6 +50,7 @@
 #define MPTCP_DSS_HAS_MAP	BIT(2)
 #define MPTCP_DSS_ACK64		BIT(1)
 #define MPTCP_DSS_HAS_ACK	BIT(0)
+#define MPTCP_DSS_FLAG_MASK	(0x1F)
 
 /* MPTCP connection sock */
 struct mptcp_sock {
@@ -80,6 +83,7 @@ struct mptcp_subflow_request_sock {
 	u64	remote_key;
 	u64	idsn;
 	u32	token;
+	u32	ssn_offset;
 };
 
 static inline struct mptcp_subflow_request_sock *
@@ -94,16 +98,23 @@ struct mptcp_subflow_context {
 	u64	local_key;
 	u64	remote_key;
 	u64	idsn;
+	u64	map_seq;
 	u32	token;
 	u32     rel_write_seq;
-	u32	request_mptcp : 1,  /* send MP_CAPABLE */
+	u32	map_subflow_seq;
+	u32	ssn_offset;
+	u16	map_data_len;
+	u16	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_version : 4,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		fourth_ack : 1,     /* send initial DSS */
-		conn_finished : 1;
+		conn_finished : 1,
+		map_valid : 1;
 
 	struct  socket *tcp_sock;  /* underlying tcp_sock */
 	struct  sock *conn;        /* parent mptcp_sock */
+	void	(*tcp_sk_data_ready)(struct sock *sk);
+	struct	rcu_head rcu;
 };
 
 static inline struct mptcp_subflow_context *
@@ -111,7 +122,8 @@ mptcp_subflow_ctx(const struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
-	return (struct mptcp_subflow_context *)icsk->icsk_ulp_data;
+	/* Use RCU on icsk_ulp_data only for sock diag code */
+	return (__force struct mptcp_subflow_context *)icsk->icsk_ulp_data;
 }
 
 static inline struct socket *
@@ -157,5 +169,12 @@ static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
 	return (struct mptcp_ext *)skb_ext_find(skb, SKB_EXT_MPTCP);
 }
+
+static inline bool before64(__u64 seq1, __u64 seq2)
+{
+	return (__s64)(seq1 - seq2) < 0;
+}
+
+#define after64(seq2, seq1)	before64(seq1, seq2)
 
 #endif /* __MPTCP_PROTOCOL_H */
