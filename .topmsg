@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-dumping-subflow-context-to-userspace
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: allow dumping subflow context to userspace
 
+add ulp-specific diagnostic functions, so that subflow information can be
+dumped to userspace programs like 'ss'.
+
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
