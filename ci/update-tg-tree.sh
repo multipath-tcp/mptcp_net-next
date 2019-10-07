@@ -82,6 +82,9 @@ tg_update() { local rc=0
 	tg update || rc="${?}"
 
 	if [ "${rc}" != 0 ]; then
+		# display useful info in the log for the notifications
+		git --no-pager diff || true
+
 		tg update --abort
 	fi
 
@@ -130,6 +133,8 @@ tg_trap_reset() { local rc
 	# check return code: if different than 0, we exit with an error: reset
 	[ "${rc}" -eq 0 ] && return 0
 
+	# in the notif, only the end is displayed, tg_reset is not interesting
+	set +x
 	tg_reset
 
 	exit "${rc}"
