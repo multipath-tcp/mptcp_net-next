@@ -492,8 +492,6 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 	.init		= subflow_ulp_init,
 	.release	= subflow_ulp_release,
 	.clone		= subflow_ulp_clone,
-	.get_info	= subflow_get_info,
-	.get_info_size	= subflow_get_info_size,
 };
 
 static int subflow_ops_init(struct request_sock_ops *subflow_ops)
@@ -528,6 +526,8 @@ void mptcp_subflow_init(void)
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 	subflow_specific.rebuild_header = subflow_rebuild_header;
+
+	mptcp_diag_subflow_init(&subflow_ulp_ops);
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP\n");

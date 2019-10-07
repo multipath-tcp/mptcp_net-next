@@ -13,7 +13,7 @@
 #include <uapi/linux/mptcp.h>
 #include "protocol.h"
 
-int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
+static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *sf;
 	struct nlattr *start;
@@ -32,23 +32,23 @@ int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (sf->mp_capable)
-		flags |= SUBFLOW_FLAGS_MCAP_REM;
+		flags |= MPTCP_SUBFLOW_FLAG_MCAP_REM;
 	if (sf->request_mptcp)
-		flags |= SUBFLOW_FLAGS_MCAP_LOC;
+		flags |= MPTCP_SUBFLOW_FLAG_MCAP_LOC;
 	if (sf->mp_join)
-		flags |= SUBFLOW_FLAGS_JOIN_REM;
+		flags |= MPTCP_SUBFLOW_FLAG_JOIN_REM;
 	if (sf->request_join)
-		flags |= SUBFLOW_FLAGS_JOIN_LOC;
+		flags |= MPTCP_SUBFLOW_FLAG_JOIN_LOC;
 	if (sf->backup)
-		flags |= SUBFLOW_FLAGS_BKUP_REM;
+		flags |= MPTCP_SUBFLOW_FLAG_BKUP_REM;
 	if (sf->request_bkup)
-		flags |= SUBFLOW_FLAGS_BKUP_LOC;
+		flags |= MPTCP_SUBFLOW_FLAG_BKUP_LOC;
 	if (sf->fourth_ack)
-		flags |= SUBFLOW_FLAGS_4THACK;
+		flags |= MPTCP_SUBFLOW_FLAG_4THACK;
 	if (sf->conn_finished)
-		flags |= SUBFLOW_FLAGS_CONNECTED;
+		flags |= MPTCP_SUBFLOW_FLAG_CONNECTED;
 	if (sf->map_valid)
-		flags |= SUBFLOW_FLAGS_MAPVALID;
+		flags |= MPTCP_SUBFLOW_FLAG_MAPVALID;
 
 	if (nla_put_u32(skb, MPTCP_SUBFLOW_TOKEN_REM, sf->remote_token) ||
 	    nla_put_u32(skb, MPTCP_SUBFLOW_TOKEN_LOC, sf->token) ||
@@ -75,7 +75,7 @@ nla_failure:
 	return err;
 }
 
-size_t subflow_get_info_size(const struct sock *sk)
+static size_t subflow_get_info_size(const struct sock *sk)
 {
 	size_t size = 0;
 
@@ -92,4 +92,10 @@ size_t subflow_get_info_size(const struct sock *sk)
 		nla_total_size(1) +	/* MPTCP_SUBFLOW_ID_LOC */
 		0;
 	return size;
+}
+
+void mptcp_diag_subflow_init(struct tcp_ulp_ops *ops)
+{
+	ops->get_info = subflow_get_info;
+	ops->get_info_size = subflow_get_info_size;
 }
