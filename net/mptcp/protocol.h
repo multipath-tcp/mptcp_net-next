@@ -315,7 +315,6 @@ static inline bool before64(__u64 seq1, __u64 seq2)
 
 #define after64(seq2, seq1)	before64(seq1, seq2)
 
-size_t subflow_get_info_size(const struct sock *sk);
-int subflow_get_info(const struct sock *sk, struct sk_buff *skb);
+void mptcp_diag_subflow_init(struct tcp_ulp_ops *ops);
 
 #endif /* __MPTCP_PROTOCOL_H */
