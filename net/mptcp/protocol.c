@@ -489,6 +489,7 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 
 	if (mpext->data_len == 0) {
 		pr_err("Infinite mapping not handled");
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
 		ret = MAPPING_MISSING;
 		goto del_out;
 	} else if (mpext->subflow_seq == 0 &&
@@ -512,8 +513,10 @@ static enum mapping_status mptcp_get_mapping(struct sock *ssk)
 		 */
 		if (subflow->map_seq != map_seq ||
 		    subflow->map_subflow_seq != mpext->subflow_seq ||
-		    subflow->map_data_len != mpext->data_len)
+		    subflow->map_data_len != mpext->data_len) {
+			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSNOMATCH);
 			pr_warn("Replaced mapping before it was done");
+		}
 	}
 
 	subflow->map_seq = map_seq;
@@ -821,6 +824,7 @@ static void mptcp_retransmit(struct work_struct *work)
 		if (ret < 0)
 			break;
 
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RETRANSSEGS);
 		copied += ret;
 		dfrag->data_len -= ret;
 	}
@@ -1003,7 +1007,10 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		subflow->conn = new_mptcp_sock;
 		list_add(&subflow->node, &msk->conn_list);
 		bh_unlock_sock(new_mptcp_sock);
+
+		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
 		local_bh_enable();
+
 		inet_sk_state_store(newsk, TCP_ESTABLISHED);
 		release_sock(sk);
 	} else {
@@ -1011,6 +1018,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		tcp_sk(newsk)->is_mptcp = 0;
 		new_sock->sk = NULL;
 		sock_release(new_sock);
+
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
 	return newsk;
@@ -1162,6 +1171,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->subflow = NULL;
 		bh_unlock_sock(sk);
 		local_bh_enable();
+	} else {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
 	}
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
