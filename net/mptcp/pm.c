@@ -13,17 +13,74 @@
 int mptcp_pm_announce_addr(u32 token, sa_family_t family, u8 local_id,
 			   struct in_addr *addr)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	int err = 0;
+
+	if (!msk)
+		return -EINVAL;
+
+	if (msk->pm.local_valid) {
+		err = -EBADR;
+		goto announce_put;
+	}
+
+	pr_debug("msk=%p, local_id=%d, addr=%x", msk, local_id, addr->s_addr);
+	msk->pm.local_valid = 1;
+	msk->pm.local_id = local_id;
+	msk->pm.local_family = family;
+	msk->pm.local_addr.s_addr = addr->s_addr;
+	msk->addr_signal = 1;
+
+announce_put:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 int mptcp_pm_remove_addr(u32 token, u8 local_id)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+
+	if (!msk)
+		return -EINVAL;
+
+	pr_debug("msk=%p", msk);
+	msk->pm.local_valid = 0;
+
+	sock_put((struct sock *)msk);
+	return 0;
 }
 
 int mptcp_pm_create_subflow(u32 token, u8 remote_id)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	struct sockaddr_in remote;
+	struct sockaddr_in local;
+	int err;
+
+	if (!msk)
+		return -EINVAL;
+
+	pr_debug("msk=%p", msk);
+
+	if (!msk->pm.remote_valid || remote_id != msk->pm.remote_id) {
+		err = -EBADR;
+		goto create_put;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = 0;
+	local.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	remote.sin_family = msk->pm.remote_family;
+	remote.sin_port = htons(msk->dport);
+	remote.sin_addr.s_addr = msk->pm.remote_addr.s_addr;
+
+	err = mptcp_subflow_connect((struct sock *)msk, &local, &remote,
+				    remote_id);
+
+create_put:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 int mptcp_pm_remove_subflow(u32 token, u8 remote_id)
