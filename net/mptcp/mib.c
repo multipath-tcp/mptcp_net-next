@@ -2,6 +2,7 @@
 
 #include <linux/seq_file.h>
 #include <net/ip.h>
+#include <net/mptcp.h>
 #include <net/snmp.h>
 #include <net/net_namespace.h>
 
@@ -28,7 +29,7 @@ static const struct snmp_mib mptcp_snmp_list[] = {
  */
 bool mptcp_mib_alloc(struct net *net)
 {
-	struct mptcp_mib *mib = alloc_percpu(struct mptcp_mib);
+	struct mptcp_mib __percpu *mib = alloc_percpu(struct mptcp_mib);
 
 	if (!mib)
 		return false;
