@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-and-use-MPTCP-level-retransmission
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement and use MPTCP-level retransmission
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+On timeout event, schedule a work queue to do the retransmission.
+Retransmission code resemple closely sendmsg() implementation and
+re-uses mptcp_sendmsg_frag, providing a dummy msghdr - for flags'
+sake - and peeking the relevant dfrag from the rtx head.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
