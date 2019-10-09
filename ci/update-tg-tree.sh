@@ -27,8 +27,13 @@ TG_FOR_REVIEW_BRANCH="for-review"
 ###########
 
 # $@: message to display before quiting
+err() {
+	echo "ERROR: ${*}" >&2
+}
+
+# $@: message to display before quiting
 exit_err() {
-	echo "ERROR: ${*}"
+	err "${@}"
 	exit 1
 }
 
@@ -162,20 +167,27 @@ generate_config_mptcp() {
 	# 'make olddefconfig' which will silently disable these new options.
 }
 
+# $*: config description
 compile_kernel() {
-	make -j"$(nproc)" -l"$(nproc)"
+	if ! make -j"$(nproc)" -l"$(nproc)"; then
+		err "Unable to compile ${*}"
+		return 1
+	fi
 }
 
 check_compilation() {
 	generate_config_no_mptcp
-	compile_kernel || exit_err "Unable to compile the new version without CONFIG_MPTCP"
+	compile_kernel "without CONFIG_MPTCP" || return 1
 
 	generate_config_mptcp
-	compile_kernel || exit_err "Unable to compile the new version with CONFIG_MPTCP"
+	compile_kernel "with CONFIG_MPTCP" || return 1
 }
 
 validation() {
-	check_compilation || exit_err "Unable to compile the new version"
+	if ! check_compilation; then
+		err "Unable to compile the new version"
+		return 1
+	fi
 }
 
 
@@ -213,10 +225,13 @@ tg_for_review() { local tg_conflict_files
 		tg_conflict_files=$(git status --porcelain | grep -E "^DU\\s.top(deps|msg)$")
 		if [ -n "${tg_conflict_files}" ]; then
 			echo "${tg_conflict_files}" | awk '{ print $2 }' | xargs git rm
-			git commit -s --no-edit || \
-				exit_err "Unexpected other conflicts: ${tg_conflict_files}"
+			if ! git commit -s --no-edit; then
+				err "Unexpected other conflicts: ${tg_conflict_files}"
+				return 1
+			fi
 		else
-			exit_err "Unexpected conflicts when updating ${TG_FOR_REVIEW_BRANCH}"
+			err "Unexpected conflicts when updating ${TG_FOR_REVIEW_BRANCH}"
+			return 1
 		fi
 	fi
 
