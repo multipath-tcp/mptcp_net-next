@@ -61,6 +61,7 @@ docker run \
     --init \
     -e "UPD_TG_FORCE_SYNC=${UPD_TG_FORCE_SYNC}" \
     -e "UPD_TG_NOT_BASE=${UPD_TG_NOT_BASE}" \
+    -e "UPD_TG_VALIDATE_EACH_TOPIC=${UPD_TG_VALIDATE_EACH_TOPIC}" \
     -v "${PWD}:${PWD}" \
     -v "${HOME}/.ssh:${HOME}/.ssh" \
     -v "${HOME}/.gitconfig:${HOME}/.gitconfig:ro" \

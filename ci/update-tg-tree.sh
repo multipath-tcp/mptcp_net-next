@@ -8,6 +8,11 @@
 # We should manage all errors in this script
 set -e
 
+# Env vars that can be set to change the behaviour
+: "${UPD_TG_FORCE_SYNC:=0}"
+: "${UPD_TG_NOT_BASE:=0}"
+: "${UPD_TG_VALIDATE_EACH_TOPIC:=0}"
+
 # Github remote
 GIT_REMOTE_GITHUB_NAME="origin"
 
@@ -54,6 +59,15 @@ git_clean() {
 # [ $1: ref, default: HEAD ]
 git_get_sha() {
 	git rev-parse "${1:-HEAD}"
+}
+
+# [ $1: ref, default: HEAD ]
+git_get_current_branch() {
+	git rev-parse --abbrev-ref "${1:-HEAD}"
+}
+
+tg_get_first() {
+	tg info --series | head -n1 | awk '{ print $1 }'
 }
 
 
@@ -184,9 +198,30 @@ check_compilation() {
 }
 
 validation() {
-	if ! check_compilation; then
-		err "Unable to compile the new version"
-		return 1
+	if [ "${UPD_TG_VALIDATE_EACH_TOPIC}" = "1" ]; then
+		git_checkout "$(tg_get_first)"
+
+		while true; do
+			if ! check_compilation; then
+				err "Unable to compile topic $(git_get_current_branch)"
+				return 1
+			fi
+
+			# switch to the next topic, if any, and show which one
+			tg next 2>/dev/null || break
+			tg checkout next 2>/dev/null || break
+		done
+
+		if [ "$(git_get_current_branch)" != "${TG_TOPIC_TOP}" ]; then
+			err "Not at the top after validation: $(git_get_current_branch)"
+			return 1
+		fi
+	else
+		git_checkout "${TG_TOPIC_TOP}"
+		if ! check_compilation; then
+			err "Unable to compile the new version"
+			return 1
+		fi
 	fi
 }
 
