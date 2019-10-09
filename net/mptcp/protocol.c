@@ -675,7 +675,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			arg.msg = NULL;
 			desc.count = min_t(size_t, old_ack - ack_seq,
 					   map_remaining);
-			pr_debug("Dup data, map len=%d acked=%lld dropped=%ld",
+			pr_debug("Dup data, map len=%d acked=%lld dropped=%zu",
 				 map_remaining, old_ack - ack_seq, desc.count);
 		} else {
 			arg.msg = msg;
