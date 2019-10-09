@@ -23,12 +23,12 @@ static struct percpu_counter mptcp_sockets_allocated;
 
 static void mptcp_set_timeout(const struct sock *sk, const struct sock *ssk)
 {
-	unsigned long tout = ssk && inet_csk(ssk)->icsk_pending ?
-			     inet_csk(ssk)->icsk_timeout - jiffies : 0;
+	long tout = ssk && inet_csk(ssk)->icsk_pending ?
+				      inet_csk(ssk)->icsk_timeout - jiffies : 0;
 
 	if (tout <= 0)
 		tout = mptcp_sk(sk)->timer_ival;
-	mptcp_sk(sk)->timer_ival =  tout > 0 ? tout : TCP_RTO_MIN;
+	mptcp_sk(sk)->timer_ival = tout > 0 ? tout : TCP_RTO_MIN;
 }
 
 bool mptcp_timer_pending(struct sock *sk)
