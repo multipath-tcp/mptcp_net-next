@@ -32,7 +32,7 @@ static void mptcp_set_timeout(const struct sock *sk, const struct sock *ssk)
 	mptcp_sk(sk)->timer_ival = tout > 0 ? tout : TCP_RTO_MIN;
 }
 
-bool mptcp_timer_pending(struct sock *sk)
+static bool mptcp_timer_pending(struct sock *sk)
 {
 	return timer_pending(&inet_csk(sk)->icsk_retransmit_timer);
 }
@@ -136,7 +136,7 @@ static void mptcp_clean_una(struct sock *sk)
 /* ensure we get enough memory for the frag hdr, beyond some minimal amount of
  * data
  */
-bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
+static bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
 {
 	if (likely(skb_page_frag_refill(32U + sizeof(struct mptcp_data_frag),
 					pfrag, sk->sk_allocation)))
