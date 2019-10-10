@@ -810,6 +810,7 @@ static void mptcp_retransmit(struct work_struct *work)
 
 		copied += ret;
 		dfrag->data_len -= ret;
+		dfrag->offset += ret;
 	}
 	if (copied)
 		tcp_push(ssk, msg.msg_flags, mss_now, tcp_sk(ssk)->nonagle,
