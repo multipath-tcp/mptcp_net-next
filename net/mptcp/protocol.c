@@ -96,7 +96,7 @@ static void mptcp_clean_una(struct sock *sk)
 /* ensure we get enough memory for the frag hdr, beyond some minimal amount of
  * data
  */
-bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
+static bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
 {
 	if (likely(skb_page_frag_refill(32U + sizeof(struct mptcp_data_frag),
 					pfrag, sk->sk_allocation)))
