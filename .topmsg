@@ -10,7 +10,7 @@ the current page fragment can always host an MPTCP rtx queue entry.
 
 The MPTCP rtx queue is flushed at disconnect() and close() time
 
-Note that now we need to call __mptcp_init_sock() regarless of mptcp
+Note that now we need to call __mptcp_init_sock() regardless of mptcp
 enable status, as the destructor will try to walk the rtx_queue.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
