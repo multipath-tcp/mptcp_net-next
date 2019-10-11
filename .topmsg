@@ -21,5 +21,6 @@ so an alternative would be add an additional mptcp hook in
 tso_fragment() or in sk_stream_alloc_skb() to always init
 the ext.
 
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
