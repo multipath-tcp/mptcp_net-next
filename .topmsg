@@ -13,5 +13,6 @@ connection.
 
 Data flow and connection failover not addressed by this commit.
 
-Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
