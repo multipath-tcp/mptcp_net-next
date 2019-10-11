@@ -13,7 +13,10 @@ an MPTCP socket with:
 The resulting socket is simply a wrapper around a single regular TCP
 socket, without any of the MPTCP protocol implemented over the wire.
 
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
