@@ -7,5 +7,6 @@ data to specific TCP subflows.
 tcp_request_sock_ipv4_ops will be referenced during TCP subflow
 creation.
 
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
