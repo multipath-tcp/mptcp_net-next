@@ -1,0 +1,32 @@
+git push origin origin/t/upstream:archived/t/upstream_$(date +%Y%m%d)
+for i in $(git for-each-ref refs/remotes/origin/top-bases | awk '{ print { }' | cut -d/ -f4-) $(git for-each-ref refs/remotes/origin/t/ | awk '{ print { }' | cut -d/ -f4-) for-review; do echo :$i; done | xargs git push origin}}
+
+# same on CI
+git checkout net-next
+git for-each-ref refs/top-bases | awk '{print $3}' | xargs -n1 git update-ref -d
+git for-each-ref refs/heads/t | cut -d/ -f3- | xargs git branch -D
+git branch -D for-review
+
+
+git checkout net-next
+TARGET="export_squash_09_more_nit"
+tg import $(git merge-base net-next ${TARGET})..${TARGET} ## no need to use merge-base?
+tg create t/upstream
+
+"""
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] tg: dedicated topic for the top of the tree
+
+This represents the top of our tree dedicated for the upstream.
+
+No modification should be linked to this topic.
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+"""
+
+tg push
+
+git checkout -b for-review
+git rm -f .topmsg .topdeps
+git commit -C 48e7885d9123edaa18ce5731903f3af4dbe7727a
+git push
