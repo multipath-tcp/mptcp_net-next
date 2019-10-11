@@ -4,6 +4,8 @@ Subject: [PATCH] mptcp: Associate MPTCP context with TCP socket
 Use ULP to associate a subflow_context structure with each TCP
 subflow socket.
 
-Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
