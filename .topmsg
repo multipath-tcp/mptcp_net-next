@@ -29,5 +29,6 @@ msk->subflow under the msk socket lock. To avoid breaking the locking
 assumption introduced by mptcp_finish_connect(), while avoiding UAF
 issues, we acquire a reference to the msk->subflow, where needed.
 
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
