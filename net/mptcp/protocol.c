@@ -178,6 +178,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	struct page *page;
 	u64 *write_seq;
 	size_t psize;
+	int *poffset;
 
 	/* use the mptcp page cache so that we can easily move the data
 	 * from one substream to another, but do per subflow memory accounting
@@ -238,6 +239,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			offset = dfrag->offset;
 			frag_truesize = dfrag->overhead;
 		}
+		poffset = &pfrag->offset;
 		psize = min_t(size_t, pfrag->size - offset, avail_size);
 
 		/* Copy to page */
@@ -254,6 +256,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			return -ENOMEM;
 	} else {
 		offset = dfrag->offset;
+		poffset = &dfrag->offset;
 		psize = min_t(size_t, dfrag->data_len, avail_size);
 	}
 
@@ -312,8 +315,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	 */
 
 out:
-	if (!retransmission)
-		pfrag->offset += frag_truesize;
+	*poffset += frag_truesize;
 	*write_seq += ret;
 	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
 
@@ -366,7 +368,6 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			break;
 
 		copied += ret;
-		dfrag->offset += ret;
 	}
 
 	mptcp_set_timeout(sk, ssk);
