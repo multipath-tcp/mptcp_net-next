@@ -164,8 +164,9 @@ tg_trap_reset() { local rc
 ## Validation ##
 ################
 
+# $*: parameters for defconfig
 generate_config_no_mptcp() {
-	make defconfig
+	make defconfig "${@}"
 
 	# no need to compile some drivers for our tests
 	echo | scripts/config \
@@ -185,8 +186,9 @@ generate_config_no_mptcp() {
 		--disable LOGO
 }
 
+# $*: parameters for defconfig
 generate_config_mptcp() {
-	generate_config_no_mptcp
+	generate_config_no_mptcp "${@}"
 
 	echo | scripts/config --enable MPTCP
 
@@ -195,12 +197,21 @@ generate_config_mptcp() {
 	# 'make olddefconfig' which will silently disable these new options.
 }
 
+generate_config_i386_mptcp() {
+	generate_config_mptcp "KBUILD_DEFCONFIG=i386_defconfig"
+}
+
 # $*: config description
 compile_kernel() {
 	if ! KCFLAGS="-Werror" make -j"$(nproc)" -l"$(nproc)"; then
 		err "Unable to compile ${*}"
 		return 1
 	fi
+}
+
+check_compilation_i386() {
+	generate_config_i386_mptcp
+	compile_kernel "with i386 and CONFIG_MPTCP" || return 1
 }
 
 check_compilation() {
@@ -230,6 +241,8 @@ validation() {
 			err "Not at the top after validation: $(git_get_current_branch)"
 			return 1
 		fi
+
+		check_compilation_i386
 	else
 		git_checkout "${TG_TOPIC_TOP}"
 		if ! check_compilation; then
