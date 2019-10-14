@@ -69,6 +69,14 @@ static int subflow_ulp_init(struct sock *sk)
 	struct mptcp_subflow_context *ctx;
 	int err = 0;
 
+	/* disallow attaching ULP to a socket unless it has been
+	 * created with sock_create_kern()
+	 */
+	if (!sk->sk_kern_sock) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+
 	ctx = subflow_create_ctx(sk, sk->sk_socket);
 	if (!ctx) {
 		err = -ENOMEM;
