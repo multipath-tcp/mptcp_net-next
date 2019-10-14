@@ -1095,7 +1095,6 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
 	mptcp_subflow_init();
-	mptcp_pm_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
