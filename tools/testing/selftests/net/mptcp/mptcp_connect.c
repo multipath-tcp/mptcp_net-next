@@ -18,7 +18,8 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
+
+#include <linux/tcp.h>
 
 extern int optind;
 
@@ -32,11 +33,12 @@ static int  poll_timeout;
 static const char *cfg_host;
 static const char *cfg_port	= "12000";
 static int cfg_sock_proto	= IPPROTO_MPTCP;
+static bool tcpulp_audit;
 
 
 static void die_usage(void)
 {
-	fprintf(stderr, "Usage: mptcp_connect [-s MPTCP|TCP] [-p port] "
+	fprintf(stderr, "Usage: mptcp_connect [-u] [-s MPTCP|TCP] [-p port] "
 		"[ -l ] [ -t timeout ] connect_address\n");
 	exit(1);
 }
@@ -112,6 +114,44 @@ static int sock_listen_mptcp(const char * const listenaddr,
 	}
 
 	return sock;
+}
+
+static bool sock_test_tcpulp(const char * const remoteaddr,
+			     const char * const port)
+{
+
+	struct addrinfo hints = {
+		.ai_protocol = IPPROTO_TCP,
+		.ai_socktype = SOCK_STREAM,
+	};
+	struct addrinfo *a, *addr;
+	int sock = -1, ret = 0;
+	bool test_pass = false;
+
+	hints.ai_family = AF_INET;
+
+	xgetaddrinfo(remoteaddr, port, &hints, &addr);
+	for (a = addr; a; a = a->ai_next) {
+		sock = socket(a->ai_family, a->ai_socktype, IPPROTO_TCP);
+		if (sock < 0) {
+			perror("socket");
+			continue;
+		}
+		ret = setsockopt(sock, IPPROTO_TCP, TCP_ULP, "mptcp",
+				 sizeof("mptcp"));
+		if (ret == -1 && errno == EOPNOTSUPP)
+			test_pass = true;
+		close(sock);
+
+		if (test_pass)
+			break;
+		if (!ret)
+			fprintf(stderr,
+				"setsockopt(TCP_ULP) returned 0\n");
+		else
+			perror("setsockopt(TCP_ULP)");
+	}
+	return test_pass;
 }
 
 static int sock_connect_mptcp(const char * const remoteaddr,
@@ -362,7 +402,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "lp:s:ht:")) != -1) {
+	while ((c = getopt(argc, argv, "lp:s:hut:")) != -1) {
 		switch (c) {
 		case 'l':
 			listen_mode = true;
@@ -375,6 +415,9 @@ static void parse_opts(int argc, char **argv)
 			break;
 		case 'h':
 			die_usage();
+			break;
+		case 'u':
+			tcpulp_audit = true;
 			break;
 		case 't':
 			poll_timeout = atoi(optarg) * 1000;
@@ -394,6 +437,9 @@ int main(int argc, char *argv[])
 	init_rng();
 
 	parse_opts(argc, argv);
+
+	if (tcpulp_audit)
+		return sock_test_tcpulp(cfg_host, cfg_port) ? 0 : 1;
 
 	if (listen_mode) {
 		int fd = sock_listen_mptcp(cfg_host, cfg_port);
