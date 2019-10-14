@@ -182,8 +182,14 @@ generate_config_no_mptcp() {
 		--disable AGP \
 		--disable VGA_ARB \
 		--disable EFI \
+		--disable WLAN \
 		--disable WIRELESS \
-		--disable LOGO
+		--disable LOGO \
+		--disable NFS_FS \
+		--disable XFRM_USER \
+		--disable INET6_AH \
+		--disable INET6_ESP \
+		--disable NETDEVICES
 }
 
 # $*: parameters for defconfig
