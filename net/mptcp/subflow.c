@@ -166,6 +166,14 @@ static int subflow_ulp_init(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
 
+	/* disallow attaching ULP to a socket unless it has been
+	 * created with sock_create_kern()
+	 */
+	if (!sk->sk_kern_sock) {
+		err = -EOPNOTSUPP;
+		goto out;
+	}
+
 	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
 	if (!ctx) {
 		err = -ENOMEM;
