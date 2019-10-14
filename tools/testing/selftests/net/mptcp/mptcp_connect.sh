@@ -134,6 +134,23 @@ check_mptcp_disabled()
 	return 0
 }
 
+check_mptcp_ulp_setsockopt()
+{
+	local t="ns_ulp" retval=
+
+	ip netns add ${t} || exit $ksft_skip
+	if ! ip netns exec ${t} ./mptcp_connect -u -p 10000 -s TCP 127.0.0.1 2>&1; then
+		printf "setsockopt(..., TCP_ULP, \"mptcp\", ...) allowed\t[ FAIL ]\n"
+		retval=1
+		ret=$retval
+	else
+		printf "setsockopt(..., TCP_ULP, \"mptcp\", ...) blocked\t[ OK ]\n"
+		retval=0
+	fi
+	ip netns del ${t}
+	return $retval
+}
+
 do_ping()
 {
 	listener_ns="$1"
@@ -270,6 +287,8 @@ make_file "$cin" "client"
 make_file "$sin" "server"
 
 check_mptcp_disabled
+
+check_mptcp_ulp_setsockopt
 
 for sender in 1 2 3 4;do
 	do_ping ns1 ns$sender 10.0.1.1
