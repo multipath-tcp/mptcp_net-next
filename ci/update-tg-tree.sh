@@ -183,7 +183,7 @@ generate_config_mptcp() {
 
 # $*: config description
 compile_kernel() {
-	if ! make -j"$(nproc)" -l"$(nproc)"; then
+	if ! KCFLAGS="-Werror" make -j"$(nproc)" -l"$(nproc)"; then
 		err "Unable to compile ${*}"
 		return 1
 	fi
