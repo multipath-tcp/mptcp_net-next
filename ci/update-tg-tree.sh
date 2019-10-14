@@ -167,8 +167,22 @@ tg_trap_reset() { local rc
 generate_config_no_mptcp() {
 	make defconfig
 
-	# no need to compile this GPU driver for our tests
-	echo | scripts/config --disable DRM_I915
+	# no need to compile some drivers for our tests
+	echo | scripts/config \
+		--disable DRM \
+		--disable PCCARD \
+		--disable ATA \
+		--disable MD \
+		--disable PPS \
+		--disable SOUND \
+		--disable USB \
+		--disable IOMMU_SUPPORT \
+		--disable INPUT_LEDS \
+		--disable AGP \
+		--disable VGA_ARB \
+		--disable EFI \
+		--disable WIRELESS \
+		--disable LOGO
 }
 
 generate_config_mptcp() {
