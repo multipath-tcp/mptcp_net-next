@@ -190,8 +190,8 @@ static void announce_addr_worker(struct work_struct *work)
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
 	if (pernet->has_announce_v4)
-		pm_announce_addr(pm->token, 1, AF_INET,
-				 &pernet->announce_v4_addr);
+		mptcp_pm_announce_addr(pm->token, 1, AF_INET,
+				       &pernet->announce_v4_addr);
 	sock_put((struct sock *)msk);
 }
 
@@ -205,10 +205,10 @@ static void create_subflow_worker(struct work_struct *work)
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
 	if (pernet->has_announce_v4) {
-		pm_create_subflow(pm->token, pm->remote_id, AF_INET,
-				  &pernet->announce_v4_addr);
+		mptcp_pm_create_subflow(pm->token, pm->remote_id, AF_INET,
+					&pernet->announce_v4_addr);
 	} else {
-		pm_create_subflow(pm->token, pm->remote_id, 0, NULL);
+		mptcp_pm_create_subflow(pm->token, pm->remote_id, 0, NULL);
 	}
 	sock_put((struct sock *)msk);
 }
