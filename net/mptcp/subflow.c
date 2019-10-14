@@ -17,6 +17,13 @@
 #include <net/tcp.h>
 #include <net/mptcp.h>
 #include "protocol.h"
+#include "mib.h"
+
+static inline void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
+					 enum linux_mptcp_mib_field field)
+{
+	MPTCP_INC_STATS(sock_net(req_to_sk(req)), field);
+}
 
 static int subflow_rebuild_header(struct sock *sk)
 {
@@ -62,8 +69,7 @@ static bool subflow_token_join_request(struct request_sock *req,
 
 	msk = mptcp_token_get_sock(subflow_req->token);
 	if (!msk) {
-		pr_debug("subflow_req=%p, token=%u - not found\n",
-			 subflow_req, subflow_req->token);
+		SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINNOTOKEN);
 		return false;
 	}
 
@@ -103,8 +109,14 @@ static void subflow_v4_init_req(struct request_sock *req,
 	subflow_req->mp_capable = 0;
 	subflow_req->mp_join = 0;
 
-	if (rx_opt.mptcp.mp_capable && rx_opt.mptcp.mp_join)
-		return;
+	if (rx_opt.mptcp.mp_capable) {
+		SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_MPCAPABLEPASSIVE);
+
+		if (rx_opt.mptcp.mp_join)
+			return;
+	} else if (rx_opt.mptcp.mp_join) {
+		SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINSYNRX);
+	}
 
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		int err;
@@ -177,6 +189,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			 subflow, subflow->thmac,
 			 subflow->remote_nonce);
 		if (!subflow_thmac_valid(subflow)) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_JOINACKMAC);
 			subflow->mp_join = 0;
 			// @@ need to trigger RST
 			return;
