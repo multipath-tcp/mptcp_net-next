@@ -274,6 +274,7 @@ static inline void mptcp_crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
 void mptcp_crypto_hmac_sha1(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
 			    u32 *hash_out);
 
+void mptcp_pm_init(void);
 void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side);
 void mptcp_pm_fully_established(struct mptcp_sock *msk);
 void mptcp_pm_connection_closed(struct mptcp_sock *msk);
@@ -283,7 +284,6 @@ void mptcp_pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr,
 		       u8 id);
 void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 			u8 id);
-void mptcp_pm_rm_addr(struct mptcp_sock *msk, u8 id);
 int mptcp_pm_announce_addr(u32 token, u8 local_id, sa_family_t family,
 			   struct in_addr *addr);
 int mptcp_pm_create_subflow(u32 token, u8 remote_id, sa_family_t family,
