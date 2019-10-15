@@ -31,6 +31,12 @@ static void create_subflow_worker(struct work_struct *work);
 
 static int parse_addr(struct basic_pernet *pernet, const char *addr)
 {
+	if (in4_pton(addr, -1, (u8 *)&pernet->announce_v4_addr.s_addr, '\0',
+		     NULL) > 0) {
+		pernet->has_announce_v4 = 1;
+		pernet->has_announce_v6 = 0;
+		return 0;
+	}
 #if IS_ENABLED(CONFIG_IPV6)
 	if (in6_pton(addr, -1, (u8 *)&pernet->announce_v6_addr.s6_addr, '\0',
 		     NULL) > 0) {
@@ -39,14 +45,6 @@ static int parse_addr(struct basic_pernet *pernet, const char *addr)
 		return 0;
 	}
 #endif
-
-	if (in4_pton(addr, -1, (u8 *)&pernet->announce_v4_addr.s_addr, '\0',
-		     NULL) > 0) {
-		pernet->has_announce_v4 = 1;
-		pernet->has_announce_v6 = 0;
-		return 0;
-	}
-
 	pernet->has_announce_v4 = 0;
 	pernet->has_announce_v6 = 0;
 
@@ -190,8 +188,13 @@ static void announce_addr_worker(struct work_struct *work)
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
 	if (pernet->has_announce_v4)
-		mptcp_pm_announce_addr(pm->token, 1, AF_INET,
+		mptcp_pm_announce_addr(pm->token, 1,
 				       &pernet->announce_v4_addr);
+#if IS_ENABLED(CONFIG_IPV6)
+	if (pernet->has_announce_v6)
+		mptcp_pm_announce_addr6(pm->token, 1,
+					&pernet->announce_v6_addr);
+#endif
 	sock_put((struct sock *)msk);
 }
 
@@ -204,12 +207,21 @@ static void create_subflow_worker(struct work_struct *work)
 
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
-	if (pernet->has_announce_v4) {
-		mptcp_pm_create_subflow(pm->token, pm->remote_id, AF_INET,
+	if (pernet->has_announce_v4)
+		mptcp_pm_create_subflow(pm->token, pm->remote_id,
 					&pernet->announce_v4_addr);
-	} else {
-		mptcp_pm_create_subflow(pm->token, pm->remote_id, 0, NULL);
-	}
+#if IS_ENABLED(CONFIG_IPV6)
+	else if (pernet->has_announce_v6)
+		mptcp_pm_create_subflow6(pm->token, pm->remote_id,
+					 &pernet->announce_v6_addr);
+#endif
+	else if (pm->local_family == AF_INET)
+		mptcp_pm_create_subflow(pm->token, pm->remote_id, NULL);
+#if IS_ENABLED(CONFIG_IPV6)
+	else
+		mptcp_pm_create_subflow6(pm->token, pm->remote_id, NULL);
+#endif
+
 	sock_put((struct sock *)msk);
 }
 
