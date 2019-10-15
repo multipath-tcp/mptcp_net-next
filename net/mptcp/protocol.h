@@ -203,6 +203,7 @@ static inline void mptcp_crypto_key_gen_sha1(u64 *key, u32 *token, u64 *idsn)
 void mptcp_crypto_hmac_sha1(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
 			    u32 *hash_out);
 
+void mptcp_pm_init(void);
 void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side);
 void mptcp_pm_fully_established(struct mptcp_sock *msk);
 void mptcp_pm_connection_closed(struct mptcp_sock *msk);
