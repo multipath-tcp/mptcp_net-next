@@ -87,11 +87,6 @@ void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 	pr_debug("msk=%p", msk);
 }
 
-void mptcp_pm_rm_addr(struct mptcp_sock *msk, u8 id)
-{
-	pr_debug("msk=%p", msk);
-}
-
 /* path manager helpers */
 
 int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
