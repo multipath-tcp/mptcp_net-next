@@ -193,4 +193,5 @@ int mptcp_pm_get_local_id(struct request_sock *req, struct sock *sk,
 
 void mptcp_pm_init(void)
 {
+	mptcp_basic_init();
 }

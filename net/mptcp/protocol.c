@@ -1447,7 +1447,6 @@ void mptcp_proto_init(void)
 
 	mptcp_subflow_init();
 	mptcp_pm_init();
-	mptcp_basic_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
