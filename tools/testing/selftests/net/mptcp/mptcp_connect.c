@@ -26,6 +26,9 @@ extern int optind;
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
 #endif
+#ifndef TCP_ULP
+#define TCP_ULP 31
+#endif
 
 static bool listen_mode;
 static int  poll_timeout;
