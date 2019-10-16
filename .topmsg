@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Implement-path-manager-interface-commands
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Implement path manager interface commands
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use the addr_signal flag to indicate to the subflow layer
+that a local address may be announced, and call subflow_connect()
+to initiate a secondary subflow.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
