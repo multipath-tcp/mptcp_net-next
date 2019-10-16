@@ -319,10 +319,13 @@ void mptcp_pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr,
 		       u8 id);
 void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 			u8 id);
-int mptcp_pm_announce_addr(u32 token, u8 local_id, sa_family_t family,
-			   struct in_addr *addr);
-int mptcp_pm_create_subflow(u32 token, u8 remote_id, sa_family_t family,
-			    struct in_addr *addr);
+
+int mptcp_pm_announce_addr(u32 token, u8 local_id, struct in_addr *addr);
+int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr);
+#if IS_ENABLED(CONFIG_IPV6)
+int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr);
+int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr);
+#endif
 int mptcp_pm_remove_addr(u32 token, u8 local_id);
 int mptcp_pm_remove_subflow(u32 token, u8 remote_id);
 
