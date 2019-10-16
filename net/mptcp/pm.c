@@ -10,8 +10,7 @@
 
 /* path manager command handlers */
 
-int mptcp_pm_announce_addr(u32 token, u8 local_id, sa_family_t family,
-			   struct in_addr *addr)
+int mptcp_pm_announce_addr(u32 token, u8 local_id, struct in_addr *addr)
 {
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	int err = 0;
@@ -36,6 +35,13 @@ announce_put:
 	return err;
 }
 
+#if IS_ENABLED(CONFIG_IPV6)
+int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr)
+{
+	return -ENOTSUPP;
+}
+#endif
+
 int mptcp_pm_remove_addr(u32 token, u8 local_id)
 {
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
@@ -50,8 +56,7 @@ int mptcp_pm_remove_addr(u32 token, u8 local_id)
 	return 0;
 }
 
-int mptcp_pm_create_subflow(u32 token, u8 remote_id, sa_family_t family,
-			    struct in_addr *addr)
+int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 {
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	struct sockaddr_in remote;
@@ -86,6 +91,13 @@ create_put:
 	sock_put((struct sock *)msk);
 	return err;
 }
+
+#if IS_ENABLED(CONFIG_IPV6)
+int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
+{
+	return -ENOTSUPP;
+}
+#endif
 
 int mptcp_pm_remove_subflow(u32 token, u8 remote_id)
 {
@@ -153,16 +165,23 @@ int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 			 struct sockaddr_storage *saddr)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *)saddr;
+	struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)saddr;
 
 	if (!msk->pm.local_valid)
 		return -1;
 
-	if (msk->pm.local_family != AF_INET)
+	if (msk->pm.local_family == AF_INET) {
+		addr->sin_family = msk->pm.local_family;
+		addr->sin_addr = msk->pm.local_addr;
+#if IS_ENABLED(CONFIG_IPV6)
+	} else if (msk->pm.local_family == AF_INET6) {
+		addr6->sin6_family = msk->pm.local_family;
+		addr6->sin6_addr = msk->pm.local_addr6;
+#endif
+	} else {
 		return -1;
-
+	}
 	*id = msk->pm.local_id;
-	addr->sin_family = msk->pm.local_family;
-	addr->sin_addr.s_addr = msk->pm.local_addr.s_addr;
 
 	return 0;
 }
