@@ -220,6 +220,12 @@ check_compilation_i386() {
 	compile_kernel "with i386 and CONFIG_MPTCP" || return 1
 }
 
+check_compilation_no_ipv6() {
+	generate_config_mptcp
+	echo | scripts/config --disable IPV6
+	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
+}
+
 check_compilation() {
 	generate_config_no_mptcp
 	compile_kernel "without CONFIG_MPTCP" || return 1
@@ -248,6 +254,7 @@ validation() {
 			return 1
 		fi
 
+		check_compilation_no_ipv6
 		check_compilation_i386
 	else
 		git_checkout "${TG_TOPIC_TOP}"
