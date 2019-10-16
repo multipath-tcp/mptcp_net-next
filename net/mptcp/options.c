@@ -405,13 +405,21 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	if (mptcp_pm_addr_signal(msk, &id, &saddr))
 		return false;
 
-	if (saddr.ss_family == AF_INET && remaining < TCPOLEN_MPTCP_ADD_ADDR)
-		return false;
-
-	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
-	opts->addr_id = id;
-	opts->addr.s_addr = ((struct sockaddr_in *)&saddr)->sin_addr.s_addr;
-	*size = TCPOLEN_MPTCP_ADD_ADDR;
+	if (saddr.ss_family == AF_INET) {
+		if (remaining < TCPOLEN_MPTCP_ADD_ADDR)
+			return false;
+		opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
+		opts->addr_id = id;
+		opts->addr = ((struct sockaddr_in *)&saddr)->sin_addr;
+		*size = TCPOLEN_MPTCP_ADD_ADDR;
+	} else if (saddr.ss_family == AF_INET6) {
+		if (remaining < TCPOLEN_MPTCP_ADD_ADDR6)
+			return false;
+		opts->suboptions |= OPTION_MPTCP_ADD_ADDR6;
+		opts->addr_id = id;
+		opts->addr6 = ((struct sockaddr_in6 *)&saddr)->sin6_addr;
+		*size = TCPOLEN_MPTCP_ADD_ADDR6;
+	}
 
 	msk->addr_signal = 0;
 
