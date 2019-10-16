@@ -87,7 +87,7 @@ void mptcp_pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr,
 
 	pr_debug("msk=%p, addr=%x, remote_id=%d", msk, addr->s_addr, id);
 
-	pm->remote_addr.s_addr = addr->s_addr;
+	pm->remote_addr = *addr;
 	pm->remote_id = id;
 	pm->remote_family = AF_INET;
 	pm->remote_valid = 1;
