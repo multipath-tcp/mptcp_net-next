@@ -391,6 +391,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 
 	if (mpext->data_len == 0) {
 		pr_err("Infinite mapping not handled");
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
 		return MAPPING_INVALID;
 	} else if (mpext->subflow_seq == 0 &&
 		   mpext->data_fin == 1) {
@@ -439,8 +440,10 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 		/* Allow replacing only with an identical map  */
 		if (subflow->map_seq != mpext->data_seq ||
 		    subflow->map_subflow_seq != mpext->subflow_seq ||
-		    subflow->map_data_len != mpext->data_len)
+		    subflow->map_data_len != mpext->data_len) {
+			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSNOMATCH);
 			return MAPPING_INVALID;
+		}
 
 		goto validate_seq;
 	}
