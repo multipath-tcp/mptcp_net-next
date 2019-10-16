@@ -597,13 +597,14 @@ static void subflow_data_ready(struct sock *sk)
 	}
 }
 
-int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
-			  struct sockaddr_in *remote, u8 remote_id)
+int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
+			  struct sockaddr *remote, u8 remote_id)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
 	struct socket *sf;
 	u32 remote_token;
+	int addrlen;
 	int err;
 
 	lock_sock(sk);
@@ -621,8 +622,12 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
 	sock_hold(sf->sk);
 	release_sock(sk);
 
-	err = kernel_bind(sf, (struct sockaddr *)local,
-			  sizeof(struct sockaddr_in));
+	addrlen = sizeof(struct sockaddr_in);
+#if IS_ENABLED(CONFIG_IPV6)
+	if (local->sa_family == AF_INET6)
+		addrlen = sizeof(struct sockaddr_in6);
+#endif
+	err = kernel_bind(sf, local, addrlen);
 	if (err)
 		goto failed;
 
@@ -633,8 +638,7 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr_in *local,
 	subflow->request_join = 1;
 	subflow->request_bkup = 1;
 
-	err = kernel_connect(sf, (struct sockaddr *)remote,
-			     sizeof(struct sockaddr_in), O_NONBLOCK);
+	err = kernel_connect(sf, remote, addrlen, O_NONBLOCK);
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
