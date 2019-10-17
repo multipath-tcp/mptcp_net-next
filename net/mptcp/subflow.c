@@ -438,8 +438,10 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 		/* If this skb data are fully covered by the current mapping,
 		 * the new map would need caching, which is not supported
 		 */
-		if (skb_is_fully_mapped(ssk, skb))
+		if (skb_is_fully_mapped(ssk, skb)) {
+			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSNOMATCH);
 			return MAPPING_INVALID;
+		}
 
 		/* will validate the next map after consuming the current one */
 		return MAPPING_OK;
