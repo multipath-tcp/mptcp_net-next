@@ -72,13 +72,15 @@ static int proc_parse_addr(struct ctl_table *ctl, int write,
 			snprintf(tmp, INET_ADDRSTRLEN, "%pI4",
 				 &pernet->announce_v4_addr);
 			tbl.data = tmp;
+		}
 #if IS_ENABLED(CONFIG_IPV6)
-		} else if (pernet->has_announce_v6) {
+		else if (pernet->has_announce_v6) {
 			snprintf(tmp, INET6_ADDRSTRLEN, "%pI6c",
 				 &pernet->announce_v6_addr);
 			tbl.data = tmp;
+		}
 #endif
-		} else {
+		else {
 			tbl.data = none;
 		}
 		tbl.maxlen = strlen(tbl.data);
