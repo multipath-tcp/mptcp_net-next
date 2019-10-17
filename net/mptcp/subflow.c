@@ -192,9 +192,9 @@ static bool validate_mapping(struct sock *ssk, struct sk_buff *skb)
 		warn_bad_map(subflow, ssn);
 		return false;
 	}
-	if (unlikely(after(ssn + skb->len, subflow->map_subflow_seq +
-					   subflow->map_data_len))) {
-		/* Mapping does not cover the full skb. Invalid */
+	if (unlikely(!before(ssn, subflow->map_subflow_seq +
+				  subflow->map_data_len))) {
+		/* Mapping does covers past subflow data, invalid */
 		warn_bad_map(subflow, ssn + skb->len);
 		return false;
 	}
