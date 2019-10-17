@@ -104,8 +104,10 @@ void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 			 struct sockaddr_storage *saddr)
 {
-	struct sockaddr_in *addr = (struct sockaddr_in *)saddr;
+#if IS_ENABLED(CONFIG_IPV6)
 	struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)saddr;
+#endif
+	struct sockaddr_in *addr = (struct sockaddr_in *)saddr;
 
 	if (!msk->pm.local_valid)
 		return -1;
