@@ -446,7 +446,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			map_remaining = subflow->map_data_len -
 					mptcp_subflow_get_map_offset(subflow);
 			desc.count = min_t(size_t, len - copied, map_remaining);
-			pr_debug("reading %ld bytes, copied %d", desc.count,
+			pr_debug("reading %zu bytes, copied %d", desc.count,
 				 copied);
 			bytes_read = tcp_read_sock(ssk, &desc, mptcp_read_actor);
 			if (bytes_read < 0) {
