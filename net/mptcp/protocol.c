@@ -864,7 +864,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		new_sock->sk = NULL;
 		sock_release(new_sock);
 
-		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
 	return newsk;
@@ -1017,7 +1018,8 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		bh_unlock_sock(sk);
 		local_bh_enable();
 	} else {
-		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
 	}
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
