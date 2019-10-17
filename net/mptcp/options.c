@@ -288,7 +288,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		remaining -= opt_size;
 		return true;
 	} else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
-					       opts)) {
+						 opts)) {
 		*size += opt_size;
 		remaining -= opt_size;
 		return true;
