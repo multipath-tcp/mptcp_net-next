@@ -44,8 +44,8 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		 *
 		 * Section 3.3.0:
 		 * "If a checksum is not present when its use has been
-		 * negotiated, the receiver MUST close the subflow with a RST as it is
-		 * considered broken."
+		 * negotiated, the receiver MUST close the subflow with a RST as
+		 * it is considered broken."
 		 *
 		 * We don't implement DSS checksum - fall back to TCP.
 		 */
