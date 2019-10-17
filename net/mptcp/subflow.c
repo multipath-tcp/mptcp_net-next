@@ -525,7 +525,7 @@ static bool subflow_check_data_avail(struct sock *ssk)
 			delta = min_t(size_t, ack_seq - old_ack, map_remaining);
 
 		/* discard mapped data */
-		pr_debug("discarding %ld bytes, current map len=%d", delta,
+		pr_debug("discarding %zu bytes, current map len=%d", delta,
 			 map_remaining);
 		if (delta) {
 			struct mptcp_read_arg arg = {
