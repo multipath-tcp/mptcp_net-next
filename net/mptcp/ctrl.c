@@ -35,7 +35,7 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.procname = "enabled",
 		.maxlen = sizeof(int),
 		.mode = 0644,
-		/* users with CAP_NET_ADMIN or root (not and) can change thi
+		/* users with CAP_NET_ADMIN or root (not and) can change this
 		 * value, same as other sysctl or the 'net' tree.
 		 */
 		.proc_handler = proc_dointvec,
