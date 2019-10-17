@@ -117,9 +117,7 @@ static int phylink_is_empty_linkmode(const unsigned long *linkmode)
 	phylink_set(tmp, Pause);
 	phylink_set(tmp, Asym_Pause);
 
-	bitmap_andnot(tmp, linkmode, tmp, __ETHTOOL_LINK_MODE_MASK_NBITS);
-
-	return linkmode_empty(tmp);
+	return linkmode_subset(linkmode, tmp);
 }
 
 static const char *phylink_an_mode_str(unsigned int mode)
@@ -550,26 +548,17 @@ static const struct sfp_upstream_ops sfp_phylink_ops;
 static int phylink_register_sfp(struct phylink *pl,
 				struct fwnode_handle *fwnode)
 {
-	struct fwnode_reference_args ref;
+	struct sfp_bus *bus;
 	int ret;
 
-	if (!fwnode)
-		return 0;
-
-	ret = fwnode_property_get_reference_args(fwnode, "sfp", NULL,
-						 0, 0, &ref);
-	if (ret < 0) {
-		if (ret == -ENOENT)
-			return 0;
-
-		phylink_err(pl, "unable to parse \"sfp\" node: %d\n",
-			    ret);
+	bus = sfp_register_upstream_node(fwnode, pl, &sfp_phylink_ops);
+	if (IS_ERR(bus)) {
+		ret = PTR_ERR(bus);
+		phylink_err(pl, "unable to attach SFP bus: %d\n", ret);
 		return ret;
 	}
 
-	pl->sfp_bus = sfp_register_upstream(ref.fwnode, pl, &sfp_phylink_ops);
-	if (!pl->sfp_bus)
-		return -ENOMEM;
+	pl->sfp_bus = bus;
 
 	return 0;
 }
@@ -1728,8 +1717,7 @@ static int phylink_sfp_module_insert(void *upstream,
 	if (phy_interface_mode_is_8023z(iface) && pl->phydev)
 		return -EINVAL;
 
-	changed = !bitmap_equal(pl->supported, support,
-				__ETHTOOL_LINK_MODE_MASK_NBITS);
+	changed = !linkmode_equal(pl->supported, support);
 	if (changed) {
 		linkmode_copy(pl->supported, support);
 		linkmode_copy(pl->link_config.advertising, config.advertising);
