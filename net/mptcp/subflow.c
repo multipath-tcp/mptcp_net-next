@@ -430,10 +430,8 @@ bool mptcp_subflow_data_available(struct sock *sk)
 	}
 
 	skb = skb_peek(&sk->sk_receive_queue);
-	if (!skb)
-		return false;
-
-	subflow->data_avail = tcp_sk(sk)->copied_seq < TCP_SKB_CB(skb)->end_seq;
+	subflow->data_avail = skb &&
+		       before(tcp_sk(sk)->copied_seq, TCP_SKB_CB(skb)->end_seq);
 	return subflow->data_avail;
 }
 
