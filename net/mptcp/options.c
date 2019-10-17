@@ -234,13 +234,14 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			memcpy((u8 *)&mp_opt->addr.s_addr, (u8 *)ptr, 4);
 			pr_debug("ADD_ADDR: addr=%x, id=%d",
 				 mp_opt->addr.s_addr, mp_opt->addr_id);
+		}
 #if IS_ENABLED(CONFIG_IPV6)
-		} else {
+		else {
 			mp_opt->add_addr = 1;
 			memcpy(mp_opt->addr6.s6_addr, (u8 *)ptr, 16);
 			pr_debug("ADD_ADDR: addr6=, id=%d", mp_opt->addr_id);
-#endif
 		}
+#endif
 		break;
 
 	/* MPTCPOPT_RM_ADDR
