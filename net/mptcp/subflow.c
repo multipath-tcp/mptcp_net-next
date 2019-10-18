@@ -320,6 +320,19 @@ static void warn_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
 		  ssn, subflow->map_subflow_seq, subflow->map_data_len);
 }
 
+static bool skb_is_fully_mapped(struct sock *ssk, struct sk_buff *skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	unsigned skb_consumed;
+
+	skb_consumed = tcp_sk(ssk)->copied_seq - TCP_SKB_CB(skb)->seq;
+	if (WARN_ON_ONCE(skb_consumed >= skb->len))
+		return true;
+
+	return skb->len - skb_consumed <= subflow->map_data_len -
+					  mptcp_subflow_get_map_offset(subflow);
+}
+
 static bool validate_mapping(struct sock *ssk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
@@ -332,9 +345,9 @@ static bool validate_mapping(struct sock *ssk, struct sk_buff *skb)
 		warn_bad_map(subflow, ssn);
 		return false;
 	}
-	if (unlikely(after(ssn + skb->len, subflow->map_subflow_seq +
-					   subflow->map_data_len))) {
-		/* Mapping does not cover the full skb. Invalid */
+	if (unlikely(!before(ssn, subflow->map_subflow_seq +
+				  subflow->map_data_len))) {
+		/* Mapping does covers past subflow data, invalid */
 		warn_bad_map(subflow, ssn + skb->len);
 		return false;
 	}
@@ -400,36 +413,22 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 	}
 
 	if (subflow->map_valid) {
-		/* check for in-sequence new map; since the current mapping
-		 * still valid, we can't replace it yet; instead just
-		 * coalesce it
-		 */
-		if (subflow->map_seq + subflow->map_data_len ==
-		    mpext->data_seq) {
-			subflow->map_data_len += mpext->data_len;
-			if (unlikely(subflow->map_data_len > 1 << 30)) {
-				unsigned delta = subflow->map_data_len >> 1;
-
-				/* to avoid len overflows, just drop old bits of
-				 * the current mapping when it becomes really
-				 * big. delta is larger then the max map len
-				 * carried by the MPTCP extension, so the map
-				 * start will still be lower then the SSN
-				 */
-				subflow->map_data_len -= delta;
-				subflow->map_subflow_seq += delta;
-				subflow->map_seq += delta;
-			}
-			goto validate_seq;
+		/* Allow replacing only with an identical map */
+		if (subflow->map_seq == map_seq &&
+		    subflow->map_subflow_seq == mpext->subflow_seq &&
+		    subflow->map_data_len == mpext->data_len) {
+			skb_ext_del(skb, SKB_EXT_MPTCP);
+			return MAPPING_OK;
 		}
 
-		/* Allow replacing only with an identical map  */
-		if (subflow->map_seq != mpext->data_seq ||
-		    subflow->map_subflow_seq != mpext->subflow_seq ||
-		    subflow->map_data_len != mpext->data_len)
+		/* If this skb data are fully covered by the current mapping,
+		 * the new map would need caching, which is not supported
+		 */
+		if (skb_is_fully_mapped(ssk, skb))
 			return MAPPING_INVALID;
 
-		goto validate_seq;
+		/* will validate the next map after consuming the current one */
+		return MAPPING_OK;
 	}
 
 	subflow->map_seq = map_seq;
@@ -570,10 +569,8 @@ bool mptcp_subflow_data_available(struct sock *sk)
 	}
 
 	skb = skb_peek(&sk->sk_receive_queue);
-	if (!skb)
-		return false;
-
-	subflow->data_avail = tcp_sk(sk)->copied_seq < TCP_SKB_CB(skb)->end_seq;
+	subflow->data_avail = skb &&
+		       before(tcp_sk(sk)->copied_seq, TCP_SKB_CB(skb)->end_seq);
 	return subflow->data_avail;
 }
 
