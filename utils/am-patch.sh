@@ -18,8 +18,14 @@ fi
 
 if git am -3 -s "${PATCH}"; then
 	echo -e "\n\n\t ====> Patch applied with success: $(git rev-parse --short HEAD)"
-	printf "\t- %s: \"squashed\" in \"%s\"\n" \
+	if $(echo "${PATCH}" | grep -q "\[PATCH.\+[0-9]\+_[0-9]\+\]"); then
+		NB=" patch $(echo "${PATCH}" | sed "s/.*\[\PATCH.\+\([0-9]\+\)_\([0-9]\+\)\].*/\1\/\2/g")"
+	else
+		NB=""
+	fi
+	printf "\t- %s: \"squashed\"%s in \"%s\"\n" \
 		"$(git rev-parse --short HEAD)" \
+		"${NB}" \
 		"$(./.title.sh)"
 	echo -e "\ttrying signed-off\n"
 	./.signed-off.sh
