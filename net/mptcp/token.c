@@ -161,8 +161,8 @@ void mptcp_token_update_accept(struct sock *sk, struct sock *conn)
 	slot = radix_tree_lookup_slot(&token_tree, subflow->token);
 	WARN_ON_ONCE(!slot);
 	if (slot) {
-		WARN_ON_ONCE(*slot != &token_used);
-		*slot = conn;
+		WARN_ON_ONCE(rcu_access_pointer(*slot) != &token_used);
+		radix_tree_replace_slot(&token_tree, slot, conn);
 	}
 	spin_unlock_bh(&token_tree_lock);
 }
