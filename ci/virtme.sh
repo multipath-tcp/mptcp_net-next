@@ -63,7 +63,7 @@ prepare() {
         mkdir -p "${VIRTME_SCRIPT_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
-make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
+time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${OUTPUT_SCRIPT}"
 # to avoid leaving files owned by root
 find . -user root -exec rm -rf "{}" \;
