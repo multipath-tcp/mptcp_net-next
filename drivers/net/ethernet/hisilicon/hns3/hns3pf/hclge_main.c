@@ -325,8 +325,7 @@ static const struct hclge_mac_mgr_tbl_entry_cmd hclge_mgr_table[] = {
 	{
 		.flags = HCLGE_MAC_MGR_MASK_VLAN_B,
 		.ethter_type = cpu_to_le16(ETH_P_LLDP),
-		.mac_addr_hi32 = cpu_to_le32(htonl(0x0180C200)),
-		.mac_addr_lo16 = cpu_to_le16(htons(0x000E)),
+		.mac_addr = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e},
 		.i_port_bitmap = 0x1,
 	},
 };
@@ -908,6 +907,9 @@ static int hclge_query_pf_resource(struct hclge_dev *hdev)
 		hnae3_get_field(__le16_to_cpu(req->pf_intr_vector_number),
 				HCLGE_PF_VEC_NUM_M, HCLGE_PF_VEC_NUM_S);
 
+		/* nic's msix numbers is always equals to the roce's. */
+		hdev->num_nic_msi = hdev->num_roce_msi;
+
 		/* PF should have NIC vectors and Roce vectors,
 		 * NIC vectors are queued before Roce vectors.
 		 */
@@ -917,6 +919,15 @@ static int hclge_query_pf_resource(struct hclge_dev *hdev)
 		hdev->num_msi =
 		hnae3_get_field(__le16_to_cpu(req->pf_intr_vector_number),
 				HCLGE_PF_VEC_NUM_M, HCLGE_PF_VEC_NUM_S);
+
+		hdev->num_nic_msi = hdev->num_msi;
+	}
+
+	if (hdev->num_nic_msi < HNAE3_MIN_VECTOR_NUM) {
+		dev_err(&hdev->pdev->dev,
+			"Just %u msi resources, not enough for pf(min:2).\n",
+			hdev->num_nic_msi);
+		return -EINVAL;
 	}
 
 	return 0;
@@ -1539,6 +1550,10 @@ static int  hclge_assign_tqp(struct hclge_vport *vport, u16 num_tqps)
 	vport->alloc_tqps = alloced;
 	kinfo->rss_size = min_t(u16, hdev->rss_size_max,
 				vport->alloc_tqps / hdev->tm_info.num_tc);
+
+	/* ensure one to one mapping between irq and queue at default */
+	kinfo->rss_size = min_t(u16, kinfo->rss_size,
+				(hdev->num_nic_msi - 1) / hdev->tm_info.num_tc);
 
 	return 0;
 }
@@ -2319,7 +2334,8 @@ static int hclge_init_msi(struct hclge_dev *hdev)
 	int vectors;
 	int i;
 
-	vectors = pci_alloc_irq_vectors(pdev, 1, hdev->num_msi,
+	vectors = pci_alloc_irq_vectors(pdev, HNAE3_MIN_VECTOR_NUM,
+					hdev->num_msi,
 					PCI_IRQ_MSI | PCI_IRQ_MSIX);
 	if (vectors < 0) {
 		dev_err(&pdev->dev,
@@ -2334,6 +2350,7 @@ static int hclge_init_msi(struct hclge_dev *hdev)
 
 	hdev->num_msi = vectors;
 	hdev->num_msi_left = vectors;
+
 	hdev->base_msi_vector = pdev->irq;
 	hdev->roce_base_vector = hdev->base_msi_vector +
 				hdev->roce_base_msix_offset;
@@ -3993,6 +4010,7 @@ static int hclge_get_vector(struct hnae3_handle *handle, u16 vector_num,
 	int alloc = 0;
 	int i, j;
 
+	vector_num = min_t(u16, hdev->num_nic_msi - 1, vector_num);
 	vector_num = min(hdev->num_msi_left, vector_num);
 
 	for (j = 0; j < vector_num; j++) {
@@ -9781,6 +9799,9 @@ static int hclge_reset_ae_dev(struct hnae3_ae_dev *ae_dev)
 		dev_err(&pdev->dev, "fd table init fail, ret=%d\n", ret);
 		return ret;
 	}
+
+	/* Log and clear the hw errors those already occurred */
+	hclge_handle_all_hns_hw_errors(ae_dev);
 
 	/* Re-enable the hw error interrupts because
 	 * the interrupts get disabled on global reset.
