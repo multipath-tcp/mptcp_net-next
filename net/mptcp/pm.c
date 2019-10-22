@@ -95,7 +95,7 @@ int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 
 	local.sin_family = AF_INET;
 	local.sin_port = 0;
-	if (!addr)
+	if (addr)
 		local.sin_addr = *addr;
 	else
 		local.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -133,7 +133,7 @@ int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
 
 	local.sin6_family = AF_INET6;
 	local.sin6_port = 0;
-	if (!addr)
+	if (addr)
 		local.sin6_addr = *addr;
 	else
 		local.sin6_addr = in6addr_any;
