@@ -113,11 +113,11 @@ analyse() {
         if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
                 echo "Call Trace found"
                 exit 2
-        elif grep -q "^ok [0-9]\+ selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
+        elif grep -q "^ok [0-9]\+ selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
                 echo "Selftests OK"
         else
                 echo "Error when launching selftests"
-                grep -A 9999 "^# selftests: mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"
+                grep -A 9999 "^# selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"
                 exit 1
         fi
 }
