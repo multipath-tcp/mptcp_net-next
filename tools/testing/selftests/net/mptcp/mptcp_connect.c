@@ -54,6 +54,21 @@ static const char *getxinfo_strerr(int err)
 	return gai_strerror(err);
 }
 
+static void xgetnameinfo(const struct sockaddr *addr, socklen_t addrlen,
+			 char *host, socklen_t hostlen,
+			 char *serv, socklen_t servlen)
+{
+	int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+	int err = getnameinfo(addr, addrlen, host, hostlen, serv, servlen, flags);
+
+	if (err) {
+		const char *errstr = getxinfo_strerr(err);
+
+		fprintf(stderr, "Fatal: getnameinfo: %s\n", errstr);
+		exit(1);
+	}
+}
+
 static void xgetaddrinfo(const char *node, const char *service,
 			 const struct addrinfo *hints,
 			 struct addrinfo **res)
@@ -327,6 +342,94 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 	return 0;
 }
 
+static void check_sockaddr(int pf, struct sockaddr_storage *ss,
+			   socklen_t salen)
+{
+	char addr[INET6_ADDRSTRLEN];
+	char serv[INET6_ADDRSTRLEN];
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
+	int wanted_size = 0;
+
+	switch (pf) {
+	case AF_INET:
+		wanted_size = sizeof(*sin);
+		sin = (void *)ss;
+		if (!sin->sin_port)
+			fprintf(stderr, "accept: something wrong: ip connection from port 0");
+		break;
+	case AF_INET6:
+		wanted_size = sizeof(*sin6);
+		sin6 = (void *)ss;
+		if (!sin6->sin6_port)
+			fprintf(stderr, "accept: something wrong: ipv6 connection from port 0");
+		break;
+	default:
+		fprintf(stderr, "accept: Unknown pf %d, salen %u\n", pf, salen);
+		return;
+	}
+
+	if (salen != wanted_size)
+		fprintf(stderr, "accept: size mismatch, got %d expected %d\n",
+				(int)salen, wanted_size);
+
+	if (ss->ss_family != pf)
+		fprintf(stderr, "accept: pf mismatch, expect %d, ss_family is %d\n",
+				(int)ss->ss_family, pf);
+}
+
+static void check_getpeername(int fd, struct sockaddr_storage *ss, socklen_t salen)
+{
+	struct sockaddr_storage peerss;
+	socklen_t peersalen = sizeof(peerss);
+
+	if (getpeername(fd, (struct sockaddr *)&peerss, &peersalen) < 0) {
+		perror("getpeername");
+		return;
+	}
+
+	if (peersalen != salen) {
+		fprintf(stderr, "%s: %d vs %d\n", __func__, peersalen, salen);
+		return;
+	}
+
+	if (memcmp(ss, &peerss, peersalen)) {
+		char a[INET6_ADDRSTRLEN];
+		char b[INET6_ADDRSTRLEN];
+		char c[INET6_ADDRSTRLEN];
+		char d[INET6_ADDRSTRLEN];
+
+		xgetnameinfo((struct sockaddr *)ss, salen,
+			     a, sizeof(a), b, sizeof(b));
+
+		xgetnameinfo((struct sockaddr *)&peerss, peersalen,
+			     c, sizeof(c), d, sizeof(d));
+
+		fprintf(stderr, "%s: memcmp failure: accept %s vs peername %s, %s vs %s salen %d vs %d\n",
+			__func__, a, c, b, d, peersalen, salen);
+	}
+}
+
+static void check_getpeername_connect(int fd)
+{
+	struct sockaddr_storage ss;
+	socklen_t salen = sizeof(ss);
+	char a[INET6_ADDRSTRLEN];
+	char b[INET6_ADDRSTRLEN];
+
+	if (getpeername(fd, (struct sockaddr *)&ss, &salen) < 0) {
+		perror("getpeername");
+		return;
+	}
+
+	xgetnameinfo((struct sockaddr *)&ss, salen,
+		     a, sizeof(a), b, sizeof(b));
+
+	if (strcmp(cfg_host, a) || strcmp(cfg_port, b))
+		fprintf(stderr, "%s: %s vs %s, %s vs %s\n", __func__,
+			cfg_host, a, cfg_port, b);
+}
+
 int main_loop_s(int listensock)
 {
 	struct sockaddr_storage ss;
@@ -350,6 +453,9 @@ int main_loop_s(int listensock)
 	salen = sizeof(ss);
 	remotesock = accept(listensock, (struct sockaddr *)&ss, &salen);
 	if (remotesock >= 0) {
+		check_sockaddr(pf, &ss, salen);
+		check_getpeername(remotesock, &ss, salen);
+
 		copyfd_io(0, remotesock, 1);
 		return 0;
 	}
@@ -384,6 +490,7 @@ int main_loop(void)
 	if (fd < 0)
 		return 2;
 
+	check_getpeername_connect(fd);
 	return copyfd_io(0, fd, 1);
 }
 
