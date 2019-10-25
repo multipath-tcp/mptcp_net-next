@@ -321,22 +321,39 @@ make_file()
 	echo "Created $name (size $TSIZE) containing data sent by $who"
 }
 
-run_tests()
+run_tests_lo()
 {
 	listener_ns="$1"
 	connector_ns="$2"
 	connect_addr="$3"
 	local_addr="$4"
+	loopback="$5"
 	lret=0
 
-	for proto in MPTCP TCP;do
-		do_transfer ${listener_ns} ${connector_ns} MPTCP "$proto" ${connect_addr} ${local_addr}
-		lret=$?
-		if [ $lret -ne 0 ]; then
-			ret=$lret
-			return 1
-		fi
-	done
+	# skip if test programs are running inside same netns for subsequent runs.
+	if [ $loopback -eq 0 ] && [ ${listener_ns} = ${connector_ns} ]; then
+		ret=$lret
+		return 1
+	fi
+
+	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} ${local_addr}
+	lret=$?
+	if [ $lret -ne 0 ]; then
+		ret=$lret
+		return 1
+	fi
+
+	# don't bother testing fallback tcp except for loopback case.
+	if [ ${listener_ns} != ${connector_ns} ]; then
+		return 0
+	fi
+
+	do_transfer ${listener_ns} ${connector_ns} MPTCP TCP ${connect_addr} ${local_addr}
+	lret=$?
+	if [ $lret -ne 0 ]; then
+		ret=$lret
+		return 1
+	fi
 
 	do_transfer ${listener_ns} ${connector_ns} TCP MPTCP ${connect_addr} ${local_addr}
 	lret=$?
@@ -346,6 +363,11 @@ run_tests()
 	fi
 
 	return 0
+}
+
+run_tests()
+{
+	run_tests_lo $1 $2 $3 $4 0
 }
 
 make_file "$cin" "client"
@@ -408,11 +430,16 @@ elif [ $delay -gt 0 ]; then
 fi
 
 for sender in $ns1 $ns2 $ns3 $ns4;do
-	run_tests "$ns1" $sender 10.0.1.1 0.0.0.0
+	run_tests_lo "$ns1" "$sender" 10.0.1.1 0.0.0.0 1
+	if [ $ret -ne 0 ] ;then
+		echo "FAIL: Could not even run loopback test" 1>&2
+		exit $ret
+	fi
 	if $ipv6;then
-		run_tests "$ns1" $sender dead:beef:1::1 ::
+		run_tests_lo "$ns1" $sender dead:beef:1::1 :: 1
 		if [ $? -ne 0 ] ;then
 			echo "SKIP: IPv6 tests" 2>&1
+			ret=0
 			ipv6=false
 		fi
 	fi
