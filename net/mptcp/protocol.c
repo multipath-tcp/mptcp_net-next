@@ -630,11 +630,13 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 		return ret;
 	}
 
+	sock_poll_wait(file, sock, wait);
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct socket *tcp_sock;
 
 		tcp_sock = mptcp_subflow_tcp_socket(subflow);
-		ret |= tcp_poll(file, tcp_sock, wait);
+		ret |= __tcp_poll(tcp_sock->sk);
 	}
 	release_sock(sk);
 
