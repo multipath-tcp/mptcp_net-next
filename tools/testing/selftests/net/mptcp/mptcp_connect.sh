@@ -1,6 +1,8 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
 
+time_start=$(date +%s)
+
 ret=0
 sin=""
 sout=""
@@ -316,5 +318,10 @@ for sender in 1 2 3 4;do
 
 	run_tests ns4 ns$sender 10.0.3.1
 done
+
+time_end=$(date +%s)
+time_run=$((time_end-time_start))
+
+echo "Time: ${time_run} seconds"
 
 exit $ret
