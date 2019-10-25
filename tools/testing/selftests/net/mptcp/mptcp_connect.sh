@@ -3,6 +3,7 @@
 
 time_start=$(date +%s)
 
+optstring="d:e:l:r:h6"
 ret=0
 sin=""
 sout=""
@@ -12,6 +13,62 @@ ksft_skip=4
 capture=0
 timeout=30
 ipv6=false
+ethtool_random_on=true
+tc_delay="$((RANDOM%400))"
+tc_loss=$((RANDOM%101))
+tc_reorder=""
+
+if [ $tc_loss -eq 100 ];then
+	tc_loss=1%
+elif [ $tc_loss -ge 10 ]; then
+	tc_loss=0.$tc_loss%
+elif [ $tc_loss -ge 1 ]; then
+	tc_loss=0.0$tc_loss%
+else
+	tc_loss=""
+fi
+
+usage() {
+	echo "Usage: $0 [ -a ]"
+	echo -e "\t-d: tc/netem delay in milliseconds, e.g. \"-d 10\" (default random)"
+	echo -e "\t-l: tc/netem loss percentage, e.g. \"-l 0.02\" (default random)"
+	echo -e "\t-r: tc/netem reorder mode, e.g. \"-r 25% 50% gap 5\", use "-r 0" to disable reordering (default random)"
+	echo -e "\t-e: ethtool features to disable, e.g.: \"-e tso -e gso\" (default: randomly disable any of tso/gso/gro)"
+}
+
+while getopts "$optstring" option;do
+	case "$option" in
+	"h")
+		usage $0
+		exit 0
+		;;
+	"d")
+		if [ $OPTARG -ge 0 ];then
+			tc_delay="$OPTARG"
+		else
+			echo "-d requires numeric argument, got \"$OPTARG\"" 1>&2
+			exit 1
+		fi
+		;;
+	"e")
+		ethtool_args="$ethtool_args $OPTARG off"
+		ethtool_random_on=false
+		;;
+	"l")
+		tc_loss="$OPTARG"
+		;;
+	"r")
+		tc_reorder="$OPTARG"
+		;;
+	"6")
+		ipv6=true
+		;;
+	"?")
+		usage $0
+		exit 1
+		;;
+	esac
+done
 
 sec=$(date +%s)
 rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
@@ -110,28 +167,38 @@ ip -net "$ns4" route add default via 10.0.3.2
 $ipv6 && ip -net "$ns4" route add default via dead:beef:3::2
 
 set_ethtool_flags() {
-	ns=$1
-	dev=$2
+	local ns="$1"
+	local dev="$2"
+	local flags="$3"
 
-	r=$RANDOM
+	ip netns exec $ns ethtool -K $dev $flags 2>/dev/null
+	[ $? -eq 0 ] && echo "INFO: set $ns dev $dev: ethtool -K $flags"
+}
+
+set_random_ethtool_flags() {
+	local flags=""
+	local r=$RANDOM
 
 	pick1=$((r & 1))
 	pick2=$((r & 2))
 	pick3=$((r & 4))
 
-	flags=""
 	[ $pick1 -ne 0 ] && flags="tso off"
 	[ $pick2 -ne 0 ] && flags="$flags gso off"
 	[ $pick3 -ne 0 ] && flags="$flags gro off"
 
 	[ -z "$flags" ] && return
 
-	ip netns exec $ns ethtool -K $dev $flags 2>/dev/null
-	[ $? -eq 0 ] && echo "INFO: set $ns dev $dev: ethtool -K $flags"
+	set_ethtool_flags "$1" "$2" "$flags"
 }
 
-set_ethtool_flags "$ns3" ns3eth2
-set_ethtool_flags "$ns4" ns4eth3
+if $ethtool_random_on;then
+	set_random_ethtool_flags "$ns3" ns3eth2
+	set_random_ethtool_flags "$ns4" ns4eth3
+else
+	set_ethtool_flags "$ns3" ns3eth2 "$ethtool_args"
+	set_ethtool_flags "$ns4" ns4eth3 "$ethtool_args"
+fi
 
 print_file_err()
 {
@@ -404,30 +471,30 @@ for sender in "$ns1" "$ns2" "$ns3" "$ns4";do
 	$ipv6 && do_ping "$ns4" $sender dead:beef:3::1
 done
 
-loss=$((RANDOM%101))
-if [ $loss -eq 100 ] ;then
-	loss=1%
-	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
-elif [ $loss -ge 10 ]; then
-	loss=0.$loss%
-	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
-elif [ $loss -ge 1 ]; then
-	loss=0.0$loss%
-	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
+[ -n "$tc_loss" ] && tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $tc_loss
+echo -n "INFO: Using loss of $tc_loss "
+test "$tc_delay" -gt 0 && echo -n "delay $tc_delay ms "
+
+if [ -z "${tc_reorder}" ]; then
+	reorder1=$((RANDOM%10))
+	reorder1=$((100 - reorder1))
+	reorder2=$((RANDOM%100))
+
+	if [ $tc_delay -gt 0 ] && [ $reorder1 -lt 100 ] && [ $reorder2 -gt 0 ]; then
+		tc_reorder="reorder ${reorder1}% ${reorder2}%"
+		echo -n "$tc_reorder "
+	fi
+elif [ "$tc_reorder" = "0" ];then
+	tc_reorder=""
+elif [ "$tc_delay" -gt 0 ];then
+	# reordering requires some delay
+	tc_reorder="reorder $tc_reorder"
+	echo -n "$tc_reorder "
 fi
 
-delay=$((RANDOM%400))
-reorder1=$((RANDOM%10))
-reorder1=$((100 - reorder1))
-reorder2=$((RANDOM%100))
+echo "on ns3eth4"
 
-if [ $reorder1 -lt 100 ] && [ $reorder2 -gt 0 ]; then
-  tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${delay}ms reorder ${reorder1}% ${reorder2}%
-  echo "INFO: Using loss of $loss, delay $delay ms, reorder: $reorder1, $reorder2 on ns3eth4"
-elif [ $delay -gt 0 ]; then
-  tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${delay}ms
-  echo "INFO: Using loss of $loss, delay $delay ms on ns3eth4"
-fi
+tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${tc_delay}ms $tc_reorder
 
 for sender in $ns1 $ns2 $ns3 $ns4;do
 	run_tests_lo "$ns1" "$sender" 10.0.1.1 0.0.0.0 1
