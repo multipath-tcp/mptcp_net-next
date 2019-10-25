@@ -13,6 +13,13 @@ capture=0
 timeout=30
 ipv6=false
 
+sec=$(date +%s)
+rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
+ns1="ns1-$rndh"
+ns2="ns2-$rndh"
+ns3="ns3-$rndh"
+ns4="ns4-$rndh"
+
 TEST_COUNT=0
 
 cleanup()
@@ -21,8 +28,8 @@ cleanup()
 	rm -f "$sin" "$sout"
 	rm -f "$capout"
 
-	for i in 1 2 3 4; do
-		ip netns del ns$i
+	for netns in "$ns1" "$ns2" "$ns3" "$ns4";do
+		ip netns del $netns
 	done
 }
 
@@ -45,62 +52,62 @@ cout=$(mktemp)
 capout=$(mktemp)
 trap cleanup EXIT
 
-for i in 1 2 3 4;do
-	ip netns add ns$i || exit $ksft_skip
-	ip -net ns$i link set lo up
+for i in "$ns1" "$ns2" "$ns3" "$ns4";do
+	ip netns add $i || exit $ksft_skip
+	ip -net $i link set lo up
 done
 
-#  ns1              ns2                    ns3                     ns4
+#  "$ns1"              ns2                    ns3                     ns4
 # ns1eth2    ns2eth1   ns2eth3      ns3eth2   ns3eth4       ns4eth3
 #                           - drop 1% ->            reorder 25%
 #                           <- TSO off -
 
-ip link add ns1eth2 netns ns1 type veth peer name ns2eth1 netns ns2
-ip link add ns2eth3 netns ns2 type veth peer name ns3eth2 netns ns3
-ip link add ns3eth4 netns ns3 type veth peer name ns4eth3 netns ns4
+ip link add ns1eth2 netns "$ns1" type veth peer name ns2eth1 netns "$ns2"
+ip link add ns2eth3 netns "$ns2" type veth peer name ns3eth2 netns "$ns3"
+ip link add ns3eth4 netns "$ns3" type veth peer name ns4eth3 netns "$ns4"
 
-ip -net ns1 addr add 10.0.1.1/24 dev ns1eth2
+ip -net "$ns1" addr add 10.0.1.1/24 dev ns1eth2
 if $ipv6 ; then
-	ip -net ns1 addr add dead:beef:1::1/64 dev ns1eth2
+	ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth2
 	if [ $? -ne 0 ] ;then
 		echo "SKIP: Can't add ipv6 address, skip ipv6 tests" 1>&2
 		ipv6=false
 	fi
 fi
 
-ip -net ns1 link set ns1eth2 up
-ip -net ns1 route add default via 10.0.1.2
-$ipv6 && ip -net ns1 route add default via dead:beef:1::2
+ip -net "$ns1" link set ns1eth2 up
+ip -net "$ns1" route add default via 10.0.1.2
+$ipv6 && ip -net "$ns1" route add default via dead:beef:1::2
 
-ip -net ns2 addr add 10.0.1.2/24 dev ns2eth1
-$ipv6 && ip -net ns2 addr add dead:beef:1::2/64 dev ns2eth1
-ip -net ns2 link set ns2eth1 up
+ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
+$ipv6 && ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1
+ip -net "$ns2" link set ns2eth1 up
 
-ip -net ns2 addr add 10.0.2.1/24 dev ns2eth3
-$ipv6 && ip -net ns2 addr add dead:beef:2::1/64 dev ns2eth3
-ip -net ns2 link set ns2eth3 up
-ip -net ns2 route add default via 10.0.2.2
-$ipv6 && ip -net ns2 route add default via dead:beef:2::2
-ip netns exec ns2 sysctl -q net.ipv4.ip_forward=1
-$ipv6 && ip netns exec ns2 sysctl -q net.ipv6.conf.all.forwarding=1
+ip -net "$ns2" addr add 10.0.2.1/24 dev ns2eth3
+$ipv6 && ip -net "$ns2" addr add dead:beef:2::1/64 dev ns2eth3
+ip -net "$ns2" link set ns2eth3 up
+ip -net "$ns2" route add default via 10.0.2.2
+$ipv6 && ip -net "$ns2" route add default via dead:beef:2::2
+ip netns exec "$ns2" sysctl -q net.ipv4.ip_forward=1
+$ipv6 && ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
 
-ip -net ns3 addr add 10.0.2.2/24 dev ns3eth2
-$ipv6 && ip -net ns3 addr add dead:beef:2::2/64 dev ns3eth2
-ip -net ns3 link set ns3eth2 up
+ip -net "$ns3" addr add 10.0.2.2/24 dev ns3eth2
+$ipv6 && ip -net "$ns3" addr add dead:beef:2::2/64 dev ns3eth2
+ip -net "$ns3" link set ns3eth2 up
 
-ip -net ns3 addr add 10.0.3.2/24 dev ns3eth4
-$ipv6 && ip -net ns3 addr add dead:beef:3::2/64 dev ns3eth4
-ip -net ns3 link set ns3eth4 up
-ip -net ns3 route add default via 10.0.2.1
-$ipv6 && ip -net ns3 route add default via dead:beef:2::1
-ip netns exec ns3 sysctl -q net.ipv4.ip_forward=1
-$ipv6 && ip netns exec ns3 sysctl -q net.ipv6.conf.all.forwarding=1
+ip -net "$ns3" addr add 10.0.3.2/24 dev ns3eth4
+$ipv6 && ip -net "$ns3" addr add dead:beef:3::2/64 dev ns3eth4
+ip -net "$ns3" link set ns3eth4 up
+ip -net "$ns3" route add default via 10.0.2.1
+$ipv6 && ip -net "$ns3" route add default via dead:beef:2::1
+ip netns exec "$ns3" sysctl -q net.ipv4.ip_forward=1
+$ipv6 && ip netns exec "$ns3" sysctl -q net.ipv6.conf.all.forwarding=1
 
-ip -net ns4 addr add 10.0.3.1/24 dev ns4eth3
-$ipv6 && ip -net ns4 addr add dead:beef:3::1/64 dev ns4eth3
-ip -net ns4 link set ns4eth3 up
-ip -net ns4 route add default via 10.0.3.2
-$ipv6 && ip -net ns4 route add default via dead:beef:3::2
+ip -net "$ns4" addr add 10.0.3.1/24 dev ns4eth3
+$ipv6 && ip -net "$ns4" addr add dead:beef:3::1/64 dev ns4eth3
+ip -net "$ns4" link set ns4eth3 up
+ip -net "$ns4" route add default via 10.0.3.2
+$ipv6 && ip -net "$ns4" route add default via dead:beef:3::2
 
 set_ethtool_flags() {
 	ns=$1
@@ -123,8 +130,8 @@ set_ethtool_flags() {
 	[ $? -eq 0 ] && echo "INFO: set $ns dev $dev: ethtool -K $flags"
 }
 
-set_ethtool_flags ns3 ns3eth2
-set_ethtool_flags ns4 ns4eth3
+set_ethtool_flags "$ns3" ns3eth2
+set_ethtool_flags "$ns4" ns4eth3
 
 print_file_err()
 {
@@ -153,7 +160,7 @@ check_transfer()
 
 check_mptcp_disabled()
 {
-	disabled_ns="ns_disabled"
+	disabled_ns="ns_disabled-$sech-$(mktemp -u XXXXXX)"
 	ip netns add ${disabled_ns} || exit $ksft_skip
 
 	# net.mptcp.enabled should be enabled by default
@@ -181,7 +188,7 @@ check_mptcp_disabled()
 
 check_mptcp_ulp_setsockopt()
 {
-	local t="ns_ulp" retval=
+	local t="ns_ulp-$sech-$(mktemp -u XXXXXX)" retval=
 
 	ip netns add ${t} || exit $ksft_skip
 	if ! ip netns exec ${t} ./mptcp_connect -u -p 10000 -s TCP 127.0.0.1 2>&1; then
@@ -346,40 +353,40 @@ check_mptcp_ulp_setsockopt
 # Allow DAD to finish
 $ipv6 && sleep 2
 
-for sender in 1 2 3 4;do
-	do_ping ns1 ns$sender 10.0.1.1
+for sender in "$ns1" "$ns2" "$ns3" "$ns4";do
+	do_ping "$ns1" $sender 10.0.1.1
 	if $ipv6;then
-		do_ping ns1 ns$sender dead:beef:1::1
+		do_ping "$ns1" $sender dead:beef:1::1
 		if [ $? -ne 0 ]; then
 			echo "SKIP: IPv6 tests" 2>&1
 			ipv6=false
 		fi
 	fi
 
-	do_ping ns2 ns$sender 10.0.1.2
-	$ipv6 && do_ping ns2 ns$sender dead:beef:1::2
-	do_ping ns2 ns$sender 10.0.2.1
-	$ipv6 && do_ping ns2 ns$sender dead:beef:2::1
+	do_ping "$ns2" $sender 10.0.1.2
+	$ipv6 && do_ping "$ns2" $sender dead:beef:1::2
+	do_ping "$ns2" $sender 10.0.2.1
+	$ipv6 && do_ping "$ns2" $sender dead:beef:2::1
 
-	do_ping ns3 ns$sender 10.0.2.2
-	$ipv6 && do_ping ns3 ns$sender dead:beef:2::2
-	do_ping ns3 ns$sender 10.0.3.2
-	$ipv6 && do_ping ns3 ns$sender dead:beef:3::2
+	do_ping "$ns3" $sender 10.0.2.2
+	$ipv6 && do_ping "$ns3" $sender dead:beef:2::2
+	do_ping "$ns3" $sender 10.0.3.2
+	$ipv6 && do_ping "$ns3" $sender dead:beef:3::2
 
-	do_ping ns4 ns$sender 10.0.3.1
-	$ipv6 && do_ping ns4 ns$sender dead:beef:3::1
+	do_ping ns4 $sender 10.0.3.1
+	$ipv6 && do_ping "$ns4" $sender dead:beef:3::1
 done
 
 loss=$((RANDOM%101))
 if [ $loss -eq 100 ] ;then
 	loss=1%
-	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
 elif [ $loss -ge 10 ]; then
 	loss=0.$loss%
-	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
 elif [ $loss -ge 1 ]; then
 	loss=0.0$loss%
-	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+	tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $loss
 fi
 
 delay=$((RANDOM%400))
@@ -388,35 +395,35 @@ reorder1=$((100 - reorder1))
 reorder2=$((RANDOM%100))
 
 if [ $reorder1 -lt 100 ] && [ $reorder2 -gt 0 ]; then
-  tc -net ns3 qdisc add dev ns3eth4 root netem delay ${delay}ms reorder ${reorder1}% ${reorder2}%
+  tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${delay}ms reorder ${reorder1}% ${reorder2}%
   echo "INFO: Using loss of $loss, delay $delay ms, reorder: $reorder1, $reorder2 on ns3eth4"
 elif [ $delay -gt 0 ]; then
-  tc -net ns3 qdisc add dev ns3eth4 root netem delay ${delay}ms
+  tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${delay}ms
   echo "INFO: Using loss of $loss, delay $delay ms on ns3eth4"
 fi
 
-for sender in 1 2 3 4;do
-	run_tests ns1 ns$sender 10.0.1.1 0.0.0.0
+for sender in $ns1 $ns2 $ns3 $ns4;do
+	run_tests "$ns1" $sender 10.0.1.1 0.0.0.0
 	if $ipv6;then
-		run_tests ns1 ns$sender dead:beef:1::1 ::
+		run_tests "$ns1" $sender dead:beef:1::1 ::
 		if [ $? -ne 0 ] ;then
 			echo "SKIP: IPv6 tests" 2>&1
 			ipv6=false
 		fi
 	fi
 
-	run_tests ns2 ns$sender 10.0.1.2 0.0.0.0
-	$ipv6 && run_tests ns2 ns$sender dead:beef:1::2 ::
-	run_tests ns2 ns$sender 10.0.2.1 0.0.0.0
-	$ipv6 && run_tests ns2 ns$sender dead:beef:2::1 ::
+	run_tests "$ns2" $sender 10.0.1.2 0.0.0.0
+	$ipv6 && run_tests "$ns2" $sender dead:beef:1::2 ::
+	run_tests "$ns2" $sender 10.0.2.1 0.0.0.0
+	$ipv6 && run_tests "$ns2" $sender dead:beef:2::1 ::
 
-	run_tests ns3 ns$sender 10.0.2.2 0.0.0.0
-	$ipv6 && run_tests ns3 ns$sender dead:beef:2::2 ::
-	run_tests ns3 ns$sender 10.0.3.2 0.0.0.0
-	$ipv6 && run_tests ns3 ns$sender dead:beef:3::2 ::
+	run_tests "$ns3" $sender 10.0.2.2 0.0.0.0
+	$ipv6 && run_tests "$ns3" $sender dead:beef:2::2 ::
+	run_tests "$ns3" $sender 10.0.3.2 0.0.0.0
+	$ipv6 && run_tests "$ns3" $sender dead:beef:3::2 ::
 
-	run_tests ns4 ns$sender 10.0.3.1 0.0.0.0
-	$ipv6 && run_tests ns4 ns$sender dead:beef:3::1 ::
+	run_tests "$ns4" $sender 10.0.3.1 0.0.0.0
+	$ipv6 && run_tests "$ns4" $sender dead:beef:3::1 ::
 done
 
 time_end=$(date +%s)
