@@ -3,14 +3,14 @@
 
 time_start=$(date +%s)
 
-optstring="d:e:l:r:h6"
+optstring="d:e:l:r:h6c"
 ret=0
 sin=""
 sout=""
 cin=""
 cout=""
 ksft_skip=4
-capture=0
+capture=false
 timeout=30
 ipv6=false
 ethtool_random_on=true
@@ -34,6 +34,8 @@ usage() {
 	echo -e "\t-l: tc/netem loss percentage, e.g. \"-l 0.02\" (default random)"
 	echo -e "\t-r: tc/netem reorder mode, e.g. \"-r 25% 50% gap 5\", use "-r 0" to disable reordering (default random)"
 	echo -e "\t-e: ethtool features to disable, e.g.: \"-e tso -e gso\" (default: randomly disable any of tso/gso/gro)"
+	echo -e "\t-6: enable IPv6 tests (default: only test IPv4)"
+	echo -e "\t-c: capture packets for each test using tcpdump (default: no capture)"
 }
 
 while getopts "$optstring" option;do
@@ -63,6 +65,9 @@ while getopts "$optstring" option;do
 	"6")
 		ipv6=true
 		;;
+	"c")
+		capture=true
+		;;
 	"?")
 		usage $0
 		exit 1
@@ -89,12 +94,6 @@ cleanup()
 		ip netns del $netns
 	done
 }
-
-for arg in "$@"; do
-    if [ "$arg" = "-c" ]; then
-	capture=1
-    fi
-done
 
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
@@ -305,7 +304,7 @@ do_transfer()
 
 	printf "%-4s %-5s -> %-4s (%s:%d) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${connect_addr} ${port} ${srv_proto}
 
-	if [ $capture -eq 1 ]; then
+	if $capture; then
 	    if [ -z $SUDO_USER ] ; then
 		capuser=""
 	    else
@@ -336,7 +335,7 @@ do_transfer()
 
 	stop=$(date +%s)
 
-	if [ $capture -eq 1 ]; then
+	if $capture; then
 	    sleep 1
 	    kill $cappid
 	fi
