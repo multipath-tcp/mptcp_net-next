@@ -258,6 +258,7 @@ do_transfer()
 
 	sleep 1
 
+	start=$(date +%s)
 	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
 	cpid=$!
 
@@ -266,13 +267,17 @@ do_transfer()
 	wait $spid
 	rets=$?
 
+	stop=$(date +%s)
+
 	if [ $capture -eq 1 ]; then
 	    sleep 1
 	    kill $cappid
 	fi
 
+	duration=$((stop-start))
+	duration=$(printf "(duration %03ss)" $duration)
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
-		echo "[ FAIL ] client exit code $retc, server $rets" 1>&2
+		echo "$duration [ FAIL ] client exit code $retc, server $rets" 1>&2
 		echo "\nnetns ${listener_ns} socket stat for $port:" 1>&2
 		ip netns exec ${listener_ns} ss -nita 1>&2 -o "sport = :$port"
 		echo "\nnetns ${connector_ns} socket stat for $port:" 1>&2
@@ -288,7 +293,7 @@ do_transfer()
 	rets=$?
 
 	if [ $retc -eq 0 ] && [ $rets -eq 0 ];then
-		echo "[ OK ]"
+		echo "$duration [ OK ]"
 		cat "$capout"
 		return 0
 	fi
