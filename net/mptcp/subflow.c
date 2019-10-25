@@ -594,6 +594,16 @@ static void subflow_data_ready(struct sock *sk)
 	}
 }
 
+static void subflow_write_space(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct sock *parent = subflow->conn;
+
+	sk_stream_write_space(sk);
+	if (parent)
+		sk_stream_write_space(parent);
+}
+
 int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 			  struct sockaddr *remote, u8 remote_id)
 {
@@ -723,6 +733,7 @@ static int subflow_ulp_init(struct sock *sk)
 	icsk->icsk_af_ops = &subflow_specific;
 	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	sk->sk_data_ready = subflow_data_ready;
+	sk->sk_write_space = subflow_write_space;
 out:
 	return err;
 }
