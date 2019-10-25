@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/subflow-wake-parent-mptcp-socket-on-subflow-state-change
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] subflow: wake parent mptcp socket on subflow state change
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We need to wakeup readers blocking for POLLIN, as no
+more data will arrive they will never be awoken otherwise.
+
+This is needed at least until proper MPTCP-Level fin/reset
+signalling gets added.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
