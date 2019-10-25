@@ -19,4 +19,6 @@ Co-developed-by: Davide Caratti <dcaratti@redhat.com>
 Signed-off-by: Davide Caratti <dcaratti@redhat.com>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
