@@ -37,11 +37,11 @@ static const char *cfg_host;
 static const char *cfg_port	= "12000";
 static int cfg_sock_proto	= IPPROTO_MPTCP;
 static bool tcpulp_audit;
-
+static int pf = AF_INET;
 
 static void die_usage(void)
 {
-	fprintf(stderr, "Usage: mptcp_connect [-u] [-s MPTCP|TCP] [-p port] "
+	fprintf(stderr, "Usage: mptcp_connect [-6] [-u] [-s MPTCP|TCP] [-p port] "
 		"[ -l ] [ -t timeout ] connect_address\n");
 	exit(1);
 }
@@ -94,12 +94,13 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		.ai_flags = AI_PASSIVE | AI_NUMERICHOST
 	};
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = pf;
 
 	struct addrinfo *a, *addr;
 	int one = 1;
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
+	hints.ai_family = pf;
 
 	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, cfg_sock_proto);
@@ -182,7 +183,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 	struct addrinfo *a, *addr;
 	int sock = -1;
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = pf;
 
 	xgetaddrinfo(remoteaddr, port, &hints, &addr);
 	for (a = addr; a; a = a->ai_next) {
@@ -345,11 +346,9 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 static void check_sockaddr(int pf, struct sockaddr_storage *ss,
 			   socklen_t salen)
 {
-	char addr[INET6_ADDRSTRLEN];
-	char serv[INET6_ADDRSTRLEN];
 	struct sockaddr_in6 *sin6;
 	struct sockaddr_in *sin;
-	int wanted_size = 0;
+	socklen_t wanted_size = 0;
 
 	switch (pf) {
 	case AF_INET:
@@ -512,7 +511,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "lp:s:hut:")) != -1) {
+	while ((c = getopt(argc, argv, "6lp:s:hut:")) != -1) {
 		switch (c) {
 		case 'l':
 			listen_mode = true;
@@ -529,6 +528,9 @@ static void parse_opts(int argc, char **argv)
 		case 'u':
 			tcpulp_audit = true;
 			break;
+		case '6':
+			pf = AF_INET6;
+			break;
 		case 't':
 			poll_timeout = atoi(optarg) * 1000;
 			if (poll_timeout <= 0)
@@ -540,6 +542,9 @@ static void parse_opts(int argc, char **argv)
 	if (optind + 1 != argc)
 		die_usage();
 	cfg_host = argv[optind];
+
+	if (strchr(cfg_host, ':'))
+		pf = AF_INET6;
 }
 
 int main(int argc, char *argv[])
