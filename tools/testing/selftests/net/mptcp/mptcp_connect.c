@@ -207,27 +207,18 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 {
-	size_t offset = 0;
+	unsigned int do_w;
+	ssize_t bw;
 
-	while (offset < len) {
-		unsigned int do_w;
-		size_t written;
-		ssize_t bw;
+	do_w = rand() & 0xffff;
+	if (do_w == 0 || do_w > len)
+		do_w = len;
 
-		do_w = rand() & 0xffff;
-		if (do_w == 0 || do_w > (len - offset))
-			do_w = len - offset;
+	bw = write(fd, buf, do_w);
+	if (bw < 0)
+		perror("write");
 
-		bw = write(fd, buf + offset, do_w);
-		if (bw < 0) {
-			perror("write");
-			return 0;
-		}
-
-		written = (size_t)bw;
-		offset += written;
-	}
-	return offset;
+	return bw;
 }
 
 static size_t do_write(const int fd, char *buf, const size_t len)
@@ -271,9 +262,11 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 		.fd = peerfd,
 		.events = POLLIN | POLLOUT,
 	};
+	unsigned int woff = 0, wlen = 0;
+	char wbuf[8192];
 
 	for (;;) {
-		char buf[8192];
+		char rbuf[8192];
 		ssize_t len;
 
 		if (fds.events == 0)
@@ -293,7 +286,7 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 		}
 
 		if (fds.revents & POLLIN) {
-			len = do_rnd_read(peerfd, buf, sizeof(buf));
+			len = do_rnd_read(peerfd, rbuf, sizeof(rbuf));
 			if (len == 0) {
 				/* no more data to receive:
 				 * peer has closed its write side
@@ -310,15 +303,25 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 				return 3;
 			}
 
-			do_write(outfd, buf, len);
+			do_write(outfd, rbuf, len);
 		}
 
 		if (fds.revents & POLLOUT) {
-			len = do_rnd_read(infd, buf, sizeof(buf));
-			if (len > 0) {
-				if (!do_rnd_write(peerfd, buf, len))
+			if (wlen == 0) {
+				woff = 0;
+				wlen = read(infd, wbuf, sizeof(wbuf));
+			}
+
+			if (wlen > 0) {
+				ssize_t bw;
+
+				bw = do_rnd_write(peerfd, wbuf + woff, wlen);
+				if (bw < 0)
 					return 111;
-			} else if (len == 0) {
+
+				woff += bw;
+				wlen -= bw;
+			} else if (wlen == 0) {
 				/* We have no more data to send. */
 				fds.events &= ~POLLOUT;
 
