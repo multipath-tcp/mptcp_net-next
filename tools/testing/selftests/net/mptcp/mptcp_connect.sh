@@ -93,7 +93,6 @@ $ipv6 && ip -net ns3 addr add dead:beef:3::2/64 dev ns3eth4
 ip -net ns3 link set ns3eth4 up
 ip -net ns3 route add default via 10.0.2.1
 $ipv6 && ip -net ns3 route add default via dead:beef:2::1
-ip netns exec ns3 ethtool -K ns3eth2 tso off 2>/dev/null
 ip netns exec ns3 sysctl -q net.ipv4.ip_forward=1
 $ipv6 && ip netns exec ns3 sysctl -q net.ipv6.conf.all.forwarding=1
 
@@ -102,6 +101,30 @@ $ipv6 && ip -net ns4 addr add dead:beef:3::1/64 dev ns4eth3
 ip -net ns4 link set ns4eth3 up
 ip -net ns4 route add default via 10.0.3.2
 $ipv6 && ip -net ns4 route add default via dead:beef:3::2
+
+set_ethtool_flags() {
+	ns=$1
+	dev=$2
+
+	r=$RANDOM
+
+	pick1=$((r & 1))
+	pick2=$((r & 2))
+	pick3=$((r & 4))
+
+	flags=""
+	[ $pick1 -ne 0 ] && flags="tso off"
+	[ $pick2 -ne 0 ] && flags="$flags gso off"
+	[ $pick3 -ne 0 ] && flags="$flags gro off"
+
+	[ -z "$flags" ] && return
+
+	ip netns exec $ns ethtool -K $dev $flags 2>/dev/null
+	[ $? -eq 0 ] && echo "INFO: set $ns dev $dev: ethtool -K $flags"
+}
+
+set_ethtool_flags ns3 ns3eth2
+set_ethtool_flags ns4 ns4eth3
 
 print_file_err()
 {
