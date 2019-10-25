@@ -304,8 +304,30 @@ for sender in 1 2 3 4;do
 	do_ping ns4 ns$sender 10.0.3.1
 done
 
-tc -net ns2 qdisc add dev ns2eth3 root netem loss random 1
-tc -net ns3 qdisc add dev ns3eth4 root netem delay 10ms reorder 25% 50% gap 5
+loss=$((RANDOM%101))
+if [ $loss -eq 100 ] ;then
+	loss=1%
+	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+elif [ $loss -ge 10 ]; then
+	loss=0.$loss%
+	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+elif [ $loss -ge 1 ]; then
+	loss=0.0$loss%
+	tc -net ns2 qdisc add dev ns2eth3 root netem loss random $loss
+fi
+
+delay=$((RANDOM%400))
+reorder1=$((RANDOM%10))
+reorder1=$((100 - reorder1))
+reorder2=$((RANDOM%100))
+
+if [ $reorder1 -lt 100 ] && [ $reorder2 -gt 0 ]; then
+  tc -net ns3 qdisc add dev ns3eth4 root netem delay ${delay}ms reorder ${reorder1}% ${reorder2}%
+  echo "INFO: Using loss of $loss, delay $delay ms, reorder: $reorder1, $reorder2 on ns3eth4"
+elif [ $delay -gt 0 ]; then
+  tc -net ns3 qdisc add dev ns3eth4 root netem delay ${delay}ms
+  echo "INFO: Using loss of $loss, delay $delay ms on ns3eth4"
+fi
 
 for sender in 1 2 3 4;do
 	run_tests ns1 ns$sender 10.0.1.1
