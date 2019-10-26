@@ -528,6 +528,9 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
 
+	if (!subflow->mp_capable)
+		return;
+
 	mp_opt = &opt_rx->mptcp;
 
 	if (msk && mp_opt->add_addr) {
