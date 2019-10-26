@@ -37,11 +37,11 @@ static const char *cfg_host;
 static const char *cfg_port	= "12000";
 static int cfg_sock_proto	= IPPROTO_MPTCP;
 static bool tcpulp_audit;
-
+static int pf = AF_INET;
 
 static void die_usage(void)
 {
-	fprintf(stderr, "Usage: mptcp_connect [-u] [-s MPTCP|TCP] [-p port] "
+	fprintf(stderr, "Usage: mptcp_connect [-6] [-u] [-s MPTCP|TCP] [-p port] "
 		"[ -l ] [ -t timeout ] connect_address\n");
 	exit(1);
 }
@@ -52,6 +52,21 @@ static const char *getxinfo_strerr(int err)
 		return strerror(errno);
 
 	return gai_strerror(err);
+}
+
+static void xgetnameinfo(const struct sockaddr *addr, socklen_t addrlen,
+			 char *host, socklen_t hostlen,
+			 char *serv, socklen_t servlen)
+{
+	int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+	int err = getnameinfo(addr, addrlen, host, hostlen, serv, servlen, flags);
+
+	if (err) {
+		const char *errstr = getxinfo_strerr(err);
+
+		fprintf(stderr, "Fatal: getnameinfo: %s\n", errstr);
+		exit(1);
+	}
 }
 
 static void xgetaddrinfo(const char *node, const char *service,
@@ -79,12 +94,13 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		.ai_flags = AI_PASSIVE | AI_NUMERICHOST
 	};
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = pf;
 
 	struct addrinfo *a, *addr;
 	int one = 1;
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
+	hints.ai_family = pf;
 
 	for (a = addr; a; a = a->ai_next) {
 		sock = socket(a->ai_family, a->ai_socktype, cfg_sock_proto);
@@ -167,7 +183,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 	struct addrinfo *a, *addr;
 	int sock = -1;
 
-	hints.ai_family = AF_INET;
+	hints.ai_family = pf;
 
 	xgetaddrinfo(remoteaddr, port, &hints, &addr);
 	for (a = addr; a; a = a->ai_next) {
@@ -191,27 +207,18 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 {
-	size_t offset = 0;
+	unsigned int do_w;
+	ssize_t bw;
 
-	while (offset < len) {
-		unsigned int do_w;
-		size_t written;
-		ssize_t bw;
+	do_w = rand() & 0xffff;
+	if (do_w == 0 || do_w > len)
+		do_w = len;
 
-		do_w = rand() & 0xffff;
-		if (do_w == 0 || do_w > (len - offset))
-			do_w = len - offset;
+	bw = write(fd, buf, do_w);
+	if (bw < 0)
+		perror("write");
 
-		bw = write(fd, buf + offset, do_w);
-		if (bw < 0) {
-			perror("write");
-			return 0;
-		}
-
-		written = (size_t)bw;
-		offset += written;
-	}
-	return offset;
+	return bw;
 }
 
 static size_t do_write(const int fd, char *buf, const size_t len)
@@ -255,9 +262,11 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 		.fd = peerfd,
 		.events = POLLIN | POLLOUT,
 	};
+	unsigned int woff = 0, wlen = 0;
+	char wbuf[8192];
 
 	for (;;) {
-		char buf[8192];
+		char rbuf[8192];
 		ssize_t len;
 
 		if (fds.events == 0)
@@ -277,7 +286,7 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 		}
 
 		if (fds.revents & POLLIN) {
-			len = do_rnd_read(peerfd, buf, sizeof(buf));
+			len = do_rnd_read(peerfd, rbuf, sizeof(rbuf));
 			if (len == 0) {
 				/* no more data to receive:
 				 * peer has closed its write side
@@ -294,15 +303,25 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 				return 3;
 			}
 
-			do_write(outfd, buf, len);
+			do_write(outfd, rbuf, len);
 		}
 
 		if (fds.revents & POLLOUT) {
-			len = do_rnd_read(infd, buf, sizeof(buf));
-			if (len > 0) {
-				if (!do_rnd_write(peerfd, buf, len))
+			if (wlen == 0) {
+				woff = 0;
+				wlen = read(infd, wbuf, sizeof(wbuf));
+			}
+
+			if (wlen > 0) {
+				ssize_t bw;
+
+				bw = do_rnd_write(peerfd, wbuf + woff, wlen);
+				if (bw < 0)
 					return 111;
-			} else if (len == 0) {
+
+				woff += bw;
+				wlen -= bw;
+			} else if (wlen == 0) {
 				/* We have no more data to send. */
 				fds.events &= ~POLLOUT;
 
@@ -325,6 +344,92 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 
 	close(peerfd);
 	return 0;
+}
+
+static void check_sockaddr(int pf, struct sockaddr_storage *ss,
+			   socklen_t salen)
+{
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
+	socklen_t wanted_size = 0;
+
+	switch (pf) {
+	case AF_INET:
+		wanted_size = sizeof(*sin);
+		sin = (void *)ss;
+		if (!sin->sin_port)
+			fprintf(stderr, "accept: something wrong: ip connection from port 0");
+		break;
+	case AF_INET6:
+		wanted_size = sizeof(*sin6);
+		sin6 = (void *)ss;
+		if (!sin6->sin6_port)
+			fprintf(stderr, "accept: something wrong: ipv6 connection from port 0");
+		break;
+	default:
+		fprintf(stderr, "accept: Unknown pf %d, salen %u\n", pf, salen);
+		return;
+	}
+
+	if (salen != wanted_size)
+		fprintf(stderr, "accept: size mismatch, got %d expected %d\n",
+				(int)salen, wanted_size);
+
+	if (ss->ss_family != pf)
+		fprintf(stderr, "accept: pf mismatch, expect %d, ss_family is %d\n",
+				(int)ss->ss_family, pf);
+}
+
+static void check_getpeername(int fd, struct sockaddr_storage *ss, socklen_t salen)
+{
+	struct sockaddr_storage peerss;
+	socklen_t peersalen = sizeof(peerss);
+
+	if (getpeername(fd, (struct sockaddr *)&peerss, &peersalen) < 0) {
+		perror("getpeername");
+		return;
+	}
+
+	if (peersalen != salen) {
+		fprintf(stderr, "%s: %d vs %d\n", __func__, peersalen, salen);
+		return;
+	}
+
+	if (memcmp(ss, &peerss, peersalen)) {
+		char a[INET6_ADDRSTRLEN];
+		char b[INET6_ADDRSTRLEN];
+		char c[INET6_ADDRSTRLEN];
+		char d[INET6_ADDRSTRLEN];
+
+		xgetnameinfo((struct sockaddr *)ss, salen,
+			     a, sizeof(a), b, sizeof(b));
+
+		xgetnameinfo((struct sockaddr *)&peerss, peersalen,
+			     c, sizeof(c), d, sizeof(d));
+
+		fprintf(stderr, "%s: memcmp failure: accept %s vs peername %s, %s vs %s salen %d vs %d\n",
+			__func__, a, c, b, d, peersalen, salen);
+	}
+}
+
+static void check_getpeername_connect(int fd)
+{
+	struct sockaddr_storage ss;
+	socklen_t salen = sizeof(ss);
+	char a[INET6_ADDRSTRLEN];
+	char b[INET6_ADDRSTRLEN];
+
+	if (getpeername(fd, (struct sockaddr *)&ss, &salen) < 0) {
+		perror("getpeername");
+		return;
+	}
+
+	xgetnameinfo((struct sockaddr *)&ss, salen,
+		     a, sizeof(a), b, sizeof(b));
+
+	if (strcmp(cfg_host, a) || strcmp(cfg_port, b))
+		fprintf(stderr, "%s: %s vs %s, %s vs %s\n", __func__,
+			cfg_host, a, cfg_port, b);
 }
 
 int main_loop_s(int listensock)
@@ -350,6 +455,9 @@ int main_loop_s(int listensock)
 	salen = sizeof(ss);
 	remotesock = accept(listensock, (struct sockaddr *)&ss, &salen);
 	if (remotesock >= 0) {
+		check_sockaddr(pf, &ss, salen);
+		check_getpeername(remotesock, &ss, salen);
+
 		copyfd_io(0, remotesock, 1);
 		return 0;
 	}
@@ -384,6 +492,7 @@ int main_loop(void)
 	if (fd < 0)
 		return 2;
 
+	check_getpeername_connect(fd);
 	return copyfd_io(0, fd, 1);
 }
 
@@ -405,7 +514,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "lp:s:hut:")) != -1) {
+	while ((c = getopt(argc, argv, "6lp:s:hut:")) != -1) {
 		switch (c) {
 		case 'l':
 			listen_mode = true;
@@ -422,6 +531,9 @@ static void parse_opts(int argc, char **argv)
 		case 'u':
 			tcpulp_audit = true;
 			break;
+		case '6':
+			pf = AF_INET6;
+			break;
 		case 't':
 			poll_timeout = atoi(optarg) * 1000;
 			if (poll_timeout <= 0)
@@ -433,6 +545,9 @@ static void parse_opts(int argc, char **argv)
 	if (optind + 1 != argc)
 		die_usage();
 	cfg_host = argv[optind];
+
+	if (strchr(cfg_host, ':'))
+		pf = AF_INET6;
 }
 
 int main(int argc, char *argv[])
