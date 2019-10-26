@@ -37,4 +37,5 @@ trap 'exit_trap ${?}' EXIT
 if [ "$(git status --porcelain | grep -v "^?? " | wc -l)" = "0" ]; then
 	echo "Am didn't do anything, use patch"
 	patch -p1 --merge < "${PATCH}"
+	exit 1
 fi
