@@ -1558,7 +1558,7 @@ static netdev_features_t rtl8169_fix_features(struct net_device *dev,
 
 	if (dev->mtu > JUMBO_1K &&
 	    tp->mac_version > RTL_GIGA_MAC_VER_06)
-		features &= ~NETIF_F_IP_CSUM;
+		features &= ~(NETIF_F_CSUM_MASK | NETIF_F_ALL_TSO);
 
 	return features;
 }
@@ -5493,18 +5493,15 @@ static int rtl8169_rx_fill(struct rtl8169_private *tp)
 
 		data = rtl8169_alloc_rx_data(tp, tp->RxDescArray + i);
 		if (!data) {
-			rtl8169_make_unusable_by_asic(tp->RxDescArray + i);
-			goto err_out;
+			rtl8169_rx_clear(tp);
+			return -ENOMEM;
 		}
 		tp->Rx_databuff[i] = data;
 	}
 
 	rtl8169_mark_as_last_descriptor(tp->RxDescArray + NUM_RX_DESC - 1);
-	return 0;
 
-err_out:
-	rtl8169_rx_clear(tp);
-	return -ENOMEM;
+	return 0;
 }
 
 static int rtl8169_init_ring(struct rtl8169_private *tp)
