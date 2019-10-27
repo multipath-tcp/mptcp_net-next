@@ -61,13 +61,17 @@ git_get_sha() {
 	git rev-parse "${1:-HEAD}"
 }
 
-# [ $1: ref, default: HEAD ]
 git_get_current_branch() {
-	git rev-parse --abbrev-ref "${1:-HEAD}"
+	git rev-parse --abbrev-ref HEAD
 }
 
 tg_get_first() {
 	tg info --series | head -n1 | awk '{ print $1 }'
+}
+
+# [ $1: branch, default: current branch ]
+is_tg_top() {
+	[ "${1:-$(git_get_current_branch)}" = "${TG_TOPIC_TOP}" ]
 }
 
 
@@ -226,21 +230,38 @@ check_compilation_no_ipv6() {
 	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
 }
 
-check_compilation() {
-	generate_config_no_mptcp
-	compile_kernel "without CONFIG_MPTCP" || return 1
-
-	generate_config_mptcp
-	compile_kernel "with CONFIG_MPTCP" || return 1
+# $1: branch
+tg_has_non_mptcp_modified_files() {
+	git diff --name-only "refs/top-bases/${1}..refs/heads/${1}" | \
+		grep -qEv "^(\.top(deps|msg)$|net/mptcp/)"
 }
 
-validation() {
+# $1: branch
+check_compilation() { local branch
+	branch="${1}"
+
+	# no need to compile without MPTCP if we only changed files in net/mptcp
+	if is_tg_top "${branch}" || \
+	   tg_has_non_mptcp_modified_files "${branch}"; then
+		generate_config_no_mptcp
+		compile_kernel "without CONFIG_MPTCP" || return 1
+	fi
+
+	# no need to compile with MPTCP if the option is not available
+	if [ -f "net/mptcp/Kconfig" ]; then
+		generate_config_mptcp
+		compile_kernel "with CONFIG_MPTCP" || return 1
+	fi
+}
+
+validation() { local curr_branch
 	if [ "${UPD_TG_VALIDATE_EACH_TOPIC}" = "1" ]; then
 		git_checkout "$(tg_get_first)"
 
 		while true; do
-			if ! check_compilation; then
-				err "Unable to compile topic $(git_get_current_branch)"
+			curr_branch="$(git_get_current_branch)"
+			if ! check_compilation "${curr_branch}"; then
+				err "Unable to compile topic ${curr_branch}"
 				return 1
 			fi
 
@@ -249,8 +270,8 @@ validation() {
 			tg checkout next 2>/dev/null || break
 		done
 
-		if [ "$(git_get_current_branch)" != "${TG_TOPIC_TOP}" ]; then
-			err "Not at the top after validation: $(git_get_current_branch)"
+		if ! is_tg_top "${curr_branch}"; then
+			err "Not at the top after validation: ${curr_branch}"
 			return 1
 		fi
 
@@ -258,7 +279,7 @@ validation() {
 		check_compilation_i386
 	else
 		git_checkout "${TG_TOPIC_TOP}"
-		if ! check_compilation; then
+		if ! check_compilation "${TG_TOPIC_TOP}"; then
 			err "Unable to compile the new version"
 			return 1
 		fi
