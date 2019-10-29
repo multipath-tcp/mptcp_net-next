@@ -38,6 +38,7 @@
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
 	struct inet_connection_sock sk;
+	sa_family_t	family;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
 
