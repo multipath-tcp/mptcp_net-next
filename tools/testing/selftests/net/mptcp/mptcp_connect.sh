@@ -231,7 +231,7 @@ check_mptcp_disabled()
 
 	# net.mptcp.enabled should be enabled by default
 	if [ "$(ip netns exec ${disabled_ns} sysctl net.mptcp.enabled | awk '{ print $3 }')" -ne 1 ]; then
-		echo -e "net.mptcp.enabled sysctl is not 1 by default\t[ FAIL ]"
+		echo -e "net.mptcp.enabled sysctl is not 1 by default\t\t[ FAIL ]"
 		ret=1
 		return 1
 	fi
@@ -243,12 +243,12 @@ check_mptcp_disabled()
 	ip netns delete ${disabled_ns}
 
 	if [ ${err} -eq 0 ]; then
-		echo -e "New MPTCP socket cannot be blocked via sysctl\t[ FAIL ]"
+		echo -e "New MPTCP socket cannot be blocked via sysctl\t\t[ FAIL ]"
 		ret=1
 		return 1
 	fi
 
-	echo -e "New MPTCP socket can be blocked via sysctl\t[ OK ]"
+	echo -e "New MPTCP socket can be blocked via sysctl\t\t[ OK ]"
 	return 0
 }
 
@@ -324,7 +324,7 @@ do_transfer()
 
 	sleep 1
 
-	start=$(date +%s)
+	start=$(date +%s%3N)
 	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
 	cpid=$!
 
@@ -333,7 +333,7 @@ do_transfer()
 	wait $spid
 	rets=$?
 
-	stop=$(date +%s)
+	stop=$(date +%s%3N)
 
 	if $capture; then
 	    sleep 1
@@ -341,7 +341,7 @@ do_transfer()
 	fi
 
 	duration=$((stop-start))
-	duration=$(printf "(duration %03ss)" $duration)
+	duration=$(printf "(duration %05sms)" $duration)
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
 		echo "$duration [ FAIL ] client exit code $retc, server $rets" 1>&2
 		echo "\nnetns ${listener_ns} socket stat for $port:" 1>&2
