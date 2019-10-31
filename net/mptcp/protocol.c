@@ -308,8 +308,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
 		msk->ack_seq = ack_seq;
-		msk->remote_key = subflow->remote_key;
-		msk->ack_seq++;
 		subflow->rel_write_seq = 1;
 		newsk = new_mptcp_sock;
 		subflow->conn = new_mptcp_sock;
