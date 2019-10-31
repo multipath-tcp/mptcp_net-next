@@ -189,11 +189,15 @@ static void announce_addr_worker(struct work_struct *work)
 
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
-	if (pernet->has_announce_v4)
+	/* Only announce addresses in the same family as listening socket.
+	 * When the listening socket can accept connections from both
+	 * families this restriction may be removed.
+	 */
+	if (pernet->has_announce_v4 && msk->family == AF_INET)
 		mptcp_pm_announce_addr(pm->token, 1,
 				       &pernet->announce_v4_addr);
 #if IS_ENABLED(CONFIG_IPV6)
-	if (pernet->has_announce_v6)
+	else if (pernet->has_announce_v6 && msk->family == AF_INET6)
 		mptcp_pm_announce_addr6(pm->token, 1,
 					&pernet->announce_v6_addr);
 #endif
@@ -209,19 +213,23 @@ static void create_subflow_worker(struct work_struct *work)
 
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
 
-	if (pernet->has_announce_v4)
-		mptcp_pm_create_subflow(pm->token, pm->remote_id,
-					&pernet->announce_v4_addr);
+	if (pm->remote_family == AF_INET) {
+		if (pernet->has_announce_v4)
+			mptcp_pm_create_subflow(pm->token, pm->remote_id,
+						&pernet->announce_v4_addr);
+		else
+			mptcp_pm_create_subflow(pm->token, pm->remote_id,
+						NULL);
+	}
 #if IS_ENABLED(CONFIG_IPV6)
-	else if (pernet->has_announce_v6)
-		mptcp_pm_create_subflow6(pm->token, pm->remote_id,
-					 &pernet->announce_v6_addr);
-#endif
-	else if (pm->local_family == AF_INET)
-		mptcp_pm_create_subflow(pm->token, pm->remote_id, NULL);
-#if IS_ENABLED(CONFIG_IPV6)
-	else
-		mptcp_pm_create_subflow6(pm->token, pm->remote_id, NULL);
+	else if (pm->remote_family == AF_INET6) {
+		if (pernet->has_announce_v6)
+			mptcp_pm_create_subflow6(pm->token, pm->remote_id,
+						 &pernet->announce_v6_addr);
+		else
+			mptcp_pm_create_subflow6(pm->token, pm->remote_id,
+						 NULL);
+	}
 #endif
 
 	sock_put((struct sock *)msk);
