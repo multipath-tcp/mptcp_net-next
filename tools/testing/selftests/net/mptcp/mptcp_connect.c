@@ -340,6 +340,12 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 				return 4;
 			}
 		}
+
+		if (fds.revents & (POLLERR | POLLNVAL)) {
+			fprintf(stderr, "Unexpected revents: "
+				"POLLERR/POLLNVAL(%x)\n", fds.revents);
+			return 5;
+		}
 	}
 
 	close(peerfd);
