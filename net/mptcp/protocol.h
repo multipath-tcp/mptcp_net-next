@@ -45,6 +45,7 @@ struct mptcp_sock {
 	u64		local_key;
 	u64		remote_key;
 	u32		token;
+	sa_family_t	family;
 	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
