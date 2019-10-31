@@ -489,14 +489,11 @@ static inline bool tcp_stream_is_readable(const struct tcp_sock *tp,
  *	take care of normal races (between the test and the event) and we don't
  *	go look at any of the socket buffers directly.
  */
-__poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
+__poll_t __tcp_poll(struct sock *sk)
 {
 	__poll_t mask;
-	struct sock *sk = sock->sk;
 	const struct tcp_sock *tp = tcp_sk(sk);
 	int state;
-
-	sock_poll_wait(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
 	if (state == TCP_LISTEN)
@@ -588,6 +585,13 @@ __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		mask |= EPOLLERR;
 
 	return mask;
+}
+
+__poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
+{
+	sock_poll_wait(file, sock, wait);
+
+	return __tcp_poll(sock->sk);
 }
 EXPORT_SYMBOL(tcp_poll);
 
