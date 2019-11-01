@@ -8762,6 +8762,8 @@ static int bnxt_hwrm_if_change(struct bnxt *bp, bool up)
 	}
 	if (resc_reinit || fw_reset) {
 		if (fw_reset) {
+			if (!test_bit(BNXT_STATE_IN_FW_RESET, &bp->state))
+				bnxt_ulp_stop(bp);
 			rc = bnxt_fw_init_one(bp);
 			if (rc) {
 				set_bit(BNXT_STATE_ABORT_ERR, &bp->state);
@@ -9224,13 +9226,16 @@ static int bnxt_open(struct net_device *dev)
 	if (rc) {
 		bnxt_hwrm_if_change(bp, false);
 	} else {
-		if (test_and_clear_bit(BNXT_STATE_FW_RESET_DET, &bp->state) &&
-		    BNXT_PF(bp)) {
-			struct bnxt_pf_info *pf = &bp->pf;
-			int n = pf->active_vfs;
+		if (test_and_clear_bit(BNXT_STATE_FW_RESET_DET, &bp->state)) {
+			if (BNXT_PF(bp)) {
+				struct bnxt_pf_info *pf = &bp->pf;
+				int n = pf->active_vfs;
 
-			if (n)
-				bnxt_cfg_hw_sriov(bp, &n, true);
+				if (n)
+					bnxt_cfg_hw_sriov(bp, &n, true);
+			}
+			if (!test_bit(BNXT_STATE_IN_FW_RESET, &bp->state))
+				bnxt_ulp_start(bp, 0);
 		}
 		bnxt_hwmon_open(bp);
 	}
@@ -9927,12 +9932,15 @@ static void bnxt_reset_task(struct bnxt *bp, bool silent)
 	if (netif_running(bp->dev)) {
 		int rc;
 
-		if (!silent)
+		if (silent) {
+			bnxt_close_nic(bp, false, false);
+			bnxt_open_nic(bp, false, false);
+		} else {
 			bnxt_ulp_stop(bp);
-		bnxt_close_nic(bp, false, false);
-		rc = bnxt_open_nic(bp, false, false);
-		if (!silent && !rc)
-			bnxt_ulp_start(bp);
+			bnxt_close_nic(bp, true, false);
+			rc = bnxt_open_nic(bp, true, false);
+			bnxt_ulp_start(bp, rc);
+		}
 	}
 }
 
@@ -10048,8 +10056,8 @@ static void bnxt_reset(struct bnxt *bp, bool silent)
 
 static void bnxt_fw_reset_close(struct bnxt *bp)
 {
+	bnxt_ulp_stop(bp);
 	__bnxt_close_nic(bp, true, false);
-	bnxt_ulp_irq_stop(bp);
 	bnxt_clear_int_mode(bp);
 	bnxt_hwrm_func_drv_unrgtr(bp);
 	bnxt_free_ctx_mem(bp);
@@ -10581,14 +10589,23 @@ static void bnxt_fw_reset_writel(struct bnxt *bp, int reg_idx)
 static void bnxt_reset_all(struct bnxt *bp)
 {
 	struct bnxt_fw_health *fw_health = bp->fw_health;
-	int i;
+	int i, rc;
+
+	if (bp->fw_cap & BNXT_FW_CAP_ERR_RECOVER_RELOAD) {
+#ifdef CONFIG_TEE_BNXT_FW
+		rc = tee_bnxt_fw_load();
+		if (rc)
+			netdev_err(bp->dev, "Unable to reset FW rc=%d\n", rc);
+		bp->fw_reset_timestamp = jiffies;
+#endif
+		return;
+	}
 
 	if (fw_health->flags & ERROR_RECOVERY_QCFG_RESP_FLAGS_HOST) {
 		for (i = 0; i < fw_health->fw_reset_seq_cnt; i++)
 			bnxt_fw_reset_writel(bp, i);
 	} else if (fw_health->flags & ERROR_RECOVERY_QCFG_RESP_FLAGS_CO_CPU) {
 		struct hwrm_fw_reset_input req = {0};
-		int rc;
 
 		bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_FW_RESET, -1, -1);
 		req.resp_addr = cpu_to_le64(bp->hwrm_cmd_kong_resp_dma_addr);
@@ -10722,13 +10739,13 @@ static void bnxt_fw_reset_task(struct work_struct *work)
 			clear_bit(BNXT_STATE_IN_FW_RESET, &bp->state);
 			dev_close(bp->dev);
 		}
-		bnxt_ulp_irq_restart(bp, rc);
-		rtnl_unlock();
 
 		bp->fw_reset_state = 0;
 		/* Make sure fw_reset_state is 0 before clearing the flag */
 		smp_mb__before_atomic();
 		clear_bit(BNXT_STATE_IN_FW_RESET, &bp->state);
+		bnxt_ulp_start(bp, rc);
+		rtnl_unlock();
 		break;
 	}
 	return;
@@ -10936,7 +10953,7 @@ static int bnxt_setup_tc_block_cb(enum tc_setup_type type, void *type_data,
 	}
 }
 
-static LIST_HEAD(bnxt_block_cb_list);
+LIST_HEAD(bnxt_block_cb_list);
 
 static int bnxt_setup_tc(struct net_device *dev, enum tc_setup_type type,
 			 void *type_data)
@@ -11884,6 +11901,7 @@ static int bnxt_suspend(struct device *device)
 	int rc = 0;
 
 	rtnl_lock();
+	bnxt_ulp_stop(bp);
 	if (netif_running(dev)) {
 		netif_device_detach(dev);
 		rc = bnxt_close(dev);
@@ -11917,6 +11935,7 @@ static int bnxt_resume(struct device *device)
 	}
 
 resume_exit:
+	bnxt_ulp_start(bp, rc);
 	rtnl_unlock();
 	return rc;
 }
@@ -11996,10 +12015,9 @@ static pci_ers_result_t bnxt_io_slot_reset(struct pci_dev *pdev)
 		if (!err && netif_running(netdev))
 			err = bnxt_open(netdev);
 
-		if (!err) {
+		if (!err)
 			result = PCI_ERS_RESULT_RECOVERED;
-			bnxt_ulp_start(bp);
-		}
+		bnxt_ulp_start(bp, err);
 	}
 
 	if (result != PCI_ERS_RESULT_RECOVERED && netif_running(netdev))
