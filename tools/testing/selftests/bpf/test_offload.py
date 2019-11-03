@@ -22,6 +22,7 @@ import os
 import pprint
 import random
 import re
+import stat
 import string
 import struct
 import subprocess
@@ -311,6 +312,7 @@ class DebugfsDir:
         for f in out.split():
             if f == "ports":
                 continue
+
             p = os.path.join(path, f)
             if os.path.isfile(p) and os.access(p, os.R_OK):
                 _, out = cmd('cat %s/%s' % (path, f))
