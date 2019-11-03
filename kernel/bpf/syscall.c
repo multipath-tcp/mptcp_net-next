@@ -1327,10 +1327,23 @@ static void __bpf_prog_put_rcu(struct rcu_head *rcu)
 {
 	struct bpf_prog_aux *aux = container_of(rcu, struct bpf_prog_aux, rcu);
 
+	kvfree(aux->func_info);
 	free_used_maps(aux);
 	bpf_prog_uncharge_memlock(aux->prog);
 	security_bpf_prog_free(aux);
 	bpf_prog_free(aux->prog);
+}
+
+static void __bpf_prog_put_noref(struct bpf_prog *prog, bool deferred)
+{
+	bpf_prog_kallsyms_del_all(prog);
+	btf_put(prog->aux->btf);
+	bpf_prog_free_linfo(prog);
+
+	if (deferred)
+		call_rcu(&prog->aux->rcu, __bpf_prog_put_rcu);
+	else
+		__bpf_prog_put_rcu(&prog->aux->rcu);
 }
 
 static void __bpf_prog_put(struct bpf_prog *prog, bool do_idr_lock)
@@ -1339,12 +1352,7 @@ static void __bpf_prog_put(struct bpf_prog *prog, bool do_idr_lock)
 		perf_event_bpf_event(prog, PERF_BPF_EVENT_PROG_UNLOAD, 0);
 		/* bpf_prog_free_id() must be called first */
 		bpf_prog_free_id(prog, do_idr_lock);
-		bpf_prog_kallsyms_del_all(prog);
-		btf_put(prog->aux->btf);
-		kvfree(prog->aux->func_info);
-		bpf_prog_free_linfo(prog);
-
-		call_rcu(&prog->aux->rcu, __bpf_prog_put_rcu);
+		__bpf_prog_put_noref(prog, true);
 	}
 }
 
@@ -1571,7 +1579,7 @@ bpf_prog_load_check_attach(enum bpf_prog_type prog_type,
 			   u32 btf_id)
 {
 	switch (prog_type) {
-	case BPF_PROG_TYPE_RAW_TRACEPOINT:
+	case BPF_PROG_TYPE_TRACING:
 		if (btf_id > BTF_MAX_TYPE)
 			return -EINVAL;
 		break;
@@ -1756,11 +1764,12 @@ static int bpf_prog_load(union bpf_attr *attr, union bpf_attr __user *uattr)
 	return err;
 
 free_used_maps:
-	bpf_prog_free_linfo(prog);
-	kvfree(prog->aux->func_info);
-	btf_put(prog->aux->btf);
-	bpf_prog_kallsyms_del_subprogs(prog);
-	free_used_maps(prog->aux);
+	/* In case we have subprogs, we need to wait for a grace
+	 * period before we can tear down JIT memory since symbols
+	 * are already exposed under kallsyms.
+	 */
+	__bpf_prog_put_noref(prog, prog->aux->func_cnt);
+	return err;
 free_prog:
 	bpf_prog_uncharge_memlock(prog);
 free_prog_sec:
@@ -1833,13 +1842,13 @@ static int bpf_raw_tracepoint_open(const union bpf_attr *attr)
 		return PTR_ERR(prog);
 
 	if (prog->type != BPF_PROG_TYPE_RAW_TRACEPOINT &&
+	    prog->type != BPF_PROG_TYPE_TRACING &&
 	    prog->type != BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE) {
 		err = -EINVAL;
 		goto out_put_prog;
 	}
 
-	if (prog->type == BPF_PROG_TYPE_RAW_TRACEPOINT &&
-	    prog->aux->attach_btf_id) {
+	if (prog->type == BPF_PROG_TYPE_TRACING) {
 		if (attr->raw_tracepoint.name) {
 			/* raw_tp name should not be specified in raw_tp
 			 * programs that were verified via in-kernel BTF info
