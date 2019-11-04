@@ -134,6 +134,7 @@ struct mptcp_sock {
 	unsigned long	flags;
 	u16		dport;
 	sa_family_t	family;
+	struct work_struct rtx_work;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
@@ -157,6 +158,16 @@ static inline struct mptcp_data_frag *mptcp_rtx_tail(const struct sock *sk)
 		return NULL;
 
 	return list_last_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
+}
+
+static inline struct mptcp_data_frag *mptcp_rtx_head(const struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (list_empty(&msk->rtx_queue))
+		return NULL;
+
+	return list_first_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
 }
 
 struct mptcp_subflow_request_sock {
