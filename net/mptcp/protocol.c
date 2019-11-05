@@ -310,6 +310,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	read_descriptor_t desc;
 	struct socket *ssock;
 	struct tcp_sock *tp;
+	bool done = false;
 	struct sock *ssk;
 	int copied = 0;
 	int target;
@@ -335,7 +336,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	len = min_t(size_t, len, INT_MAX);
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, len);
 
-	while (copied < len) {
+	while (!done) {
 		u32 map_remaining;
 		int bytes_read;
 
@@ -352,7 +353,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		tp = tcp_sk(ssk);
 
 		lock_sock(ssk);
-		while (mptcp_subflow_data_available(ssk)) {
+		while (mptcp_subflow_data_available(ssk) && !done) {
 			/* try to read as much data as available */
 			map_remaining = subflow->map_data_len -
 					mptcp_subflow_get_map_offset(subflow);
@@ -363,8 +364,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			if (bytes_read < 0) {
 				if (!copied)
 					copied = bytes_read;
-				release_sock(ssk);
-				goto out;
+				done = true;
+				continue;
 			}
 
 			pr_debug("msk ack_seq=%llx -> %llx", msk->ack_seq,
@@ -372,13 +373,13 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			msk->ack_seq += bytes_read;
 			copied += bytes_read;
 			if (copied >= len) {
-				release_sock(ssk);
-				goto out;
+				done = true;
+				continue;
 			}
 			if (tp->urg_data && tp->urg_seq == tp->copied_seq) {
 				pr_err("Urgent data present, cannot proceed");
-				release_sock(ssk);
-				goto out;
+				done = true;
+				continue;
 			}
 		}
 		release_sock(ssk);
@@ -427,7 +428,6 @@ wait_for_data:
 		mptcp_wait_data(sk, &timeo);
 	}
 
-out:
 	release_sock(sk);
 	return copied;
 }
