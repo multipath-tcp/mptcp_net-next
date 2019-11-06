@@ -133,7 +133,6 @@ struct mptcp_sock {
 	u32		token;
 	unsigned long	flags;
 	u16		dport;
-	sa_family_t	family;
 	struct work_struct rtx_work;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
