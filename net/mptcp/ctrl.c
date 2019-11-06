@@ -117,3 +117,14 @@ void __init mptcp_init(void)
 	if (register_pernet_subsys(&mptcp_pernet_ops) < 0)
 		panic("Failed to register MPTCP pernet subsystem.\n");
 }
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+int __init mptcpv6_init(void)
+{
+	int err;
+
+	err = mptcp_proto_v6_init();
+
+	return err;
+}
+#endif
