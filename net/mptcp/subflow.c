@@ -30,7 +30,7 @@ static int subflow_rebuild_header(struct sock *sk)
 	if (err)
 		return err;
 
-	return inet_sk_rebuild_header(sk);
+	return subflow->icsk_af_ops->rebuild_header(sk);
 }
 
 static void subflow_req_destructor(struct request_sock *req)
@@ -225,6 +225,7 @@ static int subflow_ulp_init(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	tp->is_mptcp = 1;
+	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
 out:
 	return err;
@@ -257,6 +258,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
+	new_ctx->icsk_af_ops = old_ctx->icsk_af_ops;
 
 	if (subflow_req->mp_capable) {
 		new_ctx->mp_capable = 1;
