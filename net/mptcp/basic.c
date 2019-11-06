@@ -185,6 +185,7 @@ static void announce_addr_worker(struct work_struct *work)
 	struct mptcp_pm_data *pm = container_of(work, struct mptcp_pm_data,
 						addr_work);
 	struct mptcp_sock *msk = container_of(pm, struct mptcp_sock, pm);
+	struct sock *sk = (struct sock *)msk;
 	struct basic_pernet *pernet;
 
 	pernet = net_generic(sock_net((struct sock *)msk), basic_pernet_id);
@@ -193,11 +194,11 @@ static void announce_addr_worker(struct work_struct *work)
 	 * When the listening socket can accept connections from both
 	 * families this restriction may be removed.
 	 */
-	if (pernet->has_announce_v4 && msk->family == AF_INET)
+	if (pernet->has_announce_v4 && sk->sk_family == AF_INET)
 		mptcp_pm_announce_addr(pm->token, 1,
 				       &pernet->announce_v4_addr);
 #if IS_ENABLED(CONFIG_IPV6)
-	else if (pernet->has_announce_v6 && msk->family == AF_INET6)
+	else if (pernet->has_announce_v6 && sk->sk_family == AF_INET6)
 		mptcp_pm_announce_addr6(pm->token, 1,
 					&pernet->announce_v6_addr);
 #endif
