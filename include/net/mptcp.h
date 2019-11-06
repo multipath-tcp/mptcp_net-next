@@ -27,12 +27,18 @@ struct mptcp_ext {
 
 #ifdef CONFIG_MPTCP
 
+void mptcp_init(void);
+
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return skb_ext_exist(skb, SKB_EXT_MPTCP);
 }
 
 #else
+
+static inline void mptcp_init(void)
+{
+}
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
