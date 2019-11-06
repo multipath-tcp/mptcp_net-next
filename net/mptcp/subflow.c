@@ -60,7 +60,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 static struct request_sock_ops subflow_request_sock_ops;
 static struct tcp_request_sock_ops subflow_request_sock_ipv4_ops;
 
-static int subflow_conn_request(struct sock *sk, struct sk_buff *skb)
+static int subflow_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
@@ -92,7 +92,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 	/* if the sk is MP_CAPABLE, we already received the client key */
 
-	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
+	child = listener->icsk_af_ops->syn_recv_sock(sk, skb, req, dst,
+						     req_unhash, own_req);
 
 	if (child && *own_req) {
 		if (!mptcp_subflow_ctx(child)) {
@@ -254,7 +255,7 @@ void mptcp_subflow_init(void)
 	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
 
 	subflow_specific = ipv4_specific;
-	subflow_specific.conn_request = subflow_conn_request;
+	subflow_specific.conn_request = subflow_v4_conn_request;
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 
