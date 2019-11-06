@@ -133,7 +133,6 @@ struct mptcp_sock {
 	u32		token;
 	unsigned long	flags;
 	u16		dport;
-	sa_family_t	family;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
