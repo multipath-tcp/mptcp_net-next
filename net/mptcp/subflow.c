@@ -19,7 +19,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
-	inet_sk_rx_dst_set(sk, skb);
+	subflow->icsk_af_ops->sk_rx_dst_set(sk, skb);
 
 	if (subflow->conn && !subflow->conn_finished) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
