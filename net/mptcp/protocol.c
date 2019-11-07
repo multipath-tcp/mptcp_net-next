@@ -1147,18 +1147,6 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *ssk;
 	int ret;
 
-	if (sock->sk->sk_prot == &tcp_prot) {
-		/* we are being invoked from __sys_accept4, after
-		 * mptcp_accept() has just accepted a non-mp-capable
-		 * flow: sk is a tcp_sk, not an mptcp one.
-		 *
-		 * Hand the socket over to tcp so all further socket ops
-		 * bypass mptcp.
-		 */
-		sock->ops = &inet_stream_ops;
-		return sock->ops->getname(sock, uaddr, peer);
-	}
-
 	lock_sock(sock->sk);
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
@@ -1181,6 +1169,28 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	ret = ssk->sk_socket->ops->getname(ssk->sk_socket, uaddr, peer);
 	release_sock(sock->sk);
+	return ret;
+}
+
+static int mptcp_v4_getname(struct socket *sock, struct sockaddr *uaddr,
+			    int peer)
+{
+	int ret;
+
+	if (sock->sk->sk_prot == &tcp_prot) {
+		/* we are being invoked from __sys_accept4, after
+		 * mptcp_accept() has just accepted a non-mp-capable
+		 * flow: sk is a tcp_sk, not an mptcp one.
+		 *
+		 * Hand the socket over to tcp so all further socket ops
+		 * bypass mptcp.
+		 */
+		sock->ops = &inet_stream_ops;
+		return sock->ops->getname(sock, uaddr, peer);
+	}
+
+	ret = mptcp_getname(sock, uaddr, peer);
+
 	return ret;
 }
 
@@ -1300,7 +1310,7 @@ void mptcp_proto_init(void)
 	mptcp_stream_ops.connect = mptcp_stream_connect;
 	mptcp_stream_ops.poll = mptcp_poll;
 	mptcp_stream_ops.accept = mptcp_stream_accept;
-	mptcp_stream_ops.getname = mptcp_getname;
+	mptcp_stream_ops.getname = mptcp_v4_getname;
 	mptcp_stream_ops.listen = mptcp_listen;
 	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
