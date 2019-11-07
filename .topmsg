@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-IPv6-support
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add IPv6 support
 
+Add hooks for IPv6 as needed and initialize MPTCP
+IPv6 support.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
