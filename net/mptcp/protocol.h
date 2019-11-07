@@ -104,6 +104,7 @@ struct mptcp_subflow_context {
 
 	struct	socket *tcp_sock;   /* underlying tcp_sock */
 	struct	sock *conn;	    /* parent mptcp_sock */
+	const	struct inet_connection_sock_af_ops *icsk_af_ops;
 	struct	rcu_head rcu;
 };
 
