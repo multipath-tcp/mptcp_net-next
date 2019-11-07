@@ -90,18 +90,15 @@ static bool subflow_token_join_request(struct request_sock *req,
 	return true;
 }
 
-static void subflow_v4_init_req(struct request_sock *req,
-				const struct sock *sk_listener,
-				struct sk_buff *skb)
+static void subflow_init_req(struct request_sock *req,
+			     const struct sock *sk_listener,
+			     struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk_listener);
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct tcp_options_received rx_opt;
 
-	tcp_rsk(req)->is_mptcp = 1;
 	pr_debug("subflow_req=%p, listener=%p", subflow_req, listener);
-
-	tcp_request_sock_ipv4_ops.init_req(req, sk_listener, skb);
 
 	memset(&rx_opt.mptcp, 0, sizeof(rx_opt.mptcp));
 	mptcp_get_options(skb, &rx_opt);
@@ -144,6 +141,17 @@ static void subflow_v4_init_req(struct request_sock *req,
 			// @@ need to trigger RST
 		}
 	}
+}
+
+static void subflow_v4_init_req(struct request_sock *req,
+				const struct sock *sk_listener,
+				struct sk_buff *skb)
+{
+	tcp_rsk(req)->is_mptcp = 1;
+
+	tcp_request_sock_ipv4_ops.init_req(req, sk_listener, skb);
+
+	subflow_init_req(req, sk_listener, skb);
 }
 
 /* validate received truncated hmac and create hmac for third ACK */
