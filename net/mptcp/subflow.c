@@ -45,7 +45,7 @@ static int subflow_rebuild_header(struct sock *sk)
 	if (err)
 		return err;
 
-	return inet_sk_rebuild_header(sk);
+	return subflow->icsk_af_ops->rebuild_header(sk);
 }
 
 static void subflow_req_destructor(struct request_sock *req)
@@ -169,7 +169,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
-	inet_sk_rx_dst_set(sk, skb);
+	subflow->icsk_af_ops->sk_rx_dst_set(sk, skb);
 
 	if (!subflow->conn)
 		return;
@@ -208,7 +208,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 static struct request_sock_ops subflow_request_sock_ops;
 static struct tcp_request_sock_ops subflow_request_sock_ipv4_ops;
 
-static int subflow_conn_request(struct sock *sk, struct sk_buff *skb)
+static int subflow_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
@@ -276,7 +276,8 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			return NULL;
 	}
 
-	child = tcp_v4_syn_recv_sock(sk, skb, req, dst, req_unhash, own_req);
+	child = listener->icsk_af_ops->syn_recv_sock(sk, skb, req, dst,
+						     req_unhash, own_req);
 
 	if (child && *own_req) {
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
@@ -769,6 +770,7 @@ static int subflow_ulp_init(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	tp->is_mptcp = 1;
+	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
 	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	sk->sk_data_ready = subflow_data_ready;
@@ -806,6 +808,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
+	new_ctx->icsk_af_ops = old_ctx->icsk_af_ops;
 	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
 
 	if (subflow_req->mp_capable) {
@@ -862,7 +865,7 @@ void mptcp_subflow_init(void)
 	subflow_request_sock_ipv4_ops.init_req = subflow_v4_init_req;
 
 	subflow_specific = ipv4_specific;
-	subflow_specific.conn_request = subflow_conn_request;
+	subflow_specific.conn_request = subflow_v4_conn_request;
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 	subflow_specific.rebuild_header = subflow_rebuild_header;
