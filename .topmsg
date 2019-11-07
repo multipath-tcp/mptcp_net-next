@@ -9,4 +9,6 @@ Call Trace:
  tcp_poll+0x17f/0x540
  sock_poll+0x152/0x180
 
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Florian Westphal <fw@strlen.de>
