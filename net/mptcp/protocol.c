@@ -300,7 +300,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		ret = tcp_poll(file, ssock, wait);
+		ret = ssock->ops->poll(file, ssock, wait);
 		sock_put(ssock->sk);
 		return ret;
 	}
