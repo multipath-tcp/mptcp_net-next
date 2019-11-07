@@ -885,7 +885,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
-	err = inet_bind(ssock, uaddr, addr_len);
+	err = ssock->ops->bind(ssock, uaddr, addr_len);
 	sock_put(ssock->sk);
 	return err;
 }
@@ -904,7 +904,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
-	err = inet_stream_connect(ssock, uaddr, addr_len, flags);
+	err = ssock->ops->connect(ssock, uaddr, addr_len, flags);
 	sock_put(ssock->sk);
 	return err;
 }
@@ -926,7 +926,7 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 		 * bypass mptcp.
 		 */
 		sock->ops = &inet_stream_ops;
-		return inet_getname(sock, uaddr, peer);
+		return sock->ops->getname(sock, uaddr, peer);
 	}
 
 	lock_sock(sock->sk);
@@ -934,7 +934,7 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 	if (ssock) {
 		release_sock(sock->sk);
 		pr_debug("subflow=%p", ssock->sk);
-		ret = inet_getname(ssock, uaddr, peer);
+		ret = ssock->ops->getname(ssock, uaddr, peer);
 		sock_put(ssock->sk);
 		return ret;
 	}
@@ -949,7 +949,7 @@ static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
 		return -ENOTCONN;
 	}
 
-	ret = inet_getname(ssk->sk_socket, uaddr, peer);
+	ret = ssk->sk_socket->ops->getname(ssk->sk_socket, uaddr, peer);
 	release_sock(sock->sk);
 	return ret;
 }
@@ -966,7 +966,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
-	err = inet_listen(ssock, backlog);
+	err = ssock->ops->listen(ssock, backlog);
 	sock_put(ssock->sk);
 	return err;
 }
@@ -984,7 +984,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 	if (!ssock)
 		return -EINVAL;
 
-	err = inet_accept(sock, newsock, flags, kern);
+	err = ssock->ops->accept(sock, newsock, flags, kern);
 	sock_put(ssock->sk);
 	return err;
 }
@@ -1003,7 +1003,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		ret = tcp_poll(file, ssock, wait);
+		ret = ssock->ops->poll(file, ssock, wait);
 		sock_put(ssock->sk);
 		return ret;
 	}
