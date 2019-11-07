@@ -262,7 +262,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
-	err = inet_bind(ssock, uaddr, addr_len);
+	err = ssock->ops->bind(ssock, uaddr, addr_len);
 	sock_put(ssock->sk);
 	return err;
 }
@@ -281,7 +281,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
-	err = inet_stream_connect(ssock, uaddr, addr_len, flags);
+	err = ssock->ops->connect(ssock, uaddr, addr_len, flags);
 	sock_put(ssock->sk);
 	return err;
 }
