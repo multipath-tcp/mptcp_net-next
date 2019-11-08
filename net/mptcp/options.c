@@ -582,8 +582,10 @@ static void update_una(struct mptcp_sock *msk,
 		snd_una = old_snd_una;
 		old_snd_una = atomic64_cmpxchg(&msk->snd_una, snd_una,
 					       new_snd_una);
-		if (old_snd_una == snd_una)
+		if (old_snd_una == snd_una) {
+			mptcp_reset_timer((struct sock *)msk);
 			break;
+		}
 	}
 }
 
