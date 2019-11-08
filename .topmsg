@@ -7,4 +7,6 @@ against concurrent updates from multiple subflows.
 
 Initialize the snd_una at connect()/accept() time.
 
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
