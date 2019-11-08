@@ -658,6 +658,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
 		pr_debug("msk=%p, token=%u", msk, msk->token);
+		msk->dport = ntohs(inet_sk(msk->subflow->sk)->inet_dport);
 
 		mptcp_pm_new_connection(msk, 0);
 
