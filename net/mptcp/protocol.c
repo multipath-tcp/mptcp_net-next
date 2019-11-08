@@ -422,22 +422,21 @@ wait_for_data:
 	return copied;
 }
 
-static int mptcp_init_sock(struct sock *sk)
+static int __mptcp_init_sock(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct net *net = sock_net(sk);
-	struct socket *sf;
-	int err;
-
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
-	if (!err) {
-		pr_debug("subflow=%p", sf->sk);
-		msk->subflow = sf;
-	}
 
 	INIT_LIST_HEAD(&msk->conn_list);
 
-	return err;
+	return 0;
+}
+
+static int mptcp_init_sock(struct sock *sk)
+{
+	if (!mptcp_is_enabled(sock_net(sk)))
+		return -ENOPROTOOPT;
+
+	return __mptcp_init_sock(sk);
 }
 
 static void mptcp_close(struct sock *sk, long timeout)
@@ -506,7 +505,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 			return NULL;
 		}
 
-		mptcp_init_sock(new_mptcp_sock);
+		__mptcp_init_sock(new_mptcp_sock);
 
 		msk = mptcp_sk(new_mptcp_sock);
 		msk->remote_key = subflow->remote_key;
@@ -947,7 +946,7 @@ static struct inet_protosw mptcp_protosw = {
 	.flags		= INET_PROTOSW_ICSK,
 };
 
-void __init mptcp_init(void)
+void mptcp_proto_init(void)
 {
 	mptcp_prot.h.hashinfo = tcp_prot.h.hashinfo;
 	mptcp_stream_ops = inet_stream_ops;
