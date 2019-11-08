@@ -372,22 +372,12 @@ static void mptcp_wait_data(struct sock *sk, long *timeo)
 {
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	int data_ready;
 
 	add_wait_queue(sk_sleep(sk), &wait);
 	sk_set_bit(SOCKWQ_ASYNC_WAITDATA, sk);
 
-	release_sock(sk);
-
-	smp_mb__before_atomic();
-	data_ready = test_and_clear_bit(MPTCP_DATA_READY, &msk->flags);
-	smp_mb__after_atomic();
-
-	if (!data_ready)
-		*timeo = wait_woken(&wait, TASK_INTERRUPTIBLE, *timeo);
-
-	sched_annotate_sleep();
-	lock_sock(sk);
+	sk_wait_event(sk, timeo,
+		      test_and_clear_bit(MPTCP_DATA_READY, &msk->flags), &wait);
 
 	sk_clear_bit(SOCKWQ_ASYNC_WAITDATA, sk);
 	remove_wait_queue(sk_sleep(sk), &wait);
