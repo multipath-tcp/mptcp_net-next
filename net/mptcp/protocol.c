@@ -675,7 +675,9 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 		return ret;
 	}
 
+	release_sock(sk);
 	sock_poll_wait(file, sock, wait);
+	lock_sock(sk);
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct socket *tcp_sock;
