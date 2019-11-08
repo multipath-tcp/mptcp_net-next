@@ -248,7 +248,7 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 }
 
 static inline u64
-mptcp_subflow_get_map_offset(struct mptcp_subflow_context *subflow)
+mptcp_subflow_get_map_offset(const struct mptcp_subflow_context *subflow)
 {
 	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
 		      subflow->ssn_offset -
@@ -256,7 +256,7 @@ mptcp_subflow_get_map_offset(struct mptcp_subflow_context *subflow)
 }
 
 static inline u64
-mptcp_subflow_get_mapped_dsn(struct mptcp_subflow_context *subflow)
+mptcp_subflow_get_mapped_dsn(const struct mptcp_subflow_context *subflow)
 {
 	return subflow->map_seq + mptcp_subflow_get_map_offset(subflow);
 }
