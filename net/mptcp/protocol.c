@@ -591,10 +591,12 @@ static void mptcp_retransmit_handler(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	if (atomic64_read(&msk->snd_una) == msk->write_seq)
+	if (atomic64_read(&msk->snd_una) == msk->write_seq) {
 		mptcp_stop_timer(sk);
-	else
-		mptcp_reset_timer(sk);
+	} else {
+		if (schedule_work(&msk->rtx_work))
+			sock_hold(sk);
+	}
 }
 
 static void mptcp_retransmit_timer(struct timer_list *t)
@@ -616,12 +618,74 @@ static void mptcp_retransmit_timer(struct timer_list *t)
 	sock_put(sk);
 }
 
+static void mptcp_retransmit(struct work_struct *work)
+{
+	int orig_len, orig_offset, ret, mss_now = 0, size_goal = 0;
+	struct mptcp_data_frag *dfrag;
+	struct sock *ssk, *sk;
+	struct mptcp_sock *msk;
+	u64 orig_write_seq;
+	size_t copied = 0;
+	struct msghdr msg;
+	long timeo = 0;
+
+	msk = container_of(work, struct mptcp_sock, rtx_work);
+	sk = &msk->sk.icsk_inet.sk;
+
+	lock_sock(sk);
+	mptcp_clean_una(sk);
+	dfrag = mptcp_rtx_head(sk);
+	if (!dfrag)
+		goto unlock;
+
+	ssk = mptcp_subflow_get(msk);
+	if (!ssk)
+		goto reset_unlock;
+
+	lock_sock(ssk);
+
+	msg.msg_flags = MSG_DONTWAIT;
+	orig_len = dfrag->data_len;
+	orig_offset = dfrag->offset;
+	orig_write_seq = dfrag->data_seq;
+	while (dfrag->data_len > 0) {
+		ret = mptcp_sendmsg_frag(sk, ssk, &msg, dfrag, &timeo, &mss_now,
+					 &size_goal);
+		if (ret < 0)
+			break;
+
+		copied += ret;
+		dfrag->data_len -= ret;
+		dfrag->offset += ret;
+	}
+	if (copied)
+		tcp_push(ssk, msg.msg_flags, mss_now, tcp_sk(ssk)->nonagle,
+			 size_goal);
+
+	dfrag->data_seq = orig_write_seq;
+	dfrag->offset = orig_offset;
+	dfrag->data_len = orig_len;
+
+	mptcp_set_timeout(sk, ssk);
+	release_sock(ssk);
+
+reset_unlock:
+	if (!mptcp_timer_pending(sk))
+		mptcp_reset_timer(sk);
+
+unlock:
+	release_sock(sk);
+	sock_put(sk);
+}
+
 static int __mptcp_init_sock(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	INIT_LIST_HEAD(&msk->conn_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
+
+	INIT_WORK(&msk->rtx_work, mptcp_retransmit);
 
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
@@ -655,6 +719,14 @@ static void __mptcp_clear_xmit(struct sock *sk)
 		dfrag_clear(sk, dfrag);
 }
 
+static void mptcp_cancel_rtx_work(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (cancel_work_sync(&msk->rtx_work))
+		sock_put(sk);
+}
+
 static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
@@ -684,6 +756,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	__mptcp_clear_xmit(sk);
 	release_sock(sk);
 
+	mptcp_cancel_rtx_work(sk);
+
 	sk_common_release(sk);
 }
 
@@ -692,6 +766,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	lock_sock(sk);
 	__mptcp_clear_xmit(sk);
 	release_sock(sk);
+	mptcp_cancel_rtx_work(sk);
 	return tcp_disconnect(sk, flags);
 }
 
