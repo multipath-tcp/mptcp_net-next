@@ -7,14 +7,19 @@
 #define phylink_to_dpaa2_mac(config) \
 	container_of((config), struct dpaa2_mac, phylink_config)
 
-static phy_interface_t phy_mode(enum dpmac_eth_if eth_if)
+static int phy_mode(enum dpmac_eth_if eth_if, phy_interface_t *if_mode)
 {
+	*if_mode = PHY_INTERFACE_MODE_NA;
+
 	switch (eth_if) {
 	case DPMAC_ETH_IF_RGMII:
-		return PHY_INTERFACE_MODE_RGMII;
+		*if_mode = PHY_INTERFACE_MODE_RGMII;
+		break;
 	default:
 		return -EINVAL;
 	}
+
+	return 0;
 }
 
 /* Caller must call of_node_put on the returned value */
@@ -51,11 +56,11 @@ static int dpaa2_mac_get_if_mode(struct device_node *node,
 	if (!err)
 		return if_mode;
 
-	if_mode = phy_mode(attr.eth_if);
-	if (if_mode >= 0)
+	err = phy_mode(attr.eth_if, &if_mode);
+	if (!err)
 		return if_mode;
 
-	return -ENODEV;
+	return err;
 }
 
 static bool dpaa2_mac_phy_mode_mismatch(struct dpaa2_mac *mac,
@@ -299,4 +304,72 @@ void dpaa2_mac_disconnect(struct dpaa2_mac *mac)
 	phylink_disconnect_phy(mac->phylink);
 	phylink_destroy(mac->phylink);
 	dpmac_close(mac->mc_io, 0, mac->mc_dev->mc_handle);
+}
+
+static char dpaa2_mac_ethtool_stats[][ETH_GSTRING_LEN] = {
+	[DPMAC_CNT_ING_ALL_FRAME]		= "[mac] rx all frames",
+	[DPMAC_CNT_ING_GOOD_FRAME]		= "[mac] rx frames ok",
+	[DPMAC_CNT_ING_ERR_FRAME]		= "[mac] rx frame errors",
+	[DPMAC_CNT_ING_FRAME_DISCARD]		= "[mac] rx frame discards",
+	[DPMAC_CNT_ING_UCAST_FRAME]		= "[mac] rx u-cast",
+	[DPMAC_CNT_ING_BCAST_FRAME]		= "[mac] rx b-cast",
+	[DPMAC_CNT_ING_MCAST_FRAME]		= "[mac] rx m-cast",
+	[DPMAC_CNT_ING_FRAME_64]		= "[mac] rx 64 bytes",
+	[DPMAC_CNT_ING_FRAME_127]		= "[mac] rx 65-127 bytes",
+	[DPMAC_CNT_ING_FRAME_255]		= "[mac] rx 128-255 bytes",
+	[DPMAC_CNT_ING_FRAME_511]		= "[mac] rx 256-511 bytes",
+	[DPMAC_CNT_ING_FRAME_1023]		= "[mac] rx 512-1023 bytes",
+	[DPMAC_CNT_ING_FRAME_1518]		= "[mac] rx 1024-1518 bytes",
+	[DPMAC_CNT_ING_FRAME_1519_MAX]		= "[mac] rx 1519-max bytes",
+	[DPMAC_CNT_ING_FRAG]			= "[mac] rx frags",
+	[DPMAC_CNT_ING_JABBER]			= "[mac] rx jabber",
+	[DPMAC_CNT_ING_ALIGN_ERR]		= "[mac] rx align errors",
+	[DPMAC_CNT_ING_OVERSIZED]		= "[mac] rx oversized",
+	[DPMAC_CNT_ING_VALID_PAUSE_FRAME]	= "[mac] rx pause",
+	[DPMAC_CNT_ING_BYTE]			= "[mac] rx bytes",
+	[DPMAC_CNT_EGR_GOOD_FRAME]		= "[mac] tx frames ok",
+	[DPMAC_CNT_EGR_UCAST_FRAME]		= "[mac] tx u-cast",
+	[DPMAC_CNT_EGR_MCAST_FRAME]		= "[mac] tx m-cast",
+	[DPMAC_CNT_EGR_BCAST_FRAME]		= "[mac] tx b-cast",
+	[DPMAC_CNT_EGR_ERR_FRAME]		= "[mac] tx frame errors",
+	[DPMAC_CNT_EGR_UNDERSIZED]		= "[mac] tx undersized",
+	[DPMAC_CNT_EGR_VALID_PAUSE_FRAME]	= "[mac] tx b-pause",
+	[DPMAC_CNT_EGR_BYTE]			= "[mac] tx bytes",
+};
+
+#define DPAA2_MAC_NUM_STATS	ARRAY_SIZE(dpaa2_mac_ethtool_stats)
+
+int dpaa2_mac_get_sset_count(void)
+{
+	return DPAA2_MAC_NUM_STATS;
+}
+
+void dpaa2_mac_get_strings(u8 *data)
+{
+	u8 *p = data;
+	int i;
+
+	for (i = 0; i < DPAA2_MAC_NUM_STATS; i++) {
+		strlcpy(p, dpaa2_mac_ethtool_stats[i], ETH_GSTRING_LEN);
+		p += ETH_GSTRING_LEN;
+	}
+}
+
+void dpaa2_mac_get_ethtool_stats(struct dpaa2_mac *mac, u64 *data)
+{
+	struct fsl_mc_device *dpmac_dev = mac->mc_dev;
+	int i, err;
+	u64 value;
+
+	for (i = 0; i < DPAA2_MAC_NUM_STATS; i++) {
+		err = dpmac_get_counter(mac->mc_io, 0, dpmac_dev->mc_handle,
+					i, &value);
+		if (err) {
+			netdev_err_once(mac->net_dev,
+					"dpmac_get_counter error %d\n", err);
+			*(data + i) = U64_MAX;
+			continue;
+		}
+		*(data + i) = value;
+	}
 }
