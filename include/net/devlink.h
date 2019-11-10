@@ -38,8 +38,9 @@ struct devlink {
 	struct device *dev;
 	possible_net_t _net;
 	struct mutex lock;
-	bool reload_failed;
-	bool registered;
+	u8 reload_failed:1,
+	   reload_enabled:1,
+	   registered:1;
 	char priv[0] __aligned(NETDEV_ALIGN);
 };
 
@@ -569,6 +570,21 @@ enum devlink_trap_generic_id {
 	DEVLINK_TRAP_GENERIC_ID_BLACKHOLE_ROUTE,
 	DEVLINK_TRAP_GENERIC_ID_TTL_ERROR,
 	DEVLINK_TRAP_GENERIC_ID_TAIL_DROP,
+	DEVLINK_TRAP_GENERIC_ID_NON_IP_PACKET,
+	DEVLINK_TRAP_GENERIC_ID_UC_DIP_MC_DMAC,
+	DEVLINK_TRAP_GENERIC_ID_DIP_LB,
+	DEVLINK_TRAP_GENERIC_ID_SIP_MC,
+	DEVLINK_TRAP_GENERIC_ID_SIP_LB,
+	DEVLINK_TRAP_GENERIC_ID_CORRUPTED_IP_HDR,
+	DEVLINK_TRAP_GENERIC_ID_IPV4_SIP_BC,
+	DEVLINK_TRAP_GENERIC_ID_IPV6_MC_DIP_RESERVED_SCOPE,
+	DEVLINK_TRAP_GENERIC_ID_IPV6_MC_DIP_INTERFACE_LOCAL_SCOPE,
+	DEVLINK_TRAP_GENERIC_ID_MTU_ERROR,
+	DEVLINK_TRAP_GENERIC_ID_UNRESOLVED_NEIGH,
+	DEVLINK_TRAP_GENERIC_ID_RPF,
+	DEVLINK_TRAP_GENERIC_ID_REJECT_ROUTE,
+	DEVLINK_TRAP_GENERIC_ID_IPV4_LPM_UNICAST_MISS,
+	DEVLINK_TRAP_GENERIC_ID_IPV6_LPM_UNICAST_MISS,
 
 	/* Add new generic trap IDs above */
 	__DEVLINK_TRAP_GENERIC_ID_MAX,
@@ -607,6 +623,36 @@ enum devlink_trap_group_generic_id {
 	"ttl_value_is_too_small"
 #define DEVLINK_TRAP_GENERIC_NAME_TAIL_DROP \
 	"tail_drop"
+#define DEVLINK_TRAP_GENERIC_NAME_NON_IP_PACKET \
+	"non_ip"
+#define DEVLINK_TRAP_GENERIC_NAME_UC_DIP_MC_DMAC \
+	"uc_dip_over_mc_dmac"
+#define DEVLINK_TRAP_GENERIC_NAME_DIP_LB \
+	"dip_is_loopback_address"
+#define DEVLINK_TRAP_GENERIC_NAME_SIP_MC \
+	"sip_is_mc"
+#define DEVLINK_TRAP_GENERIC_NAME_SIP_LB \
+	"sip_is_loopback_address"
+#define DEVLINK_TRAP_GENERIC_NAME_CORRUPTED_IP_HDR \
+	"ip_header_corrupted"
+#define DEVLINK_TRAP_GENERIC_NAME_IPV4_SIP_BC \
+	"ipv4_sip_is_limited_bc"
+#define DEVLINK_TRAP_GENERIC_NAME_IPV6_MC_DIP_RESERVED_SCOPE \
+	"ipv6_mc_dip_reserved_scope"
+#define DEVLINK_TRAP_GENERIC_NAME_IPV6_MC_DIP_INTERFACE_LOCAL_SCOPE \
+	"ipv6_mc_dip_interface_local_scope"
+#define DEVLINK_TRAP_GENERIC_NAME_MTU_ERROR \
+	"mtu_value_is_too_small"
+#define DEVLINK_TRAP_GENERIC_NAME_UNRESOLVED_NEIGH \
+	"unresolved_neigh"
+#define DEVLINK_TRAP_GENERIC_NAME_RPF \
+	"mc_reverse_path_forwarding"
+#define DEVLINK_TRAP_GENERIC_NAME_REJECT_ROUTE \
+	"reject_route"
+#define DEVLINK_TRAP_GENERIC_NAME_IPV4_LPM_UNICAST_MISS \
+	"ipv4_lpm_miss"
+#define DEVLINK_TRAP_GENERIC_NAME_IPV6_LPM_UNICAST_MISS \
+	"ipv6_lpm_miss"
 
 #define DEVLINK_TRAP_GROUP_GENERIC_NAME_L2_DROPS \
 	"l2_drops"
@@ -779,6 +825,8 @@ void devlink_net_set(struct devlink *devlink, struct net *net);
 struct devlink *devlink_alloc(const struct devlink_ops *ops, size_t priv_size);
 int devlink_register(struct devlink *devlink, struct device *dev);
 void devlink_unregister(struct devlink *devlink);
+void devlink_reload_enable(struct devlink *devlink);
+void devlink_reload_disable(struct devlink *devlink);
 void devlink_free(struct devlink *devlink);
 int devlink_port_register(struct devlink *devlink,
 			  struct devlink_port *devlink_port,
