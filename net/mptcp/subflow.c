@@ -373,6 +373,7 @@ void mptcp_subflow_init(void)
 	subflow_v6_specific.conn_request = subflow_v6_conn_request;
 	subflow_v6_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_v6_specific.sk_rx_dst_set = subflow_finish_connect;
+	subflow_v6_specific.rebuild_header = subflow_rebuild_header;
 #endif
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
