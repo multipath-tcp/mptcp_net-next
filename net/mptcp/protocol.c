@@ -355,6 +355,7 @@ int mptcpv6_init(void)
 	mptcp_v6_stream_ops = inet6_stream_ops;
 	mptcp_v6_stream_ops.bind = mptcp_bind;
 	mptcp_v6_stream_ops.connect = mptcp_stream_connect;
+	mptcp_v6_stream_ops.poll = mptcp_poll;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
 
