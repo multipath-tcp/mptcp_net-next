@@ -35,7 +35,7 @@ struct mptcp_out_options {
 	u64 rcvr_key;
 	union {
 		struct in_addr addr;
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		struct in6_addr addr6;
 #endif
 	};
