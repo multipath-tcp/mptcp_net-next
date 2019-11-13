@@ -697,7 +697,7 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	release_sock(sk);
 
 	addrlen = sizeof(struct sockaddr_in);
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	if (local->sa_family == AF_INET6)
 		addrlen = sizeof(struct sockaddr_in6);
 #endif
