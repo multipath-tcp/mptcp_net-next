@@ -277,6 +277,40 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	return err;
 }
 
+static __poll_t mptcp_poll(struct file *file, struct socket *sock,
+			   struct poll_table_struct *wait)
+{
+	struct mptcp_subflow_context *subflow;
+	const struct mptcp_sock *msk;
+	struct sock *sk = sock->sk;
+	struct socket *ssock;
+	__poll_t ret = 0;
+
+	msk = mptcp_sk(sk);
+	lock_sock(sk);
+	ssock = __mptcp_fallback_get_ref(msk);
+	if (ssock) {
+		release_sock(sk);
+		ret = ssock->ops->poll(file, ssock, wait);
+		sock_put(ssock->sk);
+		return ret;
+	}
+
+	release_sock(sk);
+	sock_poll_wait(file, sock, wait);
+	lock_sock(sk);
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct socket *tcp_sock;
+
+		tcp_sock = mptcp_subflow_tcp_socket(subflow);
+		ret |= __tcp_poll(tcp_sock->sk);
+	}
+	release_sock(sk);
+
+	return ret;
+}
+
 static struct proto_ops mptcp_stream_ops;
 
 static struct inet_protosw mptcp_protosw = {
@@ -293,6 +327,7 @@ void __init mptcp_init(void)
 	mptcp_stream_ops = inet_stream_ops;
 	mptcp_stream_ops.bind = mptcp_bind;
 	mptcp_stream_ops.connect = mptcp_stream_connect;
+	mptcp_stream_ops.poll = mptcp_poll;
 
 	mptcp_subflow_init();
 
