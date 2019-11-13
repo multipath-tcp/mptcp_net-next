@@ -189,6 +189,7 @@ static int subflow_ulp_init(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	tp->is_mptcp = 1;
+	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
 out:
 	return err;
