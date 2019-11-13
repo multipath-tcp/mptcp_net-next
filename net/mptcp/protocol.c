@@ -195,17 +195,23 @@ void __init mptcp_init(void)
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct proto_ops mptcp_v6_stream_ops;
+
 static struct inet_protosw mptcp_v6_protosw = {
 	.type		= SOCK_STREAM,
 	.protocol	= IPPROTO_MPTCP,
 	.prot		= &mptcp_prot,
-	.ops		= &inet6_stream_ops,
+	.ops		= &mptcp_v6_stream_ops,
 	.flags		= INET_PROTOSW_ICSK,
 };
 
 int mptcpv6_init(void)
 {
 	int err;
+
+	mptcp_v6_stream_ops = inet6_stream_ops;
+	mptcp_v6_stream_ops.bind = mptcp_bind;
+	mptcp_v6_stream_ops.connect = mptcp_stream_connect;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
 
