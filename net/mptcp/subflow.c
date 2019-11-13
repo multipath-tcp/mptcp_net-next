@@ -118,6 +118,10 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 static struct inet_connection_sock_af_ops subflow_specific;
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct inet_connection_sock_af_ops subflow_v6_specific;
+#endif
+
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
 	struct mptcp_subflow_context *subflow;
@@ -125,7 +129,8 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	struct socket *sf;
 	int err;
 
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
+	err = sock_create_kern(net, sk->sk_family, SOCK_STREAM, IPPROTO_TCP,
+			       &sf);
 	if (err)
 		return err;
 
@@ -186,11 +191,15 @@ static int subflow_ulp_init(struct sock *sk)
 		goto out;
 	}
 
-	pr_debug("subflow=%p", ctx);
+	pr_debug("subflow=%p, family=%d", ctx, sk->sk_family);
 
 	tp->is_mptcp = 1;
 	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	if (sk->sk_family == AF_INET6)
+		icsk->icsk_af_ops = &subflow_v6_specific;
+#endif
 out:
 	return err;
 }
@@ -269,6 +278,11 @@ void mptcp_subflow_init(void)
 	subflow_specific.conn_request = subflow_v4_conn_request;
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	subflow_v6_specific = ipv6_specific;
+	subflow_v6_specific.sk_rx_dst_set = subflow_finish_connect;
+#endif
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP\n");
