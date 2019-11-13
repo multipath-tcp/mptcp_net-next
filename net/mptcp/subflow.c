@@ -63,8 +63,8 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 
 static int subflow_ulp_init(struct sock *sk)
 {
-	struct tcp_sock *tsk = tcp_sk(sk);
 	struct mptcp_subflow_context *ctx;
+	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
 
 	/* disallow attaching ULP to a socket unless it has been
@@ -83,7 +83,7 @@ static int subflow_ulp_init(struct sock *sk)
 
 	pr_debug("subflow=%p", ctx);
 
-	tsk->is_mptcp = 1;
+	tp->is_mptcp = 1;
 out:
 	return err;
 }
