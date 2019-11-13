@@ -207,6 +207,9 @@ void mptcp_subflow_init(void);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+extern const struct inet_connection_sock_af_ops ipv6_specific;
+#endif
 
 void mptcp_proto_init(void);
 
