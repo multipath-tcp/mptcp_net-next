@@ -11,4 +11,6 @@ The value of this new sysctl can be different per namespace. We can then
 restrict the usage of MPTCP to the selected NS. In case of serious
 issues with MPTCP, administrators can now easily turn MPTCP off.
 
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
