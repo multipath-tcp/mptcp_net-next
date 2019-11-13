@@ -1,6 +1,6 @@
 
 config MPTCP
-	bool "Multipath TCP"
+	bool "MPTCP: Multipath TCP"
 	depends on INET
 	select SKB_EXTENSIONS
 	help
@@ -9,3 +9,8 @@ config MPTCP
 	  uses the TCP protocol, and TCP options carry header information for
 	  MPTCP.
 
+config MPTCP_IPV6
+	bool "MPTCP: IPv6 support for Multipath TCP"
+	depends on MPTCP
+	select IPV6
+	default y
