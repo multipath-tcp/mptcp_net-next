@@ -587,6 +587,7 @@ int mptcpv6_init(void)
 	mptcp_v6_stream_ops.accept = mptcp_stream_accept;
 	mptcp_v6_stream_ops.getname = mptcp_v6_getname;
 	mptcp_v6_stream_ops.listen = mptcp_listen;
+	mptcp_v6_stream_ops.shutdown = mptcp_shutdown;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
 
