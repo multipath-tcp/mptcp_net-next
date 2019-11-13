@@ -14,6 +14,9 @@
 #include <net/inet_hashtables.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+#include <net/transp_v6.h>
+#endif
 #include <net/mptcp.h>
 #include "protocol.h"
 
@@ -342,10 +345,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct socket *ssock;
-	int err = -ENOTSUPP;
-
-	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
-		return err;
+	int err;
 
 	ssock = mptcp_socket_create_get(msk);
 	if (IS_ERR(ssock))
@@ -410,6 +410,30 @@ static int mptcp_v4_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	return ret;
 }
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static int mptcp_v6_getname(struct socket *sock, struct sockaddr *uaddr,
+			    int peer)
+{
+	int ret;
+
+	if (sock->sk->sk_prot == &tcpv6_prot) {
+		/* we are being invoked from __sys_accept4 after
+		 * mptcp_accept() has accepted a non-mp-capable
+		 * subflow: sk is a tcp_sk, not mptcp.
+		 *
+		 * Hand the socket over to tcp so all further
+		 * socket ops bypass mptcp.
+		 */
+		sock->ops = &inet6_stream_ops;
+		return sock->ops->getname(sock, uaddr, peer);
+	}
+
+	ret = mptcp_getname(sock, uaddr, peer);
+
+	return ret;
+}
+#endif
 
 static int mptcp_listen(struct socket *sock, int backlog)
 {
@@ -508,3 +532,32 @@ void __init mptcp_init(void)
 
 	inet_register_protosw(&mptcp_protosw);
 }
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct proto_ops mptcp_v6_stream_ops;
+
+static struct inet_protosw mptcp_v6_protosw = {
+	.type		= SOCK_STREAM,
+	.protocol	= IPPROTO_MPTCP,
+	.prot		= &mptcp_prot,
+	.ops		= &mptcp_v6_stream_ops,
+	.flags		= INET_PROTOSW_ICSK,
+};
+
+int mptcpv6_init(void)
+{
+	int err;
+
+	mptcp_v6_stream_ops = inet6_stream_ops;
+	mptcp_v6_stream_ops.bind = mptcp_bind;
+	mptcp_v6_stream_ops.connect = mptcp_stream_connect;
+	mptcp_v6_stream_ops.poll = mptcp_poll;
+	mptcp_v6_stream_ops.accept = mptcp_stream_accept;
+	mptcp_v6_stream_ops.getname = mptcp_v6_getname;
+	mptcp_v6_stream_ops.listen = mptcp_listen;
+
+	err = inet6_register_protosw(&mptcp_v6_protosw);
+
+	return err;
+}
+#endif
