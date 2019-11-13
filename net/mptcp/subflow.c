@@ -15,6 +15,22 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
+static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
+	subflow->icsk_af_ops->sk_rx_dst_set(sk, skb);
+
+	if (subflow->conn && !subflow->conn_finished) {
+		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
+			 subflow->remote_key);
+		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
+		subflow->conn_finished = 1;
+	}
+}
+
+static struct inet_connection_sock_af_ops subflow_specific;
+
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
 	struct mptcp_subflow_context *subflow;
@@ -63,6 +79,7 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 
 static int subflow_ulp_init(struct sock *sk)
 {
+	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct mptcp_subflow_context *ctx;
 	struct tcp_sock *tp = tcp_sk(sk);
 	int err = 0;
@@ -84,6 +101,8 @@ static int subflow_ulp_init(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	tp->is_mptcp = 1;
+	ctx->icsk_af_ops = icsk->icsk_af_ops;
+	icsk->icsk_af_ops = &subflow_specific;
 out:
 	return err;
 }
@@ -109,6 +128,9 @@ static struct tcp_ulp_ops subflow_ulp_ops __read_mostly = {
 
 void mptcp_subflow_init(void)
 {
+	subflow_specific = ipv4_specific;
+	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
+
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP\n");
 }
