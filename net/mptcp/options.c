@@ -493,7 +493,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	if (msk && mp_opt->add_addr) {
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4)
 			mptcp_pm_add_addr(msk, &mp_opt->addr, mp_opt->addr_id);
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		else if (mp_opt->family == MPTCP_ADDR_IPVERSION_6)
 			mptcp_pm_add_addr6(msk, &mp_opt->addr6,
 					   mp_opt->addr_id);
