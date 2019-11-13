@@ -189,6 +189,7 @@ static int subflow_ulp_init(struct sock *sk)
 	pr_debug("subflow=%p", ctx);
 
 	tp->is_mptcp = 1;
+	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
 out:
 	return err;
@@ -211,6 +212,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+	struct mptcp_subflow_context *old_ctx = mptcp_subflow_ctx(newsk);
 	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
@@ -220,6 +222,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 
 	new_ctx->conn = NULL;
 	new_ctx->conn_finished = 1;
+	new_ctx->icsk_af_ops = old_ctx->icsk_af_ops;
 
 	if (subflow_req->mp_capable) {
 		new_ctx->mp_capable = 1;

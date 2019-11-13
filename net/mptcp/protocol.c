@@ -118,20 +118,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 static int mptcp_init_sock(struct sock *sk)
 {
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct net *net = sock_net(sk);
-	struct socket *sf;
-	int err;
-
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
-	if (!err) {
-		pr_debug("subflow=%p", sf->sk);
-		msk->subflow = sf;
-	}
-
 	INIT_LIST_HEAD(&msk->conn_list);
 
-	return err;
+	return 0;
 }
 
 static void mptcp_close(struct sock *sk, long timeout)
