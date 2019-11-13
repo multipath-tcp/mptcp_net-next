@@ -257,6 +257,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 			      const gfp_t priority)
 {
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+	struct mptcp_subflow_context *old_ctx = mptcp_subflow_ctx(newsk);
 	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
