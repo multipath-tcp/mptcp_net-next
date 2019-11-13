@@ -193,3 +193,22 @@ void __init mptcp_init(void)
 
 	inet_register_protosw(&mptcp_protosw);
 }
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct inet_protosw mptcp_v6_protosw = {
+	.type		= SOCK_STREAM,
+	.protocol	= IPPROTO_MPTCP,
+	.prot		= &mptcp_prot,
+	.ops		= &inet6_stream_ops,
+	.flags		= INET_PROTOSW_ICSK,
+};
+
+int mptcpv6_init(void)
+{
+	int err;
+
+	err = inet6_register_protosw(&mptcp_v6_protosw);
+
+	return err;
+}
+#endif
