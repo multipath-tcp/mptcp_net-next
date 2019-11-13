@@ -14,6 +14,9 @@
 #include <net/inet_hashtables.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+#include <net/ip6_route.h>
+#endif
 #include <net/mptcp.h>
 #include "protocol.h"
 
@@ -86,6 +89,19 @@ static void subflow_v4_init_req(struct request_sock *req,
 	subflow_init_req(req, sk_listener, skb);
 }
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static void subflow_v6_init_req(struct request_sock *req,
+				const struct sock *sk_listener,
+				struct sk_buff *skb)
+{
+	tcp_rsk(req)->is_mptcp = 1;
+
+	tcp_request_sock_ipv6_ops.init_req(req, sk_listener, skb);
+
+	subflow_init_req(req, sk_listener, skb);
+}
+#endif
+
 static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
@@ -125,6 +141,31 @@ drop:
 	tcp_listendrop(sk);
 	return 0;
 }
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct tcp_request_sock_ops subflow_request_sock_ipv6_ops;
+static struct inet_connection_sock_af_ops subflow_v6_specific;
+
+static int subflow_v6_conn_request(struct sock *sk, struct sk_buff *skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
+	pr_debug("subflow=%p", subflow);
+
+	if (skb->protocol == htons(ETH_P_IP))
+		return tcp_v4_conn_request(sk, skb);
+
+	if (!ipv6_unicast_destination(skb))
+		goto drop;
+
+	return tcp_conn_request(&subflow_request_sock_ops,
+				&subflow_request_sock_ipv6_ops, sk, skb);
+
+drop:
+	tcp_listendrop(sk);
+	return 0; /* don't send reset */
+}
+#endif
 
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct sk_buff *skb,
@@ -480,7 +521,8 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	struct socket *sf;
 	int err;
 
-	err = sock_create_kern(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sf);
+	err = sock_create_kern(net, sk->sk_family, SOCK_STREAM, IPPROTO_TCP,
+			       &sf);
 	if (err)
 		return err;
 
@@ -542,11 +584,15 @@ static int subflow_ulp_init(struct sock *sk)
 		goto out;
 	}
 
-	pr_debug("subflow=%p", ctx);
+	pr_debug("subflow=%p, family=%d", ctx, sk->sk_family);
 
 	tp->is_mptcp = 1;
 	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = &subflow_specific;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	if (sk->sk_family == AF_INET6)
+		icsk->icsk_af_ops = &subflow_v6_specific;
+#endif
 	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	sk->sk_data_ready = subflow_data_ready;
 	sk->sk_write_space = subflow_write_space;
@@ -636,6 +682,17 @@ void mptcp_subflow_init(void)
 	subflow_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_specific.sk_rx_dst_set = subflow_finish_connect;
 	subflow_specific.rebuild_header = subflow_rebuild_header;
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	subflow_request_sock_ipv6_ops = tcp_request_sock_ipv6_ops;
+	subflow_request_sock_ipv6_ops.init_req = subflow_v6_init_req;
+
+	subflow_v6_specific = ipv6_specific;
+	subflow_v6_specific.conn_request = subflow_v6_conn_request;
+	subflow_v6_specific.syn_recv_sock = subflow_syn_recv_sock;
+	subflow_v6_specific.sk_rx_dst_set = subflow_finish_connect;
+	subflow_v6_specific.rebuild_header = subflow_rebuild_header;
+#endif
 
 	if (tcp_register_ulp(&subflow_ulp_ops) != 0)
 		panic("MPTCP: failed to register subflows to ULP\n");
