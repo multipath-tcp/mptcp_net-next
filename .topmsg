@@ -7,4 +7,6 @@ for a subflow socket and to the final ACK of the three-way handshake.
 Use the .sk_rx_dst_set() handler in the subflow proto to capture when the
 responding SYN-ACK is received and notify the MPTCP connection layer.
 
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
