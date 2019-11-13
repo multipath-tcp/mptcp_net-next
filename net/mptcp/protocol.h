@@ -38,8 +38,14 @@
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
 	struct inet_connection_sock sk;
+	u64		local_key;
+	u64		remote_key;
+	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
+
+#define mptcp_for_each_subflow(__msk, __subflow)			\
+	list_for_each_entry(__subflow, &((__msk)->conn_list), node)
 
 static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 {
@@ -48,10 +54,17 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
+	struct	list_head node;/* conn_list of subflows */
+	u64	local_key;
+	u64	remote_key;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
-		request_version : 4;
+		request_version : 4,
+		mp_capable : 1,	    /* remote is MPTCP capable */
+		fourth_ack : 1,	    /* send initial DSS */
+		conn_finished : 1;
 	struct	socket *tcp_sock;   /* underlying tcp_sock */
 	struct	sock *conn;	    /* parent mptcp_sock */
+	const	struct inet_connection_sock_af_ops *icsk_af_ops;
 	struct	rcu_head rcu;
 };
 
@@ -72,5 +85,9 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 
 void mptcp_subflow_init(void);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
+
+extern const struct inet_connection_sock_af_ops ipv4_specific;
+
+void mptcp_finish_connect(struct sock *sk, int mp_capable);
 
 #endif /* __MPTCP_PROTOCOL_H */
