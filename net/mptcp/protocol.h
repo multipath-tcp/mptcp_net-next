@@ -89,7 +89,7 @@ struct mptcp_pm_data {
 	sa_family_t local_family;
 	union {
 		struct in_addr local_addr;
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		struct in6_addr local_addr6;
 #endif
 	};
@@ -98,7 +98,7 @@ struct mptcp_pm_data {
 	sa_family_t remote_family;
 	union {
 		struct in_addr remote_addr;
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		struct in6_addr remote_addr6;
 #endif
 	};
@@ -296,7 +296,7 @@ void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 
 int mptcp_pm_announce_addr(u32 token, u8 local_id, struct in_addr *addr);
 int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr);
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr);
 int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr);
 #endif
