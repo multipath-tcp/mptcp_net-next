@@ -35,7 +35,7 @@ announce_put:
 	return err;
 }
 
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr)
 {
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
@@ -113,7 +113,7 @@ create_put:
 	return err;
 }
 
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
 {
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
@@ -224,7 +224,7 @@ void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
 int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 			 struct sockaddr_storage *saddr)
 {
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)saddr;
 #endif
 	struct sockaddr_in *addr = (struct sockaddr_in *)saddr;
@@ -235,7 +235,7 @@ int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 	if (msk->pm.local_family == AF_INET) {
 		addr->sin_family = msk->pm.local_family;
 		addr->sin_addr = msk->pm.local_addr;
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	} else if (msk->pm.local_family == AF_INET6) {
 		addr6->sin6_family = msk->pm.local_family;
 		addr6->sin6_addr = msk->pm.local_addr6;
