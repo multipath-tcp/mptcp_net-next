@@ -241,6 +241,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 static int mptcp_init_sock(struct sock *sk)
 {
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
 	INIT_LIST_HEAD(&msk->conn_list);
 
 	return 0;
