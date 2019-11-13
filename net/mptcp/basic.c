@@ -17,7 +17,7 @@ struct basic_pernet {
 
 	union {
 		struct in_addr announce_v4_addr;
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		struct in6_addr announce_v6_addr;
 #endif
 	};
@@ -37,7 +37,7 @@ static int parse_addr(struct basic_pernet *pernet, const char *addr)
 		pernet->has_announce_v6 = 0;
 		return 0;
 	}
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	if (in6_pton(addr, -1, (u8 *)&pernet->announce_v6_addr.s6_addr, '\0',
 		     NULL) > 0) {
 		pernet->has_announce_v4 = 0;
@@ -73,7 +73,7 @@ static int proc_parse_addr(struct ctl_table *ctl, int write,
 				 &pernet->announce_v4_addr);
 			tbl.data = tmp;
 		}
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		else if (pernet->has_announce_v6) {
 			snprintf(tmp, INET6_ADDRSTRLEN, "%pI6c",
 				 &pernet->announce_v6_addr);
@@ -197,7 +197,7 @@ static void announce_addr_worker(struct work_struct *work)
 	if (pernet->has_announce_v4 && sk->sk_family == AF_INET)
 		mptcp_pm_announce_addr(pm->token, 1,
 				       &pernet->announce_v4_addr);
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else if (pernet->has_announce_v6 && sk->sk_family == AF_INET6)
 		mptcp_pm_announce_addr6(pm->token, 1,
 					&pernet->announce_v6_addr);
@@ -222,7 +222,7 @@ static void create_subflow_worker(struct work_struct *work)
 			mptcp_pm_create_subflow(pm->token, pm->remote_id,
 						NULL);
 	}
-#if IS_ENABLED(CONFIG_IPV6)
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else if (pm->remote_family == AF_INET6) {
 		if (pernet->has_announce_v6)
 			mptcp_pm_create_subflow6(pm->token, pm->remote_id,
