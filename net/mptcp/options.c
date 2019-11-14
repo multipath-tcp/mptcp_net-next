@@ -371,8 +371,7 @@ static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
 		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu",
 			 subflow, subflow->local_key, subflow->remote_key);
 		return true;
-	} else if (subflow->mp_join && !subflow->fourth_ack &&
-		   remaining >= TCPOLEN_MPTCP_MPJ_ACK) {
+	} else if (subflow->mp_join && !subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPJ_ACK;
 		memcpy(opts->hmac, subflow->hmac, MPTCPOPT_HMAC_LEN);
 		*size = TCPOLEN_MPTCP_MPJ_ACK;
