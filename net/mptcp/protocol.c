@@ -674,10 +674,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct socket *ssock;
-	int err = -ENOTSUPP;
-
-	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
-		return err;
+	int err;
 
 	ssock = mptcp_socket_create_get(msk);
 	if (IS_ERR(ssock))
