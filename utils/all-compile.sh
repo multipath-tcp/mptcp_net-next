@@ -7,8 +7,8 @@ fi
 
 set -e
 
-echo | ./scripts/config --disable MPTCP || true
+echo | ./scripts/config -d MPTCP -d MPTCP_IPV6 || true
 make -j$(nproc)
 
-echo | ./scripts/config --enable MPTCP
+echo | ./scripts/config -e MPTCP -e MPTCP_IPV6
 make -j$(nproc)

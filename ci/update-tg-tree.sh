@@ -200,7 +200,7 @@ generate_config_no_mptcp() {
 generate_config_mptcp() {
 	generate_config_no_mptcp "${@}"
 
-	echo | scripts/config --enable MPTCP
+	echo | scripts/config -e MPTCP -e MPTCP_IPV6
 
 	# Here, we want to have a failure if some new MPTCP options are
 	# available not to forget to enable them. We then don't want to run
@@ -226,7 +226,7 @@ check_compilation_i386() {
 
 check_compilation_no_ipv6() {
 	generate_config_mptcp
-	echo | scripts/config --disable IPV6
+	echo | scripts/config -d IPV6 -d MPTCP_IPV6
 	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
 }
 
