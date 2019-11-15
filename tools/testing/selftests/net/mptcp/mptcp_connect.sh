@@ -302,7 +302,8 @@ do_transfer()
 	:> "$sout"
 	:> "$capout"
 
-	printf "%-4s %-5s -> %-4s (%s:%d) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${connect_addr} ${port} ${srv_proto}
+	addr_port=$(printf "%s:%d" ${connect_addr} ${port})
+	printf "%-4s %-5s -> %-4s (%-20s) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${addr_port} ${srv_proto}
 
 	if $capture; then
 	    if [ -z $SUDO_USER ] ; then
