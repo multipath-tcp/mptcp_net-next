@@ -466,7 +466,7 @@ for sender in "$ns1" "$ns2" "$ns3" "$ns4";do
 	do_ping "$ns3" $sender 10.0.3.2
 	$ipv6 && do_ping "$ns3" $sender dead:beef:3::2
 
-	do_ping ns4 $sender 10.0.3.1
+	do_ping "$ns4" $sender 10.0.3.1
 	$ipv6 && do_ping "$ns4" $sender dead:beef:3::1
 done
 
