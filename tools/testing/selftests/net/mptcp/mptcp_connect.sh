@@ -3,7 +3,7 @@
 
 time_start=$(date +%s)
 
-optstring="d:e:l:r:h6c"
+optstring="d:e:l:r:h4c"
 ret=0
 sin=""
 sout=""
@@ -12,7 +12,7 @@ cout=""
 ksft_skip=4
 capture=false
 timeout=30
-ipv6=false
+ipv6=true
 ethtool_random_on=true
 tc_delay="$((RANDOM%400))"
 tc_loss=$((RANDOM%101))
@@ -34,7 +34,7 @@ usage() {
 	echo -e "\t-l: tc/netem loss percentage, e.g. \"-l 0.02\" (default random)"
 	echo -e "\t-r: tc/netem reorder mode, e.g. \"-r 25% 50% gap 5\", use "-r 0" to disable reordering (default random)"
 	echo -e "\t-e: ethtool features to disable, e.g.: \"-e tso -e gso\" (default: randomly disable any of tso/gso/gro)"
-	echo -e "\t-6: enable IPv6 tests (default: only test IPv4)"
+	echo -e "\t-4: IPv4 only: disable IPv6 tests (default: test both IPv4 and IPv6)"
 	echo -e "\t-c: capture packets for each test using tcpdump (default: no capture)"
 }
 
@@ -62,8 +62,8 @@ while getopts "$optstring" option;do
 	"r")
 		tc_reorder="$OPTARG"
 		;;
-	"6")
-		ipv6=true
+	"4")
+		ipv6=false
 		;;
 	"c")
 		capture=true
