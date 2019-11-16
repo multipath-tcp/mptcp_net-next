@@ -426,8 +426,7 @@ run_tests_lo()
 
 	# skip if test programs are running inside same netns for subsequent runs.
 	if [ $loopback -eq 0 ] && [ ${listener_ns} = ${connector_ns} ]; then
-		ret=$lret
-		return 1
+		return 0
 	fi
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} ${local_addr}
