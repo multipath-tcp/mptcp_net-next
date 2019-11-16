@@ -8,6 +8,7 @@
 #ifndef __NET_MPTCP_H
 #define __NET_MPTCP_H
 
+#include <linux/skbuff.h>
 #include <linux/types.h>
 
 /* MPTCP sk_buff extension data */
@@ -24,4 +25,19 @@ struct mptcp_ext {
 			__unused:2;
 };
 
+#ifdef CONFIG_MPTCP
+
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return skb_ext_exist(skb, SKB_EXT_MPTCP);
+}
+
+#else
+
+static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return false;
+}
+
+#endif /* CONFIG_MPTCP */
 #endif /* __NET_MPTCP_H */
