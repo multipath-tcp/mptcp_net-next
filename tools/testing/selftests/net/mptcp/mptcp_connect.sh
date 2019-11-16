@@ -461,9 +461,23 @@ check_mptcp_disabled
 
 check_mptcp_ulp_setsockopt
 
-# Allow DAD to finish
-$ipv6 && sleep 2
+show_all_ipv6()
+{
+	local ns
+	for ns in "$ns1" "$ns2" "$ns3" "$ns4"; do
+		ip -net "${ns}" -6 addr show scope global
+	done
+}
 
+# Allow DAD to finish
+if $ipv6; then
+	for dad in $(seq 20); do
+		show_all_ipv6 | grep -q -e tentative -e temporary || break
+		sleep 0.1
+	done
+fi
+
+echo "INFO: validating network environment with pings"
 for sender in "$ns1" "$ns2" "$ns3" "$ns4";do
 	do_ping "$ns1" $sender 10.0.1.1
 	if $ipv6;then
