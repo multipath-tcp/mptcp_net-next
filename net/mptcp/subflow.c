@@ -470,6 +470,7 @@ bool mptcp_subflow_data_available(struct sock *sk)
 	}
 
 	if (!subflow_check_data_avail(sk)) {
+		subflow->data_avail = 0;
 		/* set EoF only there is no data available - we already spooled
 		 * all the pending skbs
 		 */
