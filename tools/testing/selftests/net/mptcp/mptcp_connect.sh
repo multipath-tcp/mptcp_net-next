@@ -90,6 +90,7 @@ cleanup()
 	rm -f "$sin" "$sout"
 	rm -f "$capout"
 
+	local netns
 	for netns in "$ns1" "$ns2" "$ns3" "$ns4";do
 		ip netns del $netns
 	done
@@ -178,9 +179,9 @@ set_random_ethtool_flags() {
 	local flags=""
 	local r=$RANDOM
 
-	pick1=$((r & 1))
-	pick2=$((r & 2))
-	pick3=$((r & 4))
+	local pick1=$((r & 1))
+	local pick2=$((r & 2))
+	local pick3=$((r & 4))
 
 	[ $pick1 -ne 0 ] && flags="tso off"
 	[ $pick2 -ne 0 ] && flags="$flags gso off"
@@ -208,9 +209,9 @@ print_file_err()
 
 check_transfer()
 {
-	in=$1
-	out=$2
-	what=$3
+	local in=$1
+	local out=$2
+	local what=$3
 
 	cmp "$in" "$out" > /dev/null 2>&1
 	if [ $? -ne 0 ] ;then
@@ -226,6 +227,7 @@ check_transfer()
 
 check_mptcp_disabled()
 {
+	local disabled_ns
 	disabled_ns="ns_disabled-$sech-$(mktemp -u XXXXXX)"
 	ip netns add ${disabled_ns} || exit $ksft_skip
 
@@ -254,7 +256,8 @@ check_mptcp_disabled()
 
 check_mptcp_ulp_setsockopt()
 {
-	local t="ns_ulp-$sech-$(mktemp -u XXXXXX)" retval=
+	local t retval
+	t="ns_ulp-$sech-$(mktemp -u XXXXXX)"
 
 	ip netns add ${t} || exit $ksft_skip
 	if ! ip netns exec ${t} ./mptcp_connect -u -p 10000 -s TCP 127.0.0.1 2>&1; then
@@ -271,9 +274,9 @@ check_mptcp_ulp_setsockopt()
 
 do_ping()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	connect_addr="$3"
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
 
 	ip netns exec ${connector_ns} ping -q -c 1 $connect_addr >/dev/null
 	if [ $? -ne 0 ] ; then
@@ -305,13 +308,14 @@ wait_local_port_listen()
 
 do_transfer()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	cl_proto="$3"
-	srv_proto="$4"
-	connect_addr="$5"
-	local_addr="$6"
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local cl_proto="$3"
+	local srv_proto="$4"
+	local connect_addr="$5"
+	local local_addr="$6"
 
+	local port
 	port=$((10000+$TEST_COUNT))
 	TEST_COUNT=$((TEST_COUNT+1))
 
@@ -319,45 +323,50 @@ do_transfer()
 	:> "$sout"
 	:> "$capout"
 
+	local addr_port
 	addr_port=$(printf "%s:%d" ${connect_addr} ${port})
 	printf "%.3s %-5s -> %.3s (%-20s) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${addr_port} ${srv_proto}
 
 	if $capture; then
-	    if [ -z $SUDO_USER ] ; then
-		capuser=""
-	    else
-		capuser="-Z $SUDO_USER"
-	    fi
+		local capuser
+		if [ -z $SUDO_USER ] ; then
+			capuser=""
+		else
+			capuser="-Z $SUDO_USER"
+		fi
 
-	    capfile="${listener_ns}-${connector_ns}-${cl_proto}-${srv_proto}-${connect_addr}.pcap"
+		local capfile="${listener_ns}-${connector_ns}-${cl_proto}-${srv_proto}-${connect_addr}.pcap"
 
-	    ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
-	    cappid=$!
+		ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
+		local cappid=$!
 
-	    sleep 1
+		sleep 1
 	fi
 
 	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} $local_addr < "$sin" > "$sout" &
-	spid=$!
+	local spid=$!
 
 	wait_local_port_listen "${listener_ns}" "${port}"
 
+	local start
 	start=$(date +%s%3N)
 	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
-	cpid=$!
+	local cpid=$!
 
 	wait $cpid
-	retc=$?
+	local retc=$?
 	wait $spid
-	rets=$?
+	local rets=$?
 
+	local stop
 	stop=$(date +%s%3N)
 
 	if $capture; then
-	    sleep 1
-	    kill $cappid
+		sleep 1
+		kill $cappid
 	fi
 
+	local duration
 	duration=$((stop-start))
 	duration=$(printf "(duration %05sms)" $duration)
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
@@ -388,9 +397,10 @@ do_transfer()
 
 make_file()
 {
-	name=$1
-	who=$2
+	local name=$1
+	local who=$2
 
+	local SIZE TSIZE
 	SIZE=$((RANDOM % (1024 * 8)))
 	TSIZE=$((SIZE * 1024))
 
@@ -407,12 +417,12 @@ make_file()
 
 run_tests_lo()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	connect_addr="$3"
-	local_addr="$4"
-	loopback="$5"
-	lret=0
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
+	local local_addr="$4"
+	local loopback="$5"
+	local lret=0
 
 	# skip if test programs are running inside same netns for subsequent runs.
 	if [ $loopback -eq 0 ] && [ ${listener_ns} = ${connector_ns} ]; then
