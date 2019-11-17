@@ -52,6 +52,7 @@
 #define FIRMWARE_8168G_3	"rtl_nic/rtl8168g-3.fw"
 #define FIRMWARE_8168H_1	"rtl_nic/rtl8168h-1.fw"
 #define FIRMWARE_8168H_2	"rtl_nic/rtl8168h-2.fw"
+#define FIRMWARE_8168FP_3	"rtl_nic/rtl8168fp-3.fw"
 #define FIRMWARE_8107E_1	"rtl_nic/rtl8107e-1.fw"
 #define FIRMWARE_8107E_2	"rtl_nic/rtl8107e-2.fw"
 #define FIRMWARE_8125A_3	"rtl_nic/rtl8125a-3.fw"
@@ -203,7 +204,7 @@ static const struct {
 	[RTL_GIGA_MAC_VER_49] = {"RTL8168ep/8111ep"			},
 	[RTL_GIGA_MAC_VER_50] = {"RTL8168ep/8111ep"			},
 	[RTL_GIGA_MAC_VER_51] = {"RTL8168ep/8111ep"			},
-	[RTL_GIGA_MAC_VER_52] = {"RTL8117"				},
+	[RTL_GIGA_MAC_VER_52] = {"RTL8168fp/RTL8117",  FIRMWARE_8168FP_3},
 	[RTL_GIGA_MAC_VER_60] = {"RTL8125"				},
 	[RTL_GIGA_MAC_VER_61] = {"RTL8125",		FIRMWARE_8125A_3},
 };
@@ -715,6 +716,7 @@ MODULE_FIRMWARE(FIRMWARE_8168G_2);
 MODULE_FIRMWARE(FIRMWARE_8168G_3);
 MODULE_FIRMWARE(FIRMWARE_8168H_1);
 MODULE_FIRMWARE(FIRMWARE_8168H_2);
+MODULE_FIRMWARE(FIRMWARE_8168FP_3);
 MODULE_FIRMWARE(FIRMWARE_8107E_1);
 MODULE_FIRMWARE(FIRMWARE_8107E_2);
 MODULE_FIRMWARE(FIRMWARE_8125A_3);
@@ -2297,14 +2299,6 @@ static void rtl_apply_firmware(struct rtl8169_private *tp)
 		rtl_fw_write_firmware(tp, tp->rtl_fw);
 }
 
-static void rtl_apply_firmware_cond(struct rtl8169_private *tp, u8 reg, u16 val)
-{
-	if (rtl_readphy(tp, reg) != val)
-		netif_warn(tp, hw, tp->dev, "chipset not ready for firmware\n");
-	else
-		rtl_apply_firmware(tp);
-}
-
 static void rtl8168_config_eee_mac(struct rtl8169_private *tp)
 {
 	/* Adjust EEE LED frequency */
@@ -2691,6 +2685,21 @@ static const struct phy_reg rtl8168d_1_phy_reg_init_1[] = {
 	{ 0x1f, 0x0002 }
 };
 
+static void rtl8168d_apply_firmware_cond(struct rtl8169_private *tp, u16 val)
+{
+	u16 reg_val;
+
+	rtl_writephy(tp, 0x1f, 0x0005);
+	rtl_writephy(tp, 0x05, 0x001b);
+	reg_val = rtl_readphy(tp, 0x06);
+	rtl_writephy(tp, 0x1f, 0x0000);
+
+	if (reg_val != val)
+		netif_warn(tp, hw, tp->dev, "chipset not ready for firmware\n");
+	else
+		rtl_apply_firmware(tp);
+}
+
 static void rtl8168d_1_hw_phy_config(struct rtl8169_private *tp)
 {
 	rtl_writephy_batch(tp, rtl8168d_1_phy_reg_init_0);
@@ -2737,13 +2746,9 @@ static void rtl8168d_1_hw_phy_config(struct rtl8169_private *tp)
 	rtl_writephy(tp, 0x1f, 0x0002);
 	rtl_w0w1_phy(tp, 0x02, 0x0100, 0x0600);
 	rtl_w0w1_phy(tp, 0x03, 0x0000, 0xe000);
-
-	rtl_writephy(tp, 0x1f, 0x0005);
-	rtl_writephy(tp, 0x05, 0x001b);
-
-	rtl_apply_firmware_cond(tp, MII_EXPANSION, 0xbf00);
-
 	rtl_writephy(tp, 0x1f, 0x0000);
+
+	rtl8168d_apply_firmware_cond(tp, 0xbf00);
 }
 
 static void rtl8168d_2_hw_phy_config(struct rtl8169_private *tp)
@@ -2782,13 +2787,9 @@ static void rtl8168d_2_hw_phy_config(struct rtl8169_private *tp)
 	/* Switching regulator Slew rate */
 	rtl_writephy(tp, 0x1f, 0x0002);
 	rtl_patchphy(tp, 0x0f, 0x0017);
-
-	rtl_writephy(tp, 0x1f, 0x0005);
-	rtl_writephy(tp, 0x05, 0x001b);
-
-	rtl_apply_firmware_cond(tp, MII_EXPANSION, 0xb300);
-
 	rtl_writephy(tp, 0x1f, 0x0000);
+
+	rtl8168d_apply_firmware_cond(tp, 0xb300);
 }
 
 static void rtl8168d_3_hw_phy_config(struct rtl8169_private *tp)
@@ -4883,6 +4884,9 @@ static void rtl_hw_start_8117(struct rtl8169_private *tp)
 	r8168_mac_ocp_write(tp, 0xe63e, 0x0000);
 	r8168_mac_ocp_write(tp, 0xc094, 0x0000);
 	r8168_mac_ocp_write(tp, 0xc09e, 0x0000);
+
+	/* firmware is for MAC only */
+	rtl_apply_firmware(tp);
 
 	rtl_hw_aspm_clkreq_enable(tp, true);
 }
