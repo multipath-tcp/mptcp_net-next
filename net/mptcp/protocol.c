@@ -541,8 +541,10 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
+	bool more_data_avail = false;
 	struct mptcp_read_arg arg;
 	read_descriptor_t desc;
+	bool wait_data = false;
 	struct socket *ssock;
 	struct tcp_sock *tp;
 	bool done = false;
@@ -575,10 +577,6 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		u32 map_remaining;
 		int bytes_read;
 
-		smp_mb__before_atomic();
-		clear_bit(MPTCP_DATA_READY, &msk->flags);
-		smp_mb__after_atomic();
-
 		ssk = mptcp_subflow_recv_lookup(msk);
 		pr_debug("msk=%p ssk=%p", msk, ssk);
 		if (!ssk)
@@ -588,7 +586,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		tp = tcp_sk(ssk);
 
 		lock_sock(ssk);
-		while (mptcp_subflow_data_available(ssk) && !done) {
+		do {
 			/* try to read as much data as available */
 			map_remaining = subflow->map_data_len -
 					mptcp_subflow_get_map_offset(subflow);
@@ -600,7 +598,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				if (!copied)
 					copied = bytes_read;
 				done = true;
-				continue;
+				goto next;
 			}
 
 			pr_debug("msk ack_seq=%llx -> %llx", msk->ack_seq,
@@ -609,18 +607,22 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			copied += bytes_read;
 			if (copied >= len) {
 				done = true;
-				continue;
+				goto next;
 			}
 			if (tp->urg_data && tp->urg_seq == tp->copied_seq) {
 				pr_err("Urgent data present, cannot proceed");
 				done = true;
-				continue;
+				goto next;
 			}
-		}
+next:
+			more_data_avail = mptcp_subflow_data_available(ssk);
+		} while (more_data_avail && !done);
 		release_sock(ssk);
 		continue;
 
 wait_for_data:
+		more_data_avail = false;
+
 		/* only the master socket status is relevant here. The exit
 		 * conditions mirror closely tcp_recvmsg()
 		 */
@@ -660,7 +662,22 @@ wait_for_data:
 		}
 
 		pr_debug("block timeout %ld", timeo);
+		wait_data = true;
 		mptcp_wait_data(sk, &timeo);
+	}
+
+	if (more_data_avail) {
+		if (!test_bit(MPTCP_DATA_READY, &msk->flags))
+			set_bit(MPTCP_DATA_READY, &msk->flags);
+	} else if (!wait_data) {
+		clear_bit(MPTCP_DATA_READY, &msk->flags);
+
+		/* .. race-breaker: ssk might get new data after last
+		 * data_available() returns false.
+		 */
+		ssk = mptcp_subflow_recv_lookup(msk);
+		if (unlikely(ssk))
+			set_bit(MPTCP_DATA_READY, &msk->flags);
 	}
 
 	release_sock(sk);
