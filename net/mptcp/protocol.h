@@ -15,6 +15,9 @@
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
 #define OPTION_MPTCP_MPC_SYNACK	BIT(1)
 #define OPTION_MPTCP_MPC_ACK	BIT(2)
+#define OPTION_MPTCP_MPJ_SYN	BIT(3)
+#define OPTION_MPTCP_MPJ_SYNACK	BIT(4)
+#define OPTION_MPTCP_MPJ_ACK	BIT(5)
 #define OPTION_MPTCP_ADD_ADDR	BIT(6)
 #define OPTION_MPTCP_ADD_ADDR6	BIT(7)
 #define OPTION_MPTCP_RM_ADDR	BIT(8)
@@ -33,6 +36,9 @@
 #define TCPOLEN_MPTCP_MPC_SYN		12
 #define TCPOLEN_MPTCP_MPC_SYNACK	20
 #define TCPOLEN_MPTCP_MPC_ACK		20
+#define TCPOLEN_MPTCP_MPJ_SYN		12
+#define TCPOLEN_MPTCP_MPJ_SYNACK	16
+#define TCPOLEN_MPTCP_MPJ_ACK		24
 #define TCPOLEN_MPTCP_DSS_BASE		4
 #define TCPOLEN_MPTCP_DSS_ACK32		4
 #define TCPOLEN_MPTCP_DSS_ACK64		8
@@ -42,6 +48,9 @@
 #define TCPOLEN_MPTCP_ADD_ADDR		8
 #define TCPOLEN_MPTCP_ADD_ADDR6		20
 #define TCPOLEN_MPTCP_RM_ADDR		4
+
+#define MPTCPOPT_BACKUP		BIT(0)
+#define MPTCPOPT_HMAC_LEN	20
 
 /* MPTCP MP_CAPABLE flags */
 #define MPTCP_VERSION_MASK	(0x0F)
@@ -131,11 +140,15 @@ struct mptcp_subflow_request_sock {
 		backup : 1,
 		version : 4;
 	u8	local_id;
+	u8	remote_id;
 	u64	local_key;
 	u64	remote_key;
 	u64	idsn;
 	u32	token;
 	u32	ssn_offset;
+	u64	thmac;
+	u32	local_nonce;
+	u32	remote_nonce;
 };
 
 static inline struct mptcp_subflow_request_sock *
@@ -159,11 +172,18 @@ struct mptcp_subflow_context {
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_version : 4,
 		mp_capable : 1,	    /* remote is MPTCP capable */
+		mp_join : 1,	    /* remote is JOINing */
 		fourth_ack : 1,	    /* send initial DSS */
 		conn_finished : 1,
 		map_valid : 1,
+		backup : 1,
 		data_avail : 1,
 		rx_eof : 1;
+	u32	remote_nonce;
+	u64	thmac;
+	u32	local_nonce;
+	u8	local_id;
+	u8	remote_id;
 
 	struct	socket *tcp_sock;   /* underlying tcp_sock */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -227,12 +247,14 @@ void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
 
 void mptcp_finish_connect(struct sock *sk, int mp_capable);
+void mptcp_finish_join(struct sock *sk);
 
 int mptcp_token_new_request(struct request_sock *req);
 void mptcp_token_destroy_request(u32 token);
 int mptcp_token_new_connect(struct sock *sk);
 int mptcp_token_new_accept(u32 token);
 void mptcp_token_update_accept(struct sock *sk, struct sock *conn);
+struct mptcp_sock *mptcp_token_get_sock(u32 token);
 void mptcp_token_destroy(u32 token);
 
 void mptcp_crypto_key_sha1(u64 key, u32 *token, u64 *idsn);
