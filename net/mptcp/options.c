@@ -383,7 +383,6 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
 
@@ -391,17 +390,6 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 		return;
 
 	mp_opt = &opt_rx->mptcp;
-
-	if (msk && mp_opt->add_addr) {
-		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4)
-			mptcp_pm_add_addr(msk, &mp_opt->addr, mp_opt->addr_id);
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		else if (mp_opt->family == MPTCP_ADDR_IPVERSION_6)
-			mptcp_pm_add_addr6(msk, &mp_opt->addr6,
-					   mp_opt->addr_id);
-#endif
-		mp_opt->add_addr = 0;
-	}
 
 	if (!mp_opt->dss)
 		return;
@@ -427,9 +415,6 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	}
 
 	mpext->data_fin = mp_opt->data_fin;
-
-	if (msk)
-		mptcp_pm_fully_established(msk);
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
