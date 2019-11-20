@@ -60,6 +60,16 @@ static void subflow_init_req(struct request_sock *req,
 	memset(&rx_opt.mptcp, 0, sizeof(rx_opt.mptcp));
 	mptcp_get_options(skb, &rx_opt);
 
+	subflow_req->mp_capable = 0;
+
+#ifdef CONFIG_TCP_MD5SIG
+	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
+	 * TCP option space.
+	 */
+	if (rcu_access_pointer(tcp_sk(sk_listener)->md5sig_info))
+		return;
+#endif
+
 	if (rx_opt.mptcp.mp_capable && listener->request_mptcp) {
 		int err;
 
@@ -72,8 +82,6 @@ static void subflow_init_req(struct request_sock *req,
 		else
 			subflow_req->version = rx_opt.mptcp.version;
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
-	} else {
-		subflow_req->mp_capable = 0;
 	}
 }
 

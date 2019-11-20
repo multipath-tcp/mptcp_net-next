@@ -200,7 +200,7 @@ static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
-	if (!subflow->fourth_ack && remaining >= TCPOLEN_MPTCP_MPC_ACK) {
+	if (!subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
@@ -220,6 +220,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 {
 	unsigned int dss_size = 0;
 	struct mptcp_ext *mpext;
+	struct mptcp_sock *msk;
 	unsigned int ack_size;
 
 	mpext = skb ? mptcp_get_ext(skb) : NULL;
@@ -229,15 +230,10 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
 
-		if (map_size <= remaining) {
-			remaining -= map_size;
-			dss_size = map_size;
-			if (mpext)
-				opts->ext_copy = *mpext;
-		} else {
-			opts->ext_copy.use_map = 0;
-			WARN_ONCE(1, "MPTCP: Map dropped");
-		}
+		remaining -= map_size;
+		dss_size = map_size;
+		if (mpext)
+			opts->ext_copy = *mpext;
 	}
 
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
@@ -246,29 +242,19 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 	if (dss_size == 0)
 		ack_size += TCPOLEN_MPTCP_DSS_BASE;
 
-	if (ack_size <= remaining) {
-		struct mptcp_sock *msk;
+	dss_size += ack_size;
 
-		dss_size += ack_size;
-
-		msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
-		if (msk) {
-			opts->ext_copy.data_ack = msk->ack_seq;
-		} else {
-			mptcp_crypto_key_sha1(mptcp_subflow_ctx(sk)->remote_key,
-					      NULL, &opts->ext_copy.data_ack);
-			opts->ext_copy.data_ack++;
-		}
-
-		opts->ext_copy.ack64 = 1;
-		opts->ext_copy.use_ack = 1;
+	msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
+	if (msk) {
+		opts->ext_copy.data_ack = msk->ack_seq;
 	} else {
-		opts->ext_copy.use_ack = 0;
-		WARN(1, "MPTCP: Ack dropped");
+		mptcp_crypto_key_sha1(mptcp_subflow_ctx(sk)->remote_key,
+				      NULL, &opts->ext_copy.data_ack);
+		opts->ext_copy.data_ack++;
 	}
 
-	if (!dss_size)
-		return false;
+	opts->ext_copy.ack64 = 1;
+	opts->ext_copy.use_ack = 1;
 
 	*size = ALIGN(dss_size, 4);
 	return true;
@@ -279,22 +265,27 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       struct mptcp_out_options *opts)
 {
 	unsigned int opt_size = 0;
+	bool ret = false;
 
 	if (!mptcp_subflow_ctx(sk)->mp_capable)
 		return false;
 
-	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts)) {
-		*size += opt_size;
-		remaining -= opt_size;
-		return true;
-	} else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
-						 opts)) {
-		*size += opt_size;
-		remaining -= opt_size;
-		return true;
-	}
+	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts))
+		ret = true;
+	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
+						 opts))
+		ret = true;
 
-	return false;
+	/* we reserved enough space for the above options, and exceeding the
+	 * TCP option space would be fatal
+	 */
+	if (WARN_ON_ONCE(opt_size > remaining))
+		return false;
+
+	*size += opt_size;
+	remaining -= opt_size;
+
+	return ret;
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
