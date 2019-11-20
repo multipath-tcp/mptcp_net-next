@@ -194,12 +194,13 @@ void mptcp_rcv_synsent(struct sock *sk)
 	}
 }
 
-bool mptcp_established_options(struct sock *sk, unsigned int *size,
-			       struct mptcp_out_options *opts)
+static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
+					 unsigned int remaining,
+					 struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
-	if (subflow->mp_capable && !subflow->fourth_ack) {
+	if (!subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
@@ -210,6 +211,81 @@ bool mptcp_established_options(struct sock *sk, unsigned int *size,
 		return true;
 	}
 	return false;
+}
+
+static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
+					  unsigned int *size,
+					  unsigned int remaining,
+					  struct mptcp_out_options *opts)
+{
+	unsigned int dss_size = 0;
+	struct mptcp_ext *mpext;
+	struct mptcp_sock *msk;
+	unsigned int ack_size;
+
+	mpext = skb ? mptcp_get_ext(skb) : NULL;
+
+	if (!skb || (mpext && mpext->use_map)) {
+		unsigned int map_size;
+
+		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
+
+		remaining -= map_size;
+		dss_size = map_size;
+		if (mpext)
+			opts->ext_copy = *mpext;
+	}
+
+	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
+
+	/* Add kind/length/subtype/flag overhead if mapping is not populated */
+	if (dss_size == 0)
+		ack_size += TCPOLEN_MPTCP_DSS_BASE;
+
+	dss_size += ack_size;
+
+	msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
+	if (msk) {
+		opts->ext_copy.data_ack = msk->ack_seq;
+	} else {
+		mptcp_crypto_key_sha1(mptcp_subflow_ctx(sk)->remote_key,
+				      NULL, &opts->ext_copy.data_ack);
+		opts->ext_copy.data_ack++;
+	}
+
+	opts->ext_copy.ack64 = 1;
+	opts->ext_copy.use_ack = 1;
+
+	*size = ALIGN(dss_size, 4);
+	return true;
+}
+
+bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			       unsigned int *size, unsigned int remaining,
+			       struct mptcp_out_options *opts)
+{
+	unsigned int opt_size = 0;
+	bool ret = false;
+
+	if (!mptcp_subflow_ctx(sk)->mp_capable)
+		return false;
+
+	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts))
+		ret = true;
+	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
+						 opts))
+		ret = true;
+
+	/* we reserved enough space for the above options, and exceeding the
+	 * TCP option space would be fatal
+	 */
+	if (WARN_ON_ONCE(opt_size > remaining))
+		return false;
+
+	*size += opt_size;
+	remaining -= opt_size;
+
+	return ret;
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
@@ -254,6 +330,47 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
+		}
+	}
+
+	if (opts->ext_copy.use_ack || opts->ext_copy.use_map) {
+		struct mptcp_ext *mpext = &opts->ext_copy;
+		u8 len = TCPOLEN_MPTCP_DSS_BASE;
+		u8 flags = 0;
+
+		if (mpext->use_ack) {
+			len += TCPOLEN_MPTCP_DSS_ACK64;
+			flags = MPTCP_DSS_HAS_ACK | MPTCP_DSS_ACK64;
+		}
+
+		if (mpext->use_map) {
+			len += TCPOLEN_MPTCP_DSS_MAP64;
+
+			/* Use only 64-bit mapping flags for now, add
+			 * support for optional 32-bit mappings later.
+			 */
+			flags |= MPTCP_DSS_HAS_MAP | MPTCP_DSS_DSN64;
+			if (mpext->data_fin)
+				flags |= MPTCP_DSS_DATA_FIN;
+		}
+
+		*ptr++ = htonl((TCPOPT_MPTCP << 24) |
+			       (len  << 16) |
+			       (MPTCPOPT_DSS << 12) |
+			       (flags));
+
+		if (mpext->use_ack) {
+			put_unaligned_be64(mpext->data_ack, ptr);
+			ptr += 2;
+		}
+
+		if (mpext->use_map) {
+			put_unaligned_be64(mpext->data_seq, ptr);
+			ptr += 2;
+			put_unaligned_be32(mpext->subflow_seq, ptr);
+			ptr += 1;
+			put_unaligned_be32(mpext->data_len << 16 |
+					   TCPOPT_NOP << 8 | TCPOPT_NOP, ptr);
 		}
 	}
 }
