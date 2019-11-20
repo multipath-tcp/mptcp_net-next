@@ -501,14 +501,9 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	remaining -= opt_size;
 
 	if (mptcp_established_options_addr(sk, &opt_size, remaining, opts)) {
-		if (opt_size > remaining) {
-			pr_debug("est opt: not enough space for addr: %u > %u",
-				 opt_size, remaining);
-		} else {
-			*size += opt_size;
-			remaining -= opt_size;
-			ret = true;
-		}
+		*size += opt_size;
+		remaining -= opt_size;
+		ret = true;
 	}
 
 	return ret;
