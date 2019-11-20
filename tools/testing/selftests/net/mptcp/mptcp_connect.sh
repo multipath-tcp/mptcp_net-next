@@ -3,7 +3,7 @@
 
 time_start=$(date +%s)
 
-optstring="d:e:l:r:h6c"
+optstring="d:e:l:r:h4c"
 ret=0
 sin=""
 sout=""
@@ -12,7 +12,7 @@ cout=""
 ksft_skip=4
 capture=false
 timeout=30
-ipv6=false
+ipv6=true
 ethtool_random_on=true
 tc_delay="$((RANDOM%400))"
 tc_loss=$((RANDOM%101))
@@ -34,7 +34,7 @@ usage() {
 	echo -e "\t-l: tc/netem loss percentage, e.g. \"-l 0.02\" (default random)"
 	echo -e "\t-r: tc/netem reorder mode, e.g. \"-r 25% 50% gap 5\", use "-r 0" to disable reordering (default random)"
 	echo -e "\t-e: ethtool features to disable, e.g.: \"-e tso -e gso\" (default: randomly disable any of tso/gso/gro)"
-	echo -e "\t-6: enable IPv6 tests (default: only test IPv4)"
+	echo -e "\t-4: IPv4 only: disable IPv6 tests (default: test both IPv4 and IPv6)"
 	echo -e "\t-c: capture packets for each test using tcpdump (default: no capture)"
 }
 
@@ -62,8 +62,8 @@ while getopts "$optstring" option;do
 	"r")
 		tc_reorder="$OPTARG"
 		;;
-	"6")
-		ipv6=true
+	"4")
+		ipv6=false
 		;;
 	"c")
 		capture=true
@@ -90,6 +90,7 @@ cleanup()
 	rm -f "$sin" "$sout"
 	rm -f "$capout"
 
+	local netns
 	for netns in "$ns1" "$ns2" "$ns3" "$ns4";do
 		ip netns del $netns
 	done
@@ -123,47 +124,41 @@ ip link add ns2eth3 netns "$ns2" type veth peer name ns3eth2 netns "$ns3"
 ip link add ns3eth4 netns "$ns3" type veth peer name ns4eth3 netns "$ns4"
 
 ip -net "$ns1" addr add 10.0.1.1/24 dev ns1eth2
-if $ipv6 ; then
-	ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth2
-	if [ $? -ne 0 ] ;then
-		echo "SKIP: Can't add ipv6 address, skip ipv6 tests" 1>&2
-		ipv6=false
-	fi
-fi
+ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth2
 
 ip -net "$ns1" link set ns1eth2 up
 ip -net "$ns1" route add default via 10.0.1.2
-$ipv6 && ip -net "$ns1" route add default via dead:beef:1::2
+ip -net "$ns1" route add default via dead:beef:1::2
 
 ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
-$ipv6 && ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1
+ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1
 ip -net "$ns2" link set ns2eth1 up
 
 ip -net "$ns2" addr add 10.0.2.1/24 dev ns2eth3
-$ipv6 && ip -net "$ns2" addr add dead:beef:2::1/64 dev ns2eth3
+ip -net "$ns2" addr add dead:beef:2::1/64 dev ns2eth3
 ip -net "$ns2" link set ns2eth3 up
 ip -net "$ns2" route add default via 10.0.2.2
-$ipv6 && ip -net "$ns2" route add default via dead:beef:2::2
+ip -net "$ns2" route add default via dead:beef:2::2
 ip netns exec "$ns2" sysctl -q net.ipv4.ip_forward=1
-$ipv6 && ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
+ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
 
 ip -net "$ns3" addr add 10.0.2.2/24 dev ns3eth2
-$ipv6 && ip -net "$ns3" addr add dead:beef:2::2/64 dev ns3eth2
+ip -net "$ns3" addr add dead:beef:2::2/64 dev ns3eth2
 ip -net "$ns3" link set ns3eth2 up
 
 ip -net "$ns3" addr add 10.0.3.2/24 dev ns3eth4
-$ipv6 && ip -net "$ns3" addr add dead:beef:3::2/64 dev ns3eth4
+ip -net "$ns3" addr add dead:beef:3::2/64 dev ns3eth4
 ip -net "$ns3" link set ns3eth4 up
 ip -net "$ns3" route add default via 10.0.2.1
-$ipv6 && ip -net "$ns3" route add default via dead:beef:2::1
+ip -net "$ns3" route add default via dead:beef:2::1
 ip netns exec "$ns3" sysctl -q net.ipv4.ip_forward=1
-$ipv6 && ip netns exec "$ns3" sysctl -q net.ipv6.conf.all.forwarding=1
+ip netns exec "$ns3" sysctl -q net.ipv6.conf.all.forwarding=1
 
 ip -net "$ns4" addr add 10.0.3.1/24 dev ns4eth3
-$ipv6 && ip -net "$ns4" addr add dead:beef:3::1/64 dev ns4eth3
+ip -net "$ns4" addr add dead:beef:3::1/64 dev ns4eth3
 ip -net "$ns4" link set ns4eth3 up
 ip -net "$ns4" route add default via 10.0.3.2
-$ipv6 && ip -net "$ns4" route add default via dead:beef:3::2
+ip -net "$ns4" route add default via dead:beef:3::2
 
 set_ethtool_flags() {
 	local ns="$1"
@@ -178,9 +173,9 @@ set_random_ethtool_flags() {
 	local flags=""
 	local r=$RANDOM
 
-	pick1=$((r & 1))
-	pick2=$((r & 2))
-	pick3=$((r & 4))
+	local pick1=$((r & 1))
+	local pick2=$((r & 2))
+	local pick3=$((r & 4))
 
 	[ $pick1 -ne 0 ] && flags="tso off"
 	[ $pick2 -ne 0 ] && flags="$flags gso off"
@@ -208,9 +203,9 @@ print_file_err()
 
 check_transfer()
 {
-	in=$1
-	out=$2
-	what=$3
+	local in=$1
+	local out=$2
+	local what=$3
 
 	cmp "$in" "$out" > /dev/null 2>&1
 	if [ $? -ne 0 ] ;then
@@ -226,6 +221,7 @@ check_transfer()
 
 check_mptcp_disabled()
 {
+	local disabled_ns
 	disabled_ns="ns_disabled-$sech-$(mktemp -u XXXXXX)"
 	ip netns add ${disabled_ns} || exit $ksft_skip
 
@@ -254,7 +250,8 @@ check_mptcp_disabled()
 
 check_mptcp_ulp_setsockopt()
 {
-	local t="ns_ulp-$sech-$(mktemp -u XXXXXX)" retval=
+	local t retval
+	t="ns_ulp-$sech-$(mktemp -u XXXXXX)"
 
 	ip netns add ${t} || exit $ksft_skip
 	if ! ip netns exec ${t} ./mptcp_connect -u -p 10000 -s TCP 127.0.0.1 2>&1; then
@@ -269,11 +266,21 @@ check_mptcp_ulp_setsockopt()
 	return $retval
 }
 
+# $1: IP address
+is_v6()
+{
+	[ -z "${1##*:*}" ]
+}
+
 do_ping()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	connect_addr="$3"
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
+
+	if ! $ipv6 && is_v6 "${connect_addr}"; then
+		return 0
+	fi
 
 	ip netns exec ${connector_ns} ping -q -c 1 $connect_addr >/dev/null
 	if [ $? -ne 0 ] ; then
@@ -286,15 +293,33 @@ do_ping()
 	return 0
 }
 
+# $1: ns, $2: port
+wait_local_port_listen()
+{
+	local listener_ns="${1}"
+	local port="${2}"
+
+	local port_hex i
+
+	port_hex="$(printf "%04X" "${port}")"
+	for i in $(seq 10); do
+		ip netns exec "${listener_ns}" cat /proc/net/tcp* | \
+			awk "BEGIN {rc=1} {if (\$2 ~ /:${port_hex}\$/ && \$4 ~ /0A/) {rc=0; exit}} END {exit rc}" &&
+			break
+		sleep 0.1
+	done
+}
+
 do_transfer()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	cl_proto="$3"
-	srv_proto="$4"
-	connect_addr="$5"
-	local_addr="$6"
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local cl_proto="$3"
+	local srv_proto="$4"
+	local connect_addr="$5"
+	local local_addr="$6"
 
+	local port
 	port=$((10000+$TEST_COUNT))
 	TEST_COUNT=$((TEST_COUNT+1))
 
@@ -302,44 +327,50 @@ do_transfer()
 	:> "$sout"
 	:> "$capout"
 
-	printf "%-4s %-5s -> %-4s (%s:%d) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${connect_addr} ${port} ${srv_proto}
+	local addr_port
+	addr_port=$(printf "%s:%d" ${connect_addr} ${port})
+	printf "%.3s %-5s -> %.3s (%-20s) %-5s\t" ${connector_ns} ${cl_proto} ${listener_ns} ${addr_port} ${srv_proto}
 
 	if $capture; then
-	    if [ -z $SUDO_USER ] ; then
-		capuser=""
-	    else
-		capuser="-Z $SUDO_USER"
-	    fi
+		local capuser
+		if [ -z $SUDO_USER ] ; then
+			capuser=""
+		else
+			capuser="-Z $SUDO_USER"
+		fi
 
-	    capfile="${listener_ns}-${connector_ns}-${cl_proto}-${srv_proto}-${connect_addr}.pcap"
+		local capfile="${listener_ns}-${connector_ns}-${cl_proto}-${srv_proto}-${connect_addr}.pcap"
 
-	    ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
-	    cappid=$!
+		ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
+		local cappid=$!
 
-	    sleep 1
+		sleep 1
 	fi
 
 	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} $local_addr < "$sin" > "$sout" &
-	spid=$!
+	local spid=$!
 
-	sleep 1
+	wait_local_port_listen "${listener_ns}" "${port}"
 
+	local start
 	start=$(date +%s%3N)
 	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
-	cpid=$!
+	local cpid=$!
 
 	wait $cpid
-	retc=$?
+	local retc=$?
 	wait $spid
-	rets=$?
+	local rets=$?
 
+	local stop
 	stop=$(date +%s%3N)
 
 	if $capture; then
-	    sleep 1
-	    kill $cappid
+		sleep 1
+		kill $cappid
 	fi
 
+	local duration
 	duration=$((stop-start))
 	duration=$(printf "(duration %05sms)" $duration)
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
@@ -370,9 +401,10 @@ do_transfer()
 
 make_file()
 {
-	name=$1
-	who=$2
+	local name=$1
+	local who=$2
 
+	local SIZE TSIZE
 	SIZE=$((RANDOM % (1024 * 8)))
 	TSIZE=$((SIZE * 1024))
 
@@ -389,17 +421,27 @@ make_file()
 
 run_tests_lo()
 {
-	listener_ns="$1"
-	connector_ns="$2"
-	connect_addr="$3"
-	local_addr="$4"
-	loopback="$5"
-	lret=0
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
+	local loopback="$4"
+	local lret=0
 
 	# skip if test programs are running inside same netns for subsequent runs.
 	if [ $loopback -eq 0 ] && [ ${listener_ns} = ${connector_ns} ]; then
-		ret=$lret
-		return 1
+		return 0
+	fi
+
+	# skip if we don't want v6
+	if ! $ipv6 && is_v6 "${connect_addr}"; then
+		return 0
+	fi
+
+	local local_addr
+	if is_v6 "${connect_addr}"; then
+		local_addr="::"
+	else
+		local_addr="0.0.0.0"
 	fi
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} ${local_addr}
@@ -433,7 +475,7 @@ run_tests_lo()
 
 run_tests()
 {
-	run_tests_lo $1 $2 $3 $4 0
+	run_tests_lo $1 $2 $3 0
 }
 
 make_file "$cin" "client"
@@ -443,31 +485,37 @@ check_mptcp_disabled
 
 check_mptcp_ulp_setsockopt
 
-# Allow DAD to finish
-$ipv6 && sleep 2
+show_all_ipv6()
+{
+	local ns
+	for ns in "$ns1" "$ns2" "$ns3" "$ns4"; do
+		ip -net "${ns}" -6 addr show scope global
+	done
+}
 
+# Allow DAD to finish
+for dad in $(seq 20); do
+	show_all_ipv6 | grep -q -e tentative -e temporary || break
+	sleep 0.1
+done
+
+echo "INFO: validating network environment with pings"
 for sender in "$ns1" "$ns2" "$ns3" "$ns4";do
 	do_ping "$ns1" $sender 10.0.1.1
-	if $ipv6;then
-		do_ping "$ns1" $sender dead:beef:1::1
-		if [ $? -ne 0 ]; then
-			echo "SKIP: IPv6 tests" 2>&1
-			ipv6=false
-		fi
-	fi
+	do_ping "$ns1" $sender dead:beef:1::1
 
 	do_ping "$ns2" $sender 10.0.1.2
-	$ipv6 && do_ping "$ns2" $sender dead:beef:1::2
+	do_ping "$ns2" $sender dead:beef:1::2
 	do_ping "$ns2" $sender 10.0.2.1
-	$ipv6 && do_ping "$ns2" $sender dead:beef:2::1
+	do_ping "$ns2" $sender dead:beef:2::1
 
 	do_ping "$ns3" $sender 10.0.2.2
-	$ipv6 && do_ping "$ns3" $sender dead:beef:2::2
+	do_ping "$ns3" $sender dead:beef:2::2
 	do_ping "$ns3" $sender 10.0.3.2
-	$ipv6 && do_ping "$ns3" $sender dead:beef:3::2
+	do_ping "$ns3" $sender dead:beef:3::2
 
-	do_ping ns4 $sender 10.0.3.1
-	$ipv6 && do_ping "$ns4" $sender dead:beef:3::1
+	do_ping "$ns4" $sender 10.0.3.1
+	do_ping "$ns4" $sender dead:beef:3::1
 done
 
 [ -n "$tc_loss" ] && tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $tc_loss
@@ -496,32 +544,29 @@ echo "on ns3eth4"
 tc -net "$ns3" qdisc add dev ns3eth4 root netem delay ${tc_delay}ms $tc_reorder
 
 for sender in $ns1 $ns2 $ns3 $ns4;do
-	run_tests_lo "$ns1" "$sender" 10.0.1.1 0.0.0.0 1
+	run_tests_lo "$ns1" "$sender" 10.0.1.1 1
 	if [ $ret -ne 0 ] ;then
 		echo "FAIL: Could not even run loopback test" 1>&2
 		exit $ret
 	fi
-	if $ipv6;then
-		run_tests_lo "$ns1" $sender dead:beef:1::1 :: 1
-		if [ $? -ne 0 ] ;then
-			echo "SKIP: IPv6 tests" 2>&1
-			ret=0
-			ipv6=false
-		fi
+	run_tests_lo "$ns1" $sender dead:beef:1::1 1
+	if [ $ret -ne 0 ] ;then
+		echo "FAIL: Could not even run loopback v6 test" 2>&1
+		exit $ret
 	fi
 
-	run_tests "$ns2" $sender 10.0.1.2 0.0.0.0
-	$ipv6 && run_tests "$ns2" $sender dead:beef:1::2 ::
-	run_tests "$ns2" $sender 10.0.2.1 0.0.0.0
-	$ipv6 && run_tests "$ns2" $sender dead:beef:2::1 ::
+	run_tests "$ns2" $sender 10.0.1.2
+	run_tests "$ns2" $sender dead:beef:1::2
+	run_tests "$ns2" $sender 10.0.2.1
+	run_tests "$ns2" $sender dead:beef:2::1
 
-	run_tests "$ns3" $sender 10.0.2.2 0.0.0.0
-	$ipv6 && run_tests "$ns3" $sender dead:beef:2::2 ::
-	run_tests "$ns3" $sender 10.0.3.2 0.0.0.0
-	$ipv6 && run_tests "$ns3" $sender dead:beef:3::2 ::
+	run_tests "$ns3" $sender 10.0.2.2
+	run_tests "$ns3" $sender dead:beef:2::2
+	run_tests "$ns3" $sender 10.0.3.2
+	run_tests "$ns3" $sender dead:beef:3::2
 
-	run_tests "$ns4" $sender 10.0.3.1 0.0.0.0
-	$ipv6 && run_tests "$ns4" $sender dead:beef:3::1 ::
+	run_tests "$ns4" $sender 10.0.3.1
+	run_tests "$ns4" $sender dead:beef:3::1
 done
 
 time_end=$(date +%s)
