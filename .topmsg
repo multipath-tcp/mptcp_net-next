@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-and-use-mptcp-RTX-flag
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add and use mptcp RTX flag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This is needed in the (unlikely) case that userspace is blocked in
+mptcp_sendmsg because wmem is exhausted.
+
+In that case, only the rtx work queue will clean the rtx backlog, but it
+could take several milliseconds until it runs next.  So, allow it to get
+scheduled as soon as possible so wmem can be reclaimed if the mptcp
+socket sndbuf is exhausted.
+
+Because such quick-schedule should not cause retransmits, add a flag
+that indicates when the work queue has been scheduled on behalf of the
+retransmit timer.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
