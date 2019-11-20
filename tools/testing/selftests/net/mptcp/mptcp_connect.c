@@ -3,6 +3,7 @@
 #define _GNU_SOURCE
 
 #include <errno.h>
+#include <limits.h>
 #include <fcntl.h>
 #include <string.h>
 #include <stdbool.h>
@@ -13,8 +14,11 @@
 #include <unistd.h>
 
 #include <sys/poll.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -33,15 +37,23 @@ extern int optind;
 static bool listen_mode;
 static int  poll_timeout;
 
+enum cfg_mode {
+	CFG_MODE_POLL,
+	CFG_MODE_MMAP,
+	CFG_MODE_SENDFILE,
+};
+
+static enum cfg_mode cfg_mode = CFG_MODE_POLL;
 static const char *cfg_host;
 static const char *cfg_port	= "12000";
 static int cfg_sock_proto	= IPPROTO_MPTCP;
 static bool tcpulp_audit;
 static int pf = AF_INET;
+static int cfg_sndbuf;
 
 static void die_usage(void)
 {
-	fprintf(stderr, "Usage: mptcp_connect [-6] [-u] [-s MPTCP|TCP] [-p port] "
+	fprintf(stderr, "Usage: mptcp_connect [-6] [-u] [-s MPTCP|TCP] [-p port] -m mode]"
 		"[ -l ] [ -t timeout ] connect_address\n");
 	exit(1);
 }
@@ -80,6 +92,17 @@ static void xgetaddrinfo(const char *node, const char *service,
 
 		fprintf(stderr, "Fatal: getaddrinfo(%s:%s): %s\n",
 			node ? node : "", service ? service : "", errstr);
+		exit(1);
+	}
+}
+
+static void set_sndbuf(int fd, unsigned int size)
+{
+	int err;
+
+	err = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
+	if (err) {
+		perror("set SO_SNDBUF");
 		exit(1);
 	}
 }
@@ -256,7 +279,7 @@ static ssize_t do_rnd_read(const int fd, char *buf, const size_t len)
 	return read(fd, buf, cap);
 }
 
-static int copyfd_io(int infd, int peerfd, int outfd)
+static int copyfd_io_poll(int infd, int peerfd, int outfd)
 {
 	struct pollfd fds = {
 		.fd = peerfd,
@@ -350,6 +373,168 @@ static int copyfd_io(int infd, int peerfd, int outfd)
 
 	close(peerfd);
 	return 0;
+}
+
+static int do_recvfile(int infd, int outfd)
+{
+	ssize_t r;
+
+	do {
+		char buf[16536];
+
+		r = do_rnd_read(infd, buf, sizeof(buf));
+		if (r > 0) {
+			if (write(outfd, buf, r) != r)
+				break;
+		} else if (r < 0) {
+			perror("read");
+		}
+	} while (r > 0);
+
+	return (int)r;
+}
+
+static int do_mmap(int infd, int outfd, unsigned int size)
+{
+	char *inbuf = mmap(NULL, size, PROT_READ, MAP_SHARED, infd, 0);
+	ssize_t ret = 0, off = 0;
+	size_t rem;
+
+	if (inbuf == MAP_FAILED) {
+		perror("mmap");
+		return 1;
+	}
+
+	rem = size;
+
+	while (rem > 0) {
+		ret = write(outfd, inbuf + off, rem);
+
+		if (ret < 0) {
+			perror("write");
+			break;
+		}
+
+		off += ret;
+		rem -= ret;
+	}
+
+	munmap(inbuf, size);
+	return rem;
+}
+
+static int get_infd_size(int fd)
+{
+	struct stat sb;
+	ssize_t count;
+	int err;
+
+	err = fstat(fd, &sb);
+	if (err < 0) {
+		perror("fstat");
+		return -1;
+	}
+
+	if ((sb.st_mode & S_IFMT) != S_IFREG) {
+		fprintf(stderr, "%s: stdin is not a regular file\n", __func__);
+		return -2;
+	}
+
+	count = sb.st_size;
+	if (count > INT_MAX) {
+		fprintf(stderr, "File too large: %zu\n", count);
+		return -3;
+	}
+
+	return (int)count;
+}
+
+static int do_sendfile(int infd, int outfd, unsigned int count)
+{
+	while (count > 0) {
+		ssize_t r;
+
+		r = sendfile(outfd, infd, NULL, count);
+		if (r < 0) {
+			perror("sendfile");
+			return 3;
+		}
+
+		count -= r;
+	}
+
+	return 0;
+}
+
+static int copyfd_io_mmap(int infd, int peerfd, int outfd,
+			      unsigned int size)
+{
+	int err;
+
+	if (listen_mode) {
+		err = do_recvfile(peerfd, outfd);
+		if (err)
+			return err;
+
+		err = do_mmap(infd, peerfd, size);
+	} else {
+		err = do_mmap(infd, peerfd, size);
+		if (err)
+			return err;
+
+		shutdown(peerfd, SHUT_WR);
+
+		err = do_recvfile(peerfd, outfd);
+	}
+
+	return err;
+}
+
+
+static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
+			      unsigned int size)
+{
+	int err;
+
+	if (listen_mode) {
+		err = do_recvfile(peerfd, outfd);
+		if (err)
+			return err;
+
+		err = do_sendfile(infd, peerfd, size);
+	} else {
+		err = do_sendfile(infd, peerfd, size);
+		if (err)
+			return err;
+		err = do_recvfile(peerfd, outfd);
+	}
+
+	return err;
+}
+
+static int copyfd_io(int infd, int peerfd, int outfd)
+{
+	int file_size;
+
+	switch (cfg_mode) {
+	case CFG_MODE_POLL:
+		return copyfd_io_poll(infd, peerfd, outfd);
+	case CFG_MODE_MMAP:
+		file_size = get_infd_size(infd);
+		if (file_size < 0)
+			return file_size;
+		return copyfd_io_mmap(infd, peerfd, outfd, file_size);
+	case CFG_MODE_SENDFILE:
+		file_size = get_infd_size(infd);
+		if (file_size < 0)
+			return file_size;
+		return copyfd_io_sendfile(infd, peerfd, outfd, file_size);
+	}
+
+	fprintf(stderr, "Invalid mode %d\n", cfg_mode);
+
+	die_usage();
+	return 1;
 }
 
 static void check_sockaddr(int pf, struct sockaddr_storage *ss,
@@ -464,8 +649,7 @@ int main_loop_s(int listensock)
 		check_sockaddr(pf, &ss, salen);
 		check_getpeername(remotesock, &ss, salen);
 
-		copyfd_io(0, remotesock, 1);
-		return 0;
+		return copyfd_io(0, remotesock, 1);
 	}
 
 	perror("accept");
@@ -499,6 +683,10 @@ int main_loop(void)
 		return 2;
 
 	check_getpeername_connect(fd);
+
+	if (cfg_sndbuf)
+		set_sndbuf(fd, cfg_sndbuf);
+
 	return copyfd_io(0, fd, 1);
 }
 
@@ -509,10 +697,58 @@ int parse_proto(const char *proto)
 	if (!strcasecmp(proto, "TCP"))
 		return IPPROTO_TCP;
 
-	fprintf(stderr, "Unknown protocol: %s.", proto);
+	fprintf(stderr, "Unknown protocol: %s\n.", proto);
 	die_usage();
 
 	/* silence compiler warning */
+	return 0;
+}
+
+int parse_mode(const char *mode)
+{
+	if (!strcasecmp(mode, "poll"))
+		return CFG_MODE_POLL;
+	if (!strcasecmp(mode, "mmap"))
+		return CFG_MODE_MMAP;
+	if (!strcasecmp(mode, "sendfile"))
+		return CFG_MODE_SENDFILE;
+
+	fprintf(stderr, "Unknown test mode: %s\n", mode);
+	fprintf(stderr, "Supported modes are:\n");
+	fprintf(stderr, "\t\t\"poll\" - interleaved read/write using poll()\n");
+	fprintf(stderr, "\t\t\"mmap\" - send entire input file (mmap+write), then read response (-l will read input first)\n");
+	fprintf(stderr, "\t\t\"sendfile\" - send entire input file (sendfile), then read response (-l will read input first)\n");
+
+	die_usage();
+
+	/* silence compiler warning */
+	return 0;
+}
+
+int parse_sndbuf(const char *size)
+{
+	unsigned long s;
+
+	errno = 0;
+
+	s = strtoul(size, NULL, 0);
+
+	if (errno) {
+		fprintf(stderr, "Invalid sndbuf size %s (%s)\n",
+				size,
+				strerror(errno));
+		die_usage();
+	}
+
+	if (s > INT_MAX) {
+		fprintf(stderr, "Invalid sndbuf size %s (%s)\n",
+				size,
+				strerror(ERANGE));
+		die_usage();
+	}
+
+	cfg_sndbuf = s;
+
 	return 0;
 }
 
@@ -520,7 +756,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "6lp:s:hut:")) != -1) {
+	while ((c = getopt(argc, argv, "6lp:s:hut:m:b:")) != -1) {
 		switch (c) {
 		case 'l':
 			listen_mode = true;
@@ -544,6 +780,12 @@ static void parse_opts(int argc, char **argv)
 			poll_timeout = atoi(optarg) * 1000;
 			if (poll_timeout <= 0)
 				poll_timeout = -1;
+			break;
+		case 'm':
+			cfg_mode = parse_mode(optarg);
+			break;
+		case 'b':
+			cfg_sndbuf = parse_sndbuf(optarg);
 			break;
 		}
 	}
@@ -570,6 +812,9 @@ int main(int argc, char *argv[])
 
 		if (fd < 0)
 			return 1;
+
+		if (cfg_sndbuf)
+			set_sndbuf(fd, cfg_sndbuf);
 
 		return main_loop_s(fd);
 	}

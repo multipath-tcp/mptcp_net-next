@@ -3,7 +3,7 @@
 
 time_start=$(date +%s)
 
-optstring="d:e:l:r:h4c"
+optstring="b:d:e:l:r:h4c:m:"
 ret=0
 sin=""
 sout=""
@@ -17,6 +17,9 @@ ethtool_random_on=true
 tc_delay="$((RANDOM%400))"
 tc_loss=$((RANDOM%101))
 tc_reorder=""
+testmode=""
+sndbuf=0
+options_log=true
 
 if [ $tc_loss -eq 100 ];then
 	tc_loss=1%
@@ -36,6 +39,8 @@ usage() {
 	echo -e "\t-e: ethtool features to disable, e.g.: \"-e tso -e gso\" (default: randomly disable any of tso/gso/gro)"
 	echo -e "\t-4: IPv4 only: disable IPv6 tests (default: test both IPv4 and IPv6)"
 	echo -e "\t-c: capture packets for each test using tcpdump (default: no capture)"
+	echo -e "\t-b: set sndbuf value (default: use kernel default)"
+	echo -e "\t-m: test mode (poll, sendfile; default: poll)"
 }
 
 while getopts "$optstring" option;do
@@ -67,6 +72,17 @@ while getopts "$optstring" option;do
 		;;
 	"c")
 		capture=true
+		;;
+	"b")
+		if [ $OPTARG -ge 0 ];then
+			sndbuf="$OPTARG"
+		else
+			echo "-s requires numeric argument, got \"$OPTARG\"" 1>&2
+			exit 1
+		fi
+		;;
+	"m")
+		testmode="$OPTARG"
 		;;
 	"?")
 		usage $0
@@ -318,10 +334,24 @@ do_transfer()
 	local srv_proto="$4"
 	local connect_addr="$5"
 	local local_addr="$6"
+	local extra_args=""
 
 	local port
 	port=$((10000+$TEST_COUNT))
 	TEST_COUNT=$((TEST_COUNT+1))
+
+	if [ "$sndbuf" -gt 0 ]; then
+		extra_args="$extra_args -b $sndbuf"
+	fi
+
+	if [ -n "$testmode" ]; then
+		extra_args="$extra_args -m $testmode"
+	fi
+
+	if [ -n "$extra_args" ] && $options_log; then
+		options_log=false
+		echo "INFO: extra options: $extra_args"
+	fi
 
 	:> "$cout"
 	:> "$sout"
@@ -347,14 +377,14 @@ do_transfer()
 		sleep 1
 	fi
 
-	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} $local_addr < "$sin" > "$sout" &
+	ip netns exec ${listener_ns} ./mptcp_connect -t $timeout -l -p $port -s ${srv_proto} $extra_args $local_addr < "$sin" > "$sout" &
 	local spid=$!
 
 	wait_local_port_listen "${listener_ns}" "${port}"
 
 	local start
 	start=$(date +%s%3N)
-	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $connect_addr < "$cin" > "$cout" &
+	ip netns exec ${connector_ns} ./mptcp_connect -t $timeout -p $port -s ${cl_proto} $extra_args $connect_addr < "$cin" > "$cout" &
 	local cpid=$!
 
 	wait $cpid
