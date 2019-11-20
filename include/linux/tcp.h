@@ -106,14 +106,8 @@ struct tcp_options_received {
 		u8      mp_capable : 1,
 			mp_join : 1,
 			dss : 1,
-			backup : 1,
 			version : 4;
 		u8      flags;
-		u8      join_id;
-		u32     token;
-		u32     nonce;
-		u64     thmac;
-		u8      hmac[20];
 		u8	dss_flags;
 		u8	use_map:1,
 			dsn64:1,
@@ -121,16 +115,6 @@ struct tcp_options_received {
 			use_ack:1,
 			ack64:1,
 			__unused:3;
-		u8	add_addr : 1,
-			rm_addr : 1,
-			family : 4;
-		u8	addr_id;
-		union {
-			struct	in_addr	addr;
-#if IS_ENABLED(CONFIG_IPV6)
-			struct	in6_addr addr6;
-#endif
-		};
 	} mptcp;
 #endif
 };
@@ -144,7 +128,6 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 #endif
 #if IS_ENABLED(CONFIG_MPTCP)
 	rx_opt->mptcp.mp_capable = rx_opt->mptcp.mp_join = 0;
-	rx_opt->mptcp.add_addr = rx_opt->mptcp.rm_addr = 0;
 	rx_opt->mptcp.dss = 0;
 #endif
 }
