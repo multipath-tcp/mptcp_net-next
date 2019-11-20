@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/subflow-sk_data_ready-make-wakeup-on-tcp-sock-conditional
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] subflow: sk_data_ready: make wakeup on tcp sock conditional
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+No need for this unless we don't have a parent or the socket is not
+mp capable.
+
+Only the mptcp socket will be waiting for events.  In case the mptcp
+socket connected to a tcp-only peer, we're in fallback mode and need
+to wakeup the parent too.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
