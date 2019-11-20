@@ -654,10 +654,13 @@ static void subflow_data_ready(struct sock *sk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *parent = subflow->conn;
 
-	subflow->tcp_sk_data_ready(sk);
+	if (!parent || !(subflow->mp_capable || subflow->mp_join)) {
+		subflow->tcp_sk_data_ready(sk);
 
-	if (!parent || !(subflow->mp_capable || subflow->mp_join))
+		if (parent)
+			parent->sk_data_ready(parent);
 		return;
+	}
 
 	/* always propagate the EoF */
 	if (mptcp_subflow_data_available(sk) || subflow->rx_eof) {
@@ -675,8 +678,11 @@ static void subflow_write_space(struct sock *sk)
 	struct sock *parent = subflow->conn;
 
 	sk_stream_write_space(sk);
-	if (parent)
+	if (parent && sk_stream_is_writeable(sk)) {
+		set_bit(MPTCP_SEND_SPACE, &mptcp_sk(parent)->flags);
+		smp_mb__after_atomic();
 		sk_stream_write_space(parent);
+	}
 }
 
 int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
