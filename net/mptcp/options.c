@@ -427,16 +427,12 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		return false;
 
 	opts->suboptions = 0;
+
 	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts))
 		ret = true;
 	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
 						 opts))
 		ret = true;
-	if (mptcp_established_options_addr(sk, &opt_size, remaining, opts)) {
-		*size += opt_size;
-		remaining -= opt_size;
-		ret = true;
-	}
 
 	/* we reserved enough space for the above options, and exceeding the
 	 * TCP option space would be fatal
@@ -446,6 +442,17 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	*size += opt_size;
 	remaining -= opt_size;
+
+	if (mptcp_established_options_addr(sk, &opt_size, remaining, opts)) {
+		if (opt_size > remaining) {
+			pr_debug("est opt: not enough space for addr: %u > %u",
+				 opt_size, remaining);
+		} else {
+			*size += opt_size;
+			remaining -= opt_size;
+			ret = true;
+		}
+	}
 
 	return ret;
 }
