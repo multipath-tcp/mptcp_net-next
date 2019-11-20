@@ -96,6 +96,14 @@ static void subflow_init_req(struct request_sock *req,
 	subflow_req->mp_capable = 0;
 	subflow_req->mp_join = 0;
 
+#ifdef CONFIG_TCP_MD5SIG
+	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
+	 * TCP option space.
+	 */
+	if (rcu_access_pointer(tcp_sk(sk_listener)->md5sig_info))
+		return;
+#endif
+
 	if (rx_opt.mptcp.mp_capable && rx_opt.mptcp.mp_join)
 		return;
 
