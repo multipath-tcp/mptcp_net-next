@@ -1,9 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] selftests: make sockets non-blocking for default poll mode
-
-This change makes tests fail because mptcp_poll may signal
-POLLIN when no data is there and POLLOUT when it should not.
-
-Rest of series addresses this and makes selftest work again.
-
-Signed-off-by: Florian Westphal <fw@strlen.de>
