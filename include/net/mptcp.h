@@ -27,6 +27,8 @@ struct mptcp_ext {
 
 #ifdef CONFIG_MPTCP
 
+void mptcp_init(void);
+
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return skb_ext_exist(skb, SKB_EXT_MPTCP);
@@ -34,10 +36,24 @@ static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 
 #else
 
+static inline void mptcp_init(void)
+{
+}
+
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return false;
 }
 
 #endif /* CONFIG_MPTCP */
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+int mptcpv6_init(void);
+#elif IS_ENABLED(CONFIG_IPV6)
+static inline int mptcpv6_init(void)
+{
+	return 0;
+}
+#endif
+
 #endif /* __NET_MPTCP_H */
