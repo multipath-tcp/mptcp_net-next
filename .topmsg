@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftest-add-mmap-write-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftest: add mmap-write support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+No changes on default options.  New option -b allows to set a lower
+send buffer size.
+
+New option "-m mmap" allows to use a mode where the sender transmits the
+entire file in very large chunks (using mmap + write) instead of the
+default poll+read/write.
+
+This is mainly useful to make sure we cope with large writes.
+I also added sendfile() support (as its easy), but it won't work yet
+for mptcp sockets.
+
+should be squashed into mptcp: add basic kselftest for mptcp
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
