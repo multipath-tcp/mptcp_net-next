@@ -3,7 +3,7 @@
 
 time_start=$(date +%s)
 
-optstring="b:d:e:l:r:h4c:m:"
+optstring="b:d:e:l:r:h4cm:"
 ret=0
 sin=""
 sout=""
