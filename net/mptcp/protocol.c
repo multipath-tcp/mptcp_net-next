@@ -289,7 +289,7 @@ static struct proto mptcp_prot = {
 	.unhash		= inet_unhash,
 	.get_port	= mptcp_get_port,
 	.obj_size	= sizeof(struct mptcp_sock),
-	.no_autobind	= 1,
+	.no_autobind	= true,
 };
 
 static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
@@ -540,11 +540,12 @@ void __init mptcp_init(void)
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static struct proto_ops mptcp_v6_stream_ops;
+static struct proto mptcp_v6_prot;
 
 static struct inet_protosw mptcp_v6_protosw = {
 	.type		= SOCK_STREAM,
 	.protocol	= IPPROTO_MPTCP,
-	.prot		= &mptcp_prot,
+	.prot		= &mptcp_v6_prot,
 	.ops		= &mptcp_v6_stream_ops,
 	.flags		= INET_PROTOSW_ICSK,
 };
@@ -552,6 +553,16 @@ static struct inet_protosw mptcp_v6_protosw = {
 int mptcpv6_init(void)
 {
 	int err;
+
+	mptcp_v6_prot = mptcp_prot;
+	strcpy(mptcp_v6_prot.name, "MPTCPv6");
+	mptcp_v6_prot.slab = NULL;
+	mptcp_v6_prot.obj_size = sizeof(struct mptcp_sock) +
+				 sizeof(struct ipv6_pinfo);
+
+	err = proto_register(&mptcp_v6_prot, 1);
+	if (err)
+		return err;
 
 	mptcp_v6_stream_ops = inet6_stream_ops;
 	mptcp_v6_stream_ops.bind = mptcp_bind;
@@ -562,6 +573,8 @@ int mptcpv6_init(void)
 	mptcp_v6_stream_ops.listen = mptcp_listen;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
+	if (err)
+		proto_unregister(&mptcp_v6_prot);
 
 	return err;
 }
