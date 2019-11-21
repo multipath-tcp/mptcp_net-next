@@ -47,6 +47,21 @@ static int page_pool_init(struct page_pool *pool,
 	    (pool->p.dma_dir != DMA_BIDIRECTIONAL))
 		return -EINVAL;
 
+	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV) {
+		/* In order to request DMA-sync-for-device the page
+		 * needs to be mapped
+		 */
+		if (!(pool->p.flags & PP_FLAG_DMA_MAP))
+			return -EINVAL;
+
+		if (!pool->p.max_len)
+			return -EINVAL;
+
+		/* pool->p.offset has to be set according to the address
+		 * offset used by the DMA engine to start copying rx data
+		 */
+	}
+
 	if (ptr_ring_init(&pool->ring, ring_qsize, GFP_KERNEL) < 0)
 		return -ENOMEM;
 
@@ -115,6 +130,16 @@ static struct page *__page_pool_get_cached(struct page_pool *pool)
 	return page;
 }
 
+static void page_pool_dma_sync_for_device(struct page_pool *pool,
+					  struct page *page,
+					  unsigned int dma_sync_size)
+{
+	dma_sync_size = min(dma_sync_size, pool->p.max_len);
+	dma_sync_single_range_for_device(pool->p.dev, page->dma_addr,
+					 pool->p.offset, dma_sync_size,
+					 pool->p.dma_dir);
+}
+
 /* slow path */
 noinline
 static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
@@ -158,6 +183,9 @@ static struct page *__page_pool_alloc_pages_slow(struct page_pool *pool,
 		return NULL;
 	}
 	page->dma_addr = dma;
+
+	if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
+		page_pool_dma_sync_for_device(pool, page, pool->p.max_len);
 
 skip_dma_map:
 	/* Track how many pages are held 'in-flight' */
@@ -281,8 +309,19 @@ static bool __page_pool_recycle_direct(struct page *page,
 	return true;
 }
 
-void __page_pool_put_page(struct page_pool *pool,
-			  struct page *page, bool allow_direct)
+/* page is NOT reusable when:
+ * 1) allocated when system is under some pressure. (page_is_pfmemalloc)
+ * 2) belongs to a different NUMA node than pool->p.nid.
+ *
+ * To update pool->p.nid users must call page_pool_update_nid.
+ */
+static bool pool_page_reusable(struct page_pool *pool, struct page *page)
+{
+	return !page_is_pfmemalloc(page) && page_to_nid(page) == pool->p.nid;
+}
+
+void __page_pool_put_page(struct page_pool *pool, struct page *page,
+			  unsigned int dma_sync_size, bool allow_direct)
 {
 	/* This allocator is optimized for the XDP mode that uses
 	 * one-frame-per-page, but have fallbacks that act like the
@@ -290,8 +329,13 @@ void __page_pool_put_page(struct page_pool *pool,
 	 *
 	 * refcnt == 1 means page_pool owns page, and can recycle it.
 	 */
-	if (likely(page_ref_count(page) == 1)) {
+	if (likely(page_ref_count(page) == 1 &&
+		   pool_page_reusable(pool, page))) {
 		/* Read barrier done in page_ref_count / READ_ONCE */
+
+		if (pool->p.flags & PP_FLAG_DMA_SYNC_DEV)
+			page_pool_dma_sync_for_device(pool, page,
+						      dma_sync_size);
 
 		if (allow_direct && in_serving_softirq())
 			if (__page_pool_recycle_direct(page, pool))
@@ -436,3 +480,11 @@ void page_pool_destroy(struct page_pool *pool)
 	schedule_delayed_work(&pool->release_dw, DEFER_TIME);
 }
 EXPORT_SYMBOL(page_pool_destroy);
+
+/* Caller must provide appropriate safe context, e.g. NAPI. */
+void page_pool_update_nid(struct page_pool *pool, int new_nid)
+{
+	trace_page_pool_update_nid(pool, new_nid);
+	pool->p.nid = new_nid;
+}
+EXPORT_SYMBOL(page_pool_update_nid);
