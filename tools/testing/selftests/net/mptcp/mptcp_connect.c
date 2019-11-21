@@ -380,7 +380,7 @@ static int do_recvfile(int infd, int outfd)
 	ssize_t r;
 
 	do {
-		char buf[16536];
+		char buf[16384];
 
 		r = do_rnd_read(infd, buf, sizeof(buf));
 		if (r > 0) {
