@@ -137,13 +137,18 @@ static inline bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
 		df->data_seq + df->data_len == msk->write_seq;
 }
 
+static void dfrag_uncharge(struct sock *sk, int len)
+{
+	sk_mem_uncharge(sk, len);
+	sk_wmem_queued_add(sk, -len);
+}
+
 static void dfrag_clear(struct sock *sk, struct mptcp_data_frag *dfrag)
 {
 	int len = dfrag->data_len + dfrag->overhead;
 
 	list_del(&dfrag->list);
-	sk_mem_uncharge(sk, len);
-	sk_wmem_queued_add(sk, -len);
+	dfrag_uncharge(sk, len);
 	put_page(dfrag->page);
 }
 
@@ -152,14 +157,31 @@ static void mptcp_clean_una(struct sock *sk)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_data_frag *dtmp, *dfrag;
 	u64 snd_una = atomic64_read(&msk->snd_una);
+	bool cleaned = false;
 
 	list_for_each_entry_safe(dfrag, dtmp, &msk->rtx_queue, list) {
 		if (after64(dfrag->data_seq + dfrag->data_len, snd_una))
 			break;
 
 		dfrag_clear(sk, dfrag);
+		cleaned = true;
 	}
-	sk_mem_reclaim_partial(sk);
+
+	dfrag = mptcp_rtx_head(sk);
+	if (dfrag && after64(snd_una, dfrag->data_seq)) {
+		u64 delta = dfrag->data_seq + dfrag->data_len - snd_una;
+
+		dfrag->data_seq += delta;
+		dfrag->data_len -= delta;
+
+		dfrag_uncharge(sk, delta);
+		cleaned = true;
+	}
+
+	if (cleaned) {
+		sk_mem_reclaim_partial(sk);
+		sk_stream_write_space(sk);
+	}
 }
 
 /* ensure we get enough memory for the frag hdr, beyond some minimal amount of
