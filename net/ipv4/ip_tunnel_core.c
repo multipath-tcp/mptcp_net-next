@@ -215,6 +215,7 @@ void ip_tunnel_get_stats64(struct net_device *dev,
 EXPORT_SYMBOL_GPL(ip_tunnel_get_stats64);
 
 static const struct nla_policy ip_tun_policy[LWTUNNEL_IP_MAX + 1] = {
+	[LWTUNNEL_IP_UNSPEC]	= { .strict_start_type = LWTUNNEL_IP_OPTS },
 	[LWTUNNEL_IP_ID]	= { .type = NLA_U64 },
 	[LWTUNNEL_IP_DST]	= { .type = NLA_U32 },
 	[LWTUNNEL_IP_SRC]	= { .type = NLA_U32 },
@@ -320,6 +321,7 @@ static int ip_tun_parse_opts_erspan(struct nlattr *attr,
 {
 	struct nlattr *tb[LWTUNNEL_IP_OPT_ERSPAN_MAX + 1];
 	int err;
+	u8 ver;
 
 	err = nla_parse_nested(tb, LWTUNNEL_IP_OPT_ERSPAN_MAX, attr,
 			       erspan_opt_policy, extack);
@@ -329,24 +331,31 @@ static int ip_tun_parse_opts_erspan(struct nlattr *attr,
 	if (!tb[LWTUNNEL_IP_OPT_ERSPAN_VER])
 		return -EINVAL;
 
+	ver = nla_get_u8(tb[LWTUNNEL_IP_OPT_ERSPAN_VER]);
+	if (ver == 1) {
+		if (!tb[LWTUNNEL_IP_OPT_ERSPAN_INDEX])
+			return -EINVAL;
+	} else if (ver == 2) {
+		if (!tb[LWTUNNEL_IP_OPT_ERSPAN_DIR] ||
+		    !tb[LWTUNNEL_IP_OPT_ERSPAN_HWID])
+			return -EINVAL;
+	} else {
+		return -EINVAL;
+	}
+
 	if (info) {
 		struct erspan_metadata *md =
 			ip_tunnel_info_opts(info) + opts_len;
 
-		attr = tb[LWTUNNEL_IP_OPT_ERSPAN_VER];
-		md->version = nla_get_u8(attr);
-
-		if (md->version == 1 && tb[LWTUNNEL_IP_OPT_ERSPAN_INDEX]) {
+		md->version = ver;
+		if (ver == 1) {
 			attr = tb[LWTUNNEL_IP_OPT_ERSPAN_INDEX];
 			md->u.index = nla_get_be32(attr);
-		} else if (md->version == 2 && tb[LWTUNNEL_IP_OPT_ERSPAN_DIR] &&
-			   tb[LWTUNNEL_IP_OPT_ERSPAN_HWID]) {
+		} else {
 			attr = tb[LWTUNNEL_IP_OPT_ERSPAN_DIR];
 			md->u.md2.dir = nla_get_u8(attr);
 			attr = tb[LWTUNNEL_IP_OPT_ERSPAN_HWID];
 			set_hwid(&md->u.md2, nla_get_u8(attr));
-		} else {
-			return -EINVAL;
 		}
 
 		info->key.tun_flags |= TUNNEL_ERSPAN_OPT;
@@ -700,12 +709,14 @@ static const struct lwtunnel_encap_ops ip_tun_lwt_ops = {
 };
 
 static const struct nla_policy ip6_tun_policy[LWTUNNEL_IP6_MAX + 1] = {
+	[LWTUNNEL_IP6_UNSPEC]	= { .strict_start_type = LWTUNNEL_IP6_OPTS },
 	[LWTUNNEL_IP6_ID]		= { .type = NLA_U64 },
 	[LWTUNNEL_IP6_DST]		= { .len = sizeof(struct in6_addr) },
 	[LWTUNNEL_IP6_SRC]		= { .len = sizeof(struct in6_addr) },
 	[LWTUNNEL_IP6_HOPLIMIT]		= { .type = NLA_U8 },
 	[LWTUNNEL_IP6_TC]		= { .type = NLA_U8 },
 	[LWTUNNEL_IP6_FLAGS]		= { .type = NLA_U16 },
+	[LWTUNNEL_IP6_OPTS]		= { .type = NLA_NESTED },
 };
 
 static int ip6_tun_build_state(struct nlattr *attr,
