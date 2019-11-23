@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-ADD_ADDR-handling
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add ADD_ADDR handling
 
+Add handling for sending and receiving the ADD_ADDR, ADD_ADDR6,
+and RM_ADDR suboptions.
+
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
