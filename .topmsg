@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/sendmsg-block-until-mptcp-sk-is-writeable
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] sendmsg: block until mptcp sk is writeable
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This disables transmit of new data until the peer has acked
+enough mptcp data to get below the wspace write threshold (more than
+half of wspace upperlimit is available again).
+
+Also have poll not report EPOLLOUT in this case, its not relevant if a
+subflow is writeable.
+
+The latter is a temporary workaround that is needed because mptcp_poll
+walks the subflows and calls __tcp_poll on each of them.
+
+Because subflow ssk is usually writable, the EPOLLOUT needs to be
+removed if the mptcp sndbuf is exhausted.
+
+This is only needed until __tcp_poll is removed later in the series.
+
+v2: drop the "empty send" part as per comments from Paolo and Mat.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
