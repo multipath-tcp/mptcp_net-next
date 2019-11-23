@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-partial-cleaning-of-rtx-head-dfrag
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: allow partial cleaning of rtx head dfrag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After adding wmem accouting for the mptcp socket we could get
+into a situation where the mptcp socket can't transmit more data,
+and mptcp_clean_una doesn't reduce wmem even if snd_una has advanced
+because it currently will only remove entire dfrags.
+
+Allow advancing the dfrag head sequence and reduce wmem,
+even though this isn't correct (as we can't release the page).
+
+Because we will soon block on mptcp sk in case wmem is too large,
+call sk_stream_write_space() in case we reduced the backlog so
+userspace task blocked in sendmsg or poll will be woken up.
+
+This isn't an issue if the send buffer is large, but it is when
+SO_SNDBUF is used to reduce it to a lower value.
+
+Note we can still get a deadlock for low SO_SNDBUF values in
+case both sides of the connection write to the socket: both could
+be blocked due to wmem being too small -- and current mptcp stack
+will only increment mptcp ack_seq on recv.
+
+This doesn't happen with the selftest as it uses poll() and
+will always call recv if there is data to read.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
