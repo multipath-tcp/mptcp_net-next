@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/recv-make-DATA_READY-reflect-ssk-in-sequence-state
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
