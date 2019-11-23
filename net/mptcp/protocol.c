@@ -406,23 +406,27 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		return ret;
 	}
 
+	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
+
+	mptcp_clean_una(sk);
+
+	while (!sk_stream_memory_free(sk)) {
+		ret = sk_stream_wait_memory(sk, &timeo);
+		if (ret)
+			goto out;
+
+		mptcp_clean_una(sk);
+	}
+
 	ssk = mptcp_subflow_get(msk);
 	if (!ssk) {
 		release_sock(sk);
 		return -ENOTCONN;
 	}
 
-	if (!msg_data_left(msg)) {
-		pr_debug("empty send");
-		ret = sock_sendmsg(ssk->sk_socket, msg);
-		goto out;
-	}
-
 	pr_debug("conn_list->subflow=%p", ssk);
 
 	lock_sock(ssk);
-	mptcp_clean_una(sk);
-	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
 	while (msg_data_left(msg)) {
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
 					 &size_goal);
@@ -1320,6 +1324,10 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 		tcp_sock = mptcp_subflow_tcp_socket(subflow);
 		ret |= __tcp_poll(tcp_sock->sk);
 	}
+
+	if (!sk_stream_is_writeable(sk))
+		ret &= ~(EPOLLOUT|EPOLLWRNORM);
+
 	release_sock(sk);
 
 	return ret;
