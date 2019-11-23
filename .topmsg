@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-handling-of-outgoing-MP_JOIN-requests
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add handling of outgoing MP_JOIN requests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subflow creation may be initiated by the path manager when
+the primary connection is fully established and a remote
+address has been received via ADD_ADDR.
+
+Create an in-kernel sock and use kernel_connect() to
+initiate connection. When a valid SYN-ACK is received the
+new sock is added to the tail of the mptcp sock conn_list
+where it will not interfere with data flow on the original
+connection.
+
+Data flow and connection failover not addressed by this commit.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
