@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-MIB-counter-infrastructure
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add MIB counter infrastructure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Exported via same /proc file as the Linux TCP MIB counters, so "netstat -s"
+or "nstat" will show them automatically.
+
+The MPTCP MIB counters are allocated in a distinct pcpu area in order to
+avoid bloating/wasting TCP pcpu memory.
+
+Counters are allocated once the first MPTCP socket is created in a
+network namespace and free'd on exit.
+
+If no sockets have been allocated, all-zero mptcp counters are shown.
+
+The MIB counter list is taken from the multipath-tcp.org kernel, but
+only a few counters have been picked up so far.  The counter list can
+be increased at any time later on.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
