@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Implement-basic-path-manager
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Implement basic path manager
 
+Two features: 1) After an incoming connection is fully established
+announce a second local address and 2) When an outgoing connection
+is fully established, and an ADD_ADDR option has been received,
+initiate a secondary subflow to that address.
+
+The second local address may be configured through the
+net.mptcp.pm.announce_addr sysctl variable. If configured
+then for listeners this address will be announced with the
+ADD_ADDR option, and for clients the local socket will be bound
+to this address (or INADDR_ANY if not specified).
+
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
