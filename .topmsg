@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-shutdown-socket-operation
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add shutdown() socket operation
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Call shutdown on all subflows in use on the given socket, or on the
+fallback socket.
+
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
