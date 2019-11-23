@@ -189,7 +189,10 @@ static void mptcp_clean_una(struct sock *sk)
 
 	if (cleaned) {
 		sk_mem_reclaim_partial(sk);
-		sk_stream_write_space(sk);
+
+		/* Only wake up writers if a subflow is ready */
+		if (test_bit(MPTCP_SEND_SPACE, &msk->flags))
+			sk_stream_write_space(sk);
 	}
 }
 
@@ -837,6 +840,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&msk->rtx_queue);
 
 	INIT_WORK(&msk->rtx_work, mptcp_worker);
+	__set_bit(MPTCP_SEND_SPACE, &msk->flags);
 
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
@@ -1409,39 +1413,35 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
-	struct mptcp_subflow_context *subflow;
 	const struct mptcp_sock *msk;
 	struct sock *sk = sock->sk;
 	struct socket *ssock;
-	__poll_t ret = 0;
+	__poll_t mask = 0;
 
 	msk = mptcp_sk(sk);
 	lock_sock(sk);
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sk);
-		ret = ssock->ops->poll(file, ssock, wait);
+		mask = ssock->ops->poll(file, ssock, wait);
 		sock_put(ssock->sk);
-		return ret;
+		return mask;
 	}
 
 	release_sock(sk);
 	sock_poll_wait(file, sock, wait);
 	lock_sock(sk);
 
-	mptcp_for_each_subflow(msk, subflow) {
-		struct socket *tcp_sock;
-
-		tcp_sock = mptcp_subflow_tcp_socket(subflow);
-		ret |= __tcp_poll(tcp_sock->sk);
-	}
-
-	if (!sk_stream_is_writeable(sk))
-		ret &= ~(EPOLLOUT|EPOLLWRNORM);
+	if (test_bit(MPTCP_DATA_READY, &msk->flags))
+		mask = EPOLLIN | EPOLLRDNORM;
+	if (sk_stream_is_writeable(sk) && test_bit(MPTCP_SEND_SPACE, &msk->flags))
+		mask |= EPOLLOUT | EPOLLWRNORM;
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
+		mask |= EPOLLIN | EPOLLRDNORM | EPOLLRDHUP;
 
 	release_sock(sk);
 
-	return ret;
+	return mask;
 }
 
 static int mptcp_shutdown(struct socket *sock, int how)
