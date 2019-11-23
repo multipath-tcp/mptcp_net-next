@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/sendmsg-clear-SEND_SPACE-if-write-caused-wmem-to-grow-too-large
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] sendmsg: clear SEND_SPACE if write caused wmem to grow too large
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This is needed when we get rid of __tcp_poll and let mptcp_poll only
+rely on msk->flags -- we need to avoid EPOLLOUT if the write filled
+too much sndbuf space.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
