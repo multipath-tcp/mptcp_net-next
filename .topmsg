@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-make-sockets-non-blocking-for-default-poll-mode
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
