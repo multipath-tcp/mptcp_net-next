@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-and-use-mptcp_subflow_get_retrans
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add and use mptcp_subflow_get_retrans
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Instead of having retransmit worker grab first subflow on the list,
+make it always return NULL, unless either the first non-backup subflow
+on the list is idle or all normal subflows have already been removed.
+
+In the latter case, the first idle backup subflow is used.
+
+Rationale is that it makes no sense to attempt to retransmit
+at mptcp level if there is still unsent data in its write queue.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
