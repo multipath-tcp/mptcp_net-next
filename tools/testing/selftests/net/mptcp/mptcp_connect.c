@@ -279,6 +279,15 @@ static ssize_t do_rnd_read(const int fd, char *buf, const size_t len)
 	return read(fd, buf, cap);
 }
 
+static void set_nonblock(int fd)
+{
+        int flags = fcntl(fd, F_GETFL);
+        if (flags == -1)
+                return;
+
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
 static int copyfd_io_poll(int infd, int peerfd, int outfd)
 {
 	struct pollfd fds = {
@@ -287,6 +296,8 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd)
 	};
 	unsigned int woff = 0, wlen = 0;
 	char wbuf[8192];
+
+	set_nonblock(peerfd);
 
 	for (;;) {
 		char rbuf[8192];
