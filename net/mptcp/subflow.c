@@ -177,9 +177,9 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 close_child:
 	pr_debug("closing child socket");
-	inet_sk_set_state(child, TCP_CLOSE);
-	sock_set_flag(child, SOCK_DEAD);
-	inet_csk_destroy_sock(child);
+	tcp_send_active_reset(child, GFP_ATOMIC);
+	inet_csk_prepare_forced_close(child);
+	tcp_done(child);
 	return NULL;
 }
 
