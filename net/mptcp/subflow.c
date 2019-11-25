@@ -678,8 +678,11 @@ static void subflow_write_space(struct sock *sk)
 	struct sock *parent = subflow->conn;
 
 	sk_stream_write_space(sk);
-	if (parent)
+	if (parent && sk_stream_is_writeable(sk)) {
+		set_bit(MPTCP_SEND_SPACE, &mptcp_sk(parent)->flags);
+		smp_mb__after_atomic();
 		sk_stream_write_space(parent);
+	}
 }
 
 int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
