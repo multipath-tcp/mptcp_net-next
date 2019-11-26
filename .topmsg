@@ -10,4 +10,6 @@ The subflow is added at the end of the subflow list so it will not
 interfere with the existing subflows operation and no data is
 expected to be transmitted on it.
 
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
