@@ -31,7 +31,6 @@ static int subflow_rebuild_header(struct sock *sk)
 		err = mptcp_token_new_connect(sk);
 	} else if (subflow->request_join && !subflow->local_nonce) {
 		pr_debug("subflow=%p", sk);
-		mptcp_token_get_sock(subflow->token);
 
 		do {
 			get_random_bytes(&subflow->local_nonce, sizeof(u32));
