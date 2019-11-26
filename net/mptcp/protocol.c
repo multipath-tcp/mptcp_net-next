@@ -638,7 +638,6 @@ static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *ssk = NULL;
 
 	mptcp_token_destroy(msk->token);
 	inet_sk_state_store(sk, TCP_CLOSE);
@@ -646,13 +645,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	lock_sock(sk);
 
 	if (msk->subflow) {
-		ssk = msk->subflow;
+		sock_release(msk->subflow);
 		msk->subflow = NULL;
-	}
-
-	if (ssk) {
-		pr_debug("subflow=%p", ssk->sk);
-		sock_release(ssk);
 	}
 
 	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
