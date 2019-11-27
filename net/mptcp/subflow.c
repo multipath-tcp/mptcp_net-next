@@ -139,6 +139,7 @@ static void subflow_init_req(struct request_sock *req,
 		subflow_req->remote_key = rx_opt.mptcp.sndr_key;
 		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 	} else if (rx_opt.mptcp.mp_join && listener->request_mptcp) {
+		subflow_req->ssn_offset = TCP_SKB_CB(skb)->seq;
 		subflow_req->mp_join = 1;
 		subflow_req->backup = rx_opt.mptcp.backup;
 		subflow_req->remote_id = rx_opt.mptcp.join_id;
@@ -231,6 +232,8 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 				      subflow->remote_nonce,
 				      (u32 *)subflow->hmac);
 
+		if (skb)
+			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 		mptcp_finish_join(sk);
 		subflow->conn_finished = 1;
 	}
@@ -858,6 +861,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		new_ctx->ssn_offset = subflow_req->ssn_offset;
 		new_ctx->idsn = subflow_req->idsn;
 	} else if (subflow_req->mp_join) {
+		new_ctx->ssn_offset = subflow_req->ssn_offset;
 		new_ctx->mp_join = 1;
 		new_ctx->fourth_ack = 1;
 		new_ctx->backup = subflow_req->backup;
