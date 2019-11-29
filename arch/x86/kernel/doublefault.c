@@ -54,7 +54,7 @@ struct x86_hw_tss doublefault_tss __cacheline_aligned = {
 	.sp0		= STACK_START,
 	.ss0		= __KERNEL_DS,
 	.ldt		= 0,
-	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,
+	.io_bitmap_base	= IO_BITMAP_OFFSET_INVALID,
 
 	.ip		= (unsigned long) doublefault_fn,
 	/* 0x2 bit is always set */
@@ -65,6 +65,9 @@ struct x86_hw_tss doublefault_tss __cacheline_aligned = {
 	.ss		= __KERNEL_DS,
 	.ds		= __USER_DS,
 	.fs		= __KERNEL_PERCPU,
+#ifndef CONFIG_X86_32_LAZY_GS
+	.gs		= __KERNEL_STACK_CANARY,
+#endif
 
 	.__cr3		= __pa_nodebug(swapper_pg_dir),
 };
