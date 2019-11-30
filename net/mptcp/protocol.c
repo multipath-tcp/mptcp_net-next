@@ -779,6 +779,32 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 	return backup;
 }
 
+/* subflow sockets can be either outgoing (connect) or incoming
+ * (accept).
+ *
+ * Outgoing subflows use in-kernel sockets.
+ * Incoming subflows do not have their own 'struct socket' allocated,
+ * so we need to use tcp_close() after detaching them from the mptcp
+ * parent socket.
+ */
+static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
+			      struct mptcp_subflow_context *subflow,
+			      long timeout)
+{
+	struct socket *sock = READ_ONCE(ssk->sk_socket);
+
+	list_del(&subflow->node);
+
+	if (sock && sock != sk->sk_socket) {
+		/* outgoing subflow */
+		sock_release(sock);
+	} else {
+		/* incoming subflow */
+		sock_orphan(ssk);
+		tcp_close(ssk, timeout);
+	}
+}
+
 static void mptcp_worker(struct work_struct *work)
 {
 	int orig_len, orig_offset, ret, mss_now = 0, size_goal = 0;
@@ -941,9 +967,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-		pr_debug("conn_list->subflow=%p", subflow);
-		list_del(&subflow->node);
-		sock_release(ssk->sk_socket);
+		__mptcp_close_ssk(sk, ssk, subflow, timeout);
 	}
 
 	if (msk->cached_ext)
@@ -993,23 +1017,22 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
-	struct socket *new_sock;
 	struct socket *listener;
 	struct sock *newsk;
 
 	listener = msk->subflow;
 
 	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
-	*err = kernel_accept(listener, &new_sock, flags);
-	if (*err < 0)
+	newsk = inet_csk_accept(listener->sk, flags, err, kern);
+	if (!newsk)
 		return NULL;
 
-	subflow = mptcp_subflow_ctx(new_sock->sk);
+	subflow = mptcp_subflow_ctx(newsk);
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
 	if (subflow->mp_capable) {
-		struct sock *ssk = new_sock->sk;
 		struct sock *new_mptcp_sock;
+		struct sock *ssk = newsk;
 		u64 ack_seq;
 
 		lock_sock(sk);
@@ -1020,8 +1043,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 			*err = -ENOBUFS;
 			local_bh_enable();
 			release_sock(sk);
-			kernel_sock_shutdown(new_sock, SHUT_RDWR);
-			sock_release(new_sock);
+			mptcp_subflow_shutdown(newsk, SHUT_RDWR + 1);
+			tcp_close(newsk, 0);
 			return NULL;
 		}
 
@@ -1031,7 +1054,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
 
-		mptcp_token_update_accept(new_sock->sk, new_mptcp_sock);
+		mptcp_token_update_accept(newsk, new_mptcp_sock);
 		msk->subflow = NULL;
 
 		mptcp_pm_new_connection(msk, 1);
@@ -1066,10 +1089,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 			mptcp_subflow_data_available(ssk);
 		release_sock(ssk);
 	} else {
-		newsk = new_sock->sk;
 		tcp_sk(newsk)->is_mptcp = 0;
-		new_sock->sk = NULL;
-		sock_release(new_sock);
 
 		MPTCP_INC_STATS(sock_net(sk),
 				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
@@ -1233,11 +1253,21 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
 
+static void mptcp_sock_graft(struct sock *sk, struct socket *parent)
+{
+	write_lock_bh(&sk->sk_callback_lock);
+	rcu_assign_pointer(sk->sk_wq, &parent->wq);
+	sk_set_socket(sk, parent);
+	sk->sk_uid = SOCK_INODE(parent)->i_uid;
+	write_unlock_bh(&sk->sk_callback_lock);
+}
+
 bool mptcp_finish_join(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct sock *parent = (void *)msk;
+	struct socket *parent_sock;
 	bool ret = false;
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
@@ -1249,8 +1279,14 @@ bool mptcp_finish_join(struct sock *sk)
 	if (parent->sk_state != TCP_ESTABLISHED)
 		goto out;
 
-	ret = true;
-	list_add_tail(&subflow->node, &msk->conn_list);
+	parent_sock = READ_ONCE(parent->sk_socket);
+	if (parent_sock) {
+		if (!sk->sk_socket)
+			mptcp_sock_graft(sk, parent_sock);
+
+		ret = true;
+		list_add_tail(&subflow->node, &msk->conn_list);
+	}
 out:
 	bh_unlock_sock(subflow->conn);
 	local_bh_enable();
@@ -1472,6 +1508,21 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		return -EINVAL;
 
 	err = ssock->ops->accept(sock, newsock, flags, kern);
+	if (err == 0 && newsock->sk->sk_prot != &tcp_prot) {
+		struct mptcp_sock *msk = mptcp_sk(newsock->sk);
+		struct mptcp_subflow_context *subflow;
+
+		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
+		 * This is needed so NOSPACE flag can be set from tcp stack.
+		 */
+		list_for_each_entry(subflow, &msk->conn_list, node) {
+			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+			if (!ssk->sk_socket)
+				mptcp_sock_graft(ssk, newsock);
+		}
+	}
+
 	sock_put(ssock->sk);
 	return err;
 }
