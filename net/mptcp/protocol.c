@@ -40,7 +40,7 @@ static bool mptcp_timer_pending(struct sock *sk)
 	return timer_pending(&inet_csk(sk)->icsk_retransmit_timer);
 }
 
-void mptcp_reset_timer(struct sock *sk)
+static void mptcp_reset_timer(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	unsigned long tout;
@@ -50,6 +50,15 @@ void mptcp_reset_timer(struct sock *sk)
 	if (WARN_ON_ONCE(!tout))
 		tout = TCP_RTO_MIN;
 	sk_reset_timer(sk, &icsk->icsk_retransmit_timer, jiffies + tout);
+}
+
+void mptcp_data_acked(struct sock *sk)
+{
+	mptcp_reset_timer(sk);
+
+	if (!sk_stream_is_writeable(sk) &&
+	    schedule_work(&mptcp_sk(sk)->rtx_work))
+		sock_hold(sk);
 }
 
 static void mptcp_stop_timer(struct sock *sk)
@@ -623,6 +632,7 @@ static void mptcp_retransmit_handler(struct sock *sk)
 	if (atomic64_read(&msk->snd_una) == msk->write_seq) {
 		mptcp_stop_timer(sk);
 	} else {
+		set_bit(MPTCP_WORK_RTX, &msk->flags);
 		if (schedule_work(&msk->rtx_work))
 			sock_hold(sk);
 	}
@@ -647,7 +657,7 @@ static void mptcp_retransmit_timer(struct timer_list *t)
 	sock_put(sk);
 }
 
-static void mptcp_retransmit(struct work_struct *work)
+static void mptcp_worker(struct work_struct *work)
 {
 	int orig_len, orig_offset, ret, mss_now = 0, size_goal = 0;
 	struct mptcp_data_frag *dfrag;
@@ -663,6 +673,10 @@ static void mptcp_retransmit(struct work_struct *work)
 
 	lock_sock(sk);
 	mptcp_clean_una(sk);
+
+	if (!test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
+		goto unlock;
+
 	dfrag = mptcp_rtx_head(sk);
 	if (!dfrag)
 		goto unlock;
@@ -715,7 +729,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&msk->conn_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
 
-	INIT_WORK(&msk->rtx_work, mptcp_retransmit);
+	INIT_WORK(&msk->rtx_work, mptcp_worker);
 
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
@@ -755,7 +769,7 @@ static void __mptcp_clear_xmit(struct sock *sk)
 		dfrag_clear(sk, dfrag);
 }
 
-static void mptcp_cancel_rtx_work(struct sock *sk)
+static void mptcp_cancel_work(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
@@ -786,7 +800,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	__mptcp_clear_xmit(sk);
 	release_sock(sk);
 
-	mptcp_cancel_rtx_work(sk);
+	mptcp_cancel_work(sk);
 
 	sk_common_release(sk);
 }
@@ -796,7 +810,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	lock_sock(sk);
 	__mptcp_clear_xmit(sk);
 	release_sock(sk);
-	mptcp_cancel_rtx_work(sk);
+	mptcp_cancel_work(sk);
 	return tcp_disconnect(sk, flags);
 }
 
