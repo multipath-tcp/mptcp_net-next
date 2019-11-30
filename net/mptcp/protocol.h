@@ -235,7 +235,7 @@ struct mptcp_subflow_context {
 	u8	local_id;
 	u8	remote_id;
 
-	struct	socket *tcp_sock;   /* underlying tcp_sock */
+	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
 	const	struct inet_connection_sock_af_ops *icsk_af_ops;
 	void	(*tcp_sk_data_ready)(struct sock *sk);
@@ -251,8 +251,8 @@ mptcp_subflow_ctx(const struct sock *sk)
 	return (__force struct mptcp_subflow_context *)icsk->icsk_ulp_data;
 }
 
-static inline struct socket *
-mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
+static inline struct sock *
+mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 {
 	return subflow->tcp_sock;
 }
@@ -260,7 +260,7 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 static inline u64
 mptcp_subflow_get_map_offset(const struct mptcp_subflow_context *subflow)
 {
-	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
+	return tcp_sk(mptcp_subflow_tcp_sock(subflow))->copied_seq -
 		      subflow->ssn_offset -
 		      subflow->map_subflow_seq;
 }
