@@ -221,8 +221,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 		if (skb)
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
-		mptcp_finish_join(sk);
-		subflow->conn_finished = 1;
+
+		if (mptcp_finish_join(sk))
+			subflow->conn_finished = 1;
 	}
 }
 
