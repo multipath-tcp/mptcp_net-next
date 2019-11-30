@@ -312,7 +312,8 @@ create_child:
 				goto close_child;
 
 			ctx->conn = (struct sock *)owner;
-			mptcp_finish_join(child);
+			if (!mptcp_finish_join(child))
+				goto close_child;
 		}
 	}
 
