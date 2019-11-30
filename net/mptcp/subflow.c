@@ -743,6 +743,11 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	int err;
 
 	lock_sock(sk);
+	if (sk->sk_state != TCP_ESTABLISHED) {
+		release_sock(sk);
+		return -ENOTCONN;
+	}
+
 	err = mptcp_subflow_create_socket(sk, &sf);
 	if (err) {
 		release_sock(sk);
@@ -753,9 +758,6 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	subflow->remote_key = msk->remote_key;
 	subflow->local_key = msk->local_key;
 	subflow->token = msk->token;
-
-	sock_hold(sf->sk);
-	release_sock(sk);
 
 	addrlen = sizeof(struct sockaddr_in);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -773,15 +775,18 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	subflow->request_join = 1;
 	subflow->request_bkup = 1;
 
+	list_add(&subflow->node, &msk->join_list);
+
 	err = kernel_connect(sf, remote, addrlen, O_NONBLOCK);
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
-	sock_put(sf->sk);
+	release_sock(sk);
 	return err;
 
 failed:
-	sock_put(sf->sk);
+	list_del_init(&subflow->node);
+	release_sock(sk);
 	sock_release(sf);
 	return err;
 }
@@ -825,6 +830,7 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 	if (!ctx)
 		return NULL;
 	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
+	INIT_LIST_HEAD(&ctx->node);
 
 	pr_debug("subflow=%p", ctx);
 
