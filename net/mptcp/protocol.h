@@ -298,7 +298,7 @@ int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
 
-void mptcp_finish_connect(struct sock *sk, int mp_capable);
+void mptcp_finish_connect(struct sock *sk);
 bool mptcp_finish_join(struct sock *sk);
 void mptcp_data_acked(struct sock *sk);
 
