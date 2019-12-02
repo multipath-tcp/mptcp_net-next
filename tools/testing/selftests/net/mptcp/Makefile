@@ -8,4 +8,6 @@ TEST_PROGS := mptcp_connect.sh
 
 TEST_GEN_FILES = mptcp_connect
 
+EXTRA_CLEAN := *.pcap
+
 include ../../lib.mk
