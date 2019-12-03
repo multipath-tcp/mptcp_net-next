@@ -38,6 +38,10 @@ struct mptcp_out_options {
 #endif
 	};
 	u8 addr_id;
+	u8 join_id;
+	u8 backup;
+	u32 nonce;
+	u64 thmac;
 	struct mptcp_ext ext_copy;
 #endif
 };
@@ -75,6 +79,8 @@ static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
 {
 	return skb_ext_exist(skb, SKB_EXT_MPTCP);
 }
+
+bool mptcp_sk_is_subflow(const struct sock *sk);
 
 #else
 
@@ -130,6 +136,11 @@ static inline void mptcp_incoming_options(struct sock *sk,
 }
 
 static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+{
+	return false;
+}
+
+static inline bool mptcp_sk_is_subflow(const struct sock *sk)
 {
 	return false;
 }
