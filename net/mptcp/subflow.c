@@ -784,6 +784,28 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 	return ctx;
 }
 
+static void __subflow_state_change(struct sock *sk)
+{
+	struct socket_wq *wq;
+
+	rcu_read_lock();
+	wq = rcu_dereference(sk->sk_wq);
+	if (skwq_has_sleeper(wq))
+		wake_up_interruptible_all(&wq->wait);
+	rcu_read_unlock();
+}
+
+static void subflow_state_change(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct sock *parent = subflow->conn;
+
+	__subflow_state_change(sk);
+
+	if (parent)
+		__subflow_state_change(parent);
+}
+
 static int subflow_ulp_init(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -817,6 +839,7 @@ static int subflow_ulp_init(struct sock *sk)
 	ctx->tcp_sk_data_ready = sk->sk_data_ready;
 	sk->sk_data_ready = subflow_data_ready;
 	sk->sk_write_space = subflow_write_space;
+	sk->sk_state_change = subflow_state_change;
 out:
 	return err;
 }
