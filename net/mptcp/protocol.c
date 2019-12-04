@@ -105,10 +105,10 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 {
 	int mss_now, avail_size, size_goal, ret;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	bool collapsed, can_collapse = false;
 	struct mptcp_ext *mpext = NULL;
+	struct sk_buff *skb, *tail;
+	bool can_collapse = false;
 	struct page_frag *pfrag;
-	struct sk_buff *skb;
 	size_t psize;
 
 	/* use the mptcp page cache so that we can easily move the data
@@ -165,10 +165,14 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	if (unlikely(ret < psize))
 		iov_iter_revert(&msg->msg_iter, psize - ret);
 
-	collapsed = skb == tcp_write_queue_tail(ssk);
-	if (collapsed) {
+	/* if the tail skb extension is still the cached one, collapsing
+	 * really happened. Note: we can't check for 'same skb' as the sk_buff
+	 * hdr on tail can be transmitted, freed and re-allocated by the
+	 * do_tcp_sendpages() call
+	 */
+	tail = tcp_write_queue_tail(ssk);
+	if (mpext && tail && mpext == skb_ext_find(tail, SKB_EXT_MPTCP)) {
 		WARN_ON_ONCE(!can_collapse);
-		/* when collapsing mpext always exists */
 		mpext->data_len += ret;
 		goto out;
 	}
