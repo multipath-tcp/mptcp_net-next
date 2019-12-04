@@ -371,6 +371,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_ext *mpext;
 	struct sk_buff *skb;
+	u16 data_len;
 	u64 map_seq;
 
 	skb = skb_peek(&ssk->sk_receive_queue);
@@ -395,25 +396,38 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 
 		if (!subflow->map_valid)
 			return MAPPING_INVALID;
+
 		goto validate_seq;
 	}
 
-	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u", mpext->data_seq,
-		 mpext->dsn64, mpext->subflow_seq, mpext->data_len);
+	pr_debug("seq=%llu is64=%d ssn=%u data_len=%u data_fin=%d",
+		 mpext->data_seq, mpext->dsn64, mpext->subflow_seq,
+		 mpext->data_len, mpext->data_fin);
 
-	if (mpext->data_len == 0) {
+	data_len = mpext->data_len;
+	if (data_len == 0) {
 		pr_err("Infinite mapping not handled");
 		return MAPPING_INVALID;
-	} else if (mpext->subflow_seq == 0 &&
-		   mpext->data_fin == 1) {
-		if (WARN_ON_ONCE(mpext->data_len != 1))
-			return false;
+	}
 
-		/* do not try hard to handle this any better, till we have
-		 * real data_fin support
-		 */
-		pr_debug("DATA_FIN with no payload");
-		return MAPPING_DATA_FIN;
+	if (mpext->data_fin == 1) {
+		if (data_len == 1) {
+			pr_debug("DATA_FIN with no payload");
+			if (subflow->map_valid) {
+				/* A DATA_FIN might arrive in a DSS
+				 * option before the previous mapping
+				 * has been fully consumed. Continue
+				 * handling the existing mapping.
+				 */
+				skb_ext_del(skb, SKB_EXT_MPTCP);
+				return MAPPING_OK;
+			} else {
+				return MAPPING_DATA_FIN;
+			}
+		}
+
+		/* Adjust for DATA_FIN using 1 byte of sequence space */
+		data_len--;
 	}
 
 	if (!mpext->dsn64) {
@@ -428,7 +442,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 		/* Allow replacing only with an identical map */
 		if (subflow->map_seq == map_seq &&
 		    subflow->map_subflow_seq == mpext->subflow_seq &&
-		    subflow->map_data_len == mpext->data_len) {
+		    subflow->map_data_len == data_len) {
 			skb_ext_del(skb, SKB_EXT_MPTCP);
 			return MAPPING_OK;
 		}
@@ -445,7 +459,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 
 	subflow->map_seq = map_seq;
 	subflow->map_subflow_seq = mpext->subflow_seq;
-	subflow->map_data_len = mpext->data_len;
+	subflow->map_data_len = data_len;
 	subflow->map_valid = 1;
 	pr_debug("new map seq=%llu subflow_seq=%u data_len=%u",
 		 subflow->map_seq, subflow->map_subflow_seq,
