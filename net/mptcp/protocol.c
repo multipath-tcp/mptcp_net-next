@@ -139,8 +139,11 @@ static inline bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
 
 static void dfrag_clear(struct sock *sk, struct mptcp_data_frag *dfrag)
 {
+	int len = dfrag->data_len + dfrag->overhead;
+
 	list_del(&dfrag->list);
-	sk_mem_uncharge(sk, dfrag->data_len + dfrag->overhead);
+	sk_mem_uncharge(sk, len);
+	sk_wmem_queued_add(sk, -len);
 	put_page(dfrag->page);
 }
 
@@ -304,6 +307,9 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		if (!dfrag_collapsed) {
 			get_page(dfrag->page);
 			list_add_tail(&dfrag->list, &msk->rtx_queue);
+			sk_wmem_queued_add(sk, frag_truesize);
+		} else {
+			sk_wmem_queued_add(sk, ret);
 		}
 
 		/* charge data on mptcp rtx queue to the master socket
@@ -711,6 +717,7 @@ static int mptcp_init_sock(struct sock *sk)
 		return ret;
 
 	sk_sockets_allocated_inc(sk);
+	sk->sk_sndbuf = sock_net(sk)->ipv4.sysctl_tcp_wmem[2];
 
 	return 0;
 }
