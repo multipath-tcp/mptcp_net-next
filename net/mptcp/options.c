@@ -382,19 +382,49 @@ static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
 	return false;
 }
 
+static void mptcp_write_data_fin(struct mptcp_subflow_context *subflow,
+				 struct mptcp_ext *ext)
+{
+	ext->data_fin = 1;
+
+	if (!ext->use_map) {
+		/* RFC6824 requires a DSS mapping with specific values
+		 * if DATA_FIN is set but no data payload is mapped
+		 */
+		ext->use_map = 1;
+		ext->dsn64 = 1;
+		ext->data_seq = mptcp_sk(subflow->conn)->write_seq;
+		ext->subflow_seq = 0;
+		ext->data_len = 1;
+	} else {
+		/* If there's an existing DSS mapping, DATA_FIN consumes
+		 * 1 additional byte of mapping space.
+		 */
+		ext->data_len++;
+	}
+}
+
 static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 					  unsigned int *size,
 					  unsigned int remaining,
 					  struct mptcp_out_options *opts)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	unsigned int dss_size = 0;
 	struct mptcp_ext *mpext;
 	struct mptcp_sock *msk;
 	unsigned int ack_size;
+	u8 tcp_fin;
 
-	mpext = skb ? mptcp_get_ext(skb) : NULL;
+	if (skb) {
+		mpext = mptcp_get_ext(skb);
+		tcp_fin = TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN;
+	} else {
+		mpext = NULL;
+		tcp_fin = 0;
+	}
 
-	if (!skb || (mpext && mpext->use_map)) {
+	if (!skb || (mpext && mpext->use_map) || tcp_fin) {
 		unsigned int map_size;
 
 		map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
@@ -403,6 +433,10 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		dss_size = map_size;
 		if (mpext)
 			opts->ext_copy = *mpext;
+
+		if (skb && tcp_fin &&
+		    subflow->conn->sk_state != TCP_ESTABLISHED)
+			mptcp_write_data_fin(subflow, &opts->ext_copy);
 	}
 
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
