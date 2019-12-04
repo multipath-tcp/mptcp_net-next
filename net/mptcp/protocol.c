@@ -1175,6 +1175,10 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	pr_debug("sk=%p, how=%d", msk, how);
 
 	lock_sock(sock->sk);
+
+	if (how == SHUT_WR || how == SHUT_RDWR)
+		inet_sk_state_store(sock->sk, TCP_FIN_WAIT1);
+
 	ssock = __mptcp_fallback_get_ref(msk);
 	if (ssock) {
 		release_sock(sock->sk);
