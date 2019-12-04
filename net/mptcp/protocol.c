@@ -21,6 +21,7 @@
 #endif
 #include <net/mptcp.h>
 #include "protocol.h"
+#include "mib.h"
 
 static struct percpu_counter mptcp_sockets_allocated;
 
@@ -695,15 +696,20 @@ static int __mptcp_init_sock(struct sock *sk)
 
 static int mptcp_init_sock(struct sock *sk)
 {
-	int ret = __mptcp_init_sock(sk);
+	struct net *net = sock_net(sk);
+	int ret;
 
+	if (!mptcp_is_enabled(net))
+		return -ENOPROTOOPT;
+
+	if (unlikely(!net->mib.mptcp_statistics) && !mptcp_mib_alloc(net))
+		return -ENOMEM;
+
+	ret = __mptcp_init_sock(sk);
 	if (ret)
 		return ret;
 
 	sk_sockets_allocated_inc(sk);
-
-	if (!mptcp_is_enabled(sock_net(sk)))
-		return -ENOPROTOOPT;
 
 	return 0;
 }
