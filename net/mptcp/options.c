@@ -220,11 +220,9 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
 		opts->sndr_key = subflow_req->local_key;
-		opts->rcvr_key = subflow_req->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_SYNACK;
-		pr_debug("subflow_req=%p, local_key=%llu, remote_key=%llu",
-			 subflow_req, subflow_req->local_key,
-			 subflow_req->remote_key);
+		pr_debug("subflow_req=%p, local_key=%llu",
+			 subflow_req, subflow_req->local_key);
 		return true;
 	}
 	return false;
@@ -250,8 +248,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}
