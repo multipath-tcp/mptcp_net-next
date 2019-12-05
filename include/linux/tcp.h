@@ -107,7 +107,6 @@ struct tcp_options_received {
 			mp_join : 1,
 			dss : 1,
 			version : 4;
-		u8	dss_flags;
 		u8	use_map:1,
 			dsn64:1,
 			data_fin:1,
