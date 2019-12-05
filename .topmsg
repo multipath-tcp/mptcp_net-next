@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-from-sha1-v0-to-sha256-v1
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move from sha1 (v0) to sha256 (v1)
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+For simplicity's sake use directly sha256 primitives (and pull them
+as a required build dep).
+Add optional, boot-time self-tests for the hmac function.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
