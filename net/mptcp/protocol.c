@@ -587,6 +587,12 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		lock_sock(ssk);
 		do {
+			if (unlikely(!msk->can_ack)) {
+				msk->remote_key = subflow->remote_key;
+				msk->ack_seq = subflow->map_seq;
+				msk->can_ack = true;
+			}
+
 			/* try to read as much data as available */
 			map_remaining = subflow->map_data_len -
 					mptcp_subflow_get_map_offset(subflow);
@@ -943,7 +949,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		__mptcp_init_sock(new_mptcp_sock);
 
 		msk = mptcp_sk(new_mptcp_sock);
-		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
 
@@ -952,11 +957,15 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 		mptcp_pm_new_connection(msk, 1);
 
-		mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
 		atomic64_set(&msk->snd_una, msk->write_seq);
-		ack_seq++;
-		msk->ack_seq = ack_seq;
+		if (subflow->can_ack) {
+			msk->can_ack = true;
+			msk->remote_key = subflow->remote_key;
+			mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
+			ack_seq++;
+			msk->ack_seq = ack_seq;
+		}
 		newsk = new_mptcp_sock;
 		list_add(&subflow->node, &msk->conn_list);
 		bh_unlock_sock(new_mptcp_sock);
@@ -970,8 +979,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		 * the receive path and process the pending ones
 		 */
 		lock_sock(new_sock->sk);
-		subflow->map_seq = ack_seq;
-		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
 		subflow->tcp_sock = new_sock;
 		subflow->conn = new_mptcp_sock;
@@ -1130,6 +1137,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		atomic64_set(&msk->snd_una, msk->write_seq);
 		ack_seq++;
 		msk->ack_seq = ack_seq;
+		msk->can_ack = 1;
 		subflow->map_seq = ack_seq;
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
@@ -1221,7 +1229,7 @@ static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 	msk->subflow = ssock;
 	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
-	subflow->request_version = 0; /* currently only v0 supported */
+	subflow->request_version = 1; /* only v1 supported */
 
 	sock_hold(ssock->sk);
 
