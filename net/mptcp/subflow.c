@@ -682,11 +682,6 @@ bool mptcp_subflow_data_available(struct sock *sk)
 
 	if (!subflow_check_data_avail(sk)) {
 		subflow->data_avail = 0;
-		/* set EoF only there is no data available - we already spooled
-		 * all the pending skbs
-		 */
-		if (sk->sk_shutdown & RCV_SHUTDOWN || sk->sk_state == TCP_CLOSE)
-			subflow->rx_eof = 1;
 		return false;
 	}
 
@@ -709,8 +704,7 @@ static void subflow_data_ready(struct sock *sk)
 		return;
 	}
 
-	/* always propagate the EoF */
-	if (mptcp_subflow_data_available(sk) || subflow->rx_eof) {
+	if (mptcp_subflow_data_available(sk)) {
 		smp_mb__before_atomic();
 		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
 		smp_mb__after_atomic();
@@ -850,15 +844,23 @@ static void __subflow_state_change(struct sock *sk)
 	rcu_read_unlock();
 }
 
+static bool subflow_is_done(const struct sock *sk)
+{
+	return sk->sk_shutdown & RCV_SHUTDOWN || sk->sk_state == TCP_CLOSE;
+}
+
 static void subflow_state_change(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	struct sock *parent = subflow->conn;
+	struct sock *parent = READ_ONCE(subflow->conn);
 
 	__subflow_state_change(sk);
 
-	if (parent)
-		__subflow_state_change(parent);
+	if (parent && !(parent->sk_shutdown & RCV_SHUTDOWN) &&
+	    !subflow->rx_eof && subflow_is_done(sk)) {
+		subflow->rx_eof = 1;
+		mptcp_subflow_eof(parent);
+	}
 }
 
 static int subflow_ulp_init(struct sock *sk)
