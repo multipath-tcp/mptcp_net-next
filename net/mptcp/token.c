@@ -182,8 +182,13 @@ struct mptcp_sock *mptcp_token_get_sock(u32 token)
 
 	spin_lock_bh(&token_tree_lock);
 	conn = radix_tree_lookup(&token_tree, token);
-	if (conn)
-		sock_hold(conn);
+	if (conn) {
+		/* token still reserved? */
+		if (conn == (struct sock *)&token_used)
+			conn = NULL;
+		else
+			sock_hold(conn);
+	}
 	spin_unlock_bh(&token_tree_lock);
 
 	return mptcp_sk(conn);
