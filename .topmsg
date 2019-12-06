@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/pass-subflow-socket-to-mptcp_finish_connect
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] pass subflow socket to mptcp_finish_connect
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Unlike _join(), we pass the mptcp socket and then use msk->subflow
+to get back the subflow socket.
+
+Just pass the subflow directly.
+
+Right now we take the mptcp socket from the subflow context
+(subflow->conn), pass that to mptcp_finish_connect and then use
+the msk->subflow pointer to get to the subflow socket, i.e.
+we do:
+
+subflow_ctx(ssk)->mptcp_socket->subflow
+
+just to get what the caller already had: ssk.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
