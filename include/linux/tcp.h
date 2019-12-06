@@ -113,7 +113,6 @@ struct tcp_options_received {
 		u32	nonce;
 		u64	thmac;
 		u8	hmac[20];
-		u8	dss_flags;
 		u8	use_map:1,
 			dsn64:1,
 			data_fin:1,
