@@ -420,6 +420,11 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 		mpext = mptcp_get_ext(skb);
 		data_len = mpext ? mpext->data_len : 0;
 
+		/* we will check ext_copy.data_len in mptcp_write_options() to
+		 * discriminate between TCPOLEN_MPTCP_MPC_ACK_DATA and
+		 * TCPOLEN_MPTCP_MPC_ACK
+		 */
+		opts->ext_copy.data_len = data_len;
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
@@ -429,26 +434,15 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 		 * packets that start the first subflow of an MPTCP connection,
 		 * as well as the first packet that carries data
 		 */
-		if (data_len > 0) {
-			/* we will check ext_copy.data_len in
-			 * mptcp_write_options() to discriminate between
-			 * TCPOLEN_MPTCP_MPC_ACK_DATA and TCPOLEN_MPTCP_MPC_ACK
-			 */
-			opts->ext_copy.data_len = data_len;
+		if (data_len > 0)
 			*size = ALIGN(TCPOLEN_MPTCP_MPC_ACK_DATA, 4);
-			pr_debug("subflow=%p, local_key=%llu, remote_key=%llu map_len=%d",
-				 subflow, subflow->local_key,
-				 subflow->remote_key, opts->ext_copy.data_len);
-			return true;
-		}
+		else
+			*size = TCPOLEN_MPTCP_MPC_ACK;
 
-		/* plain MP_CAPABLE + ack */
-		opts->suboptions = OPTION_MPTCP_MPC_ACK;
-		opts->ext_copy.data_len = 0;
-		*size = TCPOLEN_MPTCP_MPC_ACK;
-		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu",
-			 subflow, subflow->local_key,
-			 subflow->remote_key);
+		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu map_len=%d",
+			 subflow, subflow->local_key,  subflow->remote_key,
+			 data_len);
+
 		return true;
 	} else if (subflow->mp_join && !subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPJ_ACK;
