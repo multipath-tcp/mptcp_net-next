@@ -1495,6 +1495,15 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	return err;
 }
 
+static bool is_tcp_proto(const struct proto *p)
+{
+#ifdef CONFIG_MPTCP_IPV6
+	return p == &tcp_prot || p == &tcpv6_prot;
+#else
+	return p == &tcp_prot;
+#endif
+}
+
 static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 			       int flags, bool kern)
 {
@@ -1509,7 +1518,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		return -EINVAL;
 
 	err = ssock->ops->accept(sock, newsock, flags, kern);
-	if (err == 0 && newsock->sk->sk_prot != &tcp_prot) {
+	if (err == 0 && !is_tcp_proto(newsock->sk->sk_prot)) {
 		struct mptcp_sock *msk = mptcp_sk(newsock->sk);
 		struct mptcp_subflow_context *subflow;
 
