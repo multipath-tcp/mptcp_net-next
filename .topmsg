@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/don-t-flag-parent-socket-as-RCV_SHUTDOWN-if-one-one-subflow-has-closed
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] don't flag parent socket as RCV_SHUTDOWN if one one subflow has closed
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+instead schedule the mptcp worker and tell it to check eof state on all
+subflows.  If all have closed, then also flag the mptcp socket as closed
+and wake up userspace process blocking in poll().
+
+v2: move eof checks to subflow_state_change() (Paolo)
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
