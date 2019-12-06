@@ -1,6 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] store tcp_sk, not socket
-
-preparation patch to avoid outer 'struct socket'.
-
-Signed-off-by: Florian Westphal <fw@strlen.de>
