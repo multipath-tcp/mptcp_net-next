@@ -329,6 +329,8 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 		 */
 		mpext = mptcp_get_ext(skb);
 		data_len = mpext ? mpext->data_len : 0;
+
+		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
 
@@ -338,8 +340,6 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 		 * as well as the first packet that carries data
 		 */
 		if (data_len > 0) {
-			opts->suboptions = OPTION_MPTCP_MPC_ACK;
-
 			/* we will check ext_copy.data_len in
 			 * mptcp_write_options() to discriminate between
 			 * TCPOLEN_MPTCP_MPC_ACK_DATA and TCPOLEN_MPTCP_MPC_ACK
