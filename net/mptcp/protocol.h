@@ -68,6 +68,7 @@ struct mptcp_sock {
 	u64		ack_seq;
 	u32		token;
 	unsigned long	flags;
+	bool		can_ack;
 	struct list_head conn_list;
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 };
@@ -82,9 +83,10 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 
 struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
-	u8	mp_capable : 1,
+	u16	mp_capable : 1,
 		mp_join : 1,
 		backup : 1,
+		remote_key_valid : 1,
 		version : 4;
 	u64	local_key;
 	u64	remote_key;
@@ -118,8 +120,10 @@ struct mptcp_subflow_context {
 		fourth_ack : 1,	    /* send initial DSS */
 		conn_finished : 1,
 		map_valid : 1,
+		mpc_map : 1,
 		data_avail : 1,
-		rx_eof : 1;
+		rx_eof : 1,
+		can_ack : 1;	    /* only after processing the remote a key */
 
 	struct	socket *tcp_sock;   /* underlying tcp_sock */
 	struct	sock *conn;	    /* parent mptcp_sock */
