@@ -109,7 +109,7 @@ static struct sock *mptcp_subflow_recv_lookup(const struct mptcp_sock *msk)
 
 	mptcp_for_each_subflow(msk, subflow) {
 		if (subflow->data_avail)
-			return mptcp_subflow_tcp_socket(subflow)->sk;
+			return mptcp_subflow_tcp_sock(subflow);
 
 		receivers += !subflow->rx_eof;
 	}
@@ -392,7 +392,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	sock_owned_by_me((const struct sock *)msk);
 
 	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_socket(subflow)->sk;
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		if (!sk_stream_memory_free(ssk)) {
 			struct socket *sock = ssk->sk_socket;
@@ -761,7 +761,7 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 	sock_owned_by_me((const struct sock *)msk);
 
 	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_socket(subflow)->sk;
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		/* still data outstanding at TCP level?  Don't retransmit. */
 		if (!tcp_write_queue_empty(ssk))
@@ -916,8 +916,11 @@ static void mptcp_close(struct sock *sk, long timeout)
 	}
 
 	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
 		pr_debug("conn_list->subflow=%p", subflow);
-		sock_release(mptcp_subflow_tcp_socket(subflow));
+		list_del(&subflow->node);
+		sock_release(ssk->sk_socket);
 	}
 
 	if (msk->cached_ext)
@@ -1034,10 +1037,10 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		 */
 		lock_sock(ssk);
 		subflow->rel_write_seq = 1;
-		subflow->tcp_sock = new_sock;
+		subflow->tcp_sock = ssk;
 		subflow->conn = new_mptcp_sock;
-		if (unlikely(!skb_queue_empty(&new_sock->sk->sk_receive_queue)))
-			mptcp_subflow_data_available(new_sock->sk);
+		if (unlikely(!skb_queue_empty(&ssk->sk_receive_queue)))
+			mptcp_subflow_data_available(ssk);
 		release_sock(ssk);
 	} else {
 		newsk = new_sock->sk;
@@ -1508,11 +1511,9 @@ static int mptcp_shutdown(struct socket *sock, int how)
 	}
 
 	mptcp_for_each_subflow(msk, subflow) {
-		struct socket *tcp_socket;
+		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
 
-		tcp_socket = mptcp_subflow_tcp_socket(subflow);
-		pr_debug("conn_list->subflow=%p", subflow);
-		ret = kernel_sock_shutdown(tcp_socket, how);
+		ret = kernel_sock_shutdown(tcp_sk->sk_socket, how);
 	}
 	release_sock(sock->sk);
 
