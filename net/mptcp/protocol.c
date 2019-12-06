@@ -44,19 +44,6 @@ static struct socket *mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 	return ssock;
 }
 
-static struct sock *mptcp_subflow_get(const struct mptcp_sock *msk)
-{
-	struct mptcp_subflow_context *subflow;
-
-	sock_owned_by_me((const struct sock *)msk);
-
-	mptcp_for_each_subflow(msk, subflow) {
-		return mptcp_subflow_tcp_sock(subflow);
-	}
-
-	return NULL;
-}
-
 static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
 {
 	if (!msk->cached_ext)
@@ -192,6 +179,43 @@ out:
 	return ret;
 }
 
+static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *backup = NULL;
+
+	sock_owned_by_me((const struct sock *)msk);
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (!sk_stream_memory_free(ssk)) {
+			struct socket *sock = ssk->sk_socket;
+
+			if (sock) {
+				clear_bit(MPTCP_SEND_SPACE, &msk->flags);
+				smp_mb__after_atomic();
+
+				/* enables sk->write_space() callbacks */
+				set_bit(SOCK_NOSPACE, &sock->flags);
+			}
+
+			return NULL;
+		}
+
+		if (subflow->backup) {
+			if (!backup)
+				backup = ssk;
+
+			continue;
+		}
+
+		return ssk;
+	}
+
+	return backup;
+}
+
 static void ssk_check_wmem(struct mptcp_sock *msk, struct sock *ssk)
 {
 	struct socket *sock;
@@ -232,10 +256,17 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
 
-	ssk = mptcp_subflow_get(msk);
-	if (!ssk) {
-		release_sock(sk);
-		return -ENOTCONN;
+	ssk = mptcp_subflow_get_send(msk);
+	while (!sk_stream_memory_free(sk) || !ssk) {
+		ret = sk_stream_wait_memory(sk, &timeo);
+		if (ret)
+			goto out;
+
+		ssk = mptcp_subflow_get_send(msk);
+		if (list_empty(&msk->conn_list)) {
+			ret = -ENOTCONN;
+			goto out;
+		}
 	}
 
 	pr_debug("conn_list->subflow=%p", ssk);
@@ -258,6 +289,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 
 	ssk_check_wmem(msk, ssk);
 	release_sock(ssk);
+out:
 	release_sock(sk);
 	return ret;
 }
@@ -790,6 +822,44 @@ static void mptcp_sock_graft(struct sock *sk, struct socket *parent)
 	sk_set_socket(sk, parent);
 	sk->sk_uid = SOCK_INODE(parent)->i_uid;
 	write_unlock_bh(&sk->sk_callback_lock);
+}
+
+bool mptcp_finish_join(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+	struct sock *parent = (void *)msk;
+	struct socket *parent_sock;
+	bool ret = false;
+
+	pr_debug("msk=%p, subflow=%p", msk, subflow);
+
+	local_bh_disable();
+	bh_lock_sock_nested(subflow->conn);
+
+	/* mptcp socket already closing? */
+	if (parent->sk_state != TCP_ESTABLISHED)
+		goto out;
+
+	parent_sock = READ_ONCE(parent->sk_socket);
+	if (parent_sock) {
+		if (!sk->sk_socket)
+			mptcp_sock_graft(sk, parent_sock);
+
+		ret = true;
+		list_add_tail(&subflow->node, &msk->conn_list);
+	}
+out:
+	bh_unlock_sock(subflow->conn);
+	local_bh_enable();
+	return ret;
+}
+
+bool mptcp_sk_is_subflow(const struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
+	return subflow->mp_join == 1;
 }
 
 static bool mptcp_memory_free(const struct sock *sk, int wake)
