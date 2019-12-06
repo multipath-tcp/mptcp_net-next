@@ -81,6 +81,7 @@
 #define MPTCP_DATA_READY	BIT(0)
 #define MPTCP_WORK_RTX		BIT(1)
 #define MPTCP_SEND_SPACE	BIT(2)
+#define MPTCP_WORK_EOF		BIT(3)
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -138,10 +139,10 @@ struct mptcp_sock {
 	u32		token;
 	unsigned long	flags;
 	bool		can_ack;
-	u16		dport;
 	struct work_struct rtx_work;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
+	struct list_head join_list;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct mptcp_pm_data	pm;
@@ -236,7 +237,7 @@ struct mptcp_subflow_context {
 	u8	local_id;
 	u8	remote_id;
 
-	struct	socket *tcp_sock;   /* underlying tcp_sock */
+	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
 	const	struct inet_connection_sock_af_ops *icsk_af_ops;
 	void	(*tcp_sk_data_ready)(struct sock *sk);
@@ -252,8 +253,8 @@ mptcp_subflow_ctx(const struct sock *sk)
 	return (__force struct mptcp_subflow_context *)icsk->icsk_ulp_data;
 }
 
-static inline struct socket *
-mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
+static inline struct sock *
+mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 {
 	return subflow->tcp_sock;
 }
@@ -261,7 +262,7 @@ mptcp_subflow_tcp_socket(const struct mptcp_subflow_context *subflow)
 static inline u64
 mptcp_subflow_get_map_offset(const struct mptcp_subflow_context *subflow)
 {
-	return tcp_sk(mptcp_subflow_tcp_socket(subflow)->sk)->copied_seq -
+	return tcp_sk(mptcp_subflow_tcp_sock(subflow))->copied_seq -
 		      subflow->ssn_offset -
 		      subflow->map_subflow_seq;
 }
@@ -299,7 +300,8 @@ int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
 
-void mptcp_finish_connect(struct sock *sk, int mp_capable);
+void mptcp_finish_connect(struct sock *sk);
+void mptcp_subflow_eof(struct sock *sk);
 bool mptcp_finish_join(struct sock *sk);
 void mptcp_data_acked(struct sock *sk);
 
