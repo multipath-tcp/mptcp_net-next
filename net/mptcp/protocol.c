@@ -830,7 +830,7 @@ static struct socket *mptcp_socket_create_get(struct mptcp_sock *msk)
 	msk->subflow = ssock;
 	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
-	subflow->request_version = 0; /* currently only v0 supported */
+	subflow->request_version = 1; /* only v1 supported */
 
 	sock_hold(ssock->sk);
 
