@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/copy-connection-id-from-first-subflow-to-mptcp-socket
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] copy connection id from first subflow to mptcp socket
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This allows to call inet(6)_getname on the parent socket
+and it will return the right result.
+
+At this time it only works because the first incoming subflow has a
+'struct socket' allocated.
+
+This will change in followup patch, passive subflows will not have
+a socket struct anymore.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
