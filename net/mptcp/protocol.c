@@ -357,6 +357,12 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		lock_sock(ssk);
 		while (mptcp_subflow_data_available(ssk) && !done) {
+			if (unlikely(!msk->can_ack)) {
+				msk->remote_key = subflow->remote_key;
+				msk->ack_seq = subflow->map_seq;
+				msk->can_ack = true;
+			}
+
 			/* try to read as much data as available */
 			map_remaining = subflow->map_data_len -
 					mptcp_subflow_get_map_offset(subflow);
@@ -517,17 +523,20 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		__mptcp_init_sock(new_mptcp_sock);
 
 		msk = mptcp_sk(new_mptcp_sock);
-		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
 
 		mptcp_token_update_accept(new_sock->sk, new_mptcp_sock);
 		msk->subflow = NULL;
 
-		mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
 		msk->write_seq = subflow->idsn + 1;
-		ack_seq++;
-		msk->ack_seq = ack_seq;
+		if (subflow->can_ack) {
+			msk->can_ack = true;
+			msk->remote_key = subflow->remote_key;
+			mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
+			ack_seq++;
+			msk->ack_seq = ack_seq;
+		}
 		newsk = new_mptcp_sock;
 		list_add(&subflow->node, &msk->conn_list);
 		bh_unlock_sock(new_mptcp_sock);
@@ -539,8 +548,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		 * the receive path and process the pending ones
 		 */
 		lock_sock(new_sock->sk);
-		subflow->map_seq = ack_seq;
-		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
 		subflow->tcp_sock = new_sock;
 		subflow->conn = new_mptcp_sock;
@@ -668,6 +675,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->write_seq = subflow->idsn + 1;
 		ack_seq++;
 		msk->ack_seq = ack_seq;
+		msk->can_ack = 1;
 		subflow->map_seq = ack_seq;
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
