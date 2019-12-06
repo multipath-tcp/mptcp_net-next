@@ -350,7 +350,7 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 			*size = TCPOLEN_MPTCP_MPC_ACK;
 
 		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu map_len=%d",
-			 subflow, subflow->local_key,  subflow->remote_key,
+			 subflow, subflow->local_key, subflow->remote_key,
 			 data_len);
 
 		return true;
