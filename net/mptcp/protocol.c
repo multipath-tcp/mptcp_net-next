@@ -57,6 +57,14 @@ static struct sock *mptcp_subflow_get(const struct mptcp_sock *msk)
 	return NULL;
 }
 
+static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
+{
+	if (!msk->cached_ext)
+		msk->cached_ext = __skb_ext_alloc();
+
+	return !!msk->cached_ext;
+}
+
 static struct sock *mptcp_subflow_recv_lookup(const struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
@@ -107,7 +115,8 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	 * from one substream to another, but do per subflow memory accounting
 	 */
 	pfrag = sk_page_frag(sk);
-	while (!sk_page_frag_refill(ssk, pfrag)) {
+	while (!sk_page_frag_refill(ssk, pfrag) ||
+	       !mptcp_ext_cache_refill(msk)) {
 		ret = sk_stream_wait_memory(ssk, timeo);
 		if (ret)
 			return ret;
@@ -165,22 +174,19 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	}
 
 	skb = tcp_write_queue_tail(ssk);
-	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
-	if (mpext) {
-		memset(mpext, 0, sizeof(*mpext));
-		mpext->data_seq = msk->write_seq;
-		mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
-		mpext->data_len = ret;
-		mpext->use_map = 1;
-		mpext->dsn64 = 1;
+	mpext = __skb_ext_set(skb, SKB_EXT_MPTCP, msk->cached_ext);
+	msk->cached_ext = NULL;
 
-		pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
-			 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
-			 mpext->dsn64);
-	}
-	/* TODO: else fallback; allocation can fail, but we can't easily retire
-	 * skbs from the write_queue, as we need to roll-back TCP status
-	 */
+	memset(mpext, 0, sizeof(*mpext));
+	mpext->data_seq = msk->write_seq;
+	mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
+	mpext->data_len = ret;
+	mpext->use_map = 1;
+	mpext->dsn64 = 1;
+
+	pr_debug("data_seq=%llu subflow_seq=%u data_len=%u dsn64=%d",
+		 mpext->data_seq, mpext->subflow_seq, mpext->data_len,
+		 mpext->dsn64);
 
 out:
 	pfrag->offset += ret;
@@ -454,6 +460,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 		sock_release(mptcp_subflow_tcp_socket(subflow));
 	}
 
+	if (msk->cached_ext)
+		__skb_ext_put(msk->cached_ext);
 	release_sock(sk);
 	sk_common_release(sk);
 }
