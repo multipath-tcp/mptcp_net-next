@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/don-t-flag-parent-socket-as-RCV_SHUTDOWN-if-one-one-subflow-has-closed
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
