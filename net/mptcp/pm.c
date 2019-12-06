@@ -81,6 +81,7 @@ int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	struct sockaddr_in remote;
 	struct sockaddr_in local;
+	struct sock *sk;
 	int err;
 
 	if (!msk)
@@ -88,6 +89,7 @@ int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 
 	pr_debug("msk=%p", msk);
 
+	sk = (struct sock *)msk;
 	if (!msk->pm.remote_valid || remote_id != msk->pm.remote_id) {
 		err = -EBADR;
 		goto create_put;
@@ -101,15 +103,14 @@ int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 		local.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	remote.sin_family = msk->pm.remote_family;
-	remote.sin_port = htons(msk->dport);
+	remote.sin_port = inet_sk(sk)->inet_dport;
 	remote.sin_addr = msk->pm.remote_addr;
 
-	err = mptcp_subflow_connect((struct sock *)msk,
-				    (struct sockaddr *)&local,
+	err = mptcp_subflow_connect(sk, (struct sockaddr *)&local,
 				    (struct sockaddr *)&remote, remote_id);
 
 create_put:
-	sock_put((struct sock *)msk);
+	sock_put(sk);
 	return err;
 }
 
@@ -119,12 +120,14 @@ int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
 	struct mptcp_sock *msk = mptcp_token_get_sock(token);
 	struct sockaddr_in6 remote;
 	struct sockaddr_in6 local;
+	struct sock *sk;
 	int err;
 
 	if (!msk)
 		return -EINVAL;
 
 	pr_debug("msk=%p", msk);
+	sk = (struct sock *)msk;
 
 	if (!msk->pm.remote_valid || remote_id != msk->pm.remote_id) {
 		err = -EBADR;
@@ -139,15 +142,14 @@ int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
 		local.sin6_addr = in6addr_any;
 
 	remote.sin6_family = msk->pm.remote_family;
-	remote.sin6_port = htons(msk->dport);
+	remote.sin6_port = inet_sk(sk)->inet_dport;
 	remote.sin6_addr = msk->pm.remote_addr6;
 
-	err = mptcp_subflow_connect((struct sock *)msk,
-				    (struct sockaddr *)&local,
+	err = mptcp_subflow_connect(sk, (struct sockaddr *)&local,
 				    (struct sockaddr *)&remote, remote_id);
 
 create_put:
-	sock_put((struct sock *)msk);
+	sock_put(sk);
 	return err;
 }
 #endif
