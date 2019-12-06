@@ -1,7 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] add mptcp_subflow_shutdown
-
-soon tcp_sk->sk_socket may be pointing at the parent mptcp socket.
-Add a private shutdown function and use it instead.
-
-Signed-off-by: Florian Westphal <fw@strlen.de>
