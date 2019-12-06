@@ -209,7 +209,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 	if (subflow->mp_capable && !subflow->conn_finished) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
-		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
+		mptcp_finish_connect(sk);
 		subflow->conn_finished = 1;
 
 		if (skb) {
@@ -682,11 +682,6 @@ bool mptcp_subflow_data_available(struct sock *sk)
 
 	if (!subflow_check_data_avail(sk)) {
 		subflow->data_avail = 0;
-		/* set EoF only there is no data available - we already spooled
-		 * all the pending skbs
-		 */
-		if (sk->sk_shutdown & RCV_SHUTDOWN || sk->sk_state == TCP_CLOSE)
-			subflow->rx_eof = 1;
 		return false;
 	}
 
@@ -709,8 +704,7 @@ static void subflow_data_ready(struct sock *sk)
 		return;
 	}
 
-	/* always propagate the EoF */
-	if (mptcp_subflow_data_available(sk) || subflow->rx_eof) {
+	if (mptcp_subflow_data_available(sk)) {
 		smp_mb__before_atomic();
 		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
 		smp_mb__after_atomic();
@@ -743,6 +737,11 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	int err;
 
 	lock_sock(sk);
+	if (sk->sk_state != TCP_ESTABLISHED) {
+		release_sock(sk);
+		return -ENOTCONN;
+	}
+
 	err = mptcp_subflow_create_socket(sk, &sf);
 	if (err) {
 		release_sock(sk);
@@ -753,9 +752,6 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	subflow->remote_key = msk->remote_key;
 	subflow->local_key = msk->local_key;
 	subflow->token = msk->token;
-
-	sock_hold(sf->sk);
-	release_sock(sk);
 
 	addrlen = sizeof(struct sockaddr_in);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -773,15 +769,18 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	subflow->request_join = 1;
 	subflow->request_bkup = 1;
 
+	list_add(&subflow->node, &msk->join_list);
+
 	err = kernel_connect(sf, remote, addrlen, O_NONBLOCK);
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
-	sock_put(sf->sk);
+	release_sock(sk);
 	return err;
 
 failed:
-	sock_put(sf->sk);
+	list_del_init(&subflow->node);
+	release_sock(sk);
 	sock_release(sf);
 	return err;
 }
@@ -816,7 +815,6 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 }
 
 static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
-							struct socket *sock,
 							gfp_t priority)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -826,11 +824,11 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 	if (!ctx)
 		return NULL;
 	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
+	INIT_LIST_HEAD(&ctx->node);
 
 	pr_debug("subflow=%p", ctx);
 
-	/* might be NULL */
-	ctx->tcp_sock = sock;
+	ctx->tcp_sock = sk;
 
 	return ctx;
 }
@@ -846,15 +844,23 @@ static void __subflow_state_change(struct sock *sk)
 	rcu_read_unlock();
 }
 
+static bool subflow_is_done(const struct sock *sk)
+{
+	return sk->sk_shutdown & RCV_SHUTDOWN || sk->sk_state == TCP_CLOSE;
+}
+
 static void subflow_state_change(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	struct sock *parent = subflow->conn;
+	struct sock *parent = READ_ONCE(subflow->conn);
 
 	__subflow_state_change(sk);
 
-	if (parent)
-		__subflow_state_change(parent);
+	if (parent && !(parent->sk_shutdown & RCV_SHUTDOWN) &&
+	    !subflow->rx_eof && subflow_is_done(sk)) {
+		subflow->rx_eof = 1;
+		mptcp_subflow_eof(parent);
+	}
 }
 
 static int subflow_ulp_init(struct sock *sk)
@@ -872,7 +878,7 @@ static int subflow_ulp_init(struct sock *sk)
 		goto out;
 	}
 
-	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
+	ctx = subflow_create_ctx(sk, GFP_KERNEL);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto out;
@@ -917,7 +923,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
-	new_ctx = subflow_create_ctx(newsk, NULL, priority);
+	new_ctx = subflow_create_ctx(newsk, priority);
 	if (!new_ctx)
 		return;
 
