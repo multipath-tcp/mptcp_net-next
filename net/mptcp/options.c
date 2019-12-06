@@ -9,8 +9,13 @@
 #include <net/mptcp.h>
 #include "protocol.h"
 
-void mptcp_parse_option(const unsigned char *ptr, int opsize,
-			struct tcp_options_received *opt_rx)
+static bool mptcp_cap_flag_sha256(u8 flags)
+{
+	return (flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA256;
+}
+
+void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
+			int opsize, struct tcp_options_received *opt_rx)
 {
 	struct mptcp_options_received *mp_opt = &opt_rx->mptcp;
 	u8 subtype = *ptr >> 4;
@@ -24,16 +29,32 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 * 10-17: Receiver key (optional)
 	 */
 	case MPTCPOPT_MP_CAPABLE:
-		if (opsize != TCPOLEN_MPTCP_MPC_SYN &&
-		    opsize != TCPOLEN_MPTCP_MPC_SYNACK)
+		/* strict size checking */
+		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)) {
+			if (skb->len > tcp_hdr(skb)->doff << 2)
+				expected_opsize = TCPOLEN_MPTCP_MPC_ACK_DATA;
+			else
+				expected_opsize = TCPOLEN_MPTCP_MPC_ACK;
+		} else {
+			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_ACK)
+				expected_opsize = TCPOLEN_MPTCP_MPC_SYNACK;
+			else
+				expected_opsize = TCPOLEN_MPTCP_MPC_SYN;
+		}
+		if (opsize != expected_opsize)
 			break;
 
+		/* try to be gentle vs future versions on the initial syn */
 		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
-		if (mp_opt->version != 0)
+		if (opsize != TCPOLEN_MPTCP_MPC_SYN) {
+			if (mp_opt->version != MPTCP_SUPPORTED_VERSION)
+				break;
+		} else if (mp_opt->version < MPTCP_SUPPORTED_VERSION) {
 			break;
+		}
 
 		mp_opt->flags = *ptr++;
-		if (!((mp_opt->flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA1) ||
+		if (!mptcp_cap_flag_sha256(mp_opt->flags) ||
 		    (mp_opt->flags & MPTCP_CAP_EXTENSIBILITY))
 			break;
 
@@ -54,19 +75,29 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 			break;
 
 		mp_opt->mp_capable = 1;
-		mp_opt->sndr_key = get_unaligned_be64(ptr);
-		ptr += 8;
-
-		if (opsize == TCPOLEN_MPTCP_MPC_SYNACK) {
+		if (opsize >= TCPOLEN_MPTCP_MPC_SYNACK) {
+			mp_opt->sndr_key = get_unaligned_be64(ptr);
+			ptr += 8;
+		}
+		if (opsize >= TCPOLEN_MPTCP_MPC_ACK) {
 			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
-			pr_debug("MP_CAPABLE flags=%x, sndr=%llu, rcvr=%llu",
-				 mp_opt->flags, mp_opt->sndr_key,
-				 mp_opt->rcvr_key);
-		} else {
-			pr_debug("MP_CAPABLE flags=%x, sndr=%llu",
-				 mp_opt->flags, mp_opt->sndr_key);
 		}
+		if (opsize == TCPOLEN_MPTCP_MPC_ACK_DATA) {
+			/* Section 3.1.:
+			 * "the data parameters in a MP_CAPABLE are semantically
+			 * equivalent to those in a DSS option and can be used
+			 * interchangeably."
+			 */
+			mp_opt->dss = 1;
+			mp_opt->use_map = 1;
+			mp_opt->mpc_map = 1;
+			mp_opt->data_len = get_unaligned_be16(ptr);
+			ptr += 2;
+		}
+		pr_debug("MP_CAPABLE version=%x, flags=%x, optlen=%d sndr=%llu, rcvr=%llu len=%d",
+			 mp_opt->version, mp_opt->flags, opsize,
+			 mp_opt->sndr_key, mp_opt->rcvr_key, mp_opt->data_len);
 		break;
 
 	/* MPTCPOPT_MP_JOIN
@@ -132,6 +163,11 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		pr_debug("DSS");
 		ptr++;
 
+		/* we must clear 'mpc_map' be able to detect MP_CAPABLE
+		 * map vs DSS map in mptcp_incoming_options(), and reconstruct
+		 * map info accordingly
+		 */
+		mp_opt->mpc_map = 0;
 		mp_opt->dss_flags = (*ptr++) & MPTCP_DSS_FLAG_MASK;
 		mp_opt->data_fin = (mp_opt->dss_flags & MPTCP_DSS_DATA_FIN) != 0;
 		mp_opt->dsn64 = (mp_opt->dss_flags & MPTCP_DSS_DSN64) != 0;
@@ -305,18 +341,22 @@ void mptcp_get_options(const struct sk_buff *skb,
 			if (opsize > length)
 				return;	/* don't parse partial options */
 			if (opcode == TCPOPT_MPTCP)
-				mptcp_parse_option(ptr, opsize, opt_rx);
+				mptcp_parse_option(skb, ptr, opsize, opt_rx);
 			ptr += opsize - 2;
 			length -= opsize;
 		}
 	}
 }
 
-bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-		       struct mptcp_out_options *opts)
+bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
+		       unsigned int *size, struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
+	/* we will use snd_isn to detect first pkt [re]transmission
+	 * in mptcp_established_options_mp()
+	 */
+	subflow->snd_isn = TCP_SKB_CB(skb)->end_seq;
 	if (subflow->request_mptcp) {
 		pr_debug("local_key=%llu", subflow->local_key);
 		opts->suboptions = OPTION_MPTCP_MPC_SYN;
@@ -344,6 +384,7 @@ void mptcp_rcv_synsent(struct sock *sk)
 
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
 		subflow->mp_capable = 1;
+		subflow->can_ack = 1;
 		subflow->remote_key = tp->rx_opt.mptcp.sndr_key;
 		pr_debug("subflow=%p, remote_key=%llu", subflow,
 			 subflow->remote_key);
@@ -356,20 +397,58 @@ void mptcp_rcv_synsent(struct sock *sk)
 	}
 }
 
-static bool mptcp_established_options_mp(struct sock *sk, unsigned int *size,
+static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
+					 unsigned int *size,
 					 unsigned int remaining,
 					 struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_ext *mpext;
+	unsigned int data_len;
 
-	if (subflow->mp_capable && !subflow->fourth_ack) {
+	pr_debug("subflow=%p fourth_ack=%d seq=%x:%x remaining=%d", subflow,
+		 subflow->fourth_ack, subflow->snd_isn,
+		 skb ? TCP_SKB_CB(skb)->seq : 0, remaining);
+
+	if (subflow->mp_capable && !subflow->fourth_ack && skb &&
+	    subflow->snd_isn == TCP_SKB_CB(skb)->seq) {
+		/* When skb is not available, we better over-estimate the
+		 * emitted options len. A full DSS option is longer than
+		 * TCPOLEN_MPTCP_MPC_ACK_DATA, so let's the caller try to fit
+		 * that.
+		 */
+		mpext = mptcp_get_ext(skb);
+		data_len = mpext ? mpext->data_len : 0;
+
 		opts->suboptions = OPTION_MPTCP_MPC_ACK;
 		opts->sndr_key = subflow->local_key;
 		opts->rcvr_key = subflow->remote_key;
+
+		/* Section 3.1.
+		 * The MP_CAPABLE option is carried on the SYN, SYN/ACK, and ACK
+		 * packets that start the first subflow of an MPTCP connection,
+		 * as well as the first packet that carries data
+		 */
+		if (data_len > 0) {
+			/* we will check ext_copy.data_len in
+			 * mptcp_write_options() to discriminate between
+			 * TCPOLEN_MPTCP_MPC_ACK_DATA and TCPOLEN_MPTCP_MPC_ACK
+			 */
+			opts->ext_copy.data_len = data_len;
+			*size = ALIGN(TCPOLEN_MPTCP_MPC_ACK_DATA, 4);
+			pr_debug("subflow=%p, local_key=%llu, remote_key=%llu map_len=%d",
+				 subflow, subflow->local_key,
+				 subflow->remote_key, opts->ext_copy.data_len);
+			return true;
+		}
+
+		/* plain MP_CAPABLE + ack */
+		opts->suboptions = OPTION_MPTCP_MPC_ACK;
+		opts->ext_copy.data_len = 0;
 		*size = TCPOLEN_MPTCP_MPC_ACK;
-		subflow->fourth_ack = 1;
 		pr_debug("subflow=%p, local_key=%llu, remote_key=%llu",
-			 subflow, subflow->local_key, subflow->remote_key);
+			 subflow, subflow->local_key,
+			 subflow->remote_key);
 		return true;
 	} else if (subflow->mp_join && !subflow->fourth_ack) {
 		opts->suboptions = OPTION_MPTCP_MPJ_ACK;
@@ -439,6 +518,11 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 			mptcp_write_data_fin(subflow, &opts->ext_copy);
 	}
 
+	opts->ext_copy.use_ack = 0;
+	msk = mptcp_sk(subflow->conn);
+	if (!msk || !READ_ONCE(msk->can_ack))
+		return false;
+
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
 
 	/* Add kind/length/subtype/flag overhead if mapping is not populated */
@@ -447,15 +531,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	dss_size += ack_size;
 
-	msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
-	if (msk) {
-		opts->ext_copy.data_ack = msk->ack_seq;
-	} else {
-		mptcp_crypto_key_sha(mptcp_subflow_ctx(sk)->remote_key,
-				     NULL, &opts->ext_copy.data_ack);
-		opts->ext_copy.data_ack++;
-	}
-
+	opts->ext_copy.data_ack = msk->ack_seq;
 	opts->ext_copy.ack64 = 1;
 	opts->ext_copy.use_ack = 1;
 
@@ -519,7 +595,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	opts->suboptions = 0;
 
-	if (mptcp_established_options_mp(sk, &opt_size, remaining, opts))
+	if (mptcp_established_options_mp(sk, skb, &opt_size, remaining, opts))
 		ret = true;
 	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
 						 opts))
@@ -550,11 +626,9 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
 		opts->sndr_key = subflow_req->local_key;
-		opts->rcvr_key = subflow_req->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_SYNACK;
-		pr_debug("req=%p, local_key=%llu, remote_key=%llu",
-			 subflow_req, subflow_req->local_key,
-			 subflow_req->remote_key);
+		pr_debug("req=%p, local_key=%llu",
+			 subflow_req, subflow_req->local_key);
 		return true;
 	} else if (subflow_req->mp_join) {
 		opts->suboptions = OPTION_MPTCP_MPJ_SYNACK;
@@ -569,6 +643,35 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 		return true;
 	}
 	return false;
+}
+
+static bool check_fourth_ack(struct mptcp_subflow_context *subflow,
+			     struct sk_buff *skb,
+			     struct mptcp_options_received *mp_opt)
+{
+	/* here we can process OoO, in-window pkts, only in-sequence 4th ack
+	 * are relevant
+	 */
+	if (likely(subflow->fourth_ack ||
+		   TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1))
+		return true;
+
+	if (mp_opt->use_ack)
+		subflow->fourth_ack = 1;
+
+	if (subflow->can_ack)
+		return true;
+
+	/* If the first established packet does not contain MP_CAPABLE + data
+	 * then fallback to TCP
+	 */
+	if (!mp_opt->mp_capable) {
+		subflow->mp_capable = 0;
+		return false;
+	}
+	subflow->remote_key = mp_opt->sndr_key;
+	subflow->can_ack = 1;
+	return true;
 }
 
 static u64 expand_ack(u64 old_ack, u64 cur_ack, bool use_64bit)
@@ -625,6 +728,8 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 		return;
 
 	mp_opt = &opt_rx->mptcp;
+	if (!check_fourth_ack(subflow, skb, mp_opt))
+		return;
 
 	if (msk && mp_opt->add_addr) {
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4)
@@ -653,11 +758,23 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	memset(mpext, 0, sizeof(*mpext));
 
 	if (mp_opt->use_map) {
-		mpext->data_seq = mp_opt->data_seq;
-		mpext->subflow_seq = mp_opt->subflow_seq;
+		if (mp_opt->mpc_map) {
+			/* this is an MP_CAPABLE carrying MPTCP data
+			 * we know this map the first chunk of data
+			 */
+			mptcp_crypto_key_sha(subflow->remote_key, NULL,
+					     &mpext->data_seq);
+			mpext->data_seq++;
+			mpext->subflow_seq = 1;
+			mpext->dsn64 = 1;
+			mpext->mpc_map = 1;
+		} else {
+			mpext->data_seq = mp_opt->data_seq;
+			mpext->subflow_seq = mp_opt->subflow_seq;
+			mpext->dsn64 = mp_opt->dsn64;
+		}
 		mpext->data_len = mp_opt->data_len;
 		mpext->use_map = 1;
-		mpext->dsn64 = mp_opt->dsn64;
 	}
 
 	mpext->data_fin = mp_opt->data_fin;
@@ -668,8 +785,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 {
-	if ((OPTION_MPTCP_MPC_SYN |
-	     OPTION_MPTCP_MPC_SYNACK |
+	if ((OPTION_MPTCP_MPC_SYN | OPTION_MPTCP_MPC_SYNACK |
 	     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
 		u8 len;
 
@@ -677,20 +793,35 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			len = TCPOLEN_MPTCP_MPC_SYN;
 		else if (OPTION_MPTCP_MPC_SYNACK & opts->suboptions)
 			len = TCPOLEN_MPTCP_MPC_SYNACK;
+		else if (opts->ext_copy.data_len)
+			len = TCPOLEN_MPTCP_MPC_ACK_DATA;
 		else
 			len = TCPOLEN_MPTCP_MPC_ACK;
 
-		*ptr++ = mptcp_option(MPTCPOPT_MP_CAPABLE, len, 0,
-				      MPTCP_CAP_HMAC_SHA1);
+		*ptr++ = mptcp_option(MPTCPOPT_MP_CAPABLE, len,
+				      MPTCP_SUPPORTED_VERSION,
+				      MPTCP_CAP_HMAC_SHA256);
+
+		if (!((OPTION_MPTCP_MPC_SYNACK | OPTION_MPTCP_MPC_ACK) &
+		    opts->suboptions))
+			goto mp_capable_done;
+
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
-			put_unaligned_be64(opts->rcvr_key, ptr);
-			ptr += 2;
-		}
+		if (!((OPTION_MPTCP_MPC_ACK) & opts->suboptions))
+			goto mp_capable_done;
+
+		put_unaligned_be64(opts->rcvr_key, ptr);
+		ptr += 2;
+		if (!opts->ext_copy.data_len)
+			goto mp_capable_done;
+
+		put_unaligned_be32(opts->ext_copy.data_len << 16 |
+				   TCPOPT_NOP << 8 | TCPOPT_NOP, ptr);
+		ptr += 1;
 	}
 
+mp_capable_done:
 	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
 		*ptr++ = mptcp_option(MPTCPOPT_ADD_ADDR, TCPOLEN_MPTCP_ADD_ADDR,
 				      MPTCP_ADDR_IPVERSION_4, opts->addr_id);
