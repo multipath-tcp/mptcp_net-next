@@ -91,19 +91,6 @@ static struct socket *mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 	return ssock;
 }
 
-static struct sock *mptcp_subflow_get(const struct mptcp_sock *msk)
-{
-	struct mptcp_subflow_context *subflow;
-
-	sock_owned_by_me((const struct sock *)msk);
-
-	mptcp_for_each_subflow(msk, subflow) {
-		return mptcp_subflow_tcp_socket(subflow)->sk;
-	}
-
-	return NULL;
-}
-
 static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
 {
 	if (!msk->cached_ext)
@@ -952,6 +939,29 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	return tcp_disconnect(sk, flags);
 }
 
+static void mptcp_copy_inaddrs(struct sock *msk, const struct sock *ssk)
+{
+	const struct ipv6_pinfo *ssk6 = inet6_sk(ssk);
+	struct ipv6_pinfo *msk6 = inet6_sk(msk);
+
+	inet_sk(msk)->inet_num = inet_sk(ssk)->inet_num;
+	inet_sk(msk)->inet_dport = inet_sk(ssk)->inet_dport;
+	inet_sk(msk)->inet_sport = inet_sk(ssk)->inet_sport;
+	inet_sk(msk)->inet_daddr = inet_sk(ssk)->inet_daddr;
+	inet_sk(msk)->inet_saddr = inet_sk(ssk)->inet_saddr;
+	inet_sk(msk)->inet_rcv_saddr = inet_sk(ssk)->inet_rcv_saddr;
+
+#if IS_ENABLED(CONFIG_IPV6)
+	msk->sk_v6_daddr = ssk->sk_v6_daddr;
+	msk->sk_v6_rcv_saddr = ssk->sk_v6_rcv_saddr;
+
+	if (msk6 && ssk6) {
+		msk6->saddr = ssk6->saddr;
+		msk6->flow_label = ssk6->flow_label;
+	}
+#endif
+}
+
 static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
@@ -972,6 +982,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
 
 	if (subflow->mp_capable) {
+		struct sock *ssk = new_sock->sk;
 		struct sock *new_mptcp_sock;
 		u64 ack_seq;
 
@@ -1009,6 +1020,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 			msk->ack_seq = ack_seq;
 		}
 		newsk = new_mptcp_sock;
+		mptcp_copy_inaddrs(newsk, ssk);
 		list_add(&subflow->node, &msk->conn_list);
 		bh_unlock_sock(new_mptcp_sock);
 
@@ -1020,13 +1032,13 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		/* the subflow can already receive packet, avoid racing with
 		 * the receive path and process the pending ones
 		 */
-		lock_sock(new_sock->sk);
+		lock_sock(ssk);
 		subflow->rel_write_seq = 1;
 		subflow->tcp_sock = new_sock;
 		subflow->conn = new_mptcp_sock;
 		if (unlikely(!skb_queue_empty(&new_sock->sk->sk_receive_queue)))
 			mptcp_subflow_data_available(new_sock->sk);
-		release_sock(new_sock->sk);
+		release_sock(ssk);
 	} else {
 		newsk = new_sock->sk;
 		tcp_sk(newsk)->is_mptcp = 0;
@@ -1141,6 +1153,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	subflow = mptcp_subflow_ctx(msk->subflow->sk);
 
 	if (mp_capable) {
+		struct sock *ssk = msk->subflow->sk;
 		u64 ack_seq;
 
 		/* sk (new subflow socket) is already locked, but we need
@@ -1170,7 +1183,7 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
 		pr_debug("msk=%p, token=%u", msk, msk->token);
-		msk->dport = ntohs(inet_sk(msk->subflow->sk)->inet_dport);
+		mptcp_copy_inaddrs(sk, ssk);
 
 		mptcp_pm_new_connection(msk, 0);
 
@@ -1329,43 +1342,44 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 }
 
 static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
-			 int peer)
+			 int peer, int af)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct socket *ssock;
-	struct sock *ssk;
 	int ret;
 
-	lock_sock(sock->sk);
-	ssock = __mptcp_fallback_get_ref(msk);
-	if (ssock) {
+	if (msk->subflow) {
+		lock_sock(sock->sk);
+		ssock = __mptcp_fallback_get_ref(msk);
 		release_sock(sock->sk);
-		pr_debug("subflow=%p", ssock->sk);
-		ret = ssock->ops->getname(ssock, uaddr, peer);
-		sock_put(ssock->sk);
-		return ret;
+		if (ssock) {
+			pr_debug("subflow=%p", ssock->sk);
+			ret = ssock->ops->getname(ssock, uaddr, peer);
+			sock_put(ssock->sk);
+			return ret;
+		}
 	}
 
-	/* @@ the meaning of getname() for the remote peer when the socket
-	 * is connected and there are multiple subflows is not defined.
-	 * For now just use the first subflow on the list.
-	 */
-	ssk = mptcp_subflow_get(msk);
-	if (!ssk) {
-		release_sock(sock->sk);
-		return -ENOTCONN;
+	switch (af) {
+	case AF_INET:
+		ret = inet_getname(sock, uaddr, peer);
+		break;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	case AF_INET6:
+		ret = inet6_getname(sock, uaddr, peer);
+		break;
+#endif
+	default:
+		ret = -ENOPROTOOPT;
+		WARN_ON_ONCE(1);
 	}
 
-	ret = ssk->sk_socket->ops->getname(ssk->sk_socket, uaddr, peer);
-	release_sock(sock->sk);
 	return ret;
 }
 
 static int mptcp_v4_getname(struct socket *sock, struct sockaddr *uaddr,
 			    int peer)
 {
-	int ret;
-
 	if (sock->sk->sk_prot == &tcp_prot) {
 		/* we are being invoked from __sys_accept4, after
 		 * mptcp_accept() has just accepted a non-mp-capable
@@ -1378,17 +1392,13 @@ static int mptcp_v4_getname(struct socket *sock, struct sockaddr *uaddr,
 		return sock->ops->getname(sock, uaddr, peer);
 	}
 
-	ret = mptcp_getname(sock, uaddr, peer);
-
-	return ret;
+	return mptcp_getname(sock, uaddr, peer, AF_INET);
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static int mptcp_v6_getname(struct socket *sock, struct sockaddr *uaddr,
 			    int peer)
 {
-	int ret;
-
 	if (sock->sk->sk_prot == &tcpv6_prot) {
 		/* we are being invoked from __sys_accept4 after
 		 * mptcp_accept() has accepted a non-mp-capable
@@ -1401,9 +1411,7 @@ static int mptcp_v6_getname(struct socket *sock, struct sockaddr *uaddr,
 		return sock->ops->getname(sock, uaddr, peer);
 	}
 
-	ret = mptcp_getname(sock, uaddr, peer);
-
-	return ret;
+	return mptcp_getname(sock, uaddr, peer, AF_INET6);
 }
 #endif
 
