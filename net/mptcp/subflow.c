@@ -816,7 +816,6 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 }
 
 static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
-							struct socket *sock,
 							gfp_t priority)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -829,8 +828,7 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 
 	pr_debug("subflow=%p", ctx);
 
-	/* might be NULL */
-	ctx->tcp_sock = sock;
+	ctx->tcp_sock = sk;
 
 	return ctx;
 }
@@ -872,7 +870,7 @@ static int subflow_ulp_init(struct sock *sk)
 		goto out;
 	}
 
-	ctx = subflow_create_ctx(sk, sk->sk_socket, GFP_KERNEL);
+	ctx = subflow_create_ctx(sk, GFP_KERNEL);
 	if (!ctx) {
 		err = -ENOMEM;
 		goto out;
@@ -917,7 +915,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct mptcp_subflow_context *new_ctx;
 
 	/* newsk->sk_socket is NULL at this point */
-	new_ctx = subflow_create_ctx(newsk, NULL, priority);
+	new_ctx = subflow_create_ctx(newsk, priority);
 	if (!new_ctx)
 		return;
 
