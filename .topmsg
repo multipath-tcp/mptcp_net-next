@@ -1,4 +1,6 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/store-tcp_sk-not-socket
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] store tcp_sk, not socket
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+preparation patch to avoid outer 'struct socket'.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
