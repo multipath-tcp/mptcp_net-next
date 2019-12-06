@@ -14,6 +14,9 @@
 #include <net/inet_hashtables.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+#include <net/transp_v6.h>
+#endif
 #include <net/mptcp.h>
 #include "protocol.h"
 
@@ -26,6 +29,17 @@ static struct socket *__mptcp_fallback_get_ref(const struct mptcp_sock *msk)
 
 	sock_hold(msk->subflow->sk);
 	return msk->subflow;
+}
+
+static struct socket *mptcp_fallback_get_ref(const struct mptcp_sock *msk)
+{
+	struct socket *ssock;
+
+	lock_sock((struct sock *)msk);
+	ssock = __mptcp_fallback_get_ref(msk);
+	release_sock((struct sock *)msk);
+
+	return ssock;
 }
 
 static struct sock *mptcp_subflow_get(const struct mptcp_sock *msk)
@@ -164,6 +178,84 @@ static void mptcp_close(struct sock *sk, long timeout)
 	sk_common_release(sk);
 }
 
+static void mptcp_copy_inaddrs(struct sock *msk, const struct sock *ssk)
+{
+	const struct ipv6_pinfo *ssk6 = inet6_sk(ssk);
+	struct ipv6_pinfo *msk6 = inet6_sk(msk);
+
+	inet_sk(msk)->inet_num = inet_sk(ssk)->inet_num;
+	inet_sk(msk)->inet_dport = inet_sk(ssk)->inet_dport;
+	inet_sk(msk)->inet_sport = inet_sk(ssk)->inet_sport;
+	inet_sk(msk)->inet_daddr = inet_sk(ssk)->inet_daddr;
+	inet_sk(msk)->inet_saddr = inet_sk(ssk)->inet_saddr;
+	inet_sk(msk)->inet_rcv_saddr = inet_sk(ssk)->inet_rcv_saddr;
+
+#if IS_ENABLED(CONFIG_IPV6)
+	msk->sk_v6_daddr = ssk->sk_v6_daddr;
+	msk->sk_v6_rcv_saddr = ssk->sk_v6_rcv_saddr;
+
+	if (msk6 && ssk6) {
+		msk6->saddr = ssk6->saddr;
+		msk6->flow_label = ssk6->flow_label;
+	}
+#endif
+}
+
+static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
+				 bool kern)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+	struct socket *listener;
+	struct sock *newsk;
+
+	listener = msk->subflow;
+
+	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
+	newsk = inet_csk_accept(listener->sk, flags, err, kern);
+	if (!newsk)
+		return NULL;
+
+	subflow = mptcp_subflow_ctx(newsk);
+	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
+
+	if (subflow->mp_capable) {
+		struct sock *new_mptcp_sock;
+		struct sock *ssk = newsk;
+
+		lock_sock(sk);
+
+		local_bh_disable();
+		new_mptcp_sock = sk_clone_lock(sk, GFP_ATOMIC);
+		if (!new_mptcp_sock) {
+			*err = -ENOBUFS;
+			local_bh_enable();
+			release_sock(sk);
+			tcp_close(newsk, 0);
+			return NULL;
+		}
+
+		mptcp_init_sock(new_mptcp_sock);
+
+		msk = mptcp_sk(new_mptcp_sock);
+		msk->remote_key = subflow->remote_key;
+		msk->local_key = subflow->local_key;
+		msk->subflow = NULL;
+
+		newsk = new_mptcp_sock;
+		mptcp_copy_inaddrs(newsk, ssk);
+		list_add(&subflow->node, &msk->conn_list);
+		bh_unlock_sock(new_mptcp_sock);
+		local_bh_enable();
+		inet_sk_state_store(newsk, TCP_ESTABLISHED);
+		release_sock(sk);
+	} else {
+		tcp_sk(newsk)->is_mptcp = 0;
+	}
+
+	return newsk;
+}
+
 static int mptcp_get_port(struct sock *sk, unsigned short snum)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -209,6 +301,8 @@ void mptcp_finish_connect(struct sock *ssk)
 
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		mptcp_copy_inaddrs(sk, ssk);
+
 		list_add(&subflow->node, &msk->conn_list);
 		msk->subflow = NULL;
 		bh_unlock_sock(sk);
@@ -217,12 +311,21 @@ void mptcp_finish_connect(struct sock *ssk)
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
 
+static void mptcp_sock_graft(struct sock *sk, struct socket *parent)
+{
+	write_lock_bh(&sk->sk_callback_lock);
+	rcu_assign_pointer(sk->sk_wq, &parent->wq);
+	sk_set_socket(sk, parent);
+	sk->sk_uid = SOCK_INODE(parent)->i_uid;
+	write_unlock_bh(&sk->sk_callback_lock);
+}
+
 static struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
 	.init		= mptcp_init_sock,
 	.close		= mptcp_close,
-	.accept		= inet_csk_accept,
+	.accept		= mptcp_accept,
 	.shutdown	= tcp_shutdown,
 	.sendmsg	= mptcp_sendmsg,
 	.recvmsg	= mptcp_recvmsg,
@@ -267,10 +370,7 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct socket *ssock;
-	int err = -ENOTSUPP;
-
-	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
-		return err;
+	int err;
 
 	ssock = mptcp_socket_create_get(msk);
 	if (IS_ERR(ssock))
@@ -286,16 +386,154 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct socket *ssock;
-	int err = -ENOTSUPP;
-
-	if (uaddr->sa_family != AF_INET) // @@ allow only IPv4 for now
-		return err;
+	int err;
 
 	ssock = mptcp_socket_create_get(msk);
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
+#ifdef CONFIG_TCP_MD5SIG
+	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
+	 * TCP option space.
+	 */
+	if (rcu_access_pointer(tcp_sk(ssock->sk)->md5sig_info))
+		mptcp_subflow_ctx(ssock->sk)->request_mptcp = 0;
+#endif
+
 	err = ssock->ops->connect(ssock, uaddr, addr_len, flags);
+	sock_put(ssock->sk);
+	return err;
+}
+
+static int mptcp_getname(struct socket *sock, struct sockaddr *uaddr,
+			 int peer, int af)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	struct socket *ssock;
+	int ret;
+
+	if (msk->subflow) {
+		lock_sock(sock->sk);
+		ssock = __mptcp_fallback_get_ref(msk);
+		release_sock(sock->sk);
+		if (ssock) {
+			pr_debug("subflow=%p", ssock->sk);
+			ret = ssock->ops->getname(ssock, uaddr, peer);
+			sock_put(ssock->sk);
+			return ret;
+		}
+	}
+
+	switch (af) {
+	case AF_INET:
+		ret = inet_getname(sock, uaddr, peer);
+		break;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	case AF_INET6:
+		ret = inet6_getname(sock, uaddr, peer);
+		break;
+#endif
+	default:
+		ret = -ENOPROTOOPT;
+		WARN_ON_ONCE(1);
+	}
+
+	return ret;
+}
+
+static int mptcp_v4_getname(struct socket *sock, struct sockaddr *uaddr,
+			    int peer)
+{
+	if (sock->sk->sk_prot == &tcp_prot) {
+		/* we are being invoked from __sys_accept4, after
+		 * mptcp_accept() has just accepted a non-mp-capable
+		 * flow: sk is a tcp_sk, not an mptcp one.
+		 *
+		 * Hand the socket over to tcp so all further socket ops
+		 * bypass mptcp.
+		 */
+		sock->ops = &inet_stream_ops;
+		return sock->ops->getname(sock, uaddr, peer);
+	}
+
+	return mptcp_getname(sock, uaddr, peer, AF_INET);
+}
+
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static int mptcp_v6_getname(struct socket *sock, struct sockaddr *uaddr,
+			    int peer)
+{
+	if (sock->sk->sk_prot == &tcpv6_prot) {
+		/* we are being invoked from __sys_accept4 after
+		 * mptcp_accept() has accepted a non-mp-capable
+		 * subflow: sk is a tcp_sk, not mptcp.
+		 *
+		 * Hand the socket over to tcp so all further
+		 * socket ops bypass mptcp.
+		 */
+		sock->ops = &inet6_stream_ops;
+		return sock->ops->getname(sock, uaddr, peer);
+	}
+
+	return mptcp_getname(sock, uaddr, peer, AF_INET6);
+}
+#endif
+
+static int mptcp_listen(struct socket *sock, int backlog)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	struct socket *ssock;
+	int err;
+
+	pr_debug("msk=%p", msk);
+
+	ssock = mptcp_socket_create_get(msk);
+	if (IS_ERR(ssock))
+		return PTR_ERR(ssock);
+
+	err = ssock->ops->listen(ssock, backlog);
+	sock_put(ssock->sk);
+	return err;
+}
+
+static bool is_tcp_proto(const struct proto *p)
+{
+#ifdef CONFIG_MPTCP_IPV6
+	return p == &tcp_prot || p == &tcpv6_prot;
+#else
+	return p == &tcp_prot;
+#endif
+}
+
+static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
+			       int flags, bool kern)
+{
+	struct mptcp_sock *msk = mptcp_sk(sock->sk);
+	struct socket *ssock;
+	int err;
+
+	pr_debug("msk=%p", msk);
+
+	ssock = mptcp_fallback_get_ref(msk);
+	if (!ssock)
+		return -EINVAL;
+
+	err = ssock->ops->accept(sock, newsock, flags, kern);
+	if (err == 0 && !is_tcp_proto(newsock->sk->sk_prot)) {
+		struct mptcp_sock *msk = mptcp_sk(newsock->sk);
+		struct mptcp_subflow_context *subflow;
+
+		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
+		 * This is needed so NOSPACE flag can be set from tcp stack.
+		 */
+		list_for_each_entry(subflow, &msk->conn_list, node) {
+			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+			if (!ssk->sk_socket)
+				mptcp_sock_graft(ssk, newsock);
+		}
+	}
+
 	sock_put(ssock->sk);
 	return err;
 }
@@ -325,6 +563,9 @@ void __init mptcp_init(void)
 	mptcp_stream_ops.bind = mptcp_bind;
 	mptcp_stream_ops.connect = mptcp_stream_connect;
 	mptcp_stream_ops.poll = mptcp_poll;
+	mptcp_stream_ops.accept = mptcp_stream_accept;
+	mptcp_stream_ops.getname = mptcp_v4_getname;
+	mptcp_stream_ops.listen = mptcp_listen;
 
 	mptcp_subflow_init();
 
@@ -364,6 +605,9 @@ int mptcpv6_init(void)
 	mptcp_v6_stream_ops.bind = mptcp_bind;
 	mptcp_v6_stream_ops.connect = mptcp_stream_connect;
 	mptcp_v6_stream_ops.poll = mptcp_poll;
+	mptcp_v6_stream_ops.accept = mptcp_stream_accept;
+	mptcp_v6_stream_ops.getname = mptcp_v6_getname;
+	mptcp_v6_stream_ops.listen = mptcp_listen;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
 	if (err)
