@@ -1191,15 +1191,16 @@ static int mptcp_get_port(struct sock *sk, unsigned short snum)
 	return inet_csk_get_port(msk->subflow->sk, snum);
 }
 
-void mptcp_finish_connect(struct sock *sk, int mp_capable)
+void mptcp_finish_connect(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *sk;
 
-	subflow = mptcp_subflow_ctx(msk->subflow->sk);
+	subflow = mptcp_subflow_ctx(ssk);
+	sk = subflow->conn;
 
-	if (mp_capable) {
-		struct sock *ssk = msk->subflow->sk;
+	if (subflow->mp_capable) {
+		struct mptcp_sock *msk = mptcp_sk(sk);
 		u64 ack_seq;
 
 		/* sk (new subflow socket) is already locked, but we need

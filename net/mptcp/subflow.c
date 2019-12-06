@@ -209,7 +209,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 	if (subflow->mp_capable && !subflow->conn_finished) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
-		mptcp_finish_connect(subflow->conn, subflow->mp_capable);
+		mptcp_finish_connect(sk);
 		subflow->conn_finished = 1;
 
 		if (skb) {
