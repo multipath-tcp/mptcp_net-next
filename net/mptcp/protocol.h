@@ -142,6 +142,7 @@ struct mptcp_sock {
 	struct work_struct rtx_work;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
+	struct list_head join_list;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct mptcp_pm_data	pm;
