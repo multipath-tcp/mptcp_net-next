@@ -234,8 +234,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 		if (skb)
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
-		mptcp_finish_join(sk);
-		subflow->conn_finished = 1;
+
+		if (mptcp_finish_join(sk))
+			subflow->conn_finished = 1;
 	}
 }
 
@@ -373,7 +374,8 @@ create_child:
 				goto close_child;
 
 			ctx->conn = (struct sock *)owner;
-			mptcp_finish_join(child);
+			if (!mptcp_finish_join(child))
+				goto close_child;
 		}
 	}
 
