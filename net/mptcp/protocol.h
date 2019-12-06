@@ -128,6 +128,7 @@ struct mptcp_sock {
 	bool		can_ack;
 	u16		dport;
 	struct list_head conn_list;
+	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct mptcp_pm_data	pm;
 	u8		addr_signal;
