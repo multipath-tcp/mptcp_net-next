@@ -97,13 +97,12 @@ struct tcp_options_received {
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 #if IS_ENABLED(CONFIG_MPTCP)
 	struct mptcp_options_received {
-		u8      mp_capable : 1,
+		u64	sndr_key;
+		u64	rcvr_key;
+		u8	mp_capable : 1,
 			mp_join : 1,
 			dss : 1,
 			version : 4;
-		u8      flags;
-		u64     sndr_key;
-		u64     rcvr_key;
 	} mptcp;
 #endif
 };
