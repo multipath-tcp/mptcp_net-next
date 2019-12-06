@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/subflow-place-further-subflows-on-new-join_list
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] subflow: place further subflows on new 'join_list'
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the pm worker queue establishes a new subflow in addition to an
+existing one, we never place this socket on any list, ie. if such a request
+would time out/never complete we can't clean it up.
+
+Place them on a new join_list. When the connection completes, the
+subflow is moved to the conn_list.
+If it never completes, the socket gets closed at mptcp_shutdown time.
+
+Not done yet:
+1. extend mptcp worker to collect timed-out entries
+2. prevent arbitrary growth of pending ssks.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
