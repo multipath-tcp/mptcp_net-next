@@ -138,6 +138,7 @@ struct mptcp_sock {
 	u16		dport;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
+	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct mptcp_pm_data	pm;
 	u8		addr_signal;
