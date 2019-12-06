@@ -1181,19 +1181,28 @@ void mptcp_finish_connect(struct sock *sk, int mp_capable)
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
 
-void mptcp_finish_join(struct sock *sk)
+bool mptcp_finish_join(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+	struct sock *parent = (void *)msk;
+	bool ret = false;
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
 
 	local_bh_disable();
 	bh_lock_sock_nested(subflow->conn);
+
+	/* mptcp socket already closing? */
+	if (parent->sk_state != TCP_ESTABLISHED)
+		goto out;
+
+	ret = true;
 	list_add_tail(&subflow->node, &msk->conn_list);
+out:
 	bh_unlock_sock(subflow->conn);
 	local_bh_enable();
-	inet_sk_state_store(sk, TCP_ESTABLISHED);
+	return ret;
 }
 
 bool mptcp_sk_is_subflow(const struct sock *sk)
