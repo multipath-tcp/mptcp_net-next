@@ -24,7 +24,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_MP_CAPABLE:
 		if (opsize != TCPOLEN_MPTCP_MPC_SYN &&
-		    opsize != TCPOLEN_MPTCP_MPC_SYNACK)
+		    opsize != TCPOLEN_MPTCP_MPC_ACK)
 			break;
 
 		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
@@ -56,7 +56,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		mp_opt->sndr_key = get_unaligned_be64(ptr);
 		ptr += 8;
 
-		if (opsize == TCPOLEN_MPTCP_MPC_SYNACK) {
+		if (opsize == TCPOLEN_MPTCP_MPC_ACK) {
 			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
 			pr_debug("MP_CAPABLE flags=%x, sndr=%llu, rcvr=%llu",
