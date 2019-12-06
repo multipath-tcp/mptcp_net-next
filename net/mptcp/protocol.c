@@ -900,6 +900,29 @@ static void mptcp_cancel_work(struct sock *sk)
 		sock_put(sk);
 }
 
+static void mptcp_subflow_shutdown(struct sock *ssk, int how)
+{
+	lock_sock(ssk);
+
+	switch (ssk->sk_state) {
+	case TCP_LISTEN:
+		if (!(how & RCV_SHUTDOWN))
+			break;
+		/* fall through */
+	case TCP_SYN_SENT:
+		tcp_disconnect(ssk, O_NONBLOCK);
+		break;
+	default:
+		ssk->sk_shutdown |= how;
+		tcp_shutdown(ssk, how);
+		break;
+	}
+
+	/* Wake up anyone sleeping in poll. */
+	ssk->sk_state_change(ssk);
+	release_sock(ssk);
+}
+
 static void mptcp_close(struct sock *sk, long timeout)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
@@ -1510,11 +1533,28 @@ static int mptcp_shutdown(struct socket *sock, int how)
 		return ret;
 	}
 
+	how++;
+
+	if ((how & ~SHUTDOWN_MASK) || !how) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	if (sock->state == SS_CONNECTING) {
+		if ((1 << sock->sk->sk_state) &
+		    (TCPF_SYN_SENT | TCPF_SYN_RECV | TCPF_CLOSE))
+			sock->state = SS_DISCONNECTING;
+		else
+			sock->state = SS_CONNECTED;
+	}
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
 
-		ret = kernel_sock_shutdown(tcp_sk->sk_socket, how);
+		mptcp_subflow_shutdown(tcp_sk, how);
 	}
+
+out_unlock:
 	release_sock(sock->sk);
 
 	return ret;
