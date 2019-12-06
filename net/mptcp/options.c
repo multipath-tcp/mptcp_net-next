@@ -20,6 +20,7 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 	struct mptcp_options_received *mp_opt = &opt_rx->mptcp;
 	u8 subtype = *ptr >> 4;
 	int expected_opsize;
+	u8 flags;
 
 	switch (subtype) {
 	/* MPTCPOPT_MP_CAPABLE
@@ -53,9 +54,9 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 			break;
 		}
 
-		mp_opt->flags = *ptr++;
-		if (!mptcp_cap_flag_sha256(mp_opt->flags) ||
-		    (mp_opt->flags & MPTCP_CAP_EXTENSIBILITY))
+		flags = *ptr++;
+		if (!mptcp_cap_flag_sha256(flags) ||
+		    (flags & MPTCP_CAP_EXTENSIBILITY))
 			break;
 
 		/* RFC 6824, Section 3.1:
@@ -71,7 +72,7 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 		 *
 		 * We don't implement DSS checksum - fall back to TCP.
 		 */
-		if (mp_opt->flags & MPTCP_CAP_CHECKSUM_REQD)
+		if (flags & MPTCP_CAP_CHECKSUM_REQD)
 			break;
 
 		mp_opt->mp_capable = 1;
@@ -96,8 +97,8 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 			ptr += 2;
 		}
 		pr_debug("MP_CAPABLE version=%x, flags=%x, optlen=%d sndr=%llu, rcvr=%llu len=%d",
-			 mp_opt->version, mp_opt->flags, opsize,
-			 mp_opt->sndr_key, mp_opt->rcvr_key, mp_opt->data_len);
+			 mp_opt->version, flags, opsize, mp_opt->sndr_key,
+			 mp_opt->rcvr_key, mp_opt->data_len);
 		break;
 
 	/* MPTCPOPT_MP_JOIN
