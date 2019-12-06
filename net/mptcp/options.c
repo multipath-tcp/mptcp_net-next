@@ -25,7 +25,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 	 */
 	case MPTCPOPT_MP_CAPABLE:
 		if (opsize != TCPOLEN_MPTCP_MPC_SYN &&
-		    opsize != TCPOLEN_MPTCP_MPC_SYNACK)
+		    opsize != TCPOLEN_MPTCP_MPC_ACK)
 			break;
 
 		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
@@ -57,7 +57,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		mp_opt->sndr_key = get_unaligned_be64(ptr);
 		ptr += 8;
 
-		if (opsize == TCPOLEN_MPTCP_MPC_SYNACK) {
+		if (opsize == TCPOLEN_MPTCP_MPC_ACK) {
 			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
 			pr_debug("MP_CAPABLE flags=%x, sndr=%llu, rcvr=%llu",
@@ -403,11 +403,9 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
 		opts->sndr_key = subflow_req->local_key;
-		opts->rcvr_key = subflow_req->remote_key;
 		*size = TCPOLEN_MPTCP_MPC_SYNACK;
-		pr_debug("subflow_req=%p, local_key=%llu, remote_key=%llu",
-			 subflow_req, subflow_req->local_key,
-			 subflow_req->remote_key);
+		pr_debug("subflow_req=%p, local_key=%llu",
+			 subflow_req, subflow_req->local_key);
 		return true;
 	}
 	return false;
@@ -471,8 +469,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
-		if ((OPTION_MPTCP_MPC_SYNACK |
-		     OPTION_MPTCP_MPC_ACK) & opts->suboptions) {
+		if (OPTION_MPTCP_MPC_ACK & opts->suboptions) {
 			put_unaligned_be64(opts->rcvr_key, ptr);
 			ptr += 2;
 		}
