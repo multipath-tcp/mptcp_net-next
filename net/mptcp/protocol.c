@@ -795,6 +795,7 @@ void mptcp_finish_connect(struct sock *ssk)
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
+		pr_debug("msk=%p, token=%u", msk, msk->token);
 		mptcp_copy_inaddrs(sk, ssk);
 
 		mptcp_pm_new_connection(msk, 0);
