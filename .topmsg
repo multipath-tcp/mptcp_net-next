@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/sock-Make-sk_protocol-a-16-bit-value
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] sock: Make sk_protocol a 16-bit value
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Match the 16-bit width of skbuff->protocol. Fills an 8-bit hole so
+sizeof(struct sock) does not change.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
