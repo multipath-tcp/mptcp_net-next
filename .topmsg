@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/sock-Make-sk_protocol-a-16-bit-value
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
