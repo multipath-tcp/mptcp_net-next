@@ -769,6 +769,8 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	subflow->request_join = 1;
 	subflow->request_bkup = 1;
 
+	list_add(&subflow->node, &msk->join_list);
+
 	err = kernel_connect(sf, remote, addrlen, O_NONBLOCK);
 	if (err && err != -EINPROGRESS)
 		goto failed;

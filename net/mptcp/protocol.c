@@ -899,6 +899,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	INIT_LIST_HEAD(&msk->conn_list);
+	INIT_LIST_HEAD(&msk->join_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
 	__set_bit(MPTCP_SEND_SPACE, &msk->flags);
 
@@ -986,6 +987,12 @@ static void mptcp_close(struct sock *sk, long timeout)
 	if (msk->subflow) {
 		sock_release(msk->subflow);
 		msk->subflow = NULL;
+	}
+
+	list_for_each_entry_safe(subflow, tmp, &msk->join_list, node) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		__mptcp_close_ssk(sk, ssk, subflow, timeout);
 	}
 
 	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
@@ -1267,7 +1274,7 @@ void mptcp_finish_connect(struct sock *ssk)
 		subflow->map_seq = ack_seq;
 		subflow->map_subflow_seq = 1;
 		subflow->rel_write_seq = 1;
-		list_add(&subflow->node, &msk->conn_list);
+		list_move(&subflow->node, &msk->conn_list);
 		msk->subflow = NULL;
 		bh_unlock_sock(sk);
 		local_bh_enable();
@@ -1303,6 +1310,11 @@ bool mptcp_finish_join(struct sock *sk)
 	/* mptcp socket already closing? */
 	if (parent->sk_state != TCP_ESTABLISHED)
 		goto out;
+
+	/* unlink from join_list; caller must free ssk if
+	 * we return false below.
+	 */
+	list_del_init(&subflow->node);
 
 	parent_sock = READ_ONCE(parent->sk_socket);
 	if (parent_sock) {
