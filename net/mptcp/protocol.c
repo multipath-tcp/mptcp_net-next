@@ -827,6 +827,7 @@ static void mptcp_worker(struct work_struct *work)
 		if (ret < 0)
 			break;
 
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RETRANSSEGS);
 		copied += ret;
 		dfrag->data_len -= ret;
 		dfrag->offset += ret;
@@ -1053,6 +1054,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		mptcp_copy_inaddrs(newsk, ssk);
 		list_add(&subflow->node, &msk->conn_list);
 		bh_unlock_sock(new_mptcp_sock);
+
+		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
 		local_bh_enable();
 		inet_sk_state_store(newsk, TCP_ESTABLISHED);
 		release_sock(sk);
@@ -1069,6 +1072,9 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		release_sock(ssk);
 	} else {
 		tcp_sk(newsk)->is_mptcp = 0;
+
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
 	return newsk;
@@ -1223,6 +1229,9 @@ void mptcp_finish_connect(struct sock *ssk)
 		msk->subflow = NULL;
 		bh_unlock_sock(sk);
 		local_bh_enable();
+	} else {
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
 	}
 	inet_sk_state_store(sk, TCP_ESTABLISHED);
 }
