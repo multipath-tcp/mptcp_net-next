@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-parse-and-emit-MP_CAPABLE-option-according-to-v1-spec
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
