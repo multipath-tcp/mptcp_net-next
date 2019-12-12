@@ -195,10 +195,13 @@ static int tipc_udp_xmit(struct net *net, struct sk_buff *skb,
 				.saddr = src->ipv6,
 				.flowi6_proto = IPPROTO_UDP
 			};
-			err = ipv6_stub->ipv6_dst_lookup(net, ub->ubsock->sk,
-							 &ndst, &fl6);
-			if (err)
+			ndst = ipv6_stub->ipv6_dst_lookup_flow(net,
+							       ub->ubsock->sk,
+							       &fl6, NULL);
+			if (IS_ERR(ndst)) {
+				err = PTR_ERR(ndst);
 				goto tx_error;
+			}
 			dst_cache_set_ip6(cache, ndst, &fl6.saddr);
 		}
 		ttl = ip6_dst_hoplimit(ndst);
@@ -825,7 +828,8 @@ struct tipc_media udp_media_info = {
 	.msg2addr	= tipc_udp_msg2addr,
 	.priority	= TIPC_DEF_LINK_PRI,
 	.tolerance	= TIPC_DEF_LINK_TOL,
-	.window		= TIPC_DEF_LINK_WIN,
+	.min_win	= TIPC_DEF_LINK_WIN,
+	.max_win	= TIPC_DEF_LINK_WIN,
 	.mtu		= TIPC_DEF_LINK_UDP_MTU,
 	.type_id	= TIPC_MEDIA_TYPE_UDP,
 	.hwaddr_len	= 0,
