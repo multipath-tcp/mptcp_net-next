@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-ulp-Add-clone-operation-to-tcp_ulp_ops
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp, ulp: Add clone operation to tcp_ulp_ops
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If ULP is used on a listening socket, icsk_ulp_ops and icsk_ulp_data are
+copied when the listener is cloned. Sometimes the clone is immediately
+deleted, which will invoke the release op on the clone and likely
+corrupt the listening socket's icsk_ulp_data.
+
+The clone operation is invoked immediately after the clone is copied and
+gives the ULP type an opportunity to set up the clone socket and its
+icsk_ulp_data.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
