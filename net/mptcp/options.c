@@ -14,6 +14,7 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 {
 	struct mptcp_options_received *mp_opt = &opt_rx->mptcp;
 	u8 subtype = *ptr >> 4;
+	u8 version;
 	u8 flags;
 
 	switch (subtype) {
@@ -28,8 +29,8 @@ void mptcp_parse_option(const unsigned char *ptr, int opsize,
 		    opsize != TCPOLEN_MPTCP_MPC_ACK)
 			break;
 
-		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
-		if (mp_opt->version != 0)
+		version = *ptr++ & MPTCP_VERSION_MASK;
+		if (version != MPTCP_SUPPORTED_VERSION)
 			break;
 
 		flags = *ptr++;
@@ -245,7 +246,7 @@ void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
 
 		*ptr++ = htonl((TCPOPT_MPTCP << 24) | (len << 16) |
 			       (MPTCPOPT_MP_CAPABLE << 12) |
-			       ((MPTCP_VERSION_MASK & 0) << 8) |
+			       (MPTCP_SUPPORTED_VERSION << 8) |
 			       MPTCP_CAP_HMAC_SHA1);
 		put_unaligned_be64(opts->sndr_key, ptr);
 		ptr += 2;
