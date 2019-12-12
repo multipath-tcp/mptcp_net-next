@@ -115,7 +115,6 @@ struct mptcp_subflow_context {
 	u32	ssn_offset;
 	u32	map_data_len;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
-		request_version : 4,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		fourth_ack : 1,	    /* send initial DSS */
 		conn_finished : 1,
