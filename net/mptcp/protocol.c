@@ -181,7 +181,6 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		sock_release(sock);
 	} else {
 		/* incoming subflow */
-		sock_orphan(ssk);
 		tcp_close(ssk, timeout);
 	}
 }
