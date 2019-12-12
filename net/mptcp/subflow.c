@@ -630,18 +630,6 @@ static void subflow_state_change(struct sock *sk)
 		parent->sk_data_ready(parent);
 	}
 
-	/* as recvmsg() does not acquire the subflow socket for ssk selection
-	 * a fin packet carrying a DSS can be unnoticed if we don't trigger
-	 * the data available machinery here.
-	 */
-	if (parent && subflow->mp_capable && mptcp_subflow_data_available(sk)) {
-		smp_mb__before_atomic();
-		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
-		smp_mb__after_atomic();
-
-		parent->sk_data_ready(parent);
-	}
-
 	if (parent && !(parent->sk_shutdown & RCV_SHUTDOWN) &&
 	    !subflow->rx_eof && subflow_is_done(sk)) {
 		subflow->rx_eof = 1;
