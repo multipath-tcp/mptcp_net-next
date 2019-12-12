@@ -445,7 +445,7 @@ make_file()
 	SIZE=$((RANDOM % 1024))
 	SIZE=$((SIZE + 128))
 	TSIZE=$((TSIZE + SIZE))
-	dd if=/dev/urandom conf=notrunc of="$name" bs=1 count=$SIZE 2> /dev/null
+	dd if=/dev/urandom conv=notrunc of="$name" bs=1 count=$SIZE 2> /dev/null
 	echo -e "\nMPTCP_TEST_FILE_END_MARKER" >> "$name"
 
 	echo "Created $name (size $TSIZE) containing data sent by $who"
