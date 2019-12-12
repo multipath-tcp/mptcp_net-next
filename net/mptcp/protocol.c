@@ -82,7 +82,6 @@ static struct socket *__mptcp_socket_create(struct mptcp_sock *msk, int state)
 	subflow = mptcp_subflow_ctx(ssock->sk);
 	list_add(&subflow->node, &msk->conn_list);
 	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
-	subflow->request_version = 1; /* only v1 supported */
 
 set_state:
 	if (state != MPTCP_SAME_STATE)
