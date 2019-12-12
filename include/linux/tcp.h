@@ -88,8 +88,7 @@ struct mptcp_options_received {
 	u16	data_len;
 	u8	mp_capable : 1,
 		mp_join : 1,
-		dss : 1,
-		version : 4;
+		dss : 1;
 	u8	use_map:1,
 		dsn64:1,
 		data_fin:1,
