@@ -20,6 +20,7 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 	struct mptcp_options_received *mp_opt = &opt_rx->mptcp;
 	u8 subtype = *ptr >> 4;
 	int expected_opsize;
+	u8 version;
 	u8 flags;
 
 	switch (subtype) {
@@ -46,11 +47,11 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 			break;
 
 		/* try to be gentle vs future versions on the initial syn */
-		mp_opt->version = *ptr++ & MPTCP_VERSION_MASK;
+		version = *ptr++ & MPTCP_VERSION_MASK;
 		if (opsize != TCPOLEN_MPTCP_MPC_SYN) {
-			if (mp_opt->version != MPTCP_SUPPORTED_VERSION)
+			if (version != MPTCP_SUPPORTED_VERSION)
 				break;
-		} else if (mp_opt->version < MPTCP_SUPPORTED_VERSION) {
+		} else if (version < MPTCP_SUPPORTED_VERSION) {
 			break;
 		}
 
@@ -97,7 +98,7 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 			ptr += 2;
 		}
 		pr_debug("MP_CAPABLE version=%x, flags=%x, optlen=%d sndr=%llu, rcvr=%llu len=%d",
-			 mp_opt->version, flags, opsize, mp_opt->sndr_key,
+			 version, flags, opsize, mp_opt->sndr_key,
 			 mp_opt->rcvr_key, mp_opt->data_len);
 		break;
 
