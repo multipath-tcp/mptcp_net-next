@@ -1,4 +1,28 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rework-mptcp_sendmsg_frag-to-accept-optional-dfrag
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: rework mptcp_sendmsg_frag to accept optional dfrag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This will simplify mptcp-level retransmission implementation
+in the next patch. If dfrag is provided by the caller, skip
+kernel space memory allocation and use data and metadata
+provided by the dfrag itself.
+
+Because a peer could ack data at TCP level but refrain from
+sending mptcp-level ACKs, we could grow the mptcp socket
+backlog indefinitely.
+
+We should thus block mptcp_sendmsg until the peer has acked some of the
+sent data.
+
+In order to be able to do so, increment the mptcp socket wmem_queued
+counter on memory allocation and decrement it when releasing the memory
+on mptcp-level ack reception.
+
+Because TCP performns sndbuf auto-tuning up to tcp_wmem_max[2], make
+this the mptcp sk_sndbuf limit.
+
+In the future we could add experiment with autotuning as TCP does in
+tcp_sndbuf_expand().
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
