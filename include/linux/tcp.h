@@ -78,6 +78,17 @@ struct tcp_sack_block {
 #define TCP_SACK_SEEN     (1 << 0)   /*1 = peer is SACK capable, */
 #define TCP_DSACK_SEEN    (1 << 2)   /*1 = DSACK was received from peer*/
 
+#if IS_ENABLED(CONFIG_MPTCP)
+struct mptcp_options_received {
+	u64	sndr_key;
+	u64	rcvr_key;
+	u8	mp_capable : 1,
+		mp_join : 1,
+		dss : 1,
+		version : 4;
+};
+#endif
+
 struct tcp_options_received {
 /*	PAWS/RTTM data	*/
 	int	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
@@ -96,14 +107,7 @@ struct tcp_options_received {
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 #if IS_ENABLED(CONFIG_MPTCP)
-	struct mptcp_options_received {
-		u64	sndr_key;
-		u64	rcvr_key;
-		u8	mp_capable : 1,
-			mp_join : 1,
-			dss : 1,
-			version : 4;
-	} mptcp;
+	struct mptcp_options_received	mptcp;
 #endif
 };
 
