@@ -56,8 +56,7 @@ struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
 	u8	mp_capable : 1,
 		mp_join : 1,
-		backup : 1,
-		version : 4;
+		backup : 1;
 	u64	local_key;
 	u64	remote_key;
 };
