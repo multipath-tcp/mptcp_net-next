@@ -112,7 +112,8 @@ struct tcp_options_received {
 			data_fin:1,
 			use_ack:1,
 			ack64:1,
-			__unused:3;
+			mpc_map:1,
+			__unused:2;
 	} mptcp;
 #endif
 };
