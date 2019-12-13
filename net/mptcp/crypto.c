@@ -44,8 +44,8 @@ static void sha1_update(struct sha1_state *state, u8 *input)
 	state->count += SHA_MESSAGE_BYTES;
 }
 
-static void sha1_pad_final(struct sha1_state *state, u8 *input, unsigned length,
-			   __be32 *mptcp_hashed_key)
+static void sha1_pad_final(struct sha1_state *state, u8 *input,
+			   unsigned int length, __be32 *mptcp_hashed_key)
 {
 	int i;
 
@@ -78,7 +78,7 @@ void mptcp_crypto_key_sha(u64 key, u32 *token, u64 *idsn)
 }
 
 void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
-			    u32 *hash_out)
+			   u32 *hash_out)
 {
 	u8 input[SHA_MESSAGE_BYTES * 2];
 	struct sha1_state state;
@@ -118,5 +118,5 @@ void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
 	sha1_init(&state);
 	sha1_update(&state, input);
 	sha1_pad_final(&state, &input[SHA_MESSAGE_BYTES], SHA_DIGEST_WORDS << 2,
-		      (__be32*)hash_out);
+		       (__be32 *)hash_out);
 }
