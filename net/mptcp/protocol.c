@@ -279,6 +279,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk = mptcp_sk(new_mptcp_sock);
 		msk->remote_key = subflow->remote_key;
 		msk->local_key = subflow->local_key;
+		msk->subflow = NULL;
 
 		newsk = new_mptcp_sock;
 		mptcp_copy_inaddrs(newsk, ssk);
