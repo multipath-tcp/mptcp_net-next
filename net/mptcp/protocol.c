@@ -651,6 +651,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		msk = mptcp_sk(new_mptcp_sock);
 		msk->local_key = subflow->local_key;
 		msk->token = subflow->token;
+		msk->subflow = NULL;
 
 		mptcp_token_update_accept(newsk, new_mptcp_sock);
 
