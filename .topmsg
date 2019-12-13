@@ -1,8 +1,9 @@
 From: Florian Westphal <fw@strlen.de>
 Subject: [PATCH] mptcp: add basic kselftest for mptcp
 
-Add mpcp_connect tool:
-xmit two files back and forth between two processes.
+Add mptcp_connect tool:
+xmit two files back and forth between two processes, several net
+namespaces including some adding delays, losses and reordering.
 Wrapper script tests that data was transmitted without corruption.
 
 The "-c" command line option for mptcp_connect.sh is there for debugging:
@@ -24,10 +25,15 @@ io using read/write/poll.
 
 Will run automatically on "make kselftest".
 
-This patch merged following enhancements:
-From Mat Martineau: Add capture option
-From Matthieu Baerts: Add sysctl test
-From Paolo Abeni: Use tc/ethtool to test more skb handling code paths
+Note that the default timeout of 45 seconds is used even if there is a
+"settings" changing it to 450. 45 seconds should be enough in most cases
+but this depends on the machine running the tests.
+
+A fix to correctly read the "settings" file has been proposed upstream
+but not applied yet. It is not blocking the execution of these new tests
+but it would be nice to have it:
+
+  https://patchwork.kernel.org/patch/11204935/
 
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
