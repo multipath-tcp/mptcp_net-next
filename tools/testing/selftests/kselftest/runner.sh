@@ -90,7 +90,7 @@ run_one()
 run_many()
 {
 	echo "TAP version 13"
-	DIR="${PWD#${BASE_DIR}/}"
+	DIR=$(basename "$PWD")
 	test_num=0
 	total=$(echo "$@" | wc -w)
 	echo "1..$total"
