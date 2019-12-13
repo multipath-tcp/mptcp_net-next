@@ -145,8 +145,10 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 	rx_opt->smc_ok = 0;
 #endif
 #if IS_ENABLED(CONFIG_MPTCP)
-	rx_opt->mptcp.mp_capable = rx_opt->mptcp.mp_join = 0;
-	rx_opt->mptcp.add_addr = rx_opt->mptcp.rm_addr = 0;
+	rx_opt->mptcp.mp_capable = 0;
+	rx_opt->mptcp.mp_join = 0;
+	rx_opt->mptcp.add_addr = 0;
+	rx_opt->mptcp.rm_addr = 0;
 	rx_opt->mptcp.dss = 0;
 #endif
 }
