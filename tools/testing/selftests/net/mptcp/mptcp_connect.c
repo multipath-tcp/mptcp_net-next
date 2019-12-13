@@ -71,7 +71,8 @@ static void xgetnameinfo(const struct sockaddr *addr, socklen_t addrlen,
 			 char *serv, socklen_t servlen)
 {
 	int flags = NI_NUMERICHOST | NI_NUMERICSERV;
-	int err = getnameinfo(addr, addrlen, host, hostlen, serv, servlen, flags);
+	int err = getnameinfo(addr, addrlen, host, hostlen, serv, servlen,
+			      flags);
 
 	if (err) {
 		const char *errstr = getxinfo_strerr(err);
@@ -161,7 +162,6 @@ static int sock_listen_mptcp(const char * const listenaddr,
 static bool sock_test_tcpulp(const char * const remoteaddr,
 			     const char * const port)
 {
-
 	struct addrinfo hints = {
 		.ai_protocol = IPPROTO_TCP,
 		.ai_socktype = SOCK_STREAM,
@@ -281,11 +281,12 @@ static ssize_t do_rnd_read(const int fd, char *buf, const size_t len)
 
 static void set_nonblock(int fd)
 {
-        int flags = fcntl(fd, F_GETFL);
-        if (flags == -1)
-                return;
+	int flags = fcntl(fd, F_GETFL);
 
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (flags == -1)
+		return;
+
+	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
 static int copyfd_io_poll(int infd, int peerfd, int outfd)
@@ -478,7 +479,7 @@ static int do_sendfile(int infd, int outfd, unsigned int count)
 }
 
 static int copyfd_io_mmap(int infd, int peerfd, int outfd,
-			      unsigned int size)
+			  unsigned int size)
 {
 	int err;
 
@@ -500,7 +501,6 @@ static int copyfd_io_mmap(int infd, int peerfd, int outfd,
 
 	return err;
 }
-
 
 static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
 			      unsigned int size)
@@ -575,11 +575,11 @@ static void check_sockaddr(int pf, struct sockaddr_storage *ss,
 
 	if (salen != wanted_size)
 		fprintf(stderr, "accept: size mismatch, got %d expected %d\n",
-				(int)salen, wanted_size);
+			(int)salen, wanted_size);
 
 	if (ss->ss_family != pf)
 		fprintf(stderr, "accept: pf mismatch, expect %d, ss_family is %d\n",
-				(int)ss->ss_family, pf);
+			(int)ss->ss_family, pf);
 }
 
 static void check_getpeername(int fd, struct sockaddr_storage *ss, socklen_t salen)
@@ -746,15 +746,13 @@ int parse_sndbuf(const char *size)
 
 	if (errno) {
 		fprintf(stderr, "Invalid sndbuf size %s (%s)\n",
-				size,
-				strerror(errno));
+			size, strerror(errno));
 		die_usage();
 	}
 
 	if (s > INT_MAX) {
 		fprintf(stderr, "Invalid sndbuf size %s (%s)\n",
-				size,
-				strerror(ERANGE));
+			size, strerror(ERANGE));
 		die_usage();
 	}
 
