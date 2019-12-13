@@ -118,6 +118,7 @@ struct mptcp_sock {
 	struct list_head conn_list;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
+	struct sock	*first;
 	struct mptcp_pm_data	pm;
 	u8		addr_signal;
 };
