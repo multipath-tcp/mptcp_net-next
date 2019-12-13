@@ -237,7 +237,7 @@ static void warn_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
 static bool skb_is_fully_mapped(struct sock *ssk, struct sk_buff *skb)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
-	unsigned skb_consumed;
+	unsigned int skb_consumed;
 
 	skb_consumed = tcp_sk(ssk)->copied_seq - TCP_SKB_CB(skb)->seq;
 	if (WARN_ON_ONCE(skb_consumed >= skb->len))
@@ -284,9 +284,9 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 	if (!mpext || !mpext->use_map) {
 		if (!subflow->map_valid && !skb->len) {
 			/* the TCP stack deliver 0 len FIN pkt to the receive
-			* queue, that is the only 0len pkts ever expected here,
-			* and we can admit no mapping only for 0 len pkts
-			*/
+			 * queue, that is the only 0len pkts ever expected here,
+			 * and we can admit no mapping only for 0 len pkts
+			 */
 			if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN))
 				WARN_ONCE(1, "0len seq %d:%d flags %x",
 					  TCP_SKB_CB(skb)->seq,
