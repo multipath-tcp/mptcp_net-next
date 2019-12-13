@@ -1560,7 +1560,8 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 
 	if (test_bit(MPTCP_DATA_READY, &msk->flags))
 		mask = EPOLLIN | EPOLLRDNORM;
-	if (sk_stream_is_writeable(sk) && test_bit(MPTCP_SEND_SPACE, &msk->flags))
+	if (sk_stream_is_writeable(sk) &&
+	    test_bit(MPTCP_SEND_SPACE, &msk->flags))
 		mask |= EPOLLOUT | EPOLLWRNORM;
 	if (sk->sk_shutdown & RCV_SHUTDOWN)
 		mask |= EPOLLIN | EPOLLRDNORM | EPOLLRDHUP;
