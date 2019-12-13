@@ -573,7 +573,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			desc.count = min_t(size_t, len - copied, map_remaining);
 			pr_debug("reading %zu bytes, copied %d", desc.count,
 				 copied);
-			bytes_read = tcp_read_sock(ssk, &desc, mptcp_read_actor);
+			bytes_read = tcp_read_sock(ssk, &desc,
+						   mptcp_read_actor);
 			if (bytes_read < 0) {
 				if (!copied)
 					copied = bytes_read;
