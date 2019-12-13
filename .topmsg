@@ -3,11 +3,12 @@ Subject: [PATCH] mptcp: Write MPTCP DSS headers to outgoing data packets
 
 Per-packet metadata required to write the MPTCP DSS option is written to
 the skb_ext area. One write to the socket may contain more than one
-packet of data, in which case the DSS option in the first packet will
-have a mapping covering all of the data in that write. Packets after the
-first do not have a DSS option. This is complicated to handle under
-memory pressure, since the first packet (with the DSS mapping) is pushed
-to the TCP core before the remaining skbs are allocated.
+packet of data, which is copied to page fragments and mapped in to MPTCP
+DSS segments with size determined by the available page fragments and
+the maximum mapping length allowed by the MPTCP specification. If
+do_tcp_sendpages() splits a DSS segment in to multiple skbs, that's ok -
+the later skbs can either have duplicated DSS mapping information or
+none at all, and the receiver can handle that.
 
 The current implementation uses the subflow frag cache and tcp
 sendpages to avoid excessive code duplication. More work is required to
