@@ -6,3 +6,4 @@ as a required build dep).
 Add optional, boot-time self-tests for the hmac function.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
