@@ -3,12 +3,9 @@ Subject: [PATCH] mptcp: recvmsg() can drain data from multiple subflows
 
 With the previous patch in place, the msk can detect which subflow
 has the current map with a simple walk, let's update the main
-loop to always select the 'current' subflow.
-
-Additionally:
-- changes the exit conditions to mirror closely tcp_recvmsg()
-this should fix unexpected behavior with timeout and signals.
-- avoid unneeded refcounting on ssk
+loop to always select the 'current' subflow. The exit conditions now
+closely mirror tcp_recvmsg() to get expected timeout and signal
+behavior.
 
 Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
