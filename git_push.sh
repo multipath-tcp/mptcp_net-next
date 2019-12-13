@@ -1,4 +1,6 @@
-#! /bin/bash
+#! /bin/bash -e
+
+git push "${@}" origin HEAD:scripts
 
 trap 'git config --local push.gpgsign true' EXIT
 
