@@ -456,7 +456,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	if (mptcp_established_options_mp(sk, skb, &opt_size, remaining, opts))
 		ret = true;
 	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
-						 opts))
+					       opts))
 		ret = true;
 
 	/* we reserved enough space for the above options, and exceeding the
