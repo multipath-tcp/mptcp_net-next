@@ -19,6 +19,7 @@ VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/selftests.sh"
 VIRTME_SCRIPT_END="__VIRTME_END__"
 VIRTME_RUN_SCRIPT="${VIRTME_SCRIPT_DIR}/virtme.sh"
 VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
+KSELFTEST_FRAMEWORK_PATCH="${VIRTME_SCRIPT_DIR}/kselftest_framework_add_support_timeout.patch"
 
 SELFTESTS_DIR="tools/testing/selftests/net/mptcp"
 
@@ -56,6 +57,11 @@ get_tmp_file_rm_previous() {
         mktemp --tmpdir="${PWD}"
 }
 
+trap_exit() {
+        rm -f "${OUTPUT_SCRIPT}" "${OUTPUT_VIRTME}"
+	patch -R -p1 < "${KSELFTEST_FRAMEWORK_PATCH}" || true
+}
+
 prepare() {
         OUTPUT_SCRIPT=$(get_tmp_file_rm_previous "${OUTPUT_SCRIPT}")
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
@@ -71,7 +77,24 @@ echo "${VIRTME_SCRIPT_END}"
 EOF
         chmod +x "${VIRTME_SCRIPT}"
 
-        trap 'rm -f "${OUTPUT_SCRIPT}" "${OUTPUT_VIRTME}"' EXIT
+        cat <<'EOF' > "${KSELFTEST_FRAMEWORK_PATCH}"
+diff --git a/tools/testing/selftests/kselftest/runner.sh b/tools/testing/selftests/kselftest/runner.sh
+--- a/tools/testing/selftests/kselftest/runner.sh
++++ b/tools/testing/selftests/kselftest/runner.sh
+@@ -90,7 +90,7 @@ run_one()
+ run_many()
+ {
+ 	echo "TAP version 13"
+-	DIR=$(basename "$PWD")
++	DIR="${PWD#${BASE_DIR}/}"
+ 	test_num=0
+ 	total=$(echo "$@" | wc -w)
+ 	echo "1..$total"
+--
+EOF
+        trap 'trap_exit' EXIT
+
+        patch -p1 < "${KSELFTEST_FRAMEWORK_PATCH}"
 }
 
 run() {
@@ -147,5 +170,6 @@ else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs
         go_expect "${@}"
+        trap_exit
         go_expect "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 fi
