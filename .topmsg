@@ -1,0 +1,17 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add subflow write space signalling and mptcp_poll
+
+Add new SEND_SPACE flag to indicate that a subflow has enough space to
+accept more data for transmission.
+
+It gets cleared at the end of mptcp_sendmsg() in case ssk has run
+below the free watermark.
+
+It is (re-set) from the wspace callback.
+
+This allows us to use msk->flags to determine the poll mask.
+
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
