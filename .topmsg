@@ -1,0 +1,23 @@
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add key generation and token tree
+
+Generate the local keys, IDSN, and token when creating a new socket.
+Introduce the token tree to track all tokens in use using a radix tree
+with the MPTCP token itself as the index.
+
+Override the rebuild_header callback in inet_connection_sock_af_ops for
+creating the local key on a new outgoing connection.
+
+Override the init_req callback of tcp_request_sock_ops for creating the
+local key on a new incoming connection.
+
+Will be used to obtain the MPTCP parent socket to handle incoming joins.
+
+Co-developed-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
