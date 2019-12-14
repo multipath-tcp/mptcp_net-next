@@ -1,0 +1,16 @@
+From: Christoph Paasch <cpaasch@apple.com>
+Subject: [PATCH] mptcp: parse and emit MP_CAPABLE option according to v1 spec
+
+This implements MP_CAPABLE options parsing and writing according
+to RFC 6824 bis / RFC 8684: MPTCP v1.
+
+Local key is sent on syn/ack, and both keys are sent on 3rd ack.
+MP_CAPABLE messages len are updated accordingly. We need the skbuff to
+correctly emit the above, so we push the skbuff struct as an argument
+all the way from tcp code to the relevant mptcp callbacks.
+
+When processing incoming MP_CAPABLE + data, build a full blown DSS-like
+map info, to simplify later processing.  On child socket creation, we
+need to record the remote key, if available.
+
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
