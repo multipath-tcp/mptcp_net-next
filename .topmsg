@@ -4,4 +4,6 @@ Subject: [PATCH] tcp: Check for filled TCP option space before SACK
 The SACK code would potentially add four bytes to the expected
 TCP option size even if all option space was already used.
 
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
