@@ -61,6 +61,7 @@ static void subflow_init_req(struct request_sock *req,
 	mptcp_get_options(skb, &rx_opt);
 
 	subflow_req->mp_capable = 0;
+	subflow_req->remote_key_valid = 0;
 
 #ifdef CONFIG_TCP_MD5SIG
 	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
@@ -184,17 +185,28 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
 
-	/* if the sk is MP_CAPABLE, we need to fetch the client key */
+	/* if the sk is MP_CAPABLE, we try to fetch the client key */
 	subflow_req = mptcp_subflow_rsk(req);
 	if (subflow_req->mp_capable) {
+		if (TCP_SKB_CB(skb)->seq != subflow_req->ssn_offset + 1) {
+			/* here we can receive and accept an in-window,
+			 * out-of-order pkt, which will not carry the MP_CAPABLE
+			 * opt even on mptcp enabled paths
+			 */
+			goto create_child;
+		}
+
 		opt_rx.mptcp.mp_capable = 0;
 		mptcp_get_options(skb, &opt_rx);
-		if (!opt_rx.mptcp.mp_capable)
-			subflow_req->mp_capable = 0;
-		else
+		if (opt_rx.mptcp.mp_capable) {
 			subflow_req->remote_key = opt_rx.mptcp.sndr_key;
+			subflow_req->remote_key_valid = 1;
+		} else {
+			subflow_req->mp_capable = 0;
+		}
 	}
 
+create_child:
 	child = listener->icsk_af_ops->syn_recv_sock(sk, skb, req, dst,
 						     req_unhash, own_req);
 
@@ -373,6 +385,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk)
 	subflow->map_subflow_seq = mpext->subflow_seq;
 	subflow->map_data_len = data_len;
 	subflow->map_valid = 1;
+	subflow->mpc_map = mpext->mpc_map;
 	pr_debug("new map seq=%llu subflow_seq=%u data_len=%u",
 		 subflow->map_seq, subflow->map_subflow_seq,
 		 subflow->map_data_len);
@@ -423,6 +436,19 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		skb = skb_peek(&ssk->sk_receive_queue);
 		if (WARN_ON_ONCE(!skb))
 			return false;
+
+		/* if msk lacks the remote key, this subflow must provide an
+		 * MP_CAPABLE-based mapping
+		 */
+		if (unlikely(!READ_ONCE(msk->can_ack))) {
+			if (!subflow->mpc_map) {
+				ssk->sk_err = EBADMSG;
+				goto fatal;
+			}
+			WRITE_ONCE(msk->remote_key, subflow->remote_key);
+			WRITE_ONCE(msk->ack_seq, subflow->map_seq);
+			WRITE_ONCE(msk->can_ack, true);
+		}
 
 		old_ack = READ_ONCE(msk->ack_seq);
 		ack_seq = mptcp_subflow_get_mapped_dsn(subflow);
@@ -704,8 +730,12 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
 
 	if (subflow_req->mp_capable) {
+		/* see comments in subflow_syn_recv_sock(), MPTCP connection
+		 * is fully established only after we receive the remote key
+		 */
 		new_ctx->mp_capable = 1;
-		new_ctx->fourth_ack = 1;
+		new_ctx->fourth_ack = subflow_req->remote_key_valid;
+		new_ctx->can_ack = subflow_req->remote_key_valid;
 		new_ctx->remote_key = subflow_req->remote_key;
 		new_ctx->local_key = subflow_req->local_key;
 		new_ctx->token = subflow_req->token;
