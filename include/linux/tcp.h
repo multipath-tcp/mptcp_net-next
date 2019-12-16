@@ -96,6 +96,15 @@ struct mptcp_options_received {
 		ack64:1,
 		mpc_map:1,
 		__unused:2;
+	u8	add_addr : 1,
+		family : 4;
+	u8	addr_id;
+	union {
+		struct	in_addr	addr;
+#if IS_ENABLED(CONFIG_IPV6)
+		struct	in6_addr addr6;
+#endif
+	};
 };
 #endif
 
