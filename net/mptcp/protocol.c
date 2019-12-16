@@ -559,8 +559,6 @@ void mptcp_finish_connect(struct sock *ssk)
 	subflow->map_subflow_seq = 1;
 	subflow->rel_write_seq = 1;
 
-	subflow->rel_write_seq = 1;
-
 	/* the socket is not connected yet, no msk/subflow ops can access/race
 	 * accessing the field below
 	 */
