@@ -52,7 +52,17 @@ static struct socket *__mptcp_fallback_to_tcp(struct mptcp_sock *msk,
 	sock->sk = NULL;
 
 	/* socket is now TCP */
+	lock_sock(ssk);
 	sock_graft(ssk, sock);
+	if (subflow->conn) {
+		/* Clearing the 'conn' field will make the ULP-overriden
+		 * ops behaving like plain TCP ones.
+		 * Note: we can't release the ULP data on a live socket.
+		 */
+		sock_put(subflow->conn);
+		subflow->conn = NULL;
+	}
+	release_sock(ssk);
 	sock->ops = sk->sk_family == AF_INET6 ? &inet6_stream_ops :
 						&inet_stream_ops;
 
@@ -79,8 +89,8 @@ static bool __mptcp_needs_tcp_fallback(const struct mptcp_sock *msk)
 	return msk->first && !tcp_sk(msk->first)->is_mptcp;
 }
 
-/* if the mp_capable handshake is failed, return a tcp socket
- * return it.
+/* if the mp_capable handshake has failed, it fallbacks msk to plain TCP,
+ * releases the socket lock and returns a reference to the now TCP socket.
  * Otherwise returns NULL
  */
 static struct socket *__mptcp_tcp_fallback(struct mptcp_sock *msk)
