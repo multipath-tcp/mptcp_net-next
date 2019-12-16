@@ -456,8 +456,8 @@ struct sock {
 				sk_no_check_tx : 1,
 				sk_no_check_rx : 1,
 				sk_userlocks : 4,
-				sk_pacing_shift : 8,
 				sk_type      : 16;
+	u8			sk_pacing_shift;
 	u16			sk_protocol;
 	u16			sk_gso_max_segs;
 	unsigned long	        sk_lingertime;
