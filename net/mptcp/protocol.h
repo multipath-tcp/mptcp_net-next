@@ -8,7 +8,7 @@
 #define __MPTCP_PROTOCOL_H
 
 #include <linux/random.h>
-#include <linux/tcp.h>
+#include <net/tcp.h>
 #include <net/inet_connection_sock.h>
 
 #define MPTCP_SUPPORTED_VERSION	1
