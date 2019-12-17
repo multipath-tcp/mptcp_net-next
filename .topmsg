@@ -4,6 +4,11 @@ Subject: [PATCH] sock: Make sk_protocol a 16-bit value
 Match the 16-bit width of skbuff->protocol. Fills an 8-bit hole so
 sizeof(struct sock) does not change.
 
+v2 -> v3:
+ - keep 'sk_type' 2 bytes aligned (Eric)
+v1 -> v2:
+ - preserve sk_pacing_shift as bit field (Eric)
+
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
