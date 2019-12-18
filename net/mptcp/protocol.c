@@ -472,7 +472,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct sock *ssk;
 	long timeo;
 
-	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
+	if (msg->msg_flags & ~(MSG_MORE | MSG_NOSIGNAL))
 		return -EOPNOTSUPP;
 
 	lock_sock(sk);
@@ -559,8 +559,6 @@ int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
 		pr_debug("Flushing skb payload");
 	}
 
-	// MSG_PEEK support? Other flags? MSG_TRUNC?
-
 	desc->count -= copy_len;
 
 	pr_debug("consumed %zu bytes, %zu left", copy_len, desc->count);
@@ -598,6 +596,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	int copied = 0;
 	int target;
 	long timeo;
+
+	if (msg->msg_flags & ~(MSG_MORE | MSG_PEEK))
+		return -EOPNOTSUPP;
 
 	lock_sock(sk);
 	ssock = __mptcp_tcp_fallback(msk);
