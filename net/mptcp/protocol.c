@@ -70,7 +70,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct socket *subflow = msk->subflow;
 
-	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
+	if (msg->msg_flags & ~(MSG_MORE | MSG_NOSIGNAL))
 		return -EOPNOTSUPP;
 
 	return sock_sendmsg(subflow, msg);
@@ -81,6 +81,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct socket *subflow = msk->subflow;
+
+	if (msg->msg_flags & ~(MSG_MORE | MSG_PEEK))
+		return -EOPNOTSUPP;
 
 	return sock_recvmsg(subflow, msg, flags);
 }
