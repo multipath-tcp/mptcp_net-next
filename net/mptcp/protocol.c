@@ -246,8 +246,6 @@ int mptcp_read_actor(read_descriptor_t *desc, struct sk_buff *skb,
 		pr_debug("Flushing skb payload");
 	}
 
-	// MSG_PEEK support? Other flags? MSG_TRUNC?
-
 	desc->count -= copy_len;
 
 	pr_debug("consumed %zu bytes, %zu left", copy_len, desc->count);
