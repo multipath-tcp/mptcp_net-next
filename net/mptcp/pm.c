@@ -12,30 +12,145 @@
 
 int mptcp_pm_announce_addr(u32 token, u8 local_id, struct in_addr *addr)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	int err = 0;
+
+	if (!msk)
+		return -EINVAL;
+
+	if (msk->pm.local_valid) {
+		err = -EBADR;
+		goto announce_put;
+	}
+
+	pr_debug("msk=%p, local_id=%d", msk, local_id);
+	msk->pm.local_valid = 1;
+	msk->pm.local_id = local_id;
+	msk->pm.local_family = AF_INET;
+	msk->pm.local_addr = *addr;
+	msk->addr_signal = 1;
+
+announce_put:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	int err = 0;
+
+	if (!msk)
+		return -EINVAL;
+
+	if (msk->pm.local_valid) {
+		err = -EBADR;
+		goto announce_put;
+	}
+
+	pr_debug("msk=%p, local_id=%d", msk, local_id);
+	msk->pm.local_valid = 1;
+	msk->pm.local_id = local_id;
+	msk->pm.local_family = AF_INET6;
+	msk->pm.local_addr6 = *addr;
+	msk->addr_signal = 1;
+
+announce_put:
+	sock_put((struct sock *)msk);
+	return err;
 }
 #endif
 
 int mptcp_pm_remove_addr(u32 token, u8 local_id)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+
+	if (!msk)
+		return -EINVAL;
+
+	pr_debug("msk=%p", msk);
+	msk->pm.local_valid = 0;
+
+	sock_put((struct sock *)msk);
+	return 0;
 }
 
 int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	struct sockaddr_in remote;
+	struct sockaddr_in local;
+	struct sock *sk;
+	int err;
+
+	if (!msk)
+		return -EINVAL;
+
+	pr_debug("msk=%p", msk);
+
+	sk = (struct sock *)msk;
+	if (!msk->pm.remote_valid || remote_id != msk->pm.remote_id) {
+		err = -EBADR;
+		goto create_put;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = 0;
+	if (addr)
+		local.sin_addr = *addr;
+	else
+		local.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	remote.sin_family = msk->pm.remote_family;
+	remote.sin_port = inet_sk(sk)->inet_dport;
+	remote.sin_addr = msk->pm.remote_addr;
+
+	err = mptcp_subflow_connect(sk, (struct sockaddr *)&local,
+				    (struct sockaddr *)&remote, remote_id);
+
+create_put:
+	sock_put(sk);
+	return err;
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr)
 {
-	return -ENOTSUPP;
+	struct mptcp_sock *msk = mptcp_token_get_sock(token);
+	struct sockaddr_in6 remote;
+	struct sockaddr_in6 local;
+	struct sock *sk;
+	int err;
+
+	if (!msk)
+		return -EINVAL;
+
+	pr_debug("msk=%p", msk);
+	sk = (struct sock *)msk;
+
+	if (!msk->pm.remote_valid || remote_id != msk->pm.remote_id) {
+		err = -EBADR;
+		goto create_put;
+	}
+
+	local.sin6_family = AF_INET6;
+	local.sin6_port = 0;
+	if (addr)
+		local.sin6_addr = *addr;
+	else
+		local.sin6_addr = in6addr_any;
+
+	remote.sin6_family = msk->pm.remote_family;
+	remote.sin6_port = inet_sk(sk)->inet_dport;
+	remote.sin6_addr = msk->pm.remote_addr6;
+
+	err = mptcp_subflow_connect(sk, (struct sockaddr *)&local,
+				    (struct sockaddr *)&remote, remote_id);
+
+create_put:
+	sock_put(sk);
+	return err;
 }
 #endif
 
