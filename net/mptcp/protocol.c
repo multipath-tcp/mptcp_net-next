@@ -102,7 +102,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct sock *ssk;
 	int ret;
 
-	if (msg->msg_flags & ~(MSG_MORE | MSG_NOSIGNAL))
+	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
 		return -EOPNOTSUPP;
 
 	lock_sock(sk);
@@ -134,7 +134,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	struct sock *ssk;
 	int copied = 0;
 
-	if (msg->msg_flags & ~(MSG_MORE | MSG_PEEK))
+	if (msg->msg_flags & ~(MSG_WAITALL | MSG_DONTWAIT))
 		return -EOPNOTSUPP;
 
 	lock_sock(sk);
