@@ -169,6 +169,8 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side)
 
 	pm->server_side = server_side;
 	pm->token = msk->token;
+
+	mptcp_basic_new_connection(pm);
 }
 
 void mptcp_pm_fully_established(struct mptcp_sock *msk)
@@ -176,6 +178,8 @@ void mptcp_pm_fully_established(struct mptcp_sock *msk)
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	pr_debug("msk=%p", msk);
+
+	mptcp_basic_fully_established(pm);
 
 	pm->fully_established = 1;
 }
@@ -205,6 +209,9 @@ void mptcp_pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr,
 	pm->remote_addr = *addr;
 	pm->remote_id = id;
 	pm->remote_family = AF_INET;
+
+	mptcp_basic_add_addr(pm);
+
 	pm->remote_valid = 1;
 }
 
@@ -262,4 +269,5 @@ int mptcp_pm_get_local_id(struct request_sock *req, struct sock *sk,
 
 void mptcp_pm_init(void)
 {
+	mptcp_basic_init();
 }
