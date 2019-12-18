@@ -220,8 +220,8 @@ static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
 
 static struct sock *mptcp_subflow_recv_lookup(const struct mptcp_sock *msk)
 {
-	struct sock *sk = (struct sock *)msk;
 	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
 
 	sock_owned_by_me(sk);
 
