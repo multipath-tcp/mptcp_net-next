@@ -9,7 +9,7 @@ This allows merging of TSO packet trains and even cross-TSO packets, and
 does not require any additional action when moving data into existing
 SKBs.
 
-v2 -> v3:
+v3 -> v4:
  - allow collapsing, under mptcp_skb_can_collapse() constraint
 
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
