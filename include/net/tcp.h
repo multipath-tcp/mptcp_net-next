@@ -986,7 +986,7 @@ static inline bool tcp_skb_can_collapse(const struct sk_buff *to,
 					const struct sk_buff *from)
 {
 	return likely(tcp_skb_can_collapse_to(to) &&
-		      !mptcp_skb_ext_exist(from));
+		      mptcp_skb_can_collapse(to, from));
 }
 
 /* Events passed to congestion control interface */
