@@ -1,10 +1,16 @@
 From: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Subject: [PATCH] tcp: Prevent coalesce/collapse when skb has MPTCP extensions
+Subject: [PATCH] tcp: coalesce/collapse must respect MPTCP extensions
 
-The MPTCP extension data needs to be preserved as it passes through the
-TCP stack. Make sure that these skbs are not appended to others during
-coalesce or collapse, so the data remains associated with the payload of
-the given skb.
+Coalesce and collapse of packets carrying MPTCP extensions is allowed
+when the newer packet has no extension or the extensions carried by both
+packets are equal.
+
+This allows merging of TSO packet trains and even cross-TSO packets, and
+does not require any additional action when moving data into existing
+SKBs.
+
+v2 -> v3:
+ - allow collapsing, under mptcp_skb_can_collapse() constraint
 
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
