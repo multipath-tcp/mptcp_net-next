@@ -64,9 +64,41 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
-static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+/* move the skb extension owership, with the assumption that 'to' is
+ * newly allocated
+ */
+static inline void mptcp_skb_ext_move(struct sk_buff *to,
+				      struct sk_buff *from)
 {
-	return skb_ext_exist(skb, SKB_EXT_MPTCP);
+	if (!skb_ext_exist(from, SKB_EXT_MPTCP))
+		return;
+
+	if (WARN_ON_ONCE(to->active_extensions))
+		skb_ext_put(to);
+
+	to->active_extensions = from->active_extensions;
+	to->extensions = from->extensions;
+	from->active_extensions = 0;
+}
+
+static inline bool mptcp_ext_matches(const struct mptcp_ext *to_ext,
+				     const struct mptcp_ext *from_ext)
+{
+	return !from_ext ||
+	       (to_ext && from_ext &&
+	        !memcmp(from_ext, to_ext, sizeof(struct mptcp_ext)));
+}
+
+/* check if skbs can be collapsed.
+ * MPTCP collapse is allowed if neither @to or @from carry an mptcp data
+ * mapping, or if the extension of @to is the same as @from.
+ * Collapsing is not possible if @to lacks an extension, but @from carries one.
+ */
+static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
+					  const struct sk_buff *from)
+{
+	return mptcp_ext_matches(skb_ext_find(to, SKB_EXT_MPTCP),
+				 skb_ext_find(from, SKB_EXT_MPTCP));
 }
 
 #else
@@ -122,9 +154,15 @@ static inline void mptcp_incoming_options(struct sock *sk,
 {
 }
 
-static inline bool mptcp_skb_ext_exist(const struct sk_buff *skb)
+static inline void mptcp_skb_ext_move(struct sk_buff *to,
+				      const struct sk_buff *from)
 {
-	return false;
+}
+
+static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
+					  const struct sk_buff *from)
+{
+	return true;
 }
 
 #endif /* CONFIG_MPTCP */
