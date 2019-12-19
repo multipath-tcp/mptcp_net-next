@@ -6,4 +6,6 @@ TCP stack. Make sure that these skbs are not appended to others during
 coalesce or collapse, so the data remains associated with the payload of
 the given skb.
 
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
