@@ -1,0 +1,26 @@
+From: Christoph Paasch <cpaasch@apple.com>
+Subject: [PATCH] mptcp: process MP_CAPABLE data option
+
+This patch implements the handling of MP_CAPABLE + data option, as per
+RFC 6824 bis / RFC 8684: MPTCP v1.
+
+On the server side we can receive the remote key after that the connection
+is established. We need to explicitly track the 'missing remote key'
+status and avoid emitting a mptcp ack until we get such info.
+
+When a late/retransmitted/OoO pkt carrying MP_CAPABLE[+data] option
+is received, we have to propagate the mptcp seq number info to
+the msk socket. To avoid ABBA locking issue, explicitly check for
+that in recvmsg(), where we own msk and subflow sock locks.
+
+The above also means that an established mp_capable subflow - still
+waiting for the remote key - can be 'downgraded' to plain TCP.
+
+Such change could potentially block a reader waiting for new data
+forever - as they hook to msk, while later wake-up after the downgrade
+will be on subflow only.
+
+The above issue is not handled here, we likely have to get rid of
+msk->fallback to handle that cleanly.
+
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
