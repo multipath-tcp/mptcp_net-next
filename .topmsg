@@ -6,4 +6,5 @@ limits have more to do with the those protocol definitions than they do
 with the data type of sk_protocol, so remove SK_PROTOCOL_MAX and use
 U8_MAX directly.
 
+Reviewed-by: Eric Dumazet <edumazet@google.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
