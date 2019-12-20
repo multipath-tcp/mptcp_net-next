@@ -10,4 +10,7 @@ The clone operation is invoked immediately after the clone is copied and
 gives the ULP type an opportunity to set up the clone socket and its
 icsk_ulp_data.
 
+The MPTCP ULP clone will silently fallback to plain TCP on allocation
+failure, so 'clone()' does not need to return an error code.
+
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
