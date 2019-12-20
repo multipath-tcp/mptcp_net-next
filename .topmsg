@@ -1,0 +1,47 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add basic kselftest for mptcp
+
+Add mptcp_connect tool:
+xmit two files back and forth between two processes, several net
+namespaces including some adding delays, losses and reordering.
+Wrapper script tests that data was transmitted without corruption.
+
+The "-c" command line option for mptcp_connect.sh is there for debugging:
+
+The script will use tcpdump to create one .pcap file per test case, named
+according to the namespaces, protocols, and connect address in use.
+For example, the first test case writes the capture to
+ns1-ns1-MPTCP-MPTCP-10.0.1.1.pcap.
+
+The stderr output from tcpdump is printed after the test completes to
+show tcpdump's "packets dropped by kernel" information.
+
+Also check that userspace can't create MPTCP sockets when mptcp.enabled
+sysctl is off.
+
+The "-b" option allows to tune/lower send buffer size.
+"-m mmap" can be used to test blocking io.  Default is non-blocking
+io using read/write/poll.
+
+Will run automatically on "make kselftest".
+
+Note that the default timeout of 45 seconds is used even if there is a
+"settings" changing it to 450. 45 seconds should be enough in most cases
+but this depends on the machine running the tests.
+
+A fix to correctly read the "settings" file has been proposed upstream
+but not applied yet. It is not blocking the execution of these new tests
+but it would be nice to have it:
+
+  https://patchwork.kernel.org/patch/11204935/
+
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Co-developed-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
