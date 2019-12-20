@@ -48,7 +48,7 @@ static inline void mptcp_skb_ext_move(struct sk_buff *to,
 static inline bool mptcp_ext_matches(const struct mptcp_ext *to_ext,
 				     const struct mptcp_ext *from_ext)
 {
-	/* MPTCP always clear the ext when adding it to the skb, so
+	/* MPTCP always clears the ext when adding it to the skb, so
 	 * holes do not bother us here
 	 */
 	return !from_ext ||
