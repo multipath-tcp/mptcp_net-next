@@ -13,4 +13,7 @@ icsk_ulp_data.
 The MPTCP ULP clone will silently fallback to plain TCP on allocation
 failure, so 'clone()' does not need to return an error code.
 
+v5 -> v6:
+ - clarified MPTCP clone usage in commit message
+
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
