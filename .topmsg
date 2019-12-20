@@ -1,0 +1,29 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cope with later TCP fallback
+
+With V1 passive connections can fallback TCP after that the
+subflow become established:
+
+syn+ MP_CAPABLE ->
+               <- syn, ack + MP_CAPABLE
+
+ack, seq = 3    ->
+        // OoO packet is accepted because in-sequence
+        // passive socket is created, is in ESTABLISHED
+	// status and tentatively as MP_CAPABLE
+
+ack, seq = 2     ->
+        // no MP_CAPABLE opt, subflow should fallback to TCP
+
+We can't use the 'subflow' socket fallback, as we don't have
+it available for passive connection.
+
+Instead, when the fallback is detected, replace the mptcp
+socket with the underlining TCP subflow. Beyond covering
+the above scenario, it makes TCP fallback socket as efficient
+as plain TCP ones.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
