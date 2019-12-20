@@ -23,7 +23,8 @@ struct mptcp_ext {
 			data_fin:1,
 			use_ack:1,
 			ack64:1,
-			__unused:2;
+			__unused:3;
+	/* one byte hole */
 };
 
 struct mptcp_out_options {
