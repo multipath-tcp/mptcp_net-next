@@ -1,0 +1,21 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: recvmsg() can drain data from multiple subflows
+
+With the previous patch in place, the msk can detect which subflow
+has the current map with a simple walk, let's update the main
+loop to always select the 'current' subflow. The exit conditions now
+closely mirror tcp_recvmsg() to get expected timeout and signal
+behavior.
+
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Co-developed-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Co-developed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
