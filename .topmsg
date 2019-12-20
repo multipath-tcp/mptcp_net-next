@@ -1,0 +1,9 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] skb: add helpers to allocate ext independently from sk_buff
+
+Currently we can allocate the extension only after the skb,
+this change allows the user to do the opposite, will simplify
+allocation failure handling from MPTCP.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
