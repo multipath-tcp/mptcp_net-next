@@ -1,0 +1,17 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] mptcp: new sysctl to control the activation per NS
+
+New MPTCP sockets will return -ENOPROTOOPT if MPTCP support is disabled
+for the current net namespace.
+
+We are providing here a way to control access to the feature for those
+that need to turn it on or off.
+
+The value of this new sysctl can be different per namespace. We can then
+restrict the usage of MPTCP to the selected NS. In case of serious
+issues with MPTCP, administrators can now easily turn MPTCP off.
+
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
