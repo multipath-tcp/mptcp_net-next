@@ -7,4 +7,5 @@ IPPROTO numbers mostly map directly to IANA-specified protocol numbers.
 MPTCP does not have a protocol number allocated because MPTCP packets
 use the TCP protocol number. Use private number not used OTA.
 
+Reviewed-by: Eric Dumazet <edumazet@google.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
