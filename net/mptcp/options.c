@@ -365,6 +365,16 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 		opts->sndr_key = subflow->local_key;
 		*size = TCPOLEN_MPTCP_MPC_SYN;
 		return true;
+	} else if (subflow->request_join) {
+		pr_debug("remote_token=%u, nonce=%u", subflow->remote_token,
+			 subflow->local_nonce);
+		opts->suboptions = OPTION_MPTCP_MPJ_SYN;
+		opts->join_id = subflow->remote_id;
+		opts->token = subflow->remote_token;
+		opts->nonce = subflow->local_nonce;
+		opts->backup = subflow->request_bkup;
+		*size = TCPOLEN_MPTCP_MPJ_SYN;
+		return true;
 	}
 	return false;
 }
@@ -374,12 +384,19 @@ void mptcp_rcv_synsent(struct sock *sk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	pr_debug("subflow=%p", subflow);
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
 		subflow->mp_capable = 1;
 		subflow->can_ack = 1;
 		subflow->remote_key = tp->rx_opt.mptcp.sndr_key;
-	} else {
+		pr_debug("subflow=%p, remote_key=%llu", subflow,
+			 subflow->remote_key);
+	} else if (subflow->request_join && tp->rx_opt.mptcp.mp_join) {
+		subflow->mp_join = 1;
+		subflow->thmac = tp->rx_opt.mptcp.thmac;
+		subflow->remote_nonce = tp->rx_opt.mptcp.nonce;
+		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u", subflow,
+			 subflow->thmac, subflow->remote_nonce);
+	} else if (subflow->request_mptcp) {
 		tcp_sk(sk)->is_mptcp = 0;
 	}
 }
@@ -430,6 +447,13 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 			 subflow, subflow->local_key, subflow->remote_key,
 			 data_len);
 
+		return true;
+	} else if (subflow->mp_join && !subflow->fourth_ack) {
+		opts->suboptions = OPTION_MPTCP_MPJ_ACK;
+		memcpy(opts->hmac, subflow->hmac, MPTCPOPT_HMAC_LEN);
+		*size = TCPOLEN_MPTCP_MPJ_ACK;
+		subflow->fourth_ack = 1;
+		pr_debug("subflow=%p", subflow);
 		return true;
 	}
 	return false;
@@ -564,10 +588,11 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       unsigned int *size, unsigned int remaining,
 			       struct mptcp_out_options *opts)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	unsigned int opt_size = 0;
 	bool ret = false;
 
-	if (!mptcp_subflow_ctx(sk)->mp_capable)
+	if (!subflow->mp_capable && !subflow->mp_join)
 		return false;
 
 	opts->suboptions = 0;
@@ -660,7 +685,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
 
-	if (!subflow->mp_capable)
+	if (!subflow->mp_capable && !subflow->mp_join)
 		return;
 
 	mp_opt = &opt_rx->mptcp;
@@ -780,6 +805,16 @@ mp_capable_done:
 				      0, opts->addr_id);
 	}
 
+	if (OPTION_MPTCP_MPJ_SYN & opts->suboptions) {
+		*ptr++ = mptcp_option(MPTCPOPT_MP_JOIN,
+				      TCPOLEN_MPTCP_MPJ_SYN,
+				      opts->backup, opts->join_id);
+		put_unaligned_be32(opts->token, ptr);
+		ptr += 1;
+		put_unaligned_be32(opts->nonce, ptr);
+		ptr += 1;
+	}
+
 	if (OPTION_MPTCP_MPJ_SYNACK & opts->suboptions) {
 		*ptr++ = mptcp_option(MPTCPOPT_MP_JOIN,
 				      TCPOLEN_MPTCP_MPJ_SYNACK,
@@ -788,6 +823,13 @@ mp_capable_done:
 		ptr += 2;
 		put_unaligned_be32(opts->nonce, ptr);
 		ptr += 1;
+	}
+
+	if (OPTION_MPTCP_MPJ_ACK & opts->suboptions) {
+		*ptr++ = mptcp_option(MPTCPOPT_MP_JOIN,
+				      TCPOLEN_MPTCP_MPJ_ACK, 0, 0);
+		memcpy(ptr, opts->hmac, MPTCPOPT_HMAC_LEN);
+		ptr += 5;
 	}
 
 	if (opts->ext_copy.use_ack || opts->ext_copy.use_map) {
