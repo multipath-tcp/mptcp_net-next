@@ -97,6 +97,7 @@ struct mptcp_options_received {
 		mpc_map:1,
 		__unused:2;
 	u8	add_addr : 1,
+		rm_addr : 1,
 		family : 4;
 	u8	addr_id;
 	union {
@@ -140,6 +141,8 @@ static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 #if IS_ENABLED(CONFIG_MPTCP)
 	rx_opt->mptcp.mp_capable = 0;
 	rx_opt->mptcp.mp_join = 0;
+	rx_opt->mptcp.add_addr = 0;
+	rx_opt->mptcp.rm_addr = 0;
 	rx_opt->mptcp.dss = 0;
 #endif
 }
