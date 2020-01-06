@@ -1,6 +1,6 @@
 #! /bin/bash
 #
-# The goal is to regularly sync 'net-next' branch on this repo with Davem's one.
+# The goal is to regularly sync 'net-next' branch on this repo with netdev's one.
 # Then our topgit tree can be updated and the modifications can be pushed only
 # after a successful build and tests. In case of problem, a notification will be
 # sent to Matthieu Baerts.
@@ -16,8 +16,8 @@ set -e
 # Github remote
 GIT_REMOTE_GITHUB_NAME="origin"
 
-# Davem remote
-GIT_REMOTE_NET_NEXT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
+# Netdev remote
+GIT_REMOTE_NET_NEXT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git"
 GIT_REMOTE_NET_NEXT_BRANCH="master"
 
 # Local repo
