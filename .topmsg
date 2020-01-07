@@ -4,6 +4,12 @@ Subject: [PATCH] sock: Make sk_protocol a 16-bit value
 Match the 16-bit width of skbuff->protocol. Fills an 8-bit hole so
 sizeof(struct sock) does not change.
 
+Also take care of BPF field access for sk_type/sk_protocol. Both of them
+are now outside the bitfield, so we can use load instructions without
+further shifting/masking.
+
+v5 -> v6:
+ - update eBPF accessors, too (Intel's kbuild test robot)
 v2 -> v3:
  - keep 'sk_type' 2 bytes aligned (Eric)
 v1 -> v2:
