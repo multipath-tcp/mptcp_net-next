@@ -15,6 +15,9 @@ v2 -> v3:
 v1 -> v2:
  - preserve sk_pacing_shift as bit field (Eric)
 
+Cc: Alexei Starovoitov <ast@kernel.org
+Cc: Daniel Borkmann <daniel@iogearbox.net>
+Cc: bpf@vger.kernel.org
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
