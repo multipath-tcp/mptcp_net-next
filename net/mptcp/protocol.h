@@ -144,8 +144,8 @@ struct mptcp_sock {
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct sock	*first;
-	struct mptcp_pm_data	pm;
 	u8		addr_signal;
+	struct mptcp_pm_data	pm;
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
