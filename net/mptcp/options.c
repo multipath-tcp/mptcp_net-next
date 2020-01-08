@@ -498,11 +498,11 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	if (!msk)
 		return false;
 
-	if (!msk->pm.fully_established || !msk->addr_signal)
+	if (!msk->addr_signal)
 		return false;
 
-	if (mptcp_pm_addr_signal(msk, &id, &saddr))
-		return false;
+	id = 0;
+	memset(&saddr, 0, sizeof(saddr));
 
 	if (saddr.ss_family == AF_INET) {
 		if (remaining < TCPOLEN_MPTCP_ADD_ADDR)
