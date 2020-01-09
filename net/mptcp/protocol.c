@@ -153,7 +153,7 @@ static void __mptcp_flush_join_list(struct mptcp_sock *msk)
 		return;
 
 	spin_lock_bh(&msk->join_list_lock);
-	list_splice_tail(&msk->join_list, &msk->conn_list);
+	list_splice_tail_init(&msk->join_list, &msk->conn_list);
 	spin_unlock_bh(&msk->join_list_lock);
 }
 
@@ -1420,9 +1420,9 @@ bool mptcp_finish_join(struct sock *sk)
 
 		/* active connections are already on conn_list */
 		if (list_empty(&subflow->node)) {
-			spin_lock(&msk->join_list_lock);
+			spin_lock_bh(&msk->join_list_lock);
 			list_add_tail(&subflow->node, &msk->join_list);
-			spin_unlock(&msk->join_list_lock);
+			spin_unlock_bh(&msk->join_list_lock);
 		}
 	}
 	return true;
