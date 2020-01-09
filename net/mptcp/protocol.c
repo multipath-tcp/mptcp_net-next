@@ -1353,8 +1353,6 @@ void mptcp_finish_connect(struct sock *ssk)
 
 	pr_debug("msk=%p, token=%u", sk, subflow->token);
 
-	mptcp_pm_new_connection(msk, 0);
-
 	mptcp_crypto_key_sha(subflow->remote_key, NULL, &ack_seq);
 	ack_seq++;
 	subflow->map_seq = ack_seq;
@@ -1371,6 +1369,8 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->ack_seq, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
 	atomic64_set(&msk->snd_una, msk->write_seq);
+
+	mptcp_pm_new_connection(msk, 0);
 }
 
 static void mptcp_sock_graft(struct sock *sk, struct socket *parent)
