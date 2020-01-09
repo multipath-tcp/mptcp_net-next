@@ -319,9 +319,10 @@ static int ethnl_default_doit(struct sk_buff *skb, struct genl_info *info)
 	rtnl_unlock();
 	if (ret < 0)
 		goto err_cleanup;
-	reply_len = ops->reply_size(req_info, reply_data);
+	ret = ops->reply_size(req_info, reply_data);
 	if (ret < 0)
 		goto err_cleanup;
+	reply_len = ret;
 	ret = -ENOMEM;
 	rskb = ethnl_reply_init(reply_len, req_info->dev, ops->reply_cmd,
 				ops->hdr_attr, info, &reply_payload);
@@ -472,8 +473,8 @@ static int ethnl_default_start(struct netlink_callback *cb)
 		return -ENOMEM;
 	reply_data = kmalloc(ops->reply_data_size, GFP_KERNEL);
 	if (!reply_data) {
-		kfree(req_info);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto free_req_info;
 	}
 
 	ret = ethnl_default_parse(req_info, cb->nlh, sock_net(cb->skb->sk), ops,
@@ -487,7 +488,7 @@ static int ethnl_default_start(struct netlink_callback *cb)
 		req_info->dev = NULL;
 	}
 	if (ret < 0)
-		return ret;
+		goto free_reply_data;
 
 	ctx->ops = ops;
 	ctx->req_info = req_info;
@@ -496,6 +497,13 @@ static int ethnl_default_start(struct netlink_callback *cb)
 	ctx->pos_idx = 0;
 
 	return 0;
+
+free_reply_data:
+	kfree(reply_data);
+free_req_info:
+	kfree(req_info);
+
+	return ret;
 }
 
 /* default ->done() handler for GET requests */
@@ -548,9 +556,10 @@ static void ethnl_default_notify(struct net_device *dev, unsigned int cmd,
 	ret = ops->prepare_data(req_info, reply_data, NULL);
 	if (ret < 0)
 		goto err_cleanup;
-	reply_len = ops->reply_size(req_info, reply_data);
+	ret = ops->reply_size(req_info, reply_data);
 	if (ret < 0)
 		goto err_cleanup;
+	reply_len = ret;
 	ret = -ENOMEM;
 	skb = genlmsg_new(reply_len, GFP_KERNEL);
 	if (!skb)
