@@ -305,6 +305,7 @@ void mptcp_rcv_synsent(struct sock *sk)
 	pr_debug("subflow=%p", subflow);
 	if (subflow->request_mptcp && tp->rx_opt.mptcp.mp_capable) {
 		subflow->mp_capable = 1;
+		subflow->can_ack = 1;
 		subflow->remote_key = tp->rx_opt.mptcp.sndr_key;
 	} else {
 		tcp_sk(sk)->is_mptcp = 0;
@@ -394,6 +395,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 	struct mptcp_ext *mpext;
 	struct mptcp_sock *msk;
 	unsigned int ack_size;
+	bool ret = false;
 	u8 tcp_fin;
 
 	if (skb) {
@@ -417,6 +419,14 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 		if (skb && tcp_fin &&
 		    subflow->conn->sk_state != TCP_ESTABLISHED)
 			mptcp_write_data_fin(subflow, &opts->ext_copy);
+		ret = true;
+	}
+
+	opts->ext_copy.use_ack = 0;
+	msk = mptcp_sk(subflow->conn);
+	if (!msk || !READ_ONCE(msk->can_ack)) {
+		*size = ALIGN(dss_size, 4);
+		return ret;
 	}
 
 	ack_size = TCPOLEN_MPTCP_DSS_ACK64;
@@ -427,15 +437,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 
 	dss_size += ack_size;
 
-	msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
-	if (msk) {
-		opts->ext_copy.data_ack = msk->ack_seq;
-	} else {
-		mptcp_crypto_key_sha(mptcp_subflow_ctx(sk)->remote_key,
-				     NULL, &opts->ext_copy.data_ack);
-		opts->ext_copy.data_ack++;
-	}
-
+	opts->ext_copy.data_ack = msk->ack_seq;
 	opts->ext_copy.ack64 = 1;
 	opts->ext_copy.use_ack = 1;
 
@@ -487,6 +489,36 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 	return false;
 }
 
+static bool check_fourth_ack(struct mptcp_subflow_context *subflow,
+			     struct sk_buff *skb,
+			     struct mptcp_options_received *mp_opt)
+{
+	/* here we can process OoO, in-window pkts, only in-sequence 4th ack
+	 * are relevant
+	 */
+	if (likely(subflow->fourth_ack ||
+		   TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1))
+		return true;
+
+	if (mp_opt->use_ack)
+		subflow->fourth_ack = 1;
+
+	if (subflow->can_ack)
+		return true;
+
+	/* If the first established packet does not contain MP_CAPABLE + data
+	 * then fallback to TCP
+	 */
+	if (!mp_opt->mp_capable) {
+		subflow->mp_capable = 0;
+		tcp_sk(mptcp_subflow_tcp_sock(subflow))->is_mptcp = 0;
+		return false;
+	}
+	subflow->remote_key = mp_opt->sndr_key;
+	subflow->can_ack = 1;
+	return true;
+}
+
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
@@ -498,6 +530,8 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 		return;
 
 	mp_opt = &opt_rx->mptcp;
+	if (!check_fourth_ack(subflow, skb, mp_opt))
+		return;
 
 	if (!mp_opt->dss)
 		return;
