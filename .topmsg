@@ -1,0 +1,10 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] net: Make sock protocol value checks more specific
+
+SK_PROTOCOL_MAX is only used in two places, for DECNet and AX.25. The
+limits have more to do with the those protocol definitions than they do
+with the data type of sk_protocol, so remove SK_PROTOCOL_MAX and use
+U8_MAX directly.
+
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
