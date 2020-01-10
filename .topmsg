@@ -1,0 +1,7 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Add MPTCP option number
+
+TCP option 30 is allocated for MPTCP by the IANA.
+
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
