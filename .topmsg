@@ -1,0 +1,13 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Export TCP functions and ops struct
+
+MPTCP will make use of tcp_send_mss() and tcp_push() when sending
+data to specific TCP subflows.
+
+tcp_request_sock_ipvX_ops and ipvX_specific will be referenced
+during TCP subflow creation.
+
+Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
