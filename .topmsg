@@ -1,0 +1,25 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] sock: Make sk_protocol a 16-bit value
+
+Match the 16-bit width of skbuff->protocol. Fills an 8-bit hole so
+sizeof(struct sock) does not change.
+
+Also take care of BPF field access for sk_type/sk_protocol. Both of them
+are now outside the bitfield, so we can use load instructions without
+further shifting/masking.
+
+v5 -> v6:
+ - update eBPF accessors, too (Intel's kbuild test robot)
+v2 -> v3:
+ - keep 'sk_type' 2 bytes aligned (Eric)
+v1 -> v2:
+ - preserve sk_pacing_shift as bit field (Eric)
+
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Daniel Borkmann <daniel@iogearbox.net>
+Cc: bpf@vger.kernel.org
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
