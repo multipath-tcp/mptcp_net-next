@@ -1,0 +1,9 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move from sha1 (v0) to sha256 (v1)
+
+For simplicity's sake use directly sha256 primitives (and pull them
+as a required build dep).
+Add optional, boot-time self-tests for the hmac function.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
