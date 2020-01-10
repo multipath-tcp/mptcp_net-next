@@ -1,0 +1,22 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: clean ext on tx recycle
+
+Otherwise we will find stray/unexpected/old extensions value on next
+iteration.
+
+On tcp_write_xmit() we can end-up splitting an already queued skb in two
+parts, via tso_fragment(). The newly created skb can be allocated via
+the tx cache and an upper layer will not be aware of it, so that upper
+layer cannot set the ext properly.
+
+Resetting the ext on recycle ensures that stale data is not propagated
+in to packet headers or elsewhere.
+
+An alternative would be add an additional hook in tso_fragment() or in
+sk_stream_alloc_skb() to init the ext for upper layers that need it.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
