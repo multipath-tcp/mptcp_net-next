@@ -1,0 +1,19 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] tcp: Check for filled TCP option space before SACK
+
+Update the SACK check to work with zero option space available, a case
+that's possible with MPTCP but not MD5+TS. Maintained only one
+conditional branch for insufficient SACK space.
+
+v1 -> v2:
+- Moves the check inside the SACK branch by taking recent SACK fix:
+
+    9424e2e7ad93 (tcp: md5: fix potential overestimation of TCP option space)
+
+  in to account, but modifies it to work in MPTCP scenarios beyond the
+  MD5+TS corner case.
+
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
