@@ -45,7 +45,7 @@ static struct socket *__mptcp_tcp_fallback(const struct mptcp_sock *msk)
 
 	sock_owned_by_me((const struct sock *)msk);
 
-	if (!ssock || tcp_sk(ssock->sk)->is_mptcp)
+	if (!ssock || sk_is_mptcp(ssock->sk))
 		return NULL;
 
 	return ssock;
