@@ -85,7 +85,7 @@ static struct socket *__mptcp_nmpc_socket(const struct mptcp_sock *msk)
 
 static bool __mptcp_needs_tcp_fallback(const struct mptcp_sock *msk)
 {
-	return msk->first && !tcp_sk(msk->first)->is_mptcp;
+	return msk->first && !sk_is_mptcp(msk->first);
 }
 
 /* if the mp_capable handshake has failed, it fallbacks msk to plain TCP,
