@@ -952,6 +952,9 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		return;
 	}
 
+	/* see comments in subflow_syn_recv_sock(), MPTCP connection is fully
+	 * established only after we receive the remote key
+	 */
 	new_ctx->conn_finished = 1;
 	new_ctx->icsk_af_ops = old_ctx->icsk_af_ops;
 	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
