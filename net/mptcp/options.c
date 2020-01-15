@@ -503,6 +503,9 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 
 	if (mp_opt->use_map) {
 		if (mp_opt->mpc_map) {
+			struct mptcp_subflow_context *subflow =
+				mptcp_subflow_ctx(sk);
+
 			/* this is an MP_CAPABLE carrying MPTCP data
 			 * we know this map the first chunk of data
 			 */
