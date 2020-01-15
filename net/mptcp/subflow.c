@@ -318,6 +318,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	struct mptcp_subflow_context *listener = mptcp_subflow_ctx(sk);
 	struct mptcp_subflow_request_sock *subflow_req;
 	struct tcp_options_received opt_rx;
+	bool fallback_is_fatal = false;
 	struct sock *child;
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
@@ -342,6 +343,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 			subflow_req->mp_capable = 0;
 		}
 	} else if (subflow_req->mp_join) {
+		fallback_is_fatal = true;
 		opt_rx.mptcp.mp_join = 0;
 		mptcp_get_options(skb, &opt_rx);
 		if (!opt_rx.mptcp.mp_join ||
@@ -356,11 +358,14 @@ create_child:
 	if (child && *own_req) {
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
-		/* we have null ctx on TCP fallback, not fatal on MPC
-		 * handshake
+		/* we have null ctx on TCP fallback, which is fatal on
+		 * MPJ handshake
 		 */
-		if (!ctx)
+		if (!ctx) {
+			if (fallback_is_fatal)
+				goto close_child;
 			return child;
+		}
 
 		if (ctx->mp_capable) {
 			if (mptcp_token_new_accept(ctx->token))
