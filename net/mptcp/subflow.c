@@ -517,7 +517,7 @@ static void subflow_data_ready(struct sock *sk)
 	struct sock *parent = subflow->conn;
 
 	if (!parent || !subflow->mp_capable) {
-		subflow->tcp_sk_data_ready(sk);
+		subflow->tcp_data_ready(sk);
 
 		if (parent)
 			parent->sk_data_ready(parent);
@@ -667,7 +667,9 @@ static int subflow_ulp_init(struct sock *sk)
 	if (sk->sk_family == AF_INET6)
 		icsk->icsk_af_ops = &subflow_v6_specific;
 #endif
-	ctx->tcp_sk_data_ready = sk->sk_data_ready;
+	ctx->tcp_data_ready = sk->sk_data_ready;
+	ctx->tcp_state_change = sk->sk_state_change;
+	ctx->tcp_write_space = sk->sk_write_space;
 	sk->sk_data_ready = subflow_data_ready;
 	sk->sk_write_space = subflow_write_space;
 	sk->sk_state_change = subflow_state_change;
@@ -688,10 +690,12 @@ static void subflow_ulp_release(struct sock *sk)
 	kfree_rcu(ctx, rcu);
 }
 
-static void subflow_ulp_fallback(struct sock *sk)
+static void subflow_ulp_fallback(struct sock *sk,
+				 struct mptcp_subflow_context *old_ctx)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
+	mptcp_subflow_tcp_fallback(sk, old_ctx);
 	icsk->icsk_ulp_ops = NULL;
 	rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
 	tcp_sk(sk)->is_mptcp = 0;
@@ -706,19 +710,21 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct mptcp_subflow_context *new_ctx;
 
 	if (!subflow_req->mp_capable) {
-		subflow_ulp_fallback(newsk);
+		subflow_ulp_fallback(newsk, old_ctx);
 		return;
 	}
 
 	new_ctx = subflow_create_ctx(newsk, priority);
 	if (new_ctx == NULL) {
-		subflow_ulp_fallback(newsk);
+		subflow_ulp_fallback(newsk, old_ctx);
 		return;
 	}
 
 	new_ctx->conn_finished = 1;
 	new_ctx->icsk_af_ops = old_ctx->icsk_af_ops;
-	new_ctx->tcp_sk_data_ready = old_ctx->tcp_sk_data_ready;
+	new_ctx->tcp_data_ready = old_ctx->tcp_data_ready;
+	new_ctx->tcp_state_change = old_ctx->tcp_state_change;
+	new_ctx->tcp_write_space = old_ctx->tcp_write_space;
 	new_ctx->mp_capable = 1;
 	new_ctx->fourth_ack = 1;
 	new_ctx->remote_key = subflow_req->remote_key;
