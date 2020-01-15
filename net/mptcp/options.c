@@ -450,9 +450,6 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	unsigned int opt_size = 0;
 	bool ret = false;
 
-	if (!mptcp_subflow_ctx(sk)->mp_capable)
-		return false;
-
 	if (mptcp_established_options_mp(sk, skb, &opt_size, remaining, opts))
 		ret = true;
 	else if (mptcp_established_options_dss(sk, skb, &opt_size, remaining,
