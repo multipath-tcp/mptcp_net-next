@@ -418,12 +418,8 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
-	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
-
-	if (!subflow->mp_capable)
-		return;
 
 	mp_opt = &opt_rx->mptcp;
 
