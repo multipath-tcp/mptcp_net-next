@@ -12,4 +12,6 @@ expected to be transmitted on it.
 
 Co-developed-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
