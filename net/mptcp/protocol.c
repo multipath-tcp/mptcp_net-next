@@ -54,10 +54,10 @@ static struct socket *__mptcp_fallback_to_tcp(struct mptcp_sock *msk,
 	lock_sock(ssk);
 	sock_graft(ssk, sock);
 	if (subflow->conn) {
-		/* Clearing the 'conn' field will make the ULP-overriden
-		 * ops behaving like plain TCP ones.
-		 * Note: we can't release the ULP data on a live socket.
+		/* We can't release the ULP data on a live socket,
+		 * restore the tcp callback
 		 */
+		mptcp_subflow_tcp_fallback(ssk, subflow);
 		sock_put(subflow->conn);
 		subflow->conn = NULL;
 	}
