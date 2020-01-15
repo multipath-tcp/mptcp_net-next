@@ -191,8 +191,11 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	if (child && *own_req) {
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
+		/* we have null ctx on TCP fallback, not fatal on MPC
+		 * handshake
+		 */
 		if (!ctx)
-			goto close_child;
+			return child;
 
 		if (ctx->mp_capable) {
 			if (mptcp_token_new_accept(ctx->token))
