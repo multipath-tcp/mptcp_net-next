@@ -240,7 +240,10 @@ struct mptcp_subflow_context {
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
 	const	struct inet_connection_sock_af_ops *icsk_af_ops;
-	void	(*tcp_sk_data_ready)(struct sock *sk);
+	void	(*tcp_data_ready)(struct sock *sk);
+	void	(*tcp_state_change)(struct sock *sk);
+	void	(*tcp_write_space)(struct sock *sk);
+
 	struct	rcu_head rcu;
 };
 
@@ -279,6 +282,16 @@ void mptcp_subflow_init(void);
 int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 			  struct sockaddr *remote, u8 remote_id);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
+
+static inline void mptcp_subflow_tcp_fallback(struct sock *sk,
+					      struct mptcp_subflow_context *ctx)
+{
+	sk->sk_data_ready = ctx->tcp_data_ready;
+	sk->sk_state_change = ctx->tcp_state_change;
+	sk->sk_write_space = ctx->tcp_write_space;
+
+	inet_csk(sk)->icsk_af_ops = ctx->icsk_af_ops;
+}
 
 extern const struct inet_connection_sock_af_ops ipv4_specific;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
