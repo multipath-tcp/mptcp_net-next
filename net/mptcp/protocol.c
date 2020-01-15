@@ -365,7 +365,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct mptcp_subflow_context *subflow;
 	struct socket *listener;
 	struct sock *newsk;
 
@@ -380,14 +379,15 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 	if (!newsk)
 		return NULL;
 
-	subflow = mptcp_subflow_ctx(newsk);
-	pr_debug("msk=%p, new subflow=%p, ", msk, subflow);
+	pr_debug("msk=%p, subflow is mptcp=%d", msk, sk_is_mptcp(newsk));
 
-	if (subflow->mp_capable) {
+	if (sk_is_mptcp(newsk)) {
+		struct mptcp_subflow_context *subflow;
 		struct sock *new_mptcp_sock;
 		struct sock *ssk = newsk;
 		u64 ack_seq;
 
+		subflow = mptcp_subflow_ctx(newsk);
 		lock_sock(sk);
 
 		local_bh_disable();
@@ -427,8 +427,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		bh_unlock_sock(new_mptcp_sock);
 		local_bh_enable();
 		release_sock(sk);
-	} else {
-		tcp_sk(newsk)->is_mptcp = 0;
 	}
 
 	return newsk;
