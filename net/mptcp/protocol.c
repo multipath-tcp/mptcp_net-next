@@ -583,6 +583,15 @@ fallback:
 
 	pr_debug("conn_list->subflow=%p", ssk);
 
+	if (unlikely(sk->sk_userlocks & SOCK_SNDBUF_LOCK)) {
+		int limit = sk_stream_wspace(sk);
+
+		if (WARN_ON_ONCE(limit <= 0))
+			limit = 1;
+
+		iov_iter_truncate(&msg->msg_iter, limit);
+	}
+
 	lock_sock(ssk);
 	while (msg_data_left(msg)) {
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
