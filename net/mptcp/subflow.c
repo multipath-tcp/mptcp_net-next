@@ -187,10 +187,13 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 	subflow->icsk_af_ops->sk_rx_dst_set(sk, skb);
 
-	if (!subflow->conn)
+	if (subflow->conn_finished || !tcp_sk(sk)->is_mptcp)
 		return;
 
-	if (subflow->mp_capable && !subflow->conn_finished) {
+	if (!subflow->conn)
+		goto do_reset;
+
+	if (subflow->mp_capable) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
 			 subflow->remote_key);
 		mptcp_finish_connect(sk);
@@ -200,14 +203,13 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			pr_debug("synack seq=%u", TCP_SKB_CB(skb)->seq);
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 		}
-	} else if (subflow->mp_join && !subflow->conn_finished) {
+	} else if (subflow->mp_join) {
 		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u",
 			 subflow, subflow->thmac,
 			 subflow->remote_nonce);
 		if (!subflow_thmac_valid(subflow)) {
 			subflow->mp_join = 0;
-			// @@ need to trigger RST
-			return;
+			goto do_reset;
 		}
 
 		mptcp_crypto_hmac_sha(subflow->local_key, subflow->remote_key,
@@ -218,8 +220,14 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		if (skb)
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 
-		if (mptcp_finish_join(sk))
-			subflow->conn_finished = 1;
+		if (!mptcp_finish_join(sk))
+			goto do_reset;
+
+		subflow->conn_finished = 1;
+	} else {
+do_reset:
+		tcp_send_active_reset(sk, GFP_ATOMIC);
+		tcp_done(sk);
 	}
 }
 
