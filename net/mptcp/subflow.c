@@ -551,9 +551,7 @@ static void subflow_data_ready(struct sock *sk)
 	}
 
 	if (mptcp_subflow_data_available(sk)) {
-		smp_mb__before_atomic();
 		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
-		smp_mb__after_atomic();
 
 		parent->sk_data_ready(parent);
 	}
@@ -653,9 +651,7 @@ static void subflow_state_change(struct sock *sk)
 	 * the data available machinery here.
 	 */
 	if (parent && subflow->mp_capable && mptcp_subflow_data_available(sk)) {
-		smp_mb__before_atomic();
 		set_bit(MPTCP_DATA_READY, &mptcp_sk(parent)->flags);
-		smp_mb__after_atomic();
 
 		parent->sk_data_ready(parent);
 	}
