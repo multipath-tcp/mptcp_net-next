@@ -499,6 +499,7 @@ static void ssk_check_wmem(struct mptcp_sock *msk, struct sock *ssk)
 	if (sock) {
 		clear_bit(MPTCP_SEND_SPACE, &msk->flags);
 		smp_mb__after_atomic();
+		/* set NOSPACE only after clearing SEND_SPACE flag */
 		set_bit(SOCK_NOSPACE, &sock->flags);
 	}
 }
