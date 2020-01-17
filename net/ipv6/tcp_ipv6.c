@@ -1208,7 +1208,7 @@ static struct sock *tcp_v6_syn_recv_sock(const struct sock *sk, struct sk_buff *
 
 		inet_csk(newsk)->icsk_af_ops = &ipv6_mapped;
 		if (sk_is_mptcp(newsk))
-			mptcp_handle_ipv6_mapped(sk, true);
+			mptcp_handle_ipv6_mapped(newsk, true);
 		newsk->sk_backlog_rcv = tcp_v4_do_rcv;
 #ifdef CONFIG_TCP_MD5SIG
 		newtp->af_specific = &tcp_sock_ipv6_mapped_specific;
