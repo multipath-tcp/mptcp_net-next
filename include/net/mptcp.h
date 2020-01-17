@@ -194,6 +194,8 @@ static inline bool mptcp_sk_is_subflow(const struct sock *sk)
 
 #endif /* CONFIG_MPTCP */
 
+void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped);
+
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcpv6_init(void);
 #elif IS_ENABLED(CONFIG_IPV6)

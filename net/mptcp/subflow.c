@@ -255,6 +255,7 @@ drop:
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static struct tcp_request_sock_ops subflow_request_sock_ipv6_ops;
 static struct inet_connection_sock_af_ops subflow_v6_specific;
+static struct inet_connection_sock_af_ops subflow_v6m_specific;
 
 static int subflow_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 {
@@ -263,7 +264,7 @@ static int subflow_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	pr_debug("subflow=%p", subflow);
 
 	if (skb->protocol == htons(ETH_P_IP))
-		return tcp_v4_conn_request(sk, skb);
+		return subflow_v4_conn_request(sk, skb);
 
 	if (!ipv6_unicast_destination(skb))
 		goto drop;
@@ -724,6 +725,36 @@ static void subflow_write_space(struct sock *sk)
 	}
 }
 
+static struct inet_connection_sock_af_ops *
+subflow_default_af_ops(struct sock *sk)
+{
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	if (sk->sk_family == AF_INET6)
+		return &subflow_v6_specific;
+#endif
+	return &subflow_specific;
+}
+
+void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped)
+{
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct inet_connection_sock_af_ops *target;
+
+	target = mapped ? &subflow_v6m_specific : subflow_default_af_ops(sk);
+
+	pr_debug("subflow=%p family=%d ops=%p target=%p mapped=%d",
+	         subflow, sk->sk_family, icsk->icsk_af_ops, target, mapped);
+
+	if (likely(icsk->icsk_af_ops == target))
+		return;
+
+	subflow->icsk_af_ops = icsk->icsk_af_ops;
+	icsk->icsk_af_ops = target;
+#endif
+}
+
 int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 			  struct sockaddr *remote, u8 remote_id)
 {
@@ -900,7 +931,7 @@ static int subflow_ulp_init(struct sock *sk)
 
 	tp->is_mptcp = 1;
 	ctx->icsk_af_ops = icsk->icsk_af_ops;
-	icsk->icsk_af_ops = &subflow_specific;
+	icsk->icsk_af_ops = subflow_default_af_ops(sk);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	if (sk->sk_family == AF_INET6)
 		icsk->icsk_af_ops = &subflow_v6_specific;
@@ -1037,6 +1068,13 @@ void mptcp_subflow_init(void)
 	subflow_v6_specific.syn_recv_sock = subflow_syn_recv_sock;
 	subflow_v6_specific.sk_rx_dst_set = subflow_finish_connect;
 	subflow_v6_specific.rebuild_header = subflow_rebuild_header;
+
+	subflow_v6m_specific = subflow_v6_specific;
+	subflow_v6m_specific.queue_xmit = ipv4_specific.queue_xmit;
+	subflow_v6m_specific.send_check = ipv4_specific.send_check;
+	subflow_v6m_specific.net_header_len = ipv4_specific.net_header_len;
+	subflow_v6m_specific.mtu_reduced = ipv4_specific.mtu_reduced;
+	subflow_v6m_specific.net_frag_header_len = 0;
 #endif
 
 	mptcp_diag_subflow_init(&subflow_ulp_ops);
