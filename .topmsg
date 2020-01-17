@@ -5,4 +5,4 @@ If the current sendmsg() lands on the same subflow we used last, we
 can try to collapse the data.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
