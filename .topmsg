@@ -14,4 +14,4 @@ This allows us to use msk->flags to determine the poll mask.
 Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Florian Westphal <fw@strlen.de>
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
