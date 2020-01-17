@@ -120,7 +120,7 @@ static struct test_cast tests[] = {
 	},
 };
 
-static void __init crypto_test(void)
+static int __init test_mptcp_crypto(void)
 {
 	char hmac[20], hmac_hex[41];
 	u32 nonce1, nonce2;
@@ -145,7 +145,8 @@ static void __init crypto_test(void)
 		else
 			pr_info("test %d [ ok ]", i);
 	}
+	return 0;
 }
 
-late_initcall(crypto_test);
+late_initcall(test_mptcp_crypto);
 #endif
