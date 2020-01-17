@@ -683,10 +683,6 @@ static int subflow_ulp_init(struct sock *sk)
 	tp->is_mptcp = 1;
 	ctx->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = subflow_default_af_ops(sk);
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	if (sk->sk_family == AF_INET6)
-		icsk->icsk_af_ops = &subflow_v6_specific;
-#endif
 	ctx->tcp_data_ready = sk->sk_data_ready;
 	ctx->tcp_state_change = sk->sk_state_change;
 	ctx->tcp_write_space = sk->sk_write_space;
