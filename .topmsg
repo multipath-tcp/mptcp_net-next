@@ -7,4 +7,4 @@ Therefore, for now, we return -EOPNOTSUPP unless we're in fallback mode.
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
