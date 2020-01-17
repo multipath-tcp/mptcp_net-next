@@ -14,4 +14,4 @@ issues with MPTCP, administrators can now easily turn MPTCP off.
 Co-developed-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Christoph Paasch <cpaasch@apple.com>
