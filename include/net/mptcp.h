@@ -181,6 +181,8 @@ static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
 
 #endif /* CONFIG_MPTCP */
 
+void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped);
+
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcpv6_init(void);
 #elif IS_ENABLED(CONFIG_IPV6)
