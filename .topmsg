@@ -6,13 +6,13 @@ fields. MPTCP fields are parsed from the TCP option header and placed in
 an skb extension, allowing the upper MPTCP layer to access MPTCP
 options after the skb has gone through the TCP stack.
 
-The subflow implements it's own data_ready() ops, which ensures that
-the pending data is in sequence - according to MPTCP seq number -
-dropping out-of-seq skbs.  The DATA_READY bit flag is set if this
-is the case.  This allows the MPTCP socket layer to determine if more
-data is available without having to consult the individual subflows.
+The subflow implements its own data_ready() ops, which ensures that the
+pending data is in sequence - according to MPTCP seq number - dropping
+out-of-seq skbs. The DATA_READY bit flag is set if this is the case.
+This allows the MPTCP socket layer to determine if more data is
+available without having to consult the individual subflows.
 
-It additionally validates the current mapping and propagate EoF events
+It additionally validates the current mapping and propagates EoF events
 to the connection socket.
 
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
