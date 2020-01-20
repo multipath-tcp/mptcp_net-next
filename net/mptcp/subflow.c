@@ -140,6 +140,32 @@ drop:
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static struct tcp_request_sock_ops subflow_request_sock_ipv6_ops;
+static struct inet_connection_sock_af_ops subflow_v6_specific;
+static struct inet_connection_sock_af_ops subflow_v6m_specific;
+
+static int subflow_v6_conn_request(struct sock *sk, struct sk_buff *skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
+	pr_debug("subflow=%p", subflow);
+
+	if (skb->protocol == htons(ETH_P_IP))
+		return subflow_v4_conn_request(sk, skb);
+
+	if (!ipv6_unicast_destination(skb))
+		goto drop;
+
+	return tcp_conn_request(&subflow_request_sock_ops,
+				&subflow_request_sock_ipv6_ops, sk, skb);
+
+drop:
+	tcp_listendrop(sk);
+	return 0; /* don't send reset */
+}
+#endif
+
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct sk_buff *skb,
 					  struct request_sock *req,
@@ -183,32 +209,6 @@ close_child:
 }
 
 static struct inet_connection_sock_af_ops subflow_specific;
-
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-static struct tcp_request_sock_ops subflow_request_sock_ipv6_ops;
-static struct inet_connection_sock_af_ops subflow_v6_specific;
-static struct inet_connection_sock_af_ops subflow_v6m_specific;
-
-static int subflow_v6_conn_request(struct sock *sk, struct sk_buff *skb)
-{
-	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-
-	pr_debug("subflow=%p", subflow);
-
-	if (skb->protocol == htons(ETH_P_IP))
-		return subflow_v4_conn_request(sk, skb);
-
-	if (!ipv6_unicast_destination(skb))
-		goto drop;
-
-	return tcp_conn_request(&subflow_request_sock_ops,
-				&subflow_request_sock_ipv6_ops, sk, skb);
-
-drop:
-	tcp_listendrop(sk);
-	return 0; /* don't send reset */
-}
-#endif
 
 static struct inet_connection_sock_af_ops *
 subflow_default_af_ops(struct sock *sk)
