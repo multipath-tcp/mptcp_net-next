@@ -146,6 +146,16 @@ set_state:
 	return ssock;
 }
 
+static void __mptcp_flush_join_list(struct mptcp_sock *msk)
+{
+	if (likely(list_empty(&msk->join_list)))
+		return;
+
+	spin_lock_bh(&msk->join_list_lock);
+	list_splice_tail_init(&msk->join_list, &msk->conn_list);
+	spin_unlock_bh(&msk->join_list_lock);
+}
+
 static void mptcp_set_timeout(const struct sock *sk, const struct sock *ssk)
 {
 	long tout = ssk && inet_csk(ssk)->icsk_pending ?
@@ -566,6 +576,7 @@ fallback:
 
 	mptcp_clean_una(sk);
 
+	__mptcp_flush_join_list(msk);
 	ssk = mptcp_subflow_get_send(msk);
 	while (!sk_stream_memory_free(sk) || !ssk) {
 		ret = sk_stream_wait_memory(sk, &timeo);
@@ -705,6 +716,7 @@ fallback:
 
 	len = min_t(size_t, len, INT_MAX);
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, len);
+	__mptcp_flush_join_list(msk);
 
 	while (!done) {
 		u32 map_remaining;
@@ -956,6 +968,7 @@ static void mptcp_worker(struct work_struct *work)
 	if (!dfrag)
 		goto unlock;
 
+	__mptcp_flush_join_list(msk);
 	ssk = mptcp_subflow_get_retrans(msk);
 	if (!ssk)
 		goto reset_unlock;
@@ -1001,7 +1014,10 @@ static int __mptcp_init_sock(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	spin_lock_init(&msk->join_list_lock);
+
 	INIT_LIST_HEAD(&msk->conn_list);
+	INIT_LIST_HEAD(&msk->join_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
 
 	__set_bit(MPTCP_SEND_SPACE, &msk->flags);
@@ -1086,6 +1102,8 @@ static void __mptcp_close(struct sock *sk, long timeout)
 
 	mptcp_token_destroy(msk->token);
 	inet_sk_state_store(sk, TCP_CLOSE);
+
+	__mptcp_flush_join_list(msk);
 
 	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
@@ -1397,6 +1415,13 @@ bool mptcp_finish_join(struct sock *sk)
 	if (parent_sock) {
 		if (!sk->sk_socket)
 			mptcp_sock_graft(sk, parent_sock);
+
+		/* active connections are already on conn_list */
+		if (list_empty(&subflow->node)) {
+			spin_lock_bh(&msk->join_list_lock);
+			list_add_tail(&subflow->node, &msk->join_list);
+			spin_unlock_bh(&msk->join_list_lock);
+		}
 	}
 	return true;
 }
