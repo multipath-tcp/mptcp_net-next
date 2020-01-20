@@ -1,11 +1,11 @@
 From: Peter Krystad <peter.krystad@linux.intel.com>
 Subject: [PATCH] mptcp: Handle MPTCP TCP options
 
-Add routines to parse and format the MP_CAPABLE option.
+Add hooks to parse and format the MP_CAPABLE option.
 
-These options are handled according to MPTCPv0 (RFC6824).
-RFC6824bis/RFC8684 MPTCPv1 MP_CAPABLE is added later in coordination
-with related code changes.
+This option is handled according to MPTCP version 0 (RFC6824).
+MPTCP version 1 MP_CAPABLE (RFC6824bis/RFC8684) will be added later in
+coordination with related code changes.
 
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
