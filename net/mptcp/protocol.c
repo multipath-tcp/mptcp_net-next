@@ -71,10 +71,9 @@ static struct socket *__mptcp_fallback_to_tcp(struct mptcp_sock *msk,
 	return sock;
 }
 
-/* if msk has a single subflow socket, and the mp_capable handshake is not
- * completed yet or has failed - that is, the socket is Not MP Capable,
- * returns it.
- * Otherwise returns NULL
+/* If msk has an initial subflow socket, and the MP_CAPABLE handshake has not
+ * completed yet or has failed, return the subflow socket.
+ * Otherwise return NULL.
  */
 static struct socket *__mptcp_nmpc_socket(const struct mptcp_sock *msk)
 {
@@ -139,7 +138,7 @@ static struct socket *__mptcp_socket_create(struct mptcp_sock *msk, int state)
 	msk->subflow = ssock;
 	subflow = mptcp_subflow_ctx(ssock->sk);
 	list_add(&subflow->node, &msk->conn_list);
-	subflow->request_mptcp = 1; /* @@ if MPTCP enabled */
+	subflow->request_mptcp = 1;
 
 set_state:
 	if (state != MPTCP_SAME_STATE)
