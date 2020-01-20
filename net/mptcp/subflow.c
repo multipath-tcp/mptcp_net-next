@@ -253,7 +253,9 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 		return err;
 
 	lock_sock(sf->sk);
-	/* kern socket do not acquire by default net ref, but TCP timer need it
+
+	/* kernel sockets do not by default acquire net ref, but TCP timer
+	 * needs it.
 	 */
 	sf->sk->sk_net_refcnt = 1;
 	get_net(net);
@@ -283,6 +285,7 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 	ctx = kzalloc(sizeof(*ctx), priority);
 	if (!ctx)
 		return NULL;
+
 	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
 	INIT_LIST_HEAD(&ctx->node);
 
