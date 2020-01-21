@@ -275,8 +275,15 @@ validation() { local curr_branch
 			return 1
 		fi
 
-		check_compilation_no_ipv6
-		check_compilation_i386
+		if ! check_compilation_no_ipv6; then
+			err "Unable to compile without IPv6"
+			return 1
+		fi
+
+		if ! check_compilation_i386; then
+			err "Unable to compile for i386 arch"
+			return 1
+		fi
 	else
 		git_checkout "${TG_TOPIC_TOP}"
 		if ! check_compilation "${TG_TOPIC_TOP}"; then
