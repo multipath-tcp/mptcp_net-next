@@ -12,6 +12,8 @@
 #include <linux/tcp.h>
 #include <linux/types.h>
 
+struct seq_file;
+
 /* MPTCP sk_buff extension data */
 struct mptcp_ext {
 	u64		data_ack;
@@ -121,6 +123,7 @@ static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
 
 bool mptcp_sk_is_subflow(const struct sock *sk);
 
+void mptcp_seq_show(struct seq_file *seq);
 #else
 
 static inline void mptcp_init(void)
@@ -192,6 +195,7 @@ static inline bool mptcp_sk_is_subflow(const struct sock *sk)
 	return false;
 }
 
+static inline void mptcp_seq_show(struct seq_file *seq) { }
 #endif /* CONFIG_MPTCP */
 
 void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped);
