@@ -363,6 +363,11 @@ int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
 int mptcp_pm_get_local_id(struct request_sock *req, struct sock *sk,
 			  const struct sk_buff *skb);
 
+void mptcp_basic_init(void);
+void mptcp_basic_new_connection(struct mptcp_pm_data *pm);
+void mptcp_basic_fully_established(struct mptcp_pm_data *pm);
+void mptcp_basic_add_addr(struct mptcp_pm_data *pm);
+
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
 	return (struct mptcp_ext *)skb_ext_find(skb, SKB_EXT_MPTCP);
