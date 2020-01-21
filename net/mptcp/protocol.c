@@ -28,6 +28,15 @@ static struct percpu_counter mptcp_sockets_allocated;
 
 static void __mptcp_close(struct sock *sk, long timeout);
 
+static const struct proto_ops * tcp_proto_ops(struct sock *sk)
+{
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6)
+		return &inet6_stream_ops;
+#endif
+	return &inet_stream_ops;
+}
+
 /* MP_CAPABLE handshake failed, convert msk to plain tcp, replacing
  * socket->sk and stream ops and destroying msk
  * return the msk socket, as we can't access msk anymore after this function
@@ -62,8 +71,7 @@ static struct socket *__mptcp_fallback_to_tcp(struct mptcp_sock *msk,
 		subflow->conn = NULL;
 	}
 	release_sock(ssk);
-	sock->ops = sk->sk_family == AF_INET6 ? &inet6_stream_ops :
-						&inet_stream_ops;
+	sock->ops = tcp_proto_ops(ssk);
 
 	/* destroy the left-over msk sock */
 	__mptcp_close(sk, 0);
