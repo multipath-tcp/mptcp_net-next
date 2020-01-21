@@ -579,17 +579,10 @@ static void mptcp_close(struct sock *sk, long timeout)
 
 static void mptcp_copy_inaddrs(struct sock *msk, const struct sock *ssk)
 {
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	const struct ipv6_pinfo *ssk6 = inet6_sk(ssk);
 	struct ipv6_pinfo *msk6 = inet6_sk(msk);
 
-	inet_sk(msk)->inet_num = inet_sk(ssk)->inet_num;
-	inet_sk(msk)->inet_dport = inet_sk(ssk)->inet_dport;
-	inet_sk(msk)->inet_sport = inet_sk(ssk)->inet_sport;
-	inet_sk(msk)->inet_daddr = inet_sk(ssk)->inet_daddr;
-	inet_sk(msk)->inet_saddr = inet_sk(ssk)->inet_saddr;
-	inet_sk(msk)->inet_rcv_saddr = inet_sk(ssk)->inet_rcv_saddr;
-
-#if IS_ENABLED(CONFIG_IPV6)
 	msk->sk_v6_daddr = ssk->sk_v6_daddr;
 	msk->sk_v6_rcv_saddr = ssk->sk_v6_rcv_saddr;
 
@@ -598,6 +591,13 @@ static void mptcp_copy_inaddrs(struct sock *msk, const struct sock *ssk)
 		msk6->flow_label = ssk6->flow_label;
 	}
 #endif
+
+	inet_sk(msk)->inet_num = inet_sk(ssk)->inet_num;
+	inet_sk(msk)->inet_dport = inet_sk(ssk)->inet_dport;
+	inet_sk(msk)->inet_sport = inet_sk(ssk)->inet_sport;
+	inet_sk(msk)->inet_daddr = inet_sk(ssk)->inet_daddr;
+	inet_sk(msk)->inet_saddr = inet_sk(ssk)->inet_saddr;
+	inet_sk(msk)->inet_rcv_saddr = inet_sk(ssk)->inet_rcv_saddr;
 }
 
 static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
@@ -941,7 +941,7 @@ unlock:
 
 static bool is_tcp_proto(const struct proto *p)
 {
-#ifdef CONFIG_MPTCP_IPV6
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	return p == &tcp_prot || p == &tcpv6_prot;
 #else
 	return p == &tcp_prot;
