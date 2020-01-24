@@ -40,8 +40,8 @@ launch_virtme_commit() { local ref
 }
 
 # We want to test the kselftests at the end of each series we are going to send
-launch_virtme_commit "mptcp: add basic kselftest for mptcp"
-launch_virtme_commit "mptcp: cope with later TCP fallback"
+#launch_virtme_commit "mptcp: add basic kselftest for mptcp"
+#launch_virtme_commit "mptcp: cope with later TCP fallback"
 launch_virtme_ref_log "export"
 
 if [ "${EXIT_RC}" -ne 0 ]; then
