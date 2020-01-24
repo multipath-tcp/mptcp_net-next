@@ -23,7 +23,8 @@ struct mptcp_ext {
 			data_fin:1,
 			use_ack:1,
 			ack64:1,
-			__unused:3;
+			mpc_map:1,
+			__unused:2;
 	/* one byte hole */
 };
 
@@ -50,16 +51,18 @@ static inline bool rsk_is_mptcp(const struct request_sock *req)
 	return tcp_rsk(req)->is_mptcp;
 }
 
-void mptcp_parse_option(const unsigned char *ptr, int opsize,
-			struct tcp_options_received *opt_rx);
-bool mptcp_syn_options(struct sock *sk, unsigned int *size,
-		       struct mptcp_out_options *opts);
+void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
+			int opsize, struct tcp_options_received *opt_rx);
+bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
+		       unsigned int *size, struct mptcp_out_options *opts);
 void mptcp_rcv_synsent(struct sock *sk);
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts);
 bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       unsigned int *size, unsigned int remaining,
 			       struct mptcp_out_options *opts);
+void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
+			    struct tcp_options_received *opt_rx);
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts);
 
@@ -119,12 +122,14 @@ static inline bool rsk_is_mptcp(const struct request_sock *req)
 	return false;
 }
 
-static inline void mptcp_parse_option(const unsigned char *ptr, int opsize,
+static inline void mptcp_parse_option(const struct sk_buff *skb,
+				      const unsigned char *ptr, int opsize,
 				      struct tcp_options_received *opt_rx)
 {
 }
 
-static inline bool mptcp_syn_options(struct sock *sk, unsigned int *size,
+static inline bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
+				     unsigned int *size,
 				     struct mptcp_out_options *opts)
 {
 	return false;
@@ -148,6 +153,12 @@ static inline bool mptcp_established_options(struct sock *sk,
 					     struct mptcp_out_options *opts)
 {
 	return false;
+}
+
+static inline void mptcp_incoming_options(struct sock *sk,
+					  struct sk_buff *skb,
+					  struct tcp_options_received *opt_rx)
+{
 }
 
 static inline void mptcp_skb_ext_move(struct sk_buff *to,
