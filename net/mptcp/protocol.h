@@ -11,7 +11,7 @@
 #include <net/tcp.h>
 #include <net/inet_connection_sock.h>
 
-#define MPTCP_SUPPORTED_VERSION	0
+#define MPTCP_SUPPORTED_VERSION	1
 
 /* MPTCP option bits */
 #define OPTION_MPTCP_MPC_SYN	BIT(0)
@@ -29,9 +29,10 @@
 #define MPTCPOPT_MP_FASTCLOSE	7
 
 /* MPTCP suboption lengths */
-#define TCPOLEN_MPTCP_MPC_SYN		12
+#define TCPOLEN_MPTCP_MPC_SYN		4
 #define TCPOLEN_MPTCP_MPC_SYNACK	12
 #define TCPOLEN_MPTCP_MPC_ACK		20
+#define TCPOLEN_MPTCP_MPC_ACK_DATA	22
 #define TCPOLEN_MPTCP_DSS_BASE		4
 #define TCPOLEN_MPTCP_DSS_ACK32		4
 #define TCPOLEN_MPTCP_DSS_ACK64		8
@@ -68,9 +69,11 @@ struct mptcp_sock {
 	u64		ack_seq;
 	u32		token;
 	unsigned long	flags;
+	bool		can_ack;
 	struct list_head conn_list;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
+	struct sock	*first;
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
@@ -83,9 +86,10 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 
 struct mptcp_subflow_request_sock {
 	struct	tcp_request_sock sk;
-	u8	mp_capable : 1,
+	u16	mp_capable : 1,
 		mp_join : 1,
-		backup : 1;
+		backup : 1,
+		remote_key_valid : 1;
 	u64	local_key;
 	u64	remote_key;
 	u64	idsn;
@@ -106,6 +110,7 @@ struct mptcp_subflow_context {
 	u64	remote_key;
 	u64	idsn;
 	u64	map_seq;
+	u32	snd_isn;
 	u32	token;
 	u32	rel_write_seq;
 	u32	map_subflow_seq;
@@ -116,8 +121,10 @@ struct mptcp_subflow_context {
 		fourth_ack : 1,	    /* send initial DSS */
 		conn_finished : 1,
 		map_valid : 1,
+		mpc_map : 1,
 		data_avail : 1,
-		rx_eof : 1;
+		rx_eof : 1,
+		can_ack : 1;	    /* only after processing the remote a key */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
