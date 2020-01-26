@@ -28,7 +28,7 @@ static struct percpu_counter mptcp_sockets_allocated;
 
 static void __mptcp_close(struct sock *sk, long timeout);
 
-static const struct proto_ops * tcp_proto_ops(struct sock *sk)
+static const struct proto_ops *tcp_proto_ops(struct sock *sk)
 {
 #if IS_ENABLED(CONFIG_IPV6)
 	if (sk->sk_family == AF_INET6)
@@ -1525,7 +1525,31 @@ out_unlock:
 	return ret;
 }
 
-static struct proto_ops mptcp_stream_ops;
+static const struct proto_ops mptcp_stream_ops = {
+	.family		   = PF_INET,
+	.owner		   = THIS_MODULE,
+	.release	   = inet_release,
+	.bind		   = mptcp_bind,
+	.connect	   = mptcp_stream_connect,
+	.socketpair	   = sock_no_socketpair,
+	.accept		   = mptcp_stream_accept,
+	.getname	   = mptcp_v4_getname,
+	.poll		   = mptcp_poll,
+	.ioctl		   = inet_ioctl,
+	.gettstamp	   = sock_gettstamp,
+	.listen		   = mptcp_listen,
+	.shutdown	   = mptcp_shutdown,
+	.setsockopt	   = sock_common_setsockopt,
+	.getsockopt	   = sock_common_getsockopt,
+	.sendmsg	   = inet_sendmsg,
+	.recvmsg	   = inet_recvmsg,
+	.mmap		   = sock_no_mmap,
+	.sendpage	   = inet_sendpage,
+#ifdef CONFIG_COMPAT
+	.compat_setsockopt = compat_sock_common_setsockopt,
+	.compat_getsockopt = compat_sock_common_getsockopt,
+#endif
+};
 
 static struct inet_protosw mptcp_protosw = {
 	.type		= SOCK_STREAM,
@@ -1538,14 +1562,6 @@ static struct inet_protosw mptcp_protosw = {
 void mptcp_proto_init(void)
 {
 	mptcp_prot.h.hashinfo = tcp_prot.h.hashinfo;
-	mptcp_stream_ops = inet_stream_ops;
-	mptcp_stream_ops.bind = mptcp_bind;
-	mptcp_stream_ops.connect = mptcp_stream_connect;
-	mptcp_stream_ops.poll = mptcp_poll;
-	mptcp_stream_ops.accept = mptcp_stream_accept;
-	mptcp_stream_ops.getname = mptcp_v4_getname;
-	mptcp_stream_ops.listen = mptcp_listen;
-	mptcp_stream_ops.shutdown = mptcp_shutdown;
 
 	if (percpu_counter_init(&mptcp_sockets_allocated, 0, GFP_KERNEL))
 		panic("Failed to allocate MPTCP pcpu counter\n");
@@ -1560,7 +1576,32 @@ void mptcp_proto_init(void)
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-static struct proto_ops mptcp_v6_stream_ops;
+static const struct proto_ops mptcp_v6_stream_ops = {
+	.family		   = PF_INET6,
+	.owner		   = THIS_MODULE,
+	.release	   = inet6_release,
+	.bind		   = mptcp_bind,
+	.connect	   = mptcp_stream_connect,
+	.socketpair	   = sock_no_socketpair,
+	.accept		   = mptcp_stream_accept,
+	.getname	   = mptcp_v6_getname,
+	.poll		   = mptcp_poll,
+	.ioctl		   = inet6_ioctl,
+	.gettstamp	   = sock_gettstamp,
+	.listen		   = mptcp_listen,
+	.shutdown	   = mptcp_shutdown,
+	.setsockopt	   = sock_common_setsockopt,
+	.getsockopt	   = sock_common_getsockopt,
+	.sendmsg	   = inet6_sendmsg,
+	.recvmsg	   = inet6_recvmsg,
+	.mmap		   = sock_no_mmap,
+	.sendpage	   = inet_sendpage,
+#ifdef CONFIG_COMPAT
+	.compat_setsockopt = compat_sock_common_setsockopt,
+	.compat_getsockopt = compat_sock_common_getsockopt,
+#endif
+};
+
 static struct proto mptcp_v6_prot;
 
 static void mptcp_v6_destroy(struct sock *sk)
@@ -1591,15 +1632,6 @@ int mptcp_proto_v6_init(void)
 	err = proto_register(&mptcp_v6_prot, 1);
 	if (err)
 		return err;
-
-	mptcp_v6_stream_ops = inet6_stream_ops;
-	mptcp_v6_stream_ops.bind = mptcp_bind;
-	mptcp_v6_stream_ops.connect = mptcp_stream_connect;
-	mptcp_v6_stream_ops.poll = mptcp_poll;
-	mptcp_v6_stream_ops.accept = mptcp_stream_accept;
-	mptcp_v6_stream_ops.getname = mptcp_v6_getname;
-	mptcp_v6_stream_ops.listen = mptcp_listen;
-	mptcp_v6_stream_ops.shutdown = mptcp_shutdown;
 
 	err = inet6_register_protosw(&mptcp_v6_protosw);
 	if (err)
