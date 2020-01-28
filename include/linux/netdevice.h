@@ -939,6 +939,11 @@ struct netdev_name_node {
 int netdev_name_node_alt_create(struct net_device *dev, const char *name);
 int netdev_name_node_alt_destroy(struct net_device *dev, const char *name);
 
+struct netdev_net_notifier {
+	struct list_head list;
+	struct notifier_block *nb;
+};
+
 /*
  * This structure defines the management hooks for network devices.
  * The following hooks can be defined; unless noted otherwise, they are
@@ -1793,6 +1798,10 @@ enum netdev_priv_flags {
  *
  *	@wol_enabled:	Wake-on-LAN is enabled
  *
+ *	@net_notifier_list:	List of per-net netdev notifier block
+ *				that follow this device when it is moved
+ *				to another network namespace.
+ *
  *	FIXME: cleanup struct net_device such that network protocol info
  *	moves out.
  */
@@ -2085,6 +2094,8 @@ struct net_device {
 	struct lock_class_key	addr_list_lock_key;
 	bool			proto_down;
 	unsigned		wol_enabled:1;
+
+	struct list_head	net_notifier_list;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -2326,7 +2337,8 @@ struct napi_gro_cb {
 	/* Number of gro_receive callbacks this packet already went through */
 	u8 recursion_counter:4;
 
-	/* 1 bit hole */
+	/* GRO is done by frag_list pointer chaining. */
+	u8	is_flist:1;
 
 	/* used to support CHECKSUM_COMPLETE for tunneling protocols */
 	__wsum	csum;
@@ -2528,6 +2540,12 @@ int unregister_netdevice_notifier(struct notifier_block *nb);
 int register_netdevice_notifier_net(struct net *net, struct notifier_block *nb);
 int unregister_netdevice_notifier_net(struct net *net,
 				      struct notifier_block *nb);
+int register_netdevice_notifier_dev_net(struct net_device *dev,
+					struct notifier_block *nb,
+					struct netdev_net_notifier *nn);
+int unregister_netdevice_notifier_dev_net(struct net_device *dev,
+					  struct notifier_block *nb,
+					  struct netdev_net_notifier *nn);
 
 struct netdev_notifier_info {
 	struct net_device	*dev;
@@ -2694,6 +2712,7 @@ struct net_device *dev_get_by_napi_id(unsigned int napi_id);
 int netdev_get_name(struct net *net, char *name, int ifindex);
 int dev_restart(struct net_device *dev);
 int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb);
+int skb_gro_receive_list(struct sk_buff *p, struct sk_buff *skb);
 
 static inline unsigned int skb_gro_offset(const struct sk_buff *skb)
 {
@@ -3894,22 +3913,48 @@ void netif_device_attach(struct net_device *dev);
  */
 
 enum {
-	NETIF_MSG_DRV		= 0x0001,
-	NETIF_MSG_PROBE		= 0x0002,
-	NETIF_MSG_LINK		= 0x0004,
-	NETIF_MSG_TIMER		= 0x0008,
-	NETIF_MSG_IFDOWN	= 0x0010,
-	NETIF_MSG_IFUP		= 0x0020,
-	NETIF_MSG_RX_ERR	= 0x0040,
-	NETIF_MSG_TX_ERR	= 0x0080,
-	NETIF_MSG_TX_QUEUED	= 0x0100,
-	NETIF_MSG_INTR		= 0x0200,
-	NETIF_MSG_TX_DONE	= 0x0400,
-	NETIF_MSG_RX_STATUS	= 0x0800,
-	NETIF_MSG_PKTDATA	= 0x1000,
-	NETIF_MSG_HW		= 0x2000,
-	NETIF_MSG_WOL		= 0x4000,
+	NETIF_MSG_DRV_BIT,
+	NETIF_MSG_PROBE_BIT,
+	NETIF_MSG_LINK_BIT,
+	NETIF_MSG_TIMER_BIT,
+	NETIF_MSG_IFDOWN_BIT,
+	NETIF_MSG_IFUP_BIT,
+	NETIF_MSG_RX_ERR_BIT,
+	NETIF_MSG_TX_ERR_BIT,
+	NETIF_MSG_TX_QUEUED_BIT,
+	NETIF_MSG_INTR_BIT,
+	NETIF_MSG_TX_DONE_BIT,
+	NETIF_MSG_RX_STATUS_BIT,
+	NETIF_MSG_PKTDATA_BIT,
+	NETIF_MSG_HW_BIT,
+	NETIF_MSG_WOL_BIT,
+
+	/* When you add a new bit above, update netif_msg_class_names array
+	 * in net/ethtool/common.c
+	 */
+	NETIF_MSG_CLASS_COUNT,
 };
+/* Both ethtool_ops interface and internal driver implementation use u32 */
+static_assert(NETIF_MSG_CLASS_COUNT <= 32);
+
+#define __NETIF_MSG_BIT(bit)	((u32)1 << (bit))
+#define __NETIF_MSG(name)	__NETIF_MSG_BIT(NETIF_MSG_ ## name ## _BIT)
+
+#define NETIF_MSG_DRV		__NETIF_MSG(DRV)
+#define NETIF_MSG_PROBE		__NETIF_MSG(PROBE)
+#define NETIF_MSG_LINK		__NETIF_MSG(LINK)
+#define NETIF_MSG_TIMER		__NETIF_MSG(TIMER)
+#define NETIF_MSG_IFDOWN	__NETIF_MSG(IFDOWN)
+#define NETIF_MSG_IFUP		__NETIF_MSG(IFUP)
+#define NETIF_MSG_RX_ERR	__NETIF_MSG(RX_ERR)
+#define NETIF_MSG_TX_ERR	__NETIF_MSG(TX_ERR)
+#define NETIF_MSG_TX_QUEUED	__NETIF_MSG(TX_QUEUED)
+#define NETIF_MSG_INTR		__NETIF_MSG(INTR)
+#define NETIF_MSG_TX_DONE	__NETIF_MSG(TX_DONE)
+#define NETIF_MSG_RX_STATUS	__NETIF_MSG(RX_STATUS)
+#define NETIF_MSG_PKTDATA	__NETIF_MSG(PKTDATA)
+#define NETIF_MSG_HW		__NETIF_MSG(HW)
+#define NETIF_MSG_WOL		__NETIF_MSG(WOL)
 
 #define netif_msg_drv(p)	((p)->msg_enable & NETIF_MSG_DRV)
 #define netif_msg_probe(p)	((p)->msg_enable & NETIF_MSG_PROBE)
@@ -4570,6 +4615,7 @@ static inline bool net_gso_ok(netdev_features_t features, int gso_type)
 	BUILD_BUG_ON(SKB_GSO_ESP != (NETIF_F_GSO_ESP >> NETIF_F_GSO_SHIFT));
 	BUILD_BUG_ON(SKB_GSO_UDP != (NETIF_F_GSO_UDP >> NETIF_F_GSO_SHIFT));
 	BUILD_BUG_ON(SKB_GSO_UDP_L4 != (NETIF_F_GSO_UDP_L4 >> NETIF_F_GSO_SHIFT));
+	BUILD_BUG_ON(SKB_GSO_FRAGLIST != (NETIF_F_GSO_FRAGLIST >> NETIF_F_GSO_SHIFT));
 
 	return (features & feature) == feature;
 }
