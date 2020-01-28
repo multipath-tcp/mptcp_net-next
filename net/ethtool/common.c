@@ -59,6 +59,7 @@ const char netdev_features_strings[NETDEV_FEATURE_COUNT][ETH_GSTRING_LEN] = {
 	[NETIF_F_HW_TLS_RECORD_BIT] =	"tls-hw-record",
 	[NETIF_F_HW_TLS_TX_BIT] =	 "tls-hw-tx-offload",
 	[NETIF_F_HW_TLS_RX_BIT] =	 "tls-hw-rx-offload",
+	[NETIF_F_GRO_FRAGLIST_BIT] =	 "rx-gro-list",
 };
 
 const char
@@ -169,6 +170,37 @@ const char link_mode_names[][ETH_GSTRING_LEN] = {
 	__DEFINE_LINK_MODE_NAME(400000, CR8, Full),
 };
 static_assert(ARRAY_SIZE(link_mode_names) == __ETHTOOL_LINK_MODE_MASK_NBITS);
+
+const char netif_msg_class_names[][ETH_GSTRING_LEN] = {
+	[NETIF_MSG_DRV_BIT]		= "drv",
+	[NETIF_MSG_PROBE_BIT]		= "probe",
+	[NETIF_MSG_LINK_BIT]		= "link",
+	[NETIF_MSG_TIMER_BIT]		= "timer",
+	[NETIF_MSG_IFDOWN_BIT]		= "ifdown",
+	[NETIF_MSG_IFUP_BIT]		= "ifup",
+	[NETIF_MSG_RX_ERR_BIT]		= "rx_err",
+	[NETIF_MSG_TX_ERR_BIT]		= "tx_err",
+	[NETIF_MSG_TX_QUEUED_BIT]	= "tx_queued",
+	[NETIF_MSG_INTR_BIT]		= "intr",
+	[NETIF_MSG_TX_DONE_BIT]		= "tx_done",
+	[NETIF_MSG_RX_STATUS_BIT]	= "rx_status",
+	[NETIF_MSG_PKTDATA_BIT]		= "pktdata",
+	[NETIF_MSG_HW_BIT]		= "hw",
+	[NETIF_MSG_WOL_BIT]		= "wol",
+};
+static_assert(ARRAY_SIZE(netif_msg_class_names) == NETIF_MSG_CLASS_COUNT);
+
+const char wol_mode_names[][ETH_GSTRING_LEN] = {
+	[const_ilog2(WAKE_PHY)]		= "phy",
+	[const_ilog2(WAKE_UCAST)]	= "ucast",
+	[const_ilog2(WAKE_MCAST)]	= "mcast",
+	[const_ilog2(WAKE_BCAST)]	= "bcast",
+	[const_ilog2(WAKE_ARP)]		= "arp",
+	[const_ilog2(WAKE_MAGIC)]	= "magic",
+	[const_ilog2(WAKE_MAGICSECURE)]	= "magicsecure",
+	[const_ilog2(WAKE_FILTER)]	= "filter",
+};
+static_assert(ARRAY_SIZE(wol_mode_names) == WOL_MODE_COUNT);
 
 /* return false if legacy contained non-0 deprecated fields
  * maxtxpkt/maxrxpkt. rest of ksettings always updated
