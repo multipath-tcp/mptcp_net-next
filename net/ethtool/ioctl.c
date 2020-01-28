@@ -17,6 +17,7 @@
 #include <linux/phy.h>
 #include <linux/bitops.h>
 #include <linux/uaccess.h>
+#include <linux/vermagic.h>
 #include <linux/vmalloc.h>
 #include <linux/sfp.h>
 #include <linux/slab.h>
@@ -655,6 +656,7 @@ static noinline_for_stack int ethtool_get_drvinfo(struct net_device *dev,
 
 	memset(&info, 0, sizeof(info));
 	info.cmd = ETHTOOL_GDRVINFO;
+	strlcpy(info.version, UTS_RELEASE, sizeof(info.version));
 	if (ops->get_drvinfo) {
 		ops->get_drvinfo(dev, &info);
 	} else if (dev->dev.parent && dev->dev.parent->driver) {
@@ -1316,6 +1318,7 @@ static int ethtool_set_wol(struct net_device *dev, char __user *useraddr)
 		return ret;
 
 	dev->wol_enabled = !!wol.wolopts;
+	ethtool_notify(dev, ETHTOOL_MSG_WOL_NTF, NULL);
 
 	return 0;
 }
@@ -2545,6 +2548,8 @@ int dev_ethtool(struct net *net, struct ifreq *ifr)
 	case ETHTOOL_SMSGLVL:
 		rc = ethtool_set_value_void(dev, useraddr,
 				       dev->ethtool_ops->set_msglevel);
+		if (!rc)
+			ethtool_notify(dev, ETHTOOL_MSG_DEBUG_NTF, NULL);
 		break;
 	case ETHTOOL_GEEE:
 		rc = ethtool_get_eee(dev, useraddr);
