@@ -76,6 +76,34 @@ static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 		     ((nib & 0xF) << 8) | field);
 }
 
+struct mptcp_pm_data {
+	u8	local_valid;
+	u8	local_id;
+	sa_family_t local_family;
+	union {
+		struct in_addr local_addr;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+		struct in6_addr local_addr6;
+#endif
+	};
+	u8	remote_valid;
+	u8	remote_id;
+	sa_family_t remote_family;
+	union {
+		struct in_addr remote_addr;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+		struct in6_addr remote_addr6;
+#endif
+	};
+	u8	server_side : 1,
+		fully_established : 1;
+
+	/* for interim path manager */
+	struct	work_struct addr_work;
+	struct	work_struct subflow_work;
+	u32	token;
+};
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
@@ -92,6 +120,7 @@ struct mptcp_sock {
 	struct socket	*subflow; /* outgoing connect/listener/!mp_capable */
 	struct sock	*first;
 	u8		addr_signal;
+	struct mptcp_pm_data	pm;
 };
 
 #define mptcp_for_each_subflow(__msk, __subflow)			\
@@ -108,6 +137,7 @@ struct mptcp_subflow_request_sock {
 		mp_join : 1,
 		backup : 1,
 		remote_key_valid : 1;
+	u8	local_id;
 	u64	local_key;
 	u64	remote_key;
 	u64	idsn;
@@ -242,6 +272,31 @@ static inline void mptcp_crypto_key_gen_sha(u64 *key, u32 *token, u64 *idsn)
 
 void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
 			   void *hash_out);
+
+void mptcp_pm_init(void);
+void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side);
+void mptcp_pm_fully_established(struct mptcp_sock *msk);
+void mptcp_pm_connection_closed(struct mptcp_sock *msk);
+void mptcp_pm_subflow_established(struct mptcp_sock *msk, u8 id);
+void mptcp_pm_subflow_closed(struct mptcp_sock *msk, u8 id);
+void mptcp_pm_add_addr(struct mptcp_sock *msk, const struct in_addr *addr,
+		       u8 id);
+void mptcp_pm_add_addr6(struct mptcp_sock *msk, const struct in6_addr *addr,
+			u8 id);
+
+int mptcp_pm_announce_addr(u32 token, u8 local_id, struct in_addr *addr);
+int mptcp_pm_create_subflow(u32 token, u8 remote_id, struct in_addr *addr);
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+int mptcp_pm_announce_addr6(u32 token, u8 local_id, struct in6_addr *addr);
+int mptcp_pm_create_subflow6(u32 token, u8 remote_id, struct in6_addr *addr);
+#endif
+int mptcp_pm_remove_addr(u32 token, u8 local_id);
+int mptcp_pm_remove_subflow(u32 token, u8 remote_id);
+
+int mptcp_pm_addr_signal(struct mptcp_sock *msk, u8 *id,
+			 struct sockaddr_storage *saddr);
+int mptcp_pm_get_local_id(struct request_sock *req, struct sock *sk,
+			  const struct sk_buff *skb);
 
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
