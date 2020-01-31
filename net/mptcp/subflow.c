@@ -262,6 +262,9 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
 
+	if (tcp_rsk(req)->is_mptcp == 0)
+		goto create_child;
+
 	/* if the sk is MP_CAPABLE, we try to fetch the client key */
 	subflow_req = mptcp_subflow_rsk(req);
 	if (subflow_req->mp_capable) {
@@ -678,9 +681,9 @@ subflow_default_af_ops(struct sock *sk)
 	return &subflow_specific;
 }
 
-void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped)
-{
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
+void mptcpv6_handle_mapped(struct sock *sk, bool mapped)
+{
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct inet_connection_sock_af_ops *target;
@@ -695,8 +698,8 @@ void mptcp_handle_ipv6_mapped(struct sock *sk, bool mapped)
 
 	subflow->icsk_af_ops = icsk->icsk_af_ops;
 	icsk->icsk_af_ops = target;
-#endif
 }
+#endif
 
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
@@ -717,7 +720,9 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	 */
 	sf->sk->sk_net_refcnt = 1;
 	get_net(net);
+#ifdef CONFIG_PROC_FS
 	this_cpu_add(*net->core.sock_inuse, 1);
+#endif
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	release_sock(sf->sk);
 
@@ -863,7 +868,8 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	struct mptcp_subflow_context *old_ctx = mptcp_subflow_ctx(newsk);
 	struct mptcp_subflow_context *new_ctx;
 
-	if (!subflow_req->mp_capable && !subflow_req->mp_join) {
+	if (!tcp_rsk(req)->is_mptcp ||
+	    (!subflow_req->mp_capable && !subflow_req->mp_join)) {
 		subflow_ulp_fallback(newsk, old_ctx);
 		return;
 	}
