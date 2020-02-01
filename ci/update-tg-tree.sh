@@ -98,7 +98,10 @@ tg_update_base() { local sha_before_update
 		exit 0
 	fi
 
-	git push "${GIT_REMOTE_GITHUB_NAME}" "${TG_TOPIC_BASE}"
+	# Push will be done with the 'tg push'
+	# in case of conflicts, the resolver will be able to sync the tree to
+	# the latest valid state, update the base manually then resolve the
+	# conflicts only once
 }
 
 tg_update() { local rc=0
