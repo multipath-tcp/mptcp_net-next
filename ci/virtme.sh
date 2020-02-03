@@ -32,7 +32,7 @@ OUTPUT_VIRTME=
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
-        kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM)
+        kconfig=(-e MPTCP -e MPTCP_IPV6 -e MPTCP_HMAC_TEST -e VETH -e NET_SCH_NETEM)
         if [ -n "${1}" ]; then
                 kconfig+=("${@}")
         fi

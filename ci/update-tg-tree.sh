@@ -203,7 +203,7 @@ generate_config_no_mptcp() {
 generate_config_mptcp() {
 	generate_config_no_mptcp "${@}"
 
-	echo | scripts/config -e MPTCP -e MPTCP_IPV6
+	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_HMAC_TEST
 
 	# Here, we want to have a failure if some new MPTCP options are
 	# available not to forget to enable them. We then don't want to run
