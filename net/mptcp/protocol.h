@@ -81,6 +81,7 @@
 #define MPTCP_DATA_READY	BIT(0)
 #define MPTCP_SEND_SPACE	BIT(1)
 #define MPTCP_WORK_RTX		BIT(2)
+#define MPTCP_WORK_EOF		BIT(3)
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -311,6 +312,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 		       struct tcp_options_received *opt_rx);
 
 void mptcp_finish_connect(struct sock *sk);
+void mptcp_subflow_eof(struct sock *sk);
 bool mptcp_finish_join(struct sock *sk);
 void mptcp_data_acked(struct sock *sk);
 
