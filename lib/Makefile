@@ -230,7 +230,7 @@ $(foreach file, $(libfdt_files), \
 	$(eval CFLAGS_$(file) = -I $(srctree)/scripts/dtc/libfdt))
 lib-$(CONFIG_LIBFDT) += $(libfdt_files)
 
-lib-$(CONFIG_LIBXBC) += bootconfig.o
+lib-$(CONFIG_BOOT_CONFIG) += bootconfig.o
 
 obj-$(CONFIG_RBTREE_TEST) += rbtree_test.o
 obj-$(CONFIG_INTERVAL_TREE_TEST) += interval_tree_test.o
@@ -241,8 +241,8 @@ obj-$(CONFIG_ASN1) += asn1_decoder.o
 
 obj-$(CONFIG_FONT_SUPPORT) += fonts/
 
-hostprogs-y	:= gen_crc32table
-hostprogs-y	+= gen_crc64table
+hostprogs	:= gen_crc32table
+hostprogs	+= gen_crc64table
 clean-files	:= crc32table.h
 clean-files	+= crc64table.h
 
