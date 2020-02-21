@@ -80,6 +80,7 @@
 /* MPTCP socket flags */
 #define MPTCP_DATA_READY	BIT(0)
 #define MPTCP_SEND_SPACE	BIT(1)
+#define MPTCP_WORK_RTX		BIT(2)
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -137,6 +138,7 @@ struct mptcp_sock {
 	u32		token;
 	unsigned long	flags;
 	bool		can_ack;
+	struct work_struct rtx_work;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct skb_ext	*cached_ext;	/* for the next sendmsg */
