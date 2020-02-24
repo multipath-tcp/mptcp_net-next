@@ -693,6 +693,8 @@ static int __mptcp_init_sock(struct sock *sk)
 	msk->first = NULL;
 	inet_csk(sk)->icsk_sync_mss = mptcp_sync_mss;
 
+	mptcp_pm_data_init(msk);
+
 	return 0;
 }
 
