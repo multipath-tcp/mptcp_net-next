@@ -50,6 +50,7 @@ static int cfg_sock_proto	= IPPROTO_MPTCP;
 static bool tcpulp_audit;
 static int pf = AF_INET;
 static int cfg_sndbuf;
+static bool cfg_join;
 
 static void die_usage(void)
 {
@@ -230,6 +231,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 {
+	static bool first = true;
 	unsigned int do_w;
 	ssize_t bw;
 
@@ -237,9 +239,18 @@ static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 	if (do_w == 0 || do_w > len)
 		do_w = len;
 
+	if (cfg_join && first && do_w > 100)
+		do_w = 100;
+
 	bw = write(fd, buf, do_w);
 	if (bw < 0)
 		perror("write");
+
+	/* let the join handshake complete, before going on */
+	if (cfg_join && first) {
+		sleep(1);
+		first = false;
+	}
 
 	return bw;
 }
@@ -638,7 +649,7 @@ static void maybe_close(int fd)
 {
 	unsigned int r = rand();
 
-	if (r & 1)
+	if (!cfg_join && (r & 1))
 		close(fd);
 }
 
@@ -774,8 +785,12 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "6lp:s:hut:m:b:")) != -1) {
+	while ((c = getopt(argc, argv, "6jlp:s:hut:m:b:")) != -1) {
 		switch (c) {
+		case 'j':
+			cfg_join = true;
+			cfg_mode = CFG_MODE_POLL;
+			break;
 		case 'l':
 			listen_mode = true;
 			break;
