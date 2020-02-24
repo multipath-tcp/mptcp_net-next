@@ -50,17 +50,20 @@ static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 	if (sf->map_valid)
 		flags |= MPTCP_SUBFLOW_FLAG_MAPVALID;
 
-	if (nla_put_u32(skb, MPTCP_SUBFLOW_TOKEN_REM, sf->remote_token) ||
-	    nla_put_u32(skb, MPTCP_SUBFLOW_TOKEN_LOC, sf->token) ||
-	    nla_put_u32(skb, MPTCP_SUBFLOW_RELWRITE_SEQ, sf->rel_write_seq) ||
-	    nla_put_u64_64bit(skb, MPTCP_SUBFLOW_MAP_SEQ, sf->map_seq,
-			      MPTCP_SUBFLOW_PAD) ||
-	    nla_put_u32(skb, MPTCP_SUBFLOW_MAP_SFSEQ, sf->map_subflow_seq) ||
-	    nla_put_u32(skb, MPTCP_SUBFLOW_SSN_OFFSET, sf->ssn_offset) ||
-	    nla_put_u16(skb, MPTCP_SUBFLOW_MAP_DATALEN, sf->map_data_len) ||
-	    nla_put_u32(skb, MPTCP_SUBFLOW_FLAGS, flags) ||
-	    nla_put_u8(skb, MPTCP_SUBFLOW_ID_REM, sf->remote_id) ||
-	    nla_put_u8(skb, MPTCP_SUBFLOW_ID_LOC, sf->local_id)) {
+	if (nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_TOKEN_REM, sf->remote_token) ||
+	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_TOKEN_LOC, sf->token) ||
+	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_RELWRITE_SEQ,
+			sf->rel_write_seq) ||
+	    nla_put_u64_64bit(skb, MPTCP_SUBFLOW_ATTR_MAP_SEQ, sf->map_seq,
+			      MPTCP_SUBFLOW_ATTR_PAD) ||
+	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_MAP_SFSEQ,
+			sf->map_subflow_seq) ||
+	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_SSN_OFFSET, sf->ssn_offset) ||
+	    nla_put_u16(skb, MPTCP_SUBFLOW_ATTR_MAP_DATALEN,
+			sf->map_data_len) ||
+	    nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_FLAGS, flags) ||
+	    nla_put_u8(skb, MPTCP_SUBFLOW_ATTR_ID_REM, sf->remote_id) ||
+	    nla_put_u8(skb, MPTCP_SUBFLOW_ATTR_ID_LOC, sf->local_id)) {
 		err = -EMSGSIZE;
 		goto nla_failure;
 	}
@@ -80,16 +83,16 @@ static size_t subflow_get_info_size(const struct sock *sk)
 	size_t size = 0;
 
 	size += nla_total_size(0) +	/* INET_ULP_INFO_MPTCP */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_TOKEN_REM */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_TOKEN_LOC */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_RELWRITE_SEQ */
-		nla_total_size_64bit(8) +	/* MPTCP_SUBFLOW_MAP_SEQ */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_MAP_SFSEQ */
-		nla_total_size(2) +	/* MPTCP_SUBFLOW_SSN_OFFSET */
-		nla_total_size(2) +	/* MPTCP_SUBFLOW_MAP_DATALEN */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_FLAGS */
-		nla_total_size(1) +	/* MPTCP_SUBFLOW_ID_REM */
-		nla_total_size(1) +	/* MPTCP_SUBFLOW_ID_LOC */
+		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_TOKEN_REM */
+		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_TOKEN_LOC */
+		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_RELWRITE_SEQ */
+		nla_total_size_64bit(8) +	/* MPTCP_SUBFLOW_ATTR_MAP_SEQ */
+		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_MAP_SFSEQ */
+		nla_total_size(2) +	/* MPTCP_SUBFLOW_ATTR_SSN_OFFSET */
+		nla_total_size(2) +	/* MPTCP_SUBFLOW_ATTR_MAP_DATALEN */
+		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_FLAGS */
+		nla_total_size(1) +	/* MPTCP_SUBFLOW_ATTR_ID_REM */
+		nla_total_size(1) +	/* MPTCP_SUBFLOW_ATTR_ID_LOC */
 		0;
 	return size;
 }
