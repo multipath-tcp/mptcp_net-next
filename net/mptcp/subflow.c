@@ -826,11 +826,14 @@ int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
+	spin_lock_bh(&msk->join_list_lock);
+	list_add_tail(&subflow->node, &msk->join_list);
+	spin_unlock_bh(&msk->join_list_lock);
+
 	release_sock(sk);
 	return err;
 
 failed:
-	list_del_init(&subflow->node);
 	release_sock(sk);
 	sock_release(sf);
 	return err;
