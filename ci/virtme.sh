@@ -23,7 +23,10 @@ VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
 SELFTESTS_DIR="tools/testing/selftests/net/mptcp"
 
 KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
-                      -e PROVE_LOCKING -d DEBUG_LOCKDEP)
+                      -e PROVE_LOCKING -e DEBUG_LOCKDEP
+                      -e PREEMPT -e DEBUG_PREEMPT
+                      -e DEBUG_SLAVE -e DEBUG_PAGEALLOC -e DEBUG_MUTEXES -e DEBUG_SPINLOCK -e DEBUG_ATOMIC_SLEEP
+                      -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD)
 
 # tmp files
 OUTPUT_SCRIPT=
