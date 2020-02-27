@@ -53,7 +53,7 @@ RUN echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" > /etc/apt
     apt-get clean
 
 # virtme
-RUN cd /tmp && \
+RUN cd /opt && \
     git clone "${VIRTME_GIT_URL}" && \
     cd virtme && \
     git checkout "${VIRTME_GIT_SHA}"
