@@ -26,7 +26,7 @@ DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
 
 cat <<EOF > "${DOCKERFILE}"
-FROM ubuntu:latest
+FROM ubuntu:bionic
 
 # Use the same rights as the launcher
 RUN mkdir -p "$(dirname "${HOME}")" && \
@@ -39,7 +39,17 @@ RUN apt-get update && \
                     build-essential libncurses5-dev gcc libssl-dev bc bison \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
                     python3 python3-pkg-resources busybox iproute2 tcpdump \
-                    iputils-ping ethtool klibc-utils rsync ccache && \
+                    iputils-ping ethtool klibc-utils rsync ccache \
+                    ca-certificates gnupg2 && \
+    apt-get clean
+
+# CLang dev for BPF selftests (curl required)
+RUN echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" > /etc/apt/sources.list.d/clang.list && \
+    curl https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends \
+                    clang lld llvm libcap-dev && \
     apt-get clean
 
 # virtme
