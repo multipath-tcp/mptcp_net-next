@@ -68,6 +68,7 @@ static bool subflow_token_join_request(struct request_sock *req,
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 	struct mptcp_sock *msk;
+	int local_id;
 
 	msk = mptcp_token_get_sock(subflow_req->token);
 	if (!msk) {
@@ -75,10 +76,12 @@ static bool subflow_token_join_request(struct request_sock *req,
 		return false;
 	}
 
-	if (mptcp_pm_get_local_id(req, (struct sock *)msk, skb)) {
+	local_id = mptcp_pm_get_local_id(msk, (struct sock_common *)req);
+	if (local_id < 0) {
 		sock_put((struct sock *)msk);
 		return false;
 	}
+	subflow_req->local_id = local_id;
 
 	get_random_bytes(&subflow_req->local_nonce, sizeof(u32));
 
