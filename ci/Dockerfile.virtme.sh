@@ -21,6 +21,8 @@ fi
 
 VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
 VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
+PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
+PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
@@ -40,7 +42,7 @@ RUN apt-get update && \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
                     python3 python3-pkg-resources busybox iproute2 tcpdump \
                     iputils-ping ethtool klibc-utils rsync ccache \
-                    ca-certificates gnupg2 && \
+                    ca-certificates gnupg2 net-tools && \
     apt-get clean
 
 # CLang dev for BPF selftests (curl required)
@@ -57,6 +59,16 @@ RUN cd /opt && \
     git clone "${VIRTME_GIT_URL}" && \
     cd virtme && \
     git checkout "${VIRTME_GIT_SHA}"
+
+# packetdrill
+ENV PACKETDRILL_GIT_BRANCH "${PACKETDRILL_GIT_BRANCH}"
+RUN cd /opt && \
+    git clone "${PACKETDRILL_GIT_URL}" && \
+    cd packetdrill && \
+        git checkout "${PACKETDRILL_GIT_BRANCH}" && \
+        cd gtests/net/packetdrill/ && \
+            ./configure && \
+            make
 
 # sudo rights (for kvm)
 RUN usermod -a -G sudo "${USER}" && \

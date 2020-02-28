@@ -31,11 +31,14 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
 # tmp files
 OUTPUT_SELFTESTS=
 OUTPUT_VIRTME=
+OUTPUT_PACKETDRILL=
 
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
         kconfig=(-e MPTCP -e MPTCP_IPV6 -e MPTCP_HMAC_TEST -e VETH -e NET_SCH_NETEM)
+        # Extra options needed for packetdrill
+        kconfig+=(-e TUN)
         if [ -n "${1}" ]; then
                 kconfig+=("${@}")
         fi
@@ -59,9 +62,20 @@ get_tmp_file_rm_previous() {
         mktemp --tmpdir="${PWD}"
 }
 
-prepare() {
+prepare() { local old_pwd
+        old_pwd="${PWD}"
         OUTPUT_SELFTESTS=$(get_tmp_file_rm_previous "${OUTPUT_SELFTESTS}")
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
+        OUTPUT_PACKETDRILL=$(get_tmp_file_rm_previous "${OUTPUT_PACKETDRILL}")
+
+        # make sure we have the last stable tests
+        cd /opt/packetdrill/
+        sudo git fetch origin
+        sudo git checkout -f "origin/${PACKETDRILL_GIT_BRANCH}"
+        cd gtests/net/packetdrill/
+        sudo ./configure
+        sudo make
+        cd "${old_pwd}"
 
         mkdir -p "${VIRTME_SCRIPT_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
@@ -71,12 +85,17 @@ prepare() {
 time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${OUTPUT_SELFTESTS}"
 
+# packetdrill
+cd /opt/packetdrill/gtests/net/
+./packetdrill/run_all.py -l -v mptcp/mp_capable 2>&1 | tee "${OUTPUT_PACKETDRILL}"
+# ./packetdrill/run_all.py -l -v mptcp/dss 2>&1 | tee -a "${OUTPUT_PACKETDRILL}"
+
 # end
 echo "${VIRTME_SCRIPT_END}"
 EOF
         chmod +x "${VIRTME_SCRIPT}"
 
-        trap 'rm -f "${OUTPUT_SELFTESTS}" "${OUTPUT_VIRTME}"' EXIT
+        trap 'rm -f "${OUTPUT_SELFTESTS}" "${OUTPUT_VIRTME}" "${OUTPUT_PACKETDRILL}"' EXIT
 }
 
 run() {
@@ -135,6 +154,15 @@ analyse() {
                 echo "Error when launching selftests"
                 grep -A 9999 "^# selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SELFTESTS}"
                 exit 1
+        fi
+
+        # check packetdrill results
+        if grep "^Ran " "${OUTPUT_PACKETDRILL}" | grep -vq " 0 failing"; then
+                echo "Error when launching packetdrill"
+                cat "${OUTPUT_PACKETDRILL}"
+                exit 3
+        else
+                echo "Packetdrill OK"
         fi
 }
 
