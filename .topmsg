@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-memory-accounting-for-mptcp-rtx-queue
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement memory accounting for mptcp rtx queue
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Charge the data on the rtx queue to the master MPTCP socket, too.
+Such memory in uncharged when the data is acked/dequeued.
+
+Also account mptcp sockets inuse via a protocol specific pcpu
+counter.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
