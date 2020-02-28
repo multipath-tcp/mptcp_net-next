@@ -1525,16 +1525,14 @@ bool mptcp_finish_join(struct sock *sk)
 		return false;
 
 	parent_sock = READ_ONCE(parent->sk_socket);
-	if (parent_sock) {
-		if (!sk->sk_socket)
-			mptcp_sock_graft(sk, parent_sock);
+	if (parent_sock && !sk->sk_socket) {
+		mptcp_sock_graft(sk, parent_sock);
 
 		/* active connections are already on conn_list */
-		if (list_empty(&subflow->node)) {
-			spin_lock_bh(&msk->join_list_lock);
+		spin_lock_bh(&msk->join_list_lock);
+		if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
 			list_add_tail(&subflow->node, &msk->join_list);
-			spin_unlock_bh(&msk->join_list_lock);
-		}
+		spin_unlock_bh(&msk->join_list_lock);
 	}
 	return true;
 }
