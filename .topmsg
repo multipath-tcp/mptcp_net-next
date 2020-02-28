@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-add-test-cases-for-MPTCP-MP_JOIN
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: add test-cases for MPTCP MP_JOIN
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use the pm netlink to configure the creation of several
+subflows, and verify that via MIB counters.
+
+Update the mptcp_connect program to allow reliable MP_JOIN
+handshake even on small data file
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
