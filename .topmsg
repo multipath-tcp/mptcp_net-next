@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-increment-MIB-counters-in-a-few-places
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: increment MIB counters in a few places
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add initial use of the new MIB counters.
+We can extend this later on as more features get added.
+
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
