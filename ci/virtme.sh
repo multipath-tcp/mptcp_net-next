@@ -29,7 +29,7 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD)
 
 # tmp files
-OUTPUT_SCRIPT=
+OUTPUT_SELFTESTS=
 OUTPUT_VIRTME=
 
 # $@: extra kconfig
@@ -60,21 +60,22 @@ get_tmp_file_rm_previous() {
 }
 
 prepare() {
-        OUTPUT_SCRIPT=$(get_tmp_file_rm_previous "${OUTPUT_SCRIPT}")
+        OUTPUT_SELFTESTS=$(get_tmp_file_rm_previous "${OUTPUT_SELFTESTS}")
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
 
         mkdir -p "${VIRTME_SCRIPT_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
 time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
-        tee "${OUTPUT_SCRIPT}"
+        tee "${OUTPUT_SELFTESTS}"
+
 # to avoid leaving files owned by root
 find . -user root -exec rm -rf "{}" \;
 echo "${VIRTME_SCRIPT_END}"
 EOF
         chmod +x "${VIRTME_SCRIPT}"
 
-        trap 'rm -f "${OUTPUT_SCRIPT}" "${OUTPUT_VIRTME}"' EXIT
+        trap 'rm -f "${OUTPUT_SELFTESTS}" "${OUTPUT_VIRTME}"' EXIT
 }
 
 run() {
@@ -113,14 +114,20 @@ EOF
 # $@: args for kconfig
 analyse() {
         echo "Kconfig: ${*}"
+
+        # look for crashes/warnings
         if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
                 echo "Call Trace found"
+                # exit directly, that's bad
                 exit 2
-        elif grep -q "^ok [0-9]\+ selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"; then
+        fi
+
+        # check selftests results
+        if grep -q "^ok [0-9]\+ selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SELFTESTS}"; then
                 echo "Selftests OK"
         else
                 echo "Error when launching selftests"
-                grep -A 9999 "^# selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SCRIPT}"
+                grep -A 9999 "^# selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SELFTESTS}"
                 exit 1
         fi
 }
