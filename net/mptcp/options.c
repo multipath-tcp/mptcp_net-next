@@ -471,7 +471,7 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	if (!msk)
 		return false;
 
-	if (!msk->pm.fully_established || !msk->addr_signal)
+	if (!msk->pm.fully_established)
 		return false;
 
 	if (mptcp_pm_addr_signal(msk, &id, &saddr))
@@ -495,8 +495,6 @@ static bool mptcp_established_options_addr(struct sock *sk,
 		*size = TCPOLEN_MPTCP_ADD_ADDR6;
 	}
 #endif
-
-	msk->addr_signal = 0;
 
 	return true;
 }
