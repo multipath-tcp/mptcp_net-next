@@ -52,8 +52,10 @@
 #define TCPOLEN_MPTCP_ADD_ADDR6		20
 #define TCPOLEN_MPTCP_RM_ADDR		4
 
+/* MPTCP MP_JOIN flags */
 #define MPTCPOPT_BACKUP		BIT(0)
 #define MPTCPOPT_HMAC_LEN	20
+#define MPTCPOPT_THMAC_LEN	8
 
 /* MPTCP MP_CAPABLE flags */
 #define MPTCP_VERSION_MASK	(0x0F)
@@ -193,6 +195,8 @@ struct mptcp_subflow_context {
 	u32	ssn_offset;
 	u32	map_data_len;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
+		request_join : 1,   /* send MP_JOIN */
+		request_bkup : 1,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		mp_join : 1,	    /* remote is JOINing */
 		fourth_ack : 1,	    /* send initial DSS */
@@ -206,6 +210,8 @@ struct mptcp_subflow_context {
 	u32	remote_nonce;
 	u64	thmac;
 	u32	local_nonce;
+	u32	remote_token;
+	u8	hmac[MPTCPOPT_HMAC_LEN];
 	u8	local_id;
 	u8	remote_id;
 
@@ -251,6 +257,11 @@ mptcp_subflow_get_mapped_dsn(const struct mptcp_subflow_context *subflow)
 int mptcp_is_enabled(struct net *net);
 bool mptcp_subflow_data_available(struct sock *sk);
 void mptcp_subflow_init(void);
+
+/* called with sk socket lock held */
+int __mptcp_subflow_connect(struct sock *sk, int ifindex,
+			    const struct mptcp_addr_info *loc,
+			    const struct mptcp_addr_info *remote);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 static inline void mptcp_subflow_tcp_fallback(struct sock *sk,
