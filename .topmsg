@@ -15,4 +15,6 @@ Not done yet:
 1. extend mptcp worker to collect timed-out entries
 2. prevent arbitrary growth of pending ssks.
 
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Florian Westphal <fw@strlen.de>
