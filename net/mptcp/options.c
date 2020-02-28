@@ -128,7 +128,6 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 		}
 		break;
 
-
 	case MPTCPOPT_DSS:
 		pr_debug("DSS");
 		ptr++;
@@ -565,8 +564,12 @@ static bool check_fourth_ack(struct mptcp_subflow_context *subflow,
 		   TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1))
 		return true;
 
-	if (mp_opt->use_ack)
+	if (mp_opt->use_ack) {
 		subflow->fourth_ack = 1;
+		if (subflow->mp_join)
+			mptcp_pm_subflow_established(mptcp_sk(subflow->conn),
+						     subflow);
+	}
 
 	if (subflow->can_ack)
 		return true;
