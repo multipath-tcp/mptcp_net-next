@@ -291,8 +291,11 @@ mptcp_subflow_get_mapped_dsn(const struct mptcp_subflow_context *subflow)
 int mptcp_is_enabled(struct net *net);
 bool mptcp_subflow_data_available(struct sock *sk);
 void mptcp_subflow_init(void);
-int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
-			  struct sockaddr *remote, u8 remote_id);
+
+/* called with sk socket lock held */
+int __mptcp_subflow_connect(struct sock *sk, int ifindex,
+			    const struct mptcp_addr_info *loc,
+			    const struct mptcp_addr_info *remote);
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 
 static inline void mptcp_subflow_tcp_fallback(struct sock *sk,
