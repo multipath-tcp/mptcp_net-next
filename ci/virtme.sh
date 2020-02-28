@@ -66,11 +66,12 @@ prepare() {
         mkdir -p "${VIRTME_SCRIPT_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
+
+# selftests
 time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${OUTPUT_SELFTESTS}"
 
-# to avoid leaving files owned by root
-find . -user root -exec rm -rf "{}" \;
+# end
 echo "${VIRTME_SCRIPT_END}"
 EOF
         chmod +x "${VIRTME_SCRIPT}"
@@ -111,6 +112,11 @@ EOF
         "${VIRTME_RUN_EXPECT}" | tee "${OUTPUT_VIRTME}"
 }
 
+clean_expect() {
+        # to avoid leaving files owned by root
+        find . -user root -exec rm -rf "{}" \; || true
+}
+
 # $@: args for kconfig
 analyse() {
         echo "Kconfig: ${*}"
@@ -145,6 +151,7 @@ go_expect() {
         build
         prepare
         run_expect
+        clean_expect
         analyse "${@}"
 }
 
