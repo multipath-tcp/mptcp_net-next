@@ -309,7 +309,7 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 		pr_debug("remote_token=%u, nonce=%u", subflow->remote_token,
 			 subflow->local_nonce);
 		opts->suboptions = OPTION_MPTCP_MPJ_SYN;
-		opts->join_id = subflow->remote_id;
+		opts->join_id = subflow->local_id;
 		opts->token = subflow->remote_token;
 		opts->nonce = subflow->local_nonce;
 		opts->backup = subflow->request_bkup;
