@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-update-per-unacked-sequence-on-pkt-reception
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: update per unacked sequence on pkt reception
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+So that we keep per unacked sequence number consistent; since
+we update per msk data, use an atomic64 cmpxcgh() to protect
+against concurrent updates from multiple subflows.
+
+Initialize the snd_una at connect()/accept() time.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
