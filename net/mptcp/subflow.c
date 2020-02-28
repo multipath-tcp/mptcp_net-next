@@ -31,19 +31,31 @@ static inline void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
 static int subflow_rebuild_header(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	int err = 0;
+	int local_id, err = 0;
 
 	if (subflow->request_mptcp && !subflow->token) {
 		pr_debug("subflow=%p", sk);
 		err = mptcp_token_new_connect(sk);
 	} else if (subflow->request_join && !subflow->local_nonce) {
+		struct mptcp_sock *msk = (struct mptcp_sock *)subflow->conn;
+
 		pr_debug("subflow=%p", sk);
 
 		do {
 			get_random_bytes(&subflow->local_nonce, sizeof(u32));
 		} while (!subflow->local_nonce);
+
+		if (subflow->local_id)
+			goto out;
+
+		local_id = mptcp_pm_get_local_id(msk, (struct sock_common *)sk);
+		if (local_id < 0)
+			return -EINVAL;
+
+		subflow->local_id = local_id;
 	}
 
+out:
 	if (err)
 		return err;
 
@@ -782,59 +794,75 @@ void mptcpv6_handle_mapped(struct sock *sk, bool mapped)
 }
 #endif
 
-int mptcp_subflow_connect(struct sock *sk, struct sockaddr *local,
-			  struct sockaddr *remote, u8 remote_id)
+static void mptcp_info2sockaddr(const struct mptcp_addr_info *info,
+				struct sockaddr_storage *addr)
+{
+	memset(addr, 0, sizeof(*addr));
+	addr->ss_family = info->family;
+	if (addr->ss_family == AF_INET) {
+		struct sockaddr_in *in_addr = (struct sockaddr_in *)addr;
+
+		in_addr->sin_addr = info->addr;
+		in_addr->sin_port = info->port;
+	} else if (addr->ss_family == AF_INET6) {
+		struct sockaddr_in6 *in6_addr = (struct sockaddr_in6 *)addr;
+
+		in6_addr->sin6_addr = info->addr6;
+		in6_addr->sin6_port = info->port;
+	}
+}
+
+int __mptcp_subflow_connect(struct sock *sk, int ifindex,
+			    const struct mptcp_addr_info *loc,
+			    const struct mptcp_addr_info *remote)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
+	struct sockaddr_storage addr;
 	struct socket *sf;
 	u32 remote_token;
 	int addrlen;
 	int err;
 
-	lock_sock(sk);
-	if (sk->sk_state != TCP_ESTABLISHED) {
-		release_sock(sk);
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
-	}
 
 	err = mptcp_subflow_create_socket(sk, &sf);
-	if (err) {
-		release_sock(sk);
+	if (err)
 		return err;
-	}
 
 	subflow = mptcp_subflow_ctx(sf->sk);
 	subflow->remote_key = msk->remote_key;
 	subflow->local_key = msk->local_key;
 	subflow->token = msk->token;
+	mptcp_info2sockaddr(loc, &addr);
 
 	addrlen = sizeof(struct sockaddr_in);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	if (local->sa_family == AF_INET6)
+	if (loc->family == AF_INET6)
 		addrlen = sizeof(struct sockaddr_in6);
 #endif
-	err = kernel_bind(sf, local, addrlen);
+	sf->sk->sk_bound_dev_if = ifindex;
+	err = kernel_bind(sf, (struct sockaddr *)&addr, addrlen);
 	if (err)
 		goto failed;
 
 	mptcp_crypto_key_sha(subflow->remote_key, &remote_token, NULL);
 	pr_debug("msk=%p remote_token=%u", msk, remote_token);
 	subflow->remote_token = remote_token;
-	subflow->remote_id = remote_id;
+	subflow->local_id = loc->id;
 	subflow->request_join = 1;
 	subflow->request_bkup = 1;
+	mptcp_info2sockaddr(remote, &addr);
 
-	err = kernel_connect(sf, remote, addrlen, O_NONBLOCK);
+	err = kernel_connect(sf, (struct sockaddr *)&addr, addrlen, O_NONBLOCK);
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
-	release_sock(sk);
 	return err;
 
 failed:
 	list_del_init(&subflow->node);
-	release_sock(sk);
 	sock_release(sf);
 	return err;
 }
