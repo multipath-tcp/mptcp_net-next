@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-handling-of-incoming-MP_JOIN-requests
+From: Peter Krystad <peter.krystad@linux.intel.com>
+Subject: [PATCH] mptcp: Add handling of incoming MP_JOIN requests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Process the MP_JOIN option in a SYN packet with the same flow
+as MP_CAPABLE but when the third ACK is received add the
+subflow to the MPTCP socket subflow list instead of adding it to
+the TCP socket accept queue.
+
+The subflow is added at the end of the subflow list so it will not
+interfere with the existing subflows operation and no data is
+expected to be transmitted on it.
+
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Peter Krystad <peter.krystad@linux.intel.com>
