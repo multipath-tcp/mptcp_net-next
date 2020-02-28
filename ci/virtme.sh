@@ -12,7 +12,7 @@ set -e
 VIRTME_PATH="/opt/virtme"
 VIRTME_CONFIGKERNEL="${VIRTME_PATH}/virtme-configkernel"
 VIRTME_RUN="${VIRTME_PATH}/virtme-run"
-VIRTME_RUN_OPTS=(--net --balloon --memory 512M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
+VIRTME_RUN_OPTS=(--net --balloon --memory 768M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
 
 VIRTME_SCRIPT_DIR="patches/virtme"
 VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/selftests.sh"
