@@ -43,7 +43,7 @@ struct pm_nl_pernet {
 static bool addresses_equal(const struct mptcp_addr_info *a,
 			    struct mptcp_addr_info *b, bool use_port)
 {
-	bool addr_equals;
+	bool addr_equals = false;
 
 	if (a->family != b->family)
 		return false;
