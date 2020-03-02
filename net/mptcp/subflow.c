@@ -862,10 +862,13 @@ int __mptcp_subflow_connect(struct sock *sk, int ifindex,
 	if (err && err != -EINPROGRESS)
 		goto failed;
 
+	spin_lock_bh(&msk->join_list_lock);
+	list_add_tail(&subflow->node, &msk->join_list);
+	spin_unlock_bh(&msk->join_list_lock);
+
 	return err;
 
 failed:
-	list_del_init(&subflow->node);
 	sock_release(sf);
 	return err;
 }
