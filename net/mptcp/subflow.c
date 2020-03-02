@@ -804,12 +804,15 @@ static void mptcp_info2sockaddr(const struct mptcp_addr_info *info,
 
 		in_addr->sin_addr = info->addr;
 		in_addr->sin_port = info->port;
-	} else if (addr->ss_family == AF_INET6) {
+	}
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	else if (addr->ss_family == AF_INET6) {
 		struct sockaddr_in6 *in6_addr = (struct sockaddr_in6 *)addr;
 
 		in6_addr->sin6_addr = info->addr6;
 		in6_addr->sin6_port = info->port;
 	}
+#endif
 }
 
 int __mptcp_subflow_connect(struct sock *sk, int ifindex,
