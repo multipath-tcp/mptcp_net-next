@@ -38,7 +38,7 @@ gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
         kconfig=(-e MPTCP -e MPTCP_IPV6 -e MPTCP_HMAC_TEST -e VETH -e NET_SCH_NETEM)
         # Extra options needed for packetdrill
-        kconfig+=(-e TUN)
+        kconfig+=(-e TUN -e CRYPTO_USER_API_HASH)
         if [ -n "${1}" ]; then
                 kconfig+=("${@}")
         fi
@@ -88,7 +88,7 @@ time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
 # packetdrill
 cd /opt/packetdrill/gtests/net/
 ./packetdrill/run_all.py -l -v mptcp/mp_capable 2>&1 | tee "${OUTPUT_PACKETDRILL}"
-# ./packetdrill/run_all.py -l -v mptcp/dss 2>&1 | tee -a "${OUTPUT_PACKETDRILL}"
+./packetdrill/run_all.py -l -v mptcp/dss 2>&1 | tee -a "${OUTPUT_PACKETDRILL}"
 
 # end
 echo "${VIRTME_SCRIPT_END}"
