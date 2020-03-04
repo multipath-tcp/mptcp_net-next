@@ -148,12 +148,16 @@ analyse() {
         fi
 
         # check selftests results
-        if grep -q "^ok [0-9]\+ selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SELFTESTS}"; then
-                echo "Selftests OK"
-        else
+        if grep -q "^not ok [0-9]\+ selftests: net/mptcp: " "${OUTPUT_SELFTESTS}"; then
                 echo "Error when launching selftests"
-                grep -A 9999 "^# selftests: \S*mptcp: mptcp_connect\.sh$" "${OUTPUT_SELFTESTS}"
+                local not_ok
+                for not_ok in $(grep "^not ok [0-9]\+ selftests: net/mptcp: *" "${OUTPUT_SELFTESTS}" | \
+                                sed "s/.*net\/mptcp: \(\S\+\).*/\1/"); do
+                        sed -n "/^# selftests: net\/mptcp: ${not_ok}$/,/^not ok [0-9]\+ selftests: net\/mptcp: ${not_ok} #/p" "${OUTPUT_SELFTESTS}"
+                done
                 exit 1
+        else
+                echo "Selftests OK"
         fi
 
         # check packetdrill results
