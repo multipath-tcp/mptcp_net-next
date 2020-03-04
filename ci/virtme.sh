@@ -33,6 +33,9 @@ OUTPUT_SELFTESTS=
 OUTPUT_VIRTME=
 OUTPUT_PACKETDRILL=
 
+CONNECT_MMAP_BEGIN="__CONNECT_MMAP_BEGIN__"
+CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
+
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
@@ -84,6 +87,11 @@ prepare() { local old_pwd
 # selftests
 time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${OUTPUT_SELFTESTS}"
+
+cd tools/testing/selftests/net/mptcp
+echo "${CONNECT_MMAP_BEGIN}" >> "${OUTPUT_SELFTESTS}"
+#{ ./mptcp_connect.sh -m mmap 2>&1 || echo "${CONNECT_MMAP_ERROR}" >> "${OUTPUT_SELFTESTS}"; } | \
+#        tee -a "${OUTPUT_SELFTESTS}"
 
 # packetdrill
 cd /opt/packetdrill/gtests/net/
@@ -158,6 +166,14 @@ analyse() {
                 exit 1
         else
                 echo "Selftests OK"
+        fi
+
+        if grep -q "${CONNECT_MMAP_ERROR}" "${OUTPUT_SELFTESTS}"; then
+                echo "Error with mptcp_connect.sh mmap"
+                sed -n "/^${CONNECT_MMAP_BEGIN}$/,/^${CONNECT_MMAP_ERROR}$/p" "${OUTPUT_SELFTESTS}"
+                exit 1
+        else
+                echo "mptcp_connect.sh mmap OK"
         fi
 
         # check packetdrill results
