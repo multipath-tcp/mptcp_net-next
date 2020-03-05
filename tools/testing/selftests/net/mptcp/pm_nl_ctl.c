@@ -30,7 +30,7 @@ static void syntax(char *argv[])
 	fprintf(stderr, "\tget <id>\n");
 	fprintf(stderr, "\tflush\n");
 	fprintf(stderr, "\tdump\n");
-	fprintf(stderr, "\taccept [<max>]\n");
+	fprintf(stderr, "\tlimits [<rcv addr max> <subflow max>]\n");
 	exit(0);
 }
 
@@ -501,7 +501,7 @@ int flush_addrs(int fd, int pm_family, int argc, char *argv[])
 	return 0;
 }
 
-static void print_accept(struct nlmsghdr *nh, int pm_family, int total_len)
+static void print_limits(struct nlmsghdr *nh, int pm_family, int total_len)
 {
 	struct rtattr *attrs;
 	uint32_t max;
@@ -520,11 +520,15 @@ static void print_accept(struct nlmsghdr *nh, int pm_family, int total_len)
 		attrs = (struct rtattr *) ((char *) NLMSG_DATA(nh) +
 					   GENL_HDRLEN);
 		while (RTA_OK(attrs, len)) {
-			if (attrs->rta_type != MPTCP_PM_ATTR_RCV_ADD_ADDRS)
+			int type = attrs->rta_type;
+
+			if (type != MPTCP_PM_ATTR_RCV_ADD_ADDRS &&
+			    type != MPTCP_PM_ATTR_SUBFLOWS)
 				goto next;
 
 			memcpy(&max, RTA_DATA(attrs), 4);
-			printf("accept %u\n", max);
+			printf("%s %u\n", type == MPTCP_PM_ATTR_SUBFLOWS ?
+					  "subflows": "accept", max);
 
 next:
 			attrs = RTA_NEXT(attrs, len);
@@ -532,22 +536,23 @@ next:
 	}
 }
 
-int get_set_accept(int fd, int pm_family, int argc, char *argv[])
+int get_set_limits(int fd, int pm_family, int argc, char *argv[])
 {
 	char data[NLMSG_ALIGN(sizeof(struct nlmsghdr)) +
 		  NLMSG_ALIGN(sizeof(struct genlmsghdr)) +
 		  1024];
+	uint32_t rcv_addr = 0, subflows = 0;
 	int cmd, len = sizeof(data);
 	struct nlmsghdr *nh;
-	uint32_t max = 0;
 	int off = 0;
 
 	/* limit */
-	if (argc == 3) {
-		max = atoi(argv[2]);
-		cmd = MPTCP_PM_CMD_SET_RCV_ADD_ADDRS;
+	if (argc == 4) {
+		rcv_addr = atoi(argv[2]);
+		subflows = atoi(argv[3]);
+		cmd = MPTCP_PM_CMD_SET_LIMITS;
 	} else {
-		cmd = MPTCP_PM_CMD_GET_RCV_ADD_ADDRS;
+		cmd = MPTCP_PM_CMD_GET_LIMITS;
 	}
 
 	memset(data, 0, sizeof(data));
@@ -555,20 +560,27 @@ int get_set_accept(int fd, int pm_family, int argc, char *argv[])
 	off = init_genl_req(data, pm_family, cmd, MPTCP_PM_VER);
 
 	/* limit */
-	if (cmd == MPTCP_PM_CMD_SET_RCV_ADD_ADDRS) {
+	if (cmd == MPTCP_PM_CMD_SET_LIMITS) {
 		struct rtattr *rta = (void *)(data + off);
 
 		rta->rta_type = MPTCP_PM_ATTR_RCV_ADD_ADDRS;
 		rta->rta_len = RTA_LENGTH(4);
-		memcpy(RTA_DATA(rta), &max, 4);
+		memcpy(RTA_DATA(rta), &rcv_addr, 4);
 		off += NLMSG_ALIGN(rta->rta_len);
-		cmd = MPTCP_PM_CMD_SET_RCV_ADD_ADDRS;
+
+		rta = (void *)(data + off);
+		rta->rta_type = MPTCP_PM_ATTR_SUBFLOWS;
+		rta->rta_len = RTA_LENGTH(4);
+		memcpy(RTA_DATA(rta), &subflows, 4);
+		off += NLMSG_ALIGN(rta->rta_len);
+
+		/* do not expect a reply */
 		len = 0;
 	}
 
 	len = do_nl_req(fd, nh, off, len);
-	if (cmd == MPTCP_PM_CMD_GET_RCV_ADD_ADDRS)
-		print_accept(nh, pm_family, len);
+	if (cmd == MPTCP_PM_CMD_GET_LIMITS)
+		print_limits(nh, pm_family, len);
 	return 0;
 }
 
@@ -595,8 +607,8 @@ int main(int argc, char *argv[])
 		return get_addr(fd, pm_family, argc, argv);
 	else if (!strcmp(argv[1], "dump"))
 		return dump_addrs(fd, pm_family, argc, argv);
-	else if (!strcmp(argv[1], "accept"))
-		return get_set_accept(fd, pm_family, argc, argv);
+	else if (!strcmp(argv[1], "limits"))
+		return get_set_limits(fd, pm_family, argc, argv);
 
 	fprintf(stderr, "unknown sub-command: %s", argv[1]);
 	syntax(argv);
