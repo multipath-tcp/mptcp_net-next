@@ -432,31 +432,30 @@ static bool mptcp_established_options_addr(struct sock *sk,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
-	struct sockaddr_storage saddr;
-	u8 id;
+	struct mptcp_addr_info saddr;
+	int len;
 
 	if (!msk)
 		return false;
 
-	id = 0;
-	memset(&saddr, 0, sizeof(saddr));
+	if (!mptcp_pm_should_signal(msk) ||
+	    !(mptcp_pm_addr_signal(msk, remaining, &saddr)))
+		return false;
 
-	if (saddr.ss_family == AF_INET) {
-		if (remaining < TCPOLEN_MPTCP_ADD_ADDR)
-			return false;
+	len = mptcp_add_addr_len(saddr.family);
+	if (remaining < len)
+		return false;
+
+	*size = len;
+	opts->addr_id = saddr.id;
+	if (saddr.family == AF_INET) {
 		opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
-		opts->addr_id = id;
-		opts->addr = ((struct sockaddr_in *)&saddr)->sin_addr;
-		*size = TCPOLEN_MPTCP_ADD_ADDR;
+		opts->addr = saddr.addr;
 	}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	else if (saddr.ss_family == AF_INET6) {
-		if (remaining < TCPOLEN_MPTCP_ADD_ADDR6)
-			return false;
+	else if (saddr.family == AF_INET6) {
 		opts->suboptions |= OPTION_MPTCP_ADD_ADDR6;
-		opts->addr_id = id;
-		opts->addr6 = ((struct sockaddr_in6 *)&saddr)->sin6_addr;
-		*size = TCPOLEN_MPTCP_ADD_ADDR6;
+		opts->addr6 = saddr.addr6;
 	}
 #endif
 
@@ -545,12 +544,32 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_options_received *mp_opt;
 	struct mptcp_ext *mpext;
 
 	mp_opt = &opt_rx->mptcp;
 	if (!check_fourth_ack(subflow, skb, mp_opt))
 		return;
+
+	if (msk && mp_opt->add_addr) {
+		struct mptcp_addr_info addr;
+
+		addr.port = 0;
+		addr.id = mp_opt->addr_id;
+		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4) {
+			addr.family = AF_INET;
+			addr.addr = mp_opt->addr;
+		}
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+		else if (mp_opt->family == MPTCP_ADDR_IPVERSION_6) {
+			addr.family = AF_INET6;
+			addr.addr6 = mp_opt->addr6;
+		}
+#endif
+		mptcp_pm_add_addr_received(msk, &addr);
+		mp_opt->add_addr = 0;
+	}
 
 	if (!mp_opt->dss)
 		return;
@@ -588,6 +607,9 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	}
 
 	mpext->data_fin = mp_opt->data_fin;
+
+	if (msk)
+		mptcp_pm_fully_established(msk);
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
