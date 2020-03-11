@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rename-fourth-ack-field
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: rename fourth ack field
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The name is misleading, it actually track the 'fully established'
+status.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
