@@ -577,37 +577,66 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 	return false;
 }
 
-static bool check_fully_established(struct mptcp_subflow_context *subflow,
+static bool check_fully_established(struct mptcp_sock *msk, struct sock *sk,
+				    struct mptcp_subflow_context *subflow,
 				    struct sk_buff *skb,
 				    struct mptcp_options_received *mp_opt)
 {
 	/* here we can process OoO, in-window pkts, only in-sequence 4th ack
-	 * are relevant
+	 * will make the subflow fully established
 	 */
-	if (likely(subflow->fully_established ||
-		   TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1))
-		return true;
-
-	if (mp_opt->use_ack) {
-		subflow->fully_established = 1;
-		if (subflow->mp_join)
-			mptcp_pm_subflow_established(mptcp_sk(subflow->conn),
-						     subflow);
+	if (likely(subflow->fully_established)) {
+		/* on passive sockets, check for 3rd ack retransmission
+		 * note that msk is always set by subflow_syn_recv_sock()
+		 * for mp_join subflows
+		 */
+		if (TCP_SKB_CB(skb)->seq == subflow->ssn_offset + 1 &&
+		    TCP_SKB_CB(skb)->end_seq == TCP_SKB_CB(skb)->seq &&
+		    subflow->mp_join && mp_opt->mp_join &&
+		    READ_ONCE(msk->pm.server_side))
+			tcp_send_ack(sk);
+		goto fully_established;
 	}
 
-	if (subflow->can_ack)
-		return true;
+	/* we should process OoO packets before the first subflow is fully
+	 * established, but not expected for MP_JOIN subflows
+	 */
+	if (TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1)
+		return subflow->mp_capable;
+
+	if (mp_opt->use_ack) {
+		/* subflows are fully established as soon as we get any
+		 * additional ack.
+		 */
+		subflow->fully_established = 1;
+		goto fully_established;
+	}
+
+	WARN_ON_ONCE(subflow->can_ack);
 
 	/* If the first established packet does not contain MP_CAPABLE + data
 	 * then fallback to TCP
 	 */
 	if (!mp_opt->mp_capable) {
 		subflow->mp_capable = 0;
-		tcp_sk(mptcp_subflow_tcp_sock(subflow))->is_mptcp = 0;
+		tcp_sk(sk)->is_mptcp = 0;
 		return false;
 	}
+
+	subflow->fully_established = 1;
 	subflow->remote_key = mp_opt->sndr_key;
 	subflow->can_ack = 1;
+
+fully_established:
+	/* msk can be null for MPC subflow on passive socket */
+	if (subflow->pm_notified || !msk)
+		return true;
+
+	subflow->pm_notified = 1;
+	if (subflow->mp_join)
+		mptcp_pm_subflow_established(msk, subflow);
+	else
+		mptcp_pm_fully_established(msk);
 	return true;
 }
 
@@ -620,7 +649,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	struct mptcp_ext *mpext;
 
 	mp_opt = &opt_rx->mptcp;
-	if (!check_fully_established(subflow, skb, mp_opt))
+	if (!check_fully_established(msk, sk, subflow, skb, mp_opt))
 		return;
 
 	if (msk && mp_opt->add_addr) {
@@ -678,9 +707,6 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	}
 
 	mpext->data_fin = mp_opt->data_fin;
-
-	if (msk)
-		mptcp_pm_fully_established(msk);
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
