@@ -236,6 +236,7 @@ struct mptcp_subflow_context {
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		mp_join : 1,	    /* remote is JOINing */
 		fully_established : 1,	    /* path validated */
+		pm_notified : 1,    /* PM hook called for established status */
 		conn_finished : 1,
 		map_valid : 1,
 		mpc_map : 1,
