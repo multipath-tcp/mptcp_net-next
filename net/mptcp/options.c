@@ -341,6 +341,38 @@ void mptcp_rcv_synsent(struct sock *sk)
 	}
 }
 
+/* MP_JOIN client subflow must wait for 4th ack before sending any data:
+ * TCP can't schedule delack timer before the subflow is fully established.
+ * MPTCP uses the delack timer to do 3rd ack retransmissions
+ */
+static void schedule_3rdack_retransmission(struct sock *sk)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
+	unsigned long timeout;
+
+	/* reschedule with a timeout above RTT, as we must look only for drop */
+	if (tp->srtt_us)
+		timeout = tp->srtt_us << 1;
+	else
+		timeout = TCP_TIMEOUT_INIT;
+
+	WARN_ON_ONCE(icsk->icsk_ack.pending & ICSK_ACK_TIMER);
+	icsk->icsk_ack.pending |= ICSK_ACK_SCHED | ICSK_ACK_TIMER;
+	icsk->icsk_ack.timeout = timeout;
+	sk_reset_timer(sk, &icsk->icsk_delack_timer, timeout);
+}
+
+static void clear_3rdack_retransmission(struct sock *sk)
+{
+	struct inet_connection_sock *icsk = inet_csk(sk);
+
+	sk_stop_timer(sk, &icsk->icsk_delack_timer);
+	icsk->icsk_ack.timeout = 0;
+	icsk->icsk_ack.ato = 0;
+	icsk->icsk_ack.pending &= ~(ICSK_ACK_SCHED | ICSK_ACK_TIMER);
+}
+
 static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 					 unsigned int *size,
 					 unsigned int remaining,
@@ -350,17 +382,21 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 	struct mptcp_ext *mpext;
 	unsigned int data_len;
 
-	pr_debug("subflow=%p fully established=%d seq=%x:%x remaining=%d",
-		 subflow, subflow->fully_established, subflow->snd_isn,
-		 skb ? TCP_SKB_CB(skb)->seq : 0, remaining);
+	/* When skb is not available, we better over-estimate the emitted
+	 * options len. A full DSS option (28 bytes) is longer than
+	 * TCPOLEN_MPTCP_MPC_ACK_DATA(22) or TCPOLEN_MPTCP_MPJ_ACK(24), so
+	 * tell the caller to defer the estimate to
+	 * mptcp_established_options_dss(), which will reserve enough space.
+	 */
+	if (!skb)
+		return false;
 
-	if (subflow->mp_capable && !subflow->fully_established && skb &&
-	    subflow->snd_isn == TCP_SKB_CB(skb)->seq) {
-		/* When skb is not available, we better over-estimate the
-		 * emitted options len. A full DSS option is longer than
-		 * TCPOLEN_MPTCP_MPC_ACK_DATA, so let's the caller try to fit
-		 * that.
-		 */
+	/* MPC/MPJ needed only on 3rd ack packet */
+	if (subflow->fully_established ||
+	    subflow->snd_isn != TCP_SKB_CB(skb)->seq)
+		return false;
+
+	if (subflow->mp_capable) {
 		mpext = mptcp_get_ext(skb);
 		data_len = mpext ? mpext->data_len : 0;
 
@@ -388,12 +424,13 @@ static bool mptcp_established_options_mp(struct sock *sk, struct sk_buff *skb,
 			 data_len);
 
 		return true;
-	} else if (subflow->mp_join && !subflow->fourth_ack) {
+	} else if (subflow->mp_join) {
 		opts->suboptions = OPTION_MPTCP_MPJ_ACK;
 		memcpy(opts->hmac, subflow->hmac, MPTCPOPT_HMAC_LEN);
 		*size = TCPOLEN_MPTCP_MPJ_ACK;
-		subflow->fourth_ack = 1;
 		pr_debug("subflow=%p", subflow);
+
+		schedule_3rdack_retransmission(sk);
 		return true;
 	}
 	return false;
@@ -633,10 +670,12 @@ fully_established:
 		return true;
 
 	subflow->pm_notified = 1;
-	if (subflow->mp_join)
+	if (subflow->mp_join) {
+		clear_3rdack_retransmission(sk);
 		mptcp_pm_subflow_established(msk, subflow);
-	else
+	} else {
 		mptcp_pm_fully_established(msk);
+	}
 	return true;
 }
 
