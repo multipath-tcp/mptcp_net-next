@@ -43,6 +43,12 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side)
 	WRITE_ONCE(pm->server_side, server_side);
 }
 
+bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
+{
+	pr_debug("msk=%p", msk);
+	return false;
+}
+
 static bool mptcp_pm_schedule_work(struct mptcp_sock *msk,
 				   enum mptcp_pm_status new_status)
 {
@@ -175,10 +181,11 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	msk->pm.add_addr_signaled = 0;
 	msk->pm.add_addr_accepted = 0;
 	msk->pm.local_addr_used = 0;
+	msk->pm.subflows = 0;
 	WRITE_ONCE(msk->pm.work_pending, false);
 	WRITE_ONCE(msk->pm.addr_signal, false);
-	WRITE_ONCE(msk->pm.fully_established, false);
 	WRITE_ONCE(msk->pm.accept_addr, false);
+	WRITE_ONCE(msk->pm.accept_subflow, false);
 	msk->pm.status = MPTCP_PM_IDLE;
 
 	spin_lock_init(&msk->pm.lock);
