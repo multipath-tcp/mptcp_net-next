@@ -1041,7 +1041,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 		 * is fully established only after we receive the remote key
 		 */
 		new_ctx->mp_capable = 1;
-		new_ctx->fourth_ack = subflow_req->remote_key_valid;
+		new_ctx->fully_established = subflow_req->remote_key_valid;
 		new_ctx->can_ack = subflow_req->remote_key_valid;
 		new_ctx->remote_key = subflow_req->remote_key;
 		new_ctx->local_key = subflow_req->local_key;
@@ -1051,7 +1051,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	} else if (subflow_req->mp_join) {
 		new_ctx->ssn_offset = subflow_req->ssn_offset;
 		new_ctx->mp_join = 1;
-		new_ctx->fourth_ack = 1;
+		new_ctx->fully_established = 1;
 		new_ctx->backup = subflow_req->backup;
 		new_ctx->local_id = subflow_req->local_id;
 		new_ctx->token = subflow_req->token;
