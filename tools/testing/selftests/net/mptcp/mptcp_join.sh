@@ -17,7 +17,6 @@ init()
 	capout=$(mktemp)
 
 	rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
-	nstat="/tmp/.nstat.$rndh"
 
 	ns1="ns1-$rndh"
 	ns2="ns2-$rndh"
@@ -53,7 +52,6 @@ init()
 cleanup_partial()
 {
 	rm -f "$capout"
-	rm -f "$nstat"
 
 	for netns in "$ns1" "$ns2"; do
 		ip netns del $netns
@@ -222,20 +220,50 @@ run_tests()
 chk_join_nr()
 {
 	local msg="$1"
-	local ns=$2
-	local nr=$3
+	local syn_nr=$2
+	local syn_ack_nr=$3
+	local ack_nr=$4
 	local count
+	local dump_stats
 
-	count=`NSTAT_HISTORY=$nstat ip netns exec $ns nstat |grep MPTcpExtMPJoinSynRx | awk '{print $2}'`
+	printf "%-36s %s" "$msg" "syn"
+	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtMPJoinSynRx | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	printf "%-50s %s" "$msg"
-	if [ "$count" != "$nr" ]; then
-		echo "[fail] got $count JOIN[s] expected $nr"
+	if [ "$count" != "$syn_nr" ]; then
+		echo "[fail] got $count JOIN[s] syn expected $syn_nr"
 		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - synack"
+	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtMPJoinSynAckRx | awk '{print $2}'`
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$syn_ack_nr" ]; then
+		echo "[fail] got $count JOIN[s] synack expected $syn_ack_nr"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - ack"
+	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtMPJoinAckRx | awk '{print $2}'`
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$ack_nr" ]; then
+		echo "[fail] got $count JOIN[s] ack expected $ack_nr"
+		ret=1
+		dump_stats=1
 	else
 		echo "[ ok ]"
 	fi
-
+	if [ "${dump_stats}" = 1 ]; then
+		echo Server ns stats
+		ip netns exec $ns1 nstat -as | grep MPTcp
+		echo Client ns stats
+		ip netns exec $ns2 nstat -as | grep MPTcp
+	fi
 }
 
 sin=$(mktemp)
@@ -248,49 +276,78 @@ make_file "$sin" "server"
 trap cleanup EXIT
 
 run_tests $ns1 $ns2 10.0.1.1
-chk_join_nr "no JOIN" $ns1 "0"
+chk_join_nr "no JOIN" "0" "0" "0"
+
+# subflow limted by client
+reset
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+run_tests $ns1 $ns2 10.0.1.1
+chk_join_nr "single subflow, limited by client" 0 0 0
+
+# subflow limted by server
+reset
+ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+run_tests $ns1 $ns2 10.0.1.1
+chk_join_nr "single subflow, limited by server" 1 1 0
 
 # subflow
 reset
+ip netns exec $ns1 ./pm_nl_ctl limits 0 1
+ip netns exec $ns2 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 run_tests $ns1 $ns2 10.0.1.1
-chk_join_nr "single subflow" $ns1 1
+chk_join_nr "single subflow" 1 1 1
 
 # multiple subflows
 reset
+ip netns exec $ns1 ./pm_nl_ctl limits 0 2
+ip netns exec $ns2 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
 run_tests $ns1 $ns2 10.0.1.1
-# chk_join_nr "multiple subflows" $ns1 2 # TODO: uncomment me when the bug is fixed
+chk_join_nr "multiple subflows" 2 2 2
+
+# multiple subflows limited by serverf
+reset
+ip netns exec $ns1 ./pm_nl_ctl limits 0 1
+ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+run_tests $ns1 $ns2 10.0.1.1
+chk_join_nr "multiple subflows, limited by server" 2 2 1
 
 # add_address, unused
 reset
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 run_tests $ns1 $ns2 10.0.1.1
-chk_join_nr "unused signal address" $ns1 0
+chk_join_nr "unused signal address" 0 0 0
 
 # accept and use add_addr
 reset
+ip netns exec $ns1 ./pm_nl_ctl limits 0 1
+ip netns exec $ns2 ./pm_nl_ctl limits 1 1
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-ip netns exec $ns2 ./pm_nl_ctl accept 1
 run_tests $ns1 $ns2 10.0.1.1
-chk_join_nr "signal address" $ns1 1
+chk_join_nr "signal address" 1 1 1
 
 # accept and use add_addr with an additional subflow
 reset
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-ip netns exec $ns2 ./pm_nl_ctl accept 1
+ip netns exec $ns1 ./pm_nl_ctl limits 0 2
+ip netns exec $ns2 ./pm_nl_ctl limits 1 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 run_tests $ns1 $ns2 10.0.1.1
-chk_join_nr "subflow and signal" $ns1 2
+chk_join_nr "subflow and signal" 2 2 2
 
-# accept and use add_addr with an additional subflows
+# accept and use add_addr with additional subflows
 reset
+ip netns exec $ns1 ./pm_nl_ctl limits 0 3
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-ip netns exec $ns2 ./pm_nl_ctl accept 1
+ip netns exec $ns2 ./pm_nl_ctl limits 1 3
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.2 flags signal
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 run_tests $ns1 $ns2 10.0.1.1
-# chk_join_nr "multiple subflows and signal" $ns1 3 # TODO: uncomment me when the bug is fixed
+chk_join_nr "multiple subflows and signal" 3 3 3
 
 exit $ret
