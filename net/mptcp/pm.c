@@ -45,8 +45,23 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side)
 
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 {
-	pr_debug("msk=%p", msk);
-	return false;
+	struct mptcp_pm_data *pm = &msk->pm;
+	int ret;
+
+	pr_debug("msk=%p subflows=%d max=%d allow=%d", msk, pm->subflows,
+		 pm->subflows_max, READ_ONCE(pm->accept_subflow));
+
+	/* try to avoid acquiring the lock below */
+	if (!READ_ONCE(pm->accept_subflow))
+		return false;
+
+	spin_lock_bh(&pm->lock);
+	ret = pm->subflows < pm->subflows_max;
+	if (ret && ++pm->subflows == pm->subflows_max)
+		WRITE_ONCE(pm->accept_subflow, false);
+	spin_unlock_bh(&pm->lock);
+
+	return ret;
 }
 
 static bool mptcp_pm_schedule_work(struct mptcp_sock *msk,
@@ -70,13 +85,13 @@ void mptcp_pm_fully_established(struct mptcp_sock *msk)
 	pr_debug("msk=%p", msk);
 
 	/* try to avoid acquiring the lock below */
-	if (READ_ONCE(pm->fully_established))
+	if (!READ_ONCE(pm->work_pending))
 		return;
 
 	spin_lock_bh(&pm->lock);
-	if (!READ_ONCE(pm->fully_established) &&
-	    mptcp_pm_schedule_work(msk, MPTCP_PM_ESTABLISHED))
-		WRITE_ONCE(pm->fully_established, true);
+
+	if (READ_ONCE(pm->work_pending))
+		mptcp_pm_schedule_work(msk, MPTCP_PM_ESTABLISHED);
 
 	spin_unlock_bh(&pm->lock);
 }
