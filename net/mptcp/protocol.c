@@ -1542,6 +1542,7 @@ bool mptcp_finish_join(struct sock *sk)
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct sock *parent = (void *)msk;
 	struct socket *parent_sock;
+	bool ret;
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
 
@@ -1553,12 +1554,15 @@ bool mptcp_finish_join(struct sock *sk)
 	if (parent_sock && !sk->sk_socket) {
 		mptcp_sock_graft(sk, parent_sock);
 
-		/* active connections are already on conn_list */
-		spin_lock_bh(&msk->join_list_lock);
-		if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
-			list_add_tail(&subflow->node, &msk->join_list);
-		spin_unlock_bh(&msk->join_list_lock);
-		return mptcp_pm_allow_new_subflow(msk);
+		ret = mptcp_pm_allow_new_subflow(msk);
+		if (ret) {
+			/* active connections are already on conn_list */
+			spin_lock_bh(&msk->join_list_lock);
+			if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
+				list_add_tail(&subflow->node, &msk->join_list);
+			spin_unlock_bh(&msk->join_list_lock);
+		}
+		return ret;
 	}
 	return true;
 }
