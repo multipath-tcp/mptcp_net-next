@@ -199,7 +199,7 @@ struct mptcp_subflow_context {
 		request_bkup : 1,
 		mp_capable : 1,	    /* remote is MPTCP capable */
 		mp_join : 1,	    /* remote is JOINing */
-		fourth_ack : 1,	    /* send initial DSS */
+		fully_established : 1,	    /* path validated */
 		conn_finished : 1,
 		map_valid : 1,
 		mpc_map : 1,
