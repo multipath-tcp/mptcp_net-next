@@ -43,8 +43,8 @@ static int subflow_get_info(const struct sock *sk, struct sk_buff *skb)
 		flags |= MPTCP_SUBFLOW_FLAG_BKUP_REM;
 	if (sf->request_bkup)
 		flags |= MPTCP_SUBFLOW_FLAG_BKUP_LOC;
-	if (sf->fourth_ack)
-		flags |= MPTCP_SUBFLOW_FLAG_4THACK;
+	if (sf->fully_established)
+		flags |= MPTCP_SUBFLOW_FLAG_FULLY_ESTABLISHED;
 	if (sf->conn_finished)
 		flags |= MPTCP_SUBFLOW_FLAG_CONNECTED;
 	if (sf->map_valid)
