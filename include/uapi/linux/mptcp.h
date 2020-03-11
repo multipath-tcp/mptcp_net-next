@@ -40,7 +40,7 @@ enum {
 /*
  * ATTR types defined for MPTCP
  */
-enum mptcp_pm_attrs {
+enum {
 	MPTCP_PM_ATTR_UNSPEC,
 
 	MPTCP_PM_ATTR_ADDR,				/* nested address */
@@ -52,7 +52,7 @@ enum mptcp_pm_attrs {
 
 #define MPTCP_PM_ATTR_MAX (__MPTCP_PM_ATTR_MAX - 1)
 
-enum mptcp_pm_addr_addrs {
+enum {
 	MPTCP_PM_ADDR_ATTR_UNSPEC,
 
 	MPTCP_PM_ADDR_ATTR_FAMILY,			/* u16 */
