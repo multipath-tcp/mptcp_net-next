@@ -118,15 +118,17 @@ struct mptcp_pm_data {
 
 	bool		addr_signal;
 	bool		server_side;
-	bool		fully_established;
 	bool		work_pending;
 	bool		accept_addr;
+	bool		accept_subflow;
 	u8		add_addr_signaled;
 	u8		add_addr_accepted;
 	u8		local_addr_used;
+	u8		subflows;
 	u8		add_addr_signal_max;
 	u8		add_addr_accept_max;
 	u8		local_addr_max;
+	u8		subflows_max;
 	enum mptcp_pm_status status;
 
 	struct		work_struct work;
@@ -357,6 +359,7 @@ void mptcp_pm_init(void);
 void mptcp_pm_data_init(struct mptcp_sock *msk);
 void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side);
 void mptcp_pm_fully_established(struct mptcp_sock *msk);
+bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk);
 void mptcp_pm_connection_closed(struct mptcp_sock *msk);
 void mptcp_pm_subflow_established(struct mptcp_sock *msk,
 				  struct mptcp_subflow_context *subflow);
