@@ -1362,9 +1362,10 @@ bool mptcp_finish_join(struct sock *sk)
 		return false;
 
 	parent_sock = READ_ONCE(parent->sk_socket);
-	if (parent_sock) {
-		if (!sk->sk_socket)
-			mptcp_sock_graft(sk, parent_sock);
+	if (parent_sock && !sk->sk_socket) {
+		/* passive connection, attach to msk socket */
+		mptcp_sock_graft(sk, parent_sock);
+		return mptcp_pm_allow_new_subflow(msk);
 	}
 	return true;
 }
