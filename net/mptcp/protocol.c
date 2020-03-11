@@ -1558,6 +1558,7 @@ bool mptcp_finish_join(struct sock *sk)
 		if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
 			list_add_tail(&subflow->node, &msk->join_list);
 		spin_unlock_bh(&msk->join_list_lock);
+		return mptcp_pm_allow_new_subflow(msk);
 	}
 	return true;
 }
