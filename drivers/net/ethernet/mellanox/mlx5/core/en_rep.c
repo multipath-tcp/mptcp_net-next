@@ -1607,6 +1607,7 @@ static int mlx5e_create_rep_root_ft(struct mlx5e_priv *priv)
 	}
 
 	ft_attr.max_fte = 0; /* Empty table, miss rule will always point to next table */
+	ft_attr.prio = 1;
 	ft_attr.level = 1;
 
 	rpriv->root_ft = mlx5_create_flow_table(ns, &ft_attr);
@@ -1952,7 +1953,7 @@ static const struct mlx5e_profile mlx5e_rep_profile = {
 	.update_rx		= mlx5e_update_rep_rx,
 	.update_stats           = mlx5e_update_ndo_stats,
 	.rx_handlers.handle_rx_cqe       = mlx5e_handle_rx_cqe_rep,
-	.rx_handlers.handle_rx_cqe_mpwqe = mlx5e_handle_rx_cqe_mpwrq,
+	.rx_handlers.handle_rx_cqe_mpwqe = mlx5e_handle_rx_cqe_mpwrq_rep,
 	.max_tc			= 1,
 	.rq_groups		= MLX5E_NUM_RQ_GROUPS(REGULAR),
 	.stats_grps		= mlx5e_rep_stats_grps,
@@ -1972,7 +1973,7 @@ static const struct mlx5e_profile mlx5e_uplink_rep_profile = {
 	.update_stats           = mlx5e_update_ndo_stats,
 	.update_carrier	        = mlx5e_update_carrier,
 	.rx_handlers.handle_rx_cqe       = mlx5e_handle_rx_cqe_rep,
-	.rx_handlers.handle_rx_cqe_mpwqe = mlx5e_handle_rx_cqe_mpwrq,
+	.rx_handlers.handle_rx_cqe_mpwqe = mlx5e_handle_rx_cqe_mpwrq_rep,
 	.max_tc			= MLX5E_MAX_NUM_TC,
 	.rq_groups		= MLX5E_NUM_RQ_GROUPS(REGULAR),
 	.stats_grps		= mlx5e_ul_rep_stats_grps,
