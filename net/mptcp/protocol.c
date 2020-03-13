@@ -703,6 +703,8 @@ static int __mptcp_init_sock(struct sock *sk)
 	msk->first = NULL;
 	inet_csk(sk)->icsk_sync_mss = mptcp_sync_mss;
 
+	mptcp_pm_data_init(msk);
+
 	return 0;
 }
 
@@ -885,6 +887,8 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 
 		mptcp_token_update_accept(newsk, new_mptcp_sock);
 
+		mptcp_pm_new_connection(msk, 1);
+
 		msk->write_seq = subflow->idsn + 1;
 		if (subflow->can_ack) {
 			msk->can_ack = true;
@@ -1053,6 +1057,8 @@ void mptcp_finish_connect(struct sock *ssk)
 		inet_sk_state_store(sk, TCP_ESTABLISHED);
 		sk->sk_state_change(sk);
 	}
+
+	mptcp_pm_new_connection(msk, 0);
 }
 
 static void mptcp_sock_graft(struct sock *sk, struct socket *parent)
@@ -1377,6 +1383,7 @@ void mptcp_proto_init(void)
 	mptcp_prot.h.hashinfo = tcp_prot.h.hashinfo;
 
 	mptcp_subflow_init();
+	mptcp_pm_init();
 
 	if (proto_register(&mptcp_prot, 1) != 0)
 		panic("Failed to register MPTCP proto.\n");
