@@ -2434,7 +2434,7 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err,
 							       in_skb->len))
 				WARN_ON(nla_put_u32(skb, NLMSGERR_ATTR_OFFS,
 						    (u8 *)extack->bad_attr -
-						    in_skb->data));
+						    (u8 *)nlh));
 		} else {
 			if (extack->cookie_len)
 				WARN_ON(nla_put(skb, NLMSGERR_ATTR_COOKIE,
@@ -2583,6 +2583,7 @@ static void *__netlink_seq_next(struct seq_file *seq)
 }
 
 static void *netlink_seq_start(struct seq_file *seq, loff_t *posp)
+	__acquires(RCU)
 {
 	struct nl_seq_iter *iter = seq->private;
 	void *obj = SEQ_START_TOKEN;
