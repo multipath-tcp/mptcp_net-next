@@ -1020,6 +1020,7 @@ static void mptcp_worker(struct work_struct *work)
 		if (ret < 0)
 			break;
 
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RETRANSSEGS);
 		copied += ret;
 		dfrag->data_len -= ret;
 		dfrag->offset += ret;
@@ -1316,7 +1317,12 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		 */
 		inet_sk_state_store(new_mptcp_sock, TCP_SYN_RECV);
 		bh_unlock_sock(new_mptcp_sock);
+
+		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
 		local_bh_enable();
+	} else {
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
 	return newsk;
@@ -1437,12 +1443,14 @@ void mptcp_finish_connect(struct sock *ssk)
 	u64 ack_seq;
 
 	subflow = mptcp_subflow_ctx(ssk);
-
-	if (!subflow->mp_capable)
-		return;
-
 	sk = subflow->conn;
 	msk = mptcp_sk(sk);
+
+	if (!subflow->mp_capable) {
+		MPTCP_INC_STATS(sock_net(sk),
+				MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
+		return;
+	}
 
 	pr_debug("msk=%p, token=%u", sk, subflow->token);
 
