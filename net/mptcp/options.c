@@ -597,6 +597,30 @@ static bool check_fully_established(struct mptcp_subflow_context *subflow,
 	return true;
 }
 
+static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
+				struct mptcp_options_received *mp_opt)
+{
+	u64 hmac;
+
+	if (mp_opt->echo)
+		return true;
+
+	if (mp_opt->family == MPTCP_ADDR_IPVERSION_4)
+		hmac = add_addr_generate_hmac(subflow->remote_key,
+					      subflow->local_key,
+					      mp_opt->addr_id, &mp_opt->addr);
+	else
+		hmac = add_addr6_generate_hmac(subflow->remote_key,
+					       subflow->local_key,
+					       mp_opt->addr_id, &mp_opt->addr6);
+
+	pr_debug("subflow=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
+		 subflow, (unsigned long long)hmac,
+		 (unsigned long long)mp_opt->ahmac);
+
+	return hmac == mp_opt->ahmac;
+}
+
 void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			    struct tcp_options_received *opt_rx)
 {
@@ -609,7 +633,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	if (!check_fully_established(subflow, skb, mp_opt))
 		return;
 
-	if (msk && mp_opt->add_addr) {
+	if (msk && mp_opt->add_addr && add_addr_hmac_valid(subflow, mp_opt)) {
 		struct mptcp_addr_info addr;
 
 		addr.port = 0;
@@ -624,7 +648,8 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 			addr.addr6 = mp_opt->addr6;
 		}
 #endif
-		mptcp_pm_add_addr_received(msk, &addr);
+		if (!mp_opt->echo)
+			mptcp_pm_add_addr_received(msk, &addr);
 		mp_opt->add_addr = 0;
 	}
 
