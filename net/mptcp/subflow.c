@@ -343,6 +343,12 @@ out:
 	if (unlikely(new_msk))
 		sock_put(new_msk);
 	return child;
+
+close_child:
+	tcp_send_active_reset(child, GFP_ATOMIC);
+	inet_csk_prepare_forced_close(child);
+	tcp_done(child);
+	return NULL;
 }
 
 static struct inet_connection_sock_af_ops subflow_specific;
