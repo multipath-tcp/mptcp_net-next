@@ -42,6 +42,8 @@ struct mptcp_out_options {
 #endif
 	};
 	u8 addr_id;
+	u64 ahmac;
+	u8 rm_id;
 	u8 join_id;
 	u8 backup;
 	u32 nonce;
