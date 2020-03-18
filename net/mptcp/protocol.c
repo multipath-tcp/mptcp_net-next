@@ -1288,6 +1288,9 @@ struct sock *mptcp_sk_clone(const struct sock *sk, struct request_sock *req)
 		ack_seq++;
 		msk->ack_seq = ack_seq;
 	}
+
+	/* will be fully established after successful MPC subflow creation */
+	inet_sk_state_store(nsk, TCP_SYN_RECV);
 	bh_unlock_sock(nsk);
 
 	/* keep a single reference */
@@ -1345,10 +1348,6 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 		mptcp_copy_inaddrs(newsk, ssk);
 		list_add(&subflow->node, &msk->conn_list);
 
-		/* will be fully established at mptcp_stream_accept()
-		 * completion.
-		 */
-		inet_sk_state_store(new_mptcp_sock, TCP_SYN_RECV);
 		bh_unlock_sock(new_mptcp_sock);
 
 		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEPASSIVEACK);
@@ -1740,8 +1739,6 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 			if (!ssk->sk_socket)
 				mptcp_sock_graft(ssk, newsock);
 		}
-
-		inet_sk_state_store(newsock->sk, TCP_ESTABLISHED);
 	}
 
 	sock_put(ssock->sk);
