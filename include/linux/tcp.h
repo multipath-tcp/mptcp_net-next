@@ -92,7 +92,7 @@ struct mptcp_options_received {
 		add_addr : 1,
 		rm_addr : 1,
 		family : 4,
-		echo : 1;
+		echo : 1,
 		backup : 1;
 	u32	token;
 	u32	nonce;
