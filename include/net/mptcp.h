@@ -40,6 +40,8 @@ struct mptcp_out_options {
 #endif
 	};
 	u8 addr_id;
+	u64 ahmac;
+	u8 rm_id;
 	struct mptcp_ext ext_copy;
 #endif
 };
