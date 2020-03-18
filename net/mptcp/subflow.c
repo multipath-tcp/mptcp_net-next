@@ -194,9 +194,9 @@ static bool subflow_thmac_valid(struct mptcp_subflow_context *subflow)
 	u8 hmac[MPTCPOPT_HMAC_LEN];
 	u64 thmac;
 
-	mptcp_crypto_hmac_sha(subflow->remote_key, subflow->local_key,
+	subflow_generate_hmac(subflow->remote_key, subflow->local_key,
 			      subflow->remote_nonce, subflow->local_nonce,
-			      (u32 *)hmac);
+			      hmac);
 
 	thmac = get_unaligned_be64(hmac);
 	pr_debug("subflow=%p, token=%u, thmac=%llu, subflow->thmac=%llu\n",
@@ -235,10 +235,10 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			goto do_reset;
 		}
 
-		mptcp_crypto_hmac_sha(subflow->local_key, subflow->remote_key,
+		subflow_generate_hmac(subflow->local_key, subflow->remote_key,
 				      subflow->local_nonce,
 				      subflow->remote_nonce,
-				      (u32 *)subflow->hmac);
+				      subflow->hmac);
 
 		if (skb)
 			subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
