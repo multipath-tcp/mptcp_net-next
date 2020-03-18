@@ -350,8 +350,7 @@ static inline void mptcp_crypto_key_gen_sha(u64 *key, u32 *token, u64 *idsn)
 	mptcp_crypto_key_sha(*key, token, idsn);
 }
 
-void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
-			   void *hash_out);
+void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u8 *msg, int len, void *hmac);
 
 void mptcp_pm_init(void);
 void mptcp_pm_data_init(struct mptcp_sock *msk);
