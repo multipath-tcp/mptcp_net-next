@@ -33,8 +33,9 @@ init()
 	# ns1eth1    ns2eth1
 	# ns1eth2    ns2eth2
 	# ns1eth3    ns2eth3
+	# ns1eth4    ns2eth4
 
-	for i in `seq 1 3`; do
+	for i in `seq 1 4`; do
 		ip link add ns1eth$i netns "$ns1" type veth peer name ns2eth$i netns "$ns2"
 		ip -net "$ns1" addr add 10.0.$i.1/24 dev ns1eth$i
 		ip -net "$ns1" addr add dead:beef:$i::1/64 dev ns1eth$i nodad
@@ -332,6 +333,9 @@ run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "signal address" 1 1 1
 
 # accept and use add_addr with an additional subflow
+# note: signal address in server ns and local addresses in client ns must
+# belong to different subnets or one of the listed local address could be
+# used for 'add_addr' subflow
 reset
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns1 ./pm_nl_ctl limits 0 2
@@ -345,8 +349,8 @@ reset
 ip netns exec $ns1 ./pm_nl_ctl limits 0 3
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
 run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "multiple subflows and signal" 3 3 3
 
