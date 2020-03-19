@@ -268,7 +268,7 @@ static size_t do_rnd_write(const int fd, char *buf, const size_t len)
 
 	/* let the join handshake complete, before going on */
 	if (cfg_join && first) {
-		sleep(1);
+		usleep(200000);
 		first = false;
 	}
 
@@ -396,8 +396,11 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd)
 					break;
 
 				/* ... but we still receive.
-				 * Close our write side.
+				 * Close our write side, ev. give some time
+				 * for address notification
 				 */
+				if (cfg_join)
+					usleep(400000);
 				shutdown(peerfd, SHUT_WR);
 			} else {
 				if (errno == EINTR)
@@ -413,6 +416,10 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd)
 			return 5;
 		}
 	}
+
+	/* leave some time for late join/announce */
+	if (cfg_join)
+		usleep(400000);
 
 	close(peerfd);
 	return 0;
