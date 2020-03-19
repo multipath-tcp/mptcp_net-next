@@ -602,7 +602,7 @@ static bool check_fully_established(struct mptcp_subflow_context *subflow,
 static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
 				struct mptcp_options_received *mp_opt)
 {
-	u64 hmac;
+	u64 hmac = 0;
 
 	if (mp_opt->echo)
 		return true;
@@ -611,10 +611,12 @@ static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
 		hmac = add_addr_generate_hmac(subflow->remote_key,
 					      subflow->local_key,
 					      mp_opt->addr_id, &mp_opt->addr);
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else
 		hmac = add_addr6_generate_hmac(subflow->remote_key,
 					       subflow->local_key,
 					       mp_opt->addr_id, &mp_opt->addr6);
+#endif
 
 	pr_debug("subflow=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
 		 subflow, (unsigned long long)hmac,
