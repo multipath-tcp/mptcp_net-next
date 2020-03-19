@@ -457,6 +457,7 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 	return get_unaligned_be64(hmac);
 }
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static u64 add_addr6_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 				   struct in6_addr *addr)
 {
@@ -472,6 +473,7 @@ static u64 add_addr6_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 
 	return get_unaligned_be64(hmac);
 }
+#endif
 
 static bool mptcp_established_options_addr(struct sock *sk,
 					   unsigned int *size,
