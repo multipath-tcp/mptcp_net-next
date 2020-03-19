@@ -64,18 +64,21 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 	return ret;
 }
 
+/* return true if the new status bit is currenty cleared, that is, this event
+ * can be server, eventually by an already scheduled work
+ */
 static bool mptcp_pm_schedule_work(struct mptcp_sock *msk,
 				   enum mptcp_pm_status new_status)
 {
-	if (msk->pm.status != MPTCP_PM_IDLE)
+	pr_debug("msk=%p status=%x new=%lx", msk, msk->pm.status,
+		 BIT(new_status));
+	if (msk->pm.status & BIT(new_status))
 		return false;
 
-	if (queue_work(pm_wq, &msk->pm.work)) {
-		msk->pm.status = new_status;
+	msk->pm.status |= BIT(new_status);
+	if (queue_work(pm_wq, &msk->pm.work))
 		sock_hold((struct sock *)msk);
-		return true;
-	}
-	return false;
+	return true;
 }
 
 void mptcp_pm_fully_established(struct mptcp_sock *msk)
@@ -183,23 +186,25 @@ static void pm_worker(struct work_struct *work)
 	struct mptcp_sock *msk = container_of(pm, struct mptcp_sock, pm);
 	struct sock *sk = (struct sock *)msk;
 
-	switch (READ_ONCE(pm->status)) {
-	case MPTCP_PM_ADD_ADDR_RECEIVED:
+	lock_sock(sk);
+	spin_lock_bh(&msk->pm.lock);
+
+	pr_debug("msk=%p status=%x", msk, pm->status);
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_RECEIVED);
 		mptcp_pm_nl_add_addr_received(msk);
-		break;
-
-	case MPTCP_PM_ESTABLISHED:
+	}
+	if (pm->status & BIT(MPTCP_PM_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_ESTABLISHED);
 		mptcp_pm_nl_fully_established(msk);
-		break;
-
-	case MPTCP_PM_SUBFLOW_ESTABLISHED:
+	}
+	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
 		mptcp_pm_nl_subflow_established(msk);
-		break;
-
-	default:
-		break;
 	}
 
+	spin_unlock_bh(&msk->pm.lock);
+	release_sock(sk);
 	sock_put(sk);
 }
 
@@ -213,12 +218,18 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	WRITE_ONCE(msk->pm.addr_signal, false);
 	WRITE_ONCE(msk->pm.accept_addr, false);
 	WRITE_ONCE(msk->pm.accept_subflow, false);
-	msk->pm.status = MPTCP_PM_IDLE;
+	msk->pm.status = 0;
 
 	spin_lock_init(&msk->pm.lock);
 	INIT_WORK(&msk->pm.work, pm_worker);
 
 	mptcp_pm_nl_data_init(msk);
+}
+
+void mptcp_pm_close(struct mptcp_sock *msk)
+{
+	if (cancel_work_sync(&msk->pm.work))
+		sock_put((struct sock *)msk);
 }
 
 void mptcp_pm_init(void)
