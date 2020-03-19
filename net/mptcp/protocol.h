@@ -110,7 +110,6 @@ struct mptcp_addr_info {
 };
 
 enum mptcp_pm_status {
-	MPTCP_PM_IDLE,
 	MPTCP_PM_ADD_ADDR_RECEIVED,
 	MPTCP_PM_ESTABLISHED,
 	MPTCP_PM_SUBFLOW_ESTABLISHED,
@@ -135,7 +134,7 @@ struct mptcp_pm_data {
 	u8		add_addr_accept_max;
 	u8		local_addr_max;
 	u8		subflows_max;
-	enum mptcp_pm_status status;
+	u8		status;
 
 	struct		work_struct work;
 };
@@ -329,6 +328,7 @@ void mptcp_crypto_hmac_sha(u64 key1, u64 key2, u8 *msg, int len, void *hmac);
 
 void mptcp_pm_init(void);
 void mptcp_pm_data_init(struct mptcp_sock *msk);
+void mptcp_pm_close(struct mptcp_sock *msk);
 void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side);
 void mptcp_pm_fully_established(struct mptcp_sock *msk);
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk);
