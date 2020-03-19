@@ -176,13 +176,10 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 
-	lock_sock(sk);
-
-	spin_lock_bh(&msk->pm.lock);
-	msk->pm.status = MPTCP_PM_IDLE;
-	pr_debug("local %d:%d signal %d:%d\n",
+	pr_debug("local %d:%d signal %d:%d subflows %d:%d\n",
 		 msk->pm.local_addr_used, msk->pm.local_addr_max,
-		 msk->pm.add_addr_signaled, msk->pm.add_addr_signal_max);
+		 msk->pm.add_addr_signaled, msk->pm.add_addr_signal_max,
+		 msk->pm.subflows, msk->pm.subflows_max);
 
 	/* check first for announce */
 	if (msk->pm.add_addr_signaled < msk->pm.add_addr_signal_max) {
@@ -190,7 +187,7 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 					      msk->pm.add_addr_signaled);
 
 		if (local) {
-			msk->pm.local_addr_used++;
+			msk->pm.add_addr_signaled++;
 			mptcp_pm_announce_addr(msk, &local->addr);
 		} else {
 			/* pick failed, avoid fourther attempts later */
@@ -213,7 +210,7 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 			spin_unlock_bh(&msk->pm.lock);
 			__mptcp_subflow_connect(sk, local->ifindex,
 						&local->addr, &remote);
-			release_sock(sk);
+			spin_lock_bh(&msk->pm.lock);
 			return;
 		}
 
@@ -221,9 +218,6 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 		msk->pm.local_addr_used = msk->pm.local_addr_max;
 		check_work_pending(msk);
 	}
-
-	spin_unlock_bh(&msk->pm.lock);
-	release_sock(sk);
 }
 
 void mptcp_pm_nl_fully_established(struct mptcp_sock *msk)
@@ -245,8 +239,6 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 
-	spin_lock_bh(&msk->pm.lock);
-	msk->pm.status = MPTCP_PM_IDLE;
 	pr_debug("accepted %d:%d remote family %d",
 		 msk->pm.add_addr_accepted, msk->pm.add_addr_accept_max,
 		 msk->pm.remote.family);
@@ -264,11 +256,10 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 		remote.port = sk->sk_dport;
 	memset(&local, 0, sizeof(local));
 	local.family = remote.family;
-	spin_unlock_bh(&msk->pm.lock);
 
-	lock_sock(sk);
+	spin_unlock_bh(&msk->pm.lock);
 	__mptcp_subflow_connect((struct sock *)msk, 0, &local, &remote);
-	release_sock(sk);
+	spin_lock_bh(&msk->pm.lock);
 }
 
 static bool address_use_port(struct mptcp_pm_addr_entry *entry)
