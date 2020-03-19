@@ -550,6 +550,7 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 	return get_unaligned_be64(hmac);
 }
 
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static u64 add_addr6_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 				   struct in6_addr *addr)
 {
@@ -565,6 +566,7 @@ static u64 add_addr6_generate_hmac(u64 key1, u64 key2, u8 addr_id,
 
 	return get_unaligned_be64(hmac);
 }
+#endif
 
 static bool mptcp_established_options_addr(struct sock *sk,
 					   unsigned int *size,
@@ -779,7 +781,7 @@ static void update_una(struct mptcp_sock *msk,
 static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
 				struct mptcp_options_received *mp_opt)
 {
-	u64 hmac;
+	u64 hmac = 0;
 
 	if (mp_opt->echo)
 		return true;
@@ -788,10 +790,12 @@ static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
 		hmac = add_addr_generate_hmac(subflow->remote_key,
 					      subflow->local_key,
 					      mp_opt->addr_id, &mp_opt->addr);
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else
 		hmac = add_addr6_generate_hmac(subflow->remote_key,
 					       subflow->local_key,
 					       mp_opt->addr_id, &mp_opt->addr6);
+#endif
 
 	pr_debug("subflow=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
 		 subflow, (unsigned long long)hmac,
