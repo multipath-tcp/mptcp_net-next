@@ -1046,6 +1046,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	}
 
 	mptcp_cancel_work(sk);
+	mptcp_pm_close(msk);
 
 	__skb_queue_purge(&sk->sk_receive_queue);
 
