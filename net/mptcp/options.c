@@ -839,7 +839,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	/* we can't wait for recvmsg() to update the ack_seq, otherwise
 	 * monodirectional flows will stuck
 	 */
-	if (msk && mp_opt->use_ack)
+	if (mp_opt->use_ack)
 		update_una(msk, mp_opt);
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
