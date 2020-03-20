@@ -1586,21 +1586,23 @@ bool mptcp_finish_join(struct sock *sk)
 	if (inet_sk_state_load(parent) != TCP_ESTABLISHED)
 		return false;
 
+	if (!msk->pm.server_side)
+		return true;
+
+	/* passive connection, attach to msk socket */
 	parent_sock = READ_ONCE(parent->sk_socket);
-	if (parent_sock && !sk->sk_socket) {
+	if (parent_sock && !sk->sk_socket)
 		mptcp_sock_graft(sk, parent_sock);
 
-		ret = mptcp_pm_allow_new_subflow(msk);
-		if (ret) {
-			/* active connections are already on conn_list */
-			spin_lock_bh(&msk->join_list_lock);
-			if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
-				list_add_tail(&subflow->node, &msk->join_list);
-			spin_unlock_bh(&msk->join_list_lock);
-		}
-		return ret;
+	ret = mptcp_pm_allow_new_subflow(msk);
+	if (ret) {
+		/* active connections are already on conn_list */
+		spin_lock_bh(&msk->join_list_lock);
+		if (!WARN_ON_ONCE(!list_empty(&subflow->node)))
+			list_add_tail(&subflow->node, &msk->join_list);
+		spin_unlock_bh(&msk->join_list_lock);
 	}
-	return true;
+	return ret;
 }
 
 bool mptcp_sk_is_subflow(const struct sock *sk)
