@@ -1072,6 +1072,7 @@ static void mptcp_worker(struct work_struct *work)
 
 	lock_sock(sk);
 	mptcp_clean_una(sk);
+	__mptcp_flush_join_list(msk);
 	__mptcp_move_skbs(msk);
 
 	if (test_and_clear_bit(MPTCP_WORK_EOF, &msk->flags))
