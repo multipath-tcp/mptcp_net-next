@@ -661,8 +661,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *sk,
 	subflow->can_ack = 1;
 
 fully_established:
-	/* msk can be null for MPC subflow on passive socket */
-	if (subflow->pm_notified || !msk)
+	if (likely(subflow->pm_notified))
 		return true;
 
 	subflow->pm_notified = 1;
