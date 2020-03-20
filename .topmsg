@@ -2,7 +2,7 @@ From: Paolo Abeni <pabeni@redhat.com>
 Subject: [PATCH] mptcp: update per unacked sequence on pkt reception
 
 So that we keep per unacked sequence number consistent; since
-we update per msk data, use an atomic64 cmpxcgh() to protect
+we update per msk data, use an atomic64 cmpxchg() to protect
 against concurrent updates from multiple subflows.
 
 Initialize the snd_una at connect()/accept() time.
