@@ -827,7 +827,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	if (mp_opt->add_addr && add_addr_hmac_valid(msk, mp_opt)) {
 		struct mptcp_addr_info addr;
 
-		addr.port = 0;
+		addr.port = htons(mp_opt->port);
 		addr.id = mp_opt->addr_id;
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4) {
 			addr.family = AF_INET;
