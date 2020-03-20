@@ -2,7 +2,7 @@ From: Paolo Abeni <pabeni@redhat.com>
 Subject: [PATCH] mptcp: implement and use MPTCP-level retransmission
 
 On timeout event, schedule a work queue to do the retransmission.
-Retransmission code resemple closely sendmsg() implementation and
+Retransmission code closely resembles the sendmsg() implementation and
 re-uses mptcp_sendmsg_frag, providing a dummy msghdr - for flags'
 sake - and peeking the relevant dfrag from the rtx head.
 
