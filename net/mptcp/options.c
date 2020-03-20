@@ -692,8 +692,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 
 	mpext->data_fin = mp_opt->data_fin;
 
-	if (msk)
-		mptcp_pm_fully_established(msk);
+	mptcp_pm_fully_established(msk);
 }
 
 void mptcp_write_options(__be32 *ptr, struct mptcp_out_options *opts)
