@@ -1118,13 +1118,15 @@ bool mptcp_finish_join(struct sock *sk)
 	if (inet_sk_state_load(parent) != TCP_ESTABLISHED)
 		return false;
 
+	if (!msk->pm.server_side)
+		return true;
+
+	/* passive connection, attach to msk socket */
 	parent_sock = READ_ONCE(parent->sk_socket);
-	if (parent_sock && !sk->sk_socket) {
-		/* passive connection, attach to msk socket */
+	if (parent_sock && !sk->sk_socket)
 		mptcp_sock_graft(sk, parent_sock);
-		return mptcp_pm_allow_new_subflow(msk);
-	}
-	return true;
+
+	return mptcp_pm_allow_new_subflow(msk);
 }
 
 bool mptcp_sk_is_subflow(const struct sock *sk)
