@@ -6,10 +6,15 @@ the primary connection is fully established and a remote
 address has been received via ADD_ADDR.
 
 Create an in-kernel sock and use kernel_connect() to
-initiate connection. When a valid SYN-ACK is received the
-new sock is added to the tail of the mptcp sock conn_list
-where it will not interfere with data flow on the original
-connection.
+initiate connection.
+
+Passive sockets can't acquire the mptcp socket lock at
+subflow creation time, so an additional list protected by
+a new spinlock is used to track the MPJ subflows.
+
+Such list is spliced into conn_list tail every time the msk
+socket lock is acquired, so that it will not interfere
+with data flow on the original connection.
 
 Data flow and connection failover not addressed by this commit.
 
