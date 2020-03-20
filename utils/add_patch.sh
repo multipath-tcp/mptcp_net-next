@@ -18,7 +18,7 @@ git am -3 "${@}" || { echo "ERROR with git am. Please fix in another" \
                            "terminal (up to 'git am --continue') and press" \
                            "enter to continue"; read; }
 git checkout "${PARENT}"
-tg import "${TG_TOP}"..tmp
+tg import "${PARENT}"..tmp
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout "${TG_TOP}"
 echo ${BRANCH} > .topdeps
