@@ -99,7 +99,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	WRITE_ONCE(msk->pm.addr_signal, false);
 	WRITE_ONCE(msk->pm.accept_addr, false);
 	WRITE_ONCE(msk->pm.accept_subflow, false);
-	msk->pm.status = MPTCP_PM_IDLE;
+	msk->pm.status = 0;
 
 	spin_lock_init(&msk->pm.lock);
 	INIT_WORK(&msk->pm.work, pm_worker);
