@@ -518,9 +518,6 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	struct mptcp_addr_info saddr;
 	int len;
 
-	if (!msk)
-		return false;
-
 	if (!mptcp_pm_should_signal(msk) ||
 	    !(mptcp_pm_addr_signal(msk, remaining, &saddr)))
 		return false;
