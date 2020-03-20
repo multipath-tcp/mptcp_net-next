@@ -204,6 +204,7 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 				break;
 		}
 
+		mp_opt->add_addr = 1;
 		mp_opt->addr_id = *ptr++;
 		pr_debug("ADD_ADDR: id=%d", mp_opt->addr_id);
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4) {
@@ -497,8 +498,8 @@ static bool mptcp_established_options_addr(struct sock *sk,
 		opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
 		opts->addr_id = id;
 		opts->addr = ((struct sockaddr_in *)&saddr)->sin_addr;
-		opts->ahmac = add_addr_generate_hmac(subflow->local_key,
-						     subflow->remote_key,
+		opts->ahmac = add_addr_generate_hmac(msk->local_key,
+						     msk->remote_key,
 						     opts->addr_id,
 						     &opts->addr);
 		*size = TCPOLEN_MPTCP_ADD_ADDR;
@@ -509,8 +510,8 @@ static bool mptcp_established_options_addr(struct sock *sk,
 			return false;
 		opts->suboptions |= OPTION_MPTCP_ADD_ADDR6;
 		opts->addr_id = id;
-		opts->ahmac = add_addr6_generate_hmac(subflow->local_key,
-						      subflow->remote_key,
+		opts->ahmac = add_addr6_generate_hmac(msk->local_key,
+						      msk->remote_key,
 						      opts->addr_id,
 						      &opts->addr6);
 		opts->addr6 = ((struct sockaddr_in6 *)&saddr)->sin6_addr;
