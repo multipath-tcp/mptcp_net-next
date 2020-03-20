@@ -486,9 +486,6 @@ static bool mptcp_established_options_addr(struct sock *sk,
 	struct sockaddr_storage saddr;
 	u8 id;
 
-	if (!msk)
-		return false;
-
 	id = 0;
 	memset(&saddr, 0, sizeof(saddr));
 
