@@ -115,6 +115,7 @@ struct mptcp_options_received {
 #endif
 	};
 	u64	ahmac;
+	u16	port;
 };
 #endif
 
