@@ -779,7 +779,7 @@ static void update_una(struct mptcp_sock *msk,
 	}
 }
 
-static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
+static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 				struct mptcp_options_received *mp_opt)
 {
 	u64 hmac = 0;
@@ -788,18 +788,18 @@ static bool add_addr_hmac_valid(struct mptcp_subflow_context *subflow,
 		return true;
 
 	if (mp_opt->family == MPTCP_ADDR_IPVERSION_4)
-		hmac = add_addr_generate_hmac(subflow->remote_key,
-					      subflow->local_key,
+		hmac = add_addr_generate_hmac(msk->remote_key,
+					      msk->local_key,
 					      mp_opt->addr_id, &mp_opt->addr);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else
-		hmac = add_addr6_generate_hmac(subflow->remote_key,
-					       subflow->local_key,
+		hmac = add_addr6_generate_hmac(msk->remote_key,
+					       msk->local_key,
 					       mp_opt->addr_id, &mp_opt->addr6);
 #endif
 
-	pr_debug("subflow=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
-		 subflow, (unsigned long long)hmac,
+	pr_debug("msk=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
+		 msk, (unsigned long long)hmac,
 		 (unsigned long long)mp_opt->ahmac);
 
 	return hmac == mp_opt->ahmac;
@@ -817,7 +817,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 	if (!check_fully_established(msk, sk, subflow, skb, mp_opt))
 		return;
 
-	if (msk && mp_opt->add_addr && add_addr_hmac_valid(subflow, mp_opt)) {
+	if (mp_opt->add_addr && add_addr_hmac_valid(msk, mp_opt)) {
 		struct mptcp_addr_info addr;
 
 		addr.port = 0;
