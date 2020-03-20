@@ -1,0 +1,20 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: re-check dsn before reading from subflow
+
+mptcp_subflow_data_available() is commonly called via
+ssk->sk_data_ready(), in this case the mptcp socket lock
+cannot be acquired.
+
+Therefore, while we can safely discard subflow data that
+was already received up to msk->ack_seq, we cannot be sure
+that 'subflow->data_avail' will still be valid at the time
+userspace wants to read the data -- a previous read on a
+different subflow might have carried this data already.
+
+In that (unlikely) event, msk->ack_seq will have been updated
+and will be ahead of the subflow dsn.
+
+We can check for this condition and skip/resync to the expected
+sequence number.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
