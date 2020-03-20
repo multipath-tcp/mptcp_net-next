@@ -1,5 +1,5 @@
 From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: add MIB counter infrastructure
+Subject: [PATCH] mptcp: add and use MIB counter infrastructure
 
 Exported via same /proc file as the Linux TCP MIB counters, so "netstat -s"
 or "nstat" will show them automatically.
