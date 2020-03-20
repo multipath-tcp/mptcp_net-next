@@ -110,7 +110,6 @@ struct mptcp_addr_info {
 };
 
 enum mptcp_pm_status {
-	MPTCP_PM_IDLE,
 	MPTCP_PM_ADD_ADDR_RECEIVED,
 	MPTCP_PM_ESTABLISHED,
 	MPTCP_PM_SUBFLOW_ESTABLISHED,
@@ -135,7 +134,7 @@ struct mptcp_pm_data {
 	u8		add_addr_accept_max;
 	u8		local_addr_max;
 	u8		subflows_max;
-	enum mptcp_pm_status status;
+	u8		status;
 
 	struct		work_struct work;
 };
