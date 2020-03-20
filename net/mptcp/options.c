@@ -205,16 +205,27 @@ void mptcp_parse_option(const struct sk_buff *skb, const unsigned char *ptr,
 		}
 
 		mp_opt->add_addr = 1;
+		mp_opt->port = 0;
 		mp_opt->addr_id = *ptr++;
 		pr_debug("ADD_ADDR: id=%d", mp_opt->addr_id);
 		if (mp_opt->family == MPTCP_ADDR_IPVERSION_4) {
 			memcpy((u8 *)&mp_opt->addr.s_addr, (u8 *)ptr, 4);
 			ptr += 4;
+			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT ||
+			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT) {
+				mp_opt->port = get_unaligned_be16(ptr);
+				ptr += 2;
+			}
 		}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 		else {
 			memcpy(mp_opt->addr6.s6_addr, (u8 *)ptr, 16);
 			ptr += 16;
+			if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT ||
+			    opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT) {
+				mp_opt->port = get_unaligned_be16(ptr);
+				ptr += 2;
+			}
 		}
 #endif
 		if (!mp_opt->echo) {
