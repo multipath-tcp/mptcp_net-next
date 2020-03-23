@@ -64,7 +64,7 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 	return ret;
 }
 
-/* return true if the new status bit is currenty cleared, that is, this event
+/* return true if the new status bit is currently cleared, that is, this event
  * can be server, eventually by an already scheduled work
  */
 static bool mptcp_pm_schedule_work(struct mptcp_sock *msk,
