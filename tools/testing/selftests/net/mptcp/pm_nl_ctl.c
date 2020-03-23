@@ -528,7 +528,7 @@ static void print_limits(struct nlmsghdr *nh, int pm_family, int total_len)
 
 			memcpy(&max, RTA_DATA(attrs), 4);
 			printf("%s %u\n", type == MPTCP_PM_ATTR_SUBFLOWS ?
-					  "subflows": "accept", max);
+					  "subflows" : "accept", max);
 
 next:
 			attrs = RTA_NEXT(attrs, len);
