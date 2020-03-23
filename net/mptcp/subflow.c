@@ -988,7 +988,8 @@ static void subflow_state_change(struct sock *sk)
 	if (!(parent->sk_shutdown & RCV_SHUTDOWN) &&
 	    !subflow->rx_eof && subflow_is_done(sk)) {
 		subflow->rx_eof = 1;
-		mptcp_subflow_eof(parent);
+		parent->sk_shutdown |= RCV_SHUTDOWN;
+		__subflow_state_change(parent);
 	}
 }
 
