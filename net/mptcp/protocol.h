@@ -89,6 +89,7 @@
 #define MPTCP_DATA_READY	0
 #define MPTCP_SEND_SPACE	1
 #define MPTCP_WORK_RTX		2
+#define MPTCP_WORK_EOF		3
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -339,6 +340,7 @@ void mptcp_finish_connect(struct sock *sk);
 void mptcp_data_ready(struct sock *sk, struct sock *ssk);
 bool mptcp_finish_join(struct sock *sk);
 void mptcp_data_acked(struct sock *sk);
+void mptcp_subflow_eof(struct sock *sk);
 
 int mptcp_token_new_request(struct request_sock *req);
 void mptcp_token_destroy_request(u32 token);
@@ -395,6 +397,13 @@ static inline unsigned int mptcp_add_addr_len(int family)
 bool mptcp_pm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 			  struct mptcp_addr_info *saddr);
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
+
+void mptcp_pm_nl_init(void);
+void mptcp_pm_nl_data_init(struct mptcp_sock *msk);
+void mptcp_pm_nl_fully_established(struct mptcp_sock *msk);
+void mptcp_pm_nl_subflow_established(struct mptcp_sock *msk);
+void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk);
+int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
 
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
