@@ -1,7 +1,7 @@
 From: Florian Westphal <fw@strlen.de>
 Subject: [PATCH] mptcp: allow partial cleaning of rtx head dfrag
 
-After adding wmem accouting for the mptcp socket we could get
+After adding wmem accounting for the mptcp socket we could get
 into a situation where the mptcp socket can't transmit more data,
 and mptcp_clean_una doesn't reduce wmem even if snd_una has advanced
 because it currently will only remove entire dfrags.
