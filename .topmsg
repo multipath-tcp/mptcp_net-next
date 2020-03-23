@@ -8,3 +8,4 @@ Update the mptcp_connect program to allow reliable MP_JOIN
 handshake even on small data file
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
