@@ -906,6 +906,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk, struct request_sock *req)
 	}
 
 	msk->write_seq = subflow_req->idsn + 1;
+	atomic64_set(&msk->snd_una, msk->write_seq);
 	if (subflow_req->remote_key_valid) {
 		msk->can_ack = true;
 		msk->remote_key = subflow_req->remote_key;
@@ -1107,6 +1108,7 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->write_seq, subflow->idsn + 1);
 	WRITE_ONCE(msk->ack_seq, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
+	atomic64_set(&msk->snd_una, msk->write_seq);
 	if (inet_sk_state_load(sk) != TCP_ESTABLISHED) {
 		inet_sk_state_store(sk, TCP_ESTABLISHED);
 		sk->sk_state_change(sk);
