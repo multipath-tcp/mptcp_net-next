@@ -10,3 +10,4 @@ The timer is clearer for good by __mptcp_clear_xmit()
 Also clean MPTCP rtx queue before each transmission.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
