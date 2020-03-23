@@ -444,7 +444,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		if (ret)
 			return ret;
 
-		/* id sk_stream_wait_memory() sleeps snd_una can change
+		/* if sk_stream_wait_memory() sleeps snd_una can change
 		 * significantly, refresh the rtx queue
 		 */
 		mptcp_clean_una(sk);
