@@ -163,7 +163,7 @@ static void check_work_pending(struct mptcp_sock *msk)
 {
 	if (msk->pm.add_addr_signaled == msk->pm.add_addr_signal_max &&
 	    (msk->pm.local_addr_used == msk->pm.local_addr_max ||
-	     (msk->pm.subflows == msk->pm.subflows_max)))
+	     msk->pm.subflows == msk->pm.subflows_max))
 		WRITE_ONCE(msk->pm.work_pending, false);
 }
 
