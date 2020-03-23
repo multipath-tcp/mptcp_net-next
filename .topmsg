@@ -20,3 +20,4 @@ Idea is to add an additional PM hook for ADD_ADDR echo, to allow
 the PM netlink announcing multiple addresses, in sequence.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
