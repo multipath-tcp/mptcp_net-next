@@ -235,9 +235,6 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_addr_info remote;
 	struct mptcp_addr_info local;
-	struct pm_nl_pernet *pernet;
-
-	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 
 	pr_debug("accepted %d:%d remote family %d",
 		 msk->pm.add_addr_accepted, msk->pm.add_addr_accept_max,
