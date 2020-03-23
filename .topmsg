@@ -6,3 +6,4 @@ checking the basic APIs and possible exceptional
 values.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
