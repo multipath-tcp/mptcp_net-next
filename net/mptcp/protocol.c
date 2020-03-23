@@ -945,7 +945,7 @@ static void mptcp_retransmit_timer(struct timer_list *t)
 /* Find an idle subflow.  Return NULL if there is unacked data at tcp
  * level.
  *
- * A backup subflow is returned only if thats the only kind available.
+ * A backup subflow is returned only if that is the only kind available.
  */
 static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 {
