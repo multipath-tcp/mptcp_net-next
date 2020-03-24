@@ -125,6 +125,7 @@ int mptcp_token_new_connect(struct sock *sk)
 /**
  * mptcp_token_new_accept - insert token for later processing
  * @token: the token to insert to the tree
+ * @conn: the just cloned socket linked to the new connection
  *
  * Called when a SYN packet creates a new logical connection, i.e.
  * is not a join request.
