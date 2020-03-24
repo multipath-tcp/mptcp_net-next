@@ -24,6 +24,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/u64_stats_sync.h>
 #include <linux/irqreturn.h>
+#include <linux/iopoll.h>
 
 #include <linux/atomic.h>
 
@@ -365,6 +366,7 @@ struct macsec_ops;
  * suspended_by_mdio_bus: Set to true if this phy was suspended by MDIO bus.
  * sysfs_links: Internal boolean tracking sysfs symbolic links setup/removal.
  * loopback_enabled: Set true if this phy has been loopbacked successfully.
+ * downshifted_rate: Set true if link speed has been downshifted.
  * state: state of the PHY for management purposes
  * dev_flags: Device-specific flags used by the PHY driver.
  * irq: IRQ number of the PHY's interrupt (-1 if none)
@@ -405,6 +407,7 @@ struct phy_device {
 	unsigned suspended_by_mdio_bus:1;
 	unsigned sysfs_links:1;
 	unsigned loopback_enabled:1;
+	unsigned downshifted_rate:1;
 
 	unsigned autoneg:1;
 	/* The most recently read link state */
@@ -698,6 +701,7 @@ static inline bool phy_is_started(struct phy_device *phydev)
 
 void phy_resolve_aneg_pause(struct phy_device *phydev);
 void phy_resolve_aneg_linkmode(struct phy_device *phydev);
+void phy_check_downshift(struct phy_device *phydev);
 
 /**
  * phy_read - Convenience function for reading a given PHY register
@@ -712,6 +716,19 @@ static inline int phy_read(struct phy_device *phydev, u32 regnum)
 {
 	return mdiobus_read(phydev->mdio.bus, phydev->mdio.addr, regnum);
 }
+
+#define phy_read_poll_timeout(phydev, regnum, val, cond, sleep_us, \
+				timeout_us, sleep_before_read) \
+({ \
+	int __ret = read_poll_timeout(phy_read, val, (cond) || val < 0, \
+		sleep_us, timeout_us, sleep_before_read, phydev, regnum); \
+	if (val <  0) \
+		__ret = val; \
+	if (__ret) \
+		phydev_err(phydev, "%s failed: %d\n", __func__, __ret); \
+	__ret; \
+})
+
 
 /**
  * __phy_read - convenience function for reading a given PHY register
@@ -783,6 +800,19 @@ static inline int __phy_modify_changed(struct phy_device *phydev, u32 regnum,
  * Same rules as for phy_read();
  */
 int phy_read_mmd(struct phy_device *phydev, int devad, u32 regnum);
+
+#define phy_read_mmd_poll_timeout(phydev, devaddr, regnum, val, cond, \
+				  sleep_us, timeout_us, sleep_before_read) \
+({ \
+	int __ret = read_poll_timeout(phy_read_mmd, val, (cond) || val < 0, \
+				  sleep_us, timeout_us, sleep_before_read, \
+				  phydev, devaddr, regnum); \
+	if (val <  0) \
+		__ret = val; \
+	if (__ret) \
+		phydev_err(phydev, "%s failed: %d\n", __func__, __ret); \
+	__ret; \
+})
 
 /**
  * __phy_read_mmd - Convenience function for reading a register
