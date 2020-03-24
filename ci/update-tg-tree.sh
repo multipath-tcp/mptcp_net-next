@@ -233,6 +233,14 @@ check_compilation_no_ipv6() {
 	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
 }
 
+check_compilation_extra_warnings() { local src obj
+	for src in net/mptcp/*.c; do
+		obj="${src/%.c/.o}"
+		touch "${src}"
+		KCFLAGS="-Werror" make W=1 "${obj}" || return 1
+	done
+}
+
 # $1: branch
 tg_has_non_mptcp_modified_files() {
 	git diff --name-only "refs/top-bases/${1}..refs/heads/${1}" | \
@@ -275,6 +283,11 @@ validation() { local curr_branch
 
 		if ! is_tg_top "${curr_branch}"; then
 			err "Not at the top after validation: ${curr_branch}"
+			return 1
+		fi
+
+		if ! check_compilation_extra_warnings; then
+			err "Unable to compile mptcp source code with W=1"
 			return 1
 		fi
 
