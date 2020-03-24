@@ -1057,10 +1057,6 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->write_seq, subflow->idsn + 1);
 	WRITE_ONCE(msk->ack_seq, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
-	if (inet_sk_state_load(sk) != TCP_ESTABLISHED) {
-		inet_sk_state_store(sk, TCP_ESTABLISHED);
-		sk->sk_state_change(sk);
-	}
 
 	mptcp_pm_new_connection(msk, 0);
 }
