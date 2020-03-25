@@ -13,3 +13,9 @@ git checkout t/upstream
 tg remote origin --populate
 tg update
 git --no-pager diff --stat "${NET_NEXT_BEFORE}"..net-next
+
+if [ -n "${1}" ]; then
+	echo "push?"
+	read
+	tg push
+fi
