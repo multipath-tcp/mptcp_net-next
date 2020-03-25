@@ -1,1 +1,0 @@
-t/sendmsg-truncate-source-buffer-if-mptcp-sndbuf-size-was-set-from-userspace
