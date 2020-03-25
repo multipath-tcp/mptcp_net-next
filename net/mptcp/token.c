@@ -142,7 +142,7 @@ int mptcp_token_new_accept(u32 token, struct sock *conn)
 
 /**
  * mptcp_token_get_sock - retrieve mptcp connection sock using its token
- * @token - token of the mptcp connection to retrieve
+ * @token: token of the mptcp connection to retrieve
  *
  * This function returns the mptcp connection structure with the given token.
  * A reference count on the mptcp socket returned is taken.
