@@ -233,7 +233,7 @@ check_compilation_no_ipv6() {
 	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
 }
 
-check_compilation_extra_warnings() { local src obj
+check_compilation_mptcp_extra_warnings() { local src obj
 	for src in net/mptcp/*.c; do
 		obj="${src/%.c/.o}"
 		touch "${src}"
@@ -262,6 +262,12 @@ check_compilation() { local branch
 	if [ -f "net/mptcp/Kconfig" ]; then
 		generate_config_mptcp
 		compile_kernel "with CONFIG_MPTCP" || return 1
+
+		if ! check_compilation_mptcp_extra_warnings; then
+			err "Unable to compile mptcp source code with W=1"
+			return 1
+		fi
+
 	fi
 }
 
@@ -283,11 +289,6 @@ validation() { local curr_branch
 
 		if ! is_tg_top "${curr_branch}"; then
 			err "Not at the top after validation: ${curr_branch}"
-			return 1
-		fi
-
-		if ! check_compilation_extra_warnings; then
-			err "Unable to compile mptcp source code with W=1"
 			return 1
 		fi
 
