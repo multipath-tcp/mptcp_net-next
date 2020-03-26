@@ -702,15 +702,12 @@ static int parse_limit(struct genl_info *info, int id, unsigned int *limit)
 {
 	struct nlattr *attr = info->attrs[id];
 
-	if (!attr) {
-		GENL_SET_ERR_MSG(info, "missing announce accept limit");
-		return -EINVAL;
-	}
+	if (!attr)
+		return 0;
 
 	*limit = nla_get_u32(attr);
 	if (*limit > MPTCP_PM_ADDR_MAX) {
-		GENL_SET_ERR_MSG(info,
-				 "announce accept limit greater than maximum");
+		GENL_SET_ERR_MSG(info, "limit greater than maximum");
 		return -EINVAL;
 	}
 	return 0;
@@ -723,17 +720,23 @@ mptcp_nl_cmd_set_limits(struct sk_buff *skb, struct genl_info *info)
 	unsigned int rcv_addrs, subflows;
 	int ret;
 
+	spin_lock_bh(&pernet->lock);
+	rcv_addrs = pernet->add_addr_accept_max;
 	ret = parse_limit(info, MPTCP_PM_ATTR_RCV_ADD_ADDRS, &rcv_addrs);
 	if (ret)
-		return ret;
+		goto unlock;
 
+	subflows = pernet->subflows_max;
 	ret = parse_limit(info, MPTCP_PM_ATTR_SUBFLOWS, &subflows);
 	if (ret)
-		return ret;
+		goto unlock;
 
 	WRITE_ONCE(pernet->add_addr_accept_max, rcv_addrs);
 	WRITE_ONCE(pernet->subflows_max, subflows);
-	return 0;
+
+unlock:
+	spin_unlock_bh(&pernet->lock);
+	return ret;
 }
 
 static int
@@ -789,7 +792,6 @@ static struct genl_ops mptcp_pm_ops[] = {
 		.cmd    = MPTCP_PM_CMD_GET_ADDR,
 		.doit   = mptcp_nl_cmd_get_addr,
 		.dumpit   = mptcp_nl_cmd_dump_addrs,
-		.flags  = GENL_ADMIN_PERM,
 	},
 	{
 		.cmd    = MPTCP_PM_CMD_SET_LIMITS,
@@ -799,7 +801,6 @@ static struct genl_ops mptcp_pm_ops[] = {
 	{
 		.cmd    = MPTCP_PM_CMD_GET_LIMITS,
 		.doit   = mptcp_nl_cmd_get_limits,
-		.flags  = GENL_ADMIN_PERM,
 	},
 };
 
