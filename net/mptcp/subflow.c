@@ -22,8 +22,8 @@
 #include "protocol.h"
 #include "mib.h"
 
-static inline void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
-					 enum linux_mptcp_mib_field field)
+static void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
+				  enum linux_mptcp_mib_field field)
 {
 	MPTCP_INC_STATS(sock_net(req_to_sk(req)), field);
 }
