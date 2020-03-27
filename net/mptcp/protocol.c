@@ -367,9 +367,9 @@ static inline bool mptcp_skb_can_collapse_to(u64 write_seq,
 	return mpext && mpext->data_seq + mpext->data_len == write_seq;
 }
 
-static inline bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
-					      const struct page_frag *pfrag,
-					      const struct mptcp_data_frag *df)
+static bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
+				       const struct page_frag *pfrag,
+				       const struct mptcp_data_frag *df)
 {
 	return df && pfrag->page == df->page &&
 		df->data_seq + df->data_len == msk->write_seq;
@@ -439,7 +439,7 @@ static bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
 	return false;
 }
 
-static inline struct mptcp_data_frag *
+static struct mptcp_data_frag *
 mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
 		      int orig_offset)
 {
