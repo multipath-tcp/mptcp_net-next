@@ -2,6 +2,7 @@
 #ifndef _UAPI_MPTCP_H
 #define _UAPI_MPTCP_H
 
+#include <linux/const.h>
 #include <linux/types.h>
 
 #define MPTCP_SUBFLOW_FLAG_MCAP_REM		_BITUL(0)
