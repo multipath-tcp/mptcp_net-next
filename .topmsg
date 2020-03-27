@@ -16,6 +16,9 @@ The MIB counter list is taken from the multipath-tcp.org kernel, but
 only a few counters have been picked up so far.  The counter list can
 be increased at any time later on.
 
+v2 -> v3:
+ - remove 'inline' in foo.c files (David S. Miller)
+
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Florian Westphal <fw@strlen.de>
