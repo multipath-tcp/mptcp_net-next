@@ -1,8 +1,8 @@
 From: Paolo Abeni <pabeni@redhat.com>
 Subject: [PATCH] mptcp: queue data for mptcp level retransmission
 
-keep the send page fragment on an MPTCP level retransmission queue.
-the queue entries are allocated inside the page frag allocator,
+Keep the send page fragment on an MPTCP level retransmission queue.
+The queue entries are allocated inside the page frag allocator,
 acquiring an additional reference to the page for each list entry.
 
 Also switch to a custom page frag refill function, to ensure that
@@ -12,6 +12,9 @@ The MPTCP rtx queue is flushed at disconnect() and close() time
 
 Note that now we need to call __mptcp_init_sock() regardless of mptcp
 enable status, as the destructor will try to walk the rtx_queue.
+
+v2 -> v3:
+ - remove 'inline' in foo.c files (David S. Miller)
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
