@@ -4,6 +4,9 @@ Subject: [PATCH] mptcp: allow dumping subflow context to userspace
 add ulp-specific diagnostic functions, so that subflow information can be
 dumped to userspace programs like 'ss'.
 
+v2 -> v3:
+- uapi: use bit macros appropriate for userspace
+
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
