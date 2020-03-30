@@ -88,6 +88,7 @@
 /* MPTCP socket flags */
 #define MPTCP_DATA_READY	0
 #define MPTCP_SEND_SPACE	1
+#define MPTCP_WORK_RTX		2
 
 static inline __be32 mptcp_option(u8 subopt, u8 len, u8 nib, u8 field)
 {
@@ -157,6 +158,7 @@ struct mptcp_sock {
 	u64		write_seq;
 	u64		ack_seq;
 	atomic64_t	snd_una;
+	unsigned long	timer_ival;
 	u32		token;
 	unsigned long	flags;
 	bool		can_ack;
@@ -187,6 +189,16 @@ static inline struct mptcp_data_frag *mptcp_rtx_tail(const struct sock *sk)
 		return NULL;
 
 	return list_last_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
+}
+
+static inline struct mptcp_data_frag *mptcp_rtx_head(const struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (list_empty(&msk->rtx_queue))
+		return NULL;
+
+	return list_first_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
 }
 
 struct mptcp_subflow_request_sock {
@@ -326,6 +338,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 void mptcp_finish_connect(struct sock *sk);
 void mptcp_data_ready(struct sock *sk, struct sock *ssk);
 bool mptcp_finish_join(struct sock *sk);
+void mptcp_data_acked(struct sock *sk);
 
 int mptcp_token_new_request(struct request_sock *req);
 void mptcp_token_destroy_request(u32 token);
@@ -383,6 +396,13 @@ bool mptcp_pm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 			  struct mptcp_addr_info *saddr);
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
 
+void mptcp_pm_nl_init(void);
+void mptcp_pm_nl_data_init(struct mptcp_sock *msk);
+void mptcp_pm_nl_fully_established(struct mptcp_sock *msk);
+void mptcp_pm_nl_subflow_established(struct mptcp_sock *msk);
+void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk);
+int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
+
 static inline struct mptcp_ext *mptcp_get_ext(struct sk_buff *skb)
 {
 	return (struct mptcp_ext *)skb_ext_find(skb, SKB_EXT_MPTCP);
@@ -394,5 +414,7 @@ static inline bool before64(__u64 seq1, __u64 seq2)
 }
 
 #define after64(seq2, seq1)	before64(seq1, seq2)
+
+void mptcp_diag_subflow_init(struct tcp_ulp_ops *ops);
 
 #endif /* __MPTCP_PROTOCOL_H */
