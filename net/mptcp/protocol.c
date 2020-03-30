@@ -121,6 +121,27 @@ static void __mptcp_move_skb(struct mptcp_sock *msk, struct sock *ssk,
 	MPTCP_SKB_CB(skb)->offset = offset;
 }
 
+/* both sockets must be locked */
+static bool mptcp_subflow_dsn_valid(const struct mptcp_sock *msk,
+				    struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	u64 dsn = mptcp_subflow_get_mapped_dsn(subflow);
+
+	/* revalidate data sequence number.
+	 *
+	 * mptcp_subflow_data_available() is usually called
+	 * without msk lock.  Its unlikely (but possible)
+	 * that msk->ack_seq has been advanced since the last
+	 * call found in-sequence data.
+	 */
+	if (likely(dsn == msk->ack_seq))
+		return true;
+
+	subflow->data_avail = 0;
+	return mptcp_subflow_data_available(ssk);
+}
+
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 					   struct sock *ssk,
 					   unsigned int *bytes)
@@ -131,6 +152,11 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 	bool more_data_avail;
 	struct tcp_sock *tp;
 	bool done = false;
+
+	if (!mptcp_subflow_dsn_valid(msk, ssk)) {
+		*bytes = 0;
+		return false;
+	}
 
 	if (!(sk->sk_userlocks & SOCK_RCVBUF_LOCK)) {
 		int rcvbuf = max(ssk->sk_rcvbuf, sk->sk_rcvbuf);
@@ -698,6 +724,15 @@ fallback:
 	}
 
 	pr_debug("conn_list->subflow=%p", ssk);
+
+	if (unlikely(sk->sk_userlocks & SOCK_SNDBUF_LOCK)) {
+		int limit = sk_stream_wspace(sk);
+
+		if (WARN_ON_ONCE(limit <= 0))
+			limit = 1;
+
+		iov_iter_truncate(&msg->msg_iter, limit);
+	}
 
 	lock_sock(ssk);
 	while (msg_data_left(msg)) {
