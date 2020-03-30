@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-fix-failure-due-to-whitespace-damage
+Subject: [PATCH] selftests:mptcp: fix failure due to whitespace damage
 
+'pm_nl_ctl' was adding a trailing whitespace after having printed the
+IP. But at the end, the IP element is currently always the last one.
+
+The bash script launching 'pm_nl_ctl' had trailing whitespaces in the
+expected result on purpose. But these whitespaces have been removed when
+the patch has been applied upstream. To avoid trailing whitespaces in
+the bash code, 'pm_nl_ctl' and expected results have now been adapted.
+
+The MPTCP PM selftest can now pass again.
+
+Fixes: eedbc685321b (selftests: add PM netlink functional tests)
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
