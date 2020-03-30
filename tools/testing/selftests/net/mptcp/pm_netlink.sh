@@ -78,14 +78,14 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 flags signal,backup
 check "ip netns exec $ns1 ./pm_nl_ctl get 1" "id 1 flags  10.0.1.1 " "simple add/get addr"
 
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
-"id 1 flags  10.0.1.1 
-id 2 flags subflow dev lo 10.0.1.2 
+"id 1 flags  10.0.1.1
+id 2 flags subflow dev lo 10.0.1.2
 id 3 flags signal,backup 10.0.1.3 " "dump addrs"
 
 ip netns exec $ns1 ./pm_nl_ctl del 2
 check "ip netns exec $ns1 ./pm_nl_ctl get 2" "" "simple del addr"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
-"id 1 flags  10.0.1.1 
+"id 1 flags  10.0.1.1
 id 3 flags signal,backup 10.0.1.3 " "dump addrs after del"
 
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3
@@ -104,12 +104,12 @@ for i in `seq 9 256`; do
 	ip netns exec $ns1 ./pm_nl_ctl del $i
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.9
 done
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "id 1 flags  10.0.1.1 
-id 3 flags signal,backup 10.0.1.3 
-id 4 flags signal 10.0.1.4 
-id 5 flags signal 10.0.1.5 
-id 6 flags signal 10.0.1.6 
-id 7 flags signal 10.0.1.7 
+check "ip netns exec $ns1 ./pm_nl_ctl dump" "id 1 flags  10.0.1.1
+id 3 flags signal,backup 10.0.1.3
+id 4 flags signal 10.0.1.4
+id 5 flags signal 10.0.1.5
+id 6 flags signal 10.0.1.6
+id 7 flags signal 10.0.1.7
 id 8 flags signal 10.0.1.8 " "id limit"
 
 ip netns exec $ns1 ./pm_nl_ctl flush
