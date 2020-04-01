@@ -1,4 +1,35 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-tcp-fallback-crash
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: fix tcp fallback crash
 
+Christoph Paasch reports following crash:
+
+general protection fault, probably for non-canonical address 0xfe85e717fe88a633: 0000 [#1] PREEMPT SMP
+CPU: 0 PID: 2874 Comm: syz-executor072 Not tainted 5.6.0-rc5 #62
+RIP: 0010:__pv_queued_spin_lock_slowpath+0x1b3/0x2f0 kernel/locking/qspinlock.c:471
+[..]
+ queued_spin_lock_slowpath arch/x86/include/asm/qspinlock.h:50 [inline]
+ do_raw_spin_lock include/linux/spinlock.h:181 [inline]
+ spin_lock_bh include/linux/spinlock.h:343 [inline]
+ __mptcp_flush_join_list+0x44/0xb0 net/mptcp/protocol.c:278
+ mptcp_shutdown+0xb3/0x230 net/mptcp/protocol.c:1882
+[..]
+
+Problem is that mptcp_shutdown() socket isn't an mptcp socket,
+its a plain tcp_sk.  Thus, trying to access mptcp_sk specific
+members accesses garbage.
+
+Root cause is that accept() returns a fallback (tcp) socket,
+not an mptcp one.  There is code in getpeername to detect this
+and override the sockets stream_ops.  But this will only run when
+accept() caller provided a sockaddr struct.  "accept(fd, NULL, 0)"
+will therefore result in mptcp stream ops, with sock->sk being a
+tcp_sk.  Update the existing fallback handling to detect this as well.
+
+Moreover, mptcp_shutdown did not have fallback handling, and
+mptcp_poll did it too late so add that there as well.
+
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Tested-by: Christoph Paasch <cpaasch@apple.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
