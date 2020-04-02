@@ -28,6 +28,7 @@ tcp_sk.  Update the existing fallback handling to detect this as well.
 Moreover, mptcp_shutdown did not have fallback handling, and
 mptcp_poll did it too late so add that there as well.
 
+Fixes: ec3edaa7ca6c ("mptcp: Add handling of outgoing MP_JOIN requests")
 Reported-by: Christoph Paasch <cpaasch@apple.com>
 Tested-by: Christoph Paasch <cpaasch@apple.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
