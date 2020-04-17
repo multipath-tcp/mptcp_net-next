@@ -1326,10 +1326,12 @@ retry:
 		 * start trying again otherwise it can loop forever.
 		 */
 
-		if (fatal_signal_pending(current))
+		if (fatal_signal_pending(current)) {
+			if (!pages_done)
+				pages_done = -EINTR;
 			break;
+		}
 
-		*locked = 1;
 		ret = down_read_killable(&mm->mmap_sem);
 		if (ret) {
 			BUG_ON(ret > 0);
@@ -1338,6 +1340,7 @@ retry:
 			break;
 		}
 
+		*locked = 1;
 		ret = __get_user_pages(tsk, mm, start, 1, flags | FOLL_TRIED,
 				       pages, NULL, locked);
 		if (!*locked) {
