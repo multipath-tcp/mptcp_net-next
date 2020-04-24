@@ -1,0 +1,13 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] mptcp: fix "fn parameter not described" warnings
+
+Obtained with:
+
+  $ make W=1 net/mptcp/token.o
+  net/mptcp/token.c:53: warning: Function parameter or member 'req' not described in 'mptcp_token_new_request'
+  net/mptcp/token.c:98: warning: Function parameter or member 'sk' not described in 'mptcp_token_new_connect'
+  net/mptcp/token.c:178: warning: Function parameter or member 'token' not described in 'mptcp_token_destroy_request'
+  net/mptcp/token.c:191: warning: Function parameter or member 'token' not described in 'mptcp_token_destroy'
+
+Fixes: 79c0949e9a09 (mptcp: Add key generation and token tree)
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
