@@ -1,0 +1,18 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] tcp: mptcp: use mptcp receive buffer space to select rcv window
+
+In MPTCP, the receive windo is shared across all subflows, because it
+refers to the mptcp-level sequence space.
+
+This commit doesn't change choice of initial window for passive or active
+connections.
+While it would be possible to change those as well, this adds complexity
+(especially when handling MP_JOIN requests).
+
+However, the MPTCP RFC specifically says that a MPTCP sender
+'MUST NOT use the RCV.WND field of a TCP segment at the connection level if
+it does not also carry a DSS option with a Data ACK field.'
+
+SYN/SYNACK packets do not carry a DSS option with a Data ACK field.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
