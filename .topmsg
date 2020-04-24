@@ -1,0 +1,10 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] mptcp: fix "fn parameter not described" warning
+
+Obtained with:
+
+  $ make W=1 net/mptcp/token.o
+  net/mptcp/token.c:133: warning: Function parameter or member 'conn' not described in 'mptcp_token_new_accept'
+
+Fixes: 58b09919626b (mptcp: create msk early)
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
