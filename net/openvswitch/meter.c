@@ -107,8 +107,8 @@ dp_meter_instance_realloc(struct dp_meter_table *tbl, u32 size)
 		return -ENOMEM;
 
 	for (i = 0; i < n_meters; i++)
-		new_ti->dp_meters[i] =
-			rcu_dereference_ovsl(ti->dp_meters[i]);
+		if (rcu_dereference_ovsl(ti->dp_meters[i]))
+			new_ti->dp_meters[i] = ti->dp_meters[i];
 
 	rcu_assign_pointer(tbl->ti, new_ti);
 	call_rcu(&ti->rcu, dp_meter_instance_free_rcu);
@@ -393,7 +393,7 @@ static struct dp_meter *dp_meter_create(struct nlattr **a)
 		 * Start with a full bucket.
 		 */
 		band->bucket = (band->burst_size + band->rate) * 1000ULL;
-		band_max_delta_t = band->bucket / band->rate;
+		band_max_delta_t = div_u64(band->bucket, band->rate);
 		if (band_max_delta_t > meter->max_delta_t)
 			meter->max_delta_t = band_max_delta_t;
 		band++;
@@ -752,7 +752,7 @@ void ovs_meters_exit(struct datapath *dp)
 	int i;
 
 	for (i = 0; i < ti->n_meters; i++)
-		ovs_meter_free(ti->dp_meters[i]);
+		ovs_meter_free(rcu_dereference_raw(ti->dp_meters[i]));
 
 	dp_meter_instance_free(ti);
 }
