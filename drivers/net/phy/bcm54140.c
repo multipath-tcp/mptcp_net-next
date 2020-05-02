@@ -115,6 +115,16 @@
 #define BCM54140_HWMON_IN_ALARM_BIT(ch) ((ch) ? BCM54140_RDB_MON_ISR_3V3 \
 					      : BCM54140_RDB_MON_ISR_1V0)
 
+/* This PHY has two different PHY IDs depening on its MODE_SEL pin. This
+ * pin choses between 4x SGMII and QSGMII mode:
+ *   AE02_5009 4x SGMII
+ *   AE02_5019 QSGMII
+ */
+#define BCM54140_PHY_ID_MASK	0xffffffe8
+
+#define BCM54140_PHY_ID_REV(phy_id)	((phy_id) & 0x7)
+#define BCM54140_REV_B0			1
+
 #define BCM54140_DEFAULT_DOWNSHIFT 5
 #define BCM54140_MAX_DOWNSHIFT 9
 
@@ -632,9 +642,11 @@ static int bcm54140_config_init(struct phy_device *phydev)
 	int ret;
 
 	/* Apply hardware errata */
-	ret = bcm54140_b0_workaround(phydev);
-	if (ret)
-		return ret;
+	if (BCM54140_PHY_ID_REV(phydev->phy_id) == BCM54140_REV_B0) {
+		ret = bcm54140_b0_workaround(phydev);
+		if (ret)
+			return ret;
+	}
 
 	/* Unmask events we are interested in. */
 	reg &= ~(BCM54140_RDB_INT_DUPLEX |
@@ -852,7 +864,7 @@ static int bcm54140_set_tunable(struct phy_device *phydev,
 static struct phy_driver bcm54140_drivers[] = {
 	{
 		.phy_id         = PHY_ID_BCM54140,
-		.phy_id_mask    = 0xfffffff0,
+		.phy_id_mask    = BCM54140_PHY_ID_MASK,
 		.name           = "Broadcom BCM54140",
 		.features       = PHY_GBIT_FEATURES,
 		.config_init    = bcm54140_config_init,
@@ -862,6 +874,7 @@ static struct phy_driver bcm54140_drivers[] = {
 		.probe		= bcm54140_probe,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
+		.soft_reset	= genphy_soft_reset,
 		.get_tunable	= bcm54140_get_tunable,
 		.set_tunable	= bcm54140_set_tunable,
 	},
@@ -869,7 +882,7 @@ static struct phy_driver bcm54140_drivers[] = {
 module_phy_driver(bcm54140_drivers);
 
 static struct mdio_device_id __maybe_unused bcm54140_tbl[] = {
-	{ PHY_ID_BCM54140, 0xfffffff0 },
+	{ PHY_ID_BCM54140, BCM54140_PHY_ID_MASK },
 	{ }
 };
 
