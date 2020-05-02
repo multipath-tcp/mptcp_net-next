@@ -23,6 +23,7 @@ GIT_REMOTE_NET_NEXT_BRANCH="master"
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
+TG_TOPIC_SKIP="t/DO-NOT-MERGE-mptcp-enabled-by-default"
 TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
@@ -277,7 +278,10 @@ validation() { local curr_branch
 
 		while true; do
 			curr_branch="$(git_get_current_branch)"
-			if ! check_compilation "${curr_branch}"; then
+
+			if skip_tg_topic "${curr_branch}"; then
+				echo "We can skip this topic"
+			elif ! check_compilation "${curr_branch}"; then
 				err "Unable to compile topic ${curr_branch}"
 				return 1
 			fi
