@@ -332,6 +332,12 @@ tg_export() { local current_date tag
 	tag="${TG_EXPORT_BRANCH}/${current_date}"
 
 	tg export --linearize --force "${TG_EXPORT_BRANCH}"
+
+	# change the committer for the last commit to let Intel's kbuild starting tests
+	GIT_COMMITTER_NAME="Matthieu Baerts" \
+		GIT_COMMITTER_EMAIL="matthieu.baerts@tessares.net" \
+		git commit --amend --no-edit
+
 	git push --force "${GIT_REMOTE_GITHUB_NAME}" "${TG_EXPORT_BRANCH}"
 
 	# send a tag to Github to keep previous commits: we might have refs to them
