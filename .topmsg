@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fill-skb-extension-cache-outside-of-mptcp_sendmsg_frag
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: fill skb extension cache outside of mptcp_sendmsg_frag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp_sendmsg_frag helper contains a loop that will wait on the
+subflow sk.
+
+It seems preferrable to only wait in mptcp_sendmsg() when blocking io is
+requested.  mptcp_sendmsg already has such a wait loop that is used when
+no subflow socket is available for transmission.
+
+This is a preparation patch that makes sure we call
+mptcp_sendmsg_frag only if a skb extension has been allocated.
+
+Moreover, such allocation currently uses GFP_ATOMIC while it
+could use sleeping allocation instead.
+
+Followup patches will remove the wait loop from mptcp_sendmsg_frag()
+and will allow to do a sleeping allocation for the extension.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
