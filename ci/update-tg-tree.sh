@@ -27,6 +27,7 @@ TG_TOPIC_SKIP="t/DO-NOT-MERGE-mptcp-enabled-by-default"
 TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
+ERR_MSG=""
 
 ###########
 ## Utils ##
@@ -37,10 +38,20 @@ err() {
 	echo "ERROR: ${*}" >&2
 }
 
-# $@: message to display before quiting
-exit_err() {
-	err "${@}"
-	exit 1
+# $1: last return code
+print_err() { local rc
+	rc="${1}"
+
+	# check return code: if different than 0, we exit with an error: reset
+	if [ "${rc}" -eq 0 ]; then
+		return 0
+	fi
+
+	# in the notif, only the end is displayed
+	set +x
+	err "${ERR_MSG}"
+
+	return "${rc}"
 }
 
 # $1: branch ;  [ $2: remote, default: origin ]
@@ -162,14 +173,14 @@ tg_reset() { local topic
 tg_trap_reset() { local rc
 	rc="${1}"
 
-	# check return code: if different than 0, we exit with an error: reset
-	[ "${rc}" -eq 0 ] && return 0
+	# print the error message is any.
+	if print_err "${rc}"; then
+		return 0
+	fi
 
-	# in the notif, only the end is displayed, tg_reset is not interesting
-	set +x
 	tg_reset
 
-	exit "${rc}"
+	return "${rc}"
 }
 
 
@@ -230,13 +241,13 @@ compile_kernel() {
 
 check_compilation_i386() {
 	generate_config_i386_mptcp
-	compile_kernel "with i386 and CONFIG_MPTCP" || return 1
+	compile_kernel "with i386 and CONFIG_MPTCP"
 }
 
 check_compilation_no_ipv6() {
 	generate_config_mptcp
 	echo | scripts/config -d IPV6 -d MPTCP_IPV6
-	compile_kernel "without IPv6 and with CONFIG_MPTCP" || return 1
+	compile_kernel "without IPv6 and with CONFIG_MPTCP"
 }
 
 check_compilation_mptcp_extra_warnings() { local src obj
@@ -261,13 +272,19 @@ check_compilation() { local branch
 	if is_tg_top "${branch}" || \
 	   tg_has_non_mptcp_modified_files "${branch}"; then
 		generate_config_no_mptcp
-		compile_kernel "without CONFIG_MPTCP" || return 1
+		if ! compile_kernel "without CONFIG_MPTCP"; then
+			err "Unable to compile without CONFIG_MPTCP"
+			return 1
+		fi
 	fi
 
 	# no need to compile with MPTCP if the option is not available
 	if [ -f "net/mptcp/Kconfig" ]; then
 		generate_config_mptcp
-		compile_kernel "with CONFIG_MPTCP" || return 1
+		if ! compile_kernel "with CONFIG_MPTCP"; then
+			err "Unable to compile with CONFIG_MPTCP"
+			return 1
+		fi
 
 		if ! check_compilation_mptcp_extra_warnings; then
 			err "Unable to compile mptcp source code with W=1"
@@ -378,11 +395,28 @@ tg_for_review() { local tg_conflict_files
 ## Main ##
 ##########
 
-git_clean || exit_err "Unable to clean the environment"
-tg_update_base || exit_err "Unable to update the topgit base"
+
+trap 'print_err "${?}"' EXIT
+
+ERR_MSG="Unable to clean the environment"
+git_clean
+
+ERR_MSG="Unable to update the topgit base"
+tg_update_base
+
 trap 'tg_trap_reset "${?}"' EXIT
-tg_update_tree || exit_err "Unable to update the topgit tree"
-validation || exit_err "Unexpected error during the validation phase"
-tg_push_tree || exit_err "Unable to push the update of the Topgit tree"
-tg_export || exit_err "Unable to export the TopGit tree"
-tg_for_review || exit_err "Unable to update the ${TG_FOR_REVIEW_BRANCH} branch"
+
+ERR_MSG="Unable to update the topgit tree"
+tg_update_tree
+
+ERR_MSG="Unexpected error during the validation phase"
+validation
+
+ERR_MSG="Unable to push the update of the Topgit tree"
+tg_push_tree
+
+ERR_MSG="Unable to export the TopGit tree"
+tg_export
+
+ERR_MSG="Unable to update the ${TG_FOR_REVIEW_BRANCH} branch"
+tg_for_review
