@@ -4,7 +4,14 @@ set -ex
 
 [ -f "${1}" ]
 
-TG_TOP=${TG_TOP:-t/upstream}
+TOP="t/upstream"
+TG_TOP=${TG_TOP:-${TOP}}
+
+# the last commit is always the DO-NOT-MERGE one.
+if [ "${TG_TOP}" = "${TOP}" ]; then
+	TG_TOP=$(git show "${TG_TOP}:.topdeps")
+fi
+
 echo "Adding new patch before ${TG_TOP}"
 
 git checkout "${TG_TOP}"
@@ -24,7 +31,7 @@ git checkout "${TG_TOP}"
 echo ${BRANCH} > .topdeps
 git commit -sm "tg: switch to ${BRANCH}" .topdeps
 tg update
-git checkout t/upstream
+git checkout ${TOP}
 tg update
 echo "push?"
 read
