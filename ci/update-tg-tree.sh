@@ -75,6 +75,11 @@ is_tg_top() {
 	[ "${1:-$(git_get_current_branch)}" = "${TG_TOPIC_TOP}" ]
 }
 
+# $1: branch
+skipped_tg_topic() {
+	[ "${TG_TOPIC_SKIP}" = "${1}" ]
+}
+
 
 ###############
 ## TG Update ##
@@ -279,7 +284,7 @@ validation() { local curr_branch
 		while true; do
 			curr_branch="$(git_get_current_branch)"
 
-			if skip_tg_topic "${curr_branch}"; then
+			if skipped_tg_topic "${curr_branch}"; then
 				echo "We can skip this topic"
 			elif ! check_compilation "${curr_branch}"; then
 				err "Unable to compile topic ${curr_branch}"
