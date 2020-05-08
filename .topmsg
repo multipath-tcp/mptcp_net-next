@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-inner-wait-loop-from-mptcp_sendmsg_frag
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: remove inner wait loop from mptcp_sendmsg_frag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+previous patches made sure we only call into this function
+when these prerequisites are met, so no need to wait on the
+subflow socket anymore.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/7
+Signed-off-by: Florian Westphal <fw@strlen.de>
