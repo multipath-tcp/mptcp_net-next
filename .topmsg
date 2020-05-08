@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-blocking-in-tcp_sendpages
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: avoid blocking in tcp_sendpages
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The transmit loop continues to xmit new data until an
+error is returned or all data was transmitted.
+
+For the blocking i/o case, this means that tcp_sendpages() may
+block on the subflow until more space becomes available, i.e. we end up
+sleeping with the mptcp socket lock held.
+
+Instead we should check if a different subflow is ready to be used.
+
+This restarts the subflow sk lookup when the tx operation succeeded
+and the tcp subflow can't accept more data or if tcp_sendpages
+indicates -EAGAIN on a blocking mptcp socket.
+
+In case all subflows are busy, the existing logic will wait until
+a subflow is ready, releasing the mptcp level socket while doing so.
+
+The mptcp worker already sets DONTWAIT, so no need to make
+changes there.
+
+Reported-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
