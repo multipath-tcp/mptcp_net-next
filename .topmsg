@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-allow-__skb_ext_alloc-to-sleep
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] net: allow __skb_ext_alloc to sleep
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp calls this from the transmit side, from process context.
+Allow a sleeping allocation instead of unconditional GFP_ATOMIC.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
