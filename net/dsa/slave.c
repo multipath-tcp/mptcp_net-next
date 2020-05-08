@@ -856,19 +856,17 @@ dsa_slave_add_cls_matchall_mirred(struct net_device *dev,
 	struct dsa_port *to_dp;
 	int err;
 
-	act = &cls->rule->action.entries[0];
-
 	if (!ds->ops->port_mirror_add)
 		return -EOPNOTSUPP;
-
-	if (!act->dev)
-		return -EINVAL;
 
 	if (!flow_action_basic_hw_stats_check(&cls->rule->action,
 					      cls->common.extack))
 		return -EOPNOTSUPP;
 
 	act = &cls->rule->action.entries[0];
+
+	if (!act->dev)
+		return -EINVAL;
 
 	if (!dsa_slave_dev_check(act->dev))
 		return -EOPNOTSUPP;
@@ -913,13 +911,13 @@ dsa_slave_add_cls_matchall_police(struct net_device *dev,
 
 	if (!ds->ops->port_policer_add) {
 		NL_SET_ERR_MSG_MOD(extack,
-				   "Policing offload not implemented\n");
+				   "Policing offload not implemented");
 		return -EOPNOTSUPP;
 	}
 
 	if (!ingress) {
 		NL_SET_ERR_MSG_MOD(extack,
-				   "Only supported on ingress qdisc\n");
+				   "Only supported on ingress qdisc");
 		return -EOPNOTSUPP;
 	}
 
@@ -930,7 +928,7 @@ dsa_slave_add_cls_matchall_police(struct net_device *dev,
 	list_for_each_entry(mall_tc_entry, &p->mall_tc_list, list) {
 		if (mall_tc_entry->type == DSA_PORT_MALL_POLICER) {
 			NL_SET_ERR_MSG_MOD(extack,
-					   "Only one port policer allowed\n");
+					   "Only one port policer allowed");
 			return -EEXIST;
 		}
 	}
