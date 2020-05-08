@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fill-skb-page-frag-cache-outside-of-mptcp_sendmsg_frag
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: fill skb page frag cache outside of mptcp_sendmsg_frag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp_sendmsg_frag helper contains a loop that will wait on the
+subflow sk.
+
+It seems preferrable to only wait in mptcp_sendmsg() when blocking io is
+requested.  mptcp_sendmsg already has such a wait loop that is used when
+no subflow socket is available for transmission.
+
+This is another preparation patch that makes sure we call
+mptcp_sendmsg_frag only if the page frag cache has been refilled.
+
+Followup patch will remove the wait loop from mptcp_sendmsg_frag().
+
+The retransmit worker doesn't need to do this refill as it won't
+transmit new mptcp-level data.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
