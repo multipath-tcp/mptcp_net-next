@@ -90,8 +90,10 @@ time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
 
 cd tools/testing/selftests/net/mptcp
 echo "${CONNECT_MMAP_BEGIN}" >> "${OUTPUT_SELFTESTS}"
-#{ ./mptcp_connect.sh -m mmap 2>&1 || echo "${CONNECT_MMAP_ERROR}" >> "${OUTPUT_SELFTESTS}"; } | \
-#        tee -a "${OUTPUT_SELFTESTS}"
+{ ./mptcp_connect.sh -m mmap 2>&1 || echo "${CONNECT_MMAP_ERROR}" >> "${OUTPUT_SELFTESTS}"; } | \
+        tee -a "${OUTPUT_SELFTESTS}"
+
+# TODO: mptcp_connect.sh with -R ; -S
 
 # packetdrill
 cd /opt/packetdrill/gtests/net/
