@@ -1377,7 +1377,7 @@ static struct rt6_info *ip6_rt_pcpu_alloc(const struct fib6_result *res)
 
 	rcu_read_lock();
 	dev = ip6_rt_get_dev_rcu(res);
-	pcpu_rt = ip6_dst_alloc(dev_net(dev), dev, flags);
+	pcpu_rt = ip6_dst_alloc(dev_net(dev), dev, flags | DST_NOCOUNT);
 	rcu_read_unlock();
 	if (!pcpu_rt) {
 		fib6_info_release(f6i);
@@ -3195,6 +3195,9 @@ static int ip6_dst_gc(struct dst_ops *ops)
 	int entries;
 
 	entries = dst_entries_get_fast(ops);
+	if (entries > rt_max_size)
+		entries = dst_entries_get_slow(ops);
+
 	if (time_after(rt_last_gc + rt_min_interval, jiffies) &&
 	    entries <= rt_max_size)
 		goto out;
