@@ -785,6 +785,11 @@ restart:
 		}
 
 		copied += ret;
+		mptcp_set_timeout(sk, ssk);
+		/* start the timer, if it's not pending */
+		if (!mptcp_timer_pending(sk))
+			mptcp_reset_timer(sk);
+
 		tx_ok = msg_data_left(msg);
 		if (!tx_ok)
 			break;
@@ -796,12 +801,10 @@ restart:
 		}
 	}
 
-	mptcp_set_timeout(sk, ssk);
 	if (copied) {
 		ret = copied;
 		tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle,
 			 size_goal);
-
 		/* start the timer, if it's not pending */
 		if (!mptcp_timer_pending(sk))
 			mptcp_reset_timer(sk);
