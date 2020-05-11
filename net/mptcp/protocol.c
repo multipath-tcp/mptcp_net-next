@@ -647,6 +647,9 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 out:
 	if (!retransmission)
 		pfrag->offset += frag_truesize;
+
+	mptcp_set_timeout(sk, ssk);
+
 	*write_seq += ret;
 	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
 
@@ -829,7 +832,6 @@ wait_for_sndbuf:
 		}
 	}
 
-	mptcp_set_timeout(sk, ssk);
 	if (copied) {
 		ret = copied;
 		tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle,
@@ -1195,7 +1197,6 @@ static void mptcp_worker(struct work_struct *work)
 	dfrag->offset = orig_offset;
 	dfrag->data_len = orig_len;
 
-	mptcp_set_timeout(sk, ssk);
 	release_sock(ssk);
 
 reset_unlock:
