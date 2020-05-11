@@ -653,6 +653,15 @@ out:
 	return ret;
 }
 
+static void mptcp_nospace(struct mptcp_sock *msk, struct socket *sock)
+{
+	clear_bit(MPTCP_SEND_SPACE, &msk->flags);
+	smp_mb__after_atomic(); /* msk->flags is changed by write_space cb */
+
+	/* enables sk->write_space() callbacks */
+	set_bit(SOCK_NOSPACE, &sock->flags);
+}
+
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
@@ -666,13 +675,8 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 		if (!sk_stream_memory_free(ssk)) {
 			struct socket *sock = ssk->sk_socket;
 
-			if (sock) {
-				clear_bit(MPTCP_SEND_SPACE, &msk->flags);
-				smp_mb__after_atomic();
-
-				/* enables sk->write_space() callbacks */
-				set_bit(SOCK_NOSPACE, &sock->flags);
-			}
+			if (sock)
+				mptcp_nospace(msk, sock);
 
 			return NULL;
 		}
@@ -740,6 +744,7 @@ fallback:
 
 	mptcp_clean_una(sk);
 
+wait_for_sndbuf:
 	__mptcp_flush_join_list(msk);
 	ssk = mptcp_subflow_get_send(msk);
 	while (!sk_stream_memory_free(sk) || !ssk) {
@@ -777,6 +782,24 @@ fallback:
 		}
 
 		copied += ret;
+
+		/* memory is charged to mptcp level socket as well, i.e.
+		 * if msg is very large, mptcp socket may run out of buffer
+		 * space.  mptcp_clean_una() will release data that has
+		 * been acked at mptcp level in the mean time, so there is
+		 * a good chance we can continue sending data right away.
+		 */
+		if (unlikely(!sk_stream_memory_free(sk))) {
+			tcp_push(ssk, msg->msg_flags, mss_now,
+				 tcp_sk(ssk)->nonagle, size_goal);
+			mptcp_clean_una(sk);
+			if (!sk_stream_memory_free(sk)) {
+				/* no luck, can't send more for now */
+				mptcp_nospace(msk, sk->sk_socket);
+				release_sock(ssk);
+				goto wait_for_sndbuf;
+			}
+		}
 	}
 
 	mptcp_set_timeout(sk, ssk);
