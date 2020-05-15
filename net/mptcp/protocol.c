@@ -488,22 +488,6 @@ mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
 	return dfrag;
 }
 
-static bool mptcp_sendmsg_alloc_skb(struct sock *sk)
-{
-	struct sk_buff *skb;
-
-	if (sk->sk_tx_skb_cache)
-		return true;
-
-	skb = alloc_skb_fclone(sk->sk_prot->max_header, sk->sk_allocation);
-	if (skb) {
-		skb_reserve(skb, sk->sk_prot->max_header);
-		sk->sk_tx_skb_cache = skb;
-	}
-
-	return sk->sk_tx_skb_cache != NULL;
-}
-
 static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			      struct msghdr *msg, struct mptcp_data_frag *dfrag,
 			      long *timeo, int *pmss_now,
@@ -519,11 +503,6 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	struct page *page;
 	u64 *write_seq;
 	size_t psize;
-
-	if (!ssk->sk_tx_skb_cache) {
-		ssk->sk_tx_skb_cache = sk->sk_tx_skb_cache;
-		sk->sk_tx_skb_cache = NULL;
-	}
 
 	/* use the mptcp page cache so that we can easily move the data
 	 * from one substream to another, but do per subflow memory accounting
@@ -611,7 +590,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	 * access the skb after the sendpages call
 	 */
 	ret = do_tcp_sendpages(ssk, page, offset, psize,
-			       msg->msg_flags | MSG_SENDPAGE_NOTLAST | MSG_DONTWAIT);
+			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
 	if (ret <= 0)
 		return ret;
 
@@ -677,16 +656,9 @@ out:
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct sock *sk = (struct sock *)msk;
 	struct sock *backup = NULL;
 
-	sock_owned_by_me(sk);
-
-	if (!mptcp_sendmsg_alloc_skb(sk))
-		return NULL;
-
-	if (!mptcp_ext_cache_refill(msk))
-		return NULL;
+	sock_owned_by_me((const struct sock *)msk);
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
@@ -742,7 +714,6 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct socket *ssock;
 	size_t copied = 0;
 	struct sock *ssk;
-	bool tx_ok;
 	long timeo;
 
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
@@ -767,7 +738,6 @@ fallback:
 		return ret >= 0 ? ret + copied : (copied ? copied : ret);
 	}
 
-restart:
 	mptcp_clean_una(sk);
 
 	__mptcp_flush_join_list(msk);
@@ -789,17 +759,11 @@ restart:
 	pr_debug("conn_list->subflow=%p", ssk);
 
 	lock_sock(ssk);
-	tx_ok = msg_data_left(msg);
-	while (tx_ok) {
+	while (msg_data_left(msg)) {
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
 					 &size_goal);
-		if (ret < 0) {
-			if (ret == -EAGAIN && timeo > 0) {
-				release_sock(ssk);
-				goto restart;
-			}
+		if (ret < 0)
 			break;
-		}
 		if (ret == 0 && unlikely(__mptcp_needs_tcp_fallback(msk))) {
 			/* Can happen for passive sockets:
 			 * 3WHS negotiated MPTCP, but first packet after is
@@ -813,27 +777,14 @@ restart:
 		}
 
 		copied += ret;
-		mptcp_set_timeout(sk, ssk);
-		/* start the timer, if it's not pending */
-		if (!mptcp_timer_pending(sk))
-			mptcp_reset_timer(sk);
-
-		tx_ok = msg_data_left(msg);
-		if (!tx_ok)
-			break;
-		if (!sk_stream_memory_free(ssk) ||
-		    !mptcp_ext_cache_refill(msk)) {
-			tcp_push(ssk, msg->msg_flags, mss_now,
-				 tcp_sk(ssk)->nonagle, size_goal);
-			release_sock(ssk);
-			goto restart;
-		}
 	}
 
+	mptcp_set_timeout(sk, ssk);
 	if (copied) {
 		ret = copied;
 		tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle,
 			 size_goal);
+
 		/* start the timer, if it's not pending */
 		if (!mptcp_timer_pending(sk))
 			mptcp_reset_timer(sk);
@@ -1143,7 +1094,7 @@ static void mptcp_worker(struct work_struct *work)
 {
 	struct mptcp_sock *msk = container_of(work, struct mptcp_sock, work);
 	struct sock *ssk, *sk = &msk->sk.icsk_inet.sk;
-	int orig_len, orig_offset, mss_now = 0, size_goal = 0;
+	int orig_len, orig_offset, ret, mss_now = 0, size_goal = 0;
 	struct mptcp_data_frag *dfrag;
 	u64 orig_write_seq;
 	size_t copied = 0;
@@ -1165,9 +1116,6 @@ static void mptcp_worker(struct work_struct *work)
 	if (!dfrag)
 		goto unlock;
 
-	if (!mptcp_ext_cache_refill(msk))
-		goto reset_unlock;
-
 	ssk = mptcp_subflow_get_retrans(msk);
 	if (!ssk)
 		goto reset_unlock;
@@ -1179,8 +1127,8 @@ static void mptcp_worker(struct work_struct *work)
 	orig_offset = dfrag->offset;
 	orig_write_seq = dfrag->data_seq;
 	while (dfrag->data_len > 0) {
-		int ret = mptcp_sendmsg_frag(sk, ssk, &msg, dfrag, &timeo,
-					     &mss_now, &size_goal);
+		ret = mptcp_sendmsg_frag(sk, ssk, &msg, dfrag, &timeo, &mss_now,
+					 &size_goal);
 		if (ret < 0)
 			break;
 
@@ -1188,9 +1136,6 @@ static void mptcp_worker(struct work_struct *work)
 		copied += ret;
 		dfrag->data_len -= ret;
 		dfrag->offset += ret;
-
-		if (!mptcp_ext_cache_refill(msk))
-			break;
 	}
 	if (copied)
 		tcp_push(ssk, msg.msg_flags, mss_now, tcp_sk(ssk)->nonagle,
@@ -1514,7 +1459,6 @@ static void mptcp_destroy(struct sock *sk)
 	if (msk->cached_ext)
 		__skb_ext_put(msk->cached_ext);
 
-	kfree_skb(sk->sk_tx_skb_cache);
 	sk_sockets_allocated_dec(sk);
 }
 
@@ -1725,7 +1669,6 @@ static struct proto mptcp_prot = {
 	.hash		= inet_hash,
 	.unhash		= inet_unhash,
 	.get_port	= mptcp_get_port,
-	.max_header	= MAX_TCP_HEADER,
 	.sockets_allocated	= &mptcp_sockets_allocated,
 	.memory_allocated	= &tcp_memory_allocated,
 	.memory_pressure	= &tcp_memory_pressure,
