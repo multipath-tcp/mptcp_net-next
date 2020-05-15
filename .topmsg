@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/inet_connection_sock-factor-out-destroy-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] inet_connection_sock: factor out destroy helper.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Move the steps to prepare an inet_connection_sock for
+forced disposal inside a separate helper. No functional
+changes inteded, this will just simplify the next patch.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Christoph Paasch <cpaasch@apple.com>
