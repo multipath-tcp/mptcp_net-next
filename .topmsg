@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-cope-better-with-MP_JOIN-failure
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cope better with MP_JOIN failure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently, on MP_JOIN failure we reset the child
+socket, but leave the request socket untouched.
+
+tcp_check_req will deal with it according to the
+'tcp_abort_on_overflow' sysctl value - by default the
+req socket will stay alive.
+
+The above leads to inconsistent behavior on MP JOIN
+failure, and bad listener overflow accounting.
+
+This patch addresses the issue leveraging the infrastructure
+just introduced to ask the TCP stack to drop the req on
+failure.
+
+The child socket is not freed anymore by subflow_syn_recv_sock(),
+instead it's moved to a dead state and will be disposed by the
+next sock_put done by the TCP stack, so that listener overflow
+accounting is not affected by MP JOIN failure.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Christoph Paasch <cpaasch@apple.com>
