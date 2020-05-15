@@ -590,7 +590,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	 * access the skb after the sendpages call
 	 */
 	ret = do_tcp_sendpages(ssk, page, offset, psize,
-			       msg->msg_flags | MSG_SENDPAGE_NOTLAST | MSG_DONTWAIT);
+			       msg->msg_flags | MSG_SENDPAGE_NOTLAST);
 	if (ret <= 0)
 		return ret;
 
@@ -714,7 +714,6 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	struct socket *ssock;
 	size_t copied = 0;
 	struct sock *ssk;
-	bool tx_ok;
 	long timeo;
 
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
@@ -739,7 +738,6 @@ fallback:
 		return ret >= 0 ? ret + copied : (copied ? copied : ret);
 	}
 
-restart:
 	mptcp_clean_una(sk);
 
 	__mptcp_flush_join_list(msk);
@@ -761,17 +759,11 @@ restart:
 	pr_debug("conn_list->subflow=%p", ssk);
 
 	lock_sock(ssk);
-	tx_ok = msg_data_left(msg);
-	while (tx_ok) {
+	while (msg_data_left(msg)) {
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
 					 &size_goal);
-		if (ret < 0) {
-			if (ret == -EAGAIN && timeo > 0) {
-				release_sock(ssk);
-				goto restart;
-			}
+		if (ret < 0)
 			break;
-		}
 		if (ret == 0 && unlikely(__mptcp_needs_tcp_fallback(msk))) {
 			/* Can happen for passive sockets:
 			 * 3WHS negotiated MPTCP, but first packet after is
@@ -785,15 +777,6 @@ restart:
 		}
 
 		copied += ret;
-		tx_ok = msg_data_left(msg);
-		if (!tx_ok)
-			break;
-		if (!sk_stream_memory_free(ssk)) {
-			tcp_push(ssk, msg->msg_flags, mss_now,
-				 tcp_sk(ssk)->nonagle, size_goal);
-			release_sock(ssk);
-			goto restart;
-		}
 	}
 
 	mptcp_set_timeout(sk, ssk);
