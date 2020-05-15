@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-cope-better-with-MP_JOIN-failure
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
