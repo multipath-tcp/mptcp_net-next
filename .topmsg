@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-make-sure-timer-is-inited-once-data-is-pending-for-transmission
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: make sure timer is inited once data is pending for transmission
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp_connect self-tests with additional '-m mmap' argument triggers a
+(harmless) WARN_ON_ONCE splat in mptcp_reset_timer() as the msk sockets
+timer_ival is still 0.
+
+This is because the timer is only set up after the transmit loop, but
+the splat can be triggered once the first mptcp-level ACK is processed.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/3
+Signed-off-by: Florian Westphal <fw@strlen.de>
