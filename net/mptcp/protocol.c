@@ -488,22 +488,6 @@ mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
 	return dfrag;
 }
 
-static bool mptcp_sendmsg_alloc_skb(struct sock *sk)
-{
-	struct sk_buff *skb;
-
-	if (sk->sk_tx_skb_cache)
-		return true;
-
-	skb = alloc_skb_fclone(sk->sk_prot->max_header, sk->sk_allocation);
-	if (skb) {
-		skb_reserve(skb, sk->sk_prot->max_header);
-		sk->sk_tx_skb_cache = skb;
-	}
-
-	return sk->sk_tx_skb_cache != NULL;
-}
-
 static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			      struct msghdr *msg, struct mptcp_data_frag *dfrag,
 			      long *timeo, int *pmss_now,
@@ -519,11 +503,6 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	struct page *page;
 	u64 *write_seq;
 	size_t psize;
-
-	if (!ssk->sk_tx_skb_cache) {
-		ssk->sk_tx_skb_cache = sk->sk_tx_skb_cache;
-		sk->sk_tx_skb_cache = NULL;
-	}
 
 	/* use the mptcp page cache so that we can easily move the data
 	 * from one substream to another, but do per subflow memory accounting
@@ -677,13 +656,9 @@ out:
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct sock *sk = (struct sock *)msk;
 	struct sock *backup = NULL;
 
-	sock_owned_by_me(sk);
-
-	if (!mptcp_sendmsg_alloc_skb(sk))
-		return NULL;
+	sock_owned_by_me((const struct sock *)msk);
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
@@ -1504,7 +1479,6 @@ static void mptcp_destroy(struct sock *sk)
 	if (msk->cached_ext)
 		__skb_ext_put(msk->cached_ext);
 
-	kfree_skb(sk->sk_tx_skb_cache);
 	sk_sockets_allocated_dec(sk);
 }
 
@@ -1715,7 +1689,6 @@ static struct proto mptcp_prot = {
 	.hash		= inet_hash,
 	.unhash		= inet_unhash,
 	.get_port	= mptcp_get_port,
-	.max_header	= MAX_TCP_HEADER,
 	.sockets_allocated	= &mptcp_sockets_allocated,
 	.memory_allocated	= &tcp_memory_allocated,
 	.memory_pressure	= &tcp_memory_pressure,
