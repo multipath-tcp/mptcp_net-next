@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-break-and-restart-in-case-mptcp-sndbuf-is-full
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: break and restart in case mptcp sndbuf is full
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Its not enough to wait for TCP-level acks (free tcp send space).
+We also hold on to any transmitted data for mptcp-level retransmits,
+so we can't continue sending more data when there is no more mptcp send
+buffer space available.
+
+Therefore add needed check in mptcp_sendmsg, flush tcp data and
+wait until mptcp snd space becomes available.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
