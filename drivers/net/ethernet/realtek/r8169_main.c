@@ -10,7 +10,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -1916,12 +1915,6 @@ static int rtl8169_set_eee(struct net_device *dev, struct ethtool_eee *data)
 
 	if (!pm_runtime_active(d)) {
 		ret = -EOPNOTSUPP;
-		goto out;
-	}
-
-	if (dev->phydev->autoneg == AUTONEG_DISABLE ||
-	    dev->phydev->duplex != DUPLEX_FULL) {
-		ret = -EPROTONOSUPPORT;
 		goto out;
 	}
 
