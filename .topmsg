@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/inet_connection_sock-factor-out-destroy-helper
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
