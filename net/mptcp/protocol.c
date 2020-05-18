@@ -367,8 +367,10 @@ static void mptcp_stop_timer(struct sock *sk)
 
 static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
 {
+	const struct sock *sk = (const struct sock *)msk;
+
 	if (!msk->cached_ext)
-		msk->cached_ext = __skb_ext_alloc();
+		msk->cached_ext = __skb_ext_alloc(sk->sk_allocation);
 
 	return !!msk->cached_ext;
 }
@@ -633,9 +635,6 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 out:
 	if (!retransmission)
 		pfrag->offset += frag_truesize;
-
-	mptcp_set_timeout(sk, ssk);
-
 	*write_seq += ret;
 	mptcp_subflow_ctx(ssk)->rel_write_seq += ret;
 
@@ -694,13 +693,8 @@ static void ssk_check_wmem(struct mptcp_sock *msk, struct sock *ssk)
 		return;
 
 	sock = READ_ONCE(ssk->sk_socket);
-
-	if (sock) {
-		clear_bit(MPTCP_SEND_SPACE, &msk->flags);
-		smp_mb__after_atomic();
-		/* set NOSPACE only after clearing SEND_SPACE flag */
-		set_bit(SOCK_NOSPACE, &sock->flags);
-	}
+	if (sock)
+		mptcp_nospace(msk, sock);
 }
 
 static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
@@ -746,6 +740,19 @@ wait_for_sndbuf:
 	while (!sk_stream_memory_free(sk) ||
 	       !ssk ||
 	       !mptcp_page_frag_refill(ssk, pfrag)) {
+		if (ssk) {
+			/* make sure retransmit timer is
+			 * running before we wait for memory.
+			 *
+			 * The retransmit timer might be needed
+			 * to make the peer send an up-to-date
+			 * MPTCP Ack.
+			 */
+			mptcp_set_timeout(sk, ssk);
+			if (!mptcp_timer_pending(sk))
+				mptcp_reset_timer(sk);
+		}
+
 		ret = sk_stream_wait_memory(sk, &timeo);
 		if (ret)
 			goto out;
@@ -768,6 +775,7 @@ wait_for_sndbuf:
 					 &size_goal);
 		if (ret < 0) {
 			if (ret == -EAGAIN && timeo > 0) {
+				mptcp_set_timeout(sk, ssk);
 				release_sock(ssk);
 				goto restart;
 			}
@@ -797,6 +805,7 @@ wait_for_sndbuf:
 			set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
 			tcp_push(ssk, msg->msg_flags, mss_now,
 				 tcp_sk(ssk)->nonagle, size_goal);
+			mptcp_set_timeout(sk, ssk);
 			release_sock(ssk);
 			goto restart;
 		}
@@ -819,14 +828,19 @@ wait_for_sndbuf:
 				 tcp_sk(ssk)->nonagle, size_goal);
 			mptcp_clean_una(sk);
 			if (!sk_stream_memory_free(sk)) {
-				/* no luck, can't send more for now */
-				mptcp_nospace(msk, sk->sk_socket);
+				/* can't send more for now, need to wait for
+				 * MPTCP-level ACKs from peer.
+				 *
+				 * Wakeup will happen via mptcp_clean_una().
+				 */
+				mptcp_set_timeout(sk, ssk);
 				release_sock(ssk);
 				goto wait_for_sndbuf;
 			}
 		}
 	}
 
+	mptcp_set_timeout(sk, ssk);
 	if (copied) {
 		ret = copied;
 		tcp_push(ssk, msg->msg_flags, mss_now, tcp_sk(ssk)->nonagle,
@@ -1198,6 +1212,7 @@ static void mptcp_worker(struct work_struct *work)
 	dfrag->offset = orig_offset;
 	dfrag->data_len = orig_len;
 
+	mptcp_set_timeout(sk, ssk);
 	release_sock(ssk);
 
 reset_unlock:
