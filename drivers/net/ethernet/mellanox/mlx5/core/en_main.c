@@ -38,7 +38,7 @@
 #include <linux/bpf.h>
 #include <linux/if_bridge.h>
 #include <net/page_pool.h>
-#include <net/xdp_sock.h>
+#include <net/xdp_sock_drv.h>
 #include "eswitch.h"
 #include "en.h"
 #include "en/txrx.h"
@@ -373,7 +373,6 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 	struct mlx5_core_dev *mdev = c->mdev;
 	void *rqc = rqp->rqc;
 	void *rqc_wq = MLX5_ADDR_OF(rqc, rqc, wq);
-	u32 num_xsk_frames = 0;
 	u32 rq_xdp_ix;
 	u32 pool_size;
 	int wq_sz;
@@ -413,7 +412,6 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 
 	rq->buff.map_dir = rq->xdp_prog ? DMA_BIDIRECTIONAL : DMA_FROM_DEVICE;
 	rq->buff.headroom = mlx5e_get_rq_headroom(mdev, params, xsk);
-	rq->buff.umem_headroom = xsk ? xsk->headroom : 0;
 	pool_size = 1 << params->log_rq_mtu_frames;
 
 	switch (rq->wq_type) {
@@ -426,10 +424,6 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 		rq->mpwqe.wq.db = &rq->mpwqe.wq.db[MLX5_RCV_DBR];
 
 		wq_sz = mlx5_wq_ll_get_size(&rq->mpwqe.wq);
-
-		if (xsk)
-			num_xsk_frames = wq_sz <<
-				mlx5e_mpwqe_get_log_num_strides(mdev, params, xsk);
 
 		pool_size = MLX5_MPWRQ_PAGES_PER_WQE <<
 			mlx5e_mpwqe_get_log_rq_size(params, xsk);
@@ -482,9 +476,6 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 
 		wq_sz = mlx5_wq_cyc_get_size(&rq->wqe.wq);
 
-		if (xsk)
-			num_xsk_frames = wq_sz << rq->wqe.info.log_num_frags;
-
 		rq->wqe.info = rqp->frags_info;
 		rq->buff.frame0_sz = rq->wqe.info.arr[0].frag_stride;
 
@@ -525,19 +516,9 @@ static int mlx5e_alloc_rq(struct mlx5e_channel *c,
 	}
 
 	if (xsk) {
-		rq->buff.frame0_sz = xsk_umem_xdp_frame_sz(umem);
-
-		err = mlx5e_xsk_resize_reuseq(umem, num_xsk_frames);
-		if (unlikely(err)) {
-			mlx5_core_err(mdev, "Unable to allocate the Reuse Ring for %u frames\n",
-				      num_xsk_frames);
-			goto err_free;
-		}
-
-		rq->zca.free = mlx5e_xsk_zca_free;
 		err = xdp_rxq_info_reg_mem_model(&rq->xdp_rxq,
-						 MEM_TYPE_ZERO_COPY,
-						 &rq->zca);
+						 MEM_TYPE_XSK_BUFF_POOL, NULL);
+		xsk_buff_set_rxq_info(rq->umem, &rq->xdp_rxq);
 	} else {
 		/* Create a page_pool and register it with rxq */
 		pp_params.order     = 0;
@@ -3539,41 +3520,6 @@ out:
 	return err;
 }
 
-#ifdef CONFIG_MLX5_ESWITCH
-static int mlx5e_setup_tc_cls_flower(struct mlx5e_priv *priv,
-				     struct flow_cls_offload *cls_flower,
-				     unsigned long flags)
-{
-	switch (cls_flower->command) {
-	case FLOW_CLS_REPLACE:
-		return mlx5e_configure_flower(priv->netdev, priv, cls_flower,
-					      flags);
-	case FLOW_CLS_DESTROY:
-		return mlx5e_delete_flower(priv->netdev, priv, cls_flower,
-					   flags);
-	case FLOW_CLS_STATS:
-		return mlx5e_stats_flower(priv->netdev, priv, cls_flower,
-					  flags);
-	default:
-		return -EOPNOTSUPP;
-	}
-}
-
-static int mlx5e_setup_tc_block_cb(enum tc_setup_type type, void *type_data,
-				   void *cb_priv)
-{
-	unsigned long flags = MLX5_TC_FLAG(INGRESS) | MLX5_TC_FLAG(NIC_OFFLOAD);
-	struct mlx5e_priv *priv = cb_priv;
-
-	switch (type) {
-	case TC_SETUP_CLSFLOWER:
-		return mlx5e_setup_tc_cls_flower(priv, type_data, flags);
-	default:
-		return -EOPNOTSUPP;
-	}
-}
-#endif
-
 static LIST_HEAD(mlx5e_block_cb_list);
 
 static int mlx5e_setup_tc(struct net_device *dev, enum tc_setup_type type,
@@ -3582,7 +3528,6 @@ static int mlx5e_setup_tc(struct net_device *dev, enum tc_setup_type type,
 	struct mlx5e_priv *priv = netdev_priv(dev);
 
 	switch (type) {
-#ifdef CONFIG_MLX5_ESWITCH
 	case TC_SETUP_BLOCK: {
 		struct flow_block_offload *f = type_data;
 
@@ -3592,7 +3537,6 @@ static int mlx5e_setup_tc(struct net_device *dev, enum tc_setup_type type,
 						  mlx5e_setup_tc_block_cb,
 						  priv, priv, true);
 	}
-#endif
 	case TC_SETUP_QDISC_MQPRIO:
 		return mlx5e_setup_tc_mqprio(priv, type_data);
 	default:
@@ -3765,7 +3709,7 @@ static int set_feature_cvlan_filter(struct net_device *netdev, bool enable)
 	return 0;
 }
 
-#ifdef CONFIG_MLX5_ESWITCH
+#if IS_ENABLED(CONFIG_MLX5_CLS_ACT)
 static int set_feature_tc_num_filters(struct net_device *netdev, bool enable)
 {
 	struct mlx5e_priv *priv = netdev_priv(netdev);
@@ -3876,7 +3820,7 @@ int mlx5e_set_features(struct net_device *netdev, netdev_features_t features)
 	err |= MLX5E_HANDLE_FEATURE(NETIF_F_LRO, set_feature_lro);
 	err |= MLX5E_HANDLE_FEATURE(NETIF_F_HW_VLAN_CTAG_FILTER,
 				    set_feature_cvlan_filter);
-#ifdef CONFIG_MLX5_ESWITCH
+#if IS_ENABLED(CONFIG_MLX5_CLS_ACT)
 	err |= MLX5E_HANDLE_FEATURE(NETIF_F_HW_TC, set_feature_tc_num_filters);
 #endif
 	err |= MLX5E_HANDLE_FEATURE(NETIF_F_RXALL, set_feature_rx_all);
