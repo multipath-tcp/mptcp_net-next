@@ -1308,6 +1308,8 @@ static int mtk_star_receive_packet(struct mtk_star_priv *priv)
 		goto push_new_skb;
 	}
 
+	desc_data.dma_addr = new_dma_addr;
+
 	/* We can't fail anymore at this point: it's safe to unmap the skb. */
 	mtk_star_dma_unmap_rx(priv, &desc_data);
 
@@ -1318,7 +1320,6 @@ static int mtk_star_receive_packet(struct mtk_star_priv *priv)
 	netif_receive_skb(desc_data.skb);
 
 push_new_skb:
-	desc_data.dma_addr = new_dma_addr;
 	desc_data.len = skb_tailroom(new_skb);
 	desc_data.skb = new_skb;
 
@@ -1467,7 +1468,7 @@ out_put_node:
 	return ret;
 }
 
-static int mtk_star_suspend(struct device *dev)
+static __maybe_unused int mtk_star_suspend(struct device *dev)
 {
 	struct mtk_star_priv *priv;
 	struct net_device *ndev;
@@ -1483,7 +1484,7 @@ static int mtk_star_suspend(struct device *dev)
 	return 0;
 }
 
-static int mtk_star_resume(struct device *dev)
+static __maybe_unused int mtk_star_resume(struct device *dev)
 {
 	struct mtk_star_priv *priv;
 	struct net_device *ndev;
