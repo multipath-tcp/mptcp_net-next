@@ -5003,9 +5003,11 @@ static bool mlxsw_sp_fib6_rt_should_ignore(const struct fib6_info *rt)
 {
 	/* Packets with link-local destination IP arriving to the router
 	 * are trapped to the CPU, so no need to program specific routes
-	 * for them.
+	 * for them. Only allow prefix routes (usually one fe80::/64) so
+	 * that packets are trapped for the right reason.
 	 */
-	if (ipv6_addr_type(&rt->fib6_dst.addr) & IPV6_ADDR_LINKLOCAL)
+	if ((ipv6_addr_type(&rt->fib6_dst.addr) & IPV6_ADDR_LINKLOCAL) &&
+	    (rt->fib6_flags & (RTF_LOCAL | RTF_ANYCAST)))
 		return true;
 
 	/* Multicast routes aren't supported, so ignore them. Neighbour
@@ -7572,7 +7574,7 @@ static struct mlxsw_sp_fid *
 mlxsw_sp_rif_vlan_fid_get(struct mlxsw_sp_rif *rif,
 			  struct netlink_ext_ack *extack)
 {
-	struct net_device *br_dev = rif->dev;
+	struct net_device *br_dev;
 	u16 vid;
 	int err;
 
