@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-__init-annotation-on-setup-functions
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add __init annotation on setup functions
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add the missing annotation in some setup-only
+functions.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+--
+v1 -> v2
+ - move mptcp_token_init() into the next patch
+ - added missing annotation for pm_netlink
