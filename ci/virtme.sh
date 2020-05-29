@@ -39,7 +39,12 @@ CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
-        kconfig=(-e MPTCP -e MPTCP_IPV6 -m MPTCP_KUNIT_TESTS -e VETH -e NET_SCH_NETEM)
+        kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM)
+        # Extra options needed for MPTCP KUnit tests
+        kconfig+=(-m KUNIT -e KUNIT_DEBUGFS \
+                  -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
+                  -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST -d LIST_KUNIT_TEST \
+                  -m MPTCP_KUNIT_TESTS)
         # Extra options needed for packetdrill
         kconfig+=(-e TUN -e CRYPTO_USER_API_HASH)
         if [ -n "${1}" ]; then
@@ -83,6 +88,12 @@ prepare() { local old_pwd
         mkdir -p "${VIRTME_SCRIPT_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
+
+# kunit
+insmod ./lib/kunit/kunit.ko
+for ko in net/mptcp/*_test.ko; do
+	insmod "\${ko}"
+done
 
 # selftests
 time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
@@ -154,6 +165,18 @@ analyse() {
         if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
                 echo "Call Trace found"
                 # exit directly, that's bad
+                exit 2
+        fi
+
+	# KUnit tests
+        if ! grep -q "\] ok 1 - mptcp-crypto" "${OUTPUT_VIRTME}"; then
+                echo "KUnit Crypto tests failed"
+                grep -B 10 "mptcp-crypto" "${OUTPUT_VIRTME}"
+                exit 2
+        fi
+        if ! grep -q "\] ok 2 - mptcp-token" "${OUTPUT_VIRTME}"; then
+                echo "KUnit Token tests failed"
+                grep -B 10 "mptcp-token" "${OUTPUT_VIRTME}"
                 exit 2
         fi
 

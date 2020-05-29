@@ -42,7 +42,7 @@ RUN apt-get update && \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
                     python3 python3-pkg-resources busybox iproute2 tcpdump \
                     iputils-ping ethtool klibc-utils rsync ccache \
-                    ca-certificates gnupg2 net-tools && \
+                    ca-certificates gnupg2 net-tools kmod && \
     apt-get clean
 
 # CLang dev for BPF selftests (curl required)
