@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-crypto-test-to-KUNIT
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move crypto test to KUNIT
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+currently MPTCP uses a custom hook to executed unit test at
+boot time. Let's use the KUNIT framework instead.
+Additionally move the relevant code to a separate file and
+export the function needed by the test when self-tests
+are build as a module.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
