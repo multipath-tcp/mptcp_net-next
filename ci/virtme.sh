@@ -39,7 +39,7 @@ CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
-        kconfig=(-e MPTCP -e MPTCP_IPV6 -e MPTCP_HMAC_TEST -e VETH -e NET_SCH_NETEM)
+        kconfig=(-e MPTCP -e MPTCP_IPV6 -m MPTCP_KUNIT_TESTS -e VETH -e NET_SCH_NETEM)
         # Extra options needed for packetdrill
         kconfig+=(-e TUN -e CRYPTO_USER_API_HASH)
         if [ -n "${1}" ]; then
