@@ -32,11 +32,14 @@ static void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
 static int subflow_rebuild_header(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	int local_id, err = 0;
+	int local_id;
 
 	if (subflow->request_mptcp && !subflow->token) {
 		pr_debug("subflow=%p", sk);
-		err = mptcp_token_new_connect(sk);
+		if (mptcp_token_new_connect(sk)) {
+			subflow->mp_capable = 0;
+			goto out;
+		}
 	} else if (subflow->request_join && !subflow->local_nonce) {
 		struct mptcp_sock *msk = (struct mptcp_sock *)subflow->conn;
 
@@ -57,9 +60,6 @@ static int subflow_rebuild_header(struct sock *sk)
 	}
 
 out:
-	if (err)
-		return err;
-
 	return subflow->icsk_af_ops->rebuild_header(sk);
 }
 
@@ -1243,7 +1243,7 @@ static int subflow_ops_init(struct request_sock_ops *subflow_ops)
 	return 0;
 }
 
-void mptcp_subflow_init(void)
+void __init mptcp_subflow_init(void)
 {
 	subflow_request_sock_ops = tcp_request_sock_ops;
 	if (subflow_ops_init(&subflow_request_sock_ops) != 0)
