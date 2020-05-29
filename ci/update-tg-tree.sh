@@ -220,7 +220,12 @@ generate_config_no_mptcp() {
 generate_config_mptcp() {
 	generate_config_no_mptcp "${@}"
 
-	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e KUNIT -e MPTCP_KUNIT_TESTS
+	# to avoid warnings/errors, enable KUnit without the extras
+	echo | scripts/config -e KUNIT -d KUNIT_DEBUGFS \
+	                      -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
+	                      -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST -d LIST_KUNIT_TEST
+
+	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
 
 	# Here, we want to have a failure if some new MPTCP options are
 	# available not to forget to enable them. We then don't want to run
