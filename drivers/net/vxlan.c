@@ -881,13 +881,13 @@ static int vxlan_fdb_nh_update(struct vxlan_dev *vxlan, struct vxlan_fdb *fdb,
 			goto err_inval;
 		}
 
-		if (!nh->is_group || !nh->nh_grp->mpath) {
+		nhg = rtnl_dereference(nh->nh_grp);
+		if (!nh->is_group || !nhg->mpath) {
 			NL_SET_ERR_MSG(extack, "Nexthop is not a multipath group");
 			goto err_inval;
 		}
 
 		/* check nexthop group family */
-		nhg = rtnl_dereference(nh->nh_grp);
 		switch (vxlan->default_dst.remote_ip.sa.sa_family) {
 		case AF_INET:
 			if (!nhg->has_v4) {
@@ -2092,6 +2092,10 @@ static struct sk_buff *vxlan_na_create(struct sk_buff *request,
 	ns_olen = request->len - skb_network_offset(request) -
 		sizeof(struct ipv6hdr) - sizeof(*ns);
 	for (i = 0; i < ns_olen-1; i += (ns->opt[i+1]<<3)) {
+		if (!ns->opt[i + 1]) {
+			kfree_skb(reply);
+			return NULL;
+		}
 		if (ns->opt[i] == ND_OPT_SOURCE_LL_ADDR) {
 			daddr = ns->opt + i + sizeof(struct nd_opt_hdr);
 			break;
