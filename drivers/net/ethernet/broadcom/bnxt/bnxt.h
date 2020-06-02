@@ -659,11 +659,6 @@ struct nqe_cn {
 #define HWRM_CMD_TIMEOUT		(bp->hwrm_cmd_timeout)
 #define HWRM_RESET_TIMEOUT		((HWRM_CMD_TIMEOUT) * 4)
 #define HWRM_COREDUMP_TIMEOUT		((HWRM_CMD_TIMEOUT) * 12)
-#define HWRM_RESP_ERR_CODE_MASK		0xffff
-#define HWRM_RESP_LEN_OFFSET		4
-#define HWRM_RESP_LEN_MASK		0xffff0000
-#define HWRM_RESP_LEN_SFT		16
-#define HWRM_RESP_VALID_MASK		0xff000000
 #define BNXT_HWRM_REQ_MAX_SIZE		128
 #define BNXT_HWRM_REQS_PER_PAGE		(BNXT_PAGE_SIZE /	\
 					 BNXT_HWRM_REQ_MAX_SIZE)
@@ -1875,7 +1870,6 @@ struct bnxt {
 	u8			dsn[8];
 	struct bnxt_tc_info	*tc_info;
 	struct list_head	tc_indr_block_list;
-	struct notifier_block	tc_netdev_nb;
 	struct dentry		*debugfs_pdev;
 	struct device		*hwmon_dev;
 };
