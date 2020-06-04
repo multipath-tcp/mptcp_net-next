@@ -94,6 +94,7 @@
 #include <linux/thread_info.h>
 #include <linux/stackleak.h>
 #include <linux/kasan.h>
+#include <linux/scs.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -456,6 +457,8 @@ void put_task_stack(struct task_struct *tsk)
 
 void free_task(struct task_struct *tsk)
 {
+	scs_release(tsk);
+
 #ifndef CONFIG_THREAD_INFO_IN_TASK
 	/*
 	 * The task is finally done with both the stack and thread_info,
@@ -840,6 +843,8 @@ void __init fork_init(void)
 			  NULL, free_vm_stack_cache);
 #endif
 
+	scs_init();
+
 	lockdep_init_task(&init_task);
 	uprobes_init();
 }
@@ -896,6 +901,10 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	refcount_set(&tsk->stack_refcount, 1);
 #endif
 
+	if (err)
+		goto free_stack;
+
+	err = scs_prepare(tsk, node);
 	if (err)
 		goto free_stack;
 
@@ -1683,6 +1692,11 @@ static inline void rcu_copy_process(struct task_struct *p)
 	INIT_LIST_HEAD(&p->rcu_tasks_holdout_list);
 	p->rcu_tasks_idle_cpu = -1;
 #endif /* #ifdef CONFIG_TASKS_RCU */
+#ifdef CONFIG_TASKS_TRACE_RCU
+	p->trc_reader_nesting = 0;
+	p->trc_reader_special.s = 0;
+	INIT_LIST_HEAD(&p->trc_holdout_list);
+#endif /* #ifdef CONFIG_TASKS_TRACE_RCU */
 }
 
 struct pid *pidfd_pid(const struct file *file)
