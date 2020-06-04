@@ -1448,8 +1448,6 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->token = subflow_req->token;
 	msk->subflow = NULL;
 
-	mptcp_token_accept(subflow_req, msk);
-
 	msk->write_seq = subflow_req->idsn + 1;
 	atomic64_set(&msk->snd_una, msk->write_seq);
 	if (mp_opt->mp_capable) {
@@ -1535,7 +1533,7 @@ static void mptcp_destroy(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	mptcp_token_destroy(msk->token);
+	mptcp_token_destroy(msk);
 	if (msk->cached_ext)
 		__skb_ext_put(msk->cached_ext);
 
@@ -1814,6 +1812,7 @@ static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		goto do_connect;
 	}
 
+	mptcp_token_destroy(msk);
 	ssock = __mptcp_socket_create(msk, TCP_SYN_SENT);
 	if (IS_ERR(ssock)) {
 		err = PTR_ERR(ssock);
@@ -1890,6 +1889,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	pr_debug("msk=%p", msk);
 
 	lock_sock(sock->sk);
+	mptcp_token_destroy(msk);
 	ssock = __mptcp_socket_create(msk, TCP_LISTEN);
 	if (IS_ERR(ssock)) {
 		err = PTR_ERR(ssock);

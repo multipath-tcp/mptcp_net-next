@@ -383,13 +383,18 @@ void mptcp_data_acked(struct sock *sk);
 void mptcp_subflow_eof(struct sock *sk);
 
 void __init mptcp_token_init(void);
+static inline void mptcp_token_init_request(struct request_sock *req)
+{
+	mptcp_subflow_rsk(req)->token_node.pprev = NULL;
+}
+
 int mptcp_token_new_request(struct request_sock *req);
-void mptcp_token_destroy_request(u32 token);
+void mptcp_token_destroy_request(struct request_sock *req);
 int mptcp_token_new_connect(struct sock *sk);
 void mptcp_token_accept(struct mptcp_subflow_request_sock *r,
 			struct mptcp_sock *msk);
 struct mptcp_sock *mptcp_token_get_sock(u32 token);
-void mptcp_token_destroy(u32 token);
+void mptcp_token_destroy(struct mptcp_sock *msk);
 
 void mptcp_crypto_key_sha(u64 key, u32 *token, u64 *idsn);
 static inline void mptcp_crypto_key_gen_sha(u64 *key, u32 *token, u64 *idsn)
