@@ -1,6 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: introduce token KUNIT self-tests
-
-Unit tests for the internal MPTCP token APIs, using KUNIT
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
