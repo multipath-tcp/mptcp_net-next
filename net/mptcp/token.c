@@ -119,7 +119,7 @@ again:
 		goto again;
 	}
 
-	hlist_nulls_add_tail_rcu(&subflow_req->token_node, &bucket->req_chain);
+	hlist_nulls_add_head_rcu(&subflow_req->token_node, &bucket->req_chain);
 	bucket->chain_len++;
 	spin_unlock_bh(&bucket->lock);
 	return 0;
@@ -165,7 +165,7 @@ again:
 	}
 
 	WRITE_ONCE(msk->token, subflow->token);
-	__sk_nulls_add_node_tail_rcu((struct sock *)msk, &bucket->msk_chain);
+	__sk_nulls_add_node_rcu((struct sock *)msk, &bucket->msk_chain);
 	bucket->chain_len++;
 	spin_unlock_bh(&bucket->lock);
 	return 0;
@@ -187,15 +187,12 @@ void mptcp_token_accept(struct mptcp_subflow_request_sock *req,
 
 	bucket = token_bucket(req->token);
 	spin_lock_bh(&bucket->lock);
-	pos = __token_lookup_req(bucket, req->token);
 
-	/* if we have a multiple CPUs racing on this req, we can legitly not
-	 * find anymore the req token, otherwise the lookup must return the
-	 * current req socket
-	 */
-	if (pos && !WARN_ON_ONCE(pos != req))
-		hlist_nulls_del_rcu(&req->token_node);
-	__sk_nulls_add_node_tail_rcu((struct sock *)msk, &bucket->msk_chain);
+	/* pedantic lookup check for the moved token */
+	pos = __token_lookup_req(bucket, req->token);
+	if (!WARN_ON_ONCE(pos != req))
+		hlist_nulls_del_init_rcu(&req->token_node);
+	__sk_nulls_add_node_rcu((struct sock *)msk, &bucket->msk_chain);
 	spin_unlock_bh(&bucket->lock);
 }
 
@@ -244,21 +241,24 @@ found:
 
 /**
  * mptcp_token_destroy_request - remove mptcp connection/token
- * @token: token of mptcp connection to remove
+ * @req: mptcp request socket dropping the token
  *
- * Remove not-yet-fully-established incoming connection identified
- * by @token.
+ * Remove the token associated to @req.
  */
-void mptcp_token_destroy_request(u32 token)
+void mptcp_token_destroy_request(struct request_sock *req)
 {
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct mptcp_subflow_request_sock *pos;
 	struct token_bucket *bucket;
 
-	bucket = token_bucket(token);
+	if (hlist_nulls_unhashed(&subflow_req->token_node))
+		return;
+
+	bucket = token_bucket(subflow_req->token);
 	spin_lock_bh(&bucket->lock);
-	pos = __token_lookup_req(bucket, token);
-	if (pos) {
-		hlist_nulls_del_rcu(&pos->token_node);
+	pos = __token_lookup_req(bucket, subflow_req->token);
+	if (!WARN_ON_ONCE(pos != subflow_req)) {
+		hlist_nulls_del_init_rcu(&pos->token_node);
 		bucket->chain_len--;
 	}
 	spin_unlock_bh(&bucket->lock);
@@ -266,19 +266,22 @@ void mptcp_token_destroy_request(u32 token)
 
 /**
  * mptcp_token_destroy - remove mptcp connection/token
- * @token: token of mptcp connection to remove
+ * @msk: mptcp connection dropping the token
  *
- * Remove the connection identified by @token.
+ * Remove the token associated to @msk
  */
-void mptcp_token_destroy(u32 token)
+void mptcp_token_destroy(struct mptcp_sock *msk)
 {
 	struct token_bucket *bucket;
 	struct mptcp_sock *pos;
 
-	bucket = token_bucket(token);
+	if (sk_unhashed((struct sock *)msk))
+		return;
+
+	bucket = token_bucket(msk->token);
 	spin_lock_bh(&bucket->lock);
-	pos = __token_lookup_msk(bucket, token);
-	if (pos) {
+	pos = __token_lookup_msk(bucket, msk->token);
+	if (!WARN_ON_ONCE(pos != msk)) {
 		__sk_nulls_del_node_init_rcu((struct sock *)pos);
 		bucket->chain_len--;
 	}
