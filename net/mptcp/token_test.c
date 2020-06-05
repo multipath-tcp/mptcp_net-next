@@ -9,6 +9,7 @@ static struct mptcp_subflow_request_sock *build_req_sock(struct kunit *test)
 	req = kunit_kzalloc(test, sizeof(struct mptcp_subflow_request_sock),
 			    GFP_USER);
 	KUNIT_EXPECT_NOT_ERR_OR_NULL(test, req);
+	mptcp_token_init_request((struct request_sock *)req);
 	return req;
 }
 
@@ -23,7 +24,7 @@ static void mptcp_token_test_req_basic(struct kunit *test)
 	KUNIT_EXPECT_PTR_EQ(test, null_msk, mptcp_token_get_sock(req->token));
 
 	/* cleanup */
-	mptcp_token_destroy_request(req->token);
+	mptcp_token_destroy_request((struct request_sock *)req);
 }
 
 static struct inet_connection_sock *build_icsk(struct kunit *test)
@@ -75,7 +76,7 @@ static void mptcp_token_test_msk_basic(struct kunit *test)
 	KUNIT_EXPECT_PTR_EQ(test, msk, mptcp_token_get_sock(ctx->token));
 	KUNIT_EXPECT_EQ(test, 2, (int)refcount_read(&sk->sk_refcnt));
 
-	mptcp_token_destroy(ctx->token);
+	mptcp_token_destroy(msk);
 	KUNIT_EXPECT_PTR_EQ(test, null_msk, mptcp_token_get_sock(ctx->token));
 }
 
@@ -91,11 +92,11 @@ static void mptcp_token_test_accept(struct kunit *test)
 	KUNIT_EXPECT_PTR_EQ(test, msk, mptcp_token_get_sock(msk->token));
 
 	/* this is now a no-op */
-	mptcp_token_destroy_request(req->token);
+	mptcp_token_destroy_request((struct request_sock *)req);
 	KUNIT_EXPECT_PTR_EQ(test, msk, mptcp_token_get_sock(msk->token));
 
 	/* cleanup */
-	mptcp_token_destroy(msk->token);
+	mptcp_token_destroy(msk);
 }
 
 static void mptcp_token_test_destroyed(struct kunit *test)
@@ -117,7 +118,7 @@ static void mptcp_token_test_destroyed(struct kunit *test)
 	KUNIT_EXPECT_PTR_EQ(test, null_msk, mptcp_token_get_sock(msk->token));
 
 	/* cleanup */
-	mptcp_token_destroy(msk->token);
+	mptcp_token_destroy(msk);
 }
 
 static struct kunit_case mptcp_token_test_cases[] = {
