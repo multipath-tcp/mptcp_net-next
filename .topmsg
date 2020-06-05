@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/inet_connection_sock-clear-inet_num-out-of-destroy-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] inet_connection_sock: clear inet_num out of destroy helper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Clearing the 'inet_num' field is necessary and safe if and
+only if the socket is not bound. The MPTCP protocol calls
+the destroy helper on bound sockets, as tcp_v{4,6}_syn_recv_sock
+completed successfully.
+
+Move the clearing of such field out of the common code, otherwise
+the MPTCP MP_JOIN error path will find the wrong 'inet_num' value
+on socket disposal, __inet_put_port() will acquire the wrong lock
+and bind_node removal could race with other modifiers possibly
+corrupting the bind hash table.
+
+Reported-and-tested-by: Christoph Paasch <cpaasch@apple.com>
+Fixes: 729cd6436f35 ("mptcp: cope better with MP_JOIN failure")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
