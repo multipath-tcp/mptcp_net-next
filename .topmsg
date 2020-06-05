@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: use kmalloc on kasan build
+Subject: [PATCH] [DO-NOT-MERGE] mptcp: use kmalloc on kasan build
 
 Helps detection UaF, which apparently kasan misses
 with kmem_cache allocator.
