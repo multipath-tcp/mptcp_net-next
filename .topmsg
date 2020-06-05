@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-races-between-shutdown-and-recvmsg
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix races between shutdown and recvmsg
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The msk sk_shutdown flag is set by a workqueue, possibly
+introducing some delay in user-space notification. If the last
+subflow carries some data with the fin packet, the user space
+can wake-up before RCV_SHUTDOWN is set. If it executes unblocking
+recvmsg(), it may return with an error instead of eof.
+
+Address the issue explicitly checking for eof in recvmsg(), when
+no data is found.
+
+Fixes: 59832e246515 ("mptcp: subflow: check parent mptcp socket on subflow state change")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
