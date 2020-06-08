@@ -7,9 +7,13 @@ set -ex
 TOP="t/upstream"
 TG_TOP=${TG_TOP:-${TOP}}
 
-# the last commit is always the DO-NOT-MERGE one.
+# the last commit is always a DO-NOT-MERGE one.
 if [ "${TG_TOP}" = "${TOP}" ]; then
-	TG_TOP=$(git show "${TG_TOP}:.topdeps")
+	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
+	while git show "${TG_TOP_NEXT}:.topmsg" | grep "^Subject: " | grep -q "DO-NOT-MERGE"; do
+		TG_TOP="${TG_TOP_NEXT}"
+		TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
+	done
 fi
 
 echo "Adding new patch before ${TG_TOP}"
