@@ -19,7 +19,7 @@ fi
 if git am -3 -s "${PATCH}"; then
 	echo -e "\n\n\t ====> Patch applied with success: $(git rev-parse --short HEAD)"
 	if $(echo "${PATCH}" | grep -q "\[PATCH.\+[0-9]\+_[0-9]\+\]"); then
-		NB=" patch $(echo "${PATCH}" | sed "s/.*\[PATCH*\+ \([0-9]\+\)_\([0-9]\+\)\].*/\1\/\2/g")"
+		NB=" patch $(echo "${PATCH}" | sed "s/.*\[PATCH.*\+ \([0-9]\+\)_\([0-9]\+\)\].*/\1\/\2/g")"
 	else
 		NB=""
 	fi
