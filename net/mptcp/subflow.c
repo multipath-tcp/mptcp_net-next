@@ -32,12 +32,9 @@ static void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
 static int subflow_rebuild_header(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
-	int local_id, err = 0;
+	int local_id;
 
-	if (subflow->request_mptcp && !subflow->token) {
-		pr_debug("subflow=%p", sk);
-		err = mptcp_token_new_connect(sk);
-	} else if (subflow->request_join && !subflow->local_nonce) {
+	if (subflow->request_join && !subflow->local_nonce) {
 		struct mptcp_sock *msk = (struct mptcp_sock *)subflow->conn;
 
 		pr_debug("subflow=%p", sk);
@@ -57,9 +54,6 @@ static int subflow_rebuild_header(struct sock *sk)
 	}
 
 out:
-	if (err)
-		return err;
-
 	return subflow->icsk_af_ops->rebuild_header(sk);
 }
 
@@ -69,8 +63,7 @@ static void subflow_req_destructor(struct request_sock *req)
 
 	pr_debug("subflow_req=%p", subflow_req);
 
-	if (subflow_req->mp_capable)
-		mptcp_token_destroy_request(subflow_req->token);
+	mptcp_token_destroy_request(req);
 	tcp_request_sock_ops.destructor(req);
 }
 
@@ -133,6 +126,7 @@ static void subflow_init_req(struct request_sock *req,
 
 	subflow_req->mp_capable = 0;
 	subflow_req->mp_join = 0;
+	mptcp_token_init_request(req);
 
 #ifdef CONFIG_TCP_MD5SIG
 	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
@@ -251,7 +245,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		subflow->remote_nonce = mp_opt.nonce;
 		pr_debug("subflow=%p, thmac=%llu, remote_nonce=%u", subflow,
 			 subflow->thmac, subflow->remote_nonce);
-	} else if (subflow->request_mptcp) {
+	} else {
 		tp->is_mptcp = 0;
 	}
 
@@ -393,7 +387,7 @@ static void mptcp_sock_destruct(struct sock *sk)
 		sock_orphan(sk);
 	}
 
-	mptcp_token_destroy(mptcp_sk(sk)->token);
+	mptcp_token_destroy(mptcp_sk(sk));
 	inet_sock_destruct(sk);
 }
 
@@ -510,6 +504,7 @@ create_child:
 			 */
 			new_msk->sk_destruct = mptcp_sock_destruct;
 			mptcp_pm_new_connection(mptcp_sk(new_msk), 1);
+			mptcp_token_accept(subflow_req, mptcp_sk(new_msk));
 			ctx->conn = new_msk;
 			new_msk = NULL;
 
