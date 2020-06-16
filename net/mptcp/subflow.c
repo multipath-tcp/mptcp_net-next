@@ -225,8 +225,10 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		pr_fallback(mptcp_sk(subflow->conn));
 	}
 
-	if (mptcp_check_fallback(sk))
+	if (mptcp_check_fallback(sk)) {
+		mptcp_rcv_space_init(mptcp_sk(parent), sk);
 		return;
+	}
 
 	if (subflow->mp_capable) {
 		pr_debug("subflow=%p, remote_key=%llu", mptcp_subflow_ctx(sk),
