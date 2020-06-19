@@ -224,7 +224,8 @@ generate_config_mptcp() {
 	echo | scripts/config -e KUNIT -d KUNIT_DEBUGFS \
 	                      -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
 	                      -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST \
-	                      -d LIST_KUNIT_TEST -d LINEAR_RANGES_TEST
+	                      -d LIST_KUNIT_TEST -d LINEAR_RANGES_TEST \
+	                      -d KUNIT_ALL_TESTS
 
 	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
 
