@@ -25,7 +25,7 @@ config MPTCP_KUNIT_TESTS
 	select MPTCP
 	depends on KUNIT
 	help
-	  Currently covers the MPTCP crypto helpers.
+	  Currently covers the MPTCP crypto and token helpers.
 	  Only useful for kernel devs running KUnit test harness and are not
 	  for inclusion into a production build.
 
