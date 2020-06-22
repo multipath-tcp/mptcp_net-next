@@ -18,6 +18,7 @@ DOCKER_DIR=$(dirname "${0}")
 
 TG_SETUP_URL="https://github.com/mackyle/topgit/releases/download/topgit-0.19.12/topgit-0.19.12.tar.gz"
 TG_SETUP_TARBALL="topgit.tar.gz"
+TG_SETUP_SHA="8b6b89c55108cc75d007f63818e43aa91b69424b5b8384c06ba2aa3122f5e440  ${TG_SETUP_TARBALL}"
 
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
@@ -37,6 +38,9 @@ RUN apt-get update && \
 
 # TopGit
 RUN curl -L "${TG_SETUP_URL}" -o "${TG_SETUP_TARBALL}" && \
+    echo "${TG_SETUP_SHA}" > sha && \
+    sha256sum --check sha && \
+    rm sha && \
     tar xzf "${TG_SETUP_TARBALL}" && \
     cd "topgit-"* && \
     make prefix="/usr" install && \
