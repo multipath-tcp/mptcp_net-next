@@ -216,7 +216,9 @@ analyse() {
 go_manual() {
         gen_kconfig "${@}"
         build
+        prepare
         run
+        clean_expect
 }
 
 # $@: args for kconfig
