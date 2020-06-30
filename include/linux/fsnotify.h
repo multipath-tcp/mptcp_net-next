@@ -246,6 +246,9 @@ static inline void fsnotify_rmdir(struct inode *dir, struct dentry *dentry)
  */
 static inline void fsnotify_access(struct file *file)
 {
+	if (file->f_mode & FMODE_STREAM)
+		return;
+
 	fsnotify_file(file, FS_ACCESS);
 }
 
@@ -254,6 +257,9 @@ static inline void fsnotify_access(struct file *file)
  */
 static inline void fsnotify_modify(struct file *file)
 {
+	if (file->f_mode & FMODE_STREAM)
+		return;
+
 	fsnotify_file(file, FS_MODIFY);
 }
 
