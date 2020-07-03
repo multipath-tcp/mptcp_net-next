@@ -47,7 +47,8 @@ gen_kconfig() { local kconfig
                   -d LINEAR_RANGES_TEST -d KUNIT_ALL_TESTS \
                   -m MPTCP_KUNIT_TESTS)
         # Extra options needed for packetdrill
-        kconfig+=(-e TUN -e CRYPTO_USER_API_HASH)
+        # note: we still need SHA1 for fallback tests with v0
+        kconfig+=(-e TUN -e CRYPTO_USER_API_HASH -e CRYPTO_SHA1)
         if [ -n "${1}" ]; then
                 kconfig+=("${@}")
         fi
