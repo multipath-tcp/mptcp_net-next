@@ -155,7 +155,7 @@ EOF
 
 clean_expect() {
         # to avoid leaving files owned by root
-        find . -user root -exec rm -rf "{}" \; || true
+        sudo find . -user root -exec rm -rf "{}" \; || true
 }
 
 # $@: args for kconfig
