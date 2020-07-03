@@ -28,6 +28,7 @@ TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
 ERR_MSG=""
+TG_PUSH_NEEDED=0
 
 ###########
 ## Utils ##
@@ -119,6 +120,7 @@ tg_update_base() { local sha_before_update
 	# in case of conflicts, the resolver will be able to sync the tree to
 	# the latest valid state, update the base manually then resolve the
 	# conflicts only once
+	TG_PUSH_NEEDED=1
 }
 
 tg_update() { local rc=0
@@ -352,6 +354,10 @@ validation() { local curr_branch
 ############
 
 tg_push_tree() {
+	if [ "${TG_PUSH_NEEDED}" = "0" ]; then
+		return 0
+	fi
+
 	git_checkout "${TG_TOPIC_TOP}"
 
 	tg push -r "${GIT_REMOTE_GITHUB_NAME}"
