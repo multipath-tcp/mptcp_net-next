@@ -39,7 +39,7 @@ CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
-        kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM)
+        kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM -e INET_DIAG)
         # Extra options needed for MPTCP KUnit tests
         kconfig+=(-m KUNIT -e KUNIT_DEBUGFS \
                   -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \

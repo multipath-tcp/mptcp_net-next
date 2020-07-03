@@ -227,6 +227,9 @@ generate_config_mptcp() {
 	                      -d LIST_KUNIT_TEST -d LINEAR_RANGES_TEST \
 	                      -d KUNIT_ALL_TESTS
 
+	# For INET_MPTCP_DIAG
+	echo | scripts/config -e INET_DIAG
+
 	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
 
 	# Here, we want to have a failure if some new MPTCP options are
