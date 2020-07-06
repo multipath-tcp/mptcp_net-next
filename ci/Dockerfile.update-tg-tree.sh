@@ -33,7 +33,7 @@ RUN mkdir -p "$(dirname "${HOME}")" && \
 # dependencies for the script
 RUN apt-get update && \
     apt-get install -y build-essential libncurses5-dev gcc libssl-dev bc bison \
-                       libelf-dev flex git curl tar hashalot ccache && \
+                       libelf-dev flex git curl tar hashalot ccache sparse && \
     apt-get clean
 
 # TopGit

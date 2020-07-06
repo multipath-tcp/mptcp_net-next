@@ -262,11 +262,46 @@ check_compilation_no_ipv6() {
 	compile_kernel "without IPv6 and with CONFIG_MPTCP"
 }
 
-check_compilation_mptcp_extra_warnings() { local src obj
+# $1: src file ; $2: warn line
+check_sparse_output() { local src warn
+	src="${1}"
+	warn="${2}"
+
+	case "${src}" in
+		"net/mptcp/protocol.c")
+			# net/mptcp/protocol.c:1535:24: warning: context imbalance in 'mptcp_sk_clone' - unexpected unlock
+			if [ "$(echo "${warn}" | grep -cE "net/mptcp/protocol.c:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_sk_clone' - unexpected unlock")" -eq 1 ]; then
+				echo "Ignore the following warning because sk_clone_lock() conditionally acquires the socket lock, (if return value != 0), so we can't annotate the caller as 'release': ${warn}"
+				return 0
+			fi
+		;;
+		"net/mptcp/mptcp_diag.c")
+			# ./include/net/sock.h:1612:31: warning: context imbalance in 'mptcp_diag_get_info' - unexpected unlock
+			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_diag_get_info' - unexpected unlock")" -eq 1 ]; then
+				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
+				return 0
+			fi
+		;;
+	esac
+
+	return 1
+}
+
+check_compilation_mptcp_extra_warnings() { local src obj warn
 	for src in net/mptcp/*.c; do
 		obj="${src/%.c/.o}"
+		if [[ "${src}" = *"_test.mod.c" ]]; then
+			continue
+		fi
+
 		touch "${src}"
 		KCFLAGS="-Werror" make W=1 "${obj}" || return 1
+
+		touch "${src}"
+		# RC is not >0 if warn but warn are lines not starting with spaces
+		while read -r warn; do
+			check_sparse_output "${src}" "${warn}" || return 1
+		done <<< "$(make C=1 "${obj}" 2>&1 >/dev/null | grep "^\S")"
 	done
 }
 
