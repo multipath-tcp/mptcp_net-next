@@ -185,12 +185,26 @@ analyse() {
         # check selftests results
         if grep -q "^not ok [0-9]\+ selftests: net/mptcp: " "${OUTPUT_SELFTESTS}"; then
                 echo "Error when launching selftests"
-                local not_ok
-                for not_ok in $(grep "^not ok [0-9]\+ selftests: net/mptcp: *" "${OUTPUT_SELFTESTS}" | \
-                                sed "s/.*net\/mptcp: \(\S\+\).*/\1/"); do
-                        sed -n "/^# selftests: net\/mptcp: ${not_ok}$/,/^not ok [0-9]\+ selftests: net\/mptcp: ${not_ok} #/p" "${OUTPUT_SELFTESTS}"
-                done
-                exit 1
+
+                local nok_line stest reason stest_err=0
+                while read -r nok_line; do
+                        stest=$(echo "${nok_line}" | sed "s/.*net\/mptcp: \(\S\+\).*/\1/")
+                        reason="${nok_line##* }"
+
+                        if [ "${reason}" = "SKIP" ]; then
+                                echo "The test ${stest} was skipped, ignore the error"
+                                continue
+                        fi
+
+                        ((++stest_err))
+
+                        # print the error to stdout
+                        sed -n "/^# selftests: net\/mptcp: ${stest}$/,/^not ok [0-9]\+ selftests: net\/mptcp: ${stest} #/p" "${OUTPUT_SELFTESTS}"
+                done <<< $(grep "^not ok [0-9]\+ selftests: net/mptcp: *" "${OUTPUT_SELFTESTS}")
+
+                if [ "${stest_err}" != "0" ]; then
+                        exit 1
+                fi
         else
                 echo "Selftests OK"
         fi
