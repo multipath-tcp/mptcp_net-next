@@ -267,6 +267,10 @@ check_sparse_output() { local src warn
 	src="${1}"
 	warn="${2}"
 
+	if [ -z "${warn}" ]; then
+		return 0
+	fi
+
 	case "${src}" in
 		"net/mptcp/protocol.c")
 			# net/mptcp/protocol.c:1535:24: warning: context imbalance in 'mptcp_sk_clone' - unexpected unlock
