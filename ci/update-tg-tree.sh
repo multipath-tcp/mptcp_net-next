@@ -334,19 +334,15 @@ check_compilation() { local branch
 		fi
 	fi
 
-	# no need to compile with MPTCP if the option is not available
-	if [ -f "net/mptcp/Kconfig" ]; then
-		generate_config_mptcp
-		if ! compile_kernel "with CONFIG_MPTCP"; then
-			err "Unable to compile with CONFIG_MPTCP"
-			return 1
-		fi
+	generate_config_mptcp
+	if ! compile_kernel "with CONFIG_MPTCP"; then
+		err "Unable to compile with CONFIG_MPTCP"
+		return 1
+	fi
 
-		if ! check_compilation_mptcp_extra_warnings; then
-			err "Unable to compile mptcp source code with W=1"
-			return 1
-		fi
-
+	if ! check_compilation_mptcp_extra_warnings; then
+		err "Unable to compile mptcp source code with W=1 C=1"
+		return 1
 	fi
 }
 
