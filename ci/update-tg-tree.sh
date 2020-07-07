@@ -92,6 +92,11 @@ skipped_tg_topic() {
 	[ "${TG_TOPIC_SKIP}" = "${1}" ]
 }
 
+# $1: branch
+empty_tg_topic() {
+	[ "$(git diff --summary "refs/top-bases/${1}..${1}" -- ':!^.top*' | wc -l)" = "0" ]
+}
+
 
 ###############
 ## TG Update ##
@@ -354,6 +359,9 @@ validation() { local curr_branch
 
 			if skipped_tg_topic "${curr_branch}"; then
 				echo "We can skip this topic"
+			elif ! is_tg_top "${curr_branch}" && \
+			     empty_tg_topic "${curr_branch}"; then
+				echo "We can skip empty topic";
 			elif ! check_compilation "${curr_branch}"; then
 				err "Unable to compile topic ${curr_branch}"
 				return 1
