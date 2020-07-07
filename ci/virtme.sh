@@ -36,6 +36,8 @@ OUTPUT_PACKETDRILL=
 CONNECT_MMAP_BEGIN="__CONNECT_MMAP_BEGIN__"
 CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
 
+EXIT_STATUS=0
+
 # $@: extra kconfig
 gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
@@ -192,7 +194,8 @@ analyse() {
                         reason="${nok_line##* }"
 
                         if [ "${reason}" = "SKIP" ]; then
-                                echo "The test ${stest} was skipped, ignore the error"
+                                echo "The test ${stest} was skipped, exit later with 42 err code"
+                                EXIT_STATUS=42
                                 continue
                         fi
 
@@ -257,3 +260,5 @@ else
         go_expect "${@}"
         go_expect "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 fi
+
+exit "${EXIT_STATUS}"

@@ -18,7 +18,7 @@ launch_virtme_ref() {
 # $1: title ; [ $2: git ref ]
 launch_virtme_ref_log() {
 	if ! launch_virtme_ref "${2:-${1}}"; then
-		EXIT_RC=42
+		EXIT_RC=${?}
 		ISSUES+=("${1}")
 	fi
 }
