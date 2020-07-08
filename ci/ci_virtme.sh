@@ -39,6 +39,13 @@ launch_virtme_commit() { local ref
 	fi
 }
 
+clean() {
+	# remove prev results
+	rm -rf "patches/virtme/results"
+}
+
+clean
+
 # We want to test the kselftests at the end of each series we are going to send
 #launch_virtme_commit "mptcp: add basic kselftest for mptcp"
 #launch_virtme_commit "mptcp: cope with later TCP fallback"

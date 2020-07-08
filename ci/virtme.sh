@@ -15,12 +15,11 @@ VIRTME_RUN="${VIRTME_PATH}/virtme-run"
 VIRTME_RUN_OPTS=(--net --balloon --memory 768M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
 
 VIRTME_SCRIPT_DIR="patches/virtme"
+
 VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/selftests.sh"
 VIRTME_SCRIPT_END="__VIRTME_END__"
 VIRTME_RUN_SCRIPT="${VIRTME_SCRIPT_DIR}/virtme.sh"
 VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
-
-SELFTESTS_DIR="tools/testing/selftests/net/mptcp"
 
 KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e PROVE_LOCKING -e DEBUG_LOCKDEP
@@ -28,13 +27,12 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e DEBUG_SLAVE -e DEBUG_PAGEALLOC -e DEBUG_MUTEXES -e DEBUG_SPINLOCK -e DEBUG_ATOMIC_SLEEP
                       -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD)
 
-# tmp files
-OUTPUT_SELFTESTS=
-OUTPUT_VIRTME=
-OUTPUT_PACKETDRILL=
+# results for the CI
+RESULTS_DIR_BASE="${PWD}/${VIRTME_SCRIPT_DIR}/results"
+RESULTS_DIR=
 
-CONNECT_MMAP_BEGIN="__CONNECT_MMAP_BEGIN__"
-CONNECT_MMAP_ERROR="__CONNECT_MMAP_ERROR__"
+# tmp files
+OUTPUT_VIRTME=
 
 EXIT_STATUS=0
 
@@ -76,9 +74,15 @@ get_tmp_file_rm_previous() {
 
 prepare() { local old_pwd
         old_pwd="${PWD}"
-        OUTPUT_SELFTESTS=$(get_tmp_file_rm_previous "${OUTPUT_SELFTESTS}")
+
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
-        OUTPUT_PACKETDRILL=$(get_tmp_file_rm_previous "${OUTPUT_PACKETDRILL}")
+        RESULTS_DIR="${RESULTS_DIR_BASE}/$(git rev-parse --short HEAD)/${1:-}"
+
+        local kunit_tap="${RESULTS_DIR}/kunit.tap"
+        local selftests_tap="${RESULTS_DIR}/selftests.tap"
+        local mptcp_connect_mmap_tap="${RESULTS_DIR}/mptcp_connect_mmap.tap"
+        local packetdrill_mpc_tap="${RESULTS_DIR}/packetdrill_mpc.tap"
+        local packetdrill_dss_tap="${RESULTS_DIR}/packetdrill_dss.tap"
 
         # make sure we have the last stable tests
         cd /opt/packetdrill/
@@ -89,38 +93,71 @@ prepare() { local old_pwd
         sudo make
         cd "${old_pwd}"
 
-        mkdir -p "${VIRTME_SCRIPT_DIR}"
+        rm -rf "${RESULTS_DIR}"
+        mkdir -p "${VIRTME_SCRIPT_DIR}" "${RESULTS_DIR}"
         cat <<EOF > "${VIRTME_SCRIPT}"
 #! /bin/bash -x
 
+TAP_PREFIX="${PWD}/tools/testing/selftests/kselftest/prefix.pl"
+
+# \$1: file ; \$2+: commands
+tap() { local out fname
+        out="\${1}"
+        fname="\$(basename \${out})"
+        shift
+
+        echo "TAP version 13" > "\${out}"
+        echo "1..1" >> "\${out}"
+        {
+                if "\${@}" 2>&1; then
+                        echo "ok 1 test: \${fname}" >> "\${out}"
+                else
+                        echo "nok 1 test: \${fname} # exit=\${?}" >> "\${out}"
+                fi
+        } | "\${TAP_PREFIX}" | tee -a "\${out}"
+}
+
 # kunit
-insmod ./lib/kunit/kunit.ko
-for ko in net/mptcp/*_test.ko; do
-	insmod "\${ko}"
-done
+{
+        insmod ./lib/kunit/kunit.ko
+
+        echo "TAP version 14"
+        echo "1..$(echo net/mptcp/*_test.ko | wc -w)"
+
+        for ko in net/mptcp/*_test.ko; do
+                insmod "\${ko}"
+
+                kunit="\${ko:10:-8}"
+                kunit="\${kunit//_/-}"
+                cat /sys/kernel/debug/kunit/\${kunit}/results
+        done
+} > "${kunit_tap}"
 
 # selftests
-time make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
-        tee "${OUTPUT_SELFTESTS}"
+make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
+        grep -v -e "^make" -e "^\\s" | \
+        tee "${selftests_tap}"
 
 cd tools/testing/selftests/net/mptcp
-echo "${CONNECT_MMAP_BEGIN}" >> "${OUTPUT_SELFTESTS}"
-{ ./mptcp_connect.sh -m mmap 2>&1 || echo "${CONNECT_MMAP_ERROR}" >> "${OUTPUT_SELFTESTS}"; } | \
-        tee -a "${OUTPUT_SELFTESTS}"
+tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
 
 # TODO: mptcp_connect.sh with -R ; -S
 
 # packetdrill
 cd /opt/packetdrill/gtests/net/
-./packetdrill/run_all.py -l -v mptcp/mp_capable 2>&1 | tee "${OUTPUT_PACKETDRILL}"
-./packetdrill/run_all.py -l -v mptcp/dss 2>&1 | tee -a "${OUTPUT_PACKETDRILL}"
+export PYTHONUNBUFFERED=1
+tap "${packetdrill_mpc_tap}" ./packetdrill/run_all.py -l -v mptcp/mp_capable
+tap "${packetdrill_dss_tap}" ./packetdrill/run_all.py -l -v mptcp/dss
+
+# to be able to read files from users and not to be rm by the clean step
+chown -R "$(id -u):$(id -g)" "${RESULTS_DIR}"
 
 # end
 echo "${VIRTME_SCRIPT_END}"
 EOF
         chmod +x "${VIRTME_SCRIPT}"
 
-        trap 'rm -f "${OUTPUT_SELFTESTS}" "${OUTPUT_VIRTME}" "${OUTPUT_PACKETDRILL}"' EXIT
+        trap 'rm -f "${OUTPUT_VIRTME}"' EXIT
 }
 
 run() {
@@ -142,7 +179,7 @@ set timeout 900
 spawn "${VIRTME_RUN_SCRIPT}"
 
 expect "virtme-init: console is ttyS0\r"
-send -- "${VIRTME_SCRIPT}\r"
+send -- "stdbuf -oL ${VIRTME_SCRIPT}\r"
 
 expect "${VIRTME_SCRIPT_END}\r"
 send -- "/usr/lib/klibc/bin/poweroff\r"
@@ -156,77 +193,22 @@ EOF
         "${VIRTME_RUN_EXPECT}" | tee "${OUTPUT_VIRTME}"
 }
 
-clean_expect() {
+clean() {
         # to avoid leaving files owned by root
-        sudo find . -user root -exec rm -rf "{}" \; || true
+        sudo find . -user root -exec rm -vrf "{}" \; || true
 }
 
 # $@: args for kconfig
 analyse() {
-        echo "Kconfig: ${*}"
-
         # look for crashes/warnings
         if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
-                echo "Call Trace found"
+                echo "Call Trace found (additional kconfig: ${*}):"
                 # exit directly, that's bad
-                exit 2
-        fi
-
-	# KUnit tests
-        if ! grep -q "\] ok 1 - mptcp-crypto" "${OUTPUT_VIRTME}"; then
-                echo "KUnit Crypto tests failed"
-                grep -B 10 "mptcp-crypto" "${OUTPUT_VIRTME}"
-                exit 2
-        fi
-        if ! grep -q "\] ok 2 - mptcp-token" "${OUTPUT_VIRTME}"; then
-                echo "KUnit Token tests failed"
-                grep -B 10 "mptcp-token" "${OUTPUT_VIRTME}"
-                exit 2
-        fi
-
-        # check selftests results
-        if grep -q "^not ok [0-9]\+ selftests: net/mptcp: " "${OUTPUT_SELFTESTS}"; then
-                echo "Error when launching selftests"
-
-                local nok_line stest reason stest_err=0
-                while read -r nok_line; do
-                        stest=$(echo "${nok_line}" | sed "s/.*net\/mptcp: \(\S\+\).*/\1/")
-                        reason="${nok_line##* }"
-
-                        if [ "${reason}" = "SKIP" ]; then
-                                echo "The test ${stest} was skipped, exit later with 42 err code"
-                                EXIT_STATUS=42
-                                continue
-                        fi
-
-                        ((++stest_err))
-
-                        # print the error to stdout
-                        sed -n "/^# selftests: net\/mptcp: ${stest}$/,/^not ok [0-9]\+ selftests: net\/mptcp: ${stest} #/p" "${OUTPUT_SELFTESTS}"
-                done <<< $(grep "^not ok [0-9]\+ selftests: net/mptcp: *" "${OUTPUT_SELFTESTS}")
-
-                if [ "${stest_err}" != "0" ]; then
-                        exit 1
-                fi
-        else
-                echo "Selftests OK"
-        fi
-
-        if grep -q "${CONNECT_MMAP_ERROR}" "${OUTPUT_SELFTESTS}"; then
-                echo "Error with mptcp_connect.sh mmap"
-                sed -n "/^${CONNECT_MMAP_BEGIN}$/,/^${CONNECT_MMAP_ERROR}$/p" "${OUTPUT_SELFTESTS}"
                 exit 1
-        else
-                echo "mptcp_connect.sh mmap OK"
         fi
 
-        # check packetdrill results
-        if grep "^Ran " "${OUTPUT_PACKETDRILL}" | grep -vq " 0 failing"; then
-                echo "Error when launching packetdrill"
-                cat "${OUTPUT_PACKETDRILL}"
-                exit 3
-        else
-                echo "Packetdrill OK"
+        if grep -r "^not ok " "${RESULTS_DIR}"; then
+                EXIT_STATUS=42
         fi
 }
 
@@ -236,16 +218,20 @@ go_manual() {
         build
         prepare
         run
-        clean_expect
+        clean
+        rm -rf "${RESULTS_DIR}"
 }
 
-# $@: args for kconfig
-go_expect() {
+# $1: mode ; $2+: args for kconfig
+go_expect() { local mode
+        mode="${1}"
+        shift
+
         gen_kconfig "${@}"
         build
-        prepare
+        prepare "${mode}"
         run_expect
-        clean_expect
+        clean
         analyse "${@}"
 }
 
@@ -257,8 +243,8 @@ if [ "${1}" = "manual" ]; then
 else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs
-        go_expect "${@}"
-        go_expect "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
+        go_expect "normal" "${@}"
+        go_expect "debug" "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 fi
 
 exit "${EXIT_STATUS}"
