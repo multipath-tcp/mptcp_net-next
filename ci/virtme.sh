@@ -165,7 +165,7 @@ run() {
 run_expect() {
         cat <<EOF > "${VIRTME_RUN_SCRIPT}"
 #! /bin/bash -x
-sudo "${VIRTME_RUN}" ${VIRTME_RUN_OPTS[@]} 2>&1
+sudo "${VIRTME_RUN}" ${VIRTME_RUN_OPTS[@]} 2>&1 | tr -d '\r'
 EOF
         chmod +x "${VIRTME_RUN_SCRIPT}"
 
