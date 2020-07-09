@@ -234,7 +234,8 @@ generate_config_mptcp() {
 	                      -d KUNIT_ALL_TESTS
 
 	# For INET_MPTCP_DIAG
-	echo | scripts/config -e INET_DIAG
+	echo | scripts/config -e INET_DIAG \
+	                      -d INET_UDP_DIAG -d INET_RAW_DIAG -d INET_DIAG_DESTROY
 
 	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
 

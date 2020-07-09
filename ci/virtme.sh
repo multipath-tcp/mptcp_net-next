@@ -42,11 +42,12 @@ gen_kconfig() { local kconfig
         # Extra options are needed for MPTCP kselftests
         kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM -e INET_DIAG)
         # Extra options needed for MPTCP KUnit tests
-        kconfig+=(-m KUNIT -e KUNIT_DEBUGFS \
+        kconfig+=(-m KUNIT -e KUNIT_DEBUGFS -m MPTCP_KUNIT_TESTS)
+        # Extra options to avoid questions
+        kconfig+=(-e INET_UDP_DIAG -e INET_RAW_DIAG -e INET_DIAG_DESTROY \
                   -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
                   -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST -d LIST_KUNIT_TEST \
-                  -d LINEAR_RANGES_TEST -d KUNIT_ALL_TESTS \
-                  -m MPTCP_KUNIT_TESTS)
+                  -d LINEAR_RANGES_TEST -d KUNIT_ALL_TESTS)
         # Extra options needed for packetdrill
         # note: we still need SHA1 for fallback tests with v0
         kconfig+=(-e TUN -e CRYPTO_USER_API_HASH -e CRYPTO_SHA1)
