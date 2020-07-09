@@ -21,8 +21,17 @@ fi
 
 VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
 VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
+
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
+
+IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2.git"
+IPROUTE2_GIT_SHA="2f31d12a25d289d864fd9bffc417e4518043e37d" # pre v5.8.0
+# last tag
+#IPROUTE2_GIT_SHA="$(curl https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/ 2>/dev/null | \
+#                         grep -o 'iproute2-[0-9]\+\.[0-9]\+\.[0-9]\+\.tar\.xz' | \
+#                         tail -n1 | \
+#                         grep -o "[0-9]\+\.[0-9]\+\.[0-9]")
 
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
@@ -40,9 +49,10 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
                     build-essential libncurses5-dev gcc libssl-dev bc bison \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
-                    python3 python3-pkg-resources busybox iproute2 tcpdump \
+                    python3 python3-pkg-resources busybox tcpdump \
                     iputils-ping ethtool klibc-utils kbd rsync ccache \
-                    ca-certificates gnupg2 net-tools kmod && \
+                    ca-certificates gnupg2 net-tools kmod \
+                    pkg-config libmnl-dev && \
     apt-get clean
 
 # CLang dev for BPF selftests (curl required)
@@ -58,7 +68,16 @@ RUN echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" > /etc/apt
 RUN cd /opt && \
     git clone "${VIRTME_GIT_URL}" && \
     cd virtme && \
-    git checkout "${VIRTME_GIT_SHA}"
+        git checkout "${VIRTME_GIT_SHA}"
+
+# iproute
+RUN cd /opt && \
+    git clone "${IPROUTE2_GIT_URL}" && \
+    cd iproute2 && \
+        git checkout "${IPROUTE2_GIT_SHA}" && \
+        ./configure && \
+        make -j"$(nproc)" -l"$(nproc)" && \
+        make install
 
 # packetdrill
 ENV PACKETDRILL_GIT_BRANCH "${PACKETDRILL_GIT_BRANCH}"
