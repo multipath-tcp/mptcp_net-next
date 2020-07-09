@@ -136,8 +136,7 @@ tap() { local out fname
 } > "${kunit_tap}"
 
 # selftests
-make -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
-        grep -v -e "^make" -e "^\\s" | \
+make --silent -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
         tee "${selftests_tap}"
 
 cd tools/testing/selftests/net/mptcp
