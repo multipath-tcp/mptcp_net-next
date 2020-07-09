@@ -74,6 +74,9 @@ RUN cd /opt && \
 RUN usermod -a -G sudo "${USER}" && \
     echo "${USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
+# to quickly shutdown the VM
+RUN ln -sv /usr/lib/klibc/bin/poweroff /usr/sbin/
+
 # CCache for quicker builds with default colours
 # Note: use 'ccache -M xG' to increase max size, default is 5GB
 ENV PATH /usr/lib/ccache:\${PATH}
