@@ -16,8 +16,9 @@ VIRTME_RUN_OPTS=(--net --balloon --memory 768M --kdir "${PWD}" --mods=none --rwd
 
 VIRTME_SCRIPT_DIR="patches/virtme"
 
-VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/selftests.sh"
+VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/tests.sh"
 VIRTME_SCRIPT_END="__VIRTME_END__"
+VIRTME_EXPECT_TIMEOUT="900"
 VIRTME_RUN_SCRIPT="${VIRTME_SCRIPT_DIR}/virtme.sh"
 VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
 
@@ -174,7 +175,7 @@ EOF
         cat <<EOF > "${VIRTME_RUN_EXPECT}"
 #!/usr/bin/expect -f
 
-set timeout 900
+set timeout "${VIRTME_EXPECT_TIMEOUT}"
 
 spawn "${VIRTME_RUN_SCRIPT}"
 
@@ -202,7 +203,13 @@ clean() {
 analyse() {
         # look for crashes/warnings
         if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
-                echo "Call Trace found (additional kconfig: ${*}):"
+                echo "Call Trace found (additional kconfig: '${*}')"
+                # exit directly, that's bad
+                exit 1
+        fi
+
+        if ! grep -q "${VIRTME_SCRIPT_END}" "${OUTPUT_VIRTME}"; then
+                echo "Timeout (additional kconfig: '${*}')"
                 # exit directly, that's bad
                 exit 1
         fi
