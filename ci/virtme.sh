@@ -150,9 +150,6 @@ export PYTHONUNBUFFERED=1
 tap "${packetdrill_mpc_tap}" ./packetdrill/run_all.py -l -v mptcp/mp_capable
 tap "${packetdrill_dss_tap}" ./packetdrill/run_all.py -l -v mptcp/dss
 
-# to be able to read files from users and not to be rm by the clean step
-chown -R "$(id -u):$(id -g)" "${RESULTS_DIR}"
-
 # end
 echo "${VIRTME_SCRIPT_END}"
 EOF
@@ -195,6 +192,9 @@ EOF
 }
 
 clean() {
+        # to be able to read files from users and not to be rm by the clean step
+        sudo chown -R "$(id -u):$(id -g)" "${RESULTS_DIR}"
+
         # to avoid leaving files owned by root
         sudo find . -user root -exec rm -vrf "{}" \; || true
 }
