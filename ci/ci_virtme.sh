@@ -5,8 +5,8 @@
 
 set -e
 
-EXIT_RC=0
-ISSUES=()
+EXIT_RCS=()
+JOBS=()
 
 # $1: git ref
 launch_virtme_ref() {
@@ -20,10 +20,8 @@ launch_virtme_ref_log() { local rc
 	rc=0
 
 	launch_virtme_ref "${2:-${1}}" || rc="${?}"
-	if [ ${rc} -ne 0 ]; then
-		EXIT_RC="${rc}"
-		ISSUES+=("${1}")
-	fi
+	EXIT_RCS+=("${rc}")
+	JOBS+=("${1}")
 }
 
 # $1: commit title
@@ -55,8 +53,22 @@ clean
 #launch_virtme_commit "selftests: add test-cases for MPTCP MP_JOIN"
 launch_virtme_ref_log "export"
 
-if [ "${EXIT_RC}" -ne 0 ]; then
-	echo "Errors with:"
-	printf '%s\n' "${ISSUES[@]}"
-	exit "${EXIT_RC}"
-fi
+set +x
+echo
+echo "Summary:"
+
+EXIT_RC=0
+for i in $(seq ${#EXIT_RCS[@]}); do
+	rc="${EXIT_RCS[i-1]}"
+	job="${JOBS[i-1]}"
+
+	if [ "${rc}" -eq 42 ]; then
+		echo "- ${job}: unstable"
+	elif [ "${rc}" -eq 0 ]; then
+		echo "- ${job}: success"
+	else
+		echo "- ${job}: errors"
+		EXIT_RC="${rc}"
+	fi
+done
+exit "${EXIT_RC}"
