@@ -68,7 +68,7 @@ RUN cd /opt && \
         git checkout "${PACKETDRILL_GIT_BRANCH}" && \
         cd gtests/net/packetdrill/ && \
             ./configure && \
-            make
+            make -j"$(nproc)" -l"$(nproc)"
 
 # sudo rights (for kvm)
 RUN usermod -a -G sudo "${USER}" && \

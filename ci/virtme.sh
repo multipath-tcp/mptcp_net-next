@@ -92,7 +92,7 @@ prepare() { local old_pwd
         sudo git checkout -f "origin/${PACKETDRILL_GIT_BRANCH}"
         cd gtests/net/packetdrill/
         sudo ./configure
-        sudo make
+        sudo make -j"$(nproc)" -l"$(nproc)"
         cd "${old_pwd}"
 
         rm -rf "${RESULTS_DIR}"
