@@ -17,6 +17,7 @@ if [ "${BRANCH}" = "t/upstream" ] || [ ! -f ".topdeps" ]; then
 fi
 
 if git am -3 -s "${PATCH}"; then
+	COMMIT="$(git rev-parse HEAD)"
 	echo -e "\n\n\t ====> Patch applied with success: $(git rev-parse --short HEAD)"
 	if $(echo "${PATCH}" | grep -q "\[PATCH.\+[0-9]\+_[0-9]\+\]"); then
 		NB=" patch $(echo "${PATCH}" | sed "s/.*\[PATCH.*\+ \([0-9]\+\)_\([0-9]\+\)\].*/\1\/\2/g")"
@@ -29,13 +30,14 @@ if git am -3 -s "${PATCH}"; then
 		"$(./.title.sh)"
 	echo -e "\ttrying signed-off\n"
 	./.signed-off.sh
+	bash ./.patch-file-accept.sh "${PATCH}" "${COMMIT}"
 	exit
 fi
 
 trap 'exit_trap ${?}' EXIT
 
 if [ "$(git status --porcelain | grep -v "^?? " | wc -l)" = "0" ]; then
-	echo "Am didn't do anything, use patch"
+	echo "Am didn't do anything, use patch then 'end-squash.sh'"
 	patch -p1 --merge < "${PATCH}"
 	exit 1
 fi

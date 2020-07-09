@@ -1,6 +1,4 @@
-#! /bin/bash
-
-set -ex
+#! /bin/bash -ex
 
 [ -f "${1}" ]
 
@@ -40,3 +38,6 @@ tg update
 echo "push?"
 read
 tg push
+for PATCH in "${@}"; do
+	./.patch-file-accept.sh "${PATCH}"
+done
