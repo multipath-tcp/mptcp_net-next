@@ -112,7 +112,7 @@ tap() { local out fname
                 if "\${@}" 2>&1; then
                         echo "ok 1 test: \${fname}" >> "\${out}"
                 else
-                        echo "nok 1 test: \${fname} # exit=\${?}" >> "\${out}"
+                        echo "not ok 1 test: \${fname} # exit=\${?}" >> "\${out}"
                 fi
         } | "\${TAP_PREFIX}" | tee -a "\${out}"
 }
