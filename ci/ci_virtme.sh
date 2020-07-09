@@ -16,9 +16,12 @@ launch_virtme_ref() {
 }
 
 # $1: title ; [ $2: git ref ]
-launch_virtme_ref_log() {
-	if ! launch_virtme_ref "${2:-${1}}"; then
-		EXIT_RC=${?}
+launch_virtme_ref_log() { local rc
+	rc=0
+
+	launch_virtme_ref "${2:-${1}}" || rc="${?}"
+	if [ ${rc} -ne 0 ]; then
+		EXIT_RC="${rc}"
 		ISSUES+=("${1}")
 	fi
 }
