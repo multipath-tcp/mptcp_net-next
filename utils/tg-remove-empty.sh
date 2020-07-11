@@ -13,6 +13,7 @@ tg_empty() {
 while true; do
 	BRANCH="$(git_current_branch)"
 	if tg_empty && [ "${BRANCH}" != "t/upstream" ]; then
+		echo -e "\n\t => Remove ${BRANCH}\n"
 		DEPS="$(cat .topdeps)"
 		tg annihilate # it jumps to the next one
 		tg update
