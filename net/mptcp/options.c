@@ -724,9 +724,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *sk,
 
 	if (unlikely(!READ_ONCE(msk->pm.server_side)))
 		pr_warn_once("bogus mpc option on established client sk");
-	subflow->fully_established = 1;
-	subflow->remote_key = mp_opt->sndr_key;
-	subflow->can_ack = 1;
+	mptcp_subflow_fully_established(subflow, mp_opt);
 
 fully_established:
 	if (likely(subflow->pm_notified))
