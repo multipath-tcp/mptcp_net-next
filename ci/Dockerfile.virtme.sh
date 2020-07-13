@@ -25,13 +25,14 @@ VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
-IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2.git"
-IPROUTE2_GIT_SHA="2f31d12a25d289d864fd9bffc417e4518043e37d" # pre v5.8.0
+IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2-next.git"
+IPROUTE2_GIT_SHA="a5c9d01c5c6cad45ea2ca80da6d61f699baf419d" # pre v5.8.0
 # last tag
 #IPROUTE2_GIT_SHA="$(curl https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/ 2>/dev/null | \
 #                         grep -o 'iproute2-[0-9]\+\.[0-9]\+\.[0-9]\+\.tar\.xz' | \
 #                         tail -n1 | \
 #                         grep -o "[0-9]\+\.[0-9]\+\.[0-9]")
+#IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2.git"
 
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
@@ -72,7 +73,7 @@ RUN cd /opt && \
 
 # iproute
 RUN cd /opt && \
-    git clone "${IPROUTE2_GIT_URL}" && \
+    git clone "${IPROUTE2_GIT_URL}" iproute2 && \
     cd iproute2 && \
         git checkout "${IPROUTE2_GIT_SHA}" && \
         ./configure && \
