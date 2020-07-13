@@ -71,6 +71,7 @@ RUN curl -L "${SPARSE_URL}" -o "${SPARSE_TARBALL}" && \
 # Note: use 'ccache -M xG' to increase max size, default is 5GB
 ENV PATH /usr/lib/ccache:\${PATH}
 ENV CCACHE_COMPRESS true
+ENV KBUILD_BUILD_TIMESTAMP ""
 ENV GCC_COLORS error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01
 
 # switch to the current user and current dir
