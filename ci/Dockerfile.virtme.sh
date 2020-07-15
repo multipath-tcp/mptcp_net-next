@@ -26,7 +26,7 @@ PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
 IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2-next.git"
-IPROUTE2_GIT_SHA="a5c9d01c5c6cad45ea2ca80da6d61f699baf419d" # pre v5.8.0
+IPROUTE2_GIT_SHA="9c3be2c0eee01be7832b7900a8be798a19c659a5" # pre v5.8.0 with MPTCP support in ss
 # last tag
 #IPROUTE2_GIT_SHA="$(curl https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/ 2>/dev/null | \
 #                         grep -o 'iproute2-[0-9]\+\.[0-9]\+\.[0-9]\+\.tar\.xz' | \
