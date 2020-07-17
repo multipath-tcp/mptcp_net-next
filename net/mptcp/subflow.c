@@ -387,6 +387,19 @@ static void subflow_drop_ctx(struct sock *ssk)
 	kfree_rcu(ctx, rcu);
 }
 
+void mptcp_subflow_fully_established(struct mptcp_subflow_context *subflow,
+				     struct mptcp_options_received *mp_opt)
+{
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+
+	subflow->remote_key = mp_opt->sndr_key;
+	subflow->fully_established = 1;
+	subflow->can_ack = 1;
+
+	inet_sk_state_store(subflow->conn, TCP_ESTABLISHED);
+	mptcp_pm_new_connection(msk, 1);
+}
+
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct sk_buff *skb,
 					  struct request_sock *req,
@@ -470,7 +483,6 @@ create_child:
 			 * created mptcp socket
 			 */
 			new_msk->sk_destruct = mptcp_sock_destruct;
-			mptcp_pm_new_connection(mptcp_sk(new_msk), 1);
 			mptcp_token_accept(subflow_req, mptcp_sk(new_msk));
 			ctx->conn = new_msk;
 			new_msk = NULL;
@@ -478,9 +490,8 @@ create_child:
 			/* with OoO packets we can reach here without ingress
 			 * mpc option
 			 */
-			ctx->remote_key = mp_opt.sndr_key;
-			ctx->fully_established = mp_opt.mp_capable;
-			ctx->can_ack = mp_opt.mp_capable;
+			if (mp_opt.mp_capable)
+				mptcp_subflow_fully_established(ctx, &mp_opt);
 		} else if (ctx->mp_join) {
 			struct mptcp_sock *owner;
 
