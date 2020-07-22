@@ -25,6 +25,11 @@ VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
+LIBPCAP_GIT_URL="https://github.com/the-tcpdump-group/libpcap.git"
+LIBPCAP_GIT_SHA="9d5a1f262a57cc93df74906ea912accc5bedf7f0" # sync with tcpdump
+TCPDUMP_GIT_URL="https://github.com/the-tcpdump-group/tcpdump.git"
+TCPDUMP_GIT_SHA="c429fc4120116c407acf4f4df483ac5f069e2a63" # last tag has no MPTCPv1 support
+
 IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2-next.git"
 IPROUTE2_GIT_SHA="9c3be2c0eee01be7832b7900a8be798a19c659a5" # pre v5.8.0 with MPTCP support in ss
 # last tag
@@ -50,9 +55,11 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
                     build-essential libncurses5-dev gcc libssl-dev bc bison \
                     libelf-dev flex git curl tar hashalot qemu-kvm sudo expect \
-                    python3 python3-pkg-resources busybox tcpdump \
+                    python3 python3-pkg-resources busybox \
                     iputils-ping ethtool klibc-utils kbd rsync ccache \
                     ca-certificates gnupg2 net-tools kmod \
+                    libdbus-1-dev libnl-genl-3-dev libibverbs-dev \
+                    libssl-dev libssl1.0.0 libsmi2-dev libcap-ng-dev \
                     pkg-config libmnl-dev && \
     apt-get clean
 
@@ -70,6 +77,21 @@ RUN cd /opt && \
     git clone "${VIRTME_GIT_URL}" && \
     cd virtme && \
         git checkout "${VIRTME_GIT_SHA}"
+
+# libpcap & tcpdump
+RUN cd /opt && \
+    git clone "${LIBPCAP_GIT_URL}" libpcap && \
+    git clone "${TCPDUMP_GIT_URL}" tcpdump && \
+    cd libpcap && \
+        git checkout "${LIBPCAP_GIT_SHA}" && \
+        ./configure && \
+        make -j"$(nproc)" -l"$(nproc)" && \
+        make install && \
+    cd ../tcpdump && \
+        git checkout "${TCPDUMP_GIT_SHA}" && \
+        ./configure && \
+        make -j"$(nproc)" -l"$(nproc)" && \
+        make install
 
 # iproute
 RUN cd /opt && \
