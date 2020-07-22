@@ -211,7 +211,9 @@ clean() {
 # $@: args for kconfig
 analyse() {
         # look for crashes/warnings
-        if grep -C 30 "Call Trace:" "${OUTPUT_VIRTME}"; then
+        if grep -q "Call Trace:" "${OUTPUT_VIRTME}"; then
+                grep -C 40 "Call Trace:" "${OUTPUT_VIRTME}" | \
+                        ./scripts/decode_stacktrace.sh vmlinux "${PWD}" "${PWD}"
                 echo "Call Trace found (additional kconfig: '${*}')"
                 # exit directly, that's bad
                 exit 1
