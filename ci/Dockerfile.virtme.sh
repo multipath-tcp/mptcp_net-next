@@ -84,12 +84,12 @@ RUN cd /opt && \
     git clone "${TCPDUMP_GIT_URL}" tcpdump && \
     cd libpcap && \
         git checkout "${LIBPCAP_GIT_SHA}" && \
-        ./configure && \
+        ./configure --prefix=/usr && \
         make -j"$(nproc)" -l"$(nproc)" && \
         make install && \
     cd ../tcpdump && \
         git checkout "${TCPDUMP_GIT_SHA}" && \
-        ./configure && \
+        ./configure --prefix=/usr && \
         make -j"$(nproc)" -l"$(nproc)" && \
         make install
 
