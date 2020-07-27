@@ -20,7 +20,7 @@ if [ "${1}" = "manual" ]; then
 fi
 
 VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
-VIRTME_GIT_SHA="a2223d11b58097b0cbb8eeacf66b17699ddada7f"
+VIRTME_GIT_SHA="88cd30f073714bd097d83bc7a6b028c0e4bf7a2b"
 
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
