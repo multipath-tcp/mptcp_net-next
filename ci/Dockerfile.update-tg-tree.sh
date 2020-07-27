@@ -33,7 +33,7 @@ DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
 
 cat <<EOF > "${DOCKERFILE}"
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 # Use the same rights as the launcher
 RUN mkdir -p "$(dirname "${HOME}")" && \
