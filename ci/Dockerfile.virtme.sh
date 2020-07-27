@@ -39,6 +39,9 @@ IPROUTE2_GIT_SHA="9c3be2c0eee01be7832b7900a8be798a19c659a5" # pre v5.8.0 with MP
 #                         grep -o "[0-9]\+\.[0-9]\+\.[0-9]")
 #IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2.git"
 
+BYOBU_URL="https://launchpad.net/byobu/trunk/5.133/+download/byobu_5.133.orig.tar.gz"
+BYOBU_MD5="0ff03f3795cc08aae50c1ab117c03261 byobu.tar.gz"
+
 DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
 
@@ -62,7 +65,8 @@ RUN apt-get update && \
                     libsmi2-dev libcap-ng-dev \
                     pkg-config libmnl-dev \
                     clang lld llvm libcap-dev \
-                    iptables ebtables nftables vim psmisc bash-completion && \
+                    iptables ebtables nftables vim psmisc bash-completion \
+                    gettext-base libevent-dev libnewt0.52 libslang2 libutempter0 python3-newt tmux && \
     apt-get clean
 
 # virtme
@@ -70,6 +74,16 @@ RUN cd /opt && \
     git clone "${VIRTME_GIT_URL}" && \
     cd virtme && \
         git checkout "${VIRTME_GIT_SHA}"
+
+# byobu (not to have a dep to iproute2)
+RUN cd /opt && \
+    curl -L "${BYOBU_URL}" -o byobu.tar.gz && \
+    echo "${BYOBU_MD5}" | md5sum -c && \
+    tar xzf byobu.tar.gz && \
+    cd byobu-*/ && \
+        ./configure --prefix=/usr && \
+        make && \
+        sudo make install
 
 # libpcap & tcpdump
 RUN cd /opt && \
