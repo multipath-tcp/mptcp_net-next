@@ -12,7 +12,7 @@ set -e
 VIRTME_PATH="/opt/virtme"
 VIRTME_CONFIGKERNEL="${VIRTME_PATH}/virtme-configkernel"
 VIRTME_RUN="${VIRTME_PATH}/virtme-run"
-VIRTME_RUN_OPTS=(--net --balloon --memory 768M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
+VIRTME_RUN_OPTS=(--net --memory 768M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
 
 VIRTME_SCRIPT_DIR="patches/virtme"
 
@@ -262,6 +262,7 @@ else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs
         go_expect "normal" "${@}"
+        make clean
         go_expect "debug" "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 fi
 

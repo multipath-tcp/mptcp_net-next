@@ -43,7 +43,7 @@ DOCKERFILE=$(mktemp --tmpdir="${DOCKER_DIR}")
 trap 'rm -f "${DOCKERFILE}"' EXIT
 
 cat <<EOF > "${DOCKERFILE}"
-FROM ubuntu:bionic
+FROM ubuntu:20.04
 
 # Use the same rights as the launcher
 RUN mkdir -p "$(dirname "${HOME}")" && \
@@ -59,16 +59,8 @@ RUN apt-get update && \
                     iputils-ping ethtool klibc-utils kbd rsync ccache \
                     ca-certificates gnupg2 net-tools kmod \
                     libdbus-1-dev libnl-genl-3-dev libibverbs-dev \
-                    libssl-dev libssl1.0.0 libsmi2-dev libcap-ng-dev \
-                    pkg-config libmnl-dev && \
-    apt-get clean
-
-# CLang dev for BPF selftests (curl required)
-RUN echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main" > /etc/apt/sources.list.d/clang.list && \
-    curl https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive \
-    apt-get install -y --no-install-recommends \
+                    libsmi2-dev libcap-ng-dev \
+                    pkg-config libmnl-dev \
                     clang lld llvm libcap-dev && \
     apt-get clean
 
