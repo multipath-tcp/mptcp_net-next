@@ -61,7 +61,8 @@ RUN apt-get update && \
                     libdbus-1-dev libnl-genl-3-dev libibverbs-dev \
                     libsmi2-dev libcap-ng-dev \
                     pkg-config libmnl-dev \
-                    clang lld llvm libcap-dev && \
+                    clang lld llvm libcap-dev \
+                    iptables ebtables nftables vim psmisc bash-completion && \
     apt-get clean
 
 # virtme
