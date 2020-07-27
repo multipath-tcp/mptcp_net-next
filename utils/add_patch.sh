@@ -16,6 +16,12 @@ fi
 
 echo "Adding new patch before ${TG_TOP}"
 
+for PATCH in "${@}"; do
+	echo "Checkpatch on ${PATCH}"
+	./.checkpatch.sh "${PATCH}" || { echo "Error with checkpatch. Press" \
+					      "enter to continue"; read; }
+done
+
 git checkout "${TG_TOP}"
 [ -f .topdeps ]
 
