@@ -23,7 +23,8 @@ GIT_REMOTE_NET_NEXT_BRANCH="master"
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
-TG_TOPIC_SKIP="t/DO-NOT-MERGE-mptcp-enabled-by-default"
+TG_TOPICS_SKIP=("t/DO-NOT-MERGE-mptcp-enabled-by-default"
+		"t/mptcp-Add-mptcp_close_state-helper")
 TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
@@ -88,8 +89,15 @@ is_tg_top() {
 }
 
 # $1: branch
-skipped_tg_topic() {
-	[ "${TG_TOPIC_SKIP}" = "${1}" ]
+skipped_tg_topic() { local topic curr
+	curr="${1}"
+
+	for topic in "${TG_TOPICS_SKIP[@]}"; do
+		if [ "${topic}" = "${curr}" ]; then
+			return 0
+		fi
+	done
+	return 1
 }
 
 empty_tg_topic() {
