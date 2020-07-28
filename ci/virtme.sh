@@ -72,6 +72,7 @@ gen_kconfig() { local kconfig
 build() {
         make -j"$(nproc)" -l"$(nproc)"
         make -j"$(nproc)" -l"$(nproc)" headers_install
+        make -j"$(nproc)" -l"$(nproc)" -C tools/testing/selftests/net/mptcp
 }
 
 # $1 previous file
