@@ -1,0 +1,16 @@
+#! /usr/local/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+	chain output {
+		type filter hook output priority 0; policy accept;
+		tcp dport 8000 socket mark 5 counter;
+		tcp dport 8000 socket mark 4 counter;
+		tcp dport 8000 socket mark 3 counter;
+		tcp dport 8000 socket mark 2 counter;
+		tcp dport 8000 socket mark 1 counter;
+		tcp dport 8000 socket mark 0 counter;
+	}
+}
+
