@@ -177,7 +177,10 @@ lookup_protocol:
 	answer_flags = answer->flags;
 	rcu_read_unlock();
 
+#if !IS_ENABLED(CONFIG_KASAN)
+	/* with kasan we use kmalloc */
 	WARN_ON(!answer_prot->slab);
+#endif
 
 	err = -ENOBUFS;
 	sk = sk_alloc(net, PF_INET6, GFP_KERNEL, answer_prot, kern);
