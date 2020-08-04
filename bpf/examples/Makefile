@@ -1,4 +1,4 @@
-MPTCP=${PWD}/../../mptcp_net-next
+MPTCP := ${PWD}/../../../mptcp_net-next
 
 CFLAGS := -I${MPTCP}/usr/include
 CFLAGS += -I${MPTCP}/tools/lib
