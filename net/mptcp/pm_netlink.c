@@ -173,7 +173,7 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_addr_entry *local;
-	struct mptcp_addr_info remote;
+	struct mptcp_addr_info remote = { 0 };
 	struct pm_nl_pernet *pernet;
 
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
@@ -259,6 +259,40 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 	__mptcp_subflow_connect((struct sock *)msk, 0, &local, &remote);
 	spin_lock_bh(&msk->pm.lock);
+}
+
+void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow, *tmp;
+	struct sock *sk = (struct sock *)msk;
+
+	pr_debug("rm_id %d", msk->pm.rm_id);
+
+	if (!msk->pm.rm_id)
+		return;
+
+	if (list_empty(&msk->conn_list))
+		return;
+
+	msk->pm.add_addr_accepted--;
+	msk->pm.subflows--;
+	WRITE_ONCE(msk->pm.accept_addr, true);
+
+	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		int how = RCV_SHUTDOWN | SEND_SHUTDOWN;
+		long timeout = 0;
+
+		if (msk->pm.rm_id != subflow->remote_id &&
+		    msk->pm.rm_id != subflow->local_id)
+			continue;
+
+		spin_unlock_bh(&msk->pm.lock);
+		mptcp_subflow_shutdown(sk, ssk, how);
+		__mptcp_close_ssk(sk, ssk, subflow, timeout);
+		spin_lock_bh(&msk->pm.lock);
+		break;
+	}
 }
 
 static bool address_use_port(struct mptcp_pm_addr_entry *entry)
