@@ -770,7 +770,7 @@ static bool mptcp_is_writeable(struct mptcp_sock *msk)
 		return false;
 
 	mptcp_for_each_subflow(msk, subflow) {
-		if (sk_stream_memory_free(mptcp_subflow_tcp_sock(subflow)))
+		if (READ_ONCE(subflow->writable))
 			return true;
 	}
 	return false;
@@ -1099,7 +1099,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 		if (next_backup || next_ssk)
 			continue;
 
-		free = sk_stream_memory_free(ssk);
+		free = READ_ONCE(subflow->writable);
 		if (!free)
 			continue;
 
@@ -1114,7 +1114,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 
 	if (msk->last_snd) {
 		*sndbuf = max(tcp_sk(msk->last_snd)->snd_wnd, *sndbuf);
-		free = sk_stream_memory_free(msk->last_snd);
+		free = READ_ONCE(mptcp_subflow_ctx(msk->last_snd)->writable);
 	} else {
 		free = false;
 	}
@@ -1216,6 +1216,8 @@ wait_for_sndbuf:
 	lock_sock(ssk);
 	tx_ok = msg_data_left(msg);
 	while (tx_ok) {
+		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
 					 &size_goal);
 		if (ret < 0) {
@@ -1233,11 +1235,14 @@ wait_for_sndbuf:
 		msk->snd_burst -= ret;
 		copied += ret;
 
+		if (!sk_stream_memory_free(ssk))
+			WRITE_ONCE(subflow->writable, false);
+
 		tx_ok = msg_data_left(msg);
 		if (!tx_ok)
 			break;
 
-		if (!sk_stream_memory_free(ssk) ||
+		if (!subflow->writable ||
 		    !mptcp_page_frag_refill(ssk, pfrag) ||
 		    !mptcp_ext_cache_refill(msk)) {
 			tcp_push(ssk, msg->msg_flags, mss_now,
