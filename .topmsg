@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-OoO-related-mibs
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add OoO related mibs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add a bunch of MPTCP mibs related to MPTCP OoO data
+processing.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
