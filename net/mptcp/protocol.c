@@ -475,7 +475,7 @@ void mptcp_data_acked(struct sock *sk)
 {
 	mptcp_reset_timer(sk);
 
-	if ((!sk_stream_is_writeable(sk) ||
+	if ((!test_bit(MPTCP_SEND_SPACE, &mptcp_sk(sk)->flags) ||
 	     (inet_sk_state_load(sk) != TCP_ESTABLISHED)) &&
 	    schedule_work(&mptcp_sk(sk)->work))
 		sock_hold(sk);
@@ -570,6 +570,20 @@ static void dfrag_clear(struct sock *sk, struct mptcp_data_frag *dfrag)
 	put_page(dfrag->page);
 }
 
+static bool mptcp_is_writeable(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+
+	if (!sk_stream_is_writeable((struct sock *)msk))
+		return false;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (READ_ONCE(subflow->writable))
+			return true;
+	}
+	return false;
+}
+
 static void mptcp_clean_una(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -612,8 +626,15 @@ out:
 		sk_mem_reclaim_partial(sk);
 
 		/* Only wake up writers if a subflow is ready */
-		if (test_bit(MPTCP_SEND_SPACE, &msk->flags))
+		if (mptcp_is_writeable(msk)) {
+			set_bit(MPTCP_SEND_SPACE, &mptcp_sk(sk)->flags);
+			smp_mb__after_atomic();
+
+			/* set SEND_SPACE before sk_stream_write_space clears
+			 * NOSPACE
+			 */
 			sk_stream_write_space(sk);
+		}
 	}
 }
 
@@ -799,21 +820,31 @@ out:
 	return ret;
 }
 
-static void mptcp_nospace(struct mptcp_sock *msk, struct socket *sock)
+static void mptcp_nospace(struct mptcp_sock *msk)
 {
+	struct mptcp_subflow_context *subflow;
+
 	clear_bit(MPTCP_SEND_SPACE, &msk->flags);
 	smp_mb__after_atomic(); /* msk->flags is changed by write_space cb */
 
-	/* enables sk->write_space() callbacks */
-	set_bit(SOCK_NOSPACE, &sock->flags);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		struct socket *sock = READ_ONCE(ssk->sk_socket);
+
+		/* enables ssk->write_space() callbacks */
+		if (sock)
+			set_bit(SOCK_NOSPACE, &sock->flags);
+	}
 }
 
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
 	struct sock *backup = NULL;
+	bool free;
 
-	sock_owned_by_me((const struct sock *)msk);
+	sock_owned_by_me(sk);
 
 	if (!mptcp_ext_cache_refill(msk))
 		return NULL;
@@ -821,12 +852,9 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-		if (!sk_stream_memory_free(ssk)) {
-			struct socket *sock = ssk->sk_socket;
-
-			if (sock)
-				mptcp_nospace(msk, sock);
-
+		free = READ_ONCE(subflow->writable);
+		if (!free) {
+			mptcp_nospace(msk);
 			return NULL;
 		}
 
@@ -843,16 +871,10 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	return backup;
 }
 
-static void ssk_check_wmem(struct mptcp_sock *msk, struct sock *ssk)
+static void ssk_check_wmem(struct mptcp_sock *msk)
 {
-	struct socket *sock;
-
-	if (likely(sk_stream_is_writeable(ssk)))
-		return;
-
-	sock = READ_ONCE(ssk->sk_socket);
-	if (sock)
-		mptcp_nospace(msk, sock);
+	if (unlikely(!mptcp_is_writeable(msk)))
+		mptcp_nospace(msk);
 }
 
 static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
@@ -906,6 +928,7 @@ wait_for_sndbuf:
 				mptcp_reset_timer(sk);
 		}
 
+		mptcp_nospace(msk);
 		ret = sk_stream_wait_memory(sk, &timeo);
 		if (ret)
 			goto out;
@@ -924,6 +947,8 @@ wait_for_sndbuf:
 	lock_sock(ssk);
 	tx_ok = msg_data_left(msg);
 	while (tx_ok) {
+		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
 		ret = mptcp_sendmsg_frag(sk, ssk, msg, NULL, &timeo, &mss_now,
 					 &size_goal);
 		if (ret < 0) {
@@ -937,14 +962,16 @@ wait_for_sndbuf:
 
 		copied += ret;
 
+		if (!sk_stream_memory_free(ssk))
+			WRITE_ONCE(subflow->writable, false);
+
 		tx_ok = msg_data_left(msg);
 		if (!tx_ok)
 			break;
 
-		if (!sk_stream_memory_free(ssk) ||
+		if (!subflow->writable ||
 		    !mptcp_page_frag_refill(ssk, pfrag) ||
 		    !mptcp_ext_cache_refill(msk)) {
-			set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
 			tcp_push(ssk, msg->msg_flags, mss_now,
 				 tcp_sk(ssk)->nonagle, size_goal);
 			mptcp_set_timeout(sk, ssk);
@@ -992,9 +1019,9 @@ wait_for_sndbuf:
 			mptcp_reset_timer(sk);
 	}
 
-	ssk_check_wmem(msk, ssk);
 	release_sock(ssk);
 out:
+	ssk_check_wmem(msk);
 	release_sock(sk);
 	return copied ? : ret;
 }
@@ -2293,8 +2320,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 
 	if (state != TCP_SYN_SENT && state != TCP_SYN_RECV) {
 		mask |= mptcp_check_readable(msk);
-		if (sk_stream_is_writeable(sk) &&
-		    test_bit(MPTCP_SEND_SPACE, &msk->flags))
+		if (test_bit(MPTCP_SEND_SPACE, &msk->flags))
 			mask |= EPOLLOUT | EPOLLWRNORM;
 	}
 	if (sk->sk_shutdown & RCV_SHUTDOWN)
