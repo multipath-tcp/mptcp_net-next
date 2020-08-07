@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rename-addr_signal-and-the-related-functions
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: rename addr_signal and the related functions
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch renamed addr_signal and the related functions with the explicit
+word "add".
+
+Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
