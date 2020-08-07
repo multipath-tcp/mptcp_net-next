@@ -93,8 +93,7 @@ prepare() { local old_pwd
         local kunit_tap="${RESULTS_DIR}/kunit.tap"
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
         local mptcp_connect_mmap_tap="${RESULTS_DIR}/mptcp_connect_mmap.tap"
-        local packetdrill_mpc_tap="${RESULTS_DIR}/packetdrill_mpc.tap"
-        local packetdrill_dss_tap="${RESULTS_DIR}/packetdrill_dss.tap"
+        local pktd_base="${RESULTS_DIR}/packetdrill"
 
         # make sure we have the last stable tests
         cd /opt/packetdrill/
@@ -157,8 +156,11 @@ tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
 # packetdrill
 cd /opt/packetdrill/gtests/net/
 export PYTHONUNBUFFERED=1
-tap "${packetdrill_mpc_tap}" ./packetdrill/run_all.py -l -v mptcp/mp_capable
-tap "${packetdrill_dss_tap}" ./packetdrill/run_all.py -l -v mptcp/dss
+for pktd_dir in mptcp/*; do
+        pktd="\${pktd_dir:6}"
+        [ "\${pktd}" = "common" ] && continue
+        tap "${pktd_base}_\${pktd}.tap" ./packetdrill/run_all.py -l -v \${pktd_dir}
+done
 
 # end
 echo "${VIRTME_SCRIPT_END}"
