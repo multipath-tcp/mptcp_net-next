@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-picking-different-xmit-subflows
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: allow picking different xmit subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Update the scheduler to less trivial heuristic: cache
+the last used subflow, and try to send on it a reasonably
+long burst of data. When the burst or the subflow send
+space is exhausted, move to the next one with available
+send space.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
