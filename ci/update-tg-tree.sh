@@ -23,10 +23,7 @@ GIT_REMOTE_NET_NEXT_BRANCH="master"
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
-TG_TOPICS_SKIP=("t/DO-NOT-MERGE-mptcp-enabled-by-default"
-		"t/mptcp-Track-received-DATA_FIN-sequence-number-and-add-related-helpers"
-		"t/mptcp-Add-mptcp_close_state-helper"
-		"t/mptcp-Add-helper-to-process-acks-of-DATA_FIN")
+TG_TOPICS_SKIP=("t/DO-NOT-MERGE-mptcp-enabled-by-default")
 TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
