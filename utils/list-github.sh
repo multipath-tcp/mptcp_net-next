@@ -13,12 +13,17 @@ echo
 my_ghi --state open --since "${LAST_WEEK}"
 
 echo
-echo "    Bugs (open and flagged as \"bug\")"
+echo "    Bugs (opened, flagged as \"bug\" and assigned)"
 echo
-my_ghi --state open -L bug
+my_ghi --state open -L bug | grep " @"
 
 echo
-echo "    In Progress (open and assigned to someone)"
+echo "    Bugs (opened and flagged as \"bug\" and not assigned)"
+echo
+my_ghi --state open -L bug | grep -v " @"
+
+echo
+echo "    In Progress (opened and assigned)"
 echo
 my_ghi --state open -N bug | grep " @"
 
