@@ -996,8 +996,11 @@ static void subflow_write_space(struct sock *sk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *parent = subflow->conn;
 
-	sk_stream_write_space(sk);
-	if (sk_stream_is_writeable(sk)) {
+	if (!sk_stream_memory_free(sk))
+		return;
+
+	WRITE_ONCE(subflow->writable, true);
+	if (sk_stream_is_writeable(parent)) {
 		set_bit(MPTCP_SEND_SPACE, &mptcp_sk(parent)->flags);
 		smp_mb__after_atomic();
 		/* set SEND_SPACE before sk_stream_write_space clears NOSPACE */
@@ -1199,6 +1202,7 @@ static struct mptcp_subflow_context *subflow_create_ctx(struct sock *sk,
 
 	rcu_assign_pointer(icsk->icsk_ulp_data, ctx);
 	INIT_LIST_HEAD(&ctx->node);
+	WRITE_ONCE(ctx->writable, true);
 
 	pr_debug("subflow=%p", ctx);
 
