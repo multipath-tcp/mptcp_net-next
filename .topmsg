@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-simult-flow-self-tests
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: simult flow self-tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add a bunch of test-cases for multiple subflow xmit:
+create multiple subflows simulating different links
+condition via netem and verify that the msk is able
+to use completely the aggregated bandwidth.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
