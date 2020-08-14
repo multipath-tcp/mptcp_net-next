@@ -669,6 +669,10 @@ MSRs that have been set successfully.
 Defines the vcpu responses to the cpuid instruction.  Applications
 should use the KVM_SET_CPUID2 ioctl if available.
 
+Note, when this IOCTL fails, KVM gives no guarantees that previous valid CPUID
+configuration (if there is) is not corrupted. Userspace can get a copy of the
+resulting CPUID configuration through KVM_GET_CPUID2 in case.
+
 ::
 
   struct kvm_cpuid_entry {
@@ -2156,9 +2160,12 @@ registers, find a list below:
   PPC     KVM_REG_PPC_MMCRA               64
   PPC     KVM_REG_PPC_MMCR2               64
   PPC     KVM_REG_PPC_MMCRS               64
+  PPC     KVM_REG_PPC_MMCR3               64
   PPC     KVM_REG_PPC_SIAR                64
   PPC     KVM_REG_PPC_SDAR                64
   PPC     KVM_REG_PPC_SIER                64
+  PPC     KVM_REG_PPC_SIER2               64
+  PPC     KVM_REG_PPC_SIER3               64
   PPC     KVM_REG_PPC_PMC1                32
   PPC     KVM_REG_PPC_PMC2                32
   PPC     KVM_REG_PPC_PMC3                32
@@ -4795,6 +4802,7 @@ hardware_exit_reason.
 		/* KVM_EXIT_FAIL_ENTRY */
 		struct {
 			__u64 hardware_entry_failure_reason;
+			__u32 cpu; /* if KVM_LAST_CPU */
 		} fail_entry;
 
 If exit_reason is KVM_EXIT_FAIL_ENTRY, the vcpu could not be run due
