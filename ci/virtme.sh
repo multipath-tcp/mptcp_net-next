@@ -191,7 +191,17 @@ spawn "${VIRTME_RUN_SCRIPT}"
 expect "virtme-init: console is ttyS0\r"
 send -- "stdbuf -oL ${VIRTME_SCRIPT}\r"
 
-expect "${VIRTME_SCRIPT_END}\r"
+expect {
+	"${VIRTME_SCRIPT_END}\r" {
+		send_user "validation script ended with success\n"
+	} timeout {
+		send_user "Timeout: sending Ctrl+C\n"
+		send "\x03"
+	} eof {
+		send_user "Unexpected stop of the VM\n"
+		exit 1
+        }
+}
 send -- "/usr/lib/klibc/bin/poweroff\r"
 
 expect eof
