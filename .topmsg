@@ -19,4 +19,5 @@ required.
 Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
