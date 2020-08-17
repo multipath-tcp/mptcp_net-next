@@ -17,5 +17,6 @@ kworker. This is why we have to do low level memcg manipulation, if
 required.
 
 Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
