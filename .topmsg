@@ -27,4 +27,5 @@ https://github.com/multipath-tcp/mptcp_net-next/tree/scripts/bpf/examples
 
 Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
