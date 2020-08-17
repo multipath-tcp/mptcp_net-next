@@ -16,4 +16,5 @@ Currently, it is limited to the field 'token' of the msk but it is
 easily extensible.
 
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
