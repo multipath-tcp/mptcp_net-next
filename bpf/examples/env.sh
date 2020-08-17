@@ -3,7 +3,7 @@
 # cli options
 DEBUG=0
 create_cgroup=0
-loader=""
+BPF_OBJECT=""
 both=0
 mptcp=0
 clean=0
@@ -26,8 +26,8 @@ do
         create_cgroup=1
         shift
         ;;
-        -l|--loader)
-        loader="$2"
+        -B|--bpf_object)
+        BPF_OBJECT="${2}"
         shift
         shift
         ;;
@@ -133,8 +133,8 @@ clean () {
 }
 
 launch_loader () {
-	info "Launching <${loader}> in <${ns_name}> netns"
-        LD_LIBRARY_PATH=/usr/local/lib64 ${ns_exec} "./${loader}" "${cgroup}" &
+	info "Launching <${BPF_OBJECT}> in <${ns_name}> netns"
+        LD_LIBRARY_PATH=/usr/local/lib64 ${ns_exec} "./loader" "${BPF_OBJECT}" "${cgroup}" &
 
         if [[ "${create_cgroup}" -eq "1" ]]
         then
@@ -158,9 +158,9 @@ then
 fi
 
 # loader is mandatory
-if [[ "${loader}" = "" ]]
+if [[ "${BPF_OBJECT}" = "" ]]
 then
-    error "No BPF loader provided, use -l <loader>"
+    error "No BPF object file provided, use -B <bpf object file>"
     exit 1
 fi
 
