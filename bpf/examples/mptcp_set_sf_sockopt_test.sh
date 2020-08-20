@@ -5,17 +5,20 @@ BPF_OBJECT="mptcp_set_sf_sockopt_kern.o"
 USE_MPTCP="mptcp-tools/use_mptcp/use_mptcp.sh"
 NS_EXEC="ip netns exec"
 NS_CLIENT_EXEC="${NS_EXEC} ns_client"
-CLIENT_PROCS="/tmp/cgroup2/client/cgroup.procs"
+CPATH="/tmp/cgroup2"
+CLIENT_PROCS="${CPATH}/client/cgroup.procs"
 TCPDUMP_DUMP="/tmp/tcpdump.log"
+
+[[ "${VERBOSE}" = "1" ]] && VERBOSE="-v" || VERBOSE=""
 
 info () {
 	echo -e "\n[INFO] ${*}"
 }
 
 show () {
-	while [ 1 ]
+	while true
     do
-        ${NS_EXEC} $1 ss -bit --cgroup
+        ${NS_EXEC} "${1}" ss -bit --cgroup
         sleep 0.25
     done
 }
@@ -24,10 +27,13 @@ show () {
 echo > "${TRACEFS}/trace"
 
 # setup testing env and load BPF program on client side
-./env.sh --clean -c -m -B "${BPF_OBJECT}"
-
-# wait for end of setup
-sleep 5
+# shellcheck disable=SC2086 # string may be empty
+./env.sh -clean -c -m -B "${BPF_OBJECT}" ${VERBOSE}
+if [[ ${?} -ne 0 ]]
+then
+	info "Env setup failed. Quit."
+	exit 1
+fi
 
 # load output filtering rules on client side
 ${NS_CLIENT_EXEC} nft -f client.rules
@@ -37,7 +43,7 @@ show ns_server &
 SPID="${!}"
 
 # register current process to the client cgroup
-echo $$ >> "${CLIENT_PROCS}"
+echo ${$} >> "${CLIENT_PROCS}"
 
 # show client socket status
 show ns_client &
@@ -54,7 +60,7 @@ sleep 5
 ${NS_CLIENT_EXEC} "${USE_MPTCP}" curl 10.0.1.2:8000 -o /dev/null &> /dev/null
 
 # unregister current process from the client cgroup
-echo 0 >> "${CLIENT_PROCS}"
+echo ${$} >> "${CPATH}/cgroup.procs"
 
 # kill ss wrappers and tcpdump
 kill "${CPID}" "${SPID}" &> /dev/null
@@ -63,6 +69,7 @@ kill "${TPID}" &> /dev/null
 
 info "Client-side tcpdump log :"
 tcpdump -r "${TCPDUMP_DUMP}"
+rm "${TCPDUMP_DUMP}"
 
 # show output filtering result
 info "Client-side output filters :"

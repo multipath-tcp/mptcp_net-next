@@ -8,6 +8,41 @@ This directory contains some examples of possible applications of eBPF programs 
 - The [`mptcp_net-next`](https://github.com/multipath-tcp/mptcp_net-next) kernel is supposed to be accessible at `${PWD}/../../../mptcp_net-next`.
 - Nftables>=v0.9.2 and python3 are required.
 
+## Environment
+
+A [bash script](env.sh) is provided to build the following testing environment required to run the provided examples.
+
+```
+|-----------------------|                   |---------------------------|
+| [client cgroup2]      |                   | [server cgroup2]          |
+| [- ./loader ...]      |                   | [- ./loader ...]          |
+| - curl 10.0.1.2:8000  |                   | - python3 -m http.server  |
+|-----------------------|                   |---------------------------|
+|ns_client netns        |                   |ns_server netns            |
+|+++++++++++++++++++++++|    10.0.1.0/24    |+++++++++++++++++++++++++++|
+|veth1 10.0.1.1         |-------------------|veth2 10.0.1.2             |
+|                       |                   |   [0-1000ms delay]        |
+|+++++++++++++++++++++++|   [10.0.2.0/24]   |+++++++++++++++++++++++++++|
+|[veth3 10.0.2.1]       |-------------------|[veth4 10.0.2.2]           |
+|+++++++++++++++++++++++|   [10.0.3.0/24]   |+++++++++++++++++++++++++++|
+|[veth5 10.0.3.1]       |-------------------|[veth4 10.0.3.2]           |
+|-----------------------|                   |---------------------------|
+```
+
+Here is its usage :
+```
+Usage: ./env.sh [ OPTIONS ]
+where OPTIONS := { -c[group] | -m[ptcp] | [-B[PF_object] <bpf_object> ] |
+                   -d[elay] <delay>] | -v[erbose] | -b[oth] | -clean }
+```
+- `-cgroup`	: create distinct `cgroup2` for the client and the server and register the subsequent processes as part of their respective group.
+- `-mptcp`	: create the network configuratioin to use 3 links and multiple subflows between the client and the server.
+- `-BPF_object`	: the object file containing the BPF code to attach to the client cgroup.
+- `-delay`	: add between [0 1000] ms of delay on `veth2`.
+- `-verbose` : lot of environemnt creation informations.
+- `-both` : if a BPF object file is provided, it is also attached in the server cgroup.
+- `-clean`	: cleanup of the environment.
+
 ## How to use
 
 It is required that the examples have been compiled, see the [Makefile](Makefile).

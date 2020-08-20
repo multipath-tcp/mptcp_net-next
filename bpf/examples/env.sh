@@ -1,71 +1,89 @@
 #! /bin/bash
 
 # cli options
-DEBUG=0
-create_cgroup=0
+VERBOSE=0
+CREATE_CGROUP=0
 BPF_OBJECT=""
-both=0
-mptcp=0
-clean=0
-use_mptcp=""
-delay=0
+BOTH=0
+MPTCP=0
+CLEAN=0
+USE_MPTCP=""
+DELAY=0
 
 # cgroup2 related data
-base="/tmp"
-cgroup_type="cgroup2"
-cpath="${base}/${cgroup_type}"
-cgroups=("client" "server")
+BASE="/tmp"
+CGROUP_TYPE="cgroup2"
+CPATH="${BASE}/${CGROUP_TYPE}"
+HOSTS=("client" "server")
 
-nargs="$#"
+# Total number of veth to create
+END=2
+
+usage () {
+	echo -e "Usage: ${0} [ OPTIONS ]
+where OPTIONS := { -c[group] | -m[ptcp] | [-B[PF_object] <bpf_object> ] |
+		   -d[elay] <delay>] | -v[erbose] | -b[oth] | -clean }"
+}
+
+NARGS=${#}
 
 # Parse CLI options
-while [[ "$#" -gt 0 ]]
+while [[ ${#} -gt 0 ]]
 do
-    case "$1" in
-        -c|--cgroup)
-        create_cgroup=1
-        shift
-        ;;
-        -B|--bpf_object)
-        BPF_OBJECT="${2}"
-        shift
-        shift
-        ;;
-        -b|--both)
-        both=1
-        shift
-        ;;
-        -m|--mptcp)
-        mptcp=1
-        shift
-        ;;
-        --clean)
-	clean=1
-        shift
-        ;;
-	-D|--debug)
-	DEBUG=1
-	shift
-	;;
-	-d|--delay)
-	delay=1
-	shift
-	;;
-    esac
+	case "$1" in
+		-c|-cgroup)
+		CREATE_CGROUP=1
+		shift
+		;;
+		-B|-BPF_object)
+		BPF_OBJECT="${2}"
+		shift 2
+		;;
+		-b|-both)
+		BOTH=1
+		shift
+		;;
+		-m|-mptcp)
+		MPTCP=1
+		shift
+		;;
+		-clean)
+		CLEAN=1
+		shift
+		;;
+		-v|-verbose)
+		VERBOSE=1
+		shift
+		;;
+		-d|-delay)
+		[[ "${2}" -gt 0 && "${2}" -le 1000 ]] && DELAY="${2}" || DELAY=0
+		shift 2
+		;;
+		-h|-help)
+		usage
+		exit 0
+		shift
+		;;
+		*)
+		usage
+		exit 1
+		shift
+		;;
+	esac
 done
 
 #################
 #### Helpers ####
 #################
 
-if [[ ${DEBUG} -eq "1" ]]
+if [[ ${VERBOSE} -eq 1 ]]
 then
 	info () {
-		echo "[INFO] $*"
+		echo -e "[INF] ${*}"
 	}
 
 	error () {
-		echo "[ERROR] $*"
+		echo -e "[ERR] ${*}"
 	}
 else
 	info () { :; }
@@ -73,74 +91,249 @@ else
 fi
 
 setup_iface() {
-    ns="$4"
-    ns_exec="ip netns exec $ns"
+	local dev="${1}"
+	local subnet="${2}"
+	local ip="${3}"
+	local ns="${4}"
+	local ns_exec="ip netns exec ${ns}"
 
-    info "Setup veth$1 interface into <$ns> netns"
+	info "\tsetup veth${dev} interface into <${ns}> netns"
 
-    ip l set "veth$1" netns "$ns"
-    $ns_exec ip l set dev veth"$1" up
-    $ns_exec ip a add dev veth"$1" 10.0."$2"."$3"/24
+	ip l set "veth${dev}" netns "${ns}"
+	${ns_exec} ip l set dev veth"${dev}" up
+	${ns_exec} ip a add dev veth"${dev}" 10.0."${subnet}"."${ip}"/24
 }
 
 kill_cgroup_procs () {
-    proc_file="${cpath}/${1}/cgroup.procs"
+	local cgroup="${1}"
+	local proc_file="${CPATH}/${cgroup}/cgroup.procs"
 
-    if [[ -f ${proc_file} ]]
-    then
-        # clean all old processes attached to the cgroup if any
-        if [[ $(wc -l "${proc_file}" | sed -e 's/ .*$//g') -ne "0" ]]
-        then
-            info "Cleaning <${cgroup}> cgroup procs"
-            # shellcheck disable=SC2046 # we can have multiple pid
-            kill $(cat "${proc_file}")
-        fi
-    fi
+	if [[ -f "${proc_file}" ]]
+	then
+		# clean all old processes attached to the cgroup if any
+		if [[ $(wc -l "${proc_file}" | sed -e 's/ .*$//g') -ne 0 ]]
+		then
+			# shellcheck disable=SC2046 # we can have multiple pid
+			if [[ $(kill $(cat "${proc_file}")) -eq 0 ]]
+			then
+				info "\tcleaned <${cgroup}> cgroup procs"
+			else
+				error "\tfailed to clean <${cgroup}> cgroup procs"
+			fi
+		fi
+	fi
 }
 
-clean () {
-    info "Begin env cleaning"
+# check the presence of the cgroup
+# create it if not found
+create_cgroup() {
+	local cgroup="${1}"
 
-    # delete netns if exist
-    for ns in $(ip netns list | grep ns_ | sed 's/(id: [0-9]\+)//g')
-    do
-        ip netns del "$ns"
-        info "<$ns> removed"
-    done
+	if [[ ${CREATE_CGROUP} -eq 1 ]]
+	then
+		local dir="${CPATH}/${cgroup}"
+		if [[ ! -d "${dir}" ]]
+		then
+			info "\tcreate <${cgroup}> cgroup2"
+			mkdir -p "${dir}"
+		fi
+		kill_cgroup_procs "${cgroup}"
+	fi
+}
 
-    # if temporary cgroup2 created, remove it
-    if [[ -d ${cpath} ]]
-    then
-        # if cgroups created, remove them
-        for cgroup in "${cgroups[@]}"
-        do
-            dir="${cpath}/${cgroup}"
-            if [[ -d  ${dir} ]]
-            then
-                kill_cgroup_procs "${cgroup}"
-                rmdir "${dir}"
-                info "${dir} removed"
-            fi
-        done
+# check the presence of the netns
+# create it if not present
+create_netns() {
+	local host="${1}"
+	local i="${2}"
 
-        umount ${cpath}
-        rmdir ${cpath}
+	local ns_name="ns_${host}"
+	local ns_exec="ip netns exec ${ns_name}"
 
-        info "${cpath} removed"
-    fi
+	ip netns list | grep "${ns_name}" > /dev/null
+	if [ ${?} -eq 1 ]
+	then
+		info "\tcreate <${ns_name}> netns"
+		ip netns add "${ns_name}"
 
-    info "End of env cleaning"
+		local j=1
+		for dev in $(seq 1 2 "${END}")
+		do
+			setup_iface "$((dev + i - 1))" "$((j++))" "$i" "${ns_name}"
+		done
+
+		if [[ ${MPTCP} -eq 1 ]]
+		then
+			info "\tallow multiple MPTCP subflows in <${ns_name}> netns"
+			${ns_exec} ip mptcp endpoint flush
+			${ns_exec} ip mptcp limits set add_addr_accepted 8 subflows 8
+		fi
+	fi
+}
+
+write_cgroup() {
+	if [[ ${CREATE_CGROUP} -eq 1 ]]
+	then
+		local op=${1}
+		local cgroup=""
+		local sop="unregister"
+
+		if [[ ${op} -ne 0 && ${op} -ne 1 ]]
+		then
+			error "Wrong operation on cgroup"
+			clean
+			exit 1
+		fi
+
+		if [[ ${op} -eq 1 ]]
+		then
+			cgroup="${2}/"
+			sop="register"
+		fi
+
+		local proc_file="${CPATH}/${cgroup}cgroup.procs"
+
+		echo "${$}" >> "${proc_file}"
+		info "\t${sop} current process (<${cgroup}> cgroup)"
+	fi
+}
+
+register_to_cgroup () {
+	local cgroup="${1}"
+
+	write_cgroup 1 "${cgroup}"
+}
+
+unregister_from_cgroup () {
+	write_cgroup 0
+}
+
+dump_cgroup_procs () {
+	local cgroup="${1}"
+	local proc_file="${CPATH}/${cgroup}/cgroup.procs"
+
+	if [[ ${CREATE_CGROUP} -eq 1 &&
+		$(wc -l "${proc_file}" | sed -e 's/ .*$//g') -ne 0 ]]
+	then
+		info "Registered processes in <${cgroup}> cgroup :"
+		# shellcheck disable=SC2046 # we can have multiple pid
+		info "$(ps -fp $(cat "${proc_file}"))"
+	fi
+}
+
+check_process () {
+	local pid="${1}"
+
+	# let time to process to launch
+	sleep 1
+
+	kill -0 "${pid}" &> /dev/null
+	if [[ ${?} -eq 1 ]]
+	then
+		error "Background process failed to start. Quit."
+
+		# expected to be launched with current shell in specific cgroup
+		unregister_from_cgroup
+
+		# clean unachieved env
+		clean
+		exit 1
+	fi
+
+	info "Background process launched as expected."
 }
 
 launch_loader () {
-	info "Launching <${BPF_OBJECT}> in <${ns_name}> netns"
-        LD_LIBRARY_PATH=/usr/local/lib64 ${ns_exec} "./loader" "${BPF_OBJECT}" "${cgroup}" &
+	if [[ "${BPF_OBJECT}" != "" ]]
+	then
+		local host="${1}"
 
-        if [[ "${create_cgroup}" -eq "1" ]]
-        then
-	        echo $! >> "${proc_file}"
-	        info "Registering loader to <${cgroup}> cgroup"
-        fi
+		local ns_name="ns_${host}"
+		local ns_exec="ip netns exec ${ns_name}"
+
+		info "Launch <${BPF_OBJECT}> in <${ns_name}> netns"
+		LD_LIBRARY_PATH=/usr/local/lib64 ${ns_exec} "./loader" "${BPF_OBJECT}" "${host}" &
+		check_process ${!}
+	fi
+}
+
+setup_host () {
+	local host="${1}"
+	local ns_exec="ip netns exec ns_${host}"
+
+	if [ "${host}" = "server" ]
+	then
+
+		register_to_cgroup "${host}"
+
+		info "Launch server process in <${host}> netns"
+		${ns_exec} pkill python3
+		#shellcheck disable=SC2086 # the string may be empty
+		${ns_exec} ${USE_MPTCP} python3 -m http.server &
+		check_process ${!}
+
+		if [[ ${BOTH} -eq 1 ]]
+		then
+			launch_loader "${host}"
+		fi
+
+		if [[ ${DELAY} -ne 0 ]]
+		then
+			${ns_exec} tc qdisc add dev veth2 root netem delay "${DELAY}"ms
+		fi
+
+	else # client env
+
+		if [[ ${MPTCP} -eq 1 ]]
+		then
+			IFS=' ' read -r -a addrs <<< "$($ns_exec ip a show type veth scope global up | grep inet | sed -e 's/inet//g' -e 's/\/24.*$//g' -e 's/ //g' | tr '\n' ' ')"
+			for addr in "${addrs[@]:1}"
+			do
+				info "\tadvertise MPTCP subflow on ${addr}"
+				${ns_exec} ip mptcp endpoint add "${addr}" subflow
+			done
+		fi
+
+		register_to_cgroup "${host}"
+
+		launch_loader "${host}"
+    fi
+
+	unregister_from_cgroup "${host}"
+}
+
+clean () {
+	info "Clean env"
+
+	# delete netns if exist
+	for ns in $(ip netns list | grep ns_ | sed 's/(id: [0-9]\+)//g')
+	do
+		ip netns del "${ns}"
+		info "\tremoved <${ns}>"
+	done
+
+	local dir=""
+
+	# if temporary cgroup2 created, remove it
+	if [[ -d "${CPATH}" ]]
+	then
+		# if cgroups created, remove them
+		for cgroup in "${HOSTS[@]}"
+		do
+			dir="${CPATH}/${cgroup}"
+			if [[ -d  ${dir} ]]
+			then
+				kill_cgroup_procs "${cgroup}"
+				rmdir "${dir}"
+				info "\tremoved <${dir}>"
+			fi
+		done
+
+		umount ${CPATH}
+		rmdir ${CPATH}
+
+		info "\tremoved <${CPATH}>"
+	fi
 }
 
 ##############
@@ -148,127 +341,58 @@ launch_loader () {
 ##############
 
 # clean previous environment if any
-if [[ "${clean}" -eq "1" ]]
+if [[ ${CLEAN} -eq 1 ]]
 then
-    clean
-    if [[ "${nargs}" -eq "1" ]]
-    then
-        exit $?
-    fi
-fi
-
-# loader is mandatory
-if [[ "${BPF_OBJECT}" = "" ]]
-then
-    error "No BPF object file provided, use -B <bpf object file>"
-    exit 1
+	clean
+	if [[ ${NARGS} -eq 1 || (${NARGS} -eq 2 && ${VERBOSE} -eq 1 ) ]]
+	then
+		exit $?
+	fi
 fi
 
 # create cgroup2 mount point
-if [[ "${create_cgroup}" -eq "1" ]]
+if [[ ${CREATE_CGROUP} -eq 1 ]]
 then
-	if [[ ! -d "${cpath}" ]]
+	if [[ ! -d "${CPATH}" ]]
 	then
-		info "Creating cgroup2 mounting point"
-		mkdir -p $cpath
-		mount -t $cgroup_type none $cpath
+		info "Create cgroup2 mounting point"
+		mkdir -p "${CPATH}"
+		mount -t "${CGROUP_TYPE}" none "${CPATH}"
 	fi
 fi
 
 # create veth pair for inter netns link
 ip l | grep veth1 > /dev/null
-if [ "$?" -eq "1" ]
+if [ ${?} -eq 1 ]
 then
-	info "Creating veth pair(s)"
-	end=2
-	if [[ "$mptcp" -eq "1" ]]
+	info "Create veth pair(s)"
+	if [[ ${MPTCP} -eq 1 ]]
 	then
-		use_mptcp="./mptcp-tools/use_mptcp/use_mptcp.sh"
-		end=6
+		USE_MPTCP="./mptcp-tools/use_mptcp/use_mptcp.sh"
+		END=6
 	fi
 
-	for dev in $(seq 1 2 "${end}")
+	for dev in $(seq 1 2 "${END}")
 	do
 		ip l add veth"${dev}" type veth peer name veth"$((dev+1))"
 	done
 fi
 
 # setup client and server environment
-i=1
-for cgroup in "${cgroups[@]}"
+IDX=1
+for host in "${HOSTS[@]}"
 do
-	# check the presence of the cgroup
-        # create it if not found
-	if [[ "${create_cgroup}" -eq "1" ]]
-	then
-		if [[ ! -d "${cpath}/${cgroup}" ]]
-		then
-			info "Creating <${cgroup}> cgroup2"
-			mkdir -p "${cpath}/${cgroup}"
-		fi
-		kill_cgroup_procs "${cgroup}"
-	fi
 
-	# check the presence of the netns
-	# create it if not present
-	ns_name="ns_${cgroup}"
-	ns_exec="ip netns exec $ns_name"
-	ip netns list | grep "${ns_name}" > /dev/null
-	if [ $? -eq 1 ]
-	then
-		info "Creating <${ns_name}> netns"
-		ip netns add "${ns_name}"
+	info "Setup <${host}> host"
 
-		j=1
-		for dev in $(seq 1 2 "${end}")
-		do
-			setup_iface "$((dev + i - 1))" "$((j++))" "$i" "${ns_name}"
-		done
+	create_cgroup "${host}"
+	create_netns "${host}" "${IDX}"
 
-		if [[ "$mptcp" -eq "1" ]]
-		then
-			info "Allowing multiple MPTCP subflows in <$ns_name> netns"
-			$ns_exec ip mptcp endpoint flush
-			$ns_exec ip mptcp limits set add_addr_accepted 8 subflows 8
-		fi
-	fi
+	setup_host "${host}"
+	dump_cgroup_procs "${host}"
 
-	if [ "$cgroup" = "server" ]
-	then
-		$ns_exec pkill python3
-		$ns_exec $use_mptcp python3 -m http.server &
-
-		if [[ "$create_cgroup" -eq "1" ]]
-		then
-			echo $! >> "$proc_file"
-			info "Registering HTTP server to <$cgroup> cgroup"
-		fi
-
-
-		if [[ "${both}" -eq "1" ]]
-		then
-			launch_loader
-		fi
-
-		if [[ "${delay}" -eq "1" ]]
-		then
-			$ns_exec tc qdisc add dev veth$i root netem delay 1000ms
-		fi
-
-	else # client env
-
-		if [[ "$mptcp" -eq "1" ]]
-		then
-			IFS=' ' read -r -a addrs <<< "$($ns_exec ip a show type veth scope global up | grep inet | sed -e 's/inet//g' -e 's/\/24.*$//g' -e 's/ //g' | tr '\n' ' ')"
-			for addr in "${addrs[@]:1}"
-			do
-				info "Advertising MPTCP subflow on ${addr}"
-				$ns_exec ip mptcp endpoint add "${addr}" subflow
-			done
-		fi
-		launch_loader
-        fi
-
-    ((i++))
+	((IDX++))
 
 done
+
+info "Env ready !"
