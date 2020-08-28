@@ -974,7 +974,7 @@ static void subflow_write_space(struct sock *sk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct sock *parent = subflow->conn;
 
-	if (!sk_stream_memory_free(sk))
+	if (!sk_stream_is_writeable(sk))
 		return;
 
 	WRITE_ONCE(subflow->writable, true);
