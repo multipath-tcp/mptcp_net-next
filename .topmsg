@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-stale-subflow-writeable-caching
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: fix stale subflow->writeable caching
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Even with fixed subflow_write_space(), we may still indicate EPOLLOUT
+even if no subflow is writeable.
+
+We need to re-check the last ssk that was used after the final tcp_push().
+tcp_push() can allocate new skbs that get charged to the subflow sk
+which may bring it above the wmem limit.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
