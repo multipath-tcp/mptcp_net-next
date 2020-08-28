@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-only-wake-parent-if-subflow-is-writable
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: only wake parent if subflow is writable
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp_connect.sh -d 10 -l 0 -r 0 -e "" -f $((100 * 1024 * 1024)) -m poll
+
+will result in frequent write errors:
+ns1 MPTCP -> ns3 (10.0.2.2:10010      ) MPTCP   write: Resource temporarily unavailable
+
+We promised write() would not block but then no subflow was ready
+to accept more data.
+
+Changing the 'free' check to 'writeable' (which checks the available
+space is above min thresh) makes those errors go away.
+
+Note that there are still poll timeouts:
+ns1 MPTCP -> ns2 (10.0.1.2:10006      ) MPTCP   copyfd_io_poll: poll timed out (events: POLLIN 1, POLLOUT 0)
+copyfd_io_poll: poll timed out (events: POLLIN 0, POLLOUT 4)
+
+This appears unrelated, they also appear without this change.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
