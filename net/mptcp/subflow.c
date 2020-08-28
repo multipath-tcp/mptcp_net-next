@@ -818,8 +818,10 @@ static void mptcp_subflow_discard_data(struct sock *ssk, struct sk_buff *skb,
 		 subflow->map_subflow_seq);
 	MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DUPDATA);
 	tcp_sk(ssk)->copied_seq += incr;
-	if (incr >= skb->len)
+	if (!before(tcp_sk(ssk)->copied_seq, TCP_SKB_CB(skb)->end_seq))
 		sk_eat_skb(ssk, skb);
+	if (mptcp_subflow_get_map_offset(subflow) >= subflow->map_data_len)
+		subflow->map_valid = 0;
 }
 
 static bool subflow_check_data_avail(struct sock *ssk)
