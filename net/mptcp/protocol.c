@@ -457,6 +457,18 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 	bool more_data_avail;
 	struct tcp_sock *tp;
 	bool done = false;
+	int sk_rbuf;
+
+	sk_rbuf = READ_ONCE(sk->sk_rcvbuf);
+
+	if (!(sk->sk_userlocks & SOCK_RCVBUF_LOCK)) {
+		int ssk_rbuf = READ_ONCE(ssk->sk_rcvbuf);
+
+		if (unlikely(ssk_rbuf > sk_rbuf)) {
+			WRITE_ONCE(sk->sk_rcvbuf, ssk_rbuf);
+			sk_rbuf = ssk_rbuf;
+		}
+	}
 
 	pr_debug("msk=%p ssk=%p", msk, ssk);
 	tp = tcp_sk(ssk);
@@ -511,7 +523,7 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 		WRITE_ONCE(tp->copied_seq, seq);
 		more_data_avail = mptcp_subflow_data_available(ssk);
 
-		if (atomic_read(&sk->sk_rmem_alloc) > READ_ONCE(sk->sk_rcvbuf)) {
+		if (atomic_read(&sk->sk_rmem_alloc) > sk_rbuf) {
 			done = true;
 			break;
 		}
@@ -603,6 +615,7 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	int sk_rbuf, ssk_rbuf;
 	bool wake;
 
 	/* move_skbs_to_msk below can legitly clear the data_avail flag,
@@ -613,12 +626,16 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 	if (wake)
 		set_bit(MPTCP_DATA_READY, &msk->flags);
 
-	if (atomic_read(&sk->sk_rmem_alloc) < READ_ONCE(sk->sk_rcvbuf) &&
-	    move_skbs_to_msk(msk, ssk))
+	ssk_rbuf = READ_ONCE(ssk->sk_rcvbuf);
+	sk_rbuf = READ_ONCE(sk->sk_rcvbuf);
+	if (unlikely(ssk_rbuf > sk_rbuf))
+		sk_rbuf = ssk_rbuf;
+
+	/* over limit? can't append more skbs to msk */
+	if (atomic_read(&sk->sk_rmem_alloc) > sk_rbuf)
 		goto wake;
 
-	/* don't schedule if mptcp sk is (still) over limit */
-	if (atomic_read(&sk->sk_rmem_alloc) > READ_ONCE(sk->sk_rcvbuf))
+	if (move_skbs_to_msk(msk, ssk))
 		goto wake;
 
 	/* mptcp socket is owned, release_cb should retry */
@@ -1239,7 +1256,7 @@ restart:
 		msk->snd_burst -= ret;
 		copied += ret;
 
-		if (!sk_stream_memory_free(ssk))
+		if (!sk_stream_is_writeable(ssk))
 			WRITE_ONCE(subflow->writable, false);
 
 		tx_ok = msg_data_left(msg);
@@ -1294,6 +1311,9 @@ restart:
 		/* start the timer, if it's not pending */
 		if (!mptcp_timer_pending(sk))
 			mptcp_reset_timer(sk);
+
+		if (!sk_stream_is_writeable(ssk))
+			WRITE_ONCE(mptcp_subflow_ctx(ssk)->writable, false);
 	}
 
 	release_sock(ssk);
