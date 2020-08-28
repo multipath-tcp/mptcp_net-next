@@ -1256,7 +1256,7 @@ restart:
 		msk->snd_burst -= ret;
 		copied += ret;
 
-		if (!sk_stream_memory_free(ssk))
+		if (!sk_stream_is_writeable(ssk))
 			WRITE_ONCE(subflow->writable, false);
 
 		tx_ok = msg_data_left(msg);
@@ -1311,6 +1311,9 @@ restart:
 		/* start the timer, if it's not pending */
 		if (!mptcp_timer_pending(sk))
 			mptcp_reset_timer(sk);
+
+		if (!sk_stream_is_writeable(ssk))
+			WRITE_ONCE(mptcp_subflow_ctx(ssk)->writable, false);
 	}
 
 	release_sock(ssk);
