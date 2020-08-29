@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rethink-is-writable-conditional
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: rethink 'is writable' conditional
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently, when checking for the 'msk is writable' condition, we look at
+the individual subflows write space.
+That works well while we sends data via a single subflow, but will not as
+soon as we will enable concurrent xmit on multiple subflows.
+
+With this change msk become writable when following conditions hold:
+- the socket has some free write space
+- there is at least a subflow with write free space
+
+Additonally we need to set the NOSPACE bit on all subflows
+before blocking.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
