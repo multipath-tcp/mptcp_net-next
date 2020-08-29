@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-and-use-mptcp_try_coalesce
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce and use mptcp_try_coalesce()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Factor-out existing code, will be re-used by the
+next patch.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
