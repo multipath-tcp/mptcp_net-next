@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-introduce-and-use-mptcp_try_coalesce
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
