@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-address-attribute-into-mptcp_addr_info
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move address attribute into mptcp_addr_info
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+So that can be accessed easily from subflow creation
+helper. No functional change intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
