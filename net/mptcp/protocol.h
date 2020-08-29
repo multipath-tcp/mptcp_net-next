@@ -299,6 +299,7 @@ struct mptcp_subflow_context {
 		rx_eof : 1,
 		use_64bit_ack : 1, /* Set when we received a 64-bit DSN */
 		can_ack : 1;	    /* only after processing the remote a key */
+	bool	writable;
 	u32	remote_nonce;
 	u64	thmac;
 	u32	local_nonce;
