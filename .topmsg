@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: introduce and use mptcp_try_coalesce()
-
-Factor-out existing code, will be re-used by the
-next patch.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
