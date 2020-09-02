@@ -391,7 +391,6 @@ static bool type_is_sk_pointer(enum bpf_reg_type type)
 	return type == PTR_TO_SOCKET ||
 		type == PTR_TO_SOCK_COMMON ||
 		type == PTR_TO_TCP_SOCK ||
-		type == PTR_TO_MPTCP_SOCK ||
 		type == PTR_TO_XDP_SOCK;
 }
 
@@ -399,7 +398,6 @@ static bool reg_type_not_null(enum bpf_reg_type type)
 {
 	return type == PTR_TO_SOCKET ||
 		type == PTR_TO_TCP_SOCK ||
-		type == PTR_TO_MPTCP_SOCK ||
 		type == PTR_TO_MAP_VALUE ||
 		type == PTR_TO_SOCK_COMMON;
 }
@@ -410,7 +408,6 @@ static bool reg_type_may_be_null(enum bpf_reg_type type)
 	       type == PTR_TO_SOCKET_OR_NULL ||
 	       type == PTR_TO_SOCK_COMMON_OR_NULL ||
 	       type == PTR_TO_TCP_SOCK_OR_NULL ||
-	       type == PTR_TO_MPTCP_SOCK_OR_NULL ||
 	       type == PTR_TO_BTF_ID_OR_NULL ||
 	       type == PTR_TO_MEM_OR_NULL ||
 	       type == PTR_TO_RDONLY_BUF_OR_NULL ||
@@ -429,8 +426,6 @@ static bool reg_type_may_be_refcounted_or_null(enum bpf_reg_type type)
 		type == PTR_TO_SOCKET_OR_NULL ||
 		type == PTR_TO_TCP_SOCK ||
 		type == PTR_TO_TCP_SOCK_OR_NULL ||
-		type == PTR_TO_MPTCP_SOCK ||
-		type == PTR_TO_MPTCP_SOCK_OR_NULL ||
 		type == PTR_TO_MEM ||
 		type == PTR_TO_MEM_OR_NULL;
 }
@@ -504,8 +499,6 @@ static const char * const reg_type_str[] = {
 	[PTR_TO_SOCK_COMMON_OR_NULL] = "sock_common_or_null",
 	[PTR_TO_TCP_SOCK]	= "tcp_sock",
 	[PTR_TO_TCP_SOCK_OR_NULL] = "tcp_sock_or_null",
-	[PTR_TO_MPTCP_SOCK]	= "mptcp_sock",
-	[PTR_TO_MPTCP_SOCK_OR_NULL] = "mptcp_sock_or_null",
 	[PTR_TO_TP_BUFFER]	= "tp_buffer",
 	[PTR_TO_XDP_SOCK]	= "xdp_sock",
 	[PTR_TO_BTF_ID]		= "ptr_",
@@ -2183,8 +2176,6 @@ static bool is_spillable_regtype(enum bpf_reg_type type)
 	case PTR_TO_SOCK_COMMON_OR_NULL:
 	case PTR_TO_TCP_SOCK:
 	case PTR_TO_TCP_SOCK_OR_NULL:
-	case PTR_TO_MPTCP_SOCK:
-	case PTR_TO_MPTCP_SOCK_OR_NULL:
 	case PTR_TO_XDP_SOCK:
 	case PTR_TO_BTF_ID:
 	case PTR_TO_BTF_ID_OR_NULL:
@@ -2786,9 +2777,6 @@ static int check_sock_access(struct bpf_verifier_env *env, int insn_idx,
 	case PTR_TO_TCP_SOCK:
 		valid = bpf_tcp_sock_is_valid_access(off, size, t, &info);
 		break;
-	case PTR_TO_MPTCP_SOCK:
-		valid = bpf_mptcp_sock_is_valid_access(off, size, t, &info);
-		break;
 	case PTR_TO_XDP_SOCK:
 		valid = bpf_xdp_sock_is_valid_access(off, size, t, &info);
 		break;
@@ -2946,9 +2934,6 @@ static int check_ptr_alignment(struct bpf_verifier_env *env,
 		break;
 	case PTR_TO_TCP_SOCK:
 		pointer_desc = "tcp_sock ";
-		break;
-	case PTR_TO_MPTCP_SOCK:
-		pointer_desc = "mptcp_sock ";
 		break;
 	case PTR_TO_XDP_SOCK:
 		pointer_desc = "xdp_sock ";
@@ -4914,10 +4899,6 @@ static int check_helper_call(struct bpf_verifier_env *env, int func_id, int insn
 		mark_reg_known_zero(env, regs, BPF_REG_0);
 		regs[BPF_REG_0].type = PTR_TO_TCP_SOCK_OR_NULL;
 		regs[BPF_REG_0].id = ++env->id_gen;
-	} else if (fn->ret_type == RET_PTR_TO_MPTCP_SOCK_OR_NULL) {
-		mark_reg_known_zero(env, regs, BPF_REG_0);
-		regs[BPF_REG_0].type = PTR_TO_MPTCP_SOCK_OR_NULL;
-		regs[BPF_REG_0].id = ++env->id_gen;
 	} else if (fn->ret_type == RET_PTR_TO_ALLOC_MEM_OR_NULL) {
 		mark_reg_known_zero(env, regs, BPF_REG_0);
 		regs[BPF_REG_0].type = PTR_TO_MEM_OR_NULL;
@@ -5245,8 +5226,6 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 	case PTR_TO_SOCK_COMMON_OR_NULL:
 	case PTR_TO_TCP_SOCK:
 	case PTR_TO_TCP_SOCK_OR_NULL:
-	case PTR_TO_MPTCP_SOCK:
-	case PTR_TO_MPTCP_SOCK_OR_NULL:
 	case PTR_TO_XDP_SOCK:
 		verbose(env, "R%d pointer arithmetic on %s prohibited\n",
 			dst, reg_type_str[ptr_reg->type]);
@@ -6901,8 +6880,6 @@ static void mark_ptr_or_null_reg(struct bpf_func_state *state,
 			reg->type = PTR_TO_SOCK_COMMON;
 		} else if (reg->type == PTR_TO_TCP_SOCK_OR_NULL) {
 			reg->type = PTR_TO_TCP_SOCK;
-		} else if (reg->type == PTR_TO_MPTCP_SOCK_OR_NULL) {
-			reg->type = PTR_TO_MPTCP_SOCK;
 		} else if (reg->type == PTR_TO_BTF_ID_OR_NULL) {
 			reg->type = PTR_TO_BTF_ID;
 		} else if (reg->type == PTR_TO_MEM_OR_NULL) {
@@ -8265,8 +8242,6 @@ static bool regsafe(struct bpf_reg_state *rold, struct bpf_reg_state *rcur,
 	case PTR_TO_SOCK_COMMON_OR_NULL:
 	case PTR_TO_TCP_SOCK:
 	case PTR_TO_TCP_SOCK_OR_NULL:
-	case PTR_TO_MPTCP_SOCK:
-	case PTR_TO_MPTCP_SOCK_OR_NULL:
 	case PTR_TO_XDP_SOCK:
 		/* Only valid matches are exact, which memcmp() above
 		 * would have accepted
@@ -8794,8 +8769,6 @@ static bool reg_type_mismatch_ok(enum bpf_reg_type type)
 	case PTR_TO_SOCK_COMMON_OR_NULL:
 	case PTR_TO_TCP_SOCK:
 	case PTR_TO_TCP_SOCK_OR_NULL:
-	case PTR_TO_MPTCP_SOCK:
-	case PTR_TO_MPTCP_SOCK_OR_NULL:
 	case PTR_TO_XDP_SOCK:
 	case PTR_TO_BTF_ID:
 	case PTR_TO_BTF_ID_OR_NULL:
@@ -9915,9 +9888,6 @@ static int convert_ctx_accesses(struct bpf_verifier_env *env)
 			break;
 		case PTR_TO_TCP_SOCK:
 			convert_ctx_access = bpf_tcp_sock_convert_ctx_access;
-			break;
-		case PTR_TO_MPTCP_SOCK:
-			convert_ctx_access = bpf_mptcp_sock_convert_ctx_access;
 			break;
 		case PTR_TO_XDP_SOCK:
 			convert_ctx_access = bpf_xdp_sock_convert_ctx_access;
