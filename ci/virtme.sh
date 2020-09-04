@@ -49,7 +49,7 @@ gen_kconfig() { local kconfig
         kconfig+=(-e INET_UDP_DIAG -e INET_RAW_DIAG -e INET_DIAG_DESTROY \
                   -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
                   -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST -d LIST_KUNIT_TEST \
-                  -d LINEAR_RANGES_TEST -d KUNIT_ALL_TESTS)
+                  -d LINEAR_RANGES_TEST -d BITS_TEST -d KUNIT_ALL_TESTS)
 
         # Extra options needed for packetdrill
         # note: we still need SHA1 for fallback tests with v0

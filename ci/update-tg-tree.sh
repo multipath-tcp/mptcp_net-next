@@ -238,6 +238,7 @@ generate_config_mptcp() {
 	                      -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
 	                      -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST \
 	                      -d LIST_KUNIT_TEST -d LINEAR_RANGES_TEST \
+	                      -d BITS_TEST \
 	                      -d KUNIT_ALL_TESTS
 
 	# For INET_MPTCP_DIAG
