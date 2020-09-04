@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-ADD_ADDR-related-mibs
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add ADD_ADDR related mibs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added two mibs for ADD_ADDR, MPTCP_MIB_ADDADDR for receiving
+of the ADD_ADDR suboption with echo-flag=0, and MPTCP_MIB_ECHOADD for
+receiving the ADD_ADDR suboption with echo-flag=1.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
