@@ -1,1 +1,1 @@
-t/bpf-add-bpf_mptcp_sock-structure-and-helper
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
