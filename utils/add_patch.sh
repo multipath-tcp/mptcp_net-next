@@ -59,8 +59,6 @@ git commit -sm "tg: switch to ${BRANCH}" .topdeps
 tg_update
 git checkout ${TOP}
 tg_update
-echo "push?"
-read
 tg push
 for PATCH in "${@}"; do
 	./.patch-file-accept.sh "${PATCH}"
