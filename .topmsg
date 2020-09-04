@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-send-out-ADD_ADDR-with-echo-flag
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: send out ADD_ADDR with echo flag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the ADD_ADDR suboption has been received, we need to send out the same
+ADD_ADDR suboption with echo-flag=1, and no HMAC.
+
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
