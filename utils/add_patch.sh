@@ -5,6 +5,24 @@
 TOP="t/upstream"
 TG_TOP=${TG_TOP:-${TOP}}
 
+tg_up_err() {
+	echo "Please fix the conflicts in another terminal." \
+	     "End with ./.end-conflict.sh, then press Enter to continue."
+	read
+}
+
+
+tg_update() {
+	if ! tg update; then
+		tg_up_err
+
+		while ! tg update --continue; do
+			tg_up_err
+		done
+	fi
+}
+
+
 # the last commit is always a DO-NOT-MERGE one.
 if [ "${TG_TOP}" = "${TOP}" ]; then
 	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
@@ -38,9 +56,9 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout "${TG_TOP}"
 echo ${BRANCH} > .topdeps
 git commit -sm "tg: switch to ${BRANCH}" .topdeps
-tg update
+tg_update
 git checkout ${TOP}
-tg update
+tg_update
 echo "push?"
 read
 tg push
