@@ -192,7 +192,6 @@ static void mptcp_check_data_fin_ack(struct sock *sk)
 			sk->sk_state_change(sk);
 			break;
 		case TCP_CLOSING:
-			fallthrough;
 		case TCP_LAST_ACK:
 			inet_sk_state_store(sk, TCP_CLOSE);
 			sk->sk_state_change(sk);
@@ -929,7 +928,6 @@ restart:
 		goto out;
 	}
 
-wait_for_sndbuf:
 	__mptcp_flush_join_list(msk);
 	ssk = mptcp_subflow_get_send(msk);
 	while (!sk_stream_memory_free(sk) ||
@@ -1019,7 +1017,7 @@ wait_for_sndbuf:
 				 */
 				mptcp_set_timeout(sk, ssk);
 				release_sock(ssk);
-				goto wait_for_sndbuf;
+				goto restart;
 			}
 		}
 	}
@@ -1585,7 +1583,7 @@ void mptcp_subflow_shutdown(struct sock *sk, struct sock *ssk, int how)
 	case TCP_LISTEN:
 		if (!(how & RCV_SHUTDOWN))
 			break;
-		/* fall through */
+		fallthrough;
 	case TCP_SYN_SENT:
 		tcp_disconnect(ssk, O_NONBLOCK);
 		break;
