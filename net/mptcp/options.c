@@ -891,9 +891,9 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb,
 #endif
 		if (!mp_opt.echo) {
 			mptcp_pm_add_addr_received(msk, &addr);
-			__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDR);
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDR);
 		} else {
-			__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ECHOADD);
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ECHOADD);
 		}
 		mp_opt.add_addr = 0;
 	}
