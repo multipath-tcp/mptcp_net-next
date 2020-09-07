@@ -6,4 +6,6 @@ of the ADD_ADDR suboption with echo-flag=0, and MPTCP_MIB_ECHOADD for
 receiving the ADD_ADDR suboption with echo-flag=1.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
