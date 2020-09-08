@@ -1784,7 +1784,7 @@ int dsa_slave_create(struct dsa_port *port)
 	rtnl_lock();
 	ret = dsa_slave_change_mtu(slave_dev, ETH_DATA_LEN);
 	rtnl_unlock();
-	if (ret)
+	if (ret && ret != -EOPNOTSUPP)
 		dev_warn(ds->dev, "nonfatal error %d setting MTU on port %d\n",
 			 ret, port->index);
 
@@ -1792,8 +1792,9 @@ int dsa_slave_create(struct dsa_port *port)
 
 	ret = dsa_slave_phy_setup(slave_dev);
 	if (ret) {
-		netdev_err(master, "error %d setting up slave PHY for %s\n",
-			   ret, slave_dev->name);
+		netdev_err(slave_dev,
+			   "error %d setting up PHY for tree %d, switch %d, port %d\n",
+			   ret, ds->dst->index, ds->index, port->index);
 		goto out_gcells;
 	}
 
