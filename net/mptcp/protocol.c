@@ -1031,41 +1031,109 @@ static void mptcp_nospace(struct mptcp_sock *msk)
 	}
 }
 
+static bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
+{
+	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+	/* can't send if JOIN hasn't completed yet (i.e. is usable for mptcp) */
+	if (subflow->request_join && !subflow->fully_established)
+		return false;
+
+	/* only send if our side has not closed yet */
+	return ((1 << ssk->sk_state) & (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT));
+}
+
+#define MPTCP_SEND_BURST_SIZE		(1 << 15)
+
+static struct list_head *mptcp_next_subflow(struct mptcp_sock *msk,
+					    struct list_head *pos,
+					    bool wrap_around)
+{
+	if (list_is_last(pos, &msk->conn_list) && wrap_around)
+		return msk->conn_list.next;
+	return pos->next;
+}
+
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 					   u32 *sndbuf)
 {
 	struct mptcp_subflow_context *subflow;
-	struct sock *sk = (struct sock *)msk;
-	struct sock *backup = NULL;
+	struct sock *next_backup = NULL;
+	struct list_head *pos, *start;
+	struct sock *next_ssk = NULL;
+	bool wrap_around;
 	bool free;
 
-	sock_owned_by_me(sk);
+	sock_owned_by_me((struct sock *)msk);
 
 	*sndbuf = 0;
 	if (!mptcp_ext_cache_refill(msk))
 		return NULL;
 
-	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-		free = sk_stream_is_writeable(subflow->tcp_sock);
-		if (!free) {
-			mptcp_nospace(msk);
-			return NULL;
-		}
-
-		*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
-		if (subflow->backup) {
-			if (!backup)
-				backup = ssk;
-
-			continue;
-		}
-
-		return ssk;
+	if (__mptcp_check_fallback(msk)) {
+		*sndbuf = msk->first ? msk->first->sk_sndbuf : 0;
+		return msk->first;
 	}
 
-	return backup;
+	/* lookup the first writeable subflow and first writable back subflow
+	 * starting from last used, with wrap-around
+	 */
+	if (msk->last_snd) {
+		start = &mptcp_subflow_ctx(msk->last_snd)->node;
+		wrap_around = true;
+	} else {
+		start = &msk->conn_list;
+		wrap_around = false;
+	}
+	pr_debug("msk=%p start=%p pos=%p wrap_around=%d last=%p", msk, start,
+		 mptcp_next_subflow(msk, start, wrap_around), wrap_around,
+		 msk->last_snd);
+	for (pos = mptcp_next_subflow(msk, start, wrap_around); pos != start;
+	     pos = mptcp_next_subflow(msk, pos, wrap_around)) {
+		struct sock *ssk;
+
+		subflow = list_entry(pos, struct mptcp_subflow_context, node);
+		ssk =  mptcp_subflow_tcp_sock(subflow);
+		if (!mptcp_subflow_active(subflow))
+			continue;
+
+		*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
+		if (next_backup || next_ssk)
+			continue;
+
+		free = sk_stream_is_writeable(subflow->tcp_sock);
+		if (!free)
+			continue;
+
+		if (!subflow->backup && !next_ssk)
+			next_ssk = ssk;
+
+		if (subflow->backup && !next_backup)
+			next_backup = ssk;
+	}
+	if (!next_ssk)
+		next_ssk = next_backup;
+
+	if (msk->last_snd) {
+		*sndbuf = max(tcp_sk(msk->last_snd)->snd_wnd, *sndbuf);
+		free = sk_stream_memory_free(msk->last_snd);
+	} else {
+		free = false;
+	}
+	pr_debug("msk=%p ssk=%p:%d last=%p last free=%d burst=%d", msk,
+		 next_ssk, next_ssk ? sk_stream_wspace(next_ssk) : 0,
+		 msk->last_snd, free, msk->snd_burst);
+
+	/* use the looked-up subflow if the previusly one has exauted the burst
+	 * or is not writable
+	 */
+	if (next_ssk && (!free || msk->snd_burst <= 0)) {
+		msk->last_snd = next_ssk;
+		msk->snd_burst = min_t(int, MPTCP_SEND_BURST_SIZE,
+				       sk_stream_wspace(next_ssk));
+		free = true;
+	}
+	return free ? msk->last_snd : NULL;
 }
 
 static void ssk_check_wmem(struct mptcp_sock *msk)
@@ -1160,6 +1228,10 @@ restart:
 			break;
 		}
 
+		/* burst can be negative, we will try move to the next subflow
+		 * at selection time, if possible.
+		 */
+		msk->snd_burst -= ret;
 		copied += ret;
 
 		tx_ok = msg_data_left(msg);
@@ -1375,6 +1447,11 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk)
 	unsigned int moved = 0;
 	bool done;
 
+	/* avoid looping forever below on racing close */
+	if (((struct sock *)msk)->sk_state == TCP_CLOSE)
+		return false;
+
+	__mptcp_flush_join_list(msk);
 	do {
 		struct sock *ssk = mptcp_subflow_recv_lookup(msk);
 
@@ -1539,8 +1616,14 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 
 	sock_owned_by_me((const struct sock *)msk);
 
+	if (__mptcp_check_fallback(msk))
+		return msk->first;
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (!mptcp_subflow_active(subflow))
+			continue;
 
 		/* still data outstanding at TCP level?  Don't retransmit. */
 		if (!tcp_write_queue_empty(ssk))
