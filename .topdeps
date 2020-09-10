@@ -1,1 +1,1 @@
-t/mptcp-add-accept_subflow-re-check
+t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
