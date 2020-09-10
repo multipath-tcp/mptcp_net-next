@@ -15,6 +15,7 @@
 #include <uapi/linux/mptcp.h>
 
 #include "protocol.h"
+#include "mib.h"
 
 /* forward declaration */
 static struct genl_family mptcp_genl_family;
@@ -300,6 +301,43 @@ void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
 		msk->pm.subflows--;
 		WRITE_ONCE(msk->pm.accept_addr, true);
 
+		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMADDR);
+
+		break;
+	}
+}
+
+void mptcp_pm_nl_rm_subflow_received(struct mptcp_sock *msk, u8 rm_id)
+{
+	struct mptcp_subflow_context *subflow, *tmp;
+	struct sock *sk = (struct sock *)msk;
+
+	pr_debug("subflow rm_id %d", rm_id);
+
+	if (!rm_id)
+		return;
+
+	if (list_empty(&msk->conn_list))
+		return;
+
+	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		int how = RCV_SHUTDOWN | SEND_SHUTDOWN;
+		long timeout = 0;
+
+		if (rm_id != subflow->local_id)
+			continue;
+
+		spin_unlock_bh(&msk->pm.lock);
+		mptcp_subflow_shutdown(sk, ssk, how);
+		__mptcp_close_ssk(sk, ssk, subflow, timeout);
+		spin_lock_bh(&msk->pm.lock);
+
+		msk->pm.local_addr_used--;
+		msk->pm.subflows--;
+
+		__MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMSUBFLOW);
+
 		break;
 	}
 }
@@ -567,6 +605,35 @@ __lookup_addr_by_id(struct pm_nl_pernet *pernet, unsigned int id)
 	return NULL;
 }
 
+static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
+						   struct mptcp_addr_info *addr)
+{
+	struct mptcp_sock *msk;
+	long s_slot = 0, s_num = 0;
+
+	pr_debug("remove_id=%d\n", addr->id);
+
+	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
+		struct sock *sk = (struct sock *)msk;
+
+		if (list_empty(&msk->conn_list))
+			goto next;
+
+		lock_sock(sk);
+		if (lookup_subflow_by_saddr(&msk->conn_list, addr)) {
+			mptcp_pm_remove_addr(msk, addr->id);
+			mptcp_pm_remove_subflow(msk, addr->id);
+		}
+		release_sock(sk);
+
+next:
+		sock_put(sk);
+		cond_resched();
+	}
+
+	return 0;
+}
+
 static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
@@ -582,8 +649,8 @@ static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 	entry = __lookup_addr_by_id(pernet, addr.addr.id);
 	if (!entry) {
 		GENL_SET_ERR_MSG(info, "address not found");
-		ret = -EINVAL;
-		goto out;
+		spin_unlock_bh(&pernet->lock);
+		return -EINVAL;
 	}
 	if (entry->addr.flags & MPTCP_PM_ADDR_FLAG_SIGNAL)
 		pernet->add_addr_signal_max--;
@@ -592,9 +659,11 @@ static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 
 	pernet->addrs--;
 	list_del_rcu(&entry->list);
-	kfree_rcu(entry, rcu);
-out:
 	spin_unlock_bh(&pernet->lock);
+
+	mptcp_nl_remove_subflow_and_signal_addr(sock_net(skb->sk), &entry->addr);
+	kfree_rcu(entry, rcu);
+
 	return ret;
 }
 
