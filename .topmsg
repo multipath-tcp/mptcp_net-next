@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add accept_subflow re-check
-
-The re-check of pm->accept_subflow with pm->lock held was missing, this
-patch fixed it.
-
-Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
