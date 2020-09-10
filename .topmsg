@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-subflow-s-remote_id-issues
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: fix subflow's remote_id issues
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch set the init remote_id to zero, otherwise it will be a random
+number.
+
+Then it added the missing subflow's remote_id setting code both in
+__mptcp_subflow_connect and in subflow_ulp_clone.
+
+Fixes: 01cacb00b35cb ("mptcp: add netlink-based PM")
+Fixes: ec3edaa7ca6ce ("mptcp: Add handling of outgoing MP_JOIN requests")
+Fixes: f296234c98a8f ("mptcp: Add handling of incoming MP_JOIN requests")
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
