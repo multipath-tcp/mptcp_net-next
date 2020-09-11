@@ -1043,26 +1043,25 @@ static bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 	return ((1 << ssk->sk_state) & (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT));
 }
 
-#define MPTCP_SEND_BURST_SIZE		(1 << 15)
+#define MPTCP_SEND_BURST_SIZE		((1 << 16) - \
+					 sizeof(struct tcphdr) - \
+					 MAX_TCP_OPTION_SPACE - \
+					 sizeof(struct ipv6hdr) - \
+					 sizeof(struct frag_hdr))
 
-static struct list_head *mptcp_next_subflow(struct mptcp_sock *msk,
-					    struct list_head *pos,
-					    bool wrap_around)
-{
-	if (list_is_last(pos, &msk->conn_list) && wrap_around)
-		return msk->conn_list.next;
-	return pos->next;
-}
+struct subflow_send_info {
+	struct sock *ssk;
+	uint64_t ratio;
+};
 
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 					   u32 *sndbuf)
 {
+	struct subflow_send_info send_info[2];
 	struct mptcp_subflow_context *subflow;
-	struct sock *next_backup = NULL;
-	struct list_head *pos, *start;
-	struct sock *next_ssk = NULL;
-	bool wrap_around;
-	bool free;
+	int i, nr_active = 0;
+	int64_t ratio, pace;
+	struct sock *ssk;
 
 	sock_owned_by_me((struct sock *)msk);
 
@@ -1075,65 +1074,57 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 		return msk->first;
 	}
 
-	/* lookup the first writeable subflow and first writable back subflow
-	 * starting from last used, with wrap-around
-	 */
-	if (msk->last_snd) {
-		start = &mptcp_subflow_ctx(msk->last_snd)->node;
-		wrap_around = true;
-	} else {
-		start = &msk->conn_list;
-		wrap_around = false;
+	/* re-use last subflow, if the burst allow that */
+	if (msk->last_snd && msk->snd_burst > 0 &&
+	    sk_stream_memory_free(msk->last_snd) &&
+	    mptcp_subflow_active(mptcp_subflow_ctx(msk->last_snd))) {
+		mptcp_for_each_subflow(msk, subflow) {
+			ssk =  mptcp_subflow_tcp_sock(subflow);
+			*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
+		}
+		return msk->last_snd;
 	}
-	pr_debug("msk=%p start=%p pos=%p wrap_around=%d last=%p", msk, start,
-		 mptcp_next_subflow(msk, start, wrap_around), wrap_around,
-		 msk->last_snd);
-	for (pos = mptcp_next_subflow(msk, start, wrap_around); pos != start;
-	     pos = mptcp_next_subflow(msk, pos, wrap_around)) {
-		struct sock *ssk;
 
-		subflow = list_entry(pos, struct mptcp_subflow_context, node);
+	/* pick the subflow with the lower wmem/wspace ratio */
+	for (i = 0; i < 2; ++i) {
+		send_info[i].ssk = NULL;
+		send_info[i].ratio = -1;
+	}
+	mptcp_for_each_subflow(msk, subflow) {
 		ssk =  mptcp_subflow_tcp_sock(subflow);
 		if (!mptcp_subflow_active(subflow))
 			continue;
 
+		nr_active += !subflow->backup;
 		*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
-		if (next_backup || next_ssk)
+		if (!sk_stream_memory_free(subflow->tcp_sock))
 			continue;
 
-		free = sk_stream_is_writeable(subflow->tcp_sock);
-		if (!free)
+		pace = READ_ONCE(ssk->sk_pacing_rate);
+		if (!pace)
 			continue;
 
-		if (!subflow->backup && !next_ssk)
-			next_ssk = ssk;
-
-		if (subflow->backup && !next_backup)
-			next_backup = ssk;
+		ratio = (int64_t)READ_ONCE(ssk->sk_wmem_queued) << 32 / pace;
+		if (ratio < send_info[subflow->backup].ratio) {
+			send_info[subflow->backup].ssk = ssk;
+			send_info[subflow->backup].ratio = ratio;
+		}
 	}
-	if (!next_ssk)
-		next_ssk = next_backup;
 
-	if (msk->last_snd) {
-		*sndbuf = max(tcp_sk(msk->last_snd)->snd_wnd, *sndbuf);
-		free = sk_stream_memory_free(msk->last_snd);
-	} else {
-		free = false;
-	}
-	pr_debug("msk=%p ssk=%p:%d last=%p last free=%d burst=%d", msk,
-		 next_ssk, next_ssk ? sk_stream_wspace(next_ssk) : 0,
-		 msk->last_snd, free, msk->snd_burst);
+	/* pick the best backup if no other subflow is active */
+	if (!nr_active)
+		send_info[0].ssk = send_info[1].ssk;
 
-	/* use the looked-up subflow if the previusly one has exauted the burst
-	 * or is not writable
-	 */
-	if (next_ssk && (!free || msk->snd_burst <= 0)) {
-		msk->last_snd = next_ssk;
+	pr_debug("msk=%p nr_active=%d ssk=%p:%lld backup=%p:%lld",
+		 msk, nr_active, send_info[0].ssk, send_info[0].ratio,
+		 send_info[1].ssk, send_info[1].ratio);
+	if (send_info[0].ssk) {
+		msk->last_snd = send_info[0].ssk;
 		msk->snd_burst = min_t(int, MPTCP_SEND_BURST_SIZE,
-				       sk_stream_wspace(next_ssk));
-		free = true;
+				       sk_stream_wspace(msk->last_snd));
+		return msk->last_snd;
 	}
-	return free ? msk->last_snd : NULL;
+	return NULL;
 }
 
 static void ssk_check_wmem(struct mptcp_sock *msk)
