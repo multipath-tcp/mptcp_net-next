@@ -1087,8 +1087,10 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 		return NULL;
 
 	if (__mptcp_check_fallback(msk)) {
-		*sndbuf = msk->first ? msk->first->sk_sndbuf : 0;
-		return msk->first;
+		if (!msk->first)
+			return NULL;
+		*sndbuf = msk->first->sk_sndbuf;
+		return sk_stream_memory_free(msk->first) ? msk->first : NULL;
 	}
 
 	/* re-use last subflow, if the burst allow that */
