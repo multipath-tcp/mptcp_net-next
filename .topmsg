@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-call-tcp_cleanup_rbuf-on-subflows
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: call tcp_cleanup_rbuf on subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+That is needed to let the subflows announce promply when new
+space is available in the receive buffer.
+
+tcp_cleanup_rbuf() is currently a static function, drop the
+scope modifier and add a declaration in the TCP header.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+--
+should be inserted just before "mptcp: simult flow self-tests"
+
+v1 -> v2:
+ - move tcp_cleanup_rbuf() declaration inside the headers
