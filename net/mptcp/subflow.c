@@ -1098,6 +1098,7 @@ int __mptcp_subflow_connect(struct sock *sk, int ifindex,
 	subflow->remote_key = msk->remote_key;
 	subflow->local_key = msk->local_key;
 	subflow->token = msk->token;
+	subflow->remote_id = remote->id;
 	mptcp_info2sockaddr(loc, &addr);
 
 	addrlen = sizeof(struct sockaddr_in);
