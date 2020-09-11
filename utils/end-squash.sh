@@ -3,7 +3,7 @@
 git am --continue
 SHA="$(git rev-parse --short HEAD)"
 COMMIT="$(git rev-parse HEAD)"
-TITLE="$(git show --pretty="format:%s")"
+TITLE="$(git log -1 --pretty="format:%s")"
 printf " - %s: \"squashed\" (with conflicts) in \"%s\"\n" \
 	"${SHA}" \
 	"$(./.title.sh)"
