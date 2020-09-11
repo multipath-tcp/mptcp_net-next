@@ -1082,8 +1082,9 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 	struct subflow_send_info send_info[2];
 	struct mptcp_subflow_context *subflow;
 	int i, nr_active = 0;
-	int64_t ratio, pace;
 	struct sock *ssk;
+	u64 ratio;
+	u32 pace;
 
 	sock_owned_by_me((struct sock *)msk);
 
@@ -1128,7 +1129,8 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 		if (!pace)
 			continue;
 
-		ratio = (int64_t)READ_ONCE(ssk->sk_wmem_queued) << 32 / pace;
+		ratio = div_u64((u64)READ_ONCE(ssk->sk_wmem_queued) << 32,
+				pace);
 		if (ratio < send_info[subflow->backup].ratio) {
 			send_info[subflow->backup].ssk = ssk;
 			send_info[subflow->backup].ratio = ratio;
