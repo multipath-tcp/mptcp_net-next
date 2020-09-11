@@ -3,8 +3,11 @@ Subject: [PATCH] mptcp: allow picking different xmit subflows
 
 Update the scheduler to less trivial heuristic: cache
 the last used subflow, and try to send on it a reasonably
-long burst of data. When the burst or the subflow send
-space is exhausted, move to the next one with available
-send space.
+long burst of data.
+
+When the burst or the subflow send space is exhausted, pick
+the subflow with the lower ratio between write space and
+send buffer - that is, the subflow with the greater relative
+amount of free space.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
