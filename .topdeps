@@ -1,1 +1,2 @@
 t/mptcp-call-tcp_cleanup_rbuf-on-subflows
+t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
