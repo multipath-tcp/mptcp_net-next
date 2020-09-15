@@ -1,2 +1,1 @@
-t/mptcp-basic-sndbuf-autotuning
 t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
