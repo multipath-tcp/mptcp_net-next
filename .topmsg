@@ -1,0 +1,26 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: adjust mptcp receive buffer limit if subflow has larger one
+
+In addition to tcp autotuning during read, it may also increase the
+receive buffer in tcp_clamp_window().
+
+In this case, mptcp should adjust its receive buffer size as well so
+it can move all pending skbs from the subflow socket to the mptcp socket.
+
+At this time, TCP can have more skbs ready for processing than what the
+mptcp receive buffer size allows.
+
+In the mptcp case, the receive window announced is based on the free
+space of the mptcp parent socket instead of the individual subflows.
+
+Following the subflow allows mptcp to grow its receive buffer.
+
+This is especially noticeable for loopback traffic where two skbs are
+enough to fill the initial receive window.
+
+In mptcp_data_ready() we do not hold the mptcp socket lock, so modifying
+mptcp_sk->sk_rcvbuf is racy.  Do it when moving skbs from subflow to
+mptcp socket, both sockets are locked in this case.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
