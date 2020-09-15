@@ -1,0 +1,18 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove addr and subflow in PM netlink
+
+This patch implements the remove announced addr and subflow logic in PM
+netlink.
+
+When the PM netlink removes an address, we traverse all the existing msk
+sockets to find the relevant sockets.
+
+In the traversing, we check if this address is in conn_list. If it is,
+we trigger the RM_ADDR signal to remove the remote subflow and remove the
+local subflow which using this local address.
+
+Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
