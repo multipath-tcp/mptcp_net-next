@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: move address attribute into mptcp_addr_info
-
-So that can be accessed easily from subflow creation
-helper. No functional change intended.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
