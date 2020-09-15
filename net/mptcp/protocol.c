@@ -128,6 +128,9 @@ static bool mptcp_try_coalesce(struct sock *sk, struct sk_buff *to,
 	    !skb_try_coalesce(to, from, &fragstolen, &delta))
 		return false;
 
+	pr_debug("colesced seq %llx into %llx new len %d new end seq %llx",
+		 MPTCP_SKB_CB(from)->map_seq, MPTCP_SKB_CB(to)->map_seq,
+		 to->len, MPTCP_SKB_CB(from)->end_seq);
 	MPTCP_SKB_CB(to)->end_seq = MPTCP_SKB_CB(from)->end_seq;
 	kfree_skb_partial(from, fragstolen);
 	atomic_add(delta, &sk->sk_rmem_alloc);
@@ -160,13 +163,17 @@ static void mptcp_data_queue_ofo(struct mptcp_sock *msk, struct sk_buff *skb)
 	max_seq = tcp_space(sk);
 	max_seq = max_seq > 0 ? max_seq + msk->ack_seq : msk->ack_seq;
 
+	pr_debug("msk=%p seq=%llx limit=%llx empty=%d", msk, seq, max_seq,
+		 RB_EMPTY_ROOT(&msk->out_of_order_queue));
 	if (after64(seq, max_seq)) {
 		/* out of window */
 		mptcp_drop(sk, skb);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_NODSSWINDOW);
 		return;
 	}
 
 	p = &msk->out_of_order_queue.rb_node;
+	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOQUEUE);
 	if (RB_EMPTY_ROOT(&msk->out_of_order_queue)) {
 		rb_link_node(&skb->rbnode, NULL, p);
 		rb_insert_color(&skb->rbnode, &msk->out_of_order_queue);
@@ -177,11 +184,15 @@ static void mptcp_data_queue_ofo(struct mptcp_sock *msk, struct sk_buff *skb)
 	/* with 2 subflows, adding at end of ooo queue is quite likely
 	 * Use of ooo_last_skb avoids the O(Log(N)) rbtree lookup.
 	 */
-	if (mptcp_ooo_try_coalesce(msk, msk->ooo_last_skb, skb))
+	if (mptcp_ooo_try_coalesce(msk, msk->ooo_last_skb, skb)) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOMERGE);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOQUEUETAIL);
 		return;
+	}
 
 	/* Can avoid an rbtree lookup if we are adding skb after ooo_last_skb */
 	if (!before64(seq, MPTCP_SKB_CB(msk->ooo_last_skb)->end_seq)) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOQUEUETAIL);
 		parent = &msk->ooo_last_skb->rbnode;
 		p = &parent->rb_right;
 		goto insert;
@@ -200,6 +211,7 @@ static void mptcp_data_queue_ofo(struct mptcp_sock *msk, struct sk_buff *skb)
 			if (!after64(end_seq, MPTCP_SKB_CB(skb1)->end_seq)) {
 				/* All the bits are present. Drop. */
 				mptcp_drop(sk, skb);
+				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
 				return;
 			}
 			if (after64(seq, MPTCP_SKB_CB(skb1)->map_seq)) {
@@ -215,13 +227,16 @@ static void mptcp_data_queue_ofo(struct mptcp_sock *msk, struct sk_buff *skb)
 				rb_replace_node(&skb1->rbnode, &skb->rbnode,
 						&msk->out_of_order_queue);
 				mptcp_drop(sk, skb1);
+				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
 				goto merge_right;
 			}
 		} else if (mptcp_ooo_try_coalesce(msk, skb1, skb)) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOMERGE);
 			return;
 		}
 		p = &parent->rb_right;
 	}
+
 insert:
 	/* Insert segment into RB tree. */
 	rb_link_node(&skb->rbnode, parent, p);
@@ -234,6 +249,7 @@ merge_right:
 			break;
 		rb_erase(&skb1->rbnode, &msk->out_of_order_queue);
 		mptcp_drop(sk, skb1);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
 	}
 	/* If there is no skb after us, we are the last_skb ! */
 	if (!skb1)
@@ -283,6 +299,7 @@ static bool __mptcp_move_skb(struct mptcp_sock *msk, struct sock *ssk,
 	/* old data, keep it simple and drop the whole pkt, sender
 	 * will retransmit as needed, if needed.
 	 */
+	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
 	mptcp_drop(sk, skb);
 	return false;
 }
@@ -498,6 +515,8 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 	} while (more_data_avail);
 
 	*bytes += moved;
+	if (moved)
+		tcp_cleanup_rbuf(ssk, moved);
 
 	return done;
 }
@@ -511,6 +530,7 @@ static bool mptcp_ofo_queue(struct mptcp_sock *msk)
 	u64 end_seq;
 
 	p = rb_first(&msk->out_of_order_queue);
+	pr_debug("msk=%p empty=%d", msk, RB_EMPTY_ROOT(&msk->out_of_order_queue));
 	while (p) {
 		skb = rb_to_skb(p);
 		if (after64(MPTCP_SKB_CB(skb)->map_seq, msk->ack_seq))
@@ -522,6 +542,7 @@ static bool mptcp_ofo_queue(struct mptcp_sock *msk)
 		if (unlikely(!after64(MPTCP_SKB_CB(skb)->end_seq,
 				      msk->ack_seq))) {
 			mptcp_drop(sk, skb);
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
 			continue;
 		}
 
@@ -531,6 +552,9 @@ static bool mptcp_ofo_queue(struct mptcp_sock *msk)
 			int delta = msk->ack_seq - MPTCP_SKB_CB(skb)->map_seq;
 
 			/* skip overlapping data, if any */
+			pr_debug("uncoalesced seq=%llx ack seq=%llx delta=%d",
+				 MPTCP_SKB_CB(skb)->map_seq, msk->ack_seq,
+				 delta);
 			MPTCP_SKB_CB(skb)->offset += delta;
 			__skb_queue_tail(&sk->sk_receive_queue, skb);
 		}
@@ -1009,41 +1033,105 @@ static void mptcp_nospace(struct mptcp_sock *msk)
 	}
 }
 
+static bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
+{
+	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+	/* can't send if JOIN hasn't completed yet (i.e. is usable for mptcp) */
+	if (subflow->request_join && !subflow->fully_established)
+		return false;
+
+	/* only send if our side has not closed yet */
+	return ((1 << ssk->sk_state) & (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT));
+}
+
+#define MPTCP_SEND_BURST_SIZE		((1 << 16) - \
+					 sizeof(struct tcphdr) - \
+					 MAX_TCP_OPTION_SPACE - \
+					 sizeof(struct ipv6hdr) - \
+					 sizeof(struct frag_hdr))
+
+struct subflow_send_info {
+	struct sock *ssk;
+	u64 ratio;
+};
+
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
 					   u32 *sndbuf)
 {
+	struct subflow_send_info send_info[2];
 	struct mptcp_subflow_context *subflow;
-	struct sock *sk = (struct sock *)msk;
-	struct sock *backup = NULL;
-	bool free;
+	int i, nr_active = 0;
+	struct sock *ssk;
+	u64 ratio;
+	u32 pace;
 
-	sock_owned_by_me(sk);
+	sock_owned_by_me((struct sock *)msk);
 
 	*sndbuf = 0;
 	if (!mptcp_ext_cache_refill(msk))
 		return NULL;
 
-	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-		free = sk_stream_is_writeable(subflow->tcp_sock);
-		if (!free) {
-			mptcp_nospace(msk);
+	if (__mptcp_check_fallback(msk)) {
+		if (!msk->first)
 			return NULL;
-		}
-
-		*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
-		if (subflow->backup) {
-			if (!backup)
-				backup = ssk;
-
-			continue;
-		}
-
-		return ssk;
+		*sndbuf = msk->first->sk_sndbuf;
+		return sk_stream_memory_free(msk->first) ? msk->first : NULL;
 	}
 
-	return backup;
+	/* re-use last subflow, if the burst allow that */
+	if (msk->last_snd && msk->snd_burst > 0 &&
+	    sk_stream_memory_free(msk->last_snd) &&
+	    mptcp_subflow_active(mptcp_subflow_ctx(msk->last_snd))) {
+		mptcp_for_each_subflow(msk, subflow) {
+			ssk =  mptcp_subflow_tcp_sock(subflow);
+			*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
+		}
+		return msk->last_snd;
+	}
+
+	/* pick the subflow with the lower wmem/wspace ratio */
+	for (i = 0; i < 2; ++i) {
+		send_info[i].ssk = NULL;
+		send_info[i].ratio = -1;
+	}
+	mptcp_for_each_subflow(msk, subflow) {
+		ssk =  mptcp_subflow_tcp_sock(subflow);
+		if (!mptcp_subflow_active(subflow))
+			continue;
+
+		nr_active += !subflow->backup;
+		*sndbuf = max(tcp_sk(ssk)->snd_wnd, *sndbuf);
+		if (!sk_stream_memory_free(subflow->tcp_sock))
+			continue;
+
+		pace = READ_ONCE(ssk->sk_pacing_rate);
+		if (!pace)
+			continue;
+
+		ratio = div_u64((u64)READ_ONCE(ssk->sk_wmem_queued) << 32,
+				pace);
+		if (ratio < send_info[subflow->backup].ratio) {
+			send_info[subflow->backup].ssk = ssk;
+			send_info[subflow->backup].ratio = ratio;
+		}
+	}
+
+	pr_debug("msk=%p nr_active=%d ssk=%p:%lld backup=%p:%lld",
+		 msk, nr_active, send_info[0].ssk, send_info[0].ratio,
+		 send_info[1].ssk, send_info[1].ratio);
+
+	/* pick the best backup if no other subflow is active */
+	if (!nr_active)
+		send_info[0].ssk = send_info[1].ssk;
+
+	if (send_info[0].ssk) {
+		msk->last_snd = send_info[0].ssk;
+		msk->snd_burst = min_t(int, MPTCP_SEND_BURST_SIZE,
+				       sk_stream_wspace(msk->last_snd));
+		return msk->last_snd;
+	}
+	return NULL;
 }
 
 static void ssk_check_wmem(struct mptcp_sock *msk)
@@ -1138,6 +1226,10 @@ restart:
 			break;
 		}
 
+		/* burst can be negative, we will try move to the next subflow
+		 * at selection time, if possible.
+		 */
+		msk->snd_burst -= ret;
 		copied += ret;
 
 		tx_ok = msg_data_left(msg);
@@ -1334,10 +1426,14 @@ static void mptcp_rcv_space_adjust(struct mptcp_sock *msk, int copied)
 			 */
 			mptcp_for_each_subflow(msk, subflow) {
 				struct sock *ssk;
+				bool slow;
 
 				ssk = mptcp_subflow_tcp_sock(subflow);
+				slow = lock_sock_fast(ssk);
 				WRITE_ONCE(ssk->sk_rcvbuf, rcvbuf);
 				tcp_sk(ssk)->window_clamp = window_clamp;
+				tcp_cleanup_rbuf(ssk, 1);
+				unlock_sock_fast(ssk, slow);
 			}
 		}
 	}
@@ -1353,6 +1449,11 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk)
 	unsigned int moved = 0;
 	bool done;
 
+	/* avoid looping forever below on racing close */
+	if (((struct sock *)msk)->sk_state == TCP_CLOSE)
+		return false;
+
+	__mptcp_flush_join_list(msk);
 	do {
 		struct sock *ssk = mptcp_subflow_recv_lookup(msk);
 
@@ -1517,8 +1618,14 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 
 	sock_owned_by_me((const struct sock *)msk);
 
+	if (__mptcp_check_fallback(msk))
+		return msk->first;
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (!mptcp_subflow_active(subflow))
+			continue;
 
 		/* still data outstanding at TCP level?  Don't retransmit. */
 		if (!tcp_write_queue_empty(ssk))
