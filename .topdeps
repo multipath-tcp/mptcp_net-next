@@ -1,2 +1,1 @@
-t/selftests-mptcp-Better-delay-reordering-configuration
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
