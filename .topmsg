@@ -1,0 +1,20 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: propagate MPTCP skb extensions on xmit splits
+
+When the TCP stack splits a packet on the write queue, the tail
+half currently lose the associated skb extensions, and will not
+carry the DSM on the wire.
+
+The above does not cause functional problems and is allowed by
+the RFC, but interact badly with GRO and RX coalescing, as possible
+candidates for aggregation will carry different TCP options.
+
+This change tries to improve the MPTCP behavior, propagating the
+skb extensions on split.
+
+Additionally, we must prevent the MPTCP stack from updating the
+mapping after the split occur: that will both violate the RFC and
+fool the reader.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
