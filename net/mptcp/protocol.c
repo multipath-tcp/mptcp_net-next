@@ -1053,7 +1053,7 @@ static bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 
 struct subflow_send_info {
 	struct sock *ssk;
-	uint64_t ratio;
+	u64 ratio;
 };
 
 static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
