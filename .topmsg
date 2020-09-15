@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: allow creating non-backup subflows
-
-Currently the 'backup' attribute of local endpoint
-is ignored. Let's use it for the MP_JOIN handshake
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
