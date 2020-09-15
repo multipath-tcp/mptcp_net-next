@@ -1,1 +1,2 @@
 t/mptcp-simult-flow-self-tests
+t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
