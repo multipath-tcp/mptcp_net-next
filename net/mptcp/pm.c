@@ -235,6 +235,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	msk->pm.status = 0;
 
 	spin_lock_init(&msk->pm.lock);
+	INIT_LIST_HEAD(&msk->pm.anno_list);
 
 	mptcp_pm_nl_data_init(msk);
 }
