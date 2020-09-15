@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: simult flow self-tests
-
-Add a bunch of test-cases for multiple subflow xmit:
-create multiple subflows simulating different links
-condition via netem and verify that the msk is able
-to use completely the aggregated bandwidth.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
