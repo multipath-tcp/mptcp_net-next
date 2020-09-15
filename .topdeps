@@ -1,1 +1,2 @@
 t/mptcp-cleanup-mptcp_subflow_discard_data
+t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
