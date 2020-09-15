@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: add OoO related mibs
-
-Add a bunch of MPTCP mibs related to MPTCP OoO data
-processing.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
