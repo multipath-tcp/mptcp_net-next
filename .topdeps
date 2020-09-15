@@ -1,2 +1,1 @@
-t/mptcp-allow-picking-different-xmit-subflows
 t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
