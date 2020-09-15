@@ -1,1 +1,2 @@
 t/mptcp-add-OoO-related-mibs
+t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
