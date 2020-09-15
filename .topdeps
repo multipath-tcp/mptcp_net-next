@@ -1,2 +1,1 @@
-t/mptcp-move-address-attribute-into-mptcp_addr_info
 t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
