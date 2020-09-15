@@ -1,2 +1,1 @@
-t/mptcp-free-acked-data-before-waiting-for-more-memory
 t/selftests-mptcp-add-remove-addr-and-subflow-test-cases
