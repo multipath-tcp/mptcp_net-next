@@ -3576,6 +3576,15 @@ union bpf_attr {
  * 		the data in *dst*. This is a wrapper of copy_from_user().
  * 	Return
  * 		0 on success, or a negative error in case of failure.
+ *
+ * struct bpf_mptcp_sock *bpf_mptcp_sock(struct bpf_sock *sk)
+ *	Description
+ *		This helper gets a **struct bpf_mptcp_sock** pointer from a
+ *		**struct bpf_sock** pointer.
+ *	Return
+ *		A **struct bpf_mptcp_sock** pointer on success, or **NULL** in
+ *		case of failure.
+ *
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -3727,6 +3736,7 @@ union bpf_attr {
 	FN(inode_storage_delete),	\
 	FN(d_path),			\
 	FN(copy_from_user),		\
+	FN(mptcp_sock),			\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -4058,6 +4068,10 @@ struct bpf_tcp_sock {
 	__u32 delivered_ce;	/* Like the above but only ECE marked packets */
 	__u32 icsk_retransmits;	/* Number of unrecovered [RTO] timeouts */
 	__u32 is_mptcp;		/* Is MPTCP subflow? */
+};
+
+struct bpf_mptcp_sock {
+	__u32 token;		/* msk token */
 };
 
 struct bpf_sock_tuple {
