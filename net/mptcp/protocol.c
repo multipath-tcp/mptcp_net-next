@@ -2153,6 +2153,7 @@ static void mptcp_destroy(struct sock *sk)
 	if (msk->cached_ext)
 		__skb_ext_put(msk->cached_ext);
 
+	mptcp_pm_free_anno_list(msk);
 	sk_sockets_allocated_dec(sk);
 }
 
