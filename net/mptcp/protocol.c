@@ -1830,15 +1830,15 @@ static int mptcp_init_sock(struct sock *sk)
 	struct net *net = sock_net(sk);
 	int ret;
 
+	ret = __mptcp_init_sock(sk);
+	if (ret)
+		return ret;
+
 	if (!mptcp_is_enabled(net))
 		return -ENOPROTOOPT;
 
 	if (unlikely(!net->mib.mptcp_statistics) && !mptcp_mib_alloc(net))
 		return -ENOMEM;
-
-	ret = __mptcp_init_sock(sk);
-	if (ret)
-		return ret;
 
 	ret = __mptcp_socket_create(mptcp_sk(sk));
 	if (ret)
