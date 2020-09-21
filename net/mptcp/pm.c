@@ -35,7 +35,7 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, u8 local_id)
 
 int mptcp_pm_remove_subflow(struct mptcp_sock *msk, u8 local_id)
 {
-	pr_debug("%s msk=%p, local_id=%d", __func__, msk, local_id);
+	pr_debug("msk=%p, local_id=%d", msk, local_id);
 
 	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_nl_rm_subflow_received(msk, local_id);
