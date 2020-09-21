@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add sk_stop_timer_sync helper
-
-This patch added a new helper sk_stop_timer_sync, it deactivates a timer
-like sk_stop_timer, but waits for the handler to finish.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
