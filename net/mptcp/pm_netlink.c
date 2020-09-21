@@ -211,7 +211,7 @@ void mptcp_pm_free_anno_list(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_addr_entry *entry, *tmp;
 
-	pr_debug("msk=%p\n", msk);
+	pr_debug("msk=%p", msk);
 
 	spin_lock_bh(&msk->pm.lock);
 	list_for_each_entry_safe(entry, tmp, &msk->pm.anno_list, list) {
@@ -682,7 +682,7 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 	struct mptcp_sock *msk;
 	long s_slot = 0, s_num = 0;
 
-	pr_debug("remove_id=%d\n", addr->id);
+	pr_debug("remove_id=%d", addr->id);
 
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
