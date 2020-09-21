@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-add-sk_stop_timer_sync-helper
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
