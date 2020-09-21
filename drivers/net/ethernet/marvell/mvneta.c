@@ -751,13 +751,12 @@ static void mvneta_txq_inc_put(struct mvneta_tx_queue *txq)
 static void mvneta_mib_counters_clear(struct mvneta_port *pp)
 {
 	int i;
-	u32 dummy;
 
 	/* Perform dummy reads from MIB counters */
 	for (i = 0; i < MVNETA_MIB_LATE_COLLISION; i += 4)
-		dummy = mvreg_read(pp, (MVNETA_MIB_COUNTERS_BASE + i));
-	dummy = mvreg_read(pp, MVNETA_RX_DISCARD_FRAME_COUNT);
-	dummy = mvreg_read(pp, MVNETA_OVERRUN_FRAME_COUNT);
+		mvreg_read(pp, (MVNETA_MIB_COUNTERS_BASE + i));
+	mvreg_read(pp, MVNETA_RX_DISCARD_FRAME_COUNT);
+	mvreg_read(pp, MVNETA_OVERRUN_FRAME_COUNT);
 }
 
 /* Get System Network Statistics */
@@ -2305,10 +2304,7 @@ mvneta_swbm_build_skb(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
 {
 	struct skb_shared_info *sinfo = xdp_get_shared_info_from_buff(xdp);
 	int i, num_frags = sinfo->nr_frags;
-	skb_frag_t frags[MAX_SKB_FRAGS];
 	struct sk_buff *skb;
-
-	memcpy(frags, sinfo->frags, sizeof(skb_frag_t) * num_frags);
 
 	skb = build_skb(xdp->data_hard_start, PAGE_SIZE);
 	if (!skb)
@@ -2321,12 +2317,12 @@ mvneta_swbm_build_skb(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
 	mvneta_rx_csum(pp, desc_status, skb);
 
 	for (i = 0; i < num_frags; i++) {
-		struct page *page = skb_frag_page(&frags[i]);
+		skb_frag_t *frag = &sinfo->frags[i];
 
 		skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags,
-				page, skb_frag_off(&frags[i]),
-				skb_frag_size(&frags[i]), PAGE_SIZE);
-		page_pool_release_page(rxq->page_pool, page);
+				skb_frag_page(frag), skb_frag_off(frag),
+				skb_frag_size(frag), PAGE_SIZE);
+		page_pool_release_page(rxq->page_pool, skb_frag_page(frag));
 	}
 
 	return skb;
