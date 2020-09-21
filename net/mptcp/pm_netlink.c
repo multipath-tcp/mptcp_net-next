@@ -191,16 +191,14 @@ static struct mptcp_pm_add_entry *
 lookup_anno_list_by_saddr(struct mptcp_sock *msk,
 			  struct mptcp_addr_info *addr)
 {
-	struct mptcp_pm_add_entry *entry, *ret = NULL;
+	struct mptcp_pm_add_entry *entry;
 
 	list_for_each_entry(entry, &msk->pm.anno_list, list) {
-		if (addresses_equal(&entry->addr, addr, false)) {
-			ret = entry;
-			break;
-		}
+		if (addresses_equal(&entry->addr, addr, false))
+			return entry;
 	}
 
-	return ret;
+	return NULL;
 }
 
 static void mptcp_pm_add_timer(struct timer_list *timer)
@@ -214,7 +212,7 @@ static void mptcp_pm_add_timer(struct timer_list *timer)
 	if (!msk)
 		return;
 
-	if (sk->sk_state == TCP_CLOSE)
+	if (inet_sk_state_load(sk) == TCP_CLOSE)
 		return;
 
 	if (!entry->addr.id)
@@ -251,6 +249,8 @@ mptcp_pm_del_add_timer(struct mptcp_sock *msk,
 
 	spin_lock_bh(&msk->pm.lock);
 	entry = lookup_anno_list_by_saddr(msk, addr);
+	if (entry)
+		entry->retrans_times = ADD_ADDR_RETRANS_MAX;
 	spin_unlock_bh(&msk->pm.lock);
 
 	if (entry)
