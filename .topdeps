@@ -1,2 +1,1 @@
-t/mptcp-rename-addr_signal-and-the-related-functions
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
