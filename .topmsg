@@ -1,7 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add struct mptcp_pm_add_entry
-
-Add a new struct mptcp_pm_add_entry to describe add_addr's entry.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
