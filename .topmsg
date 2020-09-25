@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add mptcp_destroy_common helper
-
-This patch added a new helper named mptcp_destroy_common containing the
-shared code between mptcp_destroy() and mptcp_sock_destruct().
-
-Suggested-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
