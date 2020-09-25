@@ -1,1 +1,2 @@
 t/selftests-mptcp-add-ADD_ADDR-mibs-check-function
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
