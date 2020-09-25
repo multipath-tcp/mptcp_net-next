@@ -1,0 +1,16 @@
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Wake up MPTCP worker when DATA_FIN found on a TCP FIN packet
+
+When receiving a DATA_FIN MPTCP option on a TCP FIN packet, the DATA_FIN
+information would be stored but the MPTCP worker did not get
+scheduled. In turn, the MPTCP socket state would remain in
+TCP_ESTABLISHED and no blocked operations would be awakened.
+
+TCP FIN packets are seen by the MPTCP socket when moving skbs out of the
+subflow receive queues, so schedule the MPTCP worker when a skb with
+DATA_FIN but no data payload is moved from a subflow queue. Other cases
+(DATA_FIN on a bare TCP ACK or on a packet with data payload) are
+already handled.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
