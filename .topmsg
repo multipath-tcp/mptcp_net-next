@@ -1,0 +1,10 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: split mptcp_clean_una function
+
+mptcp_clean_una() will wake writers in case memory could be reclaimed.
+When called from mptcp_sendmsg the wakeup code isn't needed.
+
+Move the wakeup to a new helper and then use that from the mptcp worker.
+
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
