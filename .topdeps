@@ -1,1 +1,2 @@
 t/mptcp-add-mptcp_destroy_common-helper
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
