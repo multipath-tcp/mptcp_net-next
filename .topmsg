@@ -1,0 +1,7 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: use _fast lock version in __mptcp_move_skbs
+
+The function is short and won't sleep, so this can use the _fast version.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
