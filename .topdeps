@@ -1,2 +1,1 @@
-t/mptcp-add-RM_ADDR-related-mibs
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
