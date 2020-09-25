@@ -1,1 +1,2 @@
 t/mptcp-send-out-ADD_ADDR-with-echo-flag
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
