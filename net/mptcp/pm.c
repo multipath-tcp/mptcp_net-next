@@ -26,12 +26,21 @@ int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 
 int mptcp_pm_remove_addr(struct mptcp_sock *msk, u8 local_id)
 {
-	return -ENOTSUPP;
+	pr_debug("msk=%p, local_id=%d", msk, local_id);
+
+	msk->pm.rm_id = local_id;
+	WRITE_ONCE(msk->pm.rm_addr_signal, true);
+	return 0;
 }
 
-int mptcp_pm_remove_subflow(struct mptcp_sock *msk, u8 remote_id)
+int mptcp_pm_remove_subflow(struct mptcp_sock *msk, u8 local_id)
 {
-	return -ENOTSUPP;
+	pr_debug("msk=%p, local_id=%d", msk, local_id);
+
+	spin_lock_bh(&msk->pm.lock);
+	mptcp_pm_nl_rm_subflow_received(msk, local_id);
+	spin_unlock_bh(&msk->pm.lock);
+	return 0;
 }
 
 /* path manager event handlers */
@@ -48,7 +57,7 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, int server_side)
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
-	int ret;
+	int ret = 0;
 
 	pr_debug("msk=%p subflows=%d max=%d allow=%d", msk, pm->subflows,
 		 pm->subflows_max, READ_ONCE(pm->accept_subflow));
@@ -58,9 +67,11 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 		return false;
 
 	spin_lock_bh(&pm->lock);
-	ret = pm->subflows < pm->subflows_max;
-	if (ret && ++pm->subflows == pm->subflows_max)
-		WRITE_ONCE(pm->accept_subflow, false);
+	if (READ_ONCE(pm->accept_subflow)) {
+		ret = pm->subflows < pm->subflows_max;
+		if (ret && ++pm->subflows == pm->subflows_max)
+			WRITE_ONCE(pm->accept_subflow, false);
+	}
 	spin_unlock_bh(&pm->lock);
 
 	return ret;
@@ -229,6 +240,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	msk->pm.status = 0;
 
 	spin_lock_init(&msk->pm.lock);
+	INIT_LIST_HEAD(&msk->pm.anno_list);
 
 	mptcp_pm_nl_data_init(msk);
 }
