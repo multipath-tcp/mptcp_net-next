@@ -267,8 +267,7 @@ static int dpaa2_pcs_create(struct dpaa2_mac *mac,
 		return 0;
 	}
 
-	if (!of_device_is_available(node) ||
-	    !of_device_is_available(node->parent)) {
+	if (!of_device_is_available(node)) {
 		netdev_err(mac->net_dev, "pcs-handle node not available\n");
 		return -ENODEV;
 	}
@@ -291,9 +290,9 @@ static int dpaa2_pcs_create(struct dpaa2_mac *mac,
 static void dpaa2_pcs_destroy(struct dpaa2_mac *mac)
 {
 	struct lynx_pcs *pcs = mac->pcs;
-	struct device *dev = &pcs->mdio->dev;
 
 	if (pcs) {
+		struct device *dev = &pcs->mdio->dev;
 		lynx_pcs_destroy(pcs);
 		put_device(dev);
 		mac->pcs = NULL;
