@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Consistently-use-READ_ONCE-WRITE_ONCE-with-msk-ack_seq
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Consistently use READ_ONCE/WRITE_ONCE with msk->ack_seq
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The msk->ack_seq value is sometimes read without the msk lock held, so
+make proper use of READ_ONCE and WRITE_ONCE.
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
