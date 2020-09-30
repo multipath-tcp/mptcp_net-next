@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Handle-incoming-32-bit-DATA_FIN-values
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Handle incoming 32-bit DATA_FIN values
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The peer may send a DATA_FIN mapping with either a 32-bit or 64-bit
+sequence number. When a 32-bit sequence number is received for the
+DATA_FIN, it must be expanded to 64 bits before comparing it to the
+last acked sequence number. This expansion was missing.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/93
+Fixes: 3721b9b64676 (mptcp: Track received DATA_FIN sequence number and add related helpers)
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
