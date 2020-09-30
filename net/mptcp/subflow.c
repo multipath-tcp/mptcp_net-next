@@ -732,8 +732,8 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 
 	if (mpext->data_fin == 1) {
 		if (data_len == 1) {
-			mptcp_update_rcv_data_fin(msk, mpext->data_seq,
-						  mpext->dsn64);
+			bool updated = mptcp_update_rcv_data_fin(msk, mpext->data_seq,
+								 mpext->dsn64);
 			pr_debug("DATA_FIN with no payload seq=%llu", mpext->data_seq);
 			if (subflow->map_valid) {
 				/* A DATA_FIN might arrive in a DSS
