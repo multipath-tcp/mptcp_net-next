@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-fix-syn-cookied-MPTCP-request-socket-leak
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: fix syn cookied MPTCP request socket leak
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If a syn-cookies request socket don't pass MPTCP-level
+validation done in syn_recv_sock(), we need to release
+it immediately, or it will be leaked.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/89
+Fixes: 9466a1ccebbe ("mptcp: enable JOIN requests even if cookies are in use")
+Reported-and-tested-by: Geliang Tang <geliangtang@gmail.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
