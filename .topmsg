@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-a-new-sysctl-add_addr_timeout
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add a new sysctl add_addr_timeout
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new sysctl, named add_addr_timeout, to control the
+timeout value (in seconds) of the ADD_ADDR retransmission.
+
+Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
