@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-more-DATA-FIN-fixes
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: more DATA FIN fixes
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently data fin on data packet are not handled properly:
+the 'rcv_data_fin_seq' field is interpreted as the last
+sequence number carrying a valid data, but for data fin
+packet with valid maps we currently store map_seq + map_len,
+that is, the next value.
+
+The 'write_seq' fields carries instead the value subseguent
+to the last valid byte, so in mptcp_write_data_fin() we
+never detect correctly the last DSS map.
+
+Fixes: 1a49b2c2a501 ("mptcp: Handle incoming 32-bit DATA_FIN values")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
