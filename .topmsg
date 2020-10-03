@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-factor-out-__tcp_close-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: factor out __tcp_close() helper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+unlocked version of protocol level close, will be used by
+MPTCP to allow decouple orphaning and subflow level close.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
