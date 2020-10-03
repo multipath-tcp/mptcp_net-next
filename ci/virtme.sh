@@ -12,7 +12,7 @@ set -e
 VIRTME_PATH="/opt/virtme"
 VIRTME_CONFIGKERNEL="${VIRTME_PATH}/virtme-configkernel"
 VIRTME_RUN="${VIRTME_PATH}/virtme-run"
-VIRTME_RUN_OPTS=(--net --memory 768M --kdir "${PWD}" --mods=none --rwdir "${PWD}" --pwd)
+VIRTME_RUN_OPTS=(--net --memory 768M --kdir "${PWD}" --mods=auto --rwdir "${PWD}" --pwd)
 VIRTME_RUN_OPTS+=(--qemu-opts -smp 2) # 2 cores
 
 VIRTME_SCRIPT_DIR="patches/virtme"
@@ -91,6 +91,9 @@ prepare() { local old_pwd
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
         local mptcp_connect_mmap_tap="${RESULTS_DIR}/mptcp_connect_mmap.tap"
         local pktd_base="${RESULTS_DIR}/packetdrill"
+
+        # for the kmods
+        sudo mkdir -p /lib/modules
 
         # make sure we have the last stable tests
         cd /opt/packetdrill/
@@ -215,6 +218,7 @@ clean() {
         sudo chown -R "$(id -u):$(id -g)" "${RESULTS_DIR}"
 
         # to avoid leaving files owned by root
+        sudo rm -rf ./.virtme_mods || true
         sudo find . -user root -exec rm -vrf "{}" \; || true
 }
 
