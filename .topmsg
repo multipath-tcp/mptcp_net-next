@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reduce-the-arguments-of-mptcp_sendmsg_frag
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: reduce the arguments of mptcp_sendmsg_frag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current argument list is pretty long and quite unreadable,
+move many of them into a specific struct. Later patches
+will add more stuff to such struct.
+
+Additionally drop the 'timeo' argument, now unused.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
