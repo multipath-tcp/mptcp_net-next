@@ -39,18 +39,9 @@ OUTPUT_VIRTME=
 EXIT_STATUS=0
 
 # $@: extra kconfig
-gen_kconfig() { local kconfig
-        # Extra options are needed for MPTCP kselftests
-        kconfig=(-e MPTCP -e MPTCP_IPV6 -e VETH -e NET_SCH_NETEM -e INET_DIAG)
-
+gen_kconfig() { local kconfig=()
         # Extra options needed for MPTCP KUnit tests
         kconfig+=(-m KUNIT -e KUNIT_DEBUGFS -m MPTCP_KUNIT_TESTS)
-
-        # Extra options to avoid questions
-        kconfig+=(-e INET_UDP_DIAG -e INET_RAW_DIAG -e INET_DIAG_DESTROY \
-                  -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
-                  -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST -d LIST_KUNIT_TEST \
-                  -d LINEAR_RANGES_TEST -d BITS_TEST -d KUNIT_ALL_TESTS)
 
         # Extra options needed for packetdrill
         # note: we still need SHA1 for fallback tests with v0
@@ -67,7 +58,12 @@ gen_kconfig() { local kconfig
 
         "${VIRTME_CONFIGKERNEL}" --arch=x86_64 --defconfig
 
+        # Extra options are needed for MPTCP kselftests
+        cat "tools/testing/selftests/net/mptcp/config" >> .config
+
         echo | ./scripts/config "${kconfig[@]}"
+
+        make olddefconfig
 }
 
 build() {
