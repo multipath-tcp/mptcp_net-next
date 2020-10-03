@@ -301,6 +301,11 @@ check_sparse_output() { local src warn
 				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
 				return 0
 			fi
+			# ./include/net/sock.h:1608:31: warning: context imbalance in 'mptcp_close' - unexpected unlock
+			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_close' - unexpected unlock")" -eq 1 ]; then
+				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
+				return 0
+			fi
 		;;
 		"net/mptcp/mptcp_diag.c")
 			# ./include/net/sock.h:1612:31: warning: context imbalance in 'mptcp_diag_get_info' - unexpected unlock
