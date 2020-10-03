@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-don-t-skip-needed-ack
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: don't skip needed ack
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently we skip calling tcp_cleanup_rbuf() when packets
+are moved into the OoO queue or simply dropped. In both
+cases we still increment tp->copied_seq, and we should
+ask the TCP stack to check for ack.
+
+Fixes: c76c6956566f ("mptcp: call tcp_cleanup_rbuf on subflows")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
