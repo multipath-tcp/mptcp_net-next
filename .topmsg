@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-MPTCP-snd_nxt
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce MPTCP snd_nxt
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Track the next MPTCP sequence number used on xmit,
+currently always equal to write_next.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
