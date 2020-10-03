@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-ADD_ADDRs-with-echo-bit-are-smaller
+Subject: [PATCH] mptcp: ADD_ADDRs with echo bit are smaller
 
+The MPTCP ADD_ADDR suboption with echo-flag=1 has no HMAC, the size is
+smaller than the one initially sent without echo-flag=1. We then need to
+use the correct size everywhere when we need this echo bit.
+
+Before this patch, the wrong size was reserved but the correct amount of
+bytes were written (and read): the remaining bytes contained garbage.
+
+Fixes: 6a6c05a8b016 ("mptcp: send out ADD_ADDR with echo flag")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/95
+Reported-and-tested-by: Davide Caratti <dcaratti@redhat.com>
+Acked-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
