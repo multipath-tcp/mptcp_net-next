@@ -276,13 +276,24 @@ check_compilation_no_ipv6() {
 }
 
 # $1: src file ; $2: warn line
-check_sparse_output() { local src warn
+check_sparse_output() { local src warn unlock_sock_fast
 	src="${1}"
 	warn="${2}"
 
 	if [ -z "${warn}" ]; then
 		return 0
 	fi
+
+	for unlock_sock_fast in $(git grep -p unlock_sock_fast -- "${src}" | \
+					grep "${src}=" | \
+					sed "s/.*\b\(\S\+\)(.*/\1/g"); do
+		# ./include/net/sock.h:1608:31: warning: context imbalance in 'mptcp_close' - unexpected unlock
+		if [ "$(echo "${warn}" | \
+			grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in '${unlock_sock_fast}' - unexpected unlock")" -eq 1 ]; then
+			echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: '${warn}'"
+			return 0
+		fi
+	done
 
 	case "${src}" in
 		"net/mptcp/protocol.c")
@@ -291,31 +302,10 @@ check_sparse_output() { local src warn
 				echo "Ignore the following warning because sk_clone_lock() conditionally acquires the socket lock, (if return value != 0), so we can't annotate the caller as 'release': ${warn}"
 				return 0
 			fi
-			# ./include/net/sock.h:1610:31: warning: context imbalance in '__mptcp_move_skbs' - unexpected unlock
-			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in '__mptcp_move_skbs' - unexpected unlock")" -eq 1 ]; then
-				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
-				return 0
-			fi
-			# ./include/net/sock.h:1610:31: warning: context imbalance in 'mptcp_rcv_space_adjust' - unexpected unlock
-			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_rcv_space_adjust' - unexpected unlock")" -eq 1 ]; then
-				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
-				return 0
-			fi
-			# ./include/net/sock.h:1608:31: warning: context imbalance in 'mptcp_close' - unexpected unlock
-			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_close' - unexpected unlock")" -eq 1 ]; then
-				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
-				return 0
-			fi
-		;;
-		"net/mptcp/mptcp_diag.c")
-			# ./include/net/sock.h:1612:31: warning: context imbalance in 'mptcp_diag_get_info' - unexpected unlock
-			if [ "$(echo "${warn}" | grep -cE "./include/net/sock.h:[0-9]+:[0-9]+: warning: context imbalance in 'mptcp_diag_get_info' - unexpected unlock")" -eq 1 ]; then
-				echo "Ignore the following warning because unlock_sock_fast() conditionally releases the socket lock: ${warn}'"
-				return 0
-			fi
 		;;
 	esac
 
+	echo "Non whitelisted warning: ${warn}"
 	return 1
 }
 
