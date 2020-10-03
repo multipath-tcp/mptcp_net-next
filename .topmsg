@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: introduce mptcp_schedule_work
-
-remove some of code duplications an allow preventing
-rescheduling on close.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
