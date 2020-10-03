@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: introduce MPTCP snd_nxt
-
-Track the next MPTCP sequence number used on xmit,
-currently always equal to write_next.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
