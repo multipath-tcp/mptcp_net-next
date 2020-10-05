@@ -51,12 +51,34 @@ apply_patches() {
 	"apply_patches_${MODE}" "${@}"
 }
 
+print_rebase_pause() {
+	printf "%s. Use 'git rebase -i \"%s\"' to fi anything if needed. %s." \
+	       "${1}" \
+	       "${2}" \
+	       "Press Enter to continue."
+	read -r
+}
+
 # $1: git base; $2: git end
 checkpatch() {
 	if ! ./.checkpatch.sh --git "${1}..${2}"; then
-		echo "Error with checkpatch. Use 'git rebase -i \"${1}\"' to" \
-		     "fix anything if needed and press Enter to continue."
-		read -r
+		print_rebase_pause "Error with checkpatch" "${1}"
+	fi
+}
+
+# $1: git base; $2: git end
+check_sob() { local commit err=0
+	for commit in $(git log --format="%H" "${1}..${2}"); do
+		if ! git log -1 --format="%b" "${commit}" | \
+		     sed "/^$/d" | \
+		     tail -n1 | \
+		     grep -q "^Signed-off-by: "; then
+			echo "Please fix the SOB of: $(git log -1 --format="%h %s" "${commit}")"
+			err=1
+		fi
+	done
+	if [ "${err}" = 1 ]; then
+		print_rebase_pause "Please make sure the Signed-off-by is the last line" "${1}"
 	fi
 }
 
@@ -90,6 +112,9 @@ apply_patches "${@}"
 
 # Make sure all patches are OK
 checkpatch "${PARENT}" "tmp"
+
+# Make sure all patches are ending with Signed-off-by
+check_sob "${PARENT}" "tmp"
 
 # Import new patches with tg import
 git checkout "${PARENT}"
