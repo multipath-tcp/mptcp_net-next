@@ -116,6 +116,9 @@ checkpatch "${PARENT}" "tmp"
 # Make sure all patches are ending with Signed-off-by
 check_sob "${PARENT}" "tmp"
 
+# Other checks?
+print_rebase_pause "No additional tags to add?" "${PARENT}"
+
 # Import new patches with tg import
 git checkout "${PARENT}"
 tg import "${PARENT}"..tmp
