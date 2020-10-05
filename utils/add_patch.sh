@@ -60,10 +60,10 @@ checkpatch() {
 	fi
 }
 
-accept_patches() { local subject
-	while read -r subject; do
-		./.patch-subject-accept.sh "${subject}"
-	done <<< "$(git log --format="%s" "${1}")"
+accept_patches() { local commit subject
+	while read -r commit subject; do
+		./.patch-subject-accept.sh "${subject}" "${commit}"
+	done <<< "$(git log --reverse --format="%H %s" "${1}" | grep -v "^\S\+ tg ")"
 }
 
 
@@ -106,4 +106,4 @@ TG_PUSH=0 TG_TOP="${TG_TOP}" ./.publish.sh
 TG_PUSH=1 TG_TOP="${TOP}" ./.publish.sh
 
 # Mark as done
-accept_patches "${PARENT}"..tmp
+accept_patches "${PARENT}..${BRANCH}"
