@@ -11,4 +11,4 @@ case "${1}" in
 		;;
 esac
 
-git format-patch --subject-prefix="PATCH ${TARGET}" -o "patches/$(git rev-parse --abbrev-ref HEAD)" --notes "${@}"
+TARGET="${TARGET}" ./.gen-patch.sh "${@:--1}"
