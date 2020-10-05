@@ -3,22 +3,7 @@
 TOP="t/upstream"
 TG_TOP=${TG_TOP:-${TOP}}
 
-# $1: type; $2: ID
-is_pw() {
-	[[ "${2}" =~ ^[0-9]+$ ]] || return $?
-	git-pw "${1}" list -c ID -f simple | grep -q "^${2}$"
-}
-
-if [ -f "${1}" ]; then
-	MODE="files"
-elif is_pw series "${1}"; then
-	MODE="series"
-elif is_pw patch "${1}"; then
-	MODE="patch"
-else
-	echo "'${1}': Not a file nor a patchwork ref" >&2
-	exit 1
-fi
+MODE=$(cat ./.get_arg_mode.sh "${1}")
 
 apply_patches_files() {
 	if ! git am -3 "${@}"; then
