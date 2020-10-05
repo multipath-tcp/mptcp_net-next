@@ -20,7 +20,7 @@ exit_trap() {
 am_files() { local nb subject
 	if git am -3 -s "${1}" || { git am --abort && git am -s "${1}"; }; then
 		subject="$(grep "^Subject: " "${1}" | head -n1)"
-		if echo "${subject}" | grep -q "\[PATCH.\+ [0-9]\+/[0-9]\+\] "; then
+		if echo "${subject}" | grep -q "\[PATCH.* [0-9]\+/[0-9]\+\] "; then
 			# shellcheck disable=SC2001
 			nb=" patch $(echo "${subject}" | \
 				sed "s#.*\[PATCH.* \([0-9]\+/[0-9]\+\)\].\+#\1#g")"
