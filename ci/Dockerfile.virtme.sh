@@ -65,6 +65,7 @@ RUN apt-get update && \
                     libsmi2-dev libcap-ng-dev \
                     pkg-config libmnl-dev \
                     clang lld llvm libcap-dev \
+                    gdb crash dwarves \
                     iptables ebtables nftables vim psmisc bash-completion \
                     gettext-base libevent-dev libnewt0.52 libslang2 libutempter0 python3-newt tmux && \
     apt-get clean
