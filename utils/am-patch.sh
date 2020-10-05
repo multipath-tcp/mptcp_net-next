@@ -13,8 +13,7 @@ fi
 
 MODE=$(cat ./.get_arg_mode.sh "${PATCH}")
 
-exit_trap() { local rc
-	rc=${1}
+exit_trap() {
 	echo -e "\n\n\t ====> Do not forget the signed-off-by"
 }
 
@@ -22,6 +21,7 @@ am_files() { local nb subject
 	if git am -3 -s "${1}"; then
 		subject="$(grep "^Subject: " "${1}" | head -n1)"
 		if echo "${subject}" | grep -q "\[PATCH.\+ [0-9]\+/[0-9]\+\] "; then
+			# shellcheck disable=SC2001
 			nb=" patch $(echo "${subject}" | \
 				sed "s#.*\[PATCH.* \([0-9]\+/[0-9]\+\)\].\+#\1#g")"
 		fi
@@ -39,7 +39,7 @@ am_files() { local nb subject
 
 	trap 'exit_trap ${?}' EXIT
 
-	if [ "$(git status --porcelain | grep -v "^?? " | wc -l)" = "0" ]; then
+	if [ "$(git status --porcelain | grep -c -v "^?? ")" = "0" ]; then
 		echo "Am didn't do anything, use patch then 'end-squash.sh'"
 		patch -p1 --merge < "${1}"
 		exit 1
