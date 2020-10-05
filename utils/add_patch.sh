@@ -20,23 +20,6 @@ else
 	exit 1
 fi
 
-tg_up_err() {
-	echo "Please fix the conflicts in another terminal." \
-	     "End with ./.end-conflict.sh, then press Enter to continue."
-	read -r
-}
-
-
-tg_update() {
-	if ! tg update; then
-		tg_up_err
-
-		while ! tg update --continue; do
-			tg_up_err
-		done
-	fi
-}
-
 apply_patches_files() {
 	if ! git am -3 "${@}"; then
 		echo "ERROR with git am. Please fix in another terminal (up to" \
@@ -98,20 +81,29 @@ echo "Adding new patch(es) before ${TG_TOP}"
 git checkout "${TG_TOP}"
 [ -f .topdeps ]
 
+# Apply patches in a tmp branch created from the parent commit of TG_TOP
 PARENT="$(cat .topdeps)"
 git checkout "${PARENT}"
 git branch -f tmp
 git checkout tmp
 apply_patches "${@}"
+
+# Make sure all patches are OK
 checkpatch "${PARENT}" "tmp"
+
+# Import new patches with tg import
 git checkout "${PARENT}"
 tg import "${PARENT}"..tmp
+
+# Change the dep of TG_TOP to point to the last new patch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout "${TG_TOP}"
 echo "${BRANCH}" > .topdeps
 git commit -sm "tg: switch to ${BRANCH}" .topdeps
-tg_update
-git checkout ${TOP}
-tg_update
-tg push
+TG_PUSH=0 TG_TOP="${TG_TOP}" ./.publish.sh
+
+# update the tree
+TG_PUSH=1 TG_TOP="${TOP}" ./.publish.sh
+
+# Mark as done
 accept_patches "${PARENT}"..tmp
