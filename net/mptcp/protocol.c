@@ -985,7 +985,9 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 
 	/* Zero window and all data acked? Probe. */
 	avail_size = mptcp_check_allowed_size(msk, data_seq, avail_size);
-	if (avail_size == 0 && atomic64_read(&msk->snd_una) == msk->snd_nxt) {
+	if (avail_size == 0) {
+		if (skb || atomic64_read(&msk->snd_una) != msk->snd_nxt)
+			return 0;
 		zero_window_probe = true;
 		data_seq = atomic64_read(&msk->snd_una) - 1;
 		avail_size = 1;
