@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-mptcp-make-DACK4-DACK8-usage-consistent-among-all-subflows
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] net: mptcp: make DACK4/DACK8 usage consistent among all subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+using packetdrill it's possible to observe the same MPTCP DSN being acked
+by different subflows with DACK4 and DACK8. This is in contrast with what
+specified in RFC8684 §3.3.2: if an MPTCP endpoint transmits a 64-bit wide
+DSN, it MUST be acknowledged with a 64-bit wide DACK. Fix 'use_64bit_ack'
+variable to make it a property of MPTCP sockets, not TCP subflows.
+
+Fixes: a0c1d0eafd1e ("mptcp: Use 32-bit DATA_ACK when possible")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
