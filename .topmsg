@@ -1,4 +1,20 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-interpret-n-as-a-new-line-v2
+Subject: [PATCH] selftests: mptcp: interpret \n as a new line - v2
 
+In case of errors, this message was printed:
+
+  (...)
+  balanced bwidth with unbalanced delay       5233 max 5005  [ fail ]
+  client exit code 0, server 0
+  \nnetns ns3-0-EwnkPH socket stat for 10003:
+  (...)
+
+Obviously, the idea was to add a new line before the socket stat and not
+print "\nnetns".
+
+The commit 8b974778f998 ("selftests: mptcp: interpret \n as a new line")
+is very similar to this one. But the modification in simult_flows.sh was
+missed because this commit above was done in parallel to one here below.
+
+Fixes: 1a418cb8e888 ("mptcp: simult flow self-tests")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
