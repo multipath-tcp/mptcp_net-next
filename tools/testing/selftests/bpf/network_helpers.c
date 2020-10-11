@@ -14,6 +14,10 @@
 #include "bpf_util.h"
 #include "network_helpers.h"
 
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP 262
+#endif
+
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_err(MSG, ...) ({						\
 			int __save = errno;				\
@@ -66,8 +70,8 @@ static int settimeo(int fd, int timeout_ms)
 
 #define save_errno_close(fd) ({ int __save = errno; close(fd); errno = __save; })
 
-int start_server(int family, int type, const char *addr_str, __u16 port,
-		 int timeout_ms)
+static int start_server_proto(int family, int type, int protocol,
+			      const char *addr_str, __u16 port, int timeout_ms)
 {
 	struct sockaddr_storage addr = {};
 	socklen_t len;
@@ -76,7 +80,7 @@ int start_server(int family, int type, const char *addr_str, __u16 port,
 	if (make_sockaddr(family, addr_str, port, &addr, &len))
 		return -1;
 
-	fd = socket(family, type, 0);
+	fd = socket(family, type, protocol);
 	if (fd < 0) {
 		log_err("Failed to create server socket");
 		return -1;
@@ -102,6 +106,19 @@ int start_server(int family, int type, const char *addr_str, __u16 port,
 error_close:
 	save_errno_close(fd);
 	return -1;
+}
+
+int start_server(int family, int type, const char *addr_str, __u16 port,
+		 int timeout_ms)
+{
+	return start_server_proto(family, type, 0, addr_str, port, timeout_ms);
+}
+
+int start_mptcp_server(int family, const char *addr_str, __u16 port,
+		       int timeout_ms)
+{
+	return start_server_proto(family, SOCK_STREAM, IPPROTO_MPTCP, addr_str,
+				   port, timeout_ms);
 }
 
 int fastopen_connect(int server_fd, const char *data, unsigned int data_len,
@@ -153,7 +170,7 @@ static int connect_fd_to_addr(int fd,
 	return 0;
 }
 
-int connect_to_fd(int server_fd, int timeout_ms)
+static int connect_to_fd_proto(int server_fd, int protocol, int timeout_ms)
 {
 	struct sockaddr_storage addr;
 	struct sockaddr_in *addr_in;
@@ -173,7 +190,7 @@ int connect_to_fd(int server_fd, int timeout_ms)
 	}
 
 	addr_in = (struct sockaddr_in *)&addr;
-	fd = socket(addr_in->sin_family, type, 0);
+	fd = socket(addr_in->sin_family, type, protocol);
 	if (fd < 0) {
 		log_err("Failed to create client socket");
 		return -1;
@@ -190,6 +207,16 @@ int connect_to_fd(int server_fd, int timeout_ms)
 error_close:
 	save_errno_close(fd);
 	return -1;
+}
+
+int connect_to_fd(int server_fd, int timeout_ms)
+{
+	return connect_to_fd_proto(server_fd, 0, timeout_ms);
+}
+
+int connect_to_mptcp_fd(int server_fd, int timeout_ms)
+{
+	return connect_to_fd_proto(server_fd, IPPROTO_MPTCP, timeout_ms);
 }
 
 int connect_fd_to_fd(int client_fd, int server_fd, int timeout_ms)
