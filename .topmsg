@@ -30,4 +30,6 @@ and the async ULP release is detected checking ULP ops. If such
 field has been already cleared by the ULP release path, the
 dangling context is freed directly by __mptcp_done().
 
+Co-developed-by: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
