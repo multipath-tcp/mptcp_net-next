@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-subflows-garbage-collection
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: subflows garbage collection
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The msk can close MP_JOIN subflows if the initial handshake
+fails. Currently such subflows are kept alive in the
+conn_list until the msk itself is closed.
+
+Beyond the wasted memory, we could end-up sending the
+DATA_FIN and the DATA_FIN ack on such socket, even after a
+reset.
+
+Fixes: 43b54c6ee382 ("mptcp: Use full MPTCP-level disconnect state machine")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
