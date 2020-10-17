@@ -1866,7 +1866,8 @@ static void mptcp_worker(struct work_struct *work)
 	 */
 	if (sock_flag(sk, SOCK_DEAD) &&
 	    (mptcp_check_close_timeout(sk) ||
-	    (state != sk->sk_state && sk->sk_state == TCP_CLOSE))) {
+	    (state != sk->sk_state &&
+	    ((1 << inet_sk_state_load(sk)) & (TCPF_CLOSE | TCPF_FIN_WAIT2))))) {
 		inet_sk_state_store(sk, TCP_CLOSE);
 		__mptcp_destroy_sock(sk, 0);
 		goto unlock;
