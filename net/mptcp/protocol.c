@@ -42,7 +42,7 @@ struct mptcp_skb_cb {
 
 static struct percpu_counter mptcp_sockets_allocated;
 
-static void __mptcp_destroy_sock(struct sock *sk, int timeout);
+static void __mptcp_destroy_sock(struct sock *sk);
 static void __mptcp_check_send_data_fin(struct sock *sk);
 
 /* If msk has an initial subflow socket, and the MP_CAPABLE handshake has not
@@ -1732,8 +1732,7 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
  * parent socket.
  */
 void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
-		       struct mptcp_subflow_context *subflow,
-		       long timeout)
+		       struct mptcp_subflow_context *subflow)
 {
 	struct socket *sock = READ_ONCE(ssk->sk_socket);
 
@@ -1754,7 +1753,7 @@ void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	} else {
 		/* otherwise ask tcp do dispose of ssk and subflow ctx */
 		subflow->disposable = 1;
-		__tcp_close(ssk, timeout);
+		__tcp_close(ssk, 0);
 
 		/* close acquired an extra ref */
 		__sock_put(ssk);
@@ -1805,7 +1804,7 @@ static void __mptcp_close_subflow(struct mptcp_sock *msk)
 		if (inet_sk_state_load(ssk) != TCP_CLOSE)
 			continue;
 
-		__mptcp_close_ssk((struct sock *)msk, ssk, subflow, 0);
+		__mptcp_close_ssk((struct sock *)msk, ssk, subflow);
 	}
 }
 
@@ -1869,7 +1868,7 @@ static void mptcp_worker(struct work_struct *work)
 	    (state != sk->sk_state &&
 	    ((1 << inet_sk_state_load(sk)) & (TCPF_CLOSE | TCPF_FIN_WAIT2))))) {
 		inet_sk_state_store(sk, TCP_CLOSE);
-		__mptcp_destroy_sock(sk, 0);
+		__mptcp_destroy_sock(sk);
 		goto unlock;
 	}
 
@@ -2091,13 +2090,13 @@ static void __mptcp_wr_shutdown(struct sock *sk)
 	__mptcp_check_send_data_fin(sk);
 }
 
-static void __mptcp_destroy_sock(struct sock *sk, int timeout)
+static void __mptcp_destroy_sock(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	LIST_HEAD(conn_list);
 
-	pr_debug("msk=%p timeout=%d", msk, timeout);
+	pr_debug("msk=%p", msk);
 
 	/* be sure to always acquire the join list lock, to sync vs
 	 * mptcp_finish_join().
@@ -2113,7 +2112,7 @@ static void __mptcp_destroy_sock(struct sock *sk, int timeout)
 
 	list_for_each_entry_safe(subflow, tmp, &conn_list, node) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		__mptcp_close_ssk(sk, ssk, subflow, timeout);
+		__mptcp_close_ssk(sk, ssk, subflow);
 	}
 
 	sk->sk_prot->destroy(sk);
@@ -2165,7 +2164,7 @@ cleanup:
 	sock_hold(sk);
 	pr_debug("msk=%p state=%d", sk, sk->sk_state);
 	if (sk->sk_state == TCP_CLOSE) {
-		__mptcp_destroy_sock(sk, timeout);
+		__mptcp_destroy_sock(sk);
 		do_cancel_work = true;
 	} else {
 		sk_reset_timer(sk, &sk->sk_timer, jiffies + TCP_TIMEWAIT_LEN);
