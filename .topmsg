@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: send explicit ack on delayed ack_seq incr
-
-When the worker moves some bytes from the OoO queue into
-the receive queue, the msk->ask_seq is updated, the MPTCP-level
-ack carrying that value needs to wait the next ingress packet,
-possibly slowing down or hanging the peer
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
