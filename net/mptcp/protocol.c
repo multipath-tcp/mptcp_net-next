@@ -1671,6 +1671,13 @@ static void mptcp_retransmit_timer(struct timer_list *t)
 	sock_put(sk);
 }
 
+static void mptcp_timeout_timer(struct timer_list *t)
+{
+	struct sock *sk = from_timer(sk, t, sk_timer);
+
+	mptcp_schedule_work(sk);
+}
+
 /* Find an idle subflow.  Return NULL if there is unacked data at tcp
  * level.
  *
@@ -1799,7 +1806,7 @@ static bool mptcp_check_close_timeout(const struct sock *sk)
 	s32 delta = tcp_jiffies32 - inet_csk(sk)->icsk_mtup.probe_timestamp;
 	struct mptcp_subflow_context *subflow;
 
-	if (delta > TCP_TIMEWAIT_LEN)
+	if (delta >= TCP_TIMEWAIT_LEN)
 		return true;
 
 	/* if all subflows are in closed status don't bother with additional
@@ -1925,7 +1932,7 @@ static int __mptcp_init_sock(struct sock *sk)
 
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
-
+	timer_setup(&sk->sk_timer, mptcp_timeout_timer, 0);
 	return 0;
 }
 
@@ -2092,6 +2099,7 @@ static void __mptcp_destroy_sock(struct sock *sk, int timeout)
 	list_splice_init(&msk->conn_list, &conn_list);
 
 	__mptcp_clear_xmit(sk);
+	sk_stop_timer(sk, &sk->sk_timer);
 	msk->pm.status = 0;
 
 	list_for_each_entry_safe(subflow, tmp, &conn_list, node) {
@@ -2150,6 +2158,8 @@ cleanup:
 	if (sk->sk_state == TCP_CLOSE) {
 		__mptcp_destroy_sock(sk, timeout);
 		do_cancel_work = true;
+	} else {
+		sk_reset_timer(sk, &sk->sk_timer, jiffies + TCP_TIMEWAIT_LEN);
 	}
 	release_sock(sk);
 	if (do_cancel_work)
