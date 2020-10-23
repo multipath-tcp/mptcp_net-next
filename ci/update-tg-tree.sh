@@ -284,6 +284,12 @@ check_sparse_output() { local src warn unlock_sock_fast
 		return 0
 	fi
 
+	# ignore 'notes', only interested in the error message
+	if [ "$(echo "${warn}" | \
+		grep -cE "^${src}: note: in included file (.*):$")" -eq 1 ]; then
+		return 0
+	fi
+
 	for unlock_sock_fast in $(git grep -p unlock_sock_fast -- "${src}" | \
 					grep "${src}=" | \
 					sed "s/.*\b\(\S\+\)(.*/\1/g"); do
