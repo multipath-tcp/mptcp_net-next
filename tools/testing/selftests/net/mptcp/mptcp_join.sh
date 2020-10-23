@@ -14,17 +14,19 @@ capture=0
 
 TEST_COUNT=0
 
-# generated using "nfbpf_compile '(tcp[34] & 0xf0) == 0x30'"
-CBPF_MPTCP_SUBOPTION_ADD_ADDR="13,
+# generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
+#				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
+CBPF_MPTCP_SUBOPTION_ADD_ADDR="14,
 			       48 0 0 0,
 			       84 0 0 240,
-			       21 0 9 64,
-			       48 0 0 9,
-			       21 0 7 6,
-			       40 0 0 6,
-			       69 5 0 8191,
-			       177 0 0 0,
-			       80 0 0 34,
+			       21 0 3 64,
+			       48 0 0 54,
+			       84 0 0 240,
+			       21 6 7 48,
+			       48 0 0 0,
+			       84 0 0 240,
+			       21 0 4 96,
+			       48 0 0 74,
 			       84 0 0 240,
 			       21 0 1 48,
 			       6 0 0 65535,
@@ -101,10 +103,18 @@ reset_with_cookies()
 
 reset_with_add_addr_timeout()
 {
+	local ip="${1:-4}"
+	local tables
+
+	tables="iptables"
+	if [ $ip -eq 6 ]; then
+		tables="ip6tables"
+	fi
+
 	reset
 
 	ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
-	ip netns exec $ns2 iptables -A OUTPUT -p tcp \
+	ip netns exec $ns2 $tables -A OUTPUT -p tcp \
 		-m tcp --tcp-option 30 \
 		-m bpf --bytecode \
 		"$CBPF_MPTCP_SUBOPTION_ADD_ADDR" \
@@ -120,6 +130,18 @@ done
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
 	echo "SKIP: Could not run test without ip tool"
+	exit $ksft_skip
+fi
+
+iptables -V > /dev/null 2>&1
+if [ $? -ne 0 ];then
+	echo "SKIP: Could not run all tests without iptables tool"
+	exit $ksft_skip
+fi
+
+ip6tables -V > /dev/null 2>&1
+if [ $? -ne 0 ];then
+	echo "SKIP: Could not run all tests without ip6tables tool"
 	exit $ksft_skip
 fi
 
