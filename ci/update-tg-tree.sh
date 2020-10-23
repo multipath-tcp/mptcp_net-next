@@ -286,7 +286,7 @@ check_sparse_output() { local src warn unlock_sock_fast
 
 	# ignore 'notes', only interested in the error message
 	if [ "$(echo "${warn}" | \
-		grep -cE "^${src}: note: in included file (.*):$")" -eq 1 ]; then
+		grep -cE "^${src}: note: in included file")" -eq 1 ]; then
 		return 0
 	fi
 
