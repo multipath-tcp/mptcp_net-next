@@ -953,8 +953,8 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	struct mptcp_ext *mpext = NULL;
 	struct sk_buff *skb, *tail;
 	bool can_collapse = false;
-	int avail_size, ret;
-	size_t psize;
+	int avail_size;
+	size_t ret;
 
 	pr_debug("msk=%p ssk=%p sending dfrag at seq=%lld len=%d already sent=%d",
 		 msk, ssk, dfrag->data_seq, dfrag->data_len, info->sent);
@@ -983,15 +983,13 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			 info->limit > dfrag->data_len))
 		return 0;
 
-	psize = min_t(size_t, info->limit - info->sent, avail_size);
-
-	tail = tcp_build_frag(ssk, psize, info->flags, dfrag->page,
-			      dfrag->offset + info->sent, &psize);
+	ret = info->limit - info->sent;
+	tail = tcp_build_frag(ssk, avail_size, info->flags, dfrag->page,
+			      dfrag->offset + info->sent, &ret);
 	if (!tail) {
 		tcp_remove_empty_skb(sk, tcp_write_queue_tail(ssk));
 		return -ENOMEM;
 	}
-	ret = psize;
 
 	/* if the tail skb is still the cached one, collapsing really happened.
 	 */
