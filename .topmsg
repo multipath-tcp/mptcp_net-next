@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: change add_addr_signal type
-
-This patch changed the 'add_addr_signal' type from bool to char, so that
-we could encode the addr type there.
-
-Suggested-by: Paolo Abeni <pabeni@redhat.com>
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
