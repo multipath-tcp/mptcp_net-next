@@ -1681,15 +1681,21 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		       struct mptcp_subflow_context *subflow)
 {
-	struct socket *sock = READ_ONCE(ssk->sk_socket);
+	bool dispose_socket = false;
+	struct socket *sock;
 
 	list_del(&subflow->node);
 
-	/* outgoing subflow */
-	if (sock && sock != sk->sk_socket)
-		iput(SOCK_INODE(sock));
-
 	lock_sock(ssk);
+
+	/* if we are invoked by the msk cleanup code, the subflow is
+	 * already orphaned
+	 */
+	sock = ssk->sk_socket;
+	if (sock) {
+		dispose_socket = sock != sk->sk_socket;
+		sock_orphan(ssk);
+	}
 
 	/* if ssk hit tcp_done(), tcp_cleanup_ulp() cleared the related ops
 	 * the ssk has been already destroyed, we just need to release the
@@ -1706,6 +1712,9 @@ void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		__sock_put(ssk);
 	}
 	release_sock(ssk);
+	if (dispose_socket)
+		iput(SOCK_INODE(sock));
+
 	sock_put(ssk);
 }
 
@@ -2096,15 +2105,20 @@ cleanup:
 	inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32;
 	list_for_each_entry(subflow, &mptcp_sk(sk)->conn_list, node) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		struct socket *sock = READ_ONCE(ssk->sk_socket);
-		bool slow;
-
-		if (sock && sock != sk->sk_socket)
-			iput(SOCK_INODE(sock));
+		bool slow, dispose_socket;
+		struct socket *sock;
 
 		slow = lock_sock_fast(ssk);
+		sock = ssk->sk_socket;
+		dispose_socket = sock && sock != sk->sk_socket;
 		sock_orphan(ssk);
 		unlock_sock_fast(ssk, slow);
+
+		/* for the outgoing subflows we additionally need to free
+		 * the associated socket
+		 */
+		if (dispose_socket)
+			iput(SOCK_INODE(sock));
 	}
 	sock_orphan(sk);
 
