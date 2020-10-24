@@ -82,7 +82,7 @@ cleanup_partial()
 cleanup()
 {
 	rm -f "$cin" "$cout"
-	rm -f "$cin" "$cout" "$cinsent"
+	rm -f "$sin" "$sout" "$cinsent"
 	cleanup_partial
 }
 
