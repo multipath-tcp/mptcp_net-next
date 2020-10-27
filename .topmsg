@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/checkpatch-Enable-GIT_DIR-environment-use-to-set-git-repository-location
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
