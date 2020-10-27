@@ -1,8 +1,0 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] acpica: fix compilation error
-
-Patch from Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-Fixes: 7a8379eb41a4 ("ACPICA: Add support for using logical addresses of GPE blocks")
-Link: https://lore.kernel.org/linux-acpi/fe077e28-2421-6d48-d55a-882b802e47c1@tessares.net/T/#u
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
