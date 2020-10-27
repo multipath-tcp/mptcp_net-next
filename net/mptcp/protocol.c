@@ -696,7 +696,7 @@ wake:
 		sk->sk_data_ready(sk);
 }
 
-static void __mptcp_flush_join_list(struct mptcp_sock *msk)
+void __mptcp_flush_join_list(struct mptcp_sock *msk)
 {
 	if (likely(list_empty(&msk->join_list)))
 		return;
