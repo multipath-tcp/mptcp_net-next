@@ -344,7 +344,7 @@ run_tests()
 	listener_ns="$1"
 	connector_ns="$2"
 	connect_addr="$3"
-	test_linkfail="$4"
+	test_linkfail="${4:-0}"
 	rm_nr_ns1="${5:-0}"
 	rm_nr_ns2="${6:-0}"
 	speed="${7:-fast}"
@@ -509,20 +509,20 @@ make_file "$cin" "client" 1
 make_file "$sin" "server" 1
 trap cleanup EXIT
 
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "no JOIN" "0" "0" "0"
 
 # subflow limted by client
 reset
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "single subflow, limited by client" 0 0 0
 
 # subflow limted by server
 reset
 ip netns exec $ns2 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "single subflow, limited by server" 1 1 0
 
 # subflow
@@ -530,7 +530,7 @@ reset
 ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "single subflow" 1 1 1
 
 # multiple subflows
@@ -539,7 +539,7 @@ ip netns exec $ns1 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "multiple subflows" 2 2 2
 
 # multiple subflows limited by serverf
@@ -548,13 +548,13 @@ ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "multiple subflows, limited by server" 2 2 1
 
 # add_address, unused
 reset
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "unused signal address" 0 0 0
 chk_add_nr 1 1
 
@@ -563,7 +563,7 @@ reset
 ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 1 1
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "signal address" 1 1 1
 chk_add_nr 1 1
 
@@ -576,7 +576,7 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns1 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl limits 1 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "subflow and signal" 2 2 2
 chk_add_nr 1 1
 
@@ -587,7 +587,7 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns2 ./pm_nl_ctl limits 1 3
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "multiple subflows and signal" 3 3 3
 chk_add_nr 1 1
 
@@ -722,7 +722,7 @@ reset_with_cookies
 ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "single subflow with syn cookies" 1 1 1
 
 # multiple subflows with syn cookies
@@ -731,7 +731,7 @@ ip netns exec $ns1 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "multiple subflows with syn cookies" 2 2 2
 
 # multiple subflows limited by server
@@ -740,7 +740,7 @@ ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "subflows limited by server w cookies" 2 2 1
 
 # test signal address with cookies
@@ -748,7 +748,7 @@ reset_with_cookies
 ip netns exec $ns1 ./pm_nl_ctl limits 0 1
 ip netns exec $ns2 ./pm_nl_ctl limits 1 1
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "signal address with syn cookies" 1 1 1
 chk_add_nr 1 1
 
@@ -758,7 +758,7 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns1 ./pm_nl_ctl limits 0 2
 ip netns exec $ns2 ./pm_nl_ctl limits 1 2
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "subflow and signal w cookies" 2 2 2
 chk_add_nr 1 1
 
@@ -769,7 +769,7 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 ip netns exec $ns2 ./pm_nl_ctl limits 1 3
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
-run_tests $ns1 $ns2 10.0.1.1 0
+run_tests $ns1 $ns2 10.0.1.1
 chk_join_nr "subflows and signal w. cookies" 3 3 3
 chk_add_nr 1 1
 
