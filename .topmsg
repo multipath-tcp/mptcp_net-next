@@ -8,8 +8,7 @@ ADD_ADDR suboption, no other MPTCP suboptions.
 
 In mptcp_pm_announce_addr, we check whether this is an IPv6 ADD_ADDR.
 If it is, we set the flag MPTCP_ADD_ADDR_IPV6 to true. Then we call
-mptcp_pm_check_send_dedicated_add_addr_packet to sent out a new pure
-ACK packet.
+mptcp_pm_nl_add_addr_send_ack to sent out a new pure ACK packet.
 
 In mptcp_established_options_add_addr, we check whether this is a pure
 ACK packet for ADD_ADDR. If it is, we drop all other MPTCP suboptions
