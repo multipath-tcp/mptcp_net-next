@@ -157,12 +157,20 @@ void mptcp_pm_add_addr_received(struct mptcp_sock *msk,
 
 	if (!READ_ONCE(pm->accept_addr)) {
 		mptcp_pm_announce_addr(msk, addr, true);
-		mptcp_pm_check_send_dedicated_add_addr_packet(msk);
+		mptcp_pm_add_addr_send_ack(msk);
 	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
 		pm->remote = *addr;
 	}
 
 	spin_unlock_bh(&pm->lock);
+}
+
+void mptcp_pm_add_addr_send_ack(struct mptcp_sock *msk)
+{
+	if (!mptcp_pm_should_add_signal_ipv6(msk))
+		return;
+
+	mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_SEND_ACK);
 }
 
 void mptcp_pm_rm_addr_received(struct mptcp_sock *msk, u8 rm_id)
