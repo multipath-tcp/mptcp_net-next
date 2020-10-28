@@ -588,7 +588,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	bool echo;
 	int len;
 
-	if (READ_ONCE(msk->pm.add_addr_signal) & BIT(MPTCP_ADD_ADDR_IPV6) &&
+	if (mptcp_pm_should_add_signal_ipv6(msk) &&
 	    skb && skb_is_tcp_pure_ack(skb)) {
 		pr_debug("drop other suboptions");
 		opts->suboptions = 0;
