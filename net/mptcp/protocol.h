@@ -528,6 +528,11 @@ static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
 	return READ_ONCE(msk->pm.add_addr_signal) & BIT(MPTCP_ADD_ADDR_SIGNAL);
 }
 
+static inline bool mptcp_pm_should_add_signal_echo(struct mptcp_sock *msk)
+{
+	return READ_ONCE(msk->pm.add_addr_signal) & BIT(MPTCP_ADD_ADDR_ECHO);
+}
+
 static inline bool mptcp_pm_should_add_signal_ipv6(struct mptcp_sock *msk)
 {
 	return READ_ONCE(msk->pm.add_addr_signal) & BIT(MPTCP_ADD_ADDR_IPV6);
