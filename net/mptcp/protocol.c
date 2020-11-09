@@ -757,8 +757,10 @@ static void mptcp_check_for_eof(struct mptcp_sock *msk)
 
 	mptcp_for_each_subflow(msk, subflow)
 		receivers += !subflow->rx_eof;
+	if (receivers)
+		return;
 
-	if (!receivers && !(sk->sk_shutdown & RCV_SHUTDOWN)) {
+	if (!(sk->sk_shutdown & RCV_SHUTDOWN)) {
 		/* hopefully temporary hack: propagate shutdown status
 		 * to msk, when all subflows agree on it
 		 */
@@ -768,6 +770,8 @@ static void mptcp_check_for_eof(struct mptcp_sock *msk)
 		set_bit(MPTCP_DATA_READY, &msk->flags);
 		sk->sk_data_ready(sk);
 	}
+	if (sk->sk_state != TCP_CLOSE && sk->sk_shutdown == SHUTDOWN_MASK)
+		inet_sk_state_store(sk, TCP_CLOSE);
 }
 
 static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
@@ -2138,11 +2142,12 @@ static void mptcp_close(struct sock *sk, long timeout)
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	if (sk->sk_state == TCP_LISTEN ||
-	    __mptcp_check_fallback((struct mptcp_sock *)sk)) {
+	if ((1 << sk->sk_state) & (TCPF_LISTEN | TCP_CLOSE)) {
 		inet_sk_state_store(sk, TCP_CLOSE);
 		goto cleanup;
-	} else if (sk->sk_state == TCP_CLOSE) {
+	} else if (__mptcp_check_fallback((struct mptcp_sock *)sk)) {
+		if (!mptcp_send_head(sk))
+			inet_sk_state_store(sk, TCP_CLOSE);
 		goto cleanup;
 	}
 
