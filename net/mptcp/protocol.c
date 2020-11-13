@@ -328,6 +328,19 @@ static void mptcp_stop_timer(struct sock *sk)
 	mptcp_sk(sk)->timer_ival = 0;
 }
 
+static void mptcp_close_wake_up(struct sock *sk)
+{
+	if (sock_flag(sk, SOCK_DEAD))
+		return;
+
+	sk->sk_state_change(sk);
+	if (sk->sk_shutdown == SHUTDOWN_MASK ||
+	    sk->sk_state == TCP_CLOSE)
+		sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_HUP);
+	else
+		sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
+}
+
 static void mptcp_check_data_fin_ack(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -353,18 +366,7 @@ static void mptcp_check_data_fin_ack(struct sock *sk)
 			break;
 		}
 
-		/* if the socket is detached from user-space there is no point
-		 * in keeping it around after spooling all the data
-		 */
-		if (sock_flag(sk, SOCK_DEAD))
-			return;
-
-		sk->sk_state_change(sk);
-		if (sk->sk_shutdown == SHUTDOWN_MASK ||
-		    sk->sk_state == TCP_CLOSE)
-			sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_HUP);
-		else
-			sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
+		mptcp_close_wake_up(sk);
 	}
 }
 
@@ -454,15 +456,7 @@ static void mptcp_check_data_fin(struct sock *sk)
 			release_sock(ssk);
 		}
 
-		if (sock_flag(sk, SOCK_DEAD))
-			return;
-
-		sk->sk_state_change(sk);
-		if (sk->sk_shutdown == SHUTDOWN_MASK ||
-		    sk->sk_state == TCP_CLOSE)
-			sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_HUP);
-		else
-			sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
+		mptcp_close_wake_up(sk);
 	}
 }
 
@@ -763,8 +757,19 @@ static void mptcp_check_for_eof(struct mptcp_sock *msk)
 		set_bit(MPTCP_DATA_READY, &msk->flags);
 		sk->sk_data_ready(sk);
 	}
-	if (sk->sk_state != TCP_CLOSE && sk->sk_shutdown == SHUTDOWN_MASK)
+
+	switch (sk->sk_state) {
+	case TCP_ESTABLISHED:
+		inet_sk_state_store(sk, TCP_CLOSE_WAIT);
+		break;
+	case TCP_FIN_WAIT1:
+		/* fallback sockets skip TCP_CLOSING - TCP will take care */
 		inet_sk_state_store(sk, TCP_CLOSE);
+		break;
+	default:
+		return;
+	}
+	mptcp_close_wake_up(sk);
 }
 
 static bool mptcp_ext_cache_refill(struct mptcp_sock *msk)
@@ -2034,6 +2039,12 @@ static void __mptcp_check_send_data_fin(struct sock *sk)
 		return;
 
 	WRITE_ONCE(msk->snd_nxt, msk->write_seq);
+
+	/* fallback socket will not get data_fin/ack, can move to close now */
+	if (__mptcp_check_fallback(msk) && sk->sk_state == TCP_LAST_ACK) {
+		inet_sk_state_store(sk, TCP_CLOSE);
+		mptcp_close_wake_up(sk);
+	}
 
 	__mptcp_flush_join_list(msk);
 	mptcp_for_each_subflow(msk, subflow) {
