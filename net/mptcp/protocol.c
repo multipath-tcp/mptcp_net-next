@@ -2157,12 +2157,8 @@ static void mptcp_close(struct sock *sk, long timeout)
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	if ((1 << sk->sk_state) & (TCPF_LISTEN | TCP_CLOSE)) {
+	if ((1 << sk->sk_state) & (TCPF_LISTEN | TCPF_CLOSE)) {
 		inet_sk_state_store(sk, TCP_CLOSE);
-		goto cleanup;
-	} else if (__mptcp_check_fallback((struct mptcp_sock *)sk)) {
-		if (!mptcp_send_head(sk))
-			inet_sk_state_store(sk, TCP_CLOSE);
 		goto cleanup;
 	}
 
