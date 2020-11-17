@@ -979,7 +979,7 @@ new_segment:
 			return NULL;
 
 		skb = sk_stream_alloc_skb(sk, 0, sk->sk_allocation,
-				tcp_rtx_and_write_queues_empty(sk));
+					  tcp_rtx_and_write_queues_empty(sk));
 		if (!skb)
 			return NULL;
 
