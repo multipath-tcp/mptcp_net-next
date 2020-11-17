@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] tcp: factor out __tcp_close() helper
-
-unlocked version of protocol level close, will be used by
-MPTCP to allow decouple orphaning and subflow level close.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
