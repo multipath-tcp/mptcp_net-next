@@ -1,0 +1,26 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: refine MPTCP-level ack scheduling
+
+Send timely MPTCP-level ack is somewhat difficult when
+the insertion into the msk receive level is performed
+by the worker.
+
+It needs TCP-level dup-ack to notify the MPTCP-level
+ack_seq increase, as both the TCP-level ack seq and the
+rcv window are unchanged.
+
+We can actually avoid processing incoming data with the
+worker, and let the subflow or recevmsg() send ack as needed.
+
+When recvmsg() moves the skbs inside the msk receive queue,
+the msk space is still unchanged, so tcp_cleanup_rbuf() could
+end-up skipping TCP-level ack generation. Anyway, when
+__mptcp_move_skbs() is invoked, a known amount of bytes is
+going to be consumed soon: we update rcv wnd computation taking
+them in account.
+
+Additionally we need to explicitly trigger tcp_cleanup_rbuf()
+when recvmsg() consumes a significant amount of the receive buffer.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
