@@ -1,0 +1,16 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: keep unaccepted MPC subflow into join list
+
+This will simplify all operation dealing with subflows
+before accept time (e.g. data fin processing, add_addr).
+
+The join list is already flushed by mptcp_stream_accept()
+before returning the newly created msk to the user space.
+
+This also fixes an potential bug present into the old code:
+conn_list was manipulated without helding the msk lock
+in mptcp_stream_accept().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Tested-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
