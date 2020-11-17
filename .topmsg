@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: move mptcp_options_received's port initialization
-
-This patch moved mptcp_options_received's port initialization from
-mptcp_parse_option to mptcp_get_options, put it together with the other
-fields initializations of mptcp_options_received.
-
-Fixes: 3df523ab582c5 ("mptcp: Add ADD_ADDR handling")
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
