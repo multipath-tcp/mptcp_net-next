@@ -1,0 +1,12 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: skip to next candidate if subflow has unacked data
+
+In case a subflow path is blocked, MPTCP-level retransmit may not take
+place anymore because such subflow is likely to have unacked data left
+in its write queue.
+
+Ignore subflows that have experienced loss and test next candidate.
+
+Fixes: 3b1d6210a95773691 ("mptcp: implement and use MPTCP-level retransmission")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
