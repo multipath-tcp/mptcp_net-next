@@ -1,0 +1,16 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: track window announced to peer
+
+OoO handling attempts to detect when packet is out-of-window by testing
+current ack sequence and remaining space vs. sequence number.
+
+This doesn't work reliably. Store the highest allowed sequence number
+that we've announced and use it to detect oow packets.
+
+Do this when mptcp options get written to the packet (wire format).
+For this to work we need to move the write_options call until after
+stack selected a new tcp window.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
