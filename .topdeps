@@ -1,2 +1,1 @@
-t/mptcp-introduce-mptcp_schedule_work
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
