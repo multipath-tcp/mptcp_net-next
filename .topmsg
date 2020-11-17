@@ -1,0 +1,8 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add ADD_ADDR IPv6 test cases
+
+This patch added IPv6 support for do_transfer, and the test cases for
+ADD_ADDR IPv6.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
