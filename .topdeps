@@ -1,1 +1,2 @@
 t/mptcp-adjust-mptcp-receive-buffer-limit-if-subflow-has-larger-one
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
