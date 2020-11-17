@@ -1,2 +1,1 @@
-t/tcp-factor-out-__tcp_close-helper
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
