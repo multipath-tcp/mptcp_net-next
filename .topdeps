@@ -1,1 +1,2 @@
 t/mptcp-try-to-push-pending-data-on-snd-una-updates
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
