@@ -1,1 +1,2 @@
 t/mptcp-move-page-frag-allocation-in-mptcp_sendmsg
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
