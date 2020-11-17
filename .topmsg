@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: add accounting for pending data
-
-Preparation patch to track the data pending in the msk
-write queue. No functional change introduced here
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
