@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: initialize mptcp_options_received's ahmac
-
-This patch initialize mptcp_options_received's ahmac to zero, otherwise it
-will be a random number when receiving ADD_ADDR suboption with echo-flag=1.
-
-Fixes: 3df523ab582c5 ("mptcp: Add ADD_ADDR handling")
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
