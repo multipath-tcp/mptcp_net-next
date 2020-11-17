@@ -1,1 +1,2 @@
 t/tcp-propagate-MPTCP-skb-extensions-on-xmit-splits
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
