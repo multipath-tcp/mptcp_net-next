@@ -1,0 +1,19 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: send out dedicated ADD_ADDR packet
+
+When ADD_ADDR suboption includes an IPv6 address, the size is 28 octets.
+It will not fit when other MPTCP suboptions are included in this packet,
+e.g. DSS. So here we send out an ADD_ADDR dedicated packet to carry only
+ADD_ADDR suboption, no other MPTCP suboptions.
+
+In mptcp_pm_announce_addr, we check whether this is an IPv6 ADD_ADDR.
+If it is, we set the flag MPTCP_ADD_ADDR_IPV6 to true. Then we call
+mptcp_pm_nl_add_addr_send_ack to sent out a new pure ACK packet.
+
+In mptcp_established_options_add_addr, we check whether this is a pure
+ACK packet for ADD_ADDR. If it is, we drop all other MPTCP suboptions
+in this packet, only put ADD_ADDR suboption in it.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
