@@ -1,2 +1,1 @@
-t/mptcp-refactor-shutdown-and-close
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
