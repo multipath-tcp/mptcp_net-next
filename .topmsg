@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-state-tracking-for-fallback-socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix state tracking for fallback socket
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We need to cope with some more state transition for
+fallback sockets, or could still end-up moving to TCP_CLOSE
+too early and avoid spooling some pending data
+
+Fixes: ("mptcp: refactor shutdown and close")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
