@@ -2097,7 +2097,7 @@ static void __mptcp_check_send_data_fin(struct sock *sk)
 	WRITE_ONCE(msk->snd_nxt, msk->write_seq);
 
 	/* fallback socket will not get data_fin/ack, can move to the next
-	 * states now
+	 * state now
 	 */
 	if (__mptcp_check_fallback(msk)) {
 		if ((1 << sk->sk_state) & (TCPF_CLOSING | TCPF_LAST_ACK)) {
