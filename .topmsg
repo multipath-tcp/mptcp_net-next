@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-send-out-dedicated-packet-for-ADD_ADDR-using-port
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: send out dedicated packet for ADD_ADDR using port
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The process is similar to that of the ADD_ADDR IPv6, this patch also sent
+out a pure ack for the ADD_ADDR using port.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
