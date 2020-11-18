@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-unify-ADD_ADDR-and-echo-suboptions-writing
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: unify ADD_ADDR and echo suboptions writing
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There are two differences between ADD_ADDR suboption and ADD_ADDR echo
+suboption: The length of the former is 8 octets longer than the length
+of the latter. The former's echo-flag is 0, and latter's echo-flag is 1.
+
+This patch added two local variables, len and echo, to unify ADD_ADDR
+and ADD_ADDR echo suboptions writing.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
