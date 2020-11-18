@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-CANCEL_WORK-status-bit
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop CANCEL_WORK status bit
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Only mptcp_close() can actually cancel the workqueue,
+no need to add and use this flag.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
