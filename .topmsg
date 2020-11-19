@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-wmem-reservation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement wmem reservation
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This leverage the previous commit to reserve the wmem
+required for the sendmsg() operation when the msk socket
+lock is first acquired.
+Some heuristics are used to get a reasonable [over] estimation of
+the whole memory required. If we can't forward alloc such amount
+fallback to a reasonable small chunk, otherwise enter the wait
+for memory path.
+
+When sendmsg() need more memory it looks at wmem_reserved
+first and if that is exaused, move more space from
+sk_forward_alloc.
+
+The reserved memory is a transient state and is released at the
+next socket unlock via the release_cb().
+
+Overall this will simplify the next patch.
+
+Acked-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
