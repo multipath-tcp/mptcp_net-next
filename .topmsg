@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: drop CANCEL_WORK status bit
+Subject: [PATCH] mptcp: drop WORKER_RUNNING status bit
 
 Only mptcp_close() can actually cancel the workqueue,
 no need to add and use this flag.
