@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: print out port and ahmac when receiving ADD_ADDR
-
-This patch printed out more debugging information for the ADD_ADDR
-suboption parsing on the incoming path.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
