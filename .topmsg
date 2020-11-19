@@ -5,6 +5,6 @@ We need to cope with some more state transition for
 fallback sockets, or could still end-up moving to TCP_CLOSE
 too early and avoid spooling some pending data
 
-Fixes: ("mptcp: refactor shutdown and close")
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
