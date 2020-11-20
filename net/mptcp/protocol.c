@@ -2510,7 +2510,9 @@ void mptcp_destroy_common(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
 
-	skb_queue_splice_tail_init(&sk->sk_receive_queue, &msk->receive_queue);
+	/* move to sk_receive_queue, sk_stream_kill_queues will purge it */
+	skb_queue_splice_tail_init(&msk->receive_queue, &sk->sk_receive_queue);
+
 	skb_rbtree_purge(&msk->out_of_order_queue);
 	mptcp_token_destroy(msk);
 	mptcp_pm_free_anno_list(msk);
