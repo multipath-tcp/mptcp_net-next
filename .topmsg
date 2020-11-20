@@ -19,4 +19,6 @@ first into the latter in mptcp_lock_sock(). Additionally rmem
 allocated memory is bulk-freed via release_cb()
 
 Acked-by: Florian Westphal <fw@strlen.de>
+Co-developed-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Florian Westphal <fw@strlen.de>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
