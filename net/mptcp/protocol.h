@@ -258,8 +258,6 @@ struct mptcp_sock {
 	} rcvq_space;
 };
 
-void __lock_sock(struct sock *sk);
-
 #define mptcp_lock_sock(___sk, cb) do {					\
 	struct sock *__sk = (___sk); /* silence macro reuse warning */	\
 	might_sleep();							\
