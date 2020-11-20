@@ -1488,7 +1488,6 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 	struct mptcp_sendmsg_info info;
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0;
-	u32 sndbuf;
 
 	info.flags = 0;
 	while ((dfrag = mptcp_send_head(sk))) {
@@ -1500,8 +1499,8 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 
 			/* do auto tuning */
 			if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK) &&
-			    sndbuf > READ_ONCE(sk->sk_sndbuf))
-				WRITE_ONCE(sk->sk_sndbuf, sndbuf);
+			    ssk->sk_sndbuf > READ_ONCE(sk->sk_sndbuf))
+				WRITE_ONCE(sk->sk_sndbuf, ssk->sk_sndbuf);
 
 			if (unlikely(mptcp_must_reclaim_memory(sk, ssk))) {
 				__mptcp_update_wmem(sk);
