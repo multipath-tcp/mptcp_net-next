@@ -1,2 +1,1 @@
-t/mptcp-track-window-announced-to-peer
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
