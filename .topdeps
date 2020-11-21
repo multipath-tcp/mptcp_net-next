@@ -1,2 +1,1 @@
-t/mptcp-send-out-dedicated-ADD_ADDR-packet
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
