@@ -1271,10 +1271,15 @@ static inline bool __sk_stream_memory_free(const struct sock *sk, int wake)
 	if (READ_ONCE(sk->sk_wmem_queued) >= READ_ONCE(sk->sk_sndbuf))
 		return false;
 
+#ifdef CONFIG_INET
 	return sk->sk_prot->stream_memory_free ?
 		INDIRECT_CALL_1(sk->sk_prot->stream_memory_free,
 			        tcp_stream_memory_free,
 				sk, wake) : true;
+#else
+	return sk->sk_prot->stream_memory_free ?
+		sk->sk_prot->stream_memory_free(sk, wake) : true;
+#endif
 }
 
 static inline bool sk_stream_memory_free(const struct sock *sk)
@@ -1595,7 +1600,8 @@ void release_sock(struct sock *sk);
 				SINGLE_DEPTH_NESTING)
 #define bh_unlock_sock(__sk)	spin_unlock(&((__sk)->sk_lock.slock))
 
-bool lock_sock_fast(struct sock *sk);
+bool lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock);
+
 /**
  * unlock_sock_fast - complement of lock_sock_fast
  * @sk: socket
@@ -1605,11 +1611,14 @@ bool lock_sock_fast(struct sock *sk);
  * If slow mode is on, we call regular release_sock()
  */
 static inline void unlock_sock_fast(struct sock *sk, bool slow)
+	__releases(&sk->sk_lock.slock)
 {
-	if (slow)
+	if (slow) {
 		release_sock(sk);
-	else
+		__release(&sk->sk_lock.slock);
+	} else {
 		spin_unlock_bh(&sk->sk_lock.slock);
+	}
 }
 
 /* Used by processes to "lock" a socket state, so that
