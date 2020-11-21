@@ -1,2 +1,1 @@
-t/mptcp-keep-unaccepted-MPC-subflow-into-join-list
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
