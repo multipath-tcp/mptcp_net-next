@@ -1,0 +1,11 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: open code mptcp variant for lock_sock
+
+This allows invoking an additional callback under the
+socket spin lock.
+
+Will be used by the next patches to avoid additional
+spin lock contention
+
+Acked-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
