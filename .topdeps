@@ -1,2 +1,1 @@
-t/mptcp-change-add_addr_signal-type
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
