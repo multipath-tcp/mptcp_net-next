@@ -728,6 +728,14 @@ static int ipa_probe(struct platform_device *pdev)
 
 	ipa_validate_build();
 
+	/* Get configuration data early; needed for clock initialization */
+	data = of_device_get_match_data(dev);
+	if (!data) {
+		/* This is really IPA_VALIDATE (should never happen) */
+		dev_err(dev, "matched hardware not supported\n");
+		return -ENODEV;
+	}
+
 	/* If we need Trust Zone, make sure it's available */
 	modem_init = of_property_read_bool(dev->of_node, "modem-init");
 	if (!modem_init)
@@ -748,22 +756,13 @@ static int ipa_probe(struct platform_device *pdev)
 	/* The clock and interconnects might not be ready when we're
 	 * probed, so might return -EPROBE_DEFER.
 	 */
-	clock = ipa_clock_init(dev);
+	clock = ipa_clock_init(dev, data->clock_data);
 	if (IS_ERR(clock)) {
 		ret = PTR_ERR(clock);
 		goto err_rproc_put;
 	}
 
-	/* No more EPROBE_DEFER.  Get our configuration data */
-	data = of_device_get_match_data(dev);
-	if (!data) {
-		/* This is really IPA_VALIDATE (should never happen) */
-		dev_err(dev, "matched hardware not supported\n");
-		ret = -ENOTSUPP;
-		goto err_clock_exit;
-	}
-
-	/* Allocate and initialize the IPA structure */
+	/* No more EPROBE_DEFER.  Allocate and initialize the IPA structure */
 	ipa = kzalloc(sizeof(*ipa), GFP_KERNEL);
 	if (!ipa) {
 		ret = -ENOMEM;
@@ -864,6 +863,11 @@ static int ipa_remove(struct platform_device *pdev)
 
 	if (ipa->setup_complete) {
 		ret = ipa_modem_stop(ipa);
+		/* If starting or stopping is in progress, try once more */
+		if (ret == -EBUSY) {
+			usleep_range(USEC_PER_MSEC, 2 * USEC_PER_MSEC);
+			ret = ipa_modem_stop(ipa);
+		}
 		if (ret)
 			return ret;
 
@@ -882,6 +886,15 @@ static int ipa_remove(struct platform_device *pdev)
 	rproc_put(rproc);
 
 	return 0;
+}
+
+static void ipa_shutdown(struct platform_device *pdev)
+{
+	int ret;
+
+	ret = ipa_remove(pdev);
+	if (ret)
+		dev_err(&pdev->dev, "shutdown: remove returned %d\n", ret);
 }
 
 /**
@@ -941,8 +954,9 @@ static const struct dev_pm_ops ipa_pm_ops = {
 };
 
 static struct platform_driver ipa_driver = {
-	.probe	= ipa_probe,
-	.remove	= ipa_remove,
+	.probe		= ipa_probe,
+	.remove		= ipa_remove,
+	.shutdown	= ipa_shutdown,
 	.driver	= {
 		.name		= "ipa",
 		.pm		= &ipa_pm_ops,
