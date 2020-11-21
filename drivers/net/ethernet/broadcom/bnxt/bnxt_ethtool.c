@@ -2079,6 +2079,9 @@ int bnxt_hwrm_nvm_get_dev_info(struct bnxt *bp,
 	struct hwrm_nvm_get_dev_info_input req = {0};
 	int rc;
 
+	if (BNXT_VF(bp))
+		return -EOPNOTSUPP;
+
 	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_NVM_GET_DEV_INFO, -1, -1);
 	mutex_lock(&bp->hwrm_cmd_lock);
 	rc = _hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
@@ -2416,13 +2419,12 @@ static int bnxt_flash_firmware_from_file(struct net_device *dev,
 	return rc;
 }
 
-int bnxt_flash_package_from_file(struct net_device *dev, const char *filename,
-				 u32 install_type)
+int bnxt_flash_package_from_fw_obj(struct net_device *dev, const struct firmware *fw,
+				   u32 install_type)
 {
 	struct bnxt *bp = netdev_priv(dev);
 	struct hwrm_nvm_install_update_output *resp = bp->hwrm_cmd_resp_addr;
 	struct hwrm_nvm_install_update_input install = {0};
-	const struct firmware *fw;
 	u32 item_len;
 	int rc = 0;
 	u16 index;
@@ -2434,13 +2436,6 @@ int bnxt_flash_package_from_file(struct net_device *dev, const char *filename,
 				  &index, &item_len, NULL);
 	if (rc) {
 		netdev_err(dev, "PKG update area not created in nvram\n");
-		return rc;
-	}
-
-	rc = request_firmware(&fw, filename, &dev->dev);
-	if (rc != 0) {
-		netdev_err(dev, "PKG error %d requesting file: %s\n",
-			   rc, filename);
 		return rc;
 	}
 
@@ -2475,7 +2470,6 @@ int bnxt_flash_package_from_file(struct net_device *dev, const char *filename,
 					  dma_handle);
 		}
 	}
-	release_firmware(fw);
 	if (rc)
 		goto err_exit;
 
@@ -2511,6 +2505,26 @@ flash_pkg_exit:
 err_exit:
 	if (rc == -EACCES)
 		bnxt_print_admin_err(bp);
+	return rc;
+}
+
+static int bnxt_flash_package_from_file(struct net_device *dev, const char *filename,
+					u32 install_type)
+{
+	const struct firmware *fw;
+	int rc;
+
+	rc = request_firmware(&fw, filename, &dev->dev);
+	if (rc != 0) {
+		netdev_err(dev, "PKG error %d requesting file: %s\n",
+			   rc, filename);
+		return rc;
+	}
+
+	rc = bnxt_flash_package_from_fw_obj(dev, fw, install_type);
+
+	release_firmware(fw);
+
 	return rc;
 }
 
@@ -2997,7 +3011,7 @@ static int bnxt_get_module_eeprom(struct net_device *dev,
 	/* Read A2 portion of the EEPROM */
 	if (length) {
 		start -= ETH_MODULE_SFF_8436_LEN;
-		rc = bnxt_read_sfp_module_eeprom_info(bp, I2C_DEV_ADDR_A2, 1,
+		rc = bnxt_read_sfp_module_eeprom_info(bp, I2C_DEV_ADDR_A2, 0,
 						      start, length, data);
 	}
 	return rc;
