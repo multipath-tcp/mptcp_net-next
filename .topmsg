@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-put-reference-in-mptcp-timeout-timer
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: put reference in mptcp timeout timer
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+On close this timer might be scheduled. mptcp uses sk_reset_timer for
+this, so the a reference on the mptcp socket is taken.
+
+This causes a refcount leak which can for example be reproduced
+with 'mp_join_server_v4.pkt' from the mptcp-packetdrill repo.
+
+The leak has nothing to do with join requests, v1_mp_capable_bind_no_cs.pkt
+works too when replacing the last ack mpcapable to v1 instead of v0.
+
+unreferenced object 0xffff888109bba040 (size 2744):
+  comm "packetdrill", [..]
+  backtrace:
+    [..] sk_prot_alloc.isra.0+0x2b/0xc0
+    [..] sk_clone_lock+0x2f/0x740
+    [..] mptcp_sk_clone+0x33/0x1a0
+    [..] subflow_syn_recv_sock+0x2b1/0x690 [..]
+
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Cc: Paolo Abeni <pabeni@redhat.com>
+Cc: Davide Caratti <dcaratti@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
