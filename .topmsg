@@ -1,0 +1,9 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid a few atomic ops in the rx path
+
+Extending the data_lock scope in mptcp_incoming_option
+we can use that to protect both snd_una and wnd_end.
+In the typical case we will have a single atomic op instead of 2
+
+Acked-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
