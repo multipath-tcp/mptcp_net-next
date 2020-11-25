@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-the-variable-sk-instead-of-open-coding
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: use the variable sk instead of open-coding
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the local variable sk has been defined, use it instead of
+open-coding.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
