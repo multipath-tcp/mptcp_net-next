@@ -1,0 +1,22 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use mptcp release_cb for delayed tasks
+
+We have some tasks triggered by the subflow receive path
+which require to access the msk socket status, specifically:
+mptcp_clean_una() and mptcp_push_pending()
+
+We have almost everything in place to defer to the msk
+release_cb such tasks when the msk sock is owned.
+
+Since the worker is no more used to clean the acked data,
+for fallback sockets we need to explicitly flush them.
+
+As added bonus we can move th wake-up code in __mptcp_clean_una(),
+simplify a lot mptcp_poll() and move the timer update under
+the data lock.
+
+The worker is now used only to process and send DATA_FIN
+packets and do the mptcp-level retransmissions.
+
+Acked-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
