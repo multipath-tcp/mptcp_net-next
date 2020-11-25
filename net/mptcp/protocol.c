@@ -1868,7 +1868,7 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk, unsigned int rcv)
 		mptcp_data_unlock(sk);
 	}
 	if (ret)
-		mptcp_check_data_fin((struct sock *)msk);
+		mptcp_check_data_fin(sk);
 	return !skb_queue_empty(&msk->receive_queue);
 }
 
