@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-parse-and-act-on-incoming-FASTCLOSE-option
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: parse and act on incoming FASTCLOSE option
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+parse the MPTCP FASTCLOSE subtype.
+
+If provided key matches the local one, schedule the work queue to close
+(with tcp reset) all subflows.
+
+The MPTCP socket moves to closed state immediately.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Florian Westphal <fw@strlen.de>
