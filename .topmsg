@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-NULL-ptr-dereference-on-bad-MPJ
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix NULL ptr dereference on bad MPJ
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If an msk listener receives an MPJ carrying an invalid token, it
+will zero the request socket msk entry. That should later
+cause fallback and subflow reset - as per RFC - at
+subflow_syn_recv_sock() time due to failing hmac validation.
+
+Since commit 4cf8b7e48a09 ("subflow: introduce and use
+mptcp_can_accept_new_subflow()"), we unconditionally dereference
+- in mptcp_can_accept_new_subflow - the subflow request msk
+before performing hmac validation. In the above scenario we
+hit a NULL ptr dereference.
+
+Address the issue doing the hmac validation earlier.
+
+Fixes: 4cf8b7e48a09 ("subflow: introduce and use mptcp_can_accept_new_subflow()")
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
