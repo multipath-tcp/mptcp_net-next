@@ -1,0 +1,15 @@
+name: "IRC Notifications"
+on: [create]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc tag
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'create' && github.event.ref_type == 'tag'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: github-bot
+          message: |
+            ${{ github.actor }} tagged ${{ github.repository }} ${{ github.event.ref }}
