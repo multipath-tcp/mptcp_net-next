@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-rm_addr_signal-flag
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: drop rm_addr_signal flag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch reused add_addr_signal for the RM_ADDR announcing signal, by
+defining a new ADD_ADDR status named MPTCP_RM_ADDR_SIGNAL. Then the flag
+rm_addr_signal in PM could be dropped.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
