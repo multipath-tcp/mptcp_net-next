@@ -16,7 +16,7 @@ jobs:
           nickname: gh-tag-bot
           message: |
             New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
-      - name: irc issue open-close
+      - name: irc issues
         uses: rectalogic/notify-irc@v1
         if: github.event_name == 'issues'
         with:
@@ -26,5 +26,5 @@ jobs:
             Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
             Issue title: "${{ github.event.issue.title }}"
             Issue opened by: ${{ github.event.issue.user.login }}
-            Assignee: ${{ github.event.assignee.login }}
+            Assignee (if any): ${{ github.event.assignee.login }}
             URL: ${{ github.event.issue.html_url }}
