@@ -13,7 +13,7 @@ jobs:
         if: github.event_name == 'create' && github.event.ref_type == 'tag'
         with:
           channel: "#MPTCPUpstream"
-          nickname: github-tag-bot
+          nickname: gh-tag-bot
           message: >
             New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
       - name: irc issue open-close
@@ -25,7 +25,7 @@ jobs:
            github.event.action == 'closed')
         with:
           channel: "#MPTCPUpstream"
-          nickname: github-issues-bot
+          nickname: gh-issues-bot
           message: >
             Issue #${{ github.event.issue.number }} has been
             ${{ github.event.action }} by ${{ github.actor }}.\n
@@ -38,7 +38,7 @@ jobs:
            github.event.action == 'unassigned')
         with:
           channel: "#MPTCPUpstream"
-          nickname: github-issues-bot
+          nickname: gh-issues-bot
           message: >
             Issue #${{ github.event.issue.number }} has been
             ${{ github.event.action }} to/from ${{ github.event.assignee.login }}
