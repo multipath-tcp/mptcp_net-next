@@ -1,5 +1,8 @@
 name: "IRC Notifications"
-on: [create]
+on:
+  create
+  issues:
+    types: [opened, reopened, closed]
 
 jobs:
   irc:
@@ -10,6 +13,16 @@ jobs:
         if: github.event_name == 'create' && github.event.ref_type == 'tag'
         with:
           channel: "#MPTCPUpstream"
-          nickname: github-bot
+          nickname: github-tag-bot
           message: >
             New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
+      - name: irc issue open-close
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'issues'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: github-issues-bot
+          message: >
+            Issue #${{ github.event.issue.number }} has been
+            ${{ github.event.action }} by ${{ github.actor }}.\n
+            ${{ github.event.issue.html_url }}
