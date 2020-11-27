@@ -28,7 +28,9 @@ jobs:
           nickname: gh-issues-bot
           message: |
             Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
-            ${{ github.event.issue.html_url }}
+            Issue title: "${{ github.event.issue.title }}"
+            Issue opened by: ${{ github.event.issue.user.login }}
+            URL: ${{ github.event.issue.html_url }}
       - name: irc issue assign
         uses: rectalogic/notify-irc@v1
         if: >
@@ -39,5 +41,8 @@ jobs:
           channel: "#MPTCPUpstream"
           nickname: gh-issues-bot
           message: |
-            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} to/from ${{ github.event.assignee.login }} by ${{ github.actor }}.
-            ${{ github.event.issue.html_url }}
+            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
+            Assignee: ${{ github.event.assignee.login }}
+            Issue title: ${{ github.event.issue.title }}
+            Issue opened by: ${{ github.event.issue.user.login }}
+            URL: ${{ github.event.issue.html_url }}
