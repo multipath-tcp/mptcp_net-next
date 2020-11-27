@@ -2,7 +2,7 @@ name: "IRC Notifications"
 on: [create]
 
 jobs:
-  test:
+  irc:
     runs-on: ubuntu-latest
     steps:
       - name: irc tag
