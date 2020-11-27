@@ -11,5 +11,5 @@ jobs:
         with:
           channel: "#MPTCPUpstream"
           nickname: github-bot
-          message: |
-            ${{ github.actor }} tagged ${{ github.repository }} ${{ github.event.ref }}
+          message: >
+            New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
