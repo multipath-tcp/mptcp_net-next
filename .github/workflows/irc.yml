@@ -1,8 +1,11 @@
 name: "IRC Notifications"
-on: [create]
+on:
+  create
+  issues:
+    types: [opened, reopened, closed, assigned, unassigned]
 
 jobs:
-  test:
+  irc:
     runs-on: ubuntu-latest
     steps:
       - name: irc tag
@@ -10,6 +13,34 @@ jobs:
         if: github.event_name == 'create' && github.event.ref_type == 'tag'
         with:
           channel: "#MPTCPUpstream"
-          nickname: github-bot
-          message: |
-            ${{ github.actor }} tagged ${{ github.repository }} ${{ github.event.ref }}
+          nickname: github-tag-bot
+          message: >
+            New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
+      - name: irc issue open-close
+        uses: rectalogic/notify-irc@v1
+        if: >
+          github.event_name == 'issues' &&
+          (github.event.action == 'opened' ||
+           github.event.action == 'reopened' ||
+           github.event.action == 'closed')
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: github-issues-bot
+          message: >
+            Issue #${{ github.event.issue.number }} has been
+            ${{ github.event.action }} by ${{ github.actor }}.\n
+            ${{ github.event.issue.html_url }}
+      - name: irc issue assign
+        uses: rectalogic/notify-irc@v1
+        if: >
+          github.event_name == 'issues' &&
+          (github.event.action == 'assigned' ||
+           github.event.action == 'unassigned')
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: github-issues-bot
+          message: >
+            Issue #${{ github.event.issue.number }} has been
+            ${{ github.event.action }} to/from ${{ github.event.assignee.login }}
+            by ${{ github.actor }}.\n
+            ${{ github.event.issue.html_url }}
