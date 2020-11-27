@@ -1,6 +1,6 @@
 name: "IRC Notifications"
 on:
-  create
+  create:
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
 
