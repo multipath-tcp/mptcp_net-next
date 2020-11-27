@@ -18,26 +18,13 @@ jobs:
             New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
       - name: irc issue open-close
         uses: rectalogic/notify-irc@v1
-        if: >
-          github.event_name == 'issues' &&
-          (github.event.action == 'opened' ||
-           github.event.action == 'reopened' ||
-           github.event.action == 'closed')
+        if: github.event_name == 'issues'
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-issues-bot
           message: |
             Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
-            ${{ github.event.issue.html_url }}
-      - name: irc issue assign
-        uses: rectalogic/notify-irc@v1
-        if: >
-          github.event_name == 'issues' &&
-          (github.event.action == 'assigned' ||
-           github.event.action == 'unassigned')
-        with:
-          channel: "#MPTCPUpstream"
-          nickname: gh-issues-bot
-          message: |
-            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} to/from ${{ github.event.assignee.login }} by ${{ github.actor }}.
-            ${{ github.event.issue.html_url }}
+            Issue title: "${{ github.event.issue.title }}"
+            Issue opened by: ${{ github.event.issue.user.login }}
+            Assignee: ${{ github.event.assignee.login }}
+            URL: ${{ github.event.issue.html_url }}
