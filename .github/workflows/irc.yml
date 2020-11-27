@@ -14,7 +14,7 @@ jobs:
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-tag-bot
-          message: >
+          message: |
             New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
       - name: irc issue open-close
         uses: rectalogic/notify-irc@v1
@@ -26,9 +26,8 @@ jobs:
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-issues-bot
-          message: >
-            Issue #${{ github.event.issue.number }} has been
-            ${{ github.event.action }} by ${{ github.actor }}.\n
+          message: |
+            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
             ${{ github.event.issue.html_url }}
       - name: irc issue assign
         uses: rectalogic/notify-irc@v1
@@ -39,8 +38,6 @@ jobs:
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-issues-bot
-          message: >
-            Issue #${{ github.event.issue.number }} has been
-            ${{ github.event.action }} to/from ${{ github.event.assignee.login }}
-            by ${{ github.actor }}.\n
+          message: |
+            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} to/from ${{ github.event.assignee.login }} by ${{ github.actor }}.
             ${{ github.event.issue.html_url }}
