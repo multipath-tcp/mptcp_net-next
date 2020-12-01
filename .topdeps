@@ -1,1 +1,2 @@
 t/mptcp-open-code-mptcp-variant-for-lock_sock
+t/mptcp-rename-add_addr_signal-and-mptcp_add_addr_status
