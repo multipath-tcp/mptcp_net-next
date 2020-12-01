@@ -1874,7 +1874,7 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk, unsigned int rcv)
 
 		/* we can have data pending in the subflows only if the msk
 		 * receive buffer was full at subflow_data_ready() time,
-		 * it is an likely slow path
+		 * that is an unlikely slow path.
 		 */
 		if (likely(!ssk))
 			break;
@@ -1902,7 +1902,7 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk, unsigned int rcv)
 		mptcp_data_unlock(sk);
 	}
 	if (ret)
-		mptcp_check_data_fin(sk);
+		mptcp_check_data_fin((struct sock *)msk);
 	return !skb_queue_empty(&msk->receive_queue);
 }
 
