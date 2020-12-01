@@ -1,1 +1,2 @@
 t/mptcp-protect-the-rx-path-with-the-msk-socket-spinlock
+t/mptcp-rename-add_addr_signal-and-mptcp_add_addr_status
