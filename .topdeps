@@ -1,1 +1,2 @@
 t/mptcp-allocate-TX-skbs-in-msk-context
+t/mptcp-rename-add_addr_signal-and-mptcp_add_addr_status
