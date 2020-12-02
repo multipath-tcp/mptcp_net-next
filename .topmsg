@@ -1,0 +1,12 @@
+From: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Subject: [PATCH] bpf:selftests: add MPTCP test base
+
+This patch adds a base for MPTCP specific tests.
+
+It is currently limited to the is_mptcp field in case of plain TCP
+connection because there is no easy way to get the subflow sk from a msk
+in userspace. This implies that we cannot lookup the sk_storage attached
+to the subflow sk in the sockops program.
+
+Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
