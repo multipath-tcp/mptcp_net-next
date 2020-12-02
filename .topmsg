@@ -1,0 +1,15 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] tcp: parse mptcp options contained in reset packets
+
+Because TCP-level resets only affect the subflow, there is a MPTCP
+option to indicate that the MPTCP-level connection should be closed
+immediately without a mptcp-level fin exchange.
+
+This is the 'MPTCP fast close option'.  It can be carried on ack
+segments or TCP resets.  In the latter case, its needed to parse mptcp
+options also for reset packets so that MPTCP can act accordingly.
+
+Next patch will add receive side fastclose support in MPTCP.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Florian Westphal <fw@strlen.de>
