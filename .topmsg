@@ -1,0 +1,9 @@
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: hold mptcp socket before calling tcp_done
+
+When processing options from tcp reset path its possible that
+tcp_done(ssk) drops the last reference on the mptcp socket which
+results in use-after-free.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Florian Westphal <fw@strlen.de>
