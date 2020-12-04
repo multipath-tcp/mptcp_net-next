@@ -58,7 +58,6 @@
 #define TCPOLEN_MPTCP_ADD_ADDR6_BASE	20
 #define TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT	24
 #define TCPOLEN_MPTCP_PORT_LEN		4
-#define TCPOLEN_MPTCP_ADD_ADDR_HMAC	8
 #define TCPOLEN_MPTCP_RM_ADDR_BASE	4
 #define TCPOLEN_MPTCP_FASTCLOSE		12
 
@@ -593,7 +592,7 @@ static inline unsigned int mptcp_add_addr_len(int family, bool echo, bool port)
 	if (family == AF_INET6)
 		len = TCPOLEN_MPTCP_ADD_ADDR6_BASE;
 	if (!echo)
-		len += TCPOLEN_MPTCP_ADD_ADDR_HMAC;
+		len += MPTCPOPT_THMAC_LEN;
 	if (port)
 		len += TCPOLEN_MPTCP_PORT_LEN;
 
