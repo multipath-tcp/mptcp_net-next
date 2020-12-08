@@ -51,19 +51,34 @@ checkpatch() {
 	fi
 }
 
+# $1: ref
+commit_desc() {
+	git log -1 --format="%h %s" "${1}"
+}
+
 # $1: git base; $2: git end
-check_sob() { local commit err=0
+check_commit_msgs() { local commit sob=0 dot=0
 	for commit in $(git log --format="%H" "${1}..${2}"); do
 		if ! git log -1 --format="%b" "${commit}" | \
 		     sed "/^$/d" | \
 		     tail -n1 | \
 		     grep -q "^Signed-off-by: "; then
-			echo "Please fix the SOB of: $(git log -1 --format="%h %s" "${commit}")"
-			err=1
+			echo "Please fix the SOB of:" \
+			     "$(commit_desc "${commit}")"
+			sob=1
+		fi
+
+		if git log -1 --format="%s" "${commit}" | grep -q "\.$"; then
+			echo "Please remove the dot at the end of:" \
+			     "$(commit_desc "${commit}")"
+			dot=1
 		fi
 	done
-	if [ "${err}" = 1 ]; then
+	if [ "${sob}" != 0 ]; then
 		print_rebase_pause "Please make sure the Signed-off-by is the last line" "${1}"
+	fi
+	if [ "${dot}" != 0 ]; then
+		print_rebase_pause "Please make sure no commit have a dot at the end of the commit title" "${1}"
 	fi
 }
 
@@ -99,7 +114,7 @@ apply_patches "${@}"
 checkpatch "${PARENT}" "tmp"
 
 # Make sure all patches are ending with Signed-off-by
-check_sob "${PARENT}" "tmp"
+check_commit_msgs "${PARENT}" "tmp"
 
 # Other checks?
 print_rebase_pause "No additional tags to add?" "${PARENT}"
