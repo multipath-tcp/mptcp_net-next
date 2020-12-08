@@ -1,11 +1,15 @@
-#! /bin/bash -ex
+#! /bin/bash -e
+
+# shellcheck disable=SC1091
+# shellcheck source=./lib.sh
+source ./.lib.sh
 
 TG_TOP="${TG_TOP:-t/upstream}"
 TG_PUSH="${TG_PUSH:-1}"
 
 tg_up_err() {
-	echo "Please fix the conflicts in another terminal." \
-	     "End with ./.end-conflict.sh, then press Enter to continue."
+	printerr "Please fix the conflicts in another terminal." \
+	         "End with ./.end-conflict.sh, then press Enter to continue."
 	read -r
 }
 
@@ -33,9 +37,11 @@ if [ "${TG_PUSH}" = 1 ]; then
 		exit
 	fi
 
-	echo "New patches:"
+	echo -e "${COLOR_BLUE}"
+	printf "New patches:\n"
 	git log --format="- %h: %s" --reverse --no-merges "${OLD_REV}..${NEW_REV}" | \
 		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
 
-	echo "- Results: ${OLD_REV}..${NEW_REV}"
+	printf "%sResults: %s..%s\n" "- " "${OLD_REV}" "${NEW_REV}"
+	echo -e "${COLOR_RESET}"
 fi

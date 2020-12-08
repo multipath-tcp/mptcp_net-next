@@ -1,5 +1,9 @@
 #! /bin/bash -ex
 
+# shellcheck disable=SC1091
+# shellcheck source=./lib.sh
+source ./.lib.sh
+
 TOP="t/upstream"
 TG_TOP=${TG_TOP:-${TOP}}
 
@@ -7,8 +11,9 @@ MODE=$(bash "-${-}" ./.get_arg_mode.sh "${1}")
 
 apply_patches_files() {
 	if ! git am -3 "${@}"; then
-		echo "ERROR with git am. Please fix in another terminal (up to" \
-		     "'git am --continue' included) and press ENTER to continue."
+		printerr "ERROR with git am. Please fix in another terminal" \
+		         "(up to 'git am --continue' included) and press ENTER" \
+		         "to continue."
 		read -r
 	fi
 }
@@ -16,9 +21,9 @@ apply_patches_files() {
 apply_patches_git_pw() {
 	for i in "${@}"; do
 		if ! git-pw "${MODE}" apply ${GIT_PW_ARG:+"${GIT_PW_ARG}"} "${i}"; then
-			echo "ERROR with 'git-pw ${MODE} apply ${i}'. Please" \
-			     "resolve in another terminal and press ENTER to" \
-			     "continue."
+			printerr "ERROR with 'git-pw ${MODE} apply ${i}'. " \
+			         "Please fix in another terminal and press" \
+			         "ENTER to continue."
 			read -r
 		fi
 	done
@@ -37,17 +42,16 @@ apply_patches() {
 }
 
 print_rebase_pause() {
-	printf "%s. Use 'git rebase -i \"%s\"' to fi anything if needed. %s." \
-	       "${1}" \
-	       "${2}" \
-	       "Press Enter to continue."
+	print "${1}\n" \
+	      "Use 'git rebase -i \"${2}\"' to fix anything if needed.\n" \
+	      "Press Enter to continue."
 	read -r
 }
 
 # $1: git base; $2: git end
 checkpatch() {
 	if ! ./.checkpatch.sh --git "${1}..${2}"; then
-		print_rebase_pause "Error with checkpatch" "${1}"
+		print_rebase_pause "Error with checkpatch." "${1}"
 	fi
 }
 
@@ -63,22 +67,22 @@ check_commit_msgs() { local commit sob=0 dot=0
 		     sed "/^$/d" | \
 		     tail -n1 | \
 		     grep -q "^Signed-off-by: "; then
-			echo "Please fix the SOB of:" \
-			     "$(commit_desc "${commit}")"
+			printinfo "Please fix the SOB of:" \
+			          "$(commit_desc "${commit}")"
 			sob=1
 		fi
 
 		if git log -1 --format="%s" "${commit}" | grep -q "\.$"; then
-			echo "Please remove the dot at the end of:" \
-			     "$(commit_desc "${commit}")"
+			printinfo "Please remove the dot at the end of:" \
+			          "$(commit_desc "${commit}")"
 			dot=1
 		fi
 	done
 	if [ "${sob}" != 0 ]; then
-		print_rebase_pause "Please make sure the Signed-off-by is the last line" "${1}"
+		print_rebase_pause "Please make sure the Signed-off-by is the last line." "${1}"
 	fi
 	if [ "${dot}" != 0 ]; then
-		print_rebase_pause "Please make sure no commit have a dot at the end of the commit title" "${1}"
+		print_rebase_pause "Please make sure no commit have a dot at the end of the commit title." "${1}"
 	fi
 }
 
@@ -98,7 +102,7 @@ if [ "${TG_TOP}" = "${TOP}" ]; then
 	done
 fi
 
-echo "Adding new patch(es) before ${TG_TOP}"
+printinfo "Adding new patch(es) before ${TG_TOP}"
 
 git checkout "${TG_TOP}"
 [ -f .topdeps ]

@@ -1,13 +1,17 @@
 #!/bin/bash -e
 
+# shellcheck disable=SC1091
+# shellcheck source=./lib.sh
+source ./.lib.sh
+
 PATCH="${1}"
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-echo "Current branch is: ${BRANCH}"
+printinfo "Current branch is: ${BRANCH}"
 head -n2 .topmsg | grep "^Subject: "
 
 if [ "${BRANCH}" = "t/upstream" ] || [ ! -f ".topdeps" ]; then
-	echo "wrong branch... exit"
+	printerr "wrong branch... exit"
 	exit 1
 fi
 
@@ -31,11 +35,9 @@ am_files() { local nb subject sha
 		fi
 		sha=$(git rev-parse HEAD)
 
-		printf "\n\t- %s: \"squashed\"%s in \"%s\"\n" \
-			"$(git rev-parse --short HEAD)" \
-			"${nb}" \
-			"$(./.title.sh)"
-		printf "\ttrying signed-off\n\n"
+		print " - $(git rev-parse --short HEAD): \"squashed\"${nb}" \
+		      "in $(./.title.sh)"
+		printinfo "trying signed-off"
 		./.signed-off.sh
 
 		bash "-${-}" ./.patch-file-accept.sh "${1}" "${sha}"
@@ -44,7 +46,7 @@ am_files() { local nb subject sha
 
 
 	if [ "$(git status --porcelain | grep -c -v "^?? ")" = "0" ]; then
-		echo "Am didn't do anything, use patch then 'end-squash.sh'"
+		printinfo "'git am' didn't do anything, use patch then 'end-squash.sh'"
 		unset TMP_FILE
 
 		patch -p1 --merge < "${1}"
@@ -53,7 +55,7 @@ am_files() { local nb subject sha
 }
 
 am_series() {
-	echo "Are you sure you want to apply a series here?"
+	printerr "Are you sure you want to apply a series here?"
 	exit 1
 }
 
