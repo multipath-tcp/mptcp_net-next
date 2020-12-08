@@ -281,6 +281,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		mp_opt->rm_id = *ptr++;
 		pr_debug("RM_ADDR: id=%d", mp_opt->rm_id);
 		break;
+
 	case MPTCPOPT_MP_FASTCLOSE:
 		if (opsize != TCPOLEN_MPTCP_FASTCLOSE)
 			break;
@@ -290,6 +291,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		ptr += 8;
 		mp_opt->fastclose = 1;
 		break;
+
 	default:
 		break;
 	}
