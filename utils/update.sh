@@ -9,9 +9,10 @@ elif [ -n "${1}" ]; then
 else
 	git pull origin
 fi
-git checkout t/upstream
 tg remote origin --populate
-tg update
+
+TG_PUSH=0 ./.publish.sh
+
 git --no-pager diff --stat "${NET_NEXT_BEFORE}"..net-next
 
 if [ -n "${1}" ]; then
