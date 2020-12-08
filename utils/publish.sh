@@ -35,7 +35,7 @@ if [ "${TG_PUSH}" = 1 ]; then
 
 	echo "New patches:"
 	git log --format="- %h: %s" --reverse --no-merges "${OLD_REV}..${NEW_REV}" | \
-		grep -v -e "^\S\+ tg " -e "^\S\+ tg: "
+		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
 
 	echo "- Results: ${OLD_REV}..${NEW_REV}"
 fi
