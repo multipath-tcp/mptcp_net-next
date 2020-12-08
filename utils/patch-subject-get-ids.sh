@@ -5,7 +5,7 @@ SUBJECT="${*}"
 [ -n "${SUBJECT}" ]
 
 bash "-${-}" ./.list-pending.sh NO_AUTH | \
-	grep " ${SUBJECT}$" | \
+	grep " ${SUBJECT}\.*$" | \
 	cut -d: -f1 | \
 	sort -nr
 
