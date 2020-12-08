@@ -11,7 +11,7 @@ if [ "${BRANCH}" = "t/upstream" ] || [ ! -f ".topdeps" ]; then
 	exit 1
 fi
 
-MODE=$(cat ./.get_arg_mode.sh "${PATCH}")
+MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${PATCH}")
 
 exit_trap() {
 	echo -e "\n\n\t ====> Do not forget the signed-off-by"

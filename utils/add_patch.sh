@@ -3,7 +3,7 @@
 TOP="t/upstream"
 TG_TOP=${TG_TOP:-${TOP}}
 
-MODE=$(cat ./.get_arg_mode.sh "${1}")
+MODE=$(bash "-${-}" ./.get_arg_mode.sh "${1}")
 
 apply_patches_files() {
 	if ! git am -3 "${@}"; then
