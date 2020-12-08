@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 PATCH="${1}"
 
@@ -13,8 +13,12 @@ fi
 
 MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${PATCH}")
 
+TMP_FILE=""
+
 exit_trap() {
-	echo -e "\n\n\t ====> Do not forget the signed-off-by"
+	if [ -n "${TMP_FILE}" ]; then
+		rm -f "${TMP_FILE}"
+	fi
 }
 
 am_files() { local nb subject
@@ -37,10 +41,11 @@ am_files() { local nb subject
 		exit
 	fi
 
-	trap 'exit_trap ${?}' EXIT
 
 	if [ "$(git status --porcelain | grep -c -v "^?? ")" = "0" ]; then
 		echo "Am didn't do anything, use patch then 'end-squash.sh'"
+		unset TMP_FILE
+
 		patch -p1 --merge < "${1}"
 		exit 1
 	fi
@@ -52,7 +57,13 @@ am_series() {
 }
 
 am_patch() {
-	am_files "$(git-pw patch download "${1}")"
+	TMP_FILE=$(mktemp)
+
+	git-pw patch download "${1}" "${TMP_FILE}"
+
+	am_files "${TMP_FILE}"
 }
+
+trap 'exit_trap' EXIT
 
 "am_${MODE}" "${PATCH}"
