@@ -41,7 +41,7 @@ EXIT_STATUS=0
 # $@: extra kconfig
 gen_kconfig() { local kconfig=()
         # Extra options needed for MPTCP KUnit tests
-        kconfig+=(-m KUNIT -e KUNIT_DEBUGFS -m MPTCP_KUNIT_TESTS)
+        kconfig+=(-m KUNIT -e KUNIT_DEBUGFS -d KUNIT_ALL_TESTS -m MPTCP_KUNIT_TESTS)
 
         # Extra options needed for packetdrill
         # note: we still need SHA1 for fallback tests with v0
@@ -59,7 +59,7 @@ gen_kconfig() { local kconfig=()
         "${VIRTME_CONFIGKERNEL}" --arch=x86_64 --defconfig
 
         # Extra options are needed for MPTCP kselftests
-        cat "tools/testing/selftests/net/mptcp/config" >> .config
+        ./scripts/kconfig/merge_config.sh -m .config "tools/testing/selftests/net/mptcp/config"
 
         echo | ./scripts/config "${kconfig[@]}"
 

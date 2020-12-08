@@ -234,18 +234,14 @@ generate_config_mptcp() {
 	generate_config_no_mptcp "${@}"
 
 	# to avoid warnings/errors, enable KUnit without the extras
-	echo | scripts/config -e KUNIT -d KUNIT_DEBUGFS \
-	                      -d KUNIT_TEST -d KUNIT_EXAMPLE_TEST \
-	                      -d EXT4_KUNIT_TESTS -d SYSCTL_KUNIT_TEST \
-	                      -d LIST_KUNIT_TEST -d LINEAR_RANGES_TEST \
-	                      -d BITS_TEST \
-	                      -d KUNIT_ALL_TESTS
+	echo | scripts/config -e KUNIT -d KUNIT_ALL_TESTS \
+	                      -d LINEAR_RANGES_TEST -d BITS_TEST
 
 	# For INET_MPTCP_DIAG
 	echo | scripts/config -e INET_DIAG \
 	                      -d INET_UDP_DIAG -d INET_RAW_DIAG -d INET_DIAG_DESTROY
 
-	echo | scripts/config -e MPTCP -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
+	echo | scripts/config -e MPTCP -e IPV6 -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
 
 	# Here, we want to have a failure if some new MPTCP options are
 	# available not to forget to enable them. We then don't want to run
