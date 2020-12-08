@@ -248,7 +248,7 @@ analyse() {
 go_manual() {
         gen_kconfig "${@}"
         build
-        prepare
+        prepare "test"
         run
         clean
         rm -rf "${RESULTS_DIR}"
@@ -272,6 +272,9 @@ go_expect() { local mode
 if [ "${1}" = "manual" ]; then
         shift
         go_manual "${@}"
+elif [ "${1}" = "debug" ]; then
+        shift
+        go_manual "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
 else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs

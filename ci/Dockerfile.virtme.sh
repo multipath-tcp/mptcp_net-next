@@ -15,7 +15,7 @@ SCRIPT_OPTS=("${@}")
 
 DOCKER_NAME="virtme"
 DOCKER_DIR=$(dirname "${0}")
-if [ "${1}" = "manual" ]; then
+if [ "${1}" = "manual" ] || [ "${1}" = "debug" ]; then
         DOCKER_EXTRA_ARGS="-it"
 fi
 
