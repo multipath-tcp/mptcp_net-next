@@ -82,11 +82,12 @@ get_tmp_file_rm_previous() {
         mktemp --tmpdir="${PWD}"
 }
 
-prepare() { local old_pwd
+prepare() { local old_pwd mode
         old_pwd="${PWD}"
+        mode="${1:-}"
 
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
-        RESULTS_DIR="${RESULTS_DIR_BASE}/$(git rev-parse --short HEAD)/${1:-}"
+        RESULTS_DIR="${RESULTS_DIR_BASE}/$(git rev-parse --short HEAD)/${mode}"
 
         local kunit_tap="${RESULTS_DIR}/kunit.tap"
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
@@ -103,6 +104,13 @@ prepare() { local old_pwd
         cd gtests/net/packetdrill/
         sudo ./configure
         sudo make -j"$(nproc)" -l"$(nproc)"
+
+        # Add higher tolerance in debug mode
+        cd ../mptcp
+        if [ "${mode}" = "debug" ]; then
+                git grep -l "^--tolerance_usecs" | \
+                        xargs sudo sed -i "s/^--tolerance_usecs=.*/&0/g"
+        fi
         cd "${old_pwd}"
 
         rm -rf "${RESULTS_DIR}"
@@ -248,10 +256,13 @@ analyse() {
 }
 
 # $@: args for kconfig
-go_manual() {
+go_manual() { local mode
+        mode="${1}"
+        shift
+
         gen_kconfig "${@}"
         build
-        prepare "test"
+        prepare "${mode}"
         run
         clean
         rm -rf "${RESULTS_DIR}"
@@ -273,11 +284,9 @@ go_expect() { local mode
 
 # allow to launch anything else
 if [ "${1}" = "manual" ]; then
-        shift
         go_manual "${@}"
 elif [ "${1}" = "debug" ]; then
-        shift
-        go_manual "${KCONFIG_EXTRA_CHECKS[@]}" "${@}"
+        go_manual "${1}" "${KCONFIG_EXTRA_CHECKS[@]}" "${@:1}"
 else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs
