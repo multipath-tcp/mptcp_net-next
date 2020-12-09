@@ -50,7 +50,9 @@ gen_kconfig() { local kconfig=()
         # Debug info
         kconfig+=(-e DEBUG_INFO -e DEBUG_INFO_COMPRESSED -e DEBUG_INFO_DWARF4 \
                   -e DEBUG_INFO_REDUCED -e DEBUG_INFO_SPLIT -e GDB_SCRIPTS \
-                  -e DYNAMIC_DEBUG --set-val CONSOLE_LOGLEVEL_DEFAULT 8)
+                  -e DYNAMIC_DEBUG --set-val CONSOLE_LOGLEVEL_DEFAULT 8 \
+                  -e FTRACE -e FUNCTION_TRACER -e DYNAMIC_FTRACE \
+                  -e FTRACE_SYSCALLS -e HIST_TRIGGERS)
 
         # extra config
         if [ -n "${1}" ]; then
