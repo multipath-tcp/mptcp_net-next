@@ -49,7 +49,8 @@ gen_kconfig() { local kconfig=()
 
         # Debug info
         kconfig+=(-e DEBUG_INFO -e DEBUG_INFO_COMPRESSED -e DEBUG_INFO_DWARF4 \
-                  -e DEBUG_INFO_REDUCED -e DEBUG_INFO_SPLIT -e GDB_SCRIPTS)
+                  -e DEBUG_INFO_REDUCED -e DEBUG_INFO_SPLIT -e GDB_SCRIPTS \
+                  -e DYNAMIC_DEBUG --set-val CONSOLE_LOGLEVEL_DEFAULT 8)
 
         # extra config
         if [ -n "${1}" ]; then
@@ -143,6 +144,8 @@ tap() { local out fname
                 cat /sys/kernel/debug/kunit/\${kunit}/results
         done
 } > "${kunit_tap}"
+
+# echo "file net/mptcp/* +fmp" > /sys/kernel/debug/dynamic_debug/control
 
 # selftests
 make --silent -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
