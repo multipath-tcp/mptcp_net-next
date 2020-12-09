@@ -12,7 +12,7 @@ set -e
 VIRTME_PATH="/opt/virtme"
 VIRTME_CONFIGKERNEL="${VIRTME_PATH}/virtme-configkernel"
 VIRTME_RUN="${VIRTME_PATH}/virtme-run"
-VIRTME_RUN_OPTS=(--net --memory 1024M --kdir "${PWD}" --mods=auto --rwdir "${PWD}" --pwd)
+VIRTME_RUN_OPTS=(--net --memory 2048M --kdir "${PWD}" --mods=auto --rwdir "${PWD}" --pwd)
 VIRTME_RUN_OPTS+=(--qemu-opts -smp 2) # 2 cores
 
 VIRTME_SCRIPT_DIR="patches/virtme"
