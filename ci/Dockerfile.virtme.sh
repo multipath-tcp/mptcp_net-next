@@ -126,7 +126,7 @@ RUN usermod -a -G sudo "${USER}" && \
     echo "${USER} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # to quickly shutdown the VM
-RUN ln -sv /usr/lib/klibc/bin/poweroff /usr/sbin/
+RUN for i in /usr/lib/klibc/bin/*; do type "\$(basename "\${i}")" >/dev/null 2>&1 || ln -sv "\${i}" /usr/sbin/; done
 
 # CCache for quicker builds with default colours
 # Note: use 'ccache -M xG' to increase max size, default is 5GB
