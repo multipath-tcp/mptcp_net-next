@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: use adding up size to get ADD_ADDR length
-
-This patch uses adding up size to get the ADD_ADDR suboption length rather
-than returning the ADD_ADDR size constants.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
