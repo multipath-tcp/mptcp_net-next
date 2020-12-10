@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: send out dedicated packet for ADD_ADDR using port
-
-The process is similar to that of the ADD_ADDR IPv6, this patch also sent
-out a pure ack for the ADD_ADDR using port.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
