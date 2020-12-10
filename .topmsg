@@ -1,0 +1,8 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: use MPTCPOPT_HMAC_LEN macro
+
+Use the macro MPTCPOPT_HMAC_LEN instead of a constant in struct
+mptcp_options_received.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
