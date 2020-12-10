@@ -1,1 +1,2 @@
 t/mptcp-add-the-outgoing-ADD_ADDR-port-support
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
