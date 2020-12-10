@@ -1,0 +1,30 @@
+name: "IRC Notifications"
+on:
+  create:
+  issues:
+    types: [opened, reopened, closed, assigned, unassigned]
+
+jobs:
+  irc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc tag
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'create' && github.event.ref_type == 'tag'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-tag-bot
+          message: |
+            New tag available: ${{ github.event.ref }} (by ${{ github.actor }})
+      - name: irc issues
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'issues'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-issues-bot
+          message: |
+            Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
+            Issue title: "${{ github.event.issue.title }}"
+            Issue opened by: ${{ github.event.issue.user.login }}
+            Assignee (if any): ${{ github.event.assignee.login }}
+            URL: ${{ github.event.issue.html_url }}
