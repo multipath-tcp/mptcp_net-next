@@ -1,0 +1,25 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: let MPTCP create max size skbs
+
+Currently the xmit path of the MPTCP protocol creates smaller-
+than-max-size skbs, which is suboptimal for the performances.
+
+There are a few things to improve:
+- when coalescing to an existing skb, must clear the PUSH flag
+- tcp_build_frag() expect the available space as an argument.
+  When coalescing is enable MPTCP already subtracted the
+  to-be-coalesced skb len. We must increment said argument
+  accordingly.
+
+Before:
+./use_mptcp.sh netperf -H 127.0.0.1 -t TCP_STREAM
+[...]
+131072  16384  16384    30.00    24414.86
+
+After:
+./use_mptcp.sh netperf -H 127.0.0.1 -t TCP_STREAM
+[...]
+131072  16384  16384    30.05    28357.69
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
