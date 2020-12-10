@@ -1,2 +1,1 @@
-t/mptcp-use-adding-up-size-to-get-ADD_ADDR-length
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
