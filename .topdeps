@@ -1,1 +1,2 @@
 t/mptcp-print-out-port-and-ahmac-when-receiving-ADD_ADDR
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
