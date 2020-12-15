@@ -1,2 +1,1 @@
-t/mptcp-let-MPTCP-create-max-size-skbs
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
