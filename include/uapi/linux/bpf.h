@@ -3823,6 +3823,14 @@ union bpf_attr {
  *		**-EOPNOTSUP** if IMA is disabled or **-EINVAL** if
  *		invalid arguments are passed.
  *
+ * struct socket *bpf_sock_from_file(struct file *file)
+ *	Description
+ *		If the given file represents a socket, returns the associated
+ *		socket.
+ *	Return
+ *		A pointer to a struct socket on success or NULL if the file is
+ *		not a socket.
+ *
  * struct bpf_mptcp_sock *bpf_mptcp_sock(struct bpf_sock *sk)
  *	Description
  *		This helper gets a **struct bpf_mptcp_sock** pointer from a
@@ -3994,6 +4002,7 @@ union bpf_attr {
 	FN(bprm_opts_set),		\
 	FN(ktime_get_coarse_ns),	\
 	FN(ima_inode_hash),		\
+	FN(sock_from_file),		\
 	FN(mptcp_sock),			\
 	/* */
 
