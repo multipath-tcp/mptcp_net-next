@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-properly-annotate-nested-lock
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: properly annotate nested lock
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+MPTCP closes the subflows while holding the msk-level lock.
+While acquiring the subflow socket lock we need to use the
+correct nested annotation, or we can hit a lockdep splat
+at runtime.
+
+Reported-and-tested-by: Geliang Tang <geliangtang@gmail.com>
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
