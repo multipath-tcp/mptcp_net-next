@@ -1,2 +1,1 @@
-t/tcp-parse-mptcp-options-contained-in-reset-packets
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
