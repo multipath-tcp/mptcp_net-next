@@ -2119,7 +2119,7 @@ void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 
 	list_del(&subflow->node);
 
-	lock_sock(ssk);
+	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 
 	/* if we are invoked by the msk cleanup code, the subflow is
 	 * already orphaned
@@ -2705,6 +2705,8 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 #endif
 	/* will be fully established after successful MPC subflow creation */
 	inet_sk_state_store(nsk, TCP_SYN_RECV);
+
+	security_inet_csk_clone(nsk, req);
 	bh_unlock_sock(nsk);
 
 	/* keep a single reference */
