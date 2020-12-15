@@ -611,7 +611,7 @@ void tcp_skb_collapse_tstamp(struct sk_buff *skb,
 /* tcp_input.c */
 void tcp_rearm_rto(struct sock *sk);
 void tcp_synack_rtt_meas(struct sock *sk, struct request_sock *req);
-void tcp_reset(struct sock *sk);
+void tcp_reset(struct sock *sk, struct sk_buff *skb);
 void tcp_skb_mark_lost_uncond_verify(struct tcp_sock *tp, struct sk_buff *skb);
 void tcp_fin(struct sock *sk);
 
@@ -1326,7 +1326,9 @@ static inline unsigned long tcp_probe0_base(const struct sock *sk)
 static inline unsigned long tcp_probe0_when(const struct sock *sk,
 					    unsigned long max_when)
 {
-	u64 when = (u64)tcp_probe0_base(sk) << inet_csk(sk)->icsk_backoff;
+	u8 backoff = min_t(u8, ilog2(TCP_RTO_MAX / TCP_RTO_MIN) + 1,
+			   inet_csk(sk)->icsk_backoff);
+	u64 when = (u64)tcp_probe0_base(sk) << backoff;
 
 	return (unsigned long)min_t(u64, when, max_when);
 }
