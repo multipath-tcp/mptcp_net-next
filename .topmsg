@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-the-incoming-MP_PRIO-support
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add the incoming MP_PRIO support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the incoming MP_PRIO logic:
+
+Added a flag named mp_prio in struct mptcp_options_received, to mark the
+MP_PRIO is received, and save the priority value to struct
+mptcp_options_received's backup member. Then invoke
+mptcp_pm_mp_prio_received with the receiving subsocket and the backup
+value.
+
+In mptcp_pm_mp_prio_received, get the subflow context according the input
+subsocket, and change the subflow's backup as the incoming priority value.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
