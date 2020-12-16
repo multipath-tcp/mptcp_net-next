@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-the-MP_PRIO-testcases
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add the MP_PRIO testcases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the MP_PRIO testcases:
+
+Add a new argument bkup for run_tests and do_transfer, it can be set as
+"backup" or "nobackup", the default value is "".
+
+Add a new function chk_prio_nr to check the MP_PRIO related MIB counters.
+
+The output looks like this:
+
+29 single subflow, backup      syn[ ok ] - synack[ ok ] - ack[ ok ]
+                               ptx[ ok ] - prx   [ ok ]
+30 single address, backup      syn[ ok ] - synack[ ok ] - ack[ ok ]
+                               add[ ok ] - echo  [ ok ]
+                               ptx[ ok ] - prx   [ ok ]
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
