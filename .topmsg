@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-testcases-for-setting-the-address-ID
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add testcases for setting the address ID
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the address ID can be set from user-space, some of the tests in
+pm_netlink.sh will fail. This patch fixed the failures, and add the
+testcases for setting the address ID.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
