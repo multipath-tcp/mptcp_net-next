@@ -656,6 +656,7 @@ int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	entry->addr = skc_local;
 	entry->addr.ifindex = 0;
 	entry->addr.flags = 0;
+	entry->addr.id = 0;
 	ret = mptcp_pm_nl_append_new_local_addr(pernet, entry);
 	if (ret < 0)
 		kfree(entry);
