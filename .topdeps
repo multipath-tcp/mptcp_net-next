@@ -1,1 +1,1 @@
-t/mptcp-push-pending-frames-when-subflow-has-free-space
+t/selftests-mptcp-add-the-MP_PRIO-testcases
