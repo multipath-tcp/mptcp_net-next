@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/linux-handle-MPTCP-consistently-with-TCP
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] linux: handle MPTCP consistently with TCP
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP protocol uses a specific protocol value, even if
+it's an extension to TCP. Additionally, MPTCP sockets
+could 'fall-back' to TCP at run-time, depending on peer MPTCP
+support and available resources.
+
+As a consequence of the specific protocol number, selinux
+applies the raw_socket class to MPTCP sockets.
+
+Existing TCP application converted to MPTCP - or forced to
+use MPTCP socket with user-space hacks - will need an
+updated policy to run successfully.
+
+This change lets selinux attach the TCP socket class to
+MPTCP sockets, too, so that no policy changes are needed in
+the above scenario.
+
+Note that the MPTCP is setting, propagating and updating the
+security context on all the subflows and related request
+socket.
+
+Link: https://lore.kernel.org/linux-security-module/CAHC9VhTaK3xx0hEGByD2zxfF7fadyPP1kb-WeWH_YCyq9X-sRg@mail.gmail.com/T/#t
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
