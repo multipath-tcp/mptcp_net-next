@@ -452,7 +452,6 @@ int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		struct sock *sk = (struct sock *)msk;
 		struct mptcp_addr_info local;
 
 		local_address((struct sock_common *)ssk, &local);
