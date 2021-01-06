@@ -877,6 +877,9 @@ static void __mptcp_wmem_reserve(struct sock *sk, int size)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	WARN_ON_ONCE(msk->wmem_reserved);
+	if (WARN_ON_ONCE(amount < 0))
+		amount = 0;
+
 	if (amount <= sk->sk_forward_alloc)
 		goto reserve;
 
@@ -1587,7 +1590,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	if (msg->msg_flags & ~(MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL))
 		return -EOPNOTSUPP;
 
-	mptcp_lock_sock(sk, __mptcp_wmem_reserve(sk, len));
+	mptcp_lock_sock(sk, __mptcp_wmem_reserve(sk, min_t(size_t, 1 << 20, len)));
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
 
@@ -2914,7 +2917,7 @@ void __mptcp_data_acked(struct sock *sk)
 		mptcp_schedule_work(sk);
 }
 
-void __mptcp_wnd_updated(struct sock *sk, struct sock *ssk)
+void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 {
 	if (!mptcp_send_head(sk))
 		return;
