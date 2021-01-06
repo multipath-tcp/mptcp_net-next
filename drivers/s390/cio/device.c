@@ -1156,7 +1156,8 @@ static int io_subchannel_chp_event(struct subchannel *sch,
 				   struct chp_link *link, int event)
 {
 	struct ccw_device *cdev = sch_get_cdev(sch);
-	int mask;
+	int mask, chpid, valid_bit;
+	int path_event[8];
 
 	mask = chp_ssd_get_mask(&sch->ssd_info, link);
 	if (!mask)
@@ -1190,6 +1191,18 @@ static int io_subchannel_chp_event(struct subchannel *sch,
 		if (cdev)
 			cdev->private->path_new_mask |= mask;
 		io_subchannel_verify(sch);
+		break;
+	case CHP_FCES_EVENT:
+		/* Forward Endpoint Security event */
+		for (chpid = 0, valid_bit = 0x80; chpid < 8; chpid++,
+				valid_bit >>= 1) {
+			if (mask & valid_bit)
+				path_event[chpid] = PE_PATH_FCES_EVENT;
+			else
+				path_event[chpid] = PE_NONE;
+		}
+		if (cdev)
+			cdev->drv->path_event(cdev, path_event);
 		break;
 	}
 	return 0;
@@ -1668,7 +1681,7 @@ void ccw_device_wait_idle(struct ccw_device *cdev)
 		cio_tsch(sch);
 		if (sch->schib.scsw.cmd.actl == 0)
 			break;
-		udelay_simple(100);
+		udelay(100);
 	}
 }
 #endif
