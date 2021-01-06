@@ -52,7 +52,8 @@ STACK_SIZE  = 1 << STACK_SHIFT
 STACK_INIT = STACK_SIZE - STACK_FRAME_OVERHEAD - __PT_SIZE
 
 _TIF_WORK	= (_TIF_SIGPENDING | _TIF_NOTIFY_RESUME | _TIF_NEED_RESCHED | \
-		   _TIF_UPROBE | _TIF_GUARDED_STORAGE | _TIF_PATCH_PENDING)
+		   _TIF_UPROBE | _TIF_GUARDED_STORAGE | _TIF_PATCH_PENDING | \
+		   _TIF_NOTIFY_SIGNAL)
 _TIF_TRACE	= (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | _TIF_SECCOMP | \
 		   _TIF_SYSCALL_TRACEPOINT)
 _CIF_WORK	= (_CIF_FPU)
@@ -413,6 +414,7 @@ ENTRY(system_call)
 	mvc	__PT_PSW(16,%r11),__LC_SVC_OLD_PSW
 	mvc	__PT_INT_CODE(4,%r11),__LC_SVC_ILC
 	stg	%r14,__PT_FLAGS(%r11)
+	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
 	ENABLE_INTS
 .Lsysc_do_svc:
 	# clear user controlled register to prevent speculative use
@@ -429,7 +431,6 @@ ENTRY(system_call)
 	jnl	.Lsysc_nr_ok
 	slag	%r8,%r1,3
 .Lsysc_nr_ok:
-	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
 	stg	%r2,__PT_ORIG_GPR2(%r11)
 	stg	%r7,STACK_FRAME_OVERHEAD(%r15)
 	lg	%r9,0(%r8,%r10)			# get system call add.
@@ -486,8 +487,8 @@ ENTRY(system_call)
 #endif
 	TSTMSK	__PT_FLAGS(%r11),_PIF_SYSCALL_RESTART
 	jo	.Lsysc_syscall_restart
-	TSTMSK	__TI_flags(%r12),_TIF_SIGPENDING
-	jo	.Lsysc_sigpending
+	TSTMSK	__TI_flags(%r12),(_TIF_SIGPENDING|_TIF_NOTIFY_SIGNAL)
+	jnz	.Lsysc_sigpending
 	TSTMSK	__TI_flags(%r12),_TIF_NOTIFY_RESUME
 	jo	.Lsysc_notify_resume
 	j	.Lsysc_return
@@ -698,8 +699,8 @@ ENTRY(pgm_check_handler)
 	mvc	__THREAD_per_address(8,%r14),__LC_PER_ADDRESS
 	mvc	__THREAD_per_cause(2,%r14),__LC_PER_CODE
 	mvc	__THREAD_per_paid(1,%r14),__LC_PER_ACCESS_ID
-6:	RESTORE_SM_CLEAR_PER
-	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
+6:	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
+	RESTORE_SM_CLEAR_PER
 	larl	%r1,pgm_check_table
 	llgh	%r10,__PT_INT_CODE+2(%r11)
 	nill	%r10,0x007f
@@ -730,8 +731,8 @@ ENTRY(pgm_check_handler)
 # PER event in supervisor state, must be kprobes
 #
 .Lpgm_kprobe:
-	RESTORE_SM_CLEAR_PER
 	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
+	RESTORE_SM_CLEAR_PER
 	lgr	%r2,%r11		# pass pointer to pt_regs
 	brasl	%r14,do_per_trap
 	j	.Lpgm_return
@@ -777,10 +778,8 @@ ENTRY(io_int_handler)
 .Lio_skip_asce:
 	mvc	__PT_INT_CODE(12,%r11),__LC_SUBCHANNEL_ID
 	xc	__PT_FLAGS(8,%r11),__PT_FLAGS(%r11)
-	TSTMSK	__LC_CPU_FLAGS,_CIF_IGNORE_IRQ
-	jo	.Lio_restore
-	TRACE_IRQS_OFF
 	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
+	TRACE_IRQS_OFF
 .Lio_loop:
 	lgr	%r2,%r11		# pass pointer to pt_regs
 	lghi	%r3,IO_INTERRUPT
@@ -865,8 +864,8 @@ ENTRY(io_int_handler)
 	TSTMSK	__TI_flags(%r12),_TIF_PATCH_PENDING
 	jo	.Lio_patch_pending
 #endif
-	TSTMSK	__TI_flags(%r12),_TIF_SIGPENDING
-	jo	.Lio_sigpending
+	TSTMSK	__TI_flags(%r12),(_TIF_SIGPENDING|_TIF_NOTIFY_SIGNAL)
+	jnz	.Lio_sigpending
 	TSTMSK	__TI_flags(%r12),_TIF_NOTIFY_RESUME
 	jo	.Lio_notify_resume
 	TSTMSK	__TI_flags(%r12),_TIF_GUARDED_STORAGE
@@ -965,10 +964,8 @@ ENTRY(ext_int_handler)
 	mvc	__PT_INT_PARM(4,%r11),__LC_EXT_PARAMS
 	mvc	__PT_INT_PARM_LONG(8,%r11),0(%r1)
 	xc	__PT_FLAGS(8,%r11),__PT_FLAGS(%r11)
-	TSTMSK	__LC_CPU_FLAGS,_CIF_IGNORE_IRQ
-	jo	.Lio_restore
-	TRACE_IRQS_OFF
 	xc	__SF_BACKCHAIN(8,%r15),__SF_BACKCHAIN(%r15)
+	TRACE_IRQS_OFF
 	lgr	%r2,%r11		# pass pointer to pt_regs
 	lghi	%r3,EXT_INTERRUPT
 	brasl	%r14,do_IRQ
