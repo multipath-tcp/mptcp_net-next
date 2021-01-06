@@ -757,8 +757,8 @@ int setup_arg_pages(struct linux_binprm *bprm,
 #ifdef CONFIG_STACK_GROWSUP
 	/* Limit stack size */
 	stack_base = bprm->rlim_stack.rlim_max;
-	if (stack_base > STACK_SIZE_MAX)
-		stack_base = STACK_SIZE_MAX;
+
+	stack_base = calc_max_stack_size(stack_base);
 
 	/* Add space for stack randomization. */
 	stack_base += (STACK_RND_MASK << PAGE_SHIFT);
@@ -966,8 +966,8 @@ EXPORT_SYMBOL(read_code);
 
 /*
  * Maps the mm_struct mm into the current task struct.
- * On success, this function returns with the mutex
- * exec_update_mutex locked.
+ * On success, this function returns with exec_update_lock
+ * held for writing.
  */
 static int exec_mmap(struct mm_struct *mm)
 {
@@ -982,7 +982,7 @@ static int exec_mmap(struct mm_struct *mm)
 	if (old_mm)
 		sync_mm_rss(old_mm);
 
-	ret = mutex_lock_killable(&tsk->signal->exec_update_mutex);
+	ret = down_write_killable(&tsk->signal->exec_update_lock);
 	if (ret)
 		return ret;
 
@@ -996,7 +996,7 @@ static int exec_mmap(struct mm_struct *mm)
 		mmap_read_lock(old_mm);
 		if (unlikely(old_mm->core_state)) {
 			mmap_read_unlock(old_mm);
-			mutex_unlock(&tsk->signal->exec_update_mutex);
+			up_write(&tsk->signal->exec_update_lock);
 			return -EINTR;
 		}
 	}
@@ -1259,6 +1259,16 @@ int begin_new_exec(struct linux_binprm * bprm)
 		goto out;
 
 	/*
+	 * Cancel any io_uring activity across execve
+	 */
+	io_uring_task_cancel();
+
+	/* Ensure the files table is not shared. */
+	retval = unshare_files();
+	if (retval)
+		goto out;
+
+	/*
 	 * Must be called _before_ exec_mmap() as bprm->mm is
 	 * not visibile until then. This also enables the update
 	 * to be lockless.
@@ -1385,7 +1395,7 @@ int begin_new_exec(struct linux_binprm * bprm)
 	return 0;
 
 out_unlock:
-	mutex_unlock(&me->signal->exec_update_mutex);
+	up_write(&me->signal->exec_update_lock);
 out:
 	return retval;
 }
@@ -1426,7 +1436,7 @@ void setup_new_exec(struct linux_binprm * bprm)
 	 * some architectures like powerpc
 	 */
 	me->mm->task_size = TASK_SIZE;
-	mutex_unlock(&me->signal->exec_update_mutex);
+	up_write(&me->signal->exec_update_lock);
 	mutex_unlock(&me->signal->cred_guard_mutex);
 }
 EXPORT_SYMBOL(setup_new_exec);
@@ -1779,21 +1789,11 @@ static int bprm_execve(struct linux_binprm *bprm,
 		       int fd, struct filename *filename, int flags)
 {
 	struct file *file;
-	struct files_struct *displaced;
 	int retval;
-
-	/*
-	 * Cancel any io_uring activity across execve
-	 */
-	io_uring_task_cancel();
-
-	retval = unshare_files(&displaced);
-	if (retval)
-		return retval;
 
 	retval = prepare_bprm_creds(bprm);
 	if (retval)
-		goto out_files;
+		return retval;
 
 	check_unsafe_exec(bprm);
 	current->in_execve = 1;
@@ -1808,11 +1808,14 @@ static int bprm_execve(struct linux_binprm *bprm,
 	bprm->file = file;
 	/*
 	 * Record that a name derived from an O_CLOEXEC fd will be
-	 * inaccessible after exec. Relies on having exclusive access to
-	 * current->files (due to unshare_files above).
+	 * inaccessible after exec.  This allows the code in exec to
+	 * choose to fail when the executable is not mmaped into the
+	 * interpreter and an open file descriptor is not passed to
+	 * the interpreter.  This makes for a better user experience
+	 * than having the interpreter start and then immediately fail
+	 * when it finds the executable is inaccessible.
 	 */
-	if (bprm->fdpath &&
-	    close_on_exec(fd, rcu_dereference_raw(current->files->fdt)))
+	if (bprm->fdpath && get_close_on_exec(fd))
 		bprm->interp_flags |= BINPRM_FLAGS_PATH_INACCESSIBLE;
 
 	/* Set the unchanging part of bprm->cred */
@@ -1830,8 +1833,6 @@ static int bprm_execve(struct linux_binprm *bprm,
 	rseq_execve(current);
 	acct_update_integrals(current);
 	task_numa_free(current, false);
-	if (displaced)
-		put_files_struct(displaced);
 	return retval;
 
 out:
@@ -1847,10 +1848,6 @@ out:
 out_unmark:
 	current->fs->in_exec = 0;
 	current->in_execve = 0;
-
-out_files:
-	if (displaced)
-		reset_files_struct(displaced);
 
 	return retval;
 }
