@@ -3626,6 +3626,7 @@ S:	Supported
 F:	Documentation/devicetree/bindings/net/brcm,bcmgenet.txt
 F:	Documentation/devicetree/bindings/net/brcm,unimac-mdio.txt
 F:	drivers/net/ethernet/broadcom/genet/
+F:	drivers/net/ethernet/broadcom/unimac.h
 F:	drivers/net/mdio/mdio-bcm-unimac.c
 F:	include/linux/platform_data/bcmgenet.h
 F:	include/linux/platform_data/mdio-bcm-unimac.h
@@ -3658,6 +3659,15 @@ N:	bcm586*
 N:	bcm88312
 N:	hr2
 N:	stingray
+
+BROADCOM IPROC GBIT ETHERNET DRIVER
+M:	Rafał Miłecki <rafal@milecki.pl>
+M:	bcm-kernel-feedback-list@broadcom.com
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/brcm,amac.txt
+F:	drivers/net/ethernet/broadcom/bgmac*
+F:	drivers/net/ethernet/broadcom/unimac.h
 
 BROADCOM KONA GPIO DRIVER
 M:	Ray Jui <rjui@broadcom.com>
@@ -3738,6 +3748,7 @@ L:	bcm-kernel-feedback-list@broadcom.com
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	drivers/net/ethernet/broadcom/bcmsysport.*
+F:	drivers/net/ethernet/broadcom/unimac.h
 
 BROADCOM TG3 GIGABIT ETHERNET DRIVER
 M:	Siva Reddy Kallam <siva.kallam@broadcom.com>
@@ -10848,7 +10859,7 @@ F:	drivers/media/radio/radio-maxiradio*
 
 MCAN MMIO DEVICE DRIVER
 M:	Dan Murphy <dmurphy@ti.com>
-M:	Sriram Dash <sriram.dash@samsung.com>
+M:	Pankaj Sharma <pankj.sharma@samsung.com>
 L:	linux-can@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/can/bosch,m_can.yaml
