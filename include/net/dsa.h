@@ -482,7 +482,7 @@ struct dsa_switch_ops {
 	void	(*phylink_fixed_state)(struct dsa_switch *ds, int port,
 				       struct phylink_link_state *state);
 	/*
-	 * ethtool hardware statistics.
+	 * Port statistics counters.
 	 */
 	void	(*get_strings)(struct dsa_switch *ds, int port,
 			       u32 stringset, uint8_t *data);
@@ -491,6 +491,8 @@ struct dsa_switch_ops {
 	int	(*get_sset_count)(struct dsa_switch *ds, int port, int sset);
 	void	(*get_ethtool_phy_stats)(struct dsa_switch *ds,
 					 int port, uint64_t *data);
+	void	(*get_stats64)(struct dsa_switch *ds, int port,
+				   struct rtnl_link_stats64 *s);
 
 	/*
 	 * ethtool Wake-on-LAN
@@ -565,12 +567,9 @@ struct dsa_switch_ops {
 	 * VLAN support
 	 */
 	int	(*port_vlan_filtering)(struct dsa_switch *ds, int port,
-				       bool vlan_filtering,
-				       struct switchdev_trans *trans);
-	int (*port_vlan_prepare)(struct dsa_switch *ds, int port,
+				       bool vlan_filtering);
+	int	(*port_vlan_add)(struct dsa_switch *ds, int port,
 				 const struct switchdev_obj_port_vlan *vlan);
-	void (*port_vlan_add)(struct dsa_switch *ds, int port,
-			      const struct switchdev_obj_port_vlan *vlan);
 	int	(*port_vlan_del)(struct dsa_switch *ds, int port,
 				 const struct switchdev_obj_port_vlan *vlan);
 	/*
@@ -586,10 +585,8 @@ struct dsa_switch_ops {
 	/*
 	 * Multicast database
 	 */
-	int (*port_mdb_prepare)(struct dsa_switch *ds, int port,
+	int	(*port_mdb_add)(struct dsa_switch *ds, int port,
 				const struct switchdev_obj_port_mdb *mdb);
-	void (*port_mdb_add)(struct dsa_switch *ds, int port,
-			     const struct switchdev_obj_port_mdb *mdb);
 	int	(*port_mdb_del)(struct dsa_switch *ds, int port,
 				const struct switchdev_obj_port_mdb *mdb);
 	/*
