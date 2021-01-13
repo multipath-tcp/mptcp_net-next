@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-more-strict-state-checking-for-acks
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: more strict state checking for acks
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Syzkaller found a way to trigger division by zero
+in mptcp_subflow_cleanup_rbuf().
+
+The current checks implemented into tcp_can_send_ack()
+are too week, let's be more accurate.
+
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Fixes: ea4ca586b16f ("mptcp: refine MPTCP-level ack scheduling")
+Fixes: fd8976790a6c ("mptcp: be careful on MPTCP-level ack.")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
