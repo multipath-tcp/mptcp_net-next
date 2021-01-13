@@ -34,7 +34,7 @@ apply_patches_series() {
 }
 
 apply_patches_patch() {
-	GIT_PW_ARG="--deps" apply_patches_git_pw "${@}"
+	GIT_PW_ARG="--no-deps" apply_patches_git_pw "${@}"
 }
 
 apply_patches() {
