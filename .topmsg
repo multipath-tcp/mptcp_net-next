@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-schedule-work-for-better-snd-subflow-selection
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: schedule work for better snd subflow selection
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Otherwise the packet scheduler policy will not be
+enforced when pushing pending data at MPTCP-level
+ack reception time.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
