@@ -1,2 +1,1 @@
-t/mptcp-add-the-incoming-MP_PRIO-support
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
