@@ -36,7 +36,7 @@ am_files() { local nb subject sha
 		sha=$(git rev-parse HEAD)
 
 		print " - $(git rev-parse --short HEAD): \"squashed\"${nb}" \
-		      "in $(./.title.sh)"
+		      "in \"$(./.title.sh)\""
 		printinfo "trying signed-off"
 		./.signed-off.sh
 
