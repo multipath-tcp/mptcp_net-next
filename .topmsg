@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-do-not-queue-excessive-data-on-subflows
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not queue excessive data on subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current packet scheduler can enqueue up to sndbuf
+data on each subflow. If the send buffer is large and
+the subflows are not symmetric, this could lead to
+suboptimal aggregate bandwidth utilization.
+
+Limit the amount of queued data to the maximum cwnd.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
