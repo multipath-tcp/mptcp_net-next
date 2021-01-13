@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-better-msk-level-shutdown
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: better msk-level shutdown.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Instead of re-implementing most of inet_shutdown, re-use
+such helper, and implement the MPTCP-specific bits at the
+'proto' level.
+
+The msk-level disconnect() can now be invoked, lets provide a
+suitable implementation.
+
+As a side effect, this fixes bad state management for listener
+sockets. The latter could lead to division by 0 oops since
+commit ea4ca586b16f ("mptcp: refine MPTCP-level ack scheduling").
+
+Fixes: 43b54c6ee382 ("mptcp: Use full MPTCP-level disconnect state machine")
+Fixes: ea4ca586b16f ("mptcp: refine MPTCP-level ack scheduling")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
