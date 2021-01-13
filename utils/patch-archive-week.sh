@@ -5,6 +5,7 @@ git-pw patch list \
 	--state Deferred \
 	--state Accepted \
 	--state Superseded \
+	--state Rejected \
 	-f simple \
 	-c ID | \
 		tail -n +3 | \
