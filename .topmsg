@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-locking-in-mptcp_disconnect
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix locking in mptcp_disconnect()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+tcp_disconnect() expects the caller acquires the sock lock,
+but mptcp_disconnect() is not doing that. Add the missing
+required lock.
+
+Reported-by: Eric Dumazet <eric.dumazet@gmail.com>
+Fixes: 76e2a55d1625 ("mptcp: better msk-level shutdown.")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
