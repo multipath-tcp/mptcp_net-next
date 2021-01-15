@@ -7,8 +7,10 @@ REF="HEAD"
 for arg in "${@}"; do
 	if [[ "${arg}" =~ -[0-9]+ ]]; then
 		REF="HEAD~${arg:1}..HEAD"
-		# continue, just in case we give two -X
+	elif ! [[ "${arg}" =~ ^- ]]; then
+		REF="${arg}"
 	fi
+	# continue, just in case we give multiple refs
 done
 
 if ! ./.checkpatch.sh --git "${REF}"; then
