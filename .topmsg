@@ -1,4 +1,17 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-support-MPJoin-with-IPv4-mapped-in-v6-sk
+Subject: [PATCH] mptcp: support MPJoin with IPv4 mapped in v6 sk
 
+With an IPv4 mapped in v6 socket, we were trying to call inet6_bind()
+with an IPv4 address resulting in a -EINVAL error because the given
+addr_len -- size of the address structure -- was too short.
+
+We now make sure to use address structures for the same family as the
+MPTCP socket for both the bind() and the connect(). It means we convert
+v4 addresses to v4 mapped in v6 or the opposite if needed.
+
+Fixes: ec3edaa7ca6c ("mptcp: Add handling of outgoing MP_JOIN requests")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/122
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
