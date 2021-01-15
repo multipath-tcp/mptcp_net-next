@@ -5,7 +5,7 @@ TARGET="${TARGET:-mptcp-next}"
 # replace -X not accepted by checkpatch with HEAD~X
 REF="HEAD"
 for arg in "${@}"; do
-	if [[ "${arg}" =~ -[0-9]+ ]]; then
+	if [[ "${arg}" =~ ^-[0-9]+$ ]]; then
 		REF="HEAD~${arg:1}..HEAD"
 	elif ! [[ "${arg}" =~ ^- ]]; then
 		REF="${arg}"
