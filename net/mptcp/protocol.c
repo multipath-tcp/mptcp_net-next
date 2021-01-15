@@ -1037,7 +1037,6 @@ out:
 			__mptcp_update_wmem(sk);
 			sk_mem_reclaim_partial(sk);
 		}
-		mptcp_write_space(sk);
 	}
 
 	if (snd_una == READ_ONCE(msk->snd_nxt)) {
