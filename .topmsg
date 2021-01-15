@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-increase-timeout-to-10-min
+Subject: [PATCH] selftests: increase timeout to 10 min
 
+On slow systems with kernel debug settings, we can reach the current
+timeout when all tests are executed.
+
+Likely some tests need be improved to remove some 'sleep' and wait
+(less) for a specific action. This can also improve stability.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
