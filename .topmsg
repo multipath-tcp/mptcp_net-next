@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: schedule work for better snd subflow selection
-
-Otherwise the packet scheduler policy will not be
-enforced when pushing pending data at MPTCP-level
-ack reception time.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
