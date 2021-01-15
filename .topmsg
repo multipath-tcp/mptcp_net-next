@@ -1,4 +1,17 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-pm-nl-support-IPv4-mapped-in-v6-addresses
+Subject: [PATCH] mptcp: pm nl: support IPv4 mapped in v6 addresses
 
+On one side, we can allow the creation of subflows between v4 mapped in
+v6 and v4 addresses. For that we look for v4mapped addresses between the
+local address we want to select and the remote one.
+
+On the other side, we also properly deal with received v4mapped
+addresses, either announced ones or set via Netlink.
+
+Fixes: 01cacb00b35c ("mptcp: add netlink-based PM")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/122
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
