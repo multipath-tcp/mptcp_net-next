@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-deal-with-MPTCP_PM_ADDR_ATTR_PORT-in-PM-netlink
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: deal with MPTCP_PM_ADDR_ATTR_PORT in PM netlink
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds MPTCP_PM_ADDR_ATTR_PORT filling and parsing in PM
+netlink.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
