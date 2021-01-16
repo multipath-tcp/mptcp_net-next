@@ -1041,13 +1041,11 @@ static void subflow_data_ready(struct sock *sk)
 
 static void subflow_write_space(struct sock *ssk)
 {
+	struct sock *sk = mptcp_subflow_ctx(ssk)->conn;
 	struct socket *sock = ssk->sk_socket;
 
-	if (mptcp_propagate_sndbuf(mptcp_subflow_ctx(ssk)->conn, ssk))
-		mptcp_write_space(ssk);
-
-	if (sk_stream_is_writeable(ssk) && sock)
-		clear_bit(SOCK_NOSPACE, &sock->flags);
+	mptcp_propagate_sndbuf(sk, ssk);
+	mptcp_write_space(sk);
 }
 
 static struct inet_connection_sock_af_ops *
