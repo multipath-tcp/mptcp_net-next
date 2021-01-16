@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-_max-fields-in-mptcp_pm_data
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: drop *_max fields in mptcp_pm_data
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch drops the per-msk values add_addr_signal_max,
+add_addr_accept_max, local_addr_max and subflows_max fields in struct
+mptcp_pm_data, uses the pernet *_max values instead. And adds four new
+helpers to get the pernet *_max values separately.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
