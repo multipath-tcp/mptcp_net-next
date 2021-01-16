@@ -8,9 +8,10 @@ as it happens inside tcp_new_space(), which in turn is called
 only when the mentioned bit is set.
 
 Let's sendmsg() set the subflows NOSPACE bit when looking for
-more memory. Additionally, cleanup the sndbuf propagation from
-subflow into the msk, leveraging the subflow write space callback
-and dropping a bunch of duplicate code.
+more memory and use the subflow write_space callback to propagate
+the snd buf update and wake-up the user-space.
+
+Additionally this allows dropping a bunch of duplicate code.
 
 This also makes the SNDBUF_LIMITED chrono relevant again
 for MPTCP subflows.
