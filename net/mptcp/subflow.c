@@ -1042,7 +1042,6 @@ static void subflow_data_ready(struct sock *sk)
 static void subflow_write_space(struct sock *ssk)
 {
 	struct sock *sk = mptcp_subflow_ctx(ssk)->conn;
-	struct socket *sock = ssk->sk_socket;
 
 	mptcp_propagate_sndbuf(sk, ssk);
 	mptcp_write_space(sk);
