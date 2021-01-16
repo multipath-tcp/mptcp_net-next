@@ -378,6 +378,13 @@ enum mptcp_data_avail {
 	MPTCP_SUBFLOW_OOO_DATA
 };
 
+struct mptcp_delegated_action {
+	struct napi_struct napi;
+	struct list_head head;
+};
+
+DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
+
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
@@ -414,6 +421,9 @@ struct mptcp_subflow_context {
 	u8	hmac[MPTCPOPT_HMAC_LEN];
 	u8	local_id;
 	u8	remote_id;
+
+	long	delegated_status;
+	struct	list_head delegated_node;
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -461,6 +471,48 @@ static inline void mptcp_add_pending_subflow(struct mptcp_sock *msk,
 	spin_lock_bh(&msk->join_list_lock);
 	list_add_tail(&subflow->node, &msk->join_list);
 	spin_unlock_bh(&msk->join_list_lock);
+}
+
+void mptcp_subflow_process_delegated(struct sock *ssk);
+
+static inline void mptcp_subflow_delegate(struct mptcp_subflow_context *subflow)
+{
+	struct mptcp_delegated_action *delegated;
+	bool schedule;
+
+	if (!test_and_set_bit(1, &subflow->delegated_status)) {
+		local_bh_disable();
+		delegated = this_cpu_ptr(&mptcp_delegated_actions);
+		schedule = list_empty(&delegated->head);
+		list_add_tail(&subflow->delegated_node, &delegated->head);
+		if (schedule)
+			napi_schedule(&delegated->napi);
+		local_bh_enable();
+	}
+}
+
+static inline struct mptcp_subflow_context *
+mptcp_subflow_delegated_next(struct mptcp_delegated_action *delegated)
+{
+	struct mptcp_subflow_context *ret;
+
+	if (list_empty(&delegated->head))
+		return NULL;
+
+	ret = list_first_entry(&delegated->head, struct mptcp_subflow_context, delegated_node);
+	list_del_init(&ret->delegated_node);
+	return ret;
+}
+
+static inline bool mptcp_subflow_has_delegated_action(const struct mptcp_subflow_context *subflow)
+{
+	return !test_bit(1, &subflow->delegated_status);
+}
+
+static inline void mptcp_subflow_delegated_done(struct mptcp_subflow_context *subflow)
+{
+	clear_bit(1, &subflow->delegated_status);
+	list_del_init(&subflow->delegated_node);
 }
 
 int mptcp_is_enabled(struct net *net);
