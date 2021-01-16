@@ -26,6 +26,7 @@ struct mptcp_pm_addr_entry {
 	struct list_head	list;
 	struct mptcp_addr_info	addr;
 	struct rcu_head		rcu;
+	struct socket		*lsk;
 };
 
 struct mptcp_pm_add_entry {
@@ -90,14 +91,14 @@ static bool address_zero(const struct mptcp_addr_info *addr)
 	memset(&zero, 0, sizeof(zero));
 	zero.family = addr->family;
 
-	return addresses_equal(addr, &zero, false);
+	return addresses_equal(addr, &zero, true);
 }
 
 static void local_address(const struct sock_common *skc,
 			  struct mptcp_addr_info *addr)
 {
-	addr->port = 0;
 	addr->family = skc->skc_family;
+	addr->port = htons(skc->skc_num);
 	if (addr->family == AF_INET)
 		addr->addr.s_addr = skc->skc_rcv_saddr;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -130,7 +131,7 @@ static bool lookup_subflow_by_saddr(const struct list_head *list,
 		skc = (struct sock_common *)mptcp_subflow_tcp_sock(subflow);
 
 		local_address(skc, &cur);
-		if (addresses_equal(&cur, saddr, false))
+		if (addresses_equal(&cur, saddr, saddr->port))
 			return true;
 	}
 
@@ -243,11 +244,32 @@ lookup_anno_list_by_saddr(struct mptcp_sock *msk,
 	struct mptcp_pm_add_entry *entry;
 
 	list_for_each_entry(entry, &msk->pm.anno_list, list) {
-		if (addresses_equal(&entry->addr, addr, false))
+		if (addresses_equal(&entry->addr, addr, true))
 			return entry;
 	}
 
 	return NULL;
+}
+
+bool mptcp_pm_sport_in_anno_list(struct mptcp_sock *msk, const struct sock *sk)
+{
+	struct mptcp_pm_add_entry *entry;
+	struct mptcp_addr_info saddr;
+	bool ret = false;
+
+	local_address((struct sock_common *)sk, &saddr);
+
+	spin_lock_bh(&msk->pm.lock);
+	list_for_each_entry(entry, &msk->pm.anno_list, list) {
+		if (addresses_equal(&entry->addr, &saddr, true)) {
+			ret = true;
+			goto out;
+		}
+	}
+
+out:
+	spin_unlock_bh(&msk->pm.lock);
+	return ret;
 }
 
 static void mptcp_pm_add_timer(struct timer_list *timer)
@@ -677,6 +699,53 @@ out:
 	return ret;
 }
 
+static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
+					    struct mptcp_pm_addr_entry *entry)
+{
+	struct sockaddr_storage addr;
+	struct mptcp_sock *msk;
+	struct socket *ssock;
+	int backlog = 1024;
+	int err;
+
+	err = sock_create_kern(sock_net(sk), entry->addr.family,
+			       SOCK_STREAM, IPPROTO_MPTCP, &entry->lsk);
+	if (err)
+		return err;
+
+	msk = mptcp_sk(entry->lsk->sk);
+	if (!msk) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	ssock = __mptcp_nmpc_socket(msk);
+	if (!ssock) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	mptcp_info2sockaddr(&entry->addr, &addr, entry->addr.family);
+	err = kernel_bind(ssock, (struct sockaddr *)&addr,
+			  sizeof(struct sockaddr_in));
+	if (err) {
+		pr_warn("kernel_bind error, err=%d", err);
+		goto out;
+	}
+
+	err = kernel_listen(ssock, backlog);
+	if (err) {
+		pr_warn("kernel_listen error, err=%d", err);
+		goto out;
+	}
+
+	return 0;
+
+out:
+	sock_release(entry->lsk);
+	return err;
+}
+
 int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_pm_addr_entry *entry;
@@ -703,7 +772,7 @@ int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
-		if (addresses_equal(&entry->addr, &skc_local, false)) {
+		if (addresses_equal(&entry->addr, &skc_local, entry->addr.port)) {
 			ret = entry->addr.id;
 			break;
 		}
@@ -721,6 +790,8 @@ int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	entry->addr.ifindex = 0;
 	entry->addr.flags = 0;
 	entry->addr.id = 0;
+	entry->addr.port = 0;
+	entry->lsk = NULL;
 	ret = mptcp_pm_nl_append_new_local_addr(pernet, entry);
 	if (ret < 0)
 		kfree(entry);
@@ -839,6 +910,9 @@ skip_family:
 	if (tb[MPTCP_PM_ADDR_ATTR_FLAGS])
 		entry->addr.flags = nla_get_u32(tb[MPTCP_PM_ADDR_ATTR_FLAGS]);
 
+	if (tb[MPTCP_PM_ADDR_ATTR_PORT])
+		entry->addr.port = htons(nla_get_u16(tb[MPTCP_PM_ADDR_ATTR_PORT]));
+
 	return 0;
 }
 
@@ -890,9 +964,19 @@ static int mptcp_nl_cmd_add_addr(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	*entry = addr;
+	if (entry->addr.port) {
+		ret = mptcp_pm_nl_create_listen_socket(skb->sk, entry);
+		if (ret) {
+			GENL_SET_ERR_MSG(info, "create listen socket error");
+			kfree(entry);
+			return ret;
+		}
+	}
 	ret = mptcp_pm_nl_append_new_local_addr(pernet, entry);
 	if (ret < 0) {
 		GENL_SET_ERR_MSG(info, "too many addresses or duplicate one");
+		if (entry->lsk)
+			sock_release(entry->lsk);
 		kfree(entry);
 		return ret;
 	}
@@ -976,6 +1060,38 @@ next:
 	return 0;
 }
 
+struct addr_entry_release_work {
+	struct rcu_work	rwork;
+	struct mptcp_pm_addr_entry *entry;
+};
+
+static void mptcp_pm_release_addr_entry(struct work_struct *work)
+{
+	struct addr_entry_release_work *w;
+	struct mptcp_pm_addr_entry *entry;
+
+	w = container_of(to_rcu_work(work), struct addr_entry_release_work, rwork);
+	entry = w->entry;
+	if (entry) {
+		if (entry->lsk)
+			sock_release(entry->lsk);
+		kfree(entry);
+	}
+	kfree(w);
+}
+
+static void mptcp_pm_free_addr_entry(struct mptcp_pm_addr_entry *entry)
+{
+	struct addr_entry_release_work *w;
+
+	w = kmalloc(sizeof(*w), GFP_ATOMIC);
+	if (w) {
+		INIT_RCU_WORK(&w->rwork, mptcp_pm_release_addr_entry);
+		w->entry = entry;
+		queue_rcu_work(system_wq, &w->rwork);
+	}
+}
+
 static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
@@ -1010,7 +1126,7 @@ static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 	spin_unlock_bh(&pernet->lock);
 
 	mptcp_nl_remove_subflow_and_signal_addr(sock_net(skb->sk), &entry->addr);
-	kfree_rcu(entry, rcu);
+	mptcp_pm_free_addr_entry(entry);
 
 	return ret;
 }
@@ -1024,7 +1140,7 @@ static void __flush_addrs(struct net *net, struct list_head *list)
 				 struct mptcp_pm_addr_entry, list);
 		mptcp_nl_remove_subflow_and_signal_addr(net, &cur->addr);
 		list_del_rcu(&cur->list);
-		kfree_rcu(cur, rcu);
+		mptcp_pm_free_addr_entry(cur);
 	}
 }
 
@@ -1062,6 +1178,8 @@ static int mptcp_nl_fill_addr(struct sk_buff *skb,
 		return -EMSGSIZE;
 
 	if (nla_put_u16(skb, MPTCP_PM_ADDR_ATTR_FAMILY, addr->family))
+		goto nla_put_failure;
+	if (nla_put_u16(skb, MPTCP_PM_ADDR_ATTR_PORT, ntohs(addr->port)))
 		goto nla_put_failure;
 	if (nla_put_u8(skb, MPTCP_PM_ADDR_ATTR_ID, addr->id))
 		goto nla_put_failure;
