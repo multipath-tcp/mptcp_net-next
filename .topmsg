@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-create-subflow-or-signal-addr-for-newly-added-address
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: create subflow or signal addr for newly added address
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently, when a new MPTCP endpoint is added, the existing MPTCP
+sockets are not affected.
+
+This patch implements a new function mptcp_nl_add_subflow_or_signal_addr,
+invoked when an address is added from PM netlink. This function traverses
+the MPTCP sockets list and invokes mptcp_pm_create_subflow_or_signal_addr
+to try to create a subflow or signal an address for the newly added
+address, if local constraint allows that.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
