@@ -204,6 +204,7 @@ unsigned int mptcp_pm_get_add_addr_signal_max(struct mptcp_sock *msk)
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 	return READ_ONCE(pernet->add_addr_signal_max);
 }
+EXPORT_SYMBOL_GPL(mptcp_pm_get_add_addr_signal_max);
 
 unsigned int mptcp_pm_get_add_addr_accept_max(struct mptcp_sock *msk)
 {
@@ -212,6 +213,7 @@ unsigned int mptcp_pm_get_add_addr_accept_max(struct mptcp_sock *msk)
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 	return READ_ONCE(pernet->add_addr_accept_max);
 }
+EXPORT_SYMBOL_GPL(mptcp_pm_get_add_addr_accept_max);
 
 unsigned int mptcp_pm_get_local_addr_max(struct mptcp_sock *msk)
 {
@@ -220,6 +222,7 @@ unsigned int mptcp_pm_get_local_addr_max(struct mptcp_sock *msk)
 	pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 	return READ_ONCE(pernet->local_addr_max);
 }
+EXPORT_SYMBOL_GPL(mptcp_pm_get_local_addr_max);
 
 unsigned int mptcp_pm_get_subflows_max(struct mptcp_sock *msk)
 {
