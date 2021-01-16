@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] selftests: mptcp: use minus values for removing address numbers
-
-This patch changes the removing addresses numbers to minus values, left
-the plus values for the adding addresses numbers.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
