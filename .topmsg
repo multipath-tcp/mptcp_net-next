@@ -10,5 +10,6 @@ the MPTCP sockets list and invokes mptcp_pm_create_subflow_or_signal_addr
 to try to create a subflow or signal an address for the newly added
 address, if local constraint allows that.
 
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/19
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
