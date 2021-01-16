@@ -1,4 +1,28 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-command-line-arguments-for-mptcp_join.sh
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add command line arguments for mptcp_join.sh
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the mptcp_join script is becoming too big, this patch splits it
+into several smaller chunks, each of them has been defined in a function
+as a individual test group for several related testcases.
+
+Using bash getopts function to parse command line arguments, and invoke
+each function to do the individual test group.
+
+Here are all the arguments:
+  -f subflows_tests
+  -s signal_address_tests
+  -l link_failure_tests
+  -t add_addr_timeout_tests
+  -r remove_tests
+  -a add_tests
+  -6 ipv6_tests
+  -4 v4mapped_tests
+  -b backup_tests
+  -p add_addr_ports_tests
+  -c syncookies_tests
+  -h help
+
+Run mptcp_join.sh with no argument will execute all testcases.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
