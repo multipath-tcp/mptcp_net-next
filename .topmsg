@@ -1,7 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: drop unused skb in subflow_token_join_request
-
-This patch drops the unused parameter skb in subflow_token_join_request.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
