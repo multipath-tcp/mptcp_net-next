@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-a-new-helper-subflow_req_create_thmac
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add a new helper subflow_req_create_thmac
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds a new helper named subflow_req_create_thmac, which is
+extracted from subflow_token_join_request. It initializes subflow_req's
+local_nonce and thmac fields, those are the more expensive to populate.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
