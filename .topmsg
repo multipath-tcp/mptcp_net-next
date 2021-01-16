@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-port-argument-for-pm_nl_ctl
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add port argument for pm_nl_ctl
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds a new argument for pm_nl_ctl tool. We can use it like
+this:
+
+ # pm_nl_ctl add 10.0.2.1 flags signal port 10100
+ # pm_nl_ctl dump
+ id 1 flags signal 10.0.2.1 10100
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
