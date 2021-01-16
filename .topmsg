@@ -1,4 +1,34 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-delegated-actions
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement delegated actions
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+On MPTCP-level ack reception, the packet scheduler
+may select a subflow other then the current one.
+
+Prior to this commit we rely on the workqueue to trigger
+action on such subflow.
+
+This changeset introduces an infrastructure that allows
+any MPTCP subflow to schedule actions (MPTCP xmit) on
+others subflows without resorting to (multiple) process
+reschedule.
+
+A dummy NAPI instance is used instead. When MPTCP needs to
+trigger action an a different subflow, it enqueues the target
+subflow on the NAPI backlog and schedule such instance as needed.
+
+The dummy NAPI poll method walks the sockets backlog and tries
+to acquire the (BH) socket lock on each of them. If the socket
+is owned by the user space, the action will be completed by
+the sock release cb, otherwise push is started.
+
+This change leverages the delegated action infrastructure
+to avoid invoking the MPTCP worker to spool the pending data,
+when the packet scheduler picks a subflow other then the one
+currently processing the incoming MPTCP-level ack.
+
+Additionally we further refine the subflow selection
+invoking the packet scheduler for each chunk of data
+even inside __mptcp_subflow_push_pending().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
