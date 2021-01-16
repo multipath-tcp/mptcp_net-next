@@ -7,4 +7,6 @@ mptcp_pm_data, uses the pernet *_max values instead. And adds four new
 helpers to get the pernet *_max values separately.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
