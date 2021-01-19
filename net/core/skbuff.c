@@ -3938,7 +3938,7 @@ normal:
 			skb_release_head_state(nskb);
 			__skb_push(nskb, doffset);
 		} else {
-			if (hsize > len || !sg)
+			if (hsize > (int)len || !sg)
 				hsize = len;
 			else if (hsize < 0)
 				hsize = 0;
