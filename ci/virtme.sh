@@ -239,7 +239,7 @@ clean() {
 analyse() {
         # look for crashes/warnings
         if grep -q "Call Trace:" "${OUTPUT_VIRTME}"; then
-                grep -C 40 "Call Trace:" "${OUTPUT_VIRTME}" | \
+                grep -C 80 "Call Trace:" "${OUTPUT_VIRTME}" | \
                         ./scripts/decode_stacktrace.sh vmlinux "${PWD}" "${PWD}"
                 echo "Call Trace found (additional kconfig: '${*}')"
                 # exit directly, that's bad
