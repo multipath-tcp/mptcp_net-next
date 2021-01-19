@@ -3415,13 +3415,16 @@ static int mptcp_napi_poll(struct napi_struct *napi, int budget)
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		bh_lock_sock_nested(ssk);
-		if (!sock_owned_by_user(ssk))
+		if (!sock_owned_by_user(ssk) &&
+		    mptcp_subflow_has_delegated_action(subflow))
 			mptcp_subflow_process_delegated(ssk);
-
-		/* if the sock is locked the delegated status will be cleared
-		 * by tcp_release_cb_override
+		/* ... elsewhere tcp_release_cb_override already processed
+		 * the action or will do at next release_sock().
+		 * In both case must dequeue the subflow here - on the same
+		 * CPU that scheduled it.
 		 */
 		bh_unlock_sock(ssk);
+		sock_put(ssk);
 
 		if (++work_done == budget)
 			return budget;
