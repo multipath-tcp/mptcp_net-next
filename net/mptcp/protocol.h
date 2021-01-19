@@ -381,6 +381,8 @@ struct mptcp_delegated_action {
 
 DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 
+#define MPTCP_DELEGATE_SEND		0
+
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
@@ -419,7 +421,7 @@ struct mptcp_subflow_context {
 	u8	remote_id;
 
 	long	delegated_status;
-	struct	list_head delegated_node;
+	struct	list_head delegated_node;   /* link into delegated_action, protected by local BH */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -476,14 +478,24 @@ static inline void mptcp_subflow_delegate(struct mptcp_subflow_context *subflow)
 	struct mptcp_delegated_action *delegated;
 	bool schedule;
 
-	if (!test_and_set_bit(1, &subflow->delegated_status)) {
-		local_bh_disable();
+	/* The implied barrier pairs with mptcp_subflow_delegated_done(), and
+	 * ensures the below list check sees list updates done prior to status
+	 * bit changes
+	 */
+	if (!test_and_set_bit(MPTCP_DELEGATE_SEND, &subflow->delegated_status)) {
+		/* still on delegated list from previous scheduling */
+		if (!list_empty(&subflow->delegated_node))
+			return;
+
+		/* the caller held the subflow bh socket lock */
+		lockdep_assert_in_softirq();
+
 		delegated = this_cpu_ptr(&mptcp_delegated_actions);
 		schedule = list_empty(&delegated->head);
 		list_add_tail(&subflow->delegated_node, &delegated->head);
+		sock_hold(mptcp_subflow_tcp_sock(subflow));
 		if (schedule)
 			napi_schedule(&delegated->napi);
-		local_bh_enable();
 	}
 }
 
@@ -502,13 +514,16 @@ mptcp_subflow_delegated_next(struct mptcp_delegated_action *delegated)
 
 static inline bool mptcp_subflow_has_delegated_action(const struct mptcp_subflow_context *subflow)
 {
-	return !test_bit(1, &subflow->delegated_status);
+	return test_bit(MPTCP_DELEGATE_SEND, &subflow->delegated_status);
 }
 
 static inline void mptcp_subflow_delegated_done(struct mptcp_subflow_context *subflow)
 {
-	clear_bit(1, &subflow->delegated_status);
-	list_del_init(&subflow->delegated_node);
+	/* pairs with mptcp_subflow_delegate, ensures delegate_node is updated before
+	 * touching the status bit
+	 */
+	smp_wmb();
+	clear_bit(MPTCP_DELEGATE_SEND, &subflow->delegated_status);
 }
 
 int mptcp_is_enabled(struct net *net);
