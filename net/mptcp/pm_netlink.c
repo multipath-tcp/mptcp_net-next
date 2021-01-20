@@ -56,6 +56,8 @@ struct pm_nl_pernet {
 #define MPTCP_PM_ADDR_MAX	8
 #define ADD_ADDR_RETRANS_MAX	3
 
+static void mptcp_pm_nl_add_addr_send_ack(struct mptcp_sock *msk);
+
 static bool addresses_equal(const struct mptcp_addr_info *a,
 			    struct mptcp_addr_info *b, bool use_port)
 {
@@ -144,6 +146,8 @@ select_local_address(const struct pm_nl_pernet *pernet,
 {
 	struct mptcp_pm_addr_entry *entry, *ret = NULL;
 	struct sock *sk = (struct sock *)msk;
+
+	msk_owned_by_me(msk);
 
 	rcu_read_lock();
 	__mptcp_flush_join_list(msk);
@@ -246,6 +250,8 @@ lookup_anno_list_by_saddr(struct mptcp_sock *msk,
 {
 	struct mptcp_pm_add_entry *entry;
 
+	lockdep_assert_held(&msk->pm.lock);
+
 	list_for_each_entry(entry, &msk->pm.anno_list, list) {
 		if (addresses_equal(&entry->addr, addr, true))
 			return entry;
@@ -341,6 +347,8 @@ static bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
 	struct mptcp_pm_add_entry *add_entry = NULL;
 	struct sock *sk = (struct sock *)msk;
 	struct net *net = sock_net(sk);
+
+	lockdep_assert_held(&msk->pm.lock);
 
 	if (lookup_anno_list_by_saddr(msk, &entry->addr))
 		return false;
@@ -442,17 +450,17 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 	}
 }
 
-void mptcp_pm_nl_fully_established(struct mptcp_sock *msk)
+static void mptcp_pm_nl_fully_established(struct mptcp_sock *msk)
 {
 	mptcp_pm_create_subflow_or_signal_addr(msk);
 }
 
-void mptcp_pm_nl_subflow_established(struct mptcp_sock *msk)
+static void mptcp_pm_nl_subflow_established(struct mptcp_sock *msk)
 {
 	mptcp_pm_create_subflow_or_signal_addr(msk);
 }
 
-void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
+static void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
 	unsigned int add_addr_accept_max;
@@ -492,9 +500,12 @@ void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	mptcp_pm_nl_add_addr_send_ack(msk);
 }
 
-void mptcp_pm_nl_add_addr_send_ack(struct mptcp_sock *msk)
+static void mptcp_pm_nl_add_addr_send_ack(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
+
+	msk_owned_by_me(msk);
+	lockdep_assert_held(&msk->pm.lock);
 
 	if (!mptcp_pm_should_add_signal_ipv6(msk) &&
 	    !mptcp_pm_should_add_signal_port(msk))
@@ -561,12 +572,14 @@ int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
 	return -EINVAL;
 }
 
-void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
+static void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
 	struct sock *sk = (struct sock *)msk;
 
 	pr_debug("address rm_id %d", msk->pm.rm_id);
+
+	msk_owned_by_me(msk);
 
 	if (!msk->pm.rm_id)
 		return;
@@ -596,12 +609,47 @@ void mptcp_pm_nl_rm_addr_received(struct mptcp_sock *msk)
 	}
 }
 
+void mptcp_pm_nl_work(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+
+	msk_owned_by_me(msk);
+
+	spin_lock_bh(&msk->pm.lock);
+
+	pr_debug("msk=%p status=%x", msk, pm->status);
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_RECEIVED);
+		mptcp_pm_nl_add_addr_received(msk);
+	}
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK)) {
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_SEND_ACK);
+		mptcp_pm_nl_add_addr_send_ack(msk);
+	}
+	if (pm->status & BIT(MPTCP_PM_RM_ADDR_RECEIVED)) {
+		pm->status &= ~BIT(MPTCP_PM_RM_ADDR_RECEIVED);
+		mptcp_pm_nl_rm_addr_received(msk);
+	}
+	if (pm->status & BIT(MPTCP_PM_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_ESTABLISHED);
+		mptcp_pm_nl_fully_established(msk);
+	}
+	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
+		mptcp_pm_nl_subflow_established(msk);
+	}
+
+	spin_unlock_bh(&msk->pm.lock);
+}
+
 void mptcp_pm_nl_rm_subflow_received(struct mptcp_sock *msk, u8 rm_id)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
 	struct sock *sk = (struct sock *)msk;
 
 	pr_debug("subflow rm_id %d", rm_id);
+
+	msk_owned_by_me(msk);
 
 	if (!rm_id)
 		return;
