@@ -25,6 +25,8 @@
 #include "protocol.h"
 #include "mib.h"
 
+static void mptcp_subflow_ops_undo_override(struct sock *ssk);
+
 static void SUBFLOW_REQ_INC_STATS(struct request_sock *req,
 				  enum linux_mptcp_mib_field field)
 {
@@ -512,13 +514,7 @@ static void subflow_ulp_fallback(struct sock *sk,
 	rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
 	tcp_sk(sk)->is_mptcp = 0;
 
-	/* undo override */
-#if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	if (sk->sk_prot == &tcpv6_prot_override)
-		sk->sk_prot = &tcpv6_prot;
-	else
-#endif
-		sk->sk_prot = &tcp_prot;
+	mptcp_subflow_ops_undo_override(sk);
 }
 
 static void subflow_drop_ctx(struct sock *ssk)
@@ -1224,6 +1220,15 @@ static void mptcp_subflow_ops_override(struct sock *ssk)
 		ssk->sk_prot = &tcp_prot_override;
 }
 
+static void mptcp_subflow_ops_undo_override(struct sock *ssk)
+{
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	if (ssk->sk_prot == &tcpv6_prot_override)
+		ssk->sk_prot = &tcpv6_prot;
+	else
+#endif
+		ssk->sk_prot = &tcp_prot;
+}
 int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 {
 	struct mptcp_subflow_context *subflow;
@@ -1409,6 +1414,7 @@ static void subflow_ulp_release(struct sock *ssk)
 		sock_put(sk);
 	}
 
+	mptcp_subflow_ops_undo_override(ssk);
 	if (release)
 		kfree_rcu(ctx, rcu);
 }
