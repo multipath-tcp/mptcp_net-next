@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-pm-netlink-work-into-pm_netlink
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: move pm netlink work into pm_netlink
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Allows to make some functions static and avoids acquire of the pm
+spinlock in protocol.c.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
