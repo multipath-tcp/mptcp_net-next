@@ -107,11 +107,15 @@ prepare() { local old_pwd mode
         sudo ./configure
         sudo make -j"$(nproc)" -l"$(nproc)"
 
-        # Add higher tolerance in debug mode
         cd ../mptcp
         if [ "${mode}" = "debug" ]; then
+                # Add higher tolerance in debug mode
                 git grep -l "^--tolerance_usecs" | \
                         xargs sudo sed -i "s/^--tolerance_usecs=.*/&0/g"
+        else
+                # double the time in normal mode, CI can be quite loaded...
+                git grep -l "^--tolerance_usecs=1" | \
+                        xargs sudo sed -i "s/^--tolerance_usecs=1/--tolerance_usecs=2/g"
         fi
         cd "${old_pwd}"
 
