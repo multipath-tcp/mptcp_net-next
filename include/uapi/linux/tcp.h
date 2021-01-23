@@ -314,6 +314,7 @@ enum {
 	TCP_NLA_TIMEOUT_REHASH, /* Timeout-triggered rehash attempts */
 	TCP_NLA_BYTES_NOTSENT,	/* Bytes in write queue not yet sent */
 	TCP_NLA_EDT,		/* Earliest departure time (CLOCK_MONOTONIC) */
+	TCP_NLA_TTL,		/* TTL or hop limit of a packet received */
 };
 
 /* for TCP_MD5SIG socket option */
@@ -353,5 +354,9 @@ struct tcp_zerocopy_receive {
 	__u64 copybuf_address;	/* in: copybuf address (small reads) */
 	__s32 copybuf_len; /* in/out: copybuf bytes avail/used or error */
 	__u32 flags; /* in: flags */
+	__u64 msg_control; /* ancillary data */
+	__u64 msg_controllen;
+	__u32 msg_flags;
+	/* __u32 hole;  Next we must add >1 u32 otherwise length checks fail. */
 };
 #endif /* _UAPI_LINUX_TCP_H */
