@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 git commit -s --no-edit
 printf " - %s: conflict in %s\n" \
