@@ -1,8 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: move pm netlink work into pm_netlink
-
-Allows to make some functions static and avoids acquire of the pm
-spinlock in protocol.c.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
