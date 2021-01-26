@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-split-__mptcp_close_ssk-helper
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: split __mptcp_close_ssk helper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Prepare for subflow close events:
+
+When mptcp connection is torn down its enough to send the mptcp socket
+close notification rather than a subflow close event for all of the
+subflows followed by the mptcp close event.
+
+This splits the helper: mptcp_close_ssk() will emit the close
+notification, __mptcp_close_ssk will not.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
