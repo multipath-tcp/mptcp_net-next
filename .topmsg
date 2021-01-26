@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-pass-subflow-socket-to-a-few-helpers
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: pass subflow socket to a few helpers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Pass the first/initial subflow to the existing functions so they can
+pass this on to the notification handler that is added later in the
+series.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
