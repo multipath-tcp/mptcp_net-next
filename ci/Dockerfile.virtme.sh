@@ -22,11 +22,8 @@ fi
 VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
 VIRTME_GIT_SHA="88cd30f073714bd097d83bc7a6b028c0e4bf7a2b"
 
-# TODO: change me once merged!
-#PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
-#PACKETDRILL_GIT_BRANCH="mptcp-net-next"
-PACKETDRILL_GIT_URL="https://github.com/matttbe/packetdrill.git"
-PACKETDRILL_GIT_BRANCH="issue-144-add_addr-sooner"
+PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
+PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
 LIBPCAP_GIT_URL="https://github.com/the-tcpdump-group/libpcap.git"
 LIBPCAP_GIT_SHA="2d3a47d5386d11c6e6c141afd50bdb56e2b087ce" # sync with tcpdump
