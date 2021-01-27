@@ -36,7 +36,7 @@ enum {
 /* netlink interface */
 #define MPTCP_PM_NAME		"mptcp_pm"
 #define MPTCP_PM_CMD_GRP_NAME	"mptcp_pm_cmds"
-#define MPTCP_PM_EV_GRP_NAME    "mptcp_pm_events"
+#define MPTCP_PM_EV_GRP_NAME	"mptcp_pm_events"
 #define MPTCP_PM_VER		0x1
 
 /*
