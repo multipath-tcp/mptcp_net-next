@@ -1,8 +1,0 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] mptcp: pm nl: reduce variable scope
-
-To avoid confusions like when working on the previous patch, better to
-declare and assign this variable only where it is needed.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
