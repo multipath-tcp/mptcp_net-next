@@ -127,20 +127,30 @@ prepare() { local old_pwd mode
 TAP_PREFIX="${PWD}/tools/testing/selftests/kselftest/prefix.pl"
 
 # \$1: file ; \$2+: commands
-tap() { local out fname
+tap() { local out fname rc=0
         out="\${1}"
         fname="\$(basename \${out})"
         shift
 
-        echo "TAP version 13" > "\${out}"
-        echo "1..1" >> "\${out}"
+        # init
         {
-                if "\${@}" 2>&1; then
-                        echo "ok 1 test: \${fname}" >> "\${out}"
-                else
-                        echo "not ok 1 test: \${fname} # exit=\${?}" >> "\${out}"
-                fi
+                echo "TAP version 13"
+                echo "1..1"
+        } | tee "\${out}"
+
+        # Exec the command and pipe in tap prefix
+        {
+                "\${@}" 2>&1 || rc=\${?}
         } | "\${TAP_PREFIX}" | tee -a "\${out}"
+
+        # summary
+        {
+                if [ \${rc} -eq 0 ]; then
+                        echo "ok 1 test: \${fname}"
+                else
+                        echo "not ok 1 test: \${fname} # exit=\${rc}"
+                fi
+        } | tee -a "\${out}"
 }
 
 # kunit
