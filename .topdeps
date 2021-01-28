@@ -1,2 +1,1 @@
-t/selftests-increase-timeout-to-10-min
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
