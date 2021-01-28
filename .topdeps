@@ -1,1 +1,2 @@
 t/mptcp-schedule-work-for-better-snd-subflow-selection
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
