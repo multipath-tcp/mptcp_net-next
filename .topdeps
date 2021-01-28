@@ -1,2 +1,1 @@
-t/mptcp-do-not-queue-excessive-data-on-subflows
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
