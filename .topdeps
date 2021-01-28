@@ -1,2 +1,1 @@
-t/selftests-mptcp-add-IPv4-mapped-IPv6-testcases
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
