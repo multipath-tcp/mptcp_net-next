@@ -1,1 +1,2 @@
 t/mptcp-support-MPJoin-with-IPv4-mapped-in-v6-sk
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
