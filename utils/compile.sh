@@ -14,4 +14,4 @@ if [ ${#} -gt 0 ]; then
 	echo | ./scripts/config "${@}"
 fi
 
-KBUILD_BUILD_TIMESTAMP="" make -j$(nproc)
+KBUILD_BUILD_TIMESTAMP="0" make -j$(nproc)
