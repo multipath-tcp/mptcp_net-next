@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 
 # $@: args
 my_ghi() {
