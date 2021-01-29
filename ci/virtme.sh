@@ -158,6 +158,9 @@ tap() { local out tmp fname rc=0
 
         # diagnostic at the end with TAP
         cat "\${tmp}" >> "\${out}"
+        rm -f "\${tmp}"
+
+        return \${rc}
 }
 
 # kunit
