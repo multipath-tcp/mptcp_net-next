@@ -127,7 +127,7 @@ prepare() { local old_pwd mode
 TAP_PREFIX="${PWD}/tools/testing/selftests/kselftest/prefix.pl"
 
 # \$1: file ; \$2+: commands
-tap() { local out tmp fname rc=0
+tap() { local out tmp fname rc
         out="\${1}"
         shift
 
@@ -142,10 +142,9 @@ tap() { local out tmp fname rc=0
         } | tee "\${out}"
 
         # Exec the command and pipe in tap prefix + store for later
-        {
-                "\${@}" 2>&1 || rc=\${?}
-        } | "\${TAP_PREFIX}" | tee "\${tmp}"
+        "\${@}" 2>&1 | "\${TAP_PREFIX}" | tee "\${tmp}"
         # output to stdout now to see the progression
+        rc=\${PIPESTATUS[0]}
 
         # summary
         {
