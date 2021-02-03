@@ -1,2 +1,1 @@
-t/selftests-mptcp-use-minus-values-for-removing-address-numbers
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
