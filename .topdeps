@@ -1,1 +1,2 @@
 t/mptcp-use-WRITE_ONCE-READ_ONCE-for-the-pernet-_max
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
