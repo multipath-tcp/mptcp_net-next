@@ -1,2 +1,1 @@
-t/mptcp-send-ack-for-every-add_addr
 t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
