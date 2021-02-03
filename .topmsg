@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-deliver-ssk-errors-to-msk
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: deliver ssk errors to msk
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently all errors received on msk subflows are ignored.
+We need to catch at least the errors on connect() and
+on fallback sockets.
+
+Use a custom sk_error_report callback at subflow level,
+and do the real action under the msk socket lock - via
+the usual sock_owned_by_user()/release_callback() schema.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
