@@ -1,1 +1,2 @@
 t/mptcp-drop-unused-skb-in-subflow_token_join_request
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
