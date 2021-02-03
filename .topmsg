@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: enable use_port when invoke addresses_equal
-
-When dealing with the addresses list local_addr_list or anno_list, we
-should enable the function addresses_equal's parameter use_port. And
-enable it in address_zero too.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
