@@ -1413,6 +1413,13 @@ static void subflow_state_change(struct sock *sk)
 	if (mptcp_subflow_data_available(sk))
 		mptcp_data_ready(parent, sk);
 
+	if (sk->sk_state == TCP_CLOSE &&
+	    !test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW, &mptcp_sk(parent)->flags)) {
+		sock_hold(parent);
+		if (!schedule_work(&mptcp_sk(parent)->work))
+			sock_put(parent);
+	}
+
 	if (__mptcp_check_fallback(mptcp_sk(parent)) &&
 	    !subflow->rx_eof && subflow_is_done(sk)) {
 		subflow->rx_eof = 1;
