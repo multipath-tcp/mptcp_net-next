@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] selftests: mptcp: add testcases for newly added addresses
-
-This patch adds testcases to create subflows or signal addresses for the
-newly added IPv4 or IPv6 addresses.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
