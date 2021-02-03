@@ -1,0 +1,20 @@
+From: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Subject: [PATCH] bpf: add 'bpf_mptcp_sock' structure and helper
+
+In order to precisely identify the parent MPTCP connection of a subflow,
+it is required to access the mptcp_sock's token which uniquely identify a
+MPTCP connection.
+
+This patch adds a new structure 'bpf_mptcp_sock' exposing the 'token' field
+of the 'mptcp_sock' extracted from a subflow's 'tcp_sock'. It also adds the
+declaration of a new BPF helper of the same name to expose the newly
+defined structure in the userspace BPF API.
+
+This is the foundation to expose more MPTCP-specific fields through BPF.
+
+Currently, it is limited to the field 'token' of the msk but it is
+easily extensible.
+
+Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
