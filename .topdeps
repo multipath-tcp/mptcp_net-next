@@ -1,1 +1,2 @@
 t/mptcp-deal-with-MPTCP_PM_ADDR_ATTR_PORT-in-PM-netlink
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
