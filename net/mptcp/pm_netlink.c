@@ -91,14 +91,14 @@ static bool address_zero(const struct mptcp_addr_info *addr)
 	memset(&zero, 0, sizeof(zero));
 	zero.family = addr->family;
 
-	return addresses_equal(addr, &zero, false);
+	return addresses_equal(addr, &zero, true);
 }
 
 static void local_address(const struct sock_common *skc,
 			  struct mptcp_addr_info *addr)
 {
-	addr->port = 0;
 	addr->family = skc->skc_family;
+	addr->port = htons(skc->skc_num);
 	if (addr->family == AF_INET)
 		addr->addr.s_addr = skc->skc_rcv_saddr;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -131,7 +131,7 @@ static bool lookup_subflow_by_saddr(const struct list_head *list,
 		skc = (struct sock_common *)mptcp_subflow_tcp_sock(subflow);
 
 		local_address(skc, &cur);
-		if (addresses_equal(&cur, saddr, false))
+		if (addresses_equal(&cur, saddr, saddr->port))
 			return true;
 	}
 
@@ -247,11 +247,32 @@ lookup_anno_list_by_saddr(struct mptcp_sock *msk,
 	struct mptcp_pm_add_entry *entry;
 
 	list_for_each_entry(entry, &msk->pm.anno_list, list) {
-		if (addresses_equal(&entry->addr, addr, false))
+		if (addresses_equal(&entry->addr, addr, true))
 			return entry;
 	}
 
 	return NULL;
+}
+
+bool mptcp_pm_sport_in_anno_list(struct mptcp_sock *msk, const struct sock *sk)
+{
+	struct mptcp_pm_add_entry *entry;
+	struct mptcp_addr_info saddr;
+	bool ret = false;
+
+	local_address((struct sock_common *)sk, &saddr);
+
+	spin_lock_bh(&msk->pm.lock);
+	list_for_each_entry(entry, &msk->pm.anno_list, list) {
+		if (addresses_equal(&entry->addr, &saddr, true)) {
+			ret = true;
+			goto out;
+		}
+	}
+
+out:
+	spin_unlock_bh(&msk->pm.lock);
+	return ret;
 }
 
 static void mptcp_pm_add_timer(struct timer_list *timer)
@@ -752,7 +773,7 @@ int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
-		if (addresses_equal(&entry->addr, &skc_local, false)) {
+		if (addresses_equal(&entry->addr, &skc_local, entry->addr.port)) {
 			ret = entry->addr.id;
 			break;
 		}
@@ -889,6 +910,9 @@ skip_family:
 
 	if (tb[MPTCP_PM_ADDR_ATTR_FLAGS])
 		entry->addr.flags = nla_get_u32(tb[MPTCP_PM_ADDR_ATTR_FLAGS]);
+
+	if (tb[MPTCP_PM_ADDR_ATTR_PORT])
+		entry->addr.port = htons(nla_get_u16(tb[MPTCP_PM_ADDR_ATTR_PORT]));
 
 	return 0;
 }
@@ -1155,6 +1179,8 @@ static int mptcp_nl_fill_addr(struct sk_buff *skb,
 		return -EMSGSIZE;
 
 	if (nla_put_u16(skb, MPTCP_PM_ADDR_ATTR_FAMILY, addr->family))
+		goto nla_put_failure;
+	if (nla_put_u16(skb, MPTCP_PM_ADDR_ATTR_PORT, ntohs(addr->port)))
 		goto nla_put_failure;
 	if (nla_put_u8(skb, MPTCP_PM_ADDR_ATTR_ID, addr->id))
 		goto nla_put_failure;
