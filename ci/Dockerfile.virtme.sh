@@ -35,6 +35,7 @@ TCPDUMP_GIT_SHA="19b771391ac80dea38c26eb3a71fef148034ebf4" # last tag has no MPT
 # last tag
 IPROUTE2_GIT_SHA="v$(curl https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/ 2>/dev/null | \
                          grep -o 'iproute2-[0-9]\+\.[0-9]\+\.[0-9]\+\.tar\.xz' | \
+                         sort -Vu | \
                          tail -n1 | \
                          grep -o "[0-9]\+\.[0-9]\+\.[0-9]")"
 IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2.git"
