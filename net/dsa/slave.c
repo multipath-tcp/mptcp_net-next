@@ -68,8 +68,11 @@ static int dsa_slave_open(struct net_device *dev)
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	int err;
 
-	if (!(master->flags & IFF_UP))
-		return -ENETDOWN;
+	err = dev_open(master, NULL);
+	if (err < 0) {
+		netdev_err(dev, "failed to open master %s\n", master->name);
+		goto out;
+	}
 
 	if (!ether_addr_equal(dev->dev_addr, master->dev_addr)) {
 		err = dev_uc_add(master, dev->dev_addr);
@@ -2078,6 +2081,30 @@ static int dsa_slave_netdevice_event(struct notifier_block *nb,
 		err = dsa_port_lag_change(dp, info->lower_state_info);
 		return notifier_from_errno(err);
 	}
+	case NETDEV_GOING_DOWN: {
+		struct dsa_port *dp, *cpu_dp;
+		struct dsa_switch_tree *dst;
+		LIST_HEAD(close_list);
+
+		if (!netdev_uses_dsa(dev))
+			return NOTIFY_DONE;
+
+		cpu_dp = dev->dsa_ptr;
+		dst = cpu_dp->ds->dst;
+
+		list_for_each_entry(dp, &dst->ports, list) {
+			if (!dsa_is_user_port(dp->ds, dp->index))
+				continue;
+
+			list_add(&dp->slave->close_list, &close_list);
+		}
+
+		dev_close_many(&close_list, true);
+
+		return NOTIFY_OK;
+	}
+	default:
+		break;
 	}
 
 	return NOTIFY_DONE;
@@ -2214,6 +2241,14 @@ static int dsa_slave_switchdev_event(struct notifier_block *unused,
 			dp = p->dp->cpu_dp;
 
 			if (!dp->ds->assisted_learning_on_cpu_port)
+				return NOTIFY_DONE;
+
+			/* When the bridge learns an address on an offloaded
+			 * LAG we don't want to send traffic to the CPU, the
+			 * other ports bridged with the LAG should be able to
+			 * autonomously forward towards it.
+			 */
+			if (dsa_tree_offloads_netdev(dp->ds->dst, dev))
 				return NOTIFY_DONE;
 		}
 
