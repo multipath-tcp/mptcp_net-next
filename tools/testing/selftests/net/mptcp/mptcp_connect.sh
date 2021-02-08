@@ -443,7 +443,7 @@ do_transfer()
 		nstat | grep Tcp > /tmp/${listener_ns}.out
 	if [ ${listener_ns} != ${connector_ns} ]; then
 		NSTAT_HISTORY=/tmp/${connector_ns}.nstat ip netns exec ${connector_ns} \
-			nstat -s | grep Tcp > /tmp/${connector_ns}.out
+			nstat | grep Tcp > /tmp/${connector_ns}.out
 	fi
 
 	local duration
