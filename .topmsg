@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-better-msk-receive-window-updates
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: better msk receive window updates
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Move mptcp_cleanup_rbuf() related checks inside the mentioned
+helper and extend them to mirror more closely TCP ones.
+
+Additionally drop the 'rmem_pending' hack, since commit 879526030c8b
+("mptcp: protect the rx path with the msk socket spinlock") we
+can use instead 'rmem_released'.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
