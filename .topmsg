@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-factor-out-__mptcp_retrans-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: factor out __mptcp_retrans helper()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Will simplify the following patch, no functional change
+intended.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
