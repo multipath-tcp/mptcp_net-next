@@ -1,4 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-fail-if-not-enough-SYN-3rd-ACK
+Subject: [PATCH] selftests: mptcp: fail if not enough SYN/3rd ACK
 
+If we receive less MPCapable SYN or 3rd ACK than expected, we now mark
+the test as failed.
+
+On the other hand, if we receive more, we keep the warning but we add a
+hint that it is probably due to retransmissions and that's why we don't
+mark the test as failed.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/148
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
