@@ -23,7 +23,8 @@ GIT_REMOTE_NET_NEXT_BRANCH="master"
 # Local repo
 TG_TOPIC_BASE="net-next"
 TG_TOPIC_TOP="t/upstream"
-TG_TOPICS_SKIP=("t/DO-NOT-MERGE-mptcp-enabled-by-default")
+TG_TOPICS_SKIP=("t/DO-NOT-MERGE-mptcp-enabled-by-default"
+		"t/mptcp-remove-multi-addresses-and-subflows-in-PM")
 TG_EXPORT_BRANCH="export"
 TG_FOR_REVIEW_BRANCH="for-review"
 
