@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/x86-build-Disable-CET-instrumentation-in-the-kernel-for-32-bit-too
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
