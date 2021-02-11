@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/x86-build-Disable-CET-instrumentation-in-the-kernel-for-32-bit-too
+From: Borislav Petkov <bp@suse.de>
+Subject: [PATCH] x86/build: Disable CET instrumentation in the kernel for 32-bit too
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+On Mon, Feb 08, 2021 at 10:19:33AM -0500, AC wrote:
+> That did fix it, thank you!
+
+Thanks!
