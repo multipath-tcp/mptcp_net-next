@@ -311,7 +311,10 @@ go_expect() { local mode
 if [ "${1}" = "manual" ]; then
         go_manual "${@}"
 elif [ "${1}" = "debug" ]; then
-        go_manual "${1}" "${KCONFIG_EXTRA_CHECKS[@]}" "${@:1}"
+        # note: we need to use "2" to skip the first arg with "$@" but we would
+        # use 1 with any other arrays!
+        # a=("${@}") ; ${a[@]:1} == ${@:2}
+        go_manual "${1}" "${KCONFIG_EXTRA_CHECKS[@]}" "${@:2}"
 else
         # first with the minimum because configs like KASAN slow down the
         # tests execution, it might hide bugs
