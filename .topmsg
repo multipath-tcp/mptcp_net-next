@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: dispose initial struct socket when its subflow is closed
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Christoph Paasch reported following crash:
+dst_release underflow
+WARNING: CPU: 0 PID: 1319 at net/core/dst.c:175 dst_release+0xc1/0xd0 net/core/dst.c:175
+CPU: 0 PID: 1319 Comm: syz-executor217 Not tainted 5.11.0-rc6af8e85128b4d0d24083c5cac646e891227052e0c #70
+Call Trace:
+ rt_cache_route+0x12e/0x140 net/ipv4/route.c:1503
+ rt_set_nexthop.constprop.0+0x1fc/0x590 net/ipv4/route.c:1612
+ __mkroute_output net/ipv4/route.c:2484 [inline]
+...
+
+The worker leaves msk->subflow alone even when it
+happened to close the subflow ssk associated with it.
+
+Fixes: 866f26f2a9c33b ("mptcp: always graft subflow socket to parent")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/157
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
