@@ -2036,9 +2036,12 @@ static enum mac_version rtl8169_get_mac_version(u16 xid, bool gmii)
 		{ 0x7c8, 0x348,	RTL_GIGA_MAC_VER_09 },
 		{ 0x7c8, 0x248,	RTL_GIGA_MAC_VER_09 },
 		{ 0x7c8, 0x340,	RTL_GIGA_MAC_VER_16 },
-		/* FIXME: where did these entries come from ? -- FR */
-		{ 0xfc8, 0x388,	RTL_GIGA_MAC_VER_13 },
-		{ 0xfc8, 0x308,	RTL_GIGA_MAC_VER_13 },
+		/* FIXME: where did these entries come from ? -- FR
+		 * Not even r8101 vendor driver knows these id's,
+		 * so let's disable detection for now. -- HK
+		 * { 0xfc8, 0x388,	RTL_GIGA_MAC_VER_13 },
+		 * { 0xfc8, 0x308,	RTL_GIGA_MAC_VER_13 },
+		 */
 
 		/* 8110 family. */
 		{ 0xfc8, 0x980,	RTL_GIGA_MAC_VER_06 },
@@ -4584,9 +4587,9 @@ static int rtl8169_poll(struct napi_struct *napi, int budget)
 	struct net_device *dev = tp->dev;
 	int work_done;
 
-	work_done = rtl_rx(dev, tp, budget);
-
 	rtl_tx(dev, tp, budget);
+
+	work_done = rtl_rx(dev, tp, budget);
 
 	if (work_done < budget && napi_complete_done(napi, work_done))
 		rtl_irq_enable(tp);
@@ -4804,9 +4807,12 @@ static void rtl8169_net_suspend(struct rtl8169_private *tp)
 
 #ifdef CONFIG_PM
 
-static int rtl8169_net_resume(struct rtl8169_private *tp)
+static int rtl8169_runtime_resume(struct device *dev)
 {
+	struct rtl8169_private *tp = dev_get_drvdata(dev);
+
 	rtl_rar_set(tp, tp->dev->dev_addr);
+	__rtl8169_set_wol(tp, tp->saved_wolopts);
 
 	if (tp->TxDescArray)
 		rtl8169_up(tp);
@@ -4840,7 +4846,7 @@ static int __maybe_unused rtl8169_resume(struct device *device)
 	if (tp->mac_version == RTL_GIGA_MAC_VER_37)
 		rtl_init_rxcfg(tp);
 
-	return rtl8169_net_resume(tp);
+	return rtl8169_runtime_resume(device);
 }
 
 static int rtl8169_runtime_suspend(struct device *device)
@@ -4858,15 +4864,6 @@ static int rtl8169_runtime_suspend(struct device *device)
 	rtnl_unlock();
 
 	return 0;
-}
-
-static int rtl8169_runtime_resume(struct device *device)
-{
-	struct rtl8169_private *tp = dev_get_drvdata(device);
-
-	__rtl8169_set_wol(tp, tp->saved_wolopts);
-
-	return rtl8169_net_resume(tp);
 }
 
 static int rtl8169_runtime_idle(struct device *device)
