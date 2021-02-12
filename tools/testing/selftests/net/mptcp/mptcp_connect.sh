@@ -499,14 +499,14 @@ do_transfer()
 		expect_ackrx=$((stat_ackrx_last_l+1))
 	fi
 
-	if [ ${expect_synrx} -lt ${stat_synrx_now_l} ]; then
-		printf "[ FAIL ] lower MPC SYN rx than expected: %d -> %d\n" \
-			"${expect_synrx}" "${stat_synrx_now_l}" 1>&2
+	if [ ${stat_synrx_now_l} -lt ${expect_synrx} ]; then
+		printf "[ FAIL ] lower MPC SYN rx (%d) than expected (%d)\n" \
+			"${stat_synrx_now_l}" "${expect_synrx}" 1>&2
 		retc=1
 	fi
-	if [ ${expect_ackrx} -lt ${stat_ackrx_now_l} ]; then
-		printf "[ FAIL ] lower MPC ACK rx than expected: %d -> %d\n" \
-			"${expect_ackrx}" "${stat_ackrx_now_l}" 1>&2
+	if [ ${stat_ackrx_now_l} -lt ${expect_ackrx} ]; then
+		printf "[ FAIL ] lower MPC ACK rx (%d) than expected (%d)\n" \
+			"${stat_ackrx_now_l}" "${expect_ackrx}" 1>&2
 		rets=1
 	fi
 
@@ -530,11 +530,11 @@ do_transfer()
 		fi
 	fi
 
-	if [ $expect_synrx -gt $stat_synrx_now_l ]; then
+	if [ ${stat_synrx_now_l} -gt ${expect_synrx} ]; then
 		printf " WARN: SYNRX: expect %d, got %d (probably retransmissions)" \
 			"${expect_synrx}" "${stat_synrx_now_l}"
 	fi
-	if [ $expect_ackrx -gt $stat_ackrx_now_l ]; then
+	if [ ${stat_ackrx_now_l} -gt ${expect_ackrx} ]; then
 		printf " WARN: ACKRX: expect %d, got %d (probably retransmissions)" \
 			"${expect_ackrx}" "${stat_ackrx_now_l}"
 	fi
