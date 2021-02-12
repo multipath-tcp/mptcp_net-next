@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
