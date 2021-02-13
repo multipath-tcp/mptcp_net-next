@@ -1,9 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: pass subflow socket to a few helpers
-
-Pass the first/initial subflow to the existing functions so they can
-pass this on to the notification handler that is added later in the
-series.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
