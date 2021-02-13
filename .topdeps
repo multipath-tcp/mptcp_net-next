@@ -1,1 +1,2 @@
 t/mptcp-pass-subflow-socket-to-a-few-helpers
+t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
