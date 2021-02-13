@@ -1,2 +1,1 @@
-t/mptcp-schedule-worker-when-subflow-is-closed
 t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
