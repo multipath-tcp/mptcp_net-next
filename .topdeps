@@ -1,2 +1,1 @@
-t/mptcp-add-netlink-event-support
 t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
