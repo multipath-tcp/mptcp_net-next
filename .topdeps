@@ -1,1 +1,2 @@
 t/mptcp-move-subflow-close-loop-after-sk-close-check
+t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
