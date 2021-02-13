@@ -1,2 +1,1 @@
-t/selftests-mptcp-display-warnings-on-one-line
 t/mptcp-clean-up-the-rtx-path
