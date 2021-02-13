@@ -964,11 +964,11 @@ static int otx2_get_fecparam(struct net_device *netdev,
 	if (IS_ERR(rsp))
 		return PTR_ERR(rsp);
 
-	if (rsp->fwdata.supported_fec <= FEC_MAX_INDEX) {
+	if (rsp->fwdata.supported_fec < FEC_MAX_INDEX) {
 		if (!rsp->fwdata.supported_fec)
 			fecparam->fec = ETHTOOL_FEC_NONE;
 		else
-			fecparam->fec = fec[rsp->fwdata.supported_fec];
+			fecparam->fec = fec[rsp->fwdata.supported_fec - 1];
 	}
 	return 0;
 }
