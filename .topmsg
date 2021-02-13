@@ -1,8 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: move subflow close loop after sk close check
-
-In case mptcp socket is already dead the entire mptcp socket
-will be freed. We can avoid the close check in this case.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
