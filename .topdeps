@@ -1,1 +1,2 @@
 t/mptcp-move-pm-netlink-work-into-pm_netlink
+t/mptcp-dispose-initial-struct-socket-when-its-subflow-is-closed
