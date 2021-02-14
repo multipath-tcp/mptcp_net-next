@@ -1,0 +1,11 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove a list of addrs when flushing
+
+This patch invoked mptcp_nl_remove_addrs_list to remove a list of addresses
+when the netlink flushes addresses, instead of using
+mptcp_nl_remove_subflow_and_signal_addr to remove them one by one.
+
+And dropped the unused parameter net in __flush_addrs too.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
