@@ -1,0 +1,16 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix race in release_cb
+
+If we receive a MPTCP_PUSH_PENDING even from a subflow when
+mptcp_release_cb() is serving the previous one, the latter
+will be delayed up to the next release_sock(msk).
+
+Address the issue implementing a test/serve loop for such
+event.
+
+Additionally rename the push helper to __mptcp_push_pending()
+to be more consistent with the existing code.
+
+Fixes: 6e628cd3a8f7 ("mptcp: use mptcp release_cb for delayed tasks")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
