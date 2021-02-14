@@ -1,0 +1,8 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: factor out __mptcp_retrans helper()
+
+Will simplify the following patch, no functional change
+intended.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
