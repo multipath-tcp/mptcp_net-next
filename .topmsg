@@ -1,0 +1,19 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove multi addresses and subflows in PM
+
+This patch implemented the function to remove a list of addresses and
+subflows, named mptcp_nl_remove_addrs_list, which had a input parameter
+rm_list as the removing addresses list.
+
+In mptcp_nl_remove_addrs_list, traverse all the existing msk sockets to
+invoke mptcp_pm_remove_addrs_and_subflows to remove a list of addresses
+for each msk socket.
+
+In mptcp_pm_remove_addrs_and_subflows, traverse all the addresses in the
+removing addresses list, to find whether this address is in the conn_list
+or anno_list. If it is, put the address ID into the removing address list
+or the removing subflow list, and pass the two lists to
+mptcp_pm_remove_addr and mptcp_pm_remove_subflow.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
