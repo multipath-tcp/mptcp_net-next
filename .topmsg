@@ -1,0 +1,11 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix poll after shutdown
+
+The current mptcp_poll() implementation gives unexpected
+results after shutdown(SEND_SHUTDOWN) and and when the msk
+status is TCP_CLOSE.
+
+Set the correct mask.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
