@@ -1,0 +1,19 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: init mptcp request socket earlier
+
+The mptcp subflow route_req() callback performs the subflow
+req initialization after the route_req() check. If the latter
+fails, mptcp-specific bits of the current request sockets
+are left uninitialized.
+
+The above causes bad things at req socket disposal time, when
+the mptcp resources are cleared.
+
+This change addresses the issue by splitting subflow_init_req()
+into the actual initialization and the mptcp-specific checks.
+The initialization is moved before any possibly failing check.
+
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Fixes: 7ea851d19b23 ("tcp: merge 'init_req' and 'route_req' functions")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
