@@ -1,0 +1,22 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add rm_list in mptcp_out_options
+
+This patch defined a new struct mptcp_rm_list, the ids field was an
+array of the removing address ids, the nr field was the valid number of
+removing address ids in the array. The array size was definced as a new
+macro MPTCP_RM_IDS_MAX. Changed the member rm_id of struct
+mptcp_out_options to rm_list.
+
+In mptcp_established_options_rm_addr, invoked mptcp_pm_rm_addr_signal to
+get the rm_list. According the number of addresses in it, calculated
+the padded RM_ADDR suboption length. And saved the ids array in struct
+mptcp_out_options's rm_list member.
+
+In mptcp_write_options, iterated each address id from struct
+mptcp_out_options's rm_list member, set the invalid ones as TCPOPT_NOP,
+then filled them into the RM_ADDR suboption.
+
+Changed TCPOLEN_MPTCP_RM_ADDR_BASE from 4 to 3.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
