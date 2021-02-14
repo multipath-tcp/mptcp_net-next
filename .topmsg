@@ -1,0 +1,16 @@
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add rm_list in mptcp_options_received
+
+This patch changed the member rm_id in struct mptcp_options_received as a
+list of the removing address ids, and renamed it to rm_list.
+
+In mptcp_parse_option, parsed the RM_ADDR suboption and filled them into
+the rm_list in struct mptcp_options_received.
+
+In mptcp_incoming_options, passed this rm_list to the function
+mptcp_pm_rm_addr_received.
+
+It also changed the parameter type of mptcp_pm_rm_addr_received.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
