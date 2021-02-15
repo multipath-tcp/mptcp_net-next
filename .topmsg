@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-DATA_FIN-generation-on-early-shutdown
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix DATA_FIN generation on early shutdown
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If the msk is closed before sending or receiving any data,
+no DATA_FIN is generated, instead an MPC ack packet is
+crafted out.
+
+In the above scenario, the MPTCP protocol create and send a
+pure ack and such packets matches also the criteria for an
+MPC ack and the protocol tries first to insert MPC options,
+leading the described error.
+
+This change address the issue skipping MPC option for DATA_FIN
+packets or if the subflow is not established.
+
+To avoid doing multiple times the same test, fetch the data_fin
+flag in a bool variable and pass it to both the interested
+helpers.
+
+Fixes: 6d0060f600ad ("mptcp: Write MPTCP DSS headers to outgoing data packets")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
