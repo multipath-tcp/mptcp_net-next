@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-fix-DATA_FIN-generation-on-early-shutdown
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
