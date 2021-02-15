@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-provide-subflow-aware-release-function
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: provide subflow aware release function
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp re-used inet(6)_release, so the subflow sockets are ignored.
+Need to invoke ip(v6)_mc_drop_socket function to ensure mcast join
+resources get free'd.
+
+Fixes: 717e79c867ca5 ("mptcp: Add setsockopt()/getsockopt() socket operations")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/110
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
