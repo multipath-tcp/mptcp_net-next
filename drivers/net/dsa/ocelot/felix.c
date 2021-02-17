@@ -1202,7 +1202,7 @@ static int felix_setup(struct dsa_switch *ds)
 
 	err = ocelot_init(ocelot);
 	if (err)
-		return err;
+		goto out_mdiobus_free;
 
 	if (ocelot->ptp) {
 		err = ocelot_init_timestamp(ocelot, felix->info->ptp_caps);
@@ -1227,7 +1227,7 @@ static int felix_setup(struct dsa_switch *ds)
 
 	err = ocelot_devlink_sb_register(ocelot);
 	if (err)
-		return err;
+		goto out_deinit_ports;
 
 	for (port = 0; port < ds->num_ports; port++) {
 		if (!dsa_is_cpu_port(ds, port))
@@ -1243,6 +1243,23 @@ static int felix_setup(struct dsa_switch *ds)
 	ds->assisted_learning_on_cpu_port = true;
 
 	return 0;
+
+out_deinit_ports:
+	for (port = 0; port < ocelot->num_phys_ports; port++) {
+		if (dsa_is_unused_port(ds, port))
+			continue;
+
+		ocelot_deinit_port(ocelot, port);
+	}
+
+	ocelot_deinit_timestamp(ocelot);
+	ocelot_deinit(ocelot);
+
+out_mdiobus_free:
+	if (felix->info->mdio_bus_free)
+		felix->info->mdio_bus_free(ocelot);
+
+	return err;
 }
 
 static void felix_teardown(struct dsa_switch *ds)
@@ -1262,8 +1279,12 @@ static void felix_teardown(struct dsa_switch *ds)
 	ocelot_deinit_timestamp(ocelot);
 	ocelot_deinit(ocelot);
 
-	for (port = 0; port < ocelot->num_phys_ports; port++)
+	for (port = 0; port < ocelot->num_phys_ports; port++) {
+		if (dsa_is_unused_port(ds, port))
+			continue;
+
 		ocelot_deinit_port(ocelot, port);
+	}
 
 	if (felix->info->mdio_bus_free)
 		felix->info->mdio_bus_free(ocelot);
@@ -1561,6 +1582,40 @@ static int felix_sb_occ_tc_port_bind_get(struct dsa_switch *ds, int port,
 					      pool_type, p_cur, p_max);
 }
 
+static int felix_mrp_add(struct dsa_switch *ds, int port,
+			 const struct switchdev_obj_mrp *mrp)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_mrp_add(ocelot, port, mrp);
+}
+
+static int felix_mrp_del(struct dsa_switch *ds, int port,
+			 const struct switchdev_obj_mrp *mrp)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_mrp_add(ocelot, port, mrp);
+}
+
+static int
+felix_mrp_add_ring_role(struct dsa_switch *ds, int port,
+			const struct switchdev_obj_ring_role_mrp *mrp)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_mrp_add_ring_role(ocelot, port, mrp);
+}
+
+static int
+felix_mrp_del_ring_role(struct dsa_switch *ds, int port,
+			const struct switchdev_obj_ring_role_mrp *mrp)
+{
+	struct ocelot *ocelot = ds->priv;
+
+	return ocelot_mrp_del_ring_role(ocelot, port, mrp);
+}
+
 const struct dsa_switch_ops felix_switch_ops = {
 	.get_tag_protocol		= felix_get_tag_protocol,
 	.change_tag_protocol		= felix_change_tag_protocol,
@@ -1615,6 +1670,10 @@ const struct dsa_switch_ops felix_switch_ops = {
 	.devlink_sb_occ_max_clear	= felix_sb_occ_max_clear,
 	.devlink_sb_occ_port_pool_get	= felix_sb_occ_port_pool_get,
 	.devlink_sb_occ_tc_port_bind_get= felix_sb_occ_tc_port_bind_get,
+	.port_mrp_add			= felix_mrp_add,
+	.port_mrp_del			= felix_mrp_del,
+	.port_mrp_add_ring_role		= felix_mrp_add_ring_role,
+	.port_mrp_del_ring_role		= felix_mrp_del_ring_role,
 };
 
 struct net_device *felix_port_to_netdev(struct ocelot *ocelot, int port)
