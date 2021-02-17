@@ -14,7 +14,6 @@
 #include <linux/numa.h>
 #include <linux/mm_types.h>
 #include <linux/wait.h>
-#include <linux/u64_stats_sync.h>
 #include <linux/refcount.h>
 #include <linux/mutex.h>
 #include <linux/module.h>
@@ -510,12 +509,6 @@ enum bpf_cgroup_storage_type {
  */
 #define MAX_BPF_FUNC_ARGS 12
 
-struct bpf_prog_stats {
-	u64 cnt;
-	u64 nsecs;
-	struct u64_stats_sync syncp;
-} __aligned(2 * sizeof(u64));
-
 struct btf_func_model {
 	u8 ret_size;
 	u8 nr_args;
@@ -539,7 +532,7 @@ struct btf_func_model {
 /* Each call __bpf_prog_enter + call bpf_func + call __bpf_prog_exit is ~50
  * bytes on x86.  Pick a number to fit into BPF_IMAGE_SIZE / 2
  */
-#define BPF_MAX_TRAMP_PROGS 40
+#define BPF_MAX_TRAMP_PROGS 38
 
 struct bpf_tramp_progs {
 	struct bpf_prog *progs[BPF_MAX_TRAMP_PROGS];
@@ -571,10 +564,10 @@ int arch_prepare_bpf_trampoline(void *image, void *image_end,
 				struct bpf_tramp_progs *tprogs,
 				void *orig_call);
 /* these two functions are called from generated trampoline */
-u64 notrace __bpf_prog_enter(void);
+u64 notrace __bpf_prog_enter(struct bpf_prog *prog);
 void notrace __bpf_prog_exit(struct bpf_prog *prog, u64 start);
-void notrace __bpf_prog_enter_sleepable(void);
-void notrace __bpf_prog_exit_sleepable(void);
+u64 notrace __bpf_prog_enter_sleepable(struct bpf_prog *prog);
+void notrace __bpf_prog_exit_sleepable(struct bpf_prog *prog, u64 start);
 
 struct bpf_ksym {
 	unsigned long		 start;
@@ -848,7 +841,6 @@ struct bpf_prog_aux {
 	u32 linfo_idx;
 	u32 num_exentries;
 	struct exception_table_entry *extable;
-	struct bpf_prog_stats __percpu *stats;
 	union {
 		struct work_struct work;
 		struct rcu_head	rcu;
@@ -1076,6 +1068,34 @@ int bpf_prog_array_copy(struct bpf_prog_array *old_array,
 			struct bpf_prog *include_prog,
 			struct bpf_prog_array **new_array);
 
+/* BPF program asks to bypass CAP_NET_BIND_SERVICE in bind. */
+#define BPF_RET_BIND_NO_CAP_NET_BIND_SERVICE			(1 << 0)
+/* BPF program asks to set CN on the packet. */
+#define BPF_RET_SET_CN						(1 << 0)
+
+#define BPF_PROG_RUN_ARRAY_FLAGS(array, ctx, func, ret_flags)		\
+	({								\
+		struct bpf_prog_array_item *_item;			\
+		struct bpf_prog *_prog;					\
+		struct bpf_prog_array *_array;				\
+		u32 _ret = 1;						\
+		u32 func_ret;						\
+		migrate_disable();					\
+		rcu_read_lock();					\
+		_array = rcu_dereference(array);			\
+		_item = &_array->items[0];				\
+		while ((_prog = READ_ONCE(_item->prog))) {		\
+			bpf_cgroup_storage_set(_item->cgroup_storage);	\
+			func_ret = func(_prog, ctx);			\
+			_ret &= (func_ret & 1);				\
+			*(ret_flags) |= (func_ret >> 1);			\
+			_item++;					\
+		}							\
+		rcu_read_unlock();					\
+		migrate_enable();					\
+		_ret;							\
+	 })
+
 #define __BPF_PROG_RUN_ARRAY(array, ctx, func, check_non_null)	\
 	({						\
 		struct bpf_prog_array_item *_item;	\
@@ -1123,25 +1143,11 @@ _out:							\
  */
 #define BPF_PROG_CGROUP_INET_EGRESS_RUN_ARRAY(array, ctx, func)		\
 	({						\
-		struct bpf_prog_array_item *_item;	\
-		struct bpf_prog *_prog;			\
-		struct bpf_prog_array *_array;		\
-		u32 ret;				\
-		u32 _ret = 1;				\
-		u32 _cn = 0;				\
-		migrate_disable();			\
-		rcu_read_lock();			\
-		_array = rcu_dereference(array);	\
-		_item = &_array->items[0];		\
-		while ((_prog = READ_ONCE(_item->prog))) {		\
-			bpf_cgroup_storage_set(_item->cgroup_storage);	\
-			ret = func(_prog, ctx);		\
-			_ret &= (ret & 1);		\
-			_cn |= (ret & 2);		\
-			_item++;			\
-		}					\
-		rcu_read_unlock();			\
-		migrate_enable();			\
+		u32 _flags = 0;				\
+		bool _cn;				\
+		u32 _ret;				\
+		_ret = BPF_PROG_RUN_ARRAY_FLAGS(array, ctx, func, &_flags); \
+		_cn = _flags & BPF_RET_SET_CN;		\
 		if (_ret)				\
 			_ret = (_cn ? NET_XMIT_CN : NET_XMIT_SUCCESS);	\
 		else					\
@@ -1275,6 +1281,11 @@ bpf_map_alloc_percpu(const struct bpf_map *map, size_t size, size_t align,
 extern int sysctl_unprivileged_bpf_disabled;
 
 static inline bool bpf_allow_ptr_leaks(void)
+{
+	return perfmon_capable();
+}
+
+static inline bool bpf_allow_uninit_stack(void)
 {
 	return perfmon_capable();
 }
@@ -1877,6 +1888,7 @@ extern const struct bpf_func_proto bpf_per_cpu_ptr_proto;
 extern const struct bpf_func_proto bpf_this_cpu_ptr_proto;
 extern const struct bpf_func_proto bpf_ktime_get_coarse_ns_proto;
 extern const struct bpf_func_proto bpf_sock_from_file_proto;
+extern const struct bpf_func_proto bpf_get_socket_ptr_cookie_proto;
 extern const struct bpf_func_proto bpf_mptcp_sock_proto;
 
 const struct bpf_func_proto *bpf_tracing_func_proto(
