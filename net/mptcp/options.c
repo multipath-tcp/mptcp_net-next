@@ -679,21 +679,19 @@ static bool mptcp_established_options_rm_addr(struct sock *sk,
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_rm_list rm_list;
-	u8 i, align;
+	int i, len;
 
 	if (!mptcp_pm_should_rm_signal(msk) ||
 	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list)))
 		return false;
 
-	if (rm_list.nr > 1)
-		align = 5;
-	if (rm_list.nr > 5)
-		align = 9;
-
-	if (remaining < TCPOLEN_MPTCP_RM_ADDR_BASE + align)
+	len = mptcp_rm_addr_len(rm_list);
+	if (len < 0)
+		return false;
+	if (remaining < len)
 		return false;
 
-	*size = TCPOLEN_MPTCP_RM_ADDR_BASE + align;
+	*size = len;
 	opts->suboptions |= OPTION_MPTCP_RM_ADDR;
 	opts->rm_list = rm_list;
 
