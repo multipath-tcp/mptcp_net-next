@@ -1,7 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add local addr info in mptcp_info
-
-Add mptcpi_local_addr_used and mptcpi_local_addr_max in struct mptcp_info.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
