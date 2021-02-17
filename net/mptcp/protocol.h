@@ -238,7 +238,6 @@ struct mptcp_sock {
 	u64		wnd_end;
 	unsigned long	timer_ival;
 	u32		token;
-	int		rmem_pending;
 	int		rmem_released;
 	unsigned long	flags;
 	bool		can_ack;
@@ -302,7 +301,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 
 static inline int __mptcp_space(const struct sock *sk)
 {
-	return tcp_space(sk) + READ_ONCE(mptcp_sk(sk)->rmem_pending);
+	return tcp_space(sk) + READ_ONCE(mptcp_sk(sk)->rmem_released);
 }
 
 static inline struct mptcp_data_frag *mptcp_send_head(const struct sock *sk)
@@ -335,19 +334,12 @@ static inline struct mptcp_data_frag *mptcp_pending_tail(const struct sock *sk)
 	return list_last_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
 }
 
-static inline struct mptcp_data_frag *mptcp_rtx_tail(const struct sock *sk)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-
-	if (!before64(msk->snd_nxt, READ_ONCE(msk->snd_una)))
-		return NULL;
-
-	return list_last_entry(&msk->rtx_queue, struct mptcp_data_frag, list);
-}
-
 static inline struct mptcp_data_frag *mptcp_rtx_head(const struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (msk->snd_una == READ_ONCE(msk->snd_nxt))
+		return NULL;
 
 	return list_first_entry_or_null(&msk->rtx_queue, struct mptcp_data_frag, list);
 }
