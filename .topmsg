@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-DATA_FIN-processing-for-orphaned-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix DATA_FIN processing for orphaned sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently we move orphaned msk sockets directly from FIN_WAIT2
+state to CLOSE, with the rationale that incoming additional
+data could be just dropped by the TCP stack/TW sockets.
+
+Anyhow we miss sending MPTCP-level ack on incoming DATA_FIN,
+and that may hang the peers.
+
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
