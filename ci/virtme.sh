@@ -162,8 +162,7 @@ tap() { local out tmp fname rc
         return \${rc}
 }
 
-# kunit
-{
+_run_kunit() { local ko kunit
         insmod ./lib/kunit/kunit.ko
 
         echo "TAP version 14"
@@ -176,27 +175,54 @@ tap() { local out tmp fname rc
                 kunit="\${kunit//_/-}"
                 cat /sys/kernel/debug/kunit/\${kunit}/results
         done
-} > "${kunit_tap}"
+}
+
+run_kunit() {
+        cd ${PWD}
+        "_\${0}" | tee "${kunit_tap}"
+}
+
+_run_selftests() {
+        make --silent -C tools/testing/selftests TARGETS=net/mptcp run_tests
+}
+
+run_selftests() {
+        cd ${PWD}
+        "_${0}" | tee "${selftests_tap}"
+}
+
+run_mptcp_connect_mmap() {
+        cd ${PWD}/tools/testing/selftests/net/mptcp
+        tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
+}
+
+# \$1: pktd_dir (e.g. mptcp/dss)
+run_packetdrill_one() { local pktd_dir="\${1}" pktd
+        pktd="\${pktd_dir:6}"
+
+        if [ "\${pktd}" = "common" ]; then
+                return 0
+        fi
+
+        cd /opt/packetdrill/gtests/net/
+        PYTHONUNBUFFERED=1 tap "${pktd_base}_\${pktd}.tap" \
+                ./packetdrill/run_all.py -l -v \${pktd_dir}
+}
+
+run_packetdrill_all() { local pktd_dir
+        cd /opt/packetdrill/gtests/net/
+
+        for pktd_dir in mptcp/*; do
+                run_packetdrill_one "\${pktd_dir}"
+        done
+}
 
 # echo "file net/mptcp/* +fmp" > /sys/kernel/debug/dynamic_debug/control
 
-# selftests
-make --silent -C tools/testing/selftests TARGETS=net/mptcp run_tests | \
-        tee "${selftests_tap}"
-
-cd tools/testing/selftests/net/mptcp
-tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
-
-# TODO: mptcp_connect.sh with -R ; -S
-
-# packetdrill
-cd /opt/packetdrill/gtests/net/
-export PYTHONUNBUFFERED=1
-for pktd_dir in mptcp/*; do
-        pktd="\${pktd_dir:6}"
-        [ "\${pktd}" = "common" ] && continue
-        tap "${pktd_base}_\${pktd}.tap" ./packetdrill/run_all.py -l -v \${pktd_dir}
-done
+run_kunit
+run_selftests
+run_mptcp_connect_mmap
+run_packetdrill_all
 
 # end
 echo "${VIRTME_SCRIPT_END}"
