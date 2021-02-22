@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-put-subflow-sock-on-connect-error
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: put subflow sock on connect error
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp_add_pending_subflow() performs a sock_hold() on the subflow,
+then adds the subflow to the join list.
+
+Without a sock_put the subflow sk won't be freed in case connect() fails.
+
+unreferenced object 0xffff88810c03b100 (size 3000):
+[..]
+    sk_prot_alloc.isra.0+0x2f/0x110
+    sk_alloc+0x5d/0xc20
+    inet6_create+0x2b7/0xd30
+    __sock_create+0x17f/0x410
+    mptcp_subflow_create_socket+0xff/0x9c0
+    __mptcp_subflow_connect+0x1da/0xaf0
+    mptcp_pm_nl_work+0x6e0/0x1120
+    mptcp_worker+0x508/0x9a0
+
+Fixes: 5b950ff4331ddda ("mptcp: link MPC subflow into msk only after accept")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
