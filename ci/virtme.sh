@@ -94,6 +94,7 @@ prepare() { local old_pwd mode
         local kunit_tap="${RESULTS_DIR}/kunit.tap"
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
         local mptcp_connect_mmap_tap="${RESULTS_DIR}/mptcp_connect_mmap.tap"
+        local dummy_tap="${RESULTS_DIR}/dummy.tap"
         local pktd_base="${RESULTS_DIR}/packetdrill"
 
         # for the kmods
@@ -191,9 +192,19 @@ run_selftests() {
         _run_selftests | tee "${selftests_tap}"
 }
 
-run_mptcp_connect_mmap() {
+# \$1: output tap file; rest: command to launch
+run_one_selftest_tap() {
         cd ${PWD}/tools/testing/selftests/net/mptcp
-        tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
+        tap "\${@}"
+}
+
+# \$@: cmd to run
+run_one_selftest() {
+        run_one_selftest_tap "${dummy_tap}" "\${@}"
+}
+
+run_mptcp_connect_mmap() {
+        run_one_selftest_tap "${mptcp_connect_mmap_tap}" ./mptcp_connect.sh -m mmap
 }
 
 # \$1: pktd_dir (e.g. mptcp/dss)
@@ -223,6 +234,9 @@ run_kunit
 run_selftests
 run_mptcp_connect_mmap
 run_packetdrill_all
+
+# For "manual" tests only
+#run_one_selftest ./mptcp_join.sh
 
 # end
 echo "${VIRTME_SCRIPT_END}"
