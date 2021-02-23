@@ -11,4 +11,5 @@ at that point the ssk is not on the conn_list yet -- this means
 worker can't see it when iterating the conn_list.
 
 Reported-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Florian Westphal <fw@strlen.de>
