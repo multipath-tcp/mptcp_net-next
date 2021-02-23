@@ -674,20 +674,25 @@ static bool mptcp_established_options_rm_addr(struct sock *sk,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
-	u8 rm_id;
+	struct mptcp_rm_list rm_list;
+	int i, len;
 
 	if (!mptcp_pm_should_rm_signal(msk) ||
-	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_id)))
+	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list)))
 		return false;
 
-	if (remaining < TCPOLEN_MPTCP_RM_ADDR_BASE)
+	len = mptcp_rm_addr_len(rm_list);
+	if (len < 0)
+		return false;
+	if (remaining < len)
 		return false;
 
-	*size = TCPOLEN_MPTCP_RM_ADDR_BASE;
+	*size = len;
 	opts->suboptions |= OPTION_MPTCP_RM_ADDR;
-	opts->rm_id = rm_id;
+	opts->rm_list = rm_list;
 
-	pr_debug("rm_id=%d", opts->rm_id);
+	for (i = 0; i < opts->rm_list.nr; i++)
+		pr_debug("rm_list_ids[%d]=%d", i, opts->rm_list.ids[i]);
 
 	return true;
 }
@@ -1217,9 +1222,23 @@ mp_capable_done:
 	}
 
 	if (OPTION_MPTCP_RM_ADDR & opts->suboptions) {
+		u8 i;
+
+		for (i = opts->rm_list.nr; i < MPTCP_RM_IDS_MAX; i++)
+			opts->rm_list.ids[i] = TCPOPT_NOP;
 		*ptr++ = mptcp_option(MPTCPOPT_RM_ADDR,
-				      TCPOLEN_MPTCP_RM_ADDR_BASE,
-				      0, opts->rm_id);
+				      TCPOLEN_MPTCP_RM_ADDR_BASE + opts->rm_list.nr,
+				      0, opts->rm_list.ids[0]);
+		if (opts->rm_list.nr > 1) {
+			put_unaligned_be32(opts->rm_list.ids[1] << 24 | opts->rm_list.ids[2] << 16 |
+					   opts->rm_list.ids[3] << 8 | opts->rm_list.ids[4], ptr);
+			ptr += 1;
+		}
+		if (opts->rm_list.nr > 5) {
+			put_unaligned_be32(opts->rm_list.ids[5] << 24 | opts->rm_list.ids[6] << 16 |
+					   opts->rm_list.ids[7] << 8 | TCPOPT_NOP, ptr);
+			ptr += 1;
+		}
 	}
 
 	if (OPTION_MPTCP_PRIO & opts->suboptions) {
