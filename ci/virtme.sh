@@ -179,7 +179,7 @@ _run_kunit() { local ko kunit
 
 run_kunit() {
         cd ${PWD}
-        "_\${0}" | tee "${kunit_tap}"
+        _run_kunit | tee "${kunit_tap}"
 }
 
 _run_selftests() {
@@ -188,7 +188,7 @@ _run_selftests() {
 
 run_selftests() {
         cd ${PWD}
-        "_${0}" | tee "${selftests_tap}"
+        _run_selftests | tee "${selftests_tap}"
 }
 
 run_mptcp_connect_mmap() {
