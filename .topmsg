@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reset-first-and-ack_hint-on-subflow-close
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: reset 'first' and ack_hint on subflow close
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Just like with last_snd, we have to NULL 'first' on subflow close.
+
+ack_hint isn't strictly required (its never dereferenced), but better to
+clear this explicitly as well instead of making it an exception.
+
+msk->first is dereferenced unconditionally at accept time, but
+at that point the ssk is not on the conn_list yet -- this means
+worker can't see it when iterating the conn_list.
+
+Reported-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
