@@ -22,8 +22,9 @@ apply_patches_git_pw() {
 	for i in "${@}"; do
 		if ! git-pw "${MODE}" apply ${GIT_PW_ARG:+"${GIT_PW_ARG}"} "${i}"; then
 			printerr "ERROR with 'git-pw ${MODE} apply ${i}'. " \
-			         "Please fix in another terminal and press" \
-			         "ENTER to continue."
+			         "Please fix in another terminal (up to 'git am" \
+			         "--continue' included) and press ENTER to " \
+			         "continue."
 			read -r
 		fi
 	done
