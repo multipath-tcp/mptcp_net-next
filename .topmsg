@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: drop unused subflow in mptcp_pm_subflow_established
-
-This patch drops the unused parameter subflow in
-mptcp_pm_subflow_established().
-
-Fixes: 926bdeab5535 ("mptcp: Implement path manager interface commands")
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
