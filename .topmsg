@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-missing-wakeup
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix missing wakeup
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+__mptcp_clean_una() can free write memory and should wake-up
+user-space processes when needed.
+
+When such function is invoked by the MPTCP receive path, the wakeup
+is not needed, as the TCP stack will later trigger subflow_write_space
+which will do the wakeup as needed.
+
+Other __mptcp_clean_una() call sites need an additional wakeup check
+Let's bundle the relevant code in a new helper and use it.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/165
+Fixes: 6e628cd3a8f7 ("mptcp: use mptcp release_cb for delayed tasks")
+Fixes: 64b9cea7a0af ("mptcp: fix spurious retransmissions")
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
