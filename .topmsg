@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-argument-port-from-mptcp_pm_announce_addr
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: drop argument port from mptcp_pm_announce_addr
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Drop the redundant argument 'port' from mptcp_pm_announce_addr, use the
+port field of another argument 'addr' instead.
+
+Fixes: 0f5c9e3f079f ("mptcp: add port parameter for mptcp_pm_announce_addr")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
