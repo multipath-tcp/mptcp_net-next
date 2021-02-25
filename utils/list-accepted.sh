@@ -6,7 +6,7 @@ list() {
 		sed "s/ \(\S\+@\S\+\)//g" | \
 		tail -n+3 | \
 		sort -u | \
-		xargs -n2 -I{} echo -n "{}, " | \
+		xargs -I{} echo -n "{}, " | \
 		sed 's/, $//g'
 	echo
 	PAGER=cat git-pw patch list --limit 250 --state "${1}" -f simple -c ID -c Name | \
