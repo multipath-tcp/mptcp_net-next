@@ -1243,11 +1243,11 @@ static void mptcp_pm_remove_addrs_and_subflows(struct mptcp_sock *msk,
 
 	if (alist.nr) {
 		spin_lock_bh(&msk->pm.lock);
-		mptcp_pm_remove_addr(msk, alist);
+		mptcp_pm_remove_addr(msk, &alist);
 		spin_unlock_bh(&msk->pm.lock);
 	}
 	if (slist.nr)
-		mptcp_pm_remove_subflow(msk, slist);
+		mptcp_pm_remove_subflow(msk, &slist);
 }
 
 static void mptcp_nl_remove_addrs_list(struct net *net,
