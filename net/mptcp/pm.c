@@ -56,9 +56,9 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 	return 0;
 }
 
-int mptcp_pm_remove_subflow(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+int mptcp_pm_remove_subflow(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list)
 {
-	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list->nr);
 
 	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_nl_rm_subflow_received(msk, rm_list);
