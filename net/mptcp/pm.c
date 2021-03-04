@@ -204,19 +204,20 @@ void mptcp_pm_add_addr_send_ack(struct mptcp_sock *msk)
 	mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_SEND_ACK);
 }
 
-void mptcp_pm_rm_addr_received(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
+			       const struct mptcp_rm_list *rm_list)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
 	u8 i;
 
-	pr_debug("msk=%p remote_ids_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p remote_ids_nr=%d", msk, rm_list->nr);
 
-	for (i = 0; i < rm_list.nr; i++)
-		mptcp_event_addr_removed(msk, rm_list.ids[i]);
+	for (i = 0; i < rm_list->nr; i++)
+		mptcp_event_addr_removed(msk, rm_list->ids[i]);
 
 	spin_lock_bh(&pm->lock);
 	mptcp_pm_schedule_work(msk, MPTCP_PM_RM_ADDR_RECEIVED);
-	pm->rm_id = rm_list.ids[0];
+	pm->rm_id = rm_list->ids[0];
 	spin_unlock_bh(&pm->lock);
 }
 
