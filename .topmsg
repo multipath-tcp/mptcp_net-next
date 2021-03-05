@@ -7,7 +7,7 @@ either -net or net-next or at least not as "MPTCP fixes".
 
 Typically they are fixing issues blocking our tests.
 
-Following commits are MPTCP-realted fixes for the -net tree.
+Following commits are MPTCP-related fixes for the -net tree.
 
 This commit is useful to easily find where are the fixes from/for other
 trees.
