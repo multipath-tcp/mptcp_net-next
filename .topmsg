@@ -1,12 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
 Subject: [PATCH] DO-NOT-MERGE: git markup: fixes other trees
 
-All commits older than this one are fixes from/for other trees than the
-net ones: -net and net-next.
+All commits older than this one are fixes for other trees than the net
+ones or imported from elsewhere. We should not send these commits to
+either -net or net-next or at least not as "MPTCP fixes".
 
 Typically they are fixing issues blocking our tests.
 
-Following commits are fixes for the -net tree.
+Following commits are MPTCP-realted fixes for the -net tree.
 
 This commit is useful to easily find where are the fixes from/for other
 trees.
