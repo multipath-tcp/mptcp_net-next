@@ -661,7 +661,7 @@ mptcp_pm_del_add_timer(struct mptcp_sock *msk,
 int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 			   const struct mptcp_addr_info *addr,
 			   bool echo);
-int mptcp_pm_remove_addr(struct mptcp_sock *msk, struct mptcp_rm_list rm_list);
+int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list);
 int mptcp_pm_remove_subflow(struct mptcp_sock *msk, u8 local_id);
 
 void mptcp_event(enum mptcp_event_type type, const struct mptcp_sock *msk,
@@ -708,12 +708,12 @@ static inline unsigned int mptcp_add_addr_len(int family, bool echo, bool port)
 	return len;
 }
 
-static inline int mptcp_rm_addr_len(struct mptcp_rm_list rm_list)
+static inline int mptcp_rm_addr_len(const struct mptcp_rm_list *rm_list)
 {
-	if (rm_list.nr == 0 || rm_list.nr >= MPTCP_RM_IDS_MAX)
+	if (rm_list->nr == 0 || rm_list->nr >= MPTCP_RM_IDS_MAX)
 		return -EINVAL;
 
-	return TCPOLEN_MPTCP_RM_ADDR_BASE + roundup(rm_list.nr - 1, 4) + 1;
+	return TCPOLEN_MPTCP_RM_ADDR_BASE + roundup(rm_list->nr - 1, 4) + 1;
 }
 
 bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, unsigned int remaining,

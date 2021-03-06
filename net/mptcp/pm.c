@@ -39,18 +39,18 @@ int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 	return 0;
 }
 
-int mptcp_pm_remove_addr(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list)
 {
 	u8 rm_addr = READ_ONCE(msk->pm.addr_signal);
 
-	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list->nr);
 
 	if (rm_addr) {
 		pr_warn("addr_signal error, rm_addr=%d", rm_addr);
 		return -EINVAL;
 	}
 
-	msk->pm.rm_list_tx = rm_list;
+	msk->pm.rm_list_tx = *rm_list;
 	rm_addr |= BIT(MPTCP_RM_ADDR_SIGNAL);
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
 	return 0;
@@ -267,7 +267,7 @@ bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 	if (!mptcp_pm_should_rm_signal(msk))
 		goto out_unlock;
 
-	len = mptcp_rm_addr_len(msk->pm.rm_list_tx);
+	len = mptcp_rm_addr_len(&msk->pm.rm_list_tx);
 	if (len < 0) {
 		WRITE_ONCE(msk->pm.addr_signal, 0);
 		goto out_unlock;
