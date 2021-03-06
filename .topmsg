@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-id-0-address
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove id 0 address
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new function mptcp_nl_remove_id_zero_address to
+remove the id 0 address.
+
+In this function, traverse all the existing msk sockets to find the
+msk matched the input IP address. Then fill the removing list with
+id 0, and pass it to mptcp_pm_remove_addr and mptcp_pm_remove_subflow.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
