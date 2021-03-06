@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-Restore-packet-capture-option-in-join-tests
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] selftests: mptcp: Restore packet capture option in join tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The join self tests previously used the '-c' command line option to
+enable creation of pcap files for the tests that run, but the change to
+allow running a subset of the join tests made overlapping use of that
+option.
+
+Restore the capture functionality with '-c' and move the syncookie test
+option to '-k'.
+
+Fixes: 1002b89f23ea ("selftests: mptcp: add command line arguments for mptcp_join.sh")
+Acked-and-tested-by: Geliang Tang <geliangtang@gmail.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
