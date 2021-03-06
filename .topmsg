@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-remove-id-0-address-testcases
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: remove id 0 address testcases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the testcases for removing the id 0 subflow and the id 0
+address.
+
+In do_transfer, use the removing addresses number '9' for deleting the id
+0 address.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
