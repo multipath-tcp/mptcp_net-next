@@ -698,7 +698,7 @@ static bool mptcp_established_options_rm_addr(struct sock *sk,
 	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list)))
 		return false;
 
-	len = mptcp_rm_addr_len(rm_list);
+	len = mptcp_rm_addr_len(&rm_list);
 	if (len < 0)
 		return false;
 	if (remaining < len)
@@ -1076,7 +1076,7 @@ void mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	}
 
 	if (mp_opt.rm_addr) {
-		mptcp_pm_rm_addr_received(msk, mp_opt.rm_list);
+		mptcp_pm_rm_addr_received(msk, &mp_opt.rm_list);
 		mp_opt.rm_addr = 0;
 	}
 
