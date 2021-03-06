@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-all-subflows-involving-id-0-address
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove all subflows involving id 0 address
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There's only one subflow involving the non-zero id address, but there
+may be multi subflows involving the id 0 address.
+
+Here's an example:
+
+ local_id=0, remote_id=0
+ local_id=1, remote_id=0
+ local_id=0, remote_id=1
+
+If the removing address id is 0, all the subflows involving the id 0
+address need to be removed.
+
+In mptcp_pm_nl_rm_addr_received/mptcp_pm_nl_rm_subflow_received, the
+"break" prevents the iteration to the next subflow, so this patch
+dropped them.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
