@@ -39,26 +39,26 @@ int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 	return 0;
 }
 
-int mptcp_pm_remove_addr(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list)
 {
 	u8 rm_addr = READ_ONCE(msk->pm.addr_signal);
 
-	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list->nr);
 
 	if (rm_addr) {
 		pr_warn("addr_signal error, rm_addr=%d", rm_addr);
 		return -EINVAL;
 	}
 
-	msk->pm.rm_list_tx = rm_list;
+	msk->pm.rm_list_tx = *rm_list;
 	rm_addr |= BIT(MPTCP_RM_ADDR_SIGNAL);
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
 	return 0;
 }
 
-int mptcp_pm_remove_subflow(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+int mptcp_pm_remove_subflow(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list)
 {
-	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p, rm_list_nr=%d", msk, rm_list->nr);
 
 	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_nl_rm_subflow_received(msk, rm_list);
@@ -219,19 +219,20 @@ void mptcp_pm_add_addr_send_ack(struct mptcp_sock *msk)
 	mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_SEND_ACK);
 }
 
-void mptcp_pm_rm_addr_received(struct mptcp_sock *msk, struct mptcp_rm_list rm_list)
+void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
+			       const struct mptcp_rm_list *rm_list)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
 	u8 i;
 
-	pr_debug("msk=%p remote_ids_nr=%d", msk, rm_list.nr);
+	pr_debug("msk=%p remote_ids_nr=%d", msk, rm_list->nr);
 
-	for (i = 0; i < rm_list.nr; i++)
-		mptcp_event_addr_removed(msk, rm_list.ids[i]);
+	for (i = 0; i < rm_list->nr; i++)
+		mptcp_event_addr_removed(msk, rm_list->ids[i]);
 
 	spin_lock_bh(&pm->lock);
 	mptcp_pm_schedule_work(msk, MPTCP_PM_RM_ADDR_RECEIVED);
-	pm->rm_list_rx = rm_list;
+	pm->rm_list_rx = *rm_list;
 	spin_unlock_bh(&pm->lock);
 }
 
@@ -284,7 +285,7 @@ bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 	if (!mptcp_pm_should_rm_signal(msk))
 		goto out_unlock;
 
-	len = mptcp_rm_addr_len(msk->pm.rm_list_tx);
+	len = mptcp_rm_addr_len(&msk->pm.rm_list_tx);
 	if (len < 0) {
 		WRITE_ONCE(msk->pm.addr_signal, 0);
 		goto out_unlock;
