@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-length-of-ADD_ADDR-with-port-sub-option
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: fix length of ADD_ADDR with port sub-option
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+in current Linux, MPTCP peers advertising endpoints with port numbers use
+a sub-option length that wrongly accounts for the trailing TCP NOP. Also,
+receivers will only process incoming ADD_ADDR with port having such wrong
+sub-option length. Fix this, making ADD_ADDR compliant to RFC8684 §3.4.1.
+
+this can be verified running tcpdump on the kselftests artifacts:
+
+ unpatched kernel:
+ [root@bottarga mptcp]# tcpdump -tnnr unpatched.pcap | grep add-addr
+ reading from file unpatched.pcap, link-type LINUX_SLL (Linux cooked v1), snapshot length 65535
+ IP 10.0.1.1.10000 > 10.0.1.2.53078: Flags [.], ack 101, win 509, options [nop,nop,TS val 214459678 ecr 521312851,mptcp add-addr v1 id 1 a00:201:2774:2d88:7436:85c3:17fd:101], length 0
+ IP 10.0.1.2.53078 > 10.0.1.1.10000: Flags [.], ack 101, win 502, options [nop,nop,TS val 521312852 ecr 214459678,mptcp add-addr[bad opt]]
+
+ patched kernel:
+ [root@bottarga mptcp]# tcpdump -tnnr patched.pcap | grep add-addr
+ reading from file patched.pcap, link-type LINUX_SLL (Linux cooked v1), snapshot length 65535
+ IP 10.0.1.1.10000 > 10.0.1.2.38178: Flags [.], ack 101, win 509, options [nop,nop,TS val 3728873902 ecr 2732713192,mptcp add-addr v1 id 1 10.0.2.1:10100 hmac 0xbccdfcbe59292a1f,nop,nop], length 0
+ IP 10.0.1.2.38178 > 10.0.1.1.10000: Flags [.], ack 101, win 502, options [nop,nop,TS val 2732713195 ecr 3728873902,mptcp add-addr v1-echo id 1 10.0.2.1:10100,nop,nop], length 0
+
+Fixes: 22fb85ffaefb ("mptcp: add port support for ADD_ADDR suboption writing")
+CC: stable@vger.kernel.org # 5.11+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-and-tested-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
