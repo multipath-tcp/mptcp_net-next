@@ -94,6 +94,12 @@ accept_patches() { local commit subject
 }
 
 
+if [ "$(git diff --shortstat | wc -l)" -ne 0 ]; then
+	printerr "Not a clean git env"
+	git status >&2
+	exit 1
+fi
+
 # the last commit is always a DO-NOT-MERGE one.
 if [ "${TG_TOP}" = "${TOP}" ]; then
 	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
