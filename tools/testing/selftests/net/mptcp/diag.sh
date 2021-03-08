@@ -8,7 +8,6 @@ test_cnt=1
 timeout_poll=100
 timeout_test=$((timeout_poll * 2 + 1))
 ret=0
-pids=()
 
 flush_pids()
 {
@@ -16,18 +15,14 @@ flush_pids()
 	# give it some time
 	sleep 1.1
 
-	for pid in ${pids[@]}; do
-		[ -d /proc/$pid ] && kill -SIGUSR1 $pid >/dev/null 2>&1
-	done
-	pids=()
+	ip netns pids "${ns}" | xargs --no-run-if-empty kill -SIGUSR1 &>/dev/null
 }
 
 cleanup()
 {
+	ip netns pids "${ns}" | xargs --no-run-if-empty kill -SIGKILL &>/dev/null
+
 	ip netns del $ns
-	for pid in ${pids[@]}; do
-		[ -d /proc/$pid ] && kill -9 $pid >/dev/null 2>&1
-	done
 }
 
 ip -Version > /dev/null 2>&1
@@ -87,7 +82,6 @@ echo "a" | \
 			./mptcp_connect -p 10000 -l -t ${timeout_poll} \
 				0.0.0.0 >/dev/null &
 sleep 0.1
-pids[0]=$!
 chk_msk_nr 0 "no msk on netns creation"
 
 echo "b" | \
@@ -96,7 +90,6 @@ echo "b" | \
 			./mptcp_connect -p 10000 -j -t ${timeout_poll} \
 				127.0.0.1 >/dev/null &
 sleep 0.1
-pids[1]=$!
 chk_msk_nr 2 "after MPC handshake "
 chk_msk_remote_key_nr 2 "....chk remote_key"
 chk_msk_fallback_nr 0 "....chk no fallback"
@@ -108,14 +101,12 @@ echo "a" | \
 		ip netns exec $ns \
 			./mptcp_connect -p 10001 -l -s TCP -t ${timeout_poll} \
 				0.0.0.0 >/dev/null &
-pids[0]=$!
 sleep 0.1
 echo "b" | \
 	timeout ${timeout_test} \
 		ip netns exec $ns \
 			./mptcp_connect -p 10001 -j -t ${timeout_poll} \
 				127.0.0.1 >/dev/null &
-pids[1]=$!
 sleep 0.1
 chk_msk_fallback_nr 1 "check fallback"
 flush_pids
@@ -127,7 +118,6 @@ for I in `seq 1 $NR_CLIENTS`; do
 			ip netns exec $ns \
 				./mptcp_connect -p $((I+10001)) -l -w 10 \
 					-t ${timeout_poll} 0.0.0.0 >/dev/null &
-	pids[$((I*2))]=$!
 done
 sleep 0.1
 
@@ -137,7 +127,6 @@ for I in `seq 1 $NR_CLIENTS`; do
 			ip netns exec $ns \
 				./mptcp_connect -p $((I+10001)) -w 10 \
 					-t ${timeout_poll} 127.0.0.1 >/dev/null &
-	pids[$((I*2 + 1))]=$!
 done
 sleep 1.5
 
