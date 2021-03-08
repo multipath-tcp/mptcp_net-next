@@ -15,6 +15,13 @@ Note that in mptcp_connect.sh, we were using a long timeout to validate
 the fact we cannot create a socket if a sysctl is set. We don't need
 this timeout.
 
+In diag.sh, we want to send signals to mptcp_connect instances that have
+been started in the netns. But we cannot send this signal to 'timeout'
+otherwise that will stop the timeout and messages telling us SIGUSR1 has
+been received will be printed. Instead of trying to find the right PID
+and storing them in an array, we can simply use the output of
+'ip netns pids' which is all the PIDs we want to send signal to.
+
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/160
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
