@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-sockopt-function-into-a-new-file
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move sockopt function into a new file
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP sockopt implementation is going to be much
+more big and complex soon. Let's move it to a different
+source file.
+
+No functional change intended.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
