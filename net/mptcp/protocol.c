@@ -11,7 +11,6 @@
 #include <linux/netdevice.h>
 #include <linux/sched/signal.h>
 #include <linux/atomic.h>
-#include <linux/igmp.h>
 #include <net/sock.h>
 #include <net/inet_common.h>
 #include <net/inet_hashtables.h>
@@ -20,7 +19,6 @@
 #include <net/tcp_states.h>
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 #include <net/transp_v6.h>
-#include <net/addrconf.h>
 #endif
 #include <net/mptcp.h>
 #include <net/xfrm.h>
@@ -2813,116 +2811,6 @@ static void mptcp_destroy(struct sock *sk)
 	sk_sockets_allocated_dec(sk);
 }
 
-static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
-				       sockptr_t optval, unsigned int optlen)
-{
-	struct sock *sk = (struct sock *)msk;
-	struct socket *ssock;
-	int ret;
-
-	switch (optname) {
-	case SO_REUSEPORT:
-	case SO_REUSEADDR:
-		lock_sock(sk);
-		ssock = __mptcp_nmpc_socket(msk);
-		if (!ssock) {
-			release_sock(sk);
-			return -EINVAL;
-		}
-
-		ret = sock_setsockopt(ssock, SOL_SOCKET, optname, optval, optlen);
-		if (ret == 0) {
-			if (optname == SO_REUSEPORT)
-				sk->sk_reuseport = ssock->sk->sk_reuseport;
-			else if (optname == SO_REUSEADDR)
-				sk->sk_reuse = ssock->sk->sk_reuse;
-		}
-		release_sock(sk);
-		return ret;
-	}
-
-	return sock_setsockopt(sk->sk_socket, SOL_SOCKET, optname, optval, optlen);
-}
-
-static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
-			       sockptr_t optval, unsigned int optlen)
-{
-	struct sock *sk = (struct sock *)msk;
-	int ret = -EOPNOTSUPP;
-	struct socket *ssock;
-
-	switch (optname) {
-	case IPV6_V6ONLY:
-		lock_sock(sk);
-		ssock = __mptcp_nmpc_socket(msk);
-		if (!ssock) {
-			release_sock(sk);
-			return -EINVAL;
-		}
-
-		ret = tcp_setsockopt(ssock->sk, SOL_IPV6, optname, optval, optlen);
-		if (ret == 0)
-			sk->sk_ipv6only = ssock->sk->sk_ipv6only;
-
-		release_sock(sk);
-		break;
-	}
-
-	return ret;
-}
-
-static int mptcp_setsockopt(struct sock *sk, int level, int optname,
-			    sockptr_t optval, unsigned int optlen)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct sock *ssk;
-
-	pr_debug("msk=%p", msk);
-
-	if (level == SOL_SOCKET)
-		return mptcp_setsockopt_sol_socket(msk, optname, optval, optlen);
-
-	/* @@ the meaning of setsockopt() when the socket is connected and
-	 * there are multiple subflows is not yet defined. It is up to the
-	 * MPTCP-level socket to configure the subflows until the subflow
-	 * is in TCP fallback, when TCP socket options are passed through
-	 * to the one remaining subflow.
-	 */
-	lock_sock(sk);
-	ssk = __mptcp_tcp_fallback(msk);
-	release_sock(sk);
-	if (ssk)
-		return tcp_setsockopt(ssk, level, optname, optval, optlen);
-
-	if (level == SOL_IPV6)
-		return mptcp_setsockopt_v6(msk, optname, optval, optlen);
-
-	return -EOPNOTSUPP;
-}
-
-static int mptcp_getsockopt(struct sock *sk, int level, int optname,
-			    char __user *optval, int __user *option)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct sock *ssk;
-
-	pr_debug("msk=%p", msk);
-
-	/* @@ the meaning of setsockopt() when the socket is connected and
-	 * there are multiple subflows is not yet defined. It is up to the
-	 * MPTCP-level socket to configure the subflows until the subflow
-	 * is in TCP fallback, when socket options are passed through
-	 * to the one remaining subflow.
-	 */
-	lock_sock(sk);
-	ssk = __mptcp_tcp_fallback(msk);
-	release_sock(sk);
-	if (ssk)
-		return tcp_getsockopt(ssk, level, optname, optval, option);
-
-	return -EOPNOTSUPP;
-}
-
 void __mptcp_data_acked(struct sock *sk)
 {
 	if (!sock_owned_by_user(sk))
@@ -3409,34 +3297,10 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	return mask;
 }
 
-static int mptcp_release(struct socket *sock)
-{
-	struct mptcp_subflow_context *subflow;
-	struct sock *sk = sock->sk;
-	struct mptcp_sock *msk;
-
-	if (!sk)
-		return 0;
-
-	lock_sock(sk);
-
-	msk = mptcp_sk(sk);
-
-	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-		ip_mc_drop_socket(ssk);
-	}
-
-	release_sock(sk);
-
-	return inet_release(sock);
-}
-
 static const struct proto_ops mptcp_stream_ops = {
 	.family		   = PF_INET,
 	.owner		   = THIS_MODULE,
-	.release	   = mptcp_release,
+	.release	   = inet_release,
 	.bind		   = mptcp_bind,
 	.connect	   = mptcp_stream_connect,
 	.socketpair	   = sock_no_socketpair,
@@ -3528,35 +3392,10 @@ void __init mptcp_proto_init(void)
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-static int mptcp6_release(struct socket *sock)
-{
-	struct mptcp_subflow_context *subflow;
-	struct mptcp_sock *msk;
-	struct sock *sk = sock->sk;
-
-	if (!sk)
-		return 0;
-
-	lock_sock(sk);
-
-	msk = mptcp_sk(sk);
-
-	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-		ip_mc_drop_socket(ssk);
-		ipv6_sock_mc_close(ssk);
-		ipv6_sock_ac_close(ssk);
-	}
-
-	release_sock(sk);
-	return inet6_release(sock);
-}
-
 static const struct proto_ops mptcp_v6_stream_ops = {
 	.family		   = PF_INET6,
 	.owner		   = THIS_MODULE,
-	.release	   = mptcp6_release,
+	.release	   = inet6_release,
 	.bind		   = mptcp_bind,
 	.connect	   = mptcp_stream_connect,
 	.socketpair	   = sock_no_socketpair,
