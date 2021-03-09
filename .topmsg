@@ -12,4 +12,6 @@ option to '-k'.
 Fixes: 1002b89f23ea ("selftests: mptcp: add command line arguments for mptcp_join.sh")
 Acked-and-tested-by: Geliang Tang <geliangtang@gmail.com>
 Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
