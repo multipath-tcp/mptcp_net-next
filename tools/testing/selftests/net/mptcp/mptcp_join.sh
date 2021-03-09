@@ -1387,9 +1387,13 @@ make_file "$sin" "server" 1
 trap cleanup EXIT
 
 for arg in "$@"; do
-	if [ "$arg" = "-c" ]; then
+	# check for "capture" arg before launching tests
+	if [[ "${arg}" =~ ^"-"[0-9a-zA-Z]*"c"[0-9a-zA-Z]*$ ]]; then
 		capture=1
-	else
+	fi
+
+	# exception for the capture option, the rest means: a part of the tests
+	if [ "${arg}" != "-c" ]; then
 		do_all_tests=0
 	fi
 done
