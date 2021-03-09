@@ -92,16 +92,6 @@ static bool mptcp_is_tcpsk(struct sock *sk)
 	return false;
 }
 
-static struct sock *__mptcp_tcp_fallback(struct mptcp_sock *msk)
-{
-	sock_owned_by_me((const struct sock *)msk);
-
-	if (likely(!__mptcp_check_fallback(msk)))
-		return NULL;
-
-	return msk->first;
-}
-
 static int __mptcp_socket_create(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
