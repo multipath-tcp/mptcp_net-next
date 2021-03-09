@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-revert-mptcp-provide-subflow-aware-release-function
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: revert "mptcp: provide subflow aware release function"
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This commit reverts ad98dd37051e ("mptcp: provide subflow aware
+release function"). The latter introduced a deadlock spotted by
+syzkaller and is not needed anymore after the previous commit.
+
+Fixes: ad98dd37051e ("mptcp: provide subflow aware release function")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
