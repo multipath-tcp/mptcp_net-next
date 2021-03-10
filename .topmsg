@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-skip-connecting-the-connected-address
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: skip connecting the connected address
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new helper named lookup_subflow_by_daddr to find
+whether the destination address is in the msk's conn_list.
+
+In mptcp_pm_nl_add_addr_received, use lookup_subflow_by_daddr to check
+whether the announced address is already connected. If it is, skip
+connecting this address and send out the echo.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
