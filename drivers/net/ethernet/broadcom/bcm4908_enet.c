@@ -570,6 +570,7 @@ static int bcm4908_enet_poll(struct napi_struct *napi, int weight)
 
 		if (len < ETH_ZLEN ||
 		    (ctl & (DMA_CTL_STATUS_SOP | DMA_CTL_STATUS_EOP)) != (DMA_CTL_STATUS_SOP | DMA_CTL_STATUS_EOP)) {
+			kfree_skb(slot.skb);
 			enet->netdev->stats.rx_dropped++;
 			break;
 		}
@@ -582,12 +583,17 @@ static int bcm4908_enet_poll(struct napi_struct *napi, int weight)
 
 		enet->netdev->stats.rx_packets++;
 		enet->netdev->stats.rx_bytes += len;
+
+		handled++;
 	}
 
 	if (handled < weight) {
 		napi_complete_done(napi, handled);
 		bcm4908_enet_intrs_on(enet);
 	}
+
+	/* Hardware could disable ring if it run out of descriptors */
+	bcm4908_enet_dma_rx_ring_enable(enet, &enet->rx_ring);
 
 	return handled;
 }
