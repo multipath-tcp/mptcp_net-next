@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-unneeded-check-on-first-subflow
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: remove unneeded check on first subflow
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently we explicitly check for the first subflow being
+NULL in a couple of places, even if we don't need any
+special actions in such scenario.
+
+Just drop the unneeded checks, to avoid confusion.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
