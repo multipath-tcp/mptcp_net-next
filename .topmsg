@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-signal-addresses-testcases
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: signal addresses testcases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds testcases for signalling multi valid and invalid
+addresses for both signal_address_tests and remove_tests.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
