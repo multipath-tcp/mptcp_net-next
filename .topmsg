@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-cfg_do_w-for-cfg_remove
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: add cfg_do_w for cfg_remove
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In some testcases, we need to slow down the transmitting process. This
+patch added a new argument named cfg_do_w for cfg_remove to allow the
+caller to pass an argument to cfg_remove.
+
+In do_rnd_write, use this cfg_do_w to control the transmitting speed.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
