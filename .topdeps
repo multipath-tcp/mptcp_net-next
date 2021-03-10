@@ -1,1 +1,2 @@
 t/mptcp-fix-race-in-release_cb
+t/bpf-selftests-add-bpf_mptcp_sock-verifier-tests
