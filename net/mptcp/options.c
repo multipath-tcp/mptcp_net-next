@@ -1226,22 +1226,22 @@ mp_capable_done:
 	}
 
 	if (OPTION_MPTCP_RM_ADDR & opts->suboptions) {
-		u8 i;
+		u8 i = 1;
 
-		for (i = opts->rm_list.nr; i < MPTCP_RM_IDS_MAX; i++)
-			opts->rm_list.ids[i] = TCPOPT_NOP;
 		*ptr++ = mptcp_option(MPTCPOPT_RM_ADDR,
 				      TCPOLEN_MPTCP_RM_ADDR_BASE + opts->rm_list.nr,
 				      0, opts->rm_list.ids[0]);
-		if (opts->rm_list.nr > 1) {
-			put_unaligned_be32(opts->rm_list.ids[1] << 24 | opts->rm_list.ids[2] << 16 |
-					   opts->rm_list.ids[3] << 8 | opts->rm_list.ids[4], ptr);
+
+		while (i < opts->rm_list.nr) {
+			u8 id1, id2, id3, id4;
+
+			id1 = opts->rm_list.ids[i];
+			id2 = i + 1 < opts->rm_list.nr ? opts->rm_list.ids[i + 1] : TCPOPT_NOP;
+			id3 = i + 2 < opts->rm_list.nr ? opts->rm_list.ids[i + 2] : TCPOPT_NOP;
+			id4 = i + 3 < opts->rm_list.nr ? opts->rm_list.ids[i + 3] : TCPOPT_NOP;
+			put_unaligned_be32(id1 << 24 | id2 << 16 | id3 << 8 | id4, ptr);
 			ptr += 1;
-		}
-		if (opts->rm_list.nr > 5) {
-			put_unaligned_be32(opts->rm_list.ids[5] << 24 | opts->rm_list.ids[6] << 16 |
-					   opts->rm_list.ids[7] << 8 | TCPOPT_NOP, ptr);
-			ptr += 1;
+			i += 4;
 		}
 	}
 
