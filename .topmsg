@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-set-addr-id-for-removing-testcases
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: set addr id for removing testcases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The removing testcases can only delete the addresses from id 1, this
+patch added the support for deleting the addresses from any id that user
+set.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
