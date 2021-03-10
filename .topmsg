@@ -1,4 +1,12 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-dump-more-info-on-mpjoin-errors
+Subject: [PATCH] selftests: mptcp: dump more info on mpjoin errors
 
+Very occasionally, MPTCP selftests fail. Yeah, I saw that at least once!
+
+Here we provide more details in case of errors with mptcp_join.sh script
+like it was done with mptcp_connect.sh, see
+commit 767389c8dd55 ("selftests: mptcp: dump more info on errors")
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
