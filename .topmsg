@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-unify-RM_ADDR-and-RM_SUBFLOW-receiving
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: unify RM_ADDR and RM_SUBFLOW receiving
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There are some duplicate code in mptcp_pm_nl_rm_addr_received and
+mptcp_pm_nl_rm_subflow_received. This patch unifies them into a new
+function named mptcp_pm_nl_rm_addr_or_subflow. In it, use the input
+parameter rm_type to identify it's now removing an address or a subflow.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
