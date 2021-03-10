@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-timeout-testcases-for-multi-addresses
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] selftests: mptcp: timeout testcases for multi addresses
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the timeout testcases for multi addresses, valid and
+invalid.
+
+These testcases need to transmit 8 ADD_ADDRs, so add a new speed level
+'least' to set 10 to mptcp_connect to slow down the transmitting process.
+The original speed level 'slow' still uses 50.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
