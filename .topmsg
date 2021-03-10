@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-multi-addresses-in-PM
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: remove multi addresses in PM
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch dropped the member rm_id of struct mptcp_pm_data. Use
+rm_list_rx in mptcp_pm_nl_rm_addr_received instead of using rm_id.
+
+In mptcp_pm_nl_rm_addr_received, iterated each address id from
+pm.rm_list_rx, then shut down and closed each address id's subsocket.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
