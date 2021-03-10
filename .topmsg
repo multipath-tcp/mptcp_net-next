@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: move to next addr when timeout
-
-This patch called mptcp_pm_subflow_established to move to the next address
-when an ADD_ADDR has been retransmitted the maximum number of times.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
