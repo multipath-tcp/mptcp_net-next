@@ -1,4 +1,8 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/DO-NOT-MERGE-mptcp-add-GitHub-Actions
+Subject: [PATCH] DO-NOT-MERGE: mptcp: add GitHub Actions
+
+Currently supported:
+
+- irc: send notifications to the IRC channel
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
