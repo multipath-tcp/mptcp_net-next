@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-export-lookup_anno_list_by_saddr
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: export lookup_anno_list_by_saddr
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch exported the static function lookup_anno_list_by_saddr, and
+renamed it to mptcp_lookup_anno_list_by_saddr.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
