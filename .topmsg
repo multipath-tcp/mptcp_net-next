@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] selftests: mptcp: add testcases for removing addrs
-
-This patch added the testcases for removing a list of addresses. Used
-the netlink to flush the addresses in the testcases.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
