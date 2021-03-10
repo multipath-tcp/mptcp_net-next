@@ -1,1 +1,2 @@
 t/mptcp-fix-length-of-ADD_ADDR-with-port-sub-option
+t/selftests-mptcp-Restore-packet-capture-option-in-join-tests
