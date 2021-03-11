@@ -110,6 +110,8 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case SO_RCVLOWAT:
 		case SO_RCVTIMEO_OLD:
 		case SO_RCVTIMEO_NEW:
+		case SO_SNDTIMEO_OLD:
+		case SO_SNDTIMEO_NEW:
 		case SO_MARK:
 		case SO_INCOMING_CPU:
 		case SO_BINDTOIFINDEX:
