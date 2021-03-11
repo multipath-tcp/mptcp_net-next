@@ -22,4 +22,6 @@ Let's do the same with all other non supported sockopts.
 
 Fixes: 717e79c867ca5 ("mptcp: Add setsockopt()/getsockopt() socket operations")
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
