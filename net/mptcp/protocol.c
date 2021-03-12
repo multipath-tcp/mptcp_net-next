@@ -2838,7 +2838,7 @@ static void mptcp_release_cb(struct sock *sk)
 		if (test_and_clear_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->flags))
 			flags |= BIT(MPTCP_PUSH_PENDING);
 		if (test_and_clear_bit(MPTCP_RETRANSMIT, &mptcp_sk(sk)->flags))
-			flags |= MPTCP_RETRANSMIT;
+			flags |= BIT(MPTCP_RETRANSMIT);
 		if (!flags)
 			break;
 
@@ -2853,7 +2853,7 @@ static void mptcp_release_cb(struct sock *sk)
 		spin_unlock_bh(&sk->sk_lock.slock);
 		if (flags & BIT(MPTCP_PUSH_PENDING))
 			__mptcp_push_pending(sk, 0);
-		if (flags & MPTCP_RETRANSMIT)
+		if (flags & BIT(MPTCP_RETRANSMIT))
 			__mptcp_retrans(sk);
 
 		cond_resched();
