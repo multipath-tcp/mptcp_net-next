@@ -1,4 +1,30 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-avoid-calling-pm_nl_ctl-with-bad-IDs
+Subject: [PATCH] selftests: mptcp: avoid calling pm_nl_ctl with bad IDs
 
+IDs are supposed to be between 0 and 255.
+
+In pm_nl_ctl, for both the 'add' and 'get' instruction, the ID is casted
+in a u_int8_t. So if we give 256, we will delete ID 0. Obviously, the
+goal is not to delete this ID by giving 256.
+
+We could modify pm_nl_ctl and stop if the ID is negative or higher than
+255 but probably better not to increase the number of lines for such
+things in this tool which is only used in selftests. Instead, we use it
+within the limits.
+
+This modification also means that we will no longer add a new ID for the
+2nd entry. That's why we removed an expected entry from the dump and
+introduced with
+commit dc8eb10e95a8 ("selftests: mptcp: add testcases for setting the address ID").
+
+So now we delete ID 9 like before and we add entries for IDs 10 to 255
+that are deleted just after.
+
+Note that this could be seen as a fix but it was not really an issue so
+far: we were simply playing with ID 0/1 once again. With the following
+commit ("selftests: mptcp: add addr argument for del_addr"), it will be
+different because ID 0 is going to required an address. We don't want
+errors when trying to delete ID 0 without the address argument.
+
+Acked-and-tested-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
