@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-ADD_ADDR-HMAC-in-case-port-is-specified
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: fix ADD_ADDR HMAC in case port is specified
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently, Linux computes the HMAC contained in ADD_ADDR sub-option using
+the Address Id and the IP Address, and hardcodes a destination port equal
+to zero. This is not ok for ADD_ADDR with port: ensure to account for the
+endpoint port when computing the HMAC, in compliance with RFC8684 §3.4.1.
+
+Fixes: 22fb85ffaefb ("mptcp: add port support for ADD_ADDR suboption writing")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
