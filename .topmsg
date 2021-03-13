@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-fix-ADD_ADDR-HMAC-in-case-port-is-specified
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
