@@ -1,9 +1,0 @@
-From: Dan Carpenter <dan.carpenter@oracle.com>
-Subject: [PATCH] mptcp: fix bit MPTCP_PUSH_PENDING tests
-
-The MPTCP_PUSH_PENDING define is 6 and these tests should be testing if
-BIT(6) is set.
-
-Fixes: c2e6048fa1cf ("mptcp: fix race in release_cb")
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
