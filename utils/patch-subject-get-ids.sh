@@ -4,11 +4,9 @@ SUBJECT="${*}"
 
 [ -n "${SUBJECT}" ]
 
-# escape special chars for grep
-SUBJECT="${SUBJECT//\*/\\\*}"
-
-bash "-${-}" ./.list-pending.sh NO_AUTH | \
-	grep " ${SUBJECT}\.*$" | \
-	cut -d: -f1 | \
+pwclient list -a no -f "%{id}==%{state}@@%{name}##" | \
+	grep -v -e "==Accepted@@" -e "==Superseded@@" -e "==Deferred@@" | \
+	sed "s/@@\[.*\] /@@/g" | \
+	grep --fixed-strings -e "@@${SUBJECT}##" -e "@@${SUBJECT}.##" | \
+	cut -d= -f1 | \
 	sort -nr
-

@@ -4,8 +4,6 @@ pwclient list -a no -f "%{id}: %{state}: %{name}" | \
 	grep -v ": Superseded:" | \
 	grep -v ": Deferred:"
 
-[ "${1}" = "NO_AUTH" ] && exit 0
-
 echo
 echo "Duplicated:"
 pwclient list -a no -f "%{state}:%{name}" | \
