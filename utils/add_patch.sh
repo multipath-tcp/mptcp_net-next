@@ -5,7 +5,11 @@
 source ./.lib.sh
 
 TOP="t/upstream"
-TG_TOP=${TG_TOP:-${TOP}}
+
+if [ -z "${TG_TOP}" ]; then
+	printerr "TG_TOP is not defined. Please use add_patch_xxx.sh"
+	exit 1
+fi
 
 MODE=$(bash "-${-}" ./.get_arg_mode.sh "${1}")
 
