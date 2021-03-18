@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rename-mptcp_pm_nl_add_addr_send_ack
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: rename mptcp_pm_nl_add_addr_send_ack
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since mptcp_pm_nl_add_addr_send_ack is now used for both ADD_ADDR and
+RM_ADDR cases, rename it to mptcp_pm_nl_addr_send_ack.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
