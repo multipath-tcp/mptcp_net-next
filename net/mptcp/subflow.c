@@ -948,9 +948,12 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	subflow->map_data_len = data_len;
 	subflow->map_valid = 1;
 	subflow->mpc_map = mpext->mpc_map;
-	pr_debug("new map seq=%llu subflow_seq=%u data_len=%u",
+	subflow->data_csum = 0;
+	subflow->csum_len = 0;
+	subflow->map_csum = mpext->csum;
+	pr_debug("new map seq=%llu subflow_seq=%u data_len=%u csum=%u",
 		 subflow->map_seq, subflow->map_subflow_seq,
-		 subflow->map_data_len);
+		 subflow->map_data_len, subflow->map_csum);
 
 validate_seq:
 	/* we revalidate valid mapping on new skb, because we must ensure

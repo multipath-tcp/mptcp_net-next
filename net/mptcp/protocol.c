@@ -520,6 +520,35 @@ static bool mptcp_check_data_fin(struct sock *sk)
 	return ret;
 }
 
+static bool mptcp_validate_data_checksum(struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+	struct csum_pseudo_header header;
+	__wsum csum;
+
+	if (__mptcp_check_fallback(msk))
+		goto out;
+
+	if (subflow->csum_len < subflow->map_data_len)
+		goto out;
+
+	header.data_seq = subflow->map_seq;
+	header.subflow_seq = subflow->map_subflow_seq;
+	header.data_len = subflow->map_data_len;
+	header.csum = subflow->map_csum;
+
+	csum = csum_partial(&header, sizeof(header), subflow->data_csum);
+
+	if (csum_fold(csum))
+		return false;
+	subflow->data_csum = 0;
+	subflow->csum_len = 0;
+
+out:
+	return true;
+}
+
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 					   struct sock *ssk,
 					   unsigned int *bytes)
@@ -588,6 +617,12 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 			if (tp->urg_data)
 				done = true;
 
+			if (READ_ONCE(msk->csum_enabled)) {
+				subflow->data_csum = skb_checksum(skb, offset, len,
+								  subflow->data_csum);
+				subflow->csum_len += len;
+				mptcp_validate_data_checksum(ssk);
+			}
 			if (__mptcp_move_skb(msk, ssk, skb, offset, len))
 				moved += len;
 			seq += len;
