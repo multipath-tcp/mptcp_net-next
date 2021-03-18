@@ -540,6 +540,8 @@ static bool mptcp_validate_data_checksum(struct sock *ssk)
 
 	csum = csum_partial(&header, sizeof(header), subflow->data_csum);
 
+	trace_mptcp_validate_data_checksum(&header, csum_fold(csum));
+
 	if (csum_fold(csum)) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSCSUMERR);
 		return false;
@@ -1323,6 +1325,8 @@ static __sum16 mptcp_generate_data_checksum(struct sk_buff *skb)
 
 	csum = skb_checksum(skb, 0, skb->len, 0);
 	csum = csum_partial(&header, sizeof(header), csum);
+
+	trace_mptcp_generate_data_checksum(&header, csum_fold(csum));
 
 	return csum_fold(csum);
 }

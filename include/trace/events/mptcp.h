@@ -169,6 +169,44 @@ TRACE_EVENT(subflow_check_data_avail,
 		  __entry->skb)
 );
 
+DECLARE_EVENT_CLASS(mptcp_event_data_checksum,
+
+	TP_PROTO(struct csum_pseudo_header *header, __sum16 csum),
+
+	TP_ARGS(header, csum),
+
+	TP_STRUCT__entry(
+		__field(u64, data_seq)
+		__field(u32, subflow_seq)
+		__field(u16, data_len)
+		__field(u16, data_csum)
+		__field(u16, csum)
+	),
+
+	TP_fast_assign(
+		__entry->data_seq = header->data_seq;
+		__entry->subflow_seq = header->subflow_seq;
+		__entry->data_len = header->data_len;
+		__entry->data_csum = (__force u16)header->csum;
+		__entry->csum = (__force u16)csum;
+	),
+
+	TP_printk("data_seq=%llu subflow_seq=%u data_len=%u csum=%u",
+		  __entry->data_seq, __entry->subflow_seq, __entry->data_len,
+		  __entry->csum)
+);
+
+DEFINE_EVENT(mptcp_event_data_checksum, mptcp_generate_data_checksum,
+	TP_PROTO(struct csum_pseudo_header *header, __sum16 csum),
+	TP_ARGS(header, csum));
+
+DEFINE_EVENT_PRINT(mptcp_event_data_checksum, mptcp_validate_data_checksum,
+	TP_PROTO(struct csum_pseudo_header *header, __sum16 csum),
+	TP_ARGS(header, csum),
+	TP_printk("data_seq=%llu subflow_seq=%u data_len=%u csum=%u, checksum %s!",
+		  __entry->data_seq, __entry->subflow_seq, __entry->data_len,
+		  __entry->data_csum, __entry->csum ? "error" : "done"));
+
 #endif /* _TRACE_MPTCP_H */
 
 /* This part must be outside protection */
