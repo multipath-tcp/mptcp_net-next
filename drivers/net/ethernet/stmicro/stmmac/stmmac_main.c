@@ -466,6 +466,7 @@ static void stmmac_get_tx_hwtstamp(struct stmmac_priv *priv,
 {
 	struct skb_shared_hwtstamps shhwtstamp;
 	bool found = false;
+	s64 adjust = 0;
 	u64 ns = 0;
 
 	if (!priv->hwts_tx_en)
@@ -484,6 +485,13 @@ static void stmmac_get_tx_hwtstamp(struct stmmac_priv *priv,
 	}
 
 	if (found) {
+		/* Correct the clk domain crossing(CDC) error */
+		if (priv->plat->has_gmac4 && priv->plat->clk_ptp_rate) {
+			adjust += -(2 * (NSEC_PER_SEC /
+					 priv->plat->clk_ptp_rate));
+			ns += adjust;
+		}
+
 		memset(&shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
 		shhwtstamp.hwtstamp = ns_to_ktime(ns);
 
@@ -507,6 +515,7 @@ static void stmmac_get_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *p,
 {
 	struct skb_shared_hwtstamps *shhwtstamp = NULL;
 	struct dma_desc *desc = p;
+	u64 adjust = 0;
 	u64 ns = 0;
 
 	if (!priv->hwts_rx_en)
@@ -518,6 +527,13 @@ static void stmmac_get_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *p,
 	/* Check if timestamp is available */
 	if (stmmac_get_rx_timestamp_status(priv, p, np, priv->adv_ts)) {
 		stmmac_get_timestamp(priv, desc, priv->adv_ts, &ns);
+
+		/* Correct the clk domain crossing(CDC) error */
+		if (priv->plat->has_gmac4 && priv->plat->clk_ptp_rate) {
+			adjust += 2 * (NSEC_PER_SEC / priv->plat->clk_ptp_rate);
+			ns -= adjust;
+		}
+
 		netdev_dbg(priv->dev, "get valid RX hw timestamp %llu\n", ns);
 		shhwtstamp = skb_hwtstamps(skb);
 		memset(shhwtstamp, 0, sizeof(struct skb_shared_hwtstamps));
@@ -2218,7 +2234,8 @@ static int stmmac_tx_clean(struct stmmac_priv *priv, int budget, u32 queue)
 
 	/* We still have pending packets, let's call for a new scheduling */
 	if (tx_q->dirty_tx != tx_q->cur_tx)
-		hrtimer_start(&tx_q->txtimer, STMMAC_COAL_TIMER(priv->tx_coal_timer),
+		hrtimer_start(&tx_q->txtimer,
+			      STMMAC_COAL_TIMER(priv->tx_coal_timer[queue]),
 			      HRTIMER_MODE_REL);
 
 	__netif_tx_unlock_bh(netdev_get_tx_queue(priv->dev, queue));
@@ -2503,7 +2520,8 @@ static void stmmac_tx_timer_arm(struct stmmac_priv *priv, u32 queue)
 {
 	struct stmmac_tx_queue *tx_q = &priv->tx_queue[queue];
 
-	hrtimer_start(&tx_q->txtimer, STMMAC_COAL_TIMER(priv->tx_coal_timer),
+	hrtimer_start(&tx_q->txtimer,
+		      STMMAC_COAL_TIMER(priv->tx_coal_timer[queue]),
 		      HRTIMER_MODE_REL);
 }
 
@@ -2544,18 +2562,21 @@ static enum hrtimer_restart stmmac_tx_timer(struct hrtimer *t)
 static void stmmac_init_coalesce(struct stmmac_priv *priv)
 {
 	u32 tx_channel_count = priv->plat->tx_queues_to_use;
+	u32 rx_channel_count = priv->plat->rx_queues_to_use;
 	u32 chan;
-
-	priv->tx_coal_frames = STMMAC_TX_FRAMES;
-	priv->tx_coal_timer = STMMAC_COAL_TX_TIMER;
-	priv->rx_coal_frames = STMMAC_RX_FRAMES;
 
 	for (chan = 0; chan < tx_channel_count; chan++) {
 		struct stmmac_tx_queue *tx_q = &priv->tx_queue[chan];
 
+		priv->tx_coal_frames[chan] = STMMAC_TX_FRAMES;
+		priv->tx_coal_timer[chan] = STMMAC_COAL_TX_TIMER;
+
 		hrtimer_init(&tx_q->txtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		tx_q->txtimer.function = stmmac_tx_timer;
 	}
+
+	for (chan = 0; chan < rx_channel_count; chan++)
+		priv->rx_coal_frames[chan] = STMMAC_RX_FRAMES;
 }
 
 static void stmmac_set_rings_length(struct stmmac_priv *priv)
@@ -2860,10 +2881,15 @@ static int stmmac_hw_setup(struct net_device *dev, bool init_ptp)
 		priv->tx_lpi_timer = eee_timer * 1000;
 
 	if (priv->use_riwt) {
-		if (!priv->rx_riwt)
-			priv->rx_riwt = DEF_DMA_RIWT;
+		u32 queue;
 
-		ret = stmmac_rx_watchdog(priv, priv->ioaddr, priv->rx_riwt, rx_cnt);
+		for (queue = 0; queue < rx_cnt; queue++) {
+			if (!priv->rx_riwt[queue])
+				priv->rx_riwt[queue] = DEF_DMA_RIWT;
+
+			stmmac_rx_watchdog(priv, priv->ioaddr,
+					   priv->rx_riwt[queue], queue);
+		}
 	}
 
 	if (priv->hw->pcs)
@@ -3362,11 +3388,12 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) && priv->hwts_tx_en)
 		set_ic = true;
-	else if (!priv->tx_coal_frames)
+	else if (!priv->tx_coal_frames[queue])
 		set_ic = false;
-	else if (tx_packets > priv->tx_coal_frames)
+	else if (tx_packets > priv->tx_coal_frames[queue])
 		set_ic = true;
-	else if ((tx_q->tx_count_frames % priv->tx_coal_frames) < tx_packets)
+	else if ((tx_q->tx_count_frames %
+		  priv->tx_coal_frames[queue]) < tx_packets)
 		set_ic = true;
 	else
 		set_ic = false;
@@ -3591,11 +3618,12 @@ static netdev_tx_t stmmac_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) && priv->hwts_tx_en)
 		set_ic = true;
-	else if (!priv->tx_coal_frames)
+	else if (!priv->tx_coal_frames[queue])
 		set_ic = false;
-	else if (tx_packets > priv->tx_coal_frames)
+	else if (tx_packets > priv->tx_coal_frames[queue])
 		set_ic = true;
-	else if ((tx_q->tx_count_frames % priv->tx_coal_frames) < tx_packets)
+	else if ((tx_q->tx_count_frames %
+		  priv->tx_coal_frames[queue]) < tx_packets)
 		set_ic = true;
 	else
 		set_ic = false;
@@ -3794,11 +3822,11 @@ static inline void stmmac_rx_refill(struct stmmac_priv *priv, u32 queue)
 		stmmac_refill_desc3(priv, rx_q, p);
 
 		rx_q->rx_count_frames++;
-		rx_q->rx_count_frames += priv->rx_coal_frames;
-		if (rx_q->rx_count_frames > priv->rx_coal_frames)
+		rx_q->rx_count_frames += priv->rx_coal_frames[queue];
+		if (rx_q->rx_count_frames > priv->rx_coal_frames[queue])
 			rx_q->rx_count_frames = 0;
 
-		use_rx_wd = !priv->rx_coal_frames;
+		use_rx_wd = !priv->rx_coal_frames[queue];
 		use_rx_wd |= rx_q->rx_count_frames > 0;
 		if (!priv->use_riwt)
 			use_rx_wd = false;
