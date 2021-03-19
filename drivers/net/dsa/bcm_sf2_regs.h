@@ -21,6 +21,7 @@ enum bcm_sf2_reg_offs {
 	REG_RGMII_0_CNTRL,
 	REG_RGMII_1_CNTRL,
 	REG_RGMII_2_CNTRL,
+	REG_RGMII_11_CNTRL,
 	REG_LED_0_CNTRL,
 	REG_LED_1_CNTRL,
 	REG_LED_2_CNTRL,
@@ -54,8 +55,6 @@ enum bcm_sf2_reg_offs {
 #define CROSSBAR_BCM4908_EXT_SERDES	0
 #define CROSSBAR_BCM4908_EXT_GPHY4	1
 #define CROSSBAR_BCM4908_EXT_RGMII	2
-
-#define REG_RGMII_CNTRL_P(x)		(REG_RGMII_0_CNTRL + (x))
 
 /* Relative to REG_RGMII_CNTRL */
 #define  RGMII_MODE_EN			(1 << 0)
