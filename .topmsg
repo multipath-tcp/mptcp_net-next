@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-mptcp_addr_info-in-mptcp_options_received
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: use mptcp_addr_info in mptcp_options_received
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new struct mptcp_addr_info member addr in struct
+mptcp_options_received, and dropped the original family, addr_id, addr,
+addr6 and port fields in it. Then we can pass the parameter mp_opt.addr
+directly to mptcp_pm_add_addr_received and mptcp_pm_add_addr_echoed.
+
+Since the port number became as a big-endian order now, use ntohs to
+convert it before printing it out.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
