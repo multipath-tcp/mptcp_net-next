@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-mptcp_addr_info-in-mptcp_out_options
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: use mptcp_addr_info in mptcp_out_options
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch moved the mptcp_addr_info struct from protocol.h to mptcp.h,
+added a new struct mptcp_addr_info member addr in struct mptcp_out_options,
+and dropped the original addr, addr6, addr_id and port fields in it. Then
+we can use opts->addr to get the adding address from PM directly using
+mptcp_pm_add_addr_signal.
+
+Since the port number became as a big-endian order now, use ntohs to
+convert it before printing it out.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
