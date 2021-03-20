@@ -176,7 +176,7 @@ static int otx2_tc_egress_matchall_install(struct otx2_nic *nic,
 
 	if (nic->flags & OTX2_FLAG_TC_MATCHALL_EGRESS_ENABLED) {
 		NL_SET_ERR_MSG_MOD(extack,
-				   "Only one Egress MATCHALL ratelimitter can be offloaded");
+				   "Only one Egress MATCHALL ratelimiter can be offloaded");
 		return -ENOMEM;
 	}
 
@@ -536,6 +536,7 @@ static int otx2_tc_add_flow(struct otx2_nic *nic,
 	new_node = kzalloc(sizeof(*new_node), GFP_KERNEL);
 	if (!new_node)
 		return -ENOMEM;
+	spin_lock_init(&new_node->lock);
 	new_node->cookie = tc_flow_cmd->cookie;
 
 	mutex_lock(&nic->mbox.lock);
