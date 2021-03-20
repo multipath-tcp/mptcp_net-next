@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-move-flags-and-ifindex-out-of-mptcp_addr_info
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
