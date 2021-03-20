@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-OPTION_MPTCP_ADD_ADDR6
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: drop OPTION_MPTCP_ADD_ADDR6
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the family field was added in struct mptcp_out_options, no need to
+use OPTION_MPTCP_ADD_ADDR6 to identify the IPv6 address. Drop it.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
