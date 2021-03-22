@@ -659,7 +659,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							     msk->remote_key,
 							     opts->addr.id,
 							     &opts->addr.addr,
-							     opts->addr.port);
+							     be16_to_cpu(opts->addr.port));
 		}
 	}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -670,7 +670,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							      msk->remote_key,
 							      opts->addr.id,
 							      &opts->addr.addr6,
-							      opts->addr.port);
+							      be16_to_cpu(opts->addr.port));
 		}
 	}
 #endif
@@ -1238,10 +1238,12 @@ mp_capable_done:
 				ptr += 2;
 			}
 		} else {
+			u16 port = be16_to_cpu(opts->addr.port);
+
 			if (opts->ahmac) {
 				u8 *bptr = (u8 *)ptr;
 
-				put_unaligned_be16(opts->addr.port, bptr);
+				put_unaligned_be16(port, bptr);
 				bptr += 2;
 				put_unaligned_be64(opts->ahmac, bptr);
 				bptr += 8;
@@ -1250,7 +1252,7 @@ mp_capable_done:
 
 				ptr += 3;
 			} else {
-				put_unaligned_be32(opts->addr.port << 16 |
+				put_unaligned_be32(port << 16 |
 						   TCPOPT_NOP << 8 |
 						   TCPOPT_NOP, ptr);
 				ptr += 1;
