@@ -248,7 +248,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 4;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = cpu_to_be16(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -258,7 +258,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 16;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = cpu_to_be16(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -995,13 +995,13 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 		hmac = add_addr_generate_hmac(msk->remote_key,
 					      msk->local_key,
 					      mp_opt->addr.id, &mp_opt->addr.addr,
-					      mp_opt->addr.port);
+					      be16_to_cpu(mp_opt->addr.port));
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else
 		hmac = add_addr6_generate_hmac(msk->remote_key,
 					       msk->local_key,
 					       mp_opt->addr.id, &mp_opt->addr.addr6,
-					       mp_opt->addr.port);
+					       be16_to_cpu(mp_opt->addr.port));
 #endif
 
 	pr_debug("msk=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
