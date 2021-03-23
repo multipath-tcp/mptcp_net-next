@@ -7,8 +7,9 @@ and dropped the original addr, addr6, addr_id and port fields in it. Then
 we can use opts->addr to get the adding address from PM directly using
 mptcp_pm_add_addr_signal.
 
-Since the port number became as a big-endian order now, use ntohs to
-convert it before printing it out.
+Since the port number became big-endian now, use ntohs to convert it
+before sending it out with the ADD_ADDR suboption. Also convert it
+when passing it to add_addr_generate_hmac or printing it out.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
