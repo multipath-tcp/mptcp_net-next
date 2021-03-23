@@ -11,4 +11,6 @@ Since the port number became as a big-endian order now, use ntohs to
 convert it before printing it out.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
