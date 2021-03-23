@@ -6,8 +6,9 @@ mptcp_options_received, and dropped the original family, addr_id, addr,
 addr6 and port fields in it. Then we can pass the parameter mp_opt.addr
 directly to mptcp_pm_add_addr_received and mptcp_pm_add_addr_echoed.
 
-Since the port number became as a big-endian order now, use ntohs to
-convert it before printing it out.
+Since the port number became big-endian now, use htons to convert the
+incoming port number to it. Also use ntohs to convert it when passing
+it to add_addr_generate_hmac or printing it out.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
