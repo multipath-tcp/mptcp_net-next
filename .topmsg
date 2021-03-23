@@ -7,4 +7,6 @@ difference between add_addr_generate_hmac and add_addr6_generate_hmac.
 This patch dropped the duplicate code and unify them into one.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
