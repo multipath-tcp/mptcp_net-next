@@ -659,7 +659,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							     msk->remote_key,
 							     opts->addr.id,
 							     &opts->addr.addr,
-							     be16_to_cpu(opts->addr.port));
+							     ntohs(opts->addr.port));
 		}
 	}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -670,7 +670,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							      msk->remote_key,
 							      opts->addr.id,
 							      &opts->addr.addr6,
-							      be16_to_cpu(opts->addr.port));
+							      ntohs(opts->addr.port));
 		}
 	}
 #endif
@@ -1238,7 +1238,7 @@ mp_capable_done:
 				ptr += 2;
 			}
 		} else {
-			u16 port = be16_to_cpu(opts->addr.port);
+			u16 port = ntohs(opts->addr.port);
 
 			if (opts->ahmac) {
 				u8 *bptr = (u8 *)ptr;
