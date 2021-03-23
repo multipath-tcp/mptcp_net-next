@@ -248,7 +248,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 4;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = htons(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -258,7 +258,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 16;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = htons(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -586,6 +586,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 				  struct mptcp_addr_info *addr)
 {
+	u16 port = ntohs(addr->port);
 	u8 hmac[SHA256_DIGEST_SIZE];
 	u8 msg[19];
 	int i = 0;
@@ -601,8 +602,8 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 		i += 16;
 	}
 #endif
-	msg[i++] = addr->port >> 8;
-	msg[i++] = addr->port & 0xFF;
+	msg[i++] = port >> 8;
+	msg[i++] = port & 0xFF;
 
 	mptcp_crypto_hmac_sha(key1, key2, msg, i, hmac);
 
@@ -1187,10 +1188,12 @@ mp_capable_done:
 				ptr += 2;
 			}
 		} else {
+			u16 port = ntohs(opts->addr.port);
+
 			if (opts->ahmac) {
 				u8 *bptr = (u8 *)ptr;
 
-				put_unaligned_be16(opts->addr.port, bptr);
+				put_unaligned_be16(port, bptr);
 				bptr += 2;
 				put_unaligned_be64(opts->ahmac, bptr);
 				bptr += 8;
@@ -1199,7 +1202,7 @@ mp_capable_done:
 
 				ptr += 3;
 			} else {
-				put_unaligned_be32(opts->addr.port << 16 |
+				put_unaligned_be32(port << 16 |
 						   TCPOPT_NOP << 8 |
 						   TCPOPT_NOP, ptr);
 				ptr += 1;
