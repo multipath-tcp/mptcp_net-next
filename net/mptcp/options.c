@@ -586,7 +586,7 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 				  struct mptcp_addr_info *addr)
 {
-	u16 port = be16_to_cpu(addr->port);
+	u16 port = ntohs(addr->port);
 	u8 hmac[SHA256_DIGEST_SIZE];
 	u8 msg[19];
 	int i = 0;
