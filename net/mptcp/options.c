@@ -248,7 +248,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 4;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = htons(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -258,7 +258,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 16;
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT) {
-				mp_opt->addr.port = get_unaligned_be16(ptr);
+				mp_opt->addr.port = htons(get_unaligned_be16(ptr));
 				ptr += 2;
 			}
 		}
@@ -659,7 +659,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							     msk->remote_key,
 							     opts->addr.id,
 							     &opts->addr.addr,
-							     opts->addr.port);
+							     ntohs(opts->addr.port));
 		}
 	}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -669,7 +669,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 							      msk->remote_key,
 							      opts->addr.id,
 							      &opts->addr.addr6,
-							      opts->addr.port);
+							      ntohs(opts->addr.port));
 		}
 	}
 #endif
@@ -995,13 +995,13 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 		hmac = add_addr_generate_hmac(msk->remote_key,
 					      msk->local_key,
 					      mp_opt->addr.id, &mp_opt->addr.addr,
-					      mp_opt->addr.port);
+					      ntohs(mp_opt->addr.port));
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else
 		hmac = add_addr6_generate_hmac(msk->remote_key,
 					       msk->local_key,
 					       mp_opt->addr.id, &mp_opt->addr.addr6,
-					       mp_opt->addr.port);
+					       ntohs(mp_opt->addr.port));
 #endif
 
 	pr_debug("msk=%p, ahmac=%llu, mp_opt->ahmac=%llu\n",
@@ -1219,10 +1219,12 @@ mp_capable_done:
 				ptr += 2;
 			}
 		} else {
+			u16 port = ntohs(opts->addr.port);
+
 			if (opts->ahmac) {
 				u8 *bptr = (u8 *)ptr;
 
-				put_unaligned_be16(opts->addr.port, bptr);
+				put_unaligned_be16(port, bptr);
 				bptr += 2;
 				put_unaligned_be64(opts->ahmac, bptr);
 				bptr += 8;
@@ -1231,7 +1233,7 @@ mp_capable_done:
 
 				ptr += 3;
 			} else {
-				put_unaligned_be32(opts->addr.port << 16 |
+				put_unaligned_be32(port << 16 |
 						   TCPOPT_NOP << 8 |
 						   TCPOPT_NOP, ptr);
 				ptr += 1;
