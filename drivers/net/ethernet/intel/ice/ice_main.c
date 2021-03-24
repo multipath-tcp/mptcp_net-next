@@ -1044,7 +1044,7 @@ struct ice_aq_task {
 };
 
 /**
- * ice_wait_for_aq_event - Wait for an AdminQ event from firmware
+ * ice_aq_wait_for_event - Wait for an AdminQ event from firmware
  * @pf: pointer to the PF private structure
  * @opcode: the opcode to wait for
  * @timeout: how long to wait, in jiffies
@@ -2071,6 +2071,7 @@ static void ice_service_task(struct work_struct *work)
 	ice_process_vflr_event(pf);
 	ice_clean_mailboxq_subtask(pf);
 	ice_sync_arfs_fltrs(pf);
+	ice_flush_fdir_ctx(pf);
 	/* Clear __ICE_SERVICE_SCHED flag to allow scheduling next event */
 	ice_service_task_complete(pf);
 
@@ -2082,6 +2083,7 @@ static void ice_service_task(struct work_struct *work)
 	    test_bit(__ICE_MDD_EVENT_PENDING, pf->state) ||
 	    test_bit(__ICE_VFLR_EVENT_PENDING, pf->state) ||
 	    test_bit(__ICE_MAILBOXQ_EVENT_PENDING, pf->state) ||
+	    test_bit(__ICE_FD_VF_FLUSH_CTX, pf->state) ||
 	    test_bit(__ICE_ADMINQ_EVENT_PENDING, pf->state))
 		mod_timer(&pf->serv_tmr, jiffies);
 }
@@ -2220,8 +2222,13 @@ static int ice_vsi_req_irq_msix(struct ice_vsi *vsi, char *basename)
 			/* skip this unused q_vector */
 			continue;
 		}
-		err = devm_request_irq(dev, irq_num, vsi->irq_handler, 0,
-				       q_vector->name, q_vector);
+		if (vsi->type == ICE_VSI_CTRL && vsi->vf_id != ICE_INVAL_VFID)
+			err = devm_request_irq(dev, irq_num, vsi->irq_handler,
+					       IRQF_SHARED, q_vector->name,
+					       q_vector);
+		else
+			err = devm_request_irq(dev, irq_num, vsi->irq_handler,
+					       0, q_vector->name, q_vector);
 		if (err) {
 			netdev_err(vsi->netdev, "MSIX request_irq failed, error: %d\n",
 				   err);
@@ -4314,7 +4321,7 @@ static void ice_set_wake(struct ice_pf *pf)
 }
 
 /**
- * ice_setup_magic_mc_wake - setup device to wake on multicast magic packet
+ * ice_setup_mc_magic_wake - setup device to wake on multicast magic packet
  * @pf: pointer to the PF struct
  *
  * Issue firmware command to enable multicast magic wake, making
