@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         defconfig: ['x86_64', 'i386']
         ipv6: ['with_ipv6', 'without_ipv6']
