@@ -6066,10 +6066,14 @@ static int retrieve_ptr_limit(const struct bpf_reg_state *ptr_reg,
 {
 	bool mask_to_left = (opcode == BPF_ADD &&  off_is_neg) ||
 			    (opcode == BPF_SUB && !off_is_neg);
-	u32 off;
+	u32 off, max;
 
 	switch (ptr_reg->type) {
 	case PTR_TO_STACK:
+		/* Offset 0 is out-of-bounds, but acceptable start for the
+		 * left direction, see BPF_REG_FP.
+		 */
+		max = MAX_BPF_STACK + mask_to_left;
 		/* Indirect variable offset stack access is prohibited in
 		 * unprivileged mode so it's not handled here.
 		 */
@@ -6077,8 +6081,8 @@ static int retrieve_ptr_limit(const struct bpf_reg_state *ptr_reg,
 		if (mask_to_left)
 			*ptr_limit = MAX_BPF_STACK + off;
 		else
-			*ptr_limit = -off;
-		return 0;
+			*ptr_limit = -off - 1;
+		return *ptr_limit >= max ? -ERANGE : 0;
 	case PTR_TO_MAP_KEY:
 		/* Currently, this code is not exercised as the only use
 		 * is bpf_for_each_map_elem() helper which requires
@@ -6093,13 +6097,14 @@ static int retrieve_ptr_limit(const struct bpf_reg_state *ptr_reg,
 		}
 		return 0;
 	case PTR_TO_MAP_VALUE:
+		max = ptr_reg->map_ptr->value_size;
 		if (mask_to_left) {
 			*ptr_limit = ptr_reg->umax_value + ptr_reg->off;
 		} else {
 			off = ptr_reg->smin_value + ptr_reg->off;
-			*ptr_limit = ptr_reg->map_ptr->value_size - off;
+			*ptr_limit = ptr_reg->map_ptr->value_size - off - 1;
 		}
-		return 0;
+		return *ptr_limit >= max ? -ERANGE : 0;
 	default:
 		return -EINVAL;
 	}
@@ -6152,6 +6157,7 @@ static int sanitize_ptr_alu(struct bpf_verifier_env *env,
 	u32 alu_state, alu_limit;
 	struct bpf_reg_state tmp;
 	bool ret;
+	int err;
 
 	if (can_skip_alu_sanitation(env, insn))
 		return 0;
@@ -6167,10 +6173,13 @@ static int sanitize_ptr_alu(struct bpf_verifier_env *env,
 	alu_state |= ptr_is_dst_reg ?
 		     BPF_ALU_SANITIZE_SRC : BPF_ALU_SANITIZE_DST;
 
-	if (retrieve_ptr_limit(ptr_reg, &alu_limit, opcode, off_is_neg))
-		return 0;
-	if (update_alu_sanitation_state(aux, alu_state, alu_limit))
-		return -EACCES;
+	err = retrieve_ptr_limit(ptr_reg, &alu_limit, opcode, off_is_neg);
+	if (err < 0)
+		return err;
+
+	err = update_alu_sanitation_state(aux, alu_state, alu_limit);
+	if (err < 0)
+		return err;
 do_sim:
 	/* Simulate and find potential out-of-bounds access under
 	 * speculative execution from truncation as a result of
@@ -6324,7 +6333,7 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 	case BPF_ADD:
 		ret = sanitize_ptr_alu(env, insn, ptr_reg, dst_reg, smin_val < 0);
 		if (ret < 0) {
-			verbose(env, "R%d tried to add from different maps or paths\n", dst);
+			verbose(env, "R%d tried to add from different maps, paths, or prohibited types\n", dst);
 			return ret;
 		}
 		/* We can take a fixed offset as long as it doesn't overflow
@@ -6379,7 +6388,7 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 	case BPF_SUB:
 		ret = sanitize_ptr_alu(env, insn, ptr_reg, dst_reg, smin_val < 0);
 		if (ret < 0) {
-			verbose(env, "R%d tried to sub from different maps or paths\n", dst);
+			verbose(env, "R%d tried to sub from different maps, paths, or prohibited types\n", dst);
 			return ret;
 		}
 		if (dst_reg == off_reg) {
@@ -9299,6 +9308,10 @@ static int check_btf_info(struct bpf_verifier_env *env,
 	btf = btf_get_by_fd(attr->prog_btf_fd);
 	if (IS_ERR(btf))
 		return PTR_ERR(btf);
+	if (btf_is_kernel(btf)) {
+		btf_put(btf);
+		return -EACCES;
+	}
 	env->prog->aux->btf = btf;
 
 	err = check_btf_func(env, attr, uattr);
@@ -11929,7 +11942,6 @@ static int do_misc_fixups(struct bpf_verifier_env *env)
 		    insn->code == (BPF_ALU64 | BPF_SUB | BPF_X)) {
 			const u8 code_add = BPF_ALU64 | BPF_ADD | BPF_X;
 			const u8 code_sub = BPF_ALU64 | BPF_SUB | BPF_X;
-			struct bpf_insn insn_buf[16];
 			struct bpf_insn *patch = &insn_buf[0];
 			bool issrc, isneg;
 			u32 off_reg;
@@ -11946,7 +11958,7 @@ static int do_misc_fixups(struct bpf_verifier_env *env)
 			off_reg = issrc ? insn->src_reg : insn->dst_reg;
 			if (isneg)
 				*patch++ = BPF_ALU64_IMM(BPF_MUL, off_reg, -1);
-			*patch++ = BPF_MOV32_IMM(BPF_REG_AX, aux->alu_limit - 1);
+			*patch++ = BPF_MOV32_IMM(BPF_REG_AX, aux->alu_limit);
 			*patch++ = BPF_ALU64_REG(BPF_SUB, BPF_REG_AX, off_reg);
 			*patch++ = BPF_ALU64_REG(BPF_OR, BPF_REG_AX, off_reg);
 			*patch++ = BPF_ALU64_IMM(BPF_NEG, BPF_REG_AX, 0);
