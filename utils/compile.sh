@@ -5,13 +5,21 @@ else
 	git log --oneline --no-decorate -1 HEAD
 fi
 
-echo | scripts/config --disable DRM --disable PCCARD --disable ATA --disable MD --disable PPS --disable SOUND --disable USB --disable IOMMU_SUPPORT --disable INPUT_LEDS --disable AGP --disable VGA_ARB --disable EFI --disable WLAN --disable WIRELESS --disable LOGO --disable NFS_FS --disable XFRM_USER --disable INET6_AH --disable INET6_ESP --disable NETDEVICES
-echo | ./scripts/config -e INET_DIAG -d INET_UDP_DIAG -d INET_RAW_DIAG -d INET_DIAG_DESTROY
-echo | ./scripts/config -e MPTCP -e MPTCP_IPV6 -e IPV6 -m KUNIT -m MPTCP_KUNIT_TESTS -d KUNIT_ALL_TESTS
-#echo | ./scripts/config --disable MPTCP || true
+scripts/config	-e NET -e INET \
+		-e 64BIT \
+		-e IPV6 \
+		-e KUNIT -d KUNIT_ALL_TESTS \
+		-e INET_DIAG -d INET_UDP_DIAG -d INET_RAW_DIAG -d INET_DIAG_DESTROY \
+		-e SYN_COOKIES
+
+make olddefconfig
+
+scripts/config	-e MPTCP -e MPTCP_KUNIT_TESTS \
+		-e MPTCP_IPV6
+
 
 if [ ${#} -gt 0 ]; then
-	echo | ./scripts/config "${@}"
+	./scripts/config "${@}"
 fi
 
-KBUILD_BUILD_TIMESTAMP="0" make -j$(nproc)
+KBUILD_BUILD_TIMESTAMP="0" KCFLAGS="-Werror" make -j$(nproc)
