@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+    name: "Build (matrix)"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -33,10 +34,15 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
+  notif:
+    name: "IRC Notif"
+    needs: build
+    if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
+    runs-on: ubuntu-latest
+    steps:
       - name: "IRC notification"
         uses: rectalogic/notify-irc@v1
-        if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-build-bot
-          message: "New build ended: ${{ job.status }} (by ${{ github.actor }} on ${{ github.ref }}): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          message: "New build validating ${{ github.ref }} ended with ${{ needs.build.result }} (started by ${{ github.actor }}): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
