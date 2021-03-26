@@ -1,1 +1,1 @@
-t/static_call-Fix-the-module-key-fixup
+t/static_call-fix-unused-variable-warn-w-o-MODULE
