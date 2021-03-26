@@ -1,4 +1,25 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/static_call-fix-unused-variable-warn-w-o-MODULE
+Subject: [PATCH] static_call: fix unused variable warn w/o MODULE
 
+Here is the warning converted as error and reported by GCC:
+
+  kernel/static_call.c: In function ‘__static_call_update’:
+  kernel/static_call.c:153:18: error: unused variable ‘mod’ [-Werror=unused-variable]
+    153 |   struct module *mod = site_mod->mod;
+        |                  ^~~
+  cc1: all warnings being treated as errors
+  make[1]: *** [scripts/Makefile.build:271: kernel/static_call.o] Error 1
+
+This is simply because since recently, we no longer use 'mod' variable
+elsewhere if MODULE is unset.
+
+When using 'make tinyconfig' to generate the default kconfig, MODULE is
+unset.
+
+There are different ways to fix this warning. Here I tried to minimised
+the number of modified lines and not add more #ifdef. We could also move
+the declaration of the 'mod' variable inside the if-statement or
+directly use site_mod->mod.
+
+Fixes: 698bacefe993 ("static_call: Align static_call_is_init() patching condition")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
