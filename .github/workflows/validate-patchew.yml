@@ -32,4 +32,3 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
-          base: top
