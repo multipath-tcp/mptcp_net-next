@@ -1,13 +1,15 @@
-name: "Validate 'export' branch"
+name: "MPTCP Upstream Build Validation"
 on:
   push:
     branches:
       - export
+      - refs/tags/patchew/*
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         defconfig: ['x86_64', 'i386']
         ipv6: ['with_ipv6', 'without_ipv6']
@@ -16,14 +18,14 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v2
         with:
-          fetch-depth: 100 # we should not have more commits on top of net-next
+          fetch-depth: 100 # we should not have more commits on top of net-next/export
       - name: "Setup cache for CCache"
         uses: actions/cache@v2
         with:
           path: ${{ github.workspace }}/.ccache
           key: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.sha }}
           restore-keys: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-
-      - name: "Validate export"
+      - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
         with:
           each_commit: true
@@ -31,4 +33,10 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
-          base: bottom
+      - name: "IRC notification"
+        uses: rectalogic/notify-irc@v1
+        if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-build-bot
+          message: "New build ended: ${{ job.status }} (by ${{ github.actor }} on ${{ github.ref }}): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
