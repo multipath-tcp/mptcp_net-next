@@ -32,3 +32,10 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
+      - name: "IRC notification"
+        uses: rectalogic/notify-irc@v1
+        if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-build-bot
+          message: "New build ended: ${{ job.status }} (by ${{ github.actor }} on ${{ github.ref }}): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
