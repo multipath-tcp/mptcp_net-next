@@ -4118,6 +4118,8 @@ void ixgbe_configure_rx_ring(struct ixgbe_adapter *adapter,
 #endif
 	}
 
+	ring->rx_offset = ixgbe_rx_offset(ring);
+
 	if (ring->xsk_pool && hw->mac.type != ixgbe_mac_82599EB) {
 		u32 xsk_buf_len = xsk_pool_get_rx_frame_size(ring->xsk_pool);
 
@@ -6578,7 +6580,6 @@ int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
 
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
-	rx_ring->rx_offset = ixgbe_rx_offset(rx_ring);
 
 	/* XDP RX-queue info */
 	if (xdp_rxq_info_reg(&rx_ring->xdp_rxq, adapter->netdev,
@@ -10188,7 +10189,7 @@ static int ixgbe_xdp_xmit(struct net_device *dev, int n,
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
 	struct ixgbe_ring *ring;
-	int drops = 0;
+	int nxmit = 0;
 	int i;
 
 	if (unlikely(test_bit(__IXGBE_DOWN, &adapter->state)))
@@ -10212,16 +10213,15 @@ static int ixgbe_xdp_xmit(struct net_device *dev, int n,
 		int err;
 
 		err = ixgbe_xmit_xdp_ring(adapter, xdpf);
-		if (err != IXGBE_XDP_TX) {
-			xdp_return_frame_rx_napi(xdpf);
-			drops++;
-		}
+		if (err != IXGBE_XDP_TX)
+			break;
+		nxmit++;
 	}
 
 	if (unlikely(flags & XDP_XMIT_FLUSH))
 		ixgbe_xdp_ring_update_tail(ring);
 
-	return n - drops;
+	return nxmit;
 }
 
 static const struct net_device_ops ixgbe_netdev_ops = {
