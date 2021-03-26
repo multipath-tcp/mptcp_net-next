@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/static_call-fix-unused-variable-warn-w-o-MODULE
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
