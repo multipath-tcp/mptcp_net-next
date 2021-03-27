@@ -1,13 +1,19 @@
 name: "MPTCP Upstream Build Validation"
 on:
   push:
-    branches:
-      - export
-      - refs/tags/patchew/*
+    branches-ignore:
+      - 'archived/**' # previous branches
+      - 't/**'        # TopGit tree
+      - 'net-next'    # part of the TopGit tree
+    tags:
+      - 'export/**'    # the CI create a new tag once there is a new export
+      - 'patchew/**'  # patchew is using tags
 
 jobs:
   build:
     name: "Build (matrix)"
+    # always build except for export and for-review branches on the official repo (we will build the tag)
+    if: github.repository_owner != 'multipath-tcp' || (github.ref != 'refs/heads/export' && github.ref != 'refs/heads/for-review')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
