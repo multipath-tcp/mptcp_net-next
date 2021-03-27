@@ -22,7 +22,7 @@ jobs:
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-issues-bot
-          message: |
+          message: |-
             Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
             Issue title: "${{ github.event.issue.title }}"
             Issue opened by: ${{ github.event.issue.user.login }}
