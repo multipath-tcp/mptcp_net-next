@@ -540,8 +540,10 @@ static bool mptcp_validate_data_checksum(struct sock *ssk)
 
 	csum = csum_partial(&header, sizeof(header), subflow->data_csum);
 
-	if (csum_fold(csum))
+	if (csum_fold(csum)) {
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSCSUMERR);
 		return false;
+	}
 	subflow->data_csum = 0;
 	subflow->csum_len = 0;
 
