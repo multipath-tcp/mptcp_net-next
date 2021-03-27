@@ -35,7 +35,8 @@ jobs:
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
         with:
-          each_commit: true
+          # we want to validate each commits on top of net-next/export except for stable
+          each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
           ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
