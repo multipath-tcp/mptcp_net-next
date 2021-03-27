@@ -1,13 +1,19 @@
 name: "MPTCP Upstream Build Validation"
 on:
   push:
-    branches:
-      - export
-      - refs/tags/patchew/*
+    branches-ignore:
+      - 'archived/**' # previous branches
+      - 't/**'        # TopGit tree
+      - 'net-next'    # part of the TopGit tree
+    tags:
+      - 'export/**'    # the CI create a new tag once there is a new export
+      - 'patchew/**'  # patchew is using tags
 
 jobs:
   build:
     name: "Build (matrix)"
+    # always build except for export and for-review branches on the official repo (we will build the tag)
+    if: github.repository_owner != 'multipath-tcp' || (github.ref != 'refs/heads/export' && github.ref != 'refs/heads/for-review')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -29,7 +35,8 @@ jobs:
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
         with:
-          each_commit: true
+          # we want to validate each commits on top of net-next/export except for stable
+          each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
           ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
@@ -37,10 +44,12 @@ jobs:
   notif:
     name: "IRC Notif"
     needs: build
-    if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
+    # we cannot combine the two if's below apparently
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: "IRC notification"
+        if: github.repository_owner == 'multipath-tcp' && needs.build.result != 'skipped' && needs.build.result != 'cancelled'
         uses: rectalogic/notify-irc@v1
         with:
           channel: "#MPTCPUpstream"
