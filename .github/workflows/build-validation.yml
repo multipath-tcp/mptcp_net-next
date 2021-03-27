@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "IRC notification"
-        if: github.repository_owner == 'multipath-tcp'
+        if: github.repository_owner == 'multipath-tcp' && needs.build.result != 'skipped' && needs.build.result != 'cancelled'
         uses: rectalogic/notify-irc@v1
         with:
           channel: "#MPTCPUpstream"
