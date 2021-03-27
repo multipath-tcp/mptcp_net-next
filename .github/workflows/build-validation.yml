@@ -41,17 +41,3 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
-  notif:
-    name: "IRC Notif"
-    needs: build
-    # we cannot combine the two if's below apparently
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: "IRC notification"
-        if: github.repository_owner == 'multipath-tcp' && needs.build.result != 'skipped' && needs.build.result != 'cancelled'
-        uses: rectalogic/notify-irc@v1
-        with:
-          channel: "#MPTCPUpstream"
-          nickname: gh-build-bot
-          message: "New build validating ${{ github.ref }} ended with ${{ needs.build.result }} (started by ${{ github.actor }}): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
