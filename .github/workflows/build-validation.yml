@@ -37,10 +37,12 @@ jobs:
   notif:
     name: "IRC Notif"
     needs: build
-    if: ${{ always() }} && github.repository_owner == 'multipath-tcp'
+    # we cannot combine the two if's below apparently
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: "IRC notification"
+        if: github.repository_owner == 'multipath-tcp'
         uses: rectalogic/notify-irc@v1
         with:
           channel: "#MPTCPUpstream"
