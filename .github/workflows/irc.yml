@@ -49,4 +49,4 @@ jobs:
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} ended with ${{ github.event.workflow_run.conclusion }}
             Started by ${{ github.actor }}
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
