@@ -1,0 +1,43 @@
+name: "MPTCP Upstream Build Validation"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**' # previous branches
+      - 't/**'        # TopGit tree
+      - 'net-next'    # part of the TopGit tree
+      - 'for-review'  # part of the TopGit tree
+      - 'export'      # part of the TopGit tree
+    tags:
+      - 'export/**'   # the CI create a new tag once there is a new export
+      - 'patchew/**'  # patchew is using tags
+
+jobs:
+  build:
+    name: "Build (matrix)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        defconfig: ['x86_64', 'i386']
+        ipv6: ['with_ipv6', 'without_ipv6']
+        mptcp: ['with_mptcp', 'without_mptcp']
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 100 # we should not have more commits on top of net-next/export
+      - name: "Setup cache for CCache"
+        uses: actions/cache@v2
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.sha }}
+          restore-keys: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-
+      - name: "Build Validation"
+        uses: multipath-tcp/mptcp-upstream-validate-export-action@main
+        with:
+          # we want to validate each commits on top of net-next/export except for stable
+          each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
+          ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
+          defconfig: ${{ matrix.defconfig }}
+          ipv6: ${{ matrix.ipv6 }}
+          mptcp: ${{ matrix.mptcp }}
