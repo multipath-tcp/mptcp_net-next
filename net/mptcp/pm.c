@@ -53,6 +53,7 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 	msk->pm.rm_list_tx = *rm_list;
 	rm_addr |= BIT(MPTCP_RM_ADDR_SIGNAL);
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
+	mptcp_pm_nl_addr_send_ack(msk);
 	return 0;
 }
 
@@ -152,8 +153,7 @@ void mptcp_pm_connection_closed(struct mptcp_sock *msk)
 	pr_debug("msk=%p", msk);
 }
 
-void mptcp_pm_subflow_established(struct mptcp_sock *msk,
-				  struct mptcp_subflow_context *subflow)
+void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
 
@@ -193,6 +193,21 @@ void mptcp_pm_add_addr_received(struct mptcp_sock *msk,
 	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
 		pm->remote = *addr;
 	}
+
+	spin_unlock_bh(&pm->lock);
+}
+
+void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
+			      struct mptcp_addr_info *addr)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+
+	pr_debug("msk=%p", msk);
+
+	spin_lock_bh(&pm->lock);
+
+	if (mptcp_lookup_anno_list_by_saddr(msk, addr) && READ_ONCE(pm->work_pending))
+		mptcp_pm_schedule_work(msk, MPTCP_PM_SUBFLOW_ESTABLISHED);
 
 	spin_unlock_bh(&pm->lock);
 }
