@@ -3,6 +3,10 @@ on:
   create:
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
+  workflow_run:
+    workflows: ["MPTCP Upstream Build Validation"]
+    types:
+      - completed
 
 jobs:
   irc-tag:
@@ -32,3 +36,17 @@ jobs:
             Issue opened by: ${{ github.event.issue.user.login }}
             Assignee (if any): ${{ github.event.assignee.login }}
             URL: ${{ github.event.issue.html_url }}
+  irc-build:
+    name: "IRC Build"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc build
+        uses: rectalogic/notify-irc@v1
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-build-bot
+          message: |-
+            New build validating ${{ github.event.workflow_run.head_branch }} ended with ${{ github.event.workflow_run.conclusion }}
+            Started by ${{ github.actor }}
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}"
