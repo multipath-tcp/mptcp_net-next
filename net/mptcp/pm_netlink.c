@@ -1162,9 +1162,9 @@ static void mptcp_pm_free_addr_entry(struct mptcp_pm_addr_entry *entry)
 static int mptcp_nl_remove_id_zero_address(struct net *net,
 					   struct mptcp_addr_info *addr)
 {
-	struct mptcp_sock *msk;
-	long s_slot = 0, s_num = 0;
 	struct mptcp_rm_list list = { .nr = 0 };
+	long s_slot = 0, s_num = 0;
+	struct mptcp_sock *msk;
 
 	list.ids[list.nr++] = 0;
 
