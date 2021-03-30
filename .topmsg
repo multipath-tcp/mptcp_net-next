@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-all-sub-options-except-ADD_ADDR-when-the-echo-bit-is-set
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: drop all sub-options except ADD_ADDR when the echo bit is set
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Current Linux carries echo-ed ADD_ADDR over pure TCP ACKs, so there is no
+need to add a DSS element that would fit only ADD_ADDR with IPv4 address.
+Drop the DSS from echo-ed ADD_ADDR, regardless of the IP version.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
