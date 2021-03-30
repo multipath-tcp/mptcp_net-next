@@ -29,6 +29,8 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e PREEMPT -e DEBUG_PREEMPT
                       -e DEBUG_SLAVE -e DEBUG_PAGEALLOC -e DEBUG_MUTEXES -e DEBUG_SPINLOCK -e DEBUG_ATOMIC_SLEEP
                       -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD)
+                      # TODO: kmemleak (or all the time?)
+                      # TODO: kfence (or all the time?)
 
 # results for the CI
 RESULTS_DIR_BASE="${PWD}/${VIRTME_SCRIPT_DIR}/results"
