@@ -26,9 +26,9 @@ PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
 
 LIBPCAP_GIT_URL="https://github.com/the-tcpdump-group/libpcap.git"
-LIBPCAP_GIT_SHA="2d3a47d5386d11c6e6c141afd50bdb56e2b087ce" # sync with tcpdump
+LIBPCAP_GIT_SHA="libpcap-1.10.0"
 TCPDUMP_GIT_URL="https://github.com/the-tcpdump-group/tcpdump.git"
-TCPDUMP_GIT_SHA="19b771391ac80dea38c26eb3a71fef148034ebf4" # last tag has no MPTCPv1 support
+TCPDUMP_GIT_SHA="tcpdump-4.99.0"
 
 #IPROUTE2_GIT_URL="git://git.kernel.org/pub/scm/network/iproute2/iproute2-next.git"
 #IPROUTE2_GIT_SHA="9c3be2c0eee01be7832b7900a8be798a19c659a5" # pre v5.8.0 with MPTCP support in ss
