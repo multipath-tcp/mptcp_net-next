@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] selftests: mptcp: add the net device name testcase
-
-This patch added a new testcase for setting the net device name. In it,
-pass the net device name to pm_nl_ctl to set the ifindex field of struct
-mptcp_pm_addr_entry.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
