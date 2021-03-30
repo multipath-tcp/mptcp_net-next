@@ -47,6 +47,5 @@ jobs:
           channel: "#MPTCPUpstream"
           nickname: gh-build-bot
           message: |-
-            New build validating ${{ github.event.workflow_run.head_branch }} ended with ${{ github.event.workflow_run.conclusion }}
-            Started by ${{ github.actor }}
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
             https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
