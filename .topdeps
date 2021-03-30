@@ -1,1 +1,1 @@
-t/selftests-mptcp-add-the-net-device-name-testcase
+t/mptcp-drop-all-sub-options-except-ADD_ADDR-when-the-echo-bit-is-set
