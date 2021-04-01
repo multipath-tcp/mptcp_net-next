@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add tracepoint in ack_update_msk
-
-This patch added a tracepoint in ack_update_msk() to track the
-incoming data_ack and window/snd_una updates.
-
-Suggested-by: Paolo Abeni <pabeni@redhat.com>
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
