@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-tracepoint-in-subflow_check_data_avail
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add tracepoint in subflow_check_data_avail
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a tracepoint in subflow_check_data_avail() to show the
+mapping status.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
