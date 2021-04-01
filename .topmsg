@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-tracepoint-in-mptcp_subflow_get_send
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add tracepoint in mptcp_subflow_get_send
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a tracepoint in the packet scheduler function
+mptcp_subflow_get_send().
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
