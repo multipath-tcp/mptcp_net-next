@@ -31,22 +31,29 @@ TRACE_EVENT(mptcp_subflow_get_send,
 	),
 
 	TP_fast_assign(
-		bool sk = sk_fullsock(subflow->tcp_sock);
+		struct sock *ssk;
 
 		__entry->active = mptcp_subflow_active(subflow);
 		__entry->backup = subflow->backup;
-		if (sk) {
-			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
+		if (subflow->tcp_sock && sk_fullsock(subflow->tcp_sock))
 			__entry->free = sk_stream_memory_free(subflow->tcp_sock);
-			if (ssk) {
-				__entry->snd_wnd = tcp_sk(ssk)->snd_wnd;
-				__entry->pace = ssk->sk_pacing_rate;
-				if (__entry->pace)
-					__entry->ratio = div_u64((u64)ssk->sk_wmem_queued << 32,
-								 __entry->pace);
-			}
+		else
+			__entry->free = 0;
+
+		ssk = mptcp_subflow_tcp_sock(subflow);
+		if (ssk && sk_fullsock(ssk)) {
+			__entry->snd_wnd = tcp_sk(ssk)->snd_wnd;
+			__entry->pace = ssk->sk_pacing_rate;
+		} else {
+			__entry->snd_wnd = 0;
+			__entry->pace = 0;
 		}
+
+		if (ssk && sk_fullsock(ssk) && __entry->pace)
+			__entry->ratio = div_u64((u64)ssk->sk_wmem_queued << 32, __entry->pace);
+		else
+			__entry->ratio = 0;
 	),
 
 	TP_printk("active=%d free=%d snd_wnd=%u pace=%u backup=%u ratio=%llu",
