@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-revert-mptcp-forbit-mcast-related-sockopt-on-MPTCP-sockets
+Subject: [PATCH] mptcp: revert "mptcp: forbit mcast-related sockopt on MPTCP sockets"
 
+This change reverts commit 86581852d771 ("mptcp: forbit mcast-related sockopt on MPTCP sockets").
+
+As announced in the cover letter of the mentioned patch above, the
+following commits introduce a larger MPTCP sockopt implementation
+refactor.
+
+This time, we switch from a blocklist to an allowlist. This is safer for
+the future where new sockoptions could be added while not being fully
+supported with MPTCP sockets and thus causing unstabilities.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
