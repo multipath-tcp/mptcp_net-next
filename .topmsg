@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-forbit-mcast-related-sockopt-on-MPTCP-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: forbit mcast-related sockopt on MPTCP sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Unrolling mcast state at msk dismantel time is bug prone, as
+syzkaller reported:
+
+======================================================
+WARNING: possible circular locking dependency detected
+5.11.0-syzkaller #0 Not tainted
+------------------------------------------------------
+syz-executor905/8822 is trying to acquire lock:
+ffffffff8d678fe8 (rtnl_mutex){+.+.}-{3:3}, at: ipv6_sock_mc_close+0xd7/0x110 net/ipv6/mcast.c:323
+
+but task is already holding lock:
+ffff888024390120 (sk_lock-AF_INET6){+.+.}-{0:0}, at: lock_sock include/net/sock.h:1600 [inline]
+ffff888024390120 (sk_lock-AF_INET6){+.+.}-{0:0}, at: mptcp6_release+0x57/0x130 net/mptcp/protocol.c:3507
+
+which lock already depends on the new lock.
+
+Instead we can simply forbit any mcast-related setsockopt
+
+Fixes: 717e79c867ca5 ("mptcp: Add setsockopt()/getsockopt() socket operations")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
