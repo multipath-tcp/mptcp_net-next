@@ -481,7 +481,7 @@ static bool mptcp_check_data_fin(struct sock *sk)
 	u64 rcv_data_fin_seq;
 	bool ret = false;
 
-	if (__mptcp_check_fallback(msk) || !msk->first)
+	if (__mptcp_check_fallback(msk))
 		return ret;
 
 	/* Need to ack a DATA_FIN received from a peer while this side
@@ -2968,14 +2968,18 @@ bool mptcp_finish_join(struct sock *ssk)
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
 
 	/* mptcp socket already closing? */
-	if (!mptcp_is_fully_established(parent))
+	if (!mptcp_is_fully_established(parent)) {
+		subflow->reset_reason = MPTCP_RST_EMPTCP;
 		return false;
+	}
 
 	if (!msk->pm.server_side)
 		goto out;
 
-	if (!mptcp_pm_allow_new_subflow(msk))
+	if (!mptcp_pm_allow_new_subflow(msk)) {
+		subflow->reset_reason = MPTCP_RST_EPROHIBIT;
 		return false;
+	}
 
 	/* active connections are already on conn_list, and we can't acquire
 	 * msk lock here.
@@ -2989,8 +2993,10 @@ bool mptcp_finish_join(struct sock *ssk)
 		sock_hold(ssk);
 	}
 	spin_unlock_bh(&msk->join_list_lock);
-	if (!ret)
+	if (!ret) {
+		subflow->reset_reason = MPTCP_RST_EPROHIBIT;
 		return false;
+	}
 
 	/* attach to msk socket only after we are sure he will deal with us
 	 * at close time
