@@ -60,11 +60,26 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI'
     runs-on: ubuntu-latest
     steps:
+      # from: https://cirrus-ci.org/guide/notifications/
+      - name: get status
+        uses: octokit/request-action@v2.x
+        id: get_status_check_run
+        with:
+          route: GET /repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed
+          mediaType: '{"previews": ["antiope"]}'
       - name: irc tests
         uses: rectalogic/notify-irc@v1
         with:
           channel: "#MPTCPUpstream"
           nickname: gh-tests-bot
           message: |-
-            New Tests job validating ${{ github.event.check_suite.head_branch }} (${{ github.event.check_suite.name }}, by ${{ github.actor }}) ended with ${{ github.event.check_suite.conclusion }}
-            ${{ github.event.check_suite.url }}
+            New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.check_suite.conclusion }}
+            ${CHECK_0_NAME}: success=${CHECK_0_SUCCESS}: ${CHECK_0_URL}
+            ${CHECK_1_NAME}: success=${CHECK_1_SUCCESS}: ${CHECK_1_URL}
+        env:
+          CHECK_0_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
+          CHECK_0_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].name }}
+          CHECK_0_SUCCESS: ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[0].output.text, '==EXIT_STATUS=0==') }}
+          CHECK_1_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].details_url }}
+          CHECK_1_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].name }}
+          CHECK_1_SUCCESS: ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[1].output.text, '==EXIT_STATUS=0==') }}
