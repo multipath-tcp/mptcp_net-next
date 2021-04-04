@@ -25,7 +25,11 @@ task:
       debug_script:  /entrypoint.sh expect-debug
 
   always:
-    junit_result_artifacts:
-      path: ".virtme/results/*/*.xml"
-      format: junit
-      type: text/xml
+    tap_result_artifacts:
+      path: ".virtme/results/${MATRIX_JOB}/*.tap"
+      type: text/plain
+    # JUnit format is useful for PR
+    # junit_result_artifacts:
+    #   path: ".virtme/results/*/*.xml"
+    #   format: junit
+    #   type: text/xml
