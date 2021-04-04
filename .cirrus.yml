@@ -13,16 +13,18 @@ task:
   env:
     CIRRUS_CLONE_DEPTH: 1       ## no need to have a full clone
     CIRRUS_LOG_TIMESTAMP: true  ## useful
+    INPUT_CCACHE_MAXSIZE: 1G
+    matrix:
+      MATRIX_JOB: normal
+      MATRIX_JOB: debug
 
   ccache_cache:
-    folder: ".virtme/build/ccache"
+    folder: ".virtme/ccache"
     reupload_on_changes: true
+    fingerprint_script:
+      - echo ${MATRIX_JOB}
 
-  matrix:
-    - name: Normal
-      normal_script: /entrypoint.sh expect-normal
-    - name: Debug
-      debug_script:  /entrypoint.sh expect-debug
+  test_script: /entrypoint.sh expect-${MATRIX_JOB}
 
   always:
     tap_result_artifacts:
