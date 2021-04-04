@@ -30,6 +30,9 @@ task:
     tap_result_artifacts:
       path: ".virtme/results/${MATRIX_JOB}/*.tap"
       type: text/plain
+    summary_artifacts:
+      path: ".virtme/results/${MATRIX_JOB}/summary.txt"
+      type: text/plain
     # JUnit format is useful for PR
     # junit_result_artifacts:
     #   path: ".virtme/results/*/*.xml"
