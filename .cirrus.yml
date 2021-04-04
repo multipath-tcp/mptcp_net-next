@@ -1,0 +1,30 @@
+
+# Launch 2 jobs in //: with and without debug
+task:
+  name: KVM validation
+
+  container:
+    image: mptcp/mptcp-upstream-virtme-docker
+    kvm: true   ## Needed for the tests
+    cpu: 8      ## Max 16 per project, even number with kvm
+    memory: 8G  ## Max 4 per CPU
+
+  env:
+    CIRRUS_CLONE_DEPTH: 0       ## no need to have a full clone
+    CIRRUS_LOG_TIMESTAMP: true  ## useful
+
+  ccache_cache:
+    folder: ".virtme/build/ccache"
+    reupload_on_changes: true
+
+  matrix:
+    - name: Normal
+      normal_script: expect-normal  # arg for the entrypoint
+    - name: Debug
+      debug_script: expect-debug    # arg for the entrypoint
+
+  always:
+    junit_result_artifacts:
+      path: ".virtme/results/*/*.xml"
+      format: junit
+      type: text/xml
