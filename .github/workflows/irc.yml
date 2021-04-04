@@ -7,6 +7,9 @@ on:
     workflows: ["MPTCP Upstream Build Validation"]
     types:
       - completed
+  check_suite:
+    types:
+      - completed
 
 jobs:
   irc-tag:
@@ -20,6 +23,7 @@ jobs:
           channel: "#MPTCPUpstream"
           nickname: gh-tag-bot
           message: "New tag available: ${{ github.event.ref }} (by ${{ github.actor }})"
+
   irc-issues:
     name: "IRC Issues"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
@@ -36,6 +40,7 @@ jobs:
             Issue opened by: ${{ github.event.issue.user.login }}
             Assignee (if any): ${{ github.event.assignee.login }}
             URL: ${{ github.event.issue.html_url }}
+
   irc-build:
     name: "IRC Build"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run'
@@ -49,3 +54,17 @@ jobs:
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
             https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
+
+  irc-tests:
+    name: "IRC Tests"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc tests
+        uses: rectalogic/notify-irc@v1
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-tests-bot
+          message: |-
+            New Tests job validating ${{ github.event.check_suite.head_branch }} (${{ github.event.check_suite.name }}, by ${{ github.actor }}) ended with ${{ github.event.check_suite.conclusion }}
+            ${{ github.event.check_suite.url }}
