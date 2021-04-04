@@ -2,6 +2,7 @@
 # Launch 2 jobs in //: with and without debug
 task:
   name: KVM validation
+  only_if: $CIRRUS_TAG != ''  ## only tags
 
   container:
     image: mptcp/mptcp-upstream-virtme-docker
@@ -10,7 +11,7 @@ task:
     memory: 8G  ## Max 4 per CPU
 
   env:
-    CIRRUS_CLONE_DEPTH: 0       ## no need to have a full clone
+    CIRRUS_CLONE_DEPTH: 1       ## no need to have a full clone
     CIRRUS_LOG_TIMESTAMP: true  ## useful
 
   ccache_cache:
@@ -19,9 +20,9 @@ task:
 
   matrix:
     - name: Normal
-      normal_script: expect-normal  # arg for the entrypoint
+      normal_script: /entrypoint.sh expect-normal
     - name: Debug
-      debug_script: expect-debug    # arg for the entrypoint
+      debug_script:  /entrypoint.sh expect-debug
 
   always:
     junit_result_artifacts:
