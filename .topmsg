@@ -1,0 +1,10 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: add GitHub Actions
+
+Currently supported:
+
+- build-validation: check different combinations of validation
+- irc: send notifications to the IRC channel
+- update-tg-tree: periodically or manually sync with net-next
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
