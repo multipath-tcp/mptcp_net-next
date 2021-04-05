@@ -76,8 +76,8 @@ jobs:
           nickname: gh-tests-bot
           message: |-
             New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.check_suite.conclusion }}
-            ${CHECK_0_NAME}: success=${CHECK_0_SUCCESS}: ${CHECK_0_URL}
-            ${CHECK_1_NAME}: success=${CHECK_1_SUCCESS}: ${CHECK_1_URL}
+            ${{ env.CHECK_0_NAME }}: success=${{ env.CHECK_0_SUCCESS }}: ${{ env.CHECK_0_URL }}
+            ${{ env.CHECK_1_NAME }}: success=${{ env.CHECK_1_SUCCESS }}: ${{ env.CHECK_1_URL }}
         env:
           CHECK_0_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
           CHECK_0_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].name }}
