@@ -7,6 +7,9 @@ on:
     workflows: ["MPTCP Upstream Build Validation"]
     types:
       - completed
+  check_suite:
+    types:
+      - completed
 
 jobs:
   irc-tag:
@@ -20,6 +23,7 @@ jobs:
           channel: "#MPTCPUpstream"
           nickname: gh-tag-bot
           message: "New tag available: ${{ github.event.ref }} (by ${{ github.actor }})"
+
   irc-issues:
     name: "IRC Issues"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
@@ -36,6 +40,7 @@ jobs:
             Issue opened by: ${{ github.event.issue.user.login }}
             Assignee (if any): ${{ github.event.assignee.login }}
             URL: ${{ github.event.issue.html_url }}
+
   irc-build:
     name: "IRC Build"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run'
@@ -49,3 +54,34 @@ jobs:
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
             https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
+
+  irc-tests:
+    name: "IRC Tests"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI'
+    runs-on: ubuntu-latest
+    steps:
+      # from: https://cirrus-ci.org/guide/notifications/
+      - name: get status
+        uses: octokit/request-action@v2.x
+        id: get_status_check_run
+        with:
+          route: GET /repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed
+          mediaType: '{"previews": ["antiope"]}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: irc tests
+        uses: rectalogic/notify-irc@v1
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-tests-bot
+          message: |-
+            New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.check_suite.conclusion }}
+            ${CHECK_0_NAME}: success=${CHECK_0_SUCCESS}: ${CHECK_0_URL}
+            ${CHECK_1_NAME}: success=${CHECK_1_SUCCESS}: ${CHECK_1_URL}
+        env:
+          CHECK_0_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
+          CHECK_0_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].name }}
+          CHECK_0_SUCCESS: ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[0].output.text, '==EXIT_STATUS=0==') }}
+          CHECK_1_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].details_url }}
+          CHECK_1_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].name }}
+          CHECK_1_SUCCESS: ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[1].output.text, '==EXIT_STATUS=0==') }}
