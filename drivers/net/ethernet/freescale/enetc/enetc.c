@@ -406,6 +406,7 @@ static bool enetc_clean_tx_ring(struct enetc_bdr *tx_ring, int napi_budget)
 	while (bds_to_clean && tx_frm_cnt < ENETC_DEFAULT_TX_WORK) {
 		struct xdp_frame *xdp_frame = enetc_tx_swbd_get_xdp_frame(tx_swbd);
 		struct sk_buff *skb = enetc_tx_swbd_get_skb(tx_swbd);
+		bool is_eof = tx_swbd->is_eof;
 
 		if (unlikely(tx_swbd->check_wb)) {
 			struct enetc_ndev_priv *priv = netdev_priv(ndev);
@@ -453,7 +454,7 @@ static bool enetc_clean_tx_ring(struct enetc_bdr *tx_ring, int napi_budget)
 		}
 
 		/* BD iteration loop end */
-		if (tx_swbd->is_eof) {
+		if (is_eof) {
 			tx_frm_cnt++;
 			/* re-arm interrupt source */
 			enetc_wr_reg_hot(tx_ring->idr, BIT(tx_ring->index) |
@@ -895,7 +896,7 @@ static int enetc_xdp_frame_to_xdp_tx_swbd(struct enetc_bdr *tx_ring,
 		dma = dma_map_single(tx_ring->dev, data, len, DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(tx_ring->dev, dma))) {
 			/* Undo the DMA mapping for all fragments */
-			while (n-- >= 0)
+			while (--n >= 0)
 				enetc_unmap_tx_buff(tx_ring, &xdp_tx_arr[n]);
 
 			netdev_err(tx_ring->ndev, "DMA map error\n");
@@ -2343,11 +2344,7 @@ int enetc_alloc_msix(struct enetc_ndev_priv *priv)
 			int idx;
 
 			/* default tx ring mapping policy */
-			if (priv->bdr_int_num == ENETC_MAX_BDR_INT)
-				idx = 2 * j + i; /* 2 CPUs */
-			else
-				idx = j + i * v_tx_rings; /* default */
-
+			idx = priv->bdr_int_num * j + i;
 			__set_bit(idx, &v->tx_rings_map);
 			bdr = &v->tx_ring[j];
 			bdr->index = idx;
