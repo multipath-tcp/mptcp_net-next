@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-use-mptcp_for_each_subflow-in-mptcp_close
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
