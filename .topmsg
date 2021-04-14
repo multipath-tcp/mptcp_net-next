@@ -1,8 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: setsockopt: handle SO_KEEPALIVE and SO_PRIORITY
-
-start with something simple: both take an integer value, both
-need to be mirrored to all subflows.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
