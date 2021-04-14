@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-packet-mark-test-case
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp: add packet mark test case
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Extend mptcp_connect tool with SO_MARK support (-M <value>) and
+add a test case that checks that the packet mark gets copied to all
+subflows.
+
+This is done by only allowing packets with either skb->mark 1 or 2
+via iptables.
+
+DROP rule packet counter is checked; if its not zero, print an error
+message and fail the test case.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
