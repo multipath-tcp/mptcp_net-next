@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-mptcp_for_each_subflow-in-mptcp_close
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: use mptcp_for_each_subflow in mptcp_close
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch used the macro helper mptcp_for_each_subflow() instead of
+list_for_each_entry() in mptcp_close.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
