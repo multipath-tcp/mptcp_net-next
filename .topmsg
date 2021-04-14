@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-setsockopt-add-SO_MARK-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: setsockopt: add SO_MARK support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Value is synced to all subflows.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
