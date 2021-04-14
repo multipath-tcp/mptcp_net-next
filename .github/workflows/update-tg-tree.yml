@@ -17,7 +17,7 @@ on:
 
 jobs:
   export:
-    if: false && github.repository_owner == 'multipath-tcp'
+    if: github.repository_owner == 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
