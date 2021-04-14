@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-setsockopt-support-SO_LINGER
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: setsockopt: support SO_LINGER
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Similar to PRIORITY/KEEPALIVE: needs to be mirrored to all subflows.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
