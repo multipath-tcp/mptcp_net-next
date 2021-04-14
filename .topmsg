@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-skeleton-to-sync-msk-socket-options-to-subflows
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add skeleton to sync msk socket options to subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Handle following cases:
+1. setsockopt is called with multiple subflows.
+   Change might have to be mirrored to all of them.
+   This is done directly in process context/setsockopt call.
+2. Outgoing subflow is created after one or several setsockopt()
+   calls have been made.  Old setsockopt changes should be
+   synced to the new socket.
+3. Incoming subflow, after setsockopt call(s).
+
+Cases 2 and 3 are handled right after the join list is spliced to the conn
+list.
+
+Not all sockopt values can be just be copied by value, some require
+helper calls.  Those can acquire socket lock (which can sleep).
+
+If the join->conn list splicing is done from preemptible context,
+synchronization can be done right away, otherwise its deferred to work
+queue.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
