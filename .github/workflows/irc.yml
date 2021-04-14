@@ -81,9 +81,9 @@ jobs:
         env:
           CHECK_0_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
           CHECK_0_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].name }}
-          CHECK_0_SUMMARY: ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].summary }}
+          CHECK_0_SUMMARY: ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].output.summary }}
           CHECK_0_TESTS:   ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[0].output.text, '==EXIT_STATUS=0==') }}
           CHECK_1_URL:     ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].details_url }}
           CHECK_1_NAME:    ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].name }}
-          CHECK_1_SUMMARY: ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].summary }}
+          CHECK_1_SUMMARY: ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].output.summary }}
           CHECK_1_TESTS:   ${{ contains(fromJson(steps.get_status_check_run.outputs.data).check_runs[1].output.text, '==EXIT_STATUS=0==') }}
