@@ -11,13 +11,18 @@ JOBS=()
 # $1: git ref
 launch_virtme_ref() {
 	echo " ## Virtme: Testing Git ref '${1}' ##"
-	git checkout "${1}"
+	git checkout -f "${1}"
 	bash -x patches/docker/Dockerfile.virtme.sh patches/virtme.sh
 }
 
 # $1: title ; [ $2: git ref ]
 launch_virtme_ref_log() { local rc
 	rc=0
+
+	# sync with origin if we need to build a branch
+	if [ -z "${2}" ]; then
+		git branch -f "${1}" "origin/${1}"
+	fi
 
 	launch_virtme_ref "${2:-${1}}" || rc="${?}"
 	EXIT_RCS+=("${rc}")
