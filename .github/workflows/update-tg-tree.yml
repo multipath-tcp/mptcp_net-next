@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0 # we need all commits for TopGit
-          token: '${{ secrets.PAT_MATTTBE }}'
+          token: '${{ secrets.PAT_JENKINS_TESSARES }}'
       - name: "Update TG tree"
         uses: multipath-tcp/mptcp-upstream-topgit-action@main
         with:
