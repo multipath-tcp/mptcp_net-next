@@ -14,7 +14,7 @@ scripts/config	-e NET -e INET \
 
 make olddefconfig
 
-scripts/config	-e MPTCP -e MPTCP_KUNIT_TESTS \
+scripts/config	-e MPTCP -e MPTCP_KUNIT_TEST \
 		-e MPTCP_IPV6
 
 

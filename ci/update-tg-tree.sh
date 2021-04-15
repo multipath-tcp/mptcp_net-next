@@ -284,7 +284,7 @@ generate_config_mptcp() {
 	echo | scripts/config -e INET_DIAG \
 	                      -d INET_UDP_DIAG -d INET_RAW_DIAG -d INET_DIAG_DESTROY
 
-	echo | scripts/config -e MPTCP -e IPV6 -e MPTCP_IPV6 -e MPTCP_KUNIT_TESTS
+	echo | scripts/config -e MPTCP -e IPV6 -e MPTCP_IPV6 -e MPTCP_KUNIT_TEST
 
 	# Here, we want to have a failure if some new MPTCP options are
 	# available not to forget to enable them. We then don't want to run
