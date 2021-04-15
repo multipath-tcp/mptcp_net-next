@@ -27,14 +27,17 @@ task:
   test_script: /entrypoint.sh expect-${MATRIX_JOB}
 
   always:
-    tap_result_artifacts:
-      path: ".virtme/results/${MATRIX_JOB}/*.tap"
+    conclusion_artifacts:
+      path: "conclusion.txt"
       type: text/plain
     summary_artifacts:
-      path: ".virtme/results/${MATRIX_JOB}/summary.txt"
+      path: "summary.txt"
       type: text/plain
-    # JUnit format is useful for PR
-    # junit_result_artifacts:
-    #   path: ".virtme/results/*/*.xml"
-    #   format: junit
-    #   type: text/xml
+    tap_result_artifacts:
+      path: "*.tap"
+      type: text/plain
+    # JUnit format is for the moment only useful for PR but publish them just in case for later
+    junit_artifacts:
+      path: "*.tap.xml"
+      type: text/xml
+      format: junit
