@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/kunit-mptcp-adhere-to-KUNIT-formatting-standard
+From: Nico Pache <npache@redhat.com>
+Subject: [PATCH] kunit: mptcp: adhere to KUNIT formatting standard
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Drop 'S' from end of CONFIG_MPTCP_KUNIT_TESTS in order to adhere to the
+KUNIT *_KUNIT_TEST config name format.
+
+Fixes: a00a582203db (mptcp: move crypto test to KUNIT)
+Reviewed-by: David Gow <davidgow@google.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Nico Pache <npache@redhat.com>
