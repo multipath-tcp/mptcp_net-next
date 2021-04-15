@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-format-specifiers-for-unsigned-int
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: fix format specifiers for unsigned int
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Some of the sequence numbers are printed as the negative ones in the debug
+log:
+
+[   46.250932] MPTCP: DSS
+[   46.250940] MPTCP: data_fin=0 dsn64=0 use_map=0 ack64=1 use_ack=1
+[   46.250948] MPTCP: data_ack=2344892449471675613
+[   46.251012] MPTCP: msk=000000006e157e3f status=10
+[   46.251023] MPTCP: msk=000000006e157e3f snd_data_fin_enable=0 pending=0 snd_nxt=2344892449471700189 write_seq=2344892449471700189
+[   46.251343] MPTCP: msk=00000000ec44a129 ssk=00000000f7abd481 sending dfrag at seq=-1658937016627538668 len=100 already sent=0
+[   46.251360] MPTCP: data_seq=16787807057082012948 subflow_seq=1 data_len=100 dsn64=1
+
+This patch used the format specifier %u instead of %d for the unsigned int
+values to fix it.
+
+Fixes: d9ca1de8c0cd ("mptcp: move page frag allocation in mptcp_sendmsg()")
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
