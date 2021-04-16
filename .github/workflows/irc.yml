@@ -84,8 +84,8 @@ jobs:
           nickname: gh-tests-bot
           message: |-
             New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) just ended:
-            - ${{ steps.get_conclusion_cirrus.conclusion_0 }}: ${{ env.CHECK_0_URL }}
-            - ${{ steps.get_conclusion_cirrus.conclusion_1 }}: ${{ env.CHECK_1_URL }}
+            - ${{ steps.get_conclusion_cirrus.outputs.conclusion_0 }}: ${{ env.CHECK_0_URL }}
+            - ${{ steps.get_conclusion_cirrus.outputs.conclusion_1 }}: ${{ env.CHECK_1_URL }}
         env:
           CHECK_0_URL:  ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
           CHECK_1_URL:  ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].details_url }}
