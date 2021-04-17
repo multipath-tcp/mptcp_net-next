@@ -25,6 +25,9 @@
 #include "protocol.h"
 #include "mib.h"
 
+#define CREATE_TRACE_POINTS
+#include <trace/events/mptcp.h>
+
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 struct mptcp6_sock {
 	struct mptcp_sock msk;
@@ -88,16 +91,6 @@ static bool mptcp_is_tcpsk(struct sock *sk)
 	}
 
 	return false;
-}
-
-static struct sock *__mptcp_tcp_fallback(struct mptcp_sock *msk)
-{
-	sock_owned_by_me((const struct sock *)msk);
-
-	if (likely(!__mptcp_check_fallback(msk)))
-		return NULL;
-
-	return msk->first;
 }
 
 static int __mptcp_socket_create(struct mptcp_sock *msk)
@@ -407,18 +400,6 @@ static void mptcp_set_timeout(const struct sock *sk, const struct sock *ssk)
 	if (tout <= 0)
 		tout = mptcp_sk(sk)->timer_ival;
 	mptcp_sk(sk)->timer_ival = tout > 0 ? tout : TCP_RTO_MIN;
-}
-
-static bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
-{
-	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-	/* can't send if JOIN hasn't completed yet (i.e. is usable for mptcp) */
-	if (subflow->request_join && !subflow->fully_established)
-		return false;
-
-	/* only send if our side has not closed yet */
-	return ((1 << ssk->sk_state) & (TCPF_ESTABLISHED | TCPF_CLOSE_WAIT));
 }
 
 static bool tcp_can_send_ack(const struct sock *ssk)
@@ -740,18 +721,47 @@ wake:
 		sk->sk_data_ready(sk);
 }
 
-void __mptcp_flush_join_list(struct mptcp_sock *msk)
+static bool mptcp_do_flush_join_list(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
+	bool ret = false;
 
 	if (likely(list_empty(&msk->join_list)))
-		return;
+		return false;
 
 	spin_lock_bh(&msk->join_list_lock);
-	list_for_each_entry(subflow, &msk->join_list, node)
+	list_for_each_entry(subflow, &msk->join_list, node) {
+		u32 sseq = READ_ONCE(subflow->setsockopt_seq);
+
 		mptcp_propagate_sndbuf((struct sock *)msk, mptcp_subflow_tcp_sock(subflow));
+		if (READ_ONCE(msk->setsockopt_seq) != sseq)
+			ret = true;
+	}
 	list_splice_tail_init(&msk->join_list, &msk->conn_list);
 	spin_unlock_bh(&msk->join_list_lock);
+
+	return ret;
+}
+
+void __mptcp_flush_join_list(struct mptcp_sock *msk)
+{
+	if (likely(!mptcp_do_flush_join_list(msk)))
+		return;
+
+	if (!test_and_set_bit(MPTCP_WORK_SYNC_SETSOCKOPT, &msk->flags))
+		mptcp_schedule_work((struct sock *)msk);
+}
+
+static void mptcp_flush_join_list(struct mptcp_sock *msk)
+{
+	bool sync_needed = test_and_clear_bit(MPTCP_WORK_SYNC_SETSOCKOPT, &msk->flags);
+
+	might_sleep();
+
+	if (!mptcp_do_flush_join_list(msk) && !sync_needed)
+		return;
+
+	mptcp_sockopt_sync_all(msk);
 }
 
 static bool mptcp_timer_pending(struct sock *sk)
@@ -1275,7 +1285,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	int avail_size;
 	size_t ret = 0;
 
-	pr_debug("msk=%p ssk=%p sending dfrag at seq=%lld len=%d already sent=%d",
+	pr_debug("msk=%p ssk=%p sending dfrag at seq=%llu len=%u already sent=%u",
 		 msk, ssk, dfrag->data_seq, dfrag->data_len, info->sent);
 
 	/* compute send limit */
@@ -1403,6 +1413,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 		send_info[i].ratio = -1;
 	}
 	mptcp_for_each_subflow(msk, subflow) {
+		trace_mptcp_subflow_get_send(subflow);
 		ssk =  mptcp_subflow_tcp_sock(subflow);
 		if (!mptcp_subflow_active(subflow))
 			continue;
@@ -1422,10 +1433,6 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 			send_info[subflow->backup].ratio = ratio;
 		}
 	}
-
-	pr_debug("msk=%p nr_active=%d ssk=%p:%lld backup=%p:%lld",
-		 msk, nr_active, send_info[0].ssk, send_info[0].ratio,
-		 send_info[1].ssk, send_info[1].ratio);
 
 	/* pick the best backup if no other subflow is active */
 	if (!nr_active)
@@ -1467,7 +1474,7 @@ static void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 			int ret = 0;
 
 			prev_ssk = ssk;
-			__mptcp_flush_join_list(msk);
+			mptcp_flush_join_list(msk);
 			ssk = mptcp_subflow_get_send(msk);
 
 			/* try to keep the subflow socket lock across
@@ -1693,7 +1700,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			if (!msk->first_pending)
 				WRITE_ONCE(msk->first_pending, dfrag);
 		}
-		pr_debug("msk=%p dfrag at seq=%lld len=%d sent=%d new=%d", msk,
+		pr_debug("msk=%p dfrag at seq=%llu len=%u sent=%u new=%d", msk,
 			 dfrag->data_seq, dfrag->data_len, dfrag->already_sent,
 			 !dfrag_collapsed);
 
@@ -1893,7 +1900,7 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk)
 	unsigned int moved = 0;
 	bool ret, done;
 
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 	do {
 		struct sock *ssk = mptcp_subflow_recv_lookup(msk);
 		bool slowpath;
@@ -2317,7 +2324,7 @@ static void mptcp_worker(struct work_struct *work)
 		goto unlock;
 
 	mptcp_check_data_fin_ack(sk);
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 
 	mptcp_check_fastclose(msk);
 
@@ -2380,6 +2387,9 @@ static int __mptcp_init_sock(struct sock *sk)
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
 	timer_setup(&sk->sk_timer, mptcp_timeout_timer, 0);
+
+	tcp_assign_congestion_control(sk);
+
 	return 0;
 }
 
@@ -2517,7 +2527,7 @@ static void __mptcp_check_send_data_fin(struct sock *sk)
 		}
 	}
 
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
 
@@ -2573,6 +2583,8 @@ static void __mptcp_destroy_sock(struct sock *sk)
 	WARN_ON_ONCE(msk->rmem_released);
 	sk_stream_kill_queues(sk);
 	xfrm_sk_free_policy(sk);
+
+	tcp_cleanup_congestion_control(sk);
 	sk_refcnt_debug_release(sk);
 	mptcp_dispose_initial_subflow(msk);
 	sock_put(sk);
@@ -2599,7 +2611,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 cleanup:
 	/* orphan all the subflows */
 	inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32;
-	list_for_each_entry(subflow, &mptcp_sk(sk)->conn_list, node) {
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow = lock_sock_fast(ssk);
 
@@ -2654,7 +2666,8 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	__mptcp_flush_join_list(msk);
+	mptcp_do_flush_join_list(msk);
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
@@ -2703,6 +2716,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->snd_nxt = msk->write_seq;
 	msk->snd_una = msk->write_seq;
 	msk->wnd_end = msk->snd_nxt + req->rsk_rcv_wnd;
+	msk->setsockopt_seq = mptcp_sk(sk)->setsockopt_seq;
 
 	if (mp_opt->mp_capable) {
 		msk->can_ack = true;
@@ -2809,161 +2823,6 @@ static void mptcp_destroy(struct sock *sk)
 
 	mptcp_destroy_common(msk);
 	sk_sockets_allocated_dec(sk);
-}
-
-static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
-				       sockptr_t optval, unsigned int optlen)
-{
-	struct sock *sk = (struct sock *)msk;
-	struct socket *ssock;
-	int ret;
-
-	switch (optname) {
-	case SO_REUSEPORT:
-	case SO_REUSEADDR:
-		lock_sock(sk);
-		ssock = __mptcp_nmpc_socket(msk);
-		if (!ssock) {
-			release_sock(sk);
-			return -EINVAL;
-		}
-
-		ret = sock_setsockopt(ssock, SOL_SOCKET, optname, optval, optlen);
-		if (ret == 0) {
-			if (optname == SO_REUSEPORT)
-				sk->sk_reuseport = ssock->sk->sk_reuseport;
-			else if (optname == SO_REUSEADDR)
-				sk->sk_reuse = ssock->sk->sk_reuse;
-		}
-		release_sock(sk);
-		return ret;
-	}
-
-	return sock_setsockopt(sk->sk_socket, SOL_SOCKET, optname, optval, optlen);
-}
-
-static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
-			       sockptr_t optval, unsigned int optlen)
-{
-	struct sock *sk = (struct sock *)msk;
-	int ret = -EOPNOTSUPP;
-	struct socket *ssock;
-
-	switch (optname) {
-	case IPV6_V6ONLY:
-		lock_sock(sk);
-		ssock = __mptcp_nmpc_socket(msk);
-		if (!ssock) {
-			release_sock(sk);
-			return -EINVAL;
-		}
-
-		ret = tcp_setsockopt(ssock->sk, SOL_IPV6, optname, optval, optlen);
-		if (ret == 0)
-			sk->sk_ipv6only = ssock->sk->sk_ipv6only;
-
-		release_sock(sk);
-		break;
-	}
-
-	return ret;
-}
-
-static bool mptcp_unsupported(int level, int optname)
-{
-	if (level == SOL_IP) {
-		switch (optname) {
-		case IP_ADD_MEMBERSHIP:
-		case IP_ADD_SOURCE_MEMBERSHIP:
-		case IP_DROP_MEMBERSHIP:
-		case IP_DROP_SOURCE_MEMBERSHIP:
-		case IP_BLOCK_SOURCE:
-		case IP_UNBLOCK_SOURCE:
-		case MCAST_JOIN_GROUP:
-		case MCAST_LEAVE_GROUP:
-		case MCAST_JOIN_SOURCE_GROUP:
-		case MCAST_LEAVE_SOURCE_GROUP:
-		case MCAST_BLOCK_SOURCE:
-		case MCAST_UNBLOCK_SOURCE:
-		case MCAST_MSFILTER:
-			return true;
-		}
-		return false;
-	}
-	if (level == SOL_IPV6) {
-		switch (optname) {
-		case IPV6_ADDRFORM:
-		case IPV6_ADD_MEMBERSHIP:
-		case IPV6_DROP_MEMBERSHIP:
-		case IPV6_JOIN_ANYCAST:
-		case IPV6_LEAVE_ANYCAST:
-		case MCAST_JOIN_GROUP:
-		case MCAST_LEAVE_GROUP:
-		case MCAST_JOIN_SOURCE_GROUP:
-		case MCAST_LEAVE_SOURCE_GROUP:
-		case MCAST_BLOCK_SOURCE:
-		case MCAST_UNBLOCK_SOURCE:
-		case MCAST_MSFILTER:
-			return true;
-		}
-		return false;
-	}
-	return false;
-}
-
-static int mptcp_setsockopt(struct sock *sk, int level, int optname,
-			    sockptr_t optval, unsigned int optlen)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct sock *ssk;
-
-	pr_debug("msk=%p", msk);
-
-	if (mptcp_unsupported(level, optname))
-		return -ENOPROTOOPT;
-
-	if (level == SOL_SOCKET)
-		return mptcp_setsockopt_sol_socket(msk, optname, optval, optlen);
-
-	/* @@ the meaning of setsockopt() when the socket is connected and
-	 * there are multiple subflows is not yet defined. It is up to the
-	 * MPTCP-level socket to configure the subflows until the subflow
-	 * is in TCP fallback, when TCP socket options are passed through
-	 * to the one remaining subflow.
-	 */
-	lock_sock(sk);
-	ssk = __mptcp_tcp_fallback(msk);
-	release_sock(sk);
-	if (ssk)
-		return tcp_setsockopt(ssk, level, optname, optval, optlen);
-
-	if (level == SOL_IPV6)
-		return mptcp_setsockopt_v6(msk, optname, optval, optlen);
-
-	return -EOPNOTSUPP;
-}
-
-static int mptcp_getsockopt(struct sock *sk, int level, int optname,
-			    char __user *optval, int __user *option)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct sock *ssk;
-
-	pr_debug("msk=%p", msk);
-
-	/* @@ the meaning of setsockopt() when the socket is connected and
-	 * there are multiple subflows is not yet defined. It is up to the
-	 * MPTCP-level socket to configure the subflows until the subflow
-	 * is in TCP fallback, when socket options are passed through
-	 * to the one remaining subflow.
-	 */
-	lock_sock(sk);
-	ssk = __mptcp_tcp_fallback(msk);
-	release_sock(sk);
-	if (ssk)
-		return tcp_getsockopt(ssk, level, optname, optval, option);
-
-	return -EOPNOTSUPP;
 }
 
 void __mptcp_data_acked(struct sock *sk)
@@ -3375,7 +3234,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
 		 * This is needed so NOSPACE flag can be set from tcp stack.
 		 */
-		__mptcp_flush_join_list(msk);
+		mptcp_flush_join_list(msk);
 		mptcp_for_each_subflow(msk, subflow) {
 			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
