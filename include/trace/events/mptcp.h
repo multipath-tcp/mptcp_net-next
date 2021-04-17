@@ -7,6 +7,14 @@
 
 #include <linux/tracepoint.h>
 
+#define show_mapping_status(status)					\
+	__print_symbolic(status,					\
+		{ 0, "MAPPING_OK" },					\
+		{ 1, "MAPPING_INVALID" },				\
+		{ 2, "MAPPING_EMPTY" },					\
+		{ 3, "MAPPING_DATA_FIN" },				\
+		{ 4, "MAPPING_DUMMY" })
+
 TRACE_EVENT(mptcp_subflow_get_send,
 
 	TP_PROTO(struct mptcp_subflow_context *subflow),
@@ -105,6 +113,59 @@ DECLARE_EVENT_CLASS(mptcp_dump_mpext,
 DEFINE_EVENT(mptcp_dump_mpext, get_mapping_status,
 	TP_PROTO(struct mptcp_ext *mpext),
 	TP_ARGS(mpext));
+
+TRACE_EVENT(ack_update_msk,
+
+	TP_PROTO(u64 data_ack, u64 old_snd_una,
+		 u64 new_snd_una, u64 new_wnd_end,
+		 u64 msk_wnd_end),
+
+	TP_ARGS(data_ack, old_snd_una,
+		new_snd_una, new_wnd_end,
+		msk_wnd_end),
+
+	TP_STRUCT__entry(
+		__field(u64, data_ack)
+		__field(u64, old_snd_una)
+		__field(u64, new_snd_una)
+		__field(u64, new_wnd_end)
+		__field(u64, msk_wnd_end)
+	),
+
+	TP_fast_assign(
+		__entry->data_ack = data_ack;
+		__entry->old_snd_una = old_snd_una;
+		__entry->new_snd_una = new_snd_una;
+		__entry->new_wnd_end = new_wnd_end;
+		__entry->msk_wnd_end = msk_wnd_end;
+	),
+
+	TP_printk("data_ack=%llu old_snd_una=%llu new_snd_una=%llu new_wnd_end=%llu msk_wnd_end=%llu",
+		  __entry->data_ack, __entry->old_snd_una,
+		  __entry->new_snd_una, __entry->new_wnd_end,
+		  __entry->msk_wnd_end)
+);
+
+TRACE_EVENT(subflow_check_data_avail,
+
+	TP_PROTO(__u8 status, struct sk_buff *skb),
+
+	TP_ARGS(status, skb),
+
+	TP_STRUCT__entry(
+		__field(u8, status)
+		__field(const void *, skb)
+	),
+
+	TP_fast_assign(
+		__entry->status = status;
+		__entry->skb = skb;
+	),
+
+	TP_printk("mapping_status=%s, skb=%p",
+		  show_mapping_status(__entry->status),
+		  __entry->skb)
+);
 
 #endif /* _TRACE_MPTCP_H */
 
