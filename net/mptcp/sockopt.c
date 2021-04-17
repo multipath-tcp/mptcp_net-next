@@ -77,6 +77,9 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 		bool slow = lock_sock_fast(ssk);
 
 		switch (optname) {
+		case SO_DEBUG:
+			sock_valbool_flag(ssk, SOCK_DBG, !!val);
+			break;
 		case SO_KEEPALIVE:
 			if (ssk->sk_prot->keepalive)
 				ssk->sk_prot->keepalive(ssk, !!val);
@@ -84,6 +87,25 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 			break;
 		case SO_PRIORITY:
 			ssk->sk_priority = val;
+			break;
+		case SO_SNDBUF:
+		case SO_SNDBUFFORCE:
+			ssk->sk_userlocks |= SOCK_SNDBUF_LOCK;
+			WRITE_ONCE(ssk->sk_sndbuf, sk->sk_sndbuf);
+			break;
+		case SO_RCVBUF:
+		case SO_RCVBUFFORCE:
+			ssk->sk_userlocks |= SOCK_RCVBUF_LOCK;
+			WRITE_ONCE(ssk->sk_rcvbuf, sk->sk_rcvbuf);
+			break;
+		case SO_MARK:
+			if (READ_ONCE(ssk->sk_mark) != sk->sk_mark) {
+				ssk->sk_mark = sk->sk_mark;
+				sk_dst_reset(ssk);
+			}
+			break;
+		case SO_INCOMING_CPU:
+			WRITE_ONCE(ssk->sk_incoming_cpu, val);
 			break;
 		}
 
@@ -109,6 +131,15 @@ static int mptcp_sol_socket_intval(struct mptcp_sock *msk, int optname, int val)
 	return 0;
 }
 
+static void mptcp_so_incoming_cpu(struct mptcp_sock *msk, int val)
+{
+	struct sock *sk = (struct sock *)msk;
+
+	WRITE_ONCE(sk->sk_incoming_cpu, val);
+
+	mptcp_sol_socket_sync_intval(msk, SO_INCOMING_CPU, val);
+}
+
 static int mptcp_setsockopt_sol_socket_int(struct mptcp_sock *msk, int optname,
 					   sockptr_t optval, unsigned int optlen)
 {
@@ -122,11 +153,61 @@ static int mptcp_setsockopt_sol_socket_int(struct mptcp_sock *msk, int optname,
 	case SO_KEEPALIVE:
 		mptcp_sol_socket_sync_intval(msk, optname, val);
 		return 0;
+	case SO_DEBUG:
+	case SO_MARK:
 	case SO_PRIORITY:
+	case SO_SNDBUF:
+	case SO_SNDBUFFORCE:
+	case SO_RCVBUF:
+	case SO_RCVBUFFORCE:
 		return mptcp_sol_socket_intval(msk, optname, val);
+	case SO_INCOMING_CPU:
+		mptcp_so_incoming_cpu(msk, val);
+		return 0;
 	}
 
 	return -ENOPROTOOPT;
+}
+
+static int mptcp_setsockopt_sol_socket_linger(struct mptcp_sock *msk, sockptr_t optval,
+					      unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	struct linger ling;
+	sockptr_t kopt;
+	int ret;
+
+	if (optlen < sizeof(ling))
+		return -EINVAL;
+
+	if (copy_from_sockptr(&ling, optval, sizeof(ling)))
+		return -EFAULT;
+
+	kopt = KERNEL_SOCKPTR(&ling);
+	ret = sock_setsockopt(sk->sk_socket, SOL_SOCKET, SO_LINGER, kopt, sizeof(ling));
+	if (ret)
+		return ret;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool slow = lock_sock_fast(ssk);
+
+		if (!ling.l_onoff) {
+			sock_reset_flag(ssk, SOCK_LINGER);
+		} else {
+			ssk->sk_lingertime = sk->sk_lingertime;
+			sock_set_flag(ssk, SOCK_LINGER);
+		}
+
+		subflow->setsockopt_seq = msk->setsockopt_seq;
+		unlock_sock_fast(ssk, slow);
+	}
+
+	release_sock(sk);
+	return 0;
 }
 
 static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
@@ -139,6 +220,8 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	switch (optname) {
 	case SO_REUSEPORT:
 	case SO_REUSEADDR:
+	case SO_BINDTODEVICE:
+	case SO_BINDTOIFINDEX:
 		lock_sock(sk);
 		ssock = __mptcp_nmpc_socket(msk);
 		if (!ssock) {
@@ -152,12 +235,36 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 				sk->sk_reuseport = ssock->sk->sk_reuseport;
 			else if (optname == SO_REUSEADDR)
 				sk->sk_reuse = ssock->sk->sk_reuse;
+			else if (optname == SO_BINDTODEVICE)
+				sk->sk_bound_dev_if = ssock->sk->sk_bound_dev_if;
+			else if (optname == SO_BINDTOIFINDEX)
+				sk->sk_bound_dev_if = ssock->sk->sk_bound_dev_if;
 		}
 		release_sock(sk);
 		return ret;
 	case SO_KEEPALIVE:
 	case SO_PRIORITY:
+	case SO_SNDBUF:
+	case SO_SNDBUFFORCE:
+	case SO_RCVBUF:
+	case SO_RCVBUFFORCE:
+	case SO_MARK:
+	case SO_INCOMING_CPU:
+	case SO_DEBUG:
 		return mptcp_setsockopt_sol_socket_int(msk, optname, optval, optlen);
+	case SO_LINGER:
+		return mptcp_setsockopt_sol_socket_linger(msk, optval, optlen);
+	case SO_NO_CHECK:
+	case SO_DONTROUTE:
+	case SO_BROADCAST:
+	case SO_BSDCOMPAT:
+	case SO_PASSCRED:
+	case SO_PASSSEC:
+	case SO_RXQ_OVFL:
+	case SO_WIFI_STATUS:
+	case SO_NOFCS:
+	case SO_SELECT_ERR_QUEUE:
+		return 0;
 	}
 
 	return sock_setsockopt(sk->sk_socket, SOL_SOCKET, optname, optval, optlen);
@@ -403,6 +510,62 @@ static bool mptcp_supported_sockopt(int level, int optname)
 	return false;
 }
 
+static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t optval,
+					       unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	char name[TCP_CA_NAME_MAX];
+	bool cap_net_admin;
+	int ret;
+
+	if (optlen < 1)
+		return -EINVAL;
+
+	ret = strncpy_from_sockptr(name, optval,
+				   min_t(long, TCP_CA_NAME_MAX - 1, optlen));
+	if (ret < 0)
+		return -EFAULT;
+
+	name[ret] = 0;
+
+	cap_net_admin = ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN);
+
+	ret = 0;
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		int err;
+
+		lock_sock(ssk);
+		err = tcp_set_congestion_control(ssk, name, true, cap_net_admin);
+		if (err < 0 && ret == 0)
+			ret = err;
+		subflow->setsockopt_seq = msk->setsockopt_seq;
+		release_sock(ssk);
+	}
+
+	if (ret == 0)
+		tcp_set_congestion_control(sk, name, false, cap_net_admin);
+
+	release_sock(sk);
+	return ret;
+}
+
+static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
+				    sockptr_t optval, unsigned int optlen)
+{
+	switch (optname) {
+	case TCP_ULP:
+		return -EOPNOTSUPP;
+	case TCP_CONGESTION:
+		return mptcp_setsockopt_sol_tcp_congestion(msk, optval, optlen);
+	}
+
+	return -EOPNOTSUPP;
+}
+
 int mptcp_setsockopt(struct sock *sk, int level, int optname,
 		     sockptr_t optval, unsigned int optlen)
 {
@@ -432,6 +595,49 @@ int mptcp_setsockopt(struct sock *sk, int level, int optname,
 	if (level == SOL_IPV6)
 		return mptcp_setsockopt_v6(msk, optname, optval, optlen);
 
+	if (level == SOL_TCP)
+		return mptcp_setsockopt_sol_tcp(msk, optname, optval, optlen);
+
+	return -EOPNOTSUPP;
+}
+
+static int mptcp_getsockopt_first_sf_only(struct mptcp_sock *msk, int level, int optname,
+					  char __user *optval, int __user *optlen)
+{
+	struct sock *sk = (struct sock *)msk;
+	struct socket *ssock;
+	int ret = -EINVAL;
+	struct sock *ssk;
+
+	lock_sock(sk);
+	ssk = msk->first;
+	if (ssk) {
+		ret = tcp_getsockopt(ssk, level, optname, optval, optlen);
+		goto out;
+	}
+
+	ssock = __mptcp_nmpc_socket(msk);
+	if (!ssock)
+		goto out;
+
+	ret = tcp_getsockopt(ssock->sk, level, optname, optval, optlen);
+
+out:
+	release_sock(sk);
+	return ret;
+}
+
+static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
+				    char __user *optval, int __user *optlen)
+{
+	switch (optname) {
+	case TCP_ULP:
+	case TCP_CONGESTION:
+	case TCP_INFO:
+	case TCP_CC_INFO:
+		return mptcp_getsockopt_first_sf_only(msk, SOL_TCP, optname,
+						      optval, optlen);
+	}
 	return -EOPNOTSUPP;
 }
 
@@ -455,11 +661,14 @@ int mptcp_getsockopt(struct sock *sk, int level, int optname,
 	if (ssk)
 		return tcp_getsockopt(ssk, level, optname, optval, option);
 
+	if (level == SOL_TCP)
+		return mptcp_getsockopt_sol_tcp(msk, optname, optval, option);
 	return -EOPNOTSUPP;
 }
 
 static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 {
+	static const unsigned int tx_rx_locks = SOCK_RCVBUF_LOCK | SOCK_SNDBUF_LOCK;
 	struct sock *sk = (struct sock *)msk;
 
 	if (ssk->sk_prot->keepalive) {
@@ -470,6 +679,33 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	}
 
 	ssk->sk_priority = sk->sk_priority;
+	ssk->sk_bound_dev_if = sk->sk_bound_dev_if;
+	ssk->sk_incoming_cpu = sk->sk_incoming_cpu;
+
+	if (sk->sk_userlocks & tx_rx_locks) {
+		ssk->sk_userlocks |= sk->sk_userlocks & tx_rx_locks;
+		if (sk->sk_userlocks & SOCK_SNDBUF_LOCK)
+			WRITE_ONCE(ssk->sk_sndbuf, sk->sk_sndbuf);
+		if (sk->sk_userlocks & SOCK_RCVBUF_LOCK)
+			WRITE_ONCE(ssk->sk_rcvbuf, sk->sk_rcvbuf);
+	}
+
+	if (sock_flag(sk, SOCK_LINGER)) {
+		ssk->sk_lingertime = sk->sk_lingertime;
+		sock_set_flag(ssk, SOCK_LINGER);
+	} else {
+		sock_reset_flag(ssk, SOCK_LINGER);
+	}
+
+	if (sk->sk_mark != ssk->sk_mark) {
+		ssk->sk_mark = sk->sk_mark;
+		sk_dst_reset(ssk);
+	}
+
+	sock_valbool_flag(ssk, SOCK_DBG, sock_flag(sk, SOCK_DBG));
+
+	if (inet_csk(sk)->icsk_ca_ops != inet_csk(ssk)->icsk_ca_ops)
+		tcp_set_congestion_control(ssk, inet_csk(sk)->icsk_ca_ops->name, false, true);
 }
 
 static void __mptcp_sockopt_sync(struct mptcp_sock *msk, struct sock *ssk)
