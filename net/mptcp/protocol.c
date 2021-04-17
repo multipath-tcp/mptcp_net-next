@@ -721,18 +721,47 @@ wake:
 		sk->sk_data_ready(sk);
 }
 
-void __mptcp_flush_join_list(struct mptcp_sock *msk)
+static bool mptcp_do_flush_join_list(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
+	bool ret = false;
 
 	if (likely(list_empty(&msk->join_list)))
-		return;
+		return false;
 
 	spin_lock_bh(&msk->join_list_lock);
-	list_for_each_entry(subflow, &msk->join_list, node)
+	list_for_each_entry(subflow, &msk->join_list, node) {
+		u32 sseq = READ_ONCE(subflow->setsockopt_seq);
+
 		mptcp_propagate_sndbuf((struct sock *)msk, mptcp_subflow_tcp_sock(subflow));
+		if (READ_ONCE(msk->setsockopt_seq) != sseq)
+			ret = true;
+	}
 	list_splice_tail_init(&msk->join_list, &msk->conn_list);
 	spin_unlock_bh(&msk->join_list_lock);
+
+	return ret;
+}
+
+void __mptcp_flush_join_list(struct mptcp_sock *msk)
+{
+	if (likely(!mptcp_do_flush_join_list(msk)))
+		return;
+
+	if (!test_and_set_bit(MPTCP_WORK_SYNC_SETSOCKOPT, &msk->flags))
+		mptcp_schedule_work((struct sock *)msk);
+}
+
+static void mptcp_flush_join_list(struct mptcp_sock *msk)
+{
+	bool sync_needed = test_and_clear_bit(MPTCP_WORK_SYNC_SETSOCKOPT, &msk->flags);
+
+	might_sleep();
+
+	if (!mptcp_do_flush_join_list(msk) && !sync_needed)
+		return;
+
+	mptcp_sockopt_sync_all(msk);
 }
 
 static bool mptcp_timer_pending(struct sock *sk)
@@ -1445,7 +1474,7 @@ static void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 			int ret = 0;
 
 			prev_ssk = ssk;
-			__mptcp_flush_join_list(msk);
+			mptcp_flush_join_list(msk);
 			ssk = mptcp_subflow_get_send(msk);
 
 			/* try to keep the subflow socket lock across
@@ -1871,7 +1900,7 @@ static bool __mptcp_move_skbs(struct mptcp_sock *msk)
 	unsigned int moved = 0;
 	bool ret, done;
 
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 	do {
 		struct sock *ssk = mptcp_subflow_recv_lookup(msk);
 		bool slowpath;
@@ -2295,7 +2324,7 @@ static void mptcp_worker(struct work_struct *work)
 		goto unlock;
 
 	mptcp_check_data_fin_ack(sk);
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 
 	mptcp_check_fastclose(msk);
 
@@ -2358,6 +2387,9 @@ static int __mptcp_init_sock(struct sock *sk)
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
 	timer_setup(&sk->sk_timer, mptcp_timeout_timer, 0);
+
+	tcp_assign_congestion_control(sk);
+
 	return 0;
 }
 
@@ -2495,7 +2527,7 @@ static void __mptcp_check_send_data_fin(struct sock *sk)
 		}
 	}
 
-	__mptcp_flush_join_list(msk);
+	mptcp_flush_join_list(msk);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
 
@@ -2551,6 +2583,8 @@ static void __mptcp_destroy_sock(struct sock *sk)
 	WARN_ON_ONCE(msk->rmem_released);
 	sk_stream_kill_queues(sk);
 	xfrm_sk_free_policy(sk);
+
+	tcp_cleanup_congestion_control(sk);
 	sk_refcnt_debug_release(sk);
 	mptcp_dispose_initial_subflow(msk);
 	sock_put(sk);
@@ -2577,7 +2611,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 cleanup:
 	/* orphan all the subflows */
 	inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32;
-	list_for_each_entry(subflow, &mptcp_sk(sk)->conn_list, node) {
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow = lock_sock_fast(ssk);
 
@@ -2632,7 +2666,8 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	__mptcp_flush_join_list(msk);
+	mptcp_do_flush_join_list(msk);
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
@@ -2681,6 +2716,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->snd_nxt = msk->write_seq;
 	msk->snd_una = msk->write_seq;
 	msk->wnd_end = msk->snd_nxt + req->rsk_rcv_wnd;
+	msk->setsockopt_seq = mptcp_sk(sk)->setsockopt_seq;
 
 	if (mp_opt->mp_capable) {
 		msk->can_ack = true;
@@ -3198,7 +3234,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
 		 * This is needed so NOSPACE flag can be set from tcp stack.
 		 */
-		__mptcp_flush_join_list(msk);
+		mptcp_flush_join_list(msk);
 		mptcp_for_each_subflow(msk, subflow) {
 			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
