@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: implement MSG_TRUNC support
-
-The mentioned flag is currently silenlty ignored. This
-change implements the TCP-like behaviour, dropping the
-pending data up to the specified length.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
