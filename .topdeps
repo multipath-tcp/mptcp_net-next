@@ -1,1 +1,1 @@
-t/mptcp-ignore-unsupported-msg-flags
+t/selftests-mptcp-add-a-test-case-for-MSG_PEEK
