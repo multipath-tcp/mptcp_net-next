@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-a-test-case-for-MSG_PEEK
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] selftests: mptcp: add a test case for MSG_PEEK
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Extend mptcp_connect tool with MSG_PEEK support and add a test case in
+mptcp_connect.sh that checks the data recvived from/after recv() with
+MSG_PEEK.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
