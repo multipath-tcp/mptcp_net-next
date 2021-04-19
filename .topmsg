@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-ignore-unsupported-msg-flags
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: ignore unsupported msg flags
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently mptcp_sendmsg() fails with EOPNOTSUPP if the
+user-space provides some unsupported flag. That is unexpected
+and may foul existing applications migrated to MPTCP, which
+expect a different behavior.
+
+Change the mentioned function to silently ignore the unsupported
+flags except MSG_FASTOPEN. This is the only flags currently not
+supported by MPTCP with user-space visible side-effects.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/162
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
