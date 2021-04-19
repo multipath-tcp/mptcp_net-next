@@ -1,8 +1,0 @@
-From: Yonglong Li <liyonglong@chinatelecom.cn>
-Subject: [PATCH] mptcp: add MSG_PEEK support
-
-This patch adds support for MSG_PEEK flag. Packets are not removed
-from the receive_queue if MSG_PEEK set in recv() system call.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
