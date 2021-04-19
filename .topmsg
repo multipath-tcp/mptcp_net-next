@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-dummy-MSG_ERRQUEUE-support
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement dummy MSG_ERRQUEUE support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp_recvmsg() currently silently ignores MSG_ERRQUEUE, returning
+input data instead of error cmsg.
+
+This change provides a dummy implementation for MSG_ERRQUEUE - always
+returns no data. That is consistent with the current lack of a suitable
+IP_RECVERR setsockopt() support.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
