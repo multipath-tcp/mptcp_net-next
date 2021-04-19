@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-MSG_TRUNC-support
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement MSG_TRUNC support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mentioned flag is currently silenlty ignored. This
+change implements the TCP-like behaviour, dropping the
+pending data up to the specified length.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
