@@ -740,7 +740,7 @@ done
 
 testpeek=true
 options_log=true
-peekmode="saveAfterPeek"
+peekmode="saveWithPeek"
 run_tests_lo "$ns1" "$ns1" 10.0.1.1 1
 run_tests_lo "$ns1" $sender dead:beef:1::1 1
 
