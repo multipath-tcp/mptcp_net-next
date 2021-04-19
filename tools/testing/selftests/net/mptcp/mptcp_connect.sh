@@ -742,12 +742,12 @@ testpeek=true
 options_log=true
 peekmode="saveWithPeek"
 run_tests_lo "$ns1" "$ns1" 10.0.1.1 1
-run_tests_lo "$ns1" $sender dead:beef:1::1 1
+run_tests_lo "$ns1" "$ns1" dead:beef:1::1 1
 
 options_log=true
 peekmode="saveAfterPeek"
 run_tests_lo "$ns1" "$ns1" 10.0.1.1 1
-run_tests_lo "$ns1" $sender dead:beef:1::1 1
+run_tests_lo "$ns1" "$ns1" dead:beef:1::1 1
 
 time_end=$(date +%s)
 time_run=$((time_end-time_start))
