@@ -95,14 +95,14 @@ tg_for_review() {
 	git checkout -f "${TG_TOP}"
 }
 
-tg_export_tag() {
+tg_export_tag() { local tag
 	git checkout -f "${TG_TOP}"
 	tg export --linearize --force "${TG_EXPORT}"
 
-	TAG="${TG_EXPORT}/$(date +%Y%m%dT%H%M%S)"
-	git tag "${TAG}" "${TG_EXPORT}"
+	tag="${TG_EXPORT}/$(date +%Y%m%dT%H%M%S)"
+	git tag "${tag}" "${TG_EXPORT}"
 
-	git push -f origin "${TG_EXPORT}" "${TAG}"
+	git push -f origin "${TG_EXPORT}" "${tag}"
 	git checkout -f "${TG_TOP}"
 }
 
