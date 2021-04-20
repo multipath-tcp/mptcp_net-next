@@ -4,7 +4,11 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-TG_TOP="${TG_TOP:-t/upstream}"
+TG_TOP_END="t/upstream"
+TG_FOR_REVIEW="for-review"
+TG_EXPORT="export"
+
+TG_TOP="${TG_TOP:-${TG_TOP_END}}"
 TG_PUSH="${TG_PUSH:-1}"
 TG_UPSTREAM="${TG_UPSTREAM:-0}"
 
@@ -69,6 +73,39 @@ tg_update() {
 	fi
 }
 
+tg_for_review() {
+	git branch -f "${TG_FOR_REVIEW}" origin/"${TG_FOR_REVIEW}"
+	git checkout -f "${TG_FOR_REVIEW}"
+	if ! git merge --no-edit --signoff "${TG_TOP}"; then
+		# the only possible conflict would be with the topgit files, manage this
+		tg_conflict_files=$(git status --porcelain | grep -E "^DU\\s.top(deps|msg)$")
+		if [ -n "${tg_conflict_files}" ]; then
+			echo "${tg_conflict_files}" | awk '{ print $2 }' | xargs git rm
+			if ! git commit -s --no-edit; then
+				printerr "Unexpected other conflicts: ${tg_conflict_files}"
+				exit 1
+			fi
+		else
+			printerr "Unexpected conflicts when updating ${TG_FOR_REVIEW}"
+			exit 1
+		fi
+	fi
+
+	git push origin "${TG_FOR_REVIEW}"
+	git checkout -f "${TG_TOP}"
+}
+
+tg_export_tag() {
+	git checkout -f "${TG_TOP}"
+	tg export --linearize --force "${TG_EXPORT}"
+
+	TAG="${TG_EXPORT}/$(date +%Y%m%dT%H%M%S)"
+	git tag "${TAG}" "${TG_EXPORT}"
+
+	git push -f origin "${TG_EXPORT}" "${TAG}"
+	git checkout -f "${TG_TOP}"
+}
+
 
 git checkout "${TG_TOP}"
 tg_update
@@ -77,9 +114,15 @@ if [ "${TG_PUSH}" = 1 ]; then
 	OLD_REV="$(git rev-parse --short "origin/${TG_TOP}")"
 	NEW_REV="$(git rev-parse --short "${TG_TOP}")"
 
+	if [ "${OLD_REV}" = "${NEW_REV}" ]; then
+		printinfo "No new modification, no push"
+		exit
+	fi
+
 	tg push
 
-	if [ "${OLD_REV}" = "${NEW_REV}" ]; then
+	if [ "${TG_TOP}" != "${TG_TOP_END}" ]; then
+		printinfo "Not on ${TG_TOP_END}, no new tag and summary"
 		exit
 	fi
 
@@ -90,4 +133,14 @@ if [ "${TG_PUSH}" = 1 ]; then
 
 	printf "%sResults: %s..%s\n" "- " "${OLD_REV}" "${NEW_REV}"
 	echo -e "${COLOR_RESET}"
+
+	print "Publish export and tag? (Y/n)"
+	read -n 1 -r
+	echo
+	if [[ $REPLY =~ ^[Nn]$ ]]; then
+		exit 0
+	fi
+
+	tg_for_review
+	tg_export_tag
 fi

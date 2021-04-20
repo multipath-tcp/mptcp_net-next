@@ -29,5 +29,5 @@ git --no-pager diff --stat "${NET_NEXT_BEFORE}"..net-next
 if [ -n "${1}" ]; then
 	echo "push?"
 	read -r
-	tg push
+	./.publish.sh
 fi
