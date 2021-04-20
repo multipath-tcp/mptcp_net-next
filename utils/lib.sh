@@ -11,15 +11,15 @@ print_color() {
 }
 
 print() {
-	print_color "${COLOR_GREEN}" "${@}"
+	print_color "${COLOR_GREEN}${*}"
 }
 
 printinfo() {
-	print_color "${COLOR_BLUE}" "${@}"
+	print_color "${COLOR_BLUE}${*}"
 }
 
 printerr() {
-	print_color "${COLOR_RED}" "${@}" >&2
+	print_color "${COLOR_RED}${*}" >&2
 }
 
 # Trap to display a message when there is an error (set -e)
