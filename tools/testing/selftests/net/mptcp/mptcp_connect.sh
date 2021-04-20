@@ -23,6 +23,8 @@ rcvbuf=0
 options_log=true
 do_tcp=0
 filesize=0
+peekmode=""
+testpeek=false
 
 if [ $tc_loss -eq 100 ];then
 	tc_loss=1%
@@ -393,6 +395,10 @@ do_transfer()
 		extra_args="$extra_args -m $testmode"
 	fi
 
+	if $testpeek; then
+		extra_args="$extra_args -P $peekmode"
+	fi
+
 	if [ -n "$extra_args" ] && $options_log; then
 		options_log=false
 		echo "INFO: extra options: $extra_args"
@@ -731,6 +737,17 @@ for sender in $ns1 $ns2 $ns3 $ns4;do
 	run_tests "$ns4" $sender 10.0.3.1
 	run_tests "$ns4" $sender dead:beef:3::1
 done
+
+testpeek=true
+options_log=true
+peekmode="saveAfterPeek"
+run_tests_lo "$ns1" "$ns1" 10.0.1.1 1
+run_tests_lo "$ns1" $sender dead:beef:1::1 1
+
+options_log=true
+peekmode="saveAfterPeek"
+run_tests_lo "$ns1" "$ns1" 10.0.1.1 1
+run_tests_lo "$ns1" $sender dead:beef:1::1 1
 
 time_end=$(date +%s)
 time_run=$((time_end-time_start))
