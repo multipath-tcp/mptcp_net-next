@@ -6,4 +6,6 @@ mptcp_connect.sh that checks the data recvived from/after recv() with
 MSG_PEEK.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
