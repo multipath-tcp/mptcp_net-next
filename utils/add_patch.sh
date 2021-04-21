@@ -4,8 +4,6 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-TOP="t/upstream"
-
 if [ -z "${TG_TOP}" ]; then
 	printerr "TG_TOP is not defined. Please use add_patch_xxx.sh"
 	exit 1
@@ -107,7 +105,7 @@ if [ "$(git diff --shortstat | wc -l)" -ne 0 ]; then
 fi
 
 # the last commit is always a DO-NOT-MERGE one.
-if [ "${TG_TOP}" = "${TOP}" ]; then
+if [ "${TG_TOP}" = "${TG_TOPIC_TOP}" ]; then
 	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
 	while git show "${TG_TOP_NEXT}:.topmsg" | grep "^Subject: " | grep -q "DO-NOT-MERGE"; do
 		TG_TOP="${TG_TOP_NEXT}"
@@ -148,7 +146,7 @@ git commit -sm "tg: switch to ${BRANCH}" .topdeps
 TG_PUSH=0 TG_TOP="${TG_TOP}" ./.publish.sh
 
 # update the tree
-TG_PUSH=1 TG_TOP="${TOP}" ./.publish.sh
+TG_PUSH=1 TG_TOP="${TG_TOPIC_TOP}" ./.publish.sh
 
 # Mark as done
 accept_patches "${PARENT}..${BRANCH}"

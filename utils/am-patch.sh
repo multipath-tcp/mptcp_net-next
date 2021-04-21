@@ -10,7 +10,7 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 printinfo "Current branch is: ${BRANCH}"
 head -n2 .topmsg | grep "^Subject: "
 
-if [ "${BRANCH}" = "t/upstream" ] || [ ! -f ".topdeps" ]; then
+if [ "${BRANCH}" = "${TG_TOPIC_TOP}" ] || [ ! -f ".topdeps" ]; then
 	printerr "wrong branch... exit"
 	exit 1
 fi

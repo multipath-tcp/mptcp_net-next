@@ -4,11 +4,10 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-TG_TOP_END="t/upstream"
 TG_FOR_REVIEW="for-review"
 TG_EXPORT="export"
 
-TG_TOP="${TG_TOP:-${TG_TOP_END}}"
+TG_TOP="${TG_TOP:-${TG_TOPIC_TOP}}"
 TG_PUSH="${TG_PUSH:-1}"
 TG_UPSTREAM="${TG_UPSTREAM:-0}"
 
@@ -125,8 +124,8 @@ if [ "${TG_PUSH}" = 1 ]; then
 
 	tg push
 
-	if [ "${TG_TOP}" != "${TG_TOP_END}" ]; then
-		printinfo "Not on ${TG_TOP_END}, no new tag and summary"
+	if [ "${TG_TOP}" != "${TG_TOPIC_TOP}" ]; then
+		printinfo "Not on ${TG_TOPIC_TOP}, no new tag and summary"
 		exit
 	fi
 
