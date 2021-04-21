@@ -1,1 +1,1 @@
-t/mptcp-fix-pr_debug-in-mptcp_token_new_connect
+t/mptcp-using-TOKEN_MAX_RETRIES-instead-of-magic-number
