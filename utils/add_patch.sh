@@ -11,6 +11,8 @@ if [ -z "${TG_TOP}" ]; then
 	exit 1
 fi
 
+check_sync_upstream || exit 1
+
 MODE=$(bash "-${-}" ./.get_arg_mode.sh "${1}")
 
 apply_patches_files() {

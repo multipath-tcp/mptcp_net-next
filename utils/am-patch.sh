@@ -15,6 +15,8 @@ if [ "${BRANCH}" = "t/upstream" ] || [ ! -f ".topdeps" ]; then
 	exit 1
 fi
 
+check_sync_upstream || exit 1
+
 MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${PATCH}")
 
 TMP_FILE=""

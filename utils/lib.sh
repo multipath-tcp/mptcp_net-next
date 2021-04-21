@@ -5,6 +5,8 @@ COLOR_GREEN="\E[1;32m"
 COLOR_BLUE="\E[1;34m"
 COLOR_RESET="\E(B\E[m"
 
+TG_TOPIC_TOP="t/upstream"
+
 # $1: color, $2: text
 print_color() {
 	echo -e "${START_PRINT:-}${*}${COLOR_RESET}"
@@ -20,6 +22,27 @@ printinfo() {
 
 printerr() {
 	print_color "${COLOR_RED}${*}" >&2
+}
+
+topgit_get_remote() {
+	if ! git config topgit.remote; then
+		printerr "No topgit.remote in the git config, please fix that"
+		return 1
+	fi
+}
+
+check_sync_upstream() { local remote sha_loc sha_rem
+	remote="$(topgit_get_remote)" || return 1
+	git fetch "${remote}"
+
+	sha_loc="$(git rev-parse "${TG_TOPIC_TOP}")"
+	sha_rem="$(git rev-parse "${remote}/${TG_TOPIC_TOP}")"
+	if [ "${sha_loc}" != "${sha_rem}" ]; then
+		printerr "You are not sync with the remote ${remote}, please fix that"
+		return 1
+	fi
+
+	return 0
 }
 
 # Trap to display a message when there is an error (set -e)
