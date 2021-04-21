@@ -7,9 +7,11 @@
 #include <linux/wwan.h>
 
 /* MHI wwan flags */
-#define MHI_WWAN_DL_CAP		BIT(0)
-#define MHI_WWAN_UL_CAP		BIT(1)
-#define MHI_WWAN_RX_REFILL	BIT(2)
+enum mhi_wwan_flags {
+	MHI_WWAN_DL_CAP,
+	MHI_WWAN_UL_CAP,
+	MHI_WWAN_RX_REFILL,
+};
 
 #define MHI_WWAN_MAX_MTU	0x8000
 
@@ -56,11 +58,11 @@ static bool mhi_wwan_rx_budget_dec(struct mhi_wwan_dev *mhiwwan)
 
 	spin_lock(&mhiwwan->rx_lock);
 
-	if (mhiwwan->rx_budget)
+	if (mhiwwan->rx_budget) {
 		mhiwwan->rx_budget--;
-
-	if (mhiwwan->rx_budget && test_bit(MHI_WWAN_RX_REFILL, &mhiwwan->flags))
-		ret = true;
+		if (test_bit(MHI_WWAN_RX_REFILL, &mhiwwan->flags))
+			ret = true;
+	}
 
 	spin_unlock(&mhiwwan->rx_lock);
 
