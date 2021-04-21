@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Retransmit-DATA_FIN
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Retransmit DATA_FIN
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+With this change, the MPTCP-level retransmission timer is used to resend
+DATA_FIN. The retranmit timer is not stopped while waiting for a
+MPTCP-level ACK of DATA_FIN, and retransmitted DATA_FINs are sent on all
+subflows. The retry interval starts at TCP_RTO_MIN and then doubles on
+each attempt, up to TCP_RTO_MAX.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/146
+Fixes: 43b54c6ee382 ("mptcp: Use full MPTCP-level disconnect state machine")
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
