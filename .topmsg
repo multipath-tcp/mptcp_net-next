@@ -9,4 +9,5 @@ each attempt, up to TCP_RTO_MAX.
 
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/146
 Fixes: 43b54c6ee382 ("mptcp: Use full MPTCP-level disconnect state machine")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
