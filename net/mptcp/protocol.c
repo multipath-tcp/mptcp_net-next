@@ -1069,9 +1069,8 @@ out:
 		}
 	}
 
-	if (snd_una == READ_ONCE(msk->snd_nxt) &&
-	    !mptcp_data_fin_enabled(msk)) {
-		if (msk->timer_ival)
+	if (snd_una == READ_ONCE(msk->snd_nxt)) {
+		if (msk->timer_ival && !mptcp_data_fin_enabled(msk))
 			mptcp_stop_timer(sk);
 	} else {
 		mptcp_reset_timer(sk);
