@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-redundant-initialization-in-pm_nl_init_net
+From: Jianguo Wu <wujianguo@chinatelecom.cn>
+Subject: [PATCH] mptcp: remove redundant initialization in pm_nl_init_net()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Memory of struct pm_nl_pernet{} is allocated by kzalloc()
+in setup_net()->ops_init(), so it's no need to reset counters
+and zero bitmap in pm_nl_init_net().
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Jianguo Wu <wujianguo@chinatelecom.cn>
