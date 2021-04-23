@@ -2497,6 +2497,8 @@ void mptcp_subflow_shutdown(struct sock *sk, struct sock *ssk, int how)
 			pr_debug("Sending DATA_FIN on subflow %p", ssk);
 			mptcp_set_timeout(sk, ssk);
 			tcp_send_ack(ssk);
+			if (!mptcp_timer_pending(sk))
+				mptcp_reset_timer(sk);
 		}
 		break;
 	}
