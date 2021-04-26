@@ -53,7 +53,7 @@ jobs:
           nickname: gh-build-bot
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
+            ${{ github.event.workflow_run.html_url }}
 
   irc-tests:
     name: "IRC Tests"
