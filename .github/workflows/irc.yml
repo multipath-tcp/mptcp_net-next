@@ -4,7 +4,7 @@ on:
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
   workflow_run:
-    workflows: ["MPTCP Upstream Build Validation"]
+    workflows: ["MPTCP Upstream Build Validation", "Update TopGit tree"]
     types:
       - completed
   check_suite:
@@ -43,7 +43,7 @@ jobs:
 
   irc-build:
     name: "IRC Build"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run'
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
     runs-on: ubuntu-latest
     steps:
       - name: irc build
@@ -53,7 +53,21 @@ jobs:
           nickname: gh-build-bot
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}
+            ${{ github.event.workflow_run.html_url }}
+
+  irc-topgit:
+    name: "IRC TopGit"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Update TopGit tree' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc topgit
+        uses: rectalogic/notify-irc@v1
+        with:
+          channel: "#MPTCPUpstream"
+          nickname: gh-topgit-bot
+          message: |-
+            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
+            ${{ github.event.workflow_run.html_url }}
 
   irc-tests:
     name: "IRC Tests"
