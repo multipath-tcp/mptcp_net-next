@@ -17,7 +17,7 @@ static int mptcp_pernet_id;
 struct mptcp_pernet {
 	struct ctl_table_header *ctl_table_hdr;
 
-	int mptcp_enabled;
+	u8 mptcp_enabled;
 	unsigned int add_addr_timeout;
 };
 
@@ -39,12 +39,14 @@ unsigned int mptcp_get_add_addr_timeout(struct net *net)
 static struct ctl_table mptcp_sysctl_table[] = {
 	{
 		.procname = "enabled",
-		.maxlen = sizeof(int),
+		.maxlen = sizeof(u8),
 		.mode = 0644,
 		/* users with CAP_NET_ADMIN or root (not and) can change this
 		 * value, same as other sysctl or the 'net' tree.
 		 */
-		.proc_handler = proc_dointvec,
+		.proc_handler = proc_dou8vec_minmax,
+		.extra1       = SYSCTL_ZERO,
+		.extra2       = SYSCTL_ONE
 	},
 	{
 		.procname = "add_addr_timeout",
