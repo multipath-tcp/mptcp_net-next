@@ -26,6 +26,10 @@ task:
 
   test_script: /entrypoint.sh expect-${MATRIX_JOB}
 
+  on_failure:
+    vmlinux_artifacts:
+      path: "vmlinux.zstd"
+
   always:
     conclusion_artifacts:
       path: "conclusion.txt"
