@@ -1,4 +1,19 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-support-SYSCTL-only-if-enabled
+Subject: [PATCH] mptcp: support SYSCTL only if enabled
 
+Since the introduction of the sysctl support in MPTCP with
+commit 784325e9f037 ("mptcp: new sysctl to control the activation per NS"),
+we don't check CONFIG_SYSCTL.
+
+Until now, that was not an issue: the register and unregister functions
+were replaced by NO-OP one if SYSCTL was not enabled in the config. The
+only thing we could have avoid is not to reserve memory for the table
+but that's for the moment only a small table per net-ns.
+
+But the following commit is going to use SYSCTL_ZERO and SYSCTL_ONE
+which are not be defined if SYSCTL is not enabled in the config. This
+causes 'undefined reference' errors from the linker.
+
+Reported-by: kernel test robot <lkp@intel.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
