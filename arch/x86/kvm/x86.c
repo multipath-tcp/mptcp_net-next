@@ -156,9 +156,9 @@ module_param(tsc_tolerance_ppm, uint, S_IRUGO | S_IWUSR);
 
 /*
  * lapic timer advance (tscdeadline mode only) in nanoseconds.  '-1' enables
- * adaptive tuning starting from default advancment of 1000ns.  '0' disables
+ * adaptive tuning starting from default advancement of 1000ns.  '0' disables
  * advancement entirely.  Any other value is used as-is and disables adaptive
- * tuning, i.e. allows priveleged userspace to set an exact advancement time.
+ * tuning, i.e. allows privileged userspace to set an exact advancement time.
  */
 static int __read_mostly lapic_timer_advance_ns = -1;
 module_param(lapic_timer_advance_ns, int, S_IRUGO | S_IWUSR);
@@ -1287,7 +1287,7 @@ static const u32 emulated_msrs_all[] = {
 	MSR_KVM_PV_EOI_EN, MSR_KVM_ASYNC_PF_INT, MSR_KVM_ASYNC_PF_ACK,
 
 	MSR_IA32_TSC_ADJUST,
-	MSR_IA32_TSCDEADLINE,
+	MSR_IA32_TSC_DEADLINE,
 	MSR_IA32_ARCH_CAPABILITIES,
 	MSR_IA32_PERF_CAPABILITIES,
 	MSR_IA32_MISC_ENABLE,
@@ -1372,7 +1372,7 @@ static u64 kvm_get_arch_capabilities(void)
 	/*
 	 * If nx_huge_pages is enabled, KVM's shadow paging will ensure that
 	 * the nested hypervisor runs with NX huge pages.  If it is not,
-	 * L1 is anyway vulnerable to ITLB_MULTIHIT explots from other
+	 * L1 is anyway vulnerable to ITLB_MULTIHIT exploits from other
 	 * L1 guests, so it need not worry about its own (L2) guests.
 	 */
 	data |= ARCH_CAP_PSCHANGE_MC_NO;
@@ -1849,7 +1849,7 @@ fastpath_t handle_fastpath_set_msr_irqoff(struct kvm_vcpu *vcpu)
 			ret = EXIT_FASTPATH_EXIT_HANDLED;
 		}
 		break;
-	case MSR_IA32_TSCDEADLINE:
+	case MSR_IA32_TSC_DEADLINE:
 		data = kvm_read_edx_eax(vcpu);
 		if (!handle_fastpath_set_tscdeadline(vcpu, data)) {
 			kvm_skip_emulated_instruction(vcpu);
@@ -3087,7 +3087,7 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		return kvm_set_apic_base(vcpu, msr_info);
 	case APIC_BASE_MSR ... APIC_BASE_MSR + 0xff:
 		return kvm_x2apic_msr_write(vcpu, msr, data);
-	case MSR_IA32_TSCDEADLINE:
+	case MSR_IA32_TSC_DEADLINE:
 		kvm_set_lapic_tscdeadline_msr(vcpu, data);
 		break;
 	case MSR_IA32_TSC_ADJUST:
@@ -3449,7 +3449,7 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		break;
 	case APIC_BASE_MSR ... APIC_BASE_MSR + 0xff:
 		return kvm_x2apic_msr_read(vcpu, msr_info->index, &msr_info->data);
-	case MSR_IA32_TSCDEADLINE:
+	case MSR_IA32_TSC_DEADLINE:
 		msr_info->data = kvm_get_lapic_tscdeadline_msr(vcpu);
 		break;
 	case MSR_IA32_TSC_ADJUST:
@@ -4025,7 +4025,6 @@ static void kvm_steal_time_set_preempted(struct kvm_vcpu *vcpu)
 {
 	struct kvm_host_map map;
 	struct kvm_steal_time *st;
-	int idx;
 
 	if (!(vcpu->arch.st.msr_val & KVM_MSR_ENABLED))
 		return;
@@ -4033,15 +4032,9 @@ static void kvm_steal_time_set_preempted(struct kvm_vcpu *vcpu)
 	if (vcpu->arch.st.preempted)
 		return;
 
-	/*
-	 * Take the srcu lock as memslots will be accessed to check the gfn
-	 * cache generation against the memslots generation.
-	 */
-	idx = srcu_read_lock(&vcpu->kvm->srcu);
-
 	if (kvm_map_gfn(vcpu, vcpu->arch.st.msr_val >> PAGE_SHIFT, &map,
 			&vcpu->arch.st.cache, true))
-		goto out;
+		return;
 
 	st = map.hva +
 		offset_in_page(vcpu->arch.st.msr_val & KVM_STEAL_VALID_BITS);
@@ -4049,20 +4042,25 @@ static void kvm_steal_time_set_preempted(struct kvm_vcpu *vcpu)
 	st->preempted = vcpu->arch.st.preempted = KVM_VCPU_PREEMPTED;
 
 	kvm_unmap_gfn(vcpu, &map, &vcpu->arch.st.cache, true, true);
-
-out:
-	srcu_read_unlock(&vcpu->kvm->srcu, idx);
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	int idx;
+
 	if (vcpu->preempted && !vcpu->arch.guest_state_protected)
 		vcpu->arch.preempted_in_kernel = !static_call(kvm_x86_get_cpl)(vcpu);
 
+	/*
+	 * Take the srcu lock as memslots will be accessed to check the gfn
+	 * cache generation against the memslots generation.
+	 */
+	idx = srcu_read_lock(&vcpu->kvm->srcu);
 	if (kvm_xen_msr_enabled(vcpu->kvm))
 		kvm_xen_runstate_set_preempted(vcpu);
 	else
 		kvm_steal_time_set_preempted(vcpu);
+	srcu_read_unlock(&vcpu->kvm->srcu, idx);
 
 	static_call(kvm_x86_vcpu_put)(vcpu);
 	vcpu->arch.last_host_tsc = rdtsc();
