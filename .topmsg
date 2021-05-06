@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add sk parameter for mptcp_parse_option
-
-This patch added a new parameter name sk in mptcp_parse_option() and
-mptcp_get_options().
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
