@@ -37,11 +37,10 @@ static void mptcp_parse_option(const struct sock *sk,
 	case MPTCPOPT_MP_CAPABLE:
 		/* strict size checking */
 		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)) {
-			if (skb->len > tcp_hdr(skb)->doff << 2) {
+			if (skb->len > tcp_hdr(skb)->doff << 2)
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK_DATA;
-			} else {
+			else
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK;
-			}
 		} else {
 			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_ACK)
 				expected_opsize = TCPOLEN_MPTCP_MPC_SYNACK;
@@ -188,10 +187,8 @@ static void mptcp_parse_option(const struct sock *sk,
 				expected_opsize += TCPOLEN_MPTCP_DSS_MAP32;
 		}
 
-		/* RFC 6824, Section 3.3:
-		 * If a checksum is present, but its use had
-		 * not been negotiated in the MP_CAPABLE handshake,
-		 * the checksum field MUST be ignored.
+		/* Always parse any csum presence combination, we will enforce
+		 * RFC 8684 Section 3.3.0 checks later in subflow_data_ready
 		 */
 		if (opsize != expected_opsize &&
 		    opsize != expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM)
@@ -226,9 +223,15 @@ static void mptcp_parse_option(const struct sock *sk,
 			mp_opt->data_len = get_unaligned_be16(ptr);
 			ptr += 2;
 
-			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u",
+			if (opsize == expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM) {
+				mp_opt->csum_reqd = 1;
+				mp_opt->csum = (__force __sum16)get_unaligned_be16(ptr);
+				ptr += 2;
+			}
+
+			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u csum=%d:%u",
 				 mp_opt->data_seq, mp_opt->subflow_seq,
-				 mp_opt->data_len);
+				 mp_opt->data_len, mp_opt->csum_reqd, mp_opt->csum);
 		}
 
 		break;
