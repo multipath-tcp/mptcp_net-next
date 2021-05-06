@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-the-mib-for-data-checksum
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add the mib for data checksum
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the mib for the data checksum, MPTCP_MIB_DSSCSUMERR.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
