@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: cleanup error path in subflow_check_data_avail()
-
-Move fallback code out of the main loop and adds some
-branch prediction annotations.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
