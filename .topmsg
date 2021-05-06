@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: tune re-injections for csum enabled mode
-
-If the MPTCP-level checksum is enabled, on re-injections we
-must spool a complete DSS, or the receive side will not be
-able to compute the csum and process any data.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
