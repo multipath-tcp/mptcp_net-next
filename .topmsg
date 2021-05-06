@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-send-out-checksum-for-DSS
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: send out checksum for DSS
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In mptcp_write_options, if the checksum is enabled, adjust the option
+length and send out the data checksum with DSS suboption.
+
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
