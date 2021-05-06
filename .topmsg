@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: add a new sysctl checksum_enabled
-
-This patch added a new sysctl, named checksum_enabled, to control
-whether DSS checksum can be enabled.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
