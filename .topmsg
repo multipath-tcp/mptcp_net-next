@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-csum_enabled-in-mptcp_sock
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add csum_enabled in mptcp_sock
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new member named csum_enabled in struct mptcp_sock,
+used a dummy mptcp_is_checksum_enabled() helper to initialize it.
+
+Also added a new member named mptcpi_csum_enabled in struct mptcp_info
+to expose the csum_enabled flag.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
