@@ -41,6 +41,11 @@ unsigned int mptcp_get_add_addr_timeout(struct net *net)
 	return mptcp_get_pernet(net)->add_addr_timeout;
 }
 
+int mptcp_is_checksum_enabled(struct net *net)
+{
+	return mptcp_get_pernet(net)->checksum_enabled;
+}
+
 static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 {
 	pernet->mptcp_enabled = 1;
@@ -49,11 +54,6 @@ static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 }
 
 #ifdef CONFIG_SYSCTL
-int mptcp_is_checksum_enabled(struct net *net)
-{
-	return mptcp_get_pernet(net)->checksum_enabled;
-}
-
 static struct ctl_table mptcp_sysctl_table[] = {
 	{
 		.procname = "enabled",
