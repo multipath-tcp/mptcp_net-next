@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-dump-csum-fields-in-mptcp_dump_mpext
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: dump csum fields in mptcp_dump_mpext
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In mptcp_dump_mpext, dump the csum fields, csum and csum_reqd in struct
+mptcp_dump_mpext too.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
