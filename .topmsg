@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-OOB-access-in-setsockopt
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid OOB access in setsockopt()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We can't use tcp_set_congestion_control() on an mptcp socket, as
+such function can end-up accessing a tcp-specific field -
+prior_ssthresh - causing an OOB access.
+
+To allow propagating the correct ca algo on subflow, cache the ca
+name at initialization time.
+
+Additionally avoid overriding the user-selected CA (if any) at
+clone time.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/182
+Fixes: aa1fbd94e5c7 ("mptcp: sockopt: add TCP_CONGESTION and TCP_INFO")
+Acked-by: Florian Westphal <fw@strlen.de>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
