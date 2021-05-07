@@ -1,7 +1,7 @@
 From: Geliang Tang <geliangtang@gmail.com>
 Subject: [PATCH] mptcp: add the mib for data checksum
 
-This patch added the mib for the data checksum, MPTCP_MIB_DSSCSUMERR.
+This patch added the mib for the data checksum, MPTCP_MIB_DATACSUMERR.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
