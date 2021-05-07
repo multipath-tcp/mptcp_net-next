@@ -37,11 +37,10 @@ static void mptcp_parse_option(const struct sock *sk,
 	case MPTCPOPT_MP_CAPABLE:
 		/* strict size checking */
 		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)) {
-			if (skb->len > tcp_hdr(skb)->doff << 2) {
+			if (skb->len > tcp_hdr(skb)->doff << 2)
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK_DATA;
-			} else {
+			else
 				expected_opsize = TCPOLEN_MPTCP_MPC_ACK;
-			}
 		} else {
 			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_ACK)
 				expected_opsize = TCPOLEN_MPTCP_MPC_SYNACK;
