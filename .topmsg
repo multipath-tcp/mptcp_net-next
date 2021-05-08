@@ -1,10 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] DO-NOT-MERGE: mptcp: add GitHub Actions
+Subject: [PATCH] DO-NOT-MERGE: mptcp: add CI support
 
 Currently supported:
 
-- build-validation: check different combinations of validation
-- irc: send notifications to the IRC channel
-- update-tg-tree: periodically or manually sync with net-next
+- Github Actions:
+  - build-validation: check different combinations of validation
+  - IRC: send notifications to the IRC channel
+  - Update TopGit tree: run build tests and then override the export
+    branch.
+
+- Cirrus:
+  - Run tests in a KVM: selftests, kunit, packetdrill, etc.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
