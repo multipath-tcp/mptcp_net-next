@@ -12794,7 +12794,7 @@ static void bnxt_vpd_read_info(struct bnxt *bp)
 		goto exit;
 	}
 
-	i = pci_vpd_find_tag(vpd_data, 0, vpd_size, PCI_VPD_LRDT_RO_DATA);
+	i = pci_vpd_find_tag(vpd_data, vpd_size, PCI_VPD_LRDT_RO_DATA);
 	if (i < 0) {
 		netdev_err(bp->dev, "VPD READ-Only not found\n");
 		goto exit;
@@ -12984,8 +12984,6 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	if (!BNXT_CHIP_P4_PLUS(bp))
 		bp->flags |= BNXT_FLAG_DOUBLE_DB;
-
-	bp->ulp_probe = bnxt_ulp_probe;
 
 	rc = bnxt_init_mac_addr(bp);
 	if (rc) {
