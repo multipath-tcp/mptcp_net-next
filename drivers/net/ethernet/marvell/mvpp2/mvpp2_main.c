@@ -3784,9 +3784,9 @@ mvpp2_xdp_xmit(struct net_device *dev, int num_frame,
 }
 
 static int
-mvpp2_run_xdp(struct mvpp2_port *port, struct mvpp2_rx_queue *rxq,
-	      struct bpf_prog *prog, struct xdp_buff *xdp,
-	      struct page_pool *pp, struct mvpp2_pcpu_stats *stats)
+mvpp2_run_xdp(struct mvpp2_port *port, struct bpf_prog *prog,
+	      struct xdp_buff *xdp, struct page_pool *pp,
+	      struct mvpp2_pcpu_stats *stats)
 {
 	unsigned int len, sync, err;
 	struct page *page;
@@ -3925,7 +3925,7 @@ static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 					 MVPP2_MH_SIZE + MVPP2_SKB_HEADROOM,
 					 rx_bytes, false);
 
-			ret = mvpp2_run_xdp(port, rxq, xdp_prog, &xdp, pp, &ps);
+			ret = mvpp2_run_xdp(port, xdp_prog, &xdp, pp, &ps);
 
 			if (ret) {
 				xdp_ret |= ret;
@@ -7311,7 +7311,6 @@ static int mvpp2_get_sram(struct platform_device *pdev,
 
 static int mvpp2_probe(struct platform_device *pdev)
 {
-	const struct acpi_device_id *acpi_id;
 	struct fwnode_handle *fwnode = pdev->dev.fwnode;
 	struct fwnode_handle *port_fwnode;
 	struct mvpp2 *priv;
@@ -7324,16 +7323,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
-	if (has_acpi_companion(&pdev->dev)) {
-		acpi_id = acpi_match_device(pdev->dev.driver->acpi_match_table,
-					    &pdev->dev);
-		if (!acpi_id)
-			return -EINVAL;
-		priv->hw_version = (unsigned long)acpi_id->driver_data;
-	} else {
-		priv->hw_version =
-			(unsigned long)of_device_get_match_data(&pdev->dev);
-	}
+	priv->hw_version = (unsigned long)device_get_match_data(&pdev->dev);
 
 	/* multi queue mode isn't supported on PPV2.1, fallback to single
 	 * mode
@@ -7445,34 +7435,35 @@ static int mvpp2_probe(struct platform_device *pdev)
 			if (err < 0)
 				goto err_gop_clk;
 
-			priv->mg_core_clk = devm_clk_get(&pdev->dev, "mg_core_clk");
+			priv->mg_core_clk = devm_clk_get_optional(&pdev->dev, "mg_core_clk");
 			if (IS_ERR(priv->mg_core_clk)) {
-				priv->mg_core_clk = NULL;
-			} else {
-				err = clk_prepare_enable(priv->mg_core_clk);
-				if (err < 0)
-					goto err_mg_clk;
+				err = PTR_ERR(priv->mg_core_clk);
+				goto err_mg_clk;
 			}
+
+			err = clk_prepare_enable(priv->mg_core_clk);
+			if (err < 0)
+				goto err_mg_clk;
 		}
 
-		priv->axi_clk = devm_clk_get(&pdev->dev, "axi_clk");
+		priv->axi_clk = devm_clk_get_optional(&pdev->dev, "axi_clk");
 		if (IS_ERR(priv->axi_clk)) {
 			err = PTR_ERR(priv->axi_clk);
-			if (err == -EPROBE_DEFER)
-				goto err_mg_core_clk;
-			priv->axi_clk = NULL;
-		} else {
-			err = clk_prepare_enable(priv->axi_clk);
-			if (err < 0)
-				goto err_mg_core_clk;
+			goto err_mg_core_clk;
 		}
+
+		err = clk_prepare_enable(priv->axi_clk);
+		if (err < 0)
+			goto err_mg_core_clk;
 
 		/* Get system's tclk rate */
 		priv->tclk = clk_get_rate(priv->pp_clk);
-	} else if (device_property_read_u32(&pdev->dev, "clock-frequency",
-					    &priv->tclk)) {
-		dev_err(&pdev->dev, "missing clock-frequency value\n");
-		return -EINVAL;
+	} else {
+		err = device_property_read_u32(&pdev->dev, "clock-frequency", &priv->tclk);
+		if (err) {
+			dev_err(&pdev->dev, "missing clock-frequency value\n");
+			return err;
+		}
 	}
 
 	if (priv->hw_version >= MVPP22) {
@@ -7552,6 +7543,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 	return 0;
 
 err_port_probe:
+	fwnode_handle_put(port_fwnode);
+
 	i = 0;
 	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
 		if (priv->port_list[i])
@@ -7560,13 +7553,10 @@ err_port_probe:
 	}
 err_axi_clk:
 	clk_disable_unprepare(priv->axi_clk);
-
 err_mg_core_clk:
-	if (priv->hw_version >= MVPP22)
-		clk_disable_unprepare(priv->mg_core_clk);
+	clk_disable_unprepare(priv->mg_core_clk);
 err_mg_clk:
-	if (priv->hw_version >= MVPP22)
-		clk_disable_unprepare(priv->mg_clk);
+	clk_disable_unprepare(priv->mg_clk);
 err_gop_clk:
 	clk_disable_unprepare(priv->gop_clk);
 err_pp_clk:
