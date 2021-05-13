@@ -519,9 +519,6 @@ static void mptcp_write_data_fin(struct mptcp_subflow_context *subflow,
 		 */
 		ext->data_fin = 1;
 		ext->data_len++;
-
-		/* the pseudo header has changed, update the csum accordingly */
-		csum_replace2(&ext->csum, htons(ext->data_len - 1), htons(ext->data_len));
 	}
 }
 
