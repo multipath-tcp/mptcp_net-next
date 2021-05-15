@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp_connect-add-SO_TIMESTAMPNS-cmsg-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp_connect: add SO_TIMESTAMPNS cmsg support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This extends the existing setsockopt test case to also check for cmsg
+timestamps.
+
+mptcp_connect will abort/fail if the setockopt was passed but the
+timestamp cmsg isn't present after successful recvmsg().
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
