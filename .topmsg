@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/sock-expose-so_timestamp-options-for-mptcp
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] sock: expose so_timestamp options for mptcp
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This exports SO_TIMESTAMP_* function for re-use by MPTCP.
+
+Without this there is too much copy & paste needed to support
+this from mptcp setsockopt path.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
