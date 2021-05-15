@@ -32,6 +32,13 @@ topgit_get_remote() {
 }
 
 check_sync_upstream() { local remote sha_loc sha_rem
+	# only if you know what you are doing :)
+	# e.g. you include squash-to patch and new patches
+	if [ "${TG_SKIP_CHECK_SYNC:-}" = "1" ]; then
+		printinfo "Check sync upstream has been skipped."
+		return 0
+	fi
+
 	remote="$(topgit_get_remote)" || return 1
 	git fetch "${remote}"
 
