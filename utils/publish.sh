@@ -104,7 +104,7 @@ tg_export_tag() { local tag
 	git push -f origin "${TG_EXPORT}" "${tag}"
 	git checkout -f "${TG_TOP}"
 
-	printinfo "Builds and tests are now in progress:"
+	printinfo "Builds and tests are now in progress:\\n"
 	printinfo "https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/${tag}"
 	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${tag}"
 }

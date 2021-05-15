@@ -22,7 +22,7 @@ apply_patches_files() {
 	fi
 }
 
-apply_patches_git_pw() {
+apply_patches_git_pw() { local i
 	for i in "${@}"; do
 		if ! git-pw "${MODE}" apply ${GIT_PW_ARG:+"${GIT_PW_ARG}"} "${i}"; then
 			printerr "ERROR with 'git-pw ${MODE} apply ${i}'. " \
@@ -87,7 +87,7 @@ check_commit_msgs() { local commit sob=0 dot=0
 		print_rebase_pause "Please make sure the Signed-off-by is the last line." "${1}"
 	fi
 	if [ "${dot}" != 0 ]; then
-		print_rebase_pause "Please make sure no commit have a dot at the end of the commit title." "${1}"
+		print_rebase_pause "Please make sure no commits have a dot at the end of the commit title." "${1}"
 	fi
 }
 
