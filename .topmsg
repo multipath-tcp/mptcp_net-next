@@ -1,9 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: receive path cmsg support
-
-This adds support for SO_TIMESTAMP(NS).  Timestamps are passed to
-userspace in the same way as for plain tcp sockets.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
