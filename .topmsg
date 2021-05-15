@@ -1,9 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] sock: expose so_timestamping options for mptcp
-
-Similar to previous patch: expose SO_TIMESTAMPING helper so we do not
-have to copy & paste this into the mptcp core.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
