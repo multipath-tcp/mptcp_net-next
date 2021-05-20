@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-error-message-on-infinite-mapping
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid error message on infinite mapping
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Another left-over. Avoid flooding dmesg with useless text,
+we already have a MIB for that event.
+
+Fixes: 648ef4b88673 ("mptcp: Implement MPTCP receive path")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
