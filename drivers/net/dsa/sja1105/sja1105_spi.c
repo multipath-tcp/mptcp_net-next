@@ -8,8 +8,6 @@
 #include "sja1105.h"
 
 #define SJA1105_SIZE_RESET_CMD		4
-#define SJA1105_SIZE_SPI_MSG_HEADER	4
-#define SJA1105_SIZE_SPI_MSG_MAXLEN	(64 * 4)
 
 struct sja1105_chunk {
 	u8	*buf;
@@ -29,13 +27,6 @@ sja1105_spi_message_pack(void *buf, const struct sja1105_spi_message *msg)
 	sja1105_pack(buf, &msg->address,    24,  4, size);
 }
 
-#define sja1105_hdr_xfer(xfers, chunk) \
-	((xfers) + 2 * (chunk))
-#define sja1105_chunk_xfer(xfers, chunk) \
-	((xfers) + 2 * (chunk) + 1)
-#define sja1105_hdr_buf(hdr_bufs, chunk) \
-	((hdr_bufs) + (chunk) * SJA1105_SIZE_SPI_MSG_HEADER)
-
 /* If @rw is:
  * - SPI_WRITE: creates and sends an SPI write message at absolute
  *		address reg_addr, taking @len bytes from *buf
@@ -46,41 +37,25 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 			sja1105_spi_rw_mode_t rw, u64 reg_addr, u8 *buf,
 			size_t len, struct ptp_system_timestamp *ptp_sts)
 {
-	struct sja1105_chunk chunk = {
-		.len = min_t(size_t, len, SJA1105_SIZE_SPI_MSG_MAXLEN),
-		.reg_addr = reg_addr,
-		.buf = buf,
-	};
+	u8 hdr_buf[SJA1105_SIZE_SPI_MSG_HEADER] = {0};
 	struct spi_device *spi = priv->spidev;
-	struct spi_transfer *xfers;
+	struct spi_transfer xfers[2] = {0};
+	struct spi_transfer *chunk_xfer;
+	struct spi_transfer *hdr_xfer;
+	struct sja1105_chunk chunk;
 	int num_chunks;
 	int rc, i = 0;
-	u8 *hdr_bufs;
 
-	num_chunks = DIV_ROUND_UP(len, SJA1105_SIZE_SPI_MSG_MAXLEN);
+	num_chunks = DIV_ROUND_UP(len, priv->max_xfer_len);
 
-	/* One transfer for each message header, one for each message
-	 * payload (chunk).
-	 */
-	xfers = kcalloc(2 * num_chunks, sizeof(struct spi_transfer),
-			GFP_KERNEL);
-	if (!xfers)
-		return -ENOMEM;
+	chunk.reg_addr = reg_addr;
+	chunk.buf = buf;
+	chunk.len = min_t(size_t, len, priv->max_xfer_len);
 
-	/* Packed buffers for the num_chunks SPI message headers,
-	 * stored as a contiguous array
-	 */
-	hdr_bufs = kcalloc(num_chunks, SJA1105_SIZE_SPI_MSG_HEADER,
-			   GFP_KERNEL);
-	if (!hdr_bufs) {
-		kfree(xfers);
-		return -ENOMEM;
-	}
+	hdr_xfer = &xfers[0];
+	chunk_xfer = &xfers[1];
 
 	for (i = 0; i < num_chunks; i++) {
-		struct spi_transfer *chunk_xfer = sja1105_chunk_xfer(xfers, i);
-		struct spi_transfer *hdr_xfer = sja1105_hdr_xfer(xfers, i);
-		u8 *hdr_buf = sja1105_hdr_buf(hdr_bufs, i);
 		struct spi_transfer *ptp_sts_xfer;
 		struct sja1105_spi_message msg;
 
@@ -127,21 +102,16 @@ static int sja1105_xfer(const struct sja1105_private *priv,
 		chunk.buf += chunk.len;
 		chunk.reg_addr += chunk.len / 4;
 		chunk.len = min_t(size_t, (ptrdiff_t)(buf + len - chunk.buf),
-				  SJA1105_SIZE_SPI_MSG_MAXLEN);
+				  priv->max_xfer_len);
 
-		/* De-assert the chip select after each chunk. */
-		if (chunk.len)
-			chunk_xfer->cs_change = 1;
+		rc = spi_sync_transfer(spi, xfers, 2);
+		if (rc < 0) {
+			dev_err(&spi->dev, "SPI transfer failed: %d\n", rc);
+			return rc;
+		}
 	}
 
-	rc = spi_sync_transfer(spi, xfers, 2 * num_chunks);
-	if (rc < 0)
-		dev_err(&spi->dev, "SPI transfer failed: %d\n", rc);
-
-	kfree(hdr_bufs);
-	kfree(xfers);
-
-	return rc;
+	return 0;
 }
 
 int sja1105_xfer_buf(const struct sja1105_private *priv,
@@ -446,9 +416,9 @@ static struct sja1105_regs sja1105et_regs = {
 	.pad_mii_rx = {0x100801, 0x100803, 0x100805, 0x100807, 0x100809},
 	.rmii_pll1 = 0x10000A,
 	.cgu_idiv = {0x10000B, 0x10000C, 0x10000D, 0x10000E, 0x10000F},
-	.mac = {0x200, 0x202, 0x204, 0x206, 0x208},
-	.mac_hl1 = {0x400, 0x410, 0x420, 0x430, 0x440},
-	.mac_hl2 = {0x600, 0x610, 0x620, 0x630, 0x640},
+	.stats[MAC] = {0x200, 0x202, 0x204, 0x206, 0x208},
+	.stats[HL1] = {0x400, 0x410, 0x420, 0x430, 0x440},
+	.stats[HL2] = {0x600, 0x610, 0x620, 0x630, 0x640},
 	/* UM10944.pdf, Table 78, CGU Register overview */
 	.mii_tx_clk = {0x100013, 0x10001A, 0x100021, 0x100028, 0x10002F},
 	.mii_rx_clk = {0x100014, 0x10001B, 0x100022, 0x100029, 0x100030},
@@ -482,10 +452,10 @@ static struct sja1105_regs sja1105pqrs_regs = {
 	.sgmii = 0x1F0000,
 	.rmii_pll1 = 0x10000A,
 	.cgu_idiv = {0x10000B, 0x10000C, 0x10000D, 0x10000E, 0x10000F},
-	.mac = {0x200, 0x202, 0x204, 0x206, 0x208},
-	.mac_hl1 = {0x400, 0x410, 0x420, 0x430, 0x440},
-	.mac_hl2 = {0x600, 0x610, 0x620, 0x630, 0x640},
-	.ether_stats = {0x1400, 0x1418, 0x1430, 0x1448, 0x1460},
+	.stats[MAC] = {0x200, 0x202, 0x204, 0x206, 0x208},
+	.stats[HL1] = {0x400, 0x410, 0x420, 0x430, 0x440},
+	.stats[HL2] = {0x600, 0x610, 0x620, 0x630, 0x640},
+	.stats[ETHER] = {0x1400, 0x1418, 0x1430, 0x1448, 0x1460},
 	/* UM11040.pdf, Table 114 */
 	.mii_tx_clk = {0x100013, 0x100019, 0x10001F, 0x100025, 0x10002B},
 	.mii_rx_clk = {0x100014, 0x10001A, 0x100020, 0x100026, 0x10002C},
@@ -494,7 +464,6 @@ static struct sja1105_regs sja1105pqrs_regs = {
 	.rgmii_tx_clk = {0x100016, 0x10001C, 0x100022, 0x100028, 0x10002E},
 	.rmii_ref_clk = {0x100015, 0x10001B, 0x100021, 0x100027, 0x10002D},
 	.rmii_ext_tx_clk = {0x100017, 0x10001D, 0x100023, 0x100029, 0x10002F},
-	.qlevel = {0x604, 0x614, 0x624, 0x634, 0x644},
 	.ptpegr_ts = {0xC0, 0xC4, 0xC8, 0xCC, 0xD0},
 	.ptpschtm = 0x13, /* Spans 0x13 to 0x14 */
 	.ptppinst = 0x15,
