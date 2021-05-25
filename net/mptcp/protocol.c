@@ -1040,7 +1040,7 @@ static void dfrag_clear(struct sock *sk, struct mptcp_data_frag *dfrag)
 	put_page(dfrag->page);
 }
 
-static bool __mptcp_do_clean_una(struct sock *sk)
+static void __mptcp_clean_una(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_data_frag *dtmp, *dfrag;
@@ -1081,6 +1081,12 @@ static bool __mptcp_do_clean_una(struct sock *sk)
 	}
 
 out:
+	if (cleaned) {
+		if (tcp_under_memory_pressure(sk)) {
+			__mptcp_update_wmem(sk);
+			sk_mem_reclaim_partial(sk);
+		}
+	}
 
 	if (snd_una == READ_ONCE(msk->snd_nxt)) {
 		if (msk->timer_ival && !mptcp_data_fin_enabled(msk))
@@ -1088,34 +1094,22 @@ out:
 	} else {
 		mptcp_reset_timer(sk);
 	}
-	return cleaned;
-}
-
-static void __mptcp_clean_una(struct sock *sk)
-{
-	if (__mptcp_do_clean_una(sk) && tcp_under_memory_pressure(sk)) {
-		__mptcp_update_wmem(sk);
-		sk_mem_reclaim_partial(sk);
-	}
 }
 
 static void __mptcp_clean_una_wakeup(struct sock *sk)
 {
+#ifdef CONFIG_LOCKDEP
+	WARN_ON_ONCE(!lockdep_is_held(&sk->sk_lock.slock));
+#endif
 	__mptcp_clean_una(sk);
 	mptcp_write_space(sk);
 }
 
-/* variant __mptcp_clean_una_wakeup() for caller owning the msk socket lock,
- * but not the msk_data_lock/msk socket spin lock
- */
 static void mptcp_clean_una_wakeup(struct sock *sk)
 {
-#ifdef CONFIG_LOCKDEP
-	WARN_ON_ONCE(!lockdep_is_held(&sk->sk_lock));
-#endif
-	if (__mptcp_do_clean_una(sk) && tcp_under_memory_pressure(sk))
-		mptcp_mem_reclaim_partial(sk);
-	mptcp_write_space(sk);
+	mptcp_data_lock(sk);
+	__mptcp_clean_una_wakeup(sk);
+	mptcp_data_unlock(sk);
 }
 
 static void mptcp_enter_memory_pressure(struct sock *sk)
