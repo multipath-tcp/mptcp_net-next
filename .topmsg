@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: fix sk_forward_memory corruption under memory pressure
+Subject: [PATCH] mptcp: fix sk_forward_memory corruption on retransmission
 
 MPTCP sk_forward_memory handling is a bit special, as such field
 is protected by the msk socket spin_lock, instead of the plain
@@ -8,14 +8,14 @@ socket lock.
 Currently we have a code path updating such field without handling
 the relevant lock:
 
-__mptcp_retrans() -> __mptcp_clean_una_wakeup() -> __mptcp_update_wmem()
+__mptcp_retrans() -> __mptcp_clean_una_wakeup()
 
-We can hit the above only under memory pressure. When that happen,
-forward memory accounting could be corrupted, as reported by Matt.
+Several helpers in __mptcp_clean_una_wakeup() will update
+sk_forward_alloc, possibly causing such field corruption, as reported
+by Matthieu.
 
-Address the issue creating a new variant of __mptcp_clean_una_wakeup()
-which handle fwd memory updates with the proper care and invoking
-such new helper in the relevant code path.
+Address the issue providing and using a new variant of blamed function
+which explicitly acquires the msk spin lock.
 
 Fixes: 64b9cea7a0af ("mptcp: fix spurious retransmissions")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/172
