@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-update-selftest-for-fallback-due-to-OoO
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: update selftest for fallback due to OoO
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The previous commit noted that we can have fallback
+scenario due to OoO (or packet drop). Update the self-tests
+accordingly
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
