@@ -1305,7 +1305,7 @@ static bool mptcp_alloc_tx_skb(struct sock *sk, struct sock *ssk)
 static void mptcp_update_data_checksum(struct sk_buff *skb, int added)
 {
 	struct mptcp_ext *mpext = mptcp_get_ext(skb);
-	__wsum csum = csum_unfold(mpext->csum);
+	__wsum csum = ~csum_unfold(mpext->csum);
 	int offset = skb->len - added;
 
 	mpext->csum = csum_fold(csum_block_add(csum, skb_checksum(skb, offset, added, 0), offset));
