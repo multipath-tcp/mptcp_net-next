@@ -22,7 +22,8 @@ elif [ "${SERIES}" = 1 ] && is_pw series "${1}"; then
 elif is_pw patch "${1}" \
 		 --state "new" \
 		 --state "under-review" \
-		 --state "awaiting-upstream" \
+		 --state "queued" \
+		 --state "mainlined" \
 		 --state "deferred"; then
 	echo "patch"
 else
