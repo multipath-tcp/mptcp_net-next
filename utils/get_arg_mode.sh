@@ -15,6 +15,8 @@ is_pw() { local mode id
 
 if [ -f "${1}" ]; then
 	echo "files"
+elif [ "${1}" = "patch" ] || [ "${1}" = "series" ]; then
+	echo "${1}"
 elif [ "${SERIES}" = 1 ] && is_pw series "${1}"; then
 	echo "series"
 elif is_pw patch "${1}" \

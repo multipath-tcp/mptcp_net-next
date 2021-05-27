@@ -4,8 +4,6 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-PATCH="${1}"
-
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 printinfo "Current branch is: ${BRANCH}"
 head -n2 .topmsg | grep "^Subject: "
@@ -17,7 +15,7 @@ fi
 
 check_sync_upstream || exit 1
 
-MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${PATCH}")
+MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${1}")
 
 TMP_FILE=""
 
@@ -61,14 +59,18 @@ am_series() {
 	exit 1
 }
 
-am_patch() {
+am_patch() { local patch="${1}"
 	TMP_FILE=$(mktemp)
 
-	git-pw patch download "${1}" "${TMP_FILE}"
+	if [ "${patch}" = "patch" ]; then
+		patch="${2}"
+	fi
+
+	git-pw patch download "${patch}" "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }
 
 trap 'exit_trap' EXIT
 
-"am_${MODE}" "${PATCH}"
+"am_${MODE}" "${@}"

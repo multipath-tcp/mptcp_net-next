@@ -42,8 +42,14 @@ apply_patches_patch() {
 	GIT_PW_ARG="--no-deps" apply_patches_git_pw "${@}"
 }
 
-apply_patches() {
-	"apply_patches_${MODE}" "${@}"
+apply_patches() { local p patches=()
+	for p in "${@}"; do
+		if [ "${p}" = "patch" ] || [ "${p}" = "series" ]; then
+			continue;
+		fi
+		patches+=("${p}")
+	done
+	"apply_patches_${MODE}" "${patches}"
 }
 
 print_rebase_pause() {
