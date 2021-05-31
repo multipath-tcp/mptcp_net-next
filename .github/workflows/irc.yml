@@ -20,7 +20,8 @@ jobs:
       - name: irc tag
         uses: rectalogic/notify-irc@v1
         with:
-          channel: "#MPTCPUpstream"
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
           nickname: gh-tag-bot
           message: "New tag available: ${{ github.event.ref }} (by ${{ github.actor }})"
 
@@ -32,7 +33,8 @@ jobs:
       - name: irc issues
         uses: rectalogic/notify-irc@v1
         with:
-          channel: "#MPTCPUpstream"
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
           nickname: gh-issues-bot
           message: |-
             Issue #${{ github.event.issue.number }} has been ${{ github.event.action }} by ${{ github.actor }}.
@@ -49,7 +51,8 @@ jobs:
       - name: irc build
         uses: rectalogic/notify-irc@v1
         with:
-          channel: "#MPTCPUpstream"
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
           nickname: gh-build-bot
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
@@ -63,7 +66,8 @@ jobs:
       - name: irc topgit
         uses: rectalogic/notify-irc@v1
         with:
-          channel: "#MPTCPUpstream"
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
           nickname: gh-topgit-bot
           message: |-
             New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
@@ -94,7 +98,8 @@ jobs:
       - name: irc tests
         uses: rectalogic/notify-irc@v1
         with:
-          channel: "#MPTCPUpstream"
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
           nickname: gh-tests-bot
           message: |-
             New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) just ended:
