@@ -1,1 +1,1 @@
-t/mptcp-do-not-warn-on-bad-input-from-the-network
+t/selftests-mptcp-enable-syncookie-only-in-absence-of-reorders
