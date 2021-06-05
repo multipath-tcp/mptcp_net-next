@@ -1,2 +1,1 @@
-t/selftests-mptcp_connect-add-SO_TIMESTAMPNS-cmsg-support
 t/selftests-mptcp-enable-checksum-in-mptcp_join.sh
