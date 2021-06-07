@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-tx-skb-cache
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop tx skb cache
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mentioned cache was introduced to reduce the number of skb
+allocation in atomic context, but the required complexity is
+excessive.
+
+This change remove the mentioned cache.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
