@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-MIB-counter-for-invalid-mapping
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add MIB counter for invalid mapping
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Account this exceptional events for better introspection.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
