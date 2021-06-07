@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-don-t-clear-MPTCP_DATA_READY-in-sk_wait_event
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: don't clear MPTCP_DATA_READY in sk_wait_event()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If we don't flush entirely the receive queue, we need set
+again such bit later. We can simply avoid clearing it.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
