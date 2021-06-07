@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-fast-lock-for-subflows-when-possible
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use fast lock for subflows when possible
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There are a bunch of callsite where the ssk socket
+lock is acquired using the full-blown version eligible for
+the fast variant. Let's move to the latter.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
