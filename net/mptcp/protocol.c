@@ -687,8 +687,6 @@ static bool move_skbs_to_msk(struct mptcp_sock *msk, struct sock *ssk)
 	if (inet_sk_state_load(sk) == TCP_CLOSE)
 		return false;
 
-	mptcp_data_lock(sk);
-
 	__mptcp_move_skbs_from_subflow(msk, ssk, &moved);
 	__mptcp_ofo_queue(msk);
 	if (unlikely(ssk->sk_err)) {
@@ -705,8 +703,6 @@ static bool move_skbs_to_msk(struct mptcp_sock *msk, struct sock *ssk)
 	 */
 	if (mptcp_pending_data_fin(sk, NULL))
 		mptcp_schedule_work(sk);
-	mptcp_data_unlock(sk);
-
 	return moved > 0;
 }
 
@@ -733,10 +729,12 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 		return;
 
 	/* Wake-up the reader only for in-sequence data */
+	mptcp_data_lock(sk);
 	if (move_skbs_to_msk(msk, ssk)) {
 		set_bit(MPTCP_DATA_READY, &msk->flags);
 		sk->sk_data_ready(sk);
 	}
+	mptcp_data_unlock(sk);
 }
 
 static bool mptcp_do_flush_join_list(struct mptcp_sock *msk)
