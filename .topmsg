@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-turn-rp_filter-off-on-each-NIC
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] selftests: mptcp: turn rp_filter off on each NIC
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+To turn rp_filter off we should:
+
+  echo 0 > /proc/sys/net/ipv4/conf/default/rp_filter
+
+and
+
+  echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+
+before NIC created.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
