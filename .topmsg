@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-sysctl-allow_join_initial_addr_port
+From: Geliang Tang <geliangtang@gmail.com>
+Subject: [PATCH] mptcp: add sysctl allow_join_initial_addr_port
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new sysctl, named allow_join_initial_addr_port, to
+control whether allow peers to send join requests to the IP address and
+port number used by the initial subflow.
+
+Suggested-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
