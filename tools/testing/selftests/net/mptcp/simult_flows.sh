@@ -60,8 +60,8 @@ setup()
 	for i in "$ns1" "$ns2" "$ns3";do
 		ip netns add $i || exit $ksft_skip
 		ip -net $i link set lo up
-		ip netns exec $1 sysctl -q net.ipv4.conf.all.rp_filter=0
-		ip netns exec $1 sysctl -q net.ipv4.conf.default.rp_filter=0
+		ip netns exec $i sysctl -q net.ipv4.conf.all.rp_filter=0
+		ip netns exec $i sysctl -q net.ipv4.conf.default.rp_filter=0
 	done
 
 	ip link add ns1eth1 netns "$ns1" type veth peer name ns2eth1 netns "$ns2"
