@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-refine-mptcp_cleanup_rbuf
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: refine mptcp_cleanup_rbuf
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current cleanup rbuf tries a bit too hard to avoid acquiring
+the subflow socket lock. We may end-up delaying the needed ack,
+or skip acking a blocked subflow.
+
+Address the above extending the conditions used to trigger the cleanup
+to reflect more closely what TCP does and invoking tcp_cleanup_rbuf()
+on all the active subflows.
+
+Note that we can't replicate the exact tests implemented in
+tcp_cleanup_rbuf(), as MPTCP lacks some of the required info - e.g.
+ping-pong mode.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
