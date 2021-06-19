@@ -1886,17 +1886,23 @@ int sja1105_static_config_reload(struct sja1105_private *priv,
 	mutex_lock(&priv->ptp_data.lock);
 
 	rc = __sja1105_ptp_gettimex(ds, &now, &ptp_sts_before);
-	if (rc < 0)
-		goto out_unlock_ptp;
+	if (rc < 0) {
+		mutex_unlock(&priv->ptp_data.lock);
+		goto out;
+	}
 
 	/* Reset switch and send updated static configuration */
 	rc = sja1105_static_config_upload(priv);
-	if (rc < 0)
-		goto out_unlock_ptp;
+	if (rc < 0) {
+		mutex_unlock(&priv->ptp_data.lock);
+		goto out;
+	}
 
 	rc = __sja1105_ptp_settime(ds, 0, &ptp_sts_after);
-	if (rc < 0)
-		goto out_unlock_ptp;
+	if (rc < 0) {
+		mutex_unlock(&priv->ptp_data.lock);
+		goto out;
+	}
 
 	t1 = timespec64_to_ns(&ptp_sts_before.pre_ts);
 	t2 = timespec64_to_ns(&ptp_sts_before.post_ts);
@@ -1911,7 +1917,6 @@ int sja1105_static_config_reload(struct sja1105_private *priv,
 
 	__sja1105_ptp_adjtime(ds, now);
 
-out_unlock_ptp:
 	mutex_unlock(&priv->ptp_data.lock);
 
 	dev_info(priv->ds->dev,
@@ -1922,9 +1927,11 @@ out_unlock_ptp:
 	 * For these interfaces there is no dynamic configuration
 	 * needed, since PLLs have same settings at all speeds.
 	 */
-	rc = priv->info->clocking_setup(priv);
-	if (rc < 0)
-		goto out;
+	if (priv->info->clocking_setup) {
+		rc = priv->info->clocking_setup(priv);
+		if (rc < 0)
+			goto out;
+	}
 
 	for (i = 0; i < ds->num_ports; i++) {
 		struct dw_xpcs *xpcs = priv->xpcs[i];
@@ -3032,18 +3039,34 @@ static int sja1105_setup(struct dsa_switch *ds)
 		goto out_ptp_clock_unregister;
 	}
 
+	if (priv->info->disable_microcontroller) {
+		rc = priv->info->disable_microcontroller(priv);
+		if (rc < 0) {
+			dev_err(ds->dev,
+				"Failed to disable microcontroller: %pe\n",
+				ERR_PTR(rc));
+			goto out_mdiobus_unregister;
+		}
+	}
+
 	/* Create and send configuration down to device */
 	rc = sja1105_static_config_load(priv);
 	if (rc < 0) {
 		dev_err(ds->dev, "Failed to load static config: %d\n", rc);
 		goto out_mdiobus_unregister;
 	}
+
 	/* Configure the CGU (PHY link modes and speeds) */
-	rc = priv->info->clocking_setup(priv);
-	if (rc < 0) {
-		dev_err(ds->dev, "Failed to configure MII clocking: %d\n", rc);
-		goto out_static_config_free;
+	if (priv->info->clocking_setup) {
+		rc = priv->info->clocking_setup(priv);
+		if (rc < 0) {
+			dev_err(ds->dev,
+				"Failed to configure MII clocking: %pe\n",
+				ERR_PTR(rc));
+			goto out_static_config_free;
+		}
 	}
+
 	/* On SJA1105, VLAN filtering per se is always enabled in hardware.
 	 * The only thing we can do to disable it is lie about what the 802.1Q
 	 * EtherType is.
