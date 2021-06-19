@@ -1,1 +1,2 @@
 t/selftests-mptcp-enable-checksum-in-mptcp_join.sh
+t/mptcp-add-csum_reqd-in-mptcp_out_options
