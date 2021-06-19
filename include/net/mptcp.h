@@ -32,7 +32,8 @@ struct mptcp_ext {
 			mpc_map:1,
 			frozen:1,
 			reset_transient:1;
-	u8		reset_reason:4;
+	u8		reset_reason:4,
+			csum_reqd:1;
 };
 
 #define MPTCP_RM_IDS_MAX	8
@@ -64,8 +65,9 @@ struct mptcp_out_options {
 	struct mptcp_rm_list rm_list;
 	u8 join_id;
 	u8 backup;
-	u8 reset_reason:4;
-	u8 reset_transient:1;
+	u8 reset_reason:4,
+	   reset_transient:1,
+	   csum_reqd:1;
 	u32 nonce;
 	u64 thmac;
 	u32 token;
