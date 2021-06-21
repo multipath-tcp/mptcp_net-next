@@ -11,6 +11,7 @@ git-pw patch list \
 	--state Accepted \
 	--state Superseded \
 	--state Rejected \
+	--state not-applicable \
 	-f simple \
 	-c ID | \
 		tail -n +3 | \

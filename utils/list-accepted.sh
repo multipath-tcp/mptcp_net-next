@@ -20,3 +20,5 @@ echo "== Deferred =="
 list Deferred
 echo "== Mainlined =="
 list Mainlined
+echo "== Not Applicable =="
+list not-applicable
