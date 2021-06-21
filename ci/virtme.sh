@@ -20,7 +20,7 @@ VIRTME_SCRIPT_DIR="patches/virtme"
 
 VIRTME_SCRIPT="${VIRTME_SCRIPT_DIR}/tests.sh"
 VIRTME_SCRIPT_END="__VIRTME_END__"
-VIRTME_EXPECT_TIMEOUT="1500"
+VIRTME_EXPECT_TIMEOUT="1800"
 VIRTME_RUN_SCRIPT="${VIRTME_SCRIPT_DIR}/virtme.sh"
 VIRTME_RUN_EXPECT="${VIRTME_SCRIPT_DIR}/virtme.expect"
 
@@ -122,6 +122,13 @@ prepare() { local old_pwd mode
                         xargs sudo sed -i "s/^--tolerance_usecs=1/--tolerance_usecs=2/g"
         fi
         cd "${old_pwd}"
+
+        git checkout -- tools/testing/selftests/net/mptcp/settings
+        if [ "${mode}" = "debug" ]; then
+                timeo="$(grep "^timeout=" tools/testing/selftests/net/mptcp/settings | cut -d= -f2)"
+                timeo=$((timeo + 300))
+                sed -i "s/^timeout=.*/timeout=${timeo}/g" tools/testing/selftests/net/mptcp/settings
+        fi
 
         rm -rf "${RESULTS_DIR}"
         mkdir -p "${VIRTME_SCRIPT_DIR}" "${RESULTS_DIR}"
