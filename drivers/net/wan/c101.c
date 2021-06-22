@@ -92,7 +92,7 @@ static card_t **new_card = &first_card;
 #define phy_node(port)		   (0)
 #define winsize(card)		   (C101_WINDOW_SIZE)
 #define win0base(card)		   ((card)->win0base)
-#define winbase(card)      	   ((card)->win0base + 0x2000)
+#define winbase(card)		   ((card)->win0base + 0x2000)
 #define get_port(card, port)	   (card)
 static void sca_msci_intr(port_t *port);
 
@@ -307,7 +307,7 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	}
 
 	card = kzalloc(sizeof(card_t), GFP_KERNEL);
-	if (card == NULL)
+	if (!card)
 		return -ENOBUFS;
 
 	card->dev = alloc_hdlcdev(card);
@@ -381,7 +381,7 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 
 static int __init c101_init(void)
 {
-	if (hw == NULL) {
+	if (!hw) {
 #ifdef MODULE
 		pr_info("no card initialized\n");
 #endif
@@ -416,6 +416,7 @@ static void __exit c101_cleanup(void)
 
 	while (card) {
 		card_t *ptr = card;
+
 		card = card->next_card;
 		unregister_hdlc_device(port_to_dev(ptr));
 		c101_destroy_card(ptr);
