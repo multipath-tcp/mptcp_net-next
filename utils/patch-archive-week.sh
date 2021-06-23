@@ -6,7 +6,6 @@ git config --local pw.states \
 
 git-pw patch list \
 	--limit 250 \
-	--state Deferred \
 	--state Mainlined \
 	--state Accepted \
 	--state Superseded \
