@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-masking-a-bool-warning
+Subject: [PATCH] mptcp: fix 'masking a bool' warning
 
+Dan Carpenter reported an issue introduced in
+commit fde56eea01f9 ("mptcp: refine mptcp_cleanup_rbuf") where a new
+boolean (ack_pending) is masked with 0x9.
+
+This is not the intention to ignore values by using a boolean. This
+variable should not have a 'bool' type: we should keep the 'u8' to allow
+this comparison.
+
+Fixes: fde56eea01f9 ("mptcp: refine mptcp_cleanup_rbuf")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
