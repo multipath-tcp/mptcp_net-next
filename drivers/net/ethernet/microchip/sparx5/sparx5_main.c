@@ -228,14 +228,18 @@ static int sparx5_create_targets(struct sparx5 *sparx5)
 	for (idx = 0; idx < IO_RANGES; idx++) {
 		iores[idx] = platform_get_resource(sparx5->pdev, IORESOURCE_MEM,
 						   idx);
+		if (!iores[idx]) {
+			dev_err(sparx5->dev, "Invalid resource\n");
+			return -EINVAL;
+		}
 		iomem[idx] = devm_ioremap(sparx5->dev,
 					  iores[idx]->start,
 					  iores[idx]->end - iores[idx]->start
 					  + 1);
-		if (IS_ERR(iomem[idx])) {
+		if (!iomem[idx]) {
 			dev_err(sparx5->dev, "Unable to get switch registers: %s\n",
 				iores[idx]->name);
-			return PTR_ERR(iomem[idx]);
+			return -ENOMEM;
 		}
 		begin[idx] = iomem[idx] - sparx5_main_iomap[range_id[idx]].offset;
 	}
@@ -666,7 +670,6 @@ static int mchp_sparx5_probe(struct platform_device *pdev)
 	struct reset_control *reset;
 	struct sparx5 *sparx5;
 	int idx = 0, err = 0;
-	u8 *mac_addr;
 
 	if (!np && !pdev->dev.platform_data)
 		return -ENODEV;
@@ -757,12 +760,10 @@ static int mchp_sparx5_probe(struct platform_device *pdev)
 	if (err)
 		goto cleanup_config;
 
-	if (of_get_mac_address(np, mac_addr)) {
+	if (!of_get_mac_address(np, sparx5->base_mac)) {
 		dev_info(sparx5->dev, "MAC addr was not set, use random MAC\n");
 		eth_random_addr(sparx5->base_mac);
 		sparx5->base_mac[5] = 0;
-	} else {
-		ether_addr_copy(sparx5->base_mac, mac_addr);
 	}
 
 	sparx5->xtr_irq = platform_get_irq_byname(sparx5->pdev, "xtr");

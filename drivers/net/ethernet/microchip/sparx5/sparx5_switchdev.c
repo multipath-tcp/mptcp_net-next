@@ -65,7 +65,7 @@ static void sparx5_port_attr_ageing_set(struct sparx5_port *port,
 	sparx5_set_ageing(port->sparx5, ageing_time);
 }
 
-static int sparx5_port_attr_set(struct net_device *dev,
+static int sparx5_port_attr_set(struct net_device *dev, const void *ctx,
 				const struct switchdev_attr *attr,
 				struct netlink_ext_ack *extack)
 {
@@ -485,8 +485,10 @@ int sparx5_register_notifier_blocks(struct sparx5 *s5)
 		goto err_switchdev_blocking_nb;
 
 	sparx5_owq = alloc_ordered_workqueue("sparx5_order", 0);
-	if (!sparx5_owq)
+	if (!sparx5_owq) {
+		err = -ENOMEM;
 		goto err_switchdev_blocking_nb;
+	}
 
 	return 0;
 
