@@ -152,7 +152,7 @@ static void sctp_v6_err_handle(struct sctp_transport *t, struct sk_buff *skb,
 	icmpv6_err_convert(type, code, &err);
 	if (!sock_owned_by_user(sk) && np->recverr) {
 		sk->sk_err = err;
-		sk->sk_error_report(sk);
+		sk_error_report(sk);
 	} else {
 		sk->sk_err_soft = err;
 	}
@@ -577,15 +577,20 @@ static void sctp_v6_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
 }
 
 /* Initialize a sctp_addr from an address parameter. */
-static void sctp_v6_from_addr_param(union sctp_addr *addr,
+static bool sctp_v6_from_addr_param(union sctp_addr *addr,
 				    union sctp_addr_param *param,
 				    __be16 port, int iif)
 {
+	if (ntohs(param->v6.param_hdr.length) < sizeof(struct sctp_ipv6addr_param))
+		return false;
+
 	addr->v6.sin6_family = AF_INET6;
 	addr->v6.sin6_port = port;
 	addr->v6.sin6_flowinfo = 0; /* BUG */
 	addr->v6.sin6_addr = param->v6.addr;
 	addr->v6.sin6_scope_id = iif;
+
+	return true;
 }
 
 /* Initialize an address parameter from a sctp_addr and return the length
