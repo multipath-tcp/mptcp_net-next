@@ -2,8 +2,8 @@
 VERSION = 5
 PATCHLEVEL = 13
 SUBLEVEL = 0
-EXTRAVERSION = -rc6
-NAME = Frozen Wasteland
+EXTRAVERSION =
+NAME = Opossums on Parade
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -1039,7 +1039,7 @@ LDFLAGS_vmlinux	+= $(call ld-option, -X,)
 endif
 
 ifeq ($(CONFIG_RELR),y)
-LDFLAGS_vmlinux	+= --pack-dyn-relocs=relr
+LDFLAGS_vmlinux	+= --pack-dyn-relocs=relr --use-android-relr-tags
 endif
 
 # We never want expected sections to be placed heuristically by the
