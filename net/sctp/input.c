@@ -588,6 +588,7 @@ static void sctp_v4_err_handle(struct sctp_transport *t, struct sk_buff *skb,
 		break;
 	case ICMP_REDIRECT:
 		sctp_icmp_redirect(sk, t, skb);
+		return;
 	default:
 		return;
 	}
@@ -1265,6 +1266,7 @@ static struct sctp_association *__sctp_rcv_walk_lookup(struct net *net,
 						net, ch, laddr,
 						sctp_hdr(skb)->source,
 						transportp);
+			break;
 		default:
 			break;
 		}
