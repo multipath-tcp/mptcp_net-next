@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-properly-account-bulk-freed-memory
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: properly account bulk freed memory
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After commit 879526030c8b ("mptcp: protect the rx path with
+the msk socket spinlock") the rmem currently used by a given
+msk is really sk_rmem_alloc - rmem_released.
+
+The safety check in mptcp_data_ready() does not take the above
+in due account, as a result legit incoming data is kept in
+subflow receive queue with no reason, delaying or blocking
+MPTCP-level ack generation.
+
+This change addresses the issue introducing a new helper to fetch
+the rmem memory and using it as needed. Additionally add a MIB
+counter for the exceptional event described above - the peer is
+misbehaving.
+
+Finally update introduce the required annotation when rmem_released
+is updated.
+
+Fixes: 879526030c8b ("mptcp: protect the rx path with the msk socket spinlock")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/211
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
