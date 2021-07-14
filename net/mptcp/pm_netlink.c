@@ -907,7 +907,7 @@ void mptcp_pm_nl_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ss
 	unsigned int active_max_loss_cnt;
 	struct net *net = sock_net(sk);
 	unsigned int stale_loss_cnt;
-	bool slow, push;
+	bool slow;
 
 	stale_loss_cnt = mptcp_stale_loss_cnt(net);
 	if (subflow->stale || !stale_loss_cnt || subflow->stale_count <= stale_loss_cnt)
@@ -922,13 +922,15 @@ void mptcp_pm_nl_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ss
 			slow = lock_sock_fast(ssk);
 			if (!tcp_rtx_and_write_queues_empty(ssk)) {
 				subflow->stale = 1;
-				push = __mptcp_retransmit_pending_data(sk);
+				__mptcp_retransmit_pending_data(sk);
 			}
 			unlock_sock_fast(ssk, slow);
 
-			/* pending data on the idle subflow: retransmit */
-			if (push)
-				__mptcp_push_pending(sk, 0);
+			/* always try to push the pending data regarless of re-injections:
+			 * we can possibly use backup subflows now, and subflow selection
+			 * is cheap under the msk socket lock
+			 */
+			__mptcp_push_pending(sk, 0);
 			return;
 		}
 	}
