@@ -240,42 +240,15 @@ struct request {
 	void *end_io_data;
 };
 
-static inline bool blk_op_is_scsi(unsigned int op)
+static inline bool blk_op_is_passthrough(unsigned int op)
 {
-	return op == REQ_OP_SCSI_IN || op == REQ_OP_SCSI_OUT;
-}
-
-static inline bool blk_op_is_private(unsigned int op)
-{
+	op &= REQ_OP_MASK;
 	return op == REQ_OP_DRV_IN || op == REQ_OP_DRV_OUT;
-}
-
-static inline bool blk_rq_is_scsi(struct request *rq)
-{
-	return blk_op_is_scsi(req_op(rq));
-}
-
-static inline bool blk_rq_is_private(struct request *rq)
-{
-	return blk_op_is_private(req_op(rq));
 }
 
 static inline bool blk_rq_is_passthrough(struct request *rq)
 {
-	return blk_rq_is_scsi(rq) || blk_rq_is_private(rq);
-}
-
-static inline bool bio_is_passthrough(struct bio *bio)
-{
-	unsigned op = bio_op(bio);
-
-	return blk_op_is_scsi(op) || blk_op_is_private(op);
-}
-
-static inline bool blk_op_is_passthrough(unsigned int op)
-{
-	return (blk_op_is_scsi(op & REQ_OP_MASK) ||
-			blk_op_is_private(op & REQ_OP_MASK));
+	return blk_op_is_passthrough(req_op(rq));
 }
 
 static inline unsigned short req_get_ioprio(struct request *req)
@@ -936,9 +909,11 @@ extern int blk_rq_map_kern(struct request_queue *, struct request *, void *, uns
 extern int blk_rq_map_user_iov(struct request_queue *, struct request *,
 			       struct rq_map_data *, const struct iov_iter *,
 			       gfp_t);
-extern void blk_execute_rq(struct gendisk *, struct request *, int);
 extern void blk_execute_rq_nowait(struct gendisk *,
 				  struct request *, int, rq_end_io_fn *);
+
+blk_status_t blk_execute_rq(struct gendisk *bd_disk, struct request *rq,
+			    int at_head);
 
 /* Helper to convert REQ_OP_XXX to its string format XXX */
 extern const char *blk_op_str(unsigned int op);
@@ -1011,6 +986,18 @@ static inline unsigned int blk_rq_stats_sectors(const struct request *rq)
 
 /* Helper to convert BLK_ZONE_ZONE_XXX to its string format XXX */
 const char *blk_zone_cond_str(enum blk_zone_cond zone_cond);
+
+static inline unsigned int bio_zone_no(struct bio *bio)
+{
+	return blk_queue_zone_no(bdev_get_queue(bio->bi_bdev),
+				 bio->bi_iter.bi_sector);
+}
+
+static inline unsigned int bio_zone_is_seq(struct bio *bio)
+{
+	return blk_queue_zone_is_seq(bdev_get_queue(bio->bi_bdev),
+				     bio->bi_iter.bi_sector);
+}
 
 static inline unsigned int blk_rq_zone_no(struct request *rq)
 {
