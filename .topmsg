@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-faster-active-backup-recovery
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: faster active backup recovery
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The msk can use backup subflows to transmit in-sequence data
+only if there are no other active subflow. On active backup
+scenario, the MPTCP connection can do forward progress only
+due to MPTCP retransmissions - rtx can pick backup subflows.
+
+This patch introduces a new flag flow MPTCP subflows: if the
+underlying TCP connection made no progresses for long time,
+and there are other less problematic subflows available, the
+given subflow become stale.
+
+Stale subflows are not considered active: if all non backup
+subflows become stale, the MPTCP scheduler can pick backup
+subflows for plain transmissions.
+
+Stale subflows can return in active state, as soon as any reply
+from the peer is observed.
+
+Active backup scenarios can now leverage the available b/w
+with no restrinction.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/207
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
