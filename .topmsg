@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-more-accurate-timeout
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: more accurate timeout
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+As reported by Maxim, we have a lot of MPTCP-level
+retransmissions when multilple links with different latencies
+are in use.
+
+This patch refactor the mptcp-level timeout accounting so that
+the maximum of all the active subflow timeout is used. To avoid
+traversing the subflow list multiple times, the update is
+performed inside the packet scheduler.
+
+Additionally clean-up a bit timeout handling.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
