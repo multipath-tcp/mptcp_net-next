@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-cleanup-sysctl-data-and-helpers
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup sysctl data and helpers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reorder the data in mptcp_pernet to avoid wasting space
+with no reasons and constify the access helpers.
+
+No functional changes intended.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
