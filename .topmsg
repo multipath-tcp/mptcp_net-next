@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-less-aggressive-retransmission-strategy
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: less aggressive retransmission strategy
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current mptcp re-inject strategy is very aggressive,
+we have mptcp-level retransmissions even on single subflow
+connection, if the link in-use is lossy.
+
+Let's be a little more conservative: we do retransmit
+only if at least a subflow has write and rtx queue empty.
+
+Additionally use the backup subflows only if the active
+subflows are stale - no progresses in at least an rtx period
+and ignore stale subflows for rtx timeout update
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/207
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
