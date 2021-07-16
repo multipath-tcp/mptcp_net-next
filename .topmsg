@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-mibs-for-stale-subflows-processing
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add mibs for stale subflows processing
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This allows monitoring exceptional events like
+active backup scenarios.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
