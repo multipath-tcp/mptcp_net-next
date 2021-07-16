@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-testcase-for-active-back
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add testcase for active-back
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add more test-case for link failures scenario,
+including recovery from link failure using only
+backup subflows and bi-directional transfer.
+
+Additionally explicitly check for stale count
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
