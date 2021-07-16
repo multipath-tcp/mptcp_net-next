@@ -300,6 +300,7 @@ enum {
 	BIO_CGROUP_ACCT,	/* has been accounted to a cgroup */
 	BIO_TRACKED,		/* set if bio goes through the rq_qos path */
 	BIO_REMAPPED,
+	BIO_ZONE_WRITE_LOCKED,	/* Owns a zoned device zone write lock */
 	BIO_FLAG_LAST
 };
 
@@ -350,9 +351,6 @@ enum req_opf {
 	/* reset all the zone present on the device */
 	REQ_OP_ZONE_RESET_ALL	= 17,
 
-	/* SCSI passthrough using struct scsi_request */
-	REQ_OP_SCSI_IN		= 32,
-	REQ_OP_SCSI_OUT		= 33,
 	/* Driver private requests */
 	REQ_OP_DRV_IN		= 34,
 	REQ_OP_DRV_OUT		= 35,
