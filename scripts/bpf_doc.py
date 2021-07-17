@@ -548,6 +548,7 @@ class PrinterHelpers(Printer):
             'struct inode',
             'struct socket',
             'struct file',
+            'struct bpf_timer',
     ]
     known_types = {
             '...',
@@ -595,6 +596,7 @@ class PrinterHelpers(Printer):
             'struct inode',
             'struct socket',
             'struct file',
+            'struct bpf_timer',
             'struct bpf_mptcp_sock',
     }
     mapped_types = {
