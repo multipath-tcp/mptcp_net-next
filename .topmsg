@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/net-switchdev-remove-stray-semicolon-in-switchdev_handle_fdb_del_to_device-shim
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
