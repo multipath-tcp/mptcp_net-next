@@ -39,6 +39,8 @@ enum {
 	DSA_NOTIFIER_MRP_DEL,
 	DSA_NOTIFIER_MRP_ADD_RING_ROLE,
 	DSA_NOTIFIER_MRP_DEL_RING_ROLE,
+	DSA_NOTIFIER_TAG_8021Q_VLAN_ADD,
+	DSA_NOTIFIER_TAG_8021Q_VLAN_DEL,
 };
 
 /* DSA_NOTIFIER_AGEING_TIME */
@@ -111,6 +113,14 @@ struct dsa_notifier_mrp_ring_role_info {
 	const struct switchdev_obj_ring_role_mrp *mrp;
 	int sw_index;
 	int port;
+};
+
+/* DSA_NOTIFIER_TAG_8021Q_VLAN_* */
+struct dsa_notifier_tag_8021q_vlan_info {
+	int tree_index;
+	int sw_index;
+	int port;
+	u16 vid;
 };
 
 struct dsa_switchdev_event_work {
@@ -253,16 +263,18 @@ int dsa_port_link_register_of(struct dsa_port *dp);
 void dsa_port_link_unregister_of(struct dsa_port *dp);
 int dsa_port_hsr_join(struct dsa_port *dp, struct net_device *hsr);
 void dsa_port_hsr_leave(struct dsa_port *dp, struct net_device *hsr);
+int dsa_port_tag_8021q_vlan_add(struct dsa_port *dp, u16 vid);
+void dsa_port_tag_8021q_vlan_del(struct dsa_port *dp, u16 vid);
 extern const struct phylink_mac_ops dsa_port_phylink_mac_ops;
 
 static inline bool dsa_port_offloads_bridge_port(struct dsa_port *dp,
-						 struct net_device *dev)
+						 const struct net_device *dev)
 {
 	return dsa_port_to_bridge_port(dp) == dev;
 }
 
 static inline bool dsa_port_offloads_bridge(struct dsa_port *dp,
-					    struct net_device *bridge_dev)
+					    const struct net_device *bridge_dev)
 {
 	/* DSA ports connected to a bridge, and event was emitted
 	 * for the bridge.
@@ -272,12 +284,25 @@ static inline bool dsa_port_offloads_bridge(struct dsa_port *dp,
 
 /* Returns true if any port of this tree offloads the given net_device */
 static inline bool dsa_tree_offloads_bridge_port(struct dsa_switch_tree *dst,
-						 struct net_device *dev)
+						 const struct net_device *dev)
 {
 	struct dsa_port *dp;
 
 	list_for_each_entry(dp, &dst->ports, list)
 		if (dsa_port_offloads_bridge_port(dp, dev))
+			return true;
+
+	return false;
+}
+
+/* Returns true if any port of this tree offloads the given bridge */
+static inline bool dsa_tree_offloads_bridge(struct dsa_switch_tree *dst,
+					    const struct net_device *bridge_dev)
+{
+	struct dsa_port *dp;
+
+	list_for_each_entry(dp, &dst->ports, list)
+		if (dsa_port_offloads_bridge(dp, bridge_dev))
 			return true;
 
 	return false;
@@ -385,6 +410,16 @@ int dsa_tree_change_tag_proto(struct dsa_switch_tree *dst,
 			      struct net_device *master,
 			      const struct dsa_device_ops *tag_ops,
 			      const struct dsa_device_ops *old_tag_ops);
+
+/* tag_8021q.c */
+int dsa_tag_8021q_bridge_join(struct dsa_switch *ds,
+			      struct dsa_notifier_bridge_info *info);
+int dsa_tag_8021q_bridge_leave(struct dsa_switch *ds,
+			       struct dsa_notifier_bridge_info *info);
+int dsa_switch_tag_8021q_vlan_add(struct dsa_switch *ds,
+				  struct dsa_notifier_tag_8021q_vlan_info *info);
+int dsa_switch_tag_8021q_vlan_del(struct dsa_switch *ds,
+				  struct dsa_notifier_tag_8021q_vlan_info *info);
 
 extern struct list_head dsa_tree_list;
 
