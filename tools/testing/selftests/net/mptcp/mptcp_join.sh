@@ -228,7 +228,6 @@ link_failure()
 
 	for l in $FAILING_LINKS; do
 		veth="ns1eth$l"
-		echo "link $veth down" 1>&2
 		ip -net "$ns" link set "$veth" down
 	done
 }
@@ -634,7 +633,7 @@ chk_stale_nr()
 	local stale_nr
 	local recover_nr
 
-	printf "%-39s %s" " " "stale"
+	printf "%-39s %s" " " "stale             "
 	stale_nr=`ip netns exec $ns nstat -as | grep MPTcpExtSubflowStale | awk '{print $2}'`
 	[ -z "$stale_nr" ] && stale_nr=0
 	recover_nr=`ip netns exec $ns nstat -as | grep MPTcpExtSubflowRecover | awk '{print $2}'`
@@ -878,7 +877,7 @@ chk_link_usage()
 	local tx_rate=$((tx_link * 100 / $tx_total))
 	local tolerance=5
 
-	printf "%-39s %s" " " "link usage "
+	printf "%-39s %s" " " "link usage        "
 	if [ $tx_rate -lt $((expected_rate - $tolerance)) -o \
 	     $tx_rate -gt $((expected_rate + $tolerance)) ]; then
 		echo "[fail] got $tx_rate% usage, expected $expected_rate%"
@@ -1039,7 +1038,7 @@ link_failure_tests()
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 dev ns2eth4 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1 2
-	chk_join_nr "multiple flows, signal, bidirectional, link failure" 3 3 3
+	chk_join_nr "multi flows, signal, bidi, link fail" 3 3 3
 	chk_add_nr 1 1
 	chk_stale_nr $ns2 1 -1 1
 
@@ -1053,7 +1052,7 @@ link_failure_tests()
 	export FAILING_LINKS="1"
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
 	run_tests $ns1 $ns2 10.0.1.1 1
-	chk_join_nr "backup subflow unused with link failure" 2 2 2
+	chk_join_nr "backup subflow unused, link failure" 2 2 2
 	chk_add_nr 1 1
 	chk_link_usage $ns2 ns2eth3 $cinsent 0
 
@@ -1067,7 +1066,7 @@ link_failure_tests()
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
 	export FAILING_LINKS="1 2"
 	run_tests $ns1 $ns2 10.0.1.1 1
-	chk_join_nr "backup subflow used due to multiple links failure" 2 2 2
+	chk_join_nr "backup flow used, multi links fail" 2 2 2
 	chk_add_nr 1 1
 	chk_stale_nr $ns2 2 4 2
 	chk_link_usage $ns2 ns2eth3 $cinsent 50
@@ -1081,7 +1080,7 @@ link_failure_tests()
 	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
 	run_tests $ns1 $ns2 10.0.1.1 2
-	chk_join_nr "backup subflow in use, bidirectional, link failure" 2 2 2
+	chk_join_nr "backup flow used, bidi, link failure" 2 2 2
 	chk_add_nr 1 1
 	chk_stale_nr $ns2 1 -1 2
 	chk_link_usage $ns2 ns2eth3 $cinsent 50
