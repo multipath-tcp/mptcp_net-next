@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-switchdev-remove-stray-semicolon-in-switchdev_handle_fdb_del_to_device-shim
+From: Vladimir Oltean <vladimir.oltean@nxp.com>
+Subject: [PATCH] net: switchdev: remove stray semicolon in switchdev_handle_fdb_del_to_device shim
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+With the semicolon at the end, the compiler sees the shim function as a
+declaration and not as a definition, and warns:
+
+'switchdev_handle_fdb_del_to_device' declared 'static' but never defined
+
+Reported-by: kernel test robot <lkp@intel.com>
+Fixes: 8ca07176ab00 ("net: switchdev: introduce a fanout helper for SWITCHDEV_FDB_{ADD,DEL}_TO_DEVICE")
+Signed-off-by: Vladimir Oltean <vladimir.oltean@nxp.com>
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
