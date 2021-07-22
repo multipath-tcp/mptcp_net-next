@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-build-ADD_ADDR-echo-ADD_ADDR-option-according-pm.add_signal
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] mptcp: build ADD_ADDR/echo-ADD_ADDR option according pm.add_signal
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+According to the MPTCP_ADD_ADDR_SIGNAL or MPTCP_ADD_ADDR_ECHO flag, build
+the ADD_ADDR/ADD_ADDR_ECHO option.
+
+Add a new member remote in struct mptcp_out_options for the ADD_ADDR_ECHO,
+and rename addr to local for the ADD_ADDR only.
+
+In mptcp_pm_add_addr_signal(), use opts->remote or opts->local to save the
+announced ADD_ADDR or ADD_ADDR_ECHO address. And in mptcp_write_options(),
+put this saved address into the ADD_ADDR/ADD_ADDR_ECHO option.
+
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
