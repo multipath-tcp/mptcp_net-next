@@ -1,9 +1,0 @@
-From: Yonglong Li <liyonglong@chinatelecom.cn>
-Subject: [PATCH] mptcp: fix ADD_ADDR and RM_ADDR maybe flush addr_signal each other
-
-ADD_ADDR shares pm.addr_signal with RM_ADDR, so after RM_ADDR/ADD_ADDR
-has done, we should not clean ADD_ADDR/RM_ADDR's addr_signal.
-
-Co-developed-by: Geliang Tang <geliangtang@gmail.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
-Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
