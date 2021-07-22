@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-make-MPTCP_ADD_ADDR_SIGNAL-and-MPTCP_ADD_ADDR_ECHO-separate
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] mptcp: make MPTCP_ADD_ADDR_SIGNAL and MPTCP_ADD_ADDR_ECHO separate
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use MPTCP_ADD_ADDR_SIGNAL only for the action of sending ADD_ADDR, and
+use MPTCP_ADD_ADDR_ECHO only for the action of sending ADD_ADDR echo.
+
+Use msk->pm.local to save the announced ADD_ADDR address only, and reuse
+msk->pm.remote to save the announced ADD_ADDR_ECHO address.
+
+To prepare for the next patch.
+
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
