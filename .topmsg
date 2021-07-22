@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/ipv6-fix-ioam6_if_id_max-defined-but-not-used-warn
+Subject: [PATCH] ipv6: fix "'ioam6_if_id_max' defined but not used" warn
 
+When compiling without CONFIG_SYSCTL, this warning appears:
+
+  net/ipv6/addrconf.c:99:12: error: 'ioam6_if_id_max' defined but not used [-Werror=unused-variable]
+     99 | static u32 ioam6_if_id_max = U16_MAX;
+        |            ^~~~~~~~~~~~~~~
+  cc1: all warnings being treated as errors
+
+Simply moving the declaration of this variable under ...
+
+  #ifdef CONFIG_SYSCTL
+
+... with other similar variables fixes the issue.
+
+Fixes: 9ee11f0fff20 ("ipv6: ioam: Data plane support for Pre-allocated Trace")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
