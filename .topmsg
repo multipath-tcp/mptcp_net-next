@@ -8,4 +8,6 @@ backup subflows and bi-directional transfer.
 Additionally explicitly check for stale count
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
