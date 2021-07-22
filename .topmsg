@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add_addr-and-echo-race-test
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] selftests: mptcp: add_addr and echo race test
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added an extra test for the singal_address_tests() to do the
+ADD_ADDR and ADD_ADDR_ECHO race test.
+
+Co-developed-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
