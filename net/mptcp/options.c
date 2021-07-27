@@ -665,16 +665,18 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	unsigned int opt_size = *size;
 	bool echo;
 	bool port;
+	u8 family;
 	int len;
 
 	if (!mptcp_pm_should_add_signal(msk) ||
-	    !mptcp_pm_add_addr_signal(msk, skb, opt_size, remaining, &opts->addr,
+	    !mptcp_pm_add_addr_signal(msk, skb, opt_size, remaining, opts,
 		    &echo, &port, &drop_other_suboptions))
 		return false;
 
 	if (drop_other_suboptions)
 		remaining += opt_size;
-	len = mptcp_add_addr_len(opts->addr.family, echo, port);
+	family = echo ? opts->remote.family : opts->local.family;
+	len = mptcp_add_addr_len(family, echo, port);
 	if (remaining < len)
 		return false;
 
@@ -690,10 +692,11 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	if (!echo) {
 		opts->ahmac = add_addr_generate_hmac(msk->local_key,
 						     msk->remote_key,
-						     &opts->addr);
+						     &opts->local);
 	}
-	pr_debug("addr_id=%d, ahmac=%llu, echo=%d, port=%d",
-		 opts->addr.id, opts->ahmac, echo, ntohs(opts->addr.port));
+	pr_debug("local_id=%d, local_port=%d, remote_id=%d, remote_port=%d, ahmac=%llu, echo=%d",
+		 opts->local.id, ntohs(opts->local.port), opts->remote.id,
+		 ntohs(opts->remote.port), opts->ahmac, echo);
 
 	return true;
 }
@@ -1250,15 +1253,16 @@ void mptcp_write_options(__be32 *ptr, const struct tcp_sock *tp,
 
 mp_capable_done:
 	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
+		struct mptcp_addr_info *addr = opts->ahmac ? &opts->local : &opts->remote;
 		u8 len = TCPOLEN_MPTCP_ADD_ADDR_BASE;
 		u8 echo = MPTCP_ADDR_ECHO;
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		if (opts->addr.family == AF_INET6)
+		if (addr->family == AF_INET6)
 			len = TCPOLEN_MPTCP_ADD_ADDR6_BASE;
 #endif
 
-		if (opts->addr.port)
+		if (addr->port)
 			len += TCPOLEN_MPTCP_PORT_LEN;
 
 		if (opts->ahmac) {
@@ -1267,25 +1271,25 @@ mp_capable_done:
 		}
 
 		*ptr++ = mptcp_option(MPTCPOPT_ADD_ADDR,
-				      len, echo, opts->addr.id);
-		if (opts->addr.family == AF_INET) {
-			memcpy((u8 *)ptr, (u8 *)&opts->addr.addr.s_addr, 4);
+				      len, echo, addr->id);
+		if (addr->family == AF_INET) {
+			memcpy((u8 *)ptr, (u8 *)&addr->addr.s_addr, 4);
 			ptr += 1;
 		}
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		else if (opts->addr.family == AF_INET6) {
-			memcpy((u8 *)ptr, opts->addr.addr6.s6_addr, 16);
+		else if (addr->family == AF_INET6) {
+			memcpy((u8 *)ptr, addr->addr6.s6_addr, 16);
 			ptr += 4;
 		}
 #endif
 
-		if (!opts->addr.port) {
+		if (!addr->port) {
 			if (opts->ahmac) {
 				put_unaligned_be64(opts->ahmac, ptr);
 				ptr += 2;
 			}
 		} else {
-			u16 port = ntohs(opts->addr.port);
+			u16 port = ntohs(addr->port);
 
 			if (opts->ahmac) {
 				u8 *bptr = (u8 *)ptr;
