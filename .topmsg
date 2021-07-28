@@ -12,4 +12,6 @@ option length check if drop_other_suboptions is true.
 
 Co-developed-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
