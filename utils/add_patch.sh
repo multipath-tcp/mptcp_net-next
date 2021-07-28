@@ -49,7 +49,7 @@ apply_patches() { local p patches=()
 		fi
 		patches+=("${p}")
 	done
-	"apply_patches_${MODE}" "${patches}"
+	"apply_patches_${MODE}" "${patches[@]}"
 }
 
 print_rebase_pause() {
