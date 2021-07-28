@@ -665,7 +665,6 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	unsigned int opt_size = *size;
 	bool echo;
 	bool port;
-	u8 family;
 	int len;
 
 	if (!mptcp_pm_should_add_signal(msk) ||
@@ -675,8 +674,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 
 	if (drop_other_suboptions)
 		remaining += opt_size;
-	family = echo ? opts->remote.family : opts->local.family;
-	len = mptcp_add_addr_len(family, echo, port);
+	len = mptcp_add_addr_len(opts->addr.family, echo, port);
 	if (remaining < len)
 		return false;
 
@@ -692,11 +690,10 @@ static bool mptcp_established_options_add_addr(struct sock *sk, struct sk_buff *
 	if (!echo) {
 		opts->ahmac = add_addr_generate_hmac(msk->local_key,
 						     msk->remote_key,
-						     &opts->local);
+						     &opts->addr);
 	}
-	pr_debug("local_id=%d, local_port=%d, remote_id=%d, remote_port=%d, ahmac=%llu, echo=%d",
-		 opts->local.id, ntohs(opts->local.port), opts->remote.id,
-		 ntohs(opts->remote.port), opts->ahmac, echo);
+	pr_debug("addr_id=%d, addr_port=%d, ahmac=%llu, echo=%d",
+		 opts->addr.id, ntohs(opts->addr.port), opts->ahmac, echo);
 
 	return true;
 }
@@ -1253,7 +1250,7 @@ void mptcp_write_options(__be32 *ptr, const struct tcp_sock *tp,
 
 mp_capable_done:
 	if (OPTION_MPTCP_ADD_ADDR & opts->suboptions) {
-		struct mptcp_addr_info *addr = opts->ahmac ? &opts->local : &opts->remote;
+		struct mptcp_addr_info *addr = &opts->addr;
 		u8 len = TCPOLEN_MPTCP_ADD_ADDR_BASE;
 		u8 echo = MPTCP_ADDR_ECHO;
 
