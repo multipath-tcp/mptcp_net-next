@@ -286,10 +286,10 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, struct sk_buff *skb,
 		goto out_unlock;
 
 	if (*echo) {
-		opts->remote = msk->pm.remote;
+		opts->addr = msk->pm.remote;
 		add_addr = msk->pm.addr_signal & ~BIT(MPTCP_ADD_ADDR_ECHO);
 	} else {
-		opts->local = msk->pm.local;
+		opts->addr = msk->pm.local;
 		add_addr = msk->pm.addr_signal & ~BIT(MPTCP_ADD_ADDR_SIGNAL);
 	}
 	WRITE_ONCE(msk->pm.addr_signal, add_addr);
