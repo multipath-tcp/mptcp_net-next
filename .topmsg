@@ -13,4 +13,6 @@ put this saved address into the ADD_ADDR/ADD_ADDR_ECHO option.
 
 Co-developed-by: Geliang Tang <geliangtang@gmail.com>
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
