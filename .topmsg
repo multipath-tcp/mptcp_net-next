@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-shrink-mptcp_out_options-struct
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: shrink mptcp_out_options struct
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After the previous patch we can alias with a union several
+fields in mptcp_out_options. Such struct is stack allocated and
+memset() for each plain TCP out packet. Every saved byted counts.
+
+Before:
+pahole -EC mptcp_out_options
+ # ...
+/* size: 136, cachelines: 3, members: 17 */
+
+After:
+pahole -EC mptcp_out_options
+ # ...
+/* size: 56, cachelines: 1, members: 9 */
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
