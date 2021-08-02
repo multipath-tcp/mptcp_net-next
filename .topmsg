@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/ipv4-Fix-refcount-warning-for-new-fib_info
+From: David Ahern <dsahern@kernel.org>
+Subject: [PATCH] ipv4: Fix refcount warning for new fib_info
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Ioana reported a refcount warning when booting over NFS:
+
+[    5.042532] ------------[ cut here ]------------
+[    5.047184] refcount_t: addition on 0; use-after-free.
+[    5.052324] WARNING: CPU: 7 PID: 1 at lib/refcount.c:25 refcount_warn_saturate+0xa4/0x150
+...
+[    5.167201] Call trace:
+[    5.169635]  refcount_warn_saturate+0xa4/0x150
+[    5.174067]  fib_create_info+0xc00/0xc90
+[    5.177982]  fib_table_insert+0x8c/0x620
+[    5.181893]  fib_magic.isra.0+0x110/0x11c
+[    5.185891]  fib_add_ifaddr+0xb8/0x190
+[    5.189629]  fib_inetaddr_event+0x8c/0x140
+
+fib_treeref needs to be set after kzalloc. The old code had a ++ which
+led to the confusion when the int was replaced by a refcount_t.
+
+Fixes: 79976892f7ea ("net: convert fib_treeref from int to refcount_t")
+Signed-off-by: David Ahern <dsahern@kernel.org>
+Reported-by: Ioana Ciornei <ciorneiioana@gmail.com>
+Cc: Yajun Deng <yajun.deng@linux.dev>
