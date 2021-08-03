@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@xiaomi.com>
-Subject: [PATCH] selftests: mptcp: set and print the fullmesh flag
-
-This patch dealt with the MPTCP_PM_ADDR_FLAG_FULLMESH flag in add_addr()
-and print_addr(), to set and print out the fullmesh flag.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
