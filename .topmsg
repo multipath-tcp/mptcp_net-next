@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remote-addresses-fullmesh
+From: Geliang Tang <geliangtang@xiaomi.com>
+Subject: [PATCH] mptcp: remote addresses fullmesh
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added and managed a new per endpoint flag, named
+MPTCP_PM_ADDR_FLAG_FULLMESH.
+
+In mptcp_pm_create_subflow_or_signal_addr(), if such flag is set, instead
+of:
+        remote_address((struct sock_common *)sk, &remote);
+fill a temporary allocated array of all known remote address. After
+releaseing the pm lock loop on such array and create a subflow for each
+remote address from the given local.
+
+Note that the we could still use an array even for non 'fullmesh'
+endpoint: with a single entry corresponding to the primary MPC subflow
+remote address.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
