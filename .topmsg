@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-flags-and-ifindex-arguments
+From: Geliang Tang <geliangtang@xiaomi.com>
+Subject: [PATCH] mptcp: drop flags and ifindex arguments
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new helper mptcp_pm_get_flags_and_ifindex_by_id(),
+and used it in __mptcp_subflow_connect() to get the flags and ifindex
+values.
+
+Then the two arguments flags and ifindex of __mptcp_subflow_connect()
+can be dropped.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
