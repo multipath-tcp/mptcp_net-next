@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-fullmesh-testcases
+From: Geliang Tang <geliangtang@xiaomi.com>
+Subject: [PATCH] selftests: mptcp: add fullmesh testcases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the testcases for the fullmesh address flag of the path
+manager.
+
+Reuse the above 10 address numbers for the fullmesh test.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
