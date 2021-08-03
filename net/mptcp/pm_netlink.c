@@ -1213,16 +1213,17 @@ int mptcp_pm_get_flags_and_ifindex_by_id(struct net *net, unsigned int id,
 {
 	struct mptcp_pm_addr_entry *entry;
 
-	rcu_read_lock();
-	entry = __lookup_addr_by_id(net_generic(net, pm_nl_pernet_id), id);
-	rcu_read_unlock();
+	*flags = 0;
+	*ifindex = 0;
 
-	if (entry) {
-		*flags = entry->flags;
-		*ifindex = entry->ifindex;
-	} else {
-		*flags = 0;
-		*ifindex = 0;
+	if (id) {
+		rcu_read_lock();
+		entry = __lookup_addr_by_id(net_generic(net, pm_nl_pernet_id), id);
+		if (entry) {
+			*flags = entry->flags;
+			*ifindex = entry->ifindex;
+		}
+		rcu_read_unlock();
 	}
 
 	return 0;
