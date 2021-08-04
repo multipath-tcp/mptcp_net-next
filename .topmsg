@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@xiaomi.com>
-Subject: [PATCH] selftests: mptcp: delete uncontinuous removing ids
-
-The removing addresses testcases can only deal with the continuous ids.
-This patch added the uncontinuous removing ids support.
-
-Fixes: f87744ad42446 ("selftests: mptcp: set addr id for removing testcases")
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
