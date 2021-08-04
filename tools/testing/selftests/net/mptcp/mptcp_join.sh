@@ -366,14 +366,14 @@ do_transfer()
 		fi
 	fi
 
+	flags="subflow"
+	if [[ "${addr_nr_ns2}" = "fullmesh_"* ]]; then
+		flags="${flags},fullmesh"
+		addr_nr_ns2=${addr_nr_ns2:9}
+	fi
+
 	if [ $addr_nr_ns2 -gt 0 ]; then
-		if [ $addr_nr_ns2 -gt 10 ]; then
-			let add_nr_ns2=addr_nr_ns2-10
-			flags=subflow,fullmesh
-		else
-			let add_nr_ns2=addr_nr_ns2
-			flags=subflow
-		fi
+		let add_nr_ns2=addr_nr_ns2
 		counter=3
 		sleep 1
 		while [ $add_nr_ns2 -gt 0 ]; do
@@ -1724,7 +1724,7 @@ fullmesh_tests()
 	ip netns exec $ns1 ./pm_nl_ctl limits 1 3
 	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	run_tests $ns1 $ns2 10.0.1.1 0 0 11 slow # 11 here meams creating 1 fullmesh subflow
+	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_1 slow
 	chk_join_nr "fullmesh test 1x1" 3 3 3
 	chk_add_nr 1 1
 
@@ -1735,7 +1735,7 @@ fullmesh_tests()
 	ip netns exec $ns1 ./pm_nl_ctl limits 2 5
 	ip netns exec $ns2 ./pm_nl_ctl limits 1 5
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	run_tests $ns1 $ns2 10.0.1.1 0 0 12 slow # 12 here meams creating 2 fullmesh subflows
+	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_2 slow
 	chk_join_nr "fullmesh test 1x2" 5 5 5
 	chk_add_nr 1 1
 
@@ -1747,7 +1747,7 @@ fullmesh_tests()
 	ip netns exec $ns1 ./pm_nl_ctl limits 2 4
 	ip netns exec $ns2 ./pm_nl_ctl limits 1 4
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	run_tests $ns1 $ns2 10.0.1.1 0 0 12 slow
+	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_2 slow
 	chk_join_nr "fullmesh test 1x2, limited" 4 4 4
 	chk_add_nr 1 1
 }
