@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-send-out-MP_FAIL-when-data-checksum-fails
+From: Geliang Tang <geliangtang@xiaomi.com>
+Subject: [PATCH] mptcp: send out MP_FAIL when data checksum fails
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When a bad checksum is detected, set the send_mp_fail flag to send out
+the MP_FAIL option.
+
+Add a new function mptcp_has_another_subflow() to check whether there's
+only a single subflow.
+
+When multiple subflows are in use, close the affected subflow with a RST
+that includes an MP_FAIL option and discard the data with the bad
+checksum.
+
+Set the sk_state of the subsocket to TCP_CLOSE, then the flag
+MPTCP_WORK_CLOSE_SUBFLOW will be set in subflow_sched_work_if_closed,
+and the subflow will be closed.
+
+When a single subfow is in use, temporarily handled by sending MP_FAIL
+with a RST too.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
