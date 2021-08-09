@@ -30,7 +30,37 @@ static int dsa_port_notify(const struct dsa_port *dp, unsigned long e, void *v)
 	return dsa_tree_notify(dp->ds->dst, e, v);
 }
 
-int dsa_port_set_state(struct dsa_port *dp, u8 state)
+static void dsa_port_notify_bridge_fdb_flush(const struct dsa_port *dp)
+{
+	struct net_device *brport_dev = dsa_port_to_bridge_port(dp);
+	struct switchdev_notifier_fdb_info info = {
+		/* flush all VLANs */
+		.vid = 0,
+	};
+
+	/* When the port becomes standalone it has already left the bridge.
+	 * Don't notify the bridge in that case.
+	 */
+	if (!brport_dev)
+		return;
+
+	call_switchdev_notifiers(SWITCHDEV_FDB_FLUSH_TO_BRIDGE,
+				 brport_dev, &info.info, NULL);
+}
+
+static void dsa_port_fast_age(const struct dsa_port *dp)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->port_fast_age)
+		return;
+
+	ds->ops->port_fast_age(ds, dp->index);
+
+	dsa_port_notify_bridge_fdb_flush(dp);
+}
+
+int dsa_port_set_state(struct dsa_port *dp, u8 state, bool do_fast_age)
 {
 	struct dsa_switch *ds = dp->ds;
 	int port = dp->index;
@@ -40,10 +70,13 @@ int dsa_port_set_state(struct dsa_port *dp, u8 state)
 
 	ds->ops->port_stp_state_set(ds, port, state);
 
-	if (ds->ops->port_fast_age) {
+	if (do_fast_age && dp->learning) {
 		/* Fast age FDB entries or flush appropriate forwarding database
 		 * for the given port, if we are moving it from Learning or
 		 * Forwarding state, to Disabled or Blocking or Listening state.
+		 * Ports that were standalone before the STP state change don't
+		 * need to fast age the FDB, since address learning is off in
+		 * standalone mode.
 		 */
 
 		if ((dp->stp_state == BR_STATE_LEARNING ||
@@ -51,7 +84,7 @@ int dsa_port_set_state(struct dsa_port *dp, u8 state)
 		    (state == BR_STATE_DISABLED ||
 		     state == BR_STATE_BLOCKING ||
 		     state == BR_STATE_LISTENING))
-			ds->ops->port_fast_age(ds, port);
+			dsa_port_fast_age(dp);
 	}
 
 	dp->stp_state = state;
@@ -59,11 +92,12 @@ int dsa_port_set_state(struct dsa_port *dp, u8 state)
 	return 0;
 }
 
-static void dsa_port_set_state_now(struct dsa_port *dp, u8 state)
+static void dsa_port_set_state_now(struct dsa_port *dp, u8 state,
+				   bool do_fast_age)
 {
 	int err;
 
-	err = dsa_port_set_state(dp, state);
+	err = dsa_port_set_state(dp, state, do_fast_age);
 	if (err)
 		pr_err("DSA: failed to set STP state %u (%d)\n", state, err);
 }
@@ -81,7 +115,7 @@ int dsa_port_enable_rt(struct dsa_port *dp, struct phy_device *phy)
 	}
 
 	if (!dp->bridge_dev)
-		dsa_port_set_state_now(dp, BR_STATE_FORWARDING);
+		dsa_port_set_state_now(dp, BR_STATE_FORWARDING, false);
 
 	if (dp->pl)
 		phylink_start(dp->pl);
@@ -109,7 +143,7 @@ void dsa_port_disable_rt(struct dsa_port *dp)
 		phylink_stop(dp->pl);
 
 	if (!dp->bridge_dev)
-		dsa_port_set_state_now(dp, BR_STATE_DISABLED);
+		dsa_port_set_state_now(dp, BR_STATE_DISABLED, false);
 
 	if (ds->ops->port_disable)
 		ds->ops->port_disable(ds, port);
@@ -178,7 +212,7 @@ static int dsa_port_switchdev_sync_attrs(struct dsa_port *dp,
 	if (err)
 		return err;
 
-	err = dsa_port_set_state(dp, br_port_get_stp_state(brport_dev));
+	err = dsa_port_set_state(dp, br_port_get_stp_state(brport_dev), false);
 	if (err && err != -EOPNOTSUPP)
 		return err;
 
@@ -211,7 +245,7 @@ static void dsa_port_switchdev_unsync_attrs(struct dsa_port *dp)
 	/* Port left the bridge, put in BR_STATE_DISABLED by the bridge layer,
 	 * so allow it to be in BR_STATE_FORWARDING to be kept functional
 	 */
-	dsa_port_set_state_now(dp, BR_STATE_FORWARDING);
+	dsa_port_set_state_now(dp, BR_STATE_FORWARDING, true);
 
 	/* VLAN filtering is handled by dsa_switch_bridge_leave */
 
@@ -629,16 +663,33 @@ int dsa_port_pre_bridge_flags(const struct dsa_port *dp,
 	return ds->ops->port_pre_bridge_flags(ds, dp->index, flags, extack);
 }
 
-int dsa_port_bridge_flags(const struct dsa_port *dp,
+int dsa_port_bridge_flags(struct dsa_port *dp,
 			  struct switchdev_brport_flags flags,
 			  struct netlink_ext_ack *extack)
 {
 	struct dsa_switch *ds = dp->ds;
+	int err;
 
 	if (!ds->ops->port_bridge_flags)
 		return -EOPNOTSUPP;
 
-	return ds->ops->port_bridge_flags(ds, dp->index, flags, extack);
+	err = ds->ops->port_bridge_flags(ds, dp->index, flags, extack);
+	if (err)
+		return err;
+
+	if (flags.mask & BR_LEARNING) {
+		bool learning = flags.val & BR_LEARNING;
+
+		if (learning == dp->learning)
+			return 0;
+
+		if (dp->learning && !learning)
+			dsa_port_fast_age(dp);
+
+		dp->learning = learning;
+	}
+
+	return 0;
 }
 
 int dsa_port_mtu_change(struct dsa_port *dp, int new_mtu,
