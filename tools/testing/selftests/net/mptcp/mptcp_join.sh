@@ -511,9 +511,13 @@ run_tests()
 	# create the input file for the failure test when
 	# the first failure test run
 	if [ "$test_linkfail" -ne 0 -a -z "$cinfail" ]; then
-		size=$((RANDOM%8))
+		# the client file must be considerably larger
+		# of the maximum expected cwin value, or the
+		# link utilization will be not predicable
+		size=$((RANDOM%2))
 		size=$((size+1))
-		size=$((size*2048))
+		size=$((size*8192))
+		size=$((size + ( $RANDOM % 8192) ))
 
 		cinfail=$(mktemp)
 		make_file "$cinfail" "client" $size
