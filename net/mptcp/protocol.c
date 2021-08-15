@@ -420,7 +420,8 @@ static long mptcp_timeout_from_subflow(const struct mptcp_subflow_context *subfl
 {
 	const struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-	return inet_csk(ssk)->icsk_pending ? inet_csk(ssk)->icsk_timeout - jiffies : 0;
+	return inet_csk(ssk)->icsk_pending && !subflow->stale_count ?
+	       inet_csk(ssk)->icsk_timeout - jiffies : 0;
 }
 
 static void mptcp_set_timeout(struct sock *sk)
@@ -1054,8 +1055,14 @@ static void __mptcp_clean_una(struct sock *sk)
 		if (after64(dfrag->data_seq + dfrag->data_len, snd_una))
 			break;
 
-		if (WARN_ON_ONCE(dfrag == msk->first_pending))
-			break;
+		if (unlikely(dfrag == msk->first_pending)) {
+			/* in recovery mode can see ack after the current snd head */
+			if (WARN_ON_ONCE(!msk->recovery))
+				break;
+
+			WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+		}
+
 		dfrag_clear(sk, dfrag);
 		cleaned = true;
 	}
@@ -1064,8 +1071,14 @@ static void __mptcp_clean_una(struct sock *sk)
 	if (dfrag && after64(snd_una, dfrag->data_seq)) {
 		u64 delta = snd_una - dfrag->data_seq;
 
-		if (WARN_ON_ONCE(delta > dfrag->already_sent))
-			goto out;
+		/* prevent wrap around in recovery mode */
+		if (unlikely(delta > dfrag->already_sent)) {
+			if (WARN_ON_ONCE(!msk->recovery))
+				goto out;
+			if (WARN_ON_ONCE(delta > dfrag->data_len))
+				goto out;
+			dfrag->already_sent += delta - dfrag->already_sent;
+		}
 
 		dfrag->data_seq += delta;
 		dfrag->offset += delta;
@@ -1076,6 +1089,10 @@ static void __mptcp_clean_una(struct sock *sk)
 		cleaned = true;
 	}
 
+	/* all retransmitted data acked, recovery completed */
+	if (unlikely(msk->recovery) && after64(msk->snd_una, msk->recovery_snd_nxt))
+		msk->recovery = false;
+
 out:
 	if (cleaned) {
 		if (tcp_under_memory_pressure(sk)) {
@@ -1084,7 +1101,7 @@ out:
 		}
 	}
 
-	if (snd_una == READ_ONCE(msk->snd_nxt)) {
+	if (snd_una == READ_ONCE(msk->snd_nxt) && !msk->recovery) {
 		if (mptcp_timer_pending(sk) && !mptcp_data_fin_enabled(msk))
 			mptcp_stop_timer(sk);
 	} else {
@@ -1374,6 +1391,28 @@ struct subflow_send_info {
 	u64 ratio;
 };
 
+void mptcp_subflow_set_active(struct mptcp_subflow_context *subflow)
+{
+	if (!subflow->stale)
+		return;
+
+	subflow->stale = 0;
+	MPTCP_INC_STATS(sock_net(mptcp_subflow_tcp_sock(subflow)), MPTCP_MIB_SUBFLOWRECOVER);
+}
+
+bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
+{
+	if (unlikely(subflow->stale)) {
+		u32 rcv_tstamp = READ_ONCE(tcp_sk(mptcp_subflow_tcp_sock(subflow))->rcv_tstamp);
+
+		if (subflow->stale_rcv_tstamp == rcv_tstamp)
+			return false;
+
+		mptcp_subflow_set_active(subflow);
+	}
+	return __mptcp_subflow_active(subflow);
+}
+
 /* implement the mptcp packet scheduler;
  * returns the subflow that will transmit the next DSS
  * additionally updates the rtx timeout
@@ -1455,7 +1494,7 @@ static void mptcp_push_release(struct sock *sk, struct sock *ssk,
 	release_sock(ssk);
 }
 
-static void __mptcp_push_pending(struct sock *sk, unsigned int flags)
+void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 {
 	struct sock *prev_ssk = NULL, *ssk = NULL;
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -2098,10 +2137,11 @@ static void mptcp_timeout_timer(struct timer_list *t)
  *
  * A backup subflow is returned only if that is the only kind available.
  */
-static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
+static struct sock *mptcp_subflow_get_retrans(struct mptcp_sock *msk)
 {
+	struct sock *backup = NULL, *pick = NULL;
 	struct mptcp_subflow_context *subflow;
-	struct sock *backup = NULL;
+	int min_stale_count = INT_MAX;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -2111,14 +2151,14 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-		if (!mptcp_subflow_active(subflow))
+		if (!__mptcp_subflow_active(subflow))
 			continue;
 
-		/* still data outstanding at TCP level?  Don't retransmit. */
-		if (!tcp_write_queue_empty(ssk)) {
-			if (inet_csk(ssk)->icsk_ca_state >= TCP_CA_Loss)
-				continue;
-			return NULL;
+		/* still data outstanding at TCP level? skip this */
+		if (!tcp_rtx_and_write_queues_empty(ssk)) {
+			mptcp_pm_subflow_chk_stale(msk, ssk);
+			min_stale_count = min_t(int, min_stale_count, subflow->stale_count);
+			continue;
 		}
 
 		if (subflow->backup) {
@@ -2127,10 +2167,15 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 			continue;
 		}
 
-		return ssk;
+		if (!pick)
+			pick = ssk;
 	}
 
-	return backup;
+	if (pick)
+		return pick;
+
+	/* use backup only if there are no progresses anywhere */
+	return min_stale_count > 1 ? backup : NULL;
 }
 
 static void mptcp_dispose_initial_subflow(struct mptcp_sock *msk)
@@ -2139,6 +2184,50 @@ static void mptcp_dispose_initial_subflow(struct mptcp_sock *msk)
 		iput(SOCK_INODE(msk->subflow));
 		msk->subflow = NULL;
 	}
+}
+
+bool __mptcp_retransmit_pending_data(struct sock *sk)
+{
+	struct mptcp_data_frag *cur, *rtx_head;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (__mptcp_check_fallback(mptcp_sk(sk)))
+		return false;
+
+	if (tcp_rtx_and_write_queues_empty(sk))
+		return false;
+
+	/* the closing socket has some data untransmitted and/or unacked:
+	 * some data in the mptcp rtx queue has not really xmitted yet.
+	 * keep it simple and re-inject the whole mptcp level rtx queue
+	 */
+	mptcp_data_lock(sk);
+	__mptcp_clean_una_wakeup(sk);
+	rtx_head = mptcp_rtx_head(sk);
+	if (!rtx_head) {
+		mptcp_data_unlock(sk);
+		return false;
+	}
+
+	/* will accept ack for reijected data before re-sending them */
+	if (!msk->recovery || after64(msk->snd_nxt, msk->recovery_snd_nxt))
+		msk->recovery_snd_nxt = msk->snd_nxt;
+	msk->recovery = true;
+	mptcp_data_unlock(sk);
+
+	msk->first_pending = rtx_head;
+	msk->tx_pending_data += msk->snd_nxt - rtx_head->data_seq;
+	msk->snd_nxt = rtx_head->data_seq;
+	msk->snd_burst = 0;
+
+	/* be sure to clear the "sent status" on all re-injected fragments */
+	list_for_each_entry(cur, &msk->rtx_queue, list) {
+		if (!cur->already_sent)
+			break;
+		cur->already_sent = 0;
+	}
+
+	return true;
 }
 
 /* subflow sockets can be either outgoing (connect) or incoming
@@ -2153,6 +2242,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 			      struct mptcp_subflow_context *subflow)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	bool need_push;
 
 	list_del(&subflow->node);
 
@@ -2164,6 +2254,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	if (ssk->sk_socket)
 		sock_orphan(ssk);
 
+	need_push = __mptcp_retransmit_pending_data(sk);
 	subflow->disposable = 1;
 
 	/* if ssk hit tcp_done(), tcp_cleanup_ulp() cleared the related ops
@@ -2191,6 +2282,9 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 
 	if (msk->subflow && ssk == msk->subflow->sk)
 		mptcp_dispose_initial_subflow(msk);
+
+	if (need_push)
+		__mptcp_push_pending(sk, 0);
 }
 
 void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
@@ -2403,6 +2497,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	msk->first = NULL;
 	inet_csk(sk)->icsk_sync_mss = mptcp_sync_mss;
 	WRITE_ONCE(msk->csum_enabled, mptcp_is_checksum_enabled(sock_net(sk)));
+	msk->recovery = false;
 
 	mptcp_pm_data_init(msk);
 
