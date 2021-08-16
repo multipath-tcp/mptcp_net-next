@@ -1,9 +1,0 @@
-From: Geliang Tang <geliangtang@gmail.com>
-Subject: [PATCH] mptcp: drop unuse rcu in mptcp_pm_addr_entry
-
-kfree_rcu() had been removed from pm_netlink.c, so this rcu field in
-struct mptcp_pm_addr_entry became useless. Let's drop it.
-
-Fixes: 1729cf186d8a ("mptcp: create the listening socket for new port")
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@gmail.com>
