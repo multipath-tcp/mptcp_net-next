@@ -171,11 +171,13 @@ config PTP_1588_CLOCK_OCP
 	depends on PTP_1588_CLOCK
 	depends on HAS_IOMEM && PCI
 	depends on SPI && I2C && MTD
+	depends on !S390
 	imply SPI_MEM
 	imply SPI_XILINX
 	imply MTD_SPI_NOR
 	imply I2C_XILINX
 	select SERIAL_8250
+	select NET_DEVLINK
 
 	default n
 	help
