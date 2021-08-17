@@ -1,4 +1,21 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-full-fully-established-support-after-ADD_ADDR
+Subject: [PATCH] mptcp: full fully established support after ADD_ADDR
 
+If directly after an MP_CAPABLE 3WHS, the client receives an ADD_ADDR
+with HMAC from the server, it is enough to switch to a "fully
+established" mode because it has received more MPTCP options.
+
+It was then OK to enable the "fully_established" flag on the MPTCP
+socket. Still, best to check if the ADD_ADDR looks valid by looking if
+it contains an HMAC (no 'echo' bit). If an ADD_ADDR echo is received
+while we are not in "fully established" mode, it is strange and then
+we should not switch to this mode now.
+
+But that is not enough. On one hand, the path-manager has be notified
+the state has changed. On the other hand, the "fully_established" flag
+on the subflow socket should be turned on as well not to re-send the
+MP_CAPABLE 3rd ACK content with the next ACK.
+
+Fixes: 84dfe3677a6f ("mptcp: send out dedicated ADD_ADDR packet")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
