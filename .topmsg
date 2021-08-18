@@ -1,7 +1,0 @@
-From: Geliang Tang <geliangtang@xiaomi.com>
-Subject: [PATCH] selftests: mptcp: add MP_FAIL mibs check
-
-This patch added a function chk_fail_nr to check the mibs for MP_FAIL.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
