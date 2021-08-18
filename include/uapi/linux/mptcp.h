@@ -201,8 +201,25 @@ struct mptcp_subflow_data {
 	__u32		size_user;			/* size of one element in data[] */
 } __attribute__((aligned(8)));
 
+struct mptcp_subflow_addrs {
+	union {
+		__kernel_sa_family_t sa_family;
+		struct sockaddr sa_local;
+		struct sockaddr_in sin_local;
+		struct sockaddr_in6 sin6_local;
+		struct sockaddr_storage ss_local;
+	};
+	union {
+		struct sockaddr sa_remote;
+		struct sockaddr_in sin_remote;
+		struct sockaddr_in6 sin6_remote;
+		struct sockaddr_storage ss_remote;
+	};
+};
+
 /* MPTCP socket options */
 #define MPTCP_INFO		1
 #define MPTCP_TCPINFO		2
+#define MPTCP_SUBFLOW_ADDRS	3
 
 #endif /* _UAPI_MPTCP_H */
