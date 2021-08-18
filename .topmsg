@@ -1,4 +1,62 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-MPTCP_SUBFLOW_ADDRS-getsockopt-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add MPTCP_SUBFLOW_ADDRS getsockopt support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This retrieves the address pairs of all subflows currently
+active for a given mptcp connection.
+
+It re-uses the same meta-header as for MPTCP_TCPINFO.
+
+A new structure is provided to hold the subflow
+address data:
+
+struct mptcp_subflow_addrs {
+	union {
+		__kernel_sa_family_t sa_family;
+		struct sockaddr sa_local;
+		struct sockaddr_in sin_local;
+		struct sockaddr_in6 sin6_local;
+		struct sockaddr_storage ss_local;
+	};
+	union {
+		struct sockaddr sa_remote;
+		struct sockaddr_in sin_remote;
+		struct sockaddr_in6 sin6_remote;
+		struct sockaddr_storage ss_remote;
+	};
+};
+
+Usage of the new getsockopt is very similar to
+MPTCP_TCPINFO one.
+
+Userspace allocates a
+'struct mptcp_subflow_data', followed by one or
+more 'struct mptcp_subflow_addrs', then inits the
+mptcp_subflow_data structure as follows:
+
+struct mptcp_subflow_addrs *sf_addr;
+struct mptcp_subflow_data *addr;
+socklen_t olen = sizeof(*addr) + (8 * sizeof(*sf_addr));
+
+addr = malloc(olen);
+addr->size_subflow_data = sizeof(*addr);
+addr->num_subflows = 0;
+addr->size_kernel = 0;
+addr->size_user = sizeof(struct mptcp_subflow_addrs);
+
+sf_addr = (struct mptcp_subflow_addrs *)(addr + 1);
+
+and then retrieves the endpoint addresses via:
+ret = getsockopt(fd, SOL_MPTCP, MPTCP_SUBFLOW_ADDRS,
+		 addr, &olen);
+
+If the call succeeds, kernel will have added up to 8
+endpoint addresses after the 'mptcp_subflow_data' header.
+
+Userspace needs to re-check 'olen' value to detect how
+many bytes have been filled in by the kernel.
+
+Userspace can check addr->num_subflows to discover when
+there were more subflows that available data space.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
