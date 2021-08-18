@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-new-mptcp_fill_diag-helper
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add new mptcp_fill_diag helper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Will be re-used from getsockopt path.
+Since diag can be a module, we can't export the helper from diag, it
+needs to be moved to core.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
