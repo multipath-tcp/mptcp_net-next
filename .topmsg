@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-MPTCP_INFO-getsockopt
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add MPTCP_INFO getsockopt
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Its not compatible with multipath-tcp.org kernel one.
+
+1. The out-of-tree implementation defines a different 'struct mptcp_info',
+   with embedded __user addresses for additional data such as
+   endpoint addresses.
+
+2. Mat Martineau points out that embedded __user addresses doesn't work
+with BPF_CGROUP_RUN_PROG_GETSOCKOPT() which assumes that copying in
+optsize bytes from optval provides all data that got copied to userspace.
+
+This provides mptcp_info data for the given mptcp socket.
+
+Userspace sets optlen to the size of the structure it expects.
+The kernel updates it to contain the number of bytes that it copied.
+
+This allows to append more information to the structure later.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
