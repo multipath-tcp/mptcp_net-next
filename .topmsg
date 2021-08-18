@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-mptcp-getsockopt-test-cases
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp: add mptcp getsockopt test cases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add a test program that retrieves the three info types:
+1. mptcp meta information
+2. tcp info for subflow
+3. subflow endpoint addresses
+
+For all three rudimentary checks are added.
+
+1. Meta information checks that the logical mptcp
+   sequence numbers advance as expected, based on the bytes read
+   (init seq + bytes_received/sent) and the connection state
+   (after close, we should exect 1 extra byte due to FIN).
+
+2. TCP info checks the number of bytes sent/received vs.
+   sums of read/write syscall return values.
+
+3. Subflow endpoint addresses are checked vs. getsockname/getpeername
+   result.
+
+Tests for forward compatibility (0-initialisation of output-only
+fields in mptcp_subflow_data structure) are added as well.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
