@@ -1,1 +1,1 @@
-t/selftests-mptcp-add-MP_FAIL-mibs-check
+t/selftests-mptcp-add-mptcp-getsockopt-test-cases
