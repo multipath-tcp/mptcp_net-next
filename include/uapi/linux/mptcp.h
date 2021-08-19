@@ -4,6 +4,7 @@
 
 #include <linux/const.h>
 #include <linux/types.h>
+#include <linux/in.h>
 
 #define MPTCP_SUBFLOW_FLAG_MCAP_REM		_BITUL(0)
 #define MPTCP_SUBFLOW_FLAG_MCAP_LOC		_BITUL(1)
@@ -192,5 +193,8 @@ enum mptcp_event_attr {
 #define MPTCP_RST_EWQ2BIG	4
 #define MPTCP_RST_EBADPERF	5
 #define MPTCP_RST_EMIDDLEBOX	6
+
+/* MPTCP socket options */
+#define MPTCP_INFO 1
 
 #endif /* _UAPI_MPTCP_H */
