@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-optimize-the-input-options-processing
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: optimize the input options processing
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Most MPTCP packets carries a single MPTCP subption: the
+DSS containing the mapping for the current packet.
+
+Check explicitly for the above, so that is such scenario we
+replace most conditional statements with a single likely() one.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
