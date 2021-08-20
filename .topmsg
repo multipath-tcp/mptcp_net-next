@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-better-binary-layout-for-mptcp_options_received
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: better binary layout for mptcp_options_received
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change reorder the mptcp_options_received fields
+to shrink the structure a bit and to ensure the most
+frequently used fields are all in the first cacheline.
+
+Sub-opt specific flags are moved out of the suboptions area,
+and we must now explicitly set them when the relevant
+suboption is parsed.
+
+There is a notable exception: 'csum_reqd' is used by both DSS
+and MPC suboptions, and keeping such field in the suboptions
+flag area will simplfy the next patch.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
