@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-consolidate-in_opt-sub-options-fields-in-a-bitmask
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consolidate in_opt sub-options fields in a bitmask
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This makes input options processing more consistent with
+output ones and will simplify the next patch.
+
+Also avoid clearing the suboption field after processing
+it, since it's not needed.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
