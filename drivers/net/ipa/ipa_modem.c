@@ -49,15 +49,17 @@ static int ipa_open(struct net_device *netdev)
 {
 	struct ipa_priv *priv = netdev_priv(netdev);
 	struct ipa *ipa = priv->ipa;
+	struct device *dev;
 	int ret;
 
-	ret = ipa_clock_get(ipa);
-	if (WARN_ON(ret < 0))
-		goto err_clock_put;
+	dev = &ipa->pdev->dev;
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
+		goto err_power_put;
 
 	ret = ipa_endpoint_enable_one(ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]);
 	if (ret)
-		goto err_clock_put;
+		goto err_power_put;
 
 	ret = ipa_endpoint_enable_one(ipa->name_map[IPA_ENDPOINT_AP_MODEM_RX]);
 	if (ret)
@@ -65,14 +67,14 @@ static int ipa_open(struct net_device *netdev)
 
 	netif_start_queue(netdev);
 
-	(void)ipa_clock_put(ipa);
+	(void)pm_runtime_put(dev);
 
 	return 0;
 
 err_disable_tx:
 	ipa_endpoint_disable_one(ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]);
-err_clock_put:
-	(void)ipa_clock_put(ipa);
+err_power_put:
+	(void)pm_runtime_put(dev);
 
 	return ret;
 }
@@ -82,18 +84,20 @@ static int ipa_stop(struct net_device *netdev)
 {
 	struct ipa_priv *priv = netdev_priv(netdev);
 	struct ipa *ipa = priv->ipa;
+	struct device *dev;
 	int ret;
 
-	ret = ipa_clock_get(ipa);
-	if (WARN_ON(ret < 0))
-		goto out_clock_put;
+	dev = &ipa->pdev->dev;
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0)
+		goto out_power_put;
 
 	netif_stop_queue(netdev);
 
 	ipa_endpoint_disable_one(ipa->name_map[IPA_ENDPOINT_AP_MODEM_RX]);
 	ipa_endpoint_disable_one(ipa->name_map[IPA_ENDPOINT_AP_MODEM_TX]);
-out_clock_put:
-	(void)ipa_clock_put(ipa);
+out_power_put:
+	(void)pm_runtime_put(dev);
 
 	return 0;
 }
@@ -130,6 +134,7 @@ ipa_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (ret < 1) {
 		/* If a resume won't happen, just drop the packet */
 		if (ret < 0 && ret != -EINPROGRESS) {
+			ipa_power_modem_queue_active(ipa);
 			pm_runtime_put_noidle(dev);
 			goto err_drop_skb;
 		}
@@ -138,12 +143,14 @@ ipa_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 		 * until we're resumed; ipa_modem_resume() arranges for the
 		 * TX queue to be started again.
 		 */
-		netif_stop_queue(netdev);
+		ipa_power_modem_queue_stop(ipa);
 
 		(void)pm_runtime_put(dev);
 
 		return NETDEV_TX_BUSY;
 	}
+
+	ipa_power_modem_queue_active(ipa);
 
 	ret = ipa_endpoint_skb_tx(endpoint, skb);
 
@@ -241,7 +248,7 @@ static void ipa_modem_wake_queue_work(struct work_struct *work)
 {
 	struct ipa_priv *priv = container_of(work, struct ipa_priv, work);
 
-	netif_wake_queue(priv->ipa->modem_netdev);
+	ipa_power_modem_queue_wake(priv->ipa);
 }
 
 /** ipa_modem_resume() - resume callback for runtime_pm
@@ -359,9 +366,11 @@ static void ipa_modem_crashed(struct ipa *ipa)
 	struct device *dev = &ipa->pdev->dev;
 	int ret;
 
-	ret = ipa_clock_get(ipa);
-	if (WARN_ON(ret < 0))
-		goto out_clock_put;
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0) {
+		dev_err(dev, "error %d getting power to handle crash\n", ret);
+		goto out_power_put;
+	}
 
 	ipa_endpoint_modem_pause_all(ipa, true);
 
@@ -388,8 +397,8 @@ static void ipa_modem_crashed(struct ipa *ipa)
 	if (ret)
 		dev_err(dev, "error %d zeroing modem memory regions\n", ret);
 
-out_clock_put:
-	(void)ipa_clock_put(ipa);
+out_power_put:
+	(void)pm_runtime_put(dev);
 }
 
 static int ipa_modem_notify(struct notifier_block *nb, unsigned long action,
