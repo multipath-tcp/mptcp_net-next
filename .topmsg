@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-make-the-locking-tx-schema-more-readable
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: make the locking tx schema more readable
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Florian noted the locking schema used by __mptcp_push_pending()
+is hard to follow, let's add some more descriptive comments
+and drop an unneeded and confusing check.
+
+Suggested-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
