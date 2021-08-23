@@ -30,6 +30,15 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
     runs-on: ubuntu-latest
     steps:
+      - name: issue info
+        id: info
+        if: github.event.action != "opened"
+        run: |
+          echo "::set-output name=opener::, opened by ${OPENER}"
+          echo "::set-output name=assignee::${ASSIGNEE:+ and assigned to ${ASSIGNEE}}"
+        env:
+          OPENER: ${{ github.event.issue.user.login }}
+          ASSIGNEE: ${{ github.event.assignee.login }}
       - name: irc issues
         uses: rectalogic/notify-irc@v1
         with:
@@ -37,7 +46,7 @@ jobs:
           channel: "#mptcp"
           nickname: gh-issues-bot
           message: |-
-            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}", opened by ${{ github.event.issue.user.login }} and assigned to ${{ github.event.assignee.login }}) has been ${{ github.event.action }} by ${{ github.actor }}
+            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ step.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
             ${{ github.event.issue.html_url }}
 
   irc-build:
