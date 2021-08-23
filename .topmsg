@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-possible-divide-by-zero
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix possible divide by zero
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Florian noted that if mptcp_alloc_tx_skb() allocation fails
+in __mptcp_push_pending(), we can end-up invoking
+mptcp_push_release()/tcp_push() with a zero mss, causing
+a divide by 0 error.
+
+This change addresses the issue refactoring the skb allocation
+code so that skb allocation always happens after the call
+to tcp_send_mss() correctly initialize mss_now.
+
+As side bonuses we now fill the skb tx cache only when needed,
+and this also clean-up a bit the output path.
+
+Reported-by: Florian Westphal <fw@strlen.de>
+Fixes: 724cfd2ee8aa ("mptcp: allocate TX skbs in msk context")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
