@@ -1290,7 +1290,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	bool zero_window_probe = false;
 	struct mptcp_ext *mpext = NULL;
 	struct sk_buff *skb, *tail;
-	bool can_collapse = false;
+	bool must_collapse = false;
 	int size_bias = 0;
 	int avail_size;
 	size_t ret = 0;
@@ -1310,17 +1310,21 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		 * SSN association set here
 		 */
 		mpext = skb_ext_find(skb, SKB_EXT_MPTCP);
-		can_collapse = (info->size_goal - skb->len > 0) &&
-			 mptcp_skb_can_collapse_to(data_seq, skb, mpext);
-		if (!can_collapse) {
+		if (!mptcp_skb_can_collapse_to(data_seq, skb, mpext)) {
 			TCP_SKB_CB(skb)->eor = 1;
-		} else {
+			goto alloc_skb;
+		}
+
+		must_collapse = (info->size_goal - skb->len > 0) &&
+				(skb_shinfo(skb)->nr_frags < sysctl_max_skb_frags);
+		if (must_collapse) {
 			size_bias = skb->len;
 			avail_size = info->size_goal - skb->len;
 		}
 	}
 
-	if (!can_collapse && !ssk->sk_tx_skb_cache &&
+alloc_skb:
+	if (!must_collapse && !ssk->sk_tx_skb_cache &&
 	    !mptcp_alloc_tx_skb(sk, ssk, info->data_lock_held))
 		return 0;
 
@@ -1353,7 +1357,6 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	if (skb == tail) {
 		TCP_SKB_CB(tail)->tcp_flags &= ~TCPHDR_PSH;
 		mpext->data_len += ret;
-		WARN_ON_ONCE(!can_collapse);
 		WARN_ON_ONCE(zero_window_probe);
 		goto out;
 	}
