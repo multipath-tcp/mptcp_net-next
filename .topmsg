@@ -7,8 +7,10 @@ mptcp_push_release()/tcp_push() with a zero mss, causing
 a divide by 0 error.
 
 This change addresses the issue refactoring the skb allocation
-code so that skb allocation always happens after the call
-to tcp_send_mss() correctly initialize mss_now.
+code checking if skb collapsing will happen for sure and doing
+the skb allocation only after such check. Skb allocation will
+now happen only after the call to tcp_send_mss() which
+correctly initializes mss_now.
 
 As side bonuses we now fill the skb tx cache only when needed,
 and this also clean-up a bit the output path.
