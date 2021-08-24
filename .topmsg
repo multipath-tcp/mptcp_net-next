@@ -6,7 +6,7 @@ Currently supported:
 - Github Actions:
   - build-validation: check different combinations of validation
   - IRC: send notifications to the IRC channel
-  - Update TopGit tree: run build tests and then override the export
+  - Update TopGit tree: sync with net-next and then override the export
     branch.
 
 - Cirrus:
