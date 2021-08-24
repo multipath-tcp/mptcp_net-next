@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: issue info
         id: info
-        if: github.event.action != "opened"
+        if: github.event.action != 'opened'
         run: |
           echo "::set-output name=opener::, opened by ${OPENER}"
           echo "::set-output name=assignee::${ASSIGNEE:+ and assigned to ${ASSIGNEE}}"
