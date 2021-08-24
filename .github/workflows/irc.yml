@@ -46,7 +46,7 @@ jobs:
           channel: "#mptcp"
           nickname: gh-issues-bot
           message: |-
-            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ step.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
+            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ steps.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
             ${{ github.event.issue.html_url }}
 
   irc-build:
