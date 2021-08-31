@@ -1,2 +1,1 @@
-t/mptcp-make-the-locking-tx-schema-more-readable
 t/selftests-mptcp-add-mptcp-getsockopt-test-cases
