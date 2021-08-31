@@ -56,4 +56,5 @@ for address advertisement or subflow priority change.
 Fixes: 84dfe3677a6f ("mptcp: send out dedicated ADD_ADDR packet")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/229
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
