@@ -1005,9 +1005,7 @@ static void mptcp_wmem_uncharge(struct sock *sk, int size)
 
 static void __mptcp_mem_reclaim_partial(struct sock *sk)
 {
-#ifdef CONFIG_LOCKDEP
-	WARN_ON_ONCE(!lockdep_is_held(&sk->sk_lock.slock));
-#endif
+	lockdep_assert_held_once(&sk->sk_lock.slock);
 	__mptcp_update_wmem(sk);
 	sk_mem_reclaim_partial(sk);
 }
@@ -1512,7 +1510,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	struct sock *prev_ssk = NULL, *ssk = NULL;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_sendmsg_info info = {
-				.flags = flags,
+		.flags = flags,
 	};
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0;
