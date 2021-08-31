@@ -235,12 +235,17 @@ static int connect_fd_to_addr(int fd,
 	return 0;
 }
 
-static int connect_to_fd_proto(int server_fd, int protocol, int timeout_ms)
+static const struct network_helper_opts default_opts;
+
+int connect_to_fd_opts(int server_fd, const struct network_helper_opts *opts)
 {
 	struct sockaddr_storage addr;
 	struct sockaddr_in *addr_in;
 	socklen_t addrlen, optlen;
 	int fd, type;
+
+	if (!opts)
+		opts = &default_opts;
 
 	optlen = sizeof(type);
 	if (getsockopt(server_fd, SOL_SOCKET, SO_TYPE, &type, &optlen)) {
@@ -255,13 +260,18 @@ static int connect_to_fd_proto(int server_fd, int protocol, int timeout_ms)
 	}
 
 	addr_in = (struct sockaddr_in *)&addr;
-	fd = socket(addr_in->sin_family, type, protocol);
+	fd = socket(addr_in->sin_family, type, opts->protocol);
 	if (fd < 0) {
 		log_err("Failed to create client socket");
 		return -1;
 	}
 
-	if (settimeo(fd, timeout_ms))
+	if (settimeo(fd, opts->timeout_ms))
+		goto error_close;
+
+	if (opts->cc && opts->cc[0] &&
+	    setsockopt(fd, SOL_TCP, TCP_CONGESTION, opts->cc,
+		       strlen(opts->cc) + 1))
 		goto error_close;
 
 	if (connect_fd_to_addr(fd, &addr, addrlen))
@@ -276,12 +286,21 @@ error_close:
 
 int connect_to_fd(int server_fd, int timeout_ms)
 {
-	return connect_to_fd_proto(server_fd, 0, timeout_ms);
+	struct network_helper_opts opts = {
+		.timeout_ms = timeout_ms,
+	};
+
+	return connect_to_fd_opts(server_fd, &opts);
 }
 
 int connect_to_mptcp_fd(int server_fd, int timeout_ms)
 {
-	return connect_to_fd_proto(server_fd, IPPROTO_MPTCP, timeout_ms);
+	struct network_helper_opts opts = {
+		.timeout_ms = timeout_ms,
+		.protocol = IPPROTO_MPTCP,
+	};
+
+	return connect_to_fd_opts(server_fd, &opts);
 }
 
 int connect_fd_to_fd(int client_fd, int server_fd, int timeout_ms)
