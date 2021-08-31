@@ -23,9 +23,14 @@ echo
 my_ghi --state open -L bug | grep -v " @"
 
 echo
-echo "    In Progress (opened and assigned)"
+echo "    In Progress (opened, new feature and assigned)"
 echo
 my_ghi --state open -N bug | grep " @"
+
+echo
+echo "    For later (opened and not assigned assigned)"
+echo
+my_ghi --state open -N bug | grep -v " @"
 
 echo
 echo "    Recently closed (since last week)"
