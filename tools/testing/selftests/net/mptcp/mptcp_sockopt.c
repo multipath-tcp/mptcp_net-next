@@ -33,35 +33,7 @@ static int pf = AF_INET;
 #define SOL_MPTCP 284
 #endif
 
-#ifndef TCP_TCPINFO
-struct mptcp_subflow_data {
-	__u32		size_subflow_data;		/* size of this structure in userspace */
-	__u32		num_subflows;			/* must be 0, set by kernel */
-	__u32		size_kernel;			/* must be 0, set by kernel */
-	__u32		size_user;			/* size of one element in data[] */
-} __attribute__((aligned(8)));
-
-struct mptcp_subflow_addrs {
-	union {
-		__kernel_sa_family_t sa_family;
-		struct sockaddr sa_local;
-		struct sockaddr_in sin_local;
-		struct sockaddr_in6 sin6_local;
-		struct sockaddr_storage ss_local;
-	};
-	union {
-		struct sockaddr sa_remote;
-		struct sockaddr_in sin_remote;
-		struct sockaddr_in6 sin6_remote;
-		struct sockaddr_storage ss_remote;
-	};
-};
-
-#define MPTCP_INFO		1
-#define MPTCP_TCPINFO		2
-#define MPTCP_SUBFLOW_ADDRS	3
-#endif
-
+#ifndef MPTCP_INFO
 struct mptcp_info {
 	__u8	mptcpi_subflows;
 	__u8	mptcpi_add_addr_signal;
@@ -78,6 +50,34 @@ struct mptcp_info {
 	__u8	mptcpi_local_addr_max;
 	__u8	mptcpi_csum_enabled;
 };
+
+struct mptcp_subflow_data {
+	__u32		size_subflow_data;		/* size of this structure in userspace */
+	__u32		num_subflows;			/* must be 0, set by kernel */
+	__u32		size_kernel;			/* must be 0, set by kernel */
+	__u32		size_user;			/* size of one element in data[] */
+} __attribute__((aligned(8)));
+
+struct mptcp_subflow_addrs {
+	union {
+		__kernel_sa_family_t sa_family;
+		struct sockaddr sa_local;
+		struct sockaddr_in sin_local;
+		struct sockaddr_in6 sin6_local;
+		struct __kernel_sockaddr_storage ss_local;
+	};
+	union {
+		struct sockaddr sa_remote;
+		struct sockaddr_in sin_remote;
+		struct sockaddr_in6 sin6_remote;
+		struct __kernel_sockaddr_storage ss_remote;
+	};
+};
+
+#define MPTCP_INFO		1
+#define MPTCP_TCPINFO		2
+#define MPTCP_SUBFLOW_ADDRS	3
+#endif
 
 struct so_state {
 	struct mptcp_info mi;
