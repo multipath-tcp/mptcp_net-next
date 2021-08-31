@@ -15,6 +15,10 @@ correctly initializes mss_now.
 As side bonuses we now fill the skb tx cache only when needed,
 and this also clean-up a bit the output path.
 
+v1 -> v2:
+ - use lockdep_assert_held_once() - Jakub
+ - fix indentation - Jakub
+
 Reported-by: Florian Westphal <fw@strlen.de>
 Fixes: 724cfd2ee8aa ("mptcp: allocate TX skbs in msk context")
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
