@@ -1,4 +1,32 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/x86-setup-Explicitly-include-acpi.h
+From: Nathan Chancellor <nathan@kernel.org>
+Subject: [PATCH] x86/setup: Explicitly include acpi.h
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After commit 342f43af70db ("iscsi_ibft: fix crash due to KASLR physical
+memory remapping"), certain configurations show the following errors:
+
+arch/x86/kernel/setup.c: In function ‘setup_arch’:
+arch/x86/kernel/setup.c:916:13: error: implicit declaration of function ‘acpi_mps_check’ [-Werror=implicit-function-declaration]
+  916 |         if (acpi_mps_check()) {
+      |             ^~~~~~~~~~~~~~
+arch/x86/kernel/setup.c:1110:9: error: implicit declaration of function ‘acpi_table_upgrade’ [-Werror=implicit-function-declaration]
+ 1110 |         acpi_table_upgrade();
+      |         ^~~~~~~~~~~~~~~~~~
+arch/x86/kernel/setup.c:1112:9: error: implicit declaration of function ‘acpi_boot_table_init’ [-Werror=implicit-function-declaration]
+ 1112 |         acpi_boot_table_init();
+      |         ^~~~~~~~~~~~~~~~~~~~
+arch/x86/kernel/setup.c:1120:9: error: implicit declaration of function ‘early_acpi_boot_init’; did you mean ‘early_cpu_init’? [-Werror=implicit-function-declaration]
+ 1120 |         early_acpi_boot_init();
+      |         ^~~~~~~~~~~~~~~~~~~~
+      |         early_cpu_init
+arch/x86/kernel/setup.c:1162:9: error: implicit declaration of function ‘acpi_boot_init’ [-Werror=implicit-function-declaration]
+ 1162 |         acpi_boot_init();
+      |         ^~~~~~~~~~~~~~
+cc1: some warnings being treated as errors
+
+acpi.h was being implicitly included from iscsi_ibft.h in these
+configurations so the removal of that means these functions have no
+definition or declaration. Add acpi.h explicitly so there is no more
+error.
+
+Signed-off-by: Nathan Chancellor <nathan@kernel.org>
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
