@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-do-not-shrink-snd_nxt-when-recovering
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: do not shrink snd_nxt when recovering
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When recovering after a link failure, snd_nxt should not be set to a
+lower value.  Else, update of snd_nxt is broken because:
+
+  msk->snd_nxt += ret; (where ret is number of bytes sent)
+
+assumes that snd_nxt always moves forward.
+After reduction, its possible that snd_nxt update gets out of sync:
+dfrag we just sent might have had a data sequence number even past
+recovery_snd_nxt.
+
+This change factors the common msk state update to a helper
+and updates snd_nxt based on the current dfrag data sequence number.
+
+The conditional is required for the recovery phase where we may
+re-transmit old dfrags that are before current snd_nxt.
+
+After this change, snd_nxt only moves forward and covers all in-sequence
+data that was transmitted.
+
+recovery_snd_nxt is retained to detect when recovery has completed.
+
+Fixes: 1e1d9d6f119c5 ("mptcp: handle pending data on closed subflow")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
