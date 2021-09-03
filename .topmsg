@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-OPTIONS_MPTCP_MPC
+From: Geliang Tang <geliangtang@xiaomi.com>
+Subject: [PATCH] mptcp: use OPTIONS_MPTCP_MPC
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since OPTIONS_MPTCP_MPC has been defined, use it instead of open-coding.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
