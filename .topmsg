@@ -1,8 +1,0 @@
-From: Geliang Tang <geliangtang@xiaomi.com>
-Subject: [PATCH] mptcp: use OPTIONS_MPTCP_MPC
-
-Since OPTIONS_MPTCP_MPC has been defined, use it instead of open-coding.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliangtang@xiaomi.com>
