@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-stop-relying-on-tcp_tx_skb_cache
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: stop relying on tcp_tx_skb_cache
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We want to revert the skb TX cache, but MPTCP is currently
+using it unconditionally.
+
+Rework the MPTCP tx code, so that tcp_tx_skb_cache is not
+needed anymore: do the whole coalescing check, skb allocation
+skb initialization/update inside mptcp_sendmsg_frag(), quite
+alike the current TCP code.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
