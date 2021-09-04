@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/Partially-revert-tcp-factor-out-tcp_build_frag
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] Partially revert "tcp: factor out tcp_build_frag()"
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This is a partial revert for commit b796d04bd014 ("tcp:
+factor out tcp_build_frag()").
+
+MPTCP was the only user of the tcp_build_frag helper, and after
+the previous patch MPTCP does not use the mentioned helper anymore.
+Let's avoid exposing TCP internals.
+
+The revert is partial, as tcp_remove_empty_skb(), exposed
+by the same commit is still required.
+
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
