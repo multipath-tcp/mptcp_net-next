@@ -1382,11 +1382,6 @@ alloc_skb:
 		goto out;
 	}
 
-	if (WARN_ON_ONCE(!mpext)) {
-		/* should never reach here, stream corrupted */
-		return -EINVAL;
-	}
-
 	memset(mpext, 0, sizeof(*mpext));
 	mpext->data_seq = data_seq;
 	mpext->subflow_seq = mptcp_subflow_ctx(ssk)->rel_write_seq;
