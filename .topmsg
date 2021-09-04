@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: use lockdep_assert_held_once() instead of open-codying it
-
-We have a few more places where the mptcp code duplicates
-lockdep_assert_held_once(). Let's use the existing macro and
-avoid a bunch of compiler's conditional.
-
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
