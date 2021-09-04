@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-expose-the-tcp_mark_push-and-skb_entail-helpers
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: expose the tcp_mark_push() and skb_entail() helpers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+They will be used by the next patch.
+
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
