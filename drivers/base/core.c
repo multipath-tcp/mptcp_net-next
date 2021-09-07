@@ -27,6 +27,7 @@
 #include <linux/netdevice.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/mm.h>
+#include <linux/swiotlb.h>
 #include <linux/sysfs.h>
 #include <linux/dma-map-ops.h> /* for dma_default_coherent */
 
@@ -886,6 +887,8 @@ static void device_link_put_kref(struct device_link *link)
 {
 	if (link->flags & DL_FLAG_STATELESS)
 		kref_put(&link->kref, __device_link_del);
+	else if (!device_is_registered(link->consumer))
+		__device_link_del(&link->kref);
 	else
 		WARN(1, "Unable to drop a managed device link reference\n");
 }
@@ -2849,6 +2852,9 @@ void device_initialize(struct device *dev)
     defined(CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL)
 	dev->dma_coherent = dma_default_coherent;
 #endif
+#ifdef CONFIG_SWIOTLB
+	dev->dma_io_tlb_mem = &io_tlb_default_mem;
+#endif
 }
 EXPORT_SYMBOL_GPL(device_initialize);
 
@@ -4579,8 +4585,8 @@ static void __dev_printk(const char *level, const struct device *dev,
 		printk("%s(NULL device *): %pV", level, vaf);
 }
 
-void dev_printk(const char *level, const struct device *dev,
-		const char *fmt, ...)
+void _dev_printk(const char *level, const struct device *dev,
+		 const char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list args;
@@ -4594,7 +4600,7 @@ void dev_printk(const char *level, const struct device *dev,
 
 	va_end(args);
 }
-EXPORT_SYMBOL(dev_printk);
+EXPORT_SYMBOL(_dev_printk);
 
 #define define_dev_printk_level(func, kern_level)		\
 void func(const struct device *dev, const char *fmt, ...)	\
