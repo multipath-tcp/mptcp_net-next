@@ -963,68 +963,6 @@ void tcp_remove_empty_skb(struct sock *sk, struct sk_buff *skb)
 	}
 }
 
-struct sk_buff *tcp_build_frag(struct sock *sk, int size_goal, int flags,
-			       struct page *page, int offset, size_t *size)
-{
-	struct sk_buff *skb = tcp_write_queue_tail(sk);
-	struct tcp_sock *tp = tcp_sk(sk);
-	bool can_coalesce;
-	int copy, i;
-
-	if (!skb || (copy = size_goal - skb->len) <= 0 ||
-	    !tcp_skb_can_collapse_to(skb)) {
-new_segment:
-		if (!sk_stream_memory_free(sk))
-			return NULL;
-
-		skb = sk_stream_alloc_skb(sk, 0, sk->sk_allocation,
-					  tcp_rtx_and_write_queues_empty(sk));
-		if (!skb)
-			return NULL;
-
-#ifdef CONFIG_TLS_DEVICE
-		skb->decrypted = !!(flags & MSG_SENDPAGE_DECRYPTED);
-#endif
-		skb_entail(sk, skb);
-		copy = size_goal;
-	}
-
-	if (copy > *size)
-		copy = *size;
-
-	i = skb_shinfo(skb)->nr_frags;
-	can_coalesce = skb_can_coalesce(skb, i, page, offset);
-	if (!can_coalesce && i >= sysctl_max_skb_frags) {
-		tcp_mark_push(tp, skb);
-		goto new_segment;
-	}
-	if (!sk_wmem_schedule(sk, copy))
-		return NULL;
-
-	if (can_coalesce) {
-		skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
-	} else {
-		get_page(page);
-		skb_fill_page_desc(skb, i, page, offset, copy);
-	}
-
-	if (!(flags & MSG_NO_SHARED_FRAGS))
-		skb_shinfo(skb)->flags |= SKBFL_SHARED_FRAG;
-
-	skb->len += copy;
-	skb->data_len += copy;
-	skb->truesize += copy;
-	sk_wmem_queued_add(sk, copy);
-	sk_mem_charge(sk, copy);
-	skb->ip_summed = CHECKSUM_PARTIAL;
-	WRITE_ONCE(tp->write_seq, tp->write_seq + copy);
-	TCP_SKB_CB(skb)->end_seq += copy;
-	tcp_skb_pcount_set(skb, 0);
-
-	*size = copy;
-	return skb;
-}
-
 ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 			 size_t size, int flags)
 {
@@ -1060,12 +998,59 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 		goto out_err;
 
 	while (size > 0) {
-		struct sk_buff *skb;
-		size_t copy = size;
+		struct sk_buff *skb = tcp_write_queue_tail(sk);
+		int copy, i;
+		bool can_coalesce;
 
-		skb = tcp_build_frag(sk, size_goal, flags, page, offset, &copy);
-		if (!skb)
+		if (!skb || (copy = size_goal - skb->len) <= 0 ||
+		    !tcp_skb_can_collapse_to(skb)) {
+new_segment:
+			if (!sk_stream_memory_free(sk))
+				goto wait_for_space;
+
+			skb = sk_stream_alloc_skb(sk, 0, sk->sk_allocation,
+					tcp_rtx_and_write_queues_empty(sk));
+			if (!skb)
+				goto wait_for_space;
+
+#ifdef CONFIG_TLS_DEVICE
+			skb->decrypted = !!(flags & MSG_SENDPAGE_DECRYPTED);
+#endif
+			skb_entail(sk, skb);
+			copy = size_goal;
+		}
+
+		if (copy > size)
+			copy = size;
+
+		i = skb_shinfo(skb)->nr_frags;
+		can_coalesce = skb_can_coalesce(skb, i, page, offset);
+		if (!can_coalesce && i >= sysctl_max_skb_frags) {
+			tcp_mark_push(tp, skb);
+			goto new_segment;
+		}
+		if (!sk_wmem_schedule(sk, copy))
 			goto wait_for_space;
+
+		if (can_coalesce) {
+			skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
+		} else {
+			get_page(page);
+			skb_fill_page_desc(skb, i, page, offset, copy);
+		}
+
+		if (!(flags & MSG_NO_SHARED_FRAGS))
+			skb_shinfo(skb)->flags |= SKBFL_SHARED_FRAG;
+
+		skb->len += copy;
+		skb->data_len += copy;
+		skb->truesize += copy;
+		sk_wmem_queued_add(sk, copy);
+		sk_mem_charge(sk, copy);
+		skb->ip_summed = CHECKSUM_PARTIAL;
+		WRITE_ONCE(tp->write_seq, tp->write_seq + copy);
+		TCP_SKB_CB(skb)->end_seq += copy;
+		tcp_skb_pcount_set(skb, 0);
 
 		if (!copied)
 			TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_PSH;
