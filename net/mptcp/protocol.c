@@ -1553,7 +1553,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	struct sock *prev_ssk = NULL, *ssk = NULL;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_sendmsg_info info = {
-		.flags = flags,
+				.flags = flags,
 	};
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0;
@@ -1615,7 +1615,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_sendmsg_info info = {
-				 .data_lock_held = true,
+		.data_lock_held = true,
 	};
 	struct mptcp_data_frag *dfrag;
 	struct sock *xmit_ssk;
