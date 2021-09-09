@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/kbuild-Only-default-to-Werror-if-COMPILE_TEST
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
