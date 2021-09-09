@@ -1336,7 +1336,7 @@ alloc_skb:
 	if (copy == 0) {
 		u64 snd_una = READ_ONCE(msk->snd_una);
 
-		if (skb || snd_una != msk->snd_nxt) {
+		if (snd_una != msk->snd_nxt) {
 			tcp_remove_empty_skb(ssk, tcp_write_queue_tail(ssk));
 			return 0;
 		}
