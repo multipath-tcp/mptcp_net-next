@@ -1,0 +1,47 @@
+
+# Launch 2 jobs in //: with and without debug
+task:
+  name: KVM validation
+  only_if: $CIRRUS_TAG != ''  ## only tags
+
+  container:
+    image: mptcp/mptcp-upstream-virtme-docker
+    kvm: true   ## Needed for the tests
+    cpu: 8      ## Max 16 per project, even number with kvm
+    memory: 8G  ## Max 4 per CPU
+
+  env:
+    CIRRUS_CLONE_DEPTH: 1       ## no need to have a full clone
+    CIRRUS_LOG_TIMESTAMP: true  ## useful
+    INPUT_CCACHE_MAXSIZE: 1G
+    matrix:
+      MATRIX_JOB: normal
+      MATRIX_JOB: debug
+
+  ccache_cache:
+    folder: ".virtme/ccache"
+    reupload_on_changes: true
+    fingerprint_script:
+      - echo ${MATRIX_JOB}
+
+  test_script: /entrypoint.sh expect-${MATRIX_JOB}
+
+  on_failure:
+    vmlinux_artifacts:
+      path: "vmlinux.zstd"
+
+  always:
+    conclusion_artifacts:
+      path: "conclusion.txt"
+      type: text/plain
+    summary_artifacts:
+      path: "summary.txt"
+      type: text/plain
+    tap_result_artifacts:
+      path: "*.tap"
+      type: text/plain
+    # JUnit format is for the moment only useful for PR but publish them just in case for later
+    junit_artifacts:
+      path: "*.tap.xml"
+      type: text/xml
+      format: junit
