@@ -1105,7 +1105,8 @@ out:
 	if (cleaned && tcp_under_memory_pressure(sk))
 		__mptcp_mem_reclaim_partial(sk);
 
-	if (snd_una == READ_ONCE(msk->snd_nxt) && !msk->recovery) {
+	if (snd_una == READ_ONCE(msk->snd_nxt) &&
+	    snd_una == READ_ONCE(msk->write_seq)) {
 		if (mptcp_timer_pending(sk) && !mptcp_data_fin_enabled(msk))
 			mptcp_stop_timer(sk);
 	} else {
@@ -1531,7 +1532,6 @@ static void mptcp_update_post_push(struct mptcp_sock *msk,
 	dfrag->already_sent += sent;
 
 	msk->snd_burst -= sent;
-	msk->tx_pending_data -= sent;
 
 	snd_nxt_new += dfrag->already_sent;
 
@@ -1546,6 +1546,13 @@ static void mptcp_update_post_push(struct mptcp_sock *msk,
 	 */
 	if (likely(after64(snd_nxt_new, msk->snd_nxt)))
 		msk->snd_nxt = snd_nxt_new;
+}
+
+static void mptcp_check_and_set_pending(struct sock *sk)
+{
+	if (mptcp_send_head(sk) &&
+	    !test_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->flags))
+		set_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->flags);
 }
 
 void __mptcp_push_pending(struct sock *sk, unsigned int flags)
@@ -1761,7 +1768,6 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		frag_truesize += psize;
 		pfrag->offset += frag_truesize;
 		WRITE_ONCE(msk->write_seq, msk->write_seq + psize);
-		msk->tx_pending_data += psize;
 
 		/* charge data on mptcp pending queue to the msk socket
 		 * Note: we charge such data both to sk and ssk
@@ -2254,7 +2260,6 @@ bool __mptcp_retransmit_pending_data(struct sock *sk)
 	mptcp_data_unlock(sk);
 
 	msk->first_pending = rtx_head;
-	msk->tx_pending_data += msk->snd_nxt - rtx_head->data_seq;
 	msk->snd_burst = 0;
 
 	/* be sure to clear the "sent status" on all re-injected fragments */
@@ -2417,6 +2422,9 @@ static void __mptcp_retrans(struct sock *sk)
 	int ret;
 
 	mptcp_clean_una_wakeup(sk);
+
+	/* first check ssk: need to kick "stale" logic */
+	ssk = mptcp_subflow_get_retrans(msk);
 	dfrag = mptcp_rtx_head(sk);
 	if (!dfrag) {
 		if (mptcp_data_fin_enabled(msk)) {
@@ -2429,10 +2437,12 @@ static void __mptcp_retrans(struct sock *sk)
 			goto reset_timer;
 		}
 
-		return;
+		if (!mptcp_send_head(sk))
+			return;
+
+		goto reset_timer;
 	}
 
-	ssk = mptcp_subflow_get_retrans(msk);
 	if (!ssk)
 		goto reset_timer;
 
@@ -2459,6 +2469,8 @@ static void __mptcp_retrans(struct sock *sk)
 	release_sock(ssk);
 
 reset_timer:
+	mptcp_check_and_set_pending(sk);
+
 	if (!mptcp_timer_pending(sk))
 		mptcp_reset_timer(sk);
 }
@@ -2525,7 +2537,6 @@ static int __mptcp_init_sock(struct sock *sk)
 	msk->first_pending = NULL;
 	msk->wmem_reserved = 0;
 	WRITE_ONCE(msk->rmem_released, 0);
-	msk->tx_pending_data = 0;
 	msk->timer_ival = TCP_RTO_MIN;
 
 	msk->first = NULL;
