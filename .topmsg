@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/chtls-rename-skb_entail-to-chtls_skb_entail
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
