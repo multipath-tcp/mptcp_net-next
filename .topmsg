@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-tx_pending_data
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: remove tx_pending_data
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The update on recovery is not correct.
+
+msk->tx_pending_data += msk->snd_nxt - rtx_head->data_seq;
+
+will update tx_pending_data multiple times when a subflow is declared
+stale while earlier recovery is still in progress.
+This means that tx_pending_data will still be positive even after
+all data as has been transmitted.
+
+Rather than fix it, remove this field: there are no consumers.
+The outstanding data byte count can be computed either via
+
+ "msk->write_seq - rtx_head->data_seq" or
+ "msk->write_seq - msk->snd_una".
+
+The latter is more recent/accurate estimate as rtx_head adjustment
+is deferred until mptcp lock can be acquired.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
