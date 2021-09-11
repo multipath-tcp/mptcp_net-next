@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-re-arm-retransmit-timer-if-data-is-pending
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: re-arm retransmit timer if data is pending
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The retransmit head will be NULL in case there is no in-flight data
+(meaning all data injected into network has been acked).
+
+In that case the retransmit timer is stopped.
+
+This is only correct if there is no more pending, not-yet-sent data.
+
+If there is, the retransmit timer needs to set the PENDING bit again so
+that mptcp tries to send the remaining (new) data once a subflow can accept
+more data.
+
+Also, mptcp_subflow_get_retrans() has to be called unconditionally.
+
+This function checks for subflows that have become unresponsive and marks
+them as stale, so in the case where the rtx queue is empty, subflows
+will never be marked stale which prevents available backup subflows from
+becoming eligible for transmit.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/226
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
