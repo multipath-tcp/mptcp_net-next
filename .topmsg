@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/chtls-rename-skb_entail-to-chtls_skb_entail
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] chtls: rename skb_entail() to chtls_skb_entail()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The next patch will expose the core TCP helper with the same
+name. It looks like we can't trivially re-use it in chtls, so
+remame the driver specific's one to avoid name conflicts.
+
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
