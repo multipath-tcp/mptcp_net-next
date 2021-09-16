@@ -238,7 +238,7 @@ found:
  *
  * returns NULL if no connection with the given token value exists.
  */
-struct mptcp_sock *mptcp_token_get_sock(u32 token)
+struct mptcp_sock *mptcp_token_get_sock(struct net *net, u32 token)
 {
 	struct hlist_nulls_node *pos;
 	struct token_bucket *bucket;
@@ -251,11 +251,15 @@ struct mptcp_sock *mptcp_token_get_sock(u32 token)
 again:
 	sk_nulls_for_each_rcu(sk, pos, &bucket->msk_chain) {
 		msk = mptcp_sk(sk);
-		if (READ_ONCE(msk->token) != token)
+		if (READ_ONCE(msk->token) != token ||
+		    !net_eq(sock_net(sk), net))
 			continue;
+
 		if (!refcount_inc_not_zero(&sk->sk_refcnt))
 			goto not_found;
-		if (READ_ONCE(msk->token) != token) {
+
+		if (READ_ONCE(msk->token) != token ||
+		    !net_eq(sock_net(sk), net)) {
 			sock_put(sk);
 			goto again;
 		}
