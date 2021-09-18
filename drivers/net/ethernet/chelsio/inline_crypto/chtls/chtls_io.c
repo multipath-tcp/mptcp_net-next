@@ -119,8 +119,8 @@ static int send_flowc_wr(struct sock *sk, struct fw_flowc_wr *flowc,
 		if (!skb)
 			return -ENOMEM;
 
-		skb_entail(sk, skb,
-			   ULPCB_FLAG_NO_HDR | ULPCB_FLAG_NO_APPEND);
+		chtls_skb_entail(sk, skb,
+				 ULPCB_FLAG_NO_HDR | ULPCB_FLAG_NO_APPEND);
 		return 0;
 	}
 
@@ -816,7 +816,7 @@ static int select_size(struct sock *sk, int io_len, int flags, int len)
 	return io_len;
 }
 
-void skb_entail(struct sock *sk, struct sk_buff *skb, int flags)
+void chtls_skb_entail(struct sock *sk, struct sk_buff *skb, int flags)
 {
 	struct chtls_sock *csk = rcu_dereference_sk_user_data(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -840,7 +840,7 @@ static struct sk_buff *get_tx_skb(struct sock *sk, int size)
 	skb = alloc_skb(size + TX_HEADER_LEN, sk->sk_allocation);
 	if (likely(skb)) {
 		skb_reserve(skb, TX_HEADER_LEN);
-		skb_entail(sk, skb, ULPCB_FLAG_NEED_HDR);
+		chtls_skb_entail(sk, skb, ULPCB_FLAG_NEED_HDR);
 		skb_reset_transport_header(skb);
 	}
 	return skb;
@@ -857,7 +857,7 @@ static struct sk_buff *get_record_skb(struct sock *sk, int size, bool zcopy)
 	if (likely(skb)) {
 		skb_reserve(skb, (TX_TLSHDR_LEN +
 			    KEY_ON_MEM_SZ + max_ivs_size(sk, size)));
-		skb_entail(sk, skb, ULPCB_FLAG_NEED_HDR);
+		chtls_skb_entail(sk, skb, ULPCB_FLAG_NEED_HDR);
 		skb_reset_transport_header(skb);
 		ULP_SKB_CB(skb)->ulp.tls.ofld = 1;
 		ULP_SKB_CB(skb)->ulp.tls.type = csk->tlshws.type;
