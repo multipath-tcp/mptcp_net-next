@@ -1,0 +1,1 @@
+t/kbuild-Only-default-to-Werror-if-COMPILE_TEST
