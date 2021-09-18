@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/perf-ignore-deprecation-warning-when-using-libbpf-s-btf__get_from_id
+From: Andrii Nakryiko <andrii@kernel.org>
+Subject: [PATCH] perf: ignore deprecation warning when using libbpf's btf__get_from_id()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Perf code re-implements libbpf's btf__load_from_kernel_by_id() API as
+a weak function, presumably to dynamically link against old version of
+libbpf shared library. Unfortunately this causes compilation warning
+when perf is compiled against libbpf v0.6+.
+
+For now, just ignore deprecation warning, but there might be a better
+solution, depending on perf's needs.
+
+Signed-off-by: Andrii Nakryiko <andrii@kernel.org>
