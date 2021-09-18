@@ -1,1 +1,1 @@
-t/kbuild-Only-default-to-Werror-if-COMPILE_TEST
+t/perf-ignore-deprecation-warning-when-using-libbpf-s-btf__get_from_id
