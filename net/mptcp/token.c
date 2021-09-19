@@ -231,6 +231,7 @@ found:
 
 /**
  * mptcp_token_get_sock - retrieve mptcp connection sock using its token
+ * @net: restrict to this namespace
  * @token: token of the mptcp connection to retrieve
  *
  * This function returns the mptcp connection structure with the given token.
