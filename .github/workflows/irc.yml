@@ -1,0 +1,131 @@
+name: "IRC Notifications"
+on:
+  create:
+  issues:
+    types: [opened, reopened, closed, assigned, unassigned]
+  workflow_run:
+    workflows: ["MPTCP Upstream Build Validation", "Update TopGit tree"]
+    types:
+      - completed
+  check_suite:
+    types:
+      - completed
+
+jobs:
+  irc-tag:
+    name: "IRC Tag"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'create' && github.event.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc tag
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tag-bot
+          message: "New tag available: ${{ github.event.ref }} (by ${{ github.actor }})"
+
+  irc-issues:
+    name: "IRC Issues"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: issue info
+        id: info
+        if: github.event.action != 'opened'
+        run: |
+          echo "::set-output name=opener::, opened by ${OPENER}"
+          echo "::set-output name=assignee::${ASSIGNEE:+ and assigned to ${ASSIGNEE}}"
+        env:
+          OPENER: ${{ github.event.issue.user.login }}
+          ASSIGNEE: ${{ github.event.assignee.login }}
+      - name: irc issues
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-issues-bot
+          message: |-
+            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ steps.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
+            ${{ github.event.issue.html_url }}
+
+  irc-build:
+    name: "IRC Build"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc build
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-build-bot
+          message: |-
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
+            ${{ github.event.workflow_run.html_url }}
+
+  irc-build-error:
+    name: "IRC Build Error"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc build
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-build-bot
+          message: |-
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}
+            ${{ github.event.workflow_run.html_url }}
+
+  irc-topgit:
+    name: "IRC TopGit"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Update TopGit tree' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc topgit
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-topgit-bot
+          message: |-
+            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
+            ${{ github.event.workflow_run.html_url }}
+
+  irc-tests:
+    name: "IRC Tests"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
+    runs-on: ubuntu-latest
+    steps:
+      # from: https://cirrus-ci.org/guide/notifications/
+      - name: get status
+        uses: octokit/request-action@v2.x
+        id: get_status_check_run
+        with:
+          route: GET /repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed
+          mediaType: '{"previews": ["antiope"]}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: get conclusion
+        id: get_conclusion_cirrus
+        run: |
+          echo "::set-output name=conclusion_0::$(curl ${CHECK_0_URL} || echo "0: Unable to get the conclusion")"
+          echo "::set-output name=conclusion_1::$(curl ${CHECK_1_URL} || echo "1: Unable to get the conclusion")"
+        env:
+          CHECK_0_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].external_id }}/conclusion/conclusion.txt"
+          CHECK_1_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].external_id }}/conclusion/conclusion.txt"
+      - name: irc tests
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tests-bot
+          message: |-
+            New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) just ended:
+            - ${{ steps.get_conclusion_cirrus.outputs.conclusion_0 }}: ${{ env.CHECK_0_URL }}
+            - ${{ steps.get_conclusion_cirrus.outputs.conclusion_1 }}: ${{ env.CHECK_1_URL }}
+        env:
+          CHECK_0_URL:  ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[0].details_url }}
+          CHECK_1_URL:  ${{ fromJson(steps.get_status_check_run.outputs.data).check_runs[1].details_url }}
