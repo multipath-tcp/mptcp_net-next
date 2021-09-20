@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-always-provide-MPTCP-skb-ext-for-tx-skb
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: always provide MPTCP skb ext for tx skb
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp code will uses whatever skb is present into
+ssk->sk_tx_skb_cache. If the skb tx cache is enabled, the
+recycle operation will clean the MPTCP extension from the
+cached skb, and the MPTCP would hit a later WARN.
+
+Fix the issue always invoking the mptcp skb allocation
+helper, which will safely check the cached skb for the extension
+presence.
+
+Fixes: 1094c6fe7280 ("mptcp: fix possible divide by zero")
+Reported-by: syzbot+263a248eec3e875baa7b@syzkaller.appspotmail.com
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
