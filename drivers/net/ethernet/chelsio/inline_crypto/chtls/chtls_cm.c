@@ -317,7 +317,7 @@ static void chtls_close_conn(struct sock *sk)
 	OPCODE_TID(req) = htonl(MK_OPCODE_TID(CPL_CLOSE_CON_REQ, tid));
 
 	tcp_uncork(sk);
-	chtls_skb_entail(sk, skb, ULPCB_FLAG_NO_HDR | ULPCB_FLAG_NO_APPEND);
+	skb_entail(sk, skb, ULPCB_FLAG_NO_HDR | ULPCB_FLAG_NO_APPEND);
 	if (sk->sk_state != TCP_SYN_SENT)
 		chtls_push_frames(csk, 1);
 }
