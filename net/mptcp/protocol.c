@@ -1074,6 +1074,7 @@ static void __mptcp_clean_una(struct sock *sk)
 			WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
 		}
 
+		msk->last_fully_acked_dss_start_seq = dfrag->data_seq;
 		dfrag_clear(sk, dfrag);
 		cleaned = true;
 	}
@@ -2895,6 +2896,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->snd_una = msk->write_seq;
 	msk->wnd_end = msk->snd_nxt + req->rsk_rcv_wnd;
 	msk->setsockopt_seq = mptcp_sk(sk)->setsockopt_seq;
+	msk->last_fully_acked_dss_start_seq = subflow_req->idsn - 1;
 
 	if (mp_opt->suboptions & OPTIONS_MPTCP_MPC) {
 		msk->can_ack = true;
@@ -3151,6 +3153,7 @@ void mptcp_finish_connect(struct sock *ssk)
 	WRITE_ONCE(msk->rcv_wnd_sent, ack_seq);
 	WRITE_ONCE(msk->can_ack, 1);
 	WRITE_ONCE(msk->snd_una, msk->write_seq);
+	WRITE_ONCE(msk->last_fully_acked_dss_start_seq, subflow->idsn - 1);
 
 	mptcp_pm_new_connection(msk, ssk, 0);
 
