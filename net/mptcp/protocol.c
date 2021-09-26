@@ -729,6 +729,9 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 	if (unlikely(subflow->disposable))
 		return;
 
+	if (!subflow->last_retrans_seq || mptcp_is_data_contiguous(ssk))
+		subflow->last_retrans_seq = tcp_sk(ssk)->snd_una - 1;
+
 	ssk_rbuf = READ_ONCE(ssk->sk_rcvbuf);
 	sk_rbuf = READ_ONCE(sk->sk_rcvbuf);
 	if (unlikely(ssk_rbuf > sk_rbuf))
@@ -2415,6 +2418,7 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 static void __mptcp_retrans(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sendmsg_info info = {};
 	struct mptcp_data_frag *dfrag;
 	size_t copied = 0;
@@ -2464,6 +2468,8 @@ static void __mptcp_retrans(struct sock *sk)
 		dfrag->already_sent = max(dfrag->already_sent, info.sent);
 		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
 			 info.size_goal);
+		subflow = mptcp_subflow_ctx(ssk);
+		subflow->last_retrans_seq = tcp_sk(ssk)->snd_nxt;
 	}
 
 	release_sock(ssk);

@@ -416,6 +416,7 @@ struct mptcp_subflow_context {
 	u32	map_data_len;
 	__wsum	map_data_csum;
 	u32	map_csum_len;
+	u32	last_retrans_seq;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_join : 1,   /* send MP_JOIN */
 		request_bkup : 1,
@@ -623,6 +624,13 @@ static inline bool mptcp_has_another_subflow(struct sock *ssk)
 	}
 
 	return false;
+}
+
+static inline bool mptcp_is_data_contiguous(struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
+	return before(subflow->last_retrans_seq, tcp_sk(ssk)->snd_una);
 }
 
 void __init mptcp_proto_init(void);
