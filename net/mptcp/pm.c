@@ -251,7 +251,12 @@ void mptcp_pm_mp_prio_received(struct sock *sk, u8 bkup)
 
 void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
 	pr_debug("fail_seq=%llu", fail_seq);
+
+	if (mptcp_allow_infinite_fallback(sk))
+		subflow->send_infinite_map = 1;
 }
 
 /* path manager helpers */
