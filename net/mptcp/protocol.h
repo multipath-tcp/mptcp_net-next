@@ -249,6 +249,7 @@ struct mptcp_sock {
 	bool		rcv_fastclose;
 	bool		use_64bit_ack; /* Set when we received a 64-bit DSN */
 	bool		csum_enabled;
+	bool		allow_infinite_fallback;
 	spinlock_t	join_list_lock;
 	struct work_struct work;
 	struct sk_buff  *ooo_last_skb;
@@ -612,17 +613,20 @@ static inline void mptcp_subflow_tcp_fallback(struct sock *sk,
 	inet_csk(sk)->icsk_af_ops = ctx->icsk_af_ops;
 }
 
-static inline bool mptcp_has_another_subflow(struct sock *ssk)
+static inline bool mptcp_allow_infinite_fallback(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk), *tmp;
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 
 	mptcp_for_each_subflow(msk, tmp) {
+		if (tmp->mp_join)
+			return false;
+
 		if (tmp != subflow)
-			return true;
+			return false;
 	}
 
-	return false;
+	return READ_ONCE(msk->allow_infinite_fallback);
 }
 
 void __init mptcp_proto_init(void);
