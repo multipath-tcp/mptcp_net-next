@@ -947,6 +947,53 @@ void sock_set_mark(struct sock *sk, u32 val)
 }
 EXPORT_SYMBOL(sock_set_mark);
 
+static void sock_release_reserved_memory(struct sock *sk, int bytes)
+{
+	/* Round down bytes to multiple of pages */
+	bytes &= ~(SK_MEM_QUANTUM - 1);
+
+	WARN_ON(bytes > sk->sk_reserved_mem);
+	sk->sk_reserved_mem -= bytes;
+	sk_mem_reclaim(sk);
+}
+
+static int sock_reserve_memory(struct sock *sk, int bytes)
+{
+	long allocated;
+	bool charged;
+	int pages;
+
+	if (!mem_cgroup_sockets_enabled || !sk->sk_memcg)
+		return -EOPNOTSUPP;
+
+	if (!bytes)
+		return 0;
+
+	pages = sk_mem_pages(bytes);
+
+	/* pre-charge to memcg */
+	charged = mem_cgroup_charge_skmem(sk->sk_memcg, pages,
+					  GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	if (!charged)
+		return -ENOMEM;
+
+	/* pre-charge to forward_alloc */
+	allocated = sk_memory_allocated_add(sk, pages);
+	/* If the system goes into memory pressure with this
+	 * precharge, give up and return error.
+	 */
+	if (allocated > sk_prot_mem_limits(sk, 1)) {
+		sk_memory_allocated_sub(sk, pages);
+		mem_cgroup_uncharge_skmem(sk->sk_memcg, pages);
+		return -ENOMEM;
+	}
+	sk->sk_forward_alloc += pages << SK_MEM_QUANTUM_SHIFT;
+
+	sk->sk_reserved_mem += pages << SK_MEM_QUANTUM_SHIFT;
+
+	return 0;
+}
+
 /*
  *	This is meant for all protocols to use and covers goings on
  *	at the socket level. Everything here is generic.
@@ -1367,6 +1414,23 @@ set_sndbuf:
 					  ~SOCK_BUF_LOCK_MASK);
 		break;
 
+	case SO_RESERVE_MEM:
+	{
+		int delta;
+
+		if (val < 0) {
+			ret = -EINVAL;
+			break;
+		}
+
+		delta = val - sk->sk_reserved_mem;
+		if (delta < 0)
+			sock_release_reserved_memory(sk, -delta);
+		else
+			ret = sock_reserve_memory(sk, delta);
+		break;
+	}
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1376,6 +1440,16 @@ set_sndbuf:
 }
 EXPORT_SYMBOL(sock_setsockopt);
 
+static const struct cred *sk_get_peer_cred(struct sock *sk)
+{
+	const struct cred *cred;
+
+	spin_lock(&sk->sk_peer_lock);
+	cred = get_cred(sk->sk_peer_cred);
+	spin_unlock(&sk->sk_peer_lock);
+
+	return cred;
+}
 
 static void cred_to_ucred(struct pid *pid, const struct cred *cred,
 			  struct ucred *ucred)
@@ -1552,7 +1626,11 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		struct ucred peercred;
 		if (len > sizeof(peercred))
 			len = sizeof(peercred);
+
+		spin_lock(&sk->sk_peer_lock);
 		cred_to_ucred(sk->sk_peer_pid, sk->sk_peer_cred, &peercred);
+		spin_unlock(&sk->sk_peer_lock);
+
 		if (copy_to_user(optval, &peercred, len))
 			return -EFAULT;
 		goto lenout;
@@ -1560,20 +1638,23 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 
 	case SO_PEERGROUPS:
 	{
+		const struct cred *cred;
 		int ret, n;
 
-		if (!sk->sk_peer_cred)
+		cred = sk_get_peer_cred(sk);
+		if (!cred)
 			return -ENODATA;
 
-		n = sk->sk_peer_cred->group_info->ngroups;
+		n = cred->group_info->ngroups;
 		if (len < n * sizeof(gid_t)) {
 			len = n * sizeof(gid_t);
+			put_cred(cred);
 			return put_user(len, optlen) ? -EFAULT : -ERANGE;
 		}
 		len = n * sizeof(gid_t);
 
-		ret = groups_to_user((gid_t __user *)optval,
-				     sk->sk_peer_cred->group_info);
+		ret = groups_to_user((gid_t __user *)optval, cred->group_info);
+		put_cred(cred);
 		if (ret)
 			return ret;
 		goto lenout;
@@ -1731,6 +1812,10 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 
 	case SO_BUF_LOCK:
 		v.val = sk->sk_userlocks & SOCK_BUF_LOCK_MASK;
+		break;
+
+	case SO_RESERVE_MEM:
+		v.val = sk->sk_reserved_mem;
 		break;
 
 	default:
@@ -1935,9 +2020,10 @@ static void __sk_destruct(struct rcu_head *head)
 		sk->sk_frag.page = NULL;
 	}
 
-	if (sk->sk_peer_cred)
-		put_cred(sk->sk_peer_cred);
+	/* We do not need to acquire sk->sk_peer_lock, we are the last user. */
+	put_cred(sk->sk_peer_cred);
 	put_pid(sk->sk_peer_pid);
+
 	if (likely(sk->sk_net_refcnt))
 		put_net(sock_net(sk));
 	sk_prot_free(sk->sk_prot_creator, sk);
@@ -2045,6 +2131,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 	newsk->sk_dst_pending_confirm = 0;
 	newsk->sk_wmem_queued	= 0;
 	newsk->sk_forward_alloc = 0;
+	newsk->sk_reserved_mem  = 0;
 	atomic_set(&newsk->sk_drops, 0);
 	newsk->sk_send_head	= NULL;
 	newsk->sk_userlocks	= sk->sk_userlocks & ~SOCK_BINDPORT_LOCK;
@@ -3145,6 +3232,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 
 	sk->sk_peer_pid 	=	NULL;
 	sk->sk_peer_cred	=	NULL;
+	spin_lock_init(&sk->sk_peer_lock);
+
 	sk->sk_write_pending	=	0;
 	sk->sk_rcvlowat		=	1;
 	sk->sk_rcvtimeo		=	MAX_SCHEDULE_TIMEOUT;
@@ -3210,24 +3299,8 @@ void release_sock(struct sock *sk)
 }
 EXPORT_SYMBOL(release_sock);
 
-/**
- * lock_sock_fast - fast version of lock_sock
- * @sk: socket
- *
- * This version should be used for very small section, where process wont block
- * return false if fast path is taken:
- *
- *   sk_lock.slock locked, owned = 0, BH disabled
- *
- * return true if slow path is taken:
- *
- *   sk_lock.slock unlocked, owned = 1, BH enabled
- */
-bool lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock)
+bool __lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock)
 {
-	/* The sk_lock has mutex_lock() semantics here. */
-	mutex_acquire(&sk->sk_lock.dep_map, 0, 0, _RET_IP_);
-
 	might_sleep();
 	spin_lock_bh(&sk->sk_lock.slock);
 
@@ -3256,7 +3329,7 @@ bool lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock)
 	spin_unlock_bh(&sk->sk_lock.slock);
 	return true;
 }
-EXPORT_SYMBOL(lock_sock_fast);
+EXPORT_SYMBOL(__lock_sock_fast);
 
 int sock_gettstamp(struct socket *sock, void __user *userstamp,
 		   bool timeval, bool time32)
