@@ -269,6 +269,7 @@ struct bpf_local_storage;
   *	@sk_omem_alloc: "o" is "option" or "other"
   *	@sk_wmem_queued: persistent queue size
   *	@sk_forward_alloc: space allocated forward
+  *	@sk_reserved_mem: space reserved and non-reclaimable for the socket
   *	@sk_napi_id: id of the last napi context to receive data for sk
   *	@sk_ll_usec: usecs to busypoll when there is no data
   *	@sk_allocation: allocation mode
@@ -409,6 +410,7 @@ struct sock {
 #define sk_rmem_alloc sk_backlog.rmem_alloc
 
 	int			sk_forward_alloc;
+	u32			sk_reserved_mem;
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	unsigned int		sk_ll_usec;
 	/* ===== mostly read cache line ===== */
@@ -484,8 +486,10 @@ struct sock {
 	u8			sk_prefer_busy_poll;
 	u16			sk_busy_poll_budget;
 #endif
+	spinlock_t		sk_peer_lock;
 	struct pid		*sk_peer_pid;
 	const struct cred	*sk_peer_cred;
+
 	long			sk_rcvtimeo;
 	ktime_t			sk_stamp;
 #if BITS_PER_LONG==32
@@ -1511,20 +1515,49 @@ sk_rmem_schedule(struct sock *sk, struct sk_buff *skb, int size)
 		skb_pfmemalloc(skb);
 }
 
+static inline int sk_unused_reserved_mem(const struct sock *sk)
+{
+	int unused_mem;
+
+	if (likely(!sk->sk_reserved_mem))
+		return 0;
+
+	unused_mem = sk->sk_reserved_mem - sk->sk_wmem_queued -
+			atomic_read(&sk->sk_rmem_alloc);
+
+	return unused_mem > 0 ? unused_mem : 0;
+}
+
 static inline void sk_mem_reclaim(struct sock *sk)
 {
+	int reclaimable;
+
 	if (!sk_has_account(sk))
 		return;
-	if (sk->sk_forward_alloc >= SK_MEM_QUANTUM)
-		__sk_mem_reclaim(sk, sk->sk_forward_alloc);
+
+	reclaimable = sk->sk_forward_alloc - sk_unused_reserved_mem(sk);
+
+	if (reclaimable >= SK_MEM_QUANTUM)
+		__sk_mem_reclaim(sk, reclaimable);
+}
+
+static inline void sk_mem_reclaim_final(struct sock *sk)
+{
+	sk->sk_reserved_mem = 0;
+	sk_mem_reclaim(sk);
 }
 
 static inline void sk_mem_reclaim_partial(struct sock *sk)
 {
+	int reclaimable;
+
 	if (!sk_has_account(sk))
 		return;
-	if (sk->sk_forward_alloc > SK_MEM_QUANTUM)
-		__sk_mem_reclaim(sk, sk->sk_forward_alloc - 1);
+
+	reclaimable = sk->sk_forward_alloc - sk_unused_reserved_mem(sk);
+
+	if (reclaimable > SK_MEM_QUANTUM)
+		__sk_mem_reclaim(sk, reclaimable - 1);
 }
 
 static inline void sk_mem_charge(struct sock *sk, int size)
@@ -1536,9 +1569,12 @@ static inline void sk_mem_charge(struct sock *sk, int size)
 
 static inline void sk_mem_uncharge(struct sock *sk, int size)
 {
+	int reclaimable;
+
 	if (!sk_has_account(sk))
 		return;
 	sk->sk_forward_alloc += size;
+	reclaimable = sk->sk_forward_alloc - sk_unused_reserved_mem(sk);
 
 	/* Avoid a possible overflow.
 	 * TCP send queues can make this happen, if sk_mem_reclaim()
@@ -1547,7 +1583,7 @@ static inline void sk_mem_uncharge(struct sock *sk, int size)
 	 * If we reach 2 MBytes, reclaim 1 MBytes right now, there is
 	 * no need to hold that much forward allocation anyway.
 	 */
-	if (unlikely(sk->sk_forward_alloc >= 1 << 21))
+	if (unlikely(reclaimable >= 1 << 21))
 		__sk_mem_reclaim(sk, 1 << 20);
 }
 
@@ -1617,7 +1653,7 @@ bool __lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock);
  * lock_sock_fast - fast version of lock_sock
  * @sk: socket
  *
- * This version should be used for very small section, where process won't block
+ * This version should be used for very small section, where process wont block
  * return false if fast path is taken:
  *
  *   sk_lock.slock locked, owned = 0, BH disabled
@@ -2373,6 +2409,7 @@ static inline void sk_stream_moderate_sndbuf(struct sock *sk)
 		return;
 
 	val = min(sk->sk_sndbuf, sk->sk_wmem_queued >> 1);
+	val = max_t(u32, val, sk_unused_reserved_mem(sk));
 
 	WRITE_ONCE(sk->sk_sndbuf, max_t(u32, val, SOCK_MIN_SNDBUF));
 }
