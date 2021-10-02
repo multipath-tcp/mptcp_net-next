@@ -1,2 +1,1 @@
-t/perf-ignore-deprecation-warning-when-using-libbpf-s-btf__get_from_id
 t/DO-NOT-MERGE-git-markup-net-next
