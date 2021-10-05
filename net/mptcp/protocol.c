@@ -2519,6 +2519,10 @@ static int __mptcp_init_sock(struct sock *sk)
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
 	timer_setup(&sk->sk_timer, mptcp_timeout_timer, 0);
 
+#if IS_ENABLED(CONFIG_KASAN)
+	sock_set_flag(sk, SOCK_RCU_FREE);
+#endif
+
 	return 0;
 }
 
@@ -2864,7 +2868,9 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 		WRITE_ONCE(msk->rcv_wnd_sent, ack_seq);
 	}
 
+#if !IS_ENABLED(CONFIG_KASAN)
 	sock_reset_flag(nsk, SOCK_RCU_FREE);
+#endif
 	/* will be fully established after successful MPC subflow creation */
 	inet_sk_state_store(nsk, TCP_SYN_RECV);
 
@@ -3522,6 +3528,12 @@ static int mptcp_napi_poll(struct napi_struct *napi, int budget)
 	return work_done;
 }
 
+#if IS_ENABLED(CONFIG_KASAN)
+#define MPTCP_USE_SLAB		0
+#else
+#define MPTCP_USE_SLAB		1
+#endif
+
 void __init mptcp_proto_init(void)
 {
 	struct mptcp_delegated_action *delegated;
@@ -3545,7 +3557,7 @@ void __init mptcp_proto_init(void)
 	mptcp_pm_init();
 	mptcp_token_init();
 
-	if (proto_register(&mptcp_prot, 1) != 0)
+	if (proto_register(&mptcp_prot, MPTCP_USE_SLAB) != 0)
 		panic("Failed to register MPTCP proto.\n");
 
 	inet_register_protosw(&mptcp_protosw);
@@ -3605,7 +3617,7 @@ int __init mptcp_proto_v6_init(void)
 	mptcp_v6_prot.destroy = mptcp_v6_destroy;
 	mptcp_v6_prot.obj_size = sizeof(struct mptcp6_sock);
 
-	err = proto_register(&mptcp_v6_prot, 1);
+	err = proto_register(&mptcp_v6_prot, MPTCP_USE_SLAB);
 	if (err)
 		return err;
 
