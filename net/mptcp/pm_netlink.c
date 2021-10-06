@@ -468,6 +468,8 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 	struct pm_nl_pernet *pernet;
 	unsigned int subflows_max;
 
+	WARN_ON_ONCE(READ_ONCE(msk->pm.userspace));
+
 	pernet = net_generic(sock_net(sk), pm_nl_pernet_id);
 
 	add_addr_signal_max = mptcp_pm_get_add_addr_signal_max(msk);
@@ -699,6 +701,8 @@ static void mptcp_pm_nl_rm_addr_or_subflow(struct mptcp_sock *msk,
 		 rm_type == MPTCP_MIB_RMADDR ? "address" : "subflow", rm_list->nr);
 
 	msk_owned_by_me(msk);
+
+	WARN_ON_ONCE(READ_ONCE(msk->pm.userspace));
 
 	if (!rm_list->nr)
 		return;
@@ -1243,6 +1247,8 @@ static bool mptcp_pm_remove_anno_addr(struct mptcp_sock *msk,
 {
 	struct mptcp_rm_list list = { .nr = 0 };
 	bool ret;
+
+	WARN_ON_ONCE(READ_ONCE(msk->pm.userspace));
 
 	list.ids[list.nr++] = addr->id;
 
