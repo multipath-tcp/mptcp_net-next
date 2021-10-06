@@ -197,6 +197,7 @@ struct mptcp_pm_data {
 	bool		accept_addr;
 	bool		accept_subflow;
 	bool		remote_deny_join_id0;
+	bool		userspace;
 	u8		add_addr_signaled;
 	u8		add_addr_accepted;
 	u8		local_addr_used;
