@@ -136,7 +136,7 @@ void mptcp_pm_fully_established(struct mptcp_sock *msk, const struct sock *ssk, 
 	 * racing paths - accept() and check_fully_established()
 	 * be sure to serve this event only once.
 	 */
-	if (READ_ONCE(pm->work_pending) &&
+	if (READ_ONCE(pm->work_pending) && !READ_ONCE(pm->userspace) &&
 	    !(msk->pm.status & BIT(MPTCP_PM_ALREADY_ESTABLISHED)))
 		mptcp_pm_schedule_work(msk, MPTCP_PM_ESTABLISHED);
 
@@ -161,7 +161,7 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 
 	pr_debug("msk=%p", msk);
 
-	if (!READ_ONCE(pm->work_pending))
+	if (!READ_ONCE(pm->work_pending) || READ_ONCE(pm->userspace))
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -187,6 +187,9 @@ void mptcp_pm_add_addr_received(struct mptcp_sock *msk,
 
 	mptcp_event_addr_announced(msk, addr);
 
+	if (READ_ONCE(pm->userspace))
+		return;
+
 	spin_lock_bh(&pm->lock);
 
 	if (!READ_ONCE(pm->accept_addr)) {
@@ -205,6 +208,9 @@ void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	pr_debug("msk=%p", msk);
+
+	if (READ_ONCE(pm->userspace))
+		return;
 
 	spin_lock_bh(&pm->lock);
 
@@ -232,6 +238,9 @@ void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
 
 	for (i = 0; i < rm_list->nr; i++)
 		mptcp_event_addr_removed(msk, rm_list->ids[i]);
+
+	if (READ_ONCE(pm->userspace))
+		return;
 
 	spin_lock_bh(&pm->lock);
 	mptcp_pm_schedule_work(msk, MPTCP_PM_RM_ADDR_RECEIVED);
