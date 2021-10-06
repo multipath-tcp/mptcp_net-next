@@ -753,13 +753,9 @@ void mptcp_pm_nl_rm_subflow_received(struct mptcp_sock *msk,
 	mptcp_pm_nl_rm_addr_or_subflow(msk, rm_list, MPTCP_MIB_RMSUBFLOW);
 }
 
-void mptcp_pm_nl_work(struct mptcp_sock *msk)
+static void mptcp_pm_kernel_work(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
-
-	msk_owned_by_me(msk);
-
-	spin_lock_bh(&msk->pm.lock);
 
 	pr_debug("msk=%p status=%x", msk, pm->status);
 	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
@@ -782,6 +778,45 @@ void mptcp_pm_nl_work(struct mptcp_sock *msk)
 		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
 		mptcp_pm_nl_subflow_established(msk);
 	}
+}
+
+static void mptcp_pm_userspace_work(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+
+	pr_debug("msk=%p status=%x", msk, pm->status);
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_RECEIVED);
+		WARN_ONCE(1, "Unexpected ADD_ADDR status in userspace PM mode");
+	}
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK)) {
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_SEND_ACK);
+		WARN_ONCE(1, "Unexpected ADD_ADDR retransmit status in userspace PM mode");
+	}
+	if (pm->status & BIT(MPTCP_PM_RM_ADDR_RECEIVED)) {
+		pm->status &= ~BIT(MPTCP_PM_RM_ADDR_RECEIVED);
+		WARN_ONCE(1, "Unexpected RM_ADDR status in userspace PM mode");
+	}
+	if (pm->status & BIT(MPTCP_PM_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_ESTABLISHED);
+		WARN_ONCE(1, "Unexpected established status in userspace PM mode");
+	}
+	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
+		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
+		WARN_ONCE(1, "Unexpected subflow established status in userspace PM mode");
+	}
+}
+
+void mptcp_pm_nl_work(struct mptcp_sock *msk)
+{
+	msk_owned_by_me(msk);
+
+	spin_lock_bh(&msk->pm.lock);
+
+	if (READ_ONCE(msk->pm.userspace))
+		mptcp_pm_userspace_work(msk);
+	else
+		mptcp_pm_kernel_work(msk);
 
 	spin_unlock_bh(&msk->pm.lock);
 }
