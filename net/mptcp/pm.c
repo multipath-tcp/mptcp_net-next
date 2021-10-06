@@ -367,6 +367,8 @@ void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
 
 void mptcp_pm_data_init(struct mptcp_sock *msk)
 {
+	struct sock *sk = (struct sock *)msk;
+
 	msk->pm.add_addr_signaled = 0;
 	msk->pm.add_addr_accepted = 0;
 	msk->pm.local_addr_used = 0;
@@ -378,7 +380,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	WRITE_ONCE(msk->pm.accept_addr, false);
 	WRITE_ONCE(msk->pm.accept_subflow, false);
 	WRITE_ONCE(msk->pm.remote_deny_join_id0, false);
-	WRITE_ONCE(msk->pm.userspace, false);
+	WRITE_ONCE(msk->pm.userspace, mptcp_userspace_pm_default(sock_net(sk)));
 	msk->pm.status = 0;
 
 	spin_lock_init(&msk->pm.lock);
