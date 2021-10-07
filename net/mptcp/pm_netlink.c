@@ -994,6 +994,7 @@ static const struct nla_policy mptcp_pm_policy[MPTCP_PM_ATTR_MAX + 1] = {
 	[MPTCP_PM_ATTR_RCV_ADD_ADDRS]	= { .type	= NLA_U32,	},
 	[MPTCP_PM_ATTR_SUBFLOWS]	= { .type	= NLA_U32,	},
 	[MPTCP_PM_ATTR_TOKEN]		= { .type	= NLA_U32,	},
+	[MPTCP_PM_ATTR_LOC_ID]		= { .type	= NLA_U8,	},
 };
 
 void mptcp_pm_nl_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
@@ -1701,6 +1702,43 @@ next:
 	return ret;
 }
 
+static int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
+{
+	struct nlattr *id = info->attrs[MPTCP_PM_ATTR_LOC_ID],
+		*token = info->attrs[MPTCP_PM_ATTR_TOKEN];
+	struct mptcp_sock *msk;
+	struct mptcp_rm_list rm_list = { .nr = 0 };
+	u32 _token;
+	u8 _id;
+
+	if (!id || !token) {
+		GENL_SET_ERR_MSG(info, "missing remove info");
+		return -EINVAL;
+	}
+
+	_id = nla_get_u8(id);
+	_token = nla_get_u32(token);
+
+	msk = mptcp_token_get_sock(sock_net(skb->sk), _token);
+	if (!msk) {
+		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
+		return -EINVAL;
+	}
+
+	rm_list.ids[rm_list.nr++] = _id;
+
+	lock_sock((struct sock *)msk);
+	spin_lock_bh(&msk->pm.lock);
+
+	msk->pm.userspace = true;
+	mptcp_pm_remove_addr(msk, &rm_list);
+
+	spin_unlock_bh(&msk->pm.lock);
+	release_sock((struct sock *)msk);
+
+	return 0;
+}
+
 static int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *addr = info->attrs[MPTCP_PM_ATTR_ADDR],
@@ -2075,6 +2113,11 @@ static const struct genl_small_ops mptcp_pm_ops[] = {
 	{
 		.cmd    = MPTCP_PM_CMD_ANNOUNCE,
 		.doit   = mptcp_nl_cmd_announce,
+		.flags  = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd    = MPTCP_PM_CMD_REMOVE,
+		.doit   = mptcp_nl_cmd_remove,
 		.flags  = GENL_ADMIN_PERM,
 	},
 };
