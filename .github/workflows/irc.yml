@@ -112,9 +112,7 @@ jobs:
         uses: octokit/request-action@v2.x
         id: status
         with:
-          route: GET /repos/{repo}/check-suites/{check_suite}/check-runs?status=completed
-          repo: ${{ github.repository }}
-          check_suite: ${{ github.event.check_suite.id }}
+          route: GET /repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed
           mediaType: '{"previews": ["antiope"]}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,8 +120,7 @@ jobs:
         uses: octokit/request-action@v2.x
         id: tags
         with:
-          route: GET /repos/{repo}/tags
-          repo: ${{ github.repository }}
+          route: GET /repos/${{ github.repository }}/tags
           mediaType: '{"previews": ["antiope"]}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
