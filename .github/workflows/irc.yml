@@ -130,9 +130,9 @@ jobs:
         id: cirrus
         run: |
           echo -n "::set-output name=conclusion_0::"
-          curl "${CHECK_0_URL}" 2>/dev/null || echo "0: Unable to get the conclusion"
+          echo "$(curl -q "${CHECK_0_URL}" || echo "0: Unable to get the conclusion")"
           echo -n "::set-output name=conclusion_1::"
-          curl "${CHECK_1_URL}" 2>/dev/null || echo "1: Unable to get the conclusion"
+          echo "$(curl -q "${CHECK_1_URL}" || echo "1: Unable to get the conclusion")"
         env:
           CHECK_0_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.status.outputs.data).check_runs[0].external_id }}/conclusion/conclusion.txt"
           CHECK_1_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.status.outputs.data).check_runs[1].external_id }}/conclusion/conclusion.txt"
