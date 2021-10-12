@@ -116,21 +116,15 @@ jobs:
           mediaType: '{"previews": ["antiope"]}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: get last tags
-        uses: octokit/request-action@v2.x
-        id: tags
-        with:
-          route: GET /repos/${{ github.repository }}/tags
-          mediaType: '{"previews": ["antiope"]}'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: get linked tag
         id: tag
         run: |
-          echo -n "::set-output name=tag::"
-          echo "${TAGS}" | jq -r '.[] | select(.commit.sha == "${SHA}").name'
+          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r '.[] | last(select(.object.sha == "${SHA}")).ref')
+          echo "Found: ${TAG}"
+          echo "::set-output name=tag::${TAG:10}"
         env:
-          TAGS: "${{ steps.tags.outputs.data }}"
+          ACCEPT: "Accept: application/vnd.github.v3+json"
+          URL: "https://api.github.com/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.check_suite.head_sha }}"
       - name: get conclusion
         id: cirrus
