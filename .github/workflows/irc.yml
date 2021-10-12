@@ -119,7 +119,7 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r '.[] | last(select(.object.sha == "${SHA}")).ref')
+          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG}"
           echo "::set-output name=tag::${TAG:10}"
         env:
