@@ -19,13 +19,19 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
+      - name: tag shortner
+        id: tag
+        run: |
+          echo "::set-output name=tag::${REF:10}"
+        env:
+          REF: ${{ github.event.ref }}
       - name: irc tag
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
           nickname: gh-tag-bot
-          message: "New tag available: ${{ github.event.ref }} (by ${{ github.actor }})"
+          message: "New tag available: ${{ steps.tag.outputs.tag }} (by ${{ github.actor }})"
 
   irc-issues:
     name: "IRC Issues"
