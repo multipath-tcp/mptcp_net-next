@@ -1,6 +1,8 @@
 name: "IRC Notifications"
 on:
-  create:
+  push:
+    tags:
+      - 'export/**'   # exclude patchew/** tags and branches
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
   workflow_run:
@@ -51,7 +53,7 @@ jobs:
 
   irc-build:
     name: "IRC Build"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/')
     runs-on: ubuntu-latest
     steps:
       - name: irc build
@@ -66,7 +68,7 @@ jobs:
 
   irc-build-error:
     name: "IRC Build Error"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && github.event.workflow_run.conclusion != 'success'
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/') && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
     steps:
       - name: irc build
@@ -96,7 +98,7 @@ jobs:
 
   irc-tests:
     name: "IRC Tests"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral' && github.event.check_suite.head_branch == 'export'
     runs-on: ubuntu-latest
     steps:
       # from: https://cirrus-ci.org/guide/notifications/
@@ -110,6 +112,23 @@ jobs:
           mediaType: '{"previews": ["antiope"]}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: get last tags
+        uses: octokit/request-action@v2.x
+        id: tags
+        with:
+          route: GET /repos/{repo}/tags
+          repo: ${{ github.repository }}
+          mediaType: '{"previews": ["antiope"]}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: get linked tag
+        id: tag
+        run: |
+          echo -n "::set-output name=tag::"
+          echo "${TAGS}" | jq -r '.[] | select(.commit.sha == "${SHA}").name'
+        env:
+          TAGS: "${{ steps.tags.outputs.data }}"
+          SHA: "${{ github.event.check_suite.head_sha }}"
       - name: get conclusion
         id: cirrus
         run: |
@@ -127,9 +146,10 @@ jobs:
           channel: "#mptcp-ci"
           nickname: gh-tests-bot
           message: |-
-            New Tests job validating ${{ github.event.check_suite.head_branch }} (by ${{ github.actor }}) just ended:
+            New Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
             - ${{ steps.cirrus.outputs.conclusion_0 }}: ${{ env.CHECK_0_URL }}
             - ${{ steps.cirrus.outputs.conclusion_1 }}: ${{ env.CHECK_1_URL }}
         env:
           CHECK_0_URL:  ${{ fromJson(steps.status.outputs.data).check_runs[0].details_url }}
           CHECK_1_URL:  ${{ fromJson(steps.status.outputs.data).check_runs[1].details_url }}
+        if: startsWith(steps.tag.outputs.tag, 'export/')
