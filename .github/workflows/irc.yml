@@ -106,16 +106,10 @@ jobs:
     name: "IRC Tests"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
     runs-on: ubuntu-latest
+    env:
+      ACCEPT: "Accept: application/vnd.github.v3+json"
+      URI: "https://api.github.com"
     steps:
-      # from: https://cirrus-ci.org/guide/notifications/
-      - name: get status
-        uses: octokit/request-action@v2.x
-        id: status
-        with:
-          route: GET /repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed
-          mediaType: '{"previews": ["antiope"]}'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: get linked tag
         id: tag
         run: |
@@ -123,20 +117,47 @@ jobs:
           echo "Found: ${TAG}"
           echo "::set-output name=tag::${TAG:10}"
         env:
-          ACCEPT: "Accept: application/vnd.github.v3+json"
-          URL: "https://api.github.com/repos/${{ github.repository }}/git/matching-refs/tags/"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.check_suite.head_sha }}"
-      - name: get conclusion
+
+      # inspired by: https://cirrus-ci.org/guide/notifications/
+      - name: get cirrus status
+        if: startsWith(steps.tag.outputs.tag, 'export/')
         id: cirrus
         run: |
-          echo -n "::set-output name=conclusion_0::"
-          echo "$(curl -q "${CHECK_0_URL}" || echo "0: Unable to get the conclusion")"
-          echo -n "::set-output name=conclusion_1::"
-          echo "$(curl -q "${CHECK_1_URL}" || echo "1: Unable to get the conclusion")"
+          curl -H "${ACCEPT}" "${URL}" > check-runs.json
+          jq -r '.check_runs[] | select(.conclusion != "neutral")' check-runs.json > check-runs_strip.json
+
+          i=0
+          for id in $(jq -r '.external_id' check-runs_strip.json); do
+            echo "${i}: Found ID: ${id}"
+            ccl_url="https://api.cirrus-ci.com/v1/artifact/task/${id}/conclusion/conclusion.txt"
+
+            echo -n "::set-output name=ccl_${i}::"
+            echo "$(curl -q "${ccl_url}" || echo "${i}: Unable to get the conclusion")"
+
+            i=$((i+1))
+          done
+
+          i=0
+          for url in $(jq -r '.details_url' check-runs_strip.json); do
+            echo "${i}: URL: ${url}"
+
+            echo "::set-output name=url_${i}::${url}"
+
+            i=$((i+1))
+          done
+
+          # extra debug if nothing was found
+          if [ ${i} -eq 0 ]; then
+            jq '.' check-runs.json
+            jq '.' check-runs_strip.json
+          fi
         env:
-          CHECK_0_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.status.outputs.data).check_runs[0].external_id }}/conclusion/conclusion.txt"
-          CHECK_1_URL: "https://api.cirrus-ci.com/v1/artifact/task/${{ fromJson(steps.status.outputs.data).check_runs[1].external_id }}/conclusion/conclusion.txt"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed"
+
       - name: irc tests
+        if: startsWith(steps.tag.outputs.tag, 'export/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
@@ -144,9 +165,5 @@ jobs:
           nickname: gh-tests-bot
           message: |-
             New Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
-            - ${{ steps.cirrus.outputs.conclusion_0 }}: ${{ env.CHECK_0_URL }}
-            - ${{ steps.cirrus.outputs.conclusion_1 }}: ${{ env.CHECK_1_URL }}
-        env:
-          CHECK_0_URL:  ${{ fromJson(steps.status.outputs.data).check_runs[0].details_url }}
-          CHECK_1_URL:  ${{ fromJson(steps.status.outputs.data).check_runs[1].details_url }}
-        if: startsWith(steps.tag.outputs.tag, 'export/')
+            - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
+            - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
