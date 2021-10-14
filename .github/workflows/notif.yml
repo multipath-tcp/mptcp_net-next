@@ -256,6 +256,10 @@ jobs:
 
           SHA="${{ github.event.workflow_run.head_sha }}"
           echo "::set-output name=sha::${SHA:12}"
+
+          COMMITTER=$(jq -r '.committer.name' commit.json)
+          echo "Found committer: '${COMMITTER}'"
+          echo "::set-output name=committer::${COMMITTER}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
@@ -290,7 +294,7 @@ jobs:
               - Task: ${{ steps.cirrus.outputs.url_1 }}
               - Summary: ${{ steps.cirrus.outputs.sum_1 }}
 
-            Initiator: ${{ github.actor }}
+            Initiator: ${{ steps.commit.outputs.committer }}
             Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Please note that some efforts might still be needed to stabilise the tests
