@@ -90,7 +90,7 @@ jobs:
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
-      - name: get message-id
+      - name: get commit info
         if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
         id: commit
         run: |
@@ -107,8 +107,11 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=name::${NAME%% *}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "::set-output name=sha::${SHA:12}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
@@ -139,9 +142,7 @@ jobs:
 
             Status: ${{ github.event.workflow_run.conclusion }}
             Initiator: ${{ github.actor }}
-            Ref: ${{ github.event.workflow_run.head_branch }}
-            Commits: https://github.com/${{ github.repository }}/commits/${{ github.event.workflow_run.head_branch }}
-            Tree: https://github.com/${{ github.repository }}/tree/${{ github.event.workflow_run.head_branch }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Feel free to reply to this email if you cannot access logs, if you need
             some support to fix the error, if this doesn't seem to be caused by your
@@ -231,7 +232,7 @@ jobs:
             - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
             - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
 
-      - name: get message-id
+      - name: get commit info
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
@@ -248,8 +249,11 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=name::${NAME%% *}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "::set-output name=sha::${SHA:12}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
@@ -283,9 +287,7 @@ jobs:
               - Summary: ${{ steps.cirrus.outputs.sum_1 }}
 
             Initiator: ${{ github.actor }}
-            Ref: ${{ steps.tag.outputs.tag }}
-            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.tag.outputs.tag }}
-            Tree: https://github.com/${{ github.repository }}/tree/${{ steps.tag.outputs.tag }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Please note that some efforts might still be needed to stabilise the tests
             suite when ran on a public CI like here. It is then possible some reported
