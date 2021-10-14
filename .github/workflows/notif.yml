@@ -16,6 +16,7 @@ on:
 env:
   ACCEPT: "Accept: application/vnd.github.v3+json"
   URI: "https://api.github.com"
+  PW: "https://patchwork.kernel.org/api/1.2"
 
 jobs:
   tag:
@@ -63,10 +64,11 @@ jobs:
 
   build:
     name: "Build"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/')
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
     runs-on: ubuntu-latest
     steps:
       - name: irc build
+        if: startsWith(github.event.workflow_run.head_branch, 'export/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
@@ -74,6 +76,32 @@ jobs:
           nickname: gh-build-bot
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
+
+      - name: set patchwork check
+        if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
+        run: |
+          MID="$(curl -H "${ACCEPT}" "${URL_GH}" | jq -r '.message' | tail -n1 | awk '{ print $1}')"
+          MID="${MID:1:-1}"
+          CHECK_URL="$(curl "${URL_PW}/${MID}" | jq -r 'last(.[].checks)')"
+
+          echo "Found: ${MID} - ${CHECK_URL}"
+
+          if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+            STATE="success"
+          else
+            STATE="fail"
+          fi
+
+          curl -X POST \
+            -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+            -F "state=${STATE}" \
+            -F "target_url=${{ github.event.workflow_run.html_url }}" \
+            -F "context=build" \
+            -F "description=${{ github.event.workflow_run.name }}" \
+            "${CHECK_URL}" | jq '.'
+        env:
+          URL_GH: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
 
   build-error:
     name: "Build Error"
@@ -90,7 +118,7 @@ jobs:
           message: |-
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
-      - name: get message-id
+      - name: get commit info
         if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
         id: commit
         run: |
@@ -98,7 +126,7 @@ jobs:
 
           read -r TAG MID < <(jq -r '.message' commit.json | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
-          echo "::set-output name=mid::${MID}"
+          echo "::set-output name=mid::${MID:1:-1}"
 
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
@@ -107,8 +135,11 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=name::${NAME%% *}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "::set-output name=sha::${SHA:12}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
@@ -124,7 +155,7 @@ jobs:
           cc: mptcp@lists.linux.dev
           from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
-          in_reply_to: ${{ steps.commit.outputs.mid }}
+          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
           subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
           body: |
             Hi ${{ steps.commit.outputs.name }},
@@ -139,9 +170,7 @@ jobs:
 
             Status: ${{ github.event.workflow_run.conclusion }}
             Initiator: ${{ github.actor }}
-            Ref: ${{ github.event.workflow_run.head_branch }}
-            Commits: https://github.com/${{ github.repository }}/commits/${{ github.event.workflow_run.head_branch }}
-            Tree: https://github.com/${{ github.repository }}/tree/${{ github.event.workflow_run.head_branch }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Feel free to reply to this email if you cannot access logs, if you need
             some support to fix the error, if this doesn't seem to be caused by your
@@ -194,9 +223,11 @@ jobs:
             url_ccl="${url_base}/conclusion/conclusion.txt"
             url_sum="${url_base}/summary/summary.txt"
 
-            echo -n "::set-output name=ccl_${i}::"
-            echo "$(curl -q "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
+            ccl="$(curl "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
 
+            echo "::set-output name=ccl_${i}::${ccl}"
+            echo -n "::set-output name=ccl_title_${i}::"; echo "${ccl}" | cut -d: -f1-2
+            echo -n "::set-output name=ccl_status_${i}::"; echo "${ccl}" | cut -d: -f3- | sed 's/^ //'
             echo "::set-output name=sum_${i}::${url_sum}"
 
             i=$((i+1))
@@ -231,7 +262,7 @@ jobs:
             - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
             - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
 
-      - name: get message-id
+      - name: get commit info
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
@@ -239,7 +270,7 @@ jobs:
 
           read -r TAG MID < <(jq -r '.message' commit.json | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
-          echo "::set-output name=mid::${MID}"
+          echo "::set-output name=mid::${MID:1:-1}"
 
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
@@ -248,8 +279,15 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=name::${NAME%% *}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
+
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "::set-output name=sha::${SHA:12}"
+
+          COMMITTER=$(jq -r '.committer.name' commit.json)
+          echo "Found committer: '${COMMITTER}'"
+          echo "::set-output name=committer::${COMMITTER}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
@@ -265,7 +303,7 @@ jobs:
           cc: mptcp@lists.linux.dev
           from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
-          in_reply_to: ${{ steps.commit.outputs.mid }}
+          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
           subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
           body: |
             Hi ${{ steps.commit.outputs.name }},
@@ -274,18 +312,18 @@ jobs:
 
             Our CI did some validations and here is its report:
 
-            - ${{ steps.cirrus.outputs.ccl_0 }}:
+            - ${{ steps.cirrus.outputs.ccl_title_0 }}:
+              - ${{ steps.cirrus.outputs.ccl_status_0 }}:
               - Task: ${{ steps.cirrus.outputs.url_0 }}
               - Summary: ${{ steps.cirrus.outputs.sum_0 }}
 
-            - ${{ steps.cirrus.outputs.ccl_1 }}:
+            - ${{ steps.cirrus.outputs.ccl_title_1 }}:
+              - ${{ steps.cirrus.outputs.ccl_status_1 }}:
               - Task: ${{ steps.cirrus.outputs.url_1 }}
               - Summary: ${{ steps.cirrus.outputs.sum_1 }}
 
-            Initiator: ${{ github.actor }}
-            Ref: ${{ steps.tag.outputs.tag }}
-            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.tag.outputs.tag }}
-            Tree: https://github.com/${{ github.repository }}/tree/${{ steps.tag.outputs.tag }}
+            Initiator: ${{ steps.commit.outputs.committer }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Please note that some efforts might still be needed to stabilise the tests
             suite when ran on a public CI like here. It is then possible some reported
@@ -294,3 +332,31 @@ jobs:
 
             Cheers,
             MPTCP GH Action bot
+
+      - name: set patchwork check
+        if: startsWith(steps.tag.outputs.tag, 'patchew/')
+        run: |
+          CHECK_URL="$(curl "${URL}" | jq -r 'last(.[].checks)')"
+          echo "Found: ${CHECK_URL}"
+
+          # $1: title, $2: status, $3: url
+          submit() {
+            if [[ "${2}" == "Success"* ]]; then
+              STATE="success"
+            else
+              STATE="fail"
+            fi
+
+            curl -X POST \
+              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+              -F "state=${STATE}" \
+              -F "target_url=${3}" \
+              -F "context=${1//[ :]/_}" \
+              -F "description=${2}" \
+              "${CHECK_URL}" | jq '.'
+          }
+
+          submit "${{ steps.cirrus.outputs.ccl_title_0 }}" "${{ steps.cirrus.outputs.ccl_status_0 }}" "${{ steps.cirrus.outputs.url_0 }}"
+          submit "${{ steps.cirrus.outputs.ccl_title_1 }}" "${{ steps.cirrus.outputs.ccl_status_1 }}" "${{ steps.cirrus.outputs.url_1 }}"
+        env:
+          URL: "{{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
