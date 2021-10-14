@@ -69,8 +69,7 @@ jobs:
           channel: "#mptcp-ci"
           nickname: gh-build-bot
           message: |-
-            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
-            ${{ github.event.workflow_run.html_url }}
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   build-error:
     name: "Build Error"
@@ -84,8 +83,7 @@ jobs:
           channel: "#mptcp"
           nickname: gh-build-bot
           message: |-
-            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}
-            ${{ github.event.workflow_run.html_url }}
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   topgit:
     name: "TopGit"
