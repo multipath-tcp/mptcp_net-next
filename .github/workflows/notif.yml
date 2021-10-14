@@ -195,9 +195,11 @@ jobs:
             url_ccl="${url_base}/conclusion/conclusion.txt"
             url_sum="${url_base}/summary/summary.txt"
 
-            echo -n "::set-output name=ccl_${i}::"
-            echo "$(curl -q "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
+            ccl="$(curl "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
 
+            echo "::set-output name=ccl_${i}::${ccl}"
+            echo -n "::set-output name=ccl_title_${i}::"; echo "${ccl}" | cut -d: -f1-2
+            echo -n "::set-output name=ccl_status_${i}::"; echo "${ccl}" | cut -d: -f3-
             echo "::set-output name=sum_${i}::${url_sum}"
 
             i=$((i+1))
@@ -278,11 +280,13 @@ jobs:
 
             Our CI did some validations and here is its report:
 
-            - ${{ steps.cirrus.outputs.ccl_0 }}:
+            - ${{ steps.cirrus.outputs.ccl_title_0 }}:
+              - ${{ steps.cirrus.outputs.ccl_status_0 }}:
               - Task: ${{ steps.cirrus.outputs.url_0 }}
               - Summary: ${{ steps.cirrus.outputs.sum_0 }}
 
-            - ${{ steps.cirrus.outputs.ccl_1 }}:
+            - ${{ steps.cirrus.outputs.ccl_title_1 }}:
+              - ${{ steps.cirrus.outputs.ccl_status_1 }}:
               - Task: ${{ steps.cirrus.outputs.url_1 }}
               - Summary: ${{ steps.cirrus.outputs.sum_1 }}
 
