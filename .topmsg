@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Avoid-NULL-dereference-in-mptcp_getsockopt_subflow_addrs
+From: Tim Gardner <tim.gardner@canonical.com>
+Subject: [PATCH] mptcp: Avoid NULL dereference in mptcp_getsockopt_subflow_addrs()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Coverity complains of a possible NULL dereference in
+mptcp_getsockopt_subflow_addrs():
+
+ 861       } else if (sk->sk_family == AF_INET6) {
+    	3. returned_null: inet6_sk returns NULL. [show details]
+    	4. var_assigned: Assigning: np = NULL return value from inet6_sk.
+ 862                const struct ipv6_pinfo *np = inet6_sk(sk);
+
+Fix this by checking for NULL.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/231
+Fixes: c11c5906bc0a ("mptcp: add MPTCP_SUBFLOW_ADDRS getsockopt support")
+Cc: Florian Westphal <fw@strlen.de>
+Signed-off-by: Tim Gardner <tim.gardner@canonical.com>
+[mjm: Added WARN_ON_ONCE() to the unexpected case]
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
