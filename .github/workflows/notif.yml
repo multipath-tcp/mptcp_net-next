@@ -107,6 +107,7 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "::set-output name=name::${NAME}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
@@ -126,7 +127,7 @@ jobs:
           in_reply_to: ${{ steps.commit.outputs.mid }}
           subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
           body: |
-            Hello,
+            Hi ${{ steps.commit.outputs.name }},
 
             Thank you for your modifications, that's great!
 
@@ -247,6 +248,7 @@ jobs:
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "::set-output name=name::${NAME}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
@@ -266,7 +268,7 @@ jobs:
           in_reply_to: ${{ steps.commit.outputs.mid }}
           subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
           body: |
-            Hello,
+            Hi ${{ steps.commit.outputs.name }},
 
             Thank you for your modifications, that's great!
 
