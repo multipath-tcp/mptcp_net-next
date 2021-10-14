@@ -190,10 +190,14 @@ jobs:
           i=0
           for id in $(jq -r '.external_id' check-runs_strip.json); do
             echo "${i}: Found ID: ${id}"
-            ccl_url="https://api.cirrus-ci.com/v1/artifact/task/${id}/conclusion/conclusion.txt"
+            url_base="https://api.cirrus-ci.com/v1/artifact/task/${id}"
+            url_ccl="${url_base}/conclusion/conclusion.txt"
+            url_sum="${url_base}/summary/summary.txt"
 
             echo -n "::set-output name=ccl_${i}::"
-            echo "$(curl -q "${ccl_url}" || echo "${i}: Unable to get the conclusion")"
+            echo "$(curl -q "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
+
+            echo "::set-output name=sum_${i}::${url_sum}"
 
             i=$((i+1))
           done
@@ -269,8 +273,13 @@ jobs:
 
             Our CI did some validations and here is its report:
 
-            - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
-            - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
+            - ${{ steps.cirrus.outputs.ccl_0 }}:
+              - Task: ${{ steps.cirrus.outputs.url_0 }}
+              - Summary: ${{ steps.cirrus.outputs.sum_0 }}
+
+            - ${{ steps.cirrus.outputs.ccl_1 }}:
+              - Task: ${{ steps.cirrus.outputs.url_1 }}
+              - Summary: ${{ steps.cirrus.outputs.sum_1 }}
 
             Initiator: ${{ github.actor }}
             Ref: ${{ steps.tag.outputs.tag }}
