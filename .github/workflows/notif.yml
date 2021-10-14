@@ -1,0 +1,296 @@
+name: "Notifications"
+on:
+  push:
+    tags:
+      - 'export/**'   # exclude patchew/** tags and branches
+  issues:
+    types: [opened, reopened, closed, assigned, unassigned]
+  workflow_run:
+    workflows: ["MPTCP Upstream Build Validation", "Update TopGit tree"]
+    types:
+      - completed
+  check_suite:
+    types:
+      - completed
+
+env:
+  ACCEPT: "Accept: application/vnd.github.v3+json"
+  URI: "https://api.github.com"
+
+jobs:
+  tag:
+    name: "Tag"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag shortner
+        id: tag
+        run: |
+          echo "::set-output name=tag::${REF:10}"
+        env:
+          REF: ${{ github.event.ref }}
+      - name: irc tag
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tag-bot
+          message: "New tag available: ${{ steps.tag.outputs.tag }} (by ${{ github.actor }})"
+
+  issues:
+    name: "Issues"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: issue info
+        id: info
+        if: github.event.action != 'opened'
+        run: |
+          echo "::set-output name=opener::, opened by ${OPENER}"
+          echo "::set-output name=assignee::${ASSIGNEE:+ and assigned to ${ASSIGNEE}}"
+        env:
+          OPENER: ${{ github.event.issue.user.login }}
+          ASSIGNEE: ${{ github.event.assignee.login }}
+      - name: irc issues
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-issues-bot
+          message: |-
+            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ steps.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
+            ${{ github.event.issue.html_url }}
+
+  build:
+    name: "Build"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc build
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-build-bot
+          message: |-
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
+
+  build-error:
+    name: "Build Error"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc build
+        if: startsWith(github.event.workflow_run.head_branch, 'export/')
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-build-bot
+          message: |-
+            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
+
+      - name: get message-id
+        if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
+        id: commit
+        run: |
+          curl -H "${ACCEPT}" "${URL}" > commit.json
+
+          read -r TAG MID < <(jq -r '.message' commit.json | tail -n1)
+          echo "Found message ID: '${TAG}' '${MID}'"
+          echo "::set-output name=mid::${MID}"
+
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+          echo "Found subject: '${SUBJECT}'"
+          echo "::set-output name=subject::${SUBJECT}"
+
+          NAME=$(jq -r '.author.name' commit.json)
+          EMAIL=$(jq -r '.author.email' commit.json)
+          echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=author::${NAME} <${EMAIL}>"
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
+
+      - name: send email
+        if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
+        uses: matttbe/action-send-mail@in_reply_to
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: ${{ steps.commit.outputs.mid }}
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
+          body: |
+            Hi ${{ steps.commit.outputs.name }},
+
+            Thank you for your modifications, that's great!
+
+            But sadly, our CI spotted some issues with it when trying to build it.
+
+            You can find more details there:
+
+              ${{ github.event.workflow_run.html_url }}
+
+            Status: ${{ github.event.workflow_run.conclusion }}
+            Initiator: ${{ github.actor }}
+            Ref: ${{ github.event.workflow_run.head_branch }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ github.event.workflow_run.head_branch }}
+            Tree: https://github.com/${{ github.repository }}/tree/${{ github.event.workflow_run.head_branch }}
+
+            Feel free to reply to this email if you cannot access logs, if you need
+            some support to fix the error, if this doesn't seem to be caused by your
+            modifications or if the error is a false positive one.
+
+            Cheers,
+            MPTCP GH Action bot
+
+  topgit:
+    name: "TopGit"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Update TopGit tree' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc topgit
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-topgit-bot
+          message: |-
+            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
+            ${{ github.event.workflow_run.html_url }}
+
+  tests:
+    name: "Tests"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
+    runs-on: ubuntu-latest
+    steps:
+      - name: get linked tag
+        id: tag
+        run: |
+          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA})"
+          echo "::set-output name=tag::${TAG:10}"
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.event.check_suite.head_sha }}"
+
+      # inspired by: https://cirrus-ci.org/guide/notifications/
+      - name: get cirrus status
+        id: cirrus
+        run: |
+          curl -H "${ACCEPT}" "${URL}" > check-runs.json
+          jq -r '.check_runs[] | select(.conclusion != "neutral")' check-runs.json > check-runs_strip.json
+
+          i=0
+          for id in $(jq -r '.external_id' check-runs_strip.json); do
+            echo "${i}: Found ID: ${id}"
+            url_base="https://api.cirrus-ci.com/v1/artifact/task/${id}"
+            url_ccl="${url_base}/conclusion/conclusion.txt"
+            url_sum="${url_base}/summary/summary.txt"
+
+            echo -n "::set-output name=ccl_${i}::"
+            echo "$(curl -q "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
+
+            echo "::set-output name=sum_${i}::${url_sum}"
+
+            i=$((i+1))
+          done
+
+          i=0
+          for url in $(jq -r '.details_url' check-runs_strip.json); do
+            echo "${i}: URL: ${url}"
+
+            echo "::set-output name=url_${i}::${url}"
+
+            i=$((i+1))
+          done
+
+          # extra debug if nothing was found
+          if [ ${i} -eq 0 ]; then
+            jq '.' check-runs.json
+            jq '.' check-runs_strip.json
+          fi
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed"
+
+      - name: irc tests
+        if: startsWith(steps.tag.outputs.tag, 'export/')
+        uses: rectalogic/notify-irc@v1
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tests-bot
+          message: |-
+            New Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
+            - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
+            - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
+
+      - name: get message-id
+        if: startsWith(steps.tag.outputs.tag, 'patchew/')
+        id: commit
+        run: |
+          curl -H "${ACCEPT}" "${URL}" > commit.json
+
+          read -r TAG MID < <(jq -r '.message' commit.json | tail -n1)
+          echo "Found message ID: '${TAG}' '${MID}'"
+          echo "::set-output name=mid::${MID}"
+
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+          echo "Found subject: '${SUBJECT}'"
+          echo "::set-output name=subject::${SUBJECT}"
+
+          NAME=$(jq -r '.author.name' commit.json)
+          EMAIL=$(jq -r '.author.email' commit.json)
+          echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "::set-output name=name::${NAME}"
+          echo "::set-output name=author::${NAME} <${EMAIL}>"
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
+
+      - name: send email
+        if: startsWith(steps.tag.outputs.tag, 'patchew/')
+        uses: matttbe/action-send-mail@in_reply_to
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: ${{ steps.commit.outputs.mid }}
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
+          body: |
+            Hi ${{ steps.commit.outputs.name }},
+
+            Thank you for your modifications, that's great!
+
+            Our CI did some validations and here is its report:
+
+            - ${{ steps.cirrus.outputs.ccl_0 }}:
+              - Task: ${{ steps.cirrus.outputs.url_0 }}
+              - Summary: ${{ steps.cirrus.outputs.sum_0 }}
+
+            - ${{ steps.cirrus.outputs.ccl_1 }}:
+              - Task: ${{ steps.cirrus.outputs.url_1 }}
+              - Summary: ${{ steps.cirrus.outputs.sum_1 }}
+
+            Initiator: ${{ github.actor }}
+            Ref: ${{ steps.tag.outputs.tag }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.tag.outputs.tag }}
+            Tree: https://github.com/${{ github.repository }}/tree/${{ steps.tag.outputs.tag }}
+
+            Please note that some efforts might still be needed to stabilise the tests
+            suite when ran on a public CI like here. It is then possible some reported
+            issues are not due to your modifications. Do not hesitate to help us
+            improving that ;-)
+
+            Cheers,
+            MPTCP GH Action bot
