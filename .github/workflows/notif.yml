@@ -343,6 +343,8 @@ jobs:
           submit() {
             if [[ "${2}" == "Success"* ]]; then
               STATE="success"
+            elif [[ "${2}" == "Unstable"* ]]; then
+              STATE="warning"
             else
               STATE="fail"
             fi
