@@ -1,4 +1,4 @@
-name: "IRC Notifications"
+name: "Notifications"
 on:
   push:
     tags:
@@ -14,8 +14,8 @@ on:
       - completed
 
 jobs:
-  irc-tag:
-    name: "IRC Tag"
+  tag:
+    name: "Tag"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -33,8 +33,8 @@ jobs:
           nickname: gh-tag-bot
           message: "New tag available: ${{ steps.tag.outputs.tag }} (by ${{ github.actor }})"
 
-  irc-issues:
-    name: "IRC Issues"
+  issues:
+    name: "Issues"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
     runs-on: ubuntu-latest
     steps:
@@ -57,8 +57,8 @@ jobs:
             Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ steps.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
             ${{ github.event.issue.html_url }}
 
-  irc-build:
-    name: "IRC Build"
+  build:
+    name: "Build"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/')
     runs-on: ubuntu-latest
     steps:
@@ -72,8 +72,8 @@ jobs:
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}
             ${{ github.event.workflow_run.html_url }}
 
-  irc-build-error:
-    name: "IRC Build Error"
+  build-error:
+    name: "Build Error"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && startsWith(github.event.workflow_run.head_branch, 'export/') && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
     steps:
@@ -87,8 +87,8 @@ jobs:
             New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}
             ${{ github.event.workflow_run.html_url }}
 
-  irc-topgit:
-    name: "IRC TopGit"
+  topgit:
+    name: "TopGit"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Update TopGit tree' && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
     steps:
@@ -102,8 +102,8 @@ jobs:
             New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
             ${{ github.event.workflow_run.html_url }}
 
-  irc-tests:
-    name: "IRC Tests"
+  tests:
+    name: "Tests"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
     runs-on: ubuntu-latest
     env:
