@@ -122,7 +122,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           to: ${{ steps.commit.outputs.author }}
           cc: mptcp@lists.linux.dev
-          from: MPTCP CI <noreply@github.com>
+          from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
           in_reply_to: ${{ steps.commit.outputs.mid }}
           subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
@@ -263,7 +263,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           to: ${{ steps.commit.outputs.author }}
           cc: mptcp@lists.linux.dev
-          from: MPTCP CI <noreply@github.com>
+          from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
           in_reply_to: ${{ steps.commit.outputs.mid }}
           subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
