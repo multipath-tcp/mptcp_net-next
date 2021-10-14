@@ -124,7 +124,7 @@ jobs:
           from: MPTCP CI <noreply@github.com>
           reply_to: mptcp@lists.linux.dev
           in_reply_to: ${{ steps.commit.outputs.mid }}
-          subject: Re: ${{ steps.commit.outputs.subject }}: Build Failure
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
           body: |
             Hello,
 
@@ -265,7 +265,7 @@ jobs:
           from: MPTCP CI <noreply@github.com>
           reply_to: mptcp@lists.linux.dev
           in_reply_to: ${{ steps.commit.outputs.mid }}
-          subject: Re: ${{ steps.commit.outputs.subject }}: Tests Results
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
           body: |
             Hello,
 
