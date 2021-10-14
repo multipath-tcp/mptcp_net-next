@@ -181,7 +181,6 @@ jobs:
 
       # inspired by: https://cirrus-ci.org/guide/notifications/
       - name: get cirrus status
-        if: startsWith(steps.tag.outputs.tag, 'export/')
         id: cirrus
         run: |
           curl -H "${ACCEPT}" "${URL}" > check-runs.json
