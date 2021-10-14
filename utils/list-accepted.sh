@@ -18,6 +18,8 @@ echo "== Accepted in our repo =="
 list Accepted
 echo "== Deferred =="
 list Deferred
+echo "== Handled elsewhere =="
+list handled-elsewhere
 echo "== Mainlined =="
 list Mainlined
 echo "== Not Applicable =="

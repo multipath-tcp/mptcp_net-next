@@ -24,6 +24,7 @@ elif is_pw patch "${1}" \
 		 --state "under-review" \
 		 --state "queued" \
 		 --state "mainlined" \
+		 --state "handled-elsewhere" \
 		 --state "deferred"; then
 	echo "patch"
 else
