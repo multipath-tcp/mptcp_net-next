@@ -109,7 +109,7 @@ jobs:
           echo "Found author: '${NAME}' '${EMAIL}'"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
         env:
-          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.sha }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
       - name: send email
         if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
@@ -173,7 +173,7 @@ jobs:
         id: tag
         run: |
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
-          echo "Found: ${TAG}"
+          echo "Found: ${TAG} (${SHA})"
           echo "::set-output name=tag::${TAG:10}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
@@ -250,7 +250,7 @@ jobs:
           echo "Found author: '${NAME}' '${EMAIL}'"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
         env:
-          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.sha }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
       - name: send email
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
