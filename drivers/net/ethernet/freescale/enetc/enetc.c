@@ -7,6 +7,7 @@
 #include <linux/udp.h>
 #include <linux/vmalloc.h>
 #include <linux/ptp_classify.h>
+#include <net/ip6_checksum.h>
 #include <net/pkt_sched.h>
 #include <net/tso.h>
 
@@ -1766,8 +1767,10 @@ static int enetc_alloc_txbdr(struct enetc_bdr *txr)
 					      txr->bd_count * TSO_HEADER_SIZE,
 					      &txr->tso_headers_dma,
 					      GFP_KERNEL);
-	if (err)
+	if (!txr->tso_headers) {
+		err = -ENOMEM;
 		goto err_alloc_tso;
+	}
 
 	txr->next_to_clean = 0;
 	txr->next_to_use = 0;
