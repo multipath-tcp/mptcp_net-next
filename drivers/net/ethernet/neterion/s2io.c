@@ -5217,7 +5217,7 @@ static int s2io_set_mac_addr(struct net_device *dev, void *p)
  *  as defined in errno.h file on failure.
  */
 
-static int do_s2io_prog_unicast(struct net_device *dev, u8 *addr)
+static int do_s2io_prog_unicast(struct net_device *dev, const u8 *addr)
 {
 	struct s2io_nic *sp = netdev_priv(dev);
 	register u64 mac_addr = 0, perm_addr = 0;
@@ -8566,7 +8566,7 @@ static void s2io_io_resume(struct pci_dev *pdev)
 			return;
 		}
 
-		if (s2io_set_mac_addr(netdev, netdev->dev_addr) == FAILURE) {
+		if (do_s2io_prog_unicast(netdev, netdev->dev_addr) == FAILURE) {
 			s2io_card_down(sp);
 			pr_err("Can't restore mac addr after reset.\n");
 			return;
