@@ -234,8 +234,6 @@ static inline void eth_random_addr(u8 *addr)
 	addr[0] |= 0x02;	/* set local assignment bit (IEEE802) */
 }
 
-#define random_ether_addr(addr) eth_random_addr(addr)
-
 /**
  * eth_broadcast_addr - Assign broadcast address
  * @addr: Pointer to a six-byte array containing the Ethernet address
@@ -269,8 +267,11 @@ static inline void eth_zero_addr(u8 *addr)
  */
 static inline void eth_hw_addr_random(struct net_device *dev)
 {
+	u8 addr[ETH_ALEN];
+
+	eth_random_addr(addr);
+	__dev_addr_set(dev, addr, ETH_ALEN);
 	dev->addr_assign_type = NET_ADDR_RANDOM;
-	eth_random_addr(dev->dev_addr);
 }
 
 /**
