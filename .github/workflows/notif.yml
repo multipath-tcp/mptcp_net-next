@@ -191,8 +191,7 @@ jobs:
           channel: "#mptcp"
           nickname: gh-topgit-bot
           message: |-
-            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
-            ${{ github.event.workflow_run.html_url }}
+            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   tests:
     name: "Tests"
