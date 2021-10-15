@@ -80,9 +80,9 @@ jobs:
       - name: set patchwork check
         if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
         run: |
-          MID="$(curl -H "${ACCEPT}" "${URL_GH}" | jq -r '.message' | tail -n1 | awk '{ print $1}')"
+          MID="$(curl -H "${ACCEPT}" "${URL_GH}" | jq -r '.message' | tail -n1 | awk '{ print $2}')"
           MID="${MID:1:-1}"
-          CHECK_URL="$(curl "${URL_PW}/${MID}" | jq -r 'last(.[].checks)')"
+          CHECK_URL="$(curl "${URL_PW}${MID}" | jq -r 'last(.[].checks)')"
 
           echo "Found: ${MID} - ${CHECK_URL}"
 
@@ -361,4 +361,4 @@ jobs:
           submit "${{ steps.cirrus.outputs.ccl_title_0 }}" "${{ steps.cirrus.outputs.ccl_status_0 }}" "${{ steps.cirrus.outputs.url_0 }}"
           submit "${{ steps.cirrus.outputs.ccl_title_1 }}" "${{ steps.cirrus.outputs.ccl_status_1 }}" "${{ steps.cirrus.outputs.url_1 }}"
         env:
-          URL: "{{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
+          URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
