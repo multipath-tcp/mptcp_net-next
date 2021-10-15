@@ -191,8 +191,7 @@ jobs:
           channel: "#mptcp"
           nickname: gh-topgit-bot
           message: |-
-            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}
-            ${{ github.event.workflow_run.html_url }}
+            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   tests:
     name: "Tests"
@@ -282,7 +281,7 @@ jobs:
           echo "::set-output name=name::${NAME%% *}"
           echo "::set-output name=author::${NAME} <${EMAIL}>"
 
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHA="${{ github.event.check_suite.head_sha }}"
           echo "::set-output name=sha::${SHA:12}"
 
           COMMITTER=$(jq -r '.committer.name' commit.json)
