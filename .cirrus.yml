@@ -3,6 +3,7 @@
 task:
   name: KVM validation
   only_if: $CIRRUS_TAG != ''  ## only tags
+  timeout_in: 90m
 
   container:
     image: mptcp/mptcp-upstream-virtme-docker
