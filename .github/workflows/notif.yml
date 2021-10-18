@@ -139,7 +139,7 @@ jobs:
           echo "::set-output name=author::${NAME} <${EMAIL}>"
 
           SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "::set-output name=sha::${SHA:12}"
+          echo "::set-output name=sha::${SHA:0:12}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
@@ -281,7 +281,7 @@ jobs:
           echo "::set-output name=author::${NAME} <${EMAIL}>"
 
           SHA="${{ github.event.check_suite.head_sha }}"
-          echo "::set-output name=sha::${SHA:12}"
+          echo "::set-output name=sha::${SHA:0:12}"
 
           COMMITTER=$(jq -r '.committer.name' commit.json)
           echo "Found committer: '${COMMITTER}'"
