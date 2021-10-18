@@ -145,7 +145,7 @@ jobs:
 
       - name: send email
         if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
-        uses: matttbe/action-send-mail@in_reply_to
+        uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -292,7 +292,7 @@ jobs:
 
       - name: send email
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
-        uses: matttbe/action-send-mail@in_reply_to
+        uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
