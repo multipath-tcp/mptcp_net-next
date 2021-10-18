@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-introduce-sk_forward_alloc_get
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] net: introduce sk_forward_alloc_get()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+A later patch will change the MPTCP memory accounting schema
+in such a way that MPTCP sockets will encode the total amount of
+forward allocated memory in two separate fields (one for tx and
+one for rx).
+
+MPTCP sockets will use their own helper to provide the accurate
+amount of fwd allocated memory.
+
+To allow the above, this patch adds a new, optional, sk method to
+fetch the fwd memory, wrap the call in a new helper and use it
+where it is apprioriated.
+
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
