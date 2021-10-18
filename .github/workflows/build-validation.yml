@@ -30,8 +30,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-
+          key: ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-${{ github.run_id }}${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ matrix.defconfig }}-${{ matrix.ipv6 }}-${{ matrix.mptcp }}-
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
         with:
