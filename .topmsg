@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-unused-sk-in-mptcp_push_release
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: drop unused sk in mptcp_push_release
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since mptcp_set_timeout() had removed from mptcp_push_release() in
+commit 33d41c9cd74c5 ("mptcp: more accurate timeout"), the argument
+sk in mptcp_push_release() became useless. Let's drop it.
+
+Fixes: 33d41c9cd74c5 ("mptcp: more accurate timeout")
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
