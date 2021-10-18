@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allocate-fwd-memory-separatelly-on-the-rx-and-tx-path
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: allocate fwd memory separatelly on the rx and tx path
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+All the mptcp receive path is protected by the msk socket
+spinlock. As consequences, the tx path has to play a few tricks to
+allocate the forward memory without acquiring the spinlock multiple
+times, making the overall TX path quite complex.
+
+This patch tries to clean-up a bit the tx path, using completely
+separated fwd memory allocation, for the rx and the tx path.
+
+The forward memory allocated in the rx path is now accounted in
+msk->rmem_fwd_alloc and is (still) protected by the msk socket spinlock.
+
+To cope with the above we provide a few MPTCP-specific variants for
+the helpers to charge, uncharge, reclaim and free the forward memory
+in the receive path.
+
+msk->sk_forward_alloc now accounts only the forward memory for the tx
+path, we can use the plain core sock helper to manipulate it and drop
+quite a bit of complexity.
+
+On memory pressure, both rx and tx fwd memories are reclaimed.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
