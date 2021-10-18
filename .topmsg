@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: allocate fwd memory separatelly on the rx and tx path
+Subject: [PATCH] mptcp: allocate fwd memory separately on the rx and tx path
 
 All the mptcp receive path is protected by the msk socket
 spinlock. As consequences, the tx path has to play a few tricks to
