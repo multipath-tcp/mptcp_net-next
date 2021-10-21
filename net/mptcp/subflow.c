@@ -938,7 +938,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	if (!skb)
 		return MAPPING_EMPTY;
 
-	if (mptcp_check_fallback(ssk))
+	if (mptcp_check_fallback(ssk) && !mptcp_check_infinite_map(skb))
 		return MAPPING_DUMMY;
 
 	mpext = mptcp_get_ext(skb);

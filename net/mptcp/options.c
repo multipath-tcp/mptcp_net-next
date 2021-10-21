@@ -1077,6 +1077,14 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 	return hmac == mp_opt->ahmac;
 }
 
+static bool mptcp_infinite_map_received(struct mptcp_options_received *mp_opt)
+{
+	if (mp_opt->use_map && !mp_opt->data_len)
+		return true;
+
+	return false;
+}
+
 /* Return false if a subflow has been reset, else return true */
 bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 {
@@ -1085,7 +1093,9 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	struct mptcp_options_received mp_opt;
 	struct mptcp_ext *mpext;
 
-	if (__mptcp_check_fallback(msk)) {
+	mptcp_get_options(sk, skb, &mp_opt);
+
+	if (__mptcp_check_fallback(msk) && !mptcp_infinite_map_received(&mp_opt)) {
 		/* Keep it simple and unconditionally trigger send data cleanup and
 		 * pending queue spooling. We will need to acquire the data lock
 		 * for more accurate checks, and once the lock is acquired, such
@@ -1098,8 +1108,6 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		mptcp_data_unlock(subflow->conn);
 		return true;
 	}
-
-	mptcp_get_options(sk, skb, &mp_opt);
 
 	/* The subflow can be in close state only if check_fully_established()
 	 * just sent a reset. If so, tell the caller to ignore the current packet.
@@ -1202,6 +1210,8 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		if (mpext->csum_reqd)
 			mpext->csum = mp_opt.csum;
+		if (mptcp_infinite_map_received(&mp_opt))
+			mpext->infinite_map = 1;
 	}
 
 	return true;
