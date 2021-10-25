@@ -538,6 +538,7 @@ class PrinterHelpers(Printer):
             'struct tcp_request_sock',
             'struct udp6_sock',
             'struct task_struct',
+            'struct bpf_mptcp_sock',
 
             'struct __sk_buff',
             'struct sk_msg_md',
@@ -596,6 +597,7 @@ class PrinterHelpers(Printer):
             'struct socket',
             'struct file',
             'struct bpf_timer',
+            'struct bpf_mptcp_sock',
     }
     mapped_types = {
             'u8': '__u8',
