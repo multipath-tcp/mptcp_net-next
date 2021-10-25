@@ -6,7 +6,6 @@ on:
       - 't/**'        # TopGit tree
       - 'net-next'    # part of the TopGit tree
       - 'for-review'  # part of the TopGit tree
-      - 'export'      # part of the TopGit tree
     tags:
       - 'export/**'   # the CI create a new tag once there is a new export
       - 'patchew/**'  # patchew is using tags
@@ -14,6 +13,7 @@ on:
 jobs:
   build:
     name: "Build (matrix)"
+    if: github.repository_owner != 'multipath-tcp' || startswith(github.event.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
