@@ -67,33 +67,57 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
     runs-on: ubuntu-latest
     steps:
+      - name: get linked tag
+        id: tag
+        run: |
+          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG=${TAG:10}"
+          echo "::set-output name=tag::${TAG:-${BRANCH}}"
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.event.workflow_run.head_sha }}"
+          BRANCH: "${{ github.event.workflow_run.head_branch }}"
+
       - name: irc build
-        if: startsWith(github.event.workflow_run.head_branch, 'export/')
+        if: startsWith(steps.tag.outputs.tag, 'export/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
           nickname: gh-build-bot
           message: |-
-            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   build-error:
     name: "Build Error"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: get linked tag
+        id: tag
+        run: |
+          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG=${TAG:10}"
+          echo "::set-output name=tag::${TAG:-${BRANCH}}"
+        env:
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.event.workflow_run.head_sha }}"
+          BRANCH: "${{ github.event.workflow_run.head_branch }}"
+
       - name: irc build
-        if: startsWith(github.event.workflow_run.head_branch, 'export/')
+        if: startsWith(steps.tag.outputs.tag, 'export/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
           channel: "#mptcp"
           nickname: gh-build-bot
           message: |-
-            New build validating ${{ github.event.workflow_run.head_branch }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) failed: ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
       - name: get commit info
-        if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
+        if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
           curl -H "${ACCEPT}" "${URL}" > commit.json
@@ -118,7 +142,7 @@ jobs:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
       - name: send email
-        if: startsWith(github.event.workflow_run.head_branch, 'patchew/')
+        if: startsWith(steps.tag.outputs.tag, 'patchew/')
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
