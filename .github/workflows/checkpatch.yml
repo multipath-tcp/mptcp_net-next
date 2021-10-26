@@ -62,7 +62,8 @@ jobs:
           send() { local check_url
             check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
             if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
-              echo "URL not found"
+              echo "URL not found: '${check_url}' '${URL_PW}${1}'"
+              curl "${URL_PW}${1}"
               return 1
             fi
 
@@ -81,6 +82,7 @@ jobs:
           fi
 
           while read -r mid status desc; do
+            echo "Sending: '${mid}' '${status}' '${desc}'"
             send "${mid}" "${status}" "${desc}"
           done < "${RESULTS}"
         env:
