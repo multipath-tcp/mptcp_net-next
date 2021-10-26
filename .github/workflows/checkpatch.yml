@@ -12,6 +12,7 @@ on:
 env:
   PW: "https://patchwork.kernel.org/api/1.2"
   RESULTS: "./checkpatch-results.txt"
+  DETAILS: "./checkpatch-details.txt"
 
 jobs:
   checkpatch:
@@ -37,6 +38,12 @@ jobs:
         with:
           name: results
           path: ${{ env.RESULTS }}
+
+      - name: "Artifacts"
+        uses: actions/upload-artifact@v2
+        with:
+          name: details
+          path: ${{ env.DETAILS }}
 
   notif:
     name: "Notifications"
