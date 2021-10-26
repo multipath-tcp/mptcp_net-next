@@ -30,6 +30,7 @@ jobs:
         with:
           each_commit: true
           checkpatch: true
+          debug: ${{ secrets.BUILD_ACTION_DEBUG }}
 
       - name: "Artifacts"
         uses: actions/upload-artifact@v2
