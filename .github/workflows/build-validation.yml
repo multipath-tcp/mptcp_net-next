@@ -53,6 +53,7 @@ jobs:
           mptcp: ${{ matrix.mptcp }}
 
       - name: "Artifacts"
+        if: always()
         uses: actions/upload-artifact@v2
         with:
           name: results
@@ -62,7 +63,7 @@ jobs:
     name: "Notifications"
     needs: build
     # only for the official repo (patchew)
-    if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
+    if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v2
