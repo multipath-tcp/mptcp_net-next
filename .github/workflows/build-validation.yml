@@ -51,6 +51,7 @@ jobs:
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
+          debug: ${{ secrets.BUILD_ACTION_DEBUG }}
 
       - name: "Artifacts"
         if: always()
