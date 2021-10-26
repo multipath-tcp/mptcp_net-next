@@ -16,7 +16,7 @@ env:
 jobs:
   build:
     name: "Build (matrix)"
-    if: github.repository_owner != 'multipath-tcp' || startswith(github.event.ref, 'refs/tags/')
+    if: github.repository_owner != 'multipath-tcp' || startswith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -62,7 +62,7 @@ jobs:
     name: "Notifications"
     needs: build
     # only for the official repo (patchew)
-    if: github.repository_owner == 'multipath-tcp' && startswith(github.event.ref, 'refs/tags/patchew/')
+    if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v2
