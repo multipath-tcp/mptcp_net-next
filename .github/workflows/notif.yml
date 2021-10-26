@@ -72,7 +72,7 @@ jobs:
         run: |
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
-          TAG=${TAG:10}"
+          TAG="${TAG:10}"
           echo "::set-output name=tag::${TAG:-${BRANCH}}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
@@ -99,7 +99,7 @@ jobs:
         run: |
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
-          TAG=${TAG:10}"
+          TAG="${TAG:10}"
           echo "::set-output name=tag::${TAG:-${BRANCH}}"
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
