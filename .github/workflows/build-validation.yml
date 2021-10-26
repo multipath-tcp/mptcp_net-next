@@ -7,8 +7,11 @@ on:
       - 'net-next'    # part of the TopGit tree
       - 'for-review'  # part of the TopGit tree
     tags:
-      - 'export/**'   # the CI create a new tag once there is a new export
       - 'patchew/**'  # patchew is using tags
+      # ideally, we would take 'export/**' but the cache is per branch...
+      # In other words, when using tags, we can only use the cache if we re-tag.
+      # https://github.com/actions/cache/issues/556
+      # So we build the "export" branch and we try to find the tag later
 
 env:
   PW: "https://patchwork.kernel.org/api/1.2"
@@ -16,7 +19,6 @@ env:
 jobs:
   build:
     name: "Build (matrix)"
-    if: github.repository_owner != 'multipath-tcp' || startswith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
