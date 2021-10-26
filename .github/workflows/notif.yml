@@ -140,6 +140,7 @@ jobs:
 
             You can find more details there:
 
+              https://patchwork.kernel.org/project/mptcp/patch/${{ steps.commit.outputs.mid }}/
               ${{ github.event.workflow_run.html_url }}
 
             Status: ${{ github.event.workflow_run.conclusion }}
