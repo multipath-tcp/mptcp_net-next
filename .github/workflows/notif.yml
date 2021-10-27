@@ -334,17 +334,21 @@ jobs:
       - name: set patchwork check
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         run: |
-          set_url() {
-            CHECK_URL="$(curl "${URL}" | jq -r 'last(.[].checks)')"
-            if [ -z "${CHECK_URL}" ] || [ "${CHECK_URL}" = "null" ]; then
-              echo "URL not found: '${CHECK_URL}' '${URL}'"
-              unset CHECK_URL
+          CHECK_URLS=()
+          set_url() { local series_url
+            series_url=$(curl "${URL}" | jq -r 'last(last(.[].series)[].url)')
+            if [ -z "${series_url}" ] || [ "${series_url}" = "null" ]; then
+              echo "Series not found: '${series_url}' '${URL}'"
               return 1
             fi
+
+            echo "Found Series: '${series_url}'"
+
+            readarray -t CHECK_URLS < <(curl "${series_url}" | jq -r '.patches[].url')
           }
 
           # $1: title, $2: status, $3: url
-          submit() {
+          submit() { local check_url
             if [[ "${2}" == "Success"* ]]; then
               STATE="success"
             elif [[ "${2}" == "Unstable"* ]]; then
@@ -353,13 +357,15 @@ jobs:
               STATE="fail"
             fi
 
-            curl -X POST \
-              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
-              -F "state=${STATE}" \
-              -F "target_url=${3}" \
-              -F "context=${1//[ :]/_}" \
-              -F "description=${2}" \
-              "${CHECK_URL}" | jq '.'
+            for check_url in "${CHECK_URLS[@]}"; do
+              curl -X POST \
+                -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+                -F "state=${STATE}" \
+                -F "target_url=${3}" \
+                -F "context=${1//[ :]/_}" \
+                -F "description=${2}" \
+                "${check_url}" | jq '.'
+            done
           }
 
           for i in $(seq 30); do # patches can take a bit of time to appear
@@ -367,10 +373,11 @@ jobs:
             sleep 1m
           done
 
-          if [ -z "${CHECK_URL}" ]; then
+          if [ "${#CHECK_URLS[@]}" -eq 0 ]; then
+            echo "Error: didn't find any URLs after ${i} attempts"
             exit 1
           fi
-          echo "Found: ${CHECK_URL}"
+          echo "Found: ${#CHECK_URLS} urls after ${i} attempts: ${CHECK_URLS[@]}"
 
           submit "${{ steps.cirrus.outputs.ccl_title_0 }}" "${{ steps.cirrus.outputs.ccl_status_0 }}" "${{ steps.cirrus.outputs.url_0 }}"
           submit "${{ steps.cirrus.outputs.ccl_title_1 }}" "${{ steps.cirrus.outputs.ccl_status_1 }}" "${{ steps.cirrus.outputs.url_1 }}"
