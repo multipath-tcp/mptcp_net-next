@@ -3,7 +3,8 @@
 _dup() {
 	# shellcheck disable=SC2086
 	pwclient list -a no -f "%{state}:%{name}" | \
-		grep ${1} -e "^Superseded:" -e "^Deferred:" -e "^Mainlined:" -e "^Not Applicable:" -e "^Handled Elsewhere:" | \
+		grep ${1} -e "^Deferred:" -e "^Mainlined:" -e "^Not Applicable:" -e "^Handled Elsewhere:" | \
+		grep -v "^Superseded:" | \
 		cut -d: -f2- | \
 		sed 's/\[.\+\]//g;s/^\s\+//g' | \
 		sort | \
