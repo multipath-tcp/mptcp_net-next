@@ -232,6 +232,20 @@ link_failure()
 	done
 }
 
+checksum_failure()
+{
+	tc -n $ns2 qdisc add dev ns2eth2 clsact
+	tc -n $ns2 filter add dev ns2eth2 egress \
+		protocol ip prio 1000 \
+		flower ip_proto tcp \
+		action pedit munge offset 148 u32 invert \
+		pipe csum tcp
+
+	sleep 1
+
+	tc -n $ns2 qdisc del dev ns2eth2 clsact
+}
+
 # $1: IP address
 is_v6()
 {
@@ -419,6 +433,8 @@ do_transfer()
 			fi
 			sleep 1
 			ip netns exec ${connector_ns} ./pm_nl_ctl del 0 $addr
+		elif [ $rm_nr_ns2 -eq 10 ]; then
+			checksum_failure
 		fi
 	fi
 
@@ -542,6 +558,8 @@ run_tests()
 chk_csum_nr()
 {
 	local msg=${1:-""}
+	local csum_1=${2:-0}
+	local csum_2=${3:-0}
 	local count
 	local dump_stats
 
@@ -553,8 +571,8 @@ chk_csum_nr()
 	printf " %-36s %s" "$msg" "sum"
 	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtDataCsumErr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != 0 ]; then
-		echo "[fail] got $count data checksum error[s] expected 0"
+	if [ "$count" != $csum_1 ]; then
+		echo "[fail] got $count data checksum error[s] expected $csum_1"
 		ret=1
 		dump_stats=1
 	else
@@ -563,8 +581,8 @@ chk_csum_nr()
 	echo -n " - csum  "
 	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtDataCsumErr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != 0 ]; then
-		echo "[fail] got $count data checksum error[s] expected 0"
+	if [ "$count" != $csum_2 ]; then
+		echo "[fail] got $count data checksum error[s] expected $csum_2"
 		ret=1
 		dump_stats=1
 	else
@@ -621,6 +639,7 @@ chk_join_nr()
 	local syn_nr=$2
 	local syn_ack_nr=$3
 	local ack_nr=$4
+	local fail_nr=${5:-0}
 	local count
 	local dump_stats
 
@@ -663,8 +682,8 @@ chk_join_nr()
 		ip netns exec $ns2 nstat -as | grep MPTcp
 	fi
 	if [ $checksum -eq 1 ]; then
-		chk_csum_nr
-		chk_fail_nr 0 0
+		chk_csum_nr "" $fail_nr
+		chk_fail_nr $fail_nr $fail_nr
 	fi
 }
 
@@ -1799,6 +1818,18 @@ fullmesh_tests()
 	chk_add_nr 1 1
 }
 
+fail_tests()
+{
+       # multiple subflows
+       reset
+       ip netns exec $ns1 ./pm_nl_ctl limits 0 2
+       ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+       ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow
+       ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 dev ns2eth2 flags subflow
+       run_tests $ns1 $ns2 10.0.1.1 2 0 -10 fast
+       chk_join_nr "MP_FAIL test, multiple subflows" 2 2 2 1
+}
+
 all_tests()
 {
 	subflows_tests
@@ -1815,6 +1846,7 @@ all_tests()
 	checksum_tests
 	deny_join_id0_tests
 	fullmesh_tests
+	fail_tests
 }
 
 usage()
@@ -1834,6 +1866,7 @@ usage()
 	echo "  -S checksum_tests"
 	echo "  -d deny_join_id0_tests"
 	echo "  -m fullmesh_tests"
+	echo "  -F fail_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
 	echo "  -h help"
@@ -1869,7 +1902,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fsltra64bpkdmchCS' opt; do
+while getopts 'fsltra64bpkdmchCSF' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -1912,6 +1945,9 @@ while getopts 'fsltra64bpkdmchCS' opt; do
 			;;
 		m)
 			fullmesh_tests
+			;;
+		F)
+			fail_tests
 			;;
 		c)
 			;;
