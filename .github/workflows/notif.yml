@@ -265,7 +265,7 @@ jobs:
         run: |
           curl -H "${ACCEPT}" "${URL}" > commit.json
 
-          read -r TAG MID < <(jq -r '.message' commit.json | tail -n1)
+          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
           echo "::set-output name=mid::${MID:1:-1}"
 
