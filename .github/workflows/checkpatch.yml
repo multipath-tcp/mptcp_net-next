@@ -24,7 +24,7 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v2
         with:
-          fetch-depth: 25 # we should not have more commits on top of export
+          fetch-depth: 0 ## to make sure a mentioned commit exists
 
       - name: "Checkpatch"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
