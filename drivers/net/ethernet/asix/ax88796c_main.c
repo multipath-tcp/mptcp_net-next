@@ -693,6 +693,7 @@ static void ax88796c_set_mac(struct  ax88796c_device *ax_local)
 	switch (ax_local->speed) {
 	case SPEED_100:
 		maccr |= MACCR_SPEED_100;
+		break;
 	case SPEED_10:
 	case SPEED_UNKNOWN:
 		break;
@@ -703,6 +704,7 @@ static void ax88796c_set_mac(struct  ax88796c_device *ax_local)
 	switch (ax_local->duplex) {
 	case DUPLEX_FULL:
 		maccr |= MACCR_SPEED_100;
+		break;
 	case DUPLEX_HALF:
 	case DUPLEX_UNKNOWN:
 		break;
@@ -848,11 +850,10 @@ ax88796c_open(struct net_device *ndev)
 	/* Setup flow-control configuration */
 	phy_support_asym_pause(ax_local->phydev);
 
-	if (ax_local->phydev->advertising &&
-	    (linkmode_test_bit(ETHTOOL_LINK_MODE_Pause_BIT,
-			       ax_local->phydev->advertising) ||
-	     linkmode_test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
-			       ax_local->phydev->advertising)))
+	if (linkmode_test_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+			      ax_local->phydev->advertising) ||
+	    linkmode_test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+			      ax_local->phydev->advertising))
 		fc |= AX_FC_ANEG;
 
 	fc |= linkmode_test_bit(ETHTOOL_LINK_MODE_Pause_BIT,
