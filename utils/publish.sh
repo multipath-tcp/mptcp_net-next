@@ -109,7 +109,7 @@ tg_tag() { local tag
 
 	printinfo "Builds and tests are now in progress:\\n"
 	printinfo "https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/${tag}"
-	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${tag}"
+	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${TG_EXPORT}"
 }
 
 tg_export_tag() {
