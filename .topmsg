@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-corrupt-receiver-key-in-MPC-data-checksum
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: fix corrupt receiver key in MPC + data + checksum
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+using packetdrill it's possible to observe that the receiver key contains
+random values when clients transmit MP_CAPABLE with data and checksum (as
+specified in RFC8684 §3.1). Fix the layout of mptcp_out_options, to avoid
+using the skb extension copy when writing the MP_CAPABLE sub-option.
+
+Fixes: d7b269083786 ("mptcp: shrink mptcp_out_options struct")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/233
+Reported-by: Poorva Sonparote <psonparo@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
