@@ -59,11 +59,10 @@ jobs:
       - name: "Patchwork"
         run: |
           # $1: mid, $2: status, $3: desc
-          send() { local check_url
+          _send() { local check_url
             check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
             if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
               echo "URL not found: '${check_url}' '${URL_PW}${1}'"
-              curl "${URL_PW}${1}"
               return 1
             fi
 
@@ -74,6 +73,27 @@ jobs:
               -F "context=checkpatch" \
               -F "description=${3}" \
               "${check_url}" | jq '.'
+          }
+
+          FIRST=1
+          send() { local i
+            # patches can take a bit of time to appear: retry the first time
+            if [ "${FIRST}" = "1" ]; then
+              FIRST=0
+
+              for i in $(seq 45); do
+                if _send "${@}"; then
+                  echo "Successful sent after ${i} attempts"
+                  return 0
+                fi
+                sleep 1m
+              done
+
+              curl "${URL_PW}${1}"
+              return 1
+            else
+              _send "${@}"
+            fi
           }
 
           if [ ! -s "${RESULTS}" ]; then
