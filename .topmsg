@@ -1,9 +1,0 @@
-From: Poorva Sonparote <psonparo@redhat.com>
-Subject: [PATCH] Exposing __ip_sock_set_tos() in ip.h
-
-Making the static function __ip_sock_set_tos() from net/ipv4/ip_sockglue.c
-accessible by declaring it in include/net/ip.h
-The reason for doing this is to use this function to set IP_TOS value in
-mptcp_setsockopt() without the lock.
-
-Signed-off-by: Poorva Sonparote <psonparo@redhat.com>
