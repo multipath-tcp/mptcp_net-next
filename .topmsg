@@ -1,9 +1,8 @@
 From: Poorva Sonparote <psonparo@redhat.com>
-Subject: [PATCH] Support for IP_TOS for MPTCP setsockopt()
+Subject: [PATCH] mptcp: Support for IP_TOS for MPTCP setsockopt()
 
 SOL_IP provides a way to configure network layer attributes in a
 socket. This patch adds support for IP_TOS for setsockopt(.. ,SOL_IP, ..)
-https://github.com/multipath-tcp/mptcp_net-next/issues/220
 
 Support for SOL_IP is added in mptcp_setsockopt() and IP_TOS is handled in
 a private function. The idea here is to take in the value passed for IP_TOS
@@ -15,6 +14,6 @@ __ip_sock_set_tos(ssk,..).
 The patch has been tested using the packetdrill script here -
 https://github.com/multipath-tcp/mptcp_net-next/issues/220#issuecomment-947863717
 
-Reported-by: kernel test robot <lkp@intel.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/220
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Poorva Sonparote <psonparo@redhat.com>
