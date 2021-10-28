@@ -344,7 +344,7 @@ jobs:
 
             echo "Found Series: '${series_url}'"
 
-            readarray -t CHECK_URLS < <(curl "${series_url}" | jq -r '.patches[].url')
+            readarray -t CHECK_URLS < <(curl "${series_url}" | jq -r '.patches[].url + "checks/"')
           }
 
           # $1: title, $2: status, $3: url
@@ -377,7 +377,7 @@ jobs:
             echo "Error: didn't find any URLs after ${i} attempts"
             exit 1
           fi
-          echo "Found: ${#CHECK_URLS} urls after ${i} attempts: ${CHECK_URLS[@]}"
+          echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
 
           submit "${{ steps.cirrus.outputs.ccl_title_0 }}" "${{ steps.cirrus.outputs.ccl_status_0 }}" "${{ steps.cirrus.outputs.url_0 }}"
           submit "${{ steps.cirrus.outputs.ccl_title_1 }}" "${{ steps.cirrus.outputs.ccl_status_1 }}" "${{ steps.cirrus.outputs.url_1 }}"
