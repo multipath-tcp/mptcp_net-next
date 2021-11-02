@@ -537,6 +537,7 @@ class PrinterHelpers(Printer):
             'struct tcp_timewait_sock',
             'struct tcp_request_sock',
             'struct udp6_sock',
+            'struct unix_sock',
             'struct task_struct',
             'struct bpf_mptcp_sock',
 
@@ -590,6 +591,7 @@ class PrinterHelpers(Printer):
             'struct tcp_timewait_sock',
             'struct tcp_request_sock',
             'struct udp6_sock',
+            'struct unix_sock',
             'struct task_struct',
             'struct path',
             'struct btf_ptr',
