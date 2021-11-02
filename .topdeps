@@ -1,1 +1,2 @@
 t/mptcp-fix-corrupt-receiver-key-in-MPC-data-checksum
+t/selftests-mptcp-fix-proto-type-in-link_failure-tests
