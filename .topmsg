@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-sockopt-add-SOL_IP-freebind-transparent-options
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: sockopt: add SOL_IP freebind & transparent options
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+These options also need to be set before bind, so do the sync of msk to
+new ssk socket a bit earlier.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
