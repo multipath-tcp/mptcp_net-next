@@ -4,7 +4,7 @@
 extra_paholeopt=
 
 if ! [ -x "$(command -v ${PAHOLE})" ]; then
-	return
+	exit 0
 fi
 
 pahole_ver=$(${PAHOLE} --version | sed -E 's/v([0-9]+)\.([0-9]+)/\1\2/')
