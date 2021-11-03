@@ -2690,10 +2690,17 @@ static void mptcp_close(struct sock *sk, long timeout)
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	if ((1 << sk->sk_state) & (TCPF_LISTEN | TCPF_CLOSE)) {
-		inet_sk_state_store(sk, TCP_CLOSE);
+	if (sk->sk_state == TCP_LISTEN) {
+		struct socket *listener;
+
+		listener = __mptcp_nmpc_socket(mptcp_sk(sk));
+		if (listener)
+			__mptcp_close_ssk(sk, listener->sk, mptcp_subflow_ctx(listener->sk));
 		goto cleanup;
 	}
+
+	if (sk->sk_state == TCP_CLOSE)
+		goto cleanup;
 
 	if (mptcp_close_state(sk))
 		__mptcp_wr_shutdown(sk);
@@ -2701,7 +2708,7 @@ static void mptcp_close(struct sock *sk, long timeout)
 	sk_stream_wait_close(sk, timeout);
 
 cleanup:
-	/* orphan all the subflows */
+	/* orphan all the non listener subflows */
 	inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32;
 	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
