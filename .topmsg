@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-delegate-action-to-schedule-3rd-ack-retrans
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use delegate action to schedule 3rd ack retrans
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Scheduling a delack in mptcp_established_options_mp() is
+not a good idea: such function is called by tcp_send_ack() and
+the pending delayed ack will be cleared shortly after by the
+tcp_event_ack_sent() call in __tcp_transmit_skb().
+
+Instead use the mptcp delegated action infrastructure to
+schedule the delayed ack after the current bh processing completes.
+
+Additionally moves the schedule_3rdack_retransmission() helper
+into protocol.c to avoid making it visible in a different compilation
+unit.
+
+Fixes: ec3edaa7ca6ce02f ("mptcp: Add handling of outgoing MP_JOIN requests")
+Reviewed-by: Mat Martineau <mathew.j.martineau>@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
