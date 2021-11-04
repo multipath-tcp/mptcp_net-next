@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-delack-timer
+From: Eric Dumazet <edumazet@google.com>
+Subject: [PATCH] mptcp: fix delack timer
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+To compute the rtx timeout schedule_3rdack_retransmission() does multiple
+things in the wrong way: srtt_us is measured in usec/8 and the timeout
+itself is an absolute value.
+
+Fixes: ec3edaa7ca6ce02f ("mptcp: Add handling of outgoing MP_JOIN requests")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau>@linux.intel.com>
+Signed-off-by: Eric Dumazet <edumazet@google.com>
