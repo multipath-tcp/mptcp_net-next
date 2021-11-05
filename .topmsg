@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-mib-for-infinite-map-sending
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add mib for infinite map sending
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new mib named MPTCP_MIB_INFINITEMAPTX, increase it
+when a infinite mapping has been sent out.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
