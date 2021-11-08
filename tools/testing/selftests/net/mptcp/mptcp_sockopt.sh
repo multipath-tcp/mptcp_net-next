@@ -167,7 +167,7 @@ do_transfer()
 	:> "$cout"
 	:> "$sout"
 
-	mptcp_connect="./mptcp_connect -r 20"
+	mptcp_connect="./mptcp_connect"
 
 	local local_addr
 	if is_v6 "${connect_addr}"; then
@@ -178,7 +178,7 @@ do_transfer()
 
 	timeout ${timeout_test} \
 		ip netns exec ${listener_ns} \
-			$mptcp_connect -t ${timeout_poll} -l -M 1 -p $port -s ${srv_proto} -c TIMESTAMPNS \
+			$mptcp_connect -t ${timeout_poll} -l -M 1 -p $port -s ${srv_proto} -c TIMESTAMPNS,TCPINQ \
 				${local_addr} < "$sin" > "$sout" &
 	spid=$!
 
@@ -186,7 +186,7 @@ do_transfer()
 
 	timeout ${timeout_test} \
 		ip netns exec ${connector_ns} \
-			$mptcp_connect -t ${timeout_poll} -M 2 -p $port -s ${cl_proto} -c TIMESTAMPNS \
+			$mptcp_connect -t ${timeout_poll} -M 2 -p $port -s ${cl_proto} -c TIMESTAMPNS,TCPINQ \
 				$connect_addr < "$cin" > "$cout" &
 
 	cpid=$!
@@ -284,8 +284,8 @@ sout=$(mktemp)
 cin=$(mktemp)
 cout=$(mktemp)
 init
-make_file "$cin" "client" 1
-make_file "$sin" "server" 1
+make_file "$cin" "client" 1024
+make_file "$sin" "server" 1024
 trap cleanup EXIT
 
 run_tests $ns1 $ns2 10.0.1.1
