@@ -207,6 +207,7 @@ struct scsi_device {
 					 * creation time */
 	unsigned ignore_media_change:1; /* Ignore MEDIA CHANGE on resume */
 
+	unsigned int queue_stopped;	/* request queue is quiesced */
 	bool offline_already;		/* Device offline message logged */
 
 	atomic_t disk_events_disable_depth; /* disable depth for disk events */
@@ -225,6 +226,12 @@ struct scsi_device {
 
 	struct device		sdev_gendev,
 				sdev_dev;
+	/*
+	 * The array size 6 provides space for one attribute group for the
+	 * SCSI core, four attribute groups defined by SCSI LLDs and one
+	 * terminating NULL pointer.
+	 */
+	const struct attribute_group *gendev_attr_groups[6];
 
 	struct execute_work	ew; /* used to get process context on put */
 	struct work_struct	requeue_work;
