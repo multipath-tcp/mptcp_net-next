@@ -622,7 +622,7 @@ static int mptcp_setsockopt_sol_ip_set_transparent(struct mptcp_sock *msk, int o
 	struct sock *sk = (struct sock *)msk;
 	struct inet_sock *issk;
 	struct socket *ssock;
-	int ret, err;
+	int err;
 
 	err = ip_setsockopt(sk, SOL_IP, optname, optval, optlen);
 	if (err != 0)
@@ -653,7 +653,7 @@ static int mptcp_setsockopt_sol_ip_set_transparent(struct mptcp_sock *msk, int o
 
 	sockopt_seq_inc(msk);
 	release_sock(sk);
-	return ret;
+	return 0;
 }
 
 static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
