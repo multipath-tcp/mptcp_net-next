@@ -2166,6 +2166,7 @@ extern const struct bpf_func_proto bpf_btf_find_by_name_kind_proto;
 extern const struct bpf_func_proto bpf_sk_setsockopt_proto;
 extern const struct bpf_func_proto bpf_sk_getsockopt_proto;
 extern const struct bpf_func_proto bpf_kallsyms_lookup_name_proto;
+extern const struct bpf_func_proto bpf_find_vma_proto;
 extern const struct bpf_func_proto bpf_mptcp_sock_proto;
 
 const struct bpf_func_proto *tracing_prog_func_proto(
