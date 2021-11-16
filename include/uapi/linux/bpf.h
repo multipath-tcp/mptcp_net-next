@@ -4939,6 +4939,25 @@ union bpf_attr {
  *
  *		**-EPERM** if caller does not have permission to obtain kernel address.
  *
+ * long bpf_find_vma(struct task_struct *task, u64 addr, void *callback_fn, void *callback_ctx, u64 flags)
+ *	Description
+ *		Find vma of *task* that contains *addr*, call *callback_fn*
+ *		function with *task*, *vma*, and *callback_ctx*.
+ *		The *callback_fn* should be a static function and
+ *		the *callback_ctx* should be a pointer to the stack.
+ *		The *flags* is used to control certain aspects of the helper.
+ *		Currently, the *flags* must be 0.
+ *
+ *		The expected callback signature is
+ *
+ *		long (\*callback_fn)(struct task_struct \*task, struct vm_area_struct \*vma, void \*callback_ctx);
+ *
+ *	Return
+ *		0 on success.
+ *		**-ENOENT** if *task->mm* is NULL, or no vma contains *addr*.
+ *		**-EBUSY** if failed to try lock mmap_lock.
+ *		**-EINVAL** for invalid **flags**.
+ *
  * struct bpf_mptcp_sock *bpf_mptcp_sock(struct bpf_sock *sk)
  *	Description
  *		This helper gets a **struct bpf_mptcp_sock** pointer from a
@@ -5128,6 +5147,7 @@ union bpf_attr {
 	FN(trace_vprintk),		\
 	FN(skc_to_unix_sock),		\
 	FN(kallsyms_lookup_name),	\
+	FN(find_vma),			\
 	FN(mptcp_sock),			\
 	/* */
 
@@ -6310,6 +6330,7 @@ struct bpf_sk_lookup {
 	__u32 local_ip4;	/* Network byte order */
 	__u32 local_ip6[4];	/* Network byte order */
 	__u32 local_port;	/* Host byte order */
+	__u32 ingress_ifindex;		/* The arriving interface. Determined by inet_iif. */
 };
 
 /*
