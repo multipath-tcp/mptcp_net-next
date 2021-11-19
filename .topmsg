@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-TCP_INQ-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp: add TCP_INQ support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Do checks on the returned inq counter.
+
+Fail on:
+1. Huge value (> 1 kbyte, test case files are 1 kb)
+2. last hint larger than returned bytes when read was short
+3. erronenous indication of EOF.
+
+3) happens when a hint of X bytes reads X-1 on next call
+   but next recvmsg returns more data (instead of EOF).
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
