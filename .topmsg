@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-full-disconnect-implementation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: full disconnect implementation
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current mptcp_disconnect() implementation lacks several
+steps, we additionally need to reset the msk socket state
+and flush the subflow list.
+
+Factor out the needed helper to avoid code duplication.
+
+Additionally ensure that the initial subflow is disposed
+only after mptcp_close(), just reset it at disconnect time.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
