@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: implement support for user-space disconnect
-
-Handle explicitly AF_UNSPEC in mptcp_stream_connnect() to
-allow user-space to disconnect established MPTCP connections
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
