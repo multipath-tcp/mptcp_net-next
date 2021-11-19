@@ -627,6 +627,7 @@ typedef unsigned char *sk_buff_data_t;
  *		for retransmit timer
  *	@rbnode: RB tree node, alternative to next/prev for netem/tcp
  *	@list: queue head
+ *	@ll_node: anchor in an llist (eg socket defer_list)
  *	@sk: Socket we are owned by
  *	@ip_defrag_offset: (aka @sk) alternate use of @sk, used in
  *		fragmentation management
@@ -4228,7 +4229,7 @@ static inline void skb_remcsum_process(struct sk_buff *skb, void *ptr,
 		return;
 	}
 
-	 if (unlikely(skb->ip_summed != CHECKSUM_COMPLETE)) {
+	if (unlikely(skb->ip_summed != CHECKSUM_COMPLETE)) {
 		__skb_checksum_complete(skb);
 		skb_postpull_rcsum(skb, skb->data, ptr - (void *)skb->data);
 	}
