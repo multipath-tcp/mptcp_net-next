@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-SIOCINQ-OUTQ-and-OUTQNSD-ioctls
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add SIOCINQ, OUTQ and OUTQNSD ioctls
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Allows to query in-sequence data ready for read(), total bytes in
+write queue and total bytes in write queue that have not yet been sent.
+
+v2: remove unneeded READ_ONCE() (Paolo Abeni)
+v3: check for new data unconditionally in SIOCINQ ioctl (Mat Martineau)
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
