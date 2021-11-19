@@ -569,7 +569,6 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		/* TCP_FASTOPEN_KEY, TCP_FASTOPEN TCP_FASTOPEN_CONNECT, TCP_FASTOPEN_NO_COOKIE,
 		 * are not supported fastopen is currently unsupported
 		 */
-		/* TCP_INQ is currently unsupported, needs some recvmsg work */
 	}
 	return false;
 }
