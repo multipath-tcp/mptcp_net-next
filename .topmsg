@@ -1,7 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: add infinite map mibs check
-
-This patch added a function chk_infi_nr() to check the mibs for the
-infinite mapping.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
