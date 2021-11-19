@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-cleanup-accept-and-poll
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup accept and poll
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After the previous patch,  msk->subflow will never be deleted during
+the whole msk lifetime. We don't need anymore to acquire references to
+it in mptcp_stream_accept() and we can use the listener subflow accept
+queue to simplify mptcp_poll() for listener socket.
+
+Overall this removes a lock pair and 4 more atomic operations per
+accept().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
