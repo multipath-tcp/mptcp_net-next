@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-TCP_INQ-cmsg-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: add TCP_INQ cmsg support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Support the TCP_INQ setsockopt.
+
+This is a boolean that tells recvmsg path to include the remaining
+in-sequence bytes in the cmsg data.
+
+v2: do not use CB(skb)->offset, increment map_seq instead (Paolo Abeni)
+v3: adjust CB(skb)->map_seq when taking skb from ofo queue (Paolo Abeni)
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/224
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
