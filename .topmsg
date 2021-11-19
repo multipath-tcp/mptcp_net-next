@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-inq-test-case
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp: add inq test case
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+client & server use a unix socket connection to communicate
+outside of the mptcp connection.
+
+This allows the consumer to know in advance how many bytes have been
+(or will be) sent by the peer.
+This allows stricter checks on the bytecounts reported by TCP_INQ cmsg.
+
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
