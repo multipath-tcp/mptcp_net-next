@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-getsockopt-add-support-for-IP_TOS
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: getsockopt: add support for IP_TOS
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+earlier patch added IP_TOS setsockopt support, this allows to get
+the value set by earlier setsockopt.
+
+Extends mptcp_put_int_option to handle u8 input/output by
+adding required cast.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Florian Westphal <fw@strlen.de>
