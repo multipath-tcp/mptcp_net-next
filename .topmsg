@@ -1,9 +1,0 @@
-From: Davide Caratti <dcaratti@redhat.com>
-Subject: [PATCH] mptcp: allow changing the "backup" bit by endpoint id
-
-a non-zero 'id' is sufficient to identify MPTCP endpoints: allow changing
-the value of 'backup' bit by simply specifying the endpoint id.
-
-Link: https://github.com/multipath-tcp/mptcp_net-next/issues/158
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Davide Caratti <dcaratti@redhat.com>
