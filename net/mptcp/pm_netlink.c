@@ -173,6 +173,9 @@ select_local_address(const struct pm_nl_pernet *pernet,
 		if (!(entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW))
 			continue;
 
+		if (test_bit(entry->addr.id, msk->pm.endpoint_usage_mask))
+			continue;
+
 		if (entry->addr.family != sk->sk_family) {
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 			if ((entry->addr.family == AF_INET &&
@@ -512,8 +515,10 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 			check_work_pending(msk);
 			nr = fill_remote_addresses_vec(msk, fullmesh, addrs);
 			spin_unlock_bh(&msk->pm.lock);
-			for (i = 0; i < nr; i++)
+			for (i = 0; i < nr; i++) {
+				set_bit(local->addr.id, msk->pm.endpoint_usage_mask);
 				__mptcp_subflow_connect(sk, &local->addr, &addrs[i]);
+			}
 			spin_lock_bh(&msk->pm.lock);
 			return;
 		}
@@ -1282,6 +1287,7 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		mptcp_pm_remove_anno_addr(msk, addr, remove_subflow);
 		if (remove_subflow)
 			mptcp_pm_remove_subflow(msk, &list);
+		clear_bit(addr->id, msk->pm.endpoint_usage_mask);
 		release_sock(sk);
 
 next:

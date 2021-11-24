@@ -376,6 +376,7 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	WRITE_ONCE(msk->pm.accept_subflow, false);
 	WRITE_ONCE(msk->pm.remote_deny_join_id0, false);
 	msk->pm.status = 0;
+	bitmap_zero(msk->pm.endpoint_usage_mask, 256);
 
 	mptcp_pm_nl_data_init(msk);
 }
