@@ -172,6 +172,34 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 	spin_unlock_bh(&pm->lock);
 }
 
+void mptcp_pm_subflow_check_next(struct mptcp_sock *msk, const struct sock *ssk,
+				 const struct mptcp_subflow_context *subflow)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+	bool closed;
+
+	closed = ssk->sk_state == TCP_CLOSE;
+	if (subflow->fully_established && !closed)
+		return;
+
+	spin_lock_bh(&pm->lock);
+	if (closed) {
+		pm->local_addr_used--;
+		pm->subflows--;
+		/* do not enable the pm worker: we don't want to pick again
+		 * the just closed subflow
+		 */
+	}
+
+	/* Even if this subflow is not really established, tell the PM to try
+	 * to pick the next one, if possible.
+	 */
+	if (pm->work_pending)
+		mptcp_pm_schedule_work(msk, MPTCP_PM_SUBFLOW_ESTABLISHED);
+
+	spin_unlock_bh(&pm->lock);
+}
+
 void mptcp_pm_subflow_closed(struct mptcp_sock *msk, u8 id)
 {
 	pr_debug("msk=%p", msk);
