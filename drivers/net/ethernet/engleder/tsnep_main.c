@@ -1152,7 +1152,6 @@ static int tsnep_probe(struct platform_device *pdev)
 	adapter->addr = devm_ioremap_resource(&pdev->dev, io);
 	if (IS_ERR(adapter->addr))
 		return PTR_ERR(adapter->addr);
-	adapter->size = io->end - io->start + 1;
 	adapter->irq = platform_get_irq(pdev, 0);
 	netdev->mem_start = io->start;
 	netdev->mem_end = io->end;
@@ -1260,7 +1259,6 @@ MODULE_DEVICE_TABLE(of, tsnep_of_match);
 static struct platform_driver tsnep_driver = {
 	.driver = {
 		.name = TSNEP,
-		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(tsnep_of_match),
 	},
 	.probe = tsnep_probe,
