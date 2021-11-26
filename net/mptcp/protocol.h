@@ -190,6 +190,7 @@ struct mptcp_pm_data {
 
 	spinlock_t	lock;		/*protects the whole PM data */
 
+	DECLARE_BITMAP(endpoint_usage_mask, 256);
 	u8		addr_signal;
 	bool		server_side;
 	bool		work_pending;
