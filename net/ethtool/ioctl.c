@@ -734,6 +734,9 @@ ethtool_get_drvinfo(struct net_device *dev, struct ethtool_devlink_compat *rsp)
 			sizeof(rsp->info.bus_info));
 		strlcpy(rsp->info.driver, dev->dev.parent->driver->name,
 			sizeof(rsp->info.driver));
+	} else if (dev->rtnl_link_ops) {
+		strlcpy(rsp->info.driver, dev->rtnl_link_ops->kind,
+			sizeof(rsp->info.driver));
 	} else {
 		return -EOPNOTSUPP;
 	}
@@ -1719,7 +1722,7 @@ static noinline_for_stack int ethtool_set_coalesce(struct net_device *dev,
 	struct ethtool_coalesce coalesce;
 	int ret;
 
-	if (!dev->ethtool_ops->set_coalesce && !dev->ethtool_ops->get_coalesce)
+	if (!dev->ethtool_ops->set_coalesce || !dev->ethtool_ops->get_coalesce)
 		return -EOPNOTSUPP;
 
 	ret = dev->ethtool_ops->get_coalesce(dev, &coalesce, &kernel_coalesce,
