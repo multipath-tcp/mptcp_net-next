@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-expose-mptcp_check_and_set_pending
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
