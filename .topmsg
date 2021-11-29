@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-support-TCP_CORK-and-TCP_NODELAY
+From: Maxim Galaganov <max@internet.ru>
+Subject: [PATCH] mptcp: support TCP_CORK and TCP_NODELAY
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+First, add cork and nodelay fields to the mptcp_sock structure
+so they can be used in sync_socket_options(), and fill them on setsockopt
+while holding the msk socket lock.
+
+Then, on setsockopt set proper tcp_sk(ssk)->nonagle values for subflows
+by calling __tcp_sock_set_cork() or __tcp_sock_set_nodelay() on the ssk
+while holding the ssk socket lock.
+
+tcp_push_pending_frames() will be invoked on the ssk if a cork was cleared
+or nodelay was set. Also set MPTCP_PUSH_PENDING bit by calling
+mptcp_check_and_set_pending(). This will lead to __mptcp_push_pending()
+being called inside mptcp_release_cb() with new tcp_sk(ssk)->nonagle.
+
+Also add getsockopt support for TCP_CORK and TCP_NODELAY.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Maxim Galaganov <max@internet.ru>
