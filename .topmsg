@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-expose-__tcp_sock_set_cork-and-__tcp_sock_set_nodelay
+From: Maxim Galaganov <max@internet.ru>
+Subject: [PATCH] tcp: expose __tcp_sock_set_cork and __tcp_sock_set_nodelay
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Expose __tcp_sock_set_cork() and __tcp_sock_set_nodelay() for use in
+MPTCP setsockopt code -- namely for syncing MPTCP socket options with
+subflows inside sync_socket_options() while already holding the subflow
+socket lock.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Maxim Galaganov <max@internet.ru>
