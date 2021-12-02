@@ -1,4 +1,49 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-deadlock-in-__mptcp_push_pending
+From: Maxim Galaganov <max@internet.ru>
+Subject: [PATCH] mptcp: fix deadlock in __mptcp_push_pending()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+__mptcp_push_pending() may call mptcp_flush_join_list() with subflow
+socket lock held. If such call hits mptcp_sockopt_sync_all() then
+subsequently __mptcp_sockopt_sync() could try to lock the subflow
+socket for itself, causing a deadlock.
+
+sysrq: Show Blocked State
+task:ss-server       state:D stack:    0 pid:  938 ppid:     1 flags:0x00000000
+Call Trace:
+ <TASK>
+ __schedule+0x2d6/0x10c0
+ ? __mod_memcg_state+0x4d/0x70
+ ? csum_partial+0xd/0x20
+ ? _raw_spin_lock_irqsave+0x26/0x50
+ schedule+0x4e/0xc0
+ __lock_sock+0x69/0x90
+ ? do_wait_intr_irq+0xa0/0xa0
+ __lock_sock_fast+0x35/0x50
+ mptcp_sockopt_sync_all+0x38/0xc0
+ __mptcp_push_pending+0x105/0x200
+ mptcp_sendmsg+0x466/0x490
+ sock_sendmsg+0x57/0x60
+ __sys_sendto+0xf0/0x160
+ ? do_wait_intr_irq+0xa0/0xa0
+ ? fpregs_restore_userregs+0x12/0xd0
+ __x64_sys_sendto+0x20/0x30
+ do_syscall_64+0x38/0x90
+ entry_SYSCALL_64_after_hwframe+0x44/0xae
+RIP: 0033:0x7f9ba546c2d0
+RSP: 002b:00007ffdc3b762d8 EFLAGS: 00000246 ORIG_RAX: 000000000000002c
+RAX: ffffffffffffffda RBX: 00007f9ba56c8060 RCX: 00007f9ba546c2d0
+RDX: 000000000000077a RSI: 0000000000e5e180 RDI: 0000000000000234
+RBP: 0000000000cc57f0 R08: 0000000000000000 R09: 0000000000000000
+R10: 0000000000000000 R11: 0000000000000246 R12: 00007f9ba56c8060
+R13: 0000000000b6ba60 R14: 0000000000cc7840 R15: 41d8685b1d7901b8
+ </TASK>
+
+Fix the issue by using __mptcp_flush_join_list() instead of plain
+mptcp_flush_join_list() inside __mptcp_push_pending(), as suggested by
+Florian. The sockopt sync will be deferred to the workqueue.
+
+Fixes: 1b3e7ede1365 ("mptcp: setsockopt: handle SO_KEEPALIVE and SO_PRIORITY")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/244
+Suggested-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Maxim Galaganov <max@internet.ru>
