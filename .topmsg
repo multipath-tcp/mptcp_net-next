@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: add disconnect selftests
+Subject: [PATCH] selftests: mptcp: add disconnect tests
 
 Performs several disconnect/reconnect on the same socket,
 ensuring the overall transfer is succesful.
