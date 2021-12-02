@@ -1,4 +1,9 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-missing-documented-NL-params
+Subject: [PATCH] mptcp: add missing documented NL params
 
+'loc_id' and 'rem_id' are set in all events linked to subflows but those
+were missing in the events description in the comments.
+
+Fixes: b911c97c7dc7 ("mptcp: add netlink event support")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
