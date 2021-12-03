@@ -300,7 +300,8 @@ static void connect_one_server(int fd, int unixfd)
 
 	wait_for_ack(fd, 5000, sent);
 
-	write(fd, buf, 1);
+	ret = write(fd, buf, 1);
+	assert(ret == 1);
 	close(fd);
 	ret = write(unixfd, "closed", 6);
 	assert(ret == 6);
