@@ -183,6 +183,8 @@ enum mptcp_addr_signal_status {
 	MPTCP_RM_ADDR_SIGNAL,
 };
 
+#define MAX_ADDR_ID		255
+
 struct mptcp_pm_data {
 	struct mptcp_addr_info local;
 	struct mptcp_addr_info remote;
@@ -190,6 +192,7 @@ struct mptcp_pm_data {
 
 	spinlock_t	lock;		/*protects the whole PM data */
 
+	DECLARE_BITMAP(id_avail_bitmap, MAX_ADDR_ID + 1);
 	u8		addr_signal;
 	bool		server_side;
 	bool		work_pending;
