@@ -690,9 +690,11 @@ static void init_rng(void)
 
 	if (fd >= 0) {
 		unsigned int foo;
+		ssize_t ret;
 
 		/* can't fail */
-		(void)read(fd, &foo, sizeof(foo));
+		ret = read(fd, &foo, sizeof(foo));
+		assert(ret == sizeof(foo));
 
 		close(fd);
 		srand(foo);
