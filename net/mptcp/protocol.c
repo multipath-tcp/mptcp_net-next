@@ -3025,6 +3025,7 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				MPTCP_MIB_MPCAPABLEPASSIVEFALLBACK);
 	}
 
+	newsk->sk_kern_sock = kern;
 	return newsk;
 }
 
