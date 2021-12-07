@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-clear-kern-flag-from-fallback-sockets
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: clear 'kern' flag from fallback sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp ULP extension relies on sk->sk_sock_kern being set correctly:
+It prevents setsockopt(fd, IPPROTO_TCP, TCP_ULP, "mptcp", 6); from
+working for plain tcp sockets (any userspace-exposed socket).
+
+But in case of fallback, accept() can return a plain tcp sk.
+In such case, sk is still tagged as 'kernel' and setsockopt will work.
+
+This will crash the kernel, The subflow extension has a NULL ctx->conn
+mptcp socket:
+
+BUG: KASAN: null-ptr-deref in subflow_data_ready+0x181/0x2b0
+Call Trace:
+ tcp_data_ready+0xf8/0x370
+ [..]
+
+Fixes: cf7da0d66cc1 ("mptcp: Create SUBFLOW socket for incoming connections")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
