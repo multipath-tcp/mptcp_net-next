@@ -1,1 +1,2 @@
 t/selftests-mptcp-add-inq-test-case
+t/selftests-mptcp-add-infinite-map-mibs-check
