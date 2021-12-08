@@ -21,6 +21,8 @@
 #define VSC9959_TAS_GCL_ENTRY_MAX	63
 #define VSC9959_VCAP_POLICER_BASE	63
 #define VSC9959_VCAP_POLICER_MAX	383
+#define VSC9959_SWITCH_PCI_BAR		4
+#define VSC9959_IMDIO_PCI_BAR		0
 
 static const u32 vsc9959_ana_regmap[] = {
 	REG(ANA_ADVLEARN,			0x0089a0),
@@ -1503,11 +1505,9 @@ static int vsc9959_stream_table_add(struct ocelot *ocelot,
 	struct felix_stream *stream_entry;
 	int ret;
 
-	stream_entry = kzalloc(sizeof(*stream_entry), GFP_KERNEL);
+	stream_entry = kmemdup(stream, sizeof(*stream_entry), GFP_KERNEL);
 	if (!stream_entry)
 		return -ENOMEM;
-
-	memcpy(stream_entry, stream, sizeof(*stream_entry));
 
 	if (!stream->dummy) {
 		ret = vsc9959_mact_stream_set(ocelot, stream_entry, extack);
@@ -1624,11 +1624,10 @@ static int vsc9959_psfp_sfi_list_add(struct ocelot *ocelot,
 	struct felix_stream_filter *sfi_entry;
 	int ret;
 
-	sfi_entry = kzalloc(sizeof(*sfi_entry), GFP_KERNEL);
+	sfi_entry = kmemdup(sfi, sizeof(*sfi_entry), GFP_KERNEL);
 	if (!sfi_entry)
 		return -ENOMEM;
 
-	memcpy(sfi_entry, sfi, sizeof(*sfi_entry));
 	refcount_set(&sfi_entry->refcount, 1);
 
 	ret = vsc9959_psfp_sfi_set(ocelot, sfi_entry);
@@ -2230,8 +2229,6 @@ static const struct felix_info felix_info_vsc9959 = {
 	.num_mact_rows		= 2048,
 	.num_ports		= 6,
 	.num_tx_queues		= OCELOT_NUM_TC,
-	.switch_pci_bar		= 4,
-	.imdio_pci_bar		= 0,
 	.quirk_no_xtr_irq	= true,
 	.ptp_caps		= &vsc9959_ptp_caps,
 	.mdio_bus_alloc		= vsc9959_mdio_bus_alloc,
@@ -2240,6 +2237,7 @@ static const struct felix_info felix_info_vsc9959 = {
 	.prevalidate_phy_mode	= vsc9959_prevalidate_phy_mode,
 	.port_setup_tc		= vsc9959_port_setup_tc,
 	.port_sched_speed_set	= vsc9959_sched_speed_set,
+	.init_regmap		= ocelot_regmap_init,
 };
 
 static irqreturn_t felix_irq_handler(int irq, void *data)
@@ -2290,10 +2288,8 @@ static int felix_pci_probe(struct pci_dev *pdev,
 	ocelot->dev = &pdev->dev;
 	ocelot->num_flooding_pgids = OCELOT_NUM_TC;
 	felix->info = &felix_info_vsc9959;
-	felix->switch_base = pci_resource_start(pdev,
-						felix->info->switch_pci_bar);
-	felix->imdio_base = pci_resource_start(pdev,
-					       felix->info->imdio_pci_bar);
+	felix->switch_base = pci_resource_start(pdev, VSC9959_SWITCH_PCI_BAR);
+	felix->imdio_base = pci_resource_start(pdev, VSC9959_IMDIO_PCI_BAR);
 
 	pci_set_master(pdev);
 
