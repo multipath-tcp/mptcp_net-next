@@ -1,1 +1,2 @@
 t/mptcp-allow-changing-the-backup-bit-by-endpoint-id
+t/mptcp-add-disconnect-selftests
