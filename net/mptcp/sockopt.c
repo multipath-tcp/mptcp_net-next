@@ -615,6 +615,66 @@ static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t
 	return ret;
 }
 
+static int mptcp_setsockopt_sol_tcp_cork(struct mptcp_sock *msk, sockptr_t optval,
+					 unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+
+	if (copy_from_sockptr(&val, optval, sizeof(val)))
+		return -EFAULT;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	msk->cork = !!val;
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		lock_sock(ssk);
+		__tcp_sock_set_cork(ssk, !!val);
+		release_sock(ssk);
+	}
+	if (!val)
+		mptcp_check_and_set_pending(sk);
+	release_sock(sk);
+
+	return 0;
+}
+
+static int mptcp_setsockopt_sol_tcp_nodelay(struct mptcp_sock *msk, sockptr_t optval,
+					    unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	int val;
+
+	if (optlen < sizeof(int))
+		return -EINVAL;
+
+	if (copy_from_sockptr(&val, optval, sizeof(val)))
+		return -EFAULT;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	msk->nodelay = !!val;
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		lock_sock(ssk);
+		__tcp_sock_set_nodelay(ssk, !!val);
+		release_sock(ssk);
+	}
+	if (val)
+		mptcp_check_and_set_pending(sk);
+	release_sock(sk);
+
+	return 0;
+}
+
 static int mptcp_setsockopt_sol_ip_set_transparent(struct mptcp_sock *msk, int optname,
 						   sockptr_t optval, unsigned int optlen)
 {
@@ -716,6 +776,10 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		return -EOPNOTSUPP;
 	case TCP_CONGESTION:
 		return mptcp_setsockopt_sol_tcp_congestion(msk, optval, optlen);
+	case TCP_CORK:
+		return mptcp_setsockopt_sol_tcp_cork(msk, optval, optlen);
+	case TCP_NODELAY:
+		return mptcp_setsockopt_sol_tcp_nodelay(msk, optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
@@ -1052,15 +1116,24 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 
 	if (get_user(len, optlen))
 		return -EFAULT;
-
-	len = min_t(unsigned int, len, sizeof(int));
 	if (len < 0)
 		return -EINVAL;
 
-	if (put_user(len, optlen))
-		return -EFAULT;
-	if (copy_to_user(optval, &val, len))
-		return -EFAULT;
+	if (len < sizeof(int) && len > 0 && val >= 0 && val <= 255) {
+		unsigned char ucval = (unsigned char)val;
+
+		len = 1;
+		if (put_user(len, optlen))
+			return -EFAULT;
+		if (copy_to_user(optval, &ucval, 1))
+			return -EFAULT;
+	} else {
+		len = min_t(unsigned int, len, sizeof(int));
+		if (put_user(len, optlen))
+			return -EFAULT;
+		if (copy_to_user(optval, &val, len))
+			return -EFAULT;
+	}
 
 	return 0;
 }
@@ -1077,7 +1150,24 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 						      optval, optlen);
 	case TCP_INQ:
 		return mptcp_put_int_option(msk, optval, optlen, msk->recvmsg_inq);
+	case TCP_CORK:
+		return mptcp_put_int_option(msk, optval, optlen, msk->cork);
+	case TCP_NODELAY:
+		return mptcp_put_int_option(msk, optval, optlen, msk->nodelay);
 	}
+	return -EOPNOTSUPP;
+}
+
+static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
+			       char __user *optval, int __user *optlen)
+{
+	struct sock *sk = (void *)msk;
+
+	switch (optname) {
+	case IP_TOS:
+		return mptcp_put_int_option(msk, optval, optlen, inet_sk(sk)->tos);
+	}
+
 	return -EOPNOTSUPP;
 }
 
@@ -1116,6 +1206,8 @@ int mptcp_getsockopt(struct sock *sk, int level, int optname,
 	if (ssk)
 		return tcp_getsockopt(ssk, level, optname, optval, option);
 
+	if (level == SOL_IP)
+		return mptcp_getsockopt_v4(msk, optname, optval, option);
 	if (level == SOL_TCP)
 		return mptcp_getsockopt_sol_tcp(msk, optname, optval, option);
 	if (level == SOL_MPTCP)
@@ -1164,6 +1256,8 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 
 	if (inet_csk(sk)->icsk_ca_ops != inet_csk(ssk)->icsk_ca_ops)
 		tcp_set_congestion_control(ssk, msk->ca_name, false, true);
+	__tcp_sock_set_cork(ssk, !!msk->cork);
+	__tcp_sock_set_nodelay(ssk, !!msk->nodelay);
 
 	inet_sk(ssk)->transparent = inet_sk(sk)->transparent;
 	inet_sk(ssk)->freebind = inet_sk(sk)->freebind;
