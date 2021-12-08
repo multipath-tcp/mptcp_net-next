@@ -1,2 +1,1 @@
-t/mptcp-support-TCP_CORK-and-TCP_NODELAY
 t/mptcp-getsockopt-add-support-for-IP_TOS
