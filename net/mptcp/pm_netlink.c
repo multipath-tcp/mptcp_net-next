@@ -251,14 +251,17 @@ unsigned int mptcp_pm_get_local_addr_max(struct mptcp_sock *msk)
 }
 EXPORT_SYMBOL_GPL(mptcp_pm_get_local_addr_max);
 
-static void check_work_pending(struct mptcp_sock *msk)
+bool mptcp_pm_nl_check_work_pending(struct mptcp_sock *msk)
 {
 	struct pm_nl_pernet *pernet = net_generic(sock_net((struct sock *)msk), pm_nl_pernet_id);
 
 	if (msk->pm.subflows == mptcp_pm_get_subflows_max(msk) ||
 	    (find_next_and_bit(pernet->id_bitmap, msk->pm.id_avail_bitmap, MAX_ADDR_ID + 1, 0) ==
-	     MAX_ADDR_ID + 1))
+	     MAX_ADDR_ID + 1)) {
 		WRITE_ONCE(msk->pm.work_pending, false);
+		return false;
+	}
+	return true;
 }
 
 struct mptcp_pm_add_entry *
@@ -503,12 +506,12 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 
 	/* do lazy endpoint usage accounting for the MPC subflows */
 	if (unlikely(!(msk->pm.status & BIT(MPTCP_PM_MPC_ENDPOINT_ACCOUNTED))) && msk->first) {
-		struct mptcp_addr_info local;
+		struct mptcp_addr_info mpc_addr;
 		int mpc_id;
 
-		local_address((struct sock_common *)msk->first, &local);
-		mpc_id = lookup_id_by_addr(pernet, &local);
-		if (mpc_id < 0)
+		local_address((struct sock_common *)msk->first, &mpc_addr);
+		mpc_id = lookup_id_by_addr(pernet, &mpc_addr);
+		if (mpc_id >= 0)
 			__clear_bit(mpc_id, msk->pm.id_avail_bitmap);
 
 		msk->pm.status |= BIT(MPTCP_PM_MPC_ENDPOINT_ACCOUNTED);
@@ -553,7 +556,7 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 			spin_lock_bh(&msk->pm.lock);
 		}
 	}
-	check_work_pending(msk);
+	mptcp_pm_nl_check_work_pending(msk);
 }
 
 static void mptcp_pm_nl_fully_established(struct mptcp_sock *msk)
@@ -760,11 +763,12 @@ static void mptcp_pm_nl_rm_addr_or_subflow(struct mptcp_sock *msk,
 				 i, rm_list->ids[i], subflow->local_id, subflow->remote_id);
 			spin_unlock_bh(&msk->pm.lock);
 			mptcp_subflow_shutdown(sk, ssk, how);
+
+			/* the following takes care of updating the subflows counter */
 			mptcp_close_ssk(sk, ssk, subflow);
 			spin_lock_bh(&msk->pm.lock);
 
 			removed = true;
-			msk->pm.subflows--;
 			__MPTCP_INC_STATS(sock_net(sk), rm_type);
 		}
 		__set_bit(rm_list->ids[1], msk->pm.id_avail_bitmap);
