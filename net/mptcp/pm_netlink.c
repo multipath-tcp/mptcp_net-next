@@ -1278,10 +1278,16 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		}
 
 		lock_sock(sk);
+		/* don't touch subflows for listener sockets */
+		if (sk->sk_state == TCP_LISTEN)
+			goto unlock_next;
+
 		remove_subflow = lookup_subflow_by_saddr(&msk->conn_list, addr);
 		mptcp_pm_remove_anno_addr(msk, addr, remove_subflow);
 		if (remove_subflow)
 			mptcp_pm_remove_subflow(msk, &list);
+
+unlock_next:
 		release_sock(sk);
 
 next:
@@ -1321,10 +1327,16 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 			goto next;
 
 		lock_sock(sk);
+		/* don't touch subflows for listener sockets */
+		if (sk->sk_state == TCP_LISTEN)
+			goto unlock_next;
+
 		spin_lock_bh(&msk->pm.lock);
 		mptcp_pm_remove_addr(msk, &list);
 		mptcp_pm_nl_rm_subflow_received(msk, &list);
 		spin_unlock_bh(&msk->pm.lock);
+
+unlock_next:
 		release_sock(sk);
 
 next:
