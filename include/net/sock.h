@@ -350,6 +350,7 @@ struct bpf_local_storage;
   *	@sk_txtime_deadline_mode: set deadline mode for SO_TXTIME
   *	@sk_txtime_report_errors: set report errors mode for SO_TXTIME
   *	@sk_txtime_unused: unused txtime flags
+  *	@ns_tracker: tracker for netns reference
   */
 struct sock {
 	/*
@@ -538,6 +539,7 @@ struct sock {
 	struct bpf_local_storage __rcu	*sk_bpf_storage;
 #endif
 	struct rcu_head		sk_rcu;
+	netns_tracker		ns_tracker;
 };
 
 enum sk_pacing {
@@ -1633,16 +1635,6 @@ static inline void sk_mem_uncharge(struct sock *sk, int size)
 		__sk_mem_reclaim(sk, SK_RECLAIM_CHUNK);
 }
 
-static inline void sock_release_ownership(struct sock *sk)
-{
-	if (sk->sk_lock.owned) {
-		sk->sk_lock.owned = 0;
-
-		/* The sk_lock has mutex_unlock() semantics: */
-		mutex_release(&sk->sk_lock.dep_map, _RET_IP_);
-	}
-}
-
 /*
  * Macro so as to not evaluate some arguments when
  * lockdep is not enabled.
@@ -1769,12 +1761,23 @@ static inline bool sock_owned_by_user_nocheck(const struct sock *sk)
 	return sk->sk_lock.owned;
 }
 
+static inline void sock_release_ownership(struct sock *sk)
+{
+	if (sock_owned_by_user_nocheck(sk)) {
+		sk->sk_lock.owned = 0;
+
+		/* The sk_lock has mutex_unlock() semantics: */
+		mutex_release(&sk->sk_lock.dep_map, _RET_IP_);
+	}
+}
+
 /* no reclassification while locks are held */
 static inline bool sock_allow_reclassification(const struct sock *csk)
 {
 	struct sock *sk = (struct sock *)csk;
 
-	return !sk->sk_lock.owned && !spin_is_locked(&sk->sk_lock.slock);
+	return !sock_owned_by_user_nocheck(sk) &&
+		!spin_is_locked(&sk->sk_lock.slock);
 }
 
 struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
