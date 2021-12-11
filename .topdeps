@@ -1,1 +1,2 @@
 t/mptcp-getsockopt-add-support-for-IP_TOS
+t/mptcp-add-disconnect-selftests
