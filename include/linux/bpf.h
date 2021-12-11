@@ -1085,7 +1085,7 @@ struct bpf_array {
 };
 
 #define BPF_COMPLEXITY_LIMIT_INSNS      1000000 /* yes. 1M insns */
-#define MAX_TAIL_CALL_CNT 32
+#define MAX_TAIL_CALL_CNT 33
 
 #define BPF_F_ACCESS_MASK	(BPF_F_RDONLY |		\
 				 BPF_F_RDONLY_PROG |	\
@@ -1725,6 +1725,14 @@ bool bpf_prog_has_kfunc_call(const struct bpf_prog *prog);
 const struct btf_func_model *
 bpf_jit_find_kfunc_model(const struct bpf_prog *prog,
 			 const struct bpf_insn *insn);
+struct bpf_core_ctx {
+	struct bpf_verifier_log *log;
+	const struct btf *btf;
+};
+
+int bpf_core_apply(struct bpf_core_ctx *ctx, const struct bpf_core_relo *relo,
+		   int relo_idx, void *insn);
+
 #else /* !CONFIG_BPF_SYSCALL */
 static inline struct bpf_prog *bpf_prog_get(u32 ufd)
 {
@@ -2157,6 +2165,7 @@ extern const struct bpf_func_proto bpf_sk_setsockopt_proto;
 extern const struct bpf_func_proto bpf_sk_getsockopt_proto;
 extern const struct bpf_func_proto bpf_kallsyms_lookup_name_proto;
 extern const struct bpf_func_proto bpf_find_vma_proto;
+extern const struct bpf_func_proto bpf_loop_proto;
 extern const struct bpf_func_proto bpf_mptcp_sock_proto;
 
 const struct bpf_func_proto *tracing_prog_func_proto(
