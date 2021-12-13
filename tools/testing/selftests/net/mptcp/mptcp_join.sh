@@ -238,6 +238,37 @@ is_v6()
 	[ -z "${1##*:*}" ]
 }
 
+# $1: ns, $2: port
+wait_local_port_listen()
+{
+	local listener_ns="${1}"
+	local port="${2}"
+
+	local port_hex i
+
+	port_hex="$(printf "%04X" "${port}")"
+	for i in $(seq 10); do
+		ip netns exec "${listener_ns}" cat /proc/net/tcp* | \
+			awk "BEGIN {rc=1} {if (\$2 ~ /:${port_hex}\$/ && \$4 ~ /0A/) {rc=0; exit}} END {exit rc}" &&
+			break
+		sleep 0.1
+	done
+}
+
+# $1: ns, $2: endpoint id
+wait_address_deleted()
+{
+	local ns="${1}"
+	local addr="${2}"
+	local cnt
+
+	for i in $(seq 10); do
+		cnt=$(ss -tON ${ns} state big src = ${addr} | wc -l)
+		[ "$cnt" != 0 ] || break;
+		sleep 0.1
+	done
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -307,7 +338,7 @@ do_transfer()
 	fi
 	spid=$!
 
-	sleep 1
+	wait_local_port_listen "${listener_ns}" "${srv_port}"
 
 	if [ "$test_link_fail" -eq 0 ];then
 		timeout ${timeout_test} \
@@ -324,10 +355,13 @@ do_transfer()
 	fi
 	cpid=$!
 
+	# let the mptcp subflow be established in background before
+	# do endpoint manipulation
+	[ $addr_nr_ns1 = "0" -a $addr_nr_ns2 = "0" ] || sleep 1
+
 	if [ $addr_nr_ns1 -gt 0 ]; then
 		let add_nr_ns1=addr_nr_ns1
 		counter=2
-		sleep 1
 		while [ $add_nr_ns1 -gt 0 ]; do
 			local addr
 			if is_v6 "${connect_addr}"; then
@@ -339,7 +373,6 @@ do_transfer()
 			let counter+=1
 			let add_nr_ns1-=1
 		done
-		sleep 1
 	elif [ $addr_nr_ns1 -lt 0 ]; then
 		let rm_nr_ns1=-addr_nr_ns1
 		if [ $rm_nr_ns1 -lt 8 ]; then
@@ -347,22 +380,18 @@ do_transfer()
 			pos=1
 			dump=(`ip netns exec ${listener_ns} ./pm_nl_ctl dump`)
 			if [ ${#dump[@]} -gt 0 ]; then
-				sleep 1
-
 				while [ $counter -le $rm_nr_ns1 ]
 				do
 					id=${dump[$pos]}
 					ip netns exec ${listener_ns} ./pm_nl_ctl del $id
-					sleep 1
+					wait_address_deleted ${listener_ns} ${dump[-1]}
 					let counter+=1
 					let pos+=5
 				done
 			fi
 		elif [ $rm_nr_ns1 -eq 8 ]; then
-			sleep 1
 			ip netns exec ${listener_ns} ./pm_nl_ctl flush
 		elif [ $rm_nr_ns1 -eq 9 ]; then
-			sleep 1
 			ip netns exec ${listener_ns} ./pm_nl_ctl del 0 ${connect_addr}
 		fi
 	fi
@@ -373,10 +402,13 @@ do_transfer()
 		addr_nr_ns2=${addr_nr_ns2:9}
 	fi
 
+	# if newly added endpoints must be deleted, give the background msk
+	# some time to created them
+	[ $addr_nr_ns1 -gt 0 -a $addr_nr_ns2 -lt 0 ] && sleep 1
+
 	if [ $addr_nr_ns2 -gt 0 ]; then
 		let add_nr_ns2=addr_nr_ns2
 		counter=3
-		sleep 1
 		while [ $add_nr_ns2 -gt 0 ]; do
 			local addr
 			if is_v6 "${connect_addr}"; then
@@ -388,7 +420,6 @@ do_transfer()
 			let counter+=1
 			let add_nr_ns2-=1
 		done
-		sleep 1
 	elif [ $addr_nr_ns2 -lt 0 ]; then
 		let rm_nr_ns2=-addr_nr_ns2
 		if [ $rm_nr_ns2 -lt 8 ]; then
@@ -396,19 +427,17 @@ do_transfer()
 			pos=1
 			dump=(`ip netns exec ${connector_ns} ./pm_nl_ctl dump`)
 			if [ ${#dump[@]} -gt 0 ]; then
-				sleep 1
-
 				while [ $counter -le $rm_nr_ns2 ]
 				do
+					# rm_addr are serialized, allow the previous one to complete
 					id=${dump[$pos]}
 					ip netns exec ${connector_ns} ./pm_nl_ctl del $id
-					sleep 1
+					wait_address_deleted ${connector_ns} ${dump[-1]}
 					let counter+=1
 					let pos+=5
 				done
 			fi
 		elif [ $rm_nr_ns2 -eq 8 ]; then
-			sleep 1
 			ip netns exec ${connector_ns} ./pm_nl_ctl flush
 		elif [ $rm_nr_ns2 -eq 9 ]; then
 			local addr
@@ -417,7 +446,6 @@ do_transfer()
 			else
 				addr="10.0.1.2"
 			fi
-			sleep 1
 			ip netns exec ${connector_ns} ./pm_nl_ctl del 0 $addr
 		fi
 	fi
