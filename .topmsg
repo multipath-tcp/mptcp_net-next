@@ -1,5 +1,5 @@
 From: Jean Sacren <sakiwit@gmail.com>
-Subject: [PATCH] net: mptcp: clean up harmless false expressions
+Subject: [PATCH] mptcp: clean up harmless false expressions
 
 entry->addr.id is u8 with a range from 0 to 255 and MAX_ADDR_ID is 255.
 We should drop both false expressions of (entry->addr.id > MAX_ADDR_ID).
