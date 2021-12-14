@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-mptcp-clean-up-harmless-false-expressions
+From: Jean Sacren <sakiwit@gmail.com>
+Subject: [PATCH] net: mptcp: clean up harmless false expressions
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+entry->addr.id is u8 with a range from 0 to 255 and MAX_ADDR_ID is 255.
+We should drop both false expressions of (entry->addr.id > MAX_ADDR_ID).
+
+We should also remove the obsolete parentheses in the first if branch.
+
+Use U8_MAX for MAX_ADDR_ID and add a comment to show the link to
+mptcp_addr_info.id as suggested by Mr. Matthieu Baerts.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Jean Sacren <sakiwit@gmail.com>
