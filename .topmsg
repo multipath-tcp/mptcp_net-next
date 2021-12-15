@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-keep-track-of-local-endpoint-still-available-for-each-msk
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: keep track of local endpoint still available for each msk
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Include into the path manager status a bitmap tracking the list
+of local endpoints still available - not yet used - for the
+relevant mptcp socket.
+
+Keep such map updated at endpoint creation/deletion time, so
+that we can easily skip already used endpoint at local address
+selection time.
+
+The endpoint used by the initial subflow is lazyly accounted at
+subflow creation time: the usage bitmap is be up2date before
+endpoint selection and we avoid such unneeded task in some relevant
+scenarios - e.g. busy servers accepting incoming subflows but
+not creating any additional ones nor annuncing additional addresses.
+
+Overall this allows for fair local endpoints usage in case of
+subflow failure.
+
+As a side effect, this patch also enforces that each endpoint
+is used at most once for each mptcp connection.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
