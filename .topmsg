@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-clean-up-MPJ-option-writing
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: clean-up MPJ option writing
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Check for all MPJ variant at once, this reduces the number
+of conditionals traversed on average and will simplify the
+next patch.
+
+No functional change intended.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
