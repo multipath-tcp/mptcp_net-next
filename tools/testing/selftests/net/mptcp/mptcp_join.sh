@@ -1091,7 +1091,7 @@ subflows_error_tests()
 
 	# updates in the child shell do not have any effect here, we
 	# need to bump the test counter for the above case
-	TEST_COUNT=$((TEST_COUNT))
+	TEST_COUNT=$((TEST_COUNT+1))
 
 	# mpj subflow will be in TW after the reset
 	wait_for_tw $ns2
