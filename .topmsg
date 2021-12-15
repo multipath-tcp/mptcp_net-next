@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-cleanup-MPJ-subflow-list-handling
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup MPJ subflow list handling
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We can simplify the join list handling leveraging the
+mptcp_release_cb(): if we can acquire the msk socket
+lock ad mptcp_finish_join time, move the new subflow
+directly into the conn_list, otherwise place it on join_list and
+let the release_cb process such list.
+
+Since pending MPJ connection are now always processed
+in a timely way, we can avoid flushing the join list
+every time we have to process all the current subflows.
+
+Additionally we can now use the mptcp data lock to protect
+the join_list, removing the additional spin lock.
+
+Finally, the MPJ handshake is now always finalized under the
+msk socket lock, we can drop the additional synchronization
+between mptcp_finish_join() and mptcp_close().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
