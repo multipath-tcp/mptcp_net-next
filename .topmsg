@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-per-socket-endpoint-accounting
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix per socket endpoint accounting
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since full-mesh endpoint support, the reception of a single ADD_ADDR
+option can cause multiple subflows creation. When such option is
+accepted we increment 'add_addr_accepted' by one. When we received
+a paired RM_ADDR option, we deleted all the relevant subflows,
+decrementing 'add_addr_accepted' by one for each of them.
+
+We have a similar issue for 'local_addr_used'
+
+Fix them moving the pm endpoint accounting outside the subflow
+traversal.
+
+Fixes: 1a0d6136c5f0 ("mptcp: local addresses fullmesh")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
