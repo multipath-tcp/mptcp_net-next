@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-tests-for-subflow-creation-failure
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add tests for subflow creation failure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Verify that, when multiple endpoints are available, subflows
+creation proceed even when the first additional subflow creation
+fails - due to packet drop on the relevant link
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
