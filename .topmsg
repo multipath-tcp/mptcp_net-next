@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Make-kernel-path-manager-check-for-userspace-managed-sockets
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Make kernel path manager check for userspace-managed sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Userspace-managed sockets should not have their subflows or
+advertisements changed by the kernel path manager.
+
+v3: Use helper function for PM mode (Paolo Abeni)
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
