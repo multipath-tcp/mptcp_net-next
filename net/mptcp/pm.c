@@ -87,6 +87,13 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 	unsigned int subflows_max;
 	int ret = 0;
 
+	if (READ_ONCE(pm->pm_type) != MPTCP_PM_TYPE_KERNEL) {
+		spin_lock_bh(&msk->pm.lock);
+		++pm->subflows;
+		spin_unlock_bh(&msk->pm.lock);
+		return true;
+	}
+
 	subflows_max = mptcp_pm_get_subflows_max(msk);
 
 	pr_debug("msk=%p subflows=%d max=%d allow=%d", msk, pm->subflows,
