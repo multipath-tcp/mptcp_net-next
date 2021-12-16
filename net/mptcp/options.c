@@ -920,8 +920,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		 */
 		if (TCP_SKB_CB(skb)->seq == subflow->ssn_offset + 1 &&
 		    TCP_SKB_CB(skb)->end_seq == TCP_SKB_CB(skb)->seq &&
-		    subflow->mp_join && (mp_opt->suboptions & OPTIONS_MPTCP_MPJ) &&
-		    READ_ONCE(msk->pm.server_side))
+		    subflow->mp_join && (mp_opt->suboptions & OPTIONS_MPTCP_MPJ))
 			tcp_send_ack(ssk);
 		goto fully_established;
 	}
