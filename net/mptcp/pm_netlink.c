@@ -484,6 +484,31 @@ static bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
 	return true;
 }
 
+void mptcp_free_local_addr_list(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_addr_entry *entry, *tmp;
+	struct sock *sk = (struct sock *)msk;
+	struct pm_nl_pernet *pernet;
+	LIST_HEAD(free_list);
+
+	if (READ_ONCE(msk->pm.pm_type) == MPTCP_PM_TYPE_KERNEL)
+		return;
+
+	pernet = net_generic(sock_net(sk), pm_nl_pernet_id);
+
+	pr_debug("msk=%p", msk);
+
+	mptcp_data_lock(sk);
+	list_splice_init(&msk->local_addr_list, &free_list);
+	mptcp_data_unlock(sk);
+
+	list_for_each_entry_safe(entry, tmp, &free_list, list) {
+		if (entry->lsk_ref)
+			lsk_list_release(pernet, entry->lsk_ref);
+		kfree(entry);
+	}
+}
+
 void mptcp_pm_free_anno_list(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_add_entry *entry, *tmp;
@@ -970,6 +995,60 @@ static bool address_use_port(struct mptcp_pm_addr_entry *entry)
 	return (entry->flags &
 		(MPTCP_PM_ADDR_FLAG_SIGNAL | MPTCP_PM_ADDR_FLAG_SUBFLOW)) ==
 		MPTCP_PM_ADDR_FLAG_SIGNAL;
+}
+
+static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
+						    struct mptcp_pm_addr_entry *entry)
+{
+	DECLARE_BITMAP(id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
+	struct mptcp_pm_addr_entry *match = NULL;
+	struct sock *sk = (struct sock *)msk;
+	struct mptcp_pm_addr_entry *e;
+	bool addr_match = false;
+	bool id_match = false;
+	int ret = -EINVAL;
+
+	bitmap_zero(id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
+
+	mptcp_data_lock(sk);
+	list_for_each_entry(e, &msk->local_addr_list, list) {
+		addr_match = addresses_equal(&e->addr, &entry->addr, true);
+		if (addr_match && entry->addr.id == 0)
+			entry->addr.id = e->addr.id;
+		id_match = (e->addr.id == entry->addr.id);
+		if (addr_match && id_match) {
+			match = e;
+			break;
+		} else if (addr_match || id_match) {
+			break;
+		}
+		__set_bit(e->addr.id, id_bitmap);
+	}
+
+	if (!match && !addr_match && !id_match) {
+		e = kmalloc(sizeof(*e), GFP_ATOMIC);
+		if (!e) {
+			mptcp_data_unlock(sk);
+			return -ENOMEM;
+		}
+
+		*e = *entry;
+		if (!e->addr.id)
+			e->addr.id = find_next_zero_bit(id_bitmap,
+							MPTCP_PM_MAX_ADDR_ID + 1,
+							1);
+		list_add_tail_rcu(&e->list, &msk->local_addr_list);
+		ret = e->addr.id;
+
+		if (e->lsk_ref && e->addr.port)
+			lsk_list_add_ref(e->lsk_ref);
+	} else if (match) {
+		ret = entry->addr.id;
+	}
+
+	mptcp_data_unlock(sk);
+
+	return ret;
 }
 
 static int mptcp_pm_nl_append_new_local_addr(struct pm_nl_pernet *pernet,
