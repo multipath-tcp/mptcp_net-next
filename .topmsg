@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-a-per-namespace-sysctl-to-set-the-default-path-manager-type
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Add a per-namespace sysctl to set the default path manager type
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The new net.mptcp.pm_type sysctl determines which path manager will be
+used by each newly-created MPTCP socket.
+
+v2: Handle builds without CONFIG_SYSCTL
+v3: Clarify logic for type-specific PM init (Geliang Tang and Paolo Abeni)
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
