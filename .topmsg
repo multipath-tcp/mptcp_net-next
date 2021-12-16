@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Remove-redundant-assignments-in-path-manager-init
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Remove redundant assignments in path manager init
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+A few members of the mptcp_pm_data struct were assigned to hard-coded
+values in mptcp_pm_data_reset(), and then immediately changed in
+mptcp_pm_nl_data_init().
+
+Instead, flatten all the assignments in to mptcp_pm_data_reset().
+
+v2: Resolve conflicts due to rename of mptcp_pm_data_reset()
+v4: Resolve conflict in mptcp_pm_data_reset()
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
