@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-atomic-bit-manipulation-when-possible
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid atomic bit manipulation when possible
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently the msk->flags bitmask carries both state for the
+mptcp_release_cb() - mostly touched under the mptcp data lock
+- and others state info touched even outside such lock scope.
+
+As a consequence, msk->flags is always manipulated with
+atomic operations.
+
+This change splits such bitmask in two separate fields, so
+that we use plain bit oper operations when touching the
+cb-related info.
+
+The MPTCP_PUSH_PENDING bit needs additional care, as it is the
+only CB related field currently accessed either under the mptcp
+data lock or the mptcp socket lock.
+Let's add another mask just for such bit's sake.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
