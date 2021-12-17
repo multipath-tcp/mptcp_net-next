@@ -810,8 +810,16 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 
 static bool __mptcp_finish_join(struct mptcp_sock *msk, struct sock *ssk)
 {
-	if (((struct sock *)msk)->sk_state != TCP_ESTABLISHED)
+	struct sock *sk = (struct sock *)msk;
+
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return false;
+
+	/* attach to msk socket only after we are sure we will deal with it
+	 * at close time
+	 */
+	if (sk->sk_socket && !ssk->sk_socket)
+		mptcp_sock_graft(ssk, sk->sk_socket);
 
 	mptcp_propagate_sndbuf((struct sock *)msk, ssk);
 	mptcp_sockopt_sync_locked(msk, ssk);
@@ -3228,7 +3236,6 @@ bool mptcp_finish_join(struct sock *ssk)
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct sock *parent = (void *)msk;
-	struct socket *parent_sock;
 	bool ret = true;
 
 	pr_debug("msk=%p, subflow=%p", msk, subflow);
@@ -3271,13 +3278,6 @@ err_prohibited:
 		subflow->reset_reason = MPTCP_RST_EPROHIBIT;
 		return false;
 	}
-
-	/* attach to msk socket only after we are sure he will deal with us
-	 * at close time
-	 */
-	parent_sock = READ_ONCE(parent->sk_socket);
-	if (parent_sock && !ssk->sk_socket)
-		mptcp_sock_graft(ssk, parent_sock);
 
 	subflow->map_seq = READ_ONCE(msk->ack_seq);
 
