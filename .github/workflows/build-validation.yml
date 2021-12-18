@@ -1,0 +1,148 @@
+name: "MPTCP Upstream Build Validation"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**' # previous branches
+      - 't/**'        # TopGit tree
+      - 'net-next'    # part of the TopGit tree
+      - 'for-review'  # part of the TopGit tree
+    tags:
+      - 'patchew/**'  # patchew is using tags
+      # ideally, we would take 'export/**' but the cache is per branch...
+      # In other words, when using tags, we can only use the cache if we re-tag.
+      # https://github.com/actions/cache/issues/556
+      # So we build the "export" branch and we try to find the tag later
+
+env:
+  PW: "https://patchwork.kernel.org/api/1.2"
+
+jobs:
+  build:
+    name: "Build (matrix)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        defconfig: ['x86_64', 'i386']
+        ipv6: ['with_ipv6', 'without_ipv6']
+        mptcp: ['with_mptcp', 'without_mptcp']
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 100 # we should not have more commits on top of net-next/export
+
+      - name: "Setup cache for CCache"
+        uses: actions/cache@v2
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-
+
+      - name: "Build Validation"
+        uses: multipath-tcp/mptcp-upstream-validate-export-action@main
+        with:
+          # we want to validate each commits on top of net-next/export except for stable
+          each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
+          ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
+          defconfig: ${{ matrix.defconfig }}
+          ipv6: ${{ matrix.ipv6 }}
+          mptcp: ${{ matrix.mptcp }}
+          debug: ${{ secrets.BUILD_ACTION_DEBUG }}
+
+      - name: "Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: results
+          path: ./build-*-results.txt
+
+  notif:
+    name: "Notifications"
+    needs: build
+    # only for the official repo (patchew)
+    if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: results
+
+      - name: "Patchwork"
+        run: |
+          # $1: mid
+          get_status() {
+            case "$(awk "/^${1} /{ print \$2 }" build-*-results.txt | sort -u)" in
+              'fail'*)    echo "fail"; ;;
+              *'warning') echo "warning"; ;;
+              'success')  echo "success"; ;;
+              *)          echo "fail"; ;;
+            esac
+          }
+
+          # $1: mid, $2: status
+          get_desc() {
+            awk "/^${1} ${2} /{
+              out=\$3
+              for(i=4; i<=NF; i++)
+                out=out\" \"\$i
+              print out
+            }" build-*-results.txt | sort -u | sed '$!{:a;N;s/\n/ ; /;ta}'
+          }
+
+          # $1: mid, $2: status, $3: desc
+          _send() { local check_url
+            check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
+            if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
+              echo "URL not found: '${check_url}' '${URL_PW}${1}'"
+              return 1
+            fi
+
+            curl -X POST \
+              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+              -F "state=${2}" \
+              -F "target_url=${URL_GH}" \
+              -F "context=build" \
+              -F "description=${3}" \
+              "${check_url}" | jq '.'
+          }
+
+          FIRST=1
+          send() { local i
+            # patches can take a bit of time to appear: retry the first time
+            if [ "${FIRST}" = "1" ]; then
+              FIRST=0
+
+              for i in $(seq 45); do
+                if _send "${@}"; then
+                  echo "Successful sent after ${i} attempts"
+                  return 0
+                fi
+                sleep 1m
+              done
+
+              curl "${URL_PW}${1}"
+              return 1
+            else
+              _send "${@}"
+            fi
+          }
+
+          if ! ls ./build-*-results.txt; then
+            echo "Strange, no results, please check why"
+            exit 1
+          fi
+
+          while read -r mid; do
+            status=$(get_status "${mid}")
+            desc=$(get_desc "${mid}" "${status}")
+            send "${mid}" "${status}" "${desc}"
+          done < <(awk '{ print $1 }' build-*-results.txt | sort -u)
+        env:
+          URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
