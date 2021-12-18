@@ -1,1 +1,2 @@
 t/net-mptcp-clean-up-harmless-false-expressions
+t/mptcp-add-disconnect-selftests
