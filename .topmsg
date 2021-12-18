@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reuse-__mptcp_make_csum-in-validate_data_csum
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: reuse __mptcp_make_csum in validate_data_csum
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch reused __mptcp_make_csum() in validate_data_csum() instead of
+open-coding.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
