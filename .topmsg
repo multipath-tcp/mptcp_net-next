@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-change-the-parameter-of-__mptcp_make_csum
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: change the parameter of __mptcp_make_csum
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch changed the type of the last parameter of __mptcp_make_csum()
+from __sum16 to __wsum. And export this function in protocol.h.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
