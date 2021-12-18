@@ -6,4 +6,6 @@ creation proceed even when the first additional subflow creation
 fails - due to packet drop on the relevant link
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
