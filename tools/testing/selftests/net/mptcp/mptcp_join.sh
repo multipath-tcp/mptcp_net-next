@@ -1058,7 +1058,7 @@ subflows_error_tests()
 	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.1.2 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
-	chk_join_nr "no MPC address reuse with single endpoint" 0 0 0
+	chk_join_nr "no MPC reuse with single endpoint" 0 0 0
 
 	# multiple subflows, with subflow creation error
 	reset
@@ -1068,7 +1068,7 @@ subflows_error_tests()
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
 	ip netns exec $ns1 iptables -A INPUT -s 10.0.3.2 -p tcp -j REJECT
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
-	chk_join_nr "multiple subflows, with failing subflow" 1 1 1
+	chk_join_nr "multi subflows, with failing subflow" 1 1 1
 
 	# multiple subflows, with subflow timeout on MPJ
 	reset
@@ -1078,7 +1078,7 @@ subflows_error_tests()
 	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
 	ip netns exec $ns1 iptables -A INPUT -s 10.0.3.2 -p tcp -j DROP
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
-	chk_join_nr "multiple subflows, with subflow timeout" 1 1 1
+	chk_join_nr "multi subflows, with subflow timeout" 1 1 1
 
 	# multiple subflows, check that the endpoint corresponding to
 	# closed subflow (due to reset) is not reused if additional
@@ -1101,7 +1101,7 @@ subflows_error_tests()
 
 	# additional subflow could be created only if the PM select
 	# the later endpoint, skipping the already used one
-	chk_join_nr "multiple subflows, fair usage on close" 1 1 1
+	chk_join_nr "multi subflows, fair usage on close" 1 1 1
 }
 
 signal_address_tests()
