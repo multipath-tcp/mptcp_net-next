@@ -28,5 +28,6 @@ while true; do
 	fi
 done
 
-tg update
-tg push
+echo -e "\n\nPublish or Ctrl+C for manual push?"
+read -r
+./.publish.sh

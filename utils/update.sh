@@ -27,7 +27,7 @@ TG_UPSTREAM="${UPSTREAM}" \
 git --no-pager diff --stat "${NET_NEXT_BEFORE}"..net-next
 
 if [ -n "${1}" ]; then
-	echo "push?"
+	echo "remove empty topics & push?"
 	read -r
-	./.publish.sh
+	./.tg-remove-empty.sh
 fi
