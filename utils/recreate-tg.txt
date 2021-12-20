@@ -10,7 +10,7 @@ git branch -D for-review
 
 git checkout net-next
 TARGET="export_squash_09_more_nit"
-tg import $(git merge-base net-next ${TARGET})..${TARGET} ## no need to use merge-base?
+tg import --notes $(git merge-base net-next ${TARGET})..${TARGET} ## no need to use merge-base?
 tg create t/upstream
 
 """

@@ -96,7 +96,7 @@ tg_for_review() {
 
 tg_export() {
 	git checkout -f "${TG_TOP}"
-	tg export --linearize --force "${TG_EXPORT}"
+	tg export --linearize --force --notes "${TG_EXPORT}"
 	git push -f origin "${TG_EXPORT}"
 	git checkout -f "${TG_TOP}"
 }

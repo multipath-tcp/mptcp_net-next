@@ -142,7 +142,7 @@ print_rebase_pause "No additional tags to add?" "${PARENT}"
 
 # Import new patches with tg import
 git checkout "${PARENT}"
-tg import "${PARENT}"..tmp
+tg import --notes "${PARENT}"..tmp
 
 # Change the dep of TG_TOP to point to the last new patch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
