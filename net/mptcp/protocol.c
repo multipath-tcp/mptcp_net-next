@@ -2508,8 +2508,7 @@ static void mptcp_worker(struct work_struct *work)
 
 	mptcp_check_fastclose(msk);
 
-	if (msk->pm.status)
-		mptcp_pm_nl_work(msk);
+	mptcp_pm_nl_work(msk);
 
 	if (test_and_clear_bit(MPTCP_WORK_EOF, &msk->flags))
 		mptcp_check_for_eof(msk);
