@@ -378,7 +378,7 @@ do_transfer()
 			else
 				addr="10.0.$counter.1"
 			fi
-			ip netns exec $ns1 ./pm_nl_ctl add $addr flags signal
+			ip -n $ns1 mptcp endpoint add $addr signal
 			let counter+=1
 			let add_nr_ns1-=1
 		done
@@ -386,29 +386,29 @@ do_transfer()
 		let rm_nr_ns1=-addr_nr_ns1
 		if [ $rm_nr_ns1 -lt 8 ]; then
 			counter=1
-			pos=1
-			dump=(`ip netns exec ${listener_ns} ./pm_nl_ctl dump`)
+			pos=0
+			dump=(`ip -n ${listener_ns} mptcp endpoint show | awk -F "id " '{ print $2 }'`)
 			if [ ${#dump[@]} -gt 0 ]; then
 				while [ $counter -le $rm_nr_ns1 ]
 				do
 					id=${dump[$pos]}
 					rm_addr=$(rm_addr_count ${connector_ns})
-					ip netns exec ${listener_ns} ./pm_nl_ctl del $id
+					ip -n ${listener_ns} mptcp endpoint delete id $id
 					wait_rm_addr ${connector_ns} ${rm_addr}
 					let counter+=1
-					let pos+=5
+					let pos+=2
 				done
 			fi
 		elif [ $rm_nr_ns1 -eq 8 ]; then
-			ip netns exec ${listener_ns} ./pm_nl_ctl flush
+			ip -n ${listener_ns} mptcp endpoint flush
 		elif [ $rm_nr_ns1 -eq 9 ]; then
-			ip netns exec ${listener_ns} ./pm_nl_ctl del 0 ${connect_addr}
+			ip -n ${listener_ns} mptcp endpoint delete id 0 ${connect_addr}
 		fi
 	fi
 
 	flags="subflow"
 	if [[ "${addr_nr_ns2}" = "fullmesh_"* ]]; then
-		flags="${flags},fullmesh"
+		flags="${flags} fullmesh"
 		addr_nr_ns2=${addr_nr_ns2:9}
 	fi
 
@@ -426,7 +426,7 @@ do_transfer()
 			else
 				addr="10.0.$counter.2"
 			fi
-			ip netns exec $ns2 ./pm_nl_ctl add $addr flags $flags
+			ip -n $ns2 mptcp endpoint add $addr $flags
 			let counter+=1
 			let add_nr_ns2-=1
 		done
@@ -434,22 +434,22 @@ do_transfer()
 		let rm_nr_ns2=-addr_nr_ns2
 		if [ $rm_nr_ns2 -lt 8 ]; then
 			counter=1
-			pos=1
-			dump=(`ip netns exec ${connector_ns} ./pm_nl_ctl dump`)
+			pos=0
+			dump=(`ip -n ${connector_ns} mptcp endpoint show | awk -F"id " '{ print $2 }'`)
 			if [ ${#dump[@]} -gt 0 ]; then
 				while [ $counter -le $rm_nr_ns2 ]
 				do
 					# rm_addr are serialized, allow the previous one to complete
 					id=${dump[$pos]}
 					rm_addr=$(rm_addr_count ${listener_ns})
-					ip netns exec ${connector_ns} ./pm_nl_ctl del $id
+					ip -n ${connector_ns} mptcp endpoint delete id $id
 					wait_rm_addr ${listener_ns} ${rm_addr}
 					let counter+=1
-					let pos+=5
+					let pos+=2
 				done
 			fi
 		elif [ $rm_nr_ns2 -eq 8 ]; then
-			ip netns exec ${connector_ns} ./pm_nl_ctl flush
+			ip -n ${connector_ns} mptcp endpoint flush
 		elif [ $rm_nr_ns2 -eq 9 ]; then
 			local addr
 			if is_v6 "${connect_addr}"; then
@@ -457,17 +457,17 @@ do_transfer()
 			else
 				addr="10.0.1.2"
 			fi
-			ip netns exec ${connector_ns} ./pm_nl_ctl del 0 $addr
+			ip -n ${connector_ns} mptcp endpoint delete id 0 $addr
 		fi
 	fi
 
 	if [ ! -z $bkup ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
-			dump=(`ip netns exec $netns ./pm_nl_ctl dump`)
+			dump=(`ip -n $netns mptcp endpoint show`)
 			if [ ${#dump[@]} -gt 0 ]; then
-				addr=${dump[${#dump[@]} - 1]}
-				backup="ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup"
+				addr=${dump[0]}
+				backup="ip -n $netns mptcp endpoint set $addr $bkup"
 				$backup
 			fi
 		done
@@ -1011,51 +1011,51 @@ subflows_tests()
 
 	# subflow limited by client
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 0
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 0
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 0
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 0
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow, limited by client" 0 0 0
 
 	# subflow limited by server
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 0
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 0
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow, limited by server" 1 1 0
 
 	# subflow
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow" 1 1 1
 
 	# multiple subflows
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple subflows" 2 2 2
 
 	# multiple subflows limited by server
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple subflows, limited by server" 2 2 1
 
 	# single subflow, dev
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow dev ns2eth3
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow dev ns2eth3
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow, dev" 1 1 1
 }
@@ -1065,28 +1065,28 @@ subflows_error_tests()
 	# If a single subflow is configured, and matches the MPC src
 	# address, no additional subflow should be created
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.1.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.1.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
 	chk_join_nr "no MPC reuse with single endpoint" 0 0 0
 
 	# multiple subflows, with subflow creation error
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	ip netns exec $ns1 iptables -A INPUT -s 10.0.3.2 -p tcp -j REJECT
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
 	chk_join_nr "multi subflows, with failing subflow" 1 1 1
 
 	# multiple subflows, with subflow timeout on MPJ
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	ip netns exec $ns1 iptables -A INPUT -s 10.0.3.2 -p tcp -j DROP
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
 	chk_join_nr "multi subflows, with subflow timeout" 1 1 1
@@ -1095,9 +1095,9 @@ subflows_error_tests()
 	# closed subflow (due to reset) is not reused if additional
 	# subflows are added later
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	ip netns exec $ns1 iptables -A INPUT -s 10.0.3.2 -p tcp -j REJECT
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow &
 
@@ -1107,7 +1107,7 @@ subflows_error_tests()
 
 	# mpj subflow will be in TW after the reset
 	wait_for_tw $ns2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	wait
 
 	# additional subflow could be created only if the PM select
@@ -1119,16 +1119,16 @@ signal_address_tests()
 {
 	# add_address, unused
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "unused signal address" 0 0 0
 	chk_add_nr 1 1
 
 	# accept and use add_addr
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address" 1 1 1
 	chk_add_nr 1 1
@@ -1138,59 +1138,59 @@ signal_address_tests()
 	# belong to different subnets or one of the listed local address could be
 	# used for 'add_addr' subflow
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflow and signal" 2 2 2
 	chk_add_nr 1 1
 
 	# accept and use add_addr with additional subflows
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple subflows and signal" 3 3 3
 	chk_add_nr 1 1
 
 	# signal addresses
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.4.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.4.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal addresses" 3 3 3
 	chk_add_nr 3 3
 
 	# signal invalid addresses
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.12.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.14.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.12.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.14.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal invalid addresses" 1 1 1
 	chk_add_nr 3 3
 
 	# signal addresses race test
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 4 4
-	ip netns exec $ns2 ./pm_nl_ctl limits 4 4
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.4.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.1.2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 4 subflows 4
+	ip -n $ns2 mptcp limits set add_addr_accepted 4 subflows 4
+	ip -n $ns1 mptcp endpoint add 10.0.1.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.4.1 signal
+	ip -n $ns2 mptcp endpoint add 10.0.1.2 signal
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 signal
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 signal
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 signal
 	run_tests $ns1 $ns2 10.0.1.1
 
 	# the server will not signal the address terminating
@@ -1210,11 +1210,11 @@ link_failure_tests()
 	# active backup and link switch-over.
 	# Let's set some arbitrary (low) virtual link limits.
 	init_shapers
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 dev ns2eth4 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 dev ns1eth2 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 dev ns2eth3 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 dev ns2eth4 subflow
 	run_tests $ns1 $ns2 10.0.1.1 1
 	chk_join_nr "multiple flows, signal, link failure" 3 3 3
 	chk_add_nr 1 1
@@ -1224,11 +1224,11 @@ link_failure_tests()
 	# for bidirectional transfer
 	reset
 	init_shapers
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 dev ns2eth4 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 dev ns1eth2 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 dev ns2eth3 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 dev ns2eth4 subflow
 	run_tests $ns1 $ns2 10.0.1.1 2
 	chk_join_nr "multi flows, signal, bidi, link fail" 3 3 3
 	chk_add_nr 1 1
@@ -1238,11 +1238,11 @@ link_failure_tests()
 	# will never be used
 	reset
 	init_shapers
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 dev ns1eth2 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
 	export FAILING_LINKS="1"
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 dev ns2eth3 subflow backup
 	run_tests $ns1 $ns2 10.0.1.1 1
 	chk_join_nr "backup subflow unused, link failure" 2 2 2
 	chk_add_nr 1 1
@@ -1252,10 +1252,10 @@ link_failure_tests()
 	# the traffic
 	reset
 	init_shapers
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 dev ns1eth2 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 dev ns2eth3 subflow backup
 	export FAILING_LINKS="1 2"
 	run_tests $ns1 $ns2 10.0.1.1 1
 	chk_join_nr "backup flow used, multi links fail" 2 2 2
@@ -1267,10 +1267,10 @@ link_failure_tests()
 	# for bidirectional transfer
 	reset
 	init_shapers
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 dev ns2eth3 flags subflow,backup
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 dev ns1eth2 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 dev ns2eth3 subflow backup
 	run_tests $ns1 $ns2 10.0.1.1 2
 	chk_join_nr "backup flow used, bidi, link failure" 2 2 2
 	chk_add_nr 1 1
@@ -1282,38 +1282,38 @@ add_addr_timeout_tests()
 {
 	# add_addr timeout
 	reset_with_add_addr_timeout
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflow 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow
 	chk_join_nr "signal address, ADD_ADDR timeout" 1 1 1
 	chk_add_nr 4 0
 
 	# add_addr timeout IPv6
 	reset_with_add_addr_timeout 6
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add dead:beef:2::1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add dead:beef:2::1 signal
 	run_tests $ns1 $ns2 dead:beef:1::1 0 0 0 slow
 	chk_join_nr "signal address, ADD_ADDR6 timeout" 1 1 1
 	chk_add_nr 4 0
 
 	# signal addresses timeout
 	reset_with_add_addr_timeout
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 least
 	chk_join_nr "signal addresses, ADD_ADDR timeout" 2 2 2
 	chk_add_nr 8 0
 
 	# signal invalid addresses timeout
 	reset_with_add_addr_timeout
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.12.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.12.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 least
 	chk_join_nr "invalid address, ADD_ADDR timeout" 1 1 1
 	chk_add_nr 8 0
@@ -1323,28 +1323,28 @@ remove_tests()
 {
 	# single subflow, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 -1 slow
 	chk_join_nr "remove single subflow" 1 1 1
 	chk_rm_nr 1 1
 
 	# multiple subflows, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 -2 slow
 	chk_join_nr "remove multiple subflows" 2 2 2
 	chk_rm_nr 2 2
 
 	# single address, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 -1 0 slow
 	chk_join_nr "remove single address" 1 1 1
 	chk_add_nr 1 1
@@ -1352,10 +1352,10 @@ remove_tests()
 
 	# subflow and signal, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -1 -1 slow
 	chk_join_nr "remove subflow and signal" 2 2 2
 	chk_add_nr 1 1
@@ -1363,11 +1363,11 @@ remove_tests()
 
 	# subflows and signal, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -1 -2 slow
 	chk_join_nr "remove subflows and signal" 3 3 3
 	chk_add_nr 1 1
@@ -1375,11 +1375,11 @@ remove_tests()
 
 	# addresses remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal id 250
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.4.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal id 250
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.4.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1 0 -3 0 slow
 	chk_join_nr "remove addresses" 3 3 3
 	chk_add_nr 3 3
@@ -1387,11 +1387,11 @@ remove_tests()
 
 	# invalid addresses remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.12.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.14.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.12.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.14.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1 0 -3 0 slow
 	chk_join_nr "remove invalid addresses" 1 1 1
 	chk_add_nr 3 3
@@ -1399,11 +1399,11 @@ remove_tests()
 
 	# subflows and signal, flush
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -8 -8 slow
 	chk_join_nr "flush subflows and signal" 3 3 3
 	chk_add_nr 1 1
@@ -1411,22 +1411,22 @@ remove_tests()
 
 	# subflows flush
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow id 150
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow id 150
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -8 -8 slow
 	chk_join_nr "flush subflows" 3 3 3
 	chk_rm_nr 3 3
 
 	# addresses flush
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal id 250
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.4.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal id 250
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.4.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1 0 -8 -8 slow
 	chk_join_nr "flush addresses" 3 3 3
 	chk_add_nr 3 3
@@ -1434,11 +1434,11 @@ remove_tests()
 
 	# invalid addresses flush
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.12.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.14.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
+	ip -n $ns1 mptcp limits set add_addr_accepted 3 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.12.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal
+	ip -n $ns1 mptcp endpoint add 10.0.14.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 3 subflows 3
 	run_tests $ns1 $ns2 10.0.1.1 0 -8 0 slow
 	chk_join_nr "flush invalid addresses" 1 1 1
 	chk_add_nr 3 3
@@ -1446,18 +1446,18 @@ remove_tests()
 
 	# remove id 0 subflow
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 -9 slow
 	chk_join_nr "remove id 0 subflow" 1 1 1
 	chk_rm_nr 1 1
 
 	# remove id 0 address
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 -9 0 slow
 	chk_join_nr "remove id 0 address" 1 1 1
 	chk_add_nr 1 1
@@ -1468,37 +1468,37 @@ add_tests()
 {
 	# add single subflow
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 0 1 slow
 	chk_join_nr "add single subflow" 1 1 1
 
 	# add signal address
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 1 0 slow
 	chk_join_nr "add signal address" 1 1 1
 	chk_add_nr 1 1
 
 	# add multiple subflows
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
 	run_tests $ns1 $ns2 10.0.1.1 0 0 2 slow
 	chk_join_nr "add multiple subflows" 2 2 2
 
 	# add multiple subflows IPv6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
 	run_tests $ns1 $ns2 dead:beef:1::1 0 0 2 slow
 	chk_join_nr "add multiple subflows IPv6" 2 2 2
 
 	# add multiple addresses IPv6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
 	run_tests $ns1 $ns2 dead:beef:1::1 0 2 0 slow
 	chk_join_nr "add multiple addresses IPv6" 2 2 2
 	chk_add_nr 2 2
@@ -1508,33 +1508,33 @@ ipv6_tests()
 {
 	# subflow IPv6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add dead:beef:3::2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add dead:beef:3::2 subflow
 	run_tests $ns1 $ns2 dead:beef:1::1 0 0 0 slow
 	chk_join_nr "single subflow IPv6" 1 1 1
 
 	# add_address, unused IPv6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl add dead:beef:2::1 flags signal
+	ip -n $ns1 mptcp endpoint add dead:beef:2::1 signal
 	run_tests $ns1 $ns2 dead:beef:1::1 0 0 0 slow
 	chk_join_nr "unused signal address IPv6" 0 0 0
 	chk_add_nr 1 1
 
 	# signal address IPv6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add dead:beef:2::1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add dead:beef:2::1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 dead:beef:1::1 0 0 0 slow
 	chk_join_nr "single address IPv6" 1 1 1
 	chk_add_nr 1 1
 
 	# single address IPv6, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add dead:beef:2::1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add dead:beef:2::1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 dead:beef:1::1 0 -1 0 slow
 	chk_join_nr "remove single address IPv6" 1 1 1
 	chk_add_nr 1 1
@@ -1542,10 +1542,10 @@ ipv6_tests()
 
 	# subflow and signal IPv6, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add dead:beef:2::1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add dead:beef:3::2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add dead:beef:2::1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add dead:beef:3::2 subflow
 	run_tests $ns1 $ns2 dead:beef:1::1 0 -1 -1 slow
 	chk_join_nr "remove subflow and signal IPv6" 2 2 2
 	chk_add_nr 1 1
@@ -1556,76 +1556,76 @@ v4mapped_tests()
 {
 	# subflow IPv4-mapped to IPv4-mapped
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add "::ffff:10.0.3.2" flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add "::ffff:10.0.3.2" subflow
 	run_tests $ns1 $ns2 "::ffff:10.0.1.1"
 	chk_join_nr "single subflow IPv4-mapped" 1 1 1
 
 	# signal address IPv4-mapped with IPv4-mapped sk
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add "::ffff:10.0.2.1" flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add "::ffff:10.0.2.1" signal
 	run_tests $ns1 $ns2 "::ffff:10.0.1.1"
 	chk_join_nr "signal address IPv4-mapped" 1 1 1
 	chk_add_nr 1 1
 
 	# subflow v4-map-v6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 "::ffff:10.0.1.1"
 	chk_join_nr "single subflow v4-map-v6" 1 1 1
 
 	# signal address v4-map-v6
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 "::ffff:10.0.1.1"
 	chk_join_nr "signal address v4-map-v6" 1 1 1
 	chk_add_nr 1 1
 
 	# subflow v6-map-v4
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add "::ffff:10.0.3.2" flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add "::ffff:10.0.3.2" subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow v6-map-v4" 1 1 1
 
 	# signal address v6-map-v4
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add "::ffff:10.0.2.1" flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add "::ffff:10.0.2.1" signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address v6-map-v4" 1 1 1
 	chk_add_nr 1 1
 
 	# no subflow IPv6 to v4 address
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add dead:beef:2::2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add dead:beef:2::2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "no JOIN with diff families v4-v6" 0 0 0
 
 	# no subflow IPv6 to v4 address even if v6 has a valid v4 at the end
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add dead:beef:2::10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add dead:beef:2::10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "no JOIN with diff families v4-v6-2" 0 0 0
 
 	# no subflow IPv4 to v6 address, no need to slow down too then
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 dead:beef:1::1
 	chk_join_nr "no JOIN with diff families v6-v4" 0 0 0
 }
@@ -1634,18 +1634,18 @@ backup_tests()
 {
 	# single subflow, backup
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow,backup
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow backup
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow nobackup
 	chk_join_nr "single subflow, backup" 1 1 1
 	chk_prio_nr 0 1
 
 	# single address, backup
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow backup
 	chk_join_nr "single address, backup" 1 1 1
 	chk_add_nr 1 1
@@ -1656,28 +1656,28 @@ add_addr_ports_tests()
 {
 	# signal address with port
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address with port" 1 1 1
 	chk_add_nr 1 1 1
 
 	# subflow and signal with port
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflow and signal with port" 2 2 2
 	chk_add_nr 1 1 1
 
 	# single address with port, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1 0 -1 0 slow
 	chk_join_nr "remove single address with port" 1 1 1
 	chk_add_nr 1 1 1
@@ -1685,10 +1685,10 @@ add_addr_ports_tests()
 
 	# subflow and signal with port, remove
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -1 -1 slow
 	chk_join_nr "remove subflow and signal with port" 2 2 2
 	chk_add_nr 1 1 1
@@ -1696,11 +1696,11 @@ add_addr_ports_tests()
 
 	# subflows and signal with port, flush
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 -8 -2 slow
 	chk_join_nr "flush subflows and signal with port" 3 3 3
 	chk_add_nr 1 1
@@ -1708,20 +1708,20 @@ add_addr_ports_tests()
 
 	# multiple addresses with port
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal port 10100
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal port 10100
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple addresses with port" 2 2 2
 	chk_add_nr 2 2 2
 
 	# multiple addresses with ports
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal port 10100
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal port 10101
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal port 10100
+	ip -n $ns1 mptcp endpoint add 10.0.3.1 signal port 10101
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple addresses with ports" 2 2 2
 	chk_add_nr 2 2 2
@@ -1731,56 +1731,56 @@ syncookies_tests()
 {
 	# single subflow, syncookies
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow with syn cookies" 1 1 1
 
 	# multiple subflows with syn cookies
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "multiple subflows with syn cookies" 2 2 2
 
 	# multiple subflows limited by server
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflows limited by server w cookies" 2 1 1
 
 	# test signal address with cookies
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address with syn cookies" 1 1 1
 	chk_add_nr 1 1
 
 	# test cookie with subflow and signal
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 2
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 2
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflow and signal w cookies" 2 2 2
 	chk_add_nr 1 1
 
 	# accept and use add_addr with additional subflows
 	reset_with_cookies
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.4.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
+	ip -n $ns2 mptcp endpoint add 10.0.4.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflows and signal w. cookies" 3 3 3
 	chk_add_nr 1 1
@@ -1790,29 +1790,29 @@ checksum_tests()
 {
 	# checksum test 0 0
 	reset_with_checksum 0 0
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_csum_nr "checksum test 0 0"
 
 	# checksum test 1 1
 	reset_with_checksum 1 1
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_csum_nr "checksum test 1 1"
 
 	# checksum test 0 1
 	reset_with_checksum 0 1
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_csum_nr "checksum test 0 1"
 
 	# checksum test 1 0
 	reset_with_checksum 1 0
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_csum_nr "checksum test 1 0"
 }
@@ -1821,26 +1821,26 @@ deny_join_id0_tests()
 {
 	# subflow allow join id0 ns1
 	reset_with_allow_join_id0 1 0
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow allow join id0 ns1" 1 1 1
 
 	# subflow allow join id0 ns2
 	reset_with_allow_join_id0 0 1
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "single subflow allow join id0 ns2" 0 0 0
 
 	# signal address allow join id0 ns1
 	# ADD_ADDRs are not affected by allow_join_id0 value.
 	reset_with_allow_join_id0 1 0
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address allow join id0 ns1" 1 1 1
 	chk_add_nr 1 1
@@ -1848,28 +1848,28 @@ deny_join_id0_tests()
 	# signal address allow join id0 ns2
 	# ADD_ADDRs are not affected by allow_join_id0 value.
 	reset_with_allow_join_id0 0 1
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "signal address allow join id0 ns2" 1 1 1
 	chk_add_nr 1 1
 
 	# subflow and address allow join id0 ns1
 	reset_with_allow_join_id0 1 0
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflow and address allow join id0 1" 2 2 2
 
 	# subflow and address allow join id0 ns2
 	reset_with_allow_join_id0 0 1
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 2 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 2 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "subflow and address allow join id0 2" 1 1 1
 }
@@ -1880,10 +1880,10 @@ fullmesh_tests()
 	# 2 fullmesh addrs in ns2, added before the connection,
 	# 1 non-fullmesh addr in ns1, added during the connection.
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 4
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 4
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.2.2 flags subflow,fullmesh
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow,fullmesh
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 4
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 4
+	ip -n $ns2 mptcp endpoint add 10.0.2.2 subflow fullmesh
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow fullmesh
 	run_tests $ns1 $ns2 10.0.1.1 0 1 0 slow
 	chk_join_nr "fullmesh test 2x1" 4 4 4
 	chk_add_nr 1 1
@@ -1892,9 +1892,9 @@ fullmesh_tests()
 	# 1 non-fullmesh addr in ns1, added before the connection,
 	# 1 fullmesh addr in ns2, added during the connection.
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 3
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 3
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_1 slow
 	chk_join_nr "fullmesh test 1x1" 3 3 3
 	chk_add_nr 1 1
@@ -1903,9 +1903,9 @@ fullmesh_tests()
 	# 1 non-fullmesh addr in ns1, added before the connection,
 	# 2 fullmesh addrs in ns2, added during the connection.
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 5
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 5
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 5
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 5
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_2 slow
 	chk_join_nr "fullmesh test 1x2" 5 5 5
 	chk_add_nr 1 1
@@ -1915,9 +1915,9 @@ fullmesh_tests()
 	# 2 fullmesh addrs in ns2, added during the connection,
 	# limit max_subflows to 4.
 	reset
-	ip netns exec $ns1 ./pm_nl_ctl limits 2 4
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 4
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 2 subflows 4
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 4
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_2 slow
 	chk_join_nr "fullmesh test 1x2, limited" 4 4 4
 	chk_add_nr 1 1
@@ -1928,9 +1928,9 @@ userspace_tests()
 	# userspace pm type prevents add_addr
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type prevents add_addr" 0 0 0
 	chk_add_nr 0 0
@@ -1938,9 +1938,9 @@ userspace_tests()
 	# userspace pm type echoes add_addr
 	reset
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 2
+	ip -n $ns1 mptcp endpoint add 10.0.2.1 signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type echoes add_addr" 0 0 0
 	chk_add_nr 1 1
@@ -1948,27 +1948,27 @@ userspace_tests()
 	# userspace pm type rejects join
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type rejects join" 1 1 0
 
 	# userspace pm type does not send join
 	reset
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type does not send join" 0 0 0
 
 	# userspace pm type prevents mp_prio
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 1 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow backup
 	chk_join_nr "userspace pm type prevents mp_prio" 1 1 0
 	chk_prio_nr 0 0
@@ -1977,9 +1977,9 @@ userspace_tests()
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
-	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
+	ip -n $ns1 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp limits set add_addr_accepted 0 subflows 1
+	ip -n $ns2 mptcp endpoint add 10.0.3.2 subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 -1 slow
 	chk_join_nr "userspace pm type prevents rm_addr" 0 0 0
 	chk_rm_nr 0 0
