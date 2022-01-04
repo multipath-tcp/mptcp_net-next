@@ -68,100 +68,96 @@ check()
 	fi
 }
 
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "" "defaults addr list"
-check "ip netns exec $ns1 ./pm_nl_ctl limits" "accept 0
-subflows 2" "defaults limits"
+check "ip -n $ns1 mptcp endpoint show" "" "defaults addr list"
+check "ip -n $ns1 mptcp limits show" "add_addr_accepted 0 subflows 2 " "defaults limits"
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2 flags subflow dev lo
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 flags signal,backup
-check "ip netns exec $ns1 ./pm_nl_ctl get 1" "id 1 flags  10.0.1.1" "simple add/get addr"
+ip -n $ns1 mptcp endpoint add 10.0.1.1
+ip -n $ns1 mptcp endpoint add 10.0.1.2 subflow dev lo
+ip -n $ns1 mptcp endpoint add 10.0.1.3 signal backup
+check "ip -n $ns1 mptcp endpoint show id 1" "10.0.1.1 id 1 " "simple add/get addr"
 
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
-"id 1 flags  10.0.1.1
-id 2 flags subflow dev lo 10.0.1.2
-id 3 flags signal,backup 10.0.1.3" "dump addrs"
+check "ip -n $ns1 mptcp endpoint show" \
+"10.0.1.1 id 1 
+10.0.1.2 id 2 subflow dev lo 
+10.0.1.3 id 3 signal backup " "dump addrs"
 
-ip netns exec $ns1 ./pm_nl_ctl del 2
-check "ip netns exec $ns1 ./pm_nl_ctl get 2" "" "simple del addr"
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
-"id 1 flags  10.0.1.1
-id 3 flags signal,backup 10.0.1.3" "dump addrs after del"
+ip -n $ns1 mptcp endpoint delete id 2
+check "ip -n $ns1 mptcp endpoint show id 2" "" "simple del addr"
+check "ip -n $ns1 mptcp endpoint show" \
+"10.0.1.1 id 1 
+10.0.1.3 id 3 signal backup " "dump addrs after del"
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3
-check "ip netns exec $ns1 ./pm_nl_ctl get 4" "" "duplicate addr"
+ip -n $ns1 mptcp endpoint add 10.0.1.3 >/dev/null 2>&1
+check "ip -n $ns1 mptcp endpoint show id 4" "" "duplicate addr"
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4 flags signal
-check "ip netns exec $ns1 ./pm_nl_ctl get 4" "id 4 flags signal 10.0.1.4" "id addr increment"
+ip -n $ns1 mptcp endpoint add 10.0.1.4 signal
+check "ip -n $ns1 mptcp endpoint show id 4" "10.0.1.4 id 4 signal " "id addr increment"
 
 for i in `seq 5 9`; do
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.$i flags signal >/dev/null 2>&1
+	ip -n $ns1 mptcp endpoint add 10.0.1.$i signal >/dev/null 2>&1
 done
-check "ip netns exec $ns1 ./pm_nl_ctl get 9" "id 9 flags signal 10.0.1.9" "hard addr limit"
-check "ip netns exec $ns1 ./pm_nl_ctl get 10" "" "above hard addr limit"
+check "ip -n $ns1 mptcp endpoint show id 9" "10.0.1.9 id 9 signal " "hard addr limit"
+check "ip -n $ns1 mptcp endpoint show id 10" "" "above hard addr limit"
 
-ip netns exec $ns1 ./pm_nl_ctl del 9
+ip -n $ns1 mptcp endpoint delete id 9
 for i in `seq 10 255`; do
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.9 id $i
-	ip netns exec $ns1 ./pm_nl_ctl del $i
+	ip -n $ns1 mptcp endpoint add 10.0.0.9 id $i
+	ip -n $ns1 mptcp endpoint delete id $i
 done
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "id 1 flags  10.0.1.1
-id 3 flags signal,backup 10.0.1.3
-id 4 flags signal 10.0.1.4
-id 5 flags signal 10.0.1.5
-id 6 flags signal 10.0.1.6
-id 7 flags signal 10.0.1.7
-id 8 flags signal 10.0.1.8" "id limit"
+check "ip -n $ns1 mptcp endpoint show" "10.0.1.1 id 1 
+10.0.1.3 id 3 signal backup 
+10.0.1.4 id 4 signal 
+10.0.1.5 id 5 signal 
+10.0.1.6 id 6 signal 
+10.0.1.7 id 7 signal 
+10.0.1.8 id 8 signal " "id limit"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "" "flush addrs"
+ip -n $ns1 mptcp endpoint flush
+check "ip -n $ns1 mptcp endpoint dump" "" "flush addrs"
 
-ip netns exec $ns1 ./pm_nl_ctl limits 9 1
-check "ip netns exec $ns1 ./pm_nl_ctl limits" "accept 0
-subflows 2" "rcv addrs above hard limit"
+ip -n $ns1 mptcp limits set add_addr_accepted 9 subflows 1 >/dev/null 2>&1
+check "ip -n $ns1 mptcp limits show" "add_addr_accepted 0 subflows 2 " "rcv addrs above hard limit"
 
-ip netns exec $ns1 ./pm_nl_ctl limits 1 9
-check "ip netns exec $ns1 ./pm_nl_ctl limits" "accept 0
-subflows 2" "subflows above hard limit"
+ip -n $ns1 mptcp limits set add_addr_accepted 1 subflows 9 >/dev/null 2>&1
+check "ip -n $ns1 mptcp limits show" "add_addr_accepted 0 subflows 2 " "subflows above hard limit"
 
-ip netns exec $ns1 ./pm_nl_ctl limits 8 8
-check "ip netns exec $ns1 ./pm_nl_ctl limits" "accept 8
-subflows 8" "set limits"
+ip -n $ns1 mptcp limits set add_addr_accepted 8 subflows 8
+check "ip -n $ns1 mptcp limits show" "add_addr_accepted 8 subflows 8 " "set limits"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 id 100
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.5 id 254
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.6
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.7
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.8
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "id 1 flags  10.0.1.1
-id 2 flags  10.0.1.2
-id 3 flags  10.0.1.7
-id 4 flags  10.0.1.8
-id 100 flags  10.0.1.3
-id 101 flags  10.0.1.4
-id 254 flags  10.0.1.5
-id 255 flags  10.0.1.6" "set ids"
+ip -n $ns1 mptcp endpoint flush
+ip -n $ns1 mptcp endpoint add 10.0.1.1
+ip -n $ns1 mptcp endpoint add 10.0.1.2
+ip -n $ns1 mptcp endpoint add 10.0.1.3 id 100
+ip -n $ns1 mptcp endpoint add 10.0.1.4
+ip -n $ns1 mptcp endpoint add 10.0.1.5 id 254
+ip -n $ns1 mptcp endpoint add 10.0.1.6
+ip -n $ns1 mptcp endpoint add 10.0.1.7
+ip -n $ns1 mptcp endpoint add 10.0.1.8
+check "ip -n $ns1 mptcp endpoint show" "10.0.1.1 id 1 
+10.0.1.2 id 2 
+10.0.1.7 id 3 
+10.0.1.8 id 4 
+10.0.1.3 id 100 
+10.0.1.4 id 101 
+10.0.1.5 id 254 
+10.0.1.6 id 255 " "set ids"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.2 id 254
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.3
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.4
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.5 id 253
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.6
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.7
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.8
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "id 1 flags  10.0.0.1
-id 2 flags  10.0.0.4
-id 3 flags  10.0.0.6
-id 4 flags  10.0.0.7
-id 5 flags  10.0.0.8
-id 253 flags  10.0.0.5
-id 254 flags  10.0.0.2
-id 255 flags  10.0.0.3" "wrap-around ids"
+ip -n $ns1 mptcp endpoint flush
+ip -n $ns1 mptcp endpoint add 10.0.0.1
+ip -n $ns1 mptcp endpoint add 10.0.0.2 id 254
+ip -n $ns1 mptcp endpoint add 10.0.0.3
+ip -n $ns1 mptcp endpoint add 10.0.0.4
+ip -n $ns1 mptcp endpoint add 10.0.0.5 id 253
+ip -n $ns1 mptcp endpoint add 10.0.0.6
+ip -n $ns1 mptcp endpoint add 10.0.0.7
+ip -n $ns1 mptcp endpoint add 10.0.0.8
+check "ip -n $ns1 mptcp endpoint show" "10.0.0.1 id 1 
+10.0.0.4 id 2 
+10.0.0.6 id 3 
+10.0.0.7 id 4 
+10.0.0.8 id 5 
+10.0.0.5 id 253 
+10.0.0.2 id 254 
+10.0.0.3 id 255 " "wrap-around ids"
 
 exit $ret
