@@ -57,15 +57,15 @@ init()
 		# let $ns2 reach any $ns1 address from any interface
 		ip -net "$ns2" route add default via 10.0.$i.1 dev ns2eth$i metric 10$i
 
-		ip netns exec $ns1 ./pm_nl_ctl add 10.0.$i.1 flags signal
-		ip netns exec $ns1 ./pm_nl_ctl add dead:beef:$i::1 flags signal
+		ip -net $ns1 mptcp endpoint add 10.0.$i.1 signal
+		ip -net $ns1 mptcp endpoint add dead:beef:$i::1 signal
 
-		ip netns exec $ns2 ./pm_nl_ctl add 10.0.$i.2 flags signal
-		ip netns exec $ns2 ./pm_nl_ctl add dead:beef:$i::2 flags signal
+		ip -net $ns2 mptcp endpoint add 10.0.$i.2 signal
+		ip -net $ns2 mptcp endpoint add dead:beef:$i::2 signal
 	done
 
-	ip netns exec $ns1 ./pm_nl_ctl limits 8 8
-	ip netns exec $ns2 ./pm_nl_ctl limits 8 8
+	ip -net $ns1 mptcp limits set add_addr_accepted 8 subflows 8
+	ip -net $ns2 mptcp limits set add_addr_accepted 8 subflows 8
 
 	add_mark_rules $ns1 1
 	add_mark_rules $ns2 2
