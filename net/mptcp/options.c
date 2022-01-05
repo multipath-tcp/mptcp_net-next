@@ -864,11 +864,14 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	*size += opt_size;
 	remaining -= opt_size;
+	/* Note: this can remove previously set options in some conditions */
 	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining, opts)) {
 		*size += opt_size;
 		remaining -= opt_size;
 		ret = true;
-	} else if (mptcp_established_options_rm_addr(sk, &opt_size, remaining, opts)) {
+	}
+
+	if (mptcp_established_options_rm_addr(sk, &opt_size, remaining, opts)) {
 		*size += opt_size;
 		remaining -= opt_size;
 		ret = true;
