@@ -1,4 +1,16 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-opt-size-when-sending-DSS-MP_FAIL
+Subject: [PATCH] mptcp: fix opt size when sending DSS + MP_FAIL
 
+When these two options had to be sent -- which is not common -- the DSS
+size was not being taken into account in the remaining size.
+
+Additionally in this situation, the reported size was only the one of
+the MP_FAIL which can cause issue if at the end, we need to write more
+in the TCP options than previously said.
+
+Here we use a dedicated variable for MP_FAIL size to keep the
+WARN_ON_ONCE() just after.
+
+Fixes: c25aeb4e0953 ("mptcp: MP_FAIL suboption sending")
+Acked-and-tested-by: Geliang Tang <geliang.tang@suse.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
