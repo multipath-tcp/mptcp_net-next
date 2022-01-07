@@ -385,20 +385,25 @@ do_transfer()
 	elif [ $addr_nr_ns1 -lt 0 ]; then
 		let rm_nr_ns1=-addr_nr_ns1
 		if [ $rm_nr_ns1 -lt 8 ]; then
-			counter=1
-			pos=1
-			dump=(`ip netns exec ${listener_ns} ./pm_nl_ctl dump`)
-			if [ ${#dump[@]} -gt 0 ]; then
-				while [ $counter -le $rm_nr_ns1 ]
-				do
-					id=${dump[$pos]}
-					rm_addr=$(rm_addr_count ${connector_ns})
-					ip netns exec ${listener_ns} ./pm_nl_ctl del $id
-					wait_rm_addr ${connector_ns} ${rm_addr}
-					let counter+=1
-					let pos+=5
+			counter=0
+			ip netns exec ${listener_ns} ./pm_nl_ctl dump | while read line; do
+				local arr=($line)
+				local nr=0
+
+				for i in ${arr[@]}; do
+					if [ $i = "id" ]; then
+						if [ $counter -eq $rm_nr_ns1 ]; then
+							break
+						fi
+						id=${arr[$nr+1]}
+						rm_addr=$(rm_addr_count ${connector_ns})
+						ip netns exec ${listener_ns} ./pm_nl_ctl del $id
+						wait_rm_addr ${connector_ns} ${rm_addr}
+						let counter+=1
+					fi
+					let nr+=1
 				done
-			fi
+			done
 		elif [ $rm_nr_ns1 -eq 8 ]; then
 			ip netns exec ${listener_ns} ./pm_nl_ctl flush
 		elif [ $rm_nr_ns1 -eq 9 ]; then
@@ -433,21 +438,26 @@ do_transfer()
 	elif [ $addr_nr_ns2 -lt 0 ]; then
 		let rm_nr_ns2=-addr_nr_ns2
 		if [ $rm_nr_ns2 -lt 8 ]; then
-			counter=1
-			pos=1
-			dump=(`ip netns exec ${connector_ns} ./pm_nl_ctl dump`)
-			if [ ${#dump[@]} -gt 0 ]; then
-				while [ $counter -le $rm_nr_ns2 ]
-				do
-					# rm_addr are serialized, allow the previous one to complete
-					id=${dump[$pos]}
-					rm_addr=$(rm_addr_count ${listener_ns})
-					ip netns exec ${connector_ns} ./pm_nl_ctl del $id
-					wait_rm_addr ${listener_ns} ${rm_addr}
-					let counter+=1
-					let pos+=5
+			counter=0
+			ip netns exec ${connector_ns} ./pm_nl_ctl dump | while read line; do
+				local arr=($line)
+				local nr=0
+
+				for i in ${arr[@]}; do
+					if [ $i = "id" ]; then
+						if [ $counter -eq $rm_nr_ns2 ]; then
+							break
+						fi
+						# rm_addr are serialized, allow the previous one to complete
+						id=${arr[$nr+1]}
+						rm_addr=$(rm_addr_count ${listener_ns})
+						ip netns exec ${connector_ns} ./pm_nl_ctl del $id
+						wait_rm_addr ${listener_ns} ${rm_addr}
+						let counter+=1
+					fi
+					let nr+=1
 				done
-			fi
+			done
 		elif [ $rm_nr_ns2 -eq 8 ]; then
 			ip netns exec ${connector_ns} ./pm_nl_ctl flush
 		elif [ $rm_nr_ns2 -eq 9 ]; then
