@@ -339,6 +339,19 @@ pm_nl_add_endpoint()
 	fi
 }
 
+pm_nl_del_endpoint()
+{
+	local ns=$1
+	local id=$2
+	local addr=$3
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint delete id $id $addr
+	else
+		ip netns exec $ns ./pm_nl_ctl del $id $addr
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -458,7 +471,7 @@ do_transfer()
 						fi
 						id=${arr[$nr+1]}
 						rm_addr=$(rm_addr_count ${connector_ns})
-						ip netns exec ${listener_ns} ./pm_nl_ctl del $id
+						pm_nl_del_endpoint ${listener_ns} $id
 						wait_rm_addr ${connector_ns} ${rm_addr}
 						let counter+=1
 					fi
@@ -468,7 +481,7 @@ do_transfer()
 		elif [ $rm_nr_ns1 -eq 8 ]; then
 			ip netns exec ${listener_ns} ./pm_nl_ctl flush
 		elif [ $rm_nr_ns1 -eq 9 ]; then
-			ip netns exec ${listener_ns} ./pm_nl_ctl del 0 ${connect_addr}
+			pm_nl_del_endpoint ${listener_ns} 0 ${connect_addr}
 		fi
 	fi
 
@@ -513,7 +526,7 @@ do_transfer()
 						# complete
 						id=${arr[$nr+1]}
 						rm_addr=$(rm_addr_count ${listener_ns})
-						ip netns exec ${connector_ns} ./pm_nl_ctl del $id
+						pm_nl_del_endpoint ${connector_ns} $id
 						wait_rm_addr ${listener_ns} ${rm_addr}
 						let counter+=1
 					fi
@@ -529,7 +542,7 @@ do_transfer()
 			else
 				addr="10.0.1.2"
 			fi
-			ip netns exec ${connector_ns} ./pm_nl_ctl del 0 $addr
+			pm_nl_del_endpoint ${connector_ns} 0 $addr
 		fi
 	fi
 
