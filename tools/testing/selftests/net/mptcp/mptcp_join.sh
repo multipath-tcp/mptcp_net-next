@@ -475,12 +475,14 @@ do_transfer()
 	if [ ! -z $bkup ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
-			dump=(`ip netns exec $netns ./pm_nl_ctl dump`)
-			if [ ${#dump[@]} -gt 0 ]; then
-				addr=${dump[${#dump[@]} - 1]}
-				backup="ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup"
-				$backup
-			fi
+			ip netns exec $netns ./pm_nl_ctl dump | while read line; do
+				local arr=($line)
+				# 'pm_nl_ctl' shows the address at the end
+				let pos=${#arr[@]}-1
+
+				addr=${arr[$pos]}
+				ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup
+			done
 		done
 	fi
 
