@@ -352,6 +352,17 @@ pm_nl_del_endpoint()
 	fi
 }
 
+pm_nl_flush_endpoint()
+{
+	local ns=$1
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint flush
+	else
+		ip netns exec $ns ./pm_nl_ctl flush
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -479,7 +490,7 @@ do_transfer()
 				done
 			done
 		elif [ $rm_nr_ns1 -eq 8 ]; then
-			ip netns exec ${listener_ns} ./pm_nl_ctl flush
+			pm_nl_flush_endpoint ${listener_ns}
 		elif [ $rm_nr_ns1 -eq 9 ]; then
 			pm_nl_del_endpoint ${listener_ns} 0 ${connect_addr}
 		fi
@@ -533,7 +544,7 @@ do_transfer()
 				done
 			done
 		elif [ $rm_nr_ns2 -eq 8 ]; then
-			ip netns exec ${connector_ns} ./pm_nl_ctl flush
+			pm_nl_flush_endpoint ${connector_ns}
 		elif [ $rm_nr_ns2 -eq 9 ]; then
 			local addr
 			if is_v6 "${connect_addr}"; then
