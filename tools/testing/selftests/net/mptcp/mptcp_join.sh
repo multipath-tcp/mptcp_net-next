@@ -393,8 +393,8 @@ do_transfer()
 				do
 					id=${dump[$pos]}
 					rm_addr=$(rm_addr_count ${connector_ns})
-					ip netns exec ${listener_ns} ./pm_nl_ctl del $id
 					wait_rm_addr ${connector_ns} ${rm_addr}
+					ip netns exec ${listener_ns} ./pm_nl_ctl del $id
 					let counter+=1
 					let pos+=5
 				done
@@ -442,8 +442,8 @@ do_transfer()
 					# rm_addr are serialized, allow the previous one to complete
 					id=${dump[$pos]}
 					rm_addr=$(rm_addr_count ${listener_ns})
-					ip netns exec ${connector_ns} ./pm_nl_ctl del $id
 					wait_rm_addr ${listener_ns} ${rm_addr}
+					ip netns exec ${connector_ns} ./pm_nl_ctl del $id
 					let counter+=1
 					let pos+=5
 				done
