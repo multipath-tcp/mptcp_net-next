@@ -374,6 +374,19 @@ pm_nl_show_endpoint()
 	fi
 }
 
+pm_nl_set_endpoint()
+{
+	local ns=$1
+	local addr=$2
+	local bkup=$3
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint set $addr $bkup
+	else
+		ip netns exec $ns ./pm_nl_ctl set $addr flags $bkup
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -581,7 +594,7 @@ do_transfer()
 					pos=0
 				fi
 				addr=${arr[$pos]}
-				ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup
+				pm_nl_set_endpoint $netns $addr $bkup
 			done
 		done
 	fi
