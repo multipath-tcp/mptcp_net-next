@@ -363,6 +363,17 @@ pm_nl_flush_endpoint()
 	fi
 }
 
+pm_nl_show_endpoint()
+{
+	local ns=$1
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint show
+	else
+		ip netns exec $ns ./pm_nl_ctl dump
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -471,7 +482,7 @@ do_transfer()
 		let rm_nr_ns1=-addr_nr_ns1
 		if [ $rm_nr_ns1 -lt 8 ]; then
 			counter=0
-			ip netns exec ${listener_ns} ./pm_nl_ctl dump | while read line; do
+			pm_nl_show_endpoint ${listener_ns} | while read line; do
 				local arr=($line)
 				local nr=0
 
@@ -524,7 +535,7 @@ do_transfer()
 		let rm_nr_ns2=-addr_nr_ns2
 		if [ $rm_nr_ns2 -lt 8 ]; then
 			counter=0
-			ip netns exec ${connector_ns} ./pm_nl_ctl dump | while read line; do
+			pm_nl_show_endpoint ${connector_ns} | while read line; do
 				local arr=($line)
 				local nr=0
 
@@ -560,11 +571,15 @@ do_transfer()
 	if [ ! -z $bkup ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
-			ip netns exec $netns ./pm_nl_ctl dump | while read line; do
+			pm_nl_show_endpoint $netns | while read line; do
 				local arr=($line)
 				# 'pm_nl_ctl' shows the address at the end
 				let pos=${#arr[@]}-1
 
+				# 'ip mptcp' shows the address at the front
+				if [ $ip_mptcp -eq 1 ]; then
+					pos=0
+				fi
 				addr=${arr[$pos]}
 				ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup
 			done
