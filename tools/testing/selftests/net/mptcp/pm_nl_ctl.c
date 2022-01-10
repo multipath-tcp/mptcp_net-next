@@ -28,8 +28,8 @@ static void syntax(char *argv[])
 	fprintf(stderr, "\tadd [flags signal|subflow|backup|fullmesh] [id <nr>] [dev <name>] <ip>\n");
 	fprintf(stderr, "\tdel <id> [<ip>]\n");
 	fprintf(stderr, "\tget <id>\n");
-	fprintf(stderr, "\tset <ip> [flags backup]\n");
-	fprintf(stderr, "\tclear <ip> [flags backup]\n");
+	fprintf(stderr, "\tset <ip> [flags backup|fullmesh]\n");
+	fprintf(stderr, "\tclear <ip> [flags backup|fullmesh]\n");
 	fprintf(stderr, "\tflush\n");
 	fprintf(stderr, "\tdump\n");
 	fprintf(stderr, "\tlimits [<rcv addr max> <subflow max>]\n");
@@ -711,7 +711,9 @@ int set_flags(int fd, int pm_family, int clear_flags, int argc, char *argv[])
 			     str = NULL) {
 				if (!strcmp(tok, "backup"))
 					flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
-				else if (strcmp(tok, "nobackup"))
+				else if (!strcmp(tok, "fullmesh"))
+					flags |= MPTCP_PM_ADDR_FLAG_FULLMESH;
+				else
 					error(1, errno,
 					      "unknown flag %s", argv[arg]);
 			}
