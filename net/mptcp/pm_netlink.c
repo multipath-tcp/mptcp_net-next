@@ -1736,21 +1736,21 @@ next:
 	return ret;
 }
 
-static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
+static int __mptcp_nl_cmd_set_flags(struct sk_buff *skb,
+				    struct genl_info *info,
+				    int clear_flags)
 {
 	struct mptcp_pm_addr_entry addr = { .addr = { .family = AF_UNSPEC }, }, *entry;
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct net *net = sock_net(skb->sk);
-	u8 bkup = 0, lookup_by_id = 0;
+	u8 lookup_by_id = 0;
 	int ret;
 
 	ret = mptcp_pm_parse_addr(attr, info, false, &addr);
 	if (ret < 0)
 		return ret;
 
-	if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
-		bkup = 1;
 	if (addr.addr.family == AF_UNSPEC) {
 		lookup_by_id = 1;
 		if (!addr.addr.id)
@@ -1760,16 +1760,27 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 	list_for_each_entry(entry, &pernet->local_addr_list, list) {
 		if ((!lookup_by_id && addresses_equal(&entry->addr, &addr.addr, true)) ||
 		    (lookup_by_id && entry->addr.id == addr.addr.id)) {
-			mptcp_nl_addr_backup(net, &entry->addr, bkup);
-
-			if (bkup)
-				entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
-			else
-				entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+			if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP) {
+				mptcp_nl_addr_backup(net, &entry->addr, !clear_flags);
+				if (clear_flags)
+					entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+				else
+					entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
+			}
 		}
 	}
 
 	return 0;
+}
+
+static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
+{
+	return __mptcp_nl_cmd_set_flags(skb, info, 0);
+}
+
+static int mptcp_nl_cmd_clear_flags(struct sk_buff *skb, struct genl_info *info)
+{
+	return __mptcp_nl_cmd_set_flags(skb, info, 1);
 }
 
 static void mptcp_nl_mcast_send(struct net *net, struct sk_buff *nlskb, gfp_t gfp)
@@ -2072,6 +2083,11 @@ static const struct genl_small_ops mptcp_pm_ops[] = {
 	{
 		.cmd    = MPTCP_PM_CMD_SET_FLAGS,
 		.doit   = mptcp_nl_cmd_set_flags,
+		.flags  = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd    = MPTCP_PM_CMD_CLEAR_FLAGS,
+		.doit   = mptcp_nl_cmd_clear_flags,
 		.flags  = GENL_ADMIN_PERM,
 	},
 };
