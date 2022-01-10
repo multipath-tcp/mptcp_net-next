@@ -289,7 +289,7 @@ do_transfer()
 	addr_nr_ns1="$7"
 	addr_nr_ns2="$8"
 	speed="$9"
-	bkup="${10}"
+	setflags="${10}"
 
 	port=$((10000+$TEST_COUNT))
 	TEST_COUNT=$((TEST_COUNT+1))
@@ -461,14 +461,20 @@ do_transfer()
 		fi
 	fi
 
-	if [ ! -z $bkup ]; then
+	if [ ! -z $setflags ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
 			dump=(`ip netns exec $netns ./pm_nl_ctl dump`)
 			if [ ${#dump[@]} -gt 0 ]; then
 				addr=${dump[${#dump[@]} - 1]}
-				backup="ip netns exec $netns ./pm_nl_ctl set $addr flags $bkup"
-				$backup
+				if [ $setflags = "backup" ]; then
+					cmd=set
+					flags=backup
+				elif [ $setflags = "nobackup" ]; then
+					cmd=clear
+					flags=backup
+				fi
+				ip netns exec $netns ./pm_nl_ctl $cmd $addr flags $flags
 			fi
 		done
 	fi
@@ -545,7 +551,7 @@ run_tests()
 	addr_nr_ns1="${5:-0}"
 	addr_nr_ns2="${6:-0}"
 	speed="${7:-fast}"
-	bkup="${8:-""}"
+	setflags="${8:-""}"
 	lret=0
 	oldin=""
 
@@ -574,7 +580,7 @@ run_tests()
 	fi
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} \
-		${test_linkfail} ${addr_nr_ns1} ${addr_nr_ns2} ${speed} ${bkup}
+		${test_linkfail} ${addr_nr_ns1} ${addr_nr_ns2} ${speed} ${setflags}
 	lret=$?
 }
 
