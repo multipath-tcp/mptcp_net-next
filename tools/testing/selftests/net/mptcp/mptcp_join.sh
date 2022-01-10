@@ -680,12 +680,7 @@ chk_infi_nr()
 		echo "[ ok ]"
 	fi
 
-	if [ "${dump_stats}" = 1 ]; then
-		echo Server ns stats
-		ip netns exec $ns1 nstat -as | grep MPTcp
-		echo Client ns stats
-		ip netns exec $ns2 nstat -as | grep MPTcp
-	fi
+	[ "${dump_stats}" = 1 ] && dump_stats
 }
 
 chk_join_nr()
