@@ -28,7 +28,8 @@ static void syntax(char *argv[])
 	fprintf(stderr, "\tadd [flags signal|subflow|backup|fullmesh] [id <nr>] [dev <name>] <ip>\n");
 	fprintf(stderr, "\tdel <id> [<ip>]\n");
 	fprintf(stderr, "\tget <id>\n");
-	fprintf(stderr, "\tset <ip> [flags backup|nobackup]\n");
+	fprintf(stderr, "\tset <ip> [flags backup]\n");
+	fprintf(stderr, "\tclear <ip> [flags backup]\n");
 	fprintf(stderr, "\tflush\n");
 	fprintf(stderr, "\tdump\n");
 	fprintf(stderr, "\tlimits [<rcv addr max> <subflow max>]\n");
@@ -647,7 +648,7 @@ int get_set_limits(int fd, int pm_family, int argc, char *argv[])
 	return 0;
 }
 
-int set_flags(int fd, int pm_family, int argc, char *argv[])
+int set_flags(int fd, int pm_family, int clear_flags, int argc, char *argv[])
 {
 	char data[NLMSG_ALIGN(sizeof(struct nlmsghdr)) +
 		  NLMSG_ALIGN(sizeof(struct genlmsghdr)) +
@@ -662,7 +663,8 @@ int set_flags(int fd, int pm_family, int argc, char *argv[])
 
 	memset(data, 0, sizeof(data));
 	nh = (void *)data;
-	off = init_genl_req(data, pm_family, MPTCP_PM_CMD_SET_FLAGS,
+	off = init_genl_req(data, pm_family,
+			    clear_flags ? MPTCP_PM_CMD_CLEAR_FLAGS : MPTCP_PM_CMD_SET_FLAGS,
 			    MPTCP_PM_VER);
 
 	if (argc < 3)
@@ -755,7 +757,9 @@ int main(int argc, char *argv[])
 	else if (!strcmp(argv[1], "limits"))
 		return get_set_limits(fd, pm_family, argc, argv);
 	else if (!strcmp(argv[1], "set"))
-		return set_flags(fd, pm_family, argc, argv);
+		return set_flags(fd, pm_family, 0, argc, argv);
+	else if (!strcmp(argv[1], "clear"))
+		return set_flags(fd, pm_family, 1, argc, argv);
 
 	fprintf(stderr, "unknown sub-command: %s", argv[1]);
 	syntax(argv);
