@@ -1766,6 +1766,13 @@ static int __mptcp_nl_cmd_set_flags(struct sk_buff *skb,
 					entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
 				else
 					entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
+			} else if (addr.flags & MPTCP_PM_ADDR_FLAG_FULLMESH) {
+				mptcp_nl_remove_subflow_and_signal_addr(net, &entry->addr);
+				if (clear_flags)
+					entry->flags &= ~MPTCP_PM_ADDR_FLAG_FULLMESH;
+				else
+					entry->flags |= MPTCP_PM_ADDR_FLAG_FULLMESH;
+				mptcp_nl_add_subflow_or_signal_addr(net);
 			}
 		}
 	}
