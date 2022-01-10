@@ -1,2 +1,1 @@
-t/mptcp-reuse-__mptcp_make_csum-in-validate_data_csum
 t/selftests-mptcp-Add-tests-for-userspace-PM-type
