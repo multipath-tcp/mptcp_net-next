@@ -473,6 +473,12 @@ do_transfer()
 				elif [ $setflags = "nobackup" ]; then
 					cmd=clear
 					flags=backup
+				elif [ $setflags = "fullmesh" ]; then
+					cmd=set
+					flags=fullmesh
+				elif [ $setflags = "nofullmesh" ]; then
+					cmd=clear
+					flags=fullmesh
 				fi
 				ip netns exec $netns ./pm_nl_ctl $cmd $addr flags $flags
 			fi
@@ -1927,6 +1933,24 @@ fullmesh_tests()
 	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_2 slow
 	chk_join_nr "fullmesh test 1x2, limited" 4 4 4
 	chk_add_nr 1 1
+
+	# fullmesh flag setting test
+	reset
+	ip netns exec $ns1 ./pm_nl_ctl limits 4 4
+	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags subflow
+	ip netns exec $ns2 ./pm_nl_ctl limits 4 4
+	run_tests $ns1 $ns2 10.0.1.1 0 0 1 slow fullmesh
+	chk_join_nr "fullmesh flag setting test" 2 2 2
+	chk_rm_nr 1 1
+
+	# fullmesh flag clearing test
+	reset
+	ip netns exec $ns1 ./pm_nl_ctl limits 4 4
+	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags subflow,fullmesh
+	ip netns exec $ns2 ./pm_nl_ctl limits 4 4
+	run_tests $ns1 $ns2 10.0.1.1 0 0 fullmesh_1 slow nofullmesh
+	chk_join_nr "fullmesh flag clearing test" 2 2 2
+	chk_rm_nr 1 1
 }
 
 userspace_tests()
