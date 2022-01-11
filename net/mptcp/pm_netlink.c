@@ -1743,13 +1743,17 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct net *net = sock_net(skb->sk);
 	u8 bkup = 0, lookup_by_id = 0;
+	u8 fullmesh = 0;
 	int ret;
 
 	ret = mptcp_pm_parse_addr(attr, info, false, &addr);
 	if (ret < 0)
 		return ret;
 
-	if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
+	if (addr.flags & MPTCP_PM_ADDR_FLAG_FULLMESH ||
+	    addr.flags & MPTCP_PM_ADDR_FLAG_NOFULLMESH)
+		fullmesh = 1;
+	else if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
 	if (addr.addr.family == AF_UNSPEC) {
 		lookup_by_id = 1;
@@ -1760,12 +1764,21 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 	list_for_each_entry(entry, &pernet->local_addr_list, list) {
 		if ((!lookup_by_id && addresses_equal(&entry->addr, &addr.addr, true)) ||
 		    (lookup_by_id && entry->addr.id == addr.addr.id)) {
-			mptcp_nl_addr_backup(net, &entry->addr, bkup);
+			if (fullmesh) {
+				mptcp_nl_remove_subflow_and_signal_addr(net, &entry->addr);
+				if (addr.flags & MPTCP_PM_ADDR_FLAG_FULLMESH)
+					entry->flags |= MPTCP_PM_ADDR_FLAG_FULLMESH;
+				else
+					entry->flags &= ~MPTCP_PM_ADDR_FLAG_FULLMESH;
+				mptcp_nl_add_subflow_or_signal_addr(net);
+			} else {
+				mptcp_nl_addr_backup(net, &entry->addr, bkup);
 
-			if (bkup)
-				entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
-			else
-				entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+				if (bkup)
+					entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
+				else
+					entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+			}
 		}
 	}
 
