@@ -22,6 +22,14 @@ static struct genl_family mptcp_genl_family;
 
 static int pm_nl_pernet_id;
 
+struct mptcp_local_lsk {
+	struct list_head	list;
+	struct mptcp_addr_info	addr;
+	struct socket		*lsk;
+	struct rcu_head		rcu;
+	refcount_t		refcount;
+};
+
 struct mptcp_pm_addr_entry {
 	struct list_head	list;
 	struct mptcp_addr_info	addr;
@@ -41,7 +49,10 @@ struct mptcp_pm_add_entry {
 struct pm_nl_pernet {
 	/* protects pernet updates */
 	spinlock_t		lock;
+	/* protects access to pernet lsk list */
+	spinlock_t		lsk_list_lock;
 	struct list_head	local_addr_list;
+	struct list_head	lsk_list;
 	unsigned int		addrs;
 	unsigned int		stale_loss_cnt;
 	unsigned int		add_addr_signal_max;
@@ -81,6 +92,69 @@ static bool addresses_equal(const struct mptcp_addr_info *a,
 		return true;
 
 	return a->port == b->port;
+}
+
+static struct mptcp_local_lsk *lsk_list_find(struct pm_nl_pernet *pernet,
+					     struct mptcp_addr_info *addr)
+{
+	struct mptcp_local_lsk *lsk_ref = NULL;
+	struct mptcp_local_lsk *i;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(i, &pernet->lsk_list, list) {
+		if (addresses_equal(&i->addr, addr, true)) {
+			if (refcount_inc_not_zero(&i->refcount)) {
+				lsk_ref = i;
+				break;
+			}
+		}
+	}
+
+	rcu_read_unlock();
+
+	return lsk_ref;
+}
+
+static void lsk_list_add_ref(struct mptcp_local_lsk *lsk_ref)
+{
+	refcount_inc(&lsk_ref->refcount);
+}
+
+static struct mptcp_local_lsk *lsk_list_add(struct pm_nl_pernet *pernet,
+					    struct mptcp_addr_info *addr,
+					    struct socket *lsk)
+{
+	struct mptcp_local_lsk *lsk_ref;
+
+	lsk_ref = kmalloc(sizeof(*lsk_ref), GFP_ATOMIC);
+
+	if (!lsk_ref)
+		return NULL;
+
+	lsk_ref->lsk = lsk;
+	memcpy(&lsk_ref->addr, addr, sizeof(struct mptcp_addr_info));
+	refcount_set(&lsk_ref->refcount, 1);
+
+	spin_lock_bh(&pernet->lsk_list_lock);
+	list_add_rcu(&lsk_ref->list, &pernet->lsk_list);
+	spin_unlock_bh(&pernet->lsk_list_lock);
+
+	return lsk_ref;
+}
+
+static void lsk_list_release(struct pm_nl_pernet *pernet,
+			     struct mptcp_local_lsk *lsk_ref)
+{
+	if (lsk_ref && refcount_dec_and_test(&lsk_ref->refcount)) {
+		sock_release(lsk_ref->lsk);
+
+		spin_lock_bh(&pernet->lsk_list_lock);
+		list_del_rcu(&lsk_ref->list);
+		spin_unlock_bh(&pernet->lsk_list_lock);
+
+		kfree_rcu(lsk_ref, rcu);
+	}
 }
 
 static bool address_zero(const struct mptcp_addr_info *addr)
@@ -2098,12 +2172,14 @@ static int __net_init pm_nl_init_net(struct net *net)
 	struct pm_nl_pernet *pernet = net_generic(net, pm_nl_pernet_id);
 
 	INIT_LIST_HEAD_RCU(&pernet->local_addr_list);
+	INIT_LIST_HEAD_RCU(&pernet->lsk_list);
 
 	/* Cit. 2 subflows ought to be enough for anybody. */
 	pernet->subflows_max = 2;
 	pernet->next_id = 1;
 	pernet->stale_loss_cnt = 4;
 	spin_lock_init(&pernet->lock);
+	spin_lock_init(&pernet->lsk_list_lock);
 
 	/* No need to initialize other pernet fields, the struct is zeroed at
 	 * allocation time.
