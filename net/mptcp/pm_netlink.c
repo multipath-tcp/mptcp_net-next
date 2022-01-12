@@ -1933,7 +1933,8 @@ nla_put_failure:
 }
 
 void mptcp_event_addr_announced(const struct mptcp_sock *msk,
-				const struct mptcp_addr_info *info)
+				const struct mptcp_addr_info *info,
+				const struct sock *ssk)
 {
 	struct net *net = sock_net((const struct sock *)msk);
 	struct nlmsghdr *nlh;
@@ -1957,7 +1958,10 @@ void mptcp_event_addr_announced(const struct mptcp_sock *msk,
 	if (nla_put_u8(skb, MPTCP_ATTR_REM_ID, info->id))
 		goto nla_put_failure;
 
-	if (nla_put_be16(skb, MPTCP_ATTR_DPORT, info->port))
+	if (nla_put_be16(skb, MPTCP_ATTR_DPORT,
+			 info->port  == 0 ?
+			 ((struct inet_sock *)inet_sk(ssk))->inet_dport :
+			 info->port))
 		goto nla_put_failure;
 
 	switch (info->family) {
