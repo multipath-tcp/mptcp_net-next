@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-msk-traversal-in-mptcp_nl_cmd_set_flags
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix msk traversal in mptcp_nl_cmd_set_flags()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP endpoint list is under RCU protection, guarded by the
+pernet spinlock. mptcp_nl_cmd_set_flags() traverses the list
+without acquiring the spin-lock nor under the RCU critical section.
+
+This change addresses the issue performing the lookup and the endpoint
+update under the pernet spinlock.
+
+Fixes: 0f9f696a502e ("mptcp: add set_flags command in PM netlink")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
