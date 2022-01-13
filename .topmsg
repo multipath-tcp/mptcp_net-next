@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-clarify-when-options-can-be-used
+Subject: [PATCH] mptcp: clarify when options can be used
 
+RFC8684 doesn't seem to clearly specify which MPTCP options can be used
+together.
+
+Some options are mutually exclusive -- e.g. MP_CAPABLE and MP_JOIN --,
+some can be used together -- e.g. DSS + MP_PRIO --, some can but we
+prefer not to -- e.g. DSS + ADD_ADDR -- and some have to be used
+together at some points -- e.g. MP_FAIL and DSS.
+
+We need to clarify this as a base before allowing other modifications.
+
+For example, does it make sense to send a RM_ADDR with an MPC or MPJ?
+This remains open for possible future discussions.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
