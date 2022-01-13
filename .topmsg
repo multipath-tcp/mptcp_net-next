@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-removing-ids-bitmap-setting
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: fix removing ids bitmap setting
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In mptcp_pm_nl_rm_addr_or_subflow(), the bit of rm_list->ids[i] in the
+id_avail_bitmap should be set, not rm_list->ids[1]. This patch fixed it.
+
+Fixes: 86e39e04482b ("mptcp: keep track of local endpoint still available for each msk")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
