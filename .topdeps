@@ -1,1 +1,1 @@
-t/mptcp-fix-removing-ids-bitmap-setting
+t/selftests-mptcp-fix-ipv6-routing-setup
