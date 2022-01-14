@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-fix-ipv6-routing-setup
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: fix ipv6 routing setup
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+MPJ ipv6 selftests currently lack per link route to the server
+net. Additionally, ipv6 subflows endpoints are created without any
+interface specified. The end-result is that in ipv6 self-tests
+subflows are created all on the same link, leading to expected delays
+and sporadic self-tests failures.
+
+Fix the issue by adding the missing setup bits.
+
+Fixes: 523514ed0a99 ("selftests: mptcp: add ADD_ADDR IPv6 test cases")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reported-and-tested-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
