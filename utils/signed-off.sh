@@ -20,7 +20,7 @@ sed -i '$ d' .topmsg # remove last line
 echo "${COD}" >> .topmsg
 echo "${SIG}" >> .topmsg
 echo "${LAST_LINE}" >> .topmsg
-git commit -sm "tg: add $(git show -s --format="%aN" HEAD)' signed-off + codev
+git commit -sm "tg: add $(git show -s --format="%aN" HEAD)'s signed-off + codev
 
 After the fix provided in this topic, see:
 $(git show -s --format="%h (%s)" HEAD)" .topmsg
