@@ -1722,9 +1722,20 @@ fail:
 	return -EMSGSIZE;
 }
 
-static int mptcp_nl_addr_backup(struct net *net,
-				struct mptcp_addr_info *addr,
-				u8 bkup)
+static void mptcp_pm_nl_fullmesh(struct mptcp_sock *msk,
+				 struct mptcp_addr_info *addr)
+{
+	struct mptcp_rm_list list = { .nr = 0 };
+
+	list.ids[list.nr++] = addr->id;
+
+	mptcp_pm_nl_rm_subflow_received(msk, &list);
+	mptcp_pm_create_subflow_or_signal_addr(msk);
+}
+
+static int mptcp_nl_set_flags(struct net *net,
+			      struct mptcp_addr_info *addr,
+			      u8 bkup, u8 fmesh)
 {
 	long s_slot = 0, s_num = 0;
 	struct mptcp_sock *msk;
@@ -1738,7 +1749,10 @@ static int mptcp_nl_addr_backup(struct net *net,
 
 		lock_sock(sk);
 		spin_lock_bh(&msk->pm.lock);
-		ret = mptcp_pm_nl_mp_prio_send_ack(msk, addr, bkup);
+		if (bkup || !fmesh)
+			ret = mptcp_pm_nl_mp_prio_send_ack(msk, addr, bkup);
+		if (fmesh || !bkup)
+			mptcp_pm_nl_fullmesh(msk, addr);
 		spin_unlock_bh(&msk->pm.lock);
 		release_sock(sk);
 
@@ -1757,6 +1771,7 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct net *net = sock_net(skb->sk);
 	u8 bkup = 0, lookup_by_id = 0;
+	u8 fmesh = 0;
 	int ret;
 
 	ret = mptcp_pm_parse_addr(attr, info, false, &addr);
@@ -1765,6 +1780,8 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 
 	if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
+	if (addr.flags & MPTCP_PM_ADDR_FLAG_FULLMESH)
+		fmesh = 1;
 	if (addr.addr.family == AF_UNSPEC) {
 		lookup_by_id = 1;
 		if (!addr.addr.id)
@@ -1778,14 +1795,25 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 		return -EINVAL;
 	}
 
+	if ((fmesh || !bkup) && (entry->flags & MPTCP_PM_ADDR_FLAG_SIGNAL)) {
+		spin_unlock_bh(&pernet->lock);
+		return -EINVAL;
+	}
+
 	if (bkup)
 		entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
 	else
 		entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+
+	if (fmesh)
+		entry->flags |= MPTCP_PM_ADDR_FLAG_FULLMESH;
+	else
+		entry->flags &= ~MPTCP_PM_ADDR_FLAG_FULLMESH;
+
 	addr = *entry;
 	spin_unlock_bh(&pernet->lock);
 
-	mptcp_nl_addr_backup(net, &addr.addr, bkup);
+	mptcp_nl_set_flags(net, &addr.addr, bkup, fmesh);
 	return 0;
 }
 
