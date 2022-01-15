@@ -180,6 +180,22 @@ if [ $? -ne 0 ];then
 	exit $ksft_skip
 fi
 
+is_invert()
+{
+	in=$1
+	out=$2
+
+	cmp -l "$in" "$out" | while read line; do
+		local arr=($line)
+
+		let sum=${arr[1]}+${arr[2]}
+		# Octal 377 is 0xFF
+		if [ $sum -ne 377 ]; then
+			return 1
+		fi
+	done
+}
+
 print_file_err()
 {
 	ls -l "$1" 1>&2
@@ -195,6 +211,11 @@ check_transfer()
 
 	cmp "$in" "$out" > /dev/null 2>&1
 	if [ $? -ne 0 ] ;then
+		is_invert "$in" "$out"
+		if [ $? -eq 0 ]; then
+			echo "[ FAIL ] $what has inverted bytes (in, out)"
+			return 0
+		fi
 		echo "[ FAIL ] $what does not match (in, out):"
 		print_file_err "$in"
 		print_file_err "$out"
