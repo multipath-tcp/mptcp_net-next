@@ -193,15 +193,22 @@ check_transfer()
 	out=$2
 	what=$3
 
-	cmp "$in" "$out" > /dev/null 2>&1
-	if [ $? -ne 0 ] ;then
-		echo "[ FAIL ] $what does not match (in, out):"
-		print_file_err "$in"
-		print_file_err "$out"
-		ret=1
+	cmp -l "$in" "$out" | while read line; do
+		local arr=($line)
 
-		return 1
-	fi
+		let sum=${arr[1]}+${arr[2]}
+		# Octal 377 is 0xFF
+		if [ $sum -ne 377 ]; then
+			echo "[ FAIL ] $what does not match (in, out):"
+			print_file_err "$in"
+			print_file_err "$out"
+			ret=1
+
+			return 1
+		else
+			echo "$what has inverted bytes at ${arr[0]} (in, out)"
+		fi
+	done
 
 	return 0
 }
