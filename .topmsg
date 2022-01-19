@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-sched-do-not-allocate-a-tracker-in-tcf_exts_init
+From: Eric Dumazet <edumazet@google.com>
+Subject: [PATCH] net: sched: do not allocate a tracker in tcf_exts_init()
 
+While struct tcf_exts has a net pointer, it is not refcounted
+until tcf_exts_get_net() is called.
+
+Fixes: dbdcda634ce3 ("net: sched: add netns refcount tracker to struct tcf_exts")
+Signed-off-by: Eric Dumazet <edumazet@google.com>
+Reported-by: syzbot <syzkaller@googlegroups.com>
+Link: https://lore.kernel.org/r/20220110094750.236478-1-eric.dumazet@gmail.com
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
