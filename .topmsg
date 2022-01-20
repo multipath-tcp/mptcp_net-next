@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-ip-mptcp-wrappers
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add ip mptcp wrappers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added four basic 'ip mptcp' wrappers:
+
+pm_nl_set_limits()
+pm_nl_add_endpoint()
+pm_nl_del_endpoint()
+pm_nl_flush_endpoint().
+
+Wrapped the PM netlink commands 'ip mptcp' and 'pm_nl_ctl' in them, and
+used a new argument 'ip_mptcp' to choose which one to use for setting the
+PM limits, adding or deleting the PM endpoint.
+
+Used the wrappers in all the selftests in mptcp_join.sh instead of using
+the pm_nl_ctl commands directly.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
