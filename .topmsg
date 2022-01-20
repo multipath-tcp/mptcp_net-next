@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-invert-check-in-check_transfer
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add invert check in check_transfer
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the invert bytes check for the output data in
+check_transfer().
+
+Instead of the file mismatch error:
+
+  [ FAIL ] file received by server does not match (in, out):
+  -rw------- 1 root root 45643832 Jan 16 15:04 /tmp/tmp.9xpM6Paivv
+  Trailing bytes are:
+  MPTCP_TEST_FILE_END_MARKER
+  -rw------- 1 root root 45643832 Jan 16 15:04 /tmp/tmp.wnz1Yp4u7Z
+  Trailing bytes are:
+  MPTCP_TEST_FILE_END_MARKER
+
+Print out the inverted bytes like this:
+
+  file received by server has inverted byte at 7454789
+  file received by server has inverted byte at 7454790
+  file received by server has inverted byte at 7454791
+  file received by server has inverted byte at 7454792
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
