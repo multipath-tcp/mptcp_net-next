@@ -388,7 +388,7 @@ pm_nl_change_endpoint()
 	if [ $ip_mptcp -eq 1 ]; then
 		ip -n $ns mptcp endpoint change id $id ${flags//","/" "}
 	else
-		[ ! -z $5 ]; port="port $5"
+		if [ $5 -ne 0 ]; then port="port $5"; fi
 		ip netns exec $ns ./pm_nl_ctl set $addr flags $flags $port
 	fi
 }
