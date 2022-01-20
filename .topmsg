@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-wrapper-for-showing-addrs
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add wrapper for showing addrs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch implemented a new function named pm_nl_show_endpoints(), wrapped
+the PM netlink commands 'ip mptcp endpoint show' and 'pm_nl_ctl dump' in
+it, used a new argument 'ip_mptcp' to choose which one to use to show all
+the PM endpoints.
+
+Used this wrapper in do_transfer() instead of using the pm_nl_ctl commands
+directly.
+
+The original 'pos+=5' in the remoing tests only works for the output of
+'pm_nl_ctl show':
+
+  id 1 flags subflow 10.0.1.1
+
+It doesn't work for the output of 'ip mptcp endpoint show':
+
+  10.0.1.1 id 1 subflow
+
+So implemented a more flexible approach to get the address ID from the PM
+dump output to fit for both commands.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
