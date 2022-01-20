@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: print out reset infos of MP_RST
-
-This patch printed out the reset infos, reset_transient and reset_reason,
-of MP_RST in mptcp_parse_option() to show that MP_RST is received.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
