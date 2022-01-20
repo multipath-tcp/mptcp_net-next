@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-to-use-port-and-non-signal-in-set_flags
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: allow to use port and non-signal in set_flags
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+It's illegal to use both port and non-signal flags for adding address.
+But it's legal to use both of them for setting flags, which always uses
+non-signal flags, backup or fullmesh.
+
+This patch moves this non-signal flag with port check from
+mptcp_pm_parse_addr() to mptcp_nl_cmd_add_addr(). Do the check only when
+adding addresses, not setting flags or deleting addresses.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
