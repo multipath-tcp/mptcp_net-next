@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-the-port-argument-for-set_flags
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add the port argument for set_flags
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the port argument for setting the address flags in
+pm_nl_ctl.
+
+Usage:
+
+    pm_nl_ctl set 10.0.2.1 flags backup port 10100
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
