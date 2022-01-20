@@ -568,7 +568,7 @@ do_transfer()
 						fi
 					fi
 				done
-				[ ! -z $port ]; _port="port $port"
+				if [ $port -ne 0 ]; then _port="port $port"; fi
 				ip netns exec $netns ./pm_nl_ctl set $addr flags $sflags $_port
 			done
 		done
