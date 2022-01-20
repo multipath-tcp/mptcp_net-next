@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-backup-with-port-testcase
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add backup with port testcase
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the backup testcase using an address with a port number.
+
+The original backup tests only work for the output of 'pm_nl_ctl dump'
+without the port number. It chooses the last item in the dump to parse
+the address in it, and in this case, the address is showed at the end
+of the item.
+
+But it doesn't work for the dump with the port number, in this case, the
+port number is showed at the end of the item, not the address.
+
+So implemented a more flexible approach to get the address and the port
+number from the dump to fit for the port number case.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
