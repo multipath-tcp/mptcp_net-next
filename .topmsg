@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-wrapper-for-setting-flags
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add wrapper for setting flags
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch implemented a new function named pm_nl_set_endpoint(), wrapped
+the PM netlink commands 'ip mptcp endpoint change flags' and 'pm_nl_ctl
+set flags' in it, and used a new argument 'ip_mptcp' to choose which one
+to use to set the flags of the PM endpoint.
+
+'ip mptcp' used the ID number argument to find out the address to change
+flags, while 'pm_nl_ctl' used the address and port number arguments. So
+we need to parse the address ID from the PM dump output as well as the
+address and port number.
+
+Used this wrapper in do_transfer() instead of using the pm_nl_ctl command
+directly.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
