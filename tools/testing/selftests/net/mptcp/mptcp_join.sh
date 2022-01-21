@@ -393,12 +393,22 @@ pm_nl_change_endpoint()
 	local id=$3
 	local addr=$4
 	local port=""
+	local use_id=$((RANDOM%2))
+
+	if [ $5 -ne 0 ]; then port="port $5"; fi
 
 	if [ $ip_mptcp -eq 1 ]; then
-		ip -n $ns mptcp endpoint change id $id ${flags//","/" "}
+		if [ $use_id -eq 1 ]; then
+			ip -n $ns mptcp endpoint change id $id ${flags//","/" "}
+		else
+			ip -n $ns mptcp endpoint change $addr ${flags//","/" "} $port
+		fi
 	else
-		if [ $5 -ne 0 ]; then port="port $5"; fi
-		ip netns exec $ns ./pm_nl_ctl set $addr flags $flags $port
+		if [ $use_id -eq 1 ]; then
+			ip netns exec $ns ./pm_nl_ctl set id $id flags $flags
+		else
+			ip netns exec $ns ./pm_nl_ctl set $addr flags $flags $port
+		fi
 	fi
 }
 
