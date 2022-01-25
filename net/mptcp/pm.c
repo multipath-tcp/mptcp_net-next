@@ -275,8 +275,10 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 
 	pr_debug("fail_seq=%llu", fail_seq);
 
-	if (!mptcp_has_another_subflow(sk) && READ_ONCE(msk->allow_infinite_fallback))
+	if (!mptcp_has_another_subflow(sk) && READ_ONCE(msk->allow_infinite_fallback)) {
 		subflow->send_infinite_map = 1;
+		subflow->infinite_sent = 0;
+	}
 }
 
 /* path manager helpers */

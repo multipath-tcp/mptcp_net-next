@@ -450,6 +450,7 @@ struct mptcp_subflow_context {
 		send_mp_fail : 1,
 		send_fastclose : 1,
 		send_infinite_map : 1,
+		infinite_sent : 1,
 		rx_eof : 1,
 		can_ack : 1,        /* only after processing the remote a key */
 		disposable : 1,	    /* ctx can be free at ulp release time */
@@ -893,13 +894,17 @@ static inline void mptcp_do_fallback(struct sock *sk)
 
 #define pr_fallback(a) pr_debug("%s:fallback to TCP (msk=%p)", __func__, a)
 
-static inline bool mptcp_check_infinite_map(struct sk_buff *skb)
+static inline bool mptcp_check_infinite_map(struct mptcp_subflow_context *subflow,
+					    struct sk_buff *skb)
 {
 	struct mptcp_ext *mpext;
 
 	mpext = skb ? mptcp_get_ext(skb) : NULL;
-	if (mpext && mpext->infinite_map)
+	if (mpext && mpext->infinite_map &&
+	    !subflow->infinite_sent) {
+		subflow->infinite_sent = 1;
 		return true;
+	}
 
 	return false;
 }
