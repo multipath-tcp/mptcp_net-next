@@ -119,6 +119,7 @@ properties:
       - items:
           - enum:
               - qcom,apq8060-dragonboard
+              - qcom,apq8060-tenderloin
               - qcom,msm8660-surf
           - const: qcom,msm8660
 
