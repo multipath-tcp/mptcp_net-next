@@ -119,7 +119,7 @@ int main(void)
 	ksft_print_msg("[NOTE]\tthe stack size is %lu\n", stack_size);
 
 	ksft_print_header();
-	ksft_set_plan(3);
+	ksft_set_plan(4);
 
 	sigemptyset(&act.sa_mask);
 	act.sa_flags = SA_ONSTACK | SA_SIGINFO;
@@ -129,24 +129,18 @@ int main(void)
 	sigaction(SIGUSR2, &act, NULL);
 	sstack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE,
 		      MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-	if (sstack == MAP_FAILED) {
+	if (sstack == MAP_FAILED)
 		ksft_exit_fail_msg("mmap() - %s\n", strerror(errno));
-		return EXIT_FAILURE;
-	}
 
 	err = sigaltstack(NULL, &stk);
-	if (err) {
+	if (err)
 		ksft_exit_fail_msg("sigaltstack() - %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	if (stk.ss_flags == SS_DISABLE) {
+	if (stk.ss_flags == SS_DISABLE)
 		ksft_test_result_pass(
 				"Initial sigaltstack state was SS_DISABLE\n");
-	} else {
+	else
 		ksft_exit_fail_msg("Initial sigaltstack state was %x; "
 		       "should have been SS_DISABLE\n", stk.ss_flags);
-		return EXIT_FAILURE;
-	}
 
 	stk.ss_sp = sstack;
 	stk.ss_size = stack_size;
@@ -167,16 +161,13 @@ int main(void)
 			ksft_exit_fail_msg(
 				"sigaltstack(SS_ONSTACK | SS_AUTODISARM)  %s\n",
 					strerror(errno));
-			return EXIT_FAILURE;
 		}
 	}
 
 	ustack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE,
 		      MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-	if (ustack == MAP_FAILED) {
+	if (ustack == MAP_FAILED)
 		ksft_exit_fail_msg("mmap() - %s\n", strerror(errno));
-		return EXIT_FAILURE;
-	}
 	getcontext(&uc);
 	uc.uc_link = NULL;
 	uc.uc_stack.ss_sp = ustack;
@@ -185,17 +176,28 @@ int main(void)
 	raise(SIGUSR1);
 
 	err = sigaltstack(NULL, &stk);
-	if (err) {
+	if (err)
 		ksft_exit_fail_msg("sigaltstack() - %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-	if (stk.ss_flags != SS_AUTODISARM) {
-		ksft_exit_fail_msg("ss_flags=%x, should be SS_AUTODISARM\n",
+	if (stk.ss_flags != SS_AUTODISARM)
+		ksft_test_result_fail("ss_flags=%x, should be SS_AUTODISARM\n",
 				stk.ss_flags);
-		exit(EXIT_FAILURE);
-	}
-	ksft_test_result_pass(
+	else
+		ksft_test_result_pass(
 			"sigaltstack is still SS_AUTODISARM after signal\n");
+	/* We are done, disable SS and exit. */
+	stk.ss_flags = SS_DISABLE | SS_AUTODISARM;
+	err = sigaltstack(&stk, NULL);
+	if (err)
+		ksft_exit_fail_msg("sigaltstack() - %s\n", strerror(errno));
+	err = sigaltstack(NULL, &stk);
+	if (err)
+		ksft_exit_fail_msg("sigaltstack() - %s\n", strerror(errno));
+	if (stk.ss_flags != SS_DISABLE)
+		ksft_test_result_fail("ss_flags=%x, should be SS_DISABLE\n",
+				stk.ss_flags);
+	else
+		ksft_test_result_pass(
+			"sigaltstack disabled\n");
 
 	ksft_exit_pass();
 	return 0;
