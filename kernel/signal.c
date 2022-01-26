@@ -4209,6 +4209,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp,
 		if (ss_mode == SS_DISABLE) {
 			ss_size = 0;
 			ss_sp = NULL;
+			ss_flags = SS_DISABLE;
 		} else {
 			if (unlikely(ss_size < min_ss_size))
 				ret = -ENOMEM;
