@@ -1339,7 +1339,8 @@ void mptcp_write_options(__be32 *ptr, const struct tcp_sock *tp,
 			ptr += 1;
 			if (opts->csum_reqd) {
 				put_unaligned_be32(mpext->data_len << 16 |
-						   mptcp_make_csum(mpext), ptr);
+						   (mpext->data_len ? mptcp_make_csum(mpext) : 0),
+						   ptr);
 			} else {
 				put_unaligned_be32(mpext->data_len << 16 |
 						   TCPOPT_NOP << 8 | TCPOPT_NOP, ptr);
