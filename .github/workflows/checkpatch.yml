@@ -1,0 +1,138 @@
+name: "CheckPatch"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**' # previous branches
+      - 't/**'        # TopGit tree
+      - 'net-next'    # part of the TopGit tree
+      - 'for-review'  # part of the TopGit tree
+    tags:
+      - 'patchew/**'  # patchew is using tags
+
+env:
+  PW: "https://patchwork.kernel.org/api/1.2"
+  RESULTS: "./checkpatch-results.txt"
+  DETAILS: "./checkpatch-details.txt"
+
+jobs:
+  checkpatch:
+    name: "Checkpatch"
+    # for others or for the official repo but only commits from patchew
+    if: github.repository_owner != 'multipath-tcp' || startswith(github.ref, 'refs/tags/patchew/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 ## to make sure a mentioned commit exists
+
+      - name: "Checkpatch"
+        uses: multipath-tcp/mptcp-upstream-validate-export-action@main
+        with:
+          each_commit: true
+          checkpatch: true
+          debug: ${{ secrets.BUILD_ACTION_DEBUG }}
+
+      - name: "Artifacts"
+        uses: actions/upload-artifact@v2
+        with:
+          name: results
+          path: ${{ env.RESULTS }}
+
+      - name: "Artifacts"
+        uses: actions/upload-artifact@v2
+        with:
+          name: details
+          path: ${{ env.DETAILS }}
+
+  notif:
+    name: "Notifications"
+    needs: checkpatch
+    # only for the official repo (patchew)
+    if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: results
+
+      - name: "Patchwork"
+        run: |
+          # $1: mid, $2: status, $3: desc
+          _send() { local check_url
+            check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
+            if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
+              echo "URL not found: '${check_url}' '${URL_PW}${1}'"
+              return 1
+            fi
+
+            curl -X POST \
+              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+              -F "state=${2}" \
+              -F "target_url=${URL_GH}" \
+              -F "context=checkpatch" \
+              -F "description=${3}" \
+              "${check_url}" | jq '.'
+          }
+
+          FIRST=1
+          send() { local i
+            # patches can take a bit of time to appear: retry the first time
+            if [ "${FIRST}" = "1" ]; then
+              FIRST=0
+
+              for i in $(seq 45); do
+                if _send "${@}"; then
+                  echo "Successful sent after ${i} attempts"
+                  return 0
+                fi
+                sleep 1m
+              done
+
+              curl "${URL_PW}${1}"
+              return 1
+            else
+              _send "${@}"
+            fi
+          }
+
+          if [ ! -s "${RESULTS}" ]; then
+            echo "Strange, no results, please check why"
+            exit 1
+          fi
+
+          while read -r mid status desc; do
+            echo "Sending: '${mid}' '${status}' '${desc}'"
+            send "${mid}" "${status}" "${desc}"
+          done < "${RESULTS}"
+        env:
+          URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+
+  status:
+    name: "Status"
+    needs: checkpatch
+    # for others, to report an error if patches were not OK
+    if: github.repository_owner != 'multipath-tcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: results
+      - name: "Set exit status"
+        run: |
+          if [ ! -s "${RESULTS}" ]; then
+            echo "Strange, no results, please check why"
+            exit 1
+          fi
+
+          if awk '{ if ($2 != "success") exit 1 }' "${RESULTS}"; then
+            echo "Everything OK with Checkpatch, good job!"
+            exit 0
+          fi
+
+          echo "Checkpatch detected some issues:"
+          echo
+          cat "${RESULTS}"
+          echo
+          exit 1
