@@ -25,3 +25,6 @@ $(warning,$(shell,printf 'hello\nworld\n\n4\n\n\n'))
 # 'lineno' to the line number.
 $(warning,filename=$(filename))
 $(warning,lineno=$(lineno))
+
+# 'shell' can return more than 256 bytes of output
+$(info,$(shell,printf 'hello%01024dworld\n' '0'))
