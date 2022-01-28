@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-set_flags-tests-in-pm_netlink.sh
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add set_flags tests in pm_netlink.sh
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the setting flags test cases, using both addr-based and
+id-based lookups for the setting address.
+
+The output looks like this:
+
+ set flags (backup)                                 [ OK ]
+           (nobackup)                               [ OK ]
+           (fullmesh)                               [ OK ]
+           (nofullmesh)                             [ OK ]
+           (backup,fullmesh)                        [ OK ]
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
