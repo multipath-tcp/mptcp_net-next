@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: set ip_mptcp in command line
-
-This patch added a command line option '-i' for mptcp_join.sh to use
-'ip mptcp' commands instead of using 'pm_nl_ctl' commands to deal with
-PM netlink.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
