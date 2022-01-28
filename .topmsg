@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: drop unused sk in mptcp_get_options
-
-The parameter 'sk' became useless since the code using it was dropped
-from mptcp_get_options() in the commit 8d548ea1dd15 ("mptcp: do not set
-unconditionally csum_reqd on incoming opt"). Let's drop it.
-
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
