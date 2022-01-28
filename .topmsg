@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-netlink-process-IPv6-addrs-in-creating-listening-sockets
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: netlink: process IPv6 addrs in creating listening sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change updates mptcp_pm_nl_create_listen_socket() to create
+listening sockets bound to IPv6 addresses (where IPv6 is supported).
+
+Fixes: 1729cf186d8a ("mptcp: create the listening socket for new port")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
