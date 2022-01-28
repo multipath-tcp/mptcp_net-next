@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-MPTCP_SUBFLOW_NODATA
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: use MPTCP_SUBFLOW_NODATA
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Set subflow->data_avail with the enum value MPTCP_SUBFLOW_NODATA, instead
+of using 0 directly.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
