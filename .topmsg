@@ -1,4 +1,12 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-mptcp_parse_option-is-no-longer-exported
+Subject: [PATCH] mptcp: mptcp_parse_option is no longer exported
 
+Options parsing in now done from mptcp_incoming_options().
+
+mptcp_parse_option() has been removed from mptcp.h when CONFIG_MPTCP is
+defined but not when it is not.
+
+Fixes: cfde141ea3fa ("mptcp: move option parsing into mptcp_incoming_options()")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
