@@ -1,1 +1,1 @@
-t/selftests-mptcp-set-ip_mptcp-in-command-line
+t/mptcp-mptcp_parse_option-is-no-longer-exported
