@@ -1231,7 +1231,6 @@ static void mptcp_update_infinite_map(struct mptcp_sock *msk,
 
 	mpext->infinite_map = 1;
 	mpext->data_len = 0;
-	mpext->csum = 0;
 
 	mptcp_subflow_ctx(ssk)->send_infinite_map = 0;
 	pr_fallback(msk);
