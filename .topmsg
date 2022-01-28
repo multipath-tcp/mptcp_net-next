@@ -1,4 +1,29 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-missing-join-check
+Subject: [PATCH] selftests: mptcp: add missing join check
 
+This function also writes the name of the test with its ID, making clear
+a new test has been executed.
+
+Without that, the ADD_ADDR results from this test was appended at the
+end of the previous test causing confusions. Especially when the second
+test was failing, we had:
+
+  17 signal invalid addresses     syn[ ok ] - synack[ ok ] - ack[ ok ]
+                                  add[ ok ] - echo  [ ok ]
+                                  add[fail] got 2 ADD_ADDR[s] expected 3
+
+In fact, this 17th test was OK but not the 18th one.
+
+Now we have:
+
+  17 signal invalid addresses     syn[ ok ] - synack[ ok ] - ack[ ok ]
+                                  add[ ok ] - echo  [ ok ]
+  18 signal addresses race test   syn[fail] got 2 JOIN[s] syn expected 3
+   - synack[fail] got 2 JOIN[s] synack expected
+   - ack[fail] got 2 JOIN[s] ack expected 3
+                                  add[fail] got 2 ADD_ADDR[s] expected 3
+
+Fixes: 33c563ad28e3 ("selftests: mptcp: add_addr and echo race test")
+Reported-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
