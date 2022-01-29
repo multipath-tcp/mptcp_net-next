@@ -1114,8 +1114,8 @@ static int mptcp_pm_parse_addr(struct nlattr *attr, struct genl_info *info,
 	}
 
 	/* no validation needed - was already done via nested policy */
-	err = nla_parse_nested_deprecated(tb, MPTCP_PM_ADDR_ATTR_MAX, attr,
-					  mptcp_pm_addr_policy, info->extack);
+	err = nla_parse_nested(tb, MPTCP_PM_ADDR_ATTR_MAX, attr,
+			       mptcp_pm_addr_policy, info->extack);
 	if (err)
 		return err;
 
