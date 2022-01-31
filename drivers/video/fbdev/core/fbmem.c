@@ -1064,7 +1064,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 EXPORT_SYMBOL(fb_set_var);
 
 int
-fb_blank(struct fb_info *info, int blank)
+fb_blank(struct fb_info *info, unsigned long blank)
 {
 	struct fb_event event;
 	int ret = -EINVAL;
