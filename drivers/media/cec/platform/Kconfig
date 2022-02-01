@@ -98,7 +98,11 @@ config CEC_TEGRA
 	  between compatible devices.
 
 config CEC_SECO
-	tristate "SECO Boards HDMI CEC driver"
+	bool "SECO Boards HDMI CEC drivers"
+
+config CEC_SECO_LEGACY
+	tristate "SECO Legacy Boards HDMI CEC driver"
+	depends on CEC_SECO
 	depends on (X86 || IA64) || COMPILE_TEST
 	depends on PCI && DMI
 	select CEC_CORE
@@ -109,9 +113,23 @@ config CEC_SECO
 	  CEC bus is present in the HDMI connector and enables communication
 	  between compatible devices.
 
+config CEC_SECO_MEC
+	tristate "SECO MEC-Based Boards HDMI CEC driver"
+	depends on CEC_SECO
+	depends on (X86 || IA64) || COMPILE_TEST
+	depends on PCI && DMI
+	select CEC_CORE
+	select CEC_NOTIFIER
+	help
+	  This is a driver for SECO MEC-Based Boards integrated CEC interface.
+	  Selecting it will enable support for this device.
+	  CEC bus is present in the HDMI connectors and enables communication
+	  between compatible devices.
+
+
 config CEC_SECO_RC
 	bool "SECO Boards IR RC5 support"
-	depends on CEC_SECO
+	depends on CEC_SECO_LEGACY
 	depends on RC_CORE=y || RC_CORE = CEC_SECO
 	help
 	  If you say yes here you will get support for the

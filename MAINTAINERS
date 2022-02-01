@@ -17287,6 +17287,8 @@ M:	Ettore Chimenti <ek5.chimenti@gmail.com>
 S:	Maintained
 F:	drivers/media/cec/platform/seco/seco-cec.c
 F:	drivers/media/cec/platform/seco/seco-cec.h
+F:	drivers/media/cec/platform/seco/seco-meccec.c
+F:	drivers/media/cec/platform/seco/seco-meccec.h
 
 SECURE COMPUTING
 M:	Kees Cook <keescook@chromium.org>
