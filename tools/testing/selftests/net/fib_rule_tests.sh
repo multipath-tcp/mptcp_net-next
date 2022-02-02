@@ -96,7 +96,7 @@ fib_rule6_del()
 
 fib_rule6_del_by_pref()
 {
-	pref=$($IP -6 rule show | grep "$1 lookup $TABLE" | cut -d ":" -f 1)
+	pref=$($IP -6 rule show $1 table $RTABLE | cut -d ":" -f 1)
 	$IP -6 rule del pref $pref
 }
 
@@ -104,17 +104,21 @@ fib_rule6_test_match_n_redirect()
 {
 	local match="$1"
 	local getmatch="$2"
+	local description="$3"
 
 	$IP -6 rule add $match table $RTABLE
 	$IP -6 route get $GW_IP6 $getmatch | grep -q "table $RTABLE"
-	log_test $? 0 "rule6 check: $1"
+	log_test $? 0 "rule6 check: $description"
 
 	fib_rule6_del_by_pref "$match"
-	log_test $? 0 "rule6 del by pref: $match"
+	log_test $? 0 "rule6 del by pref: $description"
 }
 
 fib_rule6_test()
 {
+	local getmatch
+	local match
+
 	# setup the fib rule redirect route
 	$IP -6 route add table $RTABLE default via $GW_IP6 dev $DEV onlink
 
@@ -165,7 +169,7 @@ fib_rule4_del()
 
 fib_rule4_del_by_pref()
 {
-	pref=$($IP rule show | grep "$1 lookup $TABLE" | cut -d ":" -f 1)
+	pref=$($IP rule show $1 table $RTABLE | cut -d ":" -f 1)
 	$IP rule del pref $pref
 }
 
@@ -173,17 +177,21 @@ fib_rule4_test_match_n_redirect()
 {
 	local match="$1"
 	local getmatch="$2"
+	local description="$3"
 
 	$IP rule add $match table $RTABLE
 	$IP route get $GW_IP4 $getmatch | grep -q "table $RTABLE"
-	log_test $? 0 "rule4 check: $1"
+	log_test $? 0 "rule4 check: $description"
 
 	fib_rule4_del_by_pref "$match"
-	log_test $? 0 "rule4 del by pref: $match"
+	log_test $? 0 "rule4 del by pref: $description"
 }
 
 fib_rule4_test()
 {
+	local getmatch
+	local match
+
 	# setup the fib rule redirect route
 	$IP route add table $RTABLE default via $GW_IP4 dev $DEV onlink
 
@@ -192,11 +200,11 @@ fib_rule4_test()
 
 	# need enable forwarding and disable rp_filter temporarily as all the
 	# addresses are in the same subnet and egress device == ingress device.
-	ip netns exec testns sysctl -w net.ipv4.ip_forward=1
-	ip netns exec testns sysctl -w net.ipv4.conf.$DEV.rp_filter=0
+	ip netns exec testns sysctl -qw net.ipv4.ip_forward=1
+	ip netns exec testns sysctl -qw net.ipv4.conf.$DEV.rp_filter=0
 	match="from $SRC_IP iif $DEV"
 	fib_rule4_test_match_n_redirect "$match" "$match" "iif redirect to table"
-	ip netns exec testns sysctl -w net.ipv4.ip_forward=0
+	ip netns exec testns sysctl -qw net.ipv4.ip_forward=0
 
 	match="tos 0x10"
 	fib_rule4_test_match_n_redirect "$match" "$match" "tos redirect to table"
