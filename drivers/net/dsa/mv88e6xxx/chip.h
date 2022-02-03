@@ -179,6 +179,7 @@ struct mv88e6xxx_vtu_entry {
 	u16	fid;
 	u8	sid;
 	bool	valid;
+	bool	policy;
 	u8	member[DSA_MAX_PORTS];
 	u8	state[DSA_MAX_PORTS];
 };
@@ -610,9 +611,8 @@ struct mv88e6xxx_ops {
 	const struct mv88e6xxx_ptp_ops *ptp_ops;
 
 	/* Phylink */
-	void (*phylink_validate)(struct mv88e6xxx_chip *chip, int port,
-				 unsigned long *mask,
-				 struct phylink_link_state *state);
+	void (*phylink_get_caps)(struct mv88e6xxx_chip *chip, int port,
+				 struct phylink_config *config);
 
 	/* Max Frame Size */
 	int (*set_max_frame_size)(struct mv88e6xxx_chip *chip, int mtu);
