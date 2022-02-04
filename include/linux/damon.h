@@ -221,6 +221,7 @@ struct damos_stat {
  * @wmarks:		Watermarks for automated (in)activation of this scheme.
  * @stat:		Statistics of this scheme.
  * @list:		List head for siblings.
+ * @node:		NUMA node of target regions.
  *
  * For each aggregation interval, DAMON finds regions which fit in the
  * condition (&min_sz_region, &max_sz_region, &min_nr_accesses,
@@ -252,6 +253,7 @@ struct damos {
 	struct damos_watermarks wmarks;
 	struct damos_stat stat;
 	struct list_head list;
+	int node;
 };
 
 struct damon_ctx;
@@ -471,7 +473,7 @@ struct damos *damon_new_scheme(
 		unsigned int min_nr_accesses, unsigned int max_nr_accesses,
 		unsigned int min_age_region, unsigned int max_age_region,
 		enum damos_action action, struct damos_quota *quota,
-		struct damos_watermarks *wmarks);
+		struct damos_watermarks *wmarks, int node);
 void damon_add_scheme(struct damon_ctx *ctx, struct damos *s);
 void damon_destroy_scheme(struct damos *s);
 

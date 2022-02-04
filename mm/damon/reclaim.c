@@ -177,6 +177,14 @@ static unsigned long monitor_region_end __read_mostly;
 module_param(monitor_region_end, ulong, 0600);
 
 /*
+ * NUMA node of target to monitor
+ *
+ * If node is NUMA_NO_NODE, watermark is based on system entire memory.
+ */
+static int node __read_mostly = NUMA_NO_NODE;
+module_param(node, int, 0600);
+
+/*
  * PID of the DAMON thread
  *
  * If DAMON_RECLAIM is enabled, this becomes the PID of the worker thread.
@@ -285,7 +293,9 @@ static struct damos *damon_reclaim_new_scheme(void)
 			/* under the quota. */
 			&quota,
 			/* (De)activate this according to the watermarks. */
-			&wmarks);
+			&wmarks,
+			/* Watermarks is based on this NUMA node */
+			node);
 
 	return scheme;
 }
