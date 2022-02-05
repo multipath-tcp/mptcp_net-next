@@ -375,6 +375,33 @@ pm_nl_flush_endpoint()
 	fi
 }
 
+pm_nl_show_endpoints()
+{
+	local ns=$1
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint show
+	else
+		ip netns exec $ns ./pm_nl_ctl dump
+	fi
+}
+
+pm_nl_change_endpoint()
+{
+	local ns=$1
+	local flags=$2
+	local id=$3
+	local addr=$4
+	local port=""
+
+	if [ $ip_mptcp -eq 1 ]; then
+		ip -n $ns mptcp endpoint change id $id ${flags//","/" "}
+	else
+		if [ $5 -ne 0 ]; then port="port $5"; fi
+		ip netns exec $ns ./pm_nl_ctl set $addr flags $flags $port
+	fi
+}
+
 do_transfer()
 {
 	listener_ns="$1"
@@ -482,20 +509,25 @@ do_transfer()
 	elif [ $addr_nr_ns1 -lt 0 ]; then
 		let rm_nr_ns1=-addr_nr_ns1
 		if [ $rm_nr_ns1 -lt 8 ]; then
-			counter=1
-			pos=1
-			dump=(`ip netns exec ${listener_ns} ./pm_nl_ctl dump`)
-			if [ ${#dump[@]} -gt 0 ]; then
-				while [ $counter -le $rm_nr_ns1 ]
-				do
-					id=${dump[$pos]}
-					rm_addr=$(rm_addr_count ${connector_ns})
-					pm_nl_del_endpoint ${listener_ns} $id
-					wait_rm_addr ${connector_ns} ${rm_addr}
-					let counter+=1
-					let pos+=5
+			counter=0
+			pm_nl_show_endpoints ${listener_ns} | while read line; do
+				local arr=($line)
+				local nr=0
+
+				for i in ${arr[@]}; do
+					if [ $i = "id" ]; then
+						if [ $counter -eq $rm_nr_ns1 ]; then
+							break
+						fi
+						id=${arr[$nr+1]}
+						rm_addr=$(rm_addr_count ${connector_ns})
+						pm_nl_del_endpoint ${listener_ns} $id
+						wait_rm_addr ${connector_ns} ${rm_addr}
+						let counter+=1
+					fi
+					let nr+=1
 				done
-			fi
+			done
 		elif [ $rm_nr_ns1 -eq 8 ]; then
 			pm_nl_flush_endpoint ${listener_ns}
 		elif [ $rm_nr_ns1 -eq 9 ]; then
@@ -530,21 +562,27 @@ do_transfer()
 	elif [ $addr_nr_ns2 -lt 0 ]; then
 		let rm_nr_ns2=-addr_nr_ns2
 		if [ $rm_nr_ns2 -lt 8 ]; then
-			counter=1
-			pos=1
-			dump=(`ip netns exec ${connector_ns} ./pm_nl_ctl dump`)
-			if [ ${#dump[@]} -gt 0 ]; then
-				while [ $counter -le $rm_nr_ns2 ]
-				do
-					# rm_addr are serialized, allow the previous one to complete
-					id=${dump[$pos]}
-					rm_addr=$(rm_addr_count ${listener_ns})
-					pm_nl_del_endpoint ${connector_ns} $id
-					wait_rm_addr ${listener_ns} ${rm_addr}
-					let counter+=1
-					let pos+=5
+			counter=0
+			pm_nl_show_endpoints ${connector_ns} | while read line; do
+				local arr=($line)
+				local nr=0
+
+				for i in ${arr[@]}; do
+					if [ $i = "id" ]; then
+						if [ $counter -eq $rm_nr_ns2 ]; then
+							break
+						fi
+						# rm_addr are serialized, allow the previous one to
+						# complete
+						id=${arr[$nr+1]}
+						rm_addr=$(rm_addr_count ${listener_ns})
+						pm_nl_del_endpoint ${connector_ns} $id
+						wait_rm_addr ${listener_ns} ${rm_addr}
+						let counter+=1
+					fi
+					let nr+=1
 				done
-			fi
+			done
 		elif [ $rm_nr_ns2 -eq 8 ]; then
 			pm_nl_flush_endpoint ${connector_ns}
 		elif [ $rm_nr_ns2 -eq 9 ]; then
@@ -561,11 +599,11 @@ do_transfer()
 	if [ ! -z $sflags ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
-			ip netns exec $netns ./pm_nl_ctl dump | while read line; do
+			pm_nl_show_endpoints $netns | while read line; do
 				local arr=($line)
 				local addr
 				local port=0
-				local _port=""
+				local id
 
 				for i in ${arr[@]}; do
 					if is_addr $i; then
@@ -574,11 +612,13 @@ do_transfer()
 						# The minimum expected port number is 10000
 						if [ $i -gt 10000 ]; then
 							port=$i
+						# The maximum id number is 255
+						elif [ $i -lt 255 ]; then
+							id=$i
 						fi
 					fi
 				done
-				if [ $port -ne 0 ]; then _port="port $port"; fi
-				ip netns exec $netns ./pm_nl_ctl set $addr flags $sflags $_port
+				pm_nl_change_endpoint $netns $sflags $id $addr $port
 			done
 		done
 	fi
@@ -2087,9 +2127,9 @@ userspace_tests()
 	# userspace pm type prevents add_addr
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 0 2
-	pm_nl_set_limits $ns2 0 2
-	pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
+	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type prevents add_addr" 0 0 0
 	chk_add_nr 0 0
@@ -2097,9 +2137,9 @@ userspace_tests()
 	# userspace pm type echoes add_addr
 	reset
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 0 2
-	pm_nl_set_limits $ns2 0 2
-	pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+	ip netns exec $ns1 ./pm_nl_ctl limits 0 2
+	ip netns exec $ns2 ./pm_nl_ctl limits 0 2
+	ip netns exec $ns1 ./pm_nl_ctl add 10.0.2.1 flags signal
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type echoes add_addr" 0 0 0
 	chk_add_nr 1 1
@@ -2107,27 +2147,27 @@ userspace_tests()
 	# userspace pm type rejects join
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 1 1
-	pm_nl_set_limits $ns2 1 1
-	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type rejects join" 1 1 0
 
 	# userspace pm type does not send join
 	reset
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 1 1
-	pm_nl_set_limits $ns2 1 1
-	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1
 	chk_join_nr "userspace pm type does not send join" 0 0 0
 
 	# userspace pm type prevents mp_prio
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 1 1
-	pm_nl_set_limits $ns2 1 1
-	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	ip netns exec $ns1 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl limits 1 1
+	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow backup
 	chk_join_nr "userspace pm type prevents mp_prio" 1 1 0
 	chk_prio_nr 0 0
@@ -2136,9 +2176,9 @@ userspace_tests()
 	reset
 	ip netns exec $ns1 sysctl -q net.mptcp.pm_type=1
 	ip netns exec $ns2 sysctl -q net.mptcp.pm_type=1
-	pm_nl_set_limits $ns1 0 1
-	pm_nl_set_limits $ns2 0 1
-	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	ip netns exec $ns1 ./pm_nl_ctl limits 0 1
+	ip netns exec $ns2 ./pm_nl_ctl limits 0 1
+	ip netns exec $ns2 ./pm_nl_ctl add 10.0.3.2 flags subflow
 	run_tests $ns1 $ns2 10.0.1.1 0 0 -1 slow
 	chk_join_nr "userspace pm type prevents rm_addr" 0 0 0
 	chk_rm_nr 0 0
@@ -2185,6 +2225,7 @@ usage()
 	echo "  -u userspace_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
+	echo "  -i use ip mptcp"
 	echo "  -h help"
 }
 
@@ -2206,9 +2247,12 @@ for arg in "$@"; do
 	if [[ "${arg}" =~ ^"-"[0-9a-zA-Z]*"C"[0-9a-zA-Z]*$ ]]; then
 		checksum=1
 	fi
+	if [[ "${arg}" =~ ^"-"[0-9a-zA-Z]*"i"[0-9a-zA-Z]*$ ]]; then
+		ip_mptcp=1
+	fi
 
-	# exception for the capture/checksum options, the rest means: a part of the tests
-	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ]; then
+	# exception for the capture/checksum/ip_mptcp options, the rest means: a part of the tests
+	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ] && [ "${arg}" != "-i" ]; then
 		do_all_tests=0
 	fi
 done
@@ -2218,7 +2262,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fesltra64bpkdmuchCS' opt; do
+while getopts 'fesltra64bpkdmuchCSi' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -2271,6 +2315,8 @@ while getopts 'fesltra64bpkdmuchCS' opt; do
 		c)
 			;;
 		C)
+			;;
+		i)
 			;;
 		h | *)
 			usage
