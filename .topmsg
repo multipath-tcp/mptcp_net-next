@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-mptcp-increase-timeout-to-20-minutes
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
