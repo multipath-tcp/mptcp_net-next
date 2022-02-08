@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-simplify-pm_nl_change_endpoint
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: simplify pm_nl_change_endpoint
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch simplified pm_nl_change_endpoint(), using id-based address
+lookups only. And dropped the fragile way of parsing 'addr' and 'id'
+from the output of pm_nl_show_endpoints().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
