@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-unneeded-type-casts-for-hmac
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: drop unneeded type casts for hmac
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Drop the unneeded type casts to 'unsigned long long' for printing out the
+hmac values in add_addr_hmac_valid() and subflow_thmac_valid().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
