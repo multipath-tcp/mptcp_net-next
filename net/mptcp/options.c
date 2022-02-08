@@ -234,8 +234,8 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		break;
 
 	case MPTCPOPT_ADD_ADDR:
-		mp_opt->echo = (*ptr++) & MPTCP_ADDR_ECHO;
-		if (!mp_opt->echo) {
+		mp_opt->addr.echo = (*ptr++) & MPTCP_ADDR_ECHO;
+		if (!mp_opt->addr.echo) {
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT)
 				mp_opt->addr.family = AF_INET;
@@ -283,13 +283,14 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			}
 		}
 #endif
-		if (!mp_opt->echo) {
+		if (!mp_opt->addr.echo) {
 			mp_opt->ahmac = get_unaligned_be64(ptr);
 			ptr += 8;
 		}
 		pr_debug("ADD_ADDR%s: id=%d, ahmac=%llu, echo=%d, port=%d",
 			 (mp_opt->addr.family == AF_INET6) ? "6" : "",
-			 mp_opt->addr.id, mp_opt->ahmac, mp_opt->echo, ntohs(mp_opt->addr.port));
+			 mp_opt->addr.id, mp_opt->ahmac,
+			 mp_opt->addr.echo, ntohs(mp_opt->addr.port));
 		break;
 
 	case MPTCPOPT_RM_ADDR:
@@ -945,7 +946,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	}
 
 	if (((mp_opt->suboptions & OPTION_MPTCP_DSS) && mp_opt->use_ack) ||
-	    ((mp_opt->suboptions & OPTION_MPTCP_ADD_ADDR) && !mp_opt->echo)) {
+	    ((mp_opt->suboptions & OPTION_MPTCP_ADD_ADDR) && !mp_opt->addr.echo)) {
 		/* subflows are fully established as soon as we get any
 		 * additional ack, including ADD_ADDR.
 		 */
@@ -1076,7 +1077,7 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 {
 	u64 hmac = 0;
 
-	if (mp_opt->echo)
+	if (mp_opt->addr.echo)
 		return true;
 
 	hmac = add_addr_generate_hmac(msk->remote_key,
@@ -1128,7 +1129,8 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		if ((mp_opt.suboptions & OPTION_MPTCP_ADD_ADDR) &&
 		    add_addr_hmac_valid(msk, &mp_opt)) {
-			if (!mp_opt.echo) {
+			if (!mp_opt.addr.echo) {
+				mp_opt.addr.echo = 1;
 				mptcp_pm_add_addr_received(msk, &mp_opt.addr);
 				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDR);
 			} else {

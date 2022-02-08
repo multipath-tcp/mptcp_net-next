@@ -48,7 +48,8 @@ struct mptcp_rm_list {
 
 struct mptcp_addr_info {
 	u8			id;
-	sa_family_t		family;
+	u8			echo:1,
+				family:4;
 	__be16			port;
 	union {
 		struct in_addr	addr;

@@ -151,7 +151,6 @@ struct mptcp_options_received {
 		mpc_map:1,
 		reset_reason:4,
 		reset_transient:1,
-		echo:1,
 		backup:1,
 		deny_join_id0:1,
 		__unused:2;
