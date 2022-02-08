@@ -6,7 +6,7 @@ config and not recent hardware, takes around 10 minutes to execute the
 slowest MPTCP test: mptcp_join.sh.
 
 Even if most CIs don't take that long to execute these tests --
-typically max 10 minutes to run all selftests -- it will helpi some of
+typically max 10 minutes to run all selftests -- it will help some of
 them if the timeout is increased.
 
 The timeout could be disabled but it is always good to have an extra
@@ -18,7 +18,7 @@ in this very slow environment with other jobs running in parallel.
 The slowest test, mptcp_join.sh takes ~30 minutes in this case.
 
 In such environments, the selftests timeout set in the 'settings' file
-is disabled because this environment is known as being exceptionnaly
+is disabled because this environment is known as being exceptionnally
 slow. It has been decided not to take such exceptional environments into
 account and set the timeout to 20min.
 
