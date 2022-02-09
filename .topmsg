@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-SNDTIMEO-setsockopt-support
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add SNDTIMEO setsockopt support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add setsockopt support for SO_SNDTIMEO_OLD and SO_SNDTIMEO_NEW to fix this
+error reported by the mptcp bpf selftest:
+
+ (network_helpers.c:64: errno: Operation not supported) Failed to set SO_SNDTIMEO
+ test_mptcp:FAIL:115
+
+ All error logs:
+
+ (network_helpers.c:64: errno: Operation not supported) Failed to set SO_SNDTIMEO
+ test_mptcp:FAIL:115
+ Summary: 0/0 PASSED, 0 SKIPPED, 1 FAILED
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
