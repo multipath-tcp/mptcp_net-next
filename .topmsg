@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-race-in-overlapping-signal-events
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix race in overlapping signal events
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After commit a88c9e496937 ("mptcp: do not block subflows
+creation on errors"), if a signal address races with a failing
+subflow creation, the subflow creation failure control path
+can trigger the selection of the next address to be announced
+while the current announced is still pending.
+
+The above will cause the unintended suppression of the ADD_ADDR
+announce.
+
+Fix the issue skipping the to-be-suppressed announce before it
+will mark an endpoint as already used. The relevant announce
+will be triggered again when the current one will complete.
+
+Fixes: a88c9e496937 ("mptcp: do not block subflows creation on errors")
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
