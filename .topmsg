@@ -1,5 +1,5 @@
 From: Nicolas Rybowski <nicolas.rybowski@tessares.net>
-Subject: [PATCH] bpf:selftests: add bpf_mptcp_sock() verifier tests
+Subject: [PATCH] selftests: bpf: add bpf_mptcp_sock() verifier tests
 
 This patch adds verifier side tests for the new bpf_mptcp_sock() helper.
 
