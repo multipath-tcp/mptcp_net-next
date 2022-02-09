@@ -938,7 +938,7 @@ chk_add_nr()
 
 	timeout=`ip netns exec $ns1 sysctl -n net.mptcp.add_addr_timeout`
 
-	printf "%-${nr_blank}s %s" " " "add"
+	printf "%-39s %s" " " "add"
 	count=`ip netns exec $ns2 nstat -as MPTcpExtAddAddr | grep MPTcpExtAddAddr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
 
