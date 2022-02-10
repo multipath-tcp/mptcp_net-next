@@ -850,4 +850,15 @@ alternative_endif
 
 #endif /* GNU_PROPERTY_AARCH64_FEATURE_1_DEFAULT */
 
+/*
+ * Test whether the SP has overflowed, without corrupting a GPR.
+ */
+.macro test_sp_overflow shift, label
+	add	sp, sp, x0			// sp' = sp + x0
+	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
+	tbnz	x0, #\shift, \label
+	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
+	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
+.endm
+
 #endif	/* __ASM_ASSEMBLER_H */
