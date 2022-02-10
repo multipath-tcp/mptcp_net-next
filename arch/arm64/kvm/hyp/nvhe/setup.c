@@ -105,11 +105,19 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 		if (ret)
 			return ret;
 
-		end = (void *)per_cpu_ptr(&kvm_init_params, i)->stack_hyp_va;
+		/* Map stack pages in the 'private' VA range */
+		end = (void *)__hyp_pa(per_cpu_ptr(&kvm_init_params, i)->stack_hyp_va);
 		start = end - PAGE_SIZE;
-		ret = pkvm_create_mappings(start, end, PAGE_HYP);
-		if (ret)
-			return ret;
+		start = (void *)__pkvm_create_private_mapping((phys_addr_t)start,
+					PAGE_SIZE, PAGE_HYP);
+		if (IS_ERR_OR_NULL(start))
+			return PTR_ERR(start);
+		end = start + PAGE_SIZE;
+		/*
+		 * Update stack_hyp_va to the end of the stack page's
+		 * allocated 'private' VA range.
+		 */
+		per_cpu_ptr(&kvm_init_params, i)->stack_hyp_va = (unsigned long) end;
 	}
 
 	/*
