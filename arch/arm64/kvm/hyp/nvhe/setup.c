@@ -105,7 +105,24 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 		if (ret)
 			return ret;
 
-		/* Map stack pages in the 'private' VA range */
+		/*
+		 * Allocate 'private' VA range for stack guard pages.
+		 *
+		 * The 'private' VA range grows upward and stacks downwards, so
+		 * allocate the guard page first. But make sure to align the
+		 * stack itself with PAGE_SIZE * 2 granularity to ease overflow
+		 * detection in the entry assembly code.
+		 */
+		do {
+			start = (void *)hyp_alloc_private_va_range(PAGE_SIZE);
+			if (IS_ERR(start))
+				return PTR_ERR(start);
+		} while (IS_ALIGNED((u64) start, PAGE_SIZE * 2));
+
+		/*
+		 * Map stack pages in the 'private' VA range above the allocated
+		 * guard pages.
+		 */
 		end = (void *)__hyp_pa(per_cpu_ptr(&kvm_init_params, i)->stack_hyp_va);
 		start = end - PAGE_SIZE;
 		start = (void *)__pkvm_create_private_mapping((phys_addr_t)start,
