@@ -23,6 +23,29 @@ unsigned long hyp_nr_cpus;
 #ifdef CONFIG_NVHE_EL2_DEBUG
 DEFINE_PER_CPU(unsigned long [PAGE_SIZE/sizeof(long)], hyp_overflow_stack)
 	__aligned(16);
+
+DEFINE_PER_CPU(struct kvm_nvhe_panic_info, kvm_panic_info);
+
+static void init_nvhe_panic_info(void)
+{
+	struct kvm_nvhe_panic_info *panic_info;
+	struct kvm_nvhe_init_params *params;
+	int cpu;
+
+	for (cpu = 0; cpu < hyp_nr_cpus; cpu++) {
+		panic_info = per_cpu_ptr(&kvm_panic_info, cpu);
+		params = per_cpu_ptr(&kvm_init_params, cpu);
+
+		panic_info->hyp_stack_base = (unsigned long)(params->stack_hyp_va - PAGE_SIZE);
+		panic_info->hyp_overflow_stack_base
+			= (unsigned long)per_cpu_ptr(hyp_overflow_stack, cpu);
+		panic_info->start_fp = 0;
+	}
+}
+#else
+static inline void init_nvhe_panic_info(void)
+{
+}
 #endif
 
 #define hyp_percpu_size ((unsigned long)__per_cpu_end - \
@@ -140,6 +163,8 @@ static int recreate_hyp_mappings(phys_addr_t phys, unsigned long size,
 		 * allocated 'private' VA range.
 		 */
 		per_cpu_ptr(&kvm_init_params, i)->stack_hyp_va = (unsigned long) end;
+
+		init_nvhe_panic_info();
 	}
 
 	/*

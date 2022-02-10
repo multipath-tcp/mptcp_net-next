@@ -34,6 +34,21 @@ DEFINE_PER_CPU(struct kvm_host_data, kvm_host_data);
 DEFINE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
 DEFINE_PER_CPU(unsigned long, kvm_hyp_vector);
 
+#ifdef CONFIG_NVHE_EL2_DEBUG
+DECLARE_PER_CPU(struct kvm_nvhe_panic_info, kvm_panic_info);
+
+static void update_nvhe_panic_info_fp(void)
+{
+	struct kvm_nvhe_panic_info *panic_info = this_cpu_ptr(&kvm_panic_info);
+
+	panic_info->start_fp = (unsigned long)__builtin_frame_address(0);
+}
+#else
+static inline void update_nvhe_panic_info_fp(void)
+{
+}
+#endif
+
 static void __activate_traps(struct kvm_vcpu *vcpu)
 {
 	u64 val;
@@ -354,6 +369,8 @@ void __noreturn hyp_panic(void)
 	u64 par = read_sysreg_par();
 	struct kvm_cpu_context *host_ctxt;
 	struct kvm_vcpu *vcpu;
+
+	update_nvhe_panic_info_fp();
 
 	host_ctxt = &this_cpu_ptr(&kvm_host_data)->host_ctxt;
 	vcpu = host_ctxt->__hyp_running_vcpu;

@@ -23,6 +23,7 @@
 
 #define CREATE_TRACE_POINTS
 #include "trace_handle_exit.h"
+#include "stacktrace.h"
 
 typedef int (*exit_handle_fn)(struct kvm_vcpu *);
 
@@ -325,6 +326,8 @@ void __noreturn __cold nvhe_hyp_panic_handler(u64 esr, u64 spsr,
 	} else {
 		kvm_err("nVHE hyp panic at: %016llx!\n", elr_virt + hyp_offset);
 	}
+
+	hyp_dump_backtrace(hyp_offset);
 
 	/*
 	 * Hyp has panicked and we're going to handle that by panicking the
