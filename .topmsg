@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: constify a bunch of of helpers
-
-A few pm-related helpers don't touch arguments which lacking
-the const modifier, let's constify them.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
