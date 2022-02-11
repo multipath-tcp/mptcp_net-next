@@ -1,4 +1,7 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-exit-after-usage
+Subject: [PATCH] selftests: mptcp: join: exit after usage()
 
+With an error if it is an unknown option.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
