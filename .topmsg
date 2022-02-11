@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-allow-running-cCi
+Subject: [PATCH] selftests: mptcp: join: allow running -cCi
 
+Without this patch, no tests would be ran when launching:
+
+  mptcp_join.sh -cCi
+
+In any order or a combination with 2 of these letters.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
