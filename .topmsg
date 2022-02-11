@@ -1,4 +1,12 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-create-tmp-files-only-if-needed
+Subject: [PATCH] selftests: mptcp: join: create tmp files only if needed
 
+These tmp files will only be created when a test will be launched.
+
+This avoid 'dd' output when '-h' is used for example.
+
+While at it, also avoid creating netns that will be removed when
+starting the first test.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
