@@ -18,6 +18,7 @@ checksum=0
 ip_mptcp=0
 check_invert=0
 do_all_tests=1
+init=0
 
 TEST_COUNT=0
 nr_blank=40
@@ -40,11 +41,11 @@ CBPF_MPTCP_SUBOPTION_ADD_ADDR="14,
 			       6 0 0 65535,
 			       6 0 0 0"
 
-init()
+init_partial()
 {
 	capout=$(mktemp)
 
-	rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
+	rndh=$(mktemp -u XXXXXX)
 
 	ns1="ns1-$rndh"
 	ns2="ns2-$rndh"
@@ -103,6 +104,41 @@ cleanup_partial()
 	done
 }
 
+check_tools()
+{
+	if ! ip -Version &> /dev/null; then
+		echo "SKIP: Could not run test without ip tool"
+		exit $ksft_skip
+	fi
+
+	if ! iptables -V &> /dev/null; then
+		echo "SKIP: Could not run all tests without iptables tool"
+		exit $ksft_skip
+	fi
+
+	if ! ip6tables -V &> /dev/null; then
+		echo "SKIP: Could not run all tests without ip6tables tool"
+		exit $ksft_skip
+	fi
+}
+
+init() {
+	init=1
+
+	check_tools
+
+	sin=$(mktemp)
+	sout=$(mktemp)
+	cin=$(mktemp)
+	cinsent=$(mktemp)
+	cout=$(mktemp)
+
+	trap cleanup EXIT
+
+	make_file "$cin" "client" 1
+	make_file "$sin" "server" 1
+}
+
 cleanup()
 {
 	rm -f "$cin" "$cout" "$sinfail"
@@ -112,8 +148,13 @@ cleanup()
 
 reset()
 {
-	cleanup_partial
-	init
+	if [ "${init}" != "1" ]; then
+		init
+	else
+		cleanup_partial
+	fi
+
+	init_partial
 }
 
 reset_with_cookies()
@@ -166,24 +207,6 @@ reset_with_allow_join_id0()
 	ip netns exec $ns1 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns1_enable
 	ip netns exec $ns2 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns2_enable
 }
-
-ip -Version > /dev/null 2>&1
-if [ $? -ne 0 ];then
-	echo "SKIP: Could not run test without ip tool"
-	exit $ksft_skip
-fi
-
-iptables -V > /dev/null 2>&1
-if [ $? -ne 0 ];then
-	echo "SKIP: Could not run all tests without iptables tool"
-	exit $ksft_skip
-fi
-
-ip6tables -V > /dev/null 2>&1
-if [ $? -ne 0 ];then
-	echo "SKIP: Could not run all tests without ip6tables tool"
-	exit $ksft_skip
-fi
 
 print_file_err()
 {
@@ -676,8 +699,6 @@ run_tests()
 	addr_nr_ns2="${6:-0}"
 	speed="${7:-fast}"
 	sflags="${8:-""}"
-	lret=0
-	oldin=""
 
 	# create the input file for the failure test when
 	# the first failure test run
@@ -705,7 +726,6 @@ run_tests()
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} \
 		${test_linkfail} ${addr_nr_ns1} ${addr_nr_ns2} ${speed} ${sflags}
-	lret=$?
 }
 
 dump_stats()
@@ -2203,8 +2223,14 @@ all_tests()
 	userspace_tests
 }
 
+# [$1: error message]
 usage()
 {
+	if [ -n "${1}" ]; then
+		echo "${1}"
+		ret=1
+	fi
+
 	echo "mptcp_join usage:"
 	echo "  -f subflows_tests"
 	echo "  -e subflows_error_tests"
@@ -2226,17 +2252,9 @@ usage()
 	echo "  -C enable data checksum"
 	echo "  -i use ip mptcp"
 	echo "  -h help"
-}
 
-sin=$(mktemp)
-sout=$(mktemp)
-cin=$(mktemp)
-cinsent=$(mktemp)
-cout=$(mktemp)
-init
-make_file "$cin" "client" 1
-make_file "$sin" "server" 1
-trap cleanup EXIT
+	exit ${ret}
+}
 
 for arg in "$@"; do
 	# check for "capture/checksum" args before launching tests
@@ -2251,7 +2269,7 @@ for arg in "$@"; do
 	fi
 
 	# exception for the capture/checksum/ip_mptcp options, the rest means: a part of the tests
-	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ] && [ "${arg}" != "-i" ]; then
+	if ! [[ "${arg}" =~ ^"-"[cCi]+$ ]]; then
 		do_all_tests=0
 	fi
 done
@@ -2317,8 +2335,11 @@ while getopts 'fesltra64bpkdmuchCSi' opt; do
 			;;
 		i)
 			;;
-		h | *)
+		h)
 			usage
+			;;
+		*)
+			usage "Unknown option: -${opt}"
 			;;
 	esac
 done
