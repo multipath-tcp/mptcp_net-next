@@ -1,4 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-check-for-tools-only-if-needed
+Subject: [PATCH] selftests: mptcp: join: check for tools only if needed
 
+To allow showing the 'help' menu even if these tools are not available.
+
+While at it, also avoid launching the command then checking $?. Instead,
+the check is directly done in the 'if'.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
