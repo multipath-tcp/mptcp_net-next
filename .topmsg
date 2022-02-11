@@ -1,8 +1,0 @@
-From: Florian Westphal <fw@strlen.de>
-Subject: [PATCH] mptcp: don't save tcp data_ready and write space callbacks
-
-Assign the helpers directly rather than save/restore in the context
-structure.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Florian Westphal <fw@strlen.de>
