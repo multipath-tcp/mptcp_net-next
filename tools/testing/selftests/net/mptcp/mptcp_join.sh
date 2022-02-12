@@ -802,6 +802,47 @@ chk_fail_nr()
 	[ "${dump_stats}" = 1 ] && dump_stats
 }
 
+chk_rst_nr()
+{
+	local rst_tx=$1
+	local rst_rx=$2
+	local invert=${3:-""}
+	local count
+	local dump_stats
+
+	if [ -z $invert ]; then
+		ns_tx=$ns1
+		ns_rx=$ns2
+	elif [ $invert = "invert" ]; then
+		ns_tx=$ns2
+		ns_rx=$ns1
+	fi
+
+	printf "%-${nr_blank}s %s" " " "rtx"
+	count=`ip netns exec $ns_tx nstat -as | grep MPTcpExtMPRstTx | awk '{print $2}'`
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$rst_tx" ]; then
+		echo "[fail] got $count MP_RST[s] TX expected $rst_tx"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - rstrx "
+	count=`ip netns exec $ns_rx nstat -as | grep MPTcpExtMPRstRx | awk '{print $2}'`
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$rst_rx" ]; then
+		echo "[fail] got $count MP_RST[s] RX expected $rst_rx"
+		ret=1
+		dump_stats=1
+	else
+		echo "[ ok ]"
+	fi
+
+	[ "${dump_stats}" = 1 ] && dump_stats
+}
+
 chk_infi_nr()
 {
 	local mp_infi_nr_tx=$1
@@ -920,6 +961,7 @@ chk_join_nr()
 	if [ $checksum -eq 1 ]; then
 		chk_csum_nr
 		chk_fail_nr 0 0
+		chk_rst_nr 0 0
 		chk_infi_nr 0 0
 	fi
 }
