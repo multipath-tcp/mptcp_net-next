@@ -424,6 +424,7 @@ do_transfer()
 	addr_nr_ns2="$8"
 	speed="$9"
 	sflags="${10}"
+	fastclose="${11}"
 
 	port=$((10000+$TEST_COUNT))
 	TEST_COUNT=$((TEST_COUNT+1))
@@ -460,6 +461,13 @@ do_transfer()
 		extra_args="-r 50"
 	elif [ $speed = "least" ]; then
 		extra_args="-r 10"
+	fi
+
+	if [ $fastclose -eq 2 ]; then
+		# disconnect
+		extra_args="$extra_args -I 2"
+	elif [ $fastclose -eq 3 ]; then
+		extra_args="$extra_args -I 3"
 	fi
 
 	local local_addr
@@ -607,7 +615,7 @@ do_transfer()
 		fi
 	fi
 
-	if [ ! -z $sflags ]; then
+	if [ $sflags != "null" ]; then
 		sleep 1
 		for netns in "$ns1" "$ns2"; do
 			pm_nl_show_endpoints $netns | while read line; do
@@ -698,7 +706,8 @@ run_tests()
 	addr_nr_ns1="${5:-0}"
 	addr_nr_ns2="${6:-0}"
 	speed="${7:-fast}"
-	sflags="${8:-""}"
+	sflags="${8:-null}"
+	fastclose="${9:-0}"
 
 	# create the input file for the failure test when
 	# the first failure test run
@@ -725,7 +734,7 @@ run_tests()
 	fi
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} \
-		${test_linkfail} ${addr_nr_ns1} ${addr_nr_ns2} ${speed} ${sflags}
+		${test_linkfail} ${addr_nr_ns1} ${addr_nr_ns2} ${speed} ${sflags} ${fastclose}
 }
 
 dump_stats()
@@ -2277,6 +2286,21 @@ userspace_tests()
 	chk_rm_nr 0 0
 }
 
+fastclose_tests()
+{
+	reset
+	run_tests $ns1 $ns2 10.0.1.1 0 0 0 fast null 2
+	chk_join_nr "fastclose test 1" 0 0 0
+	chk_fclose_nr 1 1
+	chk_rst_nr 1 1 invert
+
+	reset
+	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow null 3
+	chk_join_nr "fastclose test 2" 0 0 0
+	chk_fclose_nr 2 2
+	chk_rst_nr 2 2 invert
+}
+
 all_tests()
 {
 	subflows_tests
@@ -2295,6 +2319,7 @@ all_tests()
 	deny_join_id0_tests
 	fullmesh_tests
 	userspace_tests
+	fastclose_tests
 }
 
 # [$1: error message]
@@ -2322,6 +2347,7 @@ usage()
 	echo "  -d deny_join_id0_tests"
 	echo "  -m fullmesh_tests"
 	echo "  -u userspace_tests"
+	echo "  -z fastclose_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
 	echo "  -i use ip mptcp"
@@ -2353,7 +2379,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fesltra64bpkdmuchCSi' opt; do
+while getopts 'fesltra64bpkdmuchzCSi' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -2402,6 +2428,9 @@ while getopts 'fesltra64bpkdmuchCSi' opt; do
 			;;
 		u)
 			userspace_tests
+			;;
+		z)
+			fastclose_tests
 			;;
 		c)
 			;;
