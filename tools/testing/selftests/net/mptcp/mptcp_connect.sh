@@ -524,6 +524,20 @@ do_transfer()
 		fi
 	fi
 
+	if $checksum; then
+		local csum_err_s=$(get_mib_counter "${listener_ns}" "MPTcpExtDataCsumErr")
+		local csum_err_c=$(get_mib_counter "${connector_ns}" "MPTcpExtDataCsumErr")
+
+		if [ $csum_err_s -gt 0 ]; then
+			printf "[ FAIL ]\nserver got $csum_err_s data checksum error[s]"
+			rets=1
+		fi
+		if [ $csum_err_c -gt 0 ]; then
+			printf "[ FAIL ]\nclient got $csum_err_c data checksum error[s]"
+			retc=1
+		fi
+	fi
+
 	if [ $retc -eq 0 ] && [ $rets -eq 0 ]; then
 		printf "[ OK ]"
 	fi
