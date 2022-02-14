@@ -212,6 +212,129 @@ static ssize_t queue_discard_zeroes_data_show(struct request_queue *q, char *pag
 	return queue_var_show(0, page);
 }
 
+static ssize_t queue_copy_offload_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(blk_queue_copy(q), page);
+}
+
+static ssize_t queue_copy_offload_store(struct request_queue *q,
+				       const char *page, size_t count)
+{
+	unsigned long copy_offload;
+	ssize_t ret = queue_var_store(&copy_offload, page, count);
+
+	if (ret < 0)
+		return ret;
+
+	if (copy_offload && !q->limits.max_hw_copy_sectors)
+		return -EINVAL;
+
+	if (copy_offload)
+		blk_queue_flag_set(QUEUE_FLAG_COPY, q);
+	else
+		blk_queue_flag_clear(QUEUE_FLAG_COPY, q);
+
+	return ret;
+}
+
+static ssize_t queue_copy_max_hw_show(struct request_queue *q, char *page)
+{
+	return sprintf(page, "%llu\n",
+		(unsigned long long)q->limits.max_hw_copy_sectors << 9);
+}
+
+static ssize_t queue_copy_max_show(struct request_queue *q, char *page)
+{
+	return sprintf(page, "%llu\n",
+		(unsigned long long)q->limits.max_copy_sectors << 9);
+}
+
+static ssize_t queue_copy_max_store(struct request_queue *q,
+				       const char *page, size_t count)
+{
+	unsigned long max_copy;
+	ssize_t ret = queue_var_store(&max_copy, page, count);
+
+	if (ret < 0)
+		return ret;
+
+	if (max_copy & (queue_logical_block_size(q) - 1))
+		return -EINVAL;
+
+	max_copy >>= 9;
+	if (max_copy > q->limits.max_hw_copy_sectors)
+		max_copy = q->limits.max_hw_copy_sectors;
+
+	q->limits.max_copy_sectors = max_copy;
+	return ret;
+}
+
+static ssize_t queue_copy_range_max_hw_show(struct request_queue *q, char *page)
+{
+	return sprintf(page, "%llu\n",
+		(unsigned long long)q->limits.max_hw_copy_range_sectors << 9);
+}
+
+static ssize_t queue_copy_range_max_show(struct request_queue *q,
+		char *page)
+{
+	return sprintf(page, "%llu\n",
+		(unsigned long long)q->limits.max_copy_range_sectors << 9);
+}
+
+static ssize_t queue_copy_range_max_store(struct request_queue *q,
+				       const char *page, size_t count)
+{
+	unsigned long max_copy;
+	ssize_t ret = queue_var_store(&max_copy, page, count);
+
+	if (ret < 0)
+		return ret;
+
+	if (max_copy & (queue_logical_block_size(q) - 1))
+		return -EINVAL;
+
+	max_copy >>= 9;
+	if (max_copy > UINT_MAX)
+		return -EINVAL;
+
+	if (max_copy > q->limits.max_hw_copy_range_sectors)
+		max_copy = q->limits.max_hw_copy_range_sectors;
+
+	q->limits.max_copy_range_sectors = max_copy;
+	return ret;
+}
+
+static ssize_t queue_copy_nr_ranges_max_hw_show(struct request_queue *q, char *page)
+{
+	return queue_var_show(q->limits.max_hw_copy_nr_ranges, page);
+}
+
+static ssize_t queue_copy_nr_ranges_max_show(struct request_queue *q,
+		char *page)
+{
+	return queue_var_show(q->limits.max_copy_nr_ranges, page);
+}
+
+static ssize_t queue_copy_nr_ranges_max_store(struct request_queue *q,
+				       const char *page, size_t count)
+{
+	unsigned long max_nr;
+	ssize_t ret = queue_var_store(&max_nr, page, count);
+
+	if (ret < 0)
+		return ret;
+
+	if (max_nr > USHRT_MAX)
+		return -EINVAL;
+
+	if (max_nr > q->limits.max_hw_copy_nr_ranges)
+		max_nr = q->limits.max_hw_copy_nr_ranges;
+
+	q->limits.max_copy_nr_ranges = max_nr;
+	return ret;
+}
+
 static ssize_t queue_write_same_max_show(struct request_queue *q, char *page)
 {
 	return sprintf(page, "%llu\n",
@@ -597,6 +720,14 @@ QUEUE_RO_ENTRY(queue_nr_zones, "nr_zones");
 QUEUE_RO_ENTRY(queue_max_open_zones, "max_open_zones");
 QUEUE_RO_ENTRY(queue_max_active_zones, "max_active_zones");
 
+QUEUE_RW_ENTRY(queue_copy_offload, "copy_offload");
+QUEUE_RO_ENTRY(queue_copy_max_hw, "copy_max_hw_bytes");
+QUEUE_RW_ENTRY(queue_copy_max, "copy_max_bytes");
+QUEUE_RO_ENTRY(queue_copy_range_max_hw, "copy_max_range_hw_bytes");
+QUEUE_RW_ENTRY(queue_copy_range_max, "copy_max_range_bytes");
+QUEUE_RO_ENTRY(queue_copy_nr_ranges_max_hw, "copy_max_nr_ranges_hw");
+QUEUE_RW_ENTRY(queue_copy_nr_ranges_max, "copy_max_nr_ranges");
+
 QUEUE_RW_ENTRY(queue_nomerges, "nomerges");
 QUEUE_RW_ENTRY(queue_rq_affinity, "rq_affinity");
 QUEUE_RW_ENTRY(queue_poll, "io_poll");
@@ -643,6 +774,13 @@ static struct attribute *queue_attrs[] = {
 	&queue_discard_max_entry.attr,
 	&queue_discard_max_hw_entry.attr,
 	&queue_discard_zeroes_data_entry.attr,
+	&queue_copy_offload_entry.attr,
+	&queue_copy_max_hw_entry.attr,
+	&queue_copy_max_entry.attr,
+	&queue_copy_range_max_hw_entry.attr,
+	&queue_copy_range_max_entry.attr,
+	&queue_copy_nr_ranges_max_hw_entry.attr,
+	&queue_copy_nr_ranges_max_entry.attr,
 	&queue_write_same_max_entry.attr,
 	&queue_write_zeroes_max_entry.attr,
 	&queue_zone_append_max_entry.attr,

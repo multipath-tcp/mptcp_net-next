@@ -57,6 +57,12 @@ void blk_set_default_limits(struct queue_limits *lim)
 	lim->misaligned = 0;
 	lim->zoned = BLK_ZONED_NONE;
 	lim->zone_write_granularity = 0;
+	lim->max_hw_copy_sectors = 0;
+	lim->max_copy_sectors = 0;
+	lim->max_hw_copy_nr_ranges = 0;
+	lim->max_copy_nr_ranges = 0;
+	lim->max_hw_copy_range_sectors = 0;
+	lim->max_copy_range_sectors = 0;
 }
 EXPORT_SYMBOL(blk_set_default_limits);
 
@@ -82,6 +88,12 @@ void blk_set_stacking_limits(struct queue_limits *lim)
 	lim->max_write_same_sectors = UINT_MAX;
 	lim->max_write_zeroes_sectors = UINT_MAX;
 	lim->max_zone_append_sectors = UINT_MAX;
+	lim->max_hw_copy_sectors = ULONG_MAX;
+	lim->max_copy_sectors = ULONG_MAX;
+	lim->max_hw_copy_range_sectors = UINT_MAX;
+	lim->max_copy_range_sectors = UINT_MAX;
+	lim->max_hw_copy_nr_ranges = USHRT_MAX;
+	lim->max_copy_nr_ranges = USHRT_MAX;
 }
 EXPORT_SYMBOL(blk_set_stacking_limits);
 
@@ -177,6 +189,45 @@ void blk_queue_max_discard_sectors(struct request_queue *q,
 	q->limits.max_discard_sectors = max_discard_sectors;
 }
 EXPORT_SYMBOL(blk_queue_max_discard_sectors);
+
+/**
+ * blk_queue_max_copy_sectors - set max sectors for a single copy payload
+ * @q:  the request queue for the device
+ * @max_copy_sectors: maximum number of sectors to copy
+ **/
+void blk_queue_max_copy_sectors(struct request_queue *q,
+		unsigned int max_copy_sectors)
+{
+	q->limits.max_hw_copy_sectors = max_copy_sectors;
+	q->limits.max_copy_sectors = max_copy_sectors;
+}
+EXPORT_SYMBOL(blk_queue_max_copy_sectors);
+
+/**
+ * blk_queue_max_copy_range_sectors - set max sectors for a single range, in a copy payload
+ * @q:  the request queue for the device
+ * @max_copy_range_sectors: maximum number of sectors to copy in a single range
+ **/
+void blk_queue_max_copy_range_sectors(struct request_queue *q,
+		unsigned int max_copy_range_sectors)
+{
+	q->limits.max_hw_copy_range_sectors = max_copy_range_sectors;
+	q->limits.max_copy_range_sectors = max_copy_range_sectors;
+}
+EXPORT_SYMBOL(blk_queue_max_copy_range_sectors);
+
+/**
+ * blk_queue_max_copy_nr_ranges - set max number of ranges, in a copy payload
+ * @q:  the request queue for the device
+ * @max_copy_nr_ranges: maximum number of ranges
+ **/
+void blk_queue_max_copy_nr_ranges(struct request_queue *q,
+		unsigned int max_copy_nr_ranges)
+{
+	q->limits.max_hw_copy_nr_ranges = max_copy_nr_ranges;
+	q->limits.max_copy_nr_ranges = max_copy_nr_ranges;
+}
+EXPORT_SYMBOL(blk_queue_max_copy_nr_ranges);
 
 /**
  * blk_queue_max_write_same_sectors - set max sectors for a single write same
@@ -540,6 +591,14 @@ int blk_stack_limits(struct queue_limits *t, struct queue_limits *b,
 
 	t->max_segment_size = min_not_zero(t->max_segment_size,
 					   b->max_segment_size);
+
+	t->max_copy_sectors = min(t->max_copy_sectors, b->max_copy_sectors);
+	t->max_hw_copy_sectors = min(t->max_hw_copy_sectors, b->max_hw_copy_sectors);
+	t->max_copy_range_sectors = min(t->max_copy_range_sectors, b->max_copy_range_sectors);
+	t->max_hw_copy_range_sectors = min(t->max_hw_copy_range_sectors,
+						b->max_hw_copy_range_sectors);
+	t->max_copy_nr_ranges = min(t->max_copy_nr_ranges, b->max_copy_nr_ranges);
+	t->max_hw_copy_nr_ranges = min(t->max_hw_copy_nr_ranges, b->max_hw_copy_nr_ranges);
 
 	t->misaligned |= b->misaligned;
 
