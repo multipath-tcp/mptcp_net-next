@@ -362,6 +362,11 @@ struct dm_target {
 	 * zone append operations using regular writes.
 	 */
 	bool emulate_zone_append:1;
+
+	/*
+	 * copy offload is supported
+	 */
+	bool copy_supported:1;
 };
 
 void *dm_per_bio_data(struct bio *bio, size_t data_size);
