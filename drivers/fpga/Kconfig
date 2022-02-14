@@ -243,4 +243,13 @@ config FPGA_MGR_VERSAL_FPGA
 	  configure the programmable logic(PL).
 
 	  To compile this as a module, choose M here.
+
+config FPGA_MGR_MICROSEMI_SPI
+	tristate "Microsemi FPGA manager"
+	depends on SPI
+	select CRC_CCITT
+	help
+	  FPGA manager driver support for Microsemi Polarfire FPGAs
+	  programming over slave SPI interface.
+
 endif # FPGA
