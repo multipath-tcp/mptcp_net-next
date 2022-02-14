@@ -2203,8 +2203,14 @@ all_tests()
 	userspace_tests
 }
 
+# [$1: error message]
 usage()
 {
+	if [ -n "${1}" ]; then
+		echo "${1}"
+		ret=1
+	fi
+
 	echo "mptcp_join usage:"
 	echo "  -f subflows_tests"
 	echo "  -e subflows_error_tests"
@@ -2226,6 +2232,8 @@ usage()
 	echo "  -C enable data checksum"
 	echo "  -i use ip mptcp"
 	echo "  -h help"
+
+	exit ${ret}
 }
 
 sin=$(mktemp)
@@ -2317,8 +2325,11 @@ while getopts 'fesltra64bpkdmuchCSi' opt; do
 			;;
 		i)
 			;;
-		h | *)
+		h)
 			usage
+			;;
+		*)
+			usage "Unknown option: -${opt}"
 			;;
 	esac
 done
