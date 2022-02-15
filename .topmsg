@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-tracepoint-in-mptcp_sendmsg_frag
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add tracepoint in mptcp_sendmsg_frag
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The tracepoint in get_mapping_status() only dumped the incoming mpext
+fields. This patch added a new tracepoint in mptcp_sendmsg_frag() to dump
+the outgoing mpext too.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
