@@ -1133,15 +1133,14 @@ chk_rm_nr()
 	local invert=${3:-""}
 	local count
 	local dump_stats
-	local addr_ns
-	local subflow_ns
+	local addr_ns=$ns1
+	local subflow_ns=$ns2
+	local extra_msg=""
 
-	if [ -z $invert ]; then
-		addr_ns=$ns1
-		subflow_ns=$ns2
-	elif [ $invert = "invert" ]; then
+	if [[ $invert = "invert" ]]; then
 		addr_ns=$ns2
 		subflow_ns=$ns1
+		extra_msg="   invert"
 	fi
 
 	printf "%-${nr_blank}s %s" " " "rm "
@@ -1155,7 +1154,7 @@ chk_rm_nr()
 		echo -n "[ ok ]"
 	fi
 
-	echo -n " - sf    "
+	echo -n " - rmsf  "
 	count=`ip netns exec $subflow_ns nstat -as | grep MPTcpExtRmSubflow | awk '{print $2}'`
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$rm_subflow_nr" ]; then
@@ -1195,8 +1194,10 @@ chk_prio_nr()
 		ret=1
 		dump_stats=1
 	else
-		echo "[ ok ]"
+		echo -n "[ ok ]"
 	fi
+
+	echo "$extra_msg"
 
 	[ "${dump_stats}" = 1 ] && dump_stats
 }
