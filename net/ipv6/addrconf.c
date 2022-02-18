@@ -1836,8 +1836,8 @@ out:
 }
 EXPORT_SYMBOL(ipv6_dev_get_saddr);
 
-int __ipv6_get_lladdr(struct inet6_dev *idev, struct in6_addr *addr,
-		      u32 banned_flags)
+static int __ipv6_get_lladdr(struct inet6_dev *idev, struct in6_addr *addr,
+			      u32 banned_flags)
 {
 	struct inet6_ifaddr *ifp;
 	int err = -EADDRNOTAVAIL;
@@ -7187,7 +7187,7 @@ static void __net_exit addrconf_exit_net(struct net *net)
 	kfree(net->ipv6.devconf_all);
 	net->ipv6.devconf_all = NULL;
 
-	cancel_delayed_work(&net->ipv6.addr_chk_work);
+	cancel_delayed_work_sync(&net->ipv6.addr_chk_work);
 	/*
 	 *	Check hash table, then free it.
 	 */
