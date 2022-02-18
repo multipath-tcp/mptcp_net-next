@@ -1293,7 +1293,6 @@ signal_address_tests()
 
 	# signal addresses race test
 	reset
-
 	pm_nl_set_limits $ns1 4 4
 	pm_nl_set_limits $ns2 4 4
 	pm_nl_add_endpoint $ns1 10.0.1.1 flags signal
