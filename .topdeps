@@ -1,2 +1,1 @@
-t/selftests-mptcp-add-csum-mib-check-for-mptcp_connect
 t/selftests-mptcp-join-allow-running-cCi
