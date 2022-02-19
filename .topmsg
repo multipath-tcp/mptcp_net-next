@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-accurate-SIOCOUTQ-for-fallback-socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: accurate SIOCOUTQ for fallback socket
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP SIOCOUTQ implementation is not very accurate in
+case of fallback: it only measures the data in the MPTCP-level
+write queue, but it does not take in account the subflow
+write queue utilization. In case of fallback the first can be
+empty, while the latter is not.
+
+The above produces sporadic self-tests issues and can foul
+legit user-space application.
+
+Fix the issue additionally querying the subflow in case of fallback.
+
+Fixes: 644807e3e462 ("mptcp: add SIOCINQ, OUTQ and OUTQNSD ioctls")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/260
+Reported-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
