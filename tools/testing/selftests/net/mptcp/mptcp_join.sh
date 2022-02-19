@@ -2268,7 +2268,7 @@ for arg in "$@"; do
 	fi
 
 	# exception for the capture/checksum/ip_mptcp options, the rest means: a part of the tests
-	if [ "${arg}" != "-c" ] && [ "${arg}" != "-C" ] && [ "${arg}" != "-i" ]; then
+	if ! [[ "${arg}" =~ ^"-"[cCi]+$ ]]; then
 		do_all_tests=0
 	fi
 done
