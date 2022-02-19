@@ -16,7 +16,6 @@ mptcp_connect=""
 capture=0
 checksum=0
 ip_mptcp=0
-check_invert=0
 do_all_tests=1
 init=0
 
@@ -60,8 +59,6 @@ init_partial()
 			ip netns exec $netns sysctl -q net.mptcp.checksum_enabled=1
 		fi
 	done
-
-	check_invert=0
 
 	#  ns1              ns2
 	# ns1eth1    ns2eth1
@@ -220,21 +217,15 @@ check_transfer()
 	out=$2
 	what=$3
 
-	cmp -l "$in" "$out" | while read line; do
-		local arr=($line)
+	cmp "$in" "$out" > /dev/null 2>&1
+	if [ $? -ne 0 ] ;then
+		echo "[ FAIL ] $what does not match (in, out):"
+		print_file_err "$in"
+		print_file_err "$out"
+		ret=1
 
-		let sum=0${arr[1]}+0${arr[2]}
-		if [ $check_invert -eq 0 ] || [ $sum -ne $((0xff)) ]; then
-			echo "[ FAIL ] $what does not match (in, out):"
-			print_file_err "$in"
-			print_file_err "$out"
-			ret=1
-
-			return 1
-		else
-			echo "$what has inverted byte at ${arr[0]}"
-		fi
-	done
+		return 1
+	fi
 
 	return 0
 }
