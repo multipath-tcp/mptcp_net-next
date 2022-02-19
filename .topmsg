@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-more-careful-RM_ADDR-generation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: more careful RM_ADDR generation
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The in-kernel MPTCP path manager, when processing the MPTCP_PM_CMD_FLUSH_ADDR
+command, generates RM_ADDR events for each known local address. While that
+is allowed by the RFC, it makes unpredictable the exact number of RM_ADDR
+generated when both ends flush the PM addresses.
+
+This change restricts the RM_ADDR generation to previously explicitly
+announced addresses, and adjust the expected results in a bunch of related
+self-tests.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
