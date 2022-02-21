@@ -428,7 +428,7 @@ pm_nl_check_endpoint()
 	local id
 
 	TEST_COUNT=$((TEST_COUNT + 1))
-	printf "%03u %-40s" "$TEST_COUNT" "$msg"
+	printf "%03u %-${nr_blank}s" "$TEST_COUNT" "$msg"
 
 	shift 3
 	while [ -n "$1" ]; do
