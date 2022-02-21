@@ -56,7 +56,7 @@ u32 bpf_mptcp_sock_convert_ctx_access(enum bpf_access_type type,
 
 BPF_CALL_1(bpf_mptcp_sock, struct sock *, sk)
 {
-	if (sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
+	if (sk && sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
 		struct mptcp_subflow_context *mptcp_sfc = mptcp_subflow_ctx(sk);
 
 		return (unsigned long)mptcp_sfc->conn;
