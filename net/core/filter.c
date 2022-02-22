@@ -11143,6 +11143,19 @@ const struct bpf_func_proto bpf_sock_from_file_proto = {
 	.arg1_btf_id	= &bpf_sock_from_file_btf_ids[1],
 };
 
+BPF_CALL_1(bpf_mptcp_sock, struct sock *, sk)
+{
+	return (unsigned long)msk_from_subflow(sk);
+}
+
+const struct bpf_func_proto bpf_mptcp_sock_proto = {
+	.func		= bpf_mptcp_sock,
+	.gpl_only	= false,
+	.ret_type	= RET_PTR_TO_BTF_ID_OR_NULL,
+	.arg1_type	= ARG_PTR_TO_SOCK_COMMON,
+	.ret_btf_id	= &btf_sock_ids[BTF_SOCK_TYPE_MPTCP],
+};
+
 static const struct bpf_func_proto *
 bpf_sk_base_func_proto(enum bpf_func_id func_id)
 {
