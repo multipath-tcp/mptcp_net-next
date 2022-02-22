@@ -177,6 +177,7 @@ jobs:
 
             Cheers,
             MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (Tessares)
 
   topgit:
     name: "TopGit"
@@ -296,9 +297,8 @@ jobs:
           server_port: 465
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          to: matthieu.baerts@tessares.net
-          #to: ${{ steps.commit.outputs.author }}
-          #cc: mptcp@lists.linux.dev
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
           from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
           in_reply_to: "<${{ steps.commit.outputs.mid }}>"
@@ -323,13 +323,14 @@ jobs:
             Initiator: ${{ steps.commit.outputs.committer }}
             Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
-            Please note that some efforts might still be needed to stabilise the tests
-            suite when ran on a public CI like here. It is then possible some reported
-            issues are not due to your modifications. Do not hesitate to help us
-            improving that ;-)
+            Please note that despite all the efforts that have been already done to have a
+            stable tests suite when executed on a public CI like here, it is possible some
+            reported issues are not due to your modifications. Still, do not hesitate to
+            help us improve that ;-)
 
             Cheers,
             MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (Tessares)
 
       - name: set patchwork check
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
