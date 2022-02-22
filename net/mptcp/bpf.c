@@ -26,47 +26,13 @@ bool bpf_mptcp_sock_is_valid_access(int off, int size, enum bpf_access_type type
 	}
 }
 
-u32 bpf_mptcp_sock_convert_ctx_access(enum bpf_access_type type,
-				      const struct bpf_insn *si,
-				      struct bpf_insn *insn_buf,
-				      struct bpf_prog *prog, u32 *target_size)
+struct sock *msk_from_subflow(struct sock *sk)
 {
-	struct bpf_insn *insn = insn_buf;
+	if (sk && sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
+		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
-#define BPF_MPTCP_SOCK_GET_COMMON(FIELD)							\
-	do {											\
-		BUILD_BUG_ON(sizeof_field(struct mptcp_sock, FIELD) >				\
-				sizeof_field(struct bpf_mptcp_sock, FIELD));			\
-		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(struct mptcp_sock, FIELD),		\
-							si->dst_reg, si->src_reg,		\
-							offsetof(struct mptcp_sock, FIELD));	\
-	} while (0)
-
-	if (insn > insn_buf)
-		return insn - insn_buf;
-
-	switch (si->off) {
-	case offsetof(struct bpf_mptcp_sock, token):
-		BPF_MPTCP_SOCK_GET_COMMON(token);
-		break;
+		return subflow->conn;
 	}
-
-	return insn - insn_buf;
+	return NULL;
 }
-
-BPF_CALL_1(bpf_mptcp_sock, struct sock *, sk)
-{
-	if (sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
-		struct mptcp_subflow_context *mptcp_sfc = mptcp_subflow_ctx(sk);
-
-		return (unsigned long)mptcp_sfc->conn;
-	}
-	return (unsigned long)NULL;
-}
-
-const struct bpf_func_proto bpf_mptcp_sock_proto = {
-	.func           = bpf_mptcp_sock,
-	.gpl_only       = false,
-	.ret_type       = RET_PTR_TO_MPTCP_SOCK_OR_NULL,
-	.arg1_type      = ARG_PTR_TO_SOCK_COMMON,
-};
+EXPORT_SYMBOL(msk_from_subflow);
