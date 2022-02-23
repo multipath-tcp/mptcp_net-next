@@ -12,7 +12,6 @@ cout=""
 ksft_skip=4
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-mptcp_connect=""
 capture=0
 checksum=0
 ip_mptcp=0
@@ -454,12 +453,19 @@ do_transfer()
 	NSTAT_HISTORY=/tmp/${connector_ns}.nstat ip netns exec ${connector_ns} \
 		nstat -n
 
+	local extra_args
 	if [ $speed = "fast" ]; then
-		mptcp_connect="./mptcp_connect -j"
+		extra_args="-j"
 	elif [ $speed = "slow" ]; then
-		mptcp_connect="./mptcp_connect -r 50"
-	elif [ $speed = "least" ]; then
-		mptcp_connect="./mptcp_connect -r 10"
+		extra_args="-r 50"
+	elif [[ $speed = "speed_"* ]]; then
+		extra_args="-r ${speed:6}"
+	fi
+
+	if [[ "${addr_nr_ns2}" = "fastclose_"* ]]; then
+		# disconnect
+		extra_args="$extra_args -I ${addr_nr_ns2:10}"
+		addr_nr_ns2=0
 	fi
 
 	local local_addr
@@ -469,16 +475,16 @@ do_transfer()
 		local_addr="0.0.0.0"
 	fi
 
-	if [ "$test_link_fail" -eq 2 ];then
+	if [ "$test_link_fail" -gt 1 ];then
 		timeout ${timeout_test} \
 			ip netns exec ${listener_ns} \
-				$mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
-					${local_addr} < "$sinfail" > "$sout" &
+				./mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
+					$extra_args ${local_addr} < "$sinfail" > "$sout" &
 	else
 		timeout ${timeout_test} \
 			ip netns exec ${listener_ns} \
-				$mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
-					${local_addr} < "$sin" > "$sout" &
+				./mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
+					$extra_args ${local_addr} < "$sin" > "$sout" &
 	fi
 	spid=$!
 
@@ -487,15 +493,21 @@ do_transfer()
 	if [ "$test_link_fail" -eq 0 ];then
 		timeout ${timeout_test} \
 			ip netns exec ${connector_ns} \
-				$mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
-					$connect_addr < "$cin" > "$cout" &
-	else
+				./mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
+					$extra_args $connect_addr < "$cin" > "$cout" &
+	elif [ "$test_link_fail" -eq 1 ] || [ "$test_link_fail" -eq 2 ];then
 		( cat "$cinfail" ; sleep 2; link_failure $listener_ns ; cat "$cinfail" ) | \
 			tee "$cinsent" | \
 			timeout ${timeout_test} \
 				ip netns exec ${connector_ns} \
-					$mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
-						$connect_addr > "$cout" &
+					./mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
+						$extra_args $connect_addr > "$cout" &
+	else
+		cat "$cinfail" | tee "$cinsent" | \
+			timeout ${timeout_test} \
+				ip netns exec ${connector_ns} \
+					./mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
+						$extra_args $connect_addr > "$cout" &
 	fi
 	cpid=$!
 
@@ -655,7 +667,7 @@ do_transfer()
 		return 1
 	fi
 
-	if [ "$test_link_fail" -eq 2 ];then
+	if [ "$test_link_fail" -gt 1 ];then
 		check_transfer $sinfail $cout "file received by client"
 	else
 		check_transfer $sin $cout "file received by client"
@@ -700,9 +712,18 @@ run_tests()
 	speed="${7:-fast}"
 	sflags="${8:-""}"
 
+	# The values above 2 are reused to make test files
+	# with the given sizes (KB)
+	if [ "$test_linkfail" -gt 2 ]; then
+		size=$test_linkfail
+
+		if [ -z "$cinfail" ]; then
+			cinfail=$(mktemp)
+		fi
+		make_file "$cinfail" "client" $size
 	# create the input file for the failure test when
 	# the first failure test run
-	if [ "$test_linkfail" -ne 0 -a -z "$cinfail" ]; then
+	elif [ "$test_linkfail" -ne 0 -a -z "$cinfail" ]; then
 		# the client file must be considerably larger
 		# of the maximum expected cwin value, or the
 		# link utilization will be not predicable
@@ -715,7 +736,14 @@ run_tests()
 		make_file "$cinfail" "client" $size
 	fi
 
-	if [ "$test_linkfail" -eq 2 -a -z "$sinfail" ]; then
+	if [ "$test_linkfail" -gt 2 ]; then
+		size=$test_linkfail
+
+		if [ -z "$sinfail" ]; then
+			sinfail=$(mktemp)
+		fi
+		make_file "$sinfail" "server" $size
+	elif [ "$test_linkfail" -eq 2 -a -z "$sinfail" ]; then
 		size=$((RANDOM%16))
 		size=$((size+1))
 		size=$((size*2048))
@@ -802,6 +830,82 @@ chk_fail_nr()
 	[ "${dump_stats}" = 1 ] && dump_stats
 }
 
+chk_fclose_nr()
+{
+	local fclose_tx=$1
+	local fclose_rx=$2
+	local count
+	local dump_stats
+
+	printf "%-${nr_blank}s %s" " " "ctx"
+	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtMPFastcloseTx | awk '{print $2}'`
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$fclose_tx" ]; then
+		echo "[fail] got $count MP_FASTCLOSE[s] TX expected $fclose_tx"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - fclzrx"
+	count=$(ip netns exec $ns1 nstat -as | grep MPTcpExtMPFastcloseRx | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$fclose_rx" ]; then
+		echo "[fail] got $count MP_FASTCLOSE[s] RX expected $fclose_rx"
+		ret=1
+		dump_stats=1
+	else
+		echo "[ ok ]"
+	fi
+
+	[ "${dump_stats}" = 1 ] && dump_stats
+}
+
+chk_rst_nr()
+{
+	local rst_tx=$1
+	local rst_rx=$2
+	local ns_invert=${3:-""}
+	local count
+	local dump_stats
+	local ns_tx=$ns1
+	local ns_rx=$ns2
+	local extra_msg=""
+
+	if [[ $ns_invert = "invert" ]]; then
+		ns_tx=$ns2
+		ns_rx=$ns1
+		extra_msg="   invert"
+	fi
+
+	printf "%-${nr_blank}s %s" " " "rtx"
+	count=$(ip netns exec $ns_tx nstat -as | grep MPTcpExtMPRstTx | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$rst_tx" ]; then
+		echo "[fail] got $count MP_RST[s] TX expected $rst_tx"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - rstrx "
+	count=$(ip netns exec $ns_rx nstat -as | grep MPTcpExtMPRstRx | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$rst_rx" ]; then
+		echo "[fail] got $count MP_RST[s] RX expected $rst_rx"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	[ "${dump_stats}" = 1 ] && dump_stats
+
+	echo "$extra_msg"
+}
+
 chk_infi_nr()
 {
 	local mp_infi_nr_tx=$1
@@ -810,7 +914,7 @@ chk_infi_nr()
 	local dump_stats
 
 	printf "%-${nr_blank}s %s" " " "itx"
-	count=`ip netns exec $ns2 nstat -as | grep InfiniteMapTx | awk '{print $2}'`
+	count=$(ip netns exec $ns2 nstat -as | grep InfiniteMapTx | awk '{print $2}')
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$mp_infi_nr_tx" ]; then
 		echo "[fail] got $count infinite map[s] TX expected $mp_infi_nr_tx"
@@ -821,7 +925,7 @@ chk_infi_nr()
 	fi
 
 	echo -n " - irx   "
-	count=`ip netns exec $ns1 nstat -as | grep InfiniteMapRx | awk '{print $2}'`
+	count=$(ip netns exec $ns1 nstat -as | grep InfiniteMapRx | awk '{print $2}')
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$mp_infi_nr_rx" ]; then
 		echo "[fail] got $count infinite map[s] RX expected $mp_infi_nr_rx"
@@ -1500,7 +1604,7 @@ add_addr_timeout_tests()
 	pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 	pm_nl_add_endpoint $ns1 10.0.3.1 flags signal
 	pm_nl_set_limits $ns2 2 2
-	run_tests $ns1 $ns2 10.0.1.1 0 0 0 least
+	run_tests $ns1 $ns2 10.0.1.1 0 0 0 speed_10
 	chk_join_nr "signal addresses, ADD_ADDR timeout" 2 2 2
 	chk_add_nr 8 0
 
@@ -1510,7 +1614,7 @@ add_addr_timeout_tests()
 	pm_nl_add_endpoint $ns1 10.0.12.1 flags signal
 	pm_nl_add_endpoint $ns1 10.0.3.1 flags signal
 	pm_nl_set_limits $ns2 2 2
-	run_tests $ns1 $ns2 10.0.1.1 0 0 0 least
+	run_tests $ns1 $ns2 10.0.1.1 0 0 0 speed_10
 	chk_join_nr "invalid address, ADD_ADDR timeout" 1 1 1
 	chk_add_nr 8 0
 }
@@ -2167,6 +2271,15 @@ fullmesh_tests()
 	chk_rm_nr 0 1
 }
 
+fastclose_tests()
+{
+	reset
+	run_tests $ns1 $ns2 10.0.1.1 1024 0 fastclose_2
+	chk_join_nr "fastclose test" 0 0 0
+	chk_fclose_nr 1 1
+	chk_rst_nr 1 1 invert
+}
+
 userspace_tests()
 {
 	# userspace pm type prevents add_addr
@@ -2246,6 +2359,7 @@ all_tests()
 	checksum_tests
 	deny_join_id0_tests
 	fullmesh_tests
+	fastclose_tests
 	userspace_tests
 }
 
@@ -2273,6 +2387,7 @@ usage()
 	echo "  -S checksum_tests"
 	echo "  -d deny_join_id0_tests"
 	echo "  -m fullmesh_tests"
+	echo "  -z fastclose_tests"
 	echo "  -u userspace_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
@@ -2305,7 +2420,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fesltra64bpkdmuchCSi' opt; do
+while getopts 'fesltra64bpkdmchzuCSi' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -2351,6 +2466,9 @@ while getopts 'fesltra64bpkdmuchCSi' opt; do
 			;;
 		m)
 			fullmesh_tests
+			;;
+		z)
+			fastclose_tests
 			;;
 		u)
 			userspace_tests
