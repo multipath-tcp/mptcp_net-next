@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: add the mibs for MP_RST
-
-This patch added two more mibs for MP_RST, MPTCP_MIB_MPRSTTX for
-the MP_RST sending and MPTCP_MIB_MPRSTRX for the MP_RST receiving.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
