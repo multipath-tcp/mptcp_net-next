@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-extra_args-in-do_transfer
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add extra_args in do_transfer
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Instead of using a global variable mptcp_connect, this patch added
+a new local variable extra_args in do_transfer() to store the extra
+arguments passing to the mptcp_connect commands.
+
+This patch also renamed the speed level 'least' to 'speed_*'. This
+more flexible way can avoid the need to add new speed levels in the
+future.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
