@@ -1,1 +1,1 @@
-t/selftests-mptcp-add-implicit-endpoint-test-case
+t/mptcp-add-fullmesh-flag-check-for-adding-address
