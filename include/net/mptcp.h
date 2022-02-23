@@ -189,6 +189,7 @@ int mptcp_subflow_init_cookie_req(struct request_sock *req,
 				  struct sk_buff *skb);
 
 __be32 mptcp_get_reset_option(const struct sk_buff *skb);
+struct sock *__mptcp_handle_join(int af, struct sk_buff *skb);
 
 static inline __be32 mptcp_reset_option(const struct sk_buff *skb)
 {
@@ -199,6 +200,11 @@ static inline __be32 mptcp_reset_option(const struct sk_buff *skb)
 }
 static inline struct sock *mptcp_handle_join(int af, struct sk_buff *skb)
 {
+	const struct tcphdr *th = tcp_hdr(skb);
+
+	if (th->syn && !th->ack && !th->rst && !th->fin)
+		return __mptcp_handle_join(af, skb);
+
 	return NULL;
 }
 #else
@@ -283,9 +289,13 @@ static inline struct sock *mptcp_handle_join(int af, struct sk_buff *skb) { retu
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 int mptcpv6_init(void);
+int mptcpv6_init_net(struct net *net);
+void mptcpv6_exit_net(struct net *net);
 void mptcpv6_handle_mapped(struct sock *sk, bool mapped);
 #elif IS_ENABLED(CONFIG_IPV6)
 static inline int mptcpv6_init(void) { return 0; }
+static inline int mptcpv6_init_net(struct net *net) { return 0; }
+static inline void mptcpv6_exit_net(struct net *net) { }
 static inline void mptcpv6_handle_mapped(struct sock *sk, bool mapped) { }
 #endif
 

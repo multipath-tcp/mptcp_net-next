@@ -2256,13 +2256,22 @@ static struct inet_protosw tcpv6_protosw = {
 
 static int __net_init tcpv6_net_init(struct net *net)
 {
-	return inet_ctl_sock_create(&net->ipv6.tcp_sk, PF_INET6,
-				    SOCK_RAW, IPPROTO_TCP, net);
+	int err = inet_ctl_sock_create(&net->ipv6.tcp_sk, PF_INET6,
+				       SOCK_RAW, IPPROTO_TCP, net);
+	if (err)
+		return err;
+
+	err = mptcpv6_init_net(net);
+	if (err)
+		inet_ctl_sock_destroy(net->ipv6.tcp_sk);
+
+	return err;
 }
 
 static void __net_exit tcpv6_net_exit(struct net *net)
 {
 	inet_ctl_sock_destroy(net->ipv6.tcp_sk);
+	mptcpv6_exit_net(net);
 }
 
 static struct pernet_operations tcpv6_net_ops = {
@@ -2287,15 +2296,9 @@ int __init tcpv6_init(void)
 	if (ret)
 		goto out_tcpv6_protosw;
 
-	ret = mptcpv6_init();
-	if (ret)
-		goto out_tcpv6_pernet_subsys;
-
 out:
 	return ret;
 
-out_tcpv6_pernet_subsys:
-	unregister_pernet_subsys(&tcpv6_net_ops);
 out_tcpv6_protosw:
 	inet6_unregister_protosw(&tcpv6_protosw);
 out_tcpv6_protocol:
