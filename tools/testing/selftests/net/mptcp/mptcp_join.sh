@@ -16,6 +16,7 @@ capture=0
 checksum=0
 ip_mptcp=0
 check_invert=0
+validate_checksum=0
 do_all_tests=1
 init=0
 
@@ -62,6 +63,7 @@ init_partial()
 	done
 
 	check_invert=0
+	validate_checksum=$checksum
 
 	#  ns1              ns2
 	# ns1eth1    ns2eth1
@@ -205,6 +207,58 @@ reset_with_allow_join_id0()
 
 	ip netns exec $ns1 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns1_enable
 	ip netns exec $ns2 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns2_enable
+}
+
+# Modify TCP payload without corrupting the TCP packet
+#
+# This rule inverts a 8-bit word at byte offset 148 for the 2nd TCP ACK packets
+# carrying enough data.
+# Once it is done, the TCP Checksum field is updated so the packet is still
+# considered as valid at the TCP level.
+# Because the MPTCP checksum, covering the TCP options and data, has not been
+# updated, the modification will be detected and an MP_FAIL will be emitted:
+# what we want to validate here without corrupting "random" MPTCP options.
+#
+# To avoid having tc producing this pr_info() message for each TCP ACK packets
+# not carrying enough data:
+#
+#     tc action pedit offset 162 out of bounds
+#
+# Netfilter is used to mark packets with enough data.
+reset_with_fail()
+{
+	reset
+
+	ip netns exec $ns1 sysctl -q net.mptcp.checksum_enabled=1
+	ip netns exec $ns2 sysctl -q net.mptcp.checksum_enabled=1
+
+	check_invert=1
+	validate_checksum=1
+	local i="$1"
+	local ip="${2:-4}"
+	local tables
+
+	tables="iptables"
+	if [ $ip -eq 6 ]; then
+		tables="ip6tables"
+	fi
+
+	ip netns exec $ns2 $tables \
+		-t mangle \
+		-A OUTPUT \
+		-o ns2eth$i \
+		-p tcp \
+		-m length --length 150:9999 \
+		-m statistic --mode nth --packet 1 --every 99999 \
+		-j MARK --set-mark 42 || exit 1
+
+	tc -n $ns2 qdisc add dev ns2eth$i clsact || exit 1
+	tc -n $ns2 filter add dev ns2eth$i egress \
+		protocol ip prio 1000 \
+		handle 42 fw \
+		action pedit munge offset 148 u8 invert \
+		pipe csum tcp \
+		index 100 || exit 1
 }
 
 print_file_err()
@@ -767,8 +821,21 @@ dump_stats()
 chk_csum_nr()
 {
 	local msg=${1:-""}
+	local csum_ns1=${2:-0}
+	local csum_ns2=${3:-0}
 	local count
 	local dump_stats
+	local allow_multi_errors_ns1=0
+	local allow_multi_errors_ns2=0
+
+	if [[ "${csum_ns1}" = "+"* ]]; then
+		allow_multi_errors_ns1=1
+		csum_ns1=${csum_ns1:1}
+	fi
+	if [[ "${csum_ns2}" = "+"* ]]; then
+		allow_multi_errors_ns2=1
+		csum_ns2=${csum_ns2:1}
+	fi
 
 	if [ ! -z "$msg" ]; then
 		printf "%03u" "$TEST_COUNT"
@@ -778,8 +845,9 @@ chk_csum_nr()
 	printf " %-36s %s" "$msg" "sum"
 	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtDataCsumErr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != 0 ]; then
-		echo "[fail] got $count data checksum error[s] expected 0"
+	if [ "$count" != $csum_ns1 -a $allow_multi_errors_ns1 -eq 0 ] ||
+	   [ "$count" -lt $csum_ns1 -a $allow_multi_errors_ns1 -eq 1 ]; then
+		echo "[fail] got $count data checksum error[s] expected $csum_ns1"
 		ret=1
 		dump_stats=1
 	else
@@ -788,8 +856,9 @@ chk_csum_nr()
 	echo -n " - csum  "
 	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtDataCsumErr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != 0 ]; then
-		echo "[fail] got $count data checksum error[s] expected 0"
+	if [ "$count" != $csum_ns2 -a $allow_multi_errors_ns2 -eq 0 ] ||
+	   [ "$count" -lt $csum_ns2 -a $allow_multi_errors_ns2 -eq 1 ]; then
+		echo "[fail] got $count data checksum error[s] expected $csum_ns2"
 		ret=1
 		dump_stats=1
 	else
@@ -800,27 +869,27 @@ chk_csum_nr()
 
 chk_fail_nr()
 {
-	local mp_fail_nr_tx=$1
-	local mp_fail_nr_rx=$2
+	local fail_tx=$1
+	local fail_rx=$2
 	local count
 	local dump_stats
 
 	printf "%-${nr_blank}s %s" " " "ftx"
 	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtMPFailTx | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != "$mp_fail_nr_tx" ]; then
-		echo "[fail] got $count MP_FAIL[s] TX expected $mp_fail_nr_tx"
+	if [ "$count" != "$fail_tx" ]; then
+		echo "[fail] got $count MP_FAIL[s] TX expected $fail_tx"
 		ret=1
 		dump_stats=1
 	else
 		echo -n "[ ok ]"
 	fi
 
-	echo -n " - frx   "
+	echo -n " - failrx"
 	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtMPFailRx | awk '{print $2}'`
 	[ -z "$count" ] && count=0
-	if [ "$count" != "$mp_fail_nr_rx" ]; then
-		echo "[fail] got $count MP_FAIL[s] RX expected $mp_fail_nr_rx"
+	if [ "$count" != "$fail_rx" ]; then
+		echo "[fail] got $count MP_FAIL[s] RX expected $fail_rx"
 		ret=1
 		dump_stats=1
 	else
@@ -944,6 +1013,11 @@ chk_join_nr()
 	local syn_nr=$2
 	local syn_ack_nr=$3
 	local ack_nr=$4
+	local csum_ns1=${5:-0}
+	local csum_ns2=${6:-0}
+	local fail_nr=${7:-0}
+	local rst_nr=${8:-0}
+	local infi_nr=${9:-0}
 	local count
 	local dump_stats
 	local with_cookie
@@ -989,10 +1063,11 @@ chk_join_nr()
 		echo "[ ok ]"
 	fi
 	[ "${dump_stats}" = 1 ] && dump_stats
-	if [ $checksum -eq 1 ]; then
-		chk_csum_nr
-		chk_fail_nr 0 0
-		chk_infi_nr 0 0
+	if [ $validate_checksum -eq 1 ]; then
+		chk_csum_nr "" $csum_ns1 $csum_ns2
+		chk_fail_nr $fail_nr $fail_nr
+		chk_rst_nr $rst_nr $rst_nr
+		chk_infi_nr $infi_nr $infi_nr
 	fi
 }
 
@@ -1167,15 +1242,14 @@ chk_rm_nr()
 	local invert=${3:-""}
 	local count
 	local dump_stats
-	local addr_ns
-	local subflow_ns
+	local addr_ns=$ns1
+	local subflow_ns=$ns2
+	local extra_msg=""
 
-	if [ -z $invert ]; then
-		addr_ns=$ns1
-		subflow_ns=$ns2
-	elif [ $invert = "invert" ]; then
+	if [[ $invert = "invert" ]]; then
 		addr_ns=$ns2
 		subflow_ns=$ns1
+		extra_msg="   invert"
 	fi
 
 	printf "%-${nr_blank}s %s" " " "rm "
@@ -1189,7 +1263,7 @@ chk_rm_nr()
 		echo -n "[ ok ]"
 	fi
 
-	echo -n " - sf    "
+	echo -n " - rmsf  "
 	count=`ip netns exec $subflow_ns nstat -as | grep MPTcpExtRmSubflow | awk '{print $2}'`
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$rm_subflow_nr" ]; then
@@ -1197,10 +1271,12 @@ chk_rm_nr()
 		ret=1
 		dump_stats=1
 	else
-		echo "[ ok ]"
+		echo -n "[ ok ]"
 	fi
 
 	[ "${dump_stats}" = 1 ] && dump_stats
+
+	echo "$extra_msg"
 }
 
 chk_prio_nr()
@@ -2253,6 +2329,41 @@ fastclose_tests()
 	chk_rst_nr 1 1 invert
 }
 
+pedit_action_pkts()
+{
+	tc -n $ns2 -j -s action show action pedit index 100 | \
+		sed 's/.*"packets":\([0-9]\+\),.*/\1/'
+}
+
+fail_tests()
+{
+	# multiple subflows
+	reset_with_fail 2
+	tc -n $ns2 qdisc add dev ns2eth1 root netem rate 20mbit delay 1
+	pm_nl_set_limits $ns1 0 1
+	pm_nl_set_limits $ns2 0 1
+	pm_nl_add_endpoint $ns2 10.0.2.2 dev ns2eth2 flags subflow
+	run_tests $ns1 $ns2 10.0.1.1 1024
+	chk_join_nr "MP_FAIL MP_RST: $(pedit_action_pkts) corrupted pkts" 1 1 1 \
+									  +1 +0 \
+									  1 \
+									  1
+
+	# single subflow
+	reset_with_fail 1
+	run_tests $ns1 $ns2 10.0.1.1 128
+									# syn_nr syn_ack_nr ack_nr
+									# csum_ns1 csum_ns2
+									# fail_nr
+									# rst_nr
+									# infi_nr
+	chk_join_nr "Infinite map: $(pedit_action_pkts) corrupted pkts" 0 0 0 \
+									+1 +0 \
+									1 \
+									0 \
+									1
+}
+
 userspace_tests()
 {
 	# userspace pm type prevents add_addr
@@ -2333,6 +2444,7 @@ all_tests()
 	deny_join_id0_tests
 	fullmesh_tests
 	fastclose_tests
+	fail_tests
 	userspace_tests
 }
 
@@ -2361,6 +2473,7 @@ usage()
 	echo "  -d deny_join_id0_tests"
 	echo "  -m fullmesh_tests"
 	echo "  -z fastclose_tests"
+	echo "  -F fail_tests"
 	echo "  -u userspace_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
@@ -2393,7 +2506,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fesltra64bpkdmchzuCSi' opt; do
+while getopts 'fesltra64bpkdmchzuFCSi' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -2442,6 +2555,9 @@ while getopts 'fesltra64bpkdmchzuCSi' opt; do
 			;;
 		z)
 			fastclose_tests
+			;;
+		F)
+			fail_tests
 			;;
 		u)
 			userspace_tests
