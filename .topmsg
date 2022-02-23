@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: reuse linkfail to make given size files
-
-This patch reused the test_linkfail values above 2 to make test files with
-the given sizes (KB) for both the client side and the server side. It's
-useful for the test cases using different file sizes.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
