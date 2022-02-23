@@ -269,13 +269,26 @@ mptcp_lookup_anno_list_by_saddr(const struct mptcp_sock *msk,
 	return NULL;
 }
 
-bool mptcp_pm_sport_in_anno_list(struct mptcp_sock *msk, const struct sock *sk)
+static void skb_fetch_src_address(const struct sk_buff *skb,
+				  struct mptcp_addr_info *addr)
+{
+	addr->port = tcp_hdr(skb)->dest;
+	if (addr->family == AF_INET)
+		addr->addr.s_addr = ip_hdr(skb)->daddr;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	else if (addr->family == AF_INET6)
+		addr->addr6 = ipv6_hdr(skb)->daddr;
+#endif
+}
+
+bool mptcp_pm_sport_in_anno_list(struct mptcp_sock *msk, int af, const struct sk_buff *skb)
 {
 	struct mptcp_pm_add_entry *entry;
 	struct mptcp_addr_info saddr;
 	bool ret = false;
 
-	local_address((struct sock_common *)sk, &saddr);
+	saddr.family = af;
+	skb_fetch_src_address(skb, &saddr);
 
 	spin_lock_bh(&msk->pm.lock);
 	list_for_each_entry(entry, &msk->pm.anno_list, list) {
