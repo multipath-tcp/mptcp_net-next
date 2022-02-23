@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-update-output-info-of-chk_rm_nr
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: update output info of chk_rm_nr
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch updated the output info of chk_rm_nr. Renamed 'sf' to 'rmsf',
+which means 'remove subflow'. Added the display of whether the inverted
+namespaces has been used to check the mib counters.
+
+The new output looks like this:
+
+ 002 remove multiple subflows          syn[ ok ] - synack[ ok ] - ack[ ok ]
+                                       rm [ ok ] - rmsf  [ ok ]
+ 003 remove single address             syn[ ok ] - synack[ ok ] - ack[ ok ]
+                                       add[ ok ] - echo  [ ok ]
+                                       rm [ ok ] - rmsf  [ ok ]   invert
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
