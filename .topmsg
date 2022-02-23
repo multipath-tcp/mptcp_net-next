@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-mptcp-update-output-info-of-chk_rm_nr
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
