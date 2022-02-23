@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] selftests: mptcp: add implicit endpoint test case
-
-Ensure implicit endpoint are created when expected and
-that the user-space can update them
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
