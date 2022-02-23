@@ -906,27 +906,27 @@ chk_rst_nr()
 
 chk_infi_nr()
 {
-	local mp_infi_nr_tx=$1
-	local mp_infi_nr_rx=$2
+	local infi_tx=$1
+	local infi_rx=$2
 	local count
 	local dump_stats
 
 	printf "%-${nr_blank}s %s" " " "itx"
 	count=$(ip netns exec $ns2 nstat -as | grep InfiniteMapTx | awk '{print $2}')
 	[ -z "$count" ] && count=0
-	if [ "$count" != "$mp_infi_nr_tx" ]; then
-		echo "[fail] got $count infinite map[s] TX expected $mp_infi_nr_tx"
+	if [ "$count" != "$infi_tx" ]; then
+		echo "[fail] got $count infinite map[s] TX expected $infi_tx"
 		ret=1
 		dump_stats=1
 	else
 		echo -n "[ ok ]"
 	fi
 
-	echo -n " - irx   "
+	echo -n " - infirx"
 	count=$(ip netns exec $ns1 nstat -as | grep InfiniteMapRx | awk '{print $2}')
 	[ -z "$count" ] && count=0
-	if [ "$count" != "$mp_infi_nr_rx" ]; then
-		echo "[fail] got $count infinite map[s] RX expected $mp_infi_nr_rx"
+	if [ "$count" != "$infi_rx" ]; then
+		echo "[fail] got $count infinite map[s] RX expected $infi_rx"
 		ret=1
 		dump_stats=1
 	else
