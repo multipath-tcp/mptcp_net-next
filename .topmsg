@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-fastclose-testcase
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add fastclose testcase
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the self test for MP_FASTCLOSE. Reused the argument
+addr_nr_ns2 of do_transfer() to pass the extra arguments '-I 2' to
+mptcp_connect commands. Then mptcp_connect disconnected the
+connections to trigger the MP_FASTCLOSE sending and receiving. Used
+chk_fclose_nr to check the MP_FASTCLOSE mibs and used chk_rst_nr to
+check the MP_RST mibs. This test used the test_linkfail value to make
+1024KB test files.
+
+The output looks like this:
+
+Created /tmp/tmp.XB8sfv1hJ0 (size 1024 KB) containing data sent by client
+Created /tmp/tmp.RtTDbzqrXI (size 1024 KB) containing data sent by server
+001 fastclose test                syn[ ok ] - synack[ ok ] - ack[ ok ]
+                                  ctx[ ok ] - fclzrx[ ok ]
+                                  rtx[ ok ] - rstrx [ ok ]   invert
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
