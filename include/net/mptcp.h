@@ -16,6 +16,17 @@ struct mptcp_info;
 struct mptcp_sock;
 struct seq_file;
 
+/* MPTCP option subtypes */
+#define MPTCPOPT_MP_CAPABLE	0
+#define MPTCPOPT_MP_JOIN	1
+#define MPTCPOPT_DSS		2
+#define MPTCPOPT_ADD_ADDR	3
+#define MPTCPOPT_RM_ADDR	4
+#define MPTCPOPT_MP_PRIO	5
+#define MPTCPOPT_MP_FAIL	6
+#define MPTCPOPT_MP_FASTCLOSE	7
+#define MPTCPOPT_RST		8
+
 /* MPTCP sk_buff extension data */
 struct mptcp_ext {
 	union {
@@ -99,6 +110,8 @@ struct mptcp_out_options {
 extern struct request_sock_ops mptcp_subflow_request_sock_ops;
 
 void mptcp_init(void);
+
+int mptcp_is_enabled(const struct net *net);
 
 static inline bool sk_is_mptcp(const struct sock *sk)
 {
@@ -201,6 +214,11 @@ static inline __be32 mptcp_reset_option(const struct sk_buff *skb)
 
 static inline void mptcp_init(void)
 {
+}
+
+static inline int mptcp_is_enabled(const struct net *net)
+{
+	return 0;
 }
 
 static inline bool sk_is_mptcp(const struct sock *sk)

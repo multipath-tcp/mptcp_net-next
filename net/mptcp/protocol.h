@@ -36,17 +36,6 @@
 #define OPTIONS_MPTCP_MPJ	(OPTION_MPTCP_MPJ_SYN | OPTION_MPTCP_MPJ_SYNACK | \
 				 OPTION_MPTCP_MPJ_ACK)
 
-/* MPTCP option subtypes */
-#define MPTCPOPT_MP_CAPABLE	0
-#define MPTCPOPT_MP_JOIN	1
-#define MPTCPOPT_DSS		2
-#define MPTCPOPT_ADD_ADDR	3
-#define MPTCPOPT_RM_ADDR	4
-#define MPTCPOPT_MP_PRIO	5
-#define MPTCPOPT_MP_FAIL	6
-#define MPTCPOPT_MP_FASTCLOSE	7
-#define MPTCPOPT_RST		8
-
 /* MPTCP suboption lengths */
 #define TCPOLEN_MPTCP_MPC_SYN		4
 #define TCPOLEN_MPTCP_MPC_SYNACK	12
@@ -577,7 +566,6 @@ static inline void mptcp_subflow_delegated_done(struct mptcp_subflow_context *su
 	clear_bit(action, &subflow->delegated_status);
 }
 
-int mptcp_is_enabled(const struct net *net);
 unsigned int mptcp_get_add_addr_timeout(const struct net *net);
 int mptcp_is_checksum_enabled(const struct net *net);
 int mptcp_allow_join_id0(const struct net *net);
