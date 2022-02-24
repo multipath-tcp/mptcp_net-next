@@ -851,7 +851,7 @@ chk_fclose_nr()
 	local dump_stats
 
 	printf "%-${nr_blank}s %s" " " "ctx"
-	count=`ip netns exec $ns2 nstat -as | grep MPTcpExtMPFastcloseTx | awk '{print $2}'`
+	count=$(ip netns exec $ns2 nstat -as | grep MPTcpExtMPFastcloseTx | awk '{print $2}')
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$fclose_tx" ]; then
 		echo "[fail] got $count MP_FASTCLOSE[s] TX expected $fclose_tx"
