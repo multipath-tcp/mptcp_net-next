@@ -2155,6 +2155,10 @@ no_tcp_socket:
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_it;
 
+	sk = mptcp_handle_join4(skb);
+	if (sk)
+		goto process;
+
 	tcp_v4_fill_cb(skb, iph, th);
 
 	if (tcp_checksum_complete(skb)) {
@@ -2201,6 +2205,9 @@ do_time_wait:
 							iph->daddr, th->dest,
 							inet_iif(skb),
 							sdif);
+		if (!sk2)
+			sk2 = mptcp_handle_join4(skb);
+
 		if (sk2) {
 			inet_twsk_deschedule_put(inet_twsk(sk));
 			sk = sk2;

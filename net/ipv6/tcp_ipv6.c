@@ -1800,6 +1800,10 @@ no_tcp_socket:
 	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_it;
 
+	sk = mptcp_handle_join6(skb);
+	if (sk)
+		goto process;
+
 	tcp_v6_fill_cb(skb, hdr, th);
 
 	if (tcp_checksum_complete(skb)) {
@@ -1849,6 +1853,9 @@ do_time_wait:
 					    ntohs(th->dest),
 					    tcp_v6_iif_l3_slave(skb),
 					    sdif);
+		if (!sk2)
+			sk2 = mptcp_handle_join6(skb);
+
 		if (sk2) {
 			struct inet_timewait_sock *tw = inet_twsk(sk);
 			inet_twsk_deschedule_put(tw);
