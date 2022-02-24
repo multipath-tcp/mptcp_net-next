@@ -6,6 +6,7 @@
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	__u32 token;
 };
 
 static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)

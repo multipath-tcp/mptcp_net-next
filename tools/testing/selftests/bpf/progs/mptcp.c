@@ -8,6 +8,7 @@ __u32 _version SEC("version") = 1;
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	__u32 token;
 };
 
 struct {
@@ -20,6 +21,7 @@ struct {
 SEC("sockops")
 int _sockops(struct bpf_sock_ops *ctx)
 {
+	char fmt[] = "invoked=%u is_mptcp=%u token=%u\n";
 	struct mptcp_storage *storage;
 	struct bpf_tcp_sock *tcp_sk;
 	int op = (int)ctx->op;
@@ -43,6 +45,20 @@ int _sockops(struct bpf_sock_ops *ctx)
 
 	storage->invoked++;
 	storage->is_mptcp = tcp_sk->is_mptcp;
+	storage->token = 0;
+
+	if (tcp_sk->is_mptcp) {
+		struct bpf_mptcp_sock *msk;
+
+		msk = bpf_mptcp_sock(sk);
+		if (!msk)
+			return 1;
+
+		storage->token = msk->token;
+	}
+
+	bpf_trace_printk(fmt, sizeof(fmt),
+			 storage->invoked, storage->is_mptcp, storage->token);
 
 	return 1;
 }
