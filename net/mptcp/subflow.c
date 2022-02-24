@@ -116,6 +116,9 @@ static void subflow_init_req(struct request_sock *req, const struct sock *sk_lis
 
 static bool subflow_use_different_sport(struct mptcp_sock *msk, const struct sock *sk)
 {
+	if (inet_sk(sk)->inet_sport == 0)
+		return true;
+
 	return inet_sk(sk)->inet_sport != inet_sk((struct sock *)msk)->inet_sport;
 }
 
@@ -216,11 +219,6 @@ again:
 			pr_debug("syn inet_sport=%d %d",
 				 ntohs(inet_sk(sk_listener)->inet_sport),
 				 ntohs(inet_sk((struct sock *)subflow_req->msk)->inet_sport));
-			if (!mptcp_pm_sport_in_anno_list(subflow_req->msk,
-							 sk_listener->sk_family, skb)) {
-				SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_MISMATCHPORTSYNRX);
-				return -EPERM;
-			}
 			SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINPORTSYNRX);
 		}
 

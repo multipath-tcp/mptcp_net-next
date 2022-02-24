@@ -3794,7 +3794,7 @@ static struct inet_protosw mptcp_v6_protosw = {
 	.flags		= INET_PROTOSW_ICSK,
 };
 
-int __init mptcp_proto_v6_init(void)
+int __net_init mptcp_proto_v6_init(void)
 {
 	int err;
 
