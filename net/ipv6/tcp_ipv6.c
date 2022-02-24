@@ -1731,6 +1731,13 @@ process:
 				tcp_v6_restore_cb(skb);
 				sock_put(sk);
 				goto lookup;
+			} else if (req_status == TCP_REQ_MP_JOIN) {
+				struct sock *msk = mptcp_handle_join6(skb);
+
+				if (msk) {
+					sk = msk;
+					goto process;
+				}
 			}
 			goto discard_and_relse;
 		}

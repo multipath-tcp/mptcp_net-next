@@ -572,10 +572,16 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	bool own_req;
 
 	tmp_opt.saw_tstamp = 0;
+	tmp_opt.saw_mp_join = 0;
 	if (th->doff > (sizeof(struct tcphdr)>>2)) {
 		tcp_parse_options(sock_net(sk), skb, &tmp_opt, 0, NULL);
 
-		if (tmp_opt.saw_tstamp) {
+		if (unlikely(tmp_opt.saw_mp_join) &&
+		    mptcp_is_enabled(sock_net(sk))) {
+			*req_status = TCP_REQ_MP_JOIN;
+
+			return NULL;
+		} else if (tmp_opt.saw_tstamp) {
 			tmp_opt.ts_recent = req->ts_recent;
 			if (tmp_opt.rcv_tsecr)
 				tmp_opt.rcv_tsecr -= tcp_rsk(req)->ts_off;
