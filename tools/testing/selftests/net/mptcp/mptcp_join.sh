@@ -847,7 +847,7 @@ chk_fclose_nr()
 	fi
 
 	echo -n " - fclzrx"
-	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtMPFastcloseRx | awk '{print $2}'`
+	count=$(ip netns exec $ns1 nstat -as | grep MPTcpExtMPFastcloseRx | awk '{print $2}')
 	[ -z "$count" ] && count=0
 	if [ "$count" != "$fclose_rx" ]; then
 		echo "[fail] got $count MP_FASTCLOSE[s] RX expected $fclose_rx"
@@ -902,6 +902,38 @@ chk_rst_nr()
 	[ "${dump_stats}" = 1 ] && dump_stats
 
 	echo "$extra_msg"
+}
+
+chk_infi_nr()
+{
+	local infi_tx=$1
+	local infi_rx=$2
+	local count
+	local dump_stats
+
+	printf "%-${nr_blank}s %s" " " "itx"
+	count=$(ip netns exec $ns2 nstat -as | grep InfiniteMapTx | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$infi_tx" ]; then
+		echo "[fail] got $count infinite map[s] TX expected $infi_tx"
+		ret=1
+		dump_stats=1
+	else
+		echo -n "[ ok ]"
+	fi
+
+	echo -n " - infirx"
+	count=$(ip netns exec $ns1 nstat -as | grep InfiniteMapRx | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$infi_rx" ]; then
+		echo "[fail] got $count infinite map[s] RX expected $infi_rx"
+		ret=1
+		dump_stats=1
+	else
+		echo "[ ok ]"
+	fi
+
+	[ "${dump_stats}" = 1 ] && dump_stats
 }
 
 chk_join_nr()
@@ -959,6 +991,7 @@ chk_join_nr()
 		chk_csum_nr
 		chk_fail_nr 0 0
 		chk_rst_nr 0 0
+		chk_infi_nr 0 0
 	fi
 }
 
