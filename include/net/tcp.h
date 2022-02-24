@@ -382,9 +382,17 @@ enum tcp_tw_status {
 enum tcp_tw_status tcp_timewait_state_process(struct inet_timewait_sock *tw,
 					      struct sk_buff *skb,
 					      const struct tcphdr *th);
+
+enum tcp_req_status {
+	TCP_REQ_OK = 0,
+	TCP_REQ_LOST_RACE = 1,
+	TCP_REQ_MP_JOIN = 2
+};
+
 struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 			   struct request_sock *req, bool fastopen,
-			   bool *lost_race);
+			   enum tcp_req_status *req_status);
+
 int tcp_child_process(struct sock *parent, struct sock *child,
 		      struct sk_buff *skb);
 void tcp_enter_loss(struct sock *sk);

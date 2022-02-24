@@ -1682,8 +1682,8 @@ process:
 		goto do_time_wait;
 
 	if (sk->sk_state == TCP_NEW_SYN_RECV) {
+		enum tcp_req_status req_status = TCP_REQ_OK;
 		struct request_sock *req = inet_reqsk(sk);
-		bool req_stolen = false;
 		struct sock *nsk;
 
 		sk = req->rsk_listener;
@@ -1716,13 +1716,13 @@ process:
 			th = (const struct tcphdr *)skb->data;
 			hdr = ipv6_hdr(skb);
 			tcp_v6_fill_cb(skb, hdr, th);
-			nsk = tcp_check_req(sk, skb, req, false, &req_stolen);
+			nsk = tcp_check_req(sk, skb, req, false, &req_status);
 		} else {
 			drop_reason = SKB_DROP_REASON_SOCKET_FILTER;
 		}
 		if (!nsk) {
 			reqsk_put(req);
-			if (req_stolen) {
+			if (req_status == TCP_REQ_LOST_RACE) {
 				/* Another cpu got exclusive access to req
 				 * and created a full blown socket.
 				 * Try to feed this packet to this socket

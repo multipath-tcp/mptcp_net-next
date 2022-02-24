@@ -6457,12 +6457,12 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	req = rcu_dereference_protected(tp->fastopen_rsk,
 					lockdep_sock_is_held(sk));
 	if (req) {
-		bool req_stolen;
+		enum tcp_req_status req_status;
 
 		WARN_ON_ONCE(sk->sk_state != TCP_SYN_RECV &&
 		    sk->sk_state != TCP_FIN_WAIT1);
 
-		if (!tcp_check_req(sk, skb, req, true, &req_stolen))
+		if (!tcp_check_req(sk, skb, req, true, &req_status))
 			goto discard;
 	}
 

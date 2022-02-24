@@ -562,7 +562,7 @@ EXPORT_SYMBOL(tcp_create_openreq_child);
 
 struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 			   struct request_sock *req,
-			   bool fastopen, bool *req_stolen)
+			   bool fastopen, enum tcp_req_status *req_status)
 {
 	struct tcp_options_received tmp_opt;
 	struct sock *child;
@@ -774,7 +774,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 
 	sock_rps_save_rxhash(child, skb);
 	tcp_synack_rtt_meas(child, req);
-	*req_stolen = !own_req;
+	*req_status = own_req ? TCP_REQ_OK : TCP_REQ_LOST_RACE;
 	return inet_csk_complete_hashdance(sk, child, req, own_req);
 
 listen_overflow:
@@ -803,7 +803,7 @@ embryonic_reset:
 
 		if (unlinked)
 			__NET_INC_STATS(sock_net(sk), LINUX_MIB_EMBRYONICRSTS);
-		*req_stolen = !unlinked;
+		*req_status = unlinked ? TCP_REQ_OK : TCP_REQ_LOST_RACE;
 	}
 	return NULL;
 }
