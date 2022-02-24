@@ -4122,6 +4122,14 @@ void tcp_parse_options(const struct net *net,
 				opt_rx->saw_unknown = 1;
 				break;
 
+			case TCPOPT_MPTCP:
+				__u8 mptcp_subtype = *ptr >> 4;
+
+				if (mptcp_subtype == MPTCPOPT_MP_JOIN)
+					opt_rx->saw_mp_join = 1;
+
+				break;
+
 			default:
 				opt_rx->saw_unknown = 1;
 			}
