@@ -365,6 +365,21 @@ wait_rm_addr()
 	done
 }
 
+wait_mpj()
+{
+	local ns="${1}"
+	local cnt old_cnt
+
+	old_cnt=$(ip netns exec ${ns} nstat -as | grep MPJoinAckRx | awk '{print $2}')
+
+	local i
+	for i in $(seq 10); do
+		cnt=$(ip netns exec ${ns} nstat -as | grep MPJoinAckRx | awk '{print $2}')
+		[ "$cnt" = "${old_cnt}" ] || break
+		sleep 0.1
+	done
+}
+
 pm_nl_set_limits()
 {
 	local ns=$1
@@ -468,9 +483,10 @@ pm_nl_change_endpoint()
 pm_nl_check_endpoint()
 {
 	local line expected_line
-	local msg="$1"
-	local addr=$3
-	local ns=$2
+	local title="$1"
+	local msg="$2"
+	local ns=$3
+	local addr=$4
 	local _flags=""
 	local flags
 	local _port
@@ -479,10 +495,13 @@ pm_nl_check_endpoint()
 	local _id
 	local id
 
-	TEST_COUNT=$((TEST_COUNT + 1))
-	printf "%03u %-${nr_blank}s" "$TEST_COUNT" "$msg"
+	if [ -n "${title}" ]; then
+		printf "%03u %-36s %s" "${TEST_COUNT}" "${title}" "${msg}"
+	else
+		printf "%-${nr_blank}s %s" " " "${msg}"
+	fi
 
-	shift 3
+	shift 4
 	while [ -n "$1" ]; do
 		if [ $1 = "flags" ]; then
 			_flags=$2
@@ -2532,21 +2551,6 @@ userspace_tests()
 	chk_rm_nr 0 0
 }
 
-wait_mpj()
-{
-	local ns="${1}"
-	local cnt old_cnt
-
-	old_cnt=$(ip netns exec ${ns} nstat -as | grep MPJoinAckRx | awk '{print $2}')
-
-	local i
-	for i in $(seq 10); do
-		cnt=$(ip netns exec ${ns} nstat -as | grep MPJoinAckRx | awk '{print $2}')
-		[ "$cnt" = "${old_cnt}" ] || break
-		sleep 0.1
-	done
-}
-
 implicit_tests()
 {
 	# userspace pm type prevents add_addr
@@ -2557,15 +2561,16 @@ implicit_tests()
 	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow &
 
 	wait_mpj $ns1
-	pm_nl_check_endpoint "implicit EP creation" \
+	TEST_COUNT=$((TEST_COUNT + 1))
+	pm_nl_check_endpoint "implicit EP" "creation" \
 		$ns2 10.0.2.2 id 1 flags implicit
 
 	pm_nl_add_endpoint $ns2 10.0.2.2 id 33
-	pm_nl_check_endpoint "implicit EP ID change is prevented" \
+	pm_nl_check_endpoint "" "ID change is prevented" \
 		$ns2 10.0.2.2 id 1 flags implicit
 
 	pm_nl_add_endpoint $ns2 10.0.2.2 flags signal
-	pm_nl_check_endpoint "implicit EP modification is allowed" \
+	pm_nl_check_endpoint "" "modif is allowed" \
 		$ns2 10.0.2.2 id 1 flags signal
 	wait
 }
