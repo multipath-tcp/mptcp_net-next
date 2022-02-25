@@ -1,9 +1,0 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] selftests: mptcp: join: helper to filter TCP
-
-This is more readable and reduces duplicated commands.
-
-This might also be useful to add v6 support and switch to nftables.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
