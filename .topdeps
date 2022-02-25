@@ -1,1 +1,1 @@
-t/mptcp-add-fullmesh-flag-check-for-adding-address
+t/selftests-mptcp-join-make-it-shellcheck-compliant
