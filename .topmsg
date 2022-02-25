@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-drop-msg-argument-of-chk_csum_nr
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: drop msg argument of chk_csum_nr
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch dropped the msg argument of chk_csum_nr, to unify chk_csum_nr
+with other chk_*_nr functions.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
