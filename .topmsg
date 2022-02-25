@@ -1,4 +1,29 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-make-it-shellcheck-compliant
+Subject: [PATCH] selftests: mptcp: join: make it shellcheck compliant
 
+This fixes a few issues reported by ShellCheck:
+
+- SC2068: Double quote array expansions to avoid re-splitting elements.
+- SC2206: Quote to prevent word splitting/globbing, or split robustly
+          with mapfile or read -a.
+- SC2166: Prefer [ p ] && [ q ] as [ p -a q ] is not well defined.
+- SC2155: Declare and assign separately to avoid masking return values.
+- SC2162: read without -r will mangle backslashes.
+- SC2219: Instead of 'let expr', prefer (( expr )) .
+- SC2181: Check exit code directly with e.g. 'if mycmd;', not indirectly
+          with $?.
+- SC2236: Use -n instead of ! -z.
+- SC2004: $/${} is unnecessary on arithmetic variables.
+- SC2012: Use find instead of ls to better handle non-alphanumeric
+          filenames.
+- SC2002: Useless cat. Consider 'cmd < file | ..' or 'cmd file | ..'
+          instead.
+
+SC2086 (Double quotes to prevent globbing and word splitting) is ignored
+because it is controlled for the moment and there are too many to
+change.
+
+While at it, also fixed the alignment in one comment.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
