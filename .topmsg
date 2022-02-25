@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-reset-failing-links
+Subject: [PATCH] selftests: mptcp: join: reset failing links
 
+Best to always reset this env var before each test to avoid surprising
+behaviour depending on the order tests are running.
+
+Also clearly set it for the last failing links test is also needed when
+only this test is executed.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
