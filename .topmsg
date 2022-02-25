@@ -1,4 +1,19 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-alt.-to-exec-specific-tests
+Subject: [PATCH] selftests: mptcp: join: alt. to exec specific tests
 
+Running a specific test by giving the ID is often what we want: the CI
+reports an issue with the Nth test, it is reproducible with:
+
+  ./mptcp_join.sh N
+
+But this might not work when there is a need to find which commit has
+introduced a regression making a test unstable: failing from time to
+time. Indeed, a specific test is not attached to one ID: the ID is in
+fact a counter. It means the same test can have a different ID if other
+tests have been added/removed before this unstable one.
+
+Remembering the current test can also help listing failed tests at the
+end.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
