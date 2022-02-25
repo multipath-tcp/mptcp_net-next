@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-list-failure-at-the-end
+Subject: [PATCH] selftests: mptcp: join: list failure at the end
 
+With ~100 tests, it helps to have this summary at the end not to scroll
+to find which one has failed.
+
+It is especially interseting when looking at the output produced by the
+CI where the kernel logs from the serial are mixed together.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
