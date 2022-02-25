@@ -7,4 +7,6 @@ responsible for ADD_ADDR echo, so also make sure that's working.
 
 Tested-by: Geliang Tang <geliang.tang@suse.com>
 Acked-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
