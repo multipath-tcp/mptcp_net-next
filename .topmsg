@@ -7,5 +7,15 @@ Without this patch, no tests would be ran when launching:
 
 In any order or a combination with 2 of these letters.
 
+The recommended way with getopt is first parse all options and then act.
+
+This allows to do some actions in priority, e.g. display the help menu
+and stop.
+
+But also some global variables changing the behaviour of this selftests
+ -- like the ones behind -cCi options -- can be set before running the
+different tests. By doing that, we can also avoid long and unreadable
+regex.
+
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
