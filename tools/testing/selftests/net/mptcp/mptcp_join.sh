@@ -238,6 +238,8 @@ reset_with_checksum()
 
 	ip netns exec $ns1 sysctl -q net.mptcp.checksum_enabled=$ns1_enable
 	ip netns exec $ns2 sysctl -q net.mptcp.checksum_enabled=$ns2_enable
+
+	validate_checksum=1
 }
 
 reset_with_allow_join_id0()
@@ -974,9 +976,8 @@ dump_stats()
 
 chk_csum_nr()
 {
-	local msg=${1:-""}
-	local csum_ns1=${2:-0}
-	local csum_ns2=${3:-0}
+	local csum_ns1=${1:-0}
+	local csum_ns2=${2:-0}
 	local count
 	local dump_stats
 	local allow_multi_errors_ns1=0
@@ -991,13 +992,7 @@ chk_csum_nr()
 		csum_ns2=${csum_ns2:1}
 	fi
 
-	if [ "${msg}" = 1 ]; then
-		printf "%03u" "$TEST_COUNT"
-		msg="${TEST_NAME}"
-	else
-		echo -n "   "
-	fi
-	printf " %-36s %s" "$msg" "sum"
+	printf "%-${nr_blank}s %s" " " "sum"
 	count=`ip netns exec $ns1 nstat -as | grep MPTcpExtDataCsumErr | awk '{print $2}'`
 	[ -z "$count" ] && count=0
 	if [ "$count" != $csum_ns1 -a $allow_multi_errors_ns1 -eq 0 ] ||
@@ -1224,7 +1219,7 @@ chk_join_nr()
 	fi
 	[ "${dump_stats}" = 1 ] && dump_stats
 	if [ $validate_checksum -eq 1 ]; then
-		chk_csum_nr "" $csum_ns1 $csum_ns2
+		chk_csum_nr $csum_ns1 $csum_ns2
 		chk_fail_nr $fail_nr $fail_nr
 		chk_rst_nr $rst_nr $rst_nr
 		chk_infi_nr $infi_nr $infi_nr
@@ -2420,7 +2415,7 @@ checksum_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		run_tests $ns1 $ns2 10.0.1.1
-		chk_csum_nr 1
+		chk_join_nr 0 0 0
 	fi
 
 	# checksum test 1 1
@@ -2428,7 +2423,7 @@ checksum_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		run_tests $ns1 $ns2 10.0.1.1
-		chk_csum_nr 1
+		chk_join_nr 0 0 0
 	fi
 
 	# checksum test 0 1
@@ -2436,7 +2431,7 @@ checksum_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		run_tests $ns1 $ns2 10.0.1.1
-		chk_csum_nr 1
+		chk_join_nr 0 0 0
 	fi
 
 	# checksum test 1 0
@@ -2444,7 +2439,7 @@ checksum_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		run_tests $ns1 $ns2 10.0.1.1
-		chk_csum_nr 1
+		chk_join_nr 0 0 0
 	fi
 }
 
