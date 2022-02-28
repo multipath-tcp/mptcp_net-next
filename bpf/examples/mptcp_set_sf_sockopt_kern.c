@@ -16,12 +16,12 @@ char _license[] SEC("license") = "GPL";
 char cc [TCP_CA_NAME_MAX] = "vegas";
 
 /* Associate a subflow counter to each token */
-struct bpf_map_def SEC("maps") mptcp_sf = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(__u32),
-	.value_size = sizeof(__u32),
-	.max_entries = 100
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(key_size, sizeof(__u32));
+	__uint(value_size, sizeof(__u32));
+	__uint(max_entries, 100);
+} mptcp_sf SEC(".maps");
 
 #define DEBUG 1
 

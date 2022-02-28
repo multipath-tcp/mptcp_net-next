@@ -133,10 +133,10 @@ int main(int argc, const char **argv)
 	LIBBPF_ERROR_WRAPPER(ret, "failed to load programs from object file");
 
 	do {
-		prog = bpf_program__next(prog, object_file);
+		prog = bpf_object__next_program(object_file, prog);
 		if (!prog) break;
 
-		name = (char*) bpf_program__title(prog, false);
+		name = (char *)bpf_program__section_name(prog);
 
 		switch(bpf_program__get_expected_attach_type(prog)) {
 		case BPF_CGROUP_SOCK_OPS:
