@@ -117,6 +117,10 @@ DECLARE_EVENT_CLASS(mptcp_dump_mpext,
 		  __entry->csum_reqd, __entry->infinite_map)
 );
 
+DEFINE_EVENT(mptcp_dump_mpext, mptcp_sendmsg_frag,
+	TP_PROTO(struct mptcp_ext *mpext),
+	TP_ARGS(mpext));
+
 DEFINE_EVENT(mptcp_dump_mpext, get_mapping_status,
 	TP_PROTO(struct mptcp_ext *mpext),
 	TP_ARGS(mpext));
