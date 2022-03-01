@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-send-ADD_ADDR-echo-before-create-subflows
+From: Yonglong Li <liyonglong@chinatelecom.cn>
+Subject: [PATCH] mptcp: send ADD_ADDR echo before create subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In some corner cases, the peer handing an incoming ADD_ADDR option, can
+receive a retransmitted ADD_ADDR for the same address before the subflow
+creation completes.
+
+We can avoid the above issue by generating and sending the ADD_ADDR echo
+before starting the MPJ subflow connection.
+
+This slightly changes the behaviour of the packetdrill tests as the
+ADD_ADDR echo packet is sent earlier.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Yonglong Li <liyonglong@chinatelecom.cn>
