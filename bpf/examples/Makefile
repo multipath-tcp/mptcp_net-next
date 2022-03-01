@@ -18,4 +18,4 @@ mptcp_set_sf_sockopt_kern.o:
 		$(CFLAGS) -o mptcp_set_sf_sockopt_kern.o
 
 clean:
-	@rm *_kern.o loader
+	@rm -f *_kern.o loader
