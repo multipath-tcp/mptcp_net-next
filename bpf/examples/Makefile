@@ -1,11 +1,9 @@
 MPTCP := ${PWD}/../../../mptcp_net-next
 
 CFLAGS := -I${MPTCP}/usr/include
-CFLAGS += -I${MPTCP}/tools/lib
-CFLAGS += -I${MPTCP}/tools/include
-CFLAGS += -I${MPTCP}/tools/perf
+CFLAGS += -I${MPTCP}/tools/perf/libbpf/include
 
-LOADER_FLAGS := -lelf -lz ${MPTCP}/tools/lib/bpf/libbpf.a
+LOADER_FLAGS := -lelf -lz ${MPTCP}/tools/perf/libbpf/libbpf.a
 LOADER_FLAGS += -DHAVE_ATTR_TEST=0
 
 BPF_FLAGS := -O2 -target bpf -g
