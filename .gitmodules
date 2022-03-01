@@ -1,0 +1,3 @@
+[submodule "bpf/examples/mptcp-tools"]
+	path = bpf/examples/mptcp-tools
+	url = https://github.com/pabeni/mptcp-tools
