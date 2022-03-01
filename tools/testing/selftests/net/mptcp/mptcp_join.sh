@@ -54,6 +54,7 @@ init_partial()
 		ip netns add $netns || exit $ksft_skip
 		ip -net $netns link set lo up
 		ip netns exec $netns sysctl -q net.mptcp.enabled=1
+		ip netns exec $netns sysctl -q net.mptcp.pm_type=0
 		ip netns exec $netns sysctl -q net.ipv4.conf.all.rp_filter=0
 		ip netns exec $netns sysctl -q net.ipv4.conf.default.rp_filter=0
 		if [ $checksum -eq 1 ]; then
@@ -1347,6 +1348,13 @@ wait_for_tw()
 	return 1
 }
 
+set_userspace_pm()
+{
+	local ns=$1
+
+	ip netns exec $ns sysctl -q net.mptcp.pm_type=1
+}
+
 subflows_tests()
 {
 	reset
@@ -2363,6 +2371,68 @@ fail_tests()
 									1
 }
 
+userspace_tests()
+{
+	# userspace pm type prevents add_addr
+	reset
+	set_userspace_pm $ns1
+	pm_nl_set_limits $ns1 0 2
+	pm_nl_set_limits $ns2 0 2
+	pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+	run_tests $ns1 $ns2 10.0.1.1
+	chk_join_nr "userspace pm type prevents add_addr" 0 0 0
+	chk_add_nr 0 0
+
+	# userspace pm type echoes add_addr
+	reset
+	set_userspace_pm $ns2
+	pm_nl_set_limits $ns1 0 2
+	pm_nl_set_limits $ns2 0 2
+	pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+	run_tests $ns1 $ns2 10.0.1.1
+	chk_join_nr "userspace pm type echoes add_addr" 0 0 0
+	chk_add_nr 1 1
+
+	# userspace pm type rejects join
+	reset
+	set_userspace_pm $ns1
+	pm_nl_set_limits $ns1 1 1
+	pm_nl_set_limits $ns2 1 1
+	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	run_tests $ns1 $ns2 10.0.1.1
+	chk_join_nr "userspace pm type rejects join" 1 1 0
+
+	# userspace pm type does not send join
+	reset
+	set_userspace_pm $ns2
+	pm_nl_set_limits $ns1 1 1
+	pm_nl_set_limits $ns2 1 1
+	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	run_tests $ns1 $ns2 10.0.1.1
+	chk_join_nr "userspace pm type does not send join" 0 0 0
+
+	# userspace pm type prevents mp_prio
+	reset
+	set_userspace_pm $ns1
+	pm_nl_set_limits $ns1 1 1
+	pm_nl_set_limits $ns2 1 1
+	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	run_tests $ns1 $ns2 10.0.1.1 0 0 0 slow backup
+	chk_join_nr "userspace pm type prevents mp_prio" 1 1 0
+	chk_prio_nr 0 0
+
+	# userspace pm type prevents rm_addr
+	reset
+	set_userspace_pm $ns1
+	set_userspace_pm $ns2
+	pm_nl_set_limits $ns1 0 1
+	pm_nl_set_limits $ns2 0 1
+	pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+	run_tests $ns1 $ns2 10.0.1.1 0 0 -1 slow
+	chk_join_nr "userspace pm type prevents rm_addr" 0 0 0
+	chk_rm_nr 0 0
+}
+
 all_tests()
 {
 	subflows_tests
@@ -2382,6 +2452,7 @@ all_tests()
 	fullmesh_tests
 	fastclose_tests
 	fail_tests
+	userspace_tests
 }
 
 # [$1: error message]
@@ -2410,6 +2481,7 @@ usage()
 	echo "  -m fullmesh_tests"
 	echo "  -z fastclose_tests"
 	echo "  -F fail_tests"
+	echo "  -u userspace_tests"
 	echo "  -c capture pcap files"
 	echo "  -C enable data checksum"
 	echo "  -i use ip mptcp"
@@ -2441,7 +2513,7 @@ if [ $do_all_tests -eq 1 ]; then
 	exit $ret
 fi
 
-while getopts 'fesltra64bpkdmchzFCSi' opt; do
+while getopts 'fesltra64bpkdmchzuFCSi' opt; do
 	case $opt in
 		f)
 			subflows_tests
@@ -2493,6 +2565,9 @@ while getopts 'fesltra64bpkdmchzFCSi' opt; do
 			;;
 		F)
 			fail_tests
+			;;
+		u)
+			userspace_tests
 			;;
 		c)
 			;;
