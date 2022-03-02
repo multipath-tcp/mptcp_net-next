@@ -6,7 +6,7 @@ task:
   timeout_in: 115m
 
   container:
-    image: mptcp/mptcp-upstream-virtme-docker
+    image: mptcp/mptcp-upstream-virtme-docker:main
     kvm: true   ## Needed for the tests
     cpu: 4      ## Max 16 per project, even number with kvm
     memory: 4G  ## Max 4 per CPU
