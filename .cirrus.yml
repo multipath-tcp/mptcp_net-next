@@ -3,10 +3,10 @@
 task:
   name: KVM validation
   only_if: $CIRRUS_TAG != ''  ## only tags
-  timeout_in: 90m
+  timeout_in: 115m
 
   container:
-    image: mptcp/mptcp-upstream-virtme-docker
+    image: mptcp/mptcp-upstream-virtme-docker:main
     kvm: true   ## Needed for the tests
     cpu: 4      ## Max 16 per project, even number with kvm
     memory: 4G  ## Max 4 per CPU
@@ -30,6 +30,9 @@ task:
   on_failure:
     vmlinux_artifacts:
       path: "vmlinux.zstd"
+    kmemleak_artifacts:
+      path: "kmemleak.txt"
+      type: text/plain
 
   always:
     conclusion_artifacts:
