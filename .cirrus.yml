@@ -30,6 +30,9 @@ task:
   on_failure:
     vmlinux_artifacts:
       path: "vmlinux.zstd"
+    kmemleak_artifacts:
+      path: "kmemleak.txt"
+      type: text/plain
 
   always:
     conclusion_artifacts:
