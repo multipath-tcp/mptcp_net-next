@@ -25,3 +25,18 @@ bool bpf_mptcp_sock_is_valid_access(int off, int size, enum bpf_access_type type
 		return size == sizeof(__u32);
 	}
 }
+
+struct bpf_mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
+{
+	if (sk && sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
+		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+		struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+		struct bpf_mptcp_sock *bpf_msk;
+
+		bpf_msk = (struct bpf_mptcp_sock *)subflow->conn;
+		bpf_msk->token = msk->token;
+		return bpf_msk;
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(bpf_mptcp_sock_from_subflow);
