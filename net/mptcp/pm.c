@@ -285,6 +285,7 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPFAILTX);
 			subflow->send_infinite_map = 1;
 		} else {
+			sk_stop_timer((struct sock *)msk, &msk->sk.icsk_retransmit_timer);
 			subflow->mp_fail_response_expect = 0;
 		}
 	}

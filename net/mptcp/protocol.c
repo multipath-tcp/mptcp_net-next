@@ -866,6 +866,36 @@ static void mptcp_reset_timer(struct sock *sk)
 	sk_reset_timer(sk, &icsk->icsk_retransmit_timer, jiffies + tout);
 }
 
+static void mptcp_mp_fail_timer(struct timer_list *t)
+{
+	struct inet_connection_sock *icsk = from_timer(icsk, t,
+						       icsk_retransmit_timer);
+	struct sock *sk = &icsk->icsk_inet.sk, *ssk;
+	struct mptcp_subflow_context *subflow;
+
+	if (!sk || inet_sk_state_load(sk) == TCP_CLOSE)
+		return;
+
+	bh_lock_sock(sk);
+	subflow = mptcp_subflow_ctx(mptcp_sk(sk)->first);
+	ssk = mptcp_subflow_tcp_sock(subflow);
+	pr_debug("MP_FAIL is lost, reset the subflow");
+	mptcp_subflow_reset(ssk);
+	bh_unlock_sock(sk);
+	sock_put(sk);
+}
+
+void mptcp_setup_mp_fail_timer(struct mptcp_sock *msk)
+{
+	struct sock *sk = (struct sock *)msk;
+
+	/* re-use the csk retrans timer for MP_FAIL retrans */
+	sk_stop_timer(sk, &msk->sk.icsk_retransmit_timer);
+	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_mp_fail_timer, 0);
+	__mptcp_set_timeout(sk, TCP_RTO_MAX);
+	mptcp_reset_timer(sk);
+}
+
 bool mptcp_schedule_work(struct sock *sk)
 {
 	if (inet_sk_state_load(sk) != TCP_CLOSE &&
@@ -1604,7 +1634,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 
 out:
 	/* ensure the rtx timer is running */
-	if (!mptcp_timer_pending(sk))
+	if (!mptcp_timer_pending(sk) && !__mptcp_check_fallback(msk))
 		mptcp_reset_timer(sk);
 	if (copied)
 		__mptcp_check_send_data_fin(sk);
