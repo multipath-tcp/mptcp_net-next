@@ -6,9 +6,11 @@
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	__u32 token;
 };
 
-static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
+static int verify_sk(int map_fd, int client_fd, const char *msg,
+		     __u32 is_mptcp, __u32 token)
 {
 	int err = 0, cfd = client_fd;
 	struct mptcp_storage val;
@@ -19,8 +21,23 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 	 * does not trigger sockops events.
 	 * We silently pass this situation at the moment.
 	 */
-	if (is_mptcp == 1)
-		return 0;
+	if (is_mptcp == 1) {
+		if (token <= 0)
+			return 0;
+
+		if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
+			perror("Failed to read socket storage");
+			return -1;
+		}
+
+		if (val.token <= 0) {
+			log_err("%s: unexpected bpf_mptcp_sock.token %d %d",
+				msg, val.token, token);
+			err++;
+		}
+
+		return err;
+	}
 
 	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
 		perror("Failed to read socket storage");
@@ -76,8 +93,8 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 		goto close_client_fd;
 	}
 
-	err += is_mptcp ? verify_sk(map_fd, client_fd, "MPTCP subflow socket", 1) :
-			  verify_sk(map_fd, client_fd, "plain TCP socket", 0);
+	err += is_mptcp ? verify_sk(map_fd, client_fd, "MPTCP subflow socket", 1, 1) :
+			  verify_sk(map_fd, client_fd, "plain TCP socket", 0, 0);
 
 close_client_fd:
 	close(client_fd);
