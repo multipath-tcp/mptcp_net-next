@@ -2359,12 +2359,18 @@ bool bpf_mptcp_sock_is_valid_access(int off, int size,
 				    enum bpf_access_type type,
 				    struct bpf_insn_access_aux *info);
 
+struct bpf_mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk);
 #else /* CONFIG_MPTCP */
 static inline bool bpf_mptcp_sock_is_valid_access(int off, int size,
 						  enum bpf_access_type type,
 						  struct bpf_insn_access_aux *info)
 {
 	return false;
+}
+
+static struct bpf_mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
+{
+	return NULL;
 }
 #endif /* CONFIG_MPTCP */
 
