@@ -1219,6 +1219,7 @@ fallback:
 					sk_eat_skb(ssk, skb);
 			} else {
 				subflow->mp_fail_response_expect = 1;
+				mptcp_setup_mp_fail_timer(msk);
 			}
 			WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_NODATA);
 			return true;

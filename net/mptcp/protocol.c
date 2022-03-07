@@ -866,6 +866,59 @@ static void mptcp_reset_timer(struct sock *sk)
 	sk_reset_timer(sk, &icsk->icsk_retransmit_timer, jiffies + tout);
 }
 
+static struct mptcp_subflow_context *
+mp_fail_response_expect_subflow(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow, *ret = NULL;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (subflow->mp_fail_response_expect) {
+			ret = subflow;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static void mptcp_mp_fail_timer(struct timer_list *t)
+{
+	struct inet_connection_sock *icsk = from_timer(icsk, t,
+						       icsk_retransmit_timer);
+	struct sock *sk = &icsk->icsk_inet.sk;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+
+	if (!sk || inet_sk_state_load(sk) == TCP_CLOSE)
+		return;
+
+	spin_lock_bh(&msk->pm.lock);
+	subflow = mp_fail_response_expect_subflow(msk);
+	spin_unlock_bh(&msk->pm.lock);
+	if (subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		pr_debug("MP_FAIL is lost, reset the subflow");
+		bh_lock_sock(ssk);
+		mptcp_subflow_reset(ssk);
+		bh_unlock_sock(ssk);
+	}
+	sock_put(sk);
+}
+
+void mptcp_setup_mp_fail_timer(struct mptcp_sock *msk)
+{
+	struct sock *sk = (struct sock *)msk;
+
+	mptcp_data_lock(sk);
+	/* re-use the csk retrans timer for MP_FAIL retrans */
+	sk_stop_timer(sk, &msk->sk.icsk_retransmit_timer);
+	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_mp_fail_timer, 0);
+	__mptcp_set_timeout(sk, TCP_RTO_MAX);
+	mptcp_reset_timer(sk);
+	mptcp_data_unlock(sk);
+}
+
 bool mptcp_schedule_work(struct sock *sk)
 {
 	if (inet_sk_state_load(sk) != TCP_CLOSE &&
@@ -1428,6 +1481,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
+	u8 mp_fail_response_expect = 0;
 	u32 pace, burst, wmem;
 	int i, nr_active = 0;
 	struct sock *ssk;
@@ -1442,11 +1496,15 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 		return sk_stream_memory_free(msk->first) ? msk->first : NULL;
 	}
 
+	if (mp_fail_response_expect_subflow(msk))
+		mp_fail_response_expect = 1;
+
 	/* re-use last subflow, if the burst allow that */
 	if (msk->last_snd && msk->snd_burst > 0 &&
 	    sk_stream_memory_free(msk->last_snd) &&
 	    mptcp_subflow_active(mptcp_subflow_ctx(msk->last_snd))) {
-		mptcp_set_timeout(sk);
+		if (!mp_fail_response_expect)
+			mptcp_set_timeout(sk);
 		return msk->last_snd;
 	}
 
@@ -1479,7 +1537,8 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 			send_info[subflow->backup].linger_time = linger_time;
 		}
 	}
-	__mptcp_set_timeout(sk, tout);
+	if (!mp_fail_response_expect)
+		__mptcp_set_timeout(sk, tout);
 
 	/* pick the best backup if no other subflow is active */
 	if (!nr_active)
