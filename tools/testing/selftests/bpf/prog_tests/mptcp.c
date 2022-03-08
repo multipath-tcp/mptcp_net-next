@@ -13,12 +13,6 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 	int err = 0, cfd = client_fd;
 	struct mptcp_storage val;
 
-	/* Currently there is no easy way to get back the subflow sk from the MPTCP
-	 * sk, thus we cannot access here the sk_storage associated to the subflow
-	 * sk. Also, there is no sk_storage associated with the MPTCP sk since it
-	 * does not trigger sockops events.
-	 * We silently pass this situation at the moment.
-	 */
 	if (is_mptcp == 1)
 		return 0;
 
@@ -28,14 +22,14 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 	}
 
 	if (val.invoked != 1) {
-		log_err("%s: unexpected invoked count %d != %d",
-			msg, val.invoked, 1);
+		log_err("%s: unexpected invoked count %d != 1",
+			msg, val.invoked);
 		err++;
 	}
 
-	if (val.is_mptcp != is_mptcp) {
-		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != %d",
-			msg, val.is_mptcp, is_mptcp);
+	if (val.is_mptcp != 0) {
+		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != 0",
+			msg, val.is_mptcp);
 		err++;
 	}
 
