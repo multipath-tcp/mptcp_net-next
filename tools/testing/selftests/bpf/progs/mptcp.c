@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
+#include "bpf_tcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
 __u32 _version SEC("version") = 1;
@@ -8,6 +9,7 @@ __u32 _version SEC("version") = 1;
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	__u32 token;
 };
 
 struct {
@@ -43,6 +45,26 @@ int _sockops(struct bpf_sock_ops *ctx)
 
 	storage->invoked++;
 	storage->is_mptcp = tcp_sk->is_mptcp;
+	storage->token = 0;
+
+	if (tcp_sk->is_mptcp) {
+		char fmt[] = "msk=%p token=%x\n";
+		struct mptcp_sock *msk;
+
+		msk = bpf_skc_to_mptcp_sock(sk);
+		if (!msk)
+			return 1;
+
+		storage = bpf_sk_storage_get(&socket_storage_map, msk, 0,
+					     BPF_SK_STORAGE_GET_F_CREATE);
+		if (!storage)
+			return 1;
+
+		storage->invoked++;
+		storage->is_mptcp = 1;
+		storage->token = msk->token;
+		bpf_trace_printk(fmt, sizeof(fmt), msk, storage->token);
+	}
 
 	return 1;
 }
