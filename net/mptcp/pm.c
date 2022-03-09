@@ -284,6 +284,8 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 			subflow->send_mp_fail = 1;
 			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPFAILTX);
 			subflow->send_infinite_map = 1;
+		} else {
+			clear_bit(MPTCP_FAIL_NO_RESPONSE, &msk->flags);
 		}
 	}
 }

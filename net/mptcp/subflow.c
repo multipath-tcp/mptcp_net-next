@@ -1009,6 +1009,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		pr_debug("infinite mapping received");
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
 		subflow->map_data_len = 0;
+		clear_bit(MPTCP_FAIL_NO_RESPONSE, &msk->flags);
 		return MAPPING_INVALID;
 	}
 
@@ -1219,6 +1220,7 @@ fallback:
 					sk_eat_skb(ssk, skb);
 			} else {
 				WRITE_ONCE(subflow->mp_fail_response_expect, true);
+				set_bit(MPTCP_FAIL_NO_RESPONSE, &msk->flags);
 			}
 			WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_NODATA);
 			return true;
