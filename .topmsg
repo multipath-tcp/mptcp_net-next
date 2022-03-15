@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-Add-the-uapi-headers-include-variable
+From: Muhammad Usama Anjum <usama.anjum@collabora.com>
+Subject: [PATCH] selftests: mptcp: Add the uapi headers include variable
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Out of tree build of this test fails if relative path of the output
+directory is specified. Add the KHDR_INCLUDES to correctly reach the
+headers.
+
+Signed-off-by: Muhammad Usama Anjum <usama.anjum@collabora.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Shuah Khan <skhan@linuxfoundation.org>
