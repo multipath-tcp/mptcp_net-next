@@ -811,37 +811,35 @@ static int vxlan_fdb_nh_update(struct vxlan_dev *vxlan, struct vxlan_fdb *fdb,
 		goto err_inval;
 	}
 
-	if (nh) {
-		if (!nexthop_get(nh)) {
-			NL_SET_ERR_MSG(extack, "Nexthop has been deleted");
-			nh = NULL;
-			goto err_inval;
-		}
-		if (!nexthop_is_fdb(nh)) {
-			NL_SET_ERR_MSG(extack, "Nexthop is not a fdb nexthop");
-			goto err_inval;
-		}
+	if (!nexthop_get(nh)) {
+		NL_SET_ERR_MSG(extack, "Nexthop has been deleted");
+		nh = NULL;
+		goto err_inval;
+	}
+	if (!nexthop_is_fdb(nh)) {
+		NL_SET_ERR_MSG(extack, "Nexthop is not a fdb nexthop");
+		goto err_inval;
+	}
 
-		if (!nexthop_is_multipath(nh)) {
-			NL_SET_ERR_MSG(extack, "Nexthop is not a multipath group");
+	if (!nexthop_is_multipath(nh)) {
+		NL_SET_ERR_MSG(extack, "Nexthop is not a multipath group");
+		goto err_inval;
+	}
+
+	/* check nexthop group family */
+	switch (vxlan->default_dst.remote_ip.sa.sa_family) {
+	case AF_INET:
+		if (!nexthop_has_v4(nh)) {
+			err = -EAFNOSUPPORT;
+			NL_SET_ERR_MSG(extack, "Nexthop group family not supported");
 			goto err_inval;
 		}
-
-		/* check nexthop group family */
-		switch (vxlan->default_dst.remote_ip.sa.sa_family) {
-		case AF_INET:
-			if (!nexthop_has_v4(nh)) {
-				err = -EAFNOSUPPORT;
-				NL_SET_ERR_MSG(extack, "Nexthop group family not supported");
-				goto err_inval;
-			}
-			break;
-		case AF_INET6:
-			if (nexthop_has_v4(nh)) {
-				err = -EAFNOSUPPORT;
-				NL_SET_ERR_MSG(extack, "Nexthop group family not supported");
-				goto err_inval;
-			}
+		break;
+	case AF_INET6:
+		if (nexthop_has_v4(nh)) {
+			err = -EAFNOSUPPORT;
+			NL_SET_ERR_MSG(extack, "Nexthop group family not supported");
+			goto err_inval;
 		}
 	}
 
@@ -1762,7 +1760,7 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 
 	if (unlikely(!(vxlan->dev->flags & IFF_UP))) {
 		rcu_read_unlock();
-		atomic_long_inc(&vxlan->dev->rx_dropped);
+		dev_core_stats_rx_dropped_inc(vxlan->dev);
 		vxlan_vnifilter_count(vxlan, vni, vninode,
 				      VXLAN_VNI_STATS_RX_DROPS, 0);
 		goto drop;
@@ -2992,7 +2990,6 @@ static void vxlan_flush(struct vxlan_dev *vxlan, bool do_all)
 static int vxlan_stop(struct net_device *dev)
 {
 	struct vxlan_dev *vxlan = netdev_priv(dev);
-	int ret = 0;
 
 	vxlan_multicast_leave(vxlan);
 
@@ -3001,7 +2998,7 @@ static int vxlan_stop(struct net_device *dev)
 	vxlan_flush(vxlan, false);
 	vxlan_sock_release(vxlan);
 
-	return ret;
+	return 0;
 }
 
 /* Stub, nothing needs to be done. */
