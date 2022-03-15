@@ -1965,9 +1965,10 @@ process:
 		struct sock *nsk;
 
 		sk = req->rsk_listener;
-		if (unlikely(tcp_inbound_md5_hash(sk, skb, &drop_reason,
-						  &iph->saddr, &iph->daddr,
-						  AF_INET, dif, sdif))) {
+		drop_reason = tcp_inbound_md5_hash(sk, skb,
+						   &iph->saddr, &iph->daddr,
+						   AF_INET, dif, sdif);
+		if (unlikely(drop_reason)) {
 			sk_drops_add(sk, skb);
 			reqsk_put(req);
 			goto discard_it;
@@ -2041,8 +2042,9 @@ process:
 		goto discard_and_relse;
 	}
 
-	if (tcp_inbound_md5_hash(sk, skb, &drop_reason, &iph->saddr,
-				 &iph->daddr, AF_INET, dif, sdif))
+	drop_reason = tcp_inbound_md5_hash(sk, skb, &iph->saddr,
+					   &iph->daddr, AF_INET, dif, sdif);
+	if (drop_reason)
 		goto discard_and_relse;
 
 	nf_reset_ct(skb);
@@ -3135,6 +3137,7 @@ static int __net_init tcp_sk_init(struct net *net)
 	/* rfc5961 challenge ack rate limiting */
 	net->ipv4.sysctl_tcp_challenge_ack_limit = 1000;
 	net->ipv4.sysctl_tcp_min_tso_segs = 2;
+	net->ipv4.sysctl_tcp_tso_rtt_log = 9;  /* 2^9 = 512 usec */
 	net->ipv4.sysctl_tcp_min_rtt_wlen = 300;
 	net->ipv4.sysctl_tcp_autocorking = 1;
 	net->ipv4.sysctl_tcp_invalid_ratelimit = HZ/2;
