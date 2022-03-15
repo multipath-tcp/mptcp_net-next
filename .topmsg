@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-Add-tests-for-userspace-PM-type
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] selftests: mptcp: Add tests for userspace PM type
 
+These tests ensure that the in-kernel path manager is bypassed when
+the userspace path manager is configured. Kernel code is still
+responsible for ADD_ADDR echo, so also make sure that's working.
+
+Tested-by: Geliang Tang <geliang.tang@suse.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
