@@ -1,4 +1,24 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-infinite-mapping-sending
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: infinite mapping sending
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added the infinite mapping sending logic.
+
+Added a new flag send_infinite_map in struct mptcp_subflow_context. Set
+it true when a single contiguous subflow is in use and the
+allow_infinite_fallback flag is true in mptcp_pm_mp_fail_received().
+
+In mptcp_sendmsg_frag(), if this flag is true, call the new function
+mptcp_update_infinite_map() to set the infinite mapping.
+
+Added a new flag infinite_map in struct mptcp_ext, set it true in
+mptcp_update_infinite_map(), and check this flag in a new helper
+mptcp_check_infinite_map().
+
+In mptcp_update_infinite_map(), set data_len and csum to 0, and clear
+the send_infinite_map flag, then do fallback.
+
+In mptcp_established_options(), use the helper mptcp_check_infinite_map()
+to let the infinite mapping DSS can be sent out in the fallback mode.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
