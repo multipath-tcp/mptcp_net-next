@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-a-member-to-mptcp_pm_data-to-track-kernel-vs-userspace-mode
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Add a member to mptcp_pm_data to track kernel vs userspace mode
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When adding support for netlink path management commands, the kernel
+needs to know whether paths are being controlled by the in-kernel path
+manager or a userspace PM.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
