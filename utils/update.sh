@@ -38,6 +38,13 @@ update() {
 			new_base=FETCH_HEAD
 		else
 			new_base=$(git merge-base FETCH_HEAD "${TG_BASE_NET_NEXT}")
+
+			if git merge-base --is-ancestor "${TG_BASE_NET}" "${new_base}"; then
+				echo "Going to update the -net base (if new_base is different)"
+			else
+				echo "The -net base is newer than the common commit, no modif"
+				new_base="${TG_BASE_NET}"
+			fi
 		fi
 		git merge --no-stat --ff-only "${new_base}"
 
