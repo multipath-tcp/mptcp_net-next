@@ -6,8 +6,12 @@ source ./.lib.sh
 
 TARGET="${1}"
 
+sync_net() {
+	[ "${TARGET}" = "new-net" ]
+}
+
 sync_upstream() {
-	[ "${TARGET}" = "new" ]
+	[ "${TARGET}" = "new" ] || sync_net
 }
 
 update_local_tree() {
@@ -27,11 +31,12 @@ update() {
 
 	if sync_upstream; then
 		local new_base
-		if [ "${base}" = "${TG_BASE_NET_NEXT}" ]; then
-			git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" master
+
+		git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" master
+
+		if [ "${base}" = "${TG_BASE_NET_NEXT}" ] || sync_net; then
 			new_base=FETCH_HEAD
 		else
-			git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" master
 			new_base=$(git merge-base FETCH_HEAD "${TG_BASE_NET_NEXT}")
 		fi
 		git merge --no-stat --ff-only "${new_base}"
