@@ -5117,6 +5117,14 @@ union bpf_attr {
  *		0 on success.
  *		**-EINVAL** for invalid input
  *		**-EOPNOTSUPP** for unsupported delivery_time_type and protocol
+ *
+ * struct bpf_mptcp_sock *bpf_mptcp_sock(struct bpf_sock *sk)
+ *	Description
+ *		This helper gets a **struct bpf_mptcp_sock** pointer from a
+ *		**struct bpf_sock** pointer.
+ *	Return
+ *		A **struct bpf_mptcp_sock** pointer on success, or **NULL** in
+ *		case of failure.
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -5312,6 +5320,7 @@ union bpf_attr {
 	FN(xdp_store_bytes),		\
 	FN(copy_from_user_task),	\
 	FN(skb_set_delivery_time),      \
+	FN(mptcp_sock),			\
 	/* */
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
@@ -5665,6 +5674,10 @@ struct bpf_tcp_sock {
 	__u32 delivered_ce;	/* Like the above but only ECE marked packets */
 	__u32 icsk_retransmits;	/* Number of unrecovered [RTO] timeouts */
 	__u32 is_mptcp;		/* Is MPTCP subflow? */
+};
+
+struct bpf_mptcp_sock {
+	__u32 token;		/* msk token */
 };
 
 struct bpf_sock_tuple {
