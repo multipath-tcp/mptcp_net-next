@@ -123,8 +123,9 @@ publish() { local top review old_rev new_rev
 	git checkout -f "${top}"
 	tg_update
 
-	old_rev="$(git rev-parse "origin/${top}")"
-	new_rev="$(git rev-parse "${top}")"
+	# "--short" for when we display the result
+	old_rev="$(git rev-parse --short "origin/${top}")"
+	new_rev="$(git rev-parse --short "${top}")"
 
 	if [ "${old_rev}" = "${new_rev}" ]; then
 		printinfo "No new modification, no push"
@@ -148,7 +149,7 @@ publish() { local top review old_rev new_rev
 	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
 		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
 
-	printf "%sResults: %s..%s\n" "- " "${old_rev}" "${new_rev}"
+	printf "%sResults: %s..%s (%s)\n" "- " "${old_rev}" "${new_rev}" "${export}"
 	echo -e "${COLOR_RESET}"
 }
 
