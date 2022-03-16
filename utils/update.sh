@@ -34,7 +34,7 @@ update() {
 			git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" master
 			new_base=$(git merge-base FETCH_HEAD "${TG_BASE_NET_NEXT}")
 		fi
-		git pull --no-stat --ff-only "${new_base}"
+		git merge --no-stat --ff-only "${new_base}"
 
 		git fetch origin
 		range="${before}..${base}"
