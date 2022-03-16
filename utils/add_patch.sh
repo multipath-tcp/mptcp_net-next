@@ -111,7 +111,8 @@ if [ "$(git diff --shortstat | wc -l)" -ne 0 ]; then
 fi
 
 # the last commit is always a DO-NOT-MERGE one.
-if [ "${TG_TOP}" = "${TG_TOPIC_TOP}" ]; then
+if [ "${TG_TOP}" = "${TG_TOPIC_TOP_NET_NEXT}" ] ||
+   [ "${TG_TOP}" = "${TG_TOPIC_TOP_NET}" ]; then
 	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
 	while git show "${TG_TOP_NEXT}:.topmsg" | grep "^Subject: " | grep -q "DO-NOT-MERGE"; do
 		TG_TOP="${TG_TOP_NEXT}"

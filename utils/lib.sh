@@ -5,7 +5,14 @@ COLOR_GREEN="\E[1;32m"
 COLOR_BLUE="\E[1;34m"
 COLOR_RESET="\E(B\E[m"
 
-TG_TOPIC_TOP="t/upstream"
+export TG_BASE_NET_NEXT="net-next"
+export TG_BASE_NET="net"
+export TG_TOPIC_TOP_NET_NEXT="t/upstream"
+export TG_TOPIC_TOP_NET="${TG_TOPIC_TOP_NET_NEXT}-net"
+export TG_FOR_REVIEW_NET_NEXT="for-review"
+export TG_FOR_REVIEW_NET="${TG_FOR_REVIEW_NET_NEXT}-net"
+export TG_EXPORT_NET_NEXT="export"
+export TG_EXPORT_NET="${TG_EXPORT_NET_NEXT}-net"
 
 # $1: color, $2: text
 print_color() {
@@ -31,6 +38,18 @@ topgit_get_remote() {
 	fi
 }
 
+check_sha() { local remote top sha_loc sha_rem
+	remote="${1}"
+	top="${2}"
+
+	sha_loc="$(git rev-parse "${top}")"
+	sha_rem="$(git rev-parse "${remote}/${top}")"
+	if [ "${sha_loc}" != "${sha_rem}" ]; then
+		printerr "You are not sync with the remote ${remote} for ${top}, please fix that"
+		return 1
+	fi
+}
+
 check_sync_upstream() { local remote sha_loc sha_rem
 	# only if you know what you are doing :)
 	# e.g. you include squash-to patch and new patches
@@ -42,12 +61,8 @@ check_sync_upstream() { local remote sha_loc sha_rem
 	remote="$(topgit_get_remote)" || return 1
 	git fetch "${remote}"
 
-	sha_loc="$(git rev-parse "${TG_TOPIC_TOP}")"
-	sha_rem="$(git rev-parse "${remote}/${TG_TOPIC_TOP}")"
-	if [ "${sha_loc}" != "${sha_rem}" ]; then
-		printerr "You are not sync with the remote ${remote}, please fix that"
-		return 1
-	fi
+	check_sha "${remote}" "${TG_TOPIC_TOP_NET_NEXT}" || return 1
+	check_sha "${remote}" "${TG_TOPIC_TOP_NET}" || return 1
 
 	return 0
 }

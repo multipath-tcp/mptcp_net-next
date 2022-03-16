@@ -1,16 +1,44 @@
-git push origin origin/t/upstream:archived/t/upstream_$(date +%Y%m%d)
-for i in $(git for-each-ref refs/remotes/origin/top-bases | awk '{ print { }' | cut -d/ -f4-) $(git for-each-ref refs/remotes/origin/t/ | awk '{ print { }' | cut -d/ -f4-) for-review; do echo :$i; done | xargs git push origin}}
-
-# same on CI
 git checkout net-next
-git for-each-ref refs/top-bases | awk '{print $3}' | xargs -n1 git update-ref -d
-git for-each-ref refs/heads/t | cut -d/ -f3- | xargs git branch -D
+git for-each-ref refs/top-bases | awk '{print $3}' | xargs -r -n1 git update-ref -d
+git for-each-ref refs/heads/t | cut -d/ -f3- | xargs -r git branch -D
 git branch -D for-review
+rm -rf .git/tg-cache-old
+mv .git/tg-cache .git/tg-cache-old
+
+# ===========
+
+EXPORT_NET="matttbe/export-net"
+EXPORT="matttbe/export"
+
+git checkout net
+tg import $(git merge-base net ${EXPORT_NET})..${EXPORT_NET}
+tg create t/upstream-net
+
+"""
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] tg: dedicated topic for the top of the tree (net)
+
+This represents the top of our -net tree dedicated for the upstream.
+
+No modification should be linked to this topic.
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+"""
+
+git checkout -b for-review-net
+git rm -f .topmsg .topdeps
+git commit -C 57737a5e565bdf6d5b00258f4a4123437cac690b
 
 
 git checkout net-next
-TARGET="export_squash_09_more_nit"
-tg import --notes $(git merge-base net-next ${TARGET})..${TARGET} ## no need to use merge-base?
+tg import $(git merge-base net-next ${EXPORT})..$(git log -1 --grep "^DO-NOT-MERGE: git markup: fixes net-next$" --format="format:%H" "${EXPORT}")
+tg depend add t/DO-NOT-MERGE-git-markup-end-common-net-net-next
+echo "MPTCP-related features for net-next tree." > .git_markup
+git add .git_markup
+git commit -s --no-edit
+tg update --continue
+
+tg import $(git log -1 --grep "^DO-NOT-MERGE: git markup: features net-next$" --format="format:%H" "${EXPORT}")~..${EXPORT}
 tg create t/upstream
 
 """
@@ -24,9 +52,18 @@ No modification should be linked to this topic.
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 """
 
-tg push
-
 git checkout -b for-review
 git rm -f .topmsg .topdeps
 git commit -C 48e7885d9123edaa18ce5731903f3af4dbe7727a
-git push
+
+
+# =====================
+
+git branch archived/t/upstream_$(date +%Y%m%d) origin/t/upstream && git push origin archived/t/upstream_$(date +%Y%m%d)
+for i in $(git for-each-ref refs/remotes/origin/top-bases | awk '{ print $3 }' | cut -d/ -f4-) $(git for-each-ref refs/remotes/origin/t/ | awk '{ print $3 }' | cut -d/ -f4-) for-review; do echo :$i; done | xargs git push origin
+
+git checkout t/upstream
+tg push
+git checkout t/upstream-net
+tg push
+git push origin -f for-review for-review-net export export-net

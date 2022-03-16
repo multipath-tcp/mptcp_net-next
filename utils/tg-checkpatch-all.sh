@@ -1,7 +1,7 @@
 #!/bin/bash
 ./.tg-first.sh
 ./.tg-checkpatch.sh
-while tg checkout next; do
+while echo 1 | tg checkout next; do
 	./.title.sh
 	./.tg-checkpatch.sh
 done

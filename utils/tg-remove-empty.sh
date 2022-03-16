@@ -5,14 +5,14 @@ git_current_branch() {
 }
 
 tg_empty() {
-	[ "$(tg patch | grep -c "diff --git a/")" = "0" ]
+	[ -z "$(tg files)" ]
 }
 
 ./.tg-first.sh
 
 while true; do
 	BRANCH="$(git_current_branch)"
-	if tg_empty && [ "${BRANCH}" != "t/upstream" ]; then
+	if tg_empty && ! [[ "${BRANCH}" =~ ^"t/upstream"* ]]; then
 		echo -e "\n\t => Remove ${BRANCH}\n"
 		DEPS="$(cat .topdeps)"
 		tg annihilate # it jumps to the next one
@@ -22,7 +22,11 @@ while true; do
 		tg update
 		tg push "${BRANCH}"
 		#tg delete "${BRANCH}"
+	elif [ "${BRANCH}" = "t/DO-NOT-MERGE-git-markup-end-common-net-net-next" ]; then
+		echo -e "\n\t => Special case ${BRANCH}\n"
+		git checkout t/DO-NOT-MERGE-git-markup-fixes-net-next
 	else
+		echo -e "\n\t => Skip ${BRANCH}\n"
 		tg checkout next || break
 		tg update
 	fi

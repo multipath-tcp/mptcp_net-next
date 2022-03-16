@@ -4,14 +4,9 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-TG_FOR_REVIEW="for-review"
-TG_EXPORT="export"
-
-TG_TOP="${TG_TOP:-${TG_TOPIC_TOP}}"
+TG_TOP="${TG_TOP:-${TG_TOPIC_TOP_NET_NEXT}}"
 TG_PUSH="${TG_PUSH:-1}"
-TG_UPSTREAM="${TG_UPSTREAM:-0}"
-
-TG_BOTTOM="net-next"
+TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
 
 tg_up_err() {
 	printerr "Please fix the conflicts in another terminal." \
@@ -24,12 +19,12 @@ topic_has_been_upstreamed() { local subject="${1}"
 		--fixed-strings \
 		--grep "${subject}" \
 		--format="format:==%s==" \
-		"${TG_UPSTREAM}..${TG_BOTTOM}" | \
+		"${TG_UPSTREAM_RANGE}" | \
 			grep -q --fixed-strings "==${subject}=="
 }
 
 tg_up_upstream() { local subject
-	if [ "${TG_UPSTREAM}" = "0" ]; then
+	if [ "${TG_UPSTREAM_RANGE}" = "0" ]; then
 		return 1
 	fi
 
@@ -72,89 +67,109 @@ tg_update() {
 	fi
 }
 
-tg_for_review() {
-	git branch -f "${TG_FOR_REVIEW}" origin/"${TG_FOR_REVIEW}"
-	git checkout -f "${TG_FOR_REVIEW}"
-	if ! git merge --no-edit --signoff "${TG_TOP}"; then
+tg_for_review() { local branch_top branch_review tg_conflict_files
+	branch_top="${1}"
+	branch_review="${2}"
+
+	git branch -f "${branch_review}" origin/"${branch_review}"
+	git checkout -f "${branch_review}"
+	if ! git merge --no-edit --signoff "${branch_top}"; then
 		# the only possible conflict would be with the topgit files, manage this
 		tg_conflict_files=$(git status --porcelain | grep -E "^DU\\s.top(deps|msg)$")
 		if [ -n "${tg_conflict_files}" ]; then
 			echo "${tg_conflict_files}" | awk '{ print $2 }' | xargs git rm
 			if ! git commit -s --no-edit; then
-				printerr "Unexpected other conflicts: ${tg_conflict_files}"
-				exit 1
+				err "Unexpected other conflicts: ${tg_conflict_files}"
+				return 1
 			fi
 		else
-			printerr "Unexpected conflicts when updating ${TG_FOR_REVIEW}"
-			exit 1
+			err "Unexpected conflicts when updating ${branch_review}"
+			return 1
 		fi
 	fi
 
-	git push origin "${TG_FOR_REVIEW}"
-	git checkout -f "${TG_TOP}"
+	git push origin "${branch_review}"
 }
 
-tg_export() {
-	git checkout -f "${TG_TOP}"
-	tg export --linearize --force --notes "${TG_EXPORT}"
-	git push -f origin "${TG_EXPORT}"
-	git checkout -f "${TG_TOP}"
-}
+tg_export() { local branch_top branch_export tag
+	branch_top="${1}"
+	branch_export="${2}"
 
-tg_tag() { local tag
-	tag="${TG_EXPORT}/$(date --utc +%Y%m%dT%H%M%S)"
+	git checkout -f "${branch_top}"
 
-	git tag "${tag}" "${TG_EXPORT}"
-	git push -f origin "${tag}"
+	tg export --force --notes "${branch_export}"
+	git push --force origin "${branch_export}"
+
+	if [ "${TG_NO_TAG}" = "1" ]; then
+		return
+	fi
+
+	tag="${branch_export}/${DATE}"
+
+	# send a tag to Github to keep previous commits: we might have refs to them
+	git tag "${tag}" "${branch_export}"
+	git push origin "${tag}"
 
 	printinfo "Builds and tests are now in progress:\\n"
 	printinfo "https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/${tag}"
-	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${TG_EXPORT}"
+	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${branch_export}"
 }
 
-tg_export_tag() {
-	tg_export
+publish() { local top review old_rev new_rev
+	top="${1}"
+	review="${2}"
+	export="${3}"
 
-	if [ "${TG_NO_TAG}" != "1" ]; then
-		tg_tag
-	fi
-}
+	git checkout -f "${top}"
+	tg_update
 
+	old_rev="$(git rev-parse "origin/${top}")"
+	new_rev="$(git rev-parse "${top}")"
 
-git checkout "${TG_TOP}"
-tg_update
-
-if [ "${TG_PUSH}" = 1 ]; then
-	OLD_REV="$(git rev-parse --short "origin/${TG_TOP}")"
-	NEW_REV="$(git rev-parse --short "${TG_TOP}")"
-
-	if [ "${OLD_REV}" = "${NEW_REV}" ]; then
+	if [ "${old_rev}" = "${new_rev}" ]; then
 		printinfo "No new modification, no push"
-		exit
+		return 0
 	fi
 
 	tg push
 
-	if [ "${TG_TOP}" != "${TG_TOPIC_TOP}" ]; then
-		printinfo "Not on ${TG_TOPIC_TOP}, no new tag and summary"
-		exit
-	fi
-
-	echo -e "${COLOR_BLUE}"
-	printf "New patches:\n"
-	git log --format="- %h: %s" --reverse --no-merges "${OLD_REV}..${NEW_REV}" | \
-		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
-
-	printf "%sResults: %s..%s\n" "- " "${OLD_REV}" "${NEW_REV}"
-	echo -e "${COLOR_RESET}"
-
-	print "Publish export and tag? (Y/n)"
+	print "Publish ${export} and tag (${DATE})? (Y/n)"
 	read -n 1 -r
 	echo
 	if [[ $REPLY =~ ^[Nn]$ ]]; then
-		exit 0
+		return 0
 	fi
 
-	tg_for_review
-	tg_export_tag
+	tg_for_review "${top}" "${review}"
+	tg_export "${top}" "${export}"
+
+	echo -e "${COLOR_BLUE}"
+	printf "New patches for %s:\n" "${top}"
+	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
+		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
+
+	printf "%sResults: %s..%s\n" "- " "${old_rev}" "${new_rev}"
+	echo -e "${COLOR_RESET}"
+}
+
+if [ "${TG_TOP}" != "${TG_TOPIC_TOP_NET_NEXT}" ] && [ "${TG_TOP}" != "${TG_TOPIC_TOP_NET}" ]; then
+	git checkout "${TG_TOP}"
+	tg_update
+
+	if [ "${TG_PUSH}" = 1 ]; then
+		printerr "Not on ${TG_TOPIC_TOP_NET_NEXT} nor ${TG_TOPIC_TOP_NET}, no new tag and summary"
+		exit 1
+	fi
+
+	exit 0
 fi
+
+if [ "${TG_PUSH}" != 1 ]; then
+	exit 0
+fi
+
+DATE=$(date --utc +%Y%m%dT%H%M%S)
+publish "${TG_TOPIC_TOP_NET_NEXT}" "${TG_FOR_REVIEW_NET_NEXT}" "${TG_EXPORT_NET_NEXT}"
+publish "${TG_TOPIC_TOP_NET}" "${TG_FOR_REVIEW_NET}" "${TG_EXPORT_NET}"
+
+git checkout -f "${TG_TOPIC_TOP_NET_NEXT}"

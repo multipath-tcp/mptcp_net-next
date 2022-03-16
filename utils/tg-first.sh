@@ -1,2 +1,2 @@
 #!/bin/bash
-echo 1 | tg checkout --series
+git checkout t/DO-NOT-MERGE-git-markup-net

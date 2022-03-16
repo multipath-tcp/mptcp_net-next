@@ -17,7 +17,7 @@ add_signed_off_if_needed() {
 
 next() {
 	[ "$(git rev-parse --abbrev-ref HEAD)" = "${END}" ] && return 1
-	tg checkout next
+	echo 1 | tg checkout next
 }
 
 ./.tg-first.sh
