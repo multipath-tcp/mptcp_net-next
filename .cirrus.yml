@@ -23,8 +23,7 @@ task:
   ccache_cache:
     folder: ".virtme/ccache"
     reupload_on_changes: true
-    fingerprint_script:
-      - echo ${MATRIX_JOB}
+    fingerprint_script: echo ${MATRIX_JOB}-${CIRRUS_TAG%/*}
 
   test_script: /entrypoint.sh expect-${MATRIX_JOB}
 
