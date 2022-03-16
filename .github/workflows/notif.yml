@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - 'export/**'   # exclude patchew/** tags and branches
+      - 'export-net/**'
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
   workflow_run:
@@ -80,7 +81,7 @@ jobs:
           BRANCH: "${{ github.event.workflow_run.head_branch }}"
 
       - name: irc build
-        if: startsWith(steps.tag.outputs.tag, 'export/')
+        if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
@@ -107,7 +108,7 @@ jobs:
           BRANCH: "${{ github.event.workflow_run.head_branch }}"
 
       - name: irc build
-        if: startsWith(steps.tag.outputs.tag, 'export/')
+        if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
