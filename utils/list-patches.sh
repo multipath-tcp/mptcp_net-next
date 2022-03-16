@@ -16,7 +16,9 @@ dup() { local d
 	if [ -n "${d}" ]; then
 		echo "There are duplicated entries for ${1}:"
 		echo "${d}"
-		exit 1
+		echo
+		echo "Press Enter to continue"
+		read
 	fi
 	echo "No duplicated entries for ${1}"
 	echo
