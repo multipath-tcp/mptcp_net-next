@@ -2,12 +2,14 @@ name: "CheckPatch"
 on:
   push:
     branches-ignore:
-      - 'archived/**' # previous branches
-      - 't/**'        # TopGit tree
-      - 'net-next'    # part of the TopGit tree
-      - 'for-review'  # part of the TopGit tree
+      - 'archived/**'    # previous branches
+      - 't/**'           # TopGit tree
+      - 'net'            # part of the TopGit tree
+      - 'net-next'       # part of the TopGit tree
+      - 'for-review'     # part of the TopGit tree
+      - 'for-review-net' # part of the TopGit tree
     tags:
-      - 'patchew/**'  # patchew is using tags
+      - 'patchew/**'     # patchew is using tags
 
 env:
   PW: "https://patchwork.kernel.org/api/1.2"
