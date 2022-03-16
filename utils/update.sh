@@ -15,9 +15,7 @@ sync_upstream() {
 }
 
 update_local_tree() {
-	TG_TOP="${1}" \
-		TG_UPSTREAM_RANGE="${2}" \
-		TG_PUSH=0 \
+	TG_TOP="${1}" TG_UPSTREAM_RANGE="${2}" \
 		./.publish.sh
 }
 

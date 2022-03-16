@@ -4,8 +4,7 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-TG_TOP="${TG_TOP:-${TG_TOPIC_TOP_NET_NEXT}}"
-TG_PUSH="${TG_PUSH:-1}"
+TG_TOP="${TG_TOP:-}"
 TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
 
 tg_up_err() {
@@ -153,19 +152,10 @@ publish() { local top review old_rev new_rev
 	echo -e "${COLOR_RESET}"
 }
 
-if [ "${TG_TOP}" != "${TG_TOPIC_TOP_NET_NEXT}" ] && [ "${TG_TOP}" != "${TG_TOPIC_TOP_NET}" ]; then
+if [ -n "${TG_TOP}" ]; then
 	git checkout "${TG_TOP}"
 	tg_update
 
-	if [ "${TG_PUSH}" = 1 ]; then
-		printerr "Not on ${TG_TOPIC_TOP_NET_NEXT} nor ${TG_TOPIC_TOP_NET}, no new tag and summary"
-		exit 1
-	fi
-
-	exit 0
-fi
-
-if [ "${TG_PUSH}" != 1 ]; then
 	exit 0
 fi
 

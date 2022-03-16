@@ -150,10 +150,10 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout "${TG_TOP}"
 echo "${BRANCH}" > .topdeps
 git commit -sm "tg: switch to ${BRANCH}" .topdeps
-TG_PUSH=0 TG_TOP="${TG_TOP}" ./.publish.sh
+TG_TOP="${TG_TOP}" ./.publish.sh
 
 # update the tree
-TG_PUSH=1 TG_TOP="${TG_TOPIC_TOP}" ./.publish.sh
+./.publish.sh
 
 # Mark as done
 accept_patches "${PARENT}..${BRANCH}"
