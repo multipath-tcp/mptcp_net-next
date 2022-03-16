@@ -39,9 +39,10 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-
             ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-
             ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-
             ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-
@@ -51,7 +52,7 @@ jobs:
         with:
           # we want to validate each commits on top of net-next/export (or -net) except for stable
           each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
-          ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
+          ccache_maxsize: 310M ## 5/2^3/2=312.5: 5GB = project limit ; 2^3 = matrix ; 2: -net and net-next
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
