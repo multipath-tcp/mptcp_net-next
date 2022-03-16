@@ -2,12 +2,14 @@ name: "MPTCP Upstream Build Validation"
 on:
   push:
     branches-ignore:
-      - 'archived/**' # previous branches
-      - 't/**'        # TopGit tree
-      - 'net-next'    # part of the TopGit tree
-      - 'for-review'  # part of the TopGit tree
+      - 'archived/**'    # previous branches
+      - 't/**'           # TopGit tree
+      - 'net'            # part of the TopGit tree
+      - 'net-next'       # part of the TopGit tree
+      - 'for-review'     # part of the TopGit tree
+      - 'for-review-net' # part of the TopGit tree
     tags:
-      - 'patchew/**'  # patchew is using tags
+      - 'patchew/**'     # patchew is using tags
       # ideally, we would take 'export/**' but the cache is per branch...
       # In other words, when using tags, we can only use the cache if we re-tag.
       # https://github.com/actions/cache/issues/556
@@ -31,7 +33,7 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v2
         with:
-          fetch-depth: 100 # we should not have more commits on top of net-next/export
+          fetch-depth: 100 # we should not have more commits on top of net-next/export (or -net)
 
       - name: "Setup cache for CCache"
         uses: actions/cache@v2
@@ -47,7 +49,7 @@ jobs:
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
         with:
-          # we want to validate each commits on top of net-next/export except for stable
+          # we want to validate each commits on top of net-next/export (or -net) except for stable
           each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
           ccache_maxsize: 620M ## 5/2^3=625: 5GB = project limit ; 2^3 = matrix
           defconfig: ${{ matrix.defconfig }}
