@@ -796,6 +796,9 @@ static void mptcp_pm_nl_rm_addr_or_subflow(struct mptcp_sock *msk,
 		if (!removed)
 			continue;
 
+		if (!mptcp_pm_is_kernel(msk))
+			continue;
+
 		if (rm_type == MPTCP_MIB_RMADDR) {
 			msk->pm.add_addr_accepted--;
 			WRITE_ONCE(msk->pm.accept_addr, true);
@@ -1844,6 +1847,11 @@ static void mptcp_nl_mcast_send(struct net *net, struct sk_buff *nlskb, gfp_t gf
 {
 	genlmsg_multicast_netns(&mptcp_genl_family, net,
 				nlskb, 0, MPTCP_PM_EV_GRP_OFFSET, gfp);
+}
+
+bool mptcp_userspace_pm_active(struct net *net)
+{
+	return genl_has_listeners(&mptcp_genl_family, net, MPTCP_PM_EV_GRP_OFFSET);
 }
 
 static int mptcp_event_add_subflow(struct sk_buff *skb, const struct sock *ssk)
