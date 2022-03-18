@@ -451,6 +451,12 @@ static int dsa_slave_port_attr_set(struct net_device *dev, const void *ctx,
 
 		ret = dsa_port_set_state(dp, attr->u.stp_state, true);
 		break;
+	case SWITCHDEV_ATTR_ID_PORT_MST_STATE:
+		if (!dsa_port_offloads_bridge_port(dp, attr->orig_dev))
+			return -EOPNOTSUPP;
+
+		ret = dsa_port_set_mst_state(dp, &attr->u.mst_state, extack);
+		break;
 	case SWITCHDEV_ATTR_ID_BRIDGE_VLAN_FILTERING:
 		if (!dsa_port_offloads_bridge_dev(dp, attr->orig_dev))
 			return -EOPNOTSUPP;
@@ -464,6 +470,12 @@ static int dsa_slave_port_attr_set(struct net_device *dev, const void *ctx,
 
 		ret = dsa_port_ageing_time(dp, attr->u.ageing_time);
 		break;
+	case SWITCHDEV_ATTR_ID_BRIDGE_MST:
+		if (!dsa_port_offloads_bridge_dev(dp, attr->orig_dev))
+			return -EOPNOTSUPP;
+
+		ret = dsa_port_mst_enable(dp, attr->u.mst, extack);
+		break;
 	case SWITCHDEV_ATTR_ID_PORT_PRE_BRIDGE_FLAGS:
 		if (!dsa_port_offloads_bridge_port(dp, attr->orig_dev))
 			return -EOPNOTSUPP;
@@ -476,6 +488,12 @@ static int dsa_slave_port_attr_set(struct net_device *dev, const void *ctx,
 			return -EOPNOTSUPP;
 
 		ret = dsa_port_bridge_flags(dp, attr->u.brport_flags, extack);
+		break;
+	case SWITCHDEV_ATTR_ID_VLAN_MSTI:
+		if (!dsa_port_offloads_bridge_dev(dp, attr->orig_dev))
+			return -EOPNOTSUPP;
+
+		ret = dsa_port_vlan_msti(dp, &attr->u.vlan_msti);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
@@ -1155,6 +1173,7 @@ dsa_slave_add_cls_matchall_mirred(struct net_device *dev,
 				  struct tc_cls_matchall_offload *cls,
 				  bool ingress)
 {
+	struct netlink_ext_ack *extack = cls->common.extack;
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_mall_mirror_tc_entry *mirror;
@@ -1192,7 +1211,7 @@ dsa_slave_add_cls_matchall_mirred(struct net_device *dev,
 	mirror->to_local_port = to_dp->index;
 	mirror->ingress = ingress;
 
-	err = ds->ops->port_mirror_add(ds, dp->index, mirror, ingress);
+	err = ds->ops->port_mirror_add(ds, dp->index, mirror, ingress, extack);
 	if (err) {
 		kfree(mall_tc_entry);
 		return err;
