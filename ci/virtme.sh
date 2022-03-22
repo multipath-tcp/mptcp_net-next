@@ -119,7 +119,7 @@ prepare() { local old_pwd mode
         else
                 # double the time in normal mode, CI can be quite loaded...
                 git grep -l "^--tolerance_usecs=1" | \
-                        xargs sudo sed -i "s/^--tolerance_usecs=1/--tolerance_usecs=2/g"
+                        xargs sudo sed -i "s/^--tolerance_usecs=1/--tolerance_usecs=4/g"
         fi
         cd "${old_pwd}"
 
