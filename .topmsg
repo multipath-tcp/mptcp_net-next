@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-optimize-release_cb-for-the-common-case
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: optimize release_cb for the common case
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp release callback checks several flags in atomic
+context, but only MPTCP_CLEAN_UNA can be up frequently.
+
+Reorganize the code to avoid multiple conditionals in the
+most common scenarios.
+
+Additional clarify a related comment.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
