@@ -1,1 +1,2 @@
 t/selftests-bpf-add-bpf_mptcp_sock-verifier-tests
+t/selftests-bpf-add-MPTCP-test-base
