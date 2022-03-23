@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-MP_FAIL-response-support
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add MP_FAIL response support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch added a new struct member mp_fail_response_expect in struct
+mptcp_subflow_context to support MP_FAIL response. In the single subflow
+with checksum error and contiguous data special case, a MP_FAIL sent in
+response to another MP_FAIL.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
