@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: use mptcp_stop_timer
-
-Use the helper mptcp_stop_timer() instead of using sk_stop_timer() to
-stop icsk_retransmit_timer directly.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
