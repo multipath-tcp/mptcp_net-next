@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reset-the-packet-scheduler-on-PRIO-change
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: reset the packet scheduler on PRIO change
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Similar to the previous patch, for priority changes
+requested by the local PM.
+
+Reported-and-suggested-by: Davide Caratti <dcaratti@redhat.com>
+Fixes: 067065422fcd ("mptcp: add the outgoing MP_PRIO support")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
