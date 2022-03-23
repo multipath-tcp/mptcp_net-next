@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-check-MP_FAIL-response-mibs
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: check MP_FAIL response mibs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch extended chk_fail_nr to check the MP_FAIL response mibs.
+
+Added a new argument invert for chk_fail_nr to allow it can check the
+MP_FAIL TX and RX mibs from the opposite direction.
+
+When the infinite map was received before the MP_FAIL response, the
+response will be lost. A '-' can be added into fail_tx or fail_rx to
+represent that MP_FAIL response TX or RX can be lost when doing the
+checks.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
