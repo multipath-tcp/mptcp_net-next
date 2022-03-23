@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reset-the-packet-scheduler-on-incoming-MP_PRIO
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: reset the packet scheduler on incoming MP_PRIO
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When an incoming MP_PRIO option changes the backup
+status of any subflow, we need to reset the packet
+scheduler status, or the next send could keep using
+the previously selected subflow, without taking in account
+the new priorities.
+
+Reported-by: Davide Caratti <dcaratti@redhat.com>
+Fixes: 40453a5c61f4 ("mptcp: add the incoming MP_PRIO support")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
