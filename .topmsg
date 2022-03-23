@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: add data lock for sk timers
-
-mptcp_data_lock() needs to be held when manipulating the msk
-retransmit_timer or the sk sk_timer. This patch adds the data
-lock for the both timers.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
