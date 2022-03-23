@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-use-mptcp_stop_timer
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
