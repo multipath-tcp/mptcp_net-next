@@ -17,4 +17,6 @@ easily extensible.
 
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
