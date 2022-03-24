@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
+/* Copyright (c) 2020, Tessares SA. */
+
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 
@@ -25,20 +27,20 @@ int _sockops(struct bpf_sock_ops *ctx)
 	int op = (int)ctx->op;
 	struct bpf_sock *sk;
 
+	if (op != BPF_SOCK_OPS_TCP_CONNECT_CB)
+		return 1;
+
 	sk = ctx->sk;
 	if (!sk)
+		return 1;
+
+	tcp_sk = bpf_tcp_sock(sk);
+	if (!tcp_sk)
 		return 1;
 
 	storage = bpf_sk_storage_get(&socket_storage_map, sk, 0,
 				     BPF_SK_STORAGE_GET_F_CREATE);
 	if (!storage)
-		return 1;
-
-	if (op != BPF_SOCK_OPS_TCP_CONNECT_CB)
-		return 1;
-
-	tcp_sk = bpf_tcp_sock(sk);
-	if (!tcp_sk)
 		return 1;
 
 	storage->invoked++;

@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
+/* Copyright (c) 2020, Tessares SA. */
+
 #include <test_progs.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
@@ -13,12 +15,6 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 	int err = 0, cfd = client_fd;
 	struct mptcp_storage val;
 
-	/* Currently there is no easy way to get back the subflow sk from the MPTCP
-	 * sk, thus we cannot access here the sk_storage associated to the subflow
-	 * sk. Also, there is no sk_storage associated with the MPTCP sk since it
-	 * does not trigger sockops events.
-	 * We silently pass this situation at the moment.
-	 */
 	if (is_mptcp == 1)
 		return 0;
 
@@ -28,14 +24,14 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 	}
 
 	if (val.invoked != 1) {
-		log_err("%s: unexpected invoked count %d != %d",
-			msg, val.invoked, 1);
+		log_err("%s: unexpected invoked count %d != 1",
+			msg, val.invoked);
 		err++;
 	}
 
-	if (val.is_mptcp != is_mptcp) {
-		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != %d",
-			msg, val.is_mptcp, is_mptcp);
+	if (val.is_mptcp != 0) {
+		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != 0",
+			msg, val.is_mptcp);
 		err++;
 	}
 
@@ -44,28 +40,46 @@ static int verify_sk(int map_fd, int client_fd, const char *msg, __u32 is_mptcp)
 
 static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 {
-	int client_fd, prog_fd, map_fd, err;
+	int client_fd, prog_fd, map_fd;
+	const char *file = "./mptcp.o";
+	struct bpf_program *prog;
 	struct bpf_object *obj;
 	struct bpf_map *map;
+	int err = 0;
 
-	struct bpf_prog_load_attr attr = {
-		.prog_type = BPF_PROG_TYPE_SOCK_OPS,
-		.file = "./mptcp.o",
-		.expected_attach_type = BPF_CGROUP_SOCK_OPS,
-	};
+	obj = bpf_object__open(file);
+	if (libbpf_get_error(obj))
+		return -1;
 
-	err = bpf_prog_load_xattr(&attr, &obj, &prog_fd);
+	err = bpf_object__load(obj);
 	if (err) {
 		log_err("Failed to load BPF object");
-		return -1;
+		err = -1;
+		goto close_bpf_object;
 	}
 
+	prog = bpf_object__next_program(obj, NULL);
+	if (!prog) {
+		log_err("Failed to get BPF program");
+		err = -1;
+		goto close_bpf_object;
+	}
+
+	prog_fd = bpf_program__fd(prog);
+
 	map = bpf_object__next_map(obj, NULL);
+	if (!map) {
+		log_err("Failed to get BPF map");
+		err = -1;
+		goto close_bpf_object;
+	}
+
 	map_fd = bpf_map__fd(map);
 
 	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
 	if (err) {
 		log_err("Failed to attach BPF program");
+		err = -1;
 		goto close_bpf_object;
 	}
 
@@ -87,7 +101,7 @@ close_bpf_object:
 	return err;
 }
 
-void test_mptcp(void)
+void test_base(void)
 {
 	int server_fd, cgroup_fd;
 
@@ -116,4 +130,10 @@ with_mptcp:
 
 close_cgroup_fd:
 	close(cgroup_fd);
+}
+
+void test_mptcp(void)
+{
+	if (test__start_subtest("base"))
+		test_base();
 }
