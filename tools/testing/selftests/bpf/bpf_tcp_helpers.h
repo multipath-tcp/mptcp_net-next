@@ -83,6 +83,12 @@ struct tcp_sock {
 	__u64	tcp_mstamp;	/* most recent packet received/sent */
 } __attribute__((preserve_access_index));
 
+struct mptcp_sock {
+	struct inet_connection_sock	sk;
+
+	__u32		token;
+} __attribute__((preserve_access_index));
+
 static __always_inline struct inet_connection_sock *inet_csk(const struct sock *sk)
 {
 	return (struct inet_connection_sock *)sk;
