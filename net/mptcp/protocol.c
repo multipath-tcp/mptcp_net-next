@@ -3589,8 +3589,11 @@ static int mptcp_listen(struct socket *sock, int backlog)
 
 	err = ssock->ops->listen(ssock, backlog);
 	inet_sk_state_store(sock->sk, inet_sk_state_load(ssock->sk));
-	if (!err)
+	if (!err) {
 		mptcp_copy_inaddrs(sock->sk, ssock->sk);
+		WRITE_ONCE(sock->sk->sk_max_ack_backlog,
+			   READ_ONCE(ssock->sk->sk_max_ack_backlog));
+	}
 
 unlock:
 	release_sock(sock->sk);
