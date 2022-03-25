@@ -17,21 +17,9 @@
 #include <asm/ctl_reg.h>
 #include <asm/extable.h>
 #include <asm/facility.h>
+#include <asm-generic/access_ok.h>
 
 void debug_user_asce(int exit);
-
-static inline int __range_ok(unsigned long addr, unsigned long size)
-{
-	return 1;
-}
-
-#define __access_ok(addr, size)				\
-({							\
-	__chk_user_ptr(addr);				\
-	__range_ok((unsigned long)(addr), (size));	\
-})
-
-#define access_ok(addr, size) __access_ok(addr, size)
 
 unsigned long __must_check
 raw_copy_from_user(void *to, const void __user *from, unsigned long n);
@@ -43,6 +31,28 @@ raw_copy_to_user(void __user *to, const void *from, unsigned long n);
 #define INLINE_COPY_FROM_USER
 #define INLINE_COPY_TO_USER
 #endif
+
+unsigned long __must_check
+_copy_from_user_key(void *to, const void __user *from, unsigned long n, unsigned long key);
+
+static __always_inline unsigned long __must_check
+copy_from_user_key(void *to, const void __user *from, unsigned long n, unsigned long key)
+{
+	if (likely(check_copy_size(to, n, false)))
+		n = _copy_from_user_key(to, from, n, key);
+	return n;
+}
+
+unsigned long __must_check
+_copy_to_user_key(void __user *to, const void *from, unsigned long n, unsigned long key);
+
+static __always_inline unsigned long __must_check
+copy_to_user_key(void __user *to, const void *from, unsigned long n, unsigned long key)
+{
+	if (likely(check_copy_size(from, n, true)))
+		n = _copy_to_user_key(to, from, n, key);
+	return n;
+}
 
 int __put_user_bad(void) __attribute__((noreturn));
 int __get_user_bad(void) __attribute__((noreturn));
@@ -281,8 +291,6 @@ static inline unsigned long __must_check clear_user(void __user *to, unsigned lo
 
 int copy_to_user_real(void __user *dest, void *src, unsigned long count);
 void *s390_kernel_write(void *dst, const void *src, size_t size);
-
-#define HAVE_GET_KERNEL_NOFAULT
 
 int __noreturn __put_kernel_bad(void);
 
