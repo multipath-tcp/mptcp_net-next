@@ -623,6 +623,12 @@ void mptcp_init_sched(struct mptcp_sock *msk,
 		      struct mptcp_sched_ops *sched);
 void mptcp_release_sched(struct mptcp_sock *msk);
 
+static inline struct sock *mptcp_sched_get_subflow(struct mptcp_sock *msk)
+{
+	return INDIRECT_CALL_INET_1(msk->sched->get_subflow,
+				    mptcp_subflow_get_send, msk);
+}
+
 static inline bool __mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 {
 	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
