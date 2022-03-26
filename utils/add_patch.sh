@@ -153,7 +153,7 @@ git commit -sm "tg: switch to ${BRANCH}" .topdeps
 TG_TOP="${TG_TOP}" ./.publish.sh
 
 # update the tree
-./.publish.sh
+TG_TOP= ./.publish.sh
 
 # Mark as done
 accept_patches "${PARENT}..${BRANCH}"
