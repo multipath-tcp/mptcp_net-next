@@ -615,6 +615,8 @@ int mptcp_register_scheduler(const struct net *net,
 void mptcp_unregister_scheduler(const struct net *net,
 				struct mptcp_sched_ops *sched);
 void mptcp_sched_init(void);
+struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk);
+void mptcp_sched_data_init(struct sock *sk);
 
 static inline bool __mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 {

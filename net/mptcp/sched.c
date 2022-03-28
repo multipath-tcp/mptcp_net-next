@@ -23,6 +23,12 @@ struct sched_pernet {
 	struct list_head	sched_list;
 };
 
+static struct mptcp_sched_ops mptcp_sched_default = {
+	.get_subflow    = mptcp_subflow_get_send,
+	.name           = "default",
+	.owner          = THIS_MODULE,
+};
+
 static struct sched_pernet *sched_get_pernet(const struct net *net)
 {
 	return net_generic(net, sched_pernet_id);
@@ -70,6 +76,9 @@ void mptcp_unregister_scheduler(const struct net *net,
 {
 	struct sched_pernet *pernet = sched_get_pernet(net);
 
+	if (sched == &mptcp_sched_default)
+		return;
+
 	spin_lock(&pernet->lock);
 	list_del_rcu(&sched->list);
 	spin_unlock(&pernet->lock);
@@ -110,4 +119,9 @@ void mptcp_sched_init(void)
 {
 	if (register_pernet_subsys(&mptcp_sched_pernet_ops) < 0)
 		panic("Failed to register MPTCP sched pernet subsystem.\n");
+}
+
+void mptcp_sched_data_init(struct sock *sk)
+{
+	mptcp_register_scheduler(sock_net(sk), &mptcp_sched_default);
 }
