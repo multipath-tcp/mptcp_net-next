@@ -125,3 +125,30 @@ void mptcp_sched_data_init(struct sock *sk)
 {
 	mptcp_register_scheduler(sock_net(sk), &mptcp_sched_default);
 }
+
+int mptcp_init_sched(struct mptcp_sock *msk,
+		     struct mptcp_sched_ops *sched)
+{
+	if (!sched)
+		msk->sched = &mptcp_sched_default;
+	else
+		msk->sched = sched;
+
+	if (!bpf_try_module_get(msk->sched, msk->sched->owner))
+		return -EBUSY;
+
+	if (msk->sched->init)
+		msk->sched->init(msk);
+
+	pr_debug("sched=%s", msk->sched->name);
+
+	return 0;
+}
+
+void mptcp_release_sched(struct mptcp_sock *msk)
+{
+	if (msk->sched && msk->sched->release)
+		msk->sched->release(msk);
+	bpf_module_put(msk->sched, msk->sched->owner);
+	msk->sched = NULL;
+}
