@@ -608,6 +608,13 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock);
 void mptcp_info2sockaddr(const struct mptcp_addr_info *info,
 			 struct sockaddr_storage *addr,
 			 unsigned short family);
+struct mptcp_sched_ops *mptcp_sched_find(const struct net *net,
+					 const char *name);
+int mptcp_register_scheduler(const struct net *net,
+			     struct mptcp_sched_ops *sched);
+void mptcp_unregister_scheduler(const struct net *net,
+				struct mptcp_sched_ops *sched);
+void mptcp_sched_init(void);
 
 static inline bool __mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 {
