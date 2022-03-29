@@ -133,6 +133,14 @@ publish() { local top review old_rev new_rev
 
 	tg push
 
+	echo -e "${COLOR_BLUE}"
+	printf "New patches for %s:\n" "${top}"
+	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
+		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
+
+	printf "%sResults: %s..%s (%s)\n" "- " "${old_rev}" "${new_rev}" "${export}"
+	echo -e "${COLOR_RESET}"
+
 	print "Publish ${export} and tag (${DATE})? (Y/n)"
 	read -n 1 -r
 	echo
@@ -142,14 +150,6 @@ publish() { local top review old_rev new_rev
 
 	tg_for_review "${top}" "${review}"
 	tg_export "${top}" "${export}"
-
-	echo -e "${COLOR_BLUE}"
-	printf "New patches for %s:\n" "${top}"
-	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
-		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
-
-	printf "%sResults: %s..%s (%s)\n" "- " "${old_rev}" "${new_rev}" "${export}"
-	echo -e "${COLOR_RESET}"
 }
 
 if [ -n "${TG_TOP}" ]; then
