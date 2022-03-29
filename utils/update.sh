@@ -72,3 +72,6 @@ if sync_upstream; then
 	read -r
 	./.tg-remove-empty.sh
 fi
+
+# Switch to upstream top, not -net
+git checkout "${TG_TOPIC_TOP_NET_NEXT}"
