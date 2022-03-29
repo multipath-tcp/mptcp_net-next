@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-pm_nl_pernet-helpers
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add pm_nl_pernet helpers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds two pm_nl_pernet related helpers, named pm_nl_get_pernet()
+and pm_nl_get_pernet_from_msk() to get pm_nl_pernet from 'net' or 'msk'.
+Use these helpers instead of using net_generic() directly.
+
+Suggested-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
