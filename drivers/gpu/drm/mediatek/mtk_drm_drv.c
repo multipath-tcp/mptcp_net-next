@@ -236,6 +236,9 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 	struct device *dma_dev;
 	int ret;
 
+	if (drm_firmware_drivers_only())
+		return -ENODEV;
+
 	if (!iommu_present(&platform_bus_type))
 		return -EPROBE_DEFER;
 
@@ -368,11 +371,6 @@ static const struct drm_driver mtk_drm_driver = {
 	.major = DRIVER_MAJOR,
 	.minor = DRIVER_MINOR,
 };
-
-static int compare_of(struct device *dev, void *data)
-{
-	return dev->of_node == data;
-}
 
 static int mtk_drm_bind(struct device *dev)
 {
@@ -614,7 +612,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
 		    comp_type == MTK_DSI) {
 			dev_info(dev, "Adding component match for %pOF\n",
 				 node);
-			drm_of_component_match_add(dev, &match, compare_of,
+			drm_of_component_match_add(dev, &match, component_compare_of,
 						   node);
 		}
 
