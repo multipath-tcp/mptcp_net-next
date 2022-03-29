@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/bpf-add-bpf_skc_to_mptcp_sock_proto
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] bpf: add bpf_skc_to_mptcp_sock_proto
 
+This patch implements a new struct bpf_func_proto, named
+bpf_skc_to_mptcp_sock_proto. Define a new bpf_id BTF_SOCK_TYPE_MPTCP,
+and a new helper bpf_skc_to_mptcp_sock(), which invokes another new
+helper bpf_mptcp_sock_from_subflow() in net/mptcp/bpf.c to get struct
+mptcp_sock from a given subflow socket.
+
+Co-developed-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
