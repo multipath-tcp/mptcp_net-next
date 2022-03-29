@@ -1,4 +1,32 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/perf-tools-.git-ORIG_HEAD-might-not-exist
+Subject: [PATCH] perf tools: .git/ORIG_HEAD might not exist
 
+It seems it cannot be assumed .git/ORIG_HEAD exists if .git/HEAD is
+there.
+
+Indeed, recently our public CI reported[1] the following error when
+compiling Perf tool:
+
+  $ cd tools/perf
+  $ make -j4 -l4 O=/tmp/(...)/perf DESTDIR=/usr install
+  (...)
+  make[2]: *** No rule to make target '../../.git/ORIG_HEAD', needed by '/tmp/(...)/perf/PERF-VERSION-FILE'.
+
+This is because apparently[2] Cirrus Ci uses a Git client implemented
+purely in Go[3] to perform a clone. Most likely, this tool doesn't
+create any .git/ORIG_HEAD file but .git/HEAD is there. The error can
+indeed be reproduced by renaming this .git/ORIG_HEAD file while keeping
+.git/HEAD. In other words, it means it is not enough to check the
+presence of .git/HEAD to assume .git/ORIG_HEAD exists as well.
+
+With the modification here, the version file is always regenerated if
+.git/ORIG_HEAD file is not present. But that is not an issue as kernel
+devs probably don't use such tools in their dev env and it can be
+assumed for them that they have both .git/HEAD and .git/ORIG_HEAD files.
+
+[1] https://cirrus-ci.com/task/5673396527693824?logs=test#L5026
+[2] https://cirrus-ci.org/guide/tips-and-tricks/
+[3] https://github.com/go-git/go-git
+
+Fixes: 4e666cdb06ee ("perf tools: Fix dependency for version file creation")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
