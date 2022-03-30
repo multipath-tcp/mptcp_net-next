@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-diag-switch-to-context-structure
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: diag: switch to context structure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Raw access to cb->arg[] is deprecated, use a context structure.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
