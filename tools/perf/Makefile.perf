@@ -1143,12 +1143,10 @@ endif
 # Trick: if ../../.git does not exist - we are building out of tree for example,
 # then force version regeneration:
 #
-GIT-HEAD-PHONY =
 ifeq ($(wildcard ../../.git/HEAD),)
-    GIT-HEAD-PHONY += ../../.git/HEAD
-endif
-ifeq ($(wildcard ../../.git/ORIG_HEAD),)
-    GIT-HEAD-PHONY += ../../.git/ORIG_HEAD
+    GIT-HEAD-PHONY = ../../.git/HEAD ../../.git/ORIG_HEAD
+else
+    GIT-HEAD-PHONY =
 endif
 
 FORCE:
