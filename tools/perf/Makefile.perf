@@ -691,9 +691,8 @@ $(OUTPUT)common-cmds.h: $(wildcard Documentation/perf-*.txt)
 $(SCRIPTS) : % : %.sh
 	$(QUIET_GEN)$(INSTALL) '$@.sh' '$(OUTPUT)$@'
 
-$(OUTPUT)PERF-VERSION-FILE: ../../.git/HEAD ../../.git/ORIG_HEAD
+$(OUTPUT)PERF-VERSION-FILE: .FORCE-PERF-VERSION-FILE
 	$(Q)$(SHELL_PATH) util/PERF-VERSION-GEN $(OUTPUT)
-	$(Q)touch $(OUTPUT)PERF-VERSION-FILE
 
 # These can record PERF_VERSION
 perf.spec $(SCRIPTS) \
@@ -1139,23 +1138,12 @@ else
 	@echo "FEATURE-DUMP file available in $(OUTPUT)FEATURE-DUMP"
 endif
 
-#
-# Trick: if ../../.git does not exist - we are building out of tree for example,
-# then force version regeneration:
-#
-GIT-HEAD-PHONY =
-ifeq ($(wildcard ../../.git/HEAD),)
-    GIT-HEAD-PHONY += ../../.git/HEAD
-endif
-ifeq ($(wildcard ../../.git/ORIG_HEAD),)
-    GIT-HEAD-PHONY += ../../.git/ORIG_HEAD
-endif
 
 FORCE:
 
 .PHONY: all install clean config-clean strip install-gtk
 .PHONY: shell_compatibility_test please_set_SHELL_PATH_to_a_more_modern_shell
-.PHONY: $(GIT-HEAD-PHONY) TAGS tags cscope FORCE prepare
+.PHONY: .FORCE-PERF-VERSION-FILE TAGS tags cscope FORCE prepare
 .PHONY: libtraceevent_plugins archheaders
 
 endif # force_fixdep
