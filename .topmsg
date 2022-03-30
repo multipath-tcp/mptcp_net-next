@@ -1,32 +1,49 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] perf tools: .git/ORIG_HEAD might not exist
+From: John Garry <john.garry@huawei.com>
+Subject: [PATCH] perf tools: Stop depending on .git files for building PERF-VERSION-FILE
 
-It seems it cannot be assumed .git/ORIG_HEAD exists if .git/HEAD is
-there.
+This essentially reverts commit c72e3f04b45fb2e50cdd81a50c3778c6a57251d8
+and commit 4e666cdb06eede2069a7b1a96a1359d1c441a3eb.
 
-Indeed, recently our public CI reported[1] the following error when
-compiling Perf tool:
+In commit c72e3f04b45f ("tools/perf/build: Speed up git-version test on
+re-make"), a makefile dependency on .git/HEAD was added. The background is
+that running PERF-VERSION-FILE is relatively slow, and commands like
+"git describe" are particularly slow.
 
-  $ cd tools/perf
-  $ make -j4 -l4 O=/tmp/(...)/perf DESTDIR=/usr install
-  (...)
-  make[2]: *** No rule to make target '../../.git/ORIG_HEAD', needed by '/tmp/(...)/perf/PERF-VERSION-FILE'.
+In commit 4e666cdb06ee ("perf tools: Fix dependency for version file
+creation"), an additional dependency on .git/ORIG_HEAD was added, as
+.git/HEAD may not change for "git reset --hard HEAD^" command. However,
+depending on whether we're on a branch or not, a "git cherry-pick" may
+not lead to the version being updated.
 
-This is because apparently[2] Cirrus Ci uses a Git client implemented
-purely in Go[3] to perform a clone. Most likely, this tool doesn't
-create any .git/ORIG_HEAD file but .git/HEAD is there. The error can
-indeed be reproduced by renaming this .git/ORIG_HEAD file while keeping
-.git/HEAD. In other words, it means it is not enough to check the
-presence of .git/HEAD to assume .git/ORIG_HEAD exists as well.
+As discussed with the git community in [0], using git internal files for
+dependencies is not reliable. Commit 4e666cdb06ee also breaks some build
+scenarios [1].
 
-With the modification here, the version file is always regenerated if
-.git/ORIG_HEAD file is not present. But that is not an issue as kernel
-devs probably don't use such tools in their dev env and it can be
-assumed for them that they have both .git/HEAD and .git/ORIG_HEAD files.
+As mentioned, c72e3f04b45f was added to speed up the build. However in
+commit 7572733b8499 ("perf tools: Fix version kernel tag") we removed the
+call to "git describe", so just revert Makefile.perf back to same as pre
+c72e3f04b45f and the build should not be so slow, as below:
 
-[1] https://cirrus-ci.com/task/5673396527693824?logs=test#L5026
-[2] https://cirrus-ci.org/guide/tips-and-tricks/
-[3] https://github.com/go-git/go-git
+Pre 7572733b8499:
+$> time util/PERF-VERSION-GEN
+  PERF_VERSION = 5.17.rc8.g4e666cdb06ee
+
+real    0m0.110s
+user    0m0.091s
+sys     0m0.019s
+
+Post 7572733b8499:
+$> time util/PERF-VERSION-GEN
+  PERF_VERSION = 5.17.rc8.g7572733b8499
+
+real    0m0.039s
+user    0m0.036s
+sys     0m0.007s
+
+[0] https://lore.kernel.org/git/87wngkpddp.fsf@igel.home/T/#m4a4dd6de52fdbe21179306cd57b3761eb07f45f8
+[1] https://lore.kernel.org/linux-perf-users/20220329093120.4173283-1-matthieu.baerts@tessares.net/T/#u
 
 Fixes: 4e666cdb06ee ("perf tools: Fix dependency for version file creation")
+Reported-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: John Garry <john.garry@huawei.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
