@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-listen-diag-dump-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: listen diag dump support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+makes 'ss -Ml' show mptcp listen sockets.
+
+Iterate over the tcp listen sockets and pick those that have mptcp ulp
+info attached.
+
+mptcp_diag_get_info() is modified to prefer msk->first for mptcp sockets
+in listen state.  This reports accurate number for recv and send queue
+(pending / max connection backlog counters).
+
+Sample output:
+ss -Mil
+State        Recv-Q Send-Q Local Address:Port  Peer Address:Port
+LISTEN       0      20     127.0.0.1:12000     0.0.0.0:*
+         subflows_max:2
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
