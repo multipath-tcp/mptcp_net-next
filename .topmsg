@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-diag-listen-tests
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests/mptcp: add diag listen tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Check dumping of mptcp listener sockets:
+1. filter by dport should not return any results
+2. filter by sport should return listen sk
+3. filter by saddr+sport should return listen sk
+4. no filter should return listen sk
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
