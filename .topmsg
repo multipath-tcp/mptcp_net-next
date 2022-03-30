@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-locking-in-mptcp_diag_fill_info
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: remove locking in mptcp_diag_fill_info
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Problem is that listener iteration would call this from atomic context
+so this locking is not allowed.
+
+One way is to drop locks before calling the helper, but afaics the lock
+isn't really needed, all values are fetched via READ_ONCE().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
