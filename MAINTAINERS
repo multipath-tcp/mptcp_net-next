@@ -13745,6 +13745,8 @@ F:	include/net/mptcp.h
 F:	include/trace/events/mptcp.h
 F:	include/uapi/linux/mptcp.h
 F:	net/mptcp/
+F:	tools/testing/selftests/bpf/progs/mptcp_sock.c
+F:	tools/testing/selftests/bpf/prog_tests/mptcp.c
 F:	tools/testing/selftests/net/mptcp/
 
 NETWORKING [TCP]
