@@ -1,7 +1,7 @@
 From: Geliang Tang <geliang.tang@suse.com>
 Subject: [PATCH] mptcp: reset subflow when MP_FAIL doesn't respond
 
-This patch added a new msk->flags bit MPTCP_FAIL_NO_RESPONSE, then reused
+This patch adds a new msk->flags bit MPTCP_FAIL_NO_RESPONSE, then reuses
 sk_timer to trigger a check if we have not received a response from the
 peer after sending MP_FAIL. If the peer doesn't respond properly, reset
 the subflow.
