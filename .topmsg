@@ -4,4 +4,7 @@ Subject: [PATCH] mptcp: don't send RST for single subflow
 When a bad checksum is detected and a single subflow is in use, don't
 send RST + MP_FAIL, send data_ack + MP_FAIL instead.
 
+So invoke tcp_send_active_reset() only when mptcp_has_another_subflow()
+is true.
+
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
