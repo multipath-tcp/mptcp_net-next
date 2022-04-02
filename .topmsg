@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-ADD_ADDR-echo-test-with-missing-userspace-daemon
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] selftests: mptcp: ADD_ADDR echo test with missing userspace daemon
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Check userspace PM behavior to ensure ADD_ADDR echoes are only sent when
+there is an active userspace daemon. If the daemon is restarting or
+hasn't loaded yet, the missing echo will cause the peer to retransmit
+the ADD_ADDR - and hopefully the daemon will be ready to receive it at
+that later time.
+
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
