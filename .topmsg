@@ -9,4 +9,6 @@ v2: Remove unneeded check in mptcp_pm_rm_addr_received() (Kishen Maloor)
 v3: Add and use helper function for PM mode (Paolo Abeni)
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Kishen Maloor <kishen.maloor@intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
 Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
