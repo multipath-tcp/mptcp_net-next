@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-reflect-remote-port-not-0-in-ANNOUNCED-events
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: reflect remote port (not 0) in ANNOUNCED events
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Per RFC 8684, if no port is specified in an ADD_ADDR message, MPTCP
+SHOULD attempt to connect to the specified address on the same port
+as the port that is already in use by the subflow on which the
+ADD_ADDR signal was sent.
+
+To facilitate that, this change reflects the specific remote port in
+use by that subflow in MPTCP_EVENT_ANNOUNCED events.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
