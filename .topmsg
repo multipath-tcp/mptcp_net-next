@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-store-remote-id-from-MP_JOIN-SYN-ACK-in-local-ctx
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: store remote id from MP_JOIN SYN/ACK in local ctx
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change reads the addr id assigned to the remote endpoint
+of a subflow from the MP_JOIN SYN/ACK message and stores it
+in the related subflow context. The remote id was not being
+captured prior to this change, and will now provide a consistent
+view of remote endpoints and their ids as seen through netlink
+events.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
