@@ -1,1 +1,1 @@
-t/selftests-mptcp-print-extra-msg-in-chk_csum_nr
+t/selftests-mptcp-add-MP_FAIL-reset-testcase
