@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-expose-server_side-attribute-in-MPTCP-netlink-events
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: expose server_side attribute in MPTCP netlink events
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change records the 'server_side' attribute of MPTCP_EVENT_CREATED
+and MPTCP_EVENT_ESTABLISHED events to inform their recipient about the
+Client/Server role of the running MPTCP application.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/246
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
