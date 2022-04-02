@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-establish-subflows-from-either-end-of-connection
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: establish subflows from either end of connection
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change updates internal logic to permit subflows to be
+established from either the client or server ends of MPTCP
+connections. This symmetry and added flexibility may be
+harnessed by PM implementations running on either end in
+creating new subflows.
+
+The essence of this change lies in not relying on the
+"server_side" flag (which continues to be available if needed).
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
