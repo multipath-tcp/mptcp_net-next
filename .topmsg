@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-bypass-in-kernel-PM-restrictions-for-non-kernel-PMs
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: bypass in-kernel PM restrictions for non-kernel PMs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Current limits on the # of addresses/subflows must apply only to
+in-kernel PM managed sockets. Thus this change removes such
+restrictions on connections overseen by non-kernel (e.g. userspace)
+PMs. This change also ensures that the kernel does not record stats
+inside struct mptcp_pm_data updated along kernel code paths when exercised
+via non-kernel PMs.
+
+Additionally, address announcements are acknolwedged and subflow
+requests are honored only when it's deemed that	a userspace path
+manager	is active at the time.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
