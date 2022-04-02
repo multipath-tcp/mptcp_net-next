@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-MP_FAIL-reset-testcase
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add MP_FAIL reset testcase
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add the multiple subflows test case for MP_FAIL, to test the MP_FAIL
+reset case. Use the test_linkfail value to make 1024KB test files.
+
+Invoke reset_with_fail() to use 'iptables' and 'tc action pedit' rules
+to produce the bit flips to trigger the checksum failures on ns2eth2.
+Add delays on ns2eth1 to make sure more data can translate on ns2eth2.
+
+The check_invert flag is enabled in reset_with_fail(), so this test
+prints out the inverted bytes, instead of the file mismatch errors.
+
+Invoke pedit_action_pkts() to get the numbers of the packets edited
+by the tc pedit actions, and print this numbers to the output.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
