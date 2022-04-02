@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: print extra msg in chk_csum_nr
-
-When the multiple checksum errors occur in chk_csum_nr(), print the
-numbers of the errors as an extra message.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
