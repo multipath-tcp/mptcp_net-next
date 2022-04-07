@@ -1,7 +1,1 @@
-<<<<<<< t/DO-NOT-MERGE-git-markup-fixes-net-next base
-Fixes for other trees than the net ones or imported from elsewhere.
-We should not send these commits to either -net or net-next.
-=======
-MPTCP-related modifications only needed for the -net tree.
->>>>>>> t/DO-NOT-MERGE-git-markup-end-common-net-net-next
 MPTCP-related features for net-next tree.
