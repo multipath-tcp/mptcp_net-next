@@ -13,6 +13,12 @@
 #include <linux/spinlock.h>
 #include "protocol.h"
 
+static struct mptcp_sched_ops mptcp_sched_default = {
+	.get_subflow    = mptcp_subflow_get_send,
+	.name           = "default",
+	.owner          = THIS_MODULE,
+};
+
 static DEFINE_SPINLOCK(mptcp_sched_list_lock);
 static LIST_HEAD(mptcp_sched_list);
 
@@ -50,7 +56,15 @@ int mptcp_register_scheduler(struct mptcp_sched_ops *sched)
 
 void mptcp_unregister_scheduler(struct mptcp_sched_ops *sched)
 {
+	if (sched == &mptcp_sched_default)
+		return;
+
 	spin_lock(&mptcp_sched_list_lock);
 	list_del_rcu(&sched->list);
 	spin_unlock(&mptcp_sched_list_lock);
+}
+
+void mptcp_sched_init(void)
+{
+	mptcp_register_scheduler(&mptcp_sched_default);
 }
