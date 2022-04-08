@@ -91,7 +91,8 @@ make_file()
 	local name=$1
 	local ksize=1
 
-	dd if=/dev/urandom of="$name" bs=1024 count=$ksize 2> /dev/null
+	dd if=/dev/urandom of="$name" bs=2 count=$ksize 2> /dev/null
+	stdbuf -oL printf "adding marker\n"
 	echo -e "\nMPTCP_TEST_FILE_END_MARKER" >> "$name"
 }
 
@@ -99,7 +100,9 @@ make_connection()
 {
 	local file
 	file=$(mktemp)
+	stdbuf -oL printf "In make_connection\n"
 	make_file "$file" "client"
+	stdbuf -oL printf "make_file done\n"
 
 	local is_v6=$1
 	local app_port=$app4_port
@@ -114,6 +117,7 @@ make_connection()
 		is_v6="v4"
 	fi
 
+	stdbuf -oL printf "setting up event capture\n"
 	# Capture netlink events over the two network namespaces running
 	# the MPTCP client and server
 	local client_evts
@@ -121,11 +125,13 @@ make_connection()
 	:>"$client_evts"
 	ip netns exec "$ns2" ./pm_nl_ctl events >> "$client_evts" 2>&1 &
 	local client_evts_pid=$!
+	stdbuf -oL printf "client capture running\n"
 	local server_evts
 	server_evts=$(mktemp)
 	:>"$server_evts"
 	ip netns exec "$ns1" ./pm_nl_ctl events >> "$server_evts" 2>&1 &
 	local server_evts_pid=$!
+	stdbuf -oL printf "server capture running\n"
 	sleep 0.1
 
 	# Run the server
@@ -133,6 +139,7 @@ make_connection()
 	   ./mptcp_connect -s MPTCP -w 300 -p $app_port -l $listen_addr > /dev/null 2>&1 &
 	local server_pid=$!
 	sleep 0.1
+	stdbuf -oL printf "server running\n"
 
 	# Run the client, transfer $file and stay connected to the server
 	# to conduct tests
@@ -141,9 +148,11 @@ make_connection()
 	   2>&1 > /dev/null < "$file" &
 	local client_pid=$!
 	sleep 0.1
+	stdbuf -oL printf "client running\n"
 
 	# Capture client/server attributes from MPTCP connection netlink events
 	kill $client_evts_pid
+	stdbuf -oL printf "sent SIGTERM to client event process\n"
 
 	local client_token
 	local client_port
@@ -157,11 +166,13 @@ make_connection()
 				      "$client_evts")
 
 	kill $server_evts_pid
+	stdbuf -oL printf "sent SIGTERM to server event process\n"
 	server_token=$(sed -n 's/.*\(token:\)\([[:digit:]]*\).*$/\2/p;q' "$server_evts")
 	server_serverside=$(sed -n 's/.*\(server_side:\)\([[:digit:]]*\).*$/\2/p;q'\
 				      "$server_evts")
 
 	rm -f "$client_evts" "$server_evts" "$file"
+	stdbuf -oL printf "cleaned up temp files\n"
 
 	if [ "$client_token" != "" ] && [ "$server_token" != "" ] && [ "$client_serverside" = 0 ] &&
 		   [ "$server_serverside" = 1 ]
