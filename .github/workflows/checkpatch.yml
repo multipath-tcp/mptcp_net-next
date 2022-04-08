@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0 ## to make sure a mentioned commit exists
 
@@ -36,13 +36,13 @@ jobs:
           debug: ${{ secrets.BUILD_ACTION_DEBUG }}
 
       - name: "Artifacts"
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: results
           path: ${{ env.RESULTS }}
 
       - name: "Artifacts"
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: details
           path: ${{ env.DETAILS }}
@@ -54,7 +54,7 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: results
 
@@ -118,7 +118,7 @@ jobs:
     if: github.repository_owner != 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: results
       - name: "Set exit status"
