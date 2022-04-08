@@ -31,12 +31,12 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 100 # we should not have more commits on top of net-next/export (or -net)
 
       - name: "Setup cache for CCache"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ${{ github.workspace }}/.ccache
           key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-${{ github.sha }}
@@ -60,7 +60,7 @@ jobs:
 
       - name: "Artifacts"
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: results
           path: ./build-*-results.txt
@@ -72,7 +72,7 @@ jobs:
     if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: results
 
