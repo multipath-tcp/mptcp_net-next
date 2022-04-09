@@ -70,6 +70,27 @@
 #define KSZ8081_LMD_SHORT_INDICATOR		BIT(12)
 #define KSZ8081_LMD_DELTA_TIME_MASK		GENMASK(8, 0)
 
+#define KSZ9x31_LMD				0x12
+#define KSZ9x31_LMD_VCT_EN			BIT(15)
+#define KSZ9x31_LMD_VCT_DIS_TX			BIT(14)
+#define KSZ9x31_LMD_VCT_PAIR(n)			(((n) & 0x3) << 12)
+#define KSZ9x31_LMD_VCT_SEL_RESULT		0
+#define KSZ9x31_LMD_VCT_SEL_THRES_HI		BIT(10)
+#define KSZ9x31_LMD_VCT_SEL_THRES_LO		BIT(11)
+#define KSZ9x31_LMD_VCT_SEL_MASK		GENMASK(11, 10)
+#define KSZ9x31_LMD_VCT_ST_NORMAL		0
+#define KSZ9x31_LMD_VCT_ST_OPEN			1
+#define KSZ9x31_LMD_VCT_ST_SHORT		2
+#define KSZ9x31_LMD_VCT_ST_FAIL			3
+#define KSZ9x31_LMD_VCT_ST_MASK			GENMASK(9, 8)
+#define KSZ9x31_LMD_VCT_DATA_REFLECTED_INVALID	BIT(7)
+#define KSZ9x31_LMD_VCT_DATA_SIG_WAIT_TOO_LONG	BIT(6)
+#define KSZ9x31_LMD_VCT_DATA_MASK100		BIT(5)
+#define KSZ9x31_LMD_VCT_DATA_NLP_FLP		BIT(4)
+#define KSZ9x31_LMD_VCT_DATA_LO_PULSE_MASK	GENMASK(3, 2)
+#define KSZ9x31_LMD_VCT_DATA_HI_PULSE_MASK	GENMASK(1, 0)
+#define KSZ9x31_LMD_VCT_DATA_MASK		GENMASK(7, 0)
+
 /* Lan8814 general Interrupt control/status reg in GPHY specific block. */
 #define LAN8814_INTC				0x18
 #define LAN8814_INTS				0x1B
@@ -98,15 +119,6 @@
 #define PTP_TIMESTAMP_EN_DREQ_			BIT(1)
 #define PTP_TIMESTAMP_EN_PDREQ_			BIT(2)
 #define PTP_TIMESTAMP_EN_PDRES_			BIT(3)
-
-#define PTP_RX_LATENCY_1000			0x0224
-#define PTP_TX_LATENCY_1000			0x0225
-
-#define PTP_RX_LATENCY_100			0x0222
-#define PTP_TX_LATENCY_100			0x0223
-
-#define PTP_RX_LATENCY_10			0x0220
-#define PTP_TX_LATENCY_10			0x0221
 
 #define PTP_TX_PARSE_L2_ADDR_EN			0x0284
 #define PTP_RX_PARSE_L2_ADDR_EN			0x0244
@@ -268,15 +280,6 @@ struct lan8814_ptp_rx_ts {
 	u16 seq_id;
 };
 
-struct kszphy_latencies {
-	u16 rx_10;
-	u16 tx_10;
-	u16 rx_100;
-	u16 tx_100;
-	u16 rx_1000;
-	u16 tx_1000;
-};
-
 struct kszphy_ptp_priv {
 	struct mii_timestamper mii_ts;
 	struct phy_device *phydev;
@@ -296,22 +299,14 @@ struct kszphy_ptp_priv {
 
 struct kszphy_priv {
 	struct kszphy_ptp_priv ptp_priv;
-	struct kszphy_latencies latencies;
 	const struct kszphy_type *type;
 	int led_mode;
+	u16 vct_ctrl1000;
 	bool rmii_ref_clk_sel;
 	bool rmii_ref_clk_sel_val;
 	u64 stats[ARRAY_SIZE(kszphy_hw_stats)];
 };
 
-static struct kszphy_latencies lan8814_latencies = {
-	.rx_10		= 0x22AA,
-	.tx_10		= 0x2E4A,
-	.rx_100		= 0x092A,
-	.tx_100		= 0x02C1,
-	.rx_1000	= 0x01AD,
-	.tx_1000	= 0x00C9,
-};
 static const struct kszphy_type ksz8021_type = {
 	.led_mode_reg		= MII_KSZPHY_CTRL_2,
 	.has_broadcast_disable	= true,
@@ -1351,6 +1346,199 @@ static int ksz9031_read_status(struct phy_device *phydev)
 	}
 
 	return 0;
+}
+
+static int ksz9x31_cable_test_start(struct phy_device *phydev)
+{
+	struct kszphy_priv *priv = phydev->priv;
+	int ret;
+
+	/* KSZ9131RNX, DS00002841B-page 38, 4.14 LinkMD (R) Cable Diagnostic
+	 * Prior to running the cable diagnostics, Auto-negotiation should
+	 * be disabled, full duplex set and the link speed set to 1000Mbps
+	 * via the Basic Control Register.
+	 */
+	ret = phy_modify(phydev, MII_BMCR,
+			 BMCR_SPEED1000 | BMCR_FULLDPLX |
+			 BMCR_ANENABLE | BMCR_SPEED100,
+			 BMCR_SPEED1000 | BMCR_FULLDPLX);
+	if (ret)
+		return ret;
+
+	/* KSZ9131RNX, DS00002841B-page 38, 4.14 LinkMD (R) Cable Diagnostic
+	 * The Master-Slave configuration should be set to Slave by writing
+	 * a value of 0x1000 to the Auto-Negotiation Master Slave Control
+	 * Register.
+	 */
+	ret = phy_read(phydev, MII_CTRL1000);
+	if (ret < 0)
+		return ret;
+
+	/* Cache these bits, they need to be restored once LinkMD finishes. */
+	priv->vct_ctrl1000 = ret & (CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER);
+	ret &= ~(CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER);
+	ret |= CTL1000_ENABLE_MASTER;
+
+	return phy_write(phydev, MII_CTRL1000, ret);
+}
+
+static int ksz9x31_cable_test_result_trans(u16 status)
+{
+	switch (FIELD_GET(KSZ9x31_LMD_VCT_ST_MASK, status)) {
+	case KSZ9x31_LMD_VCT_ST_NORMAL:
+		return ETHTOOL_A_CABLE_RESULT_CODE_OK;
+	case KSZ9x31_LMD_VCT_ST_OPEN:
+		return ETHTOOL_A_CABLE_RESULT_CODE_OPEN;
+	case KSZ9x31_LMD_VCT_ST_SHORT:
+		return ETHTOOL_A_CABLE_RESULT_CODE_SAME_SHORT;
+	case KSZ9x31_LMD_VCT_ST_FAIL:
+		fallthrough;
+	default:
+		return ETHTOOL_A_CABLE_RESULT_CODE_UNSPEC;
+	}
+}
+
+static bool ksz9x31_cable_test_failed(u16 status)
+{
+	int stat = FIELD_GET(KSZ9x31_LMD_VCT_ST_MASK, status);
+
+	return stat == KSZ9x31_LMD_VCT_ST_FAIL;
+}
+
+static bool ksz9x31_cable_test_fault_length_valid(u16 status)
+{
+	switch (FIELD_GET(KSZ9x31_LMD_VCT_ST_MASK, status)) {
+	case KSZ9x31_LMD_VCT_ST_OPEN:
+		fallthrough;
+	case KSZ9x31_LMD_VCT_ST_SHORT:
+		return true;
+	}
+	return false;
+}
+
+static int ksz9x31_cable_test_fault_length(struct phy_device *phydev, u16 stat)
+{
+	int dt = FIELD_GET(KSZ9x31_LMD_VCT_DATA_MASK, stat);
+
+	/* KSZ9131RNX, DS00002841B-page 38, 4.14 LinkMD (R) Cable Diagnostic
+	 *
+	 * distance to fault = (VCT_DATA - 22) * 4 / cable propagation velocity
+	 */
+	if ((phydev->phy_id & MICREL_PHY_ID_MASK) == PHY_ID_KSZ9131)
+		dt = clamp(dt - 22, 0, 255);
+
+	return (dt * 400) / 10;
+}
+
+static int ksz9x31_cable_test_wait_for_completion(struct phy_device *phydev)
+{
+	int val, ret;
+
+	ret = phy_read_poll_timeout(phydev, KSZ9x31_LMD, val,
+				    !(val & KSZ9x31_LMD_VCT_EN),
+				    30000, 100000, true);
+
+	return ret < 0 ? ret : 0;
+}
+
+static int ksz9x31_cable_test_get_pair(int pair)
+{
+	static const int ethtool_pair[] = {
+		ETHTOOL_A_CABLE_PAIR_A,
+		ETHTOOL_A_CABLE_PAIR_B,
+		ETHTOOL_A_CABLE_PAIR_C,
+		ETHTOOL_A_CABLE_PAIR_D,
+	};
+
+	return ethtool_pair[pair];
+}
+
+static int ksz9x31_cable_test_one_pair(struct phy_device *phydev, int pair)
+{
+	int ret, val;
+
+	/* KSZ9131RNX, DS00002841B-page 38, 4.14 LinkMD (R) Cable Diagnostic
+	 * To test each individual cable pair, set the cable pair in the Cable
+	 * Diagnostics Test Pair (VCT_PAIR[1:0]) field of the LinkMD Cable
+	 * Diagnostic Register, along with setting the Cable Diagnostics Test
+	 * Enable (VCT_EN) bit. The Cable Diagnostics Test Enable (VCT_EN) bit
+	 * will self clear when the test is concluded.
+	 */
+	ret = phy_write(phydev, KSZ9x31_LMD,
+			KSZ9x31_LMD_VCT_EN | KSZ9x31_LMD_VCT_PAIR(pair));
+	if (ret)
+		return ret;
+
+	ret = ksz9x31_cable_test_wait_for_completion(phydev);
+	if (ret)
+		return ret;
+
+	val = phy_read(phydev, KSZ9x31_LMD);
+	if (val < 0)
+		return val;
+
+	if (ksz9x31_cable_test_failed(val))
+		return -EAGAIN;
+
+	ret = ethnl_cable_test_result(phydev,
+				      ksz9x31_cable_test_get_pair(pair),
+				      ksz9x31_cable_test_result_trans(val));
+	if (ret)
+		return ret;
+
+	if (!ksz9x31_cable_test_fault_length_valid(val))
+		return 0;
+
+	return ethnl_cable_test_fault_length(phydev,
+					     ksz9x31_cable_test_get_pair(pair),
+					     ksz9x31_cable_test_fault_length(phydev, val));
+}
+
+static int ksz9x31_cable_test_get_status(struct phy_device *phydev,
+					 bool *finished)
+{
+	struct kszphy_priv *priv = phydev->priv;
+	unsigned long pair_mask = 0xf;
+	int retries = 20;
+	int pair, ret, rv;
+
+	*finished = false;
+
+	/* Try harder if link partner is active */
+	while (pair_mask && retries--) {
+		for_each_set_bit(pair, &pair_mask, 4) {
+			ret = ksz9x31_cable_test_one_pair(phydev, pair);
+			if (ret == -EAGAIN)
+				continue;
+			if (ret < 0)
+				return ret;
+			clear_bit(pair, &pair_mask);
+		}
+		/* If link partner is in autonegotiation mode it will send 2ms
+		 * of FLPs with at least 6ms of silence.
+		 * Add 2ms sleep to have better chances to hit this silence.
+		 */
+		if (pair_mask)
+			usleep_range(2000, 3000);
+	}
+
+	/* Report remaining unfinished pair result as unknown. */
+	for_each_set_bit(pair, &pair_mask, 4) {
+		ret = ethnl_cable_test_result(phydev,
+					      ksz9x31_cable_test_get_pair(pair),
+					      ETHTOOL_A_CABLE_RESULT_CODE_UNSPEC);
+	}
+
+	*finished = true;
+
+	/* Restore cached bits from before LinkMD got started. */
+	rv = phy_modify(phydev, MII_CTRL1000,
+			CTL1000_ENABLE_MASTER | CTL1000_AS_MASTER,
+			priv->vct_ctrl1000);
+	if (rv)
+		return rv;
+
+	return ret;
 }
 
 static int ksz8873mll_config_aneg(struct phy_device *phydev)
@@ -2618,55 +2806,6 @@ static int lan8814_ptp_probe_once(struct phy_device *phydev)
 	return 0;
 }
 
-static int lan8814_read_status(struct phy_device *phydev)
-{
-	struct kszphy_priv *priv = phydev->priv;
-	struct kszphy_latencies *latencies = &priv->latencies;
-	int err;
-	int regval;
-
-	err = genphy_read_status(phydev);
-	if (err)
-		return err;
-
-	switch (phydev->speed) {
-	case SPEED_1000:
-		lanphy_write_page_reg(phydev, 5, PTP_RX_LATENCY_1000,
-				      latencies->rx_1000);
-		lanphy_write_page_reg(phydev, 5, PTP_TX_LATENCY_1000,
-				      latencies->tx_1000);
-		break;
-	case SPEED_100:
-		lanphy_write_page_reg(phydev, 5, PTP_RX_LATENCY_100,
-				      latencies->rx_100);
-		lanphy_write_page_reg(phydev, 5, PTP_TX_LATENCY_100,
-				      latencies->tx_100);
-		break;
-	case SPEED_10:
-		lanphy_write_page_reg(phydev, 5, PTP_RX_LATENCY_10,
-				      latencies->rx_10);
-		lanphy_write_page_reg(phydev, 5, PTP_TX_LATENCY_10,
-				      latencies->tx_10);
-		break;
-	default:
-		break;
-	}
-
-	/* Make sure the PHY is not broken. Read idle error count,
-	 * and reset the PHY if it is maxed out.
-	 */
-	regval = phy_read(phydev, MII_STAT1000);
-	if ((regval & 0xFF) == 0xFF) {
-		phy_init_hw(phydev);
-		phydev->link = 0;
-		if (phydev->drv->config_intr && phy_interrupt_is_valid(phydev))
-			phydev->drv->config_intr(phydev);
-		return genphy_config_aneg(phydev);
-	}
-
-	return 0;
-}
-
 static int lan8814_config_init(struct phy_device *phydev)
 {
 	int val;
@@ -2690,30 +2829,8 @@ static int lan8814_config_init(struct phy_device *phydev)
 	return 0;
 }
 
-static void lan8814_parse_latency(struct phy_device *phydev)
-{
-	const struct device_node *np = phydev->mdio.dev.of_node;
-	struct kszphy_priv *priv = phydev->priv;
-	struct kszphy_latencies *latency = &priv->latencies;
-	u32 val;
-
-	if (!of_property_read_u32(np, "lan8814,latency_rx_10", &val))
-		latency->rx_10 = val;
-	if (!of_property_read_u32(np, "lan8814,latency_tx_10", &val))
-		latency->tx_10 = val;
-	if (!of_property_read_u32(np, "lan8814,latency_rx_100", &val))
-		latency->rx_100 = val;
-	if (!of_property_read_u32(np, "lan8814,latency_tx_100", &val))
-		latency->tx_100 = val;
-	if (!of_property_read_u32(np, "lan8814,latency_rx_1000", &val))
-		latency->rx_1000 = val;
-	if (!of_property_read_u32(np, "lan8814,latency_tx_1000", &val))
-		latency->tx_1000 = val;
-}
-
 static int lan8814_probe(struct phy_device *phydev)
 {
-	const struct device_node *np = phydev->mdio.dev.of_node;
 	struct kszphy_priv *priv;
 	u16 addr;
 	int err;
@@ -2724,13 +2841,10 @@ static int lan8814_probe(struct phy_device *phydev)
 
 	priv->led_mode = -1;
 
-	priv->latencies = lan8814_latencies;
-
 	phydev->priv = priv;
 
 	if (!IS_ENABLED(CONFIG_PTP_1588_CLOCK) ||
-	    !IS_ENABLED(CONFIG_NETWORK_PHY_TIMESTAMPING) ||
-	    of_property_read_bool(np, "lan8814,ignore-ts"))
+	    !IS_ENABLED(CONFIG_NETWORK_PHY_TIMESTAMPING))
 		return 0;
 
 	/* Strap-in value for PHY address, below register read gives starting
@@ -2746,7 +2860,6 @@ static int lan8814_probe(struct phy_device *phydev)
 			return err;
 	}
 
-	lan8814_parse_latency(phydev);
 	lan8814_ptp_init(phydev);
 
 	return 0;
@@ -2908,6 +3021,7 @@ static struct phy_driver ksphy_driver[] = {
 	.phy_id		= PHY_ID_KSZ9031,
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
 	.name		= "Micrel KSZ9031 Gigabit PHY",
+	.flags		= PHY_POLL_CABLE_TEST,
 	.driver_data	= &ksz9021_type,
 	.probe		= kszphy_probe,
 	.get_features	= ksz9031_get_features,
@@ -2921,6 +3035,8 @@ static struct phy_driver ksphy_driver[] = {
 	.get_stats	= kszphy_get_stats,
 	.suspend	= kszphy_suspend,
 	.resume		= kszphy_resume,
+	.cable_test_start	= ksz9x31_cable_test_start,
+	.cable_test_get_status	= ksz9x31_cable_test_get_status,
 }, {
 	.phy_id		= PHY_ID_LAN8814,
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
@@ -2928,7 +3044,7 @@ static struct phy_driver ksphy_driver[] = {
 	.config_init	= lan8814_config_init,
 	.probe		= lan8814_probe,
 	.soft_reset	= genphy_soft_reset,
-	.read_status	= lan8814_read_status,
+	.read_status	= ksz9031_read_status,
 	.get_sset_count	= kszphy_get_sset_count,
 	.get_strings	= kszphy_get_strings,
 	.get_stats	= kszphy_get_stats,
@@ -2955,6 +3071,7 @@ static struct phy_driver ksphy_driver[] = {
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
 	.name		= "Microchip KSZ9131 Gigabit PHY",
 	/* PHY_GBIT_FEATURES */
+	.flags		= PHY_POLL_CABLE_TEST,
 	.driver_data	= &ksz9021_type,
 	.probe		= kszphy_probe,
 	.config_init	= ksz9131_config_init,
@@ -2965,6 +3082,8 @@ static struct phy_driver ksphy_driver[] = {
 	.get_stats	= kszphy_get_stats,
 	.suspend	= kszphy_suspend,
 	.resume		= kszphy_resume,
+	.cable_test_start	= ksz9x31_cable_test_start,
+	.cable_test_get_status	= ksz9x31_cable_test_get_status,
 }, {
 	.phy_id		= PHY_ID_KSZ8873MLL,
 	.phy_id_mask	= MICREL_PHY_ID_MASK,
