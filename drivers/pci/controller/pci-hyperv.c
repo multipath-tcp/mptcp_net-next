@@ -766,14 +766,6 @@ static unsigned int hv_msi_get_int_vector(struct irq_data *irqd)
 	return irqd->parent_data->hwirq;
 }
 
-static void hv_set_msi_entry_from_desc(union hv_msi_entry *msi_entry,
-				       struct msi_desc *msi_desc)
-{
-	msi_entry->address = ((u64)msi_desc->msg.address_hi << 32) |
-			      msi_desc->msg.address_lo;
-	msi_entry->data = msi_desc->msg.data;
-}
-
 /*
  * @nr_bm_irqs:		Indicates the number of IRQs that were allocated from
  *			the bitmap.
@@ -3415,6 +3407,15 @@ static int hv_pci_probe(struct hv_device *hdev,
 	hbus->bridge->domain_nr = dom;
 #ifdef CONFIG_X86
 	hbus->sysdata.domain = dom;
+#elif defined(CONFIG_ARM64)
+	/*
+	 * Set the PCI bus parent to be the corresponding VMbus
+	 * device. Then the VMbus device will be assigned as the
+	 * ACPI companion in pcibios_root_bridge_prepare() and
+	 * pci_dma_configure() will propagate device coherence
+	 * information to devices created on the bus.
+	 */
+	hbus->sysdata.parent = hdev->device.parent;
 #endif
 
 	hbus->hdev = hdev;
