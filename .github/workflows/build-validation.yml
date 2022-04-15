@@ -30,10 +30,17 @@ jobs:
         mptcp: ['with_mptcp', 'without_mptcp']
 
     steps:
-      - name: "Checkout"
+      - name: "Checkout (light)"
+        if: github.ref != 'refs/heads/export'
         uses: actions/checkout@v3
         with:
-          fetch-depth: 100 # we should not have more commits on top of net-next/export (or -net)
+          fetch-depth: 100 # we should not have more commits on top of export and -net
+
+      - name: "Checkout (export)"
+        if: github.ref == 'refs/heads/export'
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
 
       - name: "Setup cache for CCache"
         uses: actions/cache@v3
