@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-ADD_ADDR-reissuance-by-userspace-PMs
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: allow ADD_ADDR reissuance by userspace PMs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change allows userspace PM implementations to reissue ADD_ADDR
+announcements (if necessary) based on their chosen policy.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
