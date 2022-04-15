@@ -306,7 +306,6 @@ static struct sock *mptcp_nl_find_ssk(struct mptcp_sock *msk,
 	lock_sock(sk);
 
 	mptcp_for_each_subflow(msk, subflow) {
-		const struct ipv6_pinfo *pinfo;
 		const struct inet_sock *issk;
 		struct sock *ssk;
 
@@ -324,12 +323,14 @@ static struct sock *mptcp_nl_find_ssk(struct mptcp_sock *msk,
 				continue;
 			break;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-		case AF_INET6:
-			pinfo = inet6_sk(ssk);
+		case AF_INET6: {
+			const struct ipv6_pinfo *pinfo = inet6_sk(ssk);
+
 			if (!ipv6_addr_equal(&local->addr6, &pinfo->saddr) ||
 			    !ipv6_addr_equal(&remote->addr6, &ssk->sk_v6_daddr))
 				continue;
 			break;
+		}
 #endif
 		default:
 			continue;
