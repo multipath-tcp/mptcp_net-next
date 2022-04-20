@@ -126,7 +126,7 @@ git checkout "${TG_TOP}"
 [ -f .topdeps ]
 
 # Apply patches in a tmp branch created from the parent commit of TG_TOP
-PARENT="$(cat .topdeps)"
+PARENT="$(head -n1 .topdeps)"
 git checkout "${PARENT}"
 git branch -f tmp
 git checkout tmp
