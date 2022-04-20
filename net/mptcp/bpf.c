@@ -60,6 +60,9 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	case offsetof(struct mptcp_sock, last_snd):
 		end = offsetofend(struct mptcp_sock, last_snd);
 		break;
+	case offsetofend(struct mptcp_sock, sched):
+		end = offsetofend(struct mptcp_sock, sched) + sizeof(u8);
+		break;
 	default:
 		bpf_log(log, "no write support to mptcp_sock at off %d\n", off);
 		return -EACCES;

@@ -83,6 +83,7 @@ int mptcp_init_sched(struct mptcp_sock *msk,
 	msk->sched = sched_init;
 	if (msk->sched->init)
 		msk->sched->init(msk);
+	msk->call_me_again = 0;
 
 	pr_debug("sched=%s", msk->sched->name);
 
