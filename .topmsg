@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/Revert-rtnetlink-return-EINVAL-when-request-cannot-succeed
+From: Florent Fourcot <florent.fourcot@wifirst.fr>
+Subject: [PATCH] Revert "rtnetlink: return EINVAL when request cannot succeed"
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This reverts commit b6177d3240a4
+
+ip-link command is testing kernel capability by sending a RTM_NEWLINK
+request, without any argument. It accepts everything in reply, except
+EOPNOTSUPP and EINVAL (functions iplink_have_newlink / accept_msg)
+
+So we must keep compatiblity here, invalid empty message should not
+return EINVAL
+
+Signed-off-by: Florent Fourcot <florent.fourcot@wifirst.fr>
