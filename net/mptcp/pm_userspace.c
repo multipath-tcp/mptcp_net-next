@@ -126,12 +126,12 @@ int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *addr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct mptcp_pm_addr_entry addr_val;
 	struct mptcp_sock *msk;
+	int err = -EINVAL;
 	u32 token_val;
-	int err;
 
 	if (!addr || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
-		return -EINVAL;
+		return err;
 	}
 
 	token_val = nla_get_u32(token);
@@ -139,29 +139,29 @@ int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 	msk = mptcp_token_get_sock(sock_net(skb->sk), token_val);
 	if (!msk) {
 		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
-		return -EINVAL;
+		return err;
 	}
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		return -EINVAL;
+		goto announce_err;
 	}
 
 	err = mptcp_pm_parse_entry(addr, info, true, &addr_val);
 	if (err < 0) {
 		GENL_SET_ERR_MSG(info, "error parsing local address");
-		return err;
+		goto announce_err;
 	}
 
 	if (addr_val.addr.id == 0 || !(addr_val.flags & MPTCP_PM_ADDR_FLAG_SIGNAL)) {
 		GENL_SET_ERR_MSG(info, "invalid addr id or flags");
-		return -EINVAL;
+		goto announce_err;
 	}
 
 	err = mptcp_userspace_pm_append_new_local_addr(msk, &addr_val);
 	if (err < 0) {
 		GENL_SET_ERR_MSG(info, "did not match address and id");
-		return err;
+		goto announce_err;
 	}
 
 	lock_sock((struct sock *)msk);
@@ -175,7 +175,10 @@ int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 	spin_unlock_bh(&msk->pm.lock);
 	release_sock((struct sock *)msk);
 
-	return 0;
+	err = 0;
+ announce_err:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
@@ -186,12 +189,13 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
 	LIST_HEAD(free_list);
+	int err = -EINVAL;
 	u32 token_val;
 	u8 id_val;
 
 	if (!id || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
-		return -EINVAL;
+		return err;
 	}
 
 	id_val = nla_get_u8(id);
@@ -200,12 +204,12 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	msk = mptcp_token_get_sock(sock_net(skb->sk), token_val);
 	if (!msk) {
 		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
-		return -EINVAL;
+		return err;
 	}
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		return -EINVAL;
+		goto remove_err;
 	}
 
 	lock_sock((struct sock *)msk);
@@ -220,7 +224,7 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	if (!match) {
 		GENL_SET_ERR_MSG(info, "address with specified id not found");
 		release_sock((struct sock *)msk);
-		return -EINVAL;
+		goto remove_err;
 	}
 
 	list_move(&match->list, &free_list);
@@ -232,7 +236,11 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	list_for_each_entry_safe(match, entry, &free_list, list) {
 		sock_kfree_s((struct sock *)msk, match, sizeof(*match));
 	}
-	return 0;
+
+	err = 0;
+ remove_err:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
@@ -243,13 +251,13 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 	struct mptcp_addr_info addr_r;
 	struct mptcp_addr_info addr_l;
 	struct mptcp_sock *msk;
+	int err = -EINVAL;
 	struct sock *sk;
 	u32 token_val;
-	int ret;
 
 	if (!laddr || !raddr || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
-		return -EINVAL;
+		return err;
 	}
 
 	token_val = nla_get_u32(token);
@@ -257,39 +265,41 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 	msk = mptcp_token_get_sock(genl_info_net(info), token_val);
 	if (!msk) {
 		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
-		return -EINVAL;
+		return err;
 	}
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		return -EINVAL;
+		goto create_err;
 	}
 
-	ret = mptcp_pm_parse_addr(laddr, info, &addr_l);
-	if (ret < 0) {
+	err = mptcp_pm_parse_addr(laddr, info, &addr_l);
+	if (err < 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, laddr, "error parsing local addr");
-		return -EINVAL;
+		goto create_err;
 	}
 
 	if (addr_l.id == 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, laddr, "missing local addr id");
-		return -EINVAL;
+		goto create_err;
 	}
 
-	ret = mptcp_pm_parse_addr(raddr, info, &addr_r);
-	if (ret < 0) {
+	err = mptcp_pm_parse_addr(raddr, info, &addr_r);
+	if (err < 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, raddr, "error parsing remote addr");
-		return -EINVAL;
+		goto create_err;
 	}
 
 	sk = &msk->sk.icsk_inet.sk;
 	lock_sock(sk);
 
-	ret = __mptcp_subflow_connect(sk, &addr_l, &addr_r);
+	err = __mptcp_subflow_connect(sk, &addr_l, &addr_r);
 
 	release_sock(sk);
 
-	return ret;
+ create_err:
+	sock_put((struct sock *)msk);
+	return err;
 }
 
 static struct sock *mptcp_nl_find_ssk(struct mptcp_sock *msk,
@@ -358,12 +368,12 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 	struct mptcp_addr_info addr_r;
 	struct mptcp_sock *msk;
 	struct sock *sk, *ssk;
+	int err = -EINVAL;
 	u32 token_val;
-	int ret;
 
 	if (!laddr || !raddr || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
-		return -EINVAL;
+		return err;
 	}
 
 	token_val = nla_get_u32(token);
@@ -371,34 +381,34 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 	msk = mptcp_token_get_sock(genl_info_net(info), token_val);
 	if (!msk) {
 		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
-		return -EINVAL;
+		return err;
 	}
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		return -EINVAL;
+		goto destroy_err;
 	}
 
-	ret = mptcp_pm_parse_addr(laddr, info, &addr_l);
-	if (ret < 0) {
+	err = mptcp_pm_parse_addr(laddr, info, &addr_l);
+	if (err < 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, laddr, "error parsing local addr");
-		return ret;
+		goto destroy_err;
 	}
 
-	ret = mptcp_pm_parse_addr(raddr, info, &addr_r);
-	if (ret < 0) {
+	err = mptcp_pm_parse_addr(raddr, info, &addr_r);
+	if (err < 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, raddr, "error parsing remote addr");
-		return ret;
+		goto destroy_err;
 	}
 
 	if (addr_l.family != addr_r.family) {
 		GENL_SET_ERR_MSG(info, "address families do not match");
-		return -EINVAL;
+		goto destroy_err;
 	}
 
 	if (!addr_l.port || !addr_r.port) {
 		GENL_SET_ERR_MSG(info, "missing local or remote port");
-		return -EINVAL;
+		goto destroy_err;
 	}
 
 	sk = &msk->sk.icsk_inet.sk;
@@ -408,9 +418,12 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 
 		mptcp_subflow_shutdown(sk, ssk, RCV_SHUTDOWN | SEND_SHUTDOWN);
 		mptcp_close_ssk(sk, ssk, subflow);
+		err = 0;
 	} else {
-		ret = -ESRCH;
+		err = -ESRCH;
 	}
 
-	return ret;
+ destroy_err:
+	sock_put((struct sock *)msk);
+	return err;
 }
