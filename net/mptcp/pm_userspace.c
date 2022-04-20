@@ -186,12 +186,13 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
 	LIST_HEAD(free_list);
+	int err = -EINVAL;
 	u32 token_val;
 	u8 id_val;
 
 	if (!id || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
-		return -EINVAL;
+		return err;
 	}
 
 	id_val = nla_get_u8(id);
@@ -200,12 +201,12 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	msk = mptcp_token_get_sock(sock_net(skb->sk), token_val);
 	if (!msk) {
 		NL_SET_ERR_MSG_ATTR(info->extack, token, "invalid token");
-		return -EINVAL;
+		return err;
 	}
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		return -EINVAL;
+		goto remove_err;
 	}
 
 	lock_sock((struct sock *)msk);
@@ -220,7 +221,7 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	if (!match) {
 		GENL_SET_ERR_MSG(info, "address with specified id not found");
 		release_sock((struct sock *)msk);
-		return -EINVAL;
+		goto remove_err;
 	}
 
 	list_move(&match->list, &free_list);
@@ -232,5 +233,9 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	list_for_each_entry_safe(match, entry, &free_list, list) {
 		sock_kfree_s((struct sock *)msk, match, sizeof(*match));
 	}
-	return 0;
+
+	err = 0;
+ remove_err:
+	sock_put((struct sock *)msk);
+	return err;
 }
