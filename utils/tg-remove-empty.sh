@@ -14,10 +14,10 @@ while true; do
 	BRANCH="$(git_current_branch)"
 	if tg_empty && ! [[ "${BRANCH}" =~ ^"t/upstream"* ]]; then
 		echo -e "\n\t => Remove ${BRANCH}\n"
-		DEPS="$(cat .topdeps)"
+		DEPS="$(head -n1 .topdeps)"
 		tg annihilate # it jumps to the next one
 		tg update
-		echo "${DEPS}" > .topdeps
+		sed -i "1c\\${DEPS}" .topdeps
 		git commit -sm "tg: parent topic is empty" .topdeps
 		tg update
 		tg push "${BRANCH}"

@@ -116,7 +116,7 @@ if [ "${TG_TOP}" = "${TG_TOPIC_TOP_NET_NEXT}" ] ||
 	TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
 	while git show "${TG_TOP_NEXT}:.topmsg" | grep "^Subject: " | grep -q "DO-NOT-MERGE"; do
 		TG_TOP="${TG_TOP_NEXT}"
-		TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps")
+		TG_TOP_NEXT=$(git show "${TG_TOP}:.topdeps" | head -n1)
 	done
 fi
 
@@ -148,7 +148,7 @@ tg import --notes "${PARENT}"..tmp
 # Change the dep of TG_TOP to point to the last new patch
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 git checkout "${TG_TOP}"
-echo "${BRANCH}" > .topdeps
+sed -i "1c\\${BRANCH}" .topdeps
 git commit -sm "tg: switch to ${BRANCH}" .topdeps
 TG_TOP="${TG_TOP}" ./.publish.sh
 
