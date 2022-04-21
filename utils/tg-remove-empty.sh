@@ -23,8 +23,11 @@ while true; do
 		tg push "${BRANCH}"
 		#tg delete "${BRANCH}"
 	elif [ "${BRANCH}" = "t/DO-NOT-MERGE-git-markup-end-common-net-net-next" ]; then
-		echo -e "\n\t => Special case ${BRANCH}\n"
-		git checkout t/DO-NOT-MERGE-git-markup-fixes-net-next
+		echo -e "\n\t => Special case ${BRANCH}: continue on -net tree\n"
+		echo 2 | tg checkout next || break
+	elif [ "${BRANCH}" = "t/upstream-net" ]; then
+		echo -e "\n\t => Net tree done, switch to net-next tree\n"
+		git checkout t/DO-NOT-MERGE-git-markup-net-next
 	else
 		echo -e "\n\t => Skip ${BRANCH}\n"
 		tg checkout next || break
