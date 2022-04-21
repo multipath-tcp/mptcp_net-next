@@ -1,4 +1,55 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/x86-pm-fix-false-positive-kmemleak-report-in-msr_build_context
+Subject: [PATCH] x86/pm: fix false positive kmemleak report in msr_build_context()
 
+Since commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume"),
+kmemleak reports this issue:
+
+  unreferenced object 0xffff888009cedc00 (size 256):
+    comm "swapper/0", pid 1, jiffies 4294693823 (age 73.764s)
+    hex dump (first 32 bytes):
+      00 00 00 00 00 00 00 00 48 00 00 00 00 00 00 00  ........H.......
+      00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+    backtrace:
+      msr_build_context (include/linux/slab.h:621)
+      pm_check_save_msr (arch/x86/power/cpu.c:520)
+      do_one_initcall (init/main.c:1298)
+      kernel_init_freeable (init/main.c:1370)
+      kernel_init (init/main.c:1504)
+      ret_from_fork (arch/x86/entry/entry_64.S:304)
+
+It is easy to reproduce it on my side:
+
+  - boot the VM with a debug kernel config [1]
+  - wait ~1 minute
+  - start a kmemleak scan
+
+It seems kmemleak has an issue with the array allocated in
+msr_build_context() and assigned to a pointer in a static structure
+(saved_context.saved_msrs->array): there is no leak then.
+
+It looks like this is a limitation from kmemleak but that's alright,
+kmemleak_no_leak() can be used to avoid complaining about that.
+
+Please note that it looks like this issue is not new, e.g.
+
+  https://lore.kernel.org/all/9f1bb619-c4ee-21c4-a251-870bd4db04fa@lwfinger.net/
+  https://lore.kernel.org/all/94e48fcd-1dbd-ebd2-4c91-f39941735909@molgen.mpg.de/
+
+But on my side, msr_build_context() is only used since:
+
+  commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume").
+
+Depending on their CPUs, others have probably the same issue since:
+
+  commit 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume"),
+
+hence the 'Fixes' tag here below to help with the backports. But I
+understand if someone says the origin of this issue is more on
+kmemleak's side. What is unclear to me is why this issue was not seen by
+other people and CIs. Maybe the kernel config [1]?
+
+[1] https://github.com/multipath-tcp/mptcp_net-next/files/8531660/kmemleak-cpu-sched-bisect.kconfig.txt
+
+Fixes: 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/268
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
