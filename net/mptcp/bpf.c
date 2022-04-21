@@ -40,6 +40,7 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 {
 	const struct btf_type *state;
 	u32 type_id;
+	size_t end;
 
 	if (atype == BPF_READ)
 		return btf_struct_access(log, btf, t, off, size, atype,
@@ -52,6 +53,21 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	state = btf_type_by_id(btf, type_id);
 	if (t != state) {
 		bpf_log(log, "only read is supported\n");
+		return -EACCES;
+	}
+
+	switch (off) {
+	case offsetofend(struct mptcp_sock, sched):
+		end = offsetofend(struct mptcp_sock, sched) + sizeof(u8);
+		break;
+	default:
+		bpf_log(log, "no write support to mptcp_sock at off %d\n", off);
+		return -EACCES;
+	}
+
+	if (off + size > end) {
+		bpf_log(log, "access beyond mptcp_sock at off %u size %u ended at %zu",
+			off, size, end);
 		return -EACCES;
 	}
 
