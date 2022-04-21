@@ -28,9 +28,12 @@ while true; do
 	elif [ "${BRANCH}" = "t/upstream-net" ]; then
 		echo -e "\n\t => Net tree done, switch to net-next tree\n"
 		git checkout t/DO-NOT-MERGE-git-markup-net-next
+	elif [ "${BRANCH}" = "t/upstream" ]; then
+		echo -e "\n\t => End\n"
+		break
 	else
-		echo -e "\n\t => Skip ${BRANCH}\n"
-		tg checkout next || break
+		echo -e "\n\t => Not empty, skip ${BRANCH}\n"
+		tg checkout next || exit 1
 		tg update
 	fi
 done
