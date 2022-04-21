@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/x86-pm-fix-false-positive-kmemleak-report-in-msr_build_context
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
