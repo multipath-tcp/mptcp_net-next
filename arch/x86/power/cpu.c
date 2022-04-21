@@ -14,6 +14,7 @@
 #include <linux/tboot.h>
 #include <linux/dmi.h>
 #include <linux/pgtable.h>
+#include <linux/kmemleak.h>
 
 #include <asm/proto.h>
 #include <asm/mtrr.h>
@@ -412,6 +413,9 @@ static int msr_build_context(const u32 *msr_id, const int num)
 		pr_err("x86/pm: Can not allocate memory to save/restore MSRs during suspend.\n");
 		return -ENOMEM;
 	}
+
+	/* The pointer is going to be stored in static struct (saved_context) */
+	kmemleak_not_leak(msr_array);
 
 	if (saved_msrs->array) {
 		/*
