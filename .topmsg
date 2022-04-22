@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-mib-for-xmit-window-sharing
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add mib for xmit window sharing
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Bump a counter for counter when snd_wnd is shared among subflow,
+for observability's sake.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
