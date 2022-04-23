@@ -1251,7 +1251,7 @@ static void mptcp_set_rwin(struct tcp_sock *tp, struct tcphdr *th)
 			if (before64(rcv_wnd_new, rcv_wnd))
 				goto raise_win;
 			rcv_wnd_old = rcv_wnd;
-		};
+		}
 		return;
 	}
 
