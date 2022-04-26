@@ -1,5 +1,5 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] x86/pm: fix false positive kmemleak report in msr_build_context()
+Subject: [PATCH v2] x86/pm: fix false positive kmemleak report in msr_build_context()
 
 Since commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume"),
 kmemleak reports this issue:
@@ -19,16 +19,70 @@ kmemleak reports this issue:
 
 It is easy to reproduce it on my side:
 
-  - boot the VM with a debug kernel config [1]
+  - boot the VM with a debug kernel config (see the 'Closes:' tag)
   - wait ~1 minute
   - start a kmemleak scan
 
 It seems kmemleak has an issue with the array allocated in
-msr_build_context() and assigned to a pointer in a static structure
-(saved_context.saved_msrs->array): there is no leak then.
+msr_build_context(). This array is assigned to a pointer in a static
+structure (saved_context.saved_msrs->array): there is no leak then.
 
-It looks like this is a limitation from kmemleak but that's alright,
-kmemleak_no_leak() can be used to avoid complaining about that.
+A simple fix for this issue would be to use kmemleak_no_leak() but Mat
+noticed that the root cause here is alignment within the packed 'struct
+saved_context' (from suspend_64.h). Kmemleak only searches for pointers
+that are aligned (see how pointers are scanned in kmemleak.c), but
+pahole shows that the saved_msrs struct member and all members after it
+in the structure are unaligned:
+
+  struct saved_context {
+    struct pt_regs             regs;                 /*     0   168 */
+    /* --- cacheline 2 boundary (128 bytes) was 40 bytes ago --- */
+    u16                        ds;                   /*   168     2 */
+    u16                        es;                   /*   170     2 */
+    u16                        fs;                   /*   172     2 */
+    u16                        gs;                   /*   174     2 */
+    long unsigned int          kernelmode_gs_base;   /*   176     8 */
+    long unsigned int          usermode_gs_base;     /*   184     8 */
+    /* --- cacheline 3 boundary (192 bytes) --- */
+    long unsigned int          fs_base;              /*   192     8 */
+    long unsigned int          cr0;                  /*   200     8 */
+    long unsigned int          cr2;                  /*   208     8 */
+    long unsigned int          cr3;                  /*   216     8 */
+    long unsigned int          cr4;                  /*   224     8 */
+    u64                        misc_enable;          /*   232     8 */
+    bool                       misc_enable_saved;    /*   240     1 */
+
+   /* Note below odd offset values for the remainder of this struct */
+
+    struct saved_msrs          saved_msrs;           /*   241    16 */
+    /* --- cacheline 4 boundary (256 bytes) was 1 bytes ago --- */
+    long unsigned int          efer;                 /*   257     8 */
+    u16                        gdt_pad;              /*   265     2 */
+    struct desc_ptr            gdt_desc;             /*   267    10 */
+    u16                        idt_pad;              /*   277     2 */
+    struct desc_ptr            idt;                  /*   279    10 */
+    u16                        ldt;                  /*   289     2 */
+    u16                        tss;                  /*   291     2 */
+    long unsigned int          tr;                   /*   293     8 */
+    long unsigned int          safety;               /*   301     8 */
+    long unsigned int          return_address;       /*   309     8 */
+
+    /* size: 317, cachelines: 5, members: 25 */
+    /* last cacheline: 61 bytes */
+  } __attribute__((__packed__));
+
+By moving 'misc_enable_saved' to the end of the struct declaration,
+'saved_msrs' fits in before the cacheline 4 boundary and the kmemleak
+warning goes away.
+
+The comment above the 'saved_context' declaration says to check
+wakeup_64.S file and __save/__restore_processor_state() if the struct is
+modified: it looks like it's the members before 'misc_enable' that must
+be carefully placed.
+
+At the end, the false positive kmemleak report is due to a limitation
+from kmemleak but that's always good to avoid unaligned member for
+optimisation purposes.
 
 Please note that it looks like this issue is not new, e.g.
 
@@ -39,17 +93,13 @@ But on my side, msr_build_context() is only used since:
 
   commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume").
 
-Depending on their CPUs, others have probably the same issue since:
+Others probably have the same issue since:
 
   commit 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume"),
 
-hence the 'Fixes' tag here below to help with the backports. But I
-understand if someone says the origin of this issue is more on
-kmemleak's side. What is unclear to me is why this issue was not seen by
-other people and CIs. Maybe the kernel config [1]?
-
-[1] https://github.com/multipath-tcp/mptcp_net-next/files/8531660/kmemleak-cpu-sched-bisect.kconfig.txt
+Hence the 'Fixes' tag here below to help with the backports.
 
 Fixes: 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/268
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
