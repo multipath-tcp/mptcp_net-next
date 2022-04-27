@@ -14,12 +14,12 @@
  * Image of the saved processor state, used by the low level ACPI suspend to
  * RAM code and by the low level hibernation code.
  *
- * If you modify it before 'misc_enable', fix arch/x86/kernel/acpi/wakeup_64.S
+ * If you modify it, check how it is used in arch/x86/kernel/acpi/wakeup_64.S
  * and make sure that __save/__restore_processor_state(), defined in
- * arch/x86/kernel/suspend_64.c, still work as required.
+ * arch/x86/power/cpu.c, still work as required.
  *
  * Because the structure is packed, make sure to avoid unaligned members. For
- * optimisations purposes but also because tools like Kmemleak only search for
+ * optimisation purposes but also because tools like kmemleak only search for
  * pointers that are aligned.
  */
 struct saved_context {
