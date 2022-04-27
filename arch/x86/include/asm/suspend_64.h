@@ -14,13 +14,9 @@
  * Image of the saved processor state, used by the low level ACPI suspend to
  * RAM code and by the low level hibernation code.
  *
- * If you modify it before 'misc_enable', fix arch/x86/kernel/acpi/wakeup_64.S
- * and make sure that __save/__restore_processor_state(), defined in
- * arch/x86/kernel/suspend_64.c, still work as required.
- *
- * Because the structure is packed, make sure to avoid unaligned members. For
- * optimisations purposes but also because tools like Kmemleak only search for
- * pointers that are aligned.
+ * If you modify it, fix arch/x86/kernel/acpi/wakeup_64.S and make sure that
+ * __save/__restore_processor_state(), defined in arch/x86/kernel/suspend_64.c,
+ * still work as required.
  */
 struct saved_context {
 	struct pt_regs regs;
@@ -40,6 +36,7 @@ struct saved_context {
 
 	unsigned long cr0, cr2, cr3, cr4;
 	u64 misc_enable;
+	bool misc_enable_saved;
 	struct saved_msrs saved_msrs;
 	unsigned long efer;
 	u16 gdt_pad; /* Unused */
@@ -51,7 +48,6 @@ struct saved_context {
 	unsigned long tr;
 	unsigned long safety;
 	unsigned long return_address;
-	bool misc_enable_saved;
 } __attribute__((packed));
 
 #define loaddebug(thread,register) \
