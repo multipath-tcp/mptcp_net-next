@@ -1,7 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH v2] x86/pm: fix false positive kmemleak report in msr_build_context()
+Subject: x86/pm: Fix false positive kmemleak report in msr_build_context()
 
-Since commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume"),
+Since
+
+  e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume")
+
 kmemleak reports this issue:
 
   unreferenced object 0xffff888009cedc00 (size 256):
@@ -17,38 +20,26 @@ kmemleak reports this issue:
       kernel_init (init/main.c:1504)
       ret_from_fork (arch/x86/entry/entry_64.S:304)
 
-It is easy to reproduce it on my side:
+Reproducer:
 
-  - boot the VM with a debug kernel config (see the 'Closes:' tag)
+  - boot the VM with a debug kernel config (see
+    https://github.com/multipath-tcp/mptcp_net-next/issues/268)
   - wait ~1 minute
   - start a kmemleak scan
 
-It seems kmemleak has an issue with the array allocated in
-msr_build_context(). This array is assigned to a pointer in a static
-structure (saved_context.saved_msrs->array): there is no leak then.
-
-A simple fix for this issue would be to use kmemleak_no_leak() but Mat
-noticed that the root cause here is alignment within the packed 'struct
-saved_context' (from suspend_64.h). Kmemleak only searches for pointers
-that are aligned (see how pointers are scanned in kmemleak.c), but
-pahole shows that the saved_msrs struct member and all members after it
-in the structure are unaligned:
+The root cause here is alignment within the packed struct saved_context
+(from suspend_64.h). Kmemleak only searches for pointers that are
+aligned (see how pointers are scanned in kmemleak.c), but pahole shows
+that the saved_msrs struct member and all members after it in the
+structure are unaligned:
 
   struct saved_context {
     struct pt_regs             regs;                 /*     0   168 */
     /* --- cacheline 2 boundary (128 bytes) was 40 bytes ago --- */
     u16                        ds;                   /*   168     2 */
-    u16                        es;                   /*   170     2 */
-    u16                        fs;                   /*   172     2 */
-    u16                        gs;                   /*   174     2 */
-    long unsigned int          kernelmode_gs_base;   /*   176     8 */
-    long unsigned int          usermode_gs_base;     /*   184     8 */
-    /* --- cacheline 3 boundary (192 bytes) --- */
-    long unsigned int          fs_base;              /*   192     8 */
-    long unsigned int          cr0;                  /*   200     8 */
-    long unsigned int          cr2;                  /*   208     8 */
-    long unsigned int          cr3;                  /*   216     8 */
-    long unsigned int          cr4;                  /*   224     8 */
+
+    ...
+
     u64                        misc_enable;          /*   232     8 */
     bool                       misc_enable_saved;    /*   240     1 */
 
@@ -71,17 +62,16 @@ in the structure are unaligned:
     /* last cacheline: 61 bytes */
   } __attribute__((__packed__));
 
-By moving 'misc_enable_saved' to the end of the struct declaration,
-'saved_msrs' fits in before the cacheline 4 boundary and the kmemleak
-warning goes away.
+Move misc_enable_saved to the end of the struct declaration so that
+saved_msrs fits in before the cacheline 4 boundary.
 
-The comment above the 'saved_context' declaration says to check
-wakeup_64.S file and __save/__restore_processor_state() if the struct is
-modified: it looks like it's the members before 'misc_enable' that must
-be carefully placed.
+The comment above the saved_context declaration says to fix wakeup_64.S
+file and __save/__restore_processor_state() if the struct is modified:
+it looks like all the accesses in wakeup_64.S are done through offsets
+which are computed at build-time. Update that comment accordingly.
 
 At the end, the false positive kmemleak report is due to a limitation
-from kmemleak but that's always good to avoid unaligned member for
+from kmemleak but it is always good to avoid unaligned members for
 optimisation purposes.
 
 Please note that it looks like this issue is not new, e.g.
@@ -89,17 +79,11 @@ Please note that it looks like this issue is not new, e.g.
   https://lore.kernel.org/all/9f1bb619-c4ee-21c4-a251-870bd4db04fa@lwfinger.net/
   https://lore.kernel.org/all/94e48fcd-1dbd-ebd2-4c91-f39941735909@molgen.mpg.de/
 
-But on my side, msr_build_context() is only used since:
-
-  commit e2a1256b17b1 ("x86/speculation: Restore speculation related MSRs during S3 resume").
-
-Others probably have the same issue since:
-
-  commit 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume"),
-
-Hence the 'Fixes' tag here below to help with the backports.
+  [ bp: Massage + cleanup commit message. ]
 
 Fixes: 7a9c2dd08ead ("x86/pm: Introduce quirk framework to save/restore extra MSR registers around suspend/resume")
-Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/268
 Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Borislav Petkov <bp@suse.de>
+Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Link: https://lore.kernel.org/r/20220426202138.498310-1-matthieu.baerts@tessares.net
