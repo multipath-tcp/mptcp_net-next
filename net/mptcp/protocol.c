@@ -2259,6 +2259,14 @@ static struct sock *mptcp_subflow_get_retrans(struct mptcp_sock *msk)
 	return min_stale_count > 1 ? backup : NULL;
 }
 
+void mptcp_get_subflow_default(struct mptcp_sock *msk, bool reinject,
+			       struct mptcp_sched_data *data)
+{
+	data->sock = reinject ? mptcp_subflow_get_retrans(msk) :
+				mptcp_subflow_get_send(msk);
+	data->call_again = 0;
+}
+
 static void mptcp_dispose_initial_subflow(struct mptcp_sock *msk)
 {
 	if (msk->subflow) {
@@ -3813,6 +3821,7 @@ void __init mptcp_proto_init(void)
 
 	mptcp_subflow_init();
 	mptcp_pm_init();
+	mptcp_sched_init();
 	mptcp_token_init();
 
 	if (proto_register(&mptcp_prot, MPTCP_USE_SLAB) != 0)
