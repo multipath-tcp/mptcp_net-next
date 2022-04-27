@@ -8,6 +8,7 @@
 
 char _license[] SEC("license") = "GPL";
 __u32 _version SEC("version") = 1;
+extern bool CONFIG_MPTCP __kconfig;
 
 struct mptcp_storage {
 	__u32 invoked;
@@ -52,6 +53,9 @@ int _sockops(struct bpf_sock_ops *ctx)
 		storage->token = 0;
 		bzero(storage->ca_name, TCP_CA_NAME_MAX);
 	} else {
+		if (!CONFIG_MPTCP)
+			return 1;
+
 		msk = bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
 			return 1;
