@@ -7,16 +7,16 @@
 char _license[] SEC("license") = "GPL";
 
 SEC("struct_ops/mptcp_sched_first_init")
-void BPF_PROG(mptcp_sched_first_init, struct mptcp_sock *msk)
+void BPF_PROG(mptcp_sched_first_init, const struct mptcp_sock *msk)
 {
 }
 
 SEC("struct_ops/mptcp_sched_first_release")
-void BPF_PROG(mptcp_sched_first_release, struct mptcp_sock *msk)
+void BPF_PROG(mptcp_sched_first_release, const struct mptcp_sock *msk)
 {
 }
 
-void BPF_STRUCT_OPS(bpf_first_get_subflow, struct mptcp_sock *msk,
+void BPF_STRUCT_OPS(bpf_first_get_subflow, const struct mptcp_sock *msk,
 		    bool reinject, struct mptcp_sched_data *data)
 {
 	data->sock = msk->first;
