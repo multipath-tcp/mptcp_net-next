@@ -5144,6 +5144,17 @@ union bpf_attr {
  *		**-EOPNOTSUP** if the hash calculation failed or **-EINVAL** if
  *		invalid arguments are passed.
  *
+ * void *bpf_kptr_xchg(void *map_value, void *ptr)
+ *	Description
+ *		Exchange kptr at pointer *map_value* with *ptr*, and return the
+ *		old value. *ptr* can be NULL, otherwise it must be a referenced
+ *		pointer which will be released when this helper is called.
+ *	Return
+ *		The old value of kptr (which can be NULL). The returned pointer
+ *		if not NULL, is a reference which must be released using its
+ *		corresponding release function, or moved into a BPF map before
+ *		program exit.
+ *
  * struct mptcp_sock *bpf_skc_to_mptcp_sock(void *sk)
  *	Description
  *		Dynamically cast a *sk* pointer to a *mptcp_sock* pointer.
@@ -5345,6 +5356,7 @@ union bpf_attr {
 	FN(copy_from_user_task),	\
 	FN(skb_set_tstamp),		\
 	FN(ima_file_hash),		\
+	FN(kptr_xchg),			\
 	FN(skc_to_mptcp_sock),		\
 	/* */
 
