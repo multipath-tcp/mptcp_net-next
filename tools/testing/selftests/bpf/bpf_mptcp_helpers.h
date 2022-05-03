@@ -16,10 +16,10 @@ struct mptcp_sched_data {
 struct mptcp_sched_ops {
 	char name[MPTCP_SCHED_NAME_MAX];
 
-	void (*init)(struct mptcp_sock *msk);
-	void (*release)(struct mptcp_sock *msk);
+	void (*init)(const struct mptcp_sock *msk);
+	void (*release)(const struct mptcp_sock *msk);
 
-	void (*get_subflow)(struct mptcp_sock *msk, bool reinject,
+	void (*get_subflow)(const struct mptcp_sock *msk, bool reinject,
 			    struct mptcp_sched_data *data);
 	void *owner;
 };
