@@ -7,5 +7,6 @@ Register and unregister the bpf scheduler in .reg and .unreg.
 This MPTCP BPF scheduler implementation is similar to BPF TCP CC. And
 net/ipv4/bpf_tcp_ca.c is a frame of reference for this patch.
 
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
