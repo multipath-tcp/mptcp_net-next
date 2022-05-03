@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-sched-in-mptcp_sock
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add sched in mptcp_sock
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds a new struct member sched in struct mptcp_sock.
+And two helpers mptcp_init_sched() and mptcp_release_sched() to
+init and release it.
+
+Init it with the sysctl scheduler in mptcp_init_sock(), copy the
+scheduler from the parent in mptcp_sk_clone(), and release it in
+__mptcp_destroy_sock().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
