@@ -24,7 +24,6 @@ static u32 mptcp_sched_id;
 static u32 optional_ops[] = {
 	offsetof(struct mptcp_sched_ops, init),
 	offsetof(struct mptcp_sched_ops, release),
-	offsetof(struct mptcp_sched_ops, get_subflow),
 };
 
 static const struct bpf_func_proto *
