@@ -9,5 +9,6 @@ Init it with the sysctl scheduler in mptcp_init_sock(), copy the
 scheduler from the parent in mptcp_sk_clone(), and release it in
 __mptcp_destroy_sock().
 
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
