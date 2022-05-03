@@ -5,10 +5,15 @@
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
 
+#ifndef TCP_CA_NAME_MAX
+#define TCP_CA_NAME_MAX	16
+#endif
+
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
 	__u32 token;
+	char ca_name[TCP_CA_NAME_MAX];
 };
 
 static char monitor_log_path[64];
@@ -79,11 +84,36 @@ err:
 	return token;
 }
 
+void get_msk_ca_name(char ca_name[])
+{
+	size_t len;
+	int fd;
+
+	fd = open("/proc/sys/net/ipv4/tcp_congestion_control", O_RDONLY);
+	if (CHECK_FAIL(fd < 0)) {
+		log_err("Failed to open tcp_congestion_control");
+		return;
+	}
+
+	len = read(fd, ca_name, TCP_CA_NAME_MAX);
+	if (CHECK_FAIL(len < 0)) {
+		log_err("Failed to read ca_name");
+		goto err;
+	}
+
+	if (len > 0 && ca_name[len - 1] == '\n')
+		ca_name[len - 1] = '\0';
+
+err:
+	close(fd);
+}
+
 static int verify_msk(int map_fd, int client_fd)
 {
 	char *msg = "MPTCP subflow socket";
 	int err = 0, cfd = client_fd;
 	struct mptcp_storage val;
+	char ca_name[TCP_CA_NAME_MAX];
 	__u32 token;
 
 	token = get_msk_token();
@@ -91,6 +121,8 @@ static int verify_msk(int map_fd, int client_fd)
 		log_err("Unexpected token %x", token);
 		return -1;
 	}
+
+	get_msk_ca_name(ca_name);
 
 	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
 		perror("Failed to read socket storage");
@@ -112,6 +144,12 @@ static int verify_msk(int map_fd, int client_fd)
 	if (val.token != token) {
 		log_err("Unexpected mptcp_sock.token %x != %x",
 			val.token, token);
+		err++;
+	}
+
+	if (strncmp(val.ca_name, ca_name, TCP_CA_NAME_MAX)) {
+		log_err("Unexpected mptcp_sock.ca_name %s != %s",
+			val.ca_name, ca_name);
 		err++;
 	}
 
