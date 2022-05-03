@@ -7,5 +7,6 @@ to set net.mptcp.scheduler to use this sched.
 
 Some code in send_data() is from prog_tests/bpf_tcp_ca.c.
 
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
