@@ -12,5 +12,6 @@ For supporting a "redundant" packet scheduler in the future, this patch
 adds a flag in struct mptcp_sched_data named call_again to indicate that
 get_subflow() function needs to be called again.
 
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
