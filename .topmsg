@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-subflow-limits-test-cases
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add subflow limits test-cases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add and deletes a bunch of endpoints and verify the
+respect of configured limits.
+
+This covers the codepath introduced by the previous patch.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
