@@ -6,5 +6,6 @@ mptcp_sched_get_retrans(), invoke get_subflow() of msk->sched
 in them. Use them instead of using mptcp_subflow_get_send() or
 mptcp_subflow_get_retrans() directly.
 
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
