@@ -371,6 +371,7 @@ static void test_first(void)
 
 	close(client_fd);
 	close(server_fd);
+	system("sysctl -qw net.mptcp.scheduler=default");
 	bpf_link__destroy(link);
 	mptcp_bpf_first__destroy(first_skel);
 }
