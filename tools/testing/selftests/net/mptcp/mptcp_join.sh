@@ -2740,7 +2740,7 @@ fail_tests()
 		pm_nl_set_limits $ns2 0 1
 		pm_nl_add_endpoint $ns2 10.0.2.2 dev ns2eth2 flags subflow
 		run_tests $ns1 $ns2 10.0.1.1 1024
-		chk_join_nr 1 1 1 +1 +0 1 1 0 "$(pedit_action_pkts)"
+		chk_join_nr 1 1 1 1 0 1 1 0 "$(pedit_action_pkts)"
 	fi
 }
 
