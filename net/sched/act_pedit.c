@@ -233,13 +233,11 @@ static int tcf_pedit_init(struct net *net, struct nlattr *nla,
 		u32 cur = p->tcfp_keys[i].off;
 
 		/* The AT option can read a single byte, we can bound the actual
-		 * value with uchar max. Each key touches 4 bytes starting from
-		 * the computed offset
+		 * value with uchar max.
 		 */
-		if (p->tcfp_keys[i].offmask) {
-			cur += 255 >> p->tcfp_keys[i].shift;
-			cur = max(p->tcfp_keys[i].at, cur);
-		}
+		cur += (0xff & p->tcfp_keys[i].offmask) >> p->tcfp_keys[i].shift;
+
+		/* Each key touches 4 bytes starting from the computed offset */
 		p->tcfp_off_max_hint = max(p->tcfp_off_max_hint, cur + 4);
 	}
 
@@ -325,14 +323,14 @@ static int tcf_pedit_act(struct sk_buff *skb, const struct tc_action *a,
 	u32 max_offset;
 	int i;
 
+	spin_lock(&p->tcf_lock);
+
 	max_offset = (skb_transport_header_was_set(skb) ?
 		      skb_transport_offset(skb) :
 		      skb_network_offset(skb)) +
 		     p->tcfp_off_max_hint;
 	if (skb_ensure_writable(skb, min(skb->len, max_offset)))
-		return p->tcf_action;
-
-	spin_lock(&p->tcf_lock);
+		goto unlock;
 
 	tcf_lastuse_update(&p->tcf_tm);
 
@@ -422,6 +420,7 @@ bad:
 	p->tcf_qstats.overlimits++;
 done:
 	bstats_update(&p->tcf_bstats, skb);
+unlock:
 	spin_unlock(&p->tcf_lock);
 	return p->tcf_action;
 }
