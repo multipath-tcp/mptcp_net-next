@@ -14,7 +14,12 @@ writable.
 Note that this may cause performance regressions in some scenario,
 but hopefully pedit is not critical path.
 
-Fixes: 1da177e4c3f4 ("Linux-2.6.12-rc2")
+v1 -> v2:
+ - cleanup hint update (Jakub)
+ - avoid raices while accessing the hint (Jakub)
+ - re-organize the comments for clarity
+
+Fixes: db2c24175d14 ("act_pedit: access skb->data safely")
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Tested-by: Geliang Tang <geliang.tang@suse.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
