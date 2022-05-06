@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-sockopt-add-TCP_DEFER_ACCEPT-support
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] mptcp: sockopt: add TCP_DEFER_ACCEPT support
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Support this via passthrough to the underlying tcp listener socket.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/271
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
