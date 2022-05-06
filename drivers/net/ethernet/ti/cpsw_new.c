@@ -1240,8 +1240,10 @@ static int cpsw_probe_dt(struct cpsw_common *cpsw)
 	data->slave_data = devm_kcalloc(dev, CPSW_SLAVE_PORTS_NUM,
 					sizeof(struct cpsw_slave_data),
 					GFP_KERNEL);
-	if (!data->slave_data)
+	if (!data->slave_data) {
+		of_node_put(tmp_node);
 		return -ENOMEM;
+	}
 
 	/* Populate all the child nodes here...
 	 */
@@ -1335,6 +1337,7 @@ static int cpsw_probe_dt(struct cpsw_common *cpsw)
 
 err_node_put:
 	of_node_put(port_np);
+	of_node_put(tmp_node);
 	return ret;
 }
 
@@ -1417,10 +1420,9 @@ static int cpsw_create_ports(struct cpsw_common *cpsw)
 				       cpsw->quirk_irq ?
 				       cpsw_rx_poll : cpsw_rx_mq_poll,
 				       NAPI_POLL_WEIGHT);
-			netif_tx_napi_add(ndev, &cpsw->napi_tx,
+			netif_napi_add_tx(ndev, &cpsw->napi_tx,
 					  cpsw->quirk_irq ?
-					  cpsw_tx_poll : cpsw_tx_mq_poll,
-					  NAPI_POLL_WEIGHT);
+					  cpsw_tx_poll : cpsw_tx_mq_poll);
 		}
 
 		napi_ndev = ndev;
