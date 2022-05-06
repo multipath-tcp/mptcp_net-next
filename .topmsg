@@ -1,7 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: add more offered MIBs counter
-
-Track the exceptional handling of MPTCP-level offered window
-with a few more counters for observability.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
