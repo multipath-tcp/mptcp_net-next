@@ -15,4 +15,6 @@ Invoke pedit_action_pkts() to get the numbers of the packets edited
 by the tc pedit actions, and print this numbers to the output.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
