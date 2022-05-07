@@ -95,16 +95,12 @@ void get_msk_ca_name(char ca_name[])
 	int fd;
 
 	fd = open("/proc/sys/net/ipv4/tcp_congestion_control", O_RDONLY);
-	if (CHECK_FAIL(fd < 0)) {
-		log_err("Failed to open tcp_congestion_control");
+	if (!ASSERT_GT(fd, 0, "Failed to open tcp_congestion_control"))
 		return;
-	}
 
 	len = read(fd, ca_name, TCP_CA_NAME_MAX);
-	if (CHECK_FAIL(len < 0)) {
-		log_err("Failed to read ca_name");
+	if (!ASSERT_GT(len, 0, "Failed to read ca_name"))
 		goto err;
-	}
 
 	if (len > 0 && ca_name[len - 1] == '\n')
 		ca_name[len - 1] = '\0';
