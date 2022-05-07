@@ -60,7 +60,7 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 	}
 
 	prog_fd = bpf_program__fd(prog);
-	if (!ASSERT_GT(prog_fd, 0, "bpf_program__fd")) {
+	if (!ASSERT_GE(prog_fd, 0, "bpf_program__fd")) {
 		err = -EIO;
 		goto out;
 	}
@@ -72,7 +72,7 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 	}
 
 	map_fd = bpf_map__fd(map);
-	if (!ASSERT_GT(map_fd, 0, "bpf_map__fd")) {
+	if (!ASSERT_GE(map_fd, 0, "bpf_map__fd")) {
 		err = -EIO;
 		goto out;
 	}
@@ -83,7 +83,7 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 
 	client_fd = is_mptcp ? connect_to_mptcp_fd(server_fd, 0) :
 			       connect_to_fd(server_fd, 0);
-	if (!ASSERT_GT(client_fd, 0, "connect to fd")) {
+	if (!ASSERT_GE(client_fd, 0, "connect to fd")) {
 		err = -EIO;
 		goto out;
 	}
