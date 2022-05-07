@@ -127,12 +127,12 @@ void test_base(void)
 	int server_fd, cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp");
-	if (!ASSERT_GT(cgroup_fd, 0, "test__join_cgroup"))
+	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
 	/* without MPTCP */
 	server_fd = start_server(AF_INET, SOCK_STREAM, NULL, 0, 0);
-	if (!ASSERT_GT(server_fd, 0, "start_server"))
+	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto with_mptcp;
 
 	ASSERT_OK(run_test(cgroup_fd, server_fd, false), "run_test tcp");
@@ -142,7 +142,7 @@ void test_base(void)
 with_mptcp:
 	/* with MPTCP */
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
-	if (!ASSERT_GT(server_fd, 0, "start_mptcp_server"))
+	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
 		goto close_cgroup_fd;
 
 	ASSERT_OK(run_test(cgroup_fd, server_fd, true), "run_test mptcp");
