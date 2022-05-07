@@ -57,7 +57,7 @@ static __u32 get_msk_token(void)
 	sync();
 
 	fd = open(monitor_log_path, O_RDONLY);
-	if (!ASSERT_GT(fd, 0, "Failed to open monitor_log_path"))
+	if (!ASSERT_GE(fd, 0, "Failed to open monitor_log_path"))
 		return token;
 
 	len = read(fd, buf, sizeof(buf));
