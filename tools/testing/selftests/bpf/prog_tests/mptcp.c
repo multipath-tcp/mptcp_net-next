@@ -57,16 +57,12 @@ static __u32 get_msk_token(void)
 	sync();
 
 	fd = open(monitor_log_path, O_RDONLY);
-	if (CHECK_FAIL(fd < 0)) {
-		log_err("Failed to open %s", monitor_log_path);
+	if (!ASSERT_GE(fd, 0, "Failed to open monitor_log_path"))
 		return token;
-	}
 
 	len = read(fd, buf, sizeof(buf));
-	if (CHECK_FAIL(len < 0)) {
-		log_err("Failed to read %s", monitor_log_path);
+	if (!ASSERT_GT(len, 0, "Failed to read monitor_log_path"))
 		goto err;
-	}
 
 	if (strncmp(buf, prefix, strlen(prefix))) {
 		log_err("Invalid prefix %s", buf);
@@ -88,10 +84,8 @@ static int verify_msk(int map_fd, int client_fd)
 	__u32 token;
 
 	token = get_msk_token();
-	if (token <= 0) {
-		log_err("Unexpected token %x", token);
+	if (!ASSERT_GT(token, 0, "Unexpected token"))
 		return -1;
-	}
 
 	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
 	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
@@ -198,12 +192,12 @@ void test_base(void)
 
 with_mptcp:
 	/* with MPTCP */
-	if (CHECK_FAIL(!mkdtemp(tmp_dir)))
+	if (!ASSERT_OK_PTR(mkdtemp(tmp_dir), "mkdtemp"))
 		goto close_cgroup_fd;
 	snprintf(monitor_log_path, sizeof(monitor_log_path),
 		 "%s/ip_mptcp_monitor", tmp_dir);
 	snprintf(cmd, sizeof(cmd), "ip mptcp monitor > %s &", monitor_log_path);
-	if (CHECK_FAIL(system(cmd)))
+	if (!ASSERT_OK(system(cmd), "ip mptcp monitor"))
 		goto close_cgroup_fd;
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
 	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
