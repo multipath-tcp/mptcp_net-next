@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020, Tessares SA. */
+/* Copyright (c) 2022, SUSE. */
 
 #include <test_progs.h>
 #include "cgroup_helpers.h"
@@ -26,13 +27,12 @@ static int stop, duration;
 static int verify_tsk(int map_fd, int client_fd)
 {
 	char *msg = "plain TCP socket";
-	int err = 0, cfd = client_fd;
+	int err, cfd = client_fd;
 	struct mptcp_storage val;
 
-	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
-		perror("Failed to read socket storage");
-		return -1;
-	}
+	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
+	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
+		return err;
 
 	if (val.invoked != 1) {
 		log_err("%s: unexpected invoked count %d != 1",
@@ -66,16 +66,12 @@ static __u32 get_msk_token(void)
 	sync();
 
 	fd = open(monitor_log_path, O_RDONLY);
-	if (CHECK_FAIL(fd < 0)) {
-		log_err("Failed to open %s", monitor_log_path);
+	if (!ASSERT_GE(fd, 0, "Failed to open monitor_log_path"))
 		return token;
-	}
 
 	len = read(fd, buf, sizeof(buf));
-	if (CHECK_FAIL(len < 0)) {
-		log_err("Failed to read %s", monitor_log_path);
+	if (!ASSERT_GT(len, 0, "Failed to read monitor_log_path"))
 		goto err;
-	}
 
 	if (strncmp(buf, prefix, strlen(prefix))) {
 		log_err("Invalid prefix %s", buf);
@@ -95,16 +91,12 @@ void get_msk_ca_name(char ca_name[])
 	int fd;
 
 	fd = open("/proc/sys/net/ipv4/tcp_congestion_control", O_RDONLY);
-	if (CHECK_FAIL(fd < 0)) {
-		log_err("Failed to open tcp_congestion_control");
+	if (!ASSERT_GE(fd, 0, "Failed to open tcp_congestion_control"))
 		return;
-	}
 
 	len = read(fd, ca_name, TCP_CA_NAME_MAX);
-	if (CHECK_FAIL(len < 0)) {
-		log_err("Failed to read ca_name");
+	if (!ASSERT_GT(len, 0, "Failed to read ca_name"))
 		goto err;
-	}
 
 	if (len > 0 && ca_name[len - 1] == '\n')
 		ca_name[len - 1] = '\0';
@@ -116,23 +108,20 @@ err:
 static int verify_msk(int map_fd, int client_fd)
 {
 	char *msg = "MPTCP subflow socket";
-	int err = 0, cfd = client_fd;
+	int err, cfd = client_fd;
 	struct mptcp_storage val;
 	char ca_name[TCP_CA_NAME_MAX];
 	__u32 token;
 
 	token = get_msk_token();
-	if (token <= 0) {
-		log_err("Unexpected token %x", token);
+	if (!ASSERT_GT(token, 0, "Unexpected token"))
 		return -1;
-	}
 
 	get_msk_ca_name(ca_name);
 
-	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
-		perror("Failed to read socket storage");
-		return -1;
-	}
+	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
+	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
+		return err;
 
 	if (val.invoked != 1) {
 		log_err("%s: unexpected invoked count %d != 1",
@@ -179,40 +168,40 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 		return -EIO;
 
 	err = bpf_object__load(obj);
-	if (CHECK_FAIL(err))
+	if (!ASSERT_OK(err, "bpf_object__load"))
 		goto out;
 
 	prog = bpf_object__find_program_by_name(obj, "_sockops");
-	if (CHECK_FAIL(!prog)) {
+	if (!ASSERT_OK_PTR(prog, "bpf_object__find_program_by_name")) {
 		err = -EIO;
 		goto out;
 	}
 
 	prog_fd = bpf_program__fd(prog);
-	if (CHECK_FAIL(prog_fd < 0)) {
+	if (!ASSERT_GE(prog_fd, 0, "bpf_program__fd")) {
 		err = -EIO;
 		goto out;
 	}
 
 	map = bpf_object__find_map_by_name(obj, "socket_storage_map");
-	if (CHECK_FAIL(!map)) {
+	if (!ASSERT_OK_PTR(map, "bpf_object__find_map_by_name")) {
 		err = -EIO;
 		goto out;
 	}
 
 	map_fd = bpf_map__fd(map);
-	if (CHECK_FAIL(map_fd < 0)) {
+	if (!ASSERT_GE(map_fd, 0, "bpf_map__fd")) {
 		err = -EIO;
 		goto out;
 	}
 
 	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
-	if (CHECK_FAIL(err))
+	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
 
 	client_fd = is_mptcp ? connect_to_mptcp_fd(server_fd, 0) :
 			       connect_to_fd(server_fd, 0);
-	if (client_fd < 0) {
+	if (!ASSERT_GE(client_fd, 0, "connect to fd")) {
 		err = -EIO;
 		goto out;
 	}
@@ -233,32 +222,32 @@ void test_base(void)
 	int server_fd, cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp");
-	if (CHECK_FAIL(cgroup_fd < 0))
+	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
 	/* without MPTCP */
 	server_fd = start_server(AF_INET, SOCK_STREAM, NULL, 0, 0);
-	if (CHECK_FAIL(server_fd < 0))
+	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto with_mptcp;
 
-	CHECK_FAIL(run_test(cgroup_fd, server_fd, false));
+	ASSERT_OK(run_test(cgroup_fd, server_fd, false), "run_test tcp");
 
 	close(server_fd);
 
 with_mptcp:
 	/* with MPTCP */
-	if (CHECK_FAIL(!mkdtemp(tmp_dir)))
+	if (!ASSERT_OK_PTR(mkdtemp(tmp_dir), "mkdtemp"))
 		goto close_cgroup_fd;
 	snprintf(monitor_log_path, sizeof(monitor_log_path),
 		 "%s/ip_mptcp_monitor", tmp_dir);
 	snprintf(cmd, sizeof(cmd), "ip mptcp monitor > %s &", monitor_log_path);
-	if (CHECK_FAIL(system(cmd)))
+	if (!ASSERT_OK(system(cmd), "ip mptcp monitor"))
 		goto close_cgroup_fd;
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
-	if (CHECK_FAIL(server_fd < 0))
+	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
 		goto close_cgroup_fd;
 
-	CHECK_FAIL(run_test(cgroup_fd, server_fd, true));
+	ASSERT_OK(run_test(cgroup_fd, server_fd, true), "run_test mptcp");
 
 	close(server_fd);
 	snprintf(cmd, sizeof(cmd), "rm -rf %s", tmp_dir);
@@ -354,7 +343,7 @@ static void test_first(void)
 	struct bpf_link *link;
 
 	first_skel = mptcp_bpf_first__open_and_load();
-	if (CHECK(!first_skel, "bpf_first__open_and_load", "failed\n"))
+	if (!ASSERT_OK_PTR(first_skel, "bpf_first__open_and_load"))
 		return;
 
 	link = bpf_map__attach_struct_ops(first_skel->maps.first);
