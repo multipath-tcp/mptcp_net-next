@@ -343,7 +343,7 @@ static void test_first(void)
 	struct bpf_link *link;
 
 	first_skel = mptcp_bpf_first__open_and_load();
-	if (CHECK(!first_skel, "bpf_first__open_and_load", "failed\n"))
+	if (!ASSERT_OK_PTR(first_skel, "bpf_first__open_and_load"))
 		return;
 
 	link = bpf_map__attach_struct_ops(first_skel->maps.first);
