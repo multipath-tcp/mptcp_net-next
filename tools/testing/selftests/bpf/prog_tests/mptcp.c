@@ -24,13 +24,12 @@ static char monitor_log_path[64];
 static int verify_tsk(int map_fd, int client_fd)
 {
 	char *msg = "plain TCP socket";
-	int err = 0, cfd = client_fd;
+	int err, cfd = client_fd;
 	struct mptcp_storage val;
 
-	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
-		perror("Failed to read socket storage");
-		return -1;
-	}
+	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
+	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
+		return err;
 
 	if (val.invoked != 1) {
 		log_err("%s: unexpected invoked count %d != 1",
