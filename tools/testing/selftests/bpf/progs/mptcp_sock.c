@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020, Tessares SA. */
+/* Copyright (c) 2022, SUSE. */
 
 #include <string.h>
 #include <linux/bpf.h>
@@ -7,7 +8,6 @@
 #include "bpf_mptcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
-__u32 _version SEC("version") = 1;
 extern bool CONFIG_MPTCP __kconfig;
 
 struct mptcp_storage {
