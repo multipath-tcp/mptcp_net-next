@@ -8,7 +8,7 @@ connection because there is no easy way to get the subflow sk from a msk
 in userspace. This implies that we cannot lookup the sk_storage attached
 to the subflow sk in the sockops program.
 
-v3:
+v4:
  - add copyright 2022 (Andrii)
  - use ASSERT_* instead of CHECK_FAIL (Andrii)
  - drop SEC("version") (Andrii)
