@@ -18,4 +18,5 @@ tools/testing/selftests/bpf/config.
 
 Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Andrii Nakryiko <andrii@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
