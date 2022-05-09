@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020, Tessares SA. */
+/* Copyright (c) 2022, SUSE. */
 
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 
 char _license[] SEC("license") = "GPL";
-__u32 _version SEC("version") = 1;
 
 struct mptcp_storage {
 	__u32 invoked;
