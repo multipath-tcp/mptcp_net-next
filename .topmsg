@@ -12,6 +12,9 @@ Get the infos from socket_storage_map in prog_tests/mptcp.c. Add a new
 function verify_msk() to verify the infos of MPTCP socket, and rename
 verify_sk() to verify_tsk() to verify TCP socket only.
 
+v2: Add CONFIG_MPTCP check for clearer error messages
+v3: use ASSERT_* instead of CHECK_FAIL (Andrii)
+
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
