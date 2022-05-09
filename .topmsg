@@ -1,5 +1,5 @@
 From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: bpf: verify ca_name of struct mptcp_sock
+Subject: [PATCH] selftests/bpf: verify ca_name of struct mptcp_sock
 
 This patch verifies another member of struct mptcp_sock, ca_name. Add a
 new function get_msk_ca_name() to read the sysctl tcp_congestion_control
