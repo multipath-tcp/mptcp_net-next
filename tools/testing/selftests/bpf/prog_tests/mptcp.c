@@ -83,7 +83,7 @@ err:
 static int verify_msk(int map_fd, int client_fd)
 {
 	char *msg = "MPTCP subflow socket";
-	int err = 0, cfd = client_fd;
+	int err, cfd = client_fd;
 	struct mptcp_storage val;
 	__u32 token;
 
@@ -93,10 +93,9 @@ static int verify_msk(int map_fd, int client_fd)
 		return -1;
 	}
 
-	if (CHECK_FAIL(bpf_map_lookup_elem(map_fd, &cfd, &val) < 0)) {
-		perror("Failed to read socket storage");
-		return -1;
-	}
+	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
+	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
+		return err;
 
 	if (val.invoked != 1) {
 		log_err("%s: unexpected invoked count %d != 1",
@@ -185,15 +184,15 @@ void test_base(void)
 	int server_fd, cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp");
-	if (CHECK_FAIL(cgroup_fd < 0))
+	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
 	/* without MPTCP */
 	server_fd = start_server(AF_INET, SOCK_STREAM, NULL, 0, 0);
-	if (CHECK_FAIL(server_fd < 0))
+	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto with_mptcp;
 
-	CHECK_FAIL(run_test(cgroup_fd, server_fd, false));
+	ASSERT_OK(run_test(cgroup_fd, server_fd, false), "run_test tcp");
 
 	close(server_fd);
 
@@ -207,10 +206,10 @@ with_mptcp:
 	if (CHECK_FAIL(system(cmd)))
 		goto close_cgroup_fd;
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
-	if (CHECK_FAIL(server_fd < 0))
+	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
 		goto close_cgroup_fd;
 
-	CHECK_FAIL(run_test(cgroup_fd, server_fd, true));
+	ASSERT_OK(run_test(cgroup_fd, server_fd, true), "run_test mptcp");
 
 	close(server_fd);
 	snprintf(cmd, sizeof(cmd), "rm -rf %s", tmp_dir);
