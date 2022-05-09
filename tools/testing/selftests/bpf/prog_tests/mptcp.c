@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020, Tessares SA. */
+/* Copyright (c) 2022, SUSE. */
 
 #include <test_progs.h>
 #include "cgroup_helpers.h"
@@ -130,40 +131,40 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 		return -EIO;
 
 	err = bpf_object__load(obj);
-	if (CHECK_FAIL(err))
+	if (!ASSERT_OK(err, "bpf_object__load"))
 		goto out;
 
 	prog = bpf_object__find_program_by_name(obj, "_sockops");
-	if (CHECK_FAIL(!prog)) {
+	if (!ASSERT_OK_PTR(prog, "bpf_object__find_program_by_name")) {
 		err = -EIO;
 		goto out;
 	}
 
 	prog_fd = bpf_program__fd(prog);
-	if (CHECK_FAIL(prog_fd < 0)) {
+	if (!ASSERT_GE(prog_fd, 0, "bpf_program__fd")) {
 		err = -EIO;
 		goto out;
 	}
 
 	map = bpf_object__find_map_by_name(obj, "socket_storage_map");
-	if (CHECK_FAIL(!map)) {
+	if (!ASSERT_OK_PTR(map, "bpf_object__find_map_by_name")) {
 		err = -EIO;
 		goto out;
 	}
 
 	map_fd = bpf_map__fd(map);
-	if (CHECK_FAIL(map_fd < 0)) {
+	if (!ASSERT_GE(map_fd, 0, "bpf_map__fd")) {
 		err = -EIO;
 		goto out;
 	}
 
 	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
-	if (CHECK_FAIL(err))
+	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
 
 	client_fd = is_mptcp ? connect_to_mptcp_fd(server_fd, 0) :
 			       connect_to_fd(server_fd, 0);
-	if (client_fd < 0) {
+	if (!ASSERT_GE(client_fd, 0, "connect to fd")) {
 		err = -EIO;
 		goto out;
 	}
