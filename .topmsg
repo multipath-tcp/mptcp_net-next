@@ -1,5 +1,5 @@
 From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: bpf: add bpf_first test
+Subject: [PATCH] selftests/bpf: add bpf_first test
 
 This patch expends the MPTCP test base to support MPTCP packet
 scheduler tests. Add the bpf_first scheduler test in it. Use sysctl
