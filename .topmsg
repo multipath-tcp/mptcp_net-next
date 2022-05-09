@@ -7,6 +7,9 @@ and a new helper bpf_skc_to_mptcp_sock(), which invokes another new
 helper bpf_mptcp_sock_from_subflow() in net/mptcp/bpf.c to get struct
 mptcp_sock from a given subflow socket.
 
+v2: Emit BTF type, add func_id checks in verifier.c and bpf_trace.c,
+remove build check for CONFIG_BPF_JIT
+
 Co-developed-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
