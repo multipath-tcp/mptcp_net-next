@@ -1,5 +1,5 @@
 From: Nicolas Rybowski <nicolas.rybowski@tessares.net>
-Subject: [PATCH] selftests: bpf: add MPTCP test base
+Subject: [PATCH] selftests/bpf: add MPTCP test base
 
 This patch adds a base for MPTCP specific tests.
 
