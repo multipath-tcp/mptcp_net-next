@@ -5,6 +5,10 @@ This patch verifies another member of struct mptcp_sock, ca_name. Add a
 new function get_msk_ca_name() to read the sysctl tcp_congestion_control
 and verify it in verify_msk().
 
+v3: Access the sysctl through the filesystem to avoid compatibility
+    issues with the busybox sysctl command.
+v4: use ASSERT_* instead of CHECK_FAIL (Andrii)
+
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
