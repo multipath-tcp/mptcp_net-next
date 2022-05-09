@@ -1,5 +1,5 @@
 From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: bpf: Enable CONFIG_IKCONFIG_PROC in config
+Subject: [PATCH] selftests/bpf: Enable CONFIG_IKCONFIG_PROC in config
 
 CONFIG_IKCONFIG_PROC is required by BPF selftests, otherwise we get
 errors like this:
