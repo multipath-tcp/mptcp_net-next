@@ -9,7 +9,10 @@
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	__u32 token;
 };
+
+static char monitor_log_path[64];
 
 static int verify_tsk(int map_fd, int client_fd)
 {
@@ -36,11 +39,52 @@ static int verify_tsk(int map_fd, int client_fd)
 	return err;
 }
 
+/*
+ * Parse the token from the output of 'ip mptcp monitor':
+ *
+ * [       CREATED] token=3ca933d3 remid=0 locid=0 saddr4=127.0.0.1 ...
+ * [       CREATED] token=2ab57040 remid=0 locid=0 saddr4=127.0.0.1 ...
+ */
+static __u32 get_msk_token(void)
+{
+	char *prefix = "[       CREATED] token=";
+	char buf[BUFSIZ] = {};
+	__u32 token = 0;
+	ssize_t len;
+	int fd;
+
+	sync();
+
+	fd = open(monitor_log_path, O_RDONLY);
+	if (!ASSERT_GE(fd, 0, "Failed to open monitor_log_path"))
+		return token;
+
+	len = read(fd, buf, sizeof(buf));
+	if (!ASSERT_GT(len, 0, "Failed to read monitor_log_path"))
+		goto err;
+
+	if (strncmp(buf, prefix, strlen(prefix))) {
+		log_err("Invalid prefix %s", buf);
+		goto err;
+	}
+
+	token = strtol(buf + strlen(prefix), NULL, 16);
+
+err:
+	close(fd);
+	return token;
+}
+
 static int verify_msk(int map_fd, int client_fd)
 {
 	char *msg = "MPTCP subflow socket";
 	int err, cfd = client_fd;
 	struct mptcp_storage val;
+	__u32 token;
+
+	token = get_msk_token();
+	if (!ASSERT_GT(token, 0, "Unexpected token"))
+		return -1;
 
 	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
 	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
@@ -55,6 +99,12 @@ static int verify_msk(int map_fd, int client_fd)
 	if (val.is_mptcp != 1) {
 		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != 1",
 			msg, val.is_mptcp);
+		err++;
+	}
+
+	if (val.token != token) {
+		log_err("Unexpected mptcp_sock.token %x != %x",
+			val.token, token);
 		err++;
 	}
 
@@ -123,6 +173,7 @@ out:
 
 void test_base(void)
 {
+	char cmd[256], tmp_dir[] = "/tmp/XXXXXX";
 	int server_fd, cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp");
@@ -140,6 +191,17 @@ void test_base(void)
 
 with_mptcp:
 	/* with MPTCP */
+	if (system("ip mptcp help 2>&1 | grep -q monitor")) {
+		test__skip();
+		goto close_cgroup_fd;
+	}
+	if (!ASSERT_OK_PTR(mkdtemp(tmp_dir), "mkdtemp"))
+		goto close_cgroup_fd;
+	snprintf(monitor_log_path, sizeof(monitor_log_path),
+		 "%s/ip_mptcp_monitor", tmp_dir);
+	snprintf(cmd, sizeof(cmd), "ip mptcp monitor > %s &", monitor_log_path);
+	if (!ASSERT_OK(system(cmd), "ip mptcp monitor"))
+		goto close_cgroup_fd;
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
 	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
 		goto close_cgroup_fd;
@@ -147,6 +209,8 @@ with_mptcp:
 	ASSERT_OK(run_test(cgroup_fd, server_fd, true), "run_test mptcp");
 
 	close(server_fd);
+	snprintf(cmd, sizeof(cmd), "rm -rf %s", tmp_dir);
+	system(cmd);
 
 close_cgroup_fd:
 	close(cgroup_fd);
