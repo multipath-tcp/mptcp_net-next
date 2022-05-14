@@ -2,7 +2,7 @@
 /* Copyright (c) 2022, SUSE. */
 
 #include <linux/bpf.h>
-#include "bpf_mptcp_helpers.h"
+#include "bpf_tcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
 
