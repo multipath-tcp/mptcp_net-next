@@ -5,7 +5,9 @@ This patch verifies the struct member token of struct mptcp_sock. Add a
 new function get_msk_token() to parse the msk token from the output of
 the command 'ip mptcp monitor', and verify it in verify_msk().
 
-v4: use ASSERT_* instead of CHECK_FAIL (Andrii)
+v4:
+ - use ASSERT_* instead of CHECK_FAIL (Andrii)
+ - skip the test if 'ip mptcp monitor' is not supported (Mat)
 
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
