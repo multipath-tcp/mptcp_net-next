@@ -4,7 +4,7 @@
 
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
-#include "bpf_mptcp_helpers.h"
+#include "bpf_tcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
 extern bool CONFIG_MPTCP __kconfig;
