@@ -12,6 +12,7 @@ v4:
  - add copyright 2022 (Andrii)
  - use ASSERT_* instead of CHECK_FAIL (Andrii)
  - drop SEC("version") (Andrii)
+ - use is_mptcp in tcp_sock, instead of bpf_tcp_sock (Martin & Andrii)
 
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Co-developed-by: Geliang Tang <geliang.tang@suse.com>
