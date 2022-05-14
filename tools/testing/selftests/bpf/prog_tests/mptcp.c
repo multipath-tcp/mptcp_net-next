@@ -236,6 +236,10 @@ void test_base(void)
 
 with_mptcp:
 	/* with MPTCP */
+	if (system("ip mptcp help 2>&1 | grep -q monitor")) {
+		test__skip();
+		goto close_cgroup_fd;
+	}
 	if (!ASSERT_OK_PTR(mkdtemp(tmp_dir), "mkdtemp"))
 		goto close_cgroup_fd;
 	snprintf(monitor_log_path, sizeof(monitor_log_path),
