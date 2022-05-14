@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-checksum-byte-order
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix checksum byte order
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP code typecasts the checksum value to u16 and
+then convert it to big endian while storing the value into
+the MPTCP option.
+
+As a result, the wire encoding for little endian host is
+wrong, and that causes interoperabilty interoperability
+issues with other implementation or host with different endianness.
+
+Address the issue writing in the packet the unmodified __sum16 value.
+
+MPTCP checksum is disabled by default, interoperating with systems
+with bad mptcp-level csum encodying should cause fallback to TCP.
+
+Fixes: c5b39e26d003 ("mptcp: send out checksum for DSS")
+Fixes: 390b95a5fb84 ("mptcp: receive checksum for DSS")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
