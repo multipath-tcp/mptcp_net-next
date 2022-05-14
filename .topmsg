@@ -16,6 +16,7 @@ v2: Add CONFIG_MPTCP check for clearer error messages
 v4:
  - use ASSERT_* instead of CHECK_FAIL (Andrii)
  - drop bpf_mptcp_helpers.h (Andrii)
+v5: some 'ASSERT_*' were replaced in the next commit by mistake.
 
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
