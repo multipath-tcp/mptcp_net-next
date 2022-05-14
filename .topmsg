@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Do-TCP-fallback-on-early-DSS-checksum-failure
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] mptcp: Do TCP fallback on early DSS checksum failure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+RFC 8684 section 3.7 describes several opportunities for a MPTCP
+connection to "fall back" to regular TCP early in the connection
+process, before it has been confirmed that MPTCP options can be
+successfully propagated on all SYN, SYN/ACK, and data packets. If a peer
+acknowledges the first received data packet with a regular TCP header
+(no MPTCP options), fallback is allowed.
+
+If the recipient of that first data packet finds a MPTCP DSS checksum
+error, this provides an opportunity to fail gracefully with a TCP
+fallback rather than resetting the connection (as might happen if a
+checksum failure were detected later).
+
+This commit modifies the checksum failure code to attempt fallback on
+the initial subflow of a MPTCP connection, only if it's a failure in the
+first data mapping. In cases where the peer initiates the connection,
+requests checksums, is the first to send data, and the peer is sending
+incorrect checksums (see
+https://github.com/multipath-tcp/mptcp_net-next/issues/275), this allows
+the connection to proceed as TCP rather than reset.
+
+Fixes: dd8bcd1768ff ("mptcp: validate the data checksum")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
