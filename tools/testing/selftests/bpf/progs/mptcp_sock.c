@@ -43,7 +43,7 @@ int _sockops(struct bpf_sock_ops *ctx)
 		return 1;
 
 	is_mptcp = bpf_core_field_exists(tsk->is_mptcp) ? tsk->is_mptcp : 0;
-	if (is_mptcp) {
+	if (!is_mptcp) {
 		storage = bpf_sk_storage_get(&socket_storage_map, sk, 0,
 					     BPF_SK_STORAGE_GET_F_CREATE);
 		if (!storage)
