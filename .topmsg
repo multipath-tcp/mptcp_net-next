@@ -1,4 +1,4 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/fix-up-for-netfilter-conntrack-remove-unconfirmed-list
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Subject: [PATCH] fix up for "netfilter: conntrack: remove unconfirmed list"
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
