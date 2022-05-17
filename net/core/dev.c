@@ -2998,11 +2998,12 @@ EXPORT_SYMBOL(netif_set_real_num_queues);
  * @size:	max skb->len of a TSO frame
  *
  * Set the limit on the size of TSO super-frames the device can handle.
- * Unless explicitly set the stack will assume the value of %GSO_MAX_SIZE.
+ * Unless explicitly set the stack will assume the value of
+ * %GSO_LEGACY_MAX_SIZE.
  */
 void netif_set_tso_max_size(struct net_device *dev, unsigned int size)
 {
-	dev->tso_max_size = size;
+	dev->tso_max_size = min(GSO_MAX_SIZE, size);
 	if (size < READ_ONCE(dev->gso_max_size))
 		netif_set_gso_max_size(dev, size);
 }
@@ -4329,6 +4330,7 @@ int netdev_max_backlog __read_mostly = 1000;
 EXPORT_SYMBOL(netdev_max_backlog);
 
 int netdev_tstamp_prequeue __read_mostly = 1;
+unsigned int sysctl_skb_defer_max __read_mostly = 64;
 int netdev_budget __read_mostly = 300;
 /* Must be at least 2 jiffes to guarantee 1 jiffy timeout */
 unsigned int __read_mostly netdev_budget_usecs = 2 * USEC_PER_SEC / HZ;
@@ -4581,9 +4583,12 @@ static void rps_trigger_softirq(void *data)
 #endif /* CONFIG_RPS */
 
 /* Called from hardirq (IPI) context */
-static void trigger_rx_softirq(void *data __always_unused)
+static void trigger_rx_softirq(void *data)
 {
+	struct softnet_data *sd = data;
+
 	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+	smp_store_release(&sd->defer_ipi_scheduled, 0);
 }
 
 /*
@@ -6629,7 +6634,7 @@ static void skb_defer_free_flush(struct softnet_data *sd)
 
 	while (skb != NULL) {
 		next = skb->next;
-		__kfree_skb(skb);
+		napi_consume_skb(skb, 1);
 		skb = next;
 	}
 }
@@ -6649,6 +6654,8 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 
 	for (;;) {
 		struct napi_struct *n;
+
+		skb_defer_free_flush(sd);
 
 		if (list_empty(&list)) {
 			if (!sd_has_rps_ipi_waiting(sd) && list_empty(&repoll))
@@ -6679,8 +6686,7 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 
 	net_rps_action_and_irq_enable(sd);
-end:
-	skb_defer_free_flush(sd);
+end:;
 }
 
 struct netdev_adjacent {
@@ -10595,9 +10601,9 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 
 	dev_net_set(dev, &init_net);
 
-	dev->gso_max_size = GSO_MAX_SIZE;
+	dev->gso_max_size = GSO_LEGACY_MAX_SIZE;
 	dev->gso_max_segs = GSO_MAX_SEGS;
-	dev->gro_max_size = GRO_MAX_SIZE;
+	dev->gro_max_size = GRO_LEGACY_MAX_SIZE;
 	dev->tso_max_size = TSO_LEGACY_MAX_SIZE;
 	dev->tso_max_segs = TSO_MAX_SEGS;
 	dev->upper_level = 1;
@@ -11381,7 +11387,7 @@ static int __init net_dev_init(void)
 		INIT_CSD(&sd->csd, rps_trigger_softirq, sd);
 		sd->cpu = i;
 #endif
-		INIT_CSD(&sd->defer_csd, trigger_rx_softirq, NULL);
+		INIT_CSD(&sd->defer_csd, trigger_rx_softirq, sd);
 		spin_lock_init(&sd->defer_lock);
 
 		init_gro_hash(&sd->backlog);
