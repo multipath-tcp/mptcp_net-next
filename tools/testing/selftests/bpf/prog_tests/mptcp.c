@@ -358,7 +358,7 @@ static void test_first(void)
 
 	system("sysctl -qw net.mptcp.scheduler=bpf_first");
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
-	client_fd = connect_to_mptcp_fd(server_fd, 0);
+	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd);
 
