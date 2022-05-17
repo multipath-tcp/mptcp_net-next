@@ -980,8 +980,7 @@ static void octep_device_cleanup(struct octep_device *oct)
 	dev_info(&oct->pdev->dev, "Cleaning up Octeon Device ...\n");
 
 	for (i = 0; i < OCTEP_MAX_VF; i++) {
-		if (oct->mbox[i])
-			vfree(oct->mbox[i]);
+		vfree(oct->mbox[i]);
 		oct->mbox[i] = NULL;
 	}
 
@@ -1149,6 +1148,7 @@ static int __init octep_init_module(void)
 	if (ret < 0) {
 		pr_err("%s: Failed to register PCI driver; err=%d\n",
 		       OCTEP_DRV_NAME, ret);
+		destroy_workqueue(octep_wq);
 		return ret;
 	}
 
