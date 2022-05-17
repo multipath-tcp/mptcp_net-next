@@ -510,7 +510,8 @@ enum skb_drop_reason {
 	(name = SKB_DROP_REASON_##reason)
 #define SKB_DR_OR(name, reason)					\
 	do {							\
-		if (name == SKB_DROP_REASON_NOT_SPECIFIED)	\
+		if (name == SKB_DROP_REASON_NOT_SPECIFIED ||	\
+		    name == SKB_NOT_DROPPED_YET)		\
 			SKB_DR_SET(name, reason);		\
 	} while (0)
 
@@ -1763,11 +1764,6 @@ static inline void skb_set_end_offset(struct sk_buff *skb, unsigned int offset)
 	skb->end = skb->head + offset;
 }
 #endif
-
-static inline unsigned int skb_data_area_size(struct sk_buff *skb)
-{
-	return skb_end_pointer(skb) - skb->data;
-}
 
 struct ubuf_info *msg_zerocopy_realloc(struct sock *sk, size_t size,
 				       struct ubuf_info *uarg);
