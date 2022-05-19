@@ -2,12 +2,19 @@ From: Geliang Tang <geliang.tang@suse.com>
 Subject: [PATCH] selftests/bpf: verify token of struct mptcp_sock
 
 This patch verifies the struct member token of struct mptcp_sock. Add a
-new function get_msk_token() to parse the msk token from the output of
-the command 'ip mptcp monitor', and verify it in verify_msk().
+new member token in struct mptcp_storage to store the token value of the
+msk socket got by bpf_skc_to_mptcp_sock(). Trace the kernel function
+mptcp_pm_new_connection() by using bpf fentry prog to obtain the msk token
+and save it in a global bpf variable. Pass the variable to verify_msk() to
+verify it with the token saved in socket_storage_map.
 
 v4:
  - use ASSERT_* instead of CHECK_FAIL (Andrii)
  - skip the test if 'ip mptcp monitor' is not supported (Mat)
+
+v5:
+ - Drop 'ip mptcp monitor', trace mptcp_pm_new_connection instead (Martin)
+ - Use ASSERT_EQ (Andrii)
 
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
