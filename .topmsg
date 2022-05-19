@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-move-MPTCPOPT_HMAC_LEN-to-net-mptcp.h
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
