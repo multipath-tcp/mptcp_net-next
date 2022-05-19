@@ -11,7 +11,6 @@ char _license[] SEC("license") = "GPL";
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
-	__u32 token;
 };
 
 struct {
@@ -48,8 +47,6 @@ int _sockops(struct bpf_sock_ops *ctx)
 					     BPF_SK_STORAGE_GET_F_CREATE);
 		if (!storage)
 			return 1;
-
-		storage->token = 0;
 	} else {
 		msk = bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
@@ -59,8 +56,6 @@ int _sockops(struct bpf_sock_ops *ctx)
 					     BPF_SK_STORAGE_GET_F_CREATE);
 		if (!storage)
 			return 1;
-
-		storage->token = msk->token;
 	}
 	storage->invoked++;
 	storage->is_mptcp = is_mptcp;
