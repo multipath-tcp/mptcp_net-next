@@ -172,4 +172,3 @@ struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
 
 	return NULL;
 }
-EXPORT_SYMBOL(bpf_mptcp_sock_from_subflow);
