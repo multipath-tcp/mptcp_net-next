@@ -14,6 +14,12 @@ v4:
  - drop SEC("version") (Andrii)
  - use is_mptcp in tcp_sock, instead of bpf_tcp_sock (Martin & Andrii)
 
+v5:
+ - Drop connect_to_mptcp_fd (Martin)
+ - Use BPF test skeleton (Andrii)
+ - Use ASSERT_EQ (Andrii)
+ - Drop the 'msg' parameter of verify_sk
+
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Co-developed-by: Geliang Tang <geliang.tang@suse.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
