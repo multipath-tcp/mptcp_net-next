@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-MPTCPOPT_HMAC_LEN-to-net-mptcp.h
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: move MPTCPOPT_HMAC_LEN to net/mptcp.h
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Move macro MPTCPOPT_HMAC_LEN definition from net/mptcp/protocol.h to
+include/net/mptcp.h.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
