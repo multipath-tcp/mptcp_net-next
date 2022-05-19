@@ -1,4 +1,0 @@
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Subject: [PATCH] fix up for "netfilter: conntrack: remove unconfirmed list"
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
