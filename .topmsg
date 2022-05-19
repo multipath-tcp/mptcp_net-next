@@ -7,7 +7,10 @@ and verify it in verify_msk().
 
 v3: Access the sysctl through the filesystem to avoid compatibility
     issues with the busybox sysctl command.
+
 v4: use ASSERT_* instead of CHECK_FAIL (Andrii)
+
+v5: use ASSERT_STRNEQ() instead of strncmp() (Andrii)
 
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
