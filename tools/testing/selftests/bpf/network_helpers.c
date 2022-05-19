@@ -21,10 +21,6 @@
 #include "network_helpers.h"
 #include "test_progs.h"
 
-#ifndef IPPROTO_MPTCP
-#define IPPROTO_MPTCP 262
-#endif
-
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_err(MSG, ...) ({						\
 			int __save = errno;				\
@@ -77,13 +73,13 @@ int settimeo(int fd, int timeout_ms)
 
 #define save_errno_close(fd) ({ int __save = errno; close(fd); errno = __save; })
 
-static int __start_server(int type, int protocol, const struct sockaddr *addr,
+static int __start_server(int type, const struct sockaddr *addr,
 			  socklen_t addrlen, int timeout_ms, bool reuseport)
 {
 	int on = 1;
 	int fd;
 
-	fd = socket(addr->sa_family, type, protocol);
+	fd = socket(addr->sa_family, type, 0);
 	if (fd < 0) {
 		log_err("Failed to create server socket");
 		return -1;
@@ -117,8 +113,8 @@ error_close:
 	return -1;
 }
 
-static int start_server_proto(int family, int type, int protocol,
-			      const char *addr_str, __u16 port, int timeout_ms)
+int start_server(int family, int type, const char *addr_str, __u16 port,
+		 int timeout_ms)
 {
 	struct sockaddr_storage addr;
 	socklen_t addrlen;
@@ -126,21 +122,8 @@ static int start_server_proto(int family, int type, int protocol,
 	if (make_sockaddr(family, addr_str, port, &addr, &addrlen))
 		return -1;
 
-	return __start_server(type, protocol, (struct sockaddr *)&addr,
+	return __start_server(type, (struct sockaddr *)&addr,
 			      addrlen, timeout_ms, false);
-}
-
-int start_server(int family, int type, const char *addr_str, __u16 port,
-		 int timeout_ms)
-{
-	return start_server_proto(family, type, 0, addr_str, port, timeout_ms);
-}
-
-int start_mptcp_server(int family, const char *addr_str, __u16 port,
-		       int timeout_ms)
-{
-	return start_server_proto(family, SOCK_STREAM, IPPROTO_MPTCP, addr_str,
-				  port, timeout_ms);
 }
 
 int *start_reuseport_server(int family, int type, const char *addr_str,
@@ -161,7 +144,7 @@ int *start_reuseport_server(int family, int type, const char *addr_str,
 	if (!fds)
 		return NULL;
 
-	fds[0] = __start_server(type, 0, (struct sockaddr *)&addr, addrlen,
+	fds[0] = __start_server(type, (struct sockaddr *)&addr, addrlen,
 				timeout_ms, true);
 	if (fds[0] == -1)
 		goto close_fds;
@@ -171,7 +154,7 @@ int *start_reuseport_server(int family, int type, const char *addr_str,
 		goto close_fds;
 
 	for (; nr_fds < nr_listens; nr_fds++) {
-		fds[nr_fds] = __start_server(type, 0, (struct sockaddr *)&addr,
+		fds[nr_fds] = __start_server(type, (struct sockaddr *)&addr,
 					     addrlen, timeout_ms, true);
 		if (fds[nr_fds] == -1)
 			goto close_fds;
@@ -282,7 +265,7 @@ int connect_to_fd_opts(int server_fd, const struct network_helper_opts *opts)
 	}
 
 	addr_in = (struct sockaddr_in *)&addr;
-	fd = socket(addr_in->sin_family, type, opts->protocol);
+	fd = socket(addr_in->sin_family, type, 0);
 	if (fd < 0) {
 		log_err("Failed to create client socket");
 		return -1;
@@ -310,16 +293,6 @@ int connect_to_fd(int server_fd, int timeout_ms)
 {
 	struct network_helper_opts opts = {
 		.timeout_ms = timeout_ms,
-	};
-
-	return connect_to_fd_opts(server_fd, &opts);
-}
-
-int connect_to_mptcp_fd(int server_fd, int timeout_ms)
-{
-	struct network_helper_opts opts = {
-		.timeout_ms = timeout_ms,
-		.protocol = IPPROTO_MPTCP,
 	};
 
 	return connect_to_fd_opts(server_fd, &opts);
