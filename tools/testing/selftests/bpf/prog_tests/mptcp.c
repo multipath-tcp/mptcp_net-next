@@ -12,11 +12,13 @@ struct mptcp_storage {
 	__u32 is_mptcp;
 };
 
-static int verify_tsk(int map_fd, int client_fd)
+static int verify_sk(int map_fd, int client_fd, __u32 is_mptcp)
 {
-	char *msg = "plain TCP socket";
 	int err, cfd = client_fd;
 	struct mptcp_storage val;
+
+	if (is_mptcp == 1)
+		return 0;
 
 	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
 	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
@@ -27,31 +29,6 @@ static int verify_tsk(int map_fd, int client_fd)
 
 	if (!ASSERT_EQ(val.is_mptcp, 0, "unexpected is_mptcp"))
 		err++;
-
-	return err;
-}
-
-static int verify_msk(int map_fd, int client_fd)
-{
-	char *msg = "MPTCP subflow socket";
-	int err, cfd = client_fd;
-	struct mptcp_storage val;
-
-	err = bpf_map_lookup_elem(map_fd, &cfd, &val);
-	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
-		return err;
-
-	if (val.invoked != 1) {
-		log_err("%s: unexpected invoked count %d != 1",
-			msg, val.invoked);
-		err++;
-	}
-
-	if (val.is_mptcp != 1) {
-		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != 1",
-			msg, val.is_mptcp);
-		err++;
-	}
 
 	return err;
 }
@@ -87,8 +64,8 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 		goto out;
 	}
 
-	err += is_mptcp ? verify_msk(map_fd, client_fd) :
-			  verify_tsk(map_fd, client_fd);
+	err += is_mptcp ? verify_sk(map_fd, client_fd, 1) :
+			  verify_sk(map_fd, client_fd, 0);
 
 	close(client_fd);
 
