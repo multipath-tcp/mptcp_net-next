@@ -9,6 +9,7 @@ mptcp_sock from a given subflow socket.
 
 v2: Emit BTF type, add func_id checks in verifier.c and bpf_trace.c,
 remove build check for CONFIG_BPF_JIT
+v5: Drop EXPORT_SYMBOL (Martin)
 
 Co-developed-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
 Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
