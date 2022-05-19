@@ -7,7 +7,6 @@
 #include "bpf_tcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
-extern bool CONFIG_MPTCP __kconfig;
 
 struct mptcp_storage {
 	__u32 invoked;
@@ -52,9 +51,6 @@ int _sockops(struct bpf_sock_ops *ctx)
 
 		storage->token = 0;
 	} else {
-		if (!CONFIG_MPTCP)
-			return 1;
-
 		msk = bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
 			return 1;
