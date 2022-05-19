@@ -13,9 +13,7 @@ __u32 token = 0;
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
-	struct sock *sk;
 	__u32 token;
-	struct sock *first;
 	char ca_name[TCP_CA_NAME_MAX];
 };
 
@@ -56,7 +54,6 @@ int _sockops(struct bpf_sock_ops *ctx)
 
 		storage->token = 0;
 		bzero(storage->ca_name, TCP_CA_NAME_MAX);
-		storage->first = NULL;
 	} else {
 		msk = bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
@@ -69,11 +66,9 @@ int _sockops(struct bpf_sock_ops *ctx)
 
 		storage->token = msk->token;
 		memcpy(storage->ca_name, msk->ca_name, TCP_CA_NAME_MAX);
-		storage->first = msk->first;
 	}
 	storage->invoked++;
 	storage->is_mptcp = is_mptcp;
-	storage->sk = (struct sock *)sk;
 
 	return 1;
 }
