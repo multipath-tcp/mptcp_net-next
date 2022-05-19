@@ -5,6 +5,7 @@
 #include <test_progs.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
+#include "mptcp_sock.skel.h"
 
 struct mptcp_storage {
 	__u32 invoked;
@@ -21,17 +22,11 @@ static int verify_tsk(int map_fd, int client_fd)
 	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
 		return err;
 
-	if (val.invoked != 1) {
-		log_err("%s: unexpected invoked count %d != 1",
-			msg, val.invoked);
+	if (!ASSERT_EQ(val.invoked, 1, "unexpected invoked count"))
 		err++;
-	}
 
-	if (val.is_mptcp != 0) {
-		log_err("%s: unexpected bpf_tcp_sock.is_mptcp %d != 0",
-			msg, val.is_mptcp);
+	if (!ASSERT_EQ(val.is_mptcp, 0, "unexpected is_mptcp"))
 		err++;
-	}
 
 	return err;
 }
@@ -64,37 +59,19 @@ static int verify_msk(int map_fd, int client_fd)
 static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 {
 	int client_fd, prog_fd, map_fd, err;
-	struct bpf_program *prog;
-	struct bpf_object *obj;
-	struct bpf_map *map;
+	struct mptcp_sock *sock_skel;
 
-	obj = bpf_object__open("./mptcp_sock.o");
-	if (libbpf_get_error(obj))
+	sock_skel = mptcp_sock__open_and_load();
+	if (!ASSERT_OK_PTR(sock_skel, "skel_open_load"))
 		return -EIO;
 
-	err = bpf_object__load(obj);
-	if (!ASSERT_OK(err, "bpf_object__load"))
-		goto out;
-
-	prog = bpf_object__find_program_by_name(obj, "_sockops");
-	if (!ASSERT_OK_PTR(prog, "bpf_object__find_program_by_name")) {
-		err = -EIO;
-		goto out;
-	}
-
-	prog_fd = bpf_program__fd(prog);
+	prog_fd = bpf_program__fd(sock_skel->progs._sockops);
 	if (!ASSERT_GE(prog_fd, 0, "bpf_program__fd")) {
 		err = -EIO;
 		goto out;
 	}
 
-	map = bpf_object__find_map_by_name(obj, "socket_storage_map");
-	if (!ASSERT_OK_PTR(map, "bpf_object__find_map_by_name")) {
-		err = -EIO;
-		goto out;
-	}
-
-	map_fd = bpf_map__fd(map);
+	map_fd = bpf_map__fd(sock_skel->maps.socket_storage_map);
 	if (!ASSERT_GE(map_fd, 0, "bpf_map__fd")) {
 		err = -EIO;
 		goto out;
@@ -104,8 +81,7 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
 
-	client_fd = is_mptcp ? connect_to_mptcp_fd(server_fd, 0) :
-			       connect_to_fd(server_fd, 0);
+	client_fd = connect_to_fd(server_fd, 0);
 	if (!ASSERT_GE(client_fd, 0, "connect to fd")) {
 		err = -EIO;
 		goto out;
@@ -117,7 +93,7 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 	close(client_fd);
 
 out:
-	bpf_object__close(obj);
+	mptcp_sock__destroy(sock_skel);
 	return err;
 }
 
