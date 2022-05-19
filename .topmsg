@@ -5,6 +5,9 @@ This patch verifies the 'first' struct member of struct mptcp_sock, which
 points to the first subflow of msk. Save 'sk' in mptcp_storage, and verify
 it with 'first' in verify_msk().
 
+v5:
+ - Use ASSERT_EQ() instead of a manual comparison + log (Andrii).
+
 Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
