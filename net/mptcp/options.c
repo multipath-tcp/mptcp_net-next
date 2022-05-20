@@ -1396,7 +1396,7 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 				 * the checksum will also be set to 0.
 				 */
 				put_len_csum(mpext->data_len,
-					     mpext->data_len ? mptcp_make_csum(mpext) : 0,
+					     (mpext->data_len ? mptcp_make_csum(mpext) : 0),
 					     ptr);
 			} else {
 				put_unaligned_be32(mpext->data_len << 16 |
