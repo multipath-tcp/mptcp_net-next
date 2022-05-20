@@ -52,11 +52,8 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	}
 
 	switch (off) {
-	case offsetof(struct mptcp_sched_data, sock):
-		end = offsetofend(struct mptcp_sched_data, sock);
-		break;
-	case offsetof(struct mptcp_sched_data, call_again):
-		end = offsetofend(struct mptcp_sched_data, call_again);
+	case offsetof(struct mptcp_sched_data, bitmap):
+		end = offsetofend(struct mptcp_sched_data, bitmap);
 		break;
 	default:
 		bpf_log(log, "no write support to mptcp_sched_data at off %d\n", off);
