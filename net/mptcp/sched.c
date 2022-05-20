@@ -91,7 +91,21 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 static int mptcp_sched_data_init(struct mptcp_sock *msk,
 				 struct mptcp_sched_data *data)
 {
+	struct mptcp_subflow_context *subflow;
+	int i = 0;
+
 	data->bitmap = 0;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (i == MPTCP_SUBFLOWS_MAX) {
+			pr_warn_once("too many subflows");
+			break;
+		}
+		data->contexts[i++] = subflow;
+	}
+
+	for (; i < MPTCP_SUBFLOWS_MAX; i++)
+		data->contexts[i++] = NULL;
 
 	return 0;
 }
@@ -101,6 +115,7 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sched_data data;
 	struct sock *ssk;
+	int i;
 
 	sock_owned_by_me((struct sock *)msk);
 
@@ -133,6 +148,12 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	mptcp_sched_data_init(msk, &data);
 	msk->sched->get_subflow(msk, false, &data);
 
+	for (i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
+		if (test_bit(i, &data.bitmap) && data.contexts[i]) {
+			data.contexts[i]->scheduled = 1;
+			msk->last_snd = data.contexts[i]->tcp_sock;
+		}
+	}
 	return 0;
 
 err:
@@ -149,6 +170,7 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sched_data data;
 	struct sock *ssk;
+	int i;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -174,6 +196,13 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 
 	mptcp_sched_data_init(msk, &data);
 	msk->sched->get_subflow(msk, true, &data);
+
+	for (i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
+		if (test_bit(i, &data.bitmap) && data.contexts[i]) {
+			data.contexts[i]->scheduled = 1;
+			msk->last_snd = data.contexts[i]->tcp_sock;
+		}
+	}
 
 	return 0;
 

@@ -97,9 +97,11 @@ struct mptcp_out_options {
 };
 
 #define MPTCP_SCHED_NAME_MAX	16
+#define MPTCP_SUBFLOWS_MAX	8
 
 struct mptcp_sched_data {
 	unsigned long	bitmap;
+	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
 };
 
 struct mptcp_sched_ops {
