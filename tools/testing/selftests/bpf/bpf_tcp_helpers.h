@@ -233,8 +233,7 @@ extern void tcp_cong_avoid_ai(struct tcp_sock *tp, __u32 w, __u32 acked) __ksym;
 #define MPTCP_SCHED_NAME_MAX	16
 
 struct mptcp_sched_data {
-	struct sock	*sock;
-	bool		call_again;
+	unsigned long	bitmap;
 };
 
 struct mptcp_sched_ops {

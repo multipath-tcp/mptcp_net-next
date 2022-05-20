@@ -99,8 +99,7 @@ struct mptcp_out_options {
 #define MPTCP_SCHED_NAME_MAX	16
 
 struct mptcp_sched_data {
-	struct sock	*sock;
-	bool		call_again;
+	unsigned long	bitmap;
 };
 
 struct mptcp_sched_ops {
