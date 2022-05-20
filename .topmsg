@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp_ipv6-set-the-drop_reason-in-the-right-place
+From: Jakub Kicinski <kuba@kernel.org>
+Subject: [PATCH] tcp_ipv6: set the drop_reason in the right place
 
+Looks like the IPv6 version of the patch under Fixes was
+a copy/paste of the IPv4 but hit the wrong spot.
+It is tcp_v6_rcv() which uses drop_reason as a boolean, and
+needs to be protected against reason == 0 before calling free.
+tcp_v6_do_rcv() has a pretty straightforward flow.
+
+Fixes: f8319dfd1b3b ("net: tcp: reset 'drop_reason' to NOT_SPCIFIED in tcp_v{4,6}_rcv()")
+Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
