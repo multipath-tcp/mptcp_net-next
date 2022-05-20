@@ -91,51 +91,97 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 static int mptcp_sched_data_init(struct mptcp_sock *msk,
 				 struct mptcp_sched_data *data)
 {
-	data->sock = NULL;
-	data->call_again = 0;
+	data->bitmap = 0;
 
 	return 0;
 }
 
-struct sock *mptcp_sched_get_send(struct mptcp_sock *msk)
+int mptcp_sched_get_send(struct mptcp_sock *msk)
 {
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sched_data data;
+	struct sock *ssk;
 
 	sock_owned_by_me((struct sock *)msk);
 
+	mptcp_for_each_subflow(msk, subflow)
+		subflow->scheduled = 0;
+
 	/* the following check is moved out of mptcp_subflow_get_send */
 	if (__mptcp_check_fallback(msk)) {
-		if (!msk->first)
-			return NULL;
-		return sk_stream_memory_free(msk->first) ? msk->first : NULL;
+		if (msk->first && sk_stream_memory_free(msk->first)) {
+			subflow = mptcp_subflow_ctx(msk->first);
+			subflow->scheduled = 1;
+			return 0;
+		}
+		return -EINVAL;
 	}
 
-	if (!msk->sched)
-		return mptcp_subflow_get_send(msk);
+	if (!msk->sched) {
+		ssk = mptcp_subflow_get_send(msk);
+		if (!ssk)
+			goto err;
+
+		subflow = mptcp_subflow_ctx(ssk);
+		if (!subflow)
+			goto err;
+
+		subflow->scheduled = 1;
+		return 0;
+	}
 
 	mptcp_sched_data_init(msk, &data);
 	msk->sched->get_subflow(msk, false, &data);
 
-	msk->last_snd = data.sock;
-	return data.sock;
+	return 0;
+
+err:
+	if (msk->first) {
+		subflow = mptcp_subflow_ctx(msk->first);
+		subflow->scheduled = 1;
+		return 0;
+	}
+	return -EINVAL;
 }
 
-struct sock *mptcp_sched_get_retrans(struct mptcp_sock *msk)
+int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sched_data data;
+	struct sock *ssk;
 
 	sock_owned_by_me((const struct sock *)msk);
 
+	mptcp_for_each_subflow(msk, subflow)
+		subflow->scheduled = 0;
+
 	/* the following check is moved out of mptcp_subflow_get_retrans */
 	if (__mptcp_check_fallback(msk))
-		return NULL;
+		goto err;
 
-	if (!msk->sched)
-		return mptcp_subflow_get_retrans(msk);
+	if (!msk->sched) {
+		ssk = mptcp_subflow_get_retrans(msk);
+		if (!ssk)
+			goto err;
+
+		subflow = mptcp_subflow_ctx(ssk);
+		if (!subflow)
+			goto err;
+
+		subflow->scheduled = 1;
+		return 0;
+	}
 
 	mptcp_sched_data_init(msk, &data);
 	msk->sched->get_subflow(msk, true, &data);
 
-	msk->last_snd = data.sock;
-	return data.sock;
+	return 0;
+
+err:
+	if (msk->first) {
+		subflow = mptcp_subflow_ctx(msk->first);
+		subflow->scheduled = 1;
+		return 0;
+	}
+	return -EINVAL;
 }
