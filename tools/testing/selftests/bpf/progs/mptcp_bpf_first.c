@@ -19,8 +19,10 @@ void BPF_PROG(mptcp_sched_first_release, const struct mptcp_sock *msk)
 void BPF_STRUCT_OPS(bpf_first_get_subflow, const struct mptcp_sock *msk,
 		    bool reinject, struct mptcp_sched_data *data)
 {
-	data->sock = msk->first;
-	data->call_again = 0;
+	unsigned long bitmap = 0;
+
+	set_bit(0, &bitmap);
+	data->bitmap = bitmap;
 }
 
 SEC(".struct_ops")

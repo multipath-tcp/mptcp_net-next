@@ -263,4 +263,15 @@ struct mptcp_sock {
 	char		ca_name[TCP_CA_NAME_MAX];
 } __attribute__((preserve_access_index));
 
+#define _AC(X,Y)	(X##Y)
+#define UL(x)		(_AC(x, UL))
+
+static inline void set_bit(unsigned int nr, volatile unsigned long *addr)
+{
+        unsigned long *p = ((unsigned long *)addr) + (nr / sizeof(unsigned long));
+        unsigned long mask = UL(1) << (nr % sizeof(unsigned long));
+
+        *p  |= mask;
+}
+
 #endif
