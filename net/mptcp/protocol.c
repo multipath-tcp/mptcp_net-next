@@ -1634,23 +1634,34 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 			 * check for a different subflow usage only after
 			 * spooling the first chunk of data
 			 */
-			xmit_ssk = first ? ssk : mptcp_sched_get_send(mptcp_sk(sk));
-			if (!xmit_ssk)
-				goto out;
-			if (xmit_ssk != ssk) {
-				mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk),
-						       MPTCP_DELEGATE_SEND);
-				goto out;
-			}
+			if (first) {
+				xmit_ssk = ssk;
 
-			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
-			if (ret <= 0)
-				goto out;
+				if (!xmit_ssk)
+					goto out;
+				ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
+				if (ret <= 0)
+					goto out;
+				first = false;
+			} else {
+				xmit_ssk = mptcp_sched_get_send(mptcp_sk(sk));
+
+				if (!xmit_ssk)
+					goto out;
+				if (xmit_ssk != ssk) {
+					mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk),
+							       MPTCP_DELEGATE_SEND);
+					goto out;
+				}
+
+				ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
+				if (ret <= 0)
+					goto out;
+			}
 
 			info.sent += ret;
 			copied += ret;
 			len -= ret;
-			first = false;
 
 			mptcp_update_post_push(msk, dfrag, ret);
 		}
