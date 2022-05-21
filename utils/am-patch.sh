@@ -15,6 +15,11 @@ if [ "${BRANCH}" = "${TG_TOPIC_TOP_NET_NEXT}" ] ||
 	exit 1
 fi
 
+AM_ARGS=()
+if [ "${NO_SOB}" != "1" ]; then
+	AM_ARG+=("-s")
+fi
+
 check_sync_upstream || exit 1
 
 MODE=$(SERIES=0 bash "-${-}" ./.get_arg_mode.sh "${1}")
@@ -28,7 +33,7 @@ exit_trap() {
 }
 
 am_files() { local nb subject sha
-	if git am -3 -s "${1}" || { git am --abort && git am -s "${1}"; }; then
+	if git am -3 "${AM_ARGS[@]}" "${1}" || { git am --abort && git am "${AM_ARGS[@]}" "${1}"; }; then
 		subject="$(grep "^Subject: " "${1}" | head -n1)"
 		if echo "${subject}" | grep -q "\[PATCH.* [0-9]\+/[0-9]\+\] "; then
 			# shellcheck disable=SC2001
