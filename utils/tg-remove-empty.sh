@@ -18,7 +18,7 @@ tg_next() { local curr next
 
 	if ! is_dep "${next}" "${curr}"; then
 		# tg next seems to have issues returning the right one
-		next=t/DO-NOT-MERGE-git-markup-fixes-net-next
+		next=t/DO-NOT-MERGE-git-markup-net-next
 		if ! is_dep "${next}" "${curr}"; then
 			>&2 echo -e "\n\n\tError: unable to find next, not $(tg next) for ${curr}\n\n"
 			exit 1
