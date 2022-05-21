@@ -38,8 +38,10 @@ while true; do
 		NEXT="$(tg_next "${BRANCH}")"
 
 		# the next line comes from tg annihilate and does:
-		#    git rm -f .topdeps .topmsg
-		git read-tree "$(git merge-base "refs/top-bases/${BRANCH}" "refs/heads/${BRANCH}")^{tree}"
+		#   git read-tree "$(git merge-base "refs/top-bases/${BRANCH}" "refs/heads/${BRANCH}")^{tree}"
+		# but because we know the topic is empty, it is the same as the
+		# following one which is way quicker:
+		git rm -f .topdeps .topmsg
 		git commit --no-verify -sm "TopGit branch ${BRANCH} annihilated."
 
 		git checkout "${NEXT}"
