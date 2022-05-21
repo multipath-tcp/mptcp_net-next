@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-conflict-with-netinet-in.h
+From: Ossama Othman <ossama.othman@intel.com>
+Subject: [PATCH] mptcp: fix conflict with <netinet/in.h>
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Including <linux/mptcp.h> before the C library <netinet/in.h> header
+causes symbol redefinition errors at compile-time due to duplicate
+declarations and definitions in the <linux/in.h> header included by
+<linux/mptcp.h>.
+
+Explicitly include <netinet/in.h> before <linux/in.h> in
+<linux/mptcp.h> when __KERNEL__ is not defined so that the C library
+compatibility logic in <linux/libc-compat.h> is enabled when including
+<linux/mptcp.h> in user space code.
+
+Fixes: c11c5906bc0a ("mptcp: add MPTCP_SUBFLOW_ADDRS getsockopt support")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Ossama Othman <ossama.othman@intel.com>
