@@ -126,7 +126,7 @@ publish() { local top review old_rev new_rev
 	old_rev="$(git rev-parse --short "origin/${top}")"
 	new_rev="$(git rev-parse --short "${top}")"
 
-	if [ "${old_rev}" = "${new_rev}" ]; then
+	if [ "${old_rev}" = "${new_rev}" ] && [ "${FORCE}" != "1" ]; then
 		printinfo "No new modification, no push"
 		return 0
 	fi
