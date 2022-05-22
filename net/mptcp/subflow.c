@@ -1002,16 +1002,17 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 			sk_eat_skb(ssk, skb);
 			return MAPPING_EMPTY;
 		}
-
+/*
 		if (!subflow->map_valid)
 			return MAPPING_INVALID;
-
+*/
 		goto validate_seq;
 	}
 
 	trace_get_mapping_status(mpext);
 
 	data_len = mpext->data_len;
+
 	if (data_len == 0) {
 		pr_debug("infinite mapping received");
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
@@ -1075,6 +1076,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		/* If this skb data are fully covered by the current mapping,
 		 * the new map would need caching, which is not supported
 		 */
+
 		if (skb_is_fully_mapped(ssk, skb)) {
 			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSNOMATCH);
 			return MAPPING_INVALID;
@@ -1107,11 +1109,12 @@ validate_seq:
 	/* we revalidate valid mapping on new skb, because we must ensure
 	 * the current skb is completely covered by the available mapping
 	 */
+	/*
 	if (!validate_mapping(ssk, skb)) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSTCPMISMATCH);
 		return MAPPING_INVALID;
 	}
-
+	*/
 	skb_ext_del(skb, SKB_EXT_MPTCP);
 
 validate_csum:

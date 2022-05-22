@@ -6273,9 +6273,10 @@ consume:
 		}
 		if (fastopen_fail)
 			return -1;
-		if (sk->sk_write_pending ||
-		    icsk->icsk_accept_queue.rskq_defer_accept ||
-		    inet_csk_in_pingpong_mode(sk)) {
+
+		if (!sk_is_mptcp(sk) && (sk->sk_write_pending ||
+		     icsk->icsk_accept_queue.rskq_defer_accept ||
+		     inet_csk_in_pingpong_mode(sk))) {
 			/* Save one ACK. Data will be ready after
 			 * several ticks, if write_pending is set.
 			 *

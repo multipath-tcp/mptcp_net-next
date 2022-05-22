@@ -747,7 +747,7 @@ static void mptcp_set_option_cond(const struct request_sock *req,
 	if (rsk_is_mptcp(req)) {
 		unsigned int size;
 
-		if (mptcp_synack_options(req, &size, &opts->mptcp)) {
+		if (mptcp_synack_options(req, &size, &opts->mptcp, &opts->options)) {
 			if (*remaining >= size) {
 				opts->options |= OPTION_MPTCP;
 				*remaining -= size;
@@ -822,7 +822,6 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			tp->syn_fastopen_exp = fastopen->cookie.exp ? 1 : 0;
 		}
 	}
-
 	smc_set_option(tp, opts, &remaining);
 
 	if (sk_is_mptcp(sk)) {

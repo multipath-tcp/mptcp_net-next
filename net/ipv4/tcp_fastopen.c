@@ -346,8 +346,10 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 			      struct tcp_fastopen_cookie *foc,
 			      const struct dst_entry *dst)
 {
+	/*
 	bool syn_data = TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq + 1;
 	int tcp_fastopen = sock_net(sk)->ipv4.sysctl_tcp_fastopen;
+	*/
 	struct tcp_fastopen_cookie valid_foc = { .len = -1 };
 	struct sock *child;
 	int ret = 0;
@@ -355,12 +357,14 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 	if (foc->len == 0) /* Client requests a cookie */
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPFASTOPENCOOKIEREQD);
 
+	/*
 	if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
 	      (syn_data || foc->len >= 0) &&
 	      tcp_fastopen_queue_check(sk))) {
 		foc->len = -1;
 		return NULL;
 	}
+	*/
 
 	if (tcp_fastopen_no_cookie(sk, dst, TFO_SERVER_COOKIE_NOT_REQD))
 		goto fastopen;

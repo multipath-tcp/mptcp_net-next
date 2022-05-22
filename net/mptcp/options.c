@@ -887,16 +887,20 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
-			  struct mptcp_out_options *opts)
+			  struct mptcp_out_options *opts, u16 *tcp_options)
 {
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+#define OPTION_TS               BIT(1)
+
+
+        *tcp_options ^= OPTION_TS;
 
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
 		opts->sndr_key = subflow_req->local_key;
 		opts->csum_reqd = subflow_req->csum_reqd;
 		opts->allow_join_id0 = subflow_req->allow_join_id0;
-		*size = TCPOLEN_MPTCP_MPC_SYNACK;
+		*size = TCPOLEN_MPTCP_MPC_SYNACK  - TCPOLEN_TSTAMP_ALIGNED + TCPOLEN_SACKPERM_ALIGNED;
 		pr_debug("subflow_req=%p, local_key=%llu",
 			 subflow_req, subflow_req->local_key);
 		return true;

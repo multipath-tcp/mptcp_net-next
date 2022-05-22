@@ -54,6 +54,8 @@ static struct percpu_counter mptcp_sockets_allocated ____cacheline_aligned_in_sm
 
 static void __mptcp_destroy_sock(struct sock *sk);
 static void __mptcp_check_send_data_fin(struct sock *sk);
+static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+				int addr_len, int flags);
 
 DEFINE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 static struct net_device mptcp_napi_dev;
@@ -1673,6 +1675,53 @@ out:
 	}
 }
 
+static int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
+				  size_t len, struct mptcp_sock *msk, size_t copied)
+{
+	const struct iphdr *iph;
+	struct ubuf_info *uarg;
+	struct sockaddr *uaddr;
+	struct sk_buff *skb;
+	struct tcp_sock *tp;
+	struct socket *ssk;
+	int ret;
+
+	ssk = __mptcp_nmpc_socket(msk);
+	if (unlikely(!ssk))
+		goto out_EFAULT;
+	skb = tcp_stream_alloc_skb(ssk->sk, 0, ssk->sk->sk_allocation, true);
+	if (unlikely(!skb))
+		goto out_EFAULT;
+	iph = ip_hdr(skb);
+	if (unlikely(!iph))
+		goto out_EFAULT;
+	uarg = msg_zerocopy_realloc(sk, len, skb_zcopy(skb));
+	if (unlikely(!uarg))
+		goto out_EFAULT;
+	uaddr = msg->msg_name;
+
+	tp = tcp_sk(ssk->sk);
+	if (unlikely(!tp))
+		goto out_EFAULT;
+	if (!tp->fastopen_req)
+		tp->fastopen_req = kzalloc(sizeof(*tp->fastopen_req), ssk->sk->sk_allocation);
+
+	if (unlikely(!tp->fastopen_req))
+		goto out_EFAULT;
+	tp->fastopen_req->data = msg;
+	tp->fastopen_req->size = len;
+	tp->fastopen_req->uarg = uarg;
+
+	/* requests a cookie */
+	ret = mptcp_stream_connect(sk->sk_socket, uaddr,
+				   msg->msg_namelen, msg->msg_flags);
+
+	return ret;
+out_EFAULT:
+	ret = -EFAULT;
+	return ret;
+}
+
 static void mptcp_set_nospace(struct sock *sk)
 {
 	/* enable autotune */
@@ -1690,9 +1739,9 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	int ret = 0;
 	long timeo;
 
-	/* we don't support FASTOPEN yet */
+	/* we don't fully support FASTOPEN yet */
 	if (msg->msg_flags & MSG_FASTOPEN)
-		return -EOPNOTSUPP;
+		ret = mptcp_sendmsg_fastopen(sk, msg, len, msk, copied);
 
 	/* silently ignore everything else */
 	msg->msg_flags &= MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL;
@@ -2558,10 +2607,10 @@ static void mptcp_worker(struct work_struct *work)
 
 	if (test_and_clear_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
 		__mptcp_close_subflow(msk);
-
+/*
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
-
+*/
 	mptcp_mp_fail_no_response(msk);
 
 unlock:
@@ -2680,6 +2729,8 @@ void mptcp_subflow_shutdown(struct sock *sk, struct sock *ssk, int how)
 		fallthrough;
 	case TCP_SYN_SENT:
 		tcp_disconnect(ssk, O_NONBLOCK);
+		break;
+	case TCP_ESTABLISHED:
 		break;
 	default:
 		if (__mptcp_check_fallback(mptcp_sk(sk))) {
