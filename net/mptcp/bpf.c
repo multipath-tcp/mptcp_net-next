@@ -18,8 +18,6 @@
 #ifdef CONFIG_BPF_JIT
 extern struct bpf_struct_ops bpf_mptcp_sched_ops;
 extern struct btf *btf_vmlinux;
-static const struct btf_type *mptcp_sched_type __read_mostly;
-static u32 mptcp_sched_id;
 
 static u32 optional_ops[] = {
 	offsetof(struct mptcp_sched_ops, init),
@@ -40,33 +38,9 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 					     u32 *next_btf_id,
 					     enum bpf_type_flag *flag)
 {
-	size_t end;
-
-	if (atype == BPF_READ)
+	if (atype == BPF_READ) {
 		return btf_struct_access(log, btf, t, off, size, atype,
 					 next_btf_id, flag);
-
-	if (t != mptcp_sched_type) {
-		bpf_log(log, "only access to mptcp_sched_data is supported\n");
-		return -EACCES;
-	}
-
-	switch (off) {
-	case offsetof(struct mptcp_sched_data, sock):
-		end = offsetofend(struct mptcp_sched_data, sock);
-		break;
-	case offsetof(struct mptcp_sched_data, call_again):
-		end = offsetofend(struct mptcp_sched_data, call_again);
-		break;
-	default:
-		bpf_log(log, "no write support to mptcp_sched_data at off %d\n", off);
-		return -EACCES;
-	}
-
-	if (off + size > end) {
-		bpf_log(log, "access beyond mptcp_sched_data at off %u size %u ended at %zu",
-			off, size, end);
-		return -EACCES;
 	}
 
 	return NOT_INIT;
@@ -142,15 +116,6 @@ static int bpf_mptcp_sched_init_member(const struct btf_type *t,
 
 static int bpf_mptcp_sched_init(struct btf *btf)
 {
-	s32 type_id;
-
-	type_id = btf_find_by_name_kind(btf, "mptcp_sched_data",
-					BTF_KIND_STRUCT);
-	if (type_id < 0)
-		return -EINVAL;
-	mptcp_sched_id = type_id;
-	mptcp_sched_type = btf_type_by_id(btf, mptcp_sched_id);
-
 	return 0;
 }
 
