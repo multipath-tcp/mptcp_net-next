@@ -97,15 +97,15 @@ struct mptcp_out_options {
 };
 
 #define MPTCP_SCHED_NAME_MAX	16
+#define MPTCP_SUBFLOWS_MAX	8
 
 struct mptcp_sched_data {
-	struct sock	*sock;
-	bool		call_again;
+	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
 };
 
 struct mptcp_sched_ops {
-	void (*get_subflow)(const struct mptcp_sock *msk, bool reinject,
-			    struct mptcp_sched_data *data);
+	unsigned long (*get_subflow)(const struct mptcp_sock *msk, bool reinject,
+				     struct mptcp_sched_data *data);
 
 	char			name[MPTCP_SCHED_NAME_MAX];
 	struct module		*owner;
