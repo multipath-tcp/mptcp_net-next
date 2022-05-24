@@ -16,10 +16,10 @@ tg_up_err() {
 topic_has_been_upstreamed() { local subject="${1}"
 	git log \
 		--fixed-strings \
-		--grep "${subject}" \
+		-i --grep "${subject}" \
 		--format="format:==%s==" \
 		"${TG_UPSTREAM_RANGE}" | \
-			grep -q --fixed-strings "==${subject}=="
+			grep -q --fixed-strings -i "==${subject}=="
 }
 
 tg_up_upstream() { local subject
