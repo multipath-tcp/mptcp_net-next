@@ -2,7 +2,6 @@
 /* Copyright (c) 2020, Tessares SA. */
 /* Copyright (c) 2022, SUSE. */
 
-#include <string.h>
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include "bpf_tcp_helpers.h"
@@ -13,7 +12,9 @@ __u32 token = 0;
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
+	struct sock *sk;
 	__u32 token;
+	struct sock *first;
 	char ca_name[TCP_CA_NAME_MAX];
 };
 
@@ -53,7 +54,8 @@ int _sockops(struct bpf_sock_ops *ctx)
 			return 1;
 
 		storage->token = 0;
-		bzero(storage->ca_name, TCP_CA_NAME_MAX);
+		__builtin_memset(storage->ca_name, 0, TCP_CA_NAME_MAX);
+		storage->first = NULL;
 	} else {
 		msk = bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
@@ -65,10 +67,12 @@ int _sockops(struct bpf_sock_ops *ctx)
 			return 1;
 
 		storage->token = msk->token;
-		memcpy(storage->ca_name, msk->ca_name, TCP_CA_NAME_MAX);
+		__builtin_memcpy(storage->ca_name, msk->ca_name, TCP_CA_NAME_MAX);
+		storage->first = msk->first;
 	}
 	storage->invoked++;
 	storage->is_mptcp = is_mptcp;
+	storage->sk = (struct sock *)sk;
 
 	return 1;
 }
