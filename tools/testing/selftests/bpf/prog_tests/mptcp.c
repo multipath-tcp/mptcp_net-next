@@ -42,7 +42,7 @@ static int verify_tsk(int map_fd, int client_fd)
 	return err;
 }
 
-void get_msk_ca_name(char ca_name[])
+static void get_msk_ca_name(char ca_name[])
 {
 	size_t len;
 	int fd;
@@ -140,7 +140,7 @@ out:
 	return err;
 }
 
-void test_base(void)
+static void test_base(void)
 {
 	int server_fd, cgroup_fd;
 
