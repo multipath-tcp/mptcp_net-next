@@ -235,6 +235,8 @@ extern void tcp_cong_avoid_ai(struct tcp_sock *tp, __u32 w, __u32 acked) __ksym;
 
 struct mptcp_subflow_context {
 	__u32	token;
+	__u32	padding : 12,
+		backup : 1;
 } __attribute__((preserve_access_index));
 
 struct mptcp_sched_subflow {
