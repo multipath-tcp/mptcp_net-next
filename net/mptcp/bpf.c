@@ -33,6 +33,12 @@ bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
 	return bpf_base_func_proto(func_id);
 }
 
+static size_t subflow_offset(int i)
+{
+	return offsetof(struct mptcp_sched_data, subflows) +
+	       i * sizeof(struct mptcp_sched_subflow);
+}
+
 static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 					     const struct btf *btf,
 					     const struct btf_type *t, int off,
@@ -40,36 +46,30 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 					     u32 *next_btf_id,
 					     enum bpf_type_flag *flag)
 {
-	size_t end;
+	size_t start, end, soff;
+	int i;
 
-	if (atype == BPF_READ)
+	if (atype == BPF_READ) {
 		return btf_struct_access(log, btf, t, off, size, atype,
 					 next_btf_id, flag);
+	}
 
 	if (t != mptcp_sched_type) {
 		bpf_log(log, "only access to mptcp_sched_data is supported\n");
 		return -EACCES;
 	}
 
-	switch (off) {
-	case offsetof(struct mptcp_sched_data, sock):
-		end = offsetofend(struct mptcp_sched_data, sock);
-		break;
-	case offsetof(struct mptcp_sched_data, call_again):
-		end = offsetofend(struct mptcp_sched_data, call_again);
-		break;
-	default:
-		bpf_log(log, "no write support to mptcp_sched_data at off %d\n", off);
-		return -EACCES;
+	start = offsetof(struct mptcp_sched_subflow, is_scheduled);
+	end = offsetofend(struct mptcp_sched_subflow, is_scheduled);
+
+	for (i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
+		soff = subflow_offset(i);
+		if (off == soff + start && off + size <= soff + end)
+			return NOT_INIT; /* offsets match up with is_scheduled */
 	}
 
-	if (off + size > end) {
-		bpf_log(log, "access beyond mptcp_sched_data at off %u size %u ended at %zu",
-			off, size, end);
-		return -EACCES;
-	}
-
-	return NOT_INIT;
+	bpf_log(log, "no write support to mptcp_sched_data at off %d\n", off);
+	return -EACCES;
 }
 
 static const struct bpf_verifier_ops bpf_mptcp_sched_verifier_ops = {
