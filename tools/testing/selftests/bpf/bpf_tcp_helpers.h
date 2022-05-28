@@ -231,10 +231,20 @@ extern __u32 tcp_slow_start(struct tcp_sock *tp, __u32 acked) __ksym;
 extern void tcp_cong_avoid_ai(struct tcp_sock *tp, __u32 w, __u32 acked) __ksym;
 
 #define MPTCP_SCHED_NAME_MAX	16
+#define MPTCP_SUBFLOWS_MAX	8
+
+struct mptcp_subflow_context {
+	__u32	token;
+} __attribute__((preserve_access_index));
+
+struct mptcp_sched_subflow {
+	struct mptcp_subflow_context *context;
+	bool	is_scheduled;
+};
 
 struct mptcp_sched_data {
-	struct sock	*sock;
-	bool		call_again;
+	bool	reinject;
+	struct mptcp_sched_subflow subflows[MPTCP_SUBFLOWS_MAX];
 };
 
 struct mptcp_sched_ops {
@@ -243,7 +253,7 @@ struct mptcp_sched_ops {
 	void (*init)(const struct mptcp_sock *msk);
 	void (*release)(const struct mptcp_sock *msk);
 
-	void (*get_subflow)(const struct mptcp_sock *msk, bool reinject,
+	void (*get_subflow)(const struct mptcp_sock *msk,
 			    struct mptcp_sched_data *data);
 	void *owner;
 };
