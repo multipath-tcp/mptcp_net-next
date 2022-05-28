@@ -88,11 +88,28 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	bpf_module_put(sched, sched->owner);
 }
 
-static int mptcp_sched_data_init(struct mptcp_sock *msk,
+static int mptcp_sched_data_init(struct mptcp_sock *msk, bool reinject,
 				 struct mptcp_sched_data *data)
 {
-	data->sock = NULL;
-	data->call_again = 0;
+	struct mptcp_subflow_context *subflow;
+	int i = 0;
+
+	data->reinject = reinject;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (i == MPTCP_SUBFLOWS_MAX) {
+			pr_warn_once("too many subflows");
+			break;
+		}
+		data->subflows[i].context = subflow;
+		data->subflows[i].is_scheduled = 0;
+		i++;
+	}
+
+	for (; i < MPTCP_SUBFLOWS_MAX; i++) {
+		data->subflows[i].context = NULL;
+		data->subflows[i].is_scheduled = 0;
+	}
 
 	return 0;
 }
@@ -100,6 +117,8 @@ static int mptcp_sched_data_init(struct mptcp_sock *msk,
 struct sock *mptcp_sched_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_sched_data data;
+	struct sock *ssk = NULL;
+	int i;
 
 	sock_owned_by_me((struct sock *)msk);
 
@@ -113,16 +132,26 @@ struct sock *mptcp_sched_get_send(struct mptcp_sock *msk)
 	if (!msk->sched)
 		return mptcp_subflow_get_send(msk);
 
-	mptcp_sched_data_init(msk, &data);
-	msk->sched->get_subflow(msk, false, &data);
+	mptcp_sched_data_init(msk, false, &data);
+	msk->sched->get_subflow(msk, &data);
 
-	msk->last_snd = data.sock;
-	return data.sock;
+	for (i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
+		if (data.subflows[i].is_scheduled &&
+		    data.subflows[i].context) {
+			ssk = data.subflows[i].context->tcp_sock;
+			msk->last_snd = ssk;
+			break;
+		}
+	}
+
+	return ssk;
 }
 
 struct sock *mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
 	struct mptcp_sched_data data;
+	struct sock *ssk = NULL;
+	int i;
 
 	sock_owned_by_me((const struct sock *)msk);
 
@@ -133,9 +162,17 @@ struct sock *mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	if (!msk->sched)
 		return mptcp_subflow_get_retrans(msk);
 
-	mptcp_sched_data_init(msk, &data);
-	msk->sched->get_subflow(msk, true, &data);
+	mptcp_sched_data_init(msk, true, &data);
+	msk->sched->get_subflow(msk, &data);
 
-	msk->last_snd = data.sock;
-	return data.sock;
+	for (i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
+		if (data.subflows[i].is_scheduled &&
+		    data.subflows[i].context) {
+			ssk = data.subflows[i].context->tcp_sock;
+			msk->last_snd = ssk;
+			break;
+		}
+	}
+
+	return ssk;
 }
