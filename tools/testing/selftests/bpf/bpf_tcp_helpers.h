@@ -261,4 +261,7 @@ struct mptcp_sock {
 	char		ca_name[TCP_CA_NAME_MAX];
 } __attribute__((preserve_access_index));
 
+extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
+					bool scheduled) __ksym;
+
 #endif

@@ -88,6 +88,12 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	bpf_module_put(sched, sched->owner);
 }
 
+void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
+				 bool scheduled)
+{
+	WRITE_ONCE(subflow->scheduled, scheduled);
+}
+
 static int mptcp_sched_data_init(struct mptcp_sock *msk, bool reinject,
 				 struct mptcp_sched_data *data)
 {
@@ -101,6 +107,7 @@ static int mptcp_sched_data_init(struct mptcp_sock *msk, bool reinject,
 			pr_warn_once("too many subflows");
 			break;
 		}
+		mptcp_subflow_set_scheduled(subflow, false);
 		data->contexts[i++] = subflow;
 	}
 
