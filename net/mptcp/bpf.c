@@ -42,29 +42,27 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 {
 	size_t end;
 
-	if (atype == BPF_READ)
+	if (atype == BPF_READ) {
 		return btf_struct_access(log, btf, t, off, size, atype,
 					 next_btf_id, flag);
+	}
 
 	if (t != mptcp_sched_type) {
-		bpf_log(log, "only access to mptcp_sched_data is supported\n");
+		bpf_log(log, "only access to mptcp_subflow_context is supported\n");
 		return -EACCES;
 	}
 
 	switch (off) {
-	case offsetof(struct mptcp_sched_data, sock):
-		end = offsetofend(struct mptcp_sched_data, sock);
-		break;
-	case offsetof(struct mptcp_sched_data, call_again):
-		end = offsetofend(struct mptcp_sched_data, call_again);
+	case offsetof(struct mptcp_subflow_context, scheduled):
+		end = offsetofend(struct mptcp_subflow_context, scheduled);
 		break;
 	default:
-		bpf_log(log, "no write support to mptcp_sched_data at off %d\n", off);
+		bpf_log(log, "no write support to mptcp_subflow_context at off %d\n", off);
 		return -EACCES;
 	}
 
 	if (off + size > end) {
-		bpf_log(log, "access beyond mptcp_sched_data at off %u size %u ended at %zu",
+		bpf_log(log, "access beyond mptcp_subflow_context at off %u size %u ended at %zu",
 			off, size, end);
 		return -EACCES;
 	}
@@ -144,7 +142,7 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 {
 	s32 type_id;
 
-	type_id = btf_find_by_name_kind(btf, "mptcp_sched_data",
+	type_id = btf_find_by_name_kind(btf, "mptcp_subflow_context",
 					BTF_KIND_STRUCT);
 	if (type_id < 0)
 		return -EINVAL;
