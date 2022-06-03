@@ -101,9 +101,6 @@ static inline int ftrace_mod_get_kallsym(unsigned int symnum, unsigned long *val
 #ifdef CONFIG_FUNCTION_TRACER
 
 extern int ftrace_enabled;
-extern int
-ftrace_enable_sysctl(struct ctl_table *table, int write,
-		     void *buffer, size_t *lenp, loff_t *ppos);
 
 #ifndef CONFIG_HAVE_DYNAMIC_FTRACE_WITH_ARGS
 
@@ -455,8 +452,8 @@ static inline void stack_tracer_enable(void) { }
 
 #ifdef CONFIG_DYNAMIC_FTRACE
 
-int ftrace_arch_code_modify_prepare(void);
-int ftrace_arch_code_modify_post_process(void);
+void ftrace_arch_code_modify_prepare(void);
+void ftrace_arch_code_modify_post_process(void);
 
 enum ftrace_bug_type {
 	FTRACE_BUG_UNKNOWN,
