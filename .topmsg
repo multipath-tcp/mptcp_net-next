@@ -2,15 +2,15 @@ From: Geliang Tang <geliang.tang@suse.com>
 Subject: [PATCH] mptcp: add struct mptcp_sched_ops
 
 This patch defines struct mptcp_sched_ops, which has three struct members,
-name, owner and list, and three function pointers, init, release and
-get_subflow.
+name, owner and list, and three function pointers: init(), release() and
+get_subflow().
+
+The scheduler function get_subflow() has a struct mptcp_sched_data
+parameter, which contains a reinject flag and a mptcp_subflow_context
+array.
 
 Add the scheduler registering, unregistering and finding functions to add,
 delete and find a packet scheduler on the global list mptcp_sched_list.
-
-For supporting a "redundant" packet scheduler in the future, this patch
-adds a flag in struct mptcp_sched_data named call_again to indicate that
-get_subflow() function needs to be called again.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
