@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-bpf-Add-bpf_rr-test
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests/bpf: Add bpf_rr test
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds the round-robin BPF MPTCP scheduler test. Use sysctl to
+set net.mptcp.scheduler to use this sched. Add a veth net device to
+simulate the multiple addresses case. Use 'ip mptcp endpoint' command to
+add this new endpoint to PM netlink. Send data and check bytes_sent of
+'ss' output after it to make sure the data has been sent on the new veth
+net device.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
