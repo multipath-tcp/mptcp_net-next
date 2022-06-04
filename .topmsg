@@ -2,9 +2,15 @@ From: Geliang Tang <geliang.tang@suse.com>
 Subject: [PATCH] mptcp: add get_subflow wrappers
 
 This patch defines two new wrappers mptcp_sched_get_send() and
-mptcp_sched_get_retrans(), invoke get_subflow() of msk->sched
-in them. Use them instead of using mptcp_subflow_get_send() or
+mptcp_sched_get_retrans(), invoke get_subflow() of msk->sched in them.
+Use them instead of using mptcp_subflow_get_send() or
 mptcp_subflow_get_retrans() directly.
+
+Set the subflow pointers array in struct mptcp_sched_data before invoking
+get_subflow(), then it can be used in get_subflow() in the BPF contexts.
+
+Check the subflow scheduled flags to test which subflow or subflows are
+picked by the scheduler.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
