@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/bpf-Add-bpf_mptcp_sched_kfunc_set
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] bpf: Add bpf_mptcp_sched_kfunc_set
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds a new struct btf_kfunc_id_set for MPTCP scheduler. Add
+mptcp_subflow_set_scheduled() helper into this id_set, and register it
+in bpf_mptcp_sched_kfunc_init() to make sure this helper can be accessed
+from the BPF context.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
