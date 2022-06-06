@@ -334,18 +334,17 @@ static void test_bkup(void)
 		return;
 	}
 
-	add_veth();
-	system("ip mptcp endpoint add 10.0.1.1 subflow backup");
-	system("sysctl -qw net.mptcp.scheduler=bpf_bkup");
-	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
+	sched_init("subflow backup", "bpf_bkup");
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd);
-	ASSERT_GT(system("ss -MOenita | grep '10.0.1.1' | grep 'bytes_sent:'"), 0, "ss");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
+	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
 
 	close(client_fd);
 	close(server_fd);
-	cleanup();
+	sched_cleanup();
 	bpf_link__destroy(link);
 	mptcp_bpf_bkup__destroy(bkup_skel);
 }
