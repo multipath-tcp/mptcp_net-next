@@ -366,18 +366,17 @@ static void test_rr(void)
 		return;
 	}
 
-	add_veth();
-	system("ip mptcp endpoint add 10.0.1.1 subflow");
-	system("sysctl -qw net.mptcp.scheduler=bpf_rr");
-	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
+	sched_init("subflow", "bpf_rr");
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd);
-	ASSERT_OK(system("ss -MOenita | grep '10.0.1.1' | grep -q 'bytes_sent:'"), "ss");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr 1");
+	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr 2");
 
 	close(client_fd);
 	close(server_fd);
-	cleanup();
+	sched_cleanup();
 	bpf_link__destroy(link);
 	mptcp_bpf_rr__destroy(rr_skel);
 }
