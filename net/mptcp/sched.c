@@ -119,6 +119,7 @@ static int mptcp_sched_data_init(struct mptcp_sock *msk, bool reinject,
 
 struct sock *mptcp_sched_get_send(struct mptcp_sock *msk, int *err)
 {
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sched_data data;
 	struct sock *ssk = NULL;
 
@@ -146,6 +147,20 @@ struct sock *mptcp_sched_get_send(struct mptcp_sock *msk, int *err)
 
 	mptcp_sched_data_init(msk, false, &data);
 	msk->sched->get_subflow(msk, &data);
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (READ_ONCE(subflow->scheduled)) {
+			/*
+			 * TODO: Redundant subflows are not supported in
+			 * __mptcp_subflow_push_pending() yet. Here's a
+			 * placeholder to pick the first subflow for the
+			 * redundant subflows case.
+			 */
+			ssk = subflow->tcp_sock;
+			*err = 0;
+			break;
+		}
+	}
 
 	return ssk;
 }
