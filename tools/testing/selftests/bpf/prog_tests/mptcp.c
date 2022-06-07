@@ -13,6 +13,9 @@
 #define TCP_CA_NAME_MAX	16
 #endif
 
+#define ADDR_1	"10.0.1.1"
+#define ADDR_2	"10.0.1.2"
+
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
@@ -251,18 +254,37 @@ static void send_data(int lfd, int fd)
 	      PTR_ERR(thread_ret));
 }
 
-static void add_veth(void)
+static void sched_init(char *flags, char *sched)
 {
-	system("ip link add veth1 type veth");
-	system("ip addr add 10.0.1.1/24 dev veth1");
+	char cmd[64];
+
+	system("ip link add veth1 type veth peer name veth2");
+	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth1", ADDR_1);
+	system(cmd);
 	system("ip link set veth1 up");
+	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth2", ADDR_2);
+	system(cmd);
+	system("ip link set veth2 up");
+
+	snprintf(cmd, sizeof(cmd), "ip mptcp endpoint add %s %s", ADDR_2, flags);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "sysctl -qw net.mptcp.scheduler=%s", sched);
+	system(cmd);
 }
 
-static void cleanup(void)
+static void sched_cleanup(void)
 {
 	system("sysctl -qw net.mptcp.scheduler=default");
 	system("ip mptcp endpoint flush");
 	system("ip link del veth1");
+}
+
+static int has_bytes_sent(char *addr)
+{
+	char cmd[64];
+
+	snprintf(cmd, sizeof(cmd), "ss -it dst %s | grep -q 'bytes_sent:'", addr);
+	return system(cmd);
 }
 
 static void test_first(void)
@@ -281,18 +303,17 @@ static void test_first(void)
 		return;
 	}
 
-	add_veth();
-	system("ip mptcp endpoint add 10.0.1.1 subflow");
-	system("sysctl -qw net.mptcp.scheduler=bpf_first");
-	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
+	sched_init("subflow", "bpf_first");
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd);
-	ASSERT_GT(system("ss -MOenita | grep '10.0.1.1' | grep 'bytes_sent:'"), 0, "ss");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
+	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
 
 	close(client_fd);
 	close(server_fd);
-	cleanup();
+	sched_cleanup();
 	bpf_link__destroy(link);
 	mptcp_bpf_first__destroy(first_skel);
 }
