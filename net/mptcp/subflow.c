@@ -974,7 +974,6 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	bool csum_reqd = READ_ONCE(msk->csum_enabled);
-	struct sock *sk = (struct sock *)msk;
 	struct mptcp_ext *mpext;
 	struct sk_buff *skb;
 	u16 data_len;
@@ -1016,9 +1015,6 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		pr_debug("infinite mapping received");
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
 		subflow->map_data_len = 0;
-		if (!sock_flag(ssk, SOCK_DEAD))
-			sk_stop_timer(sk, &sk->sk_timer);
-
 		return MAPPING_INVALID;
 	}
 
@@ -1238,11 +1234,9 @@ fallback:
 				tcp_send_active_reset(ssk, GFP_ATOMIC);
 				while ((skb = skb_peek(&ssk->sk_receive_queue)))
 					sk_eat_skb(ssk, skb);
-			} else if (!sock_flag(ssk, SOCK_DEAD)) {
-				WRITE_ONCE(subflow->mp_fail_response_expect, true);
-				sk_reset_timer((struct sock *)msk,
-					       &((struct sock *)msk)->sk_timer,
-					       jiffies + TCP_RTO_MAX);
+			} else {
+				msk->fail_sock = ssk;
+				msk->fail_timeout = jiffies + TCP_RTO_MAX;
 			}
 			WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_NODATA);
 			return true;
