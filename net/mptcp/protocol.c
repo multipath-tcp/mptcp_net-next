@@ -2185,7 +2185,12 @@ mp_fail_response_expect_subflow(struct mptcp_sock *msk)
 static void mptcp_timeout_timer(struct timer_list *t)
 {
 	struct sock *sk = from_timer(sk, t, sk_timer);
+	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	bh_lock_sock(sk);
+	if (test_and_clear_bit(MPTCP_FAIL_RESPONSE_EXPECT, &msk->flags))
+		__set_bit(MPTCP_FAIL_NO_RESPONSE, &msk->flags);
+	bh_unlock_sock(sk);
 	mptcp_schedule_work(sk);
 	sock_put(sk);
 }
@@ -2562,7 +2567,8 @@ static void mptcp_worker(struct work_struct *work)
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
 
-	mptcp_mp_fail_no_response(msk);
+	if (test_and_clear_bit(MPTCP_FAIL_NO_RESPONSE, &msk->flags))
+		mptcp_mp_fail_no_response(msk);
 
 unlock:
 	release_sock(sk);

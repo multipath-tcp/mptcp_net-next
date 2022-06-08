@@ -1240,6 +1240,7 @@ fallback:
 					sk_eat_skb(ssk, skb);
 			} else if (!sock_flag(ssk, SOCK_DEAD)) {
 				WRITE_ONCE(subflow->mp_fail_response_expect, true);
+				__set_bit(MPTCP_FAIL_RESPONSE_EXPECT, &msk->flags);
 				sk_reset_timer((struct sock *)msk,
 					       &((struct sock *)msk)->sk_timer,
 					       jiffies + TCP_RTO_MAX);
