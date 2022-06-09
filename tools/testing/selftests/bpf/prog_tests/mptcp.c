@@ -13,9 +13,6 @@
 #define TCP_CA_NAME_MAX	16
 #endif
 
-#define ADDR_1	"10.0.1.1"
-#define ADDR_2	"10.0.1.2"
-
 struct mptcp_storage {
 	__u32 invoked;
 	__u32 is_mptcp;
@@ -24,9 +21,6 @@ struct mptcp_storage {
 	struct sock *first;
 	char ca_name[TCP_CA_NAME_MAX];
 };
-
-static const unsigned int total_bytes = 10 * 1024 * 1024;
-static int stop, duration;
 
 static int verify_tsk(int map_fd, int client_fd)
 {
@@ -175,6 +169,9 @@ close_cgroup_fd:
 	close(cgroup_fd);
 }
 
+static const unsigned int total_bytes = 10 * 1024 * 1024;
+static int stop, duration;
+
 static void *server(void *arg)
 {
 	int lfd = (int)(long)arg, err = 0, fd;
@@ -253,6 +250,9 @@ static void send_data(int lfd, int fd)
 	CHECK(IS_ERR(thread_ret), "pthread_join", "thread_ret:%ld",
 	      PTR_ERR(thread_ret));
 }
+
+#define ADDR_1	"10.0.1.1"
+#define ADDR_2	"10.0.1.2"
 
 static void sched_init(char *flags, char *sched)
 {
