@@ -305,7 +305,7 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 	if (!READ_ONCE(msk->allow_infinite_fallback))
 		return;
 
-	if (!READ_ONCE(subflow->mp_fail_response_expect)) {
+	if (!msk->fail_ssk) {
 		pr_debug("send MP_FAIL response and infinite map");
 
 		subflow->send_mp_fail = 1;

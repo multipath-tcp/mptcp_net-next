@@ -2167,21 +2167,6 @@ static void mptcp_retransmit_timer(struct timer_list *t)
 	sock_put(sk);
 }
 
-static struct mptcp_subflow_context *
-mp_fail_response_expect_subflow(struct mptcp_sock *msk)
-{
-	struct mptcp_subflow_context *subflow, *ret = NULL;
-
-	mptcp_for_each_subflow(msk, subflow) {
-		if (READ_ONCE(subflow->mp_fail_response_expect)) {
-			ret = subflow;
-			break;
-		}
-	}
-
-	return ret;
-}
-
 static void mptcp_timeout_timer(struct timer_list *t)
 {
 	struct sock *sk = from_timer(sk, t, sk_timer);
@@ -2507,19 +2492,16 @@ reset_timer:
 
 static void mptcp_mp_fail_no_response(struct mptcp_sock *msk)
 {
-	struct mptcp_subflow_context *subflow;
-	struct sock *ssk;
+	struct sock *ssk = msk->fail_ssk;
 	bool slow;
 
-	subflow = mp_fail_response_expect_subflow(msk);
-	if (subflow) {
-		pr_debug("MP_FAIL doesn't respond, reset the subflow");
+	pr_debug("MP_FAIL doesn't respond, reset the subflow");
 
-		ssk = mptcp_subflow_tcp_sock(subflow);
-		slow = lock_sock_fast(ssk);
-		mptcp_subflow_reset(ssk);
-		unlock_sock_fast(ssk, slow);
-	}
+	slow = lock_sock_fast(ssk);
+	mptcp_subflow_reset(ssk);
+	unlock_sock_fast(ssk, slow);
+
+	msk->fail_ssk = NULL;
 }
 
 static void mptcp_worker(struct work_struct *work)
@@ -2562,7 +2544,7 @@ static void mptcp_worker(struct work_struct *work)
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
 
-	if (time_after(jiffies, msk->fail_tout))
+	if (msk->fail_ssk && time_after(jiffies, msk->fail_tout))
 		mptcp_mp_fail_no_response(msk);
 
 unlock:
@@ -2590,6 +2572,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	WRITE_ONCE(msk->csum_enabled, mptcp_is_checksum_enabled(sock_net(sk)));
 	WRITE_ONCE(msk->allow_infinite_fallback, true);
 	msk->recovery = false;
+	msk->fail_ssk = NULL;
 	msk->fail_tout = 0;
 
 	mptcp_pm_data_init(msk);

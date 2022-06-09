@@ -1235,7 +1235,7 @@ fallback:
 				while ((skb = skb_peek(&ssk->sk_receive_queue)))
 					sk_eat_skb(ssk, skb);
 			} else {
-				WRITE_ONCE(subflow->mp_fail_response_expect, true);
+				msk->fail_ssk = ssk;
 				msk->fail_tout = jiffies + TCP_RTO_MAX;
 			}
 			WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_NODATA);
