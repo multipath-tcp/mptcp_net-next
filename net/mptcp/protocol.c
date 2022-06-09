@@ -2562,7 +2562,8 @@ static void mptcp_worker(struct work_struct *work)
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
 
-	mptcp_mp_fail_no_response(msk);
+	if (time_after(jiffies, msk->fail_tout))
+		mptcp_mp_fail_no_response(msk);
 
 unlock:
 	release_sock(sk);
@@ -2589,6 +2590,7 @@ static int __mptcp_init_sock(struct sock *sk)
 	WRITE_ONCE(msk->csum_enabled, mptcp_is_checksum_enabled(sock_net(sk)));
 	WRITE_ONCE(msk->allow_infinite_fallback, true);
 	msk->recovery = false;
+	msk->fail_tout = 0;
 
 	mptcp_pm_data_init(msk);
 
