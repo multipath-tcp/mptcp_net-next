@@ -306,6 +306,8 @@ struct mptcp_sock {
 
 	u32 setsockopt_seq;
 	char		ca_name[TCP_CA_NAME_MAX];
+	struct sock	*fail_ssk;
+	unsigned long	fail_tout;
 };
 
 #define mptcp_data_lock(sk) spin_lock_bh(&(sk)->sk_lock.slock)
@@ -468,7 +470,6 @@ struct mptcp_subflow_context {
 		local_id_valid : 1, /* local_id is correctly initialized */
 		valid_csum_seen : 1;        /* at least one csum validated */
 	enum mptcp_data_avail data_avail;
-	bool	mp_fail_response_expect;
 	bool	scheduled;
 	u32	remote_nonce;
 	u64	thmac;
