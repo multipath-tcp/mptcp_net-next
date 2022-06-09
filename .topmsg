@@ -1,4 +1,23 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-invoke-MP_FAIL-response-when-needed
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: invoke MP_FAIL response when needed
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+mptcp_mp_fail_no_response shouldn't be invoked on each worker run, it
+should be invoked only when MP_FAIL response timeout occurs.
+
+This patch refactors the MP_FAIL response logic.
+
+Add fail_tout in mptcp_sock to record the MP_FAIL timestamp. Check it
+in mptcp_worker() before invoking mptcp_mp_fail_no_response(). Drop
+the code to reuse sk_timer for MP_FAIL response.
+
+Add fail_ssk struct member in struct mptcp_sock to record the MP_FAIL
+subsocket. It can replace the mp_fail_response_expect flag in struct
+mptcp_subflow_context. Drop mp_fail_response_expect_subflow() helper,
+just use this fail_ssk in mptcp_mp_fail_no_response() to reset the
+subflow.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/281
+Fixes: d9fb797046c5 ("mptcp: Do not traverse the subflow connection list without lock")
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
