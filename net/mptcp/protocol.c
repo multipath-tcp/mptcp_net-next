@@ -1549,6 +1549,62 @@ void mptcp_check_and_set_pending(struct sock *sk)
 		mptcp_sk(sk)->push_pending |= BIT(MPTCP_PUSH_PENDING);
 }
 
+static int __mptcp_subflows_push_pending(struct sock *sk, struct mptcp_sendmsg_info *info)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_data_frag *dfrag;
+	int len, copied = 0, err = 0;
+	struct sock *ssk = NULL;
+
+	while ((dfrag = mptcp_send_head(sk))) {
+		info->sent = dfrag->already_sent;
+		info->limit = dfrag->data_len;
+		len = dfrag->data_len - dfrag->already_sent;
+		while (len > 0) {
+			int ret = 0, max = 0;
+
+			mptcp_sched_get_send(msk, &err);
+			if (err)
+				goto out;
+
+			mptcp_for_each_subflow(msk, subflow) {
+				if (READ_ONCE(subflow->scheduled)) {
+					ssk = mptcp_subflow_tcp_sock(subflow);
+					if (!ssk)
+						goto out;
+
+					lock_sock(ssk);
+
+					ret = mptcp_sendmsg_frag(sk, ssk, dfrag, info);
+					if (ret <= 0) {
+						mptcp_push_release(ssk, info);
+						goto out;
+					}
+
+					if (ret > max)
+						max = ret;
+
+					mptcp_push_release(ssk, info);
+
+					msk->last_snd = ssk;
+					mptcp_subflow_set_scheduled(subflow, false);
+				}
+			}
+
+			info->sent += max;
+			copied += max;
+			len -= max;
+
+			mptcp_update_post_push(msk, dfrag, max);
+		}
+		WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+	}
+
+out:
+	return copied;
+}
+
 void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 {
 	struct sock *prev_ssk = NULL, *ssk = NULL;
@@ -1559,15 +1615,20 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0;
 
+	if (unlikely(msk->sched && msk->sched->redundant)) {
+		copied = __mptcp_subflows_push_pending(sk, &info);
+		goto out;
+	}
+
 	while ((dfrag = mptcp_send_head(sk))) {
 		info.sent = dfrag->already_sent;
 		info.limit = dfrag->data_len;
 		len = dfrag->data_len - dfrag->already_sent;
 		while (len > 0) {
-			int ret = 0;
+			int ret = 0, err = 0;
 
 			prev_ssk = ssk;
-			ssk = mptcp_subflow_get_send(msk);
+			ssk = mptcp_sched_get_send(msk, &err);
 
 			/* First check. If the ssk has changed since
 			 * the last round, release prev_ssk
@@ -1628,13 +1689,13 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 		info.limit = dfrag->data_len;
 		len = dfrag->data_len - dfrag->already_sent;
 		while (len > 0) {
-			int ret = 0;
+			int ret = 0, err = 0;
 
 			/* the caller already invoked the packet scheduler,
 			 * check for a different subflow usage only after
 			 * spooling the first chunk of data
 			 */
-			xmit_ssk = first ? ssk : mptcp_subflow_get_send(mptcp_sk(sk));
+			xmit_ssk = first ? ssk : mptcp_sched_get_send(mptcp_sk(sk), &err);
 			if (!xmit_ssk)
 				goto out;
 			if (xmit_ssk != ssk) {
@@ -3093,11 +3154,13 @@ void __mptcp_data_acked(struct sock *sk)
 
 void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 {
+	int err = 0;
+
 	if (!mptcp_send_head(sk))
 		return;
 
 	if (!sock_owned_by_user(sk)) {
-		struct sock *xmit_ssk = mptcp_subflow_get_send(mptcp_sk(sk));
+		struct sock *xmit_ssk = mptcp_sched_get_send(mptcp_sk(sk), &err);
 
 		if (xmit_ssk == ssk)
 			__mptcp_subflow_push_pending(sk, ssk);
