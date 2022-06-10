@@ -109,6 +109,7 @@ struct mptcp_sched_ops {
 			    struct mptcp_sched_data *data);
 
 	char			name[MPTCP_SCHED_NAME_MAX];
+	bool			redundant;
 	struct module		*owner;
 	struct list_head	list;
 
