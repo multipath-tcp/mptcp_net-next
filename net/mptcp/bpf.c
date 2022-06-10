@@ -125,6 +125,9 @@ static int bpf_mptcp_sched_init_member(const struct btf_type *t,
 		if (mptcp_sched_find(usched->name))
 			return -EEXIST;
 		return 1;
+	case offsetof(struct mptcp_sched_ops, redundant):
+		sched->redundant = usched->redundant;
+		return 1;
 	}
 
 	if (!btf_type_resolve_func_ptr(btf_vmlinux, member->type, NULL))
