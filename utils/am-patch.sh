@@ -78,12 +78,18 @@ am_patch() { local patch="${1}"
 	am_files "${TMP_FILE}"
 }
 
-am_b4() {
+am_b4() { local i args=()
 	if [ "${1}" = "b4" ]; then
 		shift
 	fi
 
-	b4 shazam "${@}"
+	for i in "${@}"; do
+		if [[ "${i}" =~ ^- ]]; then
+			args+=("${i}")
+			continue
+		fi
+		b4 shazam --no-parent "${args[@]}" "${i}"
+	done
 }
 
 trap 'exit_trap' EXIT

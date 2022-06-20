@@ -42,8 +42,14 @@ apply_patches_patch() {
 	GIT_PW_ARG="--no-deps" apply_patches_git_pw "${@}"
 }
 
-apply_patches_b4() {
-	b4 shazam "${@}"
+apply_patches_b4() { local i args=()
+	for i in "${@}"; do
+		if [[ "${i}" =~ ^- ]]; then
+			args+=("${i}")
+			continue
+		fi
+		b4 shazam --no-parent "${args[@]}" "${i}"
+	done
 }
 
 apply_patches() { local p patches=()
