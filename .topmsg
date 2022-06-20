@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/raw-Use-helpers-for-the-hlist_nulls-variant
+From: Kuniyuki Iwashima <kuniyu@amazon.com>
+Subject: [PATCH] raw: Use helpers for the hlist_nulls variant.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+hlist_nulls_add_head_rcu() and hlist_nulls_for_each_entry() have dedicated
+macros for sk.
+
+Signed-off-by: Kuniyuki Iwashima <kuniyu@amazon.com>
