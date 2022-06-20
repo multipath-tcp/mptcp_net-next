@@ -1,5 +1,5 @@
 From: Kuniyuki Iwashima <kuniyu@amazon.com>
-Subject: [PATCH] raw: Fix mixed declarations error in raw_icmp_error() (re-apply)
+Subject: [PATCH] raw: Fix mixed declarations error in raw_icmp_error().
 
 The trailing semicolon causes a compiler error, so let's remove it.
 
