@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-pm-address-tests
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: userspace pm address tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds userspace pm tests support for mptcp_join.sh script. Add
+userspace pm add_addr and rm_addr test cases in userspace_tests().
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
