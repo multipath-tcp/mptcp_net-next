@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/raw-Use-helpers-for-the-hlist_nulls-variant
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
