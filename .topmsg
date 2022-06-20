@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-tweak-simult_flows-for-debug-kernels
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: tweak simult_flows for debug kernels
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mentioned test measures the transfer run-time to verify
+that the user-space program is able to use the full aggregate B/W.
+
+Even on (virtual) link-speed-bound tests, debug kernel can slow
+down the transfer enough to cause sporadic test failures.
+
+Instead of unconditionally raising the maximum allowed run-time,
+tweak when the running kernel is a debug one, and use some simple/
+rough heuristic to guess such scenarios.
+
+Note: this intentionally avoids looking for /boot/config-<version> as
+the latter file is not always available in our reference CI
+environments.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
