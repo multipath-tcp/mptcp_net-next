@@ -42,9 +42,13 @@ apply_patches_patch() {
 	GIT_PW_ARG="--no-deps" apply_patches_git_pw "${@}"
 }
 
+apply_patches_b4() {
+	b4 shazam "${@}"
+}
+
 apply_patches() { local p patches=()
 	for p in "${@}"; do
-		if [ "${p}" = "patch" ] || [ "${p}" = "series" ]; then
+		if [ "${p}" = "patch" ] || [ "${p}" = "series" ] || [ "${p}" = "b4" ]; then
 			continue;
 		fi
 		patches+=("${p}")

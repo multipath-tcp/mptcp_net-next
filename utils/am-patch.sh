@@ -78,6 +78,14 @@ am_patch() { local patch="${1}"
 	am_files "${TMP_FILE}"
 }
 
+am_b4() {
+	if [ "${1}" = "b4" ]; then
+		shift
+	fi
+
+	b4 shazam "${@}"
+}
+
 trap 'exit_trap' EXIT
 
 "am_${MODE}" "${@}"

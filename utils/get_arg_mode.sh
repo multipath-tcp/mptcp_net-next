@@ -15,7 +15,7 @@ is_pw() { local mode id
 
 if [ -f "${1}" ]; then
 	echo "files"
-elif [ "${1}" = "patch" ] || [ "${1}" = "series" ]; then
+elif [ "${1}" = "patch" ] || [ "${1}" = "series" ] || [ "${1}" = "b4" ]; then
 	echo "${1}"
 elif [ "${SERIES}" = 1 ] && is_pw series "${1}"; then
 	echo "series"
@@ -28,6 +28,6 @@ elif is_pw patch "${1}" \
 		 --state "deferred"; then
 	echo "patch"
 else
-	echo "'${1}': Not a file nor a patchwork ref" >&2
+	echo "'${1}': Not a file nor a patchwork ref nor b4" >&2
 	exit 1
 fi
