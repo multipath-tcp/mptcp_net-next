@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/raw-Fix-mixed-declarations-error-in-raw_icmp_error-re-apply
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
