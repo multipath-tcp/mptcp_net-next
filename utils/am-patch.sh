@@ -88,7 +88,7 @@ am_b4() { local i args=()
 			args+=("${i}")
 			continue
 		fi
-		b4 shazam --no-parent "${args[@]}" "${i}"
+		b4 shazam --no-parent --add-my-sob "${args[@]}" "${i}"
 	done
 }
 
