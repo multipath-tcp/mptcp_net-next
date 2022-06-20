@@ -103,6 +103,11 @@ accept_patches() { local commit subject
 	done <<< "$(git log --reverse --format="%H %s" "${1}" | grep -v "^\S\+ tg ")"
 }
 
+list_commits() {
+	printinfo "New commit(s):"
+	git log --reverse --format="- %h: %s" "${1}" | grep -v "^- \S\+ tg "
+}
+
 
 if [ "$(git diff --shortstat | wc -l)" -ne 0 ]; then
 	printerr "Not a clean git env"
@@ -122,11 +127,8 @@ fi
 
 printinfo "Adding new patch(es) before ${TG_TOP}"
 
-git checkout "${TG_TOP}"
-[ -f .topdeps ]
-
 # Apply patches in a tmp branch created from the parent commit of TG_TOP
-PARENT="$(head -n1 .topdeps)"
+PARENT="$(git show "${TG_TOP}":.topdeps | head -n1)" || exit 1
 git checkout "${PARENT}"
 git branch -f tmp
 git checkout tmp
@@ -153,7 +155,11 @@ git commit -sm "tg: switch to ${BRANCH}" .topdeps
 TG_TOP="${TG_TOP}" ./.publish.sh
 
 # update the tree
-TG_TOP= ./.publish.sh
+if [ "${NO_PUBLISH}" != 1 ]; then
+	TG_TOP= ./.publish.sh
+else
+	list_commits "${PARENT}..${BRANCH}"
+fi
 
 # Mark as done
 accept_patches "${PARENT}..${BRANCH}"
