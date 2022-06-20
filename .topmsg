@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-avoid-Terminated-messages-in-userspace_pm
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: avoid Terminated messages in userspace_pm
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There're some 'Terminated' messages in the output of userspace pm tests
+script after killing './pm_nl_ctl events' processes:
+
+Created network namespaces ns1, ns2         			[OK]
+./userspace_pm.sh: line 166: 13735 Terminated              ip netns exec "$ns2" ./pm_nl_ctl events >> "$client_evts" 2>&1
+./userspace_pm.sh: line 172: 13737 Terminated              ip netns exec "$ns1" ./pm_nl_ctl events >> "$server_evts" 2>&1
+Established IPv4 MPTCP Connection ns2 => ns1    		[OK]
+./userspace_pm.sh: line 166: 13753 Terminated              ip netns exec "$ns2" ./pm_nl_ctl events >> "$client_evts" 2>&1
+./userspace_pm.sh: line 172: 13755 Terminated              ip netns exec "$ns1" ./pm_nl_ctl events >> "$server_evts" 2>&1
+Established IPv6 MPTCP Connection ns2 => ns1    		[OK]
+ADD_ADDR 10.0.2.2 (ns2) => ns1, invalid token    		[OK]
+
+This patch adds a helper kill_wait(), in it using 'wait $pid 2>/dev/null'
+commands after 'kill $pid' to avoid printing out these Terminated messages.
+Use this helper instead of using 'kill $pid'.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
