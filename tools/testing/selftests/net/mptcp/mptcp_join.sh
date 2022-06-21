@@ -949,8 +949,7 @@ do_transfer()
 
 	if [ $userspace_pm -eq 1 ]; then
 		kill_wait $evts_ns1_pid
-		kill $evts_ns2_pid
-		wait $evts_ns2_pid 2>/dev/null
+		kill_wait $evts_ns2_pid
 		rm -rf $evts_ns1 $evts_ns2
 	fi
 
