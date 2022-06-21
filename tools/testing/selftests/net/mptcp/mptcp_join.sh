@@ -455,6 +455,12 @@ wait_mpj()
 	done
 }
 
+kill_wait()
+{
+	kill $1 > /dev/null 2>&1
+	wait $1 2>/dev/null
+}
+
 pm_nl_set_limits()
 {
 	local ns=$1
@@ -917,8 +923,7 @@ do_transfer()
 	fi
 
 	if [ $userspace_pm -eq 1 ]; then
-		kill $evts_ns1_pid
-		wait $evts_ns1_pid 2>/dev/null
+		kill_wait $evts_ns1_pid
 		rm -rf $evts_ns1
 	fi
 
