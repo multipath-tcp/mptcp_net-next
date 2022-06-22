@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] net: remove SK_RECLAIM_THRESHOLD and SK_RECLAIM_CHUNK
-
-There are no more users for the mentioned macros, just
-drop them.
-
-Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
