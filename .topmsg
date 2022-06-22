@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-remove-SK_RECLAIM_THRESHOLD-and-SK_RECLAIM_CHUNK
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] net: remove SK_RECLAIM_THRESHOLD and SK_RECLAIM_CHUNK
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+There are no more users for the mentioned macros, just
+drop them.
+
+Acked-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
