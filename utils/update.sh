@@ -56,7 +56,7 @@ update() {
 	tg remote origin --populate
 
 	update_local_tree "${top}" "${range}"
-	if [ "${top}" = "${TG_BASE_NET}" ]; then
+	if [ "${top}" = "${TG_TOPIC_TOP_NET}" ]; then
 		# we also need to update the net-next part
 		update_local_tree "${TG_TOPIC_TOP_NET_NEXT}" "${range}"
 	fi
