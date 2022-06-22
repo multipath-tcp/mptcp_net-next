@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-MAPPING_BAD_CSUM
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce MAPPING_BAD_CSUM
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This allow moving a couple of conditional out of the fast path,
+making the code more easy to follow and will simplify the next
+patch.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
