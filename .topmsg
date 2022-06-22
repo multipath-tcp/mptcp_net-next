@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-refine-memory-scheduling
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: refine memory scheduling
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Similar to commit 7c80b038d23e ("net: fix sk_wmem_schedule() and
+sk_rmem_schedule() errors"), let the MPTCP receive path schedule
+exactly the required amount of memory.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
