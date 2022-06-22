@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-Initialize-variables-to-quiet-gcc-12-warnings
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] selftests: mptcp: Initialize variables to quiet gcc 12 warnings
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In a few MPTCP selftest tools, gcc 12 complains that the 'sock' variable
+might be used uninitialized. This is a false positive because the only
+code path that could lead to uninitialized access is where getaddrinfo()
+fails, but the local xgetaddrinfo() wrapper exits if such a failure
+occurs.
+
+Initialize the 'sock' variable anyway to allow the tools to build with
+gcc 12.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
