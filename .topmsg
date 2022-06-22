@@ -20,4 +20,6 @@ Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/281
 Fixes: d9fb797046c5 ("mptcp: Do not traverse the subflow connection list without lock")
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
