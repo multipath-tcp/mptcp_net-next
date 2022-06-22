@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-consistent-map-handling-on-failure
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
