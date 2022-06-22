@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-never-fetch-fwd-memory-from-the-subflow
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: never fetch fwd memory from the subflow
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The memory accounting is broken in such exceptional code
+path, and after commit 4890b686f408 ("net: keep sk->sk_forward_alloc
+as small as possible") we can't find much help there.
+
+Drop the broken code.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
