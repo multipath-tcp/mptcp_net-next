@@ -5,9 +5,10 @@
 source ./.lib.sh
 
 TARGET="${1}"
+SYNC_NET="${2:-new}"
 
 sync_net() {
-	[ "${TARGET}" = "new-net" ]
+	[ "${TARGET}" = "${SYNC_NET}" ]
 }
 
 sync_upstream() {
