@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: update pm_nl_ctl usage header
-
-The usage header of pm_nl_ctl command doesn't match with the context. So
-this patch adds the missing userspace PM keywords 'ann', 'rem', 'csf',
-'dsf', 'events' and 'listen' in it.
-
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
