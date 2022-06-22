@@ -17,7 +17,7 @@ fi
 
 AM_ARGS=()
 if [ "${NO_SOB}" != "1" ]; then
-	AM_ARG+=("-s")
+	AM_ARGS+=("-s")
 fi
 
 check_sync_upstream || exit 1
@@ -85,7 +85,7 @@ am_b4() {
 		shift
 	fi
 
-	b4 am --prep-3way -o - --no-parent --add-my-sob --add-link "${@}" > "${TMP_FILE}"
+	b4 am --prep-3way -o - --no-parent --add-link "${@}" > "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }
