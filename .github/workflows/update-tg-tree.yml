@@ -14,7 +14,7 @@ on:
       force_upd_net:
         description: 'Set it to 1 to force updating the -net base with upstream instead of the merge-base with net-next'
         required: true
-        default: '0'
+        default: '1'
 
   schedule:
     - cron: '33 5 * * *' # in UTC: after US West coast's work day
