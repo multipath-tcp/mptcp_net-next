@@ -717,9 +717,9 @@ void mptcp_pm_nl_addr_send_ack(struct mptcp_sock *msk)
 	}
 }
 
-static int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
-					struct mptcp_addr_info *addr,
-					u8 bkup)
+int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
+				 struct mptcp_addr_info *addr,
+				 u8 bkup, bool use_id)
 {
 	struct mptcp_subflow_context *subflow;
 
@@ -730,9 +730,14 @@ static int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
 		struct sock *sk = (struct sock *)msk;
 		struct mptcp_addr_info local;
 
-		local_address((struct sock_common *)ssk, &local);
-		if (!mptcp_addresses_equal(&local, addr, addr->port))
+		if (use_id && subflow->local_id != addr->id)
 			continue;
+
+		if (!use_id) {
+			local_address((struct sock_common *)ssk, &local);
+			if (!mptcp_addresses_equal(&local, addr, addr->port))
+				continue;
+		}
 
 		if (subflow->backup != bkup)
 			msk->last_snd = NULL;
@@ -1837,7 +1842,7 @@ static int mptcp_nl_set_flags(struct net *net,
 		lock_sock(sk);
 		spin_lock_bh(&msk->pm.lock);
 		if (changed & MPTCP_PM_ADDR_FLAG_BACKUP)
-			ret = mptcp_pm_nl_mp_prio_send_ack(msk, addr, bkup);
+			ret = mptcp_pm_nl_mp_prio_send_ack(msk, addr, bkup, false);
 		if (changed & MPTCP_PM_ADDR_FLAG_FULLMESH)
 			mptcp_pm_nl_fullmesh(msk, addr);
 		spin_unlock_bh(&msk->pm.lock);
@@ -1854,6 +1859,7 @@ next:
 static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry addr = { .addr = { .family = AF_UNSPEC }, }, *entry;
+	struct nlattr *token = info->attrs[MPTCP_PM_ATTR_TOKEN];
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	u8 changed, mask = MPTCP_PM_ADDR_FLAG_BACKUP |
@@ -1868,6 +1874,11 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 
 	if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
+
+	if (token)
+		return mptcp_userspace_pm_set_flags(sock_net(skb->sk),
+						    token, &addr, bkup);
+
 	if (addr.addr.family == AF_UNSPEC) {
 		lookup_by_id = 1;
 		if (!addr.addr.id)
