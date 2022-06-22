@@ -66,26 +66,26 @@ am_series() {
 	exit 1
 }
 
-am_patch() { local patch="${1}"
+am_patch() {
 	TMP_FILE=$(mktemp)
 
-	if [ "${patch}" = "patch" ]; then
-		patch="${2}"
+	if [ "${1}" = "patch" ]; then
+		shift
 	fi
 
-	git-pw patch download "${patch}" "${TMP_FILE}"
+	git-pw patch download "${@}" "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }
 
-am_b4() { local patch="${1}"
+am_b4() {
 	TMP_FILE=$(mktemp)
 
-	if [ "${patch}" = "b4" ]; then
-		patch="${2}"
+	if [ "${1}" = "b4" ]; then
+		shift
 	fi
 
-	b4 am --prep-3way -o - --no-parent --add-my-sob --add-link "${patch}" > "${TMP_FILE}"
+	b4 am --prep-3way -o - --no-parent --add-my-sob --add-link "${@}" > "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }
