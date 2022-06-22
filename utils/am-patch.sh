@@ -78,18 +78,16 @@ am_patch() { local patch="${1}"
 	am_files "${TMP_FILE}"
 }
 
-am_b4() { local i args=()
-	if [ "${1}" = "b4" ]; then
-		shift
+am_b4() { local patch="${1}"
+	TMP_FILE=$(mktemp)
+
+	if [ "${patch}" = "b4" ]; then
+		patch="${2}"
 	fi
 
-	for i in "${@}"; do
-		if [[ "${i}" =~ ^- ]]; then
-			args+=("${i}")
-			continue
-		fi
-		b4 shazam --no-parent --add-my-sob "${args[@]}" "${i}"
-	done
+	b4 am --prep-3way -o - --no-parent --add-my-sob --add-link "${patch}" > "${TMP_FILE}"
+
+	am_files "${TMP_FILE}"
 }
 
 trap 'exit_trap' EXIT
