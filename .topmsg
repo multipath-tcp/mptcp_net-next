@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-SK_RECLAIM_-macros
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop SK_RECLAIM_* macros
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After commit 4890b686f408 ("net: keep sk->sk_forward_alloc as small as
+possible"), the MPTCP protocol is the last SK_RECLAIM_CHUNK and
+SK_RECLAIM_THRESHOLD users.
+
+Update the MPTCP reclaim schema to match the core/TCP one and drop the
+mentioned macros. This additionally clean the MPTCP code a bit.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
