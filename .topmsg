@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-race-on-unaccepted-mptcp-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix race on unaccepted mptcp sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the listener socket owning the relevant request is closed,
+it frees the unaccepted subflows and that causes later deletion
+of the paired MPTCP sockets.
+
+The mptcp socket's worker can run in the time interval between such delete
+operations. When that happens, any access to msk->first will cause an UaF
+access, as the subflow cleanup did not cleared such field in the mptcp
+socket.
+
+Address the issue explicitly traversing the listener socket accept
+queue at close time and performing the needed cleanup on the pending
+msk.
+
+Note that the locking is a bit tricky, as we need to acquire the msk
+socket lock, while still owning the subflow socket one.
+
+Fixes: 86e39e04482b ("mptcp: keep track of local endpoint still available for each msk")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
