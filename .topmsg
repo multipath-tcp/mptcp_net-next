@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-consistent-map-handling-on-failure
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consistent map handling on failure
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the MPTCP receive path reach a non fatal fall-back condition, e.g.
+when the MPC sockets must fall-back to TCP, the existing code is a little
+self-inconsistent: it reports that new data is available - return true -
+but sets the MPC flag to the opposite value.
+
+As the consequence read operations in some exceptional scenario may block
+unexpectedly.
+
+Address the issue setting the correct MPC read status. Additionally avoid
+some code duplication in the fatal fall-back scenario.
+
+Fixes: 9c81be0dbc89 ("mptcp: add MP_FAIL response support")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
