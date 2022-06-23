@@ -28,13 +28,14 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e PROVE_LOCKING -e DEBUG_LOCKDEP
                       -e PREEMPT -e DEBUG_PREEMPT
                       -e DEBUG_SLAVE -e DEBUG_PAGEALLOC -e DEBUG_MUTEXES -e DEBUG_SPINLOCK -e DEBUG_ATOMIC_SLEEP
-                      -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD)
-                      # TODO: kmemleak (or all the time?)
+                      -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD
+                      -e DEBUG_KMEMLEAK -e DEBUG_KMEMLEAK_AUTO_SCAN -d DEBUG_KMEMLEAK_DEFAULT_OFF)
                       # TODO: kfence (or all the time?)
 
 # results for the CI
 RESULTS_DIR_BASE="${PWD}/${VIRTME_SCRIPT_DIR}/results"
 RESULTS_DIR=
+KMEMLEAK="kmemleak.txt"
 
 # tmp files
 OUTPUT_VIRTME=
@@ -93,6 +94,7 @@ prepare() { local old_pwd mode
 
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
         RESULTS_DIR="${RESULTS_DIR_BASE}/$(git rev-parse --short HEAD)/${mode}"
+        KMEMLEAK="${RESULTS_DIR}/${KMEMLEAK}"
 
         local kunit_tap="${RESULTS_DIR}/kunit.tap"
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
@@ -238,6 +240,13 @@ run_packetdrill_all() { local pktd_dir
         done
 }
 
+kmemleak_scan() {
+        if [ -f /sys/kernel/debug/kmemleak ]; then
+                echo scan > /sys/kernel/debug/kmemleak
+                cat /sys/kernel/debug/kmemleak > "${KMEMLEAK}"
+        fi
+}
+
 # echo "file net/mptcp/* +fmp" > /sys/kernel/debug/dynamic_debug/control
 
 run_kunit
@@ -247,6 +256,8 @@ run_packetdrill_all
 
 # For "manual" tests only
 #run_one_selftest ./mptcp_join.sh
+
+kmemleak_scan
 
 # end
 echo "${VIRTME_SCRIPT_END}"
@@ -316,6 +327,12 @@ analyse() {
                         ./scripts/decode_stacktrace.sh vmlinux "${PWD}" "${PWD}"
                 echo "Call Trace found (additional kconfig: '${*}')"
                 # exit directly, that's bad
+                exit 1
+        fi
+
+        if [ -s "${KMEMLEAK}" ]; then
+                echo "KMemLeak:"
+                cat "${KMEMLEAK}"
                 exit 1
         fi
 
