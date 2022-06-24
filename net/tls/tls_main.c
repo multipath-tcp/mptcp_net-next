@@ -921,8 +921,7 @@ static void tls_update(struct sock *sk, struct proto *p,
 {
 	struct tls_context *ctx;
 
-	if (sk->sk_prot == p)
-		return;
+	WARN_ON_ONCE(sk->sk_prot == p);
 
 	ctx = tls_get_ctx(sk);
 	if (likely(ctx)) {
