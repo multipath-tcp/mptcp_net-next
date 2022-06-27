@@ -110,9 +110,10 @@ setup()
 	# debug build can slow down measurably the test program
 	# we use quite tight time limit on the run-time, to ensure
 	# maximum B/W usage.
-	# Use the kmemleak file presence as a rough estimate for this being
-	# a debug kernel and increase the maximum run-time accordingly
-	[ -f /sys/kernel/debug/kmemleak ] && slack=$((slack+200))
+	# Use the kmemleak or lockdep file presence as a rough estimate
+	# for this being a debug kernel and increase the maximum
+	# run-time accordingly
+	[ -f /sys/kernel/debug/kmemleak -o -f /proc/lockdep ] && slack=$((slack+200))
 }
 
 # $1: ns, $2: port
