@@ -29,7 +29,7 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
                       -e PREEMPT -e DEBUG_PREEMPT
                       -e DEBUG_SLAVE -e DEBUG_PAGEALLOC -e DEBUG_MUTEXES -e DEBUG_SPINLOCK -e DEBUG_ATOMIC_SLEEP
                       -e PROVE_RCU -e DEBUG_OBJECTS_RCU_HEAD
-                      -e DEBUG_KMEMLEAK -e DEBUG_KMEMLEAK_AUTO_SCAN -d DEBUG_KMEMLEAK_DEFAULT_OFF)
+                      -e DEBUG_KMEMLEAK -d DEBUG_KMEMLEAK_AUTO_SCAN -e DEBUG_KMEMLEAK_DEFAULT_OFF)
                       # TODO: kfence (or all the time?)
 
 # results for the CI
@@ -257,7 +257,7 @@ run_packetdrill_all
 # For "manual" tests only
 #run_one_selftest ./mptcp_join.sh
 
-kmemleak_scan
+# kmemleak_scan
 
 # end
 echo "${VIRTME_SCRIPT_END}"
