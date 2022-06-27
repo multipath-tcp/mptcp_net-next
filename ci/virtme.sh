@@ -125,11 +125,15 @@ prepare() { local old_pwd mode
         fi
         cd "${old_pwd}"
 
-        git checkout -- tools/testing/selftests/net/mptcp/settings
+        git checkout -- tools/testing/selftests/net/mptcp/settings tools/testing/selftests/net/mptcp/simult_flows.sh
         if [ "${mode}" = "debug" ]; then
                 timeo="$(grep "^timeout=" tools/testing/selftests/net/mptcp/settings | cut -d= -f2)"
                 timeo=$((timeo + 300))
                 sed -i "s/^timeout=.*/timeout=${timeo}/g" tools/testing/selftests/net/mptcp/settings
+
+                timeo="$(grep "^slack=" tools/testing/selftests/net/mptcp/simult_flows.sh | cut -d= -f2)"
+                timeo=$((timeo + 200))
+                sed -i "s/^slack=.*/slack=${timeo}/g" tools/testing/selftests/net/mptcp/simult_flows.sh
         fi
 
         rm -rf "${RESULTS_DIR}"
