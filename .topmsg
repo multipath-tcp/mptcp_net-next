@@ -9,5 +9,6 @@ Change the existing lock scope so that the relevant code is under
 its protection.
 
 Fixes: d9a4594edabf ("mptcp: netlink: Add MPTCP_PM_CMD_REMOVE")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/287
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
