@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-locking-in-mptcp_nl_cmd_sf_destroy
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix locking in mptcp_nl_cmd_sf_destroy()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The user-space PM subflow removal path uses a couple of helpers
+that must be called under the msk socket lock and the current
+code lacks such requirement.
+
+Change the existing lock scope so that the relevant code is under
+its protection.
+
+Fixes: d9a4594edabf ("mptcp: netlink: Add MPTCP_PM_CMD_REMOVE")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
