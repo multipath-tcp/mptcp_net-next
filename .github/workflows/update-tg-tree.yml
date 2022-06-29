@@ -34,4 +34,4 @@ jobs:
         with:
           not_base: "${{ github.event.inputs.keep_base_untouched || '0' }}"
           force_sync: "${{ github.event.inputs.force_sync || '0' }}"
-          force_upd_net: "${{ github.event.inputs.force_upd_net || '0' }}"
+          force_upd_net: "${{ github.event.inputs.force_upd_net || '1' }}"
