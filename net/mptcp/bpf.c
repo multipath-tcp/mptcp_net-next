@@ -21,7 +21,7 @@ extern struct btf *btf_vmlinux;
 static const struct btf_type *mptcp_sched_type __read_mostly;
 static u32 mptcp_sched_id;
 
-static u32 optional_ops[] = {
+static u32 optional_sched_ops[] = {
 	offsetof(struct mptcp_sched_ops, init),
 	offsetof(struct mptcp_sched_ops, release),
 };
@@ -92,12 +92,12 @@ static int bpf_mptcp_sched_check_member(const struct btf_type *t,
 	return 0;
 }
 
-static bool is_optional(u32 member_offset)
+static bool is_optional_sched(u32 member_offset)
 {
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(optional_ops); i++) {
-		if (member_offset == optional_ops[i])
+	for (i = 0; i < ARRAY_SIZE(optional_sched_ops); i++) {
+		if (member_offset == optional_sched_ops[i])
 			return true;
 	}
 
@@ -132,7 +132,7 @@ static int bpf_mptcp_sched_init_member(const struct btf_type *t,
 
 	/* Ensure bpf_prog is provided for compulsory func ptr */
 	prog_fd = (int)(*(unsigned long *)(udata + moff));
-	if (!prog_fd && !is_optional(moff))
+	if (!prog_fd && !is_optional_sched(moff))
 		return -EINVAL;
 
 	return 0;
