@@ -29,13 +29,25 @@ echo
 echo
 echo "    In Progress (opened, new feature and assigned)"
 echo
-my_ghi --state open -N bug | grep " @"
+my_ghi --state open -L enhancement | grep " @"
+
+echo
+echo
+echo "    Assigned Questions (opened, questions and assigned)"
+echo
+my_ghi --state open -L question | grep " @"
+
+echo
+echo
+echo "    Open questions (opened, questions and not assigned)"
+echo
+my_ghi --state open -L question | grep -v " @"
 
 echo
 echo
 echo "    For later (opened and not assigned assigned)"
 echo
-my_ghi --state open -N bug | grep -v " @"
+my_ghi --state open -N bug -N question | grep -v " @"
 
 echo
 echo
