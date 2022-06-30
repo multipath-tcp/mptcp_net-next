@@ -2,8 +2,9 @@
 
 # $@: args
 my_ghi() {
-	ghi list --sort created --no-pulls "${@}" | \
-		sed "s/ [0-9]\+$//g;s/ [0-9]\+ @/ @/g;s/ $//g"
+	ghi list --sort created --no-pulls "${@}" |
+		sed "s/ [0-9]\+$//g;s/ [0-9]\+ @/ @/g;s/ $//g" |
+		grep -v "^# multipath-tcp/mptcp_net-next"
 }
 
 LAST_WEEK="$(date -dlast-week +%Y-%m-%d)"
