@@ -355,6 +355,16 @@ static inline struct mptcp_data_frag *mptcp_send_next(struct sock *sk)
 						     list_next_entry(cur, list);
 }
 
+static inline struct mptcp_data_frag *mptcp_next_frag(struct sock *sk,
+						      struct mptcp_data_frag *cur)
+{
+	if (!cur)
+		return NULL;
+
+	return list_is_last(&cur->list, &mptcp_sk(sk)->rtx_queue) ? NULL :
+						     list_next_entry(cur, list);
+}
+
 static inline struct mptcp_data_frag *mptcp_pending_tail(const struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
