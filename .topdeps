@@ -1,1 +1,1 @@
-t/mptcp-Acquire-the-subflow-socket-lock-before-modifying-MP_PRIO-flags
+t/selftests-mptcp-userspace-PM-support-for-MP_PRIO-signals
