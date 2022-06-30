@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-netlink-issue-MP_PRIO-signals-from-userspace-PMs
+From: Kishen Maloor <kishen.maloor@intel.com>
+Subject: [PATCH] mptcp: netlink: issue MP_PRIO signals from userspace PMs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This change updates MPTCP_PM_CMD_SET_FLAGS to allow userspace PMs
+to issue MP_PRIO signals over a specific subflow selected by
+the connection token, local and remote address+port.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/286
+Fixes: 702c2f646d42 ("mptcp: netlink: allow userspace-driven subflow establishment")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Kishen Maloor <kishen.maloor@intel.com>
