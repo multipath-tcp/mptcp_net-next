@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-local-endpoint-accounting
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix local endpoint accounting
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In mptcp_pm_nl_rm_addr_or_subflow() we always mark as available
+the id corresponding to the just removed address.
+
+The used bitmap actually tracks only the local IDs: we must
+restrict the operation when a (local) subflow is removed.
+
+Fixes: a88c9e496937 ("mptcp: do not block subflows creation on errors")
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
