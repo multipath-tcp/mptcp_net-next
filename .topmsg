@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-allow-the-in-kernel-PM-to-set-MPC-subflow-priority
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: allow the in kernel PM to set MPC subflow priority
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Any local endpoints configured on the address matching the
+MPC subflow are currently ignored.
+
+Specifically, setting a backup flag on them has no effect
+on the first subflow, as the MPC handshake can't carry such
+info.
+
+This change refactors the MPC endpoint id accounting to
+additionally fetch the priority info from the relevant endpoint
+and eventually trigger the MP_PRIO handshake as needed.
+
+As a result, the MPC subflow now switches to backup priority
+after that the MPTCP socket is fully established, according
+to the local endpoint configuration.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
