@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-address-lookup-improvements
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: address lookup improvements
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When looking-up a socket address in the endpoint list, we
+must prefer port-based matches over address only match.
+
+Ensure that port-based endpoints are listed first, using
+head insertion for them. Additionally be sure that only
+port-based endpoints carry a non zero port number.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
