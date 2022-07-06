@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-MPC-backup-tests
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add MPC backup tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add a couple of test-cases covering the newly introduced
+features - priority update for the MPC subflow.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
