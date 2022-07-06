@@ -48,7 +48,7 @@ apply_patches_b4() { local i args=()
 			args+=("${i}")
 			continue
 		fi
-		if ! b4 shazam --no-parent "${args[@]}" "${i}"; then
+		if ! b4 shazam --no-parent -t "${args[@]}" "${i}"; then
 			printerr "ERROR with 'b4 shazam --no-parent ${args[@]} ${i}'. " \
 			         "Please fix in another terminal (up to 'git am" \
 			         "--continue' included) and press ENTER to " \
