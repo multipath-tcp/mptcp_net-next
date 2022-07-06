@@ -1,4 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-validate-userspace-PM-tests-by-default
+Subject: [PATCH] selftests: mptcp: validate userspace PM tests by default
 
+The new script was not listed in the programs to test.
+
+By concequence, some CIs running MPTCP selftests were not validating
+these new tests. Note that MPTCP CI was validating it as it executes all
+.sh scripts from 'tools/testing/selftests/net/mptcp' directory.
+
+Fixes: 259a834fadda ("selftests: mptcp: functional tests for the userspace PM type")
+Reported-by: Jakub Kicinski <kuba@kernel.org>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
