@@ -12,6 +12,7 @@ timeout_test=$((timeout_poll * 2 + 1))
 test_cnt=1
 ret=0
 bail=0
+slack=50
 
 usage() {
 	echo "Usage: $0 [ -b ] [ -c ] [ -d ]"
@@ -52,6 +53,7 @@ setup()
 	cout=$(mktemp)
 	capout=$(mktemp)
 	size=$((2 * 2048 * 4096))
+
 	dd if=/dev/zero of=$small bs=4096 count=20 >/dev/null 2>&1
 	dd if=/dev/zero of=$large bs=4096 count=$((size / 4096)) >/dev/null 2>&1
 
@@ -104,6 +106,13 @@ setup()
 	ip -net "$ns3" route add default via dead:beef:3::2
 
 	ip netns exec "$ns3" ./pm_nl_ctl limits 1 1
+
+	# debug build can slow down measurably the test program
+	# we use quite tight time limit on the run-time, to ensure
+	# maximum B/W usage.
+	# Use the kmemleak file presence as a rough estimate for this being
+	# a debug kernel and increase the maximum run-time accordingly
+	[ -f /sys/kernel/debug/kmemleak ] && slack=$((slack+200))
 }
 
 # $1: ns, $2: port
@@ -241,7 +250,7 @@ run_test()
 
 	# mptcp_connect will do some sleeps to allow the mp_join handshake
 	# completion (see mptcp_connect): 200ms on each side, add some slack
-	time=$((time + 450))
+	time=$((time + 400 + slack))
 
 	printf "%-60s" "$msg"
 	do_transfer $small $large $time
