@@ -110,9 +110,12 @@ setup()
 	# debug build can slow down measurably the test program
 	# we use quite tight time limit on the run-time, to ensure
 	# maximum B/W usage.
-	# Use the kmemleak file presence as a rough estimate for this being
-	# a debug kernel and increase the maximum run-time accordingly
-	[ -f /sys/kernel/debug/kmemleak ] && slack=$((slack+200))
+	# Use kmemleak/lockdep/kasan/prove_locking presence as a rough
+	# estimate for this being a debug kernel and increase the
+	# maximum run-time accordingly. Observed run times for CI builds
+	# running selftests, including kbuild, were used to determine the
+	# amount of time to add.
+	grep -q ' kmemleak_init$\| lockdep_init$\| kasan_init$\| prove_locking$' /proc/kallsyms && slack=$((slack+550))
 }
 
 # $1: ns, $2: port
