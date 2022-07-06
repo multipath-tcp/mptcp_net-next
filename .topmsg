@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-and-use-mptcp_pm_send_ack
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce and use mptcp_pm_send_ack()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The in-kernel PM has a bit of duplicate code related to ack
+generation. Create a new helper factoring out the PM-specific
+needs and use it in a couple of places.
+
+As a bonus, mptcp_subflow_send_ack() is not used anymore
+outside its own compilation unit and can become static.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
