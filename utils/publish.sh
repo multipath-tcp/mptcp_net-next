@@ -109,9 +109,9 @@ tg_export() { local branch_top branch_export tag
 	git tag "${tag}" "${branch_export}"
 	git push origin "${tag}"
 
-	printinfo "Builds and tests are now in progress:\\n"
+	printinfo "Tests are now in progress:\\n"
 	printinfo "https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/${tag}"
-	printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${branch_export}"
+	# printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${branch_export}"
 }
 
 publish() { local top review old_rev new_rev
