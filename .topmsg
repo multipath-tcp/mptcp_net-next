@@ -16,4 +16,6 @@ the latter file is not always available in our reference CI
 environments.
 
 Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Co-developed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
