@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/bpf-fix-dubious-one-bit-signed-bitfield-warnings
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
