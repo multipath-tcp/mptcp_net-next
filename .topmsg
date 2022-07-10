@@ -1,4 +1,22 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/bpf-fix-dubious-one-bit-signed-bitfield-warnings
+Subject: [PATCH] bpf: fix 'dubious one-bit signed bitfield' warnings
 
+Our CI[1] reported these warnings when using Sparse:
+
+  $ touch net/mptcp/bpf.c
+  $ make C=1 net/mptcp/bpf.o
+  net/mptcp/bpf.c: note: in included file:
+  include/linux/bpf_verifier.h:348:26: error: dubious one-bit signed bitfield
+  include/linux/bpf_verifier.h:349:29: error: dubious one-bit signed bitfield
+
+These two fields from the new 'bpf_loop_inline_state' structure are used
+as booleans. Instead of declaring two 'unsigned int', we can declare
+them as 'bool'.
+
+While at it, also set 'state->initialized' to 'true' instead of '1' to
+make it clearer it is linked to a 'bool' type.
+
+[1] https://github.com/multipath-tcp/mptcp_net-next/actions/runs/2643588487
+
+Fixes: 1ade23711971 ("bpf: Inline calls to bpf_loop when callback is known")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
