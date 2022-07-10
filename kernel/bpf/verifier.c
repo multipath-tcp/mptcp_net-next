@@ -7144,7 +7144,7 @@ static void update_loop_inline_state(struct bpf_verifier_env *env, u32 subprogno
 	struct bpf_loop_inline_state *state = &cur_aux(env)->loop_inline_state;
 
 	if (!state->initialized) {
-		state->initialized = 1;
+		state->initialized = true;
 		state->fit_for_inline = loop_flag_is_zero(env);
 		state->callback_subprogno = subprogno;
 		return;
