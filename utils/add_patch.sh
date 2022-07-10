@@ -1,4 +1,4 @@
-#! /bin/bash -ex
+#! /bin/bash -e
 
 # shellcheck disable=SC1091
 # shellcheck source=./lib.sh
