@@ -88,26 +88,14 @@ commit_desc() {
 }
 
 # $1: git base; $2: git end
-check_commit_msgs() { local commit sob=0 dot=0
+check_commit_msgs() { local commit dot=0
 	for commit in $(git log --format="%H" "${1}..${2}"); do
-		if ! git log -1 --format="%b" "${commit}" | \
-		     sed "/^$/d" | \
-		     tail -n1 | \
-		     grep -q "^Signed-off-by: "; then
-			printinfo "Please fix the SOB of:" \
-			          "$(commit_desc "${commit}")"
-			sob=1
-		fi
-
 		if git log -1 --format="%s" "${commit}" | grep -q "\.$"; then
 			printinfo "Please remove the dot at the end of:" \
 			          "$(commit_desc "${commit}")"
 			dot=1
 		fi
 	done
-	if [ "${sob}" != 0 ]; then
-		print_rebase_pause "Please make sure the Signed-off-by is the last line." "${1}"
-	fi
 	if [ "${dot}" != 0 ]; then
 		print_rebase_pause "Please make sure no commits have a dot at the end of the commit title." "${1}"
 	fi
