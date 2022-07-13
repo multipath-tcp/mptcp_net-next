@@ -2351,7 +2351,7 @@ static void __mptcp_close_subflow(struct mptcp_sock *msk)
 
 	might_sleep();
 
-	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		if (inet_sk_state_load(ssk) != TCP_CLOSE)
@@ -2394,7 +2394,7 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 
 	mptcp_token_destroy(msk);
 
-	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
 		bool slow;
 
@@ -2895,7 +2895,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 
 	inet_sk_state_store(sk, TCP_CLOSE);
 
-	list_for_each_entry_safe(subflow, tmp, &msk->conn_list, node) {
+	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		__mptcp_close_ssk(sk, ssk, subflow, MPTCP_CF_FASTCLOSE);
