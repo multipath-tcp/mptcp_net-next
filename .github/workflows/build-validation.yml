@@ -46,13 +46,12 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-${{ github.sha }}
+          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-${{ github.sha }}
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.ref_name }}-
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-${{ github.run_attempt }}-
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-${{ github.run_id }}-
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-
 
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
