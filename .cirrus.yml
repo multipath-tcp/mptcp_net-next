@@ -3,6 +3,7 @@
 task:
   name: KVM validation
   only_if: $CIRRUS_TAG != ''  ## only tags
+  auto_cancellation: $CIRRUS_TAG == ''
   timeout_in: 115m
 
   container:
