@@ -1700,7 +1700,7 @@ int ath11k_wmi_bcn_tmpl(struct ath11k *ar, u32 vdev_id,
 	cmd->vdev_id = vdev_id;
 	cmd->tim_ie_offset = offs->tim_offset;
 
-	if (vif->csa_active) {
+	if (vif->bss_conf.csa_active) {
 		cmd->csa_switch_count_offset = offs->cntdwn_counter_offs[0];
 		cmd->ext_csa_switch_count_offset = offs->cntdwn_counter_offs[1];
 	}
@@ -3822,7 +3822,8 @@ ath11k_wmi_obss_color_collision_event(struct ath11k_base *ab, struct sk_buff *sk
 
 	switch (ev->evt_type) {
 	case WMI_BSS_COLOR_COLLISION_DETECTION:
-		ieeee80211_obss_color_collision_notify(arvif->vif, ev->obss_color_bitmap);
+		ieeee80211_obss_color_collision_notify(arvif->vif, ev->obss_color_bitmap,
+						       GFP_KERNEL);
 		ath11k_dbg(ab, ATH11K_DBG_WMI,
 			   "OBSS color collision detected vdev:%d, event:%d, bitmap:%08llx\n",
 			   ev->vdev_id, ev->evt_type, ev->obss_color_bitmap);
@@ -6563,7 +6564,7 @@ static int ath11k_reg_chan_list_event(struct ath11k_base *ab, struct sk_buff *sk
 
 fallback:
 	/* Fallback to older reg (by sending previous country setting
-	 * again if fw has succeded and we failed to process here.
+	 * again if fw has succeeded and we failed to process here.
 	 * The Regdomain should be uniform across driver and fw. Since the
 	 * FW has processed the command and sent a success status, we expect
 	 * this function to succeed as well. If it doesn't, CTRY needs to be
@@ -7475,7 +7476,7 @@ ath11k_wmi_process_csa_switch_count_event(struct ath11k_base *ab,
 			continue;
 		}
 
-		if (arvif->is_up && arvif->vif->csa_active)
+		if (arvif->is_up && arvif->vif->bss_conf.csa_active)
 			ieee80211_csa_finish(arvif->vif);
 	}
 	rcu_read_unlock();
