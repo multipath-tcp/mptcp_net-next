@@ -138,7 +138,8 @@ static int prestera_flower_parse_actions(struct prestera_flow_block *block,
 static int prestera_flower_parse_meta(struct prestera_acl_rule *rule,
 				      struct flow_cls_offload *f,
 				      struct prestera_flow_block *block)
-{	struct flow_rule *f_rule = flow_cls_offload_flow_rule(f);
+{
+	struct flow_rule *f_rule = flow_cls_offload_flow_rule(f);
 	struct prestera_acl_match *r_match = &rule->re_key.match;
 	struct prestera_port *port;
 	struct net_device *ingress_dev;
@@ -167,24 +168,24 @@ static int prestera_flower_parse_meta(struct prestera_acl_rule *rule,
 	}
 	port = netdev_priv(ingress_dev);
 
-	mask = htons(0x1FFF);
-	key = htons(port->hw_id);
+	mask = htons(0x1FFF << 3);
+	key = htons(port->hw_id << 3);
 	rule_match_set(r_match->key, SYS_PORT, key);
 	rule_match_set(r_match->mask, SYS_PORT, mask);
 
-	mask = htons(0x1FF);
+	mask = htons(0x3FF);
 	key = htons(port->dev_id);
 	rule_match_set(r_match->key, SYS_DEV, key);
 	rule_match_set(r_match->mask, SYS_DEV, mask);
 
 	return 0;
-
 }
 
 static int prestera_flower_parse(struct prestera_flow_block *block,
 				 struct prestera_acl_rule *rule,
 				 struct flow_cls_offload *f)
-{	struct flow_rule *f_rule = flow_cls_offload_flow_rule(f);
+{
+	struct flow_rule *f_rule = flow_cls_offload_flow_rule(f);
 	struct flow_dissector *dissector = f_rule->match.dissector;
 	struct prestera_acl_match *r_match = &rule->re_key.match;
 	__be16 n_proto_mask = 0;
@@ -421,7 +422,6 @@ void prestera_flower_destroy(struct prestera_flow_block *block,
 		prestera_acl_rule_destroy(rule);
 	}
 	prestera_acl_ruleset_put(ruleset);
-
 }
 
 int prestera_flower_tmplt_create(struct prestera_flow_block *block,
