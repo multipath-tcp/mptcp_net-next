@@ -1,4 +1,25 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-subflow-cleanup-in-mptcp_destroy_common
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move subflow cleanup in mptcp_destroy_common()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If the mptcp socket creation fails due to a CGROUP_INET_SOCK_CREATE
+eBPF program, the MPTCP protocol ends-up leaking all the subflows:
+the related cleanup happens in __mptcp_destroy_sock() that is not
+invoked in such code path.
+
+Address the issue moving the subflow sockets cleanup in the
+mptcp_destroy_common() helper, which is invoked in every msk cleanup
+path.
+
+Additionally get rid of the intermediate list_splice_init step, which
+is an unneeded relic from the past.
+
+The issue is present since before the reported root cause commit, but
+any attempt to backport the fix before that hash will require a complete
+rewrite.
+
+Fixes: e16163b6e2 ("mptcp: refactor shutdown and close")
+Reported-by: Nguyen Dinh Phi <phind.uet@gmail.com>
+Co-developed-by: Nguyen Dinh Phi <phind.uet@gmail.com>
+Signed-off-by: Nguyen Dinh Phi <phind.uet@gmail.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
