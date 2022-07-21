@@ -48,12 +48,13 @@ struct gsi_ring {
 	 *
 	 * A channel ring consists of TRE entries filled by the AP and passed
 	 * to the hardware for processing.  For a channel ring, the ring index
-	 * identifies the next unused entry to be filled by the AP.
+	 * identifies the next unused entry to be filled by the AP.  In this
+	 * case the initial value is assumed by hardware to be 0.
 	 *
 	 * An event ring consists of event structures filled by the hardware
 	 * and passed to the AP.  For event rings, the ring index identifies
 	 * the next ring entry that is not known to have been filled by the
-	 * hardware.
+	 * hardware.  The initial value used is arbitrary (so we use 0).
 	 */
 	u32 index;
 };
@@ -82,13 +83,15 @@ struct gsi_trans_pool {
 struct gsi_trans_info {
 	atomic_t tre_avail;		/* TREs available for allocation */
 	struct gsi_trans_pool pool;	/* transaction pool */
+	struct gsi_trans **map;		/* TRE -> transaction map */
+
 	struct gsi_trans_pool sg_pool;	/* scatterlist pool */
 	struct gsi_trans_pool cmd_pool;	/* command payload DMA pool */
-	struct gsi_trans **map;		/* TRE -> transaction map */
 
 	spinlock_t spinlock;		/* protects updates to the lists */
 	struct list_head alloc;		/* allocated, not committed */
-	struct list_head pending;	/* committed, awaiting completion */
+	struct list_head committed;	/* committed, awaiting doorbell */
+	struct list_head pending;	/* pending, awaiting completion */
 	struct list_head complete;	/* completed, awaiting poll */
 	struct list_head polled;	/* returned by gsi_channel_poll_one() */
 };
@@ -184,7 +187,7 @@ void gsi_teardown(struct gsi *gsi);
  * @gsi:	GSI pointer
  * @channel_id:	Channel whose limit is to be returned
  *
- * Return:	 The maximum number of TREs oustanding on the channel
+ * Return:	 The maximum number of TREs outstanding on the channel
  */
 u32 gsi_channel_tre_max(struct gsi *gsi, u32 channel_id);
 
