@@ -162,13 +162,13 @@ struct bpf_struct_ops bpf_mptcp_sched_ops = {
 	.name		= "mptcp_sched_ops",
 };
 
-BTF_SET_START(bpf_mptcp_sched_kfunc_ids)
-BTF_ID(func, mptcp_subflow_set_scheduled)
-BTF_SET_END(bpf_mptcp_sched_kfunc_ids)
+BTF_SET8_START(bpf_mptcp_sched_kfunc_ids)
+BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
+BTF_SET8_END(bpf_mptcp_sched_kfunc_ids)
 
 static const struct btf_kfunc_id_set bpf_mptcp_sched_kfunc_set = {
-	.owner		= THIS_MODULE,
-	.check_set	= &bpf_mptcp_sched_kfunc_ids,
+	.owner	= THIS_MODULE,
+	.set	= &bpf_mptcp_sched_kfunc_ids,
 };
 
 static int __init bpf_mptcp_sched_kfunc_init(void)
