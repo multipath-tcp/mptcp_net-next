@@ -31,7 +31,7 @@ update() {
 	if sync_upstream; then
 		local new_base
 
-		git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" master
+		git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" main
 
 		if [ "${base}" = "${TG_BASE_NET_NEXT}" ] || sync_net; then
 			new_base=FETCH_HEAD
