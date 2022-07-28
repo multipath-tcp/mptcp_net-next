@@ -791,6 +791,9 @@ static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
 		err = do_sendfile(infd, peerfd, size);
 		if (err)
 			return err;
+
+		shutdown(peerfd, SHUT_WR);
+
 		err = do_recvfile(peerfd, outfd);
 		*in_closed_after_out = true;
 	}
