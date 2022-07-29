@@ -260,7 +260,6 @@ struct mptcp_sock {
 	int		rmem_fwd_alloc;
 	struct sock	*last_snd;
 	int		snd_burst;
-	int		old_wspace;
 	u64		recovery_snd_nxt;	/* in recovery mode accept up to this seq;
 						 * recovery related fields are under data_lock
 						 * protection
@@ -334,6 +333,11 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
 static inline int __mptcp_rmem(const struct sock *sk)
 {
 	return atomic_read(&sk->sk_rmem_alloc) - READ_ONCE(mptcp_sk(sk)->rmem_released);
+}
+
+static inline int __mptcp_receive_window(const struct mptcp_sock *msk)
+{
+	return atomic64_read(&msk->rcv_wnd_sent) - READ_ONCE(msk->ack_seq);
 }
 
 static inline int __mptcp_space(const struct sock *sk)
