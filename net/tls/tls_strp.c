@@ -187,9 +187,10 @@ static int tls_strp_copyin(read_descriptor_t *desc, struct sk_buff *in_skb,
 			   unsigned int offset, size_t in_len)
 {
 	struct tls_strparser *strp = (struct tls_strparser *)desc->arg.data;
-	size_t sz, len, chunk;
 	struct sk_buff *skb;
 	skb_frag_t *frag;
+	size_t len, chunk;
+	int sz;
 
 	if (strp->msg_ready)
 		return 0;
@@ -480,7 +481,7 @@ void tls_strp_done(struct tls_strparser *strp)
 
 int __init tls_strp_dev_init(void)
 {
-	tls_strp_wq = create_singlethread_workqueue("kstrp");
+	tls_strp_wq = create_workqueue("tls-strp");
 	if (unlikely(!tls_strp_wq))
 		return -ENOMEM;
 
