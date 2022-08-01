@@ -25,6 +25,7 @@
 #include <asm/ioctls.h>
 #include "protocol.h"
 #include "mib.h"
+#include "mptcp_fastopen.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/mptcp.h>
@@ -1665,9 +1666,9 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	int ret = 0;
 	long timeo;
 
-	/* we don't support FASTOPEN yet */
+	/* we don't fully support FASTOPEN yet */
 	if (msg->msg_flags & MSG_FASTOPEN)
-		return -EOPNOTSUPP;
+		mptcp_sendmsg_fastopen(sk, msg, len, msk, &copied);
 
 	/* silently ignore everything else */
 	msg->msg_flags &= MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL;
@@ -2671,6 +2672,7 @@ void mptcp_subflow_shutdown(struct sock *sk, struct sock *ssk, int how)
 	case TCP_SYN_SENT:
 		tcp_disconnect(ssk, O_NONBLOCK);
 		break;
+	case TCP_ESTABLISHED:
 	default:
 		if (__mptcp_check_fallback(mptcp_sk(sk))) {
 			pr_debug("Fallback");
@@ -3467,7 +3469,7 @@ static void mptcp_subflow_early_fallback(struct mptcp_sock *msk,
 	__mptcp_do_fallback(msk);
 }
 
-static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 				int addr_len, int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);

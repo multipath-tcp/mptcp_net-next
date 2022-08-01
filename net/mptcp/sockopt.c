@@ -560,6 +560,8 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case TCP_TX_DELAY:
 		case TCP_INQ:
 			return true;
+		case TCP_FASTOPEN:
+			return true;
 		}
 
 		/* TCP_MD5SIG, TCP_MD5SIG_EXT are not supported, MD5 is not compatible with MPTCP */
@@ -768,6 +770,43 @@ static int mptcp_setsockopt_sol_tcp_defer(struct mptcp_sock *msk, sockptr_t optv
 	return tcp_setsockopt(listener->sk, SOL_TCP, TCP_DEFER_ACCEPT, optval, optlen);
 }
 
+static int mptcp_setsockopt_sol_tcp_fastopen(struct mptcp_sock *msk, sockptr_t optval,
+					     unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	struct net *net = sock_net(sk);
+	int val;
+	int ret;
+
+	ret = 0;
+
+	if (copy_from_sockptr(&val, optval, sizeof(val)))
+		return -EFAULT;
+
+	lock_sock(sk);
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		lock_sock(ssk);
+
+		if (val >= 0 && ((1 << sk->sk_state) & (TCPF_CLOSE |
+		    TCPF_LISTEN))) {
+			tcp_fastopen_init_key_once(net);
+			fastopen_queue_tune(sk, val);
+		} else {
+			ret = -EINVAL;
+		}
+
+		release_sock(ssk);
+	}
+
+	release_sock(sk);
+
+	return ret;
+}
+
 static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 				    sockptr_t optval, unsigned int optlen)
 {
@@ -796,6 +835,8 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		return mptcp_setsockopt_sol_tcp_nodelay(msk, optval, optlen);
 	case TCP_DEFER_ACCEPT:
 		return mptcp_setsockopt_sol_tcp_defer(msk, optval, optlen);
+	case TCP_FASTOPEN:
+		return mptcp_setsockopt_sol_tcp_fastopen(msk, optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
