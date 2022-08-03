@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-make-sendfile-selftest-work
+From: Florian Westphal <fw@strlen.de>
+Subject: [PATCH] selftests: mptcp: make sendfile selftest work
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the selftest got added, sendfile() on mptcp sockets returned
+-EOPNOTSUPP, so running 'mptcp_connect.sh -m sendfile' failed
+immediately.
+
+This is no longer the case, but the script fails anyway due to timeout.
+Let the receiver know once the sender has sent all data, just like
+with '-m mmap' mode.
+
+v2: need to respect cfg_wait too, as pm_userspace.sh relied
+on -m sendfile to keep the connection open (Mat Martineau)
+
+Fixes: 048d19d444be ("mptcp: add basic kselftest for mptcp")
+Reported-by: Xiumei Mu <xmu@redhat.com>
+Signed-off-by: Florian Westphal <fw@strlen.de>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
