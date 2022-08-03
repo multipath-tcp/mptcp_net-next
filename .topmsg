@@ -1,8 +1,0 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] mptcp: add mptcp_for_each_subflow_safe helper
-
-Similar to mptcp_for_each_subflow(): this is clearer now that the _safe
-version is used in multiple places.
-
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
