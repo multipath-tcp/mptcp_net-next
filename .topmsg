@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-RCVPRUNE-event-later
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move RCVPRUNE event later
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This clean the code a bit, and avoid skipping msk receive
+buffer update on some weird corner case.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
