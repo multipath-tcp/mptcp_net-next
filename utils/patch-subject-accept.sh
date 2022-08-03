@@ -9,7 +9,7 @@ COMMIT="${2}"
 DELEGATE="matttbe"
 
 get_ids() {
-	git-pw patch list --limit 250 --sort date --format simple -c ID \
+	git-pw patch list --limit 250 --sort -date --format simple -c ID \
 		--state new \
 		--state under-review \
 		--state rfc \
