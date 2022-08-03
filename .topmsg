@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Add-struct-mptcp_sock-definition-when-CONFIG_MPTCP-is-disabled
+From: Jiri Olsa <jolsa@kernel.org>
+Subject: [PATCH] mptcp: Add struct mptcp_sock definition when CONFIG_MPTCP is disabled
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The btf_sock_ids array needs struct mptcp_sock BTF ID for
+the bpf_skc_to_mptcp_sock helper.
+
+When CONFIG_MPTCP is disabled, the 'struct mptcp_sock' is not
+defined and resolve_btfids will complain with:
+
+  BTFIDS  vmlinux
+WARN: resolve_btfids: unresolved symbol mptcp_sock
+
+Adding empty difinition for struct mptcp_sock when CONFIG_MPTCP
+is disabled.
+
+Acked-by: Martin KaFai Lau <kafai@fb.com>
+Signed-off-by: Jiri Olsa <jolsa@kernel.org>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
