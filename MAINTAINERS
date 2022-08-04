@@ -171,7 +171,6 @@ F:	drivers/scsi/53c700*
 
 6LOWPAN GENERIC (BTLE/IEEE 802.15.4)
 M:	Alexander Aring <alex.aring@gmail.com>
-M:	Jukka Rissanen <jukka.rissanen@linux.intel.com>
 L:	linux-bluetooth@vger.kernel.org
 L:	linux-wpan@vger.kernel.org
 S:	Maintained
@@ -241,6 +240,11 @@ F:	include/net/9p/
 F:	include/trace/events/9p.h
 F:	include/uapi/linux/virtio_9p.h
 F:	net/9p/
+
+A64FX DIAG DRIVER
+M:	Hitomi Hasegawa <hasegawa-hitomi@fujitsu.com>
+S:	Supported
+F:	drivers/soc/fujitsu/a64fx-diag.c
 
 A8293 MEDIA DRIVER
 M:	Antti Palosaari <crope@iki.fi>
@@ -1894,6 +1898,7 @@ L:	linux-aspeed@lists.ozlabs.org (moderated for non-subscribers)
 S:	Supported
 Q:	https://patchwork.ozlabs.org/project/linux-aspeed/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+F:	Documentation/devicetree/bindings/arm/aspeed/
 F:	arch/arm/boot/dts/aspeed-*
 F:	arch/arm/mach-aspeed/
 N:	aspeed
@@ -2141,11 +2146,13 @@ M:	Jean-Marie Verdun <verdun@hpe.com>
 M:	Nick Hawkins <nick.hawkins@hpe.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/arm/hpe,gxp.yaml
+F:	Documentation/devicetree/bindings/spi/hpe,gxp-spi.yaml
 F:	Documentation/devicetree/bindings/timer/hpe,gxp-timer.yaml
 F:	arch/arm/boot/dts/hpe-bmc*
 F:	arch/arm/boot/dts/hpe-gxp*
 F:	arch/arm/mach-hpe/
 F:	drivers/clocksource/timer-gxp.c
+F:	drivers/spi/spi-gxp.c
 F:	drivers/watchdog/gxp-wdt.c
 
 ARM/IGEP MACHINE SUPPORT
@@ -2449,9 +2456,11 @@ F:	Documentation/devicetree/bindings/*/*npcm*
 F:	Documentation/devicetree/bindings/arm/npcm/*
 F:	arch/arm/boot/dts/nuvoton-npcm*
 F:	arch/arm/mach-npcm/
+F:	arch/arm64/boot/dts/nuvoton/
 F:	drivers/*/*npcm*
 F:	drivers/*/*/*npcm*
 F:	include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+F:	include/dt-bindings/clock/nuvoton,npcm845-clk.h
 
 ARM/NUVOTON WPCM450 ARCHITECTURE
 M:	Jonathan Neuschäfer <j.neuschaefer@gmx.net>
@@ -2616,6 +2625,8 @@ Q:	http://patchwork.kernel.org/project/linux-renesas-soc/list/
 C:	irc://irc.libera.chat/renesas-soc
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-devel.git next
 F:	Documentation/devicetree/bindings/arm/renesas.yaml
+F:	Documentation/devicetree/bindings/hwinfo/renesas,prr.yaml
+F:	Documentation/devicetree/bindings/soc/renesas/
 F:	arch/arm64/boot/dts/renesas/
 F:	drivers/soc/renesas/
 F:	include/linux/soc/renesas/
@@ -2734,6 +2745,7 @@ Q:	http://patchwork.kernel.org/project/linux-renesas-soc/list/
 C:	irc://irc.libera.chat/renesas-soc
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-devel.git next
 F:	Documentation/devicetree/bindings/arm/renesas.yaml
+F:	Documentation/devicetree/bindings/soc/renesas/
 F:	arch/arm/boot/dts/emev2*
 F:	arch/arm/boot/dts/gr-peach*
 F:	arch/arm/boot/dts/iwg20d-q7*
@@ -2822,6 +2834,23 @@ F:	arch/arm/mach-stm32/
 F:	drivers/clocksource/armv7m_systick.c
 N:	stm32
 N:	stm
+
+ARM/SUNPLUS SP7021 SOC SUPPORT
+M:	Qin Jian <qinjian@cqplus1.com>
+L:	linux-arm-kernel@lists.infradead.org (moderated for mon-subscribers)
+S:	Maintained
+W:	https://sunplus-tibbo.atlassian.net/wiki/spaces/doc/overview
+F:	Documentation/devicetree/bindings/arm/sunplus,sp7021.yaml
+F:	Documentation/devicetree/bindings/clock/sunplus,sp7021-clkc.yaml
+F:	Documentation/devicetree/bindings/interrupt-controller/sunplus,sp7021-intc.yaml
+F:	Documentation/devicetree/bindings/reset/sunplus,reset.yaml
+F:	arch/arm/boot/dts/sunplus-sp7021*.dts*
+F:	arch/arm/configs/sp7021_*defconfig
+F:	arch/arm/mach-sunplus/
+F:	drivers/irqchip/irq-sp7021-intc.c
+F:	drivers/reset/reset-sunplus.c
+F:	include/dt-bindings/clock/sunplus,sp7021-clkc.h
+F:	include/dt-bindings/reset/sunplus,sp7021-reset.h
 
 ARM/Synaptics SoC support
 M:	Jisheng Zhang <jszhang@kernel.org>
@@ -3875,15 +3904,28 @@ BROADCOM BCMBCA ARM ARCHITECTURE
 M:	William Zhang <william.zhang@broadcom.com>
 M:	Anand Gore <anand.gore@broadcom.com>
 M:	Kursad Oney <kursad.oney@broadcom.com>
+M:	Florian Fainelli <f.fainelli@gmail.com>
 R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 T:	git git://github.com/broadcom/stblinux.git
 F:	Documentation/devicetree/bindings/arm/bcm/brcm,bcmbca.yaml
-F:	arch/arm/boot/dts/bcm47622.dtsi
-F:	arch/arm/boot/dts/bcm947622.dts
+F:	arch/arm64/boot/dts/broadcom/bcmbca/*
 N:	bcmbca
 N:	bcm[9]?47622
+N:	bcm[9]?4912
+N:	bcm[9]?63138
+N:	bcm[9]?63146
+N:	bcm[9]?63148
+N:	bcm[9]?63158
+N:	bcm[9]?63178
+N:	bcm[9]?6756
+N:	bcm[9]?6813
+N:	bcm[9]?6846
+N:	bcm[9]?6855
+N:	bcm[9]?6856
+N:	bcm[9]?6858
+N:	bcm[9]?6878
 
 BROADCOM BCM2711/BCM2835 ARM ARCHITECTURE
 M:	Florian Fainelli <f.fainelli@gmail.com>
@@ -3958,14 +4000,6 @@ L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
 F:	arch/arm/boot/dts/bcm47189*
 F:	arch/arm/boot/dts/bcm53573*
-
-BROADCOM BCM63XX ARM ARCHITECTURE
-M:	Florian Fainelli <f.fainelli@gmail.com>
-R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
-L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
-S:	Maintained
-T:	git git://github.com/broadcom/stblinux.git
-N:	bcm63xx
 
 BROADCOM BCM63XX/BCM33XX UDC DRIVER
 M:	Kevin Cernekee <cernekee@gmail.com>
@@ -4373,7 +4407,7 @@ L:	linux-pm@vger.kernel.org
 L:	linux-samsung-soc@vger.kernel.org
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/linux.git
-F:	Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+F:	Documentation/devicetree/bindings/interconnect/samsung,exynos-bus.yaml
 F:	drivers/devfreq/exynos-bus.c
 
 BUSLOGIC SCSI DRIVER
@@ -4963,7 +4997,7 @@ R:	Nick Desaulniers <ndesaulniers@google.com>
 L:	llvm@lists.linux.dev
 S:	Supported
 B:	https://github.com/ClangBuiltLinux/linux/issues
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/clang/features
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	include/linux/cfi.h
 F:	kernel/cfi.c
 
@@ -5130,6 +5164,7 @@ F:	include/linux/console*
 
 CONTEXT TRACKING
 M:	Frederic Weisbecker <frederic@kernel.org>
+M:	"Paul E. McKenney" <paulmck@kernel.org>
 S:	Maintained
 F:	kernel/context_tracking.c
 F:	include/linux/context_tracking*
@@ -5855,6 +5890,7 @@ L:	linux-pm@vger.kernel.org
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/chanwoo/linux.git
 F:	Documentation/devicetree/bindings/devfreq/
+F:	Documentation/devicetree/bindings/interconnect/mediatek,cci.yaml
 F:	drivers/devfreq/
 F:	include/linux/devfreq.h
 F:	include/trace/events/devfreq.h
@@ -6805,7 +6841,7 @@ L:	dri-devel@lists.freedesktop.org
 L:	linux-tegra@vger.kernel.org
 S:	Supported
 T:	git git://anongit.freedesktop.org/tegra/linux.git
-F:	Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
+F:	Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.yaml
 F:	Documentation/devicetree/bindings/gpu/host1x/
 F:	drivers/gpu/drm/tegra/
 F:	drivers/gpu/host1x/
@@ -7393,6 +7429,13 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	drivers/net/ethernet/ibm/ehea/
 
+ELM327 CAN NETWORK DRIVER
+M:	Max Staudt <max@enpas.org>
+L:	linux-can@vger.kernel.org
+S:	Maintained
+F:	Documentation/networking/device_drivers/can/can327.rst
+F:	drivers/net/can/can327.c
+
 EM28XX VIDEO4LINUX DRIVER
 M:	Mauro Carvalho Chehab <mchehab@kernel.org>
 L:	linux-media@vger.kernel.org
@@ -7485,6 +7528,8 @@ F:	include/video/s1d13xxxfb.h
 EROFS FILE SYSTEM
 M:	Gao Xiang <xiang@kernel.org>
 M:	Chao Yu <chao@kernel.org>
+R:	Yue Hu <huyue2@coolpad.com>
+R:	Jeffle Xu <jefflexu@linux.alibaba.com>
 L:	linux-erofs@lists.ozlabs.org
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs.git
@@ -7497,6 +7542,13 @@ M:	Jeff Layton <jlayton@kernel.org>
 S:	Maintained
 F:	include/linux/errseq.h
 F:	lib/errseq.c
+
+ESD CAN/USB DRIVERS
+M:	Frank Jungclaus <frank.jungclaus@esd.eu>
+R:	socketcan@esd.eu
+L:	linux-can@vger.kernel.org
+S:	Maintained
+F:	drivers/net/can/usb/esd_usb.c
 
 ET131X NETWORK DRIVER
 M:	Mark Einon <mark.einon@gmail.com>
@@ -7773,9 +7825,6 @@ F:	include/linux/fs.h
 F:	include/linux/fs_types.h
 F:	include/uapi/linux/fs.h
 F:	include/uapi/linux/openat2.h
-X:	fs/io-wq.c
-X:	fs/io-wq.h
-X:	fs/io_uring.c
 
 FINTEK F75375S HARDWARE MONITOR AND FAN CONTROLLER DRIVER
 M:	Riku Voipio <riku.voipio@iki.fi>
@@ -7874,6 +7923,7 @@ FORTIFY_SOURCE
 M:	Kees Cook <keescook@chromium.org>
 L:	linux-hardening@vger.kernel.org
 S:	Supported
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	include/linux/fortify-string.h
 F:	lib/test_fortify/*
 F:	scripts/test_fortify.sh
@@ -8316,6 +8366,7 @@ GCC PLUGINS
 M:	Kees Cook <keescook@chromium.org>
 L:	linux-hardening@vger.kernel.org
 S:	Maintained
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	Documentation/kbuild/gcc-plugins.rst
 F:	scripts/Makefile.gcc-plugins
 F:	scripts/gcc-plugins/
@@ -9036,15 +9087,30 @@ F:	Documentation/admin-guide/perf/hisi-pcie-pmu.rst
 F:	Documentation/admin-guide/perf/hisi-pmu.rst
 F:	drivers/perf/hisilicon
 
-HISILICON QM AND ZIP Controller DRIVER
+HISILICON HNS3 PMU DRIVER
+M:	Guangbin Huang <huangguangbin2@huawei.com>
+S:	Supported
+F:	Documentation/admin-guide/perf/hns3-pmu.rst
+F:	drivers/perf/hisilicon/hns3_pmu.c
+
+HISILICON QM DRIVER
+M:	Weili Qian <qianweili@huawei.com>
+M:	Zhou Wang <wangzhou1@hisilicon.com>
+L:	linux-crypto@vger.kernel.org
+S:	Maintained
+F:	drivers/crypto/hisilicon/Kconfig
+F:	drivers/crypto/hisilicon/Makefile
+F:	drivers/crypto/hisilicon/qm.c
+F:	drivers/crypto/hisilicon/sgl.c
+F:	include/linux/hisi_acc_qm.h
+
+HISILICON ZIP Controller DRIVER
+M:	Yang Shen <shenyang39@huawei.com>
 M:	Zhou Wang <wangzhou1@hisilicon.com>
 L:	linux-crypto@vger.kernel.org
 S:	Maintained
 F:	Documentation/ABI/testing/debugfs-hisi-zip
-F:	drivers/crypto/hisilicon/qm.c
-F:	drivers/crypto/hisilicon/sgl.c
 F:	drivers/crypto/hisilicon/zip/
-F:	include/linux/hisi_acc_qm.h
 
 HISILICON ROCE DRIVER
 M:	Wenpeng Liang <liangwenpeng@huawei.com>
@@ -9273,6 +9339,7 @@ S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/hyperv/linux.git
 F:	Documentation/ABI/stable/sysfs-bus-vmbus
 F:	Documentation/ABI/testing/debugfs-hyperv
+F:	Documentation/virt/hyperv
 F:	Documentation/networking/device_drivers/ethernet/microsoft/netvsc.rst
 F:	arch/arm64/hyperv
 F:	arch/arm64/include/asm/hyperv-tlfs.h
@@ -9618,6 +9685,7 @@ F:	drivers/input/misc/ideapad_slidebar.c
 
 IDMAPPED MOUNTS
 M:	Christian Brauner <brauner@kernel.org>
+M:	Seth Forshee <sforshee@kernel.org>
 L:	linux-fsdevel@vger.kernel.org
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/brauner/linux.git
@@ -10476,9 +10544,7 @@ L:	io-uring@vger.kernel.org
 S:	Maintained
 T:	git git://git.kernel.dk/linux-block
 T:	git git://git.kernel.dk/liburing
-F:	fs/io-wq.c
-F:	fs/io-wq.h
-F:	fs/io_uring.c
+F:	io_uring/
 F:	include/linux/io_uring.h
 F:	include/uapi/linux/io_uring.h
 F:	tools/io_uring/
@@ -10837,6 +10903,17 @@ F:	scripts/dummy-tools/
 F:	scripts/mk*
 F:	scripts/mod/
 F:	scripts/package/
+
+KERNEL HARDENING (not covered by other areas)
+M:	Kees Cook <keescook@chromium.org>
+L:	linux-hardening@vger.kernel.org
+S:	Supported
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
+F:	include/linux/overflow.h
+F:	include/linux/randomize_kstack.h
+F:	mm/usercopy.c
+K:	\b(add|choose)_random_kstack_offset\b
+K:	\b__check_(object_size|heap_object)\b
 
 KERNEL JANITORS
 L:	kernel-janitors@vger.kernel.org
@@ -11648,7 +11725,7 @@ F:	drivers/media/usb/dvb-usb-v2/lmedm04*
 LOADPIN SECURITY MODULE
 M:	Kees Cook <keescook@chromium.org>
 S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git lsm/loadpin
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	Documentation/admin-guide/LSM/LoadPin.rst
 F:	security/loadpin/
 
@@ -13169,6 +13246,7 @@ M:	UNGLinuxDriver@microchip.com
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/dsa/microchip,ksz.yaml
+F:	Documentation/devicetree/bindings/net/dsa/microchip,lan937x.yaml
 F:	drivers/net/dsa/microchip/*
 F:	include/linux/platform_data/microchip-ksz.h
 F:	net/dsa/tag_ksz.c
@@ -13832,12 +13910,11 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	net/sched/sch_netem.c
 
-NETERION 10GbE DRIVERS (s2io/vxge)
+NETERION 10GbE DRIVERS (s2io)
 M:	Jon Mason <jdmason@kudzu.us>
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	Documentation/networking/device_drivers/ethernet/neterion/s2io.rst
-F:	Documentation/networking/device_drivers/ethernet/neterion/vxge.rst
 F:	drivers/net/ethernet/neterion/
 
 NETFILTER
@@ -16325,7 +16402,6 @@ F:	drivers/media/rc/pwm-ir-tx.c
 PWM SUBSYSTEM
 M:	Thierry Reding <thierry.reding@gmail.com>
 R:	Uwe Kleine-König <u.kleine-koenig@pengutronix.de>
-M:	Lee Jones <lee.jones@linaro.org>
 L:	linux-pwm@vger.kernel.org
 S:	Maintained
 Q:	https://patchwork.ozlabs.org/project/linux-pwm/list/
@@ -16336,6 +16412,7 @@ F:	Documentation/driver-api/pwm.rst
 F:	drivers/gpio/gpio-mvebu.c
 F:	drivers/pwm/
 F:	drivers/video/backlight/pwm_bl.c
+F:	include/dt-bindings/pwm/
 F:	include/linux/pwm.h
 F:	include/linux/pwm_backlight.h
 K:	pwm_(config|apply_state|ops)
@@ -16659,6 +16736,13 @@ L:	linux-arm-msm@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/i2c/i2c-qcom-cci.txt
 F:	drivers/i2c/busses/i2c-qcom-cci.c
+
+QUALCOMM INTERCONNECT BWMON DRIVER
+M:	Krzysztof Kozlowski <krzysztof.kozlowski@linaro.org>
+L:	linux-arm-msm@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/interconnect/qcom,msm8998-bwmon.yaml
+F:	drivers/soc/qcom/icc-bwmon.c
 
 QUALCOMM IOMMU
 M:	Rob Clark <robdclark@gmail.com>
@@ -17175,6 +17259,19 @@ S:	Supported
 F:	Documentation/devicetree/bindings/iio/adc/renesas,rzg2l-adc.yaml
 F:	drivers/iio/adc/rzg2l_adc.c
 
+RENESAS RZ/N1 A5PSW SWITCH DRIVER
+M:	Clément Léger <clement.leger@bootlin.com>
+L:	linux-renesas-soc@vger.kernel.org
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/dsa/renesas,rzn1-a5psw.yaml
+F:	Documentation/devicetree/bindings/net/pcs/renesas,rzn1-miic.yaml
+F:	drivers/net/dsa/rzn1_a5psw*
+F:	drivers/net/pcs/pcs-rzn1-miic.c
+F:	include/dt-bindings/net/pcs-rzn1-miic.h
+F:	include/linux/pcs-rzn1-miic.h
+F:	net/dsa/tag_rzn1_a5psw.c
+
 RENESAS RZ/N1 RTC CONTROLLER DRIVER
 M:	Miquel Raynal <miquel.raynal@bootlin.com>
 L:	linux-rtc@vger.kernel.org
@@ -17283,6 +17380,7 @@ F:	drivers/clk/microchip/clk-mpfs.c
 F:	drivers/mailbox/mailbox-mpfs.c
 F:	drivers/pci/controller/pcie-microchip-host.c
 F:	drivers/soc/microchip/
+F:	drivers/spi/spi-microchip-core.c
 F:	include/soc/microchip/mpfs.h
 
 RNBD BLOCK DRIVERS
@@ -17978,7 +18076,7 @@ M:	Kees Cook <keescook@chromium.org>
 R:	Andy Lutomirski <luto@amacapital.net>
 R:	Will Drewry <wad@chromium.org>
 S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git seccomp
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/seccomp
 F:	Documentation/userspace-api/seccomp_filter.rst
 F:	include/linux/seccomp.h
 F:	include/uapi/linux/seccomp.h
@@ -18049,12 +18147,13 @@ S:	Supported
 F:	Documentation/admin-guide/security-bugs.rst
 
 SECURITY SUBSYSTEM
+M:	Paul Moore <paul@paul-moore.com>
 M:	James Morris <jmorris@namei.org>
 M:	"Serge E. Hallyn" <serge@hallyn.com>
 L:	linux-security-module@vger.kernel.org (suggested Cc:)
 S:	Supported
 W:	http://kernsec.org/
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jmorris/linux-security.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/lsm.git
 F:	security/
 X:	security/selinux/
 
@@ -18157,6 +18256,7 @@ SFF/SFP/SFP+ MODULE SUPPORT
 M:	Russell King <linux@armlinux.org.uk>
 L:	netdev@vger.kernel.org
 S:	Maintained
+F:	Documentation/devicetree/bindings/net/sff,sfp.yaml
 F:	drivers/net/phy/phylink.c
 F:	drivers/net/phy/sfp*
 F:	include/linux/mdio/mdio-i2c.h
@@ -18442,6 +18542,12 @@ S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/vbabka/slab.git
 F:	include/linux/sl?b*.h
 F:	mm/sl?b*
+
+SLCAN CAN NETWORK DRIVER
+M:	Dario Binacchi <dario.binacchi@amarulasolutions.com>
+L:	linux-can@vger.kernel.org
+S:	Maintained
+F:	drivers/net/can/slcan/
 
 SLEEPABLE READ-COPY UPDATE (SRCU)
 M:	Lai Jiangshan <jiangshanlai@gmail.com>
@@ -19773,7 +19879,7 @@ M:	Sowjanya Komatineni <skomatineni@nvidia.com>
 L:	linux-media@vger.kernel.org
 L:	linux-tegra@vger.kernel.org
 S:	Maintained
-F:	Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
+F:	Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.yaml
 F:	drivers/staging/media/tegra-video/
 
 TEGRA XUSB PADCTL DRIVER
@@ -19896,6 +20002,7 @@ F:	Documentation/ABI/testing/sysfs-class-thermal
 F:	Documentation/devicetree/bindings/thermal/
 F:	Documentation/driver-api/thermal/
 F:	drivers/thermal/
+F:	include/dt-bindings/thermal/
 F:	include/linux/cpu_cooling.h
 F:	include/linux/thermal.h
 F:	include/uapi/linux/thermal.h
@@ -20370,7 +20477,7 @@ F:	tools/tracing/rtla/
 
 TRADITIONAL CHINESE DOCUMENTATION
 M:	Hu Haowen <src.res@email.cn>
-L:	linux-doc-tw-discuss@lists.sourceforge.net
+L:	linux-doc-tw-discuss@lists.sourceforge.net (moderated for non-subscribers)
 S:	Maintained
 W:	https://github.com/srcres258/linux-doc
 T:	git git://github.com/srcres258/linux-doc.git doc-zh-tw
@@ -20489,6 +20596,13 @@ F:	Documentation/ABI/testing/sysfs-fs-ubifs
 F:	Documentation/filesystems/ubifs-authentication.rst
 F:	Documentation/filesystems/ubifs.rst
 F:	fs/ubifs/
+
+UBLK USERSPACE BLOCK DRIVER
+M:	Ming Lei <ming.lei@redhat.com>
+L:	linux-block@vger.kernel.org
+S:	Maintained
+F:	drivers/block/ublk_drv.c
+F:	include/uapi/linux/ublk_cmd.h
 
 UCLINUX (M68KNOMMU AND COLDFIRE)
 M:	Greg Ungerer <gerg@linux-m68k.org>
@@ -21561,6 +21675,13 @@ L:	linux-input@vger.kernel.org
 S:	Maintained
 F:	drivers/input/tablet/wacom_serial4.c
 
+WANGXUN ETHERNET DRIVER
+M:	Jiawen Wu <jiawenwu@trustnetic.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/networking/device_drivers/ethernet/wangxun/txgbe.rst
+F:	drivers/net/ethernet/wangxun/
+
 WATCHDOG DEVICE DRIVERS
 M:	Wim Van Sebroeck <wim@linux-watchdog.org>
 M:	Guenter Roeck <linux@roeck-us.net>
@@ -21877,8 +21998,7 @@ F:	include/uapi/linux/if_xdp.h
 F:	include/uapi/linux/xdp_diag.h
 F:	include/net/netns/xdp.h
 F:	net/xdp/
-F:	samples/bpf/xdpsock*
-F:	tools/lib/bpf/xsk*
+F:	tools/testing/selftests/bpf/*xsk*
 
 XEN BLOCK SUBSYSTEM
 M:	Roger Pau Monné <roger.pau@citrix.com>
@@ -22118,7 +22238,7 @@ F:	include/linux/yam.h
 YAMA SECURITY MODULE
 M:	Kees Cook <keescook@chromium.org>
 S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git yama/tip
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	Documentation/admin-guide/LSM/Yama.rst
 F:	security/yama/
 
