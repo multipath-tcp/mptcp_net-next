@@ -895,9 +895,9 @@ bool bpf_flow_dissect(struct bpf_prog *prog, struct bpf_flow_dissector *ctx,
 	return result == BPF_OK;
 }
 
-static bool is_pppoe_ses_hdr_valid(struct pppoe_hdr hdr)
+static bool is_pppoe_ses_hdr_valid(const struct pppoe_hdr *hdr)
 {
-	return hdr.ver == 1 && hdr.type == 1 && hdr.code == 0;
+	return hdr->ver == 1 && hdr->type == 1 && hdr->code == 0;
 }
 
 /**
@@ -1227,7 +1227,7 @@ proto_again:
 			break;
 		}
 
-		if (!is_pppoe_ses_hdr_valid(hdr->hdr)) {
+		if (!is_pppoe_ses_hdr_valid(&hdr->hdr)) {
 			fdret = FLOW_DISSECT_RET_OUT_BAD;
 			break;
 		}
