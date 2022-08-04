@@ -1554,9 +1554,9 @@ struct mpage_da_data {
 static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 				       bool invalidate)
 {
-	int nr_pages, i;
+	unsigned nr, i;
 	pgoff_t index, end;
-	struct pagevec pvec;
+	struct folio_batch fbatch;
 	struct inode *inode = mpd->inode;
 	struct address_space *mapping = inode->i_mapping;
 
@@ -1574,15 +1574,18 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 		ext4_es_remove_extent(inode, start, last - start + 1);
 	}
 
-	pagevec_init(&pvec);
+	folio_batch_init(&fbatch);
 	while (index <= end) {
-		nr_pages = pagevec_lookup_range(&pvec, mapping, &index, end);
-		if (nr_pages == 0)
+		nr = filemap_get_folios(mapping, &index, end, &fbatch);
+		if (nr == 0)
 			break;
-		for (i = 0; i < nr_pages; i++) {
-			struct page *page = pvec.pages[i];
-			struct folio *folio = page_folio(page);
+		for (i = 0; i < nr; i++) {
+			struct folio *folio = fbatch.folios[i];
 
+			if (folio->index < mpd->first_page)
+				continue;
+			if (folio->index + folio_nr_pages(folio) - 1 > end)
+				continue;
 			BUG_ON(!folio_test_locked(folio));
 			BUG_ON(folio_test_writeback(folio));
 			if (invalidate) {
@@ -1594,7 +1597,7 @@ static void mpage_release_unused_pages(struct mpage_da_data *mpd,
 			}
 			folio_unlock(folio);
 		}
-		pagevec_release(&pvec);
+		folio_batch_release(&fbatch);
 	}
 }
 
@@ -2311,8 +2314,8 @@ out:
  */
 static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 {
-	struct pagevec pvec;
-	int nr_pages, i;
+	struct folio_batch fbatch;
+	unsigned nr, i;
 	struct inode *inode = mpd->inode;
 	int bpp_bits = PAGE_SHIFT - inode->i_blkbits;
 	pgoff_t start, end;
@@ -2326,14 +2329,13 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 	lblk = start << bpp_bits;
 	pblock = mpd->map.m_pblk;
 
-	pagevec_init(&pvec);
+	folio_batch_init(&fbatch);
 	while (start <= end) {
-		nr_pages = pagevec_lookup_range(&pvec, inode->i_mapping,
-						&start, end);
-		if (nr_pages == 0)
+		nr = filemap_get_folios(inode->i_mapping, &start, end, &fbatch);
+		if (nr == 0)
 			break;
-		for (i = 0; i < nr_pages; i++) {
-			struct page *page = pvec.pages[i];
+		for (i = 0; i < nr; i++) {
+			struct page *page = &fbatch.folios[i]->page;
 
 			err = mpage_process_page(mpd, page, &lblk, &pblock,
 						 &map_bh);
@@ -2349,14 +2351,14 @@ static int mpage_map_and_submit_buffers(struct mpage_da_data *mpd)
 			if (err < 0)
 				goto out;
 		}
-		pagevec_release(&pvec);
+		folio_batch_release(&fbatch);
 	}
 	/* Extent fully mapped and matches with page boundary. We are done. */
 	mpd->map.m_len = 0;
 	mpd->map.m_flags = 0;
 	return 0;
 out:
-	pagevec_release(&pvec);
+	folio_batch_release(&fbatch);
 	return err;
 }
 
@@ -3631,7 +3633,7 @@ static const struct address_space_operations ext4_aops = {
 	.invalidate_folio	= ext4_invalidate_folio,
 	.release_folio		= ext4_release_folio,
 	.direct_IO		= noop_direct_IO,
-	.migratepage		= buffer_migrate_page,
+	.migrate_folio		= buffer_migrate_folio,
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 	.swap_activate		= ext4_iomap_swap_activate,
@@ -3666,7 +3668,7 @@ static const struct address_space_operations ext4_da_aops = {
 	.invalidate_folio	= ext4_invalidate_folio,
 	.release_folio		= ext4_release_folio,
 	.direct_IO		= noop_direct_IO,
-	.migratepage		= buffer_migrate_page,
+	.migrate_folio		= buffer_migrate_folio,
 	.is_partially_uptodate  = block_is_partially_uptodate,
 	.error_remove_page	= generic_error_remove_page,
 	.swap_activate		= ext4_iomap_swap_activate,
@@ -5350,14 +5352,14 @@ int ext4_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 	if (error)
 		return error;
 
-	if (is_quota_modification(inode, attr)) {
+	if (is_quota_modification(mnt_userns, inode, attr)) {
 		error = dquot_initialize(inode);
 		if (error)
 			return error;
 	}
 
-	if ((ia_valid & ATTR_UID && !uid_eq(attr->ia_uid, inode->i_uid)) ||
-	    (ia_valid & ATTR_GID && !gid_eq(attr->ia_gid, inode->i_gid))) {
+	if (i_uid_needs_update(mnt_userns, attr, inode) ||
+	    i_gid_needs_update(mnt_userns, attr, inode)) {
 		handle_t *handle;
 
 		/* (user+group)*(old+new) structure, inode write (sb,
@@ -5374,7 +5376,7 @@ int ext4_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 		 * counts xattr inode references.
 		 */
 		down_read(&EXT4_I(inode)->xattr_sem);
-		error = dquot_transfer(inode, attr);
+		error = dquot_transfer(mnt_userns, inode, attr);
 		up_read(&EXT4_I(inode)->xattr_sem);
 
 		if (error) {
@@ -5383,10 +5385,8 @@ int ext4_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 		}
 		/* Update corresponding info in inode so that everything is in
 		 * one transaction */
-		if (attr->ia_valid & ATTR_UID)
-			inode->i_uid = attr->ia_uid;
-		if (attr->ia_valid & ATTR_GID)
-			inode->i_gid = attr->ia_gid;
+		i_uid_update(mnt_userns, attr, inode);
+		i_gid_update(mnt_userns, attr, inode);
 		error = ext4_mark_inode_dirty(handle, inode);
 		ext4_journal_stop(handle);
 		if (unlikely(error)) {
