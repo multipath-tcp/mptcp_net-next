@@ -137,9 +137,58 @@ To list all topics, you can use:
 Send patches upstream
 ---------------------
 
-`send-upstream.sh` script can be used but Mat has probably more scripts to share
-and document here.
+`send-upstream.sh` script can be used, but most of our upstreaming has been done manually. For the manual process:
 
+* Prerequisite: Set up git remotes for mptcp_net-next, net, and net-next
+* Check out a local branch that's a copy of either export (for net-next) or export-net (for net)
+* Fetch latest net and net-next changes 
+* Do an interactive rebase to remove extra commits and add the upstreamer's signoff
+
+      git-rebase -i --signoff net/main  ## or net-next/main
+
+* Double-check git tags. Sender signoff should be last, and not duplicated. Reviewed-by/Acked-by precede the signoffs. Typically place Closes and Fixes tags first in the list, and make sure all -net patches have a Fixes tag. Keep Reviewed-by tags from the sender if they are present, even if it's redundant with the signoff.
+  * Properly formatted Fixes tags can be generated easily if you add the following block to your .gitconfig:
+
+        [pretty]
+            fixes = Fixes: %h (\"%s\")
+
+  * This allows generating the "Fixes: " tag with
+
+        git log --pretty=fixes <commit-id>
+
+* Build the code and run tests.
+* Check for net/net-next conflicts. If possible, defer net-next upstreaming until net-branch patches they conflict with have been merged to the net-next branch.
+* Determine cc addresses for the series.
+  * Always include netdev maintainers (davem@davemloft.net kuba@kernel.org pabeni@redhat.com edumazet@google.com), MPTCP maintainers (matthieu.baerts@tessares.net mathew.j.martineau@linux.intel.com), and mptcp@lists.linux.dev
+  * For patches with Fixes tags, also cc the author **and any co-developers** of the fixed commit. `scripts/get_maintainers.pl --email --fixes` (from the kernel repo, not the special scripts branch this README is in) will look this up for you, and is what the netdev CI will run and check against. If any outdated email addresses are associated with the fixed commit, substitute a current address if possible. It helps to add a note to the .patch file (add an extra `---` after the git tags in the relevant .patch file and then add text that will not be imported in to git).
+* Format the patches (add any relevant `--cc` flags), replacing `-N` with the appropriate number of patches:
+
+      git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net/main --subject-prefix="PATCH net"
+      ## or
+      git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net-next/main --subject-prefix="PATCH net-next"
+      
+* Edit the cover letter, replacing the subject and body placeholders.
+  * Give a quick summary of the included patches. If upstreaming a group of patches that implements a whole feature, it's helpful to add a paragraph or two explaining the full feature (refer to the original cover letters sent to mptcp@lists.linux.dev as needed).
+  * If upstreaming a collection of unrelated patches, no need to add extra explanation, just explain each in the cover letter:
+
+        Patch 1: Fix a bug
+        
+        Patches 2-3: Improve self test consistency
+        
+        Patch 4: Another bug fix
+        
+* Run the .patch files through checkpatch one more time if you want (CI should have caught issues in the code, but sometimes the above edits can add a problem).
+
+        scripts/checkpatch.pl *.patch
+        
+* Send the patches (assuming there are no extra patch files sitting around...)
+
+        git send-email *.patch
+        
+* Make sure the full series appears in both https://patchwork.kernel.org/project/mptcp/list/ and https://patchwork.kernel.org/project/netdevbpf/list/
+* Mark the series as "Handled Elsewhere" in MPTCP patchwork.
+* Check CI status in the netdev patchwork.
+* Monitor for upstream merge or maintainer feedback.
 
 Weekly meetings
 ---------------
