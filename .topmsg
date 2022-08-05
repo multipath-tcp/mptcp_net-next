@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/module-kunit-Load-.kunit_test_suites-section-when-CONFIG_KUNIT-m
+From: David Gow <davidgow@google.com>
+Subject: [PATCH] module: kunit: Load .kunit_test_suites section when CONFIG_KUNIT=m
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The new KUnit module handling has KUnit test suites listed in a
+.kunit_test_suites section of each module. This should be loaded when
+the module is, but at the moment this only happens if KUnit is built-in.
+
+Also load this when KUnit is enabled as a module: it'll not be usable
+unless KUnit is loaded, but such modules are likely to depend on KUnit
+anyway, so it's unlikely to ever be loaded needlessly.
+
+Fixes: 3d6e44623841 ("kunit: unify module and builtin suite definitions")
+Signed-off-by: David Gow <davidgow@google.com>
+Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
