@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/module-kunit-Load-.kunit_test_suites-section-when-CONFIG_KUNIT-m
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
