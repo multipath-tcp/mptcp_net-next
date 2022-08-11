@@ -6,7 +6,7 @@ SUBJECT="${1:?}"
 [[ "${SUBJECT}" =~ "."$ ]] && SUBJECT="${SUBJECT:0:-1}"
 
 COMMIT="${2}"
-DELEGATE="matttbe"
+DELEGATE=${DELEGATE:-"matttbe"}
 
 get_ids() {
 	git-pw patch list --limit 250 --sort -date --format simple -c ID \
