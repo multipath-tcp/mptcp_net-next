@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: move prefix tests of addr_nr_ns2 together
-
-Move the fullmesh prefix test of addr_nr_ns2 together with its other
-prefix tests.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
