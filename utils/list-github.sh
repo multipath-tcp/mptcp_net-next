@@ -17,7 +17,7 @@ echo
 echo
 echo "    Bugs (opened, flagged as \"bug\" and assigned)"
 echo
-my_ghi --state open -L bug | grep " @"
+my_ghi --state open -L bug | grep -e "^None.$" -e " @" | awk '{ print } END { if (NR == 0) { print "None." }  }'
 
 echo
 echo
@@ -29,13 +29,13 @@ echo
 echo
 echo "    In Progress (opened, new feature and assigned)"
 echo
-my_ghi --state open -L enhancement | grep " @"
+my_ghi --state open -L enhancement | grep -e "^None.$" -e " @" | awk '{ print } END { if (NR == 0) { print "None." }  }'
 
 echo
 echo
 echo "    Assigned Questions (opened, questions and assigned)"
 echo
-my_ghi --state open -L question | grep " @"
+my_ghi --state open -L question | grep -e "^None.$" -e " @" | awk '{ print } END { if (NR == 0) { print "None." }  }'
 
 echo
 echo
