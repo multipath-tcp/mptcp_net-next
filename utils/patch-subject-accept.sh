@@ -34,5 +34,7 @@ for i in $(get_ids); do
 done
 
 if [ -z "${i}" ]; then
-	echo -e "\n\tWARNING: Patch '${SUBJECT}' was not found in patchwork\n"
+	echo -e "\n\tWARNING: Patch '${SUBJECT}' was not found in patchwork."
+	echo -e "\tIf the subject has been modified, relaunch using:"
+	echo -e "\t\t${0} '<old subject>' ${COMMIT}\n"
 fi
