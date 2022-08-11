@@ -1,0 +1,52 @@
+#! /bin/bash -e
+
+NET="${1:?}"
+NEXT="${2:?}"
+FIX="${3:?}"
+shift 3
+
+long() {
+	git rev-parse "${@}"
+}
+
+short() {
+	git rev-parse --short "${@}"
+}
+
+desc() {
+	git show -s --format='%h ("%s")' "${@}"
+}
+
+diff() {
+	git diff ${1} ${1}^ ${1}^2 "${@:2}"
+}
+
+cat <<EOF
+Hello
+
+(...)
+
+FYI, we got a small conflict when merging -net in net-next in the MPTCP
+tree due to this patch applied in -net:
+
+  $(desc "${NET}")
+
+and this one from net-next:
+
+  $(desc "${NEXT}")
+
+The conflict has been resolved on our side[1] and the resolution we
+suggest is attached to this email.
+
+I'm sharing this thinking it can help others but if it only creates
+noise, please tell me! :-)
+
+Cheers,
+Matt
+
+[1] https://github.com/multipath-tcp/mptcp_net-next/commit/$(short "${FIX}")
+EOF
+
+PATCH="$(long "${FIX}").patch"
+diff "${FIX}" "${@}" > "${PATCH}"
+echo "=== Please include ${PATCH} in the email. ==="
