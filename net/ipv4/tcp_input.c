@@ -6608,6 +6608,11 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			 * marginal case.
 			 */
 			inet_csk_reset_keepalive_timer(sk, tmo);
+		} else if (sk_is_mptcp(sk) &&
+			   mptcp_incoming_options(sk, skb) &&
+			   mptcp_subflow_pending_data_fin_ack(sk)) {
+				inet_csk_schedule_ack(sk);
+				inet_csk_reset_keepalive_timer(sk, tmo);
 		} else {
 			tcp_time_wait(sk, TCP_FIN_WAIT2, tmo);
 			goto consume;

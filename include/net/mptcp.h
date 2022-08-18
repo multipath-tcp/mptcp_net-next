@@ -152,6 +152,8 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 
 void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info);
 
+bool mptcp_subflow_pending_data_fin_ack(const struct sock *ssk);
+
 /* move the skb extension owership, with the assumption that 'to' is
  * newly allocated
  */
@@ -297,6 +299,8 @@ static inline int mptcp_subflow_init_cookie_req(struct request_sock *req,
 }
 
 static inline __be32 mptcp_reset_option(const struct sk_buff *skb)  { return htonl(0u); }
+
+static inline bool mptcp_subflow_pending_data_fin_ack(const struct sock *ssk) { return false; }
 #endif /* CONFIG_MPTCP */
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)

@@ -351,6 +351,14 @@ static bool subflow_thmac_valid(struct mptcp_subflow_context *subflow)
 	return thmac == subflow->thmac;
 }
 
+bool mptcp_subflow_pending_data_fin_ack(const struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	struct sock *sk = subflow->conn;
+
+	return READ_ONCE(mptcp_sk(sk)->rcv_data_fin);
+}
+
 void mptcp_subflow_reset(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
