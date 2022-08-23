@@ -3679,6 +3679,7 @@ F:	Documentation/networking/bonding.rst
 F:	drivers/net/bonding/
 F:	include/net/bond*
 F:	include/uapi/linux/if_bonding.h
+F:	tools/testing/selftests/net/bonding/
 
 BOSCH SENSORTEC BMA400 ACCELEROMETER IIO DRIVER
 M:	Dan Robertson <dan@dlrobertson.com>
@@ -5718,13 +5719,6 @@ F:	include/linux/dccp.h
 F:	include/linux/tfrc.h
 F:	include/uapi/linux/dccp.h
 F:	net/dccp/
-
-DECnet NETWORK LAYER
-L:	linux-decnet-user@lists.sourceforge.net
-S:	Orphan
-W:	http://linux-decnet.sourceforge.net
-F:	Documentation/networking/decnet.rst
-F:	net/decnet/
 
 DECSTATION PLATFORM SUPPORT
 M:	"Maciej W. Rozycki" <macro@orcam.me.uk>
