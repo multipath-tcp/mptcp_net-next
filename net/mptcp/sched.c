@@ -162,6 +162,10 @@ struct sock *mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	if (__mptcp_check_fallback(msk))
 		return NULL;
 
+	/* never retransmit when there is a single subflow */
+	if (list_is_singular(&msk->conn_list) && list_empty(&msk->join_list))
+		return NULL;
+
 	if (!msk->sched)
 		return mptcp_subflow_get_retrans(msk);
 
