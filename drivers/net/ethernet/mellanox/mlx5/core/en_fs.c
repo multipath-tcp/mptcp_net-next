@@ -1459,12 +1459,13 @@ struct mlx5e_flow_steering *mlx5e_fs_init(const struct mlx5e_profile *profile,
 		goto err_free_tc;
 
 	return fs;
+
 err_free_tc:
 	mlx5e_fs_tc_free(fs);
-err_free_fs:
-	kvfree(fs);
 err_free_vlan:
 	mlx5e_fs_vlan_free(fs);
+err_free_fs:
+	kvfree(fs);
 err:
 	return NULL;
 }
