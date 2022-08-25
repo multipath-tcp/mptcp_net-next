@@ -535,14 +535,6 @@ static void mptcp_subflow_cleanup_rbuf(struct sock *ssk)
 	unlock_sock_fast(ssk, slow);
 }
 
-void mptcp_receive_window(const struct sock *ssk, int *rwnd)
-{
-	const struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
-	const struct sock *sk = subflow->conn;
-
-	*rwnd = __mptcp_receive_window(mptcp_sk(sk));
-}
-
 static bool mptcp_subflow_could_cleanup(const struct sock *ssk, bool rx_empty)
 {
 	const struct inet_connection_sock *icsk = inet_csk(ssk);
@@ -558,13 +550,13 @@ static bool mptcp_subflow_could_cleanup(const struct sock *ssk, bool rx_empty)
 
 static void mptcp_cleanup_rbuf(struct mptcp_sock *msk)
 {
-	int cur_window = __mptcp_receive_window(msk);
+	int old_space = READ_ONCE(msk->old_wspace);
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	int new_window =  __mptcp_space(sk);
+	int space =  __mptcp_space(sk);
 	bool cleanup, rx_empty;
 
-	cleanup = new_window > 0 && new_window >= (cur_window << 1);
+	cleanup = (space > 0) && (space >= (old_space << 1));
 	rx_empty = !__mptcp_rmem(sk);
 
 	mptcp_for_each_subflow(msk, subflow) {
