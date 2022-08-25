@@ -1600,9 +1600,6 @@ static void __tcp_cleanup_rbuf(struct sock *sk, int copied)
 	if (copied > 0 && !time_to_ack && !(sk->sk_shutdown & RCV_SHUTDOWN)) {
 		__u32 rcv_window_now = tcp_receive_window(tp);
 
-		if (sk_is_mptcp(sk))
-			mptcp_receive_window(sk, &rcv_window_now);
-
 		/* Optimize, __tcp_select_window() is not cheap. */
 		if (2*rcv_window_now <= tp->window_clamp) {
 			__u32 new_window = __tcp_select_window(sk);
