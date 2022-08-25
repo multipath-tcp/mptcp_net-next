@@ -125,7 +125,6 @@
 #define MPTCP_FLUSH_JOIN_LIST	5
 #define MPTCP_CONNECTED		6
 #define MPTCP_RESET_SCHEDULER	7
-#define MPTCP_DEQUEUE		8
 
 static inline bool before64(__u64 seq1, __u64 seq2)
 {
@@ -258,8 +257,10 @@ struct mptcp_sock {
 	u64		ack_seq;
 	atomic64_t	rcv_wnd_sent;
 	u64		rcv_data_fin_seq;
+	int		rmem_fwd_alloc;
 	struct sock	*last_snd;
 	int		snd_burst;
+	int		old_wspace;
 	u64		recovery_snd_nxt;	/* in recovery mode accept up to this seq;
 						 * recovery related fields are under data_lock
 						 * protection
@@ -268,6 +269,7 @@ struct mptcp_sock {
 	u64		wnd_end;
 	unsigned long	timer_ival;
 	u32		token;
+	int		rmem_released;
 	unsigned long	flags;
 	unsigned long	cb_flags;
 	unsigned long	push_pending;
@@ -287,6 +289,7 @@ struct mptcp_sock {
 	struct work_struct work;
 	struct sk_buff  *ooo_last_skb;
 	struct rb_root  out_of_order_queue;
+	struct sk_buff_head receive_queue;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct mptcp_data_frag *first_pending;
@@ -330,12 +333,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
  */
 static inline int __mptcp_rmem(const struct sock *sk)
 {
-	return atomic_read(&sk->sk_rmem_alloc);
-}
-
-static inline int __mptcp_receive_window(const struct mptcp_sock *msk)
-{
-	return atomic64_read(&msk->rcv_wnd_sent) - READ_ONCE(msk->ack_seq);
+	return atomic_read(&sk->sk_rmem_alloc) - READ_ONCE(mptcp_sk(sk)->rmem_released);
 }
 
 static inline int __mptcp_space(const struct sock *sk)
