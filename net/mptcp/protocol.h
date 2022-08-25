@@ -258,6 +258,7 @@ struct mptcp_sock {
 	u64		ack_seq;
 	atomic64_t	rcv_wnd_sent;
 	u64		rcv_data_fin_seq;
+	int		rmem_fwd_alloc;
 	struct sock	*last_snd;
 	int		snd_burst;
 	u64		recovery_snd_nxt;	/* in recovery mode accept up to this seq;
@@ -268,6 +269,7 @@ struct mptcp_sock {
 	u64		wnd_end;
 	unsigned long	timer_ival;
 	u32		token;
+	int		rmem_released;
 	unsigned long	flags;
 	unsigned long	cb_flags;
 	unsigned long	push_pending;
@@ -329,7 +331,7 @@ static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
  */
 static inline int __mptcp_rmem(const struct sock *sk)
 {
-	return atomic_read(&sk->sk_rmem_alloc);
+	return atomic_read(&sk->sk_rmem_alloc) - READ_ONCE(mptcp_sk(sk)->rmem_released);
 }
 
 static inline int __mptcp_receive_window(const struct mptcp_sock *msk)
