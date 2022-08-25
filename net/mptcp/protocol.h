@@ -125,7 +125,6 @@
 #define MPTCP_FLUSH_JOIN_LIST	5
 #define MPTCP_CONNECTED		6
 #define MPTCP_RESET_SCHEDULER	7
-#define MPTCP_DEQUEUE		8
 
 static inline bool before64(__u64 seq1, __u64 seq2)
 {
@@ -289,6 +288,7 @@ struct mptcp_sock {
 	struct work_struct work;
 	struct sk_buff  *ooo_last_skb;
 	struct rb_root  out_of_order_queue;
+	struct sk_buff_head receive_queue;
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct mptcp_data_frag *first_pending;
