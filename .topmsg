@@ -1,8 +1,0 @@
-From: Thomas Haller <thaller@redhat.com>
-Subject: [PATCH] mptcp: account memory allocation in mptcp_nl_cmd_add_addr() to user
-
-Now that non-root users can configure MPTCP endpoints, account
-the memory allocation to the user.
-
-Signed-off-by: Thomas Haller <thaller@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
