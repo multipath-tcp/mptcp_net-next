@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-do_check_data_fin-to-replace-copied
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add do_check_data_fin to replace copied
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds a new bool variable 'do_check_data_fin' to replace the
+original int variable 'copied' in __mptcp_push_pending(), check it to
+determine whether to call __mptcp_check_send_data_fin().
+
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
