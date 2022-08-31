@@ -7,7 +7,7 @@ task:
   timeout_in: 115m
 
   container:
-    image: mptcp/mptcp-upstream-virtme-docker:latest
+    image: mptcp/mptcp-upstream-virtme-docker:net
     kvm: true   ## Needed for the tests
     cpu: 4      ## Max 16 per project, even number with kvm
     memory: 4G  ## Max 4 per CPU
@@ -16,6 +16,7 @@ task:
     CIRRUS_CLONE_DEPTH: 1       ## no need to have a full clone
     CIRRUS_LOG_TIMESTAMP: true  ## useful
     INPUT_CCACHE_MAXSIZE: 1G
+    INPUT_PACKETDRILL_STABLE: 1 ## to use mptcp-<kversion> branch
     matrix:
       MATRIX_JOB: normal
       MATRIX_JOB: debug
