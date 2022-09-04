@@ -19,6 +19,8 @@
 #include <linux/pm_qos.h>
 #include <linux/ptp_clock_kernel.h>
 #include <linux/timecounter.h>
+#include <dt-bindings/firmware/imx/rsrc.h>
+#include <linux/firmware/imx/sci.h>
 
 #if defined(CONFIG_M523x) || defined(CONFIG_M527x) || defined(CONFIG_M528x) || \
     defined(CONFIG_M520x) || defined(CONFIG_M532x) || defined(CONFIG_ARM) || \
@@ -644,6 +646,8 @@ struct fec_enet_private {
 		u32 at_corr;
 		u8 at_inc_corr;
 	} ptp_saved_state;
+
+	struct imx_sc_ipc *ipc_handle;
 
 	u64 ethtool_stats[];
 };
