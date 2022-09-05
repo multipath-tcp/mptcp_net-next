@@ -1770,6 +1770,10 @@ void mptcp_subflow_queue_clean(struct sock *listener_ssk)
 		msk->first = NULL;
 		msk->dl_next = NULL;
 		unlock_sock_fast(sk, slow);
+
+		/*  */
+		sock_hold(sk);
+		sk->sk_prot->close(sk);
 	}
 
 	/* we are still under the listener msk socket lock */
