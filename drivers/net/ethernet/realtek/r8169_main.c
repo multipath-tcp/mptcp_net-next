@@ -102,7 +102,6 @@ static const struct {
 	[RTL_GIGA_MAC_VER_09] = {"RTL8102e/RTL8103e"			},
 	[RTL_GIGA_MAC_VER_10] = {"RTL8101e"				},
 	[RTL_GIGA_MAC_VER_11] = {"RTL8168b/8111b"			},
-	[RTL_GIGA_MAC_VER_12] = {"RTL8168b/8111b"			},
 	[RTL_GIGA_MAC_VER_13] = {"RTL8101e/RTL8100e"			},
 	[RTL_GIGA_MAC_VER_14] = {"RTL8401"				},
 	[RTL_GIGA_MAC_VER_16] = {"RTL8101e"				},
@@ -2029,7 +2028,6 @@ static enum mac_version rtl8169_get_mac_version(u16 xid, bool gmii)
 		{ 0x7c8, 0x3c0,	RTL_GIGA_MAC_VER_22 },
 
 		/* 8168B family. */
-		{ 0x7cf, 0x380,	RTL_GIGA_MAC_VER_12 },
 		{ 0x7c8, 0x380,	RTL_GIGA_MAC_VER_17 },
 		{ 0x7c8, 0x300,	RTL_GIGA_MAC_VER_11 },
 
@@ -2049,12 +2047,6 @@ static enum mac_version rtl8169_get_mac_version(u16 xid, bool gmii)
 		{ 0x7c8, 0x348,	RTL_GIGA_MAC_VER_09 },
 		{ 0x7c8, 0x248,	RTL_GIGA_MAC_VER_09 },
 		{ 0x7c8, 0x340,	RTL_GIGA_MAC_VER_16 },
-		/* FIXME: where did these entries come from ? -- FR
-		 * Not even r8101 vendor driver knows these id's,
-		 * so let's disable detection for now. -- HK
-		 * { 0xfc8, 0x388,	RTL_GIGA_MAC_VER_13 },
-		 * { 0xfc8, 0x308,	RTL_GIGA_MAC_VER_13 },
-		 */
 
 		/* 8110 family. */
 		{ 0xfc8, 0x980,	RTL_GIGA_MAC_VER_06 },
@@ -2324,7 +2316,6 @@ static void rtl_jumbo_config(struct rtl8169_private *tp)
 
 	rtl_unlock_config_regs(tp);
 	switch (tp->mac_version) {
-	case RTL_GIGA_MAC_VER_12:
 	case RTL_GIGA_MAC_VER_17:
 		if (jumbo) {
 			readrq = 512;
@@ -3628,7 +3619,6 @@ static void rtl_hw_config(struct rtl8169_private *tp)
 		[RTL_GIGA_MAC_VER_09] = rtl_hw_start_8102e_2,
 		[RTL_GIGA_MAC_VER_10] = NULL,
 		[RTL_GIGA_MAC_VER_11] = rtl_hw_start_8168b,
-		[RTL_GIGA_MAC_VER_12] = rtl_hw_start_8168b,
 		[RTL_GIGA_MAC_VER_13] = NULL,
 		[RTL_GIGA_MAC_VER_14] = rtl_hw_start_8401,
 		[RTL_GIGA_MAC_VER_16] = NULL,
@@ -4577,8 +4567,7 @@ static void r8169_phylink_handler(struct net_device *ndev)
 		pm_runtime_idle(&tp->pci_dev->dev);
 	}
 
-	if (net_ratelimit())
-		phy_print_status(tp->phydev);
+	phy_print_status(tp->phydev);
 }
 
 static int r8169_phy_connect(struct rtl8169_private *tp)
@@ -4859,7 +4848,6 @@ static void rtl_wol_shutdown_quirk(struct rtl8169_private *tp)
 	/* WoL fails with 8168b when the receiver is disabled. */
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_11:
-	case RTL_GIGA_MAC_VER_12:
 	case RTL_GIGA_MAC_VER_17:
 		pci_clear_master(tp->pci_dev);
 
@@ -5120,7 +5108,6 @@ static int rtl_jumbo_max(struct rtl8169_private *tp)
 		return JUMBO_7K;
 	/* RTL8168b */
 	case RTL_GIGA_MAC_VER_11:
-	case RTL_GIGA_MAC_VER_12:
 	case RTL_GIGA_MAC_VER_17:
 		return JUMBO_4K;
 	/* RTL8168c */
@@ -5129,37 +5116,6 @@ static int rtl_jumbo_max(struct rtl8169_private *tp)
 	default:
 		return JUMBO_9K;
 	}
-}
-
-static void rtl_disable_clk(void *data)
-{
-	clk_disable_unprepare(data);
-}
-
-static int rtl_get_ether_clk(struct rtl8169_private *tp)
-{
-	struct device *d = tp_to_dev(tp);
-	struct clk *clk;
-	int rc;
-
-	clk = devm_clk_get(d, "ether_clk");
-	if (IS_ERR(clk)) {
-		rc = PTR_ERR(clk);
-		if (rc == -ENOENT)
-			/* clk-core allows NULL (for suspend / resume) */
-			rc = 0;
-		else
-			dev_err_probe(d, rc, "failed to get clk\n");
-	} else {
-		tp->clk = clk;
-		rc = clk_prepare_enable(clk);
-		if (rc)
-			dev_err(d, "failed to enable clk: %d\n", rc);
-		else
-			rc = devm_add_action_or_reset(d, rtl_disable_clk, clk);
-	}
-
-	return rc;
 }
 
 static void rtl_init_mac_address(struct rtl8169_private *tp)
@@ -5225,9 +5181,9 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENOMEM;
 
 	/* Get the *optional* external "ether_clk" used on some boards */
-	rc = rtl_get_ether_clk(tp);
-	if (rc)
-		return rc;
+	tp->clk = devm_clk_get_optional_enabled(&pdev->dev, "ether_clk");
+	if (IS_ERR(tp->clk))
+		return dev_err_probe(&pdev->dev, PTR_ERR(tp->clk), "failed to get ether_clk\n");
 
 	/* enable device (incl. PCI PM wakeup and hotplug setup) */
 	rc = pcim_enable_device(pdev);
@@ -5243,12 +5199,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	region = ffs(pci_select_bars(pdev, IORESOURCE_MEM)) - 1;
 	if (region < 0) {
 		dev_err(&pdev->dev, "no MMIO resource found\n");
-		return -ENODEV;
-	}
-
-	/* check for weird/broken PCI region reporting */
-	if (pci_resource_len(pdev, region) < R8169_REGS_SIZE) {
-		dev_err(&pdev->dev, "Invalid PCI region size(s), aborting\n");
 		return -ENODEV;
 	}
 
