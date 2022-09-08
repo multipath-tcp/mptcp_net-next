@@ -23,6 +23,10 @@
 #include <net/xfrm.h>
 #include <net/busy_poll.h>
 
+/* temp: new MPTCP specific code should be defined in net/mptcp/fastopen.c
+ * and only one function should be called from there */
+#include "../../net/mptcp/protocol.h"
+
 static bool tcp_in_window(u32 seq, u32 end_seq, u32 s_win, u32 e_win)
 {
 	if (seq == s_win)
@@ -571,6 +575,13 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	bool paws_reject = false;
 	bool own_req;
 
+	struct mptcp_options_received mp_opt;
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct mptcp_sock *msk;
+	u64 ack_seq;
+
+	mp_opt.suboptions = 0;
+
 	tmp_opt.saw_tstamp = 0;
 	if (th->doff > (sizeof(struct tcphdr)>>2)) {
 		tcp_parse_options(sock_net(sk), skb, &tmp_opt, 0, NULL);
@@ -744,8 +755,24 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	/* For Fast Open no more processing is needed (sk is the
 	 * child socket).
 	 */
-	if (fastopen)
+	if (fastopen) {
+		if (!subflow)
+			return sk;
+
+		msk = mptcp_sk(subflow->conn);
+		pr_debug("%s (%i): fastopen case, update the isn master based on the key\n", __func__, __LINE__);
+		mptcp_get_options(skb, &mp_opt);
+		if (mp_opt.suboptions & OPTIONS_MPTCP_MPC && mp_opt.mpc_ack) {
+			msk->can_ack = true;
+			msk->remote_key = mp_opt.sndr_key;
+			mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);
+			ack_seq++;
+			WRITE_ONCE(msk->ack_seq, ack_seq);
+			pr_debug("%s (%i) [%llu]\n", __func__, __LINE__, msk->ack_seq);
+			atomic64_set(&msk->rcv_wnd_sent, ack_seq);
+		}
 		return sk;
+	}
 
 	/* While TCP_DEFER_ACCEPT is active, drop bare ACK. */
 	if (req->num_timeout < inet_csk(sk)->icsk_accept_queue.rskq_defer_accept &&
