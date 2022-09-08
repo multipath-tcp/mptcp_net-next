@@ -197,6 +197,8 @@ void tcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb)
 
 	tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
 	__skb_queue_tail(&sk->sk_receive_queue, skb);
+	pr_debug("%s (%i): is it needed ?\n", __func__, __LINE__);
+	tcp_data_ready(sk);
 	tp->syn_data_acked = 1;
 
 	/* u64_stats_update_begin(&tp->syncp) not needed here,
