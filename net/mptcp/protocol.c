@@ -362,6 +362,12 @@ static bool __mptcp_move_skb(struct mptcp_sock *msk, struct sock *ssk,
 
 	has_rxtstamp = TCP_SKB_CB(skb)->has_rxtstamp;
 
+	if (TCP_SKB_CB(skb)->is_tfo) {
+		mptcp_set_owner_r(skb, sk);
+		__skb_queue_tail(&sk->sk_receive_queue, skb);
+		return true;
+	}
+
 	/* the skb map_seq accounts for the skb offset:
 	 * mptcp_subflow_get_mapped_dsn() is based on the current tp->copied_seq
 	 * value

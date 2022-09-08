@@ -984,6 +984,11 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	if (mptcp_check_fallback(ssk))
 		return MAPPING_DUMMY;
 
+	if (TCP_SKB_CB(skb)->is_tfo) {
+		/* subflow->map_valid = 1; */
+		return MAPPING_OK; /* or DUMMY ? */
+	}
+
 	mpext = mptcp_get_ext(skb);
 	if (!mpext || !mpext->use_map) {
 		if (!subflow->map_valid && !skb->len) {
