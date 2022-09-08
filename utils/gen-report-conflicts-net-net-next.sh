@@ -38,9 +38,6 @@ and this one from net-next:
 The conflict has been resolved on our side[1] and the resolution we
 suggest is attached to this email.
 
-I'm sharing this thinking it can help others but if it only creates
-noise, please tell me! :-)
-
 Cheers,
 Matt
 
