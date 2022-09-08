@@ -3,7 +3,7 @@
 TARGET="${TARGET:-mptcp-next}"
 
 # replace -X not accepted by checkpatch with HEAD~X
-REF="HEAD"
+REF="HEAD~..HEAD"
 N=("-1")
 for arg in "${@}"; do
 	if [[ "${arg}" =~ ^-[0-9]+$ ]]; then
@@ -23,6 +23,7 @@ fi
 
 git format-patch \
 	--notes \
+	--base="${REF%..*}" \
 	--subject-prefix="PATCH ${TARGET}" \
 	-o "patches/$(git rev-parse --abbrev-ref HEAD)" \
 	"${N[@]}" "${@}"
