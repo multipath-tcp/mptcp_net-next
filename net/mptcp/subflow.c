@@ -1221,6 +1221,14 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		if (WARN_ON_ONCE(!skb))
 			goto no_data;
 
+		/* with TFO, we can have data, but we don't not yet the data ack
+		 * because its not part of the MTPCP seq number.
+		 */
+		if (unlikely(!READ_ONCE(msk->can_ack)) && TCP_SKB_CB(skb)->is_tfo) {
+			pr_err("%s (%i): can't ack yet, but already got data\n", __func__, __LINE__);
+			goto valid_data;
+		}
+
 		/* if msk lacks the remote key, this subflow must provide an
 		 * MP_CAPABLE-based mapping
 		 */
@@ -1240,7 +1248,7 @@ static bool subflow_check_data_avail(struct sock *ssk)
 			mptcp_subflow_discard_data(ssk, skb, old_ack - ack_seq);
 			continue;
 		}
-
+valid_data:
 		WRITE_ONCE(subflow->data_avail, MPTCP_SUBFLOW_DATA_AVAIL);
 		break;
 	}
