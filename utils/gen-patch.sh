@@ -16,6 +16,15 @@ for arg in "${@}"; do
 	# continue, just in case we give multiple refs
 done
 
+COUNT="$(git rev-list --count "${REF}")"
+
+if [ "${COUNT}" -gt 50 ]; then
+	echo "More than 50 commits, something wrong here"
+	exit 1
+elif [ "${COUNT}" -gt 1 ]; then
+	N+=("--cover-letter")
+fi
+
 if ! ./.checkpatch.sh --git "${REF}"; then
 	echo "There are some errors with CheckPatch. Press Enter to continue."
 	read -r
