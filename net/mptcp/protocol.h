@@ -155,7 +155,8 @@ struct mptcp_options_received {
 		echo:1,
 		backup:1,
 		deny_join_id0:1,
-		__unused:2;
+		mpc_ack:1,
+		__unused:1;
 	u8	join_id;
 	u64	thmac;
 	u8	hmac[MPTCPOPT_HMAC_LEN];

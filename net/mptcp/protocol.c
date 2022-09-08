@@ -2975,7 +2975,7 @@ struct sock *mptcp_sk_clone(const struct sock *sk,
 	msk->setsockopt_seq = mptcp_sk(sk)->setsockopt_seq;
 	mptcp_init_sched(msk, mptcp_sk(sk)->sched);
 
-	if (mp_opt->suboptions & OPTIONS_MPTCP_MPC) {
+	if (mp_opt->suboptions & OPTIONS_MPTCP_MPC && !mp_opt->mpc_ack) {
 		msk->can_ack = true;
 		msk->remote_key = mp_opt->sndr_key;
 		mptcp_crypto_key_sha(msk->remote_key, NULL, &ack_seq);

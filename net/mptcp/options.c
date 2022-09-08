@@ -91,6 +91,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 8;
 		}
 		if (opsize >= TCPOLEN_MPTCP_MPC_ACK) {
+			mp_opt->mpc_ack = 1;
 			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
 		}
