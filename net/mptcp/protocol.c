@@ -1530,60 +1530,74 @@ void mptcp_check_and_set_pending(struct sock *sk)
 
 void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 {
-	struct sock *prev_ssk = NULL, *ssk = NULL;
+	struct mptcp_data_frag *dfrag, *last_dfrag = NULL;
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct mptcp_sendmsg_info info = {
-				.flags = flags,
-	};
+	struct mptcp_subflow_context *subflow;
 	bool do_check_data_fin = false;
-	struct mptcp_data_frag *dfrag;
+	int last_sent = 0;
 	int len;
 
-	while ((dfrag = mptcp_send_head(sk))) {
-		info.sent = dfrag->already_sent;
-		info.limit = dfrag->data_len;
-		len = dfrag->data_len - dfrag->already_sent;
-		while (len > 0) {
-			int ret = 0;
+	if (!mptcp_sched_get_send(msk))
+		goto out;
 
-			prev_ssk = ssk;
-			ssk = mptcp_subflow_get_send(msk);
+	mptcp_for_each_subflow(msk, subflow) {
+		if (!__mptcp_subflow_active(subflow))
+			continue;
 
-			/* First check. If the ssk has changed since
-			 * the last round, release prev_ssk
-			 */
-			if (ssk != prev_ssk && prev_ssk)
-				mptcp_push_release(prev_ssk, &info);
-			if (!ssk)
+		if (READ_ONCE(subflow->scheduled)) {
+			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+			struct mptcp_sendmsg_info info = {
+				.flags = flags,
+			};
+
+			dfrag = mptcp_send_head(sk);
+			if (!dfrag)
 				goto out;
 
-			/* Need to lock the new subflow only if different
-			 * from the previous one, otherwise we are still
-			 * helding the relevant lock
-			 */
-			if (ssk != prev_ssk)
-				lock_sock(ssk);
+			lock_sock(ssk);
 
-			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
-			if (ret <= 0) {
-				if (ret == -EAGAIN)
-					continue;
-				mptcp_push_release(ssk, &info);
-				goto out;
-			}
+			do {
+				info.sent = dfrag->already_sent;
+				info.limit = dfrag->data_len;
+				len = dfrag->data_len - dfrag->already_sent;
+				last_dfrag = dfrag;
+				last_sent = 0;
+				while (len > 0) {
+					int ret = 0;
 
-			do_check_data_fin = true;
-			info.sent += ret;
-			len -= ret;
+					ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
+					if (ret <= 0) {
+						if (ret == -EAGAIN)
+							continue;
+						mptcp_push_release(ssk, &info);
+						goto out;
+					}
 
-			mptcp_update_post_push(msk, dfrag, ret);
+					do_check_data_fin = true;
+					info.sent += ret;
+					last_sent += ret;
+					len -= ret;
+				}
+			} while ((dfrag = mptcp_next_frag(sk, dfrag)));
+
+			mptcp_push_release(ssk, &info);
+			msk->last_snd = ssk;
+			mptcp_subflow_set_scheduled(subflow, false);
 		}
-		WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
 	}
 
-	/* at this point we held the socket lock for the last subflow we used */
-	if (ssk)
-		mptcp_push_release(ssk, &info);
+	while((dfrag = mptcp_send_head(sk))) {
+		if (!last_dfrag || !last_sent)
+			goto out;
+
+		if (dfrag == last_dfrag) {
+			mptcp_update_post_push(msk, dfrag, last_sent);
+			WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+			break;
+		}
+		dfrag->already_sent = dfrag->data_len;
+		WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+	}
 
 out:
 	/* ensure the rtx timer is running */
