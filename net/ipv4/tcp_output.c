@@ -1441,7 +1441,7 @@ static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 /* Initialize TSO segments for a packet. */
 static void tcp_set_skb_tso_segs(struct sk_buff *skb, unsigned int mss_now)
 {
-	if (skb->len <= mss_now) {
+	if (!mss_now || skb->len <= mss_now) {
 		/* Avoid the costly divide in the normal
 		 * non-TSO case.
 		 */
@@ -1970,6 +1970,9 @@ static u32 tcp_tso_autosize(const struct sock *sk, unsigned int mss_now,
 {
 	unsigned long bytes;
 	u32 r;
+
+	if (!mss_now)
+		return min_tso_segs;
 
 	bytes = sk->sk_pacing_rate >> READ_ONCE(sk->sk_pacing_shift);
 
