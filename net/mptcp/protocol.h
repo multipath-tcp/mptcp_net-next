@@ -836,6 +836,12 @@ void mptcp_event_addr_announced(const struct sock *ssk, const struct mptcp_addr_
 void mptcp_event_addr_removed(const struct mptcp_sock *msk, u8 id);
 bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
 
+// Fast Open Mechanism functions begin
+int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
+			   size_t len, struct mptcp_sock *msk,
+			   size_t *copied);
+// Fast Open Mechanism functions end
+
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
 {
 	return READ_ONCE(msk->pm.addr_signal) &
