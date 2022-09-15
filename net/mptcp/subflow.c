@@ -1077,8 +1077,10 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		/* will validate the next map after consuming the current one */
 		goto validate_csum;
 	}
-
-	subflow->map_seq = map_seq;
+	if (msk->is_mptfo)
+		subflow->map_seq = READ_ONCE(msk->ack_seq);
+	else
+		subflow->map_seq = map_seq;
 	subflow->map_subflow_seq = mpext->subflow_seq;
 	subflow->map_data_len = data_len;
 	subflow->map_valid = 1;
