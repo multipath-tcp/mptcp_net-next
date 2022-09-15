@@ -107,3 +107,68 @@ void mptcp_treat_hshake_ack_fastopen(struct mptcp_sock *msk, struct mptcp_subflo
 		atomic64_set(&msk->rcv_wnd_sent, ack_seq);
 	}
 }
+
+void mptcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb, struct request_sock *req)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct tcp_request_sock *tcp_r_sock = tcp_rsk(req);
+	struct sock *socket = mptcp_subflow_ctx(sk)->conn;
+	struct mptcp_sock *msk = mptcp_sk(socket);
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	if (TCP_SKB_CB(skb)->end_seq == tp->rcv_nxt)
+		return;
+
+	skb = skb_clone(skb, GFP_ATOMIC);
+	if (!skb)
+		return;
+
+	skb_dst_drop(skb);
+
+	tp->segs_in = 0;
+	tcp_segs_in(tp, skb);
+	__skb_pull(skb, tcp_hdrlen(skb));
+	sk_forced_mem_schedule(sk, skb->truesize);
+
+	TCP_SKB_CB(skb)->seq++;
+	TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_SYN;
+
+	tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+
+	msk->is_mptfo = 1;
+
+	//Solves: WARNING: at 704 _mptcp_move_skbs_from_subflow+0x5d0/0x651
+	tp->copied_seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+
+	TCP_SKB_CB(skb)->seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq;
+
+	TCP_SKB_CB(skb)->seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+	TCP_SKB_CB(skb)->end_seq =  TCP_SKB_CB(skb)->seq;
+
+	subflow->map_seq = mptcp_subflow_get_mapped_dsn(subflow);
+
+	//Solves: BAD mapping: ssn=0 map_seq=1 map_data_len=3
+	subflow->ssn_offset = tp->copied_seq - 1;
+
+	skb_ext_reset(skb);
+
+	//mptcp_set_owner_r begin
+	skb_orphan(skb);
+	skb->sk = socket;
+	skb->destructor = mptcp_rfree;
+	atomic_add(skb->truesize, &socket->sk_rmem_alloc);
+	msk->rmem_fwd_alloc -= skb->truesize;
+	//mptcp_set owner_r end
+
+	__skb_queue_tail(&msk->receive_queue, skb);
+
+	atomic64_set(&msk->rcv_wnd_sent, mptcp_subflow_get_mapped_dsn(subflow));
+
+	tp->syn_data_acked = 1;
+
+	tp->bytes_received = skb->len;
+
+	if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
+		tcp_fin(sk);
+}
