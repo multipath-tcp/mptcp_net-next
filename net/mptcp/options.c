@@ -91,6 +91,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 8;
 		}
 		if (opsize >= TCPOLEN_MPTCP_MPC_ACK) {
+			mp_opt->is_mptfo = 1;
 			mp_opt->rcvr_key = get_unaligned_be64(ptr);
 			ptr += 8;
 		}
@@ -1124,6 +1125,8 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		return sk->sk_state != TCP_CLOSE;
 
 	if (unlikely(mp_opt.suboptions != OPTION_MPTCP_DSS)) {
+		mptcp_treat_hshake_ack_fastopen(msk, subflow, mp_opt);
+
 		if ((mp_opt.suboptions & OPTION_MPTCP_FASTCLOSE) &&
 		    msk->local_key == mp_opt.rcvr_key) {
 			WRITE_ONCE(msk->rcv_fastclose, true);

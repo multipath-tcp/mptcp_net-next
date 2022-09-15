@@ -155,7 +155,8 @@ struct mptcp_options_received {
 		echo:1,
 		backup:1,
 		deny_join_id0:1,
-		__unused:2;
+		is_mptfo:1,
+		__unused:1;
 	u8	join_id;
 	u64	thmac;
 	u8	hmac[MPTCPOPT_HMAC_LEN];
@@ -282,6 +283,7 @@ struct mptcp_sock {
 	bool		use_64bit_ack; /* Set when we received a 64-bit DSN */
 	bool		csum_enabled;
 	bool		allow_infinite_fallback;
+	bool		is_mptfo;
 	u8		mpc_endpoint_id;
 	u8		recvmsg_inq:1,
 			cork:1,
@@ -848,6 +850,8 @@ int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 			   size_t *copied);
 int mptcp_setsockopt_sol_tcp_fastopen(struct mptcp_sock *msk, sockptr_t optval,
 				      unsigned int optlen);
+void mptcp_treat_hshake_ack_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
+				     struct mptcp_options_received mp_opt);
 // Fast Open Mechanism functions end
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
