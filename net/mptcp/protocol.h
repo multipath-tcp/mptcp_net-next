@@ -835,6 +835,9 @@ void mptcp_event(enum mptcp_event_type type, const struct mptcp_sock *msk,
 void mptcp_event_addr_announced(const struct sock *ssk, const struct mptcp_addr_info *info);
 void mptcp_event_addr_removed(const struct mptcp_sock *msk, u8 id);
 bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
+int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags);
+void mptcp_rmem_uncharge(struct sock *sk, int size);
+void mptcp_rfree(struct sk_buff *skb);
 
 // Fast Open Mechanism functions begin
 int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
