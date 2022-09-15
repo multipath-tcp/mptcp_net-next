@@ -16,6 +16,7 @@ int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	struct socket *ssk;
 	int ret;
 
+	lock_sock((struct sock *)msk);
 	ssk = __mptcp_nmpc_socket(msk);
 	if (unlikely(!ssk))
 		goto out_EFAULT;
@@ -30,18 +31,23 @@ int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 		goto out_EFAULT;
 	uaddr = msg->msg_name;
 
+	lock_sock(ssk->sk);
+
 	tp = tcp_sk(ssk->sk);
 	if (unlikely(!tp))
-		goto out_EFAULT;
+		goto out_lock_EFAULT;
 	if (!tp->fastopen_req)
 		tp->fastopen_req = kzalloc(sizeof(*tp->fastopen_req),
 					   ssk->sk->sk_allocation);
 
 	if (unlikely(!tp->fastopen_req))
-		goto out_EFAULT;
+		goto out_lock_EFAULT;
 	tp->fastopen_req->data = msg;
 	tp->fastopen_req->size = len;
 	tp->fastopen_req->uarg = uarg;
+
+	release_sock(ssk->sk);
+	release_sock((struct sock *)msk);
 
 	/* requests a cookie */
 	ret = mptcp_stream_connect(sk->sk_socket, uaddr,
@@ -49,7 +55,39 @@ int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	if (!ret)
 		*copied = len;
 	return ret;
+
+out_lock_EFAULT:
+	release_sock(ssk->sk);
 out_EFAULT:
+	release_sock((struct sock *)msk);
 	ret = -EFAULT;
+	return ret;
+}
+
+int mptcp_setsockopt_sol_tcp_fastopen(struct mptcp_sock *msk, sockptr_t optval,
+				      unsigned int optlen)
+{
+	struct sock *sk = (struct sock *)msk;
+	struct net *net = sock_net(sk);
+	int val;
+	int ret;
+
+	ret = 0;
+
+	if (copy_from_sockptr(&val, optval, sizeof(val)))
+		return -EFAULT;
+
+	lock_sock(sk);
+
+	if (val >= 0 && ((1 << sk->sk_state) & (TCPF_CLOSE |
+	    TCPF_LISTEN))) {
+		tcp_fastopen_init_key_once(net);
+		fastopen_queue_tune(sk, val);
+	} else {
+		ret = -EINVAL;
+	}
+
+	release_sock(sk);
+
 	return ret;
 }
