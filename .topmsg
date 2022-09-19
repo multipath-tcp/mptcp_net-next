@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-factor-out-__mptcp_close-without-socket-lock
+From: Menglong Dong <imagedong@tencent.com>
+Subject: [PATCH] mptcp: factor out __mptcp_close() without socket lock
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Factor out __mptcp_close() from mptcp_close(). The caller of
+__mptcp_close() should hold the socket lock, and cancel mptcp work when
+__mptcp_close() returns true.
+
+This function will be used in the next commit.
+
+Reviewed-by: Jiang Biao <benbjiang@tencent.com>
+Reviewed-by: Mengen Sun <mengensun@tencent.com>
+Signed-off-by: Menglong Dong <imagedong@tencent.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
