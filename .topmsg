@@ -1,4 +1,68 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-unreleased-socket-in-accept-queue
+From: Menglong Dong <imagedong@tencent.com>
+Subject: [PATCH] mptcp: fix unreleased socket in accept queue
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp socket and its subflow sockets in accept queue can't be
+released after the process exit.
+
+While the release of a mptcp socket in listening state, the
+corresponding tcp socket will be released too. Meanwhile, the tcp
+socket in the unaccept queue will be released too. However, only init
+subflow is in the unaccept queue, and the joined subflow is not in the
+unaccept queue, which makes the joined subflow won't be released, and
+therefore the corresponding unaccepted mptcp socket will not be released
+to.
+
+This can be reproduced easily with following steps:
+
+1. create 2 namespace and veth:
+   $ ip netns add mptcp-client
+   $ ip netns add mptcp-server
+   $ sysctl -w net.ipv4.conf.all.rp_filter=0
+   $ ip netns exec mptcp-client sysctl -w net.mptcp.enabled=1
+   $ ip netns exec mptcp-server sysctl -w net.mptcp.enabled=1
+   $ ip link add red-client netns mptcp-client type veth peer red-server \
+     netns mptcp-server
+   $ ip -n mptcp-server address add 10.0.0.1/24 dev red-server
+   $ ip -n mptcp-server address add 192.168.0.1/24 dev red-server
+   $ ip -n mptcp-client address add 10.0.0.2/24 dev red-client
+   $ ip -n mptcp-client address add 192.168.0.2/24 dev red-client
+   $ ip -n mptcp-server link set red-server up
+   $ ip -n mptcp-client link set red-client up
+
+2. configure the endpoint and limit for client and server:
+   $ ip -n mptcp-server mptcp endpoint flush
+   $ ip -n mptcp-server mptcp limits set subflow 2 add_addr_accepted 2
+   $ ip -n mptcp-client mptcp endpoint flush
+   $ ip -n mptcp-client mptcp limits set subflow 2 add_addr_accepted 2
+   $ ip -n mptcp-client mptcp endpoint add 192.168.0.2 dev red-client id \
+     1 subflow
+
+3. listen and accept on a port, such as 9999. The nc command we used
+   here is modified, which makes it use mptcp protocol by default.
+   $ ip netns exec mptcp-server nc -l -k -p 9999
+
+4. open another *two* terminal and use each of them to connect to the
+   server with the following command:
+   $ ip netns exec mptcp-client nc 10.0.0.1 9999
+   Input something after connect to trigger the connection of the second
+   subflow. So that there are two established mptcp connections, with the
+   second one still unaccepted.
+
+5. exit all the nc command, and check the tcp socket in server namespace.
+   And you will find that there is one tcp socket in CLOSE_WAIT state
+   and can't release forever.
+
+Fix this by closing all of the unaccepted mptcp socket in
+mptcp_subflow_queue_clean() with __mptcp_close().
+
+Now, we can ensure that all unaccepted mptcp sockets will be cleaned by
+__mptcp_close() before they are released, so mptcp_sock_destruct(), which
+is used to clean the unaccepted mptcp socket, is not needed anymore.
+
+The selftests for mptcp is ran for this commit, and no new failures.
+
+Fixes: f296234c98a8 ("mptcp: Add handling of incoming MP_JOIN requests")
+Reviewed-by: Jiang Biao <benbjiang@tencent.com>
+Reviewed-by: Mengen Sun <mengensun@tencent.com>
+Signed-off-by: Menglong Dong <imagedong@tencent.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
