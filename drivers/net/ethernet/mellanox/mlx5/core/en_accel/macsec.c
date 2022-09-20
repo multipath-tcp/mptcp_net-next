@@ -194,8 +194,10 @@ static int mlx5e_macsec_init_sa(struct macsec_context *ctx,
 				      MLX5_ACCEL_MACSEC_ACTION_DECRYPT;
 
 	macsec_rule = mlx5e_macsec_fs_add_rule(macsec->macsec_fs, ctx, &rule_attrs, &sa->fs_id);
-	if (IS_ERR_OR_NULL(macsec_rule))
+	if (!macsec_rule) {
+		err = -ENOMEM;
 		goto destroy_macsec_object;
+	}
 
 	sa->macsec_rule = macsec_rule;
 
@@ -929,14 +931,13 @@ static int mlx5e_macsec_add_secy(struct macsec_context *ctx)
 		goto out;
 	}
 
-	macsec_device->dev_addr = kzalloc(dev->addr_len, GFP_KERNEL);
+	macsec_device->dev_addr = kmemdup(dev->dev_addr, dev->addr_len, GFP_KERNEL);
 	if (!macsec_device->dev_addr) {
 		kfree(macsec_device);
 		err = -ENOMEM;
 		goto out;
 	}
 
-	memcpy(macsec_device->dev_addr, dev->dev_addr, dev->addr_len);
 	macsec_device->netdev = dev;
 
 	INIT_LIST_HEAD_RCU(&macsec_device->macsec_rx_sc_list_head);
@@ -1294,8 +1295,10 @@ int mlx5e_macsec_init(struct mlx5e_priv *priv)
 	macsec->mdev = mdev;
 
 	macsec_fs = mlx5e_macsec_fs_init(mdev, priv->netdev);
-	if (IS_ERR_OR_NULL(macsec_fs))
+	if (!macsec_fs) {
+		err = -ENOMEM;
 		goto err_out;
+	}
 
 	macsec->macsec_fs = macsec_fs;
 
