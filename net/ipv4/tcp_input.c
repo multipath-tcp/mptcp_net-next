@@ -6134,7 +6134,7 @@ static bool tcp_rcv_fastopen_synack(struct sock *sk, struct sk_buff *synack,
 			--tp->delivered;
 	}
 
-	tcp_fastopen_add_skb(sk, synack);
+	tcp_fastopen_add_skb(sk, synack, NULL);
 
 	return false;
 }
@@ -6954,7 +6954,14 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	if (IS_ENABLED(CONFIG_SMC) && want_cookie)
 		tmp_opt.smc_ok = 0;
 
-	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
+	if (foc.len == -1 && sk_is_mptcp(sk)) {
+		tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
+	} else {
+		tmp_opt.tstamp_ok = 0;
+		tcp_rsk(req)->ts_off = 1;
+		tp->syn_fastopen = 1;
+	}
+
 	tcp_openreq_init(req, &tmp_opt, skb, sk);
 	inet_rsk(req)->no_srccheck = inet_sk(sk)->transparent;
 

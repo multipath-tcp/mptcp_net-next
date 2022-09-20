@@ -840,6 +840,8 @@ void mptcp_event_addr_announced(const struct sock *ssk, const struct mptcp_addr_
 void mptcp_event_addr_removed(const struct mptcp_sock *msk, u8 id);
 bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
 int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags);
+void mptcp_rmem_uncharge(struct sock *sk, int size);
+void mptcp_rfree(struct sk_buff *skb);
 
 // Fast Open Mechanism functions begin
 int mptcp_setsockopt_sol_tcp_fastopen(struct mptcp_sock *msk, sockptr_t optval,

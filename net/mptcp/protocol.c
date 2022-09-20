@@ -178,7 +178,7 @@ static void __mptcp_rmem_reclaim(struct sock *sk, int amount)
 	__sk_mem_reduce_allocated(sk, amount);
 }
 
-static void mptcp_rmem_uncharge(struct sock *sk, int size)
+void mptcp_rmem_uncharge(struct sock *sk, int size)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	int reclaimable;
@@ -191,7 +191,7 @@ static void mptcp_rmem_uncharge(struct sock *sk, int size)
 		__mptcp_rmem_reclaim(sk, reclaimable);
 }
 
-static void mptcp_rfree(struct sk_buff *skb)
+void mptcp_rfree(struct sk_buff *skb)
 {
 	unsigned int len = skb->truesize;
 	struct sock *sk = skb->sk;

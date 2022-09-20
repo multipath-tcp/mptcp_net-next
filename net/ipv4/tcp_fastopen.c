@@ -3,6 +3,7 @@
 #include <linux/tcp.h>
 #include <linux/rcupdate.h>
 #include <net/tcp.h>
+#include "../mptcp/protocol.h"
 
 void tcp_fastopen_init_key_once(struct net *net)
 {
@@ -166,8 +167,12 @@ static void tcp_fastopen_cookie_gen(struct sock *sk,
 /* If an incoming SYN or SYNACK frame contains a payload and/or FIN,
  * queue this additional data / FIN.
  */
-void tcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb)
+void tcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb, struct request_sock *req)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct tcp_request_sock *tcp_r_sock = tcp_rsk(req);
+	struct sock *socket = mptcp_subflow_ctx(sk)->conn;
+	struct mptcp_sock *msk = mptcp_sk(socket);
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	if (TCP_SKB_CB(skb)->end_seq == tp->rcv_nxt)
@@ -194,7 +199,34 @@ void tcp_fastopen_add_skb(struct sock *sk, struct sk_buff *skb)
 	TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_SYN;
 
 	tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+
+	if (req && tp->syn_fastopen && sk_is_mptcp(sk))
+		tcp_r_sock = tcp_rsk(req);
+	else
+		goto add_skb_to_sk;
+
+	msk->is_mptfo = 1;
+
+	//Solves: WARNING: at 704 _mptcp_move_skbs_from_subflow+0x5d0/0x651
+	tp->copied_seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+
+	subflow->map_seq = mptcp_subflow_get_mapped_dsn(subflow);
+
+	//Solves: BAD mapping: ssn=0 map_seq=1 map_data_len=3
+	subflow->ssn_offset = tp->copied_seq - 1;
+
+	skb_orphan(skb);
+	skb->sk = socket;
+	skb->destructor = mptcp_rfree;
+	atomic_add(skb->truesize, &socket->sk_rmem_alloc);
+	msk->rmem_fwd_alloc -= skb->truesize;
+
+	__skb_queue_tail(&msk->receive_queue, skb);
+	atomic64_set(&msk->rcv_wnd_sent, mptcp_subflow_get_mapped_dsn(subflow));
+	goto avoid_add_skb_to_sk;
+add_skb_to_sk:
 	__skb_queue_tail(&sk->sk_receive_queue, skb);
+avoid_add_skb_to_sk:
 	tp->syn_data_acked = 1;
 
 	/* u64_stats_update_begin(&tp->syncp) not needed here,
@@ -283,7 +315,7 @@ static struct sock *tcp_fastopen_create_child(struct sock *sk,
 
 	tp->rcv_nxt = TCP_SKB_CB(skb)->seq + 1;
 
-	tcp_fastopen_add_skb(child, skb);
+	tcp_fastopen_add_skb(child, skb, req);
 
 	tcp_rsk(req)->rcv_nxt = tp->rcv_nxt;
 	tp->rcv_wup = tp->rcv_nxt;
@@ -350,17 +382,26 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 	bool syn_data = TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq + 1;
 	int tcp_fastopen = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_fastopen);
 	struct tcp_fastopen_cookie valid_foc = { .len = -1 };
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct sock *child;
 	int ret = 0;
 
 	if (foc->len == 0) /* Client requests a cookie */
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPFASTOPENCOOKIEREQD);
 
-	if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
-	      (syn_data || foc->len >= 0) &&
-	      tcp_fastopen_queue_check(sk))) {
-		foc->len = -1;
-		return NULL;
+	if (tp->syn_fastopen && sk_is_mptcp(sk)) {
+		if (((syn_data || foc->len >= 0) &&
+		     tcp_fastopen_queue_check(sk))) {
+			foc->len = -1;
+			return NULL;
+		}
+	} else {
+		if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
+		      (syn_data || foc->len >= 0) &&
+		      tcp_fastopen_queue_check(sk))) {
+			foc->len = -1;
+			return NULL;
+		}
 	}
 
 	if (tcp_fastopen_no_cookie(sk, dst, TFO_SERVER_COOKIE_NOT_REQD))
