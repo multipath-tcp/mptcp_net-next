@@ -1673,9 +1673,16 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 	long timeo;
 
 	/* we don't support FASTOPEN yet */
-	if (msg->msg_flags & MSG_FASTOPEN)
-		return -EOPNOTSUPP;
+	if (msg->msg_flags & MSG_FASTOPEN) {
+		struct socket *ssock = __mptcp_nmpc_socket(msk);
 
+		if (ssock) {
+			int copied_syn_fastopen = 0;
+
+			ret = tcp_sendmsg_fastopen(ssock->sk, msg, &copied_syn_fastopen, len, NULL);
+			copied += copied_syn_fastopen;
+		}
+	}
 	/* silently ignore everything else */
 	msg->msg_flags &= MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL;
 
