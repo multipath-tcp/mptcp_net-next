@@ -3733,10 +3733,12 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	struct mptcp_sock *msk;
+	struct socket *ssock;
 	__poll_t mask = 0;
 	int state;
 
 	msk = mptcp_sk(sk);
+	ssock = __mptcp_nmpc_socket(msk);
 	sock_poll_wait(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
@@ -3751,6 +3753,9 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	if (state != TCP_SYN_SENT && state != TCP_SYN_RECV) {
 		mask |= mptcp_check_readable(msk);
 		mask |= mptcp_check_writeable(msk);
+	} else if (ssock && state == TCP_SYN_SENT && inet_sk(ssock->sk)->defer_connect) {
+		/* cf tcp_poll() note about TFO */
+		mask |= EPOLLOUT | EPOLLWRNORM;
 	}
 	if (sk->sk_shutdown == SHUTDOWN_MASK || state == TCP_CLOSE)
 		mask |= EPOLLHUP;
