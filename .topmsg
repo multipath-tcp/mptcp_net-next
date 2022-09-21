@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-update-and-extend-fastclose-test-cases
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: update and extend fastclose test-cases
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After the previous patches, the MPTCP protocol can generate
+fast-closes on both ends of the connection. Rework the relevant
+test-case to carefully trigger the fast-close code-path on a
+single end at the time, while ensuring than a predictable amount
+of data is spooled on both ends.
+
+Additionally add another test-cases for the passive socket
+fast-close.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
