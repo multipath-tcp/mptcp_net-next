@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-fastclose-on-more-edge-scenarios
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use fastclose on more edge scenarios
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Daire reported a user-space application hang-up when the
+peer is forcibly closed before the data transfer completion.
+
+The relevant application expects the peer to either
+do an application-level clean shutdown or a transport-level
+connection reset.
+
+We can accommodate a such user by extending the fastclose
+usage: at fd close time, if the msk socket has some unread
+data, and at FIN_WAIT timeout.
+
+Note that at MPTCP close time we must ensure that the TCP
+subflows will reset: set the linger socket option to a suitable
+value.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
