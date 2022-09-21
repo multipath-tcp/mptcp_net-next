@@ -845,6 +845,7 @@ int mptcp_setsockopt_sol_tcp_fastopen(struct mptcp_sock *msk, sockptr_t optval,
 				      unsigned int optlen);
 void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
 				   struct mptcp_options_received mp_opt);
+void mptcp_set_owner_r(struct sk_buff *skb, struct sock *sk);
 // Fast Open Mechanism functions end
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)

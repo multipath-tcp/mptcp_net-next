@@ -307,6 +307,74 @@ static struct dst_entry *subflow_v4_route_req(const struct sock *sk,
 	return NULL;
 }
 
+static int subflow_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
+				  struct flowi *fl,
+				  struct request_sock *req,
+				  struct tcp_fastopen_cookie *foc,
+				  enum tcp_synack_type synack_type,
+				  struct sk_buff *syn_skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct tcp_request_sock *tcp_r_sock = tcp_rsk(req);
+	struct sock *socket = mptcp_subflow_ctx(sk)->conn;
+	struct inet_request_sock *ireq = inet_rsk(req);
+	struct mptcp_sock *msk = mptcp_sk(socket);
+	struct sock *var_sk = subflow->tcp_sock;
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct sk_buff *skb;
+
+	//<evenutally clear tstamp_ok, as needed depending on cookie size>
+	//We add ts here as in the "if" below it has no effect.
+	if (foc->len > -1) {
+		ireq->tstamp_ok = 0;
+	}
+	if (synack_type == TCP_SYNACK_FASTOPEN) {
+		// <mark subflow/msk as "mptfo">
+		msk->is_mptfo = 1;
+
+		skb = skb_peek(&var_sk->sk_receive_queue);
+
+		//<dequeue the skb from sk receive queue>
+		__skb_unlink(skb, &var_sk->sk_receive_queue);
+		skb_ext_reset(skb);
+		skb_orphan(skb);
+
+		//<set the skb mapping>
+		//Solves: WARNING: at 704 _mptcp_move_skbs_from_subflow+0x5d0/0x651
+		tp->copied_seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+
+		subflow->map_seq = mptcp_subflow_get_mapped_dsn(subflow);
+
+		//Solves: BAD mapping: ssn=0 map_seq=1 map_data_len=3
+		subflow->ssn_offset = tp->copied_seq - 1;
+
+		//<acquire the msk data lock>
+		lock_sock((struct sock *)msk);
+
+		//<move skb into msk receive queue>
+		mptcp_set_owner_r(skb, (struct sock *)msk);
+		__skb_queue_tail(&msk->receive_queue, skb);
+		atomic64_set(&msk->rcv_wnd_sent, mptcp_subflow_get_mapped_dsn(subflow));
+
+		//<call msk data_ready>
+		((struct sock *)msk)->sk_data_ready((struct sock *)msk);
+
+		//<release the msk data lock>
+		release_sock((struct sock *)msk);
+	}
+	return tcp_request_sock_ipv4_ops.send_synack(sk, dst, fl, req, foc, synack_type, syn_skb);
+}
+
+static int subflow_v6_send_synack(const struct sock *sk, struct dst_entry *dst,
+				  struct flowi *fl,
+				  struct request_sock *req,
+				  struct tcp_fastopen_cookie *foc,
+				  enum tcp_synack_type synack_type,
+				  struct sk_buff *syn_skb)
+{
+	return tcp_request_sock_ipv6_ops.send_synack(sk, dst, fl, req, foc, synack_type, syn_skb);
+}
+
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 static struct dst_entry *subflow_v6_route_req(const struct sock *sk,
 					      struct sk_buff *skb,
@@ -1920,6 +1988,7 @@ void __init mptcp_subflow_init(void)
 
 	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	subflow_request_sock_ipv4_ops.route_req = subflow_v4_route_req;
+	subflow_request_sock_ipv4_ops.send_synack = subflow_v4_send_synack;
 
 	subflow_specific = ipv4_specific;
 	subflow_specific.conn_request = subflow_v4_conn_request;
@@ -1933,6 +2002,7 @@ void __init mptcp_subflow_init(void)
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	subflow_request_sock_ipv6_ops = tcp_request_sock_ipv6_ops;
 	subflow_request_sock_ipv6_ops.route_req = subflow_v6_route_req;
+	subflow_request_sock_ipv6_ops.send_synack = subflow_v6_send_synack;
 
 	subflow_v6_specific = ipv6_specific;
 	subflow_v6_specific.conn_request = subflow_v6_conn_request;

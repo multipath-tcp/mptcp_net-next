@@ -356,13 +356,20 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 	if (foc->len == 0) /* Client requests a cookie */
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPFASTOPENCOOKIEREQD);
 
-	if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
-	      (syn_data || foc->len >= 0) &&
-	      tcp_fastopen_queue_check(sk))) {
-		foc->len = -1;
-		return NULL;
+	if (sk_is_mptcp(sk)) {
+		if (((syn_data || foc->len >= 0) &&
+		     tcp_fastopen_queue_check(sk))) {
+			foc->len = -1;
+			return NULL;
+		}
+	} else {
+		if (!((tcp_fastopen & TFO_SERVER_ENABLE) &&
+		      (syn_data || foc->len >= 0) &&
+		      tcp_fastopen_queue_check(sk))) {
+			foc->len = -1;
+			return NULL;
+		}
 	}
-
 	if (tcp_fastopen_no_cookie(sk, dst, TFO_SERVER_COOKIE_NOT_REQD))
 		goto fastopen;
 
