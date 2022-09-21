@@ -2,6 +2,7 @@
 # Makefile for net selftests
 
 TEST_PROGS := bond-break-lacpdu-tx.sh \
+	      bond-lladdr-target.sh \
 	      dev_addr_lists.sh
 
 TEST_FILES := lag_lib.sh
