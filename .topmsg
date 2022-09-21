@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-propagate-fastclose-error
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: propagate fastclose error
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When an mptcp socket is closed due to an incoming FASTCLOSE
+option, so specific sk_err is set and later syscall will
+fail usually with EPIPE.
+
+Align the current fastclose error handling with TCP reset,
+properly setting the socket error according to the current
+msk state and propagating such error.
+
+Additionally sendmsg() is currently not handling properly
+the sk_err, always returning EPIPE.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
