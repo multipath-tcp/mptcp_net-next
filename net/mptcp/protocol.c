@@ -1668,14 +1668,39 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct page_frag *pfrag;
+	struct socket *ssock;
 	size_t copied = 0;
 	int ret = 0;
 	long timeo;
 
-	/* we don't support FASTOPEN yet */
-	if (msg->msg_flags & MSG_FASTOPEN)
-		return -EOPNOTSUPP;
+	lock_sock(sk);
 
+	ssock = __mptcp_nmpc_socket(msk);
+
+	if (ssock && inet_sk(ssock->sk)->defer_connect) {
+		release_sock(sk);
+		goto fastopen;
+	} else {
+		release_sock(sk);
+	}
+	/* we don't support FASTOPEN yet */
+	if (msg->msg_flags & MSG_FASTOPEN) {
+fastopen:
+		lock_sock(sk);
+
+		ssock = __mptcp_nmpc_socket(msk);
+
+		lock_sock(ssock->sk);
+
+		if (ssock) {
+			int copied_syn_fastopen = 0;
+
+			ret = tcp_sendmsg_fastopen(ssock->sk, msg, &copied_syn_fastopen, len, NULL);
+			copied += copied_syn_fastopen;
+		}
+		release_sock(ssock->sk);
+		release_sock(sk);
+	}
 	/* silently ignore everything else */
 	msg->msg_flags &= MSG_MORE | MSG_DONTWAIT | MSG_NOSIGNAL;
 
