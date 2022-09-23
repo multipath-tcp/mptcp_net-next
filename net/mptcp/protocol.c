@@ -1698,7 +1698,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			goto out;
 		} else if (ret) {
 			release_sock(ssk);
-			goto out;
+			goto do_error;
 		}
 		release_sock(ssk);
 	}
