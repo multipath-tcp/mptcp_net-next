@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-handle-defer-connect-in-mptcp_sendmsg
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
