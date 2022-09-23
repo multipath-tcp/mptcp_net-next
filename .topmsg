@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-TCP_FASTOPEN_CONNECT-socket-option
+From: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Subject: [PATCH] mptcp: add TCP_FASTOPEN_CONNECT socket option
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Set the option for the first subflow only. For the other subflows TFO
+can't be used because a mapping would be needed to cover the data in the
+SYN.
+
+Signed-off-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
