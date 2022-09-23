@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-handle-defer-connect-in-mptcp_sendmsg
+From: Dmytro Shytyi <dmytro@shytyi.net>
+Subject: [PATCH] mptcp: handle defer connect in mptcp_sendmsg
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When TCP_FASTOPEN_CONNECT has been set on the socket before a connect,
+the defer flag is set and must be handled when sendmsg is called.
+
+This is similar to what is done in tcp_sendmsg_locked().
+
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
+Co-developed-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Signed-off-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
