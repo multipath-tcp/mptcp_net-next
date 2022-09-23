@@ -46,4 +46,5 @@ EOF
 
 PATCH="$(long "${FIX}").patch"
 diff "${FIX}" "${@}" > "${PATCH}"
-echo "=== Please include ${PATCH} in the email. ==="
+echo -e "\n\t=== Please include ${PATCH} in the email. ===\n"
+echo -e "\n\t=== Please append the subject with 'manual merge'. ===\n"
