@@ -3543,8 +3543,8 @@ static void mptcp_subflow_early_fallback(struct mptcp_sock *msk,
 	__mptcp_do_fallback(msk);
 }
 
-static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
-				int addr_len, int flags)
+int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+			 int addr_len, int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct mptcp_subflow_context *subflow;
