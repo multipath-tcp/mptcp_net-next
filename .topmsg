@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-export-tcp_sendmsg_fastopen
+From: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Subject: [PATCH] tcp: export tcp_sendmsg_fastopen
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+It will be used to support TCP FastOpen with MPTCP in the following
+commit.
+
+Co-developed-by: Dmytro Shytyi <dmytro@shytyi.net>
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
+Signed-off-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
