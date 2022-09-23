@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-poll-allow-write-call-before-actual-connect
+From: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Subject: [PATCH] mptcp: poll allow write call before actual connect
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If fastopen is used, poll must allow a first write that will trigger
+the SYN+data
+
+Similar to what is done in tcp_poll().
+
+Signed-off-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
