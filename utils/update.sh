@@ -65,6 +65,12 @@ update() {
 	git --no-pager diff --stat "${before}..${base}"
 }
 
+if [ "$(git status --porcelain --untracked-files=no | wc -l)" != 0 ]; then
+	printinfo "There are modified files that might be wiped during the update."
+	printinfo "Press Enter to continue."
+	read -r
+fi
+
 update "${TG_BASE_NET_NEXT}" "${TG_TOPIC_TOP_NET_NEXT}"
 update "${TG_BASE_NET}" "${TG_TOPIC_TOP_NET}"
 
