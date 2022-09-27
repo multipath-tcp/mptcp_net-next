@@ -19,8 +19,12 @@ on:
   schedule:
     - cron: '33 5 * * *' # in UTC: after US West coast's work day
 
+permissions: {}
 jobs:
   export:
+    permissions:
+      contents: write # for git push
+
     if: github.repository_owner == 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
