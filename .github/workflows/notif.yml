@@ -19,6 +19,7 @@ env:
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
 
+permissions: {}
 jobs:
   tag:
     name: "Tag"
@@ -64,6 +65,8 @@ jobs:
             ${{ github.event.issue.html_url }}
 
   build:
+    permissions:
+      contents: read
     name: "Build"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation'
     runs-on: ubuntu-latest
@@ -91,6 +94,9 @@ jobs:
             New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) ended with ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   build-error:
+    permissions:
+      contents: read
+
     name: "Build Error"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'MPTCP Upstream Build Validation' && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
@@ -195,6 +201,10 @@ jobs:
             New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
 
   tests:
+    permissions:
+      checks: write # to read check runs and set patchwork check
+      contents: read
+
     name: "Tests"
     if: github.repository_owner == 'multipath-tcp' && github.event_name == 'check_suite' && github.event.check_suite.app.name == 'Cirrus CI' && github.event.check_suite.conclusion != 'neutral'
     runs-on: ubuntu-latest
