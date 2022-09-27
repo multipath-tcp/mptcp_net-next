@@ -19,6 +19,8 @@ env:
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
 
+permissions: {}
+
 jobs:
   tag:
     name: "Tag"
