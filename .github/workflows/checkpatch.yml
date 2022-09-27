@@ -16,8 +16,12 @@ env:
   RESULTS: "./checkpatch-results.txt"
   DETAILS: "./checkpatch-details.txt"
 
+permissions: {}
 jobs:
   checkpatch:
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+
     name: "Checkpatch"
     # for others or for the official repo but only commits from patchew
     if: github.repository_owner != 'multipath-tcp' || startswith(github.ref, 'refs/tags/patchew/')
