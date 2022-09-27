@@ -150,6 +150,8 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 			 struct mptcp_out_options *opts);
 
 void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info);
+int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags);
+struct sock *mptcp_subflow_conn_sock(struct sock *sk);
 
 /* move the skb extension owership, with the assumption that 'to' is
  * newly allocated
@@ -286,6 +288,13 @@ static inline bool mptcp_skb_can_collapse(const struct sk_buff *to,
 
 static inline void mptcp_space(const struct sock *ssk, int *s, int *fs) { }
 static inline void mptcp_seq_show(struct seq_file *seq) { }
+static inline int mptcp_stream_connect(struct socket *sock,
+				       struct sockaddr *uaddr,
+				       int addr_len,
+				       int flags)
+{
+
+}
 
 static inline int mptcp_subflow_init_cookie_req(struct request_sock *req,
 						const struct sock *sk_listener,

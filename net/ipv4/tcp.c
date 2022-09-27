@@ -1162,8 +1162,9 @@ void tcp_free_fastopen_req(struct tcp_sock *tp)
 	}
 }
 
-int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg, int *copied,
-			 size_t size, struct ubuf_info *uarg)
+int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
+			 int *copied, size_t size,
+			 struct ubuf_info *uarg)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_sock *inet = inet_sk(sk);
@@ -1196,8 +1197,19 @@ int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg, int *copied,
 		}
 	}
 	flags = (msg->msg_flags & MSG_DONTWAIT) ? O_NONBLOCK : 0;
-	err = __inet_stream_connect(sk->sk_socket, uaddr,
-				    msg->msg_namelen, flags, 1);
+	if (!sk_is_mptcp(sk)) {
+		err = __inet_stream_connect(sk->sk_socket, uaddr,
+					    msg->msg_namelen, flags, 1);
+	} else {
+		struct sock *parent = mptcp_subflow_conn_sock(sk);
+
+		release_sock(sk);
+		release_sock(parent);
+		err = mptcp_stream_connect(sk->sk_socket, uaddr,
+					   msg->msg_namelen, msg->msg_flags);
+		lock_sock(parent);
+		lock_sock(sk);
+	}
 	/* fastopen_req could already be freed in __inet_stream_connect
 	 * if the connection times out or gets rst
 	 */
