@@ -243,6 +243,7 @@ struct mptcp_data_frag {
 	u16 offset;
 	u16 overhead;
 	u16 already_sent;
+	u16 info_sent;
 	struct page *page;
 };
 
@@ -355,6 +356,16 @@ static inline struct mptcp_data_frag *mptcp_send_next(struct sock *sk)
 
 	cur = msk->first_pending;
 	return list_is_last(&cur->list, &msk->rtx_queue) ? NULL :
+						     list_next_entry(cur, list);
+}
+
+static inline struct mptcp_data_frag *mptcp_next_frag(struct sock *sk,
+						      struct mptcp_data_frag *cur)
+{
+	if (!cur)
+		return NULL;
+
+	return list_is_last(&cur->list, &mptcp_sk(sk)->rtx_queue) ? NULL :
 						     list_next_entry(cur, list);
 }
 
