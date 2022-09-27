@@ -17,3 +17,46 @@ void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_
 	pr_debug("ack_seq=%llu sndr_key=%llu", msk->ack_seq, mp_opt.sndr_key);
 	atomic64_set(&msk->rcv_wnd_sent, ack_seq);
 }
+
+void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
+					     struct request_sock *req)
+{
+	struct tcp_request_sock *tcp_r_sock = tcp_rsk(req);
+	struct sock *ssk = subflow->tcp_sock;
+	struct sock *sk = subflow->conn;
+	struct mptcp_sock *msk;
+	struct sk_buff *skb;
+	struct tcp_sock *tp;
+
+	msk = mptcp_sk(sk);
+	tp = tcp_sk(ssk);
+
+	/* <mark subflow/msk as "mptfo"> */
+	msk->is_mptfo = 1;
+
+	skb = skb_peek(&ssk->sk_receive_queue);
+
+	/* <dequeue the skb from sk receive queue> */
+	__skb_unlink(skb, &ssk->sk_receive_queue);
+	skb_ext_reset(skb);
+	skb_orphan(skb);
+
+	/* <set the skb mapping> */
+	tp->copied_seq += tp->rcv_nxt - tcp_r_sock->rcv_isn - 1;
+	subflow->map_seq = mptcp_subflow_get_mapped_dsn(subflow);
+	subflow->ssn_offset = tp->copied_seq - 1;
+
+	/* <acquire the msk data lock> */
+	mptcp_data_lock(sk);
+
+	/* <move skb into msk receive queue> */
+	mptcp_set_owner_r(skb, sk);
+	__skb_queue_tail(&msk->receive_queue, skb);
+	atomic64_set(&msk->rcv_wnd_sent, mptcp_subflow_get_mapped_dsn(subflow));
+
+	/* <call msk data_ready> */
+	(sk)->sk_data_ready(sk);
+
+	/* <release the msk data lock> */
+	mptcp_data_unlock(sk);
+}
