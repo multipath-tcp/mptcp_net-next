@@ -18,6 +18,8 @@ on:
 env:
   PW: "https://patchwork.kernel.org/api/1.2"
 
+permissions: {}
+
 jobs:
   build:
     name: "Build (matrix)"
@@ -28,6 +30,8 @@ jobs:
         defconfig: ['x86_64', 'i386']
         ipv6: ['with_ipv6', 'without_ipv6']
         mptcp: ['with_mptcp', 'without_mptcp']
+    permissions:
+      contents: read # to fetch code (actions/checkout)
 
     steps:
       - name: "Checkout (light)"
