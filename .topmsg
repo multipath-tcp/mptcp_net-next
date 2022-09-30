@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-sockopt-use-new-helper-for-TCP_DEFER_ACCEPT
+Subject: [PATCH] mptcp: sockopt: use new helper for TCP_DEFER_ACCEPT
 
+mptcp_setsockopt_sol_tcp_defer() was doing the same thing as
+mptcp_setsockopt_first_sf_only() except for the returned code in case of
+error.
+
+Ignoring the error is needed to mimic how TCP_DEFER_ACCEPT is handled
+when used with "plain" TCP sockets.
+
+The specific function for TCP_DEFER_ACCEPT can be replaced by the new
+mptcp_setsockopt_first_sf_only() helper and errors can be ignored to
+stay compatible with TCP. A bit of cleanup.
+
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
