@@ -141,6 +141,28 @@ chk_msk_listen()
 	nr=$(ss -Ml $filter | wc -l)
 }
 
+chk_msk_inuse()
+{
+	local nr listen_nr
+	local expected=$1
+
+	shift 1
+	msg=$*
+
+	nr=$(ip netns exec $ns awk '$1~/^MPTCP$/{print $3}' /proc/net/protocols)
+	listen_nr=$(ss -N $ns -Ml | grep -c LISTEN)
+	expected=$(($expected+$listen_nr))
+
+	printf "%-50s" "$msg"
+
+	if [ $nr != $expected ]; then
+		echo "[ fail ] expected $expected found $nr"
+		ret=$test_cnt
+	else
+		echo "[  ok  ]"
+	fi
+}
+
 # $1: ns, $2: port
 wait_local_port_listen()
 {
@@ -194,8 +216,11 @@ wait_connected $ns 10000
 chk_msk_nr 2 "after MPC handshake "
 chk_msk_remote_key_nr 2 "....chk remote_key"
 chk_msk_fallback_nr 0 "....chk no fallback"
+chk_msk_inuse 2 "msk in use statistics"
 flush_pids
 
+# with '-r' flag, client won't exit after flush_pids
+chk_msk_inuse 1 "msk in use statistics"
 
 echo "a" | \
 	timeout ${timeout_test} \
@@ -231,6 +256,9 @@ for I in `seq 1 $NR_CLIENTS`; do
 done
 
 wait_msk_nr $((NR_CLIENTS*2)) "many msk socket present"
+chk_msk_inuse $((NR_CLIENTS*2+1)) "msk in use statistics"
 flush_pids
+
+chk_msk_inuse 0 "msk in use statistics"
 
 exit $ret
