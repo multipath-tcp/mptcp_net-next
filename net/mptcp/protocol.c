@@ -1589,7 +1589,15 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 	struct mptcp_data_frag *dfrag;
 	struct sock *xmit_ssk;
 	int len, copied = 0;
-	bool first = true;
+
+	xmit_ssk = mptcp_sched_get_send(msk);
+	if (!xmit_ssk)
+		goto out;
+	if (xmit_ssk != ssk) {
+		mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk),
+				       MPTCP_DELEGATE_SEND);
+		goto out;
+	}
 
 	info.flags = 0;
 	while ((dfrag = mptcp_send_head(sk))) {
@@ -1599,19 +1607,6 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 		while (len > 0) {
 			int ret = 0;
 
-			/* the caller already invoked the packet scheduler,
-			 * check for a different subflow usage only after
-			 * spooling the first chunk of data
-			 */
-			xmit_ssk = first ? ssk : mptcp_sched_get_send(msk);
-			if (!xmit_ssk)
-				goto out;
-			if (xmit_ssk != ssk) {
-				mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk),
-						       MPTCP_DELEGATE_SEND);
-				goto out;
-			}
-
 			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
 			if (ret <= 0)
 				goto out;
@@ -1619,11 +1614,18 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk)
 			info.sent += ret;
 			copied += ret;
 			len -= ret;
-			first = false;
 
 			mptcp_update_post_push(msk, dfrag, ret);
 		}
 		WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+
+		if (msk->snd_burst > 0 &&
+		    sk_stream_memory_free(ssk) &&
+		    mptcp_subflow_active(mptcp_subflow_ctx(ssk))) {
+			mptcp_set_timeout(sk);
+		} else {
+			break;
+		}
 	}
 
 out:
@@ -3182,16 +3184,10 @@ void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 	if (!mptcp_send_head(sk))
 		return;
 
-	if (!sock_owned_by_user(sk)) {
-		struct sock *xmit_ssk = mptcp_sched_get_send(mptcp_sk(sk));
-
-		if (xmit_ssk == ssk)
-			__mptcp_subflow_push_pending(sk, ssk);
-		else if (xmit_ssk)
-			mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk), MPTCP_DELEGATE_SEND);
-	} else {
+	if (!sock_owned_by_user(sk))
+		__mptcp_subflow_push_pending(sk, ssk);
+	else
 		__set_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->cb_flags);
-	}
 }
 
 #define MPTCP_FLAGS_PROCESS_CTX_NEED (BIT(MPTCP_PUSH_PENDING) | \
