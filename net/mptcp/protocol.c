@@ -1688,6 +1688,8 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		int copied_syn = 0;
 
 		lock_sock(ssk);
+		if (msg->msg_flags & MSG_FASTOPEN && sk->sk_state == TCP_CLOSE)
+			__mptcp_pre_connect(msk, ssk, msg, len);
 
 		ret = tcp_sendmsg_fastopen(ssk, msg, &copied_syn, len, NULL);
 		copied += copied_syn;
