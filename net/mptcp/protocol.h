@@ -846,6 +846,9 @@ void __mptcp_pre_connect(struct mptcp_sock *msk, struct sock *ssk,
 			 struct msghdr *msg, size_t len);
 void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
 				   struct mptcp_options_received mp_opt);
+void mptcp_set_owner_r(struct sk_buff *skb, struct sock *sk);
+void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
+					     struct request_sock *req);
 // Fast Open Mechanism functions end
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
