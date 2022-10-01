@@ -282,6 +282,7 @@ struct mptcp_sock {
 	bool		use_64bit_ack; /* Set when we received a 64-bit DSN */
 	bool		csum_enabled;
 	bool		allow_infinite_fallback;
+	bool		is_mptfo;
 	u8		mpc_endpoint_id;
 	u8		recvmsg_inq:1,
 			cork:1,
@@ -843,6 +844,8 @@ int __mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 // Fast Open Mechanism functions begin
 void __mptcp_pre_connect(struct mptcp_sock *msk, struct sock *ssk,
 			 struct msghdr *msg, size_t len);
+void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
+				   struct mptcp_options_received mp_opt);
 // Fast Open Mechanism functions end
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
