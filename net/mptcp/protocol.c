@@ -1687,22 +1687,35 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		struct sock *ssk = ssock->sk;
 		int copied_syn = 0;
 
-		lock_sock(ssk);
-		if (msg->msg_flags & MSG_FASTOPEN && sk->sk_state == TCP_CLOSE)
+		if (msg->msg_flags & MSG_FASTOPEN  && sk->sk_state == TCP_CLOSE) {
 			__mptcp_pre_connect(msk, ssk, msg, len);
+			/* we take nmpc_socket (first subflow) inside of __mptcp_stream_connect() */
+			/* avoid lock_sock(ssk) as it seems leading to deadlock */
+			ret = __mptcp_stream_connect(sk->sk_socket, msg->msg_name,
+						     msg->msg_namelen, msg->msg_flags);
 
-		ret = tcp_sendmsg_fastopen(ssk, msg, &copied_syn, len, NULL);
-		copied += copied_syn;
-		if (ret == -EINPROGRESS && copied_syn > 0) {
-			/* reflect the new state on the MPTCP socket */
-			inet_sk_state_store(sk, inet_sk_state_load(ssk));
+			if (ret >= 0)
+				copied += len;
+			else
+				goto do_error;
+		} else {
+
+			lock_sock(ssk);
+
+			ret = tcp_sendmsg_fastopen(ssk, msg, &copied_syn, len, NULL);
+
+			copied += copied_syn;
+			if (ret == -EINPROGRESS && copied_syn > 0) {
+				/* reflect the new state on the MPTCP socket */
+				inet_sk_state_store(sk, inet_sk_state_load(ssk));
+				release_sock(ssk);
+				goto out;
+			} else if (ret) {
+				release_sock(ssk);
+				goto do_error;
+			}
 			release_sock(ssk);
-			goto out;
-		} else if (ret) {
-			release_sock(ssk);
-			goto do_error;
 		}
-		release_sock(ssk);
 	}
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
@@ -3570,15 +3583,14 @@ static void mptcp_subflow_early_fallback(struct mptcp_sock *msk,
 	__mptcp_do_fallback(msk);
 }
 
-static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
-				int addr_len, int flags)
+int __mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+			   int addr_len, int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct mptcp_subflow_context *subflow;
 	struct socket *ssock;
 	int err = -EINVAL;
 
-	lock_sock(sock->sk);
 	if (uaddr) {
 		if (addr_len < sizeof(uaddr->sa_family))
 			goto unlock;
@@ -3633,7 +3645,18 @@ do_connect:
 		inet_sk_state_store(sock->sk, inet_sk_state_load(ssock->sk));
 
 unlock:
+	return err;
+}
+
+static int mptcp_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+				int addr_len, int flags)
+{
+	int err = -EINVAL;
+
+	lock_sock(sock->sk);
+	err = __mptcp_stream_connect(sock, uaddr, addr_len, flags);
 	release_sock(sock->sk);
+
 	return err;
 }
 
