@@ -72,6 +72,7 @@ void mlx5e_build_xsk_param(struct xsk_buff_pool *pool, struct mlx5e_xsk_param *x
 {
 	xsk->headroom = xsk_pool_get_headroom(pool);
 	xsk->chunk_size = xsk_pool_get_chunk_size(pool);
+	xsk->unaligned = pool->unaligned;
 }
 
 static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
@@ -123,15 +124,9 @@ static int mlx5e_xsk_enable_locked(struct mlx5e_priv *priv,
 	 * any Fill Ring entries at the setup stage.
 	 */
 
-	err = mlx5e_rx_res_xsk_activate(priv->rx_res, &priv->channels, ix);
-	if (unlikely(err))
-		goto err_deactivate;
+	mlx5e_rx_res_xsk_update(priv->rx_res, &priv->channels, ix, true);
 
 	return 0;
-
-err_deactivate:
-	mlx5e_deactivate_xsk(c);
-	mlx5e_close_xsk(c);
 
 err_remove_pool:
 	mlx5e_xsk_remove_pool(&priv->xsk, ix);
@@ -170,7 +165,7 @@ static int mlx5e_xsk_disable_locked(struct mlx5e_priv *priv, u16 ix)
 		goto remove_pool;
 
 	c = priv->channels.c[ix];
-	mlx5e_rx_res_xsk_deactivate(priv->rx_res, ix);
+	mlx5e_rx_res_xsk_update(priv->rx_res, &priv->channels, ix, false);
 	mlx5e_deactivate_xsk(c);
 	mlx5e_close_xsk(c);
 
@@ -208,11 +203,10 @@ int mlx5e_xsk_setup_pool(struct net_device *dev, struct xsk_buff_pool *pool, u16
 {
 	struct mlx5e_priv *priv = netdev_priv(dev);
 	struct mlx5e_params *params = &priv->channels.params;
-	u16 ix;
 
-	if (unlikely(!mlx5e_qid_get_ch_if_in_group(params, qid, MLX5E_RQ_GROUP_XSK, &ix)))
+	if (unlikely(qid >= params->num_channels))
 		return -EINVAL;
 
-	return pool ? mlx5e_xsk_enable_pool(priv, pool, ix) :
-		      mlx5e_xsk_disable_pool(priv, ix);
+	return pool ? mlx5e_xsk_enable_pool(priv, pool, qid) :
+		      mlx5e_xsk_disable_pool(priv, qid);
 }
