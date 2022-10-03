@@ -9,6 +9,7 @@
 struct mlx5e_xsk_param {
 	u16 headroom;
 	u16 chunk_size;
+	bool unaligned;
 };
 
 struct mlx5e_cq_param {
@@ -52,42 +53,16 @@ struct mlx5e_create_sq_param {
 	u8                          min_inline_mode;
 };
 
-static inline bool mlx5e_qid_get_ch_if_in_group(struct mlx5e_params *params,
-						u16 qid,
-						enum mlx5e_rq_group group,
-						u16 *ix)
-{
-	int nch = params->num_channels;
-	int ch = qid - nch * group;
-
-	if (ch < 0 || ch >= nch)
-		return false;
-
-	*ix = ch;
-	return true;
-}
-
-static inline void mlx5e_qid_get_ch_and_group(struct mlx5e_params *params,
-					      u16 qid,
-					      u16 *ix,
-					      enum mlx5e_rq_group *group)
-{
-	u16 nch = params->num_channels;
-
-	*ix = qid % nch;
-	*group = qid / nch;
-}
-
-static inline bool mlx5e_qid_validate(const struct mlx5e_profile *profile,
-				      struct mlx5e_params *params, u64 qid)
-{
-	return qid < params->num_channels * profile->rq_groups;
-}
-
 /* Striding RQ dynamic parameters */
 
-u16 mlx5e_mpwrq_umr_wqe_sz(u8 pages_per_wqe);
-u8 mlx5e_mpwrq_umr_wqebbs(u8 pages_per_wqe);
+u8 mlx5e_mpwrq_page_shift(struct mlx5_core_dev *mdev, struct mlx5e_xsk_param *xsk);
+u8 mlx5e_mpwrq_log_wqe_sz(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
+u8 mlx5e_mpwrq_pages_per_wqe(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
+u16 mlx5e_mpwrq_umr_wqe_sz(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
+u8 mlx5e_mpwrq_umr_wqebbs(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
+u8 mlx5e_mpwrq_mtts_per_wqe(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
+u32 mlx5e_mpwrq_max_num_entries(struct mlx5_core_dev *mdev, bool unaligned);
+u8 mlx5e_mpwrq_max_log_rq_pkts(struct mlx5_core_dev *mdev, u8 page_shift, bool unaligned);
 
 /* Parameter calculations */
 
@@ -106,12 +81,14 @@ void mlx5e_init_rq_type_params(struct mlx5_core_dev *mdev, struct mlx5e_params *
 
 u16 mlx5e_get_linear_rq_headroom(struct mlx5e_params *params,
 				 struct mlx5e_xsk_param *xsk);
-bool mlx5e_rx_is_linear_skb(struct mlx5e_params *params,
+bool mlx5e_rx_is_linear_skb(struct mlx5_core_dev *mdev,
+			    struct mlx5e_params *params,
 			    struct mlx5e_xsk_param *xsk);
 bool mlx5e_rx_mpwqe_is_linear_skb(struct mlx5_core_dev *mdev,
 				  struct mlx5e_params *params,
 				  struct mlx5e_xsk_param *xsk);
-u8 mlx5e_mpwqe_get_log_rq_size(struct mlx5e_params *params,
+u8 mlx5e_mpwqe_get_log_rq_size(struct mlx5_core_dev *mdev,
+			       struct mlx5e_params *params,
 			       struct mlx5e_xsk_param *xsk);
 u8 mlx5e_shampo_get_log_hd_entry_size(struct mlx5_core_dev *mdev,
 				      struct mlx5e_params *params);
