@@ -67,6 +67,7 @@ int mptcp_init_sched(struct mptcp_sock *msk,
 	msk->sched = sched;
 	if (msk->sched->init)
 		msk->sched->init(msk);
+	msk->last_snd = NULL;
 
 	pr_debug("sched=%s", msk->sched->name);
 
@@ -84,6 +85,7 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	msk->sched = NULL;
 	if (sched->release)
 		sched->release(msk);
+	msk->last_snd = NULL;
 
 	bpf_module_put(sched, sched->owner);
 }
