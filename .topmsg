@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-factor-out-mptcp_connect
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: factor out mptcp_connect()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The current MPTCP connect implementation duplicates a bit of inet
+code and does not use nor provide a struct proto->connect callback,
+which in turn will not fit the upcoming fastopen implementation.
+
+Refactor such implementation to use the common helper, moving the
+MPTCP-specific bits into mptcp_connect(). Additionally, avoid an
+indirect call to the subflow connect callback.
+
+Note that the fastopen call-path invokes mptcp_connect() while already
+holding the subflow socket lock. Explicitly keep track of such path
+via a new MPTCP-level flag and handle the locking accordingly.
+
+Additionally, track the connect flags in a new msk field to allow
+propagating them to the subflow inet_stream_connect call.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
