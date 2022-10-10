@@ -1208,6 +1208,11 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 			mpext->dsn64 = 1;
 			mpext->mpc_map = 1;
 			mpext->data_fin = 0;
+
+			if (msk->is_mptfo) {
+				mptcp_gen_msk_ackseq_fastopen(msk, subflow, mp_opt);
+				mpext->data_seq = READ_ONCE(msk->ack_seq);
+			}
 		} else {
 			mpext->data_seq = mp_opt.data_seq;
 			mpext->subflow_seq = mp_opt.subflow_seq;
