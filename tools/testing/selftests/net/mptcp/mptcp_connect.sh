@@ -677,6 +677,58 @@ run_tests()
 	run_tests_lo $1 $2 $3 0
 }
 
+run_test_mptfo(){
+
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
+	local loopback="$4"
+	local extra_args="$5"
+	local msg="$6"
+	local lret=0
+
+	ip netns exec "$listener_ns" sysctl -q net.ipv4.tcp_fastopen=2
+	ip netns exec "$connector_ns" sysctl -q net.ipv4.tcp_fastopen=1
+
+	# skip if test programs are running inside same netns for subsequent runs.
+	if [ $loopback -eq 0 ] && [ ${listener_ns} = ${connector_ns} ]; then
+		return 0
+	fi
+
+	# skip if we don't want v6
+	if ! $ipv6 && is_v6 "${connect_addr}"; then
+		return 0
+	fi
+
+	local local_addr
+	if is_v6 "${connect_addr}"; then
+		local_addr="::"
+	else
+		local_addr="0.0.0.0"
+	fi
+
+
+
+	TEST_COUNT=10000
+	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP \
+		    ${connect_addr} ${local_addr} "${extra_args}"
+	lret=$?
+
+	if [ $lret -ne 0 ]; then
+		echo "FAIL: $msg, mptcp connection error" 1>&2
+		ret=$lret
+		return 1
+	fi
+
+	echo "PASS: $msg"
+
+
+	ip netns exec "$listener_ns" sysctl -q net.ipv4.tcp_fastopen=0
+	ip netns exec "$connector_ns" sysctl -q net.ipv4.tcp_fastopen=0
+	return 0
+
+}
+
 run_test_transparent()
 {
 	local connect_addr="$1"
@@ -905,6 +957,31 @@ stop_if_error "Tests with peek mode have failed"
 run_test_transparent 10.0.3.1 "tproxy ipv4"
 run_test_transparent dead:beef:3::1 "tproxy ipv6"
 stop_if_error "Tests with tproxy have failed"
+
+# MPTFO (MultiPath TCP Fatopen tests)
+
+for sender in $ns1 $ns2 $ns3 $ns4;do
+	run_test_mptfo "$ns1" $sender 10.0.1.1 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns1" $sender dead:beef:1::1 0 "-o MPTFO" "mptfoIPv6"
+
+	run_test_mptfo "$ns2" $sender 10.0.1.2 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns2" $sender dead:beef:1::2 0 "-o MPTFO" "mptfoIPv6"
+	run_test_mptfo "$ns2" $sender 10.0.2.1 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns2" $sender dead:beef:2::1 0 "-o MPTFO" "mptfoIPv6"
+
+	run_test_mptfo "$ns3" $sender 10.0.2.2 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns3" $sender dead:beef:2::2 0 "-o MPTFO" "mptfoIPv6"
+	run_test_mptfo "$ns3" $sender 10.0.3.2 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns3" $sender dead:beef:3::2 0 "-o MPTFO" "mptfoIPv6"
+
+	run_test_mptfo "$ns4" $sender 10.0.3.1 0 "-o MPTFO" "mptfoIPv4"
+	run_test_mptfo "$ns4" $sender dead:beef:3::1 0 "-o MPTFO" "mptfoIPv6"
+
+	stop_if_error "Tests with $sender as a sender have failed"
+done
+#run_test_mptfo 10.0.3.1 "mptfoIPv4"
+#run_test_mptfo dead:beef:3::1 "mptfoIPv6"
+#stop_if_error "Tests with MPTFO have failed"
 
 run_tests_disconnect
 
