@@ -1600,6 +1600,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk,
 					 bool first)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
 	struct mptcp_sendmsg_info info = {
 		.data_lock_held = true,
 	};
@@ -1622,7 +1623,10 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk,
 			if (!xmit_ssk)
 				goto out;
 			if (xmit_ssk != ssk) {
-				mptcp_subflow_delegate(mptcp_subflow_ctx(xmit_ssk),
+				subflow = mptcp_subflow_ctx(xmit_ssk);
+				if (mptcp_subflow_has_delegated_action(subflow))
+					goto out;
+				mptcp_subflow_delegate(subflow,
 						       MPTCP_DELEGATE_SEND);
 				goto out;
 			}
