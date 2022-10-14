@@ -473,8 +473,7 @@ config VIRT_CPU_ACCOUNTING
 
 choice
 	prompt "Cputime accounting"
-	default TICK_CPU_ACCOUNTING if !PPC64
-	default VIRT_CPU_ACCOUNTING_NATIVE if PPC64
+	default TICK_CPU_ACCOUNTING
 
 # Kind of a stub config for the pure tick based cputime accounting
 config TICK_CPU_ACCOUNTING
@@ -970,11 +969,6 @@ config MEMCG
 	help
 	  Provides control over the memory footprint of tasks in a cgroup.
 
-config MEMCG_SWAP
-	bool
-	depends on MEMCG && SWAP
-	default y
-
 config MEMCG_KMEM
 	bool
 	depends on MEMCG && !SLOB
@@ -1273,6 +1267,7 @@ endif # NAMESPACES
 
 config CHECKPOINT_RESTORE
 	bool "Checkpoint/restore support"
+	depends on PROC_FS
 	select PROC_CHILDREN
 	select KCMP
 	default n
