@@ -1,4 +1,77 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-abba-deadlock-on-fastopen
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix abba deadlock on fastopen
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Our CI reported lockdep splat in the fastopen code:
+ ======================================================
+ WARNING: possible circular locking dependency detected
+ 6.0.0.mptcp_f5e8bfe9878d+ #1558 Not tainted
+ ------------------------------------------------------
+ packetdrill/1071 is trying to acquire lock:
+ ffff8881bd198140 (sk_lock-AF_INET){+.+.}-{0:0}, at: inet_wait_for_connect+0x19c/0x310
+
+ but task is already holding lock:
+ ffff8881b8346540 (k-sk_lock-AF_INET){+.+.}-{0:0}, at: mptcp_sendmsg+0xfdf/0x1740
+
+ which lock already depends on the new lock.
+
+ the existing dependency chain (in reverse order) is:
+
+ -> #1 (k-sk_lock-AF_INET){+.+.}-{0:0}:
+        __lock_acquire+0xb6d/0x1860
+        lock_acquire+0x1d8/0x620
+        lock_sock_nested+0x37/0xd0
+        inet_stream_connect+0x3f/0xa0
+        mptcp_connect+0x411/0x800
+        __inet_stream_connect+0x3ab/0x800
+        mptcp_stream_connect+0xac/0x110
+        __sys_connect+0x101/0x130
+        __x64_sys_connect+0x6e/0xb0
+        do_syscall_64+0x59/0x90
+        entry_SYSCALL_64_after_hwframe+0x63/0xcd
+
+ -> #0 (sk_lock-AF_INET){+.+.}-{0:0}:
+        check_prev_add+0x15e/0x2110
+        validate_chain+0xace/0xdf0
+        __lock_acquire+0xb6d/0x1860
+        lock_acquire+0x1d8/0x620
+        lock_sock_nested+0x37/0xd0
+        inet_wait_for_connect+0x19c/0x310
+        __inet_stream_connect+0x26c/0x800
+        tcp_sendmsg_fastopen+0x341/0x650
+        mptcp_sendmsg+0x109d/0x1740
+        sock_sendmsg+0xe1/0x120
+        __sys_sendto+0x1c7/0x2a0
+        __x64_sys_sendto+0xdc/0x1b0
+        do_syscall_64+0x59/0x90
+        entry_SYSCALL_64_after_hwframe+0x63/0xcd
+
+ other info that might help us debug this:
+
+  Possible unsafe locking scenario:
+
+        CPU0                    CPU1
+        ----                    ----
+   lock(k-sk_lock-AF_INET);
+                                lock(sk_lock-AF_INET);
+                                lock(k-sk_lock-AF_INET);
+   lock(sk_lock-AF_INET);
+
+  *** DEADLOCK ***
+
+ 1 lock held by packetdrill/1071:
+  #0: ffff8881b8346540 (k-sk_lock-AF_INET){+.+.}-{0:0}, at: mptcp_sendmsg+0xfdf/0x1740
+ ======================================================
+
+The problem is caused by the blocking inet_wait_for_connect() releasing
+and re-acquiring the msk socket lock while the subflow socket lock is
+still held and the MPTCP socket requires that the msk socket lock must
+be acquired before the subflow socket lock.
+
+Address the issue always invoking tcp_sendmsg_fastopen() in an
+unblocking manner, and later eventually complete the blocking
+__inet_stream_connect() as needed.
+
+Fixes: d98a82a6afc7 ("mptcp: handle defer connect in mptcp_sendmsg")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
