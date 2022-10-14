@@ -15,6 +15,7 @@
 #include <linux/seq_file.h>
 #include <linux/posix_acl_xattr.h>
 #include <linux/exportfs.h>
+#include <linux/file.h>
 #include "overlayfs.h"
 
 MODULE_AUTHOR("Miklos Szeredi <miklos@szeredi.hu>");
@@ -908,7 +909,7 @@ static int ovl_mount_dir(const char *name, struct path *path)
 	return err;
 }
 
-static int ovl_check_namelen(struct path *path, struct ovl_fs *ofs,
+static int ovl_check_namelen(const struct path *path, struct ovl_fs *ofs,
 			     const char *name)
 {
 	struct kstatfs statfs;
@@ -1366,10 +1367,11 @@ static int ovl_create_volatile_dirty(struct ovl_fs *ofs)
 }
 
 static int ovl_make_workdir(struct super_block *sb, struct ovl_fs *ofs,
-			    struct path *workpath)
+			    const struct path *workpath)
 {
 	struct vfsmount *mnt = ovl_upper_mnt(ofs);
-	struct dentry *temp, *workdir;
+	struct dentry *workdir;
+	struct file *tmpfile;
 	bool rename_whiteout;
 	bool d_type;
 	int fh_type;
@@ -1405,10 +1407,10 @@ static int ovl_make_workdir(struct super_block *sb, struct ovl_fs *ofs,
 		pr_warn("upper fs needs to support d_type.\n");
 
 	/* Check if upper/work fs supports O_TMPFILE */
-	temp = ovl_do_tmpfile(ofs, ofs->workdir, S_IFREG | 0);
-	ofs->tmpfile = !IS_ERR(temp);
+	tmpfile = ovl_do_tmpfile(ofs, ofs->workdir, S_IFREG | 0);
+	ofs->tmpfile = !IS_ERR(tmpfile);
 	if (ofs->tmpfile)
-		dput(temp);
+		fput(tmpfile);
 	else
 		pr_warn("upper fs does not support tmpfile.\n");
 
@@ -1495,7 +1497,7 @@ out:
 }
 
 static int ovl_get_workdir(struct super_block *sb, struct ovl_fs *ofs,
-			   struct path *upperpath)
+			   const struct path *upperpath)
 {
 	int err;
 	struct path workpath = { };
@@ -1538,7 +1540,7 @@ out:
 }
 
 static int ovl_get_indexdir(struct super_block *sb, struct ovl_fs *ofs,
-			    struct ovl_entry *oe, struct path *upperpath)
+			    struct ovl_entry *oe, const struct path *upperpath)
 {
 	struct vfsmount *mnt = ovl_upper_mnt(ofs);
 	struct dentry *indexdir;
