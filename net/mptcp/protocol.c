@@ -1406,7 +1406,8 @@ bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
  * returns the subflow that will transmit the next DSS
  * additionally updates the rtx timeout
  */
-static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
+static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk,
+					   struct mptcp_sched_data *data)
 {
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
@@ -1427,7 +1428,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	}
 
 	/* re-use last subflow, if the burst allow that */
-	if (msk->last_snd && msk->snd_burst > 0 &&
+	if (msk->last_snd && data->snd_burst > 0 &&
 	    sk_stream_memory_free(msk->last_snd) &&
 	    mptcp_subflow_active(mptcp_subflow_ctx(msk->last_snd))) {
 		mptcp_set_timeout(sk);
@@ -1496,7 +1497,7 @@ static struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 					   READ_ONCE(ssk->sk_pacing_rate) * burst,
 					   burst + wmem);
 	msk->last_snd = ssk;
-	msk->snd_burst = burst;
+	data->snd_burst = burst;
 	return ssk;
 }
 
@@ -1513,8 +1514,6 @@ static void mptcp_update_post_push(struct mptcp_sock *msk,
 	u64 snd_nxt_new = dfrag->data_seq;
 
 	dfrag->already_sent += sent;
-
-	msk->snd_burst -= sent;
 
 	snd_nxt_new += dfrag->already_sent;
 
@@ -1541,6 +1540,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 {
 	struct sock *prev_ssk = NULL, *ssk = NULL;
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_sched_data data = { 0 };
 	struct mptcp_sendmsg_info info = {
 				.flags = flags,
 	};
@@ -1556,7 +1556,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 			int ret = 0;
 
 			prev_ssk = ssk;
-			ssk = mptcp_subflow_get_send(msk);
+			ssk = mptcp_subflow_get_send(msk, &data);
 
 			/* First check. If the ssk has changed since
 			 * the last round, release prev_ssk
@@ -1584,6 +1584,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 			do_check_data_fin = true;
 			info.sent += ret;
 			len -= ret;
+			data.snd_burst -= ret;
 
 			mptcp_update_post_push(msk, dfrag, ret);
 		}
@@ -1605,6 +1606,7 @@ out:
 static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool first)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_sched_data data = { 0 };
 	struct mptcp_sendmsg_info info = {
 		.data_lock_held = true,
 	};
@@ -1623,7 +1625,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 			/* check for a different subflow usage only after
 			 * spooling the first chunk of data
 			 */
-			xmit_ssk = first ? ssk : mptcp_subflow_get_send(msk);
+			xmit_ssk = first ? ssk : mptcp_subflow_get_send(msk, &data);
 			if (!xmit_ssk)
 				goto out;
 			if (xmit_ssk != ssk) {
@@ -1639,6 +1641,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 			info.sent += ret;
 			copied += ret;
 			len -= ret;
+			data.snd_burst -= ret;
 			first = false;
 
 			mptcp_update_post_push(msk, dfrag, ret);
@@ -2296,7 +2299,6 @@ bool __mptcp_retransmit_pending_data(struct sock *sk)
 	mptcp_data_unlock(sk);
 
 	msk->first_pending = rtx_head;
-	msk->snd_burst = 0;
 
 	/* be sure to clear the "sent status" on all re-injected fragments */
 	list_for_each_entry(cur, &msk->rtx_queue, list) {
