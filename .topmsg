@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: factor out mptcp_connect() (net)
+Subject: [PATCH] mptcp: factor out mptcp_connect()
 
 The current MPTCP connect implementation duplicates a bit of inet
 code and does not use nor provide a struct proto->connect callback,
