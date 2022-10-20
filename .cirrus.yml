@@ -46,6 +46,9 @@ task:
     tap_result_artifacts:
       path: "*.tap"
       type: text/plain
+    kconfig_artifacts:
+      path: "config.zstd"
+      type: text/plain
     # JUnit format is for the moment only useful for PR but publish them just in case for later
     junit_artifacts:
       path: "*.tap.xml"
