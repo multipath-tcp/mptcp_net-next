@@ -4,7 +4,7 @@ task:
   name: KVM validation
   only_if: $CIRRUS_TAG != ''  ## only tags
   auto_cancellation: $CIRRUS_TAG == ''
-  timeout_in: 115m
+  timeout_in: 120m
 
   container:
     image: mptcp/mptcp-upstream-virtme-docker:net
@@ -34,6 +34,8 @@ task:
     kmemleak_artifacts:
       path: "kmemleak.txt"
       type: text/plain
+    upload_caches:
+      - ccache
 
   always:
     conclusion_artifacts:
@@ -44,6 +46,9 @@ task:
       type: text/plain
     tap_result_artifacts:
       path: "*.tap"
+      type: text/plain
+    kconfig_artifacts:
+      path: "config.zstd"
       type: text/plain
     # JUnit format is for the moment only useful for PR but publish them just in case for later
     junit_artifacts:
