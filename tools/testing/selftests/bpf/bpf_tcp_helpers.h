@@ -246,11 +246,18 @@ struct mptcp_sched_data {
 struct mptcp_sched_ops {
 	char name[MPTCP_SCHED_NAME_MAX];
 
+	/* burst scheduler */
+	int		snd_burst;
+	/* round-robin scheduler */
+	struct sock	*last_snd;
+
 	void (*init)(const struct mptcp_sock *msk);
 	void (*release)(const struct mptcp_sock *msk);
 
-	void (*get_subflow)(const struct mptcp_sock *msk,
-			    struct mptcp_sched_data *data);
+	void (*data_init)(const struct mptcp_sock *msk,
+			  struct mptcp_sched_data *data);
+	int (*get_subflow)(const struct mptcp_sock *msk,
+			   struct mptcp_sched_data *data);
 	void *owner;
 };
 
@@ -260,10 +267,13 @@ struct mptcp_sock {
 	struct sock	*last_snd;
 	__u32		token;
 	struct sock	*first;
+	struct mptcp_sched_ops	*sched;
 	char		ca_name[TCP_CA_NAME_MAX];
 } __attribute__((preserve_access_index));
 
 extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
+extern void mptcp_sched_data_set_contexts(const struct mptcp_sock *msk,
+					  struct mptcp_sched_data *data) __ksym;
 
 #endif
