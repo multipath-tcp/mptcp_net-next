@@ -110,6 +110,8 @@ struct mptcp_sched_ops {
 	int (*get_subflow)(const struct mptcp_sock *msk,
 			   struct mptcp_sched_data *data);
 
+	/* burst scheduler */
+	int		snd_burst;
 	/* round-robin scheduler */
 	struct sock	*last_snd;
 

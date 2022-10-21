@@ -68,6 +68,7 @@ int mptcp_init_sched(struct mptcp_sock *msk,
 	if (msk->sched->init)
 		msk->sched->init(msk);
 
+	msk->sched->snd_burst = 0;
 	msk->sched->last_snd = NULL;
 
 	pr_debug("sched=%s", msk->sched->name);
