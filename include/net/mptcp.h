@@ -110,6 +110,9 @@ struct mptcp_sched_ops {
 	int (*get_subflow)(const struct mptcp_sock *msk,
 			   struct mptcp_sched_data *data);
 
+	/* round-robin scheduler */
+	struct sock	*last_snd;
+
 	char			name[MPTCP_SCHED_NAME_MAX];
 	struct module		*owner;
 	struct list_head	list;

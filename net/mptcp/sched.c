@@ -68,6 +68,8 @@ int mptcp_init_sched(struct mptcp_sock *msk,
 	if (msk->sched->init)
 		msk->sched->init(msk);
 
+	msk->sched->last_snd = NULL;
+
 	pr_debug("sched=%s", msk->sched->name);
 
 out:
@@ -81,6 +83,7 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	if (!sched)
 		return;
 
+	msk->sched->last_snd = NULL;
 	msk->sched = NULL;
 	if (sched->release)
 		sched->release(msk);
