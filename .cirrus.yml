@@ -26,7 +26,9 @@ task:
     reupload_on_changes: true
     fingerprint_script: echo ${MATRIX_JOB}-${CIRRUS_TAG%/*}
 
-  test_script: /entrypoint.sh expect-${MATRIX_JOB}
+  test_script:
+    - touch .virtme-exec-run
+    - /entrypoint.sh expect-${MATRIX_JOB}
 
   on_failure:
     vmlinux_artifacts:
