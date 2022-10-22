@@ -1475,12 +1475,13 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	if (!ssk || !sk_stream_memory_free(ssk))
 		return NULL;
 
-	burst = min_t(int, MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
-	wmem = READ_ONCE(ssk->sk_wmem_queued);
-	if (!burst) {
+	if (mptcp_wnd_end(msk) <= msk->snd_nxt) {
 		msk->last_snd = NULL;
 		return ssk;
 	}
+
+	burst = min_t(u32, MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
+	wmem = READ_ONCE(ssk->sk_wmem_queued);
 
 	subflow = mptcp_subflow_ctx(ssk);
 	subflow->avg_pacing_rate = div_u64((u64)subflow->avg_pacing_rate * wmem +
