@@ -894,8 +894,13 @@ static bool address_use_port(struct mptcp_pm_addr_entry *entry)
 /* caller must ensure the RCU grace period is already elapsed */
 static void __mptcp_pm_release_addr_entry(struct mptcp_pm_addr_entry *entry)
 {
-	if (entry->lsk)
+	if (entry->lsk) {
+		struct mptcp_sock *msk = mptcp_sk(entry->lsk->sk);
+
 		sock_release(entry->lsk);
+		mptcp_event_pm_listener(msk, &entry->addr,
+					MPTCP_EVENT_LISTENER_CLOSED);
+	}
 	kfree(entry);
 }
 
@@ -1007,6 +1012,9 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 		err = -EINVAL;
 		goto out;
 	}
+
+	mptcp_event_pm_listener(msk, &entry->addr,
+				MPTCP_EVENT_LISTENER_CREATED);
 
 	ssock = __mptcp_nmpc_socket(msk);
 	if (!ssock) {
@@ -2159,6 +2167,58 @@ nla_put_failure:
 	kfree_skb(skb);
 }
 
+void mptcp_event_pm_listener(const struct mptcp_sock *msk,
+			     const struct mptcp_addr_info *info,
+			     enum mptcp_event_type event)
+{
+	struct net *net = sock_net((struct sock *)msk);
+	struct nlmsghdr *nlh;
+	struct sk_buff *skb;
+
+	if (!genl_has_listeners(&mptcp_genl_family, net, MPTCP_PM_EV_GRP_OFFSET))
+		return;
+
+	skb = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
+	if (!skb)
+		return;
+
+	nlh = genlmsg_put(skb, 0, 0, &mptcp_genl_family, 0, event);
+	if (!nlh)
+		goto nla_put_failure;
+
+	if (nla_put_u8(skb, MPTCP_ATTR_LOC_ID, info->id))
+		goto nla_put_failure;
+
+	if (nla_put_u16(skb, MPTCP_ATTR_FAMILY, info->family))
+		goto nla_put_failure;
+
+	if (nla_put_be16(skb, MPTCP_ATTR_SPORT, info->port))
+		goto nla_put_failure;
+
+	switch (info->family) {
+	case AF_INET:
+		if (nla_put_in_addr(skb, MPTCP_ATTR_SADDR4, info->addr.s_addr))
+			goto nla_put_failure;
+		break;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	case AF_INET6:
+		if (nla_put_in6_addr(skb, MPTCP_ATTR_SADDR6, &info->addr6))
+			goto nla_put_failure;
+		break;
+#endif
+	default:
+		WARN_ON_ONCE(1);
+		goto nla_put_failure;
+	}
+
+	genlmsg_end(skb, nlh);
+	mptcp_nl_mcast_send(net, skb, GFP_ATOMIC);
+	return;
+
+nla_put_failure:
+	kfree_skb(skb);
+}
+
 void mptcp_event(enum mptcp_event_type type, const struct mptcp_sock *msk,
 		 const struct sock *ssk, gfp_t gfp)
 {
@@ -2203,6 +2263,10 @@ void mptcp_event(enum mptcp_event_type type, const struct mptcp_sock *msk,
 	case MPTCP_EVENT_SUB_CLOSED:
 		if (mptcp_event_sub_closed(skb, msk, ssk) < 0)
 			goto nla_put_failure;
+		break;
+	case MPTCP_EVENT_LISTENER_CREATED:
+		break;
+	case MPTCP_EVENT_LISTENER_CLOSED:
 		break;
 	}
 
