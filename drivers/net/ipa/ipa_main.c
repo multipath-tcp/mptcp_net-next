@@ -434,6 +434,9 @@ static void ipa_idle_indication_cfg(struct ipa *ipa,
 	const struct ipa_reg *reg;
 	u32 val;
 
+	if (ipa->version < IPA_VERSION_3_5_1)
+		return;
+
 	reg = ipa_reg(ipa, IDLE_INDICATION_CFG);
 	val = ipa_reg_encode(reg, ENTER_IDLE_DEBOUNCE_THRESH,
 			     enter_idle_debounce_thresh);
@@ -739,6 +742,11 @@ static int ipa_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	if (!data->modem_route_count) {
+		dev_err(dev, "modem_route_count cannot be zero\n");
+		return -EINVAL;
+	}
+
 	/* If we need Trust Zone, make sure it's available */
 	modem_init = of_property_read_bool(dev->of_node, "modem-init");
 	if (!modem_init)
@@ -763,6 +771,7 @@ static int ipa_probe(struct platform_device *pdev)
 	dev_set_drvdata(dev, ipa);
 	ipa->power = power;
 	ipa->version = data->version;
+	ipa->modem_route_count = data->modem_route_count;
 	init_completion(&ipa->completion);
 
 	ret = ipa_reg_init(ipa);
