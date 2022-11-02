@@ -39,6 +39,9 @@ struct ipa_interrupt;
  * @power:		IPA power information
  * @table_addr:		DMA address of filter/route table content
  * @table_virt:		Virtual address of filter/route table content
+ * @route_count:	Total number of entries in a routing table
+ * @modem_route_count:	Number of modem entries in a routing table
+ * @filter_count:	Maximum number of entries in a filter table
  * @interrupt:		IPA Interrupt information
  * @uc_powered:		true if power is active by proxy for microcontroller
  * @uc_loaded:		true after microcontroller has reported it's ready
@@ -58,9 +61,10 @@ struct ipa_interrupt;
  * @zero_addr:		DMA address of preallocated zero-filled memory
  * @zero_virt:		Virtual address of preallocated zero-filled memory
  * @zero_size:		Size (bytes) of preallocated zero-filled memory
+ * @endpoint_count:	Number of endpoints represented by bit masks below
+ * @defined:		Bit mask indicating endpoints defined in config data
  * @available:		Bit mask indicating endpoints hardware supports
  * @filter_map:		Bit mask indicating endpoints that support filtering
- * @initialized:	Bit mask indicating endpoints initialized
  * @set_up:		Bit mask indicating endpoints set up
  * @enabled:		Bit mask indicating endpoints enabled
  * @modem_tx_count:	Number of defined modem TX endoints
@@ -84,6 +88,9 @@ struct ipa {
 
 	dma_addr_t table_addr;
 	__le64 *table_virt;
+	u32 route_count;
+	u32 modem_route_count;
+	u32 filter_count;
 
 	struct ipa_interrupt *interrupt;
 	bool uc_powered;
@@ -111,9 +118,10 @@ struct ipa {
 	size_t zero_size;
 
 	/* Bit masks indicating endpoint state */
-	u32 available;		/* supported by hardware */
+	u32 endpoint_count;
+	u32 defined;			/* Defined in configuration data */
+	u32 available;			/* Supported by hardware */
 	u32 filter_map;
-	u32 initialized;
 	u32 set_up;
 	u32 enabled;
 
