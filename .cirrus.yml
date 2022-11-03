@@ -34,8 +34,6 @@ task:
     kmemleak_artifacts:
       path: "kmemleak.txt"
       type: text/plain
-    upload_caches:
-      - ccache
 
   always:
     conclusion_artifacts:
@@ -47,6 +45,8 @@ task:
     tap_result_artifacts:
       path: "*.tap"
       type: text/plain
+    upload_caches:
+      - ccache
     kconfig_artifacts:
       path: "config.zstd"
       type: text/plain
