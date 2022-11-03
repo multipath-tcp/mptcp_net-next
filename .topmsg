@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-use-max_time-instead-of-time
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: use max_time instead of time
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+'time' is the local variable of run_test() function, while 'max_time' is
+the local variable of do_transfer() function. So in do_transfer(),
+$max_time should be used, not $time.
+
+Please note that here $time == $max_time so the behaviour is not changed
+but the right variable is used.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
