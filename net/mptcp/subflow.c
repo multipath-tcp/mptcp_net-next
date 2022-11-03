@@ -749,6 +749,7 @@ create_child:
 			mptcp_sk(new_msk)->setsockopt_seq = ctx->setsockopt_seq;
 			mptcp_pm_new_connection(mptcp_sk(new_msk), child, 1);
 			mptcp_token_accept(subflow_req, mptcp_sk(new_msk));
+			mptcp_inuse_inc(new_msk);
 			ctx->conn = new_msk;
 			new_msk = NULL;
 

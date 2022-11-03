@@ -116,6 +116,7 @@
 #define MPTCP_WORK_EOF		3
 #define MPTCP_FALLBACK_DONE	4
 #define MPTCP_WORK_CLOSE_SUBFLOW 5
+#define MPTCP_INUSE		6
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
@@ -381,6 +382,18 @@ static inline struct mptcp_data_frag *mptcp_rtx_head(const struct sock *sk)
 		return NULL;
 
 	return list_first_entry_or_null(&msk->rtx_queue, struct mptcp_data_frag, list);
+}
+
+static inline void mptcp_inuse_inc(const struct sock *sk)
+{
+	if (!test_and_set_bit(MPTCP_INUSE, &mptcp_sk(sk)->flags))
+		sock_prot_inuse_add(sock_net(sk), sk->sk_prot, 1);
+}
+
+static inline void mptcp_inuse_dec(const struct sock *sk)
+{
+	if (test_and_clear_bit(MPTCP_INUSE, &mptcp_sk(sk)->flags))
+		sock_prot_inuse_add(sock_net(sk), sk->sk_prot, -1);
 }
 
 struct csum_pseudo_header {
