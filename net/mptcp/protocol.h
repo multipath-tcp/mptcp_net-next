@@ -829,7 +829,7 @@ bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
 
 // Fast Open Mechanism functions begin
 void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
-				   struct mptcp_options_received mp_opt);
+				   const struct mptcp_options_received *mp_opt);
 // Fast Open Mechanism functions end
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
