@@ -8,4 +8,3 @@ We call sendto() instead of connect().
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
-Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
