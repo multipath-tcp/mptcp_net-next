@@ -5,4 +5,7 @@ This patch adds the selftests support for mptfo in mptcp_connect.c
 We introduce mptfo option, that sets "TCP_FASTOPEN" + "MSG_FASTOPEN"
 We call sendto() instead of connect().
 
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
 Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
