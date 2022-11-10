@@ -10,7 +10,6 @@ ksft_skip=4
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 mptcp_connect=""
-do_all_tests=1
 
 add_mark_rules()
 {
@@ -31,6 +30,8 @@ add_mark_rules()
 
 init()
 {
+	local sec rndh
+	sec=$(date +%s)
 	rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
 
 	ns1="ns1-$rndh"
@@ -282,7 +283,7 @@ run_tests()
 
 do_tcpinq_test()
 {
-	ip netns exec "$ns1" ./mptcp_inq "$@"
+	ip netns exec "$ns_sbox" ./mptcp_inq "$@"
 	lret=$?
 	if [ $lret -ne 0 ];then
 		ret=$lret
@@ -297,9 +298,6 @@ do_tcpinq_test()
 do_tcpinq_tests()
 {
 	local lret=0
-
-	ip netns exec "$ns1" iptables -F
-	ip netns exec "$ns1" ip6tables -F
 
 	for args in "-t tcp" "-r tcp"; do
 		do_tcpinq_test $args
