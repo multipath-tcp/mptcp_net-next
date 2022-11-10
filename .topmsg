@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-more-detailed-error-reporting-on-endpoint-creation
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
