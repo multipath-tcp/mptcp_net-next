@@ -26,10 +26,12 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 
-#include <linux/tcp.h>
 #include <linux/time_types.h>
 #include <linux/sockios.h>
+
+
 
 extern int optind;
 
@@ -83,6 +85,7 @@ struct cfg_cmsg_types {
 
 struct cfg_sockopt_types {
 	unsigned int transparent:1;
+	unsigned int mptfo:1;
 };
 
 struct tcp_inq_state {
@@ -232,6 +235,14 @@ static void set_transparent(int fd, int pf)
 	}
 }
 
+static void set_mptfo(int fd, int pf)
+{
+	int qlen = 25;
+
+	if (setsockopt(fd, SOL_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen)) == -1)
+		perror("TCP_FASTOPEN");
+}
+
 static int do_ulp_so(int sock, const char *name)
 {
 	return setsockopt(sock, IPPROTO_TCP, TCP_ULP, name, strlen(name));
@@ -300,6 +311,9 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		if (cfg_sockopt_types.transparent)
 			set_transparent(sock, pf);
 
+		if (cfg_sockopt_types.mptfo)
+			set_mptfo(sock, pf);
+
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
 
@@ -330,13 +344,18 @@ static int sock_listen_mptcp(const char * const listenaddr,
 
 static int sock_connect_mptcp(const char * const remoteaddr,
 			      const char * const port, int proto,
-			      struct addrinfo **peer)
+			      struct addrinfo **peer,
+			      int infd,
+			      unsigned int *woff)
 {
 	struct addrinfo hints = {
 		.ai_protocol = IPPROTO_TCP,
 		.ai_socktype = SOCK_STREAM,
 	};
 	struct addrinfo *a, *addr;
+	unsigned int wlen = 0;
+	int syn_copied = 0;
+	char wbuf[8192];
 	int sock = -1;
 
 	hints.ai_family = pf;
@@ -354,14 +373,33 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 		if (cfg_mark)
 			set_mark(sock, cfg_mark);
 
-		if (connect(sock, a->ai_addr, a->ai_addrlen) == 0) {
-			*peer = a;
-			break; /* success */
-		}
+		if (cfg_sockopt_types.mptfo) {
+			if (wlen == 0)
+				wlen = read(infd, wbuf, sizeof(wbuf));
 
-		perror("connect()");
-		close(sock);
-		sock = -1;
+			syn_copied = sendto(sock, wbuf, wlen, MSG_FASTOPEN,
+					    a->ai_addr, a->ai_addrlen);
+			if (syn_copied) {
+				*woff = wlen;
+				*peer = a;
+				break; /* success */
+			}
+		} else {
+			if (connect(sock, a->ai_addr, a->ai_addrlen) == 0) {
+				*peer = a;
+				break; /* success */
+			}
+		}
+		if (cfg_sockopt_types.mptfo) {
+			perror("sendto()");
+			close(sock);
+			sock = -1;
+		} else {
+
+			perror("connect()");
+			close(sock);
+			sock = -1;
+		}
 	}
 
 	freeaddrinfo(addr);
@@ -571,13 +609,14 @@ static void shut_wr(int fd)
 	shutdown(fd, SHUT_WR);
 }
 
-static int copyfd_io_poll(int infd, int peerfd, int outfd, bool *in_closed_after_out)
+static int copyfd_io_poll(int infd, int peerfd, int outfd,
+			  bool *in_closed_after_out, unsigned int woff)
 {
 	struct pollfd fds = {
 		.fd = peerfd,
 		.events = POLLIN | POLLOUT,
 	};
-	unsigned int woff = 0, wlen = 0, total_wlen = 0, total_rlen = 0;
+	unsigned int wlen = 0, total_wlen = 0, total_rlen = 0;
 	char wbuf[8192];
 
 	set_nonblock(peerfd, true);
@@ -839,7 +878,7 @@ static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
 	return err;
 }
 
-static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd)
+static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, unsigned int woff)
 {
 	bool in_closed_after_out = false;
 	struct timespec start, end;
@@ -851,7 +890,7 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd)
 
 	switch (cfg_mode) {
 	case CFG_MODE_POLL:
-		ret = copyfd_io_poll(infd, peerfd, outfd, &in_closed_after_out);
+		ret = copyfd_io_poll(infd, peerfd, outfd, &in_closed_after_out, woff);
 		break;
 
 	case CFG_MODE_MMAP:
@@ -1033,7 +1072,7 @@ again:
 
 		SOCK_TEST_TCPULP(remotesock, 0);
 
-		copyfd_io(fd, remotesock, 1, true);
+		copyfd_io(fd, remotesock, 1, true, 0);
 	} else {
 		perror("accept");
 		return 1;
@@ -1130,6 +1169,11 @@ static void parse_setsock_options(const char *name)
 		return;
 	}
 
+	if (strncmp(name, "MPTFO", len) == 0) {
+		cfg_sockopt_types.mptfo = 1;
+		return;
+	}
+
 	fprintf(stderr, "Unrecognized setsockopt option %s\n", name);
 	exit(1);
 }
@@ -1168,23 +1212,25 @@ int main_loop(void)
 {
 	int fd, ret, fd_in = 0;
 	struct addrinfo *peer;
+	unsigned int woff = 0;
 
-	/* listener is ready. */
-	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer);
-	if (fd < 0)
-		return 2;
-
+	if (!cfg_sockopt_types.mptfo) {
+		/* listener is ready. */
+		fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer, 0, 0);
+		if (fd < 0)
+			return 2;
 again:
-	check_getpeername_connect(fd);
+		check_getpeername_connect(fd);
 
-	SOCK_TEST_TCPULP(fd, cfg_sock_proto);
+		SOCK_TEST_TCPULP(fd, cfg_sock_proto);
 
-	if (cfg_rcvbuf)
-		set_rcvbuf(fd, cfg_rcvbuf);
-	if (cfg_sndbuf)
-		set_sndbuf(fd, cfg_sndbuf);
-	if (cfg_cmsg_types.cmsg_enabled)
-		apply_cmsg_types(fd, &cfg_cmsg_types);
+		if (cfg_rcvbuf)
+			set_rcvbuf(fd, cfg_rcvbuf);
+		if (cfg_sndbuf)
+			set_sndbuf(fd, cfg_sndbuf);
+		if (cfg_cmsg_types.cmsg_enabled)
+			apply_cmsg_types(fd, &cfg_cmsg_types);
+	}
 
 	if (cfg_input) {
 		fd_in = open(cfg_input, O_RDONLY);
@@ -1192,8 +1238,25 @@ again:
 			xerror("can't open %s:%d", cfg_input, errno);
 	}
 
-	/* close the client socket open only if we are not going to reconnect */
-	ret = copyfd_io(fd_in, fd, 1, 0);
+	if (cfg_sockopt_types.mptfo) {
+		/* sendto() instead of connect */
+		fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer, fd_in, &woff);
+		if (fd < 0)
+			return 2;
+
+		check_getpeername_connect(fd);
+
+		SOCK_TEST_TCPULP(fd, cfg_sock_proto);
+
+		if (cfg_rcvbuf)
+			set_rcvbuf(fd, cfg_rcvbuf);
+		if (cfg_sndbuf)
+			set_sndbuf(fd, cfg_sndbuf);
+		if (cfg_cmsg_types.cmsg_enabled)
+			apply_cmsg_types(fd, &cfg_cmsg_types);
+	}
+
+	ret = copyfd_io(fd_in, fd, 1, 0, 0);
 	if (ret)
 		return ret;
 
