@@ -1,4 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-run-mptcp_inq-from-a-clean-netns
+Subject: [PATCH] selftests: mptcp: run mptcp_inq from a clean netns
+
+A new "sandbox" net namespace is available where no other netfilter
+rules have been added.
+
+Use this new netns instead of re-using "ns1" and clean it.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
