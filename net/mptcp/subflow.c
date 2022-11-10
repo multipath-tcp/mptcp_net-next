@@ -307,7 +307,47 @@ static struct dst_entry *subflow_v4_route_req(const struct sock *sk,
 	return NULL;
 }
 
+static int subflow_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
+				  struct flowi *fl,
+				  struct request_sock *req,
+				  struct tcp_fastopen_cookie *foc,
+				  enum tcp_synack_type synack_type,
+				  struct sk_buff *syn_skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct inet_request_sock *ireq = inet_rsk(req);
+
+	/* clear tstamp_ok, as needed depending on cookie */
+	if (foc && foc->len > -1)
+		ireq->tstamp_ok = 0;
+
+	if (synack_type == TCP_SYNACK_FASTOPEN)
+		subflow_fastopen_send_synack_set_params(subflow, req);
+
+	return tcp_request_sock_ipv4_ops.send_synack(sk, dst, fl, req, foc, synack_type, syn_skb);
+}
+
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
+static int subflow_v6_send_synack(const struct sock *sk, struct dst_entry *dst,
+				  struct flowi *fl,
+				  struct request_sock *req,
+				  struct tcp_fastopen_cookie *foc,
+				  enum tcp_synack_type synack_type,
+				  struct sk_buff *syn_skb)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+	struct inet_request_sock *ireq = inet_rsk(req);
+
+	/* clear tstamp_ok, as needed depending on cookie */
+	if (foc && foc->len > -1)
+		ireq->tstamp_ok = 0;
+
+	if (synack_type == TCP_SYNACK_FASTOPEN)
+		subflow_fastopen_send_synack_set_params(subflow, req);
+
+	return tcp_request_sock_ipv6_ops.send_synack(sk, dst, fl, req, foc, synack_type, syn_skb);
+}
+
 static struct dst_entry *subflow_v6_route_req(const struct sock *sk,
 					      struct sk_buff *skb,
 					      struct flowi *fl,
@@ -645,6 +685,9 @@ void mptcp_subflow_fully_established(struct mptcp_subflow_context *subflow,
 	subflow->fully_established = 1;
 	subflow->can_ack = 1;
 	WRITE_ONCE(msk->fully_established, true);
+
+	if (msk->is_mptfo)
+		mptcp_gen_msk_ackseq_fastopen(msk, subflow, mp_opt);
 }
 
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
@@ -760,7 +803,7 @@ create_child:
 			/* with OoO packets we can reach here without ingress
 			 * mpc option
 			 */
-			if (mp_opt.suboptions & OPTIONS_MPTCP_MPC)
+			if (mp_opt.suboptions & OPTION_MPTCP_MPC_ACK)
 				mptcp_subflow_fully_established(ctx, &mp_opt);
 		} else if (ctx->mp_join) {
 			struct mptcp_sock *owner;
@@ -1929,6 +1972,7 @@ void __init mptcp_subflow_init(void)
 
 	subflow_request_sock_ipv4_ops = tcp_request_sock_ipv4_ops;
 	subflow_request_sock_ipv4_ops.route_req = subflow_v4_route_req;
+	subflow_request_sock_ipv4_ops.send_synack = subflow_v4_send_synack;
 
 	subflow_specific = ipv4_specific;
 	subflow_specific.conn_request = subflow_v4_conn_request;
@@ -1942,6 +1986,7 @@ void __init mptcp_subflow_init(void)
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	subflow_request_sock_ipv6_ops = tcp_request_sock_ipv6_ops;
 	subflow_request_sock_ipv6_ops.route_req = subflow_v6_route_req;
+	subflow_request_sock_ipv6_ops.send_synack = subflow_v6_send_synack;
 
 	subflow_v6_specific = ipv6_specific;
 	subflow_v6_specific.conn_request = subflow_v6_conn_request;
