@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-mptfo-Initiator-Listener
+From: Dmytro Shytyi <dmytro@shytyi.net>
+Subject: [PATCH] selftests: mptcp: mptfo Initiator/Listener
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds the selftests support for mptfo in mptcp_connect.c
+We introduce mptfo option, that sets "TCP_FASTOPEN" + "MSG_FASTOPEN"
+We call sendto() instead of connect().
+
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
