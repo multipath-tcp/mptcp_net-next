@@ -841,7 +841,7 @@ bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
 
 // Fast Open Mechanism functions begin
 void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
-				   struct mptcp_options_received mp_opt);
+				   const struct mptcp_options_received *mp_opt);
 void mptcp_set_owner_r(struct sk_buff *skb, struct sock *sk);
 void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
 					     struct request_sock *req);

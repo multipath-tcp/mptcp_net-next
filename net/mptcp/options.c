@@ -939,7 +939,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		    subflow->mp_join && (mp_opt->suboptions & OPTIONS_MPTCP_MPJ) &&
 		    !subflow->request_join)
 			tcp_send_ack(ssk);
-		goto fully_established;
+		goto check_notify;
 	}
 
 	/* we must process OoO packets before the first subflow is fully
@@ -950,6 +950,8 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	if (TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1) {
 		if (subflow->mp_join)
 			goto reset;
+		if (msk->is_mptfo && mp_opt->suboptions & OPTION_MPTCP_MPC_ACK)
+			goto set_fully_established;
 		return subflow->mp_capable;
 	}
 
@@ -960,7 +962,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		 */
 		subflow->fully_established = 1;
 		WRITE_ONCE(msk->fully_established, true);
-		goto fully_established;
+		goto check_notify;
 	}
 
 	/* If the first established packet does not contain MP_CAPABLE + data
@@ -979,11 +981,12 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	if (mp_opt->deny_join_id0)
 		WRITE_ONCE(msk->pm.remote_deny_join_id0, true);
 
+set_fully_established:
 	if (unlikely(!READ_ONCE(msk->pm.server_side)))
 		pr_warn_once("bogus mpc option on established client sk");
 	mptcp_subflow_fully_established(subflow, mp_opt);
 
-fully_established:
+check_notify:
 	/* if the subflow is not already linked into the conn_list, we can't
 	 * notify the PM: this subflow is still on the listener queue
 	 * and the PM possibly acquiring the subflow lock could race with
@@ -1213,11 +1216,6 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 			mpext->dsn64 = 1;
 			mpext->mpc_map = 1;
 			mpext->data_fin = 0;
-
-			if (msk->is_mptfo) {
-				mptcp_gen_msk_ackseq_fastopen(msk, subflow, mp_opt);
-				mpext->data_seq = READ_ONCE(msk->ack_seq);
-			}
 		} else {
 			mpext->data_seq = mp_opt.data_seq;
 			mpext->subflow_seq = mp_opt.subflow_seq;
