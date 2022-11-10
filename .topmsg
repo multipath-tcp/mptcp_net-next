@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-TCP_FASTOPEN-sock-option
+From: Dmytro Shytyi <dmytro@shytyi.net>
+Subject: [PATCH] mptcp: add TCP_FASTOPEN sock option
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We add the TCP_FASTOPEN socket option in this patch that is going to
+ be set by the listener side.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
