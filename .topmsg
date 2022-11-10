@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-implement-delayed-seq-generation-for-passive-fastopen
+From: Dmytro Shytyi <dmytro@shytyi.net>
+Subject: [PATCH] mptcp: implement delayed seq generation for passive fastopen
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+With fastopen in place the first subflow socket is created
+before the MPC handshake completes, and we need to properly initialize
+the sequence numbers at MPC ACK reception.
+
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
