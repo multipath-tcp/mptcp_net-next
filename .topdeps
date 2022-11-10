@@ -1,1 +1,1 @@
-t/selftests-mptcp-gives-slow-test-case-more-time
+t/selftests-mptcp-run-mptcp_sockopt-from-a-new-netns
