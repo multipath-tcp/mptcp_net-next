@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-track-accurately-the-incoming-MPC-suboption-type
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: track accurately the incoming MPC suboption type
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently in the receive path we don't need to discriminate
+between MPC SYN, MPC SYN-ACK and MPC ACK, but soon the fastopen
+code will need that info to properly track the fully established
+status.
+
+Track the exact MPC suboption type into the receive opt bitmap.
+No functional change intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
