@@ -5,4 +5,7 @@ In this patch we add skb to the msk, dequeue it from sk, remove TSs and
 do skb mapping.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
 Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
