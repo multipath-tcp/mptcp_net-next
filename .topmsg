@@ -1,4 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-removed-defined-but-unused-vars
+Subject: [PATCH] selftests: mptcp: removed defined but unused vars
+
+Some variables were set but never used.
+
+This was not causing any issues except adding some confusion and having
+shellcheck complaining about them.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
