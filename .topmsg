@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-uniform-rndh-variable
+Subject: [PATCH] selftests: mptcp: uniform 'rndh' variable
+
+The definition of 'rndh' was probably copied from one script to another
+but some times, 'sec' was not defined, not used and/or not spelled
+properly.
+
+Here all the 'rndh' are now defined the same way.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
