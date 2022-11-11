@@ -1,4 +1,19 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-fix-mibit-vs-mbit-mix-up
+Subject: [PATCH] selftests: mptcp: fix mibit vs mbit mix up
 
+The estimated time was supposing the rate was expressed in mibit
+(bit * 1024^2) but it is in mbit (bit * 1000^2).
+
+This makes the threshold higher but in a more realistic way to avoid
+false positives reported by CI instances.
+
+Before this patch, the thresholds were at 7561/4005ms and now they are
+at 7906/4178ms.
+
+While at it, also fix a typo in the linked comment, spotted by Mat.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/310
+Fixes: 1a418cb8e888 ("mptcp: simult flow self-tests")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
