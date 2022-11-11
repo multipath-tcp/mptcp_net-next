@@ -375,13 +375,12 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			set_mark(sock, cfg_mark);
 
 		if (cfg_sockopt_types.mptfo) {
-			winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
+			if (!winfo->len)
+				winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
 
 			syn_copied = sendto(sock, winfo->buf, winfo->len, MSG_FASTOPEN,
 					    a->ai_addr, a->ai_addrlen);
-			if (syn_copied < 0)
-				perror("sendto");
-			if (syn_copied) {
+			if (syn_copied >= 0) {
 				winfo->off = syn_copied;
 				winfo->len -= syn_copied;
 				*peer = a;
