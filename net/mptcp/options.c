@@ -950,7 +950,7 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	if (TCP_SKB_CB(skb)->seq != subflow->ssn_offset + 1) {
 		if (subflow->mp_join)
 			goto reset;
-		if (msk->is_mptfo && mp_opt->suboptions & OPTION_MPTCP_MPC_ACK)
+		if (subflow->is_mptfo && mp_opt->suboptions & OPTION_MPTCP_MPC_ACK)
 			goto set_fully_established;
 		return subflow->mp_capable;
 	}
