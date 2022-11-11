@@ -686,7 +686,7 @@ void mptcp_subflow_fully_established(struct mptcp_subflow_context *subflow,
 	subflow->can_ack = 1;
 	WRITE_ONCE(msk->fully_established, true);
 
-	if (msk->is_mptfo)
+	if (subflow->is_mptfo)
 		mptcp_gen_msk_ackseq_fastopen(msk, subflow, mp_opt);
 }
 
