@@ -95,6 +95,7 @@ struct wstate {
 	char buf[8192];
 	unsigned int len;
 	unsigned int off;
+	unsigned int total_len;
 };
 
 static struct tcp_inq_state tcp_inq;
@@ -375,8 +376,8 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			set_mark(sock, cfg_mark);
 
 		if (cfg_sockopt_types.mptfo) {
-			if (!winfo->len)
-				winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
+			if (!winfo->total_len)
+				winfo->total_len = winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
 
 			syn_copied = sendto(sock, winfo->buf, winfo->len, MSG_FASTOPEN,
 					    a->ai_addr, a->ai_addrlen);
@@ -757,10 +758,26 @@ static int do_recvfile(int infd, int outfd)
 	return (int)r;
 }
 
-static int do_mmap(int infd, int outfd, unsigned int size)
+static int spool_buf(int fd, struct wstate *winfo)
+{
+	while (winfo->len) {
+		int ret = write(fd, winfo->buf + winfo->off, winfo->len);
+
+		if (ret < 0) {
+			perror("write");
+			return 4;
+		}
+		winfo->off += ret;
+		winfo->len -= ret;
+	}
+	return 0;
+}
+
+static int do_mmap(int infd, int outfd, unsigned int size,
+		   struct wstate *winfo)
 {
 	char *inbuf = mmap(NULL, size, PROT_READ, MAP_SHARED, infd, 0);
-	ssize_t ret = 0, off = 0;
+	ssize_t ret = 0, off = winfo->total_len;
 	size_t rem;
 
 	if (inbuf == MAP_FAILED) {
@@ -768,7 +785,11 @@ static int do_mmap(int infd, int outfd, unsigned int size)
 		return 1;
 	}
 
-	rem = size;
+	ret = spool_buf(outfd, winfo);
+	if (ret < 0)
+		return ret;
+
+	rem = size - winfo->total_len;
 
 	while (rem > 0) {
 		ret = write(outfd, inbuf + off, rem);
@@ -812,8 +833,15 @@ static int get_infd_size(int fd)
 	return (int)count;
 }
 
-static int do_sendfile(int infd, int outfd, unsigned int count)
+static int do_sendfile(int infd, int outfd, unsigned int count,
+		       struct wstate *winfo)
 {
+	int ret = spool_buf(outfd, winfo);
+	if (ret < 0)
+		return ret;
+
+	count -= winfo->total_len;
+
 	while (count > 0) {
 		ssize_t r;
 
@@ -830,7 +858,8 @@ static int do_sendfile(int infd, int outfd, unsigned int count)
 }
 
 static int copyfd_io_mmap(int infd, int peerfd, int outfd,
-			  unsigned int size, bool *in_closed_after_out)
+			  unsigned int size, bool *in_closed_after_out,
+			  struct wstate *winfo)
 {
 	int err;
 
@@ -839,9 +868,9 @@ static int copyfd_io_mmap(int infd, int peerfd, int outfd,
 		if (err)
 			return err;
 
-		err = do_mmap(infd, peerfd, size);
+		err = do_mmap(infd, peerfd, size, winfo);
 	} else {
-		err = do_mmap(infd, peerfd, size);
+		err = do_mmap(infd, peerfd, size, winfo);
 		if (err)
 			return err;
 
@@ -855,7 +884,7 @@ static int copyfd_io_mmap(int infd, int peerfd, int outfd,
 }
 
 static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
-			      unsigned int size, bool *in_closed_after_out)
+			      unsigned int size, bool *in_closed_after_out, struct wstate *winfo)
 {
 	int err;
 
@@ -864,9 +893,9 @@ static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
 		if (err)
 			return err;
 
-		err = do_sendfile(infd, peerfd, size);
+		err = do_sendfile(infd, peerfd, size, winfo);
 	} else {
-		err = do_sendfile(infd, peerfd, size);
+		err = do_sendfile(infd, peerfd, size, winfo);
 		if (err)
 			return err;
 
@@ -898,14 +927,14 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct 
 		file_size = get_infd_size(infd);
 		if (file_size < 0)
 			return file_size;
-		ret = copyfd_io_mmap(infd, peerfd, outfd, file_size, &in_closed_after_out);
+		ret = copyfd_io_mmap(infd, peerfd, outfd, file_size, &in_closed_after_out, winfo);
 		break;
 
 	case CFG_MODE_SENDFILE:
 		file_size = get_infd_size(infd);
 		if (file_size < 0)
 			return file_size;
-		ret = copyfd_io_sendfile(infd, peerfd, outfd, file_size, &in_closed_after_out);
+		ret = copyfd_io_sendfile(infd, peerfd, outfd, file_size, &in_closed_after_out, winfo);
 		break;
 
 	default:
