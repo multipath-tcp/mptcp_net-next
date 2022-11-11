@@ -126,6 +126,15 @@
 #define MPTCP_CONNECTED		6
 #define MPTCP_RESET_SCHEDULER	7
 
+struct mptcp_skb_cb {
+	u64 map_seq;
+	u64 end_seq;
+	u32 offset;
+	u8  has_rxtstamp:1;
+};
+
+#define MPTCP_SKB_CB(__skb)	((struct mptcp_skb_cb *)&((__skb)->cb[0]))
+
 static inline bool before64(__u64 seq1, __u64 seq2)
 {
 	return (__s64)(seq1 - seq2) < 0;
