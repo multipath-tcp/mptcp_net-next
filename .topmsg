@@ -7,4 +7,6 @@ the sequence numbers at MPC ACK reception.
 
 Co-developed-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Dmytro Shytyi <dmytro@shytyi.net>
