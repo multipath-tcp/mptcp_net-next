@@ -17,7 +17,7 @@ void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subfl
 	tp = tcp_sk(ssk);
 
 	/* mark subflow/msk as "mptfo" */
-	msk->is_mptfo = 1;
+	subflow->is_mptfo = 1;
 
 	skb = skb_peek(&ssk->sk_receive_queue);
 	if (WARN_ON_ONCE(!skb))
