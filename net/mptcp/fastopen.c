@@ -9,14 +9,11 @@ void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subfl
 {
 	struct sock *ssk = subflow->tcp_sock;
 	struct sock *sk = subflow->conn;
-	struct mptcp_sock *msk;
 	struct sk_buff *skb;
 	struct tcp_sock *tp;
 
-	msk = mptcp_sk(sk);
 	tp = tcp_sk(ssk);
 
-	/* mark subflow/msk as "mptfo" */
 	subflow->is_mptfo = 1;
 
 	skb = skb_peek(&ssk->sk_receive_queue);
