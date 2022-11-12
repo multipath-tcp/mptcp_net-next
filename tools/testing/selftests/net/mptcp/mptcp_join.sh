@@ -2509,6 +2509,51 @@ backup_tests()
 	fi
 }
 
+AF_INET=2
+AF_INET6=10
+
+verify_listener_events()
+{
+	local evt=$1
+	local e_type=$2
+	local e_family=$3
+	local e_saddr=$4
+	local e_sport=$5
+	local type
+	local family
+	local saddr
+	local sport
+
+	if [ "$e_type" = 15 ]; then
+		stdbuf -o0 -e0 printf "\t\t\t\t\t CREATE_LISTENER %s:%s"\
+			"$e_saddr" "$e_sport"
+	elif [ "$e_type" = 16 ]; then
+		stdbuf -o0 -e0 printf "\t\t\t\t\t CLOSE_LISTENER %s:%s "\
+			"$e_saddr" "$e_sport"
+	fi
+
+	type=$(grep "type:$e_type," "$evt" |
+	       sed --unbuffered -n 's/.*\(type:\)\([[:digit:]]*\).*$/\2/p;q')
+	family=$(grep "type:$e_type," "$evt" |
+		 sed --unbuffered -n 's/.*\(family:\)\([[:digit:]]*\).*$/\2/p;q')
+	sport=$(grep "type:$e_type," "$evt" |
+		sed --unbuffered -n 's/.*\(sport:\)\([[:digit:]]*\).*$/\2/p;q')
+	if [ "$family" = "$AF_INET6" ]; then
+		saddr=$(grep "type:$e_type," "$evt" |
+			sed --unbuffered -n 's/.*\(saddr6:\)\([0-9a-f:.]*\).*$/\2/p;q')
+	else
+		saddr=$(grep "type:$e_type," "$evt" |
+			sed --unbuffered -n 's/.*\(saddr4:\)\([0-9.]*\).*$/\2/p;q')
+	fi
+
+	if [ "$type" = "$e_type" ] && [ "$family" = "$e_family" ] &&
+	   [ "$saddr" = "$e_saddr" ] && [ "$sport" = "$e_sport" ]; then
+		stdbuf -o0 -e0 printf "[ ok ]\n"
+		return 0
+	fi
+	stdbuf -o0 -e0 printf "[fail]\n"
+}
+
 add_addr_ports_tests()
 {
 	# signal address with port
@@ -2588,6 +2633,30 @@ add_addr_ports_tests()
 		run_tests $ns1 $ns2 10.0.1.1
 		chk_join_nr 2 2 2
 		chk_add_nr 2 2 2
+	fi
+
+	# pm listener events
+	if reset "pm listener events"; then
+		local evts
+		local pid
+
+		evts=$(mktemp)
+		:> "$evts"
+		ip netns exec $ns1 ./pm_nl_ctl events >> "$evts" 2>&1 &
+		pid=$!
+
+		pm_nl_set_limits $ns1 0 1
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal port 10100
+		pm_nl_set_limits $ns2 1 1
+		run_tests $ns1 $ns2 10.0.1.1 0 -1 0 slow
+		chk_join_nr 1 1 1
+		chk_add_nr 1 1 1
+		chk_rm_nr 1 1 invert
+
+		verify_listener_events "$evts" 15 "$AF_INET" "10.0.2.1" "10100"
+		verify_listener_events "$evts" 16 "$AF_INET" "10.0.2.1" "10100"
+		kill_wait $pid
+		rm -rf $evts
 	fi
 }
 
