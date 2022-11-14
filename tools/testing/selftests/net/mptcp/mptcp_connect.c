@@ -377,7 +377,8 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 		if (cfg_sockopt_types.mptfo) {
 			if (!winfo->total_len)
-				winfo->total_len = winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
+				winfo->total_len = winfo->len = read(infd, winfo->buf,
+								     sizeof(winfo->buf));
 
 			syn_copied = sendto(sock, winfo->buf, winfo->len, MSG_FASTOPEN,
 					    a->ai_addr, a->ai_addrlen);
@@ -837,6 +838,7 @@ static int do_sendfile(int infd, int outfd, unsigned int count,
 		       struct wstate *winfo)
 {
 	int ret = spool_buf(outfd, winfo);
+
 	if (ret < 0)
 		return ret;
 
@@ -920,21 +922,24 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct 
 
 	switch (cfg_mode) {
 	case CFG_MODE_POLL:
-		ret = copyfd_io_poll(infd, peerfd, outfd, &in_closed_after_out, winfo);
+		ret = copyfd_io_poll(infd, peerfd, outfd, &in_closed_after_out,
+				     winfo);
 		break;
 
 	case CFG_MODE_MMAP:
 		file_size = get_infd_size(infd);
 		if (file_size < 0)
 			return file_size;
-		ret = copyfd_io_mmap(infd, peerfd, outfd, file_size, &in_closed_after_out, winfo);
+		ret = copyfd_io_mmap(infd, peerfd, outfd, file_size,
+				     &in_closed_after_out, winfo);
 		break;
 
 	case CFG_MODE_SENDFILE:
 		file_size = get_infd_size(infd);
 		if (file_size < 0)
 			return file_size;
-		ret = copyfd_io_sendfile(infd, peerfd, outfd, file_size, &in_closed_after_out, winfo);
+		ret = copyfd_io_sendfile(infd, peerfd, outfd, file_size,
+					 &in_closed_after_out, winfo);
 		break;
 
 	default:
