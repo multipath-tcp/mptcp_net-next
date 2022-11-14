@@ -6,8 +6,8 @@
 
 #include "protocol.h"
 
-void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
-					     struct request_sock *req)
+void mptcp_fastopen_subflow_synack_set_params(struct mptcp_subflow_context *subflow,
+					      struct request_sock *req)
 {
 	struct sock *ssk = subflow->tcp_sock;
 	struct sock *sk = subflow->conn;
