@@ -1,9 +1,0 @@
-From: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Subject: [PATCH] mptcp: Fix grammar in a comment
-
-We kept getting initial patches from new contributors to remove a
-duplicate 'the' (since grammar checking scripts flag it), but submitters
-never followed up after code review.
-
-Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
