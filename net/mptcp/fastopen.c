@@ -70,8 +70,8 @@ void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_
 	if (skb) {
 		WARN_ON_ONCE(MPTCP_SKB_CB(skb)->end_seq);
 		pr_debug("msk %p moving seq %llx -> %llx end_seq %llx -> %llx", sk,
-			MPTCP_SKB_CB(skb)->map_seq,  msk->ack_seq + MPTCP_SKB_CB(skb)->map_seq,
-			MPTCP_SKB_CB(skb)->end_seq, MPTCP_SKB_CB(skb)->end_seq + msk->ack_seq);
+			 MPTCP_SKB_CB(skb)->map_seq, MPTCP_SKB_CB(skb)->map_seq + msk->ack_seq,
+			 MPTCP_SKB_CB(skb)->end_seq, MPTCP_SKB_CB(skb)->end_seq + msk->ack_seq);
 		MPTCP_SKB_CB(skb)->map_seq += msk->ack_seq;
 		MPTCP_SKB_CB(skb)->end_seq += msk->ack_seq;
 	}
