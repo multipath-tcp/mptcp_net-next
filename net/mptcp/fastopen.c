@@ -27,7 +27,7 @@ void mptcp_fastopen_subflow_synack_set_params(struct mptcp_subflow_context *subf
 	skb_ext_reset(skb);
 	skb_orphan(skb);
 
-	/* We copy the fastopen data, but that don't belown to the mptcp sequence
+	/* We copy the fastopen data, but that don't belong to the mptcp sequence
 	 * space, need to offset it in the subflow sequence, see mptcp_subflow_get_map_offset()
 	 */
 	tp->copied_seq += skb->len;
