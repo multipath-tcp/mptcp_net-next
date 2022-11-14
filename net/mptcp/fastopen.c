@@ -6,7 +6,7 @@
 
 #include "protocol.h"
 
-void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
+void mptcp_fastopen_gen_msk_ackseq(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
 				   const struct mptcp_options_received *mp_opt)
 {
 	struct sock *sk = (struct sock *)msk;
