@@ -1128,7 +1128,8 @@ validate_seq:
 	 */
 	if (!validate_mapping(ssk, skb)) {
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSTCPMISMATCH);
-		return MAPPING_INVALID;
+		sk_eat_skb(ssk, skb);
+		return MAPPING_EMPTY;
 	}
 
 	skb_ext_del(skb, SKB_EXT_MPTCP);
