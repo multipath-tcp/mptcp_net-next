@@ -840,8 +840,8 @@ bool mptcp_userspace_pm_active(const struct mptcp_sock *msk);
 void mptcp_fastopen_gen_msk_ackseq(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
 				   const struct mptcp_options_received *mp_opt);
 void mptcp_set_owner_r(struct sk_buff *skb, struct sock *sk);
-void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
-					     struct request_sock *req);
+void mptcp_fastopen_subflow_synack_set_params(struct mptcp_subflow_context *subflow,
+					      struct request_sock *req);
 
 static inline bool mptcp_pm_should_add_signal(struct mptcp_sock *msk)
 {
