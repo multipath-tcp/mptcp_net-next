@@ -1,4 +1,34 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/tcp-Fix-tcp_syn_flood_action-if-CONFIG_IPV6-n
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Subject: [PATCH] tcp: Fix tcp_syn_flood_action() if CONFIG_IPV6=n
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If CONFIG_IPV6=n:
+
+    net/ipv4/tcp_input.c: In function ‘tcp_syn_flood_action’:
+    include/net/sock.h:387:37: error: ‘const struct sock_common’ has no member named ‘skc_v6_rcv_saddr’; did you mean ‘skc_rcv_saddr’?
+      387 | #define sk_v6_rcv_saddr __sk_common.skc_v6_rcv_saddr
+	  |                                     ^~~~~~~~~~~~~~~~
+    include/linux/printk.h:429:19: note: in definition of macro ‘printk_index_wrap’
+      429 |   _p_func(_fmt, ##__VA_ARGS__);    \
+	  |                   ^~~~~~~~~~~
+    include/linux/printk.h:530:2: note: in expansion of macro ‘printk’
+      530 |  printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+	  |  ^~~~~~
+    include/linux/net.h:272:3: note: in expansion of macro ‘pr_info’
+      272 |   function(__VA_ARGS__);    \
+	  |   ^~~~~~~~
+    include/linux/net.h:288:2: note: in expansion of macro ‘net_ratelimited_function’
+      288 |  net_ratelimited_function(pr_info, fmt, ##__VA_ARGS__)
+	  |  ^~~~~~~~~~~~~~~~~~~~~~~~
+    include/linux/net.h:288:43: note: in expansion of macro ‘sk_v6_rcv_saddr’
+      288 |  net_ratelimited_function(pr_info, fmt, ##__VA_ARGS__)
+	  |                                           ^~~~~~~~~~~
+    net/ipv4/tcp_input.c:6847:4: note: in expansion of macro ‘net_info_ratelimited’
+     6847 |    net_info_ratelimited("%s: Possible SYN flooding on port [%pI6c]:%u. %s.\n",
+	  |    ^~~~~~~~~~~~~~~~~~~~
+
+Fix this by using "#if" instead of "if", like is done for all other
+checks for CONFIG_IPV6.
+
+Fixes: d9282e48c6088105 ("tcp: Add listening address to SYN flood message")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
