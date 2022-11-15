@@ -687,7 +687,7 @@ void mptcp_subflow_fully_established(struct mptcp_subflow_context *subflow,
 	WRITE_ONCE(msk->fully_established, true);
 
 	if (subflow->is_mptfo)
-		mptcp_gen_msk_ackseq_fastopen(msk, subflow, mp_opt);
+		mptcp_fastopen_gen_msk_ackseq(msk, subflow, mp_opt);
 }
 
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
