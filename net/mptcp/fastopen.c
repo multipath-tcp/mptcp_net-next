@@ -6,8 +6,8 @@
 
 #include "protocol.h"
 
-void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subflow,
-					     struct request_sock *req)
+void mptcp_fastopen_subflow_synack_set_params(struct mptcp_subflow_context *subflow,
+					      struct request_sock *req)
 {
 	struct sock *ssk = subflow->tcp_sock;
 	struct sock *sk = subflow->conn;
@@ -27,7 +27,7 @@ void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subfl
 	skb_ext_reset(skb);
 	skb_orphan(skb);
 
-	/* We copy the fastopen data, but that don't belown to the mptcp sequence
+	/* We copy the fastopen data, but that don't belong to the mptcp sequence
 	 * space, need to offset it in the subflow sequence, see mptcp_subflow_get_map_offset()
 	 */
 	tp->copied_seq += skb->len;
@@ -51,7 +51,7 @@ void subflow_fastopen_send_synack_set_params(struct mptcp_subflow_context *subfl
 	mptcp_data_unlock(sk);
 }
 
-void mptcp_gen_msk_ackseq_fastopen(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
+void mptcp_fastopen_gen_msk_ackseq(struct mptcp_sock *msk, struct mptcp_subflow_context *subflow,
 				   const struct mptcp_options_received *mp_opt)
 {
 	struct sock *sk = (struct sock *)msk;
