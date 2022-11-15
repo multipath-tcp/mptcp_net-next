@@ -1,8 +1,9 @@
 From: Dmytro Shytyi <dmytro@shytyi.net>
-Subject: [PATCH] mptcp: introduce MSG_FASTOPEN flag
+Subject: [PATCH] mptcp: add MSG_FASTOPEN sendmsg flag support
 
-In the following patches we will analyse the MSG_FASTOPEN flag
-in the mptcp_sendmsg() and invoke the MPTFO.
+Since commit 54f1944ed6d2 ("mptcp: factor out mptcp_connect()") all the
+infrastructure is now in place to support the MSG_FASTOPEN flag, we
+just need to call into the fastopen path in mptcp_sendmsg().
 
 Co-developed-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
 Signed-off-by: Benjamin Hesmans <benjamin.hesmans@tessares.net>
