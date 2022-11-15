@@ -399,7 +399,6 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			close(sock);
 			sock = -1;
 		} else {
-
 			perror("connect()");
 			close(sock);
 			sock = -1;
