@@ -56,16 +56,8 @@ void mptcp_fastopen_gen_msk_ackseq(struct mptcp_sock *msk, struct mptcp_subflow_
 {
 	struct sock *sk = (struct sock *)msk;
 	struct sk_buff *skb;
-	u64 ack_seq;
-
-	mptcp_crypto_key_sha(mp_opt->sndr_key, NULL, &ack_seq);
-	ack_seq++;
 
 	mptcp_data_lock(sk);
-	WRITE_ONCE(msk->can_ack, true);
-	WRITE_ONCE(msk->ack_seq, ack_seq);
-	atomic64_set(&msk->rcv_wnd_sent, ack_seq);
-	msk->remote_key = mp_opt->sndr_key;
 	skb = skb_peek_tail(&sk->sk_receive_queue);
 	if (skb) {
 		WARN_ON_ONCE(MPTCP_SKB_CB(skb)->end_seq);
