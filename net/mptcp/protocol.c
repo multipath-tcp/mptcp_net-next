@@ -806,7 +806,7 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 
 	/* Wake-up the reader only for in-sequence data */
 	mptcp_data_lock(sk);
-	if (move_skbs_to_msk(msk, ssk))
+	if (move_skbs_to_msk(msk, ssk) && !sock_flag(sk, SOCK_DEAD))
 		sk->sk_data_ready(sk);
 
 	mptcp_data_unlock(sk);
@@ -2938,7 +2938,6 @@ cleanup:
 		if (ssk == msk->first)
 			subflow->fail_tout = 0;
 
-		sock_orphan(ssk);
 		unlock_sock_fast(ssk, slow);
 	}
 	sock_orphan(sk);
