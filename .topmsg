@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-drop-last_snd-and-MPTCP_RESET_SCHEDULER
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
