@@ -1551,7 +1551,7 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 		if (msk->snd_burst <= 0 ||
 		    !sk_stream_memory_free(ssk) ||
 		    !mptcp_subflow_active(mptcp_subflow_ctx(ssk))) {
-			err = copied ? : -EAGAIN;
+			err = copied;
 			goto out;
 		}
 		mptcp_set_timeout(sk);
@@ -1641,11 +1641,8 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 
 		ret = __subflow_push_pending(sk, ssk, &info);
 		first = false;
-		if (ret <= 0) {
-			if (ret == -EAGAIN)
-				continue;
+		if (ret <= 0)
 			break;
-		}
 		copied += ret;
 	}
 
