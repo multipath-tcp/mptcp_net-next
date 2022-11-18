@@ -1,8 +1,8 @@
 From: Geliang Tang <geliang.tang@suse.com>
 Subject: [PATCH] selftests: mptcp: listener test for userspace PM
 
-This patch adds test coverage for listening sockets created by the
-userspace path manager in userspace_pm.sh.
+This patch adds test coverage for listening sockets created by userspace
+processes.
 
 It adds a new test named test_listener() and a new verifying helper
 verify_listener_events(). The new output looks like this:
