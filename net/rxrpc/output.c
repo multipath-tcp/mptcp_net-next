@@ -18,15 +18,21 @@
 
 extern int udpv6_sendmsg(struct sock *sk, struct msghdr *msg, size_t len);
 
-static ssize_t do_udp_sendmsg(struct socket *sk, struct msghdr *msg, size_t len)
+static ssize_t do_udp_sendmsg(struct socket *socket, struct msghdr *msg, size_t len)
 {
-#if IS_ENABLED(CONFIG_AF_RXRPC_IPV6)
 	struct sockaddr *sa = msg->msg_name;
+	struct sock *sk = socket->sk;
 
-	if (sa->sa_family == AF_INET6)
-		return udpv6_sendmsg(sk->sk, msg, len);
-#endif
-	return udp_sendmsg(sk->sk, msg, len);
+	if (IS_ENABLED(CONFIG_AF_RXRPC_IPV6)) {
+		if (sa->sa_family == AF_INET6) {
+			if (sk->sk_family != AF_INET6) {
+				pr_warn("AF_INET6 address on AF_INET socket\n");
+				return -ENOPROTOOPT;
+			}
+			return udpv6_sendmsg(sk, msg, len);
+		}
+	}
+	return udp_sendmsg(sk, msg, len);
 }
 
 struct rxrpc_abort_buffer {
@@ -202,7 +208,6 @@ static void rxrpc_cancel_rtt_probe(struct rxrpc_call *call,
 static int rxrpc_send_ack_packet(struct rxrpc_local *local, struct rxrpc_txbuf *txb)
 {
 	struct rxrpc_connection *conn;
-	struct rxrpc_ack_buffer *pkt;
 	struct rxrpc_call *call = txb->call;
 	struct msghdr msg;
 	struct kvec iov[1];
@@ -270,7 +275,6 @@ static int rxrpc_send_ack_packet(struct rxrpc_local *local, struct rxrpc_txbuf *
 		rxrpc_set_keepalive(call);
 	}
 
-	kfree(pkt);
 	return ret;
 }
 
