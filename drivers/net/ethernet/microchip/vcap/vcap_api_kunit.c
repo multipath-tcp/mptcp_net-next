@@ -204,9 +204,9 @@ static void test_cache_move(struct net_device *ndev, struct vcap_admin *admin,
 }
 
 /* Provide port information via a callback interface */
-static int vcap_test_port_info(struct net_device *ndev, enum vcap_type vtype,
-			       int (*pf)(void *out, int arg, const char *fmt, ...),
-			       void *out, int arg)
+static int vcap_test_port_info(struct net_device *ndev,
+			       struct vcap_admin *admin,
+			       struct vcap_output_print *out)
 {
 	return 0;
 }
@@ -254,8 +254,8 @@ test_vcap_xn_rule_creator(struct kunit *test, int cid, enum vcap_user user,
 			  u16 priority,
 			  int id, int size, int expected_addr)
 {
-	struct vcap_rule *rule = 0;
-	struct vcap_rule_internal *ri = 0;
+	struct vcap_rule *rule;
+	struct vcap_rule_internal *ri;
 	enum vcap_keyfield_set keyset = VCAP_KFS_NO_VALUE;
 	enum vcap_actionfield_set actionset = VCAP_AFS_NO_VALUE;
 	int ret;
@@ -339,7 +339,7 @@ static void vcap_api_set_bit_1_test(struct kunit *test)
 		.sw_width = 52,
 		.reg_idx = 1,
 		.reg_bitpos = 20,
-		.tg = 0
+		.tg = NULL,
 	};
 	u32 stream[2] = {0};
 
@@ -356,7 +356,7 @@ static void vcap_api_set_bit_0_test(struct kunit *test)
 		.sw_width = 52,
 		.reg_idx = 2,
 		.reg_bitpos = 11,
-		.tg = 0
+		.tg = NULL,
 	};
 	u32 stream[3] = {~0, ~0, ~0};
 
@@ -1324,8 +1324,8 @@ static void vcap_api_encode_rule_test(struct kunit *test)
 			.actionstream = actdata,
 		},
 	};
-	struct vcap_rule *rule = 0;
-	struct vcap_rule_internal *ri = 0;
+	struct vcap_rule *rule;
+	struct vcap_rule_internal *ri;
 	int vcap_chain_id = 10005;
 	enum vcap_user user = VCAP_USER_VCAP_UTIL;
 	u16 priority = 10;
@@ -1691,7 +1691,7 @@ static void vcap_api_rule_remove_at_end_test(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, 0, test_move_count);
 	KUNIT_EXPECT_EQ(test, 780, test_init_start);
 	KUNIT_EXPECT_EQ(test, 12, test_init_count);
-	KUNIT_EXPECT_EQ(test, 3071, admin.last_used_addr);
+	KUNIT_EXPECT_EQ(test, 3072, admin.last_used_addr);
 }
 
 static void vcap_api_rule_remove_in_middle_test(struct kunit *test)
@@ -1766,7 +1766,7 @@ static void vcap_api_rule_remove_in_middle_test(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, 0, test_move_count);
 	KUNIT_EXPECT_EQ(test, 798, test_init_start);
 	KUNIT_EXPECT_EQ(test, 2, test_init_count);
-	KUNIT_EXPECT_EQ(test, 799, admin.last_used_addr);
+	KUNIT_EXPECT_EQ(test, 800, admin.last_used_addr);
 }
 
 static void vcap_api_rule_remove_in_front_test(struct kunit *test)
@@ -1805,7 +1805,7 @@ static void vcap_api_rule_remove_in_front_test(struct kunit *test)
 	KUNIT_EXPECT_EQ(test, 0, test_move_count);
 	KUNIT_EXPECT_EQ(test, 780, test_init_start);
 	KUNIT_EXPECT_EQ(test, 12, test_init_count);
-	KUNIT_EXPECT_EQ(test, 799, admin.last_used_addr);
+	KUNIT_EXPECT_EQ(test, 800, admin.last_used_addr);
 
 	test_vcap_xn_rule_creator(test, 10000, VCAP_USER_QOS, 20, 400, 6, 792);
 	test_vcap_xn_rule_creator(test, 10000, VCAP_USER_QOS, 30, 300, 3, 789);
