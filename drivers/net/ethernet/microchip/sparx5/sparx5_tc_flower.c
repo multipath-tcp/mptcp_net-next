@@ -341,7 +341,7 @@ sparx5_tc_flower_handler_vlan_usage(struct sparx5_tc_flower_parse_usage *st)
 
 	st->used_keys |= BIT(FLOW_DISSECTOR_KEY_VLAN);
 
-	return err;
+	return 0;
 out:
 	NL_SET_ERR_MSG_MOD(st->fco->common.extack, "vlan parse error");
 	return err;
@@ -452,8 +452,10 @@ sparx5_tc_flower_handler_arp_usage(struct sparx5_tc_flower_parse_usage *st)
 
 	/* The IS2 ARP keyset does not support ARP hardware addresses */
 	if (!is_zero_ether_addr(mt.mask->sha) ||
-	    !is_zero_ether_addr(mt.mask->tha))
+	    !is_zero_ether_addr(mt.mask->tha)) {
+		err = -EINVAL;
 		goto out;
+	}
 
 	if (mt.mask->sip) {
 		ipval = be32_to_cpu((__force __be32)mt.key->sip);
@@ -477,7 +479,7 @@ sparx5_tc_flower_handler_arp_usage(struct sparx5_tc_flower_parse_usage *st)
 
 	st->used_keys |= BIT(FLOW_DISSECTOR_KEY_ARP);
 
-	return err;
+	return 0;
 
 out:
 	NL_SET_ERR_MSG_MOD(st->fco->common.extack, "arp parse error");
@@ -648,7 +650,11 @@ static int sparx5_tc_flower_replace(struct net_device *ndev,
 		return PTR_ERR(vrule);
 
 	vrule->cookie = fco->cookie;
-	sparx5_tc_use_dissectors(fco, admin, vrule, &l3_proto);
+
+	l3_proto = ETH_P_ALL;
+	err = sparx5_tc_use_dissectors(fco, admin, vrule, &l3_proto);
+	if (err)
+		goto out;
 
 	err = sparx5_tc_add_rule_counter(admin, vrule);
 	if (err)
