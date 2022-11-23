@@ -6843,11 +6843,14 @@ static bool tcp_syn_flood_action(const struct sock *sk, const char *proto)
 
 	if (!READ_ONCE(queue->synflood_warned) && syncookies != 2 &&
 	    xchg(&queue->synflood_warned, 1) == 0) {
-		if (IS_ENABLED(CONFIG_IPV6) && sk->sk_family == AF_INET6) {
+#if IS_ENABLED(CONFIG_IPV6)
+		if (sk->sk_family == AF_INET6) {
 			net_info_ratelimited("%s: Possible SYN flooding on port [%pI6c]:%u. %s.\n",
 					proto, inet6_rcv_saddr(sk),
 					sk->sk_num, msg);
-		} else {
+		} else
+#endif
+		{
 			net_info_ratelimited("%s: Possible SYN flooding on port %pI4:%u. %s.\n",
 					proto, &sk->sk_rcv_saddr,
 					sk->sk_num, msg);
