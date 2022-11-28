@@ -17,6 +17,7 @@ LISTENER_CLOSED=16  #MPTCP_EVENT_LISTENER_CLOSED
 AF_INET=2
 AF_INET6=10
 
+file=""
 server_evts=""
 client_evts=""
 server_evts_pid=0
@@ -52,7 +53,7 @@ cleanup()
 {
 	echo "cleanup"
 
-	rm -f "$client_evts" "$server_evts" "$file"
+	rm -rf $file $client_evts $server_evts
 
 	# Terminate the MPTCP connection and related processes
 	if [ $client4_pid -ne 0 ]; then
@@ -121,8 +122,9 @@ make_file()
 
 make_connection()
 {
-	local file
-	file=$(mktemp)
+	if [ -z "$file" ]; then
+		file=$(mktemp)
+	fi
 	make_file "$file" "client"
 
 	local is_v6=$1
@@ -190,7 +192,6 @@ make_connection()
 		       sed --unbuffered -n 's/.*\(token:\)\([[:digit:]]*\).*$/\2/p;q')
 	server_serverside=$(grep "type:1," "$server_evts" |
 			    sed --unbuffered -n 's/.*\(server_side:\)\([[:digit:]]*\).*$/\2/p;q')
-	rm -f "$file"
 
 	if [ "$client_token" != "" ] && [ "$server_token" != "" ] && [ "$client_serverside" = 0 ] &&
 		   [ "$server_serverside" = 1 ]
