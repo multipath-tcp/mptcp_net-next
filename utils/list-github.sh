@@ -7,7 +7,7 @@ my_ghi() {
 		grep -v "^# multipath-tcp/mptcp_net-next"
 }
 
-LAST_WEEK="$(date -dlast-week +%Y-%m-%d)"
+LAST_WEEK="${1:-$(date -dlast-week +%Y-%m-%d)}"
 
 echo "    Recently opened (latest from last week: *TODO*)"
 echo
