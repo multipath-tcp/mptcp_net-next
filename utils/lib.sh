@@ -67,6 +67,22 @@ check_sync_upstream() { local remote sha_loc sha_rem
 	return 0
 }
 
+tg_up_err() {
+	printerr "Please fix the conflicts in another terminal." \
+	         "End with ./.end-conflict.sh, then press Enter to continue."
+	read -r
+}
+
+tg_update() {
+	if ! tg update; then
+		"${1:-tg_up_err}"
+
+		while ! tg update --continue; do
+			"${1:-tg_up_err}"
+		done
+	fi
+}
+
 # Trap to display a message when there is an error (set -e)
 # Src: http://stackoverflow.com/a/185900
 # Available variables: https://www.gnu.org/software/bash/manual/html_node/Bash-Variables.html

@@ -7,12 +7,6 @@ source ./.lib.sh
 TG_TOP="${TG_TOP:-}"
 TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
 
-tg_up_err() {
-	printerr "Please fix the conflicts in another terminal." \
-	         "End with ./.end-conflict.sh, then press Enter to continue."
-	read -r
-}
-
 topic_has_been_upstreamed() { local subject="${1}"
 	git log \
 		--fixed-strings \
@@ -53,16 +47,6 @@ tg_up_upstream() { local subject
 tg_up_conflicts() {
 	if ! tg_up_upstream; then
 		tg_up_err
-	fi
-}
-
-tg_update() {
-	if ! tg update; then
-		tg_up_conflicts
-
-		while ! tg update --continue; do
-			tg_up_conflicts
-		done
 	fi
 }
 
@@ -120,7 +104,7 @@ publish() { local top review old_rev new_rev
 	export="${3}"
 
 	git checkout -f "${top}"
-	tg_update
+	tg_update tg_up_conflicts
 
 	# "--short" for when we display the result
 	old_rev="$(git rev-parse --short "origin/${top}")"
@@ -154,7 +138,7 @@ publish() { local top review old_rev new_rev
 
 if [ -n "${TG_TOP}" ]; then
 	git checkout "${TG_TOP}"
-	tg_update
+	tg_update tg_up_conflicts
 
 	exit 0
 fi
