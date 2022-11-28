@@ -6,6 +6,8 @@ then these two variables could be used in test_announce(), test_remove()
 and test_subflows(). The local variable 'evts' in these three functions
 then could be dropped.
 
+Also move local variable 'file' as a global one.
+
 Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
 Acked-by: Paolo Abeni <pabeni@redhat.com>
