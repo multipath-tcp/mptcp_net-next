@@ -1562,13 +1562,19 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	bool err = false;
 
 	while (mptcp_send_head(sk) && !err) {
-		int ret = 0;
+		int ret = 0, i = 0;
 
 		if (mptcp_sched_get_send(msk))
 			goto out;
 
 		mptcp_for_each_subflow(msk, subflow) {
 			if (READ_ONCE(subflow->scheduled)) {
+				if (i > 0) {
+					if (!test_and_set_bit(MPTCP_WORK_RTX, &msk->flags))
+						mptcp_schedule_work(sk);
+					goto out;
+				}
+
 				prev_ssk = ssk;
 				ssk = mptcp_subflow_tcp_sock(subflow);
 
@@ -1594,6 +1600,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 						err = true;
 					continue;
 				}
+				i++;
 				do_check_data_fin = true;
 				msk->last_snd = ssk;
 				mptcp_subflow_set_scheduled(subflow, false);
@@ -1625,7 +1632,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 
 	info.flags = 0;
 	while (mptcp_send_head(sk) && !err) {
-		int ret = 0;
+		int ret = 0, i = 0;
 
 		/* check for a different subflow usage only after
 		 * spooling the first chunk of data
@@ -1647,12 +1654,20 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 			if (READ_ONCE(subflow->scheduled)) {
 				struct sock *xmit_ssk = mptcp_subflow_tcp_sock(subflow);
 
+				if (i > 0) {
+					if (!test_and_set_bit(MPTCP_WORK_RTX, &msk->flags))
+						mptcp_schedule_work(sk);
+					goto out;
+				}
+
 				if (xmit_ssk != ssk) {
 					mptcp_subflow_delegate(subflow,
 							       MPTCP_DELEGATE_SEND);
+					i++;
 					msk->last_snd = ssk;
 					mptcp_subflow_set_scheduled(subflow, false);
-					goto out;
+					err = true;
+					continue;
 				}
 
 				ret = __subflow_push_pending(sk, ssk, &info);
@@ -1660,6 +1675,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 					err = true;
 					continue;
 				}
+				i++;
 				copied += ret;
 				msk->last_snd = ssk;
 				mptcp_subflow_set_scheduled(subflow, false);
