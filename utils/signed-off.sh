@@ -25,7 +25,6 @@ done
 
 echo "${COD}" >> .topmsg
 echo "${SIG}" >> .topmsg
-echo "${LAST_LINE}" >> .topmsg
 for ((i=${#LAST_LINES[@]} - 1; i >= 0; i--)); do
 	echo "${LAST_LINES[i]}" >> .topmsg
 done
