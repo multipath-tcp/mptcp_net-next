@@ -992,6 +992,12 @@ static void __mptcp_clean_una(struct sock *sk)
 		msk->snd_una = READ_ONCE(msk->snd_nxt);
 
 	snd_una = msk->snd_una;
+	/* Fix this:
+	 * ------------[ cut here ]------------
+	 * WARNING: CPU: 6 PID: 3007 at net/mptcp/protocol.c:1003 __mptcp_clean_una+0x243/0x2b0
+	 */
+	if (msk->first_pending)
+		goto out;
 	list_for_each_entry_safe(dfrag, dtmp, &msk->rtx_queue, list) {
 		if (after64(dfrag->data_seq + dfrag->data_len, snd_una))
 			break;
@@ -1112,6 +1118,7 @@ struct mptcp_sendmsg_info {
 	u16 sent;
 	unsigned int flags;
 	bool data_lock_held;
+	struct mptcp_data_frag *first, *last;
 };
 
 static int mptcp_check_allowed_size(const struct mptcp_sock *msk, struct sock *ssk,
@@ -1502,6 +1509,23 @@ static void mptcp_update_post_push(struct mptcp_sock *msk,
 		msk->snd_nxt = snd_nxt_new;
 }
 
+static void mptcp_update_dfrags(struct sock *sk, struct mptcp_sendmsg_info *info)
+{
+	struct mptcp_data_frag *dfrag = info->first;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (!dfrag)
+		return;
+
+	do {
+		dfrag->already_sent = 0;
+		if (dfrag == info->last)
+			break;
+	} while ((dfrag = mptcp_next_frag(sk, dfrag)));
+
+	WRITE_ONCE(msk->first_pending, info->first);
+}
+
 void mptcp_check_and_set_pending(struct sock *sk)
 {
 	if (mptcp_send_head(sk))
@@ -1515,10 +1539,12 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0, err = 0;
 
+	info->first = mptcp_send_head(sk);
 	while ((dfrag = mptcp_send_head(sk))) {
 		info->sent = dfrag->already_sent;
 		info->limit = dfrag->data_len;
 		len = dfrag->data_len - dfrag->already_sent;
+		info->last = dfrag;
 		while (len > 0) {
 			int ret = 0;
 
@@ -1572,6 +1598,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 				if (i > 0) {
 					if (!test_and_set_bit(MPTCP_WORK_RTX, &msk->flags))
 						mptcp_schedule_work(sk);
+					mptcp_update_dfrags(sk, &info);
 					goto out;
 				}
 
@@ -1657,6 +1684,7 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 				if (i > 0) {
 					if (!test_and_set_bit(MPTCP_WORK_RTX, &msk->flags))
 						mptcp_schedule_work(sk);
+					mptcp_update_dfrags(sk, &info);
 					goto out;
 				}
 
