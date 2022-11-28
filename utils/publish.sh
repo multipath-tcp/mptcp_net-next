@@ -77,6 +77,7 @@ tg_for_review() { local branch_top branch_review tg_conflict_files
 tg_export() { local branch_top branch_export tag
 	branch_top="${1}"
 	branch_export="${2}"
+	tag="${3}"
 
 	git checkout -f "${branch_top}"
 
@@ -87,21 +88,16 @@ tg_export() { local branch_top branch_export tag
 		return
 	fi
 
-	tag="${branch_export}/${DATE}"
-
 	# send a tag to Github to keep previous commits: we might have refs to them
 	git tag "${tag}" "${branch_export}"
 	git push origin "${tag}"
-
-	printinfo "Tests are now in progress:\\n"
-	printinfo "https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/${tag}"
-	# printinfo "https://github.com/multipath-tcp/mptcp_net-next/actions/workflows/build-validation.yml?query=branch:${branch_export}"
 }
 
-publish() { local top review old_rev new_rev
+publish() { local top review old_rev new_rev tag
 	top="${1}"
 	review="${2}"
 	export="${3}"
+	tag="${export}/${DATE}"
 
 	git checkout -f "${top}"
 	tg_update tg_up_conflicts
@@ -118,14 +114,17 @@ publish() { local top review old_rev new_rev
 	tg push
 
 	echo -e "${COLOR_BLUE}"
-	printf "New patches for %s:\n" "${top}"
+	printf "New patches for %s:\\n" "${top}"
 	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
 		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
 
-	printf "%sResults: %s..%s (%s)\n" "- " "${old_rev}" "${new_rev}" "${export}"
+	printf "%sResults: %s..%s (%s)\\n" "- " "${old_rev}" "${new_rev}" "${export}"
+	printf "\\nTests are now in progress:\\n"
+	printf "\\nhttps://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/%s\\n" "${tag}"
+	printf "\\nCheers,\\nMatt\\n"
 	echo -e "${COLOR_RESET}"
 
-	print "Publish ${export} and tag (${DATE})? (Y/n)"
+	print "Publish ${export} and tag (${tag})? (Y/n)"
 	read -n 1 -r
 	echo
 	if [[ $REPLY =~ ^[Nn]$ ]]; then
@@ -133,7 +132,7 @@ publish() { local top review old_rev new_rev
 	fi
 
 	tg_for_review "${top}" "${review}"
-	tg_export "${top}" "${export}"
+	tg_export "${top}" "${export}" "${tag}"
 }
 
 if [ -n "${TG_TOP}" ]; then
