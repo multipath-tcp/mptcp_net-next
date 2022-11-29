@@ -34,19 +34,21 @@ bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
 }
 
 static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
-					     const struct btf *btf,
-					     const struct btf_type *t, int off,
-					     int size, enum bpf_access_type atype,
+					     const struct bpf_reg_state *reg,
+					     int off, int size,
+					     enum bpf_access_type atype,
 					     u32 *next_btf_id,
 					     enum bpf_type_flag *flag)
 {
+	const struct btf_type *t;
 	size_t end;
 
 	if (atype == BPF_READ) {
-		return btf_struct_access(log, btf, t, off, size, atype,
+		return btf_struct_access(log, reg, off, size, atype,
 					 next_btf_id, flag);
 	}
 
+	t = btf_type_by_id(reg->btf, reg->btf_id);
 	if (t != mptcp_sched_type) {
 		bpf_log(log, "only access to mptcp_subflow_context is supported\n");
 		return -EACCES;
