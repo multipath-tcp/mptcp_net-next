@@ -30,7 +30,7 @@ jobs:
       - name: tag shortner
         id: tag
         run: |
-          echo "::set-output name=tag::${REF:10}"
+          echo "tag=${REF:10}" >> ${GITHUB_OUTPUT}
         env:
           REF: ${{ github.event.ref }}
       - name: irc tag
@@ -50,8 +50,8 @@ jobs:
         id: info
         if: github.event.action != 'opened'
         run: |
-          echo "::set-output name=opener::, opened by ${OPENER}"
-          echo "::set-output name=assignee::${ASSIGNEE:+ and assigned to ${ASSIGNEE}}"
+          echo "opener=, opened by ${OPENER}" >> ${GITHUB_OUTPUT}
+          echo "assignee=${ASSIGNEE:+ and assigned to ${ASSIGNEE}}" >> ${GITHUB_OUTPUT}
         env:
           OPENER: ${{ github.event.issue.user.login }}
           ASSIGNEE: ${{ github.event.assignee.login }}
@@ -76,7 +76,7 @@ jobs:
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
-          echo "::set-output name=tag::${TAG:-${BRANCH}}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.workflow_run.head_sha }}"
@@ -103,7 +103,7 @@ jobs:
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
-          echo "::set-output name=tag::${TAG:-${BRANCH}}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.workflow_run.head_sha }}"
@@ -127,20 +127,20 @@ jobs:
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
-          echo "::set-output name=mid::${MID:1:-1}"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
 
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
-          echo "::set-output name=subject::${SUBJECT}"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
 
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME%% *}"
-          echo "::set-output name=author::${NAME} <${EMAIL}>"
+          echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
+          echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
 
           SHA="${{ github.event.workflow_run.head_sha }}"
-          echo "::set-output name=sha::${SHA:0:12}"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
@@ -206,7 +206,7 @@ jobs:
         run: |
           TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA})"
-          echo "::set-output name=tag::${TAG:10}"
+          echo "tag=${TAG:10}" >> ${GITHUB_OUTPUT}
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.check_suite.head_sha }}"
@@ -227,10 +227,10 @@ jobs:
 
             ccl="$(curl "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
 
-            echo "::set-output name=ccl_${i}::${ccl}"
-            echo -n "::set-output name=ccl_title_${i}::"; echo "${ccl}" | cut -d: -f1-2
-            echo -n "::set-output name=ccl_status_${i}::"; echo "${ccl}" | cut -d: -f3- | sed 's/^ //'
-            echo "::set-output name=sum_${i}::${url_sum}"
+            echo "ccl_${i}=${ccl}" >> ${GITHUB_OUTPUT}
+            echo "ccl_title_${i}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
+            echo "ccl_status_${i}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+            echo "sum_${i}=${url_sum}" >> ${GITHUB_OUTPUT}
 
             i=$((i+1))
           done
@@ -239,7 +239,7 @@ jobs:
           for url in $(jq -r '.details_url' check-runs_strip.json); do
             echo "${i}: URL: ${url}"
 
-            echo "::set-output name=url_${i}::${url}"
+            echo "url_${i}=${url}" >> ${GITHUB_OUTPUT}
 
             i=$((i+1))
           done
@@ -271,24 +271,24 @@ jobs:
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
-          echo "::set-output name=mid::${MID:1:-1}"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
 
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
-          echo "::set-output name=subject::${SUBJECT}"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
 
           NAME=$(jq -r '.author.name' commit.json)
           EMAIL=$(jq -r '.author.email' commit.json)
           echo "Found author: '${NAME}' '${EMAIL}'"
-          echo "::set-output name=name::${NAME%% *}"
-          echo "::set-output name=author::${NAME} <${EMAIL}>"
+          echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
+          echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
 
           SHA="${{ github.event.check_suite.head_sha }}"
-          echo "::set-output name=sha::${SHA:0:12}"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
 
           COMMITTER=$(jq -r '.committer.name' commit.json)
           echo "Found committer: '${COMMITTER}'"
-          echo "::set-output name=committer::${COMMITTER}"
+          echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
         env:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
