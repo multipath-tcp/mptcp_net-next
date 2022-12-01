@@ -1,0 +1,16 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add pm listener events
+
+This patch adds two new MPTCP netlink event types for PM listening
+socket create and close, named MPTCP_EVENT_LISTENER_CREATED and
+MPTCP_EVENT_LISTENER_CLOSED.
+
+Add a new function mptcp_event_pm_listener() to push the new events
+with family, port and addr to userspace.
+
+Invoke mptcp_event_pm_listener() with MPTCP_EVENT_LISTENER_CREATED in
+mptcp_listen() and mptcp_pm_nl_create_listen_socket(), invoke it with
+MPTCP_EVENT_LISTENER_CLOSED in __mptcp_close_ssk().
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
