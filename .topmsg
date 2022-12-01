@@ -1,0 +1,12 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] selftests: mptcp: clearly declare global ns vars
+
+It is clearer to declare these global variables at the beginning of the
+file as it is done in other MPTCP selftests rather than in functions in
+the middle of the script.
+
+So for uniformity reason, we can do the same here in mptcp_sockopt.sh.
+
+Suggested-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
