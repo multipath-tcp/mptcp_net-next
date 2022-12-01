@@ -1,0 +1,17 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: enhance userspace pm tests
+
+Some userspace pm tests failed since pm listener events have been added.
+Now MPTCP_EVENT_LISTENER_CREATED event becomes the first item in the
+events list like this:
+
+ type:15,family:2,sport:10006,saddr4:0.0.0.0
+ type:1,token:3701282876,server_side:1,family:2,saddr4:10.0.1.1,...
+
+And no token value in this MPTCP_EVENT_LISTENER_CREATED event.
+
+This patch fixes this by specifying the type 1 item to search for token
+values.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
