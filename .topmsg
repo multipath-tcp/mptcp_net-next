@@ -1,0 +1,62 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: refactor push_pending logic
+
+To support redundant package schedulers more easily, this patch refactors
+__mptcp_push_pending() logic from:
+
+For each dfrag:
+	While sends succeed:
+		Call the scheduler (selects subflow and msk->snd_burst)
+		Update subflow locks (push/release/acquire as needed)
+		Send the dfrag data with mptcp_sendmsg_frag()
+		Update already_sent, snd_nxt, snd_burst
+	Update msk->first_pending
+Push/release on final subflow
+
+->
+
+While first_pending isn't empty:
+	Call the scheduler (selects subflow and msk->snd_burst)
+	Update subflow locks (push/release/acquire as needed)
+	For each pending dfrag:
+		While sends succeed:
+			Send the dfrag data with mptcp_sendmsg_frag()
+			Update already_sent, snd_nxt, snd_burst
+		Update msk->first_pending
+		Break if required by msk->snd_burst / etc
+	Push/release on final subflow
+
+Refactors __mptcp_subflow_push_pending logic from:
+
+For each dfrag:
+	While sends succeed:
+		Call the scheduler (selects subflow and msk->snd_burst)
+		Send the dfrag data with mptcp_subflow_delegate(), break
+		Send the dfrag data with mptcp_sendmsg_frag()
+		Update dfrag->already_sent, msk->snd_nxt, msk->snd_burst
+	Update msk->first_pending
+
+->
+
+While first_pending isn't empty:
+	Call the scheduler (selects subflow and msk->snd_burst)
+	Send the dfrag data with mptcp_subflow_delegate(), break
+	Send the dfrag data with mptcp_sendmsg_frag()
+	For each pending dfrag:
+		While sends succeed:
+			Send the dfrag data with mptcp_sendmsg_frag()
+			Update already_sent, snd_nxt, snd_burst
+		Update msk->first_pending
+		Break if required by msk->snd_burst / etc
+
+Move the duplicate code from __mptcp_push_pending() and
+__mptcp_subflow_push_pending() into a new helper function, named
+__subflow_push_pending(). Simplify __mptcp_push_pending() and
+__mptcp_subflow_push_pending() by invoking this helper.
+
+Also move the burst check conditions out of the function
+mptcp_subflow_get_send(), check them in __subflow_push_pending() in
+the inner "for each pending dfrag" loop.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
