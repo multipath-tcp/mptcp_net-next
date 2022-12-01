@@ -1,0 +1,13 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] selftests: mptcp: declare var as local
+
+Just to avoid classical Bash pitfall where variables are accidentally
+overridden by other functions because the proper scope has not been
+defined.
+
+That's also what is done in other MPTCP selftests scripts where all non
+local variables are defined at the beginning of the script and the
+others are defined with the "local" keyword.
+
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
