@@ -1,0 +1,12 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: use kmalloc on kasan build
+
+Helps detection UaF, which apparently kasan misses
+with kmem_cache allocator.
+
+We also need to always set the SOCK_RCU_FREE flag, to
+preserved the current code leveraging SLAB_TYPESAFE_BY_RCU.
+This latter change will make unreachable some existing
+errors path, but I don't see other options.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
