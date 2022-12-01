@@ -1,0 +1,13 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] mptcp: add support for TCP_FASTOPEN_KEY sockopt
+
+The goal of this socket option is to set different keys per listener,
+see commit 1fba70e5b6be ("tcp: socket option to set TCP fast open key")
+for more details about this socket option.
+
+The only thing to do here with MPTCP is to relay the request to the
+first subflow like it is already done for the other TCP_FASTOPEN* socket
+options.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
