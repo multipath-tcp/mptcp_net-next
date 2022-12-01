@@ -1,0 +1,16 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consolidate initial ack seq generation
+
+Currently the initial ack sequence is generated on demand whenever
+it's requested and the remote key is handy. The relevant code is
+scattered in different places and can lead to multiple, unneeded,
+crypto operations.
+
+This change consolidate the ack sequence generation code in a single
+helper, storing the sequence number at the subflow level.
+
+The above additionally save a few conditional in fast-path and will
+simplify the upcoming fast-open implementation.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
