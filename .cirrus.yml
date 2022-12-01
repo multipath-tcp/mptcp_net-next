@@ -19,6 +19,9 @@ task:
     matrix:
       MATRIX_JOB: normal
       MATRIX_JOB: debug
+    matrix:
+      INPUT_RUN_TESTS_EXCEPT: selftest_mptcp_join
+      INPUT_RUN_TESTS_ONLY: selftest_mptcp_join
 
   ccache_cache:
     folder: ".virtme/ccache"
