@@ -1,0 +1,15 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: make evts global in mptcp_join
+
+This patch moves evts_ns1 and evts_ns2 out of do_transfer() as two global
+variables in mptcp_join.sh. Init them in init() and remove them in
+cleanup().
+
+Add a new helper reset_with_events() to save the outputs of 'pm_nl_ctl
+events' command in them. And a new helper kill_events_pids() to kill
+pids of 'pm_nl_ctl events' command. Use these helpers in userspace pm
+tests.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
