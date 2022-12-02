@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-nlmsg_free-instead-of-kfree_skb
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: use nlmsg_free instead of kfree_skb
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use nlmsg_free() instead of kfree_skb() in pm_netlink.c.
+
+The SKB's have been created by nlmsg_new(). The proper cleaning way
+should then be done with nlmsg_free().
+
+For the moment, nlmsg_free() is simply calling kfree_skb() so we don't
+change the behaviour here.
+
+Suggested-by: Jakub Kicinski <kuba@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
