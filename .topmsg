@@ -1,4 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-proper-req-destructor-for-IPv6
+Subject: [PATCH] mptcp: use proper req destructor for IPv6
 
+Before, only the destructor from TCP request sock in IPv4 was called
+even if the subflow was IPv6.
+
+It is important to use the right destructor to avoid memory leaks with
+some advanced IPv6 features, e.g. when the request socks contain
+specific IPv6 options.
+
+Fixes: 79c0949e9a09 ("mptcp: Add key generation and token tree")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
