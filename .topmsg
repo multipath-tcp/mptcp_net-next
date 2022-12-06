@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-return-0-instead-of-err-var
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
