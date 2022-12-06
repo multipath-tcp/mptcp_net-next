@@ -141,7 +141,7 @@ Send patches upstream
 
 * Prerequisite: Set up git remotes for mptcp_net-next, net, and net-next
 * Check out a local branch that's a copy of either export (for net-next) or export-net (for net)
-* Fetch latest net and net-next changes 
+* Fetch latest net and net-next changes
 * Do an interactive rebase to remove extra commits and add the upstreamer's signoff
 
       git-rebase -i --signoff net/main  ## or net-next/main
@@ -166,25 +166,25 @@ Send patches upstream
       git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net/main --subject-prefix="PATCH net"
       ## or
       git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net-next/main --subject-prefix="PATCH net-next"
-      
+
 * Edit the cover letter, replacing the subject and body placeholders.
   * Give a quick summary of the included patches. If upstreaming a group of patches that implements a whole feature, it's helpful to add a paragraph or two explaining the full feature (refer to the original cover letters sent to mptcp@lists.linux.dev as needed).
   * If upstreaming a collection of unrelated patches, no need to add extra explanation, just explain each in the cover letter:
 
         Patch 1: Fix a bug
-        
+
         Patches 2-3: Improve self test consistency
-        
+
         Patch 4: Another bug fix
-        
+
 * Run the .patch files through checkpatch one more time if you want (CI should have caught issues in the code, but sometimes the above edits can add a problem).
 
         scripts/checkpatch.pl *.patch
-        
+
 * Send the patches (assuming there are no extra patch files sitting around...)
 
         git send-email *.patch
-        
+
 * Make sure the full series appears in both https://patchwork.kernel.org/project/mptcp/list/ and https://patchwork.kernel.org/project/netdevbpf/list/
 * Mark the series as "Handled Elsewhere" in MPTCP patchwork.
 * Check CI status in the netdev patchwork.
