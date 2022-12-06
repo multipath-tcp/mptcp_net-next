@@ -156,6 +156,8 @@ Send patches upstream
 
         git log --pretty=fixes <commit-id>
 
+* If the series is for -net (fixes), it is recommended to add `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch.
+
 * Build the code and run tests.
 * Check for net/net-next conflicts. If possible, defer net-next upstreaming until net-branch patches they conflict with have been merged to the net-next branch.
 * Determine cc addresses for the series.
