@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-return-0-instead-of-err-var
+Subject: [PATCH] mptcp: return 0 instead of 'err' var
 
+When 'err' is 0, it looks clearer to return '0' instead of the variable
+called 'err'.
+
+The behaviour is then not modified, just a clearer code.
+
+By doing this, we can also avoid false positive smatch warnings like
+this one:
+
+  net/mptcp/pm_netlink.c:1169 mptcp_pm_parse_pm_addr_attr() warn: missing error code? 'err'
+
+Reported-by: kernel test robot <lkp@intel.com>
+Reported-by: Dan Carpenter <error27@gmail.com>
+Suggested-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
