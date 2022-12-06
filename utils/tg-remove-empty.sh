@@ -30,6 +30,8 @@ tg_next() { local curr next
 
 ./.tg-first.sh
 
+CLEANED=()
+
 while true; do
 	BRANCH="$(git_current_branch)"
 	if tg_empty && ! [[ "${BRANCH}" =~ ^"t/upstream"* ]]; then
@@ -51,6 +53,8 @@ while true; do
 		tg update
 		tg push "${BRANCH}"
 
+		CLEANED+=("${BRANCH}")
+
 		#tg delete "${BRANCH}" # the next 'tg remote --populate' will get it back
 	elif [ "${BRANCH}" = "t/DO-NOT-MERGE-git-markup-end-common-net-net-next" ]; then
 		echo -e "\n\t => Special case ${BRANCH}: continue on -net tree\n"
@@ -69,6 +73,7 @@ while true; do
 	fi
 done
 
+echo -e "\n\nCleaned: ${CLEANED[*]}"
 echo -e "\n\nPublish or Ctrl+C for manual push?"
 read -r
 ./.publish.sh
