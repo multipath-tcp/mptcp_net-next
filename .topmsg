@@ -1,4 +1,64 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-deadlock-in-fastopen-error-path
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix deadlock in fastopen error path
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+MatM reported a deadlock at fastopening time:
+
+INFO: task syz-executor.0:11454 blocked for more than 143 seconds.
+      Tainted: G S                 6.1.0-rc5-03226-gdb0157db5153 #1
+"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+task:syz-executor.0  state:D stack:25104 pid:11454 ppid:424    flags:0x00004006
+Call Trace:
+ <TASK>
+ context_switch kernel/sched/core.c:5191 [inline]
+ __schedule+0x5c2/0x1550 kernel/sched/core.c:6503
+ schedule+0xe8/0x1c0 kernel/sched/core.c:6579
+ __lock_sock+0x142/0x260 net/core/sock.c:2896
+ lock_sock_nested+0xdb/0x100 net/core/sock.c:3466
+ __mptcp_close_ssk+0x1a3/0x790 net/mptcp/protocol.c:2328
+ mptcp_destroy_common+0x16a/0x650 net/mptcp/protocol.c:3171
+ mptcp_disconnect+0xb8/0x450 net/mptcp/protocol.c:3019
+ __inet_stream_connect+0x897/0xa40 net/ipv4/af_inet.c:720
+ tcp_sendmsg_fastopen+0x3dd/0x740 net/ipv4/tcp.c:1200
+ mptcp_sendmsg_fastopen net/mptcp/protocol.c:1682 [inline]
+ mptcp_sendmsg+0x128a/0x1a50 net/mptcp/protocol.c:1721
+ inet6_sendmsg+0x11f/0x150 net/ipv6/af_inet6.c:663
+ sock_sendmsg_nosec net/socket.c:714 [inline]
+ sock_sendmsg+0xf7/0x190 net/socket.c:734
+ ____sys_sendmsg+0x336/0x970 net/socket.c:2476
+ ___sys_sendmsg+0x122/0x1c0 net/socket.c:2530
+ __sys_sendmmsg+0x18d/0x460 net/socket.c:2616
+ __do_sys_sendmmsg net/socket.c:2645 [inline]
+ __se_sys_sendmmsg net/socket.c:2642 [inline]
+ __x64_sys_sendmmsg+0x9d/0x110 net/socket.c:2642
+ do_syscall_x64 arch/x86/entry/common.c:50 [inline]
+ do_syscall_64+0x38/0x90 arch/x86/entry/common.c:80
+ entry_SYSCALL_64_after_hwframe+0x63/0xcd
+RIP: 0033:0x7f5920a75e7d
+RSP: 002b:00007f59201e8028 EFLAGS: 00000246 ORIG_RAX: 0000000000000133
+RAX: ffffffffffffffda RBX: 00007f5920bb4f80 RCX: 00007f5920a75e7d
+RDX: 0000000000000001 RSI: 0000000020002940 RDI: 0000000000000005
+RBP: 00007f5920ae7593 R08: 0000000000000000 R09: 0000000000000000
+R10: 0000000020004050 R11: 0000000000000246 R12: 0000000000000000
+R13: 000000000000000b R14: 00007f5920bb4f80 R15: 00007f59201c8000
+ </TASK>
+
+In the error path, tcp_sendmsg_fastopen() ends-up calling
+mptcp_disconnect(), and the latter tries to close each
+subflow, acquiring the socket lock on each of them.
+
+At fastopen time, we have a single subflow, and such subflow
+socket lock is already held by the called, causing the deadlock.
+
+We already track the 'fastopen in progress' status inside the msk
+socket. Use it to address the issue, making mptcp_disconnect() a
+no op when invoked from the fastopen (error) path and doing the
+relevant cleanup after releasing the subflow socket lock.
+
+While at the above, rename the fastopen status bit to something
+more meaningful.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/321
+Reported-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Fixes: fa9e57468aa1 ("mptcp: fix abba deadlock on fastopen")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
