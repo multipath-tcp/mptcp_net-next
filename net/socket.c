@@ -1426,23 +1426,11 @@ call_kill:
 }
 EXPORT_SYMBOL(sock_wake_async);
 
-/**
- *	__sock_create - creates a socket
- *	@net: net namespace
- *	@family: protocol family (AF_INET, ...)
- *	@type: communication type (SOCK_STREAM, ...)
- *	@protocol: protocol (0, ...)
- *	@res: new socket
- *	@kern: boolean for kernel space sockets
- *
- *	Creates a new socket and assigns it to @res, passing through LSM.
- *	Returns 0 or an error. On failure @res is set to %NULL. @kern must
- *	be set to true if the socket resides in kernel space.
- *	This function internally uses GFP_KERNEL.
- */
 
-int __sock_create(struct net *net, int family, int type, int protocol,
-			 struct socket **res, int kern)
+
+/*creates a socket leaving LSM post-creation checks to the caller */
+int __sock_create_nosec(struct net *net, int family, int type, int protocol,
+			struct socket **res, int kern)
 {
 	int err;
 	struct socket *sock;
@@ -1528,11 +1516,8 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 	 * module can have its refcnt decremented
 	 */
 	module_put(pf->owner);
-	err = security_socket_post_create(sock, family, type, protocol, kern);
-	if (err)
-		goto out_sock_release;
-	*res = sock;
 
+	*res = sock;
 	return 0;
 
 out_module_busy:
@@ -1547,6 +1532,41 @@ out_sock_release:
 out_release:
 	rcu_read_unlock();
 	goto out_sock_release;
+}
+
+/**
+ *	__sock_create - creates a socket
+ *	@net: net namespace
+ *	@family: protocol family (AF_INET, ...)
+ *	@type: communication type (SOCK_STREAM, ...)
+ *	@protocol: protocol (0, ...)
+ *	@res: new socket
+ *	@kern: boolean for kernel space sockets
+ *
+ *	Creates a new socket and assigns it to @res, passing through LSM.
+ *	Returns 0 or an error. On failure @res is set to %NULL. @kern must
+ *	be set to true if the socket resides in kernel space.
+ *	This function internally uses GFP_KERNEL.
+ */
+
+int __sock_create(struct net *net, int family, int type, int protocol,
+		  struct socket **res, int kern)
+{
+	struct socket *sock;
+	int err;
+
+	err = __sock_create_nosec(net, family, type, protocol, &sock, kern);
+	if (err)
+		return err;
+
+	err = security_socket_post_create(sock, family, type, protocol, kern);
+	if (err) {
+		sock_release(sock);
+		return err;
+	}
+
+	*res = sock;
+	return 0;
 }
 EXPORT_SYMBOL(__sock_create);
 

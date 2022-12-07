@@ -1673,10 +1673,25 @@ int mptcp_subflow_create_socket(struct sock *sk, struct socket **new_sock)
 	if (unlikely(!sk->sk_socket))
 		return -EINVAL;
 
-	err = sock_create_kern(net, sk->sk_family, SOCK_STREAM, IPPROTO_TCP,
-			       &sf);
+	/* the subflow is created by the kernel, and we need kernel annotation
+	 * for lockdep's sake...
+	 */
+	err = __sock_create_nosec(net, sk->sk_family, SOCK_STREAM, IPPROTO_TCP,
+				  &sf, 1);
 	if (err)
 		return err;
+
+	/* ... but the MPC subflow will be indirectly exposed to the
+	 * user-space via accept(). Let's attach the current user security
+	 * label to the first subflow, that is when msk->first is not yet
+	 * initialized.
+	 */
+	err = security_socket_post_create(sf, sk->sk_family, SOCK_STREAM,
+					  IPPROTO_TCP, !!mptcp_sk(sk)->first);
+	if (err) {
+		sock_release(sf);
+		return err;
+	}
 
 	lock_sock(sf->sk);
 
