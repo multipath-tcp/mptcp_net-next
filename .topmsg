@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-net-instead-of-sock_net
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: use net instead of sock_net
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use the local variable 'net' instead of sock_net() in the functions where
+the variable 'struct net *net' has been defined.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
