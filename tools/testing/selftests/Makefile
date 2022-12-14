@@ -48,6 +48,7 @@ TARGETS += nci
 TARGETS += net
 TARGETS += net/af_unix
 TARGETS += net/forwarding
+TARGETS += net/hsr
 TARGETS += net/mptcp
 TARGETS += net/openvswitch
 TARGETS += netfilter
@@ -74,6 +75,7 @@ TARGETS += sync
 TARGETS += syscall_user_dispatch
 TARGETS += sysctl
 TARGETS += tc-testing
+TARGETS += tdx
 TARGETS += timens
 ifneq (1, $(quicktest))
 TARGETS += timers
