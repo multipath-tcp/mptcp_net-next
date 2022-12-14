@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-local-variable-ssk-in-write_options
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: use local variable ssk in write_options
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The local variable 'ssk' has been defined at the beginning of the function
+mptcp_write_options(), use it instead of getting 'ssk' again.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
