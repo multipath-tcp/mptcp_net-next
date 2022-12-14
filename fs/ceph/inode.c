@@ -126,7 +126,7 @@ const struct inode_operations ceph_file_iops = {
 	.setattr = ceph_setattr,
 	.getattr = ceph_getattr,
 	.listxattr = ceph_listxattr,
-	.get_acl = ceph_get_acl,
+	.get_inode_acl = ceph_get_acl,
 	.set_acl = ceph_set_acl,
 };
 
@@ -362,7 +362,7 @@ static int ceph_fill_fragtree(struct inode *inode,
 	if (nsplits != ci->i_fragtree_nsplits) {
 		update = true;
 	} else if (nsplits) {
-		i = prandom_u32_max(nsplits);
+		i = get_random_u32_below(nsplits);
 		id = le32_to_cpu(fragtree->splits[i].frag);
 		if (!__ceph_find_frag(ci, id))
 			update = true;
@@ -2255,7 +2255,7 @@ int ceph_setattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 	err = __ceph_setattr(inode, attr);
 
 	if (err >= 0 && (attr->ia_valid & ATTR_MODE))
-		err = posix_acl_chmod(&init_user_ns, inode, attr->ia_mode);
+		err = posix_acl_chmod(&init_user_ns, dentry, attr->ia_mode);
 
 	return err;
 }
