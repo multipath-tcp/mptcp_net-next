@@ -311,10 +311,9 @@ static int aa_xattrs_match(const struct linux_binprm *bprm,
 			   struct aa_profile *profile, unsigned int state)
 {
 	int i;
-	ssize_t size;
 	struct dentry *d;
 	char *value = NULL;
-	int value_size = 0, ret = profile->xattr_count;
+	int size, value_size = 0, ret = profile->xattr_count;
 
 	if (!bprm || !profile->xattr_count)
 		return 0;
@@ -859,10 +858,10 @@ int apparmor_bprm_creds_for_exec(struct linux_binprm *bprm)
 	const char *info = NULL;
 	int error = 0;
 	bool unsafe = false;
-	kuid_t i_uid = i_uid_into_mnt(file_mnt_user_ns(bprm->file),
-				      file_inode(bprm->file));
+	vfsuid_t vfsuid = i_uid_into_vfsuid(file_mnt_user_ns(bprm->file),
+					    file_inode(bprm->file));
 	struct path_cond cond = {
-		i_uid,
+		vfsuid_into_kuid(vfsuid),
 		file_inode(bprm->file)->i_mode
 	};
 
@@ -970,7 +969,7 @@ audit:
 	error = fn_for_each(label, profile,
 			aa_audit_file(profile, &nullperms, OP_EXEC, MAY_EXEC,
 				      bprm->filename, NULL, new,
-				      i_uid, info, error));
+				      vfsuid_into_kuid(vfsuid), info, error));
 	aa_put_label(new);
 	goto done;
 }
