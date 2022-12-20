@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-sk-to-replace-sock-sk-in-mptcp_listen
+From: Menglong Dong <imagedong@tencent.com>
+Subject: [PATCH] mptcp: introduce 'sk' to replace 'sock->sk' in mptcp_listen()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+'sock->sk' is used frequently in mptcp_listen(). Therefore, we can
+introduce the 'sk' and replace 'sock->sk' with it.
+
+Signed-off-by: Menglong Dong <imagedong@tencent.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
