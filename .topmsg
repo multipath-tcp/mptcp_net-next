@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-rename-sk-to-ssk-in-mptcp_token_new_connect
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
