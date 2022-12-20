@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-init-sk-sk_prot-in-build_msk
+From: Menglong Dong <imagedong@tencent.com>
+Subject: [PATCH] mptcp: init sk->sk_prot in build_msk()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The 'sk_prot' field in token KUNIT self-tests will be dereferenced in
+mptcp_token_new_connect(). Therefore, init it with tcp_prot.
+
+Signed-off-by: Menglong Dong <imagedong@tencent.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
