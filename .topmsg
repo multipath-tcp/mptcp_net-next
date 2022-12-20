@@ -1,8 +1,0 @@
-From: Menglong Dong <imagedong@tencent.com>
-Subject: [PATCH] mptcp: rename 'sk' to 'ssk' in mptcp_token_new_connect()
-
-'ssk' should be more appropriate to be the name of the first argument
-in mptcp_token_new_connect().
-
-Signed-off-by: Menglong Dong <imagedong@tencent.com>
-Acked-by: Paolo Abeni <pabeni@redhat.com>
