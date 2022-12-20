@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftest-mptcp-exit-from-copyfd_io_poll-when-receive-SIGUSR1
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
