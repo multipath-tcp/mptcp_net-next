@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftest-mptcp-exit-from-copyfd_io_poll-when-receive-SIGUSR1
+From: Menglong Dong <imagedong@tencent.com>
+Subject: [PATCH] selftest: mptcp: exit from copyfd_io_poll() when receive SIGUSR1
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+For now, mptcp_connect won't exit after receiving the 'SIGUSR1' signal
+if '-r' is set. Fix this by skipping poll and sleep in copyfd_io_poll()
+if 'quit' is set.
+
+Signed-off-by: Menglong Dong <imagedong@tencent.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
