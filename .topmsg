@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-bpf-Add-bpf_red-test
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests/bpf: Add bpf_red test
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds the redundant BPF MPTCP scheduler test: test_red(). Use
+sysctl to set net.mptcp.scheduler to use this sched. Add two veth net
+devices to simulate the multiple addresses case. Use 'ip mptcp endpoint'
+command to add the new endpoint ADDR_2 to PM netlink. Send data and check
+bytes_sent of 'ss' output after it to make sure the data has been
+redundantly sent on both net devices.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
