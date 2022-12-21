@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-get_send-wrapper
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: use get_send wrapper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch adds the multiple subflows support for __mptcp_push_pending
+and __mptcp_subflow_push_pending. Use get_send() wrapper instead of
+mptcp_subflow_get_send() in them.
+
+Check the subflow scheduled flags to test which subflow or subflows are
+picked by the scheduler, use them to send data.
+
+Move msk_owned_by_me() and fallback checks into get_send() wrapper from
+mptcp_subflow_get_send().
+
+This commit allows the scheduler to set the subflow->scheduled bit in
+multiple subflows, but it does not allow for sending redundant data.
+Multiple scheduled subflows will send sequential data on each subflow.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
