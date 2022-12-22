@@ -19,8 +19,8 @@ if [ "${1}" = "manual" ] || [ "${1}" = "debug" ]; then
         DOCKER_EXTRA_ARGS="-it"
 fi
 
-VIRTME_GIT_URL="git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git"
-VIRTME_GIT_SHA="88cd30f073714bd097d83bc7a6b028c0e4bf7a2b"
+VIRTME_GIT_URL="https://github.com/matttbe/virtme.git"
+VIRTME_GIT_SHA="d384fd29cb2381e50ab54c19b1ed1dc2c6db2d20"
 
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
