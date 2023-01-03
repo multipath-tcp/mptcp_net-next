@@ -78,7 +78,7 @@ list() { local list desc id name state tag n patch submitter series sid url
 
 		tag=$(echo "${name}" | sed 's/.*\(\[.\+\]\).*/\1/')
 		if [ "${tag:0:1}" = '[' ]; then
-			n=$(echo "${tag}" | sed 's#.*\([0-9]\+/[0-9]\+\).*#\1#')
+			n=$(echo "${tag}" | sed 's#.*\b\([0-9]\+/[0-9]\+\)\b.*#\1#')
 			if [[ "${n:0:1}" == [0-9] ]]; then
 				# if we have multiple patches, we only display info
 				# for the last one
