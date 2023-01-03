@@ -35,7 +35,7 @@ KCONFIG_EXTRA_CHECKS=(-e KASAN -e KASAN_OUTLINE -d TEST_KASAN
 # results for the CI
 RESULTS_DIR_BASE="${PWD}/${VIRTME_SCRIPT_DIR}/results"
 RESULTS_DIR=
-KMEMLEAK="kmemleak.txt"
+KMEMLEAK=
 
 # tmp files
 OUTPUT_VIRTME=
@@ -94,7 +94,7 @@ prepare() { local old_pwd mode
 
         OUTPUT_VIRTME=$(get_tmp_file_rm_previous "${OUTPUT_VIRTME}")
         RESULTS_DIR="${RESULTS_DIR_BASE}/$(git rev-parse --short HEAD)/${mode}"
-        KMEMLEAK="${RESULTS_DIR}/${KMEMLEAK}"
+        KMEMLEAK="${RESULTS_DIR}/kmemleak.txt"
 
         local kunit_tap="${RESULTS_DIR}/kunit.tap"
         local selftests_tap="${RESULTS_DIR}/selftests.tap"
