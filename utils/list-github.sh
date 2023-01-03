@@ -7,11 +7,11 @@ my_ghi() {
 		grep -v "^# multipath-tcp/mptcp_net-next"
 }
 
-LAST_WEEK="${1:-$(date -dlast-week +%Y-%m-%d)}"
+LAST_MEETING="${1:-$(date -dlast-week +%Y-%m-%d)}"
 
-echo "    Recently opened (latest from last week: *TODO*)"
+echo "    Recently opened (latest from the last meeting: *TODO*)"
 echo
-my_ghi --state open --since "${LAST_WEEK}"
+my_ghi --state open --since "${LAST_MEETING}"
 
 echo
 echo
@@ -51,6 +51,6 @@ my_ghi --state open -N bug -N question | grep -v " @"
 
 echo
 echo
-echo "    Recently closed (since last week)"
+echo "    Recently closed (since ${LAST_MEETING})"
 echo
-my_ghi --state closed --since "${LAST_WEEK}"
+my_ghi --state closed --since "${LAST_MEETING}"
