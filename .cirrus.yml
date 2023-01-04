@@ -10,7 +10,7 @@ task:
     image: mptcp/mptcp-upstream-virtme-docker:net
     kvm: true   ## Needed for the tests
     cpu: 4      ## Max 16 per project, even number with kvm
-    memory: 4G  ## Max 4 per CPU
+    memory: 8G  ## Max 4 per CPU
 
   env:
     CIRRUS_CLONE_DEPTH: 1       ## no need to have a full clone
