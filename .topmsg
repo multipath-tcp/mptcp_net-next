@@ -1,4 +1,12 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-validate-v4-v6-subflows-mix
+Subject: [PATCH] selftests: mptcp: userspace: validate v4-v6 subflows mix
+
+MPTCP protocol supports having subflows in both IPv4 and IPv6. In Linux,
+it is possible to have that if the MPTCP socket has been created with
+AF_INET6 family without the IPV6_V6ONLY option.
+
+Here, a new IPv4 subflow is being added to the initial IPv6 connection,
+then being removed using Netlink commands.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
