@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-print-error-details-if-any
+Subject: [PATCH] selftests: mptcp: userspace: print error details if any
+
+Before, only '[FAIL]' was printed in case of error during the validation
+phase.
+
+Now, in case of failure, the variable name, its value and expected one
+are displayed to help understand what was wrong.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
