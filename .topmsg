@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-remove-assigned-but-unused-value
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
