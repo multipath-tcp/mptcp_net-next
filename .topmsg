@@ -1,4 +1,16 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-avoid-read-errors
+Subject: [PATCH] selftests: mptcp: userspace: avoid read errors
+
+During the cleanup phase, the server pids were killed with a SIGTERM
+directly, not using a SIGUSR1 first to quit safely. As a result, this
+test was often ending with two error messages:
+
+  read: Connection reset by peer
+
+While at it, use a for-loop to terminal all the PIDs the same way.
+
+Also the different files are now removed after having killed the PIDs
+using them. It makes more sense to do that in this order.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
