@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-test-cases-for-mixed-v4-v6-subflows
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add test-cases for mixed v4/v6 subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Note that we can't guess the listener family anymore based on the client
+target address: always use IPv6.
+
+The fullmesh flag with endpoints from different families is also
+validated here.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
