@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-let-the-in-kernel-PM-use-mixed-IPv4-and-IPv6-addresses
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: let the in-kernel PM use mixed IPv4 and IPv6 addresses
 
+Currently the in-kernel PM arbitrary enforces that created subflow's
+family must match the main MPTCP socket while the RFC allows mixing
+IPv4 and IPv6 subflows.
+
+This patch changes the in-kernel PM logic to create subflows matching
+the currently selected source (or destination) address. IPv4 sockets
+can pick only IPv4 addresses (and v4 mapped in v6), while IPv6 sockets
+not restricted to V6ONLY can pick either IPv4 and IPv6 addresses as
+long as the source and destination matches.
+
+A helper, previously introduced is used to ease family matching checks,
+taking care of IPv4 vs IPv4-mapped-IPv6 vs IPv6 only addresses.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/269
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
