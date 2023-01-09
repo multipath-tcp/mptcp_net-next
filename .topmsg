@@ -1,4 +1,7 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-remove-assigned-but-unused-value
+Subject: [PATCH] mptcp: remove assigned but unused value
+
+'ret' is always set later before being used.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
