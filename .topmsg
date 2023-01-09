@@ -1,4 +1,28 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-netlink-respect-v4-v6-only-sockets
+Subject: [PATCH] mptcp: netlink: respect v4/v6-only sockets
 
+If an MPTCP socket has been created with AF_INET6 and the IPV6_V6ONLY
+option has been set, the userspace PM would allow creating subflows
+using IPv4 addresses, e.g. mapped in v6.
+
+The kernel side of userspace PM will also accept creating subflows with
+local and remote addresses having different families. Depending on the
+subflow socket's family, different behaviours are expected:
+ - If AF_INET is forced with a v6 address, the kernel will take the last
+   byte of the IP and try to connect to that: a new subflow is created
+   but to a non expected address.
+ - If AF_INET6 is forced with a v4 address, the kernel will try to
+   connect to a v4 address (v4-mapped-v6). A -EBADF error from the
+   connect() part is then expected.
+
+It is then required to check the given families can be accepted. This is
+done by using a new helper for addresses family matching, taking care of
+IPv4 vs IPv4-mapped-IPv6 addresses. This helper will be re-used later by
+the in-kernel path-manager to use mixed IPv4 and IPv6 addresses.
+
+While at it, a clear error message is now reported if there are some
+conflicts with the families that have been passed by the userspace.
+
+Fixes: 702c2f646d42 ("mptcp: netlink: allow userspace-driven subflow establishment")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
