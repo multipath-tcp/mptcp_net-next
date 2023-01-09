@@ -1,4 +1,9 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-print-titles
+Subject: [PATCH] selftests: mptcp: userspace: print titles
+
+This script is running a few tests after having setup the environment.
+
+Printing titles helps understand what is being tested.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
