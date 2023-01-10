@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: use msk_owned_by_me helper
-
-The helper msk_owned_by_me() is defined in protocol.h, so use it instead
-of sock_owned_by_me().
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
