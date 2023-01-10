@@ -1,0 +1,11 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] selftests: mptcp: userspace: refactor asserts
+
+Instead of having a long list of conditions to check, it is possible to
+give a list of variable names to compare with their 'e_XXX' version.
+
+This will ease the introduction of the following commit which will print
+which condition has failed (if any).
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
