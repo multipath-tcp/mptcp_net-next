@@ -85,7 +85,7 @@ am_b4() {
 		shift
 	fi
 
-	b4 am --prep-3way -o - --no-parent --add-link "${@}" > "${TMP_FILE}"
+	b4 am --prep-3way -o - --cherry-pick _ --add-link "${@}" > "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }

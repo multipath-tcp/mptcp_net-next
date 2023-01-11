@@ -42,14 +42,15 @@ apply_patches_patch() {
 	GIT_PW_ARG="--no-deps" apply_patches_git_pw "${@}"
 }
 
-apply_patches_b4() { local i args=()
+apply_patches_b4() { local i args
+	args=("--apply-cover-trailers")
 	for i in "${@}"; do
-		if [[ "${i}" =~ ^- ]]; then
+		if [[ "${i}" =~ ^- ]] || [ "${#i}" -lt 15 ]; then
 			args+=("${i}")
 			continue
 		fi
-		if ! b4 shazam --no-parent -t "${args[@]}" "${i}"; then
-			printerr "ERROR with 'b4 shazam --no-parent ${args[@]} ${i}'. " \
+		if ! b4 shazam "${args[@]}" "${i}"; then
+			printerr "ERROR with 'b4 shazam ${args[@]} ${i}'. " \
 			         "Please fix in another terminal (up to 'git am" \
 			         "--continue' included) and press ENTER to " \
 			         "continue."

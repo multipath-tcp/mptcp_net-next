@@ -6,7 +6,7 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-subject="$(b4 am --no-parent -T -o - "${1}" | grep "^Subject: " | head -n 1 | cut -d\" -f2)"
+subject="$(b4 am --cherry-pick _ --no-add-trailers -o - "${1}" | grep "^Subject: " | head -n 1 | cut -d\" -f2)"
 if [ -z "${subject}" ]; then
 	printerr "Not double quote in the subject: not a squash-to patch?"
 	exit 1
