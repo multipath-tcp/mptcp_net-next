@@ -364,6 +364,11 @@ struct mii_bus {
 	int (*read)(struct mii_bus *bus, int addr, int regnum);
 	/** @write: Perform a write transfer on the bus */
 	int (*write)(struct mii_bus *bus, int addr, int regnum, u16 val);
+	/** @read_c45: Perform a C45 read transfer on the bus */
+	int (*read_c45)(struct mii_bus *bus, int addr, int devnum, int regnum);
+	/** @write_c45: Perform a C45 write transfer on the bus */
+	int (*write_c45)(struct mii_bus *bus, int addr, int devnum,
+			 int regnum, u16 val);
 	/** @reset: Perform a reset of the bus */
 	int (*reset)(struct mii_bus *bus);
 
@@ -738,6 +743,9 @@ struct phy_device {
 	const struct macsec_ops *macsec_ops;
 #endif
 };
+
+/* Generic phy_device::dev_flags */
+#define PHY_F_NO_IRQ		0x80000000
 
 static inline struct phy_device *to_phy_device(const struct device *dev)
 {
