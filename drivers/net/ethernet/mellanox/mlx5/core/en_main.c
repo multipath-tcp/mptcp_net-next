@@ -35,6 +35,7 @@
 #include <net/vxlan.h>
 #include <net/geneve.h>
 #include <linux/bpf.h>
+#include <linux/debugfs.h>
 #include <linux/if_bridge.h>
 #include <linux/filter.h>
 #include <net/page_pool.h>
@@ -4084,6 +4085,9 @@ static netdev_features_t mlx5e_fix_features(struct net_device *netdev,
 	struct mlx5e_vlan_table *vlan;
 	struct mlx5e_params *params;
 
+	if (!netif_device_present(netdev))
+		return features;
+
 	vlan = mlx5e_fs_get_vlan(priv->fs);
 	mutex_lock(&priv->state_lock);
 	params = &priv->channels.params;
@@ -5230,7 +5234,8 @@ static int mlx5e_nic_init(struct mlx5_core_dev *mdev,
 	mlx5e_timestamp_init(priv);
 
 	fs = mlx5e_fs_init(priv->profile, mdev,
-			   !test_bit(MLX5E_STATE_DESTROYING, &priv->state));
+			   !test_bit(MLX5E_STATE_DESTROYING, &priv->state),
+			   priv->dfs_root);
 	if (!fs) {
 		err = -ENOMEM;
 		mlx5_core_err(mdev, "FS initialization failed, %d\n", err);
@@ -5931,6 +5936,9 @@ static int mlx5e_probe(struct auxiliary_device *adev,
 	priv->profile = profile;
 	priv->ppriv = NULL;
 
+	priv->dfs_root = debugfs_create_dir("nic",
+					    mlx5_debugfs_get_dev_root(priv->mdev));
+
 	err = mlx5e_devlink_port_register(priv);
 	if (err) {
 		mlx5_core_err(mdev, "mlx5e_devlink_port_register failed, %d\n", err);
@@ -5968,6 +5976,7 @@ err_profile_cleanup:
 err_devlink_cleanup:
 	mlx5e_devlink_port_unregister(priv);
 err_destroy_netdev:
+	debugfs_remove_recursive(priv->dfs_root);
 	mlx5e_destroy_netdev(priv);
 	return err;
 }
@@ -5982,6 +5991,7 @@ static void mlx5e_remove(struct auxiliary_device *adev)
 	mlx5e_suspend(adev, state);
 	priv->profile->cleanup(priv);
 	mlx5e_devlink_port_unregister(priv);
+	debugfs_remove_recursive(priv->dfs_root);
 	mlx5e_destroy_netdev(priv);
 }
 
