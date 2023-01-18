@@ -129,6 +129,16 @@ out_power_put:
 	return IRQ_HANDLED;
 }
 
+void ipa_interrupt_irq_disable(struct ipa *ipa)
+{
+	disable_irq(ipa->interrupt->irq);
+}
+
+void ipa_interrupt_irq_enable(struct ipa *ipa)
+{
+	enable_irq(ipa->interrupt->irq);
+}
+
 static void ipa_interrupt_enabled_update(struct ipa *ipa)
 {
 	const struct ipa_reg *reg = ipa_reg(ipa, IPA_IRQ_EN);
