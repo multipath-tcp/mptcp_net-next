@@ -20,7 +20,7 @@ if [ "${1}" = "manual" ] || [ "${1}" = "debug" ]; then
 fi
 
 VIRTME_GIT_URL="https://github.com/matttbe/virtme.git"
-VIRTME_GIT_SHA="d384fd29cb2381e50ab54c19b1ed1dc2c6db2d20"
+VIRTME_GIT_SHA="a680c0861cf6f9dc6a8a821e9e58ae43c5e68435"
 
 PACKETDRILL_GIT_URL="https://github.com/multipath-tcp/packetdrill.git"
 PACKETDRILL_GIT_BRANCH="mptcp-net-next"
