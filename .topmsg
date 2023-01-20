@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/MAINTAINERS-Update-MPTCP-maintainer-list-and-CREDITS
+From: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Subject: [PATCH] MAINTAINERS: Update MPTCP maintainer list and CREDITS
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+My responsibilities at Intel have changed, so I'm handing off exclusive
+MPTCP subsystem maintainer duties to Matthieu. It has been a privilege
+to see MPTCP through its initial upstreaming and first few years in the
+upstream kernel!
+
+Signed-off-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
