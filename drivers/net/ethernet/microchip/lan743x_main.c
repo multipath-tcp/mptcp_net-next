@@ -1418,14 +1418,6 @@ static void lan743x_phy_link_status_change(struct net_device *netdev)
 
 		data = lan743x_csr_read(adapter, MAC_CR);
 
-		/* set interface mode */
-		if (phy_interface_is_rgmii(phydev))
-			/* RGMII */
-			data &= ~MAC_CR_MII_EN_;
-		else
-			/* GMII */
-			data |= MAC_CR_MII_EN_;
-
 		/* set duplex mode */
 		if (phydev->duplex)
 			data |= MAC_CR_DPX_;
@@ -1477,10 +1469,33 @@ static void lan743x_phy_close(struct lan743x_adapter *adapter)
 	netdev->phydev = NULL;
 }
 
+static void lan743x_phy_interface_select(struct lan743x_adapter *adapter)
+{
+	u32 id_rev;
+	u32 data;
+
+	data = lan743x_csr_read(adapter, MAC_CR);
+	id_rev = adapter->csr.id_rev & ID_REV_ID_MASK_;
+
+	if (adapter->is_pci11x1x && adapter->is_sgmii_en)
+		adapter->phy_interface = PHY_INTERFACE_MODE_SGMII;
+	else if (id_rev == ID_REV_ID_LAN7430_)
+		adapter->phy_interface = PHY_INTERFACE_MODE_GMII;
+	else if ((id_rev == ID_REV_ID_LAN7431_) && (data & MAC_CR_MII_EN_))
+		adapter->phy_interface = PHY_INTERFACE_MODE_MII;
+	else
+		adapter->phy_interface = PHY_INTERFACE_MODE_RGMII;
+}
+
 static int lan743x_phy_open(struct lan743x_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	struct lan743x_phy *phy = &adapter->phy;
+	struct fixed_phy_status fphy_status = {
+		.link = 1,
+		.speed = SPEED_1000,
+		.duplex = DUPLEX_FULL,
+	};
 	struct phy_device *phydev;
 	int ret = -EIO;
 
@@ -1491,17 +1506,25 @@ static int lan743x_phy_open(struct lan743x_adapter *adapter)
 	if (!phydev) {
 		/* try internal phy */
 		phydev = phy_find_first(adapter->mdiobus);
-		if (!phydev)
-			goto return_error;
+		if (!phydev)	{
+			if ((adapter->csr.id_rev & ID_REV_ID_MASK_) ==
+					ID_REV_ID_LAN7431_) {
+				phydev = fixed_phy_register(PHY_POLL,
+							    &fphy_status, NULL);
+				if (IS_ERR(phydev)) {
+					netdev_err(netdev, "No PHY/fixed_PHY found\n");
+					return -EIO;
+				}
+			} else {
+				goto return_error;
+				}
+		}
 
-		if (adapter->is_pci11x1x)
-			ret = phy_connect_direct(netdev, phydev,
-						 lan743x_phy_link_status_change,
-						 PHY_INTERFACE_MODE_RGMII);
-		else
-			ret = phy_connect_direct(netdev, phydev,
-						 lan743x_phy_link_status_change,
-						 PHY_INTERFACE_MODE_GMII);
+		lan743x_phy_interface_select(adapter);
+
+		ret = phy_connect_direct(netdev, phydev,
+					 lan743x_phy_link_status_change,
+					 adapter->phy_interface);
 		if (ret)
 			goto return_error;
 	}
@@ -3279,7 +3302,6 @@ static int lan743x_mdiobus_init(struct lan743x_adapter *adapter)
 			lan743x_csr_write(adapter, SGMII_CTL, sgmii_ctl);
 			netif_dbg(adapter, drv, adapter->netdev,
 				  "SGMII operation\n");
-			adapter->mdiobus->probe_capabilities = MDIOBUS_C22_C45;
 			adapter->mdiobus->read = lan743x_mdiobus_read_c22;
 			adapter->mdiobus->write = lan743x_mdiobus_write_c22;
 			adapter->mdiobus->read_c45 = lan743x_mdiobus_read_c45;
@@ -3295,7 +3317,6 @@ static int lan743x_mdiobus_init(struct lan743x_adapter *adapter)
 			netif_dbg(adapter, drv, adapter->netdev,
 				  "RGMII operation\n");
 			// Only C22 support when RGMII I/F
-			adapter->mdiobus->probe_capabilities = MDIOBUS_C22;
 			adapter->mdiobus->read = lan743x_mdiobus_read_c22;
 			adapter->mdiobus->write = lan743x_mdiobus_write_c22;
 			adapter->mdiobus->name = "lan743x-mdiobus";
