@@ -76,6 +76,29 @@ If needed to avoid conflicts or to fix conflicts reported by the CI:
 You can also prune the TopGit tree manually with `./.tg-remove-empty.sh`.
 
 
+Fix conflicts resolved differently upstream
+-------------------------------------------
+
+It can happen the net maintainers resolve conflicts between -net and net-next
+differently than what was proposed and applied in our tree.
+
+No need to create a new dedicated topic for that or update
+`t/DO-NOT-MERGE-git-markup-net-next`, the proper solution is to do the fix in
+the associated top-base ref to align on what is done upstream:
+
+    git switch --detach top-bases/t/DO-NOT-MERGE-git-markup-net-next
+    <do the modifications>
+    git add -p
+    git commit -sm "..."
+    git diff net-next -- <file> # just to check
+    git update-ref refs/top-bases/t/DO-NOT-MERGE-git-markup-net-next HEAD
+    ./.publish.sh
+
+One way to check that our tree doesn't diverge with upstream is to look at:
+
+    git diff t/DO-NOT-MERGE-git-markup-net-next t/DO-NOT-MERGE-git-markup-end-common-net-net-next net-next -- *
+
+
 Add a new patch to the tree
 ---------------------------
 
