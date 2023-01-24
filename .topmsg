@@ -1,0 +1,32 @@
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Subject: [PATCH net-next] net: ethtool: fix up for "ethtool: Add and use ethnl_update_bool."
+
+After merging the net-next tree, today's linux-next build (powerpc
+ppc64_defconfig) failed like this:
+
+  In file included from net/ethtool/netlink.c:6:
+  net/ethtool/netlink.h:177:20: error: redefinition of 'ethnl_update_bool'
+    177 | static inline void ethnl_update_bool(bool *dst, const struct nlattr *attr,
+        |                    ^~~~~~~~~~~~~~~~~
+  net/ethtool/netlink.h:125:20: note: previous definition of 'ethnl_update_bool' with type 'void(bool *, const struct nlattr *, bool *)' {aka 'void(_Bool *, const struct nlattr *, _Bool *)'}
+    125 | static inline void ethnl_update_bool(bool *dst, const struct nlattr *attr,
+        |                    ^~~~~~~~~~~~~~~~~
+
+Caused by:
+
+  commit dc0b98a1758f ("ethtool: Add and use ethnl_update_bool.")
+
+merging badly with:
+
+  commit 7c494a7749a7 ("net: ethtool: netlink: introduce ethnl_update_bool()")
+
+from the net tree.
+
+The version from net-next -- commit 7c494a7749a7 ("net: ethtool:
+netlink: introduce ethnl_update_bool()") -- has been taken, keeping the
+one from net.
+
+Fixes: dc0b98a1758f ("ethtool: Add and use ethnl_update_bool.")
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
