@@ -160,41 +160,65 @@ To list all topics, you can use:
 Send patches upstream
 ---------------------
 
-`send-upstream.sh` script can be used, but most of our upstreaming has been done manually. For the manual process:
+Here is a checklist.
 
-* Prerequisite: Set up git remotes for mptcp_net-next, net, and net-next
-* Check out a local branch that's a copy of either export (for net-next) or export-net (for net)
-* Fetch latest net and net-next changes
-* Do an interactive rebase to remove extra commits and add the upstreamer's signoff
+* Prerequisite: Set up Git remotes for `mptcp_net-next`, `net`, and `net-next`:
 
-      git-rebase -i --signoff net/main  ## or net-next/main
+```
+[remote "origin"]
+        url = git@github.com:multipath-tcp/mptcp_net-next.git
+        fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "netdev-next"]
+        url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next
+        fetch = +refs/heads/*:refs/remotes/netdev-next/*
+[remote "netdev-net"]
+        url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net
+        fetch = +refs/heads/*:refs/remotes/netdev-net/*
+```
 
-* Double-check git tags. Sender signoff should be last, and not duplicated. Reviewed-by/Acked-by precede the signoffs. Typically place Closes and Fixes tags first in the list, and make sure all -net patches have a Fixes tag. Keep Reviewed-by tags from the sender if they are present, even if it's redundant with the signoff.
-  * Properly formatted Fixes tags can be generated easily if you add the following block to your .gitconfig:
+* Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
+  or `export-net` (for `net`):
 
-        [pretty]
-            fixes = Fixes: %h (\"%s\")
+        git fetch netdev-next
+        git fetch netdev-net
 
-  * This allows generating the "Fixes: " tag with
+* Prepare a new branch with either:
 
-        git log --pretty=fixes <commit-id>
+        b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
+        b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
 
-* If the series is for -net (fixes), it is recommended to add `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch.
+* Cherry-pick commits you need and add the upstreamer's signoff:
+
+        git cherry-pick -s <...>  ## use ./.list-exported-commits.sh
+
+* Double-check Git tags in commit messages:
+  * Sender signoff should be last, and not duplicated.
+  * Reviewed-by/Acked-by preceed the signoffs.
+  * Typically place Closes and Fixes tags first in the list
+  * Make sure all -net patches have a Fixes tag and CC stable (see below).
+  * Keep Reviewed-by tags from the sender if they are present, even if it's
+    redundant with the signoff.
+
+* If the series is for -net (fixes), it is recommended to add
+  `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch.
 
 * Build the code and run tests.
-* Check for net/net-next conflicts. If possible, defer net-next upstreaming until net-branch patches they conflict with have been merged to the net-next branch.
-* Determine cc addresses for the series.
-  * Always include netdev maintainers (davem@davemloft.net kuba@kernel.org pabeni@redhat.com edumazet@google.com), MPTCP maintainers (matthieu.baerts@tessares.net mathew.j.martineau@linux.intel.com), and mptcp@lists.linux.dev
-  * For patches with Fixes tags, also cc the author **and any co-developers** of the fixed commit. `scripts/get_maintainers.pl --email --fixes` (from the kernel repo, not the special scripts branch this README is in) will look this up for you, and is what the netdev CI will run and check against. If any outdated email addresses are associated with the fixed commit, substitute a current address if possible. It helps to add a note to the .patch file (add an extra `---` after the git tags in the relevant .patch file and then add text that will not be imported in to git).
-* Format the patches (add any relevant `--cc` flags), replacing `-N` with the appropriate number of patches:
 
-      git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net/main --subject-prefix="PATCH net"
-      ## or
-      git format-patch -N --to=netdev@vger.kernel.org --cc=davem@davemloft.net --cc=kuba@kernel.org --cc=pabeni@redhat.com --cc=edumazet@google.com --cc=matthieu.baerts@tessares.net --cc=mptcp@lists.linux.dev --cover-letter --base=net-next/main --subject-prefix="PATCH net-next"
+* Check for net/net-next conflicts. If possible, defer net-next upstreaming
+  until net-branch patches they conflict with have been merged to the net-next
+  branch. If it is not possible to wait, document the resolution
 
-* Edit the cover letter, replacing the subject and body placeholders.
-  * Give a quick summary of the included patches. If upstreaming a group of patches that implements a whole feature, it's helpful to add a paragraph or two explaining the full feature (refer to the original cover letters sent to mptcp@lists.linux.dev as needed).
-  * If upstreaming a collection of unrelated patches, no need to add extra explanation, just explain each in the cover letter:
+* Edit the cover letter, replacing the subject and body placeholders:
+
+        b4 prep --edit-cover
+
+  * Give a quick summary of the included patches. If upstreaming a group of
+    patches that implements a whole feature, it's helpful to add a paragraph or
+    two explaining the full feature (refer to the original cover letters sent to
+    `mptcp@lists.linux.dev` if needed).
+
+  * If upstreaming a collection of unrelated patches, no need to add extra
+    explanations, just explain each in the cover letter:
 
         Patch 1: Fix a bug
 
@@ -202,18 +226,37 @@ Send patches upstream
 
         Patch 4: Another bug fix
 
-* Run the .patch files through checkpatch one more time if you want (CI should have caught issues in the code, but sometimes the above edits can add a problem).
+* Determine cc addresses for the series:
 
-        scripts/checkpatch.pl *.patch
+        b4 prep --auto-to-cc
 
-* Send the patches (assuming there are no extra patch files sitting around...)
+  * If any outdated email addresses are associated with the fixed commit,
+    substitute a current address if possible. It helps to add a Git note to the
+    commit with `git notes edit <commit>` to document that.
 
-        git send-email *.patch
+* Run checkpatch one more time if you want (issues should have been caught
+  before but sometimes the above edits can add problems).
 
-* Make sure the full series appears in both https://patchwork.kernel.org/project/mptcp/list/ and https://patchwork.kernel.org/project/netdevbpf/list/
-* Mark the series as "Handled Elsewhere" in MPTCP patchwork.
-* Check CI status in the netdev patchwork.
+        ./scripts/checkpatch.pl --strict --codespell --git $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+
+* Send the patches to yourself only:
+
+        b4 send --reflect
+
+* If the previous step generated correct emails, send them to the mailing lists:
+
+        b4 send
+
+* Make sure the full series appears in PatchWork in both
+  [MPTCP](https://patchwork.kernel.org/project/mptcp/list/) and
+  [Netdev](https://patchwork.kernel.org/project/netdevbpf/list/) projects
+
+* Mark the series as `Handled Elsewhere` in MPTCP PatchWork.
+
+* Check CI status in the Netdev PatchWork.
+
 * Monitor for upstream merge or maintainer feedback.
+
 
 Weekly meetings
 ---------------
