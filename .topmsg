@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-do-not-wait-for-bare-sockets-timeout
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not wait for bare sockets' timeout
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If the peer closes all the existing subflows for a given
+mptcp socket and later the application closes it, the current
+implementation let it survive until the timewait timeout expires.
+
+While the above is allowed by the protocol specification it
+consumes resources for almost no reason and additionally
+causes sporadic self-tests failures.
+
+Let's move the mptcp socket to the TCP_CLOSE state when there are
+no alive subflows at close time, so that the allocated resources
+will be freed immediately.
+
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
