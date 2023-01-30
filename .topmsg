@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-do-not-keep-around-the-first-subflow-after-disconnect
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not keep around the first subflow after disconnect
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+After the previous patch the first subflow is allocated as
+needed at bind, connect, listen time. We don't need anymore
+to keep alive the first subflow after a disconnect just to
+be able to perform such syscall.
+
+Overall, this change makes the passive and active sockets consistent:
+even passive sockets will be allowed to complete life cycle after
+disconnect.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/290
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
