@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-refactor-mptcp_stream_accept
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: refactor mptcp_stream_accept()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Rewrite the mptcp socket accept op, leveraging the new
+__inet_accept() helper.
+
+This way we can avoid acquiring the new socket lock twice
+and we can avoid a couple of indirect calls.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
