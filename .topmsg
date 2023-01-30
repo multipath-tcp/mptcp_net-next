@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-first-subflow-allocation-at-mpc-access-time
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move first subflow allocation at mpc access time
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In the long run this will simplify the mptcp code and will
+allow for more consistent behavior. Move the first subflow
+allocation out of the sock->init ops into the __mptcp_nmpc_socket()
+helper.
+
+Since the first subflow creation can now happen after the first
+setsockopt() we additionally need to invoke mptcp_sockopt_sync()
+on it.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
