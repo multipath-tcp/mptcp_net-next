@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fastclose-msk-when-cleaning-unaccepted-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fastclose msk when cleaning unaccepted sockets
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When cleaning up unaccepted mptcp socket still laying inside
+the listener queue at listener close time, such sockets will
+go through a regular close, waiting for a timeout before
+shutting down the subflows.
+
+There is no need to keep the kernel resources in use for
+such a possibly long time: short-circuit to fast-close.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
