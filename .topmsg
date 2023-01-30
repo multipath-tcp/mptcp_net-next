@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selinux-Implement-mptcp_add_subflow-hook
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selinux: Implement mptcp_add_subflow hook
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Newly added subflows should inherit the LSM label from the associated
+msk socket regarless current context.
+
+This patch implements the above copying sid and class from the msk
+context, deleting the existing subflow label, if any, and then
+re-creating a new one.
+
+The new helper reuses the selinux_netlbl_sk_security_free() function,
+and the latter can end-up being called multiple times with the same
+argument; we additionally need to make it idempotent.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
