@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-locking-for-setsockopt-corner-case
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix locking for setsockopt corner-case
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We need to call the __mptcp_nmpc_socket(), and later subflow socket
+access under the msk socket lock, or e.g. a racing connect() could
+change the socket status under the hood, with unexpected results.
+
+Fixes: 54635bd04701 ("mptcp: add TCP_FASTOPEN_CONNECT socket option")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
