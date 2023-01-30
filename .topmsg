@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-unneeded-__mptcp_nmpc_socket-usage
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid unneeded __mptcp_nmpc_socket() usage
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In a few spots, the mptcp code invokes the __mptcp_nmpc_socket() helper
+multiple times under the same socket lock scope. Additionally, in such
+places, the socket status ensures that there is no MP capable handshake
+running.
+
+Under the above condition we can replace the later __mptcp_nmpc_socket()
+helper invocation with direct access to the msk->subflow pointer and
+better document such access is not supposed to fail with WARN().
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
