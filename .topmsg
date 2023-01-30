@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-fastopen-subflow-check-inside-mptcp_sendmsg_fastopen
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move fastopen subflow check inside mptcp_sendmsg_fastopen()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+So that we can avoid a bunch of check in fastpath. Additionally we
+can specialize such check according to the specific fastopen method
+- defer_connect vs MSG_FASTOPEN.
+
+The latter bits will simplify the next patches.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
