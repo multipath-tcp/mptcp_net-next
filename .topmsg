@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-mptcp_schedule_work-instead-of-open-coding-it
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use mptcp_schedule_work() instead of open-coding it
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The helper additionally take cares of checking the msk status
+before taking action. That is functionally irrelevant because
+the worker itself does nothing if the msk is in CLOSE state.
+
+Just remove a few dups line of code.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
