@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/inet-factor-out-locked-section-of-inet_accept-in-a-new-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] inet: factor out locked section of inet_accept() in a new helper
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+No functional changes intended. The new helper will be used
+by the MPTCP protocol in the next patch to avoid duplicating
+a few LoC.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
