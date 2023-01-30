@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] inet: factor out locked section of inet_accept() in a new helper
-
-No functional changes intended. The new helper will be used
-by the MPTCP protocol in the next patch to avoid duplicating
-a few LoC.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
