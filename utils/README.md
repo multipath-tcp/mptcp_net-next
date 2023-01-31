@@ -176,19 +176,22 @@ Send patches upstream
 
 Here is a checklist.
 
-* Prerequisite: Set up Git remotes for `mptcp_net-next`, `net`, and `net-next`:
+* Prerequisite:
+  * Set up Git remotes for `mptcp_net-next`, `net`, and `net-next`:
 
-```
-[remote "origin"]
-        url = git@github.com:multipath-tcp/mptcp_net-next.git
-        fetch = +refs/heads/*:refs/remotes/origin/*
-[remote "netdev-next"]
-        url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next
-        fetch = +refs/heads/*:refs/remotes/netdev-next/*
-[remote "netdev-net"]
-        url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net
-        fetch = +refs/heads/*:refs/remotes/netdev-net/*
-```
+        [remote "origin"]
+                url = git@github.com:multipath-tcp/mptcp_net-next.git
+                fetch = +refs/heads/*:refs/remotes/origin/*
+        [remote "netdev-next"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next
+                fetch = +refs/heads/*:refs/remotes/netdev-next/*
+        [remote "netdev-net"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net
+                fetch = +refs/heads/*:refs/remotes/netdev-net/*
+
+  * Install `b4` and make sure you are at least using the last stable version:
+
+        python3 -m pip install --user --upgrade b4
 
 * Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
   or `export-net` (for `net`):
