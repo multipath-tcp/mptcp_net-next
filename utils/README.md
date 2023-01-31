@@ -120,8 +120,9 @@ The different sections in the TopGit tree:
 * Features for net-next next: when a long series is in developments or for BPF
 
 All these scripts call `add_patch.sh` after having set `TG_TOP`. You can do the
-same if you need to place a patch before a specific topic (Git branch). Check
-the `Find a topic name` section below.
+same if you need to place a patch before a specific topic (Git branch) or use
+`add_patch_before_commit.sh "<commit title>" (...)`. Check the `Find a topic
+name` section below.
 
 In case of conflicts, please follow the intructions and use `./.end-conflict.sh`.
 
@@ -129,11 +130,20 @@ In case of conflicts, please follow the intructions and use `./.end-conflict.sh`
 Amend of topic (Apply a `Squash-to` patch)
 ------------------------------------------
 
-To modify a published commit and apply a `Squash-to` patch, you first need to
-checkout on the correct branch, see `Find a topic name` section below. Then
-you can use `am-patch.sh` and `publish.sh`, e.g.
+To modify a published commit and apply a `Squash-to` patch, the easiest is when
+the patch contains the subject of the commit to modify between double quotes. In
+this case, you can use:
 
-    git checkout t/DO-NOT-MERGE-mptcp-enabled-by-default
+    ./.am-squash-to-patch.sh <Message-ID>
+
+If not, you can use:
+
+    ./.am-squash-to-patch.sh "<commit title>" <Message-ID>
+
+Or "manually": you first need to switch to the correct branch, see `Find a topic
+name` section below. Then you can use `am-patch.sh` and `publish.sh`, e.g.
+
+    git switch t/DO-NOT-MERGE-mptcp-enabled-by-default
     ./.am-patch.sh [<Message-ID> | patch <Patchwork ID> | series <Patchwork ID> | mbox file]
     ./.publish.sh
 
@@ -155,6 +165,10 @@ To list all topics, you can use:
 
     git checkout t/upstream  ## or t/upstream-net
     tg info --series
+
+To find a specific topic, you can use:
+
+    ./.tg-get-topic.sh "<commit title>"
 
 
 Send patches upstream
