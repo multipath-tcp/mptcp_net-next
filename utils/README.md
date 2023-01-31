@@ -251,6 +251,7 @@ Here is a checklist.
 * Run checkpatch one more time if you want (issues should have been caught
   before but sometimes the above edits can add problems).
 
+        ./.checkpatch-b4.sh  ## or the full command below
         ./scripts/checkpatch.pl --strict --codespell --git $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
 
 * Send the patches to yourself only:
