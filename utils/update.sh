@@ -49,6 +49,8 @@ update() {
 
 		git fetch origin
 		range="${before}..${base}"
+
+		git config --local rerere.enabled true
 	else
 		git pull origin "${base}"
 		range=0
@@ -75,6 +77,7 @@ update "${TG_BASE_NET_NEXT}" "${TG_TOPIC_TOP_NET_NEXT}"
 update "${TG_BASE_NET}" "${TG_TOPIC_TOP_NET}"
 
 if sync_upstream; then
+	git config --local rerere.enabled false
 	echo "remove empty topics & push?"
 	read -r
 	./.tg-remove-empty.sh
