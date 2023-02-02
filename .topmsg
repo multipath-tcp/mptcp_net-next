@@ -1,4 +1,17 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-stop-tests-earlier
+Subject: [PATCH] selftests: mptcp: stop tests earlier
 
+These 'endpoint' tests from 'mptcp_join.sh' selftest start a transfer in
+the background and check the status during this transfer.
+
+Once the expected events have been recorded, there is no reason to wait
+for the data transfer to finish. It can be stopped earlier to reduce the
+execution time by more than half.
+
+For these tests, the exchanged data were not verified. Errors, if any,
+were ignored but that's fine, plenty of other tests are looking at that.
+It is then OK to mute stderr now that we are sure errors will be printed
+(and still ignored) because the transfer is stopped before the end.
+
+Fixes: e274f7154008 ("selftests: mptcp: add subflow limits test-cases")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
