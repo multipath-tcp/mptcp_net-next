@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 case "${1}" in
 	"net" | "net-next" | "bpf" | "bpf-next" | "iproute2" | "iproute2-next")

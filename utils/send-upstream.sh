@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 [ -f "${1}" ] || [ -d "${1}" ]
 PATCH="${1}"

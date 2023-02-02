@@ -1,4 +1,4 @@
-#! /bin/bash -ex
+#! /bin/bash -e
 
 # revert current patch
 tg patch | patch -p1 -R

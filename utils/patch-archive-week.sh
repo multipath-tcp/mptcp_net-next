@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 # Patchwork on kernel.org has extra states
 git config --local pw.states \
