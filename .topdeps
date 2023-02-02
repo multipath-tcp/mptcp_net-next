@@ -1,1 +1,1 @@
-t/mptcp-be-careful-on-subflow-status-propagation-on-errors
+t/selftests-mptcp-stop-tests-earlier
