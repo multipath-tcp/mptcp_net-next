@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-allow-more-slack-for-slow-test-case
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: allow more slack for slow test-case
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+A test-case is frequently failing on some extremely slow VMs.
+The mptcp transfer completes before the script is able to do
+all the required PM manipulation.
+
+Address the issue in the simplest possible way, making the
+transfer even more slow.
+
+Additionally dump more info in case of failures, to help debugging
+similar problems in the future and init dump_stats var.
+
+Fixes: e274f7154008 ("selftests: mptcp: add subflow limits test-cases")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/323
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
