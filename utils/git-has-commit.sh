@@ -2,8 +2,7 @@
 
 : "${1:?}"
 
-git fetch --tags netdev-net
-git fetch --tags netdev-next
+git fetch -f --multiple --tags netdev-net netdev-next
 git fetch origin
 
 git branch --remote --contains "${1}" netdev-net/main netdev-next/main origin/export
