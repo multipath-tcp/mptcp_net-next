@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-mptcp-allow-more-slack-for-slow-test-case
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
