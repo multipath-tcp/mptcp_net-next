@@ -174,7 +174,7 @@ int skb_gro_receive(struct sk_buff *p, struct sk_buff *skb)
 	/* pairs with WRITE_ONCE() in netif_set_gro(_ipv4)_max_size() */
 	gro_max_size = p->protocol == htons(ETH_P_IPV6) ?
 			READ_ONCE(p->dev->gro_max_size) :
-				READ_ONCE(p->dev->gro_ipv4_max_size);
+			READ_ONCE(p->dev->gro_ipv4_max_size);
 
 	if (unlikely(p->len + len >= gro_max_size || NAPI_GRO_CB(skb)->flush))
 		return -E2BIG;
