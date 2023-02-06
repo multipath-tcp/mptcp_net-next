@@ -209,15 +209,14 @@ Here is a checklist.
         git cherry-pick -s <...>  ## use ./.list-exported-commits.sh
 
 * Double-check Git tags in commit messages:
-  * Sender signoff should be last, and not duplicated.
-  * Reviewed-by/Acked-by preceed the signoffs.
-  * Typically place Closes and Fixes tags first in the list
-  * Make sure all -net patches have a Fixes tag and CC stable (see below).
-  * Keep Reviewed-by tags from the sender if they are present, even if it's
-    redundant with the signoff.
 
-* If the series is for -net (fixes), it is recommended to add
-  `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch:
+        git rebase -i $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+
+  * Sender `Signed-off-by` tag should be last, and not duplicated.
+  * Typically place `Closes` and `Fixes` tags first in the list
+  * If the series is for -net (fixes), it is recommended to add
+    `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each
+    patch:
 
         ./.append-cc-stable.sh netdev-net/main..
 
