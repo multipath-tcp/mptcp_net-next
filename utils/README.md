@@ -217,7 +217,9 @@ Here is a checklist.
     redundant with the signoff.
 
 * If the series is for -net (fixes), it is recommended to add
-  `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch.
+  `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each patch:
+
+        ./.append-cc-stable.sh netdev-net/main..
 
 * Build the code and run tests.
 
