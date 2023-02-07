@@ -216,7 +216,9 @@ Here is a checklist.
         git merge --no-edit netdev-next/main  ## or -net
         git switch -
 
-* Build the code and run tests.
+* Build the code and run tests:
+
+        ./.virtme_upstream.sh
 
 * Double-check Git tags in commit messages:
 
