@@ -30,4 +30,7 @@ git filter-repo --message-callback '
         if not added:
           _ins("at the end")
 
+        if not has_fixes:
+          print("    => TODO: Add version: # v<...>+")
+
         return b"\n".join(m)' --refs "${1?}"
