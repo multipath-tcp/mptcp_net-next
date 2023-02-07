@@ -196,8 +196,7 @@ Here is a checklist.
 * Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
   or `export-net` (for `net`):
 
-        git fetch netdev-next
-        git fetch netdev-net
+        git fetch --multiple netdev-next netdev-net
 
 * Prepare a new branch with either:
 
@@ -206,7 +205,18 @@ Here is a checklist.
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
-        git cherry-pick -s <...>  ## use ./.list-exported-commits.sh
+        ./.list-exported-commits.sh
+        git cherry-pick -s <...>
+
+* Check for net/net-next conflicts. If possible, defer net-next upstreaming
+  until net-branch patches they conflict with have been merged to the net-next
+  branch. If it is not possible to wait, document the resolution.
+
+        git branch -f tmp && git switch tmp
+        git merge --no-edit netdev-next/main  ## or -net
+        git switch -
+
+* Build the code and run tests.
 
 * Double-check Git tags in commit messages:
 
@@ -219,12 +229,6 @@ Here is a checklist.
     patch:
 
         ./.append-cc-stable.sh netdev-net/main..
-
-* Build the code and run tests.
-
-* Check for net/net-next conflicts. If possible, defer net-next upstreaming
-  until net-branch patches they conflict with have been merged to the net-next
-  branch. If it is not possible to wait, document the resolution
 
 * Edit the cover letter, replacing the subject and body placeholders:
 
@@ -252,8 +256,8 @@ Here is a checklist.
     substitute a current address if possible. It helps to add a Git note to the
     commit with `git notes edit <commit>` to document that.
 
-* Run checkpatch one more time if you want (issues should have been caught
-  before but sometimes the above edits can add problems).
+* Run checkpatch one more time (issues should have been caught before but
+  sometimes the above edits can add problems):
 
         ./.checkpatch-b4.sh
 
