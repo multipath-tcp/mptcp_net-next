@@ -220,6 +220,13 @@ Here is a checklist.
 
         ./.virtme_upstream.sh
 
+* Send the current version to `git.kernel.org` to get some feedback from Intel's
+  lkp:
+
+        git cherry-pick export
+        git push matttbe-korg  ## or another remote
+        git reset --hard HEAD~
+
 * Double-check Git tags in commit messages:
 
         git rebase -i $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
