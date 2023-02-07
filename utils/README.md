@@ -257,6 +257,10 @@ Here is a checklist.
 
         Patch 4: Another bug fix
 
+  * For -net, add which kernels versions have the bugs:
+
+        ./.git-check-fixes.sh netdev-net/main..
+
 * Determine cc addresses for the series:
 
         b4 prep --auto-to-cc
