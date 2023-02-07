@@ -1,6 +1,6 @@
 #!/bin/bash
 
-git fetch origin
+git fetch -q origin
 
 git log --reverse --format="        - [%h] %s (%an)" "${1:-"origin/net-next..origin/export"}" |
 	sed -n '/git markup: net (/,$p' |

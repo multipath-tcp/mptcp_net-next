@@ -1,8 +1,9 @@
 #!/bin/bash -e
 
 if [ "${FETCH}" != 0 ]; then
-	git fetch -f --multiple --tags netdev-net netdev-next
-	git fetch origin
+	echo "Fetching repositories"
+	git fetch -q -f --multiple --tags netdev-net netdev-next
+	git fetch -q origin
 fi
 
 if [ ${#} -eq 0 ]; then
