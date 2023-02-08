@@ -6626,18 +6626,22 @@ static int devlink_nl_cmd_health_reporter_diagnose_doit(struct sk_buff *skb,
 
 	err = devlink_fmsg_obj_nest_start(fmsg);
 	if (err)
-		return err;
+		goto out;
 
 	err = reporter->ops->diagnose(reporter, fmsg, info->extack);
 	if (err)
-		return err;
+		goto out;
 
 	err = devlink_fmsg_obj_nest_end(fmsg);
 	if (err)
-		return err;
+		goto out;
 
-	return devlink_fmsg_snd(fmsg, info,
-				DEVLINK_CMD_HEALTH_REPORTER_DIAGNOSE, 0);
+	err = devlink_fmsg_snd(fmsg, info,
+			       DEVLINK_CMD_HEALTH_REPORTER_DIAGNOSE, 0);
+
+out:
+	devlink_fmsg_free(fmsg);
+	return err;
 }
 
 static int
@@ -8426,6 +8430,8 @@ int devlink_port_netdevice_event(struct notifier_block *nb,
 		break;
 	case NETDEV_REGISTER:
 	case NETDEV_CHANGENAME:
+		if (devlink_net(devlink) != dev_net(netdev))
+			return NOTIFY_OK;
 		/* Set the netdev on top of previously set type. Note this
 		 * event happens also during net namespace change so here
 		 * we take into account netdev pointer appearing in this
@@ -8435,6 +8441,8 @@ int devlink_port_netdevice_event(struct notifier_block *nb,
 					netdev);
 		break;
 	case NETDEV_UNREGISTER:
+		if (devlink_net(devlink) != dev_net(netdev))
+			return NOTIFY_OK;
 		/* Clear netdev pointer, but not the type. This event happens
 		 * also during net namespace change so we need to clear
 		 * pointer to netdev that is going to another net namespace.
