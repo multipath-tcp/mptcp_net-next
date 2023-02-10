@@ -2371,9 +2371,11 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 			      unsigned int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	bool need_push;
+	bool need_push, dispose_it;
 
-	list_del(&subflow->node);
+	dispose_it = !msk->subflow || ssk != msk->subflow->sk;
+	if (dispose_it)
+		list_del(&subflow->node);
 
 	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 
@@ -2387,6 +2389,15 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	}
 
 	need_push = (flags & MPTCP_CF_PUSH) && __mptcp_retransmit_pending_data(sk);
+	if (!dispose_it) {
+		tcp_disconnect(ssk, 0);
+		msk->subflow->state = SS_UNCONNECTED;
+		mptcp_subflow_ctx_reset(subflow);
+		release_sock(ssk);
+
+		goto out;
+	}
+
 	sock_orphan(ssk);
 	subflow->disposable = 1;
 
@@ -2413,11 +2424,10 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 
 	sock_put(ssk);
 
-	if (ssk == msk->first) {
+	if (ssk == msk->first)
 		msk->first = NULL;
-		mptcp_dispose_initial_subflow(msk);
-	}
 
+out:
 	if (ssk == msk->last_snd)
 		msk->last_snd = NULL;
 
@@ -3272,6 +3282,10 @@ static void mptcp_destroy(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	/* clears msk->subflow, allowing the following to close
+	 * even the initial subflow
+	 */
+	mptcp_dispose_initial_subflow(msk);
 	mptcp_destroy_common(msk, 0);
 	sk_sockets_allocated_dec(sk);
 }
