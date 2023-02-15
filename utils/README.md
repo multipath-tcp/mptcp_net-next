@@ -198,10 +198,11 @@ Here is a checklist.
 
         git fetch --multiple netdev-next netdev-net
 
-* Prepare a new branch with either:
+* Prepare a new branch with one of these adapted commands (with a description):
 
         b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
         b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
+        b4 prep -n upstream-stable-$(date +%Y%m%d)-<description> -f stable/linux-6.x.y --set-prefixes 6.x
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
