@@ -12,7 +12,7 @@ is_stable() {
    fi
 }
 
-VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh expect-all
+VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh "${@:-expect-all}"
 
 if [ -f .virtme-exec-run-old ]; then
    mv .virtme-exec-run-old .virtme-exec-run
