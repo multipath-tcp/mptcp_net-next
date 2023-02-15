@@ -1862,7 +1862,7 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 		if (msk->first)
 			sock_hold(msk->first);
 
-		do_cancel_work = __mptcp_close(sk, 0);
+		do_cancel_work = __mptcp_close(sk, -1);
 		release_sock(sk);
 		if (do_cancel_work) {
 			/* lockdep will report a false positive ABBA deadlock
