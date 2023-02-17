@@ -988,12 +988,7 @@ set_fully_established:
 	mptcp_subflow_fully_established(subflow, mp_opt);
 
 check_notify:
-	/* if the subflow is not already linked into the conn_list, we can't
-	 * notify the PM: this subflow is still on the listener queue
-	 * and the PM possibly acquiring the subflow lock could race with
-	 * the listener close
-	 */
-	if (likely(subflow->pm_notified) || list_empty(&subflow->node))
+	if (likely(subflow->pm_notified))
 		return true;
 
 	subflow->pm_notified = 1;
