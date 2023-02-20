@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: fix UaF in listener shutdown (net-next)
+Subject: [PATCH] mptcp: fix UaF in listener shutdown
 
 As reported by Christoph after having refactored the passive
 socket initialization, the mptcp listener shutdown path is prone
