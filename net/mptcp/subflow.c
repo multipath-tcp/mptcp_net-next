@@ -1708,7 +1708,7 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	if (err)
 		return err;
 
-	lock_sock_nested(sf->sk, SINGLE_DEPTH_NESTING);
+	lock_sock(sf->sk);
 
 	err = security_mptcp_add_subflow(sk, sf->sk);
 	if (err)

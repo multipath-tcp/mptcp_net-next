@@ -999,8 +999,8 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 {
 	int addrlen = sizeof(struct sockaddr_in);
 	struct sockaddr_storage addr;
+	struct mptcp_sock *msk;
 	struct socket *ssock;
-	struct sock *newsk;
 	int backlog = 1024;
 	int err;
 
@@ -1009,13 +1009,15 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	if (err)
 		return err;
 
-	newsk = entry->lsk->sk;
-	if (!newsk)
+	msk = mptcp_sk(entry->lsk->sk);
+	if (!msk)
 		return -EINVAL;
 
-	lock_sock(newsk);
-	ssock = __mptcp_nmpc_socket(mptcp_sk(newsk));
-	release_sock(newsk);
+	/* No other code-paths can touch the msk at this point and acquiring
+	 * the msk the socket lock will trigger a lockdep false positive in
+	 * the mptcp_subflow_create_socket error path.
+	 */
+	ssock = __mptcp_nmpc_socket(msk);
 	if (IS_ERR(ssock))
 		return PTR_ERR(ssock);
 
