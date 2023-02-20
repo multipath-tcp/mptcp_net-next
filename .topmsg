@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-fix-possible-deadlock-in-subflow_error_report
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
