@@ -2422,7 +2422,7 @@ static void __mptcp_close_subflow(struct sock *sk)
 	 */
 	if (!msk->first && msk->in_accept_queue) {
 		sock_set_flag(sk, SOCK_DEAD);
-		sk->sk_state = TCP_CLOSE;
+		inet_sk_state_store(sk, TCP_CLOSE);
 	}
 }
 
