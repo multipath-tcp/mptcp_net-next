@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: use the workqueue to destroy unaccepted sockets (net-next)
+Subject: [PATCH] mptcp: use the workqueue to destroy unaccepted sockets
 
 Christoph reported a UaF at token lookup time after having
 refactored the passive socket initialization part:
