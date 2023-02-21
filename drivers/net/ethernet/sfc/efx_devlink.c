@@ -323,7 +323,7 @@ static void efx_devlink_info_running_v2(struct efx_nic *efx,
 				    GET_VERSION_V2_OUT_SUCFW_BUILD_DATE);
 		rtc_time64_to_tm(tstamp, &build_date);
 #else
-		memset(&build_date, 0, sizeof(build_date)
+		memset(&build_date, 0, sizeof(build_date));
 #endif
 		build_id = MCDI_DWORD(outbuf, GET_VERSION_V2_OUT_SUCFW_CHIP_ID);
 
@@ -655,7 +655,7 @@ static struct devlink_port *ef100_set_devlink_port(struct efx_nic *efx, u32 idx)
 				 "devlink port creation for PF failed.\n");
 		else
 			pci_warn(efx->pci_dev,
-				 "devlink_port creationg for VF %u failed.\n",
+				 "devlink_port creation for VF %u failed.\n",
 				 idx);
 		return NULL;
 	}
