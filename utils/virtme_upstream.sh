@@ -14,8 +14,11 @@ is_stable() { local prefix sublevel
    fi
 }
 
-VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh "${@:-expect-all}"
+rc=0
+VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh "${@:-expect-all}" || rc=${?}
 
 if [ -f .virtme-exec-run-old ]; then
    mv .virtme-exec-run-old .virtme-exec-run
 fi
+
+exit ${rc}
