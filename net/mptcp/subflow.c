@@ -1944,11 +1944,10 @@ static void subflow_ulp_release(struct sock *ssk)
 
 	sk = ctx->conn;
 	if (sk) {
-		/* if the msk has been orphaned, keep the ctx
-		 * alive, will be freed by __mptcp_close_ssk(),
-		 * when the subflow is still unaccepted
+		/* if the subflow has been closed by the TCP stack, keep
+		 * the ctx alive, will be freed by __mptcp_close_ssk()
 		 */
-		release = ctx->disposable || list_empty(&ctx->node);
+		release = ctx->disposable;
 		sock_put(sk);
 	}
 
