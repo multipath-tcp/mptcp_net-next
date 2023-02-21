@@ -14,16 +14,16 @@ msgid="${1}"
 source ./.lib.sh
 
 subject="${subject:-$(b4 am --cherry-pick _ --no-add-trailers -o - "${msgid}" |
-			grep "^Subject: " | head -n 1 | cut -d\" -f2)}"
+			grep "^Subject: " | head -n 1 | cut -d: -f3- | sed 's/"//g;s/^ \+//g')}"
 if [ -z "${subject}" ]; then
-	printerr "Not double quote in the subject: not a squash-to patch?"
+	printerr "Not able to find the corresponding patch in the subject: pass the commit title as first argument"
 	exit 1
 fi
 
 git checkout t/upstream
 topic="$(./.tg-get-topic.sh "${subject}")"
 if [ -z "${topic}" ]; then
-	printerr "Topic with subject '${subject}' not found: on a TopGit branch?"
+	printerr "Topic with subject '${subject}' not found: pass the commit title as first argument"
 	exit 1
 fi
 
