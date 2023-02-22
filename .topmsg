@@ -40,11 +40,11 @@ With such change, __mptcp_destroy_sock() is always called
 on msk sockets, even on accepted ones. We don't need anymore
 to transiently drop one sk reference at msk clone time.
 
-Please note that this commit depends on the parent one:
+Please note this commit depends on the parent one:
 
   mptcp: refactor passive socket initialization
 
-Fixes: 58b09919626 ("mptcp: create msk early")
+Fixes: 58b09919626b ("mptcp: create msk early")
 Reported-and-tested-by: Christoph Paasch <cpaasch@apple.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/347
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
