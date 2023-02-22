@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: fix UaF in listener shutdown (net)
+Subject: [PATCH] mptcp: fix UaF in listener shutdown
 
 As reported by Christoph after having refactored the passive
 socket initialization, the mptcp listener shutdown path is prone
@@ -48,6 +48,12 @@ of the unaccepted msk sockets.
 
 Just drop the now unnecessary code.
 
+Please note this commit depends on the two parent ones:
+
+  mptcp: refactor passive socket initialization
+  mptcp: use the workqueue to destroy unaccepted sockets
+
+Fixes: 6aeed9045071 ("mptcp: fix race on unaccepted mptcp sockets")
 Reported-and-tested-by: Christoph Paasch <cpaasch@apple.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/346
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
