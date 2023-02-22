@@ -1,14 +1,18 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: refactor passive socket initialization (net)
+Subject: [PATCH] mptcp: refactor passive socket initialization
 
-After commit 30e51b923e43 ("mptcp: fix unreleased socket in
-accept queue") unaccepted msk sockets go throu complete
-shutdown, we don't need anymore to delay inserting the first
-subflow into the subflow lists.
+After commit 30e51b923e43 ("mptcp: fix unreleased socket in accept queue")
+unaccepted msk sockets go throu complete shutdown, we don't need anymore
+to delay inserting the first subflow into the subflow lists.
 
-The reference counting deserve some extra care, as __mptcp_close()
-is unaware of the request socket linkage to the first subflow.
+The reference counting deserve some extra care, as __mptcp_close() is
+unaware of the request socket linkage to the first subflow.
 
+Please note that this is more a refactoring than a fix but because this
+modification is needed to include other corrections, see the following
+commits. Then a Fixes tag has been added here to help the stable team.
+
+Fixes: 30e51b923e43 ("mptcp: fix unreleased socket in accept queue")
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Tested-by: Christoph Paasch <cpaasch@apple.com>
