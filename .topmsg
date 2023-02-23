@@ -1,4 +1,12 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-setting-TCP_CLOSE-state-twice
+Subject: [PATCH] mptcp: avoid setting TCP_CLOSE state twice
 
+tcp_set_state() is called from tcp_done() already.
+
+There is then no need to first set the state to TCP_CLOSE, then call
+tcp_done().
+
+Fixes: d582484726c4 ("mptcp: fix fallback for MP_JOIN subflows")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/362
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
