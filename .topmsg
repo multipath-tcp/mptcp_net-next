@@ -1,15 +1,23 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] DO-NOT-MERGE: mptcp: use kmalloc on kasan build (net)
+Subject: [PATCH] DO-NOT-MERGE: mptcp: improve code coverage for CI (net)
 
 (only for -net)
 
-Helps detection UaF, which apparently kasan misses
-with kmem_cache allocator.
+mptcp: use kmalloc on kasan build
 
-We also need to always set the SOCK_RCU_FREE flag, to
-preserved the current code leveraging SLAB_TYPESAFE_BY_RCU.
-This latter change will make unreachable some existing
-errors path, but I don't see other options.
+  Helps detection UaF, which apparently kasan misses with kmem_cache
+  allocator.
+
+  We also need to always set the SOCK_RCU_FREE flag, to preserved the
+  current code leveraging SLAB_TYPESAFE_BY_RCU. This latter change will
+  make unreachable some existing errors path, but I don't see other
+  options.
+
+tcp: warn if tcp_done() is called on a closed socket
+
+  This is an extra check mainly for the CIs: to make sure we don't call
+  tcp_done() on an already closed socket as it happened in the past. If
+  we do such call, better to catch the error earlier.
 
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
