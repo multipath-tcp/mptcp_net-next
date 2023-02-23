@@ -9,4 +9,6 @@ preserved the current code leveraging SLAB_TYPESAFE_BY_RCU.
 This latter change will make unreachable some existing
 errors path, but I don't see other options.
 
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
