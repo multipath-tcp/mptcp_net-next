@@ -3,7 +3,7 @@ Subject: [PATCH] mptcp: add ro_after_init for tcp{,v6}_prot_override
 
 Add __ro_after_init labels for the variables tcp_prot_override and
 tcpv6_prot_override, just like other variables adjacent to them, to
-indicate that they are initialised from the init hoos and no writes
+indicate that they are initialised from the init hooks and no writes
 occur afterwards.
 
 Fixes: b19bc2945b40 ("mptcp: implement delegated actions")
