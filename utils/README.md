@@ -238,7 +238,7 @@ Here is a checklist.
     `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each
     patch:
 
-        ./.append-cc-stable.sh netdev-net/main..
+        ./.append-cc-stable.sh $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
 
 * Edit the cover letter, replacing the subject and body placeholders:
 
@@ -260,7 +260,7 @@ Here is a checklist.
 
   * For -net, add which kernels versions have the bugs:
 
-        ./.git-check-fixes.sh netdev-net/main..
+        ./.git-check-fixes.sh $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
 
 * Determine cc addresses for the series:
 
