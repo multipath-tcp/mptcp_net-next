@@ -12,6 +12,13 @@ fi
 
 for c in "${@}"; do
 	git log --oneline -1 "${c}"
-	git branch --remote --contains "${c}" netdev-net/main netdev-next/main origin/export origin/export-net
-	git tag --list v"[5-9]*" --contains="${c}" | sort -V | head -n1
+	if [ "${NO_BRANCH_CHECK}" != 1 ]; then
+		git branch --remote --contains "${c}" netdev-net/main \
+						      netdev-next/main \
+						      origin/export \
+						      origin/export-net
+	fi
+	if [ "${NO_TAG_CHECK}" != 1 ]; then
+		git tag --list v"[5-9]*" --contains="${c}" | sort -V | head -n1
+	fi
 done
