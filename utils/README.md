@@ -225,7 +225,7 @@ Here is a checklist.
   lkp:
 
         git cherry-pick export
-        git push matttbe-korg  ## or another remote
+        git push matttbe-korg HEAD HEAD:master -f  ## or another remote
         git reset --hard HEAD~
 
 * Double-check Git tags in commit messages:
