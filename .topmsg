@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-lockdep-false-positive-in-mptcp_pm_nl_create_listen_socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix lockdep false positive in mptcp_pm_nl_create_listen_socket()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Christoph reports a lockdep splat in the mptcp_subflow_create_socket()
+error path, when such function is invoked by
+mptcp_pm_nl_create_listen_socket().
+
+Such code path acquires two separates, nested socket lock, with the
+internal lock operation lacking the "nested" annotation. Adding that
+in sock_release() for mptcp's sake only could be confusing.
+
+Instead just add a new lockclass to the in-kernel msk socket,
+re-initializing the lockdep infra after the socket creation.
+
+Fixes: ad2171009d96 ("mptcp: fix locking for in-kernel listener creation")
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/354
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Tested-by: Christoph Paasch <cpaasch@apple.com>
