@@ -717,7 +717,7 @@ static void subflow_ulp_fallback(struct sock *sk,
 	mptcp_subflow_ops_undo_override(sk);
 }
 
-void mptcp_subflow_drop_ctx(struct sock *ssk)
+static void subflow_drop_ctx(struct sock *ssk)
 {
 	struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(ssk);
 
@@ -823,7 +823,7 @@ create_child:
 
 			if (new_msk)
 				mptcp_copy_inaddrs(new_msk, child);
-			mptcp_subflow_drop_ctx(child);
+			subflow_drop_ctx(child);
 			goto out;
 		}
 
@@ -914,7 +914,7 @@ out:
 	return child;
 
 dispose_child:
-	mptcp_subflow_drop_ctx(child);
+	subflow_drop_ctx(child);
 	tcp_rsk(req)->drop_req = true;
 	inet_csk_prepare_for_destroy_sock(child);
 	tcp_done(child);
