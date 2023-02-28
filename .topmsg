@@ -53,6 +53,9 @@ Please note this commit depends on the two parent ones:
   mptcp: refactor passive socket initialization
   mptcp: use the workqueue to destroy unaccepted sockets
 
+v2:
+ - removes left-over code that should have been dropped before (Paolo)
+
 Fixes: 6aeed9045071 ("mptcp: fix race on unaccepted mptcp sockets")
 Reported-and-tested-by: Christoph Paasch <cpaasch@apple.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/346
