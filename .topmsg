@@ -44,6 +44,12 @@ Please note this commit depends on the parent one:
 
   mptcp: refactor passive socket initialization
 
+v2:
+ - The workqueue could trigger before inet_csk_listen_stop() kicks-in,
+   or the closed socket could even land to accept(). Solve the race
+   falling back to TCP - we already complete the MPTCP level close
+   signaling. (Paolo)
+
 Fixes: 58b09919626b ("mptcp: create msk early")
 Reported-and-tested-by: Christoph Paasch <cpaasch@apple.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/347
