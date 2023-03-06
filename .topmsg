@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-possible-memory-leak-on-syn_recv-race
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix possible memory leak on syn_recv race
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When subflow_syn_recv_sock() loses the inet hash insert race, the
+newly created children will be released by inet_csk_complete_hashdance().
+
+In that scenario, without any further hint, the ulp release callback
+will keep the ulp context alive, expecting that the msk socket will
+later free it.
+
+Anyway the dying child is not linked to any msk socket, and the context
+will be leaked, as reported by Christoph.
+
+Address the issue explicitly releasing the context in the critical
+scenario.
+
+Fixes: cec37a6e41aa ("mptcp: Handle MP_CAPABLE options for outgoing connections")
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/356
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
