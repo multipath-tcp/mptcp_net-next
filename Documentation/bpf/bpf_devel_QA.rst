@@ -7,8 +7,8 @@ workflows related to reporting bugs, submitting patches, and queueing
 patches for stable kernels.
 
 For general information about submitting patches, please refer to
-`Documentation/process/`_. This document only describes additional specifics
-related to BPF.
+Documentation/process/submitting-patches.rst. This document only describes
+additional specifics related to BPF.
 
 .. contents::
     :local:
@@ -128,7 +128,7 @@ into the bpf-next tree will make their way into net-next tree. net and
 net-next are both run by David S. Miller. From there, they will go
 into the kernel mainline tree run by Linus Torvalds. To read up on the
 process of net and net-next being merged into the mainline tree, see
-the :ref:`netdev-FAQ`
+the `netdev-FAQ`_.
 
 
 
@@ -147,7 +147,7 @@ request)::
 Q: How do I indicate which tree (bpf vs. bpf-next) my patch should be applied to?
 ---------------------------------------------------------------------------------
 
-A: The process is the very same as described in the :ref:`netdev-FAQ`,
+A: The process is the very same as described in the `netdev-FAQ`_,
 so please read up on it. The subject line must indicate whether the
 patch is a fix or rather "next-like" content in order to let the
 maintainers know whether it is targeted at bpf or bpf-next.
@@ -206,7 +206,7 @@ ii) run extensive BPF test suite and
 Once the BPF pull request was accepted by David S. Miller, then
 the patches end up in net or net-next tree, respectively, and
 make their way from there further into mainline. Again, see the
-:ref:`netdev-FAQ` for additional information e.g. on how often they are
+`netdev-FAQ`_ for additional information e.g. on how often they are
 merged to mainline.
 
 Q: How long do I need to wait for feedback on my BPF patches?
@@ -230,7 +230,7 @@ Q: Are patches applied to bpf-next when the merge window is open?
 -----------------------------------------------------------------
 A: For the time when the merge window is open, bpf-next will not be
 processed. This is roughly analogous to net-next patch processing,
-so feel free to read up on the :ref:`netdev-FAQ` about further details.
+so feel free to read up on the `netdev-FAQ`_ about further details.
 
 During those two weeks of merge window, we might ask you to resend
 your patch series once bpf-next is open again. Once Linus released
@@ -394,7 +394,7 @@ netdev kernel mailing list in Cc and ask for the fix to be queued up:
   netdev@vger.kernel.org
 
 The process in general is the same as on netdev itself, see also the
-:ref:`netdev-FAQ`.
+`netdev-FAQ`_.
 
 Q: Do you also backport to kernels not currently maintained as stable?
 ----------------------------------------------------------------------
@@ -410,7 +410,7 @@ Q: The BPF patch I am about to submit needs to go to stable as well
 What should I do?
 
 A: The same rules apply as with netdev patch submissions in general, see
-the :ref:`netdev-FAQ`.
+the `netdev-FAQ`_.
 
 Never add "``Cc: stable@vger.kernel.org``" to the patch description, but
 ask the BPF maintainers to queue the patches instead. This can be done
@@ -461,15 +461,15 @@ needed::
 
   $ sudo make run_tests
 
-See the kernels selftest `Documentation/dev-tools/kselftest.rst`_
-document for further documentation.
+See :doc:`kernel selftest documentation </dev-tools/kselftest>`
+for details.
 
 To maximize the number of tests passing, the .config of the kernel
 under test should match the config file fragment in
 tools/testing/selftests/bpf as closely as possible.
 
 Finally to ensure support for latest BPF Type Format features -
-discussed in `Documentation/bpf/btf.rst`_ - pahole version 1.16
+discussed in Documentation/bpf/btf.rst - pahole version 1.16
 is required for kernels built with CONFIG_DEBUG_INFO_BTF=y.
 pahole is delivered in the dwarves package or can be built
 from source at
@@ -684,12 +684,8 @@ when:
 
 
 .. Links
-.. _Documentation/process/: https://www.kernel.org/doc/html/latest/process/
-.. _netdev-FAQ: Documentation/process/maintainer-netdev.rst
+.. _netdev-FAQ: https://www.kernel.org/doc/html/latest/process/maintainer-netdev.html
 .. _selftests:
    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/tools/testing/selftests/bpf/
-.. _Documentation/dev-tools/kselftest.rst:
-   https://www.kernel.org/doc/html/latest/dev-tools/kselftest.html
-.. _Documentation/bpf/btf.rst: btf.rst
 
 Happy BPF hacking!
