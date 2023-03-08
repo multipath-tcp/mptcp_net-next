@@ -1719,6 +1719,40 @@ chk_subflow_nr()
 	fi
 }
 
+chk_mptcp_info()
+{
+	local nr_info=$1
+	local info
+	local cnt1
+	local cnt2
+	local dump_stats
+
+	if [[ "${nr_info}" = "subflows_"* ]]; then
+		info="subflows"
+		nr_info=${nr_info:9}
+	fi
+
+	printf "%-${nr_blank}s %-30s" " " "mptcp_info $info=$nr_info"
+
+	cnt1=$(ss -N $ns1 -inmHM | grep "$info:" |
+		sed -n 's/.*\('"$info"':\)\([[:digit:]]*\).*$/\2/p;q')
+	cnt2=$(ss -N $ns2 -inmHM | grep "$info:" |
+		sed -n 's/.*\('"$info"':\)\([[:digit:]]*\).*$/\2/p;q')
+	if [ "$cnt1" != "$nr_info" -o "$cnt2" != "$nr_info" ]; then
+		echo "[fail] got $cnt1:$cnt2 $info expected $nr_info"
+		fail_test
+		dump_stats=1
+	else
+		echo "[ ok ]"
+	fi
+
+	if [ "${dump_stats}" = 1 ]; then
+		ss -N $ns1 -inmHM
+		ss -N $ns2 -inmHM
+		dump_stats
+	fi
+}
+
 chk_link_usage()
 {
 	local ns=$1
@@ -3129,6 +3163,21 @@ endpoint_tests()
 	fi
 }
 
+mptcp_info_tests()
+{
+	# mptcp_info subflows
+	if reset "mptcp_info subflows"; then
+		pm_nl_set_limits $ns1 0 1
+		pm_nl_set_limits $ns2 0 1
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+		run_tests $ns1 $ns2 10.0.1.1 0 0 0 speed_20 2>/dev/null &
+		wait_mpj $ns2
+		chk_join_nr 1 1 1
+		chk_mptcp_info subflows_1
+		kill_tests_wait
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -3177,6 +3226,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	D@mptcp_info_tests
 )
 
 all_tests_args=""
