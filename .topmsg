@@ -1,0 +1,9 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: simplify subflow_syn_recv_sock()
+
+Postpone the msk cloning to the child process creation
+so that we can avoid a bunch of conditionals.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/61
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
