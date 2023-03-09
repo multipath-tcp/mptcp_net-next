@@ -884,7 +884,6 @@ create_child:
 		}
 	}
 
-out:
 	/* check for expected invariant - should never trigger, just help
 	 * catching eariler subtle bugs
 	 */
