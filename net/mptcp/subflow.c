@@ -806,7 +806,7 @@ create_child:
 	child = listener->icsk_af_ops->syn_recv_sock(sk, skb, req, dst,
 						     req_unhash, own_req);
 
-	if (likely(child && *own_req)) {
+	if (child && *own_req) {
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
 		tcp_rsk(req)->drop_req = false;
@@ -898,12 +898,6 @@ create_child:
 			SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINACKRX);
 			tcp_rsk(req)->drop_req = true;
 		}
-	} else if (child) {
-		/* inet_csk_complete_hashdance() is going to drop the sock
-		 * soon, but context must be explicitly deleted or will be
-		 * leaked
-		 */
-		mptcp_subflow_drop_ctx(child);
 	}
 
 out:
