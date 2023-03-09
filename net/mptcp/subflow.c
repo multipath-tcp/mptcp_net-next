@@ -792,7 +792,7 @@ create_child:
 	child = listener->icsk_af_ops->syn_recv_sock(sk, skb, req, dst,
 						     req_unhash, own_req);
 
-	if (likely(child && *own_req)) {
+	if (child && *own_req) {
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
 		tcp_rsk(req)->drop_req = false;
@@ -882,15 +882,14 @@ create_child:
 			SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINACKRX);
 			tcp_rsk(req)->drop_req = true;
 		}
-	} else if (child) {
-		/* inet_csk_complete_hashdance() is going to drop the sock
-		 * soon, but context must be explicitly deleted or will be
-		 * leaked
-		 */
+
+		goto out;
+
 fallback:
 		mptcp_subflow_drop_ctx(child);
 	}
 
+out:
 	/* check for expected invariant - should never trigger, just help
 	 * catching eariler subtle bugs
 	 */
@@ -1857,10 +1856,11 @@ static void subflow_ulp_release(struct sock *ssk)
 
 	sk = ctx->conn;
 	if (sk) {
-		/* if the subflow has been closed by the TCP stack, keep
-		 * the ctx alive, will be freed by __mptcp_close_ssk()
+		/* if the msk has been orphaned, keep the ctx
+		 * alive, will be freed by __mptcp_close_ssk(),
+		 * when the subflow is still unaccepted
 		 */
-		release = ctx->disposable;
+		release = ctx->disposable || list_empty(&ctx->node);
 
 		/* inet_child_forget() does not call sk_state_change(),
 		 * explicitly trigger the socket close machinery
