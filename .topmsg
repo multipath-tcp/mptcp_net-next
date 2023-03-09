@@ -1,0 +1,8 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid unneeded address copy
+
+In the syn_recv fallback path, the msk is unused. We can skip
+setting the socket address.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
