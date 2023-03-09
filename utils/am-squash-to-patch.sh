@@ -14,7 +14,8 @@ msgid="${1}"
 source ./.lib.sh
 
 subject="${subject:-$(b4 am --cherry-pick _ --no-add-trailers -o - "${msgid}" |
-			grep "^Subject: " | head -n 1 | cut -d: -f3- | sed 's/"//g;s/^ \+//g')}"
+			grep -A 1 "^Subject: " | grep -e "^Subject: " -e "^ \S" | xargs echo |
+			head -n 1 | cut -d: -f3- | sed 's/"//g;s/^ \+//g')}"
 if [ -z "${subject}" ]; then
 	printerr "Not able to find the corresponding patch in the subject: pass the commit title as first argument"
 	exit 1
