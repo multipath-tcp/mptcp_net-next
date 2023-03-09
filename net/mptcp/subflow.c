@@ -882,11 +882,6 @@ create_child:
 			SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINACKRX);
 			tcp_rsk(req)->drop_req = true;
 		}
-
-		goto out;
-
-fallback:
-		mptcp_subflow_drop_ctx(child);
 	}
 
 out:
@@ -906,6 +901,10 @@ dispose_child:
 	req->rsk_ops->send_reset(sk, skb);
 
 	/* The last child reference will be released by the caller */
+	return child;
+
+fallback:
+	mptcp_subflow_drop_ctx(child);
 	return child;
 }
 
