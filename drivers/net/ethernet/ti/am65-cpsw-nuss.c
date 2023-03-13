@@ -1466,15 +1466,13 @@ static void am65_cpsw_disable_serdes_phy(struct am65_cpsw_common *common)
 static int am65_cpsw_init_serdes_phy(struct device *dev, struct device_node *port_np,
 				     struct am65_cpsw_port *port)
 {
-	const char *name = "serdes-phy";
+	const char *name = "serdes";
 	struct phy *phy;
 	int ret;
 
-	phy = devm_of_phy_get(dev, port_np, name);
-	if (PTR_ERR(phy) == -ENODEV)
-		return 0;
-	if (IS_ERR(phy))
-		return PTR_ERR(phy);
+	phy = devm_of_phy_optional_get(dev, port_np, name);
+	if (IS_ERR_OR_NULL(phy))
+		return PTR_ERR_OR_ZERO(phy);
 
 	/* Serdes PHY exists. Store it. */
 	port->slave.serdes_phy = phy;
