@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/Revert-veth-take-into-account-device-reconfiguration-for-xdp_features-flag
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
