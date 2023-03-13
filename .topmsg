@@ -1,14 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] Revert "veth: take into account device reconfiguration for xdp_features flag"
+Subject: [PATCH] veth: fix WARNING: suspicious RCU usage
 
-This reverts commit fccca038f3003daa8f28a5e5d97efe50f04b8d9d.
+This is the patch suggested by Eric Dumazet [1] to fix the warning
+reported on netdev [2].
 
-This commit is causing a warning reported by our CI and blocking the
-execution of the other tests when using a "debug" kernel.
+A formal patch will be sent by Lorenzo Bianconi later [3].
 
-The issue has been reported on netdev ML:
+[1] https://lore.kernel.org/netdev/CANn89iL=zQQygGg4mkAG+MES6-CpkYBL5KY+kn4j=hAowexVZw@mail.gmail.com/
+[2] https://lore.kernel.org/netdev/f5167659-99d7-04a1-2175-60ff1dabae71@tessares.net/
+[3] https://lore.kernel.org/netdev/ZA9TtSkEYavvdd0f@lore-desk/
 
-  https://lore.kernel.org/netdev/f5167659-99d7-04a1-2175-60ff1dabae71@tessares.net/
-
+Fixes: fccca038f300 ("veth: take into account device reconfiguration for xdp_features flag")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/372
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
