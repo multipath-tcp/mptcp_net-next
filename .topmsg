@@ -1,4 +1,14 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/Revert-veth-take-into-account-device-reconfiguration-for-xdp_features-flag
+Subject: [PATCH] Revert "veth: take into account device reconfiguration for xdp_features flag"
 
+This reverts commit fccca038f3003daa8f28a5e5d97efe50f04b8d9d.
+
+This commit is causing a warning reported by our CI and blocking the
+execution of the other tests when using a "debug" kernel.
+
+The issue has been reported on netdev ML:
+
+  https://lore.kernel.org/netdev/f5167659-99d7-04a1-2175-60ff1dabae71@tessares.net/
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/372
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
