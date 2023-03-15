@@ -217,6 +217,15 @@ latest public review posting of the patch; often this is automatically done
 by tools like b4 or a git hook like the one described in
 'Documentation/maintainer/configure-git.rst'.
 
+In the same category as linking web pages, a special tag is also used to close
+issues but only when the mentioned ticketing system can do this operation
+automatically::
+
+        Closes: https://example.com/issues/1234
+
+Please use this 'Closes:' tag only if it helps managing issues thanks to
+automations. If not, pick the 'Link:' one.
+
 A third kind of tag is used to document who was involved in the development of
 the patch. Each of these uses this format::
 
