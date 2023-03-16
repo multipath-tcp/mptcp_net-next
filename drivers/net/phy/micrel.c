@@ -436,11 +436,9 @@ static int kszphy_config_intr(struct phy_device *phydev)
 		if (err)
 			return err;
 
-		temp = KSZPHY_INTCS_ALL;
-		err = phy_write(phydev, MII_KSZPHY_INTCS, temp);
+		err = phy_write(phydev, MII_KSZPHY_INTCS, KSZPHY_INTCS_ALL);
 	} else {
-		temp = 0;
-		err = phy_write(phydev, MII_KSZPHY_INTCS, temp);
+		err = phy_write(phydev, MII_KSZPHY_INTCS, 0);
 		if (err)
 			return err;
 
@@ -4108,7 +4106,7 @@ static int lan8841_ptp_perout(struct ptp_clock_info *ptp,
 	period_nsec = timespec64_to_ns(&ts_period);
 
 	if (period_nsec < 200) {
-		pr_warn_ratelimited("%s: perout period too small, minimim is 200 nsec\n",
+		pr_warn_ratelimited("%s: perout period too small, minimum is 200 nsec\n",
 				    phydev_name(phydev));
 		return -EOPNOTSUPP;
 	}
