@@ -217,6 +217,15 @@ latest public review posting of the patch; often this is automatically done
 by tools like b4 or a git hook like the one described in
 'Documentation/maintainer/configure-git.rst'.
 
+Similarly, there is also the "Closes:" tag that can be used to close issues
+when the underlying public bug tracker can do this operation automatically.
+For example::
+
+	Closes: https://example.com/issues/1234
+
+Private bug trackers and invalid URLs are forbidden. For other public bug
+trackers not supporting automations, keep using the "Link:" tag instead.
+
 A third kind of tag is used to document who was involved in the development of
 the patch. Each of these uses this format::
 

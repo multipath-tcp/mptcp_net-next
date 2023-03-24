@@ -134,6 +134,15 @@ resources. In addition to giving a URL to a mailing list archive or bug,
 summarize the relevant points of the discussion that led to the
 patch as submitted.
 
+It might be interesting to use the 'Closes:' tag to close issues when the
+underlying public bug tracker can do this operation automatically. For
+example::
+
+	Closes: https://example.com/issues/1234
+
+Private bug trackers and invalid URLs are forbidden. For other public bug
+trackers not supporting automations, keep using the "Link:" tag instead.
+
 If your patch fixes a bug in a specific commit, e.g. you found an issue using
 ``git bisect``, please use the 'Fixes:' tag with the first 12 characters of
 the SHA-1 ID, and the one line summary.  Do not split the tag across multiple
