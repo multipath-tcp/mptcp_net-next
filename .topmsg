@@ -1,5 +1,5 @@
 From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: use mptcp_schedule_work instead of open-coding it (net)
+Subject: [PATCH] mptcp: use mptcp_schedule_work instead of open-coding it
 
 Beyond reducing code duplication this also avoids scheduling
 the mptcp_worker on a closed socket on some edge scenarios.
