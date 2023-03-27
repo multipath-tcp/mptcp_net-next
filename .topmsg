@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-mptcp_schedule_work-instead-of-open-coding-it-net
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use mptcp_schedule_work instead of open-coding it (net)
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Beyond reducing code duplication this also avoids scheduling
+the mptcp_worker on a closed socket on some edge scenarios.
+
+The addressed issue is actually older than the blamed commit
+below, but this fix needs it as a pre-requisite.
+
+Fixes: ba8f48f7a4d7 ("mptcp: introduce mptcp_schedule_work")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
