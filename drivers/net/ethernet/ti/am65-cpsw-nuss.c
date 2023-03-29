@@ -86,6 +86,7 @@
 
 /* AM65_CPSW_P0_REG_CTL */
 #define AM65_CPSW_P0_REG_CTL_RX_CHECKSUM_EN	BIT(0)
+#define AM65_CPSW_P0_REG_CTL_RX_REMAP_VLAN	BIT(16)
 
 /* AM65_CPSW_PORT_REG_PRI_CTL */
 #define AM65_CPSW_PORT_REG_PRI_CTL_RX_PTYPE_RROBIN	BIT(8)
@@ -385,8 +386,8 @@ static int am65_cpsw_nuss_common_open(struct am65_cpsw_common *common)
 	/* set base flow_id */
 	writel(common->rx_flow_id_base,
 	       host_p->port_base + AM65_CPSW_PORT0_REG_FLOW_ID_OFFSET);
-	/* en tx crc offload */
-	writel(AM65_CPSW_P0_REG_CTL_RX_CHECKSUM_EN, host_p->port_base + AM65_CPSW_P0_REG_CTL);
+	writel(AM65_CPSW_P0_REG_CTL_RX_CHECKSUM_EN | AM65_CPSW_P0_REG_CTL_RX_REMAP_VLAN,
+	       host_p->port_base + AM65_CPSW_P0_REG_CTL);
 
 	am65_cpsw_nuss_set_p0_ptype(common);
 
@@ -427,6 +428,8 @@ static int am65_cpsw_nuss_common_open(struct am65_cpsw_common *common)
 		am65_cpsw_init_host_port_emac(common);
 	else
 		am65_cpsw_init_host_port_switch(common);
+
+	am65_cpsw_qos_tx_p0_rate_init(common);
 
 	for (i = 0; i < common->rx_chns.descs_num; i++) {
 		skb = __netdev_alloc_skb_ip_align(NULL,
@@ -599,8 +602,12 @@ static int am65_cpsw_nuss_ndo_slave_open(struct net_device *ndev)
 		goto runtime_put;
 	}
 
-	for (i = 0; i < common->tx_ch_num; i++)
-		netdev_tx_reset_queue(netdev_get_tx_queue(ndev, i));
+	for (i = 0; i < common->tx_ch_num; i++) {
+		struct netdev_queue *txq = netdev_get_tx_queue(ndev, i);
+
+		netdev_tx_reset_queue(txq);
+		txq->tx_maxrate =  common->tx_chns[i].rate_mbps;
+	}
 
 	ret = am65_cpsw_nuss_common_open(common);
 	if (ret)
@@ -1425,6 +1432,7 @@ static const struct net_device_ops am65_cpsw_nuss_netdev_ops = {
 	.ndo_vlan_rx_kill_vid	= am65_cpsw_nuss_ndo_slave_kill_vid,
 	.ndo_eth_ioctl		= am65_cpsw_nuss_ndo_slave_ioctl,
 	.ndo_setup_tc           = am65_cpsw_qos_ndo_setup_tc,
+	.ndo_set_tx_maxrate	= am65_cpsw_qos_ndo_tx_p0_set_maxrate,
 };
 
 static void am65_cpsw_disable_phy(struct phy *phy)
@@ -1616,6 +1624,7 @@ void am65_cpsw_nuss_remove_tx_chns(struct am65_cpsw_common *common)
 
 	devm_remove_action(dev, am65_cpsw_nuss_free_tx_chns, common);
 
+	common->tx_ch_rate_msk = 0;
 	for (i = 0; i < common->tx_ch_num; i++) {
 		struct am65_cpsw_tx_chn *tx_chn = &common->tx_chns[i];
 
