@@ -20655,7 +20655,6 @@ F:	sound/soc/codecs/tscs*.h
 TENSILICA XTENSA PORT (xtensa)
 M:	Chris Zankel <chris@zankel.net>
 M:	Max Filippov <jcmvbkbc@gmail.com>
-L:	linux-xtensa@linux-xtensa.org
 S:	Maintained
 T:	git https://github.com/jcmvbkbc/linux-xtensa.git
 F:	arch/xtensa/
@@ -21652,6 +21651,7 @@ USB OVER IP DRIVER
 M:	Valentina Manea <valentina.manea.m@gmail.com>
 M:	Shuah Khan <shuah@kernel.org>
 M:	Shuah Khan <skhan@linuxfoundation.org>
+R:	Hongren Zheng <i@zenithal.me>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
 F:	Documentation/usb/usbip_protocol.rst
@@ -23046,7 +23046,6 @@ F:	drivers/gpio/gpio-xra1403.c
 
 XTENSA XTFPGA PLATFORM SUPPORT
 M:	Max Filippov <jcmvbkbc@gmail.com>
-L:	linux-xtensa@linux-xtensa.org
 S:	Maintained
 F:	drivers/spi/spi-xtensa-xtfpga.c
 F:	sound/soc/xtensa/xtfpga-i2s.c
