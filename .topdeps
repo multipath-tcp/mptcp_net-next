@@ -1,1 +1,1 @@
-t/selftests-mptcp-add-mptcp_info-tests
+t/mptcp-make-userspace_pm_append_new_local_addr-static
