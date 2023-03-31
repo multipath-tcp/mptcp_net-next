@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-NULL-pointer-dereference-on-fastopen-early-fallback
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix NULL pointer dereference on fastopen early fallback
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In case of early fallback to TCP, subflow_syn_recv_sock() deletes
+the subflow context before returning the newly allocated sock to
+the caller.
+
+The fastopen path does not cope with the above unconditionally
+dereferencing the subflow context.
+
+Fixes: 36b122baf6a8 ("mptcp: add subflow_v(4,6)_send_synack()")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
