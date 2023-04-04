@@ -378,9 +378,14 @@ check_transfer()
 			fail_test
 			return 1
 		fi
-		bytes="--bytes=${bytes}"
+
+		# note: BusyBox's "cmp" command doesn't support --bytes
+		head --bytes="$bytes" "$in" > "$in.cut"
+		head --bytes="$bytes" "$out" > "$out.cut"
+		in="$in.cut"
+		out="$out.cut"
 	fi
-	cmp -l "$in" "$out" ${bytes} | while read -r i a b; do
+	cmp -l "$in" "$out" | while read -r i a b; do
 		local sum=$((0${a} + 0${b}))
 		if [ $check_invert -eq 0 ] || [ $sum -ne $((0xff)) ]; then
 			echo "[ FAIL ] $what does not match (in, out):"
@@ -393,6 +398,10 @@ check_transfer()
 			echo "$what has inverted byte at ${i}"
 		fi
 	done
+
+	if [ -n "$bytes" ]; then
+		rm -f "$in" "$out"
+	fi
 
 	return 0
 }
