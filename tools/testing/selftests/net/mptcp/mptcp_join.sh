@@ -378,9 +378,12 @@ check_transfer()
 			fail_test
 			return 1
 		fi
-		bytes="--bytes=${bytes}"
+		# note: BusyBox's "cmp" command doesn't support --bytes
+		bytes=(head --bytes="${bytes}")
+	else
+		bytes=(cat)
 	fi
-	cmp -l "$in" "$out" ${bytes} | while read -r i a b; do
+	cmp -l "$in" "$out" 2>/dev/null | "${bytes[@]}" | while read -r i a b; do
 		local sum=$((0${a} + 0${b}))
 		if [ $check_invert -eq 0 ] || [ $sum -ne $((0xff)) ]; then
 			echo "[ FAIL ] $what does not match (in, out):"
