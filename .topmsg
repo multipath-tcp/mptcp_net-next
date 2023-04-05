@@ -1,4 +1,21 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-pm-uniform-verify-events
+Subject: [PATCH] selftests: mptcp: userspace pm: uniform verify events
 
+Simply adding a "sleep" before checking something is usually not a good
+idea because the time that has been picked can not be enough or too
+much. The best is to wait for events with a timeout.
+
+In this selftest, 'sleep 0.5' is used more than 40 times. It is always
+used before calling a 'verify_*' function except for this
+verify_listener_events which has been added later.
+
+At the end, using all these 'sleep 0.5' seems to work: the slow CIs
+don't complain so far. Also because it doesn't take too much time, we
+can just add two more 'sleep 0.5' to uniform what is done before calling
+a 'verify_*' function. For the same reasons, we can also delay a bigger
+refactoring to replace all these 'sleep 0.5' by functions waiting for
+events instead of waiting for a fix time and hope for the best.
+
+Fixes: 6c73008aa301 ("selftests: mptcp: listener test for userspace PM")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
