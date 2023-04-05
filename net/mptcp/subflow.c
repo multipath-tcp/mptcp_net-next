@@ -723,6 +723,7 @@ void mptcp_subflow_drop_ctx(struct sock *ssk)
 	if (!ctx)
 		return;
 
+	list_del(&mptcp_subflow_ctx(ssk)->node);
 	subflow_ulp_fallback(ssk, ctx);
 	if (ctx->conn)
 		sock_put(ctx->conn);
