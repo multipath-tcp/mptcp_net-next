@@ -128,7 +128,7 @@ static int inet6_create(struct net *net, struct socket *sock, int protocol,
 	int try_loading_module = 0;
 	int err;
 
-	if (protocol < 0 || protocol >= IPPROTO_MAX)
+	if (protocol < 0 || protocol >= IPPROTO_UAPI_MAX)
 		return -EINVAL;
 
 	/* Look for the requested type/protocol pair. */

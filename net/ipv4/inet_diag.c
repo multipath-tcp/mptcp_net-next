@@ -52,7 +52,7 @@ static DEFINE_MUTEX(inet_diag_table_mutex);
 
 static const struct inet_diag_handler *inet_diag_lock_handler(int proto)
 {
-	if (proto < 0 || proto >= IPPROTO_MAX) {
+	if (proto < 0 || proto >= IPPROTO_UAPI_MAX) {
 		mutex_lock(&inet_diag_table_mutex);
 		return ERR_PTR(-ENOENT);
 	}
@@ -1413,7 +1413,7 @@ int inet_diag_register(const struct inet_diag_handler *h)
 	const __u16 type = h->idiag_type;
 	int err = -EINVAL;
 
-	if (type >= IPPROTO_MAX)
+	if (type >= IPPROTO_UAPI_MAX)
 		goto out;
 
 	mutex_lock(&inet_diag_table_mutex);
@@ -1432,7 +1432,7 @@ void inet_diag_unregister(const struct inet_diag_handler *h)
 {
 	const __u16 type = h->idiag_type;
 
-	if (type >= IPPROTO_MAX)
+	if (type >= IPPROTO_UAPI_MAX)
 		return;
 
 	mutex_lock(&inet_diag_table_mutex);
@@ -1443,7 +1443,7 @@ EXPORT_SYMBOL_GPL(inet_diag_unregister);
 
 static int __init inet_diag_init(void)
 {
-	const int inet_diag_table_size = (IPPROTO_MAX *
+	const int inet_diag_table_size = (IPPROTO_UAPI_MAX *
 					  sizeof(struct inet_diag_handler *));
 	int err = -ENOMEM;
 
