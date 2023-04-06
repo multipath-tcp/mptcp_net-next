@@ -715,6 +715,7 @@ void mptcp_subflow_drop_ctx(struct sock *ssk)
 	if (!ctx)
 		return;
 
+	list_del(&mptcp_subflow_ctx(ssk)->node);
 	subflow_ulp_fallback(ssk, ctx);
 	if (ctx->conn)
 		sock_put(ctx->conn);
@@ -1881,8 +1882,7 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 		 */
 		mutex_release(&listener_sk->sk_lock.dep_map, _RET_IP_);
 		mptcp_cancel_work(sk);
-		mutex_acquire(&listener_sk->sk_lock.dep_map,
-			      SINGLE_DEPTH_NESTING, 0, _RET_IP_);
+		mutex_acquire(&listener_sk->sk_lock.dep_map, 0, 0, _RET_IP_);
 
 		sock_put(sk);
 	}
