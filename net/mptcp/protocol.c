@@ -2383,9 +2383,18 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	 * to deliver the msk to user-space.
 	 * Do nothing at the moment and take action at accept and/or listener
 	 * shutdown.
+	 * If instead such subflow has been destroyed, e.g. by inet_child_forget
+	 * do the kill
 	 */
-	if (msk->in_accept_queue && msk->first == ssk)
-		return;
+	if (msk->in_accept_queue && msk->first == ssk) {
+		if (!sock_flag(ssk, SOCK_DEAD))
+			return;
+
+		/* ensure later check in mptcp_worker will dispose the msk */
+		sock_set_flag(sk, SOCK_DEAD);
+		inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32 -
+							  TCP_TIMEWAIT_LEN -1;
+	}
 
 	dispose_it = !msk->subflow || ssk != msk->subflow->sk;
 	if (dispose_it)
