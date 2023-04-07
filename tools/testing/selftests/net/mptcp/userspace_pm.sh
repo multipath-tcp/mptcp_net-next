@@ -4,6 +4,12 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 mptcp_lib_check_mptcp
+mptcp_lib_check_kallsyms
+
+if ! mptcp_lib_kallsyms_has 'mptcp_userspace_pm_'; then
+	echo "userspace pm tests are not supported by the kernel: SKIP"
+	exit ${KSFT_SKIP}
+fi
 
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then

@@ -135,6 +135,7 @@ cleanup_partial()
 check_tools()
 {
 	mptcp_lib_check_mptcp
+	mptcp_lib_check_kallsyms
 
 	if ! ip -Version &> /dev/null; then
 		echo "SKIP: Could not run test without ip tool"
@@ -3045,6 +3046,11 @@ fail_tests()
 
 userspace_tests()
 {
+	if ! mptcp_lib_kallsyms_has 'mptcp_userspace_pm_'; then
+		echo "userspace pm tests are not supported by the kernel: SKIP"
+		return
+	fi
+
 	# userspace pm type prevents add_addr
 	if reset "userspace pm type prevents add_addr"; then
 		set_userspace_pm $ns1
