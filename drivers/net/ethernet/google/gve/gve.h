@@ -47,11 +47,11 @@
 
 #define GVE_RX_BUFFER_SIZE_DQO 2048
 
-#define GVE_GQ_TX_MIN_PKT_DESC_BYTES 182
-
 #define GVE_XDP_ACTIONS 5
 
 #define GVE_TX_MAX_HEADER_SIZE 182
+
+#define GVE_GQ_TX_MIN_PKT_DESC_BYTES 182
 
 /* Each slot in the desc ring has a 1:1 mapping to a slot in the data ring */
 struct gve_rx_desc_queue {
