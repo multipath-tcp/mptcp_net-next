@@ -2689,8 +2689,12 @@ add_addr_ports_tests()
 		chk_add_nr 1 1 1
 		chk_rm_nr 1 1 invert
 
-		verify_listener_events $evts_ns1 $LISTENER_CREATED $AF_INET 10.0.2.1 10100
-		verify_listener_events $evts_ns1 $LISTENER_CLOSED $AF_INET 10.0.2.1 10100
+		if ! mptcp_lib_kallsyms_has "mptcp_event_pm_listener$"; then
+			printf "\t\t\t\t\t SKIP: PM LISTENER events not supported"
+		else
+			verify_listener_events $evts_ns1 $LISTENER_CREATED $AF_INET 10.0.2.1 10100
+			verify_listener_events $evts_ns1 $LISTENER_CLOSED $AF_INET 10.0.2.1 10100
+		fi
 		kill_events_pids
 	fi
 
