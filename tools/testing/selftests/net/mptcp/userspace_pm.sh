@@ -915,6 +915,11 @@ test_listener()
 {
 	print_title "Listener tests"
 
+	if ! mptcp_lib_kallsyms_has "mptcp_event_pm_listener$"; then
+		echo "SKIP: PM LISTENER events not supported"
+		return
+	fi
+
 	# Capture events on the network namespace running the client
 	:>$client_evts
 
