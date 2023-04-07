@@ -2343,8 +2343,6 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 
 		/* ensure later check in mptcp_worker will dispose the msk */
 		sock_set_flag(sk, SOCK_DEAD);
-		inet_csk(sk)->icsk_mtup.probe_timestamp = tcp_jiffies32 -
-							  TCP_TIMEWAIT_LEN -1;
 	}
 
 	dispose_it = !msk->subflow || ssk != msk->subflow->sk;
@@ -2451,12 +2449,12 @@ static void __mptcp_close_subflow(struct sock *sk)
 
 }
 
-static bool mptcp_check_close_timeout(const struct sock *sk)
+static bool mptcp_should_close(const struct sock *sk)
 {
 	s32 delta = tcp_jiffies32 - inet_csk(sk)->icsk_mtup.probe_timestamp;
 	struct mptcp_subflow_context *subflow;
 
-	if (delta >= TCP_TIMEWAIT_LEN)
+	if (delta >= TCP_TIMEWAIT_LEN || mptcp_sk(sk)->in_accept_queue)
 		return true;
 
 	/* if all subflows are in closed status don't bother with additional
@@ -2664,7 +2662,7 @@ static void mptcp_worker(struct work_struct *work)
 	 * even if it is orphaned and in FIN_WAIT2 state
 	 */
 	if (sock_flag(sk, SOCK_DEAD)) {
-		if (mptcp_check_close_timeout(sk)) {
+		if (mptcp_should_close(sk)) {
 			inet_sk_state_store(sk, TCP_CLOSE);
 			mptcp_do_fastclose(sk);
 		}
