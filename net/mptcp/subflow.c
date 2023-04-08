@@ -723,6 +723,7 @@ void mptcp_subflow_drop_ctx(struct sock *ssk)
 	if (!ctx)
 		return;
 
+	list_del(&mptcp_subflow_ctx(ssk)->node);
 	subflow_ulp_fallback(ssk, ctx);
 	if (ctx->conn)
 		sock_put(ctx->conn);
@@ -1824,12 +1825,13 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 	struct request_sock_queue *queue = &inet_csk(listener_ssk)->icsk_accept_queue;
 	struct mptcp_sock *msk, *next, *head = NULL;
 	struct request_sock *req;
+	struct sock *sk, *ssk;
 
 	/* build a list of all unaccepted mptcp sockets */
 	spin_lock_bh(&queue->rskq_lock);
 	for (req = queue->rskq_accept_head; req; req = req->dl_next) {
 		struct mptcp_subflow_context *subflow;
-		struct sock *ssk = req->sk;
+		ssk = req->sk;
 
 		if (!sk_is_mptcp(ssk))
 			continue;
@@ -1839,11 +1841,12 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 			continue;
 
 		/* skip if already in list */
-		msk = mptcp_sk(subflow->conn);
+		sk = subflow->conn;
+		msk = mptcp_sk(sk);
 		if (msk->dl_next || msk == head)
 			continue;
 
-		sock_hold(subflow->conn);
+		sock_hold(sk);
 		msk->dl_next = head;
 		head = msk;
 	}
@@ -1857,17 +1860,25 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 	release_sock(listener_ssk);
 
 	for (msk = head; msk; msk = next) {
-		struct sock *sk = (struct sock *)msk;
+		sk = (struct sock *)msk;
 
 		lock_sock_nested(sk, SINGLE_DEPTH_NESTING);
+		ssk = msk->first;
 		next = msk->dl_next;
 		msk->dl_next = NULL;
 
-		/* prevent the stack from later re-schedule the worker for
-		 * this socket
-		 */
-		inet_sk_state_store(sk, TCP_CLOSE);
+		__mptcp_unaccepted_force_close(sk);
 		release_sock(sk);
+
+		/* the first subflow is not touched by the above, as the msk
+		 * is still in the accept queue, see __mptcp_close_ssk,
+		 * we need to release only the ctx related resources, the
+		 * tcp socket will be destroyed by inet_csk_listen_stop()
+		 */
+		lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
+		mptcp_subflow_drop_ctx(ssk);
+		release_sock(ssk);
+		sock_put(ssk);
 
 		/* lockdep will report a false positive ABBA deadlock
 		 * between cancel_work_sync and the listener socket.
