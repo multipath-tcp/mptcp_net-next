@@ -1,4 +1,8 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/MAINTAINERS-add-git-trees-for-MPTCP
+Subject: [PATCH] MAINTAINERS: add git trees for MPTCP
 
+This will help occasional reviewers to find our git repo without having
+to look at the wiki.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
