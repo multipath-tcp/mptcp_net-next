@@ -1,4 +1,21 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-remove-duplicated-entries-in-usage
+Subject: [PATCH] selftests: mptcp: remove duplicated entries in usage
 
+mptcp_connect tool was printing some duplicated entries when showing how
+to use it: -j -l -r
+
+While at it, I also:
+
+ - moved the very few entries that were not sorted,
+
+ - added -R that was missing since
+   commit 8a4b910d005d ("mptcp: selftests: add rcvbuf set option"),
+
+ - removed the -u parameter that has been removed in
+   commit f730b65c9d85 ("selftests: mptcp: try to set mptcp ulp mode in different sk states").
+
+No need to backport this, it is just an internal tool used by our
+selftests. The help menu is mainly useful for MPTCP kernel devs.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
