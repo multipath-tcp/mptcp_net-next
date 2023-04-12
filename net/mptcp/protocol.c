@@ -2389,9 +2389,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		sock_set_flag(sk, SOCK_DEAD);
 		lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 		mptcp_subflow_drop_ctx(ssk);
-		release_sock(ssk);
-		msk->first = NULL;
-		return;
+		goto out_release;
 	}
 
 	dispose_it = !msk->subflow || ssk != msk->subflow->sk;
@@ -2442,6 +2440,8 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		/* close acquired an extra ref */
 		__sock_put(ssk);
 	}
+
+out_release:
 	release_sock(ssk);
 
 	sock_put(ssk);
