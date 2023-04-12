@@ -12,6 +12,7 @@ on:
       - 'patchew/**'     # patchew is using tags
 
 env:
+  CURL_OPT: "-s -w '%{stderr}%{http_code}\n%{stdout}\n' --connect-timeout 5 --retry 20 --retry-delay 10"
   PW: "https://patchwork.kernel.org/api/1.2"
   RESULTS: "./checkpatch-results.txt"
   DETAILS: "./checkpatch-details.txt"
@@ -73,7 +74,8 @@ jobs:
               return 1
             fi
 
-            curl -X POST \
+            curl ${CURL_OPT} \
+              -X POST \
               -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
               -F "state=${2}" \
               -F "target_url=${URL_GH}" \
