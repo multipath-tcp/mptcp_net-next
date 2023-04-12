@@ -2357,6 +2357,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		msk->subflow->state = SS_UNCONNECTED;
 		mptcp_subflow_ctx_reset(subflow);
 		release_sock(ssk);
+
 		goto out;
 	}
 
