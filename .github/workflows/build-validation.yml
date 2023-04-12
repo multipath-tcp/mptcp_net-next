@@ -16,7 +16,7 @@ on:
       # So we build the "export" branch and we try to find the tag later
 
 env:
-  CURL_OPT: "--no-progress-meter -w '%{stderr}%{http_code}%{stdout}' --connect-timeout 30 --retry 20 --retry-delay 10"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
   PW: "https://patchwork.kernel.org/api/1.2"
 
 permissions: {}
