@@ -12,7 +12,7 @@ on:
       - 'patchew/**'     # patchew is using tags
 
 env:
-  CURL_OPT: "-s -w '%{stderr}%{http_code}\n%{stdout}\n' --connect-timeout 5 --retry 20 --retry-delay 10"
+  CURL_OPT: "--no-progress-meter -w '%{stderr}%{http_code}%{stdout}' --connect-timeout 30 --retry 20 --retry-delay 10"
   PW: "https://patchwork.kernel.org/api/1.2"
   RESULTS: "./checkpatch-results.txt"
   DETAILS: "./checkpatch-details.txt"
