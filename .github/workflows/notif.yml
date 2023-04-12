@@ -15,7 +15,8 @@ on:
       - completed
 
 env:
-  ACCEPT: "Accept: application/vnd.github.v3+json"
+  CURL_OPT: "-s -w '%{stderr}%{http_code}\n%{stdout}\n' --connect-timeout 5 --retry 20 --retry-delay 10"
+  CURL_GH: "-H 'Accept: application/vnd.github.v3+json' -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'"
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
 
@@ -73,7 +74,7 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
           echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
@@ -100,7 +101,7 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
           echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
@@ -123,7 +124,7 @@ jobs:
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
-          curl -H "${ACCEPT}" "${URL}" > commit.json
+          curl ${CURL_OPT} ${CURL_GH} "${URL}" > commit.json
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
@@ -204,7 +205,7 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl -H "${ACCEPT}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA})"
           echo "tag=${TAG:10}" >> ${GITHUB_OUTPUT}
         env:
@@ -215,7 +216,7 @@ jobs:
       - name: get cirrus status
         id: cirrus
         run: |
-          curl -H "${ACCEPT}" "${URL}" > check-runs.json
+          curl ${CURL_OPT} ${CURL_GH} "${URL}" > check-runs.json
           jq -r '.check_runs[] | select(.conclusion != "neutral")' check-runs.json > check-runs_strip.json
 
           i=0
@@ -225,7 +226,7 @@ jobs:
             url_ccl="${url_base}/conclusion/conclusion.txt"
             url_sum="${url_base}/summary/summary.txt"
 
-            ccl="$(curl "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
+            ccl="$(curl ${CURL_OPT} "${url_ccl}" || echo "${i}: Unable to get the conclusion")"
 
             echo "ccl_${i}=${ccl}" >> ${GITHUB_OUTPUT}
             echo "ccl_title_${i}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
@@ -269,7 +270,7 @@ jobs:
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
-          curl -H "${ACCEPT}" "${URL}" > commit.json
+          curl ${CURL_OPT} ${CURL_GH} "${URL}" > commit.json
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
@@ -366,7 +367,7 @@ jobs:
         run: |
           CHECK_URLS=()
           set_url() { local series_url
-            series_url=$(curl "${URL}" | jq -r 'last(last(.[].series)[].url)')
+            series_url=$(curl ${CURL_OPT} "${URL}" | jq -r 'last(last(.[].series)[].url)')
             if [ -z "${series_url}" ] || [ "${series_url}" = "null" ]; then
               echo "Series not found: '${series_url}' '${URL}'"
               return 1
@@ -374,7 +375,7 @@ jobs:
 
             echo "Found Series: '${series_url}'"
 
-            readarray -t CHECK_URLS < <(curl "${series_url}" | jq -r '.patches[].url + "checks/"')
+            readarray -t CHECK_URLS < <(curl ${CURL_OPT} "${series_url}" | jq -r '.patches[].url + "checks/"')
           }
 
           # $1: title, $2: status, $3: url
@@ -388,7 +389,8 @@ jobs:
             fi
 
             for check_url in "${CHECK_URLS[@]}"; do
-              curl -X POST \
+              curl ${CURL_OPT} \
+                -X POST \
                 -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
                 -F "state=${STATE}" \
                 -F "target_url=${3}" \
