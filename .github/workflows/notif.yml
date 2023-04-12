@@ -15,8 +15,8 @@ on:
       - completed
 
 env:
-  CURL_OPT: "-s -w '%{stderr}%{http_code}\n%{stdout}\n' --connect-timeout 5 --retry 20 --retry-delay 10"
-  CURL_GH: "-H 'Accept: application/vnd.github.v3+json' -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'"
+  CURL_OPT: "--no-progress-meter -w '%{stderr}%{http_code}%{stdout}' --connect-timeout 30 --retry 20 --retry-delay 10"
+  CURL_ACC: "Accept: application/vnd.github.v3+json"
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
 
@@ -74,11 +74,12 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
           echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.workflow_run.head_sha }}"
           BRANCH: "${{ github.event.workflow_run.head_branch }}"
@@ -101,11 +102,12 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
           echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.workflow_run.head_sha }}"
           BRANCH: "${{ github.event.workflow_run.head_branch }}"
@@ -124,7 +126,7 @@ jobs:
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
-          curl ${CURL_OPT} ${CURL_GH} "${URL}" > commit.json
+          curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" > commit.json
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
@@ -143,6 +145,7 @@ jobs:
           SHA="${{ github.event.workflow_run.head_sha }}"
           echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.workflow_run.head_sha }}"
 
       - name: send email
@@ -205,10 +208,11 @@ jobs:
       - name: get linked tag
         id: tag
         run: |
-          TAG=$(curl ${CURL_OPT} ${CURL_GH} "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
           echo "Found: ${TAG} (${SHA})"
           echo "tag=${TAG:10}" >> ${GITHUB_OUTPUT}
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
           SHA: "${{ github.event.check_suite.head_sha }}"
 
@@ -216,7 +220,7 @@ jobs:
       - name: get cirrus status
         id: cirrus
         run: |
-          curl ${CURL_OPT} ${CURL_GH} "${URL}" > check-runs.json
+          curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" > check-runs.json
           jq -r '.check_runs[] | select(.conclusion != "neutral")' check-runs.json > check-runs_strip.json
 
           i=0
@@ -251,6 +255,7 @@ jobs:
             jq '.' check-runs_strip.json
           fi
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed"
 
       - name: irc tests
@@ -270,7 +275,7 @@ jobs:
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
         id: commit
         run: |
-          curl ${CURL_OPT} ${CURL_GH} "${URL}" > commit.json
+          curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" > commit.json
 
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
           echo "Found message ID: '${TAG}' '${MID}'"
@@ -293,6 +298,7 @@ jobs:
           echo "Found committer: '${COMMITTER}'"
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
         env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
           URL: "${{ env.URI }}/repos/${{ github.repository }}/git/commits/${{ github.event.check_suite.head_sha }}"
 
       - name: send email
