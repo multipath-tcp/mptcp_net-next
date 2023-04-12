@@ -1827,13 +1827,13 @@ void mptcp_subflow_queue_clean(struct sock *listener_sk, struct sock *listener_s
 	struct request_sock_queue *queue = &inet_csk(listener_ssk)->icsk_accept_queue;
 	struct mptcp_sock *msk, *next, *head = NULL;
 	struct request_sock *req;
-	struct sock *sk, *ssk;
+	struct sock *sk;
 
 	/* build a list of all unaccepted mptcp sockets */
 	spin_lock_bh(&queue->rskq_lock);
 	for (req = queue->rskq_accept_head; req; req = req->dl_next) {
 		struct mptcp_subflow_context *subflow;
-		ssk = req->sk;
+		struct sock *ssk = req->sk;
 
 		if (!sk_is_mptcp(ssk))
 			continue;
