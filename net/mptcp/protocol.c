@@ -2317,20 +2317,23 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	bool need_push, dispose_it;
 
-	/* If the first subflow moved to a close state, e.g. due to
-	 * incoming reset and we reach here before accept we need to be able
-	 * to deliver the msk to user-space.
-	 * Do nothing at the moment and take action at accept and/or listener
-	 * shutdown.
-	 * If instead such subflow has been destroyed, e.g. by inet_child_forget
-	 * do the kill
+	/* If the first subflow moved to a close state before accept, e.g. due
+	 * to an incoming reset, mptcp either:
+	 * - if either the subflow or the msk are dead, destroy the context
+	 *   (the subflow socket is deleted by inet_child_forget) and the msk
+	 * - otherwise do nothing at the moment and take action at accept and/or
+	 *   listener shutdown - user-space must be able to accept() the closed
+	 *   socket.
 	 */
 	if (msk->in_accept_queue && msk->first == ssk) {
-		if (!sock_flag(ssk, SOCK_DEAD))
+		if (!sock_flag(sk, SOCK_DEAD) && !sock_flag(ssk, SOCK_DEAD))
 			return;
 
-		/* ensure later check in mptcp_worker will dispose the msk */
+		/* ensure later check in mptcp_worker() will dispose the msk */
 		sock_set_flag(sk, SOCK_DEAD);
+		lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
+		mptcp_subflow_drop_ctx(ssk);
+		goto out_release;
 	}
 
 	dispose_it = !msk->subflow || ssk != msk->subflow->sk;
@@ -2354,7 +2357,6 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		msk->subflow->state = SS_UNCONNECTED;
 		mptcp_subflow_ctx_reset(subflow);
 		release_sock(ssk);
-
 		goto out;
 	}
 
@@ -2381,6 +2383,8 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		/* close acquired an extra ref */
 		__sock_put(ssk);
 	}
+
+out_release:
 	release_sock(ssk);
 
 	sock_put(ssk);
