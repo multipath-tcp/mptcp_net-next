@@ -2315,7 +2315,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 			      unsigned int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	bool need_push, dispose_it;
+	bool dispose_it, need_push = false;
 
 	/* If the first subflow moved to a close state before accept, e.g. due
 	 * to an incoming reset, mptcp either:
