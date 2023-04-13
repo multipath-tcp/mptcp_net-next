@@ -308,6 +308,7 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	spin_lock_bh(&msk->pm.lock);
+	mptcp_pm_alloc_anno_list(msk, &addr_l);
 	msk->pm.local_addr_used++;
 	spin_unlock_bh(&msk->pm.lock);
 
