@@ -1,4 +1,23 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-fix-ShellCheck-warnings
+Subject: [PATCH] selftests: mptcp: join: fix ShellCheck warnings
+
+Most of the code had an issue according to ShellCheck.
+
+That's mainly due to the fact it incorrectly believes most of the code
+was unreachable because it's invoked by variable name, see how the
+"tests" array is used.
+
+Once SC2317 has been ignored, three small warnings were still visible:
+
+ - SC2155: Declare and assign separately to avoid masking return values.
+
+ - SC2046: Quote this to prevent word splitting: can be ignored because
+   "ip netns pids" can display more than one pid.
+
+ - SC2166: Prefer [ p ] || [ q ] as [ p -o q ] is not well defined.
+
+This probably didn't fix any actual issues but it might help spotting
+new interesting warnings reported by ShellCheck as just before,
+ShellCheck was reporting issues for most lines making it a bit useless.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
