@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: drop unneeded argument
-
-After the previous commit every mptcp_pm_fully_established() is
-always invoked with a GFP_ATOMIC argument. We can drop it.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
