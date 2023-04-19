@@ -1096,15 +1096,6 @@
  *	@skb pointer to skbuff of association packet.
  *	Return 0 if permission is granted.
  *
- * Security hooks for MPTCP
- *
- * @mptcp_add_subflow
- *	Update the labeling for the given MPTCP subflow, to match to
- *	owning MPTCP socket.
- *	@sk: the owning MPTCP socket
- *	@ssk: the new subflow
- *	Return 0 if successful, otherwise < 0 error code.
- *
  * Security hooks for Infiniband
  *
  * @ib_pkey_access:
