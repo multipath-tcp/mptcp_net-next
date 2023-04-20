@@ -2,18 +2,25 @@ From: Paolo Abeni <pabeni@redhat.com>
 Subject: [PATCH] security, lsm: Introduce security_mptcp_add_subflow()
 
 MPTCP can create subflows in kernel context, and later indirectly
-expose them to user-space, via the owning mptcp socket.
+expose them to user-space, via the owning MPTCP socket.
 
 As discussed in the reported link, the above causes unexpected failures
 for server, MPTCP-enabled applications.
 
 Let's introduce a new LSM hook to allow the security module to relabel
-the subflow according to the owing process.
+the subflow according to the owning user-space process, via the MPTCP
+socket owning the subflow.
 
-Note that the new hook requires both the mptcp socket and the new
+Note that the new hook requires both the MPTCP socket and the new
 subflow. This could allow future extensions, e.g. explicitly validating
-the mptcp <-> subflow linkage.
+the MPTCP <-> subflow linkage.
 
 Link: https://lore.kernel.org/mptcp/CAHC9VhTNh-YwiyTds=P1e3rixEDqbRTFj22bpya=+qJqfcaMfg@mail.gmail.com/
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Acked-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+---
+v2:
+ - Address Paul's comments:
+   - clarification around "the owning process" in the commit message
+   - making it clear the hook has to be called after the sk init part
+   - consistent capitalization of "MPTCP"
