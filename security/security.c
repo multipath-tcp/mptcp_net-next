@@ -2500,7 +2500,9 @@ EXPORT_SYMBOL(security_sctp_assoc_established);
  * @ssk: the new subflow
  *
  * Update the labeling for the given MPTCP subflow, to match the one of the
- * owning MPTCP socket.
+ * owning MPTCP socket. This hook has to be called after the socket creation and
+ * initialization via the security_socket_create() and
+ * security_socket_post_create() LSM hooks.
  *
  * Return: Returns 0 on success or a negative error code on failure.
  */
