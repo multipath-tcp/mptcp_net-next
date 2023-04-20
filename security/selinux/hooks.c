@@ -5485,7 +5485,7 @@ static int selinux_mptcp_add_subflow(struct sock *sk, struct sock *ssk)
 	ssksec->sid = sksec->sid;
 
 	/* replace the existing subflow label deleting the existing one
-	 * and re-recrating a new label using the current context
+	 * and re-recreating a new label using the updated context
 	 */
 	selinux_netlbl_sk_security_free(ssksec);
 	return selinux_netlbl_socket_post_create(ssk, ssk->sk_family);
