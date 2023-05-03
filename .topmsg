@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-centralize-stats-dumping
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: centralize stats dumping
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If a test case fails, the mptcp_join.sh script can dump the
+netns MIBs multiple times, leading to confusing output.
+
+Let's dump such info only once per test-case, when needed.
+This additionally allow removing some code duplication.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
