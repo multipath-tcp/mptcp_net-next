@@ -1,4 +1,8 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-add-explicit-check-for-new-mibs
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: add explicit check for new mibs
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Instead of duplicating the all existing TX check with
+the TX side, add the new ones on selected test cases.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
