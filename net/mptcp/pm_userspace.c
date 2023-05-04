@@ -189,6 +189,7 @@ int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 	spin_lock_bh(&msk->pm.lock);
 
 	if (mptcp_pm_alloc_anno_list(msk, &addr_val)) {
+		msk->pm.add_addr_signaled++;
 		mptcp_pm_announce_addr(msk, &addr_val.addr, false);
 		mptcp_pm_nl_addr_send_ack(msk);
 	}
@@ -334,6 +335,7 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 		spin_unlock_bh(&msk->pm.lock);
 		goto create_err;
 	}
+	msk->pm.local_addr_used++;
 	spin_unlock_bh(&msk->pm.lock);
 
 	lock_sock(sk);
@@ -344,8 +346,11 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 
 	spin_lock_bh(&msk->pm.lock);
 	if (err) {
+		msk->pm.local_addr_used--;
 		mptcp_pm_remove_anno_list_by_saddr(msk, &addr_l);
 		mptcp_userspace_pm_delete_local_addr(msk, &local);
+	} else {
+		msk->pm.subflows++;
 	}
 	spin_unlock_bh(&msk->pm.lock);
 
