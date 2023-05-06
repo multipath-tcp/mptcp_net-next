@@ -69,6 +69,7 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 							MPTCP_PM_MAX_ADDR_ID + 1,
 							1);
 		list_add_tail_rcu(&e->list, &msk->pm.userspace_pm_local_addr_list);
+		msk->pm.local_addr_used++;
 		ret = e->addr.id;
 	} else if (match) {
 		ret = entry->addr.id;
@@ -89,6 +90,7 @@ static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
 			/* TODO: a refcount is needed because the entry can
 			 * be used multiple times (e.g. fullmesh mode).
 			 */
+			msk->pm.local_addr_used--;
 			list_del_rcu(&entry->list);
 			kfree(entry);
 			return 0;
@@ -190,6 +192,7 @@ int mptcp_nl_cmd_announce(struct sk_buff *skb, struct genl_info *info)
 	spin_lock_bh(&msk->pm.lock);
 
 	if (mptcp_pm_alloc_anno_list(msk, &addr_val)) {
+		msk->pm.add_addr_signaled++;
 		mptcp_pm_announce_addr(msk, &addr_val.addr, false);
 		mptcp_pm_nl_addr_send_ack(msk);
 	}
@@ -348,7 +351,11 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 
 	release_sock(sk);
 
-	if (err) {
+	if (!err) {
+		spin_lock_bh(&msk->pm.lock);
+		msk->pm.subflows++;
+		spin_unlock_bh(&msk->pm.lock);
+	} else {
 		spin_lock_bh(&msk->pm.lock);
 		mptcp_pm_remove_anno_list_by_saddr(msk, &addr_l);
 anno_list_err:
