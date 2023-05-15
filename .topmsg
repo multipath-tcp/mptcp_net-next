@@ -21,6 +21,7 @@ The issues predates the blamed commit below, but the current resolution
 requires the infrastructure introduced there.
 
 Fixes: 54f1944ed6d2 ("mptcp: factor out mptcp_connect()")
+Reported-by: Ondrej Mosnacek <omosnace@redhat.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/399
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
