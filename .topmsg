@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-connect-timeout-handling
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix connect timeout handling
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Ondrej reported a functional issue WRT timeout handling on connect
+with a nice reproducer.
+
+The problem is that the current mptcp connect waits for both the
+MPTCP socket level timeout, and the first subflow socket timeout.
+The latter is not influenced/touched by the exposed setsockopt().
+
+Overall the above makes the SO_SNDTIMEO a no-op on connect.
+
+Since mptcp_connect is invoked via inet_stream_connect and the
+latter properly handle the MPTCP level timeout, we can address the
+issue making the nested subflow level connect always unblocking.
+
+This also allow simplifying a bit the code, dropping an ugly hack
+to handle the fastopen and custom proto_ops connect.
+
+The issues predates the blamed commit below, but the current resolution
+requires the infrastructure introduced there.
+
+Fixes: 54f1944ed6d2 ("mptcp: factor out mptcp_connect()")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/399
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
