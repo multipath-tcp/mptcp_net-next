@@ -1,4 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/Revert-net-Remove-low_thresh-in-ip-defrag
+Subject: [PATCH] Revert "net: Remove low_thresh in ip defrag"
 
+This reverts commit b2cbac9b9b28730e9e53be20b6cdf979d3b9f27e.
+
+This is causing warnings when creating new netns, see [1]. Revert it for
+the moment while a proper fix is in preparation.
+
+Link: https://lore.kernel.org/netdev/ZGIRWjNcfqI8yY8W@shredder/ [1]
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
