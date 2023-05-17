@@ -441,6 +441,7 @@ fail:
 static void test_red(void)
 {
 	struct mptcp_bpf_red *red_skel;
+	struct nstoken *nstoken = NULL;
 	int server_fd, client_fd;
 	struct bpf_link *link;
 
@@ -454,7 +455,10 @@ static void test_red(void)
 		return;
 	}
 
-	sched_init("subflow", "bpf_red");
+	nstoken = sched_init("subflow", "bpf_red");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init"))
+		goto fail;
+
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -464,7 +468,8 @@ static void test_red(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	sched_cleanup(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_red__destroy(red_skel);
 }
