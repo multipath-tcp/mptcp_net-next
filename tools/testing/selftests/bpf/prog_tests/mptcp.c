@@ -271,42 +271,69 @@ static void send_data(int lfd, int fd)
 #define ADDR_1	"10.0.1.1"
 #define ADDR_2	"10.0.1.2"
 
-static void sched_init(char *flags, char *sched)
+static struct nstoken *sched_init(char *flags, char *sched)
+{
+	struct nstoken *nstoken = NULL;
+	char cmd[64];
+
+	SYS(fail, "ip netns add %s", NS_TEST);
+	SYS(fail, "ip -net %s link set dev lo up", NS_TEST);
+
+	nstoken = open_netns(NS_TEST);
+	if (!ASSERT_OK_PTR(nstoken, "open_netns"))
+		goto fail;
+
+	snprintf(cmd, sizeof(cmd), "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR_1);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "ip -net %s link set veth1 up", NS_TEST);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "ip -net %s link set veth2 up", NS_TEST);
+	system(cmd);
+
+	snprintf(cmd, sizeof(cmd), "ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR_2, flags);
+	system(cmd);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s",
+		 NS_TEST, sched);
+	system(cmd);
+
+fail:
+	return nstoken;
+}
+
+static void sched_cleanup(struct nstoken *nstoken)
 {
 	char cmd[64];
 
-	system("ip link add veth1 type veth peer name veth2");
-	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth1", ADDR_1);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s sysctl -qw net.mptcp.scheduler=default",
+		 NS_TEST);
 	system(cmd);
-	system("ip link set veth1 up");
-	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth2", ADDR_2);
+	snprintf(cmd, sizeof(cmd), "ip -net %s mptcp endpoint flush", NS_TEST);
 	system(cmd);
-	system("ip link set veth2 up");
+	snprintf(cmd, sizeof(cmd), "ip -net %s link del veth1", NS_TEST);
+	system(cmd);
 
-	snprintf(cmd, sizeof(cmd), "ip mptcp endpoint add %s %s", ADDR_2, flags);
-	system(cmd);
-	snprintf(cmd, sizeof(cmd), "sysctl -qw net.mptcp.scheduler=%s", sched);
-	system(cmd);
-}
-
-static void sched_cleanup(void)
-{
-	system("sysctl -qw net.mptcp.scheduler=default");
-	system("ip mptcp endpoint flush");
-	system("ip link del veth1");
+	if (nstoken)
+		close_netns(nstoken);
+	SYS_NOFAIL("ip netns del " NS_TEST " &> /dev/null");
 }
 
 static int has_bytes_sent(char *addr)
 {
 	char cmd[64];
 
-	snprintf(cmd, sizeof(cmd), "ss -it dst %s | grep -q 'bytes_sent:'", addr);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it dst %s | grep -q bytes_sent:",
+		 NS_TEST, addr);
 	return system(cmd);
 }
 
 static void test_first(void)
 {
 	struct mptcp_bpf_first *first_skel;
+	struct nstoken *nstoken = NULL;
 	int server_fd, client_fd;
 	struct bpf_link *link;
 
@@ -320,7 +347,10 @@ static void test_first(void)
 		return;
 	}
 
-	sched_init("subflow", "bpf_first");
+	nstoken = sched_init("subflow", "bpf_first");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init"))
+		goto fail;
+
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -330,7 +360,8 @@ static void test_first(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	sched_cleanup(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_first__destroy(first_skel);
 }
