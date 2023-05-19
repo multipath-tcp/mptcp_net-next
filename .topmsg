@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-bpf-use-random-netns-name-for-mptcp
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests/bpf: use random netns name for mptcp
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Use rand() to generate a random netns name instead of using the fixed
+name "mptcp_ns" for every test.
+
+By doing that, we can re-launch the test even if there was an issue
+removing the previous netns or if by accident, a netns with this generic
+name already existed on the system.
+
+Note that using a different name each will also help adding more
+subtests in future commits.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
