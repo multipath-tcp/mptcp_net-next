@@ -47,16 +47,30 @@ jobs:
         with:
           fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
 
-      - name: "Setup cache for CCache"
-        uses: actions/cache@v3
+      - name: "Find base branch"
+        id: branch
+        run: |
+          if [ "${REF_NAME}" = "export" ]; then  # just to avoid the next cmd
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          elif [ -n "$(git log -1 --grep "^DO-NOT-MERGE: mptcp: enabled by default (net)$" --format="format:%H" HEAD -- net/mptcp/Kconfig)" ]; then
+            echo "name=export-net" >> ${GITHUB_OUTPUT}
+          else
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          fi
+        env:
+          REF_NAME: ${{ github.ref_name }}
+
+      - name: "Restore cache for CCache"
+        uses: actions/cache/restore@v3
+        id: restore-ccache
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}-
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-${{ github.run_id }}-
-            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ github.ref_name }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-
 
       - name: "Build Validation"
         uses: multipath-tcp/mptcp-upstream-validate-export-action@main
@@ -75,6 +89,13 @@ jobs:
         with:
           name: results
           path: ./build-*-results.txt
+
+      - name: "Save cache for CCache"
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        uses: actions/cache/save@v3
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
   notif:
     name: "Notifications"
