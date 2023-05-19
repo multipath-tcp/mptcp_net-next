@@ -114,6 +114,8 @@
 #include <linux/memcontrol.h>
 #include <linux/prefetch.h>
 #include <linux/compat.h>
+#include <linux/mroute.h>
+#include <linux/mroute6.h>
 
 #include <linux/uaccess.h>
 
@@ -138,6 +140,7 @@
 
 #include <net/tcp.h>
 #include <net/busy_poll.h>
+#include <net/phonet/phonet.h>
 
 #include <linux/ethtool.h>
 
@@ -4106,3 +4109,107 @@ int sock_bind_add(struct sock *sk, struct sockaddr *addr, int addr_len)
 	return sk->sk_prot->bind_add(sk, addr, addr_len);
 }
 EXPORT_SYMBOL(sock_bind_add);
+
+/* Copy 'size' bytes from userspace and do not copy anything back */
+int sock_skproto_ioctl_in(struct sock *sk, unsigned int cmd,
+			  void __user *arg)
+{
+	int karg;
+
+	if (get_user(karg, (u32 __user *)arg))
+		return -EFAULT;
+
+	return sk->sk_prot->ioctl(sk, cmd, &karg);
+}
+
+/* Copy 'size' bytes from userspace and return `size` back to userspace */
+int sock_skproto_ioctl_inout(struct sock *sk, unsigned int cmd,
+			     void __user *arg, size_t size)
+{
+	void *ptr;
+	int ret;
+
+	ptr = kmalloc(size, GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
+
+	if (copy_from_user(ptr, arg, size)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = sk->sk_prot->ioctl(sk, cmd, ptr);
+	if (ret)
+		goto out;
+
+	if (copy_to_user(arg, ptr, size))
+		ret = -EFAULT;
+
+out:
+	kfree(ptr);
+	return ret;
+}
+
+/* This is the most common ioctl prep function, where the result (4 bytes) is
+ * copied back to userspace if the ioctl() returns successfully. No input is
+ * copied from userspace as input argument.
+ */
+int sock_skproto_ioctl_out(struct sock *sk, unsigned int cmd,
+			   void __user *arg)
+{
+	int ret, karg = 0;
+
+	ret = sk->sk_prot->ioctl(sk, cmd, &karg);
+	if (ret)
+		return ret;
+
+	return put_user(karg, (int __user *)arg);
+}
+
+/* A wrapper around sock ioctls, which copies the data from userspace
+ * (depending on the protocol/ioctl), and copies back the result to userspace.
+ * The main motivation for this function is to pass kernel memory to the
+ * protocol ioctl callsback, instead of userspace memory.
+ */
+int sock_skprot_ioctl(struct sock *sk, unsigned int cmd,
+		      void __user *arg)
+{
+#ifdef CONFIG_IP_MROUTE
+	if (!strcmp(sk->sk_prot->name, "RAW")) {
+		switch (cmd) {
+		/* These userspace buffers will be consumed by ipmr_ioctl() */
+		case SIOCGETVIFCNT:
+			return sock_skproto_ioctl_inout(sk, cmd,
+				arg, sizeof(struct sioc_vif_req));
+		case SIOCGETSGCNT:
+			return sock_skproto_ioctl_inout(sk, cmd,
+				arg, sizeof(struct sioc_sg_req));
+		}
+	}
+#endif
+#ifdef CONFIG_IPV6_MROUTE
+	if (!strcmp(sk->sk_prot->name, "RAW6")) {
+		switch (cmd) {
+		/* These userspace buffers will be consumed by ip6mr_ioctl() */
+		case SIOCGETMIFCNT_IN6:
+			return sock_skproto_ioctl_inout(sk, cmd,
+				arg, sizeof(struct sioc_mif_req6));
+		case SIOCGETSGCNT_IN6:
+			return sock_skproto_ioctl_inout(sk, cmd,
+				arg, sizeof(struct sioc_sg_req6));
+		}
+	}
+#endif
+#ifdef CONFIG_PHONET
+	if (!strcmp(sk->sk_prot->name, "PHONET")) {
+		/* This userspace buffers will be consumed by pn_ioctl() */
+		switch (cmd) {
+		case SIOCPNADDRESOURCE:
+		case SIOCPNDELRESOURCE:
+			return sock_skproto_ioctl_in(sk, cmd, arg);
+		}
+	}
+#endif
+
+	return sock_skproto_ioctl_out(sk, cmd, arg);
+}
