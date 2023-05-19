@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-bpf-add-two-mptcp-netns-helpers
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests/bpf: add two mptcp netns helpers
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Add two netns helpers for mptcp tests: create_netns() and
+cleanup_netns(). Use them in test_base().
+
+These new helpers will be re-used in the following commits introducing
+new tests.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
