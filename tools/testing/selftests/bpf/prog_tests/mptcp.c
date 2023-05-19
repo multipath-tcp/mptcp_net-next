@@ -285,36 +285,33 @@ static void send_data(int lfd, int fd)
 #define ADDR_1	"10.0.1.1"
 #define ADDR_2	"10.0.1.2"
 
-static void sched_init(char *flags, char *sched)
+static struct nstoken *sched_init(char *flags, char *sched)
 {
-	char cmd[64];
+	struct nstoken *nstoken;
 
-	system("ip link add veth1 type veth peer name veth2");
-	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth1", ADDR_1);
-	system(cmd);
-	system("ip link set veth1 up");
-	snprintf(cmd, sizeof(cmd), "ip addr add %s/24 dev veth2", ADDR_2);
-	system(cmd);
-	system("ip link set veth2 up");
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
+		goto fail;
 
-	snprintf(cmd, sizeof(cmd), "ip mptcp endpoint add %s %s", ADDR_2, flags);
-	system(cmd);
-	snprintf(cmd, sizeof(cmd), "sysctl -qw net.mptcp.scheduler=%s", sched);
-	system(cmd);
-}
+	SYS(fail, "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR_1);
+	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
+	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
+	SYS(fail, "ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR_2, flags);
+	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
 
-static void sched_cleanup(void)
-{
-	system("sysctl -qw net.mptcp.scheduler=default");
-	system("ip mptcp endpoint flush");
-	system("ip link del veth1");
+	return nstoken;
+fail:
+	return NULL;
 }
 
 static int has_bytes_sent(char *addr)
 {
-	char cmd[64];
+	char cmd[128];
 
-	snprintf(cmd, sizeof(cmd), "ss -it dst %s | grep -q 'bytes_sent:'", addr);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it dst %s | grep -q bytes_sent:",
+		 NS_TEST, addr);
 	return system(cmd);
 }
 
@@ -322,6 +319,7 @@ static void test_first(void)
 {
 	struct mptcp_bpf_first *first_skel;
 	int server_fd, client_fd;
+	struct nstoken *nstoken;
 	struct bpf_link *link;
 
 	first_skel = mptcp_bpf_first__open_and_load();
@@ -334,7 +332,9 @@ static void test_first(void)
 		return;
 	}
 
-	sched_init("subflow", "bpf_first");
+	nstoken = sched_init("subflow", "bpf_first");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_first"))
+		goto fail;
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -344,7 +344,8 @@ static void test_first(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_first__destroy(first_skel);
 }
@@ -353,6 +354,7 @@ static void test_bkup(void)
 {
 	struct mptcp_bpf_bkup *bkup_skel;
 	int server_fd, client_fd;
+	struct nstoken *nstoken;
 	struct bpf_link *link;
 
 	bkup_skel = mptcp_bpf_bkup__open_and_load();
@@ -365,7 +367,9 @@ static void test_bkup(void)
 		return;
 	}
 
-	sched_init("subflow backup", "bpf_bkup");
+	nstoken = sched_init("subflow backup", "bpf_bkup");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_bkup"))
+		goto fail;
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -375,7 +379,8 @@ static void test_bkup(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_bkup__destroy(bkup_skel);
 }
@@ -384,6 +389,7 @@ static void test_rr(void)
 {
 	struct mptcp_bpf_rr *rr_skel;
 	int server_fd, client_fd;
+	struct nstoken *nstoken;
 	struct bpf_link *link;
 
 	rr_skel = mptcp_bpf_rr__open_and_load();
@@ -396,7 +402,9 @@ static void test_rr(void)
 		return;
 	}
 
-	sched_init("subflow", "bpf_rr");
+	nstoken = sched_init("subflow", "bpf_rr");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_rr"))
+		goto fail;
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -406,7 +414,8 @@ static void test_rr(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_rr__destroy(rr_skel);
 }
@@ -415,6 +424,7 @@ static void test_red(void)
 {
 	struct mptcp_bpf_red *red_skel;
 	int server_fd, client_fd;
+	struct nstoken *nstoken;
 	struct bpf_link *link;
 
 	red_skel = mptcp_bpf_red__open_and_load();
@@ -427,7 +437,9 @@ static void test_red(void)
 		return;
 	}
 
-	sched_init("subflow", "bpf_red");
+	nstoken = sched_init("subflow", "bpf_red");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_red"))
+		goto fail;
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
@@ -437,7 +449,8 @@ static void test_red(void)
 
 	close(client_fd);
 	close(server_fd);
-	sched_cleanup();
+fail:
+	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_red__destroy(red_skel);
 }
