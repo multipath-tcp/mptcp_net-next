@@ -188,6 +188,7 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *token = info->attrs[MPTCP_PM_ATTR_TOKEN];
 	struct nlattr *id = info->attrs[MPTCP_PM_ATTR_LOC_ID];
+	struct mptcp_rm_list rm_list = { .nr = 0 };
 	struct mptcp_pm_addr_entry *match = NULL;
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
@@ -230,12 +231,14 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 		goto remove_err;
 	}
 
-	list_move(&match->list, &free_list);
-
-	mptcp_pm_remove_addrs_and_subflows(msk, &free_list);
+	rm_list.ids[rm_list.nr++] = match->addr.id;
+	spin_lock_bh(&msk->pm.lock);
+	mptcp_pm_remove_addr(msk, &rm_list);
+	spin_unlock_bh(&msk->pm.lock);
 
 	release_sock((struct sock *)msk);
 
+	list_move(&match->list, &free_list);
 	list_for_each_entry_safe(match, entry, &free_list, list) {
 		sock_kfree_s((struct sock *)msk, match, sizeof(*match));
 	}
