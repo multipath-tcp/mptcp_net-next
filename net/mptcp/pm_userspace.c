@@ -79,6 +79,30 @@ append_err:
 	return ret;
 }
 
+static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
+						struct mptcp_pm_addr_entry *addr)
+{
+	struct mptcp_pm_addr_entry *entry, *tmp;
+
+	list_for_each_entry_safe(entry, tmp, &msk->pm.userspace_pm_local_addr_list, list) {
+		if (mptcp_addresses_equal(&entry->addr, &addr->addr, false)) {
+			if (entry->flags & MPTCP_USER_PM_FLAG_RM_SUBFLOW)
+				break;
+			entry->flags |= MPTCP_USER_PM_FLAG_RM_SUBFLOW;
+			if (entry->flags & MPTCP_USER_PM_FLAG_RM_SIGNAL) {
+				/* TODO: a refcount is needed because the entry can
+				 * be used multiple times (e.g. fullmesh mode).
+				 */
+				list_del_rcu(&entry->list);
+				kfree(entry);
+			}
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
 int mptcp_userspace_pm_get_flags_and_ifindex_by_id(struct mptcp_sock *msk,
 						   unsigned int id,
 						   u8 *flags, int *ifindex)
@@ -231,6 +255,12 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 		goto remove_err;
 	}
 
+	if (match->flags & MPTCP_USER_PM_FLAG_RM_SIGNAL) {
+		GENL_SET_ERR_MSG(info, "no need to remove this address");
+		release_sock((struct sock *)msk);
+		goto remove_err;
+	}
+
 	rm_list.ids[rm_list.nr++] = match->addr.id;
 	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_remove_addr(msk, &rm_list);
@@ -238,9 +268,12 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 
 	release_sock((struct sock *)msk);
 
-	list_move(&match->list, &free_list);
-	list_for_each_entry_safe(match, entry, &free_list, list) {
-		sock_kfree_s((struct sock *)msk, match, sizeof(*match));
+	match->flags |= MPTCP_USER_PM_FLAG_RM_SIGNAL;
+	if (match->flags & MPTCP_USER_PM_FLAG_RM_SUBFLOW) {
+		list_move(&match->list, &free_list);
+		list_for_each_entry_safe(match, entry, &free_list, list) {
+			sock_kfree_s((struct sock *)msk, match, sizeof(*match));
+		}
 	}
 
 	err = 0;
@@ -254,6 +287,7 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *raddr = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
 	struct nlattr *token = info->attrs[MPTCP_PM_ATTR_TOKEN];
 	struct nlattr *laddr = info->attrs[MPTCP_PM_ATTR_ADDR];
+	struct mptcp_pm_addr_entry local = { 0 };
 	struct mptcp_addr_info addr_r;
 	struct mptcp_addr_info addr_l;
 	struct mptcp_sock *msk;
@@ -305,11 +339,34 @@ int mptcp_nl_cmd_sf_create(struct sk_buff *skb, struct genl_info *info)
 		goto create_err;
 	}
 
+	local.addr = addr_l;
+	err = mptcp_userspace_pm_append_new_local_addr(msk, &local);
+	if (err < 0) {
+		GENL_SET_ERR_MSG(info, "did not match address and id");
+		goto create_err;
+	}
+
+	spin_lock_bh(&msk->pm.lock);
+	if (!mptcp_pm_alloc_anno_list(msk, &local)) {
+		GENL_SET_ERR_MSG(info, "cannot alloc address list");
+		err = -EINVAL;
+		goto anno_list_err;
+	}
+	spin_unlock_bh(&msk->pm.lock);
+
 	lock_sock(sk);
 
 	err = __mptcp_subflow_connect(sk, &addr_l, &addr_r);
 
 	release_sock(sk);
+
+	if (err) {
+		spin_lock_bh(&msk->pm.lock);
+		mptcp_pm_remove_anno_list_by_saddr(msk, &addr_l);
+anno_list_err:
+		mptcp_userspace_pm_delete_local_addr(msk, &local);
+		spin_unlock_bh(&msk->pm.lock);
+	}
 
  create_err:
 	sock_put((struct sock *)msk);
@@ -364,6 +421,11 @@ static struct sock *mptcp_nl_find_ssk(struct mptcp_sock *msk,
 	return NULL;
 }
 
+/* If the subflow is closed from the other peer (not via a
+ * subflow destroy command then), we want to keep the entry
+ * not to assign the same ID to another address and to be
+ * able to send RM_ADDR after the removal of the subflow.
+ */
 int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *raddr = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
@@ -423,7 +485,11 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 	ssk = mptcp_nl_find_ssk(msk, &addr_l, &addr_r);
 	if (ssk) {
 		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+		struct mptcp_pm_addr_entry entry = { .addr = addr_l };
 
+		spin_lock_bh(&msk->pm.lock);
+		mptcp_userspace_pm_delete_local_addr(msk, &entry);
+		spin_unlock_bh(&msk->pm.lock);
 		mptcp_subflow_shutdown(sk, ssk, RCV_SHUTDOWN | SEND_SHUTDOWN);
 		mptcp_close_ssk(sk, ssk, subflow);
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMSUBFLOW);
