@@ -1,4 +1,19 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-connect-skip-if-MPTCP-is-not-supported
+Subject: [PATCH] selftests: mptcp: connect: skip if MPTCP is not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting MPTCP.
+
+A new check is then added to make sure MPTCP is supported. If not, the
+test stops and is marked as "skipped". Note that this check can also
+mark the test as failed if 'SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES' env
+var is set to 1: by doing that, we can make sure a test is not being
+skipped by mistake.
+
+A new shared file is added here to be able to re-used the same check in
+the different selftests we have.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 048d19d444be ("mptcp: add basic kselftest for mptcp")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
