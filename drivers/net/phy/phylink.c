@@ -712,14 +712,11 @@ static int phylink_validate(struct phylink *pl, unsigned long *supported,
 {
 	const unsigned long *interfaces = pl->config->supported_interfaces;
 
-	if (!phy_interface_empty(interfaces)) {
-		if (state->interface == PHY_INTERFACE_MODE_NA)
-			return phylink_validate_mask(pl, supported, state,
-						     interfaces);
+	if (state->interface == PHY_INTERFACE_MODE_NA)
+		return phylink_validate_mask(pl, supported, state, interfaces);
 
-		if (!test_bit(state->interface, interfaces))
-			return -EINVAL;
-	}
+	if (!test_bit(state->interface, interfaces))
+		return -EINVAL;
 
 	return phylink_validate_mac_and_pcs(pl, supported, state);
 }
@@ -1513,18 +1510,17 @@ struct phylink *phylink_create(struct phylink_config *config,
 	struct phylink *pl;
 	int ret;
 
+	/* Validate the supplied configuration */
+	if (phy_interface_empty(config->supported_interfaces)) {
+		dev_err(config->dev,
+			"phylink: error: empty supported_interfaces\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	if (mac_ops->mac_select_pcs &&
 	    mac_ops->mac_select_pcs(config, PHY_INTERFACE_MODE_NA) !=
 	      ERR_PTR(-EOPNOTSUPP))
 		using_mac_select_pcs = true;
-
-	/* Validate the supplied configuration */
-	if (using_mac_select_pcs &&
-	    phy_interface_empty(config->supported_interfaces)) {
-		dev_err(config->dev,
-			"phylink: error: empty supported_interfaces but mac_select_pcs() method present\n");
-		return ERR_PTR(-EINVAL);
-	}
 
 	pl = kzalloc(sizeof(*pl), GFP_KERNEL);
 	if (!pl)
@@ -3151,8 +3147,8 @@ static void phylink_sfp_link_up(void *upstream)
  */
 static bool phylink_phy_no_inband(struct phy_device *phy)
 {
-	return phy->is_c45 &&
-		(phy->c45_ids.device_ids[1] & 0xfffffff0) == 0xae025150;
+	return phy->is_c45 && phy_id_compare(phy->c45_ids.device_ids[1],
+					     0xae025150, 0xfffffff0);
 }
 
 static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
