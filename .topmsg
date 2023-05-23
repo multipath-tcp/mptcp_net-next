@@ -1,4 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-pm-skip-if-MPTCP-is-not-supported
+Subject: [PATCH] selftests: mptcp: userspace pm: skip if MPTCP is not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting MPTCP.
+
+A new check is then added to make sure MPTCP is supported. If not, the
+test stops and is marked as "skipped".
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 259a834fadda ("selftests: mptcp: functional tests for the userspace PM type")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
