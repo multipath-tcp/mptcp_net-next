@@ -1,1 +1,1 @@
-t/mptcp-fix-connect-timeout-handling
+t/selftests-mptcp-userspace-pm-skip-if-MPTCP-is-not-supported
