@@ -12,6 +12,7 @@
 #include <linux/in.h>		/* for sockaddr_in			*/
 #include <linux/in6.h>		/* for sockaddr_in6			*/
 #include <linux/socket.h>	/* for sockaddr_storage and sa_family	*/
+#include <linux/tcp.h>		/* for tcp_info				*/
 
 #define MPTCP_SUBFLOW_FLAG_MCAP_REM		_BITUL(0)
 #define MPTCP_SUBFLOW_FLAG_MCAP_LOC		_BITUL(1)
@@ -244,9 +245,33 @@ struct mptcp_subflow_addrs {
 	};
 };
 
+struct mptcp_subflow_info {
+	__u32				id;
+	struct mptcp_subflow_addrs	addrs;
+};
+
+struct mptcp_subflow_full_info {
+	__u32		size_subflow_full_info;	/* size of this structure in userspace */
+	__u32		num_subflows_kern;	/* must be 0, set by kernel (real subflow count) */
+	__u32		size_tcpinfo_kernel;	/* must be 0, set by kernel */
+	__u32		size_tcpinfo_user;
+	__u32		size_sfinfo_kernel;	/* must be 0, set by kernel */
+	__u32		size_sfinfo_user;
+	__u32		num_subflows_user;	/* max subflows that userspace is interested in;
+						 * the buffers at subflow_info_addr/tcp_info_addr
+						 * are respectively at least:
+						 *  num_subflows_user * size_sfinfo_user
+						 *  num_subflows_user * size_tcpinfo_user
+						 * bytes wide
+						 */
+	__aligned_u64	subflow_info_addr;
+	__aligned_u64	tcp_info_addr;
+} __attribute__((aligned(8)));
+
 /* MPTCP socket options */
 #define MPTCP_INFO		1
 #define MPTCP_TCPINFO		2
 #define MPTCP_SUBFLOW_ADDRS	3
+#define MPTCP_FULL_INFO		4
 
 #endif /* _UAPI_MPTCP_H */
