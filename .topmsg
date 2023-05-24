@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-update-userspace-pm-addr-tests
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: update userspace pm addr tests
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch is linked to the previous commit ("mptcp: only send RM_ADDR in
+nl_cmd_remove").
+
+To align with what is done by the in-kernel PM, update userspace pm addr
+selftests, by sending a remove_subflows command together after the
+remove_addrs command.
+
+Fixes: d9a4594edabf ("mptcp: netlink: Add MPTCP_PM_CMD_REMOVE")
+Fixes: 97040cf9806e ("selftests: mptcp: userspace pm address tests")
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
