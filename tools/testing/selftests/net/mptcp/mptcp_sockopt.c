@@ -86,9 +86,38 @@ struct mptcp_subflow_addrs {
 #define MPTCP_SUBFLOW_ADDRS	3
 #endif
 
+#ifndef MPTCP_FULL_INFO
+struct mptcp_subflow_info {
+	__u32				id;
+	struct mptcp_subflow_addrs	addrs;
+};
+
+struct mptcp_subflow_full_info {
+	__u32		size_subflow_full_info;	/* size of this structure in userspace */
+	__u32		num_subflows_kern;	/* must be 0, set by kernel (real subflow count) */
+	__u32		size_tcpinfo_kernel;	/* must be 0, set by kernel */
+	__u32		size_tcpinfo_user;
+	__u32		size_sfinfo_kernel;	/* must be 0, set by kernel */
+	__u32		size_sfinfo_user;
+	__u32		num_subflows_user;	/* max subflows that userspace is interested in;
+						 * the buffers at subflow_info_addr/tcp_info_addr
+						 * are respectively at least:
+						 *  num_subflows_user * size_sfinfo_user
+						 *  num_subflows_user * size_tcpinfo_user
+						 * bytes wide
+						 */
+	__aligned_u64	subflow_info_addr;
+	__aligned_u64	tcp_info_addr;
+};
+
+#define MPTCP_FULL_INFO		4
+#endif
+
 struct so_state {
 	struct mptcp_info mi;
 	struct mptcp_info last_sample;
+	struct tcp_info tcp_info;
+	struct mptcp_subflow_addrs addrs;
 	uint64_t mptcpi_rcv_delta;
 	uint64_t tcpi_rcv_delta;
 	bool pkt_stats_avail;
@@ -365,6 +394,8 @@ static void do_getsockopt_tcp_info(struct so_state *s, int fd, size_t r, size_t 
 		olen -= sizeof(struct mptcp_subflow_data);
 		assert(olen == sizeof(struct tcp_info));
 
+		s->tcp_info = ti.ti[0];
+
 		if (ti.ti[0].tcpi_bytes_sent == w &&
 		    ti.ti[0].tcpi_bytes_received == r)
 			goto done;
@@ -386,7 +417,7 @@ done:
 	do_getsockopt_bogus_sf_data(fd, MPTCP_TCPINFO);
 }
 
-static void do_getsockopt_subflow_addrs(int fd)
+static void do_getsockopt_subflow_addrs(struct so_state *s, int fd)
 {
 	struct sockaddr_storage remote, local;
 	socklen_t olen, rlen, llen;
@@ -433,6 +464,7 @@ static void do_getsockopt_subflow_addrs(int fd)
 
 	assert(memcmp(&local, &addrs.addr[0].ss_local, sizeof(local)) == 0);
 	assert(memcmp(&remote, &addrs.addr[0].ss_remote, sizeof(remote)) == 0);
+	s->addrs = addrs.addr[0];
 
 	memset(&addrs, 0, sizeof(addrs));
 
@@ -453,13 +485,73 @@ static void do_getsockopt_subflow_addrs(int fd)
 	do_getsockopt_bogus_sf_data(fd, MPTCP_SUBFLOW_ADDRS);
 }
 
+struct my_mptcp_full_info {
+	struct mptcp_subflow_full_info i;
+	struct mptcp_info mi;
+};
+static void do_getsockopt_mptcp_full_info(struct so_state *s, int fd)
+{
+	size_t data_size = sizeof(struct my_mptcp_full_info);
+	struct mptcp_subflow_info sfinfo[2];
+	struct my_mptcp_full_info mmfi;
+	struct tcp_info tcp_info[2];
+	socklen_t olen;
+	int ret;
+
+	memset(&mmfi, 0, data_size);
+	memset(tcp_info, 0, sizeof(tcp_info));
+	memset(sfinfo, 0, sizeof(sfinfo));
+
+	mmfi.i.size_subflow_full_info = sizeof(struct mptcp_subflow_full_info);
+	mmfi.i.size_tcpinfo_user = sizeof(struct tcp_info);
+	mmfi.i.size_sfinfo_user = sizeof(struct mptcp_subflow_info);
+	mmfi.i.num_subflows_user = 2;
+	mmfi.i.subflow_info_addr = (unsigned long) &sfinfo[0];
+	mmfi.i.tcp_info_addr = (unsigned long) &tcp_info[0];
+	olen = data_size;
+
+	ret = getsockopt(fd, SOL_MPTCP, MPTCP_FULL_INFO, &mmfi, &olen);
+	if (ret < 0) {
+		if (errno == EOPNOTSUPP) {
+			fprintf(stderr, "\tMPTCP_FULL_INFO test skipped due to lack of kernel support\n");
+			return;
+		}
+		xerror("getsockopt MPTCP_FULL_INFO");
+	}
+
+	assert(olen <= data_size);
+	assert(mmfi.i.size_tcpinfo_user == mmfi.i.size_tcpinfo_kernel);
+	assert(mmfi.i.size_tcpinfo_user == sizeof(struct tcp_info));
+	assert(mmfi.i.size_sfinfo_user == mmfi.i.size_sfinfo_kernel);
+	assert(mmfi.i.size_sfinfo_user == sizeof(struct mptcp_subflow_info));
+	assert(mmfi.i.num_subflows_kern == 1);
+
+	/* Tolerate future extension to mptcp_info struct and running newer
+	 * test on top of older kernel.
+	 * Anyway any kernel supporting MPTCP_FULL_INFO must at least include
+	 * the following in mptcp_info.
+	 */
+	assert(olen > (socklen_t)sizeof(struct mptcp_subflow_full_info));
+	assert(mmfi.mi.mptcpi_subflows == 0);
+	assert(mmfi.mi.mptcpi_bytes_sent == s->last_sample.mptcpi_bytes_sent);
+	assert(mmfi.mi.mptcpi_bytes_received == s->last_sample.mptcpi_bytes_received);
+
+	assert(sfinfo[0].id == 1);
+	assert(tcp_info[0].tcpi_bytes_sent == s->tcp_info.tcpi_bytes_sent);
+	assert(tcp_info[0].tcpi_bytes_received == s->tcp_info.tcpi_bytes_received);
+	assert(!memcmp(&sfinfo->addrs, &s->addrs, sizeof(struct mptcp_subflow_addrs)));
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
 
 	do_getsockopt_tcp_info(s, fd, r, w);
 
-	do_getsockopt_subflow_addrs(fd);
+	do_getsockopt_subflow_addrs(s, fd);
+
+	if (r)
+		do_getsockopt_mptcp_full_info(s, fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
