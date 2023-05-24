@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-consolidate-passive-msk-socket-initialization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consolidate passive msk socket initialization
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+When the msk socket is cloned at MPC handshake time, a few
+fields are initialized in a racy way outside mptcp_sk_clone()
+and the msk socket lock.
+
+The above is due historical reasons: before commit a88d0092b24b
+("mptcp: simplify subflow_syn_recv_sock()") as the first subflow socket
+carrying all the needed date was not available yet at msk creation
+time
+
+We can now refactor the code moving the missing initialization bit
+under the socket lock, removing the init race and avoiding some
+code duplication.
+
+This will also simplify the next patch, as all msk->first write
+access are now under the msk socket lock.
+
+Fixes: 0397c6d85f9c ("mptcp: keep unaccepted MPC subflow into join list")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
