@@ -1,4 +1,19 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-active-subflow-finalization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix active subflow finalization
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Active subflow are inserted into the connection list at creation time.
+When the MPJ handshake completes successfully, a new subflow creation
+netlink event is generated correctly, but the current code wrongly
+avoid initializing a couple of subflow data.
+
+The above will cause misbehavior on a few exceptional events: unneeded
+mptcp-level retransmission on msk-level sequence wrap-around and infinite
+mapping fallback even when a MPJ socket is present.
+
+Address the issue factoring out the needed initialization in a new helper
+and invoking the latter from __mptcp_finish_join() time for passive
+subflow and from mptcp_finish_join() for active ones.
+
+Fixes: 0530020a7c8f ("mptcp: track and update contiguous data status")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
