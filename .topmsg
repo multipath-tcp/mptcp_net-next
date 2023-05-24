@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-data-race-around-msk-first-access
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix data race around msk->first access
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The first subflow socket is accessed outside the msk socket lock
+by mptcp_subflow_fail(), we need to annotate each write access
+with WRITE_ONCE, but a few spots still lacks it.
+
+Fixes: 76a13b315709 ("mptcp: invoke MP_FAIL response when needed")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
