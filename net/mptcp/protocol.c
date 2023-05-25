@@ -2220,6 +2220,10 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		pr_debug("block timeout %ld", timeo);
 		sk_wait_data(sk, &timeo, NULL);
+		if (unlikely(sk->sk_state == TCP_LISTEN)) {
+			copied = copied ? : -ENOTCONN;
+			goto out_release;
+		}
 	}
 
 out_err:
@@ -2240,6 +2244,7 @@ out_err:
 	if (!(flags & MSG_PEEK))
 		mptcp_rcv_space_adjust(msk, copied);
 
+out_release:
 	release_sock(sk);
 	return copied;
 }
