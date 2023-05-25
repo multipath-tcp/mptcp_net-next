@@ -16,12 +16,18 @@ static inline int ip_mroute_opt(int opt)
 	return opt >= MRT_BASE && opt <= MRT_MAX;
 }
 
+static inline int ipmr_is_sk(struct sock *sk)
+{
+	return sk->sk_type == SOCK_RAW && inet_sk(sk)->inet_num == IPPROTO_IGMP;
+}
+
 int ip_mroute_setsockopt(struct sock *, int, sockptr_t, unsigned int);
 int ip_mroute_getsockopt(struct sock *, int, sockptr_t, sockptr_t);
-int ipmr_ioctl(struct sock *sk, int cmd, void __user *arg);
+int ipmr_ioctl(struct sock *sk, int cmd, void *arg);
 int ipmr_compat_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
 int ip_mr_init(void);
 bool ipmr_rule_default(const struct fib_rule *rule);
+int ipmr_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
 #else
 static inline int ip_mroute_setsockopt(struct sock *sock, int optname,
 				       sockptr_t optval, unsigned int optlen)
@@ -35,7 +41,7 @@ static inline int ip_mroute_getsockopt(struct sock *sk, int optname,
 	return -ENOPROTOOPT;
 }
 
-static inline int ipmr_ioctl(struct sock *sk, int cmd, void __user *arg)
+static inline int ipmr_ioctl(struct sock *sk, int cmd, void *arg)
 {
 	return -ENOIOCTLCMD;
 }
@@ -50,9 +56,19 @@ static inline int ip_mroute_opt(int opt)
 	return 0;
 }
 
+static inline int ipmr_is_sk(struct sock *sk)
+{
+	return 0;
+}
+
 static inline bool ipmr_rule_default(const struct fib_rule *rule)
 {
 	return true;
+}
+
+static inline int ipmr_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
+{
+	return 1;
 }
 #endif
 

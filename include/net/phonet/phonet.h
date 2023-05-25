@@ -109,4 +109,23 @@ void phonet_sysctl_exit(void);
 int isi_register(void);
 void isi_unregister(void);
 
+#ifdef CONFIG_PHONET
+int phonet_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
+
+static inline bool phonet_is_sk(struct sock *sk)
+{
+	return sk->sk_family == PF_PHONET && sk->sk_protocol == PN_PROTO_PHONET;
+}
+#else
+static inline bool phonet_is_sk(struct sock *sk)
+{
+	return 0;
+}
+
+static inline int phonet_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
+{
+	return 1;
+}
+#endif
+
 #endif

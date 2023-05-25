@@ -40,6 +40,22 @@ static const struct phonet_protocol *phonet_proto_get(unsigned int protocol)
 	return pp;
 }
 
+int phonet_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
+{
+	int karg;
+
+	switch (cmd) {
+	case SIOCPNADDRESOURCE:
+	case SIOCPNDELRESOURCE:
+		if (get_user(karg, (int __user *)arg))
+			return -EFAULT;
+
+		return sk->sk_prot->ioctl(sk, cmd, &karg);
+	}
+	/* A positive return value means that the ioctl was not processed */
+	return 1;
+}
+
 static inline void phonet_proto_put(const struct phonet_protocol *pp)
 {
 	module_put(pp->prot->owner);

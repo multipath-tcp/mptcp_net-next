@@ -29,7 +29,7 @@ struct sock;
 extern int ip6_mroute_setsockopt(struct sock *, int, sockptr_t, unsigned int);
 extern int ip6_mroute_getsockopt(struct sock *, int, sockptr_t, sockptr_t);
 extern int ip6_mr_input(struct sk_buff *skb);
-extern int ip6mr_ioctl(struct sock *sk, int cmd, void __user *arg);
+extern int ip6mr_ioctl(struct sock *sk, int cmd, void *arg);
 extern int ip6mr_compat_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
 extern int ip6_mr_init(void);
 extern void ip6_mr_cleanup(void);
@@ -48,7 +48,7 @@ int ip6_mroute_getsockopt(struct sock *sock,
 }
 
 static inline
-int ip6mr_ioctl(struct sock *sk, int cmd, void __user *arg)
+int ip6mr_ioctl(struct sock *sk, int cmd, void *arg)
 {
 	return -ENOIOCTLCMD;
 }
@@ -100,6 +100,11 @@ extern int ip6mr_get_route(struct net *net, struct sk_buff *skb,
 #ifdef CONFIG_IPV6_MROUTE
 bool mroute6_is_socket(struct net *net, struct sk_buff *skb);
 extern int ip6mr_sk_done(struct sock *sk);
+int ip6mr_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg);
+static inline int ip6mr_is_sk(struct sock *sk)
+{
+	return sk->sk_type == SOCK_RAW && inet_sk(sk)->inet_num == IPPROTO_ICMPV6;
+}
 #else
 static inline bool mroute6_is_socket(struct net *net, struct sk_buff *skb)
 {
@@ -108,6 +113,14 @@ static inline bool mroute6_is_socket(struct net *net, struct sk_buff *skb)
 static inline int ip6mr_sk_done(struct sock *sk)
 {
 	return 0;
+}
+static inline int ip6mr_is_sk(struct sock *sk)
+{
+	return 0;
+}
+static inline int ip6mr_sk_ioctl(struct sock *sk, unsigned int cmd, void __user *arg)
+{
+	return 1;
 }
 #endif
 #endif
