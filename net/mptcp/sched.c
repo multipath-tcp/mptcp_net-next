@@ -64,6 +64,10 @@ int mptcp_init_sched(struct mptcp_sock *msk,
 	if (!bpf_try_module_get(sched, sched->owner))
 		return -EBUSY;
 
+	msk->data = kzalloc(sizeof(struct mptcp_sched_data), GFP_ATOMIC);
+	if (!msk->data)
+		return -ENOMEM;
+
 	msk->sched = sched;
 	if (msk->sched->init)
 		msk->sched->init(msk);
@@ -81,6 +85,8 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	if (!sched)
 		return;
 
+	if (msk->data)
+		kfree(msk->data);
 	msk->sched = NULL;
 	if (sched->release)
 		sched->release(msk);
