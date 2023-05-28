@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-introduce-MPTCP_FULL_INFO-getsockopt
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce MPTCP_FULL_INFO getsockopt
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Some user-space applications want to monitor the subflows utilization.
+
+Dumping the per subflow tcp_info is not enough, as the PM could close
+and re-create the subflows under-the-hood, fooling the accounting.
+Even checking the src/dst addresses used by each subflow could not
+be enough, because new subflows could re-use the same address/port of
+the just closed one.
+
+This patch introduces a new socket option, allow dumping all the relevant
+information all-at-once (everything, everywhere...), in a consistent
+manner.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/388
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
