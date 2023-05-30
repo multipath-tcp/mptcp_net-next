@@ -1406,6 +1406,13 @@ bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 	return __mptcp_subflow_active(subflow);
 }
 
+bool mptcp_stream_memory_free(struct mptcp_subflow_context *subflow)
+{
+	const struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+	return sk_stream_memory_free(ssk);
+}
+
 #define SSK_MODE_ACTIVE	0
 #define SSK_MODE_BACKUP	1
 #define SSK_MODE_MAX	2
@@ -2271,6 +2278,11 @@ static void mptcp_timeout_timer(struct timer_list *t)
 
 	mptcp_schedule_work(sk);
 	sock_put(sk);
+}
+
+bool mptcp_rtx_and_write_queues_empty(const struct sock *sk)
+{
+	return tcp_rtx_and_write_queues_empty(sk);
 }
 
 /* Find an idle subflow.  Return NULL if there is unacked data at tcp
