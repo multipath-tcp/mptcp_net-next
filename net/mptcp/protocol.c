@@ -1413,6 +1413,26 @@ bool mptcp_stream_memory_free(struct mptcp_subflow_context *subflow)
 	return sk_stream_memory_free(ssk);
 }
 
+u64 mptcp_get_linger_time(struct sock *ssk, u32 pace)
+{
+	return div_u64((u64)READ_ONCE(ssk->sk_wmem_queued) << 32, pace);
+}
+
+u32 mptcp_get_burst(const struct mptcp_sock *msk)
+{
+	return min_t(int, MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
+}
+
+unsigned long mptcp_get_pacing_rate(struct mptcp_subflow_context *subflow, u32 burst)
+{
+	struct sock *ssk =  mptcp_subflow_tcp_sock(subflow);
+	u32 wmem = READ_ONCE(ssk->sk_wmem_queued);
+
+	return div_u64((u64)subflow->avg_pacing_rate * wmem +
+		       READ_ONCE(ssk->sk_pacing_rate) * burst,
+		       burst + wmem);
+}
+
 #define SSK_MODE_ACTIVE	0
 #define SSK_MODE_BACKUP	1
 #define SSK_MODE_MAX	2
