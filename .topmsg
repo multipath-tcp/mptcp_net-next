@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-unify-pm-get_local_id-interfaces
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: unify pm get_local_id interfaces
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch unifies the three PM get_local_id() interfaces:
+
+mptcp_pm_nl_get_local_id() in mptcp/pm_netlink.c for the in-kernel PM and
+mptcp_userspace_pm_get_local_id() in mptcp/pm_userspace.c for the
+userspace PM.
+
+They'll be switched in the common PM infterface mptcp_pm_get_local_id()
+in mptcp/pm.c based on whether mptcp_pm_is_userspace() or not.
+
+Also put together the declarations of these three functions in protocol.h.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
