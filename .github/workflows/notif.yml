@@ -259,6 +259,7 @@ jobs:
           URL: "${{ env.URI }}/repos/${{ github.repository }}/check-suites/${{ github.event.check_suite.id }}/check-runs?status=completed"
 
       - name: irc tests
+        if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
         uses: rectalogic/notify-irc@v1
         with:
           server: irc.libera.chat
