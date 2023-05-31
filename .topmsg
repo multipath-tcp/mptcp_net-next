@@ -1,4 +1,16 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-handle-correctly-disconnect-failures
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: handle correctly disconnect() failures
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently the mptcp code has assumes that disconnect() can fail only
+at mptcp_sendmsg_fastopen() time - to avoid a deadlock scenario - and
+don't even bother returning an error code.
+
+Soon mptcp_disconnect() will handle more error conditions: let's track
+them explicitly.
+
+As a bonus, explicitly annotate TCP-level disconnect as not failing:
+the mptcp code never blocks for event on the subflows.
+
+Fixes: 7d803344fdc3 ("mptcp: fix deadlock in fastopen error path")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Tested-by: Christoph Paasch <cpaasch@apple.com>
