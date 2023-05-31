@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-export-local_address
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: export local_address
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Rename local_address() with "mptcp_" prefix and export it in protocol.h.
+
+This function will be re-used in the common PM code (pm.c) in the
+following commit.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
