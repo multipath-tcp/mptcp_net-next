@@ -1,1 +1,1 @@
-t/selftests-mptcp-add-MPTCP_FULL_INFO-testcase
+t/mptcp-unify-pm-set_flags-interfaces
