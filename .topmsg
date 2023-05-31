@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-unify-pm-set_flags-interfaces
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
