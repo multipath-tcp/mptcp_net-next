@@ -56,6 +56,7 @@ struct netns_sysctl_ipv6 {
 	bool skip_notify_on_dev_down;
 	u8 fib_notify_on_flag_change;
 	u8 icmpv6_error_anycast_as_unicast;
+	bool skip_print_link_becomes_ready;
 };
 
 struct netns_ipv6 {
