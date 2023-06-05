@@ -173,6 +173,18 @@ static int __init bpf_mptcp_sched_kfunc_init(void)
 					 &bpf_mptcp_sched_kfunc_set);
 }
 late_initcall(bpf_mptcp_sched_kfunc_init);
+
+bool mptcp_stream_memory_free(struct mptcp_subflow_context *subflow)
+{
+	const struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+	return sk_stream_memory_free(ssk);
+}
+
+bool mptcp_rtx_and_write_queues_empty(const struct sock *sk)
+{
+	return tcp_rtx_and_write_queues_empty(sk);
+}
 #endif /* CONFIG_BPF_JIT */
 
 struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
