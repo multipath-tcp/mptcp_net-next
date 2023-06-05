@@ -14,11 +14,20 @@ msgid="${1}"
 source ./.lib.sh
 
 subject="${subject:-$(b4 am --cherry-pick _ --no-add-trailers -o - "${msgid}" |
-			grep -A 1 "^Subject: " | grep -e "^Subject: " -e "^ \S" | xargs echo |
-			head -n 1 | cut -d: -f3- | sed 's/"//g;s/^ \+//g')}"
+			grep -A 1 "^Subject: " | grep -e "^Subject: " -e "^ \S")}"
+subject="${subject//[$'\n\r'] / }" # on one line
+echo "${subject}"
+
 if [ -z "${subject}" ]; then
 	printerr "Not able to find the corresponding patch in the subject: pass the commit title as first argument"
 	exit 1
+fi
+
+# take what is between "" if any
+if [ $(echo "${subject}" | grep -o '"' | wc -l) -eq 2 ]; then
+	subject="$(echo "${subject}" | cut -d\" -f2)"
+elif [ $(echo "${subject}" | grep -o ':' | wc -l) -gt 1 ]; then
+	subject="$(echo "${subject}" | cut -d: -f3- | sed 's/"//g;s/^ \+//g')"
 fi
 
 git checkout t/upstream
