@@ -7,6 +7,10 @@ source ./.lib.sh
 TG_TOP="${TG_TOP:-}"
 TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
 
+CI_URL="https://cirrus-ci.com/github/multipath-tcp/mptcp_net-next"
+RESULTS_EXPORT_NET_NEXT=""
+TAG_EXPORT_NET_NEXT=""
+
 topic_has_been_upstreamed() { local subject="${1}"
 	git log \
 		--fixed-strings \
@@ -93,7 +97,7 @@ tg_export() { local branch_top branch_export tag
 	git push origin "${tag}"
 }
 
-publish() { local top review old_rev new_rev tag
+publish() { local top review old_rev new_rev tag top_txt results
 	top="${1}"
 	review="${2}"
 	export="${3}"
@@ -114,13 +118,32 @@ publish() { local top review old_rev new_rev tag
 	tg push
 
 	echo -e "${COLOR_BLUE}"
-	printf "New patches for %s:\\n" "${top}"
+	top_txt="${top}"
+	if [ "${top}" = "${TG_TOPIC_TOP_NET}" ]; then
+		top_txt="${top_txt} and ${TG_TOPIC_TOP_NET_NEXT}"
+	fi
+	printf "New patches for %s:\\n" "${top_txt}"
 	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
 		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
 
-	printf "%sResults: %s..%s (%s)\\n" "- " "${old_rev}" "${new_rev}" "${export}"
+	results="- Results: ${old_rev}..${new_rev} (${export})"
+	printf "%s\\n" "${results}"
+
+	if [ "${export}" = "${TG_EXPORT_NET_NEXT}" ]; then
+		RESULTS_EXPORT_NET_NEXT="${results}"
+	elif [ -n "${RESULTS_EXPORT_NET_NEXT}" ]; then
+		printf "%s\\n" "${RESULTS_EXPORT_NET_NEXT}"
+	fi
+
 	printf "\\nTests are now in progress:\\n"
-	printf "\\nhttps://cirrus-ci.com/github/multipath-tcp/mptcp_net-next/%s\\n" "${tag}"
+	printf "\\n%s/%s\\n" "${CI_URL}" "${tag}"
+
+	if [ "${export}" = "${TG_EXPORT_NET_NEXT}" ]; then
+		TAG_EXPORT_NET_NEXT="${tag}"
+	elif [ -n "${TAG_EXPORT_NET_NEXT}" ]; then
+		printf "%s/%s\\n" "${CI_URL}" "${TAG_EXPORT_NET_NEXT}"
+	fi
+
 	printf "\\nCheers,\\nMatt\\n"
 	echo -e "${COLOR_RESET}"
 
