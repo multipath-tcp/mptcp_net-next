@@ -26,17 +26,27 @@ Hello
 
 (...)
 
-FYI, we got a small conflict when merging -net in net-next in the MPTCP
-tree due to this patch applied in -net:
+FYI, we got a small conflict when merging 'net' in 'net-next' in the
+MPTCP tree due to this patch applied in 'net':
 
   $(desc "${NET}")
 
-and this one from net-next:
+and this one from 'net-next':
 
   $(desc "${NEXT}")
 
+----- Generic Message -----
+The best is to avoid conflicts between 'net' and 'net-next' trees but if
+they cannot be avoided when preparing patches, a note about how to fix
+them is much appreciated.
+
 The conflict has been resolved on our side[1] and the resolution we
-suggest is attached to this email.
+suggest is attached to this email. Please report any issues linked to
+this conflict resolution as it might be used by others. If you worked on
+the mentioned patches, don't hesitate to ACK this conflict resolution.
+---------------------------
+
+Regarding this conflict, (...)
 
 Cheers,
 Matt
