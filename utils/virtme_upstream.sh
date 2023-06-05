@@ -14,6 +14,8 @@ is_stable() { local prefix sublevel
    fi
 }
 
+./.virtme.sh make -C tools/perf clean
+
 rc=0
 VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh "${@:-expect-all}" || rc=${?}
 
