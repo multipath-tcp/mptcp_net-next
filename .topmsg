@@ -1,4 +1,24 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/Revert-Merge-tag-9p-6.4-for-linus-of-git-git.kernel.org-pub-scm-linux-kernel-git-ericvh-v9fs
+Subject: [PATCH] Revert "Merge tag '9p-6.4-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/ericvh/v9fs"
 
+This reverts commit 8e15605be8baeb9e3957c268c7d6f901c327ad5c which
+includes:
+
+  d9bc0d11e33b fs/9p: Consolidate file operations and add readahead and writeback
+  740b8bf87322 fs/9p: Remove unnecessary superblock flags
+  8142db4f2792 fs/9p: allow disable of xattr support on mount
+  46c30cb8f539 9p: Add additional debug flags and open modes
+  6deffc8924b5 fs/9p: Add new mount modes
+  1543b4c5071c fs/9p: remove writeback fid and fix per-file modes
+  4eb3117888a9 fs/9p: Rework cache modes and add new options to Documentation
+  21e26d5e54ab fs/9p: Fix bit operation logic error
+
+These modifications and mainly the first one with commit d9bc0d11e33b
+("fs/9p: Consolidate file operations and add readahead and writeback")
+seem to cause instabilities in MPTCP tests, see the linked ticket for
+more details.
+
+As a temporarily solution, these modifications are reverted here.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/400
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
