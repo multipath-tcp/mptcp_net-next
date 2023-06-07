@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-mptcp-join-support-RM_ADDR-for-used-endpoints-or-not
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
