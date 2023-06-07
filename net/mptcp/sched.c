@@ -89,6 +89,8 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 		return;
 
 	if (msk->sched_data) {
+		if (msk->sched_data->last_snd)
+			msk->sched_data->last_snd = NULL;
 		kfree(msk->sched_data);
 		msk->sched_data = NULL;
 	}
