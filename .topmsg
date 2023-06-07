@@ -1,9 +1,0 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] selftests: mptcp: userspace pm: skip if 'ip' tool is unavailable
-
-When a required tool is missing, the return code 4 (SKIP) should be
-returned instead of 1 (FAIL).
-
-Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
-Fixes: 259a834fadda ("selftests: mptcp: functional tests for the userspace PM type")
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
