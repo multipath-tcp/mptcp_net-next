@@ -2936,16 +2936,14 @@ static void __mptcp_check_send_data_fin(struct sock *sk)
 	WRITE_ONCE(msk->snd_nxt, msk->write_seq);
 
 	/* fallback socket will not get data_fin/ack, can move to the next
-	 * state now
+	 * state now. But can't set TCP_CLOSE here, as this code path is
+	 * reachable from the mptcp_release_cb(). Anyway the subflow will
+	 * close soon and the msk state will follow via WORK_CLOSE_SUBFLOW.
 	 */
 	if (__mptcp_check_fallback(msk)) {
 		WRITE_ONCE(msk->snd_una, msk->write_seq);
-		if ((1 << sk->sk_state) & (TCPF_CLOSING | TCPF_LAST_ACK)) {
-			inet_sk_state_store(sk, TCP_CLOSE);
-			mptcp_close_wake_up(sk);
-		} else if (sk->sk_state == TCP_FIN_WAIT1) {
+		if (sk->sk_state == TCP_FIN_WAIT1)
 			inet_sk_state_store(sk, TCP_FIN_WAIT2);
-		}
 	}
 
 	mptcp_for_each_subflow(msk, subflow) {
