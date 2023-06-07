@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/selftests-mptcp-pm-nl-skip-fullmesh-flag-checks-if-not-supported
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
