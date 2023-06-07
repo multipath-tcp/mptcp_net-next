@@ -1,4 +1,23 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-diag-skip-listen-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: diag: skip listen tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the listen diag dump support introduced by
+commit 4fa39b701ce9 ("mptcp: listen diag dump support").
+
+It looks like there is no good pre-check to do here, i.e. dedicated
+function available in kallsyms. Instead, we try to get info if nothing
+is returned, the test is marked as skipped.
+
+That's not ideal because something could be wrong with the feature and
+instead of reporting an error, the test could be marked as skipped. If
+we know in advanced that the feature is supposed to be supported, the
+tester can set SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var to 1: in
+this case the test will report an error instead of marking the test as
+skipped if nothing is returned.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: f2ae0fa68e28 ("selftests/mptcp: add diag listen tests")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
