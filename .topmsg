@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-lib-skip-if-missing-symbol
+Subject: [PATCH] selftests: mptcp: lib: skip if missing symbol
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+New functions are now available to easily detect if a certain feature is
+missing by looking at kallsyms.
+
+These new helpers are going to be used in the following commits. In
+order to ease the backport of such future patches, it would be good if
+this patch is backported up to the introduction of MPTCP selftests,
+hence the Fixes tag below: this type of check was supposed to be done
+from the beginning.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 048d19d444be ("mptcp: add basic kselftest for mptcp")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
