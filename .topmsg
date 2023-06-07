@@ -1,4 +1,31 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-check-if-MIB-counter-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip check if MIB counter not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the MPTCP MIB counters introduced in commit fc518953bc9c
+("mptcp: add and use MIB counter infrastructure") and more later. The
+MPTCP Join selftest heavily relies on these counters.
+
+If a counter is not supported by the kernel, it is not displayed when
+using 'nstat -z'. We can then detect that and skip the verification. A
+new helper (get_counter()) has been added to do the required checks and
+return an error if the counter is not available.
+
+Note that if we expect to have these features available and if
+SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var is set to 1, the tests
+will be marked as failed instead of skipped.
+
+This new helper also makes sure we get the exact counter we want to
+avoid issues we had in the past, e.g. with MPTcpExtRmAddr and
+MPTcpExtRmAddrDrop sharing the same prefix. While at it, we uniform the
+way we fetch a MIB counter.
+
+Note for the backports: we rarely change these modified blocks so if
+there is are conflicts, it is very likely because a counter is not used
+in the older kernels and we don't need that chunk.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: b08fbf241064 ("selftests: add test-cases for MPTCP MP_JOIN")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
