@@ -1,4 +1,19 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-mixed-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip mixed tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the support of a mix of subflows in v4 and v6 by the
+in-kernel PM introduced by commit b9d69db87fb7 ("mptcp: let the
+in-kernel PM use mixed IPv4 and IPv6 addresses").
+
+It looks like there is no external sign we can use to predict the
+expected behaviour. Instead of accepting different behaviours and thus
+not really checking for the expected behaviour, we are looking here for
+a specific kernel version. That's not ideal but it looks better than
+removing the test because it cannot support older kernel versions.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: ad3493746ebe ("selftests: mptcp: add test-cases for mixed v4/v6 subflows")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
