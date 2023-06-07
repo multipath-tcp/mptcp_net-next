@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-pm-nl-skip-fullmesh-flag-checks-if-not-supported
+Subject: [PATCH] selftests: mptcp: pm nl: skip fullmesh flag checks if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the fullmesh flag that can be given to the MPTCP
+in-kernel path-manager and introduced in commit 2843ff6f36db ("mptcp:
+remote addresses fullmesh").
+
+If the flag is not visible in the dump after having set it, we don't
+check the content. Note that if we expect to have this feature and
+SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var is set to 1, we always
+check the content to avoid regressions.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 6da1dfdd037e ("selftests: mptcp: add set_flags tests in pm_netlink.sh")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
