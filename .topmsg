@@ -1,4 +1,27 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-implicit-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip implicit tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the support of the implicit endpoints introduced by
+commit d045b9eb95a9 ("mptcp: introduce implicit endpoints").
+
+It is possible to look for "mptcp_subflow_send_ack" in kallsyms because
+it was needed to introduce the mentioned feature. So we can know in
+advance if the feature is supported instead of trying and accepting any
+results.
+
+Note that here and in the following commits, we re-do the same check for
+each sub-test of the same function for a few reasons. The main one is
+not to break the ID assign to each test in order to be able to easily
+compare results between different kernel versions. Also, we can still
+run a specific test even if it is skipped. Another reason is that it
+makes it clear during the review that a specific subtest will be skipped
+or not under certain conditions. At the end, it looks OK to call the
+exact same helper multiple times: it is not a critical path and it is
+the same code that is executed, not really more cases to maintain.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 69c6ce7b6eca ("selftests: mptcp: add implicit endpoint test case")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
