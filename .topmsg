@@ -1,4 +1,16 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-pm-skip-PM-listener-events-tests-if-unavailable
+Subject: [PATCH] selftests: mptcp: userspace pm: skip PM listener events tests if unavailable
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the new listener events linked to the path-manager
+introduced by commit f8c9dfbd875b ("mptcp: add pm listener events").
+
+It is possible to look for "mptcp_event_pm_listener" in kallsyms to know
+in advance if the kernel supports this feature and skip these sub-tests
+if the feature is not supported.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 6c73008aa301 ("selftests: mptcp: listener test for userspace PM")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
