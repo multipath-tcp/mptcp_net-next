@@ -1,4 +1,17 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-sockopt-skip-getsockopt-checks-if-not-supported
+Subject: [PATCH] selftests: mptcp: sockopt: skip getsockopt checks if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the getsockopt(SOL_MPTCP) to get info about the MPTCP
+connections introduced by commit 55c42fa7fa33 ("mptcp: add MPTCP_INFO
+getsockopt") and the following ones.
+
+It is possible to look for "mptcp_diag_fill_info" in kallsyms because
+it is introduced by the mentioned feature. So we can know in advance if
+the feature is supported and skip the sub-test if not.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: ce9979129a0b ("selftests: mptcp: add mptcp getsockopt test cases")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
