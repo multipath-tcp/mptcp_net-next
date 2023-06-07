@@ -1,4 +1,24 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-backup-if-set-flag-on-ID-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip backup if set flag on ID not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+Commit bccefb762439 ("selftests: mptcp: simplify pm_nl_change_endpoint")
+has simplified the way the backup flag is set on an endpoint. Instead of
+doing:
+
+  ./pm_nl_ctl set 10.0.2.1 flags backup
+
+Now we do:
+
+  ./pm_nl_ctl set id 1 flags backup
+
+The new way is easier to maintain but it is also incompatible with older
+kernels not supporting the implicit endpoints putting in place the
+infrastructure to set flags per ID, hence the second Fixes tag.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: bccefb762439 ("selftests: mptcp: simplify pm_nl_change_endpoint")
+Fixes: 4cf86ae84c71 ("mptcp: strict local address ID selection")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
