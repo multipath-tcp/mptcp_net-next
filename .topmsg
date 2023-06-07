@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-uniform-listener-tests
+Subject: [PATCH] selftests: mptcp: join: uniform listener tests
 
+The alignment was different from the other tests because tabs were used
+instead of spaces.
+
+While at it, also use 'echo' instead of 'printf' to print the result to
+keep the same style as done in the other sub-tests. And, even if it
+should be better with, also remove 'stdbuf' and sed's '--unbuffered'
+option because they are not used in the other subtests and they are not
+available when using a minimal environment with busybox.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 178d023208eb ("selftests: mptcp: listener test for in-kernel PM")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
