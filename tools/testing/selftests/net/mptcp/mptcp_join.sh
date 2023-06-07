@@ -1820,8 +1820,8 @@ chk_mptcp_info()
 	local cnt2
 	local dump_stats
 
-	if [ $info1 != "subflows" ] ||
-	   [ $info2 != "subflows" ]; then
+	if [ $info1 != "subflows" ] && [ $info1 != "add_addr_signal" ] ||
+	   [ $info2 != "subflows" ] && [ $info2 != "add_addr_accepted" ]; then
 		echo "[fail] unsupported argument: $info1:$info2"
 		fail_test
 		return 1
@@ -3308,6 +3308,7 @@ userspace_tests()
 		chk_join_nr 1 1 1
 		chk_add_nr 1 1
 		chk_mptcp_info subflows 1 subflows 1
+		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
 		userspace_pm_rm_addr 10.0.2.1 10
 		wait_rm_addr $ns1 1
 		chk_rm_nr 1 1 invert
@@ -3352,6 +3353,7 @@ endpoint_tests()
 		pm_nl_check_endpoint 1 "creation" \
 			$ns2 10.0.2.2 id 1 flags implicit
 		chk_mptcp_info subflows 1 subflows 1
+		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
 
 		pm_nl_add_endpoint $ns2 10.0.2.2 id 33
 		pm_nl_check_endpoint 0 "ID change is prevented" \
