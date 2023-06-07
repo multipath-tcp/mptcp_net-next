@@ -521,10 +521,12 @@ static void do_getsockopt_mptcp_full_info(struct so_state *s, int fd)
 	}
 
 	assert(olen <= data_size);
-	assert(mfi.size_tcpinfo_user == mfi.size_tcpinfo_kernel);
-	assert(mfi.size_tcpinfo_user == sizeof(struct tcp_info));
-	assert(mfi.size_sfinfo_user == mfi.size_sfinfo_kernel);
-	assert(mfi.size_sfinfo_user == sizeof(struct mptcp_subflow_info));
+	assert(mfi.size_tcpinfo_kernel > 0);
+	assert(mfi.size_tcpinfo_user ==
+	       MIN(mfi.size_tcpinfo_kernel, sizeof(struct tcp_info)));
+	assert(mfi.size_sfinfo_kernel > 0);
+	assert(mfi.size_sfinfo_user ==
+	       MIN(mfi.size_sfinfo_kernel, sizeof(struct mptcp_subflow_info)));
 	assert(mfi.num_subflows == 1);
 
 	/* Tolerate future extension to mptcp_info struct and running newer
