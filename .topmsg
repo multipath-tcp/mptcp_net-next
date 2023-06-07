@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace-pm-skip-if-not-supported
+Subject: [PATCH] selftests: mptcp: userspace pm: skip if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the MPTCP Userspace PM introduced by commit 4638de5aefe5
+("mptcp: handle local addrs announced by userspace PMs").
+
+We can skip all these tests if the feature is not supported simply by
+looking for the MPTCP pm_type's sysctl knob.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 259a834fadda ("selftests: mptcp: functional tests for the userspace PM type")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
