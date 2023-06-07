@@ -1,4 +1,16 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-Fastclose-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip Fastclose tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the support of MP_FASTCLOSE introduced in commit
+f284c0c77321 ("mptcp: implement fastclose xmit path").
+
+If the MIB counter is not available, the test cannot be verified and the
+behaviour will not be the expected one. So we can skip the test if the
+counter is missing.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 01542c9bf9ab ("selftests: mptcp: add fastclose testcase")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
