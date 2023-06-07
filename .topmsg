@@ -1,4 +1,18 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-MPC-backups-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip MPC backups tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the support of sending an MP_PRIO signal for the initial
+subflow, introduced by commit c157bbe776b7 ("mptcp: allow the in kernel
+PM to set MPC subflow priority").
+
+It is possible to look for "mptcp_subflow_send_ack" in kallsyms because
+it was needed to introduce the mentioned feature. So we can know in
+advance if the feature is supported instead of trying and accepting any
+results.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 914f6a59b10f ("selftests: mptcp: add MPC backup tests")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
