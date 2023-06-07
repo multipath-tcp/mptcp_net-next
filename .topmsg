@@ -5,5 +5,7 @@ Add a testcase explicitly triggering the newly introduce
 MPTCP_FULL_INFO getsockopt.
 
 Link: https://github.com/multipath-tcp/mptcp_net-next/issues/388
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
