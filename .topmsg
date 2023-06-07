@@ -1,4 +1,21 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-skip-fullmesh-flag-tests-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: skip fullmesh flag tests if not supported
 
+Selftests are supposed to run on any kernels, including the old ones not
+supporting all MPTCP features.
+
+One of them is the support of the fullmesh flag for the in-kernel PM
+introduced by commit 2843ff6f36db ("mptcp: remote addresses fullmesh")
+and commit 1a0d6136c5f0 ("mptcp: local addresses fullmesh").
+
+It looks like there is no easy external sign we can use to predict the
+expected behaviour. We could add the flag and then check if it has been
+added but for that, and for each fullmesh test, we would need to setup a
+new environment, do the checks, clean it and then only start the test
+from yet another clean environment. To keep it simple and avoid
+introducing new issues, we look for a specific kernel version. That's
+not ideal but an acceptable solution for this case.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 6a0653b96f5d ("selftests: mptcp: add fullmesh setting tests")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
