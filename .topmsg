@@ -1,4 +1,21 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-possible-list-corruption-on-passive-MPJ
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix possible list corruption on passive MPJ
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+At passive MPJ time, if the msk socket lock is held by the user,
+the new subflow is appended to the msk->join_list under the msk
+data lock.
+
+In mptcp_release_cb()/__mptcp_flush_join_list(), the subflows in
+that list are moved from the join_list into the conn_list under the
+msk socket lock.
+
+Append and removal could race, possibly corrupting such list.
+Address the issue splicing the join list into a temporary one while
+still under the msk data lock.
+
+Found by code inspection, the race itself should be almost impossible
+to trigger in practice.
+
+Fixes: 3e5014909b56 ("mptcp: cleanup MPJ subflow list handling")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
