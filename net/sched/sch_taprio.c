@@ -2456,14 +2456,15 @@ static int taprio_dump_class_stats(struct Qdisc *sch, unsigned long cl,
 	__acquires(d->lock)
 {
 	struct netdev_queue *dev_queue = taprio_queue_get(sch, cl);
-	struct Qdisc *child = rtnl_dereference(dev_queue->qdisc_sleeping);
 	struct tc_taprio_qopt_offload offload = {
 		.cmd = TAPRIO_CMD_TC_STATS,
 		.tc_stats = {
 			.tc = cl - 1,
 		},
 	};
+	struct Qdisc *child;
 
+	child = rtnl_dereference(dev_queue->qdisc_sleeping);
 	if (gnet_stats_copy_basic(d, NULL, &child->bstats, true) < 0 ||
 	    qdisc_qstats_copy(d, child) < 0)
 		return -1;
