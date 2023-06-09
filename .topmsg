@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-consolidate-transition-to-TCP_CLOSE-in-mptcp_do_fastclose
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
