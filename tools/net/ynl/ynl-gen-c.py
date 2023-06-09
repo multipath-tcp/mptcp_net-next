@@ -94,7 +94,10 @@ class Type(SpecAttr):
     def arg_member(self, ri):
         member = self._complex_member_type(ri)
         if member:
-            return [member + ' *' + self.c_name]
+            arg = [member + ' *' + self.c_name]
+            if self.presence_type() == 'count':
+                arg += ['unsigned int n_' + self.c_name]
+            return arg
         raise Exception(f"Struct member not implemented for class type {self.type}")
 
     def struct_member(self, ri):
@@ -188,9 +191,12 @@ class Type(SpecAttr):
                 code.append(presence + ' = 1;')
         code += self._setter_lines(ri, member, presence)
 
-        ri.cw.write_func('static inline void',
-                         f"{op_prefix(ri, direction, deref=deref)}_set_{'_'.join(ref)}",
-                         body=code,
+        func_name = f"{op_prefix(ri, direction, deref=deref)}_set_{'_'.join(ref)}"
+        free = bool([x for x in code if 'free(' in x])
+        alloc = bool([x for x in code if 'alloc(' in x])
+        if free and not alloc:
+            func_name = '__' + func_name
+        ri.cw.write_func('static inline void', func_name, body=code,
                          args=[f'{type_name(ri, direction, deref=deref)} *{var}'] + self.arg_member(ri))
 
 
@@ -444,6 +450,13 @@ class TypeMultiAttr(Type):
     def presence_type(self):
         return 'count'
 
+    def _mnl_type(self):
+        t = self.type
+        # mnl does not have a helper for signed types
+        if t[0] == 's':
+            t = 'u' + t[1:]
+        return t
+
     def _complex_member_type(self, ri):
         if 'type' not in self.attr or self.attr['type'] == 'nest':
             return f"struct {self.nested_render_name}"
@@ -457,9 +470,14 @@ class TypeMultiAttr(Type):
         return 'type' not in self.attr or self.attr['type'] == 'nest'
 
     def free(self, ri, var, ref):
-        if 'type' not in self.attr or self.attr['type'] == 'nest':
+        if self.attr['type'] in scalars:
+            ri.cw.p(f"free({var}->{ref}{self.c_name});")
+        elif 'type' not in self.attr or self.attr['type'] == 'nest':
             ri.cw.p(f"for (i = 0; i < {var}->{ref}n_{self.c_name}; i++)")
             ri.cw.p(f'{self.nested_render_name}_free(&{var}->{ref}{self.c_name}[i]);')
+            ri.cw.p(f"free({var}->{ref}{self.c_name});")
+        else:
+            raise Exception(f"Free of MultiAttr sub-type {self.attr['type']} not supported yet")
 
     def _attr_typol(self):
         if 'type' not in self.attr or self.attr['type'] == 'nest':
@@ -470,7 +488,26 @@ class TypeMultiAttr(Type):
             raise Exception(f"Sub-type {self.attr['type']} not supported yet")
 
     def _attr_get(self, ri, var):
-        return f'{var}->n_{self.c_name}++;', None, None
+        return f'n_{self.c_name}++;', None, None
+
+    def attr_put(self, ri, var):
+        if self.attr['type'] in scalars:
+            put_type = self._mnl_type()
+            ri.cw.p(f"for (unsigned int i = 0; i < {var}->n_{self.c_name}; i++)")
+            ri.cw.p(f"mnl_attr_put_{put_type}(nlh, {self.enum_name}, {var}->{self.c_name}[i]);")
+        elif 'type' not in self.attr or self.attr['type'] == 'nest':
+            ri.cw.p(f"for (unsigned int i = 0; i < {var}->n_{self.c_name}; i++)")
+            self._attr_put_line(ri, var, f"{self.nested_render_name}_put(nlh, " +
+                                f"{self.enum_name}, &{var}->{self.c_name}[i])")
+        else:
+            raise Exception(f"Put of MultiAttr sub-type {self.attr['type']} not supported yet")
+
+    def _setter_lines(self, ri, member, presence):
+        # For multi-attr we have a count, not presence, hack up the presence
+        presence = presence[:-(len('_present.') + len(self.c_name))] + "n_" + self.c_name
+        return [f"free({member});",
+                f"{member} = {self.c_name};",
+                f"{presence} = n_{self.c_name};"]
 
 
 class TypeArrayNest(Type):
@@ -672,9 +709,6 @@ class Operation(SpecOperation):
     def __init__(self, family, yaml, req_value, rsp_value):
         super().__init__(family, yaml, req_value, rsp_value)
 
-        if req_value != rsp_value:
-            raise Exception("Directional messages not supported by codegen")
-
         self.render_name = family.name + '_' + c_lower(self.name)
 
         self.dual_policy = ('do' in yaml and 'request' in yaml['do']) and \
@@ -820,26 +854,73 @@ class Family(SpecFamily):
                 self.root_sets[op['attribute-set']]['reply'].update(rsp_attrs)
 
     def _load_nested_sets(self):
+        attr_set_queue = list(self.root_sets.keys())
+        attr_set_seen = set(self.root_sets.keys())
+
+        while len(attr_set_queue):
+            a_set = attr_set_queue.pop(0)
+            for attr, spec in self.attr_sets[a_set].items():
+                if 'nested-attributes' not in spec:
+                    continue
+
+                nested = spec['nested-attributes']
+                if nested not in attr_set_seen:
+                    attr_set_queue.append(nested)
+                    attr_set_seen.add(nested)
+
+                inherit = set()
+                if nested not in self.root_sets:
+                    if nested not in self.pure_nested_structs:
+                        self.pure_nested_structs[nested] = Struct(self, nested, inherited=inherit)
+                else:
+                    raise Exception(f'Using attr set as root and nested not supported - {nested}')
+
+                if 'type-value' in spec:
+                    if nested in self.root_sets:
+                        raise Exception("Inheriting members to a space used as root not supported")
+                    inherit.update(set(spec['type-value']))
+                elif spec['type'] == 'array-nest':
+                    inherit.add('idx')
+                self.pure_nested_structs[nested].set_inherited(inherit)
+
         for root_set, rs_members in self.root_sets.items():
             for attr, spec in self.attr_sets[root_set].items():
                 if 'nested-attributes' in spec:
-                    inherit = set()
                     nested = spec['nested-attributes']
-                    if nested not in self.root_sets:
-                        if nested not in self.pure_nested_structs:
-                            self.pure_nested_structs[nested] = Struct(self, nested, inherited=inherit)
                     if attr in rs_members['request']:
                         self.pure_nested_structs[nested].request = True
                     if attr in rs_members['reply']:
                         self.pure_nested_structs[nested].reply = True
 
-                    if 'type-value' in spec:
-                        if nested in self.root_sets:
-                            raise Exception("Inheriting members to a space used as root not supported")
-                        inherit.update(set(spec['type-value']))
-                    elif spec['type'] == 'array-nest':
-                        inherit.add('idx')
-                    self.pure_nested_structs[nested].set_inherited(inherit)
+        # Try to reorder according to dependencies
+        pns_key_list = list(self.pure_nested_structs.keys())
+        pns_key_seen = set()
+        rounds = len(pns_key_list)**2  # it's basically bubble sort
+        for _ in range(rounds):
+            if len(pns_key_list) == 0:
+                break
+            name = pns_key_list.pop(0)
+            finished = True
+            for _, spec in self.attr_sets[name].items():
+                if 'nested-attributes' in spec:
+                    if spec['nested-attributes'] not in pns_key_seen:
+                        # Dicts are sorted, this will make struct last
+                        struct = self.pure_nested_structs.pop(name)
+                        self.pure_nested_structs[name] = struct
+                        finished = False
+                        break
+            if finished:
+                pns_key_seen.add(name)
+            else:
+                pns_key_list.append(name)
+        # Propagate the request / reply
+        for attr_set, struct in reversed(self.pure_nested_structs.items()):
+            for _, spec in self.attr_sets[attr_set].items():
+                if 'nested-attributes' in spec:
+                    child = self.pure_nested_structs.get(spec['nested-attributes'])
+                    if child:
+                        child.request |= struct.request
+                        child.reply |= struct.reply
 
     def _load_all_notify(self):
         for op_name, op in self.ops.items():
@@ -1154,10 +1235,6 @@ def print_dump_prototype(ri):
     print_prototype(ri, "request")
 
 
-def put_typol_fwd(cw, struct):
-    cw.p(f'extern struct ynl_policy_nest {struct.render_name}_nest;')
-
-
 def put_typol(cw, struct):
     type_max = struct.attr_set.max_name
     cw.block_start(line=f'struct ynl_policy_attr {struct.render_name}_policy[{type_max} + 1] =')
@@ -1175,6 +1252,21 @@ def put_typol(cw, struct):
     cw.nl()
 
 
+def _put_enum_to_str_helper(cw, render_name, map_name, arg_name, enum=None):
+    args = [f'int {arg_name}']
+    if enum and not ('enum-name' in enum and not enum['enum-name']):
+        args = [f'enum {render_name} {arg_name}']
+    cw.write_func_prot('const char *', f'{render_name}_str', args)
+    cw.block_start()
+    if enum and enum.type == 'flags':
+        cw.p(f'{arg_name} = ffs({arg_name}) - 1;')
+    cw.p(f'if ({arg_name} < 0 || {arg_name} >= (int)MNL_ARRAY_SIZE({map_name}))')
+    cw.p('return NULL;')
+    cw.p(f'return {map_name}[{arg_name}];')
+    cw.block_end()
+    cw.nl()
+
+
 def put_op_name_fwd(family, cw):
     cw.write_func_prot('const char *', f'{family.name}_op_str', ['int op'], suffix=';')
 
@@ -1183,17 +1275,15 @@ def put_op_name(family, cw):
     map_name = f'{family.name}_op_strmap'
     cw.block_start(line=f"static const char * const {map_name}[] =")
     for op_name, op in family.msgs.items():
-        cw.p(f'[{op.enum_name}] = "{op_name}",')
+        if op.rsp_value:
+            if op.req_value == op.rsp_value:
+                cw.p(f'[{op.enum_name}] = "{op_name}",')
+            else:
+                cw.p(f'[{op.rsp_value}] = "{op_name}",')
     cw.block_end(line=';')
     cw.nl()
 
-    cw.write_func_prot('const char *', f'{family.name}_op_str', ['int op'])
-    cw.block_start()
-    cw.p(f'if (op < 0 || op >= (int)MNL_ARRAY_SIZE({map_name}))')
-    cw.p('return NULL;')
-    cw.p(f'return {map_name}[op];')
-    cw.block_end()
-    cw.nl()
+    _put_enum_to_str_helper(cw, family.name + '_op', map_name, 'op')
 
 
 def put_enum_to_str_fwd(family, cw, enum):
@@ -1211,18 +1301,7 @@ def put_enum_to_str(family, cw, enum):
     cw.block_end(line=';')
     cw.nl()
 
-    args = [f'enum {enum.render_name} value']
-    if 'enum-name' in enum and not enum['enum-name']:
-        args = ['int value']
-    cw.write_func_prot('const char *', f'{enum.render_name}_str', args)
-    cw.block_start()
-    if enum.type == 'flags':
-        cw.p('value = ffs(value) - 1;')
-    cw.p(f'if (value < 0 || value >= (int)MNL_ARRAY_SIZE({map_name}))')
-    cw.p('return NULL;')
-    cw.p(f'return {map_name}[value];')
-    cw.block_end()
-    cw.nl()
+    _put_enum_to_str_helper(cw, enum.render_name, map_name, 'value', enum=enum)
 
 
 def put_req_nested(ri, struct):
@@ -1269,6 +1348,11 @@ def _multi_parse(ri, struct, init_lines, local_vars):
         local_vars.append('struct ynl_parse_arg parg;')
         init_lines.append('parg.ys = yarg->ys;')
 
+    all_multi = array_nests | multi_attrs
+
+    for anest in sorted(all_multi):
+        local_vars.append(f"unsigned int n_{struct[anest].c_name} = 0;")
+
     ri.cw.block_start()
     ri.cw.write_func_lvar(local_vars)
 
@@ -1278,6 +1362,11 @@ def _multi_parse(ri, struct, init_lines, local_vars):
 
     for arg in struct.inherited:
         ri.cw.p(f'dst->{arg} = {arg};')
+
+    for anest in sorted(all_multi):
+        aspec = struct[anest]
+        ri.cw.p(f"if (dst->{aspec.c_name})")
+        ri.cw.p(f'return ynl_error_parse(yarg, "attribute already present ({struct.attr_set.name}.{aspec.name})");')
 
     ri.cw.nl()
     ri.cw.block_start(line=iter_line)
@@ -1294,8 +1383,9 @@ def _multi_parse(ri, struct, init_lines, local_vars):
     for anest in sorted(array_nests):
         aspec = struct[anest]
 
-        ri.cw.block_start(line=f"if (dst->n_{aspec.c_name})")
-        ri.cw.p(f"dst->{aspec.c_name} = calloc(dst->n_{aspec.c_name}, sizeof(*dst->{aspec.c_name}));")
+        ri.cw.block_start(line=f"if (n_{aspec.c_name})")
+        ri.cw.p(f"dst->{aspec.c_name} = calloc({aspec.c_name}, sizeof(*dst->{aspec.c_name}));")
+        ri.cw.p(f"dst->n_{aspec.c_name} = n_{aspec.c_name};")
         ri.cw.p('i = 0;')
         ri.cw.p(f"parg.rsp_policy = &{aspec.nested_render_name}_nest;")
         ri.cw.block_start(line=f"mnl_attr_for_each_nested(attr, attr_{aspec.c_name})")
@@ -1309,8 +1399,9 @@ def _multi_parse(ri, struct, init_lines, local_vars):
 
     for anest in sorted(multi_attrs):
         aspec = struct[anest]
-        ri.cw.block_start(line=f"if (dst->n_{aspec.c_name})")
-        ri.cw.p(f"dst->{aspec.c_name} = calloc(dst->n_{aspec.c_name}, sizeof(*dst->{aspec.c_name}));")
+        ri.cw.block_start(line=f"if (n_{aspec.c_name})")
+        ri.cw.p(f"dst->{aspec.c_name} = calloc(n_{aspec.c_name}, sizeof(*dst->{aspec.c_name}));")
+        ri.cw.p(f"dst->n_{aspec.c_name} = n_{aspec.c_name};")
         ri.cw.p('i = 0;')
         if 'nested-attributes' in aspec:
             ri.cw.p(f"parg.rsp_policy = &{aspec.nested_render_name}_nest;")
@@ -2192,6 +2283,13 @@ def main():
         os.sys.exit(1)
         return
 
+    supported_models = ['unified']
+    if args.mode == 'user':
+        supported_models += ['directional']
+    if parsed.msg_id_model not in supported_models:
+        print(f'Message enum-model {parsed.msg_id_model} not supported for {args.mode} generation')
+        os.sys.exit(1)
+
     cw = CodeWriter(BaseNlLib(), out_file)
 
     _, spec_kernel = find_kernel_root(args.spec)
@@ -2324,7 +2422,7 @@ def main():
             cw.nl()
 
             cw.p('/* Common nested types */')
-            for attr_set, struct in sorted(parsed.pure_nested_structs.items()):
+            for attr_set, struct in parsed.pure_nested_structs.items():
                 ri = RenderInfo(cw, parsed, args.mode, "", "", "", attr_set)
                 print_type_full(ri, struct)
 
@@ -2383,17 +2481,15 @@ def main():
             cw.nl()
 
             cw.p('/* Policies */')
-            for name, _ in parsed.attr_sets.items():
+            for name in parsed.pure_nested_structs:
                 struct = Struct(parsed, name)
-                put_typol_fwd(cw, struct)
-            cw.nl()
-
-            for name, _ in parsed.attr_sets.items():
+                put_typol(cw, struct)
+            for name in parsed.root_sets:
                 struct = Struct(parsed, name)
                 put_typol(cw, struct)
 
             cw.p('/* Common nested types */')
-            for attr_set, struct in sorted(parsed.pure_nested_structs.items()):
+            for attr_set, struct in parsed.pure_nested_structs.items():
                 ri = RenderInfo(cw, parsed, args.mode, "", "", "", attr_set)
 
                 free_rsp_nested(ri, struct)
