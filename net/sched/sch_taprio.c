@@ -20,6 +20,7 @@
 #include <linux/spinlock.h>
 #include <linux/rcupdate.h>
 #include <linux/time.h>
+#include <net/gso.h>
 #include <net/netlink.h>
 #include <net/pkt_sched.h>
 #include <net/pkt_cls.h>
@@ -798,6 +799,9 @@ static struct sk_buff *taprio_dequeue_tc_priority(struct Qdisc *sch,
 						      entry, gate_mask);
 
 			taprio_next_tc_txq(dev, tc, &q->cur_txq[tc]);
+
+			if (q->cur_txq[tc] >= dev->num_tx_queues)
+				q->cur_txq[tc] = first_txq;
 
 			if (skb)
 				return skb;
