@@ -11,11 +11,6 @@ if ! mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 	exit ${KSFT_SKIP}
 fi
 
-if ! mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
-	echo "userspace pm tests are not supported by the kernel: SKIP"
-	exit ${KSFT_SKIP}
-fi
-
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
 	echo "SKIP: Cannot not run test without ip tool"
