@@ -1,1 +1,1 @@
-t/selftests-mptcp-sockopt-relax-expected-returned-size
+t/selftests-mptcp-lib-skip-if-not-below-kernel-version
