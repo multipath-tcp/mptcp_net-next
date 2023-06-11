@@ -41,24 +41,14 @@ void v9fs_fid_add(struct dentry *dentry, struct p9_fid **pfid)
 	*pfid = NULL;
 }
 
-static bool v9fs_is_writeable(int mode)
-{
-	if (mode & (P9_OWRITE|P9_ORDWR))
-		return true;
-	else
-		return false;
-}
-
 /**
  * v9fs_fid_find_inode - search for an open fid off of the inode list
  * @inode: return a fid pointing to a specific inode
- * @want_writeable: only consider fids which are writeable
  * @uid: return a fid belonging to the specified user
- * @any: ignore uid as a selection criteria
  *
  */
-struct p9_fid *v9fs_fid_find_inode(struct inode *inode, bool want_writeable,
-	kuid_t uid, bool any)
+
+static struct p9_fid *v9fs_fid_find_inode(struct inode *inode, kuid_t uid)
 {
 	struct hlist_head *h;
 	struct p9_fid *fid, *ret = NULL;
@@ -68,12 +58,7 @@ struct p9_fid *v9fs_fid_find_inode(struct inode *inode, bool want_writeable,
 	spin_lock(&inode->i_lock);
 	h = (struct hlist_head *)&inode->i_private;
 	hlist_for_each_entry(fid, h, ilist) {
-		if (any || uid_eq(fid->uid, uid)) {
-			if (want_writeable && !v9fs_is_writeable(fid->mode)) {
-				p9_debug(P9_DEBUG_VFS, " mode: %x not writeable?\n",
-							fid->mode);
-				continue;
-			}
+		if (uid_eq(fid->uid, uid)) {
 			p9_fid_get(fid);
 			ret = fid;
 			break;
@@ -133,7 +118,7 @@ static struct p9_fid *v9fs_fid_find(struct dentry *dentry, kuid_t uid, int any)
 		spin_unlock(&dentry->d_lock);
 	} else {
 		if (dentry->d_inode)
-			ret = v9fs_fid_find_inode(dentry->d_inode, false, uid, any);
+			ret = v9fs_fid_find_inode(dentry->d_inode, uid);
 	}
 
 	return ret;
@@ -314,3 +299,28 @@ struct p9_fid *v9fs_fid_lookup(struct dentry *dentry)
 	return v9fs_fid_lookup_with_uid(dentry, uid, any);
 }
 
+struct p9_fid *v9fs_writeback_fid(struct dentry *dentry)
+{
+	int err;
+	struct p9_fid *fid, *ofid;
+
+	ofid = v9fs_fid_lookup_with_uid(dentry, GLOBAL_ROOT_UID, 0);
+	fid = clone_fid(ofid);
+	if (IS_ERR(fid))
+		goto error_out;
+	p9_fid_put(ofid);
+	/*
+	 * writeback fid will only be used to write back the
+	 * dirty pages. We always request for the open fid in read-write
+	 * mode so that a partial page write which result in page
+	 * read can work.
+	 */
+	err = p9_client_open(fid, O_RDWR);
+	if (err < 0) {
+		p9_fid_put(fid);
+		fid = ERR_PTR(err);
+		goto error_out;
+	}
+error_out:
+	return fid;
+}
