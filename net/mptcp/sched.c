@@ -125,7 +125,6 @@ mptcp_subflow_ctx_by_pos(const struct mptcp_sock *msk, unsigned int pos)
 int mptcp_sched_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_sched_data data;
 
 	msk_owned_by_me(msk);
 
@@ -155,15 +154,14 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 		return 0;
 	}
 
-	data.reinject = false;
-	msk->sched->data_init(msk, &data);
-	return msk->sched->get_subflow(msk, &data);
+	msk->sched_data.reinject = false;
+	msk->sched->data_init(msk, &msk->sched_data);
+	return msk->sched->get_subflow(msk, &msk->sched_data);
 }
 
 int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_sched_data data;
 
 	msk_owned_by_me(msk);
 
@@ -186,7 +184,7 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 		return 0;
 	}
 
-	data.reinject = true;
-	msk->sched->data_init(msk, &data);
-	return msk->sched->get_subflow(msk, &data);
+	msk->sched_data.reinject = true;
+	msk->sched->data_init(msk, &msk->sched_data);
+	return msk->sched->get_subflow(msk, &msk->sched_data);
 }
