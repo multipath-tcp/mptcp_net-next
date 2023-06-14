@@ -27,17 +27,20 @@ int BPF_STRUCT_OPS(bpf_bkup_get_subflow, const struct mptcp_sock *msk,
 {
 	int nr = 0;
 
-	for (int i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
-		if (!data->contexts[i])
+	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
+		struct mptcp_subflow_context *subflow;
+
+		subflow = mptcp_subflow_ctx_by_pos(msk, i);
+		if (!subflow)
 			break;
 
-		if (!BPF_CORE_READ_BITFIELD_PROBED(data->contexts[i], backup)) {
+		if (!BPF_CORE_READ_BITFIELD_PROBED(subflow, backup)) {
 			nr = i;
 			break;
 		}
 	}
 
-	mptcp_subflow_set_scheduled(data->contexts[nr], true);
+	mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(msk, nr), true);
 	return 0;
 }
 
