@@ -2808,6 +2808,9 @@ verify_listener_events()
 		echo "[ ok ]"
 		return 0
 	fi
+	echo  "$type ?=  $e_type - $family ?= $e_family - $saddr ?= $e_saddr - $sport ?= $e_sport"
+	echo $evt
+	cat $evt 
 	fail_test
 	echo "[fail]"
 }
