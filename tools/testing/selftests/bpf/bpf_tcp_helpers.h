@@ -239,8 +239,8 @@ struct mptcp_subflow_context {
 } __attribute__((preserve_access_index));
 
 struct mptcp_sched_data {
-	bool	reinject;
-	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
+	bool		reinject;
+	__u8		subflows;
 } __attribute__((preserve_access_index));
 
 struct mptcp_sched_ops {
@@ -262,6 +262,7 @@ struct mptcp_sock {
 	struct sock	*last_snd;
 	__u32		token;
 	struct sock	*first;
+	struct mptcp_sched_data sched_data;
 	char		ca_name[TCP_CA_NAME_MAX];
 } __attribute__((preserve_access_index));
 
@@ -269,5 +270,7 @@ extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
 extern void mptcp_sched_data_set_contexts(const struct mptcp_sock *msk,
 					  struct mptcp_sched_data *data) __ksym;
+extern struct mptcp_subflow_context *
+mptcp_subflow_ctx_by_pos(const struct mptcp_sock *msk, unsigned int pos) __ksym;
 
 #endif
