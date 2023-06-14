@@ -25,7 +25,7 @@ void BPF_STRUCT_OPS(bpf_first_data_init, const struct mptcp_sock *msk,
 int BPF_STRUCT_OPS(bpf_first_get_subflow, const struct mptcp_sock *msk,
 		   struct mptcp_sched_data *data)
 {
-	mptcp_subflow_set_scheduled(data->contexts[0], true);
+	mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(msk, 0), true);
 	return 0;
 }
 
