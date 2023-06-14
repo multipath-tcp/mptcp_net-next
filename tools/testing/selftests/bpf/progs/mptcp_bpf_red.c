@@ -25,11 +25,11 @@ void BPF_STRUCT_OPS(bpf_red_data_init, const struct mptcp_sock *msk,
 int BPF_STRUCT_OPS(bpf_red_get_subflow, const struct mptcp_sock *msk,
 		   struct mptcp_sched_data *data)
 {
-	for (int i = 0; i < MPTCP_SUBFLOWS_MAX; i++) {
-		if (!data->contexts[i])
+	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
+		if (!mptcp_subflow_ctx_by_pos(msk, i))
 			break;
 
-		mptcp_subflow_set_scheduled(data->contexts[i], true);
+		mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(msk, i), true);
 	}
 
 	return 0;
