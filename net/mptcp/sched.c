@@ -108,6 +108,7 @@ void mptcp_sched_data_set_contexts(const struct mptcp_sock *msk,
 		mptcp_subflow_set_scheduled(subflow, false);
 		data->contexts[i++] = subflow;
 	}
+	data->subflows = i;
 
 	for (; i < MPTCP_SUBFLOWS_MAX; i++)
 		data->contexts[i] = NULL;
