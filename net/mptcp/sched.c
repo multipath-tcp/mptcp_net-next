@@ -81,6 +81,8 @@ void mptcp_release_sched(struct mptcp_sock *msk)
 	if (!sched)
 		return;
 
+	if (msk->sched_data.last_snd)
+		msk->sched_data.last_snd = NULL;
 	msk->sched = NULL;
 	if (sched->release)
 		sched->release(msk);
