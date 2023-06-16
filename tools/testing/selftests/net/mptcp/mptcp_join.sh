@@ -54,6 +54,7 @@ export test_linkfail=0
 export addr_nr_ns1=0
 export addr_nr_ns2=0
 export sflags=""
+export set_endpoint_outside=0
 
 # generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
 #				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
@@ -1086,7 +1087,9 @@ do_transfer()
 	fi
 	local cpid=$!
 
-	pm_nl_set_endpoint $listener_ns $connector_ns $connect_addr
+	if [ $set_endpoint_outside -eq 0 ]; then
+		pm_nl_set_endpoint $listener_ns $connector_ns $connect_addr
+	fi
 
 	wait $cpid
 	local retc=$?
@@ -1201,6 +1204,22 @@ run_tests()
 	fi
 
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr} ${speed}
+}
+
+run_tests_bg()
+{
+	local listener_ns="$1"
+	local connector_ns="$2"
+	local connect_addr="$3"
+	local speed="${4:-fast}"
+	local wait_join="${5:-0}"
+
+	set_endpoint_outside=1 \
+		run_tests $listener_ns $connector_ns $connect_addr $speed &
+	local tests_pid=$!
+	[ $wait_join -eq 1 ] && wait_mpj $connector_ns
+	pm_nl_set_endpoint $listener_ns $connector_ns $connect_addr
+	wait $tests_pid
 }
 
 dump_stats()
@@ -2285,7 +2304,7 @@ remove_tests()
 		pm_nl_set_limits $ns2 0 1
 		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
 		addr_nr_ns2=-1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 1 1 1
 		chk_rm_tx_nr 1
 		chk_rm_nr 1 1
@@ -2309,7 +2328,7 @@ remove_tests()
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		pm_nl_set_limits $ns2 1 1
 		addr_nr_ns1=-1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 1 1 1
 		chk_add_nr 1 1
 		chk_rm_nr 1 1 invert
@@ -2322,7 +2341,7 @@ remove_tests()
 		pm_nl_set_limits $ns2 1 2
 		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
 		addr_nr_ns1=-1 addr_nr_ns2=-1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 		chk_add_nr 1 1
 		chk_rm_nr 1 1
@@ -2336,7 +2355,7 @@ remove_tests()
 		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
 		pm_nl_add_endpoint $ns2 10.0.4.2 flags subflow
 		addr_nr_ns1=-1 addr_nr_ns2=-2 \
-			run_tests $ns1 $ns2 10.0.1.1 speed_10
+			run_tests_bg $ns1 $ns2 10.0.1.1 speed_10 1
 		chk_join_nr 3 3 3
 		chk_add_nr 1 1
 		chk_rm_nr 2 2
@@ -2350,7 +2369,7 @@ remove_tests()
 		pm_nl_add_endpoint $ns1 10.0.4.1 flags signal
 		pm_nl_set_limits $ns2 3 3
 		addr_nr_ns1=-3 \
-			run_tests $ns1 $ns2 10.0.1.1 speed_10
+			run_tests_bg $ns1 $ns2 10.0.1.1 speed_10 1
 		chk_join_nr 3 3 3
 		chk_add_nr 3 3
 		chk_rm_nr 3 3 invert
@@ -2364,7 +2383,7 @@ remove_tests()
 		pm_nl_add_endpoint $ns1 10.0.14.1 flags signal
 		pm_nl_set_limits $ns2 3 3
 		addr_nr_ns1=-3 \
-			run_tests $ns1 $ns2 10.0.1.1 speed_10
+			run_tests_bg $ns1 $ns2 10.0.1.1 speed_10 1
 		chk_join_nr 1 1 1
 		chk_add_nr 3 3
 		chk_rm_nr 3 1 invert
@@ -2462,7 +2481,7 @@ add_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		addr_nr_ns2=1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 1 1 1
 	fi
 
@@ -2471,7 +2490,7 @@ add_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 1 1
 		addr_nr_ns1=1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 1 1 1
 		chk_add_nr 1 1
 	fi
@@ -2481,7 +2500,7 @@ add_tests()
 		pm_nl_set_limits $ns1 0 2
 		pm_nl_set_limits $ns2 0 2
 		addr_nr_ns2=2 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 	fi
 
@@ -2490,7 +2509,7 @@ add_tests()
 		pm_nl_set_limits $ns1 0 2
 		pm_nl_set_limits $ns2 0 2
 		addr_nr_ns2=2 \
-			run_tests $ns1 $ns2 dead:beef:1::1 slow
+			run_tests_bg $ns1 $ns2 dead:beef:1::1 slow
 		chk_join_nr 2 2 2
 	fi
 
@@ -2499,7 +2518,7 @@ add_tests()
 		pm_nl_set_limits $ns1 0 2
 		pm_nl_set_limits $ns2 2 2
 		addr_nr_ns1=2 \
-			run_tests $ns1 $ns2 dead:beef:1::1 slow
+			run_tests_bg $ns1 $ns2 dead:beef:1::1 slow
 		chk_join_nr 2 2 2
 		chk_add_nr 2 2
 	fi
@@ -2754,7 +2773,7 @@ backup_tests()
 	   continue_if mptcp_lib_kallsyms_doesnt_have "mptcp_subflow_send_ack$"; then
 		pm_nl_add_endpoint $ns2 10.0.1.2 flags subflow
 		sflags=backup \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 0 0 0
 		chk_prio_nr 0 1
 	fi
@@ -2764,7 +2783,7 @@ backup_tests()
 		pm_nl_add_endpoint $ns1 10.0.1.1 flags subflow
 		pm_nl_add_endpoint $ns2 10.0.1.2 flags subflow
 		sflags=backup \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 0 0 0
 		chk_prio_nr 1 1
 	fi
@@ -2854,7 +2873,7 @@ add_addr_ports_tests()
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal port 10100
 		pm_nl_set_limits $ns2 1 1
 		addr_nr_ns1=-1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 1 1 1
 		chk_add_nr 1 1 1
 		chk_rm_nr 1 1 invert
@@ -3088,7 +3107,7 @@ fullmesh_tests()
 		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow,fullmesh
 		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow,fullmesh
 		addr_nr_ns1=1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 4 4 4
 		chk_add_nr 1 1
 	fi
@@ -3101,7 +3120,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns2 1 3
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		addr_nr_ns2=fullmesh_1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 3 3 3
 		chk_add_nr 1 1
 	fi
@@ -3114,7 +3133,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns2 1 5
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		addr_nr_ns2=fullmesh_2 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 5 5 5
 		chk_add_nr 1 1
 	fi
@@ -3128,7 +3147,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns2 1 4
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		addr_nr_ns2=fullmesh_2 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 4 4 4
 		chk_add_nr 1 1
 	fi
@@ -3140,7 +3159,7 @@ fullmesh_tests()
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags subflow
 		pm_nl_set_limits $ns2 4 4
 		addr_nr_ns2=1 sflags=fullmesh \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 		chk_rm_nr 0 1
 	fi
@@ -3152,7 +3171,7 @@ fullmesh_tests()
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags subflow,fullmesh
 		pm_nl_set_limits $ns2 4 4
 		addr_nr_ns2=fullmesh_1 sflags=nofullmesh \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 		chk_rm_nr 0 1
 	fi
@@ -3164,7 +3183,7 @@ fullmesh_tests()
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags subflow
 		pm_nl_set_limits $ns2 4 4
 		addr_nr_ns2=1 sflags=backup,fullmesh \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 		chk_prio_nr 0 1
 		chk_rm_nr 0 1
@@ -3367,7 +3386,7 @@ userspace_tests()
 		pm_nl_set_limits $ns2 0 1
 		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
 		addr_nr_ns2=-1 \
-			run_tests $ns1 $ns2 10.0.1.1 slow
+			run_tests_bg $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 0 0 0
 		chk_rm_nr 0 0
 	fi
