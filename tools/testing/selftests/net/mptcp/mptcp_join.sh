@@ -1735,10 +1735,9 @@ chk_rm_nr()
 	fi
 
 	printf "%-${nr_blank}s %s" " " "rm "
-	count=$(get_counter ${addr_ns} "MPTcpExtRmAddr")
-	if [ -z "$count" ]; then
-		echo -n "[skip]"
-	elif [ "$count" != "$rm_addr_nr" ]; then
+	count=$(ip netns exec $addr_ns nstat -as MPTcpExtRmAddr | grep MPTcpExtRmAddr | awk '{print $2}')
+	[ -z "$count" ] && count=0
+	if [ "$count" != "$rm_addr_nr" ]; then
 		echo "[fail] got $count RM_ADDR[s] expected $rm_addr_nr"
 		fail_test
 	else
