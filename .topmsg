@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Reorder-fields-in-struct-mptcp_pm_add_entry
+From: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Subject: [PATCH] mptcp: Reorder fields in 'struct mptcp_pm_add_entry'
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Group some variables based on their sizes to reduce hole and avoid padding.
+On x86_64, this shrinks the size of 'struct mptcp_pm_add_entry'
+from 136 to 128 bytes.
+
+It saves a few bytes of memory and is more cache-line friendly.
+
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
