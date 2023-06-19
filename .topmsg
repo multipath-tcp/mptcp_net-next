@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-Reorder-fields-in-struct-mptcp_pm_add_entry
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
