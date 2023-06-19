@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-drop-legacy-code-around-RX-EOF
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop legacy code around RX EOF
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Thanks to the previous patch -- "mptcp: consolidate fallback and non
+fallback state machine" -- we can finally drop the "temporary hack"
+used to detect rx eof.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
