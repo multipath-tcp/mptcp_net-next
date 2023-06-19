@@ -1,1 +1,1 @@
-t/mptcp-fix-possible-list-corruption-on-passive-MPJ
+t/mptcp-drop-legacy-code-around-RX-EOF
