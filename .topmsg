@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-ensure-listener-is-unhashed-before-updating-the-sk-status
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: ensure listener is unhashed before updating the sk status
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP protocol access the listener subflow in a lockless
+manner in a couple of places (poll, diag). That works only if
+the msk itself leaves the listener status only after that the
+subflow itself has been closed/disconnected. Otherwise we risk
+deadlock in diag, as reported by Christoph.
+
+Address the issue ensuring that the first subflow (the listener
+one) is always disconnected before updating the msk socket status.
+
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/407
+Fixes: b29fcfb54cd7 ("mptcp: full disconnect implementation")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
