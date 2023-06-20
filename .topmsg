@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-drop-test_linkfail-parameter
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: drop test_linkfail parameter
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+run_tests() accepts too many optional parameters. Before this modification,
+it was required to set all of then when only the last one had to be
+changed. That's not clear to see all these 0 and it makes the maintenance
+harder:
+
+      run_tests $ns1 $ns2 10.0.1.1 1 2 3 slow
+
+Instead, the parameter can be set as an env var with a limited scope:
+
+      foo=1 bar=2 next=3 \
+            run_tests $ns1 $ns2 10.0.1.1 slow
+
+This patch switches to key/value "test_linkfail=*" instead of positional
+parameter test_linkfail of do_transfer() and run_tests().
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
