@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-pass-addr-to-mptcp_pm_alloc_anno_list
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: pass addr to mptcp_pm_alloc_anno_list
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Pass addr parameter to mptcp_pm_alloc_anno_list() instead of entry. We
+can reduce the scope, e.g. in mptcp_pm_alloc_anno_list(), we only access
+"entry->addr", we can then restrict to the pointer to "addr" then.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
