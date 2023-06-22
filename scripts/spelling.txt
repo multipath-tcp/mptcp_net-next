@@ -1319,6 +1319,12 @@ ressource||resource
 ressources||resources
 restesting||retesting
 resumbmitting||resubmitting
+retranmission||retransmission
+retranmissions||retransmissions
+retranmit||retransmit
+retranmits||retransmits
+retranmitted||retransmitted
+retranmitting||retransmitting
 retransmited||retransmitted
 retreived||retrieved
 retreive||retrieve
@@ -1553,6 +1559,11 @@ tranasction||transaction
 tranceiver||transceiver
 tranfer||transfer
 tranmission||transmission
+tranmissions||transmissions
+tranmit||transmit
+tranmits||transmits
+tranmitted||transmitted
+tranmitting||transmitting
 transcevier||transceiver
 transciever||transceiver
 transferd||transferred
