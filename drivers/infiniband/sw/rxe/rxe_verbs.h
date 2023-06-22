@@ -237,7 +237,7 @@ struct rxe_qp {
 	atomic_t		skb_out;
 	int			need_req_skb;
 
-	/* Timer for retranmitting packet when ACKs have been lost. RC
+	/* Timer for retransmitting packet when ACKs have been lost. RC
 	 * only. The requester sets it when it is not already
 	 * started. The responder resets it whenever an ack is
 	 * received.
