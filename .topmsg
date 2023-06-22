@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: move snd_una update earlier for fallback socket
-
-That will avoid an unneeded conditional in both the fast-path
-and in the fallback case and will simplify a bit the next
-patch.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
