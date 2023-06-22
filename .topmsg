@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: consolidate transition to TCP_CLOSE in mptcp_do_fastclose()
-
-The MPTCP code always set the msk state to TCP_CLOSE before
-calling performing the fast-close. Move such state transition in
-mptcp_do_fastclose() to avoid some code duplication.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
