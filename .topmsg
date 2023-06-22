@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] selftests: mptcp: explicitly tests aggregate counters
-
-Update the existing sockopt test-case to do some basic checks
-on the newly added counters.
-
-Link: https://github.com/multipath-tcp/mptcp_net-next/issues/385
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
