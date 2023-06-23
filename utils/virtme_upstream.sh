@@ -17,7 +17,9 @@ is_stable() { local prefix sublevel
 ./.virtme.sh make -C tools/perf clean
 
 rc=0
-VIRTME_PACKETDRILL_STABLE=$(is_stable) ./.virtme.sh "${@:-expect-all}" || rc=${?}
+INPUT_BUILD_SKIP_PERF=1 \
+   VIRTME_PACKETDRILL_STABLE=$(is_stable) \
+   ./.virtme.sh "${@:-expect-all}" || rc=${?}
 
 if [ -f .virtme-exec-run-old ]; then
    mv .virtme-exec-run-old .virtme-exec-run
