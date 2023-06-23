@@ -707,7 +707,7 @@ pm_nl_del_endpoint()
 	local addr=$3
 
 	if [ $ip_mptcp -eq 1 ]; then
-		ip -n $ns mptcp endpoint delete id $id $addr
+		ip -n $ns mptcp endpoint delete id $id
 	else
 		ip netns exec $ns ./pm_nl_ctl del $id $addr
 	fi
