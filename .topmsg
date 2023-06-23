@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-connect-fix-comment-typo
+From: Yueh-Shun Li <shamrocklee@posteo.net>
+Subject: [PATCH] selftests: mptcp: connect: fix comment typo
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Spell "transmissions" properly.
+
+Found by searching for keyword "tranm".
+
+Signed-off-by: Yueh-Shun Li <shamrocklee@posteo.net>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
