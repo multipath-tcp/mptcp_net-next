@@ -313,6 +313,9 @@ struct mptcp_sock {
 				   */
 	struct sock	*first;
 	struct mptcp_pm_data	pm;
+#ifdef CONFIG_BPF_SYSCALL
+	struct bpf_local_storage __rcu	*bpf_storage;
+#endif
 	struct mptcp_sched_ops	*sched;
 	struct {
 		u32	space;	/* bytes copied in last measurement window */

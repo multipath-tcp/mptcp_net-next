@@ -10,6 +10,7 @@
 #define pr_fmt(fmt) "MPTCP: " fmt
 
 #include <linux/bpf.h>
+#include <linux/bpf_local_storage.h>
 #include <linux/bpf_verifier.h>
 #include <linux/btf.h>
 #include <linux/btf_ids.h>
@@ -180,6 +181,159 @@ static int __init bpf_mptcp_sched_kfunc_init(void)
 					 &bpf_mptcp_sched_kfunc_set);
 }
 late_initcall(bpf_mptcp_sched_kfunc_init);
+
+/* mptcp sched storage */
+DEFINE_BPF_STORAGE_CACHE(mptcp_cache);
+
+static DEFINE_PER_CPU(int, bpf_mptcp_storage_busy);
+
+BTF_ID_LIST_GLOBAL_SINGLE(bpf_mptcp_btf_id, struct, mptcp_sock)
+
+static void bpf_mptcp_storage_lock(void)
+{
+	migrate_disable();
+	this_cpu_inc(bpf_mptcp_storage_busy);
+}
+
+static void bpf_mptcp_storage_unlock(void)
+{
+	this_cpu_dec(bpf_mptcp_storage_busy);
+	migrate_enable();
+}
+
+static struct bpf_local_storage __rcu **mptcp_storage_ptr(void *owner)
+{
+	struct mptcp_sock *msk = owner;
+
+	return &msk->bpf_storage;
+}
+
+static struct bpf_local_storage_data *
+mptcp_storage_lookup(struct mptcp_sock *msk, struct bpf_map *map,
+		     bool cacheit_lockit)
+{
+	struct bpf_local_storage *msk_storage;
+	struct bpf_local_storage_map *smap;
+
+	msk_storage = rcu_dereference_check(msk->bpf_storage, bpf_rcu_lock_held());
+	if (!msk_storage)
+		return NULL;
+
+	smap = (struct bpf_local_storage_map *)map;
+	return bpf_local_storage_lookup(msk_storage, smap, cacheit_lockit);
+}
+
+static void *bpf_mptcp_storage_lookup_elem(struct bpf_map *map, void *key)
+{
+	struct bpf_local_storage_data *sdata;
+	struct mptcp_sock *msk;
+	struct socket *sock;
+	int err, fd;
+
+	fd = *(int *)key;
+	sock = sockfd_lookup(fd, &err);
+	if (!sock)
+		return NULL;
+
+	msk = bpf_mptcp_sock_from_subflow(sock->sk);
+	if (!msk)
+		return NULL;
+
+	bpf_mptcp_storage_lock();
+	sdata = mptcp_storage_lookup(msk, map, true);
+	bpf_mptcp_storage_unlock();
+	fput(sock->file);
+	return sdata ? sdata->data : NULL;
+}
+
+static long bpf_mptcp_storage_update_elem(struct bpf_map *map, void *key,
+					  void *value, u64 map_flags)
+{
+	struct bpf_local_storage_data *sdata;
+	struct mptcp_sock *msk;
+	struct socket *sock;
+	int err, fd;
+
+	fd = *(int *)key;
+	sock = sockfd_lookup(fd, &err);
+	if (!sock)
+		return PTR_ERR(sock);
+
+	msk = bpf_mptcp_sock_from_subflow(sock->sk);
+	if (IS_ERR(msk))
+		return PTR_ERR(msk);
+
+	bpf_mptcp_storage_lock();
+	sdata = bpf_local_storage_update(msk, (struct bpf_local_storage_map *)map,
+					 value, map_flags, GFP_ATOMIC);
+	bpf_mptcp_storage_unlock();
+	fput(sock->file);
+	return PTR_ERR_OR_ZERO(sdata);
+}
+
+static int mptcp_storage_delete(struct mptcp_sock *msk, struct bpf_map *map)
+{
+	struct bpf_local_storage_data *sdata;
+
+	sdata = mptcp_storage_lookup(msk, map, false);
+	if (!sdata)
+		return -ENOENT;
+
+	bpf_selem_unlink(SELEM(sdata), false);
+	return 0;
+}
+
+static long bpf_mptcp_storage_delete_elem(struct bpf_map *map, void *key)
+{
+	struct mptcp_sock *msk;
+	struct socket *sock;
+	int ret, err, fd;
+
+	fd = *(int *)key;
+	sock = sockfd_lookup(fd, &err);
+	if (!sock)
+		return PTR_ERR(sock);
+
+	msk = bpf_mptcp_sock_from_subflow(sock->sk);
+	if (IS_ERR(msk))
+		return PTR_ERR(msk);
+
+	bpf_mptcp_storage_lock();
+	ret = mptcp_storage_delete(msk, map);
+	bpf_mptcp_storage_unlock();
+	fput(sock->file);
+	return ret;
+}
+
+static int notsupp_get_next_key(struct bpf_map *map, void *key, void *next_key)
+{
+	return -ENOTSUPP;
+}
+
+static struct bpf_map *mptcp_storage_map_alloc(union bpf_attr *attr)
+{
+	return bpf_local_storage_map_alloc(attr, &mptcp_cache, true);
+}
+
+static void mptcp_storage_map_free(struct bpf_map *map)
+{
+	bpf_local_storage_map_free(map, &mptcp_cache, &bpf_mptcp_storage_busy);
+}
+
+const struct bpf_map_ops mptcp_storage_map_ops = {
+	.map_meta_equal = bpf_map_meta_equal,
+	.map_alloc_check = bpf_local_storage_map_alloc_check,
+	.map_alloc = mptcp_storage_map_alloc,
+	.map_free = mptcp_storage_map_free,
+	.map_get_next_key = notsupp_get_next_key,
+	.map_lookup_elem = bpf_mptcp_storage_lookup_elem,
+	.map_update_elem = bpf_mptcp_storage_update_elem,
+	.map_delete_elem = bpf_mptcp_storage_delete_elem,
+	.map_check_btf = bpf_local_storage_map_check_btf,
+	.map_mem_usage = bpf_local_storage_map_mem_usage,
+	.map_btf_id = &bpf_local_storage_map_btf_id[0],
+	.map_owner_storage_ptr = mptcp_storage_ptr,
+};
 #endif /* CONFIG_BPF_JIT */
 
 struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
