@@ -1,4 +1,27 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/perf-trace-fix-MSG_SPLICE_PAGES-build-error
+Subject: [PATCH] perf trace: fix MSG_SPLICE_PAGES build error
 
+Our MPTCP CI and Stephen got this error:
+
+    In file included from builtin-trace.c:907:
+    trace/beauty/msg_flags.c: In function 'syscall_arg__scnprintf_msg_flags':
+    trace/beauty/msg_flags.c:28:21: error: 'MSG_SPLICE_PAGES' undeclared (first use in this function)
+       28 |         if (flags & MSG_##n) {
+          |                     ^~~~
+    trace/beauty/msg_flags.c:50:9: note: in expansion of macro 'P_MSG_FLAG'
+       50 |         P_MSG_FLAG(SPLICE_PAGES);
+          |         ^~~~~~~~~~
+    trace/beauty/msg_flags.c:28:21: note: each undeclared identifier is reported only once for each function it appears in
+       28 |         if (flags & MSG_##n) {
+          |                     ^~~~
+    trace/beauty/msg_flags.c:50:9: note: in expansion of macro 'P_MSG_FLAG'
+       50 |         P_MSG_FLAG(SPLICE_PAGES);
+          |         ^~~~~~~~~~
+
+The fix is similar to what was done with MSG_FASTOPEN: the new macro is
+defined if it is not defined in the system headers.
+
+Fixes: b848b26c6672 ("net: Kill MSG_SENDPAGE_NOTLAST")
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Closes: https://lore.kernel.org/r/20230626112847.2ef3d422@canb.auug.org.au/
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
