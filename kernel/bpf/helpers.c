@@ -1768,6 +1768,10 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 	case BPF_FUNC_get_current_ancestor_cgroup_id:
 		return &bpf_get_current_ancestor_cgroup_id_proto;
 #endif
+	case BPF_FUNC_mptcp_storage_get:
+		return &bpf_mptcp_storage_get_proto;
+	case BPF_FUNC_mptcp_storage_delete:
+		return &bpf_mptcp_storage_delete_proto;
 	default:
 		break;
 	}

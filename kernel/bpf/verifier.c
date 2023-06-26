@@ -561,7 +561,8 @@ static bool is_storage_get_function(enum bpf_func_id func_id)
 	return func_id == BPF_FUNC_sk_storage_get ||
 	       func_id == BPF_FUNC_inode_storage_get ||
 	       func_id == BPF_FUNC_task_storage_get ||
-	       func_id == BPF_FUNC_cgrp_storage_get;
+	       func_id == BPF_FUNC_cgrp_storage_get ||
+	       func_id == BPF_FUNC_mptcp_storage_get;
 }
 
 static bool helper_multiple_ref_obj_use(enum bpf_func_id func_id,
@@ -8364,6 +8365,11 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 		    func_id != BPF_FUNC_map_push_elem)
 			goto error;
 		break;
+	case BPF_MAP_TYPE_MPTCP_STORAGE:
+		if (func_id != BPF_FUNC_mptcp_storage_get &&
+		    func_id != BPF_FUNC_mptcp_storage_delete)
+			goto error;
+		break;
 	default:
 		break;
 	}
@@ -8474,6 +8480,11 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 	case BPF_FUNC_cgrp_storage_get:
 	case BPF_FUNC_cgrp_storage_delete:
 		if (map->map_type != BPF_MAP_TYPE_CGRP_STORAGE)
+			goto error;
+		break;
+	case BPF_FUNC_mptcp_storage_get:
+	case BPF_FUNC_mptcp_storage_delete:
+		if (map->map_type != BPF_MAP_TYPE_MPTCP_STORAGE)
 			goto error;
 		break;
 	default:

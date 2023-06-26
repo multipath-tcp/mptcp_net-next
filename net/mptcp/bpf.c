@@ -201,6 +201,17 @@ static void bpf_mptcp_storage_unlock(void)
 	migrate_enable();
 }
 
+static bool bpf_mptcp_storage_trylock(void)
+{
+	migrate_disable();
+	if (unlikely(this_cpu_inc_return(bpf_mptcp_storage_busy) != 1)) {
+		this_cpu_dec(bpf_mptcp_storage_busy);
+		migrate_enable();
+		return false;
+	}
+	return true;
+}
+
 static struct bpf_local_storage __rcu **mptcp_storage_ptr(void *owner)
 {
 	struct mptcp_sock *msk = owner;
@@ -305,6 +316,59 @@ static long bpf_mptcp_storage_delete_elem(struct bpf_map *map, void *key)
 	return ret;
 }
 
+/* Called by bpf_mptcp_storage_get*() helpers */
+static void *__bpf_mptcp_storage_get(struct bpf_map *map,
+				     struct mptcp_sock *msk, void *value,
+				     u64 flags, gfp_t gfp_flags, bool nobusy)
+{
+        struct bpf_local_storage_data *sdata;
+
+        sdata = mptcp_storage_lookup(msk, map, nobusy);
+        if (sdata)
+                return sdata->data;
+
+        if ((flags & BPF_LOCAL_STORAGE_GET_F_CREATE) && nobusy) {
+                sdata = bpf_local_storage_update(
+                        msk, (struct bpf_local_storage_map *)map, value,
+                        BPF_NOEXIST, gfp_flags);
+                return IS_ERR(sdata) ? NULL : sdata->data;
+        }
+
+        return NULL;
+}
+
+/* *gfp_flags* is a hidden argument provided by the verifier */
+BPF_CALL_5(bpf_mptcp_storage_get, struct bpf_map *, map, struct mptcp_sock *, msk,
+	   void *, value, u64, flags, gfp_t, gfp_flags)
+{
+	void *data;
+
+	WARN_ON_ONCE(!bpf_rcu_lock_held());
+	if (flags & ~BPF_LOCAL_STORAGE_GET_F_CREATE || !msk)
+		return (unsigned long)NULL;
+
+	bpf_mptcp_storage_lock();
+	data = __bpf_mptcp_storage_get(map, msk, value, flags, gfp_flags, true);
+	bpf_mptcp_storage_unlock();
+	return (unsigned long)data;
+}
+
+BPF_CALL_2(bpf_mptcp_storage_delete, struct bpf_map *, map, struct mptcp_sock *, msk)
+{
+	int ret;
+
+	WARN_ON_ONCE(!bpf_rcu_lock_held());
+	if (!msk)
+		return -EINVAL;
+
+	if (!bpf_mptcp_storage_trylock())
+		return -EBUSY;
+
+	ret = mptcp_storage_delete(msk, map);
+	bpf_mptcp_storage_unlock();
+	return ret;
+}
+
 static int notsupp_get_next_key(struct bpf_map *map, void *key, void *next_key)
 {
 	return -ENOTSUPP;
@@ -333,6 +397,26 @@ const struct bpf_map_ops mptcp_storage_map_ops = {
 	.map_mem_usage = bpf_local_storage_map_mem_usage,
 	.map_btf_id = &bpf_local_storage_map_btf_id[0],
 	.map_owner_storage_ptr = mptcp_storage_ptr,
+};
+
+const struct bpf_func_proto bpf_mptcp_storage_get_proto = {
+	.func = bpf_mptcp_storage_get,
+	.gpl_only = false,
+	.ret_type = RET_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg1_type = ARG_CONST_MAP_PTR,
+	.arg2_type = ARG_PTR_TO_BTF_ID_OR_NULL,
+	.arg2_btf_id = &bpf_mptcp_btf_id[0],
+	.arg3_type = ARG_PTR_TO_MAP_VALUE_OR_NULL,
+	.arg4_type = ARG_ANYTHING,
+};
+
+const struct bpf_func_proto bpf_mptcp_storage_delete_proto = {
+	.func           = bpf_mptcp_storage_delete,
+	.gpl_only       = false,
+	.ret_type       = RET_INTEGER,
+	.arg1_type      = ARG_CONST_MAP_PTR,
+	.arg2_type      = ARG_PTR_TO_BTF_ID_OR_NULL,
+	.arg2_btf_id    = &bpf_mptcp_btf_id[0],
 };
 #endif /* CONFIG_BPF_JIT */
 
