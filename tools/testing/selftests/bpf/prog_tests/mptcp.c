@@ -406,7 +406,7 @@ static void test_bkup(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd);
+	send_data(server_fd, client_fd, "bpf_bkup");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
 	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
 
