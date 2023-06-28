@@ -2427,7 +2427,7 @@ int __unix_dgram_recvmsg(struct sock *sk, struct msghdr *msg, size_t size,
 	}
 	err = (flags & MSG_TRUNC) ? skb->len - skip : size;
 
-	scm_recv(sock, msg, &scm, flags);
+	scm_recv_unix(sock, msg, &scm, flags);
 
 out_free:
 	skb_free_datagram(sk, skb);
@@ -2807,8 +2807,8 @@ unlock:
 	} while (size);
 
 	mutex_unlock(&u->iolock);
-	if (state->msg && check_creds)
-		scm_recv(sock, state->msg, &scm, flags);
+	if (state->msg)
+		scm_recv_unix(sock, state->msg, &scm, flags);
 	else
 		scm_destroy(&scm);
 out:
