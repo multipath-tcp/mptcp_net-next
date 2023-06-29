@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/sysctl-fix-unused-proc_cap_handler-function-warning
+From: Arnd Bergmann <arnd@arndb.de>
+Subject: [PATCH] sysctl: fix unused proc_cap_handler() function warning
 
+Since usermodehelper_table() is marked static now, we get a
+warning about it being unused when SYSCTL is disabled:
+
+kernel/umh.c:497:12: error: 'proc_cap_handler' defined but not used [-Werror=unused-function]
+
+Just move it inside of the same #ifdef.
+
+Fixes: 861dc0b46432 ("sysctl: move umh sysctl registration to its own file")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Randy Dunlap <rdunlap@infradead.org>
+Tested-by: Randy Dunlap <rdunlap@infradead.org> # build-tested
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
