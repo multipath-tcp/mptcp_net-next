@@ -1,9 +1,0 @@
-From: Yueh-Shun Li <shamrocklee@posteo.net>
-Subject: [PATCH] selftests: mptcp: connect: fix comment typo
-
-Spell "transmissions" properly.
-
-Found by searching for keyword "tranm".
-
-Signed-off-by: Yueh-Shun Li <shamrocklee@posteo.net>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
