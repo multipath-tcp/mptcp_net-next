@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: add pm_nl_set_endpoint helper
-
-This patch moves endpoint settings out of do_transfer() into a new
-helper pm_nl_set_endpoint(). And invoke this helper in do_transfer().
-This makes the code much more clearer.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
