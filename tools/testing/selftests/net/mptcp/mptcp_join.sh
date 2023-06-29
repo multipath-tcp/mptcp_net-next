@@ -101,6 +101,10 @@ init_partial()
 	check_invert=0
 	validate_checksum=$checksum
 	FAILING_LINKS=""
+	test_linkfail=0
+	addr_nr_ns1=0
+	addr_nr_ns2=0
+	sflags=""
 
 	#  ns1         ns2
 	# ns1eth1    ns2eth1
