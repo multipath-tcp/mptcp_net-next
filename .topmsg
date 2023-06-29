@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-do-not-rely-on-implicit-state-check-in-mptcp_listen
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not rely on implicit state check in mptcp_listen()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the blamed commit, closing the first subflow resets the first
+subflow socket state to SS_UNCONNECTED.
+
+The current mptcp listen implementation relies only on such
+state to prevent touching not-fully-disconnected sockets.
+
+Incoming mptcp fastclose (or paired endpoint removal) unconditionally
+closes the first subflow.
+
+All the above allows an incoming fastclose followed by a listen() call
+to successfully race with a blocking recvmsg(), potentially causing the
+latter to hit a divide by zero bug in cleanup_rbuf/__tcp_select_window().
+
+Address the issue explicitly checking the msk socket state in
+mptcp_listen(). An alternative solution would be moving the first
+subflow socket state update into mptcp_disconnect(), but in the long
+term the first subflow socket should be removed: better avoid relaying
+on it for internal consistency check.
+
+Fixes: b29fcfb54cd7 ("mptcp: full disconnect implementation")
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/414
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
