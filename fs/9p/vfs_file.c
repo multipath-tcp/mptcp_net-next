@@ -395,11 +395,13 @@ static ssize_t v9fs_file_splice_read(struct file *in, loff_t *ppos,
 				     size_t len, unsigned int flags)
 {
 	struct p9_fid *fid = in->private_data;
+	struct inode *inode = file_inode(in);
+	struct v9fs_session_info *v9ses = v9fs_inode2v9ses(inode);
 
 	p9_debug(P9_DEBUG_VFS, "fid %d count %zu offset %lld\n",
 		 fid->fid, len, *ppos);
 
-	if (fid->mode & P9L_DIRECT)
+	if (v9ses->cache > CACHE_MMAP)
 		return copy_splice_read(in, ppos, pipe, len, flags);
 	return filemap_splice_read(in, ppos, pipe, len, flags);
 }
