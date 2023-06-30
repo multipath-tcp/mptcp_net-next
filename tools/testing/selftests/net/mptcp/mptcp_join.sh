@@ -49,13 +49,14 @@ TEST_COUNT=0
 TEST_NAME=""
 nr_blank=40
 
-FAILING_LINKS=""
-test_linkfail=0
-addr_nr_ns1=0
-addr_nr_ns2=0
-sflags=""
-fastclose=""
-fullmesh=""
+# These var are used only in some tests, make sure they are not already set
+unset FAILING_LINKS
+unset test_linkfail
+unset addr_nr_ns1
+unset addr_nr_ns2
+unset sflags
+unset fastclose
+unset fullmesh
 
 # generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
 #				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
