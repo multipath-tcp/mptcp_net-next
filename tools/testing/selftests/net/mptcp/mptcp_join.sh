@@ -55,6 +55,7 @@ addr_nr_ns1=0
 addr_nr_ns2=0
 sflags=""
 fastclose=""
+fullmesh=""
 
 # generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
 #				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
@@ -831,11 +832,12 @@ pm_nl_set_endpoint()
 	local addr_nr_ns1=${addr_nr_ns1:-0}
 	local addr_nr_ns2=${addr_nr_ns2:-0}
 	local sflags=${sflags:-""}
+	local fullmesh=${fullmesh:-""}
 
 	local flags="subflow"
-	if [[ "${addr_nr_ns2}" = "fullmesh_"* ]]; then
+	if [ -n "${fullmesh}" ]; then
 		flags="${flags},fullmesh"
-		addr_nr_ns2=${addr_nr_ns2:9}
+		addr_nr_ns2=${fullmesh}
 	fi
 
 	# let the mptcp subflow be established in background before
@@ -2688,7 +2690,7 @@ mixed_tests()
 		pm_nl_set_limits $ns2 2 4
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		pm_nl_add_endpoint $ns1 dead:beef:2::1 flags signal
-		addr_nr_ns2=fullmesh_1 \
+		fullmesh=1 \
 			run_tests $ns1 $ns2 dead:beef:1::1 slow
 		chk_join_nr 4 4 4
 	fi
@@ -3101,7 +3103,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns1 1 3
 		pm_nl_set_limits $ns2 1 3
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		addr_nr_ns2=fullmesh_1 \
+		fullmesh=1 \
 			run_tests $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 3 3 3
 		chk_add_nr 1 1
@@ -3114,7 +3116,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns1 2 5
 		pm_nl_set_limits $ns2 1 5
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		addr_nr_ns2=fullmesh_2 \
+		fullmesh=2 \
 			run_tests $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 5 5 5
 		chk_add_nr 1 1
@@ -3128,7 +3130,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns1 2 4
 		pm_nl_set_limits $ns2 1 4
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		addr_nr_ns2=fullmesh_2 \
+		fullmesh=2 \
 			run_tests $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 4 4 4
 		chk_add_nr 1 1
@@ -3152,7 +3154,7 @@ fullmesh_tests()
 		pm_nl_set_limits $ns1 4 4
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags subflow,fullmesh
 		pm_nl_set_limits $ns2 4 4
-		addr_nr_ns2=fullmesh_1 sflags=nofullmesh \
+		fullmesh=1 sflags=nofullmesh \
 			run_tests $ns1 $ns2 10.0.1.1 slow
 		chk_join_nr 2 2 2
 		chk_rm_nr 0 1
