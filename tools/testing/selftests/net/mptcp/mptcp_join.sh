@@ -49,11 +49,11 @@ TEST_COUNT=0
 TEST_NAME=""
 nr_blank=40
 
-export FAILING_LINKS=""
-export test_linkfail=0
-export addr_nr_ns1=0
-export addr_nr_ns2=0
-export sflags=""
+FAILING_LINKS=""
+test_linkfail=0
+addr_nr_ns1=0
+addr_nr_ns2=0
+sflags=""
 
 # generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
 #				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
@@ -100,7 +100,6 @@ init_partial()
 	stats_dumped=0
 	check_invert=0
 	validate_checksum=$checksum
-	FAILING_LINKS=""
 
 	#  ns1         ns2
 	# ns1eth1    ns2eth1
@@ -828,6 +827,10 @@ pm_nl_set_endpoint()
 	local connector_ns="$2"
 	local connect_addr="$3"
 
+	local addr_nr_ns1=${addr_nr_ns1:-0}
+	local addr_nr_ns2=${addr_nr_ns2:-0}
+	local sflags=${sflags:-""}
+
 	# let the mptcp subflow be established in background before
 	# do endpoint manipulation
 	if [ $addr_nr_ns1 != "0" ] || [ $addr_nr_ns2 != "0" ]; then
@@ -979,6 +982,7 @@ do_transfer()
 
 	local port=$((10000 + TEST_COUNT - 1))
 	local cappid
+	local FAILING_LINKS=${FAILING_LINKS:-""}
 
 	:> "$cout"
 	:> "$sout"
@@ -1158,6 +1162,7 @@ run_tests()
 	local speed="${4:-fast}"
 
 	local size
+	local test_linkfail=${test_linkfail:-0}
 
 	# The values above 2 are reused to make test files
 	# with the given sizes (KB)
