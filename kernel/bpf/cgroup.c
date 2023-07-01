@@ -2542,6 +2542,8 @@ cgroup_common_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		default:
 			return &bpf_set_retval_proto;
 		}
+	case BPF_FUNC_mptcpify:
+		return &bpf_mptcpify_proto;
 	default:
 		return NULL;
 	}
