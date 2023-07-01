@@ -38,6 +38,7 @@ struct sock {
 #define sk_state		__sk_common.skc_state
 	unsigned long		sk_pacing_rate;
 	__u32			sk_pacing_status; /* see enum sk_pacing */
+	__u16			sk_protocol;
 } __attribute__((preserve_access_index));
 
 struct inet_sock {
