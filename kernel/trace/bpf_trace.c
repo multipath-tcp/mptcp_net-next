@@ -1886,6 +1886,27 @@ static const struct bpf_func_proto bpf_get_stack_proto_raw_tp = {
 	.arg4_type	= ARG_ANYTHING,
 };
 
+BPF_CALL_1(bpf_mptcpify, struct socket_args *, args)
+{
+	if (args->family == AF_INET &&
+	    args->type == SOCK_STREAM &&
+	    (!args->protocol || args->protocol == IPPROTO_TCP))
+		args->protocol = IPPROTO_MPTCP;
+
+	return 0;
+}
+
+BTF_ID_LIST(bpf_mptcpify_btf_ids)
+BTF_ID(struct, socket_args)
+
+static const struct bpf_func_proto bpf_mptcpify_proto = {
+	.func		= bpf_mptcpify,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_BTF_ID,
+	.arg1_btf_id	= &bpf_mptcpify_btf_ids[0],
+};
+
 static const struct bpf_func_proto *
 raw_tp_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
@@ -1936,6 +1957,8 @@ tracing_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_get_socket_ptr_cookie_proto;
 	case BPF_FUNC_xdp_get_buff_len:
 		return &bpf_xdp_get_buff_len_trace_proto;
+	case BPF_FUNC_mptcpify:
+		return &bpf_mptcpify_proto;
 #endif
 	case BPF_FUNC_seq_printf:
 		return prog->expected_attach_type == BPF_TRACE_ITER ?
