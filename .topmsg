@@ -1,4 +1,10 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-reduce-dup-code-around-printf
+Subject: [PATCH] selftests: mptcp: userspace_pm: reduce dup code around printf
+
+In this selftest, "printf" is always used with "stdbuf".
+
+With a new helper, it is possible to call "stdbuf" only from one place.
+This makes the code a bit clearer to read.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
