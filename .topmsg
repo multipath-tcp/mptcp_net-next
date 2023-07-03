@@ -1,4 +1,20 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-uniform-results-printing
+Subject: [PATCH] selftests: mptcp: userspace_pm: uniform results printing
+
+There are a few reasons to do that:
+
+- When the tabs are not printed as 8 spaces, some results were not
+  properly aligned
+
+- Some lines printing the test name were very long due to the use of a
+  lot of spaces/tabs at the end and stdbuf at the beginning.
+
+- To reduce duplicated code, e.g. to print what has failed and set the
+  status
+
+But by centralising how the test results are printed, this also prepares
+future commits to avoid more duplicated code and ease the tracking of
+the different subtests.
 
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
