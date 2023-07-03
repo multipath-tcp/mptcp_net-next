@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-connect-fail-if-nft-supposed-to-work
+Subject: [PATCH] selftests: mptcp: connect: fail if nft supposed to work
 
+In case of "external" errors when preparing the environment for the
+TProxy tests, the subtests were marked as skipped.
+
+This is fine but it means these errors are ignored. On MPTCP Public CI,
+we do want to catch such issues and mark the selftest as failed if there
+are such issues. We can then use mptcp_lib_fail_if_expected_feature()
+helper that has been recently added to fail if needed.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 5fb62e9cd3ad ("selftests: mptcp: add tproxy test case")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
