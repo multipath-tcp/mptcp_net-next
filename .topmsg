@@ -1,4 +1,16 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-sockopt-return-error-if-wrong-mark
+Subject: [PATCH] selftests: mptcp: sockopt: return error if wrong mark
 
+When an error was detected when checking the marks, a message was
+correctly printed mentioning the error but followed by another one
+saying everything was OK and the selftest was not marked as failed as
+expected.
+
+Now the 'ret' variable is directly set to 1 in order to make sure the
+exit is done with an error, similar to what is done in other functions.
+While at it, the error is correctly propagated to the caller.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: dc65fe82fb07 ("selftests: mptcp: add packet mark test case")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
