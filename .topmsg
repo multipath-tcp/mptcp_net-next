@@ -1,4 +1,13 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-report-errors-with-remove-tests
+Subject: [PATCH] selftests: mptcp: userspace_pm: report errors with 'remove' tests
 
+A message was mentioning an issue with the "remove" tests but the
+selftest was not marked as failed.
+
+Directly exit with an error like it is done everywhere else in this
+selftest.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
+Fixes: 259a834fadda ("selftests: mptcp: functional tests for the userspace PM type")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
