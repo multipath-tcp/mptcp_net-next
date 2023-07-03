@@ -1,4 +1,25 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-connect-format-subtests-results-in-TAP
+Subject: [PATCH] selftests: mptcp: connect: format subtests results in TAP
 
+The current selftests infrastructure formats the results in TAP 13. This
+version doesn't support subtests and only the end result of each
+selftest is taken into account. It means that a single issue in a
+subtest of a selftest containing multiple subtests forces the whole
+selftest to be marked as failed. It also means that subtests results are
+not tracked by CIs executing selftests.
+
+MPTCP selftests run hundreds of various subtests. It is then important
+to track each of them and not one result per selftest.
+
+It is particularly interesting to do that when validating stable kernels
+with the last version of the test suite: tests might fail because a
+feature is not supported but the test didn't skip that part. In this
+case, if subtests are not tracked, the whole selftest will be marked as
+failed making the other subtests useless because their results are
+ignored.
+
+This patch formats subtests results in TAP in mptcp_connect.sh selftest.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/368
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
