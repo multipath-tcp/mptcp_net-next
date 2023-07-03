@@ -84,6 +84,12 @@ enum sock_type {
 
 #endif /* ARCH_HAS_SOCKET_TYPES */
 
+struct socket_args {
+	int	family;
+	int	type;
+	int	protocol;
+};
+
 /**
  * enum sock_shutdown_cmd - Shutdown types
  * @SHUT_RD: shutdown receptions

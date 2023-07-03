@@ -1588,6 +1588,12 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 }
 EXPORT_SYMBOL(sock_create);
 
+int socket_create(struct socket_args *args, struct socket **res)
+{
+	return sock_create(args->family, args->type, args->protocol, res);
+}
+EXPORT_SYMBOL(socket_create);
+
 /**
  *	sock_create_kern - creates a socket (kernel space)
  *	@net: net namespace
@@ -1608,6 +1614,7 @@ EXPORT_SYMBOL(sock_create_kern);
 
 static struct socket *__sys_socket_create(int family, int type, int protocol)
 {
+	struct socket_args args = { 0 };
 	struct socket *sock;
 	int retval;
 
@@ -1621,7 +1628,10 @@ static struct socket *__sys_socket_create(int family, int type, int protocol)
 		return ERR_PTR(-EINVAL);
 	type &= SOCK_TYPE_MASK;
 
-	retval = sock_create(family, type, protocol, &sock);
+	args.family = family;
+	args.type = type;
+	args.protocol = protocol;
+	retval = socket_create(&args, &sock);
 	if (retval < 0)
 		return ERR_PTR(retval);
 
