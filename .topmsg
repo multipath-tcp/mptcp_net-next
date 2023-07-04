@@ -1,4 +1,17 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-depend-on-SYN_COOKIES
+Subject: [PATCH] selftests: mptcp: depend on SYN_COOKIES
 
+MPTCP selftests are using TCP SYN Cookies for quite a while now, since
+v5.9.
+
+Some CIs don't have this config option enabled and this is causing
+issues in the tests:
+
+  # ns1 MPTCP -> ns1 (10.0.1.1:10000      ) MPTCP     (duration   167ms) sysctl: cannot stat /proc/sys/net/ipv4/tcp_syncookies: No such file or directory
+  # [ OK ]./mptcp_connect.sh: line 554: [: -eq: unary operator expected
+
+There is no impact in the results but the test is not doing what it is
+supposed to do.
+
+Fixes: fed61c4b584c ("selftests: mptcp: make 2nd net namespace use tcp syn cookies unconditionally")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
