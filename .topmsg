@@ -1,4 +1,25 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-pm_nl_ctl-fix-32-bit-support
+Subject: [PATCH] selftests: mptcp: pm_nl_ctl: fix 32-bit support
 
+When using pm_nl_ctl to validate userspace path-manager's behaviours, it
+was failing on 32-bit architectures ~half of the time.
+
+pm_nl_ctl was not reporting any error but the command was not doing what
+it was expected to do. As a result, the expected linked event was not
+triggered after and the test failed.
+
+This is due to the fact the token given in argument to the application
+was parsed as an integer with atoi(): in a 32-bit arch, if the number
+was bigger than INT_MAX, 2147483647 was used instead.
+
+This can simply be fixed by using strtoul() instead of atoi().
+
+The errors have been seen "by chance" when manually looking at the
+results from LKFT.
+
+Fixes: 9a0b36509df0 ("selftests: mptcp: support MPTCP_PM_CMD_ANNOUNCE")
+Fixes: ecd2a77d672f ("selftests: mptcp: support MPTCP_PM_CMD_REMOVE")
+Fixes: cf8d0a6dfd64 ("selftests: mptcp: support MPTCP_PM_CMD_SUBFLOW_CREATE")
+Fixes: 57cc361b8d38 ("selftests: mptcp: support MPTCP_PM_CMD_SUBFLOW_DESTROY")
+Fixes: ca188a25d43f ("selftests: mptcp: userspace PM support for MP_PRIO signals")
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
