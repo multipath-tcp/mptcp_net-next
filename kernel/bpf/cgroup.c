@@ -1996,6 +1996,30 @@ int __cgroup_bpf_run_filter_getsockopt_kern(struct sock *sk, int level,
 
 	return ret;
 }
+
+int __cgroup_bpf_run_sockinit(int *family, int *type, int *protocol,
+			      enum cgroup_bpf_attach_type atype)
+{
+	struct bpf_sockinit_ctx ctx = {
+		.family		= *family,
+		.type		= *type,
+		.protocol	= *protocol,
+	};
+	struct cgroup *cgrp;
+	int ret;
+
+	rcu_read_lock();
+	cgrp = task_dfl_cgroup(current);
+	ret = bpf_prog_run_array_cg(&cgrp->bpf, atype, &ctx, bpf_prog_run, 0,
+				    NULL);
+	rcu_read_unlock();
+
+	*family		= ctx.family;
+	*type		= ctx.type;
+	*protocol	= ctx.protocol;
+
+	return ret;
+}
 #endif
 
 static ssize_t sysctl_cpy_dir(const struct ctl_dir *dir, char **bufp,
