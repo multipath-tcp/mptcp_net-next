@@ -7,25 +7,25 @@
 char _license[] SEC("license") = "GPL";
 
 SEC("struct_ops/mptcp_sched_first_init")
-void BPF_PROG(mptcp_sched_first_init, const struct mptcp_sock *msk)
+void BPF_PROG(mptcp_sched_first_init, struct mptcp_sock *msk)
 {
 }
 
 SEC("struct_ops/mptcp_sched_first_release")
-void BPF_PROG(mptcp_sched_first_release, const struct mptcp_sock *msk)
+void BPF_PROG(mptcp_sched_first_release, struct mptcp_sock *msk)
 {
 }
 
-void BPF_STRUCT_OPS(bpf_first_data_init, const struct mptcp_sock *msk,
+void BPF_STRUCT_OPS(bpf_first_data_init, struct mptcp_sock *msk,
 		    struct mptcp_sched_data *data)
 {
 	mptcp_sched_data_set_contexts(msk, data);
 }
 
-int BPF_STRUCT_OPS(bpf_first_get_subflow, const struct mptcp_sock *msk,
-		   struct mptcp_sched_data *data)
+int BPF_STRUCT_OPS(bpf_first_get_subflow, struct mptcp_sock *msk,
+		   const struct mptcp_sched_data *data)
 {
-	mptcp_subflow_set_scheduled(data->contexts[0], true);
+	mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(data, 0), true);
 	return 0;
 }
 
