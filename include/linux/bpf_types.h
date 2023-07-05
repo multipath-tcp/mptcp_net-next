@@ -52,6 +52,8 @@ BPF_PROG_TYPE(BPF_PROG_TYPE_TRACING, tracing,
 #ifdef CONFIG_CGROUP_BPF
 BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_DEVICE, cg_dev,
 	      struct bpf_cgroup_dev_ctx, struct bpf_cgroup_dev_ctx)
+BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_SOCKINIT, cg_sockinit,
+	      struct bpf_sockinit_ctx, struct bpf_sockinit_ctx)
 BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_SYSCTL, cg_sysctl,
 	      struct bpf_sysctl, struct bpf_sysctl_kern)
 BPF_PROG_TYPE(BPF_PROG_TYPE_CGROUP_SOCKOPT, cg_sockopt,
