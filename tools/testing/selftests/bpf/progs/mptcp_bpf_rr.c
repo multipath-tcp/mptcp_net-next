@@ -9,7 +9,6 @@ char _license[] SEC("license") = "GPL";
 struct mptcp_rr_storage {
 	struct sock *last_snd;
 };
-struct sock *last_snd;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_SK_STORAGE);
@@ -40,7 +39,15 @@ int BPF_STRUCT_OPS(bpf_rr_get_subflow, struct mptcp_sock *msk,
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_rr_storage *ptr;
+	struct sock *last_snd = NULL;
 	int nr = 0;
+
+	ptr = bpf_sk_storage_get(&mptcp_rr_map, msk, 0,
+				 BPF_LOCAL_STORAGE_GET_F_CREATE);
+	if (!ptr)
+		return -1;
+
+	last_snd = ptr->last_snd;
 
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
 		subflow = mptcp_subflow_ctx_by_pos(data, i);
@@ -60,11 +67,7 @@ int BPF_STRUCT_OPS(bpf_rr_get_subflow, struct mptcp_sock *msk,
 	if (!subflow)
 		return -1;
 	mptcp_subflow_set_scheduled(subflow, true);
-	last_snd = mptcp_subflow_tcp_sock(subflow);
-	ptr = bpf_sk_storage_get(&mptcp_rr_map, msk, 0,
-				 BPF_LOCAL_STORAGE_GET_F_CREATE);
-	if (ptr)
-		ptr->last_snd = last_snd;
+	ptr->last_snd = mptcp_subflow_tcp_sock(subflow);
 	return 0;
 }
 
