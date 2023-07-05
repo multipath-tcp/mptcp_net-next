@@ -240,26 +240,25 @@ struct mptcp_subflow_context {
 
 struct mptcp_sched_data {
 	bool	reinject;
-	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
+	__u8	subflows;
 } __attribute__((preserve_access_index));
 
 struct mptcp_sched_ops {
 	char name[MPTCP_SCHED_NAME_MAX];
 
-	void (*init)(const struct mptcp_sock *msk);
-	void (*release)(const struct mptcp_sock *msk);
+	void (*init)(struct mptcp_sock *msk);
+	void (*release)(struct mptcp_sock *msk);
 
-	void (*data_init)(const struct mptcp_sock *msk,
+	void (*data_init)(struct mptcp_sock *msk,
 			  struct mptcp_sched_data *data);
-	int (*get_subflow)(const struct mptcp_sock *msk,
-			   struct mptcp_sched_data *data);
+	int (*get_subflow)(struct mptcp_sock *msk,
+			   const struct mptcp_sched_data *data);
 	void *owner;
 };
 
 struct mptcp_sock {
 	struct inet_connection_sock	sk;
 
-	struct sock	*last_snd;
 	__u32		token;
 	struct sock	*first;
 	char		ca_name[TCP_CA_NAME_MAX];
@@ -269,5 +268,12 @@ extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
 extern void mptcp_sched_data_set_contexts(const struct mptcp_sock *msk,
 					  struct mptcp_sched_data *data) __ksym;
+extern struct mptcp_subflow_context *
+mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos) __ksym;
+static inline struct sock *
+mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
+{
+	return subflow->tcp_sock;
+}
 
 #endif
