@@ -127,6 +127,7 @@ config ARM
 	select HAVE_VIRT_CPU_ACCOUNTING_GEN
 	select HOTPLUG_CORE_SYNC_DEAD if HOTPLUG_CPU
 	select IRQ_FORCED_THREADING
+	select LOCK_MM_AND_FIND_VMA
 	select MODULES_USE_ELF_REL
 	select NEED_DMA_MAP_STATE
 	select OF_EARLY_FLATTREE if OF
@@ -1461,6 +1462,9 @@ config USE_OF
 	select OF
 	help
 	  Include support for flattened device tree machine descriptions.
+
+config ARCH_WANT_FLAT_DTB_INSTALL
+	def_bool y
 
 config ATAGS
 	bool "Support for the traditional ATAGS boot data passing"
