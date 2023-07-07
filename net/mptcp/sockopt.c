@@ -393,6 +393,7 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case IP_FREEBIND:
 		case IP_TRANSPARENT:
 		case IP_TOS:
+		case IP_TTL:
 
 		/* the following are control cmsg related */
 		case IP_PKTINFO:
@@ -406,7 +407,6 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case IP_RECVFRAGSIZE:
 
 		/* common stuff that need some love */
-		case IP_TTL:
 		case IP_BIND_ADDRESS_NO_PORT:
 		case IP_MTU_DISCOVER:
 		case IP_RECVERR:
@@ -438,6 +438,7 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case IPV6_V6ONLY:
 		case IPV6_TRANSPARENT:
 		case IPV6_FREEBIND:
+		case IPV6_UNICAST_HOPS:
 
 		/* the following are control cmsg related */
 		case IPV6_RECVPKTINFO:
@@ -460,7 +461,6 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case IPV6_TCLASS:
 		case IPV6_PKTINFO:
 		case IPV6_2292PKTOPTIONS:
-		case IPV6_UNICAST_HOPS:
 		case IPV6_MTU_DISCOVER:
 		case IPV6_MTU:
 		case IPV6_RECVERR:
@@ -734,6 +734,7 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_FREEBIND:
 	case IP_TRANSPARENT:
 	case IP_TOS:
+	case IP_TTL:
 		return mptcp_setsockopt_all_sf(msk, SOL_IP, optname, optval, optlen);
 	}
 
@@ -747,6 +748,7 @@ static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_V6ONLY:
 	case IPV6_TRANSPARENT:
 	case IPV6_FREEBIND:
+	case IPV6_UNICAST_HOPS:
 		return mptcp_setsockopt_all_sf(msk, SOL_IPV6, optname, optval, optlen);
 	}
 
@@ -1322,6 +1324,7 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_FREEBIND:
 	case IP_TRANSPARENT:
 	case IP_TOS:
+	case IP_TTL:
 		return mptcp_getsockopt_msk(msk, SOL_IP, optname, optval, optlen);
 	}
 
@@ -1335,6 +1338,7 @@ static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_V6ONLY:
 	case IPV6_TRANSPARENT:
 	case IPV6_FREEBIND:
+	case IPV6_UNICAST_HOPS:
 		return mptcp_getsockopt_msk(msk, SOL_IPV6, optname, optval, optlen);
 	}
 
@@ -1436,6 +1440,10 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 
 	inet_sk(ssk)->transparent = inet_sk(sk)->transparent;
 	inet_sk(ssk)->freebind = inet_sk(sk)->freebind;
+	inet_sk(ssk)->uc_ttl = inet_sk(sk)->uc_ttl;
+
+	if (ssk->sk_family == AF_INET6)
+		inet6_sk(ssk)->hop_limit = inet6_sk(sk)->hop_limit;
 }
 
 static void __mptcp_sockopt_sync(struct mptcp_sock *msk, struct sock *ssk)
