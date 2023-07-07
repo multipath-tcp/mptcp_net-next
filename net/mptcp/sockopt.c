@@ -1367,8 +1367,23 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 			       char __user *optval, int __user *optlen)
 {
 	switch (optname) {
+	case IP_FREEBIND:
+	case IP_TRANSPARENT:
 	case IP_TOS:
 		return mptcp_getsockopt_msk(msk, SOL_IP, optname, optval, optlen);
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
+			       char __user *optval, int __user *optlen)
+{
+	switch (optname) {
+	case IPV6_V6ONLY:
+	case IPV6_TRANSPARENT:
+	case IPV6_FREEBIND:
+		return mptcp_getsockopt_msk(msk, SOL_IPV6, optname, optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
@@ -1413,6 +1428,8 @@ int mptcp_getsockopt(struct sock *sk, int level, int optname,
 
 	if (level == SOL_IP)
 		return mptcp_getsockopt_v4(msk, optname, optval, option);
+	if (level == SOL_IPV6)
+		return mptcp_getsockopt_v6(msk, optname, optval, option);
 	if (level == SOL_TCP)
 		return mptcp_getsockopt_sol_tcp(msk, optname, optval, option);
 	if (level == SOL_MPTCP)
