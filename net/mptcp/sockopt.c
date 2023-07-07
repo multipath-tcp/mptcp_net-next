@@ -577,6 +577,25 @@ static bool mptcp_supported_sockopt(int level, int optname)
 	return false;
 }
 
+static int mptcp_setsockopt_sol_tcp_inq(struct mptcp_sock *msk, sockptr_t optval,
+					unsigned int optlen)
+{
+	struct sock *sk = (struct sock *)msk;
+	int ret, val;
+
+	ret = mptcp_get_int_option(msk, optval, optlen, &val);
+	if (ret)
+		return ret;
+	if (val < 0 || val > 1)
+		return -EINVAL;
+
+	lock_sock(sk);
+	msk->recvmsg_inq = !!val;
+	release_sock(sk);
+
+	return 0;
+}
+
 static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t optval,
 					       unsigned int optlen)
 {
@@ -784,21 +803,9 @@ unlock:
 static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 				    sockptr_t optval, unsigned int optlen)
 {
-	struct sock *sk = (void *)msk;
-	int ret, val;
-
 	switch (optname) {
 	case TCP_INQ:
-		ret = mptcp_get_int_option(msk, optval, optlen, &val);
-		if (ret)
-			return ret;
-		if (val < 0 || val > 1)
-			return -EINVAL;
-
-		lock_sock(sk);
-		msk->recvmsg_inq = !!val;
-		release_sock(sk);
-		return 0;
+		return mptcp_setsockopt_sol_tcp_inq(msk, optval, optlen);
 	case TCP_ULP:
 		return -EOPNOTSUPP;
 	case TCP_CONGESTION:
