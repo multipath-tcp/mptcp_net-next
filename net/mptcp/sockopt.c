@@ -437,6 +437,7 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		/* should work fine */
 		case IP_FREEBIND:
 		case IP_TRANSPARENT:
+		case IP_TOS:
 
 		/* the following are control cmsg related */
 		case IP_PKTINFO:
@@ -450,7 +451,6 @@ static bool mptcp_supported_sockopt(int level, int optname)
 		case IP_RECVFRAGSIZE:
 
 		/* common stuff that need some love */
-		case IP_TOS:
 		case IP_TTL:
 		case IP_BIND_ADDRESS_NO_PORT:
 		case IP_MTU_DISCOVER:
@@ -479,7 +479,10 @@ static bool mptcp_supported_sockopt(int level, int optname)
 	}
 	if (level == SOL_IPV6) {
 		switch (optname) {
+		/* should work fine */
 		case IPV6_V6ONLY:
+		case IPV6_TRANSPARENT:
+		case IPV6_FREEBIND:
 
 		/* the following are control cmsg related */
 		case IPV6_RECVPKTINFO:
@@ -500,8 +503,6 @@ static bool mptcp_supported_sockopt(int level, int optname)
 
 		/* the following ones need some love but are quite common */
 		case IPV6_TCLASS:
-		case IPV6_TRANSPARENT:
-		case IPV6_FREEBIND:
 		case IPV6_PKTINFO:
 		case IPV6_2292PKTOPTIONS:
 		case IPV6_UNICAST_HOPS:
