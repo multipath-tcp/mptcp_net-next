@@ -3220,17 +3220,12 @@ static struct sock *mptcp_accept(struct sock *sk, int flags, int *err,
 				 bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct socket *listener;
-	struct sock *newsk;
+	struct sock *ssk, *newsk;
 
-	listener = READ_ONCE(msk->subflow);
-	if (WARN_ON_ONCE(!listener)) {
-		*err = -EINVAL;
-		return NULL;
-	}
+	ssk = READ_ONCE(msk->first);
 
-	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(listener->sk));
-	newsk = inet_csk_accept(listener->sk, flags, err, kern);
+	pr_debug("msk=%p, listener=%p", msk, mptcp_subflow_ctx(ssk));
+	newsk = inet_csk_accept(ssk, flags, err, kern);
 	if (!newsk)
 		return NULL;
 
@@ -3801,7 +3796,6 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 			       int flags, bool kern)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
-	struct socket *ssock;
 	struct sock *newsk;
 	int err;
 
@@ -3810,8 +3804,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 	/* Buggy applications can call accept on socket states other then LISTEN
 	 * but no need to allocate the first subflow just to error out.
 	 */
-	ssock = READ_ONCE(msk->subflow);
-	if (!ssock)
+	if (!READ_ONCE(msk->first))
 		return -EINVAL;
 
 	newsk = mptcp_accept(sock->sk, flags, &err, kern);
