@@ -1,5 +1,5 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] selftests: mptcp: join: only check for ip6tables if needed (net)
+Subject: [PATCH] selftests: mptcp: join: only check for ip6tables if needed
 
 If 'iptables-legacy' is available, 'ip6tables-legacy' command will be
 used instead of 'ip6tables'. So no need to look if 'ip6tables' is
