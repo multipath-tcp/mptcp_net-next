@@ -3,6 +3,7 @@
 /* Copyright (c) 2022, SUSE. */
 
 #include <test_progs.h>
+#include <time.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
 #include "mptcp_sock.skel.h"
@@ -247,15 +248,19 @@ done:
 	return NULL;
 }
 
-static void send_data(int lfd, int fd)
+static void send_data(int lfd, int fd, char *msg)
 {
 	ssize_t nr_recv = 0, bytes = 0;
+	struct timespec start, end;
+	unsigned int delta_ms;
 	pthread_t srv_thread;
 	void *thread_ret;
 	char batch[1500];
 	int err;
 
 	WRITE_ONCE(stop, 0);
+	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+		return;
 
 	err = pthread_create(&srv_thread, NULL, server, (void *)(long)lfd);
 	if (CHECK(err != 0, "pthread_create", "err:%d errno:%d\n", err, errno))
@@ -272,8 +277,15 @@ static void send_data(int lfd, int fd)
 		bytes += nr_recv;
 	}
 
+	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
+		return;
+
+	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
+
 	CHECK(bytes != total_bytes, "recv", "%zd != %u nr_recv:%zd errno:%d\n",
 	      bytes, total_bytes, nr_recv, errno);
+
+	printf("%s: %u ms\n", msg, delta_ms);
 
 	WRITE_ONCE(stop, 1);
 
@@ -315,6 +327,27 @@ static int has_bytes_sent(char *addr)
 	return system(cmd);
 }
 
+static void test_default(void)
+{
+	int server_fd, client_fd;
+	struct nstoken *nstoken;
+
+	nstoken = sched_init("subflow", "default");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
+		goto fail;
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	client_fd = connect_to_fd(server_fd, 0);
+
+	send_data(server_fd, client_fd, "default");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
+	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr_2");
+
+	close(client_fd);
+	close(server_fd);
+fail:
+	cleanup_netns(nstoken);
+}
+
 static void test_first(void)
 {
 	struct mptcp_bpf_first *first_skel;
@@ -338,7 +371,7 @@ static void test_first(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd);
+	send_data(server_fd, client_fd, "bpf_first");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
 	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
 
@@ -373,7 +406,7 @@ static void test_bkup(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd);
+	send_data(server_fd, client_fd, "bpf_bkup");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
 	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
 
@@ -408,7 +441,7 @@ static void test_rr(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd);
+	send_data(server_fd, client_fd, "bpf_rr");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr 1");
 	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr 2");
 
@@ -443,7 +476,7 @@ static void test_red(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd);
+	send_data(server_fd, client_fd, "bpf_red");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr 1");
 	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr 2");
 
@@ -459,6 +492,8 @@ void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
 		test_base();
+	if (test__start_subtest("default"))
+		test_default();
 	if (test__start_subtest("first"))
 		test_first();
 	if (test__start_subtest("bkup"))
