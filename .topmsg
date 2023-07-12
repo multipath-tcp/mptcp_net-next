@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-join-colored-results
+Subject: [PATCH] selftests: mptcp: join: colored results
 
+Thanks to the parent commit, it is easy to change the output and add
+some colours to easily spot issues.
+
+The colours are not used if stdout is redirected or if NO_COLOR env var
+is set to 1 as specified in https://no-color.org.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
