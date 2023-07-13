@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-more-accurate-NL-event-generation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: more accurate NL event generation
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently the mptcp code generate a "new listener" event even
+if the actual listen() syscall fails. Address the issue moving
+the event generation call under the successful branch.
+
+Fixes: f8c9dfbd875b ("mptcp: add pm listener events")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
