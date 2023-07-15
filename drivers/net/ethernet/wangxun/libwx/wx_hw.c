@@ -1501,7 +1501,7 @@ static void wx_restore_vlan(struct wx *wx)
  *
  * Configure the Rx unit of the MAC after a reset.
  **/
-static void wx_configure_rx(struct wx *wx)
+void wx_configure_rx(struct wx *wx)
 {
 	u32 psrtype, i;
 	int ret;
@@ -1511,7 +1511,6 @@ static void wx_configure_rx(struct wx *wx)
 	psrtype = WX_RDB_PL_CFG_L4HDR |
 		  WX_RDB_PL_CFG_L3HDR |
 		  WX_RDB_PL_CFG_L2HDR |
-		  WX_RDB_PL_CFG_TUN_TUNHDR |
 		  WX_RDB_PL_CFG_TUN_TUNHDR;
 	wr32(wx, WX_RDB_PL_CFG(0), psrtype);
 
@@ -1545,6 +1544,7 @@ static void wx_configure_rx(struct wx *wx)
 	wx_enable_rx(wx);
 	wx_enable_sec_rx_path(wx);
 }
+EXPORT_SYMBOL(wx_configure_rx);
 
 static void wx_configure_isb(struct wx *wx)
 {
