@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-additional-indirection-in-sockopt
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid additional indirection in sockopt
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp sockopt infrastructure unneedly uses the first subflow
+socket struct in a few spots. We are going to remove such field
+soon, so use directly the first subflow sock instead.
+
+No functional changes intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
