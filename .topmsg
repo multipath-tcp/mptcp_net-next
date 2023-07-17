@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-ssock-usage-in-mptcp_pm_nl_create_listen_socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid ssock usage in mptcp_pm_nl_create_listen_socket()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This is one of the few remaining spots actually manipulating the
+first subflow socket. We can leverage the recently introduced
+inet helpers to get rid of ssock there.
+
+No functional changes intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
