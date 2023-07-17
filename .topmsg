@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-unneeded-indirection-in-mptcp_stream_accept
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid unneeded indirection in mptcp_stream_accept()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We are going to remove the first subflow socket soon, so avoid
+the additional indirection at accept() time. Instead access
+directly the first subflow sock, and update mptcp_accept() to
+operate on it. This allows dropping a duplicated check in
+mptcp_accept().
+
+No functional changes intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
