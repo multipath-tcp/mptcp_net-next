@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-unneeded-mptcp_token_destroy-calls
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid unneeded mptcp_token_destroy() calls
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The mptcp protocol currently clears the msk token both at
+connect() and listen() time. That was necessary before the
+mptcp protocol gained a full disconnect implementation, but
+after commit b29fcfb54cd7 ("mptcp: full disconnect implementation")
+such calls are no more necessary and a bit confusing.
+
+Just drop them.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
