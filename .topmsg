@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-avoid-additional-__inet_stream_connect-call
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
