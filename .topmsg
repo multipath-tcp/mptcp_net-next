@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/net-factor-out-inet-6-_bind_sk-helpers
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
