@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-avoid-additional-indirection-in-mptcp_poll
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
