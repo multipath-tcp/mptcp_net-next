@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-additional-indirection-in-mptcp_poll
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid additional indirection in mptcp_poll()
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+We are going to remove the first subflow socket soon, so avoid
+the additional indirection at poll() time. Instead access
+directly the first subflow sock.
+
+No functional changes intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
