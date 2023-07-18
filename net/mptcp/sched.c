@@ -127,6 +127,12 @@ void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 	WRITE_ONCE(subflow->scheduled, scheduled);
 }
 
+void mptcp_subflow_set_stale(struct mptcp_subflow_context *subflow,
+			     int stale)
+{
+	subflow->stale = stale;
+}
+
 void mptcp_sched_data_set_contexts(const struct mptcp_sock *msk,
 				   struct mptcp_sched_data *data)
 {
