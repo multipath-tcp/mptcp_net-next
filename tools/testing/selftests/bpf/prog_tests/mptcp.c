@@ -402,7 +402,7 @@ static void test_bkup(void)
 	nstoken = sched_init("subflow backup", "bpf_bkup");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_bkup"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_bkup");
