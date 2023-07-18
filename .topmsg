@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: set all env vars as local ones
-
-It would be better to move the declaration of all the env variables to
-do_transfer(), run_tests(), or pm_nl_set_endpoint() as local variables,
-instead of exporting them globally at the beginning of the file.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
