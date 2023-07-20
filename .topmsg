@@ -9,6 +9,10 @@ We are going to remove the first subflow socket soon, so avoid
 the additional indirection via at connect time, calling directly
 into the sock-level connect() ops.
 
+The sk-level connect never return -EINPROGRESS, cleanup the error
+path accordingly. Additionally, the ssk status on error is always
+TCP_CLOSE. Avoid unneeded access to the subflow sk state.
+
 No functional change intended.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
