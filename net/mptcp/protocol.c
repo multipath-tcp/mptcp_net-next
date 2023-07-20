@@ -3644,6 +3644,8 @@ out:
 	 * subflow_finish_connect()
 	 */
 	if (unlikely(err && err != -EINPROGRESS)) {
+		/* avoid leaving a dangling token in an unconnected socket */
+		mptcp_token_destroy(msk);
 		inet_sk_state_store(sk, inet_sk_state_load(ssk));
 		return err;
 	}
