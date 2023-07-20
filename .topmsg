@@ -1,4 +1,22 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-rcv-buffer-auto-tuning
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix rcv buffer auto-tuning
 
+The MPTCP code uses the assumption that the tcp_win_from_space() helper
+does not use any TCP-specific field, and thus works correctly operating
+on an MPTCP socket.
+
+The commit dfa2f0483360 ("tcp: get rid of sysctl_tcp_adv_win_scale")
+broke such assumption, and as a consequence most MPTCP connections stall
+on zero-window event due to auto-tuning changing the rcv buffer size
+quite randomly.
+
+Address the issue syncing again the MPTCP auto-tuning code with the TCP
+one. To achieve that, factor out the windows size logic in socket
+independent helpers, and reuse them in mptcp_rcv_space_adjust(). The
+MPTCP level scaling_ratio is selected as the minimum one from the all
+the subflows, as a worst-case estimate.
+
+Fixes: dfa2f0483360 ("tcp: get rid of sysctl_tcp_adv_win_scale")
+Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
