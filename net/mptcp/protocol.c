@@ -3624,16 +3624,14 @@ out:
 	/* on successful connect, the msk state will be moved to established by
 	 * subflow_finish_connect()
 	 */
-	if (unlikely(err && err != -EINPROGRESS)) {
-		inet_sk_state_store(sk, inet_sk_state_load(ssk));
+	if (unlikely(err)) {
+		/* avoid leaving a dangling token in an unconnected socket */
+		mptcp_token_destroy(msk);
+		inet_sk_state_store(sk, TCP_CLOSE);
 		return err;
 	}
 
 	mptcp_copy_inaddrs(sk, ssk);
-
-	/* silence EINPROGRESS and let the caller inet_stream_connect
-	 * handle the connection in progress
-	 */
 	return 0;
 }
 
