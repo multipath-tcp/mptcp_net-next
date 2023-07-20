@@ -59,31 +59,40 @@ rndh=$(printf %x "$sec")-$(mktemp -u XXXXXX)
 ns1="ns1-$rndh"
 ns2="ns2-$rndh"
 ret=0
+test_name=""
+
+_printf() {
+	stdbuf -o0 -e0 printf "${@}"
+}
 
 print_title()
 {
-	stdbuf -o0 -e0 printf "INFO: %s\n" "${1}"
+	_printf "INFO: %s\n" "${1}"
 }
 
 # $1: test name
 print_test()
 {
-	stdbuf -o0 -e0 printf "%-63s" "${1}"
+	test_name="${1}"
+
+	_printf "%-63s" "${test_name}"
 }
 
 print_results()
 {
-	stdbuf -o0 -e0 printf "[%s]\n" "${1}"
+	_printf "[%s]\n" "${1}"
 }
 
 test_pass()
 {
 	print_results " OK "
+	mptcp_lib_result_pass "${test_name}"
 }
 
 test_skip()
 {
 	print_results "SKIP"
+	mptcp_lib_result_skip "${test_name}"
 }
 
 # $1: msg
@@ -93,8 +102,10 @@ test_fail()
 	ret=1
 
 	if [ -n "${1}" ]; then
-		stdbuf -o0 -e0 printf "\t%s\n" "${1}"
+		_printf "\t%s\n" "${1}"
 	fi
+
+	mptcp_lib_result_fail "${test_name}"
 }
 
 kill_wait()
@@ -127,7 +138,7 @@ cleanup()
 
 	rm -rf $file $client_evts $server_evts
 
-	stdbuf -o0 -e0 printf "Done\n"
+	_printf "Done\n"
 }
 
 trap cleanup EXIT
@@ -252,6 +263,7 @@ make_connection()
 		test_pass
 	else
 		test_fail "Expected tokens (c:${client_token} - s:${server_token}) and server (c:${client_serverside} - s:${server_serverside})"
+		mptcp_lib_result_print_all_tap
 		exit 1
 	fi
 
@@ -288,7 +300,7 @@ check_expected_one()
 		test_fail
 	fi
 
-	stdbuf -o0 -e0 printf "\tExpected value for '%s': '%s', got '%s'.\n" \
+	_printf "\tExpected value for '%s': '%s', got '%s'.\n" \
 		"${var}" "${!exp}" "${!var}"
 	return 1
 }
@@ -987,4 +999,5 @@ test_subflows_v4_v6_mix
 test_prio
 test_listener
 
+mptcp_lib_result_print_all_tap
 exit ${ret}
