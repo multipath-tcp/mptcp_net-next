@@ -15,6 +15,7 @@
 #include <net/genetlink.h>
 #include <uapi/linux/mptcp.h>
 
+#include "mptcp_pm_gen.h"
 #include "protocol.h"
 #include "mib.h"
 
@@ -47,53 +48,6 @@ struct pm_nl_pernet {
 
 #define MPTCP_PM_ADDR_MAX	8
 #define ADD_ADDR_RETRANS_MAX	3
-
-const struct nla_policy mptcp_pm_add_addr_nl_policy[MPTCP_PM_ADDR_ATTR_IF_IDX + 1] = {
-	[MPTCP_PM_ADDR_ATTR_FAMILY] = { .type = NLA_U16, },
-	[MPTCP_PM_ADDR_ATTR_ADDR4] = { .type = NLA_U32, },
-	[MPTCP_PM_ADDR_ATTR_ADDR6] = { .len = 16, },
-	[MPTCP_PM_ADDR_ATTR_ID] = { .type = NLA_U8, },
-	[MPTCP_PM_ADDR_ATTR_PORT] = { .type = NLA_U16, },
-	[MPTCP_PM_ADDR_ATTR_IF_IDX] = { .type = NLA_S32, },
-	[MPTCP_PM_ADDR_ATTR_FLAGS] = { .type = NLA_U32, },
-};
-
-/* MPTCP_PM_CMD_ADD_ADDR / DEL / GET / FLUSH - do */
-static const struct nla_policy mptcp_pm_endpoint_nl_policy[MPTCP_PM_ENDPOINT_ADDR + 1] = {
-	[MPTCP_PM_ENDPOINT_ADDR] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-};
-
-/* MPTCP_PM_CMD_SET_LIMITS - do */
-static const struct nla_policy mptcp_pm_set_limits_nl_policy[MPTCP_PM_ATTR_SUBFLOWS + 1] = {
-	[MPTCP_PM_ATTR_RCV_ADD_ADDRS] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_SUBFLOWS] = { .type = NLA_U32, },
-};
-
-/* MPTCP_PM_CMD_SET_FLAGS - do */
-const struct nla_policy mptcp_pm_set_flags_nl_policy[MPTCP_PM_ATTR_ADDR_REMOTE + 1] = {
-        [MPTCP_PM_ATTR_ADDR] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-        [MPTCP_PM_ATTR_ADDR_REMOTE] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-        [MPTCP_PM_ATTR_TOKEN] = { .type = NLA_U32, },
-};
-
-/* MPTCP_PM_CMD_ANNOUNCE - do */
-static const struct nla_policy mptcp_pm_announce_nl_policy[MPTCP_PM_ATTR_TOKEN + 1] = {
-	[MPTCP_PM_ATTR_TOKEN] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_ADDR] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-};
-
-/* MPTCP_PM_CMD_REMOVE - do */
-static const struct nla_policy mptcp_pm_remove_nl_policy[MPTCP_PM_ATTR_LOC_ID + 1] = {
-	[MPTCP_PM_ATTR_TOKEN] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_LOC_ID] = { .type = NLA_U8, },
-};
-
-/* MPTCP_PM_CMD_SUBFLOW_CREATE / DESTROY - do */
-static const struct nla_policy mptcp_pm_subflow_create_nl_policy[MPTCP_PM_ATTR_ADDR_REMOTE + 1] = {
-	[MPTCP_PM_ATTR_ADDR_REMOTE] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-	[MPTCP_PM_ATTR_TOKEN] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_ADDR] = NLA_POLICY_NESTED(mptcp_pm_add_addr_nl_policy),
-};
 
 static struct pm_nl_pernet *pm_nl_get_pernet(const struct net *net)
 {
@@ -1266,7 +1220,7 @@ int mptcp_pm_parse_addr(struct nlattr *attr, struct genl_info *info,
 
 	memset(addr, 0, sizeof(*addr));
 
-	return mptcp_pm_parse_pm_addr_attr(tb, attr, info, mptcp_pm_add_addr_nl_policy, addr, true);
+	return mptcp_pm_parse_pm_addr_attr(tb, attr, info, mptcp_pm_address_nl_policy, addr, true);
 }
 
 int mptcp_pm_parse_entry(struct nlattr *attr, struct genl_info *info,
@@ -1329,14 +1283,14 @@ next:
 	return 0;
 }
 
-static int mptcp_nl_cmd_add_addr(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_add_addr_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct mptcp_pm_addr_entry addr, *entry;
 	int ret;
 
-	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_add_addr_nl_policy, true, &addr);
+	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_address_nl_policy, true, &addr);
 	if (ret < 0)
 		return ret;
 
@@ -1510,7 +1464,7 @@ next:
 	return 0;
 }
 
-static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_del_addr_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
@@ -1518,7 +1472,7 @@ static int mptcp_nl_cmd_del_addr(struct sk_buff *skb, struct genl_info *info)
 	unsigned int addr_max;
 	int ret;
 
-	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_add_addr_nl_policy,
+	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_address_nl_policy,
 				   false, &addr);
 	if (ret < 0)
 		return ret;
@@ -1646,7 +1600,7 @@ static void __reset_counters(struct pm_nl_pernet *pernet)
 	pernet->addrs = 0;
 }
 
-static int mptcp_nl_cmd_flush_addrs(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_flush_addrs_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	LIST_HEAD(free_list);
@@ -1702,7 +1656,7 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
-static int mptcp_nl_cmd_get_addr(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_get_addr_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
@@ -1711,7 +1665,7 @@ static int mptcp_nl_cmd_get_addr(struct sk_buff *skb, struct genl_info *info)
 	void *reply;
 	int ret;
 
-	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_add_addr_nl_policy,
+	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_address_nl_policy,
 				   false, &addr);
 	if (ret < 0)
 		return ret;
@@ -1753,8 +1707,8 @@ fail:
 	return ret;
 }
 
-static int mptcp_nl_cmd_dump_addrs(struct sk_buff *msg,
-				   struct netlink_callback *cb)
+int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
+				struct netlink_callback *cb)
 {
 	struct net *net = sock_net(msg->sk);
 	struct mptcp_pm_addr_entry *entry;
@@ -1811,8 +1765,7 @@ static int parse_limit(struct genl_info *info, int id, unsigned int *limit)
 	return 0;
 }
 
-static int
-mptcp_nl_cmd_set_limits(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_set_limits_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	unsigned int rcv_addrs, subflows;
@@ -1837,8 +1790,7 @@ unlock:
 	return ret;
 }
 
-static int
-mptcp_nl_cmd_get_limits(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_get_limits_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct sk_buff *msg;
@@ -1947,7 +1899,7 @@ int mptcp_pm_nl_set_flags(struct net *net, struct mptcp_pm_addr_entry *addr, u8 
 	return 0;
 }
 
-static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
+int mptcp_pm_nl_set_flags_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry remote = { .addr = { .family = AF_UNSPEC }, };
 	struct mptcp_pm_addr_entry addr = { .addr = { .family = AF_UNSPEC }, };
@@ -1958,14 +1910,14 @@ static int mptcp_nl_cmd_set_flags(struct sk_buff *skb, struct genl_info *info)
 	u8 bkup = 0;
 	int ret;
 
-	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_add_addr_nl_policy,
+	ret = mptcp_pm_parse_entry(attr, info, mptcp_pm_address_nl_policy,
 				   false, &addr);
 	if (ret < 0)
 		return ret;
 
 	if (attr_rem) {
 		ret = mptcp_pm_parse_entry(attr_rem, info,
-					   mptcp_pm_add_addr_nl_policy, false,
+					   mptcp_pm_address_nl_policy, false,
 					   &remote);
 		if (ret < 0)
 			return ret;
@@ -2314,105 +2266,13 @@ nla_put_failure:
 	nlmsg_free(skb);
 }
 
-
-static const struct genl_ops mptcp_pm_ops[] = {
-	{
-		.cmd		= MPTCP_PM_CMD_ADD_ADDR,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_add_addr,
-		.policy		= mptcp_pm_endpoint_nl_policy,
-		.maxattr	= MPTCP_PM_ENDPOINT_ADDR,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_DEL_ADDR,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_del_addr,
-		.policy		= mptcp_pm_endpoint_nl_policy,
-		.maxattr	= MPTCP_PM_ENDPOINT_ADDR,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_GET_ADDR,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_get_addr,
-		.dumpit		= mptcp_nl_cmd_dump_addrs,
-		.policy		= mptcp_pm_endpoint_nl_policy,
-		.maxattr	= MPTCP_PM_ENDPOINT_ADDR,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_FLUSH_ADDRS,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_flush_addrs,
-		.policy		= mptcp_pm_endpoint_nl_policy,
-		.maxattr	= MPTCP_PM_ENDPOINT_ADDR,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_SET_LIMITS,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_set_limits,
-		.policy		= mptcp_pm_set_limits_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_SUBFLOWS,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_GET_LIMITS,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_get_limits,
-		.policy		= mptcp_pm_set_limits_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_SUBFLOWS,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_SET_FLAGS,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_set_flags,
-		.policy		= mptcp_pm_set_flags_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_ADDR_REMOTE,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_ANNOUNCE,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_announce,
-		.policy		= mptcp_pm_announce_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_TOKEN,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_REMOVE,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_remove,
-		.policy		= mptcp_pm_remove_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_LOC_ID,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_SUBFLOW_CREATE,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_sf_create,
-		.policy		= mptcp_pm_subflow_create_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_ADDR_REMOTE,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-	{
-		.cmd		= MPTCP_PM_CMD_SUBFLOW_DESTROY,
-		.validate	= GENL_DONT_VALIDATE_STRICT,
-		.doit		= mptcp_nl_cmd_sf_destroy,
-		.policy		= mptcp_pm_subflow_create_nl_policy,
-		.maxattr	= MPTCP_PM_ATTR_ADDR_REMOTE,
-		.flags		= GENL_UNS_ADMIN_PERM,
-	},
-};
-
 static struct genl_family mptcp_genl_family __ro_after_init = {
 	.name		= MPTCP_PM_NAME,
 	.version	= MPTCP_PM_VER,
 	.netnsok	= true,
 	.module		= THIS_MODULE,
-	.ops		= mptcp_pm_ops,
-	.n_ops		= ARRAY_SIZE(mptcp_pm_ops),
+	.ops		= mptcp_pm_nl_ops,
+	.n_ops		= ARRAY_SIZE(mptcp_pm_nl_ops),
 	.resv_start_op	= MPTCP_PM_CMD_SUBFLOW_DESTROY + 1,
 	.mcgrps		= mptcp_pm_mcgrps,
 	.n_mcgrps	= ARRAY_SIZE(mptcp_pm_mcgrps),
