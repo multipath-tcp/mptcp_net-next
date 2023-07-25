@@ -35,7 +35,7 @@ jobs:
         env:
           REF: ${{ github.event.ref }}
       - name: irc tag
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
@@ -58,7 +58,7 @@ jobs:
           OPENER: ${{ github.event.issue.user.login }}
           ASSIGNEE: ${{ github.event.assignee.login }}
       - name: irc issues
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp"
@@ -88,7 +88,7 @@ jobs:
 
       - name: irc build
         if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
@@ -117,7 +117,7 @@ jobs:
 
       - name: irc build
         if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp"
@@ -196,7 +196,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: irc topgit
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp"
@@ -265,7 +265,7 @@ jobs:
 
       - name: irc tests
         if: startsWith(steps.tag.outputs.tag, 'export/') || startsWith(steps.tag.outputs.tag, 'export-net/')
-        uses: rectalogic/notify-irc@v1
+        uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
