@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/bpf-Export-more-bpf_burst-related-functions
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
