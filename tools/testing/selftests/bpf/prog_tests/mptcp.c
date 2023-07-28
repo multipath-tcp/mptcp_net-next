@@ -296,6 +296,7 @@ static void send_data(int lfd, int fd, char *msg)
 
 #define ADDR_1	"10.0.1.1"
 #define ADDR_2	"10.0.1.2"
+#define PORT_1	10001
 
 static struct nstoken *sched_init(char *flags, char *sched)
 {
@@ -322,8 +323,8 @@ static int has_bytes_sent(char *addr)
 {
 	char cmd[128];
 
-	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it dst %s | grep -q bytes_sent:",
-		 NS_TEST, addr);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it src %s sport %d dst %s | %s",
+		 NS_TEST, ADDR_1, PORT_1, addr, "grep -q bytes_sent:");
 	return system(cmd);
 }
 
@@ -335,7 +336,7 @@ static void test_default(void)
 	nstoken = sched_init("subflow", "default");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "default");
@@ -368,7 +369,7 @@ static void test_first(void)
 	nstoken = sched_init("subflow", "bpf_first");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_first"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_first");
@@ -403,7 +404,7 @@ static void test_bkup(void)
 	nstoken = sched_init("subflow backup", "bpf_bkup");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_bkup"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_bkup");
@@ -438,7 +439,7 @@ static void test_rr(void)
 	nstoken = sched_init("subflow", "bpf_rr");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_rr"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_rr");
@@ -473,7 +474,7 @@ static void test_red(void)
 	nstoken = sched_init("subflow", "bpf_red");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_red"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_red");
