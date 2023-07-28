@@ -11,6 +11,7 @@
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
+#include "mptcp_bpf_burst.skel.h"
 
 char NS_TEST[32];
 
@@ -296,6 +297,7 @@ static void send_data(int lfd, int fd, char *msg)
 
 #define ADDR_1	"10.0.1.1"
 #define ADDR_2	"10.0.1.2"
+#define PORT_1	10001
 
 static struct nstoken *sched_init(char *flags, char *sched)
 {
@@ -322,8 +324,8 @@ static int has_bytes_sent(char *addr)
 {
 	char cmd[128];
 
-	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it dst %s | grep -q bytes_sent:",
-		 NS_TEST, addr);
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it src %s sport %d dst %s | %s",
+		 NS_TEST, ADDR_1, PORT_1, addr, "grep -q bytes_sent:");
 	return system(cmd);
 }
 
@@ -335,7 +337,7 @@ static void test_default(void)
 	nstoken = sched_init("subflow", "default");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "default");
@@ -368,7 +370,7 @@ static void test_first(void)
 	nstoken = sched_init("subflow", "bpf_first");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_first"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_first");
@@ -403,7 +405,7 @@ static void test_bkup(void)
 	nstoken = sched_init("subflow backup", "bpf_bkup");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_bkup"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_bkup");
@@ -438,7 +440,7 @@ static void test_rr(void)
 	nstoken = sched_init("subflow", "bpf_rr");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_rr"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_rr");
@@ -473,7 +475,7 @@ static void test_red(void)
 	nstoken = sched_init("subflow", "bpf_red");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_red"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, 0, 0);
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
 	send_data(server_fd, client_fd, "bpf_red");
@@ -486,6 +488,41 @@ fail:
 	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
 	mptcp_bpf_red__destroy(red_skel);
+}
+
+static void test_burst(void)
+{
+	struct mptcp_bpf_burst *burst_skel;
+	int server_fd, client_fd;
+	struct nstoken *nstoken;
+	struct bpf_link *link;
+
+	burst_skel = mptcp_bpf_burst__open_and_load();
+	if (!ASSERT_OK_PTR(burst_skel, "bpf_burst__open_and_load"))
+		return;
+
+	link = bpf_map__attach_struct_ops(burst_skel->maps.burst);
+	if (!ASSERT_OK_PTR(link, "bpf_map__attach_struct_ops")) {
+		mptcp_bpf_burst__destroy(burst_skel);
+		return;
+	}
+
+	nstoken = sched_init("subflow", "bpf_burst");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_burst"))
+		goto fail;
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	client_fd = connect_to_fd(server_fd, 0);
+
+	send_data(server_fd, client_fd, "bpf_burst");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr 1");
+	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr 2");
+
+	close(client_fd);
+	close(server_fd);
+fail:
+	cleanup_netns(nstoken);
+	bpf_link__destroy(link);
+	mptcp_bpf_burst__destroy(burst_skel);
 }
 
 void test_mptcp(void)
@@ -502,4 +539,6 @@ void test_mptcp(void)
 		test_rr();
 	if (test__start_subtest("red"))
 		test_red();
+	if (test__start_subtest("burst"))
+		test_burst();
 }
