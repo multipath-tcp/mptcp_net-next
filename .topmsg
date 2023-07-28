@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-avoid-bogus-reset-on-fallback-close
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid bogus reset on fallback close
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Since the blamed commit, the MPTCP protocol unconditionally sends
+TCP resets on all the subflows on disconnect().
+
+That fits full-blown MPTCP sockets - to implement the fastclose
+mechanism - but causes unexpected corruption of the data stream,
+caught as sporadic self-tests failures.
+
+Fixes: d21f83485518 ("mptcp: use fastclose on more edge scenarios")
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/419
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
