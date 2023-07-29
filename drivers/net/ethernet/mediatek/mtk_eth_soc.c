@@ -1674,7 +1674,7 @@ static void mtk_update_rx_cpu_idx(struct mtk_eth *eth)
 
 static bool mtk_page_pool_enabled(struct mtk_eth *eth)
 {
-	return eth->soc->version == 2;
+	return mtk_is_netsys_v2_or_greater(eth);
 }
 
 static struct page_pool *mtk_create_page_pool(struct mtk_eth *eth,
@@ -5062,6 +5062,9 @@ static const struct mtk_soc_data mt7988_data = {
 	.required_clks = MT7988_CLKS_BITMAP,
 	.required_pctl = false,
 	.version = 3,
+	.offload_version = 2,
+	.hash_offset = 4,
+	.foe_entry_size = MTK_FOE_ENTRY_V3_SIZE,
 	.txrx = {
 		.txd_size = sizeof(struct mtk_tx_dma_v2),
 		.rxd_size = sizeof(struct mtk_rx_dma_v2),
