@@ -11,9 +11,9 @@ buffer that is currently always >1024 bytes. Then we can check if there
 is an error (err->error), print it if any and report the error.
 
 After this modification, it is required to mute expected errors in
-pm_netlink.sh selftest:
+mptcp_join.sh and pm_netlink.sh selftests:
 
-- when trying to add a duplicated entry
+- when trying to add a bad endpoint, e.g. duplicated
 - when trying to set the two limits above the hard limit
 
 Reviewed-by: Mat Martineau <martineau@kernel.org>
