@@ -7,5 +7,10 @@ some colours to easily spot issues.
 The colours are not used if stdout is redirected or if NO_COLOR env var
 is set to 1 as specified in https://no-color.org.
 
+It is possible to force displaying the colours even if stdout is
+redirected by setting this env var:
+
+  SELFTESTS_MPTCP_LIB_COLOR_FORCE=1
+
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
