@@ -10,8 +10,9 @@ readonly KSFT_TEST=$(basename "${0}" | sed 's/\.sh$//g')
 
 MPTCP_LIB_SUBTESTS=()
 
-# only if supported and not disabled, see no-color.org
-if [ -t 1 ] && [ "${NO_COLOR:-}" != "1" ]; then
+# only if supported (or forced) and not disabled, see no-color.org
+if { [ -t 1 ] || [ "${SELFTESTS_MPTCP_LIB_COLOR_FORCE:-}" = "1" ]; } &&
+   [ "${NO_COLOR:-}" != "1" ]; then
 	readonly MPTCP_LIB_COLOR_RED="\E[1;31m"
 	readonly MPTCP_LIB_COLOR_GREEN="\E[1;32m"
 	readonly MPTCP_LIB_COLOR_YELLOW="\E[1;33m"
