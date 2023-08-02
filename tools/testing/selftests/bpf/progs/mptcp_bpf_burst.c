@@ -25,7 +25,7 @@ struct subflow_send_info {
 	__u64 linger_time;
 };
 
-static inline __u64 div_u64(__u64 dividend, __u32 divisor)
+static __always_inline __u64 div_u64(__u64 dividend, __u32 divisor)
 {
 	return dividend / divisor;
 }
