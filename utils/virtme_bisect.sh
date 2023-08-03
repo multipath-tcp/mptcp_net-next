@@ -31,10 +31,16 @@ exit_trap() {
 	[ "${STRESS}" = 1  ] && pkill stress-ng
 	sleep 1
 
+	[ "${STASH}" = 1 ] && git stash
+
 	return ${rc}
 }
 
 trap 'exit_trap' EXIT
+
+if [ "${STASH}" = 1 ]; then
+	git stash pop
+fi
 
 VIRTME_NO_INTERACTIVE=1 VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 ./.virtme.sh "expect-${MODE}" &
 PID_VIRTME=$!
