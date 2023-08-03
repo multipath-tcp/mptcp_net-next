@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-the-incorrect-judgment-for-msk-cb_flags
+From: Xiang Yang <xiangyang3@huawei.com>
+Subject: [PATCH] mptcp: fix the incorrect judgment for msk->cb_flags
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Coccicheck reports the error below:
+net/mptcp/protocol.c:3330:15-28: ERROR: test of a variable/field address
+
+Since the address of msk->cb_flags is used in __test_and_clear_bit, the
+address should not be NULL. The judgment for if (unlikely(msk->cb_flags))
+will always be true, we should check the real value of msk->cb_flags here.
+
+Fixes: 65a569b03ca8 ("mptcp: optimize release_cb for the common case")
+Signed-off-by: Xiang Yang <xiangyang3@huawei.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
