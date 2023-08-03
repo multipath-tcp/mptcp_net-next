@@ -25,21 +25,46 @@ struct subflow_send_info {
 	__u64 linger_time;
 };
 
-static inline __u64 div_u64(__u64 dividend, __u32 divisor)
-{
-	return dividend / divisor;
-}
-
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_set_timeout(struct sock *sk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
-extern bool bpf_mptcp_subflow_memory_free(const struct sock *sk) __ksym;
-extern bool bpf_mptcp_subflow_queues_empty(const struct sock *sk) __ksym;
+extern bool tcp_stream_memory_free(const struct sock *sk, int wake) __ksym;
+extern bool bpf_mptcp_subflow_queues_empty(struct sock *sk) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
 
 #define SSK_MODE_ACTIVE	0
 #define SSK_MODE_BACKUP	1
 #define SSK_MODE_MAX	2
+
+static __always_inline __u64 div_u64(__u64 dividend, __u32 divisor)
+{
+	return dividend / divisor;
+}
+
+static __always_inline bool tcp_write_queue_empty(struct sock *sk)
+{
+	const struct tcp_sock *tp = bpf_skc_to_tcp_sock(sk);
+
+	return tp ? tp->write_seq == tp->snd_nxt : true;
+}
+
+static __always_inline bool tcp_rtx_and_write_queues_empty(struct sock *sk)
+{
+	return bpf_mptcp_subflow_queues_empty(sk) && tcp_write_queue_empty(sk);
+}
+
+static __always_inline bool __sk_stream_memory_free(const struct sock *sk, int wake)
+{
+	if (sk->sk_wmem_queued >= sk->sk_sndbuf)
+		return false;
+
+	return tcp_stream_memory_free(sk, wake);
+}
+
+static __always_inline bool sk_stream_memory_free(const struct sock *sk)
+{
+	return __sk_stream_memory_free(sk, 0);
+}
 
 SEC("struct_ops/mptcp_sched_burst_init")
 void BPF_PROG(mptcp_sched_burst_init, struct mptcp_sock *msk)
@@ -110,7 +135,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	if (!subflow)
 		return -1;
 	ssk = mptcp_subflow_tcp_sock(subflow);
-	if (!ssk || !bpf_mptcp_subflow_memory_free(ssk))
+	if (!ssk || !sk_stream_memory_free(ssk))
 		return -1;
 
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
@@ -149,7 +174,7 @@ static int bpf_burst_get_retrans(struct mptcp_sock *msk,
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
 		/* still data outstanding at TCP level? skip this */
-		if (!bpf_mptcp_subflow_queues_empty(ssk)) {
+		if (!tcp_rtx_and_write_queues_empty(ssk)) {
 			mptcp_pm_subflow_chk_stale(msk, ssk);
 			min_stale_count = min(min_stale_count, subflow->stale_count);
 			continue;
