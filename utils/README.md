@@ -196,41 +196,41 @@ Here is a checklist.
 * Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
   or `export-net` (for `net`):
 
-        git fetch --multiple netdev-next netdev-net
+      git fetch --multiple netdev-next netdev-net
 
 * Prepare a new branch with one of these adapted commands (with a description):
 
-        b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
-        b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
-        b4 prep -n upstream-stable-$(date +%Y%m%d)-<description> -f stable/linux-6.x.y --set-prefixes 6.x
+      b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
+      b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
+      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description> -f stable/linux-6.x.y --set-prefixes 6.x
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
-        ./.list-exported-commits.sh
-        git cherry-pick -s <...>
+      ./.list-exported-commits.sh
+      git cherry-pick -s <...>
 
 * Check for net/net-next conflicts. If possible, defer net-next upstreaming
   until net-branch patches they conflict with have been merged to the net-next
   branch. If it is not possible to wait, document the resolution.
 
-        git branch -f tmp && git switch tmp
-        git merge --no-edit netdev-next/main  ## or -net
-        git switch -
+      git branch -f tmp && git switch tmp
+      git merge --no-edit netdev-next/main  ## or -net
+      git switch -
 
 * Build the code and run tests:
 
-        ./.virtme_upstream.sh
+      ./.virtme_upstream.sh
 
 * Send the current version to `git.kernel.org` to get some feedback from Intel's
   lkp:
 
-        git cherry-pick export
-        git push matttbe-korg HEAD HEAD:master -f  ## or another remote
-        git reset --hard HEAD~
+      git cherry-pick export
+      git push matttbe-korg HEAD HEAD:master -f  ## or another remote
+      git reset --hard HEAD~
 
 * Double-check Git tags in commit messages:
 
-        git rebase -i $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+      git rebase -i $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
 
   * Sender `Signed-off-by` tag should be last, and not duplicated.
   * Typically place `Fixes`, `Reported-by` then `Closes` tags first in the list
@@ -242,7 +242,7 @@ Here is a checklist.
 
 * Edit the cover letter, replacing the subject and body placeholders:
 
-        b4 prep --edit-cover
+      b4 prep --edit-cover
 
   * Give a quick summary of the included patches. If upstreaming a group of
     patches that implements a whole feature, it's helpful to add a paragraph or
@@ -264,7 +264,7 @@ Here is a checklist.
 
 * Determine cc addresses for the series:
 
-        b4 prep --auto-to-cc
+      b4 prep --auto-to-cc
 
   * If any outdated email addresses are associated with the fixed commit,
     substitute a current address if possible. It helps to add a Git note to the
@@ -273,15 +273,15 @@ Here is a checklist.
 * Run checkpatch one more time (issues should have been caught before but
   sometimes the above edits can add problems):
 
-        ./.checkpatch-b4.sh
+      ./.checkpatch-b4.sh
 
 * Send the patches to yourself only:
 
-        b4 send --reflect
+      b4 send --reflect
 
 * If the previous step generated correct emails, send them to the mailing lists:
 
-        b4 send
+      b4 send
 
 * Make sure the full series appears in PatchWork in both
   [MPTCP](https://patchwork.kernel.org/project/mptcp/list/) and
