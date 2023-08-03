@@ -25,9 +25,9 @@ apply_patches_files() {
 apply_patches_git_pw() { local i
 	for i in "${@}"; do
 		if ! git-pw "${MODE}" apply ${GIT_PW_ARG:+"${GIT_PW_ARG}"} "${i}"; then
-			printerr "ERROR with 'git-pw ${MODE} apply ${i}'. " \
+			printerr "ERROR with 'git-pw ${MODE} apply ${i}'." \
 			         "Please fix in another terminal (up to 'git am" \
-			         "--continue' included) and press ENTER to " \
+			         "--continue' included) and press ENTER to" \
 			         "continue."
 			read -r
 		fi
@@ -50,9 +50,9 @@ apply_patches_b4() { local i args
 			continue
 		fi
 		if ! b4 shazam "${args[@]}" "${i}"; then
-			printerr "ERROR with 'b4 shazam ${args[@]} ${i}'. " \
+			printerr "ERROR with 'b4 shazam ${args[@]} ${i}'." \
 			         "Please fix in another terminal (up to 'git am" \
-			         "--continue' included) and press ENTER to " \
+			         "--continue' included) and press ENTER to" \
 			         "continue."
 			read -r
 		fi
