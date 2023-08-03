@@ -217,16 +217,16 @@ Here is a checklist.
       git merge --no-edit netdev-next/main  ## or -net
       git switch -
 
-* Build the code and run tests:
-
-      ./.virtme_upstream.sh
-
 * Send the current version to `git.kernel.org` to get some feedback from Intel's
   lkp:
 
       git cherry-pick export
       git push matttbe-korg HEAD HEAD:master -f  ## or another remote
       git reset --hard HEAD~
+
+* Build the code and run tests:
+
+      ./.virtme_upstream.sh
 
 * Double-check Git tags in commit messages:
 
