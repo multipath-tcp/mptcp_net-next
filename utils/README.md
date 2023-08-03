@@ -214,7 +214,7 @@ Here is a checklist.
   branch. If it is not possible to wait, document the resolution.
 
       git branch -f tmp && git switch tmp
-      git merge --no-edit netdev-next/main  ## or -net
+      git merge --no-edit netdev-next/main || git merge --abort  ## or -net
       git switch -
 
 * Send the current version to `git.kernel.org` to get some feedback from Intel's
