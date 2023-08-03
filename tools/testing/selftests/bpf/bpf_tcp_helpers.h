@@ -238,6 +238,7 @@ struct mptcp_subflow_context {
 	unsigned long avg_pacing_rate;
 	__u32	backup : 1;
 	__u8	stale_count;
+	__u32	subflow_id;
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 } __attribute__((preserve_access_index));
 
