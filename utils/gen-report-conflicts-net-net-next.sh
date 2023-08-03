@@ -48,13 +48,17 @@ the mentioned patches, don't hesitate to ACK this conflict resolution.
 
 Regarding this conflict, (...)
 
+Rerere cache is available in [2].
+
 Cheers,
 Matt
 
 [1] https://github.com/multipath-tcp/mptcp_net-next/commit/$(short "${FIX}")
+[2] https://github.com/multipath-tcp/mptcp-upstream-rr-cache/commit/(...)
 EOF
 
 PATCH="$(long "${FIX}").patch"
 diff "${FIX}" "${@}" > "${PATCH}"
 echo -e "\n\t=== Please include ${PATCH} in the email. ===\n"
-echo -e "\n\t=== Please append the subject with 'manual merge'. ===\n"
+echo -e "\n\t=== Please append the subject with 'manual merge' and cc Stephen Rothwell <sfr@canb.auug.org.au>. ===\n"
+echo -e "\n\t=== Please commit + push the modif in '.git/rr-cache' + add sha above. ===\n"
