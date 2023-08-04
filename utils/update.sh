@@ -52,7 +52,8 @@ update() {
 
 		git config --local rerere.enabled true
 		cd .git/rr-cache
-		git commit -sm "previous conflicts, already resolved in linux-next" . || true
+		git add .
+		git commit -sm "previous conflicts, already resolved in linux-next" || true
 		cd ../..
 	else
 		git pull origin "${base}"
