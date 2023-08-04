@@ -5,4 +5,4 @@ This patch implements the redundant BPF MPTCP scheduler, named bpf_red,
 which sends all packets redundantly on all available subflows.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
