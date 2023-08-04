@@ -6,5 +6,5 @@ mptcp_subflow_set_scheduled() and mptcp_sched_data_set_contexts() helpers
 into this id_set, and register it in bpf_mptcp_sched_kfunc_init() to make
 sure these helpers can be accessed from the BPF context.
 
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
