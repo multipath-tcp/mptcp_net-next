@@ -16,4 +16,4 @@ multiple subflows, but it does not allow for sending redundant data.
 Multiple scheduled subflows will send sequential data on each subflow.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
