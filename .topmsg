@@ -11,7 +11,7 @@ This MPTCP BPF scheduler implementation is similar to BPF TCP CC. And
 net/ipv4/bpf_tcp_ca.c is a frame of reference for this patch.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Co-developed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
