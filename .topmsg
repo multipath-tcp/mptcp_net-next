@@ -6,8 +6,8 @@ name, owner and list, and four function pointers: init(), release(),
 data_init() and get_subflow().
 
 The scheduler functions data_init() and get_subflow() have a struct
-mptcp_sched_data parameter, which contains a reinject flag and a
-mptcp_subflow_context array.
+mptcp_sched_data parameter, which contains a reinject flag for
+retrans or not, a subflows number and a mptcp_subflow_context array.
 
 Add the scheduler registering, unregistering and finding functions to add,
 delete and find a packet scheduler on the global list mptcp_sched_list.
