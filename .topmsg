@@ -6,5 +6,5 @@ which always picks the first subflow to send data. It's a sample of
 MPTCP BPF scheduler implementations.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
