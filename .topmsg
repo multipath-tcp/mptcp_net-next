@@ -9,4 +9,4 @@ of 'ss' output after it to make sure the data has been only sent on the
 first subflow ADDR_1.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
