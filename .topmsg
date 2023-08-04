@@ -8,5 +8,5 @@ command to add the new endpoint ADDR_2 to PM netlink. Send data and check
 bytes_sent of 'ss' output after it to make sure the data has been sent on
 both net devices.
 
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
