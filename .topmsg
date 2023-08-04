@@ -13,5 +13,5 @@ Add the scheduler registering, unregistering and finding functions to add,
 delete and find a packet scheduler on the global list mptcp_sched_list.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <mathew.j.martineau@linux.intel.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
