@@ -83,7 +83,7 @@ enum p9_cache_modes {
 
 struct v9fs_session_info {
 	/* options */
-	unsigned char flags;
+	unsigned int flags;
 	unsigned char nodev;
 	unsigned short debug;
 	unsigned int afid;
