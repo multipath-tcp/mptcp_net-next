@@ -239,6 +239,21 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 		goto remove_err;
 	}
 
+	if (id_val == 0) {
+		struct mptcp_rm_list list = { .nr = 0 };
+
+		list.ids[list.nr++] = 0;
+
+		lock_sock((struct sock *)msk);
+		spin_lock_bh(&msk->pm.lock);
+		mptcp_pm_remove_addr(msk, &list);
+		spin_unlock_bh(&msk->pm.lock);
+		release_sock((struct sock *)msk);
+
+		err = 0;
+		goto remove_err;
+	}
+
 	lock_sock((struct sock *)msk);
 
 	list_for_each_entry(entry, &msk->pm.userspace_pm_local_addr_list, list) {
@@ -399,14 +414,16 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *raddr = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
 	struct nlattr *token = info->attrs[MPTCP_PM_ATTR_TOKEN];
 	struct nlattr *laddr = info->attrs[MPTCP_PM_ATTR_ADDR];
+	struct nlattr *id = info->attrs[MPTCP_PM_ATTR_LOC_ID];
 	struct mptcp_addr_info addr_l;
 	struct mptcp_addr_info addr_r;
 	struct mptcp_sock *msk;
 	struct sock *sk, *ssk;
 	int err = -EINVAL;
 	u32 token_val;
+	u8 id_val;
 
-	if (!laddr || !raddr || !token) {
+	if (((!laddr || !raddr) && !id) || !token) {
 		GENL_SET_ERR_MSG(info, "missing required inputs");
 		return err;
 	}
@@ -421,6 +438,27 @@ int mptcp_nl_cmd_sf_destroy(struct sk_buff *skb, struct genl_info *info)
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
+		goto destroy_err;
+	}
+
+	if (id) {
+		id_val = nla_get_u8(id);
+		if (id_val == 0) {
+			struct mptcp_rm_list list = { .nr = 0 };
+
+			list.ids[list.nr++] = 0;
+
+			sk = (struct sock *)msk;
+			lock_sock(sk);
+			spin_lock_bh(&msk->pm.lock);
+			mptcp_pm_nl_rm_subflow_received(msk, &list);
+			spin_unlock_bh(&msk->pm.lock);
+			release_sock(sk);
+
+			err = 0;
+		} else {
+			err = -EINVAL;
+		}
 		goto destroy_err;
 	}
 
