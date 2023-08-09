@@ -2728,7 +2728,6 @@ static void mptcp_ca_reset(struct sock *sk)
 static int mptcp_init_sock(struct sock *sk)
 {
 	struct net *net = sock_net(sk);
-	int ret;
 
 	__mptcp_init_sock(sk);
 
