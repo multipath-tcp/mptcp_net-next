@@ -347,6 +347,7 @@ int dsf(int fd, int pm_family, int argc, char *argv[])
 	u_int32_t token;
 	int addr_start;
 	int off = 0;
+	u_int8_t id;
 	int arg;
 
 	const char *params[5];
@@ -358,8 +359,36 @@ int dsf(int fd, int pm_family, int argc, char *argv[])
 	off = init_genl_req(data, pm_family, MPTCP_PM_CMD_SUBFLOW_DESTROY,
 			    MPTCP_PM_VER);
 
-	if (argc < 12)
+	if (argc < 6)
 		syntax(argv);
+
+	if (argc < 12) {
+		for (arg = 2; arg < argc; arg++) {
+			if (!strcmp(argv[arg], "id")) {
+				if (++arg >= argc)
+					error(1, 0, " missing id value");
+
+				id = atoi(argv[arg]);
+				rta = (void *)(data + off);
+				rta->rta_type = MPTCP_PM_ATTR_LOC_ID;
+				rta->rta_len = RTA_LENGTH(1);
+				memcpy(RTA_DATA(rta), &id, 1);
+				off += NLMSG_ALIGN(rta->rta_len);
+			} else if (!strcmp(argv[arg], "token")) {
+				if (++arg >= argc)
+					error(1, 0, " missing token value");
+
+				token = strtoul(argv[arg], NULL, 10);
+				rta = (void *)(data + off);
+				rta->rta_type = MPTCP_PM_ATTR_TOKEN;
+				rta->rta_len = RTA_LENGTH(4);
+				memcpy(RTA_DATA(rta), &token, 4);
+				off += NLMSG_ALIGN(rta->rta_len);
+			} else
+				error(1, 0, "unknown keyword %s", argv[arg]);
+		}
+		goto out;
+	}
 
 	/* Params recorded in this order:
 	 * <local-ip>, <local-port>, <remote-ip>, <remote-port>, <token>
@@ -443,6 +472,7 @@ int dsf(int fd, int pm_family, int argc, char *argv[])
 	memcpy(RTA_DATA(rta), &token, 4);
 	off += NLMSG_ALIGN(rta->rta_len);
 
+out:
 	do_nl_req(fd, nh, off, 0);
 
 	return 0;
