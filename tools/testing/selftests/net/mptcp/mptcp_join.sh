@@ -3320,6 +3320,15 @@ userspace_pm_rm_sf_addr_ns2()
 	wait_rm_sf $ns2 1
 }
 
+userspace_pm_rm_id_0_subflow_or_address_ns2()
+{
+	local tk
+
+	tk=$(sed -n 's/.*\(token:\)\([[:digit:]]*\).*$/\2/p;q' "$evts_ns2")
+	ip netns exec $ns2 ./pm_nl_ctl "$1" token $tk id 0
+	sleep 0.5
+}
+
 userspace_tests()
 {
 	# userspace pm type prevents add_addr
@@ -3431,6 +3440,46 @@ userspace_tests()
 		userspace_pm_rm_sf_addr_ns2 10.0.3.2 20
 		chk_rm_nr 1 1
 		chk_mptcp_info subflows 0 subflows 0
+		kill_events_pids
+		wait $tests_pid
+	fi
+
+	# userspace pm remove id 0 subflow
+	if reset_with_events "userspace pm remove id 0 subflow" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+		set_userspace_pm $ns2
+		pm_nl_set_limits $ns1 0 2
+		speed=10 \
+			run_tests $ns1 $ns2 10.0.1.1 &
+		local tests_pid=$!
+		wait_mpj $ns2
+		userspace_pm_add_sf 10.0.1.2 0
+		userspace_pm_add_sf 10.0.3.2 20
+		chk_join_nr 2 2 2
+		chk_mptcp_info subflows 2 subflows 2
+		userspace_pm_rm_id_0_subflow_or_address_ns2 dsf
+		chk_mptcp_info subflows 1 subflows 1
+		chk_rm_nr 0 2
+		kill_events_pids
+		wait $tests_pid
+	fi
+
+	# userspace pm remove id 0 address
+	if reset_with_events "userspace pm remove id 0 address" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+		set_userspace_pm $ns2
+		pm_nl_set_limits $ns1 0 2
+		speed=10 \
+			run_tests $ns1 $ns2 10.0.1.1 &
+		local tests_pid=$!
+		wait_mpj $ns2
+		userspace_pm_add_sf 10.0.1.2 0
+		userspace_pm_add_sf 10.0.3.2 20
+		chk_join_nr 2 2 2
+		chk_mptcp_info subflows 2 subflows 2
+		userspace_pm_rm_id_0_subflow_or_address_ns2 rem
+		chk_mptcp_info subflows 1 subflows 1
+		chk_rm_nr 2 0
 		kill_events_pids
 		wait $tests_pid
 	fi
