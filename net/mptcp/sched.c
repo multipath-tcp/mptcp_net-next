@@ -223,3 +223,35 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	msk->sched->data_init(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
+
+int mptcp_get_snd_burst(struct mptcp_sock *msk)
+{
+	if (!msk->sched)
+		return msk->snd_burst;
+
+	if (msk->sched->get_params) {
+		struct mptcp_sched_params params;
+
+		msk->sched->get_params(msk, &params);
+		return params.snd_burst;
+	}
+	return 0;
+}
+
+
+int mptcp_set_snd_burst(struct mptcp_sock *msk, int burst)
+{
+	if (!msk->sched) {
+		msk->snd_burst = burst;
+		return 0;
+	}
+
+	if (msk->sched->set_params) {
+		struct mptcp_sched_params params;
+
+		params.snd_burst = burst;
+		return msk->sched->set_params(msk, &params);
+	}
+	return 0;
+
+}

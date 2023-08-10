@@ -679,6 +679,8 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk);
 struct sock *mptcp_subflow_get_retrans(struct mptcp_sock *msk);
 int mptcp_sched_get_send(struct mptcp_sock *msk);
 int mptcp_sched_get_retrans(struct mptcp_sock *msk);
+int mptcp_get_snd_burst(struct mptcp_sock *msk);
+int mptcp_set_snd_burst(struct mptcp_sock *msk, int burst);
 
 static inline bool __tcp_can_send(const struct sock *ssk)
 {
