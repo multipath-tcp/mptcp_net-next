@@ -1871,6 +1871,7 @@ def print_req_policy(cw, struct, ri=None):
     for _, arg in struct.member_list():
         arg.attr_policy(cw)
     cw.p("};")
+    cw.nl()
 
 
 def kernel_can_gen_family_struct(family):
@@ -2000,9 +2001,10 @@ def print_kernel_op_table(family, cw):
                             continue
                         dont_validate.append(x)
 
-                    members.append(('validate',
-                                    ' | '.join([c_upper('genl-dont-validate-' + x)
-                                                for x in dont_validate])), )
+                    if dont_validate:
+                        members.append(('validate',
+                                        ' | '.join([c_upper('genl-dont-validate-' + x)
+                                                    for x in dont_validate])), )
                 name = c_lower(f"{family.name}-nl-{op_name}-{op_mode}it")
                 if 'pre' in op[op_mode]:
                     members.append((cb_names[op_mode]['pre'], c_lower(op[op_mode]['pre'])))
