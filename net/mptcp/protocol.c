@@ -67,11 +67,11 @@ static bool mptcp_is_tcpsk(struct sock *sk)
 		 * Hand the socket over to tcp so all further socket ops
 		 * bypass mptcp.
 		 */
-		sock->ops = &inet_stream_ops;
+		WRITE_ONCE(sock->ops, &inet_stream_ops);
 		return true;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	} else if (unlikely(sk->sk_prot == &tcpv6_prot)) {
-		sock->ops = &inet6_stream_ops;
+		WRITE_ONCE(sock->ops, &inet6_stream_ops);
 		return true;
 #endif
 	}
