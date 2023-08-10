@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-Remove-unnecessary-test-for-__mptcp_init_sock
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
