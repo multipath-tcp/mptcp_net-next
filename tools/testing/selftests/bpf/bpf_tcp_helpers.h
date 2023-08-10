@@ -246,6 +246,12 @@ struct mptcp_sched_data {
 	__u8	subflows;
 } __attribute__((preserve_access_index));
 
+struct mptcp_sched_params {
+	union {
+		int	snd_burst;
+	};
+};
+
 struct mptcp_sched_ops {
 	char name[MPTCP_SCHED_NAME_MAX];
 
@@ -256,6 +262,10 @@ struct mptcp_sched_ops {
 			  struct mptcp_sched_data *data);
 	int (*get_subflow)(struct mptcp_sock *msk,
 			   const struct mptcp_sched_data *data);
+	int (*get_params)(struct mptcp_sock *msk,
+			  struct mptcp_sched_params *params);
+	int (*set_params)(struct mptcp_sock *msk,
+			  struct mptcp_sched_params *params);
 	void *owner;
 };
 
