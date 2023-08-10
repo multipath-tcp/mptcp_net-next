@@ -1,5 +1,5 @@
 From: Kuniyuki Iwashima <kuniyu@amazon.com>
-Subject: [PATCH] mptcp: Remove unnecessary test for __mptcp_init_sock().
+Subject: [PATCH] mptcp: Remove unnecessary test for __mptcp_init_sock()
 
 __mptcp_init_sock() always returns 0 because mptcp_init_sock() used
 to return the value directly.
