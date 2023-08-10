@@ -35,9 +35,26 @@ static int mptcp_sched_default_get_subflow(struct mptcp_sock *msk,
 	return 0;
 }
 
+static int mptcp_sched_default_get_params(struct mptcp_sock *msk,
+					  struct mptcp_sched_params *params)
+{
+	params->snd_burst = msk->snd_burst;
+	return 0;
+}
+
+
+static int mptcp_sched_default_set_params(struct mptcp_sock *msk,
+					  struct mptcp_sched_params *params)
+{
+	msk->snd_burst = params->snd_burst;
+	return 0;
+}
+
 static struct mptcp_sched_ops mptcp_sched_default = {
 	.data_init	= mptcp_sched_default_data_init,
 	.get_subflow	= mptcp_sched_default_get_subflow,
+	.get_params	= mptcp_sched_default_get_params,
+	.set_params	= mptcp_sched_default_set_params,
 	.name		= "default",
 	.owner		= THIS_MODULE,
 };
