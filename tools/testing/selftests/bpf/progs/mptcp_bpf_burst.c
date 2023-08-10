@@ -44,6 +44,8 @@ extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock
 SEC("struct_ops/mptcp_sched_burst_init")
 void BPF_PROG(mptcp_sched_burst_init, struct mptcp_sock *msk)
 {
+	bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
+			   BPF_LOCAL_STORAGE_GET_F_CREATE);
 }
 
 SEC("struct_ops/mptcp_sched_burst_release")
@@ -58,13 +60,25 @@ void BPF_STRUCT_OPS(bpf_burst_data_init, struct mptcp_sock *msk,
 	mptcp_sched_data_set_contexts(msk, data);
 }
 
+static int set_snd_burst(struct mptcp_sock *msk, int burst)
+{
+	struct mptcp_burst_storage *ptr;
+
+	ptr = bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
+				 BPF_LOCAL_STORAGE_GET_F_CREATE);
+	if (!ptr)
+		return -1;
+
+	ptr->snd_burst = burst;
+	return 0;
+}
+
 static int bpf_burst_get_send(struct mptcp_sock *msk,
 			      const struct mptcp_sched_data *data)
 {
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	struct mptcp_burst_storage *ptr;
 	__u32 pace, burst, wmem;
 	__u64 linger_time;
 	struct sock *ssk;
@@ -121,10 +135,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	subflow->avg_pacing_rate = div_u64((__u64)subflow->avg_pacing_rate * wmem +
 					   ssk->sk_pacing_rate * burst,
 					   burst + wmem);
-	ptr = bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
-				 BPF_LOCAL_STORAGE_GET_F_CREATE);
-	if (ptr)
-		ptr->snd_burst = burst;
+	set_snd_burst(msk, burst);
 
 out:
 	mptcp_subflow_set_scheduled(subflow, true);
@@ -187,11 +198,33 @@ int BPF_STRUCT_OPS(bpf_burst_get_subflow, struct mptcp_sock *msk,
 	return bpf_burst_get_send(msk, data);
 }
 
+int BPF_STRUCT_OPS(bpf_burst_get_params, struct mptcp_sock *msk,
+		   struct mptcp_sched_params *params)
+{
+	struct mptcp_burst_storage *ptr;
+
+	ptr = bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
+			BPF_LOCAL_STORAGE_GET_F_CREATE);
+	if (!ptr)
+		return -1;
+
+	params->snd_burst = ptr->snd_burst;
+	return 0;
+}
+
+int BPF_STRUCT_OPS(bpf_burst_set_params, struct mptcp_sock *msk,
+		   struct mptcp_sched_params *params)
+{
+	return set_snd_burst(msk, params->snd_burst);
+}
+
 SEC(".struct_ops")
 struct mptcp_sched_ops burst = {
 	.init		= (void *)mptcp_sched_burst_init,
 	.release	= (void *)mptcp_sched_burst_release,
 	.data_init	= (void *)bpf_burst_data_init,
 	.get_subflow	= (void *)bpf_burst_get_subflow,
+	.get_params	= (void *)bpf_burst_get_params,
+	.set_params	= (void *)bpf_burst_set_params,
 	.name		= "bpf_burst",
 };
