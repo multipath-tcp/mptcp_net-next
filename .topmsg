@@ -1,4 +1,14 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-Remove-unnecessary-test-for-__mptcp_init_sock
+From: Kuniyuki Iwashima <kuniyu@amazon.com>
+Subject: [PATCH] mptcp: Remove unnecessary test for __mptcp_init_sock().
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+__mptcp_init_sock() always returns 0 because mptcp_init_sock() used
+to return the value directly.
+
+But after commit 18b683bff89d ("mptcp: queue data for mptcp level
+retransmission"), __mptcp_init_sock() need not return value anymore.
+
+Let's remove the unnecessary test for __mptcp_init_sock() and make
+it return void.
+
+Signed-off-by: Kuniyuki Iwashima <kuniyu@amazon.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
