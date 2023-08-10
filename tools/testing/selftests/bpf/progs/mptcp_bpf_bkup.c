@@ -40,8 +40,10 @@ int BPF_STRUCT_OPS(bpf_bkup_get_subflow, struct mptcp_sock *msk,
 		}
 	}
 
-	if (nr != -1)
+	if (nr != -1) {
 		mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(data, nr), true);
+		return -1;
+	}
 	return 0;
 }
 
