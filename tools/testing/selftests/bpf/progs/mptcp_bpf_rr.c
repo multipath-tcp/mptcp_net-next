@@ -20,6 +20,8 @@ struct {
 SEC("struct_ops/mptcp_sched_rr_init")
 void BPF_PROG(mptcp_sched_rr_init, struct mptcp_sock *msk)
 {
+	bpf_sk_storage_get(&mptcp_rr_map, msk, 0,
+			   BPF_LOCAL_STORAGE_GET_F_CREATE);
 }
 
 SEC("struct_ops/mptcp_sched_rr_release")
