@@ -18,8 +18,9 @@
 
 #ifdef CONFIG_BPF_JIT
 extern struct bpf_struct_ops bpf_mptcp_sched_ops;
-static const struct btf_type *mptcp_sched_type __read_mostly;
-static u32 mptcp_sched_id;
+static const struct btf_type *mptcp_subflow_type __read_mostly;
+static const struct btf_type *mptcp_params_type __read_mostly;
+static u32 mptcp_subflow_id, mptcp_params_id;
 
 static const struct bpf_func_proto *
 bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
@@ -47,8 +48,8 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	size_t end;
 
 	t = btf_type_by_id(reg->btf, reg->btf_id);
-	if (t != mptcp_sched_type) {
-		bpf_log(log, "only access to mptcp_subflow_context is supported\n");
+	if (t != mptcp_subflow_type && t != mptcp_params_type) {
+		bpf_log(log, "only access to mptcp_sched is supported\n");
 		return -EACCES;
 	}
 
@@ -59,13 +60,16 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	case offsetof(struct mptcp_subflow_context, avg_pacing_rate):
 		end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
 		break;
+	case offsetof(struct mptcp_sched_params, snd_burst):
+		end = offsetofend(struct mptcp_sched_params, snd_burst);
+		break;
 	default:
-		bpf_log(log, "no write support to mptcp_subflow_context at off %d\n", off);
+		bpf_log(log, "no write support to mptcp_sched at off %d\n", off);
 		return -EACCES;
 	}
 
 	if (off + size > end) {
-		bpf_log(log, "access beyond mptcp_subflow_context at off %u size %u ended at %zu",
+		bpf_log(log, "access beyond mptcp_sched at off %u size %u ended at %zu",
 			off, size, end);
 		return -EACCES;
 	}
@@ -129,8 +133,15 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 					BTF_KIND_STRUCT);
 	if (type_id < 0)
 		return -EINVAL;
-	mptcp_sched_id = type_id;
-	mptcp_sched_type = btf_type_by_id(btf, mptcp_sched_id);
+	mptcp_subflow_id = type_id;
+	mptcp_subflow_type = btf_type_by_id(btf, mptcp_subflow_id);
+
+	type_id = btf_find_by_name_kind(btf, "mptcp_sched_params",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_params_id = type_id;
+	mptcp_params_type = btf_type_by_id(btf, mptcp_params_id);
 
 	return 0;
 }
