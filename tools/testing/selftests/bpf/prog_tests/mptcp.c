@@ -193,7 +193,6 @@ with_mptcp:
 
 fail:
 	cleanup_netns(nstoken);
-
 	close(cgroup_fd);
 }
 
