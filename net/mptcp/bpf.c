@@ -172,12 +172,12 @@ static const struct btf_kfunc_id_set bpf_mptcp_sched_kfunc_set = {
 	.set	= &bpf_mptcp_sched_kfunc_ids,
 };
 
-static int __init bpf_mptcp_sched_kfunc_init(void)
+static int __init bpf_mptcp_kfunc_init(void)
 {
 	return register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					 &bpf_mptcp_sched_kfunc_set);
 }
-late_initcall(bpf_mptcp_sched_kfunc_init);
+late_initcall(bpf_mptcp_kfunc_init);
 #endif /* CONFIG_BPF_JIT */
 
 struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
