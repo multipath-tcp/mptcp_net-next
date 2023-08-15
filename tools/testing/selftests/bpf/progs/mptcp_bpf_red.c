@@ -16,15 +16,11 @@ void BPF_PROG(mptcp_sched_red_release, struct mptcp_sock *msk)
 {
 }
 
-void BPF_STRUCT_OPS(bpf_red_data_init, struct mptcp_sock *msk,
-		    struct mptcp_sched_data *data)
+int BPF_STRUCT_OPS(bpf_red_get_subflow, struct mptcp_sock *msk,
+		   struct mptcp_sched_data *data)
 {
 	mptcp_sched_data_set_contexts(msk, data);
-}
 
-int BPF_STRUCT_OPS(bpf_red_get_subflow, struct mptcp_sock *msk,
-		   const struct mptcp_sched_data *data)
-{
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
 		if (!mptcp_subflow_ctx_by_pos(data, i))
 			break;
@@ -39,7 +35,6 @@ SEC(".struct_ops")
 struct mptcp_sched_ops red = {
 	.init		= (void *)mptcp_sched_red_init,
 	.release	= (void *)mptcp_sched_red_release,
-	.data_init	= (void *)bpf_red_data_init,
 	.get_subflow	= (void *)bpf_red_get_subflow,
 	.name		= "bpf_red",
 };
