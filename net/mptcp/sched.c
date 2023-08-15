@@ -16,13 +16,8 @@
 static DEFINE_SPINLOCK(mptcp_sched_list_lock);
 static LIST_HEAD(mptcp_sched_list);
 
-static void mptcp_sched_default_data_init(struct mptcp_sock *msk,
-					  struct mptcp_sched_data *data)
-{
-}
-
 static int mptcp_sched_default_get_subflow(struct mptcp_sock *msk,
-					   const struct mptcp_sched_data *data)
+					   struct mptcp_sched_data *data)
 {
 	struct sock *ssk;
 
@@ -36,7 +31,6 @@ static int mptcp_sched_default_get_subflow(struct mptcp_sock *msk,
 }
 
 static struct mptcp_sched_ops mptcp_sched_default = {
-	.data_init	= mptcp_sched_default_data_init,
 	.get_subflow	= mptcp_sched_default_get_subflow,
 	.name		= "default",
 	.owner		= THIS_MODULE,
@@ -150,17 +144,9 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 			return 0;
 	}
 
-	if (!msk->sched) {
-		struct sock *ssk;
-
-		ssk = mptcp_subflow_get_send(msk);
-		if (!ssk)
-			return -EINVAL;
-		mptcp_subflow_set_scheduled(mptcp_subflow_ctx(ssk), true);
-		return 0;
-	}
-
 	data.reinject = false;
+	if (msk->sched == &mptcp_sched_default || !msk->sched)
+		return mptcp_sched_default_get_subflow(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
 
@@ -180,17 +166,9 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 			return 0;
 	}
 
-	if (!msk->sched) {
-		struct sock *ssk;
-
-		ssk = mptcp_subflow_get_retrans(msk);
-		if (!ssk)
-			return -EINVAL;
-		mptcp_subflow_set_scheduled(mptcp_subflow_ctx(ssk), true);
-		return 0;
-	}
-
 	data.reinject = true;
+	if (msk->sched == &mptcp_sched_default || !msk->sched)
+		return mptcp_sched_default_get_subflow(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
 
