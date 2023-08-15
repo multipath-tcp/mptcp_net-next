@@ -161,7 +161,6 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	}
 
 	data.reinject = false;
-	msk->sched->data_init(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
 
@@ -192,7 +191,6 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	}
 
 	data.reinject = true;
-	msk->sched->data_init(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
 
