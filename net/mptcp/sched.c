@@ -59,7 +59,7 @@ struct mptcp_sched_ops *mptcp_sched_find(const char *name)
 
 int mptcp_register_scheduler(struct mptcp_sched_ops *sched)
 {
-	if (!sched->data_init || !sched->get_subflow)
+	if (!sched->get_subflow)
 		return -EINVAL;
 
 	spin_lock(&mptcp_sched_list_lock);
@@ -161,7 +161,6 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	}
 
 	data.reinject = false;
-	msk->sched->data_init(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
 
@@ -192,6 +191,5 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	}
 
 	data.reinject = true;
-	msk->sched->data_init(msk, &data);
 	return msk->sched->get_subflow(msk, &data);
 }
