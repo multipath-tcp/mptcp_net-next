@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: avoid subflow socket usage in mptcp_get_port()
-
-We are going to remove the first subflow socket soon, so avoid
-accessing it in mptcp_get_port(). Instead, access directly the
-first subflow sock.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
