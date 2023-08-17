@@ -8,5 +8,8 @@ Skip deleting this default scheduler in mptcp_unregister_scheduler().
 Set msk->sched to the default scheduler when the input parameter of
 mptcp_init_sched() is NULL.
 
+Invoke mptcp_sched_default_get_subflow in get_send() and get_retrans()
+if the defaut scheduler is set or msk->sched is NULL.
+
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
