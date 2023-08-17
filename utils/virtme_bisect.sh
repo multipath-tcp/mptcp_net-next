@@ -13,7 +13,7 @@ stress() { local i=0 pid nproc2
 	sleep 30
 
 	nproc2=$(nproc); nproc2=$((nproc2 * 2))
-	stress-ng --cpu "${nproc2}" --io "${nproc2}" --vm "${nproc2}" --vm-bytes 1G --timeout 60m &
+	stress-ng --cpu "${nproc2}" --iomix "${nproc2}" --vm "${nproc2}" --vm-bytes 1G --timeout 60m &
 	pid=$!
 
 	# We can also renice 20 qemu for even more impact
