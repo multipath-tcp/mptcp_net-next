@@ -3320,6 +3320,26 @@ userspace_pm_rm_sf_addr_ns2()
 	wait_rm_sf $ns2 1
 }
 
+# $1: command (rem/dsf)
+userspace_pm_rm_id_0_subflow_or_address_ns2()
+{
+	local tk da dp sp
+
+	tk=$(sed -n 's/.*\(token:\)\([[:digit:]]*\).*$/\2/p;q' "$evts_ns2")
+	da=$(sed -n 's/.*\(daddr4:\)\([0-9.]*\).*$/\2/p;q' "$evts_ns2")
+	dp=$(sed -n 's/.*\(dport:\)\([[:digit:]]*\).*$/\2/p;q' "$evts_ns2")
+	sp=$(sed -n 's/.*\(sport:\)\([[:digit:]]*\).*$/\2/p;q' "$evts_ns2")
+
+	if [ "$1" == "subflow" ]; then
+		ip netns exec $ns2 ./pm_nl_ctl dsf lip 10.0.1.2 lport $sp \
+				rip $da rport $dp token $tk
+	elif [ "$1" == "address" ]; then
+		ip netns exec $ns2 ./pm_nl_ctl rem token $tk id 0
+	fi
+
+	sleep 0.5
+}
+
 userspace_tests()
 {
 	# userspace pm type prevents add_addr
@@ -3434,6 +3454,32 @@ userspace_tests()
 		kill_events_pids
 		wait $tests_pid
 	fi
+
+	# userspace pm remove id 0 subflow & address
+	for type in "subflow" "address"; do
+		if reset_with_events "userspace pm remove id 0 $type" &&
+		   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+			set_userspace_pm $ns2
+			pm_nl_set_limits $ns1 0 2
+			speed=10 \
+				run_tests $ns1 $ns2 10.0.1.1 &
+			local tests_pid=$!
+			wait_mpj $ns2
+			userspace_pm_add_sf 10.0.2.2 0
+			userspace_pm_add_sf 10.0.3.2 20
+			chk_join_nr 2 2 2
+			chk_mptcp_info subflows 2 subflows 2
+			userspace_pm_rm_id_0_subflow_or_address_ns2 "$type"
+			if [ "$type" == "subflow" ]; then
+				chk_rm_nr 0 1
+			elif [ "$type" == "address" ]; then
+				chk_rm_nr 1 0
+			fi
+			chk_mptcp_info subflows 2 subflows 1
+			kill_events_pids
+			wait $tests_pid
+		fi
+	done
 }
 
 endpoint_tests()
