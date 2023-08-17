@@ -2,6 +2,7 @@
 
 : "${MODE:=normal}"
 : "${STRESS:=0}"
+: "${STASH:=0}"
 
 stress() { local i=0 pid nproc2
 	while [[ $((i++)) -lt 500 ]]; do
