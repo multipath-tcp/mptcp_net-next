@@ -253,10 +253,8 @@ struct mptcp_sched_ops {
 	void (*init)(struct mptcp_sock *msk);
 	void (*release)(struct mptcp_sock *msk);
 
-	void (*data_init)(struct mptcp_sock *msk,
-			  struct mptcp_sched_data *data);
 	int (*get_subflow)(struct mptcp_sock *msk,
-			   const struct mptcp_sched_data *data);
+			   struct mptcp_sched_data *data);
 	void *owner;
 };
 
