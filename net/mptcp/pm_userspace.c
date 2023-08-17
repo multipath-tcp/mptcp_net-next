@@ -236,7 +236,31 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 
 	if (!mptcp_pm_is_userspace(msk)) {
 		GENL_SET_ERR_MSG(info, "invalid request; userspace PM not selected");
-		goto remove_err;
+		goto out;
+	}
+
+	if (id_val == 0) {
+		struct mptcp_rm_list list = { .nr = 0 };
+		struct mptcp_subflow_context *subflow;
+		int id_0 = 0;
+
+		mptcp_for_each_subflow(msk, subflow) {
+			if (subflow->remote_id == 0)
+				id_0 = 1;
+		}
+		if (!id_0)
+			goto out;
+
+		list.ids[list.nr++] = 0;
+
+		lock_sock((struct sock *)msk);
+		spin_lock_bh(&msk->pm.lock);
+		mptcp_pm_remove_addr(msk, &list);
+		spin_unlock_bh(&msk->pm.lock);
+		release_sock((struct sock *)msk);
+
+		err = 0;
+		goto out;
 	}
 
 	lock_sock((struct sock *)msk);
@@ -251,7 +275,7 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	if (!match) {
 		GENL_SET_ERR_MSG(info, "address with specified id not found");
 		release_sock((struct sock *)msk);
-		goto remove_err;
+		goto out;
 	}
 
 	list_move(&match->list, &free_list);
@@ -265,7 +289,7 @@ int mptcp_nl_cmd_remove(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	err = 0;
- remove_err:
+out:
 	sock_put((struct sock *)msk);
 	return err;
 }

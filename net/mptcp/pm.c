@@ -192,7 +192,7 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk, const struct sock *ssk,
 
 	update_subflows = subflow->request_join || subflow->mp_join;
 	if (mptcp_pm_is_userspace(msk)) {
-		if (update_subflows) {
+		if (update_subflows || subflow->request_mptcp || subflow->mp_capable) {
 			spin_lock_bh(&pm->lock);
 			pm->subflows--;
 			spin_unlock_bh(&pm->lock);
