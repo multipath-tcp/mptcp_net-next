@@ -16,16 +16,12 @@ void BPF_PROG(mptcp_sched_bkup_release, struct mptcp_sock *msk)
 {
 }
 
-void BPF_STRUCT_OPS(bpf_bkup_data_init, struct mptcp_sock *msk,
-		    struct mptcp_sched_data *data)
-{
-	mptcp_sched_data_set_contexts(msk, data);
-}
-
 int BPF_STRUCT_OPS(bpf_bkup_get_subflow, struct mptcp_sock *msk,
-		   const struct mptcp_sched_data *data)
+		   struct mptcp_sched_data *data)
 {
 	int nr = -1;
+
+	mptcp_sched_data_set_contexts(msk, data);
 
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
 		struct mptcp_subflow_context *subflow;
@@ -49,7 +45,6 @@ SEC(".struct_ops")
 struct mptcp_sched_ops bkup = {
 	.init		= (void *)mptcp_sched_bkup_init,
 	.release	= (void *)mptcp_sched_bkup_release,
-	.data_init	= (void *)bpf_bkup_data_init,
 	.get_subflow	= (void *)bpf_bkup_get_subflow,
 	.name		= "bpf_bkup",
 };
