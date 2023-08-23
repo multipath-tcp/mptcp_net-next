@@ -199,3 +199,21 @@ mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
 		return NULL;
 	return data->contexts[pos];
 }
+
+int mptcp_sched_get_params(struct mptcp_sock *msk)
+{
+	if (msk->sched == &mptcp_sched_default)
+		return msk->snd_burst;
+
+	return 0;
+}
+
+int mptcp_sched_set_params(struct mptcp_sock *msk, int burst)
+{
+	if (msk->sched == &mptcp_sched_default) {
+		msk->snd_burst = burst;
+		return 0;
+	}
+
+	return 0;
+}
