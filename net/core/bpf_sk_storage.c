@@ -17,7 +17,7 @@
 
 DEFINE_BPF_STORAGE_CACHE(sk_cache);
 
-static struct bpf_local_storage_data *
+struct bpf_local_storage_data *
 bpf_sk_storage_lookup(struct sock *sk, struct bpf_map *map, bool cacheit_lockit)
 {
 	struct bpf_local_storage *sk_storage;

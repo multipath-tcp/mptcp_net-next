@@ -37,6 +37,8 @@ int bpf_sk_storage_diag_put(struct bpf_sk_storage_diag *diag,
 			    struct sock *sk, struct sk_buff *skb,
 			    int stg_array_type,
 			    unsigned int *res_diag_size);
+struct bpf_local_storage_data *
+bpf_sk_storage_lookup(struct sock *sk, struct bpf_map *map, bool cacheit_lockit);
 #else
 static inline int bpf_sk_storage_clone(const struct sock *sk,
 				       struct sock *newsk)
@@ -57,6 +59,11 @@ static inline int bpf_sk_storage_diag_put(struct bpf_sk_storage_diag *diag,
 					  unsigned int *res_diag_size)
 {
 	return 0;
+}
+struct bpf_local_storage_data *
+bpf_sk_storage_lookup(struct sock *sk, struct bpf_map *map, bool cacheit_lockit)
+{
+	return NULL;
 }
 #endif
 

@@ -11,6 +11,7 @@
 #include <linux/list.h>
 #include <linux/rculist.h>
 #include <linux/spinlock.h>
+#include <net/bpf_sk_storage.h>
 #include "protocol.h"
 
 static DEFINE_SPINLOCK(mptcp_sched_list_lock);
@@ -202,17 +203,55 @@ mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
 
 int mptcp_sched_get_params(struct mptcp_sock *msk)
 {
+	struct sock *sk = (struct sock *)msk;
+
 	if (msk->sched == &mptcp_sched_default)
 		return msk->snd_burst;
+
+	if (sk->sk_bpf_storage && sk->sk_bpf_storage->smap &&
+	    !strcmp(sk->sk_bpf_storage->smap->map.name, "mptcp_burst_map")) {
+		struct bpf_local_storage_data *sdata;
+
+		sdata = bpf_sk_storage_lookup(sk, &sk->sk_bpf_storage->smap->map, true);
+		if (sdata) {
+			struct mptcp_burst_storage {
+				int snd_burst;
+			} *ptr;
+
+			ptr = (struct mptcp_burst_storage *)sdata->data;
+			if (ptr)
+				return ptr->snd_burst;
+		}
+	}
 
 	return 0;
 }
 
 int mptcp_sched_set_params(struct mptcp_sock *msk, int burst)
 {
+	struct sock *sk = (struct sock *)msk;
+
 	if (msk->sched == &mptcp_sched_default) {
 		msk->snd_burst = burst;
 		return 0;
+	}
+
+	if (sk->sk_bpf_storage && sk->sk_bpf_storage->smap &&
+	    !strcmp(sk->sk_bpf_storage->smap->map.name, "mptcp_burst_map")) {
+		struct bpf_local_storage_data *sdata;
+
+		sdata = bpf_sk_storage_lookup(sk, &sk->sk_bpf_storage->smap->map, true);
+		if (sdata) {
+			struct mptcp_burst_storage {
+				int snd_burst;
+			} *ptr;
+
+			ptr = (struct mptcp_burst_storage *)sdata->data;
+			if (ptr) {
+				ptr->snd_burst = burst;
+				return 0;
+			}
+		}
 	}
 
 	return 0;
