@@ -383,10 +383,16 @@ reset_with_checksum()
 
 reset_with_allow_join_id0()
 {
-	local ns1_enable=$2
-	local ns2_enable=$3
+	local ns1_enable=0
+	local ns2_enable=0
 
 	reset "${1}" || return 1
+
+	if [ "${2}" == "ns1" ]; then
+		ns1_enable=1
+	elif [ "${2}" == "ns2" ]; then
+		ns2_enable=1
+	fi
 
 	ip netns exec $ns1 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns1_enable
 	ip netns exec $ns2 sysctl -q net.mptcp.allow_join_initial_addr_port=$ns2_enable
@@ -3054,65 +3060,47 @@ checksum_tests()
 
 deny_join_id0_tests()
 {
-	# subflow allow join id0 ns1
-	if reset_with_allow_join_id0 "single subflow allow join id0 ns1" 1 0; then
-		pm_nl_set_limits $ns1 1 1
-		pm_nl_set_limits $ns2 1 1
-		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
-	fi
+	local ns
 
-	# subflow allow join id0 ns2
-	if reset_with_allow_join_id0 "single subflow allow join id0 ns2" 0 1; then
-		pm_nl_set_limits $ns1 1 1
-		pm_nl_set_limits $ns2 1 1
-		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 0 0 0
-	fi
+	for ns in "ns1" "ns2"; do
+		# subflow allow join id0 ns1/ns2
+		if reset_with_allow_join_id0 "single subflow allow join id0 $ns" "$ns"; then
+			pm_nl_set_limits $ns1 1 1
+			pm_nl_set_limits $ns2 1 1
+			pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+			run_tests $ns1 $ns2 10.0.1.1
+			if [ "$ns" == "ns1" ]; then
+				chk_join_nr 1 1 1
+			elif [ "$ns" == "ns2" ]; then
+				chk_join_nr 0 0 0
+			fi
+		fi
 
-	# signal address allow join id0 ns1
-	# ADD_ADDRs are not affected by allow_join_id0 value.
-	if reset_with_allow_join_id0 "signal address allow join id0 ns1" 1 0; then
-		pm_nl_set_limits $ns1 1 1
-		pm_nl_set_limits $ns2 1 1
-		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
-		chk_add_nr 1 1
-	fi
+		# signal address allow join id0 ns1/ns2
+		# ADD_ADDRs are not affected by allow_join_id0 value.
+		if reset_with_allow_join_id0 "signal address allow join id0 $ns" "$ns"; then
+			pm_nl_set_limits $ns1 1 1
+			pm_nl_set_limits $ns2 1 1
+			pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+			run_tests $ns1 $ns2 10.0.1.1
+			chk_join_nr 1 1 1
+			chk_add_nr 1 1
+		fi
 
-	# signal address allow join id0 ns2
-	# ADD_ADDRs are not affected by allow_join_id0 value.
-	if reset_with_allow_join_id0 "signal address allow join id0 ns2" 0 1; then
-		pm_nl_set_limits $ns1 1 1
-		pm_nl_set_limits $ns2 1 1
-		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
-		chk_add_nr 1 1
-	fi
-
-	# subflow and address allow join id0 ns1
-	if reset_with_allow_join_id0 "subflow and address allow join id0 1" 1 0; then
-		pm_nl_set_limits $ns1 2 2
-		pm_nl_set_limits $ns2 2 2
-		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 2 2 2
-	fi
-
-	# subflow and address allow join id0 ns2
-	if reset_with_allow_join_id0 "subflow and address allow join id0 2" 0 1; then
-		pm_nl_set_limits $ns1 2 2
-		pm_nl_set_limits $ns2 2 2
-		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
-		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
-		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
-	fi
+		# subflow and address allow join id0 ns1/ns2
+		if reset_with_allow_join_id0 "subflow & address allow join id0 $ns" "$ns"; then
+			pm_nl_set_limits $ns1 2 2
+			pm_nl_set_limits $ns2 2 2
+			pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+			pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+			run_tests $ns1 $ns2 10.0.1.1
+			if [ "$ns" == "ns1" ]; then
+				chk_join_nr 2 2 2
+			elif [ "$ns" == "ns2" ]; then
+				chk_join_nr 1 1 1
+			fi
+		fi
+	done
 }
 
 fullmesh_tests()
