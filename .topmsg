@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-bogus-receive-window-shrinkage-with-multiple-subflows
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix bogus receive window shrinkage with multiple subflows
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+In case multiple subflows race to update the mptcp-level receive
+window, the subflow losing the race should use the window value
+provided by the "winning" subflow to update it's own tcp-level
+rcv_wnd.
+
+To such goal, the current code bogusly uses the mptcp-level rcv_wnd
+value as observed before the update attempt. On unluckly circumstances
+that may lead to TCP-level window shrinkage, and stall the other end.
+
+Address the issue feeding to the rcv wnd update the correct value.
+
+Fixes: f3589be0c420 ("mptcp: never shrink offered window")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
