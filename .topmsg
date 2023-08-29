@@ -1,4 +1,7 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-__mptcp_error_report-in-protocol.c
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: move __mptcp_error_report in protocol.c
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This will simplify the next patch. No functional change intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
