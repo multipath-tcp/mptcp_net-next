@@ -7,11 +7,12 @@ provided by the "winning" subflow to update it's own tcp-level
 rcv_wnd.
 
 To such goal, the current code bogusly uses the mptcp-level rcv_wnd
-value as observed before the update attempt. On unluckly circumstances
+value as observed before the update attempt. On unlucky circumstances
 that may lead to TCP-level window shrinkage, and stall the other end.
 
 Address the issue feeding to the rcv wnd update the correct value.
 
 Fixes: f3589be0c420 ("mptcp: never shrink offered window")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/427
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
