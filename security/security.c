@@ -1139,6 +1139,20 @@ void security_bprm_committed_creds(struct linux_binprm *bprm)
 }
 
 /**
+ * security_fs_context_submount() - Initialise fc->security
+ * @fc: new filesystem context
+ * @reference: dentry reference for submount/remount
+ *
+ * Fill out the ->security field for a new fs_context.
+ *
+ * Return: Returns 0 on success or negative error code on failure.
+ */
+int security_fs_context_submount(struct fs_context *fc, struct super_block *reference)
+{
+	return call_int_hook(fs_context_submount, 0, fc, reference);
+}
+
+/**
  * security_fs_context_dup() - Duplicate a fs_context LSM blob
  * @fc: destination filesystem context
  * @src_fc: source filesystem context
@@ -4396,7 +4410,7 @@ void security_sk_clone(const struct sock *sk, struct sock *newsk)
 }
 EXPORT_SYMBOL(security_sk_clone);
 
-void security_sk_classify_flow(struct sock *sk, struct flowi_common *flic)
+void security_sk_classify_flow(const struct sock *sk, struct flowi_common *flic)
 {
 	call_void_hook(sk_getsecid, sk, &flic->flowic_secid);
 }
