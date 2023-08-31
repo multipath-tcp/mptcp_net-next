@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/super-move-lockdep-assert
+From: Christian Brauner <brauner@kernel.org>
+Subject: [PATCH] super: move lockdep assert
 
+Fix braino and move the lockdep assertion after put_super() otherwise we
+risk a use-after-free.
+
+Fixes: 2c18a63b760a ("super: wait until we passed kill super")
+Reviewed-by: Jan Kara <jack@suse.cz>
+Reviewed-by: Christoph Hellwig <hch@lst.de>
+Message-Id: <20230828-vfs-super-fixes-v1-1-b37a4a04a88f@kernel.org>
+Signed-off-by: Christian Brauner <brauner@kernel.org>
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
