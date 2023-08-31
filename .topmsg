@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/super-move-lockdep-assert
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
