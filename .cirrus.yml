@@ -9,7 +9,7 @@ task:
   container:
     image: mptcp/mptcp-upstream-virtme-docker:latest
     kvm: true   ## Needed for the tests
-    cpu: 4      ## Max 16 per project, even number with kvm
+    cpu: 2      ## Max 16 per project, even number with kvm
     memory: 8G  ## Max 4 per CPU
 
   env:
