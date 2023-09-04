@@ -262,6 +262,7 @@ struct mptcp_sock {
 	struct inet_connection_sock	sk;
 
 	__u64		snd_nxt;
+	int		snd_burst;
 	__u32		token;
 	struct sock	*first;
 	char		ca_name[TCP_CA_NAME_MAX];
