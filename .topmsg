@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-rename-timer-related-helper-to-less-confusing-names
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: rename timer related helper to less confusing names
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The msk socket uses to different timeout to track close related
+events and retransmissions. The existing helpers do not indicate
+clearly which timer they actually touch, making the related code
+quite confusing.
+
+Change the existing helpers name to avoid such confusion. No
+functional change intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
