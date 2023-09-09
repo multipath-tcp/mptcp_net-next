@@ -69,6 +69,8 @@ static __always_inline bool sk_stream_memory_free(const struct sock *sk)
 SEC("struct_ops/mptcp_sched_burst_init")
 void BPF_PROG(mptcp_sched_burst_init, struct mptcp_sock *msk)
 {
+	bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
+			   BPF_LOCAL_STORAGE_GET_F_CREATE);
 }
 
 SEC("struct_ops/mptcp_sched_burst_release")
