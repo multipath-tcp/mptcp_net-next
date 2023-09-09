@@ -1,4 +1,29 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-dangling-connection-hang-up
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix dangling connection hang-up
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+According to RFC 8684 section 3.3:
+
+  A connection is not closed unless [...] or an implementation-specific
+  connection-level send timeout.
+
+Currently the MPTCP protocol does not implement such timeout, and
+connection timing-out at the TCP-level never move to close state.
+
+Introduces a catch-up condition at subflow close time to move the
+MPTCP socket to close, too.
+
+That additionally allow removing similar existing inside the worker.
+
+Finally, allow some additional timeout for plain ESTABLISHED mptcp
+sockets, as the protocol allows creating new subflows even at that
+point and making the connection functional again.
+
+The issues is actually present since the beginning, but it basically
+impossible to solve without a long chain of functional pre-requisites
+topped by commit bbd49d114d57 ("mptcp: consolidate transition to
+TCP_CLOSE in mptcp_do_fastclose()").
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/430
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
