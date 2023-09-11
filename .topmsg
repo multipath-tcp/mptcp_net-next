@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/workqueue-Remove-duplicate-worqueue-attributes-allocation
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
