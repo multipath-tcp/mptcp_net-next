@@ -1,4 +1,28 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/workqueue-Remove-duplicate-worqueue-attributes-allocation
+From: Catalin Marinas <catalin.marinas@arm.com>
+Subject: [PATCH] workqueue: Remove duplicate worqueue attributes allocation
 
+Commit 84193c07105c ("workqueue: Generalize unbound CPU pods")
+inadvertently introduced another call to alloc_workqueue_attrs()
+overriding the pointer returned by a previous alloc_workqueue_attrs() a
+few lines up in workqueue_init_early(). This leads to a kmemleak report:
+
+unreferenced object 0xffff000040015000 (size 96):
+  comm "swapper/0", pid 0, jiffies 4294892296 (age 163.956s)
+  hex dump (first 32 bytes):
+    00 00 00 00 00 00 00 00 03 00 00 00 00 00 00 00  ................
+    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+  backtrace:
+    [<000000004cec0d50>] __kmem_cache_alloc_node+0x1c4/0x288
+    [<0000000083361c2a>] kmalloc_trace+0x20/0x2c
+    [<000000005ca61f11>] workqueue_init_early+0xe4/0x538
+    [<000000004e6ea358>] start_kernel+0x23c/0x5ec
+    [<00000000aea9761e>] __primary_switched+0xbc/0xc4
+
+Remove the first allocation.
+
+Fixes: 84193c07105c ("workqueue: Generalize unbound CPU pods")
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Tejun Heo <tj@kernel.org>
+Reviewed-by: Sandeep Dhavale <dhavale@google.com>
+Link: https://lore.kernel.org/r/20230906173904.475722-1-catalin.marinas@arm.com
 Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
