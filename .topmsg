@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-add-a-new-sysctl-for-make-after-break-timeout
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: add a new sysctl for make after break timeout
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP protocol allows sockets with no alive subflows to stay
+in ESTABLISHED status for and user-defined timeout, to allow for
+later subflows creation.
+
+Currently such timeout is constant - TCP_TIMEWAIT_LEN. Let the
+user-space configure them via a newly added sysctl, to better cope
+with busy servers and simplify (make them faster) the relevant
+pktdrill tests.
+
+Note that the new know does not apply to orphaned MPTCP socket
+waiting for the data_fin handshake completion: they always wait
+TCP_TIMEWAIT_LEN.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
