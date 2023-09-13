@@ -123,6 +123,7 @@
 #define MPTCP_RETRANSMIT	4
 #define MPTCP_FLUSH_JOIN_LIST	5
 #define MPTCP_CONNECTED		6
+#define MPTCP_TUNE_SNDBUF	7
 
 struct mptcp_skb_cb {
 	u64 map_seq;
@@ -320,6 +321,7 @@ struct mptcp_sock {
 		u64	rtt_us; /* last maximum rtt of subflows */
 	} rcvq_space;
 	u8		scaling_ratio;
+	int		delta_sndbuf;
 
 	u32		subflow_id;
 	u32		setsockopt_seq;
@@ -446,6 +448,7 @@ DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 
 #define MPTCP_DELEGATE_SEND		0
 #define MPTCP_DELEGATE_ACK		1
+#define MPTCP_DELEGATE_SNDBUF		2
 
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
@@ -518,6 +521,7 @@ struct mptcp_subflow_context {
 
 	u32	setsockopt_seq;
 	u32	stale_rcv_tstamp;
+	int     cached_sndbuf;
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -781,13 +785,31 @@ static inline bool mptcp_data_fin_enabled(const struct mptcp_sock *msk)
 	       READ_ONCE(msk->write_seq) == READ_ONCE(msk->snd_nxt);
 }
 
-static inline bool mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+static inline void __mptcp_update_sndbuf(struct sock *sk, int delta)
 {
-	if ((sk->sk_userlocks & SOCK_SNDBUF_LOCK) || ssk->sk_sndbuf <= READ_ONCE(sk->sk_sndbuf))
-		return false;
+	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK) && delta)
+		WRITE_ONCE(sk->sk_sndbuf, sk->sk_sndbuf + delta);
+}
 
-	WRITE_ONCE(sk->sk_sndbuf, ssk->sk_sndbuf);
-	return true;
+static inline void __mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	int ssk_sndbuf = READ_ONCE(ssk->sk_sndbuf);
+
+	__mptcp_update_sndbuf(sk, ssk_sndbuf - subflow->cached_sndbuf);
+	subflow->cached_sndbuf = ssk_sndbuf;
+}
+
+static inline void mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
+	if (likely(READ_ONCE(ssk->sk_sndbuf) == subflow->cached_sndbuf))
+		return;
+
+	local_bh_disable();
+	mptcp_subflow_delegate(subflow, MPTCP_DELEGATE_SNDBUF);
+	local_bh_enable();
 }
 
 static inline void mptcp_write_space(struct sock *sk)

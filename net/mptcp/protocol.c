@@ -891,6 +891,7 @@ static bool __mptcp_finish_join(struct mptcp_sock *msk, struct sock *ssk)
 	mptcp_sockopt_sync_locked(msk, ssk);
 	mptcp_subflow_joined(msk, ssk);
 	mptcp_stop_tout_timer(sk);
+	__mptcp_propagate_sndbuf(sk, ssk);
 	return true;
 }
 
@@ -2403,6 +2404,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		 * disconnect should never fail
 		 */
 		WARN_ON_ONCE(tcp_disconnect(ssk, 0));
+		__mptcp_propagate_sndbuf(sk, ssk);
 		mptcp_subflow_ctx_reset(subflow);
 		release_sock(ssk);
 
@@ -2427,6 +2429,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	}
 
 out_release:
+	__mptcp_update_sndbuf(sk, -subflow->cached_sndbuf);
 	__mptcp_subflow_error_report(sk, ssk);
 	release_sock(ssk);
 
@@ -3214,7 +3217,7 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	 * uses the correct data
 	 */
 	mptcp_copy_inaddrs(nsk, ssk);
-	mptcp_propagate_sndbuf(nsk, ssk);
+	__mptcp_propagate_sndbuf(nsk, ssk);
 
 	mptcp_rcv_space_init(msk, ssk);
 	bh_unlock_sock(nsk);
@@ -3339,6 +3342,14 @@ void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 		__set_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->cb_flags);
 }
 
+void __mptcp_tune_sndbuf(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	__mptcp_update_sndbuf(sk, msk->delta_sndbuf);
+	msk->delta_sndbuf = 0;
+}
+
 #define MPTCP_FLAGS_PROCESS_CTX_NEED (BIT(MPTCP_PUSH_PENDING) | \
 				      BIT(MPTCP_RETRANSMIT) | \
 				      BIT(MPTCP_FLUSH_JOIN_LIST))
@@ -3392,6 +3403,8 @@ static void mptcp_release_cb(struct sock *sk)
 			__mptcp_set_connected(sk);
 		if (__test_and_clear_bit(MPTCP_ERROR_REPORT, &msk->cb_flags))
 			__mptcp_error_report(sk);
+		if (__test_and_clear_bit(MPTCP_TUNE_SNDBUF, &msk->cb_flags))
+			__mptcp_tune_sndbuf(sk);
 	}
 
 	__mptcp_update_rmem(sk);
@@ -3436,6 +3449,15 @@ void mptcp_subflow_process_delegated(struct sock *ssk)
 			__set_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->cb_flags);
 		mptcp_data_unlock(sk);
 		mptcp_subflow_delegated_done(subflow, MPTCP_DELEGATE_SEND);
+	}
+	if (test_bit(MPTCP_DELEGATE_SNDBUF, &subflow->delegated_status)) {
+		mptcp_data_lock(sk);
+		if (!sock_owned_by_user(sk))
+			__mptcp_propagate_sndbuf(sk, ssk);
+		else
+			__set_bit(MPTCP_TUNE_SNDBUF, &mptcp_sk(sk)->cb_flags);
+		mptcp_data_unlock(sk);
+		mptcp_subflow_delegated_done(subflow, MPTCP_DELEGATE_SNDBUF);
 	}
 	if (test_bit(MPTCP_DELEGATE_ACK, &subflow->delegated_status)) {
 		schedule_3rdack_retransmission(ssk);
@@ -3523,6 +3545,7 @@ bool mptcp_finish_join(struct sock *ssk)
 	/* active subflow, already present inside the conn_list */
 	if (!list_empty(&subflow->node)) {
 		mptcp_subflow_joined(msk, ssk);
+		mptcp_propagate_sndbuf(parent, ssk);
 		return true;
 	}
 
