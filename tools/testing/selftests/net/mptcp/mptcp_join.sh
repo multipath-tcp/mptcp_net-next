@@ -1856,14 +1856,23 @@ chk_mptcp_info()
 	local exp1=$2
 	local info2=$3
 	local exp2=$4
+	local all=${5:-""}
 	local cnt1
 	local cnt2
 	local dump_stats
 
-	print_check "mptcp_info ${info1:0:8}=$exp1:$exp2"
+	print_check "mptcp_info $all ${info1:0:8}=$exp1:$exp2"
 
 	cnt1=$(ss -N $ns1 -inmHM | mptcp_lib_get_info_value "$info1" "$info1")
 	cnt2=$(ss -N $ns2 -inmHM | mptcp_lib_get_info_value "$info2" "$info2")
+	if [ "$all" == "all" ]; then
+		local flag1=0 flag2=0
+
+		flag1=$(ss -N $ns1 -inmHM | grep -c "no_initial_subflow")
+		flag2=$(ss -N $ns2 -inmHM | grep -c "no_initial_subflow")
+		[ $info1 == "subflows" ] && [ $flag1 == 0 ] && cnt1=$((cnt1+1))
+		[ $info2 == "subflows" ] && [ $flag2 == 0 ] && cnt2=$((cnt2+1))
+	fi
 	# 'ss' only display active connections and counters that are not 0.
 	[ -z "$cnt1" ] && cnt1=0
 	[ -z "$cnt2" ] && cnt2=0
@@ -1881,12 +1890,24 @@ chk_mptcp_info()
 	fi
 }
 
+ver()
+{
+	printf "%02d%02d%02d%02d" ${1//./ }
+}
+
 # $1: subflows in ns1 ; $2: subflows in ns2
 # number of all subflows, including the initial subflow.
 chk_all_subflows()
 {
+	local ver_iproute2
 	local cnt1
 	local cnt2
+
+	ver_iproute2=$(ss -v |
+		 sed -n 's/.*\(iproute2-\)\([0-9].[0-9].[0-9]\).*$/\2/p')
+	(( $(ver $ver_iproute2) > $(ver 6.5.0) )) && \
+		chk_mptcp_info subflows $1 subflows $2 all && \
+		return
 
 	print_check "all subflows $1:$2"
 
