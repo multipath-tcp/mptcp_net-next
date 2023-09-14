@@ -107,6 +107,7 @@ enum {
 
 #define MPTCP_INFO_FLAG_FALLBACK		_BITUL(0)
 #define MPTCP_INFO_FLAG_REMOTE_KEY_RECEIVED	_BITUL(1)
+#define MPTCP_INFO_FLAG_NO_INITIAL_SUBFLOW	_BITUL(2)
 
 struct mptcp_info {
 	__u8	mptcpi_subflows;

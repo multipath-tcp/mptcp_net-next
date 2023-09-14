@@ -1462,7 +1462,8 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 		struct sock *sk = (struct sock *)msk;
 		struct mptcp_addr_info msk_local;
 
-		if (list_empty(&msk->conn_list) || mptcp_pm_is_userspace(msk))
+		if (list_empty(&msk->conn_list) || mptcp_pm_is_userspace(msk) ||
+		    !__mptcp_check_initial_subflow(msk))
 			goto next;
 
 		mptcp_local_address((struct sock_common *)msk, &msk_local);

@@ -919,6 +919,8 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 		flags |= MPTCP_INFO_FLAG_FALLBACK;
 	if (READ_ONCE(msk->can_ack))
 		flags |= MPTCP_INFO_FLAG_REMOTE_KEY_RECEIVED;
+	if (!__mptcp_check_initial_subflow(msk))
+		flags |= MPTCP_INFO_FLAG_NO_INITIAL_SUBFLOW;
 	info->mptcpi_flags = flags;
 	mptcp_data_lock(sk);
 	info->mptcpi_snd_una = msk->snd_una;
