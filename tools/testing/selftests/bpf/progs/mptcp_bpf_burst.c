@@ -7,17 +7,6 @@
 
 char _license[] SEC("license") = "GPL";
 
-struct mptcp_burst_storage {
-	int snd_burst;
-};
-
-struct {
-	__uint(type, BPF_MAP_TYPE_SK_STORAGE);
-	__uint(map_flags, BPF_F_NO_PREALLOC);
-	__type(key, int);
-	__type(value, struct mptcp_burst_storage);
-} mptcp_burst_map SEC(".maps");
-
 #define MPTCP_SEND_BURST_SIZE	65428
 
 struct subflow_send_info {
@@ -69,14 +58,11 @@ static __always_inline bool sk_stream_memory_free(const struct sock *sk)
 SEC("struct_ops/mptcp_sched_burst_init")
 void BPF_PROG(mptcp_sched_burst_init, struct mptcp_sock *msk)
 {
-	bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
-			   BPF_LOCAL_STORAGE_GET_F_CREATE);
 }
 
 SEC("struct_ops/mptcp_sched_burst_release")
 void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 {
-	bpf_sk_storage_delete(&mptcp_burst_map, msk);
 }
 
 static int bpf_burst_get_send(struct mptcp_sock *msk,
@@ -85,7 +71,6 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	struct mptcp_burst_storage *ptr;
 	__u32 pace, burst, wmem;
 	__u64 linger_time;
 	struct sock *ssk;
@@ -98,7 +83,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	}
 
 	for (i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
-		subflow = mptcp_subflow_ctx_by_pos(data, i);
+		subflow = bpf_mptcp_subflow_ctx_by_pos(data, i);
 		if (!subflow)
 			break;
 
@@ -127,7 +112,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	if (send_info[SSK_MODE_ACTIVE].subflow_id == MPTCP_SUBFLOWS_MAX)
 		send_info[SSK_MODE_ACTIVE].subflow_id = send_info[SSK_MODE_BACKUP].subflow_id;
 
-	subflow = mptcp_subflow_ctx_by_pos(data, send_info[SSK_MODE_ACTIVE].subflow_id);
+	subflow = bpf_mptcp_subflow_ctx_by_pos(data, send_info[SSK_MODE_ACTIVE].subflow_id);
 	if (!subflow)
 		return -1;
 	ssk = mptcp_subflow_tcp_sock(subflow);
@@ -142,10 +127,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	subflow->avg_pacing_rate = div_u64((__u64)subflow->avg_pacing_rate * wmem +
 					   ssk->sk_pacing_rate * burst,
 					   burst + wmem);
-	ptr = bpf_sk_storage_get(&mptcp_burst_map, msk, 0,
-				 BPF_LOCAL_STORAGE_GET_F_CREATE);
-	if (ptr)
-		ptr->snd_burst = burst;
+	msk->snd_burst = burst;
 
 out:
 	mptcp_subflow_set_scheduled(subflow, true);
@@ -161,7 +143,7 @@ static int bpf_burst_get_retrans(struct mptcp_sock *msk,
 	struct sock *ssk;
 
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
-		subflow = mptcp_subflow_ctx_by_pos(data, i);
+		subflow = bpf_mptcp_subflow_ctx_by_pos(data, i);
 		if (!subflow)
 			break;
 
@@ -193,7 +175,7 @@ static int bpf_burst_get_retrans(struct mptcp_sock *msk,
 	subflow_id = min_stale_count > 1 ? backup : MPTCP_SUBFLOWS_MAX;
 
 out:
-	subflow = mptcp_subflow_ctx_by_pos(data, subflow_id);
+	subflow = bpf_mptcp_subflow_ctx_by_pos(data, subflow_id);
 	if (!subflow)
 		return -1;
 	mptcp_subflow_set_scheduled(subflow, true);
@@ -203,8 +185,6 @@ out:
 int BPF_STRUCT_OPS(bpf_burst_get_subflow, struct mptcp_sock *msk,
 		   struct mptcp_sched_data *data)
 {
-	mptcp_sched_data_set_contexts(msk, data);
-
 	if (data->reinject)
 		return bpf_burst_get_retrans(msk, data);
 	return bpf_burst_get_send(msk, data);
