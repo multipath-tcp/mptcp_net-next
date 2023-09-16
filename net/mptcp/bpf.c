@@ -18,8 +18,8 @@
 
 #ifdef CONFIG_BPF_JIT
 extern struct bpf_struct_ops bpf_mptcp_sched_ops;
-static const struct btf_type *mptcp_sched_type __read_mostly;
-static u32 mptcp_sched_id;
+static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly;
+static u32 mptcp_sock_id, mptcp_subflow_id;
 
 static const struct bpf_func_proto *
 bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
@@ -47,12 +47,15 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	size_t end;
 
 	t = btf_type_by_id(reg->btf, reg->btf_id);
-	if (t != mptcp_sched_type) {
-		bpf_log(log, "only access to mptcp_subflow_context is supported\n");
+	if (t != mptcp_sock_type && t != mptcp_subflow_type) {
+		bpf_log(log, "only access to mptcp sock or subflow is supported\n");
 		return -EACCES;
 	}
 
 	switch (off) {
+	case offsetof(struct mptcp_sock, snd_burst):
+		end = offsetofend(struct mptcp_sock, snd_burst);
+		break;
 	case offsetof(struct mptcp_subflow_context, scheduled):
 		end = offsetofend(struct mptcp_subflow_context, scheduled);
 		break;
@@ -60,12 +63,14 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 		end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
 		break;
 	default:
-		bpf_log(log, "no write support to mptcp_subflow_context at off %d\n", off);
+		bpf_log(log, "no write support to %s at off %d\n",
+			t == mptcp_sock_type ? "mptcp_sock" : "mptcp_subflow_context", off);
 		return -EACCES;
 	}
 
 	if (off + size > end) {
-		bpf_log(log, "access beyond mptcp_subflow_context at off %u size %u ended at %zu",
+		bpf_log(log, "access beyond %s at off %u size %u ended at %zu",
+			t == mptcp_sock_type ? "mptcp_sock" : "mptcp_subflow_context",
 			off, size, end);
 		return -EACCES;
 	}
@@ -125,12 +130,19 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 {
 	s32 type_id;
 
+	type_id = btf_find_by_name_kind(btf, "mptcp_sock",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_sock_id = type_id;
+	mptcp_sock_type = btf_type_by_id(btf, mptcp_sock_id);
+
 	type_id = btf_find_by_name_kind(btf, "mptcp_subflow_context",
 					BTF_KIND_STRUCT);
 	if (type_id < 0)
 		return -EINVAL;
-	mptcp_sched_id = type_id;
-	mptcp_sched_type = btf_type_by_id(btf, mptcp_sched_id);
+	mptcp_subflow_id = type_id;
+	mptcp_subflow_type = btf_type_by_id(btf, mptcp_subflow_id);
 
 	return 0;
 }
@@ -167,7 +179,15 @@ __diag_push();
 __diag_ignore_all("-Wmissing-prototypes",
 		  "kfuncs which will be used in BPF programs");
 
-bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
+__bpf_kfunc struct mptcp_subflow_context *
+bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
+{
+	if (pos >= MPTCP_SUBFLOWS_MAX)
+		return NULL;
+	return data->contexts[pos];
+}
+
+__bpf_kfunc bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 {
 	return tcp_rtx_queue_empty(sk);
 }
@@ -176,8 +196,7 @@ __diag_pop();
 
 BTF_SET8_START(bpf_mptcp_sched_kfunc_ids)
 BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
-BTF_ID_FLAGS(func, mptcp_sched_data_set_contexts)
-BTF_ID_FLAGS(func, mptcp_subflow_ctx_by_pos)
+BTF_ID_FLAGS(func, bpf_mptcp_subflow_ctx_by_pos)
 BTF_ID_FLAGS(func, mptcp_subflow_active)
 BTF_ID_FLAGS(func, mptcp_set_timeout)
 BTF_ID_FLAGS(func, mptcp_wnd_end)
