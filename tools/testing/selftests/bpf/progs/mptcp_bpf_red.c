@@ -19,13 +19,11 @@ void BPF_PROG(mptcp_sched_red_release, struct mptcp_sock *msk)
 int BPF_STRUCT_OPS(bpf_red_get_subflow, struct mptcp_sock *msk,
 		   struct mptcp_sched_data *data)
 {
-	mptcp_sched_data_set_contexts(msk, data);
-
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
-		if (!mptcp_subflow_ctx_by_pos(data, i))
+		if (!bpf_mptcp_subflow_ctx_by_pos(data, i))
 			break;
 
-		mptcp_subflow_set_scheduled(mptcp_subflow_ctx_by_pos(data, i), true);
+		mptcp_subflow_set_scheduled(bpf_mptcp_subflow_ctx_by_pos(data, i), true);
 	}
 
 	return 0;
