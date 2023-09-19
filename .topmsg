@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/bpf-Fix-bpf_throw-warning-on-32-bit-arch
+From: Kumar Kartikeya Dwivedi <memxor@gmail.com>
+Subject: [PATCH] bpf: Fix bpf_throw warning on 32-bit arch
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+On 32-bit architectures, the pointer width is 32-bit, while we try to
+cast from a u64 down to it, the compiler complains on mismatch in
+integer size. Fix this by first casting to long which should match
+the pointer width on targets supported by Linux.
+
+Fixes: ec5290a178b7 ("bpf: Prevent KASAN false positive with bpf_throw")
+Reported-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Kumar Kartikeya Dwivedi <memxor@gmail.com>
+Tested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
