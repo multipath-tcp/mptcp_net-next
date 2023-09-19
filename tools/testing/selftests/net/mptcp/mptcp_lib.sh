@@ -323,3 +323,8 @@ mptcp_lib_verify_listener_events() {
 	mptcp_lib_print_err "[fail] $e_type:$type $e_family:$family \
 		$e_saddr:$saddr $e_sport:$sport"
 }
+
+# $1: IP address
+mptcp_lib_is_v6() {
+	[ -z "${1##*:*}" ]
+}
