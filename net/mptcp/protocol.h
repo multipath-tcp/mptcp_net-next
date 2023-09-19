@@ -242,6 +242,7 @@ struct mptcp_pm_addr_entry {
 	u8			flags;
 	int			ifindex;
 	struct socket		*lsk;
+	u8			subflows;
 	refcount_t		refcnt;
 };
 
