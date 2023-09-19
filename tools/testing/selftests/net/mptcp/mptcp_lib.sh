@@ -9,6 +9,11 @@ readonly KSFT_SKIP=4
 readonly KSFT_TEST=$(basename "${0}" | sed 's/\.sh$//g')
 
 SUB_ESTABLISHED=10 # MPTCP_EVENT_SUB_ESTABLISHED
+LISTENER_CREATED=15 #MPTCP_EVENT_LISTENER_CREATED
+LISTENER_CLOSED=16  #MPTCP_EVENT_LISTENER_CLOSED
+
+AF_INET=2
+AF_INET6=10
 
 MPTCP_LIB_SUBTESTS=()
 
@@ -266,4 +271,55 @@ mptcp_lib_evts_kill() {
 
 mptcp_lib_evts_remove() {
 	rm -rf $server_evts $client_evts
+}
+
+mptcp_lib_verify_listener_events() {
+	local evt=$1
+	local e_type=$2
+	local e_family=$3
+	local e_saddr=$4
+	local e_sport=$5
+	local type
+	local family
+	local saddr
+	local sport
+	local name
+
+	if [ $e_type = $LISTENER_CREATED ]; then
+		name="LISTENER_CREATED"
+	elif [ $e_type = $LISTENER_CLOSED ]; then
+		name="LISTENER_CLOSED "
+	else
+		name="$e_type"
+	fi
+
+	if [ "$(basename "$0")" == "mptcp_join.sh" ]; then
+		printf "%-6s%-36s" " " "$name $e_saddr:$e_sport"
+	elif [ "$(basename "$0")" == "userspace_pm.sh" ]; then
+		printf "%-63s" "$name $e_saddr:$e_sport"
+	fi
+
+	if ! mptcp_lib_kallsyms_has "mptcp_event_pm_listener$"; then
+		mptcp_lib_print_warn "[skip] event not supported"
+		return
+	fi
+
+	type=$(mptcp_lib_evts_get_info type "$evt" "$e_type")
+	family=$(mptcp_lib_evts_get_info family "$evt" "$e_type")
+	sport=$(mptcp_lib_evts_get_info sport "$evt" "$e_type")
+	if [ $family ] && [ $family = $AF_INET6 ]; then
+		saddr=$(mptcp_lib_evts_get_info saddr6 "$evt" "$e_type")
+	else
+		saddr=$(mptcp_lib_evts_get_info saddr4 "$evt" "$e_type")
+	fi
+
+	if [ $type ] && [ $type = $e_type ] &&
+	   [ $family ] && [ $family = $e_family ] &&
+	   [ $saddr ] && [ $saddr = $e_saddr ] &&
+	   [ $sport ] && [ $sport = $e_sport ]; then
+		mptcp_lib_print_ok "[ ok ]"
+		return 0
+	fi
+	mptcp_lib_print_err "[fail] $e_type:$type $e_family:$family \
+		$e_saddr:$saddr $e_sport:$sport"
 }
