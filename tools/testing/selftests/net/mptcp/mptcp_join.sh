@@ -3532,6 +3532,46 @@ userspace_tests()
 		kill_events_pids
 		wait $tests_pid
 	fi
+
+	# userspace pm server fullmesh
+	if reset_with_events "userspace pm server fullmesh" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+		set_userspace_pm $ns1
+		pm_nl_set_limits $ns2 5 5
+		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow,fullmesh
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow,fullmesh
+		speed=10 \
+			run_tests $ns1 $ns2 10.0.1.1 &
+		local tests_pid=$!
+		wait_mpj $ns1
+		userspace_pm_add_addr $ns1 10.0.2.1 10
+		chk_join_nr 4 4 4
+		chk_add_nr 1 1
+		chk_mptcp_info subflows 4 subflows 4
+		chk_subflows_total 5 5
+		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
+		mptcp_lib_evts_kill
+		wait $tests_pid
+	fi
+
+	# userspace pm client fullmesh
+	if reset_with_events "userspace pm client fullmesh" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+		pm_nl_set_limits $ns1 5 5
+		set_userspace_pm $ns2
+		speed=10 \
+			run_tests $ns1 $ns2 10.0.1.1 &
+		local tests_pid=$!
+		wait_mpj $ns1
+		userspace_pm_add_sf $ns2 10.0.2.2 20
+		userspace_pm_add_sf $ns2 10.0.3.2 30
+		userspace_pm_add_sf $ns2 10.0.4.2 40
+		chk_join_nr 3 3 3
+		chk_mptcp_info subflows 3 subflows 3
+		chk_subflows_total 4 4
+		mptcp_lib_evts_kill
+		wait $tests_pid
+	fi
 }
 
 endpoint_tests()
