@@ -245,18 +245,6 @@ do_transfer()
 	return 1
 }
 
-make_file()
-{
-	local name=$1
-	local who=$2
-	local size=$3
-
-	dd if=/dev/urandom of="$name" bs=1024 count=$size 2> /dev/null
-	echo -e "\nMPTCP_TEST_FILE_END_MARKER" >> "$name"
-
-	echo "Created $name (size $size KB) containing data sent by $who"
-}
-
 do_mptcp_sockopt_tests()
 {
 	local lret=0
@@ -357,8 +345,10 @@ sout=$(mktemp)
 cin=$(mktemp)
 cout=$(mktemp)
 init
-make_file "$cin" "client" 1
-make_file "$sin" "server" 1
+mptcp_lib_make_file "$cin" 1024 1
+echo "Created $cin (size 1 KB) containing data sent by client"
+mptcp_lib_make_file "$sin" 1024 1
+echo "Created $sin (size 1 KB) containing data sent by server"
 trap cleanup EXIT
 
 run_tests $ns1 $ns2 10.0.1.1
