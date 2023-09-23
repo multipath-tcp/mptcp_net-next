@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-give-rcvlowat-some-love
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: give rcvlowat some love
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP protocol allow setting sk_rcvlowat, but the value there
+is currently ignored.
+
+Additionally, the default subflows sk_rcvlowat basically disables per
+subflow delayed ack: the MPTCP protocol move the incoming data from the
+subflows into the msk socket as soon as the TCP stacks invokes the subflow
+data_ready callback. Later, when __tcp_ack_snd_check() takes action,
+the subflow-level copied_seq matches rcv_nxt, and that mandate for an
+immediate ack.
+
+Let the mptcp receive path be aware of such threshold, explicitly tracking
+the amount of data available to be ready and checking vs sk_rcvlowat in
+mptcp_poll() and before waking-up readers.
+
+Additionally implement the set_rcvlowat() callback, to properly handle
+the rcvbuf auto-tuning on sk_rcvlowat changes.
+
+Finally to properly handle delayed ack, force the subflow level threshold
+to 0 and instead explicitly ask for an immediate ack when the msk level th
+is not reached.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
