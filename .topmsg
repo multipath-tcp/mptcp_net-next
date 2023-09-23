@@ -1,4 +1,30 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-fix-delegated-action-races
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix delegated action races
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The delegated action infrastructure is prone to the following
+race: different CPUs can try to schedule different delegated
+actions on the same subflow at the same time.
+
+Each of them will check different bits via mptcp_subflow_delegate(),
+and will try to schedule the action on the related per-cpu napi
+instance.
+
+Depending on the timing, both can observe an empty delegated list
+node, causing the same entry to be added simultaneously on two different
+lists.
+
+The root cause is that the delegated actions infra does not provide
+a single synchronization point. Address the issue reserving an additional
+bit to mark the subflow as scheduled for delegation. Acquiring such bit
+guarantee the caller to own the delegated list node, and being able to
+safely schedule the subflow.
+
+Clear such bit only when the subflow scheduling is completed, ensuring
+proper barrier in place.
+
+Additionally swap the meaning of the delegated_action bitmask, to allow
+the usage of the existing helper to set multiple bit at once.
+
+Fixes: bcd97734318d ("mptcp: use delegate action to schedule 3rd ack retrans")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
