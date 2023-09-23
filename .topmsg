@@ -1,4 +1,17 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-refactor-sndbuf-auto-tuning
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: refactor sndbuf auto-tuning
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The MPTCP protocol account for the data enqueued on all the subflows
+to the main socket send buffer, while the send buffer auto-tuning
+algorithm set the main socket send buffer size as the max size among
+the subflows.
+
+That causes bad performances when at least one subflow is sndbuf
+limited, e.g. due to very high latency, as the MPTCP scheduler can't
+even fill such buffer.
+
+Change the send-buffer auto-tuning algorithm to compute the main socket
+send buffer size as the sum of all the subflows buffer size.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
