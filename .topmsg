@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/uapi-mptcp-use-header-file-generated-from-YAML-spec
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] uapi: mptcp: use header file generated from YAML spec
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+generated with:
+
+ $ ./tools/net/ynl/ynl-gen-c.py --mode uapi \
+ > --spec Documentation/netlink/specs/mptcp.yaml \
+ > --header -o include/uapi/linux/mptcp_pm.h
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/340
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
