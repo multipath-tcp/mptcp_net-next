@@ -1,4 +1,18 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-ignore-notsent_lowat-setting-at-the-subflow-level
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: ignore notsent_lowat setting at the subflow level
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Any latency related tuning taking action at the subflow level does
+not really affect the user-space, as only the main MPTCP socket is
+relevant.
+
+Anyway any limiting setting may foul the MPTCP scheduler, not being
+able to fully use the subflow-level cwin, leading to very poor b/w
+usage.
+
+Enforce notsent_lowat to be a no-op on every subflow.
+
+Note that TCP_NOTSENT_LOWAT is currently not supported, and properly
+dealing with that will require more invasive changes.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
