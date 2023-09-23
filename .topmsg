@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/uapi-mptcp-use-header-file-generated-from-YAML-spec
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
