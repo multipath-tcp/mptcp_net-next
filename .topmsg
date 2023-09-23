@@ -1,4 +1,12 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-consolidate-sockopt-synchronization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consolidate sockopt synchronization
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Move the socket option synchronization for active subflows
+at subflow creation time. This allows removing the now unused
+unlocked variant of such helper.
+
+While at that, clean-up a bit the mptcp_subflow_create_socket()
+errors path.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
