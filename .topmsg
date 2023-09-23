@@ -1,4 +1,11 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-properly-account-fastopen-data
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: properly account fastopen data
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Currently the socket level counter aggregating the received data
+does not take in account the data received via fastopen.
+
+Address the issue updating the counter as required.
+
+Fixes: 38967f424b5b ("mptcp: track some aggregate data counters")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
