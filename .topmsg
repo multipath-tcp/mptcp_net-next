@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/net-mptcp-rename-netlink-handlers-to-mptcp_pm_nl_-blah-_-doit-dumpit
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] net: mptcp: rename netlink handlers to mptcp_pm_nl_<blah>_{doit,dumpit}
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+so that they will match names generated from YAML spec.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/340
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
