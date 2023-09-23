@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-copy_from_iter-helpers-on-transmit
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use copy_from_iter helpers on transmit
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The perf traces show an high cost for the MPTCP transmit path memcpy.
+
+It turn out that the helper currently in use carries quite a bit
+of unneeded overhead, e.g. to map/unmap the memory pages.
+
+Moving to the 'copy_from_iter' variant removes such overhead and
+additionally gains the no-cache support.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
