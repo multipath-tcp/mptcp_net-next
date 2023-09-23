@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-use-plain-bool-instead-of-custom-binary-enum
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: use plain bool instead of custom binary enum
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+The 'data_avail' subflow field is already used as plain boolean,
+drop the custom binary enum type and switch to bool.
+
+No functional changed intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
