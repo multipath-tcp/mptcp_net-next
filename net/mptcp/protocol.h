@@ -125,6 +125,7 @@
 #define MPTCP_RETRANSMIT	4
 #define MPTCP_FLUSH_JOIN_LIST	5
 #define MPTCP_CONNECTED		6
+#define MPTCP_SYNC_SNDBUF	7
 
 struct mptcp_skb_cb {
 	u64 map_seq;
@@ -442,9 +443,12 @@ struct mptcp_delegated_action {
 
 DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 
-#define MPTCP_DELEGATE_SEND		0
-#define MPTCP_DELEGATE_ACK		1
+#define MPTCP_DELEGATE_SCHEDULED	0
+#define MPTCP_DELEGATE_SEND		1
+#define MPTCP_DELEGATE_ACK		2
+#define MPTCP_DELEGATE_SNDBUF		3
 
+#define MPTCP_DELEGATE_ACTIONS_MASK	(~BIT(MPTCP_DELEGATE_SCHEDULED))
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
@@ -516,6 +520,9 @@ struct mptcp_subflow_context {
 
 	u32	setsockopt_seq;
 	u32	stale_rcv_tstamp;
+	int     cached_sndbuf;	    /* sndbuf size when last synced with the msk sndbuf,
+				     * protected by the msk socket lock
+				     */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -562,23 +569,24 @@ mptcp_subflow_get_mapped_dsn(const struct mptcp_subflow_context *subflow)
 	return subflow->map_seq + mptcp_subflow_get_map_offset(subflow);
 }
 
-void mptcp_subflow_process_delegated(struct sock *ssk);
+void mptcp_subflow_process_delegated(struct sock *ssk, long actions);
 
 static inline void mptcp_subflow_delegate(struct mptcp_subflow_context *subflow, int action)
 {
+	long old, set_bits = BIT(MPTCP_DELEGATE_SCHEDULED) | BIT(action);
 	struct mptcp_delegated_action *delegated;
 	bool schedule;
 
 	/* the caller held the subflow bh socket lock */
 	lockdep_assert_in_softirq();
 
-	/* The implied barrier pairs with mptcp_subflow_delegated_done(), and
-	 * ensures the below list check sees list updates done prior to status
-	 * bit changes
+	/* The implied barrier pairs with tcp_release_cb_override()
+	 * mptcp_napi_poll(), and ensures the below list check sees list
+	 * updates done prior to delegated status bits changes
 	 */
-	if (!test_and_set_bit(action, &subflow->delegated_status)) {
-		/* still on delegated list from previous scheduling */
-		if (!list_empty(&subflow->delegated_node))
+	old = set_mask_bits(&subflow->delegated_status, 0, set_bits);
+	if (!(old & BIT(MPTCP_DELEGATE_SCHEDULED))) {
+		if (WARN_ON_ONCE(!list_empty(&subflow->delegated_node)))
 			return;
 
 		delegated = this_cpu_ptr(&mptcp_delegated_actions);
@@ -601,20 +609,6 @@ mptcp_subflow_delegated_next(struct mptcp_delegated_action *delegated)
 	ret = list_first_entry(&delegated->head, struct mptcp_subflow_context, delegated_node);
 	list_del_init(&ret->delegated_node);
 	return ret;
-}
-
-static inline bool mptcp_subflow_has_delegated_action(const struct mptcp_subflow_context *subflow)
-{
-	return !!READ_ONCE(subflow->delegated_status);
-}
-
-static inline void mptcp_subflow_delegated_done(struct mptcp_subflow_context *subflow, int action)
-{
-	/* pairs with mptcp_subflow_delegate, ensures delegate_node is updated before
-	 * touching the status bit
-	 */
-	smp_wmb();
-	clear_bit(action, &subflow->delegated_status);
 }
 
 int mptcp_is_enabled(const struct net *net);
@@ -796,13 +790,52 @@ static inline bool mptcp_data_fin_enabled(const struct mptcp_sock *msk)
 	       READ_ONCE(msk->write_seq) == READ_ONCE(msk->snd_nxt);
 }
 
-static inline bool mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+static inline void __mptcp_sync_sndbuf(struct sock *sk)
 {
-	if ((sk->sk_userlocks & SOCK_SNDBUF_LOCK) || ssk->sk_sndbuf <= READ_ONCE(sk->sk_sndbuf))
-		return false;
+	struct mptcp_subflow_context *subflow;
+	int ssk_sndbuf, new_sndbuf;
 
-	WRITE_ONCE(sk->sk_sndbuf, ssk->sk_sndbuf);
-	return true;
+	if (sk->sk_userlocks & SOCK_SNDBUF_LOCK)
+		return;
+
+	new_sndbuf = sock_net(sk)->ipv4.sysctl_tcp_wmem[0];
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
+		ssk_sndbuf =  READ_ONCE(mptcp_subflow_tcp_sock(subflow)->sk_sndbuf);
+
+		subflow->cached_sndbuf = ssk_sndbuf;
+		new_sndbuf += ssk_sndbuf;
+	}
+
+	/* the msk max wmem limit is <nr_subflows> * tcp wmem[2] */
+	WRITE_ONCE(sk->sk_sndbuf, new_sndbuf);
+}
+
+/* The called held both the msk socket and the subflow socket locks,
+ * possibly under BH
+ */
+static inline void __mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
+	if (READ_ONCE(ssk->sk_sndbuf) != subflow->cached_sndbuf)
+		__mptcp_sync_sndbuf(sk);
+}
+
+/* the caller held only the subflow socket lock, either in process or
+ * BH context. Additionally this can be called under the msk data lock,
+ * so we can't acquire such lock here: let the delegate action acquires
+ * the needed locks in suitable order.
+ */
+static inline void mptcp_propagate_sndbuf(struct sock *sk, struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+
+	if (likely(READ_ONCE(ssk->sk_sndbuf) == subflow->cached_sndbuf))
+		return;
+
+	local_bh_disable();
+	mptcp_subflow_delegate(subflow, MPTCP_DELEGATE_SNDBUF);
+	local_bh_enable();
 }
 
 static inline void mptcp_write_space(struct sock *sk)
