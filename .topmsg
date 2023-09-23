@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matthieu.baerts@tessares.net>
+Subject: [PATCH] t/mptcp-use-plain-bool-instead-of-custom-binary-enum
+
+Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
