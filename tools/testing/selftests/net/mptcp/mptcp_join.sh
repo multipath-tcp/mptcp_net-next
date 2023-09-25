@@ -2803,59 +2803,6 @@ backup_tests()
 	fi
 }
 
-LISTENER_CREATED=15 #MPTCP_EVENT_LISTENER_CREATED
-LISTENER_CLOSED=16  #MPTCP_EVENT_LISTENER_CLOSED
-
-AF_INET=2
-AF_INET6=10
-
-verify_listener_events()
-{
-	local evt=$1
-	local e_type=$2
-	local e_family=$3
-	local e_saddr=$4
-	local e_sport=$5
-	local type
-	local family
-	local saddr
-	local sport
-	local name
-
-	if [ $e_type = $LISTENER_CREATED ]; then
-		name="LISTENER_CREATED"
-	elif [ $e_type = $LISTENER_CLOSED ]; then
-		name="LISTENER_CLOSED "
-	else
-		name="$e_type"
-	fi
-
-	print_check "$name $e_saddr:$e_sport"
-
-	if ! mptcp_lib_kallsyms_has "mptcp_event_pm_listener$"; then
-		print_skip "event not supported"
-		return
-	fi
-
-	type=$(mptcp_lib_evts_get_info type "$evt" "$e_type")
-	family=$(mptcp_lib_evts_get_info family "$evt" "$e_type")
-	sport=$(mptcp_lib_evts_get_info sport "$evt" "$e_type")
-	if [ $family ] && [ $family = $AF_INET6 ]; then
-		saddr=$(mptcp_lib_evts_get_info saddr6 "$evt" "$e_type")
-	else
-		saddr=$(mptcp_lib_evts_get_info saddr4 "$evt" "$e_type")
-	fi
-
-	if [ $type ] && [ $type = $e_type ] &&
-	   [ $family ] && [ $family = $e_family ] &&
-	   [ $saddr ] && [ $saddr = $e_saddr ] &&
-	   [ $sport ] && [ $sport = $e_sport ]; then
-		print_ok
-		return 0
-	fi
-	fail_test "$e_type:$type $e_family:$family $e_saddr:$saddr $e_sport:$sport"
-}
-
 add_addr_ports_tests()
 {
 	# signal address with port
@@ -2891,8 +2838,10 @@ add_addr_ports_tests()
 		chk_add_nr 1 1 1
 		chk_rm_nr 1 1 invert
 
-		verify_listener_events $server_evts $LISTENER_CREATED $AF_INET 10.0.2.1 10100
-		verify_listener_events $server_evts $LISTENER_CLOSED $AF_INET 10.0.2.1 10100
+		mptcp_lib_verify_listener_events $server_evts $LISTENER_CREATED \
+			$AF_INET 10.0.2.1 10100
+		mptcp_lib_verify_listener_events $server_evts $LISTENER_CLOSED \
+			$AF_INET 10.0.2.1 10100
 		mptcp_lib_evts_kill
 	fi
 
