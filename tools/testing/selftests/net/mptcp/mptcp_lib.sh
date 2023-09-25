@@ -220,10 +220,50 @@ mptcp_lib_evts_get_info() {
 	cat "${2}" | mptcp_lib_get_info_value "${1}" "^type:${3:-1},"
 }
 
+server_evts=""
+client_evts=""
+server_evts_pid=0
+client_evts_pid=0
+
 mptcp_lib_kill_wait() {
 	[ $1 -eq 0 ] && return 0
 
 	kill -SIGUSR1 $1 > /dev/null 2>&1
 	kill $1 > /dev/null 2>&1
 	wait $1 2>/dev/null
+}
+
+mptcp_lib_evts_init() {
+	if [ -z "$server_evts" ]; then
+		server_evts=$(mktemp)
+	fi
+	if [ -z "$client_evts" ]; then
+		client_evts=$(mktemp)
+	fi
+}
+
+mptcp_lib_evts_start() {
+	:>"$server_evts"
+	:>"$client_evts"
+
+	if [ $server_evts_pid -ne 0 ]; then
+		mptcp_lib_kill_wait $server_evts_pid
+	fi
+	ip netns exec "$ns1" ./pm_nl_ctl events >> "$server_evts" 2>&1 &
+	server_evts_pid=$!
+
+	if [ $client_evts_pid -ne 0 ]; then
+		mptcp_lib_kill_wait $client_evts_pid
+	fi
+	ip netns exec "$ns2" ./pm_nl_ctl events >> "$client_evts" 2>&1 &
+	client_evts_pid=$!
+}
+
+mptcp_lib_evts_kill() {
+	mptcp_lib_kill_wait $server_evts_pid
+	mptcp_lib_kill_wait $client_evts_pid
+}
+
+mptcp_lib_evts_remove() {
+	rm -rf $server_evts $client_evts
 }
