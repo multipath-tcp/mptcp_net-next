@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] mptcp: drop useless ssk in pm_subflow_check_next
-
-The code using 'ssk' parameter of mptcp_pm_subflow_check_next() has been
-dropped in commit "95d686517884 (mptcp: fix subflow accounting on close)".
-So drop this useless parameter ssk.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
