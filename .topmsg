@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-move-sk-assignment-statement-ahead
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: move sk assignment statement ahead
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+If we move the sk assignment statement ahead in mptcp_nl_cmd_sf_create()
+or mptcp_nl_cmd_sf_destroy(), right after the msk null-check statements,
+sk can be used after the create_err or destroy_err labels instead of
+open-coding it again.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
