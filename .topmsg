@@ -1,9 +1,0 @@
-From: Geliang Tang <geliang.tang@suse.com>
-Subject: [PATCH] selftests: mptcp: sockopt: drop mptcp_connect var
-
-Global var mptcp_connect defined at the front of mptcp_sockopt.sh is
-duplicate with local var mptcp_connect defined in do_transfer(), drop
-this useless global one.
-
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
