@@ -1,4 +1,9 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-define-more-local-variables-sk
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: define more local variables sk
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+'(struct sock *)msk' is used several times in mptcp_nl_cmd_announce(),
+mptcp_nl_cmd_remove() or mptcp_userspace_pm_set_flags() in pm_userspace.c,
+it's worth adding a local variable sk to point it.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
