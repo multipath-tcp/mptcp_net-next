@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/selftests-mptcp-display-simult-in-extra_msg
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: display simult in extra_msg
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Just like displaying "invert" after "Info: ", "simult" should be
+displayed too when rm_subflow_nr doesn't match the expect value in
+chk_rm_nr():
+
+      syn                                 [ ok ]
+      synack                              [ ok ]
+      ack                                 [ ok ]
+      add                                 [ ok ]
+      echo                                [ ok ]
+      rm                                  [ ok ]
+      rmsf                                [ ok ] 3 in [2:4]
+      Info: invert simult
+
+      syn                                 [ ok ]
+      synack                              [ ok ]
+      ack                                 [ ok ]
+      add                                 [ ok ]
+      echo                                [ ok ]
+      rm                                  [ ok ]
+      rmsf                                [ ok ]
+      Info: invert
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
