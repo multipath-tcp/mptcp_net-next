@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
-Subject: [PATCH] t/mptcp-userspace-pm-allow-creating-id-0-subflow
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: userspace pm allow creating id 0 subflow
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+This patch drops id 0 limitation in mptcp_nl_cmd_sf_create() to allow
+creating additional subflows with the local addr ID 0.
+
+There is no reason not to allow additional subflows from this local
+address: we should be able to create new subflows from the initial
+endpoint. This limitation was breaking fullmesh support from userspace.
+
+Fixes: 702c2f646d42 ("mptcp: netlink: allow userspace-driven subflow establishment")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/391
+Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
