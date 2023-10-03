@@ -828,7 +828,7 @@ static void tcp_v4_send_reset(const struct sock *sk, struct sk_buff *skb)
 		ctl_sk->sk_mark = (sk->sk_state == TCP_TIME_WAIT) ?
 				   inet_twsk(sk)->tw_mark : sk->sk_mark;
 		ctl_sk->sk_priority = (sk->sk_state == TCP_TIME_WAIT) ?
-				   inet_twsk(sk)->tw_priority : sk->sk_priority;
+				   inet_twsk(sk)->tw_priority : READ_ONCE(sk->sk_priority);
 		transmit_time = tcp_transmit_time(sk);
 		xfrm_sk_clone_policy(ctl_sk, sk);
 		txhash = (sk->sk_state == TCP_TIME_WAIT) ?
@@ -1024,10 +1024,11 @@ static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 	if (skb) {
 		__tcp_v4_send_check(skb, ireq->ir_loc_addr, ireq->ir_rmt_addr);
 
-		tos = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_reflect_tos) ?
-				(tcp_rsk(req)->syn_tos & ~INET_ECN_MASK) |
-				(inet_sk(sk)->tos & INET_ECN_MASK) :
-				inet_sk(sk)->tos;
+		tos = READ_ONCE(inet_sk(sk)->tos);
+
+		if (READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_reflect_tos))
+			tos = (tcp_rsk(req)->syn_tos & ~INET_ECN_MASK) |
+			      (tos & INET_ECN_MASK);
 
 		if (!INET_ECN_is_capable(tos) &&
 		    tcp_bpf_ca_needs_ecn((struct sock *)req))
