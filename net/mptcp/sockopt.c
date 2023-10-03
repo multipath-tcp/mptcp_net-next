@@ -1475,6 +1475,7 @@ void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
  */
 int mptcp_set_rcvlowat(struct sock *sk, int val)
 {
+	struct mptcp_subflow_context *subflow;
 	int space, cap;
 
 	if (sk->sk_userlocks & SOCK_RCVBUF_LOCK)
@@ -1492,9 +1493,19 @@ int mptcp_set_rcvlowat(struct sock *sk, int val)
 		return 0;
 
 	space = __tcp_space_from_win(mptcp_sk(sk)->scaling_ratio, val);
-	if (space > sk->sk_rcvbuf) {
-		WRITE_ONCE(sk->sk_rcvbuf, space);
-		tcp_sk(sk)->window_clamp = val;
+	if (space <= sk->sk_rcvbuf)
+		return 0;
+
+	/* propagate the rcvbuf changes to all the subflows */
+	WRITE_ONCE(sk->sk_rcvbuf, space);
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool slow;
+
+		slow = lock_sock_fast(ssk);
+		WRITE_ONCE(ssk->sk_rcvbuf, space);
+		tcp_sk(ssk)->window_clamp = val;
+		unlock_sock_fast(ssk, slow);
 	}
 	return 0;
 }
