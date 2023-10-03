@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-define-initial-scaling-factor-value-as-a-macro
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: define initial scaling factor value as a macro
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+So that other users could access it. Notably MPTCP will use
+it in the next patch.
+
+No functional change intended.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Acked-by: Matthieu Baerts <matttbe@kernel.org>
