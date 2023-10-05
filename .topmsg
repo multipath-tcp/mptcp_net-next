@@ -7,4 +7,4 @@ shows one subflow but chk_subflows_total shows two subflows in each
 namespace.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
