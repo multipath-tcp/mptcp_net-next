@@ -16,4 +16,4 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 Reported-by: Christoph Paasch <cpaasch@apple.com>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/398
 Link: https://lore.kernel.org/r/ZPizxVT5s9JA5MPw@arm.com
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
