@@ -235,8 +235,9 @@ Here is a checklist.
   * Sender `Signed-off-by` tag should be last, and not duplicated.
   * Typically place `Fixes`, `Reported-by` then `Closes` tags first in the list
   * If the series is for -net (fixes), it is recommended to add
-    `Cc: stable@vger.kernel.org` (eventually with `# v<version>+`) on each
-    patch:
+    `Cc: stable@vger.kernel.org` (eventually with `# <version>.x`, see
+    [here](https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html)
+    for more details about that) on each patch:
 
         ./.append-cc-stable.sh $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
 
