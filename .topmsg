@@ -6,4 +6,4 @@ duplicate with local var mptcp_connect defined in do_transfer(), drop
 this useless global one.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
