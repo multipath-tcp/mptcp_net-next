@@ -1,4 +1,4 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
+From: Matthieu Baerts <matttbe@kernel.org>
 Subject: [PATCH] DO-NOT-MERGE: git markup: fixes other trees
 
 All commits older than this one are fixes for other trees than the -net
@@ -12,4 +12,4 @@ Following commits are MPTCP-related fixes for the -net tree.
 This commit is useful to easily find where are the fixes from/for other
 trees.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
