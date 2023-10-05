@@ -1,4 +1,4 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
+From: Matthieu Baerts <matttbe@kernel.org>
 Subject: [PATCH] DO-NOT-MERGE: mptcp: CI: switching to -net
 
 It is needed to maintain different versions for -net and net-next.
@@ -8,4 +8,4 @@ tests, dependences, etc.
 
 This topic is there to change some refs just for -net.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
