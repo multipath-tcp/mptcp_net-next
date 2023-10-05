@@ -15,14 +15,14 @@ tg import $(git merge-base net ${EXPORT_NET})..${EXPORT_NET}
 tg create t/upstream-net
 
 """
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
+From: Matthieu Baerts <matttbe@kernel.org>
 Subject: [PATCH] tg: dedicated topic for the top of the tree (net)
 
 This represents the top of our -net tree dedicated for the upstream.
 
 No modification should be linked to this topic.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
 """
 
 git checkout -b for-review-net
@@ -42,14 +42,14 @@ tg import $(git log -1 --grep "^DO-NOT-MERGE: git markup: features net-next$" --
 tg create t/upstream
 
 """
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
+From: Matthieu Baerts <matttbe@kernel.org>
 Subject: [PATCH] tg: dedicated topic for the top of the tree
 
 This represents the top of our tree dedicated for the upstream.
 
 No modification should be linked to this topic.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
 """
 
 git checkout -b for-review
