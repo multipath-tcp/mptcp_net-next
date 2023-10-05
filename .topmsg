@@ -5,4 +5,4 @@ Use mptcp_get_ext() helper defined in protocol.h instead of open-coding
 it in mptcp_sendmsg_frag().
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
