@@ -26,5 +26,5 @@ TCP_CLOSE in mptcp_do_fastclose()").
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/430
 Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
