@@ -10,6 +10,6 @@ endpoint. This limitation was breaking fullmesh support from userspace.
 
 Fixes: 702c2f646d42 ("mptcp: netlink: allow userspace-driven subflow establishment")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/391
-Suggested-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Suggested-by: Matthieu Baerts <matttbe@kernel.org>
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
