@@ -6,4 +6,4 @@ instead of open-coding it in both __mptcp_do_fallback() and
 mptcp_diag_fill_info().
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
