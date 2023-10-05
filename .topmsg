@@ -24,4 +24,4 @@ chk_rm_nr():
       Info: invert
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
