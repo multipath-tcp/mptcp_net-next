@@ -1,4 +1,4 @@
-From: Matthieu Baerts <matthieu.baerts@tessares.net>
+From: Matthieu Baerts <matttbe@kernel.org>
 Subject: [PATCH] DO-NOT-MERGE: git markup: fixes net-next
 
 All commits older than this one are MPTCP-related fixes for net-next
@@ -9,4 +9,4 @@ Following commits are new MPTCP-related features for net-next tree.
 This commit is useful to easily find where are MPTCP-related fixes for
 net-next tree.
 
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
