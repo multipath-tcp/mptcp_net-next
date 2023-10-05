@@ -10,4 +10,4 @@ the output of 'pm_nl_ctl events' command, to make all the userspace pm
 selftests more readable, both in mptcp_join.sh and userspace_pm.sh.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
-Reviewed-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
