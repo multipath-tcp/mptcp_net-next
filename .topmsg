@@ -29,4 +29,4 @@ Reviewed-by: Christoph Hellwig <hch@lst.de>
 Reported-by: syzbot+5b64180f8d9e39d3f061@syzkaller.appspotmail.com
 Message-Id: <20230828-vfs-super-fixes-v1-2-b37a4a04a88f@kernel.org>
 Signed-off-by: Christian Brauner <brauner@kernel.org>
-Signed-off-by: Matthieu Baerts <matthieu.baerts@tessares.net>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
