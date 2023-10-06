@@ -92,7 +92,7 @@ struct nh_res_table {
 	u32			unbalanced_timer;
 
 	u16			num_nh_buckets;
-	struct nh_res_bucket	nh_buckets[];
+	struct nh_res_bucket	nh_buckets[] __counted_by(num_nh_buckets);
 };
 
 struct nh_grp_entry {
@@ -200,7 +200,7 @@ struct nh_notifier_res_bucket_info {
 
 struct nh_notifier_res_table_info {
 	u16 num_nh_buckets;
-	struct nh_notifier_single_info nhs[];
+	struct nh_notifier_single_info nhs[] __counted_by(num_nh_buckets);
 };
 
 struct nh_notifier_info {
