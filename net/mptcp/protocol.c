@@ -2396,7 +2396,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		goto out_release;
 	}
 
-	dispose_it = msk->free_first || ssk != msk->first;
+	dispose_it = msk->free_first || ssk != msk->first || msk->pm.subflows;
 	if (dispose_it)
 		list_del(&subflow->node);
 
@@ -2446,8 +2446,20 @@ out_release:
 
 	sock_put(ssk);
 
-	if (ssk == msk->first)
-		WRITE_ONCE(msk->first, NULL);
+	if (ssk == msk->first) {
+		struct mptcp_subflow_context *tmp;
+		struct sock *next = NULL;
+
+		mptcp_for_each_subflow(msk, tmp) {
+			struct sock *s = mptcp_subflow_tcp_sock(tmp);
+
+			if (s != msk->first) {
+				next = s;
+				break;
+			}
+		}
+		WRITE_ONCE(msk->first, next);
+	}
 
 out:
 	__mptcp_sync_sndbuf(sk);
