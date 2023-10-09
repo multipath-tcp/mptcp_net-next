@@ -2396,7 +2396,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		goto out_release;
 	}
 
-	dispose_it = msk->free_first || ssk != msk->first;
+	dispose_it = msk->free_first || ssk != msk->first || !list_is_singular(&msk->conn_list);
 	if (dispose_it)
 		list_del(&subflow->node);
 
@@ -2446,7 +2446,7 @@ out_release:
 
 	sock_put(ssk);
 
-	if (ssk == msk->first)
+	if (ssk == msk->first && list_is_singular(&msk->conn_list))
 		WRITE_ONCE(msk->first, NULL);
 
 out:
