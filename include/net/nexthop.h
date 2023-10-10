@@ -126,7 +126,7 @@ struct nh_group {
 	bool			has_v4;
 
 	struct nh_res_table __rcu *res_table;
-	struct nh_grp_entry	nh_entries[];
+	struct nh_grp_entry	nh_entries[] __counted_by(num_nh);
 };
 
 struct nexthop {
@@ -187,7 +187,7 @@ struct nh_notifier_grp_entry_info {
 struct nh_notifier_grp_info {
 	u16 num_nh;
 	bool is_fdb;
-	struct nh_notifier_grp_entry_info nh_entries[];
+	struct nh_notifier_grp_entry_info nh_entries[] __counted_by(num_nh);
 };
 
 struct nh_notifier_res_bucket_info {
