@@ -805,6 +805,10 @@ class Family(SpecFamily):
             self.uapi_header = self.yaml['uapi-header']
         else:
             self.uapi_header = f"linux/{self.name}.h"
+        if self.uapi_header.startswith("linux/") and self.uapi_header.endswith('.h'):
+            self.uapi_header_name = self.uapi_header[6:-2]
+        else:
+            self.uapi_header_name = self.name
 
     def resolve(self):
         self.resolve_up(super())
@@ -1037,9 +1041,11 @@ class RenderInfo:
         if op_mode == 'notify':
             op_mode = 'do'
         for op_dir in ['request', 'reply']:
-            if op and op_dir in op[op_mode]:
-                self.struct[op_dir] = Struct(family, self.attr_set,
-                                             type_list=op[op_mode][op_dir]['attributes'])
+            if op:
+                type_list = []
+                if op_dir in op[op_mode]:
+                    type_list = op[op_mode][op_dir]['attributes']
+                self.struct[op_dir] = Struct(family, self.attr_set, type_list=type_list)
         if op_mode == 'event':
             self.struct['reply'] = Struct(family, self.attr_set, type_list=op['event']['attributes'])
 
@@ -1748,6 +1754,8 @@ def print_type_helpers(ri, direction, deref=False):
 
 
 def print_req_type_helpers(ri):
+    if len(ri.struct["request"].attr_list) == 0:
+        return
     print_alloc_wrapper(ri, "request")
     print_type_helpers(ri, "request")
 
@@ -1769,6 +1777,8 @@ def print_parse_prototype(ri, direction, terminate=True):
 
 
 def print_req_type(ri):
+    if len(ri.struct["request"].attr_list) == 0:
+        return
     print_type(ri, "request")
 
 
@@ -2124,7 +2134,7 @@ def uapi_enum_start(family, cw, obj, ckey='', enum_name='enum-name'):
 
 
 def render_uapi(family, cw):
-    hdr_prot = f"_UAPI_LINUX_{family.name.upper()}_H"
+    hdr_prot = f"_UAPI_LINUX_{c_upper(family.uapi_header_name)}_H"
     cw.p('#ifndef ' + hdr_prot)
     cw.p('#define ' + hdr_prot)
     cw.nl()
@@ -2511,9 +2521,8 @@ def main():
                 if 'dump' in op:
                     cw.p(f"/* {op.enum_name} - dump */")
                     ri = RenderInfo(cw, parsed, args.mode, op, 'dump')
-                    if 'request' in op['dump']:
-                        print_req_type(ri)
-                        print_req_type_helpers(ri)
+                    print_req_type(ri)
+                    print_req_type_helpers(ri)
                     if not ri.type_consistent:
                         print_rsp_type(ri)
                     print_wrapped_type(ri)
