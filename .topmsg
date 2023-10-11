@@ -1,4 +1,15 @@
 From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-correctly-check-for-no-RST
+Subject: [PATCH] selftests: mptcp: join: correctly check for no RST
 
+The commit mentioned below was more tolerant with the number of RST seen
+during a test because in some uncontrollable situations, multiple RST
+can be generated.
+
+But it was not taking into account the case where no RST are expected:
+this validation was then no longer reporting issues for the 0 RST case
+because it is not possible to have less than 0 RST in the counter. This
+patch fixes the issue by adding a specific condition.
+
+Fixes: 6bf41020b72b ("selftests: mptcp: update and extend fastclose test-cases")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
