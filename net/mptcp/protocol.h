@@ -1081,7 +1081,8 @@ static inline bool __mptcp_has_initial_subflow(const struct mptcp_sock *msk)
 {
 	struct sock *ssk = READ_ONCE(msk->first);
 
-	return ssk && inet_sk_state_load(ssk) != TCP_CLOSE;
+	return ssk &&
+	       !((1 << inet_sk_state_load(ssk)) & (TCPF_FIN_WAIT2 | TCPF_CLOSE));
 }
 
 static inline void mptcp_do_fallback(struct sock *ssk)
