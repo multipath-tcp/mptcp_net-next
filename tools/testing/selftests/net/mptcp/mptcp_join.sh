@@ -3316,7 +3316,7 @@ userspace_pm_rm_addr()
 	tk=$(mptcp_lib_evts_get_info token "$evts")
 
 	ip netns exec $1 ./pm_nl_ctl rem token $tk id $2
-	wait_rm_addr $1 1
+	wait_rm_addr $1
 }
 
 # $1: ns ; $2: addr ; $3: id
@@ -3352,7 +3352,7 @@ userspace_pm_rm_sf()
 
 	ip netns exec $1 ./pm_nl_ctl dsf lip $2 lport $sp \
 				rip $da rport $dp token $tk
-	wait_rm_sf $1 1
+	wait_rm_sf $1
 }
 
 userspace_tests()
