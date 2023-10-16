@@ -3311,12 +3311,14 @@ userspace_pm_rm_addr()
 {
 	local evts=$evts_ns1
 	local tk
+	local cnt
 
 	[ "$1" == "$ns2" ] && evts=$evts_ns2
 	tk=$(mptcp_lib_evts_get_info token "$evts")
 
+	cnt=$(rm_addr_count ${1})
 	ip netns exec $1 ./pm_nl_ctl rem token $tk id $2
-	wait_rm_addr $1 1
+	wait_rm_addr $1 "${cnt}"
 }
 
 # $1: ns ; $2: addr ; $3: id
@@ -3342,6 +3344,7 @@ userspace_pm_rm_sf()
 	local t=${3:-1}
 	local ip=4
 	local tk da dp sp
+	local cnt
 
 	[ "$1" == "$ns2" ] && evts=$evts_ns2
 	if is_v6 $2; then ip=6; fi
@@ -3350,9 +3353,10 @@ userspace_pm_rm_sf()
 	dp=$(mptcp_lib_evts_get_info dport "$evts" $t)
 	sp=$(mptcp_lib_evts_get_info sport "$evts" $t)
 
+	cnt=$(rm_sf_count ${1})
 	ip netns exec $1 ./pm_nl_ctl dsf lip $2 lport $sp \
 				rip $da rport $dp token $tk
-	wait_rm_sf $1 1
+	wait_rm_sf $1 "${cnt}"
 }
 
 userspace_tests()
