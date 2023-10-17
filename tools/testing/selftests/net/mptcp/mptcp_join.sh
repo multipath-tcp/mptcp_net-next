@@ -1905,8 +1905,10 @@ chk_subflows_total()
 	print_check "$info $1:$2"
 
 	# if not, count the TCP connections that are in fact MPTCP subflows
-	cnt1=$(ss -N $ns1 -ti | grep -c tcp-ulp-mptcp)
-	cnt2=$(ss -N $ns2 -ti | grep -c tcp-ulp-mptcp)
+	cnt1=$(ss -N $ns1 -ti state established state syn-sent state syn-recv |
+	       grep -c tcp-ulp-mptcp)
+	cnt2=$(ss -N $ns2 -ti state established state syn-sent state syn-recv |
+	       grep -c tcp-ulp-mptcp)
 
 	if [ "$1" != "$cnt1" ] || [ "$2" != "$cnt2" ]; then
 		fail_test "got subflows $cnt1:$cnt2 expected $1:$2"
