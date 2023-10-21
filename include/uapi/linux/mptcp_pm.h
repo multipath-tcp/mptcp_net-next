@@ -11,6 +11,7 @@
 
 /**
  * enum mptcp_event_type
+ * @MPTCP_EVENT_UNSPEC: unused event
  * @MPTCP_EVENT_CREATED: token, family, saddr4 | saddr6, daddr4 | daddr6,
  *   sport, dport A new MPTCP connection has been created. It is the good time
  *   to allocate memory and send ADD_ADDR if needed. Depending on the
