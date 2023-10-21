@@ -1,7 +1,0 @@
-From: Davide Caratti <dcaratti@redhat.com>
-Subject: [PATCH] tools: ynl: add uns-admin-perm to genetlink legacy
-
-this flag maps to GENL_UNS_ADMIN_PERM and will be used by future specs.
-
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Davide Caratti <dcaratti@redhat.com>
