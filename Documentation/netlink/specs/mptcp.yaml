@@ -4,8 +4,8 @@ name: mptcp_pm
 protocol: genetlink-legacy
 doc: Multipath TCP.
 
-c-family-name: mptcp_pm_name
-c-version-name: mptcp_pm_ver
+c-family-name: mptcp-pm-name
+c-version-name: mptcp-pm-ver
 max-by-define: true
 kernel-policy: per-op
 
@@ -13,12 +13,12 @@ definitions:
   -
     type: enum
     name: event-type
-    enum-name: mptcp_event_type
-    name-prefix: mptcp_event_
+    enum-name: mptcp-event-type
+    name-prefix: mptcp-event-
     entries:
      -
       name: unspec
-      value: 0
+      doc: unused event
      -
       name: created
       doc:
@@ -45,41 +45,38 @@ definitions:
         A new address has been announced by the peer.
      -
       name: removed
-      value: 7
       doc:
         token, rem_id
         An address has been lost by the peer.
      -
-      name: sub_established
+      name: sub-established
       value: 10
       doc:
         token, family, loc_id, rem_id, saddr4 | saddr6, daddr4 | daddr6, sport,
         dport, backup, if_idx [, error]
         A new subflow has been established. 'error' should not be set.
      -
-      name: sub_closed
-      value: 11
+      name: sub-closed
       doc:
         token, family, loc_id, rem_id, saddr4 | saddr6, daddr4 | daddr6, sport,
         dport, backup, if_idx [, error]
         A subflow has been closed. An error (copy of sk_err) could be set if an
         error has been detected for this subflow.
      -
-      name: sub_priority
+      name: sub-priority
       value: 13
       doc:
         token, family, loc_id, rem_id, saddr4 | saddr6, daddr4 | daddr6, sport,
         dport, backup, if_idx [, error]
         The priority of a subflow has changed. 'error' should not be set.
      -
-      name: listener_created
+      name: listener-created
       value: 15
       doc:
         family, sport, saddr4 | saddr6
         A new PM listener is created.
      -
-      name: listener_closed
-      value: 16
+      name: listener-closed
       doc:
         family, sport, saddr4 | saddr6
         A PM listener is closed.
@@ -87,7 +84,7 @@ definitions:
 attribute-sets:
   -
     name: address
-    name-prefix: mptcp_pm_addr_attr_
+    name-prefix: mptcp-pm-addr-attr-
     attributes:
       -
         name: unspec
@@ -107,7 +104,7 @@ attribute-sets:
         name: addr6
         type: binary
         checks:
-          min-len: 16
+          exact-len: 16
       -
         name: port
         type: u16
@@ -116,52 +113,52 @@ attribute-sets:
         name: flags
         type: u32
       -
-        name: if_idx
+        name: if-idx
         type: s32
   -
     name: subflow-attribute
-    name-prefix: mptcp_subflow_attr_
+    name-prefix: mptcp-subflow-attr-
     attributes:
       -
         name: unspec
         type: unused
         value: 0
       -
-        name: token_rem
+        name: token-rem
         type: u32
       -
-        name: token_loc
+        name: token-loc
         type: u32
       -
-        name: relwrite_seq
+        name: relwrite-seq
         type: u32
       -
-        name: map_seq
+        name: map-seq
         type: u64
       -
-        name: map_sfseq
+        name: map-sfseq
         type: u32
       -
-        name: ssn_offset
+        name: ssn-offset
         type: u32
       -
-        name: map_datalen
+        name: map-datalen
         type: u16
       -
         name: flags
         type: u32
       -
-        name: id_rem
+        name: id-rem
         type: u8
       -
-        name: id_loc
+        name: id-loc
         type: u8
       -
         name: pad
         type: pad
   -
     name: endpoint
-    name-prefix: mptcp_pm_endpoint_
+    name-prefix: mptcp-pm-endpoint-
     attributes:
       -
         name: addr
@@ -169,7 +166,7 @@ attribute-sets:
         nested-attributes: address
   -
     name: attr
-    name-prefix: mptcp_pm_attr_
+    name-prefix: mptcp-pm-attr-
     attributes:
       -
         name: unspec
@@ -180,7 +177,7 @@ attribute-sets:
         type: nest
         nested-attributes: address
       -
-        name: rcv_add_addrs
+        name: rcv-add-addrs
         type: u32
       -
         name: subflows
@@ -189,19 +186,19 @@ attribute-sets:
         name: token
         type: u32
       -
-        name: loc_id
+        name: loc-id
         type: u8
       -
-        name: addr_remote
+        name: addr-remote
         type: nest
         nested-attributes: address
   -
-    name: event_attr
-    enum-name: mptcp_event_attr
-    name-prefix: mptcp_attr_
+    name: event-attr
+    enum-name: mptcp-event-attr
+    name-prefix: mptcp-attr-
     attributes:
       -
-        name: UNSPEC
+        name: unspec
         type: unused
         value: 0
       -
@@ -211,10 +208,10 @@ attribute-sets:
         name: family
         type: u16
       -
-        name: loc_id
+        name: loc-id
         type: u8
       -
-        name: rem_id
+        name: rem-id
         type: u8
       -
         name: saddr4
@@ -258,13 +255,13 @@ attribute-sets:
         name: if_idx
         type: u32
       -
-        name: reset_reason
+        name: reset-reason
         type: u32
       -
-        name: reset_flags
+        name: reset-flags
         type: u32
       -
-        name: server_side
+        name: server-side
         type: u8
 
 operations:
@@ -274,29 +271,29 @@ operations:
       doc: unused
       value: 0
     -
-      name: add_addr
+      name: add-addr
       doc: Add endpoint
       attribute-set: endpoint
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &add_addr_attrs
+      do: &add-addr-attrs
         request:
           attributes:
             - addr
     -
-      name: del_addr
+      name: del-addr
       doc: Delete endpoint
       attribute-set: endpoint
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: *add_addr_attrs
+      do: *add-addr-attrs
     -
-      name: get_addr
+      name: get-addr
       doc: Get endpoint information
       attribute-set: endpoint
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &get_addr_attrs
+      do: &get-addr-attrs
         request:
           attributes:
            - addr
@@ -308,56 +305,56 @@ operations:
          attributes:
            - addr
     -
-      name:  flush_addrs
+      name:  flush-addrs
       doc: flush addresses
       attribute-set: endpoint
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: *add_addr_attrs
+      do: *add-addr-attrs
     -
-      name: set_limits
+      name: set-limits
       doc: Set protocol limits
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &mptcp_limits
+      do: &mptcp-limits
         request:
           attributes:
-            - rcv_add_addrs
+            - rcv-add-addrs
             - subflows
     -
-      name: get_limits
+      name: get-limits
       doc: Get protocol limits
       attribute-set: attr
       dont-validate: [ strict ]
-      do: &mptcp_get_limits
+      do: &mptcp-get-limits
         request:
            attributes:
-            - rcv_add_addrs
+            - rcv-add-addrs
             - subflows
         reply:
           attributes:
-            - rcv_add_addrs
+            - rcv-add-addrs
             - subflows
     -
-      name: set_flags
+      name: set-flags
       doc: Change endpoint flags
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &mptcp_set_flags
+      do: &mptcp-set-flags
         request:
           attributes:
             - addr
             - token
-            - addr_remote
+            - addr-remote
     -
       name: announce
       doc: announce new sf
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &announce_add
+      do: &announce-add
         request:
           attributes:
             - addr
@@ -372,23 +369,23 @@ operations:
         request:
          attributes:
            - token
-           - loc_id
+           - loc-id
     -
-      name: subflow_create
+      name: subflow-create
       doc: todo
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: &sf_create
+      do: &sf-create
         request:
           attributes:
             - addr
             - token
-            - addr_remote
+            - addr-remote
     -
-      name: subflow_destroy
+      name: subflow-destroy
       doc: todo
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
-      do: *sf_create
+      do: *sf-create
