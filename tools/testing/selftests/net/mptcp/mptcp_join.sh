@@ -1905,8 +1905,10 @@ chk_subflows_total()
 	print_check "$info $1:$2"
 
 	# if not, count the TCP connections that are in fact MPTCP subflows
-	cnt1=$(ss -N $ns1 -ti | grep -c tcp-ulp-mptcp)
-	cnt2=$(ss -N $ns2 -ti | grep -c tcp-ulp-mptcp)
+	cnt1=$(ss -N $ns1 -ti state established state syn-sent state syn-recv |
+	       grep -c tcp-ulp-mptcp)
+	cnt2=$(ss -N $ns2 -ti state established state syn-sent state syn-recv |
+	       grep -c tcp-ulp-mptcp)
 
 	if [ "$1" != "$cnt1" ] || [ "$2" != "$cnt2" ]; then
 		fail_test "got subflows $cnt1:$cnt2 expected $1:$2"
@@ -3324,12 +3326,14 @@ userspace_pm_rm_addr()
 {
 	local evts=$evts_ns1
 	local tk
+	local cnt
 
 	[ "$1" == "$ns2" ] && evts=$evts_ns2
 	tk=$(mptcp_lib_evts_get_info token "$evts")
 
+	cnt=$(rm_addr_count ${1})
 	ip netns exec $1 ./pm_nl_ctl rem token $tk id $2
-	wait_rm_addr $1 1
+	wait_rm_addr $1 "${cnt}"
 }
 
 # $1: ns ; $2: addr ; $3: id
@@ -3355,6 +3359,7 @@ userspace_pm_rm_sf()
 	local t=${3:-1}
 	local ip=4
 	local tk da dp sp
+	local cnt
 
 	[ "$1" == "$ns2" ] && evts=$evts_ns2
 	if is_v6 $2; then ip=6; fi
@@ -3363,9 +3368,10 @@ userspace_pm_rm_sf()
 	dp=$(mptcp_lib_evts_get_info dport "$evts" $t)
 	sp=$(mptcp_lib_evts_get_info sport "$evts" $t)
 
+	cnt=$(rm_sf_count ${1})
 	ip netns exec $1 ./pm_nl_ctl dsf lip $2 lport $sp \
 				rip $da rport $dp token $tk
-	wait_rm_sf $1 1
+	wait_rm_sf $1 "${cnt}"
 }
 
 userspace_tests()
@@ -3448,7 +3454,7 @@ userspace_tests()
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns2 1 1
-		speed=10 \
+		speed=5 \
 			run_tests $ns1 $ns2 10.0.1.1 &
 		local tests_pid=$!
 		wait_mpj $ns1
@@ -3472,7 +3478,7 @@ userspace_tests()
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
-		speed=10 \
+		speed=5 \
 			run_tests $ns1 $ns2 10.0.1.1 &
 		local tests_pid=$!
 		wait_mpj $ns2
@@ -3494,7 +3500,7 @@ userspace_tests()
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
-		speed=10 \
+		speed=5 \
 			run_tests $ns1 $ns2 10.0.1.1 &
 		local tests_pid=$!
 		wait_mpj $ns2
@@ -3504,6 +3510,32 @@ userspace_tests()
 		chk_join_nr 1 1 1
 		chk_mptcp_info subflows 1 subflows 1
 		chk_subflows_total 2 2
+		kill_events_pids
+		wait $tests_pid
+	fi
+
+	# userspace pm send RM_ADDR for ID 0
+	if reset_with_events "userspace pm send RM_ADDR for ID 0" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+		set_userspace_pm $ns1
+		pm_nl_set_limits $ns2 1 1
+		speed=5 \
+			run_tests $ns1 $ns2 10.0.1.1 &
+		local tests_pid=$!
+		wait_mpj $ns1
+		userspace_pm_add_addr $ns1 10.0.2.1 10
+		chk_join_nr 1 1 1
+		chk_add_nr 1 1
+		chk_mptcp_info subflows 1 subflows 1
+		chk_subflows_total 2 2
+		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
+		userspace_pm_rm_addr $ns1 0
+		# we don't look at the counter linked to the subflows that
+		# have been removed but to the one linked to the RM_ADDR
+		chk_rm_nr 1 0 invert
+		chk_rst_nr 0 0 invert
+		chk_mptcp_info subflows 1 subflows 1
+		chk_subflows_total 1 1
 		kill_events_pids
 		wait $tests_pid
 	fi
