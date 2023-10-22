@@ -9,7 +9,8 @@ To be compatible with old 'ss' or kernel versions not supporting this
 counter, get the total subflows by listing TCP connections that are
 MPTCP subflows:
 
-        ss -ti | grep -c tcp-ulp-mptcp.
+    ss -ti state state established state syn-sent state syn-recv |
+        grep -c tcp-ulp-mptcp.
 
 Signed-off-by: Geliang Tang <geliang.tang@suse.com>
 Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
