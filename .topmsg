@@ -1,4 +1,30 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-run-userspace-pm-tests-slower
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: run userspace pm tests slower
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+Some userspace pm tests failed are reported by CI:
+
+112 userspace pm add & remove address
+      syn                                 [ ok ]
+      synack                              [ ok ]
+      ack                                 [ ok ]
+      add                                 [ ok ]
+      echo                                [ ok ]
+      mptcp_info subflows=1:1             [ ok ]
+      subflows_total 2:2                  [ ok ]
+      mptcp_info add_addr_signal=1:1      [ ok ]
+      rm                                  [ ok ]
+      rmsf                                [ ok ]
+      Info: invert
+      mptcp_info subflows=0:0             [ ok ]
+      subflows_total 1:1                  [fail]
+                         got subflows 0:0 expected 1:1
+Server ns stats
+TcpPassiveOpens                 2                  0.0
+TcpInSegs                       118                0.0
+
+This patch fixes them by change 'speed' to 5 to run the tests much more
+slower.
+
+Fixes: 4369c198e599 ("selftests: mptcp: test userspace pm out of transfer")
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
