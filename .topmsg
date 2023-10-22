@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-fix-wait_rm_addr-sf-parameters
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: fix wait_rm_addr/sf parameters
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+The second input parameter of 'wait_rm_addr/sf $1 1' is misused. If it's
+1, wait_rm_addr/sf will never break, and will loop ten times, then
+'wait_rm_addr/sf' equals to 'sleep 1'. This delay time is too long,
+which can sometimes make the tests failures.
+
+A better way to use wait_rm_addr/sf is to use rm_addr/sf_count to obtain
+the current value, and then pass into wait_rm_addr/sf.
+
+Fixes: 4369c198e599 ("selftests: mptcp: test userspace pm out of transfer")
+Suggested-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
