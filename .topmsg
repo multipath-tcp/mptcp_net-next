@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-userspace-pm-send-RM_ADDR-for-ID-0
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: userspace pm send RM_ADDR for ID 0
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+This patch adds the ability to send RM_ADDR for local ID 0. Check
+whether id 0 address is removed, if not, put id 0 into a removing
+list, pass it to mptcp_pm_remove_addr() to remove id 0 address.
+
+There is no reason not to allow the userspace to remove the initial
+address (ID 0). This special case was not taken into account not
+letting the userspace to delete all addresses as announced.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/379
+Fixes: d9a4594edabf ("mptcp: netlink: Add MPTCP_PM_CMD_REMOVE")
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
