@@ -159,6 +159,15 @@ class Type(SpecAttr):
         spec = self._attr_policy(policy)
         cw.p(f"\t[{self.enum_name}] = {spec},")
 
+    def _mnl_type(self):
+        # mnl does not have helpers for signed integer types
+        # turn signed type into unsigned
+        # this only makes sense for scalar types
+        t = self.type
+        if t[0] == 's':
+            t = 'u' + t[1:]
+        return t
+
     def _attr_typol(self):
         raise Exception(f"Type policy not implemented for class type {self.type}")
 
@@ -326,15 +335,13 @@ class TypeScalar(Type):
         maybe_enum = not self.is_bitfield and 'enum' in self.attr
         if maybe_enum and self.family.consts[self.attr['enum']].enum_name:
             self.type_name = f"enum {self.family.name}_{c_lower(self.attr['enum'])}"
+        elif self.is_auto_scalar:
+            self.type_name = '__' + self.type[0] + '64'
         else:
             self.type_name = '__' + self.type
 
-    def _mnl_type(self):
-        t = self.type
-        # mnl does not have a helper for signed types
-        if t[0] == 's':
-            t = 'u' + t[1:]
-        return t
+    def mnl_type(self):
+        return self._mnl_type()
 
     def _attr_policy(self, policy):
         if 'flags-mask' in self.checks or self.is_bitfield:
@@ -357,16 +364,16 @@ class TypeScalar(Type):
         return super()._attr_policy(policy)
 
     def _attr_typol(self):
-        return f'.type = YNL_PT_U{self.type[1:]}, '
+        return f'.type = YNL_PT_U{c_upper(self.type[1:])}, '
 
     def arg_member(self, ri):
         return [f'{self.type_name} {self.c_name}{self.byte_order_comment}']
 
     def attr_put(self, ri, var):
-        self._attr_put_simple(ri, var, self._mnl_type())
+        self._attr_put_simple(ri, var, self.mnl_type())
 
     def _attr_get(self, ri, var):
-        return f"{var}->{self.c_name} = mnl_attr_get_{self._mnl_type()}(attr);", None, None
+        return f"{var}->{self.c_name} = mnl_attr_get_{self.mnl_type()}(attr);", None, None
 
     def _setter_lines(self, ri, member, presence):
         return [f"{member} = {self.c_name};"]
@@ -487,6 +494,31 @@ class TypeBinary(Type):
                 f'memcpy({member}, {self.c_name}, {presence}_len);']
 
 
+class TypeBitfield32(Type):
+    def _complex_member_type(self, ri):
+        return "struct nla_bitfield32"
+
+    def _attr_typol(self):
+        return f'.type = YNL_PT_BITFIELD32, '
+
+    def _attr_policy(self, policy):
+        if not 'enum' in self.attr:
+            raise Exception('Enum required for bitfield32 attr')
+        enum = self.family.consts[self.attr['enum']]
+        mask = enum.get_mask(as_flags=True)
+        return f"NLA_POLICY_BITFIELD32({mask})"
+
+    def attr_put(self, ri, var):
+        line = f"mnl_attr_put(nlh, {self.enum_name}, sizeof(struct nla_bitfield32), &{var}->{self.c_name})"
+        self._attr_put_line(ri, var, line)
+
+    def _attr_get(self, ri, var):
+        return f"memcpy(&{var}->{self.c_name}, mnl_attr_get_payload(attr), sizeof(struct nla_bitfield32));", None, None
+
+    def _setter_lines(self, ri, member, presence):
+        return [f"memcpy(&{member}, {self.c_name}, sizeof(struct nla_bitfield32));"]
+
+
 class TypeNest(Type):
     def _complex_member_type(self, ri):
         return self.nested_struct_type
@@ -530,12 +562,8 @@ class TypeMultiAttr(Type):
     def presence_type(self):
         return 'count'
 
-    def _mnl_type(self):
-        t = self.type
-        # mnl does not have a helper for signed types
-        if t[0] == 's':
-            t = 'u' + t[1:]
-        return t
+    def mnl_type(self):
+        return self._mnl_type()
 
     def _complex_member_type(self, ri):
         if 'type' not in self.attr or self.attr['type'] == 'nest':
@@ -570,7 +598,7 @@ class TypeMultiAttr(Type):
 
     def attr_put(self, ri, var):
         if self.attr['type'] in scalars:
-            put_type = self._mnl_type()
+            put_type = self.mnl_type()
             ri.cw.p(f"for (unsigned int i = 0; i < {var}->n_{self.c_name}; i++)")
             ri.cw.p(f"mnl_attr_put_{put_type}(nlh, {self.enum_name}, {var}->{self.c_name}[i]);")
         elif 'type' not in self.attr or self.attr['type'] == 'nest':
@@ -789,6 +817,8 @@ class AttrSet(SpecAttrSet):
             t = TypeString(self.family, self, elem, value)
         elif elem['type'] == 'binary':
             t = TypeBinary(self.family, self, elem, value)
+        elif elem['type'] == 'bitfield32':
+            t = TypeBitfield32(self.family, self, elem, value)
         elif elem['type'] == 'nest':
             t = TypeNest(self.family, self, elem, value)
         elif elem['type'] == 'array-nest':
@@ -1088,10 +1118,13 @@ class RenderInfo:
 
         # 'do' and 'dump' response parsing is identical
         self.type_consistent = True
-        if op_mode != 'do' and 'dump' in op and 'do' in op:
-            if ('reply' in op['do']) != ('reply' in op["dump"]):
-                self.type_consistent = False
-            elif 'reply' in op['do'] and op["do"]["reply"] != op["dump"]["reply"]:
+        if op_mode != 'do' and 'dump' in op:
+            if 'do' in op:
+                if ('reply' in op['do']) != ('reply' in op["dump"]):
+                    self.type_consistent = False
+                elif 'reply' in op['do'] and op["do"]["reply"] != op["dump"]["reply"]:
+                    self.type_consistent = False
+            else:
                 self.type_consistent = False
 
         self.attr_set = attr_set
@@ -1296,7 +1329,7 @@ class CodeWriter:
             self.p(line)
 
 
-scalars = {'u8', 'u16', 'u32', 'u64', 's32', 's64'}
+scalars = {'u8', 'u16', 'u32', 'u64', 's32', 's64', 'uint', 'sint'}
 
 direction_to_suffix = {
     'reply': '_rsp',
@@ -1586,11 +1619,8 @@ def _multi_parse(ri, struct, init_lines, local_vars):
             ri.cw.p(f"parg.data = &dst->{aspec.c_name}[i];")
             ri.cw.p(f"if ({aspec.nested_render_name}_parse(&parg, attr))")
             ri.cw.p('return MNL_CB_ERROR;')
-        elif aspec['type'] in scalars:
-            t = aspec['type']
-            if t[0] == 's':
-                t = 'u' + t[1:]
-            ri.cw.p(f"dst->{aspec.c_name}[i] = mnl_attr_get_{t}(attr);")
+        elif aspec.type in scalars:
+            ri.cw.p(f"dst->{aspec.c_name}[i] = mnl_attr_get_{aspec.mnl_type()}(attr);")
         else:
             raise Exception('Nest parsing type not supported yet')
         ri.cw.p('i++;')
@@ -1878,7 +1908,7 @@ def print_wrapped_type(ri):
         ri.cw.p('__u8 cmd;')
         ri.cw.p('struct ynl_ntf_base_type *next;')
         ri.cw.p(f"void (*free)({type_name(ri, 'reply')} *ntf);")
-    ri.cw.p(f"{type_name(ri, 'reply', deref=True)} obj __attribute__ ((aligned (8)));")
+    ri.cw.p(f"{type_name(ri, 'reply', deref=True)} obj __attribute__((aligned(8)));")
     ri.cw.block_end(line=';')
     ri.cw.nl()
     print_free_prototype(ri, 'reply')
@@ -2420,6 +2450,16 @@ def render_user_family(family, cw, prototype):
     cw.block_end(line=';')
 
 
+def family_contains_bitfield32(family):
+    for _, attr_set in family.attr_sets.items():
+        if attr_set.subset_of:
+            continue
+        for _, attr in attr_set.items():
+            if attr.type == "bitfield32":
+                return True
+    return False
+
+
 def find_kernel_root(full_path):
     sub_path = ''
     while True:
@@ -2505,6 +2545,8 @@ def main():
         cw.p('#include <string.h>')
         if args.header:
             cw.p('#include <linux/types.h>')
+            if family_contains_bitfield32(parsed):
+                cw.p('#include <linux/netlink.h>')
         else:
             cw.p(f'#include "{parsed.name}-user.h"')
             cw.p('#include "ynl.h"')
