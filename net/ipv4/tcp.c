@@ -927,10 +927,11 @@ int tcp_send_mss(struct sock *sk, int *size_goal, int flags)
 	return mss_now;
 }
 
-/* In some cases, both sendmsg() could have added an skb to the write queue,
- * but failed adding payload on it.  We need to remove it to consume less
+/* In some cases, sendmsg() could have added an skb to the write queue,
+ * but failed adding payload on it. We need to remove it to consume less
  * memory, but more importantly be able to generate EPOLLOUT for Edge Trigger
- * epoll() users.
+ * epoll() users. Another reason is that tcp_write_xmit() does not like
+ * finding an empty skb in the write queue.
  */
 void tcp_remove_empty_skb(struct sock *sk)
 {
@@ -1289,6 +1290,7 @@ new_segment:
 
 wait_for_space:
 		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		tcp_remove_empty_skb(sk);
 		if (copied)
 			tcp_push(sk, flags & ~MSG_MORE, mss_now,
 				 TCP_NAGLE_PUSH, size_goal);
@@ -3629,10 +3631,16 @@ int do_tcp_setsockopt(struct sock *sk, int level, int optname,
 			tp->fastopen_no_cookie = val;
 		break;
 	case TCP_TIMESTAMP:
-		if (!tp->repair)
+		if (!tp->repair) {
 			err = -EPERM;
-		else
-			WRITE_ONCE(tp->tsoffset, val - tcp_time_stamp_raw());
+			break;
+		}
+		/* val is an opaque field,
+		 * and low order bit contains usec_ts enable bit.
+		 * Its a best effort, and we do not care if user makes an error.
+		 */
+		tp->tcp_usec_ts = val & 1;
+		WRITE_ONCE(tp->tsoffset, val - tcp_clock_ts(tp->tcp_usec_ts));
 		break;
 	case TCP_REPAIR_WINDOW:
 		err = tcp_repair_set_window(tp, optval, optlen);
@@ -3754,6 +3762,8 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 		info->tcpi_options |= TCPI_OPT_ECN_SEEN;
 	if (tp->syn_data_acked)
 		info->tcpi_options |= TCPI_OPT_SYN_DATA;
+	if (tp->tcp_usec_ts)
+		info->tcpi_options |= TCPI_OPT_USEC_TS;
 
 	info->tcpi_rto = jiffies_to_usecs(icsk->icsk_rto);
 	info->tcpi_ato = jiffies_to_usecs(min_t(u32, icsk->icsk_ack.ato,
@@ -3817,10 +3827,8 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_total_rto = tp->total_rto;
 	info->tcpi_total_rto_recoveries = tp->total_rto_recoveries;
 	info->tcpi_total_rto_time = tp->total_rto_time;
-	if (tp->rto_stamp) {
-		info->tcpi_total_rto_time += tcp_time_stamp_raw() -
-						tp->rto_stamp;
-	}
+	if (tp->rto_stamp)
+		info->tcpi_total_rto_time += tcp_clock_ms() - tp->rto_stamp;
 
 	unlock_sock_fast(sk, slow);
 }
@@ -4145,7 +4153,11 @@ int do_tcp_getsockopt(struct sock *sk, int level,
 		break;
 
 	case TCP_TIMESTAMP:
-		val = tcp_time_stamp_raw() + READ_ONCE(tp->tsoffset);
+		val = tcp_clock_ts(tp->tcp_usec_ts) + READ_ONCE(tp->tsoffset);
+		if (tp->tcp_usec_ts)
+			val |= 1;
+		else
+			val &= ~1;
 		break;
 	case TCP_NOTSENT_LOWAT:
 		val = READ_ONCE(tp->notsent_lowat);
