@@ -383,6 +383,10 @@ static struct fq_flow *fq_classify(struct Qdisc *sch, struct sk_buff *skb,
 
 	if (fq_fastpath_check(sch, skb, now)) {
 		q->internal.stat_fastpath_packets++;
+		if (skb->sk == sk && q->rate_enable &&
+		    READ_ONCE(sk->sk_pacing_status) != SK_PACING_FQ)
+			smp_store_release(&sk->sk_pacing_status,
+					  SK_PACING_FQ);
 		return &q->internal;
 	}
 
@@ -651,7 +655,7 @@ static struct sk_buff *fq_dequeue(struct Qdisc *sch)
 begin:
 	head = fq_pband_head_select(pband);
 	if (!head) {
-		while (++retry < FQ_BANDS) {
+		while (++retry <= FQ_BANDS) {
 			if (++q->band_nr == FQ_BANDS)
 				q->band_nr = 0;
 			pband = &q->band_flows[q->band_nr];
