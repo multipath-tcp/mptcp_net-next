@@ -95,6 +95,7 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 		case SO_SNDBUFFORCE:
 			ssk->sk_userlocks |= SOCK_SNDBUF_LOCK;
 			WRITE_ONCE(ssk->sk_sndbuf, sk->sk_sndbuf);
+			mptcp_subflow_ctx(ssk)->cached_sndbuf = sk->sk_sndbuf;
 			break;
 		case SO_RCVBUF:
 		case SO_RCVBUFFORCE:
@@ -1415,8 +1416,10 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 
 	if (sk->sk_userlocks & tx_rx_locks) {
 		ssk->sk_userlocks |= sk->sk_userlocks & tx_rx_locks;
-		if (sk->sk_userlocks & SOCK_SNDBUF_LOCK)
+		if (sk->sk_userlocks & SOCK_SNDBUF_LOCK) {
 			WRITE_ONCE(ssk->sk_sndbuf, sk->sk_sndbuf);
+			mptcp_subflow_ctx(ssk)->cached_sndbuf = sk->sk_sndbuf;
+		}
 		if (sk->sk_userlocks & SOCK_RCVBUF_LOCK)
 			WRITE_ONCE(ssk->sk_rcvbuf, sk->sk_rcvbuf);
 	}
@@ -1451,6 +1454,12 @@ void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
 	msk_owned_by_me(msk);
 
 	ssk->sk_rcvlowat = 0;
+
+	/* subflows must ignore any latency-related settings: will not affect
+	 * the user-space - only the msk is relevant - but will foul the
+	 * mptcp scheduler
+	 */
+	tcp_sk(ssk)->notsent_lowat = UINT_MAX;
 
 	if (READ_ONCE(subflow->setsockopt_seq) != msk->setsockopt_seq) {
 		sync_socket_options(msk, ssk);
