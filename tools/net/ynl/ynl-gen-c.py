@@ -789,9 +789,11 @@ class AttrSet(SpecAttrSet):
                 pfx = f"{family.name}-a-{self.name}-"
             self.name_prefix = c_upper(pfx)
             self.max_name = c_upper(self.yaml.get('attr-max-name', f"{self.name_prefix}max"))
+            self.cnt_name = c_upper(self.yaml.get('attr-cnt-name', f"__{self.name_prefix}max"))
         else:
             self.name_prefix = family.attr_sets[self.subset_of].name_prefix
             self.max_name = family.attr_sets[self.subset_of].max_name
+            self.cnt_name = family.attr_sets[self.subset_of].cnt_name
 
         # Added by resolve:
         self.c_name = None
@@ -1162,6 +1164,7 @@ class CodeWriter:
         self._block_end = False
         self._silent_block = False
         self._ind = 0
+        self._ifdef_block = None
         if out_file is None:
             self._out = os.sys.stdout
         else:
@@ -1202,6 +1205,8 @@ class CodeWriter:
         if self._silent_block:
             ind += 1
         self._silent_block = line.endswith(')') and CodeWriter._is_cond(line)
+        if line[0] == '#':
+            ind = 0
         if add_ind:
             ind += add_ind
         self._out.write('\t' * ind + line + '\n')
@@ -1327,6 +1332,19 @@ class CodeWriter:
             line += '\t' * ((longest - len(one[0]) - 1 + 7) // 8)
             line += '= ' + str(one[1]) + ','
             self.p(line)
+
+    def ifdef_block(self, config):
+        config_option = None
+        if config:
+            config_option = 'CONFIG_' + c_upper(config)
+        if self._ifdef_block == config_option:
+            return
+
+        if self._ifdef_block:
+            self.p('#endif /* ' + self._ifdef_block + ' */')
+        if config_option:
+            self.p('#ifdef ' + config_option)
+        self._ifdef_block = config_option
 
 
 scalars = {'u8', 'u16', 'u32', 'u64', 's32', 's64', 'uint', 'sint'}
@@ -2006,10 +2024,13 @@ def print_req_policy_fwd(cw, struct, ri=None, terminate=True):
 
 
 def print_req_policy(cw, struct, ri=None):
+    if ri and ri.op:
+        cw.ifdef_block(ri.op.get('config-cond', None))
     print_req_policy_fwd(cw, struct, ri=ri, terminate=False)
     for _, arg in struct.member_list():
         arg.attr_policy(cw)
     cw.p("};")
+    cw.ifdef_block(None)
     cw.nl()
 
 
@@ -2038,7 +2059,7 @@ def print_kernel_policy_ranges(family, cw):
                 first = False
 
             sign = '' if attr.type[0] == 'u' else '_signed'
-            cw.block_start(line=f'struct netlink_range_validation{sign} {c_lower(attr.enum_name)}_range =')
+            cw.block_start(line=f'static const struct netlink_range_validation{sign} {c_lower(attr.enum_name)}_range =')
             members = []
             if 'min' in attr.checks:
                 members.append(('min', attr.get_limit('min')))
@@ -2127,6 +2148,7 @@ def print_kernel_op_table(family, cw):
             if op.is_async:
                 continue
 
+            cw.ifdef_block(op.get('config-cond', None))
             cw.block_start()
             members = [('cmd', op.enum_name)]
             if 'dont-validate' in op:
@@ -2157,6 +2179,7 @@ def print_kernel_op_table(family, cw):
                 if op.is_async or op_mode not in op:
                     continue
 
+                cw.ifdef_block(op.get('config-cond', None))
                 cw.block_start()
                 members = [('cmd', op.enum_name)]
                 if 'dont-validate' in op:
@@ -2192,6 +2215,7 @@ def print_kernel_op_table(family, cw):
                 members.append(('flags', ' | '.join([c_upper('genl-' + x) for x in flags])))
                 cw.write_struct_init(members)
                 cw.block_end(line=',')
+    cw.ifdef_block(None)
 
     cw.block_end(line=';')
     cw.nl()
@@ -2332,8 +2356,7 @@ def render_uapi(family, cw):
         if attr_set.subset_of:
             continue
 
-        cnt_name = c_upper(family.get('attr-cnt-name', f"__{attr_set.name_prefix}MAX"))
-        max_value = f"({cnt_name} - 1)"
+        max_value = f"({attr_set.cnt_name} - 1)"
 
         val = 0
         uapi_enum_start(family, cw, attr_set.yaml, 'enum-name')
@@ -2345,7 +2368,7 @@ def render_uapi(family, cw):
             val += 1
             cw.p(attr.enum_name + suffix)
         cw.nl()
-        cw.p(cnt_name + ('' if max_by_define else ','))
+        cw.p(attr_set.cnt_name + ('' if max_by_define else ','))
         if not max_by_define:
             cw.p(f"{attr_set.max_name} = {max_value}")
         cw.block_end(line=';')
