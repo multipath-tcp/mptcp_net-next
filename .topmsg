@@ -1,8 +1,0 @@
-From: Davide Caratti <dcaratti@redhat.com>
-Subject: [PATCH] tools: ynl-gen: add support for exact-len validation
-
-add support for 'exact-len' validation on netlink attributes.
-
-Link: https://github.com/multipath-tcp/mptcp_net-next/issues/340
-Signed-off-by: Davide Caratti <dcaratti@redhat.com>
-Acked-by: Matthieu Baerts <matttbe@kernel.org>
