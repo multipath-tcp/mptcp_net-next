@@ -1,9 +1,0 @@
-From: Davide Caratti <dcaratti@redhat.com>
-Subject: [PATCH] Documentation: netlink: add a YAML spec for mptcp
-
-it describes most of the current netlink interface (uAPI definitions,
-doit/dumpit operations and attributes)
-
-Link: https://github.com/multipath-tcp/mptcp_net-next/issues/340
-Acked-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Davide Caratti <dcaratti@redhat.com>
