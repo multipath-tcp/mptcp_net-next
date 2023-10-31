@@ -1,4 +1,44 @@
 From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/bpf-fix-compilation-error-without-CGROUPS-others
+Subject: [PATCH] bpf: fix compilation error without CGROUPS - others
 
+Our MPTCP CI complained [1] -- and KBuild too -- that it was no longer
+possible to build the kernel without CONFIG_CGROUPS:
+
+  kernel/bpf/task_iter.c: In function 'bpf_iter_css_task_new':
+  kernel/bpf/task_iter.c:919:14: error: 'CSS_TASK_ITER_PROCS' undeclared (first use in this function)
+    919 |         case CSS_TASK_ITER_PROCS | CSS_TASK_ITER_THREADED:
+        |              ^~~~~~~~~~~~~~~~~~~
+  kernel/bpf/task_iter.c:919:14: note: each undeclared identifier is reported only once for each function it appears in
+  kernel/bpf/task_iter.c:919:36: error: 'CSS_TASK_ITER_THREADED' undeclared (first use in this function)
+    919 |         case CSS_TASK_ITER_PROCS | CSS_TASK_ITER_THREADED:
+        |                                    ^~~~~~~~~~~~~~~~~~~~~~
+  kernel/bpf/task_iter.c:927:60: error: invalid application of 'sizeof' to incomplete type 'struct css_task_iter'
+    927 |         kit->css_it = bpf_mem_alloc(&bpf_global_ma, sizeof(struct css_task_iter));
+        |                                                            ^~~~~~
+  kernel/bpf/task_iter.c:930:9: error: implicit declaration of function 'css_task_iter_start'; did you mean 'task_seq_start'? [-Werror=implicit-function-declaration]
+    930 |         css_task_iter_start(css, flags, kit->css_it);
+        |         ^~~~~~~~~~~~~~~~~~~
+        |         task_seq_start
+  kernel/bpf/task_iter.c: In function 'bpf_iter_css_task_next':
+  kernel/bpf/task_iter.c:940:16: error: implicit declaration of function 'css_task_iter_next'; did you mean 'class_dev_iter_next'? [-Werror=implicit-function-declaration]
+    940 |         return css_task_iter_next(kit->css_it);
+        |                ^~~~~~~~~~~~~~~~~~
+        |                class_dev_iter_next
+  kernel/bpf/task_iter.c:940:16: error: returning 'int' from a function with return type 'struct task_struct *' makes pointer from integer without a cast [-Werror=int-conversion]
+    940 |         return css_task_iter_next(kit->css_it);
+        |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  kernel/bpf/task_iter.c: In function 'bpf_iter_css_task_destroy':
+  kernel/bpf/task_iter.c:949:9: error: implicit declaration of function 'css_task_iter_end' [-Werror=implicit-function-declaration]
+    949 |         css_task_iter_end(kit->css_it);
+        |         ^~~~~~~~~~~~~~~~~
+
+This patch simply surrounds with a #ifdef the new code requiring CGroups
+support. It seems enough for the compiler and this is similar to
+bpf_iter_css_{new,next,destroy}() functions where no other #ifdef have
+been added in kernel/bpf/helpers.c and in the selftests.
+
+Fixes: 9c66dc94b62a ("bpf: Introduce css_task open-coded iterator kfuncs")
+Link: https://github.com/multipath-tcp/mptcp_net-next/actions/runs/6665206927
+Reported-by: kernel test robot <lkp@intel.com>
+Closes: https://lore.kernel.org/oe-kbuild-all/202310260528.aHWgVFqq-lkp@intel.com/
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
