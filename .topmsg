@@ -1,5 +1,5 @@
 From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] bpf: fix compilation error without CGROUPS - others
+Subject: [PATCH] bpf: fix compilation error without CGROUPS
 
 Our MPTCP CI complained [1] -- and KBuild too -- that it was no longer
 possible to build the kernel without CONFIG_CGROUPS:
