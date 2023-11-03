@@ -1492,9 +1492,7 @@ struct file *get_mm_exe_file(struct mm_struct *mm)
 	struct file *exe_file;
 
 	rcu_read_lock();
-	exe_file = rcu_dereference(mm->exe_file);
-	if (exe_file && !get_file_rcu(exe_file))
-		exe_file = NULL;
+	exe_file = get_file_rcu(&mm->exe_file);
 	rcu_read_unlock();
 	return exe_file;
 }
@@ -3144,7 +3142,7 @@ static inline bool clone3_stack_valid(struct kernel_clone_args *kargs)
 		if (!access_ok((void __user *)kargs->stack, kargs->stack_size))
 			return false;
 
-#if !defined(CONFIG_STACK_GROWSUP) && !defined(CONFIG_IA64)
+#if !defined(CONFIG_STACK_GROWSUP)
 		kargs->stack += kargs->stack_size;
 #endif
 	}
