@@ -1030,6 +1030,9 @@ unsigned int mptcp_pm_get_add_addr_signal_max(const struct mptcp_sock *msk);
 unsigned int mptcp_pm_get_add_addr_accept_max(const struct mptcp_sock *msk);
 unsigned int mptcp_pm_get_subflows_max(const struct mptcp_sock *msk);
 unsigned int mptcp_pm_get_local_addr_max(const struct mptcp_sock *msk);
+unsigned long *mptcp_pm_get_id_bitmap(struct mptcp_sock *msk);
+void mptcp_pm_pernet_lock(struct mptcp_sock *msk);
+void mptcp_pm_pernet_unlock(struct mptcp_sock *msk);
 
 /* called under PM lock */
 static inline void __mptcp_pm_close_subflow(struct mptcp_sock *msk)

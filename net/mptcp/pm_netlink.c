@@ -228,6 +228,30 @@ unsigned int mptcp_pm_get_local_addr_max(const struct mptcp_sock *msk)
 }
 EXPORT_SYMBOL_GPL(mptcp_pm_get_local_addr_max);
 
+unsigned long *mptcp_pm_get_id_bitmap(struct mptcp_sock *msk)
+{
+	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
+
+	return pernet->id_bitmap;
+}
+EXPORT_SYMBOL_GPL(mptcp_pm_get_id_bitmap);
+
+void mptcp_pm_pernet_lock(struct mptcp_sock *msk)
+{
+	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
+
+	spin_lock_bh(&pernet->lock);
+}
+EXPORT_SYMBOL_GPL(mptcp_pm_pernet_lock);
+
+void mptcp_pm_pernet_unlock(struct mptcp_sock *msk)
+{
+	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
+
+	spin_unlock_bh(&pernet->lock);
+}
+EXPORT_SYMBOL_GPL(mptcp_pm_pernet_unlock);
+
 bool mptcp_pm_nl_check_work_pending(struct mptcp_sock *msk)
 {
 	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
