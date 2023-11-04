@@ -15,6 +15,12 @@ MPTCP_LIB_LISTENER_CLOSED=16  #MPTCP_EVENT_LISTENER_CLOSED
 readonly AF_INET=2
 readonly AF_INET6=10
 
+rndh=""
+ns1=""
+ns2=""
+ns3=""
+ns4=""
+
 MPTCP_LIB_SUBTESTS=()
 
 # only if supported (or forced) and not disabled, see no-color.org
@@ -442,4 +448,16 @@ mptcp_lib_verify_listener_events() {
 	fi
 
 	mptcp_lib_check_expected "type" "family" "saddr" "sport"
+}
+
+mptcp_lib_init_ns() {
+	local sec
+
+	sec=$(date +%s)
+	rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
+
+	ns1="ns1-$rndh"
+	ns2="ns2-$rndh"
+	ns3="ns3-$rndh"
+	ns4="ns4-$rndh"
 }
