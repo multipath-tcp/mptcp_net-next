@@ -832,32 +832,8 @@ test_prio()
 
 verify_listener_events()
 {
-	local evt=$1
-	local e_type=$2
-	local e_family=$3
-	local e_saddr=$4
-	local e_sport=$5
-	local type
-	local family
-	local saddr
-	local sport
-
-	if [ $e_type = $MPTCP_LIB_LISTENER_CREATED ]; then
-		print_test "CREATE_LISTENER $e_saddr:$e_sport"
-	elif [ $e_type = $MPTCP_LIB_LISTENER_CLOSED ]; then
-		print_test "CLOSE_LISTENER $e_saddr:$e_sport"
-	fi
-
-	type=$(mptcp_lib_evts_get_info type $evt $e_type)
-	family=$(mptcp_lib_evts_get_info family $evt $e_type)
-	sport=$(mptcp_lib_evts_get_info sport $evt $e_type)
-	if [ $family ] && [ $family = $AF_INET6 ]; then
-		saddr=$(mptcp_lib_evts_get_info saddr6 $evt $e_type)
-	else
-		saddr=$(mptcp_lib_evts_get_info saddr4 $evt $e_type)
-	fi
-
-	check_expected "type" "family" "saddr" "sport"
+	mptcp_lib_verify_listener_events ${*}
+	[ $? -eq 0 ] && mptcp_lib_result_pass "${TEST_NAME}"
 }
 
 test_listener()
@@ -879,6 +855,7 @@ test_listener()
 	local listener_pid=$!
 
 	sleep 0.5
+	print_test "LISTENER_CREATED 10.0.2.2:$client4_port"
 	verify_listener_events $client_evts $MPTCP_LIB_LISTENER_CREATED \
 			       $AF_INET 10.0.2.2 $client4_port
 
@@ -896,6 +873,7 @@ test_listener()
 	mptcp_lib_kill_wait $listener_pid
 
 	sleep 0.5
+	print_test "LISTENER_CLOSED 10.0.2.2:$client4_port"
 	verify_listener_events $client_evts $MPTCP_LIB_LISTENER_CLOSED \
 			       $AF_INET 10.0.2.2 $client4_port
 }
