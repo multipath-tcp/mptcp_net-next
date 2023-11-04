@@ -60,26 +60,17 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 	struct mptcp_pm_addr_entry *match = NULL;
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_addr_entry *e;
-	bool addr_match = false;
-	bool id_match = false;
 	int ret = -EINVAL;
 
 	spin_lock_bh(&msk->pm.lock);
 
-	list_for_each_entry(e, &msk->pm.userspace_pm_local_addr_list, list) {
-		addr_match = mptcp_addresses_equal(&e->addr, &entry->addr, true);
-		if (addr_match && entry->addr.id == 0)
-			entry->addr.id = e->addr.id;
-		id_match = (e->addr.id == entry->addr.id);
-		if (addr_match && id_match) {
-			match = e;
-			break;
-		} else if (addr_match || id_match) {
-			break;
-		}
-	}
+	e = mptcp_userspace_pm_get_entry(msk, &entry->addr, true);
+	if (e && entry->addr.id == 0)
+		entry->addr.id = e->addr.id;
+	if (e && e->addr.id == entry->addr.id)
+		match = e;
 
-	if (!match && !addr_match && !id_match) {
+	if (!match) {
 		/* Memory for the entry is allocated from the
 		 * sock option buffer.
 		 */
