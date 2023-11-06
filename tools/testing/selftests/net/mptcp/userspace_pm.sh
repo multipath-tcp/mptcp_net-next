@@ -874,7 +874,7 @@ test_prio()
 
 	# Check TX
 	print_test "MP_PRIO TX"
-	count=$(ip netns exec "$ns2" nstat -as | grep MPTcpExtMPPrioTx | awk '{print $2}')
+	count=$(mptcp_lib_get_counter "$ns2" "MPTcpExtMPPrioTx")
 	[ -z "$count" ] && count=0
 	if [ $count != 1 ]; then
 		test_fail "Count != 1: ${count}"
@@ -884,7 +884,7 @@ test_prio()
 
 	# Check RX
 	print_test "MP_PRIO RX"
-	count=$(ip netns exec "$ns1" nstat -as | grep MPTcpExtMPPrioRx | awk '{print $2}')
+	count=$(mptcp_lib_get_counter "$ns1" "MPTcpExtMPPrioRx")
 	[ -z "$count" ] && count=0
 	if [ $count != 1 ]; then
 		test_fail "Count != 1: ${count}"
