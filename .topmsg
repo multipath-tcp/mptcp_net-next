@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-validity-check-for-sending-RM_ADDR
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add validity check for sending RM_ADDR
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+This patch adds the validity check for sending RM_ADDRs for userspace PM
+in mptcp_pm_remove_addrs(), only send a RM_ADDR when the address is in the
+anno_list or conn_list.
+
+Fixes: 8b1c94da1e48 ("mptcp: only send RM_ADDR in nl_cmd_remove")
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
