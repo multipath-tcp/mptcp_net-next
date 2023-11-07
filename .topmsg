@@ -1,4 +1,72 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-possible-NULL-pointer-dereference-on-close
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix possible NULL pointer dereference on close
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+After the blamed commit below, the MPTCP release callback can
+dereference the first subflow pointer via __mptcp_set_connected()
+and send buffer auto-tuning. Such pointer is always expected to be
+valid, except at socket destruction time, when the first subflow is
+deleted and the pointer zeroed.
+
+If the connect event is handled by the release callback while the
+msk socket is finally released, MPTCP hits the following splat:
+
+  general protection fault, probably for non-canonical address 0xdffffc00000000f2: 0000 [#1] PREEMPT SMP KASAN
+  KASAN: null-ptr-deref in range [0x0000000000000790-0x0000000000000797]
+  CPU: 1 PID: 26719 Comm: syz-executor.2 Not tainted 6.6.0-syzkaller-10102-gff269e2cd5ad #0
+  Hardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 10/09/2023
+  RIP: 0010:mptcp_subflow_ctx net/mptcp/protocol.h:542 [inline]
+  RIP: 0010:__mptcp_propagate_sndbuf net/mptcp/protocol.h:813 [inline]
+  RIP: 0010:__mptcp_set_connected+0x57/0x3e0 net/mptcp/subflow.c:424
+  RAX: dffffc0000000000 RBX: 0000000000000000 RCX: ffffffff8a62323c
+  RDX: 00000000000000f2 RSI: ffffffff8a630116 RDI: 0000000000000790
+  RBP: ffff88803334b100 R08: 0000000000000001 R09: 0000000000000000
+  R10: 0000000000000001 R11: 0000000000000034 R12: ffff88803334b198
+  R13: ffff888054f0b018 R14: 0000000000000000 R15: ffff88803334b100
+  FS:  0000000000000000(0000) GS:ffff8880b9900000(0000) knlGS:0000000000000000
+  CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+  CR2: 00007fbcb4f75198 CR3: 000000006afb5000 CR4: 00000000003506f0
+  DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+  DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 0000000000000400
+  Call Trace:
+   <TASK>
+   mptcp_release_cb+0xa2c/0xc40 net/mptcp/protocol.c:3405
+   release_sock+0xba/0x1f0 net/core/sock.c:3537
+   mptcp_close+0x32/0xf0 net/mptcp/protocol.c:3084
+   inet_release+0x132/0x270 net/ipv4/af_inet.c:433
+   inet6_release+0x4f/0x70 net/ipv6/af_inet6.c:485
+   __sock_release+0xae/0x260 net/socket.c:659
+   sock_close+0x1c/0x20 net/socket.c:1419
+   __fput+0x270/0xbb0 fs/file_table.c:394
+   task_work_run+0x14d/0x240 kernel/task_work.c:180
+   exit_task_work include/linux/task_work.h:38 [inline]
+   do_exit+0xa92/0x2a20 kernel/exit.c:876
+   do_group_exit+0xd4/0x2a0 kernel/exit.c:1026
+   get_signal+0x23ba/0x2790 kernel/signal.c:2900
+   arch_do_signal_or_restart+0x90/0x7f0 arch/x86/kernel/signal.c:309
+   exit_to_user_mode_loop kernel/entry/common.c:168 [inline]
+   exit_to_user_mode_prepare+0x11f/0x240 kernel/entry/common.c:204
+   __syscall_exit_to_user_mode_work kernel/entry/common.c:285 [inline]
+   syscall_exit_to_user_mode+0x1d/0x60 kernel/entry/common.c:296
+   do_syscall_64+0x4b/0x110 arch/x86/entry/common.c:88
+   entry_SYSCALL_64_after_hwframe+0x63/0x6b
+  RIP: 0033:0x7fb515e7cae9
+  Code: Unable to access opcode bytes at 0x7fb515e7cabf.
+  RSP: 002b:00007fb516c560c8 EFLAGS: 00000246 ORIG_RAX: 000000000000002e
+  RAX: 000000000000003c RBX: 00007fb515f9c120 RCX: 00007fb515e7cae9
+  RDX: 0000000000000000 RSI: 0000000020000140 RDI: 0000000000000006
+  RBP: 00007fb515ec847a R08: 0000000000000000 R09: 0000000000000000
+  R10: 0000000000000000 R11: 0000000000000246 R12: 0000000000000000
+  R13: 000000000000006e R14: 00007fb515f9c120 R15: 00007ffc631eb968
+   </TASK>
+
+To avoid sparkling unneeded conditionals, address the issue explicitly
+checking msk->first only in the critical place.
+
+Fixes: 8005184fd1ca ("mptcp: refactor sndbuf auto-tuning")
+Reported-by: <syzbot+9dfbaedb6e6baca57a32@syzkaller.appspotmail.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/454
+Reported-by: Eric Dumazet <edumazet@google.com>
+Closes: https://lore.kernel.org/netdev/CANn89iLZUA6S2a=K8GObnS62KK6Jt4B7PsAs7meMFooM8xaTgw@mail.gmail.com/
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
