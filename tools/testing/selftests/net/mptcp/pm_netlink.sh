@@ -59,15 +59,15 @@ check()
 
 	printf "%-50s" "$msg"
 	if [ $cmd_ret -ne 0 ]; then
-		echo "[FAIL] command execution '$cmd' stderr "
+		mptcp_lib_print_err "[FAIL] command execution '$cmd' stderr "
 		cat $err
 		mptcp_lib_result_fail "${msg} # error ${cmd_ret}"
 		ret=1
 	elif [ "$out" = "$expected" ]; then
-		echo "[ OK ]"
+		mptcp_lib_print_ok "[ OK ]"
 		mptcp_lib_result_pass "${msg}"
 	else
-		echo -n "[FAIL] "
+		mptcp_lib_echo_err "[FAIL] "
 		echo "expected '$expected' got '$out'"
 		mptcp_lib_result_fail "${msg} # different output"
 		ret=1
