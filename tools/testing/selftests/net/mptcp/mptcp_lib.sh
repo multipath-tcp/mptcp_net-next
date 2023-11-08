@@ -452,3 +452,21 @@ mptcp_lib_verify_listener_events() {
 
 	mptcp_lib_check_expected "type" "family" "saddr" "sport"
 }
+
+rndh=""
+ns1=""
+ns2=""
+ns3=""
+ns4=""
+
+mptcp_lib_init_ns() {
+	local sec
+
+	sec=$(date +%s)
+	rndh=$(printf %x $sec)-$(mktemp -u XXXXXX)
+
+	ns1="ns1-$rndh"
+	ns2="ns2-$rndh"
+	ns3="ns3-$rndh"
+	ns4="ns4-$rndh"
+}
