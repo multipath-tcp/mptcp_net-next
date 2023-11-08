@@ -17,6 +17,20 @@ readonly AF_INET6=10
 
 MPTCP_LIB_SUBTESTS=()
 
+TEST_NAME=""
+TEST_COUNT=0
+
+ret=0
+
+capture=false
+checksum=false
+
+readonly timeout_poll=30
+timeout_test=$((timeout_poll * 2 + 1))
+
+iptables="iptables"
+ip6tables="ip6tables"
+
 sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)

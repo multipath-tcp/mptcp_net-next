@@ -12,19 +12,12 @@
 
 . "$(dirname "${0}")/mptcp_lib.sh"
 
-ret=0
 sinfail=""
 cinfail=""
 cinsent=""
 tmpfile=""
 capout=""
 ksft_skip=4
-iptables="iptables"
-ip6tables="ip6tables"
-timeout_poll=30
-timeout_test=$((timeout_poll * 2 + 1))
-capture=false
-checksum=false
 ip_mptcp=0
 check_invert=0
 validate_checksum=false
@@ -37,8 +30,6 @@ declare -A all_tests
 declare -a only_tests_ids
 declare -a only_tests_names
 declare -A failed_tests
-TEST_COUNT=0
-TEST_NAME=""
 nr_blank=6
 
 # These var are used only in some tests, make sure they are not already set

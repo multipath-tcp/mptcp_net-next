@@ -4,12 +4,7 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 mptcp_lib_init_ns
-capture=false
 ksft_skip=4
-timeout_poll=30
-timeout_test=$((timeout_poll * 2 + 1))
-TEST_COUNT=0
-ret=0
 bail=0
 slack=50
 

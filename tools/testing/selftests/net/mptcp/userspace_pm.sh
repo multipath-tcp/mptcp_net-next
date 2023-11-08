@@ -45,9 +45,6 @@ client_addr_id=${RANDOM:0:2}
 server_addr_id=${RANDOM:0:2}
 
 mptcp_lib_init_ns
-ret=0
-TEST_NAME=""
-TEST_COUNT=0
 
 _printf() {
 	stdbuf -o0 -e0 printf "${@}"

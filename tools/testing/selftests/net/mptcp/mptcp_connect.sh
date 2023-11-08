@@ -6,13 +6,9 @@
 time_start=$(date +%s)
 
 optstring="S:R:d:e:l:r:h4cm:f:tC"
-ret=0
 final_ret=0
 cin_disconnect=""
 ksft_skip=4
-capture=false
-timeout_poll=30
-timeout_test=$((timeout_poll * 2 + 1))
 ipv6=true
 ethtool_random_on=true
 tc_delay="$((RANDOM%50))"
@@ -22,7 +18,6 @@ sndbuf=0
 rcvbuf=0
 options_log=true
 do_tcp=0
-checksum=false
 filesize=0
 connect_per_transfer=1
 
@@ -119,7 +114,6 @@ done
 
 mptcp_lib_init_ns
 
-TEST_COUNT=0
 TEST_GROUP=""
 
 cleanup()
