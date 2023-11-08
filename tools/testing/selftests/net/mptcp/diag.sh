@@ -4,7 +4,6 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 mptcp_lib_init_ns
-ksft_skip=4
 
 flush_pids()
 {
@@ -32,12 +31,12 @@ mptcp_lib_check_mptcp
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
 	echo "SKIP: Could not run test without ip tool"
-	exit $ksft_skip
+	exit ${KSFT_SKIP}
 fi
 ss -h | grep -q MPTCP
 if [ $? -ne 0 ];then
 	echo "SKIP: ss tool does not support MPTCP"
-	exit $ksft_skip
+	exit ${KSFT_SKIP}
 fi
 
 get_msk_inuse()
