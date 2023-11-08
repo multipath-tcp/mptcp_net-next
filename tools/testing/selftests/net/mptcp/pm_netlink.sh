@@ -56,8 +56,9 @@ check()
 	local msg="$3"
 	local out=`$cmd 2>$err`
 	local cmd_ret=$?
+	TEST_COUNT=$((TEST_COUNT+1))
 
-	printf "%-50s" "$msg"
+	printf "%2u %-47s" "$TEST_COUNT" "$msg"
 	if [ $cmd_ret -ne 0 ]; then
 		mptcp_lib_print_err "[FAIL] command execution '$cmd' stderr "
 		cat $err

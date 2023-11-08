@@ -50,6 +50,7 @@ ns1="ns1-$rndh"
 ns2="ns2-$rndh"
 ret=0
 TEST_NAME=""
+TEST_COUNT=0
 
 _printf() {
 	stdbuf -o0 -e0 printf "${@}"
@@ -64,8 +65,9 @@ print_title()
 print_test()
 {
 	TEST_NAME="${1}"
+	TEST_COUNT=$((TEST_COUNT+1))
 
-	_printf "%-63s" "${TEST_NAME}"
+	_printf "%02u %-63s" "${TEST_COUNT}" "${TEST_NAME}"
 }
 
 test_pass()
