@@ -33,25 +33,43 @@ else
 	readonly MPTCP_LIB_COLOR_RESET=
 fi
 
+# mptcp_lib_echo_*: do not output the trailing newline
 # $1: color, $2: text
-mptcp_lib_print_color() {
-	echo -e "${MPTCP_LIB_START_PRINT:-}${*}${MPTCP_LIB_COLOR_RESET}"
+mptcp_lib_echo_color() {
+	echo -n -e "${MPTCP_LIB_START_PRINT:-}${*}${MPTCP_LIB_COLOR_RESET}"
 }
 
+mptcp_lib_echo_ok() {
+	mptcp_lib_echo_color "${MPTCP_LIB_COLOR_GREEN}${*}"
+}
+
+mptcp_lib_echo_warn() {
+	mptcp_lib_echo_color "${MPTCP_LIB_COLOR_YELLOW}${*}"
+}
+
+mptcp_lib_echo_info() {
+	mptcp_lib_echo_color "${MPTCP_LIB_COLOR_BLUE}${*}"
+}
+
+mptcp_lib_echo_err() {
+	mptcp_lib_echo_color "${MPTCP_LIB_COLOR_RED}${*}"
+}
+
+# mptcp_lib_print_*: output with EOL
 mptcp_lib_print_ok() {
-	mptcp_lib_print_color "${MPTCP_LIB_COLOR_GREEN}${*}"
+	mptcp_lib_echo_ok "${*}\n"
 }
 
 mptcp_lib_print_warn() {
-	mptcp_lib_print_color "${MPTCP_LIB_COLOR_YELLOW}${*}"
+	mptcp_lib_echo_warn "${*}\n"
 }
 
 mptcp_lib_print_info() {
-	mptcp_lib_print_color "${MPTCP_LIB_COLOR_BLUE}${*}"
+	mptcp_lib_echo_info "${*}\n"
 }
 
 mptcp_lib_print_err() {
-	mptcp_lib_print_color "${MPTCP_LIB_COLOR_RED}${*}"
+	mptcp_lib_echo_err "${*}\n"
 }
 
 # SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var can be set when validating all
