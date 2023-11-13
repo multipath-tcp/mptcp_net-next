@@ -1,4 +1,27 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-fix-fastclose-with-csum-failure
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: fix fastclose with csum failure
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+Running the mp_join selftest manually with the following command line:
+
+  ./mptcp_join.sh -z -C
+
+lead to some failures:
+
+  002 fastclose server test
+  # ...
+  rtx                                 [fail] got 1 MP_RST[s] TX expected 0
+  # ...
+  rstrx                               [fail] got 1 MP_RST[s] RX expected 0
+
+the problem is really in the wrong expectations for the RST checks
+implied by the csum validation. Note that the same check is repeated
+explicitly in the same test-case, with the correct expectation and
+pass successfully.
+
+Address the issue explicitly setting the correct expectation for
+the failing checks.
+
+Reported-by: Xiumei Mu <xmu@redhat.com>
+Fixes: ("6bf41020b72b selftests: mptcp: update and extend fastclose test-cases")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
