@@ -6,12 +6,14 @@ if [ "${FETCH}" != 0 ]; then
 	git fetch -q origin
 fi
 
-if [ ${#} -eq 0 ]; then
+if [ ${#} -eq 0 ] && [ "${FETCH}" != 1 ]; then
 	echo "Nothing to check"
 fi
 
 for c in "${@}"; do
-	git log --oneline -1 "${c}"
+	if [ "${FETCH}" != 0 ]; then
+		git log --oneline -1 "${c}"
+	fi
 	if [ "${NO_BRANCH_CHECK}" != 1 ]; then
 		git branch --remote --contains "${c}" netdev-net/main \
 						      netdev-next/main \
