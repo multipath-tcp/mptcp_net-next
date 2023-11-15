@@ -1,0 +1,3 @@
+[b4]
+	send-series-to = MPTCP Upstream <mptcp@lists.linux.dev>
+	send-prefixes = mptcp-net
