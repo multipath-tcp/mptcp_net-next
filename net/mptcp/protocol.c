@@ -3407,7 +3407,7 @@ static void mptcp_release_cb(struct sock *sk)
 		 * On sk release avoid actions depending on the first subflow
 		 */
 		if (__test_and_clear_bit(MPTCP_CONNECTED, &msk->cb_flags) && msk->first)
-			__mptcp_set_connected(sk);
+			__mptcp_propagate_state(sk);
 		if (__test_and_clear_bit(MPTCP_ERROR_REPORT, &msk->cb_flags))
 			__mptcp_error_report(sk);
 		if (__test_and_clear_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags))
