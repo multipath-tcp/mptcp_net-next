@@ -8950,7 +8950,6 @@ S:	Maintained
 F:	scripts/get_maintainer.pl
 
 GFS2 FILE SYSTEM
-M:	Bob Peterson <rpeterso@redhat.com>
 M:	Andreas Gruenbacher <agruenba@redhat.com>
 L:	gfs2@lists.linux.dev
 S:	Supported
@@ -23208,13 +23207,6 @@ S:	Maintained
 W:	https://linuxtv.org
 T:	git git://linuxtv.org/media_tree.git
 F:	drivers/media/test-drivers/vivid/*
-
-VLYNQ BUS
-M:	Florian Fainelli <f.fainelli@gmail.com>
-L:	openwrt-devel@lists.openwrt.org (subscribers-only)
-S:	Maintained
-F:	drivers/vlynq/vlynq.c
-F:	include/linux/vlynq.h
 
 VM SOCKETS (AF_VSOCK)
 M:	Stefano Garzarella <sgarzare@redhat.com>
