@@ -1500,7 +1500,9 @@ void mptcp_pm_remove_addrs_and_subflows(struct mptcp_sock *msk,
 		    slist.nr < MPTCP_RM_IDS_MAX)
 			slist.ids[slist.nr++] = entry->addr.id;
 
-		if (remove_anno_list_by_saddr(msk, &entry->addr) &&
+		if ((remove_anno_list_by_saddr(msk, &entry->addr) ||
+		     (mptcp_pm_is_userspace(msk) &&
+		      lookup_subflow_by_saddr(&msk->conn_list, &entry->addr))) &&
 		    alist.nr < MPTCP_RM_IDS_MAX)
 			alist.ids[alist.nr++] = entry->addr.id;
 	}
