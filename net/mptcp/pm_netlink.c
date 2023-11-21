@@ -1489,6 +1489,21 @@ void mptcp_pm_remove_addrs(struct mptcp_sock *msk, struct list_head *rm_list)
 	}
 }
 
+void mptcp_pm_remove_subflows(struct mptcp_sock *msk, struct list_head *rm_list)
+{
+	struct mptcp_rm_list slist = { .nr = 0 };
+	struct mptcp_pm_addr_entry *entry;
+
+	list_for_each_entry(entry, rm_list, list) {
+		if (lookup_subflow_by_saddr(&msk->conn_list, &entry->addr) &&
+		    slist.nr < MPTCP_RM_IDS_MAX)
+			slist.ids[slist.nr++] = entry->addr.id;
+	}
+
+	if (slist.nr)
+		mptcp_pm_remove_subflow(msk, &slist);
+}
+
 static void mptcp_pm_remove_addrs_and_subflows(struct mptcp_sock *msk,
 					       struct list_head *rm_list)
 {
