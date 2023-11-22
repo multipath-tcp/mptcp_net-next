@@ -5,8 +5,6 @@
 
 mptcp_lib_ns_init
 ksft_skip=4
-timeout_poll=30
-timeout_test=$((timeout_poll * 2 + 1))
 
 flush_pids()
 {

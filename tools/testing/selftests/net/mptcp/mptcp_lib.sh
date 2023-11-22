@@ -26,6 +26,9 @@ TEST_COUNT=0
 capture=false
 checksum=false
 
+readonly timeout_poll=30
+timeout_test=$((timeout_poll * 2 + 1))
+
 MPTCP_LIB_SUBTESTS=()
 
 sin=$(mktemp)
