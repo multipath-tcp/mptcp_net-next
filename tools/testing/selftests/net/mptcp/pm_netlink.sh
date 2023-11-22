@@ -45,6 +45,8 @@ ip netns exec $ns1 sysctl -q net.mptcp.enabled=1
 
 check()
 {
+	TEST_COUNT=$((TEST_COUNT+1))
+	printf "%2u " "$TEST_COUNT"
 	# ${*} doesn't work here since there're spaces in some arguments.
 	mptcp_lib_check "${1}" "${2}" "${3}"
 	local rc=$?
