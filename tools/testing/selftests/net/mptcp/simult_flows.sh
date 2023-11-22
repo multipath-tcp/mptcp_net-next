@@ -10,6 +10,12 @@ timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 bail=0
 slack=50
+large=""
+small=""
+sout=""
+cout=""
+capout=""
+size=0
 
 usage() {
 	echo "Usage: $0 [ -b ] [ -c ] [ -d ]"
