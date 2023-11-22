@@ -8,7 +8,6 @@ capture=false
 ksft_skip=4
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-TEST_COUNT=0
 bail=0
 slack=50
 

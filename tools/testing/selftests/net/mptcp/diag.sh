@@ -5,7 +5,6 @@
 
 mptcp_lib_ns_init
 ksft_skip=4
-TEST_COUNT=0
 timeout_poll=100
 timeout_test=$((timeout_poll * 2 + 1))
 

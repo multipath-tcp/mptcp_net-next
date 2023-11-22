@@ -123,7 +123,6 @@ done
 
 mptcp_lib_ns_init
 
-TEST_COUNT=0
 TEST_GROUP=""
 
 cleanup()
