@@ -12,8 +12,6 @@ bail=0
 slack=50
 large=""
 small=""
-sout=""
-cout=""
 capout=""
 size=0
 
@@ -26,7 +24,6 @@ usage() {
 
 cleanup()
 {
-	rm -f "$cout" "$sout"
 	rm -f "$large" "$small"
 	rm -f "$capout"
 
@@ -52,8 +49,6 @@ setup()
 {
 	large=$(mktemp)
 	small=$(mktemp)
-	sout=$(mktemp)
-	cout=$(mktemp)
 	capout=$(mktemp)
 	size=$((2 * 2048 * 4096))
 

@@ -3,10 +3,6 @@
 
 . "$(dirname "${0}")/mptcp_lib.sh"
 
-sin=""
-sout=""
-cin=""
-cout=""
 ksft_skip=4
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
@@ -71,8 +67,6 @@ init()
 cleanup()
 {
 	mptcp_lib_ns_exit
-	rm -f "$cin" "$cout"
-	rm -f "$sin" "$sout"
 	mptcp_lib_cleanup
 }
 
@@ -331,10 +325,6 @@ do_tcpinq_tests()
 	return $?
 }
 
-sin=$(mktemp)
-sout=$(mktemp)
-cin=$(mktemp)
-cout=$(mktemp)
 init
 make_file "$cin" "client" 1
 make_file "$sin" "server" 1

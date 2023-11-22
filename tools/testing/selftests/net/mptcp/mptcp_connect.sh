@@ -7,11 +7,7 @@ time_start=$(date +%s)
 
 optstring="S:R:d:e:l:r:h4cm:f:tC"
 final_ret=0
-sin=""
-sout=""
 cin_disconnect=""
-cin=""
-cout=""
 ksft_skip=4
 capture=false
 timeout_poll=30
@@ -128,8 +124,6 @@ TEST_GROUP=""
 cleanup()
 {
 	rm -f "$cin_disconnect" "$cout_disconnect"
-	rm -f "$cin" "$cout"
-	rm -f "$sin" "$sout"
 	rm -f "$capout"
 
 	mptcp_lib_ns_exit
@@ -145,10 +139,6 @@ if [ $? -ne 0 ];then
 	exit $ksft_skip
 fi
 
-sin=$(mktemp)
-sout=$(mktemp)
-cin=$(mktemp)
-cout=$(mktemp)
 capout=$(mktemp)
 cin_disconnect="$cin".disconnect
 cout_disconnect="$cout".disconnect

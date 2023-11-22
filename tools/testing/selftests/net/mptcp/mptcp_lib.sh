@@ -25,6 +25,11 @@ TEST_COUNT=0
 
 MPTCP_LIB_SUBTESTS=()
 
+sin=$(mktemp)
+sout=$(mktemp)
+cin=$(mktemp)
+cout=$(mktemp)
+
 # only if supported (or forced) and not disabled, see no-color.org
 if { [ -t 1 ] || [ "${SELFTESTS_MPTCP_LIB_COLOR_FORCE:-}" = "1" ]; } &&
    [ "${NO_COLOR:-}" != "1" ]; then
@@ -509,4 +514,5 @@ mptcp_lib_cleanup()
 {
 	echo "cleanup"
 	rm -f $mptcp_lib_err
+	rm -f "$sin" "$sout" "$cin" "$cout"
 }
