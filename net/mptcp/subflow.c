@@ -421,9 +421,6 @@ static bool subflow_use_different_dport(struct mptcp_sock *msk, const struct soc
 
 void __mptcp_sync_state(struct sock *sk, int state)
 {
-	struct mptcp_sock *msk = mptcp_sk(sk);
-
-	__mptcp_propagate_sndbuf(sk, msk->first);
 	if (sk->sk_state == TCP_SYN_SENT) {
 		inet_sk_state_store(sk, state);
 		sk->sk_state_change(sk);
@@ -436,10 +433,12 @@ static void mptcp_propagate_state(struct sock *sk, struct sock *ssk)
 
 	mptcp_data_lock(sk);
 	if (!sock_owned_by_user(sk)) {
+		__mptcp_propagate_sndbuf(sk, msk->first);
 		__mptcp_sync_state(sk, ssk->sk_state);
 	} else {
 		msk->pending_state = ssk->sk_state;
 		__set_bit(MPTCP_SYNC_STATE, &msk->cb_flags);
+		__set_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags);
 	}
 	mptcp_data_unlock(sk);
 }
