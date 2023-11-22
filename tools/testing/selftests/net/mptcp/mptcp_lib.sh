@@ -499,7 +499,7 @@ mptcp_lib_ns_init() {
 
 	local netns
 	for netns in "$ns1" "$ns2" "$ns3" "$ns4"; do
-		ip netns add $netns || exit ${ksft_skip}
+		ip netns add $netns || exit ${KSFT_SKIP}
 		ip -net $netns link set lo up
 
 		ip netns exec $netns sysctl -q net.ipv4.conf.all.rp_filter=0

@@ -3,7 +3,6 @@
 
 . "$(dirname "${0}")/mptcp_lib.sh"
 
-ksft_skip=4
 iptables="iptables"
 ip6tables="ip6tables"
 
@@ -74,7 +73,7 @@ mptcp_lib_check_kallsyms
 ip -Version > /dev/null 2>&1
 if [ $? -ne 0 ];then
 	echo "SKIP: Could not run test without ip tool"
-	exit $ksft_skip
+	exit ${KSFT_SKIP}
 fi
 
 # Use the legacy version if available to support old kernel versions
@@ -83,10 +82,10 @@ if iptables-legacy -V &> /dev/null; then
 	ip6tables="ip6tables-legacy"
 elif ! iptables -V &> /dev/null; then
 	echo "SKIP: Could not run all tests without iptables tool"
-	exit $ksft_skip
+	exit ${KSFT_SKIP}
 elif ! ip6tables -V &> /dev/null; then
 	echo "SKIP: Could not run all tests without ip6tables tool"
-	exit $ksft_skip
+	exit ${KSFT_SKIP}
 fi
 
 check_mark()
