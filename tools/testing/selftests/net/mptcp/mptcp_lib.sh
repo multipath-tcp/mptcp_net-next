@@ -23,6 +23,9 @@ readonly AF_INET6=10
 TEST_NAME=""
 TEST_COUNT=0
 
+capture=false
+checksum=false
+
 MPTCP_LIB_SUBTESTS=()
 
 sin=$(mktemp)
