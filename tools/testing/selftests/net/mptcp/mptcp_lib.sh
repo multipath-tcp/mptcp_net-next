@@ -258,8 +258,7 @@ mptcp_lib_make_file() {
 }
 
 # $1: file
-mptcp_lib_print_file_err()
-{
+mptcp_lib_print_file_err() {
 	ls -l "${1}" 1>&2
 	echo "Trailing bytes are: "
 	tail -c 27 "${1}"
@@ -276,10 +275,10 @@ mptcp_lib_check_transfer() {
 		mptcp_lib_print_file_err "$in"
 		mptcp_lib_print_file_err "$out"
 
-		return 1
+		return ${KSFT_FAIL}
 	fi
 
-	return 0
+	return ${KSFT_PASS}
 }
 
 # $1: ns, $2: port
