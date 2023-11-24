@@ -301,6 +301,17 @@ struct bpf_func_state {
 	struct tnum callback_ret_range;
 	bool in_async_callback_fn;
 	bool in_exception_callback_fn;
+	/* For callback calling functions that limit number of possible
+	 * callback executions (e.g. bpf_loop) keeps track of current
+	 * simulated iteration number.
+	 * Value in frame N refers to number of times callback with frame
+	 * N+1 was simulated, e.g. for the following call:
+	 *
+	 *   bpf_loop(..., fn, ...); | suppose current frame is N
+	 *                           | fn would be simulated in frame N+1
+	 *                           | number of simulations is tracked in frame N
+	 */
+	u32 callback_depth;
 
 	/* The following fields should be last. See copy_func_state() */
 	int acquired_refs;
@@ -400,6 +411,7 @@ struct bpf_verifier_state {
 	struct bpf_idx_pair *jmp_history;
 	u32 jmp_history_cnt;
 	u32 dfs_depth;
+	u32 callback_unroll_depth;
 };
 
 #define bpf_get_spilled_reg(slot, frame, mask)				\
@@ -511,6 +523,10 @@ struct bpf_insn_aux_data {
 	 * this instruction, regardless of any heuristics
 	 */
 	bool force_checkpoint;
+	/* true if instruction is a call to a helper function that
+	 * accepts callback function as a parameter.
+	 */
+	bool calls_callback;
 };
 
 #define MAX_USED_MAPS 64 /* max number of maps accessed by one eBPF program */
@@ -602,6 +618,7 @@ struct bpf_verifier_env {
 	int stack_size;			/* number of states to be processed */
 	bool strict_alignment;		/* perform strict pointer alignment checks */
 	bool test_state_freq;		/* test verifier with different pruning frequency */
+	bool test_reg_invariants;	/* fail verification on register invariants violations */
 	struct bpf_verifier_state *cur_state; /* current verifier state */
 	struct bpf_verifier_state_list **explored_states; /* search pruning optimization */
 	struct bpf_verifier_state_list *free_list;
@@ -678,6 +695,10 @@ int bpf_vlog_init(struct bpf_verifier_log *log, u32 log_level,
 		  char __user *log_buf, u32 log_size);
 void bpf_vlog_reset(struct bpf_verifier_log *log, u64 new_pos);
 int bpf_vlog_finalize(struct bpf_verifier_log *log, u32 *log_size_actual);
+
+__printf(3, 4) void verbose_linfo(struct bpf_verifier_env *env,
+				  u32 insn_off,
+				  const char *prefix_fmt, ...);
 
 static inline struct bpf_func_state *cur_func(struct bpf_verifier_env *env)
 {
@@ -777,5 +798,77 @@ static inline bool bpf_type_has_unsafe_modifiers(u32 type)
 {
 	return type_flag(type) & ~BPF_REG_TRUSTED_MODIFIERS;
 }
+
+static inline bool type_is_ptr_alloc_obj(u32 type)
+{
+	return base_type(type) == PTR_TO_BTF_ID && type_flag(type) & MEM_ALLOC;
+}
+
+static inline bool type_is_non_owning_ref(u32 type)
+{
+	return type_is_ptr_alloc_obj(type) && type_flag(type) & NON_OWN_REF;
+}
+
+static inline bool type_is_pkt_pointer(enum bpf_reg_type type)
+{
+	type = base_type(type);
+	return type == PTR_TO_PACKET ||
+	       type == PTR_TO_PACKET_META;
+}
+
+static inline bool type_is_sk_pointer(enum bpf_reg_type type)
+{
+	return type == PTR_TO_SOCKET ||
+		type == PTR_TO_SOCK_COMMON ||
+		type == PTR_TO_TCP_SOCK ||
+		type == PTR_TO_XDP_SOCK;
+}
+
+static inline void mark_reg_scratched(struct bpf_verifier_env *env, u32 regno)
+{
+	env->scratched_regs |= 1U << regno;
+}
+
+static inline void mark_stack_slot_scratched(struct bpf_verifier_env *env, u32 spi)
+{
+	env->scratched_stack_slots |= 1ULL << spi;
+}
+
+static inline bool reg_scratched(const struct bpf_verifier_env *env, u32 regno)
+{
+	return (env->scratched_regs >> regno) & 1;
+}
+
+static inline bool stack_slot_scratched(const struct bpf_verifier_env *env, u64 regno)
+{
+	return (env->scratched_stack_slots >> regno) & 1;
+}
+
+static inline bool verifier_state_scratched(const struct bpf_verifier_env *env)
+{
+	return env->scratched_regs || env->scratched_stack_slots;
+}
+
+static inline void mark_verifier_state_clean(struct bpf_verifier_env *env)
+{
+	env->scratched_regs = 0U;
+	env->scratched_stack_slots = 0ULL;
+}
+
+/* Used for printing the entire verifier state. */
+static inline void mark_verifier_state_scratched(struct bpf_verifier_env *env)
+{
+	env->scratched_regs = ~0U;
+	env->scratched_stack_slots = ~0ULL;
+}
+
+const char *reg_type_str(struct bpf_verifier_env *env, enum bpf_reg_type type);
+const char *dynptr_type_str(enum bpf_dynptr_type type);
+const char *iter_type_str(const struct btf *btf, u32 btf_id);
+const char *iter_state_str(enum bpf_iter_state state);
+
+void print_verifier_state(struct bpf_verifier_env *env,
+			  const struct bpf_func_state *state, bool print_all);
+void print_insn_state(struct bpf_verifier_env *env, const struct bpf_func_state *state);
 
 #endif /* _LINUX_BPF_VERIFIER_H */
