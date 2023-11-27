@@ -188,7 +188,7 @@ jobs:
 
             Cheers,
             MPTCP GH Action bot
-            Bot operated by Matthieu Baerts (Tessares)
+            Bot operated by Matthieu Baerts (NGI0 Core)
 
   topgit:
     name: "TopGit"
@@ -373,7 +373,7 @@ jobs:
 
             Cheers,
             MPTCP GH Action bot
-            Bot operated by Matthieu Baerts (Tessares)
+            Bot operated by Matthieu Baerts (NGI0 Core)
 
       - name: set patchwork check
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
