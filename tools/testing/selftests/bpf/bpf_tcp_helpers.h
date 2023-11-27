@@ -87,6 +87,7 @@ struct tcp_sock {
 	__u32	lsndtime;
 	__u32	prior_cwnd;
 	__u64	tcp_mstamp;	/* most recent packet received/sent */
+	__u32	write_seq;	/* Tail(+1) of data held in tcp send buffer */
 	bool	is_mptcp;
 } __attribute__((preserve_access_index));
 
