@@ -1895,6 +1895,7 @@ chk_subflows_total()
 	local cnt1
 	local cnt2
 	local info="subflows_total"
+	local dump_stats
 
 	# if subflows_total counter is supported, use it:
 	if [ -n "$(ss -N $ns1 -inmHM | mptcp_lib_get_info_value $info $info)" ]; then
