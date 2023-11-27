@@ -258,8 +258,7 @@ mptcp_lib_make_file() {
 }
 
 # $1: file
-mptcp_lib_print_file_err()
-{
+mptcp_lib_print_file_err() {
 	ls -l "${1}" 1>&2
 	echo "Trailing bytes are: "
 	tail -c 27 "${1}"
