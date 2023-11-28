@@ -13,3 +13,4 @@ mptcp_token_test-objs := token_test.o
 obj-$(CONFIG_MPTCP_KUNIT_TEST) += mptcp_crypto_test.o mptcp_token_test.o
 
 obj-$(CONFIG_BPF_SYSCALL) += bpf.o
+obj-$(CONFIG_FUNCTION_TRACER) += trace.o
