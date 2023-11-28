@@ -298,3 +298,9 @@ mptcp_lib_wait_local_port_listen() {
 		sleep 0.1
 	done
 }
+
+mptcp_lib_cleanup() {
+	echo "cleanup"
+}
+
+echo -e "\n${KSFT_TEST}\n"
