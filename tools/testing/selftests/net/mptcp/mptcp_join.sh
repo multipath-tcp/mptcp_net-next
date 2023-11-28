@@ -3513,8 +3513,8 @@ userspace_tests()
 		wait $tests_pid
 	fi
 
-	# userspace pm dump address
-	if reset_with_events "userspace pm dump address" &&
+	# userspace pm dump & flush address
+	if reset_with_events "userspace pm dump & flush address" &&
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns2 1 1
@@ -3532,12 +3532,18 @@ userspace_tests()
 		[ $ip_mptcp -eq 1 ] && dump="10.0.2.1 id 10 signal "
 		mptcp_lib_check_output "pm_nl_show_endpoints $ns1" \
 				       "$dump" "      dump addrs signal"
+		pm_nl_flush_endpoint $ns1
+		mptcp_lib_check_output "pm_nl_show_endpoints $ns1" \
+				       "" "      dump addrs after flush"
+		chk_rm_nr 1 1 invert
+		chk_mptcp_info subflows 0 subflows 0
+		chk_subflows_total 1 1
 		kill_events_pids
 		wait $tests_pid
 	fi
 
-	# userspace pm dump subflow
-	if reset_with_events "userspace pm dump subflow" &&
+	# userspace pm dump & flush subflow
+	if reset_with_events "userspace pm dump & flush subflow" &&
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
@@ -3555,6 +3561,12 @@ userspace_tests()
 		[ $ip_mptcp -eq 1 ] && dump="10.0.3.2 id 20 subflow "
 		mptcp_lib_check_output "pm_nl_show_endpoints $ns2" \
 				       "$dump" "      dump addrs subflow"
+		pm_nl_flush_endpoint $ns2
+		mptcp_lib_check_output "pm_nl_show_endpoints $ns2" \
+				       "" "      dump addrs after flush"
+		chk_rm_nr 1 1
+		chk_mptcp_info subflows 0 subflows 0
+		chk_subflows_total 1 1
 		kill_events_pids
 		wait $tests_pid
 	fi
