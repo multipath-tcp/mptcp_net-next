@@ -301,8 +301,39 @@ mptcp_lib_wait_local_port_listen() {
 	done
 }
 
+check_output_err=$(mktemp)
+
+mptcp_lib_check_output() {
+	: "${check_output_err:?}"
+	: "${ret:?}"
+
+	local cmd="$1"
+	local expected="$2"
+	local msg="$3"
+	local out=`$cmd 2>$check_output_err`
+	local cmd_ret=$?
+
+	printf "%-42s" "$msg"
+	if [ $cmd_ret -ne 0 ]; then
+		mptcp_lib_print_err "[ FAIL ] command execution '$cmd' stderr "
+		cat $check_output_err
+		ret=${KSFT_FAIL}
+		return $cmd_ret
+	elif [ "$out" = "$expected" ]; then
+		mptcp_lib_print_ok "[ OK ]"
+		return 0
+	else
+		mptcp_lib_print_err "[ FAIL ] expected '$expected' got '$out'"
+		ret=${KSFT_FAIL}
+		return 1
+	fi
+}
+
 mptcp_lib_cleanup() {
+	: "${check_output_err:?}"
+
 	echo "cleanup"
+	rm -f $check_output_err
 }
 
 echo -e "\n${KSFT_TEST}\n"
