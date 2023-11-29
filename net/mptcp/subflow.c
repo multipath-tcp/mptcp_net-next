@@ -423,7 +423,7 @@ void __mptcp_set_connected(struct sock *sk)
 {
 	__mptcp_propagate_sndbuf(sk, mptcp_sk(sk)->first);
 	if (sk->sk_state == TCP_SYN_SENT) {
-		inet_sk_state_store(sk, TCP_ESTABLISHED);
+		mptcp_set_state(sk, TCP_ESTABLISHED);
 		sk->sk_state_change(sk);
 	}
 }
