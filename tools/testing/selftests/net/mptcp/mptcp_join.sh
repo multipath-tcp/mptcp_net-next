@@ -976,6 +976,23 @@ pm_nl_set_endpoint()
 	fi
 }
 
+chk_cestab_nr()
+{
+	local ns=$1
+	local cestab=$2
+	local count
+
+	print_check "cestab"
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMPCurrEstab")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$cestab" ]; then
+		fail_test "got $count current establish[s] expected $cestab"
+	else
+		print_ok
+	fi
+}
+
 do_transfer()
 {
 	local listener_ns="$1"
@@ -989,6 +1006,9 @@ do_transfer()
 	local FAILING_LINKS=${FAILING_LINKS:-""}
 	local fastclose=${fastclose:-""}
 	local speed=${speed:-"fast"}
+
+	local addr_nr_ns1=${addr_nr_ns1:-0}
+	local addr_nr_ns2=${addr_nr_ns2:-0}
 
 	:> "$cout"
 	:> "$sout"
@@ -1090,6 +1110,13 @@ do_transfer()
 
 	pm_nl_set_endpoint $listener_ns $connector_ns $connect_addr
 
+	if [ $addr_nr_ns1 != "0" ]; then
+		chk_cestab_nr $ns1 1
+	fi
+	if [ $addr_nr_ns2 != "0" ]; then
+		chk_cestab_nr $ns2 1
+	fi
+
 	wait $cpid
 	local retc=$?
 	wait $spid
@@ -1098,6 +1125,13 @@ do_transfer()
 	if [ $capture -eq 1 ]; then
 	    sleep 1
 	    kill $cappid
+	fi
+
+	if [ $addr_nr_ns1 != "0" ]; then
+		chk_cestab_nr $ns1 0
+	fi
+	if [ $addr_nr_ns2 != "0" ]; then
+		chk_cestab_nr $ns2 0
 	fi
 
 	NSTAT_HISTORY=/tmp/${listener_ns}.nstat ip netns exec ${listener_ns} \
