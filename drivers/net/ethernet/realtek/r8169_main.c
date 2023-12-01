@@ -56,10 +56,6 @@
 #define FIRMWARE_8125A_3	"rtl_nic/rtl8125a-3.fw"
 #define FIRMWARE_8125B_2	"rtl_nic/rtl8125b-2.fw"
 
-/* Maximum number of multicast addresses to filter (vs. Rx-all-multicast).
-   The RTL chips use a 64 element hash table based on the Ethernet CRC. */
-#define	MC_FILTER_LIMIT	32
-
 #define TX_DMA_BURST	7	/* Maximum PCI burst, '7' is unlimited */
 #define InterFrameGap	0x03	/* 3 means InterFrameGap = the shortest one */
 
@@ -579,6 +575,7 @@ struct rtl8169_tc_offsets {
 enum rtl_flag {
 	RTL_FLAG_TASK_ENABLED = 0,
 	RTL_FLAG_TASK_RESET_PENDING,
+	RTL_FLAG_TASK_RESET_NO_QUEUE_WAKE,
 	RTL_FLAG_TASK_TX_TIMEOUT,
 	RTL_FLAG_MAX
 };
@@ -2231,6 +2228,9 @@ u16 rtl8168h_2_get_adc_bias_ioffset(struct rtl8169_private *tp)
 
 static void rtl_schedule_task(struct rtl8169_private *tp, enum rtl_flag flag)
 {
+	if (!test_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags))
+		return;
+
 	set_bit(flag, tp->wk.flags);
 	schedule_work(&tp->wk.work);
 }
@@ -2597,8 +2597,7 @@ static void rtl_set_rx_mode(struct net_device *dev)
 		rx_mode |= AcceptAllPhys;
 	} else if (!(dev->flags & IFF_MULTICAST)) {
 		rx_mode &= ~AcceptMulticast;
-	} else if (netdev_mc_count(dev) > MC_FILTER_LIMIT ||
-		   dev->flags & IFF_ALLMULTI ||
+	} else if (dev->flags & IFF_ALLMULTI ||
 		   tp->mac_version == RTL_GIGA_MAC_VER_35) {
 		/* accept all multicasts */
 	} else if (netdev_mc_empty(dev)) {
@@ -4472,8 +4471,7 @@ static void rtl_task(struct work_struct *work)
 
 	rtnl_lock();
 
-	if (!netif_running(tp->dev) ||
-	    !test_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags))
+	if (!test_bit(RTL_FLAG_TASK_ENABLED, tp->wk.flags))
 		goto out_unlock;
 
 	if (test_and_clear_bit(RTL_FLAG_TASK_TX_TIMEOUT, tp->wk.flags)) {
@@ -4499,6 +4497,8 @@ static void rtl_task(struct work_struct *work)
 reset:
 		rtl_reset_work(tp);
 		netif_wake_queue(tp->dev);
+	} else if (test_and_clear_bit(RTL_FLAG_TASK_RESET_NO_QUEUE_WAKE, tp->wk.flags)) {
+		rtl_reset_work(tp);
 	}
 out_unlock:
 	rtnl_unlock();
@@ -4532,7 +4532,7 @@ static void r8169_phylink_handler(struct net_device *ndev)
 	} else {
 		/* In few cases rx is broken after link-down otherwise */
 		if (rtl_is_8125(tp))
-			rtl_reset_work(tp);
+			rtl_schedule_task(tp, RTL_FLAG_TASK_RESET_NO_QUEUE_WAKE);
 		pm_runtime_idle(d);
 	}
 
@@ -4608,7 +4608,7 @@ static int rtl8169_close(struct net_device *dev)
 	rtl8169_down(tp);
 	rtl8169_rx_clear(tp);
 
-	cancel_work_sync(&tp->wk.work);
+	cancel_work(&tp->wk.work);
 
 	free_irq(tp->irq, tp);
 
@@ -4841,6 +4841,8 @@ static void rtl_remove_one(struct pci_dev *pdev)
 
 	if (pci_dev_run_wake(pdev))
 		pm_runtime_get_noresume(&pdev->dev);
+
+	cancel_work_sync(&tp->wk.work);
 
 	unregister_netdev(tp->dev);
 
