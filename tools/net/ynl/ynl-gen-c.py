@@ -1164,8 +1164,9 @@ class RenderInfo:
 
 
 class CodeWriter:
-    def __init__(self, nlib, out_file=None):
+    def __init__(self, nlib, out_file=None, overwrite=True):
         self.nlib = nlib
+        self._overwrite = overwrite
 
         self._nl = False
         self._block_end = False
@@ -1186,8 +1187,9 @@ class CodeWriter:
             return
         # Avoid modifying the file if contents didn't change
         self._out.flush()
-        if os.path.isfile(self._out_file) and filecmp.cmp(self._out.name, self._out_file, shallow=False):
-            return
+        if not self._overwrite and os.path.isfile(self._out_file):
+            if filecmp.cmp(self._out.name, self._out_file, shallow=False):
+                return
         with open(self._out_file, 'w+') as out_file:
             self._out.seek(0)
             shutil.copyfileobj(self._out, out_file)
@@ -1713,14 +1715,14 @@ def print_req(ri):
     ret_ok = '0'
     ret_err = '-1'
     direction = "request"
-    local_vars = ['struct nlmsghdr *nlh;',
+    local_vars = ['struct ynl_req_state yrs = { .yarg = { .ys = ys, }, };',
+                  'struct nlmsghdr *nlh;',
                   'int err;']
 
     if 'reply' in ri.op[ri.op_mode]:
         ret_ok = 'rsp'
         ret_err = 'NULL'
-        local_vars += [f'{type_name(ri, rdir(direction))} *rsp;',
-                       'struct ynl_req_state yrs = { .yarg = { .ys = ys, }, };']
+        local_vars += [f'{type_name(ri, rdir(direction))} *rsp;']
 
     print_prototype(ri, direction, terminate=False)
     ri.cw.block_start()
@@ -1736,7 +1738,6 @@ def print_req(ri):
         attr.attr_put(ri, "req")
     ri.cw.nl()
 
-    parse_arg = "NULL"
     if 'reply' in ri.op[ri.op_mode]:
         ri.cw.p('rsp = calloc(1, sizeof(*rsp));')
         ri.cw.p('yrs.yarg.data = rsp;')
@@ -1746,8 +1747,7 @@ def print_req(ri):
         else:
             ri.cw.p(f'yrs.rsp_cmd = {ri.op.rsp_value};')
         ri.cw.nl()
-        parse_arg = '&yrs'
-    ri.cw.p(f"err = ynl_exec(ys, nlh, {parse_arg});")
+    ri.cw.p("err = ynl_exec(ys, nlh, &yrs);")
     ri.cw.p('if (err < 0)')
     if 'reply' in ri.op[ri.op_mode]:
         ri.cw.p('goto err_free;')
@@ -2516,6 +2516,8 @@ def main():
     parser.add_argument('--header', dest='header', action='store_true', default=None)
     parser.add_argument('--source', dest='header', action='store_false')
     parser.add_argument('--user-header', nargs='+', default=[])
+    parser.add_argument('--cmp-out', action='store_true', default=None,
+                        help='Do not overwrite the output file if the new output is identical to the old')
     parser.add_argument('--exclude-op', action='append', default=[])
     parser.add_argument('-o', dest='out_file', type=str, default=None)
     args = parser.parse_args()
@@ -2543,7 +2545,7 @@ def main():
         print(f'Message enum-model {parsed.msg_id_model} not supported for {args.mode} generation')
         os.sys.exit(1)
 
-    cw = CodeWriter(BaseNlLib(), args.out_file)
+    cw = CodeWriter(BaseNlLib(), args.out_file, overwrite=(not args.cmp_out))
 
     _, spec_kernel = find_kernel_root(args.spec)
     if args.mode == 'uapi' or args.header:
