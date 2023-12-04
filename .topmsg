@@ -1,4 +1,26 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-fix-subflow_send_ack-lookup
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests: mptcp: join: fix subflow_send_ack lookup
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+MPC backups tests will skip unexpected sometimes (For example, when
+compiling kernel with an older version of gcc, such as gcc-8), since
+static functions like mptcp_subflow_send_ack also be listed in
+/proc/kallsyms, with a 't' in front of it, not 'T' ('T' is for a global
+function):
+
+ > grep "mptcp_subflow_send_ack" /proc/kallsyms
+
+ 0000000000000000 T __pfx___mptcp_subflow_send_ack
+ 0000000000000000 T __mptcp_subflow_send_ack
+ 0000000000000000 t __pfx_mptcp_subflow_send_ack
+ 0000000000000000 t mptcp_subflow_send_ack
+
+In this case, mptcp_lib_kallsyms_doesnt_have "mptcp_subflow_send_ack$"
+will be false, MPC backups tests will skip. This is not what we expected.
+
+The correct logic here should be: if mptcp_subflow_send_ack is not a
+global function in /proc/kallsyms, do these MPC backups tests. So a 'T'
+must be added in front of mptcp_subflow_send_ack.
+
+Fixes: 632978f0a961 ("selftests: mptcp: join: skip MPC backups tests if not supported")
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
