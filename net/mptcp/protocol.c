@@ -3404,9 +3404,8 @@ static void mptcp_release_cb(struct sock *sk)
 	if (unlikely(msk->cb_flags)) {
 		/* be sure to sync the msk state before taking actions
 		 * depending on sk_state (MPTCP_ERROR_REPORT)
-		 * On sk release avoid actions depending on the first subflow
 		 */
-		if (__test_and_clear_bit(MPTCP_SYNC_STATE, &msk->cb_flags) && msk->first)
+		if (__test_and_clear_bit(MPTCP_SYNC_STATE, &msk->cb_flags))
 			__mptcp_sync_state(sk, msk->pending_state);
 		if (__test_and_clear_bit(MPTCP_ERROR_REPORT, &msk->cb_flags))
 			__mptcp_error_report(sk);
