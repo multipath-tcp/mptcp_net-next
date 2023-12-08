@@ -1,0 +1,10 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: userspace pm send RM_ADDR for ID 0
+
+This patch adds a selftest for userspace PM to remove id 0 address.
+
+Use userspace_pm_add_addr() helper to add an id 10 address, then use
+userspace_pm_rm_addr() helper to remove id 0 address.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
