@@ -1,0 +1,16 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_get_counter
+
+To avoid duplicated code in different MPTCP selftests, we can add
+and use helpers defined in mptcp_lib.sh.
+
+The helper get_counter() in mptcp_join.sh and get_mib_counter() in
+mptcp_connect.sh have the same functionality, export get_counter() into
+mptcp_lib.sh and rename it as mptcp_lib_get_counter(). Use this new
+helper instead of get_counter() and get_mib_counter().
+
+Use this helper in test_prio() in userspace_pm.sh too instead of
+open-coding.
+
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
