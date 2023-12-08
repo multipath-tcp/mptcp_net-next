@@ -1,0 +1,15 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_check_transfer
+
+To avoid duplicated code in different MPTCP selftests, we can add
+and use helpers defined in mptcp_lib.sh.
+
+check_transfer() and print_file_err() helpers are defined both in
+mptcp_connect.sh and mptcp_sockopt.sh, export them into mptcp_lib.sh
+and rename them with mptcp_lib_ prefix. And use them in all scripts.
+
+Note: In mptcp_sockopt.sh it is OK to drop 'ret=1' in check_transfer()
+because it will be set in run_tests() anyway.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
