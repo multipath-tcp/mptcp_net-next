@@ -1,0 +1,10 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: userspace pm create id 0 subflow
+
+This patch adds a selftest to create id 0 subflow. Pass id 0 to the
+helper userspace_pm_add_sf() to create id 0 subflow. chk_mptcp_info
+shows one subflow but chk_subflows_total shows two subflows in each
+namespace.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
