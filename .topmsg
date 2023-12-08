@@ -1,0 +1,9 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] mptcp: fill in missing MODULE_DESCRIPTION()
+
+W=1 builds warn on missing MODULE_DESCRIPTION, add them here in MPTCP.
+
+Only two were missing: two modules with different KUint tests for MPTCP.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
