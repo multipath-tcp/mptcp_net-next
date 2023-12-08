@@ -1,0 +1,12 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_is_v6
+
+To avoid duplicated code in different MPTCP selftests, we can add
+and use helpers defined in mptcp_lib.sh.
+
+is_v6() helper is defined in mptcp_connect.sh, mptcp_join.sh and
+mptcp_sockopt.sh, so export it into mptcp_lib.sh and rename it as
+mptcp_lib_is_v6(). Use this new helper in all scripts.
+
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
