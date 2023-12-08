@@ -1,0 +1,12 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_kill_wait
+
+To avoid duplicated code in different MPTCP selftests, we can add
+and use helpers defined in mptcp_lib.sh.
+
+Export kill_wait() helper in userspace_pm.sh into mptcp_lib.sh and
+rename it as mptcp_lib_kill_wait(). It can be used to instead of
+kill_wait() in mptcp_join.sh. Use the new helper in both scripts.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
