@@ -1,0 +1,14 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: git markup: net-next
+
+All commits older than this one are from Netdev's net-next repo:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/
+
+Following commits are fixes for other trees than the net ones or
+imported from elsewhere. We should not send these commits to either -net
+or net-next.
+
+This commit is useful to easily find the "bottom of the tree".
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
