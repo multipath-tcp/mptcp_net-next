@@ -1,0 +1,13 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add evts_get_info helper
+
+This patch adds a new helper get_info_value(), using 'sed' command to
+parse the value of the given item name in the line with the given keyword,
+to make chk_mptcp_info() and pedit_action_pkts() more readable.
+
+Also add another helper evts_get_info() to use get_info_value() to parse
+the output of 'pm_nl_ctl events' command, to make all the userspace pm
+selftests more readable, both in mptcp_join.sh and userspace_pm.sh.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
