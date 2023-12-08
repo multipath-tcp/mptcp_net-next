@@ -1,0 +1,14 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add missing oflag=append
+
+In mptcp_connect.sh we are missing something like "oflag=append"
+because this will write "${rem}" bytes at the beginning of the file
+where there is already some random bytes. It should write that at
+the end.
+
+This patch adds this missing 'oflag=append' flag for 'dd' command in
+make_file().
+
+Suggested-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
