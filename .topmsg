@@ -1,0 +1,11 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: userspace pm remove initial subflow
+
+This patch adds a selftest for userspace PM to remove the initial
+subflow.
+
+Use userspace_pm_add_sf() to add a subflow, and pass initial IP address
+to userspace_pm_rm_sf() to remove the initial subflow.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
