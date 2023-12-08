@@ -1,0 +1,12 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_make_file
+
+To avoid duplicated code in different MPTCP selftests, we can add
+and use helpers defined in mptcp_lib.sh.
+
+make_file() helper in mptcp_sockopt.sh and userspace_pm.sh are the same.
+Export it into mptcp_lib.sh and rename it as mptcp_lib_kill_wait(). Use
+it in both mptcp_connect.sh and mptcp_join.sh.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
