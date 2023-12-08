@@ -1,0 +1,22 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: add mptcpi_subflows_total counter
+
+If the initial subflow has been removed, we cannot know without checking
+other counters, e.g. ss -ti <filter> | grep -c tcp-ulp-mptcp or
+getsockopt(SOL_MPTCP, MPTCP_FULL_INFO, ...) (or others except MPTCP_INFO
+of course) and then check mptcp_subflow_data->num_subflows to get the
+total amount of subflows.
+
+This patch adds a new counter mptcpi_subflows_total in mptcpi_flags to
+store the total amount of subflows, including the initial one. A new
+helper __mptcp_has_initial_subflow() is added to check whether the
+initial subflow has been removed or not. With this helper, we can then
+compute the total amount of subflows from mptcp_info by doing something
+like:
+
+    mptcpi_subflows_total = mptcpi_subflows +
+            __mptcp_has_initial_subflow(msk).
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/428
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
