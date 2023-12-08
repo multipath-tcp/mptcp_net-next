@@ -18,6 +18,7 @@
 #define  OCTEP_PCIID_CN93_PF  0xB200177d
 #define  OCTEP_PCIID_CN93_VF  0xB203177d
 
+#define  OCTEP_PCI_DEVICE_ID_CN98_PF 0xB100
 #define  OCTEP_PCI_DEVICE_ID_CN93_PF 0xB200
 #define  OCTEP_PCI_DEVICE_ID_CN93_VF 0xB203
 
@@ -246,8 +247,7 @@ struct octep_device {
 
 	/* Tx queues (IQ: Instruction Queue) */
 	u16 num_iqs;
-	/* pkind value to be used in every Tx hardware descriptor */
-	u8 pkind;
+
 	/* Pointers to Octeon Tx queues */
 	struct octep_iq *iq[OCTEP_MAX_IQ];
 
