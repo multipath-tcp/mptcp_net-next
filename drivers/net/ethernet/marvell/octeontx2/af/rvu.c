@@ -935,6 +935,9 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
 	hw->total_vfs = (cfg >> 20) & 0xFFF;
 	hw->max_vfs_per_pf = (cfg >> 40) & 0xFF;
 
+	if (!is_rvu_otx2(rvu))
+		rvu_apr_block_cn10k_init(rvu);
+
 	/* Init NPA LF's bitmap */
 	block = &hw->block[BLKADDR_NPA];
 	if (!block->implemented)
@@ -2634,6 +2637,9 @@ static void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 	 */
 	rvu_npc_free_mcam_entries(rvu, pcifunc, -1);
 	rvu_mac_reset(rvu, pcifunc);
+
+	if (rvu->mcs_blk_cnt)
+		rvu_mcs_flr_handler(rvu, pcifunc);
 
 	mutex_unlock(&rvu->flr_lock);
 }
