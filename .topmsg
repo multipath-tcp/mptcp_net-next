@@ -1,4 +1,13 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/Revert-net-rtnetlink-remove-local-list-in-__linkwatch_run_queue
+From: Johannes Berg <johannes.berg@intel.com>
+Subject: [PATCH] Revert "net: rtnetlink: remove local list in __linkwatch_run_queue()"
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+This reverts commit b8dbbbc535a9 ("net: rtnetlink: remove local list
+in __linkwatch_run_queue()"). It's evidently broken when there's a
+non-urgent work that gets added back, and then the loop can never
+finish.
+
+While reverting, add a note about that.
+
+Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Fixes: b8dbbbc535a9 ("net: rtnetlink: remove local list in __linkwatch_run_queue()")
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
