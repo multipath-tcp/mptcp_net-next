@@ -1,0 +1,12 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] mptcp: userspace pm rename remove_err to out
+
+The value of 'err' will not be only '-EINVAL', but can be '0' in some
+cases.
+
+So it's better to rename the label 'remove_err' to 'out' to avoid
+confusions.
+
+Suggested-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
