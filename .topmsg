@@ -1,0 +1,16 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: add chk_subflows_total helper
+
+This patch adds a new helper chk_subflows_total(), in it use the newly
+added counter mptcpi_subflows_total to get the "correct" amount of
+subflows, including the initial one.
+
+To be compatible with old 'ss' or kernel versions not supporting this
+counter, get the total subflows by listing TCP connections that are
+MPTCP subflows:
+
+    ss -ti state state established state syn-sent state syn-recv |
+        grep -c tcp-ulp-mptcp.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
