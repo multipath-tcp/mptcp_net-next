@@ -1,0 +1,11 @@
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup state propagation
+
+When propagating the first subflow state via the release_cb, the
+msk must actually take to 2 separate actions: state sync-up and
+send buffer sync-up. Relaying on the specific flags instead of
+bounding both in __mptcp_sync_state(), allows cleaning up a bit
+the code.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
