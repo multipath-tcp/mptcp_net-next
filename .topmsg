@@ -1,0 +1,12 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: git markup: end common net net-next
+
+All commits older than this one are patches that are needed for both the
+-net and the net-next trees.
+
+Following commits are MPTCP-related modifications only needed for -net.
+
+This commit is useful to easily find where are commits needed for -net
+and net-next.
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
