@@ -1,0 +1,13 @@
+From: Geliang Tang <geliang.tang@suse.com>
+Subject: [PATCH] selftests: mptcp: update userspace pm test helpers
+
+This patch adds a new argument namespace to userspace_pm_add_addr() and
+userspace_pm_add_sf() to make these two helper more versatile.
+
+Add two more versatile helpers for userspace pm remove subflow or address:
+userspace_pm_rm_addr() and userspace_pm_rm_sf(). The original test helpers
+userspace_pm_rm_sf_addr_ns1() and userspace_pm_rm_sf_addr_ns2() can be
+replaced by these new helpers.
+
+Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
