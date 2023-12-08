@@ -1,0 +1,11 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: CI: switching to -net
+
+It is needed to maintain different versions for -net and net-next.
+
+Indeed, the behaviour can change which has an impact on packetdrill
+tests, dependences, etc.
+
+This topic is there to change some refs just for -net.
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
