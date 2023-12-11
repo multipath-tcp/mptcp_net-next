@@ -1726,8 +1726,8 @@ fail:
 	return ret;
 }
 
-int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
-				struct netlink_callback *cb)
+static int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
+				 struct netlink_callback *cb)
 {
 	struct net *net = sock_net(msg->sk);
 	struct mptcp_pm_addr_entry *entry;
@@ -1757,6 +1757,13 @@ int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
 
 	cb->args[0] = id;
 	return msg->len;
+}
+
+int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
+				struct netlink_callback *cb)
+{
+	return mptcp_pm_nl_dump_addr(msg, cb) +
+	       mptcp_userspace_pm_dump_addr(msg, cb);
 }
 
 static int parse_limit(struct genl_info *info, int id, unsigned int *limit)
