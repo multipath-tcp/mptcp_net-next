@@ -1048,6 +1048,9 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	if (err)
 		return err;
 
+	/* avoid replacing inet_sk_state_store with mptcp_set_state here, as the
+	 * old status is known to be TCP_CLOSE, hence will not affect the count.
+	 */
 	inet_sk_state_store(newsk, TCP_LISTEN);
 	lock_sock(ssk);
 	err = __inet_listen_sk(ssk, backlog);
