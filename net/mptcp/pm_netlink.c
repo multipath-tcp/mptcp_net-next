@@ -1653,6 +1653,37 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
+int mptcp_pm_nl_put_entry_info(struct genl_info *info,
+			       struct mptcp_pm_addr_entry *entry)
+{
+	struct sk_buff *msg;
+	void *reply;
+	int ret;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	reply = genlmsg_put_reply(msg, info, &mptcp_genl_family, 0,
+				  info->genlhdr->cmd);
+	if (!reply) {
+		GENL_SET_ERR_MSG(info, "not enough space in Netlink message");
+		ret = -EMSGSIZE;
+		goto fail;
+	}
+
+	ret = mptcp_nl_fill_addr(msg, entry);
+	if (ret)
+		goto fail;
+
+	genlmsg_end(msg, reply);
+	ret = genlmsg_reply(msg, info);
+	return ret;
+fail:
+	nlmsg_free(msg);
+	return ret;
+}
+
 int mptcp_pm_nl_put_entry_msg(struct sk_buff *msg,
 			      struct netlink_callback *cb,
 			      struct mptcp_pm_addr_entry *entry)
@@ -1681,25 +1712,11 @@ int mptcp_pm_nl_get_addr_doit(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *attr = info->attrs[MPTCP_PM_ENDPOINT_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct mptcp_pm_addr_entry addr, *entry;
-	struct sk_buff *msg;
-	void *reply;
 	int ret;
 
 	ret = mptcp_pm_parse_entry(attr, info, false, &addr);
 	if (ret < 0)
 		return ret;
-
-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
-	if (!msg)
-		return -ENOMEM;
-
-	reply = genlmsg_put_reply(msg, info, &mptcp_genl_family, 0,
-				  info->genlhdr->cmd);
-	if (!reply) {
-		GENL_SET_ERR_MSG(info, "not enough space in Netlink message");
-		ret = -EMSGSIZE;
-		goto fail;
-	}
 
 	spin_lock_bh(&pernet->lock);
 	entry = __lookup_addr_by_id(pernet, addr.addr.id);
@@ -1709,20 +1726,12 @@ int mptcp_pm_nl_get_addr_doit(struct sk_buff *skb, struct genl_info *info)
 		goto unlock_fail;
 	}
 
-	ret = mptcp_nl_fill_addr(msg, entry);
-	if (ret)
-		goto unlock_fail;
-
-	genlmsg_end(msg, reply);
-	ret = genlmsg_reply(msg, info);
+	ret = mptcp_pm_nl_put_entry_info(info, entry);
 	spin_unlock_bh(&pernet->lock);
 	return ret;
 
 unlock_fail:
 	spin_unlock_bh(&pernet->lock);
-
-fail:
-	nlmsg_free(msg);
 	return ret;
 }
 
