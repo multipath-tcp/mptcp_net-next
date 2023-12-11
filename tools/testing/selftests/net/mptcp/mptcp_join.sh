@@ -3324,6 +3324,18 @@ userspace_pm_rm_sf()
 	wait_rm_sf $1 "${cnt}"
 }
 
+# $1: ns ; $2: id
+userspace_pm_get_addr()
+{
+	local evts=$server_evts
+	local tk
+
+	[ "$1" == "$ns2" ] && evts=$client_evts
+	tk=$(mptcp_lib_evts_get_info token "$evts")
+
+	ip netns exec $1 ./pm_nl_ctl get $2 token $tk
+}
+
 check_output() {
 	: "${check_output_err:?}"
 	: "${ret:?}"
@@ -3556,6 +3568,8 @@ userspace_tests()
 		chk_subflows_total 2 2
 		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
 		local dump="id 10 flags signal 10.0.2.1"
+		mptcp_lib_check_output "userspace_pm_get_addr $ns1 10" \
+				       "$dump" "      get id 10 addr"
 		[ $ip_mptcp -eq 1 ] && dump="10.0.2.1 id 10 signal "
 		check_output "pm_nl_show_endpoints $ns1" \
 			     "$dump" "      dump addrs signal"
@@ -3579,6 +3593,8 @@ userspace_tests()
 		chk_mptcp_info subflows 1 subflows 1
 		chk_subflows_total 2 2
 		local dump="id 20 flags subflow 10.0.3.2"
+		mptcp_lib_check_output "userspace_pm_get_addr $ns2 20" \
+				       "$dump" "      get id 20 addr"
 		[ $ip_mptcp -eq 1 ] && dump="10.0.3.2 id 20 subflow "
 		check_output "pm_nl_show_endpoints $ns2" \
 			     "$dump" "      dump addrs subflow"
