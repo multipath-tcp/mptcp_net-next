@@ -1,0 +1,4 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-don-t-overwrite-sock_ops-in-mptcp_is_tcpsk
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
