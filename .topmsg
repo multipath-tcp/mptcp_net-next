@@ -1,4 +1,15 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-check-CURRESTAB-counters
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests: mptcp: check CURRESTAB counters
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+This patch adds a new helper chk_cestab_nr() to check the current
+established connections counter MIB_CURRESTAB. Set the newly added
+variables cestab_ns1 and cestab_ns2 to indicate how many connections
+are expected in ns1 or ns2.
+
+Invoke check_cestab() to check the counter during the connection in
+do_transfer() and invoke chk_cestab_nr() to re-check it when the
+connection closed. These checks are embedded in add_tests().
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
