@@ -1,4 +1,10 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-mptcp_set_state
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] mptcp: use mptcp_set_state
 
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+This patch replaces all the 'inet_sk_state_store()' calls under net/mptcp
+with the new helper mptcp_set_state().
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/460
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
