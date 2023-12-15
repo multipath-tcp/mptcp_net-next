@@ -101,13 +101,17 @@ dpll_msg_add_mode_supported(struct sk_buff *msg, struct dpll_device *dpll,
 {
 	const struct dpll_device_ops *ops = dpll_device_ops(dpll);
 	enum dpll_mode mode;
+	int ret;
 
-	if (!ops->mode_supported)
-		return 0;
-	for (mode = DPLL_MODE_MANUAL; mode <= DPLL_MODE_MAX; mode++)
-		if (ops->mode_supported(dpll, dpll_priv(dpll), mode, extack))
-			if (nla_put_u32(msg, DPLL_A_MODE_SUPPORTED, mode))
-				return -EMSGSIZE;
+	/* No mode change is supported now, so the only supported mode is the
+	 * one obtained by mode_get().
+	 */
+
+	ret = ops->mode_get(dpll, dpll_priv(dpll), &mode, extack);
+	if (ret)
+		return ret;
+	if (nla_put_u32(msg, DPLL_A_MODE_SUPPORTED, mode))
+		return -EMSGSIZE;
 
 	return 0;
 }
@@ -925,7 +929,6 @@ dpll_pin_parent_pin_set(struct dpll_pin *pin, struct nlattr *parent_nest,
 			struct netlink_ext_ack *extack)
 {
 	struct nlattr *tb[DPLL_A_PIN_MAX + 1];
-	enum dpll_pin_state state;
 	u32 ppin_idx;
 	int ret;
 
@@ -936,10 +939,14 @@ dpll_pin_parent_pin_set(struct dpll_pin *pin, struct nlattr *parent_nest,
 		return -EINVAL;
 	}
 	ppin_idx = nla_get_u32(tb[DPLL_A_PIN_PARENT_ID]);
-	state = nla_get_u32(tb[DPLL_A_PIN_STATE]);
-	ret = dpll_pin_on_pin_state_set(pin, ppin_idx, state, extack);
-	if (ret)
-		return ret;
+
+	if (tb[DPLL_A_PIN_STATE]) {
+		enum dpll_pin_state state = nla_get_u32(tb[DPLL_A_PIN_STATE]);
+
+		ret = dpll_pin_on_pin_state_set(pin, ppin_idx, state, extack);
+		if (ret)
+			return ret;
+	}
 
 	return 0;
 }
