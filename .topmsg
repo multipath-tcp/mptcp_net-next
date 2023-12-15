@@ -1,8 +1,0 @@
-From: Maxim Galaganov <max@internet.ru>
-Subject: [PATCH] mptcp: rename mptcp_setsockopt_sol_ip_set_transparent()
-
-Next patch extends this function so that it's not specific to
-IP_TRANSPARENT. Change function name to mptcp_setsockopt_sol_ip_set().
-
-Reviewed-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Maxim Galaganov <max@internet.ru>
