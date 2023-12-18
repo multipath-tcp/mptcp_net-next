@@ -1,5 +1,5 @@
 From: Geliang Tang <geliang.tang@linux.dev>
-Subject: [PATCH] selftests: mptcp: check CURRESTAB counters
+Subject: [PATCH] selftests: mptcp: join: check CURRESTAB counters
 
 This patch adds a new helper chk_cestab_nr() to check the current
 established connections counter MIB_CURRESTAB. Set the newly added
