@@ -1051,7 +1051,7 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 		return err;
 	}
 
-	inet_sk_state_store(newsk, TCP_LISTEN);
+	mptcp_set_state(newsk, TCP_LISTEN);
 	release_sock(newsk);
 
 	lock_sock(ssk);
