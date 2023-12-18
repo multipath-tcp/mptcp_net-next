@@ -182,6 +182,30 @@ chk_msk_inuse()
 	__chk_nr get_msk_inuse $expected "$msg" 0
 }
 
+# $1: ns, $2: cestab nr
+chk_msk_cestab()
+{
+	local ns=$1
+	local cestab=$2
+	local count
+	local msg="....chk $2 cestab"
+	test_cnt=$((test_cnt+1))
+
+	printf "%-50s" "$msg"
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMPCurrEstab")
+	if [ -z "$count" ]; then
+		echo "[ skip ]"
+		mptcp_lib_result_skip "${msg}"
+	elif [ "$count" != "$cestab" ]; then
+		echo "[ fail ] got $count current establish[s] expected $cestab"
+		ret=${KSFT_FAIL}
+	else
+		echo "[  ok  ]"
+		mptcp_lib_result_pass "$msg"
+	fi
+}
+
 wait_connected()
 {
 	local listener_ns="${1}"
@@ -219,9 +243,11 @@ chk_msk_nr 2 "after MPC handshake "
 chk_msk_remote_key_nr 2 "....chk remote_key"
 chk_msk_fallback_nr 0 "....chk no fallback"
 chk_msk_inuse 2 "....chk 2 msk in use"
+chk_msk_cestab $ns 2
 flush_pids
 
 chk_msk_inuse 0 "....chk 0 msk in use after flush"
+chk_msk_cestab $ns 0
 
 echo "a" | \
 	timeout ${timeout_test} \
@@ -237,9 +263,11 @@ echo "b" | \
 wait_connected $ns 10001
 chk_msk_fallback_nr 1 "check fallback"
 chk_msk_inuse 1 "....chk 1 msk in use"
+chk_msk_cestab $ns 1
 flush_pids
 
 chk_msk_inuse 0 "....chk 0 msk in use after flush"
+chk_msk_cestab $ns 0
 
 NR_CLIENTS=100
 for I in `seq 1 $NR_CLIENTS`; do
@@ -261,9 +289,11 @@ done
 
 wait_msk_nr $((NR_CLIENTS*2)) "many msk socket present"
 chk_msk_inuse $((NR_CLIENTS*2)) "....chk many msk in use"
+chk_msk_cestab $ns 200
 flush_pids
 
 chk_msk_inuse 0 "....chk 0 msk in use after flush"
+chk_msk_cestab $ns 0
 
 mptcp_lib_result_print_all_tap
 exit $ret
