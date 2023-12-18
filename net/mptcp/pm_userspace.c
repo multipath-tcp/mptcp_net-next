@@ -550,3 +550,42 @@ set_flags_err:
 	sock_put(sk);
 	return ret;
 }
+
+int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
+				 struct netlink_callback *cb)
+{
+	const struct genl_info *info = genl_info_dump(cb);
+	struct net *net = sock_net(msg->sk);
+	struct mptcp_pm_addr_entry *entry;
+	struct mptcp_sock *msk;
+	int id = cb->args[0];
+	int ret = -EINVAL;
+
+	if (!info->attrs[MPTCP_PM_ATTR_TOKEN])
+		return ret;
+
+	msk = mptcp_token_get_sock(net, nla_get_u32(info->attrs[MPTCP_PM_ATTR_TOKEN]));
+	if (!msk)
+		return ret;
+
+	if (mptcp_pm_is_userspace(msk)) {
+		struct sock *sk = (struct sock *)msk;
+
+		lock_sock(sk);
+		spin_lock_bh(&msk->pm.lock);
+		list_for_each_entry(entry, &msk->pm.userspace_pm_local_addr_list, list) {
+			if (entry->addr.id <= id)
+				continue;
+
+			if (mptcp_pm_nl_put_entry_msg(msg, cb, entry))
+				break;
+
+			id = entry->addr.id;
+		}
+		spin_unlock_bh(&msk->pm.lock);
+		release_sock(sk);
+	}
+
+	cb->args[0] = id;
+	return msg->len;
+}
