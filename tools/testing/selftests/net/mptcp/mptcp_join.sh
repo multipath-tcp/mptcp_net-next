@@ -995,13 +995,14 @@ chk_cestab_nr()
 	fi
 }
 
+# $1 namespace 1, $2 namespace 2
 check_cestab()
 {
 	if [ -n "${cestab_ns1}" ]; then
-		chk_cestab_nr $1 1
+		chk_cestab_nr ${1} ${cestab_ns1}
 	fi
 	if [ -n "${cestab_ns2}" ]; then
-		chk_cestab_nr $2 1
+		chk_cestab_nr ${2} ${cestab_ns2}
 	fi
 }
 
