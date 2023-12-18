@@ -596,3 +596,26 @@ int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
 	cb->args[0] = id;
 	return msg->len;
 }
+
+int mptcp_userspace_pm_get_addr(struct net *net, struct genl_info *info,
+				u32 token, u8 id)
+{
+	struct mptcp_pm_addr_entry *entry;
+	struct mptcp_sock *msk;
+	int ret = -EINVAL;
+
+	msk = mptcp_token_get_sock(net, token);
+	if (!msk)
+		return ret;
+
+	if (!mptcp_pm_is_userspace(msk))
+		return ret;
+
+	entry = mptcp_userspace_pm_lookup_addr_by_id(msk, id);
+	if (!entry) {
+		GENL_SET_ERR_MSG(info, "address not found");
+		return ret;
+	}
+
+	return mptcp_pm_nl_put_entry_info(info, entry);
+}
