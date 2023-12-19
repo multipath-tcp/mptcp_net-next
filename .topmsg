@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@linux.dev>
-Subject: [PATCH] mailmap: add entries for Geliang Tang
-
-Map Geliang's old mail addresses to his @linux.dev one.
-
-Suggested-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
-Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
