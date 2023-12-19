@@ -1030,7 +1030,7 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 
 	lock_sock(newsk);
 	ssk = __mptcp_nmpc_sk(mptcp_sk(newsk));
-	inet_sk_state_store(newsk, TCP_LISTEN);
+	mptcp_set_state(newsk, TCP_LISTEN);
 	release_sock(newsk);
 	if (IS_ERR(ssk))
 		return PTR_ERR(ssk);
