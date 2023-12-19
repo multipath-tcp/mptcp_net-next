@@ -5,6 +5,7 @@ task:
   only_if: $CIRRUS_TAG != ''  ## only tags
   auto_cancellation: $CIRRUS_TAG == ''
   timeout_in: 120m
+  skip: true  ## we don't have enough resources for the moment
 
   container:
     image: mptcp/mptcp-upstream-virtme-docker:net
