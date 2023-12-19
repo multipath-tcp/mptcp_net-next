@@ -1253,6 +1253,32 @@ ice_handle_link_event(struct ice_pf *pf, struct ice_rq_event_info *event)
 }
 
 /**
+ * ice_get_fwlog_data - copy the FW log data from ARQ event
+ * @pf: PF that the FW log event is associated with
+ * @event: event structure containing FW log data
+ */
+static void
+ice_get_fwlog_data(struct ice_pf *pf, struct ice_rq_event_info *event)
+{
+	struct ice_fwlog_data *fwlog;
+	struct ice_hw *hw = &pf->hw;
+
+	fwlog = &hw->fwlog_ring.rings[hw->fwlog_ring.tail];
+
+	memset(fwlog->data, 0, PAGE_SIZE);
+	fwlog->data_size = le16_to_cpu(event->desc.datalen);
+
+	memcpy(fwlog->data, event->msg_buf, fwlog->data_size);
+	ice_fwlog_ring_increment(&hw->fwlog_ring.tail, hw->fwlog_ring.size);
+
+	if (ice_fwlog_ring_full(&hw->fwlog_ring)) {
+		/* the rings are full so bump the head to create room */
+		ice_fwlog_ring_increment(&hw->fwlog_ring.head,
+					 hw->fwlog_ring.size);
+	}
+}
+
+/**
  * ice_aq_prep_for_event - Prepare to wait for an AdminQ event from firmware
  * @pf: pointer to the PF private structure
  * @task: intermediate helper storage and identifier for waiting
@@ -1533,8 +1559,8 @@ static int __ice_clean_ctrlq(struct ice_pf *pf, enum ice_ctl_q q_type)
 
 			ice_vc_process_vf_msg(pf, &event, &data);
 			break;
-		case ice_aqc_opc_fw_logging:
-			ice_output_fw_log(hw, &event.desc, event.msg_buf);
+		case ice_aqc_opc_fw_logs_event:
+			ice_get_fwlog_data(pf, &event);
 			break;
 		case ice_aqc_opc_lldp_set_mib_change:
 			ice_dcb_process_lldp_set_mib_change(pf, &event);
@@ -3400,6 +3426,7 @@ static void ice_set_ops(struct ice_vsi *vsi)
 
 	netdev->netdev_ops = &ice_netdev_ops;
 	netdev->udp_tunnel_nic_info = &pf->hw.udp_tunnel_nic;
+	netdev->xdp_metadata_ops = &ice_xdp_md_ops;
 	ice_set_ethtool_ops(netdev);
 
 	if (vsi->type != ICE_VSI_PF)
@@ -4364,6 +4391,19 @@ static void ice_print_wake_reason(struct ice_pf *pf)
 }
 
 /**
+ * ice_pf_fwlog_update_module - update 1 module
+ * @pf: pointer to the PF struct
+ * @log_level: log_level to use for the @module
+ * @module: module to update
+ */
+void ice_pf_fwlog_update_module(struct ice_pf *pf, int log_level, int module)
+{
+	struct ice_hw *hw = &pf->hw;
+
+	hw->fwlog_cfg.module_entries[module].log_level = log_level;
+}
+
+/**
  * ice_register_netdev - register netdev
  * @vsi: pointer to the VSI struct
  */
@@ -5210,6 +5250,8 @@ static void ice_remove(struct pci_dev *pdev)
 		msleep(100);
 	}
 
+	ice_debugfs_exit();
+
 	if (test_bit(ICE_FLAG_SRIOV_ENA, pf->flags)) {
 		set_bit(ICE_VF_RESETS_DISABLED, pf->state);
 		ice_free_vfs(pf);
@@ -5681,6 +5723,8 @@ static int __init ice_module_init(void)
 		goto err_dest_wq;
 	}
 
+	ice_debugfs_init();
+
 	status = pci_register_driver(&ice_driver);
 	if (status) {
 		pr_err("failed to register PCI driver, err %d\n", status);
@@ -5691,6 +5735,7 @@ static int __init ice_module_init(void)
 
 err_dest_lag_wq:
 	destroy_workqueue(ice_lag_wq);
+	ice_debugfs_exit();
 err_dest_wq:
 	destroy_workqueue(ice_wq);
 	return status;
@@ -6050,6 +6095,23 @@ ice_fix_features(struct net_device *netdev, netdev_features_t features)
 }
 
 /**
+ * ice_set_rx_rings_vlan_proto - update rings with new stripped VLAN proto
+ * @vsi: PF's VSI
+ * @vlan_ethertype: VLAN ethertype (802.1Q or 802.1ad) in network byte order
+ *
+ * Store current stripped VLAN proto in ring packet context,
+ * so it can be accessed more efficiently by packet processing code.
+ */
+static void
+ice_set_rx_rings_vlan_proto(struct ice_vsi *vsi, __be16 vlan_ethertype)
+{
+	u16 i;
+
+	ice_for_each_alloc_rxq(vsi, i)
+		vsi->rx_rings[i]->pkt_ctx.vlan_proto = vlan_ethertype;
+}
+
+/**
  * ice_set_vlan_offload_features - set VLAN offload features for the PF VSI
  * @vsi: PF's VSI
  * @features: features used to determine VLAN offload settings
@@ -6090,6 +6152,9 @@ ice_set_vlan_offload_features(struct ice_vsi *vsi, netdev_features_t features)
 
 	if (strip_err || insert_err)
 		return -EIO;
+
+	ice_set_rx_rings_vlan_proto(vsi, enable_stripping ?
+				    htons(vlan_ethertype) : 0);
 
 	return 0;
 }
