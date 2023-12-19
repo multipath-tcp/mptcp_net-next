@@ -1,4 +1,11 @@
 From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/MAINTAINERS-add-Geliang-as-reviewer-for-MPTCP
+Subject: [PATCH] MAINTAINERS: add Geliang as reviewer for MPTCP
 
+For a long time now, Geliang has contributed to a lot of code and
+reviews related to MPTCP. So let's reflect that in the MAINTAINERS file.
+
+This should also encourage patch submitters to add him to the CC list.
+
+Acked-by: Geliang Tang <geliang.tang@linux.dev>
+Acked-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
