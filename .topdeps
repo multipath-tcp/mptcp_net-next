@@ -1,1 +1,1 @@
-t/MAINTAINERS-add-Geliang-as-reviewer-for-MPTCP
+t/mptcp-prevent-tcp-diag-from-closing-listener-subflows
