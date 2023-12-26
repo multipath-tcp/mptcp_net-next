@@ -118,7 +118,7 @@ static void setsockopt_checked(int sk, int optname, void *optval,
 		break;
 	default:
 		break;
-	};
+	}
 
 	__setsockopt_checked(sk, optname, false, optval, &len, err, cmd, tst);
 }
@@ -427,7 +427,7 @@ static void test_einval_del_key(void)
 
 	sk = prepare_defs(TCP_AO_DEL_KEY, &del);
 	del.set_current = 1;
-	setsockopt_checked(sk, TCP_AO_DEL_KEY, &del, ENOENT, "set non-exising current key");
+	setsockopt_checked(sk, TCP_AO_DEL_KEY, &del, ENOENT, "set non-existing current key");
 
 	sk = prepare_defs(TCP_AO_DEL_KEY, &del);
 	del.set_rnext = 1;
