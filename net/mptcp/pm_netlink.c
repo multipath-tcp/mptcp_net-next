@@ -949,7 +949,7 @@ static int mptcp_pm_nl_append_new_local_addr(struct pm_nl_pernet *pernet,
 		}
 	}
 
-	if (!entry->addr.id) {
+	if (!entry->addr.id && !(entry->flags & MPTCP_PM_ADDR_FLAG_SET_ID)) {
 find_next:
 		entry->addr.id = find_next_zero_bit(pernet->id_bitmap,
 						    MPTCP_PM_MAX_ADDR_ID + 1,
@@ -960,8 +960,11 @@ find_next:
 		}
 	}
 
-	if (!entry->addr.id)
+	if (!entry->addr.id && !(entry->flags & MPTCP_PM_ADDR_FLAG_SET_ID))
 		goto out;
+
+	if (entry->flags & MPTCP_PM_ADDR_FLAG_SET_ID)
+		entry->flags &= ~MPTCP_PM_ADDR_FLAG_SET_ID;
 
 	__set_bit(entry->addr.id, pernet->id_bitmap);
 	if (entry->addr.id > pernet->next_id)
