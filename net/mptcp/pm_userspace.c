@@ -41,8 +41,11 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 	spin_lock_bh(&msk->pm.lock);
 	list_for_each_entry(e, &msk->pm.userspace_pm_local_addr_list, list) {
 		addr_match = mptcp_addresses_equal(&e->addr, &entry->addr, true);
-		if (addr_match && entry->addr.id == 0)
+		if (addr_match && entry->addr.id == 0 &&
+		    !(entry->flags & MPTCP_PM_ADDR_FLAG_SET_ID))
 			entry->addr.id = e->addr.id;
+		else if (entry->flags & MPTCP_PM_ADDR_FLAG_SET_ID)
+			entry->flags &= ~MPTCP_PM_ADDR_FLAG_SET_ID;
 		id_match = (e->addr.id == entry->addr.id);
 		if (addr_match && id_match) {
 			match = e;
@@ -64,10 +67,12 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 		}
 
 		*e = *entry;
-		if (!e->addr.id)
+		if (!e->addr.id && !(e->flags & MPTCP_PM_ADDR_FLAG_SET_ID))
 			e->addr.id = find_next_zero_bit(id_bitmap,
 							MPTCP_PM_MAX_ADDR_ID + 1,
 							1);
+		else if (e->flags & MPTCP_PM_ADDR_FLAG_SET_ID)
+			e->flags &= ~MPTCP_PM_ADDR_FLAG_SET_ID;
 		list_add_tail_rcu(&e->list, &msk->pm.userspace_pm_local_addr_list);
 		msk->pm.local_addr_used++;
 		ret = e->addr.id;
