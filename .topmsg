@@ -1,4 +1,20 @@
-From: Matthieu Baerts <matttbe@kernel.org>
-Subject: [PATCH] t/net-sched-We-should-only-add-appropriate-qdiscs-blocks-to-ports-xarray
+From: Victor Nogueira <victor@mojatatu.com>
+Subject: [PATCH] net/sched: We should only add appropriate qdiscs blocks to ports' xarray
 
+We should only add qdiscs to the blocks ports' xarray in ingress that
+support ingress_block_set/get or in egress that support
+egress_block_set/get.
+
+Fixes: 913b47d3424e ("net/sched: Introduce tc block netdev tracking infra")
+Signed-off-by: Victor Nogueira <victor@mojatatu.com>
+Reviewed-by: Jamal Hadi Salim <jhs@mojatatu.com>
+Reported-by: Ido Schimmel <idosch@nvidia.com>
+Closes: https://lore.kernel.org/all/ZY1hBb8GFwycfgvd@shredder/
+Tested-by: Ido Schimmel <idosch@nvidia.com>
+Reported-and-tested-by: <syzbot+84339b9e7330daae4d66@syzkaller.appspotmail.com>
+Closes: https://lore.kernel.org/all/0000000000007c85f5060dcc3a28@google.com/
+Reported-and-tested-by: <syzbot+806b0572c8d06b66b234@syzkaller.appspotmail.com>
+Closes: https://lore.kernel.org/all/00000000000082f2f2060dcc3a92@google.com/
+Reported-and-tested-by: <syzbot+0039110f932d438130f9@syzkaller.appspotmail.com>
+Closes: https://lore.kernel.org/all/0000000000007fbc8c060dcc3a5c@google.com/
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
