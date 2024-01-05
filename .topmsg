@@ -1,20 +1,33 @@
-From: Victor Nogueira <victor@mojatatu.com>
-Subject: [PATCH] net/sched: We should only add appropriate qdiscs blocks to ports' xarray
+From: Jiri Pirko <jiri@nvidia.com>
+Subject: [PATCH] net: sched: move block device tracking into tcf_block_get/put_ext()
 
-We should only add qdiscs to the blocks ports' xarray in ingress that
-support ingress_block_set/get or in egress that support
-egress_block_set/get.
+Inserting the device to block xarray in qdisc_create() is not suitable
+place to do this. As it requires use of tcf_block() callback, it causes
+multiple issues. It is called for all qdisc types, which is incorrect.
+
+So, instead, move it to more suitable place, which is tcf_block_get_ext()
+and make sure it is only done for qdiscs that use block infrastructure
+and also only for blocks which are shared.
+
+Symmetrically, alter the cleanup path, move the xarray entry removal
+into tcf_block_put_ext().
 
 Fixes: 913b47d3424e ("net/sched: Introduce tc block netdev tracking infra")
-Signed-off-by: Victor Nogueira <victor@mojatatu.com>
-Reviewed-by: Jamal Hadi Salim <jhs@mojatatu.com>
 Reported-by: Ido Schimmel <idosch@nvidia.com>
 Closes: https://lore.kernel.org/all/ZY1hBb8GFwycfgvd@shredder/
-Tested-by: Ido Schimmel <idosch@nvidia.com>
+Reported-by: Kui-Feng Lee <sinquersw@gmail.com>
+Closes: https://lore.kernel.org/all/ce8d3e55-b8bc-409c-ace9-5cf1c4f7c88e@gmail.com/
 Reported-and-tested-by: <syzbot+84339b9e7330daae4d66@syzkaller.appspotmail.com>
 Closes: https://lore.kernel.org/all/0000000000007c85f5060dcc3a28@google.com/
 Reported-and-tested-by: <syzbot+806b0572c8d06b66b234@syzkaller.appspotmail.com>
 Closes: https://lore.kernel.org/all/00000000000082f2f2060dcc3a92@google.com/
 Reported-and-tested-by: <syzbot+0039110f932d438130f9@syzkaller.appspotmail.com>
 Closes: https://lore.kernel.org/all/0000000000007fbc8c060dcc3a5c@google.com/
-Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Jiri Pirko <jiri@nvidia.com>
+Reviewed-by: Jamal Hadi Salim <jhs@mojatatu.com>
+Acked-by: Jamal Hadi Salim <jhs@mojatatu.com>
+Reviewed-by: Victor Nogueira <victor@mojatatu.com>
+Tested-by: Victor Nogueira <victor@mojatatu.com>
+Tested-by: Ido Schimmel <idosch@nvidia.com>
+Link: https://lore.kernel.org/r/20240104125844.1522062-1-jiri@resnulli.us
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
