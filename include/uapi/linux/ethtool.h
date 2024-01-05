@@ -2002,6 +2002,7 @@ static inline int ethtool_validate_duplex(__u8 duplex)
  * be exploited to reduce the RSS queue spread.
  */
 #define	RXH_XFRM_SYM_XOR	(1 << 0)
+#define	RXH_XFRM_NO_CHANGE	0xff
 
 /* L2-L4 network traffic flow types */
 #define	TCP_V4_FLOW	0x01	/* hash or spec (tcp_ip4_spec) */
@@ -2219,20 +2220,4 @@ struct ethtool_link_settings {
 	 * __u32 map_lp_advertising[link_mode_masks_nwords];
 	 */
 };
-
-/**
- * enum phy_upstream - Represents the upstream component a given PHY device
- * is connected to, as in what is on the other end of the MII bus. Most PHYs
- * will be attached to an Ethernet MAC controller, but in some cases, there's
- * an intermediate PHY used as a media-converter, which will driver another
- * MII interface as its output.
- * @PHY_UPSTREAM_MAC: Upstream component is a MAC (a switch port,
- *		      or ethernet controller)
- * @PHY_UPSTREAM_PHY: Upstream component is a PHY (likely a media converter)
- */
-enum phy_upstream {
-	PHY_UPSTREAM_MAC,
-	PHY_UPSTREAM_PHY,
-};
-
 #endif /* _UAPI_LINUX_ETHTOOL_H */
