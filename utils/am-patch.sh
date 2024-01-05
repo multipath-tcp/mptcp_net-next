@@ -80,14 +80,19 @@ am_patch() {
 	am_files "${TMP_FILE}"
 }
 
-am_b4() {
+am_b4() { local opt
 	TMP_FILE=$(mktemp)
 
 	if [ "${1}" = "b4" ]; then
 		shift
 	fi
 
-	b4 am --prep-3way -o - --cherry-pick _ --add-link "${@}" > "${TMP_FILE}"
+	opt=(--prep-3way -o - --cherry-pick _)
+	if [ "${NO_SOB}" != "1" ]; then
+		opt+=(--add-link)
+	fi
+
+	b4 am "${opt[@]}" "${@}" > "${TMP_FILE}"
 
 	am_files "${TMP_FILE}"
 }
