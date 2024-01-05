@@ -973,32 +973,35 @@ static noinline_for_stack int ethtool_set_rxnfc(struct net_device *dev,
 						u32 cmd, void __user *useraddr)
 {
 	const struct ethtool_ops *ops = dev->ethtool_ops;
-	struct ethtool_rxfh_param rxfh = {};
 	struct ethtool_rxnfc info;
 	size_t info_size = sizeof(info);
 	int rc;
 
-	if (!ops->set_rxnfc || !ops->get_rxfh)
+	if (!ops->set_rxnfc)
 		return -EOPNOTSUPP;
 
 	rc = ethtool_rxnfc_copy_struct(cmd, &info, &info_size, useraddr);
 	if (rc)
 		return rc;
 
-	rc = ops->get_rxfh(dev, &rxfh);
-	if (rc)
-		return rc;
+	if (ops->get_rxfh) {
+		struct ethtool_rxfh_param rxfh = {};
 
-	/* Sanity check: if symmetric-xor is set, then:
-	 * 1 - no other fields besides IP src/dst and/or L4 src/dst
-	 * 2 - If src is set, dst must also be set
-	 */
-	if ((rxfh.input_xfrm & RXH_XFRM_SYM_XOR) &&
-	    ((info.data & ~(RXH_IP_SRC | RXH_IP_DST |
-			    RXH_L4_B_0_1 | RXH_L4_B_2_3)) ||
-	     (!!(info.data & RXH_IP_SRC) ^ !!(info.data & RXH_IP_DST)) ||
-	     (!!(info.data & RXH_L4_B_0_1) ^ !!(info.data & RXH_L4_B_2_3))))
-		return -EINVAL;
+		rc = ops->get_rxfh(dev, &rxfh);
+		if (rc)
+			return rc;
+
+		/* Sanity check: if symmetric-xor is set, then:
+		 * 1 - no other fields besides IP src/dst and/or L4 src/dst
+		 * 2 - If src is set, dst must also be set
+		 */
+		if ((rxfh.input_xfrm & RXH_XFRM_SYM_XOR) &&
+		    ((info.data & ~(RXH_IP_SRC | RXH_IP_DST |
+				    RXH_L4_B_0_1 | RXH_L4_B_2_3)) ||
+		     (!!(info.data & RXH_IP_SRC) ^ !!(info.data & RXH_IP_DST)) ||
+		     (!!(info.data & RXH_L4_B_0_1) ^ !!(info.data & RXH_L4_B_2_3))))
+			return -EINVAL;
+	}
 
 	rc = ops->set_rxnfc(dev, &info);
 	if (rc)
@@ -1252,6 +1255,11 @@ static noinline_for_stack int ethtool_get_rxfh(struct net_device *dev,
 			 &rxfh_dev.hfunc, sizeof(rxfh.hfunc))) {
 		ret = -EFAULT;
 	} else if (copy_to_user(useraddr +
+				offsetof(struct ethtool_rxfh, input_xfrm),
+				&rxfh_dev.input_xfrm,
+				sizeof(rxfh.input_xfrm))) {
+		ret = -EFAULT;
+	} else if (copy_to_user(useraddr +
 			      offsetof(struct ethtool_rxfh, rss_config[0]),
 			      rss_config, total_size)) {
 		ret = -EFAULT;
@@ -1299,14 +1307,16 @@ static noinline_for_stack int ethtool_set_rxfh(struct net_device *dev,
 		return -EOPNOTSUPP;
 
 	/* If either indir, hash key or function is valid, proceed further.
-	 * Must request at least one change: indir size, hash key or function.
+	 * Must request at least one change: indir size, hash key, function
+	 * or input transformation.
 	 */
 	if ((rxfh.indir_size &&
 	     rxfh.indir_size != ETH_RXFH_INDIR_NO_CHANGE &&
 	     rxfh.indir_size != dev_indir_size) ||
 	    (rxfh.key_size && (rxfh.key_size != dev_key_size)) ||
 	    (rxfh.indir_size == ETH_RXFH_INDIR_NO_CHANGE &&
-	     rxfh.key_size == 0 && rxfh.hfunc == ETH_RSS_HASH_NO_CHANGE))
+	     rxfh.key_size == 0 && rxfh.hfunc == ETH_RSS_HASH_NO_CHANGE &&
+	     rxfh.input_xfrm == RXH_XFRM_NO_CHANGE))
 		return -EINVAL;
 
 	if (rxfh.indir_size != ETH_RXFH_INDIR_NO_CHANGE)
