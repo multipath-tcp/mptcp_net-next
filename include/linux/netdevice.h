@@ -40,6 +40,7 @@
 #include <net/dcbnl.h>
 #endif
 #include <net/netprio_cgroup.h>
+
 #include <linux/netdev_features.h>
 #include <linux/neighbour.h>
 #include <uapi/linux/netdevice.h>
@@ -51,7 +52,6 @@
 #include <net/net_trackers.h>
 #include <net/net_debug.h>
 #include <net/dropreason-core.h>
-#include <linux/phy_link_topology_core.h>
 
 struct netpoll_info;
 struct device;
@@ -2047,7 +2047,6 @@ enum netdev_stat_type {
  *	@fcoe_ddp_xid:	Max exchange id for FCoE LRO by ddp
  *
  *	@priomap:	XXX: need comments on this one
- *	@link_topo:	Physical link topology tracking attached PHYs
  *	@phydev:	Physical device may attach itself
  *			for hardware timestamping
  *	@sfp_bus:	attached &struct sfp_bus structure.
@@ -2115,6 +2114,7 @@ struct net_device {
 	const struct net_device_ops *netdev_ops;
 	const struct header_ops *header_ops;
 	struct netdev_queue	*_tx;
+	netdev_features_t	gso_partial_features;
 	unsigned int		real_num_tx_queues;
 	unsigned int		gso_max_size;
 	unsigned int		gso_ipv4_max_size;
@@ -2149,6 +2149,7 @@ struct net_device {
 
 	/* RX read-mostly hotpath */
 	__cacheline_group_begin(net_device_read_rx);
+	struct bpf_prog __rcu	*xdp_prog;
 	struct list_head	ptype_specific;
 	int			ifindex;
 	unsigned int		real_num_rx_queues;
@@ -2211,7 +2212,6 @@ struct net_device {
 	netdev_features_t	vlan_features;
 	netdev_features_t	hw_enc_features;
 	netdev_features_t	mpls_features;
-	netdev_features_t	gso_partial_features;
 
 	unsigned int		min_mtu;
 	unsigned int		max_mtu;
@@ -2325,7 +2325,6 @@ struct net_device {
 	const unsigned char	*dev_addr;
 
 	unsigned int		num_rx_queues;
-	struct bpf_prog __rcu	*xdp_prog;
 #define GRO_LEGACY_MAX_SIZE	65536u
 /* TCP minimal MSS is 8 (TCP_MIN_GSO_SIZE),
  * and shinfo->gso_segs is a 16bit field.
@@ -2442,7 +2441,6 @@ struct net_device {
 #if IS_ENABLED(CONFIG_CGROUP_NET_PRIO)
 	struct netprio_map __rcu *priomap;
 #endif
-	struct phy_link_topology	link_topo;
 	struct phy_device	*phydev;
 	struct sfp_bus		*sfp_bus;
 	struct lock_class_key	*qdisc_tx_busylock;
