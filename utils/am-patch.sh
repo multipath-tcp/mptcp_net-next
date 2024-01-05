@@ -44,8 +44,10 @@ am_files() { local nb subject sha
 
 		print " - $(git rev-parse --short HEAD): \"squashed\"${nb}" \
 		      "in \"$(./.title.sh)\""
-		printinfo "trying signed-off"
-		./.signed-off.sh
+		if [ "${NO_SOB}" != "1" ]; then
+			printinfo "trying signed-off"
+			./.signed-off.sh
+		fi
 
 		bash "-${-}" ./.patch-file-accept.sh "${1}" "${sha}"
 		exit
