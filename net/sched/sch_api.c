@@ -1216,23 +1216,29 @@ static int qdisc_block_add_dev(struct Qdisc *sch, struct net_device *dev,
 	struct tcf_block *block;
 	int err;
 
-	block = cl_ops->tcf_block(sch, TC_H_MIN_INGRESS, NULL);
-	if (block) {
-		err = xa_insert(&block->ports, dev->ifindex, dev, GFP_KERNEL);
-		if (err) {
-			NL_SET_ERR_MSG(extack,
-				       "ingress block dev insert failed");
-			return err;
+	if (sch->ops->ingress_block_get) {
+		block = cl_ops->tcf_block(sch, TC_H_MIN_INGRESS, NULL);
+		if (block) {
+			err = xa_insert(&block->ports, dev->ifindex, dev,
+					GFP_KERNEL);
+			if (err) {
+				NL_SET_ERR_MSG(extack,
+					       "ingress block dev insert failed");
+				return err;
+			}
 		}
 	}
 
-	block = cl_ops->tcf_block(sch, TC_H_MIN_EGRESS, NULL);
-	if (block) {
-		err = xa_insert(&block->ports, dev->ifindex, dev, GFP_KERNEL);
-		if (err) {
-			NL_SET_ERR_MSG(extack,
-				       "Egress block dev insert failed");
-			goto err_out;
+	if (sch->ops->egress_block_get) {
+		block = cl_ops->tcf_block(sch, TC_H_MIN_EGRESS, NULL);
+		if (block) {
+			err = xa_insert(&block->ports, dev->ifindex, dev,
+					GFP_KERNEL);
+			if (err) {
+				NL_SET_ERR_MSG(extack,
+					       "Egress block dev insert failed");
+				goto err_out;
+			}
 		}
 	}
 
