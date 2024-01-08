@@ -1,4 +1,4 @@
-From: Geliang Tang <geliang.tang@suse.com>
+From: Geliang Tang <geliang.tang@linux.dev>
 Subject: [PATCH] selftests/bpf: Add bpf_rr test
 
 This patch adds the round-robin BPF MPTCP scheduler test: test_rr(). Use
@@ -9,4 +9,4 @@ bytes_sent of 'ss' output after it to make sure the data has been sent on
 both net devices.
 
 Reviewed-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
