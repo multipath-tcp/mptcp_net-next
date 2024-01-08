@@ -272,11 +272,9 @@ jobs:
           nickname: gh-tests-bot
           verbose: true
           message: |-
-            New Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
+            New Cirrus CI Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
             - ${{ steps.cirrus.outputs.ccl_0 }}: ${{ steps.cirrus.outputs.url_0 }}
             - ${{ steps.cirrus.outputs.ccl_1 }}: ${{ steps.cirrus.outputs.url_1 }}
-            - ${{ steps.cirrus.outputs.ccl_2 }}: ${{ steps.cirrus.outputs.url_2 }}
-            - ${{ steps.cirrus.outputs.ccl_3 }}: ${{ steps.cirrus.outputs.url_3 }}
 
       - name: get commit info
         if: startsWith(steps.tag.outputs.tag, 'patchew/')
@@ -327,7 +325,7 @@ jobs:
 
             Thank you for your modifications, that's great!
 
-            Our CI did some validations and here is its report:
+            Our CI (Cirrus) did some validations with a debug kernel and here is its report:
 
             - ${{ steps.cirrus.outputs.ccl_title_0 }}:
               - ${{ steps.cirrus.outputs.ccl_status_0 }}:
@@ -338,16 +336,6 @@ jobs:
               - ${{ steps.cirrus.outputs.ccl_status_1 }}:
               - Task: ${{ steps.cirrus.outputs.url_1 }}
               - Summary: ${{ steps.cirrus.outputs.sum_1 }}
-
-            - ${{ steps.cirrus.outputs.ccl_title_2 }}:
-              - ${{ steps.cirrus.outputs.ccl_status_2 }}:
-              - Task: ${{ steps.cirrus.outputs.url_2 }}
-              - Summary: ${{ steps.cirrus.outputs.sum_2 }}
-
-            - ${{ steps.cirrus.outputs.ccl_title_3 }}:
-              - ${{ steps.cirrus.outputs.ccl_status_3 }}:
-              - Task: ${{ steps.cirrus.outputs.url_3 }}
-              - Summary: ${{ steps.cirrus.outputs.sum_3 }}
 
             Initiator: ${{ steps.commit.outputs.committer }}
             Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
@@ -426,7 +414,5 @@ jobs:
 
           submit "${{ steps.cirrus.outputs.ccl_title_0 }}" "${{ steps.cirrus.outputs.ccl_status_0 }}" "${{ steps.cirrus.outputs.url_0 }}"
           submit "${{ steps.cirrus.outputs.ccl_title_1 }}" "${{ steps.cirrus.outputs.ccl_status_1 }}" "${{ steps.cirrus.outputs.url_1 }}"
-          submit "${{ steps.cirrus.outputs.ccl_title_2 }}" "${{ steps.cirrus.outputs.ccl_status_2 }}" "${{ steps.cirrus.outputs.url_2 }}"
-          submit "${{ steps.cirrus.outputs.ccl_title_3 }}" "${{ steps.cirrus.outputs.ccl_status_3 }}" "${{ steps.cirrus.outputs.url_3 }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
