@@ -1,4 +1,4 @@
-From: Geliang Tang <geliang.tang@suse.com>
+From: Geliang Tang <geliang.tang@linux.dev>
 Subject: [PATCH] selftests/bpf: Add bpf_first scheduler
 
 This patch implements the simplest MPTCP scheduler, named bpf_first,
@@ -7,4 +7,4 @@ MPTCP BPF scheduler implementations.
 
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
