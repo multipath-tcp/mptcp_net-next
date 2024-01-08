@@ -5,6 +5,7 @@ task:
   only_if: $CIRRUS_TAG != ''  ## only tags
   auto_cancellation: $CIRRUS_TAG == ''
   timeout_in: 120m
+  # skip: true  ## we don't have enough resources for the moment
 
   container:
     image: mptcp/mptcp-upstream-virtme-docker:latest
@@ -17,7 +18,7 @@ task:
     CIRRUS_LOG_TIMESTAMP: true  ## useful
     INPUT_CCACHE_MAXSIZE: 1G
     matrix:
-      MATRIX_JOB: normal
+      # MATRIX_JOB: normal  ## we don't have enough resources for the moment
       MATRIX_JOB: debug
     matrix:
       INPUT_RUN_TESTS_EXCEPT: selftest_mptcp_join
