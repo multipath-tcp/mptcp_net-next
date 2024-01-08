@@ -1,4 +1,4 @@
-From: Geliang Tang <geliang.tang@suse.com>
+From: Geliang Tang <geliang.tang@linux.dev>
 Subject: [PATCH] bpf: Add bpf_mptcp_sched_kfunc_set
 
 This patch adds a new struct btf_kfunc_id_set for MPTCP scheduler. Add
@@ -7,4 +7,4 @@ into this id_set, and register it in bpf_mptcp_kfunc_init() to make sure
 these helpers can be accessed from the BPF context.
 
 Reviewed-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Geliang Tang <geliang.tang@suse.com>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
