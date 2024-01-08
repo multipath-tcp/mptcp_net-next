@@ -147,6 +147,26 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 	return 0;
 }
 
+static int __bpf_mptcp_sched_get_subflow(struct mptcp_sock *msk,
+					 struct mptcp_sched_data *data)
+{
+	return 0;
+}
+
+static void __bpf_mptcp_sched_init(struct mptcp_sock *msk)
+{
+}
+
+static void __bpf_mptcp_sched_release(struct mptcp_sock *msk)
+{
+}
+
+static struct mptcp_sched_ops __bpf_mptcp_sched_ops = {
+	.get_subflow	= __bpf_mptcp_sched_get_subflow,
+	.init		= __bpf_mptcp_sched_init,
+	.release	= __bpf_mptcp_sched_release,
+};
+
 struct bpf_struct_ops bpf_mptcp_sched_ops = {
 	.verifier_ops	= &bpf_mptcp_sched_verifier_ops,
 	.reg		= bpf_mptcp_sched_reg,
@@ -155,6 +175,7 @@ struct bpf_struct_ops bpf_mptcp_sched_ops = {
 	.init_member	= bpf_mptcp_sched_init_member,
 	.init		= bpf_mptcp_sched_init,
 	.name		= "mptcp_sched_ops",
+	.cfi_stubs	= &__bpf_mptcp_sched_ops,
 };
 #endif /* CONFIG_BPF_JIT */
 
