@@ -1,0 +1,253 @@
+name: "MPTCP Upstream Tests Validation"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**'    # previous branches
+      - 't/**'           # TopGit tree
+      - 'net'            # part of the TopGit tree
+      - 'net-next'       # part of the TopGit tree
+      - 'for-review'     # part of the TopGit tree
+      - 'for-review-net' # part of the TopGit tree
+    tags:
+      - 'patchew/**'     # patchew is using tags
+      # ideally, we would take 'export/**' but the cache is per branch...
+      # In other words, when using tags, we can only use the cache if we re-tag.
+      # https://github.com/actions/cache/issues/556
+      # So we test the "export" branch and we try to find the tag later
+
+env:
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
+  PW: "https://patchwork.kernel.org/api/1.2"
+
+permissions: {}
+
+jobs:
+  tests:
+    name: "Tests (matrix)"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # matrix:
+      #   join: ['EXCEPT', 'ONLY']
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      - name: "Find base branch"
+        id: branch
+        run: |
+          if [ "$(cat .git_markup)" = "MPTCP-related modifications only needed for our tests suite (mptcp-net)." ]; then
+            echo "name=export-net" >> ${GITHUB_OUTPUT}
+          else
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          fi
+
+      - name: "Restore cache for CCache"
+        uses: actions/cache/restore@v3
+        id: restore-ccache
+        with:
+          path: ${{ github.workspace }}/.virtme/ccache
+          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
+
+      - name: "Tests"
+        uses: multipath-tcp/mptcp-upstream-virtme-docker@latest
+        with:
+          ccache_maxsize: 500M ## 10GB = project limit
+          mode: auto-normal
+          # extra_env: INPUT_RUN_TESTS_${{ matrix.join }}=selftest_mptcp_join
+
+      - name: "Artifacts (always)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: |
+            conclusion.txt
+            summary.txt
+            *.tap
+            config.zstd
+            *.tap.xml
+
+      - name: "Artifacts (failure)"
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-info
+          path: |
+            vmlinux.zstd
+            kmemleak.txt
+
+      - name: "Save cache for CCache"
+        if: always() && (github.ref_name == 'export' || github.ref_name == 'export-net')
+        uses: actions/cache/save@v3
+        with:
+          path: ${{ github.workspace }}/.virtme/ccache
+          key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
+
+  notif:
+    name: "Notifications"
+    needs: tests
+    # only for the official repo (patchew)
+    if: always() && github.repository_owner == 'multipath-tcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: results
+
+      - name: get test info
+        id: test
+        run: |
+          echo "ccl=$(cat conclusion.txt)" >> ${GITHUB_OUTPUT}
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
+          echo "ccl_title=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
+          echo "ccl_status=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+
+      - name: irc tests
+        if: github.ref_name == 'export' || github.ref_name == 'export-net'
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tests-bot
+          verbose: true
+          message: |-
+            New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended:
+            - ${{ steps.test.outputs.ccl }}: ${{ steps.test.outputs.url }}
+
+      - name: get commit info
+        id: commit
+        run: |
+          cat <<'EOF' > commit.json
+          ${{ toJSON(github.event.head_commit) }}
+          EOF
+
+          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
+          echo "Found message ID: '${TAG}' '${MID}'"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
+
+          # TODO: reply to the cover-letter: query lore.
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+          echo "Found subject: '${SUBJECT}'"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
+
+          NAME=$(jq -r '.author.name' commit.json)
+          EMAIL=$(jq -r '.author.email' commit.json)
+          echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
+          echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
+
+          SHA="${{ github.event.check_suite.head_sha }}"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
+
+      - name: send email
+        if: startswith(github.ref, 'refs/tags/patchew/')
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
+          body: |
+            Hi ${{ github.event.head_commit.author.name }},
+
+            Thank you for your modifications, that's great!
+
+            Our CI (GitHub Action) did some validations and here is its report:
+
+            - ${{ steps.test.outputs.ccl_title }}:
+              - ${{ steps.test.outputs.ccl_status }}:
+              - Task: ${{ steps.test.outputs.url }}
+
+            Initiator: ${{ steps.commit.outputs.committer }}
+            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+
+
+            If there are some issues, you can reproduce them using the same environment as
+            the one used by the CI thanks to a docker image, e.g.:
+
+                $ cd [kernel source code]
+                $ docker run -v "${PWD}:${PWD}:rw" -w "${PWD}" --privileged --rm -it \
+                    --pull always mptcp/mptcp-upstream-virtme-docker:latest \
+                    auto-normal
+
+            For more details:
+
+                https://github.com/multipath-tcp/mptcp-upstream-virtme-docker
+
+
+            Please note that despite all the efforts that have been already done to have a
+            stable tests suite when executed on a public CI like here, it is possible some
+            reported issues are not due to your modifications. Still, do not hesitate to
+            help us improve that ;-)
+
+            Cheers,
+            MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (NGI0 Core)
+
+      - name: set patchwork check
+        if: startswith(github.ref, 'refs/tags/patchew/')
+        run: |
+          CHECK_URLS=()
+          set_url() { local series_url
+            series_url=$(curl ${CURL_OPT} "${URL}" | jq -r 'last(last(.[].series)[].url)')
+            if [ -z "${series_url}" ] || [ "${series_url}" = "null" ]; then
+              echo "Series not found: '${series_url}' '${URL}'"
+              return 1
+            fi
+
+            echo "Found Series: '${series_url}'"
+
+            readarray -t CHECK_URLS < <(curl ${CURL_OPT} "${series_url}" | jq -r '.patches[].url + "checks/"')
+          }
+
+          # $1: title, $2: status, $3: url
+          submit() { local check_url
+            if [[ "${2}" == "Success"* ]]; then
+              STATE="success"
+            elif [[ "${2}" == "Unstable"* ]]; then
+              STATE="warning"
+            else
+              STATE="fail"
+            fi
+
+            for check_url in "${CHECK_URLS[@]}"; do
+              curl ${CURL_OPT} \
+                -X POST \
+                -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+                -F "state=${STATE}" \
+                -F "target_url=${3}" \
+                -F "context=${1//[ :()]/_}" \
+                -F "description=${2}" \
+                "${check_url}" | jq '.'
+            done
+          }
+
+          for i in $(seq 30); do # patches can take a bit of time to appear
+            set_url && break
+            sleep 1m
+          done
+
+          if [ "${#CHECK_URLS[@]}" -eq 0 ]; then
+            echo "Error: didn't find any URLs after ${i} attempts"
+            exit 1
+          fi
+          echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
+
+          submit "${{ steps.test.outputs.ccl_title }}" "${{ steps.test.outputs.ccl_status }}" "${{ steps.test.outputs.url }}"
+        env:
+          URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
