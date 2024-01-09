@@ -99,7 +99,7 @@ jobs:
     if: always() && github.repository_owner == 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: results
 
@@ -125,12 +125,14 @@ jobs:
 
       - name: get commit info
         id: commit
+        if: startswith(github.ref, 'refs/tags/patchew/')
         run: |
           cat <<'EOF' > commit.json
           ${{ toJSON(github.event.head_commit) }}
           EOF
 
-          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1)
+          # ignore error, just in case the MID has not been added by the author
+          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
           echo "Found message ID: '${TAG}' '${MID}'"
           echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
 
@@ -145,8 +147,7 @@ jobs:
           echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
           echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
 
-          SHA="${{ github.event.check_suite.head_sha }}"
-          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
+          echo "sha=${GITHUB_SHA:0:12}" >> ${GITHUB_OUTPUT}
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
