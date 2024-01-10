@@ -106,7 +106,8 @@ jobs:
       - name: get test info
         id: test
         run: |
-          echo "ccl=$(cat conclusion.txt)" >> ${GITHUB_OUTPUT}
+          ccl="$(cat conclusion.txt)"
+          echo "ccl=${ccl}" >> ${GITHUB_OUTPUT}
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
           echo "ccl_title=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
           echo "ccl_status=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
@@ -147,7 +148,13 @@ jobs:
           echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
           echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
 
-          echo "sha=${GITHUB_SHA:0:12}" >> ${GITHUB_OUTPUT}
+          SHA=$(jq -r '.id' commit.json)
+          echo "Found SHA: '${SHA}' ('${SHA:0:12}')"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
+
+          COMMITTER=$(jq -r '.committer.name' commit.json)
+          echo "Found committer: '${COMMITTER}'"
+          echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
@@ -164,7 +171,7 @@ jobs:
           in_reply_to: "<${{ steps.commit.outputs.mid }}>"
           subject: "Re: ${{ steps.commit.outputs.subject }}: Tests Results"
           body: |
-            Hi ${{ github.event.head_commit.author.name }},
+            Hi ${{ steps.commit.outputs.name }},
 
             Thank you for your modifications, that's great!
 
@@ -175,7 +182,7 @@ jobs:
               - Task: ${{ steps.test.outputs.url }}
 
             Initiator: ${{ steps.commit.outputs.committer }}
-            Commits: https://github.com/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+            Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
 
             If there are some issues, you can reproduce them using the same environment as
