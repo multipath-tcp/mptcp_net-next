@@ -377,7 +377,7 @@ Martin Kepplinger <martink@posteo.de> <martin.kepplinger@ginzinger.com>
 Martin Kepplinger <martink@posteo.de> <martin.kepplinger@puri.sm>
 Martin Kepplinger <martink@posteo.de> <martin.kepplinger@theobroma-systems.com>
 Martyna Szapar-Mudlaw <martyna.szapar-mudlaw@linux.intel.com> <martyna.szapar-mudlaw@intel.com>
-Mathieu Othacehe <m.othacehe@gmail.com>
+Mathieu Othacehe <m.othacehe@gmail.com> <othacehe@gnu.org>
 Mat Martineau <martineau@kernel.org> <mathew.j.martineau@linux.intel.com>
 Mat Martineau <martineau@kernel.org> <mathewm@codeaurora.org>
 Matthew Wilcox <willy@infradead.org> <matthew.r.wilcox@intel.com>
@@ -478,6 +478,8 @@ Paul E. McKenney <paulmck@kernel.org> <paulmck@linux.vnet.ibm.com>
 Paul E. McKenney <paulmck@kernel.org> <paulmck@us.ibm.com>
 Paul Mackerras <paulus@ozlabs.org> <paulus@samba.org>
 Paul Mackerras <paulus@ozlabs.org> <paulus@au1.ibm.com>
+Paul Moore <paul@paul-moore.com> <paul.moore@hp.com>
+Paul Moore <paul@paul-moore.com> <pmoore@redhat.com>
 Pavankumar Kondeti <quic_pkondeti@quicinc.com> <pkondeti@codeaurora.org>
 Peter A Jonsson <pj@ludd.ltu.se>
 Peter Oruba <peter.oruba@amd.com>
@@ -542,6 +544,8 @@ Sebastian Reichel <sre@kernel.org> <sebastian.reichel@collabora.co.uk>
 Sebastian Reichel <sre@kernel.org> <sre@debian.org>
 Sedat Dilek <sedat.dilek@gmail.com> <sedat.dilek@credativ.de>
 Senthilkumar N L <quic_snlakshm@quicinc.com> <snlakshm@codeaurora.org>
+Serge Hallyn <sergeh@kernel.org> <serge.hallyn@canonical.com>
+Serge Hallyn <sergeh@kernel.org> <serue@us.ibm.com>
 Seth Forshee <sforshee@kernel.org> <seth.forshee@canonical.com>
 Shannon Nelson <shannon.nelson@amd.com> <snelson@pensando.io>
 Shannon Nelson <shannon.nelson@amd.com> <shannon.nelson@intel.com>
@@ -604,6 +608,9 @@ Uwe Kleine-König <u.kleine-koenig@pengutronix.de>
 Uwe Kleine-König <ukleinek@strlen.de>
 Uwe Kleine-König <ukl@pengutronix.de>
 Uwe Kleine-König <Uwe.Kleine-Koenig@digi.com>
+Vadim Fedorenko <vadim.fedorenko@linux.dev> <vadfed@fb.com>
+Vadim Fedorenko <vadim.fedorenko@linux.dev> <vadfed@meta.com>
+Vadim Fedorenko <vadim.fedorenko@linux.dev> <vfedorenko@novek.ru>
 Valdis Kletnieks <Valdis.Kletnieks@vt.edu>
 Vara Reddy <quic_varar@quicinc.com> <varar@codeaurora.org>
 Varadarajan Narayanan <quic_varada@quicinc.com> <varada@codeaurora.org>
@@ -638,4 +645,5 @@ Wolfram Sang <wsa@kernel.org> <w.sang@pengutronix.de>
 Wolfram Sang <wsa@kernel.org> <wsa@the-dreams.de>
 Yakir Yang <kuankuan.y@gmail.com> <ykk@rock-chips.com>
 Yusuke Goda <goda.yusuke@renesas.com>
+Zack Rusin <zack.rusin@broadcom.com> <zackr@vmware.com>
 Zhu Yanjun <zyjzyj2000@gmail.com> <yanjunz@nvidia.com>

@@ -115,6 +115,8 @@ available subsections can be seen below.
    hte/index
    wmi
    dpll
+   wbrf
+   crypto/index
 
 .. only::  subproject and html
 
