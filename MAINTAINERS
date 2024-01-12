@@ -3339,13 +3339,17 @@ M:	Eric Paris <eparis@redhat.com>
 L:	audit@vger.kernel.org
 S:	Supported
 W:	https://github.com/linux-audit
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/audit.git
+Q:	https://patchwork.kernel.org/project/audit/list
+B:	mailto:audit@vger.kernel.org
+P:	https://github.com/linux-audit/audit-kernel/blob/main/README.md
+T:	git https://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/audit.git
 F:	include/asm-generic/audit_*.h
 F:	include/linux/audit.h
 F:	include/linux/audit_arch.h
 F:	include/uapi/linux/audit.h
 F:	kernel/audit*
 F:	lib/*audit.c
+K:	\baudit_[a-z_0-9]\+\b
 
 AUXILIARY BUS DRIVER
 M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
@@ -3372,9 +3376,8 @@ F:	Documentation/devicetree/bindings/iio/adc/avia-hx711.yaml
 F:	drivers/iio/adc/hx711.c
 
 AX.25 NETWORK LAYER
-M:	Ralf Baechle <ralf@linux-mips.org>
 L:	linux-hams@vger.kernel.org
-S:	Maintained
+S:	Orphan
 W:	https://linux-ax25.in-berlin.de
 F:	include/net/ax25.h
 F:	include/uapi/linux/ax25.h
@@ -3403,6 +3406,16 @@ S:	Supported
 W:	https://ez.analog.com/linux-software-drivers
 F:	Documentation/devicetree/bindings/hwmon/adi,axi-fan-control.yaml
 F:	drivers/hwmon/axi-fan-control.c
+
+AXI SPI ENGINE
+M:	Michael Hennerich <michael.hennerich@analog.com>
+M:	Nuno Sá <nuno.sa@analog.com>
+R:	David Lechner <dlechner@baylibre.com>
+L:	linux-spi@vger.kernel.org
+S:	Supported
+W:	https://ez.analog.com/linux-software-drivers
+F:	Documentation/devicetree/bindings/spi/adi,axi-spi-engine.yaml
+F:	drivers/spi/spi-axi-spi-engine.c
 
 AXXIA I2C CONTROLLER
 M:	Krzysztof Adamski <krzysztof.adamski@nokia.com>
@@ -3488,7 +3501,7 @@ F:	drivers/net/hamradio/baycom*
 
 BCACHE (BLOCK LAYER CACHE)
 M:	Coly Li <colyli@suse.de>
-M:	Kent Overstreet <kent.overstreet@gmail.com>
+M:	Kent Overstreet <kent.overstreet@linux.dev>
 L:	linux-bcache@vger.kernel.org
 S:	Maintained
 W:	http://bcache.evilpiepirate.org
@@ -3595,7 +3608,6 @@ F:	drivers/mtd/devices/block2mtd.c
 
 BLUETOOTH DRIVERS
 M:	Marcel Holtmann <marcel@holtmann.org>
-M:	Johan Hedberg <johan.hedberg@gmail.com>
 M:	Luiz Augusto von Dentz <luiz.dentz@gmail.com>
 L:	linux-bluetooth@vger.kernel.org
 S:	Supported
@@ -4683,11 +4695,8 @@ F:	drivers/i2c/busses/i2c-octeon*
 F:	drivers/i2c/busses/i2c-thunderx*
 
 CAVIUM LIQUIDIO NETWORK DRIVER
-M:	Derek Chickles <dchickles@marvell.com>
-M:	Satanand Burla <sburla@marvell.com>
-M:	Felix Manlunas <fmanlunas@marvell.com>
 L:	netdev@vger.kernel.org
-S:	Supported
+S:	Orphan
 W:	http://www.marvell.com
 F:	drivers/net/ethernet/cavium/liquidio/
 
@@ -5339,6 +5348,7 @@ L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/memcontrol.c
 F:	mm/swap_cgroup.c
+F:	samples/cgroup/*
 F:	tools/testing/selftests/cgroup/memcg_protection.m
 F:	tools/testing/selftests/cgroup/test_hugetlb_memcg.c
 F:	tools/testing/selftests/cgroup/test_kmem.c
@@ -5522,6 +5532,12 @@ F:	drivers/crypto/
 F:	include/crypto/
 F:	include/linux/crypto*
 F:	lib/crypto/
+
+CRYPTO SPEED TEST COMPARE
+M:	Wang Jinchao <wangjinchao@xfusion.com>
+L:	linux-crypto@vger.kernel.org
+S:	Maintained
+F:	tools/crypto/tcrypt/tcrypt_speed_compare.py
 
 CRYPTOGRAPHIC RANDOM NUMBER GENERATOR
 M:	Neil Horman <nhorman@tuxdriver.com>
@@ -6901,8 +6917,8 @@ T:	git git://anongit.freedesktop.org/drm/drm-misc
 F:	drivers/gpu/drm/vboxvideo/
 
 DRM DRIVER FOR VMWARE VIRTUAL GPU
-M:	Zack Rusin <zackr@vmware.com>
-R:	VMware Graphics Reviewers <linux-graphics-maintainer@vmware.com>
+M:	Zack Rusin <zack.rusin@broadcom.com>
+R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 L:	dri-devel@lists.freedesktop.org
 S:	Supported
 T:	git git://anongit.freedesktop.org/drm/drm-misc
@@ -7933,6 +7949,7 @@ F:	include/uapi/linux/ext4.h
 
 Extended Verification Module (EVM)
 M:	Mimi Zohar <zohar@linux.ibm.com>
+M:	Roberto Sassu <roberto.sassu@huawei.com>
 L:	linux-integrity@vger.kernel.org
 S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
@@ -8111,6 +8128,7 @@ F:	include/trace/events/fs_dax.h
 FILESYSTEMS (VFS and infrastructure)
 M:	Alexander Viro <viro@zeniv.linux.org.uk>
 M:	Christian Brauner <brauner@kernel.org>
+R:	Jan Kara <jack@suse.cz>
 L:	linux-fsdevel@vger.kernel.org
 S:	Maintained
 F:	fs/*
@@ -8131,6 +8149,16 @@ F:	fs/exportfs/
 F:	fs/fhandle.c
 F:	include/linux/exportfs.h
 
+FILESYSTEMS [IDMAPPED MOUNTS]
+M:	Christian Brauner <brauner@kernel.org>
+M:	Seth Forshee <sforshee@kernel.org>
+L:	linux-fsdevel@vger.kernel.org
+S:	Maintained
+F:	Documentation/filesystems/idmappings.rst
+F:	fs/mnt_idmapping.c
+F:	include/linux/mnt_idmapping.*
+F:	tools/testing/selftests/mount_setattr/
+
 FILESYSTEMS [IOMAP]
 M:	Christian Brauner <brauner@kernel.org>
 R:	Darrick J. Wong <djwong@kernel.org>
@@ -8139,6 +8167,15 @@ L:	linux-fsdevel@vger.kernel.org
 S:	Supported
 F:	fs/iomap/
 F:	include/linux/iomap.h
+
+FILESYSTEMS [STACKABLE]
+M:	Miklos Szeredi <miklos@szeredi.hu>
+M:	Amir Goldstein <amir73il@gmail.com>
+L:	linux-fsdevel@vger.kernel.org
+L:	linux-unionfs@vger.kernel.org
+S:	Maintained
+F:	fs/backing-file.c
+F:	include/linux/backing-file.h
 
 FINTEK F75375S HARDWARE MONITOR AND FAN CONTROLLER DRIVER
 M:	Riku Voipio <riku.voipio@iki.fi>
@@ -8998,7 +9035,7 @@ F:	drivers/gpio/gpio-mockup.c
 F:	tools/testing/selftests/gpio/
 
 GPIO REGMAP
-M:	Michael Walle <michael@walle.cc>
+M:	Michael Walle <mwalle@kernel.org>
 S:	Maintained
 F:	drivers/gpio/gpio-regmap.c
 F:	include/linux/gpio/regmap.h
@@ -9270,7 +9307,6 @@ F:	drivers/char/hw_random/
 F:	include/linux/hw_random.h
 
 HARDWARE SPINLOCK CORE
-M:	Ohad Ben-Cohen <ohad@wizery.com>
 M:	Bjorn Andersson <andersson@kernel.org>
 R:	Baolin Wang <baolin.wang7@gmail.com>
 L:	linux-remoteproc@vger.kernel.org
@@ -9499,6 +9535,7 @@ F:	Documentation/devicetree/bindings/gpio/hisilicon,ascend910-gpio.yaml
 F:	drivers/gpio/gpio-hisi.c
 
 HISILICON HIGH PERFORMANCE RSA ENGINE DRIVER (HPRE)
+M:	Zhiqi Song <songzhiqi1@huawei.com>
 M:	Longfang Liu <liulongfang@huawei.com>
 L:	linux-crypto@vger.kernel.org
 S:	Maintained
@@ -9601,7 +9638,6 @@ F:	Documentation/devicetree/bindings/scsi/hisilicon-sas.txt
 F:	drivers/scsi/hisi_sas/
 
 HISILICON SECURITY ENGINE V2 DRIVER (SEC2)
-M:	Kai Ye <yekai13@huawei.com>
 M:	Longfang Liu <liulongfang@huawei.com>
 L:	linux-crypto@vger.kernel.org
 S:	Maintained
@@ -9770,7 +9806,6 @@ F:	Documentation/networking/device_drivers/ethernet/huawei/hinic.rst
 F:	drivers/net/ethernet/huawei/hinic/
 
 HUGETLB SUBSYSTEM
-M:	Mike Kravetz <mike.kravetz@oracle.com>
 M:	Muchun Song <muchun.song@linux.dev>
 L:	linux-mm@kvack.org
 S:	Maintained
@@ -9794,8 +9829,8 @@ T:	git git://linuxtv.org/media_tree.git
 F:	drivers/media/platform/st/sti/hva
 
 HWPOISON MEMORY FAILURE HANDLING
-M:	Naoya Horiguchi <naoya.horiguchi@nec.com>
-R:	Miaohe Lin <linmiaohe@huawei.com>
+M:	Miaohe Lin <linmiaohe@huawei.com>
+R:	Naoya Horiguchi <naoya.horiguchi@nec.com>
 L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/hwpoison-inject.c
@@ -10120,7 +10155,6 @@ IBM Power SRIOV Virtual NIC Device Driver
 M:	Haren Myneni <haren@linux.ibm.com>
 M:	Rick Lindsley <ricklind@linux.ibm.com>
 R:	Nick Child <nnac123@linux.ibm.com>
-R:	Dany Madden <danymadden@us.ibm.com>
 R:	Thomas Falcon <tlfalcon@linux.ibm.com>
 L:	netdev@vger.kernel.org
 S:	Supported
@@ -10205,16 +10239,6 @@ L:	linux-input@vger.kernel.org
 S:	Maintained
 W:	https://github.com/o2genum/ideapad-slidebar
 F:	drivers/input/misc/ideapad_slidebar.c
-
-IDMAPPED MOUNTS
-M:	Christian Brauner <brauner@kernel.org>
-M:	Seth Forshee <sforshee@kernel.org>
-L:	linux-fsdevel@vger.kernel.org
-S:	Maintained
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/vfs/idmapping.git
-F:	Documentation/filesystems/idmappings.rst
-F:	include/linux/mnt_idmapping.*
-F:	tools/testing/selftests/mount_setattr/
 
 IDT VersaClock 5 CLOCK DRIVER
 M:	Luca Ceresoli <luca@lucaceresoli.net>
@@ -10508,7 +10532,9 @@ F:	drivers/crypto/inside-secure/
 
 INTEGRITY MEASUREMENT ARCHITECTURE (IMA)
 M:	Mimi Zohar <zohar@linux.ibm.com>
+M:	Roberto Sassu <roberto.sassu@huawei.com>
 M:	Dmitry Kasatkin <dmitry.kasatkin@gmail.com>
+R:	Eric Snowberg <eric.snowberg@oracle.com>
 L:	linux-integrity@vger.kernel.org
 S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/zohar/linux-integrity.git
@@ -10673,6 +10699,13 @@ L:	dmaengine@vger.kernel.org
 S:	Supported
 Q:	https://patchwork.kernel.org/project/linux-dmaengine/list/
 F:	drivers/dma/ioat*
+
+INTEL IAA CRYPTO DRIVER
+M:	Tom Zanussi <tom.zanussi@linux.intel.com>
+L:	linux-crypto@vger.kernel.org
+S:	Supported
+F:	Documentation/driver-api/crypto/iaa/iaa-crypto.rst
+F:	drivers/crypto/intel/iaa/*
 
 INTEL IDLE DRIVER
 M:	Jacob Pan <jacob.jun.pan@linux.intel.com>
@@ -12255,21 +12288,21 @@ S:	Orphan
 F:	arch/powerpc/platforms/40x/
 F:	arch/powerpc/platforms/44x/
 
-LINUX FOR POWERPC EMBEDDED PPC83XX AND PPC85XX
+LINUX FOR POWERPC EMBEDDED PPC85XX
 M:	Scott Wood <oss@buserror.net>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Odd fixes
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/scottwood/linux.git
 F:	Documentation/devicetree/bindings/cache/freescale-l2cache.txt
 F:	Documentation/devicetree/bindings/powerpc/fsl/
-F:	arch/powerpc/platforms/83xx/
 F:	arch/powerpc/platforms/85xx/
 
-LINUX FOR POWERPC EMBEDDED PPC8XX
+LINUX FOR POWERPC EMBEDDED PPC8XX AND PPC83XX
 M:	Christophe Leroy <christophe.leroy@csgroup.eu>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Maintained
 F:	arch/powerpc/platforms/8xx/
+F:	arch/powerpc/platforms/83xx/
 
 LINUX KERNEL DUMP TEST MODULE (LKDTM)
 M:	Kees Cook <keescook@chromium.org>
@@ -12416,6 +12449,12 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/har
 F:	Documentation/admin-guide/LSM/LoadPin.rst
 F:	security/loadpin/
 
+LOCKDOWN SECURITY MODULE
+L:	linux-security-module@vger.kernel.org
+S:	Odd Fixes
+T:	git https://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/lsm.git
+F:	security/lockdown/
+
 LOCKING PRIMITIVES
 M:	Peter Zijlstra <peterz@infradead.org>
 M:	Ingo Molnar <mingo@redhat.com>
@@ -12427,7 +12466,7 @@ S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git locking/core
 F:	Documentation/locking/
 F:	arch/*/include/asm/spinlock*.h
-F:	include/linux/lockdep.h
+F:	include/linux/lockdep*.h
 F:	include/linux/mutex*.h
 F:	include/linux/rwlock*.h
 F:	include/linux/rwsem*.h
@@ -12830,9 +12869,8 @@ S:	Maintained
 F:	drivers/thermal/armada_thermal.c
 
 MARVELL MVNETA ETHERNET DRIVER
-M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 L:	netdev@vger.kernel.org
-S:	Maintained
+S:	Orphan
 F:	drivers/net/ethernet/marvell/mvneta.*
 
 MARVELL MVPP2 ETHERNET DRIVER
@@ -13464,7 +13502,6 @@ F:	drivers/dma/mediatek/
 
 MEDIATEK ETHERNET DRIVER
 M:	Felix Fietkau <nbd@nbd.name>
-M:	John Crispin <john@phrozen.org>
 M:	Sean Wang <sean.wang@mediatek.com>
 M:	Mark Lee <Mark-MC.Lee@mediatek.com>
 M:	Lorenzo Bianconi <lorenzo@kernel.org>
@@ -13620,7 +13657,6 @@ F:	include/soc/mediatek/smi.h
 MEDIATEK SWITCH DRIVER
 M:	Arınç ÜNAL <arinc.unal@arinc9.com>
 M:	Daniel Golle <daniel@makrotopia.org>
-M:	Landen Chao <Landen.Chao@mediatek.com>
 M:	DENG Qingfang <dqfext@gmail.com>
 M:	Sean Wang <sean.wang@mediatek.com>
 L:	netdev@vger.kernel.org
@@ -15721,9 +15757,8 @@ F:	Documentation/devicetree/bindings/gpio/ti,omap-gpio.yaml
 F:	drivers/gpio/gpio-omap.c
 
 OMAP HARDWARE SPINLOCK SUPPORT
-M:	Ohad Ben-Cohen <ohad@wizery.com>
 L:	linux-omap@vger.kernel.org
-S:	Maintained
+S:	Orphan
 F:	drivers/hwspinlock/omap_hwspinlock.c
 
 OMAP HS MMC SUPPORT
@@ -17377,7 +17412,7 @@ F:	tools/testing/selftests/proc/
 PROC SYSCTL
 M:	Luis Chamberlain <mcgrof@kernel.org>
 M:	Kees Cook <keescook@chromium.org>
-M:	Iurii Zaikin <yzaikin@google.com>
+M:	Joel Granados <j.granados@samsung.com>
 L:	linux-kernel@vger.kernel.org
 L:	linux-fsdevel@vger.kernel.org
 S:	Maintained
@@ -19447,22 +19482,29 @@ SECURITY SUBSYSTEM
 M:	Paul Moore <paul@paul-moore.com>
 M:	James Morris <jmorris@namei.org>
 M:	"Serge E. Hallyn" <serge@hallyn.com>
-L:	linux-security-module@vger.kernel.org (suggested Cc:)
+L:	linux-security-module@vger.kernel.org
 S:	Supported
-W:	http://kernsec.org/
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/lsm.git
+Q:	https://patchwork.kernel.org/project/linux-security-module/list
+B:	mailto:linux-security-module@vger.kernel.org
+P:	https://github.com/LinuxSecurityModule/kernel/blob/main/README.md
+T:	git https://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/lsm.git
+F:	include/uapi/linux/lsm.h
 F:	security/
+F:	tools/testing/selftests/lsm/
 X:	security/selinux/
+K:	\bsecurity_[a-z_0-9]\+\b
 
 SELINUX SECURITY MODULE
 M:	Paul Moore <paul@paul-moore.com>
 M:	Stephen Smalley <stephen.smalley.work@gmail.com>
-M:	Eric Paris <eparis@parisplace.org>
+R:	Ondrej Mosnacek <omosnace@redhat.com>
 L:	selinux@vger.kernel.org
 S:	Supported
-W:	https://selinuxproject.org
 W:	https://github.com/SELinuxProject
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/selinux.git
+Q:	https://patchwork.kernel.org/project/selinux/list
+B:	mailto:selinux@vger.kernel.org
+P:	https://github.com/SELinuxProject/selinux-kernel/blob/main/README.md
+T:	git https://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/selinux.git
 F:	Documentation/ABI/removed/sysfs-selinux-checkreqprot
 F:	Documentation/ABI/removed/sysfs-selinux-disable
 F:	Documentation/admin-guide/LSM/SELinux.rst
@@ -19834,7 +19876,7 @@ W:	http://www.winischhofer.at/linuxsisusbvga.shtml
 F:	drivers/usb/misc/sisusbvga/
 
 SL28 CPLD MFD DRIVER
-M:	Michael Walle <michael@walle.cc>
+M:	Michael Walle <mwalle@kernel.org>
 S:	Maintained
 F:	Documentation/devicetree/bindings/gpio/kontron,sl28cpld-gpio.yaml
 F:	Documentation/devicetree/bindings/hwmon/kontron,sl28cpld-hwmon.yaml
@@ -19849,7 +19891,7 @@ F:	drivers/pwm/pwm-sl28cpld.c
 F:	drivers/watchdog/sl28cpld_wdt.c
 
 SL28 VPD NVMEM LAYOUT DRIVER
-M:	Michael Walle <michael@walle.cc>
+M:	Michael Walle <mwalle@kernel.org>
 S:	Maintained
 F:	Documentation/devicetree/bindings/nvmem/layouts/kontron,sl28-vpd.yaml
 F:	drivers/nvmem/layouts/sl28vpd.c
@@ -20359,7 +20401,7 @@ F:	drivers/pinctrl/spear/
 SPI NOR SUBSYSTEM
 M:	Tudor Ambarus <tudor.ambarus@linaro.org>
 M:	Pratyush Yadav <pratyush@kernel.org>
-R:	Michael Walle <michael@walle.cc>
+M:	Michael Walle <mwalle@kernel.org>
 L:	linux-mtd@lists.infradead.org
 S:	Maintained
 W:	http://www.linux-mtd.infradead.org/
@@ -21022,6 +21064,13 @@ M:	Jaehoon Chung <jh80.chung@samsung.com>
 L:	linux-mmc@vger.kernel.org
 S:	Maintained
 F:	drivers/mmc/host/dw_mmc*
+
+SYNOPSYS DESIGNWARE PCIE PMU DRIVER
+M:	Shuai Xue <xueshuai@linux.alibaba.com>
+M:	Jing Zhang <renyu.zj@linux.alibaba.com>
+S:	Supported
+F:	Documentation/admin-guide/perf/dwc_pcie_pmu.rst
+F:	drivers/perf/dwc_pcie_pmu.c
 
 SYNOPSYS HSDK RESET CONTROLLER DRIVER
 M:	Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com>
@@ -22229,7 +22278,7 @@ F:	drivers/usb/common/ulpi.c
 F:	include/linux/ulpi/
 
 UNICODE SUBSYSTEM
-M:	Gabriel Krisman Bertazi <krisman@collabora.com>
+M:	Gabriel Krisman Bertazi <krisman@kernel.org>
 L:	linux-fsdevel@vger.kernel.org
 S:	Supported
 F:	fs/unicode/
@@ -23208,9 +23257,8 @@ F:	drivers/misc/vmw_vmci/
 F:	include/linux/vmw_vmci*
 
 VMWARE VMMOUSE SUBDRIVER
-M:	Zack Rusin <zackr@vmware.com>
-R:	VMware Graphics Reviewers <linux-graphics-maintainer@vmware.com>
-R:	VMware PV-Drivers Reviewers <pv-drivers@vmware.com>
+M:	Zack Rusin <zack.rusin@broadcom.com>
+R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 L:	linux-input@vger.kernel.org
 S:	Supported
 F:	drivers/input/mouse/vmmouse.c
@@ -23579,15 +23627,6 @@ F:	drivers/platform/olpc/
 F:	drivers/platform/x86/
 F:	include/linux/platform_data/x86/
 
-X86 PLATFORM DRIVERS - ARCH
-R:	Darren Hart <dvhart@infradead.org>
-R:	Andy Shevchenko <andy@infradead.org>
-L:	platform-driver-x86@vger.kernel.org
-L:	x86@kernel.org
-S:	Maintained
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git x86/core
-F:	arch/x86/platform
-
 X86 PLATFORM UV HPE SUPERDOME FLEX
 M:	Steve Wahl <steve.wahl@hpe.com>
 R:	Justin Ernst <justin.ernst@hpe.com>
@@ -23799,10 +23838,10 @@ S:	Supported
 W:	http://xfs.org/
 C:	irc://irc.oftc.net/xfs
 T:	git git://git.kernel.org/pub/scm/fs/xfs/xfs-linux.git
-P:	Documentation/filesystems/xfs-maintainer-entry-profile.rst
+P:	Documentation/filesystems/xfs/xfs-maintainer-entry-profile.rst
 F:	Documentation/ABI/testing/sysfs-fs-xfs
 F:	Documentation/admin-guide/xfs.rst
-F:	Documentation/filesystems/xfs-*
+F:	Documentation/filesystems/xfs/*
 F:	fs/xfs/
 F:	include/uapi/linux/dqblk_xfs.h
 F:	include/uapi/linux/fsmap.h
