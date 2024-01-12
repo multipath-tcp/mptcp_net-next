@@ -66,6 +66,7 @@
 #include <linux/coredump.h>
 #include <linux/time_namespace.h>
 #include <linux/user_events.h>
+#include <linux/rseq.h>
 
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -1578,11 +1579,10 @@ static void check_unsafe_exec(struct linux_binprm *bprm)
 	 * will be able to manipulate the current directory, etc.
 	 * It would be nice to force an unshare instead...
 	 */
-	t = p;
 	n_fs = 1;
 	spin_lock(&p->fs->lock);
 	rcu_read_lock();
-	while_each_thread(p, t) {
+	for_other_threads(p, t) {
 		if (t->fs == p->fs)
 			n_fs++;
 	}
@@ -2165,7 +2165,6 @@ static struct ctl_table fs_exec_sysctls[] = {
 		.extra1		= SYSCTL_ZERO,
 		.extra2		= SYSCTL_TWO,
 	},
-	{ }
 };
 
 static int __init init_fs_exec_sysctls(void)
