@@ -1,8 +1,0 @@
-From: Geliang Tang <geliang.tang@linux.dev>
-Subject: [PATCH] selftests: mptcp: diag: check CURRESTAB counters
-
-This patch adds a new helper chk_msk_cestab() to check the current
-established connections counter MIB_CURRESTAB in diag.sh. Invoke it
-to check the counter during the connection after every chk_msk_inuse().
-
-Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
