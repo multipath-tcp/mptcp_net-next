@@ -23,7 +23,7 @@ permissions: {}
 
 jobs:
   tests:
-    name: "Tests (matrix)"
+    name: "Tests"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -31,6 +31,7 @@ jobs:
       #   join: ['EXCEPT', 'ONLY']
     permissions:
       contents: read # to fetch code (actions/checkout)
+      checks: write  # to write results
 
     steps:
       - name: "Checkout"
@@ -85,8 +86,15 @@ jobs:
             vmlinux.zstd
             kmemleak.txt
 
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            *.tap.xml
+
       - name: "Save cache for CCache"
-        if: always() && (github.ref_name == 'export' || github.ref_name == 'export-net')
+        if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v3
         with:
           path: ${{ github.workspace }}/.virtme/ccache
