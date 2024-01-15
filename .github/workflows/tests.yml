@@ -23,7 +23,7 @@ permissions: {}
 
 jobs:
   tests:
-    name: "Tests (matrix)"
+    name: "Tests"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -86,7 +86,7 @@ jobs:
             kmemleak.txt
 
       - name: "Save cache for CCache"
-        if: always() && (github.ref_name == 'export' || github.ref_name == 'export-net')
+        if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v3
         with:
           path: ${{ github.workspace }}/.virtme/ccache
