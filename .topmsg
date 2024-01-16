@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-relax-check-on-MPC-passive-fallback
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: relax check on MPC passive fallback
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+While testing the blamed commit below, I was able to miss (!)
+packetdrill failures in the fastopen test-cases.
+
+On passive fastopen the child socket is created by incoming TCP MPC syn,
+allow for both MPC_SYN and MPC_ACK header.
+
+Fixes: 724b00c12957 ("mptcp: refine opt_mp_capable determination")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts <matttbe@kernel.org>
