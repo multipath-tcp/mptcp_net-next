@@ -3385,6 +3385,31 @@ userspace_pm_get_addr()
 	ip netns exec $1 ./pm_nl_ctl get $2 token $tk
 }
 
+# $1: ns ; $2: addr
+userspace_pm_flush()
+{
+	local ns=$1
+	local line
+
+	userspace_pm_dump $ns | while read -r line; do
+		local arr=($line)
+		local nr=0
+		local id
+		local addr
+		local i
+		for i in "${arr[@]}"; do
+			if [ $i = "id" ]; then
+				id=${arr[$nr+1]}
+			fi
+			nr=$((nr + 1))
+		done
+		addr=${arr[$nr-1]}
+		[ $ip_mptcp -eq 1 ] && addr=${arr[0]}
+		userspace_pm_rm_addr $ns $id
+		userspace_pm_rm_sf $ns "$addr" $MPTCP_LIB_SUB_ESTABLISHED
+	done
+}
+
 check_output()
 {
 	local cmd="$1"
@@ -3606,8 +3631,8 @@ userspace_tests()
 		wait $tests_pid
 	fi
 
-	# userspace pm dump address
-	if reset_with_events "userspace pm dump address" &&
+	# userspace pm dump & flush address
+	if reset_with_events "userspace pm dump & flush address" &&
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns2 1 1
@@ -3626,12 +3651,18 @@ userspace_tests()
 			     "$dump" "      get id 10 addr"
 		check_output "userspace_pm_dump $ns1" \
 			     "$dump" "      dump addrs signal"
+		userspace_pm_flush $ns1
+		check_output "userspace_pm_dump $ns1" \
+			     "" "      dump addrs after flush"
+		chk_rm_nr 1 1 invert
+		chk_mptcp_info subflows 0 subflows 0
+		chk_subflows_total 1 1
 		kill_events_pids
 		wait $tests_pid
 	fi
 
-	# userspace pm dump subflow
-	if reset_with_events "userspace pm dump subflow" &&
+	# userspace pm dump & flush subflow
+	if reset_with_events "userspace pm dump & flush subflow" &&
 	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
@@ -3650,6 +3681,12 @@ userspace_tests()
 			     "$dump" "      get id 20 addr"
 		check_output "userspace_pm_dump $ns2" \
 			     "$dump" "      dump addrs subflow"
+		userspace_pm_flush $ns2
+		check_output "userspace_pm_dump $ns2" \
+			     "" "      dump addrs after flush"
+		chk_rm_nr 1 1
+		chk_mptcp_info subflows 0 subflows 0
+		chk_subflows_total 1 1
 		kill_events_pids
 		wait $tests_pid
 	fi
