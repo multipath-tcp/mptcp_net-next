@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-more-tx-path-fields-initialization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix more tx path fields initialization
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The 'msk->write_seq' and 'msk->snd_nxt' are always updated under
+the msk socket lock, except at MPC handshake completiont time.
+
+Builds-up on the previous commit to move such init under the relevant
+lock.
+
+There are no known problems caused by the potential race, the
+primary goal is consistency.
+
+Fixes: 6d0060f600ad ("mptcp: Write MPTCP DSS headers to outgoing data packets")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
