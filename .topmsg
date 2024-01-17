@@ -1,4 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-rcv-space-initialization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix rcv space initialization
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+mptcp_rcv_space_init() is supposed to happen under the msk socket
+lock, but active msk socket does that without such protection.
+
+Leverage the existing mptcp_propagate_state() helper to that extent.
+We need to ensure mptcp_rcv_space_init will happen before
+mptcp_rcv_space_adjust(), and the release_cb does not assure that:
+explicitly check for such condition.
+
+While at it, move the wnd_end initialization out of mptcp_rcv_space_init(),
+it never belonged there.
+
+Note that the race does not produce ill effect in practice, but
+change allows cleaning-up and defying better the locking model.
+
+Fixes: a6b118febbab ("mptcp: add receive buffer auto-tuning")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
