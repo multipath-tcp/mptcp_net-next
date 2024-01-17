@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-corner-case-locking-for-rx-path-fields-initialization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: corner case locking for rx path fields initialization
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Most MPTCP-level related fields are under the mptcp data lock
+protection, but are written one-off without such lock at MPC
+complete time, both for the client and the server
+
+Leverage the mptcp_propagate_state() infrastructure to move such
+initialization under the proper lock client-wise.
+
+The server side critical init steps are done by
+mptcp_subflow_fully_established(): ensure the caller properly held the
+relevant lock, and avoid acquiring the same lock in the nested scopes.
+
+There are no real potential races, as write access to such fields
+is implicitly serialized by the MPTCP state machine; the primary
+goal is consistency.
+
+Fixes: d22f4988ffec ("mptcp: process MP_CAPABLE data option")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
