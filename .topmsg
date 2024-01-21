@@ -14,6 +14,7 @@ the common place so that it can handle all 'ghost' INT3.
 
 Reported-by: Matthieu Baerts <matttbe@kernel.org>
 Closes: https://lore.kernel.org/all/06cb540e-34ff-4dcd-b936-19d4d14378c9@kernel.org/
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/471
 Signed-off-by: Masami Hiramatsu (Google) <mhiramat@kernel.org>
 Fixes: 8e791f7eba4c ("x86/kprobes: Drop removed INT3 handling code")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
