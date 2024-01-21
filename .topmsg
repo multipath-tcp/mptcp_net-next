@@ -1,4 +1,19 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/x86-Fixup-from-the-removed-INT3-if-it-is-unhandled
+From: Masami Hiramatsu <mhiramat@kernel.org>
+Subject: [PATCH] x86: Fixup from the removed INT3 if it is unhandled
 
+INT3 is used not only for software breakpoint, but also self modifying
+code on x86 in the kernel. For example, jump_label, function tracer etc.
+Those may not handle INT3 after removing it but not waiting for
+synchronizing CPUs enough. Since such 'ghost' INT3 is not handled by
+anyone because they think it has been removed already.
+Recheck there is INT3 on the exception address and if not, ignore it.
+
+Note that previously kprobes does the same thing by itself, but that is
+not a good location to do that because INT3 is commonly used. Do it at
+the common place so that it can handle all 'ghost' INT3.
+
+Reported-by: Matthieu Baerts <matttbe@kernel.org>
+Closes: https://lore.kernel.org/all/06cb540e-34ff-4dcd-b936-19d4d14378c9@kernel.org/
+Signed-off-by: Masami Hiramatsu (Google) <mhiramat@kernel.org>
+Fixes: 8e791f7eba4c ("x86/kprobes: Drop removed INT3 handling code")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
