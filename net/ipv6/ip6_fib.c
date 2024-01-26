@@ -751,8 +751,6 @@ static struct fib6_node *fib6_add_1(struct net *net,
 	int	bit;
 	__be32	dir = 0;
 
-	RT6_TRACE("fib6_add_1\n");
-
 	/* insert node in tree */
 
 	fn = root;
@@ -1803,7 +1801,7 @@ static struct fib6_node *fib6_repair_tree(struct net *net,
 					    lockdep_is_held(&table->tb6_lock));
 		struct fib6_info *new_fn_leaf;
 
-		RT6_TRACE("fixing tree: plen=%d iter=%d\n", fn->fn_bit, iter);
+		pr_debug("fixing tree: plen=%d iter=%d\n", fn->fn_bit, iter);
 		iter++;
 
 		WARN_ON(fn->fn_flags & RTN_RTINFO);
@@ -1866,7 +1864,8 @@ static struct fib6_node *fib6_repair_tree(struct net *net,
 		FOR_WALKERS(net, w) {
 			if (!child) {
 				if (w->node == fn) {
-					RT6_TRACE("W %p adjusted by delnode 1, s=%d/%d\n", w, w->state, nstate);
+					pr_debug("W %p adjusted by delnode 1, s=%d/%d\n",
+						 w, w->state, nstate);
 					w->node = pn;
 					w->state = nstate;
 				}
@@ -1874,10 +1873,12 @@ static struct fib6_node *fib6_repair_tree(struct net *net,
 				if (w->node == fn) {
 					w->node = child;
 					if (children&2) {
-						RT6_TRACE("W %p adjusted by delnode 2, s=%d\n", w, w->state);
+						pr_debug("W %p adjusted by delnode 2, s=%d\n",
+							 w, w->state);
 						w->state = w->state >= FWS_R ? FWS_U : FWS_INIT;
 					} else {
-						RT6_TRACE("W %p adjusted by delnode 2, s=%d\n", w, w->state);
+						pr_debug("W %p adjusted by delnode 2, s=%d\n",
+							 w, w->state);
 						w->state = w->state >= FWS_C ? FWS_U : FWS_INIT;
 					}
 				}
@@ -1904,8 +1905,6 @@ static void fib6_del_route(struct fib6_table *table, struct fib6_node *fn,
 				    lockdep_is_held(&table->tb6_lock));
 	struct net *net = info->nl_net;
 	bool notify_del = false;
-
-	RT6_TRACE("fib6_del_route\n");
 
 	/* If the deleted route is the first in the node and it is not part of
 	 * a multipath route, then we need to replace it with the next route
@@ -1955,7 +1954,7 @@ static void fib6_del_route(struct fib6_table *table, struct fib6_node *fn,
 	read_lock(&net->ipv6.fib6_walker_lock);
 	FOR_WALKERS(net, w) {
 		if (w->state == FWS_C && w->leaf == rt) {
-			RT6_TRACE("walker %p adjusted by delroute\n", w);
+			pr_debug("walker %p adjusted by delroute\n", w);
 			w->leaf = rcu_dereference_protected(rt->fib6_next,
 					    lockdep_is_held(&table->tb6_lock));
 			if (!w->leaf)
@@ -2293,7 +2292,7 @@ static int fib6_age(struct fib6_info *rt, void *arg)
 
 	if (rt->fib6_flags & RTF_EXPIRES && rt->expires) {
 		if (time_after(now, rt->expires)) {
-			RT6_TRACE("expiring %p\n", rt);
+			pr_debug("expiring %p\n", rt);
 			return -1;
 		}
 		gc_args->more++;
