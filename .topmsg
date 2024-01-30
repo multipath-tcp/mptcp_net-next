@@ -1,4 +1,25 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-data-re-injection-from-stale-subflow
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix data re-injection from stale subflow
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When the MPTCP PM detects that a subflow is stale, all the packet
+scheduler must re-inject all the mptcp-level unacked data. To avoid
+acquiring unneeded locks, it first try to check if any unacked data
+is present at all in the RTX queue, but such check is currently
+broken, as it uses TCP-specific helper on an MPTCP socket.
+
+Funnily enough fuzzers and static checkers are happy, as the accessed
+memory still belongs to the mptcp_sock struct, and even from a
+functional perspective the recovery completed successfully, as
+the short-cut test always failed.
+
+A recent unrelated TCP change - commit d5fed5addb2b ("tcp: reorganize
+tcp_sock fast path variables") - exposed the issue, as the tcp field
+reorganization makes the mptcp code always skip the re-inection.
+
+Fix the issue dropping the bogus call: we are on a slow path, the early
+optimization proved once again to be evil.
+
+Fixes: 1e1d9d6f119c ("mptcp: handle pending data on closed subflow")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/468
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
