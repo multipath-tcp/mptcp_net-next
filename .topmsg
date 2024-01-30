@@ -1,4 +1,19 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-really-cope-with-fastopen-race
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: really cope with fastopen race
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Fastopen and PM-trigger subflow shutdown can race, as reported by
+syzkaller.
+
+In my first attempt to close such race, I missed the fact that
+the subflow status can change again before the subflow_state_change
+callback is invoked.
+
+Address the issue additionally copying with all the states directly
+reachable from TCP_FIN_WAIT1.
+
+Fixes: 1e777f39b4d7 ("mptcp: add MSG_FASTOPEN sendmsg flag support")
+Fixes: 4fd19a307016 ("mptcp: fix inconsistent state on fastopen race")
+Reported-by: syzbot+c53d4d3ddb327e80bc51@syzkaller.appspotmail.com
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/458
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
