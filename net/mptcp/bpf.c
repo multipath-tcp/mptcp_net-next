@@ -17,7 +17,7 @@
 #include "protocol.h"
 
 #ifdef CONFIG_BPF_JIT
-extern struct bpf_struct_ops bpf_mptcp_sched_ops;
+static struct bpf_struct_ops bpf_mptcp_sched_ops;
 static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly;
 static u32 mptcp_sock_id, mptcp_subflow_id;
 
@@ -167,7 +167,7 @@ static struct mptcp_sched_ops __bpf_mptcp_sched_ops = {
 	.release	= __bpf_mptcp_sched_release,
 };
 
-struct bpf_struct_ops bpf_mptcp_sched_ops = {
+static struct bpf_struct_ops bpf_mptcp_sched_ops = {
 	.verifier_ops	= &bpf_mptcp_sched_verifier_ops,
 	.reg		= bpf_mptcp_sched_reg,
 	.unreg		= bpf_mptcp_sched_unreg,
@@ -236,7 +236,10 @@ static int __init bpf_mptcp_kfunc_init(void)
 	int ret;
 
 	ret = register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
-	return ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 						&bpf_mptcp_sched_kfunc_set);
+	ret = ret ?: register_bpf_struct_ops(&bpf_mptcp_sched_ops, mptcp_sched_ops);
+
+	return ret;
 }
 late_initcall(bpf_mptcp_kfunc_init);
