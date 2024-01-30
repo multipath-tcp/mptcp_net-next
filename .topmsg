@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-annotate-access-for-msk-keys
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: annotate access for msk keys
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Both the local and the remote key follow the same locking
+schema, put in place the proper ONCE accessors.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
