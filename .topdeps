@@ -1,1 +1,1 @@
-t/mptcp-really-cope-with-fastopen-race
+t/selftests-mptcp-join-stop-transfer-when-check-is-done
