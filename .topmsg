@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-missing-kconfig-for-NF-Filter
+Subject: [PATCH] selftests: mptcp: add missing kconfig for NF Filter
 
+Since the commit mentioned below, 'mptcp_join' selftests is using
+IPTables to add rules to the Filter table.
+
+It is then required to have IP_NF_FILTER KConfig.
+
+This KConfig is usually enabled by default in many defconfig, but we
+recently noticed that some CI were running our selftests without them
+enabled.
+
+Fixes: 8d014eaa9254 ("selftests: mptcp: add ADD_ADDR timeout test case")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
