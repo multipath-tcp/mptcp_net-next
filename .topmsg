@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-allow-changing-subtests-prefix
+Subject: [PATCH] selftests: mptcp: allow changing subtests prefix
 
+If a CI executes the same selftest multiple times with different
+options, all results from the same subtests will have the same title,
+which confuse the CI. With the same title printed in TAP, the tests are
+considered as the same ones.
+
+Now, it is possible to override this prefix by using MPTCP_LIB_KSFT_TEST
+env var, and have a different title.
+
+While at it, use 'basename' to remove the suffix as well instead of
+using an extra 'sed'.
+
+Fixes: c4192967e62f ("selftests: mptcp: lib: format subtests results in TAP")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
