@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-stop-transfer-when-check-is-done
+Subject: [PATCH] selftests: mptcp: join: stop transfer when check is done
 
+Since the mentioned commit, the "userspace pm" tests of mptcp_join
+selftests are launching the whole transfer in the background, do the
+required checks, then wait for the end of transfer.
+
+There is no need to wait longer, especially because the checks at the
+end of the transfer are ignored (which is fine). This saves quite a few
+seconds on slow environments.
+
+While at it, use 'mptcp_lib_kill_wait()' helper everywhere, instead of
+on a specific one with 'kill_tests_wait()'. Note that old versions will
+need commit bdbef0a6ff10 ("selftests: mptcp: add mptcp_lib_kill_wait")
+as well.
+
+Fixes: 4369c198e599 ("selftests: mptcp: test userspace pm out of transfer")
+Reviewed-and-tested-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
