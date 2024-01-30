@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: annotate lockless access for token
-
-The token field is manipulated under the msk socket lock
-and accessed lockless in a few spots, add proper ONCE annotation
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
