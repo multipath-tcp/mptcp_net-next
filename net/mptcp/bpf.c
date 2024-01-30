@@ -35,7 +35,7 @@ bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
 	case BPF_FUNC_skc_to_tcp_sock:
 		return &bpf_skc_to_tcp_sock_proto;
 	default:
-		return bpf_base_func_proto(func_id);
+		return bpf_base_func_proto(func_id, prog);
 	}
 }
 
