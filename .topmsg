@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-increase-timeout-to-30-min
+Subject: [PATCH] selftests: mptcp: increase timeout to 30 min
 
+On very slow environments -- e.g. when QEmu is used without KVM --,
+mptcp_join.sh selftest can take a bit more than 20 minutes. Bump the
+default timeout by 50% as it seems normal to take that long on some
+environments.
+
+When a debug kernel config is used, this selftest will take even longer,
+but that's certainly not a common test env to consider for the timeout.
+
+The Fixes tag that has been picked here is there simply to help having
+this patch backported to older stable versions. It is difficult to point
+to the exact commit that made some env reaching the timeout from time to
+time.
+
+Fixes: d17b968b9876 ("selftests: mptcp: increase timeout to 20 minutes")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
