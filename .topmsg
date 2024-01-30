@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-decrease-BW-in-simult-flows
+Subject: [PATCH] selftests: mptcp: decrease BW in simult flows
 
+When running the simult_flow selftest in slow environments -- e.g. QEmu
+without KVM support --, the results can be unstable. This selftest
+checks if the aggregated bandwidth is (almost) fully used as expected.
+
+To help improving the stability while still keeping the same validation
+in place, the BW and the delay are reduced to lower the pressure on the
+CPU.
+
+Fixes: 1a418cb8e888 ("mptcp: simult flow self-tests")
+Fixes: 219d04992b68 ("mptcp: push pending frames when subflow has free space")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
