@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-annotate-lockless-access-for-RX-path-fields
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: annotate lockless access for RX path fields
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The following fields:
+
+ - ack_seq
+ - snd_una
+ - wnd_end
+ - rmem_fwd_alloc
+
+are protected by the data lock end accessed lockless in a few
+spots. Ensure ONCE annotation for write (under such lock) and for
+lockless read.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
