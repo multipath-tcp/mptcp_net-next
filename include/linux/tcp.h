@@ -525,7 +525,16 @@ enum tsq_flags {
 	TCPF_ACK_DEFERRED		= BIT(TCP_ACK_DEFERRED),
 };
 
+#ifdef CONFIG_DEBUG_NET
+static inline struct tcp_sock *tcp_sk(const struct sock *sk)
+{
+	WARN_ON(sk->sk_protocol != IPPROTO_TCP);
+
+	return (struct tcp_sock *)sk;
+}
+#else
 #define tcp_sk(ptr) container_of_const(ptr, struct tcp_sock, inet_conn.icsk_inet.sk)
+#endif
 
 /* Variant of tcp_sk() upgrading a const sock to a read/write tcp socket.
  * Used in context of (lockless) tcp listeners.
