@@ -348,7 +348,16 @@ static inline void msk_owned_by_me(const struct mptcp_sock *msk)
 	sock_owned_by_me((const struct sock *)msk);
 }
 
+#ifdef CONFIG_DEBUG_NET
+static inline struct mptcp_sock *mptcp_sk(const struct sock *sk)
+{
+	WARN_ON(sk->sk_protocol != IPPROTO_MPTCP);
+
+	return (struct mptcp_sock *)sk;
+}
+#else
 #define mptcp_sk(ptr) container_of_const(ptr, struct mptcp_sock, sk.icsk_inet.sk)
+#endif
 
 /* the msk socket don't use the backlog, also account for the bulk
  * free memory
