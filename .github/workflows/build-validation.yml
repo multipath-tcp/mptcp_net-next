@@ -37,13 +37,13 @@ jobs:
     steps:
       - name: "Checkout (light)"
         if: github.ref != 'refs/heads/export'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 100 # we should not have more commits on top of export and -net
 
       - name: "Checkout (export)"
         if: github.ref == 'refs/heads/export'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
 
@@ -61,7 +61,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.ccache
@@ -85,14 +85,14 @@ jobs:
 
       - name: "Artifacts"
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: results
           path: ./build-*-results.txt
 
       - name: "Save cache for CCache"
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
@@ -104,7 +104,7 @@ jobs:
     if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: results
 
