@@ -87,7 +87,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: results
+          name: results-${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}
           path: ./build-*-results.txt
 
       - name: "Save cache for CCache"
@@ -106,7 +106,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: results
+          pattern: results-*
+          merge-multiple: true
 
       - name: "Patchwork"
         run: |
