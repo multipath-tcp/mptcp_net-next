@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Find base branch"
         id: branch
@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
@@ -95,7 +95,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
