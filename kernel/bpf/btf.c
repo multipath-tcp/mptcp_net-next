@@ -8802,8 +8802,15 @@ int __register_bpf_struct_ops(struct bpf_struct_ops *st_ops)
 	int err = 0;
 
 	btf = btf_get_module_btf(st_ops->owner);
-	if (!btf)
-		return -EINVAL;
+	if (!btf) {
+		if (!st_ops->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF)) {
+			pr_err("missing vmlinux BTF, cannot register structs\n");
+			return -EINVAL;
+		}
+		if (st_ops->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES))
+			pr_warn("missing module BTF, cannot register structs\n");
+		return 0;
+	}
 
 	log = kzalloc(sizeof(*log), GFP_KERNEL | __GFP_NOWARN);
 	if (!log) {
