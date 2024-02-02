@@ -1194,8 +1194,10 @@ static void nf_tables_table_disable(struct net *net, struct nft_table *table)
 #define __NFT_TABLE_F_INTERNAL		(NFT_TABLE_F_MASK + 1)
 #define __NFT_TABLE_F_WAS_DORMANT	(__NFT_TABLE_F_INTERNAL << 0)
 #define __NFT_TABLE_F_WAS_AWAKEN	(__NFT_TABLE_F_INTERNAL << 1)
+#define __NFT_TABLE_F_WAS_ORPHAN	(__NFT_TABLE_F_INTERNAL << 2)
 #define __NFT_TABLE_F_UPDATE		(__NFT_TABLE_F_WAS_DORMANT | \
-					 __NFT_TABLE_F_WAS_AWAKEN)
+					 __NFT_TABLE_F_WAS_AWAKEN | \
+					 __NFT_TABLE_F_WAS_ORPHAN)
 
 static int nf_tables_updtable(struct nft_ctx *ctx)
 {
@@ -1215,8 +1217,11 @@ static int nf_tables_updtable(struct nft_ctx *ctx)
 
 	if ((nft_table_has_owner(ctx->table) &&
 	     !(flags & NFT_TABLE_F_OWNER)) ||
-	    (!nft_table_has_owner(ctx->table) &&
-	     flags & NFT_TABLE_F_OWNER))
+	    (flags & NFT_TABLE_F_OWNER &&
+	     !nft_table_is_orphan(ctx->table)))
+		return -EOPNOTSUPP;
+
+	if ((flags ^ ctx->table->flags) & NFT_TABLE_F_PERSIST)
 		return -EOPNOTSUPP;
 
 	/* No dormant off/on/off/on games in single transaction */
@@ -1243,6 +1248,13 @@ static int nf_tables_updtable(struct nft_ctx *ctx)
 
 			ctx->table->flags |= __NFT_TABLE_F_WAS_DORMANT;
 		}
+	}
+
+	if ((flags & NFT_TABLE_F_OWNER) &&
+	    !nft_table_has_owner(ctx->table)) {
+		ctx->table->nlpid = ctx->portid;
+		ctx->table->flags |= NFT_TABLE_F_OWNER |
+				     __NFT_TABLE_F_WAS_ORPHAN;
 	}
 
 	nft_trans_table_update(trans) = true;
@@ -4235,22 +4247,17 @@ static bool nft_set_ops_candidate(const struct nft_set_type *type, u32 flags)
  * given, in that case the amount of memory per element is used.
  */
 static const struct nft_set_ops *
-nft_select_set_ops(const struct nft_ctx *ctx,
-		   const struct nlattr * const nla[],
+nft_select_set_ops(const struct nft_ctx *ctx, u32 flags,
 		   const struct nft_set_desc *desc)
 {
 	struct nftables_pernet *nft_net = nft_pernet(ctx->net);
 	const struct nft_set_ops *ops, *bops;
 	struct nft_set_estimate est, best;
 	const struct nft_set_type *type;
-	u32 flags = 0;
 	int i;
 
 	lockdep_assert_held(&nft_net->commit_mutex);
 	lockdep_nfnl_nft_mutex_not_held();
-
-	if (nla[NFTA_SET_FLAGS] != NULL)
-		flags = ntohl(nla_get_be32(nla[NFTA_SET_FLAGS]));
 
 	bops	    = NULL;
 	best.size   = ~0;
@@ -5137,7 +5144,7 @@ static int nf_tables_newset(struct sk_buff *skb, const struct nfnl_info *info,
 	if (!(info->nlh->nlmsg_flags & NLM_F_CREATE))
 		return -ENOENT;
 
-	ops = nft_select_set_ops(&ctx, nla, &desc);
+	ops = nft_select_set_ops(&ctx, flags, &desc);
 	if (IS_ERR(ops))
 		return PTR_ERR(ops);
 
@@ -7551,11 +7558,15 @@ nla_put_failure:
 	return -1;
 }
 
-static const struct nft_object_type *__nft_obj_type_get(u32 objtype)
+static const struct nft_object_type *__nft_obj_type_get(u32 objtype, u8 family)
 {
 	const struct nft_object_type *type;
 
 	list_for_each_entry(type, &nf_tables_objects, list) {
+		if (type->family != NFPROTO_UNSPEC &&
+		    type->family != family)
+			continue;
+
 		if (objtype == type->type)
 			return type;
 	}
@@ -7563,11 +7574,11 @@ static const struct nft_object_type *__nft_obj_type_get(u32 objtype)
 }
 
 static const struct nft_object_type *
-nft_obj_type_get(struct net *net, u32 objtype)
+nft_obj_type_get(struct net *net, u32 objtype, u8 family)
 {
 	const struct nft_object_type *type;
 
-	type = __nft_obj_type_get(objtype);
+	type = __nft_obj_type_get(objtype, family);
 	if (type != NULL && try_module_get(type->owner))
 		return type;
 
@@ -7660,7 +7671,7 @@ static int nf_tables_newobj(struct sk_buff *skb, const struct nfnl_info *info,
 		if (info->nlh->nlmsg_flags & NLM_F_REPLACE)
 			return -EOPNOTSUPP;
 
-		type = __nft_obj_type_get(objtype);
+		type = __nft_obj_type_get(objtype, family);
 		if (WARN_ON_ONCE(!type))
 			return -ENOENT;
 
@@ -7674,7 +7685,7 @@ static int nf_tables_newobj(struct sk_buff *skb, const struct nfnl_info *info,
 	if (!nft_use_inc(&table->use))
 		return -EMFILE;
 
-	type = nft_obj_type_get(net, objtype);
+	type = nft_obj_type_get(net, objtype, family);
 	if (IS_ERR(type)) {
 		err = PTR_ERR(type);
 		goto err_type;
@@ -10420,6 +10431,10 @@ static int __nf_tables_abort(struct net *net, enum nfnl_abort_action action)
 				} else if (trans->ctx.table->flags & __NFT_TABLE_F_WAS_AWAKEN) {
 					trans->ctx.table->flags &= ~NFT_TABLE_F_DORMANT;
 				}
+				if (trans->ctx.table->flags & __NFT_TABLE_F_WAS_ORPHAN) {
+					trans->ctx.table->flags &= ~NFT_TABLE_F_OWNER;
+					trans->ctx.table->nlpid = 0;
+				}
 				trans->ctx.table->flags &= ~__NFT_TABLE_F_UPDATE;
 				nft_trans_destroy(trans);
 			} else {
@@ -11345,6 +11360,10 @@ again:
 	list_for_each_entry(table, &nft_net->tables, list) {
 		if (nft_table_has_owner(table) &&
 		    n->portid == table->nlpid) {
+			if (table->flags & NFT_TABLE_F_PERSIST) {
+				table->flags &= ~NFT_TABLE_F_OWNER;
+				continue;
+			}
 			__nft_release_hook(net, table);
 			list_del_rcu(&table->list);
 			to_delete[deleted++] = table;
