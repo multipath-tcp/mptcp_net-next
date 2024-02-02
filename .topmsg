@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/MAINTAINERS-update-Geliang-s-email-address
+From: Geliang Tang <geliang@kernel.org>
+Subject: [PATCH] MAINTAINERS: update Geliang's email address
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Update my email-address in MAINTAINERS and .mailmap entries to my
+kernel.org account.
+
+Suggested-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
