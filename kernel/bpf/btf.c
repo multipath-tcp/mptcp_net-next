@@ -8805,7 +8805,9 @@ int __register_bpf_struct_ops(struct bpf_struct_ops *st_ops)
 
 	btf = btf_get_module_btf(st_ops->owner);
 	if (!btf)
-		return -EINVAL;
+		return register_check_missing_btf(st_ops->owner, "structs");
+	if (IS_ERR(btf))
+		return PTR_ERR(btf);
 
 	log = kzalloc(sizeof(*log), GFP_KERNEL | __GFP_NOWARN);
 	if (!log) {
