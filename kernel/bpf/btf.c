@@ -26,6 +26,7 @@
 #include <linux/bsearch.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/module.h>
 
 #include <net/netfilter/nf_bpf_link.h>
 
@@ -7649,6 +7650,24 @@ static struct btf *btf_get_module_btf(const struct module *module)
 	return btf;
 }
 
+static int register_check_missing_btf(const struct module *module, const char *msg)
+{
+	if (!module && IS_ENABLED(CONFIG_DEBUG_INFO_BTF)) {
+		pr_err("missing vmlinux BTF, cannot register %s\n", msg);
+		return -ENOENT;
+	}
+	if (module && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES)) {
+		if (IS_ENABLED(CONFIG_MODULE_ALLOW_BTF_MISMATCH)) {
+			pr_warn("allow module %s BTF mismatch, skip register %s\n",
+				module->name, msg);
+			return 0;
+		}
+		pr_err("missing module %s BTF, cannot register %s\n", module->name, msg);
+		return -ENOENT;
+	}
+	return 0;
+}
+
 BPF_CALL_4(bpf_btf_find_by_name_kind, char *, name, int, name_sz, u32, kind, int, flags)
 {
 	struct btf *btf = NULL;
@@ -8009,15 +8028,8 @@ static int __register_btf_kfunc_id_set(enum btf_kfunc_hook hook,
 	int ret, i;
 
 	btf = btf_get_module_btf(kset->owner);
-	if (!btf) {
-		if (!kset->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF)) {
-			pr_err("missing vmlinux BTF, cannot register kfuncs\n");
-			return -ENOENT;
-		}
-		if (kset->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES))
-			pr_warn("missing module BTF, cannot register kfuncs\n");
-		return 0;
-	}
+	if (!btf)
+		return register_check_missing_btf(kset->owner, "kfuncs");
 	if (IS_ERR(btf))
 		return PTR_ERR(btf);
 
@@ -8117,17 +8129,8 @@ int register_btf_id_dtor_kfuncs(const struct btf_id_dtor_kfunc *dtors, u32 add_c
 	int ret;
 
 	btf = btf_get_module_btf(owner);
-	if (!btf) {
-		if (!owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF)) {
-			pr_err("missing vmlinux BTF, cannot register dtor kfuncs\n");
-			return -ENOENT;
-		}
-		if (owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES)) {
-			pr_err("missing module BTF, cannot register dtor kfuncs\n");
-			return -ENOENT;
-		}
-		return 0;
-	}
+	if (!btf)
+		return register_check_missing_btf(owner, "dtor kfuncs");
 	if (IS_ERR(btf))
 		return PTR_ERR(btf);
 
