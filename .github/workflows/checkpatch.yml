@@ -41,6 +41,14 @@ jobs:
           checkpatch: true
           debug: ${{ secrets.BUILD_ACTION_DEBUG }}
 
+      - name: "Publish details"
+        if: always()
+        run: |
+          if [ -s "${{ env.DETAILS }}" ]; then
+            echo '### Results' >> $GITHUB_STEP_SUMMARY
+            cat "${{ env.DETAILS }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: "Artifacts"
         uses: actions/upload-artifact@v4
         with:
