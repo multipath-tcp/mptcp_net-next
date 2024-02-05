@@ -90,6 +90,16 @@ jobs:
           name: results-${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}
           path: ./build-*-results.txt
 
+      - name: "Publish details"
+        if: always()
+        run: |
+          if stat ./build-*-results.txt &>/dev/null; then
+            echo '- Results for ${{ matrix.defconfig }} ${{ matrix.ipv6 }} ${{ matrix.mptcp }}:' >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat ./build-*-results.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: "Save cache for CCache"
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         uses: actions/cache/save@v4
