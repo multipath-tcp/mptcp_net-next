@@ -37,6 +37,9 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v4
 
+      - name: "Collect Workflow Telemetry"
+        uses: catchpoint/workflow-telemetry-action@v1
+
       - name: "Find base branch"
         id: branch
         run: |
@@ -94,7 +97,7 @@ jobs:
             vmlinux.zstd
             kmemleak.txt
 
-      - name: Publish Test Results
+      - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
