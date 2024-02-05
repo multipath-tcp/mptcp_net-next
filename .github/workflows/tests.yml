@@ -37,6 +37,9 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v4
 
+      - name: "Collect Workflow Telemetry"
+        uses: catchpoint/workflow-telemetry-action@v1
+
       - name: "Find base branch"
         id: branch
         run: |
@@ -65,6 +68,14 @@ jobs:
           mode: auto-normal
           # extra_env: INPUT_RUN_TESTS_${{ matrix.join }}=selftest_mptcp_join
 
+      - name: "Publish conclusion"
+        if: always()
+        run: |
+          if [ -s "conclusion.txt" ]; then
+            echo '### Conclusion' >> $GITHUB_STEP_SUMMARY
+            cat "conclusion.txt" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: "Artifacts (always)"
         if: always()
         uses: actions/upload-artifact@v4
@@ -86,7 +97,7 @@ jobs:
             vmlinux.zstd
             kmemleak.txt
 
-      - name: Publish Test Results
+      - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
