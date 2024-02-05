@@ -65,6 +65,14 @@ jobs:
           mode: auto-normal
           # extra_env: INPUT_RUN_TESTS_${{ matrix.join }}=selftest_mptcp_join
 
+      - name: "Publish conclusion"
+        if: always()
+        run: |
+          if [ -s "conclusion.txt" ]; then
+            echo '### Conclusion' >> $GITHUB_STEP_SUMMARY
+            cat "conclusion.txt" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: "Artifacts (always)"
         if: always()
         uses: actions/upload-artifact@v4
