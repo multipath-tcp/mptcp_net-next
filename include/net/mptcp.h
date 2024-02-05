@@ -122,7 +122,7 @@ void mptcp_init(void);
 
 static inline bool sk_is_mptcp(const struct sock *sk)
 {
-	return tcp_sk(sk)->is_mptcp;
+	return sk_is_tcp(sk) ? tcp_sk(sk)->is_mptcp : false;
 }
 
 static inline bool rsk_is_mptcp(const struct request_sock *req)
