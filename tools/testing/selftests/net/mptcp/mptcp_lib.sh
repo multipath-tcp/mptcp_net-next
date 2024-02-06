@@ -218,6 +218,12 @@ mptcp_lib_evts_get_info() {
 	mptcp_lib_get_info_value "${1}" "^type:${3:-1}," < "${2}"
 }
 
+# $1: info name ; $2: evts_ns ; $3: event type; $4: addr
+mptcp_lib_evts_get_info_with_addr() {
+	cat "${2}" | grep "${4}" |
+	mptcp_lib_get_info_value "${1}" "^type:${3:-1},"
+}
+
 # $1: PID
 mptcp_lib_kill_wait() {
 	[ "${1}" -eq 0 ] && return 0
