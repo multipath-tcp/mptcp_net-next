@@ -1042,6 +1042,7 @@ out:
 	} else {
 		mptcp_reset_rtx_timer(sk);
 	}
+
 	if (mptcp_pending_data_fin_ack(sk))
 		mptcp_schedule_work(sk);
 }
