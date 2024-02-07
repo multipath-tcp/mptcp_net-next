@@ -8014,8 +8014,11 @@ static int __register_btf_kfunc_id_set(enum btf_kfunc_hook hook,
 			pr_err("missing vmlinux BTF, cannot register kfuncs\n");
 			return -ENOENT;
 		}
-		if (kset->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES))
+		if (kset->owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES) &&
+		    !IS_ENABLED(CONFIG_MODULE_ALLOW_BTF_MISMATCH)) {
 			pr_warn("missing module BTF, cannot register kfuncs\n");
+			return -ENOENT;
+		}
 		return 0;
 	}
 	if (IS_ERR(btf))
@@ -8122,7 +8125,8 @@ int register_btf_id_dtor_kfuncs(const struct btf_id_dtor_kfunc *dtors, u32 add_c
 			pr_err("missing vmlinux BTF, cannot register dtor kfuncs\n");
 			return -ENOENT;
 		}
-		if (owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES)) {
+		if (owner && IS_ENABLED(CONFIG_DEBUG_INFO_BTF_MODULES) &&
+		    !IS_ENABLED(CONFIG_MODULE_ALLOW_BTF_MISMATCH)) {
 			pr_err("missing module BTF, cannot register dtor kfuncs\n");
 			return -ENOENT;
 		}
