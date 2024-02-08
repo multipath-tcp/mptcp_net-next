@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-needs_id-for-netlink-appending-addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add needs_id for netlink appending addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Just the same as userspace PM, a new parameter needs_id is added for
+in-kernel PM mptcp_pm_nl_append_new_local_addr() too.
+
+Add a new helper mptcp_pm_has_addr_attr_id() to check whether an address
+ID is set from PM or not.
+
+In mptcp_pm_nl_get_local_id(), needs_id is always true, but in
+mptcp_pm_nl_add_addr_doit(), pass mptcp_pm_has_addr_attr_id() to
+needs_it.
+
+Fixes: efd5a4c04e18 ("mptcp: add the address ID assignment bitmap")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
