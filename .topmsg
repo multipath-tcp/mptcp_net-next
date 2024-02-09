@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-data-races-on-remote_id
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix data races on remote_id
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Similar to the previous patch, address the data race on
+remote_id, adding the suitable ONCE annotations.
+
+Fixes: bedee0b56113 ("mptcp: address lookup improvements")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
