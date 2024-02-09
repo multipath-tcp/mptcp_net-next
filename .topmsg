@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-lockless-access-in-subflow-ULP-diag
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix lockless access in subflow ULP diag
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Since the introduction of the subflow ULP diag interface, the
+dump callback accessed all the subflow data with lockless.
+
+We need either to annotate all the read and write operation accordingly,
+or acquire the subflow socket lock. Let's do latter, even if slower, to
+avoid a diffstat havoc.
+
+Fixes: 5147dfb50832 ("mptcp: allow dumping subflow context to userspace")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
