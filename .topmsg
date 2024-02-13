@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-unique-subtest-names
+Subject: [PATCH] selftests: mptcp: userspace_pm: unique subtest names
 
+It is important to have a unique (sub)test name in TAP, because some CI
+environments drop tests with duplicated names.
+
+Some subtests from the userspace_pm selftest had the same names. That's
+because different subflows are created (and deleted) between the same
+pair of IP addresses.
+
+Simply adding the destination port in the name is then enough to have
+different names, because the destination port is always different.
+
+Note that adding such info takes a bit more space, so we need to
+increase a bit the width to print the name, simply to keep all the
+'[ OK ]' aligned as before.
+
+Fixes: f589234e1af0 ("selftests: mptcp: userspace_pm: format subtests results in TAP")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
