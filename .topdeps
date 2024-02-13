@@ -1,1 +1,1 @@
-t/selftests-mptcp-diag-fix-bash-warnings-on-older-kernels
+t/selftests-mptcp-diag-unique-cestab-subtest-names
