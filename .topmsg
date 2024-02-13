@@ -1,4 +1,27 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-unique-cestab-subtest-names
+Subject: [PATCH] selftests: mptcp: diag: unique 'cestab' subtest names
 
+It is important to have a unique (sub)test name in TAP, because some CI
+environments drop tests with duplicated name.
+
+Some 'cestab' subtests from the diag selftest had the same names, e.g.:
+
+    ....chk 0 cestab
+
+Now the previous value is taken, to have different names, e.g.:
+
+    ....chk 2->0 cestab after flush
+
+While at it, the 'after flush' info is added, similar to what is done
+with the 'in use' subtests. Also inspired by these 'in use' subtests,
+'many' is displayed instead of a large number:
+
+    many msk socket present                           [  ok  ]
+    ....chk many msk in use                           [  ok  ]
+    ....chk many cestab                               [  ok  ]
+    ....chk many->0 msk in use after flush            [  ok  ]
+    ....chk many->0 cestab after flush                [  ok  ]
+
+Fixes: 81ab772819da ("selftests: mptcp: diag: check CURRESTAB counters")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
