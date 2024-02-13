@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-lib-catch-duplicated-subtest-entries
+Subject: [PATCH] selftests: mptcp: lib: catch duplicated subtest entries
 
+It is important to have a unique (sub)test name in TAP, because some CI
+environments drop tests with duplicated name.
+
+When adding a new subtest entry, an error message is printed in case of
+duplicated entries. If there were duplicated entries and if all features
+were expected to work, the script exits with an error at the end, after
+having printed all subtests in the TAP format. Thanks to that, the MPTCP
+CI will catch such issues early.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
