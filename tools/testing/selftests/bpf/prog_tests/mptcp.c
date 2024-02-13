@@ -11,6 +11,7 @@
 #include "mptcp_sock.skel.h"
 #include "mptcpify.skel.h"
 #include "mptcp_bpf_first.skel.h"
+#include "mptcp_bpf_bkup.skel.h"
 
 #define NS_TEST "mptcp_ns"
 
@@ -507,6 +508,41 @@ fail:
 	mptcp_bpf_first__destroy(first_skel);
 }
 
+static void test_bkup(void)
+{
+	struct mptcp_bpf_bkup *bkup_skel;
+	int server_fd, client_fd;
+	struct nstoken *nstoken;
+	struct bpf_link *link;
+
+	bkup_skel = mptcp_bpf_bkup__open_and_load();
+	if (!ASSERT_OK_PTR(bkup_skel, "bpf_bkup__open_and_load"))
+		return;
+
+	link = bpf_map__attach_struct_ops(bkup_skel->maps.bkup);
+	if (!ASSERT_OK_PTR(link, "bpf_map__attach_struct_ops")) {
+		mptcp_bpf_bkup__destroy(bkup_skel);
+		return;
+	}
+
+	nstoken = sched_init("subflow backup", "bpf_bkup");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_bkup"))
+		goto fail;
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	client_fd = connect_to_fd(server_fd, 0);
+
+	send_data(server_fd, client_fd, "bpf_bkup");
+	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
+	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
+
+	close(client_fd);
+	close(server_fd);
+fail:
+	cleanup_netns(nstoken);
+	bpf_link__destroy(link);
+	mptcp_bpf_bkup__destroy(bkup_skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -517,4 +553,6 @@ void test_mptcp(void)
 		test_default();
 	if (test__start_subtest("first"))
 		test_first();
+	if (test__start_subtest("bkup"))
+		test_bkup();
 }
