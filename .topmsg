@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-unique-in-use-subtest-names
+Subject: [PATCH] selftests: mptcp: diag: unique 'in use' subtest names
 
+It is important to have a unique (sub)test name in TAP, because some CI
+environments drop tests with duplicated name.
+
+Some 'in use' subtests from the diag selftest had the same names, e.g.:
+
+    chk 0 msk in use after flush
+
+Now the previous value is taken, to have different names, e.g.:
+
+    chk 2->0 msk in use after flush
+
+While at it, avoid repeating the full message, declare it once in the
+helper.
+
+Fixes: ce9902573652 ("selftests: mptcp: diag: format subtests results in TAP")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
