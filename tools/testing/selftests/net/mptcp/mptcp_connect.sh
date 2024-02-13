@@ -154,6 +154,12 @@ if [ $? -ne 0 ];then
 	exit $ksft_skip
 fi
 
+ss -h | grep -q MPTCP
+if [ $? -ne 0 ];then
+	echo "SKIP: ss tool does not support MPTCP"
+	exit $ksft_skip
+fi
+
 sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)
