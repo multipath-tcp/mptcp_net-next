@@ -1,4 +1,17 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-fix-bash-warnings-on-older-kernels
+Subject: [PATCH] selftests: mptcp: diag: fix bash warnings on older kernels
 
+Since the 'Fixes' commit mentioned below, the command that is executed
+in __chk_nr() helper can return nothing if the feature is not supported.
+This is the case when the MPTCP CURRESTAB counter is not supported.
+
+To avoid this warning ...
+
+  ./diag.sh: line 65: [: !=: unary operator expected
+
+... we just need to surround '$nr' with double quotes, to support an
+empty string when the feature is not supported.
+
+Fixes: 81ab772819da ("selftests: mptcp: diag: check CURRESTAB counters")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
