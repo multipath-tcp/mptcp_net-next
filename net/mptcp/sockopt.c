@@ -81,7 +81,7 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 
 		switch (optname) {
 		case SO_DEBUG:
-			sock_valbool_flag(ssk, SOCK_DBG, !!val);
+			/* deprecated. */
 			break;
 		case SO_KEEPALIVE:
 			if (ssk->sk_prot->keepalive)
@@ -1457,8 +1457,6 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 		ssk->sk_mark = sk->sk_mark;
 		sk_dst_reset(ssk);
 	}
-
-	sock_valbool_flag(ssk, SOCK_DBG, sock_flag(sk, SOCK_DBG));
 
 	if (inet_csk(sk)->icsk_ca_ops != inet_csk(ssk)->icsk_ca_ops)
 		tcp_set_congestion_control(ssk, msk->ca_name, false, true);

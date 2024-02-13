@@ -1194,10 +1194,9 @@ int sk_setsockopt(struct sock *sk, int level, int optname,
 
 	switch (optname) {
 	case SO_DEBUG:
+		/* deprecated, but kept for compatibility. */
 		if (val && !sockopt_capable(CAP_NET_ADMIN))
 			ret = -EACCES;
-		else
-			sock_valbool_flag(sk, SOCK_DBG, valbool);
 		break;
 	case SO_REUSEADDR:
 		sk->sk_reuse = (valbool ? SK_CAN_REUSE : SK_NO_REUSE);
@@ -1619,7 +1618,8 @@ int sk_getsockopt(struct sock *sk, int level, int optname,
 
 	switch (optname) {
 	case SO_DEBUG:
-		v.val = sock_flag(sk, SOCK_DBG);
+		/* deprecated. */
+		v.val = 0;
 		break;
 
 	case SO_DONTROUTE:
