@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-simult-flows-fix-some-subtest-names
+Subject: [PATCH] selftests: mptcp: simult flows: fix some subtest names
 
+The selftest was correctly recording all the results, but the 'reverse
+direction' part was missing in the name when needed.
+
+It is important to have a unique (sub)test name in TAP, because some CI
+environments drop tests with duplicated name.
+
+Fixes: 675d99338e7a ("selftests: mptcp: simult flows: format subtests results in TAP")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
