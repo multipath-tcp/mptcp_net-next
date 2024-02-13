@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-pm-nl-also-list-skipped-tests
+Subject: [PATCH] selftests: mptcp: pm nl: also list skipped tests
 
+If the feature is not supported by older kernels, and instead of just
+ignoring some tests, we should mark them as skipped, so we can still
+track them.
+
+Fixes: d85555ac11f9 ("selftests: mptcp: pm_netlink: format subtests results in TAP")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
