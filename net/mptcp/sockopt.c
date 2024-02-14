@@ -80,9 +80,6 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 		bool slow = lock_sock_fast(ssk);
 
 		switch (optname) {
-		case SO_DEBUG:
-			sock_valbool_flag(ssk, SOCK_DBG, !!val);
-			break;
 		case SO_KEEPALIVE:
 			if (ssk->sk_prot->keepalive)
 				ssk->sk_prot->keepalive(ssk, !!val);
@@ -183,7 +180,6 @@ static int mptcp_setsockopt_sol_socket_int(struct mptcp_sock *msk, int optname,
 	case SO_KEEPALIVE:
 		mptcp_sol_socket_sync_intval(msk, optname, val);
 		return 0;
-	case SO_DEBUG:
 	case SO_MARK:
 	case SO_PRIORITY:
 	case SO_SNDBUF:
@@ -329,7 +325,6 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	case SO_RCVBUFFORCE:
 	case SO_MARK:
 	case SO_INCOMING_CPU:
-	case SO_DEBUG:
 	case SO_TIMESTAMP_OLD:
 	case SO_TIMESTAMP_NEW:
 	case SO_TIMESTAMPNS_OLD:
@@ -363,6 +358,7 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	case SO_WIFI_STATUS:
 	case SO_NOFCS:
 	case SO_SELECT_ERR_QUEUE:
+	case SO_DEBUG: /* deprecated */
 		return 0;
 	}
 
@@ -1457,8 +1453,6 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 		ssk->sk_mark = sk->sk_mark;
 		sk_dst_reset(ssk);
 	}
-
-	sock_valbool_flag(ssk, SOCK_DBG, sock_flag(sk, SOCK_DBG));
 
 	if (inet_csk(sk)->icsk_ca_ops != inet_csk(ssk)->icsk_ca_ops)
 		tcp_set_congestion_control(ssk, msk->ca_name, false, true);

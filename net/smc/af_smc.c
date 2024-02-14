@@ -445,7 +445,6 @@ out:
 			     (1UL << SOCK_LINGER) | \
 			     (1UL << SOCK_BROADCAST) | \
 			     (1UL << SOCK_TIMESTAMP) | \
-			     (1UL << SOCK_DBG) | \
 			     (1UL << SOCK_RCVTSTAMP) | \
 			     (1UL << SOCK_RCVTSTAMPNS) | \
 			     (1UL << SOCK_LOCALROUTE) | \
@@ -511,8 +510,8 @@ static void smc_copy_sock_settings_to_clc(struct smc_sock *smc)
 
 #define SK_FLAGS_CLC_TO_SMC ((1UL << SOCK_URGINLINE) | \
 			     (1UL << SOCK_KEEPOPEN) | \
-			     (1UL << SOCK_LINGER) | \
-			     (1UL << SOCK_DBG))
+			     (1UL << SOCK_LINGER))
+
 /* copy only settings and flags relevant for smc from clc to smc socket */
 static void smc_copy_sock_settings_to_smc(struct smc_sock *smc)
 {

@@ -1115,6 +1115,11 @@ int sk_setsockopt(struct sock *sk, int level, int optname,
 
 	/* handle options which do not require locking the socket. */
 	switch (optname) {
+	case SO_DEBUG:
+		/* deprecated, but kept for compatibility */
+		if (val && !sockopt_capable(CAP_NET_ADMIN))
+			ret = -EACCES;
+		return 0;
 	case SO_PRIORITY:
 		if ((val >= 0 && val <= 6) ||
 		    sockopt_ns_capable(sock_net(sk)->user_ns, CAP_NET_RAW) ||
@@ -1193,12 +1198,6 @@ int sk_setsockopt(struct sock *sk, int level, int optname,
 	sockopt_lock_sock(sk);
 
 	switch (optname) {
-	case SO_DEBUG:
-		if (val && !sockopt_capable(CAP_NET_ADMIN))
-			ret = -EACCES;
-		else
-			sock_valbool_flag(sk, SOCK_DBG, valbool);
-		break;
 	case SO_REUSEADDR:
 		sk->sk_reuse = (valbool ? SK_CAN_REUSE : SK_NO_REUSE);
 		break;
@@ -1619,7 +1618,8 @@ int sk_getsockopt(struct sock *sk, int level, int optname,
 
 	switch (optname) {
 	case SO_DEBUG:
-		v.val = sock_flag(sk, SOCK_DBG);
+		/* deprecated. */
+		v.val = 0;
 		break;
 
 	case SO_DONTROUTE:
