@@ -1,1 +1,1 @@
-t/selftests-mptcp-diag-unique-cestab-subtest-names
+t/selftests-mptcp-rm-subflow-with-v4-v4mapped-addr
