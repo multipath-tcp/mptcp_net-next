@@ -1,4 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-stop-forcing-iptables-legacy
+Subject: [PATCH] selftests: mptcp: stop forcing iptables-legacy
 
+Commit 0c4cd3f86a40 ("selftests: mptcp: join: use 'iptables-legacy' if
+available") and commit a5a5990c099d ("selftests: mptcp: sockopt: use
+'iptables-legacy' if available") forced using iptables-legacy if
+available.
+
+This was needed because of some issues that were visible when testing
+the kselftests on a v5.15.x with iptables-nft as default backend. It
+looks like these errors are no longer present. As mentioned by Pablo [1],
+the errors were maybe due to missing kernel config. We can then use
+iptables-nft if it is the default one, instead of using a legacy tool.
+
+We can then check the variables iptables and ip6tables are valid. We can
+keep the variables to easily change it later or add options.
+
+Link: https://lore.kernel.org/netdev/ZbFiixyMFpQnxzCH@calendula/ [1]
+Suggested-by: Pablo Neira Ayuso <pablo@netfilter.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
