@@ -1,1 +1,1 @@
-t/selftests-mptcp-lib-catch-duplicated-subtest-entries
+t/selftests-mptcp-stop-forcing-iptables-legacy
