@@ -1,4 +1,59 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tracing-Inform-kmemleak-of-saved_cmdlines-allocation
+From: Steven Rostedt (Google) <rostedt@goodmis.org>
+Subject: [PATCH] tracing: Inform kmemleak of saved_cmdlines allocation
 
+The allocation of the struct saved_cmdlines_buffer structure changed from:
+
+        s = kmalloc(sizeof(*s), GFP_KERNEL);
+	s->saved_cmdlines = kmalloc_array(TASK_COMM_LEN, val, GFP_KERNEL);
+
+to:
+
+	orig_size = sizeof(*s) + val * TASK_COMM_LEN;
+	order = get_order(orig_size);
+	size = 1 << (order + PAGE_SHIFT);
+	page = alloc_pages(GFP_KERNEL, order);
+	if (!page)
+		return NULL;
+
+	s = page_address(page);
+	memset(s, 0, sizeof(*s));
+
+	s->saved_cmdlines = kmalloc_array(TASK_COMM_LEN, val, GFP_KERNEL);
+
+Where that s->saved_cmdlines allocation looks to be a dangling allocation
+to kmemleak. That's because kmemleak only keeps track of kmalloc()
+allocations. For allocations that use page_alloc() directly, the kmemleak
+needs to be explicitly informed about it.
+
+Add kmemleak_alloc() and kmemleak_free() around the page allocation so
+that it doesn't give the following false positive:
+
+unreferenced object 0xffff8881010c8000 (size 32760):
+  comm "swapper", pid 0, jiffies 4294667296
+  hex dump (first 32 bytes):
+    ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff  ................
+    ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff  ................
+  backtrace (crc ae6ec1b9):
+    [<ffffffff86722405>] kmemleak_alloc+0x45/0x80
+    [<ffffffff8414028d>] __kmalloc_large_node+0x10d/0x190
+    [<ffffffff84146ab1>] __kmalloc+0x3b1/0x4c0
+    [<ffffffff83ed7103>] allocate_cmdlines_buffer+0x113/0x230
+    [<ffffffff88649c34>] tracer_alloc_buffers.isra.0+0x124/0x460
+    [<ffffffff8864a174>] early_trace_init+0x14/0xa0
+    [<ffffffff885dd5ae>] start_kernel+0x12e/0x3c0
+    [<ffffffff885f5758>] x86_64_start_reservations+0x18/0x30
+    [<ffffffff885f582b>] x86_64_start_kernel+0x7b/0x80
+    [<ffffffff83a001c3>] secondary_startup_64_no_verify+0x15e/0x16b
+
+Link: https://lore.kernel.org/linux-trace-kernel/87r0hfnr9r.fsf@kernel.org/
+Link: https://lore.kernel.org/linux-trace-kernel/20240214112046.09a322d6@gandalf.local.home
+
+Cc: Masami Hiramatsu <mhiramat@kernel.org>
+Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Fixes: 44dc5c41b5b1 ("tracing: Fix wasted memory in saved_cmdlines logic")
+Reported-by: Kalle Valo <kvalo@kernel.org>
+Tested-by: Kalle Valo <kvalo@kernel.org>
+Signed-off-by: Steven Rostedt (Google) <rostedt@goodmis.org>
+Link: https://lore.kernel.org/r/20240215213944.508142048@goodmis.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
