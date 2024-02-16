@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-change-timeout_poll-to-30
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: diag: change timeout_poll to 30
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Even if it is set to 100ms from the beginning with commit
+df62f2ec3df6 ("selftests/mptcp: add diag interface tests"), there is
+no reason not to have it to 30ms like all the other tests. "diag.sh" is
+not supposed to be slower than the other ones.
+
+To maintain consistency with other scripts, this patch changes it to 30.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
