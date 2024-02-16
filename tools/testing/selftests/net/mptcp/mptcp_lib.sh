@@ -319,3 +319,32 @@ mptcp_lib_wait_local_port_listen() {
 		sleep 0.1
 	done
 }
+
+mptcp_lib_check_tools() {
+	mptcp_lib_check_mptcp
+	mptcp_lib_check_kallsyms
+
+	if [ "${1:-""}" == "ip" ]; then
+		if ! ip -Version &> /dev/null; then
+			mptcp_lib_print_warn "SKIP: Could not run test without ip tool"
+			exit ${KSFT_SKIP}
+		fi
+	fi
+
+	if [ "${2:-""}" == "ss" ]; then
+		if ! ss -h | grep -q MPTCP; then
+			mptcp_lib_print_warn "SKIP: ss tool does not support MPTCP"
+			exit ${KSFT_SKIP}
+		fi
+	fi
+
+	if [ "${3:-""}" == "iptables" ]; then
+		if ! iptables -V &> /dev/null; then
+			mptcp_lib_print_warn "SKIP: Could not run all tests without iptables tool"
+			exit ${KSFT_SKIP}
+		elif ! ip6tables -V &> /dev/null; then
+			mptcp_lib_print_warn "SKIP: Could not run all tests without ip6tables tool"
+			exit ${KSFT_SKIP}
+		fi
+	fi
+}

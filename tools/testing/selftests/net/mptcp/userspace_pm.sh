@@ -10,16 +10,10 @@
 
 . "$(dirname "${0}")/mptcp_lib.sh"
 
-mptcp_lib_check_mptcp
-mptcp_lib_check_kallsyms
+mptcp_lib_check_tools "ip"
 
 if ! mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 	echo "userspace pm tests are not supported by the kernel: SKIP"
-	exit ${KSFT_SKIP}
-fi
-
-if ! ip -Version &> /dev/null; then
-	echo "SKIP: Cannot not run test without ip tool"
 	exit ${KSFT_SKIP}
 fi
 
