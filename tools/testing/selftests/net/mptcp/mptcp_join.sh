@@ -3362,6 +3362,18 @@ userspace_pm_dump()
 	ip netns exec $1 ./pm_nl_ctl dump token $tk
 }
 
+# $1: ns ; $2: id
+userspace_pm_get_addr()
+{
+	local evts=$evts_ns1
+	local tk
+
+	[ "$1" == "$ns2" ] && evts=$evts_ns2
+	tk=$(mptcp_lib_evts_get_info token "$evts")
+
+	ip netns exec $1 ./pm_nl_ctl get $2 token $tk
+}
+
 check_output()
 {
 	local cmd="$1"
@@ -3482,6 +3494,14 @@ userspace_tests()
 				     $'id 10 flags signal 10.0.2.1\nid 20 flags signal 10.0.3.1' \
 				     "      dump addrs signal"
 		fi
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_get_addr$"; then
+			check_output "userspace_pm_get_addr $ns1 10" \
+				     "id 10 flags signal 10.0.2.1" \
+				     "      get id 10 addr"
+			check_output "userspace_pm_get_addr $ns1 20" \
+				     "id 20 flags signal 10.0.3.1" \
+				     "      get id 20 addr"
+		fi
 		userspace_pm_rm_addr $ns1 10
 		userspace_pm_rm_sf $ns1 "::ffff:10.0.2.1" $SUB_ESTABLISHED
 		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
@@ -3519,6 +3539,11 @@ userspace_tests()
 			check_output "userspace_pm_dump $ns2" \
 				     "id 20 flags subflow 10.0.3.2" \
 				     "      dump addrs subflow"
+		fi
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_get_addr$"; then
+			check_output "userspace_pm_get_addr $ns2 20" \
+				     "id 20 flags subflow 10.0.3.2" \
+				     "      get id 20 addr"
 		fi
 		userspace_pm_rm_addr $ns2 20
 		userspace_pm_rm_sf $ns2 10.0.3.2 $SUB_ESTABLISHED
