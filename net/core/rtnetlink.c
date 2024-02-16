@@ -842,9 +842,22 @@ int rtnl_put_cacheinfo(struct sk_buff *skb, struct dst_entry *dst, u32 id,
 }
 EXPORT_SYMBOL_GPL(rtnl_put_cacheinfo);
 
+void netdev_set_operstate(struct net_device *dev, int newstate)
+{
+	unsigned int old = READ_ONCE(dev->operstate);
+
+	do {
+		if (old == newstate)
+			return;
+	} while (!try_cmpxchg(&dev->operstate, &old, newstate));
+
+	netdev_state_change(dev);
+}
+EXPORT_SYMBOL(netdev_set_operstate);
+
 static void set_operstate(struct net_device *dev, unsigned char transition)
 {
-	unsigned char operstate = dev->operstate;
+	unsigned char operstate = READ_ONCE(dev->operstate);
 
 	switch (transition) {
 	case IF_OPER_UP:
@@ -866,12 +879,7 @@ static void set_operstate(struct net_device *dev, unsigned char transition)
 		break;
 	}
 
-	if (dev->operstate != operstate) {
-		write_lock(&dev_base_lock);
-		dev->operstate = operstate;
-		write_unlock(&dev_base_lock);
-		netdev_state_change(dev);
-	}
+	netdev_set_operstate(dev, operstate);
 }
 
 static unsigned int rtnl_dev_get_flags(const struct net_device *dev)
@@ -2191,24 +2199,21 @@ static int rtnl_valid_dump_ifinfo_req(const struct nlmsghdr *nlh,
 
 static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 {
+	const struct rtnl_link_ops *kind_ops = NULL;
 	struct netlink_ext_ack *extack = cb->extack;
 	const struct nlmsghdr *nlh = cb->nlh;
 	struct net *net = sock_net(skb->sk);
-	struct net *tgt_net = net;
-	int h, s_h;
-	int idx = 0, s_idx;
-	struct net_device *dev;
-	struct hlist_head *head;
-	struct nlattr *tb[IFLA_MAX+1];
-	u32 ext_filter_mask = 0;
-	const struct rtnl_link_ops *kind_ops = NULL;
 	unsigned int flags = NLM_F_MULTI;
+	struct nlattr *tb[IFLA_MAX+1];
+	struct {
+		unsigned long ifindex;
+	} *ctx = (void *)cb->ctx;
+	struct net *tgt_net = net;
+	u32 ext_filter_mask = 0;
+	struct net_device *dev;
 	int master_idx = 0;
 	int netnsid = -1;
 	int err, i;
-
-	s_h = cb->args[0];
-	s_idx = cb->args[1];
 
 	err = rtnl_valid_dump_ifinfo_req(nlh, cb->strict_check, tb, extack);
 	if (err < 0) {
@@ -2253,36 +2258,21 @@ static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 		flags |= NLM_F_DUMP_FILTERED;
 
 walk_entries:
-	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
-		idx = 0;
-		head = &tgt_net->dev_index_head[h];
-		hlist_for_each_entry(dev, head, index_hlist) {
-			if (link_dump_filtered(dev, master_idx, kind_ops))
-				goto cont;
-			if (idx < s_idx)
-				goto cont;
-			err = rtnl_fill_ifinfo(skb, dev, net,
-					       RTM_NEWLINK,
-					       NETLINK_CB(cb->skb).portid,
-					       nlh->nlmsg_seq, 0, flags,
-					       ext_filter_mask, 0, NULL, 0,
-					       netnsid, GFP_KERNEL);
-
-			if (err < 0) {
-				if (likely(skb->len))
-					goto out;
-
-				goto out_err;
-			}
-cont:
-			idx++;
+	err = 0;
+	for_each_netdev_dump(tgt_net, dev, ctx->ifindex) {
+		if (link_dump_filtered(dev, master_idx, kind_ops))
+			continue;
+		err = rtnl_fill_ifinfo(skb, dev, net, RTM_NEWLINK,
+				       NETLINK_CB(cb->skb).portid,
+				       nlh->nlmsg_seq, 0, flags,
+				       ext_filter_mask, 0, NULL, 0,
+				       netnsid, GFP_KERNEL);
+		if (err < 0) {
+			if (likely(skb->len))
+				err = skb->len;
+			break;
 		}
 	}
-out:
-	err = skb->len;
-out_err:
-	cb->args[1] = idx;
-	cb->args[0] = h;
 	cb->seq = tgt_net->dev_base_seq;
 	nl_dump_check_consistent(cb, nlmsg_hdr(skb));
 	if (netnsid >= 0)
@@ -2974,11 +2964,9 @@ static int do_setlink(const struct sk_buff *skb,
 	if (tb[IFLA_LINKMODE]) {
 		unsigned char value = nla_get_u8(tb[IFLA_LINKMODE]);
 
-		write_lock(&dev_base_lock);
 		if (dev->link_mode ^ value)
 			status |= DO_SETLINK_NOTIFY;
-		dev->link_mode = value;
-		write_unlock(&dev_base_lock);
+		WRITE_ONCE(dev->link_mode, value);
 	}
 
 	if (tb[IFLA_VFINFO_LIST]) {
