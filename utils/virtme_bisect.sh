@@ -37,11 +37,16 @@ exit_trap() {
 	return ${rc}
 }
 
-trap 'exit_trap' EXIT
-
 if [ "${STASH}" = 1 ]; then
-	git stash pop
+	if ! git stash pop; then
+		git --no-pager diff
+		echo "========= Conflict with git stash pop: skip ========="
+		git restore --staged --worktree .
+		exit 125 # skip
+	fi
 fi
+
+trap 'exit_trap' EXIT
 
 VIRTME_NO_INTERACTIVE=1 VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 ./.virtme.sh "expect-${MODE}" &
 PID_VIRTME=$!
