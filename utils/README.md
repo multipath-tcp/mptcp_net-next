@@ -230,7 +230,7 @@ Here is a checklist.
 
 * Double-check Git tags in commit messages:
 
-      git rebase -i $(b4 prep --show-info start-commit)..
+      git rebase -i $(b4 prep --show-info start-commit)
 
   * Sender `Signed-off-by` tag should be last, and not duplicated.
   * Typically place `Fixes`, `Reported-by` then `Closes` tags first in the list
