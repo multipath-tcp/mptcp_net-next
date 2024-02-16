@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-simult-flows-define-missing-vars
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: simult flows: define missing vars
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The variables 'large', 'small', 'sout', 'cout', 'capout' and 'size' are
+used in multiple functions, so they should be clearly defined as global
+variables at the top of the file.
+
+This patch redefines them at the beginning of simult_flows.sh.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
