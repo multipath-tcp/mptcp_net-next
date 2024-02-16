@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-avoid-printing-warning-once-on-client-side
+Subject: [PATCH] mptcp: avoid printing warning once on client side
 
+After the 'Fixes' commit mentioned below, the client side might print
+the following warning once when a subflow is fully established at the
+reception of any valid additional ack:
+
+  MPTCP: bogus mpc option on established client sk
+
+That's a normal situation, and no warning should be printed for that. We
+can then skip the check when the label is used.
+
+Fixes: e4a0fa47e816 ("mptcp: corner case locking for rx path fields initialization")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
