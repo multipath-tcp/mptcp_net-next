@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-check-the-protocol-in-mptcp_sk-with-DEBUG_NET
+Subject: [PATCH] mptcp: check the protocol in mptcp_sk() with DEBUG_NET
 
+Fuzzers and static checkers might not detect when mptcp_sk() is used
+with a non mptcp_sock structure.
+
+This is similar to the parent commit, where it is easy to use mptcp_sk()
+with a TCP sock, e.g. with a subflow sk.
+
+So a new simple check is done when CONFIG_DEBUG_NET is enabled to tell
+kernel devs when a non-MPTCP socket is being used as an MPTCP one.
+'mptcp_sk()' macro is then defined differently: with an extra WARN to
+complain when an unexpected socket is being used.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
