@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-change-capture-checksum-as-bool
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: join: change capture/checksum as bool
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+To maintain consistency with other scripts, this patch changes vars
+'capture' and 'checksum' as bool vars in mptcp_join.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
