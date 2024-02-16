@@ -3350,6 +3350,18 @@ userspace_pm_rm_sf()
 	wait_rm_sf $1 "${cnt}"
 }
 
+# $1: ns
+userspace_pm_dump()
+{
+	local evts=$evts_ns1
+	local tk
+
+	[ "$1" == "$ns2" ] && evts=$evts_ns2
+	tk=$(mptcp_lib_evts_get_info token "$evts")
+
+	ip netns exec $1 ./pm_nl_ctl dump token $tk
+}
+
 check_output()
 {
 	local cmd="$1"
@@ -3465,10 +3477,24 @@ userspace_tests()
 		chk_mptcp_info subflows 2 subflows 2
 		chk_subflows_total 3 3
 		chk_mptcp_info add_addr_signal 2 add_addr_accepted 2
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns1" \
+				     $'id 10 flags signal 10.0.2.1\nid 20 flags signal 10.0.3.1' \
+				     "      dump addrs signal"
+		fi
 		userspace_pm_rm_addr $ns1 10
 		userspace_pm_rm_sf $ns1 "::ffff:10.0.2.1" $SUB_ESTABLISHED
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns1" \
+				     "id 20 flags signal 10.0.3.1" \
+				     "      dump addrs after rm_addr 10"
+		fi
 		userspace_pm_rm_addr $ns1 20
 		userspace_pm_rm_sf $ns1 10.0.3.1 $SUB_ESTABLISHED
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns1" \
+				     "" "      dump addrs after rm_addr 20"
+		fi
 		chk_rm_nr 2 2 invert
 		chk_mptcp_info subflows 0 subflows 0
 		chk_subflows_total 1 1
@@ -3489,8 +3515,18 @@ userspace_tests()
 		chk_join_nr 1 1 1
 		chk_mptcp_info subflows 1 subflows 1
 		chk_subflows_total 2 2
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns2" \
+				     "id 20 flags subflow 10.0.3.2" \
+				     "      dump addrs subflow"
+		fi
 		userspace_pm_rm_addr $ns2 20
 		userspace_pm_rm_sf $ns2 10.0.3.2 $SUB_ESTABLISHED
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns2" \
+				     "" \
+				     "      dump addrs after rm_addr 20"
+		fi
 		chk_rm_nr 1 1
 		chk_mptcp_info subflows 0 subflows 0
 		chk_subflows_total 1 1
@@ -3510,6 +3546,11 @@ userspace_tests()
 		chk_mptcp_info subflows 0 subflows 0
 		chk_subflows_total 1 1
 		userspace_pm_add_sf $ns2 10.0.3.2 0
+		if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+			check_output "userspace_pm_dump $ns2" \
+				     "id 0 flags subflow 10.0.3.2" \
+				     "      dump addrs id 0 subflow"
+		fi
 		chk_join_nr 1 1 1
 		chk_mptcp_info subflows 1 subflows 1
 		chk_subflows_total 2 2
