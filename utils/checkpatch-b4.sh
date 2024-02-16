@@ -6,4 +6,4 @@ if [ "${branch:0:3}" != "b4/" ]; then
 	exit 1
 fi
 
-./.checkpatch.sh --git "$(b4 prep --show-info | awk '/^start-commit: / { print $2 }').."
+./.checkpatch.sh --git "$(b4 prep --show-info start-commit).."

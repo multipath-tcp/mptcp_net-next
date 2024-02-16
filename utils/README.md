@@ -230,7 +230,7 @@ Here is a checklist.
 
 * Double-check Git tags in commit messages:
 
-      git rebase -i $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+      git rebase -i $(b4 prep --show-info start-commit)..
 
   * Sender `Signed-off-by` tag should be last, and not duplicated.
   * Typically place `Fixes`, `Reported-by` then `Closes` tags first in the list
@@ -239,7 +239,7 @@ Here is a checklist.
     [here](https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html)
     for more details about that) on each patch:
 
-        ./.append-cc-stable.sh $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+        ./.append-cc-stable.sh $(b4 prep --show-info start-commit)..
 
 * Edit the cover letter, replacing the subject and body placeholders:
 
@@ -261,7 +261,7 @@ Here is a checklist.
 
   * For -net, add which kernels versions have the bugs:
 
-        ./.git-check-fixes.sh $(b4 prep --show-info | awk '/^start-commit: / { print $2 }')..
+        ./.git-check-fixes.sh $(b4 prep --show-info start-commit)..
 
 * Determine cc addresses for the series:
 

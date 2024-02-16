@@ -5,7 +5,7 @@ if [ -f .virtme-exec-run ]; then
 fi
 
 is_stable() { local prefix sublevel
-   prefix=$(b4 prep --show-info 2>/dev/null | awk '/^prefixes: / { print $2 }')
+   prefix=$(b4 prep --show-info prefixes 2>/dev/null)
    sublevel=$(awk '/^SUBLEVEL = / { print $3; exit }' Makefile)
    if [ "${prefix}" = "net" ] || [[ "${prefix}" = [0-9]"."[0-9]* ]] || [ "${sublevel}" != 0 ]; then
       echo 1
