@@ -545,7 +545,7 @@ static int ena_alloc_rx_buffer(struct ena_ring *rx_ring,
 
 	/* We handle DMA here */
 	page = ena_alloc_map_page(rx_ring, &dma);
-	if (unlikely(IS_ERR(page)))
+	if (IS_ERR(page))
 		return PTR_ERR(page);
 
 	netif_dbg(rx_ring->adapter, rx_status, rx_ring->netdev,
@@ -2885,7 +2885,6 @@ static const struct net_device_ops ena_netdev_ops = {
 	.ndo_get_stats64	= ena_get_stats64,
 	.ndo_tx_timeout		= ena_tx_timeout,
 	.ndo_change_mtu		= ena_change_mtu,
-	.ndo_set_mac_address	= NULL,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_bpf		= ena_xdp,
 	.ndo_xdp_xmit		= ena_xdp_xmit,
