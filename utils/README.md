@@ -230,7 +230,7 @@ Here is a checklist.
 
 * Double-check Git tags in commit messages:
 
-      git rebase -i $(b4 prep --show-info start-commit)
+      git log --reverse "$(b4 prep --show-info start-commit).."
 
   * Sender `Signed-off-by` tag should be last, and not duplicated.
   * Typically place `Fixes`, `Reported-by` then `Closes` tags first in the list
@@ -240,6 +240,10 @@ Here is a checklist.
     for more details about that) on each patch:
 
         ./.append-cc-stable.sh $(b4 prep --show-info start-commit)..
+
+  * If needed, rework some commits:
+
+        git rebase -i $(b4 prep --show-info start-commit)
 
 * Edit the cover letter, replacing the subject and body placeholders:
 
