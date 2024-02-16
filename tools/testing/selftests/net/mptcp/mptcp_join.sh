@@ -25,8 +25,6 @@ capout=""
 ns1=""
 ns2=""
 ksft_skip=4
-iptables="iptables"
-ip6tables="ip6tables"
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 capture=false
@@ -161,11 +159,11 @@ check_tools()
 		exit $ksft_skip
 	fi
 
-	if ! "${iptables}" -V &> /dev/null; then
-		echo "SKIP: Could not run all tests without ${iptables} tool"
+	if ! iptables -V &> /dev/null; then
+		echo "SKIP: Could not run all tests without iptables tool"
 		exit $ksft_skip
-	elif ! "${ip6tables}" -V &> /dev/null; then
-		echo "SKIP: Could not run all tests without ${ip6tables} tool"
+	elif ! ip6tables -V &> /dev/null; then
+		echo "SKIP: Could not run all tests without ip6tables tool"
 		exit $ksft_skip
 	fi
 }
@@ -348,9 +346,9 @@ reset_with_add_addr_timeout()
 
 	reset "${1}" || return 1
 
-	tables="${iptables}"
+	tables="iptables"
 	if [ $ip -eq 6 ]; then
-		tables="${ip6tables}"
+		tables="ip6tables"
 	fi
 
 	ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
@@ -414,9 +412,9 @@ setup_fail_rules()
 	local ip="${2:-4}"
 	local tables
 
-	tables="${iptables}"
+	tables="iptables"
 	if [ $ip -eq 6 ]; then
-		tables="${ip6tables}"
+		tables="ip6tables"
 	fi
 
 	ip netns exec $ns2 $tables \
@@ -475,7 +473,7 @@ reset_with_tcp_filter()
 	local src="${2}"
 	local target="${3}"
 
-	if ! ip netns exec "${ns}" ${iptables} \
+	if ! ip netns exec "${ns}" iptables \
 			-A INPUT \
 			-s "${src}" \
 			-p tcp \
