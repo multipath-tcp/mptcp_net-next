@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-snd_wnd-initialization-for-passive-socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix snd_wnd initialization for passive socket
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Such value should be inherited from the first subflow, but
+passive sockets always used 'rsk_rcv_wnd'.
+
+Fixes: 6f8a612a33e4 ("mptcp: keep track of advertised windows right edge")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
