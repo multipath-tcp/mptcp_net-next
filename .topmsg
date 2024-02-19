@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-cleanup-SOL_TCP-handling
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup SOL_TCP handling
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Most TCP-level socket options get an integer from user space, and
+set the corresponding field under the msk-level socket lock.
+
+Reduce the code duplication moving such operations in the common code.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
