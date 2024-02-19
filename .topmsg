@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-implement-TCP_NOTSENT_LOWAT-support
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implement TCP_NOTSENT_LOWAT support
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Add support for such socket option storing the user-space provided
+value in a new msk field, and using such data to implement the
+_mptcp_stream_memory_free() helper, similar to the TCP one.
+
+To avoid adding more indirect calls in the fast path, open-code
+a variant of sk_stream_memory_free() in mptcp_sendmsg() and add
+direct calls to the mptcp stream memory free helper where possible.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/464
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
