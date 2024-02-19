@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-cleanup-writer-wake-up
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup writer wake-up
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+After commit 5cf92bbadc58 ("mptcp: re-enable sndbuf autotune"), the
+MPTCP_NOSPACE bit is redundant: it is always set and cleared together with
+SOCK_NOSPACE.
+
+Let's drop the first and always relay on the latter, dropping a bunch
+of useless code.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
