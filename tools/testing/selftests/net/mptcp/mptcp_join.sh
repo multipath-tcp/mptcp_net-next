@@ -161,6 +161,11 @@ check_tools()
 		exit $ksft_skip
 	fi
 
+	if ! ss -h | grep -q MPTCP; then
+		echo "SKIP: ss tool does not support MPTCP"
+		exit $ksft_skip
+	fi
+
 	if ! "${iptables}" -V &> /dev/null; then
 		echo "SKIP: Could not run all tests without ${iptables} tool"
 		exit $ksft_skip
