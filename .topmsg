@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-potential-wake-up-event-loss
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix potential wake-up event loss
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+After the blamed commit below, the send buffer auto-tuning can
+happen after that the mptcp_propagate_sndbuf() completes - via
+the delegated action infrastructure.
+
+We must check for write space even after such change or we risk
+missing the wake-up event.
+
+Fixes: 8005184fd1ca ("mptcp: refactor sndbuf auto-tuning")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
