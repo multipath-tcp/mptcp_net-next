@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-token-for-get-addr-in-yaml
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add token for get-addr in yaml
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds token parameter together with addr in get-addr section in
+mptcp_pm.yaml, then use the following commands to update mptcp_pm_gen.c
+and mptcp_pm_gen.h:
+
+./tools/net/ynl/ynl-gen-c.py --mode kernel \
+        --spec Documentation/netlink/specs/mptcp_pm.yaml --source \
+        -o net/mptcp/mptcp_pm_gen.c
+./tools/net/ynl/ynl-gen-c.py --mode kernel \
+        --spec Documentation/netlink/specs/mptcp_pm.yaml --header \
+        -o net/mptcp/mptcp_pm_gen.h
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
