@@ -1,4 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-check-userspace-pm-flags
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: check userspace pm flags
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Just like MPTCP_PM_ADDR_FLAG_SIGNAL flag is checked in userspace PM
+announce mptcp_pm_nl_announce_doit(), PM flags should be checked in
+mptcp_pm_nl_subflow_create_doit() too.
+
+If MPTCP_PM_ADDR_FLAG_SUBFLOW flag is not set, there's no flags field
+in the output of dump_addr. This looks a bit strange:
+
+        id 10 flags  10.0.3.2
+
+This patch uses mptcp_pm_parse_entry() instead of mptcp_pm_parse_addr()
+to get the PM flags of the entry and check it. MPTCP_PM_ADDR_FLAG_SIGNAL
+flag shouldn't be set here, and if MPTCP_PM_ADDR_FLAG_SUBFLOW flag is
+missing from the netlink attribute, always set this flag.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
