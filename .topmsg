@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-export-mptcp_genl_family-mptcp_nl_fill_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: export mptcp_genl_family & mptcp_nl_fill_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch exports struct mptcp_genl_family and mptcp_nl_fill_addr() helper
+to allow them can be used in pm_userspace.c.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
