@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-token-for-get_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add token for get_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The command get_addr() of pm_nl_ctl can be used like this in in-kernel PM:
+
+	pm_nl_ctl get $id
+
+This patch adds token argument for it to support userspace PM:
+
+	pm_nl_ctl get $id token $token
+
+If 'token $token' is passed to get_addr(), copy it into the kernel netlink.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
