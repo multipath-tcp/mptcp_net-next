@@ -396,3 +396,58 @@ mptcp_lib_ns_exit() {
 		ip netns del "$netns"
 	done
 }
+
+mptcp_lib_evts_init() {
+	local arg
+
+	for arg in "${@}"; do
+		declare -n evts="${arg}"
+
+		if [ -z "${evts}" ]; then
+			evts=$(mktemp)
+		fi
+	done
+}
+
+# $1 ns1, $2 ns2
+mptcp_lib_evts_start() {
+	local ns_1="${1}"
+	local ns_2="${2}"
+	local evts_1="${3}"
+	local evts_2="${4}"
+	declare -n pid_1="${5}"
+	declare -n pid_2="${6}"
+
+	:>"${evts_1}"
+	:>"${evts_2}"
+
+	if [ ${pid_1} -ne 0 ]; then
+		mptcp_lib_kill_wait "${pid_1}"
+	fi
+	ip netns exec "${ns_1}" ./pm_nl_ctl events >> "${evts_1}" 2>&1 &
+	pid_1=$!
+
+	if [ ${pid_2} -ne 0 ]; then
+		mptcp_lib_kill_wait "${pid_2}"
+	fi
+	ip netns exec "${ns_2}" ./pm_nl_ctl events >> "${evts_2}" 2>&1 &
+	pid_2=$!
+}
+
+mptcp_lib_evts_kill() {
+	declare -n pid_1="${1}"
+	declare -n pid_2="${2}"
+
+	mptcp_lib_kill_wait "${pid_1}"
+	mptcp_lib_kill_wait "${pid_2}"
+
+	pid_1=0
+	pid_2=0
+}
+
+mptcp_lib_evts_remove() {
+	local evts_1="${1}"
+	local evts_2="${2}"
+
+	rm -rf "${evts_1}" "${evts_2}"
+}

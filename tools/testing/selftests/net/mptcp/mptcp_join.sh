@@ -158,8 +158,7 @@ init() {
 	cinsent=$(mktemp)
 	cout=$(mktemp)
 	err=$(mktemp)
-	evts_ns1=$(mktemp)
-	evts_ns2=$(mktemp)
+	mptcp_lib_evts_init evts_ns1 evts_ns2
 
 	trap cleanup EXIT
 
@@ -172,7 +171,7 @@ cleanup()
 	rm -f "$cin" "$cout" "$sinfail"
 	rm -f "$sin" "$sout" "$cinsent" "$cinfail"
 	rm -f "$tmpfile"
-	rm -rf $evts_ns1 $evts_ns2
+	mptcp_lib_evts_remove "${evts_ns1}" "${evts_ns2}"
 	rm -f "$err"
 	cleanup_partial
 }
@@ -437,12 +436,8 @@ reset_with_events()
 {
 	reset "${1}" || return 1
 
-	:> "$evts_ns1"
-	:> "$evts_ns2"
-	ip netns exec $ns1 ./pm_nl_ctl events >> "$evts_ns1" 2>&1 &
-	evts_ns1_pid=$!
-	ip netns exec $ns2 ./pm_nl_ctl events >> "$evts_ns2" 2>&1 &
-	evts_ns2_pid=$!
+	mptcp_lib_evts_start "${ns1}" "${ns2}" "${evts_ns1}" "${evts_ns2}" \
+			     evts_ns1_pid evts_ns2_pid
 }
 
 reset_with_tcp_filter()
@@ -614,8 +609,7 @@ wait_mpj()
 
 kill_events_pids()
 {
-	mptcp_lib_kill_wait $evts_ns1_pid
-	mptcp_lib_kill_wait $evts_ns2_pid
+	mptcp_lib_evts_kill evts_ns1_pid evts_ns2_pid
 }
 
 pm_nl_set_limits()
