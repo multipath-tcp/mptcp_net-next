@@ -6,6 +6,8 @@ named mptcp_lib_check_output in mptcp_lib.sh.
 
 This helper will be used for userspace dump addresses tests.
 
+Co-developed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
