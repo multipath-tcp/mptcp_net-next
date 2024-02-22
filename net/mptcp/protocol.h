@@ -673,6 +673,13 @@ bool mptcp_addresses_equal(const struct mptcp_addr_info *a,
 			   const struct mptcp_addr_info *b, bool use_port);
 void mptcp_local_address(const struct sock_common *skc, struct mptcp_addr_info *addr);
 
+static inline bool mptcp_addresses_equal_check_id(const struct mptcp_addr_info *a,
+						  const struct mptcp_addr_info *b,
+						  bool use_port, bool check_id)
+{
+	return mptcp_addresses_equal(a, b, use_port) ? a->id == b->id : false;
+}
+
 /* called with sk socket lock held */
 int __mptcp_subflow_connect(struct sock *sk, const struct mptcp_addr_info *loc,
 			    const struct mptcp_addr_info *remote);
@@ -966,7 +973,8 @@ mptcp_pm_del_add_timer(struct mptcp_sock *msk,
 		       const struct mptcp_addr_info *addr, bool check_id);
 struct mptcp_pm_add_entry *
 mptcp_lookup_anno_list_by_saddr(const struct mptcp_sock *msk,
-				const struct mptcp_addr_info *addr);
+				const struct mptcp_addr_info *addr,
+				bool check_id);
 int mptcp_pm_get_flags_and_ifindex_by_id(struct mptcp_sock *msk,
 					 unsigned int id,
 					 u8 *flags, int *ifindex);
