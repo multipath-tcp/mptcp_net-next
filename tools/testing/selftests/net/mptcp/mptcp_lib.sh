@@ -55,11 +55,13 @@ mptcp_lib_expect_all_features() {
 	[ "${SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES:-}" = "1" ]
 }
 
-# $1: msg
+# $1: msg $2: continue or not
 mptcp_lib_fail_if_expected_feature() {
+	local continue="${2:-0}"
+
 	if mptcp_lib_expect_all_features; then
-		echo "ERROR: missing feature: ${*}"
-		exit ${KSFT_FAIL}
+		echo "ERROR: missing feature: ${1}"
+		[ "${continue}" -eq 0 ] && exit ${KSFT_FAIL}
 	fi
 
 	return 1
@@ -107,7 +109,7 @@ mptcp_lib_kallsyms_has() {
 		return 0
 	fi
 
-	mptcp_lib_fail_if_expected_feature "${sym} symbol not found"
+	mptcp_lib_fail_if_expected_feature "${sym} symbol not found" 1
 }
 
 # $1: part of a symbol to look at, add '$' at the end for full name
