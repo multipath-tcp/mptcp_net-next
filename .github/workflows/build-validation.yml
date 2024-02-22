@@ -94,10 +94,10 @@ jobs:
         if: always()
         run: |
           if stat ./build-*-results.txt &>/dev/null; then
-            echo '- Results for ${{ matrix.defconfig }} ${{ matrix.ipv6 }} ${{ matrix.mptcp }}:' >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            cat ./build-*-results.txt >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo '- Results for ${{ matrix.defconfig }} ${{ matrix.ipv6 }} ${{ matrix.mptcp }}:' >> ${GITHUB_STEP_SUMMARY}
+            echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
+            cat ./build-*-results.txt >> ${GITHUB_STEP_SUMMARY}
+            echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
           fi
 
       - name: "Save cache for CCache"
