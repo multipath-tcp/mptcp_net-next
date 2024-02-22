@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: "Collect Workflow Telemetry"
-        uses: catchpoint/workflow-telemetry-action@v1
+        uses: catchpoint/workflow-telemetry-action@v2
 
       - name: "Find base branch"
         id: branch
@@ -62,17 +62,18 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: "Tests"
-        uses: multipath-tcp/mptcp-upstream-virtme-docker@latest
+        uses: multipath-tcp/mptcp-upstream-virtme-docker@${{ steps.branch.outputs.name == 'export-net' && 'net' || 'latest' }}
         with:
           ccache_maxsize: 500M ## 10GB = project limit
           mode: auto-normal
+          packetdrill_stable: ${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}
           # extra_env: INPUT_RUN_TESTS_${{ matrix.join }}=selftest_mptcp_join
 
       - name: "Publish conclusion"
         if: always()
         run: |
           if [ -s "conclusion.txt" ]; then
-            echo '### Conclusion' >> $GITHUB_STEP_SUMMARY
+            echo '## Conclusion' >> $GITHUB_STEP_SUMMARY
             cat "conclusion.txt" >> $GITHUB_STEP_SUMMARY
           fi
 
