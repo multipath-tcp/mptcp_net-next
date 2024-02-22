@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-fix-possible-deadlock-in-subflow-diag
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
