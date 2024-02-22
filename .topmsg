@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-mptcp_lib_ns_init-exit-helpers
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_ns_init/exit helpers
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Add helpers mptcp_lib_ns_init() and mptcp_lib_ns_exit() in mptcp_lib.sh
+to initialize and delete the given namespaces. Then every test script
+can invoke these helpers and use all namespaces.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
