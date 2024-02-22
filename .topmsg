@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-explicitly-trigger-the-listener-diag-code-path
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: explicitly trigger the listener diag code-path
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The mptcp diag interface already experienced a few locking bugs
+that lockdep and appropriate coverage have detected in advance.
+
+Let's add a test-case triggering the relevant code path, to prevent
+similar issues in the future.
+
+Be careful to cope with very slow environments.
+
+Note that we don't need an explicit timeout on the mptcp_connect
+subprocess to cope with eventual bug/hang-up as the final cleanup
+terminating the child processes will take care of that.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
