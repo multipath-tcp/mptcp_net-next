@@ -45,8 +45,8 @@ jobs:
         if: always()
         run: |
           if [ -s "${{ env.DETAILS }}" ]; then
-            echo '## Results' >> $GITHUB_STEP_SUMMARY
-            cat "${{ env.DETAILS }}" >> $GITHUB_STEP_SUMMARY
+            echo '## Results' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
           fi
 
       - name: "Artifacts"
