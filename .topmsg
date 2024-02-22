@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-more-operations-in-ns_init-exit
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: more operations in ns_init/exit
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Set more the default sysctl values in mptcp_lib_ns_init(). It is fine to
+do that everywhere, because they could be overridden latter if needed.
+
+mptcp_lib_ns_exit() now also try to remove temp netns files used for the
+stats even for selftests not using them. That's fine to do that because
+these files have a unique name.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
