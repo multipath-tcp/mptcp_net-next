@@ -292,7 +292,7 @@ chk_listener_nr 0 "no listener sockets"
 NR_SERVERS=100
 for I in $(seq 1 $NR_SERVERS); do
 	ip netns exec $ns ./mptcp_connect -p $((I + 20001)) \
-		-t ${timeout_poll} -l 0.0.0.0 2>&1 >/dev/null &
+		-t ${timeout_poll} -l 0.0.0.0 >/dev/null 2>&1 &
 done
 
 for I in $(seq 1 $NR_SERVERS); do
@@ -303,7 +303,7 @@ chk_listener_nr $NR_SERVERS "many listener sockets"
 
 # graceful termination
 for I in $(seq 1 $NR_SERVERS); do
-	echo a | ip netns exec $ns ./mptcp_connect -p $((I + 20001)) 127.0.0.1 2>&1 >/dev/null &
+	echo a | ip netns exec $ns ./mptcp_connect -p $((I + 20001)) 127.0.0.1 >/dev/null 2>&1 &
 done
 flush_pids
 
