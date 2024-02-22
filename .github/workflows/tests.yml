@@ -77,9 +77,9 @@ jobs:
             cat "conclusion.txt" >> $GITHUB_STEP_SUMMARY
             echo '' >> $GITHUB_STEP_SUMMARY
             echo '## Summary' >> $GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             cat "summary.txt" >> $GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: "Artifacts (always)"
