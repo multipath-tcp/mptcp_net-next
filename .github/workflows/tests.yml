@@ -75,6 +75,11 @@ jobs:
           if [ -s "conclusion.txt" ]; then
             echo '## Conclusion' >> $GITHUB_STEP_SUMMARY
             cat "conclusion.txt" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo '## Summary' >> $GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> $GITHUB_STEP_SUMMARY
+            cat "summary.txt" >> $GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: "Artifacts (always)"
