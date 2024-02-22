@@ -62,7 +62,7 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: "Tests"
-        uses: multipath-tcp/mptcp-upstream-virtme-docker@${{ steps.branch.outputs.name == 'export-net' && 'net' || 'latest' }}
+        uses: ${{ steps.branch.outputs.name == 'export-net' && 'multipath-tcp/mptcp-upstream-virtme-docker@net' || 'multipath-tcp/mptcp-upstream-virtme-docker@latest' }}
         with:
           ccache_maxsize: 500M ## 10GB = project limit
           mode: auto-normal
