@@ -1,1 +1,1 @@
-t/mptcp-fix-double-free-on-socket-dismantle
+t/selftests-mptcp-explicitly-trigger-the-listener-diag-code-path
