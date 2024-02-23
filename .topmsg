@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-userspace-pm-avoid-relaunching-pm-events
+Subject: [PATCH] selftests: userspace pm: avoid relaunching pm events
 
+'make_connection' is launched twice: once for IPv4, once for IPv6.
+
+But then, the "pm_nl_ctl events" was launched a first time, killed, then
+relaunched after for no particular reason.
+
+We can then move this code, and the generation of the temp file to
+exchange, to the init part, and remove extra conditions that no longer
+needed.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
