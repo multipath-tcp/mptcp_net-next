@@ -58,15 +58,15 @@ __chk_nr()
 	printf "%-50s" "$msg"
 	if [ "$nr" != "$expected" ]; then
 		if [ "$nr" = "$skip" ] && ! mptcp_lib_expect_all_features; then
-			echo "[SKIP] Feature probably not supported"
+			mptcp_lib_print_warn "[SKIP] Feature probably not supported"
 			mptcp_lib_result_skip "${msg}"
 		else
-			echo "[FAIL] expected $expected found $nr"
+			mptcp_lib_print_err "[FAIL] expected $expected found $nr"
 			mptcp_lib_result_fail "${msg}"
 			ret=$TEST_COUNT
 		fi
 	else
-		echo "[ OK ]"
+		mptcp_lib_print_ok "[ OK ]"
 		mptcp_lib_result_pass "${msg}"
 	fi
 	TEST_COUNT=$((TEST_COUNT+1))
@@ -116,15 +116,15 @@ wait_msk_nr()
 
 	printf "%-50s" "$msg"
 	if [ $i -ge $timeout ]; then
-		echo "[FAIL] timeout while expecting $expected max $max last $nr"
+		mptcp_lib_print_err "[FAIL] timeout while expecting $expected max $max last $nr"
 		mptcp_lib_result_fail "${msg} # timeout"
 		ret=$TEST_COUNT
 	elif [ $nr != $expected ]; then
-		echo "[FAIL] expected $expected found $nr"
+		mptcp_lib_print_err "[FAIL] expected $expected found $nr"
 		mptcp_lib_result_fail "${msg} # unexpected result"
 		ret=$TEST_COUNT
 	else
-		echo "[ OK ]"
+		mptcp_lib_print_ok "[ OK ]"
 		mptcp_lib_result_pass "${msg}"
 	fi
 	TEST_COUNT=$((TEST_COUNT+1))
