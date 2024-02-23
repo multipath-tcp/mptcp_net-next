@@ -14,8 +14,10 @@ on:
 env:
   CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
   PW: "https://patchwork.kernel.org/api/1.2"
-  RESULTS: "./checkpatch-results.txt"
-  DETAILS: "./checkpatch-details.txt"
+  CHECKPATCH_RESULTS: "./checkpatch-results.txt"
+  CHECKPATCH_DETAILS: "./checkpatch-details.txt"
+  SHELLCHECK_RESULTS: "./shellcheck-results.txt"
+  SHELLCHECK_DETAILS: "./shellcheck-details.txt"
 
 permissions: {}
 
@@ -44,22 +46,30 @@ jobs:
       - name: "Publish details"
         if: always()
         run: |
-          if [ -s "${{ env.DETAILS }}" ]; then
-            echo '## Results' >> ${GITHUB_STEP_SUMMARY}
-            cat "${{ env.DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
+          if [ -s "${{ env.CHECKPATCH_DETAILS }}" ]; then
+            echo '## CheckPatch' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.CHECKPATCH_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
+          fi
+          if [ -s "${{ env.SHELLCHECK_DETAILS }}" ]; then
+            echo '## ShellCheck' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.SHELLCHECK_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
           fi
 
       - name: "Artifacts"
         uses: actions/upload-artifact@v4
         with:
           name: results
-          path: ${{ env.RESULTS }}
+          path: |
+            ${{ env.CHECKPATCH_RESULTS }}
+            ${{ env.SHELLCHECK_RESULTS }}
 
       - name: "Artifacts"
         uses: actions/upload-artifact@v4
         with:
           name: details
-          path: ${{ env.DETAILS }}
+          path: |
+            ${{ env.CHECKPATCH_DETAILS }}
+            ${{ env.SHELLCHECK_DETAILS }}
 
   notif:
     name: "Notifications"
@@ -74,7 +84,7 @@ jobs:
 
       - name: "Patchwork"
         run: |
-          # $1: mid, $2: status, $3: desc
+          # $1: mid, $2: status, $3: desc, $4: context
           _send() { local check_url
             check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
             if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
@@ -87,7 +97,7 @@ jobs:
               -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
               -F "state=${2}" \
               -F "target_url=${URL_GH}" \
-              -F "context=checkpatch" \
+              -F "context=${4}" \
               -F "description=${3}" \
               "${check_url}" | jq '.'
           }
@@ -113,15 +123,24 @@ jobs:
             fi
           }
 
-          if [ ! -s "${RESULTS}" ]; then
-            echo "Strange, no results, please check why"
-            exit 1
-          fi
+          # $1: file, $2: context
+          parse_results() {
+            if [ ! -s "${1}" ]; then
+              echo "Strange, no results, please check why"
+              return 1
+            fi
 
-          while read -r mid status desc; do
-            echo "Sending: '${mid}' '${status}' '${desc}'"
-            send "${mid}" "${status}" "${desc}"
-          done < "${RESULTS}"
+            while read -r mid status desc; do
+              echo "Sending: '${mid}' '${status}' '${desc}' '${2}'"
+              send "${mid}" "${status}" "${desc}" "${2}"
+            done < "${1}"
+          }
+
+          rc=0
+          parse_results "${CHECKPATCH_RESULTS}" "checkpatch" || rc=1
+          parse_results "${SHELLCHECK_RESULTS}" "shellcheck" || rc=1
+          exit ${rc}
+
         env:
           URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
@@ -138,18 +157,27 @@ jobs:
           name: results
       - name: "Set exit status"
         run: |
-          if [ ! -s "${RESULTS}" ]; then
-            echo "Strange, no results, please check why"
-            exit 1
-          fi
+          # $1: result file, $2: context
+          check() {
+            if [ ! -s "${1}" ]; then
+              echo "Strange, no results, please check why"
+              exit 1
+            fi
 
-          if awk '{ if ($2 != "success") exit 1 }' "${RESULTS}"; then
-            echo "Everything OK with Checkpatch, good job!"
-            exit 0
-          fi
+            if awk '{ if ($2 != "success") exit 1 }' "${1}"; then
+              echo "Everything OK with ${2}, good job!"
+              return 0
+            fi
 
-          echo "Checkpatch detected some issues:"
-          echo
-          cat "${RESULTS}"
-          echo
-          exit 1
+            echo "${2} detected some issues:"
+            echo
+            cat "${1}"
+            echo
+
+            return 1
+          }
+
+          rc=0
+          check "${CHECKPATCH_RESULTS}" "CheckPatch" || rc=1
+          check "${SHELLCHECK_RESULTS}" "ShellCheck" || rc=1
+          exit ${rc}
