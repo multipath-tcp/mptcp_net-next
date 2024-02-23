@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause-Clear
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/msi.h>
@@ -423,7 +423,7 @@ int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 			goto free_controller;
 	} else {
 		mhi_ctrl->iova_start = 0;
-		mhi_ctrl->iova_stop = 0xFFFFFFFF;
+		mhi_ctrl->iova_stop = ab_pci->dma_mask;
 	}
 
 	mhi_ctrl->rddm_size = RDDM_DUMP_SIZE;
@@ -443,6 +443,7 @@ int ath11k_mhi_register(struct ath11k_pci *ab_pci)
 	case ATH11K_HW_QCA6390_HW20:
 	case ATH11K_HW_WCN6855_HW20:
 	case ATH11K_HW_WCN6855_HW21:
+	case ATH11K_HW_QCA2066_HW21:
 		ath11k_mhi_config = &ath11k_mhi_config_qca6390;
 		break;
 	default:
