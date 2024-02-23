@@ -1,4 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-fix-shellcheck-warnings
+Subject: [PATCH] selftests: mptcp: sockopt: fix shellcheck warnings
 
+shellcheck recently helped to prevent issues. It is then good to fix the
+other harmless issues in order to spot "real" ones later.
+
+Here, two categories of warnings are now ignored:
+
+- SC2317: Command appears to be unreachable. The cleanup() function is
+  invoked indirectly via the EXIT trap.
+
+- SC2086: Double quote to prevent globbing and word splitting. This is
+  recommended, but the current usage is correct and there is no need to
+  do all these modifications to be compliant with this rule.
+
+For the modifications:
+
+  - SC2034: ksft_skip appears unused.
+  - SC2006: Use $(...) notation instead of legacy backticks `...`.
+  - SC2145: Argument mixes string and array. Use * or separate argument.
+
+Now this script is shellcheck (0.9.0) compliant. We can easily spot new
+issues.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
