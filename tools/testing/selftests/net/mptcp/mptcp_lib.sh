@@ -411,3 +411,12 @@ mptcp_lib_events() {
 	ip netns exec "${ns}" ./pm_nl_ctl events >> "${evts}" 2>&1 &
 	pid=$!
 }
+
+mptcp_lib_print_test_counter() {
+	declare -n counter="${1}"
+	local fmt="${2}"
+	local msg="${3}"
+	local digit="${4-2}"
+
+	printf "%0${digit}u ${fmt}" "$((counter++))" "${msg}"
+}
