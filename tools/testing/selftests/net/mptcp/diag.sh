@@ -55,7 +55,7 @@ __chk_nr()
 
 	nr=$(eval $command)
 
-	printf "%-50s" "$msg"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "$msg"
 	if [ "$nr" != "$expected" ]; then
 		if [ "$nr" = "$skip" ] && ! mptcp_lib_expect_all_features; then
 			mptcp_lib_print_warn "[SKIP] Feature probably not supported"
@@ -69,7 +69,6 @@ __chk_nr()
 		mptcp_lib_print_ok "[ OK ]"
 		mptcp_lib_result_pass "${msg}"
 	fi
-	test_cnt=$((test_cnt+1))
 }
 
 __chk_msk_nr()
@@ -114,7 +113,7 @@ wait_msk_nr()
 		sleep 1
 	done
 
-	printf "%-50s" "$msg"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "$msg"
 	if [ $i -ge $timeout ]; then
 		mptcp_lib_print_err "[FAIL] timeout while expecting $expected max $max last $nr"
 		mptcp_lib_result_fail "${msg} # timeout"
@@ -127,7 +126,6 @@ wait_msk_nr()
 		mptcp_lib_print_ok "[ OK ]"
 		mptcp_lib_result_pass "${msg}"
 	fi
-	test_cnt=$((test_cnt+1))
 }
 
 chk_msk_fallback_nr()

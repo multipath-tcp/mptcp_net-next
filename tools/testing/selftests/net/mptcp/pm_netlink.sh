@@ -9,6 +9,8 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 ret=0
+#shellcheck disable=SC2034
+test_cnt=1
 
 usage() {
 	echo "Usage: $0 [ -h ]"
@@ -53,7 +55,7 @@ check()
 	local msg="$3"
 	local rc=0
 
-	printf "%-50s" "$msg"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "$msg"
 	mptcp_lib_check_output "${err}" "${cmd}" "${expected}" || rc=${?}
 	if [ ${rc} -eq 2 ]; then
 		mptcp_lib_result_fail "${msg} # error ${rc}"
@@ -189,7 +191,7 @@ subflow,backup,fullmesh 10.0.1.1" "          (backup,fullmesh)"
 else
 	for st in fullmesh nofullmesh backup,fullmesh; do
 		st="          (${st})"
-		printf "%-50s" "${st}"
+		mptcp_lib_print_test_counter test_cnt "%-50s" "${st}"
 		mptcp_lib_print_warn "[SKIP]"
 		mptcp_lib_result_skip "${st}"
 	done

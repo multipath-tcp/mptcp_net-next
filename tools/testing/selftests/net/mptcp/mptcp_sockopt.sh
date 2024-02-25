@@ -17,6 +17,8 @@ timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 iptables="iptables"
 ip6tables="ip6tables"
+#shellcheck disable=SC2034
+test_cnt=1
 
 ns1=""
 ns2=""
@@ -161,7 +163,7 @@ do_transfer()
 	wait $spid
 	local rets=$?
 
-	printf "%-50s" "transfer ${ip}"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "transfer ${ip}"
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
 		echo " client exit code $retc, server $rets" 1>&2
 		echo -e "\nnetns ${listener_ns} socket stat for ${port}:" 1>&2
@@ -178,7 +180,7 @@ do_transfer()
 	fi
 	mptcp_lib_print_ok "[ OK ]"
 
-	printf "%-50s" "mark ${ip}"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "mark ${ip}"
 	if [ $local_addr = "::" ];then
 		check_mark $listener_ns 6 || retc=1
 		check_mark $connector_ns 6 || retc=1
@@ -226,7 +228,7 @@ do_mptcp_sockopt_tests()
 	ip netns exec "$ns_sbox" ./mptcp_sockopt
 	lret=$?
 
-	printf "%-50s" "sockopt v4"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "sockopt v4"
 	if [ $lret -ne 0 ]; then
 		mptcp_lib_print_err "FAIL: SOL_MPTCP getsockopt"
 		mptcp_lib_result_fail "sockopt v4"
@@ -239,7 +241,7 @@ do_mptcp_sockopt_tests()
 	ip netns exec "$ns_sbox" ./mptcp_sockopt -6
 	lret=$?
 
-	printf "%-50s" "sockopt v6"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "sockopt v6"
 	if [ $lret -ne 0 ]; then
 		mptcp_lib_print_err "FAIL: SOL_MPTCP getsockopt (ipv6)"
 		mptcp_lib_result_fail "sockopt v6"
@@ -269,7 +271,7 @@ run_tests()
 
 do_tcpinq_test()
 {
-	printf "%-50s" "TCP_INQ: $*"
+	mptcp_lib_print_test_counter test_cnt "%-50s" "TCP_INQ: $*"
 	ip netns exec "$ns_sbox" ./mptcp_inq "$@"
 	local lret=$?
 	if [ $lret -ne 0 ];then
