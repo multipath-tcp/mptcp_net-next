@@ -131,6 +131,7 @@ ns2=""
 ns3=""
 ns4=""
 
+#shellcheck disable=SC2034
 TEST_COUNT=0
 TEST_GROUP=""
 
@@ -255,8 +256,9 @@ check_mptcp_disabled()
 
 	# net.mptcp.enabled should be enabled by default
 	if [ "$(ip netns exec ${disabled_ns} sysctl net.mptcp.enabled | awk '{ print $3 }')" -ne 1 ]; then
-		echo -n -e "net.mptcp.enabled sysctl is not 1 by default"
-		mptcp_lib_print_err "\t\t\t   [FAIL]"
+		mptcp_lib_print_test_counter TEST_COUNT "%s" \
+			"net.mptcp.enabled sysctl is not 1 by default"
+		mptcp_lib_print_err "\t\t\t\t   [FAIL]"
 		mptcp_lib_result_fail "net.mptcp.enabled sysctl is not 1 by default"
 		ret=1
 		return 1
@@ -269,15 +271,17 @@ check_mptcp_disabled()
 	mptcp_lib_ns_exit "${disabled_ns}"
 
 	if [ ${err} -eq 0 ]; then
-		echo -n -e "New MPTCP socket cannot be blocked via sysctl"
-		mptcp_lib_print_err "\t\t\t   [FAIL]"
+		mptcp_lib_print_test_counter TEST_COUNT "%s" \
+			"New MPTCP socket cannot be blocked via sysctl"
+		mptcp_lib_print_err "\t\t\t\t   [FAIL]"
 		mptcp_lib_result_fail "New MPTCP socket cannot be blocked via sysctl"
 		ret=1
 		return 1
 	fi
 
-	echo -n -e "New MPTCP socket can be blocked via sysctl"
-	mptcp_lib_print_ok "\t\t\t   [ OK ]"
+	mptcp_lib_print_test_counter TEST_COUNT "%s" \
+		"New MPTCP socket can be blocked via sysctl"
+	mptcp_lib_print_ok "\t\t\t\t   [ OK ]"
 	mptcp_lib_result_pass "New MPTCP socket can be blocked via sysctl"
 	return 0
 }
@@ -319,7 +323,6 @@ do_transfer()
 
 	local port
 	port=$((10000+PORT++))
-	TEST_COUNT=$((TEST_COUNT+1))
 
 	if [ "$rcvbuf" -gt 0 ]; then
 		extra_args="$extra_args -R $rcvbuf"
@@ -346,7 +349,7 @@ do_transfer()
 	addr_port=$(printf "%s:%d" ${connect_addr} ${port})
 	local result_msg
 	result_msg="$(printf "%.3s %-5s -> %.3s (%-20s) %-5s" ${connector_ns} ${cl_proto} ${listener_ns} ${addr_port} ${srv_proto})"
-	printf "%s\t" "${result_msg}"
+	mptcp_lib_print_test_counter TEST_COUNT "%s\t" "${result_msg}"
 
 	if $capture; then
 		local capuser
@@ -663,7 +666,8 @@ run_test_transparent()
 	# following function has been exported (T). Not great but better than
 	# checking for a specific kernel version.
 	if ! mptcp_lib_kallsyms_has "T __ip_sock_set_tos$"; then
-		echo "INFO: ${msg} not supported by the kernel: SKIP"
+		mptcp_lib_print_test_counter TEST_COUNT "%s\n" \
+			"INFO: ${msg} not supported by the kernel: SKIP"
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
 	fi
@@ -680,7 +684,8 @@ table inet mangle {
 }
 EOF
 	then
-		echo "SKIP: $msg, could not load nft ruleset"
+		mptcp_lib_print_test_counter TEST_COUNT "%s\n" \
+			"SKIP: $msg, could not load nft ruleset"
 		mptcp_lib_fail_if_expected_feature "nft rules"
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
@@ -696,7 +701,8 @@ EOF
 
 	if ! ip -net "$listener_ns" $r6flag rule add fwmark 1 lookup 100; then
 		ip netns exec "$listener_ns" nft flush ruleset
-		echo "SKIP: $msg, ip $r6flag rule failed"
+		mptcp_lib_print_test_counter TEST_COUNT "%s\n" \
+			"SKIP: $msg, ip $r6flag rule failed"
 		mptcp_lib_fail_if_expected_feature "ip rule"
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
@@ -705,7 +711,8 @@ EOF
 	if ! ip -net "$listener_ns" route add local $local_addr/0 dev lo table 100; then
 		ip netns exec "$listener_ns" nft flush ruleset
 		ip -net "$listener_ns" $r6flag rule del fwmark 1 lookup 100
-		echo "SKIP: $msg, ip route add local $local_addr failed"
+		mptcp_lib_print_test_counter TEST_COUNT "%s\n" \
+			"SKIP: $msg, ip route add local $local_addr failed"
 		mptcp_lib_fail_if_expected_feature "ip route"
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
@@ -861,7 +868,7 @@ mptcp_lib_result_code "${ret}" "ping tests"
 
 stop_if_error "Could not even run ping tests"
 
-echo -e "ping tests"
+mptcp_lib_print_test_counter TEST_COUNT "%s" "ping tests"
 mptcp_lib_print_ok "\t\t\t\t\t\t\t\t   [ OK ]"
 
 [ -n "$tc_loss" ] && tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $tc_loss delay ${tc_delay}ms
