@@ -189,7 +189,8 @@ subflow,backup,fullmesh 10.0.1.1" "          (backup,fullmesh)"
 else
 	for st in fullmesh nofullmesh backup,fullmesh; do
 		st="          (${st})"
-		printf "%-50s%s\n" "${st}" "[SKIP]"
+		printf "%-50s" "${st}"
+		mptcp_lib_print_warn "[SKIP]"
 		mptcp_lib_result_skip "${st}"
 	done
 fi
