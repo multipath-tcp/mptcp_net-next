@@ -53,6 +53,7 @@ server_addr_id=${RANDOM:0:2}
 ns1=""
 ns2=""
 ret=0
+test_cnt=0
 test_name=""
 
 _printf() {
@@ -69,7 +70,7 @@ print_test()
 {
 	test_name="${1}"
 
-	_printf "%-68s" "${test_name}"
+	mptcp_lib_print_test_counter test_cnt "%-68s" "${test_name}"
 }
 
 test_pass()
