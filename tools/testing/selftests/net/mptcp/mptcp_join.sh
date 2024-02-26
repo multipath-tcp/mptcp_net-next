@@ -48,6 +48,7 @@ declare -A all_tests
 declare -a only_tests_ids
 declare -a only_tests_names
 declare -A failed_tests
+#shellcheck disable=SC2034
 TEST_COUNT=0
 TEST_NAME=""
 nr_blank=6
@@ -172,7 +173,7 @@ cleanup()
 
 print_title()
 {
-	printf "%03u %s\n" "${TEST_COUNT}" "${TEST_NAME}"
+	mptcp_lib_print_test_counter TEST_COUNT "%s\n" "${TEST_NAME}" 3
 }
 
 print_check()
@@ -267,8 +268,6 @@ reset()
 	append_prev_results
 
 	TEST_NAME="${1}"
-
-	TEST_COUNT=$((TEST_COUNT+1))
 
 	if skip_test; then
 		last_test_ignored=1
