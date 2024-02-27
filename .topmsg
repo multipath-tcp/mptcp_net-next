@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-lookup_by_id-in-lookup_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: drop lookup_by_id in lookup_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When the lookup_by_id parameter of __lookup_addr() is true, it's the same
+as __lookup_addr_by_id(), it can be replaced by __lookup_addr_by_id()
+directly. So drop this parameter, let __lookup_addr() only looks up address
+on the local address list by comparing addresses in it, not address ids.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
