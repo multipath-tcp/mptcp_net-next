@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-make-pm_remove_addrs_and_subflows-static
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
