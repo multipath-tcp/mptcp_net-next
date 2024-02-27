@@ -566,7 +566,7 @@ void dpll_pin_put(struct dpll_pin *pin)
 		xa_destroy(&pin->dpll_refs);
 		xa_destroy(&pin->parent_refs);
 		dpll_pin_prop_free(&pin->prop);
-		kfree(pin);
+		kfree_rcu(pin, rcu);
 	}
 	mutex_unlock(&dpll_lock);
 }
