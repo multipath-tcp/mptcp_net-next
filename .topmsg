@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests: mptcp: join: add ss mptcp support check
-
-Commands 'ss -M' are used in script mptcp_join.sh to display only MPTCP
-sockets. So it must be checked if ss tool supports MPTCP in this script.
-
-Fixes: e274f7154008 ("selftests: mptcp: add subflow limits test-cases")
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
