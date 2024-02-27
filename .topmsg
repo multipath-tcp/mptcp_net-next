@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: drop duplicate header inclusions
-
-The headers net/tcp.h, net/genetlink.h and uapi/linux/mptcp.h are included
-in protocol.h already, no need to include them again directly. This patch
-removes these duplicate header inclusions.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
