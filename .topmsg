@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-set-error-messages-for-set_flags
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: set error messages for set_flags
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+In addition to returning the error value, this patch also sets an error
+messages with GENL_SET_ERR_MSG or NL_SET_ERR_MSG_ATTR both for pm_netlink.c
+and pm_userspace.c. It will help the userspace to identify the issue.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
