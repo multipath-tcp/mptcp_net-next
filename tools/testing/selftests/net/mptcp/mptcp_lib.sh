@@ -48,6 +48,29 @@ mptcp_lib_print_err() {
 	mptcp_lib_print_color "${MPTCP_LIB_COLOR_RED}${*}"
 }
 
+mptcp_lib_pr_ok() {
+	mptcp_lib_print_ok "[ OK ]"
+}
+
+mptcp_lib_pr_skip() {
+	local msg="[SKIP]"
+
+	mptcp_lib_print_warn "${msg}"
+}
+
+mptcp_lib_pr_fail() {
+	local msg="[FAIL]"
+
+	if [ "${#}" -gt 0 ]; then
+		msg+="${1:+ ${*}}"
+	fi
+	mptcp_lib_print_err "${msg}"
+}
+
+mptcp_lib_pr_info() {
+	mptcp_lib_print_info "INFO:${1:+ ${*}}"
+}
+
 # SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var can be set when validating all
 # features using the last version of the kernel and the selftests to make sure
 # a test is not being skipped by mistake.
