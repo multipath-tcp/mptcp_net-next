@@ -46,6 +46,11 @@ trap cleanup EXIT
 
 mptcp_lib_ns_init ns1
 
+print_title()
+{
+	printf "%-50s" "${@}"
+}
+
 check()
 {
 	local cmd="$1"
@@ -53,7 +58,7 @@ check()
 	local msg="$3"
 	local rc=0
 
-	printf "%-50s" "$msg"
+	print_title "$msg"
 	mptcp_lib_check_output "${err}" "${cmd}" "${expected}" || rc=${?}
 	if [ ${rc} -eq 2 ]; then
 		mptcp_lib_result_fail "${msg} # error ${rc}"
@@ -189,7 +194,7 @@ subflow,backup,fullmesh 10.0.1.1" "          (backup,fullmesh)"
 else
 	for st in fullmesh nofullmesh backup,fullmesh; do
 		st="          (${st})"
-		printf "%-50s" "${st}"
+		print_title "${st}"
 		mptcp_lib_pr_skip
 		mptcp_lib_result_skip "${st}"
 	done

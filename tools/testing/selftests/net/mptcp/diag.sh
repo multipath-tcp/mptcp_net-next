@@ -45,6 +45,11 @@ get_msk_inuse()
 	ip netns exec $ns cat /proc/net/protocols | awk '$1~/^MPTCP$/{print $3}'
 }
 
+print_title()
+{
+	printf "%-50s" "${@}"
+}
+
 __chk_nr()
 {
 	local command="$1"
@@ -55,7 +60,7 @@ __chk_nr()
 
 	nr=$(eval $command)
 
-	printf "%-50s" "$msg"
+	print_title "$msg"
 	if [ "$nr" != "$expected" ]; then
 		if [ "$nr" = "$skip" ] && ! mptcp_lib_expect_all_features; then
 			mptcp_lib_pr_skip "Feature probably not supported"
@@ -114,7 +119,7 @@ wait_msk_nr()
 		sleep 1
 	done
 
-	printf "%-50s" "$msg"
+	print_title "$msg"
 	if [ $i -ge $timeout ]; then
 		mptcp_lib_pr_fail "timeout while expecting $expected max $max last $nr"
 		mptcp_lib_result_fail "${msg} # timeout"
