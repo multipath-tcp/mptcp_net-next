@@ -184,7 +184,7 @@ do_transfer()
 	cmp $cin $sout > /dev/null 2>&1
 	local cmpc=$?
 
-	printf "%-16s" " max $max_time "
+	printf "%-10s" " max $max_time "
 	if [ $retc -eq 0 ] && [ $rets -eq 0 ] && \
 	   [ $cmpc -eq 0 ] && [ $cmps -eq 0 ]; then
 		mptcp_lib_pr_ok
@@ -203,6 +203,11 @@ do_transfer()
 
 	cat "$capout"
 	return 1
+}
+
+print_title()
+{
+	printf "%-55s" "${@}"
 }
 
 run_test()
@@ -239,7 +244,7 @@ run_test()
 	# completion (see mptcp_connect): 200ms on each side, add some slack
 	time=$((time + 400 + slack))
 
-	printf "%-60s" "$msg"
+	print_title "$msg"
 	do_transfer $small $large $time
 	lret=$?
 	mptcp_lib_result_code "${lret}" "${msg}"
@@ -248,8 +253,8 @@ run_test()
 		[ $bail -eq 0 ] || exit $ret
 	fi
 
-	msg+=" - reverse direction"
-	printf "%-60s" "${msg}"
+	msg=$(echo -n "${msg} - reverse direction" | cut -c1-54)
+	print_title "${msg}"
 	do_transfer $large $small $time
 	lret=$?
 	mptcp_lib_result_code "${lret}" "${msg}"
