@@ -131,6 +131,7 @@ ns2=""
 ns3=""
 ns4=""
 
+#shellcheck disable=SC2034 # TEST_COUNT is used by mptcp_lib.sh
 TEST_COUNT=0
 TEST_GROUP=""
 
@@ -253,7 +254,7 @@ print_title()
 	local msg="${1}"
 	local nr_blank="${2-50}"
 
-	printf "%-${nr_blank}s" "${msg}"
+	mptcp_lib_print_title TEST_COUNT "%-${nr_blank}s" "${msg}"
 }
 
 check_mptcp_disabled()
@@ -325,7 +326,6 @@ do_transfer()
 
 	local port
 	port=$((10000+PORT++))
-	TEST_COUNT=$((TEST_COUNT+1))
 
 	if [ "$rcvbuf" -gt 0 ]; then
 		extra_args="$extra_args -R $rcvbuf"

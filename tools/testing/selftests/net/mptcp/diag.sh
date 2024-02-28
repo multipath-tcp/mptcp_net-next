@@ -9,7 +9,7 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 ns=""
-test_cnt=1
+test_cnt=0
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 ret=0
@@ -47,7 +47,7 @@ get_msk_inuse()
 
 print_title()
 {
-	printf "%-50s" "${@}"
+	mptcp_lib_print_title test_cnt "%-50s" "${@}"
 }
 
 __chk_nr()
@@ -74,7 +74,6 @@ __chk_nr()
 		mptcp_lib_pr_ok
 		mptcp_lib_result_pass "${msg}"
 	fi
-	test_cnt=$((test_cnt+1))
 }
 
 __chk_msk_nr()
@@ -132,7 +131,6 @@ wait_msk_nr()
 		mptcp_lib_pr_ok
 		mptcp_lib_result_pass "${msg}"
 	fi
-	test_cnt=$((test_cnt+1))
 }
 
 chk_msk_fallback_nr()

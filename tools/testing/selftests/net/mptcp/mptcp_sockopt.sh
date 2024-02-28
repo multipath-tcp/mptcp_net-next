@@ -17,6 +17,8 @@ timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 iptables="iptables"
 ip6tables="ip6tables"
+#shellcheck disable=SC2034 # test_cnt is used by mptcp_lib.sh
+test_cnt=0
 
 ns1=""
 ns2=""
@@ -115,7 +117,7 @@ not 0 - not all expected packets marked" 1>&2
 
 print_title()
 {
-	printf "%-50s" "${@}"
+	mptcp_lib_print_title test_cnt "%-50s" "${@}"
 }
 
 do_transfer()

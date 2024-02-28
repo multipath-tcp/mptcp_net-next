@@ -9,6 +9,8 @@
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 ret=0
+#shellcheck disable=SC2034 # test_cnt is used by mptcp_lib.sh
+test_cnt=0
 
 usage() {
 	echo "Usage: $0 [ -h ]"
@@ -48,7 +50,7 @@ mptcp_lib_ns_init ns1
 
 print_title()
 {
-	printf "%-50s" "${@}"
+	mptcp_lib_print_title test_cnt "%-50s" "${@}"
 }
 
 check()

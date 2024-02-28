@@ -14,7 +14,7 @@ ns3=""
 capture=false
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-test_cnt=1
+test_cnt=0
 ret=0
 bail=0
 slack=50
@@ -127,7 +127,6 @@ do_transfer()
 	local max_time=$3
 	local port
 	port=$((10000+test_cnt))
-	test_cnt=$((test_cnt+1))
 
 	:> "$cout"
 	:> "$sout"
@@ -207,7 +206,7 @@ do_transfer()
 
 print_title()
 {
-	printf "%-55s" "${@}"
+	mptcp_lib_print_title test_cnt "%-55s" "${@}"
 }
 
 run_test()
