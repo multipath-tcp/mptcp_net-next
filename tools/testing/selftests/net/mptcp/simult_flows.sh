@@ -14,7 +14,6 @@ ns3=""
 capture=false
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-test_cnt=1
 ret=0
 bail=0
 slack=50
@@ -126,8 +125,7 @@ do_transfer()
 	local sin=$2
 	local max_time=$3
 	local port
-	port=$((10000+test_cnt))
-	test_cnt=$((test_cnt+1))
+	port=$((10000+MPTCP_LIB_TEST_COUNTER))
 
 	:> "$cout"
 	:> "$sout"
@@ -205,6 +203,12 @@ do_transfer()
 	return 1
 }
 
+print_title()
+{
+	MPTCP_LIB_TEST_FORMAT="%02u %-55s"
+	mptcp_lib_print_title "${*}"
+}
+
 run_test()
 {
 	local rate1=$1
@@ -239,7 +243,7 @@ run_test()
 	# completion (see mptcp_connect): 200ms on each side, add some slack
 	time=$((time + 400 + slack))
 
-	printf "%-60s" "$msg"
+	print_title "$msg"
 	do_transfer $small $large $time
 	lret=$?
 	mptcp_lib_result_code "${lret}" "${msg}"
@@ -249,7 +253,7 @@ run_test()
 	fi
 
 	msg+=" - reverse direction"
-	printf "%-60s" "$(echo -n ${msg} | cut -c1-54)"
+	print_title "$(echo -n ${msg} | cut -c1-54)"
 	do_transfer $large $small $time
 	lret=$?
 	mptcp_lib_result_code "${lret}" "${msg}"

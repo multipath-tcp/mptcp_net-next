@@ -428,3 +428,8 @@ mptcp_lib_pr_title_counter() {
 
 	printf "${MPTCP_LIB_TEST_FORMAT}" "${MPTCP_LIB_TEST_COUNTER}" "${*}"
 }
+
+mptcp_lib_print_title() {
+	mptcp_lib_inc_test_counter
+	mptcp_lib_pr_title_counter "${*}"
+}

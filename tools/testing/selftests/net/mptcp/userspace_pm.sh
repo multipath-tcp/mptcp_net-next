@@ -69,7 +69,8 @@ print_test()
 {
 	test_name="${1}"
 
-	_printf "%-68s" "${test_name}"
+	MPTCP_LIB_TEST_FORMAT="%02u %-68s"
+	mptcp_lib_print_title "${test_name}"
 }
 
 print_results()
