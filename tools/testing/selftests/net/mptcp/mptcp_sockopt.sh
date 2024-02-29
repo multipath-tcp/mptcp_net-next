@@ -130,10 +130,10 @@ do_transfer()
 	local local_addr ip
 	if mptcp_lib_is_v6 "${connect_addr}"; then
 		local_addr="::"
-		ip=ipv6
+		ip=v6
 	else
 		local_addr="0.0.0.0"
-		ip=ipv4
+		ip=v4
 	fi
 
 	cmsg="TIMESTAMPNS"
@@ -232,7 +232,7 @@ do_mptcp_sockopt_tests()
 	lret=$?
 
 	if [ $lret -ne 0 ]; then
-		echo "FAIL: SOL_MPTCP getsockopt (ipv6)" 1>&2
+		echo "FAIL: SOL_MPTCP getsockopt (v6)" 1>&2
 		mptcp_lib_result_fail "sockopt v6"
 		ret=$lret
 		return
