@@ -411,3 +411,20 @@ mptcp_lib_events() {
 	ip netns exec "${ns}" ./pm_nl_ctl events >> "${evts}" 2>&1 &
 	pid=$!
 }
+
+MPTCP_LIB_TEST_COUNTER=0
+MPTCP_LIB_TEST_FORMAT=""
+
+mptcp_lib_inc_test_counter() {
+	: "${MPTCP_LIB_TEST_COUNTER:?}"
+
+	MPTCP_LIB_TEST_COUNTER=$((MPTCP_LIB_TEST_COUNTER+1))
+}
+
+#shellcheck disable=SC2059
+mptcp_lib_pr_title_counter() {
+	: "${MPTCP_LIB_TEST_COUNTER:?}"
+	: "${MPTCP_LIB_TEST_FORMAT:="%02u %-50s"}"
+
+	printf "${MPTCP_LIB_TEST_FORMAT}" "${MPTCP_LIB_TEST_COUNTER}" "${*}"
+}
