@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-return-KSFT_FAIL-not-test_cnt
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: diag: return KSFT_FAIL not test_cnt
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The test counter 'test_cnt' should not be returned in diag.sh, e.g. what
+if only the 4th test fail? Will do 'exit 4' which is 'exit ${KSFT_SKIP}',
+the whole test will be marked as skipped instead of 'failed'!
+
+So we should do ret=${KSFT_FAIL} instead.
+
+Fixes: df62f2ec3df6 ("selftests/mptcp: add diag interface tests")
+Fixes: 42fb6cddec3b ("selftests: mptcp: more stable diag tests")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
