@@ -272,8 +272,9 @@ Here is a checklist.
       b4 prep --auto-to-cc
 
   * If any outdated email addresses are associated with the fixed commit,
-    substitute a current address if possible. It helps to add a Git note to the
-    commit with `git notes edit <commit>` to document that.
+    substitute a current address if possible. It helps to document that by
+    adding a note to these patches under the commit message, separated by a line
+    containing `---` (b4 will [drop Git notes](https://lore.kernel.org/tools/20221122185249.733ipcpwpgkh5xle@meerkat.local/)).
 
 * Run checkpatch one more time (issues should have been caught before but
   sometimes the above edits can add problems):
