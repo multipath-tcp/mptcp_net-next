@@ -1,4 +1,28 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-avoid-extra-waiting
+Subject: [PATCH] selftests: mptcp: diag: avoid extra waiting
 
+When creating a lot of listener sockets, it is enough to wait only for
+the last one, like we are doing before in diag.sh for other subtests.
+
+If we do a check for each listener sockets, each time listing all
+available sockets, it can take a very long time in very slow
+environments, at the point we can reach some timeout.
+
+When using the debug kconfig, the waiting time switches from more than
+8 sec to 0.1 sec on my side. In slow/busy environments, and with a poll
+timeout set to 30 ms, the waiting time could go up to ~100 sec because
+the listener socket would timeout and stop, while the script would still
+be checking one by one if all sockets are ready. The result is that
+after having waited for everything to be ready, all sockets have been
+stopped due to a timeout, and it is too late for the script to check how
+many there were.
+
+While at it, also removed ss options we don't need: we only need the
+filtering options, to count how many listener sockets have been created.
+We don't need to ask ss to display internal TCP information, and the
+memory if the output is dropped by the 'wc -l' command anyway.
+
+Fixes: b4b51d36bbaa ("selftests: mptcp: explicitly trigger the listener diag code-path")
+Reported-by: Jakub Kicinski <kuba@kernel.org>
+Closes: https://lore.kernel.org/r/20240301063754.2ecefecf@kernel.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
