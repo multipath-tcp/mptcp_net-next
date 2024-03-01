@@ -1,1 +1,1 @@
-t/selftests-mptcp-diag-return-KSFT_FAIL-not-test_cnt
+t/selftests-mptcp-diag-avoid-extra-waiting
