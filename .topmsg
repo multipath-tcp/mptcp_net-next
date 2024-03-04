@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: avoid some duplicate code in socket option handling
-
-The mptcp_get_int_option() helper is needless open-coded in a
-couple of places, replace the duplicate code with the helper
-call.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
