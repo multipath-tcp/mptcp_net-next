@@ -1,1 +1,1 @@
-t/mptcp-add-userspace_pm_lookup_addr_by_id-helper
+t/selftests-mptcp-add-mptcp_lib_check_output-helper
