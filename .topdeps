@@ -1,1 +1,1 @@
-t/mptcp-check-userspace-pm-flags
+t/selftests-mptcp-add-mptcp_lib_check_tools-helper
