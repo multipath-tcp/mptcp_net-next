@@ -1358,14 +1358,11 @@ int __cgroup_bpf_run_filter_skb(struct sock *sk,
 				struct sk_buff *skb,
 				enum cgroup_bpf_attach_type atype)
 {
-	unsigned int offset = skb->data - skb_network_header(skb);
+	unsigned int offset = -skb_network_offset(skb);
 	struct sock *save_sk;
 	void *saved_data_end;
 	struct cgroup *cgrp;
 	int ret;
-
-	if (!sk || !sk_fullsock(sk))
-		return 0;
 
 	if (sk->sk_family != AF_INET && sk->sk_family != AF_INET6)
 		return 0;
