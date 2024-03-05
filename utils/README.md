@@ -245,6 +245,15 @@ Here is a checklist.
 
         git rebase -i $(b4 prep --show-info start-commit)
 
+* Determine cc addresses for the series:
+
+      b4 prep --auto-to-cc
+
+  * If any outdated email addresses are associated with the fixed commit,
+    substitute a current address if possible. It helps to document that by
+    adding a note to these patches under the commit message, separated by a line
+    containing `---` (b4 will [drop Git notes](https://lore.kernel.org/tools/20221122185249.733ipcpwpgkh5xle@meerkat.local/)).
+
 * Edit the cover letter, replacing the subject and body placeholders:
 
       b4 prep --edit-cover
@@ -266,15 +275,6 @@ Here is a checklist.
   * For -net, add which kernels versions have the bugs:
 
         ./.git-check-fixes.sh $(b4 prep --show-info start-commit)..
-
-* Determine cc addresses for the series:
-
-      b4 prep --auto-to-cc
-
-  * If any outdated email addresses are associated with the fixed commit,
-    substitute a current address if possible. It helps to document that by
-    adding a note to these patches under the commit message, separated by a line
-    containing `---` (b4 will [drop Git notes](https://lore.kernel.org/tools/20221122185249.733ipcpwpgkh5xle@meerkat.local/)).
 
 * Run checkpatch one more time (issues should have been caught before but
   sometimes the above edits can add problems):
