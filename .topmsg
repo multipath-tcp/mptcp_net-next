@@ -1,8 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests: mptcp: print all error messages to stdout
-
-Some error messages are printed to stderr while the others are printed
-to 'stdout'. As part of the unification, this patch drop "1>&2" to let
-all errors messages are printed to 'stdout'.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
