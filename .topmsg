@@ -1,4 +1,65 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-print-test-results-with-counters
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: print test results with counters
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a new helper mptcp_lib_print_title(), a wrapper of
+mptcp_lib_inc_test_counter() and mptcp_lib_pr_title_counter(), to
+print out test counter in each test result and increase the counter.
+Use this helper to print out test counters for every tests in diag.sh,
+mptcp_connect.sh, mptcp_sockopt.sh, pm_netlink.sh, simult_flows.sh,
+and userspace_pm.sh.
+
+diag.sh:
+
+01 no msk on netns creation                          [  ok  ]
+02 listen match for dport 10000                      [  ok  ]
+03 listen match for sport 10000                      [  ok  ]
+04 listen match for saddr and sport                  [  ok  ]
+05 all listen sockets                                [  ok  ]
+
+mptcp_connect.sh:
+
+01 New MPTCP socket can be blocked via sysctl                       [ OK ]
+02 Validating network environment with pings                        [ OK ]
+INFO: Using loss of 0.85% delay 31 ms reorder .. with delay 7ms on ns3eth4
+03 ns1 MPTCP -> ns1 (10.0.1.1:10000  ) MPTCP     (duration    69ms) [ OK ]
+04 ns1 MPTCP -> ns1 (10.0.1.1:10001  ) TCP       (duration    20ms) [ OK ]
+05 ns1 TCP   -> ns1 (10.0.1.1:10002  ) MPTCP     (duration    16ms) [ OK ]
+
+mptcp_sockopt.sh:
+
+01 Transfer v4                                       [ OK ]
+02 Mark v4                                           [ OK ]
+03 Transfer v6                                       [ OK ]
+04 Mark v6                                           [ OK ]
+05 SOL_MPTCP sockopt v4                              [ OK ]
+
+pm_netlink.sh:
+
+01 defaults addr list                                [ OK ]
+02 simple add/get addr                               [ OK ]
+03 dump addrs                                        [ OK ]
+04 simple del addr                                   [ OK ]
+05 dump addrs after del                              [ OK ]
+
+simult_flows.sh:
+
+01 balanced bwidth                                     7391 max 8456 [ OK ]
+02 balanced bwidth - reverse direction                 7403 max 8456 [ OK ]
+03 balanced bwidth with unbalanced delay               7429 max 8456 [ OK ]
+04 balanced bwidth with unbalanced delay - reverse ... 7485 max 8456 [ OK ]
+05 unbalanced bwidth                                   7549 max 8456 [ OK ]
+
+userspace_pm.sh:
+
+01 Created network namespaces ns1, ns2                               [ OK ]
+INFO: Make connections
+02 Established IPv4 MPTCP Connection ns2 => ns1                      [ OK ]
+03 Established IPv6 MPTCP Connection ns2 => ns1                      [ OK ]
+INFO: Announce tests
+04 ADD_ADDR 10.0.2.2 (ns2) => ns1, invalid token                     [ OK ]
+05 ADD_ADDR id:67 10.0.2.2 (ns2) => ns1, reuse port                  [ OK ]
+
+Having test counters helps to quickly identify issues when looking at a
+long list of output logs and results.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
