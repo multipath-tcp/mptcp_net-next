@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-print-test-results-with-colors
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: print test results with colors
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+To unify the output formats of all test scripts, this patch adds
+four more helpers:
+
+	mptcp_lib_pr_ok()
+	mptcp_lib_pr_skip()
+	mptcp_lib_pr_fail()
+	mptcp_lib_pr_info()
+
+to print out [ OK ], [SKIP], [FAIL] and 'INFO: ' with colors. Use them
+in all scripts to print the "ok/skip/fail/info' using the same 'format'.
+
+Having colors helps to quickly identify issues when looking at a long
+list of output logs and results.
+
+Note that now all print the same keywords, which was not the case
+before, but it is good to uniform that.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
