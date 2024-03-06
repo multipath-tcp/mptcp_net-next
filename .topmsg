@@ -63,3 +63,4 @@ Having test counters helps to quickly identify issues when looking at a
 long list of output logs and results.
 
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
