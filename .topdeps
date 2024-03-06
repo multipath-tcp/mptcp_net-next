@@ -1,1 +1,1 @@
-t/mptcp-drop-lookup_by_id-in-lookup_addr
+t/selftests-mptcp-print-test-results-with-colors
