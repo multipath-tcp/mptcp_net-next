@@ -6,3 +6,4 @@ to 'stdout'. As part of the unification, this patch drop "1>&2" to let
 all errors messages are printed to 'stdout'.
 
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
