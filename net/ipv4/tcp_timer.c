@@ -212,9 +212,9 @@ static unsigned int tcp_model_timeout(struct sock *sk,
  * after "boundary" unsuccessful, exponentially backed-off
  * retransmissions with an initial RTO of TCP_RTO_MIN.
  */
-static bool retransmits_timed_out(struct sock *sk,
-				  unsigned int boundary,
-				  unsigned int timeout)
+bool retransmits_timed_out(struct sock *sk,
+			   unsigned int boundary,
+			   unsigned int timeout)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int start_ts, delta;

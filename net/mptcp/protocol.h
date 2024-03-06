@@ -656,6 +656,7 @@ void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 void __mptcp_subflow_send_ack(struct sock *ssk);
 void mptcp_subflow_reset(struct sock *ssk);
 void mptcp_subflow_queue_clean(struct sock *sk, struct sock *ssk);
+void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool first);
 void mptcp_sock_graft(struct sock *sk, struct socket *parent);
 u64 mptcp_wnd_end(const struct mptcp_sock *msk);
 void mptcp_set_timeout(struct sock *sk);
