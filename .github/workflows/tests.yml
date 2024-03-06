@@ -69,6 +69,7 @@ jobs:
           mode: auto-${{ matrix.mode }}
           packetdrill_stable: ${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}
           extra_env: ${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}
+          trace: ${{ secrets.TESTS_ACTION_DEBUG }}
 
       - name: "Publish conclusion"
         if: always()
