@@ -1,4 +1,18 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-fix-misaligned-output
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: connect: fix misaligned output
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The first [ OK ] in the output of mptcp_connect.sh misaligns with the
+others:
+
+New MPTCP socket can be blocked via sysctl              [ OK ]
+INFO: validating network environment with pings
+INFO: Using loss of 0.85% delay 16 ms reorder 95% 70% with delay 4ms on
+ns1 MPTCP -> ns1 (10.0.1.1:10000      ) MPTCP   (duration   184ms) [ OK ]
+ns1 MPTCP -> ns1 (10.0.1.1:10001      ) TCP     (duration    50ms) [ OK ]
+ns1 TCP   -> ns1 (10.0.1.1:10002      ) MPTCP   (duration    55ms) [ OK ]
+
+This patch aligns them by using 69 chars to display the first two lines,
+and 50 chars for the other. Since 19 chars are used to display duration
+time. Also print out a [ OK ] at the end of the 2nd line for consistency.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
