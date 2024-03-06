@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-export-TEST_COUNTER-variable
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: export TEST_COUNTER variable
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Variable TEST_COUNT are used in mptcp_connect.sh and mptcp_join.sh as
+test counters, which are initialized to 0, while variable test_cnt are used
+in diag.sh and simult_flows.sh, which are initialized to 1. To maintain
+consistency, this patch renames them all as MPTCP_LIB_TEST_COUNTER,
+initializes it to 1, and exports it into mptcp_lib.sh.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
