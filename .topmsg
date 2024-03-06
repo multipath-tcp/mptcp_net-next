@@ -1,4 +1,58 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-print-every-test-result
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: sockopt: print every test result
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Only total test results are printed out in mptcp_sockopt.sh:
+
+PASS: all packets had packet mark set
+PASS: SOL_MPTCP getsockopt has expected information
+PASS: TCP_INQ cmsg/ioctl -t tcp
+PASS: TCP_INQ cmsg/ioctl -6 -t tcp
+PASS: TCP_INQ cmsg/ioctl -r tcp
+PASS: TCP_INQ cmsg/ioctl -6 -r tcp
+PASS: TCP_INQ cmsg/ioctl -r tcp -t tcp
+
+They mismatch with the test results:
+
+ok 1 - mptcp_sockopt: mark ipv4
+ok 2 - mptcp_sockopt: transfer ipv4
+ok 3 - mptcp_sockopt: mark ipv6
+ok 4 - mptcp_sockopt: transfer ipv6
+ok 5 - mptcp_sockopt: sockopt v4
+ok 6 - mptcp_sockopt: sockopt v6
+ok 7 - mptcp_sockopt: TCP_INQ: -t tcp
+ok 8 - mptcp_sockopt: TCP_INQ: -6 -t tcp
+ok 9 - mptcp_sockopt: TCP_INQ: -r tcp
+ok 10 - mptcp_sockopt: TCP_INQ: -6 -r tcp
+ok 11 - mptcp_sockopt: TCP_INQ: -r tcp -t tcp
+
+'mptcp_sockopt.sh' now display more detailed results + why (what you had
+in a former patch from v6, merged here). It no longer displays 'PASS:',
+because it is duplicated info now that the detailed are displayed:
+
+Transfer v4                                       [ OK ]
+Mark v4                                           [ OK ]
+Transfer v6                                       [ OK ]
+Mark v6                                           [ OK ]
+SOL_MPTCP sockopt v4                              [ OK ]
+SOL_MPTCP sockopt v6                              [ OK ]
+TCP_INQ cmsg/ioctl -t tcp                         [ OK ]
+TCP_INQ cmsg/ioctl -6 -t tcp                      [ OK ]
+TCP_INQ cmsg/ioctl -r tcp                         [ OK ]
+TCP_INQ cmsg/ioctl -6 -r tcp                      [ OK ]
+TCP_INQ cmsg/ioctl -r tcp -t tcp                  [ OK ]
+
+Also fix the TAP output:
+
+ok 1 - mptcp_sockopt: transfer ipv4
+ok 2 - mptcp_sockopt: mark ipv4
+ok 3 - mptcp_sockopt: transfer ipv6
+ok 4 - mptcp_sockopt: mark ipv6
+ok 5 - mptcp_sockopt: sockopt v4
+ok 6 - mptcp_sockopt: sockopt v6
+ok 7 - mptcp_sockopt: TCP_INQ: -t tcp
+ok 8 - mptcp_sockopt: TCP_INQ: -6 -t tcp
+ok 9 - mptcp_sockopt: TCP_INQ: -r tcp
+ok 10 - mptcp_sockopt: TCP_INQ: -6 -r tcp
+ok 11 - mptcp_sockopt: TCP_INQ: -r tcp -t tcp
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
