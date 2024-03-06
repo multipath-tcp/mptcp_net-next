@@ -1,7 +1,7 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
 Subject: [PATCH] selftests: mptcp: connect: add dedicated port counter
 
-This patch adds a new dedicated counter 'prot_base' instead of TEST_COUNT
+This patch adds a new dedicated counter 'port' instead of TEST_COUNT
 to increase port numbers in mptcp_connect.sh.
 
 This can avoid outputting discontinuous test counters.
