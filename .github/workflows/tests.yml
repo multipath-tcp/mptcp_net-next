@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # matrix:
-      #   join: ['EXCEPT', 'ONLY']
+      matrix:
+        mode: ['normal', 'btf']
     permissions:
       contents: read # to fetch code (actions/checkout)
       checks: write  # to write results
@@ -54,39 +54,43 @@ jobs:
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
-          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: "Tests"
         uses: multipath-tcp/mptcp-upstream-virtme-docker@latest
         with:
           ccache_maxsize: 500M ## 10GB = project limit
-          mode: auto-normal
+          mode: auto-${{ matrix.mode }}
           packetdrill_stable: ${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}
-          # extra_env: INPUT_RUN_TESTS_${{ matrix.join }}=selftest_mptcp_join
+          extra_env: ${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}
 
       - name: "Publish conclusion"
         if: always()
         run: |
           if [ -s "conclusion.txt" ]; then
-            echo '## Conclusion' >> ${GITHUB_STEP_SUMMARY}
-            cat "conclusion.txt" >> ${GITHUB_STEP_SUMMARY}
-            echo '' >> ${GITHUB_STEP_SUMMARY}
-            echo '## Summary' >> ${GITHUB_STEP_SUMMARY}
-            echo '```' >> ${GITHUB_STEP_SUMMARY}
-            cat "summary.txt" >> ${GITHUB_STEP_SUMMARY}
-            echo '```' >> ${GITHUB_STEP_SUMMARY}
+            {
+              echo '## Mode ${{ matrix.mode }}'
+              echo '### Conclusion (${{ matrix.mode }})'
+              cat "conclusion.txt"
+              echo ''
+              echo '### Summary (${{ matrix.mode }})'
+              echo '```'
+              cat "summary.txt"
+              echo '```'
+            } >> "${GITHUB_STEP_SUMMARY}"
           fi
 
       - name: "Artifacts (always)"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: results
+          name: results-${{ matrix.mode }}
           path: |
             conclusion.txt
             summary.txt
@@ -98,7 +102,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-info
+          name: debug-info-${{ matrix.mode }}
           path: |
             vmlinux.zstd
             kmemleak.txt
@@ -126,16 +130,19 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: results
+          pattern: results-*
+          merge-multiple: false
 
       - name: get test info
         id: test
         run: |
-          ccl="$(cat conclusion.txt)"
-          echo "ccl=${ccl}" >> ${GITHUB_OUTPUT}
+          for mode in normal btf; do
+            ccl="$(cat "results-${mode}/conclusion.txt")"
+            echo "ccl_${mode}=${ccl}" >> ${GITHUB_OUTPUT}
+            echo "ccl_title_${mode}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
+            echo "ccl_status_${mode}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+          done
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
-          echo "ccl_title=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
-          echo "ccl_status=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
 
       - name: irc tests
         if: github.ref_name == 'export' || github.ref_name == 'export-net'
@@ -146,8 +153,9 @@ jobs:
           nickname: gh-tests-bot
           verbose: true
           message: |-
-            New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended:
-            - ${{ steps.test.outputs.ccl }}: ${{ steps.test.outputs.url }}
+            New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended: ${{ steps.test.outputs.url }}
+            - ${{ steps.test.outputs.ccl_normal }}
+            - ${{ steps.test.outputs.ccl_btf }}
 
       - name: get commit info
         id: commit
@@ -202,9 +210,9 @@ jobs:
 
             Our CI (GitHub Action) did some validations and here is its report:
 
-            - ${{ steps.test.outputs.ccl_title }}:
-              - ${{ steps.test.outputs.ccl_status }}:
-              - Task: ${{ steps.test.outputs.url }}
+            - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
+            - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
+            - Task: ${{ steps.test.outputs.url }}
 
             Initiator: ${{ steps.commit.outputs.committer }}
             Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
@@ -281,6 +289,7 @@ jobs:
           fi
           echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
 
-          submit "${{ steps.test.outputs.ccl_title }}" "${{ steps.test.outputs.ccl_status }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_normal }}" "${{ steps.test.outputs.ccl_status_normal }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_btf }}" "${{ steps.test.outputs.ccl_status_btf }}" "${{ steps.test.outputs.url }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
