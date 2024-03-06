@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/selftests-mptcp-connect-use-operator-to-append-strings
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
