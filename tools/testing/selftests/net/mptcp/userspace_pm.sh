@@ -54,14 +54,12 @@ ns1=""
 ns2=""
 ret=0
 test_name=""
-
-_printf() {
-	stdbuf -o0 -e0 printf "${@}"
-}
+# a bit more space: because we have more to display
+MPTCP_LIB_TEST_FORMAT="%02u %-68s"
 
 print_title()
 {
-	_printf "INFO: %s\n" "${1}"
+	mptcp_lib_pr_info "${1}"
 }
 
 # $1: test name
@@ -69,36 +67,26 @@ print_test()
 {
 	test_name="${1}"
 
-	_printf "%-68s" "${test_name}"
-}
-
-print_results()
-{
-	_printf "[%s]\n" "${1}"
+	mptcp_lib_print_title "${test_name}"
 }
 
 test_pass()
 {
-	print_results " OK "
+	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "${test_name}"
 }
 
 test_skip()
 {
-	print_results "SKIP"
+	mptcp_lib_pr_skip
 	mptcp_lib_result_skip "${test_name}"
 }
 
 # $1: msg
 test_fail()
 {
-	print_results "FAIL"
+	mptcp_lib_pr_fail "${@}"
 	ret=1
-
-	if [ -n "${1}" ]; then
-		_printf "\t%s\n" "${1}"
-	fi
-
 	mptcp_lib_result_fail "${test_name}"
 }
 
@@ -120,7 +108,7 @@ cleanup()
 
 	rm -rf $file $client_evts $server_evts
 
-	_printf "Done\n"
+	mptcp_lib_pr_info "Done"
 }
 
 trap cleanup EXIT
