@@ -33,7 +33,7 @@ do_tcp=0
 checksum=false
 filesize=0
 connect_per_transfer=1
-port_base=10000
+port=$((10000 - 1))
 
 if [ $tc_loss -eq 100 ];then
 	tc_loss=1%
@@ -320,8 +320,7 @@ do_transfer()
 	local local_addr="$6"
 	local extra_args="$7"
 
-	local port
-	port=$((port_base++))
+	port=$((port + 1))
 
 	if [ "$rcvbuf" -gt 0 ]; then
 		extra_args+=" -R $rcvbuf"
@@ -720,7 +719,7 @@ EOF
 
 	echo "INFO: test $msg"
 
-	port_base=20000
+	port=$((20000 - 1))
 	local extra_args="-o TRANSPARENT"
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP \
 		    ${connect_addr} ${local_addr} "${extra_args}"
