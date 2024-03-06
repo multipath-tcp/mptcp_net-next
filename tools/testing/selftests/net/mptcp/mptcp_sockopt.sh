@@ -113,6 +113,11 @@ check_mark()
 	return 0
 }
 
+print_title()
+{
+	mptcp_lib_print_title "${@}"
+}
+
 do_transfer()
 {
 	local listener_ns="$1"
@@ -162,7 +167,7 @@ do_transfer()
 	wait $spid
 	local rets=$?
 
-	mptcp_lib_print_title "Transfer ${ip:2}"
+	print_title "Transfer ${ip:2}"
 	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
 		echo "[FAIL] client exit code $retc, server $rets"
 		echo -e "\nnetns ${listener_ns} socket stat for ${port}:" 1>&2
@@ -183,7 +188,7 @@ do_transfer()
 	fi
 	mptcp_lib_result_code "${rets}" "transfer ${ip}"
 
-	mptcp_lib_print_title "Mark ${ip:2}"
+	print_title "Mark ${ip:2}"
 	if [ $local_addr = "::" ];then
 		check_mark $listener_ns 6 || retc=1
 		check_mark $connector_ns 6 || retc=1
@@ -227,7 +232,7 @@ do_mptcp_sockopt_tests()
 	ip netns exec "$ns_sbox" ./mptcp_sockopt
 	lret=$?
 
-	mptcp_lib_print_title "SOL_MPTCP sockopt v4"
+	print_title "SOL_MPTCP sockopt v4"
 	if [ $lret -ne 0 ]; then
 		echo "[FAIL]"
 		mptcp_lib_result_fail "sockopt v4"
@@ -240,7 +245,7 @@ do_mptcp_sockopt_tests()
 	ip netns exec "$ns_sbox" ./mptcp_sockopt -6
 	lret=$?
 
-	mptcp_lib_print_title "SOL_MPTCP sockopt v6"
+	print_title "SOL_MPTCP sockopt v6"
 	if [ $lret -ne 0 ]; then
 		echo "[FAIL]"
 		mptcp_lib_result_fail "sockopt v6"
@@ -270,7 +275,7 @@ run_tests()
 
 do_tcpinq_test()
 {
-	mptcp_lib_print_title "TCP_INQ cmsg/ioctl $*"
+	print_title "TCP_INQ cmsg/ioctl $*"
 	ip netns exec "$ns_sbox" ./mptcp_inq "$@"
 	local lret=$?
 	if [ $lret -ne 0 ];then
