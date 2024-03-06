@@ -37,8 +37,8 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v4
 
-      - name: "Collect Workflow Telemetry"
-        uses: catchpoint/workflow-telemetry-action@v2
+      #- name: "Collect Workflow Telemetry"
+      #  uses: catchpoint/workflow-telemetry-action@v2
 
       - name: "Find base branch"
         id: branch
