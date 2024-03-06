@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-use-operator-to-append-strings
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: connect: use += operator to append strings
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch uses addition assignment operator (+=) to append strings in
+mptcp_connect.sh.
+
+For extra_args, use += instead of open-coding to make the statements
+shorter.
+
+Add a local variable extra in do_transfer to save the various extra warning
+logs, using += to append it. And add a new variable tc_info to save various
+tc info, also using += to append it. This can make the code more readable
+and prepare for the next commit.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
