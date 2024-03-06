@@ -16,3 +16,4 @@ and 50 chars for the other. Since 19 chars are used to display duration
 time. Also print out a [ OK ] at the end of the 2nd line for consistency.
 
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
