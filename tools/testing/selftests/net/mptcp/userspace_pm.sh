@@ -242,8 +242,7 @@ check_expected_one()
 		test_fail
 	fi
 
-	_printf "\tExpected value for '%s': '%s', got '%s'.\n" \
-		"${var}" "${!exp}" "${!var}"
+	mptcp_lib_pr_fail "Expected value for '${var}': '${!exp}', got '${!var}'."
 	return 1
 }
 
