@@ -242,7 +242,7 @@ check_expected_one()
 		test_fail
 	fi
 
-	mptcp_lib_pr_fail "Expected value for '${var}': '${!exp}', got '${!var}'."
+	mptcp_lib_print_err "\tExpected value for '${var}': '${!exp}', got '${!var}'."
 	return 1
 }
 
