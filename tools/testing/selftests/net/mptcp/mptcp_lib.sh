@@ -8,6 +8,24 @@ readonly KSFT_SKIP=4
 # shellcheck disable=SC2155 # declare and assign separately
 readonly KSFT_TEST="${MPTCP_LIB_KSFT_TEST:-$(basename "${0}" .sh)}"
 
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_ANNOUNCED=6         # MPTCP_EVENT_ANNOUNCED
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_REMOVED=7           # MPTCP_EVENT_REMOVED
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_SUB_ESTABLISHED=10  # MPTCP_EVENT_SUB_ESTABLISHED
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_SUB_CLOSED=11       # MPTCP_EVENT_SUB_CLOSED
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_LISTENER_CREATED=15 # MPTCP_EVENT_LISTENER_CREATED
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_EVENT_LISTENER_CLOSED=16  # MPTCP_EVENT_LISTENER_CLOSED
+
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_AF_INET=2
+# shellcheck disable=SC2034
+readonly MPTCP_LIB_AF_INET6=10
+
 MPTCP_LIB_SUBTESTS=()
 MPTCP_LIB_SUBTESTS_DUPLICATED=0
 MPTCP_LIB_TEST_COUNTER=0
