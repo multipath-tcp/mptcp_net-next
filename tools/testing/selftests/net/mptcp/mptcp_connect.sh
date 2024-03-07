@@ -33,7 +33,7 @@ do_tcp=0
 checksum=false
 filesize=0
 connect_per_transfer=1
-port=$((10000 - 1))
+port=10000
 
 if [ $tc_loss -eq 100 ];then
 	tc_loss=1%
@@ -320,8 +320,6 @@ do_transfer()
 	local local_addr="$6"
 	local extra_args="$7"
 
-	port=$((port + 1))
-
 	if [ "$rcvbuf" -gt 0 ]; then
 		extra_args+=" -R $rcvbuf"
 	fi
@@ -445,6 +443,8 @@ do_transfer()
 		mptcp_lib_result_fail "${TEST_GROUP}: ${result_msg}"
 		return 1
 	fi
+
+	port=$((port+1))
 
 	mptcp_lib_check_transfer $sin $cout "file received by client"
 	retc=$?
@@ -719,7 +719,7 @@ EOF
 
 	mptcp_lib_pr_info "test $msg"
 
-	port=$((20000 - 1))
+	port=20000
 	local extra_args="-o TRANSPARENT"
 	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP \
 		    ${connect_addr} ${local_addr} "${extra_args}"
