@@ -451,6 +451,7 @@ do_transfer()
 	mptcp_lib_check_transfer $cin $sout "file received by server"
 	rets=$?
 
+	local extra=""
 	local stat_synrx_now_l
 	local stat_ackrx_now_l
 	local stat_cookietx_now
@@ -484,7 +485,7 @@ do_transfer()
 				"${stat_ackrx_now_l}" "${expect_ackrx}"
 			rets=1
 		else
-			printf "[ Note ] fallback due to TCP OoO"
+			extra+=" [ Note ] fallback due to TCP OoO"
 		fi
 	fi
 
@@ -506,8 +507,6 @@ do_transfer()
 			retc=1
 		fi
 	fi
-
-	local extra=""
 
 	if [ $cookies -eq 2 ];then
 		if [ $stat_cookietx_last -ge $stat_cookietx_now ] ;then
