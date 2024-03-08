@@ -711,25 +711,11 @@ static int gtp_encap_recv(struct sock *sk, struct sk_buff *skb)
 	return ret;
 }
 
-static int gtp_dev_init(struct net_device *dev)
-{
-	struct gtp_dev *gtp = netdev_priv(dev);
-
-	gtp->dev = dev;
-
-	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
-	if (!dev->tstats)
-		return -ENOMEM;
-
-	return 0;
-}
-
 static void gtp_dev_uninit(struct net_device *dev)
 {
 	struct gtp_dev *gtp = netdev_priv(dev);
 
 	gtp_encap_disable(gtp);
-	free_percpu(dev->tstats);
 }
 
 static inline void gtp0_push_header(struct sk_buff *skb, struct pdp_ctx *pctx)
@@ -942,10 +928,8 @@ tx_err:
 }
 
 static const struct net_device_ops gtp_netdev_ops = {
-	.ndo_init		= gtp_dev_init,
 	.ndo_uninit		= gtp_dev_uninit,
 	.ndo_start_xmit		= gtp_dev_xmit,
-	.ndo_get_stats64	= dev_get_tstats64,
 };
 
 static const struct device_type gtp_type = {
@@ -957,6 +941,7 @@ static void gtp_link_setup(struct net_device *dev)
 	unsigned int max_gtp_header_len = sizeof(struct iphdr) +
 					  sizeof(struct udphdr) +
 					  sizeof(struct gtp0_header);
+	struct gtp_dev *gtp = netdev_priv(dev);
 
 	dev->netdev_ops		= &gtp_netdev_ops;
 	dev->needs_free_netdev	= true;
@@ -970,11 +955,13 @@ static void gtp_link_setup(struct net_device *dev)
 	dev->type = ARPHRD_NONE;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
 
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 	dev->priv_flags	|= IFF_NO_QUEUE;
 	dev->features	|= NETIF_F_LLTX;
 	netif_keep_dst(dev);
 
 	dev->needed_headroom	= LL_MAX_HEADER + max_gtp_header_len;
+	gtp->dev = dev;
 }
 
 static int gtp_hashtable_new(struct gtp_dev *gtp, int hsize);
