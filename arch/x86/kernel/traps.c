@@ -721,6 +721,25 @@ static bool do_int3(struct pt_regs *regs)
 }
 NOKPROBE_SYMBOL(do_int3);
 
+static bool fixup_int3(struct pt_regs *regs)
+{
+	unsigned long addr = instruction_pointer(regs) - INT3_INSN_SIZE;
+
+	if (*(u8 *)addr != INT3_INSN_OPCODE) {
+		/*
+		 * The breakpoint instruction was removed right
+		 * after we hit it.  Another cpu has removed it
+		 * from this address.  In this case, no further
+		 * handling of this interrupt is appropriate.
+		 * Back up over the (now missing) int3 and run
+		 * the original instruction.
+		 */
+		instruction_pointer_set(regs, (unsigned long)addr);
+		return true;
+	}
+	return false;
+}
+
 static void do_int3_user(struct pt_regs *regs)
 {
 	if (do_int3(regs))
@@ -758,7 +777,7 @@ DEFINE_IDTENTRY_RAW(exc_int3)
 		irqentry_state_t irq_state = irqentry_nmi_enter(regs);
 
 		instrumentation_begin();
-		if (!do_int3(regs))
+		if (!do_int3(regs) && !fixup_int3(regs))
 			die("int3", regs, 0);
 		instrumentation_end();
 		irqentry_nmi_exit(regs, irq_state);
