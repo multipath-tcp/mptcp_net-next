@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-print_test-out-of-verify_listener_events
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: print_test out of verify_listener_events
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+verify_listener_events() helper will be exported into mptcp_lib.sh as a
+public function, but print_test() is invoked in it, which is a private
+function in userspace_pm.sh only. So this patch moves print_test() out of
+verify_listener_events().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
