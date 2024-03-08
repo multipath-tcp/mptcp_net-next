@@ -34,9 +34,21 @@ jobs:
         with:
           fetch-depth: 0 # we need all commits for TopGit
           token: '${{ secrets.PAT_MATTTBE }}'
+
       - name: "Update TG tree"
         uses: multipath-tcp/mptcp-upstream-topgit-action@main
         with:
           not_base: "${{ github.event.inputs.keep_base_untouched || '0' }}"
           force_sync: "${{ github.event.inputs.force_sync || '0' }}"
           force_upd_net: "${{ github.event.inputs.force_upd_net || '1' }}"
+
+      - name: irc topgit
+        if: failure() && github.repository_owner == 'multipath-tcp'
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-topgit-bot
+          verbose: true
+          message: |-
+            New sync with latest net and net-next failed (initiated by ${{ github.actor }}): ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
