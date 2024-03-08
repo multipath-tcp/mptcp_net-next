@@ -62,14 +62,28 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
+      - name: "Docker image"
+        run: |
+          /usr/bin/docker pull mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+
       - name: "Tests"
-        uses: multipath-tcp/mptcp-upstream-virtme-docker@latest
-        with:
-          ccache_maxsize: 500M ## 10GB = project limit
-          mode: auto-${{ matrix.mode }}
-          packetdrill_stable: ${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}
-          extra_env: ${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}
-          trace: ${{ secrets.TESTS_ACTION_DEBUG }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          set -x
+          /usr/bin/docker run --privileged --rm \
+            -e "INPUT_CCACHE_MAXSIZE=500M" \
+            -e "INPUT_PACKETDRILL_STABLE=${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}" \
+            -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
+            -e "INPUT_TRACE=${RUNNER_DEBUG}" \
+            -e "INPUT_CI_TIMEOUT_SEC" \
+            -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e GITHUB_ACTIONS=true -e CI=true \
+            --workdir /github/workspace \
+            -v "${PWD}":"/github/workspace" \
+            mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+              auto-${{ matrix.mode }}
 
       - name: "Publish conclusion"
         if: always()
