@@ -6,7 +6,7 @@ import json
 import pprint
 import time
 
-from lib import YnlFamily, Netlink
+from lib import YnlFamily, Netlink, NlError
 
 
 class YnlEncoder(json.JSONEncoder):
@@ -38,6 +38,8 @@ def main():
                         const=Netlink.NLM_F_APPEND)
     parser.add_argument('--process-unknown', action=argparse.BooleanOptionalAction)
     parser.add_argument('--output-json', action='store_true')
+    parser.add_argument('--dbg-small-recv', default=0, const=4000,
+                        action='store', nargs='?', type=int)
     args = parser.parse_args()
 
     def output(msg):
@@ -53,7 +55,10 @@ def main():
     if args.json_text:
         attrs = json.loads(args.json_text)
 
-    ynl = YnlFamily(args.spec, args.schema, args.process_unknown)
+    ynl = YnlFamily(args.spec, args.schema, args.process_unknown,
+                    recv_size=args.dbg_small_recv)
+    if args.dbg_small_recv:
+        ynl.set_recv_dbg(True)
 
     if args.ntf:
         ynl.ntf_subscribe(args.ntf)
@@ -61,12 +66,16 @@ def main():
     if args.sleep:
         time.sleep(args.sleep)
 
-    if args.do:
-        reply = ynl.do(args.do, attrs, args.flags)
-        output(reply)
-    if args.dump:
-        reply = ynl.dump(args.dump, attrs)
-        output(reply)
+    try:
+        if args.do:
+            reply = ynl.do(args.do, attrs, args.flags)
+            output(reply)
+        if args.dump:
+            reply = ynl.dump(args.dump, attrs)
+            output(reply)
+    except NlError as e:
+        print(e)
+        exit(1)
 
     if args.ntf:
         ynl.check_ntf()
