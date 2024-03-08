@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-declare-event-macros-in-mptcp_lib
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: declare event macros in mptcp_lib
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+MPTCP event macros (SUB_ESTABLISHED, LISTENER_CREATED, LISTENER_CLOSED),
+and the protocol family macros (AF_INET, AF_INET6) are defined in both
+mptcp_join.sh and userspace_pm.sh. In order not to duplicate code, this
+patch declares them all in mptcp_lib.sh with MPTCP_LIB_ prefixs.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
