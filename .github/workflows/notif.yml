@@ -7,7 +7,7 @@ on:
   issues:
     types: [opened, reopened, closed, assigned, unassigned]
   workflow_run:
-    workflows: ["MPTCP Upstream Build Validation", "Update TopGit tree"]
+    workflows: ["MPTCP Upstream Build Validation"]
     types:
       - completed
 
@@ -186,18 +186,3 @@ jobs:
             Cheers,
             MPTCP GH Action bot
             Bot operated by Matthieu Baerts (NGI0 Core)
-
-  topgit:
-    name: "TopGit"
-    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Update TopGit tree' && github.event.workflow_run.conclusion != 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - name: irc topgit
-        uses: rectalogic/notify-irc@v2
-        with:
-          server: irc.libera.chat
-          channel: "#mptcp"
-          nickname: gh-topgit-bot
-          verbose: true
-          message: |-
-            New sync with latest net-next failed (initiated by ${{ github.actor }}): ${{ github.event.workflow_run.conclusion }}: ${{ github.event.workflow_run.html_url }}
