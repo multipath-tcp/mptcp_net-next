@@ -1,13 +1,17 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
 
+# Double quotes to prevent globbing and word splitting is recommended in new
+# code but we accept it, especially because there were too many before having
+# address all other issues detected by shellcheck.
+#shellcheck disable=SC2086
+
 . "$(dirname "${0}")/mptcp_lib.sh"
 
 ns1=""
 ns2=""
 ns3=""
 capture=false
-ksft_skip=4
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
 test_cnt=1
@@ -28,6 +32,8 @@ usage() {
 	echo -e "\t-d: debug this script"
 }
 
+# This function is used in the cleanup trap
+#shellcheck disable=SC2317
 cleanup()
 {
 	rm -f "$cout" "$sout"
@@ -61,10 +67,6 @@ setup()
 	trap cleanup EXIT
 
 	mptcp_lib_ns_init ns1 ns2 ns3
-	for i in "$ns1" "$ns2" "$ns3";do
-		ip netns exec $i sysctl -q net.ipv4.conf.all.rp_filter=0
-		ip netns exec $i sysctl -q net.ipv4.conf.default.rp_filter=0
-	done
 
 	ip link add ns1eth1 netns "$ns1" type veth peer name ns2eth1 netns "$ns2"
 	ip link add ns1eth2 netns "$ns1" type veth peer name ns2eth2 netns "$ns2"
@@ -124,7 +126,7 @@ do_transfer()
 	local sin=$2
 	local max_time=$3
 	local port
-	port=$((10000+$test_cnt))
+	port=$((10000+test_cnt))
 	test_cnt=$((test_cnt+1))
 
 	:> "$cout"
