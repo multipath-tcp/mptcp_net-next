@@ -107,10 +107,51 @@ jobs:
           path: ${{ github.workspace }}/.ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
-  notif:
-    name: "Notifications"
+  notif-export:
+    name: "Notifications export branches"
     needs: build
-    # only for the official repo (patchew)
+    # only for the official repo, export branches
+    if: always() && github.repository_owner == 'multipath-tcp' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
+    runs-on: ubuntu-latest
+    steps:
+      - name: get linked tag
+        id: tag
+        run: |
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG="${TAG:10}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
+        env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.sha }}"
+          BRANCH: "${{ github.ref_name }}"
+
+      - name: irc build
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-build-bot
+          verbose: true
+          message: |-
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) ended with ${{ needs.build.result }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: irc build error
+        if: needs.build.result == 'failure'
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-build-bot
+          verbose: true
+          message: |-
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) failed: ${{ needs.build.result }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  notif-patchew:
+    name: "Notifications patchew tags"
+    needs: build
+    # only for the official repo, patchew tags branches
     if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
     runs-on: ubuntu-latest
     steps:
@@ -193,3 +234,70 @@ jobs:
         env:
           URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+
+      - name: get commit info
+        id: commit
+        run: |
+          cat <<'EOF' > commit.json
+          ${{ toJSON(github.event.head_commit) }}
+          EOF
+
+          # ignore error, just in case the MID has not been added by the author
+          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
+          echo "Found message ID: '${TAG}' '${MID}'"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
+
+          # TODO: reply to the cover-letter: query lore.
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+          echo "Found subject: '${SUBJECT}'"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
+
+          NAME=$(jq -r '.author.name' commit.json)
+          EMAIL=$(jq -r '.author.email' commit.json)
+          echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
+          echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
+
+          SHA=$(jq -r '.id' commit.json)
+          echo "Found SHA: '${SHA}' ('${SHA:0:12}')"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
+
+          COMMITTER=$(jq -r '.committer.name' commit.json)
+          echo "Found committer: '${COMMITTER}'"
+          echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
+
+      - name: send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
+          subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
+          body: |
+            Hi ${{ steps.commit.outputs.name }},
+
+            Thank you for your modifications, that's great!
+
+            But sadly, our CI spotted some issues with it when trying to build it.
+
+            You can find more details there:
+
+              ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Status: ${{ needs.build.result }}
+            Initiator: ${{ github.actor }}
+            Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+
+            Feel free to reply to this email if you cannot access logs, if you need
+            some support to fix the error, if this doesn't seem to be caused by your
+            modifications or if the error is a false positive one.
+
+            Cheers,
+            MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (NGI0 Core)
