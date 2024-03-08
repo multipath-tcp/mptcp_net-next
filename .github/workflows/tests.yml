@@ -159,8 +159,22 @@ jobs:
           done
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
 
+      - name: get linked tag
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        id: tag
+        run: |
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG="${TAG:10}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
+        env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.sha }}"
+          BRANCH: "${{ github.ref_name }}"
+
       - name: irc tests
-        if: github.ref_name == 'export' || github.ref_name == 'export-net'
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
@@ -168,10 +182,11 @@ jobs:
           nickname: gh-tests-bot
           verbose: true
           message: |-
-            New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended: ${{ steps.test.outputs.url }}
+            New GH Actions Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
             - ${{ steps.test.outputs.ccl_normal }}
             - ${{ steps.test.outputs.ccl_debug }}
             - ${{ steps.test.outputs.ccl_btf }}
+            - Task: ${{ steps.test.outputs.url }}
 
       - name: get commit info
         id: commit
