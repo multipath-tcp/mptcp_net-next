@@ -50,10 +50,8 @@ app6_port=50004
 client_addr_id=${RANDOM:0:2}
 server_addr_id=${RANDOM:0:2}
 
-sec=$(date +%s)
-rndh=$(printf %x "$sec")-$(mktemp -u XXXXXX)
-ns1="ns1-$rndh"
-ns2="ns2-$rndh"
+ns1=""
+ns2=""
 ret=0
 test_name=""
 
@@ -118,10 +116,7 @@ cleanup()
 		mptcp_lib_kill_wait $pid
 	done
 
-	local netns
-	for netns in "$ns1" "$ns2" ;do
-		ip netns del "$netns"
-	done
+	mptcp_lib_ns_exit "${ns1}" "${ns2}"
 
 	rm -rf $file $client_evts $server_evts
 
@@ -131,10 +126,8 @@ cleanup()
 trap cleanup EXIT
 
 # Create and configure network namespaces for testing
+mptcp_lib_ns_init ns1 ns2
 for i in "$ns1" "$ns2" ;do
-	ip netns add "$i" || exit 1
-	ip -net "$i" link set lo up
-	ip netns exec "$i" sysctl -q net.mptcp.enabled=1
 	ip netns exec "$i" sysctl -q net.mptcp.pm_type=1
 done
 
@@ -156,17 +149,23 @@ ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
 ip -net "$ns2" addr add dead:beef:2::2/64 dev ns2eth1 nodad
 ip -net "$ns2" link set ns2eth1 up
 
+file=$(mktemp)
+mptcp_lib_make_file "$file" 2 1
+
+# Capture netlink events over the two network namespaces running
+# the MPTCP client and server
+client_evts=$(mktemp)
+mptcp_lib_events "${ns2}" "${client_evts}" client_evts_pid
+server_evts=$(mktemp)
+mptcp_lib_events "${ns1}" "${server_evts}" server_evts_pid
+sleep 0.5
+
 print_title "Init"
 print_test "Created network namespaces ns1, ns2"
 test_pass
 
 make_connection()
 {
-	if [ -z "$file" ]; then
-		file=$(mktemp)
-	fi
-	mptcp_lib_make_file "$file" 2 1
-
 	local is_v6=$1
 	local app_port=$app4_port
 	local connect_addr="10.0.1.1"
@@ -180,27 +179,8 @@ make_connection()
 		is_v6="v4"
 	fi
 
-	# Capture netlink events over the two network namespaces running
-	# the MPTCP client and server
-	if [ -z "$client_evts" ]; then
-		client_evts=$(mktemp)
-	fi
 	:>"$client_evts"
-	if [ $client_evts_pid -ne 0 ]; then
-		mptcp_lib_kill_wait $client_evts_pid
-	fi
-	ip netns exec "$ns2" ./pm_nl_ctl events >> "$client_evts" 2>&1 &
-	client_evts_pid=$!
-	if [ -z "$server_evts" ]; then
-		server_evts=$(mktemp)
-	fi
 	:>"$server_evts"
-	if [ $server_evts_pid -ne 0 ]; then
-		mptcp_lib_kill_wait $server_evts_pid
-	fi
-	ip netns exec "$ns1" ./pm_nl_ctl events >> "$server_evts" 2>&1 &
-	server_evts_pid=$!
-	sleep 0.5
 
 	# Run the server
 	ip netns exec "$ns1" \
