@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: ['normal', 'btf']
+        mode: ['normal', 'debug', 'btf']
     permissions:
       contents: read # to fetch code (actions/checkout)
       checks: write  # to write results
@@ -62,14 +62,28 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
+      - name: "Docker image"
+        run: |
+          /usr/bin/docker pull mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+
       - name: "Tests"
-        uses: multipath-tcp/mptcp-upstream-virtme-docker@net
-        with:
-          ccache_maxsize: 500M ## 10GB = project limit
-          mode: auto-${{ matrix.mode }}
-          packetdrill_stable: ${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}
-          extra_env: ${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}
-          trace: ${{ secrets.TESTS_ACTION_DEBUG }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          set -x
+          /usr/bin/docker run --privileged --rm \
+            -e "INPUT_CCACHE_MAXSIZE=500M" \
+            -e "INPUT_PACKETDRILL_STABLE=${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}" \
+            -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
+            -e "INPUT_TRACE=${RUNNER_DEBUG}" \
+            -e "INPUT_CI_TIMEOUT_SEC" \
+            -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e GITHUB_ACTIONS=true -e CI=true \
+            --workdir /github/workspace \
+            -v "${PWD}":"/github/workspace" \
+            mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+              auto-${{ matrix.mode }}
 
       - name: "Publish conclusion"
         if: always()
@@ -137,7 +151,7 @@ jobs:
       - name: get test info
         id: test
         run: |
-          for mode in normal btf; do
+          for mode in normal debug btf; do
             ccl="$(cat "results-${mode}/conclusion.txt")"
             echo "ccl_${mode}=${ccl}" >> ${GITHUB_OUTPUT}
             echo "ccl_title_${mode}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
@@ -145,8 +159,22 @@ jobs:
           done
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
 
+      - name: get linked tag
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        id: tag
+        run: |
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG="${TAG:10}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
+        env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.sha }}"
+          BRANCH: "${{ github.ref_name }}"
+
       - name: irc tests
-        if: github.ref_name == 'export' || github.ref_name == 'export-net'
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         uses: rectalogic/notify-irc@v2
         with:
           server: irc.libera.chat
@@ -154,9 +182,11 @@ jobs:
           nickname: gh-tests-bot
           verbose: true
           message: |-
-            New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended: ${{ steps.test.outputs.url }}
+            New GH Actions Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
             - ${{ steps.test.outputs.ccl_normal }}
+            - ${{ steps.test.outputs.ccl_debug }}
             - ${{ steps.test.outputs.ccl_btf }}
+            - Task: ${{ steps.test.outputs.url }}
 
       - name: get commit info
         id: commit
@@ -209,9 +239,10 @@ jobs:
 
             Thank you for your modifications, that's great!
 
-            Our CI (GitHub Action) did some validations and here is its report:
+            Our CI did some validations and here is its report:
 
             - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
+            - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
             - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
             - Task: ${{ steps.test.outputs.url }}
 
@@ -291,6 +322,7 @@ jobs:
           echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
 
           submit "${{ steps.test.outputs.ccl_title_normal }}" "${{ steps.test.outputs.ccl_status_normal }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_debug }}" "${{ steps.test.outputs.ccl_status_debug }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf }}" "${{ steps.test.outputs.ccl_status_btf }}" "${{ steps.test.outputs.url }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
