@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-mptcp_lib_verify_listener_events
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add mptcp_lib_verify_listener_events
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+To avoid duplicated code in different MPTCP selftests, we can add and use
+helpers defined in mptcp_lib.sh.
+
+The helper verify_listener_events() is defined both in mptcp_join.sh and
+userspace_pm.sh, export it into mptcp_lib.sh and rename it with mptcp_lib_
+prefix. Use this new helper in both scripts.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
