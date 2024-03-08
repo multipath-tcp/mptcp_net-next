@@ -224,7 +224,7 @@ jobs:
 
             Thank you for your modifications, that's great!
 
-            Our CI (GitHub Action) did some validations and here is its report:
+            Our CI did some validations and here is its report:
 
             - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
             - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
