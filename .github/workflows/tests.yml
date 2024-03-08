@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: ['normal', 'btf']
+        mode: ['normal', 'debug', 'btf']
     permissions:
       contents: read # to fetch code (actions/checkout)
       checks: write  # to write results
@@ -151,7 +151,7 @@ jobs:
       - name: get test info
         id: test
         run: |
-          for mode in normal btf; do
+          for mode in normal debug btf; do
             ccl="$(cat "results-${mode}/conclusion.txt")"
             echo "ccl_${mode}=${ccl}" >> ${GITHUB_OUTPUT}
             echo "ccl_title_${mode}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
@@ -170,6 +170,7 @@ jobs:
           message: |-
             New GH Actions Tests job validating ${{ github.ref_name }} (by ${{ github.actor }}) just ended: ${{ steps.test.outputs.url }}
             - ${{ steps.test.outputs.ccl_normal }}
+            - ${{ steps.test.outputs.ccl_debug }}
             - ${{ steps.test.outputs.ccl_btf }}
 
       - name: get commit info
@@ -226,6 +227,7 @@ jobs:
             Our CI (GitHub Action) did some validations and here is its report:
 
             - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
+            - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
             - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
             - Task: ${{ steps.test.outputs.url }}
 
@@ -305,6 +307,7 @@ jobs:
           echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
 
           submit "${{ steps.test.outputs.ccl_title_normal }}" "${{ steps.test.outputs.ccl_status_normal }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_debug }}" "${{ steps.test.outputs.ccl_status_debug }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf }}" "${{ steps.test.outputs.ccl_status_btf }}" "${{ steps.test.outputs.url }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
