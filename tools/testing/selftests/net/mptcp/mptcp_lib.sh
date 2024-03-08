@@ -8,6 +8,17 @@ readonly KSFT_SKIP=4
 # shellcheck disable=SC2155 # declare and assign separately
 readonly KSFT_TEST="${MPTCP_LIB_KSFT_TEST:-$(basename "${0}" .sh)}"
 
+# These variables are used in some selftests, read-only
+declare -rx MPTCP_LIB_EVENT_ANNOUNCED=6         # MPTCP_EVENT_ANNOUNCED
+declare -rx MPTCP_LIB_EVENT_REMOVED=7           # MPTCP_EVENT_REMOVED
+declare -rx MPTCP_LIB_EVENT_SUB_ESTABLISHED=10  # MPTCP_EVENT_SUB_ESTABLISHED
+declare -rx MPTCP_LIB_EVENT_SUB_CLOSED=11       # MPTCP_EVENT_SUB_CLOSED
+declare -rx MPTCP_LIB_EVENT_LISTENER_CREATED=15 # MPTCP_EVENT_LISTENER_CREATED
+declare -rx MPTCP_LIB_EVENT_LISTENER_CLOSED=16  # MPTCP_EVENT_LISTENER_CLOSED
+
+declare -rx MPTCP_LIB_AF_INET=2
+declare -rx MPTCP_LIB_AF_INET6=10
+
 MPTCP_LIB_SUBTESTS=()
 MPTCP_LIB_SUBTESTS_DUPLICATED=0
 MPTCP_LIB_TEST_COUNTER=0
@@ -437,4 +448,60 @@ mptcp_lib_print_title() {
 
 	# shellcheck disable=SC2059 # the format is in a variable
 	printf "${MPTCP_LIB_TEST_FORMAT}" "$((++MPTCP_LIB_TEST_COUNTER))" "${*}"
+}
+
+# $1: var name ; $2: prev ret
+mptcp_lib_check_expected_one() {
+	local var="${1}"
+	local exp="e_${var}"
+	local prev_ret="${2}"
+
+	if [ "${!var}" = "${!exp}" ]; then
+		return 0
+	fi
+
+	if [ "${prev_ret}" = "0" ]; then
+		mptcp_lib_pr_fail
+	fi
+
+	mptcp_lib_print_err "Expected value for '${var}': '${!exp}', got '${!var}'."
+	return 1
+}
+
+# $@: all var names to check
+mptcp_lib_check_expected() {
+	local rc=0
+	local var
+
+	for var in "${@}"; do
+		mptcp_lib_check_expected_one "${var}" "${rc}" || rc=1
+	done
+
+	return "${rc}"
+}
+
+# shellcheck disable=SC2034 # Some variables are used below but indirectly
+mptcp_lib_verify_listener_events() {
+	local evt=${1}
+	local e_type=${2}
+	local e_family=${3}
+	local e_saddr=${4}
+	local e_sport=${5}
+	local type
+	local family
+	local saddr
+	local sport
+	local rc=0
+
+	type=$(mptcp_lib_evts_get_info type "${evt}" "${e_type}")
+	family=$(mptcp_lib_evts_get_info family "${evt}" "${e_type}")
+	if [ "${family}" ] && [ "${family}" = "${AF_INET6}" ]; then
+		saddr=$(mptcp_lib_evts_get_info saddr6 "${evt}" "${e_type}")
+	else
+		saddr=$(mptcp_lib_evts_get_info saddr4 "${evt}" "${e_type}")
+	fi
+	sport=$(mptcp_lib_evts_get_info sport "${evt}" "${e_type}")
+
+	mptcp_lib_check_expected "type" "family" "saddr" "sport" || rc="${?}"
+	return "${rc}"
 }
