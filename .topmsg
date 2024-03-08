@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-use-operator-to-append-strings
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: join: use += operator to append strings
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch uses addition assignment operator (+=) to append strings instead
+of open-coding in mptcp_join.sh. This can make the statements shorter.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
