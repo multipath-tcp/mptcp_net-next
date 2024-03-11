@@ -603,17 +603,32 @@ kill_events_pids()
 	evts_ns2_pid=0
 }
 
-pm_nl_set_limits()
+pm_nl_limits()
 {
 	local ns=$1
 	local addrs=$2
 	local subflows=$3
 
 	if mptcp_lib_is_ip_mptcp; then
-		ip -n $ns mptcp limits set add_addr_accepted $addrs subflows $subflows
+		local limits="limits"
+
+		if [ -n "$addrs" ] && [ -n "$subflows" ]; then
+			limits+=" set add_addr_accepted $addrs subflows $subflows"
+		fi
+		ip -n $ns mptcp $limits
 	else
 		ip netns exec $ns ./pm_nl_ctl limits $addrs $subflows
 	fi
+}
+
+pm_nl_set_limits()
+{
+	pm_nl_limits "${@}"
+}
+
+pm_nl_get_limits()
+{
+	pm_nl_limits "${@}"
 }
 
 pm_nl_add_endpoint()
@@ -3578,6 +3593,10 @@ endpoint_tests()
 	   mptcp_lib_kallsyms_has "subflow_rebuild_header$"; then
 		pm_nl_set_limits $ns1 2 2
 		pm_nl_set_limits $ns2 2 2
+		print_check "get limits"
+		local output=$'accept 2\nsubflows 2'
+		mptcp_lib_is_ip_mptcp && output="add_addr_accepted 2 subflows 2 "
+		check_output "pm_nl_get_limits ${ns1}" "${output}"
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1 &
