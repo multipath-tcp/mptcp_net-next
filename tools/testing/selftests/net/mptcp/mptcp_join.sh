@@ -681,9 +681,9 @@ pm_nl_check_endpoint()
 		return
 	fi
 
+	line=$(mptcp_lib_endpoint_ops show "${ns}" "${_id}")
 	if mptcp_lib_is_ip_mptcp; then
 		# get line and trim trailing whitespace
-		line=$(ip -n $ns mptcp endpoint show $id)
 		line="${line% }"
 		# the dump order is: address id flags port dev
 		[ -n "$addr" ] && expected_line="$addr"
@@ -692,7 +692,6 @@ pm_nl_check_endpoint()
 		[ -n "$dev" ] && expected_line+=" $dev"
 		[ -n "$port" ] && expected_line+=" $port"
 	else
-		line=$(ip netns exec $ns ./pm_nl_ctl get $_id)
 		# the dump order is: id flags dev address port
 		expected_line="$id"
 		[ -n "$flags" ] && expected_line+=" $flags"
