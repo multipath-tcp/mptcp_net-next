@@ -699,11 +699,18 @@ pm_nl_flush_endpoint()
 pm_nl_show_endpoints()
 {
 	local ns=$1
+	local id=$2
 
 	if mptcp_lib_is_ip_mptcp; then
-		ip -n $ns mptcp endpoint show
+		local show="show"
+
+		[ -n "$id" ] && show+=" id $id"
+		ip -n $ns mptcp endpoint $show
 	else
-		ip netns exec $ns ./pm_nl_ctl dump
+		local dump="dump"
+
+		[ -n "$id" ] && dump="get $id"
+		ip netns exec $ns ./pm_nl_ctl $dump
 	fi
 }
 
@@ -3598,6 +3605,10 @@ endpoint_tests()
 		mptcp_lib_is_ip_mptcp && output="add_addr_accepted 2 subflows 2 "
 		check_output "pm_nl_get_limits ${ns1}" "${output}"
 		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		print_check "show id 1 addr"
+		output="id 1 flags signal 10.0.2.1"
+		mptcp_lib_is_ip_mptcp && output="10.0.2.1 id 1 signal "
+		check_output "pm_nl_show_endpoints ${ns1} 1" "${output}"
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1 &
 		local tests_pid=$!
