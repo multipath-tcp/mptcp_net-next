@@ -155,7 +155,7 @@ jobs:
         run: |
           for mode in normal debug btf; do
             ccl="$(cat "results-${mode}/conclusion.txt")"
-            echo "ccl_${mode}=${ccl}" >> ${GITHUB_OUTPUT}
+            echo "ccl_${mode}=${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
             echo "ccl_title_${mode}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
             echo "ccl_status_${mode}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           done
