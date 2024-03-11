@@ -239,6 +239,7 @@ jobs:
 
       - name: get commit info
         id: commit
+        if: needs.build.result == 'failure'
         run: |
           cat <<'EOF' > commit.json
           ${{ toJSON(github.event.head_commit) }}
@@ -269,6 +270,7 @@ jobs:
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
 
       - name: send email
+        if: needs.build.result == 'failure'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -293,7 +295,7 @@ jobs:
               ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             Status: ${{ needs.build.result }}
-            Initiator: ${{ github.actor }}
+            Initiator: ${{ steps.commit.outputs.committer }}
             Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Feel free to reply to this email if you cannot access logs, if you need
