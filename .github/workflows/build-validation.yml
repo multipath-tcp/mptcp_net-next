@@ -247,11 +247,29 @@ jobs:
 
           # ignore error, just in case the MID has not been added by the author
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
+
+          # Guess the subject from the last commit
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+
+          # Query Patchwork to get cover-letter and full subject
+          if [ -n "${MID}" ]; then
+            curl "${URL_PW}${MID:1:-1}" > pw_patch.json
+            URL_PW_SERIES=$(jq -r '.[0].series.[0].url' pw_patch.json)
+            if [ -n "${URL_PW_SERIES}" ]; then  # pw_patch.json looks valid
+              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter')"
+              if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
+                MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
+                SUBJECT=$(echo "${CL}" | jq -er '.name' || echo "${SUBJECT}")
+              else
+                # to get the full subject
+                SUBJECT=$(jq -er '.[0].name' pw_patch.json || echo "${SUBJECT}")
+              fi
+            fi
+          fi
+
           echo "Found message ID: '${TAG}' '${MID}'"
           echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
 
-          # TODO: reply to the cover-letter: query lore.
-          SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
           echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
 
@@ -268,6 +286,8 @@ jobs:
           COMMITTER=$(jq -r '.committer.name' commit.json)
           echo "Found committer: '${COMMITTER}'"
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
+        env:
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
 
       - name: send email
         if: needs.build.result == 'failure'
@@ -282,7 +302,7 @@ jobs:
           from: MPTCP CI
           reply_to: mptcp@lists.linux.dev
           in_reply_to: "<${{ steps.commit.outputs.mid }}>"
-          subject: "Re: ${{ steps.commit.outputs.subject }}: Build Failure"
+          subject: "Re: ${{ steps.commit.outputs.subject }}"
           body: |
             Hi ${{ steps.commit.outputs.name }},
 
