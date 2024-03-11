@@ -295,7 +295,7 @@ jobs:
               ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             Status: ${{ needs.build.result }}
-            Initiator: ${{ github.actor }}
+            Initiator: ${{ steps.commit.outputs.committer }}
             Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
 
             Feel free to reply to this email if you cannot access logs, if you need
