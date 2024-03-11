@@ -529,3 +529,151 @@ mptcp_lib_is_ip_mptcp() {
 
 	[ ${mptcp_lib_ip_mptcp} -eq 1 ]
 }
+
+mptcp_lib_limits() {
+	local ns=${1}
+	local addrs=${2}
+	local subflows=${3}
+
+	if mptcp_lib_is_ip_mptcp; then
+		local limits="limits"
+
+		if [ -n "${addrs}" ] && [ -n "${subflows}" ]; then
+			limits+=" set add_addr_accepted ${addrs} subflows ${subflows}"
+		fi
+		# shellcheck disable=SC2086
+		ip -n "${ns}" mptcp ${limits}
+	else
+		# shellcheck disable=SC2086
+		ip netns exec "${ns}" ./pm_nl_ctl limits "${addrs}" ${subflows}
+	fi
+}
+
+mptcp_lib_add_endpoint() {
+	local ns=${1}
+	local addr=${2}
+	local flags _flags
+	local port _port
+	local dev _dev
+	local id _id
+	local nr=2
+
+	local p
+	for p in "${@}"
+	do
+		if [ "${p}" = "flags" ]; then
+			eval _flags=\$"${nr}"
+			[ -n "${_flags}" ]; flags="flags ${_flags}"
+		fi
+		if [ "${p}" = "dev" ]; then
+			eval _dev=\$"${nr}"
+			[ -n "${_dev}" ]; dev="dev ${_dev}"
+		fi
+		if [ "${p}" = "id" ]; then
+			eval _id=\$"${nr}"
+			[ -n "${_id}" ]; id="id ${_id}"
+		fi
+		if [ "${p}" = "port" ]; then
+			eval _port=\$"${nr}"
+			[ -n "${_port}" ]; port="port ${_port}"
+		fi
+
+		nr=$((nr + 1))
+	done
+
+	if mptcp_lib_is_ip_mptcp; then
+		# shellcheck disable=SC2086
+		ip -n "${ns}" mptcp endpoint add "${addr}" ${_flags//","/" "} ${dev} ${id} ${port}
+	else
+		# shellcheck disable=SC2086
+		ip netns exec "${ns}" ./pm_nl_ctl add "${addr}" ${flags} ${dev} ${id} ${port}
+	fi
+}
+
+mptcp_lib_del_endpoint() {
+	local ns=${1}
+	local id=${2}
+	local addr=${3}
+
+	if mptcp_lib_is_ip_mptcp; then
+		[ "${id}" -ne 0 ] && addr=''
+		# shellcheck disable=SC2086
+		ip -n "${ns}" mptcp endpoint delete id "${id}" ${addr}
+	else
+		ip netns exec "${ns}" ./pm_nl_ctl del "${id}" "${addr}"
+	fi
+}
+
+mptcp_lib_flush_endpoint() {
+	local ns=${1}
+
+	if mptcp_lib_is_ip_mptcp; then
+		ip -n "${ns}" mptcp endpoint flush
+	else
+		ip netns exec "${ns}" ./pm_nl_ctl flush
+	fi
+}
+
+mptcp_lib_show_endpoints() {
+	local ns=${1}
+	local id=${2}
+
+	if mptcp_lib_is_ip_mptcp; then
+		local show="show"
+
+		[ -n "${id}" ] && show+=" id ${id}"
+		# shellcheck disable=SC2086
+		ip -n "${ns}" mptcp endpoint ${show}
+	else
+		local dump="dump"
+
+		[ -n "${id}" ] && dump="get ${id}"
+		# shellcheck disable=SC2086
+		ip netns exec "${ns}" ./pm_nl_ctl ${dump}
+	fi
+}
+
+mptcp_lib_change_endpoint() {
+	local ns=${1}
+	local addr=${2}
+	local flags=${3}
+
+	if ! mptcp_lib_is_addr "${addr}"; then
+		[ "${addr}" -gt 0 ] && [ "${addr}" -lt 256 ] && addr="id ${addr}"
+	fi
+
+	if mptcp_lib_is_ip_mptcp; then
+		# shellcheck disable=SC2086
+		ip -n "${ns}" mptcp endpoint change ${addr} ${flags//","/" "}
+	else
+		# shellcheck disable=SC2086
+		ip netns exec "${ns}" ./pm_nl_ctl set ${addr} flags "${flags}"
+	fi
+}
+
+mptcp_lib_endpoint_ops() {
+	[ "$#" -lt 2 ] && return 1
+
+	case "$1" in
+	"limits")
+		mptcp_lib_limits "${@:2}"
+		;;
+	"add")
+		mptcp_lib_add_endpoint "${@:2}"
+		;;
+	"del")
+		mptcp_lib_del_endpoint "${@:2}"
+		;;
+	"flush")
+		mptcp_lib_flush_endpoint "${@:2}"
+		;;
+	"show")
+		mptcp_lib_show_endpoints "${@:2}"
+		;;
+	"change")
+		mptcp_lib_change_endpoint "${@:2}"
+		;;
+	*)
+		;;
+	esac
+}
