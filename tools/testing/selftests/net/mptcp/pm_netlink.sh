@@ -72,6 +72,7 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" "" "defaults addr list"
 default_limits="$(ip netns exec $ns1 ./pm_nl_ctl limits)"
 if mptcp_lib_expect_all_features; then
 	limits=$'accept 0\nsubflows 2'
+	mptcp_lib_is_ip_mptcp && limits="add_addr_accepted 0 subflows 2 "
 	check "ip netns exec $ns1 ./pm_nl_ctl limits" "${limits}" "defaults limits"
 fi
 
@@ -79,17 +80,24 @@ ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2 flags subflow dev lo
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 flags signal,backup
 endpoint="id 1 flags  10.0.1.1"
+mptcp_lib_is_ip_mptcp && endpoint="10.0.1.1 id 1 "
 check "ip netns exec $ns1 ./pm_nl_ctl get 1" "${endpoint}" "simple add/get addr"
 
 dump="$(printf '%s\n' \
 	"id 1 flags  10.0.1.1" \
 	"id 2 flags subflow dev lo 10.0.1.2" \
 	"id 3 flags signal,backup 10.0.1.3")"
+mptcp_lib_is_ip_mptcp && \
+dump="$(printf '%s\n' \
+	"10.0.1.1 id 1 " \
+	"10.0.1.2 id 2 subflow dev lo " \
+	"10.0.1.3 id 3 signal backup ")"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"${dump}" "dump addrs"
 
 ip netns exec $ns1 ./pm_nl_ctl del 2
 dump=$'id 1 flags  10.0.1.1\nid 3 flags signal,backup 10.0.1.3'
+mptcp_lib_is_ip_mptcp && dump=$'10.0.1.1 id 1 \n10.0.1.3 id 3 signal backup '
 check "ip netns exec $ns1 ./pm_nl_ctl get 2" "" "simple del addr"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"${dump}" "dump addrs after del"
@@ -99,12 +107,14 @@ check "ip netns exec $ns1 ./pm_nl_ctl get 4" "" "duplicate addr"
 
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4 flags signal
 endpoint="id 4 flags signal 10.0.1.4"
+mptcp_lib_is_ip_mptcp && endpoint="10.0.1.4 id 4 signal "
 check "ip netns exec $ns1 ./pm_nl_ctl get 4" "${endpoint}" "id addr increment"
 
 for i in $(seq 5 9); do
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.$i flags signal >/dev/null 2>&1
 done
 endpoint="id 9 flags signal 10.0.1.9"
+mptcp_lib_is_ip_mptcp && endpoint="10.0.1.9 id 9 signal "
 check "ip netns exec $ns1 ./pm_nl_ctl get 9" "${endpoint}" "hard addr limit"
 check "ip netns exec $ns1 ./pm_nl_ctl get 10" "" "above hard addr limit"
 
@@ -121,6 +131,15 @@ dump="$(printf '%s\n' \
 	"id 6 flags signal 10.0.1.6" \
 	"id 7 flags signal 10.0.1.7" \
 	"id 8 flags signal 10.0.1.8")"
+mptcp_lib_is_ip_mptcp && \
+dump="$(printf '%s\n' \
+	"10.0.1.1 id 1 " \
+	"10.0.1.3 id 3 signal backup " \
+	"10.0.1.4 id 4 signal " \
+	"10.0.1.5 id 5 signal " \
+	"10.0.1.6 id 6 signal " \
+	"10.0.1.7 id 7 signal " \
+	"10.0.1.8 id 8 signal ")"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "id limit"
 
 ip netns exec $ns1 ./pm_nl_ctl flush
@@ -134,6 +153,7 @@ check "ip netns exec $ns1 ./pm_nl_ctl limits" "$default_limits" "subflows above 
 
 ip netns exec $ns1 ./pm_nl_ctl limits 8 8
 limits=$'accept 8\nsubflows 8'
+mptcp_lib_is_ip_mptcp && limits="add_addr_accepted 8 subflows 8 "
 check "ip netns exec $ns1 ./pm_nl_ctl limits" "${limits}" "set limits"
 
 ip netns exec $ns1 ./pm_nl_ctl flush
@@ -154,6 +174,16 @@ dump="$(printf '%s\n' \
 	"id 101 flags  10.0.1.4" \
 	"id 254 flags  10.0.1.5" \
 	"id 255 flags  10.0.1.6")"
+mptcp_lib_is_ip_mptcp && \
+dump="$(printf '%s\n' \
+	"10.0.1.1 id 1 " \
+	"10.0.1.2 id 2 " \
+	"10.0.1.7 id 3 " \
+	"10.0.1.8 id 4 " \
+	"10.0.1.3 id 100 " \
+	"10.0.1.4 id 101 " \
+	"10.0.1.5 id 254 " \
+	"10.0.1.6 id 255 ")"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "set ids"
 
 ip netns exec $ns1 ./pm_nl_ctl flush
@@ -174,15 +204,27 @@ dump="$(printf '%s\n' \
 	"id 253 flags  10.0.0.5" \
 	"id 254 flags  10.0.0.2" \
 	"id 255 flags  10.0.0.3")"
+mptcp_lib_is_ip_mptcp && \
+dump="$(printf '%s\n' \
+	"10.0.0.1 id 1 " \
+	"10.0.0.4 id 2 " \
+	"10.0.0.6 id 3 " \
+	"10.0.0.7 id 4 " \
+	"10.0.0.8 id 5 " \
+	"10.0.0.5 id 253 " \
+	"10.0.0.2 id 254 " \
+	"10.0.0.3 id 255 ")"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "wrap-around ids"
 
 ip netns exec $ns1 ./pm_nl_ctl flush
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1 flags subflow
 ip netns exec $ns1 ./pm_nl_ctl set 10.0.1.1 flags backup
 dump="id 1 flags subflow,backup 10.0.1.1"
+mptcp_lib_is_ip_mptcp && dump="10.0.1.1 id 1 subflow backup "
 check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "set flags (backup)"
 ip netns exec $ns1 ./pm_nl_ctl set 10.0.1.1 flags nobackup
 dump="id 1 flags subflow 10.0.1.1"
+mptcp_lib_is_ip_mptcp && dump="10.0.1.1 id 1 subflow "
 check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "          (nobackup)"
 
 # fullmesh support has been added later
@@ -190,12 +232,15 @@ ip netns exec $ns1 ./pm_nl_ctl set id 1 flags fullmesh 2>/dev/null
 if ip netns exec $ns1 ./pm_nl_ctl dump | grep -q "fullmesh" ||
    mptcp_lib_expect_all_features; then
 	dump="id 1 flags subflow,fullmesh 10.0.1.1"
+	mptcp_lib_is_ip_mptcp && dump="10.0.1.1 id 1 subflow fullmesh "
 	check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "          (fullmesh)"
 	ip netns exec $ns1 ./pm_nl_ctl set id 1 flags nofullmesh
 	dump="id 1 flags subflow 10.0.1.1"
+	mptcp_lib_is_ip_mptcp && dump="10.0.1.1 id 1 subflow "
 	check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "          (nofullmesh)"
 	ip netns exec $ns1 ./pm_nl_ctl set id 1 flags backup,fullmesh
 	dump="id 1 flags subflow,backup,fullmesh 10.0.1.1"
+	mptcp_lib_is_ip_mptcp && dump="10.0.1.1 id 1 subflow backup fullmesh "
 	check "ip netns exec $ns1 ./pm_nl_ctl dump" "${dump}" "          (backup,fullmesh)"
 else
 	for st in fullmesh nofullmesh backup,fullmesh; do
