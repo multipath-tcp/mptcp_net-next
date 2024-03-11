@@ -284,6 +284,11 @@ mptcp_lib_is_v6() {
 	[ -z "${1##*:*}" ]
 }
 
+# $1: IP address
+mptcp_lib_is_addr() {
+	[ -z "${1##*.*}" ] || [ -z "${1##*:*}" ]
+}
+
 # $1: ns, $2: MIB counter
 mptcp_lib_get_counter() {
 	local ns="${1}"

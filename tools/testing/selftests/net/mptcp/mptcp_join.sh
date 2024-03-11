@@ -717,13 +717,17 @@ pm_nl_show_endpoints()
 pm_nl_change_endpoint()
 {
 	local ns=$1
-	local id=$2
+	local addr=$2
 	local flags=$3
 
+	if ! mptcp_lib_is_addr "$addr"; then
+		[ $addr -gt 0 ] && [ $addr -lt 256 ] && addr="id $addr"
+	fi
+
 	if mptcp_lib_is_ip_mptcp; then
-		ip -n $ns mptcp endpoint change id $id ${flags//","/" "}
+		ip -n $ns mptcp endpoint change $addr ${flags//","/" "}
 	else
-		ip netns exec $ns ./pm_nl_ctl set id $id flags $flags
+		ip netns exec $ns ./pm_nl_ctl set $addr flags $flags
 	fi
 }
 
@@ -3609,6 +3613,11 @@ endpoint_tests()
 		output="id 1 flags signal 10.0.2.1"
 		mptcp_lib_is_ip_mptcp && output="10.0.2.1 id 1 signal "
 		check_output "pm_nl_show_endpoints ${ns1} 1" "${output}"
+		pm_nl_change_endpoint ${ns1} 1 backup
+		print_check "change id 1 addr"
+		output="id 1 flags signal,backup 10.0.2.1"
+		mptcp_lib_is_ip_mptcp && output="10.0.2.1 id 1 signal backup "
+		check_output "pm_nl_show_endpoints ${ns1}" "${output}"
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1 &
 		local tests_pid=$!
