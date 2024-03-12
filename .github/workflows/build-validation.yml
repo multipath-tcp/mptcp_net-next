@@ -253,10 +253,10 @@ jobs:
 
           # Query Patchwork to get cover-letter and full subject
           if [ -n "${MID}" ]; then
-            curl "${URL_PW}${MID:1:-1}" > pw_patch.json
-            URL_PW_SERIES=$(jq -r '.[0].series.[0].url' pw_patch.json)
-            if [ -n "${URL_PW_SERIES}" ]; then  # pw_patch.json looks valid
-              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter')"
+            curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
+            URL_PW_SERIES=$(jq -er '.[0].series.[0].url' pw_patch.json || true)
+            if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
+              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter' || true)"
               if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
                 MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
                 SUBJECT=$(echo "${CL}" | jq -er '.name' || echo "${SUBJECT}")
