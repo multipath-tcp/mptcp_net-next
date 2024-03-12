@@ -287,6 +287,7 @@ jobs:
             curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
             URL_PW_SERIES=$(jq -er 'last(last(.[].series)[].url)' pw_patch.json || true)
             if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
+              echo "series=https://patchwork.kernel.org/project/mptcp/list/?series=$(basename "${URL_PW_SERIES}")" >> ${GITHUB_OUTPUT}
               CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter' || true)"
               if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
                 MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
@@ -335,6 +336,7 @@ jobs:
 
             Initiator: ${{ steps.commit.outputs.committer }}
             Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+            Patchwork: ${{ steps.series.outputs.series }}
 
 
             If there are some issues, you can reproduce them using the same environment as
