@@ -283,7 +283,7 @@ jobs:
         if: startswith(github.ref, 'refs/tags/patchew/')
         run: |
           # Query Patchwork to get cover-letter and full subject
-          if [ -n "${MID}" ]; then
+          if [ -n "${MID:1:-1}" ]; then
             curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
             URL_PW_SERIES=$(jq -er 'last(last(.[].series)[].url)' pw_patch.json || true)
             if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
@@ -305,7 +305,7 @@ jobs:
           echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
         env:
           URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
-          MID: "${{ steps.commit.outputs.mid }}"
+          MID: "<${{ steps.commit.outputs.mid }}>"
           SUBJECT: "${{ steps.commit.outputs.subject }}"
 
       - name: send email
