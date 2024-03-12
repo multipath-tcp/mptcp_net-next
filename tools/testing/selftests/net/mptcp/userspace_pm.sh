@@ -19,15 +19,15 @@ if ! mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
 fi
 mptcp_lib_check_tools ip
 
-ANNOUNCED=6        # MPTCP_EVENT_ANNOUNCED
-REMOVED=7          # MPTCP_EVENT_REMOVED
-SUB_ESTABLISHED=10 # MPTCP_EVENT_SUB_ESTABLISHED
-SUB_CLOSED=11      # MPTCP_EVENT_SUB_CLOSED
-LISTENER_CREATED=15 #MPTCP_EVENT_LISTENER_CREATED
-LISTENER_CLOSED=16  #MPTCP_EVENT_LISTENER_CLOSED
+ANNOUNCED=${MPTCP_LIB_EVENT_ANNOUNCED}
+REMOVED=${MPTCP_LIB_EVENT_REMOVED}
+SUB_ESTABLISHED=${MPTCP_LIB_EVENT_SUB_ESTABLISHED}
+SUB_CLOSED=${MPTCP_LIB_EVENT_SUB_CLOSED}
+LISTENER_CREATED=${MPTCP_LIB_EVENT_LISTENER_CREATED}
+LISTENER_CLOSED=${MPTCP_LIB_EVENT_LISTENER_CLOSED}
 
-AF_INET=2
-AF_INET6=10
+AF_INET=${MPTCP_LIB_AF_INET}
+AF_INET6=${MPTCP_LIB_AF_INET6}
 
 file=""
 server_evts=""
@@ -89,7 +89,7 @@ test_fail()
 	then
 		mptcp_lib_pr_fail "${@}"
 	fi
-	ret=1
+	ret=${KSFT_FAIL}
 	mptcp_lib_result_fail "${test_name}"
 }
 
@@ -209,7 +209,7 @@ make_connection()
 	else
 		test_fail "Expected tokens (c:${client_token} - s:${server_token}) and server (c:${client_serverside} - s:${server_serverside})"
 		mptcp_lib_result_print_all_tap
-		exit 1
+		exit ${KSFT_FAIL}
 	fi
 
 	if [ "$is_v6" = "v6" ]
@@ -835,26 +835,11 @@ test_prio()
 
 verify_listener_events()
 {
-	local evt=$1
-	local e_type=$2
-	local e_family=$3
-	local e_saddr=$4
-	local e_sport=$5
-	local type
-	local family
-	local saddr
-	local sport
-
-	type=$(mptcp_lib_evts_get_info type $evt $e_type)
-	family=$(mptcp_lib_evts_get_info family $evt $e_type)
-	sport=$(mptcp_lib_evts_get_info sport $evt $e_type)
-	if [ $family ] && [ $family = $AF_INET6 ]; then
-		saddr=$(mptcp_lib_evts_get_info saddr6 $evt $e_type)
+	if mptcp_lib_verify_listener_events "${@}"; then
+		test_pass
 	else
-		saddr=$(mptcp_lib_evts_get_info saddr4 $evt $e_type)
+		test_fail
 	fi
-
-	check_expected "type" "family" "saddr" "sport"
 }
 
 test_listener()
