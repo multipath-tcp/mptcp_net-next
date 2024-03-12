@@ -200,29 +200,11 @@ jobs:
 
           # ignore error, just in case the MID has not been added by the author
           read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
-
-          # Guess the subject from the last commit
-          SUBJECT=$(jq -r '.message' commit.json | head -n1)
-
-          # Query Patchwork to get cover-letter and full subject
-          if [ -n "${MID}" ]; then
-            curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
-            URL_PW_SERIES=$(jq -er 'last(last(.[].series)[].url)' pw_patch.json || true)
-            if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
-              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter' || true)"
-              if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
-                MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
-                SUBJECT=$(echo "${CL}" | jq -er '.name' || echo "${SUBJECT}")
-              else
-                # to get the full subject
-                SUBJECT=$(jq -er '.[0].name' pw_patch.json || echo "${SUBJECT}")
-              fi
-            fi
-          fi
-
           echo "Found message ID: '${TAG}' '${MID}'"
           echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
 
+          # Guess the subject from the last commit
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
           echo "Found subject: '${SUBJECT}'"
           echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
 
@@ -239,60 +221,6 @@ jobs:
           COMMITTER=$(jq -r '.committer.name' commit.json)
           echo "Found committer: '${COMMITTER}'"
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
-        env:
-          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
-
-      - name: send email
-        if: startswith(github.ref, 'refs/tags/patchew/')
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          to: ${{ steps.commit.outputs.author }}
-          cc: mptcp@lists.linux.dev
-          from: MPTCP CI
-          reply_to: mptcp@lists.linux.dev
-          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
-          subject: "Re: ${{ steps.commit.outputs.subject }}"
-          body: |
-            Hi ${{ steps.commit.outputs.name }},
-
-            Thank you for your modifications, that's great!
-
-            Our CI did some validations and here is its report:
-
-            - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
-            - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
-            - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
-            - Task: ${{ steps.test.outputs.url }}
-
-            Initiator: ${{ steps.commit.outputs.committer }}
-            Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
-
-
-            If there are some issues, you can reproduce them using the same environment as
-            the one used by the CI thanks to a docker image, e.g.:
-
-                $ cd [kernel source code]
-                $ docker run -v "${PWD}:${PWD}:rw" -w "${PWD}" --privileged --rm -it \
-                    --pull always mptcp/mptcp-upstream-virtme-docker:latest \
-                    auto-normal
-
-            For more details:
-
-                https://github.com/multipath-tcp/mptcp-upstream-virtme-docker
-
-
-            Please note that despite all the efforts that have been already done to have a
-            stable tests suite when executed on a public CI like here, it is possible some
-            reported issues are not due to your modifications. Still, do not hesitate to
-            help us improve that ;-)
-
-            Cheers,
-            MPTCP GH Action bot
-            Bot operated by Matthieu Baerts (NGI0 Core)
 
       - name: set patchwork check
         if: startswith(github.ref, 'refs/tags/patchew/')
@@ -348,3 +276,85 @@ jobs:
           submit "${{ steps.test.outputs.ccl_title_btf }}" "${{ steps.test.outputs.ccl_status_btf }}" "${{ steps.test.outputs.url }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
+
+      # do that after having set patchwork checks, so we already waited for it to be ready
+      - name: get series info
+        id: series
+        if: startswith(github.ref, 'refs/tags/patchew/')
+        run: |
+          # Query Patchwork to get cover-letter and full subject
+          if [ -n "${MID}" ]; then
+            curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
+            URL_PW_SERIES=$(jq -er 'last(last(.[].series)[].url)' pw_patch.json || true)
+            if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
+              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter' || true)"
+              if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
+                MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
+                SUBJECT=$(echo "${CL}" | jq -er '.name' || echo "${SUBJECT}")
+              else
+                # to get the full subject
+                SUBJECT=$(jq -er '.[0].name' pw_patch.json || echo "${SUBJECT}")
+              fi
+            fi
+          fi
+
+          echo "Found message ID: '${MID}'"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
+          echo "Found subject: '${SUBJECT}'"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
+        env:
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+          MID: "${{ steps.commit.outputs.mid }}"
+          SUBJECT: "${{ steps.commit.outputs.subject }}"
+
+      - name: send email
+        if: startswith(github.ref, 'refs/tags/patchew/')
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: "<${{ steps.series.outputs.mid }}>"
+          subject: "Re: ${{ steps.series.outputs.subject }}"
+          body: |
+            Hi ${{ steps.commit.outputs.name }},
+
+            Thank you for your modifications, that's great!
+
+            Our CI did some validations and here is its report:
+
+            - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
+            - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
+            - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
+            - Task: ${{ steps.test.outputs.url }}
+
+            Initiator: ${{ steps.commit.outputs.committer }}
+            Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+
+
+            If there are some issues, you can reproduce them using the same environment as
+            the one used by the CI thanks to a docker image, e.g.:
+
+                $ cd [kernel source code]
+                $ docker run -v "${PWD}:${PWD}:rw" -w "${PWD}" --privileged --rm -it \
+                    --pull always mptcp/mptcp-upstream-virtme-docker:latest \
+                    auto-normal
+
+            For more details:
+
+                https://github.com/multipath-tcp/mptcp-upstream-virtme-docker
+
+
+            Please note that despite all the efforts that have been already done to have a
+            stable tests suite when executed on a public CI like here, it is possible some
+            reported issues are not due to your modifications. Still, do not hesitate to
+            help us improve that ;-)
+
+            Cheers,
+            MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (NGI0 Core)
