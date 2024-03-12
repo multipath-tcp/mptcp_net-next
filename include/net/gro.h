@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef _NET_IPV6_GRO_H
-#define _NET_IPV6_GRO_H
+#ifndef _NET_GRO_H
+#define _NET_GRO_H
 
 #include <linux/indirect_call_wrapper.h>
 #include <linux/ip.h>
@@ -9,6 +9,7 @@
 #include <net/ip6_checksum.h>
 #include <linux/skbuff.h>
 #include <net/udp.h>
+#include <net/hotdata.h>
 
 struct napi_gro_cb {
 	union {
@@ -446,7 +447,7 @@ static inline void gro_normal_one(struct napi_struct *napi, struct sk_buff *skb,
 {
 	list_add_tail(&skb->list, &napi->rx_list);
 	napi->rx_count += segs;
-	if (napi->rx_count >= READ_ONCE(gro_normal_batch))
+	if (napi->rx_count >= READ_ONCE(net_hotdata.gro_normal_batch))
 		gro_normal_list(napi);
 }
 
@@ -493,6 +494,7 @@ static inline void inet6_get_iif_sdif(const struct sk_buff *skb, int *iif, int *
 #endif
 }
 
-extern struct list_head offload_base;
+struct packet_offload *gro_find_receive_by_type(__be16 type);
+struct packet_offload *gro_find_complete_by_type(__be16 type);
 
-#endif /* _NET_IPV6_GRO_H */
+#endif /* _NET_GRO_H */
