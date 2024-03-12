@@ -2841,15 +2841,9 @@ static int vxlan_init(struct net_device *dev)
 	if (vxlan->cfg.flags & VXLAN_F_VNIFILTER)
 		vxlan_vnigroup_init(vxlan);
 
-	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
-	if (!dev->tstats) {
-		err = -ENOMEM;
-		goto err_vnigroup_uninit;
-	}
-
 	err = gro_cells_init(&vxlan->gro_cells, dev);
 	if (err)
-		goto err_free_percpu;
+		goto err_vnigroup_uninit;
 
 	err = vxlan_mdb_init(vxlan);
 	if (err)
@@ -2860,8 +2854,6 @@ static int vxlan_init(struct net_device *dev)
 
 err_gro_cells_destroy:
 	gro_cells_destroy(&vxlan->gro_cells);
-err_free_percpu:
-	free_percpu(dev->tstats);
 err_vnigroup_uninit:
 	if (vxlan->cfg.flags & VXLAN_F_VNIFILTER)
 		vxlan_vnigroup_uninit(vxlan);
@@ -2892,8 +2884,6 @@ static void vxlan_uninit(struct net_device *dev)
 	gro_cells_destroy(&vxlan->gro_cells);
 
 	vxlan_fdb_delete_default(vxlan, vxlan->cfg.vni);
-
-	free_percpu(dev->tstats);
 }
 
 /* Start ageing timer and join group when device is brought up */
@@ -3224,7 +3214,6 @@ static const struct net_device_ops vxlan_netdev_ether_ops = {
 	.ndo_open		= vxlan_open,
 	.ndo_stop		= vxlan_stop,
 	.ndo_start_xmit		= vxlan_xmit,
-	.ndo_get_stats64	= dev_get_tstats64,
 	.ndo_set_rx_mode	= vxlan_set_multicast_list,
 	.ndo_change_mtu		= vxlan_change_mtu,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -3248,7 +3237,6 @@ static const struct net_device_ops vxlan_netdev_raw_ops = {
 	.ndo_open		= vxlan_open,
 	.ndo_stop		= vxlan_stop,
 	.ndo_start_xmit		= vxlan_xmit,
-	.ndo_get_stats64	= dev_get_tstats64,
 	.ndo_change_mtu		= vxlan_change_mtu,
 	.ndo_fill_metadata_dst	= vxlan_fill_metadata_dst,
 };
@@ -3316,6 +3304,7 @@ static void vxlan_setup(struct net_device *dev)
 	dev->min_mtu = ETH_MIN_MTU;
 	dev->max_mtu = ETH_MAX_MTU;
 
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 	INIT_LIST_HEAD(&vxlan->next);
 
 	timer_setup(&vxlan->age_timer, vxlan_cleanup, TIMER_DEFERRABLE);
