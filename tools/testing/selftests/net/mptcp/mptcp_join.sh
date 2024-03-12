@@ -142,7 +142,7 @@ init() {
 
 	mptcp_lib_check_mptcp
 	mptcp_lib_check_kallsyms
-	mptcp_lib_check_tools ip ss "${iptables}" "${ip6tables}"
+	mptcp_lib_check_tools ip ss "${iptables}" "${ip6tables}" iperf
 
 	sin=$(mktemp)
 	sout=$(mktemp)
@@ -3626,6 +3626,57 @@ endpoint_tests()
 	fi
 }
 
+iperf_tests()
+{
+	if reset "iperf tcp test, delay 1"; then
+		tc -n $ns2 qdisc add dev ns2eth1 root netem rate 1mbit delay 1
+		ip netns exec $ns1 iperf3 -s &
+		local tests_pid=$!
+		sleep 1
+		ip netns exec $ns2 iperf3 -c 10.0.1.1
+		mptcp_lib_kill_wait $tests_pid
+		chk_join_nr 0 0 0
+	fi
+
+	if reset "iperf mptcp test, delay 1"; then
+		tc -n $ns2 qdisc add dev ns2eth1 root netem rate 1mbit delay 1
+		pm_nl_set_limits $ns1 8 8
+		pm_nl_set_limits $ns2 8 8
+		pm_nl_add_endpoint $ns2 10.0.2.2 dev ns2eth2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		ip netns exec $ns1 iperf3 -m -s &
+		local tests_pid=$!
+		sleep 1
+		ip netns exec $ns2 iperf3 -m -c 10.0.1.1
+		mptcp_lib_kill_wait $tests_pid
+		chk_join_nr 2 2 2
+	fi
+
+	if reset "iperf tcp test, loss 1%"; then
+		tc -n $ns2 qdisc add dev ns2eth1 root netem rate 1mbit loss 1%
+		ip netns exec $ns1 iperf3 -s &
+		local tests_pid=$!
+		sleep 1
+		ip netns exec $ns2 iperf3 -c 10.0.1.1
+		mptcp_lib_kill_wait $tests_pid
+		chk_join_nr 0 0 0
+	fi
+
+	if reset "iperf mptcp test, loss %1"; then
+		tc -n $ns2 qdisc add dev ns2eth1 root netem rate 1mbit loss 1%
+		pm_nl_set_limits $ns1 8 8
+		pm_nl_set_limits $ns2 8 8
+		pm_nl_add_endpoint $ns2 10.0.2.2 dev ns2eth2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		ip netns exec $ns1 iperf3 -m -s &
+		local tests_pid=$!
+		sleep 1
+		ip netns exec $ns2 iperf3 -m -c 10.0.1.1
+		mptcp_lib_kill_wait $tests_pid
+		chk_join_nr 2 2 2
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -3674,6 +3725,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	t@iperf_tests
 )
 
 all_tests_args=""

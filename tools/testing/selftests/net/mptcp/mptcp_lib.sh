@@ -396,6 +396,12 @@ mptcp_lib_check_tools() {
 				exit ${KSFT_SKIP}
 			fi
 			;;
+		"iperf"*)
+			if ! iperf3 -h | grep -q multipath; then
+				mptcp_lib_pr_skip "iperf tool does not support MPTCP"
+				exit ${KSFT_SKIP}
+			fi
+			;;
 		*)
 			mptcp_lib_pr_fail "Internal error: unsupported tool: ${tool}"
 			exit ${KSFT_FAIL}
