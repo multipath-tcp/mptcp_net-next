@@ -256,7 +256,7 @@ jobs:
             URL_PW_SERIES_API=$(curl "${URL_PW}${MID:1:-1}" | jq -er 'last(last(.[].series)[].url)' || true)
             if [ -n "${URL_PW_SERIES_API}" ] && [ "${URL_PW_SERIES_API}" != "null" ]; then
               echo "series=${URL_PW_SERIES}$(basename "${URL_PW_SERIES_API}")" >> ${GITHUB_OUTPUT}
-              if curl "${URL_PW_SERIES_API}" > pw_series.json && [ test -s pw_series.json ]; then
+              if curl "${URL_PW_SERIES_API}" > pw_series.json && [ -s pw_series.json ]; then
                 CL="$(jq '.cover_letter' pw_series.json || true)"
                 if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
                   MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
