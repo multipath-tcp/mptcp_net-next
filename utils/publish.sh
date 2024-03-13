@@ -114,12 +114,12 @@ tg_export() { local branch_top branch_export tag old_rev new_rev branch_top_txt 
 
 	sha="$(git rev-parse "${branch_export}")"
 	printf "\\nTests are now in progress:\\n"
-	printf "\\n- %s:\n  %s\\n" "${branch_export}" "${CI_URL//SHA/${sha}}"
+	printf "\\n%s: %s\\n" "- ${branch_export}" "${CI_URL//SHA/${sha}}"
 
 	if [ "${branch_export}" = "${TG_EXPORT_NET_NEXT}" ]; then
 		TAG_EXPORT_NET_NEXT="${sha}"
 	elif [ -n "${TAG_EXPORT_NET_NEXT}" ]; then
-		printf "%s:\n  %s\\n" "- ${TG_EXPORT_NET_NEXT}" "${CI_URL//SHA/${TAG_EXPORT_NET_NEXT}}"
+		printf "%s: %s\\n" "- ${TG_EXPORT_NET_NEXT}" "${CI_URL//SHA/${TAG_EXPORT_NET_NEXT}}"
 	fi
 
 	printf "\\nCheers,\\nMatt\\n"
