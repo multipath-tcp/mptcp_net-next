@@ -1,0 +1,54 @@
+name: "Update TopGit tree"
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_base_untouched:
+        description: 'Set it to 1 to force a sync without updating the base from upstream'
+        required: true
+        default: '0'
+      force_sync:
+        description: 'Set it to 1 to force a sync even if net-next is not updated'
+        required: true
+        default: '0'
+      force_upd_net:
+        description: 'Set it to 1 to force updating the -net base with upstream instead of the merge-base with net-next'
+        required: true
+        default: '1'
+
+  schedule:
+    - cron: '33 5 * * 2,5' # in UTC: after US West coast's work day
+
+permissions: {}
+
+jobs:
+  export:
+    if: github.repository_owner == 'multipath-tcp'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # for git push (multipath-tcp/mptcp-upstream-topgit-action)
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need all commits for TopGit
+          token: '${{ secrets.PAT_MATTTBE }}'
+
+      - name: "Update TG tree"
+        uses: multipath-tcp/mptcp-upstream-topgit-action@main
+        with:
+          not_base: "${{ github.event.inputs.keep_base_untouched || '0' }}"
+          force_sync: "${{ github.event.inputs.force_sync || '0' }}"
+          force_upd_net: "${{ github.event.inputs.force_upd_net || '1' }}"
+
+      - name: irc topgit
+        if: failure() && github.repository_owner == 'multipath-tcp'
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-topgit-bot
+          verbose: true
+          message: |-
+            New sync with latest net and net-next failed (initiated by ${{ github.actor }}): ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
