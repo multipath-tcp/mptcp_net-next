@@ -251,21 +251,22 @@ jobs:
           # Guess the subject from the last commit
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
 
-          # Query Patchwork to get cover-letter and full subject
-          if [ -n "${MID}" ]; then
-            curl "${URL_PW}${MID:1:-1}" > pw_patch.json || true
-            URL_PW_SERIES=$(jq -er 'last(last(.[].series)[].url)' pw_patch.json || true)
-            if [ -n "${URL_PW_SERIES}" ] && [ "${URL_PW_SERIES}" != "null" ]; then
-              echo "series=https://patchwork.kernel.org/project/mptcp/list/?series=$(basename "${URL_PW_SERIES}")" >> ${GITHUB_OUTPUT}
-              CL="$(curl "${URL_PW_SERIES}" | jq '.cover_letter' || true)"
-              if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
-                MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
-                SUBJECT=$(echo "${CL}" | jq -er '.name' || echo "${SUBJECT}")
-              else
-                # to get the full subject
-                SUBJECT=$(jq -er '.[0].name' pw_patch.json || echo "${SUBJECT}")
+          if [ -n "${MID:1:-1}" ]; then
+            # get cover-letter and series' name if any
+            URL_PW_SERIES_API=$(curl "${URL_PW}${MID:1:-1}" | jq -er 'last(last(.[].series)[].url)' || true)
+            if [ -n "${URL_PW_SERIES_API}" ] && [ "${URL_PW_SERIES_API}" != "null" ]; then
+              echo "series=${URL_PW_SERIES}$(basename "${URL_PW_SERIES_API}")" >> ${GITHUB_OUTPUT}
+              if curl "${URL_PW_SERIES_API}" > pw_series.json && [ test -s pw_series.json ]; then
+                CL="$(jq '.cover_letter' pw_series.json || true)"
+                if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
+                  MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
+                  SUBJECT=$(jq -er '.name' pw_series.json || echo "${SUBJECT}")
+                fi
               fi
             fi
+
+            # get tags from Lore: not fully available from Patchwork
+            SUBJECT="$(curl "${URL_LORE//MID/${MID:1:-1}}" | grep '^Subject: ' | head -n1 | sed 's/^Subject: \(\[.*\] \).*/\1/')${SUBJECT}"
           fi
 
           echo "Found message ID: '${TAG}' '${MID}'"
@@ -289,6 +290,8 @@ jobs:
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
         env:
           URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+          URL_PW_SERIES: "https://patchwork.kernel.org/project/mptcp/list/?series="
+          URL_LORE: "https://lore.kernel.org/mptcp/MID/raw"
 
       - name: send email
         if: needs.build.result == 'failure'
