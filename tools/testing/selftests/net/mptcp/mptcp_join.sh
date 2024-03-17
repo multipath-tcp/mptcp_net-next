@@ -704,9 +704,7 @@ pm_nl_check_endpoint()
 	local ns=$2
 	local addr=$3
 	local _flags=""
-	local flags
 	local _port
-	local port
 	local dev
 	local _id
 	local id
@@ -717,10 +715,9 @@ pm_nl_check_endpoint()
 	while [ -n "$1" ]; do
 		if [ $1 = "flags" ]; then
 			_flags=$2
-			[ -n "$_flags" ]; flags="flags $_flags"
 			shift
 		elif [ $1 = "dev" ]; then
-			[ -n "$2" ]; dev="dev $2"
+			[ -n "$2" ]; dev="$2"
 			shift
 		elif [ $1 = "id" ]; then
 			_id=$2
@@ -728,7 +725,6 @@ pm_nl_check_endpoint()
 			shift
 		elif [ $1 = "port" ]; then
 			_port=$2
-			[ -n "$_port" ]; port=" port $_port"
 			shift
 		fi
 
@@ -741,24 +737,12 @@ pm_nl_check_endpoint()
 	fi
 
 	if mptcp_lib_is_ip_mptcp; then
-		# get line and trim trailing whitespace
 		line=$(ip -n $ns mptcp endpoint show $id)
-		line="${line% }"
-		# the dump order is: address id flags port dev
-		[ -n "$addr" ] && expected_line="$addr"
-		expected_line+=" $id"
-		[ -n "$_flags" ] && expected_line+=" ${_flags//","/" "}"
-		[ -n "$dev" ] && expected_line+=" $dev"
-		[ -n "$port" ] && expected_line+=" $port"
 	else
 		line=$(ip netns exec $ns ./pm_nl_ctl get $_id)
-		# the dump order is: id flags dev address port
-		expected_line="$id"
-		[ -n "$flags" ] && expected_line+=" $flags"
-		[ -n "$dev" ] && expected_line+=" $dev"
-		[ -n "$addr" ] && expected_line+=" $addr"
-		[ -n "$_port" ] && expected_line+=" $_port"
 	fi
+	expected_line=$(mptcp_lib_format_endpoints \
+		"${_id},${addr},${_flags//","/" "},${dev},${_port}")
 	if [ "$line" = "$expected_line" ]; then
 		print_ok
 	else

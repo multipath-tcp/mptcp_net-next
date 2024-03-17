@@ -554,3 +554,26 @@ mptcp_lib_pm_nl_set_limits() {
 		ip netns exec "${ns}" ./pm_nl_ctl limits "${addrs}" "${subflows}"
 	fi
 }
+
+# format: <id>,<ip>,<flags>,<dev>
+mptcp_lib_format_endpoints() {
+	local entry id ip flags dev port
+
+	for entry in "${@}"; do
+		IFS=, read -r id ip flags dev port <<< "${entry}"
+		if mptcp_lib_is_ip_mptcp; then
+			echo -n "${ip}"
+			[ -n "${port}" ] && echo -n " port ${port}"
+		        echo -n " id ${id}"
+			[ -n "${flags}" ] && echo -n " ${flags}"
+			[ -n "${dev}" ] && echo -n " dev ${dev}"
+			echo " " # always a space at the end
+		else
+			echo -n "id ${id}"
+			echo -n " flags ${flags//" "/","}"
+			[ -n "${dev}" ] && echo -n " dev ${dev}"
+			echo -n " ${ip}"
+			[ -n "${port}" ] && echo " ${port}" || echo ""
+		fi
+	done
+}
