@@ -542,3 +542,15 @@ mptcp_lib_pm_nl_get_limits() {
 		ip netns exec "${ns}" ./pm_nl_ctl limits
 	fi
 }
+
+mptcp_lib_pm_nl_set_limits() {
+	local ns=${1}
+	local addrs=${2}
+	local subflows=${3}
+
+	if mptcp_lib_is_ip_mptcp; then
+		ip -n "${ns}" mptcp limits set add_addr_accepted "${addrs}" subflows "${subflows}"
+	else
+		ip netns exec "${ns}" ./pm_nl_ctl limits "${addrs}" "${subflows}"
+	fi
+}
