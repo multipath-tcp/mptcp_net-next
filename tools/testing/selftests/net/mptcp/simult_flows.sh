@@ -86,7 +86,7 @@ setup()
 	ip -net "$ns1" route add default via dead:beef:2::2 metric 101
 
 	mptcp_lib_pm_nl_set_limits "${ns1}" 1 1
-	ip netns exec "$ns1" ./pm_nl_ctl add 10.0.2.1 dev ns1eth2 flags subflow
+	mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.2.1 dev ns1eth2 flags subflow
 
 	ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
 	ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad

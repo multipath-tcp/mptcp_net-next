@@ -67,7 +67,7 @@ check()
 	fi
 }
 
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "" "defaults addr list"
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" "" "defaults addr list"
 
 default_limits="$(mptcp_lib_pm_nl_get_limits "${ns1}")"
 if mptcp_lib_expect_all_features; then
@@ -75,45 +75,45 @@ if mptcp_lib_expect_all_features; then
 		"$(mptcp_lib_format_limits 0 2)" "defaults limits"
 fi
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2 flags subflow dev lo
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 flags signal,backup
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.1
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.2 flags subflow dev lo
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.3 flags signal,backup
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 1" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1")" "simple add/get addr"
 
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1" \
 				      "2,10.0.1.2,subflow,lo" \
 				      "3,10.0.1.3,signal backup")" \
 	"dump addrs"
 
-ip netns exec $ns1 ./pm_nl_ctl del 2
+mptcp_lib_pm_nl_del_endpoint "${ns1}" 2
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 2" "" "simple del addr"
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1" \
 				      "3,10.0.1.3,signal backup")" \
 	"dump addrs after del"
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 2>/dev/null
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.3 2>/dev/null
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 4" "" "duplicate addr"
 
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4 flags signal
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.4 flags signal
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 4" \
 	"$(mptcp_lib_format_endpoints "4,10.0.1.4,signal")" "id addr increment"
 
 for i in $(seq 5 9); do
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.$i flags signal >/dev/null 2>&1
+	mptcp_lib_pm_nl_add_endpoint "${ns1}" "10.0.1.${i}" flags signal >/dev/null 2>&1
 done
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 9" \
 	"$(mptcp_lib_format_endpoints "9,10.0.1.9,signal")" "hard addr limit"
 check "mptcp_lib_pm_nl_get_endpoint ${ns1} 10" "" "above hard addr limit"
 
-ip netns exec $ns1 ./pm_nl_ctl del 9
+mptcp_lib_pm_nl_del_endpoint "${ns1}" 9
 for i in $(seq 10 255); do
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.9 id $i
-	ip netns exec $ns1 ./pm_nl_ctl del $i
+	mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.9 id "${i}"
+	mptcp_lib_pm_nl_del_endpoint "${ns1}" "${i}"
 done
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1" \
 				      "3,10.0.1.3,signal backup" \
 				      "4,10.0.1.4,signal" \
@@ -123,8 +123,8 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 				      "8,10.0.1.8,signal")" \
 	"id limit"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-check "ip netns exec $ns1 ./pm_nl_ctl dump" "" "flush addrs"
+mptcp_lib_pm_nl_flush_endpoint "${ns1}"
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" "" "flush addrs"
 
 mptcp_lib_pm_nl_set_limits "${ns1}" 9 1 2>/dev/null
 check "mptcp_lib_pm_nl_get_limits ${ns1}" "${default_limits}" "rcv addrs above hard limit"
@@ -136,16 +136,16 @@ mptcp_lib_pm_nl_set_limits "${ns1}" 8 8
 check "mptcp_lib_pm_nl_get_limits ${ns1}" \
 	"$(mptcp_lib_format_limits 8 8)" "set limits"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 id 100
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.5 id 254
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.6
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.7
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.8
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+mptcp_lib_pm_nl_flush_endpoint "${ns1}"
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.1
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.2
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.3 id 100
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.4
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.5 id 254
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.6
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.7
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.8
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1" \
 				      "2,10.0.1.2" \
 				      "3,10.0.1.7" \
@@ -156,16 +156,16 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 				      "255,10.0.1.6")" \
 	"set ids"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.1
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.2 id 254
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.3
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.4
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.5 id 253
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.6
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.7
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.0.8
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+mptcp_lib_pm_nl_flush_endpoint "${ns1}"
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.1
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.2 id 254
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.3
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.4
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.5 id 253
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.6
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.7
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.0.8
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.0.1" \
 				      "2,10.0.0.4" \
 				      "3,10.0.0.6" \
@@ -176,30 +176,30 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 				      "255,10.0.0.3")" \
 	"wrap-around ids"
 
-ip netns exec $ns1 ./pm_nl_ctl flush
-ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1 flags subflow
+mptcp_lib_pm_nl_flush_endpoint "${ns1}"
+mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.1.1 flags subflow
 mptcp_lib_pm_nl_change_address "${ns1}" 10.0.1.1 backup
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow backup")" \
 	"set flags (backup)"
 mptcp_lib_pm_nl_change_address "${ns1}" 10.0.1.1 nobackup
-check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow")" \
 	"          (nobackup)"
 
 # fullmesh support has been added later
-ip netns exec $ns1 ./pm_nl_ctl set id 1 flags fullmesh 2>/dev/null
-if ip netns exec $ns1 ./pm_nl_ctl dump | grep -q "fullmesh" ||
+mptcp_lib_pm_nl_change_endpoint "${ns1}" 1 fullmesh 2>/dev/null
+if mptcp_lib_pm_nl_show_endpoints "${ns1}" | grep -q "fullmesh" ||
    mptcp_lib_expect_all_features; then
-	check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+	check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 		"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow fullmesh")" \
 		"          (fullmesh)"
-	ip netns exec $ns1 ./pm_nl_ctl set id 1 flags nofullmesh
-	check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+	mptcp_lib_pm_nl_change_endpoint "${ns1}" 1 nofullmesh
+	check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 		"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow")" \
 		"          (nofullmesh)"
-	ip netns exec $ns1 ./pm_nl_ctl set id 1 flags backup,fullmesh
-	check "ip netns exec $ns1 ./pm_nl_ctl dump" \
+	mptcp_lib_pm_nl_change_endpoint "${ns1}" 1 backup,fullmesh
+	check "mptcp_lib_pm_nl_show_endpoints ${ns1}" \
 		"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow backup fullmesh")" \
 		"          (backup,fullmesh)"
 else
