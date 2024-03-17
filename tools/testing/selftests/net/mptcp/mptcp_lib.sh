@@ -520,3 +520,15 @@ mptcp_lib_set_ip_mptcp() {
 mptcp_lib_is_ip_mptcp() {
 	[ "${MPTCP_LIB_IP_MPTCP}" = "1" ]
 }
+
+mptcp_lib_format_limits() {
+	local accept="${1}"
+	local subflows="${2}"
+
+	if mptcp_lib_is_ip_mptcp; then
+		# with a space at the end
+		printf "add_addr_accepted %d subflows %d \n" "${accept}" "${subflows}"
+	else
+		printf "accept %d\nsubflows %d\n" "${accept}" "${subflows}"
+	fi
+}
