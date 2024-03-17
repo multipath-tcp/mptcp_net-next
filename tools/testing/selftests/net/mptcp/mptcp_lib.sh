@@ -532,3 +532,13 @@ mptcp_lib_format_limits() {
 		printf "accept %d\nsubflows %d\n" "${accept}" "${subflows}"
 	fi
 }
+
+mptcp_lib_pm_nl_get_limits() {
+	local ns=${1}
+
+	if mptcp_lib_is_ip_mptcp; then
+		ip -n "${ns}" mptcp limits
+	else
+		ip netns exec "${ns}" ./pm_nl_ctl limits
+	fi
+}
