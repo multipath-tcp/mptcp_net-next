@@ -707,7 +707,6 @@ pm_nl_check_endpoint()
 	local _port
 	local dev
 	local _id
-	local id
 
 	print_check "${msg}"
 
@@ -721,7 +720,6 @@ pm_nl_check_endpoint()
 			shift
 		elif [ $1 = "id" ]; then
 			_id=$2
-			[ -n "$_id" ]; id="id $_id"
 			shift
 		elif [ $1 = "port" ]; then
 			_port=$2
@@ -731,16 +729,12 @@ pm_nl_check_endpoint()
 		shift
 	done
 
-	if [ -z "$id" ]; then
+	if [ -z "${_id}" ]; then
 		test_fail "bad test - missing endpoint id"
 		return
 	fi
 
-	if mptcp_lib_is_ip_mptcp; then
-		line=$(ip -n $ns mptcp endpoint show $id)
-	else
-		line=$(ip netns exec $ns ./pm_nl_ctl get $_id)
-	fi
+	line=$(mptcp_lib_pm_nl_get_endpoint "${ns}" "${_id}")
 	expected_line=$(mptcp_lib_format_endpoints \
 		"${_id},${addr},${_flags//","/" "},${dev},${_port}")
 	if [ "$line" = "$expected_line" ]; then

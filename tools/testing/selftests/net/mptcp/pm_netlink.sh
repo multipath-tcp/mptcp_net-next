@@ -78,7 +78,7 @@ fi
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.2 flags subflow dev lo
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 flags signal,backup
-check "ip netns exec $ns1 ./pm_nl_ctl get 1" \
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 1" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1")" "simple add/get addr"
 
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
@@ -88,25 +88,25 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"dump addrs"
 
 ip netns exec $ns1 ./pm_nl_ctl del 2
-check "ip netns exec $ns1 ./pm_nl_ctl get 2" "" "simple del addr"
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 2" "" "simple del addr"
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1" \
 				      "3,10.0.1.3,signal backup")" \
 	"dump addrs after del"
 
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.3 2>/dev/null
-check "ip netns exec $ns1 ./pm_nl_ctl get 4" "" "duplicate addr"
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 4" "" "duplicate addr"
 
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.4 flags signal
-check "ip netns exec $ns1 ./pm_nl_ctl get 4" \
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 4" \
 	"$(mptcp_lib_format_endpoints "4,10.0.1.4,signal")" "id addr increment"
 
 for i in $(seq 5 9); do
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.$i flags signal >/dev/null 2>&1
 done
-check "ip netns exec $ns1 ./pm_nl_ctl get 9" \
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 9" \
 	"$(mptcp_lib_format_endpoints "9,10.0.1.9,signal")" "hard addr limit"
-check "ip netns exec $ns1 ./pm_nl_ctl get 10" "" "above hard addr limit"
+check "mptcp_lib_pm_nl_get_endpoint ${ns1} 10" "" "above hard addr limit"
 
 ip netns exec $ns1 ./pm_nl_ctl del 9
 for i in $(seq 10 255); do

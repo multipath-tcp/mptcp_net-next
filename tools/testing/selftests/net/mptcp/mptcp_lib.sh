@@ -577,3 +577,14 @@ mptcp_lib_format_endpoints() {
 		fi
 	done
 }
+
+mptcp_lib_pm_nl_get_endpoint() {
+       local ns=${1}
+       local id=${2}
+
+       if mptcp_lib_is_ip_mptcp; then
+               ip -n "${ns}" mptcp endpoint show id "${id}"
+       else
+               ip netns exec "${ns}" ./pm_nl_ctl get "${id}"
+       fi
+}
