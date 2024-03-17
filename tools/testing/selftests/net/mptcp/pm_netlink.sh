@@ -178,11 +178,11 @@ check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 
 ip netns exec $ns1 ./pm_nl_ctl flush
 ip netns exec $ns1 ./pm_nl_ctl add 10.0.1.1 flags subflow
-ip netns exec $ns1 ./pm_nl_ctl set 10.0.1.1 flags backup
+mptcp_lib_pm_nl_change_address "${ns1}" 10.0.1.1 backup
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow backup")" \
 	"set flags (backup)"
-ip netns exec $ns1 ./pm_nl_ctl set 10.0.1.1 flags nobackup
+mptcp_lib_pm_nl_change_address "${ns1}" 10.0.1.1 nobackup
 check "ip netns exec $ns1 ./pm_nl_ctl dump" \
 	"$(mptcp_lib_format_endpoints "1,10.0.1.1,subflow")" \
 	"          (nobackup)"

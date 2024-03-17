@@ -588,3 +588,16 @@ mptcp_lib_pm_nl_get_endpoint() {
                ip netns exec "${ns}" ./pm_nl_ctl get "${id}"
        fi
 }
+
+mptcp_lib_pm_nl_change_address() {
+	local ns=${1}
+	local addr=${2}
+	local flags=${3}
+
+	if mptcp_lib_is_ip_mptcp; then
+		# shellcheck disable=SC2086 # blanks in flags, no double quote
+		ip -n "${ns}" mptcp endpoint change "${addr}" ${flags//","/" "}
+	else
+		ip netns exec "${ns}" ./pm_nl_ctl set "${addr}" flags "${flags}"
+	fi
+}
