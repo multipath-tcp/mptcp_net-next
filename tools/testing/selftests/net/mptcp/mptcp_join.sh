@@ -1855,6 +1855,25 @@ chk_subflows_total()
 	fi
 }
 
+show_mptcp_info()
+{
+	local info
+
+	for info in "${@}"; do
+		local cnt1
+		local cnt2
+
+		cnt1=$(ss -N $ns1 -inmHM | mptcp_lib_get_info_value "$info" "$info")
+		cnt2=$(ss -N $ns2 -inmHM | mptcp_lib_get_info_value "$info" "$info")
+		print_check "mptcp_info ${info:0:15}=$cnt1:$cnt2"
+		if [ -z "$cnt1" ] || [ -z "$cnt2" ]; then
+			print_skip
+		else
+			print_ok
+		fi
+	done
+}
+
 chk_link_usage()
 {
 	local ns=$1
@@ -3589,6 +3608,7 @@ endpoint_tests()
 			$ns2 10.0.2.2 id 1 flags implicit
 		chk_mptcp_info subflows 1 subflows 1
 		chk_mptcp_info add_addr_signal 1 add_addr_accepted 1
+		show_mptcp_info last_data_sent last_data_recv last_ack_recv
 
 		pm_nl_add_endpoint $ns2 10.0.2.2 id 33 2>/dev/null
 		pm_nl_check_endpoint "ID change is prevented" \
@@ -3612,6 +3632,7 @@ endpoint_tests()
 		wait_mpj $ns2
 		chk_subflow_nr "before delete" 2
 		chk_mptcp_info subflows 1 subflows 1
+		show_mptcp_info last_data_sent last_data_recv last_ack_recv
 
 		pm_nl_del_endpoint $ns2 2 10.0.2.2
 		sleep 0.5
