@@ -8,6 +8,7 @@ TG_TOP="${TG_TOP:-}"
 TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
 
 CI_URL="https://github.com/multipath-tcp/mptcp_net-next/commit/SHA/checks"
+CI_TAG="=TODO_CI_LINK="
 RESULTS_EXPORT_NET_NEXT=""
 TAG_EXPORT_NET_NEXT=""
 
@@ -78,12 +79,11 @@ tg_for_review() { local branch_top branch_review tg_conflict_files
 	git push origin "${branch_review}"
 }
 
-tg_export() { local branch_top branch_export tag old_rev new_rev branch_top_txt sha
+tg_export() { local branch_top branch_export tag msg ci sha
 	branch_top="${1}"
 	branch_export="${2}"
 	tag="${3}"
-	old_rev="${4}"
-	new_rev="${5}"
+	msg="${4}"
 
 	git checkout -f "${branch_top}"
 
@@ -94,43 +94,22 @@ tg_export() { local branch_top branch_export tag old_rev new_rev branch_top_txt 
 		return
 	fi
 
-	echo -e "${COLOR_BLUE}"
-	branch_top_txt="${branch_top}"
-	if [ "${branch_top}" = "${TG_TOPIC_TOP_NET}" ]; then
-		branch_top_txt="${branch_top_txt} and ${TG_TOPIC_TOP_NET_NEXT}"
-	fi
-	printf "New patches for %s:\\n" "${branch_top_txt}"
-	git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
-		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true
-
-	results="- Results: ${old_rev}..${new_rev} (${branch_export})"
-	printf "%s\\n" "${results}"
-
-	if [ "${branch_export}" = "${TG_EXPORT_NET_NEXT}" ]; then
-		RESULTS_EXPORT_NET_NEXT="${results}"
-	elif [ -n "${RESULTS_EXPORT_NET_NEXT}" ]; then
-		printf "%s\\n" "${RESULTS_EXPORT_NET_NEXT}"
-	fi
-
 	sha="$(git rev-parse "${branch_export}")"
-	printf "\\nTests are now in progress:\\n"
-	printf "\\n%s: %s\\n" "- ${branch_export}" "${CI_URL//SHA/${sha}}"
-
+	ci="$(printf "%s: %s" "- ${branch_export}" "${CI_URL//SHA/${sha}}")"
 	if [ "${branch_export}" = "${TG_EXPORT_NET_NEXT}" ]; then
 		TAG_EXPORT_NET_NEXT="${sha}"
 	elif [ -n "${TAG_EXPORT_NET_NEXT}" ]; then
-		printf "%s: %s\\n" "- ${TG_EXPORT_NET_NEXT}" "${CI_URL//SHA/${TAG_EXPORT_NET_NEXT}}"
+		ci+="$(printf "%s: %s" "\\n- ${TG_EXPORT_NET_NEXT}" "${CI_URL//SHA/${TAG_EXPORT_NET_NEXT}}")"
 	fi
 
-	printf "\\nCheers,\\nMatt\\n"
-	echo -e "${COLOR_RESET}"
+	printinfo "${msg//${CI_TAG}/${ci}}"
 
 	# send a tag to Github to keep previous commits: we might have refs to them
 	git tag "${tag}" "${branch_export}"
 	git push origin "${tag}"
 }
 
-publish() { local top review old_rev new_rev tag results
+publish() { local top review old_rev new_rev tag top_txt results msg=""
 	top="${1}"
 	review="${2}"
 	export="${3}"
@@ -150,6 +129,26 @@ publish() { local top review old_rev new_rev tag results
 
 	tg push
 
+	top_txt="${top}"
+	if [ "${top}" = "${TG_TOPIC_TOP_NET}" ]; then
+		top_txt="${top_txt} and ${TG_TOPIC_TOP_NET_NEXT}"
+	fi
+	msg+="$(printf "New patches for %s:%s" "${top_txt}" "\\n")"
+	msg+="$(git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
+		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true)"
+
+	results="- Results: ${old_rev}..${new_rev} (${export})"
+	msg+="$(printf "%s" "\\n${results}")"
+
+	if [ "${export}" = "${TG_EXPORT_NET_NEXT}" ]; then
+		RESULTS_EXPORT_NET_NEXT="${results}"
+	elif [ -n "${RESULTS_EXPORT_NET_NEXT}" ]; then
+		msg+="$(printf "%s" "\\n${RESULTS_EXPORT_NET_NEXT}")"
+	fi
+
+	msg+="$(printf "\\n\\nTests are now in progress:\\n\\n%s\\n\\nCheers,\\nMatt\\n" "${CI_TAG}")"
+	printinfo "${msg}"
+
 	print "Publish ${export} and tag (${tag})? (Y/n)"
 	read -n 1 -r
 	echo
@@ -158,7 +157,7 @@ publish() { local top review old_rev new_rev tag results
 	fi
 
 	tg_for_review "${top}" "${review}"
-	tg_export "${top}" "${export}" "${tag}" "${old_rev}" "${new_rev}"
+	tg_export "${top}" "${export}" "${tag}" "${msg}"
 }
 
 if [ -n "${TG_TOP}" ]; then
