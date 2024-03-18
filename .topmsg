@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-fix-dev-in-check_endpoint
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: join: fix dev in check_endpoint
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+There's a bug in pm_nl_check_endpoint(), 'dev' didn't be parsed correctly.
+If calling it in the 2nd test of endpoint_tests() too, it fails with an
+error like this:
+
+ creation  [FAIL] expected '10.0.2.2 id 2 subflow dev dev' \
+                     found '10.0.2.2 id 2 subflow dev ns2eth2'
+
+The reason is '$2' should be set to 'dev', not '$1'. This patch fixes it.
+
+Fixes: 69c6ce7b6eca ("selftests: mptcp: add implicit endpoint test case")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
