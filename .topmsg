@@ -1,0 +1,12 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_first test
+
+This patch adds the bpf_first scheduler test: test_first(). Use sysctl to
+set net.mptcp.scheduler to use this sched. Add two veth net devices to
+simulate the multiple addresses case. Use 'ip mptcp endpoint' command to
+add the new endpoint ADDR_2 to PM netlink. Send data and check bytes_sent
+of 'ss' output after it to make sure the data has been only sent on the
+first subflow ADDR_1.
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
