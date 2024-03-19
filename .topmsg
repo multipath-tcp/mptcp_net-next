@@ -1,0 +1,10 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add mptcp sched structs
+
+This patch adds three MPTCP scheduler structures: struct mptcp_sched_ops,
+struct mptcp_sched_data and struct mptcp_subflow_context; and exports
+mptcp_subflow_set_scheduled() and mptcp_sched_data_set_contexts() helpers
+for bpf selftests.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
