@@ -1,0 +1,9 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_rr scheduler
+
+This patch implements the round-robin BPF MPTCP scheduler, named bpf_rr,
+which always picks the next available subflow to send data. If no such
+next subflow available, picks the first one.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
