@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests: mptcp: add ms units for tc-netem delay
-
-'delay 1' in tc-netem is confusing, not sure if it's a delay of 1 second or
-1 millisecond. This patch explicitly adds millisecond units to make these
-commands clearer.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
