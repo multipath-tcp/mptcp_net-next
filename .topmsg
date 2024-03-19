@@ -1,0 +1,31 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf scheduler test
+
+This patch extends the MPTCP test base to support MPTCP packet scheduler
+tests. Add a new test to use the default in-kernel scheduler.
+
+In the new helper sched_init(), add two veth net devices to simulate the
+multiple addresses case. Use 'ip mptcp endpoint' command to add the new
+endpoint ADDR_2 to PM netlink. Use sysctl to set net.mptcp.scheduler to
+use the given sched.
+
+Invoke start_mptcp_server() to start the server on ADDR_1, and invoke
+connect_to_fd() to connect with the server from the client. Then invoke
+send_data() to send data.
+
+Some code in send_data() is from prog_tests/bpf_tcp_ca.c.
+
+Add time metrics for BPF tests to compare the performance of each
+schedulers. Run prog_tests with '-v' option can print out the running
+time of each test.
+
+Use the new helper has_bytes_sent() to check the bytes_sent filed of 'ss'
+output after send_data() to make sure no data has been sent on ADDR_2.
+All data has been sent on the first subflow.
+
+Invoke the new helper sched_cleanup() to set back net.mptcp.scheduler to
+default, flush all mptcp endpoints, and delete the veth net devices.
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
