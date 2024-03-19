@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-export-pm_nl-endpoint-ops
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: export pm_nl endpoint ops
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch exports six endpoint operation helpers with pm_nl_ prefix,
+pm_nl_set_limits(), pm_nl_add_endpoint(), pm_nl_del_endpoint(),
+pm_nl_flush_endpoint(), pm_nl_show_endpoints() and pm_nl_change_endpoint()
+into mptcp_lib.sh as public functions, and renamed each of them with a
+mptcp_lib_ prefix. Then these old pm_nl_ prefix helpers in mptcp_join.sh
+can be wrappers of mptcp_lib_ prefix ones.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
