@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-netlink-drop-disable-SC2086
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: netlink: drop disable=SC2086
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Now there are only a few of variables are not using double quotes.
+Modifying them, then "shellcheck disable=SC2086" can be dropped.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
