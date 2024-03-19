@@ -1,0 +1,8 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_bkup scheduler
+
+This patch implements the backup flag test scheduler, named bpf_bkup,
+which picks the first non-backup subflow to send data.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
