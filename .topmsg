@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-ip_mptcp-option-for-more-scripts
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: ip_mptcp option for more scripts
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds '-i' option for mptcp_sockopt.sh, pm_netlink.sh, and
+simult_flows.sh, to use 'ip mptcp' command in the tests instead of
+'pm_nl_ctl'. Update usage() correspondingly.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
