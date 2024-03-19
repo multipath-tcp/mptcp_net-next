@@ -1,0 +1,13 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] bpf: Export more bpf_burst related functions
+
+sk_stream_memory_free() and tcp_rtx_and_write_queues_empty() are needed
+to export into the BPF context for bpf_burst scheduler. But these two
+functions are inline ones. So this patch added two wrappers for them,
+and export the wrappers in the BPF context.
+
+Add more bpf_burst related functions into bpf_mptcp_sched_kfunc_set to make
+sure these helpers can be accessed from the BPF context.
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
