@@ -145,6 +145,9 @@ jobs:
     needs: tests
     # only for the official repo (patchew)
     if: always() && github.repository_owner == 'multipath-tcp'
+    concurrency:
+      group: ${{ startswith(github.ref, 'refs/heads/export') && 'ci-notif' || github.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
