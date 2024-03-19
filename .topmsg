@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-netlink-add-limits-helpers
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: netlink: add 'limits' helpers
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The output format of 'ip mptcp limits' command is much different from
+that of 'pm_nl_ctl limits' command.
+
+This patch adds format_limits() helper to format the outputs of these
+two commands to hide the difference. get_limits() has been added to show
+the limits.
+
+Use these two helpers in pm_netlink.sh to replace all 'pm_nl_ctl limits'
+commands and outputs.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
