@@ -1,4 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-get-format-_endpoint-s-helpers
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add {get,format}_endpoint(s) helpers
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The output formats of 'ip mptcp' commands are much different from that
+of 'pm_nl_ctl' commands.
+
+This patch adds a new helper format_endpoints() to format the outputs of
+'ip mptcp' and 'pm_nl_ctl' with 'endpoints' arguments to hide these
+differences.
+
+A new helper named get_endpoint() has also been added to show a specific
+endpoint identified by the given address ID, similar to mptcp_join.sh's
+pm_nl_show_endpoints() helper, but showing all entries.
+
+Use these two helpers in mptcp_join.sh and pm_netlink.sh to replace all
+'pm_nl_ctl get' commands and outputs of 'pm_nl_ctl dump/get'.
+
+Suggested-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
