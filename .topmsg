@@ -1,0 +1,10 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_burst scheduler
+
+This patch implements the burst BPF MPTCP scheduler, named bpf_burst,
+which is the default scheduler in protocol.c. bpf_burst_get_send() uses
+the same logic as mptcp_subflow_get_send() and bpf_burst_get_retrans
+uses the same logic as mptcp_subflow_get_retrans().
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
