@@ -1,0 +1,11 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] mptcp: add sched_data helpers
+
+Add a new helper mptcp_sched_data_set_contexts() to set the subflow
+pointers array in struct mptcp_sched_data. Add a new helper
+mptcp_subflow_ctx_by_pos() to get the given pos subflow from the
+contexts array in struct mptcp_sched_data. They will be invoked by
+the BPF schedulers to export the subflow pointers to the BPF contexts.
+
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
