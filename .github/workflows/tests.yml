@@ -145,6 +145,9 @@ jobs:
     needs: tests
     # only for the official repo (patchew)
     if: always() && github.repository_owner == 'multipath-tcp'
+    concurrency:
+      group: ${{ startswith(github.ref, 'refs/heads/export') && 'ci-notif' || github.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -212,7 +215,7 @@ jobs:
             # append tag, merge results, limit
             jq -c '.tag += "${{ steps.tag.outputs.tag }}"' "${new}" > "${new}.tag"
             jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
-            jq --indent 1 '.[-100:]' ${new}.all" > "${all}"
+            jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
           done
 
           cd results
