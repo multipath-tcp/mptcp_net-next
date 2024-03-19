@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-export-ip_mptcp-to-mptcp_lib
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: export ip_mptcp to mptcp_lib
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch exports ip_mptcp into mptcp_lib.sh as a public variable,
+named MPTCP_LIB_IP_MPTCP. Add a helper mptcp_lib_set_ip_mptcp() to set
+it, and a helper mptcp_lib_is_ip_mptcp() to test whether it is set. Use
+these two helpers in mptcp_join.sh.
+
+This patch is prepared for coming commits.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
