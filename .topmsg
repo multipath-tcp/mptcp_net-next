@@ -1,0 +1,10 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_first scheduler
+
+This patch implements the simplest MPTCP scheduler, named bpf_first,
+which always picks the first subflow to send data. It's a sample of
+MPTCP BPF scheduler implementations.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
