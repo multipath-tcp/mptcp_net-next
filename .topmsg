@@ -1,0 +1,17 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] bpf: Add bpf_mptcp_sched_ops
+
+This patch implements a new struct bpf_struct_ops: bpf_mptcp_sched_ops.
+Register and unregister the bpf scheduler in .reg and .unreg.
+
+Add write access for the scheduled flag of struct mptcp_subflow_context
+in .btf_struct_access.
+
+This MPTCP BPF scheduler implementation is similar to BPF TCP CC. And
+net/ipv4/bpf_tcp_ca.c is a frame of reference for this patch.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Co-developed-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
