@@ -1,0 +1,11 @@
+From: Geliang Tang <geliang.tang@linux.dev>
+Subject: [PATCH] selftests/bpf: Add bpf_bkup test
+
+This patch adds the backup BPF MPTCP scheduler test: test_bkup(). Use
+sysctl to set net.mptcp.scheduler to use this sched. Add two veth net
+devices to simulate the multiple addresses case. Use 'ip mptcp endpoint'
+command to add the new endpoint ADDR_2 to PM netlink with backup flag.
+Send data, check bytes_sent of 'ss' output, and do some cleanups.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
