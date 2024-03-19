@@ -1,0 +1,10 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add tc check for check_tools
+
+tc are used in some test scripts: mptcp_connect.sh, mptcp_join.sh and
+simult_flows.sh. It makes sense to check if tc is installed before running
+these scripts, just like other tools. So this patch add 'tc' check for
+mptcp_lib_check_tools(), and check it in these test scripts.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
