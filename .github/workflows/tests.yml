@@ -212,7 +212,7 @@ jobs:
             # append tag, merge results, limit
             jq -c '.tag += "${{ steps.tag.outputs.tag }}"' "${new}" > "${new}.tag"
             jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
-            jq --indent 1 '.[-100:]' ${new}.all" > "${all}"
+            jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
           done
 
           cd results
