@@ -1,4 +1,18 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-netlink-add-change_address-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: netlink: add change_address helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The output formats of 'ip mptcp' commands are much different from that
+of 'pm_nl_ctl' commands.
+
+A new 'change_address' helper is added here, to change the flag of an
+address. This is a bit similar to mptcp_join.sh's pm_nl_change_endpoint().
+
+Usage:
+	Address ID - pm_nl_change_endpoint $ns id $id $flags
+	IP address - change_address $ns $addr $flags
+
+Use this new helper in pm_netlink.sh to replace all 'pm_nl_ctl set'
+commands.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
