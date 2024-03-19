@@ -17,7 +17,7 @@ on:
         default: '1'
 
   schedule:
-    - cron: '33 5 * * 2,5' # in UTC: after US West coast's work day
+    - cron: '33 5 * * 1-5' # in UTC: after US West coast's work day
 
 permissions: {}
 
