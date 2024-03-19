@@ -81,7 +81,8 @@ jobs:
             -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
             -e "INPUT_CI_TIMEOUT_SEC" \
-            -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e GITHUB_ACTIONS=true -e CI=true \
+            -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
+            -e GITHUB_ACTIONS=true -e CI=true \
             --workdir /github/workspace \
             -v "${PWD}":"/github/workspace" \
             mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
@@ -114,6 +115,7 @@ jobs:
             *.tap
             config.zstd
             *.tap.xml
+            results.json
 
       - name: "Artifacts (failure)"
         if: failure()
@@ -189,6 +191,36 @@ jobs:
             - ${{ steps.test.outputs.ccl_debug }}
             - ${{ steps.test.outputs.ccl_btf }}
             - Task: ${{ steps.test.outputs.url }}
+
+      - name: Checkout results repo
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        uses: actions/checkout@v4
+        with:
+          repository: "multipath-tcp/mptcp-upstream-tests-results"
+          token: '${{ secrets.PAT_MATTTBE }}'
+          path: results
+
+      - name: save flakes results
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        run: |
+          for mode in normal debug btf; do
+            new="results-${mode}/results.json"
+            all="results/html/results/${{ github.ref_name }}/${mode}.json"
+            if [ ! -s "${new}" ]; then
+              echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${new}"
+            fi
+            # append tag, merge results, limit
+            jq -c '.tag += "${{ steps.tag.outputs.tag }}"' "${new}" > "${new}.tag"
+            jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
+            jq --indent 1 '.[-100:]' ${new}.all" > "${all}"
+          done
+
+          cd results
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add html/results/${{ github.ref_name }}/*.json
+          git commit -m "new: ${{ steps.tag.outputs.tag }}"
+          git push
 
       - name: get commit info
         id: commit
