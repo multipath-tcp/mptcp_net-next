@@ -1,0 +1,24 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: improve code coverage for CI (net)
+
+(only for -net)
+
+tcp: warn if tcp_done() is called on a closed socket
+
+  This is an extra check mainly for the CIs: to make sure we don't call
+  tcp_done() on an already closed socket as it happened in the past. If
+  we do such call, better to catch the error earlier.
+
+mptcp: warn in case of bogus mpc option on established client sk
+
+  As discussed on [1], an additional check is done to catch local
+  software bug.
+
+  This patch is supposed to land only in our tree, for both 'export' and
+  'export-net' branches, because the warning could be triggered by
+  bugged / malicious peer. We want it in our tree for our CI to detect
+  internal bugs.
+
+  Link: https://lore.kernel.org/all/20240215-mptcp-fix-bogus-pr-warn-v1-1-d14c10312820@kernel.org/ [1]
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
