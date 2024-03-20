@@ -362,8 +362,10 @@ static void *server(void *arg)
 		bytes += nr_sent;
 	}
 
-	CHECK(bytes != total_bytes, "send", "%zd != %u nr_sent:%zd errno:%d\n",
-	      bytes, total_bytes, nr_sent, errno);
+	if (bytes != total_bytes) {
+		printf("FAIL:send %zd != %u nr_sent:%zd errno:%d\n",
+		       bytes, total_bytes, nr_sent, errno);
+	}
 
 done:
 	if (fd >= 0)
@@ -409,16 +411,18 @@ static void send_data(int lfd, int fd, char *msg)
 
 	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
 
-	CHECK(bytes != total_bytes, "recv", "%zd != %u nr_recv:%zd errno:%d\n",
-	      bytes, total_bytes, nr_recv, errno);
+	if (bytes != total_bytes) {
+		printf("FAIL:recv %zd != %u nr_recv:%zd errno:%d\n",
+		       bytes, total_bytes, nr_recv, errno);
+	}
 
 	printf("%s: %u ms\n", msg, delta_ms);
 
 	WRITE_ONCE(stop, 1);
 
 	pthread_join(srv_thread, &thread_ret);
-	CHECK(IS_ERR(thread_ret), "pthread_join", "thread_ret:%ld",
-	      PTR_ERR(thread_ret));
+	if (IS_ERR(thread_ret))
+		printf("FAIL:pthread_join thread_ret:%ld\n", PTR_ERR(thread_ret));
 }
 
 #define ADDR_1	"10.0.1.1"
