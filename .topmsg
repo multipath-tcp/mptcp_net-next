@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-account-accept-of-non-MPC-client-as-fallback-to-TCP
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: don't account accept() of non-MPC client as fallback to TCP
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Current MPTCP servers increment MPTcpExtMPCapableFallbackACK when they
+accept non-MPC connections. As reported by Christoph, this is "surprising"
+because the counter might become greater than MPTcpExtMPCapableSYNRX.
+
+MPTcpExtMPCapableFallbackACK counter's name suggests it should only be
+incremented when a connection was seen using MPTCP options, then a
+fallback to TCP has been done. Let's do that by incrementing it when
+the subflow context of an inbound MPC connection attempt is dropped.
+Also, update mptcp_connect.sh kselftest, to ensure that the
+above MIB does not increment in case a pure TCP client connects to a
+MPTCP server.
+
+Fixes: fc518953bc9c ("mptcp: add and use MIB counter infrastructure")
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/449
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
