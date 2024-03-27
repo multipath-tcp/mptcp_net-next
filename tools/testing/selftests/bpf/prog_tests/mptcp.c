@@ -534,23 +534,41 @@ static int has_bytes_sent(char *dst)
 	return _ss_search(ADDR_1, dst, "sport", "bytes_sent:");
 }
 
-static void test_default(void)
+static void send_data_and_verify(char *msg, int has_bytes_sent_addr_2)
 {
 	int server_fd, client_fd;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	if (!ASSERT_NEQ(server_fd, -1, "start_mptcp_server"))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_NEQ(client_fd, -1, "connect_to_fd")) {
+		close(server_fd);
+		return;
+	}
+
+	send_data(server_fd, client_fd, msg);
+	ASSERT_OK(has_bytes_sent(ADDR_1), "Should have bytes_sent on addr_1");
+	if (has_bytes_sent_addr_2)
+		ASSERT_OK(has_bytes_sent(ADDR_2), "Should have bytes_sent on addr_2");
+	else
+		ASSERT_GT(has_bytes_sent(ADDR_2), 0, "Shouldn't have bytes_sent on addr_2");
+
+	close(client_fd);
+	close(server_fd);
+}
+
+static void test_default(void)
+{
 	struct nstoken *nstoken;
 
 	nstoken = sched_init("subflow", "default");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd, "default");
-	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
-	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr_2");
+	send_data_and_verify("default", 1);
 
-	close(client_fd);
-	close(server_fd);
 fail:
 	cleanup_netns(nstoken);
 }
