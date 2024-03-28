@@ -29,6 +29,20 @@ static const struct btf_kfunc_id_set bpf_mptcp_fmodret_set = {
 	.set   = &bpf_mptcp_fmodret_ids,
 };
 
+__diag_push();
+__diag_ignore_all("-Wmissing-prototypes",
+		  "kfuncs which will be used in BPF programs");
+
+__bpf_kfunc struct mptcp_subflow_context *
+bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
+{
+	if (pos >= MPTCP_SUBFLOWS_MAX)
+		return NULL;
+	return data->contexts[pos];
+}
+
+__diag_pop();
+
 static int __init bpf_mptcp_kfunc_init(void)
 {
 	return register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
