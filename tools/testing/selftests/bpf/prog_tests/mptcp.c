@@ -467,10 +467,6 @@ static void send_data(int lfd, int fd, char *msg)
 	ASSERT_OK(IS_ERR(thread_ret), "thread_ret");
 }
 
-#define ADDR_1	"10.0.1.1"
-#define ADDR_2	"10.0.1.2"
-#define PORT_1	10001
-
 static struct nstoken *sched_init(char *flags, char *sched)
 {
 	struct nstoken *nstoken;
