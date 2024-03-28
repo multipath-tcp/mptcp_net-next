@@ -10,6 +10,7 @@
 #include "network_helpers.h"
 #include "mptcp_sock.skel.h"
 #include "mptcpify.skel.h"
+#include "mptcp_subflow.skel.h"
 #include "mptcp_bpf_first.skel.h"
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
@@ -306,6 +307,77 @@ close_server:
 }
 
 MPTCP_BASE_TEST(mptcpify);
+
+#define ADDR1	"10.0.1.1"
+#define ADDR2	"10.0.1.2"
+#define PORT1	10001
+
+static int endpoint_init(char *flags)
+{
+	SYS(fail, "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR1);
+	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR2);
+	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
+	SYS(fail, "ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR2, flags);
+
+	return 0;
+fail:
+	return -1;
+}
+
+static int _ss_search(char *src, char *dst, char *port, char *keyword)
+{
+	char cmd[128];
+
+	snprintf(cmd, sizeof(cmd),
+		 "ip netns exec %s ss -Menita src %s dst %s %s %d | grep -q '%s'",
+		 NS_TEST, src, dst, port, PORT1, keyword);
+	return system(cmd);
+}
+
+static int ss_search(char *src, char *keyword)
+{
+	return _ss_search(src, ADDR1, "dport", keyword);
+}
+
+static void run_mptcp_subflow(int cgroup_fd, struct mptcp_subflow *skel)
+{
+	int server_fd, client_fd, prog_fd, err;
+
+	if (!ASSERT_OK(endpoint_init("subflow"), "endpoint_init"))
+		return;
+
+	err = mptcp_subflow__attach(skel);
+	if (!ASSERT_OK(err, "skel_attach"))
+		return;
+
+	prog_fd = bpf_program__fd(skel->progs.mptcp_subflow);
+	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
+	if (!ASSERT_OK(err, "prog_attach"))
+		return;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR1, PORT1, 0);
+	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_GE(client_fd, 0, "connect to fd"))
+		goto close_server;
+
+	send_byte(client_fd);
+
+	ASSERT_OK(ss_search(ADDR1, "fwmark:0x1"), "ss_search fwmark:0x1");
+	ASSERT_OK(ss_search(ADDR2, "fwmark:0x2"), "ss_search fwmark:0x2");
+	ASSERT_OK(ss_search(ADDR1, "reno"), "ss_search reno");
+	ASSERT_OK(ss_search(ADDR2, "cubic"), "ss_search cubic");
+
+	close(client_fd);
+close_server:
+	close(server_fd);
+}
+
+MPTCP_BASE_TEST(mptcp_subflow);
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int stop, duration;
@@ -640,6 +712,7 @@ void test_mptcp(void)
 {
 	RUN_MPTCP_TEST(mptcp_sock);
 	RUN_MPTCP_TEST(mptcpify);
+	RUN_MPTCP_TEST(mptcp_subflow);
 	if (test__start_subtest("default"))
 		test_default();
 	if (test__start_subtest("first"))
