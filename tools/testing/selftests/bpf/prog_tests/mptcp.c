@@ -159,18 +159,10 @@ static int verify_msk(int map_fd, int client_fd, __u32 token)
 	return err;
 }
 
-static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
+static int run_test(int cgroup_fd, int server_fd,
+		    struct mptcp_sock *sock_skel, bool is_mptcp)
 {
 	int client_fd, prog_fd, map_fd, err;
-	struct mptcp_sock *sock_skel;
-
-	sock_skel = mptcp_sock__open_and_load();
-	if (!ASSERT_OK_PTR(sock_skel, "skel_open_load"))
-		return libbpf_get_error(sock_skel);
-
-	err = mptcp_sock__attach(sock_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
-		goto out;
 
 	prog_fd = bpf_program__fd(sock_skel->progs._sockops);
 	map_fd = bpf_map__fd(sock_skel->maps.socket_storage_map);
@@ -190,29 +182,19 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 	close(client_fd);
 
 out:
-	mptcp_sock__destroy(sock_skel);
 	return err;
 }
 
-static void test_base(void)
+static void run_mptcp_sock(int cgroup_fd, struct mptcp_sock *skel)
 {
-	struct nstoken *nstoken = NULL;
-	int server_fd, cgroup_fd;
-
-	cgroup_fd = test__join_cgroup("/mptcp");
-	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
-		return;
-
-	nstoken = create_netns();
-	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
-		goto fail;
+	int server_fd;
 
 	/* without MPTCP */
 	server_fd = start_server(AF_INET, SOCK_STREAM, NULL, 0, 0);
 	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto with_mptcp;
 
-	ASSERT_OK(run_test(cgroup_fd, server_fd, false), "run_test tcp");
+	ASSERT_OK(run_test(cgroup_fd, server_fd, skel, false), "run_test tcp");
 
 	close(server_fd);
 
@@ -220,14 +202,41 @@ with_mptcp:
 	/* with MPTCP */
 	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
 	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
-		goto fail;
+		return;
 
-	ASSERT_OK(run_test(cgroup_fd, server_fd, true), "run_test mptcp");
+	ASSERT_OK(run_test(cgroup_fd, server_fd, skel, true), "run_test mptcp");
 
 	close(server_fd);
+}
+
+static void test_mptcp_sock(void)
+{
+	struct nstoken *nstoken = NULL;
+	struct mptcp_sock *sock_skel;
+	int cgroup_fd, err;
+
+	cgroup_fd = test__join_cgroup("/mptcp");
+	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
+		return;
+
+	sock_skel = mptcp_sock__open_and_load();
+	if (!ASSERT_OK_PTR(sock_skel, "skel_open_load"))
+		goto out;
+
+	err = mptcp_sock__attach(sock_skel);
+	if (!ASSERT_OK(err, "skel_attach"))
+		goto out;
+
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
+		goto fail;
+
+	run_mptcp_sock(cgroup_fd, sock_skel);
 
 fail:
 	cleanup_netns(nstoken);
+	mptcp_sock__destroy(sock_skel);
+out:
 	close(cgroup_fd);
 }
 
@@ -653,8 +662,8 @@ fail:
 
 void test_mptcp(void)
 {
-	if (test__start_subtest("base"))
-		test_base();
+	if (test__start_subtest("mptcp_sock"))
+		test_mptcp_sock();
 	if (test__start_subtest("mptcpify"))
 		test_mptcpify();
 	if (test__start_subtest("default"))
