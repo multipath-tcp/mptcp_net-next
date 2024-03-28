@@ -209,36 +209,39 @@ with_mptcp:
 	close(server_fd);
 }
 
-static void test_mptcp_sock(void)
-{
-	struct nstoken *nstoken = NULL;
-	struct mptcp_sock *sock_skel;
-	int cgroup_fd, err;
-
-	cgroup_fd = test__join_cgroup("/mptcp");
-	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
-		return;
-
-	sock_skel = mptcp_sock__open_and_load();
-	if (!ASSERT_OK_PTR(sock_skel, "skel_open_load"))
-		goto out;
-
-	err = mptcp_sock__attach(sock_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
-		goto out;
-
-	nstoken = create_netns();
-	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
-		goto fail;
-
-	run_mptcp_sock(cgroup_fd, sock_skel);
-
-fail:
-	cleanup_netns(nstoken);
-	mptcp_sock__destroy(sock_skel);
-out:
-	close(cgroup_fd);
+#define MPTCP_BASE_TEST(name)					\
+static void test_##name(void)					\
+{								\
+	struct nstoken *nstoken;				\
+	struct name *skel;					\
+	int cgroup_fd, err;					\
+								\
+	cgroup_fd = test__join_cgroup("/" #name);		\
+	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))	\
+		return;						\
+								\
+	skel = name##__open_and_load();				\
+	if (!ASSERT_OK_PTR(skel, "skel_open_load"))		\
+		goto out;					\
+								\
+	err = name##__attach(skel);				\
+	if (!ASSERT_OK(err, "skel_attach"))			\
+		goto out;					\
+								\
+	nstoken = create_netns();				\
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))		\
+		goto fail;					\
+								\
+	run_##name(cgroup_fd, skel);				\
+								\
+fail:								\
+	cleanup_netns(nstoken);					\
+	name##__destroy(skel);					\
+out:								\
+	close(cgroup_fd);					\
 }
+
+MPTCP_BASE_TEST(mptcp_sock);
 
 static void send_byte(int fd)
 {
@@ -302,37 +305,7 @@ close_server:
 	close(server_fd);
 }
 
-static void test_mptcpify(void)
-{
-	struct nstoken *nstoken = NULL;
-	struct mptcpify *mptcpify_skel;
-	int cgroup_fd;
-	int err;
-
-	cgroup_fd = test__join_cgroup("/mptcpify");
-	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
-		return;
-
-	mptcpify_skel = mptcpify__open_and_load();
-	if (!ASSERT_OK_PTR(mptcpify_skel, "skel_open_load"))
-		goto out;
-
-	err = mptcpify__attach(mptcpify_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
-		goto out;
-
-	nstoken = create_netns();
-	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
-		goto fail;
-
-	run_mptcpify(cgroup_fd, mptcpify_skel);
-
-fail:
-	cleanup_netns(nstoken);
-	mptcpify__destroy(mptcpify_skel);
-out:
-	close(cgroup_fd);
-}
+MPTCP_BASE_TEST(mptcpify);
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int stop, duration;
