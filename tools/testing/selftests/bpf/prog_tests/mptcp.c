@@ -279,61 +279,58 @@ static int verify_mptcpify(int server_fd, int client_fd)
 	return err;
 }
 
-static int run_mptcpify(int cgroup_fd)
+static void run_mptcpify(int cgroup_fd, struct mptcpify *skel)
 {
 	int server_fd, client_fd, err = 0;
-	struct mptcpify *mptcpify_skel;
-
-	mptcpify_skel = mptcpify__open_and_load();
-	if (!ASSERT_OK_PTR(mptcpify_skel, "skel_open_load"))
-		return libbpf_get_error(mptcpify_skel);
-
-	err = mptcpify__attach(mptcpify_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
-		goto out;
 
 	/* without MPTCP */
 	server_fd = start_server(AF_INET, SOCK_STREAM, NULL, 0, 0);
-	if (!ASSERT_GE(server_fd, 0, "start_server")) {
-		err = -EIO;
-		goto out;
-	}
+	if (!ASSERT_GE(server_fd, 0, "start_server"))
+		return;
 
 	client_fd = connect_to_fd(server_fd, 0);
-	if (!ASSERT_GE(client_fd, 0, "connect to fd")) {
-		err = -EIO;
+	if (!ASSERT_GE(client_fd, 0, "connect to fd"))
 		goto close_server;
-	}
 
 	send_byte(client_fd);
 
 	err = verify_mptcpify(server_fd, client_fd);
+	ASSERT_OK(err, "verify_mptcpify");
 
 	close(client_fd);
 close_server:
 	close(server_fd);
-out:
-	mptcpify__destroy(mptcpify_skel);
-	return err;
 }
 
 static void test_mptcpify(void)
 {
 	struct nstoken *nstoken = NULL;
+	struct mptcpify *mptcpify_skel;
 	int cgroup_fd;
+	int err;
 
 	cgroup_fd = test__join_cgroup("/mptcpify");
 	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
+	mptcpify_skel = mptcpify__open_and_load();
+	if (!ASSERT_OK_PTR(mptcpify_skel, "skel_open_load"))
+		goto out;
+
+	err = mptcpify__attach(mptcpify_skel);
+	if (!ASSERT_OK(err, "skel_attach"))
+		goto out;
+
 	nstoken = create_netns();
 	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		goto fail;
 
-	ASSERT_OK(run_mptcpify(cgroup_fd), "run_mptcpify");
+	run_mptcpify(cgroup_fd, mptcpify_skel);
 
 fail:
 	cleanup_netns(nstoken);
+	mptcpify__destroy(mptcpify_skel);
+out:
 	close(cgroup_fd);
 }
 
