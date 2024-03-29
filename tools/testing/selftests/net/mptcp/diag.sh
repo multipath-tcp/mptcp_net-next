@@ -200,6 +200,27 @@ chk_msk_cestab()
 		 "${expected}" "${msg}" ""
 }
 
+chk_msk_info()
+{
+	local info
+
+	for info in "${@}"; do
+		local cnt1 cnt2 msg
+
+		cnt1=$(ss -N ${ns} -inmHM | mptcp_lib_get_info_value "$info" "$info")
+		cnt2=$(ss -N ${ns} -inmHM | mptcp_lib_get_info_value "$info" "$info")
+		msg="....chk ${info:0:15}=$cnt1:$cnt2"
+		mptcp_lib_print_title "${msg}"
+		if [ "${cnt1}" -lt "${cnt2}" ]; then
+			mptcp_lib_pr_ok
+			mptcp_lib_result_pass "${msg}"
+		else
+			mptcp_lib_pr_skip
+			mptcp_lib_result_skip "${msg}"
+		fi
+	done
+}
+
 wait_connected()
 {
 	local listener_ns="${1}"
@@ -237,6 +258,7 @@ chk_msk_remote_key_nr 2 "....chk remote_key"
 chk_msk_fallback_nr 0 "....chk no fallback"
 chk_msk_inuse 2
 chk_msk_cestab 2
+chk_msk_info last_data_sent last_data_recv last_ack_recv
 flush_pids
 
 chk_msk_inuse 0 "2->0"
@@ -257,6 +279,7 @@ wait_connected $ns 10001
 chk_msk_fallback_nr 1 "check fallback"
 chk_msk_inuse 1
 chk_msk_cestab 1
+chk_msk_info last_data_sent last_data_recv last_ack_recv
 flush_pids
 
 chk_msk_inuse 0 "1->0"
@@ -283,6 +306,7 @@ done
 wait_msk_nr $((NR_CLIENTS*2)) "many msk socket present"
 chk_msk_inuse $((NR_CLIENTS*2)) "many"
 chk_msk_cestab $((NR_CLIENTS*2)) "many"
+chk_msk_info last_data_sent last_data_recv last_ack_recv
 flush_pids
 
 chk_msk_inuse 0 "many->0"
