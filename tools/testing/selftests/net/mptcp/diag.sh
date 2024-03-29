@@ -211,12 +211,16 @@ chk_msk_info()
 		cnt2=$(ss -N ${ns} -inmHM | mptcp_lib_get_info_value "$info" "$info")
 		msg="....chk ${info:0:15}=$cnt1:$cnt2"
 		mptcp_lib_print_title "${msg}"
-		if [ "${cnt1}" -lt "${cnt2}" ]; then
+		if [ -z "${cnt1}" ] || [ -z "${cnt2}" ]; then
+			mptcp_lib_pr_skip "Feature probably not supported"
+			mptcp_lib_result_skip "${msg}"
+		elif [ "${cnt1}" -lt "${cnt2}" ]; then
 			mptcp_lib_pr_ok
 			mptcp_lib_result_pass "${msg}"
 		else
-			mptcp_lib_pr_skip
-			mptcp_lib_result_skip "${msg}"
+			mptcp_lib_pr_fail "expected $cnt1 < $cnt2"
+			mptcp_lib_result_fail "${msg}"
+			ret=${KSFT_FAIL}
 		fi
 	done
 }
