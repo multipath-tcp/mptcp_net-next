@@ -1,4 +1,39 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-prevent-BPF-accessing-lowat-from-a-subflow-socket
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: prevent BPF accessing lowat from a subflow socket.
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Alexei reported the following splat:
+
+ WARNING: CPU: 32 PID: 3276 at net/mptcp/subflow.c:1430 subflow_data_ready+0x147/0x1c0
+ Modules linked in: dummy bpf_testmod(O) [last unloaded: bpf_test_no_cfi(O)]
+ CPU: 32 PID: 3276 Comm: test_progs Tainted: GO       6.8.0-12873-g2c43c33bfd23
+ Call Trace:
+  <TASK>
+  mptcp_set_rcvlowat+0x79/0x1d0
+  sk_setsockopt+0x6c0/0x1540
+  __bpf_setsockopt+0x6f/0x90
+  bpf_sock_ops_setsockopt+0x3c/0x90
+  bpf_prog_509ce5db2c7f9981_bpf_test_sockopt_int+0xb4/0x11b
+  bpf_prog_dce07e362d941d2b_bpf_test_socket_sockopt+0x12b/0x132
+  bpf_prog_348c9b5faaf10092_skops_sockopt+0x954/0xe86
+  __cgroup_bpf_run_filter_sock_ops+0xbc/0x250
+  tcp_connect+0x879/0x1160
+  tcp_v6_connect+0x50c/0x870
+  mptcp_connect+0x129/0x280
+  __inet_stream_connect+0xce/0x370
+  inet_stream_connect+0x36/0x50
+  bpf_trampoline_6442491565+0x49/0xef
+  inet_stream_connect+0x5/0x50
+  __sys_connect+0x63/0x90
+  __x64_sys_connect+0x14/0x20
+
+The root cause of the issue is that bpf allows accessing mptcp-level
+proto_ops from a tcp subflow scope.
+
+Fix the issue detecting the problematic call and preventing any action.
+
+Reported-by: Alexei Starovoitov <alexei.starovoitov@gmail.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/482
+Fixes: 5684ab1a0eff ("mptcp: give rcvlowat some love")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
