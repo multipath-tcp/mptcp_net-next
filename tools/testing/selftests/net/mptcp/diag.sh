@@ -200,6 +200,34 @@ chk_msk_cestab()
 		 "${expected}" "${msg}" ""
 }
 
+chk_msk_info()
+{
+	local port="${1}"
+	local info
+
+	for info in "${@:2}"; do
+		local cnt1 cnt2 msg
+
+		cnt1=$(ss -N ${ns} -inHM dport ${port} | mptcp_lib_get_info_value "$info" "$info")
+		sleep 0.5
+		cnt2=$(ss -N ${ns} -inHM dport ${port} | mptcp_lib_get_info_value "$info" "$info")
+		msg="....chk ${info}"
+		mptcp_lib_print_title "${msg}"
+		if { [ -z "${cnt1}" ] || [ -z "${cnt2}" ]; } &&
+		   ! mptcp_lib_expect_all_features; then
+			mptcp_lib_pr_skip "Feature probably not supported"
+			mptcp_lib_result_skip "${msg}"
+		elif [ "$((cnt1 + 500))" -lt "${cnt2}" ]; then
+			mptcp_lib_pr_ok
+			mptcp_lib_result_pass "${msg}"
+		else
+			mptcp_lib_pr_fail "expected $((cnt1 + 500)) < $cnt2"
+			mptcp_lib_result_fail "${msg}"
+			ret=${KSFT_FAIL}
+		fi
+	done
+}
+
 wait_connected()
 {
 	local listener_ns="${1}"
@@ -233,6 +261,7 @@ echo "b" | \
 				127.0.0.1 >/dev/null &
 wait_connected $ns 10000
 chk_msk_nr 2 "after MPC handshake "
+chk_msk_info 10000 last_data_sent last_data_recv last_ack_recv
 chk_msk_remote_key_nr 2 "....chk remote_key"
 chk_msk_fallback_nr 0 "....chk no fallback"
 chk_msk_inuse 2
