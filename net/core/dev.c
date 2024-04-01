@@ -455,7 +455,7 @@ EXPORT_PER_CPU_SYMBOL(softnet_data);
  * PP consumers must pay attention to run APIs in the appropriate context
  * (e.g. NAPI context).
  */
-static DEFINE_PER_CPU_ALIGNED(struct page_pool *, system_page_pool);
+static DEFINE_PER_CPU(struct page_pool *, system_page_pool);
 
 #ifdef CONFIG_LOCKDEP
 /*
@@ -2081,6 +2081,11 @@ void net_dec_egress_queue(void)
 	static_branch_dec(&egress_needed_key);
 }
 EXPORT_SYMBOL_GPL(net_dec_egress_queue);
+#endif
+
+#ifdef CONFIG_NET_CLS_ACT
+DEFINE_STATIC_KEY_FALSE(tcf_bypass_check_needed_key);
+EXPORT_SYMBOL(tcf_bypass_check_needed_key);
 #endif
 
 DEFINE_STATIC_KEY_FALSE(netstamp_needed_key);
@@ -3936,6 +3941,11 @@ static int tc_run(struct tcx_entry *entry, struct sk_buff *skb,
 
 	if (!miniq)
 		return ret;
+
+	if (static_branch_unlikely(&tcf_bypass_check_needed_key)) {
+		if (tcf_block_bypass_sw(miniq->block))
+			return ret;
+	}
 
 	tc_skb_cb(skb)->mru = 0;
 	tc_skb_cb(skb)->post_ct = false;
