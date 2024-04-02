@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-last-time-fields-in-mptcp_info
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add last time fields in mptcp_info
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds "last time" fields last_data_sent, last_data_recv and
+last_ack_recv in struct mptcp_sock to record the last time data_sent,
+data_recv and ack_recv happened. They all are initialized as
+tcp_jiffies32 in __mptcp_init_sock(), but updated as tcp_jiffies32 too
+when data is sent in __subflow_push_pending(), data is received in
+__mptcp_move_skbs_from_subflow(), and ack is received in ack_update_msk().
+
+Similar to tcpi_last_data_sent, tcpi_last_data_recv and tcpi_last_ack_recv
+exposed with TCP, this patch exposes the last time "an action happened" for
+MPTCP in mptcp_info, named mptcpi_last_data_sent, mptcpi_last_data_recv and
+mptcpi_last_ack_recv, calculated in mptcp_diag_fill_info() as the time
+deltas between now and the newly added last time fields in mptcp_sock.
+
+Also add three reserved bytes in struct mptcp_info.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/446
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
