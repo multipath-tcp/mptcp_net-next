@@ -88,6 +88,16 @@ static void cleanup_netns(struct nstoken *nstoken)
 	SYS_NOFAIL("ip netns del %s", NS_TEST);
 }
 
+static int set_nonblock(int fd)
+{
+	int flags = fcntl(fd, F_GETFL);
+
+	if (flags == -1)
+		return -1;
+
+	return fcntl(fd, flags | O_NONBLOCK);
+}
+
 static int verify_tsk(int map_fd, int client_fd)
 {
 	int err, cfd = client_fd;
@@ -466,6 +476,7 @@ static void test_default(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
+	set_nonblock(server_fd);
 	send_data(server_fd, client_fd, "default");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
 	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr_2");
@@ -639,6 +650,7 @@ static void test_burst(void)
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	client_fd = connect_to_fd(server_fd, 0);
 
+	set_nonblock(server_fd);
 	send_data(server_fd, client_fd, "bpf_burst");
 	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr 1");
 	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr 2");
