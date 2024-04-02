@@ -214,22 +214,24 @@ chk_msk_info()
 	local port="${1}"
 	local info="${2}"
 	local cnt="${3}"
-	local now delta_ms=250
+	local msg="....chk ${info}"
+	local delta_ms=250  # half what we waited before, just to be sure
+	local now
 
 	now=$(msk_info_get_value "${port}" "${info}")
 
-	mptcp_lib_print_title "....chk ${info}"
+	mptcp_lib_print_title "${msg}"
 	if { [ -z "${cnt}" ] || [ -z "${now}" ]; } &&
 	   ! mptcp_lib_expect_all_features; then
 		mptcp_lib_pr_skip "Feature probably not supported"
-		mptcp_lib_result_skip "${info}"
+		mptcp_lib_result_skip "${msg}"
 	elif [ "$((cnt + delta_ms))" -lt "${now}" ]; then
 		mptcp_lib_pr_ok
-		mptcp_lib_result_pass "${info}"
+		mptcp_lib_result_pass "${msg}"
 	else
 		mptcp_lib_pr_fail "value of ${info} changed by $((now - cnt))ms," \
 				  "expected at least ${delta_ms}ms"
-		mptcp_lib_result_fail "${info}"
+		mptcp_lib_result_fail "${msg}"
 		ret=${KSFT_FAIL}
 	fi
 }
@@ -243,7 +245,7 @@ chk_last_time_info()
 	data_recv=$(msk_info_get_value "${port}" "last_data_recv")
 	ack_recv=$(msk_info_get_value "${port}" "last_ack_recv")
 
-	sleep 0.5
+	sleep 0.5  # wait to check after if the timestamps difference
 
 	chk_msk_info "${port}" "last_data_sent" "${data_sent}"
 	chk_msk_info "${port}" "last_data_recv" "${data_recv}"
