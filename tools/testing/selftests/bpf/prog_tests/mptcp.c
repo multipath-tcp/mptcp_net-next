@@ -16,6 +16,9 @@
 #include "mptcp_bpf_burst.skel.h"
 
 #define NS_TEST "mptcp_ns"
+#define ADDR_1	"10.0.1.1"
+#define ADDR_2	"10.0.1.2"
+#define PORT_1	10001
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -37,6 +40,8 @@
 #ifndef TCP_CA_NAME_MAX
 #define TCP_CA_NAME_MAX	16
 #endif
+
+static const unsigned int total_bytes = 10 * 1024 * 1024;
 
 struct __mptcp_info {
 	__u8	mptcpi_subflows;
@@ -337,7 +342,6 @@ fail:
 	close(cgroup_fd);
 }
 
-static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int stop, duration;
 
 static void *server(void *arg)
@@ -413,15 +417,10 @@ static void send_data(int lfd, int fd, char *msg)
 	      bytes, total_bytes, nr_recv, errno);
 
 	WRITE_ONCE(stop, 1);
-
 	pthread_join(srv_thread, &thread_ret);
 	CHECK(IS_ERR(thread_ret), "pthread_join", "thread_ret:%ld",
 	      PTR_ERR(thread_ret));
 }
-
-#define ADDR_1	"10.0.1.1"
-#define ADDR_2	"10.0.1.2"
-#define PORT_1	10001
 
 static struct nstoken *sched_init(char *flags, char *sched)
 {
@@ -444,12 +443,12 @@ fail:
 	return NULL;
 }
 
-static int has_bytes_sent(char *addr)
+static int has_bytes_sent(char *dst)
 {
 	char cmd[128];
 
 	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it src %s sport %d dst %s | %s",
-		 NS_TEST, ADDR_1, PORT_1, addr, "grep -q bytes_sent:");
+		 NS_TEST, ADDR_1, PORT_1, dst, "grep -q bytes_sent:");
 	return system(cmd);
 }
 
@@ -695,8 +694,7 @@ void test_mptcp(void)
 {
 	RUN_MPTCP_TEST(base);
 	RUN_MPTCP_TEST(mptcpify);
-	if (test__start_subtest("default"))
-		test_default();
+	RUN_MPTCP_TEST(default);
 	if (test__start_subtest("first"))
 		test_first();
 	if (test__start_subtest("bkup"))
