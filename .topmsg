@@ -1,8 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Drop settimeo in do_test
-
-settimeo is invoked in start_server() and in connect_fd_to_fd() already,
-no need to invoke settimeo(lfd, 0) and settimeo(fd, 0) in do_test()
-anymore. This patch drops them.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
