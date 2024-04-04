@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Use connect_fd_to_fd in bpf_tcp_ca
-
-To simplify the code, use BPF selftests helper connect_fd_to_fd() in
-bpf_tcp_ca.c instead of open-coding it. This helper is defined in
-network_helpers.c, and exported in network_helpers.h, which is already
-included in bpf_tcp_ca.c.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
