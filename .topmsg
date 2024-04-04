@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-pid-limit-for-mptcpify-prog
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Add pid limit for mptcpify prog
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+In order to prevent mptcpify prog from affecting the running results
+of other BPF tests, a pid limit was added to restrict it from only
+modifying its own program.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Suggested-by: Martin KaFai Lau <martin.lau@kernel.org>
