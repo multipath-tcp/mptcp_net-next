@@ -304,7 +304,10 @@ static struct dst_entry *subflow_v4_route_req(const struct sock *sk,
 
 	dst_release(dst);
 	if (!req->syncookie)
-		tcp_request_sock_ops.send_reset(sk, skb, SK_RST_REASON_NOT_SPECIFIED);
+		/* According to RFC 8684, 3.2. Starting a New Subflow,
+		 * we should use an "MPTCP specific error" reason code.
+		 */
+		tcp_request_sock_ops.send_reset(sk, skb, SK_RST_REASON_MPTCP_RST_EMPTCP);
 	return NULL;
 }
 
@@ -371,7 +374,10 @@ static struct dst_entry *subflow_v6_route_req(const struct sock *sk,
 
 	dst_release(dst);
 	if (!req->syncookie)
-		tcp6_request_sock_ops.send_reset(sk, skb, SK_RST_REASON_NOT_SPECIFIED);
+		/* According to RFC 8684, 3.2. Starting a New Subflow,
+		 * we should use an "MPTCP specific error" reason code.
+		 */
+		tcp6_request_sock_ops.send_reset(sk, skb, SK_RST_REASON_MPTCP_RST_EMPTCP);
 	return NULL;
 }
 #endif
@@ -778,6 +784,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	bool fallback, fallback_is_fatal;
 	struct mptcp_sock *owner;
 	struct sock *child;
+	int reason;
 
 	pr_debug("listener=%p, req=%p, conn=%p", listener, req, listener->conn);
 
@@ -833,7 +840,8 @@ create_child:
 		 */
 		if (!ctx || fallback) {
 			if (fallback_is_fatal) {
-				subflow_add_reset_reason(skb, MPTCP_RST_EMPTCP);
+				reason = MPTCP_RST_EMPTCP;
+				subflow_add_reset_reason(skb, reason);
 				goto dispose_child;
 			}
 			goto fallback;
@@ -861,7 +869,8 @@ create_child:
 		} else if (ctx->mp_join) {
 			owner = subflow_req->msk;
 			if (!owner) {
-				subflow_add_reset_reason(skb, MPTCP_RST_EPROHIBIT);
+				reason = MPTCP_RST_EPROHIBIT;
+				subflow_add_reset_reason(skb, reason);
 				goto dispose_child;
 			}
 
@@ -875,13 +884,18 @@ create_child:
 					 ntohs(inet_sk((struct sock *)owner)->inet_sport));
 				if (!mptcp_pm_sport_in_anno_list(owner, sk)) {
 					SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_MISMATCHPORTACKRX);
+					reason = MPTCP_RST_EUNSPEC;
 					goto dispose_child;
 				}
 				SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINPORTACKRX);
 			}
 
-			if (!mptcp_finish_join(child))
+			if (!mptcp_finish_join(child)) {
+				struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
+
+				reason = subflow->reset_reason;
 				goto dispose_child;
+			}
 
 			SUBFLOW_REQ_INC_STATS(req, MPTCP_MIB_JOINACKRX);
 			tcp_rsk(req)->drop_req = true;
@@ -901,7 +915,7 @@ dispose_child:
 	tcp_rsk(req)->drop_req = true;
 	inet_csk_prepare_for_destroy_sock(child);
 	tcp_done(child);
-	req->rsk_ops->send_reset(sk, skb, SK_RST_REASON_NOT_SPECIFIED);
+	req->rsk_ops->send_reset(sk, skb, convert_mptcp_reason(reason));
 
 	/* The last child reference will be released by the caller */
 	return child;
