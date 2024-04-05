@@ -215,10 +215,7 @@ __be32 mptcp_get_reset_option(const struct sk_buff *skb);
 
 static inline __be32 mptcp_reset_option(const struct sk_buff *skb)
 {
-	if (skb_ext_exist(skb, SKB_EXT_MPTCP))
-		return mptcp_get_reset_option(skb);
-
-	return htonl(0u);
+	return mptcp_get_reset_option(skb);
 }
 #else
 
