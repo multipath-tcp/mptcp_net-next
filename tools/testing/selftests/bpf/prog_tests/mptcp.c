@@ -498,6 +498,36 @@ fail:
 	cleanup_netns(nstoken);
 }
 
+#define MPTCP_SCHED_TEST(sched, addr1, addr2)			\
+static void test_##sched(void)					\
+{								\
+	struct mptcp_bpf_##sched *skel;				\
+	struct nstoken *nstoken;				\
+	struct bpf_link *link;					\
+	struct bpf_map *map;					\
+								\
+	skel = mptcp_bpf_##sched##__open_and_load();		\
+	if (!ASSERT_OK_PTR(skel, "open_and_load:" #sched))	\
+		return;						\
+								\
+	map = bpf_object__find_map_by_name(skel->obj, #sched);	\
+	link = bpf_map__attach_struct_ops(map);			\
+	if (!ASSERT_OK_PTR(link, "attach_struct_ops:" #sched))	\
+		goto skel_destroy;				\
+								\
+	nstoken = sched_init("subflow", "bpf_" #sched);		\
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:" #sched))	\
+		goto link_destroy;				\
+								\
+	send_data_and_verify(#sched, #addr1, #addr2);		\
+								\
+	cleanup_netns(nstoken);					\
+link_destroy:							\
+	bpf_link__destroy(link);				\
+skel_destroy:							\
+	mptcp_bpf_##sched##__destroy(skel);			\
+}
+
 static void test_first(void)
 {
 	struct mptcp_bpf_first *first_skel;
