@@ -944,10 +944,10 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	unlock_sock_fast(sk, slow);
 
 	mptcp_data_lock(sk);
+	info->mptcpi_last_ack_recv = jiffies_to_msecs(now - msk->last_ack_recv);
 	info->mptcpi_snd_una = msk->snd_una;
 	info->mptcpi_rcv_nxt = msk->ack_seq;
 	info->mptcpi_bytes_acked = msk->bytes_acked;
-	info->mptcpi_last_ack_recv = jiffies_to_msecs(now - msk->last_ack_recv);
 	mptcp_data_unlock(sk);
 }
 EXPORT_SYMBOL_GPL(mptcp_diag_fill_info);
