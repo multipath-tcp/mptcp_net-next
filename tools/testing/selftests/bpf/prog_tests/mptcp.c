@@ -457,23 +457,44 @@ static int has_bytes_sent(char *addr)
 	return system(cmd);
 }
 
-static void test_default(void)
+static void send_data_and_verify(char *sched, char *addr1, char *addr2)
 {
 	int server_fd, client_fd;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	if (CHECK(server_fd < 0, sched, "start_mptcp_server: %d\n", errno))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (CHECK(client_fd < 0, sched, "connect_to_fd: %d\n", errno))
+		goto close_server;
+
+	send_data(server_fd, client_fd, sched);
+
+	if (!strcmp(addr1, "WITH_DATA"))
+		CHECK(has_bytes_sent(ADDR_1), sched, "should have bytes_sent on addr1\n");
+	else if (!strcmp(addr1, "WITHOUT_DATA"))
+		CHECK(!has_bytes_sent(ADDR_1), sched, "shouldn't have bytes_sent on addr1\n");
+	if (!strcmp(addr2, "WITH_DATA"))
+		CHECK(has_bytes_sent(ADDR_2), sched, "should have bytes_sent on addr2\n");
+	else if (!strcmp(addr2, "WITHOUT_DATA"))
+		CHECK(!has_bytes_sent(ADDR_2), sched, "shouldn't have bytes_sent on addr2\n");
+
+	close(client_fd);
+close_server:
+	close(server_fd);
+}
+
+static void test_default(void)
+{
 	struct nstoken *nstoken;
 
 	nstoken = sched_init("subflow", "default");
 	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd, "default");
-	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
-	ASSERT_OK(has_bytes_sent(ADDR_2), "has_bytes_sent addr_2");
+	send_data_and_verify("default", "WITH_DATA", "WITH_DATA");
 
-	close(client_fd);
-	close(server_fd);
 fail:
 	cleanup_netns(nstoken);
 }
@@ -663,8 +684,7 @@ void test_mptcp(void)
 {
 	RUN_MPTCP_TEST(base);
 	RUN_MPTCP_TEST(mptcpify);
-	if (test__start_subtest("default"))
-		test_default();
+	RUN_MPTCP_TEST(default);
 	if (test__start_subtest("first"))
 		test_first();
 	if (test__start_subtest("bkup"))
