@@ -4,7 +4,7 @@ Subject: [PATCH] mptcp: add last time fields in mptcp_info
 This patch adds "last time" fields last_data_sent, last_data_recv and
 last_ack_recv in struct mptcp_sock to record the last time data_sent,
 data_recv and ack_recv happened. They all are initialized as
-tcp_jiffies32 in __mptcp_init_sock(), but updated as tcp_jiffies32 too
+tcp_jiffies32 in __mptcp_init_sock(), and updated as tcp_jiffies32 too
 when data is sent in __subflow_push_pending(), data is received in
 __mptcp_move_skbs_from_subflow(), and ack is received in ack_update_msk().
 
@@ -14,8 +14,21 @@ MPTCP in mptcp_info, named mptcpi_last_data_sent, mptcpi_last_data_recv and
 mptcpi_last_ack_recv, calculated in mptcp_diag_fill_info() as the time
 deltas between now and the newly added last time fields in mptcp_sock.
 
-Also add three reserved bytes in struct mptcp_info.
+Since msk->last_ack_recv needs to be protected by mptcp_data_lock/unlock,
+and lock_sock_fast can sleep and be quite slow, move the entire
+mptcp_data_lock/unlock block after the lock/unlock_sock_fast block.
+Then mptcpi_last_data_sent and mptcpi_last_data_recv are set in
+lock/unlock_sock_fast block, while mptcpi_last_ack_recv is set in
+mptcp_data_lock/unlock block.
+
+Also add three reserved bytes in struct mptcp_info not to have holes in
+this structure exposed to userspace.
 
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/446
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
+---
+v2:
+ - Set 'now = jiffies32' inside '(un)lock_sock_fast' block (Eric).
+ - Move 'mptcp_data_(un)lock' block after '(un)lock_sock_fast', not to
+   reload 'now', and have all counters synced (Matthieu).
