@@ -195,6 +195,12 @@ int start_server_addr(const struct sockaddr *addr, socklen_t addrlen, int type)
 	return __start_server(type, 0, addr, addrlen, 0, NULL, 0);
 }
 
+int start_server_setsockopt(const struct sockaddr *addr, socklen_t addrlen, int type,
+			    int *(*setsockopt)(int fd, int val), int val)
+{
+	return __start_server(type, 0, addr, addrlen, 0, setsockopt, val);
+}
+
 void free_fds(int *fds, unsigned int nr_close_fds)
 {
 	if (fds) {
