@@ -80,9 +80,9 @@ int settimeo(int fd, int timeout_ms)
 #define save_errno_close(fd) ({ int __save = errno; close(fd); errno = __save; })
 
 static int __start_server(int type, int protocol, const struct sockaddr *addr,
-			  socklen_t addrlen, int timeout_ms, bool reuseport)
+			  socklen_t addrlen, int timeout_ms,
+			  int *(*setsockopt)(int fd, int val), int val)
 {
-	int on = 1;
 	int fd;
 
 	fd = socket(addr->sa_family, type, protocol);
@@ -94,9 +94,8 @@ static int __start_server(int type, int protocol, const struct sockaddr *addr,
 	if (settimeo(fd, timeout_ms))
 		goto error_close;
 
-	if (reuseport &&
-	    setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on))) {
-		log_err("Failed to set SO_REUSEPORT");
+	if (setsockopt && setsockopt(fd, val)) {
+		log_err("Failed to set sockopt");
 		goto error_close;
 	}
 
@@ -129,7 +128,7 @@ static int start_server_proto(int family, int type, int protocol,
 		return -1;
 
 	return __start_server(type, protocol, (struct sockaddr *)&addr,
-			      addrlen, timeout_ms, false);
+			      addrlen, timeout_ms, NULL, 0);
 }
 
 int start_server(int family, int type, const char *addr_str, __u16 port,
@@ -143,6 +142,11 @@ int start_mptcp_server(int family, const char *addr_str, __u16 port,
 {
 	return start_server_proto(family, SOCK_STREAM, IPPROTO_MPTCP, addr_str,
 				  port, timeout_ms);
+}
+
+static int setsockopt_reuse(int fd, int on)
+{
+	return setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
 }
 
 int *start_reuseport_server(int family, int type, const char *addr_str,
@@ -164,7 +168,7 @@ int *start_reuseport_server(int family, int type, const char *addr_str,
 		return NULL;
 
 	fds[0] = __start_server(type, 0, (struct sockaddr *)&addr, addrlen,
-				timeout_ms, true);
+				timeout_ms, (void *)setsockopt_reuse, 1);
 	if (fds[0] == -1)
 		goto close_fds;
 	nr_fds = 1;
@@ -174,7 +178,7 @@ int *start_reuseport_server(int family, int type, const char *addr_str,
 
 	for (; nr_fds < nr_listens; nr_fds++) {
 		fds[nr_fds] = __start_server(type, 0, (struct sockaddr *)&addr,
-					     addrlen, timeout_ms, true);
+					     addrlen, timeout_ms, (void *)setsockopt_reuse, 1);
 		if (fds[nr_fds] == -1)
 			goto close_fds;
 	}
@@ -188,7 +192,7 @@ close_fds:
 
 int start_server_addr(const struct sockaddr *addr, socklen_t addrlen, int type)
 {
-	return __start_server(type, 0, addr, addrlen, 0, 0);
+	return __start_server(type, 0, addr, addrlen, 0, NULL, 0);
 }
 
 void free_fds(int *fds, unsigned int nr_close_fds)
