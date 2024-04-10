@@ -185,6 +185,11 @@ close_fds:
 	return NULL;
 }
 
+int start_server_addr(const struct sockaddr *addr, socklen_t addrlen, int type)
+{
+	return __start_server(type, 0, addr, addrlen, 0, 0);
+}
+
 void free_fds(int *fds, unsigned int nr_close_fds)
 {
 	if (fds) {
