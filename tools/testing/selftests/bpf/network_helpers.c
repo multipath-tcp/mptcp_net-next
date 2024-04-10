@@ -7,11 +7,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <sched.h>
+#include <pthread.h>
 
 #include <arpa/inet.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <sys/param.h>
 
 #include <linux/err.h>
 #include <linux/in.h>
@@ -20,7 +22,6 @@
 
 #include "bpf_util.h"
 #include "network_helpers.h"
-#include "test_progs.h"
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -447,22 +448,30 @@ struct nstoken *open_netns(const char *name)
 	struct nstoken *token;
 
 	token = calloc(1, sizeof(struct nstoken));
-	if (!ASSERT_OK_PTR(token, "malloc token"))
+	if (!token) {
+		log_err("malloc token");
 		return NULL;
+	}
 
 	token->orig_netns_fd = open("/proc/self/ns/net", O_RDONLY);
-	if (!ASSERT_GE(token->orig_netns_fd, 0, "open /proc/self/ns/net"))
+	if (token->orig_netns_fd <= 0) {
+		log_err("open /proc/self/ns/net");
 		goto fail;
+	}
 
 	snprintf(nspath, sizeof(nspath), "%s/%s", "/var/run/netns", name);
 	nsfd = open(nspath, O_RDONLY | O_CLOEXEC);
-	if (!ASSERT_GE(nsfd, 0, "open netns fd"))
+	if (nsfd <= 0) {
+		log_err("open netns fd");
 		goto fail;
+	}
 
 	err = setns(nsfd, CLONE_NEWNET);
 	close(nsfd);
-	if (!ASSERT_OK(err, "setns"))
+	if (err) {
+		log_err("setns");
 		goto fail;
+	}
 
 	return token;
 fail:
@@ -475,7 +484,8 @@ void close_netns(struct nstoken *token)
 	if (!token)
 		return;
 
-	ASSERT_OK(setns(token->orig_netns_fd, CLONE_NEWNET), "setns");
+	if (setns(token->orig_netns_fd, CLONE_NEWNET))
+		log_err("setns");
 	close(token->orig_netns_fd);
 	free(token);
 }
