@@ -555,6 +555,7 @@ struct send_recv_arg {
 static void *send_recv_server(void *arg)
 {
 	struct send_recv_arg *a = (struct send_recv_arg *)arg;
+	int flags = fcntl(a->fd, F_GETFL);
 	ssize_t nr_sent = 0, bytes = 0;
 	char batch[1500];
 	int err = 0, fd;
@@ -578,6 +579,8 @@ static void *send_recv_server(void *arg)
 		if (nr_sent == -1 && errno == EINTR)
 			continue;
 		if (nr_sent == -1) {
+			if (flags & O_NONBLOCK && errno == EWOULDBLOCK)
+				continue;
 			err = -errno;
 			break;
 		}
@@ -599,6 +602,7 @@ done:
 
 int send_recv_data(int lfd, int fd, uint32_t total_bytes)
 {
+	int flags = fcntl(lfd, F_GETFL);
 	ssize_t nr_recv = 0, bytes = 0;
 	struct send_recv_arg arg = {
 		.fd	= lfd,
@@ -622,8 +626,11 @@ int send_recv_data(int lfd, int fd, uint32_t total_bytes)
 			       MIN(total_bytes - bytes, sizeof(batch)), 0);
 		if (nr_recv == -1 && errno == EINTR)
 			continue;
-		if (nr_recv == -1)
+		if (nr_recv == -1) {
+			if (flags & O_NONBLOCK && errno == EWOULDBLOCK)
+				continue;
 			break;
+		}
 		bytes += nr_recv;
 	}
 
