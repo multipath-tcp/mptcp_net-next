@@ -25,30 +25,6 @@ static int setsockopt_mode(int fd, int dual)
 	return setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&mode, sizeof(mode));
 }
 
-static int connect_to_server(const struct sockaddr *addr, socklen_t len)
-{
-	int fd = -1;
-
-	fd = socket(addr->sa_family, SOCK_STREAM, 0);
-	if (fd == -1) {
-		log_err("Failed to create client socket");
-		goto out;
-	}
-
-	if (connect(fd, (const struct sockaddr *)addr, len) == -1) {
-		log_err("Fail to connect to server");
-		goto close_out;
-	}
-
-	goto out;
-
-close_out:
-	close(fd);
-	fd = -1;
-out:
-	return fd;
-}
-
 static int get_map_fd_by_prog_id(int prog_id, bool *xdp)
 {
 	struct bpf_prog_info info = {};
@@ -114,7 +90,7 @@ static int run_test(int server_fd, int results_fd, bool xdp,
 		goto err;
 	}
 
-	client = connect_to_server(addr, len);
+	client = connect_to_addr((struct sockaddr_storage *)addr, len, SOCK_STREAM);
 	if (client == -1)
 		goto err;
 
