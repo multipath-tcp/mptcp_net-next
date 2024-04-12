@@ -1002,8 +1002,12 @@ static void __mptcp_clean_una(struct sock *sk)
 
 		if (unlikely(dfrag == msk->first_pending)) {
 			/* in recovery mode can see ack after the current snd head */
-			if (WARN_ON_ONCE(!msk->recovery))
+			if (WARN_ON_ONCE(!msk->recovery)) {
+				pr_err("snd_una %llx dfrag end seq %llx frag len %d bytes sent %lld acked %lld",
+					msk->snd_una, dfrag->data_seq + dfrag->data_len, dfrag->data_len,
+					msk->bytes_sent, msk->bytes_acked);
 				break;
+			}
 
 			WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
 		}
@@ -3730,6 +3734,13 @@ static int mptcp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_TOKENFALLBACKINIT);
 		mptcp_subflow_early_fallback(msk, subflow);
 	}
+
+	/* after the connect, the worker (and re-injections) can trigger
+	 * at any time, and that will need snd_una properly initialized
+	 */
+	mptcp_data_lock(sk);
+	WRITE_ONCE(msk->snd_una, subflow->idsn);
+	mptcp_data_unlock(sk);
 	if (likely(!__mptcp_check_fallback(msk)))
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVE);
 
