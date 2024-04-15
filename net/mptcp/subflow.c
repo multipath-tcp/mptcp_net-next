@@ -475,12 +475,12 @@ static void mptcp_propagate_state(struct sock *sk, struct sock *ssk,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	mptcp_data_lock(sk);
+	WRITE_ONCE(msk->snd_una, subflow->idsn + 1);
+	WRITE_ONCE(msk->wnd_end, subflow->idsn + 1 + tcp_sk(ssk)->snd_wnd);
 	if (mp_opt) {
 		/* Options are available only in the non fallback cases
 		 * avoid updating rx path fields otherwise
 		 */
-		WRITE_ONCE(msk->snd_una, subflow->idsn + 1);
-		WRITE_ONCE(msk->wnd_end, subflow->idsn + 1 + tcp_sk(ssk)->snd_wnd);
 		subflow_set_remote_key(msk, subflow, mp_opt);
 	}
 
