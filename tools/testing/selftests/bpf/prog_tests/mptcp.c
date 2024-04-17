@@ -5,7 +5,6 @@
 #include <linux/const.h>
 #include <netinet/in.h>
 #include <test_progs.h>
-#include <time.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
 #include "mptcp_sock.skel.h"
@@ -382,16 +381,12 @@ done:
 static void send_data(int lfd, int fd, char *msg)
 {
 	ssize_t nr_recv = 0, bytes = 0;
-	struct timespec start, end;
-	unsigned int delta_ms;
 	pthread_t srv_thread;
 	void *thread_ret;
 	char batch[1500];
 	int err;
 
 	WRITE_ONCE(stop, 0);
-	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
-		return;
 
 	err = pthread_create(&srv_thread, NULL, server, (void *)(long)lfd);
 	if (CHECK(err != 0, "pthread_create", "err:%d errno:%d\n", err, errno))
@@ -408,15 +403,8 @@ static void send_data(int lfd, int fd, char *msg)
 		bytes += nr_recv;
 	}
 
-	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
-		return;
-
-	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
-
 	CHECK(bytes != total_bytes, "recv", "%zd != %u nr_recv:%zd errno:%d\n",
 	      bytes, total_bytes, nr_recv, errno);
-
-	printf("%s: %u ms\n", msg, delta_ms);
 
 	WRITE_ONCE(stop, 1);
 
@@ -461,7 +449,9 @@ static int has_bytes_sent(char *addr)
 
 static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 {
+	struct timespec start, end;
 	int server_fd, client_fd;
+	unsigned int delta_ms;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	if (CHECK(server_fd < 0, sched, "start_mptcp_server: %d\n", errno))
@@ -471,7 +461,16 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	if (CHECK(client_fd < 0, sched, "connect_to_fd: %d\n", errno))
 		goto fail;
 
+	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+		goto fail;
+
 	send_data(server_fd, client_fd, sched);
+
+	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
+		goto fail;
+
+	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
+	printf("%s: %u ms\n", sched, delta_ms);
 
 	if (addr1)
 		CHECK(has_bytes_sent(ADDR_1), sched, "should have bytes_sent on addr1\n");
