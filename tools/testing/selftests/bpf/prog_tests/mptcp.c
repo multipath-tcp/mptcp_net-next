@@ -35,6 +35,7 @@
 #ifndef TCP_CA_NAME_MAX
 #define TCP_CA_NAME_MAX	16
 #endif
+#define MPTCP_SCHED_NAME_MAX	16
 
 struct __mptcp_info {
 	__u8	mptcpi_subflows;
@@ -496,40 +497,44 @@ fail:
 	cleanup_netns(nstoken);
 }
 
-static void test_first(void)
+static void test_bpf_sched(struct bpf_object *obj, char *sched,
+			   bool addr1, bool addr2)
 {
-	struct mptcp_bpf_first *first_skel;
-	int server_fd, client_fd;
+	char bpf_sched[MPTCP_SCHED_NAME_MAX] = "bpf_";
 	struct nstoken *nstoken;
 	struct bpf_link *link;
+	struct bpf_map *map;
 
-	first_skel = mptcp_bpf_first__open_and_load();
-	if (!ASSERT_OK_PTR(first_skel, "bpf_first__open_and_load"))
+	map = bpf_object__find_map_by_name(obj, sched);
+	link = bpf_map__attach_struct_ops(map);
+	if (CHECK(!link, sched, "attach_struct_ops: %d\n", errno))
 		return;
 
-	link = bpf_map__attach_struct_ops(first_skel->maps.first);
-	if (!ASSERT_OK_PTR(link, "bpf_map__attach_struct_ops")) {
-		mptcp_bpf_first__destroy(first_skel);
-		return;
-	}
-
-	nstoken = sched_init("subflow", "bpf_first");
-	if (!ASSERT_OK_PTR(nstoken, "sched_init:bpf_first"))
+	nstoken = sched_init("subflow", strcat(bpf_sched, sched));
+	if (CHECK(!nstoken, sched, "sched_init: %d\n", errno))
 		goto fail;
-	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	client_fd = connect_to_fd(server_fd, 0);
 
-	send_data(server_fd, client_fd, "bpf_first");
-	ASSERT_OK(has_bytes_sent(ADDR_1), "has_bytes_sent addr_1");
-	ASSERT_GT(has_bytes_sent(ADDR_2), 0, "has_bytes_sent addr_2");
+	send_data_and_verify(sched, addr1, addr2);
 
-	close(client_fd);
-	close(server_fd);
 fail:
 	cleanup_netns(nstoken);
 	bpf_link__destroy(link);
-	mptcp_bpf_first__destroy(first_skel);
 }
+
+#define MPTCP_SCHED_TEST(sched, addr1, addr2)			\
+static void test_##sched(void)					\
+{								\
+	struct mptcp_bpf_##sched *skel;				\
+								\
+	skel = mptcp_bpf_##sched##__open_and_load();		\
+	if (!ASSERT_OK_PTR(skel, "open_and_load:" #sched))	\
+		return;						\
+								\
+	test_bpf_sched(skel->obj, #sched, addr1, addr2);	\
+	mptcp_bpf_##sched##__destroy(skel);			\
+}
+
+MPTCP_SCHED_TEST(first, WITH_DATA, WITHOUT_DATA);
 
 #define RUN_MPTCP_TEST(suffix)					\
 do {								\
@@ -542,6 +547,5 @@ void test_mptcp(void)
 	RUN_MPTCP_TEST(base);
 	RUN_MPTCP_TEST(mptcpify);
 	RUN_MPTCP_TEST(default);
-	if (test__start_subtest("first"))
-		test_first();
+	RUN_MPTCP_TEST(first);
 }
