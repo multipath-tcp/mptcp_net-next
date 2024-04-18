@@ -505,6 +505,10 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 	struct bpf_link *link;
 	struct bpf_map *map;
 
+	if (!ASSERT_LT(strlen(bpf_sched) + strlen(sched),
+		       MPTCP_SCHED_NAME_MAX, "too long string"))
+		return;
+
 	map = bpf_object__find_map_by_name(obj, sched);
 	link = bpf_map__attach_struct_ops(map);
 	if (CHECK(!link, sched, "attach_struct_ops: %d\n", errno))
