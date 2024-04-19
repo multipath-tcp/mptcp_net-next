@@ -1,4 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sockopt-info-stop-early-if-no-buffer
+Subject: [PATCH] mptcp: sockopt: info: stop early if no buffer
+
+Up to recently, it has been recommended to use getsockopt(MPTCP_INFO) on
+an 'accept'ed socket, for a server app to check if the client requested
+to use MPTCP.
+
+In this case, the userspace app is only interested by the returned value
+of the getsocktop() call, and can then give 0 for the option length, and
+NULL for the buffer address. An easy optimisation is then to stop early,
+and avoid filling a local buffer -- which now requires two different
+locks -- if it is not needed.
+
+Note that userspace apps should use getsockopt(SO_PROTOCOL) in such case
+instead: it looks less like a workaround, and it works with any kernel
+versions, while the MPTCP_INFO method requires kernels >= v5.16.
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
