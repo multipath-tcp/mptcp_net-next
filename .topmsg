@@ -1,8 +1,13 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Add bpf_bkup scheduler
+Subject: [PATCH] selftests/bpf: Add bpf_bkup scheduler & test
 
 This patch implements the backup flag test scheduler, named bpf_bkup,
 which picks the first non-backup subflow to send data.
 
-Reviewed-by: Mat Martineau <martineau@kernel.org>
+Using MPTCP_SCHED_TEST macro to add a new test for this bpf_bkup
+scheduler, the arguments "1 0" means data has been only sent on the
+first subflow ADDR1. Run this test by RUN_MPTCP_TEST macro.
+
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
