@@ -1,10 +1,24 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Add bpf_first scheduler
+Subject: [PATCH] selftests/bpf: Add bpf_first scheduler & test
 
 This patch implements the simplest MPTCP scheduler, named bpf_first,
 which always picks the first subflow to send data. It's a sample of
 MPTCP BPF scheduler implementations.
 
+This patch defines MPTCP_SCHED_TEST macro, a template for all scheduler
+tests. Every scheduler is identified by argument name, and use sysctl
+to set net.mptcp.scheduler as "bpf_name" to use this sched. Add two
+veth net devices to simulate the multiple addresses case. Use 'ip mptcp
+endpoint' command to add the new endpoint ADDR2 to PM netlink. Arguments
+addr1/add2 means whether the data has been sent on the first/second
+subflow or not. Send data and check bytes_sent of 'ss' output after it
+using send_data_and_verify().
+
+Using MPTCP_SCHED_TEST macro to add a new test for this bpf_first
+scheduler, the arguments "1 0" means data has been only sent on the
+first subflow ADDR1. Run this test by RUN_MPTCP_TEST macro.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
