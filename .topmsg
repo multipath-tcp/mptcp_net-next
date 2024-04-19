@@ -1,4 +1,4 @@
-From: Geliang Tang <geliang.tang@linux.dev>
+From: Geliang Tang <tanggeliang@kylinos.cn>
 Subject: [PATCH] selftests/bpf: Add bpf scheduler test
 
 This patch extends the MPTCP test base to support MPTCP packet scheduler
@@ -26,5 +26,5 @@ All data has been sent on the first subflow.
 Invoke the new helper sched_cleanup() to set back net.mptcp.scheduler to
 default, flush all mptcp endpoints, and delete the veth net devices.
 
-Signed-off-by: Geliang Tang <geliang.tang@linux.dev>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
