@@ -1,9 +1,14 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Add bpf_rr scheduler
+Subject: [PATCH] selftests/bpf: Add bpf_rr scheduler & test
 
 This patch implements the round-robin BPF MPTCP scheduler, named bpf_rr,
 which always picks the next available subflow to send data. If no such
 next subflow available, picks the first one.
 
-Reviewed-by: Mat Martineau <martineau@kernel.org>
+Using MPTCP_SCHED_TEST macro to add a new test for this bpf_rr
+scheduler, the arguments "1 1" means data has been sent on both net
+devices. Run this test by RUN_MPTCP_TEST macro.
+
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
