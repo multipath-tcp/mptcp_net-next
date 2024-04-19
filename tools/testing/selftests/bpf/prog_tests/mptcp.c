@@ -12,6 +12,7 @@
 #include "mptcp_bpf_first.skel.h"
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
+#include "mptcp_bpf_red.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define WITH_DATA	true
@@ -543,6 +544,7 @@ static void test_##sched(void)					\
 MPTCP_SCHED_TEST(first, WITH_DATA, WITHOUT_DATA);
 MPTCP_SCHED_TEST(bkup, WITH_DATA, WITHOUT_DATA);
 MPTCP_SCHED_TEST(rr, WITH_DATA, WITH_DATA);
+MPTCP_SCHED_TEST(red, WITH_DATA, WITH_DATA);
 
 #define RUN_MPTCP_TEST(suffix)					\
 do {								\
@@ -558,4 +560,5 @@ void test_mptcp(void)
 	RUN_MPTCP_TEST(first);
 	RUN_MPTCP_TEST(bkup);
 	RUN_MPTCP_TEST(rr);
+	RUN_MPTCP_TEST(red);
 }
