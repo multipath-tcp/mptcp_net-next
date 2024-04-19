@@ -506,7 +506,7 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 	struct bpf_map *map;
 
 	if (!ASSERT_LT(strlen(bpf_sched) + strlen(sched),
-		       MPTCP_SCHED_NAME_MAX, "too long string"))
+		       MPTCP_SCHED_NAME_MAX, "Scheduler name too long"))
 		return;
 
 	map = bpf_object__find_map_by_name(obj, sched);
