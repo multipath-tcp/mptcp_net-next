@@ -8116,7 +8116,8 @@ static int nl80211_req_set_reg(struct sk_buff *skb, struct genl_info *info)
 			is_indoor = true;
 		}
 
-		return regulatory_hint_indoor(is_indoor, owner_nlportid);
+		regulatory_hint_indoor(is_indoor, owner_nlportid);
+		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -14030,6 +14031,8 @@ static int nl80211_set_coalesce(struct sk_buff *skb, struct genl_info *info)
 error:
 	for (i = 0; i < new_coalesce.n_rules; i++) {
 		tmp_rule = &new_coalesce.rules[i];
+		if (!tmp_rule)
+			continue;
 		for (j = 0; j < tmp_rule->n_patterns; j++)
 			kfree(tmp_rule->patterns[j].mask);
 		kfree(tmp_rule->patterns);
