@@ -620,7 +620,6 @@ ieee80211_determine_chan_mode(struct ieee80211_sub_if_data *sdata,
 		.from_ap = true,
 		.start = ies->data,
 		.len = ies->len,
-		.mode = conn->mode,
 	};
 	struct ieee802_11_elems *elems;
 	struct ieee80211_supported_band *sband;
@@ -629,6 +628,7 @@ ieee80211_determine_chan_mode(struct ieee80211_sub_if_data *sdata,
 	int ret;
 
 again:
+	parse_params.mode = conn->mode;
 	elems = ieee802_11_parse_elems_full(&parse_params);
 	if (!elems)
 		return ERR_PTR(-ENOMEM);
@@ -636,14 +636,20 @@ again:
 	ap_mode = ieee80211_determine_ap_chan(sdata, channel, bss->vht_cap_info,
 					      elems, false, conn, &ap_chandef);
 
-	mlme_link_id_dbg(sdata, link_id, "determined AP %pM to be %s\n",
-			 cbss->bssid, ieee80211_conn_mode_str(ap_mode));
-
 	/* this should be impossible since parsing depends on our mode */
 	if (WARN_ON(ap_mode > conn->mode)) {
 		ret = -EINVAL;
 		goto free;
 	}
+
+	if (conn->mode != ap_mode) {
+		conn->mode = ap_mode;
+		kfree(elems);
+		goto again;
+	}
+
+	mlme_link_id_dbg(sdata, link_id, "determined AP %pM to be %s\n",
+			 cbss->bssid, ieee80211_conn_mode_str(ap_mode));
 
 	sband = sdata->local->hw.wiphy->bands[channel->band];
 
@@ -695,7 +701,6 @@ again:
 		break;
 	}
 
-	conn->mode = ap_mode;
 	chanreq->oper = ap_chandef;
 
 	/* wider-bandwidth OFDMA is only done in EHT */
@@ -757,8 +762,10 @@ again:
 	}
 
 	/* the mode can only decrease, so this must terminate */
-	if (ap_mode != conn->mode)
+	if (ap_mode != conn->mode) {
+		kfree(elems);
 		goto again;
+	}
 
 	mlme_link_id_dbg(sdata, link_id,
 			 "connecting with %s mode, max bandwidth %d MHz\n",
@@ -1930,13 +1937,14 @@ static void ieee80211_chswitch_post_beacon(struct ieee80211_link_data *link)
 
 	WARN_ON(!link->conf->csa_active);
 
-	if (sdata->csa_blocked_tx) {
+	if (sdata->csa_blocked_queues) {
 		ieee80211_wake_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-		sdata->csa_blocked_tx = false;
+		sdata->csa_blocked_queues = false;
 	}
 
 	link->conf->csa_active = false;
+	link->u.mgd.csa_blocked_tx = false;
 	link->u.mgd.csa_waiting_bcn = false;
 
 	ret = drv_post_channel_switch(link);
@@ -1996,13 +2004,14 @@ ieee80211_sta_abort_chanswitch(struct ieee80211_link_data *link)
 
 	ieee80211_link_unreserve_chanctx(link);
 
-	if (sdata->csa_blocked_tx) {
+	if (sdata->csa_blocked_queues) {
 		ieee80211_wake_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-		sdata->csa_blocked_tx = false;
+		sdata->csa_blocked_queues = false;
 	}
 
 	link->conf->csa_active = false;
+	link->u.mgd.csa_blocked_tx = false;
 
 	drv_abort_channel_switch(link);
 }
@@ -2162,12 +2171,13 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	link->csa_chanreq = csa_ie.chanreq;
 	link->u.mgd.csa_ignored_same_chan = false;
 	link->u.mgd.beacon_crc_valid = false;
+	link->u.mgd.csa_blocked_tx = csa_ie.mode;
 
 	if (csa_ie.mode &&
 	    !ieee80211_hw_check(&local->hw, HANDLES_QUIET_CSA)) {
 		ieee80211_stop_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-		sdata->csa_blocked_tx = true;
+		sdata->csa_blocked_queues = true;
 	}
 
 	cfg80211_ch_switch_started_notify(sdata->dev, &csa_ie.chanreq.oper,
@@ -2196,7 +2206,8 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	 * reset when the disconnection worker runs.
 	 */
 	link->conf->csa_active = true;
-	sdata->csa_blocked_tx =
+	link->u.mgd.csa_blocked_tx = csa_ie.mode;
+	sdata->csa_blocked_queues =
 		csa_ie.mode && !ieee80211_hw_check(&local->hw, HANDLES_QUIET_CSA);
 
 	wiphy_work_queue(sdata->local->hw.wiphy,
@@ -3249,12 +3260,13 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	}
 
 	sdata->vif.bss_conf.csa_active = false;
+	sdata->deflink.u.mgd.csa_blocked_tx = false;
 	sdata->deflink.u.mgd.csa_waiting_bcn = false;
 	sdata->deflink.u.mgd.csa_ignored_same_chan = false;
-	if (sdata->csa_blocked_tx) {
+	if (sdata->csa_blocked_queues) {
 		ieee80211_wake_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-		sdata->csa_blocked_tx = false;
+		sdata->csa_blocked_queues = false;
 	}
 
 	/* existing TX TSPEC sessions no longer exist */
@@ -3560,19 +3572,32 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	u8 frame_buf[IEEE80211_DEAUTH_FRAME_LEN];
-	bool tx;
+	bool tx = false;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	if (!ifmgd->associated)
 		return;
 
-	/*
-	 * MLO drivers should have HANDLES_QUIET_CSA, so that csa_blocked_tx
-	 * is always false; if they don't then this may try to transmit the
-	 * frame but queues will be stopped.
-	 */
-	tx = !sdata->csa_blocked_tx;
+	/* only transmit if we have a link that makes that worthwhile */
+	for (unsigned int link_id = 0;
+	     link_id < ARRAY_SIZE(sdata->link);
+	     link_id++) {
+		struct ieee80211_link_data *link;
+
+		if (!ieee80211_vif_link_active(&sdata->vif, link_id))
+			continue;
+
+		link = sdata_dereference(sdata->link[link_id], sdata);
+		if (WARN_ON_ONCE(!link))
+			continue;
+
+		if (link->u.mgd.csa_blocked_tx)
+			continue;
+
+		tx = true;
+		break;
+	}
 
 	if (!ifmgd->driver_disconnect) {
 		unsigned int link_id;
@@ -3605,10 +3630,11 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 	/* the other links will be destroyed */
 	sdata->vif.bss_conf.csa_active = false;
 	sdata->deflink.u.mgd.csa_waiting_bcn = false;
-	if (sdata->csa_blocked_tx) {
+	sdata->deflink.u.mgd.csa_blocked_tx = false;
+	if (sdata->csa_blocked_queues) {
 		ieee80211_wake_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-		sdata->csa_blocked_tx = false;
+		sdata->csa_blocked_queues = false;
 	}
 
 	ieee80211_report_disconnect(sdata, frame_buf, sizeof(frame_buf), tx,
@@ -5818,7 +5844,7 @@ static void ieee80211_ml_reconfiguration(struct ieee80211_sub_if_data *sdata,
 		 */
 		if (control &
 		    IEEE80211_MLE_STA_RECONF_CONTROL_AP_REM_TIMER_PRESENT)
-			link_removal_timeout[link_id] = le16_to_cpu(*(__le16 *)pos);
+			link_removal_timeout[link_id] = get_unaligned_le16(pos);
 	}
 
 	removed_links &= sdata->vif.valid_links;
@@ -5843,8 +5869,11 @@ static void ieee80211_ml_reconfiguration(struct ieee80211_sub_if_data *sdata,
 			continue;
 		}
 
-		link_delay = link_conf->beacon_int *
-			link_removal_timeout[link_id];
+		if (link_removal_timeout[link_id] < 1)
+			link_delay = 0;
+		else
+			link_delay = link_conf->beacon_int *
+				(link_removal_timeout[link_id] - 1);
 
 		if (!delay)
 			delay = link_delay;
@@ -6199,7 +6228,8 @@ static void ieee80211_rx_mgmt_beacon(struct ieee80211_link_data *link,
 			link->u.mgd.dtim_period = elems->dtim_period;
 		link->u.mgd.have_beacon = true;
 		ifmgd->assoc_data->need_beacon = false;
-		if (ieee80211_hw_check(&local->hw, TIMING_BEACON_ONLY)) {
+		if (ieee80211_hw_check(&local->hw, TIMING_BEACON_ONLY) &&
+		    !ieee80211_is_s1g_beacon(hdr->frame_control)) {
 			link->conf->sync_tsf =
 				le64_to_cpu(mgmt->u.beacon.timestamp);
 			link->conf->sync_device_ts =
