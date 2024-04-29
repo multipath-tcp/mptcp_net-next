@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests/bpf: Add RUN_MPTCP_TEST macro
-
-Each MPTCP subtest tests test__start_subtest(suffix), then invokes
-test_suffix(). It makes sense to add a new macro RUN_MPTCP_TEST to
-simpolify the code.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
