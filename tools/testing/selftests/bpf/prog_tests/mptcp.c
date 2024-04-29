@@ -11,6 +11,8 @@
 #include "mptcpify.skel.h"
 
 #define NS_TEST "mptcp_ns"
+#define WITH_DATA	true
+#define WITHOUT_DATA	false
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -324,6 +326,175 @@ fail:
 	close(cgroup_fd);
 }
 
+static const unsigned int total_bytes = 10 * 1024 * 1024;
+static int stop, duration;
+
+static void *server(void *arg)
+{
+	int lfd = (int)(long)arg, err = 0, fd;
+	ssize_t nr_sent = 0, bytes = 0;
+	char batch[1500];
+
+	fd = accept(lfd, NULL, NULL);
+	while (fd == -1) {
+		if (errno == EINTR)
+			continue;
+		err = -errno;
+		goto done;
+	}
+
+	if (settimeo(fd, 0)) {
+		err = -errno;
+		goto done;
+	}
+
+	while (bytes < total_bytes && !READ_ONCE(stop)) {
+		nr_sent = send(fd, &batch,
+			       MIN(total_bytes - bytes, sizeof(batch)), 0);
+		if (nr_sent == -1 && errno == EINTR)
+			continue;
+		if (nr_sent == -1) {
+			err = -errno;
+			break;
+		}
+		bytes += nr_sent;
+	}
+
+	CHECK(bytes != total_bytes, "send", "%zd != %u nr_sent:%zd errno:%d\n",
+	      bytes, total_bytes, nr_sent, errno);
+
+done:
+	if (fd >= 0)
+		close(fd);
+	if (err) {
+		WRITE_ONCE(stop, 1);
+		return ERR_PTR(err);
+	}
+	return NULL;
+}
+
+static void send_data(int lfd, int fd, char *msg)
+{
+	ssize_t nr_recv = 0, bytes = 0;
+	pthread_t srv_thread;
+	void *thread_ret;
+	char batch[1500];
+	int err;
+
+	WRITE_ONCE(stop, 0);
+
+	err = pthread_create(&srv_thread, NULL, server, (void *)(long)lfd);
+	if (CHECK(err != 0, "pthread_create", "err:%d errno:%d\n", err, errno))
+		return;
+
+	/* recv total_bytes */
+	while (bytes < total_bytes && !READ_ONCE(stop)) {
+		nr_recv = recv(fd, &batch,
+			       MIN(total_bytes - bytes, sizeof(batch)), 0);
+		if (nr_recv == -1 && errno == EINTR)
+			continue;
+		if (nr_recv == -1)
+			break;
+		bytes += nr_recv;
+	}
+
+	CHECK(bytes != total_bytes, "recv", "%zd != %u nr_recv:%zd errno:%d\n",
+	      bytes, total_bytes, nr_recv, errno);
+
+	WRITE_ONCE(stop, 1);
+
+	pthread_join(srv_thread, &thread_ret);
+	CHECK(IS_ERR(thread_ret), "pthread_join", "thread_ret:%ld",
+	      PTR_ERR(thread_ret));
+}
+
+#define ADDR_1	"10.0.1.1"
+#define ADDR_2	"10.0.1.2"
+#define PORT_1	10001
+
+static struct nstoken *sched_init(char *flags, char *sched)
+{
+	struct nstoken *nstoken;
+
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
+		goto fail;
+
+	SYS(fail, "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR_1);
+	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
+	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
+	SYS(fail, "ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR_2, flags);
+	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
+
+	return nstoken;
+fail:
+	return NULL;
+}
+
+static int has_bytes_sent(char *addr)
+{
+	char cmd[128];
+
+	snprintf(cmd, sizeof(cmd), "ip netns exec %s ss -it src %s sport %d dst %s | %s",
+		 NS_TEST, ADDR_1, PORT_1, addr, "grep -q bytes_sent:");
+	return system(cmd);
+}
+
+static void send_data_and_verify(char *sched, bool addr1, bool addr2)
+{
+	struct timespec start, end;
+	int server_fd, client_fd;
+	unsigned int delta_ms;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	if (CHECK(server_fd < 0, sched, "start_mptcp_server: %d\n", errno))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (CHECK(client_fd < 0, sched, "connect_to_fd: %d\n", errno))
+		goto fail;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+		goto fail;
+
+	send_data(server_fd, client_fd, sched);
+
+	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
+		goto fail;
+
+	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
+	printf("%s: %u ms\n", sched, delta_ms);
+
+	if (addr1)
+		CHECK(has_bytes_sent(ADDR_1), sched, "should have bytes_sent on addr1\n");
+	else
+		CHECK(!has_bytes_sent(ADDR_1), sched, "shouldn't have bytes_sent on addr1\n");
+	if (addr2)
+		CHECK(has_bytes_sent(ADDR_2), sched, "should have bytes_sent on addr2\n");
+	else
+		CHECK(!has_bytes_sent(ADDR_2), sched, "shouldn't have bytes_sent on addr2\n");
+
+	close(client_fd);
+fail:
+	close(server_fd);
+}
+
+static void test_default(void)
+{
+	struct nstoken *nstoken;
+
+	nstoken = sched_init("subflow", "default");
+	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
+		goto fail;
+
+	send_data_and_verify("default", WITH_DATA, WITH_DATA);
+
+fail:
+	cleanup_netns(nstoken);
+}
+
 #define RUN_MPTCP_TEST(suffix)					\
 do {								\
 	if (test__start_subtest(#suffix))			\
@@ -334,4 +505,5 @@ void test_mptcp(void)
 {
 	RUN_MPTCP_TEST(base);
 	RUN_MPTCP_TEST(mptcpify);
+	RUN_MPTCP_TEST(default);
 }
