@@ -40,7 +40,7 @@
 #endif
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
-static int stop, duration;
+static int stop;
 
 struct __mptcp_info {
 	__u8	mptcpi_subflows;
