@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-mptcp-subflow-subtest
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Add mptcp subflow subtest
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a subtest named test_subflow to load and verify the newly
+added mptcp subflow example in test_mptcp. Add a helper endpoint_init()
+to add a new subflow endpoint. Add another helper ss_search() to verify the
+fwmark and congestion values set by mptcp_subflow prog using setsockopts.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/76
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
