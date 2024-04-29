@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Handle-SIGINT-when-creating-netns
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Handle SIGINT when creating netns
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+It's necessary to delete netns during the MPTCP bpf tests interrupt,
+otherwise the next tests run will fail due to unable to create netns.
+
+This patch adds a new SIGINT handle sig_int, and deletes NS_TEST in it.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
