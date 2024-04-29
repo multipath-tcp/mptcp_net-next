@@ -1,4 +1,31 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-mptcp-subflow-example
+From: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Subject: [PATCH] selftests/bpf: Add mptcp subflow example
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Move Nicolas's patch into bpf selftests directory. This example added a
+test that was adding a different mark (SO_MARK) on each subflow, and
+changing the TCP CC only on the first subflow.
+
+This example shows how it is possible to:
+
+    Identify the parent msk of an MPTCP subflow.
+    Put different sockopt for each subflow of a same MPTCP connection.
+
+Here especially, we implemented two different behaviours:
+
+    A socket mark (SOL_SOCKET SO_MARK) is put on each subflow of a same
+    MPTCP connection. The order of creation of the current subflow defines
+    its mark. The TCP CC algorithm of the very first subflow of an MPTCP
+    connection is set to "reno".
+
+The code comes from
+
+    commit 4d120186e4d6 ("bpf:examples: update mptcp_set_mark_kern.c")
+
+in MPTCP repo https://github.com/multipath-tcp/mptcp_net-next (the
+"scripts" branch).
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/76
+Co-developed-by: Geliang Tang <tanggeliang@kylinos.cn>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Signed-off-by: Nicolas Rybowski <nicolas.rybowski@tessares.net>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
