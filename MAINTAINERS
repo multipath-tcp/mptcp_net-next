@@ -3824,6 +3824,14 @@ F:	kernel/bpf/tnum.c
 F:	kernel/bpf/trampoline.c
 F:	kernel/bpf/verifier.c
 
+BPF [CRYPTO]
+M:	Vadim Fedorenko <vadim.fedorenko@linux.dev>
+L:	bpf@vger.kernel.org
+S:	Maintained
+F:	crypto/bpf_crypto_skcipher.c
+F:	include/linux/bpf_crypto.h
+F:	kernel/bpf/crypto.c
+
 BPF [DOCUMENTATION] (Related to Standardization)
 R:	David Vernet <void@manifault.com>
 L:	bpf@vger.kernel.org
@@ -24500,6 +24508,14 @@ S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/hardening
 F:	Documentation/admin-guide/LSM/Yama.rst
 F:	security/yama/
+
+YAML NETLINK (YNL)
+M:	Donald Hunter <donald.hunter@gmail.com>
+M:	Jakub Kicinski <kuba@kernel.org>
+F:	Documentation/netlink/
+F:	Documentation/userspace-api/netlink/intro-specs.rst
+F:	Documentation/userspace-api/netlink/specs.rst
+F:	tools/net/ynl/
 
 YEALINK PHONE DRIVER
 M:	Henk Vergonet <Henk.Vergonet@gmail.com>
