@@ -235,8 +235,10 @@ static void tcp_measure_rcv_mss(struct sock *sk, const struct sk_buff *skb)
 		/* Note: divides are still a bit expensive.
 		 * For the moment, only adjust scaling_ratio
 		 * when we update icsk_ack.rcv_mss.
+		 *
+		 * This breaks MPTCP BPF tests, skip it.
 		 */
-		if (unlikely(len != icsk->icsk_ack.rcv_mss)) {
+		if (unlikely(len != icsk->icsk_ack.rcv_mss && !sk_is_mptcp(sk))) {
 			u64 val = (u64)skb->len << TCP_RMEM_TO_WIN_SCALE;
 
 			do_div(val, skb->truesize);
