@@ -1,1 +1,1 @@
-t/mptcp-ensure-snd_nxt-is-properly-initialized-on-connect
+t/mptcp-only-allow-set-existing-scheduler-for-net.mptcp.scheduler
