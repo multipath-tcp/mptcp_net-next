@@ -4201,7 +4201,6 @@ S:	Supported
 F:	drivers/scsi/bnx2i/
 
 BROADCOM BNX2X 10 GIGABIT ETHERNET DRIVER
-M:	Ariel Elior <aelior@marvell.com>
 M:	Sudarsana Kalluru <skalluru@marvell.com>
 M:	Manish Chopra <manishc@marvell.com>
 L:	netdev@vger.kernel.org
@@ -15192,9 +15191,8 @@ F:	drivers/scsi/myrb.*
 F:	drivers/scsi/myrs.*
 
 MYRICOM MYRI-10G 10GbE DRIVER (MYRI10GE)
-M:	Chris Lee <christopher.lee@cspi.com>
 L:	netdev@vger.kernel.org
-S:	Supported
+S:	Orphan
 W:	https://www.cspi.com/ethernet-products/support/downloads/
 F:	drivers/net/ethernet/myricom/myri10ge/
 
@@ -16831,12 +16829,6 @@ S:	Maintained
 F:	drivers/leds/leds-pca9532.c
 F:	include/linux/leds-pca9532.h
 
-PCA9541 I2C BUS MASTER SELECTOR DRIVER
-M:	Guenter Roeck <linux@roeck-us.net>
-L:	linux-i2c@vger.kernel.org
-S:	Maintained
-F:	drivers/i2c/muxes/i2c-mux-pca9541.c
-
 PCI DRIVER FOR AARDVARK (Marvell Armada 3700)
 M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 M:	Pali Rohár <pali@kernel.org>
@@ -17913,7 +17905,7 @@ F:	Documentation/devicetree/bindings/leds/irled/pwm-ir-tx.yaml
 F:	drivers/media/rc/pwm-ir-tx.c
 
 PWM SUBSYSTEM
-M:	Uwe Kleine-König <u.kleine-koenig@pengutronix.de>
+M:	Uwe Kleine-König <ukleinek@kernel.org>
 L:	linux-pwm@vger.kernel.org
 S:	Maintained
 Q:	https://patchwork.ozlabs.org/project/linux-pwm/list/
@@ -18037,7 +18029,6 @@ S:	Supported
 F:	drivers/scsi/qedi/
 
 QLOGIC QL4xxx ETHERNET DRIVER
-M:	Ariel Elior <aelior@marvell.com>
 M:	Manish Chopra <manishc@marvell.com>
 L:	netdev@vger.kernel.org
 S:	Supported
@@ -18047,7 +18038,6 @@ F:	include/linux/qed/
 
 QLOGIC QL4xxx RDMA DRIVER
 M:	Michal Kalderon <mkalderon@marvell.com>
-M:	Ariel Elior <aelior@marvell.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/hw/qedr/
@@ -20217,7 +20207,6 @@ F:	include/linux/platform_data/simplefb.h
 
 SIOX
 M:	Thorsten Scherer <t.scherer@eckelmann.de>
-M:	Uwe Kleine-König <u.kleine-koenig@pengutronix.de>
 R:	Pengutronix Kernel Team <kernel@pengutronix.de>
 S:	Supported
 F:	drivers/gpio/gpio-siox.c
