@@ -2965,6 +2965,11 @@ bool __weak bpf_jit_supports_arena(void)
 	return false;
 }
 
+bool __weak bpf_jit_supports_insn(struct bpf_insn *insn, bool in_arena)
+{
+	return false;
+}
+
 u64 __weak bpf_arch_uaddress_limit(void)
 {
 #if defined(CONFIG_64BIT) && defined(CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE)
@@ -2972,11 +2977,6 @@ u64 __weak bpf_arch_uaddress_limit(void)
 #else
 	return 0;
 #endif
-}
-
-bool __weak bpf_jit_supports_insn(struct bpf_insn *insn, bool in_arena)
-{
-	return false;
 }
 
 /* Return TRUE if the JIT backend satisfies the following two conditions:
