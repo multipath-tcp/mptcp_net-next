@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-only-allow-set-existing-scheduler-for-net.mptcp.scheduler
+From: Gregory Detal <gregory.detal@gmail.com>
+Subject: [PATCH] mptcp: only allow set existing scheduler for net.mptcp.scheduler
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The current behavior is to accept any strings as inputs, this results in
+an inconsistent result where an unexisting scheduler can be set:
+
+  # sysctl -w net.mptcp.scheduler=notdefault
+  net.mptcp.scheduler = notdefault
+
+This patch changes this behavior by checking for existing scheduler
+before accepting the input.
+
+Fixes: e3b2870b6d22 ("mptcp: add a new sysctl scheduler")
+Signed-off-by: Gregory Detal <gregory.detal@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
