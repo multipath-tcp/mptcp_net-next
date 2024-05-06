@@ -14,4 +14,6 @@ Acked-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
 Co-developed-by: Matthieu Baerts <matttbe@kernel.org>
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
+Co-developed-by: Gregory Detal <gregory.detal@gmail.com>
+Signed-off-by: Gregory Detal <gregory.detal@gmail.com>
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
