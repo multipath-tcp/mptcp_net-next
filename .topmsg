@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-remove-unnecessary-else-statements
+Subject: [PATCH] mptcp: remove unnecessary else statements
 
+The 'else' statements are not needed here, because their previous 'if'
+block ends with a 'return'.
+
+This fixes CheckPatch warnings:
+
+  WARNING: else is not generally useful after a break or return
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
