@@ -47,24 +47,32 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 	size_t end;
 
 	t = btf_type_by_id(reg->btf, reg->btf_id);
-	if (t != mptcp_sock_type && t != mptcp_subflow_type) {
-		bpf_log(log, "only access to mptcp sock or subflow is supported\n");
-		return -EACCES;
-	}
 
-	switch (off) {
-	case offsetof(struct mptcp_sock, snd_burst):
-		end = offsetofend(struct mptcp_sock, snd_burst);
-		break;
-	case offsetof(struct mptcp_subflow_context, scheduled):
-		end = offsetofend(struct mptcp_subflow_context, scheduled);
-		break;
-	case offsetof(struct mptcp_subflow_context, avg_pacing_rate):
-		end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
-		break;
-	default:
-		bpf_log(log, "no write support to %s at off %d\n",
-			t == mptcp_sock_type ? "mptcp_sock" : "mptcp_subflow_context", off);
+	if (t == mptcp_sock_type) {
+		switch (off) {
+		case offsetof(struct mptcp_sock, snd_burst):
+			end = offsetofend(struct mptcp_sock, snd_burst);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_sock at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else if (t == mptcp_subflow_type) {
+		switch (off) {
+		case offsetof(struct mptcp_subflow_context, scheduled):
+			end = offsetofend(struct mptcp_subflow_context, scheduled);
+			break;
+		case offsetof(struct mptcp_subflow_context, avg_pacing_rate):
+			end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_subflow_context at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else {
+		bpf_log(log, "only access to mptcp sock or subflow is supported\n");
 		return -EACCES;
 	}
 
