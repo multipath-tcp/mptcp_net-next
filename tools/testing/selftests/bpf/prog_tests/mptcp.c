@@ -42,7 +42,7 @@
 #define MPTCP_SCHED_NAME_MAX	16
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
-static int stop, duration;
+static int duration;
 
 struct __mptcp_info {
 	__u8	mptcpi_subflows;
@@ -445,85 +445,6 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
-static void *server(void *arg)
-{
-	int lfd = (int)(long)arg, err = 0, fd;
-	ssize_t nr_sent = 0, bytes = 0;
-	char batch[1500];
-
-	fd = accept(lfd, NULL, NULL);
-	while (fd == -1) {
-		if (errno == EINTR)
-			continue;
-		err = -errno;
-		goto done;
-	}
-
-	if (settimeo(fd, 0)) {
-		err = -errno;
-		goto done;
-	}
-
-	while (bytes < total_bytes && !READ_ONCE(stop)) {
-		nr_sent = send(fd, &batch,
-			       MIN(total_bytes - bytes, sizeof(batch)), 0);
-		if (nr_sent == -1 && errno == EINTR)
-			continue;
-		if (nr_sent == -1) {
-			err = -errno;
-			break;
-		}
-		bytes += nr_sent;
-	}
-
-	CHECK(bytes != total_bytes, "send", "%zd != %u nr_sent:%zd errno:%d\n",
-	      bytes, total_bytes, nr_sent, errno);
-
-done:
-	if (fd >= 0)
-		close(fd);
-	if (err) {
-		WRITE_ONCE(stop, 1);
-		return ERR_PTR(err);
-	}
-	return NULL;
-}
-
-static void send_data(int lfd, int fd, char *msg)
-{
-	ssize_t nr_recv = 0, bytes = 0;
-	pthread_t srv_thread;
-	void *thread_ret;
-	char batch[1500];
-	int err;
-
-	WRITE_ONCE(stop, 0);
-
-	err = pthread_create(&srv_thread, NULL, server, (void *)(long)lfd);
-	if (CHECK(err != 0, "pthread_create", "err:%d errno:%d\n", err, errno))
-		return;
-
-	/* recv total_bytes */
-	while (bytes < total_bytes && !READ_ONCE(stop)) {
-		nr_recv = recv(fd, &batch,
-			       MIN(total_bytes - bytes, sizeof(batch)), 0);
-		if (nr_recv == -1 && errno == EINTR)
-			continue;
-		if (nr_recv == -1)
-			break;
-		bytes += nr_recv;
-	}
-
-	CHECK(bytes != total_bytes, "recv", "%zd != %u nr_recv:%zd errno:%d\n",
-	      bytes, total_bytes, nr_recv, errno);
-
-	WRITE_ONCE(stop, 1);
-
-	pthread_join(srv_thread, &thread_ret);
-	CHECK(IS_ERR(thread_ret), "pthread_join", "thread_ret:%ld",
-	      PTR_ERR(thread_ret));
-}
-
 static struct nstoken *sched_init(char *flags, char *sched)
 {
 	struct nstoken *nstoken;
@@ -565,7 +486,9 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
 		goto fail;
 
-	send_data(server_fd, client_fd, sched);
+	if (!ASSERT_OK(send_recv_data(server_fd, client_fd, total_bytes),
+		       "send_recv_data"))
+		goto fail;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
 		goto fail;
