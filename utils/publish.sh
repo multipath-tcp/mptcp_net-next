@@ -103,6 +103,8 @@ tg_export() { local branch_top branch_export tag msg ci sha
 	fi
 
 	printinfo "${msg//${CI_TAG}/${ci}}"
+	print "Continue?"
+	read -r
 
 	# send a tag to Github to keep previous commits: we might have refs to them
 	git tag "${tag}" "${branch_export}"
