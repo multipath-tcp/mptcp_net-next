@@ -32,7 +32,7 @@ exit_trap() {
 	fi
 }
 
-am_files() { local nb subject sha
+am_files() { local nb subject sha msg
 	if git am -3 "${AM_ARGS[@]}" "${1}" || { git am --abort && git am "${AM_ARGS[@]}" "${1}"; }; then
 		subject="$(grep "^Subject: " "${1}" | head -n1)"
 		if echo "${subject}" | grep -q "\[PATCH.* [0-9]\+/[0-9]\+\] "; then
@@ -44,12 +44,16 @@ am_files() { local nb subject sha
 
 		print " - $(git rev-parse --short HEAD): \"squashed\"${nb}" \
 		      "in \"$(./.title.sh)\""
+		msg="- $(git rev-parse --short HEAD): \"squashed\"${nb} in \"$(./.title.sh)\""
 		if [ "${NO_SOB}" != "1" ]; then
 			printinfo "trying signed-off"
 			if ./.signed-off.sh; then
-				print "- $(git rev-parse --short HEAD): \"Signed-off-by\" + \"Co-developed-by\""
+				msg+=$'\n'
+				msg+="- $(git rev-parse --short HEAD): \"Signed-off-by\" + \"Co-developed-by\""
 			fi
 		fi
+		print "${msg}"
+		wl-copy <<< "${msg}" 2>/dev/null || true
 
 		bash "-${-}" ./.patch-file-accept.sh "${1}" "${sha}"
 		exit
