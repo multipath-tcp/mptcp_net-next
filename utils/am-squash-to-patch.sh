@@ -13,7 +13,8 @@ msgid="${1}"
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-subject="${subject:-$(b4 am --cherry-pick _ --no-add-trailers -o - "${msgid}" |
+echo "Retrieving the subject, may take a moment..."
+subject="${subject:-$(b4 -c b4.pw-url= am --cherry-pick _ --no-add-trailers -o - "${msgid}" 2>/dev/null |
 			grep -A 1 "^Subject: " | grep -e "^Subject: " -e "^ \S")}"
 subject="${subject//[$'\n\r'] / }" # on one line
 echo "${subject}"
