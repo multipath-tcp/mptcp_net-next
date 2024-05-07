@@ -188,21 +188,29 @@ Here is a checklist.
         [remote "netdev-net"]
                 url = git://git.kernel.org/pub/scm/linux/kernel/git/netdev/net
                 fetch = +refs/heads/*:refs/remotes/netdev-net/*
+        [remote "stable"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
+                fetch = +refs/heads/*:refs/remotes/stable/*
+        [remote "stable-rc"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+                fetch = +refs/heads/*:refs/remotes/stable-rc/*
 
   * Install `b4` and make sure you are at least using the last stable version:
 
         python3 -m pip install --user --upgrade b4
 
 * Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
-  or `export-net` (for `net`):
+  or `export-net` (for `net`) or stable trees:
 
       git fetch --multiple netdev-next netdev-net
+      git fetch --multiple --tags stable stable-rc
 
 * Prepare a new branch with one of these adapted commands (with a description):
 
       b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
       b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
-      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description> -f stable/linux-6.x.y --set-prefixes 6.x
+      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable/linux-6.x.y --set-prefixes 6.x
+      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable-rc/queue/6.x --set-prefixes 6.x
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
