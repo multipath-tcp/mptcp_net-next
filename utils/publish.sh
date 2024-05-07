@@ -102,9 +102,12 @@ tg_export() { local branch_top branch_export tag msg ci sha
 		ci+="$(printf "%s: %s" "\\n- ${TG_EXPORT_NET_NEXT}" "${CI_URL//SHA/${TAG_EXPORT_NET_NEXT}}")"
 	fi
 
-	printinfo "${msg//${CI_TAG}/${ci}}"
-	print "Continue?"
-	read -r
+	msg="${msg//${CI_TAG}/${ci}}"
+	printinfo "${msg}"
+	if ! wl-copy <<< "${msg}" 2>/dev/null; then
+		print "Continue?"
+		read -r
+	fi
 
 	# send a tag to Github to keep previous commits: we might have refs to them
 	git tag "${tag}" "${branch_export}"
