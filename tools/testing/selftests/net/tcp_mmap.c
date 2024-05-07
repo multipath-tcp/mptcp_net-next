@@ -46,7 +46,6 @@
  * received 32768 MB (99.9939 % mmap'ed) in 7.43764 s, 36.9577 Gbit
  *   cpu usage user:0.035 sys:3.467, 106.873 usec per MB, 65530 c-switches
  */
-#define _GNU_SOURCE
 #include <pthread.h>
 #include <sys/types.h>
 #include <fcntl.h>

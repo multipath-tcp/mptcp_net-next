@@ -5,8 +5,6 @@
  *
  * Simple example on how to use TCP_INQ and TCP_CM_INQ.
  */
-#define _GNU_SOURCE
-
 #include <error.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>

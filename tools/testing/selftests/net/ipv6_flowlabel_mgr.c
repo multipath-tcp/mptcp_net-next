@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Test IPV6_FLOWINFO_MGR */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <error.h>
 #include <errno.h>

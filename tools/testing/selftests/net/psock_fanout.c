@@ -26,9 +26,6 @@
  * Todo:
  * - functionality: PACKET_FANOUT_FLAG_DEFRAG
  */
-
-#define _GNU_SOURCE		/* for sched_setaffinity */
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>

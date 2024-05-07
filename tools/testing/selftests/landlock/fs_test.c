@@ -6,8 +6,6 @@
  * Copyright © 2020 ANSSI
  * Copyright © 2020-2022 Microsoft Corporation
  */
-
-#define _GNU_SOURCE
 #include <fcntl.h>
 #include <linux/landlock.h>
 #include <linux/magic.h>

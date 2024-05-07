@@ -5,8 +5,6 @@
  * Copyright © 2022-2023 Huawei Tech. Co., Ltd.
  * Copyright © 2023 Microsoft Corporation
  */
-
-#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>

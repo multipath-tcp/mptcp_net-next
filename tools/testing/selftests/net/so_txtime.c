@@ -9,9 +9,6 @@
  * the expected stream. Sender will read transmit timestamps from the error
  * queue. The streams can differ due to out-of-order delivery and drops.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <error.h>
 #include <errno.h>

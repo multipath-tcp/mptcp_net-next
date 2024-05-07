@@ -24,9 +24,6 @@
  * the kernel queues completions on the error queue for all zerocopy
  * transfers.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <error.h>
 #include <errno.h>

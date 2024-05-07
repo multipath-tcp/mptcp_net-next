@@ -4,9 +4,6 @@
  * Verify that consecutive sends over packet tx_ring are mirrored
  * with their original content intact.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <assert.h>
 #include <error.h>

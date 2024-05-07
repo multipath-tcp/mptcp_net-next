@@ -34,9 +34,6 @@
  * flakiness is to be expected.
  *
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <error.h>

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright Amazon.com Inc. or its affiliates. */
-#define _GNU_SOURCE
 #include <sched.h>
 
 #include <fcntl.h>

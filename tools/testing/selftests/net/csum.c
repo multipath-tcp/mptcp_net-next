@@ -58,9 +58,6 @@
  * different seed for each run (and logs this for reproducibility). It
  * is advised to enable this for extra coverage in continuous testing.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <asm/byteorder.h>
 #include <errno.h>

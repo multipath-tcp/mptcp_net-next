@@ -3,9 +3,6 @@
 /* Test that sockets listening on a specific address are preferred
  * over sockets listening on addr_any.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <error.h>

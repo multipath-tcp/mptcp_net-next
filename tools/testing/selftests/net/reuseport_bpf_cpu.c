@@ -11,9 +11,6 @@
  * This entire process is done for several different core id permutations
  * and for each IPv4/IPv6 and TCP/UDP combination.
  */
-
-#define _GNU_SOURCE
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <error.h>
