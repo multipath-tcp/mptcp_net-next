@@ -45,7 +45,7 @@ my_ghi --state open -L question | grep -v " @"
 
 echo
 echo
-echo "    For later (opened and not assigned assigned)"
+echo "    For later (opened and not assigned)"
 echo
 my_ghi --state open -N bug -N question | grep -v " @"
 
