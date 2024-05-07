@@ -12,7 +12,7 @@ printinfo "Adding: ${SIG}"
 
 if grep -q "^${SIG}$" .topmsg; then
 	printinfo "Already has: ${SIG}"
-	exit
+	exit 1
 fi
 
 LAST_LINES=()
@@ -33,5 +33,3 @@ git commit -sm "tg: add $(git show -s --format="%aN" HEAD)'s signed-off + codev
 
 After the fix provided in this topic, see:
 $(git show -s --format="%h (%s)" HEAD)" .topmsg
-
-print " - $(git rev-parse --short HEAD): \"Signed-off-by\" + \"Co-developed-by\""

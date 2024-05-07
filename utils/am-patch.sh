@@ -46,7 +46,9 @@ am_files() { local nb subject sha
 		      "in \"$(./.title.sh)\""
 		if [ "${NO_SOB}" != "1" ]; then
 			printinfo "trying signed-off"
-			./.signed-off.sh
+			if ./.signed-off.sh; then
+				print "- $(git rev-parse --short HEAD): \"Signed-off-by\" + \"Co-developed-by\""
+			fi
 		fi
 
 		bash "-${-}" ./.patch-file-accept.sh "${1}" "${sha}"
