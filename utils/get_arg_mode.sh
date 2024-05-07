@@ -17,7 +17,7 @@ if [ -f "${1}" ]; then
 	echo "files"
 elif [ "${1}" = "patch" ] || [ "${1}" = "series" ] || [ "${1}" = "b4" ]; then
 	echo "${1}"
-elif ! [[ "${a}" =~ "[0-9]" ]]; then
+elif ! [[ "${1}" =~ ^[0-9]+$ ]]; then
 	echo "b4" ## for PW, it should be a number
 elif [ "${SERIES}" = 1 ] && is_pw series "${1}"; then
 	echo "series"
