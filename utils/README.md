@@ -194,16 +194,23 @@ Here is a checklist.
         [remote "stable-rc"]
                 url = git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
                 fetch = +refs/heads/*:refs/remotes/stable-rc/*
+        [remote "bpf"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf.git
+                fetch = +refs/heads/*:refs/remotes/bpf/*
+        [remote "bpf-next"]
+                url = git://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git
+                fetch = +refs/heads/*:refs/remotes/bpf-next/*
 
   * Install `b4` and make sure you are at least using the last stable version:
 
         python3 -m pip install --user --upgrade b4
 
 * Fetch latest `net` and `net-next` changes + either `export` (for `net-next`)
-  or `export-net` (for `net`) or stable trees:
+  or `export-net` (for `net`) or stable or BPF trees:
 
       git fetch --multiple netdev-next netdev-net
       git fetch --multiple --tags stable stable-rc
+      git fetch --multiple bpf bpf-next
 
 * Prepare a new branch with one of these adapted commands (with a description):
 
@@ -211,6 +218,8 @@ Here is a checklist.
       b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
       b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable/linux-6.x.y --set-prefixes 6.x
       b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable-rc/queue/6.x --set-prefixes 6.x
+      b4 prep -n upstream-bpf-next-$(date +%Y%m%d)-<description> -f bpf-next/master --set-prefixes bpf-next
+      b4 prep -n upstream-bpf-$(date +%Y%m%d)-<description> -f bpf/master --set-prefixes bpf
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
@@ -235,6 +244,11 @@ Here is a checklist.
 * Build the code and run tests:
 
       ./.virtme_upstream.sh
+
+  * For BPF only:
+
+      INPUT_EXTRA_ENV=INPUT_RUN_TESTS_ONLY=bpftest_all ./.virtme_upstream.sh auto-btf
+
 
 * Double-check Git tags in commit messages:
 
