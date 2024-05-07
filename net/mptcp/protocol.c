@@ -1981,9 +1981,9 @@ static int __mptcp_recvmsg_mskq(struct mptcp_sock *msk,
  */
 static void mptcp_rcv_space_adjust(struct mptcp_sock *msk, int copied)
 {
+	u8 scaling_ratio = TCP_DEFAULT_SCALING_RATIO;
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	u8 scaling_ratio = U8_MAX;
 	u32 time, advmss = 1;
 	u64 rtt_us, mstamp;
 
