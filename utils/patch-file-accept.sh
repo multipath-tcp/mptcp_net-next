@@ -19,7 +19,7 @@ else
 fi
 
 # remove '[xxx]' and \r
-SUBJECT="$(echo ${SUBJECT} | sed -e "s/\[.\+\] //g;s/\\r$//g")"
+SUBJECT="$(echo "${SUBJECT}" | sed -e "s/\[.\+\] //g;s/\\r$//g")"
 
 [ -n "${SUBJECT}" ]
 

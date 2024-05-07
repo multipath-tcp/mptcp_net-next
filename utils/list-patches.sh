@@ -35,7 +35,7 @@ dup() { local d
 		echo "${d}"
 		echo
 		echo "Press Enter to continue"
-		read
+		read -r
 	fi
 	echo "No duplicated entries for ${1}"
 	echo
@@ -76,8 +76,10 @@ list() { local list desc id name state tag n patch submitter series sid url
 
 		echo -n "${id}: ${name//#/\"}"
 
+		# shellcheck disable=SC2001
 		tag=$(echo "${name}" | sed 's/.*\(\[.\+\]\).*/\1/')
 		if [ "${tag:0:1}" = '[' ]; then
+			# shellcheck disable=SC2001
 			n=$(echo "${tag}" | sed 's#.*\b\([0-9]\+/[0-9]\+\)\b.*#\1#')
 			if [[ "${n:0:1}" == [0-9] ]]; then
 				# if we have multiple patches, we only display info

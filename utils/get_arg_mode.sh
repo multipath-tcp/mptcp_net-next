@@ -8,7 +8,7 @@ is_pw() { local mode id
 	id="${2}"
 	shift 2
 
-	[[ "${id}" =~ ^[0-9]+$ ]] || return ${?}
+	[[ "${id}" =~ ^[0-9]+$ ]] || return 1
 
 	git-pw "${mode}" list --limit 250 -c ID -f simple "${@}" | grep -q "^${id}$"
 }

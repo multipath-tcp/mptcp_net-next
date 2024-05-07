@@ -22,4 +22,4 @@ if [ ${#} -gt 0 ]; then
 	./scripts/config "${@}"
 fi
 
-KBUILD_BUILD_TIMESTAMP="0" KCFLAGS="-Werror" make -j$(nproc)
+KBUILD_BUILD_TIMESTAMP="0" KCFLAGS="-Werror" make -j"$(nproc)"

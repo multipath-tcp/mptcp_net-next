@@ -50,7 +50,7 @@ apply_patches_b4() { local i args
 			continue
 		fi
 		if ! b4 shazam "${args[@]}" "${i}"; then
-			printerr "ERROR with 'b4 shazam ${args[@]} ${i}'." \
+			printerr "ERROR with 'b4 shazam ${args[*]} ${i}'." \
 			         "Please fix in another terminal (up to 'git am" \
 			         "--continue' included) and press ENTER to" \
 			         "continue."
@@ -161,7 +161,7 @@ TG_TOP="${TG_TOP}" ./.publish.sh
 
 # update the tree
 if [ "${NO_PUBLISH}" != 1 ]; then
-	TG_TOP= ./.publish.sh
+	TG_TOP="" ./.publish.sh
 else
 	list_commits "${PARENT}..${BRANCH}"
 fi

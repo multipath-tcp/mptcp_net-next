@@ -32,7 +32,7 @@ if [ "${num}" = "0000" ]; then
     dir="${patch%/*}"
     pre="${dir}/${prefix}"
     for f in "${pre}"*.patch; do
-        fname="${f##${pre}}"
+        fname="${f##"${pre}"}"
         if [ "${fname%%-*}" = "0000" ]; then
             continue
         fi

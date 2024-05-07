@@ -25,9 +25,9 @@ if [ -z "${subject}" ]; then
 fi
 
 # take what is between "" if any
-if [ $(echo "${subject}" | grep -o '"' | wc -l) -eq 2 ]; then
+if [ "$(echo "${subject}" | grep -o '"' | wc -l)" -eq 2 ]; then
 	subject="$(echo "${subject}" | cut -d\" -f2)"
-elif [ $(echo "${subject}" | grep -o ':' | wc -l) -gt 1 ]; then
+elif [ "$(echo "${subject}" | grep -o ':' | wc -l)" -gt 1 ]; then
 	subject="$(echo "${subject}" | cut -d: -f3- | sed 's/"//g;s/^ \+//g')"
 fi
 
@@ -43,6 +43,7 @@ if ! git checkout "${topic}"; then
 	exit 1
 fi
 
+# shellcheck disable=SC2119
 tg_update
 
 trap - ERR  # err will be handled in am-patch.sh
