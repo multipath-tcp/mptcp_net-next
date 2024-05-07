@@ -6,7 +6,7 @@ LDLIBS += $(shell pkg-config --libs alsa)
 ifeq ($(LDLIBS),)
 LDLIBS += -lasound
 endif
-CFLAGS += -L$(OUTPUT) -Wl,-rpath=./
+CFLAGS += $(KHDR_INCLUDES) -L$(OUTPUT) -Wl,-rpath=./
 
 LDLIBS+=-lpthread
 

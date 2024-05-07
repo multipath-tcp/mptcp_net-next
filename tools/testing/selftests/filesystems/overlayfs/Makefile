@@ -2,6 +2,6 @@
 
 TEST_GEN_PROGS := dev_in_maps
 
-CFLAGS := -Wall -Werror
+CFLAGS := -Wall -Werror $(KHDR_INCLUDES)
 
 include ../../lib.mk
