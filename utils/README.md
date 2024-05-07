@@ -247,7 +247,7 @@ Here is a checklist.
 
   * For BPF only:
 
-      INPUT_EXTRA_ENV=INPUT_RUN_TESTS_ONLY=bpftest_all ./.virtme_upstream.sh auto-btf
+        INPUT_EXTRA_ENV=INPUT_RUN_TESTS_ONLY=bpftest_all ./.virtme_upstream.sh auto-btf
 
 
 * Double-check Git tags in commit messages:
