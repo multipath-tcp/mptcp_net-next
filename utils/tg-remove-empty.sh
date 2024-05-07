@@ -74,6 +74,10 @@ while true; do
 done
 
 echo -e "\n\nCleaned: ${CLEANED[*]}"
+
+echo "Deleting old branches"
+./.tg-delete-old-branches.sh
+
 echo -e "\n\nPublish or Ctrl+C for manual push?"
 read -r
 ./.publish.sh
