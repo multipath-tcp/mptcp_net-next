@@ -44,4 +44,5 @@ fi
 
 tg_update
 
+trap - ERR  # err will be handled in am-patch.sh
 ./.am-patch.sh "${msgid}"

@@ -55,10 +55,10 @@ am_files() { local nb subject sha
 
 
 	if [ "$(git status --porcelain | grep -c -v "^?? ")" = "0" ]; then
-		printinfo "'git am' didn't do anything, use patch then 'end-squash.sh'"
+		printerr "'git am' failed, please resolve the conflicts, then use './.end-squash.sh'"
 		unset TMP_FILE
 
-		patch -p1 --merge < "${1}"
+		patch -p1 --merge < "${1}" || true
 		exit 1
 	fi
 }
