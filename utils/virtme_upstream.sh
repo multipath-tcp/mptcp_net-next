@@ -14,8 +14,6 @@ is_stable() { local prefix sublevel
    fi
 }
 
-./.virtme.sh make -C tools/perf clean
-
 rc=0
 INPUT_BUILD_SKIP_PERF=1 \
    VIRTME_PACKETDRILL_STABLE=$(is_stable) \
