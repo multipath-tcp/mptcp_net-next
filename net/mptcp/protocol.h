@@ -309,6 +309,9 @@ struct mptcp_sock {
 			in_accept_queue:1,
 			free_first:1,
 			rcvspace_init:1;
+	u8		keepalive_cnt;
+	unsigned int	keepalive_idle;
+	unsigned int	keepalive_intvl;
 	u32		notsent_lowat;
 	struct work_struct work;
 	struct sk_buff  *ooo_last_skb;
