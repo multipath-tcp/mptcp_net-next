@@ -548,23 +548,53 @@ fail:
 	bpf_link__destroy(link);
 }
 
-#define MPTCP_SCHED_TEST(sched, addr1, addr2)			\
-static void test_##sched(void)					\
-{								\
-	struct mptcp_bpf_##sched *skel;				\
-								\
-	skel = mptcp_bpf_##sched##__open_and_load();		\
-	if (!ASSERT_OK_PTR(skel, "open_and_load:" #sched))	\
-		return;						\
-								\
-	test_bpf_sched(skel->obj, #sched, addr1, addr2);	\
-	mptcp_bpf_##sched##__destroy(skel);			\
+static void test_first(void)
+{
+	struct mptcp_bpf_first *skel;
+
+	skel = mptcp_bpf_first__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: first"))
+		return;
+
+	test_bpf_sched(skel->obj, "first", WITH_DATA, WITHOUT_DATA);
+	mptcp_bpf_first__destroy(skel);
 }
 
-MPTCP_SCHED_TEST(first, WITH_DATA, WITHOUT_DATA);
-MPTCP_SCHED_TEST(bkup, WITH_DATA, WITHOUT_DATA);
-MPTCP_SCHED_TEST(rr, WITH_DATA, WITH_DATA);
-MPTCP_SCHED_TEST(red, WITH_DATA, WITH_DATA);
+static void test_bkup(void)
+{
+	struct mptcp_bpf_bkup *skel;
+
+	skel = mptcp_bpf_bkup__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: bkup"))
+		return;
+
+	test_bpf_sched(skel->obj, "bkup", WITH_DATA, WITHOUT_DATA);
+	mptcp_bpf_bkup__destroy(skel);
+}
+
+static void test_rr(void)
+{
+	struct mptcp_bpf_rr *skel;
+
+	skel = mptcp_bpf_rr__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: rr"))
+		return;
+
+	test_bpf_sched(skel->obj, "rr", WITH_DATA, WITH_DATA);
+	mptcp_bpf_rr__destroy(skel);
+}
+
+static void test_red(void)
+{
+	struct mptcp_bpf_red *skel;
+
+	skel = mptcp_bpf_red__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: red"))
+		return;
+
+	test_bpf_sched(skel->obj, "red", WITH_DATA, WITH_DATA);
+	mptcp_bpf_red__destroy(skel);
+}
 
 void test_mptcp(void)
 {
