@@ -79,18 +79,11 @@ struct mptcp_storage {
 	char ca_name[TCP_CA_NAME_MAX];
 };
 
-static void sig_int(int sig)
-{
-	signal(sig, SIG_IGN);
-	SYS_NOFAIL("ip netns del %s", NS_TEST);
-}
-
 static struct nstoken *create_netns(void)
 {
 	SYS(fail, "ip netns add %s", NS_TEST);
 	SYS(fail, "ip -net %s link set dev lo up", NS_TEST);
 
-	signal(SIGINT, sig_int);
 	return open_netns(NS_TEST);
 fail:
 	return NULL;
@@ -575,21 +568,24 @@ MPTCP_SCHED_TEST(rr, WITH_DATA, WITH_DATA);
 MPTCP_SCHED_TEST(red, WITH_DATA, WITH_DATA);
 MPTCP_SCHED_TEST(burst, WITH_DATA, WITH_DATA);
 
-#define RUN_MPTCP_TEST(suffix)					\
-do {								\
-	if (test__start_subtest(#suffix))			\
-		test_##suffix();				\
-} while (0)
-
 void test_mptcp(void)
 {
-	RUN_MPTCP_TEST(base);
-	RUN_MPTCP_TEST(mptcpify);
-	RUN_MPTCP_TEST(subflow);
-	RUN_MPTCP_TEST(default);
-	RUN_MPTCP_TEST(first);
-	RUN_MPTCP_TEST(bkup);
-	RUN_MPTCP_TEST(rr);
-	RUN_MPTCP_TEST(red);
-	RUN_MPTCP_TEST(burst);
+	if (test__start_subtest("base"))
+		test_base();
+	if (test__start_subtest("mptcpify"))
+		test_mptcpify();
+	if (test__start_subtest("subflow"))
+		test_subflow();
+	if (test__start_subtest("default"))
+		test_default();
+	if (test__start_subtest("first"))
+		test_first();
+	if (test__start_subtest("bkup"))
+		test_bkup();
+	if (test__start_subtest("rr"))
+		test_rr();
+	if (test__start_subtest("red"))
+		test_red();
+	if (test__start_subtest("burst"))
+		test_burst();
 }
