@@ -545,20 +545,17 @@ fail:
 	bpf_link__destroy(link);
 }
 
-#define MPTCP_SCHED_TEST(sched, addr1, addr2)			\
-static void test_##sched(void)					\
-{								\
-	struct mptcp_bpf_##sched *skel;				\
-								\
-	skel = mptcp_bpf_##sched##__open_and_load();		\
-	if (!ASSERT_OK_PTR(skel, "open_and_load:" #sched))	\
-		return;						\
-								\
-	test_bpf_sched(skel->obj, #sched, addr1, addr2);	\
-	mptcp_bpf_##sched##__destroy(skel);			\
-}
+static void test_first(void)
+{
+	struct mptcp_bpf_first *skel;
 
-MPTCP_SCHED_TEST(first, WITH_DATA, WITHOUT_DATA);
+	skel = mptcp_bpf_first__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: first"))
+		return;
+
+	test_bpf_sched(skel->obj, "first", WITH_DATA, WITHOUT_DATA);
+	mptcp_bpf_first__destroy(skel);
+}
 
 void test_mptcp(void)
 {
