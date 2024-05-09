@@ -12,6 +12,7 @@
 #include "mptcp_subflow.skel.h"
 #include "mptcp_bpf_first.skel.h"
 #include "mptcp_bpf_bkup.skel.h"
+#include "mptcp_bpf_rr.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -561,6 +562,7 @@ static void test_##sched(void)					\
 
 MPTCP_SCHED_TEST(first, WITH_DATA, WITHOUT_DATA);
 MPTCP_SCHED_TEST(bkup, WITH_DATA, WITHOUT_DATA);
+MPTCP_SCHED_TEST(rr, WITH_DATA, WITH_DATA);
 
 void test_mptcp(void)
 {
@@ -576,4 +578,6 @@ void test_mptcp(void)
 		test_first();
 	if (test__start_subtest("bkup"))
 		test_bkup();
+	if (test__start_subtest("rr"))
+		test_rr();
 }
