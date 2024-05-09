@@ -1,8 +1,0 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: include inet_common in mib.h
-
-So this file is now self-contained: it can be compiled alone with
-analytic tools.
-
-Reviewed-by: Geliang Tang <geliang@kernel.org>
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
