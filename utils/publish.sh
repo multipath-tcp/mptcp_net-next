@@ -104,7 +104,7 @@ tg_export() { local branch_top branch_export tag msg ci sha
 
 	msg="${msg//${CI_TAG}/${ci}}"
 	printinfo "${msg}"
-	if ! wl-copy <<< "${msg}" 2>/dev/null; then
+	if ! wl-copy <<< "$(echo -e "${msg}")" 2>/dev/null; then
 		print "Continue?"
 		read -r
 	fi
