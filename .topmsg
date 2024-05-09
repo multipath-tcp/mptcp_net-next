@@ -1,4 +1,24 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-socket-option-to-check-for-fallback
+Subject: [PATCH] mptcp: socket option to check for fallback
+
+A way for an application to know if the connection fell back to TCP is
+to use getsockopt(MPTCP_INFO) and look for errors. The issue with this
+technique is that the same errors -- EOPNOTSUPP (IPv4) and ENOPROTOOPT
+(IPv6) -- are returned if there was a fallback, or if the kernel doesn't
+support this socket option. The userspace then has to look at the kernel
+version to know what to expect.
+
+It is not clean, and it doesn't take into account older kernels where
+the socket option has been backported. A cleaner way would be to expose
+this info to the TCP socket level. In case of MPTCP socket where no
+fallback happened, the socket options for the TCP level will be handled
+in MPTCP code, in mptcp_getsockopt_sol_tcp(). If not, that will be in
+TCP code, in do_tcp_getsockopt(). So one simply has to return 1, while
+the other can return 0.
+
+If the socket option is not supported, an error will be reported:
+EOPNOTSUPP (95 - Operation not supported) for MPTCP sockets, ENOPROTOOPT
+(92 - Protocol not available) for TCP sockets.
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Acked-by: Mat Martineau <martineau@kernel.org>
