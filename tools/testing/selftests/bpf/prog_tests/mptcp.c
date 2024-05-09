@@ -431,15 +431,12 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
-#define RUN_MPTCP_TEST(suffix)					\
-do {								\
-	if (test__start_subtest(#suffix))			\
-		test_##suffix();				\
-} while (0)
-
 void test_mptcp(void)
 {
-	RUN_MPTCP_TEST(base);
-	RUN_MPTCP_TEST(mptcpify);
-	RUN_MPTCP_TEST(subflow);
+	if (test__start_subtest("base"))
+		test_base();
+	if (test__start_subtest("mptcpify"))
+		test_mptcpify();
+	if (test__start_subtest("subflow"))
+		test_subflow();
 }
