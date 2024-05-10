@@ -1,4 +1,28 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-full-TCP-keep-alive-support
+Subject: [PATCH] mptcp: fix full TCP keep-alive support
 
+SO_KEEPALIVE support has been added a while ago, as part of a series
+"adding SOL_SOCKET" support. To have a full control of this keep-alive
+feature, it is important to also support TCP_KEEP* socket options at the
+SOL_TCP level.
+
+Supporting them on the setsockopt() part is easy, it is just a matter of
+remembering each value in the MPTCP sock structure, and calling
+tcp_sock_set_keep*() helpers on each subflow. If the value is not
+modified (0), calling these helpers will not do anything. For the
+getsockopt() part, the corresponding value from the MPTCP sock structure
+or the default one is simply returned. All of this is very similar to
+other TCP_* socket options supported by MPTCP.
+
+It looks important for kernels supporting SO_KEEPALIVE, to also support
+TCP_KEEP* options as well: some apps seem to (wrongly) consider that if
+the former is supported, the latter ones will be supported as well. But
+also, not having this simple and isolated change is preventing MPTCP
+support in some apps, and libraries like GoLang [1]. This is why this
+patch is seen as a fix.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/383
+Fixes: 1b3e7ede1365 ("mptcp: setsockopt: handle SO_KEEPALIVE and SO_PRIORITY")
+Link: https://github.com/golang/go/issues/56539 [1]
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
