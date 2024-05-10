@@ -26,6 +26,7 @@ permissions: {}
 jobs:
   tests:
     name: "Tests"
+    if: ! startswith(github.ref, 'refs/tags/patchew/') || ! contains(github.event.head_commit.message, 'Message-Id:')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -144,7 +145,7 @@ jobs:
     name: "Notifications"
     needs: tests
     # only for the official repo (patchew and export)
-    if: always() && github.repository_owner == 'multipath-tcp'
+    if: always() && github.repository_owner == 'multipath-tcp' && (needs.tests.result == 'success' || needs.tests.result == 'failure')
     concurrency:
       group: ${{ startswith(github.ref, 'refs/heads/export') && 'ci-notif' || github.sha }}
       cancel-in-progress: false
