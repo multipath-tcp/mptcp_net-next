@@ -26,6 +26,7 @@ permissions: {}
 jobs:
   build:
     name: "Build (matrix)"
+    if: ! startswith(github.ref, 'refs/tags/patchew/') || ! contains(github.event.head_commit.message, 'Message-Id:')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -154,7 +155,7 @@ jobs:
     name: "Notifications patchew tags"
     needs: build
     # only for the official repo, patchew tags branches
-    if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/')
+    if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/') && (needs.build.result == 'success' || needs.build.result == 'failure')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
