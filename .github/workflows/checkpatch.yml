@@ -25,7 +25,7 @@ jobs:
   checkpatch:
     name: "Checkpatch"
     # for others or for the official repo but only commits from patchew
-    if: github.repository_owner != 'multipath-tcp' || (startswith(github.ref, 'refs/tags/patchew/') && ! contains(github.event.head_commit.message, 'Message-Id:'))
+    if: "github.repository_owner != 'multipath-tcp' || (startswith(github.ref, 'refs/tags/patchew/') && contains(github.event.head_commit.message, 'Message-Id: '))"
     runs-on: ubuntu-latest
     permissions:
       contents: read # to fetch code (actions/checkout)
