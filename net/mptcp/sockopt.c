@@ -999,9 +999,7 @@ static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, in
 	if (get_user(len, optlen))
 		return -EFAULT;
 
-	/* Opti when used to check if a fallback to TCP happened on an 'accept'
-	 * socket. Userspace apps should use getsockopt(SO_PROTOCOL) instead.
-	 */
+	/* When used only to check if a fallback to TCP happened. */
 	if (len == 0)
 		return 0;
 
@@ -1407,6 +1405,8 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 					    READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_keepalive_probes));
 	case TCP_NOTSENT_LOWAT:
 		return mptcp_put_int_option(msk, optval, optlen, msk->notsent_lowat);
+	case TCP_IS_MPTCP:
+		return mptcp_put_int_option(msk, optval, optlen, 1);
 	}
 	return -EOPNOTSUPP;
 }
