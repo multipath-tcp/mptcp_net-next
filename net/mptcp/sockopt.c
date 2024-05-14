@@ -999,9 +999,7 @@ static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, in
 	if (get_user(len, optlen))
 		return -EFAULT;
 
-	/* Opti when used to check if a fallback to TCP happened on an 'accept'
-	 * socket. Userspace apps should use getsockopt(SO_PROTOCOL) instead.
-	 */
+	/* When used only to check if a fallback to TCP happened. */
 	if (len == 0)
 		return 0;
 
