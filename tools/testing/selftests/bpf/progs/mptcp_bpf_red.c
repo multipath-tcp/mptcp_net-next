@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2022, SUSE. */
 
-#include <linux/bpf.h>
-#include "bpf_tcp_helpers.h"
+#include "bpf_tracing_net.h"
+#include "mptcp_bpf.h"
+#include <bpf/bpf_tracing.h>
 
 char _license[] SEC("license") = "GPL";
 
-SEC("struct_ops/mptcp_sched_red_init")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_red_init, struct mptcp_sock *msk)
 {
 }
 
-SEC("struct_ops/mptcp_sched_red_release")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_red_release, struct mptcp_sock *msk)
 {
 }
 
-int BPF_STRUCT_OPS(bpf_red_get_subflow, struct mptcp_sock *msk,
-		   struct mptcp_sched_data *data)
+SEC("struct_ops")
+int BPF_PROG(bpf_red_get_subflow, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	for (int i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
 		if (!bpf_mptcp_subflow_ctx_by_pos(data, i))
