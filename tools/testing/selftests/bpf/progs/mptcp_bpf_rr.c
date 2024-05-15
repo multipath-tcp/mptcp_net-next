@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2022, SUSE. */
 
-#include <linux/bpf.h>
-#include "bpf_tcp_helpers.h"
+#include "bpf_tracing_net.h"
+#include "mptcp_bpf.h"
+#include <bpf/bpf_tracing.h>
 
 char _license[] SEC("license") = "GPL";
 
@@ -17,21 +18,22 @@ struct {
 	__type(value, struct mptcp_rr_storage);
 } mptcp_rr_map SEC(".maps");
 
-SEC("struct_ops/mptcp_sched_rr_init")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_rr_init, struct mptcp_sock *msk)
 {
 	bpf_sk_storage_get(&mptcp_rr_map, msk, 0,
 			   BPF_LOCAL_STORAGE_GET_F_CREATE);
 }
 
-SEC("struct_ops/mptcp_sched_rr_release")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_rr_release, struct mptcp_sock *msk)
 {
 	bpf_sk_storage_delete(&mptcp_rr_map, msk);
 }
 
-int BPF_STRUCT_OPS(bpf_rr_get_subflow, struct mptcp_sock *msk,
-		   struct mptcp_sched_data *data)
+SEC("struct_ops")
+int BPF_PROG(bpf_rr_get_subflow, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_rr_storage *ptr;
