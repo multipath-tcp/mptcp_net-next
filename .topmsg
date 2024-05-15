@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-mptcp_space_from_win-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add mptcp_space_from_win helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+As a wrapper of __tcp_space_from_win(), this patch adds a MPTCP dedicated
+space_from_win helper mptcp_space_from_win() in protocol.h to paired with
+mptcp_win_from_space().
+
+Use it instead of __tcp_space_from_win() in both mptcp_rcv_space_adjust()
+and mptcp_set_rcvlowat().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
