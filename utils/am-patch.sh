@@ -42,8 +42,6 @@ am_files() { local nb subject sha msg
 		fi
 		sha=$(git rev-parse HEAD)
 
-		print " - $(git rev-parse --short HEAD): \"squashed\"${nb}" \
-		      "in \"$(./.title.sh)\""
 		msg="- $(git rev-parse --short HEAD): \"squashed\"${nb} in \"$(./.title.sh)\""
 		if [ "${NO_SOB}" != "1" ]; then
 			printinfo "trying signed-off"
