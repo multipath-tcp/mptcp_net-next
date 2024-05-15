@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2022, SUSE. */
 
-#include "bpf_tracing_net.h"
 #include "mptcp_bpf.h"
 #include <bpf/bpf_tracing.h>
 
