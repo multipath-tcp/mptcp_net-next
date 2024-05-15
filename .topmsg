@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-mptcp_win_from_space-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: use mptcp_win_from_space helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The MPTCP dedicated win_from_space helper mptcp_win_from_space() is defined
+in protocol.h, use it in mptcp_rcv_space_adjust() instead of using the TCP
+one. Here scaling_ratio is the same as msk->scaling_ratio.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
