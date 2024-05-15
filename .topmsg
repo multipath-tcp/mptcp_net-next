@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-mptcp-pm_nl_ctl-link
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Add mptcp pm_nl_ctl link
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a symlink to MPTCP's pm_nl_ctl tool into bpf selftests,
+and updates Makefile to compile it.
+
+This is useful to run MPTCP BPF selftests on systems with an old version
+of IPRoute2. This tool can be used as an alternative to 'ip mptcp'.
+
+MAINTAINERS needs to be updated since a new file is added in a non
+covered place.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
