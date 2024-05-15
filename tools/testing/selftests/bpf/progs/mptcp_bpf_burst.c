@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2023, SUSE. */
 
-#include <linux/bpf.h>
+#include "bpf_tracing_net.h"
+#include "mptcp_bpf.h"
+#include <bpf/bpf_tracing.h>
 #include <limits.h>
-#include "bpf_tcp_helpers.h"
 
 char _license[] SEC("license") = "GPL";
 
 #define MPTCP_SEND_BURST_SIZE	65428
 
-struct subflow_send_info {
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+struct bpf_subflow_send_info {
 	__u8 subflow_id;
 	__u64 linger_time;
 };
@@ -55,12 +58,12 @@ static __always_inline bool sk_stream_memory_free(const struct sock *sk)
 	return __sk_stream_memory_free(sk, 0);
 }
 
-SEC("struct_ops/mptcp_sched_burst_init")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_burst_init, struct mptcp_sock *msk)
 {
 }
 
-SEC("struct_ops/mptcp_sched_burst_release")
+SEC("struct_ops")
 void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 {
 }
@@ -68,7 +71,7 @@ void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 static int bpf_burst_get_send(struct mptcp_sock *msk,
 			      struct mptcp_sched_data *data)
 {
-	struct subflow_send_info send_info[SSK_MODE_MAX];
+	struct bpf_subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 	__u32 pace, burst, wmem;
@@ -182,8 +185,9 @@ out:
 	return 0;
 }
 
-int BPF_STRUCT_OPS(bpf_burst_get_subflow, struct mptcp_sock *msk,
-		   struct mptcp_sched_data *data)
+SEC("struct_ops")
+int BPF_PROG(bpf_burst_get_subflow, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	if (data->reinject)
 		return bpf_burst_get_retrans(msk, data);
