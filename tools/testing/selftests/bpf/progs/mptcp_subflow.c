@@ -2,21 +2,10 @@
 /* Copyright (c) 2020, Tessares SA. */
 /* Copyright (c) 2024, Kylin Software */
 
-#include <sys/socket.h> // SOL_SOCKET, SO_MARK, ...
-#include <linux/tcp.h>  // TCP_CONGESTION
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
-#include "bpf_tcp_helpers.h"
+/* vmlinux.h, bpf_helpers.h and other 'define' */
+#include "bpf_tracing_net.h"
 
 char _license[] SEC("license") = "GPL";
-
-#ifndef SOL_TCP
-#define SOL_TCP 6
-#endif
-
-#ifndef TCP_CA_NAME_MAX
-#define TCP_CA_NAME_MAX 16
-#endif
 
 char cc[TCP_CA_NAME_MAX] = "reno";
 
