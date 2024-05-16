@@ -175,12 +175,9 @@ void test_assign_reuse(void)
 {
 	struct nstoken *tok = NULL;
 
-	SYS(out, "ip netns add %s", NS_TEST);
-	SYS(cleanup, "ip -net %s link set dev lo up", NS_TEST);
-
-	tok = open_netns(NS_TEST);
+	tok = create_netns(NS_TEST);
 	if (!ASSERT_OK_PTR(tok, "netns token"))
-		return;
+		goto cleanup;
 
 	if (test__start_subtest("tcpv4"))
 		run_assign_reuse(AF_INET, SOCK_STREAM, "127.0.0.1", PORT);
@@ -194,6 +191,4 @@ void test_assign_reuse(void)
 cleanup:
 	close_netns(tok);
 	SYS_NOFAIL("ip netns delete %s", NS_TEST);
-out:
-	return;
 }

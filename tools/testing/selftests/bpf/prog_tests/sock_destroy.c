@@ -193,10 +193,7 @@ void test_sock_destroy(void)
 	if (!ASSERT_OK_PTR(skel->links.sock_connect, "prog_attach"))
 		goto cleanup;
 
-	SYS(cleanup, "ip netns add %s", TEST_NS);
-	SYS(cleanup, "ip -net %s link set dev lo up", TEST_NS);
-
-	nstoken = open_netns(TEST_NS);
+	nstoken = create_netns(TEST_NS);
 	if (!ASSERT_OK_PTR(nstoken, "open_netns"))
 		goto cleanup;
 

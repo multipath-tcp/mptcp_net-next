@@ -315,9 +315,7 @@ void test_fib_lookup(void)
 		return;
 	prog_fd = bpf_program__fd(skel->progs.fib_lookup);
 
-	SYS(fail, "ip netns add %s", NS_TEST);
-
-	nstoken = open_netns(NS_TEST);
+	nstoken = create_netns(NS_TEST);
 	if (!ASSERT_OK_PTR(nstoken, "open_netns"))
 		goto fail;
 

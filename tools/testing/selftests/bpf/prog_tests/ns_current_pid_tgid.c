@@ -204,10 +204,7 @@ static void test_in_netns(int (*fn)(void *), void *arg)
 {
 	struct nstoken *nstoken = NULL;
 
-	SYS(cleanup, "ip netns add ns_current_pid_tgid");
-	SYS(cleanup, "ip -net ns_current_pid_tgid link set dev lo up");
-
-	nstoken = open_netns("ns_current_pid_tgid");
+	nstoken = create_netns("ns_current_pid_tgid");
 	if (!ASSERT_OK_PTR(nstoken, "open_netns"))
 		goto cleanup;
 
