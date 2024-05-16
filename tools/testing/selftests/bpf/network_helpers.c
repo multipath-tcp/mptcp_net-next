@@ -670,3 +670,22 @@ int send_recv_data(int lfd, int fd, uint32_t total_bytes)
 
 	return err;
 }
+
+int unshare_netns(void)
+{
+	int err;
+
+	err = unshare(CLONE_NEWNET);
+	if (err) {
+		log_err("unshare netns failed");
+		return err;
+	}
+
+	err = SYS_NOFAIL("ip link set dev lo up");
+	if (err) {
+		log_err("set dev lo up failed");
+		return err;
+	}
+
+	return 0;
+}
