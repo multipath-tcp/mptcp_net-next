@@ -7,15 +7,8 @@
 
 #include "test_progs.h"
 #include "cap_helpers.h"
+#include "network_helpers.h"
 #include "bind_perm.skel.h"
-
-static int create_netns(void)
-{
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
-		return -1;
-
-	return 0;
-}
 
 void try_bind(int family, int port, int expected_errno)
 {
@@ -54,7 +47,7 @@ void test_bind_perm(void)
 	__u64 old_caps = 0;
 	int cgroup_fd;
 
-	if (create_netns())
+	if (unshare_netns())
 		return;
 
 	cgroup_fd = test__join_cgroup("/bind_perm");

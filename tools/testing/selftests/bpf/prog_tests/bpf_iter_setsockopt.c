@@ -8,17 +8,6 @@
 #include "bpf_cubic.skel.h"
 #include "bpf_iter_setsockopt.skel.h"
 
-static int create_netns(void)
-{
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
-		return -1;
-
-	if (!ASSERT_OK(system("ip link set dev lo up"), "bring up lo"))
-		return -1;
-
-	return 0;
-}
-
 static unsigned int set_bpf_cubic(int *fds, unsigned int nr_fds)
 {
 	unsigned int i;
@@ -187,7 +176,7 @@ void serial_test_bpf_iter_setsockopt(void)
 	struct bpf_link *cubic_link = NULL;
 	struct bpf_link *dctcp_link = NULL;
 
-	if (create_netns())
+	if (unshare_netns())
 		return;
 
 	/* Load iter_skel */

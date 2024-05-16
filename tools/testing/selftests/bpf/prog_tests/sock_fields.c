@@ -45,17 +45,6 @@ static __u64 child_cg_id;
 static int linum_map_fd;
 static __u32 duration;
 
-static bool create_netns(void)
-{
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
-		return false;
-
-	if (!ASSERT_OK(system("ip link set dev lo up"), "bring up lo"))
-		return false;
-
-	return true;
-}
-
 static void print_sk(const struct bpf_sock *sk, const char *prefix)
 {
 	char src_ip4[24], dst_ip4[24];
@@ -350,7 +339,7 @@ void serial_test_sock_fields(void)
 	struct bpf_link *link;
 
 	/* Use a dedicated netns to have a fixed listen port */
-	if (!create_netns())
+	if (unshare_netns())
 		return;
 
 	/* Create a cgroup, get fd, and join it */

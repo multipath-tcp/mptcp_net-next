@@ -40,17 +40,6 @@ struct sk_fds {
 	int active_lport;
 };
 
-static int create_netns(void)
-{
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
-		return -1;
-
-	if (!ASSERT_OK(system("ip link set dev lo up"), "run ip cmd"))
-		return -1;
-
-	return 0;
-}
-
 static void print_hdr_stg(const struct hdr_stg *hdr_stg, const char *prefix)
 {
 	fprintf(stderr, "%s{active:%u, resend_syn:%u, syncookie:%u, fastopen:%u}\n",
@@ -548,7 +537,7 @@ void test_tcp_hdr_options(void)
 		if (!test__start_subtest(tests[i].desc))
 			continue;
 
-		if (create_netns())
+		if (unshare_netns())
 			break;
 
 		tests[i].run();

@@ -20,14 +20,8 @@ static const char addr6_str[] = "::1";
 static struct setget_sockopt *skel;
 static int cg_fd;
 
-static int create_netns(void)
+static int create_veth(void)
 {
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
-		return -1;
-
-	if (!ASSERT_OK(system("ip link set dev lo up"), "set lo up"))
-		return -1;
-
 	if (!ASSERT_OK(system("ip link add dev binddevtest1 type veth peer name binddevtest2"),
 		       "add veth"))
 		return -1;
@@ -160,7 +154,7 @@ void test_setget_sockopt(void)
 	if (cg_fd < 0)
 		return;
 
-	if (create_netns())
+	if (unshare_netns() || create_veth())
 		goto done;
 
 	skel = setget_sockopt__open();
