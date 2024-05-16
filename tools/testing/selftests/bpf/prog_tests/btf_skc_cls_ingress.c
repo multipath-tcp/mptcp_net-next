@@ -27,13 +27,9 @@ static int prepare_netns(void)
 	LIBBPF_OPTS(bpf_tc_opts, tc_attach,
 		    .prog_fd = bpf_program__fd(skel->progs.cls_ingress));
 
-	if (CHECK(unshare(CLONE_NEWNET), "create netns",
+	if (CHECK(unshare_netns(), "create netns",
 		  "unshare(CLONE_NEWNET): %s (%d)",
 		  strerror(errno), errno))
-		return -1;
-
-	if (CHECK(system("ip link set dev lo up"),
-		  "ip link set dev lo up", "failed\n"))
 		return -1;
 
 	qdisc_lo.ifindex = if_nametoindex("lo");

@@ -47,12 +47,10 @@ configure_stack(void)
 		return false;
 
 	/* Move to a new networking namespace */
-	if (CHECK_FAIL(unshare(CLONE_NEWNET)))
+	if (CHECK_FAIL(unshare_netns()))
 		return false;
 
 	/* Configure necessary links, routes */
-	if (CHECK_FAIL(system("ip link set dev lo up")))
-		return false;
 	if (CHECK_FAIL(system("ip route add local default dev lo")))
 		return false;
 	if (CHECK_FAIL(system("ip -6 route add local default dev lo")))

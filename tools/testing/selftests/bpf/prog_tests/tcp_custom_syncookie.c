@@ -32,11 +32,8 @@ static struct test_tcp_custom_syncookie_case {
 
 static int setup_netns(void)
 {
-	if (!ASSERT_OK(unshare(CLONE_NEWNET), "create netns"))
+	if (!ASSERT_OK(unshare_netns(), "create netns"))
 		return -1;
-
-	if (!ASSERT_OK(system("ip link set dev lo up"), "ip"))
-		goto err;
 
 	if (!ASSERT_OK(write_sysctl("/proc/sys/net/ipv4/tcp_ecn", "1"),
 		       "write_sysctl"))
