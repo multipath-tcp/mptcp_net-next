@@ -9,6 +9,7 @@
 #include <linux/icmp.h>
 
 #include "test_progs.h"
+#include "network_helpers.h"
 
 #define log_err(MSG, ...) \
 	fprintf(stderr, "(%s:%d: errno: %s) " MSG "\n", \
@@ -16,26 +17,13 @@
 
 #define RUN_TEST(name)                                                        \
 	({                                                                    \
-		if (test__start_subtest(#name))                               \
-			if (ASSERT_OK(netns_create(), "netns_create")) {      \
-				struct nstoken *token = open_netns(NETNS);    \
-				if (ASSERT_OK_PTR(token, "setns")) {          \
-					test_ ## name();                      \
-					close_netns(token);                   \
-				}                                             \
-				netns_delete();                               \
-			}                                                     \
+		if (test__start_subtest(#name)) {                             \
+			struct nstoken *token = create_netns(NETNS);          \
+			if (ASSERT_OK_PTR(token, "setns"))                    \
+				test_ ## name();                              \
+			cleanup_netns(token);                                 \
+		}                                                             \
 	})
-
-static inline int netns_create(void)
-{
-	return system("ip netns add " NETNS);
-}
-
-static inline int netns_delete(void)
-{
-	return system("ip netns del " NETNS ">/dev/null 2>&1");
-}
 
 static int open_tuntap(const char *dev_name, bool need_mac)
 {

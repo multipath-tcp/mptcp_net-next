@@ -50,7 +50,6 @@
  */
 #define NETNS "ns_lwt_reroute"
 #include "lwt_helpers.h"
-#include "network_helpers.h"
 #include <linux/net_tstamp.h>
 
 #define BPF_OBJECT            "test_lwt_reroute.bpf.o"
@@ -242,7 +241,6 @@ fail:
 
 static void *test_lwt_reroute_run(void *arg)
 {
-	netns_delete();
 	RUN_TEST(lwt_reroute_normal_xmit);
 	RUN_TEST(lwt_reroute_qdisc_dropped);
 	return NULL;

@@ -57,7 +57,6 @@
 #define NETNS "ns_lwt_redirect"
 #include "lwt_helpers.h"
 #include "test_progs.h"
-#include "network_helpers.h"
 
 #define BPF_OBJECT            "test_lwt_redirect.bpf.o"
 #define INGRESS_SEC(need_mac) ((need_mac) ? "redir_ingress" : "redir_ingress_nomac")
@@ -308,7 +307,6 @@ out:
 
 static void *test_lwt_redirect_run(void *arg)
 {
-	netns_delete();
 	RUN_TEST(lwt_redirect_normal);
 	RUN_TEST(lwt_redirect_normal_nomac);
 	RUN_TEST(lwt_redirect_dev_down);
