@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-refer-to-MPTCP-socket-in-comments
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: refer to 'MPTCP' socket in comments
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+We used to call it 'master' socket at the early stages of MPTCP
+development, but the correct wording is 'MPTCP' socket opposed to 'TCP
+subflows': convert the last 3 comments to use a more appropriate term.
+
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
