@@ -241,8 +241,6 @@ void test_xdp_do_redirect(void)
 out_tc:
 	bpf_tc_hook_destroy(&tc_hook);
 out:
-	if (nstoken)
-		close_netns(nstoken);
-	SYS_NOFAIL("ip netns del testns");
+	cleanup_netns(nstoken);
 	test_xdp_do_redirect__destroy(skel);
 }

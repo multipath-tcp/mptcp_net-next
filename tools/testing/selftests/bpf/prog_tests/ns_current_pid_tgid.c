@@ -211,9 +211,7 @@ static void test_in_netns(int (*fn)(void *), void *arg)
 	test_ns_current_pid_tgid_new_ns(fn, arg);
 
 cleanup:
-	if (nstoken)
-		close_netns(nstoken);
-	SYS_NOFAIL("ip netns del ns_current_pid_tgid");
+	cleanup_netns(nstoken);
 }
 
 /* TODO: use a different tracepoint */

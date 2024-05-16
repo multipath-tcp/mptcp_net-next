@@ -124,8 +124,7 @@ void test_sock_iter_batch(void)
 		do_test(SOCK_DGRAM, true);
 		do_test(SOCK_DGRAM, false);
 	}
-	close_netns(nstoken);
 
 done:
-	SYS_NOFAIL("ip netns del " TEST_NS);
+	cleanup_netns(nstoken);
 }

@@ -189,6 +189,5 @@ void test_assign_reuse(void)
 		run_assign_reuse(AF_INET6, SOCK_DGRAM, "::1", PORT);
 
 cleanup:
-	close_netns(tok);
-	SYS_NOFAIL("ip netns delete %s", NS_TEST);
+	cleanup_netns(tok);
 }

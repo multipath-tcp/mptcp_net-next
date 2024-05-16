@@ -209,9 +209,7 @@ void test_sock_destroy(void)
 	RUN_TESTS(sock_destroy_prog_fail);
 
 cleanup:
-	if (nstoken)
-		close_netns(nstoken);
-	SYS_NOFAIL("ip netns del " TEST_NS);
+	cleanup_netns(nstoken);
 	if (cgroup_fd >= 0)
 		close(cgroup_fd);
 	sock_destroy_prog__destroy(skel);

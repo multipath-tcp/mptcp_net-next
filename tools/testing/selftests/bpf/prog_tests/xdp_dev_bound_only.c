@@ -53,9 +53,8 @@ void test_xdp_dev_bound_only_offdev(void)
 out:
 	close(fd1);
 	close(fd2);
-	close_netns(tok);
 	/* eth42 was added inside netns, removing the netns will
 	 * also remove eth42 veth pair.
 	 */
-	SYS_NOFAIL("ip netns del " LOCAL_NETNS);
+	cleanup_netns(tok);
 }

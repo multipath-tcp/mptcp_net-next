@@ -68,10 +68,8 @@ void test_decap_sanity(void)
 	ASSERT_FALSE(skel->bss->broken_csum_start, "broken_csum_start");
 
 fail:
-	if (nstoken) {
+	if (nstoken)
 		bpf_tc_hook_destroy(&qdisc_hook);
-		close_netns(nstoken);
-	}
-	SYS_NOFAIL("ip netns del " NS_TEST);
+	cleanup_netns(nstoken);
 	decap_sanity__destroy(skel);
 }

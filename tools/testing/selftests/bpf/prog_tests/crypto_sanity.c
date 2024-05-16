@@ -190,8 +190,7 @@ void test_crypto_sanity(void)
 	ASSERT_OK(err, "bpf_tc_detach decrypt");
 
 fail:
-	close_netns(nstoken);
+	cleanup_netns(nstoken);
 	deinit_afalg();
-	SYS_NOFAIL("ip netns del " NS_TEST " &> /dev/null");
 	crypto_sanity__destroy(skel);
 }
