@@ -418,7 +418,7 @@ static void test_subflow(void)
 	if (!ASSERT_OK(err, "prog_attach"))
 		goto skel_destroy;
 
-	nstoken = create_netns();
+	nstoken = create_netns(NS_TEST);
 	if (!ASSERT_OK_PTR(nstoken, "create_netns: mptcp_subflow"))
 		goto skel_destroy;
 
