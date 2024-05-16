@@ -439,7 +439,7 @@ static struct nstoken *sched_init(char *flags, char *sched)
 {
 	struct nstoken *nstoken;
 
-	nstoken = create_netns();
+	nstoken = create_netns(NS_TEST);
 	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		return NULL;
 
