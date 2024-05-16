@@ -81,6 +81,7 @@ struct nstoken;
  */
 struct nstoken *open_netns(const char *name);
 void close_netns(struct nstoken *token);
+struct nstoken *create_netns(const char *name);
 int send_recv_data(int lfd, int fd, uint32_t total_bytes);
 int unshare_netns(void);
 

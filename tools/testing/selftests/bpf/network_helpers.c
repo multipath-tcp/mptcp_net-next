@@ -498,6 +498,34 @@ void close_netns(struct nstoken *token)
 	free(token);
 }
 
+struct nstoken *create_netns(const char *name)
+{
+	struct nstoken *token = NULL;
+
+	SYS_NOFAIL("ip netns del %s", name);
+	if (SYS_NOFAIL("ip netns add %s", name)) {
+		log_err("add netns %s failed", name);
+		goto fail;
+	}
+
+	if (SYS_NOFAIL("ip -net %s link set dev lo up", name)) {
+		log_err("set dev lo up failed");
+		goto fail;
+	}
+
+	token = open_netns(name);
+	if (!token) {
+		log_err("open netns %s failed", name);
+		goto fail;
+	}
+
+	return token;
+
+fail:
+	SYS_NOFAIL("ip netns del %s", name);
+	return NULL;
+}
+
 int get_socket_local_port(int sock_fd)
 {
 	struct sockaddr_storage addr;
