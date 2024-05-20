@@ -21,6 +21,7 @@ declare -rx MPTCP_LIB_AF_INET6=10
 
 MPTCP_LIB_SUBTESTS=()
 MPTCP_LIB_SUBTESTS_DUPLICATED=0
+MPTCP_LIB_SUBTEST_FLAKY=0
 MPTCP_LIB_TEST_COUNTER=0
 MPTCP_LIB_TEST_FORMAT="%02u %-50s"
 MPTCP_LIB_IP_MPTCP=0
@@ -40,6 +41,18 @@ else
 	readonly MPTCP_LIB_COLOR_BLUE=
 	readonly MPTCP_LIB_COLOR_RESET=
 fi
+
+# SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var can be set when validating all
+# features using the last version of the kernel and the selftests to make sure
+# a test is not being skipped by mistake.
+mptcp_lib_expect_all_features() {
+	[ "${SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES:-}" = "1" ]
+}
+
+mptcp_lib_subtest_is_flaky() {
+	# If all features are expected, do not threat them as flaky
+	[ "${MPTCP_LIB_SUBTEST_FLAKY}" = 1 ] && ! mptcp_lib_expect_all_features
+}
 
 # $1: color, $2: text
 mptcp_lib_print_color() {
@@ -72,18 +85,19 @@ mptcp_lib_pr_skip() {
 }
 
 mptcp_lib_pr_fail() {
-	mptcp_lib_print_err "[FAIL]${1:+ ${*}}"
+	local title
+
+	if mptcp_lib_subtest_is_flaky; then
+		title="IGNO"
+	else
+		title="FAIL"
+	fi
+
+	mptcp_lib_print_err "[${title}]${1:+ ${*}}"
 }
 
 mptcp_lib_pr_info() {
 	mptcp_lib_print_info "INFO: ${*}"
-}
-
-# SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES env var can be set when validating all
-# features using the last version of the kernel and the selftests to make sure
-# a test is not being skipped by mistake.
-mptcp_lib_expect_all_features() {
-	[ "${SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES:-}" = "1" ]
 }
 
 # $1: msg
@@ -208,7 +222,13 @@ mptcp_lib_result_pass() {
 
 # $1: test name
 mptcp_lib_result_fail() {
-	__mptcp_lib_result_add "not ok" "${1}"
+	if mptcp_lib_subtest_is_flaky; then
+		# It might sound better to use 'not ok # TODO' or 'ok # SKIP',
+		# but some CIs don't understand 'TODO' and treat SKIP as errors.
+		__mptcp_lib_result_add "ok" "${1} # IGNORE"
+	else
+		__mptcp_lib_result_add "not ok" "${1}"
+	fi
 }
 
 # $1: test name
