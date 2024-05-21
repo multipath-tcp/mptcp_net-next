@@ -98,7 +98,7 @@ init()
 #shellcheck disable=SC2317
 cleanup()
 {
-	mptcp_lib_ns_exit "${ns1}" "${ns2}" "${ns_sbox}"
+	cleanup_all_ns
 	rm -f "$cin" "$cout"
 	rm -f "$sin" "$sout"
 }

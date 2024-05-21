@@ -107,7 +107,7 @@ cleanup()
 		mptcp_lib_kill_wait $pid
 	done
 
-	mptcp_lib_ns_exit "${ns1}" "${ns2}"
+	cleanup_all_ns
 
 	rm -rf $file $client_evts $server_evts
 

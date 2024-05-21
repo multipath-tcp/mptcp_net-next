@@ -36,7 +36,7 @@ err=$(mktemp)
 cleanup()
 {
 	rm -f "${err}"
-	mptcp_lib_ns_exit "${ns1}"
+	cleanup_all_ns
 }
 
 mptcp_lib_check_mptcp

@@ -133,7 +133,7 @@ cleanup_partial()
 {
 	rm -f "$capout"
 
-	mptcp_lib_ns_exit "${ns1}" "${ns2}"
+	cleanup_all_ns
 }
 
 init() {

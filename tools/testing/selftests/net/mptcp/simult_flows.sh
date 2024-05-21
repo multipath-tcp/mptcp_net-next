@@ -42,7 +42,7 @@ cleanup()
 	rm -f "$large" "$small"
 	rm -f "$capout"
 
-	mptcp_lib_ns_exit "${ns1}" "${ns2}" "${ns3}"
+	cleanup_all_ns
 }
 
 mptcp_lib_check_mptcp

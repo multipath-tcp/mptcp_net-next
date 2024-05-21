@@ -33,7 +33,7 @@ cleanup()
 {
 	ip netns pids "${ns1}" | xargs --no-run-if-empty kill -SIGKILL &>/dev/null
 
-	mptcp_lib_ns_exit "${ns1}"
+	cleanup_all_ns
 }
 
 mptcp_lib_check_mptcp

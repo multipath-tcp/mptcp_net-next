@@ -424,14 +424,6 @@ mptcp_lib_ns_init() {
 	done
 }
 
-mptcp_lib_ns_exit() {
-	local netns
-	for netns in "${@}"; do
-		ip netns del "${netns}"
-		rm -f /tmp/"${netns}".{nstat,out}
-	done
-}
-
 mptcp_lib_events() {
 	local ns="${1}"
 	local evts="${2}"
