@@ -17,6 +17,7 @@ is_stable() { local prefix sublevel
 rc=0
 INPUT_BUILD_SKIP_PERF=1 \
    VIRTME_PACKETDRILL_STABLE=$(is_stable) \
+   INPUT_SELFTESTS_MPTCP_LIB_OVERRIDE_FLAKY=0 \
    "./${VIRTME_SH:-.virtme.sh}" "${@:-expect-all}" || rc=${?}
 
 if [ -f .virtme-exec-run-old ]; then
