@@ -16,7 +16,7 @@ fail-over if one path is down, and the traffic is seamlessly reinjected on other
 paths.
 
 For more details about Multipath TCP in the Linux kernel, please see the
-official website: `mptcp.dev <https://www.mptcp.dev>`.
+official website: `mptcp.dev <https://www.mptcp.dev>`_.
 
 
 Use cases
