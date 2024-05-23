@@ -1,4 +1,24 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-lib-support-flaky-subtests
+Subject: [PATCH] selftests: mptcp: lib: support flaky subtests
 
+Some subtests can be unstable, failing once every X runs. Fixing them
+can take time: there could be an issue in the kernel or in the subtest,
+and it is then important to do a proper analysis, not to hide real bugs.
+
+To avoid creating noises on the different CIs, it is important to have a
+simple way to mark subtests as flaky, and ignore the errors. This is
+what this patch introduces: subtests can be marked as flaky by setting
+MPTCP_LIB_SUBTEST_FLAKY env var to 1, e.g.
+
+  MPTCP_LIB_SUBTEST_FLAKY=1 <run flaky subtest>
+
+The subtest will be executed, and errors (if any) will be ignored. It is
+still good to run these subtests, as it exercises code, and the results
+can still be useful for the on-going investigations.
+
+Note that the MPTCP CI will continue to track these flaky subtests by
+setting SELFTESTS_MPTCP_LIB_OVERRIDE_FLAKY env var to 1, and a ticket
+has to be created before marking subtests as flaky.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
