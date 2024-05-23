@@ -132,8 +132,6 @@ init_shapers()
 cleanup_partial()
 {
 	rm -f "$capout"
-
-	mptcp_lib_ns_exit "${ns1}" "${ns2}"
 }
 
 init() {
@@ -166,6 +164,7 @@ cleanup()
 	rm -rf $evts_ns1 $evts_ns2
 	rm -f "$err"
 	cleanup_partial
+	cleanup_all_ns
 }
 
 print_check()
