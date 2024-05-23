@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-mark-fail-tests-as-flaky
+Subject: [PATCH] selftests: mptcp: join: mark 'fail' tests as flaky
 
+These tests are rarely unstable. It depends on the CI running the tests,
+especially if it is also busy doing other tasks in parallel, and if a
+debug kernel config is being used.
+
+It looks like this issue is sometimes present with the NetDev CI. While
+this is being investigated, the tests are marked as flaky not to create
+noises on such CIs.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/491
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
