@@ -128,7 +128,7 @@ slowwait_for_counter()
 
 cleanup_ns()
 {
-	local ns=""
+	local _ns=""
 	local errexit=0
 	local ret=0
 
@@ -138,10 +138,11 @@ cleanup_ns()
 		set +e
 	fi
 
-	for ns in "$@"; do
-		ip netns delete "${ns}" &> /dev/null
-		if ! busywait $BUSYWAIT_TIMEOUT ip netns list \| grep -vq "^$ns$" &> /dev/null; then
-			echo "Warn: Failed to remove namespace $ns"
+	for _ns in "$@"; do
+		ip netns delete "${_ns}" &> /dev/null
+		if ! busywait $BUSYWAIT_TIMEOUT ip netns list \
+		   \| grep -vq "^$_ns$" &> /dev/null; then
+			echo "Warn: Failed to remove namespace $_ns"
 			ret=1
 		fi
 	done
@@ -159,29 +160,35 @@ cleanup_all_ns()
 # setup_ns local remote
 setup_ns()
 {
-	local ns=""
+	local _ns=""
 	local ns_name=""
 	local ns_list=""
 	local ns_exist=
 	for ns_name in "$@"; do
+		if [ "${ns_name}" == "_ns" ]; then
+			echo "ns_name shouldn't be _ns"
+			cleanup_ns "$ns_list"
+			set -e
+			return $ksft_fail
+		fi
 		# Some test may setup/remove same netns multi times
 		if unset ${ns_name} 2> /dev/null; then
-			ns="${ns_name,,}-$(mktemp -u XXXXXX)"
-			eval readonly ${ns_name}="$ns"
+			_ns="${ns_name,,}-$(mktemp -u XXXXXX)"
+			eval readonly ${ns_name}="$_ns"
 			ns_exist=false
 		else
-			eval ns='$'${ns_name}
-			cleanup_ns "$ns"
+			eval _ns='$'${ns_name}
+			cleanup_ns "$_ns"
 			ns_exist=true
 		fi
 
-		if ! ip netns add "$ns"; then
+		if ! ip netns add "$_ns"; then
 			echo "Failed to create namespace $ns_name"
 			cleanup_ns "$ns_list"
 			return $ksft_skip
 		fi
-		ip -n "$ns" link set lo up
-		! $ns_exist && ns_list="$ns_list $ns"
+		ip -n "$_ns" link set lo up
+		! $ns_exist && ns_list="$ns_list $_ns"
 	done
 	NS_LIST="$NS_LIST $ns_list"
 }
