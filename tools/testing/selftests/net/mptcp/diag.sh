@@ -266,8 +266,8 @@ wait_connected()
 	done
 }
 
-trap cleanup EXIT
 mptcp_lib_ns_init ns
+trap cleanup EXIT
 
 echo "a" | \
 	timeout ${timeout_test} \
