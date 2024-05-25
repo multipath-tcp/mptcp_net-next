@@ -31,6 +31,7 @@ flush_pids()
 #shellcheck disable=SC2317
 cleanup()
 {
+	[ -n "${ns}" ] &&
 	ip netns pids "${ns}" | xargs --no-run-if-empty kill -SIGKILL &>/dev/null
 
 	mptcp_lib_ns_exit "${ns}"
