@@ -269,8 +269,6 @@ reset()
 		return 1
 	fi
 
-	mptcp_lib_print_title "${TEST_NAME}"
-
 	if [ "${init}" != "1" ]; then
 		init
 	else
@@ -278,6 +276,8 @@ reset()
 	fi
 
 	init_partial
+
+	mptcp_lib_print_title "${TEST_NAME}"
 
 	return 0
 }
