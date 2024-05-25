@@ -167,11 +167,11 @@ cleanup_all_ns()
 # setup_ns local remote
 setup_ns()
 {
-	local _ns=""
+	local ns_temp=""
 	local ns_name=""
 	local ns_list=()
 	for ns_name in "$@"; do
-		if [ "${ns_name}" = "_ns" ]; then
+		if [ "${ns_name}" = "ns_temp" ]; then
 			echo "Failed to setup namespace '${ns_name}': invalid name"
 			cleanup_ns "${ns_list[@]}"
 			exit $ksft_fail
@@ -179,20 +179,20 @@ setup_ns()
 
 		# Some test may setup/remove same netns multi times
 		if [ -z "${!ns_name}" ]; then
-			_ns="${ns_name,,}-$(mktemp -u XXXXXX)"
-			eval "${ns_name}=${_ns}"
+			ns_temp="${ns_name,,}-$(mktemp -u XXXXXX)"
+			eval "${ns_name}=${ns_temp}"
 		else
-			_ns="${!ns_name}"
-			cleanup_ns "${_ns}"
+			ns_temp="${!ns_name}"
+			cleanup_ns "${ns_temp}"
 		fi
 
-		if ! ip netns add "${_ns}"; then
+		if ! ip netns add "${ns_temp}"; then
 			echo "Failed to create namespace $ns_name"
 			cleanup_ns "${ns_list[@]}"
 			return $ksft_skip
 		fi
-		ip -n "${_ns}" link set lo up
-		ns_list+=("${_ns}")
+		ip -n "${ns_temp}" link set lo up
+		ns_list+=("${ns_temp}")
 	done
 	NS_LIST+=("${ns_list[@]}")
 }
