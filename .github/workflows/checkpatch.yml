@@ -165,19 +165,24 @@ jobs:
             fi
 
             if awk '{ if ($2 != "success") exit 1 }' "${1}"; then
-              echo "Everything OK with ${2}, good job!"
+              echo " *** Everything OK with ${2}, good job!"
               return 0
             fi
 
-            echo "${2} detected some issues:"
-            echo
+            echo " *** ${2} detected some issues:"
             cat "${1}"
-            echo
+            echo " *** End of the issues detected by ${2}"
 
             return 1
           }
 
+          echo
           rc=0
           check "${CHECKPATCH_RESULTS}" "CheckPatch" || rc=1
           check "${SHELLCHECK_RESULTS}" "ShellCheck" || rc=1
+          [ ${rc} -eq 0 ] && exit 0
+
+          echo
+          echo "Please check the summary page for more details about these issues:"
+          echo "  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           exit ${rc}
