@@ -193,6 +193,26 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	return msk->sched->get_subflow(msk, &data);
 }
 
+/* This is called before the data has been sent on a subflow. It returns flags
+ * that defines what the scheduler should do with the ongoing data.
+ */
+u16 __mptcp_sched_push(struct mptcp_sock *msk, struct sock *ssk,
+		       struct mptcp_data_frag *dfrag, u16 *flags)
+{
+	struct mptcp_sched_chunk chunk = {
+		.data_seq = dfrag->data_seq + dfrag->already_sent,
+		.limit = 0,
+		.flags = 0,
+	};
+
+	msk_owned_by_me(msk);
+
+	msk->sched->push(msk, mptcp_subflow_ctx(ssk), &chunk);
+	*flags = chunk.flags;
+
+	return chunk.limit;
+}
+
 int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;

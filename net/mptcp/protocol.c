@@ -1526,12 +1526,15 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0, err = 0;
+	u16 sflags = 0;
 
-	while ((dfrag = mptcp_send_head(sk))) {
+	while ((dfrag = mptcp_send_head(sk)) && !(sflags & MPTCP_SCHED_FLAG_RESCHEDULE)) {
+		u16 limit = mptcp_sched_push(msk, ssk, dfrag, &sflags);
+
 		info->sent = dfrag->already_sent;
-		info->limit = dfrag->data_len;
 		len = dfrag->data_len - dfrag->already_sent;
-		while (len > 0) {
+		info->limit = limit ? info->sent + min_t(u16, limit, len) : dfrag->data_len;
+		while (len > 0 && info->sent < info->limit) {
 			int ret = 0;
 
 			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, info);
@@ -1546,7 +1549,10 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 
 			mptcp_update_post_push(msk, dfrag, ret);
 		}
-		WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
+
+		/* if the whole data has been sent, move to next data segment: */
+		if (len <= 0)
+			WRITE_ONCE(msk->first_pending, mptcp_send_next(sk));
 
 		if (msk->snd_burst <= 0 ||
 		    !sk_stream_memory_free(ssk) ||
