@@ -69,10 +69,28 @@ int BPF_PROG(bpf_rr_get_subflow, struct mptcp_sock *msk,
 	return 0;
 }
 
+SEC("struct_ops")
+void BPF_PROG(bpf_rr_push, struct mptcp_sock *msk,
+	      struct mptcp_subflow_context *subflow,
+	      struct mptcp_sched_chunk *chunk)
+{
+	struct tcp_sock *tp = bpf_skc_to_tcp_sock(mptcp_subflow_tcp_sock(subflow));
+
+	if (!tp) {
+		/* Should not happen, in that case let default behavior. */
+		return;
+	}
+
+	/* Make sure to reschedule for each MSS. */
+	chunk->limit = tp->mss_cache;
+	chunk->flags |= MPTCP_SCHED_FLAG_RESCHEDULE;
+}
+
 SEC(".struct_ops")
 struct mptcp_sched_ops rr = {
 	.init		= (void *)mptcp_sched_rr_init,
 	.release	= (void *)mptcp_sched_rr_release,
 	.get_subflow	= (void *)bpf_rr_get_subflow,
+	.push		= (void *)bpf_rr_push,
 	.name		= "bpf_rr",
 };

@@ -6,6 +6,7 @@
 #include <bpf/bpf_core_read.h>
 
 #define MPTCP_SUBFLOWS_MAX 8
+#define MPTCP_SCHED_FLAG_RESCHEDULE (1 << 0)
 
 extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
