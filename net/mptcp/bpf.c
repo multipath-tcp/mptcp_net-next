@@ -18,8 +18,9 @@
 
 #ifdef CONFIG_BPF_JIT
 static struct bpf_struct_ops bpf_mptcp_sched_ops;
-static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly;
-static u32 mptcp_sock_id, mptcp_subflow_id;
+static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly,
+	*mptcp_sched_chunk_type;
+static u32 mptcp_sock_id, mptcp_subflow_id, mptcp_sched_chunk_id;
 
 static const struct bpf_func_proto *
 bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
@@ -68,6 +69,19 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 			break;
 		default:
 			bpf_log(log, "no write support to mptcp_subflow_context at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else if (t == mptcp_sched_chunk_type) {
+		switch (off) {
+		case offsetof(struct mptcp_sched_chunk, limit):
+			end = offsetofend(struct mptcp_sched_chunk, limit);
+			break;
+		case offsetof(struct mptcp_sched_chunk, flags):
+			end = offsetofend(struct mptcp_sched_chunk, flags);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_sched_chunk at off %d\n",
 				off);
 			return -EACCES;
 		}
@@ -151,6 +165,13 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 		return -EINVAL;
 	mptcp_subflow_id = type_id;
 	mptcp_subflow_type = btf_type_by_id(btf, mptcp_subflow_id);
+
+	type_id = btf_find_by_name_kind(btf, "mptcp_sched_chunk",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_sched_chunk_id = type_id;
+	mptcp_sched_chunk_type = btf_type_by_id(btf, mptcp_sched_chunk_id);
 
 	return 0;
 }
