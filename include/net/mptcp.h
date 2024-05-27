@@ -108,9 +108,38 @@ struct mptcp_sched_data {
 	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
 };
 
+/* MPTCP scheduler push flags */
+#define MPTCP_SCHED_FLAG_RESCHEDULE BIT(0)
+
+/* Represent a chunk of data that will be sent on a subflow */
+struct mptcp_sched_chunk {
+	/* The data sequence number of the first byte of the chunk. read-only. */
+	u64 data_seq;
+
+	/* The maximum number of bytes to send in this chunk.
+	 * Update this value to limit the amount of data to be sent.
+	 */
+	u16 limit;
+
+	/* Define the behavior of the scheduler to apply to this chunk.
+	 * Available flags are:
+	 * - MPTCP_SCHED_FLAG_RESCHEDULE: the scheduler will be called again
+	 *   after processing this chunk (potentially limited).
+	 *
+	 * 0 means default behavior, ie. full chunk sent and subflow continue
+	 * being used for further chunks.
+	 */
+	u16 flags;
+};
+
 struct mptcp_sched_ops {
 	int (*get_subflow)(struct mptcp_sock *msk,
 			   struct mptcp_sched_data *data);
+
+	/* Called before sending data on a subflow. (optional) */
+	void (*push)(struct mptcp_sock *msk,
+		     struct mptcp_subflow_context *subflow,
+		     struct mptcp_sched_chunk *chunk);
 
 	char			name[MPTCP_SCHED_NAME_MAX];
 	struct module		*owner;
