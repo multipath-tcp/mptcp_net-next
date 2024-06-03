@@ -11,7 +11,7 @@ Multipath TCP or MPTCP is an extension to the standard TCP and is described in
 `RFC 8684 (MPTCPv1) <https://www.rfc-editor.org/rfc/rfc8684.html>`_. It allows a
 device to make use of multiple interfaces at once to send and receive TCP
 packets over a single MPTCP connection. MPTCP can aggregate the bandwidth of
-multiple interfaces or prefer the one with the lowest latency, it also allows a
+multiple interfaces or prefer the one with the lowest latency. It also allows a
 fail-over if one path is down, and the traffic is seamlessly reinjected on other
 paths.
 
@@ -65,7 +65,7 @@ mptcp-sysctl.rst. There are two types: the in-kernel one (type ``0``) where the
 same rules are applied for all the connections (see: ``ip mptcp``) ; and the
 userspace one (type ``1``), controlled by a userspace daemon (i.e. `mptcpd
 <https://mptcpd.mptcp.dev/>`_) where different rules can be applied for each
-connection. The path managers can be controlled via a Netlink API, see
+connection. The path managers can be controlled via a Netlink API; see
 netlink_spec/mptcp_pm.rst.
 
 To be able to use multiple IP addresses on a host to create multiple *subflows*
@@ -106,7 +106,7 @@ If MPTCP is not supported, ``errno`` will be set to:
 - ``EPROTONOSUPPORT`` (*Protocol not supported*): MPTCP has not been compiled,
   on kernels >= v5.6.
 - ``ENOPROTOOPT`` (*Protocol not available*): MPTCP has been disabled using
-  ``net.mptcp.enabled`` sysctl knob, see mptcp-sysctl.rst.
+  ``net.mptcp.enabled`` sysctl knob; see mptcp-sysctl.rst.
 
 MPTCP is then opt-in: applications need to explicitly request it. Note that
 applications can be forced to use MPTCP with different techniques, e.g.
