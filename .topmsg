@@ -1,4 +1,17 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-net-lib-do-not-set-ns-var-as-readonly
+Subject: [PATCH] selftests: net: lib: do not set ns var as readonly
 
+It sounds good to mark the global netns variable as 'readonly', but Bash
+doesn't allow the creation of local variable with the same name.
+
+Because it looks like 'readonly' is mainly used here to check if a netns
+with that name has already been set, it sounds fine to check if the
+variable with this name has already been set instead. By doing that, we
+avoid having to modify helpers from MPTCP selftests using the same
+variable name as the one used to store the created netns name.
+
+While at it, also avoid an unnecessary call to 'eval' to set a local
+variable.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
