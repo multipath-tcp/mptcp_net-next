@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] selftests: mptcp: lib: use setup/cleanup_ns helpers
-
-This patch includes lib.sh into mptcp_lib.sh, uses setup_ns helper
-defined in lib.sh to set up namespaces in mptcp_lib_ns_init(), and
-uses cleanup_ns to delete namespaces in mptcp_lib_ns_exit().
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
