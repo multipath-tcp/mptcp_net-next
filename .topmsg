@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-net-lib-support-errexit-with-busywait
+Subject: [PATCH] selftests: net: lib: support errexit with busywait
 
+If errexit is enabled ('set -e'), loopy_wait -- or busywait and others
+using it -- will stop after the first failure.
+
+Note that if the returned status of loopy_wait is checked, and even if
+errexit is enabled, Bash will not stop at the first error.
+
+Fixes: 25ae948b4478 ("selftests/net: add lib.sh")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
