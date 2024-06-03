@@ -1,4 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-lib-use-wait_local_port_listen-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: lib: use wait_local_port_listen helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch includes net_helper.sh into mptcp_lib.sh, uses the helper
+wait_local_port_listen() defined in it to implement the similar mptcp
+helper. This can drop some duplicate code.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
