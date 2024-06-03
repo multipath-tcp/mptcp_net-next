@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-net-lib-avoid-error-removing-empty-netns-name
+Subject: [PATCH] selftests: net: lib: avoid error removing empty netns name
 
+If there is an error to create the first netns with 'setup_ns()',
+'cleanup_ns()' will be called with an empty string as first parameter.
+
+The consequences is that 'cleanup_ns()' will try to delete an invalid
+netns, and wait 20 seconds if the netns list is empty.
+
+Instead of just checking if the name is not empty, convert the string
+separated by spaces to an array. Manipulating the array is cleaner, and
+calling 'cleanup_ns()' with an empty array will be a no-op.
+
+Fixes: 25ae948b4478 ("selftests/net: add lib.sh")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
