@@ -1,7 +1,8 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] selftests: net: lib: ignore possible error
+Subject: [PATCH] selftests: net: lib: ignore possible errors
 
-No need to disable errexit temporary, simply ignore the possible error.
+No need to disable errexit temporary, simply ignore the only possible
+and not handled error.
 
 Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
