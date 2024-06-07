@@ -1,5 +1,5 @@
 From: YonglongLi <liyonglong@chinatelecom.cn>
-Subject: [PATCH] mptcp: increment RmAddr MIB counter once per RM_ADDR
+Subject: [PATCH] mptcp: pm: inc RmAddr MIB counter once per RM_ADDR ID
 
 The RmAddr MIB counter is supposed to be incremented once when a valid
 RM_ADDR has been received. Before this patch, it could have been
