@@ -92,12 +92,12 @@ static const struct bpf_verifier_ops bpf_mptcp_sched_verifier_ops = {
 	.btf_struct_access	= bpf_mptcp_sched_btf_struct_access,
 };
 
-static int bpf_mptcp_sched_reg(void *kdata)
+static int bpf_mptcp_sched_reg(void *kdata, struct bpf_link *link)
 {
 	return mptcp_register_scheduler(kdata);
 }
 
-static void bpf_mptcp_sched_unreg(void *kdata)
+static void bpf_mptcp_sched_unreg(void *kdata, struct bpf_link *link)
 {
 	mptcp_unregister_scheduler(kdata);
 }
