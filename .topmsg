@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-fixed-subtest-names
+Subject: [PATCH] selftests: mptcp: userspace_pm: fixed subtest names
 
+It is important to have a fixed (sub)test names in TAP, because these
+names are used to identify them. If they are not fixed, tracking cannot
+be done.
+
+Some subtests from the userspace_pm selftest were using random numbers
+in their names: address IDs from $RANDOM, and the client port number
+randomly picked by the kernel when creating the connection. These values
+have been replaced by 'client' and 'server' words: that's even more
+helpful than showing random numbers. Note that the addresses IDs are
+incremented and decremented in the test: +1 or -1 are then displayed.
+
+Not to loose info that can be useful for debugging in case of issues,
+these random numbers are now displayed at the beginning of the test.
+
+Fixes: f589234e1af0 ("selftests: mptcp: userspace_pm: format subtests results in TAP")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
