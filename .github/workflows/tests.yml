@@ -171,7 +171,7 @@ jobs:
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         id: tag
         run: |
-          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | grep "^refs/tags/export" | tail -n1)
           echo "Found: ${TAG} (${SHA} - ${BRANCH})"
           TAG="${TAG:10}"
           echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
