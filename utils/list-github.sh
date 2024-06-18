@@ -46,3 +46,6 @@ my_ghi --state closed --since "${LAST_MEETING}"
 
 title "Packetdrill PRs"
 gh_pr "multipath-tcp/packetdrill"
+
+title "mptcp.dev PRs"
+gh_pr "multipath-tcp/mptcp.dev"
