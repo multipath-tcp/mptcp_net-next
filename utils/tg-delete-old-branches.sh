@@ -35,8 +35,8 @@ for i in "${ORPHAN[@]}"; do
 		DELETE+=("${i}")
 		BASE="refs/top-bases/${i}"
 		echo "${i} ${SHA}" >> .tg-delete-old-branches.log
-		TG+=("${BASE}")
-		echo "${BASE} $(git rev-parse "${REFS}/${BASE}")" >> .tg-delete-old-branches.log
+		TB+=("${BASE}")
+		echo "${BASE} $(git rev-parse "${BASE}")" >> .tg-delete-old-branches.log
 	fi
 done
 
