@@ -7,6 +7,13 @@ my_ghi() {
 		grep -v "^# multipath-tcp/mptcp_net-next"
 }
 
+gh_pr() {
+	gh pr list --json number,author,title,updatedAt \
+		--search "draft:false" \
+		--template '# {{range .}}{{tablerow .number (timeago .updatedAt) .author.login .title}}{{end}}' \
+		-R "${@}" | sed 's/^/  /g'
+}
+
 LAST_MEETING="${1:-$(date -dlast-week +%Y-%m-%d)}"
 
 echo "    Recently opened (latest from the last meeting: *TODO*)"
@@ -54,3 +61,9 @@ echo
 echo "    Recently closed (since ${LAST_MEETING})"
 echo
 my_ghi --state closed --since "${LAST_MEETING}"
+
+echo
+echo
+echo "    Packetdrill PRs"
+echo
+gh_pr "multipath-tcp/packetdrill"
