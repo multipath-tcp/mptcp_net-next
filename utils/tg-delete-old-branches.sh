@@ -47,4 +47,6 @@ fi
 
 echo "Delete: ${#DELETE[@]}"
 git push --delete "${ORIGIN}" "${DELETE[@]}" "${TB[@]}"
-git branch -D "${DELETE[@]}" "${TB[@]}"
+for i in "${DELETE[@]}"; do
+	tg delete "${i}"
+done
