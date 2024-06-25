@@ -4083,12 +4083,13 @@ F:	kernel/bpf/ringbuf.c
 
 BPF [SECURITY & LSM] (Security Audit and Enforcement using BPF)
 M:	KP Singh <kpsingh@kernel.org>
-R:	Matt Bobrowski <mattbobrowski@google.com>
+M:	Matt Bobrowski <mattbobrowski@google.com>
 L:	bpf@vger.kernel.org
 S:	Maintained
 F:	Documentation/bpf/prog_lsm.rst
 F:	include/linux/bpf_lsm.h
 F:	kernel/bpf/bpf_lsm.c
+F:	kernel/trace/bpf_trace.c
 F:	security/bpf/
 
 BPF [SELFTESTS] (Test Runners & Infrastructure)
@@ -8810,7 +8811,7 @@ M:	Madalin Bucur <madalin.bucur@nxp.com>
 R:	Sean Anderson <sean.anderson@seco.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
-F:	Documentation/devicetree/bindings/net/fsl-fman.yaml
+F:	Documentation/devicetree/bindings/net/fsl,fman*.yaml
 F:	drivers/net/ethernet/freescale/fman
 
 FREESCALE QORIQ PTP CLOCK DRIVER
