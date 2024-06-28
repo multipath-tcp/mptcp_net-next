@@ -1565,9 +1565,11 @@ u32 ieee80211_sta_get_rates(struct ieee80211_sub_if_data *sdata,
 	return supp_rates;
 }
 
-void ieee80211_stop_device(struct ieee80211_local *local)
+void ieee80211_stop_device(struct ieee80211_local *local, bool suspend)
 {
+	local_bh_disable();
 	ieee80211_handle_queued_frames(local);
+	local_bh_enable();
 
 	ieee80211_led_radio(local, false);
 	ieee80211_mod_tpt_led_trig(local, 0, IEEE80211_TPT_LEDTRIG_FL_RADIO);
@@ -1576,7 +1578,7 @@ void ieee80211_stop_device(struct ieee80211_local *local)
 
 	flush_workqueue(local->workqueue);
 	wiphy_work_flush(local->hw.wiphy, NULL);
-	drv_stop(local);
+	drv_stop(local, suspend);
 }
 
 static void ieee80211_flush_completed_scan(struct ieee80211_local *local,
@@ -2334,7 +2336,7 @@ void ieee80211_recalc_min_chandef(struct ieee80211_sub_if_data *sdata,
 
 		chanctx = container_of(chanctx_conf, struct ieee80211_chanctx,
 				       conf);
-		ieee80211_recalc_chanctx_min_def(local, chanctx, NULL);
+		ieee80211_recalc_chanctx_min_def(local, chanctx, NULL, false);
 	}
 }
 
