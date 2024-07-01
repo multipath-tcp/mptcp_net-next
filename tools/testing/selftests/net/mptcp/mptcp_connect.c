@@ -1119,7 +1119,8 @@ again:
 		if (cfg_input)
 			close(fd);
 		goto again;
-	}
+	} else
+		close(fd);
 
 	return 0;
 }
