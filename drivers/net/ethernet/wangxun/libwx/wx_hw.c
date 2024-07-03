@@ -1977,6 +1977,7 @@ int wx_sw_init(struct wx *wx)
 	}
 
 	bitmap_zero(wx->state, WX_STATE_NBITS);
+	wx->misc_irq_domain = false;
 	bitmap_zero(wx->flags, WX_PF_FLAGS_NBITS);
 
 	return 0;
