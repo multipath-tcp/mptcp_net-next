@@ -55,6 +55,10 @@ static int lan937x_vphy_ind_addr_wr(struct ksz_device *dev, int addr, int reg)
 	u16 addr_base = REG_PORT_T1_PHY_CTRL_BASE;
 	u16 temp;
 
+	if ((dev->info->chip_id == LAN9371_CHIP_ID ||
+	     dev->info->chip_id == LAN9372_CHIP_ID) && addr == KSZ_PORT_4)
+		addr_base = REG_PORT_TX_PHY_CTRL_BASE;
+
 	/* get register address based on the logical port */
 	temp = PORT_CTRL_ADDR(addr, (addr_base + (reg << 2)));
 
@@ -385,6 +389,9 @@ int lan937x_setup(struct dsa_switch *ds)
 	/* disable CLK125 & CLK25, 1: disable, 0: enable */
 	lan937x_cfg(dev, REG_SW_GLOBAL_OUTPUT_CTRL__1,
 		    (SW_CLK125_ENB | SW_CLK25_ENB), true);
+
+	/* Disable global VPHY support. Related to CPU interface only? */
+	ksz_rmw32(dev, REG_SW_CFG_STRAP_OVR, SW_VPHY_DISABLE, SW_VPHY_DISABLE);
 
 	return 0;
 }
