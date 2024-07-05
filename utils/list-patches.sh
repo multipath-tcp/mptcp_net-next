@@ -110,17 +110,17 @@ list() { local list desc id name state tag n patch submitter series sid url
 		# more than one state
 		if [ "${#}" -gt 1 ]; then
 			[ "${state}" = "rfc" ] && state=RFC || state=${state//-/ }
-			echo "      - State: ${state^}"
+			echo "    - State: ${state^}"
 		fi
 
 		if [ "${n}" = "series" ]; then
 			url="https://patchwork.kernel.org/project/mptcp/list/?series=${sid}&state=*&archive=both"
 
-			echo "      - Series: ${series//#/\"}"
+			echo "    - Series: ${series//#/\"}"
 		fi
 
-		echo "      - Submitter: ${submitter//#/\"}"
-		echo "      - URL: ${url//#/\"}"
+		echo "    - Submitter: ${submitter//#/\"}"
+		echo "    - URL: ${url//#/\"}"
 		echo
 	done
 
