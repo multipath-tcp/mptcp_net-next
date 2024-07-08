@@ -3396,7 +3396,7 @@ static int mtk_open(struct net_device *dev)
 
 		for (i = 0; i < MTK_MAX_DEVS; i++) {
 			if (!eth->netdev[i])
-				break;
+				continue;
 
 			target_mac = netdev_priv(eth->netdev[i]);
 			if (!soc->offload_version) {
@@ -4464,6 +4464,20 @@ static int mtk_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 	return ret;
 }
 
+static void mtk_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam *pause)
+{
+	struct mtk_mac *mac = netdev_priv(dev);
+
+	phylink_ethtool_get_pauseparam(mac->phylink, pause);
+}
+
+static int mtk_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *pause)
+{
+	struct mtk_mac *mac = netdev_priv(dev);
+
+	return phylink_ethtool_set_pauseparam(mac->phylink, pause);
+}
+
 static u16 mtk_select_queue(struct net_device *dev, struct sk_buff *skb,
 			    struct net_device *sb_dev)
 {
@@ -4492,8 +4506,10 @@ static const struct ethtool_ops mtk_ethtool_ops = {
 	.get_strings		= mtk_get_strings,
 	.get_sset_count		= mtk_get_sset_count,
 	.get_ethtool_stats	= mtk_get_ethtool_stats,
+	.get_pauseparam		= mtk_get_pauseparam,
+	.set_pauseparam		= mtk_set_pauseparam,
 	.get_rxnfc		= mtk_get_rxnfc,
-	.set_rxnfc              = mtk_set_rxnfc,
+	.set_rxnfc		= mtk_set_rxnfc,
 };
 
 static const struct net_device_ops mtk_netdev_ops = {
