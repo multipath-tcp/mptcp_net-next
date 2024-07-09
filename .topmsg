@@ -1,8 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] selftests: mptcp: add explicit test case for remove/readd
-
-Delete and re-create a signal endpoint and ensure that the PM
-actually deletes and re-create the subflow.
-
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
