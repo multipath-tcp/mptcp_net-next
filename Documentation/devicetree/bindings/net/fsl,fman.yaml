@@ -78,6 +78,12 @@ properties:
       - description: The first element is associated with the event interrupts.
       - description: the second element is associated with the error interrupts.
 
+  dma-coherent: true
+
+  ptimer-handle:
+    $ref: /schemas/types.yaml#/definitions/phandle
+    description: see ptp/fsl,ptp.yaml
+
   fsl,qman-channel-range:
     $ref: /schemas/types.yaml#/definitions/uint32-array
     description:
