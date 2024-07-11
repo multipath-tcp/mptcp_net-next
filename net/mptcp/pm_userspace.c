@@ -137,7 +137,7 @@ int mptcp_userspace_pm_get_flags_and_ifindex_by_id(struct mptcp_sock *msk,
 }
 
 int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
-				    struct mptcp_addr_info *skc)
+				    struct mptcp_addr_info *skc, bool *backup)
 {
 	struct mptcp_pm_addr_entry *entry = NULL, *e, new_entry;
 	__be16 msk_sport =  ((struct inet_sock *)
@@ -151,8 +151,10 @@ int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
 		}
 	}
 	spin_unlock_bh(&msk->pm.lock);
-	if (entry)
+	if (entry) {
+		*backup = !!(entry->flags & MPTCP_PM_ADDR_FLAG_BACKUP);
 		return entry->addr.id;
+	}
 
 	memset(&new_entry, 0, sizeof(struct mptcp_pm_addr_entry));
 	new_entry.addr = *skc;

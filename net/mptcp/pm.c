@@ -405,13 +405,16 @@ out_unlock:
 	return ret;
 }
 
-int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
+int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc,
+			  bool *backup)
 {
 	struct mptcp_addr_info skc_local;
 	struct mptcp_addr_info msk_local;
 
 	if (WARN_ON_ONCE(!msk))
 		return -1;
+
+	*backup = false;
 
 	/* The 0 ID mapping is defined by the first subflow, copied into the msk
 	 * addr
@@ -422,8 +425,8 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 		return 0;
 
 	if (mptcp_pm_is_userspace(msk))
-		return mptcp_userspace_pm_get_local_id(msk, &skc_local);
-	return mptcp_pm_nl_get_local_id(msk, &skc_local);
+		return mptcp_userspace_pm_get_local_id(msk, &skc_local, backup);
+	return mptcp_pm_nl_get_local_id(msk, &skc_local, backup);
 }
 
 int mptcp_pm_get_flags_and_ifindex_by_id(struct mptcp_sock *msk, unsigned int id,
