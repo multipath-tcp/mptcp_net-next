@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-lib-fix-shellcheck-errors
+Subject: [PATCH] selftests: mptcp: lib: fix shellcheck errors
 
+It looks like we missed these two errors recently:
+
+  - SC2068: Double quote array expansions to avoid re-splitting elements.
+  - SC2145: Argument mixes string and array. Use * or separate argument.
+
+Two simple fixes, it is not supposed to change the behaviour as the
+variable names should not have any spaces in their names. Still, better
+to fix them to easily spot new issues.
+
+Fixes: f265d3119a29 ("selftests: mptcp: lib: use setup/cleanup_ns helpers")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
