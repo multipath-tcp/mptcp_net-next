@@ -6820,7 +6820,7 @@ tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (sk->sk_shutdown & SEND_SHUTDOWN)
 			tcp_shutdown(sk, SEND_SHUTDOWN);
 
-		if (sk->sk_socket)
+		if (sk->sk_socket && !sk_is_mptcp(sk))
 			goto consume;
 		break;
 
