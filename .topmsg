@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/Revert-tcp-Don-t-drop-SYN-ACK-for-simultaneous-connect
+Subject: [PATCH] Revert "tcp: Don't drop SYN+ACK for simultaneous connect()"
 
+This reverts commit 23e89e8ee7be73e21200947885a6d3a109a2c58d.
+
+This patch is currently causing issues. Reverting it for the moment
+while a proper solution is being investigated.
+
+Link: https://lore.kernel.org/mptcp/20240715-mptcp-process-4th-ack-mpj-v1-1-d44fc90245e2@kernel.org/
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
