@@ -87,6 +87,7 @@ static struct mptcp_sock *subflow_token_join_request(struct request_sock *req)
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
 	struct mptcp_sock *msk;
 	int local_id;
+	bool backup;
 
 	msk = mptcp_token_get_sock(sock_net(req_to_sk(req)), subflow_req->token);
 	if (!msk) {
@@ -94,12 +95,13 @@ static struct mptcp_sock *subflow_token_join_request(struct request_sock *req)
 		return NULL;
 	}
 
-	local_id = mptcp_pm_get_local_id(msk, (struct sock_common *)req);
+	local_id = mptcp_pm_get_local_id(msk, (struct sock_common *)req, &backup);
 	if (local_id < 0) {
 		sock_put((struct sock *)msk);
 		return NULL;
 	}
 	subflow_req->local_id = local_id;
+	subflow_req->request_bkup = backup;
 
 	return msk;
 }
@@ -610,16 +612,19 @@ static int subflow_chk_local_id(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
+	bool backup;
 	int err;
 
 	if (likely(subflow->local_id >= 0))
 		return 0;
 
-	err = mptcp_pm_get_local_id(msk, (struct sock_common *)sk);
+	err = mptcp_pm_get_local_id(msk, (struct sock_common *)sk, &backup);
 	if (err < 0)
 		return err;
 
 	subflow_set_local_id(subflow, err);
+	subflow->request_bkup = backup;
+
 	return 0;
 }
 
