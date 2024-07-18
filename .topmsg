@@ -1,4 +1,63 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-process-the-3rd-ACK-with-sk_socket-for-TFO-MPTCP
+Subject: [PATCH] tcp: process the 3rd ACK with sk_socket for TFO/MPTCP
 
+The 'Fixes' commit recently changed the behaviour of TCP by skipping the
+processing of the 3rd ACK when a sk->sk_socket is set. The goal was to
+skip tcp_ack_snd_check() in tcp_rcv_state_process() not to send an
+unnecessary ACK in case of simultaneous connect(). Unfortunately, that
+had an impact on TFO and MPTCP.
+
+I started to look at the impact on MPTCP, because the MPTCP CI found
+some issues with the MPTCP Packetdrill tests [1]. Then Paolo suggested
+me to look at the impact on TFO with "plain" TCP.
+
+For MPTCP, when receiving the 3rd ACK of a request adding a new path
+(MP_JOIN), sk->sk_socket will be set, and point to the MPTCP sock that
+has been created when the MPTCP connection got established before with
+the first path. The newly added 'goto' will then skip the processing of
+the segment text (step 7) and not go through tcp_data_queue() where the
+MPTCP options are validated, and some actions are triggered, e.g.
+sending the MPJ 4th ACK [2] as demonstrated by the new errors when
+running a packetdrill test [3] establishing a second subflow.
+
+This doesn't fully break MPTCP, mainly the 4th MPJ ACK that will be
+delayed. Still, we don't want to have this behaviour as it delays the
+switch to the fully established mode, and invalid MPTCP options in this
+3rd ACK will not be caught any more. This modification also affects the
+MPTCP + TFO feature as well, and being the reason why the selftests
+started to be unstable the last few days [4].
+
+For TFO, the existing 'basic-cookie-not-reqd' test [5] was no longer
+passing: if the 3rd ACK contains data, and the connection is accept()ed
+before receiving them, these data would no longer be processed, and thus
+not ACKed.
+
+One last thing about MPTCP, in case of simultaneous connect(), a
+fallback to TCP will be done, which seems fine:
+
+  `../common/defaults.sh`
+
+   0 socket(..., SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_MPTCP) = 3
+  +0 connect(3, ..., ...) = -1 EINPROGRESS (Operation now in progress)
+
+  +0 > S  0:0(0)                 <mss 1460, sackOK, TS val 100 ecr 0,   nop, wscale 8, mpcapable v1 flags[flag_h] nokey>
+  +0 < S  0:0(0) win 1000        <mss 1460, sackOK, TS val 407 ecr 0,   nop, wscale 8, mpcapable v1 flags[flag_h] nokey>
+  +0 > S. 0:0(0) ack 1           <mss 1460, sackOK, TS val 330 ecr 0,   nop, wscale 8, mpcapable v1 flags[flag_h] nokey>
+  +0 < S. 0:0(0) ack 1 win 65535 <mss 1460, sackOK, TS val 700 ecr 100, nop, wscale 8, mpcapable v1 flags[flag_h] key[skey=2]>
+
+  +0 write(3, ..., 100) = 100
+  +0 >  . 1:1(0)     ack 1 <nop, nop, TS val 845707014 ecr 700, nop, nop, sack 0:1>
+  +0 > P. 1:101(100) ack 1 <nop, nop, TS val 845958933 ecr 700>
+
+Simultaneous SYN-data crossing is also not supported by TFO, see [6].
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/actions/runs/9936227696 [1]
+Link: https://datatracker.ietf.org/doc/html/rfc8684#fig_tokens [2]
+Link: https://github.com/multipath-tcp/packetdrill/blob/mptcp-net-next/gtests/net/mptcp/syscalls/accept.pkt#L28 [3]
+Link: https://netdev.bots.linux.dev/contest.html?executor=vmksft-mptcp-dbg&test=mptcp-connect-sh [4]
+Link: https://github.com/google/packetdrill/blob/master/gtests/net/tcp/fastopen/server/basic-cookie-not-reqd.pkt#L21 [5]
+Link: https://github.com/google/packetdrill/blob/master/gtests/net/tcp/fastopen/client/simultaneous-fast-open.pkt [6]
+Fixes: 23e89e8ee7be ("tcp: Don't drop SYN+ACK for simultaneous connect().")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Suggested-by: Kuniyuki Iwashima <kuniyu@amazon.com>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
