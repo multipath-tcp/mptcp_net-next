@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] selftests: mptcp: fix error path
-
-pm_nl_check_endpoint() currently calls an not existing helper
-to mark the test as failed. Fix the wrong call.
-
-Fixes: 03668c65d153 ("selftests: mptcp: join: rework detailed report")
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
