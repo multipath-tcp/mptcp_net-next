@@ -6797,9 +6797,9 @@ tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 		/* Note, that this wakeup is only for marginal crossed SYN case.
 		 * Passively open sockets are not waked up, because
-		 * sk->sk_sleep == NULL and sk->sk_socket == NULL.
+		 * sk->sk_wq == NULL and sk->sk_socket == NULL.
 		 */
-		if (sk->sk_socket)
+		if (sk->sk_socket && th->syn)
 			sk_wake_async(sk, SOCK_WAKE_IO, POLL_OUT);
 
 		tp->snd_una = TCP_SKB_CB(skb)->ack_seq;
@@ -6820,7 +6820,12 @@ tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (sk->sk_shutdown & SEND_SHUTDOWN)
 			tcp_shutdown(sk, SEND_SHUTDOWN);
 
-		if (sk->sk_socket)
+		/* For crossed SYN cases, not to send an unnecessary ACK.
+		 * Note that sk->sk_socket can be assigned in other cases, e.g.
+		 * with TFO (if accept()'ed before the 3rd ACK) and MPTCP (MPJ:
+		 * sk_socket is the parent MPTCP sock).
+		 */
+		if (sk->sk_socket && th->syn)
 			goto consume;
 		break;
 
