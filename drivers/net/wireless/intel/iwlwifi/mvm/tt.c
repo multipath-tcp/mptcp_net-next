@@ -633,7 +633,7 @@ static int iwl_mvm_tzone_get_temp(struct thermal_zone_device *device,
 }
 
 static int iwl_mvm_tzone_set_trip_temp(struct thermal_zone_device *device,
-				       int trip, int temp)
+				       const struct thermal_trip *trip, int temp)
 {
 	struct iwl_mvm *mvm = thermal_zone_device_priv(device);
 
