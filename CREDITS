@@ -271,6 +271,9 @@ D: Driver for WaveFront soundcards (Turtle Beach Maui, Tropez, Tropez+)
 D: Various bugfixes and changes to sound drivers
 S: USA
 
+N: Daniel Bristot de Oliveira
+D: Scheduler contributions, notably: SCHED_DEADLINE
+
 N: Carlos Henrique Bauer
 E: chbauer@acm.org
 E: bauer@atlas.unisinos.br
@@ -795,6 +798,11 @@ N: Luis Correia
 E: luisfcorreia@gmail.com
 D: Ralink rt2x00 WLAN driver
 S: Belas, Portugal
+
+N: Benoît Cousson
+E: bcousson@baylibre.com
+D: TI OMAP Devicetree platforms
+D: TI OMAP HWMOD boards
 
 N: Alan Cox
 W: http://www.linux.org.uk/diary/
@@ -4367,6 +4375,10 @@ D: IP virtual server (IPVS).
 N: Haojian Zhuang
 E: haojian.zhuang@gmail.com
 D: MMP support
+
+N: Tsahee Zidenberg
+E: tsahee@annapurnalabs.com
+D: Annapurna Labs Alpine Architecture
 
 N: Richard Zidlicky
 E: rz@linux-m68k.org, rdzidlic@geocities.com
