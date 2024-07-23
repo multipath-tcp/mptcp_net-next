@@ -29,7 +29,8 @@ int BPF_PROG(bpf_bkup_get_subflow, struct mptcp_sock *msk,
 		if (!subflow)
 			break;
 
-		if (!BPF_CORE_READ_BITFIELD_PROBED(subflow, backup)) {
+		if (!BPF_CORE_READ_BITFIELD_PROBED(subflow, backup) ||
+		    !BPF_CORE_READ_BITFIELD_PROBED(subflow, request_bkup)) {
 			nr = i;
 			break;
 		}
