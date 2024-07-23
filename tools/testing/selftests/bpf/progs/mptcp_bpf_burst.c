@@ -85,9 +85,13 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	}
 
 	for (i = 0; i < data->subflows && i < MPTCP_SUBFLOWS_MAX; i++) {
+		bool backup;
+
 		subflow = bpf_mptcp_subflow_ctx_by_pos(data, i);
 		if (!subflow)
 			break;
+
+		backup = subflow->backup || subflow->request_bkup;
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
 		if (!mptcp_subflow_active(subflow))
@@ -103,9 +107,9 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 		}
 
 		linger_time = div_u64((__u64)ssk->sk_wmem_queued << 32, pace);
-		if (linger_time < send_info[subflow->backup].linger_time) {
-			send_info[subflow->backup].subflow_id = i;
-			send_info[subflow->backup].linger_time = linger_time;
+		if (linger_time < send_info[backup].linger_time) {
+			send_info[backup].subflow_id = i;
+			send_info[backup].linger_time = linger_time;
 		}
 	}
 	mptcp_set_timeout(sk);
@@ -160,7 +164,7 @@ static int bpf_burst_get_retrans(struct mptcp_sock *msk,
 			continue;
 		}
 
-		if (subflow->backup) {
+		if (subflow->backup || subflow->request_bkup) {
 			if (backup == MPTCP_SUBFLOWS_MAX)
 				backup = i;
 			continue;
