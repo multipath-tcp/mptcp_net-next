@@ -8,8 +8,8 @@ unnecessary ACK in case of simultaneous connect(). Unfortunately, that
 had an impact on TFO and MPTCP.
 
 I started to look at the impact on MPTCP, because the MPTCP CI found
-some issues with the MPTCP Packetdrill tests [1]. Then Paolo suggested
-me to look at the impact on TFO with "plain" TCP.
+some issues with the MPTCP Packetdrill tests [1]. Then Paolo Abeni
+suggested me to look at the impact on TFO with "plain" TCP.
 
 For MPTCP, when receiving the 3rd ACK of a request adding a new path
 (MP_JOIN), sk->sk_socket will be set, and point to the MPTCP sock that
@@ -44,12 +44,31 @@ fallback to TCP will be done, which seems fine:
   +0 < S  0:0(0) win 1000        <mss 1460, sackOK, TS val 407 ecr 0,   nop, wscale 8, mpcapable v1 flags[flag_h] nokey>
   +0 > S. 0:0(0) ack 1           <mss 1460, sackOK, TS val 330 ecr 0,   nop, wscale 8, mpcapable v1 flags[flag_h] nokey>
   +0 < S. 0:0(0) ack 1 win 65535 <mss 1460, sackOK, TS val 700 ecr 100, nop, wscale 8, mpcapable v1 flags[flag_h] key[skey=2]>
-
-  +0 write(3, ..., 100) = 100
-  +0 >  . 1:1(0)     ack 1 <nop, nop, TS val 845707014 ecr 700, nop, nop, sack 0:1>
-  +0 > P. 1:101(100) ack 1 <nop, nop, TS val 845958933 ecr 700>
+  +0 >  . 1:1(0) ack 1           <nop, nop, TS val 845707014 ecr 700, nop, nop, sack 0:1>
 
 Simultaneous SYN-data crossing is also not supported by TFO, see [6].
+
+Kuniyuki Iwashima suggested to restrict the processing to SYN+ACK only:
+that's a more generic solution than the one initially proposed, and
+also enough to fix the issues described above.
+
+Later on, Eric Dumazet mentioned that an ACK should still be sent in
+reaction to the second SYN+ACK that is received: not sending a DUPACK
+here seems wrong and could hurt:
+
+   0 socket(..., SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_TCP) = 3
+  +0 connect(3, ..., ...) = -1 EINPROGRESS (Operation now in progress)
+
+  +0 > S  0:0(0)                <mss 1460, sackOK, TS val 1000 ecr 0,nop,wscale 8>
+  +0 < S  0:0(0)       win 1000 <mss 1000, sackOK, nop, nop>
+  +0 > S. 0:0(0) ack 1          <mss 1460, sackOK, TS val 3308134035 ecr 0,nop,wscale 8>
+  +0 < S. 0:0(0) ack 1 win 1000 <mss 1000, sackOK, nop, nop>
+  +0 >  . 1:1(0) ack 1          <nop, nop, sack 0:1>  // <== Here
+
+So in this version, the 'goto consume' is dropped, to always send an ACK
+when switching from TCP_SYN_RECV to TCP_ESTABLISHED. This ACK will be
+seen as a DUPACK -- with DSACK if SACK has been negotiated -- in case of
+simultaneous SYN crossing: that's what is expected here.
 
 Link: https://github.com/multipath-tcp/mptcp_net-next/actions/runs/9936227696 [1]
 Link: https://datatracker.ietf.org/doc/html/rfc8684#fig_tokens [2]
@@ -60,4 +79,6 @@ Link: https://github.com/google/packetdrill/blob/master/gtests/net/tcp/fastopen/
 Fixes: 23e89e8ee7be ("tcp: Don't drop SYN+ACK for simultaneous connect().")
 Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Suggested-by: Kuniyuki Iwashima <kuniyu@amazon.com>
+Suggested-by: Eric Dumazet <edumazet@google.com>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
