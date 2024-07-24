@@ -1,0 +1,16 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: add CI support
+
+Currently supported:
+
+- Github Actions:
+  - build-validation: check different combinations of validation
+  - checkpatch: use checkpatch.pl to validate new commits
+  - notif: send notifications to the IRC channel and emails
+  - Update TopGit tree: sync with net and net-next and then override the
+    export branches.
+
+- Cirrus:
+  - Run tests in a KVM: selftests, kunit, packetdrill, etc.
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
