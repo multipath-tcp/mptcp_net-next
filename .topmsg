@@ -1,4 +1,26 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Filter-out-_GNU_SOURCE-when-compiling-test_cpp
+From: Stanislav Fomichev <sdf@fomichev.me>
+Subject: [PATCH] selftests/bpf: Filter out _GNU_SOURCE when compiling test_cpp
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Jakub reports build failures when merging linux/master with net tree:
+
+CXX      test_cpp
+In file included from <built-in>:454:
+<command line>:2:9: error: '_GNU_SOURCE' macro redefined [-Werror,-Wmacro-redefined]
+    2 | #define _GNU_SOURCE
+      |         ^
+<built-in>:445:9: note: previous definition is here
+  445 | #define _GNU_SOURCE 1
+
+The culprit is commit cc937dad85ae ("selftests: centralize -D_GNU_SOURCE= to
+CFLAGS in lib.mk") which unconditionally added -D_GNU_SOUCE to CLFAGS.
+Apparently clang++ also unconditionally adds it for the C++ targets [0]
+which causes a conflict. Add small change in the selftests makefile
+to filter it out for test_cpp.
+
+Not sure which tree it should go via, targeting bpf for now, but net
+might be better?
+
+0: https://stackoverflow.com/questions/11670581/why-is-gnu-source-defined-by-default-and-how-to-turn-it-off
+
+Cc: Jakub Kicinski <kuba@kernel.org>
+Signed-off-by: Stanislav Fomichev <sdf@fomichev.me>
