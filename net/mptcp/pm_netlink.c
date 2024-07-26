@@ -1411,6 +1411,11 @@ static bool remove_anno_list_by_saddr(struct mptcp_sock *msk,
 
 	entry = mptcp_pm_del_add_timer(msk, addr, false);
 	if (entry) {
+		spin_lock_bh(&msk->pm.lock);
+		__set_bit(entry->addr.id ? : msk->mpc_endpoint_id,
+			  msk->pm.id_avail_bitmap);
+		spin_unlock_bh(&msk->pm.lock);
+
 		list_del(&entry->list);
 		kfree(entry);
 		return true;
