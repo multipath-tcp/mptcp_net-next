@@ -1,4 +1,24 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-re-using-ID-of-unused-ADD_ADDR
+Subject: [PATCH] selftests: mptcp: join: check re-using ID of unused ADD_ADDR
 
+This test extends "delete re-add signal" to validate the previous
+commit. An extra address is announced by the server, but this address
+cannot be used by the client. The result is that no subflow will be
+established to this address.
+
+Later, the server will delete this extra endpoint, and set a new one,
+with a valid address, but re-using the same ID. Before the previous
+commit, the server would not have been able to announce this new
+address.
+
+While at it, extra checks have been added to validate the expected
+numbers of MPJ, ADD_ADDR and RM_ADDR.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: b6c08380860b ("mptcp: remove addr and subflow in PM netlink")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
