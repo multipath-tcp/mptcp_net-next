@@ -792,6 +792,25 @@
 			Documentation/networking/netconsole.rst for an
 			alternative.
 
+		<DEVNAME>:<n>.<n>[,options]
+			Use the specified serial port on the serial core bus.
+			The addressing uses DEVNAME of the physical serial port
+			device, followed by the serial core controller instance,
+			and the serial port instance. The options are the same
+			as documented for the ttyS addressing above.
+
+			The mapping of the serial ports to the tty instances
+			can be viewed with:
+
+			$ ls -d /sys/bus/serial-base/devices/*:*.*/tty/*
+			/sys/bus/serial-base/devices/00:04:0.0/tty/ttyS0
+
+			In the above example, the console can be addressed with
+			console=00:04:0.0. Note that a console addressed this
+			way will only get added when the related device driver
+			is ready. The use of an earlycon parameter in addition to
+			the console may be desired for console output early on.
+
 		uart[8250],io,<addr>[,options]
 		uart[8250],mmio,<addr>[,options]
 		uart[8250],mmio16,<addr>[,options]
@@ -1984,7 +2003,7 @@
 			for the device. By default it is set to false (0).
 
 	ieee754=	[MIPS] Select IEEE Std 754 conformance mode
-			Format: { strict | legacy | 2008 | relaxed }
+			Format: { strict | legacy | 2008 | relaxed | emulated }
 			Default: strict
 
 			Choose which programs will be accepted for execution
@@ -2004,6 +2023,8 @@
 				by the FPU
 			relaxed	accept any binaries regardless of whether
 				supported by the FPU
+			emulated accept any binaries but enable FPU emulator
+				if binary mode is unsupported by the FPU.
 
 			The FPU emulator is always able to support both NaN
 			encodings, so if no FPU hardware is present or it has
@@ -2700,6 +2721,24 @@
 	kvm-arm.vgic_v4_enable=
 			[KVM,ARM,EARLY] Allow use of GICv4 for direct
 			injection of LPIs.
+
+	kvm-arm.wfe_trap_policy=
+			[KVM,ARM] Control when to set WFE instruction trap for
+			KVM VMs. Traps are allowed but not guaranteed by the
+			CPU architecture.
+
+			trap: set WFE instruction trap
+
+			notrap: clear WFE instruction trap
+
+	kvm-arm.wfi_trap_policy=
+			[KVM,ARM] Control when to set WFI instruction trap for
+			KVM VMs. Traps are allowed but not guaranteed by the
+			CPU architecture.
+
+			trap: set WFI instruction trap
+
+			notrap: clear WFI instruction trap
 
 	kvm_cma_resv_ratio=n [PPC,EARLY]
 			Reserves given percentage from system memory area for
@@ -4015,9 +4054,9 @@
 			prediction) vulnerability. System may allow data
 			leaks with this option.
 
-	no-steal-acc	[X86,PV_OPS,ARM64,PPC/PSERIES,RISCV,EARLY] Disable
-			paravirtualized steal time accounting. steal time is
-			computed, but won't influence scheduler behaviour
+	no-steal-acc	[X86,PV_OPS,ARM64,PPC/PSERIES,RISCV,LOONGARCH,EARLY]
+			Disable paravirtualized steal time accounting. steal time
+			is computed, but won't influence scheduler behaviour
 
 	nosync		[HW,M68K] Disables sync negotiation for all devices.
 
@@ -4545,6 +4584,38 @@
 				bridges without forcing it upstream. Note:
 				this removes isolation between devices and
 				may put more devices in an IOMMU group.
+		config_acs=
+				Format:
+				<ACS flags>@<pci_dev>[; ...]
+				Specify one or more PCI devices (in the format
+				specified above) optionally prepended with flags
+				and separated by semicolons. The respective
+				capabilities will be enabled, disabled or
+				unchanged based on what is specified in
+				flags.
+
+				ACS Flags is defined as follows:
+				  bit-0 : ACS Source Validation
+				  bit-1 : ACS Translation Blocking
+				  bit-2 : ACS P2P Request Redirect
+				  bit-3 : ACS P2P Completion Redirect
+				  bit-4 : ACS Upstream Forwarding
+				  bit-5 : ACS P2P Egress Control
+				  bit-6 : ACS Direct Translated P2P
+				Each bit can be marked as:
+				  '0' – force disabled
+				  '1' – force enabled
+				  'x' – unchanged
+				For example,
+				  pci=config_acs=10x
+				would configure all devices that support
+				ACS to enable P2P Request Redirect, disable
+				Translation Blocking, and leave Source
+				Validation unchanged from whatever power-up
+				or firmware set it to.
+
+				Note: this may remove isolation between devices
+				and may put more devices in an IOMMU group.
 		force_floating	[S390] Force usage of floating interrupts.
 		nomio		[S390] Do not use MIO instructions.
 		norid		[S390] ignore the RID field and force use of
@@ -7022,6 +7093,9 @@
 	usb-storage.delay_use=
 			[UMS] The delay in seconds before a new device is
 			scanned for Logical Units (default 1).
+			Optionally the delay in milliseconds if the value has
+			suffix with "ms".
+			Example: delay_use=2567ms
 
 	usb-storage.quirks=
 			[UMS] A list of quirks entries to supplement or
@@ -7165,9 +7239,12 @@
 
 	vmalloc=nn[KMG]	[KNL,BOOT,EARLY] Forces the vmalloc area to have an
 			exact size of <nn>. This can be used to increase
-			the minimum size (128MB on x86). It can also be
-			used to decrease the size and leave more room
-			for directly mapped kernel RAM.
+			the minimum size (128MB on x86, arm32 platforms).
+			It can also be used to decrease the size and leave more room
+			for directly mapped kernel RAM. Note that this parameter does
+			not exist on many other platforms (including arm64, alpha,
+			loongarch, arc, csky, hexagon, microblaze, mips, nios2, openrisc,
+			parisc, m64k, powerpc, riscv, sh, um, xtensa, s390, sparc).
 
 	vmcp_cma=nn[MG]	[KNL,S390,EARLY]
 			Sets the memory size reserved for contiguous memory
