@@ -1372,6 +1372,66 @@ chk_join_nr()
 	fi
 }
 
+chk_join_tx_nr()
+{
+	local syn_nr=$1
+	local festab=$2
+	local create=$3
+	local bind=$4
+	local connect=$5
+	local count
+
+	print_check "syn TX"
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTx")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$syn_nr" ]; then
+		fail_test "got $count JOIN[s] syn TX expected $syn_nr"
+	else
+		print_ok
+	fi
+
+	print_check "syn TX Fully Estab Error"
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxFEstabErr")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$festab" ]; then
+		fail_test "got $count JOIN[s] syn TX Fully Estab Error expected $festab"
+	else
+		print_ok
+	fi
+
+	print_check "syn TX Create Socket Error"
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxCreatSkErr")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$create" ]; then
+		fail_test "got $count JOIN[s] syn TX Create Socket Error expected $create"
+	else
+		print_ok
+	fi
+
+	print_check "syn TX Bind Error"
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxBindErr")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$bind" ]; then
+		fail_test "got $count JOIN[s] syn TX Bind Error expected $bind"
+	else
+		print_ok
+	fi
+
+	print_check "syn TX Connect Error"
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxConnectErr")
+	if [ -z "$count" ]; then
+		print_skip
+	elif [ "$count" != "$connect" ]; then
+		fail_test "got $count JOIN[s] syn TX Connect Error expected $connect"
+	else
+		print_ok
+	fi
+}
+
 # a negative value for 'stale_max' means no upper bound:
 # for bidirectional transfer, if one peer sleep for a while
 # - as these tests do - we can have a quite high number of
@@ -1907,6 +1967,7 @@ subflows_error_tests()
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
 		chk_join_nr 0 0 0
+		chk_join_tx_nr 0 0 0 0 0
 	fi
 
 	# multiple subflows, with subflow creation error
@@ -1919,6 +1980,7 @@ subflows_error_tests()
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
 		chk_join_nr 1 1 1
+		chk_join_tx_nr 2 0 0 0 0
 	fi
 
 	# multiple subflows, with subflow timeout on MPJ
@@ -2306,6 +2368,7 @@ remove_tests()
 		addr_nr_ns1=-3 speed=10 \
 			run_tests $ns1 $ns2 10.0.1.1
 		chk_join_nr 1 1 1
+		chk_join_tx_nr 2 0 0 0 1
 		chk_add_nr 3 3
 		chk_rm_nr 3 1 invert
 		chk_rst_nr 0 0
