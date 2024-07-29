@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-simplify-checksum_tests
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: join: simplify checksum_tests
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The four checksum tests are similar, only one line is different. So
+a for-loop can be used to simplify these tests.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
