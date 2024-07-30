@@ -357,9 +357,12 @@ static int endpoint_init(char *flags)
 	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
 	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
-	/* It would be better to use  "ip -net %s mptcp endpoint add %s %s",
+	/* It would be better to use
+	 *	ip -net %s mptcp limits set add_addr_accepted 8 subflows 8
+	 *	ip -net %s mptcp endpoint add %s %s
 	 * but the BPF CI is using an old version of IPRoute (5.5.0).
 	 */
+	SYS(fail, "ip netns exec %s ./mptcp_pm_nl_ctl limits 8 8", NS_TEST);
 	SYS(fail, "ip netns exec %s ./mptcp_pm_nl_ctl add %s flags %s", NS_TEST, ADDR_2, flags);
 
 	return 0;
