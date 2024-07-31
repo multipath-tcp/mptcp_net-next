@@ -1,4 +1,24 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-only-decrement-add_addr_accepted-for-MPJ-req
+Subject: [PATCH] mptcp: pm: only decrement add_addr_accepted for MPJ req
 
+Adding the following warning ...
+
+  WARN_ON_ONCE(msk->pm.add_addr_accepted == 0)
+
+... before decrementing the add_addr_accepted counter helped to find a
+bug when running the "remove single subflow" subtest from the
+mptcp_join.sh selftest.
+
+Removing a 'subflow' endpoint will first trigger a RM_ADDR, then the
+subflow closure. Before this patch, and upon the reception of the
+RM_ADDR, the other peer will then try to decrement this
+add_addr_accepted. That's not correct because the attached subflows have
+not been created upon the reception of an ADD_ADDR.
+
+A way to solve that is to decrement the counter only if the attached
+subflow was an MP_JOIN to a remote id that was not 0, and initiated by
+the host receiving the RM_ADDR.
+
+Fixes: d0876b2284cf ("mptcp: add the incoming RM_ADDR support")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
