@@ -1,4 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-only-in-kernel-cannot-have-entries-with-ID-0
+Subject: [PATCH] mptcp: pm: only in-kernel cannot have entries with ID 0
 
+The ID 0 is specific per MPTCP connections. The per netns entries cannot
+have this special ID 0 then.
+
+But that's different for the userspace PM where the entries are per
+connection, they can then use this special ID 0.
+
+Fixes: f40be0db0b76 ("mptcp: unify pm get_flags_and_ifindex_by_id")
+Acked-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
