@@ -1,4 +1,9 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-check-add_addr_accept_max-before-accepting-new-ADD_ADDR
+Subject: [PATCH] mptcp: pm: check add_addr_accept_max before accepting new ADD_ADDR
 
+The limits might have changed in between, it is best to check them
+before accepting new ADD_ADDR.
+
+Fixes: d0876b2284cf ("mptcp: add the incoming RM_ADDR support")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
