@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-fullmesh-endp-on-1st-sf
+Subject: [PATCH] selftests: mptcp: join: validate fullmesh endp on 1st sf
 
+This case was not covered, and the wrong ID was set before the previous
+commit.
+
+The rest is not modified, it is just that it will increase the code
+coverage.
+
+The right address ID can be verified by looking at the packet traces. We
+could automate that using Netfilter with some cBPF code for example, but
+that's always a bit cryptic. Packetdrill seems better fitted for that.
+
+Fixes: 4f49d63352da ("selftests: mptcp: add fullmesh testcases")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
