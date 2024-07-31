@@ -754,8 +754,7 @@ void tcp_rcv_space_adjust(struct sock *sk)
 	 * <prev RTT . ><current RTT .. ><next RTT .... >
 	 */
 
-	if (READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_moderate_rcvbuf) &&
-	    !(sk->sk_userlocks & SOCK_RCVBUF_LOCK)) {
+	if (READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_moderate_rcvbuf)) {
 		u64 rcvwin, grow;
 		int rcvbuf;
 
@@ -771,12 +770,22 @@ void tcp_rcv_space_adjust(struct sock *sk)
 
 		rcvbuf = min_t(u64, tcp_space_from_win(sk, rcvwin),
 			       READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_rmem[2]));
-		if (rcvbuf > sk->sk_rcvbuf) {
-			WRITE_ONCE(sk->sk_rcvbuf, rcvbuf);
+		if (!(sk->sk_userlocks & SOCK_RCVBUF_LOCK)) {
+			if (rcvbuf > sk->sk_rcvbuf) {
+				WRITE_ONCE(sk->sk_rcvbuf, rcvbuf);
 
-			/* Make the window clamp follow along.  */
-			WRITE_ONCE(tp->window_clamp,
-				   tcp_win_from_space(sk, rcvbuf));
+				/* Make the window clamp follow along.  */
+				WRITE_ONCE(tp->window_clamp,
+					   tcp_win_from_space(sk, rcvbuf));
+			}
+		} else {
+			/* Make the window clamp follow along while being bounded
+			 * by SO_RCVBUF.
+			 */
+			int clamp = tcp_win_from_space(sk, min(rcvbuf, sk->sk_rcvbuf));
+
+			if (clamp > tp->window_clamp)
+				WRITE_ONCE(tp->window_clamp, clamp);
 		}
 	}
 	tp->rcvq_space.space = copied;
@@ -6797,9 +6806,9 @@ tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 		/* Note, that this wakeup is only for marginal crossed SYN case.
 		 * Passively open sockets are not waked up, because
-		 * sk->sk_sleep == NULL and sk->sk_socket == NULL.
+		 * sk->sk_wq == NULL and sk->sk_socket == NULL.
 		 */
-		if (sk->sk_socket)
+		if (sk->sk_socket && th->syn)
 			sk_wake_async(sk, SOCK_WAKE_IO, POLL_OUT);
 
 		tp->snd_una = TCP_SKB_CB(skb)->ack_seq;
