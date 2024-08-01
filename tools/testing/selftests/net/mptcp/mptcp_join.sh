@@ -3663,6 +3663,24 @@ endpoint_tests()
 	fi
 }
 
+io_thread_tests()
+{
+	if reset "io thread tests"; then
+		local nr=0 max=100
+		mptcp_lib_pm_nl_set_limits $ns1 8 8
+		mptcp_lib_pm_nl_add_endpoint $ns1 10.0.2.1 flags subflow
+		while [ $nr -lt $max ]; do
+			nr=$((nr + 1))
+			ip netns exec $ns1 ./mptcp_connect -l 10.0.1.1 -m "thread" -O 3000
+			if [ $? -ne 0 ]; then
+				echo "Test no. $nr failed."
+				break;
+			fi
+		done
+		chk_join_nr $max 0 $max
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -3711,6 +3729,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	T@io_thread_tests
 )
 
 all_tests_args=""
