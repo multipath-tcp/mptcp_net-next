@@ -1372,9 +1372,9 @@ void xdisconnect(int fd, int addrlen)
 		xerror("can't disconnect: %d", errno);
 }
 
-int main_loop(void)
+int main_loop(int listensock)
 {
-	int fd = 0, ret, fd_in = 0;
+	int fd = 0, ret, fd_in = 0, peerfd = 1;
 	struct addrinfo *peer;
 	struct wstate winfo;
 
@@ -1388,6 +1388,19 @@ int main_loop(void)
 	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer, fd_in, &winfo);
 	if (fd < 0)
 		return 2;
+
+	if (cfg_mode == CFG_MODE_THREAD &&
+	    listensock >= 0) {
+		peerfd = accept(listensock, NULL, NULL);
+		while (peerfd == -1) {
+			if (errno == EINTR)
+				continue;
+			return -errno;
+		}
+
+		if (cfg_timeo)
+			settimeo(peerfd, cfg_timeo);
+	}
 
 again:
 	check_getpeername_connect(fd);
@@ -1407,7 +1420,7 @@ again:
 			xerror("can't open %s:%d", cfg_input, errno);
 	}
 
-	ret = copyfd_io(fd_in, fd, 1, 0, &winfo);
+	ret = copyfd_io(fd_in, fd, peerfd, 0, &winfo);
 	if (ret)
 		return ret;
 
@@ -1430,6 +1443,8 @@ again:
 		close(fd);
 	}
 
+	if (listensock >= 0)
+		close(listensock);
 	return 0;
 }
 
@@ -1630,9 +1645,11 @@ int main(int argc, char *argv[])
 			set_mark(fd, cfg_mark);
 		if (cfg_cmsg_types.cmsg_enabled)
 			apply_cmsg_types(fd, &cfg_cmsg_types);
+		if (cfg_mode == CFG_MODE_THREAD)
+			return main_loop(fd);
 
 		return main_loop_s(fd);
 	}
 
-	return main_loop();
+	return main_loop(-1);
 }
