@@ -1,0 +1,188 @@
+name: "CheckPatch"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**'    # previous branches
+      - 't/**'           # TopGit tree
+      - 'net'            # part of the TopGit tree
+      - 'net-next'       # part of the TopGit tree
+      - 'for-review'     # part of the TopGit tree
+      - 'for-review-net' # part of the TopGit tree
+    tags:
+      - 'patchew/**'     # patchew is using tags
+
+env:
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
+  PW: "https://patchwork.kernel.org/api/1.2"
+  CHECKPATCH_RESULTS: "./checkpatch-results.txt"
+  CHECKPATCH_DETAILS: "./checkpatch-details.txt"
+  SHELLCHECK_RESULTS: "./shellcheck-results.txt"
+  SHELLCHECK_DETAILS: "./shellcheck-details.txt"
+
+permissions: {}
+
+jobs:
+  checkpatch:
+    name: "Checkpatch"
+    # for others or for the official repo but only commits from patchew
+    if: "github.repository_owner != 'multipath-tcp' || (startswith(github.ref, 'refs/tags/patchew/') && contains(github.event.head_commit.message, 'Message-Id: '))"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 ## to make sure a mentioned commit exists
+
+      - name: "Checkpatch"
+        uses: multipath-tcp/mptcp-upstream-validate-export-action@main
+        with:
+          each_commit: true
+          checkpatch: true
+          debug: ${{ secrets.BUILD_ACTION_DEBUG }}
+
+      - name: "Publish details"
+        if: always()
+        run: |
+          if [ -s "${{ env.CHECKPATCH_DETAILS }}" ]; then
+            echo '## CheckPatch' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.CHECKPATCH_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
+          fi
+          if [ -s "${{ env.SHELLCHECK_DETAILS }}" ]; then
+            echo '## ShellCheck' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.SHELLCHECK_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
+          fi
+
+      - name: "Artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: |
+            ${{ env.CHECKPATCH_RESULTS }}
+            ${{ env.SHELLCHECK_RESULTS }}
+
+      - name: "Artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: details
+          path: |
+            ${{ env.CHECKPATCH_DETAILS }}
+            ${{ env.SHELLCHECK_DETAILS }}
+
+  notif:
+    name: "Notifications"
+    needs: checkpatch
+    # only for the official repo (patchew)
+    if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/') && (needs.checkpatch.result == 'success' || needs.checkpatch.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: results
+
+      - name: "Patchwork"
+        run: |
+          # $1: mid, $2: status, $3: desc, $4: context
+          _send() { local check_url
+            check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
+            if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
+              echo "URL not found: '${check_url}' '${URL_PW}${1}'"
+              return 1
+            fi
+
+            curl ${CURL_OPT} \
+              -X POST \
+              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+              -F "state=${2}" \
+              -F "target_url=${URL_GH}" \
+              -F "context=${4}" \
+              -F "description=${3}" \
+              "${check_url}" | jq '.'
+          }
+
+          FIRST=1
+          send() { local i
+            # patches can take a bit of time to appear: retry the first time
+            if [ "${FIRST}" = "1" ]; then
+              FIRST=0
+
+              for i in $(seq 45); do
+                if _send "${@}"; then
+                  echo "Successful sent after ${i} attempts"
+                  return 0
+                fi
+                sleep 1m
+              done
+
+              curl "${URL_PW}${1}"
+              return 1
+            else
+              _send "${@}"
+            fi
+          }
+
+          # $1: file, $2: context
+          parse_results() {
+            if [ ! -s "${1}" ]; then
+              echo "Strange, no results, please check why"
+              return 1
+            fi
+
+            while read -r mid status desc; do
+              echo "Sending: '${mid}' '${status}' '${desc}' '${2}'"
+              send "${mid}" "${status}" "${desc}" "${2}"
+            done < "${1}"
+          }
+
+          rc=0
+          parse_results "${CHECKPATCH_RESULTS}" "checkpatch" || rc=1
+          parse_results "${SHELLCHECK_RESULTS}" "shellcheck" || rc=1
+          exit ${rc}
+
+        env:
+          URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+
+  status:
+    name: "Status"
+    needs: checkpatch
+    # for others, to report an error if patches were not OK
+    if: github.repository_owner != 'multipath-tcp'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: results
+      - name: "Set exit status"
+        run: |
+          # $1: result file, $2: context
+          check() {
+            if [ ! -s "${1}" ]; then
+              echo "Strange, no results, please check why"
+              exit 1
+            fi
+
+            if awk '{ if ($2 != "success") exit 1 }' "${1}"; then
+              echo " *** Everything OK with ${2}, good job!"
+              return 0
+            fi
+
+            echo " *** ${2} detected some issues:"
+            cat "${1}"
+            echo " *** End of the issues detected by ${2}"
+
+            return 1
+          }
+
+          echo
+          rc=0
+          check "${CHECKPATCH_RESULTS}" "CheckPatch" || rc=1
+          check "${SHELLCHECK_RESULTS}" "ShellCheck" || rc=1
+          [ ${rc} -eq 0 ] && exit 0
+
+          echo
+          echo "Please check the summary page for more details about these issues:"
+          echo "  ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit ${rc}
