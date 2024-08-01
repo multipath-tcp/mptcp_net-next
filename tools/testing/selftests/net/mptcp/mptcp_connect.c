@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <sys/ioctl.h>
 #include <sys/poll.h>
@@ -24,6 +25,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/param.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -49,6 +51,7 @@ enum cfg_mode {
 	CFG_MODE_POLL,
 	CFG_MODE_MMAP,
 	CFG_MODE_SENDFILE,
+	CFG_MODE_THREAD,
 };
 
 enum cfg_peek {
@@ -105,6 +108,8 @@ static struct tcp_inq_state tcp_inq;
 static struct cfg_cmsg_types cfg_cmsg_types;
 static struct cfg_sockopt_types cfg_sockopt_types;
 
+static unsigned int io_thread_total_bytes = 10 * 1024 * 1024;
+
 static void die_usage(void)
 {
 	fprintf(stderr, "Usage: mptcp_connect [-6] [-c cmsg] [-f offset] [-i file] [-I num] [-j] [-l] "
@@ -137,6 +142,11 @@ static void die_usage(void)
 	fprintf(stderr, "\t-T num -- set expected runtime to num ms\n");
 	fprintf(stderr, "\t-w num -- wait num sec before closing the socket\n");
 	exit(1);
+}
+
+static void *ERR_PTR(long error)
+{
+	return (void *)error;
 }
 
 static void xerror(const char *fmt, ...)
@@ -938,6 +948,94 @@ static int copyfd_io_sendfile(int infd, int peerfd, int outfd,
 	return err;
 }
 
+struct io_thread_arg {
+	int		fd;
+	uint32_t	bytes;
+	int		stop;
+};
+
+static void *send_thread(void *arg)
+{
+	struct io_thread_arg *a = (struct io_thread_arg *)arg;
+	ssize_t nr_sent = 0, bytes = 0;
+	int err = 0, fd = a->fd;
+	char batch[1500];
+
+	while (bytes < a->bytes && !a->stop) {
+		nr_sent = send(fd, &batch,
+			       MIN(a->bytes - bytes, sizeof(batch)), 0);
+		if (nr_sent == -1 && errno == EINTR)
+			continue;
+		if (nr_sent == -1) {
+			err = -errno;
+			break;
+		}
+		bytes += nr_sent;
+	}
+
+	if (bytes != a->bytes) {
+		printf("send %zd expected %u\n", bytes, a->bytes);
+		if (!err)
+			err = bytes > a->bytes ? -E2BIG : -EINTR;
+	}
+
+	if (err) {
+		a->stop = 1;
+		return ERR_PTR(err);
+	}
+	return NULL;
+}
+
+static int copyfd_io_thread(int peerfd, int fd, uint32_t total_bytes)
+{
+	ssize_t nr_recv = 0, bytes = 0;
+	struct io_thread_arg arg = {
+		.fd	= fd,
+		.bytes	= total_bytes,
+		.stop	= 0,
+	};
+	pthread_t thread;
+	void *thread_ret;
+	char batch[1500];
+	int err;
+
+	err = pthread_create(&thread, NULL, send_thread, (void *)&arg);
+	if (err) {
+		printf("Failed to pthread_create\n");
+		goto done;
+	}
+
+	/* recv total_bytes */
+	while (bytes < total_bytes && !arg.stop) {
+		nr_recv = recv(peerfd, &batch,
+			       MIN(total_bytes - bytes, sizeof(batch)), 0);
+		if (nr_recv == -1 && errno == EINTR)
+			continue;
+		if (nr_recv == -1) {
+			err = -errno;
+			break;
+		}
+		bytes += nr_recv;
+	}
+
+	if (bytes != total_bytes) {
+		printf("recv %zd expected %u\n", bytes, total_bytes);
+		if (!err)
+			err = bytes > total_bytes ? -E2BIG : -EINTR;
+	}
+
+	arg.stop = 1;
+	pthread_join(thread, &thread_ret);
+	if (thread_ret) {
+		printf("Failed in thread_ret %ld\n", (long)thread_ret);
+		err = err ? : (long)thread_ret;
+	}
+
+done:
+	close(peerfd);
+	return err;
+}
+
 static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct wstate *winfo)
 {
 	bool in_closed_after_out = false;
@@ -968,6 +1066,11 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct 
 			return file_size;
 		ret = copyfd_io_sendfile(infd, peerfd, outfd, file_size,
 					 &in_closed_after_out, winfo);
+		break;
+
+	case CFG_MODE_THREAD:
+		ret = copyfd_io_thread(peerfd, outfd,
+				       io_thread_total_bytes);
 		break;
 
 	default:
@@ -1352,6 +1455,8 @@ int parse_mode(const char *mode)
 		return CFG_MODE_MMAP;
 	if (!strcasecmp(mode, "sendfile"))
 		return CFG_MODE_SENDFILE;
+	if (!strcasecmp(mode, "thread"))
+		return CFG_MODE_THREAD;
 
 	fprintf(stderr, "Unknown test mode: %s\n", mode);
 	fprintf(stderr, "Supported modes are:\n");
