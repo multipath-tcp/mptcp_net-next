@@ -542,7 +542,7 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 		return;
 
 	nstoken = sched_init("subflow", strcat(bpf_sched, sched));
-	if (CHECK(!nstoken, sched, "sched_init: %d\n", errno))
+	if (!nstoken)
 		goto fail;
 
 	send_data_and_verify(sched, addr1, addr2);
