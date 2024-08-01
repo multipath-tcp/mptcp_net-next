@@ -75,6 +75,7 @@ static char *cfg_input;
 static int cfg_repeat = 1;
 static int cfg_truncate;
 static int cfg_rcv_trunc;
+static int cfg_timeo;
 
 struct cfg_cmsg_types {
 	unsigned int cmsg_enabled:1;
@@ -249,6 +250,30 @@ static void set_mptfo(int fd, int pf)
 		perror("TCP_FASTOPEN");
 }
 
+static int settimeo(int fd, int timeout_ms)
+{
+	struct timeval timeout = { .tv_sec = 3 };
+
+	if (timeout_ms > 0) {
+		timeout.tv_sec = timeout_ms / 1000;
+		timeout.tv_usec = (timeout_ms % 1000) * 1000;
+	}
+
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+		       sizeof(timeout))) {
+		perror("set SO_RCVTIMEO");
+		return -1;
+	}
+
+	if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+		       sizeof(timeout))) {
+		perror("set SO_SNDTIMEO");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int do_ulp_so(int sock, const char *name)
 {
 	return setsockopt(sock, IPPROTO_TCP, TCP_ULP, name, strlen(name));
@@ -375,6 +400,9 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 		if (cfg_mark)
 			set_mark(sock, cfg_mark);
+
+		if (cfg_timeo)
+			settimeo(sock, cfg_timeo);
 
 		if (cfg_sockopt_types.mptfo) {
 			if (!winfo->total_len)
@@ -1384,7 +1412,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "6c:f:hi:I:jlm:M:o:p:P:r:R:s:S:t:T:w:")) != -1) {
+	while ((c = getopt(argc, argv, "6c:f:hi:I:jlm:M:o:p:P:r:R:s:S:t:T:w:O:")) != -1) {
 		switch (c) {
 		case 'f':
 			cfg_truncate = atoi(optarg);
@@ -1461,6 +1489,9 @@ static void parse_opts(int argc, char **argv)
 			break;
 		case 'o':
 			parse_setsock_options(optarg);
+			break;
+		case 'O':
+			cfg_timeo = strtol(optarg, NULL, 0);
 			break;
 		}
 	}
