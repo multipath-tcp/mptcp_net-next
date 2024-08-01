@@ -451,7 +451,7 @@ static struct nstoken *sched_init(char *flags, char *sched)
 	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		return NULL;
 
-	if (!ASSERT_OK(endpoint_init("subflow"), "endpoint_init"))
+	if (endpoint_init("subflow"))
 		goto fail;
 
 	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
@@ -513,7 +513,7 @@ static void test_default(void)
 	struct nstoken *nstoken;
 
 	nstoken = sched_init("subflow", "default");
-	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
+	if (!nstoken)
 		goto fail;
 
 	send_data_and_verify("default", WITH_DATA, WITH_DATA);
