@@ -661,8 +661,7 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 	pernet = pm_nl_get_pernet_from_msk(msk);
 	subflows_max = mptcp_pm_get_subflows_max(msk);
 
-	if (msk->first)
-		mptcp_local_address((struct sock_common *)msk->first, &mpc_addr);
+	mptcp_local_address((struct sock_common *)msk, &mpc_addr);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
@@ -678,8 +677,7 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 			locals[i].ifindex = entry->ifindex;
 
 			/* Special case for ID0: set the correct ID */
-			if (msk->first &&
-			    mptcp_addresses_equal(&locals[i].addr, &mpc_addr, locals[i].addr.port))
+			if (mptcp_addresses_equal(&locals[i].addr, &mpc_addr, locals[i].addr.port))
 				locals[i].addr.id = 0;
 
 			msk->pm.subflows++;
