@@ -354,10 +354,11 @@ static int endpoint_init(char *flags)
 	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
 	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
-	/* It would be better to use  "ip -net %s mptcp endpoint add %s %s",
-	 * but the BPF CI is using an old version of IPRoute (5.5.0).
-	 */
-	SYS(fail, "ip netns exec %s ./mptcp_pm_nl_ctl add %s flags %s", NS_TEST, ADDR_2, flags);
+	if (SYS_NOFAIL("ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR_2, flags)) {
+		printf("'ip mptcp' not supported, skip this test.\n");
+		test__skip();
+		goto fail;
+	}
 
 	return 0;
 fail:
@@ -432,7 +433,7 @@ static void test_subflow(void)
 	if (!ASSERT_OK_PTR(nstoken, "create_netns: mptcp_subflow"))
 		goto skel_destroy;
 
-	if (!ASSERT_OK(endpoint_init("subflow"), "endpoint_init"))
+	if (endpoint_init("subflow"))
 		goto close_netns;
 
 	run_subflow(skel->data->cc);
@@ -453,7 +454,7 @@ static struct nstoken *sched_init(char *flags, char *sched)
 	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		return NULL;
 
-	if (!ASSERT_OK(endpoint_init("subflow"), "endpoint_init"))
+	if (endpoint_init("subflow"))
 		goto fail;
 
 	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
@@ -515,7 +516,7 @@ static void test_default(void)
 	struct nstoken *nstoken;
 
 	nstoken = sched_init("subflow", "default");
-	if (!ASSERT_OK_PTR(nstoken, "sched_init:default"))
+	if (!nstoken)
 		goto fail;
 
 	send_data_and_verify("default", WITH_DATA, WITH_DATA);
@@ -542,7 +543,7 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 		return;
 
 	nstoken = sched_init("subflow", strcat(bpf_sched, sched));
-	if (CHECK(!nstoken, sched, "sched_init: %d\n", errno))
+	if (!nstoken)
 		goto fail;
 
 	send_data_and_verify(sched, addr1, addr2);
