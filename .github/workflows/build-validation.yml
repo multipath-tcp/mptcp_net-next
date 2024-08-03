@@ -1,0 +1,333 @@
+name: "MPTCP Upstream Build Validation"
+on:
+  push:
+    branches-ignore:
+      - 'archived/**'    # previous branches
+      - 't/**'           # TopGit tree
+      - 'net'            # part of the TopGit tree
+      - 'net-next'       # part of the TopGit tree
+      - 'for-review'     # part of the TopGit tree
+      - 'for-review-net' # part of the TopGit tree
+    tags:
+      - 'patchew/**'     # patchew is using tags
+      # ideally, we would take 'export/**' but the cache is per branch...
+      # In other words, when using tags, we can only use the cache if we re-tag.
+      # https://github.com/actions/cache/issues/556
+      # So we build the "export" branch and we try to find the tag later
+
+env:
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
+  CURL_ACC: "Accept: application/vnd.github.v3+json"
+  URI: "https://api.github.com"
+  PW: "https://patchwork.kernel.org/api/1.2"
+
+permissions: {}
+
+jobs:
+  build:
+    name: "Build (matrix)"
+    if: "! startswith(github.ref, 'refs/tags/patchew/') || contains(github.event.head_commit.message, 'Message-Id: ')"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        defconfig: ['x86_64', 'i386']
+        ipv6: ['with_ipv6', 'without_ipv6']
+        mptcp: ['with_mptcp', 'without_mptcp']
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+
+    steps:
+      - name: "Checkout (light)"
+        if: github.ref != 'refs/heads/export'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100 # we should not have more commits on top of export and -net
+
+      - name: "Checkout (export)"
+        if: github.ref == 'refs/heads/export'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
+
+      - name: "Find base branch"
+        id: branch
+        run: |
+          if [ "${REF_NAME}" = "export" ]; then  # just to avoid the next cmd
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          elif [ -n "$(git log -1 --grep "^DO-NOT-MERGE: mptcp: enabled by default (net)$" --format="format:%H" HEAD -- net/mptcp/Kconfig)" ]; then
+            echo "name=export-net" >> ${GITHUB_OUTPUT}
+          else
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          fi
+        env:
+          REF_NAME: ${{ github.ref_name }}
+
+      - name: "Restore cache for CCache"
+        uses: actions/cache/restore@v4
+        id: restore-ccache
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-${{ github.run_id }}-
+            ${{ runner.os }}_build_${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}_${{ steps.branch.outputs.name }}-
+
+      - name: "Build Validation"
+        uses: multipath-tcp/mptcp-upstream-validate-export-action@main
+        with:
+          # we want to validate each commits on top of net-next/export (or -net) except for stable
+          each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
+          ccache_maxsize: 350M ## 10GB = project limit
+          defconfig: ${{ matrix.defconfig }}
+          ipv6: ${{ matrix.ipv6 }}
+          mptcp: ${{ matrix.mptcp }}
+          debug: ${{ runner.debug }}
+
+      - name: "Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}
+          path: ./build-*-results.txt
+
+      - name: "Publish details"
+        if: always()
+        run: |
+          if stat ./build-*-results.txt &>/dev/null; then
+            echo '- Results for ${{ matrix.defconfig }} ${{ matrix.ipv6 }} ${{ matrix.mptcp }}:' >> ${GITHUB_STEP_SUMMARY}
+            echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
+            cat ./build-*-results.txt >> ${GITHUB_STEP_SUMMARY}
+            echo "\`\`\`" >> ${GITHUB_STEP_SUMMARY}
+          fi
+
+      - name: "Save cache for CCache"
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
+
+  notif-export:
+    name: "Notifications export branches"
+    needs: build
+    # only for the official repo, export branches
+    if: always() && github.repository_owner == 'multipath-tcp' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
+    runs-on: ubuntu-latest
+    steps:
+      - name: get linked tag
+        id: tag
+        run: |
+          TAG=$(curl ${CURL_OPT} -H "${CURL_ACC}" -H "${CURL_AUTH}" "${URL}" | jq -r ".[] | select(.object.sha == \"${SHA}\").ref" | tail -n1)
+          echo "Found: ${TAG} (${SHA} - ${BRANCH})"
+          TAG="${TAG:10}"
+          echo "tag=${TAG:-${BRANCH}}" >> ${GITHUB_OUTPUT}
+        env:
+          CURL_AUTH: "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}"
+          URL: "${{ env.URI }}/repos/${{ github.repository }}/git/matching-refs/tags/"
+          SHA: "${{ github.sha }}"
+          BRANCH: "${{ github.ref_name }}"
+
+      - name: irc build
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-build-bot
+          verbose: true
+          message: |-
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) ended with ${{ needs.build.result }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: irc build error
+        if: needs.build.result == 'failure'
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-build-bot
+          verbose: true
+          message: |-
+            New build validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) failed: ${{ needs.build.result }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  notif-patchew:
+    name: "Notifications patchew tags"
+    needs: build
+    # only for the official repo, patchew tags branches
+    if: always() && github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/') && (needs.build.result == 'success' || needs.build.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          merge-multiple: true
+
+      - name: "Patchwork"
+        run: |
+          # $1: mid
+          get_status() {
+            case "$(awk "/^${1} /{ print \$2 }" build-*-results.txt | sort -u)" in
+              'fail'*)    echo "fail"; ;;
+              *'warning') echo "warning"; ;;
+              'success')  echo "success"; ;;
+              *)          echo "fail"; ;;
+            esac
+          }
+
+          # $1: mid, $2: status
+          get_desc() {
+            awk "/^${1} ${2} /{
+              out=\$3
+              for(i=4; i<=NF; i++)
+                out=out\" \"\$i
+              print out
+            }" build-*-results.txt | sort -u | sed '$!{:a;N;s/\n/ ; /;ta}'
+          }
+
+          # $1: mid, $2: status, $3: desc
+          _send() { local check_url
+            check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
+            if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
+              echo "URL not found: '${check_url}' '${URL_PW}${1}'"
+              return 1
+            fi
+
+            curl ${CURL_OPT} \
+              -X POST \
+              -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+              -F "state=${2}" \
+              -F "target_url=${URL_GH}" \
+              -F "context=build" \
+              -F "description=${3}" \
+              "${check_url}" | jq '.'
+          }
+
+          FIRST=1
+          send() { local i
+            # patches can take a bit of time to appear: retry the first time
+            if [ "${FIRST}" = "1" ]; then
+              FIRST=0
+
+              for i in $(seq 45); do
+                if _send "${@}"; then
+                  echo "Successful sent after ${i} attempts"
+                  return 0
+                fi
+                sleep 1m
+              done
+
+              curl "${URL_PW}${1}"
+              return 1
+            else
+              _send "${@}"
+            fi
+          }
+
+          if ! ls ./build-*-results.txt; then
+            echo "Strange, no results, please check why"
+            exit 1
+          fi
+
+          while read -r mid; do
+            status=$(get_status "${mid}")
+            desc=$(get_desc "${mid}" "${status}")
+            send "${mid}" "${status}" "${desc}"
+          done < <(awk '{ print $1 }' build-*-results.txt | sort -u)
+        env:
+          URL_GH: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+
+      - name: get commit info
+        id: commit
+        if: needs.build.result == 'failure'
+        run: |
+          cat <<'EOF' > commit.json
+          ${{ toJSON(github.event.head_commit) }}
+          EOF
+
+          # ignore error, just in case the MID has not been added by the author
+          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
+
+          # Guess the subject from the last commit
+          SUBJECT=$(jq -r '.message' commit.json | head -n1)
+
+          if [ -n "${MID:1:-1}" ]; then
+            # get cover-letter and series' name if any
+            URL_PW_SERIES_API=$(curl "${URL_PW}${MID:1:-1}" | jq -er 'last(last(.[].series)[].url)' || true)
+            if [ -n "${URL_PW_SERIES_API}" ] && [ "${URL_PW_SERIES_API}" != "null" ]; then
+              echo "series=${URL_PW_SERIES}$(basename "${URL_PW_SERIES_API}")" >> ${GITHUB_OUTPUT}
+              if curl "${URL_PW_SERIES_API}" > pw_series.json && [ -s pw_series.json ]; then
+                CL="$(jq '.cover_letter' pw_series.json || true)"
+                if [ -n "${CL}" ] && [ "${CL}" != "null" ] && [ "${CL}" != "{}" ]; then
+                  MID=$(echo "${CL}" | jq -er '.msgid' || echo "${MID}")
+                  SUBJECT=$(jq -er '.name' pw_series.json || echo "${SUBJECT}")
+                fi
+              fi
+            fi
+
+            # get tags from Lore: not fully available from Patchwork
+            SUBJECT="$(curl "${URL_LORE//MID/${MID:1:-1}}" | grep '^Subject: ' | head -n1 | sed 's/^Subject: \(\[.*\] \).*/\1/')${SUBJECT}"
+          fi
+
+          echo "Found message ID: '${TAG}' '${MID}'"
+          echo "mid=${MID:1:-1}" >> ${GITHUB_OUTPUT}
+
+          echo "Found subject: '${SUBJECT}'"
+          echo "subject=${SUBJECT}" >> ${GITHUB_OUTPUT}
+
+          NAME=$(jq -r '.author.name' commit.json)
+          EMAIL=$(jq -r '.author.email' commit.json)
+          echo "Found author: '${NAME}' '${EMAIL}'"
+          echo "name=${NAME%% *}" >> ${GITHUB_OUTPUT}
+          echo "author=${NAME} <${EMAIL}>" >> ${GITHUB_OUTPUT}
+
+          SHA=$(jq -r '.id' commit.json)
+          echo "Found SHA: '${SHA}' ('${SHA:0:12}')"
+          echo "sha=${SHA:0:12}" >> ${GITHUB_OUTPUT}
+
+          COMMITTER=$(jq -r '.committer.name' commit.json)
+          echo "Found committer: '${COMMITTER}'"
+          echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
+        env:
+          URL_PW: "${{ env.PW }}/patches/?project=mptcp&msgid="
+          URL_PW_SERIES: "https://patchwork.kernel.org/project/mptcp/list/?series="
+          URL_LORE: "https://lore.kernel.org/mptcp/MID/raw"
+
+      - name: send email
+        if: needs.build.result == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: ${{ steps.commit.outputs.author }}
+          cc: mptcp@lists.linux.dev
+          from: MPTCP CI
+          reply_to: mptcp@lists.linux.dev
+          in_reply_to: "<${{ steps.commit.outputs.mid }}>"
+          subject: "Re: ${{ steps.commit.outputs.subject }}"
+          body: |
+            Hi ${{ steps.commit.outputs.name }},
+
+            Thank you for your modifications, that's great!
+
+            But sadly, our CI spotted some issues with it when trying to build it.
+
+            You can find more details there:
+
+              ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Status: ${{ needs.build.result }}
+            Initiator: ${{ steps.commit.outputs.committer }}
+            Commits: ${{ github.server_url }}/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
+            Patchwork: ${{ steps.commit.outputs.series }}
+
+            Feel free to reply to this email if you cannot access logs, if you need
+            some support to fix the error, if this doesn't seem to be caused by your
+            modifications or if the error is a false positive one.
+
+            Cheers,
+            MPTCP GH Action bot
+            Bot operated by Matthieu Baerts (NGI0 Core)
