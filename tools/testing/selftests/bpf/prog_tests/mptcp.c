@@ -430,7 +430,7 @@ static void test_subflow(void)
 	if (!ASSERT_OK_PTR(nstoken, "create_netns: mptcp_subflow"))
 		goto skel_destroy;
 
-	if (endpoint_init("subflow"))
+	if (endpoint_init("subflow") < 0)
 		goto close_netns;
 
 	run_subflow(skel->data->cc);
