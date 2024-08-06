@@ -1331,6 +1331,54 @@ chk_infi_nr()
 	fi
 }
 
+chk_join_tx_nr()
+{
+	local syn_tx=${join_syn_tx:-${syn_nr}}
+	local create=${join_create_err:-0}
+	local bind=${join_bind_err:-0}
+	local connect=${join_connect_err:-0}
+	local rc=${KSFT_PASS}
+	local count
+
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTx")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$syn_tx" ]; then
+		rc=${KSFT_FAIL}
+		print_check "syn tx"
+		fail_test "got $count JOIN[s] syn tx expected $syn_tx"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxCreatSkErr")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$create" ]; then
+		rc=${KSFT_FAIL}
+		print_check "syn tx create socket error"
+		fail_test "got $count JOIN[s] syn tx create socket error expected $create"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxBindErr")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$bind" ]; then
+		rc=${KSFT_FAIL}
+		print_check "syn tx bind error"
+		fail_test "got $count JOIN[s] syn tx bind error expected $bind"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxConnectErr")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$connect" ]; then
+		rc=${KSFT_FAIL}
+		print_check "syn tx connect error"
+		fail_test "got $count JOIN[s] syn tx connect error expected $connect"
+	fi
+
+	print_results "join Tx" ${rc}
+}
+
 chk_join_nr()
 {
 	local syn_nr=$1
@@ -1384,6 +1432,8 @@ chk_join_nr()
 	fi
 
 	print_results "join Rx" ${rc}
+
+	chk_join_tx_nr
 
 	if $validate_checksum; then
 		chk_csum_nr $csum_ns1 $csum_ns2
@@ -1925,9 +1975,11 @@ subflows_error_tests()
 		pm_nl_set_limits $ns1 0 1
 		pm_nl_set_limits $ns2 0 1
 		pm_nl_add_endpoint $ns2 10.0.1.2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.12.2 flags subflow
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 0 0 0
+		join_bind_err=1 \
+			chk_join_nr 0 0 0
 	fi
 
 	# multiple subflows, with subflow creation error
@@ -1939,7 +1991,8 @@ subflows_error_tests()
 		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=2 \
+			chk_join_nr 1 1 1
 	fi
 
 	# multiple subflows, with subflow timeout on MPJ
@@ -1951,7 +2004,8 @@ subflows_error_tests()
 		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=2 \
+			chk_join_nr 1 1 1
 	fi
 
 	# multiple subflows, check that the endpoint corresponding to
@@ -1972,7 +2026,8 @@ subflows_error_tests()
 
 		# additional subflow could be created only if the PM select
 		# the later endpoint, skipping the already used one
-		chk_join_nr 1 1 1
+		join_syn_tx=2 \
+			chk_join_nr 1 1 1
 	fi
 }
 
@@ -2058,7 +2113,8 @@ signal_address_tests()
 		pm_nl_add_endpoint $ns1 10.0.14.1 flags signal
 		pm_nl_set_limits $ns2 3 3
 		run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=3 \
+			chk_join_nr 1 1 1
 		chk_add_nr 3 3
 	fi
 
@@ -2226,7 +2282,8 @@ add_addr_timeout_tests()
 		pm_nl_set_limits $ns2 2 2
 		speed=10 \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=2 \
+			chk_join_nr 1 1 1
 		chk_add_nr 8 0
 	fi
 }
@@ -2326,7 +2383,8 @@ remove_tests()
 		pm_nl_set_limits $ns2 2 2
 		addr_nr_ns1=-3 speed=10 \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=2 join_connect_err=1 \
+			chk_join_nr 1 1 1
 		chk_add_nr 3 3
 		chk_rm_nr 3 1 invert
 		chk_rst_nr 0 0
@@ -2391,7 +2449,8 @@ remove_tests()
 		pm_nl_set_limits $ns2 3 3
 		addr_nr_ns1=-8 speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
-		chk_join_nr 1 1 1
+		join_syn_tx=3 \
+			chk_join_nr 1 1 1
 		chk_add_nr 3 3
 		chk_rm_nr 3 1 invert
 		chk_rst_nr 0 0
@@ -3619,7 +3678,8 @@ endpoint_tests()
 
 		mptcp_lib_kill_wait $tests_pid
 
-		chk_join_nr 3 3 3
+		join_syn_tx=4 \
+			chk_join_nr 3 3 3
 		chk_rm_nr 1 1
 	fi
 
@@ -3654,7 +3714,8 @@ endpoint_tests()
 		chk_mptcp_info subflows 2 subflows 2
 		mptcp_lib_kill_wait $tests_pid
 
-		chk_join_nr 3 3 3
+		join_connect_err=1 \
+			chk_join_nr 3 3 3
 		chk_add_nr 4 4
 		chk_rm_nr 2 1 invert
 	fi
@@ -3685,7 +3746,8 @@ endpoint_tests()
 		wait_mpj $ns2
 		mptcp_lib_kill_wait $tests_pid
 
-		chk_join_nr 2 2 2
+		join_syn_tx=3 join_connect_err=1 \
+			chk_join_nr 2 2 2
 		chk_add_nr 2 2
 		chk_rm_nr 1 0 invert
 	fi
