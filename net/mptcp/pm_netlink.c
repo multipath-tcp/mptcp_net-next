@@ -644,8 +644,7 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 	pernet = pm_nl_get_pernet_from_msk(msk);
 	subflows_max = mptcp_pm_get_subflows_max(msk);
 
-	if (msk->first)
-		mptcp_local_address((struct sock_common *)msk->first, &mpc_addr);
+	mptcp_local_address((struct sock_common *)msk, &mpc_addr);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
@@ -660,8 +659,7 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 			addrs[i] = entry->addr;
 
 			/* Special case for ID0: set the correct ID */
-			if (msk->first &&
-			    mptcp_addresses_equal(&entry->addr, &mpc_addr, entry->addr.port))
+			if (mptcp_addresses_equal(&entry->addr, &mpc_addr, entry->addr.port))
 				addrs[i].id = 0;
 
 			i++;
@@ -1428,11 +1426,6 @@ static bool remove_anno_list_by_saddr(struct mptcp_sock *msk,
 
 	entry = mptcp_pm_del_add_timer(msk, addr, false);
 	if (entry) {
-		spin_lock_bh(&msk->pm.lock);
-		__set_bit(entry->addr.id ? : msk->mpc_endpoint_id,
-			  msk->pm.id_avail_bitmap);
-		spin_unlock_bh(&msk->pm.lock);
-
 		list_del(&entry->list);
 		kfree(entry);
 		return true;
@@ -1453,6 +1446,7 @@ static bool mptcp_pm_remove_anno_addr(struct mptcp_sock *msk,
 	ret = remove_anno_list_by_saddr(msk, addr);
 	if (ret || force) {
 		spin_lock_bh(&msk->pm.lock);
+		__set_bit(addr->id, msk->pm.id_avail_bitmap);
 		msk->pm.add_addr_signaled -= ret;
 		mptcp_pm_remove_addr(msk, &list);
 		spin_unlock_bh(&msk->pm.lock);
