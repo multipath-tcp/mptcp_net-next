@@ -1,4 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-re-adding-init-endp-with-id
+Subject: [PATCH] selftests: mptcp: join: check re-adding init endp with != id
 
+The initial subflow has a special local ID: 0. It is specific per
+connection.
+
+When a global endpoint is deleted and re-added later, it can have a
+different ID, but the kernel should still use the ID 0 if it corresponds
+to the initial address.
+
+This test validates this behaviour: the endpoint linked to the initial
+subflow is removed, and re-added with a different ID.
+
+Note that removing the initial subflow will not decrement the 'subflows'
+counters, which corresponds to the *additional* subflows. On the other
+hand, when the same endpoint is re-added, it will increment this
+counter, as it will be seen as an additional subflow this time.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 3ad14f54bd74 ("mptcp: more accurate MPC endpoint tracking")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
