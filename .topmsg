@@ -1,4 +1,17 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-MIB-counters-for-sent-MP_JOIN
+Subject: [PATCH] mptcp: MIB counters for sent MP_JOIN
 
+Recently, a few issues have been discovered around the creation of
+additional subflows. Without these counters, it was difficult to point
+out the reason why some subflows were not created as expected.
+
+These counters should have been added earlier, because there is no other
+simple ways to extract such information from the kernel, and understand
+why subflows have not been created.
+
+While at it, some pr_debug() have been added, just in case the errno
+needs to be printed.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/509
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
