@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-no-extra-msg-if-no-counter
+Subject: [PATCH] selftests: mptcp: join: no extra msg if no counter
 
+The checksum and fail counters might not be available. Then no need to
+display an extra message with missing info.
+
+While at it, fix the indentation around, which is wrong since the same
+commit.
+
+Fixes: 47867f0a7e83 ("selftests: mptcp: join: skip check if MIB counter not supported")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
