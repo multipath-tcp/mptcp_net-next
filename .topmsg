@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-MPJ-SYN-TX-MIB-counters
+Subject: [PATCH] selftests: mptcp: join: validate MPJ SYN TX MIB counters
 
+A few new MPJoinSynTx MIB counters have been added in a previous commit.
+They are being validated here in mptcp_join.sh selftest, each time the
+number of received MPJ are checked.
+
+Most of the time, the number of sent SYN+MPJ is the same as the received
+ones. But sometimes, there are more, because there are dropped, or there
+are errors.
+
+While at it, the "no MPC reuse with single endpoint" subtest has been
+modified to force a bind() error.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
