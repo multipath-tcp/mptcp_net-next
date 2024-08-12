@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-mute-errors-when-ran-in-the-background
+Subject: [PATCH] selftests: mptcp: join: mute errors when ran in the background
 
+The test is supposed to be killed before the end, which will likely
+cause "Connection reset by peer" errors. It is confusing, especially
+because in case of real transfer errors, the test will not be marked as
+failed. But that's OK, there are many other tests checking that.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
