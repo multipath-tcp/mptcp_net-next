@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-specify-host-being-checked
+Subject: [PATCH] selftests: mptcp: join: specify host being checked
 
+Instead of displaying 'invert' when looking at some events like MP_FAIL,
+MP_FASTCLOSE, MP_RESET, RM_ADDR, which is a bit vague because they are
+not traditionnaly sent from one side, the host being checked is now
+printed.
+
+For the ADD_ADDR, only display the host when it is the client sending
+it, which is more unusual.
+
+Also before, the 'invert' message was printed after a few checks, but it
+was not clear which ones exactly.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
