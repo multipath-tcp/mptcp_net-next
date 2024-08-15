@@ -3694,11 +3694,21 @@ endpoint_tests()
 		chk_subflow_nr "after re-add id 0" 3
 		chk_mptcp_info subflows 3 subflows 3
 
+		pm_nl_del_endpoint $ns2 1 10.0.1.2
+		sleep 0.5
+		chk_subflow_nr "after re-delete id 0" 2
+		chk_mptcp_info subflows 2 subflows 2 # it was an additional sf
+
+		pm_nl_add_endpoint $ns2 10.0.1.2 id 1 dev ns2eth1 flags subflow
+		wait_mpj $ns2
+		chk_subflow_nr "after re-re-add id 0" 3
+		chk_mptcp_info subflows 3 subflows 3
+
 		mptcp_lib_kill_wait $tests_pid
 
-		join_syn_tx=5 \
-			chk_join_nr 4 4 4
-		chk_rm_nr 2 2
+		join_syn_tx=6 \
+			chk_join_nr 5 5 5
+		chk_rm_nr 3 3
 	fi
 
 	# remove and re-add
