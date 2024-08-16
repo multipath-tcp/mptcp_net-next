@@ -622,7 +622,8 @@ static int vsc73xx_phy_write(struct dsa_switch *ds, int phy, int regnum,
 		return ret;
 
 	cmd = FIELD_PREP(VSC73XX_MII_CMD_PHY_ADDR, phy) |
-	      FIELD_PREP(VSC73XX_MII_CMD_PHY_REG, regnum) | val;
+	      FIELD_PREP(VSC73XX_MII_CMD_PHY_REG, regnum) |
+	      FIELD_PREP(VSC73XX_MII_CMD_WRITE_DATA, val);
 	ret = vsc73xx_write(vsc, VSC73XX_BLOCK_MII, VSC73XX_BLOCK_MII_INTERNAL,
 			    VSC73XX_MII_CMD, cmd);
 	if (ret)
