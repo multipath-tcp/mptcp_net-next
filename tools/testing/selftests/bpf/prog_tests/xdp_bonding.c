@@ -18,7 +18,7 @@
 #include <linux/if_bonding.h>
 #include <linux/limits.h>
 #include <linux/udp.h>
-#include <uapi/linux/netdev.h>
+#include <linux/netdev.h>
 
 #include "xdp_dummy.skel.h"
 #include "xdp_redirect_multi_kern.skel.h"

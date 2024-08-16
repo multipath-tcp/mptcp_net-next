@@ -11,7 +11,7 @@
 #include <sys/syscall.h>
 #include <sys/sysinfo.h>
 #include <test_progs.h>
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <unistd.h>
 
 #include "user_ringbuf_fail.skel.h"

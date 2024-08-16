@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2020 Facebook */
-#include <uapi/linux/if_link.h>
+#include <linux/if_link.h>
 #include <test_progs.h>
 #include "test_xdp_link.skel.h"
 
