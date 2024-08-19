@@ -214,12 +214,12 @@ Here is a checklist.
 
 * Prepare a new branch with one of these adapted commands (with a description):
 
-      b4 prep -n upstream-net-next-$(date +%Y%m%d)-<description> -f netdev-next/main --set-prefixes net-next
-      b4 prep -n upstream-net-$(date +%Y%m%d)-<description> -f netdev-net/main --set-prefixes net
-      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable/linux-6.x.y --set-prefixes 6.x
-      b4 prep -n upstream-stable-$(date +%Y%m%d)-<description>-6.x -f stable-rc/queue/6.x --set-prefixes 6.x
-      b4 prep -n upstream-bpf-next-$(date +%Y%m%d)-<description> -f bpf-next/master --set-prefixes bpf-next
-      b4 prep -n upstream-bpf-$(date +%Y%m%d)-<description> -f bpf/master --set-prefixes bpf
+      b4 prep -n net-next-<description> -f netdev-next/main --set-prefixes net-next
+      b4 prep -n net-<description> -f netdev-net/main --set-prefixes net
+      b4 prep -n stable-<description>-6.x -f stable/linux-6.x.y --set-prefixes 6.x
+      b4 prep -n stable-<description>-6.x -f stable-rc/queue/6.x --set-prefixes 6.x
+      b4 prep -n bpf-next-<description> -f bpf-next/master --set-prefixes bpf-next
+      b4 prep -n bpf-<description> -f bpf/master --set-prefixes bpf
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
