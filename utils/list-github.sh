@@ -14,7 +14,7 @@ my_ghi() {
 gh_pr() {
 	gh pr list --json number,author,title,updatedAt \
 		--search "draft:false" \
-		--template '# {{range .}}{{tablerow .number (timeago .updatedAt) .author.login .title}}{{end}}' \
+		--template '{{range .}}{{tablerow .number (timeago .updatedAt) .author.login .title}}{{end}}' \
 		-R "${@}" | sed 's/^/  /g'
 }
 
