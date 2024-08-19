@@ -49,3 +49,6 @@ gh_pr "multipath-tcp/packetdrill"
 
 title "mptcp.dev PRs"
 gh_pr "multipath-tcp/mptcp.dev"
+
+title "mptcpd PRs"
+gh_pr "multipath-tcp/mptcpd"
