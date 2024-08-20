@@ -383,6 +383,7 @@ static void run_subflow(char *new)
 {
 	int server_fd, client_fd, err;
 	char cc[TCP_CA_NAME_MAX];
+	unsigned int mark;
 	socklen_t len;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
@@ -407,6 +408,10 @@ static void run_subflow(char *new)
 	ASSERT_OK(ss_search(ADDR_1, new), "ss_search new cc");
 	ASSERT_OK(ss_search(ADDR_2, cc), "ss_search default cc");
 
+	len = sizeof(mark);
+	err = getsockopt(client_fd, SOL_SOCKET, SO_MARK, &mark, &len);
+	ASSERT_OK(err, "getsockopt(client_fd, SO_MARK)");
+
 	close(client_fd);
 fail:
 	close(server_fd);
@@ -417,6 +422,7 @@ static void test_subflow(void)
 	int cgroup_fd, prog_fd, err;
 	struct mptcp_subflow *skel;
 	struct nstoken *nstoken;
+	struct bpf_link *link;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
 	if (!ASSERT_GE(cgroup_fd, 0, "join_cgroup: mptcp_subflow"))
@@ -442,6 +448,10 @@ static void test_subflow(void)
 	if (endpoint_init("subflow") < 0)
 		goto close_netns;
 
+	link = bpf_program__attach_cgroup(skel->progs._getsockopt, cgroup_fd);
+	if (!ASSERT_OK_PTR(link, "getsockopt prog"))
+		goto close_netns;
+
 	run_subflow(skel->data->cc);
 
 close_netns:
@@ -450,6 +460,7 @@ skel_destroy:
 	mptcp_subflow__destroy(skel);
 close_cgroup:
 	close(cgroup_fd);
+	bpf_link__destroy(link);
 }
 
 static struct nstoken *sched_init(char *flags, char *sched)
