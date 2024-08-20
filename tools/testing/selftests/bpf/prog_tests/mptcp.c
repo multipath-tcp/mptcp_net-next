@@ -383,7 +383,7 @@ static void run_subflow(char *new)
 {
 	int server_fd, client_fd, err;
 	char cc[TCP_CA_NAME_MAX];
-	socklen_t len = sizeof(cc);
+	socklen_t len;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
@@ -393,9 +393,12 @@ static void run_subflow(char *new)
 	if (!ASSERT_GE(client_fd, 0, "connect to fd"))
 		goto fail;
 
+	len = sizeof(cc);
 	err = getsockopt(server_fd, SOL_TCP, TCP_CONGESTION, cc, &len);
-	if (!ASSERT_OK(err, "getsockopt(srv_fd, TCP_CONGESTION)"))
+	if (!ASSERT_OK(err, "getsockopt(server_fd, TCP_CONGESTION)")) {
+		close(client_fd);
 		goto fail;
+	}
 
 	send_byte(client_fd);
 
