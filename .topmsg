@@ -1,4 +1,9 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-send-ACK-on-non-stale-subflows
+Subject: [PATCH] mptcp: pm: send ACK on non stale subflows
 
+If the subflow is considered as "staled", it is better to avoid it to
+send an ACK carrying an ADD_ADDR or RM_ADDR. Another subflow, if any,
+will then be selected.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
