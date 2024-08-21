@@ -3575,8 +3575,9 @@ endpoint_tests()
 
 	if reset_with_tcp_filter "delete and re-add" ns2 10.0.3.2 REJECT OUTPUT &&
 	   mptcp_lib_kallsyms_has "subflow_rebuild_header$"; then
-		pm_nl_set_limits $ns1 0 2
-		pm_nl_set_limits $ns2 0 2
+		pm_nl_set_limits $ns1 0 3
+		pm_nl_set_limits $ns2 0 3
+		pm_nl_add_endpoint $ns2 10.0.1.2 id 1 dev ns2eth1 flags subflow
 		pm_nl_add_endpoint $ns2 10.0.2.2 id 2 dev ns2eth2 flags subflow
 		test_linkfail=4 speed=20 \
 			run_tests $ns1 $ns2 10.0.1.1 &
@@ -3588,27 +3589,27 @@ endpoint_tests()
 		chk_subflow_nr "before delete" 2
 		chk_mptcp_info subflows 1 subflows 1
 
-		pm_nl_del_endpoint $ns2 2 10.0.2.2
+		pm_nl_del_endpoint $ns2 1 10.0.1.2
 		sleep 0.5
 		chk_subflow_nr "after delete" 1
-		chk_mptcp_info subflows 0 subflows 0
+		chk_mptcp_info subflows 1 subflows 1
 
-		pm_nl_add_endpoint $ns2 10.0.2.2 id 2 dev ns2eth2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.1.2 id 1 dev ns2eth1 flags subflow
 		wait_mpj $ns2
 		chk_subflow_nr "after re-add" 2
-		chk_mptcp_info subflows 1 subflows 1
+		chk_mptcp_info subflows 2 subflows 2
 
 		pm_nl_add_endpoint $ns2 10.0.3.2 id 3 flags subflow
 		wait_attempt_fail $ns2
 		chk_subflow_nr "after new reject" 2
-		chk_mptcp_info subflows 1 subflows 1
+		chk_mptcp_info subflows 2 subflows 2
 
 		ip netns exec "${ns2}" ${iptables} -D OUTPUT -s "10.0.3.2" -p tcp -j REJECT
 		pm_nl_del_endpoint $ns2 3 10.0.3.2
 		pm_nl_add_endpoint $ns2 10.0.3.2 id 3 flags subflow
 		wait_mpj $ns2
 		chk_subflow_nr "after no reject" 3
-		chk_mptcp_info subflows 2 subflows 2
+		chk_mptcp_info subflows 3 subflows 3
 
 		mptcp_lib_kill_wait $tests_pid
 
