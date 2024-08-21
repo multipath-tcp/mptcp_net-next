@@ -3868,9 +3868,11 @@ if [ ${#tests[@]} -eq 0 ]; then
 	tests=("${all_tests_names[@]}")
 fi
 
+mptcp_lib_subtests_last_ts_reset
 for subtests in "${tests[@]}"; do
 	"${subtests}"
 done
+append_prev_results
 
 if [ ${ret} -ne 0 ]; then
 	echo
@@ -3881,7 +3883,6 @@ if [ ${ret} -ne 0 ]; then
 	echo
 fi
 
-append_prev_results
 mptcp_lib_result_print_all_tap
 
 exit $ret
