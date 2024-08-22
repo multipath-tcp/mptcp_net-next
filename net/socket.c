@@ -1695,6 +1695,7 @@ __weak noinline int update_socket_protocol(int family, int type, int protocol)
 {
 	return protocol;
 }
+ALLOW_ERROR_INJECTION(update_socket_protocol, ERRNO);
 
 __bpf_hook_end();
 
