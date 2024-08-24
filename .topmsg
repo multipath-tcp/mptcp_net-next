@@ -1,4 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-re-re-adding-ID-0-signal
+Subject: [PATCH] selftests: mptcp: join: check re-re-adding ID 0 signal
 
+This test extends "delete re-add signal" to validate the previous
+commit: when the 'signal' endpoint linked to the initial subflow (ID 0)
+is re-added multiple times, it will re-send the ADD_ADDR with id 0. The
+client should still be able to re-create this subflow, even if the
+add_addr_accepted limit has been reached as this special address is not
+considered as a new address.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: d0876b2284cf ("mptcp: add the incoming RM_ADDR support")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
