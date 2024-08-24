@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sefltests-mptcp-connect-remote-time-in-TAP-output
+Subject: [PATCH] sefltests: mptcp: connect: remote time in TAP output
 
+It is now added by the MPTCP lib automatically, see the parent commit.
+
+The time in the TAP output might be sligly different from the one
+displayed before, but that's OK.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
