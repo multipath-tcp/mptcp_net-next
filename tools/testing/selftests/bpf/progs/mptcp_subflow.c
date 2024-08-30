@@ -52,7 +52,7 @@ int mptcp_subflow(struct bpf_sock_ops *skops)
 	err = bpf_setsockopt(skops, SOL_SOCKET, SO_MARK, &mark, sizeof(mark));
 	if (err < 0)
 		return 1;
-	if (mark == 1)
+	if (mark == 2)
 		err = bpf_setsockopt(skops, SOL_TCP, TCP_CONGESTION, cc, TCP_CA_NAME_MAX);
 
 	return 1;
