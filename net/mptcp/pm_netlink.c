@@ -343,10 +343,11 @@ mptcp_pm_del_add_timer(struct mptcp_sock *msk,
 	entry = mptcp_lookup_anno_list_by_saddr(msk, addr);
 	if (entry && (!check_id || entry->addr.id == addr->id))
 		entry->retrans_times = ADD_ADDR_RETRANS_MAX;
-	spin_unlock_bh(&msk->pm.lock);
 
 	if (entry && (!check_id || entry->addr.id == addr->id))
 		sk_stop_timer_sync(sk, &entry->add_timer);
+
+	spin_unlock_bh(&msk->pm.lock);
 
 	return entry;
 }
