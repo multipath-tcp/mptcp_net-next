@@ -4,6 +4,7 @@
 
 /* vmlinux.h, bpf_helpers.h and other 'define' */
 #include "bpf_tracing_net.h"
+#include "mptcp_bpf.h"
 
 char _license[] SEC("license") = "GPL";
 
@@ -54,6 +55,95 @@ int mptcp_subflow(struct bpf_sock_ops *skops)
 		return 1;
 	if (mark == 2)
 		err = bpf_setsockopt(skops, SOL_TCP, TCP_CONGESTION, cc, TCP_CA_NAME_MAX);
+
+	return 1;
+}
+
+static int _check_getsockopt_subflow_mark(struct bpf_sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_sock *msk;
+	int i = 0;
+
+	if (sk->protocol != IPPROTO_MPTCP) {
+		bpf_printk("MPTCP Subflow: unexpected protocol %u", sk->protocol);
+		return -1;
+	}
+
+	msk = bpf_core_cast(sk, struct mptcp_sock);
+	if (msk->pm.subflows != 1) {
+		bpf_printk("MPTCP Subflow: expected 1 extra subflows, got %u",
+			   msk->pm.subflows);
+		return -1;
+	}
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk;
+
+		ssk = mptcp_subflow_tcp_sock(bpf_core_cast(subflow,
+							   struct mptcp_subflow_context));
+
+		if (ssk->sk_mark != ++i) {
+			bpf_printk("MPTCP Subflow: expected %d mark, got %d",
+				   i, ssk->sk_mark);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int _check_getsockopt_subflow_cc(struct bpf_sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_sock *msk;
+
+	if (sk->protocol != IPPROTO_MPTCP) {
+		bpf_printk("MPTCP Subflow: unexpected protocol %u", sk->protocol);
+		return -1;
+	}
+
+	msk = bpf_core_cast(sk, struct mptcp_sock);
+	if (msk->pm.subflows != 1) {
+		bpf_printk("MPTCP Subflow: expected 1 extra subflows, got %u",
+			   msk->pm.subflows);
+		return -1;
+	}
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct inet_connection_sock *icsk;
+		struct sock *ssk;
+
+		ssk = mptcp_subflow_tcp_sock(bpf_core_cast(subflow,
+							   struct mptcp_subflow_context));
+		icsk = bpf_core_cast(ssk, struct inet_connection_sock);
+
+		if (ssk->sk_mark == 2 &&
+		    __builtin_memcmp(icsk->icsk_ca_ops->name, cc, TCP_CA_NAME_MAX)) {
+			bpf_printk("MPTCP Subflow: expected %s cc, got %s",
+				   cc, icsk->icsk_ca_ops->name);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+SEC("cgroup/getsockopt")
+int _getsockopt_subflow(struct bpf_sockopt *ctx)
+{
+	struct bpf_sock *sk = ctx->sk;
+
+	if (!sk) {
+		bpf_printk("MPTCP Subflow: unexpected socket, sk is NULL");
+		ctx->retval = -1;
+		return 1;
+	}
+
+	if (ctx->level == SOL_SOCKET && ctx->optname == SO_MARK)
+		ctx->retval = _check_getsockopt_subflow_mark(sk);
+	else if (ctx->level == SOL_TCP && ctx->optname == TCP_CONGESTION)
+		ctx->retval = _check_getsockopt_subflow_cc(sk);
 
 	return 1;
 }
