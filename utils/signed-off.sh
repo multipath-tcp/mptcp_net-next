@@ -4,7 +4,7 @@
 # shellcheck source=./lib.sh
 source ./.lib.sh
 
-DEV="$(git show -s --format="%aN <%aE>" HEAD)"
+DEV="$(git show -s --format="%an <%ae>" HEAD)"
 SIG="Signed-off-by: ${DEV}"
 COD="Co-developed-by: ${DEV}"
 
