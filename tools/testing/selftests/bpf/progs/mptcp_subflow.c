@@ -63,6 +63,7 @@ int mptcp_subflow(struct bpf_sock_ops *skops)
 static int _check_getsockopt_subflow_mark(struct mptcp_sock *msk, struct bpf_sockopt *ctx)
 {
 	struct mptcp_subflow_context *subflow;
+	int *optval = ctx->optval;
 	int i = 0;
 
 	mptcp_for_each_subflow(msk, subflow) {
@@ -72,7 +73,10 @@ static int _check_getsockopt_subflow_mark(struct mptcp_sock *msk, struct bpf_soc
 							   struct mptcp_subflow_context));
 
 		if (ssk->sk_mark != ++i) {
-			ctx->retval = -2;
+			if (ctx->optval + sizeof(int) <= ctx->optval_end) {
+				*optval = ssk->sk_mark;
+				ctx->retval = 0;
+			}
 			break;
 		}
 	}
@@ -83,6 +87,7 @@ static int _check_getsockopt_subflow_mark(struct mptcp_sock *msk, struct bpf_soc
 static int _check_getsockopt_subflow_cc(struct mptcp_sock *msk, struct bpf_sockopt *ctx)
 {
 	struct mptcp_subflow_context *subflow;
+	char *optval = ctx->optval;
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct inet_connection_sock *icsk;
@@ -94,7 +99,10 @@ static int _check_getsockopt_subflow_cc(struct mptcp_sock *msk, struct bpf_socko
 
 		if (ssk->sk_mark == 2 &&
 		    __builtin_memcmp(icsk->icsk_ca_ops->name, cc, TCP_CA_NAME_MAX)) {
-			ctx->retval = -2;
+			if (ctx->optval + TCP_CA_NAME_MAX <= ctx->optval_end) {
+				__builtin_memcpy(optval, icsk->icsk_ca_ops->name, TCP_CA_NAME_MAX);
+				ctx->retval = 0;
+			}
 			break;
 		}
 	}
