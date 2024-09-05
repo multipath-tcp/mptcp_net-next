@@ -151,7 +151,7 @@ publish() { local top review old_rev new_rev tag top_txt results msg=""
 		msg+="$(printf "%s" "\\n${RESULTS_EXPORT_NET_NEXT}")"
 	fi
 
-	msg+="$(printf "\\n\\nTests are now in progress:\\n\\n%s\\n\\nCheers,\\nMatt\\n" "${CI_TAG}")"
+	msg+="$(printf "\\n\\nTests are now in progress:\\n\\n%s\\n\\n" "${CI_TAG}")"
 	printinfo "${msg}"
 
 	print "Publish ${export} and tag (${tag})? (Y/n)"
