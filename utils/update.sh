@@ -6,6 +6,7 @@ source ./.lib.sh
 
 TARGET="${1}"
 SYNC_NET="${2:-new}"
+STASHED=0
 
 sync_net() {
 	[ "${TARGET}" = "${SYNC_NET}" ]
@@ -72,9 +73,9 @@ update() {
 }
 
 if [ "$(git status --porcelain --untracked-files=no | wc -l)" != 0 ]; then
-	printinfo "There are modified files that might be wiped during the update."
-	printinfo "Press Enter to continue."
-	read -r
+	printinfo "There are modified files that might be wiped during the update. Stashing them."
+	git stash
+	STASHED=1
 fi
 
 update "${TG_BASE_NET_NEXT}" "${TG_TOPIC_TOP_NET_NEXT}"
@@ -82,10 +83,15 @@ update "${TG_BASE_NET}" "${TG_TOPIC_TOP_NET}"
 
 if sync_upstream; then
 	git config --local rerere.enabled false
-	echo "remove empty topics & push?"
+	printinfo "Remove empty topics & push?"
 	read -r
 	./.tg-remove-empty.sh
 fi
 
 # Switch to upstream top, not -net
 git checkout "${TG_TOPIC_TOP_NET_NEXT}"
+
+if [ ${STASHED} -eq 1 ]; then
+	printinfo "Unstashing modifications from before the update."
+	git stash pop
+fi
