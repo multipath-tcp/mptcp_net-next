@@ -357,12 +357,6 @@ fail:
 	return -1;
 }
 
-static int _ss_search(char *src, char *dst, char *port, char *keyword)
-{
-	return SYS_NOFAIL("ip netns exec %s ss -enita src %s dst %s %s %d | grep -q '%s'",
-			  NS_TEST, src, dst, port, PORT_1, keyword);
-}
-
 static void wait_for_new_subflows(int fd)
 {
 	socklen_t len;
