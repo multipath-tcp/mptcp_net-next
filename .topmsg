@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-getsockopt-to-inspect-mptcp-subflow
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Add getsockopt to inspect mptcp subflow
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a "cgroup/getsockopt" way to inspect the subflows of an
+mptcp socket. That will be used by the next commit to verify the socket
+options set on each subflow.
+
+This extra "cgroup/getsockopt" prog walks the msk->conn_list and use
+bpf_core_cast to cast a pointer for readonly. It allows to inspect all
+the fields of a structure.
+
+mptcp_subflow_tcp_sock(), mptcp_for_each_stubflow() and other helpers
+related to list_entry have been added into a new progs/mptcp_bpf.h file.
+
+Suggested-by: Martin KaFai Lau <martin.lau@kernel.org>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
