@@ -150,6 +150,15 @@ static const struct rtw89_rrsr_cfgs rtw8852b_rrsr_cfgs = {
 	.rsc = {R_AX_TRXPTCL_RRSR_CTL_0, B_AX_WMAC_RESP_RSC_MASK, 2},
 };
 
+static const struct rtw89_rfkill_regs rtw8852b_rfkill_regs = {
+	.pinmux = {R_AX_GPIO8_15_FUNC_SEL,
+		   B_AX_PINMUX_GPIO9_FUNC_SEL_MASK,
+		   0xf},
+	.mode = {R_AX_GPIO_EXT_CTRL + 2,
+		 (B_AX_GPIO_MOD_9 | B_AX_GPIO_IO_SEL_9) >> 16,
+		 0x0},
+};
+
 static const struct rtw89_dig_regs rtw8852b_dig_regs = {
 	.seg0_pd_reg = R_SEG0R_PD_V1,
 	.pd_lower_bound_mask = B_SEG0R_PD_LOWER_BOUND_MSK,
@@ -553,9 +562,9 @@ static void rtw8852b_rfk_init(struct rtw89_dev *rtwdev)
 	rtw8852b_rx_dck(rtwdev, RTW89_PHY_0);
 }
 
-static void rtw8852b_rfk_channel(struct rtw89_dev *rtwdev)
+static void rtw8852b_rfk_channel(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif)
 {
-	enum rtw89_phy_idx phy_idx = RTW89_PHY_0;
+	enum rtw89_phy_idx phy_idx = rtwvif->phy_idx;
 
 	rtw8852b_rx_dck(rtwdev, phy_idx);
 	rtw8852b_iqk(rtwdev, phy_idx);
@@ -569,9 +578,10 @@ static void rtw8852b_rfk_band_changed(struct rtw89_dev *rtwdev,
 	rtw8852b_tssi_scan(rtwdev, phy_idx);
 }
 
-static void rtw8852b_rfk_scan(struct rtw89_dev *rtwdev, bool start)
+static void rtw8852b_rfk_scan(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif,
+			      bool start)
 {
-	rtw8852b_wifi_scan_notify(rtwdev, start, RTW89_PHY_0);
+	rtw8852b_wifi_scan_notify(rtwdev, start, rtwvif->phy_idx);
 }
 
 static void rtw8852b_rfk_track(struct rtw89_dev *rtwdev)
@@ -818,6 +828,7 @@ const struct rtw89_chip_info rtw8852b_chip_info = {
 	.ul_tb_waveform_ctrl	= true,
 	.ul_tb_pwr_diff		= false,
 	.hw_sec_hdr		= false,
+	.hw_mgmt_tx_encrypt	= false,
 	.rf_path_num		= 2,
 	.tx_nss			= 2,
 	.rx_nss			= 2,
@@ -880,6 +891,8 @@ const struct rtw89_chip_info rtw8852b_chip_info = {
 	.rrsr_cfgs		= &rtw8852b_rrsr_cfgs,
 	.bss_clr_vld		= {R_BSS_CLR_MAP_V1, B_BSS_CLR_MAP_VLD0},
 	.bss_clr_map_reg	= R_BSS_CLR_MAP_V1,
+	.rfkill_init		= &rtw8852b_rfkill_regs,
+	.rfkill_get		= {R_AX_GPIO_EXT_CTRL, B_AX_GPIO_IN_9},
 	.dma_ch_mask		= BIT(RTW89_DMA_ACH4) | BIT(RTW89_DMA_ACH5) |
 				  BIT(RTW89_DMA_ACH6) | BIT(RTW89_DMA_ACH7) |
 				  BIT(RTW89_DMA_B1MG) | BIT(RTW89_DMA_B1HI),
