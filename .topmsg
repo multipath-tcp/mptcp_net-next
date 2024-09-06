@@ -1,7 +1,0 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] selftests: mptcp: diag: remove trailing whitespace
-
-It doesn't need to be there, and it can cause some issues with TAP
-parsers expecting only one space around the directive delimiter (#).
-
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
