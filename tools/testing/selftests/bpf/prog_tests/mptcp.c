@@ -394,11 +394,11 @@ static void run_subflow(void)
 	socklen_t len;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
 		return;
 
 	client_fd = connect_to_fd(server_fd, 0);
-	if (!ASSERT_GE(client_fd, 0, "connect to fd"))
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
 		goto close_server;
 
 	send_byte(client_fd);
@@ -429,7 +429,7 @@ static void test_subflow(void)
 	struct bpf_link *link;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
-	if (!ASSERT_GE(cgroup_fd, 0, "join_cgroup: mptcp_subflow"))
+	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: mptcp_subflow"))
 		return;
 
 	skel = mptcp_subflow__open_and_load();
