@@ -715,6 +715,12 @@ void mptcp_subflow_queue_clean(struct sock *sk, struct sock *ssk);
 void mptcp_sock_graft(struct sock *sk, struct socket *parent);
 u64 mptcp_wnd_end(const struct mptcp_sock *msk);
 void mptcp_set_timeout(struct sock *sk);
+struct bpf_iter_mptcp_subflow;
+int bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
+			       struct mptcp_sock *msk);
+struct mptcp_subflow_context *
+bpf_iter_mptcp_subflow_next(struct bpf_iter_mptcp_subflow *it);
+void bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it);
 bool bpf_mptcp_subflow_queues_empty(struct sock *sk);
 struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos);
