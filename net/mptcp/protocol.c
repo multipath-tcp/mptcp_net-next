@@ -2515,7 +2515,7 @@ void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	subflow->close_event_done = true;
 
 	if (sk->sk_state == TCP_ESTABLISHED)
-		mptcp_event(MPTCP_EVENT_SUB_CLOSED, mptcp_sk(sk), ssk, GFP_KERNEL);
+		mptcp_pm_subflow_closed(mptcp_sk(sk), ssk);
 
 	/* subflow aborted before reaching the fully_established status
 	 * attempt the creation of the next subflow

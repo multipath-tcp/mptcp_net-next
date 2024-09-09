@@ -176,6 +176,13 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 	spin_unlock_bh(&pm->lock);
 }
 
+void mptcp_pm_subflow_closed(struct mptcp_sock *msk, struct sock *ssk)
+{
+	pr_debug("msk=%p", msk);
+
+	mptcp_event(MPTCP_EVENT_SUB_CLOSED, msk, ssk, GFP_KERNEL);
+}
+
 void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 				 const struct mptcp_subflow_context *subflow)
 {
