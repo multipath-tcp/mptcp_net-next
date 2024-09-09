@@ -4596,6 +4596,8 @@ void tcp_done(struct sock *sk)
 	 */
 	req = rcu_dereference_protected(tcp_sk(sk)->fastopen_rsk, 1);
 
+	WARN_ON_ONCE(sk->sk_state == TCP_CLOSE);
+
 	if (sk->sk_state == TCP_SYN_SENT || sk->sk_state == TCP_SYN_RECV)
 		TCP_INC_STATS(sock_net(sk), TCP_MIB_ATTEMPTFAILS);
 
