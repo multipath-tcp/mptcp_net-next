@@ -388,11 +388,11 @@ static void run_subflow(void)
 	socklen_t len;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	if (!ASSERT_GE(server_fd, 0, "start_mptcp_server"))
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
 		return;
 
 	client_fd = connect_to_fd(server_fd, 0);
-	if (!ASSERT_GE(client_fd, 0, "connect to fd"))
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
 		goto close_server;
 
 	send_byte(client_fd);
@@ -423,7 +423,7 @@ static void test_subflow(void)
 	struct bpf_link *link;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
-	if (!ASSERT_GE(cgroup_fd, 0, "join_cgroup: mptcp_subflow"))
+	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: mptcp_subflow"))
 		return;
 
 	skel = mptcp_subflow__open_and_load();
@@ -501,11 +501,11 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	unsigned int delta_ms;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	if (CHECK(server_fd < 0, sched, "start_mptcp_server: %d\n", errno))
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
 		return;
 
 	client_fd = connect_to_fd(server_fd, 0);
-	if (CHECK(client_fd < 0, sched, "connect_to_fd: %d\n", errno))
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
 		goto fail;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
