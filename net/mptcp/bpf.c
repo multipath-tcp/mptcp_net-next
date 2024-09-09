@@ -60,9 +60,6 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 		}
 	} else if (t == mptcp_subflow_type) {
 		switch (off) {
-		case offsetof(struct mptcp_subflow_context, scheduled):
-			end = offsetofend(struct mptcp_subflow_context, scheduled);
-			break;
 		case offsetof(struct mptcp_subflow_context, avg_pacing_rate):
 			end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
 			break;
