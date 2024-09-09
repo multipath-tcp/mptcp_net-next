@@ -1,4 +1,39 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-Fix-uaf-in-__timer_delete_sync
+From: Edward Adam Davis <eadavis@qq.com>
+Subject: [PATCH] mptcp: pm: Fix uaf in __timer_delete_sync
 
+There are two paths to access mptcp_pm_del_add_timer, result in a race
+condition:
+
+     CPU1				CPU2
+     ====                               ====
+     net_rx_action
+     napi_poll                          netlink_sendmsg
+     __napi_poll                        netlink_unicast
+     process_backlog                    netlink_unicast_kernel
+     __netif_receive_skb                genl_rcv
+     __netif_receive_skb_one_core       netlink_rcv_skb
+     NF_HOOK                            genl_rcv_msg
+     ip_local_deliver_finish            genl_family_rcv_msg
+     ip_protocol_deliver_rcu            genl_family_rcv_msg_doit
+     tcp_v4_rcv                         mptcp_pm_nl_flush_addrs_doit
+     tcp_v4_do_rcv                      mptcp_nl_remove_addrs_list
+     tcp_rcv_established                mptcp_pm_remove_addrs_and_subflows
+     tcp_data_queue                     remove_anno_list_by_saddr
+     mptcp_incoming_options             mptcp_pm_del_add_timer
+     mptcp_pm_del_add_timer             kfree(entry)
+
+In remove_anno_list_by_saddr(running on CPU2), after leaving the critical
+zone protected by "pm.lock", the entry will be released, which leads to the
+occurrence of uaf in the mptcp_pm_del_add_timer(running on CPU1).
+
+Keeping a reference to add_timer inside the lock, and calling
+sk_stop_timer_sync() with this reference, instead of "entry->add_timer".
+
+Fixes: 00cfd77b9063 ("mptcp: retransmit ADD_ADDR when timeout")
+Cc: stable@vger.kernel.org
+Reported-by: syzbot+f3a31fb909db9b2a5c4d@syzkaller.appspotmail.com
+Closes: https://syzkaller.appspot.com/bug?extid=f3a31fb909db9b2a5c4d
+Tested-by: syzbot+f3a31fb909db9b2a5c4d@syzkaller.appspotmail.com
+Co-developed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Edward Adam Davis <eadavis@qq.com>
