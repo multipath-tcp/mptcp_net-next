@@ -74,9 +74,9 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 	__u32 pace, burst, wmem;
+	int i, nr_active = 0;
 	__u64 linger_time;
 	struct sock *ssk;
-	int i;
 
 	/* pick the subflow with the lower wmem/wspace ratio */
 	for (i = 0; i < SSK_MODE_MAX; ++i) {
@@ -97,6 +97,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 		if (!mptcp_subflow_active(subflow))
 			continue;
 
+		nr_active += !backup;
 		pace = subflow->avg_pacing_rate;
 		if (!pace) {
 			/* init pacing rate from socket */
@@ -115,7 +116,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk,
 	mptcp_set_timeout(sk);
 
 	/* pick the best backup if no other subflow is active */
-	if (send_info[SSK_MODE_ACTIVE].subflow_id == MPTCP_SUBFLOWS_MAX)
+	if (!nr_active)
 		send_info[SSK_MODE_ACTIVE].subflow_id = send_info[SSK_MODE_BACKUP].subflow_id;
 
 	subflow = bpf_mptcp_subflow_ctx_by_pos(data, send_info[SSK_MODE_ACTIVE].subflow_id);
