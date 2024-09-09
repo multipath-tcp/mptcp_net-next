@@ -1,9 +1,0 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: export mptcp_subflow_early_fallback()
-
-This helper will be used outside protocol.h in the following commit.
-
-While at it, also add a 'pr_fallback()' debug print, to help identifying
-fallbacks.
-
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
