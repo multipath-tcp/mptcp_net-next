@@ -501,11 +501,11 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	unsigned int delta_ms;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
-	if (CHECK(server_fd < 0, sched, "start_mptcp_server: %d\n", errno))
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
 		return;
 
 	client_fd = connect_to_fd(server_fd, 0);
-	if (CHECK(client_fd < 0, sched, "connect_to_fd: %d\n", errno))
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
 		goto fail;
 
 	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
