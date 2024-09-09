@@ -1,4 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-disable-active-MPTCP-in-case-of-blackhole
+Subject: [PATCH] mptcp: disable active MPTCP in case of blackhole
 
+An MPTCP firewall blackhole can be detected if the following SYN
+retransmission after a fallback to "plain" TCP is accepted.
+
+In case of blackhole, a similar technique to the one used by TFO is
+used: MPTCP can be disabled for a certain period of time, 1h by default.
+This time period will grow exponentially when more blackhole issues get
+detected right after MPTCP is re-enabled and will reset to the initial
+value when the blackhole issue goes away.
+
+The blackhole period can be modified thanks to a new sysctl knob:
+blackhole_timeout. Two new MIB counters help understanding what's
+happening:
+
+- 'Blackhole', incremented when a blackhole has been detected.
+- 'MPCapableSYNTXDisabled', incremented when an MPTCP connection
+  directly falls back to TCP during the blackhole period.
+
+Because the technique is similar to the one used by TFO, an important
+part of the new code is similar to what was can find in tcp_fastopen.c,
+with some adaptations to the MPTCP case.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/57
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
