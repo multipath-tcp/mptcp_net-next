@@ -1,4 +1,4 @@
-From: YANGANG <yangang@kylinos.cn>
+From: Gang Yan <yangang@kylinos.cn>
 Subject: [PATCH] mptcp: annotate data-races around subflow->fully_established
 
 We introduce the same handling for potential data races with the
@@ -13,5 +13,5 @@ the size of the variable being accessed, which is not supported in
 'bit_field'. Also, 'test_bit' expect the address of 'bit_field'.
 
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/516
-Signed-off-by: YANGANG <yangang@kylinos.cn>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
