@@ -5,6 +5,7 @@
 #include <linux/const.h>
 #include <netinet/in.h>
 #include <test_progs.h>
+#include <unistd.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
 #include "mptcp_sock.skel.h"
@@ -380,7 +381,7 @@ static void wait_for_new_subflows(int fd)
 		if (!err && subflows > 0)
 			break;
 
-		sleep(0.1);
+		usleep(100000); /* 0.1s */
 	}
 }
 
