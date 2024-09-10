@@ -1,4 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-include-lib.sh-file
+Subject: [PATCH] selftests: mptcp: include lib.sh file
 
+The lib.sh file from the parent directory is used by the MPTCP selftests
+and it needs to be present when running the tests.
+
+This file then needs to be listed in the Makefile to be included when
+exporting or installing the tests, e.g. with:
+
+  make -C tools/testing/selftests \
+          TARGETS=net/mptcp \
+          install INSTALL_PATH=$KSFT_INSTALL_PATH
+
+  cd $KSFT_INSTALL_PATH
+  ./run_kselftest.sh -c net/mptcp
+
+Fixes: f265d3119a29 ("selftests: mptcp: lib: use setup/cleanup_ns helpers")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
