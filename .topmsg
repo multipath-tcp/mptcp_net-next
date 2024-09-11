@@ -1,4 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/netlink-specs-mptcp-fix-port-endianness
+From: Asbjørn Sloth Tønnesen <ast@fiberby.net>
+Subject: [PATCH] netlink: specs: mptcp: fix port endianness
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The MPTCP port attribute is in host endianness, but was documented
+as big-endian in the ynl specification.
+
+Below are two examples from net/mptcp/pm_netlink.c showing that the
+attribute is converted to/from host endianness for use with netlink.
+
+Import from netlink:
+  addr->port = htons(nla_get_u16(tb[MPTCP_PM_ADDR_ATTR_PORT]))
+
+Export to netlink:
+  nla_put_u16(skb, MPTCP_PM_ADDR_ATTR_PORT, ntohs(addr->port))
+
+Where addr->port is defined as __be16.
+
+No functional change intended.
+
+Fixes: bc8aeb2045e2 ("Documentation: netlink: add a YAML spec for mptcp")
+Signed-off-by: Asbjørn Sloth Tønnesen <ast@fiberby.net>
+Reviewed-by: Davide Caratti <dcaratti@redhat.com>
