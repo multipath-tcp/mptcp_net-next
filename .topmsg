@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/memory-provider-fix-compilation-issue-without-SYSFS
+Subject: [PATCH] memory-provider: fix compilation issue without SYSFS
 
+When CONFIG_SYSFS is not set, the kernel fails to compile:
+
+     net/core/page_pool_user.c:368:45: error: implicit declaration of function 'get_netdev_rx_queue_index' [-Werror=implicit-function-declaration]
+      368 |                 if (pool->slow.queue_idx == get_netdev_rx_queue_index(rxq)) {
+          |                                             ^~~~~~~~~~~~~~~~~~~~~~~~~
+
+When CONFIG_SYSFS is not set, get_netdev_rx_queue_index() is not defined
+as well. In this case, page_pool_check_memory_provider() cannot check
+the memory provider, and a success answer can be returned instead.
+
+Fixes: 0f9214046893 ("memory-provider: dmabuf devmem memory provider")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
