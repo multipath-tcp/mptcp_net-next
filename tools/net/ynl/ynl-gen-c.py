@@ -48,6 +48,7 @@ class Type(SpecAttr):
         self.attr = attr
         self.attr_set = attr_set
         self.type = attr['type']
+        self.nla_type = self.type
         self.checks = attr.get('checks', {})
 
         self.request = False
@@ -157,7 +158,7 @@ class Type(SpecAttr):
         return '{ .type = ' + policy + ', }'
 
     def attr_policy(self, cw):
-        policy = c_upper('nla-' + self.attr['type'])
+        policy = c_upper('nla-' + self.nla_type)
 
         spec = self._attr_policy(policy)
         cw.p(f"\t[{self.enum_name}] = {spec},")
@@ -300,6 +301,9 @@ class TypeScalar(Type):
         self.byte_order_comment = ''
         if 'byte-order' in attr:
             self.byte_order_comment = f" /* {attr['byte-order']} */"
+            if self.attr['byte-order'] == 'big-endian':
+                if self.type in {'u16', 'u32'}:
+                    self.nla_type = f'be{self.type[1:]}'
 
         if 'enum' in self.attr:
             enum = self.family.consts[self.attr['enum']]
