@@ -983,7 +983,8 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		WRITE_ONCE(msk->pm.remote_deny_join_id0, true);
 
 	if (unlikely(!READ_ONCE(msk->pm.server_side)))
-		pr_warn_once("bogus mpc option on established client sk");
+		/* DO-NOT-MERGE: use WARN i/o pr_warn: only for MPTCP export */
+		WARN_ONCE(1, "bogus mpc option on established client sk");
 
 set_fully_established:
 	mptcp_data_lock((struct sock *)msk);
