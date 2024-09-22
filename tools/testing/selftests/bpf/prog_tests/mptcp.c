@@ -20,6 +20,8 @@
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
 #define ADDR_2	"10.0.1.2"
+#define ADDR_3	"10.0.1.3"
+#define ADDR_4	"10.0.1.4"
 #define PORT_1	10001
 #define WITH_DATA	true
 #define WITHOUT_DATA	false
@@ -351,22 +353,46 @@ fail:
 	close(cgroup_fd);
 }
 
-static int endpoint_init(char *flags)
+static int endpoint_add(char *addr, char *flags)
 {
+	return SYS_NOFAIL("ip -net %s mptcp endpoint add %s %s",
+			  NS_TEST, addr, flags);
+}
+
+static int endpoint_init(char *flags, u8 subflows)
+{
+	int ret = -1;
+
+	if (!subflows || subflows > 4)
+		goto fail;
+
 	SYS(fail, "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR_1);
 	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
 	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
-	if (SYS_NOFAIL("ip -net %s mptcp endpoint add %s %s", NS_TEST, ADDR_2, flags)) {
+
+	SYS(fail, "ip -net %s link add veth3 type veth peer name veth4", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth3", NS_TEST, ADDR_3);
+	SYS(fail, "ip -net %s link set dev veth3 up", NS_TEST);
+	SYS(fail, "ip -net %s addr add %s/24 dev veth4", NS_TEST, ADDR_4);
+	SYS(fail, "ip -net %s link set dev veth4 up", NS_TEST);
+
+	if (SYS_NOFAIL("ip -net %s mptcp limits set subflows 4", NS_TEST)) {
 		printf("'ip mptcp' not supported, skip this test.\n");
 		test__skip();
 		goto fail;
 	}
 
-	return 0;
+	if (subflows > 1)
+		ret = endpoint_add(ADDR_2, flags);
+	if (subflows > 2)
+		ret = ret ?: endpoint_add(ADDR_3, flags);
+	if (subflows > 3)
+		ret = ret ?: endpoint_add(ADDR_4, flags);
+
 fail:
-	return -1;
+	return ret;
 }
 
 static void wait_for_new_subflows(int fd)
@@ -424,10 +450,9 @@ close_server:
 
 static void test_subflow(void)
 {
-	int cgroup_fd, prog_fd, err;
 	struct mptcp_subflow *skel;
 	struct nstoken *nstoken;
-	struct bpf_link *link;
+	int cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
 	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: mptcp_subflow"))
@@ -439,30 +464,25 @@ static void test_subflow(void)
 
 	skel->bss->pid = getpid();
 
-	err = mptcp_subflow__attach(skel);
-	if (!ASSERT_OK(err, "skel_attach: mptcp_subflow"))
+	skel->links.mptcp_subflow =
+		bpf_program__attach_cgroup(skel->progs.mptcp_subflow, cgroup_fd);
+	if (!ASSERT_OK_PTR(skel->links.mptcp_subflow, "attach mptcp_subflow"))
 		goto skel_destroy;
 
-	prog_fd = bpf_program__fd(skel->progs.mptcp_subflow);
-	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
-	if (!ASSERT_OK(err, "prog_attach"))
+	skel->links._getsockopt_subflow =
+		bpf_program__attach_cgroup(skel->progs._getsockopt_subflow, cgroup_fd);
+	if (!ASSERT_OK_PTR(skel->links._getsockopt_subflow, "attach _getsockopt_subflow"))
 		goto skel_destroy;
 
 	nstoken = create_netns();
 	if (!ASSERT_OK_PTR(nstoken, "create_netns: mptcp_subflow"))
 		goto skel_destroy;
 
-	if (endpoint_init("subflow") < 0)
-		goto close_netns;
-
-	link = bpf_program__attach_cgroup(skel->progs._getsockopt_subflow,
-					  cgroup_fd);
-	if (!ASSERT_OK_PTR(link, "getsockopt prog"))
+	if (endpoint_init("subflow", 2) < 0)
 		goto close_netns;
 
 	run_subflow();
 
-	bpf_link__destroy(link);
 close_netns:
 	cleanup_netns(nstoken);
 skel_destroy:
