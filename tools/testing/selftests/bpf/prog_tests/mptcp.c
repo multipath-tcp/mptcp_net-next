@@ -418,10 +418,9 @@ close_server:
 
 static void test_subflow(void)
 {
-	int cgroup_fd, prog_fd, err;
 	struct mptcp_subflow *skel;
 	struct nstoken *nstoken;
-	struct bpf_link *link;
+	int cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
 	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: mptcp_subflow"))
@@ -433,13 +432,14 @@ static void test_subflow(void)
 
 	skel->bss->pid = getpid();
 
-	err = mptcp_subflow__attach(skel);
-	if (!ASSERT_OK(err, "skel_attach: mptcp_subflow"))
+	skel->links.mptcp_subflow =
+		bpf_program__attach_cgroup(skel->progs.mptcp_subflow, cgroup_fd);
+	if (!ASSERT_OK_PTR(skel->links.mptcp_subflow, "attach mptcp_subflow"))
 		goto skel_destroy;
 
-	prog_fd = bpf_program__fd(skel->progs.mptcp_subflow);
-	err = bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS, 0);
-	if (!ASSERT_OK(err, "prog_attach"))
+	skel->links._getsockopt_subflow =
+		bpf_program__attach_cgroup(skel->progs._getsockopt_subflow, cgroup_fd);
+	if (!ASSERT_OK_PTR(skel->links._getsockopt_subflow, "attach _getsockopt_subflow"))
 		goto skel_destroy;
 
 	nstoken = create_netns();
@@ -449,14 +449,8 @@ static void test_subflow(void)
 	if (endpoint_init("subflow") < 0)
 		goto close_netns;
 
-	link = bpf_program__attach_cgroup(skel->progs._getsockopt_subflow,
-					  cgroup_fd);
-	if (!ASSERT_OK_PTR(link, "getsockopt prog"))
-		goto close_netns;
-
 	run_subflow();
 
-	bpf_link__destroy(link);
 close_netns:
 	cleanup_netns(nstoken);
 skel_destroy:
