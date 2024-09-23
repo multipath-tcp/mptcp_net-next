@@ -26,10 +26,10 @@ static inline int list_is_head(const struct list_head *list,
 #define list_entry_is_head(pos, head, member)				\
 	list_is_head(&pos->member, (head))
 
-/* small difference: 'cond_break' has been added in the conditions */
+/* small difference: 'can_loop' has been added in the conditions */
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_first_entry(head, typeof(*pos), member);	\
-	     cond_break, !list_entry_is_head(pos, head, member);	\
+	     !list_entry_is_head(pos, head, member) && can_loop;	\
 	     pos = list_next_entry(pos, member))
 
 /* mptcp helpers from protocol.h */
