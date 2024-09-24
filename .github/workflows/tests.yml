@@ -82,6 +82,7 @@ jobs:
             -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
             -e "INPUT_CI_TIMEOUT_SEC" \
+            -e "INPUT_GCOV=1" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir /github/workspace \
@@ -127,6 +128,34 @@ jobs:
             vmlinux.zstd
             kmemleak.txt
 
+      - name: "Artifacts (LCov)"
+        uses: actions/upload-artifact@v4
+        with:
+          name: lcov-${{ matrix.mode }}
+          path: |
+            kernel.lcov
+            lcov/
+
+      - name: Setup .NET Core # Required to execute ReportGenerator
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+          dotnet-quality: 'ga'
+
+      - name: ReportGenerator
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.3.9
+        with:
+          reports: kernel.lcov
+          targetdir: coveragereport
+          reporttypes: MarkdownSummaryGithub
+          filefilters: +net/mptcp
+
+      - name: Publish coverage in build summary
+        run: |
+          if [ -d coveragereport ]; then
+            sed "s/^#/###/g" coveragereport/SummaryGithub.md >> ${GITHUB_STEP_SUMMARY}
+          fi
+
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
@@ -151,7 +180,8 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: get results
+        uses: actions/download-artifact@v4
         with:
           pattern: results-*
           merge-multiple: false
@@ -196,6 +226,13 @@ jobs:
             - ${{ steps.test.outputs.ccl_btf }}
             - Task: ${{ steps.test.outputs.url }}
 
+      - name: get lcov
+        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lcov-*
+          merge-multiple: false
+
       - name: Checkout results repo
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         uses: actions/checkout@v4
@@ -219,10 +256,20 @@ jobs:
             jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
           done
 
+          for mode in normal debug btf; do
+            new="lcov-${mode}/lcov"
+            all="results/html/lcov/${{ github.ref_name }}/${mode}"
+            [ -d "${new}" ] || continue
+            [ -d "${all}" ] && rm -r "${all}"
+            mkdir -p "${all}"
+            cp -r "${new}" "${all}"
+          done
+
           cd results
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add html/results/${{ github.ref_name }}/*.json
+          git add html/lcov/${{ github.ref_name }}/*/
           git commit -m "new: ${{ steps.tag.outputs.tag }}"
           git push
 
@@ -406,7 +453,8 @@ jobs:
     if: always() && github.repository_owner != 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Get Results
+        uses: actions/download-artifact@v4
         with:
           pattern: results-*
           merge-multiple: false
