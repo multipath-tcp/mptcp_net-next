@@ -78,7 +78,8 @@ jobs:
     if: github.repository_owner == 'multipath-tcp' && startswith(github.ref, 'refs/tags/patchew/') && (needs.checkpatch.result == 'success' || needs.checkpatch.result == 'failure')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: "Get Results"
+        uses: actions/download-artifact@v4
         with:
           name: results
 
@@ -152,9 +153,11 @@ jobs:
     if: github.repository_owner != 'multipath-tcp'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: "Get Results"
+        uses: actions/download-artifact@v4
         with:
           name: results
+
       - name: "Set exit status"
         run: |
           # $1: result file, $2: context
