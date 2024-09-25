@@ -310,7 +310,9 @@ jobs:
           out="results/html/lcov/${{ github.ref_name }}"
           rm -rf "${out}"
           mkdir -p "${out}"
-          /usr/bin/docker run --pull always -it --rm -v "${PWD}:${PWD}" -w "${PWD}" \
+          /usr/bin/docker run --pull always --rm \
+                              --workdir /github/workspace \
+                              -v "${PWD}":"/github/workspace" \
                               mptcp/docker-lcov-alpine:latest \
                               genhtml -j "$(nproc)" -t "${{ github.ref_name }}" \
                                       --dark-mode --legend \
@@ -328,7 +330,7 @@ jobs:
 
           cd results
           git add html/lcov/${{ github.ref_name }}
-          git commit -m "lcov: new: ${{ steps.tag.outputs.tag }}"
+          git commit -m "lcov: new: ${{ steps.tag.outputs.tag }}" || true
 
       - name: push results
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
