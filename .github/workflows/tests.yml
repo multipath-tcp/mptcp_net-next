@@ -330,7 +330,7 @@ jobs:
 
           cd results
           git add html/lcov/${{ github.ref_name }}
-          git commit -m "lcov: new: ${{ steps.tag.outputs.tag }}"
+          git commit -m "lcov: new: ${{ steps.tag.outputs.tag }}" || true
 
       - name: push results
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
