@@ -168,7 +168,7 @@ jobs:
         with:
           compare_to_earlier_commit: false
           check_run: false
-          check_name: "Test Results ({{ matrix.mode }})"
+          check_name: "Test Results (${{ matrix.mode }})"
           files: |
             *.tap.xml
 
