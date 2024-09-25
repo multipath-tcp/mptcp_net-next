@@ -296,14 +296,15 @@ jobs:
       - name: lcov to html and publish results
         if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
         run: |
-          sudo apt-get -y install lcov libjson-xs-perl
-
           out="results/html/lcov/${{ github.ref_name }}"
           rm -rf "${out}"
-          genhtml -j "$(nproc)" -t "${{ github.ref_name }}" --dark-mode \
-                  --include '/net/mptcp/' --flat --legend \
-                  --function-coverage --branch-coverage --keep-going \
-                  -o "${out}" lcov-*/kernel.lcov | tee genhtml.log
+          /usr/bin/docker run --pull always -it --rm -v "${PWD}:${PWD}" -w "${PWD}" \
+                              mptcp/docker-lcov-alpine:latest \
+                              genhtml -j "$(nproc)" -t "${{ github.ref_name }}" \
+                                      --dark-mode --legend \
+                                      --include '/net/mptcp/' --flat \
+                                      --function-coverage --branch-coverage --keep-going \
+                                      -o "${out}" lcov-*/kernel.lcov | tee genhtml.log
 
           {
             echo ''
