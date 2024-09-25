@@ -213,7 +213,7 @@ jobs:
             - Task: ${{ steps.test.outputs.url }}
 
       - name: get lcov
-        if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
+        if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
         uses: actions/download-artifact@v4
         with:
           pattern: lcov-*
