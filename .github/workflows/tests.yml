@@ -155,7 +155,7 @@ jobs:
         if: github.repository_owner == 'multipath-tcp'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          flag-name: run-${{ join(matrix.*, '-') }}
+          flag-name: ${{ matrix.mode }}
           parallel: true
           file: kernel.lcov
           format: lcov
@@ -344,7 +344,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel-finished: true
-          carryforward: "run-normal,run-debug,run-btf"
+          carryforward: "normal,debug,btf"
 
       - name: get commit info
         id: commit
