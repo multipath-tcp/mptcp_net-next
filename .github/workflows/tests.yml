@@ -303,6 +303,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: code
+          path: net/mptcp
 
       - name: lcov to html and publish results
         if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
