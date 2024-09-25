@@ -13,3 +13,8 @@ mptcp_token_test-objs := token_test.o
 obj-$(CONFIG_MPTCP_KUNIT_TEST) += mptcp_crypto_test.o mptcp_token_test.o
 
 obj-$(CONFIG_BPF_SYSCALL) += bpf.o
+
+# for GCOV coverage profiling
+ifdef CONFIG_GCOV_PROFILE_MPTCP
+GCOV_PROFILE := y
+endif
