@@ -233,8 +233,8 @@ jobs:
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         run: |
           cd results
-          git config user.name github-actions
-          git config user.email github-actions@github.com
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: save flakes results
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
