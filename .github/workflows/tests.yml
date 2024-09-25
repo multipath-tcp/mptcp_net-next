@@ -298,6 +298,7 @@ jobs:
         run: |
           out="results/html/lcov/${{ github.ref_name }}"
           rm -rf "${out}"
+          mkdir -p "${out}"
           /usr/bin/docker run --pull always -it --rm -v "${PWD}:${PWD}" -w "${PWD}" \
                               mptcp/docker-lcov-alpine:latest \
                               genhtml -j "$(nproc)" -t "${{ github.ref_name }}" \
