@@ -162,6 +162,16 @@ jobs:
           allow-empty: true
           compare-ref: ${{ steps.branch.outputs.name }}
 
+      - name: "Publish Test Results"
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          compare_to_earlier_commit: false
+          check_run: false
+          check_name: "Test Results ({{ matrix.mode }})"
+          files: |
+            *.tap.xml
+
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v4
@@ -187,6 +197,7 @@ jobs:
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
+          check_run_annotations_branch: "${{ steps.branch.outputs.name }}"
           files: |
             results-*/*.tap.xml
 
