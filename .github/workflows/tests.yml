@@ -34,7 +34,6 @@ jobs:
         mode: ['normal', 'debug', 'btf']
     permissions:
       contents: read # to fetch code (actions/checkout)
-      checks: write  # to write results
 
     steps:
       - name: "Checkout"
@@ -163,19 +162,33 @@ jobs:
           allow-empty: true
           compare-ref: ${{ steps.branch.outputs.name }}
 
-      - name: "Publish Test Results"
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          files: |
-            *.tap.xml
-
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v4
         with:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
+
+  publish-test-results:
+    name: "Publish Tests Results"
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+
+    steps:
+      - name: "Get results"
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          merge-multiple: false
+
+      - name: "Publish Test Results"
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: |
+            results-*/*.tap.xml
 
   notif:
     name: "Notifications"
