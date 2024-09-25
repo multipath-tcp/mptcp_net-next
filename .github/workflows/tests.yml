@@ -103,6 +103,11 @@ jobs:
               echo '```'
               cat "summary.txt"
               echo '```'
+              echo ''
+              echo '### Coverage (${{ matrix.mode }})'
+              echo '```'
+              cat "coverage.txt"
+              echo '```'
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
 
@@ -114,6 +119,7 @@ jobs:
           path: |
             conclusion.txt
             summary.txt
+            coverage.txt
             *.tap
             config.zstd
             *.tap.xml
