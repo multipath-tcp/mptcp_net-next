@@ -151,6 +151,18 @@ jobs:
           path: |
             net/mptcp/*.[ch]
 
+      - name: Coveralls Parallel
+        uses: coverallsapp/github-action@v2
+        if: github.repository_owner == 'multipath-tcp'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          flag-name: run-${{ join(matrix.*, '-') }}
+          parallel: true
+          file: kernel.lcov
+          format: lcov
+          allow-empty: true
+          compare-ref: ${{ steps.branch.outputs.name }}
+
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
@@ -297,6 +309,13 @@ jobs:
         run: |
           cd results
           git push
+
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+          carryforward: "run-normal,run-debug,run-btf"
 
       - name: get commit info
         id: commit
