@@ -152,7 +152,6 @@ jobs:
 
       - name: Coveralls Parallel
         uses: coverallsapp/github-action@v2
-        if: github.repository_owner == 'multipath-tcp'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           flag-name: ${{ matrix.mode }}
@@ -201,6 +200,14 @@ jobs:
           check_run_annotations_branch: "${{ steps.branch.outputs.name }}"
           files: |
             results-*/*.tap.xml
+
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+          carryforward: "normal,debug,btf"
+          debug: true
 
   notif:
     name: "Notifications"
@@ -339,14 +346,6 @@ jobs:
         run: |
           cd results
           git push
-
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
-          carryforward: "normal,debug,btf"
-          debug: true
 
       - name: get commit info
         id: commit
