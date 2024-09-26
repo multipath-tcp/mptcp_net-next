@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-ccache
         with:
-          path: ${{ github.workspace }}/.virtme/ccache
+          path: ${{ github.workspace }}/.virtme/ccache*
           key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
@@ -84,8 +84,8 @@ jobs:
             -e "INPUT_GCOV=1" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
             -e GITHUB_ACTIONS=true -e CI=true \
-            --workdir /github/workspace \
-            -v "${PWD}":"/github/workspace" \
+            --workdir "${PWD}" \
+            -v "${PWD}:${PWD}" \
             mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
               auto-${{ matrix.mode }}
 
@@ -152,7 +152,6 @@ jobs:
 
       - name: Coveralls Parallel
         uses: coverallsapp/github-action@v2
-        if: github.repository_owner == 'multipath-tcp'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           flag-name: ${{ matrix.mode }}
@@ -177,7 +176,7 @@ jobs:
         if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v4
         with:
-          path: ${{ github.workspace }}/.virtme/ccache
+          path: ${{ github.workspace }}/.virtme/ccache*
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
   publish-test-results:
@@ -201,6 +200,14 @@ jobs:
           check_run_annotations_branch: "${{ steps.branch.outputs.name }}"
           files: |
             results-*/*.tap.xml
+
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+          carryforward: "normal,debug,btf"
+          debug: true
 
   notif:
     name: "Notifications"
@@ -313,8 +320,8 @@ jobs:
           rm -rf "${out}"
           mkdir -p "${out}"
           /usr/bin/docker run --pull always --rm \
-                              --workdir /github/workspace \
-                              -v "${PWD}":"/github/workspace" \
+                              --workdir "${PWD}" \
+                              -v "${PWD}:${PWD}" \
                               mptcp/docker-lcov-alpine:latest \
                               genhtml -j "$(nproc)" -t "${{ github.ref_name }}" \
                                       --dark-mode --legend \
@@ -339,14 +346,6 @@ jobs:
         run: |
           cd results
           git push
-
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel-finished: true
-          carryforward: "normal,debug,btf"
-          debug: true
 
       - name: get commit info
         id: commit
