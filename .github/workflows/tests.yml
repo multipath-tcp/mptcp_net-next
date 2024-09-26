@@ -160,7 +160,6 @@ jobs:
           format: lcov
           allow-empty: true
           compare-ref: ${{ steps.branch.outputs.name }}
-          debug: true
 
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
@@ -207,7 +206,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel-finished: true
           carryforward: "normal,debug,btf"
-          debug: true
 
   notif:
     name: "Notifications"
