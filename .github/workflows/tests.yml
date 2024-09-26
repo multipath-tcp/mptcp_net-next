@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-ccache
         with:
-          path: ${{ github.workspace }}/.virtme/ccache
+          path: ${{ github.workspace }}/.virtme/ccache*
           key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
@@ -176,7 +176,7 @@ jobs:
         if: always() && (github.repository_owner != 'multipath-tcp' || (github.ref_name == 'export' || github.ref_name == 'export-net'))
         uses: actions/cache/save@v4
         with:
-          path: ${{ github.workspace }}/.virtme/ccache
+          path: ${{ github.workspace }}/.virtme/ccache*
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
   publish-test-results:
