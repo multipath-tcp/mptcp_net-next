@@ -154,7 +154,6 @@ jobs:
         uses: coverallsapp/github-action@v2
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           flag-name: ${{ matrix.mode }}
           parallel: true
           file: kernel.lcov
@@ -205,7 +204,6 @@ jobs:
         uses: coverallsapp/github-action@v2
         if: github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           parallel-finished: true
           carryforward: "normal,debug,btf"
 
