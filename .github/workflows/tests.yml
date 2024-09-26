@@ -84,8 +84,8 @@ jobs:
             -e "INPUT_GCOV=1" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
             -e GITHUB_ACTIONS=true -e CI=true \
-            --workdir /github/workspace \
-            -v "${PWD}":"/github/workspace" \
+            --workdir "${PWD}" \
+            -v "${PWD}:${PWD}" \
             mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
               auto-${{ matrix.mode }}
 
@@ -320,8 +320,8 @@ jobs:
           rm -rf "${out}"
           mkdir -p "${out}"
           /usr/bin/docker run --pull always --rm \
-                              --workdir /github/workspace \
-                              -v "${PWD}":"/github/workspace" \
+                              --workdir "${PWD}" \
+                              -v "${PWD}:${PWD}" \
                               mptcp/docker-lcov-alpine:latest \
                               genhtml -j "$(nproc)" -t "${{ github.ref_name }}" \
                                       --dark-mode --legend \
