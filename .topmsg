@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-handle-consistently-DSS-corruption
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: handle consistently DSS corruption
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Bugged peer implementation can send corrupted DSS options, consistently
+hitting a few warning in the data path. Use DEBUG_NET assertions, to
+avoid the splat on some builds and handle consistently the error, dumping
+related MIBs and performing fallback and/or reset according to the
+subflow type.
+
+Fixes: 6771bfd9ee24 ("mptcp: update mptcp ack sequence from work queue")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
