@@ -248,7 +248,7 @@ jobs:
           EOF
 
           # ignore error, just in case the MID has not been added by the author
-          read -r TAG MID < <(jq -r '.message' commit.json | grep "^Message-Id: " | tail -n1) || true
+          read -r TAG MID < <(jq -r '.message' commit.json | grep -i "^Message-Id: " | tail -n1) || true
 
           # Guess the subject from the last commit
           SUBJECT=$(jq -r '.message' commit.json | head -n1)
