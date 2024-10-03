@@ -532,6 +532,9 @@ struct mptcp_subflow_context {
 		close_event_done : 1,       /* has done the post-closed part */
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		__unused : 9;
+	bool	pm_listener;	    /* subflow is a listener managed by the
+				     * in-kernel PM
+				     */
 	bool	data_avail;
 	bool	scheduled;
 	bool	fully_established;  /* path validated */

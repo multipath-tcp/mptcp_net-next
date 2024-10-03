@@ -79,6 +79,9 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_RCVWNDCONFLICT,	/* Conflict with while updating msk rcv wnd */
 	MPTCP_MIB_CURRESTAB,		/* Current established MPTCP connections */
 	MPTCP_MIB_BLACKHOLE,		/* A blackhole has been detected */
+	MPTCP_MIB_ENDPOINTMPC,		/* A peer attmpted MPC towards a port-based signal
+					 * endpoint (not allowed)
+					 */
 	__MPTCP_MIB_MAX
 };
 
