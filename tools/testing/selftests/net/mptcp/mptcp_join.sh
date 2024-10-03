@@ -41,6 +41,7 @@ evts_ns2_pid=0
 last_test_failed=0
 last_test_skipped=0
 last_test_ignored=1
+cappid=""
 
 declare -A all_tests
 declare -a only_tests_ids
@@ -887,6 +888,34 @@ check_cestab()
 	fi
 }
 
+cond_start_capture()
+{
+	if $capture; then
+		local capuser
+		if [ -z $SUDO_USER ] ; then
+			capuser=""
+		else
+			capuser="-Z $SUDO_USER"
+		fi
+
+		local capfile=$(printf "mp_join-%02u-%s.pcap" "$MPTCP_LIB_TEST_COUNTER" "${listener_ns}")
+
+		echo "Capturing traffic for test $MPTCP_LIB_TEST_COUNTER into $capfile"
+		ip netns exec $1 tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
+		cappid=$!
+
+		sleep 1
+	fi
+}
+
+cond_stop_capture()
+{
+	if $capture; then
+	    sleep 1
+	    kill $cappid
+	fi
+}
+
 do_transfer()
 {
 	local listener_ns="$1"
@@ -896,7 +925,6 @@ do_transfer()
 	local connect_addr="$5"
 
 	local port=$((10000 + MPTCP_LIB_TEST_COUNTER - 1))
-	local cappid
 	local FAILING_LINKS=${FAILING_LINKS:-""}
 	local fastclose=${fastclose:-""}
 	local speed=${speed:-"fast"}
@@ -905,22 +933,7 @@ do_transfer()
 	:> "$sout"
 	:> "$capout"
 
-	if $capture; then
-		local capuser
-		if [ -z $SUDO_USER ] ; then
-			capuser=""
-		else
-			capuser="-Z $SUDO_USER"
-		fi
-
-		capfile=$(printf "mp_join-%02u-%s.pcap" "$MPTCP_LIB_TEST_COUNTER" "${listener_ns}")
-
-		echo "Capturing traffic for test $MPTCP_LIB_TEST_COUNTER into $capfile"
-		ip netns exec ${listener_ns} tcpdump -i any -s 65535 -B 32768 $capuser -w $capfile > "$capout" 2>&1 &
-		cappid=$!
-
-		sleep 1
-	fi
+	cond_start_capture ${listener_ns}
 
 	NSTAT_HISTORY=/tmp/${listener_ns}.nstat ip netns exec ${listener_ns} \
 		nstat -n
@@ -1006,11 +1019,6 @@ do_transfer()
 	local retc=$?
 	wait $spid
 	local rets=$?
-
-	if $capture; then
-	    sleep 1
-	    kill $cappid
-	fi
 
 	NSTAT_HISTORY=/tmp/${listener_ns}.nstat ip netns exec ${listener_ns} \
 		nstat | grep Tcp > /tmp/${listener_ns}.out
@@ -2158,6 +2166,34 @@ signal_address_tests()
 			# the server will not signal the address terminating
 			# the MPC subflow
 			chk_add_nr 3 3
+		fi
+	fi
+
+	if reset "port-based signal endpoint must not accept mpc"; then
+		local port=$((10000 + MPTCP_LIB_TEST_COUNTER - 1))
+
+		cond_start_capture ${ns1}
+
+		pm_nl_add_endpoint ${ns1} 10.0.2.1 flags signal port ${port}
+		mptcp_lib_wait_local_port_listen ${ns1} ${port}
+
+		timeout 1 ip netns exec ${ns2} \
+			./mptcp_connect -t ${timeout_poll} -p $port -s MPTCP 10.0.2.1 >/dev/null 2>&1
+		local ret=$?
+
+		cond_stop_capture
+
+		if [ ${ret} = 124 ]; then
+			fail_test "timeout on connect"
+		elif [ ! ${ret} ]; then
+			fail_test "unexpected successful connect"
+		else
+			local count=$(mptcp_lib_get_counter ${ns1} "MPTcpExtMPCAttemptOnEndpoint")
+			if [ "${count}" != 1 ]; then
+				fail_test "got ${count} MPC attempts on port-based enpoint, expected 1"
+			else
+				print_ok
+			fi
 		fi
 	fi
 }
