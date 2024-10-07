@@ -1,4 +1,59 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fallback-if-MPTCP-opts-are-dropped-after-1st-data
+Subject: [PATCH] mptcp: fallback if MPTCP opts are dropped after 1st data
 
+As reported by Christoph [1], before this patch, an MPTCP connection was
+wrongly reset when a host received a first data packet with MPTCP
+options after the 3wHS, but got the next ones without.
+
+According to the MPTCP v1 specs [2], a fallback should happen in this
+case, because the host didn't receive a DATA_ACK from the other peer,
+nor receive data for more than the initial window which implies a
+DATA_ACK being received by the other peer.
+
+The patch here re-uses the same logic as the one used in other places:
+by looking at allow_infinite_fallback, which is disabled at the creation
+of an additional subflow. It's not looking at the first DATA_ACK (or
+implying one received from the other side) as suggested by the RFC, but
+it is in continuation with what was already done, which is safer, and it
+fixes the reported issue. The next step, looking at this first DATA_ACK,
+is tracked in [4].
+
+This patch has been validated using the following Packetdrill script:
+
+   0 socket(..., SOCK_STREAM, IPPROTO_MPTCP) = 3
+  +0 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+  +0 bind(3, ..., ...) = 0
+  +0 listen(3, 1) = 0
+
+  // 3WHS is OK
+  +0.0 < S  0:0(0)       win 65535  <mss 1460, sackOK, nop, nop, nop, wscale 6, mpcapable v1 flags[flag_h] nokey>
+  +0.0 > S. 0:0(0) ack 1            <mss 1460, nop, nop, sackOK, nop, wscale 8, mpcapable v1 flags[flag_h] key[skey]>
+  +0.1 <  . 1:1(0) ack 1 win 2048                                              <mpcapable v1 flags[flag_h] key[ckey=2, skey]>
+  +0 accept(3, ..., ...) = 4
+
+  // Data from the client with valid MPTCP options (no DATA_ACK: normal)
+  +0.1 < P. 1:501(500) ack 1 win 2048 <mpcapable v1 flags[flag_h] key[skey, ckey] mpcdatalen 500, nop, nop>
+  // From here, the MPTCP options will be dropped by a middlebox
+  +0.0 >  . 1:1(0)     ack 501        <dss dack8=501 dll=0 nocs>
+
+  +0.1 read(4, ..., 500) = 500
+  +0   write(4, ..., 100) = 100
+
+  // The server replies with data, still thinking MPTCP is being used
+  +0.0 > P. 1:101(100)   ack 501          <dss dack8=501 dsn8=1 ssn=1 dll=100 nocs, nop, nop>
+  // But the client already did a fallback to TCP, because the two previous packets have been received without MPTCP options
+  +0.1 <  . 501:501(0)   ack 101 win 2048
+
+  +0.0 < P. 501:601(100) ack 101 win 2048
+  // The server should fallback to TCP, not reset: it didn't get a DATA_ACK, nor data for more than the initial window
+  +0.0 >  . 101:101(0)   ack 601
+
+Note that this script requires Packetdrill with MPTCP support, see [3].
+
+Fixes: dea2b1ea9c70 ("mptcp: do not reset MP_CAPABLE subflow on mapping errors")
+Reported-by: Christoph Paasch <cpaasch@apple.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/518 [1]
+Link: https://datatracker.ietf.org/doc/html/rfc8684#name-fallback [2]
+Link: https://github.com/multipath-tcp/packetdrill [3]
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/519 [4]
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
