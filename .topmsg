@@ -1,5 +1,5 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: fallback if MPTCP opts are dropped after 1st data
+Subject: [PATCH] mptcp: fallback when MPTCP opts are dropped after 1st data
 
 As reported by Christoph [1], before this patch, an MPTCP connection was
 wrongly reset when a host received a first data packet with MPTCP
