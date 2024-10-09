@@ -1,4 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-test-for-prohibited-MPC-to-port-based-endp
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: join: test for prohibited MPC to port-based endp
 
+Explicitly verify that MPC connection attempts towards a port-based
+signal endpoint fail with a reset.
+
+Note that this new test is a bit different from the other ones, not
+using 'run_tests'. It is then needed to add the capture capability, and
+the picking the right port which have been extracted into three new
+helpers. The info about the capture can also be printed from a single
+point, which simplifies the exit paths in do_transfer().
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 1729cf186d8a ("mptcp: create the listening socket for new port")
+Co-developed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
