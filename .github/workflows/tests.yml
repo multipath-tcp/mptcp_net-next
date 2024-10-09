@@ -69,6 +69,7 @@ jobs:
           /usr/bin/docker pull mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
 
       - name: "Tests"
+        timeout-minutes: 120
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -80,7 +81,6 @@ jobs:
             -e "INPUT_PACKETDRILL_STABLE=${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}" \
             -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
-            -e "INPUT_CI_TIMEOUT_SEC" \
             -e "INPUT_GCOV=1" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
             -e GITHUB_ACTIONS=true -e CI=true \
