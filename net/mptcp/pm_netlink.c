@@ -1863,33 +1863,50 @@ fail:
 	return ret;
 }
 
-static int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
-				 struct netlink_callback *cb)
+static int mptcp_pm_nl_dump_addr(struct mptcp_id_bitmap *bitmap,
+				 const struct genl_info *info)
+{
+	struct net *net = genl_info_net(info);
+	struct pm_nl_pernet *pernet;
+
+	pernet = pm_nl_get_pernet(net);
+
+	spin_lock_bh(&pernet->lock);
+	bitmap_copy(bitmap->map, pernet->id_bitmap.map, MPTCP_PM_MAX_ADDR_ID + 1);
+	spin_unlock_bh(&pernet->lock);
+
+	return 0;
+}
+
+static int mptcp_pm_dump_addr(struct mptcp_id_bitmap *bitmap,
+			      const struct genl_info *info)
+{
+	if (info->attrs[MPTCP_PM_ATTR_TOKEN])
+		return mptcp_userspace_pm_dump_addr(bitmap, info);
+	return mptcp_pm_nl_dump_addr(bitmap, info);
+}
+
+int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
+				struct netlink_callback *cb)
 {
 	const struct genl_info *info = genl_info_dump(cb);
-	struct net *net = sock_net(msg->sk);
 	struct mptcp_pm_addr_entry entry;
 	struct mptcp_id_bitmap *bitmap;
-	struct pm_nl_pernet *pernet;
 	int id = cb->args[0];
 	void *hdr;
 	int i;
 
 	bitmap = (struct mptcp_id_bitmap *)cb->ctx;
-	pernet = pm_nl_get_pernet(net);
 
-	if (!id) {
-		spin_lock_bh(&pernet->lock);
-		bitmap_copy(bitmap->map, pernet->id_bitmap.map, MPTCP_PM_MAX_ADDR_ID + 1);
-		spin_unlock_bh(&pernet->lock);
-	}
+	if (!id)
+		mptcp_pm_dump_addr(bitmap, info);
 
 	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
 		if (test_bit(i, bitmap->map)) {
-			if (mptcp_pm_nl_get_addr(i, &entry, info))
+			if (mptcp_pm_get_addr(i, &entry, info))
 				break;
 
-			if (entry.addr.id <= id)
+			if (id && entry.addr.id <= id)
 				continue;
 
 			hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).portid,
@@ -1910,21 +1927,6 @@ static int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 
 	cb->args[0] = id;
 	return msg->len;
-}
-
-static int mptcp_pm_dump_addr(struct sk_buff *msg, struct netlink_callback *cb)
-{
-	const struct genl_info *info = genl_info_dump(cb);
-
-	if (info->attrs[MPTCP_PM_ATTR_TOKEN])
-		return mptcp_userspace_pm_dump_addr(msg, cb);
-	return mptcp_pm_nl_dump_addr(msg, cb);
-}
-
-int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
-				struct netlink_callback *cb)
-{
-	return mptcp_pm_dump_addr(msg, cb);
 }
 
 static int parse_limit(struct genl_info *info, int id, unsigned int *limit)

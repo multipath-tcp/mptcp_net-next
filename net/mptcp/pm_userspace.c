@@ -597,20 +597,12 @@ static int mptcp_userspace_pm_set_bitmap(struct mptcp_sock *msk,
 	return 0;
 }
 
-int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
-				 struct netlink_callback *cb)
+int mptcp_userspace_pm_dump_addr(struct mptcp_id_bitmap *bitmap,
+				 const struct genl_info *info)
 {
-	const struct genl_info *info = genl_info_dump(cb);
-	struct mptcp_pm_addr_entry entry;
-	struct mptcp_id_bitmap *bitmap;
 	struct mptcp_sock *msk;
-	int id = cb->args[0];
 	int ret = -EINVAL;
 	struct sock *sk;
-	void *hdr;
-	int i;
-
-	bitmap = (struct mptcp_id_bitmap *)cb->ctx;
 
 	msk = mptcp_userspace_pm_get_sock(info);
 	if (!msk)
@@ -618,39 +610,11 @@ int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
 
 	sk = (struct sock *)msk;
 
-	if (!id) {
-		lock_sock(sk);
-		spin_lock_bh(&msk->pm.lock);
-		ret = mptcp_userspace_pm_set_bitmap(msk, bitmap);
-		spin_unlock_bh(&msk->pm.lock);
-		release_sock(sk);
-	}
-
-	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
-		if (test_bit(i, bitmap->map)) {
-			if (mptcp_userspace_pm_get_addr(i, &entry, info))
-				break;
-
-			if (id && entry.addr.id <= id)
-				continue;
-
-			hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).portid,
-					  cb->nlh->nlmsg_seq, &mptcp_genl_family,
-					  NLM_F_MULTI, MPTCP_PM_CMD_GET_ADDR);
-			if (!hdr)
-				break;
-
-			if (mptcp_nl_fill_addr(msg, &entry) < 0) {
-				genlmsg_cancel(msg, hdr);
-				break;
-			}
-
-			id = entry.addr.id;
-			genlmsg_end(msg, hdr);
-		}
-	}
-	cb->args[0] = id;
-	ret = msg->len;
+	lock_sock(sk);
+	spin_lock_bh(&msk->pm.lock);
+	ret = mptcp_userspace_pm_set_bitmap(msk, bitmap);
+	spin_unlock_bh(&msk->pm.lock);
+	release_sock(sk);
 
 	sock_put(sk);
 	return ret;
