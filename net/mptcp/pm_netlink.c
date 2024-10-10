@@ -1868,16 +1868,20 @@ static int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 {
 	struct net *net = sock_net(msg->sk);
 	struct mptcp_pm_addr_entry *entry;
+	struct mptcp_id_bitmap *bitmap;
 	struct pm_nl_pernet *pernet;
 	int id = cb->args[0];
 	void *hdr;
 	int i;
 
+	bitmap = (struct mptcp_id_bitmap *)cb->ctx;
 	pernet = pm_nl_get_pernet(net);
 
 	spin_lock_bh(&pernet->lock);
+	if (!id)
+		bitmap_copy(bitmap->map, pernet->id_bitmap.map, MPTCP_PM_MAX_ADDR_ID + 1);
 	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
-		if (test_bit(i, pernet->id_bitmap.map)) {
+		if (test_bit(i, bitmap->map)) {
 			entry = __lookup_addr_by_id(pernet, i);
 			if (!entry)
 				break;
