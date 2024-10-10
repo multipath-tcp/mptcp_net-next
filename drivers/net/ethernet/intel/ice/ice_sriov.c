@@ -194,7 +194,8 @@ void ice_free_vfs(struct ice_pf *pf)
 		}
 
 		/* clear malicious info since the VF is getting released */
-		list_del(&vf->mbx_info.list_entry);
+		if (!ice_is_feature_supported(pf, ICE_F_MBX_LIMIT))
+			list_del(&vf->mbx_info.list_entry);
 
 		mutex_unlock(&vf->cfg_lock);
 	}
@@ -1121,7 +1122,10 @@ int ice_sriov_set_msix_vec_count(struct pci_dev *vf_dev, int msix_vec_count)
 	if (vf->first_vector_idx < 0)
 		goto unroll;
 
-	if (ice_vf_reconfig_vsi(vf) || ice_vf_init_host_cfg(vf, vsi)) {
+	vsi->req_txq = queues;
+	vsi->req_rxq = queues;
+
+	if (ice_vsi_rebuild(vsi, ICE_VSI_FLAG_NO_INIT)) {
 		/* Try to rebuild with previous values */
 		needs_rebuild = true;
 		goto unroll;
@@ -1150,8 +1154,10 @@ unroll:
 	}
 
 	if (needs_rebuild) {
-		ice_vf_reconfig_vsi(vf);
-		ice_vf_init_host_cfg(vf, vsi);
+		vsi->req_txq = prev_queues;
+		vsi->req_rxq = prev_queues;
+
+		ice_vsi_rebuild(vsi, ICE_VSI_FLAG_NO_INIT);
 	}
 
 	ice_ena_vf_mappings(vf);
