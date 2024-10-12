@@ -358,6 +358,11 @@ struct mptcp_sock {
 #define mptcp_for_each_subflow_safe(__msk, __subflow, __tmp)			\
 	list_for_each_entry_safe(__subflow, __tmp, &((__msk)->conn_list), node)
 
+#define mptcp_for_each_address(__msk, __entry)			\
+	list_for_each_entry(__entry, &((__msk)->pm.userspace_pm_local_addr_list), list)
+#define mptcp_for_each_address_safe(__msk, __entry, __tmp)			\
+	list_for_each_entry_safe(__entry, __tmp, &((__msk)->pm.userspace_pm_local_addr_list), list)
+
 extern struct genl_family mptcp_genl_family;
 
 static inline void msk_owned_by_me(const struct mptcp_sock *msk)
