@@ -66,7 +66,7 @@ jobs:
 
       - name: "Docker image"
         run: |
-          /usr/bin/docker pull mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+          /usr/bin/docker pull ghcr.io/mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
 
       - name: "Tests"
         timeout-minutes: 120
@@ -86,7 +86,7 @@ jobs:
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
-            mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+            ghcr.io/mptcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
               auto-${{ matrix.mode }}
 
       - name: "Publish conclusion"
