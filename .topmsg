@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-middlebox-interference-for-MP_TCPRST-in-case-map_valid-is-false
+From: Davide Caratti <dcaratti@redhat.com>
+Subject: [PATCH] mptcp: use "middlebox interference" for MP_TCPRST in case map_valid is false
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+RFC8684 suggests use of "Middlebox interference (code 0x06)" in case of
+fully established subflow that carries data at TCP level with no DSS
+sub-option.
+
+This is generally the case when mpext is NULL or mpext->use_map is 0:
+use a dedicated value of 'mapping_status' and use it before closing the
+socket in subflow_check_data_avail().
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/518
+Signed-off-by: Davide Caratti <dcaratti@redhat.com>
