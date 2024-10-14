@@ -23,6 +23,10 @@
 #define ADDR_2	"10.0.1.2"
 #define ADDR_3	"10.0.1.3"
 #define ADDR_4	"10.0.1.4"
+#define ADDR6_1	"dead:beef:1::1"
+#define ADDR6_2	"dead:beef:1::2"
+#define ADDR6_3	"dead:beef:1::3"
+#define ADDR6_4	"dead:beef:1::4"
 #define PORT_1	10001
 #define WITH_DATA	true
 #define WITHOUT_DATA	false
@@ -371,14 +375,18 @@ static int address_init(void)
 {
 	SYS(fail, "ip -net %s link add veth1 type veth peer name veth2", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth1", NS_TEST, ADDR_1);
+	SYS(fail, "ip -net %s addr add %s/64 dev veth1 nodad", NS_TEST, ADDR6_1);
 	SYS(fail, "ip -net %s link set dev veth1 up", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth2", NS_TEST, ADDR_2);
+	SYS(fail, "ip -net %s addr add %s/64 dev veth2 nodad", NS_TEST, ADDR6_2);
 	SYS(fail, "ip -net %s link set dev veth2 up", NS_TEST);
 
 	SYS(fail, "ip -net %s link add veth3 type veth peer name veth4", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth3", NS_TEST, ADDR_3);
+	SYS(fail, "ip -net %s addr add %s/64 dev veth3 nodad", NS_TEST, ADDR6_3);
 	SYS(fail, "ip -net %s link set dev veth3 up", NS_TEST);
 	SYS(fail, "ip -net %s addr add %s/24 dev veth4", NS_TEST, ADDR_4);
+	SYS(fail, "ip -net %s addr add %s/64 dev veth4 nodad", NS_TEST, ADDR6_4);
 	SYS(fail, "ip -net %s link set dev veth4 up", NS_TEST);
 
 	return 0;
