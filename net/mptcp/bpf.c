@@ -212,20 +212,21 @@ struct bpf_iter_mptcp_subflow_kern {
 
 __bpf_kfunc_start_defs();
 
-__bpf_kfunc struct mptcp_subflow_context *
+__bpf_kfunc static struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx(const struct sock *sk)
 {
 	return mptcp_subflow_ctx(sk);
 }
 
-__bpf_kfunc struct sock *
+__bpf_kfunc static struct sock *
 bpf_mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 {
 	return mptcp_subflow_tcp_sock(subflow);
 }
 
-__bpf_kfunc int bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
-					   struct mptcp_sock *msk)
+__bpf_kfunc static int
+bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
+			   struct mptcp_sock *msk)
 {
 	struct bpf_iter_mptcp_subflow_kern *kit = (void *)it;
 
@@ -239,7 +240,7 @@ __bpf_kfunc int bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 	return 0;
 }
 
-__bpf_kfunc struct mptcp_subflow_context *
+__bpf_kfunc static struct mptcp_subflow_context *
 bpf_iter_mptcp_subflow_next(struct bpf_iter_mptcp_subflow *it)
 {
 	struct bpf_iter_mptcp_subflow_kern *kit = (void *)it;
@@ -251,11 +252,13 @@ bpf_iter_mptcp_subflow_next(struct bpf_iter_mptcp_subflow *it)
 	return list_entry(kit->pos, struct mptcp_subflow_context, node);
 }
 
-__bpf_kfunc void bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it)
+__bpf_kfunc static void
+bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it)
 {
 }
 
-__bpf_kfunc struct mptcp_sock *bpf_mptcp_sock_acquire(struct mptcp_sock *msk)
+__bpf_kfunc static struct mptcp_sock *
+bpf_mptcp_sock_acquire(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
 
@@ -264,14 +267,14 @@ __bpf_kfunc struct mptcp_sock *bpf_mptcp_sock_acquire(struct mptcp_sock *msk)
 	return NULL;
 }
 
-__bpf_kfunc void bpf_mptcp_sock_release(struct mptcp_sock *msk)
+__bpf_kfunc static void bpf_mptcp_sock_release(struct mptcp_sock *msk)
 {
 	struct sock *sk = (struct sock *)msk;
 
 	WARN_ON_ONCE(!sk || !refcount_dec_not_one(&sk->sk_refcnt));
 }
 
-__bpf_kfunc struct mptcp_subflow_context *
+__bpf_kfunc static struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
 {
 	if (pos >= MPTCP_SUBFLOWS_MAX)
@@ -279,7 +282,7 @@ bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int p
 	return data->contexts[pos];
 }
 
-__bpf_kfunc bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
+__bpf_kfunc static bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 {
 	return tcp_rtx_queue_empty(sk);
 }
