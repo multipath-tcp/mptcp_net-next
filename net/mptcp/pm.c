@@ -516,6 +516,9 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 		WRITE_ONCE(pm->work_pending, 0);
 		WRITE_ONCE(pm->accept_addr, 0);
 		WRITE_ONCE(pm->accept_subflow, 0);
+
+		if (mptcp_init_pm(msk, mptcp_pm_find(pm_type)))
+			return;
 	}
 
 	WRITE_ONCE(pm->addr_signal, 0);
@@ -535,4 +538,5 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 void __init mptcp_pm_init(void)
 {
 	mptcp_pm_nl_init();
+	mptcp_userspace_pm_init();
 }
