@@ -372,8 +372,8 @@ static void wait_for_new_subflows(int fd)
 	int err, i;
 
 	len = sizeof(subflows);
-	/* Wait max 1 sec for new subflows to be created */
-	for (i = 0; i < 10; i++) {
+	/* Wait max 5 sec for new subflows to be created */
+	for (i = 0; i < 50; i++) {
 		err = getsockopt(fd, SOL_MPTCP, MPTCP_INFO, &subflows, &len);
 		if (!err && subflows > 0)
 			break;
