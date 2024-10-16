@@ -495,9 +495,8 @@ bool mptcp_pm_addr_families_match(const struct sock *sk,
 		return !loc_is_v4 && !rem_is_v4;
 
 	return loc_is_v4 == rem_is_v4;
-#else
-	return mptcp_is_v4 && loc->family == AF_INET && rem->family == AF_INET;
 #endif
+	return mptcp_is_v4 && loc->family == AF_INET && rem->family == AF_INET;
 }
 
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
