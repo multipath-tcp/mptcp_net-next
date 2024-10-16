@@ -404,6 +404,7 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_addr_info skc_local;
 	struct mptcp_addr_info msk_local;
+	struct mptcp_pm_addr_entry local;
 
 	if (WARN_ON_ONCE(!msk))
 		return -1;
@@ -416,9 +417,14 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	if (mptcp_addresses_equal(&msk_local, &skc_local, false))
 		return 0;
 
+	memset(&local, 0, sizeof(struct mptcp_pm_addr_entry));
+	local.addr = skc_local;
+	local.addr.id = 0;
+	local.flags = MPTCP_PM_ADDR_FLAG_IMPLICIT;
+
 	if (mptcp_pm_is_userspace(msk))
-		return mptcp_userspace_pm_get_local_id(msk, &skc_local);
-	return mptcp_pm_nl_get_local_id(msk, &skc_local);
+		return mptcp_userspace_pm_get_local_id(msk, &local);
+	return mptcp_pm_nl_get_local_id(msk, &local);
 }
 
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
