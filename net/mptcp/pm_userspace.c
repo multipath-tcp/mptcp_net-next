@@ -195,6 +195,31 @@ out:
 	return msk;
 }
 
+static int userspace_pm_address_announce(struct mptcp_sock *msk,
+					 struct mptcp_pm_addr_entry *local)
+{
+	int err;
+
+	if (local->addr.id == 0 || !(local->flags & MPTCP_PM_ADDR_FLAG_SIGNAL))
+		return -EINVAL;
+
+	err = mptcp_userspace_pm_append_new_local_addr(msk, local, false);
+	if (err < 0)
+		return err;
+
+	spin_lock_bh(&msk->pm.lock);
+
+	if (mptcp_pm_alloc_anno_list(msk, &local->addr)) {
+		msk->pm.add_addr_signaled++;
+		mptcp_pm_announce_addr(msk, &local->addr, false);
+		mptcp_pm_nl_addr_send_ack(msk);
+	}
+
+	spin_unlock_bh(&msk->pm.lock);
+
+	return 0;
+}
+
 int mptcp_pm_nl_announce_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *addr = info->attrs[MPTCP_PM_ATTR_ADDR];
@@ -220,46 +245,24 @@ int mptcp_pm_nl_announce_doit(struct sk_buff *skb, struct genl_info *info)
 		goto announce_err;
 	}
 
-	if (addr_val.addr.id == 0 || !(addr_val.flags & MPTCP_PM_ADDR_FLAG_SIGNAL)) {
-		GENL_SET_ERR_MSG(info, "invalid addr id or flags");
-		err = -EINVAL;
-		goto announce_err;
-	}
-
-	err = mptcp_userspace_pm_append_new_local_addr(msk, &addr_val, false);
-	if (err < 0) {
-		GENL_SET_ERR_MSG(info, "did not match address and id");
-		goto announce_err;
-	}
-
 	lock_sock(sk);
-	spin_lock_bh(&msk->pm.lock);
-
-	if (mptcp_pm_alloc_anno_list(msk, &addr_val.addr)) {
-		msk->pm.add_addr_signaled++;
-		mptcp_pm_announce_addr(msk, &addr_val.addr, false);
-		mptcp_pm_nl_addr_send_ack(msk);
-	}
-
-	spin_unlock_bh(&msk->pm.lock);
+	err = userspace_pm_address_announce(msk, &addr_val);
 	release_sock(sk);
+	if (err)
+		GENL_SET_ERR_MSG(info, "address_announce failed");
 
-	err = 0;
  announce_err:
 	sock_put(sk);
 	return err;
 }
 
-static int mptcp_userspace_pm_remove_id_zero_address(struct mptcp_sock *msk,
-						     struct genl_info *info)
+static int mptcp_userspace_pm_remove_id_zero_address(struct mptcp_sock *msk)
 {
 	struct mptcp_rm_list list = { .nr = 0 };
 	struct mptcp_subflow_context *subflow;
-	struct sock *sk = (struct sock *)msk;
 	bool has_id_0 = false;
 	int err = -EINVAL;
 
-	lock_sock(sk);
 	mptcp_for_each_subflow(msk, subflow) {
 		if (READ_ONCE(subflow->local_id) == 0) {
 			has_id_0 = true;
@@ -267,7 +270,7 @@ static int mptcp_userspace_pm_remove_id_zero_address(struct mptcp_sock *msk,
 		}
 	}
 	if (!has_id_0) {
-		GENL_SET_ERR_MSG(info, "address with id 0 not found");
+		pr_debug("address with id 0 not found\n");
 		goto remove_err;
 	}
 
@@ -280,14 +283,36 @@ static int mptcp_userspace_pm_remove_id_zero_address(struct mptcp_sock *msk,
 	err = 0;
 
 remove_err:
-	release_sock(sk);
 	return err;
+}
+
+static int userspace_pm_address_remove(struct mptcp_sock *msk, u8 id)
+{
+	struct sock *sk = (struct sock *)msk;
+	struct mptcp_pm_addr_entry *match;
+
+	if (id == 0)
+		return mptcp_userspace_pm_remove_id_zero_address(msk);
+
+	spin_lock_bh(&msk->pm.lock);
+	match = mptcp_userspace_pm_lookup_addr_by_id(msk, id);
+	spin_unlock_bh(&msk->pm.lock);
+	if (!match)
+		return -EINVAL;
+
+	mptcp_pm_remove_addr_entry(msk, match);
+
+	spin_lock_bh(&msk->pm.lock);
+	list_del_rcu(&match->list);
+	sock_kfree_s(sk, match, sizeof(*match));
+	spin_unlock_bh(&msk->pm.lock);
+
+	return 0;
 }
 
 int mptcp_pm_nl_remove_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr *id = info->attrs[MPTCP_PM_ATTR_LOC_ID];
-	struct mptcp_pm_addr_entry *match;
 	struct mptcp_sock *msk;
 	int err = -EINVAL;
 	struct sock *sk;
@@ -306,33 +331,12 @@ int mptcp_pm_nl_remove_doit(struct sk_buff *skb, struct genl_info *info)
 
 	sk = (struct sock *)msk;
 
-	if (id_val == 0) {
-		err = mptcp_userspace_pm_remove_id_zero_address(msk, info);
-		goto out;
-	}
-
 	lock_sock(sk);
-
-	spin_lock_bh(&msk->pm.lock);
-	match = mptcp_userspace_pm_lookup_addr_by_id(msk, id_val);
-	spin_unlock_bh(&msk->pm.lock);
-	if (!match) {
-		GENL_SET_ERR_MSG(info, "address with specified id not found");
-		release_sock(sk);
-		goto out;
-	}
-
-	mptcp_pm_remove_addr_entry(msk, match);
-
+	err = userspace_pm_address_remove(msk, id_val);
 	release_sock(sk);
+	if (err)
+		GENL_SET_ERR_MSG(info, "address_remove failed");
 
-	spin_lock_bh(&msk->pm.lock);
-	list_del_rcu(&match->list);
-	sock_kfree_s(sk, match, sizeof(*match));
-	spin_unlock_bh(&msk->pm.lock);
-
-	err = 0;
-out:
 	sock_put(sk);
 	return err;
 }
