@@ -135,8 +135,8 @@ mptcp_userspace_pm_lookup_addr_by_id(struct mptcp_sock *msk, unsigned int id)
 	return NULL;
 }
 
-int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
-				    struct mptcp_pm_addr_entry *local)
+static int userspace_pm_get_local_id(struct mptcp_sock *msk,
+				     struct mptcp_pm_addr_entry *local)
 {
 	struct mptcp_pm_addr_entry *entry = NULL;
 	__be16 msk_sport =  ((struct inet_sock *)
@@ -154,8 +154,14 @@ int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
 	return mptcp_userspace_pm_append_new_local_addr(msk, local, true);
 }
 
-u8 mptcp_userspace_pm_get_flags(struct mptcp_sock *msk,
-				struct mptcp_addr_info *skc)
+int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
+				    struct mptcp_pm_addr_entry *local)
+{
+	return userspace_pm_get_local_id(msk, local);
+}
+
+static u8 userspace_pm_get_flags(struct mptcp_sock *msk,
+				 struct mptcp_addr_info *skc)
 {
 	struct mptcp_pm_addr_entry *entry;
 	u8 flags = 0;
@@ -167,6 +173,12 @@ u8 mptcp_userspace_pm_get_flags(struct mptcp_sock *msk,
 	spin_unlock_bh(&msk->pm.lock);
 
 	return flags;
+}
+
+u8 mptcp_userspace_pm_get_flags(struct mptcp_sock *msk,
+				struct mptcp_addr_info *skc)
+{
+	return userspace_pm_get_flags(msk, skc);
 }
 
 static struct mptcp_sock *mptcp_userspace_pm_get_sock(const struct genl_info *info)
@@ -546,34 +558,24 @@ destroy_err:
 	return err;
 }
 
-int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *loc,
-				 struct mptcp_addr_info *rem,
-				 struct genl_info *info)
+static int userspace_pm_set_flags(struct mptcp_sock *msk,
+				  struct mptcp_pm_addr_entry *local,
+				  struct mptcp_addr_info *remote)
 {
 	struct mptcp_pm_addr_entry *entry;
-	struct mptcp_sock *msk;
-	int ret = -EINVAL;
-	struct sock *sk;
 	u8 bkup = 0;
 
-	msk = mptcp_userspace_pm_get_sock(info);
-	if (!msk)
-		return ret;
-
-	sk = (struct sock *)msk;
-
-	if (loc->addr.family == AF_UNSPEC ||
-	    rem->family == AF_UNSPEC) {
-		GENL_SET_ERR_MSG(info, "invalid address families");
-		ret = -EINVAL;
-		goto set_flags_err;
+	if (local->addr.family == AF_UNSPEC ||
+	    remote->family == AF_UNSPEC) {
+		pr_debug("invalid address families\n");
+		return -EINVAL;
 	}
 
-	if (loc->flags & MPTCP_PM_ADDR_FLAG_BACKUP)
+	if (local->flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
 
 	spin_lock_bh(&msk->pm.lock);
-	entry = mptcp_userspace_pm_lookup_addr(msk, &loc->addr);
+	entry = mptcp_userspace_pm_lookup_addr(msk, &local->addr);
 	if (entry) {
 		if (bkup)
 			entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
@@ -582,11 +584,29 @@ int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *loc,
 	}
 	spin_unlock_bh(&msk->pm.lock);
 
-	lock_sock(sk);
-	ret = mptcp_pm_nl_mp_prio_send_ack(msk, &loc->addr, rem, bkup);
-	release_sock(sk);
+	return mptcp_pm_nl_mp_prio_send_ack(msk, &local->addr, remote, bkup);
+}
 
-set_flags_err:
+int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *loc,
+				 struct mptcp_addr_info *rem,
+				 struct genl_info *info)
+{
+	struct mptcp_sock *msk;
+	int ret = -EINVAL;
+	struct sock *sk;
+
+	msk = mptcp_userspace_pm_get_sock(info);
+	if (!msk)
+		return ret;
+
+	sk = (struct sock *)msk;
+
+	lock_sock(sk);
+	ret = userspace_pm_set_flags(msk, loc, rem);
+	release_sock(sk);
+	if (ret)
+		GENL_SET_ERR_MSG(info, "set_flags failed");
+
 	sock_put(sk);
 	return ret;
 }
@@ -606,6 +626,12 @@ static int mptcp_userspace_pm_set_bitmap(struct mptcp_sock *msk,
 	return 0;
 }
 
+static int userspace_pm_dump_addr(struct mptcp_sock *msk,
+				  struct mptcp_id_bitmap *bitmap)
+{
+	return mptcp_userspace_pm_set_bitmap(msk, bitmap);
+}
+
 int mptcp_userspace_pm_dump_addr(struct mptcp_id_bitmap *bitmap,
 				 const struct genl_info *info)
 {
@@ -621,12 +647,18 @@ int mptcp_userspace_pm_dump_addr(struct mptcp_id_bitmap *bitmap,
 
 	lock_sock(sk);
 	spin_lock_bh(&msk->pm.lock);
-	ret = mptcp_userspace_pm_set_bitmap(msk, bitmap);
+	ret = userspace_pm_dump_addr(msk, bitmap);
 	spin_unlock_bh(&msk->pm.lock);
 	release_sock(sk);
 
 	sock_put(sk);
 	return ret;
+}
+
+static struct mptcp_pm_addr_entry *
+userspace_pm_get_addr(struct mptcp_sock *msk, u8 id)
+{
+	return mptcp_userspace_pm_lookup_addr_by_id(msk, id);
 }
 
 int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
@@ -645,7 +677,7 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 
 	lock_sock(sk);
 	spin_lock_bh(&msk->pm.lock);
-	entry = mptcp_userspace_pm_lookup_addr_by_id(msk, id);
+	entry = userspace_pm_get_addr(msk, id);
 	if (entry) {
 		*addr = *entry;
 		ret = 0;
