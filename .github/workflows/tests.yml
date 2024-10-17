@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: restore-ccache
         with:
-          path: ${{ github.workspace }}/.virtme/ccache*
+          path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
@@ -78,9 +78,13 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+          # remove old cache if any
+          rm -rvf "${{ github.workspace }}/.virtme/ccache-"* 2>/dev/null
+
           set -x
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_CCACHE_MAXSIZE=500M" \
+            -e "INPUT_CCACHE_DIR=ccache" \
             -e "INPUT_PACKETDRILL_STABLE=${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}" \
             -e "INPUT_EXTRA_ENV=${{ startsWith(matrix.mode, 'btf-') && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
@@ -178,7 +182,7 @@ jobs:
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
         uses: actions/cache/save@v4
         with:
-          path: ${{ github.workspace }}/.virtme/ccache*
+          path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
   publish-test-results:
