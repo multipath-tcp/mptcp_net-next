@@ -543,7 +543,6 @@ static void test_iters_subflow(void)
 	struct mptcp_bpf_iters *skel;
 	struct nstoken *nstoken;
 	int cgroup_fd;
-	int err;
 
 	cgroup_fd = test__join_cgroup("/iters_subflow");
 	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: iters_subflow"))
