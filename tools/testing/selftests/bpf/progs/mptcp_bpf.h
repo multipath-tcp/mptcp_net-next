@@ -4,6 +4,9 @@
 
 #include "bpf_experimental.h"
 
+/* mptcp helpers from include/net/mptcp.h */
+#define MPTCP_SUBFLOWS_MAX 8
+
 /* list helpers from include/linux/list.h */
 static inline int list_is_head(const struct list_head *list,
 			       const struct list_head *head)
