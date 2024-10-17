@@ -51,17 +51,20 @@ jobs:
             echo "name=export" >> ${GITHUB_OUTPUT}
           fi
 
+          mode="${{ matrix.mode }}"
+          echo "mode=${mode//-/_}" >> ${GITHUB_OUTPUT}
+
       - name: "Restore cache for CCache"
         uses: actions/cache/restore@v4
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache*
-          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: "Docker image"
