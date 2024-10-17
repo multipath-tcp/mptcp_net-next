@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: ['normal', 'debug', 'btf']
+        mode: ['normal', 'debug', 'btf-normal', 'btf-debug']
     permissions:
       contents: read # to fetch code (actions/checkout)
 
@@ -51,17 +51,20 @@ jobs:
             echo "name=export" >> ${GITHUB_OUTPUT}
           fi
 
+          mode="${{ matrix.mode }}"
+          echo "mode=${mode//-/_}" >> ${GITHUB_OUTPUT}
+
       - name: "Restore cache for CCache"
         uses: actions/cache/restore@v4
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache*
-          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-${{ github.run_id }}-
-            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ matrix.mode }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: "Docker image"
@@ -79,7 +82,7 @@ jobs:
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_CCACHE_MAXSIZE=500M" \
             -e "INPUT_PACKETDRILL_STABLE=${{ steps.branch.outputs.name == 'export-net' && '1' || '0' }}" \
-            -e "INPUT_EXTRA_ENV=${{ matrix.mode == 'btf' && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
+            -e "INPUT_EXTRA_ENV=${{ startsWith(matrix.mode, 'btf-') && 'INPUT_RUN_TESTS_ONLY=bpftest_all' || '' }}" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
             -e "INPUT_GCOV=1" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
@@ -205,7 +208,7 @@ jobs:
         if: github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net'
         with:
           parallel-finished: true
-          carryforward: "normal,debug,btf"
+          carryforward: "normal,debug,btf-normal,btf-debug"
 
   notif:
     name: "Notifications"
@@ -226,11 +229,11 @@ jobs:
       - name: get test info
         id: test
         run: |
-          for mode in normal debug btf; do
+          for mode in normal debug btf-normal btf-debug; do
             ccl="$(cat "results-${mode}/conclusion.txt")"
-            echo "ccl_${mode}=${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
-            echo "ccl_title_${mode}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
-            echo "ccl_status_${mode}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+            echo "ccl_${mode//-/_}=${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
+            echo "ccl_title_${mode//-/_}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
+            echo "ccl_status_${mode//-/_}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           done
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
 
@@ -260,7 +263,8 @@ jobs:
             New GH Actions Tests job validating ${{ steps.tag.outputs.tag }} (by ${{ github.actor }}) just ended:
             - ${{ steps.test.outputs.ccl_normal }}
             - ${{ steps.test.outputs.ccl_debug }}
-            - ${{ steps.test.outputs.ccl_btf }}
+            - ${{ steps.test.outputs.ccl_btf_normal }}
+            - ${{ steps.test.outputs.ccl_btf_debug }}
             - Task: ${{ steps.test.outputs.url }}
 
       - name: Checkout results repo
@@ -281,7 +285,7 @@ jobs:
       - name: save flakes results
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         run: |
-          for mode in normal debug btf; do
+          for mode in normal debug btf-normal btf-debug; do
             new="results-${mode}/results.json"
             all="results/html/results/${{ github.ref_name }}/${mode}.json"
             if [ ! -s "${new}" ]; then
@@ -428,7 +432,8 @@ jobs:
 
           submit "${{ steps.test.outputs.ccl_title_normal }}" "${{ steps.test.outputs.ccl_status_normal }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_debug }}" "${{ steps.test.outputs.ccl_status_debug }}" "${{ steps.test.outputs.url }}"
-          submit "${{ steps.test.outputs.ccl_title_btf }}" "${{ steps.test.outputs.ccl_status_btf }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_btf_normal }}" "${{ steps.test.outputs.ccl_status_btf_normal }}" "${{ steps.test.outputs.url }}"
+          submit "${{ steps.test.outputs.ccl_title_btf_debug }}" "${{ steps.test.outputs.ccl_status_btf_debug }}" "${{ steps.test.outputs.url }}"
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
 
@@ -488,7 +493,8 @@ jobs:
 
             - ${{ steps.test.outputs.ccl_title_normal }}: ${{ steps.test.outputs.ccl_status_normal }}
             - ${{ steps.test.outputs.ccl_title_debug }}: ${{ steps.test.outputs.ccl_status_debug }}
-            - ${{ steps.test.outputs.ccl_title_btf }}: ${{ steps.test.outputs.ccl_status_btf }}
+            - ${{ steps.test.outputs.ccl_title_btf_normal }}: ${{ steps.test.outputs.ccl_status_btf_normal }}
+            - ${{ steps.test.outputs.ccl_title_btf_debug }}: ${{ steps.test.outputs.ccl_status_btf_debug }}
             - Task: ${{ steps.test.outputs.url }}
 
             Initiator: ${{ steps.commit.outputs.committer }}
@@ -534,7 +540,7 @@ jobs:
       - name: Check Status
         run: |
           issues=()
-          for mode in normal debug btf; do
+          for mode in normal debug btf-normal btf-debug; do
             ccl="results-${mode}/conclusion.txt"
             if [ ! -f "${ccl}" ] || ! grep -q "Success" "${ccl}"; then
               issues+=("${mode}")
