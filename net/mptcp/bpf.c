@@ -113,6 +113,7 @@ static int bpf_mptcp_sched_init_member(const struct btf_type *t,
 	const struct mptcp_sched_ops *usched;
 	struct mptcp_sched_ops *sched;
 	u32 moff;
+	int ret;
 
 	usched = (const struct mptcp_sched_ops *)udata;
 	sched = (struct mptcp_sched_ops *)kdata;
@@ -123,9 +124,12 @@ static int bpf_mptcp_sched_init_member(const struct btf_type *t,
 		if (bpf_obj_name_cpy(sched->name, usched->name,
 				     sizeof(sched->name)) <= 0)
 			return -EINVAL;
-		if (mptcp_sched_find(usched->name))
-			return -EEXIST;
-		return 1;
+
+		rcu_read_lock();
+		ret = mptcp_sched_find(usched->name) ? -EEXIST : 1;
+		rcu_read_unlock();
+
+		return ret;
 	}
 
 	return 0;
