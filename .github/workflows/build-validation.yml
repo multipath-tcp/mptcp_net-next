@@ -80,7 +80,7 @@ jobs:
         with:
           # we want to validate each commits on top of net-next/export (or -net) except for stable
           each_commit: ${{ ! startswith(github.ref, 'refs/heads/stable/') }}
-          ccache_maxsize: 350M ## 10GB = project limit
+          ccache_maxsize: 300M ## 10GB = project limit
           defconfig: ${{ matrix.defconfig }}
           ipv6: ${{ matrix.ipv6 }}
           mptcp: ${{ matrix.mptcp }}
