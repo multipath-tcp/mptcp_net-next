@@ -1,5 +1,5 @@
 From: Davide Caratti <dcaratti@redhat.com>
-Subject: [PATCH] mptcp: use "middlebox interference" for MP_TCPRST in case map_valid is false
+Subject: [PATCH] mptcp: use "middlebox interference" RST when no DSS
 
 RFC8684 suggests use of "Middlebox interference (code 0x06)" in case of
 fully established subflow that carries data at TCP level with no DSS
