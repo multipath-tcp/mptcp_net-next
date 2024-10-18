@@ -1,1 +1,1 @@
-t/selftests-bpf-Add-getsockopt-to-inspect-mptcp-subflow
+t/bpf-Add-bpf_mptcp_sched_kfunc_set
