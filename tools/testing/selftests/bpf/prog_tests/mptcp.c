@@ -29,6 +29,7 @@
 #define ADDR6_4	"dead:beef:4::1"
 #define PORT_1	10001
 #define PM_CTL		"./mptcp_pm_nl_ctl"
+#define PM_EVENTS	"/tmp/bpf_userspace_pm_events"
 #define WITH_DATA	true
 #define WITHOUT_DATA	false
 
@@ -53,6 +54,14 @@
 #define TCP_CA_NAME_MAX	16
 #endif
 #define MPTCP_SCHED_NAME_MAX	16
+
+enum mptcp_pm_type {
+	MPTCP_PM_TYPE_KERNEL = 0,
+	MPTCP_PM_TYPE_USERSPACE,
+
+	__MPTCP_PM_TYPE_NR,
+	__MPTCP_PM_TYPE_MAX = __MPTCP_PM_TYPE_NR - 1,
+};
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int duration;
@@ -265,6 +274,19 @@ static void send_byte(int fd)
 	char b = 0x55;
 
 	ASSERT_EQ(write(fd, &b, sizeof(b)), 1, "send single byte");
+}
+
+static int recv_byte(int fd)
+{
+	char buf[1];
+	ssize_t n;
+
+	n = recv(fd, buf, sizeof(buf), 0);
+	if (CHECK(n <= 0, "recv_byte", "recv")) {
+		log_err("failed/partial recv");
+		return -1;
+	}
+	return 0;
 }
 
 static int verify_mptcpify(int server_fd, int client_fd)
@@ -581,6 +603,159 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
+static int userspace_pm_init(enum mptcp_pm_type pm_type)
+{
+	if (address_init())
+		goto fail;
+
+	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.pm_type=%u",
+	    NS_TEST, pm_type);
+	SYS(fail, "ip netns exec %s %s limits 4 4",
+	    NS_TEST, PM_CTL);
+	SYS(fail, "ip netns exec %s %s events >> %s 2>&1 &",
+	    NS_TEST, PM_CTL, PM_EVENTS);
+
+	return 0;
+fail:
+	return -1;
+}
+
+static void userspace_pm_cleanup(void)
+{
+	SYS_NOFAIL("ip netns exec %s killall %s > /dev/null 2>&1",
+		   NS_TEST, PM_CTL);
+	SYS_NOFAIL("ip netns exec %s rm -rf %s", NS_TEST, PM_EVENTS);
+}
+
+static char *get_events_str(char *type)
+{
+	char buf[1024];
+	size_t len;
+	int fd;
+
+	fd = open(PM_EVENTS, O_RDONLY);
+	if (!ASSERT_OK_FD(fd, "failed to open pm events"))
+		return NULL;
+
+	len = read(fd, buf, sizeof(buf));
+	ASSERT_GT(len, 0, "failed to read pm events");
+
+	close(fd);
+
+	return strstr(buf, type);
+}
+
+static int userspace_pm_add_subflow(char *addr, __u8 id)
+{
+	bool ipv6 = strstr(addr, ":");
+	__u32 token, sport, dport;
+	char *str;
+	int n;
+
+	str = get_events_str("type:2");
+	if (!str)
+		return -1;
+
+	n = sscanf(strstr(str, "token"), "token:%u,", &token);
+	if (n != 1)
+		return -1;
+	n = sscanf(strstr(str, "sport"), "sport:%u,dport:%u,", &sport, &dport);
+	if (n != 2)
+		return -1;
+	str = ipv6 ? (strstr(addr, ".") ? "::ffff:"ADDR_1 : ADDR6_1) : ADDR_1;
+	SYS_NOFAIL("ip netns exec %s %s csf lip %s lid %u rip %s rport %u token %u",
+		   NS_TEST, PM_CTL, addr, id, str, dport, token);
+
+	return 0;
+}
+
+static void run_iters_address(void)
+{
+	int server_fd, client_fd, accept_fd;
+	char cc[TCP_CA_NAME_MAX];
+	socklen_t len;
+	int err;
+
+	server_fd = start_mptcp_server(AF_INET6, "::ffff:"ADDR_1, PORT_1, 0);
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
+		goto close_server;
+
+	accept_fd = accept(server_fd, NULL, NULL);
+	if (!ASSERT_OK_FD(accept_fd, "accept"))
+		goto close_client;
+
+	usleep(100000);
+	send_byte(client_fd);
+	recv_byte(accept_fd);
+	usleep(100000);
+
+	err = userspace_pm_add_subflow("::ffff:"ADDR_2, 10);
+	err = err ?: userspace_pm_add_subflow("::ffff:"ADDR_3, 20);
+	err = err ?: userspace_pm_add_subflow("::ffff:"ADDR_4, 30);
+	if (!ASSERT_OK(err, "userspace_pm_add_subflow"))
+		goto close_accept;
+
+	send_byte(accept_fd);
+	recv_byte(client_fd);
+
+	len = sizeof(cc);
+	err = getsockopt(client_fd, SOL_TCP, TCP_CONGESTION, cc, &len);
+	if (ASSERT_OK(err, "getsockopt(client_fd, TCP_CONGESTION)"))
+		ASSERT_STREQ(cc, "cubic", "cc");
+
+close_accept:
+	close(accept_fd);
+close_client:
+	close(client_fd);
+close_server:
+	close(server_fd);
+}
+
+static void test_iters_address(void)
+{
+	struct mptcp_bpf_iters *skel;
+	struct nstoken *nstoken;
+	int cgroup_fd;
+	int err;
+
+	cgroup_fd = test__join_cgroup("/iters_address");
+	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup: iters_address"))
+		return;
+
+	skel = mptcp_bpf_iters__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "skel_open_load: iters_address"))
+		goto close_cgroup;
+
+	skel->links.iters_address = bpf_program__attach_cgroup(skel->progs.iters_address,
+							       cgroup_fd);
+	if (!ASSERT_OK_PTR(skel->links.iters_address, "attach getsockopt"))
+		goto skel_destroy;
+
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
+		goto skel_destroy;
+
+	err = userspace_pm_init(MPTCP_PM_TYPE_USERSPACE);
+	if (!ASSERT_OK(err, "userspace_pm_init: iters_address"))
+		goto close_netns;
+
+	run_iters_address();
+
+	ASSERT_EQ(skel->bss->ids, 60, "address ids");
+
+	userspace_pm_cleanup();
+close_netns:
+	cleanup_netns(nstoken);
+skel_destroy:
+	mptcp_bpf_iters__destroy(skel);
+close_cgroup:
+	close(cgroup_fd);
+}
+
 static struct nstoken *sched_init(char *flags, char *sched)
 {
 	struct nstoken *nstoken;
@@ -764,6 +939,8 @@ void test_mptcp(void)
 		test_subflow();
 	if (test__start_subtest("iters_subflow"))
 		test_iters_subflow();
+	if (test__start_subtest("iters_address"))
+		test_iters_address();
 	if (test__start_subtest("default"))
 		test_default();
 	if (test__start_subtest("first"))
