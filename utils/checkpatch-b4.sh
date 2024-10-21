@@ -14,7 +14,8 @@ echo
 echo "Prefixes: ${prefixes}"
 if [[ "${prefixes}" == *"-next"* ]] &&
    git log --format="%b" "$(b4 prep --show-info series-range)" | grep -q "^Fixes: "; then
-	echo -e "\n\tWARNING: Series is for ${prefixes}, but there are patches with 'Fixes' tags\n"
+	echo -e "\n\tWARNING: Series is for ${prefixes}, but there are patches with 'Fixes' tags"
+	echo -e "\t\t$ b4 prep --set-prefixes 'mptcp-net'\n"
 	exit 1
 fi
 exit ${rc}
