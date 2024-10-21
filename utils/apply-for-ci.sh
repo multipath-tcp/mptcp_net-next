@@ -5,18 +5,13 @@ if [ -s ".topdeps" ]; then
         exit 1
 fi
 
-HEAD=$(git rev-parse HEAD)
 TAG="patchew/${1}"
 
-if ! b4 shazam -l "${1?}"; then
+if ! b4 shazam --add-message-id "${1?}"; then
         echo
         echo "Please fix the conficts in another terminal (including 'git am --continue') and press Enter to continue"
         read -r
 fi
-
-git filter-repo --message-callback '
-        return re.sub(b"Link: https://lore\.kernel\.org/r/(.*)", br"Message-Id: <\1>", message)
-        ' --refs "${HEAD}.."
 
 echo
 echo "Tag and push ${TAG}?"
