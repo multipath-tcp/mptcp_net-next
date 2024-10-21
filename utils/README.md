@@ -214,12 +214,12 @@ Here is a checklist.
 
 * Prepare a new branch with one of these adapted commands (with a description):
 
-      b4 prep -n net-next-<description> -f netdev-next/main --set-prefixes net-next
-      b4 prep -n net-<description> -f netdev-net/main --set-prefixes net
-      b4 prep -n stable-<description>-6.x -f stable/linux-6.x.y --set-prefixes 6.x
-      b4 prep -n stable-<description>-6.x -f stable-rc/queue/6.x --set-prefixes 6.x
-      b4 prep -n bpf-next-<description> -f bpf-next/master --set-prefixes bpf-next
-      b4 prep -n bpf-<description> -f bpf/master --set-prefixes bpf
+      b4 prep -f netdev-next/main --set-prefixes net-next -n net-next-mptcp-<description>
+      b4 prep -f netdev-net/main --set-prefixes net -n net-mptcp-<description>
+      b4 prep -f stable/linux-6.x.y --set-prefixes 6.x -n stable-mptcp-<description>-6.x
+      b4 prep -f stable-rc/queue/6.x --set-prefixes 6.x -n stable-mptcp-<description>-6.x
+      b4 prep -f bpf-next/master --set-prefixes bpf-next -n bpf-next-mptcp-<description>
+      b4 prep -f bpf/master --set-prefixes bpf -n bpf-mptcp-<description>
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
 
