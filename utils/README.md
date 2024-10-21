@@ -218,7 +218,7 @@ Here is a checklist.
       b4 prep -f netdev-net/main --set-prefixes net -n net-mptcp-<description>
       b4 prep -f stable/linux-6.x.y --set-prefixes 6.x -n stable-mptcp-<description>-6.x
       b4 prep -f stable-rc/queue/6.x --set-prefixes 6.x -n stable-mptcp-<description>-6.x
-      b4 prep -f bpf-next/master --set-prefixes bpf-next -n bpf-next-mptcp-<description>
+      b4 prep -f bpf-next/net --set-prefixes bpf-next/net -n bpf-next-net-mptcp-<description>
       b4 prep -f bpf/master --set-prefixes bpf -n bpf-mptcp-<description>
 
 * Cherry-pick commits you need and add the upstreamer's signoff:
