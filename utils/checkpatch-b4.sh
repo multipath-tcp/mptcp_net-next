@@ -7,10 +7,7 @@ if [ "${branch:0:3}" != "b4/" ]; then
 fi
 
 rc=0
-./.checkpatch.sh --git "$(b4 prep --show-info start-commit).." || rc=$?
-
-echo
-b4 prep --check
+b4 -c "b4.prep-perpatch-check-cmd=./scripts/checkpatch.pl -q --terse --no-summary --mailback --showfile --strict --codespell --codespellfile /usr/lib/python3/dist-packages/codespell_lib/data/dictionary.txt" prep --check || rc=$?
 
 prefixes="$(b4 prep --show-info prefixes)"
 echo
