@@ -1,4 +1,30 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-mptcp_subflow-bpf_iter-subtest
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Add mptcp_subflow bpf_iter subtest
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a "cgroup/getsockopt" program "iters_subflow" to test the
+newly added mptcp_subflow bpf_iter.
+
+Export mptcp_subflow helpers bpf_iter_mptcp_subflow_new/_next/_destroy,
+bpf_mptcp_sock_acquire/_release and other helpers into bpf_experimental.h.
+
+Use bpf_mptcp_sock_acquire() to acquire the msk, then use bpf_for_each()
+to walk the subflow list of this msk. MPTCP-specific packet scheduler kfunc
+can be called in the loop. In this test, just add all subflow ids to local
+variable local_ids, then invoke the kfunc bpf_mptcp_subflow_tcp_sock() in
+the loop to pick a subsocket.
+
+Out of the loop, use bpf_mptcp_subflow_ctx() to get the subflow context
+of the picked subsocket and do some verification. Finally, assign
+local_ids to global variable ids so that the application can obtain this
+value, and release the msk.
+
+Add a subtest named test_iters_subflow to load and verify the newly added
+mptcp_subflow type bpf_iter example in test_mptcp. Use the helper
+endpoint_init() to add 3 new subflow endpoints. Send a byte of message
+to start the mptcp connection, and wait for new subflows to be added.
+getsockopt() is invoked to trigger the "cgroup/getsockopt" test program
+"iters_subflow". Check if skel->bss->ids equals 10 to verify whether this
+mptcp_subflow bpf_iter loops correctly as expected.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
