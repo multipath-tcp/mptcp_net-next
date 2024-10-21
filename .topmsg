@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] bpf: Add bpf_mptcp_sched_kfunc_set
+Subject: [PATCH] bpf: Export mptcp packet scheduler helpers
 
 This patch adds a new struct btf_kfunc_id_set for MPTCP scheduler. Add
 mptcp_subflow_set_scheduled() and mptcp_sched_data_set_contexts() helpers
