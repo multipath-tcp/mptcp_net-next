@@ -18,7 +18,7 @@ gh_pr() {
 		-R "${@}" | sed 's/^/  /g'
 }
 
-LAST_MEETING="${1:-$(date -dlast-week +%Y-%m-%d)}"
+LAST_MEETING="${1:-$(date -d-2weeks +%Y-%m-%d)}"
 
 title "Recently opened (latest from the last meeting: *TODO*)"
 my_ghi --state open --since "${LAST_MEETING}"
