@@ -22,12 +22,15 @@ fi
 trap 'exit_trap' EXIT
 
 if is_stable || is_net; then
+   SUFFIX=$(make kernelversion | cut -d. -f1-2)
    PACKETDRILL_STABLE=1
 else
+   SUFFIX=
    PACKETDRILL_STABLE=0
 fi
 
 INPUT_BUILD_SKIP_PERF=1 \
    VIRTME_PACKETDRILL_STABLE=${PACKETDRILL_STABLE} \
    INPUT_SELFTESTS_MPTCP_LIB_OVERRIDE_FLAKY=0 \
+   INPUT_BUILD_SUFFIX=${SUFFIX} \
    "./${VIRTME_SH:-.virtme.sh}" "${@:-auto-all}"
