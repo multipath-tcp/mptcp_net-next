@@ -1435,7 +1435,6 @@ errout:
 
 /* Watch incoming packets to learn mapping between Ethernet address
  * and Tunnel endpoint.
- * Return true if packet is bogus and should be dropped.
  */
 static enum skb_drop_reason vxlan_snoop(struct net_device *dev,
 					union vxlan_addr *src_ip,
@@ -2341,7 +2340,7 @@ static int encap_bypass_if_local(struct sk_buff *skb, struct net_device *dev,
 			DEV_STATS_INC(dev, tx_errors);
 			vxlan_vnifilter_count(vxlan, vni, NULL,
 					      VXLAN_VNI_STATS_TX_ERRORS, 0);
-			kfree_skb_reason(skb, SKB_DROP_REASON_VXLAN_INVALID_HDR);
+			kfree_skb_reason(skb, SKB_DROP_REASON_VXLAN_VNI_NOT_FOUND);
 
 			return -ENOENT;
 		}
