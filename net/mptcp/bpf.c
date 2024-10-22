@@ -17,9 +17,264 @@
 #include "protocol.h"
 
 #ifdef CONFIG_BPF_JIT
-static struct bpf_struct_ops bpf_mptcp_sched_ops;
+static struct bpf_struct_ops bpf_mptcp_pm_ops,
+			     bpf_mptcp_sched_ops;
 static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly;
-static u32 mptcp_sock_id, mptcp_subflow_id;
+static u32 mptcp_sock_id, mptcp_entry_id, mptcp_addr_id, mptcp_subflow_id;
+
+/* MPTCP BPF path manager */
+
+static const struct bpf_func_proto *
+bpf_mptcp_pm_get_func_proto(enum bpf_func_id func_id,
+			    const struct bpf_prog *prog)
+{
+	switch (func_id) {
+	case BPF_FUNC_sk_storage_get:
+		return &bpf_sk_storage_get_proto;
+	case BPF_FUNC_sk_storage_delete:
+		return &bpf_sk_storage_delete_proto;
+	default:
+		return bpf_base_func_proto(func_id, prog);
+	}
+}
+
+static int bpf_mptcp_pm_btf_struct_access(struct bpf_verifier_log *log,
+					  const struct bpf_reg_state *reg,
+					  int off, int size)
+{
+	u32 id = reg->btf_id;
+	size_t end;
+
+	if (id == mptcp_sock_id) {
+		switch (off) {
+		case offsetof(struct mptcp_sock, pm.add_addr_signaled):
+			end = offsetofend(struct mptcp_sock, pm.add_addr_signaled);
+			break;
+		case offsetof(struct mptcp_sock, pm.local_addr_used):
+			end = offsetofend(struct mptcp_sock, pm.local_addr_used);
+			break;
+		case offsetof(struct mptcp_sock, pm.subflows):
+			end = offsetofend(struct mptcp_sock, pm.subflows);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_sock at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else if (id == mptcp_entry_id) {
+		switch (off) {
+		case offsetof(struct mptcp_pm_addr_entry, addr.id):
+			end = offsetofend(struct mptcp_pm_addr_entry, addr.id);
+			break;
+		case offsetof(struct mptcp_pm_addr_entry, addr.family):
+			end = offsetofend(struct mptcp_pm_addr_entry, addr.family);
+			break;
+		case offsetof(struct mptcp_pm_addr_entry, addr.port):
+			end = offsetofend(struct mptcp_pm_addr_entry, addr.port);
+			break;
+		case offsetof(struct mptcp_pm_addr_entry, flags):
+			end = offsetofend(struct mptcp_pm_addr_entry, flags);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_pm_addr_entry at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else if (id == mptcp_addr_id) {
+		switch (off) {
+		case offsetof(struct mptcp_addr_info, id):
+			end = offsetofend(struct mptcp_addr_info, id);
+			break;
+		case offsetof(struct mptcp_addr_info, family):
+			end = offsetofend(struct mptcp_addr_info, family);
+			break;
+		case offsetof(struct mptcp_addr_info, port):
+			end = offsetofend(struct mptcp_addr_info, port);
+			break;
+		default:
+			bpf_log(log, "no write support to mptcp_addr_info at off %d\n",
+				off);
+			return -EACCES;
+		}
+	} else {
+		bpf_log(log, "only access to mptcp sock or addr or entry is supported\n");
+		return -EACCES;
+	}
+
+	if (off + size > end) {
+		bpf_log(log, "access beyond %s at off %u size %u ended at %zu",
+			id == mptcp_sock_id ? "mptcp_sock" :
+			(id == mptcp_entry_id ? "mptcp_pm_addr_entry" : "mptcp_addr_info"),
+			off, size, end);
+		return -EACCES;
+	}
+
+	return NOT_INIT;
+}
+
+static const struct bpf_verifier_ops bpf_mptcp_pm_verifier_ops = {
+	.get_func_proto		= bpf_mptcp_pm_get_func_proto,
+	.is_valid_access	= bpf_tracing_btf_ctx_access,
+	.btf_struct_access	= bpf_mptcp_pm_btf_struct_access,
+};
+
+static int bpf_mptcp_pm_reg(void *kdata, struct bpf_link *link)
+{
+	return mptcp_register_path_manager(kdata);
+}
+
+static void bpf_mptcp_pm_unreg(void *kdata, struct bpf_link *link)
+{
+	mptcp_unregister_path_manager(kdata);
+}
+
+static int bpf_mptcp_pm_check_member(const struct btf_type *t,
+				     const struct btf_member *member,
+				     const struct bpf_prog *prog)
+{
+	return 0;
+}
+
+static int bpf_mptcp_pm_init_member(const struct btf_type *t,
+				    const struct btf_member *member,
+				    void *kdata, const void *udata)
+{
+	const struct mptcp_pm_ops *upm;
+	struct mptcp_pm_ops *pm;
+	u32 moff;
+
+	upm = (const struct mptcp_pm_ops *)udata;
+	pm = (struct mptcp_pm_ops *)kdata;
+
+	moff = __btf_member_bit_offset(t, member) / 8;
+	switch (moff) {
+	case offsetof(struct mptcp_pm_ops, type):
+		pm->type = upm->type;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int bpf_mptcp_pm_init(struct btf *btf)
+{
+	s32 type_id;
+
+	type_id = btf_find_by_name_kind(btf, "mptcp_sock",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_sock_id = type_id;
+
+	type_id = btf_find_by_name_kind(btf, "mptcp_pm_addr_entry",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_entry_id = type_id;
+
+	type_id = btf_find_by_name_kind(btf, "mptcp_addr_info",
+					BTF_KIND_STRUCT);
+	if (type_id < 0)
+		return -EINVAL;
+	mptcp_addr_id = type_id;
+
+	return 0;
+}
+
+static int bpf_mptcp_pm_validate(void *kdata)
+{
+	return mptcp_validate_path_manager(kdata);
+}
+
+static int __bpf_mptcp_pm_address_announce(struct mptcp_sock *msk,
+					   struct mptcp_pm_addr_entry *addr)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_pm_address_remove(struct mptcp_sock *msk, u8 id)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_pm_subflow_create(struct mptcp_sock *msk,
+					 struct mptcp_pm_addr_entry *entry,
+					 struct mptcp_addr_info *addr)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_pm_subflow_destroy(struct mptcp_sock *msk,
+					  struct mptcp_pm_addr_entry *local,
+					  struct mptcp_addr_info *remote)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_pm_get_local_id(struct mptcp_sock *msk,
+				       struct mptcp_pm_addr_entry *local)
+{
+	return 0;
+}
+
+static u8 __bpf_mptcp_pm_get_flags(struct mptcp_sock *msk,
+				   struct mptcp_addr_info *skc)
+{
+	return 0;
+}
+
+static struct mptcp_pm_addr_entry *
+__bpf_mptcp_pm_get_addr(struct mptcp_sock *msk, u8 id)
+{
+	return NULL;
+}
+
+static int __bpf_mptcp_pm_dump_addr(struct mptcp_sock *msk,
+				    struct mptcp_id_bitmap *bitmap)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_pm_set_flags(struct mptcp_sock *msk,
+				    struct mptcp_pm_addr_entry *local,
+				    struct mptcp_addr_info *remote)
+{
+	return 0;
+}
+
+static void __bpf_mptcp_pm_init(struct mptcp_sock *msk)
+{
+}
+
+static void __bpf_mptcp_pm_release(struct mptcp_sock *msk)
+{
+}
+
+static struct mptcp_pm_ops __bpf_mptcp_pm_ops = {
+	.address_announce	= __bpf_mptcp_pm_address_announce,
+	.address_remove		= __bpf_mptcp_pm_address_remove,
+	.subflow_create		= __bpf_mptcp_pm_subflow_create,
+	.subflow_destroy	= __bpf_mptcp_pm_subflow_destroy,
+	.get_local_id		= __bpf_mptcp_pm_get_local_id,
+	.get_flags		= __bpf_mptcp_pm_get_flags,
+	.get_addr		= __bpf_mptcp_pm_get_addr,
+	.dump_addr		= __bpf_mptcp_pm_dump_addr,
+	.set_flags		= __bpf_mptcp_pm_set_flags,
+	.init			= __bpf_mptcp_pm_init,
+	.release		= __bpf_mptcp_pm_release,
+};
+
+static struct bpf_struct_ops bpf_mptcp_pm_ops = {
+	.verifier_ops	= &bpf_mptcp_pm_verifier_ops,
+	.reg		= bpf_mptcp_pm_reg,
+	.unreg		= bpf_mptcp_pm_unreg,
+	.check_member	= bpf_mptcp_pm_check_member,
+	.init_member	= bpf_mptcp_pm_init_member,
+	.init		= bpf_mptcp_pm_init,
+	.validate	= bpf_mptcp_pm_validate,
+	.name		= "mptcp_pm_ops",
+	.cfi_stubs	= &__bpf_mptcp_pm_ops,
+};
 
 static const struct bpf_func_proto *
 bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
@@ -406,6 +661,7 @@ static int __init bpf_mptcp_kfunc_init(void)
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					       &bpf_mptcp_sched_kfunc_set);
 #ifdef CONFIG_BPF_JIT
+	ret = ret ?: register_bpf_struct_ops(&bpf_mptcp_pm_ops, mptcp_pm_ops);
 	ret = ret ?: register_bpf_struct_ops(&bpf_mptcp_sched_ops, mptcp_sched_ops);
 #endif
 
