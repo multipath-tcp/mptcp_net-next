@@ -598,6 +598,91 @@ __bpf_kfunc static bool bpf_ipv6_addr_v4mapped(const struct mptcp_addr_info *a)
 	return false;
 }
 
+__bpf_kfunc static void bpf_list_add_tail_rcu(struct list_head *new,
+					      struct list_head *head)
+{
+	list_add_tail_rcu(new, head);
+}
+
+__bpf_kfunc static void bpf_list_del_rcu(struct list_head *entry)
+{
+	list_del_rcu(entry);
+}
+
+__bpf_kfunc static struct mptcp_pm_addr_entry *
+bpf_pm_alloc_entry(struct sock *sk, struct mptcp_pm_addr_entry *entry)
+{
+	struct mptcp_pm_addr_entry *e;
+
+	e = sock_kmalloc(sk, sizeof(*e), GFP_ATOMIC);
+	if (!e)
+		return NULL;
+	*e = *entry;
+
+	return e;
+}
+
+__bpf_kfunc static void bpf_pm_free_entry(struct sock *sk,
+					  struct mptcp_pm_addr_entry *entry)
+{
+	sock_kfree_s(sk, entry, sizeof(*entry));
+}
+
+__bpf_kfunc static bool bpf_mptcp_addresses_equal(const struct mptcp_addr_info *a,
+						  const struct mptcp_addr_info *b, bool use_port)
+{
+	return mptcp_addresses_equal(a, b, use_port);
+}
+
+__bpf_kfunc static void bpf_bitmap_zero(struct mptcp_id_bitmap *bitmap)
+{
+	bitmap_zero(bitmap->map, MPTCP_PM_MAX_ADDR_ID + 1);
+}
+
+__bpf_kfunc static bool bpf_test_bit(__u8 id, struct mptcp_id_bitmap *bitmap)
+{
+	return test_bit(id, bitmap->map);
+}
+
+__bpf_kfunc static void bpf_set_bit(__u8 id, struct mptcp_id_bitmap *bitmap)
+{
+	__set_bit(id, bitmap->map);
+}
+
+__bpf_kfunc static __u8 bpf_next_bit(struct mptcp_id_bitmap *bitmap)
+{
+	return find_next_zero_bit(bitmap->map, MPTCP_PM_MAX_ADDR_ID + 1, 1);
+}
+
+__bpf_kfunc static bool bpf_mptcp_pm_addr_families_match(const struct sock *sk,
+							 const struct mptcp_addr_info *loc,
+							 const struct mptcp_addr_info *rem)
+{
+	return mptcp_pm_addr_families_match(sk, loc, rem);
+}
+
+__bpf_kfunc static struct ipv6_pinfo *bpf_inet6_sk(const struct sock *sk)
+{
+	return inet6_sk(sk);
+}
+
+__bpf_kfunc static bool bpf_ipv6_addr_equal(const struct mptcp_addr_info *a1,
+					    const struct in6_addr *a2)
+{
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	return ipv6_addr_equal(&a1->addr6, a2);
+#endif
+	return false;
+}
+
+__bpf_kfunc static void bpf_ipv6_addr_set_v4mapped(const __be32 addr,
+						   struct mptcp_addr_info *v4mapped)
+{
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	ipv6_addr_set_v4mapped(addr, &v4mapped->addr6);
+#endif
+}
+
 __bpf_kfunc struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos)
 {
@@ -635,6 +720,36 @@ static const struct btf_kfunc_id_set bpf_mptcp_common_kfunc_set = {
 	.set	= &bpf_mptcp_common_kfunc_ids,
 };
 
+BTF_KFUNCS_START(bpf_mptcp_struct_ops_kfunc_ids)
+BTF_ID_FLAGS(func, bpf_list_add_tail_rcu)
+BTF_ID_FLAGS(func, bpf_list_del_rcu)
+BTF_ID_FLAGS(func, bpf_pm_alloc_entry)
+BTF_ID_FLAGS(func, bpf_pm_free_entry)
+BTF_ID_FLAGS(func, mptcp_pm_alloc_anno_list)
+BTF_ID_FLAGS(func, mptcp_pm_announce_addr)
+BTF_ID_FLAGS(func, mptcp_pm_nl_addr_send_ack, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, bpf_mptcp_addresses_equal)
+BTF_ID_FLAGS(func, bpf_bitmap_zero)
+BTF_ID_FLAGS(func, bpf_test_bit)
+BTF_ID_FLAGS(func, bpf_set_bit)
+BTF_ID_FLAGS(func, bpf_next_bit)
+BTF_ID_FLAGS(func, bpf_mptcp_pm_addr_families_match)
+BTF_ID_FLAGS(func, bpf_inet6_sk)
+BTF_ID_FLAGS(func, bpf_ipv6_addr_equal)
+BTF_ID_FLAGS(func, bpf_ipv6_addr_set_v4mapped)
+BTF_ID_FLAGS(func, mptcp_pm_remove_addr)
+BTF_ID_FLAGS(func, mptcp_pm_remove_addr_entry, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, __mptcp_subflow_connect, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, mptcp_subflow_shutdown, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, mptcp_close_ssk, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, mptcp_pm_nl_mp_prio_send_ack, KF_SLEEPABLE)
+BTF_KFUNCS_END(bpf_mptcp_struct_ops_kfunc_ids)
+
+static const struct btf_kfunc_id_set bpf_mptcp_struct_ops_kfunc_set = {
+	.owner	= THIS_MODULE,
+	.set	= &bpf_mptcp_struct_ops_kfunc_ids,
+};
+
 BTF_KFUNCS_START(bpf_mptcp_sched_kfunc_ids)
 BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_ctx_by_pos)
@@ -658,6 +773,8 @@ static int __init bpf_mptcp_kfunc_init(void)
 	ret = register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_UNSPEC,
 					       &bpf_mptcp_common_kfunc_set);
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+					       &bpf_mptcp_struct_ops_kfunc_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					       &bpf_mptcp_sched_kfunc_set);
 #ifdef CONFIG_BPF_JIT
