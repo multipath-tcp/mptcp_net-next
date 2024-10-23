@@ -738,7 +738,7 @@ static void test_red(void)
 	if (!ASSERT_OK_PTR(skel, "open_and_load: red"))
 		return;
 
-	test_bpf_sched(skel->obj, "red", WITH_DATA, WITH_DATA);
+	test_bpf_sched(skel->maps.red, "red", WITH_DATA, WITH_DATA);
 	mptcp_bpf_red__destroy(skel);
 }
 
