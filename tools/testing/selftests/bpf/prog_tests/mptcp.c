@@ -726,7 +726,7 @@ static void test_rr(void)
 	if (!ASSERT_OK_PTR(skel, "open_and_load: rr"))
 		return;
 
-	test_bpf_sched(skel->obj, "rr", WITH_DATA, WITH_DATA);
+	test_bpf_sched(skel->maps.rr, "rr", WITH_DATA, WITH_DATA);
 	mptcp_bpf_rr__destroy(skel);
 }
 
