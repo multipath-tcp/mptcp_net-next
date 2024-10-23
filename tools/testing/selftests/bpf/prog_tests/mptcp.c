@@ -750,7 +750,7 @@ static void test_burst(void)
 	if (!ASSERT_OK_PTR(skel, "open_and_load: burst"))
 		return;
 
-	test_bpf_sched(skel->obj, "burst", WITH_DATA, WITH_DATA);
+	test_bpf_sched(skel->maps.burst, "burst", WITH_DATA, WITH_DATA);
 	mptcp_bpf_burst__destroy(skel);
 }
 
