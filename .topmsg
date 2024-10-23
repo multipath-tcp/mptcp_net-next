@@ -1,4 +1,23 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-no-admin-perm-to-list-endpoints
+Subject: [PATCH] mptcp: no admin perm to list endpoints
 
+During the switch to YNL, the command to list all endpoints has been
+accidentally restricted to users with admin permissions.
+
+It looks like there are no reasons to have this restriction which makes
+it harder for a user to quickly check if the endpoint list has been
+correctly populated by an automated tool. Best to go back to the
+previous behaviour then.
+
+mptcp_pm_gen.c has been modified using ynl-gen-c.py:
+
+   $ ./tools/net/ynl/ynl-gen-c.py --mode kernel \
+     --spec Documentation/netlink/specs/mptcp_pm.yaml --source \
+     -o net/mptcp/mptcp_pm_gen.c
+
+The header file doesn't need to be regenerated.
+
+Fixes: 1d0507f46843 ("net: mptcp: convert netlink from small_ops to ops")
+Reviewed-by: Davide Caratti <dcaratti@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
