@@ -714,7 +714,7 @@ static void test_bkup(void)
 	if (!ASSERT_OK_PTR(skel, "open_and_load: bkup"))
 		return;
 
-	test_bpf_sched(skel->obj, "bkup", WITH_DATA, WITHOUT_DATA);
+	test_bpf_sched(skel->maps.bkup, "bkup", WITH_DATA, WITHOUT_DATA);
 	mptcp_bpf_bkup__destroy(skel);
 }
 
