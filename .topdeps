@@ -1,1 +1,1 @@
-t/selftests-mptcp-list-sysctl-data
+t/mptcp-no-admin-perm-to-list-endpoints
