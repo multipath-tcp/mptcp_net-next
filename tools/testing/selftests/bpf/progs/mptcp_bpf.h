@@ -42,6 +42,14 @@ mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 	return subflow->tcp_sock;
 }
 
+#define WRITE_ONCE(x, val) ((*(volatile typeof(x) *) &(x)) = (val))
+
+static __always_inline void
+mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow, bool scheduled)
+{
+	WRITE_ONCE(subflow->scheduled, scheduled);
+}
+
 /* ksym */
 extern struct mptcp_sock *bpf_mptcp_sock_acquire(struct mptcp_sock *msk) __ksym;
 extern void bpf_mptcp_sock_release(struct mptcp_sock *msk) __ksym;
@@ -51,11 +59,5 @@ extern struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx(const struct sock *sk) __ksym;
 extern struct sock *
 bpf_mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow) __ksym;
-
-extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
-					bool scheduled) __ksym;
-
-extern struct mptcp_subflow_context *
-bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos) __ksym;
 
 #endif
