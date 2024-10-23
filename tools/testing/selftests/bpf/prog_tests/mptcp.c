@@ -580,23 +580,16 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
-static struct nstoken *sched_init(char *flags, char *sched)
+static int sched_init(char *flags, char *sched)
 {
-	struct nstoken *nstoken;
-
-	nstoken = create_netns();
-	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
-		return NULL;
-
-	if (endpoint_init("subflow", 2) < 0)
+	if (endpoint_init(flags, 2) < 0)
 		goto fail;
 
 	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
 
-	return nstoken;
+	return 0;
 fail:
-	cleanup_netns(nstoken);
-	return NULL;
+	return -1;
 }
 
 static int ss_search(char *src, char *dst, char *port, char *keyword)
@@ -654,9 +647,14 @@ fail:
 static void test_default(void)
 {
 	struct nstoken *nstoken;
+	int err;
 
-	nstoken = sched_init("subflow", "default");
+	nstoken = create_netns();
 	if (!nstoken)
+		goto fail;
+
+	err = sched_init("subflow", "default");
+	if (!ASSERT_OK(err, "sched_init"))
 		goto fail;
 
 	send_data_and_verify("default", WITH_DATA, WITH_DATA);
