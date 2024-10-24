@@ -87,8 +87,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk)
 		bool backup = subflow->backup || subflow->request_bkup;
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
-		if (!mptcp_subflow_active(subflow) ||
-		    !sk_stream_memory_free(ssk))
+		if (!mptcp_subflow_active(subflow))
 			continue;
 
 		nr_active += !backup;
@@ -103,6 +102,8 @@ static int bpf_burst_get_send(struct mptcp_sock *msk)
 
 		linger_time = div_u64((__u64)ssk->sk_wmem_queued << 32, pace);
 		if (linger_time < send_info[backup].linger_time) {
+			if (!sk_stream_memory_free(ssk))
+				continue;
 			send_info[backup].subflow = subflow;
 			send_info[backup].linger_time = linger_time;
 		}
