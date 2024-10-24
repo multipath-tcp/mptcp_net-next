@@ -1425,8 +1425,7 @@ struct net_device_ops {
 						        __be16 proto, u16 vid);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	void                    (*ndo_poll_controller)(struct net_device *dev);
-	int			(*ndo_netpoll_setup)(struct net_device *dev,
-						     struct netpoll_info *info);
+	int			(*ndo_netpoll_setup)(struct net_device *dev);
 	void			(*ndo_netpoll_cleanup)(struct net_device *dev);
 #endif
 	int			(*ndo_set_vf_mac)(struct net_device *dev,
@@ -3530,7 +3529,7 @@ static inline void netdev_tx_sent_queue(struct netdev_queue *dev_queue,
 	 * because in netdev_tx_completed_queue we update the dql_completed
 	 * before checking the XOFF flag.
 	 */
-	smp_mb();
+	smp_mb__after_atomic();
 
 	/* check again in case another CPU has just made room avail */
 	if (unlikely(dql_avail(&dev_queue->dql) >= 0))
