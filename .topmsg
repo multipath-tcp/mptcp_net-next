@@ -1,4 +1,31 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/perf-Fix-missing-RCU-reader-protection-in-perf_event_clear_cpumask
+From: Kan Liang <kan.liang@linux.intel.com>
+Subject: [PATCH] perf: Fix missing RCU reader protection in perf_event_clear_cpumask()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Running rcutorture scenario TREE05, the below warning is triggered.
+
+[   32.604594] WARNING: suspicious RCU usage
+[   32.605928] 6.11.0-rc5-00040-g4ba4f1afb6a9 #55238 Not tainted
+[   32.607812] -----------------------------
+[   32.609140] kernel/events/core.c:13946 RCU-list traversed in non-reader section!!
+[   32.611595] other info that might help us debug this:
+[   32.614247] rcu_scheduler_active = 2, debug_locks = 1
+[   32.616392] 3 locks held by cpuhp/4/35:
+[   32.617687]  #0: ffffffffb666a650 (cpu_hotplug_lock){++++}-{0:0}, at: cpuhp_thread_fun+0x4e/0x200
+[   32.620563]  #1: ffffffffb666cd20 (cpuhp_state-down){+.+.}-{0:0}, at: cpuhp_thread_fun+0x4e/0x200
+[   32.623412]  #2: ffffffffb677c288 (pmus_lock){+.+.}-{3:3}, at: perf_event_exit_cpu_context+0x32/0x2f0
+
+In perf_event_clear_cpumask(), uses list_for_each_entry_rcu() without an
+obvious RCU read-side critical section.
+
+Either pmus_srcu or pmus_lock is good enough to protect the pmus list.
+In the current context, pmus_lock is already held. The
+list_for_each_entry_rcu() is not required.
+
+Fixes: 4ba4f1afb6a9 ("perf: Generic hotplug support for a PMU with a scope")
+Reported-by: Paul E. McKenney <paulmck@kernel.org>
+Closes: https://lore.kernel.org/lkml/2b66dff8-b827-494b-b151-1ad8d56f13e6@paulmck-laptop/
+Tested-by: Paul E. McKenney <paulmck@kernel.org>
+Reported-by: kernel test robot <oliver.sang@intel.com>
+Closes: https://lore.kernel.org/oe-lkp/202409131559.545634cc-oliver.sang@intel.com
+Signed-off-by: Kan Liang <kan.liang@linux.intel.com>
+Suggested-by: Peter Zijlstra <peterz@infradead.org>
