@@ -23,7 +23,7 @@ struct bpf_subflow_send_info {
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_set_timeout(struct sock *sk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
-extern bool tcp_stream_memory_free(const struct sock *sk, int wake) __ksym;
+extern bool bpf_mptcp_stream_memory_free(const struct sock *sk, int wake) __ksym;
 extern bool bpf_mptcp_subflow_queues_empty(struct sock *sk) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
 
@@ -49,7 +49,7 @@ static __always_inline bool __sk_stream_memory_free(const struct sock *sk, int w
 	if (sk->sk_wmem_queued >= sk->sk_sndbuf)
 		return false;
 
-	return tcp_stream_memory_free(sk, wake);
+	return bpf_mptcp_stream_memory_free(sk, wake);
 }
 
 static __always_inline bool sk_stream_memory_free(const struct sock *sk)
@@ -87,8 +87,7 @@ static int bpf_burst_get_send(struct mptcp_sock *msk)
 		bool backup = subflow->backup || subflow->request_bkup;
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
-		if (!mptcp_subflow_active(subflow) ||
-		    !sk_stream_memory_free(ssk))
+		if (!mptcp_subflow_active(subflow))
 			continue;
 
 		nr_active += !backup;
@@ -103,6 +102,8 @@ static int bpf_burst_get_send(struct mptcp_sock *msk)
 
 		linger_time = div_u64((__u64)ssk->sk_wmem_queued << 32, pace);
 		if (linger_time < send_info[backup].linger_time) {
+			if (!sk_stream_memory_free(ssk))
+				continue;
 			send_info[backup].subflow = subflow;
 			send_info[backup].linger_time = linger_time;
 		}
