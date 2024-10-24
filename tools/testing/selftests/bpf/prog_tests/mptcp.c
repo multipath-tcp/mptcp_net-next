@@ -92,12 +92,18 @@ struct mptcp_storage {
 
 static struct nstoken *create_netns(void)
 {
-	SYS(fail, "ip netns add %s", NS_TEST);
-	SYS(fail, "ip -net %s link set dev lo up", NS_TEST);
+	struct nstoken *nstoken;
 
-	return open_netns(NS_TEST);
-fail:
-	return NULL;
+	if (make_netns(NS_TEST) < 0)
+		return NULL;
+
+	nstoken = open_netns(NS_TEST);
+	if (!nstoken) {
+		log_err("open netns %s failed", NS_TEST);
+		remove_netns(NS_TEST);
+	}
+
+	return nstoken;
 }
 
 static void cleanup_netns(struct nstoken *nstoken)
@@ -105,7 +111,7 @@ static void cleanup_netns(struct nstoken *nstoken)
 	if (nstoken)
 		close_netns(nstoken);
 
-	SYS_NOFAIL("ip netns del %s", NS_TEST);
+	remove_netns(NS_TEST);
 }
 
 static int start_mptcp_server(int family, const char *addr_str, __u16 port,
