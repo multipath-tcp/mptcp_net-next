@@ -520,12 +520,12 @@ __lookup_addr_by_id(struct pm_nl_pernet *pernet, unsigned int id)
 }
 
 static struct mptcp_pm_addr_entry *
-__lookup_addr(struct pm_nl_pernet *pernet, const struct mptcp_addr_info *info)
+__lookup_addr_by_id_rcu(struct pm_nl_pernet *pernet, unsigned int id)
 {
 	struct mptcp_pm_addr_entry *entry;
 
-	list_for_each_entry(entry, &pernet->local_addr_list, list) {
-		if (mptcp_addresses_equal(&entry->addr, info, entry->addr.port))
+	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
+		if (entry->addr.id == id)
 			return entry;
 	}
 	return NULL;
@@ -1836,8 +1836,8 @@ int mptcp_pm_nl_get_addr(struct sk_buff *skb, struct genl_info *info)
 		goto fail;
 	}
 
-	spin_lock_bh(&pernet->lock);
-	entry = __lookup_addr_by_id(pernet, addr.addr.id);
+	rcu_read_lock();
+	entry = __lookup_addr_by_id_rcu(pernet, addr.addr.id);
 	if (!entry) {
 		GENL_SET_ERR_MSG(info, "address not found");
 		ret = -EINVAL;
@@ -1850,11 +1850,11 @@ int mptcp_pm_nl_get_addr(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(msg, reply);
 	ret = genlmsg_reply(msg, info);
-	spin_unlock_bh(&pernet->lock);
+	rcu_read_unlock();
 	return ret;
 
 unlock_fail:
-	spin_unlock_bh(&pernet->lock);
+	rcu_read_unlock();
 
 fail:
 	nlmsg_free(msg);
@@ -1872,16 +1872,18 @@ int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 	struct net *net = sock_net(msg->sk);
 	struct mptcp_pm_addr_entry *entry;
 	struct pm_nl_pernet *pernet;
+	unsigned long id_bitmap[4];
 	int id = cb->args[0];
 	void *hdr;
 	int i;
 
 	pernet = pm_nl_get_pernet(net);
+	bitmap_copy(id_bitmap, pernet->id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 
-	spin_lock_bh(&pernet->lock);
+	rcu_read_lock();
 	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
-		if (test_bit(i, pernet->id_bitmap)) {
-			entry = __lookup_addr_by_id(pernet, i);
+		if (test_bit(i, id_bitmap)) {
+			entry = __lookup_addr_by_id_rcu(pernet, i);
 			if (!entry)
 				break;
 
@@ -1903,7 +1905,7 @@ int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 			genlmsg_end(msg, hdr);
 		}
 	}
-	spin_unlock_bh(&pernet->lock);
+	rcu_read_unlock();
 
 	cb->args[0] = id;
 	return msg->len;
@@ -2060,17 +2062,17 @@ int mptcp_pm_nl_set_flags(struct sk_buff *skb, struct genl_info *info)
 	if (addr.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
 
-	spin_lock_bh(&pernet->lock);
-	entry = lookup_by_id ? __lookup_addr_by_id(pernet, addr.addr.id) :
-			       __lookup_addr(pernet, &addr.addr);
+	rcu_read_lock();
+	entry = lookup_by_id ? __lookup_addr_by_id_rcu(pernet, addr.addr.id) :
+			       __lookup_addr_rcu(pernet, &addr.addr);
 	if (!entry) {
-		spin_unlock_bh(&pernet->lock);
+		rcu_read_unlock();
 		GENL_SET_ERR_MSG(info, "address not found");
 		return -EINVAL;
 	}
 	if ((addr.flags & MPTCP_PM_ADDR_FLAG_FULLMESH) &&
 	    (entry->flags & MPTCP_PM_ADDR_FLAG_SIGNAL)) {
-		spin_unlock_bh(&pernet->lock);
+		rcu_read_unlock();
 		GENL_SET_ERR_MSG(info, "invalid addr flags");
 		return -EINVAL;
 	}
@@ -2078,7 +2080,7 @@ int mptcp_pm_nl_set_flags(struct sk_buff *skb, struct genl_info *info)
 	changed = (addr.flags ^ entry->flags) & mask;
 	entry->flags = (entry->flags & ~mask) | (addr.flags & mask);
 	addr = *entry;
-	spin_unlock_bh(&pernet->lock);
+	rcu_read_unlock();
 
 	mptcp_nl_set_flags(net, &addr.addr, bkup, changed);
 	return 0;
