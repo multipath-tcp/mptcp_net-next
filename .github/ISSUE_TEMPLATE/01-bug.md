@@ -5,8 +5,14 @@ labels: ["bug", "triage"]
 
 ---
 
+**Pre-requisites**
+Before opening this ticket, I checked:
+- [ ] a similar issue has not been reported before
+- [ ] https://mptcp.dev website doesn't cover my case
+- [ ] the wiki on GitHub doesn't cover my case
+
 **Describe the bug**
-<!-- A clear and concise description of what the bug is.. -->
+<!-- A clear and concise description of what the bug is. -->
 
 **To Reproduce**
 Steps to reproduce the behavior:
