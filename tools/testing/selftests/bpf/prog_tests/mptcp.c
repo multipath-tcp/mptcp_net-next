@@ -526,7 +526,7 @@ close_server:
 static void test_iters_subflow(void)
 {
 	struct mptcp_bpf_iters *skel;
-	struct nstoken *nstoken;
+	struct netns_obj *netns;
 	int cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/iters_subflow");
@@ -542,8 +542,8 @@ static void test_iters_subflow(void)
 	if (!ASSERT_OK_PTR(skel->links.iters_subflow, "attach getsockopt"))
 		goto skel_destroy;
 
-	nstoken = create_netns();
-	if (!ASSERT_OK_PTR(nstoken, "create_netns: iters_subflow"))
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new: iters_subflow"))
 		goto skel_destroy;
 
 	if (endpoint_init("subflow", 4) < 0)
@@ -555,7 +555,7 @@ static void test_iters_subflow(void)
 	ASSERT_EQ(skel->bss->ids, 10, "subflow ids");
 
 close_netns:
-	cleanup_netns(nstoken);
+	netns_free(netns);
 skel_destroy:
 	mptcp_bpf_iters__destroy(skel);
 close_cgroup:
