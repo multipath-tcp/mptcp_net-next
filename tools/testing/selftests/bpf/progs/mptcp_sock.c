@@ -25,13 +25,23 @@ struct {
 	__type(value, struct mptcp_storage);
 } socket_storage_map SEC(".maps");
 
+struct tcp_sock___new {
+	bool is_mptcp;
+} __attribute__((preserve_access_index));
+
+struct mptcp_sock___new {
+	__u32 token;
+	struct sock *first;
+	char ca_name[TCP_CA_NAME_MAX];
+} __attribute__((preserve_access_index));
+
 SEC("sockops")
 int _sockops(struct bpf_sock_ops *ctx)
 {
 	struct mptcp_storage *storage;
-	struct mptcp_sock *msk;
+	struct mptcp_sock___new *msk;
 	int op = (int)ctx->op;
-	struct tcp_sock *tsk;
+	struct tcp_sock___new *tsk;
 	struct bpf_sock *sk;
 	bool is_mptcp;
 
@@ -42,11 +52,16 @@ int _sockops(struct bpf_sock_ops *ctx)
 	if (!sk)
 		return 1;
 
-	tsk = bpf_skc_to_tcp_sock(sk);
+	/* recast pointer to capture new type for compiler */
+	tsk = (void *)bpf_skc_to_tcp_sock(sk);
 	if (!tsk)
 		return 1;
 
-	is_mptcp = bpf_core_field_exists(tsk->is_mptcp) ? tsk->is_mptcp : 0;
+	if (bpf_core_field_exists(tsk->is_mptcp))
+		is_mptcp = BPF_CORE_READ(tsk, is_mptcp);
+	else
+		is_mptcp = 0;
+
 	if (!is_mptcp) {
 		storage = bpf_sk_storage_get(&socket_storage_map, sk, 0,
 					     BPF_SK_STORAGE_GET_F_CREATE);
@@ -57,7 +72,7 @@ int _sockops(struct bpf_sock_ops *ctx)
 		__builtin_memset(storage->ca_name, 0, TCP_CA_NAME_MAX);
 		storage->first = NULL;
 	} else {
-		msk = bpf_skc_to_mptcp_sock(sk);
+		msk = (void *)bpf_skc_to_mptcp_sock(sk);
 		if (!msk)
 			return 1;
 
@@ -66,9 +81,9 @@ int _sockops(struct bpf_sock_ops *ctx)
 		if (!storage)
 			return 1;
 
-		storage->token = msk->token;
-		__builtin_memcpy(storage->ca_name, msk->ca_name, TCP_CA_NAME_MAX);
-		storage->first = msk->first;
+		storage->token = BPF_CORE_READ(msk, token);
+		BPF_CORE_READ_STR_INTO(&storage->ca_name, msk, ca_name);
+		storage->first = BPF_CORE_READ(msk, first);
 	}
 	storage->invoked++;
 	storage->is_mptcp = is_mptcp;
@@ -81,8 +96,15 @@ SEC("fentry/mptcp_pm_new_connection")
 int BPF_PROG(trace_mptcp_pm_new_connection, struct mptcp_sock *msk,
 	     const struct sock *ssk, int server_side)
 {
-	if (!server_side)
-		token = msk->token;
+	struct mptcp_sock___new *mskw;
+
+	if (!server_side) {
+		mskw = (void *)msk;
+		if (bpf_core_field_exists(mskw->token))
+			token = BPF_CORE_READ(mskw, token);
+		else
+			token = 0;
+	}
 
 	return 0;
 }
