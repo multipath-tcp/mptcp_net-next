@@ -651,7 +651,7 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 			   bool addr1, bool addr2)
 {
 	char bpf_sched[MPTCP_SCHED_NAME_MAX] = "bpf_";
-	struct nstoken *nstoken;
+	struct netns_obj *netns;
 	struct bpf_link *link;
 	struct bpf_map *map;
 
@@ -664,14 +664,14 @@ static void test_bpf_sched(struct bpf_object *obj, char *sched,
 	if (CHECK(!link, sched, "attach_struct_ops: %d\n", errno))
 		return;
 
-	nstoken = sched_init("subflow", strcat(bpf_sched, sched));
-	if (!nstoken)
+	netns = sched_init("subflow", strcat(bpf_sched, sched));
+	if (!netns)
 		goto fail;
 
 	send_data_and_verify(sched, addr1, addr2);
 
 fail:
-	cleanup_netns(nstoken);
+	netns_free(netns);
 	bpf_link__destroy(link);
 }
 
