@@ -764,8 +764,8 @@ static int phylink_validate(struct phylink *pl, unsigned long *supported,
 static int phylink_parse_fixedlink(struct phylink *pl,
 				   const struct fwnode_handle *fwnode)
 {
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 	struct fwnode_handle *fixed_node;
-	bool pause, asym_pause, autoneg;
 	const struct phy_setting *s;
 	struct gpio_desc *desc;
 	u32 speed;
@@ -838,22 +838,15 @@ static int phylink_parse_fixedlink(struct phylink *pl,
 	linkmode_copy(pl->link_config.advertising, pl->supported);
 	phylink_validate(pl, pl->supported, &pl->link_config);
 
-	pause = phylink_test(pl->supported, Pause);
-	asym_pause = phylink_test(pl->supported, Asym_Pause);
-	autoneg = phylink_test(pl->supported, Autoneg);
 	s = phy_lookup_setting(pl->link_config.speed, pl->link_config.duplex,
 			       pl->supported, true);
-	linkmode_zero(pl->supported);
+
+	linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT, mask);
+	linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, mask);
+	linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, mask);
+	linkmode_and(pl->supported, pl->supported, mask);
+
 	phylink_set(pl->supported, MII);
-
-	if (pause)
-		phylink_set(pl->supported, Pause);
-
-	if (asym_pause)
-		phylink_set(pl->supported, Asym_Pause);
-
-	if (autoneg)
-		phylink_set(pl->supported, Autoneg);
 
 	if (s) {
 		__set_bit(s->bit, pl->supported);
@@ -2415,6 +2408,32 @@ int phylink_ethtool_set_wol(struct phylink *pl, struct ethtool_wolinfo *wol)
 }
 EXPORT_SYMBOL_GPL(phylink_ethtool_set_wol);
 
+static phy_interface_t phylink_sfp_select_interface(struct phylink *pl,
+						const unsigned long *link_modes)
+{
+	phy_interface_t interface;
+
+	interface = sfp_select_interface(pl->sfp_bus, link_modes);
+	if (interface == PHY_INTERFACE_MODE_NA) {
+		phylink_err(pl,
+			    "selection of interface failed, advertisement %*pb\n",
+			    __ETHTOOL_LINK_MODE_MASK_NBITS,
+			    link_modes);
+		return interface;
+	}
+
+	if (!test_bit(interface, pl->config->supported_interfaces)) {
+		phylink_err(pl,
+			    "selection of interface failed, SFP selected %s (%u) but MAC supports %*pbl\n",
+			    phy_modes(interface), interface,
+			    (int)PHY_INTERFACE_MODE_MAX,
+			    pl->config->supported_interfaces);
+		return PHY_INTERFACE_MODE_NA;
+	}
+
+	return interface;
+}
+
 static void phylink_merge_link_mode(unsigned long *dst, const unsigned long *b)
 {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask);
@@ -2597,15 +2616,10 @@ int phylink_ethtool_ksettings_set(struct phylink *pl,
 	 * link can be configured correctly.
 	 */
 	if (pl->sfp_bus) {
-		config.interface = sfp_select_interface(pl->sfp_bus,
+		config.interface = phylink_sfp_select_interface(pl,
 							config.advertising);
-		if (config.interface == PHY_INTERFACE_MODE_NA) {
-			phylink_err(pl,
-				    "selection of interface failed, advertisement %*pb\n",
-				    __ETHTOOL_LINK_MODE_MASK_NBITS,
-				    config.advertising);
+		if (config.interface == PHY_INTERFACE_MODE_NA)
 			return -EINVAL;
-		}
 
 		/* Revalidate with the selected interface */
 		linkmode_copy(support, pl->supported);
@@ -3210,10 +3224,8 @@ static void phylink_sfp_set_config(struct phylink *pl, u8 mode,
 static int phylink_sfp_config_phy(struct phylink *pl, u8 mode,
 				  struct phy_device *phy)
 {
-	__ETHTOOL_DECLARE_LINK_MODE_MASK(support1);
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(support);
 	struct phylink_link_state config;
-	phy_interface_t iface;
 	int ret;
 
 	linkmode_copy(support, phy->supported);
@@ -3234,24 +3246,21 @@ static int phylink_sfp_config_phy(struct phylink *pl, u8 mode,
 		return ret;
 	}
 
-	iface = sfp_select_interface(pl->sfp_bus, config.advertising);
-	if (iface == PHY_INTERFACE_MODE_NA) {
-		phylink_err(pl,
-			    "selection of interface failed, advertisement %*pb\n",
-			    __ETHTOOL_LINK_MODE_MASK_NBITS, config.advertising);
+	config.interface = phylink_sfp_select_interface(pl, config.advertising);
+	if (config.interface == PHY_INTERFACE_MODE_NA)
 		return -EINVAL;
-	}
 
-	config.interface = iface;
-	linkmode_copy(support1, support);
-	ret = phylink_validate(pl, support1, &config);
-	if (ret) {
-		phylink_err(pl,
-			    "validation of %s/%s with support %*pb failed: %pe\n",
-			    phylink_an_mode_str(mode),
-			    phy_modes(config.interface),
-			    __ETHTOOL_LINK_MODE_MASK_NBITS, support,
-			    ERR_PTR(ret));
+	/* Attach the PHY so that the PHY is present when we do the major
+	 * configuration step.
+	 */
+	ret = phylink_attach_phy(pl, phy, config.interface);
+	if (ret < 0)
+		return ret;
+
+	/* This will validate the configuration for us. */
+	ret = phylink_bringup_phy(pl, phy, config.interface);
+	if (ret < 0) {
+		phy_detach(phy);
 		return ret;
 	}
 
@@ -3409,9 +3418,7 @@ static bool phylink_phy_no_inband(struct phy_device *phy)
 static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
 {
 	struct phylink *pl = upstream;
-	phy_interface_t interface;
 	u8 mode;
-	int ret;
 
 	/*
 	 * This is the new way of dealing with flow control for PHYs,
@@ -3432,20 +3439,7 @@ static int phylink_sfp_connect_phy(void *upstream, struct phy_device *phy)
 			  pl->config->supported_interfaces);
 
 	/* Do the initial configuration */
-	ret = phylink_sfp_config_phy(pl, mode, phy);
-	if (ret < 0)
-		return ret;
-
-	interface = pl->link_config.interface;
-	ret = phylink_attach_phy(pl, phy, interface);
-	if (ret < 0)
-		return ret;
-
-	ret = phylink_bringup_phy(pl, phy, interface);
-	if (ret)
-		phy_detach(phy);
-
-	return ret;
+	return phylink_sfp_config_phy(pl, mode, phy);
 }
 
 static void phylink_sfp_disconnect_phy(void *upstream,
