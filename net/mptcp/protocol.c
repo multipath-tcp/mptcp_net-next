@@ -1460,6 +1460,8 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 
 		linger_time = div_u64((u64)READ_ONCE(ssk->sk_wmem_queued) << 32, pace);
 		if (linger_time < send_info[backup].linger_time) {
+			if (!sk_stream_memory_free(ssk))
+				continue;
 			send_info[backup].ssk = ssk;
 			send_info[backup].linger_time = linger_time;
 		}
@@ -1482,7 +1484,7 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	 * to check that subflow has a non empty cwin.
 	 */
 	ssk = send_info[SSK_MODE_ACTIVE].ssk;
-	if (!ssk || !sk_stream_memory_free(ssk))
+	if (!ssk)
 		return NULL;
 
 	burst = min_t(int, MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
