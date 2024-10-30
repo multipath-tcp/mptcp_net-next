@@ -645,25 +645,28 @@ fail:
 	netns_free(netns);
 }
 
-static void test_bpf_sched(struct bpf_object *obj, char *sched,
+static void test_bpf_sched(struct bpf_map *map, char *sched,
 			   bool addr1, bool addr2)
 {
 	char bpf_sched[MPTCP_SCHED_NAME_MAX] = "bpf_";
 	struct netns_obj *netns;
 	struct bpf_link *link;
-	struct bpf_map *map;
+	int err;
 
 	if (!ASSERT_LT(strlen(bpf_sched) + strlen(sched),
 		       MPTCP_SCHED_NAME_MAX, "Scheduler name too long"))
 		return;
 
-	map = bpf_object__find_map_by_name(obj, sched);
 	link = bpf_map__attach_struct_ops(map);
-	if (CHECK(!link, sched, "attach_struct_ops: %d\n", errno))
+	if (!ASSERT_OK_PTR(link, "attach_struct_ops"))
 		return;
 
-	netns = sched_init("subflow", strcat(bpf_sched, sched));
+	netns = netns_new(NS_TEST, true);
 	if (!netns)
+		goto fail;
+
+	err = sched_init("subflow", strcat(bpf_sched, sched));
+	if (!ASSERT_OK(err, "sched_init"))
 		goto fail;
 
 	send_data_and_verify(sched, addr1, addr2);
@@ -681,7 +684,7 @@ static void test_first(void)
 	if (!ASSERT_OK_PTR(skel, "open_and_load: first"))
 		return;
 
-	test_bpf_sched(skel->obj, "first", WITH_DATA, WITHOUT_DATA);
+	test_bpf_sched(skel->maps.first, "first", WITH_DATA, WITHOUT_DATA);
 	mptcp_bpf_first__destroy(skel);
 }
 
