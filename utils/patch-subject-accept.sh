@@ -2,13 +2,18 @@
 
 SUBJECT="${1:?}"
 
-# remote dot at the end if any
+# remove dot at the end if any
 [[ "${SUBJECT}" =~ "."$ ]] && SUBJECT="${SUBJECT:0:-1}"
 
 COMMIT="${2}"
 DELEGATE=${DELEGATE:-"matttbe"}
 
 get_ids() {
+	if [[ "${SUBJECT}" =~ ^[0-9]+$ ]]; then
+		echo "${SUBJECT}"
+		return
+	fi
+
 	git-pw patch list --limit 250 --sort -date --format simple -c ID \
 		--state new \
 		--state under-review \
