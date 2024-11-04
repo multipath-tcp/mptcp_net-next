@@ -99,6 +99,7 @@ jobs:
       - name: "Publish conclusion"
         if: always()
         run: |
+          set +e
           if [ -s "conclusion.txt" ]; then
             {
               echo '## Mode ${{ matrix.mode }}'
@@ -112,10 +113,11 @@ jobs:
               echo ''
               echo '### Coverage (${{ matrix.mode }})'
               echo '```'
-              cat "coverage.txt"
+              cat "coverage.txt" || echo "No coverage"
               echo '```'
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
+          touch kernel.lcov || true
 
       - name: "Artifacts (always)"
         if: always()
