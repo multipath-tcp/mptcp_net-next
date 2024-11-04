@@ -652,6 +652,12 @@ $(TRUNNER_BPF_SKELS_LINKED): $(TRUNNER_OUTPUT)/%: $$$$(%-deps) $(BPFTOOL) | $(TR
 $(notdir %.skel.h): $(TRUNNER_OUTPUT)/%.skel.h
 	@true
 
+$(notdir %.lskel.h): $(TRUNNER_OUTPUT)/%.lskel.h
+	@true
+
+$(notdir %.subskel.h): $(TRUNNER_OUTPUT)/%.subskel.h
+	@true
+
 endif
 
 # ensure we set up tests.h header generation rule just once
