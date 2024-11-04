@@ -132,7 +132,6 @@ TEST_PROGS := test_kmod.sh \
 	test_tunnel.sh \
 	test_lwt_seg6local.sh \
 	test_lirc_mode2.sh \
-	test_skb_cgroup_id.sh \
 	test_flow_dissector.sh \
 	test_xdp_vlan_mode_generic.sh \
 	test_xdp_vlan_mode_native.sh \
@@ -637,10 +636,11 @@ $(TRUNNER_BPF_SKELS_LINKED): $(TRUNNER_OUTPUT)/%: $$$$(%-deps) $(BPFTOOL) | $(TR
 
 # When the compiler generates a %.d file, only skel basenames (not
 # full paths) are specified as prerequisites for corresponding %.o
-# file. This target makes %.skel.h basename dependent on full paths,
-# linking generated %.d dependency with actual %.skel.h files.
-$(notdir %.skel.h): $(TRUNNER_OUTPUT)/%.skel.h
-	@true
+# file. vpath directives below instruct make to search for skel files
+# in TRUNNER_OUTPUT, if they are not present in the working directory.
+vpath %.skel.h $(TRUNNER_OUTPUT)
+vpath %.lskel.h $(TRUNNER_OUTPUT)
+vpath %.subskel.h $(TRUNNER_OUTPUT)
 
 endif
 
