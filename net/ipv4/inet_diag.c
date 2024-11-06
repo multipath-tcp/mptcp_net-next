@@ -585,7 +585,7 @@ int inet_diag_dump_one_icsk(struct inet_hashinfo *hashinfo,
 
 	err = sk_diag_fill(sk, rep, cb, req, 0, net_admin);
 	if (err < 0) {
-		WARN_ON(err == -EMSGSIZE);
+		WARN_ON_ONCE(err == -EMSGSIZE);
 		nlmsg_free(rep);
 		goto out;
 	}
