@@ -53,29 +53,39 @@ static void tcp_diag_md5sig_fill(struct tcp_diag_md5sig *info,
 }
 
 static int tcp_diag_put_md5sig(struct sk_buff *skb,
-			       const struct tcp_md5sig_info *md5sig)
+			       const struct tcp_md5sig_info *md5sig,
+			       struct nlmsghdr *nlh)
 {
+	size_t key_size = sizeof(struct tcp_diag_md5sig);
+	unsigned int attrlen, md5sig_count;
 	const struct tcp_md5sig_key *key;
 	struct tcp_diag_md5sig *info;
 	struct nlattr *attr;
-	int md5sig_count = 0;
 
+	/*
+	 * Userspace doesn't like to see zero-filled key-values, so
+	 * allocating too large attribute is bad.
+	 */
 	hlist_for_each_entry_rcu(key, &md5sig->head, node)
 		md5sig_count++;
 	if (md5sig_count == 0)
 		return 0;
 
-	attr = nla_reserve(skb, INET_DIAG_MD5SIG,
-			   md5sig_count * sizeof(struct tcp_diag_md5sig));
+	attrlen = skb_availroom(skb) - NLA_HDRLEN;
+	md5sig_count = min(md5sig_count, attrlen / key_size);
+	attr = nla_reserve(skb, INET_DIAG_MD5SIG, md5sig_count * key_size);
 	if (!attr)
 		return -EMSGSIZE;
 
 	info = nla_data(attr);
-	memset(info, 0, md5sig_count * sizeof(struct tcp_diag_md5sig));
+	memset(info, 0, md5sig_count * key_size);
 	hlist_for_each_entry_rcu(key, &md5sig->head, node) {
-		tcp_diag_md5sig_fill(info++, key);
-		if (--md5sig_count == 0)
+		/* More keys on a socket than pre-allocated space available */
+		if (md5sig_count-- == 0) {
+			nlh->nlmsg_flags |= NLM_F_DUMP_INTR;
 			break;
+		}
+		tcp_diag_md5sig_fill(info++, key);
 	}
 
 	return 0;
@@ -110,24 +120,10 @@ nla_failure:
 }
 
 static int tcp_diag_get_aux(struct sock *sk, bool net_admin,
-			    struct sk_buff *skb)
+			    struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	int err = 0;
-
-#ifdef CONFIG_TCP_MD5SIG
-	if (net_admin) {
-		struct tcp_md5sig_info *md5sig;
-
-		rcu_read_lock();
-		md5sig = rcu_dereference(tcp_sk(sk)->md5sig_info);
-		if (md5sig)
-			err = tcp_diag_put_md5sig(skb, md5sig);
-		rcu_read_unlock();
-		if (err < 0)
-			return err;
-	}
-#endif
 
 	if (net_admin) {
 		const struct tcp_ulp_ops *ulp_ops;
@@ -138,6 +134,21 @@ static int tcp_diag_get_aux(struct sock *sk, bool net_admin,
 		if (err)
 			return err;
 	}
+
+#ifdef CONFIG_TCP_MD5SIG
+	if (net_admin) {
+		struct tcp_md5sig_info *md5sig;
+
+		rcu_read_lock();
+		md5sig = rcu_dereference(tcp_sk(sk)->md5sig_info);
+		if (md5sig)
+			err = tcp_diag_put_md5sig(skb, md5sig, nlh);
+		rcu_read_unlock();
+		if (err < 0)
+			return err;
+	}
+#endif
+
 	return 0;
 }
 
