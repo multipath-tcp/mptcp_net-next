@@ -97,6 +97,53 @@ void inet_diag_msg_common_fill(struct inet_diag_msg *r, struct sock *sk)
 }
 EXPORT_SYMBOL_GPL(inet_diag_msg_common_fill);
 
+static size_t tls_get_info_size(void)
+{
+	size_t size = 0;
+
+#ifdef CONFIG_TLS
+	size += nla_total_size(0) +             /* INET_ULP_INFO_TLS */
+		nla_total_size(sizeof(u16)) +   /* TLS_INFO_VERSION */
+		nla_total_size(sizeof(u16)) +   /* TLS_INFO_CIPHER */
+		nla_total_size(sizeof(u16)) +   /* TLS_INFO_RXCONF */
+		nla_total_size(sizeof(u16)) +   /* TLS_INFO_TXCONF */
+		nla_total_size(0) +             /* TLS_INFO_ZC_RO_TX */
+		nla_total_size(0) +             /* TLS_INFO_RX_NO_PAD */
+		0;
+#endif
+
+	return size;
+}
+
+static size_t subflow_get_info_size(void)
+{
+	size_t size = 0;
+
+#ifdef CONFIG_MPTCP
+	size += nla_total_size(0) +     /* INET_ULP_INFO_MPTCP */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_TOKEN_REM */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_TOKEN_LOC */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_RELWRITE_SEQ */
+		nla_total_size_64bit(8) +       /* MPTCP_SUBFLOW_ATTR_MAP_SEQ */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_MAP_SFSEQ */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_SSN_OFFSET */
+		nla_total_size(2) +     /* MPTCP_SUBFLOW_ATTR_MAP_DATALEN */
+		nla_total_size(4) +     /* MPTCP_SUBFLOW_ATTR_FLAGS */
+		nla_total_size(1) +     /* MPTCP_SUBFLOW_ATTR_ID_REM */
+		nla_total_size(1) +     /* MPTCP_SUBFLOW_ATTR_ID_LOC */
+		0;
+#endif
+
+	return size;
+}
+
+static size_t tcp_ulp_ops_size(void)
+{
+	size_t size = max(tls_get_info_size(), subflow_get_info_size());
+
+	return size + nla_total_size(0) + nla_total_size(TCP_ULP_NAME_MAX);
+}
+
 static size_t inet_sk_attr_size(struct sock *sk,
 				const struct inet_diag_req_v2 *req,
 				bool net_admin)
@@ -115,6 +162,7 @@ static size_t inet_sk_attr_size(struct sock *sk,
 	ret += nla_total_size(sizeof(struct tcp_info))
 	     + nla_total_size(sizeof(struct inet_diag_msg))
 	     + inet_diag_msg_attrs_size()
+	     + tcp_ulp_ops_size()
 	     + 64;
 
 	if (ext & (1 << (INET_DIAG_MEMINFO - 1)))

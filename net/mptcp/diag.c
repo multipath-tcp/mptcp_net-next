@@ -84,27 +84,7 @@ nla_failure:
 	return err;
 }
 
-static size_t subflow_get_info_size(const struct sock *sk)
-{
-	size_t size = 0;
-
-	size += nla_total_size(0) +	/* INET_ULP_INFO_MPTCP */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_TOKEN_REM */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_TOKEN_LOC */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_RELWRITE_SEQ */
-		nla_total_size_64bit(8) +	/* MPTCP_SUBFLOW_ATTR_MAP_SEQ */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_MAP_SFSEQ */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_SSN_OFFSET */
-		nla_total_size(2) +	/* MPTCP_SUBFLOW_ATTR_MAP_DATALEN */
-		nla_total_size(4) +	/* MPTCP_SUBFLOW_ATTR_FLAGS */
-		nla_total_size(1) +	/* MPTCP_SUBFLOW_ATTR_ID_REM */
-		nla_total_size(1) +	/* MPTCP_SUBFLOW_ATTR_ID_LOC */
-		0;
-	return size;
-}
-
 void mptcp_diag_subflow_init(struct tcp_ulp_ops *ops)
 {
 	ops->get_info = subflow_get_info;
-	ops->get_info_size = subflow_get_info_size;
 }

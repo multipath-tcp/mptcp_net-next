@@ -2572,7 +2572,6 @@ struct tcp_ulp_ops {
 	void (*release)(struct sock *sk);
 	/* diagnostic */
 	int (*get_info)(struct sock *sk, struct sk_buff *skb);
-	size_t (*get_info_size)(const struct sock *sk);
 	/* clone ulp */
 	void (*clone)(const struct request_sock *req, struct sock *newsk,
 		      const gfp_t priority);

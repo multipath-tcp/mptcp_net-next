@@ -154,7 +154,6 @@ static int tcp_diag_get_aux(struct sock *sk, bool net_admin,
 
 static size_t tcp_diag_get_aux_size(struct sock *sk, bool net_admin)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
 	size_t size = 0;
 
 #ifdef CONFIG_TCP_MD5SIG
@@ -174,18 +173,6 @@ static size_t tcp_diag_get_aux_size(struct sock *sk, bool net_admin)
 				       sizeof(struct tcp_diag_md5sig));
 	}
 #endif
-
-	if (net_admin && sk_fullsock(sk)) {
-		const struct tcp_ulp_ops *ulp_ops;
-
-		ulp_ops = icsk->icsk_ulp_ops;
-		if (ulp_ops) {
-			size += nla_total_size(0) +
-				nla_total_size(TCP_ULP_NAME_MAX);
-			if (ulp_ops->get_info_size)
-				size += ulp_ops->get_info_size(sk);
-		}
-	}
 	return size;
 }
 
