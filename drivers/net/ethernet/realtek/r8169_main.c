@@ -347,6 +347,8 @@ enum rtl8125_registers {
 	TxPoll_8125		= 0x90,
 	LEDSEL3			= 0x96,
 	MAC0_BKP		= 0x19e0,
+	RSS_CTRL_8125		= 0x4500,
+	Q_NUM_CTRL_8125		= 0x4800,
 	EEE_TXIDLE_TIMER_8125	= 0x6048,
 };
 
@@ -660,12 +662,8 @@ struct rtl8169_private {
 		struct work_struct work;
 	} wk;
 
-	raw_spinlock_t config25_lock;
 	raw_spinlock_t mac_ocp_lock;
 	struct mutex led_lock;	/* serialize LED ctrl RMW access */
-
-	raw_spinlock_t cfg9346_usage_lock;
-	int cfg9346_usage_count;
 
 	unsigned supports_gmii:1;
 	unsigned aspm_manageable:1;
@@ -720,22 +718,12 @@ static inline struct device *tp_to_dev(struct rtl8169_private *tp)
 
 static void rtl_lock_config_regs(struct rtl8169_private *tp)
 {
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&tp->cfg9346_usage_lock, flags);
-	if (!--tp->cfg9346_usage_count)
-		RTL_W8(tp, Cfg9346, Cfg9346_Lock);
-	raw_spin_unlock_irqrestore(&tp->cfg9346_usage_lock, flags);
+	RTL_W8(tp, Cfg9346, Cfg9346_Lock);
 }
 
 static void rtl_unlock_config_regs(struct rtl8169_private *tp)
 {
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&tp->cfg9346_usage_lock, flags);
-	if (!tp->cfg9346_usage_count++)
-		RTL_W8(tp, Cfg9346, Cfg9346_Unlock);
-	raw_spin_unlock_irqrestore(&tp->cfg9346_usage_lock, flags);
+	RTL_W8(tp, Cfg9346, Cfg9346_Unlock);
 }
 
 static void rtl_pci_commit(struct rtl8169_private *tp)
@@ -746,24 +734,18 @@ static void rtl_pci_commit(struct rtl8169_private *tp)
 
 static void rtl_mod_config2(struct rtl8169_private *tp, u8 clear, u8 set)
 {
-	unsigned long flags;
 	u8 val;
 
-	raw_spin_lock_irqsave(&tp->config25_lock, flags);
 	val = RTL_R8(tp, Config2);
 	RTL_W8(tp, Config2, (val & ~clear) | set);
-	raw_spin_unlock_irqrestore(&tp->config25_lock, flags);
 }
 
 static void rtl_mod_config5(struct rtl8169_private *tp, u8 clear, u8 set)
 {
-	unsigned long flags;
 	u8 val;
 
-	raw_spin_lock_irqsave(&tp->config25_lock, flags);
 	val = RTL_R8(tp, Config5);
 	RTL_W8(tp, Config5, (val & ~clear) | set);
-	raw_spin_unlock_irqrestore(&tp->config25_lock, flags);
 }
 
 static bool rtl_is_8125(struct rtl8169_private *tp)
@@ -1569,7 +1551,6 @@ static void __rtl8169_set_wol(struct rtl8169_private *tp, u32 wolopts)
 		{ WAKE_MAGIC, Config3, MagicPacket }
 	};
 	unsigned int i, tmp = ARRAY_SIZE(cfg);
-	unsigned long flags;
 	u8 options;
 
 	rtl_unlock_config_regs(tp);
@@ -1588,14 +1569,12 @@ static void __rtl8169_set_wol(struct rtl8169_private *tp, u32 wolopts)
 			r8168_mac_ocp_modify(tp, 0xc0b6, BIT(0), 0);
 	}
 
-	raw_spin_lock_irqsave(&tp->config25_lock, flags);
 	for (i = 0; i < tmp; i++) {
 		options = RTL_R8(tp, cfg[i].reg) & ~cfg[i].mask;
 		if (wolopts & cfg[i].opt)
 			options |= cfg[i].mask;
 		RTL_W8(tp, cfg[i].reg, options);
 	}
-	raw_spin_unlock_irqrestore(&tp->config25_lock, flags);
 
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_02 ... RTL_GIGA_MAC_VER_06:
@@ -3766,8 +3745,8 @@ static void rtl_hw_start_8125_common(struct rtl8169_private *tp)
 	rtl_pcie_state_l2l3_disable(tp);
 
 	RTL_W16(tp, 0x382, 0x221b);
-	RTL_W8(tp, 0x4500, 0);
-	RTL_W16(tp, 0x4800, 0);
+	RTL_W32(tp, RSS_CTRL_8125, 0);
+	RTL_W16(tp, Q_NUM_CTRL_8125, 0);
 
 	/* disable UPS */
 	r8168_mac_ocp_modify(tp, 0xd40a, 0x0010, 0x0000);
@@ -5487,8 +5466,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	tp->supports_gmii = ent->driver_data == RTL_CFG_NO_GBIT ? 0 : 1;
 	tp->ocp_base = OCP_STD_PHY_BASE;
 
-	raw_spin_lock_init(&tp->cfg9346_usage_lock);
-	raw_spin_lock_init(&tp->config25_lock);
 	raw_spin_lock_init(&tp->mac_ocp_lock);
 	mutex_init(&tp->led_lock);
 
