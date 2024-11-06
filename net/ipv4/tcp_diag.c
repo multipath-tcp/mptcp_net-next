@@ -72,6 +72,7 @@ static int tcp_diag_put_md5sig(struct sk_buff *skb,
 		return 0;
 
 	attrlen = skb_availroom(skb) - NLA_HDRLEN;
+	attrlen = min(attrlen, U16_MAX - 1); /* attr->nla_len */
 	md5sig_count = min(md5sig_count, attrlen / key_size);
 	attr = nla_reserve(skb, INET_DIAG_MD5SIG, md5sig_count * key_size);
 	if (!attr)
