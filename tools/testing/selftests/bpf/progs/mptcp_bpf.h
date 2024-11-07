@@ -58,4 +58,9 @@ extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 extern struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos) __ksym;
 
+extern void bpf_spin_lock_bh(spinlock_t *lock) __ksym;
+extern void bpf_spin_unlock_bh(spinlock_t *lock) __ksym;
+
+extern bool bpf_ipv6_addr_v4mapped(const struct mptcp_addr_info *a) __ksym;
+
 #endif
