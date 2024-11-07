@@ -10,6 +10,7 @@ Before opening this ticket, I checked:
 - [ ] a similar issue has not been reported before
 - [ ] https://mptcp.dev website doesn't cover my case
 - [ ] the wiki on GitHub doesn't cover my case
+- [ ] this case is not fixed with the latest stable version listed on https://kernel.org
 
 **Describe the bug**
 <!-- A clear and concise description of what the bug is. -->
@@ -22,8 +23,7 @@ Steps to reproduce the behavior:
 <!-- A clear and concise description of what you expected to happen. -->
 
 **System:**
-<!-- Give the output of these commands executed on *both* the client and server sides. -->
-Commands:
+<!-- Give the output of these commands executed on *both* the client and server sides.
 ```
 uname -a
 cat /etc/os-release
@@ -31,13 +31,10 @@ sysctl net.mptcp
 ip mptcp endpoint show
 ip mptcp limits show
 ```
+-->
 
 - Client:
 - Server:
-
-**Up-to-date kernel?**
-<!-- Did you try to reproduce the issue with ideally the last stable kernel version, or at least the last LTS version (or the development version using our `export` branch)?
-See https://www.kernel.org for the supported versions -->
 
 **Additional context**
 <!--
