@@ -10,7 +10,7 @@ Before opening this ticket, I checked:
 - [ ] a similar issue has not been reported before
 - [ ] https://mptcp.dev website doesn't cover my case
 - [ ] the wiki on GitHub doesn't cover my case
-- [ ] this case is not fixed with the latest stable version listed on https://kernel.org
+- [ ] this case is not fixed with the latest stable (or LTS) version listed on https://kernel.org
 
 **Describe the bug**
 <!-- A clear and concise description of what the bug is. -->
