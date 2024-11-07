@@ -40,6 +40,12 @@ struct pm_nl_pernet {
 	DECLARE_BITMAP(id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 };
 
+struct mptcp_pm_local {
+	struct mptcp_addr_info	addr;
+	u8			flags;
+	int			ifindex;
+};
+
 #define MPTCP_PM_ADDR_MAX	8
 #define ADD_ADDR_RETRANS_MAX	3
 
@@ -638,8 +644,14 @@ subflow:
 			continue;
 
 		spin_unlock_bh(&msk->pm.lock);
-		for (i = 0; i < nr; i++)
-			__mptcp_subflow_connect(sk, &local, &addrs[i]);
+		for (i = 0; i < nr; i++) {
+			struct mptcp_pm_addr_entry entry = { 0 };
+
+			entry.addr = local.addr;
+			entry.flags = local.flags;
+			entry.ifindex = local.ifindex;
+			__mptcp_subflow_connect(sk, &entry, &addrs[i]);
+		}
 		spin_lock_bh(&msk->pm.lock);
 	}
 	mptcp_pm_nl_check_work_pending(msk);
@@ -755,9 +767,15 @@ static void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 		return;
 
 	spin_unlock_bh(&msk->pm.lock);
-	for (i = 0; i < nr; i++)
-		if (__mptcp_subflow_connect(sk, &locals[i], &remote) == 0)
+	for (i = 0; i < nr; i++) {
+		struct mptcp_pm_addr_entry entry = { 0 };
+
+		entry.addr = locals[i].addr;
+		entry.flags = locals[i].flags;
+		entry.ifindex = locals[i].ifindex;
+		if (__mptcp_subflow_connect(sk, &entry, &remote) == 0)
 			sf_created = true;
+	}
 	spin_lock_bh(&msk->pm.lock);
 
 	if (sf_created) {
