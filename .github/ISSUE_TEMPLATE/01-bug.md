@@ -16,45 +16,27 @@ Before opening this ticket, I checked:
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1. **TODO**
+1.
 
 **Expected behavior**
 <!-- A clear and concise description of what you expected to happen. -->
 
-**System: Client**
- - Kernel version (`uname -a`): **TODO**
- - Distribution and version (or `cat /etc/os-release`): **TODO**
- - MPTCP sysctl (`sysctl net.mptcp`):
+**System:**
+<!-- Give the output of these commands executed on *both* the client and server sides. -->
+Commands:
 ```
-TODO
-```
- - MPTCP PM Endpoints (`ip mptcp endpoint show`):
-```
-TODO
-```
- - MPTCP PM limits (`ip mptcp limits show`):
-```
-TODO
+uname -a
+cat /etc/os-release
+sysctl net.mptcp
+ip mptcp endpoint show
+ip mptcp limits show
 ```
 
-**System: Server**
- - Kernel version (`uname -a`): **TODO**
- - Distribution and version (or `cat /etc/os-release`): **TODO**
- - MPTCP sysctl (`sysctl net.mptcp`):
-```
-TODO
-```
- - MPTCP PM Endpoints (`ip mptcp endpoint show`):
-```
-TODO
-```
- - MPTCP PM limits (`ip mptcp limits show`):
-```
-TODO
-```
+- Client:
+- Server:
 
 **Up-to-date kernel?**
-<!-- Did you try to reproduce the issue with ideally the last stable kernel version, or at least the last LTS version (or the development version using our `export` branch?
+<!-- Did you try to reproduce the issue with ideally the last stable kernel version, or at least the last LTS version (or the development version using our `export` branch)?
 See https://www.kernel.org for the supported versions -->
 
 **Additional context**
