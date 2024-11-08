@@ -1014,6 +1014,8 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 
 	pf = enetc_si_priv(si);
 	pf->si = si;
+	pf->ops = &enetc_pf_ops;
+
 	pf->total_vfs = pci_sriov_get_totalvfs(pdev);
 	if (pf->total_vfs) {
 		pf->vf_state = kcalloc(pf->total_vfs, sizeof(struct enetc_vf_state),
@@ -1021,7 +1023,6 @@ static int enetc_pf_probe(struct pci_dev *pdev,
 		if (!pf->vf_state)
 			goto err_alloc_vf_state;
 	}
-	pf->ops = &enetc_pf_ops;
 
 	err = enetc_setup_mac_addresses(node, pf);
 	if (err)
