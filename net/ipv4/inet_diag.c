@@ -352,10 +352,6 @@ int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 
 	handler->idiag_get_info(sk, r, info);
 
-	if (ext & (1 << (INET_DIAG_INFO - 1)) && handler->idiag_get_aux)
-		if (handler->idiag_get_aux(sk, net_admin, skb) < 0)
-			goto errout;
-
 	if (sk->sk_state < TCP_TIME_WAIT) {
 		union tcp_cc_info info;
 		size_t sz = 0;
@@ -369,6 +365,10 @@ int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 		if (sz && nla_put(skb, attr, sz, &info) < 0)
 			goto errout;
 	}
+
+	if (ext & (1 << (INET_DIAG_INFO - 1)) && handler->idiag_get_aux)
+		if (handler->idiag_get_aux(sk, net_admin, skb, nlh) < 0)
+			goto errout;
 
 	/* Keep it at the end for potential retry with a larger skb,
 	 * or else do best-effort fitting, which is only done for the

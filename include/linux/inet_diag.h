@@ -22,7 +22,8 @@ struct inet_diag_handler {
 
 	int		(*idiag_get_aux)(struct sock *sk,
 					 bool net_admin,
-					 struct sk_buff *skb);
+					 struct sk_buff *skb,
+					 struct nlmsghdr *nlh);
 
 	size_t		(*idiag_get_aux_size)(struct sock *sk,
 					      bool net_admin);
