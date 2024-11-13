@@ -102,24 +102,31 @@ static size_t inet_sk_attr_size(struct sock *sk,
 				bool net_admin)
 {
 	const struct inet_diag_handler *handler;
-	size_t aux = 0;
+	int ext = req->idiag_ext;
+	size_t ret = 0;
 
 	rcu_read_lock();
 	handler = rcu_dereference(inet_diag_table[req->sdiag_protocol]);
 	DEBUG_NET_WARN_ON_ONCE(!handler);
 	if (handler && handler->idiag_get_aux_size)
-		aux = handler->idiag_get_aux_size(sk, net_admin);
+		ret += handler->idiag_get_aux_size(sk, net_admin);
 	rcu_read_unlock();
 
-	return	  nla_total_size(sizeof(struct tcp_info))
-		+ nla_total_size(sizeof(struct inet_diag_msg))
-		+ inet_diag_msg_attrs_size()
-		+ nla_total_size(sizeof(struct inet_diag_meminfo))
-		+ nla_total_size(SK_MEMINFO_VARS * sizeof(u32))
-		+ nla_total_size(TCP_CA_NAME_MAX)
-		+ nla_total_size(sizeof(struct tcpvegas_info))
-		+ aux
-		+ 64;
+	ret += nla_total_size(sizeof(struct tcp_info))
+	     + nla_total_size(sizeof(struct inet_diag_msg))
+	     + inet_diag_msg_attrs_size()
+	     + 64;
+
+	if (ext & (1 << (INET_DIAG_MEMINFO - 1)))
+		ret += nla_total_size(sizeof(struct inet_diag_meminfo));
+	if (ext & (1 << (INET_DIAG_SKMEMINFO - 1)))
+		ret += nla_total_size(SK_MEMINFO_VARS * sizeof(u32));
+	if (ext & (1 << (INET_DIAG_CONG - 1)))
+		ret += nla_total_size(TCP_CA_NAME_MAX);
+	if (ext & (1 << (INET_DIAG_VEGASINFO - 1)))
+		ret += nla_total_size(sizeof(struct tcpvegas_info));
+
+	return ret;
 }
 
 int inet_diag_msg_attrs_fill(struct sock *sk, struct sk_buff *skb,
