@@ -30,9 +30,8 @@ void BPF_PROG(mptcp_sched_rr_release, struct mptcp_sock *msk)
 	bpf_sk_storage_delete(&mptcp_rr_map, msk);
 }
 
-SEC("struct_ops")
-int BPF_PROG(bpf_rr_get_subflow, struct mptcp_sock *msk,
-	     struct mptcp_sched_data *data)
+static int bpf_rr_get_subflow(struct mptcp_sock *msk,
+			      struct mptcp_sched_data *data)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_rr_storage *ptr;
@@ -69,10 +68,25 @@ int BPF_PROG(bpf_rr_get_subflow, struct mptcp_sock *msk,
 	return 0;
 }
 
-SEC(".struct_ops")
+SEC("struct_ops")
+int BPF_PROG(bpf_rr_get_send, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
+{
+	return bpf_rr_get_subflow(msk, data);
+}
+
+SEC("struct_ops")
+int BPF_PROG(bpf_rr_get_retrans, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
+{
+	return bpf_rr_get_subflow(msk, data);
+}
+
+SEC(".struct_ops.link")
 struct mptcp_sched_ops rr = {
 	.init		= (void *)mptcp_sched_rr_init,
 	.release	= (void *)mptcp_sched_rr_release,
-	.get_subflow	= (void *)bpf_rr_get_subflow,
+	.get_send	= (void *)bpf_rr_get_send,
+	.get_retrans	= (void *)bpf_rr_get_retrans,
 	.name		= "bpf_rr",
 };
