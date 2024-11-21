@@ -252,7 +252,10 @@ bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 	if (!msk)
 		return -EINVAL;
 
-	msk_owned_by_me(msk);
+#ifdef CONFIG_LOCKDEP
+	if (!lockdep_sock_is_held((const struct sock *)msk))
+		return -EINVAL;
+#endif
 
 	kit->pos = &msk->conn_list;
 	return 0;
