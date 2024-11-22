@@ -2386,6 +2386,25 @@ void tracing_reset_online_cpus(struct array_buffer *buf)
 	ring_buffer_record_enable(buffer);
 }
 
+static void tracing_reset_all_cpus(struct array_buffer *buf)
+{
+	struct trace_buffer *buffer = buf->buffer;
+
+	if (!buffer)
+		return;
+
+	ring_buffer_record_disable(buffer);
+
+	/* Make sure all commits have finished */
+	synchronize_rcu();
+
+	buf->time_start = buffer_ftrace_now(buf, buf->cpu);
+
+	ring_buffer_reset(buffer);
+
+	ring_buffer_record_enable(buffer);
+}
+
 /* Must have trace_types_lock held */
 void tracing_reset_all_online_cpus_unlocked(void)
 {
@@ -6145,8 +6164,13 @@ static void update_last_data(struct trace_array *tr)
 	if (!tr->text_delta && !tr->data_delta)
 		return;
 
-	/* Clear old data */
-	tracing_reset_online_cpus(&tr->array_buffer);
+	/*
+	 * Need to clear all CPU buffers as there cannot be events
+	 * from the previous boot mixed with events with this boot
+	 * as that will cause a confusing trace. Need to clear all
+	 * CPU buffers, even for those that may currently be offline.
+	 */
+	tracing_reset_all_cpus(&tr->array_buffer);
 
 	/* Using current data now */
 	tr->text_delta = 0;
@@ -8563,15 +8587,22 @@ tracing_read_dyn_info(struct file *filp, char __user *ubuf,
 	char *buf;
 	int r;
 
-	/* 256 should be plenty to hold the amount needed */
-	buf = kmalloc(256, GFP_KERNEL);
+	/* 512 should be plenty to hold the amount needed */
+#define DYN_INFO_BUF_SIZE	512
+
+	buf = kmalloc(DYN_INFO_BUF_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
-	r = scnprintf(buf, 256, "%ld pages:%ld groups: %ld\n",
+	r = scnprintf(buf, DYN_INFO_BUF_SIZE,
+		      "%ld pages:%ld groups: %ld\n"
+		      "ftrace boot update time = %llu (ns)\n"
+		      "ftrace module total update time = %llu (ns)\n",
 		      ftrace_update_tot_cnt,
 		      ftrace_number_of_pages,
-		      ftrace_number_of_groups);
+		      ftrace_number_of_groups,
+		      ftrace_update_time,
+		      ftrace_total_mod_time);
 
 	ret = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
 	kfree(buf);
