@@ -1001,7 +1001,7 @@ struct task_struct {
 #ifdef CONFIG_ARCH_HAS_CPU_PASID
 	unsigned			pasid_activated:1;
 #endif
-#ifdef	CONFIG_CPU_SUP_INTEL
+#ifdef CONFIG_X86_BUS_LOCK_DETECT
 	unsigned			reported_split_lock:1;
 #endif
 #ifdef CONFIG_TASK_DELAY_ACCT
@@ -1441,6 +1441,7 @@ struct task_struct {
 
 	/* Timestamp for last schedule: */
 	unsigned long long		ftrace_timestamp;
+	unsigned long long		ftrace_sleeptime;
 
 	/*
 	 * Number of functions that haven't been traced
@@ -1898,7 +1899,7 @@ extern unsigned long init_stack[THREAD_SIZE / sizeof(unsigned long)];
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 # define task_thread_info(task)	(&(task)->thread_info)
-#elif !defined(__HAVE_THREAD_FUNCTIONS)
+#else
 # define task_thread_info(task)	((struct thread_info *)(task)->stack)
 #endif
 
@@ -2002,7 +2003,8 @@ static inline void set_tsk_need_resched(struct task_struct *tsk)
 
 static inline void clear_tsk_need_resched(struct task_struct *tsk)
 {
-	clear_tsk_thread_flag(tsk,TIF_NEED_RESCHED);
+	atomic_long_andnot(_TIF_NEED_RESCHED | _TIF_NEED_RESCHED_LAZY,
+			   (atomic_long_t *)&task_thread_info(tsk)->flags);
 }
 
 static inline int test_tsk_need_resched(struct task_struct *tsk)
