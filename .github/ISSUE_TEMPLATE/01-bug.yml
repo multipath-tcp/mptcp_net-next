@@ -20,33 +20,6 @@ body:
         - label: "This case is not fixed with the latest stable (or LTS) version listed on [kernel.org](https://kernel.org)"
 
   - type: textarea
-    id: system
-    attributes:
-      label: "System info"
-      description: |
-        Output of these commands executed on **both** the **client** and **server** sides:
-        ```
-        uname -a
-        cat /etc/os-release
-        sysctl net.mptcp
-        ip mptcp endpoint show
-        ip mptcp limits show
-        ```
-      placeholder: |
-        - client:
-        $ uname -a
-        Linux my-client 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
-        (...)
-
-        - server:
-        $ uname -a
-        Linux my-server 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
-        (...)
-      render: shell
-    validations:
-      required: true
-
-  - type: textarea
     id: what-did-you-do
     attributes:
       label: "What did you do?"
@@ -71,6 +44,48 @@ body:
     attributes:
       label: "What did you expect to have?"
       description: Why is the current behavior incorrect, and any additional context we may need to understand the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-client
+    attributes:
+      label: "System info: Client"
+      description: |
+        Output of these commands executed on the **client** side:
+        ```
+        uname -a
+        cat /etc/os-release
+        sysctl net.mptcp
+        ip mptcp endpoint show
+        ip mptcp limits show
+        ```
+      placeholder: |
+        $ uname -a
+        Linux my-client 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
+        (...)
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-server
+    attributes:
+      label: "System info: Server"
+      description: |
+        Output of these commands executed on the **server** side:
+        ```
+        uname -a
+        cat /etc/os-release
+        sysctl net.mptcp
+        ip mptcp endpoint show
+        ip mptcp limits show
+        ```
+      placeholder: |
+        $ uname -a
+        Linux my-server 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
+        (...)
+      render: shell
     validations:
       required: true
 
