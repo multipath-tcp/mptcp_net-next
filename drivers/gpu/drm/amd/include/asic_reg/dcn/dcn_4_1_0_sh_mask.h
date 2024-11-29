@@ -6199,10 +6199,12 @@
 #define DCHUBBUB_CTRL_STATUS__ROB_UNDERFLOW_STATUS__SHIFT                                                     0x1
 #define DCHUBBUB_CTRL_STATUS__ROB_OVERFLOW_STATUS__SHIFT                                                      0x2
 #define DCHUBBUB_CTRL_STATUS__ROB_OVERFLOW_CLEAR__SHIFT                                                       0x3
+#define DCHUBBUB_CTRL_STATUS__DCHUBBUB_HW_DEBUG__SHIFT                                                        0x4
 #define DCHUBBUB_CTRL_STATUS__CSTATE_SWATH_CHK_GOOD_MODE__SHIFT                                               0x1f
 #define DCHUBBUB_CTRL_STATUS__ROB_UNDERFLOW_STATUS_MASK                                                       0x00000002L
 #define DCHUBBUB_CTRL_STATUS__ROB_OVERFLOW_STATUS_MASK                                                        0x00000004L
 #define DCHUBBUB_CTRL_STATUS__ROB_OVERFLOW_CLEAR_MASK                                                         0x00000008L
+#define DCHUBBUB_CTRL_STATUS__DCHUBBUB_HW_DEBUG_MASK                                                          0x3FFFFFF0L
 #define DCHUBBUB_CTRL_STATUS__CSTATE_SWATH_CHK_GOOD_MODE_MASK                                                 0x80000000L
 //DCHUBBUB_TIMEOUT_DETECTION_CTRL1
 #define DCHUBBUB_TIMEOUT_DETECTION_CTRL1__DCHUBBUB_TIMEOUT_ERROR_STATUS__SHIFT                                0x0
