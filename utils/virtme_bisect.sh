@@ -7,7 +7,7 @@
 stress() { local i=0 pid nproc2
 	while [[ $((i++)) -lt 500 ]]; do
 		# shellcheck disable=SC2009 # we grep on the args
-		ps aux | grep "[/]run/virtme/guesttools/virtme-init" && break
+		ps aux | grep "[v]irtme_hostname=" && break
 		sleep 5s
 	done
 	sleep 30
@@ -48,7 +48,7 @@ fi
 
 trap 'exit_trap' EXIT
 
-VIRTME_NO_INTERACTIVE=1 VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 ./.virtme.sh "expect-${MODE}" &
+VIRTME_NO_INTERACTIVE=1 VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 ./.virtme.sh "auto-${MODE}" &
 PID_VIRTME=$!
 
 if [ "${STRESS}" = 1 ]; then
