@@ -145,7 +145,8 @@ static void handshake_req_alloc_case(struct kunit *test)
 
 static int handshake_sock_create(struct socket **sock)
 {
-	return sock_create_kern(&init_net, PF_INET, SOCK_STREAM, IPPROTO_TCP, sock);
+	return sock_create_net_noref(&init_net, PF_INET, SOCK_STREAM,
+				     IPPROTO_TCP, sock);
 }
 
 static void handshake_req_submit_test1(struct kunit *test)

@@ -241,7 +241,7 @@ static int rxe_qp_init_req(struct rxe_dev *rxe, struct rxe_qp *qp,
 	/* if we don't finish qp create make sure queue is valid */
 	skb_queue_head_init(&qp->req_pkts);
 
-	err = sock_create_kern(&init_net, AF_INET, SOCK_DGRAM, 0, &qp->sk);
+	err = sock_create_net_noref(&init_net, AF_INET, SOCK_DGRAM, 0, &qp->sk);
 	if (err < 0)
 		return err;
 	qp->sk->sk->sk_user_data = (void *)(uintptr_t)qp->elem.index;

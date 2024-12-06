@@ -692,8 +692,8 @@ int qrtr_ns_init(void)
 	INIT_LIST_HEAD(&qrtr_ns.lookups);
 	INIT_WORK(&qrtr_ns.work, qrtr_ns_worker);
 
-	ret = sock_create_kern(&init_net, AF_QIPCRTR, SOCK_DGRAM,
-			       PF_QIPCRTR, &qrtr_ns.sock);
+	ret = sock_create_net_noref(&init_net, AF_QIPCRTR, SOCK_DGRAM,
+				    PF_QIPCRTR, &qrtr_ns.sock);
 	if (ret < 0)
 		return ret;
 
@@ -735,7 +735,7 @@ int qrtr_ns_init(void)
 	 *  qrtr module is inserted successfully.
 	 *
 	 * However, the reference count is increased twice in
-	 * sock_create_kern(): one is to increase the reference count of owner
+	 * sock_create_net_noref(): one is to increase the reference count of owner
 	 * of qrtr socket's proto_ops struct; another is to increment the
 	 * reference count of owner of qrtr proto struct. Therefore, we must
 	 * decrement the module reference count twice to ensure that it keeps

@@ -1083,8 +1083,8 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	int backlog = 1024;
 	int err;
 
-	err = sock_create_kern(sock_net(sk), entry->addr.family,
-			       SOCK_STREAM, IPPROTO_MPTCP, &entry->lsk);
+	err = sock_create_net_noref(sock_net(sk), entry->addr.family,
+				    SOCK_STREAM, IPPROTO_MPTCP, &entry->lsk);
 	if (err)
 		return err;
 

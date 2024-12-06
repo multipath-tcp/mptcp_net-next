@@ -618,9 +618,9 @@ static struct socket *drbd_try_connect(struct drbd_connection *connection)
 	peer_addr_len = min_t(int, connection->peer_addr_len, sizeof(src_in6));
 	memcpy(&peer_in6, &connection->peer_addr, peer_addr_len);
 
-	what = "sock_create_kern";
-	err = sock_create_kern(&init_net, ((struct sockaddr *)&src_in6)->sa_family,
-			       SOCK_STREAM, IPPROTO_TCP, &sock);
+	what = "sock_create_net_noref";
+	err = sock_create_net_noref(&init_net, ((struct sockaddr *)&src_in6)->sa_family,
+				    SOCK_STREAM, IPPROTO_TCP, &sock);
 	if (err < 0) {
 		sock = NULL;
 		goto out;
@@ -713,9 +713,9 @@ static int prepare_listen_socket(struct drbd_connection *connection, struct acce
 	my_addr_len = min_t(int, connection->my_addr_len, sizeof(struct sockaddr_in6));
 	memcpy(&my_addr, &connection->my_addr, my_addr_len);
 
-	what = "sock_create_kern";
-	err = sock_create_kern(&init_net, ((struct sockaddr *)&my_addr)->sa_family,
-			       SOCK_STREAM, IPPROTO_TCP, &s_listen);
+	what = "sock_create_net_noref";
+	err = sock_create_net_noref(&init_net, ((struct sockaddr *)&my_addr)->sa_family,
+				    SOCK_STREAM, IPPROTO_TCP, &s_listen);
 	if (err) {
 		s_listen = NULL;
 		goto out;

@@ -1450,8 +1450,8 @@ static int rpc_sockname(struct net *net, struct sockaddr *sap, size_t salen,
 	struct socket *sock;
 	int err;
 
-	err = sock_create_kern(net, sap->sa_family,
-			       SOCK_DGRAM, IPPROTO_UDP, &sock);
+	err = sock_create_net_noref(net, sap->sa_family,
+				    SOCK_DGRAM, IPPROTO_UDP, &sock);
 	if (err < 0) {
 		dprintk("RPC:       can't create UDP socket (%d)\n", err);
 		goto out;

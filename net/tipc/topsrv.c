@@ -515,7 +515,7 @@ static int tipc_topsrv_create_listener(struct tipc_topsrv *srv)
 	struct sock *sk;
 	int rc;
 
-	rc = sock_create_kern(srv->net, AF_TIPC, SOCK_SEQPACKET, 0, &lsock);
+	rc = sock_create_net_noref(srv->net, AF_TIPC, SOCK_SEQPACKET, 0, &lsock);
 	if (rc < 0)
 		return rc;
 
@@ -553,7 +553,7 @@ static int tipc_topsrv_create_listener(struct tipc_topsrv *srv)
 	 * after TIPC module is inserted successfully.
 	 *
 	 * However, the reference count is ever increased twice in
-	 * sock_create_kern(): one is to increase the reference count of owner
+	 * sock_create_net_noref(): one is to increase the reference count of owner
 	 * of TIPC socket's proto_ops struct; another is to increment the
 	 * reference count of owner of TIPC proto struct. Therefore, we must
 	 * decrement the module reference count twice to ensure that it keeps

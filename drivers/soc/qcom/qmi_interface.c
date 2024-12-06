@@ -588,8 +588,8 @@ static struct socket *qmi_sock_create(struct qmi_handle *qmi,
 	struct socket *sock;
 	int ret;
 
-	ret = sock_create_kern(&init_net, AF_QIPCRTR, SOCK_DGRAM,
-			       PF_QIPCRTR, &sock);
+	ret = sock_create_net_noref(&init_net, AF_QIPCRTR, SOCK_DGRAM,
+				    PF_QIPCRTR, &sock);
 	if (ret < 0)
 		return ERR_PTR(ret);
 

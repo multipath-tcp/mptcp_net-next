@@ -1529,7 +1529,7 @@ static struct svc_xprt *svc_create_socket(struct svc_serv *serv,
 	if (protocol == IPPROTO_TCP)
 		error = sock_create_net(net, family, type, protocol, &sock);
 	else
-		error = sock_create_kern(net, family, type, protocol, &sock);
+		error = sock_create_net_noref(net, family, type, protocol, &sock);
 	if (error < 0)
 		return ERR_PTR(error);
 

@@ -1665,23 +1665,36 @@ int sock_create_net(struct net *net, int family, int type, int protocol,
 EXPORT_SYMBOL(sock_create_net);
 
 /**
- *	sock_create_kern - creates a socket (kernel space)
- *	@net: net namespace
- *	@family: protocol family (AF_INET, ...)
- *	@type: communication type (SOCK_STREAM, ...)
- *	@protocol: protocol (0, ...)
- *	@res: new socket
+ * sock_create_net_noref - creates a socket for kernel space
  *
- *	A wrapper around __sock_create().
- *	Returns 0 or an error. This function internally uses GFP_KERNEL.
+ * @net: net namespace
+ * @family: protocol family (AF_INET, ...)
+ * @type: communication type (SOCK_STREAM, ...)
+ * @protocol: protocol (0, ...)
+ * @res: new socket
+ *
+ * Creates a new socket and assigns it to @res, passing through LSM.
+ *
+ * The socket is for kernel space and should not be exposed to
+ * userspace via a file descriptor nor BPF hooks (see inet_create(),
+ * inet_release(), etc).
+ *
+ * The socket DOES NOT hold a reference count of @net to allow it to
+ * be removed; the caller MUST ensure that the socket is always freed
+ * before @net.
+ *
+ * @net MUST be alive as of calling sock_create_net_noref().
+ *
+ * Context: Process context. This function internally uses GFP_KERNEL.
+ * Return: 0 or an error.
  */
 
-int sock_create_kern(struct net *net, int family, int type, int protocol,
-		     struct socket **res)
+int sock_create_net_noref(struct net *net, int family, int type, int protocol,
+			  struct socket **res)
 {
 	return __sock_create(net, family, type, protocol, res, true, false);
 }
-EXPORT_SYMBOL(sock_create_kern);
+EXPORT_SYMBOL(sock_create_net_noref);
 
 static struct socket *__sys_socket_create(int family, int type, int protocol)
 {

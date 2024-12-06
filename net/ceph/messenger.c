@@ -442,10 +442,10 @@ int ceph_tcp_connect(struct ceph_connection *con)
 	     ceph_pr_addr(&con->peer_addr));
 	BUG_ON(con->sock);
 
-	/* sock_create_kern() allocates with GFP_KERNEL */
+	/* sock_create_net_noref() allocates with GFP_KERNEL */
 	noio_flag = memalloc_noio_save();
-	ret = sock_create_kern(read_pnet(&con->msgr->net), ss.ss_family,
-			       SOCK_STREAM, IPPROTO_TCP, &sock);
+	ret = sock_create_net_noref(read_pnet(&con->msgr->net), ss.ss_family,
+				    SOCK_STREAM, IPPROTO_TCP, &sock);
 	memalloc_noio_restore(noio_flag);
 	if (ret)
 		return ret;

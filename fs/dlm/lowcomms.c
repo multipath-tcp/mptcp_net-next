@@ -1579,8 +1579,8 @@ static int dlm_connect(struct connection *con)
 	}
 
 	/* Create a socket to communicate with */
-	result = sock_create_kern(&init_net, dlm_local_addr[0].ss_family,
-				  SOCK_STREAM, dlm_proto_ops->proto, &sock);
+	result = sock_create_net_noref(&init_net, dlm_local_addr[0].ss_family,
+				       SOCK_STREAM, dlm_proto_ops->proto, &sock);
 	if (result < 0)
 		return result;
 
@@ -1760,8 +1760,8 @@ static int dlm_listen_for_all(void)
 	if (result < 0)
 		return result;
 
-	result = sock_create_kern(&init_net, dlm_local_addr[0].ss_family,
-				  SOCK_STREAM, dlm_proto_ops->proto, &sock);
+	result = sock_create_net_noref(&init_net, dlm_local_addr[0].ss_family,
+				       SOCK_STREAM, dlm_proto_ops->proto, &sock);
 	if (result < 0) {
 		log_print("Can't create comms socket: %d", result);
 		return result;
