@@ -93,6 +93,7 @@ int rds_tcp_conn_path_connect(struct rds_conn_path *cp)
 	struct sockaddr_in6 sin6;
 	struct sockaddr_in sin;
 	struct sockaddr *addr;
+	struct net *net;
 	int addrlen;
 	bool isv6;
 	int ret;
@@ -107,19 +108,25 @@ int rds_tcp_conn_path_connect(struct rds_conn_path *cp)
 
 	mutex_lock(&tc->t_conn_path_lock);
 
+	net = rds_conn_net(conn);
+
 	if (rds_conn_path_up(cp)) {
 		mutex_unlock(&tc->t_conn_path_lock);
 		return 0;
 	}
+
+	if (!maybe_get_net(net))
+		return -EINVAL;
+
 	if (ipv6_addr_v4mapped(&conn->c_laddr)) {
-		ret = sock_create_kern(rds_conn_net(conn), PF_INET,
-				       SOCK_STREAM, IPPROTO_TCP, &sock);
+		ret = sock_create_net(net, PF_INET, SOCK_STREAM, IPPROTO_TCP, &sock);
 		isv6 = false;
 	} else {
-		ret = sock_create_kern(rds_conn_net(conn), PF_INET6,
-				       SOCK_STREAM, IPPROTO_TCP, &sock);
+		ret = sock_create_net(net, PF_INET6, SOCK_STREAM, IPPROTO_TCP, &sock);
 		isv6 = true;
 	}
+
+	put_net(net);
 
 	if (ret < 0)
 		goto out;

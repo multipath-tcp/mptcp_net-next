@@ -101,6 +101,7 @@ int rds_tcp_accept_one(struct socket *sock)
 	struct rds_connection *conn;
 	int ret;
 	struct inet_sock *inet;
+	struct net *net;
 	struct rds_tcp_connection *rs_tcp = NULL;
 	int conn_state;
 	struct rds_conn_path *cp;
@@ -108,7 +109,7 @@ int rds_tcp_accept_one(struct socket *sock)
 	struct proto_accept_arg arg = {
 		.flags = O_NONBLOCK,
 		.kern = true,
-		.hold_net = false,
+		.hold_net = true,
 	};
 #if !IS_ENABLED(CONFIG_IPV6)
 	struct in6_addr saddr, daddr;
@@ -118,13 +119,22 @@ int rds_tcp_accept_one(struct socket *sock)
 	if (!sock) /* module unload or netns delete in progress */
 		return -ENETUNREACH;
 
+	net = sock_net(sock->sk);
+
+	if (!maybe_get_net(net))
+		return -EINVAL;
+
 	ret = sock_create_lite(sock->sk->sk_family,
 			       sock->sk->sk_type, sock->sk->sk_protocol,
 			       &new_sock);
-	if (ret)
+	if (ret) {
+		put_net(net);
 		goto out;
+	}
 
 	ret = sock->ops->accept(sock, new_sock, &arg);
+	put_net(net);
+
 	if (ret < 0)
 		goto out;
 
