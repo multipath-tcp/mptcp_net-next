@@ -3146,7 +3146,6 @@ generic_ip_connect(struct TCP_Server_Info *server)
 		__netns_tracker_free(net, &sk->ns_tracker, false);
 		sk->sk_net_refcnt = 1;
 		get_net_track(net, &sk->ns_tracker, GFP_KERNEL);
-		sock_inuse_add(net, 1);
 
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 		cifs_dbg(FYI, "Socket created\n");

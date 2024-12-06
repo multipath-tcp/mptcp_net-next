@@ -3324,7 +3324,6 @@ int smc_create_clcsk(struct net *net, struct sock *sk, int family)
 	__netns_tracker_free(net, &sk->ns_tracker, false);
 	sk->sk_net_refcnt = 1;
 	get_net_track(net, &sk->ns_tracker, GFP_KERNEL);
-	sock_inuse_add(net, 1);
 	return 0;
 }
 

@@ -1775,7 +1775,7 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	__netns_tracker_free(net, &sf->sk->ns_tracker, false);
 	sf->sk->sk_net_refcnt = 1;
 	get_net_track(net, &sf->sk->ns_tracker, GFP_KERNEL);
-	sock_inuse_add(net, 1);
+
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	if (err)
 		goto err_free;

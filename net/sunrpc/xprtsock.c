@@ -1945,7 +1945,6 @@ static struct socket *xs_create_sock(struct rpc_xprt *xprt,
 		__netns_tracker_free(xprt->xprt_net, &sock->sk->ns_tracker, false);
 		sock->sk->sk_net_refcnt = 1;
 		get_net_track(xprt->xprt_net, &sock->sk->ns_tracker, GFP_KERNEL);
-		sock_inuse_add(xprt->xprt_net, 1);
 	}
 
 	filp = sock_alloc_file(sock, O_NONBLOCK, NULL);
