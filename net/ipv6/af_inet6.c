@@ -190,7 +190,7 @@ lookup_protocol:
 	WARN_ON(!answer_prot->slab);
 
 	err = -ENOBUFS;
-	sk = sk_alloc(net, PF_INET6, GFP_KERNEL, answer_prot, kern);
+	sk = sk_alloc(net, PF_INET6, GFP_KERNEL, answer_prot, kern, hold_net);
 	if (!sk)
 		goto out;
 

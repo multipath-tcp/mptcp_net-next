@@ -702,7 +702,7 @@ static int mctp_pf_create(struct net *net, struct socket *sock,
 	sock->state = SS_UNCONNECTED;
 	sock->ops = ops;
 
-	sk = sk_alloc(net, PF_MCTP, GFP_KERNEL, proto, kern);
+	sk = sk_alloc(net, PF_MCTP, GFP_KERNEL, proto, kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

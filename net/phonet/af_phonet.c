@@ -84,7 +84,7 @@ static int pn_socket_create(struct net *net, struct socket *sock, int protocol,
 		goto out;
 	}
 
-	sk = sk_alloc(net, PF_PHONET, GFP_KERNEL, pnp->prot, kern);
+	sk = sk_alloc(net, PF_PHONET, GFP_KERNEL, pnp->prot, kern, hold_net);
 	if (sk == NULL) {
 		err = -ENOMEM;
 		goto out;

@@ -736,7 +736,7 @@ static struct sock *__vsock_create(struct net *net,
 	struct vsock_sock *psk;
 	struct vsock_sock *vsk;
 
-	sk = sk_alloc(net, AF_VSOCK, priority, &vsock_proto, kern);
+	sk = sk_alloc(net, AF_VSOCK, priority, &vsock_proto, kern, hold_net);
 	if (!sk)
 		return NULL;
 

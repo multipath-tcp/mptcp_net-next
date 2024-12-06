@@ -1743,7 +1743,7 @@ static inline bool sock_allow_reclassification(const struct sock *csk)
 }
 
 struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
-		      struct proto *prot, int kern);
+		      struct proto *prot, bool kern, bool hold_net);
 void sk_free(struct sock *sk);
 void sk_destruct(struct sock *sk);
 struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority);

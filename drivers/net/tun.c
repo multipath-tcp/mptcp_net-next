@@ -3477,7 +3477,7 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 	struct tun_file *tfile;
 
 	tfile = (struct tun_file *)sk_alloc(net, AF_UNSPEC, GFP_KERNEL,
-					    &tun_proto, 0);
+					    &tun_proto, false, true);
 	if (!tfile)
 		return -ENOMEM;
 	if (ptr_ring_init(&tfile->tx_ring, 0, GFP_KERNEL)) {

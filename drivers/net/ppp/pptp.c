@@ -546,7 +546,7 @@ static int pptp_create(struct net *net, struct socket *sock,
 	struct pppox_sock *po;
 	struct pptp_opt *opt;
 
-	sk = sk_alloc(net, PF_PPPOX, GFP_KERNEL, &pptp_sk_proto, kern);
+	sk = sk_alloc(net, PF_PPPOX, GFP_KERNEL, &pptp_sk_proto, kern, hold_net);
 	if (!sk)
 		goto out;
 

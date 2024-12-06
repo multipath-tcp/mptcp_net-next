@@ -510,7 +510,7 @@ static struct sock *x25_alloc_socket(struct net *net, bool kern, bool hold_net)
 	struct x25_sock *x25;
 	struct sock *sk;
 
-	sk = sk_alloc(net, AF_X25, GFP_ATOMIC, &x25_proto, kern);
+	sk = sk_alloc(net, AF_X25, GFP_ATOMIC, &x25_proto, kern, hold_net);
 	if (!sk)
 		goto out;
 

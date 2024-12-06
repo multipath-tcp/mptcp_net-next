@@ -1048,7 +1048,7 @@ static int caif_create(struct net *net, struct socket *sock, int protocol,
 	 * is really not used at all in the net/core or socket.c but the
 	 * initialization makes sure that sock->state is not uninitialized.
 	 */
-	sk = sk_alloc(net, PF_CAIF, GFP_KERNEL, &prot, kern);
+	sk = sk_alloc(net, PF_CAIF, GFP_KERNEL, &prot, kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

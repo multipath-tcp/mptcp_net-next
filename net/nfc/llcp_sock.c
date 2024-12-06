@@ -977,7 +977,7 @@ struct sock *nfc_llcp_sock_alloc(struct socket *sock, int type, gfp_t gfp,
 	struct sock *sk;
 	struct nfc_llcp_sock *llcp_sock;
 
-	sk = sk_alloc(&init_net, PF_NFC, gfp, &llcp_sock_proto, kern);
+	sk = sk_alloc(&init_net, PF_NFC, gfp, &llcp_sock_proto, kern, hold_net);
 	if (!sk)
 		return NULL;
 

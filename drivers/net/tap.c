@@ -522,7 +522,7 @@ static int tap_open(struct inode *inode, struct file *file)
 
 	err = -ENOMEM;
 	q = (struct tap_queue *)sk_alloc(net, AF_UNSPEC, GFP_KERNEL,
-					     &tap_proto, 0);
+					 &tap_proto, false, true);
 	if (!q)
 		goto err;
 	if (ptr_ring_init(&q->ring, tap->dev->tx_queue_len, GFP_KERNEL)) {

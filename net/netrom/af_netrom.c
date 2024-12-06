@@ -435,7 +435,7 @@ static int nr_create(struct net *net, struct socket *sock, int protocol,
 	if (sock->type != SOCK_SEQPACKET || protocol != 0)
 		return -ESOCKTNOSUPPORT;
 
-	sk = sk_alloc(net, PF_NETROM, GFP_ATOMIC, &nr_proto, kern);
+	sk = sk_alloc(net, PF_NETROM, GFP_ATOMIC, &nr_proto, kern, hold_net);
 	if (sk  == NULL)
 		return -ENOMEM;
 
@@ -478,7 +478,8 @@ static struct sock *nr_make_new(struct sock *osk)
 	if (osk->sk_type != SOCK_SEQPACKET)
 		return NULL;
 
-	sk = sk_alloc(sock_net(osk), PF_NETROM, GFP_ATOMIC, osk->sk_prot, 0);
+	sk = sk_alloc(sock_net(osk), PF_NETROM, GFP_ATOMIC, osk->sk_prot,
+		      false, true);
 	if (sk == NULL)
 		return NULL;
 

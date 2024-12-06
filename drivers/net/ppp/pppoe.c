@@ -538,7 +538,7 @@ static int pppoe_create(struct net *net, struct socket *sock,
 {
 	struct sock *sk;
 
-	sk = sk_alloc(net, PF_PPPOX, GFP_KERNEL, &pppoe_sk_proto, kern);
+	sk = sk_alloc(net, PF_PPPOX, GFP_KERNEL, &pppoe_sk_proto, kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

@@ -146,7 +146,7 @@ struct sock *bt_sock_alloc(struct net *net, struct socket *sock,
 {
 	struct sock *sk;
 
-	sk = sk_alloc(net, PF_BLUETOOTH, prio, prot, kern);
+	sk = sk_alloc(net, PF_BLUETOOTH, prio, prot, kern, hold_net);
 	if (!sk)
 		return NULL;
 

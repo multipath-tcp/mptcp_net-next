@@ -890,7 +890,7 @@ static int ax25_create(struct net *net, struct socket *sock, int protocol,
 		return -ESOCKTNOSUPPORT;
 	}
 
-	sk = sk_alloc(net, PF_AX25, GFP_ATOMIC, &ax25_proto, kern);
+	sk = sk_alloc(net, PF_AX25, GFP_ATOMIC, &ax25_proto, kern, hold_net);
 	if (sk == NULL)
 		return -ENOMEM;
 
@@ -916,7 +916,8 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 	struct sock *sk;
 	ax25_cb *ax25, *oax25;
 
-	sk = sk_alloc(sock_net(osk), PF_AX25, GFP_ATOMIC, osk->sk_prot, 0);
+	sk = sk_alloc(sock_net(osk), PF_AX25, GFP_ATOMIC, osk->sk_prot,
+		      false, true);
 	if (sk == NULL)
 		return NULL;
 

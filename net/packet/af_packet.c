@@ -3414,7 +3414,7 @@ static int packet_create(struct net *net, struct socket *sock, int protocol,
 	sock->state = SS_UNCONNECTED;
 
 	err = -ENOBUFS;
-	sk = sk_alloc(net, PF_PACKET, GFP_KERNEL, &packet_proto, kern);
+	sk = sk_alloc(net, PF_PACKET, GFP_KERNEL, &packet_proto, kern, hold_net);
 	if (sk == NULL)
 		goto out;
 
