@@ -538,7 +538,8 @@ static void pptp_sock_destruct(struct sock *sk)
 	dst_release(rcu_dereference_protected(sk->sk_dst_cache, 1));
 }
 
-static int pptp_create(struct net *net, struct socket *sock, int kern)
+static int pptp_create(struct net *net, struct socket *sock,
+		       bool kern, bool hold_net)
 {
 	int error = -ENOMEM;
 	struct sock *sk;

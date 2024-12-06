@@ -533,7 +533,8 @@ static struct proto pppoe_sk_proto __read_mostly = {
  * Initialize a new struct sock.
  *
  **********************************************************************/
-static int pppoe_create(struct net *net, struct socket *sock, int kern)
+static int pppoe_create(struct net *net, struct socket *sock,
+			bool kern, bool hold_net)
 {
 	struct sock *sk;
 

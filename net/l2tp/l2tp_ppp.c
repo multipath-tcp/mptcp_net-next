@@ -477,7 +477,8 @@ static int pppol2tp_backlog_recv(struct sock *sk, struct sk_buff *skb)
 
 /* socket() handler. Initialize a new struct sock.
  */
-static int pppol2tp_create(struct net *net, struct socket *sock, int kern)
+static int pppol2tp_create(struct net *net, struct socket *sock,
+			   bool kern, bool hold_net)
 {
 	int error = -ENOMEM;
 	struct sock *sk;
