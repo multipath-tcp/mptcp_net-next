@@ -111,7 +111,7 @@ void bt_sock_unregister(int proto)
 EXPORT_SYMBOL(bt_sock_unregister);
 
 static int bt_sock_create(struct net *net, struct socket *sock, int proto,
-			  int kern)
+			  bool kern, bool hold_net)
 {
 	int err;
 
@@ -129,7 +129,7 @@ static int bt_sock_create(struct net *net, struct socket *sock, int proto,
 	read_lock(&bt_proto_lock);
 
 	if (bt_proto[proto] && try_module_get(bt_proto[proto]->owner)) {
-		err = bt_proto[proto]->create(net, sock, proto, kern);
+		err = bt_proto[proto]->create(net, sock, proto, kern, hold_net);
 		if (!err)
 			bt_sock_reclassify_lock(sock->sk, proto);
 		module_put(bt_proto[proto]->owner);
@@ -141,7 +141,8 @@ static int bt_sock_create(struct net *net, struct socket *sock, int proto,
 }
 
 struct sock *bt_sock_alloc(struct net *net, struct socket *sock,
-			   struct proto *prot, int proto, gfp_t prio, int kern)
+			   struct proto *prot, int proto, gfp_t prio,
+			   bool kern, bool hold_net)
 {
 	struct sock *sk;
 

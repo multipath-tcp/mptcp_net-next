@@ -3398,7 +3398,7 @@ static struct proto packet_proto = {
  */
 
 static int packet_create(struct net *net, struct socket *sock, int protocol,
-			 int kern)
+			 bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct packet_sock *po;

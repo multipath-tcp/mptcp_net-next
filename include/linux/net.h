@@ -233,7 +233,7 @@ struct proto_ops {
 struct net_proto_family {
 	int		family;
 	int		(*create)(struct net *net, struct socket *sock,
-				  int protocol, int kern);
+				  int protocol, bool kern, bool hold_net);
 	struct module	*owner;
 };
 

@@ -830,7 +830,7 @@ static struct proto ax25_proto = {
 };
 
 static int ax25_create(struct net *net, struct socket *sock, int protocol,
-		       int kern)
+		       bool kern, bool hold_net)
 {
 	struct sock *sk;
 	ax25_cb *ax25;

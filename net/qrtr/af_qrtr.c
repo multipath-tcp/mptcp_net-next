@@ -1258,7 +1258,7 @@ static struct proto qrtr_proto = {
 };
 
 static int qrtr_create(struct net *net, struct socket *sock,
-		       int protocol, int kern)
+		       int protocol, bool kern, bool hold_net)
 {
 	struct qrtr_sock *ipc;
 	struct sock *sk;

@@ -11,7 +11,8 @@
 #include <linux/poll.h> /* for poll_table */
 
 
-int vcc_create(struct net *net, struct socket *sock, int protocol, int family, int kern);
+int vcc_create(struct net *net, struct socket *sock, int protocol, int family,
+	       bool kern, bool hold_net);
 int vcc_release(struct socket *sock);
 int vcc_connect(struct socket *sock, int itf, short vpi, int vci);
 int vcc_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,

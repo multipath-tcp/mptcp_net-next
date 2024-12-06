@@ -112,7 +112,7 @@ static inline void can_put_proto(const struct can_proto *cp)
 }
 
 static int can_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+		      bool kern, bool hold_net)
 {
 	struct sock *sk;
 	const struct can_proto *cp;

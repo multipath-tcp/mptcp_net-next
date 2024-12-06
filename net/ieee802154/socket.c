@@ -999,7 +999,7 @@ static void ieee802154_sock_destruct(struct sock *sk)
  * set the state.
  */
 static int ieee802154_create(struct net *net, struct socket *sock,
-			     int protocol, int kern)
+			     int protocol, bool kern, bool hold_net)
 {
 	struct sock *sk;
 	int rc;

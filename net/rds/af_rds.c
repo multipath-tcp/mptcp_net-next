@@ -695,7 +695,7 @@ static int __rds_create(struct socket *sock, struct sock *sk, int protocol)
 }
 
 static int rds_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+		      bool kern, bool hold_net)
 {
 	struct sock *sk;
 

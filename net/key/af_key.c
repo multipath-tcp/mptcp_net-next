@@ -136,7 +136,7 @@ static struct proto key_proto = {
 };
 
 static int pfkey_create(struct net *net, struct socket *sock, int protocol,
-			int kern)
+			bool kern, bool hold_net)
 {
 	struct netns_pfkey *net_pfkey = net_generic(net, pfkey_net_id);
 	struct sock *sk;

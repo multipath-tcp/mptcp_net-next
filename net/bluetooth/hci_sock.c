@@ -2188,7 +2188,7 @@ static struct proto hci_sk_proto = {
 };
 
 static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
-			   int kern)
+			   bool kern, bool hold_net)
 {
 	struct sock *sk;
 
@@ -2200,7 +2200,7 @@ static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
 	sock->ops = &hci_sock_ops;
 
 	sk = bt_sock_alloc(net, sock, &hci_sk_proto, protocol, GFP_ATOMIC,
-			   kern);
+			   kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

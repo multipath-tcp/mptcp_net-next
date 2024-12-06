@@ -503,7 +503,7 @@ static void alg_sock_destruct(struct sock *sk)
 }
 
 static int alg_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+		      bool kern, bool hold_net)
 {
 	struct sock *sk;
 	int err;

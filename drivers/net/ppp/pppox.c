@@ -112,7 +112,7 @@ EXPORT_SYMBOL(pppox_compat_ioctl);
 #endif
 
 static int pppox_create(struct net *net, struct socket *sock, int protocol,
-			int kern)
+			bool kern, bool hold_net)
 {
 	int rc = -EPROTOTYPE;
 

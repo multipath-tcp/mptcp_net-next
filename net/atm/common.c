@@ -137,7 +137,8 @@ static struct proto vcc_proto = {
 	.release_cb = vcc_release_cb,
 };
 
-int vcc_create(struct net *net, struct socket *sock, int protocol, int family, int kern)
+int vcc_create(struct net *net, struct socket *sock, int protocol, int family,
+	       bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct atm_vcc *vcc;

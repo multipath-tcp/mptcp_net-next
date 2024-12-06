@@ -682,7 +682,7 @@ static struct proto mctp_proto = {
 };
 
 static int mctp_pf_create(struct net *net, struct socket *sock,
-			  int protocol, int kern)
+			  int protocol, bool kern, bool hold_net)
 {
 	const struct proto_ops *ops;
 	struct proto *proto;

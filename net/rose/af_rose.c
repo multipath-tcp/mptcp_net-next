@@ -544,7 +544,7 @@ static struct proto rose_proto = {
 };
 
 static int rose_create(struct net *net, struct socket *sock, int protocol,
-		       int kern)
+		       bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct rose_sock *rose;

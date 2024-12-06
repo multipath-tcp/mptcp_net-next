@@ -387,7 +387,7 @@ void smc_sk_init(struct net *net, struct sock *sk, int protocol)
 }
 
 static struct sock *smc_sock_alloc(struct net *net, struct socket *sock,
-				   int protocol, int kern)
+				   int protocol, bool kern, bool hold_net)
 {
 	struct proto *prot;
 	struct sock *sk;
@@ -1712,7 +1712,8 @@ static int smc_clcsock_accept(struct smc_sock *lsmc, struct smc_sock **new_smc)
 	int rc = -EINVAL;
 
 	release_sock(lsk);
-	new_sk = smc_sock_alloc(sock_net(lsk), NULL, lsk->sk_protocol, 0);
+	new_sk = smc_sock_alloc(sock_net(lsk), NULL, lsk->sk_protocol,
+				false, true);
 	if (!new_sk) {
 		rc = -ENOMEM;
 		lsk->sk_err = ENOMEM;
@@ -3328,7 +3329,7 @@ int smc_create_clcsk(struct net *net, struct sock *sk, int family)
 }
 
 static int __smc_create(struct net *net, struct socket *sock, int protocol,
-			int kern, struct socket *clcsock)
+			bool kern, bool hold_net, struct socket *clcsock)
 {
 	int family = (protocol == SMCPROTO_SMC6) ? PF_INET6 : PF_INET;
 	struct smc_sock *smc;
@@ -3346,7 +3347,7 @@ static int __smc_create(struct net *net, struct socket *sock, int protocol,
 	rc = -ENOBUFS;
 	sock->ops = &smc_sock_ops;
 	sock->state = SS_UNCONNECTED;
-	sk = smc_sock_alloc(net, sock, protocol, kern);
+	sk = smc_sock_alloc(net, sock, protocol, kern, hold_net);
 	if (!sk)
 		goto out;
 
@@ -3368,9 +3369,9 @@ out:
 }
 
 static int smc_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+		      bool kern, bool hold_net)
 {
-	return __smc_create(net, sock, protocol, kern, NULL);
+	return __smc_create(net, sock, protocol, kern, hold_net, NULL);
 }
 
 static const struct net_proto_family smc_sock_family_ops = {
@@ -3405,7 +3406,7 @@ static int smc_ulp_init(struct sock *sk)
 
 	smcsock->type = SOCK_STREAM;
 	__module_get(THIS_MODULE); /* tried in __tcp_ulp_find_autoload */
-	ret = __smc_create(net, smcsock, protocol, 0, tcp);
+	ret = __smc_create(net, smcsock, protocol, false, true, tcp);
 	if (ret) {
 		sock_release(smcsock); /* module_put() which ops won't be NULL */
 		return ret;

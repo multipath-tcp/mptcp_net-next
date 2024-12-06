@@ -250,7 +250,7 @@ EXPORT_SYMBOL(inet_listen);
  */
 
 static int inet_create(struct net *net, struct socket *sock, int protocol,
-		       int kern)
+		       bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct inet_protosw *answer;

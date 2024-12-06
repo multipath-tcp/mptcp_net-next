@@ -1006,7 +1006,8 @@ struct proto unix_stream_proto = {
 #endif
 };
 
-static struct sock *unix_create1(struct net *net, struct socket *sock, int kern, int type)
+static struct sock *unix_create1(struct net *net, struct socket *sock, int type,
+				 bool kern, bool hold_net)
 {
 	struct unix_sock *u;
 	struct sock *sk;
@@ -1061,7 +1062,7 @@ err:
 }
 
 static int unix_create(struct net *net, struct socket *sock, int protocol,
-		       int kern)
+		       bool kern, bool hold_net)
 {
 	struct sock *sk;
 
@@ -1091,7 +1092,7 @@ static int unix_create(struct net *net, struct socket *sock, int protocol,
 		return -ESOCKTNOSUPPORT;
 	}
 
-	sk = unix_create1(net, sock, kern, sock->type);
+	sk = unix_create1(net, sock, sock->type, kern, hold_net);
 	if (IS_ERR(sk))
 		return PTR_ERR(sk);
 
@@ -1568,7 +1569,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	 */
 
 	/* create new sock for complete connection */
-	newsk = unix_create1(net, NULL, 0, sock->type);
+	newsk = unix_create1(net, NULL, sock->type, false, true);
 	if (IS_ERR(newsk)) {
 		err = PTR_ERR(newsk);
 		newsk = NULL;

@@ -269,7 +269,8 @@ static struct proto rfcomm_proto = {
 };
 
 static struct sock *rfcomm_sock_alloc(struct net *net, struct socket *sock,
-				      int proto, gfp_t prio, int kern)
+				      int proto, gfp_t prio,
+				      bool kern, bool hold_net)
 {
 	struct rfcomm_dlc *d;
 	struct sock *sk;
@@ -278,7 +279,7 @@ static struct sock *rfcomm_sock_alloc(struct net *net, struct socket *sock,
 	if (!d)
 		return NULL;
 
-	sk = bt_sock_alloc(net, sock, &rfcomm_proto, proto, prio, kern);
+	sk = bt_sock_alloc(net, sock, &rfcomm_proto, proto, prio, kern, hold_net);
 	if (!sk) {
 		rfcomm_dlc_free(d);
 		return NULL;
@@ -303,7 +304,7 @@ static struct sock *rfcomm_sock_alloc(struct net *net, struct socket *sock,
 }
 
 static int rfcomm_sock_create(struct net *net, struct socket *sock,
-			      int protocol, int kern)
+			      int protocol, bool kern, bool hold_net)
 {
 	struct sock *sk;
 
@@ -316,7 +317,7 @@ static int rfcomm_sock_create(struct net *net, struct socket *sock,
 
 	sock->ops = &rfcomm_sock_ops;
 
-	sk = rfcomm_sock_alloc(net, sock, protocol, GFP_ATOMIC, kern);
+	sk = rfcomm_sock_alloc(net, sock, protocol, GFP_ATOMIC, kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 
@@ -953,7 +954,8 @@ int rfcomm_connect_ind(struct rfcomm_session *s, u8 channel, struct rfcomm_dlc *
 		goto done;
 	}
 
-	sk = rfcomm_sock_alloc(sock_net(parent), NULL, BTPROTO_RFCOMM, GFP_ATOMIC, 0);
+	sk = rfcomm_sock_alloc(sock_net(parent), NULL, BTPROTO_RFCOMM, GFP_ATOMIC,
+			       false, true);
 	if (!sk)
 		goto done;
 

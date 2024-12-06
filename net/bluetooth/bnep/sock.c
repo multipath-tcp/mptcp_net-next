@@ -196,7 +196,7 @@ static struct proto bnep_proto = {
 };
 
 static int bnep_sock_create(struct net *net, struct socket *sock, int protocol,
-			    int kern)
+			    bool kern, bool hold_net)
 {
 	struct sock *sk;
 
@@ -205,7 +205,8 @@ static int bnep_sock_create(struct net *net, struct socket *sock, int protocol,
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 
-	sk = bt_sock_alloc(net, sock, &bnep_proto, protocol, GFP_ATOMIC, kern);
+	sk = bt_sock_alloc(net, sock, &bnep_proto, protocol, GFP_ATOMIC,
+			   kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

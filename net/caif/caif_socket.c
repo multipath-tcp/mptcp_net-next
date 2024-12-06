@@ -1015,7 +1015,7 @@ static void caif_sock_destructor(struct sock *sk)
 }
 
 static int caif_create(struct net *net, struct socket *sock, int protocol,
-		       int kern)
+		       bool kern, bool hold_net)
 {
 	struct sock *sk = NULL;
 	struct caifsock *cf_sk = NULL;

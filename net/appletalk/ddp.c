@@ -1030,7 +1030,7 @@ static struct proto ddp_proto = {
  * set the state.
  */
 static int atalk_create(struct net *net, struct socket *sock, int protocol,
-			int kern)
+			bool kern, bool hold_net)
 {
 	struct sock *sk;
 	int rc = -ESOCKTNOSUPPORT;

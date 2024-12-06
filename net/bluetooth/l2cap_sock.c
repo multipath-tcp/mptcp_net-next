@@ -45,7 +45,8 @@ static struct bt_sock_list l2cap_sk_list = {
 static const struct proto_ops l2cap_sock_ops;
 static void l2cap_sock_init(struct sock *sk, struct sock *parent);
 static struct sock *l2cap_sock_alloc(struct net *net, struct socket *sock,
-				     int proto, gfp_t prio, int kern);
+				     int proto, gfp_t prio,
+				     bool kern, bool hold_net);
 static void l2cap_sock_cleanup_listen(struct sock *parent);
 
 bool l2cap_is_socket(struct socket *sock)
@@ -1466,7 +1467,7 @@ static struct l2cap_chan *l2cap_sock_new_connection_cb(struct l2cap_chan *chan)
 	}
 
 	sk = l2cap_sock_alloc(sock_net(parent), NULL, BTPROTO_L2CAP,
-			      GFP_ATOMIC, 0);
+			      GFP_ATOMIC, false, true);
 	if (!sk) {
 		release_sock(parent);
 		return NULL;
@@ -1869,12 +1870,13 @@ static struct proto l2cap_proto = {
 };
 
 static struct sock *l2cap_sock_alloc(struct net *net, struct socket *sock,
-				     int proto, gfp_t prio, int kern)
+				     int proto, gfp_t prio,
+				     bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct l2cap_chan *chan;
 
-	sk = bt_sock_alloc(net, sock, &l2cap_proto, proto, prio, kern);
+	sk = bt_sock_alloc(net, sock, &l2cap_proto, proto, prio, kern, hold_net);
 	if (!sk)
 		return NULL;
 
@@ -1898,7 +1900,7 @@ static struct sock *l2cap_sock_alloc(struct net *net, struct socket *sock,
 }
 
 static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol,
-			     int kern)
+			     bool kern, bool hold_net)
 {
 	struct sock *sk;
 
@@ -1915,7 +1917,7 @@ static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol,
 
 	sock->ops = &l2cap_sock_ops;
 
-	sk = l2cap_sock_alloc(net, sock, protocol, GFP_ATOMIC, kern);
+	sk = l2cap_sock_alloc(net, sock, protocol, GFP_ATOMIC, kern, hold_net);
 	if (!sk)
 		return -ENOMEM;
 

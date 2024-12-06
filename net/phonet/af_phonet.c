@@ -48,7 +48,7 @@ static inline void phonet_proto_put(const struct phonet_protocol *pp)
 /* protocol family functions */
 
 static int pn_socket_create(struct net *net, struct socket *sock, int protocol,
-			    int kern)
+			    bool kern, bool hold_net)
 {
 	struct sock *sk;
 	struct pn_sock *pn;

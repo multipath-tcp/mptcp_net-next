@@ -1778,7 +1778,7 @@ static const struct proto_ops kcm_seqpacket_ops = {
 
 /* Create proto operation for kcm sockets */
 static int kcm_create(struct net *net, struct socket *sock,
-		      int protocol, int kern)
+		      int protocol, bool kern, bool hold_net)
 {
 	struct kcm_net *knet = net_generic(net, kcm_net_id);
 	struct sock *sk;

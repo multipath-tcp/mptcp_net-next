@@ -34,7 +34,7 @@
 #endif
 
 static int svc_create(struct net *net, struct socket *sock, int protocol,
-		      int kern);
+		      bool kern, bool hold_net);
 
 /*
  * Note: since all this is still nicely synchronized with the signaling demon,
@@ -336,7 +336,7 @@ static int svc_accept(struct socket *sock, struct socket *newsock,
 
 	lock_sock(sk);
 
-	error = svc_create(sock_net(sk), newsock, 0, arg->kern);
+	error = svc_create(sock_net(sk), newsock, 0, arg->kern, !arg->kern);
 	if (error)
 		goto out;
 
@@ -658,7 +658,7 @@ static const struct proto_ops svc_proto_ops = {
 
 
 static int svc_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+		      bool kern, bool hold_net)
 {
 	int error;
 
@@ -666,7 +666,7 @@ static int svc_create(struct net *net, struct socket *sock, int protocol,
 		return -EAFNOSUPPORT;
 
 	sock->ops = &svc_proto_ops;
-	error = vcc_create(net, sock, protocol, AF_ATMSVC, kern);
+	error = vcc_create(net, sock, protocol, AF_ATMSVC, kern, hold_net);
 	if (error)
 		return error;
 	ATM_SD(sock)->local.sas_family = AF_ATMSVC;

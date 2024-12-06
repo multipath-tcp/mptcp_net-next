@@ -198,7 +198,7 @@ static struct proto cmtp_proto = {
 };
 
 static int cmtp_sock_create(struct net *net, struct socket *sock, int protocol,
-			    int kern)
+			    bool kern, bool hold_net)
 {
 	struct sock *sk;
 

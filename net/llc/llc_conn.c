@@ -761,10 +761,11 @@ static struct sock *llc_create_incoming_sock(struct sock *sk,
 					     struct llc_addr *saddr,
 					     struct llc_addr *daddr)
 {
-	struct sock *newsk = llc_sk_alloc(sock_net(sk), sk->sk_family, GFP_ATOMIC,
-					  sk->sk_prot, 0);
 	struct llc_sock *newllc, *llc = llc_sk(sk);
+	struct sock *newsk;
 
+	newsk = llc_sk_alloc(sock_net(sk), sk->sk_family, GFP_ATOMIC,
+			     sk->sk_prot, false, true);
 	if (!newsk)
 		goto out;
 	newllc = llc_sk(newsk);
@@ -923,11 +924,13 @@ static void llc_sk_init(struct sock *sk)
  *	@priority: for allocation (%GFP_KERNEL, %GFP_ATOMIC, etc)
  *	@prot: struct proto associated with this new sock instance
  *	@kern: is this to be a kernel socket?
+ *	@hold_net: hold netns refcnt or not
  *
  *	Allocates a LLC sock and initializes it. Returns the new LLC sock
  *	or %NULL if there's no memory available for one
  */
-struct sock *llc_sk_alloc(struct net *net, int family, gfp_t priority, struct proto *prot, int kern)
+struct sock *llc_sk_alloc(struct net *net, int family, gfp_t priority,
+			  struct proto *prot, bool kern, bool hold_net)
 {
 	struct sock *sk = sk_alloc(net, family, priority, prot, kern);
 
