@@ -387,13 +387,13 @@ void smc_sk_init(struct net *net, struct sock *sk, int protocol)
 }
 
 static struct sock *smc_sock_alloc(struct net *net, struct socket *sock,
-				   int protocol)
+				   int protocol, int kern)
 {
 	struct proto *prot;
 	struct sock *sk;
 
 	prot = (protocol == SMCPROTO_SMC6) ? &smc_proto6 : &smc_proto;
-	sk = sk_alloc(net, PF_SMC, GFP_KERNEL, prot, 0);
+	sk = sk_alloc(net, PF_SMC, GFP_KERNEL, prot, kern);
 	if (!sk)
 		return NULL;
 
@@ -1712,7 +1712,7 @@ static int smc_clcsock_accept(struct smc_sock *lsmc, struct smc_sock **new_smc)
 	int rc = -EINVAL;
 
 	release_sock(lsk);
-	new_sk = smc_sock_alloc(sock_net(lsk), NULL, lsk->sk_protocol);
+	new_sk = smc_sock_alloc(sock_net(lsk), NULL, lsk->sk_protocol, 0);
 	if (!new_sk) {
 		rc = -ENOMEM;
 		lsk->sk_err = ENOMEM;
@@ -3346,7 +3346,7 @@ static int __smc_create(struct net *net, struct socket *sock, int protocol,
 	rc = -ENOBUFS;
 	sock->ops = &smc_sock_ops;
 	sock->state = SS_UNCONNECTED;
-	sk = smc_sock_alloc(net, sock, protocol);
+	sk = smc_sock_alloc(net, sock, protocol, kern);
 	if (!sk)
 		goto out;
 
@@ -3405,7 +3405,7 @@ static int smc_ulp_init(struct sock *sk)
 
 	smcsock->type = SOCK_STREAM;
 	__module_get(THIS_MODULE); /* tried in __tcp_ulp_find_autoload */
-	ret = __smc_create(net, smcsock, protocol, 1, tcp);
+	ret = __smc_create(net, smcsock, protocol, 0, tcp);
 	if (ret) {
 		sock_release(smcsock); /* module_put() which ops won't be NULL */
 		return ret;
