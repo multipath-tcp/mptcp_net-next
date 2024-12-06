@@ -251,7 +251,7 @@ int sock_wake_async(struct socket_wq *sk_wq, int how, int band);
 int sock_register(const struct net_proto_family *fam);
 void sock_unregister(int family);
 bool sock_is_registered(int family);
-int sock_create(int family, int type, int proto, struct socket **res);
+int sock_create_user(int family, int type, int proto, struct socket **res);
 int sock_create_net(struct net *net, int family, int type, int proto,
 		    struct socket **res);
 int sock_create_kern(struct net *net, int family, int type, int proto, struct socket **res);

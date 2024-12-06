@@ -1606,22 +1606,31 @@ out_release:
 }
 
 /**
- *	sock_create - creates a socket
- *	@family: protocol family (AF_INET, ...)
- *	@type: communication type (SOCK_STREAM, ...)
- *	@protocol: protocol (0, ...)
- *	@res: new socket
+ * sock_create_user - creates a socket for userspace
  *
- *	A wrapper around __sock_create().
- *	Returns 0 or an error. This function internally uses GFP_KERNEL.
+ * @family: protocol family (AF_INET, ...)
+ * @type: communication type (SOCK_STREAM, ...)
+ * @protocol: protocol (0, ...)
+ * @res: new socket
+ *
+ * Creates a new socket and assigns it to @res, passing through LSM.
+ *
+ * The socket is for userspace and should be exposed via a file
+ * descriptor and BPF hooks (see inet_create(), inet_release(), etc).
+ *
+ * The number of sockets is available in the first line of
+ * /proc/net/sockstat.
+ *
+ * Context: Process context. This function internally uses GFP_KERNEL.
+ * Return: 0 or an error.
  */
 
-int sock_create(int family, int type, int protocol, struct socket **res)
+int sock_create_user(int family, int type, int protocol, struct socket **res)
 {
 	return __sock_create(current->nsproxy->net_ns, family, type, protocol,
 			     res, false, true);
 }
-EXPORT_SYMBOL(sock_create);
+EXPORT_SYMBOL(sock_create_user);
 
 /**
  * sock_create_net - creates a socket for kernel space
@@ -1689,7 +1698,7 @@ static struct socket *__sys_socket_create(int family, int type, int protocol)
 		return ERR_PTR(-EINVAL);
 	type &= SOCK_TYPE_MASK;
 
-	retval = sock_create(family, type, protocol, &sock);
+	retval = sock_create_user(family, type, protocol, &sock);
 	if (retval < 0)
 		return ERR_PTR(retval);
 
@@ -1799,11 +1808,11 @@ int __sys_socketpair(int family, int type, int protocol, int __user *usockvec)
 	 * supports the socketpair call.
 	 */
 
-	err = sock_create(family, type, protocol, &sock1);
+	err = sock_create_user(family, type, protocol, &sock1);
 	if (unlikely(err < 0))
 		goto out;
 
-	err = sock_create(family, type, protocol, &sock2);
+	err = sock_create_user(family, type, protocol, &sock2);
 	if (unlikely(err < 0)) {
 		sock_release(sock1);
 		goto out;
