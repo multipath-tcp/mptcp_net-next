@@ -4887,7 +4887,7 @@ static struct sock *sctp_accept(struct sock *sk, struct proto_accept_arg *arg)
 	 */
 	asoc = list_entry(ep->asocs.next, struct sctp_association, asocs);
 
-	newsk = sp->pf->create_accept_sk(sk, asoc, arg->kern);
+	newsk = sp->pf->create_accept_sk(sk, asoc, arg);
 	if (!newsk) {
 		error = -ENOMEM;
 		goto out;

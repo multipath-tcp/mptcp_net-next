@@ -520,6 +520,7 @@ static void __pvcalls_back_accept(struct work_struct *work)
 	struct proto_accept_arg arg = {
 		.flags = O_NONBLOCK,
 		.kern = true,
+		.hold_net = false,
 	};
 	struct sock_mapping *map;
 	struct pvcalls_ioworker *iow;

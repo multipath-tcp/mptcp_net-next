@@ -1786,6 +1786,8 @@ static int o2net_accept_one(struct socket *sock, int *more)
 	struct o2net_sock_container *sc = NULL;
 	struct proto_accept_arg arg = {
 		.flags = O_NONBLOCK,
+		.kern = false,
+		.hold_net = true,
 	};
 	struct o2net_node *nn;
 	unsigned int nofs_flag;

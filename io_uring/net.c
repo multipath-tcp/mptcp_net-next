@@ -1559,6 +1559,8 @@ int io_accept(struct io_kiocb *req, unsigned int issue_flags)
 	bool fixed = !!accept->file_slot;
 	struct proto_accept_arg arg = {
 		.flags = force_nonblock ? O_NONBLOCK : 0,
+		.kern = false,
+		.hold_net = true,
 	};
 	struct file *file;
 	unsigned cflags;

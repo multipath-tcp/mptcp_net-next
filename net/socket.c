@@ -1971,7 +1971,10 @@ out_fd:
 static int __sys_accept4_file(struct file *file, struct sockaddr __user *upeer_sockaddr,
 			      int __user *upeer_addrlen, int flags)
 {
-	struct proto_accept_arg arg = { };
+	struct proto_accept_arg arg = {
+		.kern = false,
+		.hold_net = true,
+	};
 	struct file *newfile;
 	int newfd;
 
@@ -3586,6 +3589,7 @@ int kernel_accept(struct socket *sock, struct socket **newsock, int flags)
 	struct proto_accept_arg arg = {
 		.flags = flags,
 		.kern = true,
+		.hold_net = false,
 	};
 	int err;
 
