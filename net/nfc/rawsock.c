@@ -321,7 +321,8 @@ static void rawsock_destruct(struct sock *sk)
 }
 
 static int rawsock_create(struct net *net, struct socket *sock,
-			  const struct nfc_protocol *nfc_proto, int kern)
+			  const struct nfc_protocol *nfc_proto,
+			  bool kern, bool hold_net)
 {
 	struct sock *sk;
 
