@@ -2232,6 +2232,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 
 		sock_lock_init(sk);
 
+		DEBUG_NET_WARN_ON_ONCE(hold_net && !net_initialized(net));
 		sk->sk_net_refcnt = hold_net;
 		if (likely(sk->sk_net_refcnt))
 			get_net_track(net, &sk->ns_tracker, priority);
