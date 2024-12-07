@@ -1783,48 +1783,19 @@ int mptcp_pm_nl_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 	return ret;
 }
 
-int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
-			  struct netlink_callback *cb,
+int mptcp_pm_nl_dump_addr(mptcp_pm_addr_id_bitmap_t *bitmap,
 			  const struct genl_info *info)
 {
 	struct net *net = genl_info_net(info);
-	struct mptcp_pm_addr_entry *entry;
 	struct pm_nl_pernet *pernet;
-	int id = cb->args[0];
-	void *hdr;
-	int i;
 
 	pernet = pm_nl_get_pernet(net);
 
 	rcu_read_lock();
-	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
-		if (test_bit(i, pernet->id_bitmap)) {
-			entry = __lookup_addr_by_id(pernet, i);
-			if (!entry)
-				break;
-
-			if (entry->addr.id <= id)
-				continue;
-
-			hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).portid,
-					  cb->nlh->nlmsg_seq, &mptcp_genl_family,
-					  NLM_F_MULTI, MPTCP_PM_CMD_GET_ADDR);
-			if (!hdr)
-				break;
-
-			if (mptcp_nl_fill_addr(msg, entry) < 0) {
-				genlmsg_cancel(msg, hdr);
-				break;
-			}
-
-			id = entry->addr.id;
-			genlmsg_end(msg, hdr);
-		}
-	}
+	bitmap_copy(bitmap->map, pernet->id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 	rcu_read_unlock();
 
-	cb->args[0] = id;
-	return msg->len;
+	return 0;
 }
 
 static int parse_limit(struct genl_info *info, int id, unsigned int *limit)

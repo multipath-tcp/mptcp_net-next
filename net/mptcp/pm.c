@@ -485,20 +485,54 @@ fail:
 	return ret;
 }
 
-static int mptcp_pm_dump_addr(struct sk_buff *msg, struct netlink_callback *cb,
+static int mptcp_pm_dump_addr(mptcp_pm_addr_id_bitmap_t *bitmap,
 			      const struct genl_info *info)
 {
 	if (info->attrs[MPTCP_PM_ATTR_TOKEN])
-		return mptcp_userspace_pm_dump_addr(msg, cb, info);
-	return mptcp_pm_nl_dump_addr(msg, cb, info);
+		return mptcp_userspace_pm_dump_addr(bitmap, info);
+	return mptcp_pm_nl_dump_addr(bitmap, info);
 }
 
 int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
 				struct netlink_callback *cb)
 {
 	const struct genl_info *info = genl_info_dump(cb);
+	mptcp_pm_addr_id_bitmap_t *bitmap;
+	struct mptcp_pm_addr_entry entry;
+	int id = cb->args[0];
+	void *hdr;
+	int i;
 
-	return mptcp_pm_dump_addr(msg, cb, info);
+	bitmap = (mptcp_pm_addr_id_bitmap_t *)cb->ctx;
+
+	mptcp_pm_dump_addr(bitmap, info);
+
+	for (i = id; i < MPTCP_PM_MAX_ADDR_ID + 1; i++) {
+		if (test_bit(i, bitmap->map)) {
+			if (mptcp_pm_get_addr(i, &entry, info))
+				break;
+
+			if (id && entry.addr.id <= id)
+				continue;
+
+			hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).portid,
+					  cb->nlh->nlmsg_seq, &mptcp_genl_family,
+					  NLM_F_MULTI, MPTCP_PM_CMD_GET_ADDR);
+			if (!hdr)
+				break;
+
+			if (mptcp_nl_fill_addr(msg, &entry) < 0) {
+				genlmsg_cancel(msg, hdr);
+				break;
+			}
+
+			id = entry.addr.id;
+			genlmsg_end(msg, hdr);
+		}
+	}
+
+	cb->args[0] = id;
+	return msg->len;
 }
 
 static int mptcp_pm_set_flags(struct sk_buff *skb, struct genl_info *info)

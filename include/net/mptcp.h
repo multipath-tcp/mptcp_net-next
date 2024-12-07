@@ -120,6 +120,13 @@ struct mptcp_sched_ops {
 	void (*release)(struct mptcp_sock *msk);
 } ____cacheline_aligned_in_smp;
 
+/* max value of mptcp_addr_info.id */
+#define MPTCP_PM_MAX_ADDR_ID		U8_MAX
+
+typedef struct {
+	DECLARE_BITMAP(map, MPTCP_PM_MAX_ADDR_ID + 1);
+} mptcp_pm_addr_id_bitmap_t;
+
 #ifdef CONFIG_MPTCP
 void mptcp_init(void);
 
