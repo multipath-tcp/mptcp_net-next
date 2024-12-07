@@ -485,19 +485,20 @@ fail:
 	return ret;
 }
 
-static int mptcp_pm_dump_addr(struct sk_buff *msg, struct netlink_callback *cb)
+static int mptcp_pm_dump_addr(struct sk_buff *msg, struct netlink_callback *cb,
+			      const struct genl_info *info)
 {
-	const struct genl_info *info = genl_info_dump(cb);
-
 	if (info->attrs[MPTCP_PM_ATTR_TOKEN])
-		return mptcp_userspace_pm_dump_addr(msg, cb);
-	return mptcp_pm_nl_dump_addr(msg, cb);
+		return mptcp_userspace_pm_dump_addr(msg, cb, info);
+	return mptcp_pm_nl_dump_addr(msg, cb, info);
 }
 
 int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
 				struct netlink_callback *cb)
 {
-	return mptcp_pm_dump_addr(msg, cb);
+	const struct genl_info *info = genl_info_dump(cb);
+
+	return mptcp_pm_dump_addr(msg, cb, info);
 }
 
 static int mptcp_pm_set_flags(struct sk_buff *skb, struct genl_info *info)

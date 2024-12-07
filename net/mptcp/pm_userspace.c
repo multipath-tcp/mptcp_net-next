@@ -615,12 +615,12 @@ set_flags_err:
 }
 
 int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
-				 struct netlink_callback *cb)
+				 struct netlink_callback *cb,
+				 const struct genl_info *info)
 {
 	struct id_bitmap {
 		DECLARE_BITMAP(map, MPTCP_PM_MAX_ADDR_ID + 1);
 	} *bitmap;
-	const struct genl_info *info = genl_info_dump(cb);
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
 	int ret = -EINVAL;
