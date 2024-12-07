@@ -1763,11 +1763,14 @@ nla_put_failure:
 }
 
 int mptcp_pm_nl_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
-			 struct genl_info *info)
+			 const struct genl_info *info)
 {
-	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
+	struct net *net = genl_info_net(info);
 	struct mptcp_pm_addr_entry *entry;
+	struct pm_nl_pernet *pernet;
 	int ret = -EINVAL;
+
+	pernet = pm_nl_get_pernet(net);
 
 	rcu_read_lock();
 	entry = __lookup_addr_by_id(pernet, id);
