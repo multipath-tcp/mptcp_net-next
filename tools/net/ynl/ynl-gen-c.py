@@ -2706,7 +2706,8 @@ def find_kernel_root(full_path):
 
 def main():
     parser = argparse.ArgumentParser(description='Netlink simple parsing generator')
-    parser.add_argument('--mode', dest='mode', type=str, required=True)
+    parser.add_argument('--mode', dest='mode', type=str, required=True,
+                        choices=('user', 'kernel', 'uapi'))
     parser.add_argument('--spec', dest='spec', type=str, required=True)
     parser.add_argument('--header', dest='header', action='store_true', default=None)
     parser.add_argument('--source', dest='header', action='store_false')
@@ -2760,7 +2761,10 @@ def main():
         cw.p('#define ' + hdr_prot)
         cw.nl()
 
-    hdr_file=os.path.basename(args.out_file[:-2]) + ".h"
+    if args.out_file:
+        hdr_file = os.path.basename(args.out_file[:-2]) + ".h"
+    else:
+        hdr_file = "generated_header_file.h"
 
     if args.mode == 'kernel':
         cw.p('#include <net/netlink.h>')
