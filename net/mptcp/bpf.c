@@ -21,6 +21,26 @@ static struct bpf_struct_ops bpf_mptcp_sched_ops;
 static const struct btf_type *mptcp_sock_type, *mptcp_subflow_type __read_mostly;
 static u32 mptcp_sock_id, mptcp_subflow_id;
 
+BPF_CALL_1(bpf_mptcp_send_info_to_ssk, struct subflow_send_info *, info)
+{
+	BTF_TYPE_EMIT(struct sock);
+
+	if (info && info->ssk && sk_fullsock(info->ssk) &&
+	    info->ssk->sk_protocol == IPPROTO_TCP &&
+	    sk_is_mptcp(info->ssk))
+		return (unsigned long)info->ssk;
+
+	return (unsigned long)NULL;
+}
+
+static const struct bpf_func_proto bpf_mptcp_send_info_to_ssk_proto = {
+	.func		= bpf_mptcp_send_info_to_ssk,
+	.gpl_only	= false,
+	.ret_type	= RET_PTR_TO_BTF_ID_OR_NULL,
+	.arg1_type	= ARG_PTR_TO_STACK,
+	.ret_btf_id	= &btf_sock_ids[BTF_SOCK_TYPE_SOCK],
+};
+
 static const struct bpf_func_proto *
 bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
 			       const struct bpf_prog *prog)
@@ -34,6 +54,8 @@ bpf_mptcp_sched_get_func_proto(enum bpf_func_id func_id,
 		return &bpf_skc_to_tcp6_sock_proto;
 	case BPF_FUNC_skc_to_tcp_sock:
 		return &bpf_skc_to_tcp_sock_proto;
+	case BPF_FUNC_mptcp_send_info_to_ssk:
+		return &bpf_mptcp_send_info_to_ssk_proto;
 	default:
 		return bpf_base_func_proto(func_id, prog);
 	}

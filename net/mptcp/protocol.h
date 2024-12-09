@@ -598,6 +598,11 @@ mptcp_subflow_ctx_reset(struct mptcp_subflow_context *subflow)
 	WRITE_ONCE(subflow->local_id, -1);
 }
 
+struct subflow_send_info {
+	struct sock *ssk;
+	u64 linger_time;
+};
+
 /* Convert reset reasons in MPTCP to enum sk_rst_reason type */
 static inline enum sk_rst_reason
 sk_rst_convert_mptcp_reason(u32 reason)
