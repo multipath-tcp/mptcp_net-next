@@ -1527,7 +1527,7 @@ static void rswitch_ether_port_deinit_all(struct rswitch_private *priv)
 {
 	unsigned int i;
 
-	for (i = 0; i < RSWITCH_NUM_PORTS; i++) {
+	rswitch_for_each_enabled_port(priv, i) {
 		phy_exit(priv->rdev[i]->serdes);
 		rswitch_ether_port_deinit_one(priv->rdev[i]);
 	}
@@ -1900,9 +1900,6 @@ static int rswitch_device_alloc(struct rswitch_private *priv, unsigned int index
 	err = rswitch_etha_get_params(rdev);
 	if (err < 0)
 		goto out_get_params;
-
-	if (rdev->priv->gwca.speed < rdev->etha->speed)
-		rdev->priv->gwca.speed = rdev->etha->speed;
 
 	err = rswitch_rxdmac_alloc(ndev);
 	if (err < 0)
