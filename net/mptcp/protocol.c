@@ -1387,11 +1387,6 @@ out:
 					 sizeof(struct ipv6hdr) - \
 					 sizeof(struct frag_hdr))
 
-struct subflow_send_info {
-	struct sock *ssk;
-	u64 linger_time;
-};
-
 void mptcp_subflow_set_active(struct mptcp_subflow_context *subflow)
 {
 	if (!subflow->stale)
