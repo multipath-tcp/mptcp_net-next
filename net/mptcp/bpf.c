@@ -237,12 +237,20 @@ bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 			   struct mptcp_sock *msk)
 {
 	struct bpf_iter_mptcp_subflow_kern *kit = (void *)it;
+	struct sock *sk = (struct sock *)msk;
+
+	BUILD_BUG_ON(sizeof(struct bpf_iter_mptcp_subflow_kern) >
+		     sizeof(struct bpf_iter_mptcp_subflow));
+	BUILD_BUG_ON(__alignof__(struct bpf_iter_mptcp_subflow_kern) !=
+		     __alignof__(struct bpf_iter_mptcp_subflow));
 
 	kit->msk = msk;
 	if (!msk)
 		return -EINVAL;
 
-	msk_owned_by_me(msk);
+	if (!sock_owned_by_user_nocheck(sk) &&
+	    !spin_is_locked(&sk->sk_lock.slock))
+		return -EINVAL;
 
 	kit->pos = &msk->conn_list;
 	return 0;
