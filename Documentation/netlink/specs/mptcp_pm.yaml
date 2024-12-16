@@ -375,7 +375,7 @@ operations:
            - loc-id
     -
       name: subflow-create
-      doc: todo
+      doc: Create subflow
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
@@ -387,7 +387,7 @@ operations:
             - addr-remote
     -
       name: subflow-destroy
-      doc: todo
+      doc: Destroy subflow
       attribute-set: attr
       dont-validate: [ strict ]
       flags: [ uns-admin-perm ]
