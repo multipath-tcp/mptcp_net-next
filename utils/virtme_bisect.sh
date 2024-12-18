@@ -48,7 +48,13 @@ fi
 
 trap 'exit_trap' EXIT
 
-VIRTME_NO_INTERACTIVE=1 VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 ./.virtme.sh "auto-${MODE}" &
+export VIRTME_NO_INTERACTIVE=1
+
+VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 INPUT_CLEAN=1 ./.virtme.sh "build" "${MODE}" "${@}" &
+PID_VIRTME=$!
+wait ${PID_VIRTME} || exit 125 # skip
+
+./.virtme.sh "vm-auto" "${MODE}" &
 PID_VIRTME=$!
 
 if [ "${STRESS}" = 1 ]; then
