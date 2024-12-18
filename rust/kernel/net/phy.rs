@@ -837,7 +837,7 @@ impl DeviceMask {
 ///         [::kernel::net::phy::create_phy_driver::<PhySample>()];
 ///
 ///     impl ::kernel::Module for Module {
-///         fn init(module: &'static ThisModule) -> Result<Self> {
+///         fn init(module: &'static ::kernel::ThisModule) -> Result<Self> {
 ///             let drivers = unsafe { &mut DRIVERS };
 ///             let mut reg = ::kernel::net::phy::Registration::register(
 ///                 module,
@@ -860,7 +860,7 @@ impl DeviceMask {
 /// ];
 /// #[cfg(MODULE)]
 /// #[no_mangle]
-/// static __mod_mdio__phydev_device_table: [::kernel::bindings::mdio_device_id; 2] = _DEVICE_TABLE;
+/// static __mod_device_table__mdio__phydev: [::kernel::bindings::mdio_device_id; 2] = _DEVICE_TABLE;
 /// ```
 #[macro_export]
 macro_rules! module_phy_driver {
@@ -883,7 +883,7 @@ macro_rules! module_phy_driver {
 
         #[cfg(MODULE)]
         #[no_mangle]
-        static __mod_mdio__phydev_device_table: [$crate::bindings::mdio_device_id;
+        static __mod_device_table__mdio__phydev: [$crate::bindings::mdio_device_id;
             $crate::module_phy_driver!(@count_devices $($dev),+) + 1] = _DEVICE_TABLE;
     };
 
@@ -903,7 +903,7 @@ macro_rules! module_phy_driver {
                 [$($crate::net::phy::create_phy_driver::<$driver>()),+];
 
             impl $crate::Module for Module {
-                fn init(module: &'static ThisModule) -> Result<Self> {
+                fn init(module: &'static $crate::ThisModule) -> Result<Self> {
                     // SAFETY: The anonymous constant guarantees that nobody else can access
                     // the `DRIVERS` static. The array is used only in the C side.
                     let drivers = unsafe { &mut DRIVERS };
