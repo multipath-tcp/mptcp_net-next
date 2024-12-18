@@ -8,8 +8,6 @@ is_net() {
    [ "$(b4 prep --show-info prefixes 2>/dev/null)" = "net" ]
 }
 
-trap 'exit_trap' EXIT
-
 if is_stable || is_net; then
    SUFFIX=$(make kernelversion | cut -d. -f1-2)
    PACKETDRILL_STABLE=1
