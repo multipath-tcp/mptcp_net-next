@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/bash -ex
 
 : "${MODE:=normal}"
 : "${STRESS:=0}"
@@ -19,7 +19,7 @@ stress() { local i=0 pid nproc2
 	# We can also renice 20 qemu for even more impact
 
 	echo -e "\n\n=== Stress in progress ($i -- ${pid}) ===\n"
-	wait ${pid}
+	wait ${pid} || true
 }
 
 exit_trap() {
@@ -29,7 +29,7 @@ exit_trap() {
 
 	docker ps --filter ancestor=mptcp/mptcp-upstream-virtme-docker --format='{{.ID}}' | xargs -r docker stop
 	jobs -p | xargs -r kill
-	[ "${STRESS}" = 1  ] && pkill stress-ng
+	[ "${STRESS}" = 1  ] && { pkill stress-ng || true; }
 	sleep 1
 
 	[ "${STASH}" = 1 ] && git stash
@@ -41,7 +41,7 @@ if [ "${STASH}" = 1 ]; then
 	if ! git stash pop; then
 		git --no-pager diff
 		echo "========= Conflict with git stash pop: skip ========="
-		git restore --staged --worktree .
+		git restore --staged --worktree . || true
 		exit 125 # skip
 	fi
 fi
