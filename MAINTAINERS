@@ -3608,6 +3608,7 @@ F:	drivers/phy/qualcomm/phy-ath79-usb.c
 
 ATHEROS ATH GENERIC UTILITIES
 M:	Kalle Valo <kvalo@kernel.org>
+M:	Jeff Johnson <jjohnson@kernel.org>
 L:	linux-wireless@vger.kernel.org
 S:	Supported
 F:	drivers/net/wireless/ath/*
@@ -3893,7 +3894,7 @@ W:	http://www.baycom.org/~tom/ham/ham.html
 F:	drivers/net/hamradio/baycom*
 
 BCACHE (BLOCK LAYER CACHE)
-M:	Coly Li <colyli@suse.de>
+M:	Coly Li <colyli@kernel.org>
 M:	Kent Overstreet <kent.overstreet@linux.dev>
 L:	linux-bcache@vger.kernel.org
 S:	Maintained
@@ -8453,7 +8454,7 @@ F:	include/video/s1d13xxxfb.h
 EROFS FILE SYSTEM
 M:	Gao Xiang <xiang@kernel.org>
 M:	Chao Yu <chao@kernel.org>
-R:	Yue Hu <huyue2@coolpad.com>
+R:	Yue Hu <zbestahu@gmail.com>
 R:	Jeffle Xu <jefflexu@linux.alibaba.com>
 R:	Sandeep Dhavale <dhavale@google.com>
 L:	linux-erofs@lists.ozlabs.org
