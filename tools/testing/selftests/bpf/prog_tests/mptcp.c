@@ -726,12 +726,22 @@ static void test_red(void)
 static void test_burst(void)
 {
 	struct mptcp_bpf_burst *skel;
+	int err;
 
-	skel = mptcp_bpf_burst__open_and_load();
-	if (!ASSERT_OK_PTR(skel, "open_and_load: burst"))
+	skel = mptcp_bpf_burst__open();
+	if (!ASSERT_OK_PTR(skel, "open: burst"))
 		return;
 
+	err = bpf_program__set_flags(skel->progs.bpf_burst_get_retrans,
+				     BPF_F_SLEEPABLE);
+	if (!ASSERT_OK(err, "set sleepable flags"))
+		goto skel_destroy;
+
+	if (!ASSERT_OK(mptcp_bpf_burst__load(skel), "load: burst"))
+		goto skel_destroy;
+
 	test_bpf_sched(skel->obj, "burst", WITH_DATA, WITH_DATA);
+skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
