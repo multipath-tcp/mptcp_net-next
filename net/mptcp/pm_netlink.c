@@ -1878,8 +1878,9 @@ static int parse_limit(struct genl_info *info, int id, unsigned int *limit)
 
 	*limit = nla_get_u32(attr);
 	if (*limit > MPTCP_PM_ADDR_MAX) {
-		NL_SET_ERR_MSG_ATTR(info->extack, attr,
-				    "limit greater than maximum");
+		NL_SET_ERR_MSG_ATTR_FMT(info->extack, attr,
+					"limit greater than maximum (%u)",
+					MPTCP_PM_ADDR_MAX);
 		return -EINVAL;
 	}
 	return 0;
@@ -2008,7 +2009,7 @@ int mptcp_pm_nl_set_flags(struct sk_buff *skb, struct genl_info *info)
 		lookup_by_id = 1;
 		if (!addr.addr.id) {
 			NL_SET_ERR_MSG_ATTR(info->extack, attr,
-					    "missing required inputs");
+					    "missing address ID");
 			return -EOPNOTSUPP;
 		}
 	}
