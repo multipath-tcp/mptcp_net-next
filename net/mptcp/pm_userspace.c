@@ -577,6 +577,7 @@ int mptcp_userspace_pm_set_flags(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
+	u8 lookup_by_id = 0;
 	int ret = -EINVAL;
 	struct sock *sk;
 	u8 bkup = 0;
@@ -592,10 +593,13 @@ int mptcp_userspace_pm_set_flags(struct sk_buff *skb, struct genl_info *info)
 		goto set_flags_err;
 
 	if (loc.addr.family == AF_UNSPEC) {
-		NL_SET_ERR_MSG_ATTR(info->extack, attr,
-				    "invalid local address family");
-		ret = -EINVAL;
-		goto set_flags_err;
+		lookup_by_id = 1;
+		if (!loc.addr.id) {
+			NL_SET_ERR_MSG_ATTR(info->extack, attr,
+					    "missing address ID");
+			ret = -EOPNOTSUPP;
+			goto set_flags_err;
+		}
 	}
 
 	if (attr_rem) {
@@ -615,17 +619,22 @@ int mptcp_userspace_pm_set_flags(struct sk_buff *skb, struct genl_info *info)
 		bkup = 1;
 
 	spin_lock_bh(&msk->pm.lock);
-	entry = mptcp_userspace_pm_lookup_addr(msk, &loc.addr);
-	if (entry) {
-		if (bkup)
-			entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
-		else
-			entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
+	entry = lookup_by_id ? mptcp_userspace_pm_lookup_addr_by_id(msk, loc.addr.id) :
+			       mptcp_userspace_pm_lookup_addr(msk, &loc.addr);
+	if (!entry) {
+		spin_unlock_bh(&msk->pm.lock);
+		ret = -EINVAL;
+		goto set_flags_err;
 	}
+
+	if (bkup)
+		entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
+	else
+		entry->flags &= ~MPTCP_PM_ADDR_FLAG_BACKUP;
 	spin_unlock_bh(&msk->pm.lock);
 
 	lock_sock(sk);
-	ret = mptcp_pm_nl_mp_prio_send_ack(msk, &loc.addr, &rem.addr, bkup);
+	ret = mptcp_pm_nl_mp_prio_send_ack(msk, &entry->addr, &rem.addr, bkup);
 	release_sock(sk);
 
 set_flags_err:
