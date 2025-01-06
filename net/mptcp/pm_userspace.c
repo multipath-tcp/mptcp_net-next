@@ -572,9 +572,9 @@ destroy_err:
 int mptcp_userspace_pm_set_flags(struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry loc = { .addr = { .family = AF_UNSPEC }, };
-	struct mptcp_pm_addr_entry rem = { .addr = { .family = AF_UNSPEC }, };
 	struct nlattr *attr_rem = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
+	struct mptcp_addr_info rem = { .family = AF_UNSPEC, };
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
 	u8 lookup_by_id = 0;
@@ -603,11 +603,11 @@ int mptcp_userspace_pm_set_flags(struct genl_info *info)
 	}
 
 	if (attr_rem) {
-		ret = mptcp_pm_parse_entry(attr_rem, info, false, &rem);
+		ret = mptcp_pm_parse_addr(attr_rem, info, &rem);
 		if (ret < 0)
 			goto set_flags_err;
 
-		if (rem.addr.family == AF_UNSPEC) {
+		if (rem.family == AF_UNSPEC) {
 			NL_SET_ERR_MSG_ATTR(info->extack, attr_rem,
 					    "invalid remote address family");
 			ret = -EINVAL;
@@ -634,7 +634,7 @@ int mptcp_userspace_pm_set_flags(struct genl_info *info)
 	spin_unlock_bh(&msk->pm.lock);
 
 	lock_sock(sk);
-	ret = mptcp_pm_nl_mp_prio_send_ack(msk, &entry->addr, &rem.addr, bkup);
+	ret = mptcp_pm_nl_mp_prio_send_ack(msk, &entry->addr, &rem, bkup);
 	release_sock(sk);
 
 set_flags_err:
