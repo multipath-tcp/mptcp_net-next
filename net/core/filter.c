@@ -11837,7 +11837,7 @@ const struct bpf_func_proto bpf_skc_to_unix_sock_proto = {
 BPF_CALL_1(bpf_skc_to_mptcp_sock, struct sock *, sk)
 {
 	BTF_TYPE_EMIT(struct mptcp_sock);
-	return (unsigned long)bpf_mptcp_sock_from_subflow(sk);
+	return (unsigned long)bpf_mptcp_sock_from_sock(sk);
 }
 
 const struct bpf_func_proto bpf_skc_to_mptcp_sock_proto = {
