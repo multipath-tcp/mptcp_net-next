@@ -564,21 +564,16 @@ destroy_err:
 	return err;
 }
 
-int mptcp_userspace_pm_set_flags(struct genl_info *info)
+int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *local,
+				 struct mptcp_addr_info *remote,
+				 struct genl_info *info)
 {
-	struct mptcp_pm_addr_entry loc = { .addr = { .family = AF_UNSPEC }, };
-	struct mptcp_addr_info rem = { .family = AF_UNSPEC, };
 	struct mptcp_pm_addr_entry *entry;
-	struct nlattr *attr, *attr_rem;
 	struct mptcp_sock *msk;
 	u8 lookup_by_id = 0;
 	int ret = -EINVAL;
 	struct sock *sk;
 	u8 bkup = 0;
-
-	if (GENL_REQ_ATTR_CHECK(info, MPTCP_PM_ATTR_ADDR) ||
-	    GENL_REQ_ATTR_CHECK(info, MPTCP_PM_ATTR_ADDR_REMOTE))
-		return ret;
 
 	msk = mptcp_userspace_pm_get_sock(info);
 	if (!msk)
@@ -586,32 +581,15 @@ int mptcp_userspace_pm_set_flags(struct genl_info *info)
 
 	sk = (struct sock *)msk;
 
-	attr = info->attrs[MPTCP_PM_ATTR_ADDR];
-	ret = mptcp_pm_parse_entry(attr, info, false, &loc);
-	if (ret < 0)
-		goto set_flags_err;
-
-	if (loc.addr.family == AF_UNSPEC)
+	if (local->addr.family == AF_UNSPEC)
 		lookup_by_id = 1;
 
-	attr_rem = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
-	ret = mptcp_pm_parse_addr(attr_rem, info, &rem);
-	if (ret < 0)
-		goto set_flags_err;
-
-	if (rem.family == AF_UNSPEC) {
-		NL_SET_ERR_MSG_ATTR(info->extack, attr_rem,
-				    "invalid remote address family");
-		ret = -EINVAL;
-		goto set_flags_err;
-	}
-
-	if (loc.flags & MPTCP_PM_ADDR_FLAG_BACKUP)
+	if (local->flags & MPTCP_PM_ADDR_FLAG_BACKUP)
 		bkup = 1;
 
 	spin_lock_bh(&msk->pm.lock);
-	entry = lookup_by_id ? mptcp_userspace_pm_lookup_addr_by_id(msk, loc.addr.id) :
-			       mptcp_userspace_pm_lookup_addr(msk, &loc.addr);
+	entry = lookup_by_id ? mptcp_userspace_pm_lookup_addr_by_id(msk, local->addr.id) :
+			       mptcp_userspace_pm_lookup_addr(msk, &local->addr);
 	if (entry) {
 		if (bkup)
 			entry->flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
@@ -621,15 +599,14 @@ int mptcp_userspace_pm_set_flags(struct genl_info *info)
 	spin_unlock_bh(&msk->pm.lock);
 
 	lock_sock(sk);
-	ret = mptcp_pm_nl_mp_prio_send_ack(msk, entry ? &entry->addr : &loc.addr,
-					   &rem, bkup);
+	ret = mptcp_pm_nl_mp_prio_send_ack(msk, entry ? &entry->addr : &local->addr,
+					   remote, bkup);
 	release_sock(sk);
 
 	/* mptcp_pm_nl_mp_prio_send_ack() only fails in one case */
 	if (ret < 0)
 		GENL_SET_ERR_MSG(info, "subflow not found");
 
-set_flags_err:
 	sock_put(sk);
 	return ret;
 }
