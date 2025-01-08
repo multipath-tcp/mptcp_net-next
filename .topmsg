@@ -1,4 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sysctl-blackhole-timeout-avoid-using-current-nsproxy
+Subject: [PATCH] mptcp: sysctl: blackhole timeout: avoid using current->nsproxy
 
+As mentioned in the previous commit, using the 'net' structure via
+'current' is not recommended for different reasons:
+
+- Inconsistency: getting info from the reader's/writer's netns vs only
+  from the opener's netns.
+
+- current->nsproxy can be NULL in some cases, resulting in an 'Oops'
+  (null-ptr-deref), e.g. when the current task is exiting, as spotted by
+  syzbot [1] using acct(2).
+
+The 'pernet' structure can be obtained from the table->data using
+container_of().
+
+Fixes: 27069e7cb3d1 ("mptcp: disable active MPTCP in case of blackhole")
+Link: https://lore.kernel.org/67769ecb.050a0220.3a8527.003f.GAE@google.com [1]
+Suggested-by: Al Viro <viro@zeniv.linux.org.uk>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
