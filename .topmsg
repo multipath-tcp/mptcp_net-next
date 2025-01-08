@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sysctl-avail-sched-remove-write-access
+Subject: [PATCH] mptcp: sysctl: avail sched: remove write access
 
+'net.mptcp.available_schedulers' sysctl knob is there to list available
+schedulers, not to modify this list.
+
+There are then no reasons to give write access to it.
+
+Nothing would have been written anyway, but no errors would have been
+returned, which is unexpected.
+
+Fixes: 73c900aa3660 ("mptcp: add net.mptcp.available_schedulers")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
