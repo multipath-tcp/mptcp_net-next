@@ -1,4 +1,35 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-avoid-spurious-errors-on-disconnect
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] selftests: mptcp: avoid spurious errors on disconnect
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The disconnect test-case generates spurious errors:
+
+  INFO: disconnect
+  INFO: extra options: -I 3 -i /tmp/tmp.r43niviyoI
+  01 ns1 MPTCP -> ns1 (10.0.1.1:10000      ) MPTCP (duration 140ms) [FAIL]
+  file received by server does not match (in, out):
+  Unexpected revents: POLLERR/POLLNVAL(19)
+  -rw-r--r-- 1 root root 10028676 Jan 10 10:47 /tmp/tmp.r43niviyoI.disconnect
+  Trailing bytes are:
+  ��\����R���!8��u2��5N%
+  -rw------- 1 root root 9992290 Jan 10 10:47 /tmp/tmp.Os4UbnWbI1
+  Trailing bytes are:
+  ��\����R���!8��u2��5N%
+  02 ns1 MPTCP -> ns1 (dead:beef:1::1:10001) MPTCP (duration 206ms) [ OK ]
+  03 ns1 MPTCP -> ns1 (dead:beef:1::1:10002) TCP   (duration  31ms) [ OK ]
+  04 ns1 TCP   -> ns1 (dead:beef:1::1:10003) MPTCP (duration  26ms) [ OK ]
+  [FAIL] Tests of the full disconnection have failed
+  Time: 2 seconds
+
+The root cause is actually in the user-space bits: the test program
+currently disconnects as soon as all the pending data has been spooled,
+generating an FASTCLOSE. If such option reaches the peer before the
+latter has reached the closed status, the msk socket will report an
+error to the user-space, as per protocol specification, causing the
+above failure.
+
+Address the issue explicitly waiting for all the relevant sockets to
+reach a closed status before performing the disconnect.
+
+Fixes: 05be5e273c84 ("selftests: mptcp: add disconnect tests")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
