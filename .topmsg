@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-spurious-wake-up-on-under-memory-pressure
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix spurious wake-up on under memory pressure
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The wake-up condition currently implemented by mptcp_epollin_ready()
+is wrong, as it could mark the MPTCP socket as readable even when
+no data are present and the system is under memory pressure.
+
+Explicitly check for some data being available in the receive queue.
+
+Fixes: 5684ab1a0eff ("mptcp: give rcvlowat some love")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
