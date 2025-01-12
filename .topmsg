@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-move-stats-info-in-case-of-errors-to-lib.sh
+Subject: [PATCH] selftests: mptcp: move stats info in case of errors to lib.sh
 
+A few MPTCP selftests are using the same code to print stats in case of
+error. This code can then be moved to mptcp_lib.sh.
+
+No behaviour changes intended, except to print the error in red and to
+stderr, like most error messages.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
