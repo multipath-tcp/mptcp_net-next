@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: drop skb parameter of get_addr
-
-The first parameters 'skb' of get_addr() interfaces are now useless
-since mptcp_userspace_pm_get_sock() helper is used. This patch drops
-these useless parameters of them.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
