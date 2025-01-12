@@ -1,8 +1,0 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] selftests: mptcp: connect: remove unused variable
-
-'cin_disconnect' is used in run_tests_disconnect(), but not
-'cout_disconnect', so it is safe to drop it.
-
-Reviewed-by: Geliang Tang <geliang@kernel.org>
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
