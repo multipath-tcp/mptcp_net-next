@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-id-parameter-for-get_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add id parameter for get_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The address id is parsed both in mptcp_pm_nl_get_addr() and
+mptcp_userspace_pm_get_addr(), this makes the code somewhat repetitive.
+So this patch adds a new parameter 'id' for all get_addr() interfaces.
+The address id is only parsed in mptcp_pm_nl_get_addr_doit(), then pass
+it to both mptcp_pm_nl_get_addr() and mptcp_userspace_pm_get_addr().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
