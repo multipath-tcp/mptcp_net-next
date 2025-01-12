@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-local-parameter-for-set_flags
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add local parameter for set_flags
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch updates the interfaces set_flags to reduce repetitive
+code, adds a new parameter 'local' for them. The local address is
+parsed in public helper mptcp_pm_nl_set_flags_doit(), then pass
+it to mptcp_pm_nl_set_flags() and mptcp_userspace_pm_set_flags().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
