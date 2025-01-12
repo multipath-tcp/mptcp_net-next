@@ -1,4 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-make-three-pm-wrappers-static
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: make three pm wrappers static
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Three netlink functions:
+
+	mptcp_pm_nl_get_addr_doit()
+	mptcp_pm_nl_get_addr_dumpit()
+	mptcp_pm_nl_set_flags_doit()
+
+are generic, implemented for each PM, in-kernel PM and userspace PM. It's
+clearer to move them from pm_netlink.c to pm.c.
+
+And the linked three path manager wrappers
+
+	mptcp_pm_get_addr()
+	mptcp_pm_dump_addr()
+	mptcp_pm_set_flags()
+
+can be changed as static functions, no need to export them in protocol.h.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
