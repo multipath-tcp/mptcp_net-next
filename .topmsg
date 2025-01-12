@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-improve-error-messages
+Subject: [PATCH] mptcp: pm: improve error messages
 
+Some error messages were:
+
+ - too generic: "missing input", "invalid request"
+
+ - not precise enough: "limit greater than maximum" but what's the max?
+
+ - missing: subflow not found, or connect error.
+
+This can be easily improved by being more precise, or adding new error
+messages.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
