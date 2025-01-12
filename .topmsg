@@ -1,4 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-simult_flows-unify-errors-msgs
+Subject: [PATCH] selftests: mptcp: simult_flows: unify errors msgs
 
+In order to unify what is printed in case of error, similar to what is
+done in mptcp_connect.sh and mptcp_join.sh, it is interesting to do the
+following modifications in simult_flows.sh:
+
+- Print the rc errors at the end of the line.
+
+- Print the MIB counters.
+
+- Use the same ss options: add -M (MPTCP sockets) and -e (detailed
+  socket information).
+
+While at it, also print of the 'max' time only in case of success,
+because 'mptcp_connect.c' will already print this info in case of error,
+e.g.:
+
+  transfer slower than expected! runtime 11948 ms, expected 11921 ms
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
