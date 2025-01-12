@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-mark-missing-address-attributes
+Subject: [PATCH] mptcp: pm: mark missing address attributes
 
+mptcp_pm_parse_entry() will check if the given attribute is defined. If
+not, it will return a generic error: "missing address info".
+
+It might then not be clear for the userspace developer which attribute
+is missing, especially when the command takes multiple addresses.
+
+By using GENL_REQ_ATTR_CHECK(), the userspace will get a hint about
+which attribute is missing, making thing clearer. Note that this is what
+was already done for most of the other MPTCP NL commands, this patch
+simply adds the missing ones.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
