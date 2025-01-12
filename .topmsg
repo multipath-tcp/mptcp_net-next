@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-save-nstat-infos
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: sockopt: save nstat infos
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Similar to the way nstat information is stored in mptcp_connect.sh
+and mptcp_join.sh scripts, this patch adds a similar way for
+mptcp_sockopt.sh and displays the nstat information when errors
+occur.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
