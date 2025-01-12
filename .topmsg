@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-skb-parameter-of-set_flags
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: drop skb parameter of set_flags
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The first parameter 'skb' in mptcp_pm_nl_set_flags() is only used to
+obtained the network namespace, which can also be obtained through the
+second parameters 'info' by using genl_info_net() helper. This patch
+drops these useless parameters 'skb' in all three set_flags() interfaces.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
