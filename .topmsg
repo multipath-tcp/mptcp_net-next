@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-m-with-ss-in-case-of-errors
+Subject: [PATCH] selftests: mptcp: add -m with ss in case of errors
 
+Recently, we had an issue where getting info about the memory would have
+helped better understanding what went wrong.
+
+Let add it just in case for later.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
