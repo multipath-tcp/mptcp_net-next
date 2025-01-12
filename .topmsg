@@ -1,4 +1,37 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reuse-sending-nlmsg-code-in-get_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: reuse sending nlmsg code in get_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The netlink messages are sent both in mptcp_pm_nl_get_addr() and
+mptcp_userspace_pm_get_addr(), this makes the code somewhat repetitive.
+This is because the netlink PM and userspace PM use different locks to
+protect the address entry that needs to be sent via the netlink message.
+The former uses rcu read lock, and the latter uses msk->pm.lock.
+
+The current get_addr() flow looks like this:
+
+	lock();
+	entry = get_entry();
+	send_nlmsg(entry);
+	unlock();
+
+After holding the lock, get the entry from the list, send the entry, and
+finally release the lock.
+
+This patch changes the process by getting the entry while holding the lock,
+then making a copy of the entry so that the lock can be released. Finally,
+the copy of the entry is sent without locking:
+
+	lock();
+	entry = get_entry();
+	*copy = *entry;
+	unlock();
+
+	send_nlmsg(copy);
+
+This way we can reuse the send_nlmsg() code in get_addr() interfaces
+between the netlink PM and userspace PM. They only need to implement their
+own get_addr() interfaces to hold the different locks, get the entry from
+the different lists, then release the locks.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
