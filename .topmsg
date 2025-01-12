@@ -1,4 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-better-display-the-files-size
+Subject: [PATCH] selftests: mptcp: connect: better display the files size
 
+'du' will print the name of the file, which was already displayed
+before, e.g.
+
+  Created /tmp/tmp.UOyy0ghfmQ (size 4703740/tmp/tmp.UOyy0ghfmQ) containing data sent by client
+  Created /tmp/tmp.xq3zvFinGo (size 1391724/tmp/tmp.xq3zvFinGo) containing data sent by server
+
+'stat' can be used instead, to display this instead:
+
+  Created /tmp/tmp.UOyy0ghfmQ (size 4703740 B) containing data sent by client
+  Created /tmp/tmp.xq3zvFinGo (size 1391724 B) containing data sent by server
+
+So easier to spot the file sizes.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
