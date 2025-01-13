@@ -1268,12 +1268,6 @@ int main_loop(void)
 	struct addrinfo *peer;
 	struct wstate winfo;
 
-	if (cfg_input && cfg_sockopt_types.mptfo) {
-		fd_in = open(cfg_input, O_RDONLY);
-		if (fd_in < 0)
-			xerror("can't open %s:%d", cfg_input, errno);
-	}
-
 	memset(&winfo, 0, sizeof(winfo));
 	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer, fd_in, &winfo);
 	if (fd < 0)
@@ -1291,7 +1285,7 @@ again:
 	if (cfg_cmsg_types.cmsg_enabled)
 		apply_cmsg_types(fd, &cfg_cmsg_types);
 
-	if (cfg_input && !cfg_sockopt_types.mptfo) {
+	if (cfg_input) {
 		fd_in = open(cfg_input, O_RDONLY);
 		if (fd_in < 0)
 			xerror("can't open %s:%d", cfg_input, errno);
