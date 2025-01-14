@@ -10736,53 +10736,25 @@ err_free_name:
 EXPORT_SYMBOL(register_netdevice);
 
 /* Initialize the core of a dummy net device.
- * This is useful if you are calling this function after alloc_netdev(),
- * since it does not memset the net_device fields.
+ * The setup steps dummy netdevs need which normal netdevs get by going
+ * through register_netdevice().
  */
-static void init_dummy_netdev_core(struct net_device *dev)
+static void init_dummy_netdev(struct net_device *dev)
 {
 	/* make sure we BUG if trying to hit standard
 	 * register/unregister code path
 	 */
 	dev->reg_state = NETREG_DUMMY;
 
-	/* NAPI wants this */
-	INIT_LIST_HEAD(&dev->napi_list);
-
 	/* a dummy interface is started by default */
 	set_bit(__LINK_STATE_PRESENT, &dev->state);
 	set_bit(__LINK_STATE_START, &dev->state);
-
-	/* napi_busy_loop stats accounting wants this */
-	dev_net_set(dev, &init_net);
 
 	/* Note : We dont allocate pcpu_refcnt for dummy devices,
 	 * because users of this 'device' dont need to change
 	 * its refcount.
 	 */
 }
-
-/**
- *	init_dummy_netdev	- init a dummy network device for NAPI
- *	@dev: device to init
- *
- *	This takes a network device structure and initializes the minimum
- *	amount of fields so it can be used to schedule NAPI polls without
- *	registering a full blown interface. This is to be used by drivers
- *	that need to tie several hardware interfaces to a single NAPI
- *	poll scheduler due to HW limitations.
- */
-void init_dummy_netdev(struct net_device *dev)
-{
-	/* Clear everything. Note we don't initialize spinlocks
-	 * as they aren't supposed to be taken by any of the
-	 * NAPI code and this dummy netdev is supposed to be
-	 * only ever used for NAPI polls
-	 */
-	memset(dev, 0, sizeof(struct net_device));
-	init_dummy_netdev_core(dev);
-}
-EXPORT_SYMBOL_GPL(init_dummy_netdev);
 
 /**
  *	register_netdev	- register a network device
@@ -11462,7 +11434,7 @@ EXPORT_SYMBOL(free_netdev);
 struct net_device *alloc_netdev_dummy(int sizeof_priv)
 {
 	return alloc_netdev(sizeof_priv, "dummy#", NET_NAME_UNKNOWN,
-			    init_dummy_netdev_core);
+			    init_dummy_netdev);
 }
 EXPORT_SYMBOL_GPL(alloc_netdev_dummy);
 
