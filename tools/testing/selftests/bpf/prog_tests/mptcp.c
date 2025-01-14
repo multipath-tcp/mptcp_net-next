@@ -12,6 +12,7 @@
 #include "mptcpify.skel.h"
 #include "mptcp_subflow.skel.h"
 #include "mptcp_bpf_iters.skel.h"
+#include "mptcp_bpf_first.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -49,6 +50,7 @@
 #ifndef TCP_CA_NAME_MAX
 #define TCP_CA_NAME_MAX	16
 #endif
+#define MPTCP_SCHED_NAME_MAX	16
 
 static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int duration;
@@ -641,6 +643,46 @@ fail:
 	netns_free(netns);
 }
 
+static void test_bpf_sched(struct bpf_object *obj, char *sched,
+			   bool addr1, bool addr2)
+{
+	char bpf_sched[MPTCP_SCHED_NAME_MAX] = "bpf_";
+	struct netns_obj *netns;
+	struct bpf_link *link;
+	struct bpf_map *map;
+
+	if (!ASSERT_LT(strlen(bpf_sched) + strlen(sched),
+		       MPTCP_SCHED_NAME_MAX, "Scheduler name too long"))
+		return;
+
+	map = bpf_object__find_map_by_name(obj, sched);
+	link = bpf_map__attach_struct_ops(map);
+	if (CHECK(!link, sched, "attach_struct_ops: %d\n", errno))
+		return;
+
+	netns = sched_init("subflow", strcat(bpf_sched, sched));
+	if (!netns)
+		goto fail;
+
+	send_data_and_verify(sched, addr1, addr2);
+
+fail:
+	netns_free(netns);
+	bpf_link__destroy(link);
+}
+
+static void test_first(void)
+{
+	struct mptcp_bpf_first *skel;
+
+	skel = mptcp_bpf_first__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: first"))
+		return;
+
+	test_bpf_sched(skel->obj, "first", WITH_DATA, WITHOUT_DATA);
+	mptcp_bpf_first__destroy(skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -653,4 +695,6 @@ void test_mptcp(void)
 		test_iters_subflow();
 	if (test__start_subtest("default"))
 		test_default();
+	if (test__start_subtest("first"))
+		test_first();
 }
