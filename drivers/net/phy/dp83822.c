@@ -762,7 +762,7 @@ static int dp83822_of_init_leds(struct phy_device *phydev)
 
 	if (dp83822->led_pin_enable[DP83822_LED_INDEX_COL_GPIO2] &&
 	    dp83822->set_gpio2_clk_out) {
-		phydev_err(phydev, "COL(GPIO2) cannot be used as LED outout, already used as clock output\n");
+		phydev_err(phydev, "COL(GPIO2) cannot be used as LED output, already used as clock output\n");
 		return -EINVAL;
 	}
 
@@ -1149,7 +1149,7 @@ static struct phy_driver dp83822_driver[] = {
 };
 module_phy_driver(dp83822_driver);
 
-static struct mdio_device_id __maybe_unused dp83822_tbl[] = {
+static const struct mdio_device_id __maybe_unused dp83822_tbl[] = {
 	{ DP83822_PHY_ID, 0xfffffff0 },
 	{ DP83825I_PHY_ID, 0xfffffff0 },
 	{ DP83826C_PHY_ID, 0xfffffff0 },
