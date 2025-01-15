@@ -164,7 +164,9 @@ int mptcp_userspace_pm_get_local_id(struct mptcp_sock *msk,
 	new_entry.addr.id = 0;
 	new_entry.flags = MPTCP_PM_ADDR_FLAG_IMPLICIT;
 
-	return userspace_pm_get_local_id(msk, &new_entry);
+	return msk->pm.ops->get_local_id ?
+	       msk->pm.ops->get_local_id(msk, &new_entry) :
+	       userspace_pm_get_local_id(msk, &new_entry);
 }
 
 static u8 userspace_pm_get_flags(struct mptcp_sock *msk,
@@ -184,7 +186,9 @@ static u8 userspace_pm_get_flags(struct mptcp_sock *msk,
 u8 mptcp_userspace_pm_get_flags(struct mptcp_sock *msk,
 				struct mptcp_addr_info *skc)
 {
-	return userspace_pm_get_flags(msk, skc);
+	return msk->pm.ops->get_flags ?
+	       msk->pm.ops->get_flags(msk, skc) :
+	       userspace_pm_get_flags(msk, skc);
 }
 
 static struct mptcp_sock *mptcp_userspace_pm_get_sock(const struct genl_info *info)
@@ -269,7 +273,9 @@ int mptcp_pm_nl_announce_doit(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	lock_sock(sk);
-	err = userspace_pm_address_announce(msk, &addr_val);
+	err = msk->pm.ops->address_announce ?
+	      msk->pm.ops->address_announce(msk, &addr_val) :
+	      userspace_pm_address_announce(msk, &addr_val);
 	release_sock(sk);
 	if (err)
 		NL_SET_ERR_MSG_ATTR(info->extack, addr,
@@ -369,7 +375,9 @@ int mptcp_pm_nl_remove_doit(struct sk_buff *skb, struct genl_info *info)
 	sk = (struct sock *)msk;
 
 	lock_sock(sk);
-	err = userspace_pm_address_remove(msk, id_val);
+	err = msk->pm.ops->address_remove ?
+	      msk->pm.ops->address_remove(msk, id_val) :
+	      userspace_pm_address_remove(msk, id_val);
 	release_sock(sk);
 	if (err)
 		NL_SET_ERR_MSG_ATTR_FMT(info->extack, id,
@@ -450,7 +458,9 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 	}
 
 	lock_sock(sk);
-	err = userspace_pm_subflow_create(msk, &entry, &addr_r);
+	err = msk->pm.ops->subflow_create ?
+	      msk->pm.ops->subflow_create(msk, &entry, &addr_r) :
+	      userspace_pm_subflow_create(msk, &entry, &addr_r);
 	release_sock(sk);
 
 	if (err)
@@ -585,7 +595,9 @@ int mptcp_pm_nl_subflow_destroy_doit(struct sk_buff *skb, struct genl_info *info
 	}
 
 	lock_sock(sk);
-	err = userspace_pm_subflow_destroy(msk, &addr_l, &addr_r);
+	err = msk->pm.ops->subflow_destroy ?
+	      msk->pm.ops->subflow_destroy(msk, &addr_l, &addr_r) :
+	      userspace_pm_subflow_destroy(msk, &addr_l, &addr_r);
 	release_sock(sk);
 	if (err)
 		GENL_SET_ERR_MSG(info, "subflow not found");
@@ -657,7 +669,9 @@ int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *local,
 	}
 
 	lock_sock(sk);
-	ret = userspace_pm_set_flags(msk, local, &rem);
+	ret = msk->pm.ops->set_flags ?
+	      msk->pm.ops->set_flags(msk, local, &rem) :
+	      userspace_pm_set_flags(msk, local, &rem);
 	release_sock(sk);
 
 	/* mptcp_pm_nl_mp_prio_send_ack() only fails in one case */
@@ -799,6 +813,36 @@ void mptcp_unregister_path_manager(struct mptcp_pm_ops *pm)
 	spin_lock(&mptcp_pm_list_lock);
 	list_del_rcu(&pm->list);
 	spin_unlock(&mptcp_pm_list_lock);
+}
+
+int mptcp_init_pm(struct mptcp_sock *msk, struct mptcp_pm_ops *pm)
+{
+	if (!pm)
+		pm = &mptcp_userspace_pm;
+
+	if (!bpf_try_module_get(pm, pm->owner))
+		return -EBUSY;
+
+	msk->pm.ops = pm;
+	if (msk->pm.ops->init)
+		msk->pm.ops->init(msk);
+
+	pr_debug("userspace_pm type %u initialized\n", msk->pm.ops->type);
+	return 0;
+}
+
+void mptcp_release_pm(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_ops *pm = msk->pm.ops;
+
+	if (!pm)
+		return;
+
+	msk->pm.ops = NULL;
+	if (pm->release)
+		pm->release(msk);
+
+	bpf_module_put(pm, pm->owner);
 }
 
 void __init mptcp_userspace_pm_init(void)
