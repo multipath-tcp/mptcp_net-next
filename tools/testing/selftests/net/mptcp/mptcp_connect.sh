@@ -137,7 +137,7 @@ TEST_GROUP=""
 #shellcheck disable=SC2317
 cleanup()
 {
-	rm -f "$cin_disconnect" "$cout_disconnect"
+	rm -f "$cin_disconnect"
 	rm -f "$cin" "$cout"
 	rm -f "$sin" "$sout"
 	rm -f "$capout"
@@ -155,7 +155,6 @@ cin=$(mktemp)
 cout=$(mktemp)
 capout=$(mktemp)
 cin_disconnect="$cin".disconnect
-cout_disconnect="$cout".disconnect
 trap cleanup EXIT
 
 mptcp_lib_ns_init ns1 ns2 ns3 ns4
@@ -583,7 +582,7 @@ make_file()
 	mptcp_lib_make_file $name 1024 $ksize
 	dd if=/dev/urandom conv=notrunc of="$name" oflag=append bs=1 count=$rem 2> /dev/null
 
-	echo "Created $name (size $(du -b "$name")) containing data sent by $who"
+	echo "Created $name (size $(stat -c "%s" "$name") B) containing data sent by $who"
 }
 
 run_tests_lo()
