@@ -3983,7 +3983,7 @@ static unsigned int mvneta_pcs_inband_caps(struct phylink_pcs *pcs,
 	return LINK_INBAND_DISABLE;
 }
 
-static void mvneta_pcs_get_state(struct phylink_pcs *pcs,
+static void mvneta_pcs_get_state(struct phylink_pcs *pcs, unsigned int neg_mode,
 				 struct phylink_link_state *state)
 {
 	struct mvneta_port *pp = mvneta_pcs_to_port(pcs);
@@ -4392,6 +4392,7 @@ static int mvneta_cpu_online(unsigned int cpu, struct hlist_node *node)
 	if (pp->neta_armada3700)
 		return 0;
 
+	netdev_lock(port->napi.dev);
 	spin_lock(&pp->lock);
 	/*
 	 * Configuring the driver for a new CPU while the driver is
@@ -4418,7 +4419,7 @@ static int mvneta_cpu_online(unsigned int cpu, struct hlist_node *node)
 
 	/* Mask all ethernet port interrupts */
 	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
-	napi_enable(&port->napi);
+	napi_enable_locked(&port->napi);
 
 	/*
 	 * Enable per-CPU interrupts on the CPU that is
@@ -4439,6 +4440,8 @@ static int mvneta_cpu_online(unsigned int cpu, struct hlist_node *node)
 		    MVNETA_CAUSE_LINK_CHANGE);
 	netif_tx_start_all_queues(pp->dev);
 	spin_unlock(&pp->lock);
+	netdev_unlock(port->napi.dev);
+
 	return 0;
 }
 
