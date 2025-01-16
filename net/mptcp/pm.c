@@ -627,6 +627,10 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 		WRITE_ONCE(pm->work_pending, 0);
 		WRITE_ONCE(pm->accept_addr, 0);
 		WRITE_ONCE(pm->accept_subflow, 0);
+
+		rcu_read_lock();
+		mptcp_init_pm(msk, mptcp_pm_find(pm_type));
+		rcu_read_unlock();
 	}
 
 	WRITE_ONCE(pm->addr_signal, 0);
