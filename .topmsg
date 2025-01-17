@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/doc-mptcp-sysctl-blackhole_timeout-is-per-netns
+Subject: [PATCH] doc: mptcp: sysctl: blackhole_timeout is per-netns
 
+All other sysctl entries mention it, and it is a per-namespace sysctl.
+
+So mention it as well.
+
+Fixes: 27069e7cb3d1 ("mptcp: disable active MPTCP in case of blackhole")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
