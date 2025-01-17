@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: reuse sending nlmsg code in get_addr
+Subject: [PATCH] mptcp: pm: reuse sending nlmsg code in get_addr
 
 The netlink messages are sent both in mptcp_pm_nl_get_addr() and
 mptcp_userspace_pm_get_addr(), this makes the code somewhat repetitive.
