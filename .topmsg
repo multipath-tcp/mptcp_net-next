@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add id parameter for get_addr
+Subject: [PATCH] mptcp: pm: add id parameter for get_addr
 
 The address id is parsed both in mptcp_pm_nl_get_addr() and
 mptcp_userspace_pm_get_addr(), this makes the code somewhat repetitive.
