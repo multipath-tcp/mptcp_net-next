@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: drop skb parameter of set_flags
+Subject: [PATCH] mptcp: pm: drop skb parameter of set_flags
 
 The first parameter 'skb' in mptcp_pm_nl_set_flags() is only used to
 obtained the network namespace, which can also be obtained through the
