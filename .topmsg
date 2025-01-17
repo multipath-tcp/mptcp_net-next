@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: change rem type of set_flags
+Subject: [PATCH] mptcp: pm: change rem type of set_flags
 
 Generally, in the path manager interfaces, the local address is defined as
 an mptcp_pm_addr_entry type address, while the remote address is defined as
