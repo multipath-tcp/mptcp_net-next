@@ -1775,10 +1775,10 @@ nla_put_failure:
 
 int mptcp_pm_nl_get_addr(u8 id, struct genl_info *info)
 {
+	struct nlattr *attr = info->attrs[MPTCP_PM_ENDPOINT_ADDR];
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
 	struct mptcp_pm_addr_entry *entry;
 	struct sk_buff *msg;
-	struct nlattr *attr;
 	void *reply;
 	int ret;
 
