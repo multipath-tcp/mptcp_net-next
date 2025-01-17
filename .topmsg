@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: make three pm wrappers static
+Subject: [PATCH] mptcp: pm: make three pm wrappers static
 
 Three netlink functions:
 
