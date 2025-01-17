@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: drop info of userspace_pm_remove_id_zero_address
+Subject: [PATCH] mptcp: pm: drop info of userspace_pm_remove_id_zero_address
 
 The only use of 'info' parameter of userspace_pm_remove_id_zero_address()
 is to set an error message into it.
