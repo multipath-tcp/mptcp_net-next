@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add local parameter for set_flags
+Subject: [PATCH] mptcp: pm: add local parameter for set_flags
 
 This patch updates the interfaces set_flags to reduce repetitive
 code, adds a new parameter 'local' for them. The local address is
