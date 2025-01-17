@@ -285,6 +285,11 @@ do_mptcp_sockopt_tests()
 	mptcp_lib_result_pass "sockopt v6"
 }
 
+do_diag_tests()
+{
+	ip netns exec "$ns_sbox" ./mptcp_sockopt -d
+}
+
 run_tests()
 {
 	local listener_ns="$1"
@@ -363,6 +368,7 @@ run_tests $ns1 $ns2 dead:beef:1::1
 
 do_mptcp_sockopt_tests
 do_tcpinq_tests
+do_diag_tests
 
 mptcp_lib_result_print_all_tap
 exit $ret

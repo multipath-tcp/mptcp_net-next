@@ -25,6 +25,10 @@
 #include <netinet/in.h>
 
 #include <linux/tcp.h>
+#include <linux/netlink.h>
+#include <linux/inet_diag.h>
+#include <linux/rtnetlink.h>
+#include <linux/sock_diag.h>
 
 static int pf = AF_INET;
 
@@ -250,17 +254,87 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 	return sock;
 }
 
+static void send_query(int fd)
+{
+	struct sockaddr_nl nladdr = {
+		.nl_family = AF_NETLINK
+	};
+	struct {
+		struct nlmsghdr nlh;
+		struct inet_diag_req_v2 r;
+	} req = {
+		.nlh = {
+			.nlmsg_len = sizeof(req),
+			.nlmsg_type = SOCK_DIAG_BY_FAMILY,
+			.nlmsg_flags = NLM_F_REQUEST | NLM_F_ATOMIC
+		},
+		.r = {
+			.sdiag_family = AF_INET,
+			.sdiag_protocol = IPPROTO_MPTCP,
+		}
+	};
+	struct rtattr rta_proto;
+	struct iovec iov[6];
+	int iovlen = 1;
+	__u32 proto;
+
+	proto = IPPROTO_MPTCP;
+	rta_proto.rta_type = INET_DIAG_REQ_PROTOCOL;
+	rta_proto.rta_len = RTA_LENGTH(sizeof(proto));
+
+	iov[0] = (struct iovec) {
+		.iov_base = &req,
+		.iov_len = sizeof(req)
+	};
+	iov[iovlen] = (struct iovec){ &rta_proto, sizeof(rta_proto)};
+	iov[iovlen+1] = (struct iovec){ &proto, sizeof(proto)};
+	req.nlh.nlmsg_len += RTA_LENGTH(sizeof(proto));
+	iovlen += 2;
+
+	struct msghdr msg = {
+		.msg_name = &nladdr,
+		.msg_namelen = sizeof(nladdr),
+		.msg_iov = iov,
+		.msg_iovlen = iovlen
+	};
+
+	for (;;) {
+		if (sendmsg(fd, &msg, 0) < 0) {
+			if (errno == EINTR)
+				continue;
+			die_perror("sendmsg");
+		}
+		return;
+	}
+}
+
+void diag(void)
+{
+	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG);
+
+	if (fd < 0)
+		die_perror("Netlink socket");
+
+	send_query(fd);
+
+	close(fd);
+}
+
 static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "h6")) != -1) {
+	while ((c = getopt(argc, argv, "h6d")) != -1) {
 		switch (c) {
 		case 'h':
 			die_usage(0);
 			break;
 		case '6':
 			pf = AF_INET6;
+			break;
+		case 'd':
+			diag();
+			exit(0);
 			break;
 		default:
 			die_usage(1);
