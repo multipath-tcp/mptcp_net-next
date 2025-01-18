@@ -686,10 +686,10 @@ int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
 
 int mptcp_userspace_pm_get_addr(u8 id, struct genl_info *info)
 {
+	struct nlattr *attr = info->attrs[MPTCP_PM_ENDPOINT_ADDR];
 	struct mptcp_pm_addr_entry *entry;
 	struct mptcp_sock *msk;
 	struct sk_buff *msg;
-	struct nlattr *attr;
 	int ret = -EINVAL;
 	struct sock *sk;
 	void *reply;
