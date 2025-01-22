@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-__mptcp_fastopen_gen_msk_ackseq
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop __mptcp_fastopen_gen_msk_ackseq()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When we will move the whole RX path under the msk socket lock, updating
+the already queued skb for passive fastopen socket at 3rd ack time will
+be extremely painful and race prone
+
+The map_seq for already enqueued skbs is used only to allow correct
+coalescing with later data; preventing collapsing to the first skb of
+a fastopen connect we can completely remove the
+__mptcp_fastopen_gen_msk_ackseq() helper.
+
+Before dropping this helper, a new item had to be added to the
+mptcp_skb_cb structure. Because this item will be frequently tested in
+the fast path -- almost on every packet -- and because there is free
+space there, a single byte is used instead of a bitfield. This micro
+optimisation slightly reduces the number of CPU operations to do the
+associated check.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
