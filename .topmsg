@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-ipv6_addr_equal-in-addresses_equal
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: use ipv6_addr_equal in addresses_equal
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Use ipv6_addr_equal() to check whether two IPv6 addresses are equal in
+mptcp_addresses_equal().
+
+This is more appropriate than using !ipv6_addr_cmp().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
