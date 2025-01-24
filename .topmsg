@@ -1,4 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-blackhole-only-if-1st-SYN-retrans-w-o-MPC-is-accepted
+Subject: [PATCH] mptcp: blackhole only if 1st SYN retrans w/o MPC is accepted
 
+The Fixes commit mentioned this:
+
+> An MPTCP firewall blackhole can be detected if the following SYN
+> retransmission after a fallback to "plain" TCP is accepted.
+
+But in fact, this blackhole was detected if any following SYN
+retransmissions after a fallback to TCP was accepted.
+
+That's because 'mptcp_subflow_early_fallback()' will set 'request_mptcp'
+to 0, and 'mpc_drop' will never be reset to 0 after.
+
+This is an issue, because some not so unusual situations might cause the
+kernel to detect a false-positive blackhole, e.g. a client trying to
+connect to a server while the network is not ready yet, causing a few
+SYN retransmissions, before reaching the end server.
+
+Fixes: 27069e7cb3d1 ("mptcp: disable active MPTCP in case of blackhole")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
