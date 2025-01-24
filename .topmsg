@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-blackhole-avoid-checking-the-state-twice
+Subject: [PATCH] mptcp: blackhole: avoid checking the state twice
 
+A small cleanup, reordering the conditions to avoid checking things
+twice.
+
+The code here is called in case of timeout on a TCP connection, before
+triggering a retransmission. But it only acts on SYN + MPC packets.
+
+So the conditions can be re-order to exit early in case of non-MPTCP
+SYN + MPC. This also reduce the indentation levels.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
