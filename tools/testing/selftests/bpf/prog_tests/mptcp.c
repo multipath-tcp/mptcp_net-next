@@ -23,6 +23,8 @@
 #define ADDR6_3	"dead:beef:3::1"
 #define ADDR6_4	"dead:beef:4::1"
 #define PORT_1	10001
+#define WITH_DATA	true
+#define WITHOUT_DATA	false
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -47,6 +49,9 @@
 #ifndef TCP_CA_NAME_MAX
 #define TCP_CA_NAME_MAX	16
 #endif
+
+static const unsigned int total_bytes = 10 * 1024 * 1024;
+static int duration;
 
 struct __mptcp_info {
 	__u8	mptcpi_subflows;
@@ -551,6 +556,91 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
+static struct netns_obj *sched_init(char *flags, char *sched)
+{
+	struct netns_obj *netns;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		return NULL;
+
+	if (endpoint_init("subflow", 2) < 0)
+		goto fail;
+
+	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
+
+	return netns;
+fail:
+	netns_free(netns);
+	return NULL;
+}
+
+static int ss_search(char *src, char *dst, char *port, char *keyword)
+{
+	return SYS_NOFAIL("ip netns exec %s ss -enita src %s dst %s %s %d | grep -q '%s'",
+			  NS_TEST, src, dst, port, PORT_1, keyword);
+}
+
+static int has_bytes_sent(char *dst)
+{
+	return ss_search(ADDR_1, dst, "sport", "bytes_sent:");
+}
+
+static void send_data_and_verify(char *sched, bool addr1, bool addr2)
+{
+	struct timespec start, end;
+	int server_fd, client_fd;
+	unsigned int delta_ms;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
+		goto fail;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
+		goto fail;
+
+	if (!ASSERT_OK(send_recv_data(server_fd, client_fd, total_bytes),
+		       "send_recv_data"))
+		goto fail;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &end) < 0)
+		goto fail;
+
+	delta_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000;
+	printf("%s: %u ms\n", sched, delta_ms);
+
+	if (addr1)
+		CHECK(has_bytes_sent(ADDR_1), sched, "should have bytes_sent on addr1\n");
+	else
+		CHECK(!has_bytes_sent(ADDR_1), sched, "shouldn't have bytes_sent on addr1\n");
+	if (addr2)
+		CHECK(has_bytes_sent(ADDR_2), sched, "should have bytes_sent on addr2\n");
+	else
+		CHECK(!has_bytes_sent(ADDR_2), sched, "shouldn't have bytes_sent on addr2\n");
+
+	close(client_fd);
+fail:
+	close(server_fd);
+}
+
+static void test_default(void)
+{
+	struct netns_obj *netns;
+
+	netns = sched_init("subflow", "default");
+	if (!netns)
+		goto fail;
+
+	send_data_and_verify("default", WITH_DATA, WITH_DATA);
+
+fail:
+	netns_free(netns);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -561,4 +651,6 @@ void test_mptcp(void)
 		test_subflow();
 	if (test__start_subtest("iters_subflow"))
 		test_iters_subflow();
+	if (test__start_subtest("default"))
+		test_default();
 }
