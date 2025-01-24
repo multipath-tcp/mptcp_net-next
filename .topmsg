@@ -1,4 +1,17 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-change-to-fullmesh-only-for-subflow
+Subject: [PATCH] mptcp: pm: change to fullmesh only for 'subflow'
 
+If an endpoint doesn't have the 'subflow' flag -- in fact, has no type,
+so not 'subflow', 'signal', nor 'implicit' -- there are then no subflows
+created from this local endpoint to at least the initial destination
+address. In this case, no need to call mptcp_pm_nl_fullmesh() which is
+there to recreate the subflows to reflect the new value of the fullmesh
+attribute.
+
+Similarly, there is then no need to iterate over all connections to do
+nothing, if only the 'fullmesh' flag has been changed, and the endpoint
+doesn't have the 'subflow' one. So stop early when dealing with this
+specific case.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
