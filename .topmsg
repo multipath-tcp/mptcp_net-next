@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-match-in-userspace_pm_append_new_local_addr
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: drop match in userspace_pm_append_new_local_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The variable 'match' in mptcp_userspace_pm_append_new_local_addr() is a
+redundant one, and this patch drops it.
+
+No need to define 'match' as 'struct mptcp_pm_addr_entry *' type. In this
+function, it's only used to check whether it's NULL. It can be defined as
+a Boolean one.
+
+Also other variables 'addr_match' and 'id_match' make 'match' a redundant
+one, which can be replaced by directly checking 'addr_match && id_match'.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
