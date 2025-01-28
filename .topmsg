@@ -1,4 +1,28 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mm-kmemleak-Fix-upper-boundary-check-for-physical-address-objects
+From: Catalin Marinas <catalin.marinas@arm.com>
+Subject: [PATCH] mm: kmemleak: Fix upper boundary check for physical address objects
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Memblock allocations are registered by kmemleak separately, based on
+their physical address. During the scanning stage, it checks whether an
+object is within the min_low_pfn and max_low_pfn boundaries and ignores
+it otherwise.
+
+With the recent addition of __percpu pointer leak detection (commit
+6c99d4eb7c5e ("kmemleak: enable tracking for percpu pointers")),
+kmemleak started reporting leaks in setup_zone_pageset() and
+setup_per_cpu_pageset(). These were caused by the node_data[0] object
+(initialised in alloc_node_data()) ending on the PFN_PHYS(max_low_pfn)
+boundary. The non-strict upper boundary check introduced by commit
+84c326299191 ("mm: kmemleak: check physical address when scan") causes
+the pg_data_t object to be ignored (not scanned) and the __percpu
+pointers it contains to be reported as leaks.
+
+Make the max_low_pfn upper boundary check strict when deciding whether
+to ignore a physical address object and not scan it.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Fixes: 84c326299191 ("mm: kmemleak: check physical address when scan")
+Reported-by: Jakub Kicinski <kuba@kernel.org>
+Tested-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Cc: Patrick Wang <patrick.wang.shcn@gmail.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: stable@vger.kernel.org # 6.0.x
