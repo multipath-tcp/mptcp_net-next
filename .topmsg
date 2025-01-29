@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-f-no-reconnect
+Subject: [PATCH] selftests: mptcp: connect: -f: no reconnect
 
+The '-f' parameter is there to force the kernel to emit MPTCP FASTCLOSE
+by closing the connection with unread bytes in the receive queue.
+
+The xdisconnect() helper was used to stop the connection, but it does
+more than that: it will shut it down, then wait before reconnecting to
+the same address. This causes the mptcp_join's "fastclose test" to fail
+all the time.
+
+This failure is due to a recent change, with commit 218cc166321f
+("selftests: mptcp: avoid spurious errors on disconnect"), but that went
+unnoticed because the test is currently ignored. The recent modification
+only shown an existing issue: xdisconnect() doesn't need to be used
+here, only the shutdown() part is needed.
+
+Fixes: 6bf41020b72b ("selftests: mptcp: update and extend fastclose test-cases")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
