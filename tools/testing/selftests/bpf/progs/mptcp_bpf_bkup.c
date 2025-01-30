@@ -17,7 +17,7 @@ void BPF_PROG(mptcp_sched_bkup_release, struct mptcp_sock *msk)
 }
 
 SEC("struct_ops")
-int BPF_PROG(bpf_bkup_get_subflow, struct mptcp_sock *msk,
+int BPF_PROG(bpf_bkup_get_send, struct mptcp_sock *msk,
 	     struct mptcp_sched_data *data)
 {
 	int nr = -1;
@@ -47,6 +47,6 @@ SEC(".struct_ops")
 struct mptcp_sched_ops bkup = {
 	.init		= (void *)mptcp_sched_bkup_init,
 	.release	= (void *)mptcp_sched_bkup_release,
-	.get_subflow	= (void *)bpf_bkup_get_subflow,
+	.get_send	= (void *)bpf_bkup_get_send,
 	.name		= "bpf_bkup",
 };
