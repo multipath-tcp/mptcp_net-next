@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-split-get_subflow-interface-into-two
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: split get_subflow interface into two
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+get_retrans() interface of the burst packet scheduler invokes a sleeping
+function mptcp_pm_subflow_chk_stale(), which calls __lock_sock_fast().
+So get_retrans() interface should be set with BPF_F_SLEEPABLE flag in
+BPF. But get_send() interface of this scheduler can't be set with
+BPF_F_SLEEPABLE flag since it's invoked in ack_update_msk() under mptcp
+data lock.
+
+So this patch has to split get_subflow() interface of packet scheduer into
+two interfaces: get_send() and get_retrans(). Then we can set get_retrans()
+interface alone with BPF_F_SLEEPABLE flag.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
