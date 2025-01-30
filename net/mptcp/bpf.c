@@ -156,7 +156,13 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 	return 0;
 }
 
-static int __bpf_mptcp_sched_get_subflow(struct mptcp_sock *msk,
+static int __bpf_mptcp_sched_get_send(struct mptcp_sock *msk,
+				      struct mptcp_sched_data *data)
+{
+	return 0;
+}
+
+static int __bpf_mptcp_sched_get_retrans(struct mptcp_sock *msk,
 					 struct mptcp_sched_data *data)
 {
 	return 0;
@@ -171,7 +177,8 @@ static void __bpf_mptcp_sched_release(struct mptcp_sock *msk)
 }
 
 static struct mptcp_sched_ops __bpf_mptcp_sched_ops = {
-	.get_subflow	= __bpf_mptcp_sched_get_subflow,
+	.get_send	= __bpf_mptcp_sched_get_send,
+	.get_retrans	= __bpf_mptcp_sched_get_retrans,
 	.init		= __bpf_mptcp_sched_init,
 	.release	= __bpf_mptcp_sched_release,
 };
@@ -327,7 +334,7 @@ BTF_ID_FLAGS(func, mptcp_set_timeout)
 BTF_ID_FLAGS(func, mptcp_wnd_end)
 BTF_ID_FLAGS(func, tcp_stream_memory_free)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_queues_empty)
-BTF_ID_FLAGS(func, mptcp_pm_subflow_chk_stale)
+BTF_ID_FLAGS(func, mptcp_pm_subflow_chk_stale, KF_SLEEPABLE)
 BTF_KFUNCS_END(bpf_mptcp_sched_kfunc_ids)
 
 static const struct btf_kfunc_id_set bpf_mptcp_sched_kfunc_set = {
