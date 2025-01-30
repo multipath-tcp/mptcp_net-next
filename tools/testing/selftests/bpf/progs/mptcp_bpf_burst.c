@@ -67,8 +67,9 @@ void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 {
 }
 
-static int bpf_burst_get_send(struct mptcp_sock *msk,
-			      struct mptcp_sched_data *data)
+SEC("struct_ops")
+int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct bpf_subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
@@ -141,8 +142,9 @@ out:
 	return 0;
 }
 
-static int bpf_burst_get_retrans(struct mptcp_sock *msk,
-				 struct mptcp_sched_data *data)
+SEC("struct_ops")
+int BPF_PROG(bpf_burst_get_retrans, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	int backup = MPTCP_SUBFLOWS_MAX, pick = MPTCP_SUBFLOWS_MAX, subflow_id;
 	struct mptcp_subflow_context *subflow;
@@ -189,19 +191,11 @@ out:
 	return 0;
 }
 
-SEC("struct_ops")
-int BPF_PROG(bpf_burst_get_subflow, struct mptcp_sock *msk,
-	     struct mptcp_sched_data *data)
-{
-	if (data->reinject)
-		return bpf_burst_get_retrans(msk, data);
-	return bpf_burst_get_send(msk, data);
-}
-
 SEC(".struct_ops")
 struct mptcp_sched_ops burst = {
 	.init		= (void *)mptcp_sched_burst_init,
 	.release	= (void *)mptcp_sched_burst_release,
-	.get_subflow	= (void *)bpf_burst_get_subflow,
+	.get_send	= (void *)bpf_burst_get_send,
+	.get_retrans	= (void *)bpf_burst_get_retrans,
 	.name		= "bpf_burst",
 };
