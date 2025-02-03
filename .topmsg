@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/debugfs-Fix-the-missing-initializations-in-__debugfs_file_get
+From: Al Viro <viro@zeniv.linux.org.uk>
+Subject: [PATCH] debugfs: Fix the missing initializations in __debugfs_file_get()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+both method table pointers in debugfs_fsdata need to be initialized,
+obviously, and calculating the bitmap of present methods would also
+go better if we start with initialized state.
+
+Fixes: 41a0ecc0997c ("debugfs: get rid of dynamically allocation proxy_ops")
+Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+Link: https://lore.kernel.org/r/20250129191937.GR1977892@ZenIV
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
