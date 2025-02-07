@@ -76,6 +76,9 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, const struct sock *ssk, int
 
 	WRITE_ONCE(pm->server_side, server_side);
 	mptcp_event(MPTCP_EVENT_CREATED, msk, ssk, GFP_ATOMIC);
+
+	if (pm->ops && pm->ops->created)
+		pm->ops->created(msk);
 }
 
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
@@ -153,16 +156,24 @@ void mptcp_pm_fully_established(struct mptcp_sock *msk, const struct sock *ssk)
 	msk->pm.status |= BIT(MPTCP_PM_ALREADY_ESTABLISHED);
 	spin_unlock_bh(&pm->lock);
 
-	if (announce)
+	if (announce) {
 		mptcp_event(MPTCP_EVENT_ESTABLISHED, msk, ssk, GFP_ATOMIC);
+
+		if (pm->ops && pm->ops->established)
+			pm->ops->established(msk);
+	}
 }
 
 void mptcp_pm_connection_closed(struct mptcp_sock *msk)
 {
 	pr_debug("msk=%p\n", msk);
 
-	if (msk->token)
+	if (msk->token) {
 		mptcp_event(MPTCP_EVENT_CLOSED, msk, NULL, GFP_KERNEL);
+
+		if (msk->pm.ops && msk->pm.ops->closed)
+			msk->pm.ops->closed(msk);
+	}
 }
 
 void mptcp_pm_subflow_established(struct mptcp_sock *msk)
@@ -629,6 +640,10 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 		WRITE_ONCE(pm->work_pending, 0);
 		WRITE_ONCE(pm->accept_addr, 0);
 		WRITE_ONCE(pm->accept_subflow, 0);
+
+		rcu_read_lock();
+		mptcp_pm_initialize(msk, mptcp_pm_find(pm_type));
+		rcu_read_unlock();
 	}
 
 	WRITE_ONCE(pm->addr_signal, 0);
@@ -703,4 +718,34 @@ void mptcp_pm_unregister(struct mptcp_pm_ops *pm)
 	spin_lock(&mptcp_pm_list_lock);
 	list_del_rcu(&pm->list);
 	spin_unlock(&mptcp_pm_list_lock);
+}
+
+int mptcp_pm_initialize(struct mptcp_sock *msk, struct mptcp_pm_ops *pm)
+{
+	if (!pm)
+		return -EINVAL;
+
+	if (!bpf_try_module_get(pm, pm->owner))
+		return -EBUSY;
+
+	msk->pm.ops = pm;
+	if (msk->pm.ops->init)
+		msk->pm.ops->init(msk);
+
+	pr_debug("userspace_pm type %u initialized\n", msk->pm.ops->type);
+	return 0;
+}
+
+void mptcp_pm_release(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_ops *pm = msk->pm.ops;
+
+	if (!pm)
+		return;
+
+	msk->pm.ops = NULL;
+	if (pm->release)
+		pm->release(msk);
+
+	bpf_module_put(pm, pm->owner);
 }

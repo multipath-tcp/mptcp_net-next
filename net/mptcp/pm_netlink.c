@@ -1080,6 +1080,7 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	int addrlen = sizeof(struct sockaddr_in);
 	struct sockaddr_storage addr;
 	struct sock *newsk, *ssk;
+	struct mptcp_sock *msk;
 	int backlog = 1024;
 	int err;
 
@@ -1104,8 +1105,9 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 				      is_ipv6 ? "msk_lock-AF_INET6" : "msk_lock-AF_INET",
 				      &mptcp_keys[is_ipv6]);
 
+	msk = mptcp_sk(newsk);
 	lock_sock(newsk);
-	ssk = __mptcp_nmpc_sk(mptcp_sk(newsk));
+	ssk = __mptcp_nmpc_sk(msk);
 	release_sock(newsk);
 	if (IS_ERR(ssk))
 		return PTR_ERR(ssk);
@@ -1136,6 +1138,13 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	if (!err)
 		mptcp_event_pm_listener(ssk, MPTCP_EVENT_LISTENER_CREATED);
 	release_sock(ssk);
+
+	if (!err) {
+		lock_sock(newsk);
+		if (msk->pm.ops && msk->pm.ops->listener_created)
+			msk->pm.ops->listener_created(msk);
+		release_sock(newsk);
+	}
 	return err;
 }
 
