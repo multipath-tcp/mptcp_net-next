@@ -198,6 +198,7 @@ enum mptcp_pm_status {
 enum mptcp_pm_type {
 	MPTCP_PM_TYPE_KERNEL = 0,
 	MPTCP_PM_TYPE_USERSPACE,
+	MPTCP_PM_TYPE_BPF_USERSPACE,
 
 	__MPTCP_PM_TYPE_NR,
 	__MPTCP_PM_TYPE_MAX = __MPTCP_PM_TYPE_NR - 1,
@@ -1093,7 +1094,10 @@ static inline bool mptcp_pm_should_rm_signal(struct mptcp_sock *msk)
 
 static inline bool mptcp_pm_is_userspace(const struct mptcp_sock *msk)
 {
-	return READ_ONCE(msk->pm.pm_type) == MPTCP_PM_TYPE_USERSPACE;
+	enum mptcp_pm_type pm_type = READ_ONCE(msk->pm.pm_type);
+
+	return (pm_type == MPTCP_PM_TYPE_USERSPACE ||
+		pm_type == MPTCP_PM_TYPE_BPF_USERSPACE);
 }
 
 static inline bool mptcp_pm_is_kernel(const struct mptcp_sock *msk)
