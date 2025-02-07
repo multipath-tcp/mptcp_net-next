@@ -15,6 +15,7 @@
 #include <linux/btf_ids.h>
 #include <net/bpf_sk_storage.h>
 #include "protocol.h"
+#include "mib.h"
 
 #ifdef CONFIG_BPF_JIT
 static struct bpf_struct_ops bpf_mptcp_pm_ops;
@@ -521,6 +522,15 @@ bpf_mptcp_subflow_ctx(const struct sock *sk)
 	return NULL;
 }
 
+__bpf_kfunc static struct sock *
+bpf_mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
+{
+	if (!subflow)
+		return NULL;
+
+	return mptcp_subflow_tcp_sock(subflow);
+}
+
 __bpf_kfunc static int
 bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 			   struct mptcp_sock *msk)
@@ -644,6 +654,71 @@ __bpf_kfunc static bool bpf_ipv4_is_private_10(__be32 addr)
 	return ipv4_is_private_10(addr);
 }
 
+__bpf_kfunc static void bpf_list_add_tail_rcu(struct list_head *new,
+					      struct list_head *head)
+{
+	list_add_tail_rcu(new, head);
+}
+
+__bpf_kfunc static void bpf_list_del_rcu(struct list_head *entry)
+{
+	list_del_rcu(entry);
+}
+
+__bpf_kfunc static struct mptcp_pm_addr_entry *
+bpf_sock_kmalloc_entry(struct sock *sk, int size, gfp_t priority)
+{
+	return sock_kmalloc(sk, size, priority);
+}
+
+__bpf_kfunc static void
+bpf_sock_kfree_entry(struct sock *sk, struct mptcp_pm_addr_entry *entry,
+		     int size)
+{
+	sock_kfree_s(sk, entry, size);
+}
+
+__bpf_kfunc static void bpf_bitmap_zero(unsigned long *dst__ign, unsigned int nbits)
+{
+	bitmap_zero(dst__ign, nbits);
+}
+
+__bpf_kfunc static void bpf_set_bit(unsigned long nr, unsigned long *addr__ign)
+{
+	__set_bit(nr, addr__ign);
+}
+
+__bpf_kfunc static __u8 bpf_find_next_zero_bit(const unsigned long *addr__ign,
+					       unsigned long size, unsigned long offset)
+{
+	return find_next_zero_bit(addr__ign, size, offset);
+}
+
+__bpf_kfunc static int
+bpf_mptcp_subflow_connect(struct sock *sk,
+			  const struct mptcp_pm_addr_entry *entry,
+			  const struct mptcp_addr_info *remote)
+{
+	struct mptcp_pm_local local;
+
+	local.addr = entry->addr;
+	local.flags = entry->flags;
+	local.ifindex = entry->ifindex;
+
+	return __mptcp_subflow_connect(sk, &local, remote);
+}
+
+__bpf_kfunc static struct net *bpf_sock_net(const struct sock *sk)
+{
+	return sock_net(sk);
+}
+
+__bpf_kfunc static void BPF_MPTCP_INC_STATS(struct net *net,
+					    enum linux_mptcp_mib_field field)
+{
+	MPTCP_INC_STATS(net, field);
+}
+
 __bpf_kfunc static bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 {
 	return tcp_rtx_queue_empty(sk);
@@ -653,6 +728,7 @@ __bpf_kfunc_end_defs();
 
 BTF_KFUNCS_START(bpf_mptcp_common_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_ctx, KF_RET_NULL)
+BTF_ID_FLAGS(func, bpf_mptcp_subflow_tcp_sock, KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
@@ -662,6 +738,24 @@ BTF_ID_FLAGS(func, bpf_iter_mptcp_userspace_pm_addr_destroy, KF_ITER_DESTROY)
 BTF_ID_FLAGS(func, bpf_spin_lock_bh)
 BTF_ID_FLAGS(func, bpf_spin_unlock_bh)
 BTF_ID_FLAGS(func, bpf_ipv4_is_private_10)
+BTF_ID_FLAGS(func, bpf_list_add_tail_rcu)
+BTF_ID_FLAGS(func, bpf_list_del_rcu)
+BTF_ID_FLAGS(func, bpf_sock_kmalloc_entry)
+BTF_ID_FLAGS(func, bpf_sock_kfree_entry)
+BTF_ID_FLAGS(func, mptcp_pm_alloc_anno_list)
+BTF_ID_FLAGS(func, mptcp_pm_announce_addr)
+BTF_ID_FLAGS(func, mptcp_pm_nl_addr_send_ack, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, bpf_bitmap_zero)
+BTF_ID_FLAGS(func, bpf_set_bit)
+BTF_ID_FLAGS(func, bpf_find_next_zero_bit)
+BTF_ID_FLAGS(func, mptcp_pm_remove_addr)
+BTF_ID_FLAGS(func, mptcp_pm_remove_addr_entry, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, bpf_mptcp_subflow_connect, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, mptcp_subflow_shutdown, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, mptcp_close_ssk, KF_SLEEPABLE)
+BTF_ID_FLAGS(func, bpf_sock_net)
+BTF_ID_FLAGS(func, BPF_MPTCP_INC_STATS)
+BTF_ID_FLAGS(func, mptcp_pm_nl_mp_prio_send_ack, KF_SLEEPABLE)
 BTF_ID_FLAGS(func, bpf_mptcp_sock_acquire, KF_ACQUIRE | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_mptcp_sock_release, KF_RELEASE)
 BTF_KFUNCS_END(bpf_mptcp_common_kfunc_ids)
@@ -693,6 +787,8 @@ static int __init bpf_mptcp_kfunc_init(void)
 
 	ret = register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_CGROUP_SOCKOPT,
+					       &bpf_mptcp_common_kfunc_set);
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					       &bpf_mptcp_common_kfunc_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					       &bpf_mptcp_sched_kfunc_set);
