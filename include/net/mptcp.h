@@ -14,6 +14,7 @@
 
 struct mptcp_info;
 struct mptcp_sock;
+struct mptcp_pm_addr_entry;
 struct seq_file;
 
 /* MPTCP sk_buff extension data */
@@ -114,6 +115,37 @@ struct mptcp_sched_ops {
 			   struct mptcp_sched_data *data);
 
 	char			name[MPTCP_SCHED_NAME_MAX];
+	struct module		*owner;
+	struct list_head	list;
+
+	void (*init)(struct mptcp_sock *msk);
+	void (*release)(struct mptcp_sock *msk);
+} ____cacheline_aligned_in_smp;
+
+struct mptcp_pm_ops {
+	int (*created)(struct mptcp_sock *msk);
+	int (*established)(struct mptcp_sock *msk);
+	int (*closed)(struct mptcp_sock *msk);
+	int (*address_announced)(struct mptcp_sock *msk,
+				 struct mptcp_pm_addr_entry *local);
+	int (*address_removed)(struct mptcp_sock *msk, u8 id);
+	int (*subflow_established)(struct mptcp_sock *msk,
+				   struct mptcp_pm_addr_entry *local,
+				   struct mptcp_addr_info *remote);
+	int (*subflow_closed)(struct mptcp_sock *msk,
+			      struct mptcp_pm_addr_entry *local,
+			      struct mptcp_addr_info *remote);
+	int (*get_local_id)(struct mptcp_sock *msk,
+			    struct mptcp_pm_addr_entry *skc);
+	bool (*get_priority)(struct mptcp_sock *msk,
+			     struct mptcp_addr_info *skc);
+	int (*set_priority)(struct mptcp_sock *msk,
+			    struct mptcp_pm_addr_entry *local,
+			    struct mptcp_addr_info *remote);
+	int (*listener_created)(struct mptcp_sock *msk);
+	int (*listener_closed)(struct mptcp_sock *msk);
+
+	u8			type;
 	struct module		*owner;
 	struct list_head	list;
 
