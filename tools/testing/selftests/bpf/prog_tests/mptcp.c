@@ -12,6 +12,7 @@
 #include "mptcpify.skel.h"
 #include "mptcp_subflow.skel.h"
 #include "mptcp_bpf_iters.skel.h"
+#include "mptcp_bpf_userspace_pm.skel.h"
 #include "mptcp_bpf_first.skel.h"
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
@@ -61,6 +62,7 @@
 enum mptcp_pm_type {
 	MPTCP_PM_TYPE_KERNEL = 0,
 	MPTCP_PM_TYPE_USERSPACE,
+	MPTCP_PM_TYPE_BPF_USERSPACE,
 
 	__MPTCP_PM_TYPE_NR,
 	__MPTCP_PM_TYPE_MAX = __MPTCP_PM_TYPE_NR - 1,
@@ -937,6 +939,53 @@ fail:
 	netns_free(netns);
 }
 
+static void test_bpf_path_manager(void)
+{
+	struct mptcp_bpf_userspace_pm *skel;
+	struct netns_obj *netns;
+	int err;
+
+	skel = mptcp_bpf_userspace_pm__open();
+	if (!ASSERT_OK_PTR(skel, "open: userspace_pm"))
+		return;
+
+	err = bpf_program__set_flags(skel->progs.mptcp_userspace_pm_address_announced,
+				     BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_userspace_pm_address_removed,
+					    BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_userspace_pm_subflow_established,
+					    BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_userspace_pm_subflow_closed,
+					    BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_userspace_pm_set_priority,
+					    BPF_F_SLEEPABLE);
+	if (!ASSERT_OK(err, "set sleepable flags"))
+		goto skel_destroy;
+
+	if (!ASSERT_OK(mptcp_bpf_userspace_pm__load(skel), "load: userspace_pm"))
+		goto skel_destroy;
+
+	err = mptcp_bpf_userspace_pm__attach(skel);
+	if (!ASSERT_OK(err, "attach: userspace_pm"))
+		goto skel_destroy;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		goto skel_destroy;
+
+	err = userspace_pm_init(MPTCP_PM_TYPE_BPF_USERSPACE);
+	if (!ASSERT_OK(err, "userspace_pm_init: bpf pm"))
+		goto close_netns;
+
+	run_userspace_pm(skel->kconfig->CONFIG_MPTCP_IPV6 ? IPV6 : IPV4);
+
+	userspace_pm_cleanup();
+close_netns:
+	netns_free(netns);
+skel_destroy:
+	mptcp_bpf_userspace_pm__destroy(skel);
+}
+
 static struct netns_obj *sched_init(char *flags, char *sched)
 {
 	struct netns_obj *netns;
@@ -1134,6 +1183,8 @@ void test_mptcp(void)
 		test_iters_address();
 	if (test__start_subtest("userspace_pm"))
 		test_userspace_pm();
+	if (test__start_subtest("bpf_path_manager"))
+		test_bpf_path_manager();
 	if (test__start_subtest("default"))
 		test_default();
 	if (test__start_subtest("first"))

@@ -42,6 +42,41 @@ static inline int list_is_head(const struct list_head *list,
 #define	ENOMEM		12	/* Out of Memory */
 #define	EINVAL		22	/* Invalid argument */
 
+/* mptcp helpers from include/net/mptcp.h */
+#define U8_MAX		((u8)~0U)
+
+/* max value of mptcp_addr_info.id */
+#define MPTCP_PM_MAX_ADDR_ID		U8_MAX
+
+/* mptcp macros from include/uapi/linux/mptcp.h */
+#define MPTCP_PM_ADDR_FLAG_SIGNAL			(1 << 0)
+#define MPTCP_PM_ADDR_FLAG_SUBFLOW			(1 << 1)
+#define MPTCP_PM_ADDR_FLAG_BACKUP			(1 << 2)
+#define MPTCP_PM_ADDR_FLAG_FULLMESH			(1 << 3)
+#define MPTCP_PM_ADDR_FLAG_IMPLICIT			(1 << 4)
+
+/* address families macros from include/linux/socket.h */
+#define AF_UNSPEC	0
+#define AF_INET		2
+#define AF_INET6	10
+
+/* shutdown macros from include/net/sock.h */
+#define RCV_SHUTDOWN	1
+#define SEND_SHUTDOWN	2
+
+/* GFP macros from include/linux/gfp_types.h */
+#define __AC(X,Y)	(X##Y)
+#define _AC(X,Y)	__AC(X,Y)
+#define _UL(x)		(_AC(x, UL))
+#define UL(x)		(_UL(x))
+#define BIT(nr)		(UL(1) << (nr))
+
+#define ___GFP_HIGH		BIT(___GFP_HIGH_BIT)
+#define __GFP_HIGH		((gfp_t)___GFP_HIGH)
+#define ___GFP_KSWAPD_RECLAIM	BIT(___GFP_KSWAPD_RECLAIM_BIT)
+#define __GFP_KSWAPD_RECLAIM	((gfp_t)___GFP_KSWAPD_RECLAIM) /* kswapd can wake */
+#define GFP_ATOMIC		(__GFP_HIGH|__GFP_KSWAPD_RECLAIM)
+
 static __always_inline struct sock *
 mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 {
@@ -61,6 +96,46 @@ extern void bpf_spin_lock_bh(spinlock_t *lock) __ksym;
 extern void bpf_spin_unlock_bh(spinlock_t *lock) __ksym;
 
 extern bool bpf_ipv4_is_private_10(__be32 addr) __ksym;
+
+extern struct mptcp_pm_addr_entry *
+bpf_sock_kmalloc_entry(struct sock *sk, int size, gfp_t priority) __ksym;
+extern void
+bpf_sock_kfree_entry(struct sock *sk, struct mptcp_pm_addr_entry *entry,
+		     int size) __ksym;
+
+extern bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
+				     const struct mptcp_addr_info *addr) __ksym;
+extern int mptcp_pm_announce_addr(struct mptcp_sock *msk,
+				  const struct mptcp_addr_info *addr,
+				  bool echo) __ksym;
+extern void mptcp_pm_nl_addr_send_ack(struct mptcp_sock *msk) __ksym;
+
+extern void bpf_bitmap_zero(unsigned long *dst, unsigned int nbits) __ksym;
+extern void bpf_set_bit(unsigned long nr, unsigned long *addr) __ksym;
+extern u8 bpf_find_next_zero_bit(const unsigned long *addr,
+				 unsigned long size, unsigned long offset) __ksym;
+
+extern int mptcp_pm_remove_addr(struct mptcp_sock *msk,
+				const struct mptcp_rm_list *rm_list) __ksym;
+extern void mptcp_pm_remove_addr_entry(struct mptcp_sock *msk,
+				       struct mptcp_pm_addr_entry *entry) __ksym;
+
+extern int bpf_mptcp_subflow_connect(struct sock *sk,
+				     const struct mptcp_pm_addr_entry *entry,
+				     const struct mptcp_addr_info *remote) __ksym;
+
+extern void
+mptcp_subflow_shutdown(struct sock *sk, struct sock *ssk, int how) __ksym;
+extern void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
+			    struct mptcp_subflow_context *subflow) __ksym;
+extern struct net *bpf_sock_net(const struct sock *sk) __ksym;
+extern void BPF_MPTCP_INC_STATS(struct net *net,
+				enum linux_mptcp_mib_field field) __ksym;
+
+extern int mptcp_pm_nl_mp_prio_send_ack(struct mptcp_sock *msk,
+					struct mptcp_addr_info *addr,
+					struct mptcp_addr_info *rem,
+					u8 bkup) __ksym;
 
 extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
