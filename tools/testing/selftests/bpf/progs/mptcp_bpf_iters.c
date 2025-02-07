@@ -61,3 +61,37 @@ out:
 	bpf_mptcp_sock_release(msk);
 	return 1;
 }
+
+SEC("cgroup/getsockopt")
+int iters_address(struct bpf_sockopt *ctx)
+{
+	struct mptcp_pm_addr_entry *entry;
+	struct bpf_sock *sk = ctx->sk;
+	struct mptcp_sock *msk;
+	int local_ids = 0;
+
+	if (ctx->level != SOL_TCP || ctx->optname != TCP_IS_MPTCP)
+		return 1;
+
+	msk = bpf_skc_to_mptcp_sock(sk);
+	if (!msk || msk->pm.server_side)
+		return 1;
+
+	bpf_spin_lock_bh(&msk->pm.lock);
+	bpf_for_each(mptcp_userspace_pm_addr, entry, (struct sock *)sk) {
+		/* Here MPTCP-specific path manager kfunc can be called:
+		 * this test is not doing anything really useful, only to
+		 * verify the iteration works.
+		 */
+
+		if (!bpf_ipv4_is_private_10(entry->addr.addr.s_addr))
+			break;
+
+		local_ids += entry->addr.id;
+	}
+	bpf_spin_unlock_bh(&msk->pm.lock);
+
+	ids = local_ids;
+
+	return 1;
+}
