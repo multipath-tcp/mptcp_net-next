@@ -3,6 +3,7 @@
 #define __MPTCP_BPF_H__
 
 #include "bpf_experimental.h"
+#include "bpf_tracing_net.h"
 
 /* mptcp helpers from include/net/mptcp.h */
 #define MPTCP_SUBFLOWS_MAX 8
@@ -36,6 +37,11 @@ static inline int list_is_head(const struct list_head *list,
 #define mptcp_for_each_subflow(__msk, __subflow)			\
 	list_for_each_entry(__subflow, &((__msk)->conn_list), node)
 
+/* errno macros from include/uapi/asm-generic/errno-base.h */
+#define	ESRCH		3	/* No such process */
+#define	ENOMEM		12	/* Out of Memory */
+#define	EINVAL		22	/* Invalid argument */
+
 static __always_inline struct sock *
 mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 {
@@ -61,5 +67,109 @@ extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 
 extern struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx_by_pos(const struct mptcp_sched_data *data, unsigned int pos) __ksym;
+
+/* reimplemented BPF helpers */
+static __always_inline void
+mptcp_pm_copy_addr(struct mptcp_addr_info *dst,
+		   struct mptcp_addr_info *src)
+{
+	dst->id = src->id;
+	dst->family = src->family;
+	dst->port = src->port;
+
+	if (src->family == AF_INET) {
+		dst->addr.s_addr = src->addr.s_addr;
+	} else if (src->family == AF_INET6) {
+		dst->addr6.s6_addr32[0] = src->addr6.s6_addr32[0];
+		dst->addr6.s6_addr32[1] = src->addr6.s6_addr32[1];
+		dst->addr6.s6_addr32[2] = src->addr6.s6_addr32[2];
+		dst->addr6.s6_addr32[3] = src->addr6.s6_addr32[3];
+	}
+}
+
+static __always_inline void
+mptcp_pm_copy_entry(struct mptcp_pm_addr_entry *dst,
+		    struct mptcp_pm_addr_entry *src)
+{
+	mptcp_pm_copy_addr(&dst->addr, &src->addr);
+
+	dst->flags = src->flags;
+	dst->ifindex = src->ifindex;
+}
+
+#define inet_sk(ptr) container_of(ptr, struct inet_sock, sk)
+
+#define ipv6_addr_equal(a, b)	((a).s6_addr32[0] == (b).s6_addr32[0] &&	\
+				 (a).s6_addr32[1] == (b).s6_addr32[1] &&	\
+				 (a).s6_addr32[2] == (b).s6_addr32[2] &&	\
+				 (a).s6_addr32[3] == (b).s6_addr32[3])
+
+static __always_inline bool
+mptcp_addresses_equal(const struct mptcp_addr_info *a,
+		      const struct mptcp_addr_info *b, bool use_port)
+{
+	bool addr_equals = false;
+
+	if (a->family == b->family) {
+		if (a->family == AF_INET)
+			addr_equals = a->addr.s_addr == b->addr.s_addr;
+		else
+			addr_equals = ipv6_addr_equal(a->addr6, b->addr6);
+	}
+
+	if (!addr_equals)
+		return false;
+	if (!use_port)
+		return true;
+
+	return a->port == b->port;
+}
+
+static __always_inline struct sock *
+mptcp_pm_find_ssk(struct mptcp_sock *msk,
+		  const struct mptcp_addr_info *local,
+		  const struct mptcp_addr_info *remote)
+{
+	struct mptcp_subflow_context *subflow;
+
+	if (local->family != remote->family)
+		return NULL;
+
+	bpf_for_each(mptcp_subflow, subflow, msk) {
+		const struct inet_sock *issk;
+		struct sock *ssk;
+
+		ssk = bpf_mptcp_subflow_tcp_sock(subflow);
+		if (!ssk)
+			continue;
+
+		if (local->family != ssk->sk_family)
+			continue;
+
+		issk = bpf_core_cast(inet_sk(ssk), struct inet_sock);
+
+		switch (ssk->sk_family) {
+		case AF_INET:
+			if (issk->inet_saddr != local->addr.s_addr ||
+			    issk->inet_daddr != remote->addr.s_addr)
+				continue;
+			break;
+		case AF_INET6: {
+			if (!ipv6_addr_equal(local->addr6, issk->pinet6->saddr) ||
+			    !ipv6_addr_equal(remote->addr6, ssk->sk_v6_daddr))
+				continue;
+			break;
+		}
+		default:
+			continue;
+		}
+
+		if (issk->inet_sport == local->port &&
+		    issk->inet_dport == remote->port)
+			return ssk;
+	}
+
+	return NULL;
+}
 
 #endif
