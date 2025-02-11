@@ -17,6 +17,8 @@ stress() { local i=0 pid nproc2
 	pid=$!
 
 	# We can also renice 20 qemu for even more impact
+	# sudo renice -n 20 -p $(pidof qemu-system-x86_64)
+	# or from ./.container.sh
 
 	echo -e "\n\n=== Stress in progress ($i -- ${pid}) ===\n"
 	wait ${pid} || true
@@ -50,11 +52,18 @@ trap 'exit_trap' EXIT
 
 export VIRTME_NO_INTERACTIVE=1
 
-VIRTME_PACKETDRILL_STABLE=1 INPUT_BUILD_SKIP_PERF=1 INPUT_CLEAN=1 ./.virtme.sh "build" "${MODE}" "${@}" &
+SUFFIX=$(make kernelversion | cut -d. -f1-2)
+
+VIRTME_PACKETDRILL_STABLE=1 \
+	INPUT_BUILD_SKIP_PERF=1 \
+	INPUT_CLEAN=1 \
+	INPUT_BUILD_SUFFIX=${SUFFIX} \
+	./.virtme.sh "build" "${MODE}" "${@}" &
 PID_VIRTME=$!
 wait ${PID_VIRTME} || exit 125 # skip
 
-./.virtme.sh "vm-auto" "${MODE}" &
+INPUT_BUILD_SUFFIX=${SUFFIX} \
+	./.virtme.sh "vm-auto" "${MODE}" &
 PID_VIRTME=$!
 
 if [ "${STRESS}" = 1 ]; then
