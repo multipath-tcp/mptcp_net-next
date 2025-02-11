@@ -1,5 +1,5 @@
 #! /bin/bash
-git filter-repo --message-callback '
+git filter-repo --force --message-callback '
         if b"Cc: stable@vger.kernel.org" in message:
           print("  [ Skip ] stable is already being Cced")
           return message
