@@ -2209,7 +2209,6 @@ F:	sound/soc/codecs/cs42l84.*
 F:	sound/soc/codecs/ssm3515.c
 
 ARM/APPLE MACHINE SUPPORT
-M:	Hector Martin <marcan@marcan.st>
 M:	Sven Peter <sven@svenpeter.dev>
 R:	Alyssa Rosenzweig <alyssa@rosenzweig.io>
 L:	asahi@lists.linux.dev
@@ -3954,6 +3953,7 @@ M:	Kent Overstreet <kent.overstreet@linux.dev>
 L:	linux-bcachefs@vger.kernel.org
 S:	Supported
 C:	irc://irc.oftc.net/bcache
+P:      Documentation/filesystems/bcachefs/SubmittingPatches.rst
 T:	git https://evilpiepirate.org/git/bcachefs.git
 F:	fs/bcachefs/
 F:	Documentation/filesystems/bcachefs/
@@ -9417,7 +9417,7 @@ F:	fs/freevxfs/
 
 FREEZER
 M:	"Rafael J. Wysocki" <rafael@kernel.org>
-M:	Pavel Machek <pavel@ucw.cz>
+M:	Pavel Machek <pavel@kernel.org>
 L:	linux-pm@vger.kernel.org
 S:	Supported
 F:	Documentation/power/freezing-of-tasks.rst
@@ -9877,7 +9877,7 @@ S:	Maintained
 F:	drivers/staging/gpib/
 
 GPIO ACPI SUPPORT
-M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+M:	Mika Westerberg <westeri@kernel.org>
 M:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 L:	linux-gpio@vger.kernel.org
 L:	linux-acpi@vger.kernel.org
@@ -10252,7 +10252,7 @@ F:	drivers/video/fbdev/hgafb.c
 
 HIBERNATION (aka Software Suspend, aka swsusp)
 M:	"Rafael J. Wysocki" <rafael@kernel.org>
-M:	Pavel Machek <pavel@ucw.cz>
+M:	Pavel Machek <pavel@kernel.org>
 L:	linux-pm@vger.kernel.org
 S:	Supported
 B:	https://bugzilla.kernel.org
@@ -13123,8 +13123,8 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git for-next/har
 F:	scripts/leaking_addresses.pl
 
 LED SUBSYSTEM
-M:	Pavel Machek <pavel@ucw.cz>
 M:	Lee Jones <lee@kernel.org>
+M:	Pavel Machek <pavel@kernel.org>
 L:	linux-leds@vger.kernel.org
 S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lee/leds.git
@@ -16824,7 +16824,7 @@ F:	include/linux/tick.h
 F:	kernel/time/tick*.*
 
 NOKIA N900 CAMERA SUPPORT (ET8EK8 SENSOR, AD5820 FOCUS)
-M:	Pavel Machek <pavel@ucw.cz>
+M:	Pavel Machek <pavel@kernel.org>
 M:	Sakari Ailus <sakari.ailus@iki.fi>
 L:	linux-media@vger.kernel.org
 S:	Maintained
@@ -22847,7 +22847,7 @@ F:	drivers/sh/
 SUSPEND TO RAM
 M:	"Rafael J. Wysocki" <rafael@kernel.org>
 M:	Len Brown <len.brown@intel.com>
-M:	Pavel Machek <pavel@ucw.cz>
+M:	Pavel Machek <pavel@kernel.org>
 L:	linux-pm@vger.kernel.org
 S:	Supported
 B:	https://bugzilla.kernel.org
