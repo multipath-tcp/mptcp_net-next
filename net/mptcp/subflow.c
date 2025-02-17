@@ -969,6 +969,7 @@ enum mapping_status {
 	MAPPING_DATA_FIN,
 	MAPPING_DUMMY,
 	MAPPING_BAD_CSUM,
+	MAPPING_INFINITE,
 	MAPPING_NODSS
 };
 
@@ -1139,8 +1140,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	if (data_len == 0) {
 		pr_debug("infinite mapping received\n");
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
-		subflow->map_data_len = 0;
-		return MAPPING_INVALID;
+		return MAPPING_INFINITE;
 	}
 
 	if (mpext->data_fin == 1) {
@@ -1357,7 +1357,8 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		status = get_mapping_status(ssk, msk);
 		trace_subflow_check_data_avail(status, skb_peek(&ssk->sk_receive_queue));
 		if (unlikely(status == MAPPING_INVALID || status == MAPPING_DUMMY ||
-			     status == MAPPING_BAD_CSUM || status == MAPPING_NODSS))
+			     status == MAPPING_BAD_CSUM || status == MAPPING_INFINITE ||
+			     status == MAPPING_NODSS))
 			goto fallback;
 
 		if (status != MAPPING_OK)
@@ -1405,7 +1406,7 @@ fallback:
 			return true;
 		}
 
-		if (!subflow_can_fallback(subflow) && subflow->map_data_len) {
+		if (!subflow_can_fallback(subflow) && status != MAPPING_INFINITE) {
 			/* fatal protocol error, close the socket.
 			 * subflow_error_report() will introduce the appropriate barriers
 			 */
