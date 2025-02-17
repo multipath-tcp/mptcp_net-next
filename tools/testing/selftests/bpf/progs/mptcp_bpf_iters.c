@@ -24,14 +24,11 @@ int iters_subflow(struct bpf_sockopt *ctx)
 	if (ctx->level != SOL_TCP || ctx->optname != TCP_IS_MPTCP)
 		return 1;
 
-	msk = bpf_skc_to_mptcp_sock(sk);
+	msk = bpf_core_cast(sk, struct mptcp_sock);
 	if (!msk || msk->pm.server_side || !msk->pm.subflows)
 		return 1;
 
-	msk = bpf_mptcp_sock_acquire(msk);
-	if (!msk)
-		return 1;
-	bpf_for_each(mptcp_subflow, subflow, msk) {
+	bpf_for_each(mptcp_subflow, subflow, (struct sock *)sk) {
 		/* Here MPTCP-specific packet scheduler kfunc can be called:
 		 * this test is not doing anything really useful, only to
 		 * verify the iteration works.
@@ -39,7 +36,7 @@ int iters_subflow(struct bpf_sockopt *ctx)
 
 		local_ids += subflow->subflow_id;
 
-		/* only to check the following kfunc works */
+		/* only to check the following helper works */
 		ssk = mptcp_subflow_tcp_sock(subflow);
 	}
 
@@ -58,6 +55,5 @@ int iters_subflow(struct bpf_sockopt *ctx)
 	ids = local_ids;
 
 out:
-	bpf_mptcp_sock_release(msk);
 	return 1;
 }
