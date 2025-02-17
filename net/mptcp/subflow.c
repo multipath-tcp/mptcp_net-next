@@ -1298,16 +1298,20 @@ static void subflow_sched_work_if_closed(struct mptcp_sock *msk, struct sock *ss
 		mptcp_schedule_work(sk);
 }
 
-static bool subflow_can_fallback(struct mptcp_subflow_context *subflow)
+static bool subflow_can_fallback(struct mptcp_subflow_context *subflow,
+				 enum mapping_status status)
 {
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 
-	if (subflow->mp_join)
+	/* If not allowed (additional paths, MPTCP reinjections): no fallback */
+	if (!READ_ONCE(msk->allow_infinite_fallback))
 		return false;
-	else if (READ_ONCE(msk->csum_enabled))
+
+	/* More strict with csum: fallback in 2 cases: inf map or never valid */
+	if (status != MAPPING_INFINITE && READ_ONCE(msk->csum_enabled))
 		return !subflow->valid_csum_seen;
-	else
-		return READ_ONCE(msk->allow_infinite_fallback);
+
+	return true;
 }
 
 static void mptcp_subflow_fail(struct mptcp_sock *msk, struct sock *ssk)
@@ -1406,7 +1410,7 @@ fallback:
 			return true;
 		}
 
-		if (!subflow_can_fallback(subflow) && status != MAPPING_INFINITE) {
+		if (!subflow_can_fallback(subflow, status)) {
 			/* fatal protocol error, close the socket.
 			 * subflow_error_report() will introduce the appropriate barriers
 			 */
