@@ -1,0 +1,56 @@
+name: "Notifications"
+on:
+  push:
+    tags:
+      - 'export/**'   # exclude patchew/** tags and branches
+      - 'export-net/**'
+  issues:
+    types: [opened, reopened, closed, assigned, unassigned]
+
+permissions: {}
+
+jobs:
+  tag:
+    name: "Tag"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: tag shortner
+        id: tag
+        run: |
+          echo "tag=${REF:10}" >> ${GITHUB_OUTPUT}
+        env:
+          REF: ${{ github.event.ref }}
+      - name: irc tag
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tag-bot
+          verbose: true
+          message: "New tag available: ${{ steps.tag.outputs.tag }} (by ${{ github.actor }})"
+
+  issues:
+    name: "Issues"
+    if: github.repository_owner == 'multipath-tcp' && github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    steps:
+      - name: issue info
+        id: info
+        if: github.event.action != 'opened'
+        run: |
+          echo "opener=, opened by ${OPENER}" >> ${GITHUB_OUTPUT}
+          echo "assignee=${ASSIGNEE:+ and assigned to ${ASSIGNEE}}" >> ${GITHUB_OUTPUT}
+        env:
+          OPENER: ${{ github.event.issue.user.login }}
+          ASSIGNEE: ${{ github.event.assignee.login }}
+      - name: irc issues
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp"
+          nickname: gh-issues-bot
+          verbose: true
+          message: |-
+            Issue #${{ github.event.issue.number }} ("${{ github.event.issue.title }}"${{ steps.info.outputs.opener }}${{ steps.info.outputs.assignee }}) has been ${{ github.event.action }} by ${{ github.actor }}
+            ${{ github.event.issue.html_url }}
