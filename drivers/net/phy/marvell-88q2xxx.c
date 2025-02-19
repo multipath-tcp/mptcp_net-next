@@ -7,34 +7,34 @@
  * Copyright (C) 2024 Liebherr-Electronics and Drives GmbH
  */
 #include <linux/ethtool_netlink.h>
+#include <linux/hwmon.h>
 #include <linux/marvell_phy.h>
 #include <linux/of.h>
 #include <linux/phy.h>
-#include <linux/hwmon.h>
 
-#define PHY_ID_88Q2220_REVB0	(MARVELL_PHY_ID_88Q2220 | 0x1)
-#define PHY_ID_88Q2220_REVB1	(MARVELL_PHY_ID_88Q2220 | 0x2)
-#define PHY_ID_88Q2220_REVB2	(MARVELL_PHY_ID_88Q2220 | 0x3)
+#define PHY_ID_88Q2220_REVB0				(MARVELL_PHY_ID_88Q2220 | 0x1)
+#define PHY_ID_88Q2220_REVB1				(MARVELL_PHY_ID_88Q2220 | 0x2)
+#define PHY_ID_88Q2220_REVB2				(MARVELL_PHY_ID_88Q2220 | 0x3)
 
-#define MDIO_MMD_AN_MV_STAT			32769
-#define MDIO_MMD_AN_MV_STAT_ANEG		0x0100
-#define MDIO_MMD_AN_MV_STAT_LOCAL_RX		0x1000
-#define MDIO_MMD_AN_MV_STAT_REMOTE_RX		0x2000
-#define MDIO_MMD_AN_MV_STAT_LOCAL_MASTER	0x4000
-#define MDIO_MMD_AN_MV_STAT_MS_CONF_FAULT	0x8000
+#define MDIO_MMD_AN_MV_STAT				32769
+#define MDIO_MMD_AN_MV_STAT_ANEG			0x0100
+#define MDIO_MMD_AN_MV_STAT_LOCAL_RX			0x1000
+#define MDIO_MMD_AN_MV_STAT_REMOTE_RX			0x2000
+#define MDIO_MMD_AN_MV_STAT_LOCAL_MASTER		0x4000
+#define MDIO_MMD_AN_MV_STAT_MS_CONF_FAULT		0x8000
 
-#define MDIO_MMD_AN_MV_STAT2			32794
-#define MDIO_MMD_AN_MV_STAT2_AN_RESOLVED	0x0800
-#define MDIO_MMD_AN_MV_STAT2_100BT1		0x2000
-#define MDIO_MMD_AN_MV_STAT2_1000BT1		0x4000
+#define MDIO_MMD_AN_MV_STAT2				32794
+#define MDIO_MMD_AN_MV_STAT2_AN_RESOLVED		0x0800
+#define MDIO_MMD_AN_MV_STAT2_100BT1			0x2000
+#define MDIO_MMD_AN_MV_STAT2_1000BT1			0x4000
 
-#define MDIO_MMD_PCS_MV_RESET_CTRL		32768
-#define MDIO_MMD_PCS_MV_RESET_CTRL_TX_DISABLE	0x8
+#define MDIO_MMD_PCS_MV_RESET_CTRL			32768
+#define MDIO_MMD_PCS_MV_RESET_CTRL_TX_DISABLE		0x8
 
-#define MDIO_MMD_PCS_MV_INT_EN			32784
-#define MDIO_MMD_PCS_MV_INT_EN_LINK_UP		0x0040
-#define MDIO_MMD_PCS_MV_INT_EN_LINK_DOWN	0x0080
-#define MDIO_MMD_PCS_MV_INT_EN_100BT1		0x1000
+#define MDIO_MMD_PCS_MV_INT_EN				32784
+#define MDIO_MMD_PCS_MV_INT_EN_LINK_UP			0x0040
+#define MDIO_MMD_PCS_MV_INT_EN_LINK_DOWN		0x0080
+#define MDIO_MMD_PCS_MV_INT_EN_100BT1			0x1000
 
 #define MDIO_MMD_PCS_MV_GPIO_INT_STAT			32785
 #define MDIO_MMD_PCS_MV_GPIO_INT_STAT_LINK_UP		0x0040
@@ -80,11 +80,11 @@
 #define MDIO_MMD_PCS_MV_100BT1_STAT1_REMOTE_RX		0x2000
 #define MDIO_MMD_PCS_MV_100BT1_STAT1_LOCAL_MASTER	0x4000
 
-#define MDIO_MMD_PCS_MV_100BT1_STAT2		33033
-#define MDIO_MMD_PCS_MV_100BT1_STAT2_JABBER	0x0001
-#define MDIO_MMD_PCS_MV_100BT1_STAT2_POL	0x0002
-#define MDIO_MMD_PCS_MV_100BT1_STAT2_LINK	0x0004
-#define MDIO_MMD_PCS_MV_100BT1_STAT2_ANGE	0x0008
+#define MDIO_MMD_PCS_MV_100BT1_STAT2			33033
+#define MDIO_MMD_PCS_MV_100BT1_STAT2_JABBER		0x0001
+#define MDIO_MMD_PCS_MV_100BT1_STAT2_POL		0x0002
+#define MDIO_MMD_PCS_MV_100BT1_STAT2_LINK		0x0004
+#define MDIO_MMD_PCS_MV_100BT1_STAT2_ANGE		0x0008
 
 #define MDIO_MMD_PCS_MV_100BT1_INT_EN			33042
 #define MDIO_MMD_PCS_MV_100BT1_INT_EN_LINKEVENT		0x0400
@@ -92,7 +92,7 @@
 #define MDIO_MMD_PCS_MV_COPPER_INT_STAT			33043
 #define MDIO_MMD_PCS_MV_COPPER_INT_STAT_LINKEVENT	0x0400
 
-#define MDIO_MMD_PCS_MV_RX_STAT			33328
+#define MDIO_MMD_PCS_MV_RX_STAT				33328
 
 #define MDIO_MMD_PCS_MV_TDR_RESET			65226
 #define MDIO_MMD_PCS_MV_TDR_RESET_TDR_RST		0x1000
@@ -115,8 +115,8 @@
 
 #define MDIO_MMD_PCS_MV_TDR_OFF_CUTOFF			65246
 
-#define MV88Q2XXX_LED_INDEX_TX_ENABLE	0
-#define MV88Q2XXX_LED_INDEX_GPIO	1
+#define MV88Q2XXX_LED_INDEX_TX_ENABLE			0
+#define MV88Q2XXX_LED_INDEX_GPIO			1
 
 struct mv88q2xxx_priv {
 	bool enable_temp;
@@ -513,6 +513,15 @@ static int mv88q2xxx_config_init(struct phy_device *phydev)
 			return ret;
 	}
 
+	/* Enable temperature sense */
+	if (priv->enable_temp) {
+		ret = phy_modify_mmd(phydev, MDIO_MMD_PCS,
+				     MDIO_MMD_PCS_MV_TEMP_SENSOR2,
+				     MDIO_MMD_PCS_MV_TEMP_SENSOR2_DIS_MASK, 0);
+		if (ret < 0)
+			return ret;
+	}
+
 	return 0;
 }
 
@@ -825,13 +834,24 @@ static int mv88q2xxx_leds_probe(struct phy_device *phydev)
 static int mv88q2xxx_probe(struct phy_device *phydev)
 {
 	struct mv88q2xxx_priv *priv;
-	int ret;
 
 	priv = devm_kzalloc(&phydev->mdio.dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
 	phydev->priv = priv;
+
+	return 0;
+}
+
+static int mv88q222x_probe(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = mv88q2xxx_probe(phydev);
+	if (ret)
+		return ret;
+
 	ret = mv88q2xxx_leds_probe(phydev);
 	if (ret)
 		return ret;
@@ -903,18 +923,6 @@ static int mv88q222x_revb1_revb2_config_init(struct phy_device *phydev)
 
 static int mv88q222x_config_init(struct phy_device *phydev)
 {
-	struct mv88q2xxx_priv *priv = phydev->priv;
-	int ret;
-
-	/* Enable temperature sense */
-	if (priv->enable_temp) {
-		ret = phy_modify_mmd(phydev, MDIO_MMD_PCS,
-				     MDIO_MMD_PCS_MV_TEMP_SENSOR2,
-				     MDIO_MMD_PCS_MV_TEMP_SENSOR2_DIS_MASK, 0);
-		if (ret < 0)
-			return ret;
-	}
-
 	if (phydev->c45_ids.device_ids[MDIO_MMD_PMAPMD] == PHY_ID_88Q2220_REVB0)
 		return mv88q222x_revb0_config_init(phydev);
 	else
@@ -1101,6 +1109,7 @@ static struct phy_driver mv88q2xxx_driver[] = {
 		.phy_id			= MARVELL_PHY_ID_88Q2110,
 		.phy_id_mask		= MARVELL_PHY_ID_MASK,
 		.name			= "mv88q2110",
+		.probe			= mv88q2xxx_probe,
 		.get_features		= mv88q2xxx_get_features,
 		.config_aneg		= mv88q2xxx_config_aneg,
 		.config_init		= mv88q2110_config_init,
@@ -1115,7 +1124,7 @@ static struct phy_driver mv88q2xxx_driver[] = {
 		.phy_id_mask		= MARVELL_PHY_ID_MASK,
 		.name			= "mv88q2220",
 		.flags			= PHY_POLL_CABLE_TEST,
-		.probe			= mv88q2xxx_probe,
+		.probe			= mv88q222x_probe,
 		.get_features		= mv88q2xxx_get_features,
 		.config_aneg		= mv88q2xxx_config_aneg,
 		.aneg_done		= genphy_c45_aneg_done,
