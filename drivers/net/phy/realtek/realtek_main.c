@@ -79,9 +79,7 @@
 /* RTL822X_VND2_XXXXX registers are only accessible when phydev->is_c45
  * is set, they cannot be accessed by C45-over-C22.
  */
-#define RTL822X_VND2_GBCR				0xa412
-
-#define RTL822X_VND2_GANLPAR				0xa414
+#define RTL822X_VND2_C22_REG(reg)		(0xa400 + 2 * (reg))
 
 #define RTL8366RB_POWER_SAVE			0x15
 #define RTL8366RB_POWER_SAVE_ON			BIT(12)
@@ -95,6 +93,16 @@
 #define RTL_VND2_PHYSR_SPEEDH			GENMASK(10, 9)
 #define RTL_VND2_PHYSR_MASTER			BIT(11)
 #define RTL_VND2_PHYSR_SPEED_MASK		(RTL_VND2_PHYSR_SPEEDL | RTL_VND2_PHYSR_SPEEDH)
+
+#define	RTL_MDIO_PCS_EEE_ABLE			0xa5c4
+#define	RTL_MDIO_AN_EEE_ADV			0xa5d0
+#define	RTL_MDIO_AN_EEE_LPABLE			0xa5d2
+#define	RTL_MDIO_AN_10GBT_CTRL			0xa5d4
+#define	RTL_MDIO_AN_10GBT_STAT			0xa5d6
+#define	RTL_MDIO_PMA_SPEED			0xa616
+#define	RTL_MDIO_AN_EEE_LPABLE2			0xa6d0
+#define	RTL_MDIO_AN_EEE_ADV2			0xa6d4
+#define	RTL_MDIO_PCS_EEE_ABLE2			0xa6ec
 
 #define RTL_GENERIC_PHYID			0x001cc800
 #define RTL_8211FVD_PHYID			0x001cc878
@@ -753,11 +761,11 @@ static int rtlgen_read_mmd(struct phy_device *phydev, int devnum, u16 regnum)
 	if (devnum == MDIO_MMD_VEND2)
 		ret = rtlgen_read_vend2(phydev, regnum);
 	else if (devnum == MDIO_MMD_PCS && regnum == MDIO_PCS_EEE_ABLE)
-		ret = rtlgen_read_vend2(phydev, 0xa5c4);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_PCS_EEE_ABLE);
 	else if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_ADV)
-		ret = rtlgen_read_vend2(phydev, 0xa5d0);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_AN_EEE_ADV);
 	else if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_LPABLE)
-		ret = rtlgen_read_vend2(phydev, 0xa5d2);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_AN_EEE_LPABLE);
 	else
 		ret = -EOPNOTSUPP;
 
@@ -772,7 +780,7 @@ static int rtlgen_write_mmd(struct phy_device *phydev, int devnum, u16 regnum,
 	if (devnum == MDIO_MMD_VEND2)
 		ret = rtlgen_write_vend2(phydev, regnum, val);
 	else if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_ADV)
-		ret = rtlgen_write_vend2(phydev, regnum, 0xa5d0);
+		ret = rtlgen_write_vend2(phydev, regnum, RTL_MDIO_AN_EEE_ADV);
 	else
 		ret = -EOPNOTSUPP;
 
@@ -787,11 +795,11 @@ static int rtl822x_read_mmd(struct phy_device *phydev, int devnum, u16 regnum)
 		return ret;
 
 	if (devnum == MDIO_MMD_PCS && regnum == MDIO_PCS_EEE_ABLE2)
-		ret = rtlgen_read_vend2(phydev, 0xa6ec);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_PCS_EEE_ABLE2);
 	else if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_ADV2)
-		ret = rtlgen_read_vend2(phydev, 0xa6d4);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_AN_EEE_ADV2);
 	else if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_LPABLE2)
-		ret = rtlgen_read_vend2(phydev, 0xa6d0);
+		ret = rtlgen_read_vend2(phydev, RTL_MDIO_AN_EEE_LPABLE2);
 
 	return ret;
 }
@@ -805,7 +813,7 @@ static int rtl822x_write_mmd(struct phy_device *phydev, int devnum, u16 regnum,
 		return ret;
 
 	if (devnum == MDIO_MMD_AN && regnum == MDIO_AN_EEE_ADV2)
-		ret = rtlgen_write_vend2(phydev, 0xa6d4, val);
+		ret = rtlgen_write_vend2(phydev, RTL_MDIO_AN_EEE_ADV2, val);
 
 	return ret;
 }
@@ -901,7 +909,7 @@ static int rtl822x_get_features(struct phy_device *phydev)
 {
 	int val;
 
-	val = phy_read_mmd(phydev, MDIO_MMD_VEND2, 0xa616);
+	val = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL_MDIO_PMA_SPEED);
 	if (val < 0)
 		return val;
 
@@ -922,7 +930,8 @@ static int rtl822x_config_aneg(struct phy_device *phydev)
 	if (phydev->autoneg == AUTONEG_ENABLE) {
 		u16 adv = linkmode_adv_to_mii_10gbt_adv_t(phydev->advertising);
 
-		ret = phy_modify_mmd_changed(phydev, MDIO_MMD_VEND2, 0xa5d4,
+		ret = phy_modify_mmd_changed(phydev, MDIO_MMD_VEND2,
+					     RTL_MDIO_AN_10GBT_CTRL,
 					     MDIO_AN_10GBT_CTRL_ADV2_5G |
 					     MDIO_AN_10GBT_CTRL_ADV5G, adv);
 		if (ret < 0)
@@ -968,7 +977,7 @@ static int rtl822x_read_status(struct phy_device *phydev)
 	    !phydev->autoneg_complete)
 		return 0;
 
-	lpadv = phy_read_mmd(phydev, MDIO_MMD_VEND2, 0xa5d6);
+	lpadv = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL_MDIO_AN_10GBT_STAT);
 	if (lpadv < 0)
 		return lpadv;
 
@@ -1015,7 +1024,8 @@ static int rtl822x_c45_config_aneg(struct phy_device *phydev)
 	val = linkmode_adv_to_mii_ctrl1000_t(phydev->advertising);
 
 	/* Vendor register as C45 has no standardized support for 1000BaseT */
-	ret = phy_modify_mmd_changed(phydev, MDIO_MMD_VEND2, RTL822X_VND2_GBCR,
+	ret = phy_modify_mmd_changed(phydev, MDIO_MMD_VEND2,
+				     RTL822X_VND2_C22_REG(MII_CTRL1000),
 				     ADVERTISE_1000FULL, val);
 	if (ret < 0)
 		return ret;
@@ -1032,7 +1042,7 @@ static int rtl822x_c45_read_status(struct phy_device *phydev)
 	/* Vendor register as C45 has no standardized support for 1000BaseT */
 	if (phydev->autoneg == AUTONEG_ENABLE && genphy_c45_aneg_done(phydev)) {
 		val = phy_read_mmd(phydev, MDIO_MMD_VEND2,
-				   RTL822X_VND2_GANLPAR);
+				   RTL822X_VND2_C22_REG(MII_STAT1000));
 		if (val < 0)
 			return val;
 	} else {
