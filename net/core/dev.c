@@ -2071,12 +2071,53 @@ static void __move_netdevice_notifier_net(struct net *src_net,
 	__register_netdevice_notifier_net(dst_net, nb, true);
 }
 
+static void rtnl_net_dev_lock(struct net_device *dev)
+{
+	bool again;
+
+	do {
+		struct net *net;
+
+		again = false;
+
+		/* netns might be being dismantled. */
+		rcu_read_lock();
+		net = dev_net_rcu(dev);
+		net_passive_inc(net);
+		rcu_read_unlock();
+
+		rtnl_net_lock(net);
+
+#ifdef CONFIG_NET_NS
+		/* dev might have been moved to another netns. */
+		if (!net_eq(net, rcu_access_pointer(dev->nd_net.net))) {
+			rtnl_net_unlock(net);
+			net_passive_dec(net);
+			again = true;
+		}
+#endif
+	} while (again);
+}
+
+static void rtnl_net_dev_unlock(struct net_device *dev)
+{
+	struct net *net = dev_net(dev);
+
+	rtnl_net_unlock(net);
+	net_passive_dec(net);
+}
+
 int register_netdevice_notifier_dev_net(struct net_device *dev,
 					struct notifier_block *nb,
 					struct netdev_net_notifier *nn)
 {
 	struct net *net = dev_net(dev);
 	int err;
+
+	/* rtnl_net_lock() assumes dev is not yet published by
+	 * register_netdevice().
+	 */
+	DEBUG_NET_WARN_ON_ONCE(!list_empty(&dev->dev_list));
 
 	rtnl_net_lock(net);
 	err = __register_netdevice_notifier_net(net, nb, false);
@@ -2094,13 +2135,12 @@ int unregister_netdevice_notifier_dev_net(struct net_device *dev,
 					  struct notifier_block *nb,
 					  struct netdev_net_notifier *nn)
 {
-	struct net *net = dev_net(dev);
 	int err;
 
-	rtnl_net_lock(net);
+	rtnl_net_dev_lock(dev);
 	list_del(&nn->list);
-	err = __unregister_netdevice_notifier_net(net, nb);
-	rtnl_net_unlock(net);
+	err = __unregister_netdevice_notifier_net(dev_net(dev), nb);
+	rtnl_net_dev_unlock(dev);
 
 	return err;
 }
@@ -9182,7 +9222,7 @@ int __dev_change_flags(struct net_device *dev, unsigned int flags,
 
 	if ((flags ^ dev->gflags) & IFF_PROMISC) {
 		int inc = (flags & IFF_PROMISC) ? 1 : -1;
-		unsigned int old_flags = dev->flags;
+		old_flags = dev->flags;
 
 		dev->gflags ^= IFF_PROMISC;
 
@@ -11901,11 +11941,9 @@ EXPORT_SYMBOL(unregister_netdevice_many);
  */
 void unregister_netdev(struct net_device *dev)
 {
-	struct net *net = dev_net(dev);
-
-	rtnl_net_lock(net);
+	rtnl_net_dev_lock(dev);
 	unregister_netdevice(dev);
-	rtnl_net_unlock(net);
+	rtnl_net_dev_unlock(dev);
 }
 EXPORT_SYMBOL(unregister_netdev);
 
