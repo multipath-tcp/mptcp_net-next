@@ -501,14 +501,36 @@ static struct sock *mptcp_nl_find_ssk(struct mptcp_sock *msk,
 	return NULL;
 }
 
+static int mptcp_userspace_pm_subflow_closed(struct mptcp_sock *msk,
+					     struct mptcp_pm_param *param)
+{
+	struct mptcp_pm_addr_entry *local = &param->entry;
+	struct mptcp_addr_info *remote = &param->addr;
+	struct sock *ssk, *sk = (struct sock *)msk;
+
+	ssk = mptcp_nl_find_ssk(msk, &local->addr, remote);
+	if (!ssk)
+		return -ESRCH;
+
+	spin_lock_bh(&msk->pm.lock);
+	mptcp_userspace_pm_delete_local_addr(msk, local);
+	spin_unlock_bh(&msk->pm.lock);
+	mptcp_subflow_shutdown(sk, ssk, RCV_SHUTDOWN | SEND_SHUTDOWN);
+	mptcp_close_ssk(sk, ssk, mptcp_subflow_ctx(ssk));
+	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMSUBFLOW);
+
+	return 0;
+}
+
 int mptcp_pm_nl_subflow_destroy_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry addr_l;
 	struct mptcp_addr_info addr_r;
 	struct nlattr *raddr, *laddr;
+	struct mptcp_pm_param param;
 	struct mptcp_sock *msk;
-	struct sock *sk, *ssk;
 	int err = -EINVAL;
+	struct sock *sk;
 
 	if (GENL_REQ_ATTR_CHECK(info, MPTCP_PM_ATTR_ADDR) ||
 	    GENL_REQ_ATTR_CHECK(info, MPTCP_PM_ATTR_ADDR_REMOTE))
@@ -559,21 +581,13 @@ int mptcp_pm_nl_subflow_destroy_doit(struct sk_buff *skb, struct genl_info *info
 	}
 
 	lock_sock(sk);
-	ssk = mptcp_nl_find_ssk(msk, &addr_l.addr, &addr_r);
-	if (!ssk) {
-		GENL_SET_ERR_MSG(info, "subflow not found");
-		err = -ESRCH;
-		goto release_sock;
-	}
-
-	spin_lock_bh(&msk->pm.lock);
-	mptcp_userspace_pm_delete_local_addr(msk, &addr_l);
-	spin_unlock_bh(&msk->pm.lock);
-	mptcp_subflow_shutdown(sk, ssk, RCV_SHUTDOWN | SEND_SHUTDOWN);
-	mptcp_close_ssk(sk, ssk, mptcp_subflow_ctx(ssk));
-	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RMSUBFLOW);
-release_sock:
+	mptcp_pm_param_set_contexts(&param, &addr_l, &addr_r);
+	err = msk->pm.ops && msk->pm.ops->subflow_closed ?
+	      msk->pm.ops->subflow_closed(msk, &param) :
+	      mptcp_userspace_pm_subflow_closed(msk, &param);
 	release_sock(sk);
+	if (err)
+		GENL_SET_ERR_MSG(info, "subflow not found");
 
 destroy_err:
 	sock_put(sk);
@@ -719,6 +733,7 @@ static struct mptcp_pm_ops mptcp_userspace_pm = {
 	.address_announced	= mptcp_userspace_pm_address_announced,
 	.address_removed	= mptcp_userspace_pm_address_removed,
 	.subflow_established	= mptcp_userspace_pm_subflow_established,
+	.subflow_closed		= mptcp_userspace_pm_subflow_closed,
 	.get_local_id		= mptcp_userspace_pm_get_local_id,
 	.get_priority		= mptcp_userspace_pm_get_priority,
 	.type			= MPTCP_PM_TYPE_USERSPACE,
