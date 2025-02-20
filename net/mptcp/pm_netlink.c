@@ -1540,8 +1540,9 @@ static int mptcp_pm_nl_address_removed(struct mptcp_sock *msk,
 }
 
 static int mptcp_pm_nl_subflow_closed(struct mptcp_sock *msk,
-				      const struct mptcp_pm_addr_entry *local)
+				      struct mptcp_pm_param *param)
 {
+	struct mptcp_pm_addr_entry *local = &param->entry;
 	struct mptcp_rm_list list = { .nr = 1 };
 	bool remove_subflow;
 
@@ -1586,7 +1587,9 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		msk->pm.ops && msk->pm.ops->address_removed ?
 			msk->pm.ops->address_removed(msk, &param) :
 			mptcp_pm_nl_address_removed(msk, &param);
-		mptcp_pm_nl_subflow_closed(msk, entry);
+		msk->pm.ops && msk->pm.ops->subflow_closed ?
+			msk->pm.ops->subflow_closed(msk, &param) :
+			mptcp_pm_nl_subflow_closed(msk, &param);
 		release_sock(sk);
 
 next:
@@ -2423,6 +2426,7 @@ static struct mptcp_pm_ops mptcp_netlink_pm = {
 	.address_announced	= mptcp_pm_nl_address_announced,
 	.address_removed	= mptcp_pm_nl_address_removed,
 	.subflow_established	= mptcp_pm_nl_subflow_established,
+	.subflow_closed		= mptcp_pm_nl_subflow_closed,
 	.get_local_id		= mptcp_pm_nl_get_local_id,
 	.get_priority		= mptcp_pm_nl_get_priority,
 	.type			= MPTCP_PM_TYPE_KERNEL,
