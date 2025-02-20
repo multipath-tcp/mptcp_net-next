@@ -1506,11 +1506,47 @@ static void __mark_subflow_endp_available(struct mptcp_sock *msk, u8 id)
 		msk->pm.local_addr_used--;
 }
 
+static int mptcp_pm_nl_address_removed(struct mptcp_sock *msk,
+				       const struct mptcp_pm_addr_entry *local)
+{
+	bool remove_subflow;
+
+	remove_subflow = mptcp_lookup_subflow_by_saddr(&msk->conn_list, &local->addr);
+	mptcp_pm_remove_anno_addr(msk, &local->addr, remove_subflow &&
+				  !(local->flags & MPTCP_PM_ADDR_FLAG_IMPLICIT));
+	return 0;
+}
+
+static int mptcp_pm_nl_subflow_closed(struct mptcp_sock *msk,
+				      const struct mptcp_pm_addr_entry *local)
+{
+	struct mptcp_rm_list list = { .nr = 1 };
+	bool remove_subflow;
+
+	list.ids[0] = mptcp_endp_get_local_id(msk, &local->addr);
+	remove_subflow = mptcp_lookup_subflow_by_saddr(&msk->conn_list, &local->addr);
+	if (remove_subflow) {
+		spin_lock_bh(&msk->pm.lock);
+		mptcp_pm_nl_rm_subflow_received(msk, &list);
+		spin_unlock_bh(&msk->pm.lock);
+	}
+
+	if (local->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW) {
+		spin_lock_bh(&msk->pm.lock);
+		__mark_subflow_endp_available(msk, list.ids[0]);
+		spin_unlock_bh(&msk->pm.lock);
+	}
+
+	if (msk->mpc_endpoint_id == local->addr.id)
+		msk->mpc_endpoint_id = 0;
+
+	return 0;
+}
+
 static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 						   const struct mptcp_pm_addr_entry *entry)
 {
 	const struct mptcp_addr_info *addr = &entry->addr;
-	struct mptcp_rm_list list = { .nr = 1 };
 	long s_slot = 0, s_num = 0;
 	struct mptcp_sock *msk;
 
@@ -1518,31 +1554,13 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
-		bool remove_subflow;
 
 		if (mptcp_pm_is_userspace(msk))
 			goto next;
 
 		lock_sock(sk);
-		remove_subflow = mptcp_lookup_subflow_by_saddr(&msk->conn_list, addr);
-		mptcp_pm_remove_anno_addr(msk, addr, remove_subflow &&
-					  !(entry->flags & MPTCP_PM_ADDR_FLAG_IMPLICIT));
-
-		list.ids[0] = mptcp_endp_get_local_id(msk, addr);
-		if (remove_subflow) {
-			spin_lock_bh(&msk->pm.lock);
-			mptcp_pm_nl_rm_subflow_received(msk, &list);
-			spin_unlock_bh(&msk->pm.lock);
-		}
-
-		if (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW) {
-			spin_lock_bh(&msk->pm.lock);
-			__mark_subflow_endp_available(msk, list.ids[0]);
-			spin_unlock_bh(&msk->pm.lock);
-		}
-
-		if (msk->mpc_endpoint_id == entry->addr.id)
-			msk->mpc_endpoint_id = 0;
+		mptcp_pm_nl_address_removed(msk, entry);
+		mptcp_pm_nl_subflow_closed(msk, entry);
 		release_sock(sk);
 
 next:
