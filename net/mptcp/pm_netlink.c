@@ -652,9 +652,12 @@ static void mptcp_pm_nl_fully_established(struct mptcp_sock *msk)
 	mptcp_pm_create_subflow_or_signal_addr(msk);
 }
 
-static void mptcp_pm_nl_subflow_established(struct mptcp_sock *msk)
+static int mptcp_pm_nl_subflow_established(struct mptcp_sock *msk,
+					   struct mptcp_pm_param *param)
 {
 	mptcp_pm_create_subflow_or_signal_addr(msk);
+
+	return 0;
 }
 
 /* Fill all the local addresses into the array addrs[],
@@ -927,6 +930,7 @@ static void mptcp_pm_nl_rm_subflow_received(struct mptcp_sock *msk,
 void mptcp_pm_nl_work(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
+	struct mptcp_pm_param param;
 
 	msk_owned_by_me(msk);
 
@@ -954,7 +958,9 @@ void mptcp_pm_nl_work(struct mptcp_sock *msk)
 	}
 	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
 		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
-		mptcp_pm_nl_subflow_established(msk);
+		msk->pm.ops && msk->pm.ops->subflow_established ?
+			msk->pm.ops->subflow_established(msk, &param) :
+			mptcp_pm_nl_subflow_established(msk, &param);
 	}
 
 	spin_unlock_bh(&msk->pm.lock);
@@ -2416,6 +2422,7 @@ static struct pernet_operations mptcp_pm_pernet_ops = {
 static struct mptcp_pm_ops mptcp_netlink_pm = {
 	.address_announced	= mptcp_pm_nl_address_announced,
 	.address_removed	= mptcp_pm_nl_address_removed,
+	.subflow_established	= mptcp_pm_nl_subflow_established,
 	.get_local_id		= mptcp_pm_nl_get_local_id,
 	.get_priority		= mptcp_pm_nl_get_priority,
 	.type			= MPTCP_PM_TYPE_KERNEL,
