@@ -121,6 +121,19 @@ struct mptcp_sched_ops {
 	void (*release)(struct mptcp_sock *msk);
 } ____cacheline_aligned_in_smp;
 
+struct mptcp_pm_addr_entry {
+	struct list_head	list;
+	struct mptcp_addr_info	addr;
+	u8			flags;
+	int			ifindex;
+	struct socket		*lsk;
+};
+
+struct mptcp_pm_param {
+	struct mptcp_pm_addr_entry	entry;
+	struct mptcp_addr_info		addr;
+};
+
 #ifdef CONFIG_MPTCP
 void mptcp_init(void);
 

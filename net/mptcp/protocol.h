@@ -246,14 +246,6 @@ struct mptcp_pm_local {
 	int			ifindex;
 };
 
-struct mptcp_pm_addr_entry {
-	struct list_head	list;
-	struct mptcp_addr_info	addr;
-	u8			flags;
-	int			ifindex;
-	struct socket		*lsk;
-};
-
 struct mptcp_data_frag {
 	struct list_head list;
 	u64 data_seq;
@@ -1125,6 +1117,9 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, const struct sk_buff *skb,
 			      bool *drop_other_suboptions);
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 			     struct mptcp_rm_list *rm_list);
+void mptcp_pm_param_set_contexts(struct mptcp_pm_param *param,
+				 const struct mptcp_pm_addr_entry *entry,
+				 const struct mptcp_addr_info *addr);
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
 int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk,
 			     struct mptcp_pm_addr_entry *skc);

@@ -401,6 +401,16 @@ out_unlock:
 	return ret;
 }
 
+void mptcp_pm_param_set_contexts(struct mptcp_pm_param *param,
+				 const struct mptcp_pm_addr_entry *entry,
+				 const struct mptcp_addr_info *addr)
+{
+	if (entry)
+		param->entry = *entry;
+	if (addr)
+		param->addr = *addr;
+}
+
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_pm_addr_entry skc_local;
