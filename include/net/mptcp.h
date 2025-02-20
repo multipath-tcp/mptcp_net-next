@@ -134,6 +134,35 @@ struct mptcp_pm_param {
 	struct mptcp_addr_info		addr;
 };
 
+struct mptcp_pm_ops {
+	int (*created)(struct mptcp_sock *msk);
+	int (*established)(struct mptcp_sock *msk);
+	int (*closed)(struct mptcp_sock *msk);
+	int (*address_announced)(struct mptcp_sock *msk,
+				 struct mptcp_pm_param *param);
+	int (*address_removed)(struct mptcp_sock *msk,
+			       struct mptcp_pm_param *param);
+	int (*subflow_established)(struct mptcp_sock *msk,
+				   struct mptcp_pm_param *param);
+	int (*subflow_closed)(struct mptcp_sock *msk,
+			      struct mptcp_pm_param *param);
+	int (*get_local_id)(struct mptcp_sock *msk,
+			    struct mptcp_pm_param *param);
+	bool (*get_priority)(struct mptcp_sock *msk,
+			     struct mptcp_pm_param *param);
+	int (*set_priority)(struct mptcp_sock *msk,
+			    struct mptcp_pm_param *param);
+	int (*listener_created)(struct mptcp_sock *msk);
+	int (*listener_closed)(struct mptcp_sock *msk);
+
+	u8			type;
+	struct module		*owner;
+	struct list_head	list;
+
+	void (*init)(struct mptcp_sock *msk);
+	void (*release)(struct mptcp_sock *msk);
+} ____cacheline_aligned_in_smp;
+
 #ifdef CONFIG_MPTCP
 void mptcp_init(void);
 
