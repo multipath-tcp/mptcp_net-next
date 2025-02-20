@@ -447,13 +447,14 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_addr_info skc_local;
+	struct mptcp_pm_param param;
 
 	mptcp_local_address((struct sock_common *)skc, &skc_local);
 
-	if (mptcp_pm_is_userspace(msk))
-		return mptcp_userspace_pm_is_backup(msk, &skc_local);
-
-	return mptcp_pm_nl_is_backup(msk, &skc_local);
+	if (!msk->pm.ops || !msk->pm.ops->get_priority)
+		return -ENOTSUPP;
+	mptcp_pm_param_set_contexts(&param, NULL, &skc_local);
+	return msk->pm.ops->get_priority(msk, &param);
 }
 
 static int mptcp_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
