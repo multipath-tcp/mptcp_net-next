@@ -1348,6 +1348,25 @@ static struct pm_nl_pernet *genl_info_pm_nl(struct genl_info *info)
 	return pm_nl_get_pernet(genl_info_net(info));
 }
 
+static int mptcp_pm_nl_address_announced(struct mptcp_sock *msk,
+					 struct mptcp_pm_param *param)
+{
+	struct mptcp_addr_info *addr = &param->addr;
+	struct mptcp_addr_info mpc_addr;
+
+	/* if the endp linked to the init sf is re-added with a != ID */
+	mptcp_local_address((struct sock_common *)msk, &mpc_addr);
+
+	spin_lock_bh(&msk->pm.lock);
+	if (mptcp_addresses_equal(addr, &mpc_addr, addr->port))
+		msk->mpc_endpoint_id = addr->id;
+
+	mptcp_pm_create_subflow_or_signal_addr(msk);
+	spin_unlock_bh(&msk->pm.lock);
+
+	return 0;
+}
+
 static int mptcp_nl_add_subflow_or_signal_addr(struct net *net,
 					       struct mptcp_addr_info *addr)
 {
@@ -1356,21 +1375,17 @@ static int mptcp_nl_add_subflow_or_signal_addr(struct net *net,
 
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
-		struct mptcp_addr_info mpc_addr;
+		struct mptcp_pm_param param;
 
 		if (!READ_ONCE(msk->fully_established) ||
 		    mptcp_pm_is_userspace(msk))
 			goto next;
 
-		/* if the endp linked to the init sf is re-added with a != ID */
-		mptcp_local_address((struct sock_common *)msk, &mpc_addr);
-
 		lock_sock(sk);
-		spin_lock_bh(&msk->pm.lock);
-		if (mptcp_addresses_equal(addr, &mpc_addr, addr->port))
-			msk->mpc_endpoint_id = addr->id;
-		mptcp_pm_create_subflow_or_signal_addr(msk);
-		spin_unlock_bh(&msk->pm.lock);
+		mptcp_pm_param_set_contexts(&param, NULL, addr);
+		msk->pm.ops && msk->pm.ops->address_announced ?
+			msk->pm.ops->address_announced(msk, &param) :
+			mptcp_pm_nl_address_announced(msk, &param);
 		release_sock(sk);
 
 next:
@@ -2394,6 +2409,7 @@ static struct pernet_operations mptcp_pm_pernet_ops = {
 };
 
 static struct mptcp_pm_ops mptcp_netlink_pm = {
+	.address_announced	= mptcp_pm_nl_address_announced,
 	.get_local_id		= mptcp_pm_nl_get_local_id,
 	.get_priority		= mptcp_pm_nl_get_priority,
 	.type			= MPTCP_PM_TYPE_KERNEL,
