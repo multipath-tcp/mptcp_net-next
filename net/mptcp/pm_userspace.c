@@ -190,9 +190,33 @@ static struct mptcp_sock *mptcp_userspace_pm_get_sock(const struct genl_info *in
 	return msk;
 }
 
+static int mptcp_userspace_pm_address_announced(struct mptcp_sock *msk,
+						struct mptcp_pm_param *param)
+{
+	struct mptcp_pm_addr_entry *local = &param->entry;
+	int err;
+
+	err = mptcp_userspace_pm_append_new_local_addr(msk, local, false);
+	if (err < 0)
+		return err;
+
+	spin_lock_bh(&msk->pm.lock);
+
+	if (mptcp_pm_alloc_anno_list(msk, &local->addr)) {
+		msk->pm.add_addr_signaled++;
+		mptcp_pm_announce_addr(msk, &local->addr, false);
+		mptcp_pm_nl_addr_send_ack(msk);
+	}
+
+	spin_unlock_bh(&msk->pm.lock);
+
+	return 0;
+}
+
 int mptcp_pm_nl_announce_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry addr_val;
+	struct mptcp_pm_param param;
 	struct mptcp_sock *msk;
 	struct nlattr *addr;
 	int err = -EINVAL;
@@ -224,26 +248,16 @@ int mptcp_pm_nl_announce_doit(struct sk_buff *skb, struct genl_info *info)
 		goto announce_err;
 	}
 
-	err = mptcp_userspace_pm_append_new_local_addr(msk, &addr_val, false);
-	if (err < 0) {
+	lock_sock(sk);
+	mptcp_pm_param_set_contexts(&param, &addr_val, NULL);
+	err = msk->pm.ops && msk->pm.ops->address_announced ?
+	      msk->pm.ops->address_announced(msk, &param) :
+	      mptcp_userspace_pm_address_announced(msk, &param);
+	release_sock(sk);
+	if (err)
 		NL_SET_ERR_MSG_ATTR(info->extack, addr,
 				    "did not match address and id");
-		goto announce_err;
-	}
 
-	lock_sock(sk);
-	spin_lock_bh(&msk->pm.lock);
-
-	if (mptcp_pm_alloc_anno_list(msk, &addr_val.addr)) {
-		msk->pm.add_addr_signaled++;
-		mptcp_pm_announce_addr(msk, &addr_val.addr, false);
-		mptcp_pm_nl_addr_send_ack(msk);
-	}
-
-	spin_unlock_bh(&msk->pm.lock);
-	release_sock(sk);
-
-	err = 0;
  announce_err:
 	sock_put(sk);
 	return err;
@@ -690,6 +704,7 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 }
 
 static struct mptcp_pm_ops mptcp_userspace_pm = {
+	.address_announced	= mptcp_userspace_pm_address_announced,
 	.get_local_id		= mptcp_userspace_pm_get_local_id,
 	.get_priority		= mptcp_userspace_pm_get_priority,
 	.type			= MPTCP_PM_TYPE_USERSPACE,
