@@ -1172,9 +1172,11 @@ int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk,
 	return ret;
 }
 
-bool mptcp_pm_nl_is_backup(struct mptcp_sock *msk, struct mptcp_addr_info *skc)
+static bool mptcp_pm_nl_get_priority(struct mptcp_sock *msk,
+				     struct mptcp_pm_param *param)
 {
 	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
+	struct mptcp_addr_info *skc = &param->addr;
 	struct mptcp_pm_addr_entry *entry;
 	bool backup;
 
@@ -1184,6 +1186,14 @@ bool mptcp_pm_nl_is_backup(struct mptcp_sock *msk, struct mptcp_addr_info *skc)
 	rcu_read_unlock();
 
 	return backup;
+}
+
+bool mptcp_pm_nl_is_backup(struct mptcp_sock *msk, struct mptcp_addr_info *skc)
+{
+	struct mptcp_pm_param param;
+
+	mptcp_pm_param_set_contexts(&param, NULL, skc);
+	return mptcp_pm_nl_get_priority(msk, &param);
 }
 
 #define MPTCP_PM_CMD_GRP_OFFSET       0
@@ -2373,6 +2383,13 @@ static struct pernet_operations mptcp_pm_pernet_ops = {
 	.size = sizeof(struct pm_nl_pernet),
 };
 
+static struct mptcp_pm_ops mptcp_netlink_pm = {
+	.get_local_id		= mptcp_pm_nl_get_local_id,
+	.get_priority		= mptcp_pm_nl_get_priority,
+	.type			= MPTCP_PM_TYPE_KERNEL,
+	.owner			= THIS_MODULE,
+};
+
 void __init mptcp_pm_nl_init(void)
 {
 	if (register_pernet_subsys(&mptcp_pm_pernet_ops) < 0)
@@ -2380,4 +2397,6 @@ void __init mptcp_pm_nl_init(void)
 
 	if (genl_register_family(&mptcp_genl_family))
 		panic("Failed to register MPTCP PM netlink family\n");
+
+	mptcp_pm_register(&mptcp_netlink_pm);
 }
