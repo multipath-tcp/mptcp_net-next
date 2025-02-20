@@ -1522,8 +1522,9 @@ static void __mark_subflow_endp_available(struct mptcp_sock *msk, u8 id)
 }
 
 static int mptcp_pm_nl_address_removed(struct mptcp_sock *msk,
-				       const struct mptcp_pm_addr_entry *local)
+				       struct mptcp_pm_param *param)
 {
+	struct mptcp_pm_addr_entry *local = &param->entry;
 	bool remove_subflow;
 
 	remove_subflow = mptcp_lookup_subflow_by_saddr(&msk->conn_list, &local->addr);
@@ -1569,12 +1570,16 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
+		struct mptcp_pm_param param;
 
 		if (mptcp_pm_is_userspace(msk))
 			goto next;
 
 		lock_sock(sk);
-		mptcp_pm_nl_address_removed(msk, entry);
+		mptcp_pm_param_set_contexts(&param, entry, NULL);
+		msk->pm.ops && msk->pm.ops->address_removed ?
+			msk->pm.ops->address_removed(msk, &param) :
+			mptcp_pm_nl_address_removed(msk, &param);
 		mptcp_pm_nl_subflow_closed(msk, entry);
 		release_sock(sk);
 
@@ -2410,6 +2415,7 @@ static struct pernet_operations mptcp_pm_pernet_ops = {
 
 static struct mptcp_pm_ops mptcp_netlink_pm = {
 	.address_announced	= mptcp_pm_nl_address_announced,
+	.address_removed	= mptcp_pm_nl_address_removed,
 	.get_local_id		= mptcp_pm_nl_get_local_id,
 	.get_priority		= mptcp_pm_nl_get_priority,
 	.type			= MPTCP_PM_TYPE_KERNEL,
