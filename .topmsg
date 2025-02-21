@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add mptcp_pm_genl_fill_addr helper
+Subject: [PATCH] mptcp: pm: add mptcp_pm_genl_fill_addr helper
 
 To save some redundant code in dump_addr() interfaces of both the
 netlink PM and userspace PM, the code that calls netlink message
