@@ -1,4 +1,17 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sched-reduce-size-for-unused-data
+Subject: [PATCH] mptcp: sched: reduce size for unused data
 
+Thanks for the previous commit ("mptcp: sched: split get_subflow
+interface into two"), the mptcp_sched_data structure is now currently
+unused.
+
+This structure has been added to allow future extensions that are not
+ready yet. At the end, this structure will not even be used at all when
+mptcp_subflow bpf_iter will be supported [1].
+
+Here is a first step to save 64 bytes on the stack for each scheduling
+operation. The structure is not removed yet not to break the WIP work on
+these extensions, but will be done when [1] will be ready and applied.
+
+Link: https://lore.kernel.org/6645ad6e-8874-44c5-8730-854c30673218@linux.dev [1]
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
