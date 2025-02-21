@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: split get_subflow interface into two
+Subject: [PATCH] mptcp: sched: split get_subflow interface into two
 
 get_retrans() interface of the burst packet scheduler invokes a sleeping
 function mptcp_pm_subflow_chk_stale(), which calls __lock_sock_fast().
