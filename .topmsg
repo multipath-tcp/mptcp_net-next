@@ -1,0 +1,12 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] bpf: Allow use of skc_to_mptcp_sock in cg_sockopt
+
+Currently, bpf_skc_to_mptcp_sock() helper is not allowed to be used
+in cg_sockopt. This patch adds this permission.
+
+Thanks to the previous patch allowing skc_to_mptcp_sock() to be used
+with MPTCP sockets, this permission allows this helper to be use it in
+CGroup BPF hooks, e.g. [gs]etsocktopt.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
