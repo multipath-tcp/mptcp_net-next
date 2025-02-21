@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: drop match in userspace_pm_append_new_local_addr
+Subject: [PATCH] mptcp: pm: drop match in userspace_pm_append_new_local_addr
 
 The variable 'match' in mptcp_userspace_pm_append_new_local_addr() is a
 redundant one, and this patch drops it.
