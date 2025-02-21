@@ -252,6 +252,7 @@ struct mptcp_pm_addr_entry {
 	u8			flags;
 	int			ifindex;
 	struct socket		*lsk;
+	struct rcu_head		rcu_head;
 };
 
 struct mptcp_data_frag {

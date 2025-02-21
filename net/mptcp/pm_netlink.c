@@ -967,9 +967,15 @@ static bool address_use_port(struct mptcp_pm_addr_entry *entry)
 		MPTCP_PM_ADDR_FLAG_SIGNAL;
 }
 
-/* caller must ensure the RCU grace period is already elapsed */
-static void __mptcp_pm_release_addr_entry(struct mptcp_pm_addr_entry *entry)
+/*
+ * Caller must ensure the RCU grace period is already elapsed or call this
+ * via a RCU callback.
+ */
+static void __mptcp_pm_release_addr_entry(struct rcu_head *head)
 {
+	struct mptcp_pm_addr_entry *entry;
+
+	entry = container_of(head, struct mptcp_pm_addr_entry, rcu_head);
 	if (entry->lsk)
 		sock_release(entry->lsk);
 	kfree(entry);
@@ -1064,8 +1070,7 @@ out:
 
 	/* just replaced an existing entry, free it */
 	if (del_entry) {
-		synchronize_rcu();
-		__mptcp_pm_release_addr_entry(del_entry);
+		call_rcu(&del_entry->rcu_head, __mptcp_pm_release_addr_entry);
 	}
 	return ret;
 }
@@ -1450,7 +1455,7 @@ int mptcp_pm_nl_add_addr_doit(struct sk_buff *skb, struct genl_info *info)
 	return 0;
 
 out_free:
-	__mptcp_pm_release_addr_entry(entry);
+	__mptcp_pm_release_addr_entry(&entry->rcu_head);
 	return ret;
 }
 
@@ -1634,7 +1639,7 @@ int mptcp_pm_nl_del_addr_doit(struct sk_buff *skb, struct genl_info *info)
 
 	mptcp_nl_remove_subflow_and_signal_addr(sock_net(skb->sk), entry);
 	synchronize_rcu();
-	__mptcp_pm_release_addr_entry(entry);
+	__mptcp_pm_release_addr_entry(&entry->rcu_head);
 
 	return ret;
 }
@@ -1700,7 +1705,7 @@ static void __flush_addrs(struct list_head *list)
 		cur = list_entry(list->next,
 				 struct mptcp_pm_addr_entry, list);
 		list_del_rcu(&cur->list);
-		__mptcp_pm_release_addr_entry(cur);
+		__mptcp_pm_release_addr_entry(&cur->rcu_head);
 	}
 }
 
