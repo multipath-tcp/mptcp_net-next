@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add a build check for userspace_pm_dump_addr
+Subject: [PATCH] mptcp: pm: add a build check for userspace_pm_dump_addr
 
 This patch adds a build check for mptcp_userspace_pm_dump_addr() to make
 sure there is enough space in 'cb->ctx' to store an address id bitmap.
