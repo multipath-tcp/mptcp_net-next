@@ -1,0 +1,19 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] bpf: Extend bpf_skc_to_mptcp_sock to MPTCP sock
+
+Currently, bpf_skc_to_mptcp_sock() can only be used with sockets that
+are MPTCP subflows: TCP sockets with tp->is_mptcp, created by the kernel
+from an MPTCP socket (IPPROTO_MPTCP). Typically used with BPF sock_ops
+operators.
+
+Here, this helper is extended to support MPTCP sockets, the ones created
+by the userspace (IPPROTO_MPTCP). This is useful for BPF hooks involving
+these sockets, e.g. [gs]etsocktopt.
+
+bpf_skc_to_mptcp_sock() uses bpf_mptcp_sock_from_subflow(). The former
+suggests any MPTCP type/subtype can be used, but the latter only accepts
+subflow ones. So bpf_mptcp_sock_from_subflow is modified here to support
+MPTCP socket, and renamed to avoid confusions.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
