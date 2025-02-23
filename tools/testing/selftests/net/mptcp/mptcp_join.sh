@@ -99,7 +99,7 @@ init_partial()
 
 	local netns
 	for netns in "$ns1" "$ns2"; do
-		ip netns exec $netns sysctl -q net.mptcp.pm_type=0 2>/dev/null || true
+		ip netns exec $netns sysctl -q net.mptcp.path_manager="in-kernel" 2>/dev/null || true
 		if $checksum; then
 			ip netns exec $netns sysctl -q net.mptcp.checksum_enabled=1
 		fi
@@ -1920,7 +1920,7 @@ set_userspace_pm()
 {
 	local ns=$1
 
-	ip netns exec $ns sysctl -q net.mptcp.pm_type=1
+	ip netns exec $ns sysctl -q net.mptcp.path_manager="userspace"
 }
 
 subflows_tests()
@@ -3497,7 +3497,7 @@ userspace_tests()
 {
 	# userspace pm type prevents add_addr
 	if reset "userspace pm type prevents add_addr" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns1 0 2
 		pm_nl_set_limits $ns2 0 2
@@ -3509,7 +3509,7 @@ userspace_tests()
 
 	# userspace pm type does not echo add_addr without daemon
 	if reset "userspace pm no echo w/o daemon" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 2
 		pm_nl_set_limits $ns2 0 2
@@ -3521,7 +3521,7 @@ userspace_tests()
 
 	# userspace pm type rejects join
 	if reset "userspace pm type rejects join" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns1 1 1
 		pm_nl_set_limits $ns2 1 1
@@ -3532,7 +3532,7 @@ userspace_tests()
 
 	# userspace pm type does not send join
 	if reset "userspace pm type does not send join" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 1 1
 		pm_nl_set_limits $ns2 1 1
@@ -3543,7 +3543,7 @@ userspace_tests()
 
 	# userspace pm type prevents mp_prio
 	if reset "userspace pm type prevents mp_prio" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns1 1 1
 		pm_nl_set_limits $ns2 1 1
@@ -3556,7 +3556,7 @@ userspace_tests()
 
 	# userspace pm type prevents rm_addr
 	if reset "userspace pm type prevents rm_addr" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
@@ -3570,7 +3570,7 @@ userspace_tests()
 
 	# userspace pm add & remove address
 	if reset_with_events "userspace pm add & remove address" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns2 2 2
 		{ speed=5 \
@@ -3603,7 +3603,7 @@ userspace_tests()
 
 	# userspace pm create destroy subflow
 	if reset_with_events "userspace pm create destroy subflow" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
 		{ speed=5 \
@@ -3631,7 +3631,7 @@ userspace_tests()
 
 	# userspace pm create id 0 subflow
 	if reset_with_events "userspace pm create id 0 subflow" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
 		{ speed=5 \
@@ -3652,7 +3652,7 @@ userspace_tests()
 
 	# userspace pm remove initial subflow
 	if reset_with_events "userspace pm remove initial subflow" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns2
 		pm_nl_set_limits $ns1 0 1
 		{ speed=5 \
@@ -3676,7 +3676,7 @@ userspace_tests()
 
 	# userspace pm send RM_ADDR for ID 0
 	if reset_with_events "userspace pm send RM_ADDR for ID 0" &&
-	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 		set_userspace_pm $ns1
 		pm_nl_set_limits $ns2 1 1
 		{ speed=5 \

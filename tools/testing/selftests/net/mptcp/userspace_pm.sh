@@ -13,7 +13,7 @@
 mptcp_lib_check_mptcp
 mptcp_lib_check_kallsyms
 
-if ! mptcp_lib_has_file '/proc/sys/net/mptcp/pm_type'; then
+if ! mptcp_lib_has_file '/proc/sys/net/mptcp/path_manager'; then
 	echo "userspace pm tests are not supported by the kernel: SKIP"
 	exit ${KSFT_SKIP}
 fi
@@ -119,7 +119,7 @@ trap cleanup EXIT
 # Create and configure network namespaces for testing
 mptcp_lib_ns_init ns1 ns2
 for i in "$ns1" "$ns2" ;do
-	ip netns exec "$i" sysctl -q net.mptcp.pm_type=1
+	ip netns exec "$i" sysctl -q net.mptcp.path_manager="userspace"
 done
 
 #  "$ns1"              ns2
