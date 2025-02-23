@@ -3307,6 +3307,7 @@ void mptcp_destroy_common(struct mptcp_sock *msk, unsigned int flags)
 	mptcp_token_destroy(msk);
 	mptcp_pm_free_anno_list(msk);
 	mptcp_free_local_addr_list(msk);
+	mptcp_pm_release(msk);
 }
 
 static void mptcp_destroy(struct sock *sk)
