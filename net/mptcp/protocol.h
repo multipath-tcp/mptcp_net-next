@@ -233,7 +233,6 @@ struct mptcp_pm_data {
 	u8		add_addr_signaled;
 	u8		add_addr_accepted;
 	u8		local_addr_used;
-	u8		pm_type;
 	u8		subflows;
 	u8		status;
 	DECLARE_BITMAP(id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
@@ -1099,12 +1098,12 @@ static inline bool mptcp_pm_should_rm_signal(struct mptcp_sock *msk)
 
 static inline bool mptcp_pm_is_userspace(const struct mptcp_sock *msk)
 {
-	return READ_ONCE(msk->pm.pm_type) == MPTCP_PM_TYPE_USERSPACE;
+	return msk->pm.ops->type == MPTCP_PM_TYPE_USERSPACE;
 }
 
 static inline bool mptcp_pm_is_kernel(const struct mptcp_sock *msk)
 {
-	return READ_ONCE(msk->pm.pm_type) == MPTCP_PM_TYPE_KERNEL;
+	return msk->pm.ops->type == MPTCP_PM_TYPE_KERNEL;
 }
 
 static inline unsigned int mptcp_add_addr_len(int family, bool echo, bool port)

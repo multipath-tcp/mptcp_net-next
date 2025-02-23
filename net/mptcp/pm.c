@@ -604,7 +604,6 @@ bool mptcp_pm_addr_families_match(const struct sock *sk,
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
 {
 	const char *path_manager = mptcp_get_path_manager(sock_net((struct sock *)msk));
-	u8 pm_type = mptcp_get_pm_type(sock_net((struct sock *)msk));
 	struct mptcp_pm_data *pm = &msk->pm;
 	int ret;
 
@@ -614,7 +613,6 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	pm->subflows = 0;
 	pm->rm_list_tx.nr = 0;
 	pm->rm_list_rx.nr = 0;
-	WRITE_ONCE(pm->pm_type, pm_type);
 
 	rcu_read_lock();
 	ret = mptcp_pm_initialize(msk, mptcp_pm_find(path_manager));
@@ -622,11 +620,11 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	if (ret)
 		return;
 
-	if (pm_type == MPTCP_PM_TYPE_KERNEL) {
+	if (pm->ops->type == MPTCP_PM_TYPE_KERNEL) {
 		bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
 
 		/* pm->work_pending must be only be set to 'true' when
-		 * pm->pm_type is set to MPTCP_PM_TYPE_KERNEL
+		 * pm->ops->type is set to MPTCP_PM_TYPE_KERNEL
 		 */
 		WRITE_ONCE(pm->work_pending,
 			   (!!mptcp_pm_get_local_addr_max(msk) &&
