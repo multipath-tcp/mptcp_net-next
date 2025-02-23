@@ -259,6 +259,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 {
 	struct ctl_table_header *hdr;
 	struct ctl_table *table;
+	int i = 0;
 
 	table = mptcp_sysctl_table;
 	if (!net_eq(net, &init_net)) {
@@ -267,17 +268,17 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 			goto err_alloc;
 	}
 
-	table[0].data = &pernet->mptcp_enabled;
-	table[1].data = &pernet->add_addr_timeout;
-	table[2].data = &pernet->checksum_enabled;
-	table[3].data = &pernet->allow_join_initial_addr_port;
-	table[4].data = &pernet->stale_loss_cnt;
-	table[5].data = &pernet->pm_type;
-	table[6].data = &pernet->scheduler;
-	/* table[7] is for available_schedulers which is read-only info */
-	table[8].data = &pernet->close_timeout;
-	table[9].data = &pernet->blackhole_timeout;
-	table[10].data = &pernet->syn_retrans_before_tcp_fallback;
+	table[i++].data = &pernet->mptcp_enabled;
+	table[i++].data = &pernet->add_addr_timeout;
+	table[i++].data = &pernet->checksum_enabled;
+	table[i++].data = &pernet->allow_join_initial_addr_port;
+	table[i++].data = &pernet->stale_loss_cnt;
+	table[i++].data = &pernet->pm_type;
+	table[i++].data = &pernet->scheduler;
+	i++; /* table[i] is for available_schedulers which is read-only info */
+	table[i++].data = &pernet->close_timeout;
+	table[i++].data = &pernet->blackhole_timeout;
+	table[i++].data = &pernet->syn_retrans_before_tcp_fallback;
 
 	hdr = register_net_sysctl_sz(net, MPTCP_SYSCTL_PATH, table,
 				     ARRAY_SIZE(mptcp_sysctl_table));
