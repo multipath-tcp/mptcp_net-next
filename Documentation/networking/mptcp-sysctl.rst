@@ -89,6 +89,10 @@ path_manager - STRING
 
 	Default: "in-kernel"
 
+available_path_managers - STRING
+	Shows the available path managers choices that are registered. More
+        path managers may be available, but not loaded.
+
 scheduler - STRING
 	Select the scheduler of your choice.
 

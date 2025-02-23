@@ -673,6 +673,26 @@ struct mptcp_pm_ops *mptcp_pm_find(const char *name)
 	return NULL;
 }
 
+/* Build string with list of available path manager values.
+ * Similar to tcp_get_available_congestion_control()
+ */
+void mptcp_pm_get_available(char *buf, size_t maxlen)
+{
+	struct mptcp_pm_ops *pm;
+	size_t offs = 0;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(pm, &mptcp_pm_list, list) {
+		offs += snprintf(buf + offs, maxlen - offs,
+				 "%s%s",
+				 offs == 0 ? "" : " ", pm->name);
+
+		if (WARN_ON_ONCE(offs >= maxlen))
+			break;
+	}
+	rcu_read_unlock();
+}
+
 int mptcp_pm_validate(struct mptcp_pm_ops *pm)
 {
 	if (!pm->get_local_id || !pm->get_priority) {

@@ -136,6 +136,24 @@ static int proc_path_manager(const struct ctl_table *ctl, int write,
 	return ret;
 }
 
+static int proc_available_path_managers(const struct ctl_table *ctl,
+					int write, void *buffer,
+					size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table tbl = { .maxlen = MPTCP_PM_BUF_MAX, };
+	int ret;
+
+	tbl.data = kmalloc(tbl.maxlen, GFP_USER);
+	if (!tbl.data)
+		return -ENOMEM;
+
+	mptcp_pm_get_available(tbl.data, MPTCP_PM_BUF_MAX);
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+	kfree(tbl.data);
+
+	return ret;
+}
+
 static int mptcp_set_scheduler(char *scheduler, const char *name)
 {
 	struct mptcp_sched_ops *sched;
@@ -253,6 +271,12 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.proc_handler = proc_path_manager,
 	},
 	{
+		.procname = "available_path_managers",
+		.maxlen	= MPTCP_PM_BUF_MAX,
+		.mode = 0444,
+		.proc_handler = proc_available_path_managers,
+	},
+	{
 		.procname = "scheduler",
 		.maxlen	= MPTCP_SCHED_NAME_MAX,
 		.mode = 0644,
@@ -304,6 +328,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 	table[i++].data = &pernet->allow_join_initial_addr_port;
 	table[i++].data = &pernet->stale_loss_cnt;
 	table[i++].data = &pernet->path_manager;
+	i++; /* table[i] is for available_path_managers which is read-only info */
 	table[i++].data = &pernet->scheduler;
 	i++; /* table[i] is for available_schedulers which is read-only info */
 	table[i++].data = &pernet->close_timeout;

@@ -1050,6 +1050,7 @@ void mptcp_pm_remove_addr_entry(struct mptcp_sock *msk,
 extern struct mptcp_pm_ops mptcp_in_kernel_pm;
 
 struct mptcp_pm_ops *mptcp_pm_find(const char *name);
+void mptcp_pm_get_available(char *buf, size_t maxlen);
 int mptcp_pm_validate(struct mptcp_pm_ops *pm);
 int mptcp_pm_register(struct mptcp_pm_ops *pm);
 void mptcp_pm_unregister(struct mptcp_pm_ops *pm);
