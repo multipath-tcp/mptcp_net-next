@@ -38,6 +38,7 @@ struct mptcp_pernet {
 	u8 checksum_enabled;
 	u8 allow_join_initial_addr_port;
 	u8 pm_type;
+	char path_manager[MPTCP_PM_NAME_MAX];
 	char scheduler[MPTCP_SCHED_NAME_MAX];
 };
 
@@ -83,6 +84,11 @@ int mptcp_get_pm_type(const struct net *net)
 	return mptcp_get_pernet(net)->pm_type;
 }
 
+const char *mptcp_get_path_manager(const struct net *net)
+{
+	return mptcp_get_pernet(net)->path_manager;
+}
+
 const char *mptcp_get_scheduler(const struct net *net)
 {
 	return mptcp_get_pernet(net)->scheduler;
@@ -100,10 +106,47 @@ static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 	pernet->allow_join_initial_addr_port = 1;
 	pernet->stale_loss_cnt = 4;
 	pernet->pm_type = MPTCP_PM_TYPE_KERNEL;
+	strscpy(pernet->path_manager, "in-kernel", sizeof(pernet->path_manager));
 	strscpy(pernet->scheduler, "default", sizeof(pernet->scheduler));
 }
 
 #ifdef CONFIG_SYSCTL
+static int mptcp_set_path_manager(char *path_manager, const char *name)
+{
+	struct mptcp_pm_ops *pm;
+	int ret = 0;
+
+	rcu_read_lock();
+	pm = mptcp_pm_find(name);
+	if (pm)
+		strscpy(path_manager, name, MPTCP_PM_NAME_MAX);
+	else
+		ret = -ENOENT;
+	rcu_read_unlock();
+
+	return ret;
+}
+
+static int proc_path_manager(const struct ctl_table *ctl, int write,
+			     void *buffer, size_t *lenp, loff_t *ppos)
+{
+	char (*path_manager)[MPTCP_PM_NAME_MAX] = ctl->data;
+	char val[MPTCP_PM_NAME_MAX];
+	const struct ctl_table tbl = {
+		.data = val,
+		.maxlen = MPTCP_PM_NAME_MAX,
+	};
+	int ret;
+
+	strscpy(val, *path_manager, MPTCP_PM_NAME_MAX);
+
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+	if (write && ret == 0)
+		ret = mptcp_set_path_manager(*path_manager, val);
+
+	return ret;
+}
+
 static int mptcp_set_scheduler(char *scheduler, const char *name)
 {
 	struct mptcp_sched_ops *sched;
@@ -223,6 +266,12 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.extra2       = &mptcp_pm_type_max
 	},
 	{
+		.procname = "path_manager",
+		.maxlen	= MPTCP_PM_NAME_MAX,
+		.mode = 0644,
+		.proc_handler = proc_path_manager,
+	},
+	{
 		.procname = "scheduler",
 		.maxlen	= MPTCP_SCHED_NAME_MAX,
 		.mode = 0644,
@@ -274,6 +323,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 	table[i++].data = &pernet->allow_join_initial_addr_port;
 	table[i++].data = &pernet->stale_loss_cnt;
 	table[i++].data = &pernet->pm_type;
+	table[i++].data = &pernet->path_manager;
 	table[i++].data = &pernet->scheduler;
 	i++; /* table[i] is for available_schedulers which is read-only info */
 	table[i++].data = &pernet->close_timeout;
