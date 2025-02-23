@@ -163,12 +163,6 @@ static bool mptcp_userspace_pm_get_priority(struct mptcp_sock *msk,
 	return backup;
 }
 
-bool mptcp_userspace_pm_is_backup(struct mptcp_sock *msk,
-				  struct mptcp_addr_info *skc)
-{
-	return mptcp_userspace_pm_get_priority(msk, skc);
-}
-
 static struct mptcp_sock *mptcp_userspace_pm_get_sock(const struct genl_info *info)
 {
 	struct mptcp_sock *msk;
