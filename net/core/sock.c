@@ -2805,6 +2805,29 @@ void *sock_kmalloc(struct sock *sk, int size, gfp_t priority)
 }
 EXPORT_SYMBOL(sock_kmalloc);
 
+/*
+ * Duplicate a memory block using the socket's option memory buffer.
+ */
+void *sock_kmemdup(struct sock *sk, const void *src, int size, gfp_t priority)
+{
+	int optmem_max = READ_ONCE(sock_net(sk)->core.sysctl_optmem_max);
+
+	if ((unsigned int)size <= optmem_max &&
+	    atomic_read(&sk->sk_omem_alloc) + size < optmem_max) {
+		void *mem;
+		/* First do the add, to avoid the race if kmalloc
+		 * might sleep.
+		 */
+		atomic_add(size, &sk->sk_omem_alloc);
+		mem = kmemdup(src, size, priority);
+		if (mem)
+			return mem;
+		atomic_sub(size, &sk->sk_omem_alloc);
+	}
+	return NULL;
+}
+EXPORT_SYMBOL(sock_kmemdup);
+
 /* Free an option memory block. Note, we actually want the inline
  * here as this allows gcc to detect the nullify and fold away the
  * condition entirely.
