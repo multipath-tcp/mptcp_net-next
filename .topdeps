@@ -1,1 +1,1 @@
-t/mptcp-sched-reduce-size-for-unused-data
+t/selftests-mptcp-add-a-test-for-mptcp_diag_dump_one
