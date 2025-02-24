@@ -52,24 +52,24 @@ bpf_mptcp_subflow_ctx(const struct sock *sk)
 
 __bpf_kfunc static int
 bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
-			   struct mptcp_sock *msk)
+			   struct sock *sk)
 {
 	struct bpf_iter_mptcp_subflow_kern *kit = (void *)it;
-	struct sock *sk = (struct sock *)msk;
+	struct mptcp_sock *msk;
 
 	BUILD_BUG_ON(sizeof(struct bpf_iter_mptcp_subflow_kern) >
 		     sizeof(struct bpf_iter_mptcp_subflow));
 	BUILD_BUG_ON(__alignof__(struct bpf_iter_mptcp_subflow_kern) !=
 		     __alignof__(struct bpf_iter_mptcp_subflow));
 
+	if (unlikely(!sk || !sk_fullsock(sk)))
+		return -EINVAL;
+
+	if (sk->sk_protocol != IPPROTO_MPTCP)
+		return -EINVAL;
+
+	msk = mptcp_sk(sk);
 	kit->msk = msk;
-	if (!msk)
-		return -EINVAL;
-
-	if (!sock_owned_by_user_nocheck(sk) &&
-	    !spin_is_locked(&sk->sk_lock.slock))
-		return -EINVAL;
-
 	kit->pos = &msk->conn_list;
 	return 0;
 }
