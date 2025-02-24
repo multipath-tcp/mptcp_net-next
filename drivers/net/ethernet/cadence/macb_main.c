@@ -1079,15 +1079,18 @@ static void macb_tx_error_task(struct work_struct *work)
 						      tx_error_task);
 	bool			halt_timeout = false;
 	struct macb		*bp = queue->bp;
+	u32			queue_index;
+	u32			packets = 0;
+	u32			bytes = 0;
 	struct macb_tx_skb	*tx_skb;
 	struct macb_dma_desc	*desc;
 	struct sk_buff		*skb;
 	unsigned int		tail;
 	unsigned long		flags;
 
+	queue_index = queue - bp->queues;
 	netdev_vdbg(bp->dev, "macb_tx_error_task: q = %u, t = %u, h = %u\n",
-		    (unsigned int)(queue - bp->queues),
-		    queue->tx_tail, queue->tx_head);
+		    queue_index, queue->tx_tail, queue->tx_head);
 
 	/* Prevent the queue NAPI TX poll from running, as it calls
 	 * macb_tx_complete(), which in turn may call netif_wake_subqueue().
@@ -1140,8 +1143,10 @@ static void macb_tx_error_task(struct work_struct *work)
 					    skb->data);
 				bp->dev->stats.tx_packets++;
 				queue->stats.tx_packets++;
+				packets++;
 				bp->dev->stats.tx_bytes += skb->len;
 				queue->stats.tx_bytes += skb->len;
+				bytes += skb->len;
 			}
 		} else {
 			/* "Buffers exhausted mid-frame" errors may only happen
@@ -1157,6 +1162,9 @@ static void macb_tx_error_task(struct work_struct *work)
 
 		macb_tx_unmap(bp, tx_skb, 0);
 	}
+
+	netdev_tx_completed_queue(netdev_get_tx_queue(bp->dev, queue_index),
+				  packets, bytes);
 
 	/* Set end of TX queue */
 	desc = macb_tx_desc(queue, 0);
@@ -1228,6 +1236,7 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 	unsigned int tail;
 	unsigned int head;
 	int packets = 0;
+	u32 bytes = 0;
 
 	spin_lock(&queue->tx_ptr_lock);
 	head = queue->tx_head;
@@ -1269,6 +1278,7 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 				bp->dev->stats.tx_bytes += skb->len;
 				queue->stats.tx_bytes += skb->len;
 				packets++;
+				bytes += skb->len;
 			}
 
 			/* Now we can safely release resources */
@@ -1282,6 +1292,9 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 				break;
 		}
 	}
+
+	netdev_tx_completed_queue(netdev_get_tx_queue(bp->dev, queue_index),
+				  packets, bytes);
 
 	queue->tx_tail = tail;
 	if (__netif_subqueue_stopped(bp->dev, queue_index) &&
@@ -1976,10 +1989,12 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
 
 		if (status & MACB_BIT(ISR_ROVR)) {
 			/* We missed at least one packet */
+			spin_lock(&bp->stats_lock);
 			if (macb_is_gem(bp))
 				bp->hw_stats.gem.rx_overruns++;
 			else
 				bp->hw_stats.macb.rx_overruns++;
+			spin_unlock(&bp->stats_lock);
 
 			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
 				queue_writel(queue, ISR, MACB_BIT(ISR_ROVR));
@@ -2384,6 +2399,8 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Make newly initialized descriptor visible to hardware */
 	wmb();
 	skb_tx_timestamp(skb);
+	netdev_tx_sent_queue(netdev_get_tx_queue(bp->dev, queue_index),
+			     skb->len);
 
 	spin_lock_irq(&bp->lock);
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
@@ -3019,6 +3036,7 @@ static int macb_close(struct net_device *dev)
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 		napi_disable(&queue->napi_rx);
 		napi_disable(&queue->napi_tx);
+		netdev_tx_reset_queue(netdev_get_tx_queue(dev, q));
 	}
 
 	phylink_stop(bp->phylink);
@@ -3096,6 +3114,7 @@ static void gem_get_stats(struct macb *bp, struct rtnl_link_stats64 *nstat)
 {
 	struct gem_stats *hwstat = &bp->hw_stats.gem;
 
+	spin_lock_irq(&bp->stats_lock);
 	if (netif_running(bp->dev))
 		gem_update_stats(bp);
 
@@ -3126,17 +3145,19 @@ static void gem_get_stats(struct macb *bp, struct rtnl_link_stats64 *nstat)
 	nstat->tx_aborted_errors = hwstat->tx_excessive_collisions;
 	nstat->tx_carrier_errors = hwstat->tx_carrier_sense_errors;
 	nstat->tx_fifo_errors = hwstat->tx_underrun;
+	spin_unlock_irq(&bp->stats_lock);
 }
 
 static void gem_get_ethtool_stats(struct net_device *dev,
 				  struct ethtool_stats *stats, u64 *data)
 {
-	struct macb *bp;
+	struct macb *bp = netdev_priv(dev);
 
-	bp = netdev_priv(dev);
+	spin_lock_irq(&bp->stats_lock);
 	gem_update_stats(bp);
 	memcpy(data, &bp->ethtool_stats, sizeof(u64)
 			* (GEM_STATS_LEN + QUEUE_STATS_LEN * MACB_MAX_QUEUES));
+	spin_unlock_irq(&bp->stats_lock);
 }
 
 static int gem_get_sset_count(struct net_device *dev, int sset)
@@ -3189,6 +3210,7 @@ static void macb_get_stats(struct net_device *dev,
 	}
 
 	/* read stats from hardware */
+	spin_lock_irq(&bp->stats_lock);
 	macb_update_stats(bp);
 
 	/* Convert HW stats into netdevice stats */
@@ -3222,6 +3244,7 @@ static void macb_get_stats(struct net_device *dev,
 	nstat->tx_carrier_errors = hwstat->tx_carrier_errors;
 	nstat->tx_fifo_errors = hwstat->tx_underruns;
 	/* Don't know about heartbeat or window errors... */
+	spin_unlock_irq(&bp->stats_lock);
 }
 
 static void macb_get_pause_stats(struct net_device *dev,
@@ -5247,6 +5270,7 @@ static int macb_probe(struct platform_device *pdev)
 		}
 	}
 	spin_lock_init(&bp->lock);
+	spin_lock_init(&bp->stats_lock);
 
 	/* setup capabilities */
 	macb_configure_caps(bp, macb_config);
