@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-a-test-for-mptcp_diag_dump_one
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add a test for mptcp_diag_dump_one
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch introduces a new 'chk_diag' test in diag.sh. It retrieves
+the token for a specified MPTCP socket (msk) using the 'ss' command and
+then accesses the 'mptcp_diag_dump_one' in kernel via ./mptcp_diag
+to verify if the correct token is returned.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/524
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
