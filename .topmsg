@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: pm: in-kernel: reduce parameters of set_flags
-
-The number of parameters in mptcp_nl_set_flags() can be reduced.
-Only need to pass a "local" parameter to it instead of "local->addr"
-and "local->flags".
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
