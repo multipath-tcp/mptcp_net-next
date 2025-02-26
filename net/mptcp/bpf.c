@@ -69,6 +69,9 @@ bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 		return -EINVAL;
 
 	msk = mptcp_sk(sk);
+
+	msk_owned_by_me(msk);
+
 	kit->msk = msk;
 	kit->pos = &msk->conn_list;
 	return 0;
