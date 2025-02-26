@@ -74,7 +74,8 @@ static void send_query(int fd, __u32 token)
 		},
 		.r = {
 			.sdiag_family = AF_INET,
-			.sdiag_protocol = IPPROTO_MPTCP,
+			/* Real proto is set via INET_DIAG_REQ_PROTOCOL */
+			.sdiag_protocol = IPPROTO_TCP,
 			.id.idiag_cookie[0] = token,
 		}
 	};
@@ -146,12 +147,12 @@ static void print_info_msg(struct mptcp_info *info)
 	printf("add_addr_accepted_max: %u\n", info->mptcpi_add_addr_accepted_max);
 
 	printf("\nTransmission Info\n");
-	printf("write_seq:        %llx\n", info->mptcpi_write_seq);
-	printf("snd_una:          %llx\n", info->mptcpi_snd_una);
-	printf("rcv_nxt:          %llx\n", info->mptcpi_rcv_nxt);
-	printf("last_data_sent:   %x\n", info->mptcpi_last_data_sent);
-	printf("last_data_recv:   %x\n", info->mptcpi_last_data_recv);
-	printf("last_ack_recv:    %x\n", info->mptcpi_last_ack_recv);
+	printf("write_seq:        %llu\n", info->mptcpi_write_seq);
+	printf("snd_una:          %llu\n", info->mptcpi_snd_una);
+	printf("rcv_nxt:          %llu\n", info->mptcpi_rcv_nxt);
+	printf("last_data_sent:   %u\n", info->mptcpi_last_data_sent);
+	printf("last_data_recv:   %u\n", info->mptcpi_last_data_recv);
+	printf("last_ack_recv:    %u\n", info->mptcpi_last_ack_recv);
 	printf("retransmits:      %u\n", info->mptcpi_retransmits);
 	printf("retransmit bytes: %llu\n", info->mptcpi_bytes_retrans);
 	printf("bytes_sent:       %llu\n", info->mptcpi_bytes_sent);
