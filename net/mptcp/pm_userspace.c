@@ -637,8 +637,6 @@ int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
 
 	BUILD_BUG_ON(sizeof(struct id_bitmap) > sizeof(cb->ctx));
 
-	BUILD_BUG_ON(sizeof(struct id_bitmap) > sizeof(cb->ctx));
-
 	bitmap = (struct id_bitmap *)cb->ctx;
 
 	msk = mptcp_userspace_pm_get_sock(info);
