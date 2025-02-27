@@ -18,7 +18,7 @@ void mptcp_free_local_addr_list(struct mptcp_sock *msk)
 	struct sock *sk = (struct sock *)msk;
 	LIST_HEAD(free_list);
 
-	if (!mptcp_pm_is_userspace(msk))
+	if (list_empty(&msk->pm.userspace_pm_local_addr_list))
 		return;
 
 	spin_lock_bh(&msk->pm.lock);
