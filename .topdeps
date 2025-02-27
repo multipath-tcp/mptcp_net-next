@@ -1,1 +1,1 @@
-t/mptcp-pm-use-addr-entry-for-get_local_id
+t/mptcp-pm-exit-early-with-ADD_ADDR-echo-if-possible
