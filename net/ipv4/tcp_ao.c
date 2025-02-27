@@ -246,12 +246,11 @@ static struct tcp_ao_key *tcp_ao_copy_key(struct sock *sk,
 {
 	struct tcp_ao_key *new_key;
 
-	new_key = sock_kmalloc(sk, tcp_ao_sizeof_key(key),
+	new_key = sock_kmemdup(sk, key, tcp_ao_sizeof_key(key),
 			       GFP_ATOMIC);
 	if (!new_key)
 		return NULL;
 
-	*new_key = *key;
 	INIT_HLIST_NODE(&new_key->node);
 	tcp_sigpool_get(new_key->tcp_sigpool_id);
 	atomic64_set(&new_key->pkt_good, 0);
