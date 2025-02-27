@@ -531,7 +531,8 @@ int mptcp_pm_nl_get_addr_dumpit(struct sk_buff *msg,
 static int mptcp_pm_set_flags(struct genl_info *info)
 {
 	struct mptcp_pm_addr_entry loc = { .addr = { .family = AF_UNSPEC }, };
-	struct nlattr *attr_loc;
+	struct mptcp_pm_addr_entry rem = { .addr = { .family = AF_UNSPEC }, };
+	struct nlattr *attr_loc, *attr_rem;
 	int ret = -EINVAL;
 
 	if (GENL_REQ_ATTR_CHECK(info, MPTCP_PM_ATTR_ADDR))
@@ -542,9 +543,20 @@ static int mptcp_pm_set_flags(struct genl_info *info)
 	if (ret < 0)
 		return ret;
 
-	if (info->attrs[MPTCP_PM_ATTR_TOKEN])
-		return mptcp_userspace_pm_set_flags(&loc, info);
-	return mptcp_pm_nl_set_flags(&loc, info);
+	if (info->attrs[MPTCP_PM_ATTR_TOKEN]) {
+		attr_rem = info->attrs[MPTCP_PM_ATTR_ADDR_REMOTE];
+		ret = mptcp_pm_parse_entry(attr_rem, info, false, &rem);
+		if (ret < 0)
+			return ret;
+
+		if (rem.addr.family == AF_UNSPEC) {
+			NL_SET_ERR_MSG_ATTR(info->extack, attr_rem,
+					    "invalid remote address family");
+			return -EINVAL;
+		}
+		return mptcp_userspace_pm_set_flags(&loc, &rem, info);
+	}
+	return mptcp_pm_nl_set_flags(&loc, &rem, info);
 }
 
 int mptcp_pm_nl_set_flags_doit(struct sk_buff *skb, struct genl_info *info)

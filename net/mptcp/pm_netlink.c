@@ -1949,6 +1949,7 @@ next:
 }
 
 int mptcp_pm_nl_set_flags(struct mptcp_pm_addr_entry *local,
+			  struct mptcp_pm_addr_entry *remote,
 			  struct genl_info *info)
 {
 	struct nlattr *attr = info->attrs[MPTCP_PM_ATTR_ADDR];
