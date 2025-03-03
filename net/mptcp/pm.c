@@ -1075,6 +1075,9 @@ int mptcp_pm_register(struct mptcp_pm_ops *pm)
 
 void mptcp_pm_unregister(struct mptcp_pm_ops *pm)
 {
+	if (pm == &mptcp_kernel_pm)
+		return;
+
 	spin_lock(&mptcp_pm_list_lock);
 	list_del_rcu(&pm->list);
 	spin_unlock(&mptcp_pm_list_lock);
