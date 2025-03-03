@@ -72,6 +72,26 @@ enabled - BOOLEAN
 
 	Default: 1 (enabled)
 
+path_manager - STRING
+	Set the default path manager name to use for each new MPTCP
+	socket. In-kernel path management will control subflow
+	connections and address advertisements according to
+	per-namespace values configured over the MPTCP netlink
+	API. Userspace path management puts per-MPTCP-connection subflow
+	connection decisions and address advertisements under control of
+	a privileged userspace program, at the cost of more netlink
+	traffic to propagate all of the related events and commands.
+	User-defined BPF-based path managers can also be set via this
+	sysctl.
+
+	This is a per-namespace sysctl.
+
+	* "kernel"          - In-kernel path manager
+	* "userspace"       - Userspace path manager
+	* all other strings - BPF-based path managers
+
+	Default: "kernel"
+
 pm_type - INTEGER
 	Set the default path manager type to use for each new MPTCP
 	socket. In-kernel path management will control subflow
@@ -83,6 +103,8 @@ pm_type - INTEGER
 	traffic to propagate all of the related events and commands.
 
 	This is a per-namespace sysctl.
+
+	(Deprecated, use path_manager instead.).
 
 	* 0 - In-kernel path manager
 	* 1 - Userspace path manager
