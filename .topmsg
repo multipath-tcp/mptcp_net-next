@@ -1,9 +1,0 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: pm: worker: split in-kernel and common tasks
-
-To make it clear what actions are in-kernel PM specific and which ones
-are not and done for all PMs, e.g. sending ADD_ADDR and close associated
-subflows when a RM_ADDR is received.
-
-Reviewed-by: Geliang Tang <geliang@kernel.org>
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
