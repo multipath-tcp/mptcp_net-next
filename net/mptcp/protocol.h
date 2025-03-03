@@ -327,6 +327,7 @@ struct mptcp_sock {
 	struct list_head conn_list;
 	struct list_head rtx_queue;
 	struct mptcp_data_frag *first_pending;
+	struct task_struct *bpf_iter_task;
 	struct list_head join_list;
 	struct sock	*first; /* The mptcp ops can safely dereference, using suitable
 				 * ONCE annotation, the subflow outside the socket
@@ -1290,5 +1291,20 @@ mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subflow_re
 
 static inline void mptcp_join_cookie_init(void) {}
 #endif
+
+static inline void mptcp_set_bpf_iter_task(struct mptcp_sock *msk)
+{
+	WRITE_ONCE(msk->bpf_iter_task, current);
+}
+
+static inline void mptcp_clear_bpf_iter_task(struct mptcp_sock *msk)
+{
+	WRITE_ONCE(msk->bpf_iter_task, NULL);
+}
+
+static inline struct task_struct *mptcp_get_bpf_iter_task(struct mptcp_sock *msk)
+{
+	return READ_ONCE(msk->bpf_iter_task);
+}
 
 #endif /* __MPTCP_PROTOCOL_H */
