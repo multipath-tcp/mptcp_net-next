@@ -79,11 +79,6 @@ unsigned int mptcp_close_timeout(const struct sock *sk)
 	return mptcp_get_pernet(sock_net(sk))->close_timeout;
 }
 
-int mptcp_get_pm_type(const struct net *net)
-{
-	return mptcp_get_pernet(net)->pm_type;
-}
-
 const char *mptcp_get_path_manager(const struct net *net)
 {
 	return mptcp_get_pernet(net)->path_manager;
