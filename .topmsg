@@ -1,4 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-remove-_nl-from-mptcp_pm_nl_rm_addr_received
+Subject: [PATCH] mptcp: pm: remove '_nl' from mptcp_pm_nl_rm_addr_received
 
+Currently, in-kernel PM specific helpers are prefixed with
+'mptcp_pm_nl_'. But here 'mptcp_pm_nl_rm_addr_received' is not specific
+to this PM: it is called from the PM worker, and used by both the
+in-kernel and userspace PMs. The helper has been renamed to
+'mptcp_pm_rm_addr_recv' instead of '_received' to avoid confusions with
+the one from pm.c.
+
+mptcp_pm_nl_rm_addr_or_subflow', and 'mptcp_pm_nl_rm_subflow_received'
+have been updated too for the same reason.
+
+To avoid confusions, the '_nl' bit has been removed from the name.
+
+While at it, the in-kernel PM specific code has been move from
+mptcp_pm_rm_addr_or_subflow to a new dedicated helper, clearer.
+
+No behavioural changes intended.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
