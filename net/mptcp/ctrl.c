@@ -217,6 +217,35 @@ static int proc_path_manager(const struct ctl_table *ctl, int write,
 	return ret;
 }
 
+static int proc_pm_type(const struct ctl_table *ctl, int write,
+			void *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct mptcp_pernet *pernet = container_of(ctl->data,
+						   struct mptcp_pernet,
+						   pm_type);
+	unsigned int val = READ_ONCE(*(u8 *)ctl->data);
+	const struct ctl_table tbl = {
+		.maxlen = sizeof(val),
+		.data = &val,
+	};
+	int ret;
+
+	if (val > mptcp_pm_type_max)
+		return -ERANGE;
+
+	ret = proc_douintvec(&tbl, write, buffer, lenp, ppos);
+	if (write && ret == 0) {
+		char *path_manager = "kernel";
+
+		if (val == MPTCP_PM_TYPE_USERSPACE)
+			path_manager = "userspace";
+		mptcp_set_path_manager(pernet->path_manager, path_manager);
+		WRITE_ONCE(*(u8 *)ctl->data, val);
+	}
+
+	return ret;
+}
+
 static struct ctl_table mptcp_sysctl_table[] = {
 	{
 		.procname = "enabled",
@@ -261,9 +290,7 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.procname = "pm_type",
 		.maxlen = sizeof(u8),
 		.mode = 0644,
-		.proc_handler = proc_dou8vec_minmax,
-		.extra1       = SYSCTL_ZERO,
-		.extra2       = &mptcp_pm_type_max
+		.proc_handler = proc_pm_type,
 	},
 	{
 		.procname = "scheduler",
