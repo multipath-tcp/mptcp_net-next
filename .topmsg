@@ -1,4 +1,42 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-split-in-kernel-PM-specific-code
+Subject: [PATCH] mptcp: pm: split in-kernel PM specific code
 
+Before this patch, the PM code was dispersed in different places:
+
+- pm.c had common code for all PMs
+
+- pm_netlink.c was supposed to be about the in-kernel PM, but also had
+  exported common Netlink helpers, NL events for PM userspace daemons,
+  etc. quite confusing.
+
+To clarify the code, a reorganisation is suggested here, only by moving
+code around to avoid confusions:
+
+- pm_netlink.c now only contains common PM Netlink code:
+  - PM events: this code was already there
+  - shared helpers around Netlink code that were already there as well
+  - more shared Netlink commands code from pm.c will come after
+
+- pm_kernel.c now contains only code that is specific to the in-kernel
+  PM. Now all functions are either called from:
+  - pm.c: events coming from the core, when this PM is being used
+  - pm_netlink.c: for shared Netlink commands
+  - mptcp_pm_gen.c: for Netlink commands specific to the in-kernel PM
+  - sockopt.c: for the exported counters per netns
+  - (while at it, a useless 'return;' spot by checkpatch at the end of
+     mptcp_pm_nl_set_flags_all, has been removed)
+
+The code around the PM is now less confusing, which should help for the
+maintenance in the long term.
+
+This will certainly impact future backports, but because other cleanups
+have already done recently, and more are coming to ease the addition of
+a new path-manager controlled with BPF (struct_ops), doing that now
+seems to be a good time. Also, many issues around the PM have been fixed
+a few months ago while increasing the code coverage in the selftests, so
+such big reorganisation can be done with more confidence now.
+
+No behavioural changes intended.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
