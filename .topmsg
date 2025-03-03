@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-avoid-calling-PM-specific-code-from-core
+Subject: [PATCH] mptcp: pm: avoid calling PM specific code from core
 
+When destroying an MPTCP socket, some userspace PM specific code was
+called from mptcp_destroy_common() in protocol.c. That feels wrong, and
+it is the only case.
+
+Instead, the core now calls mptcp_pm_destroy() from pm.c which is now in
+charge of cleaning the announced addresses list, and ask the different
+PMs to do extra cleaning if needed, e.g. the userspace PM, if used, will
+clean the local addresses list.
+
+While at it, the userspace PM specific helper has been prefixed with
+'mptcp_userspace_pm_' like the other ones.
+
+No behavioural changes intended.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
