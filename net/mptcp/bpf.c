@@ -197,14 +197,22 @@ static struct bpf_struct_ops bpf_mptcp_sched_ops = {
 
 struct mptcp_sock *bpf_mptcp_sock_from_sock(struct sock *sk)
 {
+	struct mptcp_sock *msk;
+
 	if (unlikely(!sk || !sk_fullsock(sk)))
 		return NULL;
 
-	if (sk->sk_protocol == IPPROTO_MPTCP)
-		return mptcp_sk(sk);
+	if (sk->sk_protocol == IPPROTO_MPTCP) {
+		msk = mptcp_sk(sk);
+		mptcp_set_bpf_iter_task(msk);
+		return msk;
+	}
 
-	if (sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
-		return mptcp_sk(mptcp_subflow_ctx(sk)->conn);
+	if (sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk)) {
+		msk = mptcp_sk(mptcp_subflow_ctx(sk)->conn);
+		mptcp_set_bpf_iter_task(msk);
+		return msk;
+	}
 
 	return NULL;
 }
