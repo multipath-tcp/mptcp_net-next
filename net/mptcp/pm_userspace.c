@@ -683,3 +683,21 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 	sock_put(sk);
 	return ret;
 }
+
+static void mptcp_userspace_pm_release(struct mptcp_sock *msk)
+{
+	mptcp_userspace_pm_free_local_addr_list(msk);
+}
+
+static struct mptcp_pm_ops mptcp_userspace_pm = {
+	.get_local_id		= mptcp_userspace_pm_get_local_id,
+	.get_priority		= mptcp_userspace_pm_is_backup,
+	.release		= mptcp_userspace_pm_release,
+	.name			= "userspace",
+	.owner			= THIS_MODULE,
+};
+
+void __init mptcp_userspace_pm_init(void)
+{
+	mptcp_pm_register(&mptcp_userspace_pm);
+}
