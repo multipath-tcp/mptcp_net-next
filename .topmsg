@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-split-netlink-and-in-kernel-init
+Subject: [PATCH] mptcp: pm: split netlink and in-kernel init
 
+The registration of mptcp_genl_family is useful for both the in-kernel
+and the userspace PM. It should then be done in pm_netlink.c.
+
+On the other hand, the registration of the in-kernel pernet subsystem is
+specific to the in-kernel PM, and should stay there in pm_kernel.c.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
