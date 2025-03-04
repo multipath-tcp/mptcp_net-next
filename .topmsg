@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: pm: in-kernel: use kmemdup helper
-
-Instead of using kmalloc() or kzalloc() to allocate an entry and
-then immediately duplicate another entry to the newly allocated
-one, kmemdup() helper can be used to simplify the code.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
