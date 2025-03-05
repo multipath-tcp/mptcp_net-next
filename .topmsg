@@ -2,8 +2,8 @@ From: Geliang Tang <tanggeliang@kylinos.cn>
 Subject: [PATCH] mptcp: pm: use pm variable instead of msk->pm
 
 The variable "pm" has been defined in mptcp_pm_fully_established()
-and mptcp_pm_data_reset() as "sk->pm", so use "pm" directly instead
-of using "sk->pm".
+and mptcp_pm_data_reset() as "msk->pm", so use "pm" directly instead
+of using "msk->pm".
 
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
