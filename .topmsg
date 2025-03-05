@@ -4,19 +4,18 @@ Subject: [PATCH] selftests/bpf: Add mptcp_subflow bpf_iter subtest
 This patch adds a "cgroup/getsockopt" program "iters_subflow" to test the
 newly added mptcp_subflow bpf_iter.
 
-Export mptcp_subflow helpers bpf_iter_mptcp_subflow_new/_next/_destroy,
-bpf_mptcp_sock_acquire/_release and other helpers into bpf_experimental.h.
+Export mptcp_subflow helpers bpf_iter_mptcp_subflow_new/_next/_destroy
+and other helpers into bpf_experimental.h.
 
-Use bpf_mptcp_sock_acquire() to acquire the msk, then use bpf_for_each()
-to walk the subflow list of this msk. MPTCP-specific packet scheduler kfunc
-can be called in the loop. In this test, just add all subflow ids to local
-variable local_ids, then invoke the kfunc bpf_mptcp_subflow_tcp_sock() in
-the loop to pick a subsocket.
+Use bpf_for_each() to walk the subflow list of this msk. MPTCP-specific
+packet scheduler kfunc can be called in the loop. In this test, just
+add all subflow ids to local variable local_ids, then invoke the helper
+mptcp_subflow_tcp_sock() in the loop to pick a subsocket.
 
 Out of the loop, use bpf_mptcp_subflow_ctx() to get the subflow context
 of the picked subsocket and do some verification. Finally, assign
 local_ids to global variable ids so that the application can obtain this
-value, and release the msk.
+value.
 
 Add a subtest named test_iters_subflow to load and verify the newly added
 mptcp_subflow type bpf_iter example in test_mptcp. Use the helper
