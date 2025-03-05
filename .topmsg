@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sockopt-fix-getting-freebind-transparent
+Subject: [PATCH] mptcp: sockopt: fix getting freebind & transparent
 
+When adding a socket option support in MPTCP, both the get and set parts
+are supposed to be implemented.
+
+IP(V6)_FREEBIND and IP(V6)_TRANSPARENT support for the setsockopt part
+has been added a while ago, but it looks like the get part got
+forgotten. It should have been present as a way to verify a setting has
+been set as expected, and not to act differently from TCP or any other
+socket types.
+
+Everything was in place to expose it, just the last step was missing.
+Only new code is added to cover these specific getsockopt(), that seems
+safe.
+
+Fixes: c9406a23c116 ("mptcp: sockopt: add SOL_IP freebind & transparent options")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
