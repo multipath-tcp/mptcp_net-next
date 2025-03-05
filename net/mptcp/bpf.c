@@ -12,15 +12,9 @@
 #include <linux/bpf.h>
 #include "protocol.h"
 
-struct mptcp_sock *bpf_mptcp_sock_from_sock(struct sock *sk)
+struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
 {
-	if (unlikely(!sk || !sk_fullsock(sk)))
-		return NULL;
-
-	if (sk->sk_protocol == IPPROTO_MPTCP)
-		return mptcp_sk(sk);
-
-	if (sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
+	if (sk && sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
 		return mptcp_sk(mptcp_subflow_ctx(sk)->conn);
 
 	return NULL;
@@ -58,24 +52,27 @@ bpf_mptcp_subflow_ctx(const struct sock *sk)
 
 __bpf_kfunc static int
 bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
-			   struct mptcp_sock *msk)
+			   struct sock *sk)
 {
 	struct bpf_iter_mptcp_subflow_kern *kit = (void *)it;
-	struct sock *sk = (struct sock *)msk;
+	struct mptcp_sock *msk;
 
 	BUILD_BUG_ON(sizeof(struct bpf_iter_mptcp_subflow_kern) >
 		     sizeof(struct bpf_iter_mptcp_subflow));
 	BUILD_BUG_ON(__alignof__(struct bpf_iter_mptcp_subflow_kern) !=
 		     __alignof__(struct bpf_iter_mptcp_subflow));
 
+	if (unlikely(!sk || !sk_fullsock(sk)))
+		return -EINVAL;
+
+	if (sk->sk_protocol != IPPROTO_MPTCP)
+		return -EINVAL;
+
+	msk = mptcp_sk(sk);
+
+	msk_owned_by_me(msk);
+
 	kit->msk = msk;
-	if (!msk)
-		return -EINVAL;
-
-	if (!sock_owned_by_user_nocheck(sk) &&
-	    !spin_is_locked(&sk->sk_lock.slock))
-		return -EINVAL;
-
 	kit->pos = &msk->conn_list;
 	return 0;
 }
