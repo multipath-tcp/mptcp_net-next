@@ -156,14 +156,12 @@ static int bpf_mptcp_sched_init(struct btf *btf)
 	return 0;
 }
 
-static int __bpf_mptcp_sched_get_send(struct mptcp_sock *msk,
-				      struct mptcp_sched_data *data)
+static int __bpf_mptcp_sched_get_send(struct mptcp_sock *msk)
 {
 	return 0;
 }
 
-static int __bpf_mptcp_sched_get_retrans(struct mptcp_sock *msk,
-					 struct mptcp_sched_data *data)
+static int __bpf_mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
 	return 0;
 }
