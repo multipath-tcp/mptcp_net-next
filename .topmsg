@@ -1,4 +1,52 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-clamp-window-like-before-the-cleanup
+Subject: [PATCH] tcp: clamp window like before the cleanup
 
+A recent cleanup changed the behaviour of tcp_set_window_clamp(). This
+looks unintentional, and affects MPTCP selftests, e.g. some tests
+re-establishing a connection after a disconnect are now unstable.
+
+Before the cleanup, this operation was done:
+
+  new_rcv_ssthresh = min(tp->rcv_wnd, new_window_clamp);
+  tp->rcv_ssthresh = max(new_rcv_ssthresh, tp->rcv_ssthresh);
+
+The cleanup used the 'clamp' macro which takes 3 arguments -- value,
+lowest, and highest -- and returns a value between the lowest and the
+highest allowable values. This then assumes ...
+
+  lowest (rcv_ssthresh) <= highest (rcv_wnd)
+
+... which doesn't seem to be always the case here according to the MPTCP
+selftests, even when running them without MPTCP, but only TCP.
+
+For example, when we have ...
+
+  rcv_wnd < rcv_ssthresh < new_rcv_ssthresh
+
+... before the cleanup, the rcv_ssthresh was not changed, while after
+the cleanup, it is lowered down to rcv_wnd (highest).
+
+During a simple test with TCP, here are the values I observed:
+
+  new_window_clamp (val)  rcv_ssthresh (lo)  rcv_wnd (hi)
+      117760   (out)         65495         <  65536
+      128512   (out)         109595        >  80256  => lo > hi
+      1184975  (out)         328987        <  329088
+
+      113664   (out)         65483         <  65536
+      117760   (out)         110968        <  110976
+      129024   (out)         116527        >  109696 => lo > hi
+
+Here, we can see that it is not that rare to have rcv_ssthresh (lo)
+higher than rcv_wnd (hi), so having a different behaviour when the
+clamp() macro is used, even without MPTCP.
+
+Note: new_window_clamp is always out of range (rcv_ssthresh < rcv_wnd)
+here, which seems to be generally the case in my tests with small
+connections.
+
+I then suggests reverting this part, not to change the behaviour.
+
+Fixes: 863a952eb79a ("tcp: tcp_set_window_clamp() cleanup")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/551
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
