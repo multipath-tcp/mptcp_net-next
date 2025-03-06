@@ -1045,8 +1045,24 @@ struct mptcp_pm_ops *mptcp_pm_find(const char *name)
 	return NULL;
 }
 
+int mptcp_pm_validate(struct mptcp_pm_ops *pm_ops)
+{
+	if (!pm_ops->get_local_id || !pm_ops->get_priority) {
+		pr_err("%s does not implement required ops\n", pm_ops->name);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 int mptcp_pm_register(struct mptcp_pm_ops *pm_ops)
 {
+	int ret;
+
+	ret = mptcp_pm_validate(pm_ops);
+	if (ret)
+		return ret;
+
 	spin_lock(&mptcp_pm_list_lock);
 	if (mptcp_pm_find(pm_ops->name)) {
 		spin_unlock(&mptcp_pm_list_lock);
