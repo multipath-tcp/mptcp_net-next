@@ -970,37 +970,54 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 }
 
+static void mptcp_pm_ops_init(struct mptcp_sock *msk,
+			      struct mptcp_pm_ops *pm_ops)
+{
+	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
+		pr_warn_once("pm %s fails, fallback to default pm",
+			     pm_ops->name);
+		pm_ops = &mptcp_pm_kernel;
+	}
+
+	msk->pm.ops = pm_ops;
+	if (msk->pm.ops->init)
+		msk->pm.ops->init(msk);
+
+	pr_debug("pm %s initialized\n", pm_ops->name);
+}
+
+static void mptcp_pm_ops_release(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_ops *pm_ops = msk->pm.ops;
+
+	msk->pm.ops = NULL;
+	if (pm_ops->release)
+		pm_ops->release(msk);
+
+	bpf_module_put(pm_ops, pm_ops->owner);
+
+	pr_debug("pm %s released\n", pm_ops->name);
+}
+
 void mptcp_pm_destroy(struct mptcp_sock *msk)
 {
 	mptcp_pm_free_anno_list(msk);
-
-	if (mptcp_pm_is_userspace(msk))
-		mptcp_userspace_pm_free_local_addr_list(msk);
+	mptcp_pm_ops_release(msk);
 }
 
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
 {
-	u8 pm_type = mptcp_get_pm_type(sock_net((struct sock *)msk));
+	const struct net *net = sock_net((struct sock *)msk);
+	const char *pm_name = mptcp_get_path_manager(net);
+	u8 pm_type = mptcp_get_pm_type(net);
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	memset(&pm->reset, 0, sizeof(pm->reset));
 	WRITE_ONCE(pm->pm_type, pm_type);
 
-	if (pm_type == MPTCP_PM_TYPE_KERNEL) {
-		bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
-
-		/* pm->work_pending must be only be set to 'true' when
-		 * pm->pm_type is set to MPTCP_PM_TYPE_KERNEL
-		 */
-		WRITE_ONCE(pm->work_pending,
-			   (!!mptcp_pm_get_local_addr_max(msk) &&
-			    subflows_allowed) ||
-			   !!mptcp_pm_get_add_addr_signal_max(msk));
-		WRITE_ONCE(pm->accept_addr,
-			   !!mptcp_pm_get_add_addr_accept_max(msk) &&
-			   subflows_allowed);
-		WRITE_ONCE(pm->accept_subflow, subflows_allowed);
-	}
+	rcu_read_lock();
+	mptcp_pm_ops_init(msk, mptcp_pm_find(pm_name));
+	rcu_read_unlock();
 
 	bitmap_fill(pm->id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 }
