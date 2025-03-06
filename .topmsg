@@ -1,15 +1,13 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
 Subject: [PATCH] bpf: Register mptcp common kfunc set
 
-MPTCP helper mptcp_sk() is used to convert struct sock to mptcp_sock.
-Helpers mptcp_subflow_ctx() and mptcp_subflow_tcp_sock() are used to
-convert between struct mptcp_subflow_context and sock. They all will
-be used in MPTCP BPF programs too.
+MPTCP helper mptcp_subflow_ctx() is used to convert struct sock to
+struct mptcp_subflow_context. It will be used in MPTCP BPF programs.
 
-This patch defines corresponding wrappers of them, and put the
-wrappers into mptcp common kfunc set and register the set with the
-flag BPF_PROG_TYPE_UNSPEC to let them accessible to all types of BPF
-programs.
+This patch defines corresponding wrapper of this helper, and put it
+into the newly defined mptcp common kfunc set and register this set
+with the flag BPF_PROG_TYPE_CGROUP_SOCKOPT to let it accessible to
+the 'cgroup/getsockopt' type of BPF programs.
 
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Mat Martineau <martineau@kernel.org>
