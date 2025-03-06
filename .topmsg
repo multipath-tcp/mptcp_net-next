@@ -1,4 +1,27 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-ulp-diag-more-info-without-CAP_NET_ADMIN
+Subject: [PATCH] tcp: ulp: diag: more info without CAP_NET_ADMIN
 
+When introduced in commit 61723b393292 ("tcp: ulp: add functions to dump
+ulp-specific information"), the whole ULP diag info has been exported
+only if the requester had CAP_NET_ADMIN.
+
+It looks like not everything is sensitive, and some info can be exported
+to all users in order to ease the debugging from the userspace side
+without requiring additional capabilities. Each layer should then decide
+what can be exposed to everybody. The 'net_admin' boolean is then passed
+to the different layers.
+
+On kTLS side, it looks like there is nothing sensitive there, only some
+metadata about the configuration, no cryptographic information. Then,
+everything can be exported to all users.
+
+On MPTCP side, that's different. The MPTCP-related sequence numbers per
+subflow should certainly not be exposed to everybody. For example, the
+DSS mapping and ssn_offset would give all users on the system access to
+narrow ranges of values for the subflow TCP sequence numbers and
+MPTCP-level DSNs, and then ease packet injection. The TCP diag interface
+doesn't expose the TCP sequence numbers for TCP sockets, so best to do
+the same here.
+
+Acked-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
