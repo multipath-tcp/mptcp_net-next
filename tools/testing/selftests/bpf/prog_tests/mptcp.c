@@ -741,7 +741,7 @@ static void test_burst(void)
 	if (!ASSERT_OK(mptcp_bpf_burst__load(skel), "load: burst"))
 		goto skel_destroy;
 
-	test_bpf_sched(skel->obj, "burst", WITH_DATA, WITH_DATA);
+	test_bpf_sched(skel->maps.burst, "burst", WITH_DATA, WITH_DATA);
 skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
