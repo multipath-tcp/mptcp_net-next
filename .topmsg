@@ -1,4 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-ulp-diag-always-print-the-name-if-any
+Subject: [PATCH] tcp: ulp: diag: always print the name if any
 
+Since its introduction in commit 61723b393292 ("tcp: ulp: add functions
+to dump ulp-specific information"), the ULP diag info have been exported
+only if the requester had CAP_NET_ADMIN.
+
+At least the ULP name can be exported without CAP_NET_ADMIN. This will
+already help identifying which layer is being used, e.g. which TCP
+connections are in fact MPTCP subflow.
+
+Acked-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
