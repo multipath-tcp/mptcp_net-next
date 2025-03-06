@@ -118,9 +118,61 @@ trap cleanup EXIT
 
 # Create and configure network namespaces for testing
 mptcp_lib_ns_init ns1 ns2
-for i in "$ns1" "$ns2" ;do
-	ip netns exec "$i" sysctl -q net.mptcp.pm_type=1
-done
+
+set_path_manager()
+{
+	local ns=$1
+	local pm=$2
+
+	if ! ip netns exec ${ns} sysctl net.mptcp.available_path_managers |
+	     grep -wq "${pm}"; then
+		test_fail "path manager ${pm} not found"
+		return 1
+	fi
+	ip netns exec ${ns} sysctl -q net.mptcp.path_manager="${pm}"
+}
+
+if [ -f /proc/sys/net/mptcp/path_manager ]; then
+	ip netns exec "$ns1" sysctl -q net.mptcp.pm_type=0
+	pm_name="$(ip netns exec "$ns1" sysctl -n net.mptcp.path_manager)"
+	if [ "${pm_name}" != "kernel" ]; then
+		test_fail "unexpected pm_name: ${pm_name}"
+		mptcp_lib_result_print_all_tap
+		exit ${KSFT_FAIL}
+	fi
+
+	ip netns exec "$ns1" sysctl -q net.mptcp.pm_type=1
+	pm_name="$(ip netns exec "$ns1" sysctl -n net.mptcp.path_manager)"
+	if [ "${pm_name}" != "userspace" ]; then
+		test_fail "unexpected pm_name: ${pm_name}"
+		mptcp_lib_result_print_all_tap
+		exit ${KSFT_FAIL}
+	fi
+
+	set_path_manager "$ns1" "kernel"
+	pm_type="$(ip netns exec "$ns1" sysctl -n net.mptcp.pm_type)"
+	if [ "${pm_type}" != "0" ]; then
+		test_fail "unexpected pm_type: ${pm_type}"
+		mptcp_lib_result_print_all_tap
+		exit ${KSFT_FAIL}
+	fi
+
+	set_path_manager "$ns1" "userspace"
+	pm_type="$(ip netns exec "$ns1" sysctl -n net.mptcp.pm_type)"
+	if [ "${pm_type}" != "1" ]; then
+		test_fail "unexpected pm_type: ${pm_type}"
+		mptcp_lib_result_print_all_tap
+		exit ${KSFT_FAIL}
+	fi
+
+	set_path_manager "$ns2" "userspace"
+	print_test "check path_manager and pm_type sysctl mapping"
+	test_pass
+else
+	for i in "$ns1" "$ns2"; do
+		ip netns exec "$i" sysctl -q net.mptcp.pm_type=1
+	done
+fi
 
 #  "$ns1"              ns2
 #     ns1eth2    ns2eth1
