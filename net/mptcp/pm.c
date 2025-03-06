@@ -983,12 +983,7 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	u8 pm_type = mptcp_get_pm_type(sock_net((struct sock *)msk));
 	struct mptcp_pm_data *pm = &msk->pm;
 
-	pm->add_addr_signaled = 0;
-	pm->add_addr_accepted = 0;
-	pm->local_addr_used = 0;
-	pm->subflows = 0;
-	pm->rm_list_tx.nr = 0;
-	pm->rm_list_rx.nr = 0;
+	memset(&pm->reset, 0, sizeof(pm->reset));
 	WRITE_ONCE(pm->pm_type, pm_type);
 
 	if (pm_type == MPTCP_PM_TYPE_KERNEL) {
@@ -1005,15 +1000,8 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 			   !!mptcp_pm_get_add_addr_accept_max(msk) &&
 			   subflows_allowed);
 		WRITE_ONCE(pm->accept_subflow, subflows_allowed);
-	} else {
-		WRITE_ONCE(pm->work_pending, 0);
-		WRITE_ONCE(pm->accept_addr, 0);
-		WRITE_ONCE(pm->accept_subflow, 0);
 	}
 
-	WRITE_ONCE(pm->addr_signal, 0);
-	WRITE_ONCE(pm->remote_deny_join_id0, false);
-	pm->status = 0;
 	bitmap_fill(pm->id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 }
 

@@ -223,6 +223,8 @@ struct mptcp_pm_data {
 
 	spinlock_t	lock;		/*protects the whole PM data */
 
+	struct_group(reset,
+
 	u8		addr_signal;
 	bool		server_side;
 	bool		work_pending;
@@ -238,6 +240,8 @@ struct mptcp_pm_data {
 	DECLARE_BITMAP(id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 	struct mptcp_rm_list rm_list_tx;
 	struct mptcp_rm_list rm_list_rx;
+
+	);
 };
 
 struct mptcp_pm_local {
