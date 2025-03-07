@@ -50,7 +50,8 @@ void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 }
 
 SEC("struct_ops")
-int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
+int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
@@ -66,7 +67,7 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 		send_info[i].linger_time = -1;
 	}
 
-	bpf_for_each(mptcp_subflow, subflow, sk) {
+	bpf_for_each(mptcp_subflow_sched, subflow, sk, data) {
 		bool backup = subflow->backup || subflow->request_bkup;
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
@@ -120,13 +121,14 @@ out:
 }
 
 SEC("struct_ops")
-int BPF_PROG(bpf_burst_get_retrans, struct mptcp_sock *msk)
+int BPF_PROG(bpf_burst_get_retrans, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct sock *backup = NULL, *pick = NULL;
 	struct mptcp_subflow_context *subflow;
 	int min_stale_count = INT_MAX;
 
-	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk) {
+	bpf_for_each(mptcp_subflow_sched, subflow, (struct sock *)msk, data) {
 		struct sock *ssk = bpf_mptcp_subflow_tcp_sock(subflow);
 
 		if (!ssk || !mptcp_subflow_active(subflow))
