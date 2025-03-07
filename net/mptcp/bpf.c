@@ -288,6 +288,31 @@ bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it)
 {
 }
 
+struct bpf_iter_mptcp_subflow_sched {
+	struct bpf_iter_mptcp_subflow it;
+};
+
+__bpf_kfunc static int
+bpf_iter_mptcp_subflow_sched_new(struct bpf_iter_mptcp_subflow_sched *it,
+				 struct sock *sk, struct mptcp_sched_data *data)
+{
+	if (!mptcp_sched_check_bpf_iter_task(data))
+		return -EINVAL;
+
+	return bpf_iter_mptcp_subflow_new(&it->it, sk);
+}
+
+__bpf_kfunc static struct mptcp_subflow_context *
+bpf_iter_mptcp_subflow_sched_next(struct bpf_iter_mptcp_subflow_sched *it)
+{
+	return bpf_iter_mptcp_subflow_next(&it->it);
+}
+
+__bpf_kfunc static void
+bpf_iter_mptcp_subflow_sched_destroy(struct bpf_iter_mptcp_subflow_sched *it)
+{
+}
+
 __bpf_kfunc static bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 {
 	return tcp_rtx_queue_empty(sk);
@@ -312,6 +337,9 @@ BTF_ID_FLAGS(func, bpf_mptcp_subflow_tcp_sock, KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_sched_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_sched_next, KF_ITER_NEXT | KF_RET_NULL)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_sched_destroy, KF_ITER_DESTROY)
 BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
 BTF_ID_FLAGS(func, mptcp_subflow_active)
 BTF_ID_FLAGS(func, mptcp_set_timeout)
