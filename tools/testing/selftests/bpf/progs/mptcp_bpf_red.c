@@ -17,11 +17,12 @@ void BPF_PROG(mptcp_sched_red_release, struct mptcp_sock *msk)
 }
 
 SEC("struct_ops")
-int BPF_PROG(bpf_red_get_send, struct mptcp_sock *msk)
+int BPF_PROG(bpf_red_get_send, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct mptcp_subflow_context *subflow;
 
-	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk)
+	bpf_for_each(mptcp_subflow_sched, subflow, (struct sock *)msk, data)
 		mptcp_subflow_set_scheduled(subflow, true);
 
 	return 0;
