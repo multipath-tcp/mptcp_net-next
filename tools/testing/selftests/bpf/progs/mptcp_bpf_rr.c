@@ -31,7 +31,8 @@ void BPF_PROG(mptcp_sched_rr_release, struct mptcp_sock *msk)
 }
 
 SEC("struct_ops")
-int BPF_PROG(bpf_rr_get_send, struct mptcp_sock *msk)
+int BPF_PROG(bpf_rr_get_send, struct mptcp_sock *msk,
+	     struct mptcp_sched_data *data)
 {
 	struct mptcp_subflow_context *subflow, *next;
 	struct mptcp_rr_storage *ptr;
@@ -48,9 +49,9 @@ int BPF_PROG(bpf_rr_get_send, struct mptcp_sock *msk)
 	if (!ptr->last_snd)
 		goto out;
 
-	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk) {
+	bpf_for_each(mptcp_subflow_sched, subflow, (struct sock *)msk, data) {
 		if (mptcp_subflow_tcp_sock(subflow) == ptr->last_snd) {
-			subflow = bpf_iter_mptcp_subflow_next(&___it);
+			subflow = bpf_iter_mptcp_subflow_sched_next(&___it);
 			if (!subflow)
 				break;
 
