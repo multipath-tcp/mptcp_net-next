@@ -105,6 +105,7 @@ struct mptcp_out_options {
 struct mptcp_sched_data {
 	u8	subflows;
 	struct mptcp_subflow_context *contexts[MPTCP_SUBFLOWS_MAX];
+	struct task_struct *bpf_iter_task;
 };
 
 struct mptcp_sched_ops {

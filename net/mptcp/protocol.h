@@ -1291,4 +1291,23 @@ mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subflow_re
 static inline void mptcp_join_cookie_init(void) {}
 #endif
 
+static inline void mptcp_sched_set_bpf_iter_task(struct mptcp_sched_data *data)
+{
+	WRITE_ONCE(data->bpf_iter_task, current);
+}
+
+static inline void mptcp_sched_clear_bpf_iter_task(struct mptcp_sched_data *data)
+{
+	WRITE_ONCE(data->bpf_iter_task, NULL);
+}
+
+static inline bool mptcp_sched_check_bpf_iter_task(struct mptcp_sched_data *data)
+{
+	struct task_struct *task = READ_ONCE(data->bpf_iter_task);
+
+	if (task && task == current)
+		return true;
+	return false;
+}
+
 #endif /* __MPTCP_PROTOCOL_H */
