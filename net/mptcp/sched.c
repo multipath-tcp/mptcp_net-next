@@ -157,7 +157,8 @@ void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 int mptcp_sched_get_send(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_sched_data *data = NULL;
+	struct mptcp_sched_data data;
+	int ret;
 
 	msk_owned_by_me(msk);
 
@@ -178,14 +179,20 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 	}
 
 	if (msk->sched == &mptcp_sched_default || !msk->sched)
-		return mptcp_sched_default_get_send(msk, data);
-	return msk->sched->get_send(msk, data);
+		return mptcp_sched_default_get_send(msk, &data);
+
+	mptcp_sched_set_bpf_iter_task(&data);
+	ret = msk->sched->get_send(msk, &data);
+	mptcp_sched_clear_bpf_iter_task(&data);
+
+	return ret;
 }
 
 int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
-	struct mptcp_sched_data *data = NULL;
+	struct mptcp_sched_data data;
+	int ret;
 
 	msk_owned_by_me(msk);
 
@@ -199,8 +206,14 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
 	}
 
 	if (msk->sched == &mptcp_sched_default || !msk->sched)
-		return mptcp_sched_default_get_retrans(msk, data);
+		return mptcp_sched_default_get_retrans(msk, &data);
+
+	mptcp_sched_set_bpf_iter_task(&data);
 	if (msk->sched->get_retrans)
-		return msk->sched->get_retrans(msk, data);
-	return msk->sched->get_send(msk, data);
+		ret = msk->sched->get_retrans(msk, &data);
+	else
+		ret = msk->sched->get_send(msk, &data);
+	mptcp_sched_clear_bpf_iter_task(&data);
+
+	return ret;
 }
