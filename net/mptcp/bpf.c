@@ -261,6 +261,8 @@ bpf_iter_mptcp_subflow_new(struct bpf_iter_mptcp_subflow *it,
 		return -EINVAL;
 
 	msk = mptcp_sk(sk);
+	if (!mptcp_check_bpf_iter_task(msk))
+		return -EINVAL;
 
 	msk_owned_by_me(msk);
 

@@ -334,6 +334,7 @@ struct mptcp_sock {
 				 */
 	struct mptcp_pm_data	pm;
 	struct mptcp_sched_ops	*sched;
+	struct task_struct *bpf_iter_task;
 	struct {
 		u32	space;	/* bytes copied in last measurement window */
 		u32	copied; /* bytes copied in this measurement window */
@@ -1290,5 +1291,24 @@ mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subflow_re
 
 static inline void mptcp_join_cookie_init(void) {}
 #endif
+
+static inline void mptcp_set_bpf_iter_task(struct mptcp_sock *msk)
+{
+	WRITE_ONCE(msk->bpf_iter_task, current);
+}
+
+static inline void mptcp_clear_bpf_iter_task(struct mptcp_sock *msk)
+{
+	WRITE_ONCE(msk->bpf_iter_task, NULL);
+}
+
+static inline bool mptcp_check_bpf_iter_task(struct mptcp_sock *msk)
+{
+	struct task_struct *task = READ_ONCE(msk->bpf_iter_task);
+
+	if (task && task == current)
+		return true;
+	return false;
+}
 
 #endif /* __MPTCP_PROTOCOL_H */
