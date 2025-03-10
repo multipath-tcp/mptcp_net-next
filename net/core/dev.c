@@ -156,6 +156,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/prandom.h>
 #include <linux/once_lite.h>
+#include <net/netdev_lock.h>
 #include <net/netdev_rx_queue.h>
 #include <net/page_pool/types.h>
 #include <net/page_pool/helpers.h>
@@ -3870,6 +3871,9 @@ EXPORT_SYMBOL(skb_csum_hwoffload_help);
 static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device *dev, bool *again)
 {
 	netdev_features_t features;
+
+	if (!skb_frags_readable(skb))
+		goto out_kfree_skb;
 
 	features = netif_skb_features(skb);
 	skb = validate_xmit_vlan(skb, features);
