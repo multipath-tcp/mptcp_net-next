@@ -1843,10 +1843,10 @@ int __cgroup_bpf_run_filter_setsockopt(struct sock *sk, int *level,
 		goto out;
 	}
 
-	lock_sock(sk);
+	sk->sk_lock_sock ? sk->sk_lock_sock(sk) : lock_sock(sk);
 	ret = bpf_prog_run_array_cg(&cgrp->bpf, CGROUP_SETSOCKOPT,
 				    &ctx, bpf_prog_run, 0, NULL);
-	release_sock(sk);
+	sk->sk_release_sock ? sk->sk_release_sock(sk) : release_sock(sk);
 
 	if (ret)
 		goto out;
@@ -1952,10 +1952,10 @@ int __cgroup_bpf_run_filter_getsockopt(struct sock *sk, int level,
 		}
 	}
 
-	lock_sock(sk);
+	sk->sk_lock_sock ? sk->sk_lock_sock(sk) : lock_sock(sk);
 	ret = bpf_prog_run_array_cg(&cgrp->bpf, CGROUP_GETSOCKOPT,
 				    &ctx, bpf_prog_run, retval, NULL);
-	release_sock(sk);
+	sk->sk_release_sock ? sk->sk_release_sock(sk) : release_sock(sk);
 
 	if (ret < 0)
 		goto out;

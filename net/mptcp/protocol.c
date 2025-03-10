@@ -2712,6 +2712,18 @@ unlock:
 	sock_put(sk);
 }
 
+static void mptcp_sk_lock_sock(struct sock *sk)
+{
+	lock_sock(sk);
+	mptcp_set_bpf_iter_task(mptcp_sk(sk));
+}
+
+static void mptcp_sk_release_sock(struct sock *sk)
+{
+	mptcp_clear_bpf_iter_task(mptcp_sk(sk));
+	release_sock(sk);
+}
+
 static void __mptcp_init_sock(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -2741,6 +2753,9 @@ static void __mptcp_init_sock(struct sock *sk)
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&msk->sk.icsk_retransmit_timer, mptcp_retransmit_timer, 0);
 	timer_setup(&sk->sk_timer, mptcp_tout_timer, 0);
+
+	sk->sk_lock_sock = mptcp_sk_lock_sock;
+	sk->sk_release_sock = mptcp_sk_release_sock;
 }
 
 static void mptcp_ca_reset(struct sock *sk)
