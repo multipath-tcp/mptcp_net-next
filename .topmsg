@@ -1,8 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: sysctl: add available_path_managers
-
-Similarly to net.mptcp.available_schedulers, this patch adds a new one
-net.mptcp.available_path_managers to list the available path managers.
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
