@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-pm-sysctl-mapping-tests
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add pm sysctl mapping tests
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch checks if the newly added net.mptcp.path_manager is mapped
+successfully from or to the old net.mptcp.pm_type in userspace_pm.sh.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
