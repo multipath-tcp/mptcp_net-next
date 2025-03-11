@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sysctl-set-path-manager-by-name
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: sysctl: set path manager by name
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+A new net.mptcp.path_manager sysctl is added to determine which path
+manager will be used by each newly-created MPTCP socket by setting the
+name of it.
+
+This sysctl makes the old one "pm_type" deprecated.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
