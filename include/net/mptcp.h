@@ -116,6 +116,9 @@ struct mptcp_sched_ops {
 #define MPTCP_PM_NAME_MAX	16
 
 struct mptcp_pm_ops {
+	int (*get_local_id)(struct mptcp_sock *msk,
+			    struct mptcp_pm_addr_entry *skc);
+
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;
 	struct list_head	list;
