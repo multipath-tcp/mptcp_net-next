@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sysctl-map-path_manager-to-pm_type
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: sysctl: map path_manager to pm_type
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch maps the newly added path manager sysctl "path_manager"
+to the old one "pm_type".
+
+	path_manager   pm_type
+
+	"kernel"    -> MPTCP_PM_TYPE_KERNEL
+	"userspace" -> MPTCP_PM_TYPE_USERSPACE
+	others      -> __MPTCP_PM_TYPE_NR
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
