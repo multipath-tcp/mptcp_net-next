@@ -124,6 +124,7 @@ struct mptcp_pm_ops {
 			     struct mptcp_addr_info *skc);
 
 	bool (*allow_new_subflow)(struct mptcp_sock *msk);
+	bool (*accept_new_subflow)(const struct mptcp_sock *msk);
 
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;
