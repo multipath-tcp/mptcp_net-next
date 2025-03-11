@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: pm: add struct_group in mptcp_pm_data
-
-This patch adds a "struct_group(reset, ...)" in struct mptcp_pm_data to
-simplify the reset, and make sure we don't miss any.
-
-Suggested-by: Matthieu Baerts <matttbe@kernel.org>
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
