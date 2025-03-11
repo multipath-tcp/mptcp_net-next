@@ -526,33 +526,7 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 				 const struct mptcp_subflow_context *subflow)
 {
-	struct mptcp_pm_data *pm = &msk->pm;
-	bool update_subflows;
-
-	update_subflows = subflow->request_join || subflow->mp_join;
-	if (mptcp_pm_is_userspace(msk)) {
-		if (update_subflows) {
-			spin_lock_bh(&pm->lock);
-			pm->subflows--;
-			spin_unlock_bh(&pm->lock);
-		}
-		return;
-	}
-
-	if (!READ_ONCE(pm->work_pending) && !update_subflows)
-		return;
-
-	spin_lock_bh(&pm->lock);
-	if (update_subflows)
-		__mptcp_pm_close_subflow(msk);
-
-	/* Even if this subflow is not really established, tell the PM to try
-	 * to pick the next ones, if possible.
-	 */
-	if (mptcp_pm_nl_check_work_pending(msk))
-		mptcp_pm_schedule_work(msk, MPTCP_PM_SUBFLOW_ESTABLISHED);
-
-	spin_unlock_bh(&pm->lock);
+	msk->pm.ops->subflow_check_next(msk, subflow);
 }
 
 void mptcp_pm_add_addr_received(const struct sock *ssk,
@@ -1017,7 +991,8 @@ struct mptcp_pm_ops *mptcp_pm_find(const char *name)
 int mptcp_pm_validate(struct mptcp_pm_ops *pm_ops)
 {
 	if (!pm_ops->get_local_id || !pm_ops->get_priority ||
-	    !pm_ops->allow_new_subflow || !pm_ops->accept_new_subflow) {
+	    !pm_ops->allow_new_subflow || !pm_ops->accept_new_subflow ||
+	    !pm_ops->subflow_check_next) {
 		pr_err("%s does not implement required ops\n", pm_ops->name);
 		return -EINVAL;
 	}

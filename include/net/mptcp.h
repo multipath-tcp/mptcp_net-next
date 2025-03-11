@@ -15,6 +15,7 @@
 struct mptcp_info;
 struct mptcp_sock;
 struct mptcp_pm_addr_entry;
+struct mptcp_subflow_context;
 struct seq_file;
 
 /* MPTCP sk_buff extension data */
@@ -125,6 +126,8 @@ struct mptcp_pm_ops {
 
 	bool (*allow_new_subflow)(struct mptcp_sock *msk);
 	bool (*accept_new_subflow)(const struct mptcp_sock *msk);
+	void (*subflow_check_next)(struct mptcp_sock *msk,
+				   const struct mptcp_subflow_context *subflow);
 
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;
