@@ -715,6 +715,17 @@ static void mptcp_pm_userspace_subflow_check_next(struct mptcp_sock *msk,
 	}
 }
 
+static void mptcp_pm_userspace_add_addr_echo(struct mptcp_sock *msk,
+					     const struct mptcp_addr_info *addr)
+{
+	if (mptcp_userspace_pm_active(msk)) {
+		mptcp_pm_announce_addr(msk, addr, true);
+		mptcp_pm_add_addr_send_ack(msk);
+	} else {
+		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
+	}
+}
+
 static void mptcp_pm_userspace_release(struct mptcp_sock *msk)
 {
 	mptcp_userspace_pm_free_local_addr_list(msk);
@@ -726,6 +737,7 @@ static struct mptcp_pm_ops mptcp_pm_userspace = {
 	.allow_new_subflow	= mptcp_pm_userspace_allow_new_subflow,
 	.accept_new_subflow	= mptcp_pm_userspace_accept_new_subflow,
 	.subflow_check_next	= mptcp_pm_userspace_subflow_check_next,
+	.add_addr_echo		= mptcp_pm_userspace_add_addr_echo,
 	.release		= mptcp_pm_userspace_release,
 	.name			= "userspace",
 	.owner			= THIS_MODULE,

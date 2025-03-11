@@ -529,6 +529,22 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 	msk->pm.ops->subflow_check_next(msk, subflow);
 }
 
+void mptcp_pm_add_addr_echo(struct mptcp_sock *msk,
+			    const struct mptcp_addr_info *addr)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+
+	if ((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
+	    (addr->id > 0 && !READ_ONCE(pm->accept_addr))) {
+		mptcp_pm_announce_addr(msk, addr, true);
+		mptcp_pm_add_addr_send_ack(msk);
+	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
+		pm->remote = *addr;
+	} else {
+		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
+	}
+}
+
 void mptcp_pm_add_addr_received(const struct sock *ssk,
 				const struct mptcp_addr_info *addr)
 {
@@ -543,23 +559,7 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 
 	spin_lock_bh(&pm->lock);
 
-	if (mptcp_pm_is_userspace(msk)) {
-		if (mptcp_userspace_pm_active(msk)) {
-			mptcp_pm_announce_addr(msk, addr, true);
-			mptcp_pm_add_addr_send_ack(msk);
-		} else {
-			__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
-		}
-	/* id0 should not have a different address */
-	} else if ((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
-		   (addr->id > 0 && !READ_ONCE(pm->accept_addr))) {
-		mptcp_pm_announce_addr(msk, addr, true);
-		mptcp_pm_add_addr_send_ack(msk);
-	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
-		pm->remote = *addr;
-	} else {
-		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
-	}
+	pm->ops->add_addr_echo(msk, addr);
 
 	spin_unlock_bh(&pm->lock);
 }
@@ -992,7 +992,7 @@ int mptcp_pm_validate(struct mptcp_pm_ops *pm_ops)
 {
 	if (!pm_ops->get_local_id || !pm_ops->get_priority ||
 	    !pm_ops->allow_new_subflow || !pm_ops->accept_new_subflow ||
-	    !pm_ops->subflow_check_next) {
+	    !pm_ops->subflow_check_next || !pm_ops->add_addr_echo) {
 		pr_err("%s does not implement required ops\n", pm_ops->name);
 		return -EINVAL;
 	}
