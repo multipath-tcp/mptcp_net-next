@@ -25,7 +25,6 @@
 
 /* Device memory support */
 
-/* Protected by rtnl_lock() */
 static DEFINE_XARRAY_FLAGS(net_devmem_dmabuf_bindings, XA_FLAGS_ALLOC1);
 
 static const struct memory_provider_ops dmabuf_devmem_ops;
@@ -129,10 +128,12 @@ void net_devmem_unbind_dmabuf(struct net_devmem_dmabuf_binding *binding)
 		rxq->mp_params.mp_priv = NULL;
 		rxq->mp_params.mp_ops = NULL;
 
+		netdev_lock(binding->dev);
 		rxq_idx = get_netdev_rx_queue_index(rxq);
 
 		err = netdev_rx_queue_restart(binding->dev, rxq_idx);
 		WARN_ON(err && err != -ENETDOWN);
+		netdev_unlock(binding->dev);
 	}
 
 	xa_erase(&net_devmem_dmabuf_bindings, binding->id);
