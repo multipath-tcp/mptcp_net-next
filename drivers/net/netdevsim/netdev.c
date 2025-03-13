@@ -116,7 +116,8 @@ static int nsim_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct netdevsim *ns = netdev_priv(dev);
 
-	if (ns->xdp.prog && new_mtu > NSIM_XDP_MAX_MTU)
+	if (ns->xdp.prog && !ns->xdp.prog->aux->xdp_has_frags &&
+	    new_mtu > NSIM_XDP_MAX_MTU)
 		return -EBUSY;
 
 	WRITE_ONCE(dev->mtu, new_mtu);
@@ -787,7 +788,7 @@ nsim_qreset_write(struct file *file, const char __user *data,
 	if (ret != 2)
 		return -EINVAL;
 
-	rtnl_lock();
+	netdev_lock(ns->netdev);
 	if (queue >= ns->netdev->real_num_rx_queues) {
 		ret = -EINVAL;
 		goto exit_unlock;
@@ -801,7 +802,7 @@ nsim_qreset_write(struct file *file, const char __user *data,
 
 	ret = count;
 exit_unlock:
-	rtnl_unlock();
+	netdev_unlock(ns->netdev);
 	return ret;
 }
 
