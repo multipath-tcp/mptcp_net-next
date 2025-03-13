@@ -1760,25 +1760,7 @@ void netif_close(struct net_device *dev)
 		list_del(&single);
 	}
 }
-
-int dev_setup_tc(struct net_device *dev, enum tc_setup_type type,
-		 void *type_data)
-{
-	const struct net_device_ops *ops = dev->netdev_ops;
-	int ret;
-
-	ASSERT_RTNL();
-
-	if (!ops->ndo_setup_tc)
-		return -EOPNOTSUPP;
-
-	netdev_lock_ops(dev);
-	ret = ops->ndo_setup_tc(dev, type, type_data);
-	netdev_unlock_ops(dev);
-
-	return ret;
-}
-EXPORT_SYMBOL(dev_setup_tc);
+EXPORT_SYMBOL(netif_close);
 
 void netif_disable_lro(struct net_device *dev)
 {
