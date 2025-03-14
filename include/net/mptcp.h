@@ -131,6 +131,8 @@ struct mptcp_pm_ops {
 	/* required */
 	bool (*allow_new_subflow)(struct mptcp_sock *msk);
 	bool (*accept_new_subflow)(const struct mptcp_sock *msk);
+	bool (*add_addr_echo)(struct mptcp_sock *msk,
+			      const struct mptcp_addr_info *addr);
 
 	/* optional */
 	int (*add_addr_received)(struct mptcp_sock *msk,
