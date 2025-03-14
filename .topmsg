@@ -1,4 +1,24 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-Fix-data-stream-corruption-in-the-address-announcement
+From: Arthur Mongodin <amongodin@randorisec.fr>
+Subject: [PATCH] mptcp: Fix data stream corruption in the address announcement
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Because of the size restriction in the TCP options space, the MPTCP
+ADD_ADDR option is exclusive and cannot be sent with other MPTCP ones.
+For this reason, in the linked mptcp_out_options structure, group of
+fields linked to different options are part of the same union.
+
+There is a case where the mptcp_pm_add_addr_signal() function can modify
+opts->addr, but not ended up sending an ADD_ADDR. Later on, back in
+mptcp_established_options, other options will be sent, but with
+unexpected data written in other fields due to the union, e.g. in
+opts->ext_copy. This could lead to a data stream corruption in the next
+packet.
+
+Using an intermediate variable, prevents from corrupting previously
+established DSS option. The assignment of the ADD_ADDR option
+parameters is now done once we are sure this ADD_ADDR option can be set
+in the packet, e.g. after having dropped other suboptions.
+
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Fixes: 1bff1e43a30e ("mptcp: optimize out option generation")
+Signed-off-by: Arthur Mongodin <amongodin@randorisec.fr>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
