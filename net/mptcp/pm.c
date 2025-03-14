@@ -559,6 +559,11 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 	spin_unlock_bh(&pm->lock);
 }
 
+bool mptcp_pm_add_addr_recv(struct mptcp_sock *msk)
+{
+	return mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED);
+}
+
 void mptcp_pm_add_addr_received(const struct sock *ssk,
 				const struct mptcp_addr_info *addr)
 {
@@ -586,10 +591,9 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 		   (addr->id > 0 && !READ_ONCE(pm->accept_addr))) {
 		mptcp_pm_announce_addr(msk, addr, true);
 		mptcp_pm_add_addr_send_ack(msk);
-	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
-		pm->remote = *addr;
 	} else {
-		ret = -EINVAL;
+		ret = pm->ops->add_addr_received ?
+		      pm->ops->add_addr_received(msk, addr) : -EINVAL;
 	}
 
 	if (ret)
