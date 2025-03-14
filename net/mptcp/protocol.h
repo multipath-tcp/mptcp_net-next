@@ -1030,6 +1030,7 @@ void mptcp_pm_rm_subflow(struct mptcp_sock *msk,
 			 const struct mptcp_rm_list *rm_list);
 void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
 			       const struct mptcp_rm_list *rm_list);
+void mptcp_pm_rm_addr_recv(struct mptcp_sock *msk);
 void mptcp_pm_mp_prio_received(struct sock *sk, u8 bkup);
 void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq);
 int mptcp_pm_mp_prio_send_ack(struct mptcp_sock *msk,
