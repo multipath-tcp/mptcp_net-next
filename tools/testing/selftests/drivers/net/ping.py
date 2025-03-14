@@ -15,18 +15,18 @@ no_sleep=False
 def _test_v4(cfg) -> None:
     cfg.require_ipver("4")
 
-    cmd("ping -c 1 -W0.5 " + cfg.remote_addr_v["4"])
-    cmd("ping -c 1 -W0.5 " + cfg.addr_v["4"], host=cfg.remote)
-    cmd("ping -s 65000 -c 1 -W0.5 " + cfg.remote_addr_v["4"])
-    cmd("ping -s 65000 -c 1 -W0.5 " + cfg.addr_v["4"], host=cfg.remote)
+    cmd(f"ping -c 1 -W0.5 {cfg.remote_v4}")
+    cmd(f"ping -c 1 -W0.5 {cfg.v4}", host=cfg.remote)
+    cmd(f"ping -s 65000 -c 1 -W0.5 {cfg.remote_v4}")
+    cmd(f"ping -s 65000 -c 1 -W0.5 {cfg.v4}", host=cfg.remote)
 
 def _test_v6(cfg) -> None:
     cfg.require_ipver("6")
 
-    cmd("ping -c 1 -W5 " + cfg.remote_addr_v["6"])
-    cmd("ping -c 1 -W5 " + cfg.addr_v["6"], host=cfg.remote)
-    cmd("ping -s 65000 -c 1 -W0.5 " + cfg.remote_addr_v["6"])
-    cmd("ping -s 65000 -c 1 -W0.5 " + cfg.addr_v["6"], host=cfg.remote)
+    cmd(f"ping -c 1 -W5 {cfg.remote_v6}")
+    cmd(f"ping -c 1 -W5 {cfg.v6}", host=cfg.remote)
+    cmd(f"ping -s 65000 -c 1 -W0.5 {cfg.remote_v6}")
+    cmd(f"ping -s 65000 -c 1 -W0.5 {cfg.v6}", host=cfg.remote)
 
 def _test_tcp(cfg) -> None:
     cfg.require_cmd("socat", remote=True)
