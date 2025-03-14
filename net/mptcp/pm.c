@@ -592,6 +592,7 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_pm_data *pm = &msk->pm;
+	int ret = 0;
 
 	pr_debug("msk=%p remote_id=%d accept=%d\n", msk, addr->id,
 		 READ_ONCE(pm->accept_addr));
@@ -605,7 +606,7 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 			mptcp_pm_announce_addr(msk, addr, true);
 			mptcp_pm_add_addr_send_ack(msk);
 		} else {
-			__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
+			ret = -EINVAL;
 		}
 	/* id0 should not have a different address */
 	} else if ((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
@@ -615,8 +616,11 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
 		pm->remote = *addr;
 	} else {
-		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
+		ret = -EINVAL;
 	}
+
+	if (ret)
+		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
 
 	spin_unlock_bh(&pm->lock);
 }
