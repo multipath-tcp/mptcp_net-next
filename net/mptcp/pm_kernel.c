@@ -374,7 +374,9 @@ static void mptcp_pm_kernel_established(struct mptcp_sock *msk)
 
 static void mptcp_pm_kernel_subflow_established(struct mptcp_sock *msk)
 {
+	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_create_subflow_or_signal_addr(msk);
+	spin_unlock_bh(&msk->pm.lock);
 }
 
 /* Fill all the local addresses into the array addrs[],

@@ -942,7 +942,9 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	}
 	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
 		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
+		spin_unlock_bh(&msk->pm.lock);
 		pm->ops->subflow_established(msk);
+		spin_lock_bh(&msk->pm.lock);
 	}
 	__mptcp_pm_kernel_worker(msk);
 
