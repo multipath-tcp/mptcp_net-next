@@ -934,7 +934,7 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		pm->status &= ~BIT(MPTCP_PM_RM_ADDR_RECEIVED);
 		spin_unlock_bh(&msk->pm.lock);
 		pm->ops->rm_addr_received(msk);
-		return;
+		spin_lock_bh(&msk->pm.lock);
 	}
 	if (pm->status & BIT(MPTCP_PM_ESTABLISHED)) {
 		pm->status &= ~BIT(MPTCP_PM_ESTABLISHED);
