@@ -1293,7 +1293,7 @@ again:
 
 	ret = copyfd_io(fd_in, fd, 1, 0, &winfo);
 	if (ret)
-		return ret;
+		goto out;
 
 	if (cfg_truncate > 0) {
 		shutdown(fd, SHUT_WR);
@@ -1309,12 +1309,13 @@ again:
 		memset(&winfo, 0, sizeof(winfo));
 		goto again;
 	} else {
+out:
 		close(fd);
 	}
 
 	if (cfg_input)
 		close(fd_in);
-	return 0;
+	return ret;
 }
 
 int parse_proto(const char *proto)
