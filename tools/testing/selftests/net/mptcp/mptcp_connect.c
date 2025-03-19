@@ -1268,7 +1268,7 @@ int main_loop(void)
 	struct addrinfo *peer;
 	struct wstate winfo;
 
-	if (cfg_input && cfg_sockopt_types.mptfo) {
+	if (cfg_input) {
 		fd_in = open(cfg_input, O_RDONLY);
 		if (fd_in < 0)
 			xerror("can't open %s:%d", cfg_input, errno);
@@ -1291,12 +1291,6 @@ again:
 	if (cfg_cmsg_types.cmsg_enabled)
 		apply_cmsg_types(fd, &cfg_cmsg_types);
 
-	if (cfg_input && !cfg_sockopt_types.mptfo) {
-		fd_in = open(cfg_input, O_RDONLY);
-		if (fd_in < 0)
-			xerror("can't open %s:%d", cfg_input, errno);
-	}
-
 	ret = copyfd_io(fd_in, fd, 1, 0, &winfo);
 	if (ret)
 		return ret;
@@ -1312,14 +1306,14 @@ again:
 		set_nonblock(fd, false);
 		if (connect(fd, peer->ai_addr, peer->ai_addrlen))
 			xerror("can't reconnect: %d", errno);
-		if (cfg_input)
-			close(fd_in);
 		memset(&winfo, 0, sizeof(winfo));
 		goto again;
 	} else {
 		close(fd);
 	}
 
+	if (cfg_input)
+		close(fd_in);
 	return 0;
 }
 
