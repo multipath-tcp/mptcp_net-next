@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-fix-incorrect-fd-checks-in-main_loop
+From: Cong Liu <liucong2@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: fix incorrect fd checks in main_loop
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Fix a bug where the code was checking the wrong file descriptors
+when opening the input files. The code was checking 'fd' instead
+of 'fd_in', which could lead to incorrect error handling.
+
+Fixes: 05be5e273c84 ("selftests: mptcp: add disconnect tests")
+Fixes: ca7ae8916043 ("selftests: mptcp: mptfo Initiator/Listener")
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Cong Liu <liucong2@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
