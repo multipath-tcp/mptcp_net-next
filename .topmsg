@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-mptcp_validate_scheduler-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add mptcp_validate_scheduler helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+New interface .validate is added in struct bpf_struct_ops recently, this
+patch implements it as a new helper mptcp_validate_scheduler() for struct
+mptcp_sched_ops.
+
+In this helper, check whether the required ops "get_subflow" of struct
+mptcp_sched_ops has been implemented.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
