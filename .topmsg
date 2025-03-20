@@ -1,5 +1,5 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] bpf: Add bpf_mptcp_sched_ops
+Subject: [PATCH] bpf: Add mptcp packet scheduler struct_ops
 
 This patch implements a new struct bpf_struct_ops: bpf_mptcp_sched_ops.
 Register and unregister the bpf scheduler in .reg and .unreg.
