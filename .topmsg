@@ -1,8 +1,9 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add mptcp_validate_scheduler helper
+Subject: [PATCH] mptcp: sched: split validation part
 
-New interface .validate is added in struct bpf_struct_ops recently, this
-patch implements it as a new helper mptcp_validate_scheduler() for struct
+A new interface .validate has been added in struct bpf_struct_ops
+recently. This patch prepares a future struct_ops support by
+implementing it as a new helper mptcp_validate_scheduler() for struct
 mptcp_sched_ops.
 
 In this helper, check whether the required ops "get_subflow" of struct
