@@ -559,11 +559,13 @@ close_cgroup:
 static int sched_init(char *flags, char *sched)
 {
 	if (endpoint_init(flags, 2) < 0)
-		return -1;
+		goto fail;
 
 	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.scheduler=%s", NS_TEST, sched);
 
 	return 0;
+fail:
+	return -1;
 }
 
 static int ss_search(char *src, char *dst, char *port, char *keyword)
