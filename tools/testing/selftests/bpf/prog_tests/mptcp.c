@@ -12,6 +12,7 @@
 #include "mptcpify.skel.h"
 #include "mptcp_subflow.skel.h"
 #include "mptcp_bpf_iters.skel.h"
+#include "mptcp_bpf_netlink_pm.skel.h"
 #include "mptcp_bpf_first.skel.h"
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
@@ -796,6 +797,51 @@ fail:
 	netns_free(netns);
 }
 
+static void test_bpf_netlink_pm(void)
+{
+	struct mptcp_bpf_netlink_pm *skel;
+	struct netns_obj *netns;
+	struct bpf_link *link;
+	int err;
+
+	skel = mptcp_bpf_netlink_pm__open();
+	if (!ASSERT_OK_PTR(skel, "open: bpf_netlink pm"))
+		return;
+
+	err = bpf_program__set_flags(skel->progs.mptcp_pm_netlink_established,
+				     BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_pm_netlink_subflow_established,
+					    BPF_F_SLEEPABLE);
+	err = err ?: bpf_program__set_flags(skel->progs.mptcp_pm_netlink_rm_addr_received,
+					    BPF_F_SLEEPABLE);
+	if (!ASSERT_OK(err, "set sleepable flags"))
+		goto skel_destroy;
+
+	if (!ASSERT_OK(mptcp_bpf_netlink_pm__load(skel), "load: bpf_netlink pm"))
+		goto skel_destroy;
+
+	link = bpf_map__attach_struct_ops(skel->maps.bpf_netlink);
+	if (!ASSERT_OK_PTR(link, "attach_struct_ops: bpf_netlink pm"))
+		goto skel_destroy;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		goto link_destroy;
+
+	err = pm_init("bpf_netlink");
+	if (!ASSERT_OK(err, "pm_init: bpf_netlink pm"))
+		goto close_netns;
+
+	run_netlink_pm(skel->kconfig->CONFIG_MPTCP_IPV6 ? IPV6 : IPV4);
+
+close_netns:
+	netns_free(netns);
+link_destroy:
+	bpf_link__destroy(link);
+skel_destroy:
+	mptcp_bpf_netlink_pm__destroy(skel);
+}
+
 static int sched_init(char *flags, char *sched)
 {
 	if (endpoint_init(flags, 2) < 0)
@@ -992,6 +1038,8 @@ void test_mptcp(void)
 		test_iters_subflow();
 	if (test__start_subtest("netlink_pm"))
 		test_netlink_pm();
+	if (test__start_subtest("bpf_netlink_pm"))
+		test_bpf_netlink_pm();
 	if (test__start_subtest("default"))
 		test_default();
 	if (test__start_subtest("first"))
