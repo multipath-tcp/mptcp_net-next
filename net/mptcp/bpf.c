@@ -540,6 +540,38 @@ bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it)
 {
 }
 
+__bpf_kfunc static struct mptcp_pm_addr_entry *
+bpf_kmemdup_entry(struct mptcp_pm_addr_entry *entry, int size, gfp_t priority)
+{
+	return kmemdup(entry, size, priority);
+}
+
+__bpf_kfunc static void
+bpf_kfree_entry(struct mptcp_pm_addr_entry *entry)
+{
+	kfree(entry);
+}
+
+__bpf_kfunc static void bpf_set_bit(unsigned long nr, unsigned long *addr__ign)
+{
+	__set_bit(nr, addr__ign);
+}
+
+__bpf_kfunc static void bpf_bitmap_fill(unsigned long *dst__ign, unsigned int nbits)
+{
+	bitmap_fill(dst__ign, nbits);
+}
+
+__bpf_kfunc static void bpf_spin_lock_bh(spinlock_t *lock)
+{
+	spin_lock_bh(lock);
+}
+
+__bpf_kfunc static void bpf_spin_unlock_bh(spinlock_t *lock)
+{
+	spin_unlock_bh(lock);
+}
+
 __bpf_kfunc static bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 {
 	return tcp_rtx_queue_empty(sk);
@@ -564,6 +596,22 @@ BTF_ID_FLAGS(func, bpf_mptcp_subflow_tcp_sock, KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
+BTF_ID_FLAGS(func, bpf_kmemdup_entry)
+BTF_ID_FLAGS(func, bpf_kfree_entry)
+BTF_ID_FLAGS(func, bpf_set_bit)
+BTF_ID_FLAGS(func, bpf_bitmap_fill)
+BTF_ID_FLAGS(func, bpf_spin_lock_bh)
+BTF_ID_FLAGS(func, bpf_spin_unlock_bh)
+BTF_ID_FLAGS(func, mptcp_pm_nl_lookup_addr)
+BTF_ID_FLAGS(func, mptcp_pm_nl_append_new_local_addr_msk)
+BTF_ID_FLAGS(func, mptcp_pm_get_add_addr_signal_max)
+BTF_ID_FLAGS(func, mptcp_pm_get_add_addr_accept_max)
+BTF_ID_FLAGS(func, mptcp_pm_get_subflows_max)
+BTF_ID_FLAGS(func, mptcp_pm_get_local_addr_max)
+BTF_ID_FLAGS(func, mptcp_pm_add_addr_recv)
+BTF_ID_FLAGS(func, mptcp_pm_is_init_remote_addr)
+BTF_ID_FLAGS(func, mptcp_pm_create_subflow_or_signal_addr)
+BTF_ID_FLAGS(func, mptcp_pm_rm_addr_recv)
 BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
 BTF_ID_FLAGS(func, mptcp_subflow_active)
 BTF_ID_FLAGS(func, mptcp_set_timeout)
