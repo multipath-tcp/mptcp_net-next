@@ -56,6 +56,12 @@
 #endif
 #define MPTCP_SCHED_NAME_MAX	16
 
+enum mptcp_pm_family {
+	IPV4 = 0,
+	IPV4MAPPED,
+	IPV6,
+};
+
 static const unsigned int total_bytes = 10 * 1024 * 1024;
 static int duration;
 
@@ -562,6 +568,234 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
+static int recv_byte(int fd)
+{
+	char buf[1];
+	ssize_t n;
+
+	n = recv(fd, buf, sizeof(buf), 0);
+	if (CHECK(n <= 0, "recv_byte", "recv")) {
+		log_err("failed/partial recv");
+		return -1;
+	}
+	return 0;
+}
+
+static int netlink_pm_add_subflow(char *addr, __u8 id)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint add %s subflow id %u",
+			  NS_TEST, addr, id);
+}
+
+static int netlink_pm_rm_subflow(__u8 id)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint delete id %u",
+			  NS_TEST, id);
+}
+
+static int netlink_pm_add_addr(char *addr, __u8 id)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint add %s signal id %u",
+			  NS_TEST, addr, id);
+}
+
+static int netlink_pm_rm_addr(__u8 id)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint delete id %u",
+			  NS_TEST, id);
+}
+
+static int netlink_pm_rm_addr_id_0(char *addr)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint delete id 0 %s",
+			  NS_TEST, addr);
+}
+
+static int netlink_pm_set_flags(__u8 id, char *flags)
+{
+	return SYS_NOFAIL("ip -n %s mptcp endpoint change id %u %s",
+			  NS_TEST, id, flags);
+}
+
+static int netlink_pm_get_addr(__u8 id, char *output)
+{
+	char cmd[1024];
+	FILE *fp;
+
+	sprintf(cmd, "ip -n %s mptcp endpoint show id %u", NS_TEST, id);
+	fp = popen(cmd, "r");
+	if (!fp)
+		return -1;
+
+	bzero(output, BUFSIZ);
+	fread(output, 1, BUFSIZ, fp);
+	pclose(fp);
+
+	return 0;
+}
+
+static int netlink_pm_dump_addr(char *output)
+{
+	char cmd[1024];
+	FILE *fp;
+
+	sprintf(cmd, "ip -n %s mptcp endpoint show", NS_TEST);
+	fp = popen(cmd, "r");
+	if (!fp)
+		return -1;
+
+	bzero(output, BUFSIZ);
+	fread(output, 1, BUFSIZ, fp);
+	pclose(fp);
+
+	return 0;
+}
+
+static void run_netlink_pm(enum mptcp_pm_family family)
+{
+	bool ipv4mapped = (family == IPV4MAPPED);
+	bool ipv6 = (family == IPV6 || ipv4mapped);
+	int server_fd, client_fd, accept_fd;
+	char output[BUFSIZ], expect[1024];
+	char *addr;
+	int err;
+
+	addr = ipv6 ? (ipv4mapped ? "::ffff:"ADDR_1 : ADDR6_1) : ADDR_1;
+	server_fd = start_mptcp_server(ipv6 ? AF_INET6 : AF_INET, addr, PORT_1, 0);
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
+		return;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
+		goto close_server;
+
+	accept_fd = accept(server_fd, NULL, NULL);
+	if (!ASSERT_OK_FD(accept_fd, "accept"))
+		goto close_client;
+
+	usleep(200000); /* 0.2s */
+	send_byte(client_fd);
+	recv_byte(accept_fd);
+	usleep(200000); /* 0.2s */
+
+	addr = ipv6 ? (ipv4mapped ? "::ffff:"ADDR_2 : ADDR6_2) : ADDR_2;
+	err = netlink_pm_add_subflow(addr, 100);
+	if (!ASSERT_OK(err, "netlink_pm_add_subflow 100"))
+		goto close_accept;
+
+	send_byte(accept_fd);
+	recv_byte(client_fd);
+
+	sprintf(expect, "%s id 100 subflow \n", addr);
+	err = netlink_pm_get_addr(100, output);
+	if (!ASSERT_OK(err, "netlink_pm_get_addr 100") ||
+	    !ASSERT_STRNEQ(output, expect, sizeof(expect), "get_addr"))
+		goto close_accept;
+
+	err = netlink_pm_set_flags(100, "backup");
+	if (!ASSERT_OK(err, "netlink_pm_set_flags backup"))
+		goto close_accept;
+
+	send_byte(client_fd);
+	recv_byte(accept_fd);
+
+	sprintf(expect, "%s id 100 subflow backup \n", addr);
+	err = netlink_pm_get_addr(100, output);
+	if (!ASSERT_OK(err, "netlink_pm_get_addr 100") ||
+	    !ASSERT_STRNEQ(output, expect, sizeof(expect), "get_addr"))
+		goto close_accept;
+
+	err = netlink_pm_set_flags(100, "nobackup");
+	if (!ASSERT_OK(err, "netlink_pm_set_flags nobackup"))
+		goto close_accept;
+
+	send_byte(accept_fd);
+	recv_byte(client_fd);
+
+	sprintf(expect, "%s id 100 subflow \n", addr);
+	err = netlink_pm_get_addr(100, output);
+	if (!ASSERT_OK(err, "netlink_pm_get_addr 100") ||
+	    !ASSERT_STRNEQ(output, expect, sizeof(expect), "get_addr"))
+		goto close_accept;
+
+	err = netlink_pm_rm_subflow(100);
+	if (!ASSERT_OK(err, "netlink_pm_rm_subflow 100"))
+		goto close_accept;
+
+	send_byte(client_fd);
+	recv_byte(accept_fd);
+
+	err = netlink_pm_dump_addr(output);
+	if (!ASSERT_OK(err, "netlink_pm_dump_addr") ||
+	    !ASSERT_STRNEQ(output, "", sizeof(output), "dump_addr"))
+		goto close_accept;
+
+	addr = ipv6 ? (ipv4mapped ? "::ffff:"ADDR_3 : ADDR6_3) : ADDR_3;
+	err = netlink_pm_add_addr(addr, 200);
+	if (!ASSERT_OK(err, "netlink_pm_add_addr 200"))
+		goto close_accept;
+
+	send_byte(accept_fd);
+	recv_byte(client_fd);
+
+	sprintf(expect, "%s id 200 signal \n", addr);
+	err = netlink_pm_dump_addr(output);
+	if (!ASSERT_OK(err, "netlink_pm_dump_addr") ||
+	    !ASSERT_STRNEQ(output, expect, sizeof(expect), "dump_addr"))
+		goto close_accept;
+
+	err = netlink_pm_rm_addr(200);
+	if (!ASSERT_OK(err, "netlink_pm_rm_addr 200"))
+		goto close_accept;
+
+	send_byte(client_fd);
+	recv_byte(accept_fd);
+
+	err = netlink_pm_rm_addr_id_0(addr);
+	ASSERT_OK(err, "netlink_pm_rm_addr 0");
+
+close_accept:
+	close(accept_fd);
+close_client:
+	close(client_fd);
+close_server:
+	close(server_fd);
+}
+
+static int pm_init(const char *pm_name)
+{
+	if (address_init())
+		goto fail;
+
+	SYS(fail, "ip netns exec %s sysctl -qw net.mptcp.path_manager=%s",
+	    NS_TEST, pm_name);
+	SYS(fail, "ip -n %s mptcp limits set add_addr_accepted 4 subflows 4",
+	    NS_TEST);
+
+	return 0;
+fail:
+	return -1;
+}
+
+static void test_netlink_pm(void)
+{
+	struct netns_obj *netns;
+	int err;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		return;
+
+	err = pm_init("kernel");
+	if (!ASSERT_OK(err, "pm_init: netlink pm"))
+		goto fail;
+
+	run_netlink_pm(IPV4MAPPED);
+
+fail:
+	netns_free(netns);
+}
+
 static int sched_init(char *flags, char *sched)
 {
 	if (endpoint_init(flags, 2) < 0)
@@ -756,6 +990,8 @@ void test_mptcp(void)
 		test_subflow();
 	if (test__start_subtest("iters_subflow"))
 		test_iters_subflow();
+	if (test__start_subtest("netlink_pm"))
+		test_netlink_pm();
 	if (test__start_subtest("default"))
 		test_default();
 	if (test__start_subtest("first"))
