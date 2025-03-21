@@ -1421,6 +1421,11 @@ static bool mptcp_pm_kernel_allow_new_subflow(struct mptcp_sock *msk)
 	return ret;
 }
 
+static bool mptcp_pm_kernel_accept_new_subflow(const struct mptcp_sock *msk)
+{
+	return READ_ONCE(msk->pm.accept_subflow);
+}
+
 static void mptcp_pm_kernel_init(struct mptcp_sock *msk)
 {
 	bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
@@ -1447,6 +1452,7 @@ struct mptcp_pm_ops mptcp_pm_kernel = {
 	.established		= mptcp_pm_kernel_established,
 	.subflow_established	= mptcp_pm_kernel_subflow_established,
 	.allow_new_subflow	= mptcp_pm_kernel_allow_new_subflow,
+	.accept_new_subflow	= mptcp_pm_kernel_accept_new_subflow,
 	.init			= mptcp_pm_kernel_init,
 	.name			= "kernel",
 	.owner			= THIS_MODULE,
