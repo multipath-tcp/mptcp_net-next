@@ -1396,6 +1396,14 @@ static void mptcp_pm_kernel_rm_addr_received(struct mptcp_sock *msk, u8 id)
 	mptcp_pm_nl_rm_addr(msk, id);
 }
 
+static bool mptcp_pm_kernel_add_addr_echo(struct mptcp_sock *msk,
+					  const struct mptcp_addr_info *addr)
+{
+	/* id0 should not have a different address */
+	return (addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
+	       (addr->id > 0 && !READ_ONCE(msk->pm.accept_addr));
+}
+
 static void mptcp_pm_kernel_init(struct mptcp_sock *msk)
 {
 	bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
@@ -1423,6 +1431,7 @@ struct mptcp_pm_ops mptcp_pm_kernel = {
 	.subflow_established	= mptcp_pm_kernel_subflow_established,
 	.add_addr_received	= mptcp_pm_kernel_add_addr_received,
 	.rm_addr_received	= mptcp_pm_kernel_rm_addr_received,
+	.add_addr_echo		= mptcp_pm_kernel_add_addr_echo,
 	.init			= mptcp_pm_kernel_init,
 	.name			= "kernel",
 	.owner			= THIS_MODULE,

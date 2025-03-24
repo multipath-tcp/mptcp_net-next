@@ -130,6 +130,10 @@ struct mptcp_pm_ops {
 	void (*add_addr_received)(struct mptcp_sock *msk);
 	void (*rm_addr_received)(struct mptcp_sock *msk, u8 id);
 
+	/* required */
+	bool (*add_addr_echo)(struct mptcp_sock *msk,
+			      const struct mptcp_addr_info *addr);
+
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;
 	struct list_head	list;
