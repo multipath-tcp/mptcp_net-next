@@ -453,23 +453,14 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, const struct sock *ssk, int
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
-	unsigned int subflows_max;
 	bool ret = true;
 
 	if (!pm->ops->accept_new_subflow(msk))
 		return false;
 
 	spin_lock_bh(&pm->lock);
-	if (!mptcp_pm_is_userspace(msk) && READ_ONCE(pm->accept_subflow)) {
-		subflows_max = mptcp_pm_get_subflows_max(msk);
-
-		pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
-			 subflows_max, READ_ONCE(pm->accept_subflow));
-
-		ret = pm->subflows < subflows_max;
-		if (ret && pm->subflows == subflows_max - 1)
-			WRITE_ONCE(pm->accept_subflow, false);
-	}
+	if (pm->ops->allow_new_subflow)
+		ret = pm->ops->allow_new_subflow(msk);
 	if (ret)
 		pm->subflows++;
 	spin_unlock_bh(&pm->lock);

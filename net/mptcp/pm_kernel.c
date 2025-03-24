@@ -1409,6 +1409,26 @@ static bool mptcp_pm_kernel_accept_new_subflow(const struct mptcp_sock *msk)
 	return READ_ONCE(msk->pm.accept_subflow);
 }
 
+static bool mptcp_pm_kernel_allow_new_subflow(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_data *pm = &msk->pm;
+	unsigned int subflows_max;
+	bool ret = false;
+
+	subflows_max = mptcp_pm_get_subflows_max(msk);
+
+	pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
+		 subflows_max, READ_ONCE(pm->accept_subflow));
+
+	if (READ_ONCE(pm->accept_subflow)) {
+		ret = pm->subflows < subflows_max;
+		if (ret && pm->subflows == subflows_max - 1)
+			WRITE_ONCE(pm->accept_subflow, false);
+	}
+
+	return ret;
+}
+
 static void mptcp_pm_kernel_init(struct mptcp_sock *msk)
 {
 	bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
@@ -1438,6 +1458,7 @@ struct mptcp_pm_ops mptcp_pm_kernel = {
 	.rm_addr_received	= mptcp_pm_kernel_rm_addr_received,
 	.add_addr_echo		= mptcp_pm_kernel_add_addr_echo,
 	.accept_new_subflow	= mptcp_pm_kernel_accept_new_subflow,
+	.allow_new_subflow	= mptcp_pm_kernel_allow_new_subflow,
 	.init			= mptcp_pm_kernel_init,
 	.name			= "kernel",
 	.owner			= THIS_MODULE,

@@ -135,6 +135,9 @@ struct mptcp_pm_ops {
 			      const struct mptcp_addr_info *addr);
 	bool (*accept_new_subflow)(const struct mptcp_sock *msk);
 
+	/* optional */
+	bool (*allow_new_subflow)(struct mptcp_sock *msk);
+
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;
 	struct list_head	list;
