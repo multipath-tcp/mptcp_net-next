@@ -127,6 +127,7 @@ struct mptcp_pm_ops {
 	/* optional */
 	void (*established)(struct mptcp_sock *msk);
 	void (*subflow_established)(struct mptcp_sock *msk);
+	void (*add_addr_received)(struct mptcp_sock *msk);
 
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;

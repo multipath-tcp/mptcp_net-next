@@ -607,10 +607,11 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 		   (addr->id > 0 && !READ_ONCE(pm->accept_addr))) {
 		mptcp_pm_announce_addr(msk, addr, true);
 		mptcp_pm_add_addr_send_ack(msk);
-	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
-		pm->remote = *addr;
-	} else {
-		ret = -EINVAL;
+	} else if (pm->ops->add_addr_received) {
+		if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED))
+			pm->remote = *addr;
+		else
+			ret = -EINVAL;
 	}
 
 	if (ret)
@@ -948,6 +949,12 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		return;
 
 	pr_debug("msk=%p status=%x\n", msk, pm->status);
+	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
+		spin_lock_bh(&pm->lock);
+		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_RECEIVED);
+		spin_unlock_bh(&pm->lock);
+		pm->ops->add_addr_received(msk);
+	}
 	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK)) {
 		spin_lock_bh(&pm->lock);
 		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_SEND_ACK);
@@ -972,9 +979,6 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		spin_unlock_bh(&pm->lock);
 		pm->ops->subflow_established(msk);
 	}
-	spin_lock_bh(&pm->lock);
-	__mptcp_pm_kernel_worker(msk);
-	spin_unlock_bh(&pm->lock);
 }
 
 static void mptcp_pm_ops_init(struct mptcp_sock *msk,
