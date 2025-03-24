@@ -454,33 +454,24 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
 	unsigned int subflows_max;
-	int ret = 0;
+	bool ret = true;
 
-	if (mptcp_pm_is_userspace(msk)) {
-		if (mptcp_userspace_pm_active(msk)) {
-			spin_lock_bh(&pm->lock);
-			pm->subflows++;
-			spin_unlock_bh(&pm->lock);
-			return true;
-		}
-		return false;
-	}
-
-	subflows_max = mptcp_pm_get_subflows_max(msk);
-
-	pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
-		 subflows_max, READ_ONCE(pm->accept_subflow));
-
-	/* try to avoid acquiring the lock below */
-	if (!READ_ONCE(pm->accept_subflow))
+	if (!pm->ops->accept_new_subflow(msk))
 		return false;
 
 	spin_lock_bh(&pm->lock);
-	if (READ_ONCE(pm->accept_subflow)) {
+	if (!mptcp_pm_is_userspace(msk) && READ_ONCE(pm->accept_subflow)) {
+		subflows_max = mptcp_pm_get_subflows_max(msk);
+
+		pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
+			 subflows_max, READ_ONCE(pm->accept_subflow));
+
 		ret = pm->subflows < subflows_max;
-		if (ret && ++pm->subflows == subflows_max)
+		if (ret && pm->subflows == subflows_max - 1)
 			WRITE_ONCE(pm->accept_subflow, false);
 	}
+	if (ret)
+		pm->subflows++;
 	spin_unlock_bh(&pm->lock);
 
 	return ret;
@@ -1057,7 +1048,7 @@ struct mptcp_pm_ops *mptcp_pm_find(const char *name)
 int mptcp_pm_validate(struct mptcp_pm_ops *pm_ops)
 {
 	if (!pm_ops->get_local_id || !pm_ops->get_priority ||
-	    !pm_ops->add_addr_echo) {
+	    !pm_ops->add_addr_echo || !pm_ops->accept_new_subflow) {
 		pr_err("%s does not implement required ops\n", pm_ops->name);
 		return -EINVAL;
 	}
