@@ -1525,11 +1525,25 @@ void tcp_cleanup_rbuf(struct sock *sk, int copied)
 	__tcp_cleanup_rbuf(sk, copied);
 }
 
+/* private version of sock_rfree() avoiding one atomic_sub() */
+void tcp_sock_rfree(struct sk_buff *skb)
+{
+	struct sock *sk = skb->sk;
+	unsigned int len = skb->truesize;
+
+	sock_owned_by_me(sk);
+	atomic_set(&sk->sk_rmem_alloc,
+		   atomic_read(&sk->sk_rmem_alloc) - len);
+
+	sk_forward_alloc_add(sk, len);
+	sk_mem_reclaim(sk);
+}
+
 static void tcp_eat_recv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	__skb_unlink(skb, &sk->sk_receive_queue);
-	if (likely(skb->destructor == sock_rfree)) {
-		sock_rfree(skb);
+	if (likely(skb->destructor == tcp_sock_rfree)) {
+		tcp_sock_rfree(skb);
 		skb->destructor = NULL;
 		skb->sk = NULL;
 		return skb_attempt_defer_free(skb);
@@ -3352,8 +3366,8 @@ int tcp_disconnect(struct sock *sk, int flags)
 	icsk->icsk_probes_out = 0;
 	icsk->icsk_probes_tstamp = 0;
 	icsk->icsk_rto = TCP_TIMEOUT_INIT;
-	icsk->icsk_rto_min = TCP_RTO_MIN;
-	icsk->icsk_delack_max = TCP_DELACK_MAX;
+	WRITE_ONCE(icsk->icsk_rto_min, TCP_RTO_MIN);
+	WRITE_ONCE(icsk->icsk_delack_max, TCP_DELACK_MAX);
 	tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
 	tcp_snd_cwnd_set(tp, TCP_INIT_CWND);
 	tp->snd_cwnd_cnt = 0;
@@ -3833,6 +3847,22 @@ int do_tcp_setsockopt(struct sock *sk, int level, int optname,
 			return -EINVAL;
 		WRITE_ONCE(inet_csk(sk)->icsk_rto_max, msecs_to_jiffies(val));
 		return 0;
+	case TCP_RTO_MIN_US: {
+		int rto_min = usecs_to_jiffies(val);
+
+		if (rto_min > TCP_RTO_MIN || rto_min < TCP_TIMEOUT_MIN)
+			return -EINVAL;
+		WRITE_ONCE(inet_csk(sk)->icsk_rto_min, rto_min);
+		return 0;
+	}
+	case TCP_DELACK_MAX_US: {
+		int delack_max = usecs_to_jiffies(val);
+
+		if (delack_max > TCP_DELACK_MAX || delack_max < TCP_TIMEOUT_MIN)
+			return -EINVAL;
+		WRITE_ONCE(inet_csk(sk)->icsk_delack_max, delack_max);
+		return 0;
+	}
 	}
 
 	sockopt_lock_sock(sk);
@@ -4671,6 +4701,12 @@ zerocopy_rcv_out:
 		break;
 	case TCP_RTO_MAX_MS:
 		val = jiffies_to_msecs(tcp_rto_max(sk));
+		break;
+	case TCP_RTO_MIN_US:
+		val = jiffies_to_usecs(READ_ONCE(inet_csk(sk)->icsk_rto_min));
+		break;
+	case TCP_DELACK_MAX_US:
+		val = jiffies_to_usecs(READ_ONCE(inet_csk(sk)->icsk_delack_max));
 		break;
 	default:
 		return -ENOPROTOOPT;
