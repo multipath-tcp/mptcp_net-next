@@ -779,6 +779,7 @@ static inline int tcp_bound_to_half_wnd(struct tcp_sock *tp, int pktsize)
 
 /* tcp.c */
 void tcp_get_info(struct sock *, struct tcp_info *);
+void tcp_sock_rfree(struct sk_buff *skb);
 
 /* Read 'sendfile()'-style from a TCP socket */
 int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
@@ -844,7 +845,7 @@ u32 tcp_delack_max(const struct sock *sk);
 static inline u32 tcp_rto_min(const struct sock *sk)
 {
 	const struct dst_entry *dst = __sk_dst_get(sk);
-	u32 rto_min = inet_csk(sk)->icsk_rto_min;
+	u32 rto_min = READ_ONCE(inet_csk(sk)->icsk_rto_min);
 
 	if (dst && dst_metric_locked(dst, RTAX_RTO_MIN))
 		rto_min = dst_metric_rtt(dst, RTAX_RTO_MIN);
@@ -2897,5 +2898,19 @@ enum skb_drop_reason tcp_inbound_hash(struct sock *sk,
 		const struct request_sock *req, const struct sk_buff *skb,
 		const void *saddr, const void *daddr,
 		int family, int dif, int sdif);
+
+/* version of skb_set_owner_r() avoiding one atomic_add() */
+static inline void tcp_skb_set_owner_r(struct sk_buff *skb, struct sock *sk)
+{
+	skb_orphan(skb);
+	skb->sk = sk;
+	skb->destructor = tcp_sock_rfree;
+
+	sock_owned_by_me(sk);
+	atomic_set(&sk->sk_rmem_alloc,
+		   atomic_read(&sk->sk_rmem_alloc) + skb->truesize);
+
+	sk_forward_alloc_add(sk, -skb->truesize);
+}
 
 #endif	/* _TCP_H */
