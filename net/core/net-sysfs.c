@@ -1056,7 +1056,7 @@ static ssize_t show_rps_dev_flow_table_cnt(struct netdev_rx_queue *queue,
 	rcu_read_lock();
 	flow_table = rcu_dereference(queue->rps_flow_table);
 	if (flow_table)
-		val = (unsigned long)flow_table->mask + 1;
+		val = 1UL << flow_table->log;
 	rcu_read_unlock();
 
 	return sysfs_emit(buf, "%lu\n", val);
@@ -1109,7 +1109,7 @@ static ssize_t store_rps_dev_flow_table_cnt(struct netdev_rx_queue *queue,
 		if (!table)
 			return -ENOMEM;
 
-		table->mask = mask;
+		table->log = ilog2(mask) + 1;
 		for (count = 0; count <= mask; count++)
 			table->flows[count].cpu = RPS_NO_CPU;
 	} else {
@@ -2148,8 +2148,10 @@ static void remove_queue_kobjects(struct net_device *dev)
 	net_rx_queue_update_kobjects(dev, real_rx, 0);
 	netdev_queue_update_kobjects(dev, real_tx, 0);
 
+	netdev_lock_ops(dev);
 	dev->real_num_rx_queues = 0;
 	dev->real_num_tx_queues = 0;
+	netdev_unlock_ops(dev);
 #ifdef CONFIG_SYSFS
 	kset_unregister(dev->queues_kset);
 #endif
