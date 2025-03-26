@@ -3130,6 +3130,7 @@ int netif_set_real_num_tx_queues(struct net_device *dev, unsigned int txq)
 	if (dev->reg_state == NETREG_REGISTERED ||
 	    dev->reg_state == NETREG_UNREGISTERING) {
 		ASSERT_RTNL();
+		netdev_ops_assert_locked(dev);
 
 		rc = netdev_queue_update_kobjects(dev, dev->real_num_tx_queues,
 						  txq);
@@ -3160,7 +3161,6 @@ int netif_set_real_num_tx_queues(struct net_device *dev, unsigned int txq)
 }
 EXPORT_SYMBOL(netif_set_real_num_tx_queues);
 
-#ifdef CONFIG_SYSFS
 /**
  *	netif_set_real_num_rx_queues - set actual number of RX queues used
  *	@dev: Network device
@@ -3180,6 +3180,7 @@ int netif_set_real_num_rx_queues(struct net_device *dev, unsigned int rxq)
 
 	if (dev->reg_state == NETREG_REGISTERED) {
 		ASSERT_RTNL();
+		netdev_ops_assert_locked(dev);
 
 		rc = net_rx_queue_update_kobjects(dev, dev->real_num_rx_queues,
 						  rxq);
@@ -3191,7 +3192,6 @@ int netif_set_real_num_rx_queues(struct net_device *dev, unsigned int rxq)
 	return 0;
 }
 EXPORT_SYMBOL(netif_set_real_num_rx_queues);
-#endif
 
 /**
  *	netif_set_real_num_queues - set actual number of RX and TX queues used
@@ -4751,6 +4751,11 @@ EXPORT_SYMBOL(rps_needed);
 struct static_key_false rfs_needed __read_mostly;
 EXPORT_SYMBOL(rfs_needed);
 
+static u32 rfs_slot(u32 hash, const struct rps_dev_flow_table *flow_table)
+{
+	return hash_32(hash, flow_table->log);
+}
+
 static struct rps_dev_flow *
 set_rps_cpu(struct net_device *dev, struct sk_buff *skb,
 	    struct rps_dev_flow *rflow, u16 next_cpu)
@@ -4777,7 +4782,7 @@ set_rps_cpu(struct net_device *dev, struct sk_buff *skb,
 		flow_table = rcu_dereference(rxqueue->rps_flow_table);
 		if (!flow_table)
 			goto out;
-		flow_id = skb_get_hash(skb) & flow_table->mask;
+		flow_id = rfs_slot(skb_get_hash(skb), flow_table);
 		rc = dev->netdev_ops->ndo_rx_flow_steer(dev, skb,
 							rxq_index, flow_id);
 		if (rc < 0)
@@ -4856,7 +4861,7 @@ static int get_rps_cpu(struct net_device *dev, struct sk_buff *skb,
 		/* OK, now we know there is a match,
 		 * we can look at the local (per receive queue) flow table
 		 */
-		rflow = &flow_table->flows[hash & flow_table->mask];
+		rflow = &flow_table->flows[rfs_slot(hash, flow_table)];
 		tcpu = rflow->cpu;
 
 		/*
@@ -4923,13 +4928,13 @@ bool rps_may_expire_flow(struct net_device *dev, u16 rxq_index,
 
 	rcu_read_lock();
 	flow_table = rcu_dereference(rxqueue->rps_flow_table);
-	if (flow_table && flow_id <= flow_table->mask) {
+	if (flow_table && flow_id < (1UL << flow_table->log)) {
 		rflow = &flow_table->flows[flow_id];
 		cpu = READ_ONCE(rflow->cpu);
 		if (READ_ONCE(rflow->filter) == filter_id && cpu < nr_cpu_ids &&
 		    ((int)(READ_ONCE(per_cpu(softnet_data, cpu).input_queue_head) -
 			   READ_ONCE(rflow->last_qtail)) <
-		     (int)(10 * flow_table->mask)))
+		     (int)(10 << flow_table->log)))
 			expire = false;
 	}
 	rcu_read_unlock();
@@ -6896,8 +6901,7 @@ void netif_queue_set_napi(struct net_device *dev, unsigned int queue_index,
 
 	if (WARN_ON_ONCE(napi && !napi->dev))
 		return;
-	if (dev->reg_state >= NETREG_REGISTERED)
-		ASSERT_RTNL();
+	netdev_ops_assert_locked_or_invisible(dev);
 
 	switch (type) {
 	case NETDEV_QUEUE_TYPE_RX:
@@ -10354,7 +10358,7 @@ u32 dev_get_min_mp_channel_count(const struct net_device *dev)
 {
 	int i;
 
-	ASSERT_RTNL();
+	netdev_ops_assert_locked(dev);
 
 	for (i = dev->real_num_rx_queues - 1; i >= 0; i--)
 		if (dev->_rx[i].mp_params.mp_priv)
@@ -11958,9 +11962,9 @@ void unregister_netdevice_many_notify(struct list_head *head,
 		dev_tcx_uninstall(dev);
 		netdev_lock_ops(dev);
 		dev_xdp_uninstall(dev);
+		dev_memory_provider_uninstall(dev);
 		netdev_unlock_ops(dev);
 		bpf_dev_bound_netdev_unregister(dev);
-		dev_memory_provider_uninstall(dev);
 
 		netdev_offload_xstats_disable_all(dev);
 
