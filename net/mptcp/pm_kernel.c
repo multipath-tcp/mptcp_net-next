@@ -1403,11 +1403,21 @@ static bool mptcp_pm_kernel_accept_new_subflow(struct mptcp_sock *msk,
 					       bool allow)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
+	unsigned int subflows_max;
 	bool ret = false;
+
+	subflows_max = mptcp_pm_get_subflows_max(msk);
+
+	pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
+		 subflows_max, READ_ONCE(pm->accept_subflow));
 
 	if (READ_ONCE(pm->accept_subflow)) {
 		if (allow)
 			return true;
+
+		ret = pm->subflows < subflows_max;
+		if (ret && pm->subflows == subflows_max - 1)
+			WRITE_ONCE(pm->accept_subflow, false);
 	}
 
 	return ret;
