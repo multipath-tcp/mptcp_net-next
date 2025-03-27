@@ -7164,8 +7164,7 @@ void netif_napi_add_weight_locked(struct net_device *dev,
 
 	INIT_LIST_HEAD(&napi->poll_list);
 	INIT_HLIST_NODE(&napi->napi_hash_node);
-	hrtimer_init(&napi->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
-	napi->timer.function = napi_watchdog;
+	hrtimer_setup(&napi->timer, napi_watchdog, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
 	gro_init(&napi->gro);
 	napi->skb = NULL;
 	napi->poll = poll;
