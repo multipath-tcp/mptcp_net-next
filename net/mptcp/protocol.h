@@ -1022,7 +1022,7 @@ void mptcp_pm_add_addr_send_ack(struct mptcp_sock *msk);
 void mptcp_pm_send_ack(struct mptcp_sock *msk,
 		       struct mptcp_subflow_context *subflow,
 		       bool prio, bool backup);
-void mptcp_pm_addr_send_ack(struct mptcp_sock *msk);
+void __mptcp_pm_addr_send_ack(struct mptcp_sock *msk);
 void mptcp_pm_nl_rm_addr(struct mptcp_sock *msk, u8 rm_id);
 void mptcp_pm_rm_subflow(struct mptcp_sock *msk,
 			 const struct mptcp_rm_list *rm_list);

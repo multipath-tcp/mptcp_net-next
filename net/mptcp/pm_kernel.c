@@ -326,7 +326,7 @@ static void mptcp_pm_create_subflow_or_signal_addr(struct mptcp_sock *msk)
 			local.addr.id = 0;
 
 		mptcp_pm_announce_addr(msk, &local.addr, false);
-		mptcp_pm_addr_send_ack(msk);
+		__mptcp_pm_addr_send_ack(msk);
 
 		if (local.flags & MPTCP_PM_ADDR_FLAG_SUBFLOW)
 			signal_and_subflow = true;
@@ -460,7 +460,7 @@ static void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 
 	remote = msk->pm.remote;
 	mptcp_pm_announce_addr(msk, &remote, true);
-	mptcp_pm_addr_send_ack(msk);
+	__mptcp_pm_addr_send_ack(msk);
 
 	if (lookup_subflow_by_daddr(&msk->conn_list, &remote))
 		return;

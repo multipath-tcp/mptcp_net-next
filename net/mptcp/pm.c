@@ -211,7 +211,7 @@ void mptcp_pm_send_ack(struct mptcp_sock *msk,
 	spin_lock_bh(&msk->pm.lock);
 }
 
-void mptcp_pm_addr_send_ack(struct mptcp_sock *msk)
+void __mptcp_pm_addr_send_ack(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow, *alt = NULL;
 
@@ -236,6 +236,13 @@ void mptcp_pm_addr_send_ack(struct mptcp_sock *msk)
 
 	if (alt)
 		mptcp_pm_send_ack(msk, alt, false, false);
+}
+
+static void mptcp_pm_addr_send_ack(struct mptcp_sock *msk)
+{
+	spin_lock_bh(&msk->pm.lock);
+	__mptcp_pm_addr_send_ack(msk);
+	spin_unlock_bh(&msk->pm.lock);
 }
 
 int mptcp_pm_mp_prio_send_ack(struct mptcp_sock *msk,
@@ -437,7 +444,7 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 	msk->pm.rm_list_tx = *rm_list;
 	rm_addr |= BIT(MPTCP_RM_ADDR_SIGNAL);
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
-	mptcp_pm_addr_send_ack(msk);
+	__mptcp_pm_addr_send_ack(msk);
 	return 0;
 }
 
@@ -715,7 +722,9 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 static void mptcp_pm_rm_addr_recv(struct mptcp_sock *msk)
 {
+	spin_lock_bh(&msk->pm.lock);
 	mptcp_pm_rm_addr_or_subflow(msk, &msk->pm.rm_list_rx, MPTCP_MIB_RMADDR);
+	spin_unlock_bh(&msk->pm.lock);
 }
 
 void mptcp_pm_rm_subflow(struct mptcp_sock *msk,
@@ -945,6 +954,8 @@ void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
 
 void mptcp_pm_worker(struct mptcp_sock *msk)
 {
+	u8 status, mask = BIT(MPTCP_PM_ADD_ADDR_SEND_ACK) |
+			  BIT(MPTCP_PM_RM_ADDR_RECEIVED);
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	msk_owned_by_me(msk);
@@ -952,20 +963,19 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	if (!(pm->status & MPTCP_PM_WORK_MASK))
 		return;
 
-	spin_lock_bh(&msk->pm.lock);
+	spin_lock_bh(&pm->lock);
+	status = pm->status;
+	pm->status &= ~mask;
+	spin_unlock_bh(&pm->lock);
 
-	pr_debug("msk=%p status=%x\n", msk, pm->status);
-	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK)) {
-		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_SEND_ACK);
+	pr_debug("msk=%p status=%x\n", msk, status);
+	if (status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK))
 		mptcp_pm_addr_send_ack(msk);
-	}
-	if (pm->status & BIT(MPTCP_PM_RM_ADDR_RECEIVED)) {
-		pm->status &= ~BIT(MPTCP_PM_RM_ADDR_RECEIVED);
+	if (status & BIT(MPTCP_PM_RM_ADDR_RECEIVED))
 		mptcp_pm_rm_addr_recv(msk);
-	}
+	spin_lock_bh(&pm->lock);
 	__mptcp_pm_kernel_worker(msk);
-
-	spin_unlock_bh(&msk->pm.lock);
+	spin_unlock_bh(&pm->lock);
 }
 
 static void mptcp_pm_ops_init(struct mptcp_sock *msk,
