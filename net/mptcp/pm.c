@@ -541,7 +541,7 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 
 	pr_debug("msk=%p\n", msk);
 
-	if (!READ_ONCE(pm->work_pending))
+	if (!READ_ONCE(pm->work_pending) || !pm->ops->subflow_established)
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -568,7 +568,8 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 		return;
 	}
 
-	if (!READ_ONCE(pm->work_pending) && !update_subflows)
+	if (!pm->ops->subflow_established ||
+	    (!READ_ONCE(pm->work_pending) && !update_subflows))
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -626,7 +627,7 @@ void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
 
 	pr_debug("msk=%p\n", msk);
 
-	if (!READ_ONCE(pm->work_pending))
+	if (!READ_ONCE(pm->work_pending) || !pm->ops->subflow_established)
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -944,7 +945,8 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 {
 	u8 status, mask = BIT(MPTCP_PM_ADD_ADDR_SEND_ACK) |
 			  BIT(MPTCP_PM_RM_ADDR_RECEIVED) |
-			  BIT(MPTCP_PM_ESTABLISHED);
+			  BIT(MPTCP_PM_ESTABLISHED) |
+			  BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	msk_owned_by_me(msk);
@@ -964,6 +966,8 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		mptcp_pm_rm_addr_recv(msk);
 	if (status & BIT(MPTCP_PM_ESTABLISHED))
 		pm->ops->established(msk);
+	if (status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED))
+		pm->ops->subflow_established(msk);
 	spin_lock_bh(&pm->lock);
 	__mptcp_pm_kernel_worker(msk);
 	spin_unlock_bh(&pm->lock);
