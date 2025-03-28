@@ -1008,6 +1008,7 @@ bool mptcp_pm_addr_families_match(const struct sock *sk,
 void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk);
 void mptcp_pm_new_connection(struct mptcp_sock *msk, const struct sock *ssk, int server_side);
 void mptcp_pm_fully_established(struct mptcp_sock *msk, const struct sock *ssk);
+bool mptcp_pm_accept_new_subflow(struct mptcp_sock *msk, bool allow);
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk);
 void mptcp_pm_connection_closed(struct mptcp_sock *msk);
 void mptcp_pm_subflow_established(struct mptcp_sock *msk);
@@ -1182,6 +1183,30 @@ static inline void mptcp_pm_close_subflow(struct mptcp_sock *msk)
 	spin_lock_bh(&msk->pm.lock);
 	__mptcp_pm_close_subflow(msk);
 	spin_unlock_bh(&msk->pm.lock);
+}
+
+static inline bool __mptcp_pm_accept_subflow(struct mptcp_sock *msk)
+{
+	unsigned int subflows_max = mptcp_pm_get_subflows_max(msk);
+	struct mptcp_pm_data *pm = &msk->pm;
+	bool ret;
+
+	ret = pm->subflows < subflows_max;
+	if (ret && pm->subflows + 1 == subflows_max)
+		WRITE_ONCE(pm->accept_subflow, false);
+
+	return ret;
+}
+
+static inline bool mptcp_pm_accept_subflow(struct mptcp_sock *msk)
+{
+	bool ret;
+
+	spin_lock_bh(&msk->pm.lock);
+	ret = __mptcp_pm_accept_subflow(msk);
+	spin_unlock_bh(&msk->pm.lock);
+
+	return ret;
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk);

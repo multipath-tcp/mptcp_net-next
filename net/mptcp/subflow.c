@@ -58,12 +58,10 @@ static void subflow_generate_hmac(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
 	mptcp_crypto_hmac_sha(key1, key2, msg, 8, hmac);
 }
 
-static bool mptcp_can_accept_new_subflow(const struct mptcp_sock *msk)
+static bool mptcp_can_accept_new_subflow(struct mptcp_sock *msk)
 {
 	return mptcp_is_fully_established((void *)msk) &&
-		((mptcp_pm_is_userspace(msk) &&
-		  mptcp_userspace_pm_active(msk)) ||
-		 READ_ONCE(msk->pm.accept_subflow));
+		mptcp_pm_accept_new_subflow(msk, true);
 }
 
 /* validate received token and create truncated hmac and nonce for SYN-ACK */
