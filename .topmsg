@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-MPJoinRejected-MIB-counter
+Subject: [PATCH] mptcp: add MPJoinRejected MIB counter
 
+This counter is useful to understand why some paths are rejected, and
+not created as expected.
+
+It is incremented when receiving a connection request, if the PM didn't
+allow the creation of new subflows.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
