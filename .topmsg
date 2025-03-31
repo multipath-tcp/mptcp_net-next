@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-only-inc-MPJoinAckHMacFailure-for-HMAC-failures
+Subject: [PATCH] mptcp: only inc MPJoinAckHMacFailure for HMAC failures
 
+Recently, during a debugging session using local MPTCP connections, I
+noticed MPJoinAckHMacFailure was not zero on the server side. The
+counter was in fact incremented when the PM rejected new subflows,
+because the 'subflow' limit was reached.
+
+The fix is easy, simply dissociating the two cases: only the HMAC
+validation check should increase MPTCP_MIB_JOINACKMAC counter.
+
+Fixes: 4cf8b7e48a09 ("subflow: introduce and use mptcp_can_accept_new_subflow()")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
