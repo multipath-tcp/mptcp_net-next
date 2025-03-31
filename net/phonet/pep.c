@@ -1070,7 +1070,7 @@ static int pep_getsockopt(struct sock *sk, int level, int optname,
 
 	if (level != SOL_PNPIPE)
 		return -ENOPROTOOPT;
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	switch (optname) {
@@ -1097,7 +1097,7 @@ static int pep_getsockopt(struct sock *sk, int level, int optname,
 	}
 
 	len = min_t(unsigned int, sizeof(int), len);
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 	if (put_user(val, (int __user *) optval))
 		return -EFAULT;

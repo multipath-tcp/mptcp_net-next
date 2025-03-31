@@ -728,7 +728,7 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_AX25)
 		return -ENOPROTOOPT;
 
-	if (get_user(maxlen, optlen))
+	if (get_optlen(maxlen, optlen))
 		return -EFAULT;
 
 	if (maxlen < 1)
@@ -805,7 +805,7 @@ static int ax25_getsockopt(struct socket *sock, int level, int optname,
 	}
 	release_sock(sk);
 
-	if (put_user(length, optlen))
+	if (put_optlen(length, optlen))
 		return -EFAULT;
 
 	return copy_to_user(optval, valptr, length) ? -EFAULT : 0;

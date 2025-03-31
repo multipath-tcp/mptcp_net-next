@@ -996,7 +996,7 @@ static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, in
 	struct mptcp_info m_info;
 	int len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	/* When used only to check if a fallback to TCP happened. */
@@ -1007,7 +1007,7 @@ static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, in
 
 	mptcp_diag_fill_info(msk, &m_info);
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 
 	if (copy_to_user(optval, &m_info, len))
@@ -1028,7 +1028,7 @@ static int mptcp_put_subflow_data(struct mptcp_subflow_data *sfd,
 	else
 		copied = copylen;
 
-	if (put_user(copied, optlen))
+	if (put_optlen(copied, optlen))
 		return -EFAULT;
 
 	if (copy_to_user(optval, sfd, copylen))
@@ -1043,7 +1043,7 @@ static int mptcp_get_subflow_data(struct mptcp_subflow_data *sfd,
 {
 	int len, copylen;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	/* if mptcp_subflow_data size is changed, need to adjust
@@ -1229,7 +1229,7 @@ static int mptcp_get_full_info(struct mptcp_full_info *mfi,
 	BUILD_BUG_ON(offsetof(struct mptcp_full_info, mptcp_info) !=
 		     MIN_FULL_INFO_OPTLEN_SIZE);
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (len < MIN_FULL_INFO_OPTLEN_SIZE)
@@ -1257,7 +1257,7 @@ static int mptcp_put_full_info(struct mptcp_full_info *mfi,
 			       int __user *optlen)
 {
 	copylen += MIN_FULL_INFO_OPTLEN_SIZE;
-	if (put_user(copylen, optlen))
+	if (put_optlen(copylen, optlen))
 		return -EFAULT;
 
 	if (copy_to_user(optval, mfi, copylen))
@@ -1344,7 +1344,7 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 {
 	int len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 	if (len < 0)
 		return -EINVAL;
@@ -1353,13 +1353,13 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 		unsigned char ucval = (unsigned char)val;
 
 		len = 1;
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			return -EFAULT;
 		if (copy_to_user(optval, &ucval, 1))
 			return -EFAULT;
 	} else {
 		len = min_t(unsigned int, len, sizeof(int));
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			return -EFAULT;
 		if (copy_to_user(optval, &val, len))
 			return -EFAULT;

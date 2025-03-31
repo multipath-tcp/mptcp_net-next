@@ -511,7 +511,7 @@ static int svc_getsockopt(struct socket *sock, int level, int optname,
 		error = vcc_getsockopt(sock, level, optname, optval, optlen);
 		goto out;
 	}
-	if (get_user(len, optlen)) {
+	if (get_optlen(len, optlen)) {
 		error = -EFAULT;
 		goto out;
 	}

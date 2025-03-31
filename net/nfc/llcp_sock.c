@@ -316,7 +316,7 @@ static int nfc_llcp_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_NFC)
 		return -ENOPROTOOPT;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	local = llcp_sock->local;
@@ -372,7 +372,7 @@ static int nfc_llcp_getsockopt(struct socket *sock, int level, int optname,
 
 	release_sock(sk);
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 
 	return err;

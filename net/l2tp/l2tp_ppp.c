@@ -1343,7 +1343,7 @@ static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_PPPOL2TP)
 		return -EINVAL;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (len < 0)
@@ -1374,7 +1374,7 @@ static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
 	}
 
 	err = -EFAULT;
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		goto end_put_sess;
 
 	if (copy_to_user((void __user *)optval, &val, len))

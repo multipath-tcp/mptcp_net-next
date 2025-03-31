@@ -2996,7 +2996,7 @@ static int __smc_getsockopt(struct socket *sock, int level, int optname,
 
 	smc = smc_sk(sock->sk);
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	len = min_t(int, len, sizeof(int));
@@ -3012,7 +3012,7 @@ static int __smc_getsockopt(struct socket *sock, int level, int optname,
 		return -EOPNOTSUPP;
 	}
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, &val, len))
 		return -EFAULT;

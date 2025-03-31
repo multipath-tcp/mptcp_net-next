@@ -168,7 +168,7 @@ int rds_info_getsockopt(struct socket *sock, int optname, char __user *optval,
 	int len;
 	int total;
 
-	if (get_user(len, optlen)) {
+	if (get_optlen(len, optlen)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -230,7 +230,7 @@ call_func:
 		ret = lens.each;
 	}
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		ret = -EFAULT;
 
 out:

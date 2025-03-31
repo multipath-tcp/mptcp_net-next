@@ -1487,12 +1487,12 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname,
 	if (err == -ENOPROTOOPT && optname != IPV6_2292PKTOPTIONS) {
 		int len;
 
-		if (get_user(len, optlen))
+		if (get_optlen(len, optlen))
 			return -EFAULT;
 
 		err = nf_getsockopt(sk, PF_INET6, optname, optval, &len);
 		if (err >= 0)
-			err = put_user(len, optlen);
+			err = put_optlen(len, optlen);
 	}
 #endif
 	return err;

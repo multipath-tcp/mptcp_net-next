@@ -490,7 +490,7 @@ static int rds_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_RDS)
 		goto out;
 
-	if (get_user(len, optlen)) {
+	if (get_optlen(len, optlen)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -506,7 +506,7 @@ static int rds_getsockopt(struct socket *sock, int level, int optname,
 			ret = -EINVAL;
 		else
 		if (put_user(rs->rs_recverr, (int __user *) optval) ||
-		    put_user(sizeof(int), optlen))
+		    put_optlen(sizeof(int), optlen))
 			ret = -EFAULT;
 		else
 			ret = 0;
@@ -519,7 +519,7 @@ static int rds_getsockopt(struct socket *sock, int level, int optname,
 		trans = (rs->rs_transport ? rs->rs_transport->t_type :
 			 RDS_TRANS_NONE); /* unbound */
 		if (put_user(trans, (int __user *)optval) ||
-		    put_user(sizeof(int), optlen))
+		    put_optlen(sizeof(int), optlen))
 			ret = -EFAULT;
 		else
 			ret = 0;

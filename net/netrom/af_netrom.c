@@ -356,7 +356,7 @@ static int nr_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_NETROM)
 		return -ENOPROTOOPT;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (len < 0)
@@ -389,7 +389,7 @@ static int nr_getsockopt(struct socket *sock, int level, int optname,
 
 	len = min_t(unsigned int, len, sizeof(int));
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 
 	return copy_to_user(optval, &val, len) ? -EFAULT : 0;

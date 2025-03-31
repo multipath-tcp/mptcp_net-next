@@ -603,7 +603,7 @@ static int dccp_getsockopt_service(struct sock *sk, int len,
 		goto out;
 
 	err = 0;
-	if (put_user(total_len, optlen) ||
+	if (put_optlen(total_len, optlen) ||
 	    put_user(dp->dccps_service, optval) ||
 	    (sl != NULL && copy_to_user(optval + 1, sl->dccpsl_list, slen)))
 		err = -EFAULT;
@@ -618,7 +618,7 @@ static int do_dccp_getsockopt(struct sock *sk, int level, int optname,
 	struct dccp_sock *dp;
 	int val, len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (len < (int)sizeof(int))
@@ -674,7 +674,7 @@ static int do_dccp_getsockopt(struct sock *sk, int level, int optname,
 	}
 
 	len = sizeof(val);
-	if (put_user(len, optlen) || copy_to_user(optval, &val, len))
+	if (put_optlen(len, optlen) || copy_to_user(optval, &val, len))
 		return -EFAULT;
 
 	return 0;

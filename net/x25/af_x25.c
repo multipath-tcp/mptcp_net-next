@@ -457,7 +457,7 @@ static int x25_getsockopt(struct socket *sock, int level, int optname,
 		goto out;
 
 	rc = -EFAULT;
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		goto out;
 
 	rc = -EINVAL;
@@ -467,7 +467,7 @@ static int x25_getsockopt(struct socket *sock, int level, int optname,
 	len = min_t(unsigned int, len, sizeof(int));
 
 	rc = -EFAULT;
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		goto out;
 
 	val = test_bit(X25_Q_BIT_FLAG, &x25_sk(sk)->flags);

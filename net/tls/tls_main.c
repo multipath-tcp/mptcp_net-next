@@ -445,7 +445,7 @@ static int do_tls_getsockopt_conf(struct sock *sk, char __user *optval,
 	struct cipher_context *cctx;
 	int len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (!optval || (len < sizeof(*crypto_info))) {
@@ -503,7 +503,7 @@ static int do_tls_getsockopt_tx_zc(struct sock *sk, char __user *optval,
 	unsigned int value;
 	int len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	if (len != sizeof(value))
@@ -525,7 +525,7 @@ static int do_tls_getsockopt_no_pad(struct sock *sk, char __user *optval,
 	if (ctx->prot_info.version != TLS_1_3_VERSION)
 		return -EINVAL;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 	if (len < sizeof(value))
 		return -EINVAL;
@@ -536,7 +536,7 @@ static int do_tls_getsockopt_no_pad(struct sock *sk, char __user *optval,
 	if (value < 0)
 		return value;
 
-	if (put_user(sizeof(value), optlen))
+	if (put_optlen(sizeof(value), optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, &value, sizeof(value)))
 		return -EFAULT;

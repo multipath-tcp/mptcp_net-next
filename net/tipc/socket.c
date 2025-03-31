@@ -3239,10 +3239,10 @@ static int tipc_getsockopt(struct socket *sock, int lvl, int opt,
 	int res;
 
 	if ((lvl == IPPROTO_TCP) && (sock->type == SOCK_STREAM))
-		return put_user(0, ol);
+		return put_optlen(0, ol);
 	if (lvl != SOL_TIPC)
 		return -ENOPROTOOPT;
-	res = get_user(len, ol);
+	res = get_optlen(len, ol);
 	if (res)
 		return res;
 
@@ -3292,7 +3292,7 @@ static int tipc_getsockopt(struct socket *sock, int lvl, int opt,
 	if (copy_to_user(ov, &value, sizeof(value)))
 		return -EFAULT;
 
-	return put_user(sizeof(value), ol);
+	return put_optlen(sizeof(value), ol);
 }
 
 static int tipc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)

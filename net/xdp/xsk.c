@@ -1470,7 +1470,7 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_XDP)
 		return -ENOPROTOOPT;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 	if (len < 0)
 		return -EINVAL;
@@ -1507,7 +1507,7 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 
 		if (copy_to_user(optval, &stats, stats_size))
 			return -EFAULT;
-		if (put_user(stats_size, optlen))
+		if (put_optlen(stats_size, optlen))
 			return -EFAULT;
 
 		return 0;
@@ -1559,7 +1559,7 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 
 		if (copy_to_user(optval, to_copy, len))
 			return -EFAULT;
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			return -EFAULT;
 
 		return 0;
@@ -1579,7 +1579,7 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 		len = sizeof(opts);
 		if (copy_to_user(optval, &opts, len))
 			return -EFAULT;
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			return -EFAULT;
 
 		return 0;

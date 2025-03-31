@@ -762,7 +762,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 
 	if (level != SOL_CAN_RAW)
 		return -EINVAL;
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 	if (len < 0)
 		return -EINVAL;
@@ -779,7 +779,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 			if (len < fsize) {
 				/* return -ERANGE and needed space in optlen */
 				err = -ERANGE;
-				if (put_user(fsize, optlen))
+				if (put_optlen(fsize, optlen))
 					err = -EFAULT;
 			} else {
 				if (len > fsize)
@@ -793,7 +793,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 		release_sock(sk);
 
 		if (!err)
-			err = put_user(len, optlen);
+			err = put_optlen(len, optlen);
 		return err;
 	}
 	case CAN_RAW_ERR_FILTER:
@@ -833,7 +833,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 		if (len < sizeof(ro->raw_vcid_opts)) {
 			/* return -ERANGE and needed space in optlen */
 			err = -ERANGE;
-			if (put_user(sizeof(ro->raw_vcid_opts), optlen))
+			if (put_optlen(sizeof(ro->raw_vcid_opts), optlen))
 				err = -EFAULT;
 		} else {
 			if (len > sizeof(ro->raw_vcid_opts))
@@ -842,7 +842,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 				err = -EFAULT;
 		}
 		if (!err)
-			err = put_user(len, optlen);
+			err = put_optlen(len, optlen);
 		return err;
 	}
 	case CAN_RAW_JOIN_FILTERS:
@@ -855,7 +855,7 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 		return -ENOPROTOOPT;
 	}
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, val, len))
 		return -EFAULT;

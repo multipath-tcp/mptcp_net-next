@@ -1047,7 +1047,7 @@ static int sco_sock_getsockopt_old(struct socket *sock, int optname,
 
 	BT_DBG("sk %p", sk);
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -1117,7 +1117,7 @@ static int sco_sock_getsockopt(struct socket *sock, int level, int optname,
 	if (level == SOL_SCO)
 		return sco_sock_getsockopt_old(sock, optname, optval, optlen);
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -1266,7 +1266,7 @@ static int sco_sock_getsockopt(struct socket *sock, int level, int optname,
 
 		lock_sock(sk);
 
-		if (!err && put_user(buf_len, optlen))
+		if (!err && put_optlen(buf_len, optlen))
 			err = -EFAULT;
 
 		break;

@@ -1884,7 +1884,7 @@ static int vsock_connectible_getsockopt(struct socket *sock,
 	if (level != AF_VSOCK)
 		return -ENOPROTOOPT;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	memset(&v, 0, sizeof(v));
@@ -1919,7 +1919,7 @@ static int vsock_connectible_getsockopt(struct socket *sock,
 	if (copy_to_user(optval, &v, len))
 		return -EFAULT;
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 
 	return 0;

@@ -66,7 +66,7 @@ int ccid_getsockopt_builtin_ccids(struct sock *sk, int len,
 	if (ccid_get_builtin_ccids(&ccid_array, &array_len))
 		return -ENOBUFS;
 
-	if (put_user(array_len, optlen))
+	if (put_optlen(array_len, optlen))
 		err = -EFAULT;
 	else if (len > 0 && copy_to_user(optval, ccid_array,
 					 len > array_len ? array_len : len))

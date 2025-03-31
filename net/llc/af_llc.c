@@ -1179,7 +1179,7 @@ static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
 	lock_sock(sk);
 	if (unlikely(level != SOL_LLC))
 		goto out;
-	rc = get_user(len, optlen);
+	rc = get_optlen(len, optlen);
 	if (rc)
 		goto out;
 	rc = -EINVAL;
@@ -1210,7 +1210,7 @@ static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
 		goto out;
 	}
 	rc = 0;
-	if (put_user(len, optlen) || copy_to_user(optval, &val, len))
+	if (put_optlen(len, optlen) || copy_to_user(optval, &val, len))
 		rc = -EFAULT;
 out:
 	release_sock(sk);

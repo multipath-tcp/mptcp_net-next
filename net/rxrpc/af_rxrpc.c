@@ -763,7 +763,7 @@ static int rxrpc_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_RXRPC)
 		return -EOPNOTSUPP;
 
-	if (get_user(optlen, _optlen))
+	if (get_optlen(optlen, _optlen))
 		return -EFAULT;
 
 	switch (optname) {
@@ -771,7 +771,7 @@ static int rxrpc_getsockopt(struct socket *sock, int level, int optname,
 		if (optlen < sizeof(int))
 			return -ETOOSMALL;
 		if (put_user(RXRPC__SUPPORTED - 1, (int __user *)optval) ||
-		    put_user(sizeof(int), _optlen))
+		    put_optlen(sizeof(int), _optlen))
 			return -EFAULT;
 		return 0;
 

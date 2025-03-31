@@ -1731,7 +1731,7 @@ static int iso_sock_getsockopt(struct socket *sock, int level, int optname,
 
 	BT_DBG("sk %p", sk);
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -1777,7 +1777,7 @@ static int iso_sock_getsockopt(struct socket *sock, int level, int optname,
 		len = min_t(unsigned int, len, base_len);
 		if (copy_to_user(optval, base, len))
 			err = -EFAULT;
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			err = -EFAULT;
 
 		break;

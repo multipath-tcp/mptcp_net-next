@@ -957,13 +957,13 @@ static int rawv6_geticmpfilter(struct sock *sk, int optname,
 
 	switch (optname) {
 	case ICMPV6_FILTER:
-		if (get_user(len, optlen))
+		if (get_optlen(len, optlen))
 			return -EFAULT;
 		if (len < 0)
 			return -EINVAL;
 		if (len > sizeof(struct icmp6_filter))
 			len = sizeof(struct icmp6_filter);
-		if (put_user(len, optlen))
+		if (put_optlen(len, optlen))
 			return -EFAULT;
 		if (copy_to_user(optval, &raw6_sk(sk)->filter, len))
 			return -EFAULT;
@@ -1055,7 +1055,7 @@ static int do_rawv6_getsockopt(struct sock *sk, int level, int optname,
 	struct raw6_sock *rp = raw6_sk(sk);
 	int val, len;
 
-	if (get_user(len, optlen))
+	if (get_optlen(len, optlen))
 		return -EFAULT;
 
 	switch (optname) {
@@ -1080,7 +1080,7 @@ static int do_rawv6_getsockopt(struct sock *sk, int level, int optname,
 
 	len = min_t(unsigned int, sizeof(int), len);
 
-	if (put_user(len, optlen))
+	if (put_optlen(len, optlen))
 		return -EFAULT;
 	if (copy_to_user(optval, &val, len))
 		return -EFAULT;

@@ -543,7 +543,7 @@ static int ccid3_hc_tx_getsockopt(struct sock *sk, const int optname, int len,
 		return -ENOPROTOOPT;
 	}
 
-	if (put_user(len, optlen) || copy_to_user(optval, val, len))
+	if (put_optlen(len, optlen) || copy_to_user(optval, val, len))
 		return -EFAULT;
 
 	return 0;
@@ -833,7 +833,7 @@ static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
 		return -ENOPROTOOPT;
 	}
 
-	if (put_user(len, optlen) || copy_to_user(optval, val, len))
+	if (put_optlen(len, optlen) || copy_to_user(optval, val, len))
 		return -EFAULT;
 
 	return 0;

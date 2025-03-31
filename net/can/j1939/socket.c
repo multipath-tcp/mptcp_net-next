@@ -766,7 +766,7 @@ static int j1939_sk_getsockopt(struct socket *sock, int level, int optname,
 
 	if (level != SOL_CAN_J1939)
 		return -EINVAL;
-	if (get_user(ulen, optlen))
+	if (get_optlen(ulen, optlen))
 		return -EFAULT;
 	if (ulen < 0)
 		return -EINVAL;
@@ -793,7 +793,7 @@ static int j1939_sk_getsockopt(struct socket *sock, int level, int optname,
 	 */
 	if (len > ulen)
 		ret = -EFAULT;
-	else if (put_user(len, optlen))
+	else if (put_optlen(len, optlen))
 		ret = -EFAULT;
 	else if (copy_to_user(optval, val, len))
 		ret = -EFAULT;

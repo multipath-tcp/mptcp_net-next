@@ -1771,12 +1771,12 @@ int ip_getsockopt(struct sock *sk, int level,
 			!ip_mroute_opt(optname)) {
 		int len;
 
-		if (get_user(len, optlen))
+		if (get_optlen(len, optlen))
 			return -EFAULT;
 
 		err = nf_getsockopt(sk, PF_INET, optname, optval, &len);
 		if (err >= 0)
-			err = put_user(len, optlen);
+			err = put_optlen(len, optlen);
 		return err;
 	}
 #endif
