@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-validate-MPJoin-HMacFailure-counters
+Subject: [PATCH] selftests: mptcp: validate MPJoin HMacFailure counters
 
+The parent commit fixes an issue around these counters where one of them
+-- MPJoinAckHMacFailure -- was wrongly incremented in some cases.
+
+This makes sure the counter is always 0. It should be incremented only
+in case of corruption, or a wrong implementation, which should not be
+the case in these selftests.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
