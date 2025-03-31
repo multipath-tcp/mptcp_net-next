@@ -1,4 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-validate-MPJoinRejected-counter
+Subject: [PATCH] selftests: mptcp: validate MPJoinRejected counter
 
+The parent commit adds this new counter, incremented when receiving a
+connection request, if the PM didn't allow the creation of new subflows.
+
+Most of the time, it is then kept at 0, except when the PM limits cause
+the receiver side to reject new MPJoin connections. This is the case in
+the following tests:
+
+ - single subflow, limited by server
+ - multiple subflows, limited by server
+ - subflows limited by server w cookies
+ - userspace pm type rejects join
+ - userspace pm type prevents mp_prio
+
+Simply set join_syn_rej=1 when checking the MPJoin counters for these
+tests.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
