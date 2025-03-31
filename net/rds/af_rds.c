@@ -481,7 +481,7 @@ out:
 }
 
 static int rds_getsockopt(struct socket *sock, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	struct rds_sock *rs = rds_sk_to_rs(sock->sk);
 	int ret = -ENOPROTOOPT, len;

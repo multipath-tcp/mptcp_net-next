@@ -754,7 +754,7 @@ static int j1939_sk_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int j1939_sk_getsockopt(struct socket *sock, int level, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct j1939_sock *jsk = j1939_sk(sk);

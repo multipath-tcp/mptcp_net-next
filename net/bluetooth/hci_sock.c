@@ -2053,7 +2053,7 @@ done:
 }
 
 static int hci_sock_getsockopt_old(struct socket *sock, int level, int optname,
-				   char __user *optval, int __user *optlen)
+				   char __user *optval, optlen_t optlen)
 {
 	struct hci_ufilter uf;
 	struct sock *sk = sock->sk;
@@ -2119,7 +2119,7 @@ done:
 }
 
 static int hci_sock_getsockopt(struct socket *sock, int level, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;

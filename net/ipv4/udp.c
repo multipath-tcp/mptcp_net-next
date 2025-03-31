@@ -3053,7 +3053,7 @@ int udp_setsockopt(struct sock *sk, int level, int optname, sockptr_t optval,
 }
 
 int udp_lib_getsockopt(struct sock *sk, int level, int optname,
-		       char __user *optval, int __user *optlen)
+		       char __user *optval, optlen_t optlen)
 {
 	struct udp_sock *up = udp_sk(sk);
 	int val, len;
@@ -3114,7 +3114,7 @@ int udp_lib_getsockopt(struct sock *sk, int level, int optname,
 EXPORT_IPV6_MOD(udp_lib_getsockopt);
 
 int udp_getsockopt(struct sock *sk, int level, int optname,
-		   char __user *optval, int __user *optlen)
+		   char __user *optval, optlen_t optlen)
 {
 	if (level == SOL_UDP  ||  level == SOL_UDPLITE)
 		return udp_lib_getsockopt(sk, level, optname, optval, optlen);

@@ -436,7 +436,7 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 }
 
 static int do_tls_getsockopt_conf(struct sock *sk, char __user *optval,
-				  int __user *optlen, int tx)
+				  optlen_t optlen, int tx)
 {
 	int rc = 0;
 	const struct tls_cipher_desc *cipher_desc;
@@ -497,7 +497,7 @@ out:
 }
 
 static int do_tls_getsockopt_tx_zc(struct sock *sk, char __user *optval,
-				   int __user *optlen)
+				   optlen_t optlen)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
 	unsigned int value;
@@ -517,7 +517,7 @@ static int do_tls_getsockopt_tx_zc(struct sock *sk, char __user *optval,
 }
 
 static int do_tls_getsockopt_no_pad(struct sock *sk, char __user *optval,
-				    int __user *optlen)
+				    optlen_t optlen)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
 	int value, len;
@@ -545,7 +545,7 @@ static int do_tls_getsockopt_no_pad(struct sock *sk, char __user *optval,
 }
 
 static int do_tls_getsockopt(struct sock *sk, int optname,
-			     char __user *optval, int __user *optlen)
+			     char __user *optval, optlen_t optlen)
 {
 	int rc = 0;
 
@@ -574,7 +574,7 @@ static int do_tls_getsockopt(struct sock *sk, int optname,
 }
 
 static int tls_getsockopt(struct sock *sk, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
 

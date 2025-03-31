@@ -380,7 +380,7 @@ static void ieee802154_raw_deliver(struct net_device *dev, struct sk_buff *skb)
 }
 
 static int raw_getsockopt(struct sock *sk, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	return -EOPNOTSUPP;
 }
@@ -832,7 +832,7 @@ static int ieee802154_dgram_deliver(struct net_device *dev, struct sk_buff *skb)
 }
 
 static int dgram_getsockopt(struct sock *sk, int level, int optname,
-			    char __user *optval, int __user *optlen)
+			    char __user *optval, optlen_t optlen)
 {
 	struct dgram_sock *ro = dgram_sk(sk);
 

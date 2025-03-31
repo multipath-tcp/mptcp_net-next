@@ -951,7 +951,7 @@ static int rawv6_seticmpfilter(struct sock *sk, int optname,
 }
 
 static int rawv6_geticmpfilter(struct sock *sk, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	int len;
 
@@ -1050,7 +1050,7 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int do_rawv6_getsockopt(struct sock *sk, int level, int optname,
-			    char __user *optval, int __user *optlen)
+			    char __user *optval, optlen_t optlen)
 {
 	struct raw6_sock *rp = raw6_sk(sk);
 	int val, len;
@@ -1088,7 +1088,7 @@ static int do_rawv6_getsockopt(struct sock *sk, int level, int optname,
 }
 
 static int rawv6_getsockopt(struct sock *sk, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	switch (level) {
 	case SOL_RAW:

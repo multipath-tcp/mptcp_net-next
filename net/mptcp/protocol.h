@@ -866,7 +866,7 @@ bool mptcp_schedule_work(struct sock *sk);
 int mptcp_setsockopt(struct sock *sk, int level, int optname,
 		     sockptr_t optval, unsigned int optlen);
 int mptcp_getsockopt(struct sock *sk, int level, int optname,
-		     char __user *optval, int __user *option);
+		     char __user *optval, optlen_t option);
 
 u64 __mptcp_expand_seq(u64 old_seq, u64 cur_seq);
 static inline u64 mptcp_expand_seq(u64 old_seq, u64 cur_seq, bool use_64bit)

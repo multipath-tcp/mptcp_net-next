@@ -1470,7 +1470,7 @@ int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 }
 
 int ipv6_getsockopt(struct sock *sk, int level, int optname,
-		    char __user *optval, int __user *optlen)
+		    char __user *optval, optlen_t optlen)
 {
 	int err;
 
@@ -1481,7 +1481,7 @@ int ipv6_getsockopt(struct sock *sk, int level, int optname,
 		return -ENOPROTOOPT;
 
 	err = do_ipv6_getsockopt(sk, level, optname,
-				 USER_SOCKPTR(optval), USER_SOCKPTR(optlen));
+				 USER_SOCKPTR(optval), OPTLEN_SOCKPTR(optlen));
 #ifdef CONFIG_NETFILTER
 	/* we need to exclude all possible ENOPROTOOPTs except default case */
 	if (err == -ENOPROTOOPT && optname != IPV6_2292PKTOPTIONS) {

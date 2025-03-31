@@ -58,7 +58,7 @@ int ccid_get_builtin_ccids(u8 **ccid_array, u8 *array_len)
 }
 
 int ccid_getsockopt_builtin_ccids(struct sock *sk, int len,
-				  char __user *optval, int __user *optlen)
+				  char __user *optval, optlen_t optlen)
 {
 	u8 *ccid_array, array_len;
 	int err = 0;

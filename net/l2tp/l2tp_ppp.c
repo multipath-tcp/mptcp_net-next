@@ -1332,7 +1332,7 @@ static int pppol2tp_session_getsockopt(struct sock *sk,
  * or the special tunnel type.
  */
 static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2tp_session *session;

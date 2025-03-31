@@ -2989,7 +2989,7 @@ out:
 }
 
 static int __smc_getsockopt(struct socket *sock, int level, int optname,
-			    char __user *optval, int __user *optlen)
+			    char __user *optval, optlen_t optlen)
 {
 	struct smc_sock *smc;
 	int val, len;
@@ -3141,7 +3141,7 @@ out:
 }
 
 int smc_getsockopt(struct socket *sock, int level, int optname,
-		   char __user *optval, int __user *optlen)
+		   char __user *optval, optlen_t optlen)
 {
 	struct smc_sock *smc;
 	int rc;

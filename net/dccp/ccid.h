@@ -78,11 +78,11 @@ struct ccid_operations {
 	int		(*ccid_hc_rx_getsockopt)(struct sock *sk,
 						 const int optname, int len,
 						 u32 __user *optval,
-						 int __user *optlen);
+						 optlen_t optlen);
 	int		(*ccid_hc_tx_getsockopt)(struct sock *sk,
 						 const int optname, int len,
 						 u32 __user *optval,
-						 int __user *optlen);
+						 optlen_t optlen);
 };
 
 extern struct ccid_operations ccid2_ops;
@@ -106,7 +106,7 @@ static inline void *ccid_priv(const struct ccid *ccid)
 bool ccid_support_check(u8 const *ccid_array, u8 array_len);
 int ccid_get_builtin_ccids(u8 **ccid_array, u8 *array_len);
 int ccid_getsockopt_builtin_ccids(struct sock *sk, int len,
-				  char __user *, int __user *);
+				  char __user *, optlen_t );
 
 struct ccid *ccid_new(const u8 id, struct sock *sk, bool rx);
 
@@ -240,7 +240,7 @@ static inline void ccid_hc_tx_get_info(struct ccid *ccid, struct sock *sk,
 
 static inline int ccid_hc_rx_getsockopt(struct ccid *ccid, struct sock *sk,
 					const int optname, int len,
-					u32 __user *optval, int __user *optlen)
+					u32 __user *optval, optlen_t optlen)
 {
 	int rc = -ENOPROTOOPT;
 	if (ccid != NULL && ccid->ccid_ops->ccid_hc_rx_getsockopt != NULL)
@@ -251,7 +251,7 @@ static inline int ccid_hc_rx_getsockopt(struct ccid *ccid, struct sock *sk,
 
 static inline int ccid_hc_tx_getsockopt(struct ccid *ccid, struct sock *sk,
 					const int optname, int len,
-					u32 __user *optval, int __user *optlen)
+					u32 __user *optval, optlen_t optlen)
 {
 	int rc = -ENOPROTOOPT;
 	if (ccid != NULL && ccid->ccid_ops->ccid_hc_tx_getsockopt != NULL)

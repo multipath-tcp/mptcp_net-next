@@ -756,7 +756,7 @@ error:
  * Get socket options.
  */
 static int rxrpc_getsockopt(struct socket *sock, int level, int optname,
-			    char __user *optval, int __user *_optlen)
+			    char __user *optval, optlen_t _optlen)
 {
 	int optlen;
 

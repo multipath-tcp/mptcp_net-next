@@ -302,7 +302,7 @@ static int nfc_llcp_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int nfc_llcp_getsockopt(struct socket *sock, int level, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct nfc_llcp_local *local;
 	struct sock *sk = sock->sk;

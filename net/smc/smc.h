@@ -59,7 +59,7 @@ int smc_shutdown(struct socket *sock, int how);
 int smc_setsockopt(struct socket *sock, int level, int optname,
 		   sockptr_t optval, unsigned int optlen);
 int smc_getsockopt(struct socket *sock, int level, int optname,
-		   char __user *optval, int __user *optlen);
+		   char __user *optval, optlen_t optlen);
 int smc_sendmsg(struct socket *sock, struct msghdr *msg, size_t len);
 int smc_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		int flags);

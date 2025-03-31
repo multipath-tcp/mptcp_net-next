@@ -4103,7 +4103,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, sockptr_t optval,
 }
 
 static int packet_getsockopt(struct socket *sock, int level, int optname,
-			     char __user *optval, int __user *optlen)
+			     char __user *optval, optlen_t optlen)
 {
 	int len;
 	int val, lv = sizeof(val);

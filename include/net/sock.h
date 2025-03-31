@@ -1248,7 +1248,7 @@ struct proto {
 					unsigned int optlen);
 	int			(*getsockopt)(struct sock *sk, int level,
 					int optname, char __user *optval,
-					int __user *option);
+					optlen_t optlen);
 	void			(*keepalive)(struct sock *sk, int valbool);
 #ifdef CONFIG_COMPAT
 	int			(*compat_ioctl)(struct sock *sk,
@@ -1856,7 +1856,7 @@ int sock_no_mmap(struct file *file, struct socket *sock,
  * uses the inet style.
  */
 int sock_common_getsockopt(struct socket *sock, int level, int optname,
-				  char __user *optval, int __user *optlen);
+				  char __user *optval, optlen_t optlen);
 int sock_common_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 			int flags);
 int sock_common_setsockopt(struct socket *sock, int level, int optname,

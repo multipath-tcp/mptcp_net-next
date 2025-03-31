@@ -518,7 +518,7 @@ static void ccid3_hc_tx_get_info(struct sock *sk, struct tcp_info *info)
 }
 
 static int ccid3_hc_tx_getsockopt(struct sock *sk, const int optname, int len,
-				  u32 __user *optval, int __user *optlen)
+				  u32 __user *optval, optlen_t optlen)
 {
 	const struct ccid3_hc_tx_sock *hc = ccid3_hc_tx_sk(sk);
 	struct tfrc_tx_info tfrc;
@@ -813,7 +813,7 @@ static void ccid3_hc_rx_get_info(struct sock *sk, struct tcp_info *info)
 }
 
 static int ccid3_hc_rx_getsockopt(struct sock *sk, const int optname, int len,
-				  u32 __user *optval, int __user *optlen)
+				  u32 __user *optval, optlen_t optlen)
 {
 	const struct ccid3_hc_rx_sock *hc = ccid3_hc_rx_sk(sk);
 	struct tfrc_rx_info rx_info;

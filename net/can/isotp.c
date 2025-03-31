@@ -1486,7 +1486,7 @@ static int isotp_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int isotp_getsockopt(struct socket *sock, int level, int optname,
-			    char __user *optval, int __user *optlen)
+			    char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct isotp_sock *so = isotp_sk(sk);

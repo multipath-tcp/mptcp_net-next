@@ -2350,12 +2350,15 @@ int do_sock_getsockopt(struct socket *sock, bool compat, int level,
 	} else if (unlikely(!ops->getsockopt)) {
 		err = -EOPNOTSUPP;
 	} else {
-		if (WARN_ONCE(optval.is_kernel || optlen.is_kernel,
+		optlen_t _optlen = { .up = NULL, };
+
+		if (WARN_ONCE(optval.is_kernel,
 			      "Invalid argument type"))
 			return -EOPNOTSUPP;
 
+		_optlen.up = optlen.user;
 		err = ops->getsockopt(sock, level, optname, optval.user,
-				      optlen.user);
+				      _optlen);
 	}
 
 	if (!compat)

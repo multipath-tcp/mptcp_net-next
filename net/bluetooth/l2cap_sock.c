@@ -433,7 +433,7 @@ static int l2cap_get_mode(struct l2cap_chan *chan)
 }
 
 static int l2cap_sock_getsockopt_old(struct socket *sock, int optname,
-				     char __user *optval, int __user *optlen)
+				     char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
@@ -553,7 +553,7 @@ static int l2cap_sock_getsockopt_old(struct socket *sock, int optname,
 }
 
 static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname,
-				 char __user *optval, int __user *optlen)
+				 char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;

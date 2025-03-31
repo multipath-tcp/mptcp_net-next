@@ -4732,7 +4732,7 @@ bool tcp_bpf_bypass_getsockopt(int level, int optname)
 EXPORT_IPV6_MOD(tcp_bpf_bypass_getsockopt);
 
 int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
-		   int __user *optlen)
+		   optlen_t optlen)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
@@ -4741,7 +4741,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		return READ_ONCE(icsk->icsk_af_ops)->getsockopt(sk, level, optname,
 								optval, optlen);
 	return do_tcp_getsockopt(sk, level, optname, USER_SOCKPTR(optval),
-				 USER_SOCKPTR(optlen));
+				 OPTLEN_SOCKPTR(optlen));
 }
 EXPORT_IPV6_MOD(tcp_getsockopt);
 

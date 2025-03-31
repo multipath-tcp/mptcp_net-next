@@ -156,7 +156,7 @@ EXPORT_SYMBOL_GPL(rds_info_copy);
  * in the snapshot.
  */
 int rds_info_getsockopt(struct socket *sock, int optname, char __user *optval,
-			int __user *optlen)
+			optlen_t optlen)
 {
 	struct rds_info_iterator iter;
 	struct rds_info_lengths lens;

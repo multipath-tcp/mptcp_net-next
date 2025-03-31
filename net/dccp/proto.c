@@ -586,7 +586,7 @@ EXPORT_SYMBOL_GPL(dccp_setsockopt);
 
 static int dccp_getsockopt_service(struct sock *sk, int len,
 				   __be32 __user *optval,
-				   int __user *optlen)
+				   optlen_t optlen)
 {
 	const struct dccp_sock *dp = dccp_sk(sk);
 	const struct dccp_service_list *sl;
@@ -613,7 +613,7 @@ out:
 }
 
 static int do_dccp_getsockopt(struct sock *sk, int level, int optname,
-		    char __user *optval, int __user *optlen)
+		    char __user *optval, optlen_t optlen)
 {
 	struct dccp_sock *dp;
 	int val, len;
@@ -681,7 +681,7 @@ static int do_dccp_getsockopt(struct sock *sk, int level, int optname,
 }
 
 int dccp_getsockopt(struct sock *sk, int level, int optname,
-		    char __user *optval, int __user *optlen)
+		    char __user *optval, optlen_t optlen)
 {
 	if (level != SOL_DCCP)
 		return inet_csk(sk)->icsk_af_ops->getsockopt(sk, level,

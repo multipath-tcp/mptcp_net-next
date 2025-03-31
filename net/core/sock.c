@@ -3854,7 +3854,7 @@ EXPORT_SYMBOL(sock_recv_errqueue);
  *	this means if you specify SO_ERROR (otherwise what is the point of it).
  */
 int sock_common_getsockopt(struct socket *sock, int level, int optname,
-			   char __user *optval, int __user *optlen)
+			   char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 

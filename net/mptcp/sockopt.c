@@ -906,7 +906,7 @@ int mptcp_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int mptcp_getsockopt_first_sf_only(struct mptcp_sock *msk, int level, int optname,
-					  char __user *optval, int __user *optlen)
+					  char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct sock *ssk;
@@ -991,7 +991,7 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 }
 EXPORT_SYMBOL_GPL(mptcp_diag_fill_info);
 
-static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, int __user *optlen)
+static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, optlen_t optlen)
 {
 	struct mptcp_info m_info;
 	int len;
@@ -1019,7 +1019,7 @@ static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, in
 static int mptcp_put_subflow_data(struct mptcp_subflow_data *sfd,
 				  char __user *optval,
 				  u32 copied,
-				  int __user *optlen)
+				  optlen_t optlen)
 {
 	u32 copylen = min_t(u32, sfd->size_subflow_data, sizeof(*sfd));
 
@@ -1039,7 +1039,7 @@ static int mptcp_put_subflow_data(struct mptcp_subflow_data *sfd,
 
 static int mptcp_get_subflow_data(struct mptcp_subflow_data *sfd,
 				  char __user *optval,
-				  int __user *optlen)
+				  optlen_t optlen)
 {
 	int len, copylen;
 
@@ -1076,7 +1076,7 @@ static int mptcp_get_subflow_data(struct mptcp_subflow_data *sfd,
 }
 
 static int mptcp_getsockopt_tcpinfo(struct mptcp_sock *msk, char __user *optval,
-				    int __user *optlen)
+				    optlen_t optlen)
 {
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
@@ -1168,7 +1168,7 @@ static void mptcp_get_sub_addrs(const struct sock *sk, struct mptcp_subflow_addr
 }
 
 static int mptcp_getsockopt_subflow_addrs(struct mptcp_sock *msk, char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
@@ -1222,7 +1222,7 @@ static int mptcp_getsockopt_subflow_addrs(struct mptcp_sock *msk, char __user *o
 
 static int mptcp_get_full_info(struct mptcp_full_info *mfi,
 			       char __user *optval,
-			       int __user *optlen)
+			       optlen_t optlen)
 {
 	int len;
 
@@ -1254,7 +1254,7 @@ static int mptcp_get_full_info(struct mptcp_full_info *mfi,
 static int mptcp_put_full_info(struct mptcp_full_info *mfi,
 			       char __user *optval,
 			       u32 copylen,
-			       int __user *optlen)
+			       optlen_t optlen)
 {
 	copylen += MIN_FULL_INFO_OPTLEN_SIZE;
 	if (put_optlen(copylen, optlen))
@@ -1266,7 +1266,7 @@ static int mptcp_put_full_info(struct mptcp_full_info *mfi,
 }
 
 static int mptcp_getsockopt_full_info(struct mptcp_sock *msk, char __user *optval,
-				      int __user *optlen)
+				      optlen_t optlen)
 {
 	unsigned int sfcount = 0, copylen = 0;
 	struct mptcp_subflow_context *subflow;
@@ -1340,7 +1340,7 @@ fail_release:
 }
 
 static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
-				int __user *optlen, int val)
+				optlen_t optlen, int val)
 {
 	int len;
 
@@ -1369,7 +1369,7 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 }
 
 static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = (void *)msk;
 
@@ -1412,7 +1412,7 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 }
 
 static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = (void *)msk;
 
@@ -1437,7 +1437,7 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 }
 
 static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
-			       char __user *optval, int __user *optlen)
+			       char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = (void *)msk;
 
@@ -1457,7 +1457,7 @@ static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
 }
 
 static int mptcp_getsockopt_sol_mptcp(struct mptcp_sock *msk, int optname,
-				      char __user *optval, int __user *optlen)
+				      char __user *optval, optlen_t optlen)
 {
 	switch (optname) {
 	case MPTCP_INFO:
@@ -1474,7 +1474,7 @@ static int mptcp_getsockopt_sol_mptcp(struct mptcp_sock *msk, int optname,
 }
 
 int mptcp_getsockopt(struct sock *sk, int level, int optname,
-		     char __user *optval, int __user *option)
+		     char __user *optval, optlen_t option)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct sock *ssk;

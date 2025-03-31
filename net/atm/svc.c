@@ -501,7 +501,7 @@ out:
 }
 
 static int svc_getsockopt(struct socket *sock, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	int error = 0, len;

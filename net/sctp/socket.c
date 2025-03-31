@@ -1386,7 +1386,7 @@ struct compat_sctp_getaddrs_old {
 
 static int sctp_getsockopt_connectx3(struct sock *sk, int len,
 				     char __user *optval,
-				     int __user *optlen)
+				     optlen_t optlen)
 {
 	struct sctp_getaddrs_old param;
 	sctp_assoc_t assoc_id = 0;
@@ -4557,7 +4557,7 @@ static int sctp_setsockopt_probe_interval(struct sock *sk,
  * The syntax is:
  *
  *   ret = getsockopt(int sd, int level, int optname, void __user *optval,
- *                    int __user *optlen);
+ *                    optlen_t optlen);
  *   ret = setsockopt(int sd, int level, int optname, const void __user *optval,
  *                    int optlen);
  *
@@ -5412,7 +5412,7 @@ EXPORT_SYMBOL_GPL(sctp_transport_traverse_process);
  */
 static int sctp_getsockopt_sctp_status(struct sock *sk, int len,
 				       char __user *optval,
-				       int __user *optlen)
+				       optlen_t optlen)
 {
 	struct sctp_status status;
 	struct sctp_association *asoc = NULL;
@@ -5492,7 +5492,7 @@ out:
  */
 static int sctp_getsockopt_peer_addr_info(struct sock *sk, int len,
 					  char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct sctp_paddrinfo pinfo;
 	struct sctp_transport *transport;
@@ -5554,7 +5554,7 @@ out:
  * instead a error will be indicated to the user.
  */
 static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
-					char __user *optval, int __user *optlen)
+					char __user *optval, optlen_t optlen)
 {
 	int val;
 
@@ -5576,7 +5576,7 @@ static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
  * ancillary data the user wishes to receive.
  */
 static int sctp_getsockopt_events(struct sock *sk, int len, char __user *optval,
-				  int __user *optlen)
+				  optlen_t optlen)
 {
 	struct sctp_event_subscribe subscribe;
 	__u8 *sn_type = (__u8 *)&subscribe;
@@ -5610,7 +5610,7 @@ static int sctp_getsockopt_events(struct sock *sk, int len, char __user *optval,
  * integer defining the number of seconds of idle time before an
  * association is closed.
  */
-static int sctp_getsockopt_autoclose(struct sock *sk, int len, char __user *optval, int __user *optlen)
+static int sctp_getsockopt_autoclose(struct sock *sk, int len, char __user *optval, optlen_t optlen)
 {
 	/* Applicable to UDP-style socket only */
 	if (sctp_style(sk, TCP))
@@ -5712,7 +5712,7 @@ out:
 	return retval;
 }
 
-static int sctp_getsockopt_peeloff(struct sock *sk, int len, char __user *optval, int __user *optlen)
+static int sctp_getsockopt_peeloff(struct sock *sk, int len, char __user *optval, optlen_t optlen)
 {
 	sctp_peeloff_arg_t peeloff;
 	struct file *newfile = NULL;
@@ -5746,7 +5746,7 @@ out:
 }
 
 static int sctp_getsockopt_peeloff_flags(struct sock *sk, int len,
-					 char __user *optval, int __user *optlen)
+					 char __user *optval, optlen_t optlen)
 {
 	sctp_peeloff_flags_arg_t peeloff;
 	struct file *newfile = NULL;
@@ -5913,7 +5913,7 @@ out:
  *                     IPv4- or IPv6- layer setting.
  */
 static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
-					    char __user *optval, int __user *optlen)
+					    char __user *optval, optlen_t optlen)
 {
 	struct sctp_paddrparams  params;
 	struct sctp_transport   *trans = NULL;
@@ -6057,7 +6057,7 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
  */
 static int sctp_getsockopt_delayed_ack(struct sock *sk, int len,
 					    char __user *optval,
-					    int __user *optlen)
+					    optlen_t optlen)
 {
 	struct sctp_sack_info    params;
 	struct sctp_association *asoc = NULL;
@@ -6129,7 +6129,7 @@ static int sctp_getsockopt_delayed_ack(struct sock *sk, int len,
  * by the change).  With TCP-style sockets, this option is inherited by
  * sockets derived from a listener socket.
  */
-static int sctp_getsockopt_initmsg(struct sock *sk, int len, char __user *optval, int __user *optlen)
+static int sctp_getsockopt_initmsg(struct sock *sk, int len, char __user *optval, optlen_t optlen)
 {
 	if (len < sizeof(struct sctp_initmsg))
 		return -EINVAL;
@@ -6143,7 +6143,7 @@ static int sctp_getsockopt_initmsg(struct sock *sk, int len, char __user *optval
 
 
 static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
-				      char __user *optval, int __user *optlen)
+				      char __user *optval, optlen_t optlen)
 {
 	struct sctp_association *asoc;
 	int cnt = 0;
@@ -6239,7 +6239,7 @@ static int sctp_copy_laddrs(struct sock *sk, __u16 port, void *to,
 
 
 static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
-				       char __user *optval, int __user *optlen)
+				       char __user *optval, optlen_t optlen)
 {
 	struct sctp_bind_addr *bp;
 	struct sctp_association *asoc;
@@ -6347,7 +6347,7 @@ out:
  * association peer's addresses.
  */
 static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
-					char __user *optval, int __user *optlen)
+					char __user *optval, optlen_t optlen)
 {
 	struct sctp_prim prim;
 	struct sctp_association *asoc;
@@ -6389,7 +6389,7 @@ static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
  * Indication parameter for all future INIT and INIT-ACK exchanges.
  */
 static int sctp_getsockopt_adaptation_layer(struct sock *sk, int len,
-				  char __user *optval, int __user *optlen)
+				  char __user *optval, optlen_t optlen)
 {
 	struct sctp_setadaptation adaptation;
 
@@ -6429,7 +6429,7 @@ static int sctp_getsockopt_adaptation_layer(struct sock *sk, int len,
  */
 static int sctp_getsockopt_default_send_param(struct sock *sk,
 					int len, char __user *optval,
-					int __user *optlen)
+					optlen_t optlen)
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_association *asoc;
@@ -6475,7 +6475,7 @@ static int sctp_getsockopt_default_send_param(struct sock *sk,
  */
 static int sctp_getsockopt_default_sndinfo(struct sock *sk, int len,
 					   char __user *optval,
-					   int __user *optlen)
+					   optlen_t optlen)
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_association *asoc;
@@ -6525,7 +6525,7 @@ static int sctp_getsockopt_default_sndinfo(struct sock *sk, int len,
  */
 
 static int sctp_getsockopt_nodelay(struct sock *sk, int len,
-				   char __user *optval, int __user *optlen)
+				   char __user *optval, optlen_t optlen)
 {
 	int val;
 
@@ -6555,7 +6555,7 @@ static int sctp_getsockopt_nodelay(struct sock *sk, int len,
  */
 static int sctp_getsockopt_rtoinfo(struct sock *sk, int len,
 				char __user *optval,
-				int __user *optlen) {
+				optlen_t optlen) {
 	struct sctp_rtoinfo rtoinfo;
 	struct sctp_association *asoc;
 
@@ -6609,7 +6609,7 @@ static int sctp_getsockopt_rtoinfo(struct sock *sk, int len,
  */
 static int sctp_getsockopt_associnfo(struct sock *sk, int len,
 				     char __user *optval,
-				     int __user *optlen)
+				     optlen_t optlen)
 {
 
 	struct sctp_assocparams assocparams;
@@ -6677,7 +6677,7 @@ static int sctp_getsockopt_associnfo(struct sock *sk, int len,
  * addresses on the socket.
  */
 static int sctp_getsockopt_mappedv4(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	int val;
 	struct sctp_sock *sp = sctp_sk(sk);
@@ -6700,7 +6700,7 @@ static int sctp_getsockopt_mappedv4(struct sock *sk, int len,
  * (chapter and verse is quoted at sctp_setsockopt_context())
  */
 static int sctp_getsockopt_context(struct sock *sk, int len,
-				   char __user *optval, int __user *optlen)
+				   char __user *optval, optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -6757,7 +6757,7 @@ static int sctp_getsockopt_context(struct sock *sk, int len,
  * assoc_value:  This parameter specifies the maximum size in bytes.
  */
 static int sctp_getsockopt_maxseg(struct sock *sk, int len,
-				  char __user *optval, int __user *optlen)
+				  char __user *optval, optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -6804,7 +6804,7 @@ static int sctp_getsockopt_maxseg(struct sock *sk, int len,
  * (chapter and verse is quoted at sctp_setsockopt_fragment_interleave())
  */
 static int sctp_getsockopt_fragment_interleave(struct sock *sk, int len,
-					       char __user *optval, int __user *optlen)
+					       char __user *optval, optlen_t optlen)
 {
 	int val;
 
@@ -6828,7 +6828,7 @@ static int sctp_getsockopt_fragment_interleave(struct sock *sk, int len,
  */
 static int sctp_getsockopt_partial_delivery_point(struct sock *sk, int len,
 						  char __user *optval,
-						  int __user *optlen)
+						  optlen_t optlen)
 {
 	u32 val;
 
@@ -6852,7 +6852,7 @@ static int sctp_getsockopt_partial_delivery_point(struct sock *sk, int len,
  */
 static int sctp_getsockopt_maxburst(struct sock *sk, int len,
 				    char __user *optval,
-				    int __user *optlen)
+				    optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -6891,7 +6891,7 @@ static int sctp_getsockopt_maxburst(struct sock *sk, int len,
 }
 
 static int sctp_getsockopt_hmac_ident(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_endpoint *ep = sctp_sk(sk)->ep;
 	struct sctp_hmacalgo  __user *p = (void __user *)optval;
@@ -6927,7 +6927,7 @@ static int sctp_getsockopt_hmac_ident(struct sock *sk, int len,
 }
 
 static int sctp_getsockopt_active_key(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_endpoint *ep = sctp_sk(sk)->ep;
 	struct sctp_authkeyid val;
@@ -6963,7 +6963,7 @@ static int sctp_getsockopt_active_key(struct sock *sk, int len,
 }
 
 static int sctp_getsockopt_peer_auth_chunks(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_authchunks __user *p = (void __user *)optval;
 	struct sctp_authchunks val;
@@ -7007,7 +7007,7 @@ num:
 }
 
 static int sctp_getsockopt_local_auth_chunks(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_endpoint *ep = sctp_sk(sk)->ep;
 	struct sctp_authchunks __user *p = (void __user *)optval;
@@ -7063,7 +7063,7 @@ num:
  * to a one-to-many style socket.  The option value is an uint32_t.
  */
 static int sctp_getsockopt_assoc_number(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_association *asoc;
@@ -7094,7 +7094,7 @@ static int sctp_getsockopt_assoc_number(struct sock *sk, int len,
  * See the corresponding setsockopt entry as description
  */
 static int sctp_getsockopt_auto_asconf(struct sock *sk, int len,
-				   char __user *optval, int __user *optlen)
+				   char __user *optval, optlen_t optlen)
 {
 	int val = 0;
 
@@ -7119,7 +7119,7 @@ static int sctp_getsockopt_auto_asconf(struct sock *sk, int len,
  * the SCTP associations handled by a one-to-many style socket.
  */
 static int sctp_getsockopt_assoc_ids(struct sock *sk, int len,
-				    char __user *optval, int __user *optlen)
+				    char __user *optval, optlen_t optlen)
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct sctp_association *asoc;
@@ -7170,7 +7170,7 @@ static int sctp_getsockopt_assoc_ids(struct sock *sk, int len,
  */
 static int sctp_getsockopt_paddr_thresholds(struct sock *sk,
 					    char __user *optval, int len,
-					    int __user *optlen, bool v2)
+					    optlen_t optlen, bool v2)
 {
 	struct sctp_paddrthlds_v2 val;
 	struct sctp_transport *trans;
@@ -7229,7 +7229,7 @@ out:
  */
 static int sctp_getsockopt_assoc_stats(struct sock *sk, int len,
 				       char __user *optval,
-				       int __user *optlen)
+				       optlen_t optlen)
 {
 	struct sctp_assoc_stats sas;
 	struct sctp_association *asoc = NULL;
@@ -7287,7 +7287,7 @@ static int sctp_getsockopt_assoc_stats(struct sock *sk, int len,
 
 static int sctp_getsockopt_recvrcvinfo(struct sock *sk,	int len,
 				       char __user *optval,
-				       int __user *optlen)
+				       optlen_t optlen)
 {
 	int val = 0;
 
@@ -7307,7 +7307,7 @@ static int sctp_getsockopt_recvrcvinfo(struct sock *sk,	int len,
 
 static int sctp_getsockopt_recvnxtinfo(struct sock *sk,	int len,
 				       char __user *optval,
-				       int __user *optlen)
+				       optlen_t optlen)
 {
 	int val = 0;
 
@@ -7327,7 +7327,7 @@ static int sctp_getsockopt_recvnxtinfo(struct sock *sk,	int len,
 
 static int sctp_getsockopt_pr_supported(struct sock *sk, int len,
 					char __user *optval,
-					int __user *optlen)
+					optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7366,7 +7366,7 @@ out:
 
 static int sctp_getsockopt_default_prinfo(struct sock *sk, int len,
 					  char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct sctp_default_prinfo info;
 	struct sctp_association *asoc;
@@ -7412,7 +7412,7 @@ out:
 
 static int sctp_getsockopt_pr_assocstatus(struct sock *sk, int len,
 					  char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct sctp_prstatus params;
 	struct sctp_association *asoc;
@@ -7471,7 +7471,7 @@ out:
 
 static int sctp_getsockopt_pr_streamstatus(struct sock *sk, int len,
 					   char __user *optval,
-					   int __user *optlen)
+					   optlen_t optlen)
 {
 	struct sctp_stream_out_ext *streamoute;
 	struct sctp_association *asoc;
@@ -7535,7 +7535,7 @@ out:
 
 static int sctp_getsockopt_reconfig_supported(struct sock *sk, int len,
 					      char __user *optval,
-					      int __user *optlen)
+					      optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7574,7 +7574,7 @@ out:
 
 static int sctp_getsockopt_enable_strreset(struct sock *sk, int len,
 					   char __user *optval,
-					   int __user *optlen)
+					   optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7613,7 +7613,7 @@ out:
 
 static int sctp_getsockopt_scheduler(struct sock *sk, int len,
 				     char __user *optval,
-				     int __user *optlen)
+				     optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7652,7 +7652,7 @@ out:
 
 static int sctp_getsockopt_scheduler_value(struct sock *sk, int len,
 					   char __user *optval,
-					   int __user *optlen)
+					   optlen_t optlen)
 {
 	struct sctp_stream_value params;
 	struct sctp_association *asoc;
@@ -7694,7 +7694,7 @@ out:
 
 static int sctp_getsockopt_interleaving_supported(struct sock *sk, int len,
 						  char __user *optval,
-						  int __user *optlen)
+						  optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7733,7 +7733,7 @@ out:
 
 static int sctp_getsockopt_reuse_port(struct sock *sk, int len,
 				      char __user *optval,
-				      int __user *optlen)
+				      optlen_t optlen)
 {
 	int val;
 
@@ -7752,7 +7752,7 @@ static int sctp_getsockopt_reuse_port(struct sock *sk, int len,
 }
 
 static int sctp_getsockopt_event(struct sock *sk, int len, char __user *optval,
-				 int __user *optlen)
+				 optlen_t optlen)
 {
 	struct sctp_association *asoc;
 	struct sctp_event param;
@@ -7788,7 +7788,7 @@ static int sctp_getsockopt_event(struct sock *sk, int len, char __user *optval,
 
 static int sctp_getsockopt_asconf_supported(struct sock *sk, int len,
 					    char __user *optval,
-					    int __user *optlen)
+					    optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7827,7 +7827,7 @@ out:
 
 static int sctp_getsockopt_auth_supported(struct sock *sk, int len,
 					  char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7866,7 +7866,7 @@ out:
 
 static int sctp_getsockopt_ecn_supported(struct sock *sk, int len,
 					 char __user *optval,
-					 int __user *optlen)
+					 optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7905,7 +7905,7 @@ out:
 
 static int sctp_getsockopt_pf_expose(struct sock *sk, int len,
 				     char __user *optval,
-				     int __user *optlen)
+				     optlen_t optlen)
 {
 	struct sctp_assoc_value params;
 	struct sctp_association *asoc;
@@ -7943,7 +7943,7 @@ out:
 }
 
 static int sctp_getsockopt_encap_port(struct sock *sk, int len,
-				      char __user *optval, int __user *optlen)
+				      char __user *optval, optlen_t optlen)
 {
 	struct sctp_association *asoc;
 	struct sctp_udpencaps encap;
@@ -8003,7 +8003,7 @@ out:
 
 static int sctp_getsockopt_probe_interval(struct sock *sk, int len,
 					  char __user *optval,
-					  int __user *optlen)
+					  optlen_t optlen)
 {
 	struct sctp_probeinterval params;
 	struct sctp_association *asoc;
@@ -8062,7 +8062,7 @@ out:
 }
 
 static int sctp_getsockopt(struct sock *sk, int level, int optname,
-			   char __user *optval, int __user *optlen)
+			   char __user *optval, optlen_t optlen)
 {
 	int retval = 0;
 	int len;

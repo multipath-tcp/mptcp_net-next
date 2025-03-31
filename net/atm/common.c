@@ -787,7 +787,7 @@ int vcc_setsockopt(struct socket *sock, int level, int optname,
 }
 
 int vcc_getsockopt(struct socket *sock, int level, int optname,
-		   char __user *optval, int __user *optlen)
+		   char __user *optval, optlen_t optlen)
 {
 	struct atm_vcc *vcc;
 	int len;

@@ -722,7 +722,7 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname,
 	return err;
 }
 
-static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __user *optval, int __user *optlen)
+static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct sock *l2cap_sk;
@@ -798,7 +798,7 @@ static int rfcomm_sock_getsockopt_old(struct socket *sock, int optname, char __u
 	return err;
 }
 
-static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
+static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct bt_security sec;

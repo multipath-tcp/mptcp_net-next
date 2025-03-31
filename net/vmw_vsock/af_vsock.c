@@ -1866,7 +1866,7 @@ exit:
 static int vsock_connectible_getsockopt(struct socket *sock,
 					int level, int optname,
 					char __user *optval,
-					int __user *optlen)
+					optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct vsock_sock *vsk = vsock_sk(sk);

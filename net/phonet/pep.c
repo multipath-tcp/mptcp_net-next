@@ -1063,7 +1063,7 @@ out_norel:
 }
 
 static int pep_getsockopt(struct sock *sk, int level, int optname,
-				char __user *optval, int __user *optlen)
+				char __user *optval, optlen_t optlen)
 {
 	struct pep_sock *pn = pep_sk(sk);
 	int len, val;

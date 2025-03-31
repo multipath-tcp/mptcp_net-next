@@ -1170,7 +1170,7 @@ out:
  *	Get connection specific socket information.
  */
 static int llc_ui_getsockopt(struct socket *sock, int level, int optname,
-			     char __user *optval, int __user *optlen)
+			     char __user *optval, optlen_t optlen)
 {
 	struct sock *sk = sock->sk;
 	struct llc_sock *llc = llc_sk(sk);

@@ -1758,12 +1758,12 @@ out:
 }
 
 int ip_getsockopt(struct sock *sk, int level,
-		  int optname, char __user *optval, int __user *optlen)
+		  int optname, char __user *optval, optlen_t optlen)
 {
 	int err;
 
 	err = do_ip_getsockopt(sk, level, optname,
-			       USER_SOCKPTR(optval), USER_SOCKPTR(optlen));
+			       USER_SOCKPTR(optval), OPTLEN_SOCKPTR(optlen));
 
 #ifdef CONFIG_NETFILTER
 	/* we need to exclude all possible ENOPROTOOPTs except default case */

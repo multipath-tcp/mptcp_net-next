@@ -441,7 +441,7 @@ struct sctp_af {
 					 int level,
 					 int optname,
 					 char __user *optval,
-					 int __user *optlen);
+					 optlen_t optlen);
 	void		(*get_dst)	(struct sctp_transport *t,
 					 union sctp_addr *saddr,
 					 struct flowi *fl,

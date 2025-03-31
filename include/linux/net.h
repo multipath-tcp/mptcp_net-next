@@ -193,7 +193,7 @@ struct proto_ops {
 				      int optname, sockptr_t optval,
 				      unsigned int optlen);
 	int		(*getsockopt)(struct socket *sock, int level,
-				      int optname, char __user *optval, int __user *optlen);
+				      int optname, char __user *optval, optlen_t optlen);
 	void		(*show_fdinfo)(struct seq_file *m, struct socket *sock);
 	int		(*sendmsg)   (struct socket *sock, struct msghdr *m,
 				      size_t total_len);

@@ -3229,7 +3229,7 @@ static int tipc_setsockopt(struct socket *sock, int lvl, int opt,
  * Return: 0 on success, errno otherwise
  */
 static int tipc_getsockopt(struct socket *sock, int lvl, int opt,
-			   char __user *ov, int __user *ol)
+			   char __user *ov, optlen_t ol)
 {
 	struct sock *sk = sock->sk;
 	struct tipc_sock *tsk = tipc_sk(sk);

@@ -466,7 +466,7 @@ nomem:
 }
 
 static int do_chtls_getsockopt(struct sock *sk, char __user *optval,
-			       int __user *optlen)
+			       optlen_t optlen)
 {
 	struct tls_crypto_info crypto_info = { 0 };
 
@@ -477,7 +477,7 @@ static int do_chtls_getsockopt(struct sock *sk, char __user *optval,
 }
 
 static int chtls_getsockopt(struct sock *sk, int level, int optname,
-			    char __user *optval, int __user *optlen)
+			    char __user *optval, optlen_t optlen)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
 

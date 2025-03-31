@@ -169,17 +169,21 @@ static inline int check_zeroed_sockptr(sockptr_t src, size_t offset,
 	return memchr_inv(src.kernel + offset, 0, size) == NULL;
 }
 
+typedef struct {
+	int __user *up;
+} optlen_t;
+
 #define __check_optlen_t(__optlen)				\
 ({								\
-	int __user *__ptr __maybe_unused = __optlen; 		\
-	BUILD_BUG_ON(sizeof(*(__ptr)) != sizeof(int));		\
+	optlen_t *__ptr __maybe_unused = &__optlen; \
+	BUILD_BUG_ON(sizeof(*((__ptr)->up)) != sizeof(int));	\
 })
 
 #define get_optlen(__val, __optlen)				\
 ({								\
 	long __err;						\
 	__check_optlen_t(__optlen);				\
-	__err = get_user(__val, __optlen);			\
+	__err = get_user(__val, __optlen.up);			\
 	__err;							\
 })
 
@@ -187,8 +191,13 @@ static inline int check_zeroed_sockptr(sockptr_t src, size_t offset,
 ({								\
 	long __err;						\
 	__check_optlen_t(__optlen);				\
-	__err = put_user(__val, __optlen);			\
+	__err = put_user(__val, __optlen.up);			\
 	__err;							\
 })
+
+static inline sockptr_t OPTLEN_SOCKPTR(optlen_t optlen)
+{
+	return (sockptr_t) { .user = optlen.up, };
+}
 
 #endif /* _LINUX_SOCKPTR_H */

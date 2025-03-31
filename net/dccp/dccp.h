@@ -289,7 +289,7 @@ struct sk_buff *dccp_make_response(const struct sock *sk, struct dst_entry *dst,
 int dccp_connect(struct sock *sk);
 int dccp_disconnect(struct sock *sk, int flags);
 int dccp_getsockopt(struct sock *sk, int level, int optname,
-		    char __user *optval, int __user *optlen);
+		    char __user *optval, optlen_t optlen);
 int dccp_setsockopt(struct sock *sk, int level, int optname,
 		    sockptr_t optval, unsigned int optlen);
 int dccp_ioctl(struct sock *sk, int cmd, int *karg);

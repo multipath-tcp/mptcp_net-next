@@ -807,7 +807,7 @@ static int raw_seticmpfilter(struct sock *sk, sockptr_t optval, int optlen)
 	return 0;
 }
 
-static int raw_geticmpfilter(struct sock *sk, char __user *optval, int __user *optlen)
+static int raw_geticmpfilter(struct sock *sk, char __user *optval, optlen_t optlen)
 {
 	int len, ret = -EFAULT;
 
@@ -847,7 +847,7 @@ static int raw_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int do_raw_getsockopt(struct sock *sk, int optname,
-			     char __user *optval, int __user *optlen)
+			     char __user *optval, optlen_t optlen)
 {
 	if (optname == ICMP_FILTER) {
 		if (inet_sk(sk)->inet_num != IPPROTO_ICMP)
@@ -859,7 +859,7 @@ static int do_raw_getsockopt(struct sock *sk, int optname,
 }
 
 static int raw_getsockopt(struct sock *sk, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  char __user *optval, optlen_t optlen)
 {
 	if (level != SOL_RAW)
 		return ip_getsockopt(sk, level, optname, optval, optlen);
