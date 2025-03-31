@@ -2350,15 +2350,42 @@ int do_sock_getsockopt(struct socket *sock, bool compat, int level,
 	} else if (unlikely(!ops->getsockopt)) {
 		err = -EOPNOTSUPP;
 	} else {
-		optlen_t _optlen = { .up = NULL, };
+		optlen_t _optlen = { .kp = NULL, };
+		int koptlen;
 
 		if (WARN_ONCE(optval.is_kernel,
 			      "Invalid argument type"))
 			return -EOPNOTSUPP;
 
-		_optlen.up = optlen.user;
+		if (optlen.is_kernel) {
+			_optlen.kp = optlen.kernel;
+		} else if (optlen.user != NULL) {
+			/*
+			 * If optlen.user is NULL,
+			 * we pass _optlen.kp = NULL
+			 * in order to avoid breaking
+			 * any uapi for getsockopt()
+			 * implementations that ignore
+			 * the optlen pointer completely
+			 * or do any level and optname
+			 * checking before hitting a
+			 * potential -EFAULT condition.
+			 *
+			 * Also when optlen.user is not NULL,
+			 * but copy_from_sockptr() causes -EFAULT,
+			 * we'll pass optlen.kp = NULL in order
+			 * to defer a possible -EFAULT return
+			 * to the caller to get_optlen() and put_optlen().
+			 */
+			if (copy_from_sockptr(&koptlen, optlen, sizeof(koptlen)) == 0)
+				_optlen.kp = &koptlen;
+		}
 		err = ops->getsockopt(sock, level, optname, optval.user,
 				      _optlen);
+		if (err != -EFAULT && _optlen.kp == &koptlen) {
+			if (copy_to_sockptr(optlen, &koptlen, sizeof(koptlen)))
+				return -EFAULT;
+		}
 	}
 
 	if (!compat)
