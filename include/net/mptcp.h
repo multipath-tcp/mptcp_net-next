@@ -135,6 +135,7 @@ struct mptcp_pm_ops {
 
 	/* optional, call from the msk context */
 	void (*add_addr_received)(struct mptcp_sock *msk);
+	void (*rm_addr_received)(struct mptcp_sock *msk, u8 rm_id);
 
 	char			name[MPTCP_PM_NAME_MAX];
 	struct module		*owner;

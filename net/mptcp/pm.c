@@ -690,8 +690,8 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 		if (rm_type == MPTCP_MIB_RMADDR) {
 			__MPTCP_INC_STATS(sock_net(sk), rm_type);
-			if (removed && mptcp_pm_is_kernel(msk))
-				mptcp_pm_nl_rm_addr(msk, rm_id);
+			if (removed && msk->pm.ops->rm_addr_received)
+				msk->pm.ops->rm_addr_received(msk, rm_id);
 		}
 	}
 }
