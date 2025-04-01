@@ -1015,6 +1015,8 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk);
 bool mptcp_pm_nl_check_work_pending(struct mptcp_sock *msk);
 void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 				 const struct mptcp_subflow_context *subflow);
+bool mptcp_pm_is_init_remote_addr(struct mptcp_sock *msk,
+				  const struct mptcp_addr_info *remote);
 void mptcp_pm_add_addr_received(const struct sock *ssk,
 				const struct mptcp_addr_info *addr);
 void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
@@ -1207,6 +1209,14 @@ static inline bool mptcp_pm_accept_subflow(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 
 	return ret;
+}
+
+static inline bool mptcp_pm_accept_address(struct mptcp_sock *msk,
+					   const struct mptcp_addr_info *addr)
+{
+	/* id0 should not have a different address */
+	return !((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
+		 (addr->id > 0 && !READ_ONCE(msk->pm.accept_addr)));
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk);
