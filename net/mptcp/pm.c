@@ -596,15 +596,13 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 
 	spin_lock_bh(&pm->lock);
 
-	if (mptcp_pm_is_userspace(msk)) {
-		mptcp_pm_announce_addr(msk, addr, true);
-		mptcp_pm_add_addr_send_ack(msk);
-	} else if (!mptcp_pm_accept_address(msk, addr)) {
-		mptcp_pm_announce_addr(msk, addr, true);
-		mptcp_pm_add_addr_send_ack(msk);
-	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
+	mptcp_pm_announce_addr(msk, addr, true);
+	mptcp_pm_add_addr_send_ack(msk);
+
+	if (pm->ops->add_addr_received &&
+	    mptcp_pm_accept_address(msk, addr) &&
+	    mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED))
 		pm->remote = *addr;
-	}
 
 	spin_unlock_bh(&pm->lock);
 }
@@ -932,7 +930,8 @@ void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
 
 void mptcp_pm_worker(struct mptcp_sock *msk)
 {
-	u8 status, mask = BIT(MPTCP_PM_ADD_ADDR_SEND_ACK) |
+	u8 status, mask = BIT(MPTCP_PM_ADD_ADDR_RECEIVED) |
+			  BIT(MPTCP_PM_ADD_ADDR_SEND_ACK) |
 			  BIT(MPTCP_PM_RM_ADDR_RECEIVED) |
 			  BIT(MPTCP_PM_ESTABLISHED) |
 			  BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
@@ -949,6 +948,8 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	spin_unlock_bh(&pm->lock);
 
 	pr_debug("msk=%p status=%x\n", msk, status);
+	if (status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED))
+		pm->ops->add_addr_received(msk);
 	if (status & BIT(MPTCP_PM_ADD_ADDR_SEND_ACK))
 		mptcp_pm_addr_send_ack(msk);
 	if (status & BIT(MPTCP_PM_RM_ADDR_RECEIVED))
@@ -957,9 +958,6 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		pm->ops->established(msk);
 	if (status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED))
 		pm->ops->subflow_established(msk);
-	spin_lock_bh(&pm->lock);
-	__mptcp_pm_kernel_worker(msk);
-	spin_unlock_bh(&pm->lock);
 }
 
 static void mptcp_pm_ops_init(struct mptcp_sock *msk,
