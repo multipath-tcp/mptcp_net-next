@@ -1,4 +1,35 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/x86-don-t-re-generate-cpufeaturemasks.h-so-eagerly
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Subject: [PATCH] x86: don't re-generate cpufeaturemasks.h so eagerly
 
+It turns out the code to generate the x86 cpufeaturemasks.h header was
+way too aggressive, and would re-generate it whenever the timestamp on
+the kernel config file changed.
+
+Now, the regular 'make *config' tools are fairly careful to not rewrite
+the kernel config file unless the contents change, but other usecases
+aren't that careful.
+
+Michael Kelley reports that 'make-kpkg' ends up doing "make syncconfig"
+multiple times in prepping to build, and will modify the config file in
+the process (and then modify it back, but by then the timestamps have
+changed).
+
+Jakub Kicinski reports that the netdev CI does something similar in how
+it generates the config file in multiple steps.
+
+In both cases, the config file timestamp updates then cause the
+cpufeaturemasks.h file to be regenerated, and that in turn then causes
+lots of unnecessary rebuilds due to all the normal dependencies.
+
+Fix it by using our 'filechk' infrastructure in the Makefile to generate
+the header file.  That will only write a new version of the file if the
+contents of the file have actually changed.
+
+Fixes: 841326332bcb ("x86/cpufeatures: Generate the <asm/cpufeaturemasks.h> header based on build config")
+Reported-by: Michael Kelley <mhklinux@outlook.com>
+Reported-by: Jakub Kicinski <kuba@kernel.org>
+Link: https://lore.kernel.org/all/SN6PR02MB415756D1829740F6E8AC11D1D4D82@SN6PR02MB4157.namprd02.prod.outlook.com/
+Link: https://lore.kernel.org/all/20250328162311.08134fa6@kernel.org/
+Cc: Peter Anvin <hpa@zytor.com>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
