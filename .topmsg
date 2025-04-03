@@ -1,4 +1,23 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/fwctl-cxl-Fix-uuid_t-usage-in-uapi
+From: Dan Williams <dan.j.williams@intel.com>
+Subject: [PATCH] fwctl/cxl: Fix uuid_t usage in uapi
 
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The uuid_t type is kernel internal, and Paul reports the following build
+error when it is used in a uapi header:
+
+    usr/include/cxl/features.h:59:9: error: unknown type name ‘uuid_t’
+
+Create a uuid type (__uapi_uuid_t) compatible with the longstanding
+definition uuid/uuid.h for userspace builds, and use uuid_t directly for
+kernel builds.
+
+Suggested-by: Jason Gunthorpe <jgg@nvidia.com>
+Reported-by: Paul E. McKenney <paulmck@kernel.org>
+Closes: http://lore.kernel.org/f6489337-67c7-48c8-b48a-58603ec15328@paulmck-laptop
+Fixes: 9b8e73cdb141 ("cxl: Move cxl feature command structs to user header")
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+Link: https://lore.kernel.org/67eac8df3e217_201f02948d@dwillia2-xfh.jf.intel.com.notmuch
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
