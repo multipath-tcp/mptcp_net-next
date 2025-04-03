@@ -562,20 +562,6 @@ static inline struct bkey_s_c btree_path_level_peek_all(struct bch_fs *c,
 			bch2_btree_node_iter_peek_all(&l->iter, l->b));
 }
 
-static inline struct bkey_s_c btree_path_level_peek(struct btree_trans *trans,
-						    struct btree_path *path,
-						    struct btree_path_level *l,
-						    struct bkey *u)
-{
-	struct bkey_s_c k = __btree_iter_unpack(trans->c, l, u,
-			bch2_btree_node_iter_peek(&l->iter, l->b));
-
-	path->pos = k.k ? k.k->p : l->b->key.k.p;
-	trans->paths_sorted = false;
-	bch2_btree_path_verify_level(trans, path, l - path->l);
-	return k;
-}
-
 static inline struct bkey_s_c btree_path_level_prev(struct btree_trans *trans,
 						    struct btree_path *path,
 						    struct btree_path_level *l,
@@ -1501,20 +1487,12 @@ void bch2_trans_updates_to_text(struct printbuf *buf, struct btree_trans *trans)
 
 	for (struct jset_entry *e = trans->journal_entries;
 	     e != btree_trans_journal_entries_top(trans);
-	     e = vstruct_next(e))
+	     e = vstruct_next(e)) {
 		bch2_journal_entry_to_text(buf, trans->c, e);
+		prt_newline(buf);
+	}
 
 	printbuf_indent_sub(buf, 2);
-}
-
-noinline __cold
-void bch2_dump_trans_updates(struct btree_trans *trans)
-{
-	struct printbuf buf = PRINTBUF;
-
-	bch2_trans_updates_to_text(&buf, trans);
-	bch2_print_str(trans->c, buf.buf);
-	printbuf_exit(&buf);
 }
 
 static void bch2_btree_path_to_text_short(struct printbuf *out, struct btree_trans *trans, btree_path_idx_t path_idx)
