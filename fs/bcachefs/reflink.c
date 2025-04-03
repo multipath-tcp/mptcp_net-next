@@ -185,12 +185,21 @@ static int bch2_indirect_extent_missing_error(struct btree_trans *trans,
 	BUG_ON(missing_start	< refd_start);
 	BUG_ON(missing_end	> refd_end);
 
-	if (fsck_err(trans, reflink_p_to_missing_reflink_v,
-		     "pointer to missing indirect extent\n"
-		     "  %s\n"
-		     "  missing range %llu-%llu",
-		     (bch2_bkey_val_to_text(&buf, c, p.s_c), buf.buf),
-		     missing_start, missing_end)) {
+	struct bpos missing_pos = bkey_start_pos(p.k);
+	missing_pos.offset += missing_start - live_start;
+
+	prt_printf(&buf, "pointer to missing indirect extent in ");
+	ret = bch2_inum_snap_offset_err_msg_trans(trans, &buf, missing_pos);
+	if (ret)
+		goto err;
+
+	prt_printf(&buf, "-%llu\n", (missing_pos.offset + (missing_end - missing_start)) << 9);
+	bch2_bkey_val_to_text(&buf, c, p.s_c);
+
+	prt_printf(&buf, "\nmissing reflink btree range %llu-%llu",
+		   missing_start, missing_end);
+
+	if (fsck_err(trans, reflink_p_to_missing_reflink_v, "%s", buf.buf)) {
 		struct bkey_i_reflink_p *new = bch2_bkey_make_mut_noupdate_typed(trans, p.s_c, reflink_p);
 		ret = PTR_ERR_OR_ZERO(new);
 		if (ret)
@@ -314,10 +323,10 @@ static int trans_trigger_reflink_p_segment(struct btree_trans *trans,
 	__le64 *refcount = bkey_refcount(bkey_i_to_s(new));
 	if (!*refcount && (flags & BTREE_TRIGGER_overwrite)) {
 		bch2_bkey_val_to_text(&buf, c, p.s_c);
-		prt_printf(&buf, "\n  ");
+		prt_newline(&buf);
 		bch2_bkey_val_to_text(&buf, c, k);
 		log_fsck_err(trans, reflink_refcount_underflow,
-			     "indirect extent refcount underflow while marking\n  %s",
+			     "indirect extent refcount underflow while marking\n%s",
 			   buf.buf);
 		goto next;
 	}
@@ -597,7 +606,7 @@ s64 bch2_remap_range(struct bch_fs *c,
 	u64 dst_done = 0;
 	u32 dst_snapshot, src_snapshot;
 	bool reflink_p_may_update_opts_field =
-		bch2_request_incompat_feature(c, bcachefs_metadata_version_reflink_p_may_update_opts);
+		!bch2_request_incompat_feature(c, bcachefs_metadata_version_reflink_p_may_update_opts);
 	int ret = 0, ret2 = 0;
 
 	if (!bch2_write_ref_tryget(c, BCH_WRITE_REF_reflink))
@@ -786,8 +795,8 @@ static int bch2_gc_write_reflink_key(struct btree_trans *trans,
 	if (fsck_err_on(r->refcount != le64_to_cpu(*refcount),
 			trans, reflink_v_refcount_wrong,
 			"reflink key has wrong refcount:\n"
-			"  %s\n"
-			"  should be %u",
+			"%s\n"
+			"should be %u",
 			(bch2_bkey_val_to_text(&buf, c, k), buf.buf),
 			r->refcount)) {
 		struct bkey_i *new = bch2_bkey_make_mut_noupdate(trans, k);
