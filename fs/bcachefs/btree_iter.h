@@ -9,7 +9,6 @@
 void bch2_trans_updates_to_text(struct printbuf *, struct btree_trans *);
 void bch2_btree_path_to_text(struct printbuf *, struct btree_trans *, btree_path_idx_t);
 void bch2_trans_paths_to_text(struct printbuf *, struct btree_trans *);
-void bch2_dump_trans_updates(struct btree_trans *);
 void bch2_dump_trans_paths_updates(struct btree_trans *);
 
 static inline int __bkey_err(const struct bkey *k)
@@ -335,13 +334,20 @@ static inline void bch2_trans_verify_not_unlocked_or_in_restart(struct btree_tra
 }
 
 __always_inline
-static int btree_trans_restart_ip(struct btree_trans *trans, int err, unsigned long ip)
+static int btree_trans_restart_foreign_task(struct btree_trans *trans, int err, unsigned long ip)
 {
 	BUG_ON(err <= 0);
 	BUG_ON(!bch2_err_matches(-err, BCH_ERR_transaction_restart));
 
 	trans->restarted = err;
 	trans->last_restarted_ip = ip;
+	return -err;
+}
+
+__always_inline
+static int btree_trans_restart_ip(struct btree_trans *trans, int err, unsigned long ip)
+{
+	btree_trans_restart_foreign_task(trans, err, ip);
 #ifdef CONFIG_BCACHEFS_DEBUG
 	darray_exit(&trans->last_restarted_trace);
 	bch2_save_backtrace(&trans->last_restarted_trace, current, 0, GFP_NOWAIT);
