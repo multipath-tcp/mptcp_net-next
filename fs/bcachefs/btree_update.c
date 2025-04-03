@@ -17,7 +17,7 @@
 static inline int btree_insert_entry_cmp(const struct btree_insert_entry *l,
 					 const struct btree_insert_entry *r)
 {
-	return   cmp_int(l->btree_id,	r->btree_id) ?:
+	return   cmp_int(l->sort_order,	r->sort_order) ?:
 		 cmp_int(l->cached,	r->cached) ?:
 		 -cmp_int(l->level,	r->level) ?:
 		 bpos_cmp(l->k->k.p,	r->k->k.p);
@@ -397,6 +397,7 @@ bch2_trans_update_by_path(struct btree_trans *trans, btree_path_idx_t path_idx,
 
 	n = (struct btree_insert_entry) {
 		.flags		= flags,
+		.sort_order	= btree_trigger_order(path->btree_id),
 		.bkey_type	= __btree_node_type(path->level, path->btree_id),
 		.btree_id	= path->btree_id,
 		.level		= path->level,
@@ -511,6 +512,8 @@ static noinline int bch2_trans_update_get_key_cache(struct btree_trans *trans,
 int __must_check bch2_trans_update(struct btree_trans *trans, struct btree_iter *iter,
 				   struct bkey_i *k, enum btree_iter_update_trigger_flags flags)
 {
+	kmsan_check_memory(k, bkey_bytes(&k->k));
+
 	btree_path_idx_t path_idx = iter->update_path ?: iter->path;
 	int ret;
 
@@ -840,6 +843,19 @@ int bch2_trans_log_msg(struct btree_trans *trans, struct printbuf *buf)
 	struct jset_entry_log *l = container_of(e, struct jset_entry_log, entry);
 	journal_entry_init(e, BCH_JSET_ENTRY_log, 0, 1, u64s);
 	memcpy(l->d, buf->buf, buf->pos);
+	return 0;
+}
+
+int bch2_trans_log_bkey(struct btree_trans *trans, enum btree_id btree,
+			unsigned level, struct bkey_i *k)
+{
+	struct jset_entry *e = bch2_trans_jset_entry_alloc(trans, jset_u64s(k->k.u64s));
+	int ret = PTR_ERR_OR_ZERO(e);
+	if (ret)
+		return ret;
+
+	journal_entry_init(e, BCH_JSET_ENTRY_log_bkey, btree, level, k->k.u64s);
+	bkey_copy(e->start, k);
 	return 0;
 }
 
