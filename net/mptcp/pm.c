@@ -225,8 +225,8 @@ void mptcp_pm_addr_send_ack(struct mptcp_sock *msk)
 	mptcp_for_each_subflow(msk, subflow) {
 		if (__mptcp_subflow_active(subflow)) {
 			if (!subflow->stale) {
-				mptcp_pm_send_ack(msk, subflow, false, false);
-				return;
+				alt = subflow;
+				break;
 			}
 
 			if (!alt)
