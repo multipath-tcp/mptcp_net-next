@@ -5544,12 +5544,12 @@ F:	Documentation/devicetree/bindings/sound/google,cros-ec-codec.yaml
 F:	sound/soc/codecs/cros_ec_codec.*
 
 CHROMEOS EC CHARGE CONTROL
-M:	Thomas Weißschuh <thomas@weissschuh.net>
+M:	Thomas Weißschuh <linux@weissschuh.net>
 S:	Maintained
 F:	drivers/power/supply/cros_charge-control.c
 
 CHROMEOS EC HARDWARE MONITORING
-M:	Thomas Weißschuh <thomas@weissschuh.net>
+M:	Thomas Weißschuh <linux@weissschuh.net>
 L:	chrome-platform@lists.linux.dev
 L:	linux-hwmon@vger.kernel.org
 S:	Maintained
@@ -5557,7 +5557,7 @@ F:	Documentation/hwmon/cros_ec_hwmon.rst
 F:	drivers/hwmon/cros_ec_hwmon.c
 
 CHROMEOS EC LED DRIVER
-M:	Thomas Weißschuh <thomas@weissschuh.net>
+M:	Thomas Weißschuh <linux@weissschuh.net>
 S:	Maintained
 F:	drivers/leds/leds-cros_ec.c
 
@@ -5967,9 +5967,10 @@ S:	Maintained
 F:	Documentation/security/snp-tdx-threat-model.rst
 
 CONFIGFS
-M:	Joel Becker <jlbec@evilplan.org>
+M:	Andreas Hindborg <a.hindborg@kernel.org>
+R:	Breno Leitao <leitao@debian.org>
 S:	Supported
-T:	git git://git.infradead.org/users/hch/configfs.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/a.hindborg/linux.git configfs-next
 F:	fs/configfs/
 F:	include/linux/configfs.h
 F:	samples/configfs/
@@ -6434,18 +6435,6 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 W:	http://www.chelsio.com
 F:	drivers/net/ethernet/chelsio/cxgb4vf/
-
-CXL (IBM Coherent Accelerator Processor Interface CAPI) DRIVER
-M:	Frederic Barrat <fbarrat@linux.ibm.com>
-M:	Andrew Donnellan <ajd@linux.ibm.com>
-L:	linuxppc-dev@lists.ozlabs.org
-S:	Obsolete
-F:	Documentation/ABI/obsolete/sysfs-class-cxl
-F:	Documentation/arch/powerpc/cxl.rst
-F:	arch/powerpc/platforms/powernv/pci-cxl.c
-F:	drivers/misc/cxl/
-F:	include/misc/cxl*
-F:	include/uapi/misc/cxl.h
 
 CYBERPRO FB DRIVER
 M:	Russell King <linux@armlinux.org.uk>
@@ -9118,7 +9107,7 @@ F:	include/linux/iomap.h
 
 FILESYSTEMS [NETFS LIBRARY]
 M:	David Howells <dhowells@redhat.com>
-R:	Jeff Layton <jlayton@kernel.org>
+M:	Paulo Alcantara <pc@manguebit.com>
 L:	netfs@lists.linux.dev
 L:	linux-fsdevel@vger.kernel.org
 S:	Supported
@@ -10032,7 +10021,7 @@ F:	Documentation/hwmon/gigabyte_waterforce.rst
 F:	drivers/hwmon/gigabyte_waterforce.c
 
 GIGABYTE WMI DRIVER
-M:	Thomas Weißschuh <thomas@weissschuh.net>
+M:	Thomas Weißschuh <linux@weissschuh.net>
 L:	platform-driver-x86@vger.kernel.org
 S:	Maintained
 F:	drivers/platform/x86/gigabyte-wmi.c
@@ -15498,6 +15487,45 @@ F:	tools/mm/
 F:	tools/testing/selftests/mm/
 N:	include/linux/page[-_]*
 
+MEMORY MANAGEMENT - EXECMEM
+M:	Andrew Morton <akpm@linux-foundation.org>
+M:	Mike Rapoport <rppt@kernel.org>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	include/linux/execmem.h
+F:	mm/execmem.c
+
+MEMORY MANAGEMENT - NUMA MEMBLOCKS AND NUMA EMULATION
+M:	Andrew Morton <akpm@linux-foundation.org>
+M:	Mike Rapoport <rppt@kernel.org>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	include/linux/numa_memblks.h
+F:	mm/numa.c
+F:	mm/numa_emulation.c
+F:	mm/numa_memblks.c
+
+MEMORY MANAGEMENT - SECRETMEM
+M:	Andrew Morton <akpm@linux-foundation.org>
+M:	Mike Rapoport <rppt@kernel.org>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	include/linux/secretmem.h
+F:	mm/secretmem.c
+
+MEMORY MANAGEMENT - USERFAULTFD
+M:	Andrew Morton <akpm@linux-foundation.org>
+R:	Peter Xu <peterx@redhat.com>
+L:	linux-mm@kvack.org
+S:	Maintained
+F:	Documentation/admin-guide/mm/userfaultfd.rst
+F:	fs/userfaultfd.c
+F:	include/asm-generic/pgtable_uffd.h
+F:	include/linux/userfaultfd_k.h
+F:	include/uapi/linux/userfaultfd.h
+F:	mm/userfaultfd.c
+F:	tools/testing/selftests/mm/uffd-*.[ch]
+
 MEMORY MAPPING
 M:	Andrew Morton <akpm@linux-foundation.org>
 M:	Liam R. Howlett <Liam.Howlett@oracle.com>
@@ -16560,6 +16588,12 @@ C:	irc://irc.oftc.net/mtd
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mtd/linux.git nand/next
 F:	drivers/mtd/nand/
 F:	include/linux/mtd/*nand*.h
+
+NATIONAL INSTRUMENTS SERIAL DRIVER
+M:	Chaitanya Vadrevu <chaitanya.vadrevu@emerson.com>
+L:	linux-serial@vger.kernel.org
+S:	Maintained
+F:	drivers/tty/serial/8250/8250_ni.c
 
 NATIVE INSTRUMENTS USB SOUND INTERFACE DRIVER
 M:	Daniel Mack <zonque@gmail.com>
@@ -19691,12 +19725,12 @@ F:	fs/qnx6/
 F:	include/linux/qnx6_fs.h
 
 QORIQ DPAA2 FSL-MC BUS DRIVER
-M:	Stuart Yoder <stuyoder@gmail.com>
-M:	Laurentiu Tudor <laurentiu.tudor@nxp.com>
+M:	Ioana Ciornei <ioana.ciornei@nxp.com>
+L:	linuxppc-dev@lists.ozlabs.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 F:	Documentation/ABI/stable/sysfs-bus-fsl-mc
-F:	Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+F:	Documentation/devicetree/bindings/misc/fsl,qoriq-mc.yaml
 F:	Documentation/networking/device_drivers/ethernet/freescale/dpaa2/overview.rst
 F:	drivers/bus/fsl-mc/
 F:	include/uapi/linux/fsl_mc.h
@@ -24030,7 +24064,7 @@ F:	drivers/thunderbolt/dma_test.c
 THUNDERBOLT DRIVER
 M:	Andreas Noever <andreas.noever@gmail.com>
 M:	Michael Jamet <michael.jamet@intel.com>
-M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+M:	Mika Westerberg <westeri@kernel.org>
 M:	Yehezkel Bernat <YehezkelShB@gmail.com>
 L:	linux-usb@vger.kernel.org
 S:	Maintained
@@ -24041,7 +24075,7 @@ F:	include/linux/thunderbolt.h
 
 THUNDERBOLT NETWORK DRIVER
 M:	Michael Jamet <michael.jamet@intel.com>
-M:	Mika Westerberg <mika.westerberg@linux.intel.com>
+M:	Mika Westerberg <westeri@kernel.org>
 M:	Yehezkel Bernat <YehezkelShB@gmail.com>
 L:	netdev@vger.kernel.org
 S:	Maintained
