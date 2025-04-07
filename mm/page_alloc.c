@@ -1593,7 +1593,7 @@ static __always_inline void page_del_and_expand(struct zone *zone,
 
 static void check_new_page_bad(struct page *page)
 {
-	if (unlikely(page->flags & __PG_HWPOISON)) {
+	if (unlikely(PageHWPoison(page))) {
 		/* Don't complain about hwpoisoned pages */
 		if (PageBuddy(page))
 			__ClearPageBuddy(page);
@@ -4604,8 +4604,8 @@ retry:
 		goto retry;
 
 	/* Reclaim/compaction failed to prevent the fallback */
-	if (defrag_mode) {
-		alloc_flags &= ALLOC_NOFRAGMENT;
+	if (defrag_mode && (alloc_flags & ALLOC_NOFRAGMENT)) {
+		alloc_flags &= ~ALLOC_NOFRAGMENT;
 		goto retry;
 	}
 
@@ -7384,6 +7384,9 @@ struct page *try_alloc_pages_noprof(int nid, unsigned int order)
 	page = get_page_from_freelist(alloc_gfp, order, alloc_flags, &ac);
 
 	/* Unlike regular alloc_pages() there is no __alloc_pages_slowpath(). */
+
+	if (page)
+		set_page_refcounted(page);
 
 	if (memcg_kmem_online() && page &&
 	    unlikely(__memcg_kmem_charge_page(page, alloc_gfp, order) != 0)) {
