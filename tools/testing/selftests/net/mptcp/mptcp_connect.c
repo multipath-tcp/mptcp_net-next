@@ -179,6 +179,18 @@ static void xgetnameinfo(const struct sockaddr *addr, socklen_t addrlen,
 	}
 }
 
+/* There is a lack of MPTCP support from glibc, these code leads error:
+ *	struct addrinfo hints = {
+ *		.ai_protocol = IPPROTO_MPTCP,
+ *		...
+ *	};
+ *	err = getaddrinfo(node, service, &hints, res);
+ *	...
+ * So using IPPROTO_TCP to resolve, and use TCP/MPTCP to create socket.
+ *
+ * glibc starts to support MPTCP since v2.42.
+ * Link: https://sourceware.org/git/?p=glibc.git;a=commit;h=a8e9022e0f82
+ */
 static void xgetaddrinfo(const char *node, const char *service,
 			 const struct addrinfo *hints,
 			 struct addrinfo **res)
