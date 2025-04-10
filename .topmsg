@@ -1,4 +1,26 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-use-mptcp_lib_get_info_value
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: diag: use mptcp_lib_get_info_value
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When running diag.sh in a loop, chk_dump_one will report the following
+"grep: write error":
+
+ 13 ....chk 2 cestab                                  [ OK ]
+ grep: write error
+ 14 ....chk dump_one                                  [ OK ]
+ 15 ....chk 2->0 msk in use after flush               [ OK ]
+ 16 ....chk 2->0 cestab after flush                   [ OK ]
+
+This error is caused by a broken pipe. When the output of 'ss' is processed
+by grep, 'head -n 1' will exit immediately after getting the first line,
+causing the subsequent pipe to close. At this time, if 'grep' is still
+trying to write data to the closed pipe, it will trigger a SIGPIPE signal,
+causing a write error.
+
+One solution is not to use this problematic "head -n 1" command, but to use
+mptcp_lib_get_info_value() helper defined in mptcp_lib.sh to get the value
+of 'token'.
+
+Fixes: ba2400166570 ("selftests: mptcp: add a test for mptcp_diag_dump_one")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Tested-by: Gang Yan <yangang@kylinos.cn>
