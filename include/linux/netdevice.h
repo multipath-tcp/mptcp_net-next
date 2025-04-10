@@ -688,6 +688,7 @@ struct netdev_queue {
 	/* Subordinate device that the queue has been assigned to */
 	struct net_device	*sb_dev;
 #ifdef CONFIG_XDP_SOCKETS
+	/* "ops protected", see comment about net_device::lock */
 	struct xsk_buff_pool    *pool;
 #endif
 
@@ -1952,6 +1953,7 @@ enum netdev_reg_state {
  *	@priv_destructor:	Called from unregister
  *	@npinfo:		XXX: need comments on this one
  * 	@nd_net:		Network namespace this network device is inside
+ *				protected by @lock
  *
  * 	@ml_priv:	Mid-layer private
  *	@ml_priv_type:  Mid-layer private type
@@ -2359,6 +2361,9 @@ struct net_device {
 
 	bool dismantle;
 
+	/** @moving_ns: device is changing netns, protected by @lock */
+	bool moving_ns;
+
 	enum {
 		RTNL_LINK_INITIALIZED,
 		RTNL_LINK_INITIALIZING,
@@ -2521,7 +2526,7 @@ struct net_device {
 	 *	@net_shaper_hierarchy, @reg_state, @threaded
 	 *
 	 * Double protects:
-	 *	@up
+	 *	@up, @moving_ns, @nd_net, @xdp_flags
 	 *
 	 * Double ops protects:
 	 *	@real_num_rx_queues, @real_num_tx_queues
@@ -4689,9 +4694,10 @@ static inline void __netif_tx_unlock_bh(struct netdev_queue *txq)
 /*
  * txq->trans_start can be read locklessly from dev_watchdog()
  */
-static inline void txq_trans_update(struct netdev_queue *txq)
+static inline void txq_trans_update(const struct net_device *dev,
+				    struct netdev_queue *txq)
 {
-	if (txq->xmit_lock_owner != -1)
+	if (!dev->lltx)
 		WRITE_ONCE(txq->trans_start, jiffies);
 }
 
@@ -5211,7 +5217,7 @@ static inline netdev_tx_t netdev_start_xmit(struct sk_buff *skb, struct net_devi
 
 	rc = __netdev_start_xmit(ops, skb, dev, more);
 	if (rc == NETDEV_TX_OK)
-		txq_trans_update(txq);
+		txq_trans_update(dev, txq);
 
 	return rc;
 }
