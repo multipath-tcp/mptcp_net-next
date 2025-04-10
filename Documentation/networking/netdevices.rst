@@ -336,10 +336,11 @@ operations directly under the netdev instance lock.
 Devices drivers are encouraged to rely on the instance lock where possible.
 
 For the (mostly software) drivers that need to interact with the core stack,
-there are two sets of interfaces: ``dev_xxx`` and ``netif_xxx`` (e.g.,
-``dev_set_mtu`` and ``netif_set_mtu``). The ``dev_xxx`` functions handle
-acquiring the instance lock themselves, while the ``netif_xxx`` functions
-assume that the driver has already acquired the instance lock.
+there are two sets of interfaces: ``dev_xxx``/``netdev_xxx`` and ``netif_xxx``
+(e.g., ``dev_set_mtu`` and ``netif_set_mtu``). The ``dev_xxx``/``netdev_xxx``
+functions handle acquiring the instance lock themselves, while the
+``netif_xxx`` functions assume that the driver has already acquired
+the instance lock.
 
 struct net_device_ops
 ---------------------
@@ -390,6 +391,7 @@ For devices with locked ops, currently only the following notifiers are
 running under the lock:
 * ``NETDEV_REGISTER``
 * ``NETDEV_UP``
+* ``NETDEV_CHANGE``
 * ``NETDEV_XDP_FEAT_CHANGE``
 
 The following notifiers are running without the lock:
