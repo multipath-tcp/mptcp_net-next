@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-use-IPPROTO_MPTCP-for-getaddrinfo
+From: zhenwei pi <pizhenwei@bytedance.com>
+Subject: [PATCH] selftests: mptcp: use IPPROTO_MPTCP for getaddrinfo
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+mptcp_connect.c is a startup tutorial of MPTCP programming, however
+there is a lack of ai_protocol(IPPROTO_MPTCP) usage. Add comment for
+getaddrinfo MPTCP support.
+
+This patch first uses IPPROTO_MPTCP to get addrinfo, and if glibc
+version is too old, it falls back to using IPPROTO_TCP.
+
+v2:
+ - use IPPROTO_MPTCP for getaddrinfo
+
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: zhenwei pi <pizhenwei@bytedance.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
