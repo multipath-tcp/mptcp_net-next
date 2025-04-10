@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-drop-nlh-parameter-of-recv_nlmsg
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: diag: drop nlh parameter of recv_nlmsg
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+It's strange that 'nlh' variable is set to NULL in get_mptcpinfo() and then
+this NULL pointer is passed to recv_nlmsg(). In fact, this variable should
+be defined in recv_nlmsg(), not get_mptcpinfo().
+
+So this patch drops this useless 'nlh' parameter of recv_nlmsg() and define
+'nlh' variable in recv_nlmsg().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
