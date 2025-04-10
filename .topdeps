@@ -1,1 +1,1 @@
-t/selftests-mptcp-ignore-mptcp_diag-binary
+t/mptcp-pm-add-get_priority-interface
