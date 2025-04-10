@@ -1,1 +1,1 @@
-t/selftests-mptcp-diag-drop-nlh-parameter-of-recv_nlmsg
+t/selftests-mptcp-use-IPPROTO_MPTCP-for-getaddrinfo
