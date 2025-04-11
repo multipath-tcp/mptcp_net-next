@@ -389,6 +389,7 @@ instance lock.
 
 For devices with locked ops, currently only the following notifiers are
 running under the lock:
+* ``NETDEV_CHANGE``
 * ``NETDEV_REGISTER``
 * ``NETDEV_UP``
 * ``NETDEV_CHANGE``
