@@ -392,7 +392,6 @@ running under the lock:
 * ``NETDEV_CHANGE``
 * ``NETDEV_REGISTER``
 * ``NETDEV_UP``
-* ``NETDEV_CHANGE``
 * ``NETDEV_XDP_FEAT_CHANGE``
 
 The following notifiers are running without the lock:
