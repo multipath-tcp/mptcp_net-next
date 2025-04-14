@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-Defer-freeing-of-MPTCP-userspace-path-manager-entries
+From: Mat Martineau <martineau@kernel.org>
+Subject: [PATCH] mptcp: pm: Defer freeing of MPTCP userspace path manager entries
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When path manager entries are deleted from the local address list, they
+are first unlinked from the address list using list_del_rcu(). The
+entries must not be freed until after the RCU grace period, but the
+existing code immediately frees the entry.
+
+Use kfree_rcu_mightsleep() and adjust sk_omem_alloc in open code instead
+of using the sock_kfree_s() helper. This code path is only called in a
+netlink handler, so the "might sleep" function is preferable to adding
+a rarely-used rcu_head member to struct mptcp_pm_addr_entry.
+
+Fixes: 88d097316371 ("mptcp: drop free_list for deleting entries")
+Signed-off-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
