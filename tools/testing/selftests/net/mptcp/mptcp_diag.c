@@ -91,10 +91,9 @@ static void send_query(int fd, struct inet_diag_req_v2 *r)
 		.iov_base = &req,
 		.iov_len = sizeof(req)
 	};
-	iov[iovlen] = (struct iovec){ &rta_proto, sizeof(rta_proto)};
-	iov[iovlen + 1] = (struct iovec){ &proto, sizeof(proto)};
+	iov[iovlen++] = (struct iovec){ &rta_proto, sizeof(rta_proto)};
+	iov[iovlen++] = (struct iovec){ &proto, sizeof(proto)};
 	req.nlh.nlmsg_len += RTA_LENGTH(sizeof(proto));
-	iovlen += 2;
 	struct msghdr msg = {
 		.msg_name = &nladdr,
 		.msg_namelen = sizeof(nladdr),
