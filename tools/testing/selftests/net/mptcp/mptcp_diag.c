@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <linux/tcp.h>
+#include <arpa/inet.h>
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -19,8 +20,13 @@
 #define IPPROTO_MPTCP 262
 #endif
 
+#define parse_rtattr_nested(tb, max, rta) \
+	(parse_rtattr_flags((tb), (max), RTA_DATA(rta), RTA_PAYLOAD(rta), \
+			    NLA_F_NESTED))
+
 struct params {
 	__u32 target_token;
+	char subflow_addr[1024];
 };
 
 struct mptcp_info {
@@ -58,7 +64,9 @@ static void die_perror(const char *msg)
 
 static void die_usage(int r)
 {
-	fprintf(stderr, "Usage: mptcp_diag -t\n");
+	fprintf(stderr, "Usage:\n"
+			"mptcp_diag -t <token>\n"
+			"mptcp_diag -s \"<saddr> <sport> <daddr> <dport>\"\n");
 	exit(r);
 }
 
@@ -182,6 +190,21 @@ static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto)
 		}
 		print_info_msg(info);
 	}
+	if (proto == IPPROTO_TCP && tb[INET_DIAG_ULP_INFO]) {
+		struct rtattr *ulpinfo[INET_ULP_INFO_MAX + 1] = { 0 };
+
+		parse_rtattr_nested(ulpinfo, INET_ULP_INFO_MAX,
+				    tb[INET_DIAG_ULP_INFO]);
+
+		if (ulpinfo[INET_ULP_INFO_MPTCP]) {
+			struct rtattr *sfinfo[MPTCP_SUBFLOW_ATTR_MAX + 1] = { 0 };
+
+			parse_rtattr_nested(sfinfo, MPTCP_SUBFLOW_ATTR_MAX,
+					    ulpinfo[INET_ULP_INFO_MPTCP]);
+		} else {
+			printf("It's a normal TCP!\n");
+		}
+	}
 }
 
 static void recv_nlmsg(int fd, __u32 proto)
@@ -244,6 +267,41 @@ static void get_mptcpinfo(__u32 token)
 	close(fd);
 }
 
+static void get_subflow_info(char *subflow_addr)
+{
+	struct inet_diag_req_v2 r = {
+		.sdiag_family           = AF_INET,
+		.sdiag_protocol         = IPPROTO_TCP,
+	};
+	int sport, dport;
+	char saddr[64];	// Take ipv6 into consideration
+	char daddr[64];
+	int ret;
+	int fd;
+
+	ret = sscanf(subflow_addr, "%s %d %s %d", saddr, &sport, daddr, &dport);
+	if (ret != 4)
+		die_perror("IP PORT Pairs has style problems!");
+
+	printf("%s:%d -> %s:%d\n", saddr, sport, daddr, dport);
+
+	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG);
+	if (fd < 0)
+		die_perror("Netlink socket");
+
+	r.id.idiag_cookie[0] = INET_DIAG_NOCOOKIE;
+	r.id.idiag_cookie[1] = INET_DIAG_NOCOOKIE;
+	r.id.idiag_sport = htons(sport);
+	r.id.idiag_dport = htons(dport);
+	r.id.idiag_if = 0;
+
+	inet_pton(AF_INET, saddr, &r.id.idiag_src);
+	inet_pton(AF_INET, daddr, &r.id.idiag_dst);
+	r.idiag_ext |= (1 << (INET_DIAG_INFO - 1));
+	send_query(fd, &r, IPPROTO_TCP);
+	recv_nlmsg(fd, IPPROTO_TCP);
+}
+
 static void parse_opts(int argc, char **argv, struct params *p)
 {
 	int c;
@@ -251,13 +309,16 @@ static void parse_opts(int argc, char **argv, struct params *p)
 	if (argc < 2)
 		die_usage(1);
 
-	while ((c = getopt(argc, argv, "ht:")) != -1) {
+	while ((c = getopt(argc, argv, "ht:s:")) != -1) {
 		switch (c) {
 		case 'h':
 			die_usage(0);
 			break;
 		case 't':
 			sscanf(optarg, "%x", &p->target_token);
+			break;
+		case 's':
+			snprintf(p->subflow_addr, strlen(optarg) + 1, "%s", optarg);
 			break;
 		default:
 			die_usage(1);
@@ -274,6 +335,9 @@ int main(int argc, char *argv[])
 
 	if (p.target_token)
 		get_mptcpinfo(p.target_token);
+
+	if (strlen(p.subflow_addr) != 0)
+		get_subflow_info(p.subflow_addr);
 
 	return 0;
 }
