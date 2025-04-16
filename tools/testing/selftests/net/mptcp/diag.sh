@@ -225,6 +225,60 @@ chk_dump_one()
 	fi
 }
 
+get_endpoint_addr()
+{
+	echo $1 | cut -d ":" -f 1
+}
+
+get_endpoint_port()
+{
+	echo $1 | cut -d ":" -f 2
+}
+
+chk_dump_subflow()
+{
+	local inet_diag_token
+	local subflow_line
+	local remote_addr
+	local remote_port
+	local local_addr
+	local local_port
+	local ss_token
+	local msg
+
+	subflow_line=$(ss -tnN $ns | \
+		       grep -m1 -Eo '[0-9.]+:[0-9].+ +[0-9.]+:[0-9.]+')
+
+	if [ -n "$subflow_line" ]; then
+		read -r local_endpoint remote_endpoint <<< $subflow_line
+
+		local_addr=$(get_endpoint_addr $local_endpoint)
+		local_port=$(get_endpoint_port $local_endpoint)
+
+		remote_addr=$(get_endpoint_addr $remote_endpoint)
+		remote_port=$(get_endpoint_port $remote_endpoint)
+	fi
+
+	ss_token=$(ss -tniN $ns | \
+		   grep -m1 -Eo 'token:[^ ]+')
+
+	inet_diag_token=$(ip netns exec $ns ./mptcp_diag -s \
+			  "$local_addr $local_port $remote_addr $remote_port" | \
+			  grep -Eo 'token:[^ ]+')
+
+	msg="....chk dump_subflow"
+
+	mptcp_lib_print_title "$msg"
+	if [[ $ss_token == $inet_diag_token ]]; then
+		mptcp_lib_pr_ok
+		mptcp_lib_result_pass "${msg}"
+	else
+		mptcp_lib_pr_fail "expected $ss_token but $inet_diag_token"
+		mptcp_lib_result_fail "${msg}"
+		ret=${KSFT_FAIL}
+	fi
+}
+
 msk_info_get_value()
 {
 	local port="${1}"
@@ -316,6 +370,7 @@ chk_msk_fallback_nr 0 "....chk no fallback"
 chk_msk_inuse 2
 chk_msk_cestab 2
 chk_dump_one
+chk_dump_subflow
 flush_pids
 
 chk_msk_inuse 0 "2->0"
