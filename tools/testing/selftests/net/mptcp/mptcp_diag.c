@@ -62,7 +62,7 @@ static void die_usage(int r)
 	exit(r);
 }
 
-static void send_query(int fd, struct inet_diag_req_v2 *r)
+static void send_query(int fd, struct inet_diag_req_v2 *r, __u32 proto)
 {
 	struct sockaddr_nl nladdr = {
 		.nl_family = AF_NETLINK
@@ -81,19 +81,21 @@ static void send_query(int fd, struct inet_diag_req_v2 *r)
 	struct rtattr rta_proto;
 	struct iovec iov[6];
 	int iovlen = 1;
-	__u32 proto;
-
-	proto = IPPROTO_MPTCP;
-	rta_proto.rta_type = INET_DIAG_REQ_PROTOCOL;
-	rta_proto.rta_len = RTA_LENGTH(sizeof(proto));
 
 	iov[0] = (struct iovec) {
 		.iov_base = &req,
 		.iov_len = sizeof(req)
 	};
-	iov[iovlen++] = (struct iovec){ &rta_proto, sizeof(rta_proto)};
-	iov[iovlen++] = (struct iovec){ &proto, sizeof(proto)};
-	req.nlh.nlmsg_len += RTA_LENGTH(sizeof(proto));
+
+	if (proto == IPPROTO_MPTCP) {
+		rta_proto.rta_type = INET_DIAG_REQ_PROTOCOL;
+		rta_proto.rta_len = RTA_LENGTH(sizeof(proto));
+
+		iov[iovlen++] = (struct iovec){ &rta_proto, sizeof(rta_proto)};
+		iov[iovlen++] = (struct iovec){ &proto, sizeof(proto)};
+		req.nlh.nlmsg_len += RTA_LENGTH(sizeof(proto));
+	}
+
 	struct msghdr msg = {
 		.msg_name = &nladdr,
 		.msg_namelen = sizeof(nladdr),
@@ -157,7 +159,7 @@ static void print_info_msg(struct mptcp_info *info)
 	printf("bytes_acked:      %llu\n", info->mptcpi_bytes_acked);
 }
 
-static void parse_nlmsg(struct nlmsghdr *nlh)
+static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto)
 {
 	struct inet_diag_msg *r = NLMSG_DATA(nlh);
 	struct rtattr *tb[INET_DIAG_MAX + 1];
@@ -166,7 +168,7 @@ static void parse_nlmsg(struct nlmsghdr *nlh)
 			   nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*r)),
 			   NLA_F_NESTED);
 
-	if (tb[INET_DIAG_INFO]) {
+	if (proto == IPPROTO_MPTCP && tb[INET_DIAG_INFO]) {
 		int len = RTA_PAYLOAD(tb[INET_DIAG_INFO]);
 		struct mptcp_info *info;
 
@@ -182,7 +184,7 @@ static void parse_nlmsg(struct nlmsghdr *nlh)
 	}
 }
 
-static void recv_nlmsg(int fd)
+static void recv_nlmsg(int fd, __u32 proto)
 {
 	char rcv_buff[8192];
 	struct nlmsghdr *nlh = (struct nlmsghdr *)rcv_buff;
@@ -215,7 +217,7 @@ static void recv_nlmsg(int fd)
 			       -(err->error), strerror(-(err->error)));
 			break;
 		}
-		parse_nlmsg(nlh);
+		parse_nlmsg(nlh, proto);
 		nlh = NLMSG_NEXT(nlh, len);
 	}
 }
@@ -228,6 +230,7 @@ static void get_mptcpinfo(__u32 token)
 		.sdiag_protocol         = IPPROTO_TCP,
 		.id.idiag_cookie[0]     = token,
 	};
+	__u32 proto = IPPROTO_MPTCP;
 	int fd;
 
 	fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG);
@@ -235,8 +238,8 @@ static void get_mptcpinfo(__u32 token)
 		die_perror("Netlink socket");
 
 	r.idiag_ext |= (1 << (INET_DIAG_INFO - 1));
-	send_query(fd, &r);
-	recv_nlmsg(fd);
+	send_query(fd, &r, proto);
+	recv_nlmsg(fd, proto);
 
 	close(fd);
 }
