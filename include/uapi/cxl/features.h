@@ -13,8 +13,13 @@ typedef unsigned char __uapi_uuid_t[16];
 
 #ifdef __KERNEL__
 #include <linux/uuid.h>
-static_assert(sizeof(__uapi_uuid_t) == sizeof(uuid_t) &&
-	      __alignof__(__uapi_uuid_t) == __alignof__(uuid_t));
+/*
+ * Note, __uapi_uuid_t is 1-byte aligned on modern compilers and 4-byte
+ * aligned on others. Ensure that __uapi_uuid_t in a struct is placed at
+ * a 4-byte aligned offset, or the structure is packed, to ensure
+ * consistent padding.
+ */
+static_assert(sizeof(__uapi_uuid_t) == sizeof(uuid_t));
 #define __uapi_uuid_t uuid_t
 #endif
 
