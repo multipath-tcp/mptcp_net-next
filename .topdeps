@@ -1,1 +1,1 @@
-t/selftests-mptcp-info-hide-grep-write-error-warnings
+t/selftests-mptcp-sockopt-use-IPPROTO_MPTCP-for-getaddrinfo
