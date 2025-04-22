@@ -798,6 +798,24 @@ unlock:
 	return ret;
 }
 
+static int mptcp_setsockopt_sol_tcp_maxseg(struct mptcp_sock *msk,
+					   sockptr_t optval,
+					   unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		int ret;
+
+		ret = tcp_setsockopt(ssk, SOL_TCP, TCP_MAXSEG, optval, optlen);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 				    sockptr_t optval, unsigned int optlen)
 {
@@ -819,6 +837,8 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 	case TCP_FASTOPEN_NO_COOKIE:
 		return mptcp_setsockopt_first_sf_only(msk, SOL_TCP, optname,
 						      optval, optlen);
+	case TCP_MAXSEG:
+		return mptcp_setsockopt_sol_tcp_maxseg(msk, optval, optlen);
 	}
 
 	ret = mptcp_get_int_option(msk, optval, optlen, &val);
@@ -1368,6 +1388,13 @@ static int mptcp_put_int_option(struct mptcp_sock *msk, char __user *optval,
 	return 0;
 }
 
+static int mptcp_getsockopt_sol_tcp_maxseg(struct mptcp_sock *msk,
+					   char __user *optval,
+					   int __user *optlen)
+{
+	return tcp_getsockopt(msk->first, SOL_TCP, TCP_MAXSEG, optval, optlen);
+}
+
 static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 				    char __user *optval, int __user *optlen)
 {
@@ -1407,6 +1434,8 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		return mptcp_put_int_option(msk, optval, optlen, msk->notsent_lowat);
 	case TCP_IS_MPTCP:
 		return mptcp_put_int_option(msk, optval, optlen, 1);
+	case TCP_MAXSEG:
+		return mptcp_getsockopt_sol_tcp_maxseg(msk, optval, optlen);
 	}
 	return -EOPNOTSUPP;
 }
