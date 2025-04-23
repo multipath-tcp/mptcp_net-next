@@ -697,6 +697,26 @@ static int xaccept(int s)
 	return fd;
 }
 
+static void test_tcp_maxseg_sockopt(int fd)
+{
+	int maxseg = 1000;
+	socklen_t s;
+	int r;
+
+	s = sizeof(maxseg);
+	r = setsockopt(fd, IPPROTO_TCP, TCP_MAXSEG, &maxseg, s);
+	if (r != 0)
+		die_perror("setsockopt TCP_MAXSEG");
+
+	maxseg = 0;
+	r = getsockopt(fd, IPPROTO_TCP, TCP_MAXSEG, &maxseg, &s);
+	if (r != -1 && errno != EINVAL)
+		die_perror("getsockopt TCP_MAXSEG did not indicate -EINVAL");
+
+	if (maxseg != 1000)
+		xerror("maxseg=%d", maxseg);
+}
+
 static int server(int pipefd)
 {
 	int fd = -1, r;
@@ -720,6 +740,8 @@ static int server(int pipefd)
 	r = xaccept(fd);
 
 	process_one_client(r, pipefd);
+
+	test_tcp_maxseg_sockopt(fd);
 
 	return 0;
 }
