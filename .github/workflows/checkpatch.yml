@@ -12,8 +12,9 @@ on:
       - 'patchew/**'     # patchew is using tags
 
 env:
-  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10 --user-agent 'mptcp-ci/1.0 (matttbe@kernel.org)'"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
   PW: "https://patchwork.kernel.org/api/1.2"
+  PW_AGENT: "mptcp-ci/1.0 (matttbe@kernel.org)"
   CHECKPATCH_RESULTS: "./checkpatch-results.txt"
   CHECKPATCH_DETAILS: "./checkpatch-details.txt"
   SHELLCHECK_RESULTS: "./shellcheck-results.txt"
@@ -87,13 +88,14 @@ jobs:
         run: |
           # $1: mid, $2: status, $3: desc, $4: context
           _send() { local check_url
-            check_url="$(curl "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
+            check_url="$(curl ${CURL_OPT} -A "${PW_AGENT}" "${URL_PW}${1}" | jq -r 'last(.[].checks)')"
             if [ -z "${check_url}" ] || [ "${check_url}" = "null" ]; then
               echo "URL not found: '${check_url}' '${URL_PW}${1}'"
               return 1
             fi
 
             curl ${CURL_OPT} \
+              -A "${PW_AGENT}" \
               -X POST \
               -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
               -F "state=${2}" \
@@ -117,7 +119,7 @@ jobs:
                 sleep 1m
               done
 
-              curl "${URL_PW}${1}"
+              curl ${CURL_OPT} -A "${PW_AGENT}" "${URL_PW}${1}"
               return 1
             else
               _send "${@}"
