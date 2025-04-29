@@ -1,1 +1,0 @@
-t/selftests-mptcp-sockopt-use-IPPROTO_MPTCP-for-getaddrinfo
