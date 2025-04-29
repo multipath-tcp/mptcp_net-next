@@ -341,6 +341,9 @@ jobs:
           {
             echo ''
             echo '## Coverage (All)'
+            echo 'Branch: ${{ github.ref_name }}'
+            echo 'Tag: ${{ steps.tag.outputs.tag }}'
+            echo 'Summary:'
             echo '```'
             tail -n4 genhtml.log
             echo '```'
