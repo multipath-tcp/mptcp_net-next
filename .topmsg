@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-refactor-send_query-parameters-for-code-clarity
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: refactor send_query parameters for code clarity
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch use 'inet_diag_req_v2' instead of 'token' as parameters of
+send_query, and construct the req in 'get_mptcpinfo'.
+
+This modification enhances the clarity of the code, and prepare for the
+dump_subflow_info.
+
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
