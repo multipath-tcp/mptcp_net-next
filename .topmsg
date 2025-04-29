@@ -1,4 +1,24 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-helpers-to-get-subflow_info
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add helpers to get subflow_info
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds 'get_subflow_info' in 'mptcp_diag', which can check whether
+a TCP connection is an MPTCP subflow based on the "INET_ULP_INFO_MPTCP"
+with tcp_diag method.
+
+The helper 'print_subflow_info' in 'mptcp_diag' can print the subflow_filed
+of an MPTCP subflow for further checking the 'subflow_info' through
+inet_diag method.
+
+The example of the whole output should be:
+
+'''
+127.0.0.1:10000 -> 127.0.0.1:38984
+It's a mptcp subflow, the subflow info:
+ flags:Mec token:0000(id:0)/4278e77e(id:0) seq:9288466187236176036 \
+ sfseq:1 ssnoff:2317083055 maplen:215
+'''
+
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
