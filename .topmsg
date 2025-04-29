@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-chk_sublfow-in-diag.sh
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add chk_sublfow in diag.sh
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch aims to add chk_dump_subflow in diag.sh. The subflow's
+info can be obtained through "ss -tin", then use the 'mptcp_diag'
+to verify the token in subflow_info.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/524
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
