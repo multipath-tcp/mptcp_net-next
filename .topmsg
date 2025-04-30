@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-add-tcp_sock_set_maxseg
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] tcp: add tcp_sock_set_maxseg
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Add a helper tcp_sock_set_maxseg() to directly set the TCP_MAXSEG sockopt
+from kernel space.
+
+This new helper will be used in the following patch.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Acked-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
