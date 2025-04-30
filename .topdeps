@@ -1,1 +1,1 @@
-t/mptcp-sockopt-drop-redundant-tcp_getsockopt
+t/mptcp-add-TCP_MAXSEG-sockopt-support
