@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-Align-mptcp_inet6_sk-with-other-protocols
+From: Pedro Falcato <pfalcato@suse.de>
+Subject: [PATCH] mptcp: Align mptcp_inet6_sk with other protocols
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Ever since commit f5f80e32de12 ("ipv6: remove hard coded limitation on
+ipv6_pinfo") that protocols stopped using the old "obj_size -
+sizeof(struct ipv6_pinfo)" way of grabbing ipv6_pinfo, that severely
+restricted struct layout and caused fun, hard to see issues.
+
+However, mptcp_inet6_sk wasn't fixed (unlike tcp_inet6_sk). Do so.
+The non-cloned sockets already do the right thing using
+ipv6_pinfo_offset + the generic IPv6 code.
+
+Signed-off-by: Pedro Falcato <pfalcato@suse.de>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
