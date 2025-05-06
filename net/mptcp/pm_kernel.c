@@ -1340,22 +1340,14 @@ bool mptcp_pm_nl_check_work_pending(struct mptcp_sock *msk)
 }
 
 /* Called under PM lock */
-void __mptcp_pm_kernel_worker(struct mptcp_sock *msk)
+void __mptcp_pm_kernel_worker(struct mptcp_sock *msk, u8 status)
 {
-	struct mptcp_pm_data *pm = &msk->pm;
-
-	if (pm->status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED)) {
-		pm->status &= ~BIT(MPTCP_PM_ADD_ADDR_RECEIVED);
+	if (status & BIT(MPTCP_PM_ADD_ADDR_RECEIVED))
 		mptcp_pm_nl_add_addr_received(msk);
-	}
-	if (pm->status & BIT(MPTCP_PM_ESTABLISHED)) {
-		pm->status &= ~BIT(MPTCP_PM_ESTABLISHED);
+	if (status & BIT(MPTCP_PM_ESTABLISHED))
 		mptcp_pm_nl_fully_established(msk);
-	}
-	if (pm->status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED)) {
-		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_ESTABLISHED);
+	if (status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED))
 		mptcp_pm_nl_subflow_established(msk);
-	}
 }
 
 static int __net_init pm_nl_init_net(struct net *net)
