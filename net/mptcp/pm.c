@@ -534,7 +534,7 @@ void mptcp_pm_subflow_established(struct mptcp_sock *msk)
 
 	pr_debug("msk=%p\n", msk);
 
-	if (!READ_ONCE(pm->work_pending))
+	if (!READ_ONCE(pm->work_pending) || !pm->ops->subflow_established)
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -561,7 +561,8 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 		return;
 	}
 
-	if (!READ_ONCE(pm->work_pending) && !update_subflows)
+	if (!pm->ops->subflow_established ||
+	    (!READ_ONCE(pm->work_pending) && !update_subflows))
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -619,7 +620,7 @@ void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
 
 	pr_debug("msk=%p\n", msk);
 
-	if (!READ_ONCE(pm->work_pending))
+	if (!READ_ONCE(pm->work_pending) || !pm->ops->subflow_established)
 		return;
 
 	spin_lock_bh(&pm->lock);
@@ -959,6 +960,8 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	}
 	if (status & BIT(MPTCP_PM_ESTABLISHED))
 		pm->ops->established(msk);
+	if (status & BIT(MPTCP_PM_SUBFLOW_ESTABLISHED))
+		pm->ops->subflow_established(msk);
 	spin_lock_bh(&msk->pm.lock);
 	__mptcp_pm_kernel_worker(msk, status);
 
