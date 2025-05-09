@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/Revert-kbuild-make-all-file-references-relative-to-source-root
+Subject: [PATCH] Revert "kbuild: make all file references relative to source root"
 
+This reverts commit cacd22ce69585a91c386243cd662ada962431e63.
+
+This causes issues with GCOV, objdump -S and all tools using it or
+reading the same thing, e.g. addr2line, decode_stacktrace.sh, etc.
+
+The author asked to have this patch reverted.
+
+Link: https://lore.kernel.org/5e996ded-2325-48b5-9cde-972b70e0934a@t-8ch.de
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
