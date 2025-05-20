@@ -48,7 +48,7 @@ int iters_subflow(struct bpf_sockopt *ctx)
 		goto out;
 
 	/* only to check the following kfunc works */
-	subflow = bpf_mptcp_subflow_ctx(ssk);
+	subflow = mptcp_subflow_ctx(ssk);
 	if (!subflow || subflow->token != msk->token)
 		goto out;
 

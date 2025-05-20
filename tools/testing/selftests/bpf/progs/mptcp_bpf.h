@@ -39,6 +39,16 @@ mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 	return subflow->tcp_sock;
 }
 
+static __always_inline struct mptcp_subflow_context *
+mptcp_subflow_ctx(const struct sock *sk)
+{
+	const struct inet_connection_sock *
+		icsk = bpf_core_cast(sk, struct inet_connection_sock);
+
+	/* Use RCU on icsk_ulp_data only for sock diag code */
+	return bpf_core_cast(icsk->icsk_ulp_data, struct mptcp_subflow_context);
+}
+
 /* ksym */
 extern struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx(const struct sock *sk) __ksym;
