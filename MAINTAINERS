@@ -646,6 +646,13 @@ F:	drivers/iio/accel/adxl380.h
 F:	drivers/iio/accel/adxl380_i2c.c
 F:	drivers/iio/accel/adxl380_spi.c
 
+AEONSEMI PHY DRIVER
+M:	Christian Marangi <ansuelsmth@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/aeonsemi,as21xxx.yaml
+F:	drivers/net/phy/as21xxx.c
+
 AF8133J THREE-AXIS MAGNETOMETER DRIVER
 M:	Ondřej Jirman <megi@xff.cz>
 S:	Maintained
@@ -10955,6 +10962,13 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 F:	Documentation/networking/device_drivers/ethernet/huawei/hinic.rst
 F:	drivers/net/ethernet/huawei/hinic/
+
+HUAWEI 3RD GEN ETHERNET DRIVER
+M:	Fan Gong <gongfan1@huawei.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/networking/device_drivers/ethernet/huawei/hinic3.rst
+F:	drivers/net/ethernet/huawei/hinic3/
 
 HUAWEI MATEBOOK E GO EMBEDDED CONTROLLER DRIVER
 M:	Pengyu Luo <mitltlatltl@gmail.com>
