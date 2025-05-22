@@ -3956,6 +3956,58 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	return mask;
 }
 
+static int mptcp_read_sock(struct sock *sk, read_descriptor_t *desc,
+			   sk_read_actor_t recv_actor)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct scm_timestamping_internal tss;
+	struct sk_buff *skb, *tmp;
+	size_t len = INT_MAX;
+	int copied = 0;
+
+	skb_queue_walk_safe(&sk->sk_receive_queue, skb, tmp) {
+		u32 offset = MPTCP_SKB_CB(skb)->offset;
+		u32 data_len = skb->len - offset;
+		u32 count = min_t(size_t, len - copied, data_len);
+		int used;
+
+		used = recv_actor(desc, skb, offset, count);
+		if (used <= 0) {
+			if (!copied)
+				copied = used;
+			break;
+		}
+
+		if (MPTCP_SKB_CB(skb)->has_rxtstamp)
+			tcp_update_recv_tstamps(skb, &tss);
+
+		copied += used;
+
+		if (used < data_len) {
+			MPTCP_SKB_CB(skb)->offset += used;
+			MPTCP_SKB_CB(skb)->map_seq += used;
+			msk->bytes_consumed += used;
+			break;
+		}
+
+		skb->destructor = NULL;
+		atomic_sub(skb->truesize, &sk->sk_rmem_alloc);
+		sk_mem_uncharge(sk, skb->truesize);
+		sk_eat_skb(sk, skb);
+		msk->bytes_consumed += used;
+
+		if (copied >= len)
+			break;
+	}
+
+	mptcp_rcv_space_adjust(msk, copied);
+
+	if (copied > 0)
+		mptcp_cleanup_rbuf(msk, copied);
+
+	return copied;
+}
+
 static const struct proto_ops mptcp_stream_ops = {
 	.family		   = PF_INET,
 	.owner		   = THIS_MODULE,
@@ -3976,6 +4028,7 @@ static const struct proto_ops mptcp_stream_ops = {
 	.recvmsg	   = inet_recvmsg,
 	.mmap		   = sock_no_mmap,
 	.set_rcvlowat	   = mptcp_set_rcvlowat,
+	.read_sock	   = mptcp_read_sock,
 };
 
 static struct inet_protosw mptcp_protosw = {
@@ -4080,6 +4133,7 @@ static const struct proto_ops mptcp_v6_stream_ops = {
 	.compat_ioctl	   = inet6_compat_ioctl,
 #endif
 	.set_rcvlowat	   = mptcp_set_rcvlowat,
+	.read_sock	   = mptcp_read_sock,
 };
 
 static struct proto mptcp_v6_prot;
