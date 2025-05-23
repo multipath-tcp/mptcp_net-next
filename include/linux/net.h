@@ -254,6 +254,8 @@ bool sock_is_registered(int family);
 int sock_create(int family, int type, int proto, struct socket **res);
 int __sock_create_kern(struct net *net, int family, int type, int proto,
 		       struct socket **res);
+int sock_create_kern(struct net *net, int family, int type, int proto,
+		     struct socket **res);
 int sock_create_lite(int family, int type, int proto, struct socket **res);
 struct socket *sock_alloc(void);
 void sock_release(struct socket *sock);
