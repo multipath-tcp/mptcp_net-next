@@ -1756,9 +1756,9 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 		queue->cmnd_capsule_len = sizeof(struct nvme_command) +
 						NVME_TCP_ADMIN_CCSZ;
 
-	ret = __sock_create_kern(current->nsproxy->net_ns,
-				 ctrl->addr.ss_family, SOCK_STREAM,
-				 IPPROTO_TCP, &queue->sock);
+	ret = sock_create_kern(current->nsproxy->net_ns,
+			       ctrl->addr.ss_family, SOCK_STREAM,
+			       IPPROTO_TCP, &queue->sock);
 	if (ret) {
 		dev_err(nctrl->device,
 			"failed to create socket: %d\n", ret);
@@ -1771,7 +1771,6 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 		goto err_destroy_mutex;
 	}
 
-	sk_net_refcnt_upgrade(queue->sock->sk);
 	nvme_tcp_reclassify_socket(queue->sock);
 
 	/* Single syn retry */
