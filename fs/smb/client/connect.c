@@ -3359,6 +3359,7 @@ generic_ip_connect(struct TCP_Server_Info *server)
 
 		sk = server->ssocket->sk;
 		__netns_tracker_free(net, &sk->ns_tracker, false);
+		net_passive_dec(net);
 		sk->sk_net_refcnt = 1;
 		get_net_track(net, &sk->ns_tracker, GFP_KERNEL);
 		sock_inuse_add(net, 1);
