@@ -1007,8 +1007,8 @@ p9_fd_create_tcp(struct p9_client *client, const char *addr, char *args)
 	client->trans_opts.tcp.port = opts.port;
 	client->trans_opts.tcp.privport = opts.privport;
 
-	err = sock_create_kern(current->nsproxy->net_ns, stor.ss_family,
-			       SOCK_STREAM, IPPROTO_TCP, &csocket);
+	err = __sock_create_kern(current->nsproxy->net_ns, stor.ss_family,
+				 SOCK_STREAM, IPPROTO_TCP, &csocket);
 	if (err) {
 		pr_err("%s (%d): problem creating socket\n",
 		       __func__, task_pid_nr(current));
@@ -1058,8 +1058,8 @@ p9_fd_create_unix(struct p9_client *client, const char *addr, char *args)
 
 	sun_server.sun_family = PF_UNIX;
 	strcpy(sun_server.sun_path, addr);
-	err = sock_create_kern(current->nsproxy->net_ns, PF_UNIX,
-			       SOCK_STREAM, 0, &csocket);
+	err = __sock_create_kern(current->nsproxy->net_ns, PF_UNIX,
+				 SOCK_STREAM, 0, &csocket);
 	if (err < 0) {
 		pr_err("%s (%d): problem creating socket\n",
 		       __func__, task_pid_nr(current));

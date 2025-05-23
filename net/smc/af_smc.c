@@ -3331,8 +3331,8 @@ int smc_create_clcsk(struct net *net, struct sock *sk, int family)
 	struct smc_sock *smc = smc_sk(sk);
 	int rc;
 
-	rc = sock_create_kern(net, family, SOCK_STREAM, IPPROTO_TCP,
-			      &smc->clcsock);
+	rc = __sock_create_kern(net, family, SOCK_STREAM, IPPROTO_TCP,
+				&smc->clcsock);
 	if (rc)
 		return rc;
 

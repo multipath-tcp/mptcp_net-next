@@ -1757,7 +1757,7 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	if (unlikely(!sk->sk_socket))
 		return -EINVAL;
 
-	err = sock_create_kern(net, family, SOCK_STREAM, IPPROTO_TCP, &sf);
+	err = __sock_create_kern(net, family, SOCK_STREAM, IPPROTO_TCP, &sf);
 	if (err)
 		return err;
 
@@ -1948,7 +1948,7 @@ static int subflow_ulp_init(struct sock *sk)
 	int err = 0;
 
 	/* disallow attaching ULP to a socket unless it has been
-	 * created with sock_create_kern()
+	 * created with __sock_create_kern()
 	 */
 	if (!sk->sk_kern_sock) {
 		err = -EOPNOTSUPP;

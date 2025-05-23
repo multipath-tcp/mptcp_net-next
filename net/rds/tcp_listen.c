@@ -278,8 +278,8 @@ struct socket *rds_tcp_listen_init(struct net *net, bool isv6)
 	int addr_len;
 	int ret;
 
-	ret = sock_create_kern(net, isv6 ? PF_INET6 : PF_INET, SOCK_STREAM,
-			       IPPROTO_TCP, &sock);
+	ret = __sock_create_kern(net, isv6 ? PF_INET6 : PF_INET, SOCK_STREAM,
+				 IPPROTO_TCP, &sock);
 	if (ret < 0) {
 		rdsdebug("could not create %s listener socket: %d\n",
 			 isv6 ? "IPv6" : "IPv4", ret);

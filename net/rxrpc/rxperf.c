@@ -188,8 +188,8 @@ static int rxperf_open_socket(void)
 	struct socket *socket;
 	int ret;
 
-	ret = sock_create_kern(&init_net, AF_RXRPC, SOCK_DGRAM, PF_INET6,
-			       &socket);
+	ret = __sock_create_kern(&init_net, AF_RXRPC, SOCK_DGRAM, PF_INET6,
+				 &socket);
 	if (ret < 0)
 		goto error_1;
 

@@ -804,8 +804,8 @@ __bpf_kfunc int bpf_kfunc_init_sock(struct init_sock_args *args)
 		goto out;
 	}
 
-	err = sock_create_kern(current->nsproxy->net_ns, args->af, args->type,
-			       proto, &sock);
+	err = __sock_create_kern(current->nsproxy->net_ns, args->af, args->type,
+				 proto, &sock);
 
 	if (!err)
 		/* Set timeout for call to kernel_connect() to prevent it from hanging,

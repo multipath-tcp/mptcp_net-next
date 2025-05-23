@@ -111,7 +111,7 @@ static struct inet_protosw smc_inet6_protosw = {
 static unsigned int smc_sync_mss(struct sock *sk, u32 pmtu)
 {
 	/* No need pass it through to clcsock, mss can always be set by
-	 * sock_create_kern or smc_setsockopt.
+	 * __sock_create_kern or smc_setsockopt.
 	 */
 	return 0;
 }

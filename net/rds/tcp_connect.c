@@ -112,12 +112,12 @@ int rds_tcp_conn_path_connect(struct rds_conn_path *cp)
 		return 0;
 	}
 	if (ipv6_addr_v4mapped(&conn->c_laddr)) {
-		ret = sock_create_kern(rds_conn_net(conn), PF_INET,
-				       SOCK_STREAM, IPPROTO_TCP, &sock);
+		ret = __sock_create_kern(rds_conn_net(conn), PF_INET,
+					 SOCK_STREAM, IPPROTO_TCP, &sock);
 		isv6 = false;
 	} else {
-		ret = sock_create_kern(rds_conn_net(conn), PF_INET6,
-				       SOCK_STREAM, IPPROTO_TCP, &sock);
+		ret = __sock_create_kern(rds_conn_net(conn), PF_INET6,
+					 SOCK_STREAM, IPPROTO_TCP, &sock);
 		isv6 = true;
 	}
 

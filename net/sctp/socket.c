@@ -1329,7 +1329,7 @@ static int __sctp_setsockopt_connectx(struct sock *sk, struct sockaddr *kaddrs,
 		return err;
 
 	/* in-kernel sockets don't generally have a file allocated to them
-	 * if all they do is call sock_create_kern().
+	 * if all they do is call __sock_create_kern().
 	 */
 	if (sk->sk_socket->file)
 		flags = sk->sk_socket->file->f_flags;
