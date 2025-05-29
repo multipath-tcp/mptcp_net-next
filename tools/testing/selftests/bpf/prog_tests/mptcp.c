@@ -590,6 +590,8 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	struct timespec start, end;
 	int server_fd, client_fd;
 	unsigned int delta_ms;
+	unsigned int rcvbuf;
+	socklen_t optlen;
 
 	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
 	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
@@ -602,7 +604,14 @@ static void send_data_and_verify(char *sched, bool addr1, bool addr2)
 	if (clock_gettime(CLOCK_MONOTONIC, &start) < 0)
 		goto fail;
 
-	if (!ASSERT_OK(send_recv_data(server_fd, client_fd, total_bytes),
+	optlen = sizeof(rcvbuf);
+	if (getsockopt(server_fd, SOL_SOCKET, SO_RCVBUF, &rcvbuf, &optlen) < 0)
+		goto fail;
+
+	if (setsockopt(server_fd, SOL_SOCKET, SO_SNDBUF, &rcvbuf, sizeof(rcvbuf)) < 0)
+		goto fail;
+
+	if (!ASSERT_OK(send_recv_data(server_fd, client_fd, total_bytes, rcvbuf),
 		       "send_recv_data"))
 		goto fail;
 
