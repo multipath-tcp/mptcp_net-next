@@ -12,7 +12,7 @@
 
 #ifdef CONFIG_AMD_NB
 
-#include <asm/amd_nb.h>
+#include <asm/amd/nb.h>
 
 #else
 
