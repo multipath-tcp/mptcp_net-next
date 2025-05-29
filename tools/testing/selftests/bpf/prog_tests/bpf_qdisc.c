@@ -35,7 +35,7 @@ static void do_test(char *qdisc)
 	if (!ASSERT_OK_FD(cli_fd, "connect to client"))
 		goto done;
 
-	err = send_recv_data(srv_fd, cli_fd, total_bytes);
+	err = send_recv_data(srv_fd, cli_fd, total_bytes, 0);
 	ASSERT_OK(err, "send_recv_data");
 
 done:

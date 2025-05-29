@@ -92,6 +92,17 @@ int settimeo(int fd, int timeout_ms)
 	return 0;
 }
 
+static int setsndbuf(int fd, uint32_t sndbuf)
+{
+	if (sndbuf > 0 &&
+	    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf))) {
+		log_err("Failed to set SO_SNDBUF");
+		return -1;
+	}
+
+	return 0;
+}
+
 #define save_errno_close(fd) ({ int __save = errno; close(fd); errno = __save; })
 
 int start_server_addr(int type, const struct sockaddr_storage *addr, socklen_t addrlen,
@@ -667,6 +678,7 @@ int set_hw_ring_size(char *ifname, struct ethtool_ringparam *ring_param)
 struct send_recv_arg {
 	int		fd;
 	uint32_t	bytes;
+	uint32_t	sndbuf;
 	int		stop;
 };
 
@@ -686,6 +698,11 @@ static void *send_recv_server(void *arg)
 	}
 
 	if (settimeo(fd, 0)) {
+		err = -errno;
+		goto done;
+	}
+
+	if (setsndbuf(fd, a->sndbuf)) {
 		err = -errno;
 		goto done;
 	}
@@ -718,12 +735,13 @@ done:
 	return NULL;
 }
 
-int send_recv_data(int lfd, int fd, uint32_t total_bytes)
+int send_recv_data(int lfd, int fd, uint32_t total_bytes, uint32_t sndbuf)
 {
 	ssize_t nr_recv = 0, bytes = 0;
 	struct send_recv_arg arg = {
 		.fd	= lfd,
 		.bytes	= total_bytes,
+		.sndbuf = sndbuf,
 		.stop	= 0,
 	};
 	pthread_t srv_thread;

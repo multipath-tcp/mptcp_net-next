@@ -70,7 +70,7 @@ static void do_test(const struct network_helper_opts *opts)
 	if (!start_test(NULL, opts, opts, &lfd, &fd))
 		goto done;
 
-	ASSERT_OK(send_recv_data(lfd, fd, total_bytes), "send_recv_data");
+	ASSERT_OK(send_recv_data(lfd, fd, total_bytes, 0), "send_recv_data");
 
 done:
 	if (lfd != -1)
@@ -169,7 +169,7 @@ static void test_dctcp(void)
 			!ASSERT_EQ(errno, ENOENT, "bpf_map_lookup_elem(sk_stg_map)"))
 		goto done;
 
-	ASSERT_OK(send_recv_data(lfd, fd, total_bytes), "send_recv_data");
+	ASSERT_OK(send_recv_data(lfd, fd, total_bytes, 0), "send_recv_data");
 	ASSERT_EQ(dctcp_skel->bss->stg_result, expected_stg, "stg_result");
 
 done:
