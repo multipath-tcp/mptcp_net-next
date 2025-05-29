@@ -148,6 +148,8 @@
 
 #include <linux/ethtool.h>
 
+#include <uapi/linux/pidfd.h>
+
 #include "dev.h"
 
 static DEFINE_MUTEX(proto_list_mutex);
@@ -1912,6 +1914,7 @@ int sk_getsockopt(struct sock *sk, int level, int optname,
 	{
 		struct pid *peer_pid;
 		struct file *pidfd_file = NULL;
+		unsigned int flags = 0;
 		int pidfd;
 
 		if (len > sizeof(pidfd))
@@ -1924,7 +1927,14 @@ int sk_getsockopt(struct sock *sk, int level, int optname,
 		if (!peer_pid)
 			return -ENODATA;
 
-		pidfd = pidfd_prepare(peer_pid, 0, &pidfd_file);
+		/* The use of PIDFD_STALE requires stashing of struct pid
+		 * on pidfs with pidfs_register_pid() and only AF_UNIX
+		 * were prepared for this.
+		 */
+		if (sk->sk_family == AF_UNIX)
+			flags = PIDFD_STALE;
+
+		pidfd = pidfd_prepare(peer_pid, flags, &pidfd_file);
 		put_pid(peer_pid);
 		if (pidfd < 0)
 			return pidfd;
@@ -3274,16 +3284,16 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 {
 	struct mem_cgroup *memcg = mem_cgroup_sockets_enabled ? sk->sk_memcg : NULL;
 	struct proto *prot = sk->sk_prot;
-	bool charged = false;
+	bool charged = true;
 	long allocated;
 
 	sk_memory_allocated_add(sk, amt);
 	allocated = sk_memory_allocated(sk);
 
 	if (memcg) {
-		if (!mem_cgroup_charge_skmem(memcg, amt, gfp_memcg_charge()))
+		charged = mem_cgroup_charge_skmem(memcg, amt, gfp_memcg_charge());
+		if (!charged)
 			goto suppress_allocation;
-		charged = true;
 	}
 
 	/* Under limit. */
@@ -3368,7 +3378,7 @@ suppress_allocation:
 
 	sk_memory_allocated_sub(sk, amt);
 
-	if (charged)
+	if (memcg && charged)
 		mem_cgroup_uncharge_skmem(memcg, amt);
 
 	return 0;
