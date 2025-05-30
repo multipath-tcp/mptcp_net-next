@@ -305,9 +305,6 @@ __bpf_kfunc_end_defs();
 BTF_KFUNCS_START(bpf_mptcp_common_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_ctx, KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_tcp_sock, KF_RET_NULL)
-BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
-BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
-BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
 BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
 BTF_ID_FLAGS(func, mptcp_subflow_active)
 BTF_ID_FLAGS(func, mptcp_set_timeout)
@@ -338,6 +335,31 @@ static const struct btf_kfunc_id_set bpf_mptcp_common_kfunc_set = {
 	.filter	= bpf_mptcp_common_kfunc_filter,
 };
 
+/* .filter is called sometimes before prog->aux->st_ops is set,
+ * then prog->aux->st_ops is NULL. If return -EACCES in this case,
+ * an error occur:
+ * 	bug: bad parent state for iter next call
+ */
+BTF_KFUNCS_START(bpf_mptcp_iter_kfunc_ids)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
+BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
+BTF_KFUNCS_END(bpf_mptcp_iter_kfunc_ids)
+
+static int bpf_mptcp_iter_kfunc_filter(const struct bpf_prog *prog, u32 kfunc_id)
+{
+	if (btf_id_set8_contains(&bpf_mptcp_iter_kfunc_ids, kfunc_id) &&
+	    prog->type != BPF_PROG_TYPE_STRUCT_OPS)
+		return -EACCES;
+	return 0;
+}
+
+static const struct btf_kfunc_id_set bpf_mptcp_iter_kfunc_set = {
+	.owner	= THIS_MODULE,
+	.set	= &bpf_mptcp_iter_kfunc_ids,
+	.filter	= bpf_mptcp_iter_kfunc_filter,
+};
+
 static int __init bpf_mptcp_kfunc_init(void)
 {
 	int ret;
@@ -345,6 +367,8 @@ static int __init bpf_mptcp_kfunc_init(void)
 	ret = register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
 					       &bpf_mptcp_common_kfunc_set);
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+					       &bpf_mptcp_iter_kfunc_set);
 #ifdef CONFIG_BPF_JIT
 	ret = ret ?: register_bpf_struct_ops(&bpf_mptcp_sched_ops, mptcp_sched_ops);
 #endif
