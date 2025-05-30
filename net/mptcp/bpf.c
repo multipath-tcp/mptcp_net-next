@@ -86,14 +86,25 @@ bpf_iter_mptcp_subflow_destroy(struct bpf_iter_mptcp_subflow *it)
 
 __bpf_kfunc_end_defs();
 
-BTF_KFUNCS_START(bpf_mptcp_common_kfunc_ids)
+BTF_KFUNCS_START(bpf_mptcp_iter_kfunc_ids)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_new, KF_ITER_NEW | KF_TRUSTED_ARGS)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_mptcp_subflow_destroy, KF_ITER_DESTROY)
-BTF_KFUNCS_END(bpf_mptcp_common_kfunc_ids)
+BTF_KFUNCS_END(bpf_mptcp_iter_kfunc_ids)
+
+static const struct btf_kfunc_id_set bpf_mptcp_iter_kfunc_set = {
+	.owner	= THIS_MODULE,
+	.set	= &bpf_mptcp_iter_kfunc_ids,
+};
 
 static int __init bpf_mptcp_kfunc_init(void)
 {
-	return register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
+	int ret;
+
+	ret = register_btf_fmodret_id_set(&bpf_mptcp_fmodret_set);
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+					       &bpf_mptcp_iter_kfunc_set);
+
+	return ret;
 }
 late_initcall(bpf_mptcp_kfunc_init);
