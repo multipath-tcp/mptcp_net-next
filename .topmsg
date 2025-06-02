@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-typos-in-comments
+From: moyuanhao <moyuanhao3676@163.com>
+Subject: [PATCH] mptcp: fix typos in comments
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch fixes the spelling mistakes in comments.
+greter -> greater
+
+Signed-off-by: moyuanhao <moyuanhao3676@163.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
