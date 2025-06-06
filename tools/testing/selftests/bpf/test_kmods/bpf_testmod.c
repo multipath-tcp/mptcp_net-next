@@ -385,7 +385,7 @@ int bpf_testmod_fentry_ok;
 
 noinline ssize_t
 bpf_testmod_test_read(struct file *file, struct kobject *kobj,
-		      struct bin_attribute *bin_attr,
+		      const struct bin_attribute *bin_attr,
 		      char *buf, loff_t off, size_t len)
 {
 	struct bpf_testmod_test_read_ctx ctx = {
@@ -417,7 +417,7 @@ bpf_testmod_test_read(struct file *file, struct kobject *kobj,
 
 	(void)bpf_testmod_test_arg_ptr_to_struct(&struct_arg1_2);
 
-	(void)trace_bpf_testmod_test_raw_tp_null(NULL);
+	(void)trace_bpf_testmod_test_raw_tp_null_tp(NULL);
 
 	bpf_testmod_test_struct_ops3();
 
@@ -435,14 +435,14 @@ bpf_testmod_test_read(struct file *file, struct kobject *kobj,
 	if (bpf_testmod_loop_test(101) > 100)
 		trace_bpf_testmod_test_read(current, &ctx);
 
-	trace_bpf_testmod_test_nullable_bare(NULL);
+	trace_bpf_testmod_test_nullable_bare_tp(NULL);
 
 	/* Magic number to enable writable tp */
 	if (len == 64) {
 		struct bpf_testmod_test_writable_ctx writable = {
 			.val = 1024,
 		};
-		trace_bpf_testmod_test_writable_bare(&writable);
+		trace_bpf_testmod_test_writable_bare_tp(&writable);
 		if (writable.early_ret)
 			return snprintf(buf, len, "%d\n", writable.val);
 	}
@@ -465,7 +465,7 @@ ALLOW_ERROR_INJECTION(bpf_testmod_test_read, ERRNO);
 
 noinline ssize_t
 bpf_testmod_test_write(struct file *file, struct kobject *kobj,
-		      struct bin_attribute *bin_attr,
+		      const struct bin_attribute *bin_attr,
 		      char *buf, loff_t off, size_t len)
 {
 	struct bpf_testmod_test_write_ctx ctx = {
@@ -474,7 +474,7 @@ bpf_testmod_test_write(struct file *file, struct kobject *kobj,
 		.len = len,
 	};
 
-	trace_bpf_testmod_test_write_bare(current, &ctx);
+	trace_bpf_testmod_test_write_bare_tp(current, &ctx);
 
 	return -EIO; /* always fail */
 }
@@ -567,7 +567,7 @@ static void testmod_unregister_uprobe(void)
 
 static ssize_t
 bpf_testmod_uprobe_write(struct file *file, struct kobject *kobj,
-			 struct bin_attribute *bin_attr,
+			 const struct bin_attribute *bin_attr,
 			 char *buf, loff_t off, size_t len)
 {
 	unsigned long offset = 0;
