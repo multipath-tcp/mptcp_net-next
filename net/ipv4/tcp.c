@@ -779,6 +779,12 @@ static int __tcp_splice_read(struct sock *sk, struct tcp_splice_state *tss)
 		.arg.data = tss,
 		.count	  = tss->len,
 	};
+	const struct proto_ops *ops;
+
+	ops = READ_ONCE(sk->sk_socket->ops);
+
+	if (likely(ops->read_sock))
+		return ops->read_sock(sk, &rd_desc, tcp_splice_data_recv);
 
 	return tcp_read_sock(sk, &rd_desc, tcp_splice_data_recv);
 }
