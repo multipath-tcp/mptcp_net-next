@@ -3946,6 +3946,25 @@ endpoint_tests()
 	fi
 }
 
+splice_tests()
+{
+	if reset "splice test"; then
+		mptcp_lib_pm_nl_set_limits $ns1 8 8
+		mptcp_lib_pm_nl_set_limits $ns2 8 8
+		mptcp_lib_pm_nl_add_endpoint $ns2 10.0.2.2 dev ns2eth2 flags subflow
+		mptcp_lib_pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		mptcp_lib_pm_nl_add_endpoint $ns2 10.0.4.2 dev ns2eth4 flags subflow
+
+		ip netns exec $ns1 ./mptcp_splice -l -o "$sout" -p 8080 &
+		local tests_pid=$!
+		sleep 1
+		ip netns exec $ns2 ./mptcp_splice -i "$cin" -a 10.0.1.1 -p 8080
+		mptcp_lib_kill_wait $tests_pid
+		check_transfer "$cin" "$sout" "file received by server" 1052
+		chk_join_nr 3 3 3
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -3994,6 +4013,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	L@splice_tests
 )
 
 all_tests_args=""
