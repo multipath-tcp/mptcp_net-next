@@ -339,8 +339,16 @@ do_transfer()
 	fi
 
 	if [ -n "$testmode" ]; then
-		extra_args+=" -m $testmode"
+		if [ ${testmode} = "splice" ]; then
+			# only use 'splice' mode for MPTCP tests
+			if [ ${cl_proto} = "MPTCP" ] && [ ${srv_proto} = "MPTCP" ]; then
+				extra_args+=" -m splice"
+			fi
+		else
+			extra_args+=" -m $testmode"
+		fi
 	fi
+
 
 	if [ -n "$extra_args" ] && $options_log; then
 		mptcp_lib_pr_info "extra options: $extra_args"
