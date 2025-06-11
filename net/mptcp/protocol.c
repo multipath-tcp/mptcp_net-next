@@ -3965,8 +3965,8 @@ static int mptcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct scm_timestamping_internal tss;
+	size_t len = sk->sk_rcvbuf;
 	struct sk_buff *skb, *tmp;
-	size_t len = INT_MAX;
 	int copied = 0;
 
 	if (sk->sk_state == TCP_LISTEN)
