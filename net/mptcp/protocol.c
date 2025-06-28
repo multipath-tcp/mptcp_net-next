@@ -1871,8 +1871,9 @@ do_error:
 
 static void mptcp_rcv_space_adjust(struct mptcp_sock *msk, int copied);
 
-static int __mptcp_recvmsg_mskq(struct sock *sk,
-				struct msghdr *msg,
+static int __mptcp_recvmsg_desc(struct sock *sk,
+				read_descriptor_t *desc,
+				sk_read_actor_t recv_actor,
 				size_t len, int flags,
 				struct scm_timestamping_internal *tss,
 				int *cmsg_flags)
@@ -1888,12 +1889,14 @@ static int __mptcp_recvmsg_mskq(struct sock *sk,
 		int err;
 
 		if (!(flags & MSG_TRUNC)) {
-			err = skb_copy_datagram_msg(skb, offset, msg, count);
-			if (unlikely(err < 0)) {
+			err = recv_actor(desc, skb, offset, count);
+			if (err <= 0) {
 				if (!copied)
 					return err;
 				break;
 			}
+			if (!WARN_ON_ONCE(err > count))
+				count = err;
 		}
 
 		if (MPTCP_SKB_CB(skb)->has_rxtstamp) {
@@ -1927,6 +1930,32 @@ static int __mptcp_recvmsg_mskq(struct sock *sk,
 
 	mptcp_rcv_space_adjust(msk, copied);
 	return copied;
+}
+
+static int mptcp_recvmsg_actor(read_descriptor_t *rd_desc, struct sk_buff *skb,
+			       unsigned int offset, size_t len)
+{
+	struct msghdr *msg = rd_desc->arg.data;
+	int err;
+
+	err = skb_copy_datagram_msg(skb, offset, msg, len);
+	if (unlikely(err < 0))
+		return err;
+	return len;
+}
+
+static int __mptcp_recvmsg_mskq(struct sock *sk,
+				struct msghdr *msg,
+				size_t len, int flags,
+				struct scm_timestamping_internal *tss,
+				int *cmsg_flags)
+{
+	read_descriptor_t desc = {
+		.arg.data = msg,
+	};
+
+	return __mptcp_recvmsg_desc(sk, &desc, mptcp_recvmsg_actor,
+				    len, flags, tss, cmsg_flags);
 }
 
 /* receive buffer autotuning.  See tcp_rcv_space_adjust for more information.
