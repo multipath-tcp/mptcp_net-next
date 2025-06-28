@@ -772,13 +772,15 @@ static int tcp_splice_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 
 static int __tcp_splice_read(struct sock *sk, struct tcp_splice_state *tss)
 {
+	const struct proto_ops *ops = READ_ONCE(sk->sk_socket->ops);
 	/* Store TCP splice context information in read_descriptor_t. */
 	read_descriptor_t rd_desc = {
 		.arg.data = tss,
 		.count	  = tss->len,
 	};
 
-	return tcp_read_sock(sk, &rd_desc, tcp_splice_data_recv);
+	return INDIRECT_CALL_INET_1(ops->read_sock, tcp_read_sock,
+				    sk, &rd_desc, tcp_splice_data_recv);
 }
 
 /**

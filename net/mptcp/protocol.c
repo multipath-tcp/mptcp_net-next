@@ -4089,6 +4089,7 @@ static const struct proto_ops mptcp_stream_ops = {
 	.mmap		   = sock_no_mmap,
 	.set_rcvlowat	   = mptcp_set_rcvlowat,
 	.read_sock	   = mptcp_read_sock,
+	.splice_read	   = tcp_splice_read,
 };
 
 static struct inet_protosw mptcp_protosw = {
@@ -4194,6 +4195,7 @@ static const struct proto_ops mptcp_v6_stream_ops = {
 #endif
 	.set_rcvlowat	   = mptcp_set_rcvlowat,
 	.read_sock	   = mptcp_read_sock,
+	.splice_read	   = tcp_splice_read,
 };
 
 static struct proto mptcp_v6_prot;
