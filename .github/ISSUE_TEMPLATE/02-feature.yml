@@ -1,0 +1,49 @@
+name: Feature Request
+description: Suggest an idea for this project
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve! 🙏
+        Please answer these questions and provide as much information as possible about your idea.
+
+  - type: checkboxes
+    id: pre-req
+    attributes:
+      label: Pre-requisites
+      description: "Before opening this ticket, I checked that:"
+      options:
+        - label: "A similar [idea](https://github.com/multipath-tcp/mptcp_net-next/issues?q=label%3Aenhancement) has not been reported before."
+        - label: "[mptcp.dev](https://www.mptcp.dev) website does not cover my case."
+        - label: "The [wiki](https://github.com/multipath-tcp/mptcp_net-next/wiki) doesn't cover my case."
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description"
+      description: "A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Solution"
+      description: "A clear and concise description of what you want to have."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Considered alternatives"
+      description: "A clear and concise description of any alternative solutions or features you've considered."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context"
+      description: "Add any other context or screenshots about the feature request here."
