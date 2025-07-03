@@ -779,6 +779,8 @@ static int __tcp_splice_read(struct sock *sk, struct tcp_splice_state *tss)
 		.count	  = tss->len,
 	};
 
+	if (unlikely(!ops || !ops->read_sock))
+		return -ENOTSUPP;
 	return INDIRECT_CALL_INET_1(ops->read_sock, tcp_read_sock,
 				    sk, &rd_desc, tcp_splice_data_recv);
 }
