@@ -4052,7 +4052,7 @@ static int mptcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	struct scm_timestamping_internal tss;
 	int flags = 0, cmsg_flags = 0;
 	size_t len = sk->sk_rcvbuf;
-	int copied = 0;
+	int copied;
 
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
