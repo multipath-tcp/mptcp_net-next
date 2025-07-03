@@ -41,6 +41,7 @@
 #include <linux/random.h>
 #include <linux/indirect_call_wrapper.h>
 
+#include <net/aligned_data.h>
 #include <net/tcp.h>
 #include <net/ndisc.h>
 #include <net/inet6_hashtables.h>
@@ -867,7 +868,7 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 				 int oif, int rst, u8 tclass, __be32 label,
 				 u32 priority, u32 txhash, struct tcp_key *key)
 {
-	struct net *net = sk ? sock_net(sk) : dev_net_rcu(skb_dst(skb)->dev);
+	struct net *net = sk ? sock_net(sk) : skb_dst_dev_net_rcu(skb);
 	unsigned int tot_len = sizeof(struct tcphdr);
 	struct sock *ctl_sk = net->ipv6.tcp_sk;
 	const struct tcphdr *th = tcp_hdr(skb);
@@ -1042,7 +1043,7 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb,
 	if (!sk && !ipv6_unicast_destination(skb))
 		return;
 
-	net = sk ? sock_net(sk) : dev_net_rcu(skb_dst(skb)->dev);
+	net = sk ? sock_net(sk) : skb_dst_dev_net_rcu(skb);
 	/* Invalid TCP option size or twice included auth */
 	if (tcp_parse_auth_options(th, &md5_hash_location, &aoh))
 		return;
@@ -2356,7 +2357,7 @@ struct proto tcpv6_prot = {
 	.stream_memory_free	= tcp_stream_memory_free,
 	.sockets_allocated	= &tcp_sockets_allocated,
 
-	.memory_allocated	= &tcp_memory_allocated,
+	.memory_allocated	= &net_aligned_data.tcp_memory_allocated,
 	.per_cpu_fw_alloc	= &tcp_memory_per_cpu_fw_alloc,
 
 	.memory_pressure	= &tcp_memory_pressure,
