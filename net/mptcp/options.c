@@ -980,7 +980,6 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		subflow->mp_capable = 0;
 		if (mptcp_do_fallback(ssk, MPTCP_MIB_DATA_FALLBACK))
 			goto reset;
-		pr_fallback(msk);
 		return false;
 	}
 

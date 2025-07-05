@@ -548,7 +548,6 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 					    MPTCP_MIB_MPCAPABLEACTIVEFALLBACK))
 				goto do_reset;
 
-			pr_fallback(msk);
 			goto fallback;
 		}
 
@@ -1859,7 +1858,6 @@ static void subflow_state_change(struct sock *sk)
 	msk = mptcp_sk(parent);
 	if (subflow_simultaneous_connect(sk)) {
 		mptcp_do_fallback(sk, MPTCP_MIB_SIMULT_FALLBACK);
-		pr_fallback(msk);
 		subflow->conn_finished = 1;
 		mptcp_propagate_state(parent, sk, subflow, NULL);
 	}
