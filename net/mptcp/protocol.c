@@ -3119,8 +3119,19 @@ static void mptcp_copy_inaddrs(struct sock *msk, const struct sock *ssk)
 	inet_sk(msk)->inet_rcv_saddr = inet_sk(ssk)->inet_rcv_saddr;
 }
 
+/* can safely clear the fallback status only if no subflow is going to
+ * push or receive any data on the wire
+ */
+static bool mptcp_can_reset_fb_status(const struct mptcp_sock *msk)
+{
+	return list_empty(&msk->conn_list) ||
+	       inet_sk_state_load(msk->first) == TCP_CLOSE;
+}
+
 static int mptcp_disconnect(struct sock *sk, int flags)
 {
+	long timeout = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	/* We are on the fastopen error path. We can't call straight into the
@@ -3142,7 +3153,34 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	 * subflow
 	 */
 	mptcp_destroy_common(msk, MPTCP_CF_FASTCLOSE);
+
+	if (!mptcp_can_reset_fb_status(msk)) {
+		if (!timeout)
+			return -EAGAIN;
+
+		add_wait_queue(sk_sleep(sk), &wait);
+
+		/* __mptcp_close_ssk() will wake us */
+		do {
+			if (sk_wait_event(sk, &timeout,
+					  mptcp_can_reset_fb_status(msk),
+					  &wait))
+				break;
+		} while (!signal_pending(current) && timeout);
+
+		remove_wait_queue(sk_sleep(sk), &wait);
+
+		/* timeout/signal can prevent reaching the expected status */
+		if (!mptcp_can_reset_fb_status(msk))
+			return -EBUSY;
+	}
+
+	spin_lock_bh(&msk->fallback_lock);
+	msk->allow_subflows = true;
+	msk->allow_infinite_fallback = true;
 	WRITE_ONCE(msk->flags, 0);
+	spin_unlock_bh(&msk->fallback_lock);
+
 	msk->cb_flags = 0;
 	msk->recovery = false;
 	WRITE_ONCE(msk->can_ack, false);
