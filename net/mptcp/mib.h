@@ -81,6 +81,13 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_RCVWNDCONFLICT,	/* Conflict with while updating msk rcv wnd */
 	MPTCP_MIB_CURRESTAB,		/* Current established MPTCP connections */
 	MPTCP_MIB_BLACKHOLE,		/* A blackhole has been detected */
+	MPTCP_MIB_DATA_FALLBACK,	/* Missing DSS/MPC+data on first
+					 * established packet
+					 */
+	MPTCP_MIB_MD5SUM_FALLBACK,	/* Conflicting TCP option enabled */
+	MPTCP_MIB_DSS_FALLBACK,		/* Bad or missing DSS */
+	MPTCP_MIB_SIMULT_FALLBACK,	/* Simultaneous connect */
+	MPTCP_MIB_FALLBACK_FAILED,	/* Can't fallback due to msk status */
 	__MPTCP_MIB_MAX
 };
 

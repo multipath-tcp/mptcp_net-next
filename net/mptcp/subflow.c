@@ -544,11 +544,10 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 	mptcp_get_options(skb, &mp_opt);
 	if (subflow->request_mptcp) {
 		if (!(mp_opt.suboptions & OPTION_MPTCP_MPC_SYNACK)) {
-			if (!mptcp_do_fallback(sk))
+			if (!mptcp_do_fallback(sk,
+					    MPTCP_MIB_MPCAPABLEACTIVEFALLBACK))
 				goto do_reset;
 
-			MPTCP_INC_STATS(sock_net(sk),
-					MPTCP_MIB_MPCAPABLEACTIVEFALLBACK);
 			pr_fallback(msk);
 			goto fallback;
 		}
@@ -1406,7 +1405,7 @@ fallback:
 			return true;
 		}
 
-		if (!mptcp_do_fallback(ssk)) {
+		if (!mptcp_do_fallback(ssk, MPTCP_MIB_DSS_FALLBACK)) {
 			/* fatal protocol error, close the socket.
 			 * subflow_error_report() will introduce the appropriate barriers
 			 */
@@ -1424,7 +1423,6 @@ reset:
 			WRITE_ONCE(subflow->data_avail, false);
 			return false;
 		}
-
 	}
 
 	skb = skb_peek(&ssk->sk_receive_queue);
@@ -1860,7 +1858,7 @@ static void subflow_state_change(struct sock *sk)
 
 	msk = mptcp_sk(parent);
 	if (subflow_simultaneous_connect(sk)) {
-		mptcp_do_fallback(sk);
+		mptcp_do_fallback(sk, MPTCP_MIB_SIMULT_FALLBACK);
 		pr_fallback(msk);
 		subflow->conn_finished = 1;
 		mptcp_propagate_state(parent, sk, subflow, NULL);
