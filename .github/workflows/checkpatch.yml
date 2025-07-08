@@ -102,7 +102,7 @@ jobs:
               -F "target_url=${URL_GH}" \
               -F "context=${4}" \
               -F "description=${3}" \
-              "${check_url}" | jq '.'
+              "${check_url}"
           }
 
           FIRST=1
