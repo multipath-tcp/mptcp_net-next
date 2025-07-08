@@ -426,7 +426,7 @@ jobs:
                 -F "target_url=${3}" \
                 -F "context=${1//[ :()]/_}" \
                 -F "description=${2}" \
-                "${check_url}" | jq '.'
+                "${check_url}"
             done
           }
 
