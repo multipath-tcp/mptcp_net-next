@@ -2116,12 +2116,40 @@ static unsigned int mptcp_inq_hint(const struct sock *sk)
 	return 0;
 }
 
+static int mptcp_recv_should_stop(struct sock *sk, long timeo, int *shutdown)
+{
+	if (sk->sk_err)
+		return sock_error(sk);
+
+	if (sk->sk_shutdown & RCV_SHUTDOWN) {
+		*shutdown = 1;
+		/* race breaker: the shutdown could be after the
+		 * previous receive queue check
+		 */
+		if (__mptcp_move_skbs(sk))
+			*shutdown = 0;
+		return 0;
+	}
+
+	if (sk->sk_state == TCP_CLOSE)
+		return -ENOTCONN;
+
+	if (!timeo)
+		return -EAGAIN;
+
+	if (signal_pending(current))
+		return sock_intr_errno(timeo);
+
+	return 0;
+}
+
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			 int flags, int *addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct scm_timestamping_internal tss;
 	int copied = 0, cmsg_flags = 0;
+	int shutdown = -1;
 	int target;
 	long timeo;
 
@@ -2172,34 +2200,11 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			    signal_pending(current))
 				break;
 		} else {
-			if (sk->sk_err) {
-				copied = sock_error(sk);
+			copied = mptcp_recv_should_stop(sk, timeo, &shutdown);
+			if (copied < 0 || shutdown == 1)
 				break;
-			}
-
-			if (sk->sk_shutdown & RCV_SHUTDOWN) {
-				/* race breaker: the shutdown could be after the
-				 * previous receive queue check
-				 */
-				if (__mptcp_move_skbs(sk))
-					continue;
-				break;
-			}
-
-			if (sk->sk_state == TCP_CLOSE) {
-				copied = -ENOTCONN;
-				break;
-			}
-
-			if (!timeo) {
-				copied = -EAGAIN;
-				break;
-			}
-
-			if (signal_pending(current)) {
-				copied = sock_intr_errno(timeo);
-				break;
-			}
+			if (shutdown == 0)
+				continue;
 		}
 
 		pr_debug("block timeout %ld\n", timeo);
