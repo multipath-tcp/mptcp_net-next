@@ -4091,10 +4091,9 @@ static ssize_t mptcp_splice_read(struct socket *sock, loff_t *ppos,
 		.flags = flags,
 	};
 	struct sock *sk = sock->sk;
-	int shutdown = -1;
 	ssize_t spliced;
+	int ret, err;
 	long timeo;
-	int ret;
 
 	/*
 	 * We can't seek on a socket input
@@ -4115,13 +4114,16 @@ static ssize_t mptcp_splice_read(struct socket *sock, loff_t *ppos,
 		} else if (!ret) {
 			if (spliced)
 				break;
-			if (sock_flag(sk, SOCK_DONE))
+			err = tcp_recv_should_stop(sk, timeo);
+			if (err < 0) {
+				if (err == -ESHUTDOWN) {
+					if (__mptcp_move_skbs(sk))
+						continue;
+					break;
+				}
+				ret = err;
 				break;
-			ret = mptcp_recv_should_stop(sk, timeo, &shutdown);
-			if (ret < 0 || shutdown == 1)
-				break;
-			if (shutdown == 0)
-				continue;
+			}
 			/* if __mptcp_splice_read() got nothing while we have
 			 * an skb in receive queue, we do not want to loop.
 			 * This might happen with URG data.
@@ -4141,9 +4143,7 @@ static ssize_t mptcp_splice_read(struct socket *sock, loff_t *ppos,
 		release_sock(sk);
 		lock_sock(sk);
 
-		if (sk->sk_err || sk->sk_state == TCP_CLOSE ||
-		    (sk->sk_shutdown & RCV_SHUTDOWN) ||
-		    signal_pending(current))
+		if (tcp_recv_should_stop(sk, timeo))
 			break;
 	}
 
