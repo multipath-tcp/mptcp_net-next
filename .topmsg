@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reset-fallback-status-gracefully-at-disconnect-time
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: reset fallback status gracefully at disconnect() time
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+mptcp_disconnect() clears the fallback bit unconditionally, without
+touching the associated flags.
+
+The bit clear is safe, as no fallback operation can race with that --
+all subflow are already in TCP_CLOSE status thanks to the previous
+FASTCLOSE -- but we need to consistently reset all the fallback related
+status.
+
+Also acquire the relevant lock, to avoid fouling static analyzers.
+
+Fixes: b29fcfb54cd7 ("mptcp: full disconnect implementation")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
