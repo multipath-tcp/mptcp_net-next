@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-remove-pr_fallback
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: remove pr_fallback()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+We can now track fully the fallback status of a given connection via the
+relevant mibs, the mentioned helper is redundant. Remove it completely.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
