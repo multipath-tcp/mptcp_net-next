@@ -866,8 +866,6 @@ ssize_t tcp_splice_read(struct socket *sock, loff_t *ppos,
 
 		if (!tss.len || !timeo)
 			break;
-		release_sock(sk);
-		lock_sock(sk);
 
 		if (sk->sk_err || sk->sk_state == TCP_CLOSE ||
 		    (sk->sk_shutdown & RCV_SHUTDOWN) ||
