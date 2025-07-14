@@ -21,4 +21,10 @@ mptcp: warn in case of bogus mpc option on established client sk
 
   Link: https://lore.kernel.org/all/20240215-mptcp-fix-bogus-pr-warn-v1-1-d14c10312820@kernel.org/ [1]
 
+net: debug patch for WARNING in skb_try_coalesce
+
+  Patch from Paolo Abeni.
+
+  Link: https://github.com/multipath-tcp/mptcp_net-next/issues/572
+
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
