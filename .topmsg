@@ -1,4 +1,112 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-fix-UaF-in-tcp_prune_ofo_queue
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: fix UaF in tcp_prune_ofo_queue()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The CI reported a UaF in tcp_prune_ofo_queue():
+
+BUG: KASAN: slab-use-after-free in tcp_prune_ofo_queue+0x55d/0x660
+Read of size 4 at addr ffff8880134729d8 by task socat/20348
+
+CPU: 0 UID: 0 PID: 20348 Comm: socat Not tainted 6.16.0-rc5-virtme #1 PREEMPT(full)
+Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
+Call Trace:
+ <TASK>
+ dump_stack_lvl+0x82/0xd0
+ print_address_description.constprop.0+0x2c/0x400
+ print_report+0xb4/0x270
+ kasan_report+0xca/0x100
+ tcp_prune_ofo_queue+0x55d/0x660
+ tcp_try_rmem_schedule+0x855/0x12e0
+ tcp_data_queue+0x4dd/0x2260
+ tcp_rcv_established+0x5e8/0x2370
+ tcp_v4_do_rcv+0x4ba/0x8c0
+ __release_sock+0x27a/0x390
+ release_sock+0x53/0x1d0
+ tcp_sendmsg+0x37/0x50
+ sock_write_iter+0x3c1/0x520
+ vfs_write+0xc09/0x1210
+ ksys_write+0x183/0x1d0
+ do_syscall_64+0xc1/0x380
+ entry_SYSCALL_64_after_hwframe+0x77/0x7f
+RIP: 0033:0x7fcf73ef2337
+Code: 0f 00 f7 d8 64 89 02 48 c7 c0 ff ff ff ff eb b7 0f 1f 00 f3 0f 1e fa 64 8b 04 25 18 00 00 00 85 c0 75 10 b8 01 00 00 00 0f 05 <48> 3d 00 f0 ff ff 77 51 c3 48 83 ec 28 48 89 54 24 18 48 89 74 24
+RSP: 002b:00007ffd4f924708 EFLAGS: 00000246 ORIG_RAX: 0000000000000001
+RAX: ffffffffffffffda RBX: 0000000000000000 RCX: 00007fcf73ef2337
+RDX: 0000000000002000 RSI: 0000555f11d1a000 RDI: 0000000000000008
+RBP: 0000555f11d1a000 R08: 0000000000002000 R09: 0000000000000000
+R10: 0000000000000040 R11: 0000000000000246 R12: 0000000000000008
+R13: 0000000000002000 R14: 0000555ee1a44570 R15: 0000000000002000
+ </TASK>
+
+Allocated by task 20348:
+ kasan_save_stack+0x24/0x50
+ kasan_save_track+0x14/0x30
+ __kasan_slab_alloc+0x59/0x70
+ kmem_cache_alloc_node_noprof+0x110/0x340
+ __alloc_skb+0x213/0x2e0
+ tcp_collapse+0x43f/0xff0
+ tcp_try_rmem_schedule+0x6b9/0x12e0
+ tcp_data_queue+0x4dd/0x2260
+ tcp_rcv_established+0x5e8/0x2370
+ tcp_v4_do_rcv+0x4ba/0x8c0
+ __release_sock+0x27a/0x390
+ release_sock+0x53/0x1d0
+ tcp_sendmsg+0x37/0x50
+ sock_write_iter+0x3c1/0x520
+ vfs_write+0xc09/0x1210
+ ksys_write+0x183/0x1d0
+ do_syscall_64+0xc1/0x380
+ entry_SYSCALL_64_after_hwframe+0x77/0x7f
+
+Freed by task 20348:
+ kasan_save_stack+0x24/0x50
+ kasan_save_track+0x14/0x30
+ kasan_save_free_info+0x3b/0x60
+ __kasan_slab_free+0x38/0x50
+ kmem_cache_free+0x149/0x330
+ tcp_prune_ofo_queue+0x211/0x660
+ tcp_try_rmem_schedule+0x855/0x12e0
+ tcp_data_queue+0x4dd/0x2260
+ tcp_rcv_established+0x5e8/0x2370
+ tcp_v4_do_rcv+0x4ba/0x8c0
+ __release_sock+0x27a/0x390
+ release_sock+0x53/0x1d0
+ tcp_sendmsg+0x37/0x50
+ sock_write_iter+0x3c1/0x520
+ vfs_write+0xc09/0x1210
+ ksys_write+0x183/0x1d0
+ do_syscall_64+0xc1/0x380
+ entry_SYSCALL_64_after_hwframe+0x77/0x7f
+
+The buggy address belongs to the object at ffff888013472900
+ which belongs to the cache skbuff_head_cache of size 232
+The buggy address is located 216 bytes inside of
+ freed 232-byte region [ffff888013472900, ffff8880134729e8)
+
+The buggy address belongs to the physical page:
+page: refcount:0 mapcount:0 mapping:0000000000000000 index:0x0 pfn:0x13472
+head: order:1 mapcount:0 entire_mapcount:0 nr_pages_mapped:0 pincount:0
+flags: 0x80000000000040(head|node=0|zone=1)
+page_type: f5(slab)
+raw: 0080000000000040 ffff88800198fb40 ffffea0000347b10 ffffea00004f5290
+raw: 0000000000000000 0000000000120012 00000000f5000000 0000000000000000
+head: 0080000000000040 ffff88800198fb40 ffffea0000347b10 ffffea00004f5290
+head: 0000000000000000 0000000000120012 00000000f5000000 0000000000000000
+head: 0080000000000001 ffffea00004d1c81 00000000ffffffff 00000000ffffffff
+head: 0000000000000000 0000000000000000 00000000ffffffff 0000000000000000
+page dumped because: kasan: bad access detected
+
+Memory state around the buggy address:
+ ffff888013472880: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+ ffff888013472900: fa fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>ffff888013472980: fb fb fb fb fb fb fb fb fb fb fb fb fb fc fc fc
+                                                    ^
+ ffff888013472a00: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+ ffff888013472a80: fc fc fc fc fc fc fc fc fa fb fb fb fb fb fb fb
+
+Indeed tcp_prune_ofo_queue() is reusing the skb dropped a few lines
+above. The caller wants to enqueue 'in_skb', lets check space vs the
+latter.
+
+Fixes: 1d2fbaad7cd8 ("tcp: stronger sk_rcvbuf checks")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Kuniyuki Iwashima <kuniyu@google.com>
