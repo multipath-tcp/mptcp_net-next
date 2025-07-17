@@ -803,16 +803,16 @@ static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
 				   unsigned int optlen)
 {
 	struct mptcp_subflow_context *subflow;
+	int ret = 0;
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		int ret = 0;
 
 		ret = tcp_setsockopt(ssk, level, optname, optval, optlen);
 		if (ret)
-			return ret;
+			break;
 	}
-	return 0;
+	return ret;
 }
 
 static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
