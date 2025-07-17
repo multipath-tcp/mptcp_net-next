@@ -809,8 +809,8 @@ static void mld_del_delrec(struct inet6_dev *idev, struct ifmcaddr6 *im)
 	} else {
 		im->mca_crcount = idev->mc_qrv;
 	}
-	in6_dev_put(pmc->idev);
 	ip6_mc_clear_src(pmc);
+	in6_dev_put(pmc->idev);
 	kfree_rcu(pmc, rcu);
 }
 
@@ -845,21 +845,15 @@ static void mld_clear_delrec(struct inet6_dev *idev)
 
 static void mld_clear_query(struct inet6_dev *idev)
 {
-	struct sk_buff *skb;
-
 	spin_lock_bh(&idev->mc_query_lock);
-	while ((skb = __skb_dequeue(&idev->mc_query_queue)))
-		kfree_skb(skb);
+	__skb_queue_purge(&idev->mc_query_queue);
 	spin_unlock_bh(&idev->mc_query_lock);
 }
 
 static void mld_clear_report(struct inet6_dev *idev)
 {
-	struct sk_buff *skb;
-
 	spin_lock_bh(&idev->mc_report_lock);
-	while ((skb = __skb_dequeue(&idev->mc_report_queue)))
-		kfree_skb(skb);
+	__skb_queue_purge(&idev->mc_report_queue);
 	spin_unlock_bh(&idev->mc_report_lock);
 }
 
