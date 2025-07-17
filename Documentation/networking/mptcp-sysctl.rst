@@ -12,10 +12,9 @@ add_addr_timeout - INTEGER (seconds)
 	resent to an MPTCP peer that has not acknowledged a previous
 	ADD_ADDR message.
 
-	The default value matches TCP_RTO_MAX. This is a per-namespace
-	sysctl.
+	This is a per-namespace sysctl.
 
-	Default: 120
+	Default: 1
 
 allow_join_initial_addr_port - BOOLEAN
 	Allow peers to send join requests to the IP address and port number used
