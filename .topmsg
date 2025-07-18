@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tcp-do-not-increment-BeyondWindow-MIB-for-old-seq
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] tcp: do not increment BeyondWindow MIB for old seq
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The mentioned MIB is currently incremented even when a packet
+with an old sequence number (i.e. a zero window probe) is received,
+which is IMHO misleading.
+
+Explicitly restrict such MIB increment at the relevant events.
+
+Fixes: 6c758062c64d ("tcp: add LINUX_MIB_BEYOND_WINDOW")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
