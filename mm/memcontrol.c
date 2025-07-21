@@ -4645,6 +4645,37 @@ static ssize_t memory_reclaim(struct kernfs_open_file *of, char *buf,
 	return nbytes;
 }
 
+static int memory_socket_isolated_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_seq(m);
+
+	seq_printf(m, "%d\n", READ_ONCE(memcg->socket_isolated));
+
+	return 0;
+}
+
+static ssize_t memory_socket_isolated_write(struct kernfs_open_file *of,
+					    char *buf, size_t nbytes, loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int ret, socket_isolated;
+
+	buf = strstrip(buf);
+	if (!buf)
+		return -EINVAL;
+
+	ret = kstrtoint(buf, 0, &socket_isolated);
+	if (ret)
+		return ret;
+
+	if (socket_isolated != 0 && socket_isolated != MEMCG_SOCK_ISOLATED)
+		return -EINVAL;
+
+	WRITE_ONCE(memcg->socket_isolated, socket_isolated);
+
+	return nbytes;
+}
+
 static struct cftype memory_files[] = {
 	{
 		.name = "current",
@@ -4715,6 +4746,12 @@ static struct cftype memory_files[] = {
 		.name = "reclaim",
 		.flags = CFTYPE_NS_DELEGATABLE,
 		.write = memory_reclaim,
+	},
+	{
+		.name = "socket_isolated",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_socket_isolated_show,
+		.write = memory_socket_isolated_write,
 	},
 	{ }	/* terminate */
 };

@@ -1878,6 +1878,22 @@ The following nested keys are defined.
 	Shows pressure stall information for memory. See
 	:ref:`Documentation/accounting/psi.rst <psi>` for details.
 
+  memory.socket_isolated
+	A read-write single value file which exists on non-root cgroups.
+	The default value is "0".
+
+	Some networking protocols (e.g., TCP, UDP) implement their own memory
+	accounting for socket buffers.
+
+	This memory is also charged to a non-root cgroup as sock in memory.stat.
+
+	Since per-protocol limits such as /proc/sys/net/ipv4/tcp_mem and
+	/proc/sys/net/ipv4/udp_mem are global, memory allocation for socket
+	buffers may fail even when the cgroup has available memory.
+
+	Sockets created with socket_isolated set to 1 are no longer subject
+	to these global protocol limits.
+
 
 Usage Guidelines
 ~~~~~~~~~~~~~~~~

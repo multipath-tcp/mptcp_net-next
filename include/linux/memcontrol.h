@@ -226,6 +226,12 @@ struct mem_cgroup {
 	 */
 	bool oom_group;
 
+	/*
+	 * If set, MEMCG_SOCK memory is charged on memcg only,
+	 * otherwise, memcg and sk->sk_prot->memory_allocated.
+	 */
+	bool socket_isolated;
+
 	int swappiness;
 
 	/* memory.events and memory.events.local */
