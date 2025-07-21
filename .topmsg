@@ -13,9 +13,10 @@ With the stronger check in place, tcp_clamp_window() can be invoked
 while the TCP socket has sk_rmem_alloc == 0, and the receive buffer
 will be zeroed, too.
 
-Pass to tcp_clamp_window() even the current skb truesize, so that
-such helper could compute and use the actual limit enforced by
-the stack.
+Check for the critical condition in tcp_prune_queue() and just
+drop the packet without shrinking the receiver buffer.
 
 Fixes: 1d2fbaad7cd8 ("tcp: stronger sk_rcvbuf checks")
+Suggested-by: Eric Dumazet <edumazet@google.com>
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
