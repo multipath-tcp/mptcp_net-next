@@ -15,6 +15,7 @@
 #include "mptcp_bpf_bkup.skel.h"
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
+#include "mptcp_bpf_burst.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -652,6 +653,28 @@ static void test_red(void)
 	mptcp_bpf_red__destroy(skel);
 }
 
+static void test_burst(void)
+{
+	struct mptcp_bpf_burst *skel;
+	int err;
+
+	skel = mptcp_bpf_burst__open();
+	if (!ASSERT_OK_PTR(skel, "open: burst"))
+		return;
+
+	err = bpf_program__set_flags(skel->progs.bpf_burst_get_retrans,
+				     BPF_F_SLEEPABLE);
+	if (!ASSERT_OK(err, "set sleepable flags"))
+		goto skel_destroy;
+
+	if (!ASSERT_OK(mptcp_bpf_burst__load(skel), "load: burst"))
+		goto skel_destroy;
+
+	test_bpf_sched(skel->maps.burst, "burst", WITH_DATA, WITH_DATA);
+skel_destroy:
+	mptcp_bpf_burst__destroy(skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -670,4 +693,6 @@ void test_mptcp(void)
 		test_rr();
 	if (test__start_subtest("red"))
 		test_red();
+	if (test__start_subtest("burst"))
+		test_burst();
 }
