@@ -375,7 +375,7 @@ struct mlx5e_sq_dma {
 	enum mlx5e_dma_map_type type;
 };
 
-/* Keep this enum consistent with with the corresponding strings array
+/* Keep this enum consistent with the corresponding strings array
  * declared in en/reporter_tx.c
  */
 enum {
@@ -726,6 +726,7 @@ struct mlx5e_rq {
 	struct xsk_buff_pool  *xsk_pool;
 
 	struct work_struct     recover_work;
+	struct work_struct     rx_timeout_work;
 
 	/* control */
 	struct mlx5_wq_ctrl    wq_ctrl;
