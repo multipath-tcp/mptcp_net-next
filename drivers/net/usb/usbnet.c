@@ -1013,6 +1013,13 @@ int usbnet_get_link_ksettings_internal(struct net_device *net,
 	else
 		cmd->base.speed = SPEED_UNKNOWN;
 
+	/* The standard "Universal Serial Bus Class Definitions
+	 * for Communications Devices v1.2" does not specify
+	 * anything about duplex status.
+	 * So set it DUPLEX_UNKNOWN instead of default DUPLEX_HALF.
+	 */
+	cmd->base.duplex = DUPLEX_UNKNOWN;
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usbnet_get_link_ksettings_internal);
@@ -1122,6 +1129,9 @@ static void __handle_link_change(struct usbnet *dev)
 		 * tx queue is stopped by netcore after link becomes off
 		 */
 	} else {
+		if (test_and_clear_bit(EVENT_LINK_CARRIER_ON, &dev->flags))
+			netif_carrier_on(dev->net);
+
 		/* submitting URBs for reading packets */
 		queue_work(system_bh_wq, &dev->bh_work);
 	}
@@ -2008,10 +2018,12 @@ EXPORT_SYMBOL(usbnet_manage_power);
 void usbnet_link_change(struct usbnet *dev, bool link, bool need_reset)
 {
 	/* update link after link is reseted */
-	if (link && !need_reset)
-		netif_carrier_on(dev->net);
-	else
+	if (link && !need_reset) {
+		set_bit(EVENT_LINK_CARRIER_ON, &dev->flags);
+	} else {
+		clear_bit(EVENT_LINK_CARRIER_ON, &dev->flags);
 		netif_carrier_off(dev->net);
+	}
 
 	if (need_reset && link)
 		usbnet_defer_kevent(dev, EVENT_LINK_RESET);
