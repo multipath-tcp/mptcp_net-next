@@ -347,7 +347,7 @@ reset_with_add_addr_timeout()
 		tables="${ip6tables}"
 	fi
 
-	ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
+	ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout_max=1
 
 	if ! ip netns exec $ns2 $tables -A OUTPUT -p tcp \
 			-m tcp --tcp-option 30 \
@@ -1556,7 +1556,7 @@ chk_add_nr()
 		rx=" server"
 	fi
 
-	timeout=$(ip netns exec ${ns_tx} sysctl -n net.mptcp.add_addr_timeout)
+	timeout=$(ip netns exec ${ns_tx} sysctl -n net.mptcp.add_addr_timeout_max)
 
 	print_check "add addr rx${rx}"
 	count=$(mptcp_lib_get_counter ${ns_rx} "MPTcpExtAddAddr")
@@ -1655,7 +1655,7 @@ chk_add_tx_nr()
 	local timeout
 	local count
 
-	timeout=$(ip netns exec $ns1 sysctl -n net.mptcp.add_addr_timeout)
+	timeout=$(ip netns exec $ns1 sysctl -n net.mptcp.add_addr_timeout_max)
 
 	print_check "add addr tx"
 	count=$(mptcp_lib_get_counter ${ns1} "MPTcpExtAddAddrTx")
@@ -2183,7 +2183,7 @@ signal_address_tests()
 		pm_nl_add_endpoint $ns2 10.0.4.2 flags signal
 
 		# the peer could possibly miss some addr notification, allow retransmission
-		ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
+		ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout_max=1
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
 
