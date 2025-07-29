@@ -27,7 +27,7 @@ struct mptcp_pernet {
 	struct ctl_table_header *ctl_table_hdr;
 #endif
 
-	unsigned int add_addr_timeout;
+	unsigned int add_addr_timeout_max;
 	unsigned int blackhole_timeout;
 	unsigned int close_timeout;
 	unsigned int stale_loss_cnt;
@@ -52,9 +52,9 @@ int mptcp_is_enabled(const struct net *net)
 	return mptcp_get_pernet(net)->mptcp_enabled;
 }
 
-unsigned int mptcp_get_add_addr_timeout(const struct net *net)
+unsigned int mptcp_get_add_addr_timeout_max(const struct net *net)
 {
-	return mptcp_get_pernet(net)->add_addr_timeout;
+	return mptcp_get_pernet(net)->add_addr_timeout_max;
 }
 
 int mptcp_is_checksum_enabled(const struct net *net)
@@ -97,7 +97,7 @@ const char *mptcp_get_scheduler(const struct net *net)
 static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 {
 	pernet->mptcp_enabled = 1;
-	pernet->add_addr_timeout = TCP_RTO_MAX;
+	pernet->add_addr_timeout_max = TCP_RTO_MAX;
 	pernet->blackhole_timeout = 3600;
 	pernet->syn_retrans_before_tcp_fallback = 2;
 	atomic_set(&pernet->active_disable_times, 0);
@@ -284,7 +284,7 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.extra2       = SYSCTL_ONE
 	},
 	{
-		.procname = "add_addr_timeout",
+		.procname = "add_addr_timeout_max",
 		.maxlen = sizeof(unsigned int),
 		.mode = 0644,
 		.proc_handler = proc_dointvec_jiffies,
@@ -377,7 +377,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 	}
 
 	table[0].data = &pernet->mptcp_enabled;
-	table[1].data = &pernet->add_addr_timeout;
+	table[1].data = &pernet->add_addr_timeout_max;
 	table[2].data = &pernet->checksum_enabled;
 	table[3].data = &pernet->allow_join_initial_addr_port;
 	table[4].data = &pernet->stale_loss_cnt;
