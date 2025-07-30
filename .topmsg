@@ -25,6 +25,6 @@ net: debug patch for WARNING in skb_try_coalesce
 
   Patch from Paolo Abeni.
 
-  Link: https://github.com/multipath-tcp/mptcp_net-next/issues/572
+  See ticket 572 on GH.
 
 Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
