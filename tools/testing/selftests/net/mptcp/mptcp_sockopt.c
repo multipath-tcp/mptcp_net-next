@@ -25,6 +25,7 @@
 #include <netinet/in.h>
 
 #include <linux/tcp.h>
+#include <arpa/inet.h>
 
 static int pf = AF_INET;
 
@@ -126,6 +127,15 @@ struct so_state {
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
+
+struct tcp_md5sig_ext {
+	struct __kernel_sockaddr_storage tcpm_addr;
+	unsigned short	__tcpm_pad1;
+	unsigned short	tcpm_keylen;
+	unsigned char	tcpm_key[TCP_MD5SIG_MAXKEYLEN];
+	unsigned int	tcpm_flags;
+	unsigned int	tcpm_ifindex;
+};
 
 static void die_perror(const char *msg)
 {
@@ -697,6 +707,60 @@ static int xaccept(int s)
 	return fd;
 }
 
+static void test_tcp_md5sig_sockopt(int fd)
+{
+	const char *peer_ip = (pf == AF_INET) ? "127.0.0.1" : "::1";
+	const char *key = "0123456789";
+	size_t key_len = strlen(key);
+	struct tcp_md5sig md5sig;
+	struct sockaddr_in *addr;
+
+	memset(&md5sig, 0, sizeof(md5sig));
+	addr = (struct sockaddr_in *)&md5sig.tcpm_addr;
+	addr->sin_family = pf;
+
+	if (inet_pton(pf, peer_ip, &addr->sin_addr) != 1)
+		die_perror("inet_pton failed");
+
+	if (key_len > sizeof(md5sig.tcpm_key))
+		die_perror("Key too long\n");
+
+	memcpy(md5sig.tcpm_key, key, key_len);
+	md5sig.tcpm_keylen = key_len;
+
+	if (setsockopt(fd, IPPROTO_TCP, TCP_MD5SIG, &md5sig, sizeof(md5sig)))
+		die_perror("setsockopt(TCP_MD5SIG) failed");
+}
+
+static void test_tcp_md5sig_ext_sockopt(int sockfd)
+{
+	const char *peer_ip = (pf == AF_INET) ? "127.0.0.1" : "::1";
+	const char *key = "0123456789";
+	size_t key_len = strlen(key);
+	struct tcp_md5sig_ext md5ext;
+	struct sockaddr_in *addr;
+	int ifindex = 2;
+
+	memset(&md5ext, 0, sizeof(md5ext));
+	addr = (struct sockaddr_in *)&md5ext.tcpm_addr;
+	addr->sin_family = pf;
+
+	if (inet_pton(pf, peer_ip, &addr->sin_addr) != 1)
+		die_perror("inet_pton failed");
+
+	if (key_len > TCP_MD5SIG_MAXKEYLEN)
+		die_perror("Key too long\n");
+
+	memcpy(md5ext.tcpm_key, key, key_len);
+	md5ext.tcpm_keylen = key_len;
+
+	md5ext.tcpm_ifindex = ifindex;
+	md5ext.tcpm_flags = TCP_MD5SIG_FLAG_IFINDEX;
+
+	if (setsockopt(sockfd, IPPROTO_TCP, TCP_MD5SIG_EXT, &md5ext, sizeof(md5ext)))
+		die_perror("setsockopt(TCP_MD5SIG_EXT) failed");
+}
+
 static int server(int pipefd)
 {
 	int fd = -1, r;
@@ -720,6 +784,9 @@ static int server(int pipefd)
 	r = xaccept(fd);
 
 	process_one_client(r, pipefd);
+
+	test_tcp_md5sig_sockopt(fd);
+	test_tcp_md5sig_ext_sockopt(fd);
 
 	return 0;
 }
