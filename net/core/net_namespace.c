@@ -812,19 +812,25 @@ static void net_ns_net_debugfs(struct net *net)
 
 static __net_init int net_ns_net_init(struct net *net)
 {
-	int ret;
-
 #ifdef CONFIG_NET_NS
 	net->ns.ops = &netns_operations;
 #endif
-	ret = ns_alloc_inum(&net->ns);
-	if (!ret)
-		net_ns_net_debugfs(net);
-	return ret;
+	net->ns.inum = PROC_NET_INIT_INO;
+	if (net != &init_net) {
+		int ret = ns_alloc_inum(&net->ns);
+		if (ret)
+			return ret;
+	}
+	net_ns_net_debugfs(net);
+	return 0;
 }
 
 static __net_exit void net_ns_net_exit(struct net *net)
 {
+	/*
+	 * Initial network namespace doesn't exit so we don't need any
+	 * special checks here.
+	 */
 	ns_free_inum(&net->ns);
 }
 
