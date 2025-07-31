@@ -1014,30 +1014,26 @@ perf_user_access (arm64 and riscv only)
 
 Controls user space access for reading perf event counters.
 
-arm64
-=====
+* for arm64
+  The default value is 0 (access disabled).
 
-The default value is 0 (access disabled).
+  When set to 1, user space can read performance monitor counter registers
+  directly.
 
-When set to 1, user space can read performance monitor counter registers
-directly.
+  See Documentation/arch/arm64/perf.rst for more information.
 
-See Documentation/arch/arm64/perf.rst for more information.
+* for riscv
+  When set to 0, user space access is disabled.
 
-riscv
-=====
+  The default value is 1, user space can read performance monitor counter
+  registers through perf, any direct access without perf intervention will trigger
+  an illegal instruction.
 
-When set to 0, user space access is disabled.
+  When set to 2, which enables legacy mode (user space has direct access to cycle
+  and insret CSRs only). Note that this legacy value is deprecated and will be
+  removed once all user space applications are fixed.
 
-The default value is 1, user space can read performance monitor counter
-registers through perf, any direct access without perf intervention will trigger
-an illegal instruction.
-
-When set to 2, which enables legacy mode (user space has direct access to cycle
-and insret CSRs only). Note that this legacy value is deprecated and will be
-removed once all user space applications are fixed.
-
-Note that the time CSR is always directly accessible to all modes.
+  Note that the time CSR is always directly accessible to all modes.
 
 pid_max
 =======
@@ -1465,7 +1461,7 @@ stack_erasing
 =============
 
 This parameter can be used to control kernel stack erasing at the end
-of syscalls for kernels built with ``CONFIG_GCC_PLUGIN_STACKLEAK``.
+of syscalls for kernels built with ``CONFIG_KSTACK_ERASE``.
 
 That erasing reduces the information which kernel stack leak bugs
 can reveal and blocks some uninitialized stack variable attacks.
@@ -1473,7 +1469,7 @@ The tradeoff is the performance impact: on a single CPU system kernel
 compilation sees a 1% slowdown, other systems and workloads may vary.
 
 = ====================================================================
-0 Kernel stack erasing is disabled, STACKLEAK_METRICS are not updated.
+0 Kernel stack erasing is disabled, KSTACK_ERASE_METRICS are not updated.
 1 Kernel stack erasing is enabled (default), it is performed before
   returning to the userspace at the end of syscalls.
 = ====================================================================
