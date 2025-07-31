@@ -1138,6 +1138,14 @@ retry:
 			goto keep;
 
 		if (folio_contain_hwpoisoned_page(folio)) {
+			/*
+			 * unmap_poisoned_folio() can't handle large
+			 * folio, just skip it. memory_failure() will
+			 * handle it if the UCE is triggered again.
+			 */
+			if (folio_test_large(folio))
+				goto keep_locked;
+
 			unmap_poisoned_folio(folio, folio_pfn(folio), false);
 			folio_unlock(folio);
 			folio_put(folio);
@@ -5420,7 +5428,7 @@ static void lru_gen_seq_show_full(struct seq_file *m, struct lruvec *lruvec,
 static int lru_gen_seq_show(struct seq_file *m, void *v)
 {
 	unsigned long seq;
-	bool full = !debugfs_real_fops(m->file)->write;
+	bool full = debugfs_get_aux_num(m->file);
 	struct lruvec *lruvec = v;
 	struct lru_gen_folio *lrugen = &lruvec->lrugen;
 	int nid = lruvec_pgdat(lruvec)->node_id;
@@ -5756,8 +5764,10 @@ static int __init init_lru_gen(void)
 	if (sysfs_create_group(mm_kobj, &lru_gen_attr_group))
 		pr_err("lru_gen: failed to create sysfs group\n");
 
-	debugfs_create_file("lru_gen", 0644, NULL, NULL, &lru_gen_rw_fops);
-	debugfs_create_file("lru_gen_full", 0444, NULL, NULL, &lru_gen_ro_fops);
+	debugfs_create_file_aux_num("lru_gen", 0644, NULL, NULL, 1,
+				    &lru_gen_rw_fops);
+	debugfs_create_file_aux_num("lru_gen_full", 0444, NULL, NULL, 0,
+				    &lru_gen_ro_fops);
 
 	return 0;
 };
