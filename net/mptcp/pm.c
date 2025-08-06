@@ -268,6 +268,30 @@ int mptcp_pm_mp_prio_send_ack(struct mptcp_sock *msk,
 	return -EINVAL;
 }
 
+static unsigned int mptcp_adjust_add_addr_timeout(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	unsigned int max_rto = 0;
+	unsigned int timeout;
+
+	timeout = mptcp_get_add_addr_timeout(sock_net(sk));
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		unsigned int subflow_rto;
+
+		subflow_rto = __tcp_set_rto(tcp_sk(ssk)) * 2;
+		if (subflow_rto > max_rto)
+			max_rto = subflow_rto;
+	}
+
+	if (max_rto && max_rto < timeout)
+		timeout = max_rto;
+
+	return timeout;
+}
+
 static void mptcp_pm_add_timer(struct timer_list *timer)
 {
 	struct mptcp_pm_add_entry *entry = timer_container_of(entry, timer,
@@ -292,7 +316,7 @@ static void mptcp_pm_add_timer(struct timer_list *timer)
 		goto out;
 	}
 
-	timeout = mptcp_get_add_addr_timeout(sock_net(sk));
+	timeout = mptcp_adjust_add_addr_timeout(msk);
 	if (!timeout)
 		goto out;
 
@@ -307,7 +331,7 @@ static void mptcp_pm_add_timer(struct timer_list *timer)
 
 	if (entry->retrans_times < ADD_ADDR_RETRANS_MAX)
 		sk_reset_timer(sk, timer,
-			       jiffies + timeout);
+			       jiffies + (timeout << entry->retrans_times));
 
 	spin_unlock_bh(&msk->pm.lock);
 
@@ -373,7 +397,7 @@ bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
 	timer_setup(&add_entry->add_timer, mptcp_pm_add_timer, 0);
 out:
 	sk_reset_timer(sk, &add_entry->add_timer,
-		       jiffies + mptcp_get_add_addr_timeout(sock_net(sk)));
+		       jiffies + mptcp_adjust_add_addr_timeout(msk));
 
 	return true;
 }
