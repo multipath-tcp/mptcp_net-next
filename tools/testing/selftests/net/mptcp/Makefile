@@ -8,7 +8,7 @@ TEST_PROGS := mptcp_connect.sh mptcp_connect_mmap.sh mptcp_connect_sendfile.sh \
 	      mptcp_connect_checksum.sh pm_netlink.sh mptcp_join.sh diag.sh \
 	      simult_flows.sh mptcp_sockopt.sh userspace_pm.sh
 
-TEST_GEN_FILES = mptcp_connect pm_nl_ctl mptcp_sockopt mptcp_inq mptcp_diag
+TEST_GEN_FILES = mptcp_connect pm_nl_ctl mptcp_sockopt mptcp_diag
 
 TEST_FILES := mptcp_lib.sh settings
 
