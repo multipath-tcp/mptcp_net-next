@@ -722,7 +722,7 @@ static int xaccept(int s)
 	return fd;
 }
 
-static int server(int pipefd)
+static int server(int ipcfd)
 {
 	int fd = -1, r;
 
@@ -738,13 +738,13 @@ static int server(int pipefd)
 		break;
 	}
 
-	r = write(pipefd, "conn", 4);
+	r = write(ipcfd, "conn", 4);
 	assert(r == 4);
 
 	alarm(15);
 	r = xaccept(fd);
 
-	process_one_client(r, pipefd);
+	process_one_client(r, ipcfd);
 
 	return 0;
 }
@@ -787,7 +787,7 @@ static void test_ip_tos_sockopt(int fd)
 		xerror("expect socklen_t == -1");
 }
 
-static int client(int pipefd)
+static int client(int ipcfd)
 {
 	int fd = -1;
 
@@ -806,7 +806,7 @@ static int client(int pipefd)
 
 	test_ip_tos_sockopt(fd);
 
-	connect_one_server(fd, pipefd);
+	connect_one_server(fd, ipcfd);
 
 	return 0;
 }
@@ -853,31 +853,32 @@ int main(int argc, char *argv[])
 {
 	int e1, e2, wstatus;
 	pid_t s, c, ret;
-	int pipefds[2];
+	int ipcfds[2];
 
 	parse_opts(argc, argv);
 
 	init_rng();
 
-	e1 = pipe(pipefds);
+	e1 = inq ? socketpair(AF_UNIX, SOCK_DGRAM, 0, ipcfds) :
+		   pipe(ipcfds);
 	if (e1 < 0)
 		die_perror("pipe");
 
 	s = xfork();
 	if (s == 0)
-		return server(pipefds[1]);
+		return server(ipcfds[1]);
 
-	close(pipefds[1]);
+	close(ipcfds[1]);
 
 	/* wait until server bound a socket */
-	e1 = read(pipefds[0], &e1, 4);
+	e1 = read(ipcfds[0], &e1, 4);
 	assert(e1 == 4);
 
 	c = xfork();
 	if (c == 0)
-		return client(pipefds[0]);
+		return client(ipcfds[0]);
 
-	close(pipefds[0]);
+	close(ipcfds[0]);
 
 	ret = waitpid(s, &wstatus, 0);
 	if (ret == -1)
