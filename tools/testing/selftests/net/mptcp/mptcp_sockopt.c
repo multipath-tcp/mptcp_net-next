@@ -188,6 +188,15 @@ again:
 	}
 }
 
+static void do_setsockopt_reuseaddr(int fd)
+{
+	int one = 1;
+
+	if (-1 == setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one,
+			     sizeof(one)))
+		perror("setsockopt(SO_REUSEADDR)");
+}
+
 static int sock_listen_mptcp(const char * const listenaddr,
 			     const char * const port)
 {
@@ -201,7 +210,6 @@ static int sock_listen_mptcp(const char * const listenaddr,
 	hints.ai_family = pf;
 
 	struct addrinfo *a, *addr;
-	int one = 1;
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 	hints.ai_family = pf;
@@ -211,9 +219,7 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		if (sock < 0)
 			continue;
 
-		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
-				     sizeof(one)))
-			perror("setsockopt");
+		do_setsockopt_reuseaddr(sock);
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
