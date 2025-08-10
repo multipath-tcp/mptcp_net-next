@@ -979,12 +979,6 @@ static void do_setsockopt_inq(int fd)
 		die_perror("setsockopt(TCP_INQ)");
 }
 
-static void do_setsockopts_accept(int fd)
-{
-	if (inq)
-		do_setsockopt_inq(fd);
-}
-
 static int xaccept(int s)
 {
 	int fd = accept(s, NULL, 0);
@@ -992,7 +986,8 @@ static int xaccept(int s)
 	if (fd < 0)
 		die_perror("accept");
 
-	do_setsockopts_accept(fd);
+	if (inq)
+		do_setsockopt_inq(fd);
 
 	return fd;
 }
