@@ -610,7 +610,6 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 	union tcp_ao_addr *addr;
 	int l3index = 0;
 	u8 prefixlen;
-	bool l3flag;
 	u8 flags;
 
 	if (optlen < sizeof(cmd))
@@ -623,7 +622,6 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 		return -EINVAL;
 
 	flags = cmd.tcpm_flags & TCP_MD5SIG_FLAG_IFINDEX;
-	l3flag = cmd.tcpm_flags & TCP_MD5SIG_FLAG_IFINDEX;
 
 	if (optname == TCP_MD5SIG_EXT &&
 	    cmd.tcpm_flags & TCP_MD5SIG_FLAG_PREFIX) {
@@ -635,8 +633,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 		prefixlen = ipv6_addr_v4mapped(&sin6->sin6_addr) ? 32 : 128;
 	}
 
-	if (optname == TCP_MD5SIG_EXT && cmd.tcpm_ifindex &&
-	    cmd.tcpm_flags & TCP_MD5SIG_FLAG_IFINDEX) {
+	if (optname == TCP_MD5SIG_EXT && cmd.tcpm_ifindex && flags) {
 		struct net_device *dev;
 
 		rcu_read_lock();
@@ -671,7 +668,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 		 * See the comment in tcp_ao_add_cmd()
 		 */
 		if (tcp_ao_required(sk, addr, AF_INET,
-				    l3flag ? l3index : -1, false))
+				    flags ? l3index : -1, false))
 			return -EKEYREJECTED;
 		return tcp_md5_do_add(sk, addr,
 				      AF_INET, prefixlen, l3index, flags,
@@ -683,7 +680,7 @@ static int tcp_v6_parse_md5_keys(struct sock *sk, int optname,
 	/* Don't allow keys for peers that have a matching TCP-AO key.
 	 * See the comment in tcp_ao_add_cmd()
 	 */
-	if (tcp_ao_required(sk, addr, AF_INET6, l3flag ? l3index : -1, false))
+	if (tcp_ao_required(sk, addr, AF_INET6, flags ? l3index : -1, false))
 		return -EKEYREJECTED;
 
 	return tcp_md5_do_add(sk, addr, AF_INET6, prefixlen, l3index, flags,
