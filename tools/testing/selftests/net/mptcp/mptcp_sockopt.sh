@@ -348,6 +348,54 @@ do_tcpinq_tests()
 	return $?
 }
 
+do_tcpmd5_test()
+{
+	print_title "TCP_MD5 $*"
+	ip netns exec "$ns_sbox" ./mptcp_sockopt "$@"
+	local lret=$?
+	if [ $lret -ne 0 ];then
+		ret=$lret
+		mptcp_lib_pr_fail
+		mptcp_lib_result_fail "TCP_MD5: $*"
+		return $lret
+	fi
+
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "TCP_MD5: $*"
+	return $lret
+}
+
+do_tcpmd5_tests()
+{
+	local lret=0
+
+	do_tcpmd5_test -m "md5,key=123456"
+	lret=$?
+	if [ $lret -ne 0 ] ; then
+		return $lret
+	fi
+	do_tcpmd5_test -6 -m "md5,key=123456"
+	lret=$?
+	if [ $lret -ne 0 ] ; then
+		return $lret
+	fi
+
+	ip netns exec "$ns_sbox" ip link add vrf-test type vrf table 100
+	vrf=$(ip netns exec "$ns_sbox" ip link show vrf-test |
+				       awk -F':' '{print $1; exit}')
+	do_tcpmd5_test -m "md5ext,prefix=1,index=$vrf,key=654321"
+	lret=$?
+	if [ $lret -ne 0 ] ; then
+		ip netns exec "$ns_sbox" ip link del vrf-test
+		return $lret
+	fi
+	do_tcpmd5_test -6 -m "md5ext,prefix=1,index=$vrf,key=654321"
+	lret=$?
+
+	ip netns exec "$ns_sbox" ip link del vrf-test
+	return $lret
+}
+
 sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)
@@ -363,6 +411,7 @@ run_tests $ns1 $ns2 dead:beef:1::1
 
 do_mptcp_sockopt_tests
 do_tcpinq_tests
+do_tcpmd5_tests
 
 mptcp_lib_result_print_all_tap
 exit $ret
