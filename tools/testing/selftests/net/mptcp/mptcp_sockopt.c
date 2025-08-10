@@ -36,6 +36,8 @@ static int proto_rx = IPPROTO_MPTCP;
 static bool inq;
 static bool md5;
 static char key[TCP_MD5SIG_MAXKEYLEN];
+static int prefixlen;
+static int ifindex;
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -144,7 +146,7 @@ static void die_perror(const char *msg)
 
 static void die_usage(int r)
 {
-	fprintf(stderr, "Usage: mptcp_sockopt [-6] [-t tcp|mptcp] [-r tcp|mptcp] [-i] [-m md5,key]\n");
+	fprintf(stderr, "Usage: mptcp_sockopt [-6] [-t tcp|mptcp] [-r tcp|mptcp] [-i] [-m md5,key|md5ext,prefix,index,key]\n");
 	exit(r);
 }
 
@@ -220,6 +222,19 @@ static void do_setsockopt_md5sig(int fd)
 
 	memcpy(md5sig.tcpm_key, key, key_len);
 	md5sig.tcpm_keylen = key_len;
+
+	if (prefixlen || ifindex)
+		opt = TCP_MD5SIG_EXT;
+
+	if (prefixlen) {
+		md5sig.tcpm_flags |= TCP_MD5SIG_FLAG_PREFIX;
+		md5sig.tcpm_prefixlen = prefixlen;
+	}
+
+	if (ifindex) {
+		md5sig.tcpm_flags |= TCP_MD5SIG_FLAG_IFINDEX;
+		md5sig.tcpm_ifindex = (uint8_t)ifindex;
+	}
 
 	if (setsockopt(fd, IPPROTO_TCP, opt, &md5sig, sizeof(md5sig)))
 		die_perror("setsockopt(TCP_MD5SIG) failed");
@@ -344,6 +359,9 @@ static void parse_opts(int argc, char **argv)
 			md5 = true;
 			if (!strncmp(optarg, "md5,", 4))
 				sscanf(optarg, "md5,key=%s", key);
+			else if (!strncmp(optarg, "md5ext,", 6))
+				sscanf(optarg, "md5ext,prefix=%u,index=%u,key=%s",
+				       &prefixlen, &ifindex, key);
 			break;
 		default:
 			die_usage(1);
