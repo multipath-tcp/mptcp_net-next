@@ -155,6 +155,9 @@ static int subflow_check_req(struct request_sock *req,
 
 	pr_debug("subflow_req=%p, listener=%p\n", subflow_req, listener);
 
+	if (__mptcp_check_fallback(mptcp_sk(listener->conn)))
+		return 0;
+
 #ifdef CONFIG_TCP_MD5SIG
 	/* no MPTCP if MD5SIG is enabled on this socket or we may run out of
 	 * TCP option space.
