@@ -172,6 +172,10 @@ menu "General setup"
 
 config BROKEN
 	bool
+	help
+	  This option allows you to choose whether you want to try to
+	  compile (and fix) old drivers that haven't been updated to
+	  new infrastructure.
 
 config BROKEN_ON_SMP
 	bool
@@ -1007,6 +1011,7 @@ config MEMCG
 	select PAGE_COUNTER
 	select EVENTFD
 	select SLAB_OBJ_EXT
+	select VM_EVENT_COUNTERS
 	help
 	  Provides control over the memory footprint of tasks in a cgroup.
 
@@ -1080,6 +1085,9 @@ if CGROUP_SCHED
 config GROUP_SCHED_WEIGHT
 	def_bool n
 
+config GROUP_SCHED_BANDWIDTH
+        def_bool n
+
 config FAIR_GROUP_SCHED
 	bool "Group scheduling for SCHED_OTHER"
 	depends on CGROUP_SCHED
@@ -1089,6 +1097,7 @@ config FAIR_GROUP_SCHED
 config CFS_BANDWIDTH
 	bool "CPU bandwidth provisioning for FAIR_GROUP_SCHED"
 	depends on FAIR_GROUP_SCHED
+	select GROUP_SCHED_BANDWIDTH
 	default n
 	help
 	  This option allows users to define CPU bandwidth rates (limits) for
@@ -1123,6 +1132,7 @@ config EXT_GROUP_SCHED
 	bool
 	depends on SCHED_CLASS_EXT && CGROUP_SCHED
 	select GROUP_SCHED_WEIGHT
+	select GROUP_SCHED_BANDWIDTH
 	default y
 
 endif #CGROUP_SCHED
