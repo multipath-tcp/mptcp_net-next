@@ -163,6 +163,13 @@ static void panic_on_rcu_stall(void)
 {
 	static int cpu_stall;
 
+	/*
+	 * Attempt to kick out the BPF scheduler if it's installed and defer
+	 * the panic to give the system a chance to recover.
+	 */
+	if (scx_rcu_cpu_stall())
+		return;
+
 	if (++cpu_stall < sysctl_max_rcu_stall_to_panic)
 		return;
 
@@ -982,8 +989,7 @@ void show_rcu_gp_kthreads(void)
 	for_each_possible_cpu(cpu) {
 		rdp = per_cpu_ptr(&rcu_data, cpu);
 		cbs += data_race(READ_ONCE(rdp->n_cbs_invoked));
-		if (rcu_segcblist_is_offloaded(&rdp->cblist))
-			show_rcu_nocb_state(rdp);
+		show_rcu_nocb_state(rdp);
 	}
 	pr_info("RCU callbacks invoked since boot: %lu\n", cbs);
 	show_rcu_tasks_gp_kthreads();
