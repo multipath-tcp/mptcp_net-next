@@ -7,6 +7,7 @@
 #include <linux/context_tracking.h>
 #include <linux/tick.h>
 #include <linux/kmsan.h>
+#include <linux/unwind_deferred.h>
 
 #include <asm/entry-common.h>
 
@@ -46,6 +47,22 @@ static __always_inline void arch_enter_from_user_mode(struct pt_regs *regs);
 
 #ifndef arch_enter_from_user_mode
 static __always_inline void arch_enter_from_user_mode(struct pt_regs *regs) {}
+#endif
+
+/**
+ * arch_in_rcu_eqs - Architecture specific check for RCU extended quiescent
+ * states.
+ *
+ * Returns: true if the CPU is potentially in an RCU EQS, false otherwise.
+ *
+ * Architectures only need to define this if threads other than the idle thread
+ * may have an interruptible EQS. This does not need to handle idle threads. It
+ * is safe to over-estimate at the cost of redundant RCU management work.
+ *
+ * Invoked from irqentry_enter()
+ */
+#ifndef arch_in_rcu_eqs
+static __always_inline bool arch_in_rcu_eqs(void) { return false; }
 #endif
 
 /**
@@ -240,6 +257,7 @@ static __always_inline void exit_to_user_mode(void)
 	lockdep_hardirqs_on_prepare();
 	instrumentation_end();
 
+	unwind_reset_info();
 	user_enter_irqoff();
 	arch_exit_to_user_mode();
 	lockdep_hardirqs_on(CALLER_ADDR0);
