@@ -17,6 +17,10 @@
 #define MIN_INFO_OPTLEN_SIZE		16
 #define MIN_FULL_INFO_OPTLEN_SIZE	40
 
+static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
+					  int optname, sockptr_t optval,
+					  unsigned int optlen);
+
 static struct sock *__mptcp_tcp_fallback(struct mptcp_sock *msk)
 {
 	msk_owned_by_me(msk);
@@ -287,38 +291,51 @@ static int mptcp_setsockopt_sol_socket_linger(struct mptcp_sock *msk, sockptr_t 
 	return 0;
 }
 
-static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
-				       sockptr_t optval, unsigned int optlen)
+static int mptcp_setsockopt_sol_socket_first_sf_only(struct mptcp_sock *msk, int optname,
+						     sockptr_t optval, unsigned int optlen)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct sock *ssk;
 	int ret;
+
+	if (optname != SO_REUSEPORT && optname != SO_REUSEADDR &&
+	    optname != SO_BINDTODEVICE && optname != SO_BINDTOIFINDEX)
+		return -EOPNOTSUPP;
+
+	lock_sock(sk);
+	ssk = __mptcp_nmpc_sk(msk);
+	if (IS_ERR(ssk)) {
+		release_sock(sk);
+		return PTR_ERR(ssk);
+	}
+
+	ret = sk_setsockopt(ssk, SOL_SOCKET, optname, optval, optlen);
+	if (ret == 0) {
+		if (optname == SO_REUSEPORT)
+			sk->sk_reuseport = ssk->sk_reuseport;
+		else if (optname == SO_REUSEADDR)
+			sk->sk_reuse = ssk->sk_reuse;
+		else if (optname == SO_BINDTODEVICE)
+			sk->sk_bound_dev_if = ssk->sk_bound_dev_if;
+		else if (optname == SO_BINDTOIFINDEX)
+			sk->sk_bound_dev_if = ssk->sk_bound_dev_if;
+	}
+	release_sock(sk);
+	return ret;
+}
+
+static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
+				       sockptr_t optval, unsigned int optlen)
+{
+	struct sock *sk = (struct sock *)msk;
 
 	switch (optname) {
 	case SO_REUSEPORT:
 	case SO_REUSEADDR:
 	case SO_BINDTODEVICE:
 	case SO_BINDTOIFINDEX:
-		lock_sock(sk);
-		ssk = __mptcp_nmpc_sk(msk);
-		if (IS_ERR(ssk)) {
-			release_sock(sk);
-			return PTR_ERR(ssk);
-		}
-
-		ret = sk_setsockopt(ssk, SOL_SOCKET, optname, optval, optlen);
-		if (ret == 0) {
-			if (optname == SO_REUSEPORT)
-				sk->sk_reuseport = ssk->sk_reuseport;
-			else if (optname == SO_REUSEADDR)
-				sk->sk_reuse = ssk->sk_reuse;
-			else if (optname == SO_BINDTODEVICE)
-				sk->sk_bound_dev_if = ssk->sk_bound_dev_if;
-			else if (optname == SO_BINDTOIFINDEX)
-				sk->sk_bound_dev_if = ssk->sk_bound_dev_if;
-		}
-		release_sock(sk);
-		return ret;
+		return mptcp_setsockopt_first_sf_only(msk, SOL_SOCKET, optname,
+						      optval, optlen);
 	case SO_KEEPALIVE:
 	case SO_PRIORITY:
 	case SO_SNDBUF:
@@ -806,6 +823,9 @@ static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
 	case SOL_TCP:
 		return mptcp_setsockopt_sol_tcp_first_sf_only(msk, optname,
 							      optval, optlen);
+	case SOL_SOCKET:
+		return mptcp_setsockopt_sol_socket_first_sf_only(msk, optname,
+								 optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
