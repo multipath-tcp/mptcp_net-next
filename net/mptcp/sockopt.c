@@ -848,9 +848,9 @@ static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
 	return -EOPNOTSUPP;
 }
 
-static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
-				   int optname, sockptr_t optval,
-				   unsigned int optlen)
+static int mptcp_setsockopt_sol_tcp_all_sf(struct mptcp_sock *msk,
+					   int optname, sockptr_t optval,
+					   unsigned int optlen)
 {
 	struct mptcp_subflow_context *subflow;
 	int ret = 0;
@@ -858,11 +858,24 @@ static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-		ret = tcp_setsockopt(ssk, level, optname, optval, optlen);
+		ret = tcp_setsockopt(ssk, SOL_TCP, optname, optval, optlen);
 		if (ret)
 			break;
 	}
 	return ret;
+}
+
+static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
+				   int optname, sockptr_t optval,
+				   unsigned int optlen)
+{
+	switch (level) {
+	case SOL_TCP:
+		return mptcp_setsockopt_sol_tcp_all_sf(msk, optname,
+						       optval, optlen);
+	}
+
+	return -EOPNOTSUPP;
 }
 
 static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
