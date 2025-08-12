@@ -776,8 +776,8 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 	return -EOPNOTSUPP;
 }
 
-static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level, int optname,
-					  sockptr_t optval, unsigned int optlen)
+static int mptcp_setsockopt_sol_tcp_first_sf_only(struct mptcp_sock *msk, int optname,
+						  sockptr_t optval, unsigned int optlen)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct sock *ssk;
@@ -791,11 +791,24 @@ static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level, int
 		goto unlock;
 	}
 
-	ret = tcp_setsockopt(ssk, level, optname, optval, optlen);
+	ret = tcp_setsockopt(ssk, SOL_TCP, optname, optval, optlen);
 
 unlock:
 	release_sock(sk);
 	return ret;
+}
+
+static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
+					  int optname, sockptr_t optval,
+					  unsigned int optlen)
+{
+	switch (level) {
+	case SOL_TCP:
+		return mptcp_setsockopt_sol_tcp_first_sf_only(msk, optname,
+							      optval, optlen);
+	}
+
+	return -EOPNOTSUPP;
 }
 
 static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
