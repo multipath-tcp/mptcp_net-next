@@ -20,6 +20,9 @@
 static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
 					  int optname, sockptr_t optval,
 					  unsigned int optlen);
+static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
+				   int optname, sockptr_t optval,
+				   unsigned int optlen);
 
 static struct sock *__mptcp_tcp_fallback(struct mptcp_sock *msk)
 {
@@ -760,12 +763,16 @@ static int mptcp_setsockopt_sol_ip_first_sf_only(struct mptcp_sock *msk, int opt
 	return 0;
 }
 
-static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
-				       sockptr_t optval, unsigned int optlen)
+static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk,
+					  int optname, sockptr_t optval,
+					  unsigned int optlen)
 {
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 	int err, val;
+
+	if (optname != IP_TOS)
+		return -EOPNOTSUPP;
 
 	err = ip_setsockopt(sk, SOL_IP, optname, optval, optlen);
 
@@ -774,13 +781,15 @@ static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
 
 	lock_sock(sk);
 	sockopt_seq_inc(msk);
-	val = READ_ONCE(inet_sk(sk)->tos);
+	if (optname == IP_TOS)
+		val = READ_ONCE(inet_sk(sk)->tos);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow;
 
 		slow = lock_sock_fast(ssk);
-		__ip_sock_set_tos(ssk, val);
+		if (optname == IP_TOS)
+			__ip_sock_set_tos(ssk, val);
 		unlock_sock_fast(ssk, slow);
 	}
 	release_sock(sk);
@@ -798,7 +807,7 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_LOCAL_PORT_RANGE:
 		return mptcp_setsockopt_first_sf_only(msk, SOL_IP, optname, optval, optlen);
 	case IP_TOS:
-		return mptcp_setsockopt_v4_set_tos(msk, optname, optval, optlen);
+		return mptcp_setsockopt_all_sf(msk, SOL_IP, optname, optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
@@ -873,6 +882,9 @@ static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
 	case SOL_TCP:
 		return mptcp_setsockopt_sol_tcp_all_sf(msk, optname,
 						       optval, optlen);
+	case SOL_IP:
+		return mptcp_setsockopt_sol_ip_all_sf(msk, optname,
+						      optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
