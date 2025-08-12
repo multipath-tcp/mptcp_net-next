@@ -774,7 +774,7 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk, int level,
 	struct sock *sk = (struct sock *)msk;
 	int err, val;
 
-	if (optname != IP_TOS &&
+	if (optname != IP_TOS && optname != IP_TTL &&
 	    optname != IPV6_TCLASS)
 		return -EOPNOTSUPP;
 
@@ -792,6 +792,8 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk, int level,
 	sockopt_seq_inc(msk);
 	if (optname == IP_TOS)
 		val = READ_ONCE(inet_sk(sk)->tos);
+	else if (optname == IP_TTL)
+		val = READ_ONCE(inet_sk(sk)->uc_ttl);
 	else if (optname == IPV6_TCLASS)
 		val = READ_ONCE(inet6_sk(sk)->tclass);
 	mptcp_for_each_subflow(msk, subflow) {
@@ -801,6 +803,8 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk, int level,
 		slow = lock_sock_fast(ssk);
 		if (optname == IP_TOS)
 			__ip_sock_set_tos(ssk, val);
+		else if (optname == IP_TTL)
+			WRITE_ONCE(inet_sk(ssk)->uc_ttl, val);
 		else if (optname == IPV6_TCLASS)
 			WRITE_ONCE(inet6_sk(ssk)->tclass, val);
 		unlock_sock_fast(ssk, slow);
@@ -820,6 +824,7 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_LOCAL_PORT_RANGE:
 		return mptcp_setsockopt_first_sf_only(msk, SOL_IP, optname, optval, optlen);
 	case IP_TOS:
+	case IP_TTL:
 		return mptcp_setsockopt_all_sf(msk, SOL_IP, optname, optval, optlen);
 	}
 
@@ -1528,6 +1533,7 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 			       char __user *optval, int __user *optlen)
 {
 	struct sock *sk = (void *)msk;
+	int val;
 
 	switch (optname) {
 	case IP_TOS:
@@ -1544,6 +1550,11 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_LOCAL_PORT_RANGE:
 		return mptcp_put_int_option(msk, optval, optlen,
 				READ_ONCE(inet_sk(sk)->local_port_range));
+	case IP_TTL:
+		val = READ_ONCE(inet_sk(sk)->uc_ttl);
+		if (val < 0)
+			val = READ_ONCE(sock_net(sk)->ipv4.sysctl_ip_default_ttl);
+		return mptcp_put_int_option(msk, optval, optlen, val);
 	}
 
 	return -EOPNOTSUPP;
@@ -1675,6 +1686,7 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	inet_assign_bit(FREEBIND, ssk, inet_test_bit(FREEBIND, sk));
 	inet_assign_bit(BIND_ADDRESS_NO_PORT, ssk, inet_test_bit(BIND_ADDRESS_NO_PORT, sk));
 	WRITE_ONCE(inet_sk(ssk)->local_port_range, READ_ONCE(inet_sk(sk)->local_port_range));
+	WRITE_ONCE(inet_sk(ssk)->uc_ttl, READ_ONCE(inet_sk(sk)->uc_ttl));
 	if (ssk->sk_family == AF_INET6)
 		WRITE_ONCE(inet6_sk(ssk)->tclass, READ_ONCE(inet6_sk(sk)->tclass));
 }
