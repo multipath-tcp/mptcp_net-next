@@ -401,51 +401,62 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	return -EOPNOTSUPP;
 }
 
+static int mptcp_setsockopt_sol_ipv6_first_sf_only(struct mptcp_sock *msk, int optname,
+						   sockptr_t optval, unsigned int optlen)
+{
+	struct sock *sk = (struct sock *)msk;
+	struct sock *ssk;
+	int ret;
+
+	if (optname != IPV6_V6ONLY && optname != IPV6_TRANSPARENT &&
+	    optname != IPV6_FREEBIND)
+		return -EOPNOTSUPP;
+
+	lock_sock(sk);
+	ssk = __mptcp_nmpc_sk(msk);
+	if (IS_ERR(ssk)) {
+		release_sock(sk);
+		return PTR_ERR(ssk);
+	}
+
+	ret = tcp_setsockopt(ssk, SOL_IPV6, optname, optval, optlen);
+	if (ret != 0) {
+		release_sock(sk);
+		return ret;
+	}
+
+	sockopt_seq_inc(msk);
+
+	switch (optname) {
+	case IPV6_V6ONLY:
+		sk->sk_ipv6only = ssk->sk_ipv6only;
+		break;
+	case IPV6_TRANSPARENT:
+		inet_assign_bit(TRANSPARENT, sk,
+				inet_test_bit(TRANSPARENT, ssk));
+		break;
+	case IPV6_FREEBIND:
+		inet_assign_bit(FREEBIND, sk,
+				inet_test_bit(FREEBIND, ssk));
+		break;
+	}
+
+	release_sock(sk);
+	return 0;
+}
+
 static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 			       sockptr_t optval, unsigned int optlen)
 {
-	struct sock *sk = (struct sock *)msk;
-	int ret = -EOPNOTSUPP;
-	struct sock *ssk;
-
 	switch (optname) {
 	case IPV6_V6ONLY:
 	case IPV6_TRANSPARENT:
 	case IPV6_FREEBIND:
-		lock_sock(sk);
-		ssk = __mptcp_nmpc_sk(msk);
-		if (IS_ERR(ssk)) {
-			release_sock(sk);
-			return PTR_ERR(ssk);
-		}
-
-		ret = tcp_setsockopt(ssk, SOL_IPV6, optname, optval, optlen);
-		if (ret != 0) {
-			release_sock(sk);
-			return ret;
-		}
-
-		sockopt_seq_inc(msk);
-
-		switch (optname) {
-		case IPV6_V6ONLY:
-			sk->sk_ipv6only = ssk->sk_ipv6only;
-			break;
-		case IPV6_TRANSPARENT:
-			inet_assign_bit(TRANSPARENT, sk,
-					inet_test_bit(TRANSPARENT, ssk));
-			break;
-		case IPV6_FREEBIND:
-			inet_assign_bit(FREEBIND, sk,
-					inet_test_bit(FREEBIND, ssk));
-			break;
-		}
-
-		release_sock(sk);
-		break;
+		return mptcp_setsockopt_first_sf_only(msk, SOL_IPV6, optname,
+						      optval, optlen);
 	}
 
-	return ret;
+	return -EOPNOTSUPP;
 }
 
 static bool mptcp_supported_sockopt(int level, int optname)
@@ -829,6 +840,9 @@ static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
 	case SOL_IP:
 		return mptcp_setsockopt_sol_ip_first_sf_only(msk, optname,
 							     optval, optlen);
+	case SOL_IPV6:
+		return mptcp_setsockopt_sol_ipv6_first_sf_only(msk, optname,
+							       optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
