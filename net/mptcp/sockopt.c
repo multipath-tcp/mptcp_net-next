@@ -457,6 +457,9 @@ static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_FREEBIND:
 		return mptcp_setsockopt_first_sf_only(msk, SOL_IPV6, optname,
 						      optval, optlen);
+	case IPV6_TCLASS:
+		return mptcp_setsockopt_all_sf(msk, SOL_IPV6, optname,
+					       optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
@@ -763,7 +766,7 @@ static int mptcp_setsockopt_sol_ip_first_sf_only(struct mptcp_sock *msk, int opt
 	return 0;
 }
 
-static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk,
+static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk, int level,
 					  int optname, sockptr_t optval,
 					  unsigned int optlen)
 {
@@ -771,10 +774,16 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk,
 	struct sock *sk = (struct sock *)msk;
 	int err, val;
 
-	if (optname != IP_TOS)
+	if (optname != IP_TOS &&
+	    optname != IPV6_TCLASS)
 		return -EOPNOTSUPP;
 
-	err = ip_setsockopt(sk, SOL_IP, optname, optval, optlen);
+	if (level == SOL_IP)
+		err = ip_setsockopt(sk, level, optname, optval, optlen);
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	else
+		err = ipv6_setsockopt(sk, level, optname, optval, optlen);
+#endif
 
 	if (err != 0)
 		return err;
@@ -783,6 +792,8 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk,
 	sockopt_seq_inc(msk);
 	if (optname == IP_TOS)
 		val = READ_ONCE(inet_sk(sk)->tos);
+	else if (optname == IPV6_TCLASS)
+		val = READ_ONCE(inet6_sk(sk)->tclass);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow;
@@ -790,6 +801,8 @@ static int mptcp_setsockopt_sol_ip_all_sf(struct mptcp_sock *msk,
 		slow = lock_sock_fast(ssk);
 		if (optname == IP_TOS)
 			__ip_sock_set_tos(ssk, val);
+		else if (optname == IPV6_TCLASS)
+			WRITE_ONCE(inet6_sk(ssk)->tclass, val);
 		unlock_sock_fast(ssk, slow);
 	}
 	release_sock(sk);
@@ -883,7 +896,8 @@ static int mptcp_setsockopt_all_sf(struct mptcp_sock *msk, int level,
 		return mptcp_setsockopt_sol_tcp_all_sf(msk, optname,
 						       optval, optlen);
 	case SOL_IP:
-		return mptcp_setsockopt_sol_ip_all_sf(msk, optname,
+	case SOL_IPV6:
+		return mptcp_setsockopt_sol_ip_all_sf(msk, level, optname,
 						      optval, optlen);
 	}
 
@@ -1550,6 +1564,9 @@ static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_FREEBIND:
 		return mptcp_put_int_option(msk, optval, optlen,
 					    inet_test_bit(FREEBIND, sk));
+	case IPV6_TCLASS:
+		return mptcp_put_int_option(msk, optval, optlen,
+					    inet6_sk(sk)->tclass);
 	}
 
 	return -EOPNOTSUPP;
@@ -1658,6 +1675,8 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	inet_assign_bit(FREEBIND, ssk, inet_test_bit(FREEBIND, sk));
 	inet_assign_bit(BIND_ADDRESS_NO_PORT, ssk, inet_test_bit(BIND_ADDRESS_NO_PORT, sk));
 	WRITE_ONCE(inet_sk(ssk)->local_port_range, READ_ONCE(inet_sk(sk)->local_port_range));
+	if (ssk->sk_family == AF_INET6)
+		WRITE_ONCE(inet6_sk(ssk)->tclass, READ_ONCE(inet6_sk(sk)->tclass));
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
