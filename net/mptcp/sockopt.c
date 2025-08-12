@@ -703,8 +703,8 @@ static int __mptcp_setsockopt_sol_tcp_nodelay(struct mptcp_sock *msk, int val)
 	return 0;
 }
 
-static int mptcp_setsockopt_sol_ip_set(struct mptcp_sock *msk, int optname,
-				       sockptr_t optval, unsigned int optlen)
+static int mptcp_setsockopt_sol_ip_first_sf_only(struct mptcp_sock *msk, int optname,
+						 sockptr_t optval, unsigned int optlen)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct sock *ssk;
@@ -785,7 +785,7 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_TRANSPARENT:
 	case IP_BIND_ADDRESS_NO_PORT:
 	case IP_LOCAL_PORT_RANGE:
-		return mptcp_setsockopt_sol_ip_set(msk, optname, optval, optlen);
+		return mptcp_setsockopt_first_sf_only(msk, SOL_IP, optname, optval, optlen);
 	case IP_TOS:
 		return mptcp_setsockopt_v4_set_tos(msk, optname, optval, optlen);
 	}
@@ -826,6 +826,9 @@ static int mptcp_setsockopt_first_sf_only(struct mptcp_sock *msk, int level,
 	case SOL_SOCKET:
 		return mptcp_setsockopt_sol_socket_first_sf_only(msk, optname,
 								 optval, optlen);
+	case SOL_IP:
+		return mptcp_setsockopt_sol_ip_first_sf_only(msk, optname,
+							     optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
