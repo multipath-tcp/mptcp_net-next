@@ -1,4 +1,25 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-skb-if-MPTCP-skb-extension-allocation-fails
+From: Christoph Paasch <cpaasch@openai.com>
+Subject: [PATCH] mptcp: drop skb if MPTCP skb extension allocation fails
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When skb_ext_add(skb, SKB_EXT_MPTCP) fails in mptcp_incoming_options(),
+we used to return true, letting the segment proceed through the TCP
+receive path without a DSS mapping. Such segments can leave inconsistent
+mapping state and trigger a mid-stream fallback to TCP, which in testing
+collapsed (by artificially forcing failures in skb_ext_add) throughput
+to zero.
+
+Return false instead so the TCP input path drops the skb (see
+tcp_data_queue() and step-7 processing). This is the safer choice
+under memory pressure: it preserves MPTCP correctness and provides
+backpressure to the sender.
+
+Control packets remain unaffected: ACK updates and DATA_FIN handling
+happen before attempting the extension allocation, and tcp_reset()
+continues to ignore the return value.
+
+With this change, MPTCP continues to work at high throughput if we
+artificially inject failures into skb_ext_add.
+
+Fixes: 6787b7e350d3 ("mptcp: avoid processing packet if a subflow reset")
+Signed-off-by: Christoph Paasch <cpaasch@openai.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
