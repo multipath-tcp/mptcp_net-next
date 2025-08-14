@@ -74,6 +74,8 @@ unset join_create_err
 unset join_bind_err
 unset join_connect_err
 
+unset ns1_fb
+unset ns2_fb
 unset infinite_map_tx_fb
 unset dss_corruption_fb
 unset simult_conn_fb
@@ -1581,6 +1583,20 @@ chk_join_nr()
 
 	join_syn_tx="${join_syn_tx:-${syn_nr}}" \
 		chk_join_tx_nr
+
+	if [[ -n "$ns1_fb" ]]; then
+		eval "$ns1_fb" \
+			chk_fallback_nr ${ns1}
+	else
+		chk_fallback_nr ${ns1}
+	fi
+
+	if [[ -n "$ns2_fb" ]]; then
+		eval "$ns2_fb" \
+			chk_fallback_nr ${ns2}
+	else
+		chk_fallback_nr ${ns2}
+	fi
 
 	if $validate_checksum; then
 		chk_csum_nr $csum_ns1 $csum_ns2
@@ -3435,6 +3451,7 @@ fail_tests()
 		join_csum_ns1=+1 join_csum_ns2=+0 \
 			join_fail_nr=1 join_rst_nr=0 join_infi_nr=1 \
 			join_corrupted_pkts="$(pedit_action_pkts)" \
+			ns1_fb="dss_fb=1" ns2_fb="infinite_map_tx_fb=1" \
 			chk_join_nr 0 0 0
 		chk_fail_nr 1 -1 invert
 	fi
