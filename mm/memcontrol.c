@@ -5006,8 +5006,11 @@ void mem_cgroup_sk_alloc(struct sock *sk)
 	if (!in_task())
 		return;
 
+	memcg = current->active_memcg;
+
 	rcu_read_lock();
-	memcg = mem_cgroup_from_task(current);
+	if (likely(!memcg))
+		memcg = mem_cgroup_from_task(current);
 	if (mem_cgroup_is_root(memcg))
 		goto out;
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) && !memcg1_tcpmem_active(memcg))
