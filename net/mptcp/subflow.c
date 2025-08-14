@@ -1759,7 +1759,7 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	if (unlikely(!sk->sk_socket))
 		return -EINVAL;
 
-	memcg = set_active_memcg(sk->sk_memcg);
+	memcg = set_active_memcg(mem_cgroup_from_sk(sk));
 	err = sock_create_kern(net, family, SOCK_STREAM, IPPROTO_TCP, &sf);
 	set_active_memcg(memcg);
 	if (err)
