@@ -74,6 +74,15 @@ unset join_create_err
 unset join_bind_err
 unset join_connect_err
 
+unset infinite_map_tx_fb
+unset dss_corruption_fb
+unset simult_conn_fb
+unset mpc_passive_fb
+unset mpc_active_fb
+unset mpc_data_fb
+unset MD5_Sig_fb
+unset dss_fb
+
 # generated using "nfbpf_compile '(ip && (ip[54] & 0xf0) == 0x30) ||
 #				  (ip6 && (ip6[74] & 0xf0) == 0x30)'"
 CBPF_MPTCP_SUBOPTION_ADD_ADDR="14,
@@ -1397,6 +1406,95 @@ chk_join_tx_nr()
 	fi
 
 	print_results "join Tx" ${rc}
+}
+
+chk_fallback_nr()
+{
+	local infinite_map_tx=${infinite_map_tx_fb:-0}
+	local dss_corruption=${dss_corruption_fb:-0}
+	local simult_conn=${simult_conn_fb:-0}
+	local mpc_passive=${mpc_passive_fb:-0}
+	local mpc_active=${mpc_active_fb:-0}
+	local mpc_data=${mpc_data_fb:-0}
+	local MD5_Sig=${MD5_Sig_fb:-0}
+	local dss=${dss_fb:-0}
+	local rc=${KSFT_PASS}
+	local ns=$1
+	local count
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMPCapableFallbackACK")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$mpc_passive" ]; then
+		rc=${KSFT_FAIL}
+		print_check "mpc passive fallback "
+		fail_test "got $count mpc passive fallback[s] expected $mpc_passive"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMPCapableFallbackSYNACK")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$mpc_active" ]; then
+		rc=${KSFT_FAIL}
+		print_check "mpc active fallback "
+		fail_test "got $count mpc active fallback[s] expected $mpc_active"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtDSSCorruptionFallback")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$dss_corruption" ]; then
+		rc=${KSFT_FAIL}
+		print_check "dss corruption fallback "
+		fail_test "got $count dss corruption fallback[s] expected $dss_corruption"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtInfiniteMapTx")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$infinite_map_tx" ]; then
+		rc=${KSFT_FAIL}
+		print_check "infinite map tx fallback "
+		fail_test "got $count infinite map tx fallback[s] expected $infinite_map_tx"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMPCapableDataFallback")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$mpc_data" ]; then
+		rc=${KSFT_FAIL}
+		print_check "mpc data fallback "
+		fail_test "got $count mpc data fallback[s] expected $mpc_data"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtMD5SigFallback")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$MD5_Sig" ]; then
+		rc=${KSFT_FAIL}
+		print_check "MD5 Sig fallback "
+		fail_test "got $count MD5 Sig fallback[s] expected $MD5_Sig"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtDssFallback")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$dss" ]; then
+		rc=${KSFT_FAIL}
+		print_check "dss fallback "
+		fail_test "got $count dss fallback[s] expected $dss"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns} "MPTcpExtSimultConnectFallback")
+	if [ -z "$count" ]; then
+		rc=${KSFT_SKIP}
+	elif [ "$count" != "$simult_conn" ]; then
+		rc=${KSFT_FAIL}
+		print_check "simult conn fallback "
+		fail_test "got $count simult conn fallback[s] expected $simult_conn"
+	fi
+
+	print_results "check fallback nr" ${rc}
 }
 
 chk_join_nr()
