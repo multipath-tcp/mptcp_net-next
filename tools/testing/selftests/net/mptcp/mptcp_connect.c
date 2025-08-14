@@ -44,6 +44,7 @@ extern int optind;
 #endif
 
 static int  poll_timeout = 10 * 1000;
+static bool abnormal_connection;
 static bool listen_mode;
 static bool quit;
 
@@ -1422,7 +1423,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "6c:f:hi:I:jlm:M:o:p:P:r:R:s:S:t:T:w:")) != -1) {
+	while ((c = getopt(argc, argv, "6c:f:hi:I:jlAm:M:o:p:P:r:R:s:S:t:T:w:")) != -1) {
 		switch (c) {
 		case 'f':
 			cfg_truncate = atoi(optarg);
@@ -1500,6 +1501,9 @@ static void parse_opts(int argc, char **argv)
 		case 'o':
 			parse_setsock_options(optarg);
 			break;
+		case 'A':
+			abnormal_connection = true;
+			break;
 		}
 	}
 
@@ -1509,6 +1513,29 @@ static void parse_opts(int argc, char **argv)
 
 	if (strchr(cfg_host, ':'))
 		pf = AF_INET6;
+}
+
+int self_conn_no_listen(void)
+{
+	int fd = sock_listen_mptcp(cfg_host, cfg_port);
+	socklen_t addr_len = sizeof(struct sockaddr_in);
+	struct sockaddr_in addr;
+
+	if (fd < 0)
+		return 1;
+
+	if (getsockname(fd, (struct sockaddr *)&addr, &addr_len) < 0) {
+		perror("getsockname() failed");
+		close(fd);
+		exit(1);
+	}
+
+	shutdown(fd, SHUT_RD);
+
+	connect(fd, (struct sockaddr *)&addr, addr_len);
+
+	close(fd);
+	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -1535,6 +1562,9 @@ int main(int argc, char *argv[])
 
 		return main_loop_s(fd);
 	}
+
+	if (abnormal_connection)
+		return self_conn_no_listen();
 
 	return main_loop();
 }

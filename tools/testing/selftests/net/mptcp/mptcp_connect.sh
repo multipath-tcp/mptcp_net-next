@@ -819,6 +819,32 @@ run_tests_disconnect()
 	connect_per_transfer=1
 }
 
+run_tests_selfconn_no_listen()
+{
+	local count
+	local msg
+
+	mptcp_lib_pr_info "${TEST_GROUP} test"
+
+	print_larger_title "Client fallback due to connecting to itself "
+	ip netns exec $1 ./mptcp_connect -p 10000 -s MPTCP -A 127.0.0.1
+	count=$(mptcp_lib_get_counter $1 "MPTcpExtSimultConnectFallback")
+
+	if [ -z "$count" ]; then
+		mptcp_lib_pr_skip "Self conn fallback counter not supported"
+		mptcp_lib_result_skip "${TEST_GROUP}"
+		msg="SKIP"
+	elif [ "$count" -le 0 ]; then
+		mptcp_lib_pr_fail "got $count self conn fallback expected 1"
+		msg="Fail"
+	else
+		mptcp_lib_pr_ok
+		msg="Pass"
+	fi
+
+	mptcp_lib_pr_info "test ${TEST_GROUP} ${msg}"
+}
+
 display_time()
 {
 	time_end=$(date +%s)
@@ -882,6 +908,9 @@ mptcp_lib_result_code "${ret}" "ping tests"
 
 stop_if_error "Could not even run ping tests"
 mptcp_lib_pr_ok
+
+TEST_GROUP=" test self connection"
+run_tests_selfconn_no_listen ${ns1}
 
 [ -n "$tc_loss" ] && tc -net "$ns2" qdisc add dev ns2eth3 root netem loss random $tc_loss delay ${tc_delay}ms
 tc_info="loss of $tc_loss "
