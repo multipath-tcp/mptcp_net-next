@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-remove-duplicate-sk_reset_timer-call
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: remove duplicate sk_reset_timer call
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+sk_reset_timer() was called twice in mptcp_pm_alloc_anno_list. Simplify the
+code by using a 'goto' statement to eliminate the duplication.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
