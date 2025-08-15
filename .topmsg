@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-kernel-flush-do-not-reset-ADD_ADDR-limit
+Subject: [PATCH] mptcp: pm: kernel: flush: do not reset ADD_ADDR limit
 
+A flush of the MPTCP endpoints should not affect the MPTCP limits. In
+other words, 'ip mptcp endpoint flush' should not change 'ip mptcp
+limits'.
+
+But it was the case: the MPTCP_PM_ATTR_RCV_ADD_ADDRS (add_addr_accepted)
+limit was reset by accident. Removing the reset of this counter during a
+flush fixes this issue.
+
+Fixes: 01cacb00b35c ("mptcp: add netlink-based PM")
+Reported-by: Thomas Dreibholz <dreibh@simula.no>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/579
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
