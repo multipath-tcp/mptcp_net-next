@@ -1,4 +1,28 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-make-ADD_ADDR-retransmission-timeout-adaptive
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: make ADD_ADDR retransmission timeout adaptive
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Currently the ADD_ADDR option is retransmitted with a fixed timeout. This
+patch makes the retransmission timeout adaptive by using the maximum RTO
+among all the subflows, while still capping it at the configured maximum
+value (add_addr_timeout_max). This improves responsiveness when
+establishing new subflows.
+
+Specifically:
+1. Adds mptcp_adjust_add_addr_timeout() helper to compute the adaptive
+timeout.
+2. Uses maximum subflow RTO (icsk_rto) when available.
+3. Applies exponential backoff based on retransmission count.
+4. Maintains fallback to configured max timeout when no RTO data exists.
+
+This slightly changes the behaviour of the MPTCP "add_addr_timeout"
+sysctl knob to be used as a maximum instead of a fixed value. But this
+is seen as an improvement: the ADD_ADDR might be sent quicker than
+before to improve the overall MPTCP connection. Also, the default
+value is set to 2 min, which was already way too long, and caused the
+ADD_ADDR not to be retransmitted for connections shorter than 2 minutes.
+
+Suggested-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/576
+Reviewed-by: Christoph Paasch <cpaasch@openai.com>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
