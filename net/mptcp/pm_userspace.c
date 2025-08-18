@@ -687,7 +687,13 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 	return ret;
 }
 
+static void mptcp_pm_userspace_release(struct mptcp_sock *msk)
+{
+	mptcp_userspace_pm_free_local_addr_list(msk);
+}
+
 static struct mptcp_pm_ops mptcp_pm_userspace = {
+	.release		= mptcp_pm_userspace_release,
 	.name			= "userspace",
 	.owner			= THIS_MODULE,
 };
