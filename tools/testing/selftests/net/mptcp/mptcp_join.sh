@@ -347,8 +347,6 @@ reset_with_add_addr_timeout()
 		tables="${ip6tables}"
 	fi
 
-	ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
-
 	if ! ip netns exec $ns2 $tables -A OUTPUT -p tcp \
 			-m tcp --tcp-option 30 \
 			-m bpf --bytecode \
@@ -2183,7 +2181,6 @@ signal_address_tests()
 		pm_nl_add_endpoint $ns2 10.0.4.2 flags signal
 
 		# the peer could possibly miss some addr notification, allow retransmission
-		ip netns exec $ns1 sysctl -q net.mptcp.add_addr_timeout=1
 		speed=slow \
 			run_tests $ns1 $ns2 10.0.1.1
 
