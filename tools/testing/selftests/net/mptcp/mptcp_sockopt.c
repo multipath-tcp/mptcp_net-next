@@ -182,6 +182,19 @@ again:
 	}
 }
 
+static void do_setsockopt_reuseaddr(int fd)
+{
+	int one = 1;
+
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)))
+		perror("setsockopt(SO_REUSEADDR)");
+}
+
+static void do_setsockopts(int fd)
+{
+	do_setsockopt_reuseaddr(fd);
+}
+
 static int sock_listen_mptcp(const char * const listenaddr,
 			     const char * const port)
 {
@@ -195,7 +208,6 @@ static int sock_listen_mptcp(const char * const listenaddr,
 	hints.ai_family = pf;
 
 	struct addrinfo *a, *addr;
-	int one = 1;
 
 	xgetaddrinfo(listenaddr, port, &hints, &addr);
 	hints.ai_family = pf;
@@ -205,9 +217,7 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		if (sock < 0)
 			continue;
 
-		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
-				     sizeof(one)))
-			perror("setsockopt");
+		do_setsockopts(sock);
 
 		if (bind(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
@@ -245,6 +255,8 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 		sock = socket(a->ai_family, a->ai_socktype, proto);
 		if (sock < 0)
 			continue;
+
+		do_setsockopts(sock);
 
 		if (connect(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
@@ -554,6 +566,18 @@ static void do_getsockopt_mptcp_full_info(struct so_state *s, int fd)
 	assert(!memcmp(&sfinfo->addrs, &s->addrs, sizeof(struct mptcp_subflow_addrs)));
 }
 
+static void do_getsockopt_reuseaddr(int fd)
+{
+	socklen_t len;
+	int reuse;
+
+	len = sizeof(reuse);
+	if (getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, &len))
+		perror("getsockopt(SO_REUSEADDR)");
+
+	assert(reuse == 1);
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -564,6 +588,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 
 	if (r)
 		do_getsockopt_mptcp_full_info(s, fd);
+
+	do_getsockopt_reuseaddr(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
