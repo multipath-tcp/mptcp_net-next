@@ -382,9 +382,19 @@ mptcp_lib_make_file() {
 
 # $1: file
 mptcp_lib_print_file_err() {
+	local end
+
 	ls -l "${1}" 1>&2
 	echo "Trailing bytes are: "
-	tail -c 27 "${1}"
+	end=$(tail -c 32 "${1}")
+	if command -v hexdump >/dev/null; then
+		echo "${end}" | hexdump -C | head -n2
+	elif busybox hexdump --help 2>/dev/null; then
+		echo "${end}" | busybox hexdump -C | head -n2
+	else
+		echo "${end}"
+		echo
+	fi
 }
 
 # $1: input file ; $2: output file ; $3: what kind of file
