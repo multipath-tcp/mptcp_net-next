@@ -29,6 +29,7 @@
 #include <linux/tcp.h>
 
 static int pf = AF_INET;
+static uint8_t tos_in;
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -233,12 +234,20 @@ static void do_setsockopt_bindtoifindex(int fd)
 		perror("setsockopt(SO_BINDTOIFINDEX)");
 }
 
+static void do_setsockopt_tos(int fd)
+{
+	tos_in = rand() & 0xfc;
+	if (setsockopt(fd, SOL_IP, IP_TOS, &tos_in, sizeof(tos_in)))
+		die_perror("setsockopt(IP_TOS)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
 	do_setsockopt_reuseport(fd);
 	do_setsockopt_bindtodevice(fd);
 	do_setsockopt_bindtoifindex(fd);
+	do_setsockopt_tos(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -661,6 +670,40 @@ static void do_getsockopt_bindtoifindex(int fd)
 	assert(ifindex == get_ifindex(fd, "lo"));
 }
 
+static void do_getsockopt_tos(int fd)
+{
+	uint8_t tos_out;
+	socklen_t s;
+	int r;
+
+	tos_out = 0;
+	s = sizeof(tos_out);
+	if (getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s))
+		die_perror("getsockopt IP_TOS");
+
+	if (!tos_in)
+		xerror("tos_in shouldn't be 0");
+
+	if (tos_in != tos_out)
+		xerror("tos %x != %x socklen_t %d\n", tos_in, tos_out, s);
+
+	if (s != 1)
+		xerror("tos should be 1 byte");
+
+	s = 0;
+	if (getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s))
+		die_perror("getsockopt IP_TOS 0");
+	if (s != 0)
+		xerror("expect socklen_t == 0");
+
+	s = -1;
+	r = getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s);
+	if (r != -1 && errno != EINVAL)
+		die_perror("getsockopt IP_TOS did not indicate -EINVAL");
+	if (s != -1)
+		xerror("expect socklen_t == -1");
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -679,6 +722,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_bindtodevice(fd);
 
 	do_getsockopt_bindtoifindex(fd);
+
+	do_getsockopt_tos(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
@@ -840,44 +885,6 @@ static int server(int pipefd)
 	return 0;
 }
 
-static void test_ip_tos_sockopt(int fd)
-{
-	uint8_t tos_in, tos_out;
-	socklen_t s;
-	int r;
-
-	tos_in = rand() & 0xfc;
-	r = setsockopt(fd, SOL_IP, IP_TOS, &tos_in, sizeof(tos_out));
-	if (r != 0)
-		die_perror("setsockopt IP_TOS");
-
-	tos_out = 0;
-	s = sizeof(tos_out);
-	r = getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s);
-	if (r != 0)
-		die_perror("getsockopt IP_TOS");
-
-	if (tos_in != tos_out)
-		xerror("tos %x != %x socklen_t %d\n", tos_in, tos_out, s);
-
-	if (s != 1)
-		xerror("tos should be 1 byte");
-
-	s = 0;
-	r = getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s);
-	if (r != 0)
-		die_perror("getsockopt IP_TOS 0");
-	if (s != 0)
-		xerror("expect socklen_t == 0");
-
-	s = -1;
-	r = getsockopt(fd, SOL_IP, IP_TOS, &tos_out, &s);
-	if (r != -1 && errno != EINVAL)
-		die_perror("getsockopt IP_TOS did not indicate -EINVAL");
-	if (s != -1)
-		xerror("expect socklen_t == -1");
-}
-
 static int client(int pipefd)
 {
 	int fd = -1;
@@ -894,8 +901,6 @@ static int client(int pipefd)
 	default:
 		xerror("Unknown pf %d\n", pf);
 	}
-
-	test_ip_tos_sockopt(fd);
 
 	connect_one_server(fd, pipefd);
 
