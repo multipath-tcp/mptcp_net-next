@@ -359,6 +359,10 @@ do_mptcp_sockopt_tests()
 	print_title "IP_LOCAL_PORT_RANGE sockopt v6"
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "IP_LOCAL_PORT_RANGE sockopt v6"
+
+	print_title "IPV6_V6ONLY sockopt v6"
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "IPV6_V6ONLY sockopt v6"
 }
 
 run_tests()

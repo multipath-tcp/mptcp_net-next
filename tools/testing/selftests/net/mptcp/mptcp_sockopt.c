@@ -289,6 +289,15 @@ static void do_setsockopt_local_port_range(int fd)
 		perror("setsockopt(IP_LOCAL_PORT_RANGE)");
 }
 
+static void do_setsockopt_v6only(int fd)
+{
+	int v6only = 1;
+
+	if (setsockopt(fd, SOL_IPV6, IPV6_V6ONLY, &v6only,
+		       sizeof(v6only)))
+		perror("setsockopt(IPV6_V6ONLY)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
@@ -300,6 +309,9 @@ static void do_setsockopts(int fd)
 	do_setsockopt_transparent(fd);
 	do_setsockopt_bind_address_no_port(fd);
 	do_setsockopt_local_port_range(fd);
+
+	if (pf == AF_INET6)
+		do_setsockopt_v6only(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -820,6 +832,18 @@ static void do_getsockopt_local_port_range(int fd)
 	assert(port_range == (31000 << 16 | 30000));
 }
 
+static void do_getsockopt_v6only(int fd)
+{
+	socklen_t len;
+	int v6only;
+
+	len = sizeof(v6only);
+	if (getsockopt(fd, SOL_IPV6, IPV6_V6ONLY, &v6only, &len))
+		die_perror("getsockopt(IPV6_V6ONLY)");
+
+	assert(v6only == 1);
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -848,6 +872,9 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_bind_address_no_port(fd);
 
 	do_getsockopt_local_port_range(fd);
+
+	if (pf == AF_INET6)
+		do_getsockopt_v6only(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
