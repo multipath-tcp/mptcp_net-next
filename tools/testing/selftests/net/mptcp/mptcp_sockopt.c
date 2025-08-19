@@ -23,6 +23,7 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <net/if.h>
 
 #include <linux/tcp.h>
 
@@ -198,10 +199,20 @@ static void do_setsockopt_reuseport(int fd)
 		perror("setsockopt(SO_REUSEPORT)");
 }
 
+static void do_setsockopt_bindtodevice(int fd)
+{
+	const char *interface = "lo";
+
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE,
+		       interface, strlen(interface)))
+		perror("setsockopt(SO_BINDTODEVICE)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
 	do_setsockopt_reuseport(fd);
+	do_setsockopt_bindtodevice(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -599,6 +610,18 @@ static void do_getsockopt_reuseport(int fd)
 	assert(reuse == 1);
 }
 
+static void do_getsockopt_bindtodevice(int fd)
+{
+	char ifname[IFNAMSIZ] = { 0 };
+	socklen_t len;
+
+	len = sizeof(ifname);
+	if (getsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, ifname, &len))
+		die_perror("getsockopt(SO_BINDTODEVICE)");
+
+	assert(!memcmp(ifname, "lo", len));
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -613,6 +636,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_reuseaddr(fd);
 
 	do_getsockopt_reuseport(fd);
+
+	do_getsockopt_bindtodevice(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
