@@ -285,6 +285,10 @@ do_mptcp_sockopt_tests()
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "SO_BINDTODEVICE sockopt v4"
 
+	print_title "SO_BINDTOIFINDEX sockopt v4"
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "SO_BINDTOIFINDEX sockopt v4"
+
 	ip netns exec "$ns_sbox" ./mptcp_sockopt -6
 	lret=$?
 
@@ -311,6 +315,10 @@ do_mptcp_sockopt_tests()
 	print_title "SO_BINDTODEVICE sockopt v6"
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "SO_BINDTODEVICE sockopt v6"
+
+	print_title "SO_BINDTOIFINDEX sockopt v6"
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "SO_BINDTOIFINDEX sockopt v6"
 }
 
 run_tests()

@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 
 #include <netdb.h>
 #include <netinet/in.h>
@@ -208,11 +209,36 @@ static void do_setsockopt_bindtodevice(int fd)
 		perror("setsockopt(SO_BINDTODEVICE)");
 }
 
+static int get_ifindex(int fd, const char *ifname)
+{
+	struct ifreq ifr;
+
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+
+	if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0) {
+		perror("ioctl");
+		return -1;
+	}
+
+	return ifr.ifr_ifindex;
+}
+
+static void do_setsockopt_bindtoifindex(int fd)
+{
+	int ifindex = get_ifindex(fd, "lo");
+
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTOIFINDEX,
+		       &ifindex, sizeof(ifindex)))
+		perror("setsockopt(SO_BINDTOIFINDEX)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
 	do_setsockopt_reuseport(fd);
 	do_setsockopt_bindtodevice(fd);
+	do_setsockopt_bindtoifindex(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -622,6 +648,19 @@ static void do_getsockopt_bindtodevice(int fd)
 	assert(!memcmp(ifname, "lo", len));
 }
 
+static void do_getsockopt_bindtoifindex(int fd)
+{
+	socklen_t len;
+	int ifindex;
+
+	len = sizeof(ifindex);
+	if (getsockopt(fd, SOL_SOCKET, SO_BINDTOIFINDEX,
+		       &ifindex, &len))
+		die_perror("getsockopt(SO_BINDTOIFINDEX)");
+
+	assert(ifindex == get_ifindex(fd, "lo"));
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -638,6 +677,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_reuseport(fd);
 
 	do_getsockopt_bindtodevice(fd);
+
+	do_getsockopt_bindtoifindex(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
