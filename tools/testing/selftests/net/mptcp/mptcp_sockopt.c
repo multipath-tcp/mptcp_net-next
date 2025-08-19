@@ -190,9 +190,18 @@ static void do_setsockopt_reuseaddr(int fd)
 		perror("setsockopt(SO_REUSEADDR)");
 }
 
+static void do_setsockopt_reuseport(int fd)
+{
+	int one = 1;
+
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof(one)))
+		perror("setsockopt(SO_REUSEPORT)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
+	do_setsockopt_reuseport(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -578,6 +587,18 @@ static void do_getsockopt_reuseaddr(int fd)
 	assert(reuse == 1);
 }
 
+static void do_getsockopt_reuseport(int fd)
+{
+	socklen_t len;
+	int reuse;
+
+	len = sizeof(reuse);
+	if (getsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuse, &len))
+		perror("getsockopt(SO_REUSEPORT)");
+
+	assert(reuse == 1);
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -590,6 +611,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 		do_getsockopt_mptcp_full_info(s, fd);
 
 	do_getsockopt_reuseaddr(fd);
+
+	do_getsockopt_reuseport(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
