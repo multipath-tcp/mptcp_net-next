@@ -271,6 +271,15 @@ static void do_setsockopt_transparent(int fd)
 		perror("setsockopt(IP_TRANSPARENT)");
 }
 
+static void do_setsockopt_bind_address_no_port(int fd)
+{
+	int enable = 1;
+
+	if (setsockopt(fd, SOL_IP, IP_BIND_ADDRESS_NO_PORT, &enable,
+		       sizeof(enable)))
+		perror("setsockopt(IP_BIND_ADDRESS_NO_PORT)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
@@ -280,6 +289,7 @@ static void do_setsockopts(int fd)
 	do_setsockopt_tos(fd);
 	do_setsockopt_freebind(fd);
 	do_setsockopt_transparent(fd);
+	do_setsockopt_bind_address_no_port(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -774,6 +784,19 @@ static void do_getsockopt_transparent(int fd)
 	assert(enable == 1);
 }
 
+static void do_getsockopt_bind_address_no_port(int fd)
+{
+	socklen_t len;
+	int enable;
+
+	len = sizeof(enable);
+	if (getsockopt(fd, SOL_IP, IP_BIND_ADDRESS_NO_PORT,
+		       &enable, &len))
+		die_perror("getsockopt(IP_TRANSPARENT)");
+
+	assert(enable == 1);
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -798,6 +821,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_freebind(fd);
 
 	do_getsockopt_transparent(fd);
+
+	do_getsockopt_bind_address_no_port(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)

@@ -301,6 +301,10 @@ do_mptcp_sockopt_tests()
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "IP_TRANSPARENT sockopt v4"
 
+	print_title "IP_BIND_ADDRESS_NO_PORT sockopt v4"
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "IP_BIND_ADDRESS_NO_PORT sockopt v4"
+
 	ip netns exec "$ns_sbox" ./mptcp_sockopt -6
 	lret=$?
 
@@ -343,6 +347,10 @@ do_mptcp_sockopt_tests()
 	print_title "IPV6_TRANSPARENT sockopt v6"
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "IPV6_TRANSPARENT sockopt v6"
+
+	print_title "IP_BIND_ADDRESS_NO_PORT sockopt v6"
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "IP_BIND_ADDRESS_NO_PORT sockopt v6"
 }
 
 run_tests()
