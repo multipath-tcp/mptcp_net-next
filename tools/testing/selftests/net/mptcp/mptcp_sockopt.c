@@ -256,6 +256,21 @@ static void do_setsockopt_freebind(int fd)
 		perror("setsockopt(IP_FREEBIND)");
 }
 
+static void do_setsockopt_transparent(int fd)
+{
+	int optname = IP_TRANSPARENT;
+	int level = SOL_IP;
+	int enable = 1;
+
+	if (pf == AF_INET6) {
+		level = SOL_IPV6;
+		optname = IPV6_TRANSPARENT;
+	}
+
+	if (setsockopt(fd, level, optname, &enable, sizeof(enable)))
+		perror("setsockopt(IP_TRANSPARENT)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
@@ -264,6 +279,7 @@ static void do_setsockopts(int fd)
 	do_setsockopt_bindtoifindex(fd);
 	do_setsockopt_tos(fd);
 	do_setsockopt_freebind(fd);
+	do_setsockopt_transparent(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -739,6 +755,25 @@ static void do_getsockopt_freebind(int fd)
 	assert(enable == 1);
 }
 
+static void do_getsockopt_transparent(int fd)
+{
+	int optname = IP_FREEBIND;
+	int level = SOL_IP;
+	socklen_t len;
+	int enable;
+
+	if (pf == AF_INET6) {
+		level = SOL_IPV6;
+		optname = IPV6_FREEBIND;
+	}
+
+	len = sizeof(enable);
+	if (getsockopt(fd, level, optname, &enable, &len))
+		die_perror("getsockopt(IP_TRANSPARENT)");
+
+	assert(enable == 1);
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -761,6 +796,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_tos(fd);
 
 	do_getsockopt_freebind(fd);
+
+	do_getsockopt_transparent(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
