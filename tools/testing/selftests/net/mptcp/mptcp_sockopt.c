@@ -280,6 +280,15 @@ static void do_setsockopt_bind_address_no_port(int fd)
 		perror("setsockopt(IP_BIND_ADDRESS_NO_PORT)");
 }
 
+static void do_setsockopt_local_port_range(int fd)
+{
+	uint32_t port_range = (31000 << 16 | 30000); // [30000 - 31000]
+
+	if (setsockopt(fd, SOL_IP, IP_LOCAL_PORT_RANGE, &port_range,
+		       sizeof(port_range)))
+		perror("setsockopt(IP_LOCAL_PORT_RANGE)");
+}
+
 static void do_setsockopts(int fd)
 {
 	do_setsockopt_reuseaddr(fd);
@@ -290,6 +299,7 @@ static void do_setsockopts(int fd)
 	do_setsockopt_freebind(fd);
 	do_setsockopt_transparent(fd);
 	do_setsockopt_bind_address_no_port(fd);
+	do_setsockopt_local_port_range(fd);
 }
 
 static int sock_listen_mptcp(const char * const listenaddr,
@@ -797,6 +807,19 @@ static void do_getsockopt_bind_address_no_port(int fd)
 	assert(enable == 1);
 }
 
+static void do_getsockopt_local_port_range(int fd)
+{
+	uint32_t port_range;
+	socklen_t len;
+
+	len = sizeof(port_range);
+	if (getsockopt(fd, SOL_IP, IP_LOCAL_PORT_RANGE,
+		       &port_range, &len))
+		die_perror("getsockopt(IP_LOCAL_PORT_RANGE)");
+
+	assert(port_range == (31000 << 16 | 30000));
+}
+
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -823,6 +846,8 @@ static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 	do_getsockopt_transparent(fd);
 
 	do_getsockopt_bind_address_no_port(fd);
+
+	do_getsockopt_local_port_range(fd);
 }
 
 static void connect_one_server(int fd, int pipefd)
