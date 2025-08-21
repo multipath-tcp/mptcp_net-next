@@ -272,7 +272,7 @@ do_mptcp_sockopt_tests()
 	for opt in "SOL_MPTCP" \
 		   "SO_REUSEADDR" "SO_REUSEPORT" \
 		   "SO_BINDTODEVICE" "SO_BINDTOIFINDEX" \
-		   "IP_FREEBIND"; do
+		   "IP_FREEBIND" "IP_TRANSPARENT"; do
 		print_title "$opt sockopt v4"
 		mptcp_lib_pr_ok
 		mptcp_lib_result_pass "$opt sockopt v4"
@@ -292,7 +292,7 @@ do_mptcp_sockopt_tests()
 	for opt in "SOL_MPTCP" \
 		   "SO_REUSEADDR" "SO_REUSEPORT" \
 		   "SO_BINDTODEVICE" "SO_BINDTOIFINDEX" \
-		   "IPV6_FREEBIND"; do
+		   "IPV6_FREEBIND" "IPV6_TRANSPARENT"; do
 		print_title "$opt sockopt v6"
 		mptcp_lib_pr_ok
 		mptcp_lib_result_pass "$opt sockopt v6"
