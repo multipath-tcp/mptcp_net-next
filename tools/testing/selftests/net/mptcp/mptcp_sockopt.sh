@@ -296,7 +296,8 @@ do_mptcp_sockopt_tests()
 		   "SO_BINDTODEVICE" "SO_BINDTOIFINDEX" \
 		   "IPV6_FREEBIND" "IPV6_TRANSPARENT" \
 		   "IP_BIND_ADDRESS_NO_PORT" \
-		   "IP_LOCAL_PORT_RANGE"; do
+		   "IP_LOCAL_PORT_RANGE" \
+		   "IPV6_V6ONLY"; do
 		print_title "$opt sockopt v6"
 		mptcp_lib_pr_ok
 		mptcp_lib_result_pass "$opt sockopt v6"
