@@ -209,7 +209,7 @@ neigh/default/unres_qlen_bytes - INTEGER
 
 	Setting negative value is meaningless and will return error.
 
-	Default: SK_WMEM_MAX, (same as net.core.wmem_default).
+	Default: SK_WMEM_DEFAULT, (same as net.core.wmem_default).
 
 		Exact value depends on architecture and kernel options,
 		but should be enough to allow queuing 256 packets
@@ -805,8 +805,8 @@ tcp_rmem - vector of 3 INTEGERs: min, default, max
 	This value results in initial window of 65535.
 
 	max: maximal size of receive buffer allowed for automatically
-	selected receiver buffers for TCP socket. This value does not override
-	net.core.rmem_max.  Calling setsockopt() with SO_RCVBUF disables
+	selected receiver buffers for TCP socket.
+	Calling setsockopt() with SO_RCVBUF disables
 	automatic tuning of that socket's receive buffer size, in which
 	case this value is ignored.
 	Default: between 131072 and 32MB, depending on RAM size.
@@ -3508,16 +3508,10 @@ cookie_hmac_alg - STRING
 	a listening sctp socket to a connecting client in the INIT-ACK chunk.
 	Valid values are:
 
-	* md5
-	* sha1
+	* sha256
 	* none
 
-	Ability to assign md5 or sha1 as the selected alg is predicated on the
-	configuration of those algorithms at build time (CONFIG_CRYPTO_MD5 and
-	CONFIG_CRYPTO_SHA1).
-
-	Default: Dependent on configuration.  MD5 if available, else SHA1 if
-	available, else none.
+	Default: sha256
 
 rcvbuf_policy - INTEGER
 	Determines if the receive buffer is attributed to the socket or to
