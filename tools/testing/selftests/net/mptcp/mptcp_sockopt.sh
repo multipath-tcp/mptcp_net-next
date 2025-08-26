@@ -305,7 +305,7 @@ run_tests()
 do_tcpinq_test()
 {
 	print_title "TCP_INQ cmsg/ioctl $*"
-	ip netns exec "$ns_sbox" ./mptcp_inq "$@"
+	ip netns exec "$ns_sbox" ./mptcp_sockopt "$@"
 	local lret=$?
 	if [ $lret -ne 0 ];then
 		ret=$lret
@@ -331,19 +331,19 @@ do_tcpinq_tests()
 
 	local args
 	for args in "-t tcp" "-r tcp"; do
-		do_tcpinq_test $args
+		do_tcpinq_test $args -i
 		lret=$?
 		if [ $lret -ne 0 ] ; then
 			return $lret
 		fi
-		do_tcpinq_test -6 $args
+		do_tcpinq_test -6 $args -i
 		lret=$?
 		if [ $lret -ne 0 ] ; then
 			return $lret
 		fi
 	done
 
-	do_tcpinq_test -r tcp -t tcp
+	do_tcpinq_test -r tcp -t tcp -i
 
 	return $?
 }
