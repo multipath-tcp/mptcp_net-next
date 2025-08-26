@@ -687,14 +687,9 @@ static void process_one_client(int fd, int unixfd)
 	if (ret2 < 0)
 		die_perror("write");
 
-	/* wait for hangup */
-	ret3 = read(fd, buf, 1);
-	if (ret3 != 0)
-		xerror("expected EOF, got %lu", ret3);
-
 	do_getsockopts(&s, fd, ret, ret2);
-	if (s.mptcpi_rcv_delta && s.mptcpi_rcv_delta != (uint64_t)ret + 1)
-		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64, s.mptcpi_rcv_delta, ret + 1, s.mptcpi_rcv_delta - ret);
+	if (s.mptcpi_rcv_delta && s.mptcpi_rcv_delta != (uint64_t)ret)
+		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64, s.mptcpi_rcv_delta, ret, s.mptcpi_rcv_delta - ret);
 
 	/* be nice when running on top of older kernel */
 	if (s.pkt_stats_avail) {
@@ -711,6 +706,11 @@ static void process_one_client(int fd, int unixfd)
 			       s.last_sample.mptcpi_bytes_acked, ret2,
 			       s.last_sample.mptcpi_bytes_acked - ret2);
 	}
+
+	/* wait for hangup */
+	ret3 = read(fd, buf, 1);
+	if (ret3 != 0)
+		xerror("expected EOF, got %lu", ret3);
 
 	close(fd);
 }
