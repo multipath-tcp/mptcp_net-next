@@ -642,18 +642,18 @@ static void connect_one_server(int fd, int unixfd)
 		}
 
 		total += ret;
-	} while (total < len);
+	} while (total < len - 1);
 
-	if (total != len)
-		xerror("total %lu, len %lu eof %d\n", total, len, eof);
+	if (total != len - 1)
+		xerror("total %lu, len - 1 %lu eof %d\n", total, len - 1, eof);
 
-	if (memcmp(buf, buf2, len))
+	if (memcmp(buf + 1, buf2, len - 1))
 		xerror("data corruption");
 
 	if (s.tcpi_rcv_delta)
 		assert(s.tcpi_rcv_delta <= total);
 
-	do_getsockopts(&s, fd, ret, ret);
+	do_getsockopts(&s, fd, ret, ret + 1);
 
 	if (eof)
 		total += 1; /* sequence advances due to FIN */
@@ -685,6 +685,14 @@ static void process_one_client(int fd, int unixfd)
 	ret = write(unixfd, "xmit", 4);
 	assert(ret == 4);
 
+	/* read one byte, expect cmsg to return expected - 1 */
+	ret = recvmsg(fd, &msg, 0);
+	if (ret < 0)
+		die_perror("recvmsg");
+
+	if (inq && msg.msg_controllen == 0)
+		xerror("msg_controllen is 0");
+
 	iov.iov_len = sizeof(buf);
 	ret = recvmsg(fd, &msg, 0);
 	if (ret < 0)
@@ -699,9 +707,9 @@ static void process_one_client(int fd, int unixfd)
 	if (ret2 < 0)
 		die_perror("write");
 
-	do_getsockopts(&s, fd, ret, ret2);
-	if (s.mptcpi_rcv_delta && s.mptcpi_rcv_delta != (uint64_t)ret)
-		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64, s.mptcpi_rcv_delta, ret, s.mptcpi_rcv_delta - ret);
+	do_getsockopts(&s, fd, ret + 1, ret2);
+	if (s.mptcpi_rcv_delta && s.mptcpi_rcv_delta != (uint64_t)ret + 1)
+		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64, s.mptcpi_rcv_delta, ret + 1, s.mptcpi_rcv_delta - ret);
 
 	/* be nice when running on top of older kernel */
 	if (s.pkt_stats_avail) {
@@ -709,9 +717,9 @@ static void process_one_client(int fd, int unixfd)
 			xerror("mptcpi_bytes_sent %" PRIu64 ", expect %" PRIu64,
 			       s.last_sample.mptcpi_bytes_sent, ret2,
 			       s.last_sample.mptcpi_bytes_sent - ret2);
-		if (s.last_sample.mptcpi_bytes_received != ret)
+		if (s.last_sample.mptcpi_bytes_received != ret + 1)
 			xerror("mptcpi_bytes_received %" PRIu64 ", expect %" PRIu64,
-			       s.last_sample.mptcpi_bytes_received, ret,
+			       s.last_sample.mptcpi_bytes_received, ret + 1,
 			       s.last_sample.mptcpi_bytes_received - ret);
 		if (s.last_sample.mptcpi_bytes_acked != ret)
 			xerror("mptcpi_bytes_acked %" PRIu64 ", expect %" PRIu64,
