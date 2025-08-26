@@ -740,6 +740,35 @@ static void connect_one_server(int fd, int unixfd)
 	close(unixfd);
 }
 
+static void get_tcp_inq(struct msghdr *msgh, unsigned int *inqv)
+{
+	struct cmsghdr *cmsg;
+
+	for (cmsg = CMSG_FIRSTHDR(msgh); cmsg ; cmsg = CMSG_NXTHDR(msgh, cmsg)) {
+		if (cmsg->cmsg_level == IPPROTO_TCP && cmsg->cmsg_type == TCP_CM_INQ) {
+			memcpy(inqv, CMSG_DATA(cmsg), sizeof(*inqv));
+			return;
+		}
+	}
+
+	xerror("could not find TCP_CM_INQ cmsg type");
+}
+
+static void check_tcp_inq(struct msghdr *msgh, unsigned int check, bool equal)
+{
+	unsigned int tcp_inq;
+
+	if (!inq)
+		return;
+
+	get_tcp_inq(msgh, &tcp_inq);
+
+	if (equal)
+		assert(tcp_inq == check);
+	else
+		assert(tcp_inq <= check);
+}
+
 static void process_one_client(int fd, int unixfd)
 {
 	ssize_t ret, ret2, ret3, tot;
@@ -797,6 +826,8 @@ static void process_one_client(int fd, int unixfd)
 	if (inq && msg.msg_controllen == 0)
 		xerror("msg_controllen is 0");
 
+	check_tcp_inq(&msg, expect_len - 1, true);
+
 	iov.iov_len = sizeof(buf);
 	ret = recvmsg(fd, &msg, 0);
 	if (ret < 0)
@@ -809,6 +840,9 @@ static void process_one_client(int fd, int unixfd)
 
 	/* should have gotten exact remainder of all pending data */
 	assert(ret == (ssize_t)expect_len - 1);
+
+	/* should be 0, all drained */
+	check_tcp_inq(&msg, 0, true);
 
 	ret2 = write(fd, buf, ret);
 	if (ret2 < 0)
@@ -853,6 +887,8 @@ static void process_one_client(int fd, int unixfd)
 			die_perror("recvmsg");
 
 		tot += ret;
+
+		check_tcp_inq(&msg, expect_len - tot, false);
 	} while ((size_t)tot < expect_len);
 
 	ret = write(unixfd, "shut", 4);
@@ -871,11 +907,15 @@ static void process_one_client(int fd, int unixfd)
 		die_perror("recvmsg");
 	assert(ret == 1);
 
+	/* tcp_inq should be 1 due to received fin. */
+	check_tcp_inq(&msg, 1, true);
+
 	/* wait for hangup */
 	iov.iov_len = 1;
 	ret3 = recvmsg(fd, &msg, 0);
 	if (ret3 != 0)
 		xerror("expected EOF, got %lu", ret3);
+	check_tcp_inq(&msg, 1, true);
 
 	close(fd);
 }
