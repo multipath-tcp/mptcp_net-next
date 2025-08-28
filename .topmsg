@@ -1,4 +1,23 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-record-subflows-in-RPS-table
+From: Christoph Paasch <cpaasch@openai.com>
+Subject: [PATCH] mptcp: record subflows in RPS table
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Accelerated Receive Flow Steering (aRFS) relies on sockets recording
+their RX flow hash into the rps_sock_flow_table so that incoming packets
+are steered to the CPU where the application runs.
+
+With MPTCP, the application interacts with the parent MPTCP socket while
+data is carried over per-subflow TCP sockets. Without recording these
+subflows, aRFS cannot steer interrupts and RX processing for the flows
+to the desired CPU.
+
+Record all subflows in the RPS table by calling sock_rps_record_flow()
+for each subflow at the start of mptcp_sendmsg(), mptcp_recvmsg() and
+mptcp_stream_accept(), by using the new helper
+mptcp_rps_record_subflows().
+
+It does not by itself improve throughput, but ensures that IRQ and RX
+processing are directed to the right CPU, which is a
+prerequisite for effective aRFS.
+
+Signed-off-by: Christoph Paasch <cpaasch@openai.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
