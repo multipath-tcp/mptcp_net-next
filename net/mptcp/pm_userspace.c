@@ -391,6 +391,12 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 	if (err < 0)
 		goto create_err;
 
+	if (READ_ONCE(msk->pm.remote_deny_join_id0) && addr_r.id == 0) {
+		GENL_SET_ERR_MSG(info, "deny join id0");
+		err = -ECONNREFUSED;
+		goto create_err;
+	}
+
 	if (!mptcp_pm_addr_families_match(sk, &entry.addr, &addr_r)) {
 		GENL_SET_ERR_MSG(info, "families mismatch");
 		err = -EINVAL;
