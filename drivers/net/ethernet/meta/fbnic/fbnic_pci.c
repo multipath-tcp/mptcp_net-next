@@ -135,7 +135,7 @@ void fbnic_up(struct fbnic_net *fbn)
 
 	fbnic_rss_reinit_hw(fbn->fbd, fbn);
 
-	__fbnic_set_rx_mode(fbn->netdev);
+	__fbnic_set_rx_mode(fbn->fbd);
 
 	/* Enable Tx/Rx processing */
 	fbnic_napi_enable(fbn);
@@ -152,7 +152,7 @@ void fbnic_down_noidle(struct fbnic_net *fbn)
 	fbnic_napi_disable(fbn);
 	netif_tx_disable(fbn->netdev);
 
-	fbnic_clear_rx_mode(fbn->netdev);
+	fbnic_clear_rx_mode(fbn->fbd);
 	fbnic_clear_rules(fbn->fbd);
 	fbnic_rss_disable_hw(fbn->fbd);
 	fbnic_disable(fbn);
@@ -203,6 +203,8 @@ static void fbnic_service_task(struct work_struct *work)
 	fbnic_fw_check_heartbeat(fbd);
 
 	fbnic_health_check(fbd);
+
+	fbnic_bmc_rpc_check(fbd);
 
 	if (netif_carrier_ok(fbd->netdev))
 		fbnic_napi_depletion_check(fbd->netdev);
