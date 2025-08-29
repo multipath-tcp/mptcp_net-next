@@ -3997,11 +3997,23 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 	return mask;
 }
 
-static struct sk_buff *mptcp_recv_skb(struct sock *sk)
+static struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off)
 {
+	struct sk_buff *skb;
+	u32 offset;
+
 	if (skb_queue_empty(&sk->sk_receive_queue))
 		__mptcp_move_skbs(sk);
-	return skb_peek(&sk->sk_receive_queue);
+
+	while ((skb = skb_peek(&sk->sk_receive_queue)) != NULL) {
+		offset = MPTCP_SKB_CB(skb)->offset;
+		if (offset < skb->len) {
+			*off = offset;
+			return skb;
+		}
+		mptcp_eat_recv_skb(sk, skb);
+	}
+	return NULL;
 }
 
 /*
@@ -4015,11 +4027,11 @@ static int mptcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	size_t len = sk->sk_rcvbuf;
 	struct sk_buff *skb;
 	int copied = 0;
+	u32 offset;
 
 	if (sk->sk_state == TCP_LISTEN)
 		return -ENOTCONN;
-	while ((skb = mptcp_recv_skb(sk)) != NULL) {
-		u32 offset = MPTCP_SKB_CB(skb)->offset;
+	while ((skb = mptcp_recv_skb(sk, &offset)) != NULL) {
 		u32 data_len = skb->len - offset;
 		u32 size = min_t(size_t, len - copied, data_len);
 		int count;
@@ -4050,7 +4062,7 @@ static int mptcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 	mptcp_rcv_space_adjust(msk, copied);
 
 	if (copied > 0) {
-		mptcp_recv_skb(sk);
+		mptcp_recv_skb(sk, &offset);
 		mptcp_cleanup_rbuf(msk, copied);
 	}
 
