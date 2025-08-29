@@ -16,10 +16,10 @@
  *   good time to allocate memory and send ADD_ADDR if needed. Depending on the
  *   traffic-patterns it can take a long time until the MPTCP_EVENT_ESTABLISHED
  *   is sent. Attributes: token, family, saddr4 | saddr6, daddr4 | daddr6,
- *   sport, dport, server-side.
+ *   sport, dport, server-side, deny-join-id0.
  * @MPTCP_EVENT_ESTABLISHED: A MPTCP connection is established (can start new
  *   subflows). Attributes: token, family, saddr4 | saddr6, daddr4 | daddr6,
- *   sport, dport, server-side.
+ *   sport, dport, server-side, deny-join-id0.
  * @MPTCP_EVENT_CLOSED: A MPTCP connection has stopped. Attribute: token.
  * @MPTCP_EVENT_ANNOUNCED: A new address has been announced by the peer.
  *   Attributes: token, rem_id, family, daddr4 | daddr6 [, dport].
@@ -126,6 +126,7 @@ enum mptcp_event_attr {
 	MPTCP_ATTR_RESET_REASON,
 	MPTCP_ATTR_RESET_FLAGS,
 	MPTCP_ATTR_SERVER_SIDE,
+	MPTCP_ATTR_DENY_JOIN_ID0,
 
 	__MPTCP_ATTR_MAX
 };
