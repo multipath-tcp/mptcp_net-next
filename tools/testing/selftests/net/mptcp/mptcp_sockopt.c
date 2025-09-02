@@ -593,7 +593,6 @@ static void connect_one_server(int fd, int pipefd)
 	/* un-block server */
 	ret = read(pipefd, buf2, 4);
 	assert(ret == 4);
-	close(pipefd);
 
 	assert(strncmp(buf2, "xmit", 4) == 0);
 

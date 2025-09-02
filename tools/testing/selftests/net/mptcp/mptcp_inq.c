@@ -314,8 +314,6 @@ static void connect_one_server(int fd, int unixfd)
 	close(fd);
 	ret = write(unixfd, "closed", 6);
 	assert(ret == 6);
-
-	close(unixfd);
 }
 
 static void get_tcp_inq(struct msghdr *msgh, unsigned int *inqv)
