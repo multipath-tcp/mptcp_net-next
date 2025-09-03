@@ -685,6 +685,7 @@ static void process_one_client(int fd, int pipefd)
 			       s.last_sample.mptcpi_bytes_acked - ret2);
 	}
 
+	close(pipefd);
 	close(fd);
 }
 

@@ -462,6 +462,7 @@ static void process_one_client(int fd, int unixfd)
 	get_tcp_inq(&msg, &tcp_inq);
 	assert(tcp_inq == 1);
 
+	close(unixfd);
 	close(fd);
 }
 
