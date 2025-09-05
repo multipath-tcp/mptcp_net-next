@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-allow-more-time-to-send-ADD_ADDR
+Subject: [PATCH] selftests: mptcp: join: allow more time to send ADD_ADDR
 
+When many ADD_ADDR need to be sent, it can take some time to send each
+of them, and create new subflows. Some CIs seem to occasionally have
+issues with these tests, especially with "debug" kernels.
+
+Two subtests will now run for a slightly longer time: the last two where
+3 or more ADD_ADDR are sent during the test.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
