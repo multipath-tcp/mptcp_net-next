@@ -1,4 +1,28 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-tolerate-more-ADD_ADDR
+Subject: [PATCH] selftests: mptcp: join: tolerate more ADD_ADDR
 
+ADD_ADDR can be retransmitted, and with, the parent commit, these
+retransmissions can be sent quicker: from 2 minutes to less than one
+second.
+
+To avoid false positives where retransmitted ADD_ADDR causes higher
+counters than expected, it is required to be more tolerant. Errors are
+now only reported when fewer ADD_ADDRs have been sent/received, except
+if no ADD_ADDR are expected.
+
+Before the parent commit, the tolerance was present for each tests where
+the ADD_ADDR could be retransmitted in a reasonable time (1 sec). Now
+that all tests can have retransmitted ADD_ADDR, it is normal to apply
+the same tolerance for all tests.
+
+An alternative could be to disable the ADD_ADDR retransmissions by
+default, but that's changing the default kernel behaviour. Plus,
+ADD_ADDR retransmissions can be required for some tests. To avoid adding
+exceptions to many tests, it seems better to increase the tolerance.
+
+Later, we could add a new MIB counter to identify the ADD_ADDR
+retransmissions, and remove the tolerance when this counter is
+available.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
