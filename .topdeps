@@ -1,1 +1,1 @@
-t/selftests-mptcp-disable-add_addr-retrans-in-endpoint_tests
+t/mptcp-sockopt-make-sync_socket_options-propagate-SOCK_KEEPOPEN
