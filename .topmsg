@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/selftests-mptcp-shellcheck-support-v0.11.0
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
