@@ -1,4 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-shellcheck-support-v0.11.0
+Subject: [PATCH] selftests: mptcp: shellcheck: support v0.11.0
 
+This v0.11.0 version introduces SC2329:
+
+  Warn when (non-escaping) functions are never invoked.
+
+Except that, similar to SC2317, ShellCheck is currently unable to figure
+out functions that are invoked via trap, or indirectly, when calling
+functions via variables. It is then needed to disable this new SC2329.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
