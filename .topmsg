@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/doc-mptcp-net.mptcp.pm_type-is-deprecated
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
