@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-remove-unused-returned-value-of-check_data_fin
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
