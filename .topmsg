@@ -1,4 +1,33 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-nl-announce-deny-join-id0-flag
+Subject: [PATCH] mptcp: pm: nl: announce deny-join-id0 flag
 
+During the connection establishment, a peer can tell the other one that
+it cannot establish new subflows to the initial IP address and port by
+setting the 'C' flag [1]. Doing so makes sense when the sender is behind
+a strict NAT, operating behind a legacy Layer 4 load balancer, or using
+anycast IP address for example.
+
+When this 'C' flag is set, the path-managers must then not try to
+establish new subflows to the other peer's initial IP address and port.
+The in-kernel PM has access to this info, but the userspace PM didn't.
+
+The RFC8684 [1] is strict about that:
+
+  (...) therefore the receiver MUST NOT try to open any additional
+  subflows toward this address and port.
+
+So it is important to tell the userspace about that as it is responsible
+for the respect of this flag.
+
+When a new connection is created and established, the Netlink events
+now contain the existing but not currently used 'flags' attribute. When
+MPTCP_PM_EV_FLAG_DENY_JOIN_ID0 is set, it means no other subflows
+to the initial IP address and port -- info that are also part of the
+event -- can be established.
+
+Link: https://datatracker.ietf.org/doc/html/rfc8684#section-3.1-20.6 [1]
+Fixes: 702c2f646d42 ("mptcp: netlink: allow userspace-driven subflow establishment")
+Reported-by: Marek Majkowski <marek@cloudflare.com>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/532
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
