@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-tfo-record-deny-join-id0-info
+Subject: [PATCH] mptcp: tfo: record 'deny join id0' info
 
+When TFO is used, the check to see if the 'C' flag (deny join id0) was
+set was bypassed.
+
+This flag can be set when TFO is used, so the check should also be done
+when TFO is used.
+
+Note that the set_fully_established label is also used when a 4th ACK is
+received. In this case, deny_join_id0 will not be set.
+
+Fixes: dfc8d0603033 ("mptcp: implement delayed seq generation for passive fastopen")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
