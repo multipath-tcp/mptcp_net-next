@@ -1,4 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-print-trailing-bytes-with-od
+Subject: [PATCH] selftests: mptcp: print trailing bytes with od
 
+This is better than printing random bytes in the terminal.
+
+Note that Jakub suggested 'hexdump', but Mat found out this tool is not
+often installed by default. 'od' can do a similar job, and it is in the
+POSIX specs and available in coreutils, so it should be on more systems.
+
+While at it, display a few more bytes, just to fill in the two lines.
+And no need to display the 3rd only line showing the next number of
+bytes: 0000040.
+
+Suggested-by: Jakub Kicinski <kuba@kernel.org>
+Suggested-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
