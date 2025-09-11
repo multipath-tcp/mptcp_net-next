@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-propagate-shutdown-to-subflows-when-possible
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
