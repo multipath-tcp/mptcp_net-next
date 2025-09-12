@@ -11,7 +11,8 @@ fi
 
 check_sync_upstream || exit 1
 
-MODE=$(bash "-${-}" ./.get_arg_mode.sh "${1}")
+ARG="${1?}"
+MODE=$(bash "-${-}" ./.get_arg_mode.sh "${ARG}")
 
 apply_patches_files() {
 	if ! git am -3 "${@}"; then
