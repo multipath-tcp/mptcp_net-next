@@ -124,13 +124,13 @@ VISIBLE_IF_IWLWIFI_KUNIT const struct pci_device_id iwl_hw_card_ids[] = {
 	{IWL_PCI_DEVICE(0x0082, 0x1304, iwl6005_mac_cfg)},/* low 5GHz active */
 	{IWL_PCI_DEVICE(0x0082, 0x1305, iwl6005_mac_cfg)},/* high 5GHz active */
 
-/* 6x30 Series */
-	{IWL_PCI_DEVICE(0x008A, 0x5305, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x008A, 0x5307, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x008A, 0x5325, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x008A, 0x5327, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x008B, 0x5315, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x008B, 0x5317, iwl1000_mac_cfg)},
+/* 1030/6x30 Series */
+	{IWL_PCI_DEVICE(0x008A, 0x5305, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x008A, 0x5307, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x008A, 0x5325, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x008A, 0x5327, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x008B, 0x5315, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x008B, 0x5317, iwl6030_mac_cfg)},
 	{IWL_PCI_DEVICE(0x0090, 0x5211, iwl6030_mac_cfg)},
 	{IWL_PCI_DEVICE(0x0090, 0x5215, iwl6030_mac_cfg)},
 	{IWL_PCI_DEVICE(0x0090, 0x5216, iwl6030_mac_cfg)},
@@ -181,12 +181,12 @@ VISIBLE_IF_IWLWIFI_KUNIT const struct pci_device_id iwl_hw_card_ids[] = {
 	{IWL_PCI_DEVICE(0x08AE, 0x1027, iwl1000_mac_cfg)},
 
 /* 130 Series WiFi */
-	{IWL_PCI_DEVICE(0x0896, 0x5005, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x0896, 0x5007, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x0897, 0x5015, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x0897, 0x5017, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x0896, 0x5025, iwl1000_mac_cfg)},
-	{IWL_PCI_DEVICE(0x0896, 0x5027, iwl1000_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0896, 0x5005, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0896, 0x5007, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0897, 0x5015, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0897, 0x5017, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0896, 0x5025, iwl6030_mac_cfg)},
+	{IWL_PCI_DEVICE(0x0896, 0x5027, iwl6030_mac_cfg)},
 
 /* 2x00 Series */
 	{IWL_PCI_DEVICE(0x0890, 0x4022, iwl2000_mac_cfg)},
@@ -1179,16 +1179,11 @@ static int iwl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 static void iwl_pci_remove(struct pci_dev *pdev)
 {
 	struct iwl_trans *trans = pci_get_drvdata(pdev);
-	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
 	if (!trans)
 		return;
 
-	cancel_delayed_work_sync(&trans_pcie->me_recheck_wk);
-
-	iwl_drv_stop(trans->drv);
-
-	iwl_trans_pcie_free(trans);
+	iwl_pcie_gen1_2_remove(trans);
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -1260,7 +1255,7 @@ static int _iwl_pci_resume(struct device *device, bool restore)
 		 * won't really know how to recover.
 		 */
 		iwl_pcie_prepare_card_hw(trans);
-		iwl_finish_nic_init(trans);
+		iwl_trans_activate_nic(trans);
 		iwl_op_mode_device_powered_off(trans->op_mode);
 	}
 
