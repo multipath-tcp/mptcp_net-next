@@ -726,6 +726,14 @@ static int xaccept(int s)
 	return fd;
 }
 
+static void do_setsockopt_inq(int fd)
+{
+	int on = 1;
+
+	if (-1 == setsockopt(fd, IPPROTO_TCP, TCP_INQ, &on, sizeof(on)))
+		die_perror("setsockopt(TCP_INQ)");
+}
+
 static int server(int ipcfd)
 {
 	int fd = -1, r;
@@ -747,6 +755,9 @@ static int server(int ipcfd)
 
 	alarm(15);
 	r = xaccept(fd);
+
+	if (inq)
+		do_setsockopt_inq(r);
 
 	process_one_client(r, ipcfd);
 
