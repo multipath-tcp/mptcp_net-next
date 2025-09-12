@@ -201,8 +201,8 @@ make_connection()
 		is_v6="v4"
 	fi
 
-	# set this on the server side only: will not affect the rest
-	ip netns exec "$ns1" sysctl -q net.mptcp.allow_join_initial_addr_port=0
+	# set this on the client side only: will not affect the rest
+	ip netns exec "$ns2" sysctl -q net.mptcp.allow_join_initial_addr_port=0
 
 	:>"$client_evts"
 	:>"$server_evts"
@@ -242,7 +242,7 @@ make_connection()
 	print_test "Established IP${is_v6} MPTCP Connection ns2 => ns1"
 	if [ "${client_token}" != "" ] && [ "${server_token}" != "" ] &&
 	   [ "${client_serverside}" = 0 ] && [ "${server_serverside}" = 1 ] &&
-	   [ "${client_nojoin:-0}" = 1 ] && [ "${server_nojoin:-0}" = 0 ]
+	   [ "${client_nojoin:-0}" = 0 ] && [ "${server_nojoin:-0}" = 1 ]
 	then
 		test_pass
 		print_title "Connection info: ${client_addr}:${client_port} -> ${connect_addr}:${app_port}"
