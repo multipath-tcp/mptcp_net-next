@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-netlink-fix-if-idx-type-next
+Subject: [PATCH] mptcp: pm: netlink: fix if-idx type next
 
+As pointed out by Donald, when parsing an entry, the wrong type was set
+for the temp value: this value is signed.
+
+There are no real issues here, because the intermediate variable was
+only wrong for the sign, not for the size, and the final variable had
+the right sign. But this feels wrong, and is confusing, so fixing this
+small typo introduced by commit ef0da3b8a2f1 ("mptcp: move address
+attribute into mptcp_addr_info").
+
+Reported-by: Donald Hunter <donald.hunter@gmail.com>
+Closes: https://lore.kernel.org/m2plc0ui9z.fsf@gmail.com
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
