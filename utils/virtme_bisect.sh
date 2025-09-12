@@ -3,6 +3,7 @@
 : "${MODE:=normal}"
 : "${STRESS:=0}"
 : "${STASH:=0}"
+: "${FIND_FIX:=0}"
 
 stress() { local i=0 pid nproc2
 	while [[ $((i++)) -lt 500 ]]; do
@@ -70,4 +71,11 @@ if [ "${STRESS}" = 1 ]; then
 	stress &
 fi
 
-wait ${PID_VIRTME}
+rc=0
+wait ${PID_VIRTME} || rc=${?}
+
+if [ "${FIND_FIX}" = 1 ] && [ "${rc}" != 125 ]; then
+	[ "${rc}" != 0 ] ## good is bad, bad is good
+else
+	exit ${rc}
+fi
