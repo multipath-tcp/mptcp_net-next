@@ -55,11 +55,12 @@ export VIRTME_NO_INTERACTIVE=1
 
 SUFFIX=$(make kernelversion | cut -d. -f1-2)
 
+DEFAULT_ARG_BUILD=(-d WERROR)
 VIRTME_PACKETDRILL_STABLE=1 \
 	INPUT_BUILD_SKIP_PERF=1 \
 	INPUT_CLEAN=1 \
 	INPUT_BUILD_SUFFIX=${SUFFIX} \
-	./.virtme.sh "build" "${MODE}" "${@}" &
+	./.virtme.sh "build" "${MODE}" "${@:-${DEFAULT_ARG_BUILD[@]}}" &
 PID_VIRTME=$!
 wait ${PID_VIRTME} || exit 125 # skip
 
