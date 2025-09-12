@@ -1,4 +1,23 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-fix-error-messages
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: sockopt: fix error messages
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch fixes several issues in the error reporting of the MPTCP sockopt
+selftest:
+
+1. Fix diff not printed: The error messages for counter mismatches had
+   the actual difference ('diff') as argument, but it was missing in the
+   format string. Displaying it makes the debugging easier.
+
+2. Fix variable usage: The error check for 'mptcpi_bytes_acked' incorrectly
+   used 'ret2' (sent bytes) for both the expected value and the difference
+   calculation. It now correctly uses 'ret' (received bytes), which is the
+   expected value for bytes_acked.
+
+3. Fix off-by-one in diff: The calculation for the 'mptcpi_rcv_delta' diff
+   was 's.mptcpi_rcv_delta - ret', which is off-by-one. It has been
+   corrected to 's.mptcpi_rcv_delta - (ret + 1)' to match the expected
+   value in the condition above it.
+
+Fixes: 5dcff89e1455 ("selftests: mptcp: explicitly tests aggregate counters")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
