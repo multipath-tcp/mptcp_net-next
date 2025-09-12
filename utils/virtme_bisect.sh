@@ -2,36 +2,58 @@
 
 : "${MODE:=normal}"
 : "${STRESS:=0}"
+: "${STRESS_IN:=0}"
+: "${PRIO:=0}"
 : "${STASH:=0}"
 : "${FIND_FIX:=0}"
 
-stress() { local i=0 pid nproc2
-	while [[ $((i++)) -lt 500 ]]; do
+wait_vm() { local i=0
+	while [[ $((i++)) -lt "${1}" ]]; do
 		# shellcheck disable=SC2009 # we grep on the args
-		ps aux | grep "[v]irtme_hostname=" && break
+		ps aux | grep -q "[v]irtme_hostname=" && break
 		sleep 5s
 	done
-	sleep 30
+	sleep "${2}"
+}
+
+stress() { local pid nproc2
+	wait_vm 500 30
 
 	nproc2=$(nproc); nproc2=$((nproc2 * 2))
 	stress-ng --cpu "${nproc2}" --iomix "${nproc2}" --vm "${nproc2}" --vm-bytes 1G --timeout 60m &
 	pid=$!
 
-	# We can also renice 20 qemu for even more impact
-	# sudo renice -n 20 -p $(pidof qemu-system-x86_64)
-	# or from ./.container.sh
-
-	echo -e "\n\n=== Stress in progress ($i -- ${pid}) ===\n"
+	echo -e "\n\n=== Stress in progress (${pid}) ===\n"
 	wait ${pid} || true
 }
 
-exit_trap() {
-	rc=$?
+stress_in() { local envs=() env pid
+	wait_vm 500 30
 
-	echo -e "${0}: exit trap (stress: ${STRESS} ; $(jobs -p))"
+	for env in "${!INPUT_@}"; do envs+=(-e "${env}=${!env}"); done
+	docker exec "$(docker ps --filter "label=name=mptcp-upstream-virtme-docker" -l --format "{{.ID}}")" \
+		/entrypoint.sh connect stress-ng --cpu "0" --iomix "0" --vm "0" --vm-bytes "1G" &
+	pid=$!
+
+	echo -e "\n\n=== Stress (in) in progress (${pid}) ===\n"
+	wait ${pid} || true
+}
+
+prio() { local envs=() env
+	wait_vm 500 20
+
+	for env in "${!INPUT_@}"; do envs+=(-e "${env}=${!env}"); done
+	docker exec "$(docker ps --filter "label=name=mptcp-upstream-virtme-docker" -l --format "{{.ID}}")" \
+		bash -c "renice -n ${PRIO} -p \$(pidof qemu-system-x86_64)" || true
+}
+
+exit_trap() {
+	local rc=$?
+
+	echo -e "${0}: exit trap rc=${rc} (stress: ${STRESS} ; $(jobs -p))"
 
 	docker ps --filter ancestor=mptcp/mptcp-upstream-virtme-docker --format='{{.ID}}' | xargs -r docker stop
-	jobs -p | xargs -r kill
+	jobs -p | xargs -r kill || true
 	[ "${STRESS}" = 1  ] && { pkill stress-ng || true; }
 	sleep 1
 
@@ -68,8 +90,14 @@ INPUT_BUILD_SUFFIX=${SUFFIX} \
 	./.virtme.sh "vm-auto" "${MODE}" &
 PID_VIRTME=$!
 
-if [ "${STRESS}" = 1 ]; then
+if [ "${STRESS}" != 0 ]; then
 	stress &
+fi
+if [ "${STRESS_IN}" != 0 ]; then
+	stress_in &
+fi
+if [ "${PRIO}" != 0 ]; then
+	prio &
 fi
 
 rc=0
