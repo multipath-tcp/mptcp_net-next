@@ -1,7 +1,9 @@
 #! /bin/bash
 
 is_stable() {
-   [ "$(awk '/^SUBLEVEL = / { print $3; exit }' Makefile)" != 0 ]
+   [ "${INPUT_STABLE}" = 1 ] ||
+      [ -s ".git/BISECT_LOG" ] ||
+      [ "$(awk '/^SUBLEVEL = / { print $3; exit }' Makefile)" != 0 ]
 }
 
 is_net() {
