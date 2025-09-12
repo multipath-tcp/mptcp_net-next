@@ -8,7 +8,21 @@ is_net() {
    [ "$(b4 prep --show-info prefixes 2>/dev/null)" = "net" ]
 }
 
+SYZK=0
+trap_exit() {
+   if [ "${SYZK}" = 1 ]; then
+      systemctl --user start syzkaller || true
+   fi
+}
+trap trap_exit EXIT
+
 CLEAN=0
+
+if systemctl --user is-enabled syzkaller &>/dev/null && systemctl --user is-active syzkaller &>/dev/null; then
+   SYZK=1
+   systemctl --user stop syzkaller
+fi
+
 if is_stable || is_net; then
    SUFFIX=$(make kernelversion | cut -d. -f1-2)
    PACKETDRILL_STABLE=1
