@@ -1,5 +1,5 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: pm: netlink: fix if-idx type next
+Subject: [PATCH] mptcp: pm: netlink: fix if-idx type
 
 As pointed out by Donald, when parsing an entry, the wrong type was set
 for the temp value: this value is signed.
