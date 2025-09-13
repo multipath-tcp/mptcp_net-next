@@ -2196,20 +2196,12 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		if (copied >= target)
 			break;
 
-		if (copied) {
-			if (sk->sk_err ||
-			    sk->sk_state == TCP_CLOSE ||
-			    (sk->sk_shutdown & RCV_SHUTDOWN) ||
-			    !timeo ||
-			    signal_pending(current))
+		err = tcp_recv_should_stop(sk, timeo);
+		if (err < 0) {
+			if (copied)
 				break;
-		} else {
-			if (sk->sk_err) {
-				copied = sock_error(sk);
-				break;
-			}
 
-			if (sk->sk_shutdown & RCV_SHUTDOWN) {
+			if (err == -ESHUTDOWN) {
 				/* race breaker: the shutdown could be after the
 				 * previous receive queue check
 				 */
@@ -2218,20 +2210,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 				break;
 			}
 
-			if (sk->sk_state == TCP_CLOSE) {
-				copied = -ENOTCONN;
-				break;
-			}
-
-			if (!timeo) {
-				copied = -EAGAIN;
-				break;
-			}
-
-			if (signal_pending(current)) {
-				copied = sock_intr_errno(timeo);
-				break;
-			}
+			copied = err;
+			break;
 		}
 
 		pr_debug("block timeout %ld\n", timeo);
