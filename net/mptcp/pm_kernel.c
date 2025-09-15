@@ -394,6 +394,7 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 
 	pernet = pm_nl_get_pernet_from_msk(msk);
 	subflows_max = mptcp_pm_get_subflows_max(msk);
+	/* linked to conditions in mptcp_pm_add_addr_received() */
 	deny_join_id0 = remote->id && READ_ONCE(msk->pm.remote_deny_join_id0) &&
 			!READ_ONCE(msk->pm.accept_addr) &&
 			msk->pm.local_addr_used == 0 &&

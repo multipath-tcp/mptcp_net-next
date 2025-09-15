@@ -637,7 +637,9 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 		} else {
 			__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
 		}
-	/* id0 should not have a different address ; special case for C-flag */
+	/* - id0 should not have a different address
+	 * - special case for C-flag: linked to fill_local_addresses_vec()
+	 */
 	} else if ((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
 		   (addr->id > 0 && !READ_ONCE(pm->accept_addr) &&
 		    (!READ_ONCE(msk->pm.remote_deny_join_id0) ||
