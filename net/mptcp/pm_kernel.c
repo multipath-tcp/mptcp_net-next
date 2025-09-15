@@ -389,10 +389,15 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 	struct mptcp_addr_info mpc_addr;
 	struct pm_nl_pernet *pernet;
 	unsigned int subflows_max;
+	bool deny_join_id0;
 	int i = 0;
 
 	pernet = pm_nl_get_pernet_from_msk(msk);
 	subflows_max = mptcp_pm_get_subflows_max(msk);
+	deny_join_id0 = remote->id && READ_ONCE(msk->pm.remote_deny_join_id0) &&
+			!READ_ONCE(msk->pm.accept_addr) &&
+			msk->pm.local_addr_used == 0 &&
+			mptcp_pm_get_add_addr_accept_max(msk) == 0;
 
 	mptcp_local_address((struct sock_common *)msk, &mpc_addr);
 
@@ -409,6 +414,9 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 			locals[i].flags = entry->flags;
 			locals[i].ifindex = entry->ifindex;
 
+			if (deny_join_id0)
+				__clear_bit(locals[i].addr.id, msk->pm.id_avail_bitmap);
+
 			/* Special case for ID0: set the correct ID */
 			if (mptcp_addresses_equal(&locals[i].addr, &mpc_addr, locals[i].addr.port))
 				locals[i].addr.id = 0;
@@ -418,6 +426,37 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 		}
 	}
 	rcu_read_unlock();
+
+	/* Special case: peer sets the C flag, accept one ADD_ADDR if default
+	 * limits are used -- accepting no ADD_ADDR -- and use subflow endpoints
+	 */
+	if (!i && deny_join_id0) {
+		unsigned int local_addr_max = mptcp_pm_get_local_addr_max(msk);
+
+		while (msk->pm.local_addr_used < local_addr_max &&
+		       msk->pm.subflows < subflows_max) {
+			struct mptcp_pm_local *local = &locals[i];
+
+			if (!select_local_address(pernet, msk, local))
+				break;
+
+			__clear_bit(local->addr.id, msk->pm.id_avail_bitmap);
+
+			if (!mptcp_pm_addr_families_match(sk, &local->addr,
+							  remote))
+				continue;
+
+			if (mptcp_addresses_equal(&local->addr, &mpc_addr,
+						  local->addr.port))
+				continue;
+
+			msk->pm.local_addr_used++;
+			msk->pm.subflows++;
+			i++;
+		}
+
+		return i;
+	}
 
 	/* If the array is empty, fill in the single
 	 * 'IPADDRANY' local address
