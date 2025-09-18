@@ -74,6 +74,8 @@ unsigned int mptcp_stale_loss_cnt(const struct net *net)
 
 unsigned int mptcp_close_timeout(const struct sock *sk)
 {
+	if (__mptcp_check_fallback(mptcp_sk(sk)))
+		return 0;
 	if (sock_flag(sk, SOCK_DEAD))
 		return TCP_TIMEWAIT_LEN;
 	return mptcp_get_pernet(sock_net(sk))->close_timeout;

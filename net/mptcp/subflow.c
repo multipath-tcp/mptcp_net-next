@@ -1297,14 +1297,6 @@ static void subflow_sched_work_if_closed(struct mptcp_sock *msk, struct sock *ss
 
 	if (!test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
 		mptcp_schedule_work(sk);
-
-	/* when the fallback subflow closes the rx side, trigger a 'dummy'
-	 * ingress data fin, so that the msk state will follow along
-	 */
-	if (__mptcp_check_fallback(msk) && subflow_is_done(ssk) &&
-	    msk->first == ssk &&
-	    mptcp_update_rcv_data_fin(msk, READ_ONCE(msk->ack_seq), true))
-		mptcp_schedule_work(sk);
 }
 
 static bool mptcp_subflow_fail(struct mptcp_sock *msk, struct sock *ssk)
@@ -1437,6 +1429,14 @@ reset:
 	subflow->map_data_len = skb->len;
 	subflow->map_subflow_seq = tcp_sk(ssk)->copied_seq - subflow->ssn_offset;
 	WRITE_ONCE(subflow->data_avail, true);
+
+	/* last skb in closed fallback subflow: we are at data fin */
+	if (subflow_is_done(ssk) && ssk == msk->first &&
+	    skb == skb_peek_tail(&ssk->sk_receive_queue)) {
+		mptcp_update_rcv_data_fin(msk, subflow->map_seq +
+					  subflow->map_data_len, true);
+		subflow->map_data_fin = 1;
+	}
 	return true;
 }
 
