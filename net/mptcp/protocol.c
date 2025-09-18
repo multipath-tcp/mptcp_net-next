@@ -676,13 +676,17 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 	tp = tcp_sk(ssk);
 	do {
 		int mem = own_msk ? sk_rmem_alloc_get(sk) : sk->sk_backlog.len;
+		bool over_limit = mem > READ_ONCE(sk->sk_rcvbuf);
 		u32 map_remaining, offset;
 		u32 seq = tp->copied_seq;
 		struct sk_buff *skb;
 		bool fin;
 
-		if (mem > READ_ONCE(sk->sk_rcvbuf))
+		WRITE_ONCE(subflow->data_delayed, over_limit);
+		if (subflow->data_delayed) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVDELAYED);
 			break;
+		}
 
 		/* try to move as much data as available */
 		map_remaining = subflow->map_data_len -
@@ -2108,32 +2112,13 @@ new_measure:
 	msk->rcvq_space.time = mstamp;
 }
 
-static struct mptcp_subflow_context *
-__mptcp_first_ready_from(struct mptcp_sock *msk,
-			 struct mptcp_subflow_context *subflow)
-{
-	struct mptcp_subflow_context *start_subflow = subflow;
-
-	while (!READ_ONCE(subflow->data_avail)) {
-		subflow = mptcp_next_subflow(msk, subflow);
-		if (subflow == start_subflow)
-			return NULL;
-	}
-	return subflow;
-}
-
 static bool __mptcp_move_skbs(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	bool ret = false;
 
-	if (list_empty(&msk->conn_list))
-		return false;
-
-	subflow = list_first_entry(&msk->conn_list,
-				   struct mptcp_subflow_context, node);
-	for (;;) {
+	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk;
 		bool slowpath;
 
@@ -2144,23 +2129,22 @@ static bool __mptcp_move_skbs(struct sock *sk)
 		if (sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
 			break;
 
-		subflow = __mptcp_first_ready_from(msk, subflow);
-		if (!subflow)
-			break;
+		if (!subflow->data_delayed)
+			continue;
 
 		ssk = mptcp_subflow_tcp_sock(subflow);
 		slowpath = lock_sock_fast(ssk);
-		ret = __mptcp_move_skbs_from_subflow(msk, ssk, true) || ret;
+		ret |= __mptcp_move_skbs_from_subflow(msk, ssk, true);
 		if (unlikely(ssk->sk_err))
 			__mptcp_error_report(sk);
 		unlock_sock_fast(ssk, slowpath);
-
-		subflow = mptcp_next_subflow(msk, subflow);
 	}
 
 	__mptcp_ofo_queue(msk);
-	if (ret)
+	if (ret) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DELAYED_PROCESS);
 		mptcp_check_data_fin((struct sock *)msk);
+	}
 	return ret;
 }
 
