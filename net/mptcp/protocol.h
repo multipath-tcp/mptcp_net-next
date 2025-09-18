@@ -298,6 +298,7 @@ struct mptcp_sock {
 	u32		last_data_sent;
 	u32		last_data_recv;
 	u32		last_ack_recv;
+	int		borrowed_fwd_mem;
 	unsigned long	timer_ival;
 	u32		token;
 	unsigned long	flags;
