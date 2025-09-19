@@ -42,11 +42,15 @@
 
 struct mptcp_info {
 	__u8	mptcpi_subflows;
+	#define mptcpi_extra_subflows mptcpi_subflows
 	__u8	mptcpi_add_addr_signal;
 	__u8	mptcpi_add_addr_accepted;
 	__u8	mptcpi_subflows_max;
+	#define mptcpi_limit_extra_subflows mptcpi_subflows_max
 	__u8	mptcpi_add_addr_signal_max;
+	#define mptcpi_endp_signal_max mptcpi_add_addr_signal_max
 	__u8	mptcpi_add_addr_accepted_max;
+	#define mptcpi_limit_add_addr_accepted mptcpi_add_addr_accepted_max
 	__u32	mptcpi_flags;
 	__u32	mptcpi_token;
 	__u64	mptcpi_write_seq;
@@ -54,6 +58,7 @@ struct mptcp_info {
 	__u64	mptcpi_rcv_nxt;
 	__u8	mptcpi_local_addr_used;
 	__u8	mptcpi_local_addr_max;
+	#define mptcpi_endp_subflow_max mptcpi_local_addr_max
 	__u8	mptcpi_csum_enabled;
 	__u32	mptcpi_retransmits;
 	__u64	mptcpi_bytes_retrans;
