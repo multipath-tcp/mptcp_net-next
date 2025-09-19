@@ -1,4 +1,25 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-C-flag-def-limit
+Subject: [PATCH] selftests: mptcp: join: validate C-flag + def limit
 
+The previous commit adds an exception for the C-flag case. The
+'mptcp_join.sh' selftest is extended to validate this case.
+
+In this subtest, there is a typical CDN deployment with a client where
+MPTCP endpoints have been 'automatically' configured:
+
+- the server set net.mptcp.allow_join_initial_addr_port=0
+
+- the client has multiple 'subflow' endpoints, and the default limits:
+  not accepting ADD_ADDRs.
+
+Without the parent patch, the client is not able to establish new
+subflows using its 'subflow' endpoints. The parent commit fixes that.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: df377be38725 ("mptcp: add deny_join_id0 in mptcp_options_received")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
