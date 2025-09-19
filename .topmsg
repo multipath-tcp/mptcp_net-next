@@ -1,4 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-rename-subflows-to-extra_subflows
+Subject: [PATCH] mptcp: pm: rename 'subflows' to 'extra_subflows'
 
+A few variables linked to the Path-Managers are confusing, and it would
+help current and future developers, to clarify them.
+
+One of them is 'subflows', which in fact represents the number of extra
+subflows: all the additional subflows created after the initial one, and
+not the total number of subflows.
+
+While at it, add an additional name for the corresponding variable in
+MPTCP INFO: mptcpi_extra_subflows. Not to break the current uAPI, the
+new name is added as a 'define' pointing to the former name. This will
+then also help userspace devs.
+
+No functional changes intended.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
