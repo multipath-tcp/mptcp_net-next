@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-rename-subflows_max-to-limit_extra_subflows
+Subject: [PATCH] mptcp: pm: in-kernel: rename 'subflows_max' to 'limit_extra_subflows'
 
+A few variables linked to the in-kernel Path-Manager are confusing, and
+it would help current and future developers, to clarify them.
+
+One of them is 'subflows_max', which in fact represents the limit of
+extra subflows: the limit set via 'ip mptcp limit subflows X' for
+example. It is not linked to the maximum number of created / possible
+subflows.
+
+While at it, add an additional name for the corresponding variable in
+MPTCP INFO: mptcpi_limit_extra_subflows. Not to break the current uAPI,
+the new name is added as a 'define' pointing to the former name. This
+will then also help userspace devs.
+
+No functional changes intended.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
