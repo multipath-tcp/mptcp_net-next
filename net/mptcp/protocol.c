@@ -338,11 +338,12 @@ end:
 		mptcp_rcvbuf_grow(sk);
 }
 
-static void mptcp_init_skb(struct sock *ssk,
-			   struct sk_buff *skb, int offset, int copy_len)
+static int mptcp_init_skb(struct sock *ssk,
+			  struct sk_buff *skb, int offset, int copy_len)
 {
 	const struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	bool has_rxtstamp = TCP_SKB_CB(skb)->has_rxtstamp;
+	int borrowed;
 
 	/* the skb map_seq accounts for the skb offset:
 	 * mptcp_subflow_get_mapped_dsn() is based on the current tp->copied_seq
@@ -358,6 +359,15 @@ static void mptcp_init_skb(struct sock *ssk,
 
 	skb_ext_reset(skb);
 	skb_dst_drop(skb);
+
+	/* "borrow" the fwd memory from the subflow, instead of reclaiming it */
+	skb->destructor = NULL;
+	skb->sk = NULL;
+	atomic_sub(skb->truesize, &ssk->sk_rmem_alloc);
+	borrowed = ssk->sk_forward_alloc - sk_unused_reserved_mem(ssk);
+	borrowed &= ~(PAGE_SIZE - 1);
+	sk_forward_alloc_add(ssk, skb->truesize - borrowed);
+	return borrowed;
 }
 
 static void __mptcp_add_backlog(struct sock *sk, struct sock *ssk,
@@ -717,14 +727,17 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 
 		if (offset < skb->len) {
 			size_t len = skb->len - offset;
+			int bmem;
 
-			mptcp_init_skb(ssk, skb, offset, len);
-			skb_orphan(skb);
+			bmem = mptcp_init_skb(ssk, skb, offset, len);
 
-			if (own_msk)
+			if (own_msk) {
+				sk_forward_alloc_add(sk, bmem);
 				ret |= __mptcp_move_skb(sk, skb);
-			else
+			} else {
+				msk->borrowed_fwd_mem += bmem;
 				__mptcp_add_backlog(sk, ssk, skb);
+			}
 			seq += len;
 
 			if (unlikely(map_remaining < len)) {
@@ -3514,6 +3527,8 @@ static void mptcp_release_cb(struct sock *sk)
 		if (__test_and_clear_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags))
 			__mptcp_sync_sndbuf(sk);
 	}
+	sk_forward_alloc_add(sk, msk->borrowed_fwd_mem);
+	msk->borrowed_fwd_mem = 0;
 }
 
 /* MP_JOIN client subflow must wait for 4th ack before sending any data:
