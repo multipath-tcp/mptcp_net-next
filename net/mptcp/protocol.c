@@ -142,22 +142,34 @@ static void mptcp_drop(struct sock *sk, struct sk_buff *skb)
 	__kfree_skb(skb);
 }
 
+static int __mptcp_try_coalesce(struct sock *sk, struct sk_buff *to,
+				struct sk_buff *from, bool *fragstolen)
+{
+	int limit = READ_ONCE(sk->sk_rcvbuf);
+	int delta;
+
+	if (unlikely(MPTCP_SKB_CB(to)->cant_coalesce) ||
+	    MPTCP_SKB_CB(from)->offset ||
+	    ((to->len + from->len) > (limit >> 3)) ||
+	    !skb_try_coalesce(to, from, fragstolen, &delta))
+		return 0;
+
+	pr_debug("colesced seq %llx into %llx new len %d new end seq %llx\n",
+		 MPTCP_SKB_CB(from)->map_seq, MPTCP_SKB_CB(to)->map_seq,
+		 to->len, MPTCP_SKB_CB(from)->end_seq);
+	MPTCP_SKB_CB(to)->end_seq = MPTCP_SKB_CB(from)->end_seq;
+	return delta;
+}
+
 static bool mptcp_try_coalesce(struct sock *sk, struct sk_buff *to,
 			       struct sk_buff *from)
 {
 	bool fragstolen;
 	int delta;
 
-	if (unlikely(MPTCP_SKB_CB(to)->cant_coalesce) ||
-	    MPTCP_SKB_CB(from)->offset ||
-	    ((to->len + from->len) > (sk->sk_rcvbuf >> 3)) ||
-	    !skb_try_coalesce(to, from, &fragstolen, &delta))
+	delta = __mptcp_try_coalesce(sk, to, from, &fragstolen);
+	if (!delta)
 		return false;
-
-	pr_debug("colesced seq %llx into %llx new len %d new end seq %llx\n",
-		 MPTCP_SKB_CB(from)->map_seq, MPTCP_SKB_CB(to)->map_seq,
-		 to->len, MPTCP_SKB_CB(from)->end_seq);
-	MPTCP_SKB_CB(to)->end_seq = MPTCP_SKB_CB(from)->end_seq;
 
 	/* note the fwd memory can reach a negative value after accounting
 	 * for the delta, but the later skb free will restore a non
