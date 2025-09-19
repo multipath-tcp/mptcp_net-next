@@ -560,6 +560,7 @@ struct mptcp_subflow_context {
 	u8	reset_transient:1;
 	u8	reset_reason:4;
 	u8	stale_count;
+	bool	data_delayed;
 
 	u32	subflow_id;
 

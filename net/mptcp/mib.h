@@ -88,6 +88,10 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_DSSFALLBACK,		/* Bad or missing DSS */
 	MPTCP_MIB_SIMULTCONNFALLBACK,	/* Simultaneous connect */
 	MPTCP_MIB_FALLBACKFAILED,	/* Can't fallback due to msk status */
+	MPTCP_MIB_RCVDELAYED,		/* Data move from subflow is delayed due to msk
+					 * receive buffer full
+					 */
+	MPTCP_MIB_DELAYED_PROCESS,	/* Delayed data moved in slowpath */
 	__MPTCP_MIB_MAX
 };
 
