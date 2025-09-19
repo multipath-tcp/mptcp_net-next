@@ -411,7 +411,8 @@ static unsigned int fill_local_addresses_vec(struct mptcp_sock *msk,
 			locals[i].flags = entry->flags;
 			locals[i].ifindex = entry->ifindex;
 
-			if (c_flag_case)
+			if (c_flag_case &&
+			    (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW))
 				__clear_bit(locals[i].addr.id,
 					    msk->pm.id_avail_bitmap);
 
