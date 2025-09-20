@@ -377,8 +377,7 @@ static void __mptcp_add_backlog(struct sock *sk, struct sock *ssk,
 	int delta;
 
 	if (tail && MPTCP_SKB_CB(skb)->map_seq == MPTCP_SKB_CB(tail)->end_seq) {
-		delta = __mptcp_try_coalesce(sk, tail, skb, &fragstolen);
-		if (delta) {
+		if (__mptcp_try_coalesce(sk, tail, skb, &fragstolen, &delta)) {
 			sk->sk_backlog.len += delta;
 			kfree_skb_partial(skb, fragstolen);
 			return;
