@@ -11,20 +11,17 @@
 
 struct psp_dev *psp_dev_get_for_sock(struct sock *sk)
 {
+	struct psp_dev *psd = NULL;
 	struct dst_entry *dst;
-	struct psp_dev *psd;
-
-	dst = sk_dst_get(sk);
-	if (!dst)
-		return NULL;
 
 	rcu_read_lock();
-	psd = rcu_dereference(dst->dev->psp_dev);
-	if (psd && !psp_dev_tryget(psd))
-		psd = NULL;
+	dst = __sk_dst_get(sk);
+	if (dst) {
+		psd = rcu_dereference(dst_dev_rcu(dst)->psp_dev);
+		if (psd && !psp_dev_tryget(psd))
+			psd = NULL;
+	}
 	rcu_read_unlock();
-
-	dst_release(dst);
 
 	return psd;
 }
@@ -40,7 +37,7 @@ psp_validate_xmit(struct sock *sk, struct net_device *dev, struct sk_buff *skb)
 	good = !pas || rcu_access_pointer(dev->psp_dev) == pas->psd;
 	rcu_read_unlock();
 	if (!good) {
-		kfree_skb_reason(skb, SKB_DROP_REASON_PSP_OUTPUT);
+		sk_skb_reason_drop(sk, skb, SKB_DROP_REASON_PSP_OUTPUT);
 		return NULL;
 	}
 
