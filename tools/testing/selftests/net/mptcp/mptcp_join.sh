@@ -2320,6 +2320,61 @@ signal_address_tests()
 	fi
 }
 
+address_endp_tests()
+{
+	# no address endpoints: routing rules are used
+	if reset_with_tcp_filter "without address endpoint" ns1 10.0.2.2 REJECT &&
+	   mptcp_lib_kallsyms_has "mptcp_pm_get_endp_address_max$"; then
+		pm_nl_set_limits $ns1 0 2
+		pm_nl_set_limits $ns2 2 2
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		run_tests $ns1 $ns2 10.0.1.1
+		join_syn_tx=1 \
+			chk_join_nr 0 0 0
+		chk_add_nr 1 1
+	fi
+
+	# address endpoints: this endpoint is used
+	if reset_with_tcp_filter "with address endpoint" ns1 10.0.2.2 REJECT &&
+	   mptcp_lib_kallsyms_has "mptcp_pm_get_endp_address_max$"; then
+		pm_nl_set_limits $ns1 0 2
+		pm_nl_set_limits $ns2 2 2
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags address
+		run_tests $ns1 $ns2 10.0.1.1
+		chk_join_nr 1 1 1
+		chk_add_nr 1 1
+	fi
+
+	# address endpoints: these endpoints are used
+	if reset_with_tcp_filter "with multiple address endpoints" ns1 10.0.2.2 REJECT &&
+	   mptcp_lib_kallsyms_has "mptcp_pm_get_endp_address_max$"; then
+		pm_nl_set_limits $ns1 0 2
+		pm_nl_set_limits $ns2 2 2
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		pm_nl_add_endpoint $ns1 10.0.3.1 flags signal
+		pm_nl_add_endpoint $ns2 dead:beef:3::2 flags address
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags address
+		pm_nl_add_endpoint $ns2 10.0.4.2 flags address
+		run_tests $ns1 $ns2 10.0.1.1
+		chk_join_nr 2 2 2
+		chk_add_nr 2 2
+	fi
+
+	# address endpoints: only one endpoint is used
+	if reset_with_tcp_filter "single address endpoints" ns1 10.0.2.2 REJECT &&
+	   mptcp_lib_kallsyms_has "mptcp_pm_get_endp_address_max$"; then
+		pm_nl_set_limits $ns1 0 2
+		pm_nl_set_limits $ns2 2 2
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		pm_nl_add_endpoint $ns1 10.0.3.1 flags signal
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags address
+		run_tests $ns1 $ns2 10.0.1.1
+		chk_join_nr 1 1 1
+		chk_add_nr 2 2
+	fi
+}
+
 link_failure_tests()
 {
 	# accept and use add_addr with additional subflows and link loss
@@ -4109,6 +4164,7 @@ all_tests_sorted=(
 	f@subflows_tests
 	e@subflows_error_tests
 	s@signal_address_tests
+	A@address_endp_tests
 	l@link_failure_tests
 	t@add_addr_timeout_tests
 	r@remove_tests
