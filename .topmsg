@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-minor-move_skbs_to_msk-cleanup
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: minor move_skbs_to_msk() cleanup
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Such function is called only by __mptcp_data_ready(), which in turn
+is always invoked when msk is not owned by the user: we can drop the
+redundant, related check.
+
+Additionally mptcp needs to propagate the socket error only for
+current subflow.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
