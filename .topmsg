@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-introduce-the-mptcp_init_skb-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: introduce the mptcp_init_skb helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Factor out all the skb initialization step in a new helper and
+use it. Note that this change moves the MPTCP CB initialization
+earlier: we can do such step as soon as the skb leaves the
+subflow socket receive queues.
+
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
