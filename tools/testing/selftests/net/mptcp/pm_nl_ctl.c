@@ -23,6 +23,12 @@
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
 #endif
+#ifndef MPTCP_PM_EV_FLAG_DENY_JOIN_ID0
+#define MPTCP_PM_EV_FLAG_DENY_JOIN_ID0	(1 << 0)
+#endif
+#ifndef MPTCP_PM_EV_FLAG_SERVER_SIDE
+#define MPTCP_PM_EV_FLAG_SERVER_SIDE	(1 << 1)
+#endif
 
 static void syntax(char *argv[])
 {
