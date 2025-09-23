@@ -431,8 +431,12 @@ fill_local_addresses_vec_fullmesh(struct mptcp_sock *msk,
 		local->flags = entry->flags;
 		local->ifindex = entry->ifindex;
 
-		if (c_flag_case && (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW))
+		if (c_flag_case && (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW)) {
 			__clear_bit(local->addr.id, msk->pm.id_avail_bitmap);
+
+			if (local->addr.id != msk->mpc_endpoint_id)
+				msk->pm.local_addr_used++;
+		}
 
 		/* Special case for ID0: set the correct ID */
 		if (local->addr.id == msk->mpc_endpoint_id)
