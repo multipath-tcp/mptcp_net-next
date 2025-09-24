@@ -129,7 +129,7 @@ int bpf_usdt_arg_size(struct pt_regs *ctx, __u64 arg_num)
 	if (arg_num >= BPF_USDT_MAX_ARG_CNT)
 		return -ENOENT;
 	barrier_var(arg_num);
-	if (arg_num >= spec->arg_cnt)
+	if (arg_num >= (__u64)spec->arg_cnt)
 		return -ENOENT;
 
 	arg_spec = &spec->args[arg_num];
@@ -165,7 +165,7 @@ int bpf_usdt_arg(struct pt_regs *ctx, __u64 arg_num, long *res)
 	if (arg_num >= BPF_USDT_MAX_ARG_CNT)
 		return -ENOENT;
 	barrier_var(arg_num);
-	if (arg_num >= spec->arg_cnt)
+	if (arg_num >= (__u64)spec->arg_cnt)
 		return -ENOENT;
 
 	arg_spec = &spec->args[arg_num];

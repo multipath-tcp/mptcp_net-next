@@ -42,7 +42,7 @@ int BPF_PROG(test_file_open, struct file *f)
 
 	bpf_dynptr_from_mem(value1, sizeof(value1), 0, &value_ptr);
 
-	for (i = 0; i < ARRAY_SIZE(xattr_names); i++) {
+	for (i = 0; (__u32)i < ARRAY_SIZE(xattr_names); i++) {
 		ret = bpf_get_file_xattr(f, xattr_names[i], &value_ptr);
 		if (ret == sizeof(expected_value))
 			break;
@@ -68,7 +68,7 @@ int BPF_PROG(test_inode_getxattr, struct dentry *dentry, char *name)
 
 	bpf_dynptr_from_mem(value2, sizeof(value2), 0, &value_ptr);
 
-	for (i = 0; i < ARRAY_SIZE(xattr_names); i++) {
+	for (i = 0; (__u32)i < ARRAY_SIZE(xattr_names); i++) {
 		ret = bpf_get_dentry_xattr(dentry, xattr_names[i], &value_ptr);
 		if (ret == sizeof(expected_value))
 			break;

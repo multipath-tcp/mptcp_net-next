@@ -22,11 +22,11 @@ int get_vma_offset(struct bpf_iter__task_vma *ctx)
 	if (task == NULL || vma == NULL)
 		return 0;
 
-	if (last_tgid != task->tgid)
+	if (last_tgid != (__u32)task->tgid)
 		unique_tgid_cnt++;
 	last_tgid = task->tgid;
 
-	if (task->tgid != pid)
+	if ((__u32)task->tgid != pid)
 		return 0;
 
 	if (vma->vm_start <= address && vma->vm_end > address) {

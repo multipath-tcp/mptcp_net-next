@@ -35,7 +35,7 @@ static int __strncmp(const void *m1, const void *m2, size_t len)
 {
 	const unsigned char *s1 = m1;
 	const unsigned char *s2 = m2;
-	int i, delta = 0;
+	size_t i, delta = 0;
 
 	for (i = 0; i < len; i++) {
 		delta = s1[i] - s2[i];
@@ -107,7 +107,7 @@ int BPF_PROG(trace_netif_receive_skb, struct sk_buff *skb)
 	/* Ensure we can write skb string representation */
 	p.type_id = bpf_core_type_id_kernel(struct sk_buff);
 	p.ptr = skb;
-	for (i = 0; i < ARRAY_SIZE(flags); i++) {
+	for (i = 0; (size_t)i < ARRAY_SIZE(flags); i++) {
 		++num_subtests;
 		ret = bpf_snprintf_btf(str, STRSIZE, &p, sizeof(p), 0);
 		if (ret < 0)

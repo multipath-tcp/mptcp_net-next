@@ -44,7 +44,7 @@ int BPF_PROG(sched_process_fork, struct task_struct *parent, struct task_struct 
 {
 	struct storage *stg;
 
-	if (parent->tgid != bench_pid)
+	if ((__u32)parent->tgid != bench_pid)
 		return 0;
 
 	stg = bpf_task_storage_get(&task_storage_map, child, NULL,

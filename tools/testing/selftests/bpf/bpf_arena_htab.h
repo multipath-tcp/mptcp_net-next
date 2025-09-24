@@ -42,7 +42,7 @@ static hashtab_elem_t *lookup_elem_raw(arena_list_head_t *head, __u32 hash, int 
 	hashtab_elem_t *l;
 
 	list_for_each_entry(l, head, hash_node)
-		if (l->hash == hash && l->key == key)
+		if ((__u32)l->hash == hash && l->key == key)
 			return l;
 
 	return NULL;

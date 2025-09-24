@@ -107,7 +107,7 @@ int _getsockopt(struct bpf_sockopt *ctx)
 		return 1;
 	}
 
-	if (ctx->level != SOL_CUSTOM)
+	if (ctx->level != (__s32)SOL_CUSTOM)
 		return 0; /* deny everything except custom level */
 
 	if (optval + 1 > optval_end)
@@ -212,7 +212,7 @@ int _setsockopt(struct bpf_sockopt *ctx)
 		return 1;
 	}
 
-	if (ctx->level != SOL_CUSTOM)
+	if (ctx->level != (__s32)SOL_CUSTOM)
 		return 0; /* deny everything except custom level */
 
 	if (optval + 1 > optval_end)

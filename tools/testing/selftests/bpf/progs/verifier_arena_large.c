@@ -86,10 +86,10 @@ int access_reserved(void *ctx)
 		return 1;
 
 	/* Try to dirty reserved memory. */
-	for (i = 0; i < len && can_loop; i++)
+	for (i = 0; (size_t)i < len && can_loop; i++)
 		*page = 0x5a;
 
-	for (i = 0; i < len && can_loop; i++) {
+	for (i = 0; (size_t)i < len && can_loop; i++) {
 		page = (volatile char __arena *)(base + i * PAGE_SIZE);
 
 		/*

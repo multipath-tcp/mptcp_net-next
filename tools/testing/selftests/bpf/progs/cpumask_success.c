@@ -221,7 +221,7 @@ int BPF_PROG(test_first_firstzero_cpu, struct task_struct *task, u64 clone_flags
 	if (!cpumask)
 		return 0;
 
-	if (bpf_cpumask_first(cast(cpumask)) < nr_cpus) {
+	if (bpf_cpumask_first(cast(cpumask)) < (__u32)nr_cpus) {
 		err = 3;
 		goto release_exit;
 	}
@@ -866,7 +866,7 @@ int BPF_PROG(test_populate, struct task_struct *task, u64 clone_flags)
 	 * access NR_CPUS, the upper bound for nr_cpus, so we infer
 	 * it from the size of cpumask_t.
 	 */
-	if (nr_cpus < 0 || nr_cpus >= CPUMASK_TEST_MASKLEN * 8) {
+	if (nr_cpus < 0 || (__u32)nr_cpus >= CPUMASK_TEST_MASKLEN * 8) {
 		err = 3;
 		goto out;
 	}

@@ -56,7 +56,7 @@ int _getsockopt(struct bpf_sockopt *ctx)
 	struct sockopt_inherit *storage;
 	__u8 *optval = ctx->optval;
 
-	if (ctx->level != SOL_CUSTOM)
+	if (ctx->level != (__s32)SOL_CUSTOM)
 		goto out; /* only interested in SOL_CUSTOM */
 
 	if (optval + 1 > optval_end)
@@ -87,7 +87,7 @@ int _setsockopt(struct bpf_sockopt *ctx)
 	struct sockopt_inherit *storage;
 	__u8 *optval = ctx->optval;
 
-	if (ctx->level != SOL_CUSTOM)
+	if (ctx->level != (__s32)SOL_CUSTOM)
 		goto out; /* only interested in SOL_CUSTOM */
 
 	if (optval + 1 > optval_end)

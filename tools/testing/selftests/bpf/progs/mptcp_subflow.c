@@ -63,7 +63,7 @@ int mptcp_subflow(struct bpf_sock_ops *skops)
 static int _check_getsockopt_subflow_mark(struct mptcp_sock *msk, struct bpf_sockopt *ctx)
 {
 	struct mptcp_subflow_context *subflow;
-	int i = 0;
+	__u32 i = 0;
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk;

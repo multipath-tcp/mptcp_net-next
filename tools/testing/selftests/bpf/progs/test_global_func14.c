@@ -9,7 +9,7 @@ struct S;
 __noinline int foo(const struct S *s)
 {
 	if (s)
-		return bpf_get_prandom_u32() < *(const int *) s;
+		return bpf_get_prandom_u32() < *(const __u32 *) s;
 
 	return 0;
 }

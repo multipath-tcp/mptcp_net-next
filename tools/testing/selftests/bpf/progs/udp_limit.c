@@ -50,7 +50,7 @@ int sock_release(struct bpf_sock *ctx)
 		return 1;
 
 	sk_storage = bpf_sk_storage_get(&sk_map, ctx, 0, 0);
-	if (!sk_storage || *sk_storage != 0xdeadbeef)
+	if (!sk_storage || *sk_storage != (int)0xdeadbeef)
 		return 0;
 
 	__sync_fetch_and_add(&invocations, 1);

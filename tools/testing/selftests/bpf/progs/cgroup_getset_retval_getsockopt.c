@@ -22,7 +22,7 @@ int get_retval(struct bpf_sockopt *ctx)
 	__sync_fetch_and_add(&invocations, 1);
 
 	/* optval larger than PAGE_SIZE use kernel's buffer. */
-	if (ctx->optlen > page_size)
+	if ((__u32)ctx->optlen > page_size)
 		ctx->optlen = 0;
 
 	return 1;
@@ -37,7 +37,7 @@ int set_eisconn(struct bpf_sockopt *ctx)
 		assertion_error = 1;
 
 	/* optval larger than PAGE_SIZE use kernel's buffer. */
-	if (ctx->optlen > page_size)
+	if ((__u32)ctx->optlen > page_size)
 		ctx->optlen = 0;
 
 	return 1;
@@ -51,7 +51,7 @@ int clear_retval(struct bpf_sockopt *ctx)
 	ctx->retval = 0;
 
 	/* optval larger than PAGE_SIZE use kernel's buffer. */
-	if (ctx->optlen > page_size)
+	if ((__u32)ctx->optlen > page_size)
 		ctx->optlen = 0;
 
 	return 1;

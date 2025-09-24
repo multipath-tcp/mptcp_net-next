@@ -369,7 +369,7 @@ SEC("raw_tp")
 __success
 int iter_array_fill(const void *ctx)
 {
-	int sum, i;
+	__u32 sum, i;
 
 	MY_PID_GUARD();
 
@@ -395,7 +395,7 @@ SEC("raw_tp")
 __success
 int iter_nested_iters(const void *ctx)
 {
-	int sum, row, col;
+	__u64 sum, row, col;
 
 	MY_PID_GUARD();
 
@@ -463,7 +463,7 @@ int iter_nested_deeply_iters(const void *ctx)
 
 static __noinline void fill_inner_dimension(int row)
 {
-	int col;
+	__u64 col;
 
 	bpf_for(col, 0, ARRAY_SIZE(arr2d[0])) {
 		arr2d[row][col] = row * col;
@@ -472,7 +472,7 @@ static __noinline void fill_inner_dimension(int row)
 
 static __noinline int sum_inner_dimension(int row)
 {
-	int sum = 0, col;
+	__u64 sum = 0, col;
 
 	bpf_for(col, 0, ARRAY_SIZE(arr2d[0])) {
 		sum += arr2d[row][col];
@@ -487,7 +487,7 @@ SEC("raw_tp")
 __success
 int iter_subprog_iters(const void *ctx)
 {
-	int sum, row, col;
+	__u64 sum, row, col;
 
 	MY_PID_GUARD();
 
@@ -626,7 +626,7 @@ __success
 int iter_stack_array_loop(const void *ctx)
 {
 	long arr1[16], arr2[16], sum = 0;
-	int i;
+	__u32 i;
 
 	MY_PID_GUARD();
 
@@ -663,7 +663,7 @@ static __noinline void fill(struct bpf_iter_num *it, int *arr, __u32 n, int mul)
 
 	while ((t = bpf_iter_num_next(it))) {
 		i = *t;
-		if (i >= n)
+		if ((__u32)i >= n)
 			break;
 		arr[i] =  i * mul;
 	}
@@ -1537,7 +1537,7 @@ int iter_arr_with_actual_elem_count(const void *ctx)
 {
 	int i, n = loop_data.n, sum = 0;
 
-	if (n > ARRAY_SIZE(loop_data.data))
+	if ((__u64)n > ARRAY_SIZE(loop_data.data))
 		return 0;
 
 	bpf_for(i, 0, n) {

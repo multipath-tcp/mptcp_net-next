@@ -351,7 +351,7 @@ int BPF_PROG(bpf_fq_enqueue, struct sk_buff *skb, struct Qdisc *sch,
 
 			jiffies = bpf_jiffies64();
 			if ((s64)(jiffies - (flow_copy->age + q.flow_refill_delay)) > 0) {
-				if (flow_copy->credit < q.quantum)
+				if ((__u32)flow_copy->credit < q.quantum)
 					flow_copy->credit = q.quantum;
 			}
 			flow_copy->age = 0;
@@ -590,7 +590,7 @@ struct sk_buff *BPF_PROG(bpf_fq_dequeue, struct Qdisc *sch)
 {
 	struct dequeue_nonprio_ctx cb_ctx = {};
 	struct sk_buff *skb = NULL;
-	int i;
+	__u32 i;
 
 	if (!sch->q.qlen)
 		goto out;

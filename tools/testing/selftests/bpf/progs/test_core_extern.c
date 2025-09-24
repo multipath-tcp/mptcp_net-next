@@ -37,7 +37,7 @@ uint64_t missing_val = -1;
 SEC("raw_tp/sys_enter")
 int handle_sys_enter(struct pt_regs *ctx)
 {
-	int i;
+	__u32 i;
 
 	kern_ver = LINUX_KERNEL_VERSION;
 	unkn_virt_val = LINUX_UNKNOWN_VIRTUAL_EXTERN;

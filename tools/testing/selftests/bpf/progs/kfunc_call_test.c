@@ -108,7 +108,7 @@ int kfunc_syscall_test(struct syscall_test_args *args)
 {
 	const long size = args->size;
 
-	if (size > sizeof(args->data))
+	if ((__u64)size > sizeof(args->data))
 		return -7; /* -E2BIG */
 
 	bpf_kfunc_call_test_mem_len_pass1(&args->data, sizeof(args->data));

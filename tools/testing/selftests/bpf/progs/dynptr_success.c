@@ -40,7 +40,7 @@ int test_read_write(void *ctx)
 	char write_data[64] = "hello there, world!!";
 	char read_data[64] = {};
 	struct bpf_dynptr ptr;
-	int i;
+	__u32 i;
 
 	if (bpf_get_current_pid_tgid() >> 32 != pid)
 		return 0;
@@ -114,7 +114,7 @@ int test_dynptr_data(void *ctx)
 	if (err)
 		return 0;
 
-	if (val != *(int *)data)
+	if ((int)val != *(int *)data)
 		err = 5;
 
 	return 0;
@@ -626,7 +626,7 @@ int BPF_PROG(test_dynptr_skb_tp_btf, void *skb, void *location)
 
 static inline int bpf_memcmp(const char *a, const char *b, u32 size)
 {
-	int i;
+	__u32 i;
 
 	bpf_for(i, 0, size) {
 		if (a[i] != b[i])
@@ -937,7 +937,7 @@ static __always_inline void test_dynptr_probe(void *ptr, bpf_read_dynptr_fn_t bp
 {
 	char buf[sizeof(expected_str)];
 	struct bpf_dynptr ptr_buf;
-	int i;
+	__u32 i;
 
 	if (bpf_get_current_pid_tgid() >> 32 != pid)
 		return;

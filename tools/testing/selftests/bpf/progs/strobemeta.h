@@ -409,7 +409,7 @@ static __always_inline uint64_t read_map_var(struct strobemeta_cfg *cfg,
 
 	descr->id = map.id;
 	descr->cnt = map.cnt;
-	if (cfg->req_meta_idx == idx) {
+	if (cfg->req_meta_idx == (__s64)idx) {
 		data->req_id = map.id;
 		data->req_meta_valid = 1;
 	}

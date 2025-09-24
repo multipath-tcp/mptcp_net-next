@@ -336,7 +336,7 @@ int bpf_prog9(struct sk_msg_md *msg)
 
 	bytes = bpf_map_lookup_elem(&sock_cork_bytes, &zero);
 	if (bytes) {
-		if (((__u64)data_end - (__u64)data) >= *bytes)
+		if (((__u64)data_end - (__u64)data) >= (__u64)*bytes)
 			return SK_PASS;
 		ret = bpf_msg_cork_bytes(msg, *bytes);
 		if (ret)

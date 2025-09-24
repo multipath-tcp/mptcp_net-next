@@ -115,7 +115,8 @@ int dump_task_sleepable(struct bpf_iter__task *ctx)
 	/* Same length as the string */
 	ret = bpf_copy_from_user_task_str((char *)task_str2, 10, user_ptr, task, 0);
 	/* only need to do the task pid check once */
-	if (bpf_strncmp(task_str2, 10, "test_data\0") != 0 || ret != 10 || task->tgid != pid) {
+	if (bpf_strncmp(task_str2, 10, "test_data\0") != 0 || ret != 10 ||
+			(__u32)task->tgid != pid) {
 		BPF_SEQ_PRINTF(seq, "%s\n", info);
 		return 0;
 	}

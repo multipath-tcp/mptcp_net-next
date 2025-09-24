@@ -38,7 +38,7 @@ int add_to_list_in_inner_array(void *ctx)
 	__u64 *value;
 
 	curr_pid = (u32)bpf_get_current_pid_tgid();
-	if (done || curr_pid != pid)
+	if (done || curr_pid != (__u32)pid)
 		return 0;
 
 	pid_match = true;

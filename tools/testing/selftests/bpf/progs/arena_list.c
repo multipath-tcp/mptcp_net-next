@@ -50,7 +50,7 @@ int arena_list_add(void *ctx)
 
 	list_head = &global_head;
 
-	for (i = zero; i < cnt && can_loop; i++) {
+	for (i = zero; i < (__u64)cnt && can_loop; i++) {
 		struct elem __arena *n = bpf_alloc(sizeof(*n));
 
 		test_val++;

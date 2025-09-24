@@ -49,7 +49,7 @@ int add_to_list_in_inner_array(void *ctx)
 	struct bpf_map *map;
 	int zero = 0;
 
-	if (done || (u32)bpf_get_current_pid_tgid() != pid)
+	if (done || (__u32)bpf_get_current_pid_tgid() != (__u32)pid)
 		return 0;
 
 	map = bpf_map_lookup_elem(&outer_array, &zero);

@@ -91,7 +91,7 @@ static void tcp_cwnd_reduction(struct sock *sk, int newly_acked_sacked,
 			(__u64)tp->snd_ssthresh * prr_delivered + tp->prior_cwnd - 1;
 		sndcnt = (__u32)div64_u64(dividend, (__u64)tp->prior_cwnd) - tp->prr_out;
 	} else {
-		sndcnt = max(prr_delivered - tp->prr_out, newly_acked_sacked);
+		sndcnt = max(prr_delivered - tp->prr_out, (__u32)newly_acked_sacked);
 		if (flag & FLAG_SND_UNA_ADVANCED && !newly_lost)
 			sndcnt++;
 		sndcnt = min(delta, sndcnt);

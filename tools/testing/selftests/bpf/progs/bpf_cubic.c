@@ -277,7 +277,7 @@ static void bictcp_update(struct bpf_bictcp *ca, __u32 cwnd, __u32 acked)
 	ca->ack_cnt += acked;	/* count the number of ACKed packets */
 
 	if (ca->last_cwnd == cwnd &&
-	    (__s32)(tcp_jiffies32 - ca->last_time) <= HZ / 32)
+	    (__s32)(tcp_jiffies32 - ca->last_time) <= (__s32)HZ / 32)
 		return;
 
 	/* The CUBIC function can update ca->cnt at most once per jiffy.
@@ -474,7 +474,7 @@ static void hystart_update(struct sock *sk, __u32 delay)
 			if (sk->sk_pacing_status == SK_PACING_NONE)
 				threshold >>= 1;
 
-			if ((__s32)(now - ca->round_start) > threshold) {
+			if ((__s32)(now - ca->round_start) > (__s32)threshold) {
 				ca->found = 1;
 				tp->snd_ssthresh = tp->snd_cwnd;
 			}
@@ -512,7 +512,7 @@ void BPF_PROG(bpf_cubic_acked, struct sock *sk, const struct ack_sample *sample)
 		return;
 
 	/* Discard delay samples right after fast recovery */
-	if (ca->epoch_start && (__s32)(tcp_jiffies32 - ca->epoch_start) < HZ)
+	if (ca->epoch_start && (__s32)(tcp_jiffies32 - ca->epoch_start) < (__s32)HZ)
 		return;
 
 	delay = sample->rtt_us;
@@ -525,7 +525,7 @@ void BPF_PROG(bpf_cubic_acked, struct sock *sk, const struct ack_sample *sample)
 
 	/* hystart triggers when cwnd is larger than some threshold */
 	if (!ca->found && tcp_in_slow_start(tp) && hystart &&
-	    tp->snd_cwnd >= hystart_low_window)
+	    tp->snd_cwnd >= (__u32)hystart_low_window)
 		hystart_update(sk, delay);
 }
 

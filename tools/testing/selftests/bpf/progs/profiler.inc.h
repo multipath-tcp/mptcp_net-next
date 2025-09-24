@@ -169,7 +169,7 @@ static INLINE int get_var_spid_index(struct var_kill_data_arr_t* arr_struct,
 #ifdef UNROLL
 	__pragma_loop_unroll
 #endif
-	for (int i = 0; i < ARRAY_SIZE(arr_struct->array); i++)
+	for (size_t i = 0; i < ARRAY_SIZE(arr_struct->array); i++)
 		if (arr_struct->array[i].meta.pid == spid)
 			return i;
 	return -1;
@@ -402,7 +402,7 @@ static INLINE int trace_var_sys_kill(void* ctx, int tpid, int sig)
 #ifdef UNROLL
 			__pragma_loop_unroll
 #endif
-			for (int i = 0; i < ARRAY_SIZE(arr_struct->array); i++)
+			for (size_t i = 0; i < ARRAY_SIZE(arr_struct->array); i++)
 				if (arr_struct->array[i].meta.pid == 0) {
 					bpf_probe_read_kernel(&arr_struct->array[i],
 							      sizeof(arr_struct->array[i]),
@@ -629,7 +629,7 @@ int raw_tracepoint__sched_process_exit(void* ctx)
 #ifdef UNROLL
 	__pragma_loop_unroll
 #endif
-	for (int i = 0; i < ARRAY_SIZE(arr_struct->array); i++) {
+	for (size_t i = 0; i < ARRAY_SIZE(arr_struct->array); i++) {
 		struct var_kill_data_t* past_kill_data = &arr_struct->array[i];
 
 		if (past_kill_data != NULL && past_kill_data->kill_target_pid == (pid_t)tpid) {

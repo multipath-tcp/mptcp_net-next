@@ -110,7 +110,7 @@ int list_push_pop_multiple(struct bpf_spin_lock *lock, struct bpf_list_head *hea
 {
 	struct bpf_list_node *n;
 	struct foo *f[200], *pf;
-	int i;
+	__u64 i;
 
 	/* Loop following this check adds nodes 2-at-a-time in order to
 	 * validate multiple release_on_unlock release logic
@@ -144,7 +144,7 @@ int list_push_pop_multiple(struct bpf_spin_lock *lock, struct bpf_list_head *hea
 		if (!n)
 			return 3;
 		pf = container_of(n, struct foo, node2);
-		if (pf->data != (ARRAY_SIZE(f) - i - 1)) {
+		if ((__u64)pf->data != (ARRAY_SIZE(f) - i - 1)) {
 			bpf_obj_drop(pf);
 			return 4;
 		}
@@ -163,7 +163,7 @@ int list_push_pop_multiple(struct bpf_spin_lock *lock, struct bpf_list_head *hea
 		if (!n)
 			return 5;
 		pf = container_of(n, struct foo, node2);
-		if (pf->data != i) {
+		if ((__u64)pf->data != i) {
 			bpf_obj_drop(pf);
 			return 6;
 		}
@@ -193,7 +193,7 @@ int list_in_list(struct bpf_spin_lock *lock, struct bpf_list_head *head, bool le
 	struct bpf_list_node *n;
 	struct bar *ba[8], *b;
 	struct foo *f;
-	int i;
+	__u64 i;
 
 	f = bpf_obj_new(typeof(*f));
 	if (!f)
@@ -238,7 +238,7 @@ int list_in_list(struct bpf_spin_lock *lock, struct bpf_list_head *head, bool le
 			return 6;
 		}
 		b = container_of(n, struct bar, node);
-		if (b->data != i) {
+		if ((__u64)b->data != i) {
 			bpf_obj_drop(f);
 			bpf_obj_drop(b);
 			return 7;

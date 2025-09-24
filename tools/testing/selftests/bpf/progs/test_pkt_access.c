@@ -130,11 +130,11 @@ int test_pkt_access(struct __sk_buff *skb)
 		tcp = (struct tcphdr *)((void *)(ip6h) + ihl_len);
 	}
 
-	if (test_pkt_access_subprog1(skb) != skb->len * 2)
+	if ((__u32)test_pkt_access_subprog1(skb) != skb->len * 2)
 		return TC_ACT_SHOT;
-	if (test_pkt_access_subprog2(2, skb) != skb->len * 2)
+	if ((__u32)test_pkt_access_subprog2(2, skb) != skb->len * 2)
 		return TC_ACT_SHOT;
-	if (test_pkt_access_subprog3(3, skb) != skb->len * 3 * skb->ifindex)
+	if ((__u32)test_pkt_access_subprog3(3, skb) != skb->len * 3 * skb->ifindex)
 		return TC_ACT_SHOT;
 	if (tcp) {
 		if (test_pkt_write_access_subprog(skb, (void *)tcp - data))

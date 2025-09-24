@@ -47,7 +47,7 @@ int xdp_use_helper(struct xdp_md *ctx)
 		goto out;
 	}
 
-	if (mtu_len != GLOBAL_USER_MTU)
+	if (mtu_len != (__u32)GLOBAL_USER_MTU)
 		retval = XDP_DROP;
 
 out:
@@ -165,7 +165,7 @@ int tc_use_helper(struct __sk_buff *ctx)
 		goto out;
 	}
 
-	if (mtu_len != GLOBAL_USER_MTU)
+	if (mtu_len != (__u32)GLOBAL_USER_MTU)
 		retval = BPF_REDIRECT;
 out:
 	global_bpf_mtu_tc = mtu_len;

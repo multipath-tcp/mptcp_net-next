@@ -453,8 +453,8 @@ BPF_CFLAGS = -g -Wall -Werror -D__TARGET_ARCH_$(SRCARCH) $(MENDIAN)	\
 	     -I$(abspath $(OUTPUT)/../usr/include)			\
 	     -std=gnu11		 					\
 	     -fno-strict-aliasing 					\
-	     -Wno-compare-distinct-pointer-types
-# TODO: enable me -Wsign-compare
+	     -Wno-compare-distinct-pointer-types			\
+	     -Wsign-compare
 
 CLANG_CFLAGS = $(CLANG_SYS_INCLUDES)
 

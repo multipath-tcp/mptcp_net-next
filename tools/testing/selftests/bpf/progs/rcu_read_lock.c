@@ -34,7 +34,7 @@ int get_cgroup_id(void *ctx)
 	struct css_set *cgroups;
 
 	task = bpf_get_current_task_btf();
-	if (task->pid != target_pid)
+	if ((__u32)task->pid != target_pid)
 		return 0;
 
 	/* simulate bpf_get_current_cgroup_id() helper */
@@ -56,7 +56,7 @@ int task_succ(void *ctx)
 	long *ptr;
 
 	task = bpf_get_current_task_btf();
-	if (task->pid != target_pid)
+	if ((__u32)task->pid != target_pid)
 		return 0;
 
 	bpf_rcu_read_lock();

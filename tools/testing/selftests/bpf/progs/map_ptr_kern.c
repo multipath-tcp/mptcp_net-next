@@ -148,7 +148,7 @@ static inline int check_array(void)
 {
 	struct bpf_array *array = (struct bpf_array *)&m_array;
 	struct bpf_map *map = (struct bpf_map *)&m_array;
-	int i, n_lookups = 0, n_keys = 0;
+	__u32 i, n_lookups = 0, n_keys = 0;
 
 	VERIFY(check_default(&array->map, map));
 

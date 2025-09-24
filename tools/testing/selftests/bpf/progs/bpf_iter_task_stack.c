@@ -27,7 +27,7 @@ int dump_task_stack(struct bpf_iter__task *ctx)
 	BPF_SEQ_PRINTF(seq, "pid: %8u num_entries: %8u\n", task->pid,
 		       retlen / SIZE_OF_ULONG);
 	for (i = 0; i < MAX_STACK_TRACE_DEPTH; i++) {
-		if (retlen > i * SIZE_OF_ULONG)
+		if ((__u32)retlen > i * SIZE_OF_ULONG)
 			BPF_SEQ_PRINTF(seq, "[<0>] %pB\n", (void *)entries[i]);
 	}
 	BPF_SEQ_PRINTF(seq, "\n");

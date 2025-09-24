@@ -7,7 +7,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-static __always_inline int bind_prog(struct bpf_sock_addr *ctx, int family)
+static __always_inline int bind_prog(struct bpf_sock_addr *ctx, __u32 family)
 {
 	struct bpf_sock *sk;
 

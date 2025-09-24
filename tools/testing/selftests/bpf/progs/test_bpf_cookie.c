@@ -6,7 +6,7 @@
 #include <bpf/bpf_tracing.h>
 #include <errno.h>
 
-int my_tid;
+__u32 my_tid;
 
 __u64 kprobe_res;
 __u64 kprobe_multi_res;

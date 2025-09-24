@@ -170,7 +170,7 @@ static __always_inline int is_valid_tlv_boundary(struct __sk_buff *skb,
 	if (*pad_off == 0)
 		*pad_off = cur_off;
 
-	if (*tlv_off == -1)
+	if (*tlv_off == (__u32)-1)
 		*tlv_off = cur_off;
 	else if (!offset_valid)
 		return -EINVAL;
@@ -189,7 +189,7 @@ static __always_inline int add_tlv(struct __sk_buff *skb,
 	uint32_t partial_srh_len;
 	int err;
 
-	if (tlv_off != -1)
+	if (tlv_off != (__u32)-1)
 		tlv_off += srh_off;
 
 	if (itlv->type == SR6_TLV_PADDING || itlv->type == SR6_TLV_HMAC)

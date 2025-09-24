@@ -28,7 +28,7 @@ int BPF_PROG(bpf_local_storage_destroy, struct bpf_local_storage *local_storage)
 		return 0;
 
 	sk = bpf_core_cast(sk_ptr, struct sock);
-	if (sk->sk_cookie.counter != cookie)
+	if ((__u64)sk->sk_cookie.counter != cookie)
 		return 0;
 
 	cookie_found++;
@@ -43,11 +43,11 @@ int BPF_PROG(inet6_sock_destruct, struct sock *sk)
 {
 	int *value;
 
-	if (!cookie || sk->sk_cookie.counter != cookie)
+	if (!cookie || (__u64)sk->sk_cookie.counter != cookie)
 		return 0;
 
 	value = bpf_sk_storage_get(&sk_storage, sk, 0, 0);
-	if (value && *value == 0xdeadbeef) {
+	if (value && (__u32)*value == 0xdeadbeef) {
 		cookie_found++;
 		sk_ptr = sk;
 		local_storage_ptr = sk->sk_bpf_storage;
