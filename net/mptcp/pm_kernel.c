@@ -413,6 +413,8 @@ fill_local_addresses_vec_fullmesh(struct mptcp_sock *msk,
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(entry, &pernet->local_addr_list, list) {
+		bool is_id0;
+
 		if (!(entry->flags & MPTCP_PM_ADDR_FLAG_FULLMESH))
 			continue;
 
@@ -424,12 +426,19 @@ fill_local_addresses_vec_fullmesh(struct mptcp_sock *msk,
 		local->flags = entry->flags;
 		local->ifindex = entry->ifindex;
 
-		if (c_flag_case && (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW))
+		is_id0 = mptcp_addresses_equal(&local->addr, &mpc_addr,
+					       local->addr.port);
+
+		if (c_flag_case &&
+		    (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW)) {
 			__clear_bit(local->addr.id, msk->pm.id_avail_bitmap);
 
+			if (!is_id0)
+				msk->pm.local_addr_used++;
+		}
+
 		/* Special case for ID0: set the correct ID */
-		if (mptcp_addresses_equal(&local->addr, &mpc_addr,
-					  local->addr.port))
+		if (is_id0)
 			local->addr.id = 0;
 
 		msk->pm.subflows++;
