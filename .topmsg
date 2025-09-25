@@ -1,4 +1,24 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-new-laminar-endp
+Subject: [PATCH] selftests: mptcp: join: validate new laminar endp
 
+Here are a few sub-tests for mptcp_join.sh, validating the new 'laminar'
+endpoint type.
+
+In a setup where subflows created using the routing rules would be
+rejected by the listener, and where the latter announces one IP address,
+some cases are verified:
+
+- Without any 'laminar' endpoints: no new subflows are created.
+
+- With one 'laminar' endpoint: a second subflow is created.
+
+- With multiple 'laminar' endpoints: 2 IPv4 subflows are created.
+
+- With one 'laminar' endpoint, but the server announcing a second IP
+  address, only one subflow is created.
+
+- With one 'laminar' + 'subflow' endpoint, the same endpoint is only
+  used once.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
