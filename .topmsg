@@ -1,4 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-remove-stale_loss_cnt
+Subject: [PATCH] mptcp: pm: in-kernel: remove stale_loss_cnt
 
+It is currently not used.
+
+It was in fact never used since its introduction in commit ff5a0b421cb2
+("mptcp: faster active backup recovery"). It was probably initially
+added to struct pm_nl_pernet during the development of this commit,
+before being added to struct mptcp_pernet in ctrl.c, but not removed
+from the first place.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
