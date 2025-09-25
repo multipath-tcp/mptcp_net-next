@@ -1,4 +1,44 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-add-laminar-endpoints
+Subject: [PATCH] mptcp: pm: in-kernel: add laminar endpoints
 
+Currently, upon the reception of an ADD_ADDR (and when the fullmesh flag
+is not used), the in-kernel PM will create new subflows using the local
+address the routing configuration will pick.
+
+It would be easier to pick local addresses from a selected list of
+endpoints, and use it only once, than relying on routing rules.
+
+Use case: both the client (C) and the server (S) have two addresses (a
+and b). The client establishes the connection between C(a) and S(a).
+Once established, the server announces its additional address S(b). Once
+received, the client connects to it using its second address C(b).
+Compared to a situation without the 'laminar' endpoint for C(b), the
+client didn't use this address C(b) to establish a subflow to the
+server's primary address S(a). So at the end, we have:
+
+   C        S
+  C(a) --- S(a)
+  C(b) --- S(b)
+
+In case of a 3rd address on each side (C(c) and S(c)), upon the
+reception of an ADD_ADDR with S(c), the client should not pick C(b)
+because it has already been used. C(c) should then be used.
+
+Note that this situation is currently possible if C doesn't add any
+endpoint, but configure the routing in order to pick C(b) for the route
+to S(b), and pick C(c) for the route to S(c). That doesn't sound very
+practical because it means knowing in advance the IP addresses that
+will be used and announced by the server.
+
+'laminar', like the idea of laminar flows: the different subflows don't
+mix with each other on an endpoint, unlike the "turbulent" way traffic
+is mixed by 'fullmesh'.
+
+In the code, the new endpoint type is added. Similar to the other
+subflow types, an MPTCP_INFO counter is added. While at it, hole are now
+commented in struct mptcp_info, to remember next time that these holes
+can no longer be used.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/503
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
