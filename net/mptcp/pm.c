@@ -483,23 +483,24 @@ void mptcp_pm_new_connection(struct mptcp_sock *msk, const struct sock *ssk, int
 bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
-	unsigned int subflows_max;
+	unsigned int limit_extra_subflows;
 	int ret = 0;
 
 	if (mptcp_pm_is_userspace(msk)) {
 		if (mptcp_userspace_pm_active(msk)) {
 			spin_lock_bh(&pm->lock);
-			pm->subflows++;
+			pm->extra_subflows++;
 			spin_unlock_bh(&pm->lock);
 			return true;
 		}
 		return false;
 	}
 
-	subflows_max = mptcp_pm_get_subflows_max(msk);
+	limit_extra_subflows = mptcp_pm_get_limit_extra_subflows(msk);
 
-	pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk, pm->subflows,
-		 subflows_max, READ_ONCE(pm->accept_subflow));
+	pr_debug("msk=%p subflows=%d max=%d allow=%d\n", msk,
+		 pm->extra_subflows, limit_extra_subflows,
+		 READ_ONCE(pm->accept_subflow));
 
 	/* try to avoid acquiring the lock below */
 	if (!READ_ONCE(pm->accept_subflow))
@@ -507,8 +508,8 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 
 	spin_lock_bh(&pm->lock);
 	if (READ_ONCE(pm->accept_subflow)) {
-		ret = pm->subflows < subflows_max;
-		if (ret && ++pm->subflows == subflows_max)
+		ret = pm->extra_subflows < limit_extra_subflows;
+		if (ret && ++pm->extra_subflows == limit_extra_subflows)
 			WRITE_ONCE(pm->accept_subflow, false);
 	}
 	spin_unlock_bh(&pm->lock);
@@ -594,7 +595,7 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 	if (mptcp_pm_is_userspace(msk)) {
 		if (update_subflows) {
 			spin_lock_bh(&pm->lock);
-			pm->subflows--;
+			pm->extra_subflows--;
 			spin_unlock_bh(&pm->lock);
 		}
 		return;
