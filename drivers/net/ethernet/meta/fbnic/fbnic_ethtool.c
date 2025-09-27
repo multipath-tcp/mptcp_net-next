@@ -1718,7 +1718,8 @@ fbnic_get_pause_stats(struct net_device *netdev,
 
 static void
 fbnic_get_fec_stats(struct net_device *netdev,
-		    struct ethtool_fec_stats *fec_stats)
+		    struct ethtool_fec_stats *fec_stats,
+		    struct ethtool_fec_hist *hist)
 {
 	struct fbnic_net *fbn = netdev_priv(netdev);
 	struct fbnic_phy_stats *phy_stats;
@@ -1863,6 +1864,7 @@ fbnic_get_rmon_stats(struct net_device *netdev,
 }
 
 static const struct ethtool_ops fbnic_ethtool_ops = {
+	.cap_link_lanes_supported	= true,
 	.supported_coalesce_params	= ETHTOOL_COALESCE_USECS |
 					  ETHTOOL_COALESCE_RX_MAX_FRAMES,
 	.supported_ring_params		= ETHTOOL_RING_USE_TCP_DATA_SPLIT |
