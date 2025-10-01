@@ -347,7 +347,7 @@ jobs:
             echo 'Tag: ${{ steps.tag.outputs.tag }}'
             echo 'Summary:'
             echo '```'
-            tail -n4 genhtml.log
+            grep -A4 "coverage rate:" genhtml.log || tail -n9 genhtml.log || echo "ERROR"
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
 
