@@ -1,0 +1,16 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: pm: init and release mptcp_pm_ops
+
+Add a struct mptcp_pm_ops pointer "ops" in struct mptcp_pm_data, and two
+helpers mptcp_pm_ops_init() and mptcp_pm_ops_release(), to set and release
+this pointer. mptcp_pm_ops_init() is invoked in mptcp_pm_data_reset(),
+while mptcp_pm_ops_release() is invoked in mptcp_pm_destroy().
+
+mptcp_pm_kernel_init() is defined as init() interface of the in-kernel PM,
+which sets work_pending, accept_addr and accept_subflow.
+
+mptcp_pm_userspace_is_release() is defined as release() interface of the
+userspace PM, which is a wrapper of userspace_pm_free_local_addr_list().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
