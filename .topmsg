@@ -1,0 +1,7 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests/bpf: Drop cgroup_fd of run_mptcpify
+
+The parameter 'cgroup_fd' of run_mptcpify() is useless, drop it.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
