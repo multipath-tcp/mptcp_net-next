@@ -1,0 +1,6 @@
+From: Matthieu Baerts <matttbe@kernel.org>
+Subject: [PATCH] DO-NOT-MERGE: mptcp: enabled by default
+
+This commit is useful for automated builds, e.g. from Intel's kbuild.
+
+Signed-off-by: Matthieu Baerts <matttbe@kernel.org>
