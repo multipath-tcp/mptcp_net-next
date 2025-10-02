@@ -1,0 +1,14 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: pm: add get_priority() interface
+
+This patch adds get_priority() interface for struct mptcp_sched_ops,
+then mptcp_pm_is_backup() can directly invoke get_priority() interface
+through "ops" of "msk->pm". Instead of using mptcp_pm_is_userspace()
+to check which is_backup() helper to invoke.
+
+Also rename mptcp_pm_nl_is_backup() to mptcp_pm_kernel_get_priority()
+and mptcp_userspace_pm_is_backup() to mptcp_pm_userspace_get_priority(),
+and make them static.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
