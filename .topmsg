@@ -1,0 +1,14 @@
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: pm: add get_local_id() interface
+
+This patch adds get_local_id() interface for struct mptcp_sched_ops,
+then mptcp_pm_get_local_id() can directly invoke get_local_id() interface
+through "ops" of "msk->pm". Instead of using mptcp_pm_is_userspace() to
+check which get_local_id() helper to invoke.
+
+Also rename mptcp_pm_nl_get_local_id() to mptcp_pm_kernel_get_local_id()
+and mptcp_userspace_pm_get_local_id() to mptcp_pm_userspace_get_local_id(),
+and make them static.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
