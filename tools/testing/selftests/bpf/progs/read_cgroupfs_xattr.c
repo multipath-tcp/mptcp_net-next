@@ -9,6 +9,9 @@
 
 char _license[] SEC("license") = "GPL";
 
+void bpf_rcu_read_lock(void) __ksym;
+void bpf_rcu_read_unlock(void) __ksym;
+
 pid_t target_pid = 0;
 
 char xattr_value[64];
