@@ -1,4 +1,8 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Fix-realloc-size-in-bpf_get_addrs
+From: Jiri Olsa <jolsa@kernel.org>
+Subject: [PATCH] selftests/bpf: Fix realloc size in bpf_get_addrs
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+We will segfault once we call realloc in bpf_get_addrs due to
+wrong size argument.
+
+Fixes: 6302bdeb91df ("selftests/bpf: Add a kprobe_multi subtest to use addrs instead of syms")
+Signed-off-by: Jiri Olsa <jolsa@kernel.org>
