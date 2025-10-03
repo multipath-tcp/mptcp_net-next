@@ -1,4 +1,120 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-fix-recent-compilation-errors
+Subject: [PATCH] selftests: bpf: fix recent compilation errors
+
+In cgroup_read_xattr.c:
+
+ progs/cgroup_read_xattr.c:36:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     36 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/cgroup_read_xattr.c:36:2: note: did you mean 'bpf_ct_release'?
+  .virtme/build-debug-btf//tools/include/vmlinux.h:120602:13: note: 'bpf_ct_release' declared here
+   120602 | extern void bpf_ct_release(struct nf_conn *nfct) __weak __ksym;
+          |             ^
+  progs/cgroup_read_xattr.c:52:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     52 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/cgroup_read_xattr.c:71:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     71 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/cgroup_read_xattr.c:90:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     90 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/cgroup_read_xattr.c:102:2: error: call to undeclared function 'bpf_rcu_read_lock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    102 |         bpf_rcu_read_lock();
+        |         ^
+  progs/cgroup_read_xattr.c:110:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    110 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/cgroup_read_xattr.c:112:2: error: call to undeclared function 'bpf_rcu_read_unlock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    112 |         bpf_rcu_read_unlock();
+        |         ^
+  progs/cgroup_read_xattr.c:127:13: error: call to undeclared function 'bpf_cgroup_ancestor'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ^
+  progs/cgroup_read_xattr.c:127:13: note: did you mean 'use_bpf_cgroup_ancestor'?
+  progs/cgroup_read_xattr.c:118:14: note: 'use_bpf_cgroup_ancestor' declared here
+    118 | int BPF_PROG(use_bpf_cgroup_ancestor)
+        |              ^
+    119 | {
+    120 |         u64 cgrp_id = bpf_get_current_cgroup_id();
+    121 |         struct cgroup *cgrp, *ancestor;
+    122 |
+    123 |         cgrp = bpf_cgroup_from_id(cgrp_id);
+    124 |         if (!cgrp)
+    125 |                 return 0;
+    126 |
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ~~~~~~~~~~~~~~~~~~~
+        |                    use_bpf_cgroup_ancestor
+  .virtme/build-debug-btf//tools/include/bpf/bpf_tracing.h:676:17: note: expanded from macro 'BPF_PROG'
+    676 | typeof(name(0)) name(unsigned long long *ctx)                               \
+        |                 ^
+  progs/cgroup_read_xattr.c:127:11: error: incompatible integer to pointer conversion assigning to 'struct cgroup *' from 'int' [-Wint-conversion]
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                  ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  progs/cgroup_read_xattr.c:132:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    132 |         bpf_cgroup_release(ancestor);
+        |         ^
+  progs/cgroup_read_xattr.c:149:13: error: call to undeclared function 'bpf_cgroup_ancestor'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    149 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ^
+  progs/cgroup_read_xattr.c:149:11: error: incompatible integer to pointer conversion assigning to 'struct cgroup *' from 'int' [-Wint-conversion]
+    149 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                  ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  progs/cgroup_read_xattr.c:154:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    154 |         bpf_cgroup_release(ancestor);
+        |         ^
+
+In iters_testmod.c:
+
+  progs/cgroup_read_xattr.c:102:2: error: call to undeclared function 'bpf_rcu_read_lock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    102 |         bpf_rcu_read_lock();
+        |         ^
+  progs/cgroup_read_xattr.c:112:2: error: call to undeclared function 'bpf_rcu_read_unlock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    112 |         bpf_rcu_read_unlock();
+        |         ^
+  progs/cgroup_read_xattr.c:127:13: error: call to undeclared function 'bpf_cgroup_ancestor'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ^
+  progs/cgroup_read_xattr.c:127:13: note: did you mean 'use_bpf_cgroup_ancestor'?
+  progs/cgroup_read_xattr.c:118:14: note: 'use_bpf_cgroup_ancestor' declared here
+    118 | int BPF_PROG(use_bpf_cgroup_ancestor)
+        |              ^
+    119 | {
+    120 |         u64 cgrp_id = bpf_get_current_cgroup_id();
+    121 |         struct cgroup *cgrp, *ancestor;
+    122 |
+    123 |         cgrp = bpf_cgroup_from_id(cgrp_id);
+    124 |         if (!cgrp)
+    125 |                 return 0;
+    126 |
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ~~~~~~~~~~~~~~~~~~~
+        |                    use_bpf_cgroup_ancestor
+  .virtme/build-debug-btf//tools/include/bpf/bpf_tracing.h:676:17: note: expanded from macro 'BPF_PROG'
+    676 | typeof(name(0)) name(unsigned long long *ctx)                               \
+        |                 ^
+  progs/cgroup_read_xattr.c:127:11: error: incompatible integer to pointer conversion assigning to 'struct cgroup *' from 'int' [-Wint-conversion]
+    127 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                  ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  progs/cgroup_read_xattr.c:149:13: error: call to undeclared function 'bpf_cgroup_ancestor'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+    149 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                    ^
+  progs/cgroup_read_xattr.c:149:11: error: incompatible integer to pointer conversion assigning to 'struct cgroup *' from 'int' [-Wint-conversion]
+    149 |         ancestor = bpf_cgroup_ancestor(cgrp, 1);
+        |                  ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  6 errors generated.
+
+In read_cgroupfs_xattr.c:
+
+  progs/read_cgroupfs_xattr.c:31:2: error: call to undeclared function 'bpf_rcu_read_lock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     31 |         bpf_rcu_read_lock();
+        |         ^
+  progs/read_cgroupfs_xattr.c:34:3: error: call to undeclared function 'bpf_rcu_read_unlock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     34 |                 bpf_rcu_read_unlock();
+        |                 ^
+  progs/read_cgroupfs_xattr.c:56:2: error: call to undeclared function 'bpf_rcu_read_unlock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     56 |         bpf_rcu_read_unlock();
+        |         ^
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
