@@ -116,5 +116,12 @@ In read_cgroupfs_xattr.c:
   progs/read_cgroupfs_xattr.c:56:2: error: call to undeclared function 'bpf_rcu_read_unlock'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
      56 |         bpf_rcu_read_unlock();
         |         ^
+  progs/read_cgroupfs_xattr.c:60:2: error: call to undeclared function 'bpf_cgroup_release'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+     60 |         bpf_cgroup_release(cgrp);
+        |         ^
+  progs/read_cgroupfs_xattr.c:60:2: note: did you mean 'bpf_ct_release'?
+  .virtme/build-debug-btf//tools/include/vmlinux.h:120602:13: note: 'bpf_ct_release' declared here
+   120602 | extern void bpf_ct_release(struct nf_conn *nfct) __weak __ksym;
+          |             ^
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
