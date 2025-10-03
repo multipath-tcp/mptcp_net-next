@@ -24,7 +24,7 @@
 #include <linux/compiler.h>
 #include <linux/atomic.h>
 #include <linux/irqflags.h>
-#include <linux/preempt.h>
+#include <linux/sched.h>
 #include <linux/bottom_half.h>
 #include <linux/lockdep.h>
 #include <linux/cleanup.h>
@@ -960,6 +960,20 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
 {
 	__release(RCU_SCHED);
 	preempt_enable_notrace();
+}
+
+static __always_inline void rcu_read_lock_dont_migrate(void)
+{
+	if (IS_ENABLED(CONFIG_PREEMPT_RCU))
+		migrate_disable();
+	rcu_read_lock();
+}
+
+static inline void rcu_read_unlock_migrate(void)
+{
+	rcu_read_unlock();
+	if (IS_ENABLED(CONFIG_PREEMPT_RCU))
+		migrate_enable();
 }
 
 /**
