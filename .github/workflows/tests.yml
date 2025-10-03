@@ -302,7 +302,7 @@ jobs:
           # merge split modes
           for mode in normal debug; do
             mkdir -p "results-${mode}"
-            jq 'reduce inputs as {$results} (.; .results = (.results + $results))' "results-${mode}_*/results.json" > "results-${mode}/results.json" || true
+            jq 'reduce inputs as {$results} (.; .results = (.results + $results))' "results-${mode}_"*"/results.json" > "results-${mode}/results.json" || true
           done
 
           for mode in normal debug btf-normal btf-debug; do
