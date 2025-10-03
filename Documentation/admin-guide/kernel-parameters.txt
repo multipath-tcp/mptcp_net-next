@@ -2606,6 +2606,11 @@
 			for it. Intended to get systems with badly broken
 			firmware running.
 
+	irqhandler.duration_warn_us= [KNL]
+			Warn if an IRQ handler exceeds the specified duration
+			threshold in microseconds. Useful for identifying
+			long-running IRQs in the system.
+
 	irqpoll		[HW]
 			When an interrupt is not handled search all handlers
 			for it. Also check all handlers each timer
@@ -3767,8 +3772,16 @@
 
 	mga=		[HW,DRM]
 
-	microcode.force_minrev=	[X86]
-			Format: <bool>
+	microcode=      [X86] Control the behavior of the microcode loader.
+	                Available options, comma separated:
+
+			base_rev=X - with <X> with format: <u32>
+			Set the base microcode revision of each thread when in
+			debug mode.
+
+			dis_ucode_ldr: disable the microcode loader
+
+			force_minrev:
 			Enable or disable the microcode minimal revision
 			enforcement for the runtime microcode loader.
 
@@ -6155,7 +6168,7 @@
 	rdt=		[HW,X86,RDT]
 			Turn on/off individual RDT features. List is:
 			cmt, mbmtotal, mbmlocal, l3cat, l3cdp, l2cat, l2cdp,
-			mba, smba, bmec.
+			mba, smba, bmec, abmc.
 			E.g. to turn on cmt and turn off mba use:
 				rdt=cmt,!mba
 
@@ -6406,8 +6419,9 @@
 	rodata=		[KNL,EARLY]
 		on	Mark read-only kernel memory as read-only (default).
 		off	Leave read-only kernel memory writable for debugging.
-		full	Mark read-only kernel memory and aliases as read-only
-		        [arm64]
+		noalias	Mark read-only kernel memory as read-only but retain
+			writable aliases in the direct map for regions outside
+			of the kernel image. [arm64]
 
 	rockchip.usb_uart
 			[EARLY]
@@ -6428,6 +6442,9 @@
 			mount the root filesystem
 
 	rootflags=	[KNL] Set root filesystem mount option string
+
+	initramfs_options= [KNL]
+                        Specify mount options for for the initramfs mount.
 
 	rootfstype=	[KNL] Set root filesystem type
 
