@@ -1,4 +1,7 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Fix-typo-in-subtest_basic_usdt-after-merge-conflict
+From: Jiri Olsa <jolsa@kernel.org>
+Subject: [PATCH] selftests/bpf: Fix typo in subtest_basic_usdt after merge conflict
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Use proper 'called' variable name.
+
+Fixes: ae28ed4578e6 ("Merge tag 'bpf-next-6.18' of git://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next")
+Signed-off-by: Jiri Olsa <jolsa@kernel.org>
