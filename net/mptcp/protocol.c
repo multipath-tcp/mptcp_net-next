@@ -337,6 +337,11 @@ end:
 		mptcp_rcvbuf_grow(sk);
 }
 
+static void mptcp_bl_free(struct sk_buff *skb)
+{
+	atomic_sub(skb->truesize, &skb->sk->sk_rmem_alloc);
+}
+
 static int mptcp_init_skb(struct sock *ssk, struct sk_buff *skb, int offset,
 			  int copy_len)
 {
@@ -360,7 +365,7 @@ static int mptcp_init_skb(struct sock *ssk, struct sk_buff *skb, int offset,
 	skb_dst_drop(skb);
 
 	/* "borrow" the fwd memory from the subflow, instead of reclaiming it */
-	skb->destructor = NULL;
+	skb->destructor = mptcp_bl_free;
 	borrowed = ssk->sk_forward_alloc - sk_unused_reserved_mem(ssk);
 	borrowed &= ~(PAGE_SIZE - 1);
 	sk_forward_alloc_add(ssk, skb->truesize - borrowed);
@@ -372,6 +377,13 @@ static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
 	u64 copy_len = MPTCP_SKB_CB(skb)->end_seq - MPTCP_SKB_CB(skb)->map_seq;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct sk_buff *tail;
+
+	/* Avoid the indirect call overhead, we know destructor is
+	 * mptcp_bl_free at this point.
+	 */
+	atomic_sub(skb->truesize, &skb->sk->sk_rmem_alloc);
+	skb->sk = NULL;
+	skb->destructor = NULL;
 
 	/* try to fetch required memory from subflow */
 	if (!sk_rmem_schedule(sk, skb, skb->truesize)) {
@@ -654,6 +666,35 @@ static void mptcp_dss_corruption(struct mptcp_sock *msk, struct sock *ssk)
 	}
 }
 
+static void __mptcp_add_backlog(struct sock *sk, struct sk_buff *skb)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sk_buff *tail = NULL;
+	bool fragstolen;
+	int delta;
+
+	if (unlikely(sk->sk_state == TCP_CLOSE)) {
+		kfree_skb_reason(skb, SKB_DROP_REASON_SOCKET_CLOSE);
+		return;
+	}
+
+	/* Try to coalesce with the last skb in our backlog */
+	if (!list_empty(&msk->backlog_list))
+		tail = list_last_entry(&msk->backlog_list, struct sk_buff, list);
+
+	if (tail && MPTCP_SKB_CB(skb)->map_seq == MPTCP_SKB_CB(tail)->end_seq &&
+	    skb->sk == tail->sk &&
+	    __mptcp_try_coalesce(sk, tail, skb, &fragstolen, &delta)) {
+		skb->truesize -= delta;
+		kfree_skb_partial(skb, fragstolen);
+		WRITE_ONCE(msk->backlog_len, msk->backlog_len + delta);
+		return;
+	}
+
+	list_add_tail(&skb->list, &msk->backlog_list);
+	WRITE_ONCE(msk->backlog_len, msk->backlog_len + skb->truesize);
+}
+
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 					   struct sock *ssk)
 {
@@ -701,10 +742,12 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 			int bmem;
 
 			bmem = mptcp_init_skb(ssk, skb, offset, len);
-			skb->sk = NULL;
 			sk_forward_alloc_add(sk, bmem);
-			atomic_sub(skb->truesize, &ssk->sk_rmem_alloc);
-			ret = __mptcp_move_skb(sk, skb) || ret;
+
+			if (true)
+				ret |= __mptcp_move_skb(sk, skb);
+			else
+				__mptcp_add_backlog(sk, skb);
 			seq += len;
 
 			if (unlikely(map_remaining < len)) {
@@ -2753,12 +2796,28 @@ static void mptcp_mp_fail_no_response(struct mptcp_sock *msk)
 	unlock_sock_fast(ssk, slow);
 }
 
+static void mptcp_backlog_purge(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sk_buff *tmp, *skb;
+	LIST_HEAD(backlog);
+
+	mptcp_data_lock(sk);
+	list_splice_init(&msk->backlog_list, &backlog);
+	msk->backlog_len = 0;
+	mptcp_data_unlock(sk);
+
+	list_for_each_entry_safe(skb, tmp, &backlog, list)
+		kfree_skb_reason(skb, SKB_DROP_REASON_SOCKET_CLOSE);
+}
+
 static void mptcp_do_fastclose(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	mptcp_set_state(sk, TCP_CLOSE);
+	mptcp_backlog_purge(sk);
 	mptcp_for_each_subflow_safe(msk, subflow, tmp)
 		__mptcp_close_ssk(sk, mptcp_subflow_tcp_sock(subflow),
 				  subflow, MPTCP_CF_FASTCLOSE);
@@ -2816,11 +2875,13 @@ static void __mptcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&msk->conn_list);
 	INIT_LIST_HEAD(&msk->join_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
+	INIT_LIST_HEAD(&msk->backlog_list);
 	INIT_WORK(&msk->work, mptcp_worker);
 	msk->out_of_order_queue = RB_ROOT;
 	msk->first_pending = NULL;
 	msk->timer_ival = TCP_RTO_MIN;
 	msk->scaling_ratio = TCP_DEFAULT_SCALING_RATIO;
+	msk->backlog_len = 0;
 
 	WRITE_ONCE(msk->first, NULL);
 	inet_csk(sk)->icsk_sync_mss = mptcp_sync_mss;
@@ -3197,6 +3258,7 @@ static void mptcp_destroy_common(struct mptcp_sock *msk, unsigned int flags)
 	struct sock *sk = (struct sock *)msk;
 
 	__mptcp_clear_xmit(sk);
+	mptcp_backlog_purge(sk);
 
 	/* join list will be eventually flushed (with rst) at sock lock release time */
 	mptcp_for_each_subflow_safe(msk, subflow, tmp)
