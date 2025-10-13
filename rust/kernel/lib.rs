@@ -98,11 +98,13 @@ pub mod id_pool;
 pub mod init;
 pub mod io;
 pub mod ioctl;
+pub mod iov;
 pub mod irq;
 pub mod jump_label;
 #[cfg(CONFIG_KUNIT)]
 pub mod kunit;
 pub mod list;
+pub mod maple_tree;
 pub mod miscdevice;
 pub mod mm;
 #[cfg(CONFIG_NET)]
