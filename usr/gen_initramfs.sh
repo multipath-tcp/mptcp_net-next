@@ -222,7 +222,7 @@ while [ $# -gt 0 ]; do
 			shift
 			;;
 		"-d")	# date for file mtimes
-			timestamp="$(date -d"$1" +%s || :)"
+			timestamp="$(date -u +%s || :)"
 			if test -n "$timestamp"; then
 				timestamp="-t $timestamp"
 			fi
