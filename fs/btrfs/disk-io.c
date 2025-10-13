@@ -1930,6 +1930,7 @@ static int btrfs_init_btree_inode(struct super_block *sb)
 	BTRFS_I(inode)->root = btrfs_grab_root(fs_info->tree_root);
 	set_bit(BTRFS_INODE_DUMMY, &BTRFS_I(inode)->runtime_flags);
 	__insert_inode_hash(inode, hash);
+	set_bit(AS_KERNEL_FILE, &inode->i_mapping->flags);
 	fs_info->btree_inode = inode;
 
 	return 0;
@@ -3396,7 +3397,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 
 	if (fs_info->sectorsize > PAGE_SIZE)
 		btrfs_warn(fs_info,
-			   "support for block size %u with page size %zu is experimental, some features may be missing",
+			   "support for block size %u with page size %lu is experimental, some features may be missing",
 			   fs_info->sectorsize, PAGE_SIZE);
 	/*
 	 * Handle the space caching options appropriately now that we have the
