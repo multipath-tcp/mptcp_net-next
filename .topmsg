@@ -1,4 +1,41 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-extra-bind-cases
+Subject: [PATCH] selftests: mptcp: join: validate extra bind cases
 
+By design, an MPTCP connection will not accept extra subflows where no
+MPTCP listening sockets can accept such requests.
+
+In other words, it means that if the 'server' listens on a specific
+address / device, it cannot accept MP_JOIN sent to a different address /
+device. Except if there is another MPTCP listening socket accepting
+them.
+
+This is what the new tests are validating:
+
+ - Forcing a bind on the main v4/v6 address, and checking that MP_JOIN
+   to announced addresses are not accepted.
+
+ - Also forcing a bind on the main v4/v6 address, but before, another
+   listening socket is created to accept additional subflows. Note that
+   'mptcpize run nc -l' -- or something else only doing: socket(MPTCP),
+   bind(<IP>), listen(0) -- would be enough, but here mptcp_connect is
+   reused not to depend on another tool just for that.
+
+ - Same as the previous one, but using v6 link-local addresses: this is
+   a bit particular because it is required to specify the outgoing
+   network interface when connecting to a link-local address announced
+   by the other peer. When using the routing rules, this doesn't work
+   (the outgoing interface is not known) ; but it does work with a
+   'laminar' endpoint having a specified interface.
+
+Note that extra small modifications are needed for these tests to work:
+
+ - mptcp_connect's check_getpeername_connect() check should strip the
+   specified interface when comparing addresses.
+
+ - With IPv6 link-local addresses, it is required to wait for them to
+   be ready (no longer in 'tentative' mode) before using them, otherwise
+   the bind() will not be allowed.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/591
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
