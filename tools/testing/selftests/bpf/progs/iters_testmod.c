@@ -8,6 +8,9 @@
 
 char _license[] SEC("license") = "GPL";
 
+void bpf_rcu_read_lock(void) __ksym;
+void bpf_rcu_read_unlock(void) __ksym;
+
 SEC("raw_tp/sys_enter")
 __success
 int iter_next_trusted(const void *ctx)
