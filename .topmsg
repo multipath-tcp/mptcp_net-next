@@ -1,4 +1,45 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-C-flag-handle-late-ADD_ADDR
+Subject: [PATCH] mptcp: pm: in-kernel: C-flag: handle late ADD_ADDR
 
+The special C-flag case expects the ADD_ADDR to be received when
+switching to 'fully-established'. But for various reasons, the ADD_ADDR
+could be sent after the "4th ACK", and the special case doesn't work.
+
+On NIPA, the new test validating this special case for the C-flag failed
+a few times, e.g.
+
+  102 default limits, server deny join id 0
+        syn rx                 [FAIL] got 0 JOIN[s] syn rx expected 2
+
+  Server ns stats
+  (...)
+  MPTcpExtAddAddrTx  1
+  MPTcpExtEchoAdd    1
+
+  Client ns stats
+  (...)
+  MPTcpExtAddAddr    1
+  MPTcpExtEchoAddTx  1
+
+        synack rx              [FAIL] got 0 JOIN[s] synack rx expected 2
+        ack rx                 [FAIL] got 0 JOIN[s] ack rx expected 2
+        join Rx                [FAIL] see above
+        syn tx                 [FAIL] got 0 JOIN[s] syn tx expected 2
+        join Tx                [FAIL] see above
+
+I had a suspicion about what the issue could be: the ADD_ADDR might have
+been received after the switch to the 'fully-established' state. The
+issue was not easy to reproduce. The packet capture shown that the
+ADD_ADDR can indeed be sent with a delay, and the client would not try
+to establish subflows to it as expected.
+
+A simple fix is not to mark the endpoints as 'used' in the C-flag case,
+when looking at creating subflows to the remote initial IP address and
+port. In this case, there is no need to try.
+
+Note: newly added fullmesh endpoints will still continue to be used as
+expected, thanks to the conditions behind mptcp_pm_add_addr_c_flag_case.
+
+Fixes: 4b1ff850e0c1 ("mptcp: pm: in-kernel: usable client side with C-flag")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
