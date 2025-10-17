@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-mark-implicit-tests-as-skipped-if-not-supported
+Subject: [PATCH] selftests: mptcp: join: mark implicit tests as skipped if not supported
 
+The call to 'continue_if' was missing: it properly marks a subtest as
+'skipped' if the attached condition is not valid.
+
+Without that, the test is wrongly marked as passed on older kernels.
+
+Fixes: 36c4127ae8dd ("selftests: mptcp: join: skip implicit tests if not supported")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
