@@ -696,7 +696,7 @@ static void __mptcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 }
 
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
-					   struct sock *ssk)
+					   struct sock *ssk, bool own_msk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct sock *sk = (struct sock *)msk;
@@ -711,9 +711,6 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 		u32 seq = tp->copied_seq;
 		struct sk_buff *skb;
 		bool fin;
-
-		if (sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
-			break;
 
 		/* try to move as much data as available */
 		map_remaining = subflow->map_data_len -
@@ -742,9 +739,12 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 			int bmem;
 
 			bmem = mptcp_init_skb(ssk, skb, offset, len);
-			sk_forward_alloc_add(sk, bmem);
+			if (own_msk)
+				sk_forward_alloc_add(sk, bmem);
+			else
+				msk->borrowed_mem += bmem;
 
-			if (true)
+			if (own_msk && sk_rmem_alloc_get(sk) < sk->sk_rcvbuf)
 				ret |= __mptcp_move_skb(sk, skb);
 			else
 				__mptcp_add_backlog(sk, skb);
@@ -866,7 +866,7 @@ static bool move_skbs_to_msk(struct mptcp_sock *msk, struct sock *ssk)
 	struct sock *sk = (struct sock *)msk;
 	bool moved;
 
-	moved = __mptcp_move_skbs_from_subflow(msk, ssk);
+	moved = __mptcp_move_skbs_from_subflow(msk, ssk, true);
 	__mptcp_ofo_queue(msk);
 	if (unlikely(ssk->sk_err))
 		__mptcp_subflow_error_report(sk, ssk);
@@ -898,9 +898,8 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 		/* Wake-up the reader only for in-sequence data */
 		if (move_skbs_to_msk(msk, ssk) && mptcp_epollin_ready(sk))
 			sk->sk_data_ready(sk);
-		
 	} else {
-		__set_bit(MPTCP_DEQUEUE, &mptcp_sk(sk)->cb_flags);
+		__mptcp_move_skbs_from_subflow(msk, ssk, false);
 	}
 	mptcp_data_unlock(sk);
 }
@@ -2136,60 +2135,92 @@ new_measure:
 	msk->rcvq_space.time = mstamp;
 }
 
-static struct mptcp_subflow_context *
-__mptcp_first_ready_from(struct mptcp_sock *msk,
-			 struct mptcp_subflow_context *subflow)
+static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delta)
 {
-	struct mptcp_subflow_context *start_subflow = subflow;
-
-	while (!READ_ONCE(subflow->data_avail)) {
-		subflow = mptcp_next_subflow(msk, subflow);
-		if (subflow == start_subflow)
-			return NULL;
-	}
-	return subflow;
-}
-
-static bool __mptcp_move_skbs(struct sock *sk)
-{
-	struct mptcp_subflow_context *subflow;
+	struct sk_buff *skb = list_first_entry(skbs, struct sk_buff, list);
 	struct mptcp_sock *msk = mptcp_sk(sk);
-	bool ret = false;
+	bool moved = false;
 
-	if (list_empty(&msk->conn_list))
-		return false;
-
-	subflow = list_first_entry(&msk->conn_list,
-				   struct mptcp_subflow_context, node);
-	for (;;) {
-		struct sock *ssk;
-		bool slowpath;
-
-		/*
-		 * As an optimization avoid traversing the subflows list
-		 * and ev. acquiring the subflow socket lock before baling out
-		 */
+	*delta = 0;
+	while (1) {
+		/* If the msk recvbuf is full stop, don't drop */
 		if (sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
 			break;
 
-		subflow = __mptcp_first_ready_from(msk, subflow);
-		if (!subflow)
+		prefetch(skb->next);
+		list_del(&skb->list);
+		*delta += skb->truesize;
+
+		moved |= __mptcp_move_skb(sk, skb);
+		if (list_empty(skbs))
 			break;
 
-		ssk = mptcp_subflow_tcp_sock(subflow);
-		slowpath = lock_sock_fast(ssk);
-		ret = __mptcp_move_skbs_from_subflow(msk, ssk) || ret;
-		if (unlikely(ssk->sk_err))
-			__mptcp_error_report(sk);
-		unlock_sock_fast(ssk, slowpath);
-
-		subflow = mptcp_next_subflow(msk, subflow);
+		skb = list_first_entry(skbs, struct sk_buff, list);
 	}
 
 	__mptcp_ofo_queue(msk);
-	if (ret)
+	if (moved)
 		mptcp_check_data_fin((struct sock *)msk);
-	return ret;
+	return moved;
+}
+
+static bool mptcp_can_spool_backlog(struct sock *sk, u32 moved,
+				    struct list_head *skbs)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (list_empty(&msk->backlog_list))
+		return false;
+
+	/* Borrowed mem could be zero only in the unlikely event that the bl
+	 * is full
+	 */
+	if (likely(msk->borrowed_mem)) {
+		sk_forward_alloc_add(sk, msk->borrowed_mem);
+		msk->borrowed_mem = 0;
+		sk->sk_reserved_mem = msk->backlog_len;
+	}
+
+	/* Limit the backlog loop to the maximum backlog size; moved skbs are
+	 * accounted on both the backlog and the receive buffer; the caller
+	 * should update the backlog usage ASAP, to avoid underestimate the
+	 * rcvwnd.
+	 */
+	if (moved > sk->sk_rcvbuf || sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
+		return false;
+
+	INIT_LIST_HEAD(skbs);
+	list_splice_init(&msk->backlog_list, skbs);
+	return true;
+}
+
+static void mptcp_backlog_spooled(struct sock *sk, u32 moved,
+				  struct list_head *skbs)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	WRITE_ONCE(msk->backlog_len, msk->backlog_len - moved);
+	list_splice(skbs, &msk->backlog_list);
+	sk->sk_reserved_mem = msk->backlog_len;
+}
+
+static bool mptcp_move_skbs(struct sock *sk)
+{
+	u32 moved, total_moved = 0;
+	struct list_head skbs;
+	bool enqueued = false;
+
+	mptcp_data_lock(sk);
+	while (mptcp_can_spool_backlog(sk, total_moved, &skbs)) {
+		mptcp_data_unlock(sk);
+		enqueued |= __mptcp_move_skbs(sk, &skbs, &moved);
+
+		mptcp_data_lock(sk);
+		total_moved += moved;
+		mptcp_backlog_spooled(sk, moved, &skbs);
+	}
+	mptcp_data_unlock(sk);
+	return enqueued;
 }
 
 static unsigned int mptcp_inq_hint(const struct sock *sk)
@@ -2255,7 +2286,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		copied += bytes_read;
 
-		if (skb_queue_empty(&sk->sk_receive_queue) && __mptcp_move_skbs(sk))
+		if (!list_empty(&msk->backlog_list) && mptcp_move_skbs(sk))
 			continue;
 
 		/* only the MPTCP socket status is relevant here. The exit
@@ -3522,20 +3553,22 @@ void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 
 #define MPTCP_FLAGS_PROCESS_CTX_NEED (BIT(MPTCP_PUSH_PENDING) | \
 				      BIT(MPTCP_RETRANSMIT) | \
-				      BIT(MPTCP_FLUSH_JOIN_LIST) | \
-				      BIT(MPTCP_DEQUEUE))
+				      BIT(MPTCP_FLUSH_JOIN_LIST))
 
 /* processes deferred events and flush wmem */
 static void mptcp_release_cb(struct sock *sk)
 	__must_hold(&sk->sk_lock.slock)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	u32 moved, total_moved = 0;
 
 	for (;;) {
 		unsigned long flags = (msk->cb_flags & MPTCP_FLAGS_PROCESS_CTX_NEED);
-		struct list_head join_list;
+		struct list_head join_list, skbs;
+		bool spool_bl;
 
-		if (!flags)
+		spool_bl = mptcp_can_spool_backlog(sk, total_moved, &skbs);
+		if (!flags && !spool_bl)
 			break;
 
 		INIT_LIST_HEAD(&join_list);
@@ -3551,20 +3584,26 @@ static void mptcp_release_cb(struct sock *sk)
 		msk->cb_flags &= ~flags;
 		spin_unlock_bh(&sk->sk_lock.slock);
 
+		if (total_moved)
+			cond_resched();
+
 		if (flags & BIT(MPTCP_FLUSH_JOIN_LIST))
 			__mptcp_flush_join_list(sk, &join_list);
 		if (flags & BIT(MPTCP_PUSH_PENDING))
 			__mptcp_push_pending(sk, 0);
 		if (flags & BIT(MPTCP_RETRANSMIT))
 			__mptcp_retrans(sk);
-		if ((flags & BIT(MPTCP_DEQUEUE)) && __mptcp_move_skbs(sk)) {
+		if (spool_bl && __mptcp_move_skbs(sk, &skbs, &moved)) {
 			/* notify ack seq update */
 			mptcp_cleanup_rbuf(msk, 0);
 			sk->sk_data_ready(sk);
 		}
 
-		cond_resched();
 		spin_lock_bh(&sk->sk_lock.slock);
+		if (spool_bl) {
+			total_moved += moved;
+			mptcp_backlog_spooled(sk, moved, &skbs);
+		}
 	}
 
 	if (__test_and_clear_bit(MPTCP_CLEAN_UNA, &msk->cb_flags))
@@ -3797,7 +3836,7 @@ static int mptcp_ioctl(struct sock *sk, int cmd, int *karg)
 			return -EINVAL;
 
 		lock_sock(sk);
-		if (__mptcp_move_skbs(sk))
+		if (mptcp_move_skbs(sk))
 			mptcp_cleanup_rbuf(msk, 0);
 		*karg = mptcp_inq_hint(sk);
 		release_sock(sk);
