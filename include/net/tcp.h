@@ -2958,4 +2958,13 @@ static inline int tcp_recv_should_stop(struct sock *sk, long timeo)
 	return 0;
 }
 
+/*
+ * TCP splice context
+ */
+struct tcp_splice_state {
+	struct pipe_inode_info *pipe;
+	size_t len;
+	unsigned int flags;
+};
+
 #endif	/* _TCP_H */
