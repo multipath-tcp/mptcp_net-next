@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-restore-window-probe
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: restore window probe
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Since commit 72377ab2d671 ("mptcp: more conservative check for zero
+probes") the MPTCP-level zero window probe check is always disabled, as
+the TCP-level write queue always contains at least the newly allocated
+skb.
+
+Refine the relevant check tacking in account that the above condition
+and that such skb can have zero length.
+
+Fixes: 72377ab2d671 ("mptcp: more conservative check for zero probes")
+Reported-by: Geliang Tang <geliang@kernel.org>
+Closes: https://lore.kernel.org/d0a814c364e744ca6b836ccd5b6e9146882e8d42.camel@kernel.org
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Tested-by: Geliang Tang <geliang@kernel.org>
