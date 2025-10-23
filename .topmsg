@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-zero-window-probe-mib
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: zero window probe mib
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Explicitly account for MPTCP-level zero windows probe, to catch
+hopefully earlier issues alike the one addressed by the previous
+patch.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Tested-by: Geliang Tang <geliang@kernel.org>
