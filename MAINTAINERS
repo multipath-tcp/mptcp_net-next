@@ -3841,6 +3841,7 @@ F:	drivers/hwmon/asus-ec-sensors.c
 ASUS NOTEBOOKS AND EEEPC ACPI/WMI EXTRAS DRIVERS
 M:	Corentin Chary <corentin.chary@gmail.com>
 M:	Luke D. Jones <luke@ljones.dev>
+M:	Denis Benato <benato.denis96@gmail.com>
 L:	platform-driver-x86@vger.kernel.org
 S:	Maintained
 W:	https://asus-linux.org/
@@ -21317,6 +21318,7 @@ F:	drivers/media/platform/qcom/venus/
 QUALCOMM WCN36XX WIRELESS DRIVER
 M:	Loic Poulain <loic.poulain@oss.qualcomm.com>
 L:	wcn36xx@lists.infradead.org
+L:	linux-wireless@vger.kernel.org
 S:	Supported
 W:	https://wireless.wiki.kernel.org/en/users/Drivers/wcn36xx
 F:	drivers/net/wireless/ath/wcn36xx/
@@ -26885,7 +26887,7 @@ S:	Maintained
 F:	drivers/vfio/cdx/*
 
 VFIO DRIVER
-M:	Alex Williamson <alex.williamson@redhat.com>
+M:	Alex Williamson <alex@shazbot.org>
 L:	kvm@vger.kernel.org
 S:	Maintained
 T:	git https://github.com/awilliam/linux-vfio.git
@@ -27048,7 +27050,7 @@ T:	git git://linuxtv.org/media.git
 F:	drivers/media/test-drivers/vimc/*
 
 VIRT LIB
-M:	Alex Williamson <alex.williamson@redhat.com>
+M:	Alex Williamson <alex@shazbot.org>
 M:	Paolo Bonzini <pbonzini@redhat.com>
 L:	kvm@vger.kernel.org
 S:	Supported
