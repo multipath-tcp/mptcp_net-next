@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-ensure-the-kernel-PM-does-not-take-action-too-late
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: ensure the kernel PM does not take action too late
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The PM hooks can currently take place when the msk is already shutting
+down. Subflow creation will fail, thanks to the existing check at join
+time, but we can entirely avoid starting the to be failed operations.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
