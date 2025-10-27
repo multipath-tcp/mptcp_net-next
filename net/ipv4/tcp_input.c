@@ -895,9 +895,8 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 {
 	const struct net *net = sock_net(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	u32 rcvwin, rcvbuf, cap, oldval;
+	u32 rcvwin, rcvbuf, cap;
 
-	oldval = tp->rcvq_space.space;
 	tp->rcvq_space.space = newval;
 
 	if (!READ_ONCE(net->ipv4.sysctl_tcp_moderate_rcvbuf) ||
