@@ -7,6 +7,7 @@
 #include <bpf/bpf_core_read.h>
 #include "bpf_experimental.h"
 #include "bpf_misc.h"
+#include "cgrp_kfunc_common.h"
 
 char _license[] SEC("license") = "GPL";
 
