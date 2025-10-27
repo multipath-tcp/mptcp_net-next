@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-make-mptcp_destroy_common-static
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: make mptcp_destroy_common() static
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Such function is only used inside protocol.c, there is no need
+to expose it to the whole stack.
+
+Note that the function definition most be moved earlier to avoid
+forward declaration.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
