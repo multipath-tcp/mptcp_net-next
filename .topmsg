@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drop-the-__mptcp_data_ready-helper
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: drop the __mptcp_data_ready() helper
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+It adds little clarity and there is a single user of such helper,
+just inline it in the caller.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
