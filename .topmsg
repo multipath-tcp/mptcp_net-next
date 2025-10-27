@@ -1,4 +1,19 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-cleanup-fallback-data-fin-reception
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup fallback data fin reception
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+MPTCP currently generate a dummy data_fin for fallback socket
+when the fallback subflow has completed data reception using
+the current ack_seq.
+
+We are going to introduce backlog usage for the msk soon, even
+for fallback sockets: the ack_seq value will not match the most recent
+sequence number seen by the fallback subflow socket, as it will ignore
+data_seq sitting in the backlog.
+
+Instead use the last map sequence number to set the data_fin,
+as fallback (dummy) map sequences are always in sequence.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
