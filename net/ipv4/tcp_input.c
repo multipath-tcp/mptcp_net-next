@@ -896,6 +896,7 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 	const struct net *net = sock_net(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 rcvwin, rcvbuf, cap, oldval;
+	u64 grow;
 
 	oldval = tp->rcvq_space.space;
 	tp->rcvq_space.space = newval;
@@ -904,8 +905,13 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 	    (sk->sk_userlocks & SOCK_RCVBUF_LOCK))
 		return;
 
-	/* slow start: allow the sender to double its rate. */
+	/* DRS is always one RTT late. */
 	rcvwin = newval << 1;
+
+	/* slow start: allow the sender to double its rate. */
+	grow = (u64)rcvwin * (newval - oldval);
+	do_div(grow, oldval);
+	rcvwin += grow << 1;
 
 	if (!RB_EMPTY_ROOT(&tp->out_of_order_queue))
 		rcvwin += TCP_SKB_CB(tp->ooo_last_skb)->end_seq - tp->rcv_nxt;
