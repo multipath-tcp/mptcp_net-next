@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-cleanup-fallback-dummy-mapping-generation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: cleanup fallback dummy mapping generation
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+MPTCP currently access ack_seq outside the msk socket log scope to
+generate the dummy mapping for fallback socket. Soon we are going
+to introduce backlog usage and even for fallback socket the ack_seq
+value will be significantly off outside of the msk socket lock scope.
+
+Avoid relying on ack_seq for dummy mapping generation, using instead
+the subflow sequence number. Note that in case of disconnect() and
+(re)connect() we must ensure that any previous state is re-set.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
