@@ -198,9 +198,8 @@ static bool mptcp_rcvbuf_grow(struct sock *sk, u32 newval)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	const struct net *net = sock_net(sk);
-	u32 rcvwin, rcvbuf, cap, oldval;
+	u32 rcvwin, rcvbuf, cap;
 
-	oldval = msk->rcvq_space.space;
 	msk->rcvq_space.space = newval;
 	if (!READ_ONCE(net->ipv4.sysctl_tcp_moderate_rcvbuf) ||
 	    (sk->sk_userlocks & SOCK_RCVBUF_LOCK))
