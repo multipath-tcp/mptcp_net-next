@@ -6,7 +6,6 @@ long .gcda files with no usable data.  To fix this, update GCOV_COUNTERS
 to match the value defined by GCC 15.
 
 Reported-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Closes: https://github.com/linux-test-project/lcov/issues/445
 Signed-off-by: Peter Oberparleiter <oberpar@linux.ibm.com>
 [ Note: This patch has been suggested by Peter, but not sent as it. I
   created this just so this patch can be automatically removed from this
