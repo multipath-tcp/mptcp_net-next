@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-MSG_PEEK-stream-corruption
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix MSG_PEEK stream corruption
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+If a MSG_PEEK | MSG_WAITALL read operation consumes all the bytes in the
+receive queue and recvmsg() need to waits for more data - i.e. it's a
+blocking one - upon arrival of the next packet the MPTCP protocol will
+start again copying the oldest data present in the receive queue,
+corrupting the data stream.
+
+Address the issue explicitly tracking the peeked sequence number,
+restarting from the last peeked byte.
+
+Fixes: ca4fb892579f ("mptcp: add MSG_PEEK support")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
