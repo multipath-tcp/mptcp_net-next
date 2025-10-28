@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-subflow-rcvbuf-adjust
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix subflow rcvbuf adjust
 
+The mptcp PM can add subflow to the conn_list before tcp_init_transfer().
+Calling tcp_rcvbuf_grow() on such subflow is not correct as later
+init will overwrite the update.
+
+Fix the issue calling tcp_rcvbuf_grow() only after init buffer
+initialization.
+
+Fixes: e118cdc34dd1 ("mptcp: rcvbuf auto-tuning improvement")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
