@@ -3293,7 +3293,7 @@ bind_tests()
 
 		# Launching another app listening on a different address
 		# Note: it could be a totally different app, e.g. nc, socat, ...
-		ip netns exec ${ns1} ./mptcp_connect -l -p "$(get_port)" \
+		ip netns exec ${ns1} ./mptcp_connect -l -t -1 -p "$(get_port)" \
 			-s MPTCP 10.0.2.1 &
 		extra_bind=$!
 
@@ -3315,7 +3315,7 @@ bind_tests()
 
 		# Launching another app listening on a different address
 		# Note: it could be a totally different app, e.g. nc, socat, ...
-		ip netns exec ${ns1} ./mptcp_connect -l -p "$(get_port)" \
+		ip netns exec ${ns1} ./mptcp_connect -l -t -1 -p "$(get_port)" \
 			-s MPTCP dead:beef:2::1 &
 		extra_bind=$!
 
@@ -3340,7 +3340,7 @@ bind_tests()
 
 		wait_ll_ready $ns1 # to be able to bind
 		wait_ll_ready $ns2 # also needed to bind on the client side
-		ip netns exec ${ns1} ./mptcp_connect -l -p "$(get_port)" \
+		ip netns exec ${ns1} ./mptcp_connect -l -t -1 -p "$(get_port)" \
 			-s MPTCP "${ns1ll2}%ns1eth2" &
 		extra_bind=$!
 
@@ -3371,7 +3371,7 @@ bind_tests()
 
 		wait_ll_ready $ns1 # to be able to bind
 		wait_ll_ready $ns2 # also needed to bind on the client side
-		ip netns exec ${ns1} ./mptcp_connect -l -p "$(get_port)" \
+		ip netns exec ${ns1} ./mptcp_connect -l -t -1 -p "$(get_port)" \
 			-s MPTCP "${ns1ll2}%ns1eth2" &
 		extra_bind=$!
 
