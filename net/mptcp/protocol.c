@@ -1969,7 +1969,7 @@ static int __mptcp_recvmsg_mskq(struct sock *sk, struct msghdr *msg,
 		int err;
 
 		if (flags & MSG_PEEK) {
-			/* skip already peeked skbs*/
+			/* skip already peeked skbs */
 			if (total_data_len + data_len <= copied_total) {
 				total_data_len += data_len;
 				continue;
