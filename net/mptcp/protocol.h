@@ -341,10 +341,16 @@ struct mptcp_sock {
 	struct mptcp_pm_data	pm;
 	struct mptcp_sched_ops	*sched;
 	struct {
+		u32	rtt_us;		/* Minimum rtt of subflows */
+		u32	bl_rtt_us;	/* Min rtt if subflows using the bl */
+		u8	bl_scaling_ratio;
+		bool	reset;
+		bool	reset_bl;	/* Protected by data lock */
+	} rcv_rtt_est;
+	struct {
 		int	space;	/* bytes copied in last measurement window */
 		int	copied; /* bytes copied in this measurement window */
 		u64	time;	/* start time of measurement window */
-		u64	rtt_us; /* last maximum rtt of subflows */
 	} rcvq_space;
 	u8		scaling_ratio;
 	bool		allow_subflows;
