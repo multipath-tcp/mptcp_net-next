@@ -1,4 +1,27 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-trunc-read-all-recv-data
+Subject: [PATCH] selftests: mptcp: connect: trunc: read all recv data
 
+MPTCP Join "fastclose server" selftest is sometimes failing because the
+client output file doesn't have the expected size, e.g. 296B instead of
+1024B.
+
+When looking at a packet trace when this happens, the server sent the
+expected 1024B in two parts -- 100B, then 924B -- then the MP_FASTCLOSE.
+It is then strange to see the client only receiving 296B, which would
+mean it only got a part of the second packet. The problem is then not on
+the networking side, but rather on the data reception side.
+
+When mptcp_connect is launched with '-f -1', it means the connection
+might stop before having sent everything, because a reset has been
+received. When this happens, the program was directly stopped. But it is
+also possible there are still some data to read, simply because the
+previous 'read' step was done with a buffer smaller than the pending
+data, see do_rnd_read(). In this case, it is important to read what's
+left in the kernel buffers before stopping without error like before.
+
+SIGPIPE is now ignored, not to quit the app before having read
+everything.
+
+Fixes: 6bf41020b72b ("selftests: mptcp: update and extend fastclose test-cases")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
