@@ -1,1 +1,1 @@
-t/mptcp-fix-MSG_PEEK-stream-corruption
+t/selftests-mptcp-connect-trunc-read-all-recv-data
