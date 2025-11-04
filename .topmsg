@@ -1,4 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-userspace-longer-transfer
+Subject: [PATCH] selftests: mptcp: join: userspace: longer transfer
 
+In rare cases, when the test environment is very slow, some userspace
+tests can fail because some expected events have not been seen.
+
+Because the tests are expecting a long on-going connection, and they are
+not waiting for the end of the transfer, it is fine to make the
+connection longer. This connection will be killed at the end, after the
+verifications, so making it longer doesn't change anything, apart from
+avoid it to end before the end of the verifications
+
+To play it safe, all userspace tests not waiting for the end of the
+transfer are now sharing a longer file (128KB) at slow speed.
+
+Fixes: 4369c198e599 ("selftests: mptcp: test userspace pm out of transfer")
+Fixes: b2e2248f365a ("selftests: mptcp: userspace pm create id 0 subflow")
+Fixes: e3b47e460b4b ("selftests: mptcp: userspace pm remove initial subflow")
+Fixes: b9fb176081fb ("selftests: mptcp: userspace pm send RM_ADDR for ID 0")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
