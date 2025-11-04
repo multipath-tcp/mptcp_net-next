@@ -1,4 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-endpoints-longer-transfer
+Subject: [PATCH] selftests: mptcp: join: endpoints: longer transfer
 
+In rare cases, when the test environment is very slow, some userspace
+tests can fail because some expected events have not been seen.
+
+Because the tests are expecting a long on-going connection, and they are
+not waiting for the end of the transfer, it is fine to make the
+connection longer. This connection will be killed at the end, after the
+verifications, so making it longer doesn't change anything, apart from
+avoid it to end before the end of the verifications
+
+To play it safe, all endpoints tests not waiting for the end of the
+transfer are now sharing a longer file (128KB) at slow speed.
+
+Fixes: 69c6ce7b6eca ("selftests: mptcp: add implicit endpoint test case")
+Fixes: e274f7154008 ("selftests: mptcp: add subflow limits test-cases")
+Fixes: b5e2fb832f48 ("selftests: mptcp: add explicit test case for remove/readd")
+Fixes: e06959e9eebd ("selftests: mptcp: join: test for flush/re-add endpoints")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
