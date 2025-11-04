@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-rm-set-backup-flag
+Subject: [PATCH] selftests: mptcp: join: rm: set backup flag
 
+Some of these 'remove' tests rarely fail because a subflow has been
+reset instead of cleanly removed. This can happen when one extra subflow
+which has never carried data is being closed (FIN) on one side, while
+the other is sending data for the first time.
+
+To avoid such subflows to be used right at the end, the backup flag has
+been added. With that, data will be only carried on the initial subflow.
+
+Fixes: d2c4333a801c ("selftests: mptcp: add testcases for removing addrs")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
