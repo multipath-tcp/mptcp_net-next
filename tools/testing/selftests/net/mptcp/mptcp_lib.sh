@@ -106,23 +106,32 @@ mptcp_lib_pr_info() {
 	mptcp_lib_print_info "INFO: ${*}"
 }
 
-# $1-2: listener/connector ns ; $3 port ; $4-5 listener/connector stat file
+mptcp_lib_pr_nstat() {
+	local ns="${1}"
+	local hist="/tmp/${ns}.out"
+
+	if [ -f "${hist}" ]; then
+		awk '$2 != 0 { print "  "$0 }' "${hist}"
+	else
+		ip netns exec "${ns}" nstat -as | grep Tcp
+	fi
+}
+
+# $1-2: listener/connector ns ; $3 port
 mptcp_lib_pr_err_stats() {
 	local lns="${1}"
 	local cns="${2}"
 	local port="${3}"
-	local lstat="${4}"
-	local cstat="${5}"
 
 	echo -en "${MPTCP_LIB_COLOR_RED}"
 	{
 		printf "\nnetns %s (listener) socket stat for %d:\n" "${lns}" "${port}"
 		ip netns exec "${lns}" ss -Menitam -o "sport = :${port}"
-		cat "${lstat}"
+		mptcp_lib_pr_nstat "${lns}"
 
 		printf "\nnetns %s (connector) socket stat for %d:\n" "${cns}" "${port}"
 		ip netns exec "${cns}" ss -Menitam -o "dport = :${port}"
-		[ "${lstat}" != "${cstat}" ] && cat "${cstat}"
+		[ "${lns}" != "${cns}" ] && mptcp_lib_pr_nstat "${cns}"
 	} 1>&2
 	echo -en "${MPTCP_LIB_COLOR_RESET}"
 }
@@ -355,14 +364,36 @@ mptcp_lib_is_v6() {
 	[ -z "${1##*:*}" ]
 }
 
+mptcp_lib_nstat_init() {
+	local ns="${1}"
+
+	rm -f "/tmp/${ns}."{nstat,out}
+	NSTAT_HISTORY="/tmp/${ns}.nstat" ip netns exec "${ns}" nstat -n
+}
+
+mptcp_lib_nstat_get() {
+	local ns="${1}"
+
+	# filter out non-*TCP stats, and the rate (last column)
+	NSTAT_HISTORY="/tmp/${ns}.nstat" ip netns exec "${ns}" nstat -sz |
+		grep -o ".*Tcp\S\+\s\+[0-9]\+" > "/tmp/${ns}.out"
+}
+
 # $1: ns, $2: MIB counter
+# Get the counter from the history (mptcp_lib_nstat_{init,get}()) if available.
+# If not, get the counter from nstat ignoring any history.
 mptcp_lib_get_counter() {
 	local ns="${1}"
 	local counter="${2}"
+	local hist="/tmp/${ns}.out"
 	local count
 
-	count=$(ip netns exec "${ns}" nstat -asz "${counter}" |
-		awk 'NR==1 {next} {print $2}')
+	if [[ -s "${hist}" && "${counter}" == *"Tcp"* ]]; then
+		count=$(awk "/^${counter} / {print \$2; exit}" "${hist}")
+	else
+		count=$(ip netns exec "${ns}" nstat -asz "${counter}" |
+			awk 'NR==1 {next} {print $2}')
+	fi
 	if [ -z "${count}" ]; then
 		mptcp_lib_fail_if_expected_feature "${counter} counter"
 		return 1
