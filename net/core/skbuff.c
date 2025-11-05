@@ -6131,7 +6131,10 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 		delta = from->truesize - SKB_TRUESIZE(skb_end_offset(from));
 	}
 
-	WARN_ON_ONCE(delta < len);
+	if (WARN_ON_ONCE(delta < len))
+		pr_err("skb len %d delta %d truesize %d headlen %d end %d\n",
+		       len, delta, from->truesize, skb_headlen(from),
+		       skb_end_offset(from));
 
 	memcpy(to_shinfo->frags + to_shinfo->nr_frags,
 	       from_shinfo->frags,
