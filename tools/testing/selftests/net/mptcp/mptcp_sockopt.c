@@ -27,6 +27,10 @@
 #include <linux/tcp.h>
 
 static int pf = AF_INET;
+static bool md5;
+static char key[TCP_MD5SIG_MAXKEYLEN];
+static int prefixlen;
+static int ifindex;
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -135,7 +139,7 @@ static void die_perror(const char *msg)
 
 static void die_usage(int r)
 {
-	fprintf(stderr, "Usage: mptcp_sockopt [-6]\n");
+	fprintf(stderr, "Usage: mptcp_sockopt [-6] [-m md5,key|md5ext,prefixlen,ifindex,key]\n");
 	exit(r);
 }
 
@@ -263,13 +267,21 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "h6")) != -1) {
+	while ((c = getopt(argc, argv, "h6m:")) != -1) {
 		switch (c) {
 		case 'h':
 			die_usage(0);
 			break;
 		case '6':
 			pf = AF_INET6;
+			break;
+		case 'm':
+			md5 = true;
+			if (!strncmp(optarg, "md5,", 4))
+				sscanf(optarg, "md5,key=%s", key);
+			else if (!strncmp(optarg, "md5ext,", 6))
+				sscanf(optarg, "md5ext,prefixlen=%u,ifindex=%u,key=%s",
+				       &prefixlen, &ifindex, key);
 			break;
 		default:
 			die_usage(1);
