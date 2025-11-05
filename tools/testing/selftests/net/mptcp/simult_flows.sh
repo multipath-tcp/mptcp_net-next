@@ -155,10 +155,8 @@ do_transfer()
 		sleep 1
 	fi
 
-	NSTAT_HISTORY=/tmp/${ns3}.nstat ip netns exec ${ns3} \
-		nstat -n
-	NSTAT_HISTORY=/tmp/${ns1}.nstat ip netns exec ${ns1} \
-		nstat -n
+	mptcp_lib_nstat_init "${ns3}"
+	mptcp_lib_nstat_init "${ns1}"
 
 	timeout ${timeout_test} \
 		ip netns exec ${ns3} \
@@ -185,10 +183,8 @@ do_transfer()
 		kill ${cappid_connector}
 	fi
 
-	NSTAT_HISTORY=/tmp/${ns3}.nstat ip netns exec ${ns3} \
-		nstat | grep Tcp > /tmp/${ns3}.out
-	NSTAT_HISTORY=/tmp/${ns1}.nstat ip netns exec ${ns1} \
-		nstat | grep Tcp > /tmp/${ns1}.out
+	mptcp_lib_nstat_get "${ns3}"
+	mptcp_lib_nstat_get "${ns1}"
 
 	cmp $sin $cout > /dev/null 2>&1
 	local cmps=$?
@@ -204,8 +200,7 @@ do_transfer()
 	fi
 
 	mptcp_lib_pr_fail "client exit code $retc, server $rets"
-	mptcp_lib_pr_err_stats "${ns3}" "${ns1}" "${port}" \
-		"/tmp/${ns3}.out" "/tmp/${ns1}.out"
+	mptcp_lib_pr_err_stats "${ns3}" "${ns1}" "${port}"
 	ls -l $sin $cout
 	ls -l $cin $sout
 
