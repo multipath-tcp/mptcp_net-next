@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-leverage-the-backlog-for-RX-packet-processing
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: leverage the backlog for RX packet processing
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When the msk socket is owned or the msk receive buffer is full,
+move the incoming skbs in a msk level backlog list. This avoid
+traversing the joined subflows and acquiring the subflow level
+socket lock at reception time, improving the RX performances.
+
+When processing the backlog, use the fwd alloc memory borrowed from
+the incoming subflow. skbs exceeding the msk receive space are
+not dropped; instead they are kept into the backlog until the receive
+buffer is freed. Dropping packets already acked at the TCP level is
+explicitly discouraged by the RFC and would corrupt the data stream
+for fallback sockets.
+
+Special care is needed to avoid adding skbs to the backlog of a closed
+msk and to avoid leaving dangling references into the backlog
+at subflow closing time.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
