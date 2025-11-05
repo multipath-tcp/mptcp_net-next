@@ -1,4 +1,26 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-borrow-forward-memory-from-subflow
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: borrow forward memory from subflow
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+In the MPTCP receive path, we release the subflow allocated fwd
+memory just to allocate it again shortly after for the msk.
+
+That could increases the failures chances, especially when we will
+add backlog processing, with other actions could consume the just
+released memory before the msk socket has a chance to do the
+rcv allocation.
+
+Replace the skb_orphan() call with an open-coded variant that
+explicitly borrows, the fwd memory from the subflow socket instead
+of releasing it.
+
+The borrowed memory does not have PAGE_SIZE granularity; rounding to
+the page size will make the fwd allocated memory higher than what is
+strictly required and could make the incoming subflow fwd mem
+consistently negative. Instead, keep track of the accumulated frag and
+borrow the full page at subflow close time.
+
+This allow removing the last drop in the TCP to MPTCP transition and
+the associated, now unused, MIB.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
