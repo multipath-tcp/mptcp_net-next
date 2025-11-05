@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-lib-remove-stats-files-args
+Subject: [PATCH] selftests: mptcp: lib: remove stats files args
 
+Now that these files are written from MPTCP lib helpers, the stats file
+paths are uniformed. Then, no need to specify them from the each
+selftest.
+
+No behavioural changes intended.
+
+Acked-by: Paolo Abeni <pabeni@redhat.com>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
