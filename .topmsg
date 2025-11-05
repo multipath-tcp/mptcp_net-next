@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-address-removal-logic-in-mptcp_pm_nl_rm_addr
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] mptcp: fix address removal logic in mptcp_pm_nl_rm_addr
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Fix inverted WARN_ON_ONCE condition that prevented normal address
+removal counter updates. The current code only executes decrement
+logic when the counter is already 0 (abnormal state), while
+normal removals (counter > 0) are ignored.
+
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Fixes: 636113918508 ("mptcp: pm: remove '_nl' from mptcp_pm_nl_rm_addr_received")
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
