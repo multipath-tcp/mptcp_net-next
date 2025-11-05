@@ -609,15 +609,11 @@ fill_local_addresses_vec(struct mptcp_sock *msk, struct mptcp_addr_info *remote,
 			 struct mptcp_pm_local *locals)
 {
 	bool c_flag_case = remote->id && mptcp_pm_add_addr_c_flag_case(msk);
-	int i;
 
 	/* If there is at least one MPTCP endpoint with a fullmesh flag */
-	if (mptcp_pm_get_endp_fullmesh_max(msk)) {
-		i = fill_local_addresses_vec_fullmesh(msk, remote, locals,
-						      c_flag_case);
-		if (i)
-			return i;
-	}
+	if (mptcp_pm_get_endp_fullmesh_max(msk))
+		return fill_local_addresses_vec_fullmesh(msk, remote, locals,
+							 c_flag_case);
 
 	/* If there is at least one MPTCP endpoint with a laminar flag */
 	if (mptcp_pm_get_endp_laminar_max(msk))
@@ -871,10 +867,10 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 		addrlen = sizeof(struct sockaddr_in6);
 #endif
 	if (ssk->sk_family == AF_INET)
-		err = inet_bind_sk(ssk, (struct sockaddr *)&addr, addrlen);
+		err = inet_bind_sk(ssk, (struct sockaddr_unsized *)&addr, addrlen);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else if (ssk->sk_family == AF_INET6)
-		err = inet6_bind_sk(ssk, (struct sockaddr *)&addr, addrlen);
+		err = inet6_bind_sk(ssk, (struct sockaddr_unsized *)&addr, addrlen);
 #endif
 	if (err)
 		return err;
