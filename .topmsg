@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-handle-first-subflow-closing-consistently
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: handle first subflow closing consistently
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Currently, as soon as the PM closes a subflow, the msk stops accepting data
+from it, even if the TCP socket could be still formally open in the
+incoming direction, with the notable exception of the first subflow.
+
+The root cause of such behavior is that code currently piggy back two
+separate semantic on the subflow->disposable bit: the subflow context
+must be released and that the subflow must stop accepting incoming
+data.
+
+The first subflow is never disposed, so it also never stop accepting
+incoming data. Use a separate bit to mark to mark the latter status
+and set such bit in __mptcp_close_ssk() for all subflows.
+
+Beyond making per subflow behaviour more consistent this will also
+simplify the next patch.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
