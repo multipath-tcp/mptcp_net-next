@@ -21,27 +21,4 @@ No packet is currently added to the backlog, so no functional changes
 intended here.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
---
-v6 -> v7:
-  - real fwd memory account for the backlog
-  - do not introduce a new destructor: we only have a call-site
-    dropping packets from the backlog, handle that one explicitly
-  - update to new borrow fwd mem API
-
-v5 -> v6:
-  - call mptcp_bl_free() instead of inlining it.
-  - report the bl mem in diag mem info
-  - moved here the mptcp_close_ssk chunk from the next patch.
-    (logically belongs here)
-
-v4 -> v5:
-  - split out of the next path, to make the latter smaller
-  - set a custom destructor for skbs in the backlog, this avoid
-    duplicate code, and fix a few places where the need ssk cleanup
-    was not performed.
-  - factor out the backlog purge in a new helper,
-    use spinlock protection, clear the backlog list and zero the
-    backlog len
-  - explicitly init the backlog_len at mptcp_init_sock() time
-
 Reviewed-by: Mat Martineau <martineau@kernel.org>
