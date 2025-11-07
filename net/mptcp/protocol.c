@@ -923,6 +923,7 @@ static bool __mptcp_finish_join(struct mptcp_sock *msk, struct sock *ssk)
 	mptcp_sockopt_sync_locked(msk, ssk);
 	mptcp_stop_tout_timer(sk);
 	__mptcp_propagate_sndbuf(sk, ssk);
+	__mptcp_propagate_rcvspace(sk, ssk);
 	return true;
 }
 
@@ -2050,17 +2051,21 @@ static int __mptcp_recvmsg_mskq(struct sock *sk, struct msghdr *msg,
 	return copied;
 }
 
-static void mptcp_rcv_space_init(struct mptcp_sock *msk, const struct sock *ssk)
+static void mptcp_rcv_space_init(struct mptcp_sock *msk)
 {
-	const struct tcp_sock *tp = tcp_sk(ssk);
+	struct sock *sk = (struct sock *)msk;
 
 	msk->rcvspace_init = 1;
 
-	/* initial rcv_space offering made to peer */
-	msk->rcvq_space.space = min_t(u32, tp->rcv_wnd,
-				      TCP_INIT_CWND * tp->advmss);
-	if (msk->rcvq_space.space == 0)
+	mptcp_data_lock(sk);
+	__mptcp_sync_rcvspace(sk);
+
+	/* Paranoid check: at least one subflow pushed data to the msk. */
+	if (msk->rcvq_space.space == 0) {
+		DEBUG_NET_WARN_ON_ONCE(1);
 		msk->rcvq_space.space = TCP_INIT_CWND * TCP_MSS_DEFAULT;
+	}
+	mptcp_data_unlock(sk);
 }
 
 /* receive buffer autotuning.  See tcp_rcv_space_adjust for more information.
@@ -2081,7 +2086,7 @@ static void mptcp_rcv_space_adjust(struct mptcp_sock *msk, int copied)
 		return;
 
 	if (!msk->rcvspace_init)
-		mptcp_rcv_space_init(msk, msk->first);
+		mptcp_rcv_space_init(msk);
 
 	msk->rcvq_space.copied += copied;
 
@@ -3507,6 +3512,7 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	 */
 	mptcp_copy_inaddrs(nsk, ssk);
 	__mptcp_propagate_sndbuf(nsk, ssk);
+	__mptcp_propagate_rcvspace(nsk, ssk);
 
 	msk->rcvq_space.time = mptcp_stamp();
 
@@ -3606,8 +3612,10 @@ static void mptcp_release_cb(struct sock *sk)
 			__mptcp_sync_state(sk, msk->pending_state);
 		if (__test_and_clear_bit(MPTCP_ERROR_REPORT, &msk->cb_flags))
 			__mptcp_error_report(sk);
-		if (__test_and_clear_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags))
+		if (__test_and_clear_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags)) {
 			__mptcp_sync_sndbuf(sk);
+			__mptcp_sync_rcvspace(sk);
+		}
 	}
 }
 
@@ -3723,13 +3731,13 @@ bool mptcp_finish_join(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
-	struct sock *parent = (void *)msk;
+	struct sock *sk = (void *)msk;
 	bool ret = true;
 
 	pr_debug("msk=%p, subflow=%p\n", msk, subflow);
 
 	/* mptcp socket already closing? */
-	if (!mptcp_is_fully_established(parent)) {
+	if (!mptcp_is_fully_established(sk)) {
 		subflow->reset_reason = MPTCP_RST_EMPTCP;
 		return false;
 	}
@@ -3743,7 +3751,15 @@ bool mptcp_finish_join(struct sock *ssk)
 		}
 		mptcp_subflow_joined(msk, ssk);
 		spin_unlock_bh(&msk->fallback_lock);
-		mptcp_propagate_sndbuf(parent, ssk);
+		mptcp_data_lock(sk);
+		if (!sock_owned_by_user(sk)) {
+			__mptcp_propagate_sndbuf(sk, ssk);
+			__mptcp_propagate_rcvspace(sk, ssk);
+		} else {
+			__mptcp_bl_rcvspace(sk, ssk);
+			__set_bit(MPTCP_SYNC_SNDBUF, &mptcp_sk(sk)->cb_flags);
+		}
+		mptcp_data_unlock(sk);
 		return true;
 	}
 
@@ -3755,8 +3771,8 @@ bool mptcp_finish_join(struct sock *ssk)
 	/* If we can't acquire msk socket lock here, let the release callback
 	 * handle it
 	 */
-	mptcp_data_lock(parent);
-	if (!sock_owned_by_user(parent)) {
+	mptcp_data_lock(sk);
+	if (!sock_owned_by_user(sk)) {
 		ret = __mptcp_finish_join(msk, ssk);
 		if (ret) {
 			sock_hold(ssk);
@@ -3767,7 +3783,7 @@ bool mptcp_finish_join(struct sock *ssk)
 		list_add_tail(&subflow->node, &msk->join_list);
 		__set_bit(MPTCP_FLUSH_JOIN_LIST, &msk->cb_flags);
 	}
-	mptcp_data_unlock(parent);
+	mptcp_data_unlock(sk);
 
 	if (!ret) {
 err_prohibited:

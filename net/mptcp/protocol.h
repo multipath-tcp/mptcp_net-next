@@ -360,6 +360,7 @@ struct mptcp_sock {
 
 	struct list_head backlog_list;	/* protected by the data lock */
 	u32		backlog_len;
+	u32		bl_space;	/* rcvspace propagation via bl */
 };
 
 #define mptcp_data_lock(sk) spin_lock_bh(&(sk)->sk_lock.slock)
@@ -974,6 +975,35 @@ static inline void mptcp_write_space(struct sock *sk)
 	smp_mb();
 	if (mptcp_stream_memory_free(sk, 1))
 		sk_stream_write_space(sk);
+}
+
+static inline void __mptcp_sync_rcvspace(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	msk->rcvq_space.space += msk->bl_space;
+	msk->bl_space = 0;
+}
+
+static inline u32 mptcp_subflow_rcvspace(struct sock *ssk)
+{
+	struct tcp_sock *tp = tcp_sk(ssk);
+	int space;
+
+	space = min_t(u32, tp->rcv_wnd, TCP_INIT_CWND * tp->advmss);
+	if (space == 0)
+		space = TCP_INIT_CWND * TCP_MSS_DEFAULT;
+	return space;
+}
+
+static inline void __mptcp_propagate_rcvspace(struct sock *sk, struct sock *ssk)
+{
+	mptcp_sk(sk)->rcvq_space.space += mptcp_subflow_rcvspace(ssk);
+}
+
+static inline void __mptcp_bl_rcvspace(struct sock *sk, struct sock *ssk)
+{
+	mptcp_sk(sk)->bl_space += mptcp_subflow_rcvspace(ssk);
 }
 
 static inline void __mptcp_sync_sndbuf(struct sock *sk)
