@@ -16,6 +16,7 @@
 #include <net/tls.h>
 #include <net/tls_prot.h>
 #include <net/handshake.h>
+#include <net/mptcp.h>
 #include <linux/inet.h>
 #include <linux/llist.h>
 #include <trace/events/sock.h>
@@ -2060,8 +2061,13 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port->sock->sk->sk_user_data = port;
 	port->data_ready = port->sock->sk->sk_data_ready;
 	port->sock->sk->sk_data_ready = nvmet_tcp_listen_data_ready;
-	sock_set_reuseaddr(port->sock->sk);
-	tcp_sock_set_nodelay(port->sock->sk);
+	if (proto == IPPROTO_MPTCP) {
+		mptcp_sock_set_reuseaddr(port->sock->sk);
+		mptcp_sock_set_nodelay(port->sock->sk);
+	} else {
+		sock_set_reuseaddr(port->sock->sk);
+		tcp_sock_set_nodelay(port->sock->sk);
+	}
 	if (so_priority > 0)
 		sock_set_priority(port->sock->sk, so_priority);
 
