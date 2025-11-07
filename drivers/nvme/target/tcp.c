@@ -645,11 +645,14 @@ static int nvmet_try_send_data(struct nvmet_tcp_cmd *cmd, bool last_in_batch)
 
 	while (cmd->cur_sg) {
 		struct msghdr msg = {
-			.msg_flags = MSG_DONTWAIT | MSG_SPLICE_PAGES,
+			.msg_flags = MSG_SPLICE_PAGES,
 		};
 		struct page *page = sg_page(cmd->cur_sg);
 		struct bio_vec bvec;
 		u32 left = cmd->cur_sg->length - cmd->offset;
+
+		if (cmd->queue->sock->sk->sk_protocol != IPPROTO_MPTCP)
+			msg.msg_flags |= MSG_DONTWAIT;
 
 		if ((!last_in_batch && cmd->queue->send_list_len) ||
 		    cmd->wbytes_done + left < cmd->req.transfer_len ||
@@ -694,11 +697,14 @@ static int nvmet_try_send_data(struct nvmet_tcp_cmd *cmd, bool last_in_batch)
 static int nvmet_try_send_response(struct nvmet_tcp_cmd *cmd,
 		bool last_in_batch)
 {
-	struct msghdr msg = { .msg_flags = MSG_DONTWAIT | MSG_SPLICE_PAGES, };
+	struct msghdr msg = { .msg_flags = MSG_SPLICE_PAGES, };
 	struct bio_vec bvec;
 	u8 hdgst = nvmet_tcp_hdgst_len(cmd->queue);
 	int left = sizeof(*cmd->rsp_pdu) - cmd->offset + hdgst;
 	int ret;
+
+	if (cmd->queue->sock->sk->sk_protocol != IPPROTO_MPTCP)
+		msg.msg_flags |= MSG_DONTWAIT;
 
 	if (!last_in_batch && cmd->queue->send_list_len)
 		msg.msg_flags |= MSG_MORE;
