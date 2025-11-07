@@ -4028,10 +4028,12 @@ static void mptcp_graph_subflows(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *ssk;
+	int old_amt, amt;
+	bool slow;
 
 	mptcp_for_each_subflow(msk, subflow) {
-		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		bool slow;
+		ssk = mptcp_subflow_tcp_sock(subflow);
 
 		slow = lock_sock_fast(ssk);
 
@@ -4041,8 +4043,46 @@ static void mptcp_graph_subflows(struct sock *sk)
 		if (!ssk->sk_socket)
 			mptcp_sock_graft(ssk, sk->sk_socket);
 
+		if (!mem_cgroup_from_sk(sk))
+			continue;
+
 		__mptcp_inherit_cgrp_data(sk, ssk);
 		__mptcp_inherit_memcg(sk, ssk, GFP_KERNEL);
+
+		/* Prevent subflows from queueing data into the backlog
+		 * as soon as cg is set; note that we can't race
+		 * with __mptcp_close_ssk setting this bit for a really
+		 * closing socket, because we hold the msk socket lock here.
+		 */
+		subflow->closing = 1;
+		unlock_sock_fast(ssk, slow);
+	}
+
+	if (!mem_cgroup_from_sk(sk))
+		return;
+
+	/* Charge the bl memory, note that __sk_charge accounted for
+	 * fwd memory and rmem only
+	 */
+	mptcp_data_lock(sk);
+	old_amt = sk_mem_pages(sk->sk_forward_alloc +
+			       atomic_read(&sk->sk_rmem_alloc));
+	amt = sk_mem_pages(msk->backlog_len + sk->sk_forward_alloc +
+		     atomic_read(&sk->sk_rmem_alloc));
+	amt -= old_amt;
+	if (amt)
+		mem_cgroup_sk_charge(sk, amt, GFP_ATOMIC | __GFP_NOFAIL);
+	mptcp_data_unlock(sk);
+
+	/* Finally let the subflow restart queuing data. */
+	mptcp_for_each_subflow(msk, subflow) {
+		ssk = mptcp_subflow_tcp_sock(subflow);
+
+		slow = lock_sock_fast(ssk);
+		subflow->closing = 0;
+
+		if (mptcp_subflow_data_available(ssk))
+			mptcp_data_ready(sk, ssk);
 		unlock_sock_fast(ssk, slow);
 	}
 }
