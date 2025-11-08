@@ -378,8 +378,10 @@ do_transfer()
 		ip netns exec ${listener_ns}  tcpdump ${capopt} -w "${capfile}-listener.pcap"  >> "${capout}" 2>&1 &
 		local cappid_listener=$!
 
-		ip netns exec ${connector_ns} tcpdump ${capopt} -w "${capfile}-connector.pcap" >> "${capout}" 2>&1 &
-		local cappid_connector=$!
+		if [ ${listener_ns} != ${connector_ns} ]; then
+			ip netns exec ${connector_ns} tcpdump ${capopt} -w "${capfile}-connector.pcap" >> "${capout}" 2>&1 &
+			local cappid_connector=$!
+		fi
 
 		sleep 1
 	fi
@@ -416,7 +418,9 @@ do_transfer()
 	if $capture; then
 		sleep 1
 		kill ${cappid_listener}
-		kill ${cappid_connector}
+		if [ ${listener_ns} != ${connector_ns} ]; then
+			kill ${cappid_connector}
+		fi
 	fi
 
 	mptcp_lib_nstat_get "${listener_ns}"
