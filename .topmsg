@@ -1,4 +1,11 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-mptcp-test-with-sockmap
+From: Jiayuan Chen <jiayuan.chen@linux.dev>
+Subject: [PATCH] selftests/bpf: Add mptcp test with sockmap
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Add test cases to verify that when MPTCP falls back to plain TCP sockets,
+they can properly work with sockmap.
+
+Additionally, add test cases to ensure that sockmap correctly rejects
+MPTCP sockets as expected.
+
+Signed-off-by: Jiayuan Chen <jiayuan.chen@linux.dev>
+Acked-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
