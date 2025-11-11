@@ -334,23 +334,6 @@ reset_check_counter()
 	fi
 }
 
-# $1: test name ; $2: counter to check
-reset_fastclose()
-{
-	reset_check_counter "${1}" "${2}" || return 1
-
-	local netns
-	for netns in "$ns1" "$ns2"; do
-		# Drop "plain" RST sent because the connection is closed
-		if ! ip netns exec "${netns}" "${iptables}" -A OUTPUT -p tcp \
-				--tcp-flags ALL RST \
-				-j DROP; then
-			mark_as_skipped "unable to set the 'fastclose' rule"
-			return 1
-		fi
-	done
-}
-
 # $1: test name
 reset_with_cookies()
 {
@@ -3516,7 +3499,7 @@ fullmesh_tests()
 
 fastclose_tests()
 {
-	if reset_fastclose "fastclose test" "MPTcpExtMPFastcloseTx"; then
+	if reset_check_counter "fastclose test" "MPTcpExtMPFastcloseTx"; then
 		test_linkfail=1024 fastclose=client \
 			run_tests $ns1 $ns2 10.0.1.1
 		chk_join_nr 0 0 0
@@ -3524,7 +3507,7 @@ fastclose_tests()
 		chk_rst_nr 1 1 invert
 	fi
 
-	if reset_fastclose "fastclose server test" "MPTcpExtMPFastcloseRx"; then
+	if reset_check_counter "fastclose server test" "MPTcpExtMPFastcloseRx"; then
 		test_linkfail=1024 fastclose=server \
 			run_tests $ns1 $ns2 10.0.1.1
 		join_rst_nr=1 \
