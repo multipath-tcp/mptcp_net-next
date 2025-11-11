@@ -1,4 +1,29 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-avoid-unneeded-subflow-level-drops
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: avoid unneeded subflow-level drops
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The rcv window is shared among all the subflows. Currently, MPTCP sync
+the TCP-level rcv window with the MPTCP one at tcp_transmit_skb() time.
+
+The above means that incoming data may sporadically observe outdated
+TCP-level rcv window and being wrongly dropped by TCP.
+
+Address the issue checking for the edge condition before queuing the
+data at TCP level, and eventually syncing the rcv window as needed.
+
+Note that the issue is actually present from the very first MPTCP
+implementation, but backports older than the blamed commit below will
+range from impossible to useless.
+
+Before:
+
+  $ nstat -n; sleep 1; nstat -z TcpExtBeyondWindow
+  TcpExtBeyondWindow              14                 0.0
+
+After:
+
+  $ nstat -n; sleep 1; nstat -z TcpExtBeyondWindow
+  TcpExtBeyondWindow              0                  0.0
+
+Fixes: fa3fe2b15031 ("mptcp: track window announced to peer")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
