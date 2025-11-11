@@ -1,4 +1,18 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-decouple-mptcp-fastclose-from-tcp-close
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: decouple mptcp fastclose from tcp close
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+With the current fastclose implementation, the mptcp_do_fastclose()
+helper is in charge of two distinct actions: send the fastclose reset
+and cleanup the subflows.
+
+Formally decouple the two steps, ensuring that mptcp explicitly closes
+all the subflows after the mentioned helper.
+
+This will make the upcoming fix simpler, and allows dropping the 2nd
+argument from mptcp_destroy_common(). The Fixes tag is then the same as
+in the next commit to help with the backports.
+
+Fixes: d21f83485518 ("mptcp: use fastclose on more edge scenarios")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
