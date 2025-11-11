@@ -1,1 +1,1 @@
-t/mptcp-fix-duplicate-reset-on-fastclose
+t/selftests-mptcp-join-fastclose-remove-flaky-marks
