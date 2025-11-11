@@ -12,8 +12,9 @@ ack generation at recvmsg() time quite random.
 Address the issue ensuring mptcp_write_options() is invoked even for
 fallback sockets, and just update the needed info in such a case.
 
-The issue went unnoticed for a long time, as mptcp used to overshot the
-fallback socket receive buffer autotune significantly.
+The issue went unnoticed for a long time, as mptcp currently overshots
+the fallback socket receive buffer autotune significantly. It is going
+to change in the near future.
 
 Fixes: e3859603ba13 ("mptcp: better msk receive window updates")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/594
