@@ -615,7 +615,7 @@ static void test_mptcp_sockmap(void)
 	if (!ASSERT_OK_PTR(netns, "netns_new: mptcp_sockmap"))
 		goto skel_destroy;
 
-	if (endpoint_init("subflow") < 0)
+	if (endpoint_init("subflow", 2) < 0)
 		goto close_netns;
 
 	test_sockmap_with_mptcp_fallback(skel);
