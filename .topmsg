@@ -1,4 +1,43 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-disallow-MPTCP-subflows-from-sockmap
+From: Jiayuan Chen <jiayuan.chen@linux.dev>
+Subject: [PATCH] mptcp: disallow MPTCP subflows from sockmap
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The sockmap feature allows bpf syscall from userspace, or based on bpf
+sockops, replacing the sk_prot of sockets during protocol stack processing
+with sockmap's custom read/write interfaces.
+'''
+tcp_rcv_state_process()
+  subflow_syn_recv_sock()
+    tcp_init_transfer(BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB)
+      bpf_skops_established       <== sockops
+        bpf_sock_map_update(sk)   <== call bpf helper
+          tcp_bpf_update_proto()  <== update sk_prot
+'''
+Consider two scenarios:
+
+1. When the server has MPTCP enabled and the client also requests MPTCP,
+   the sk passed to the BPF program is a subflow sk. Since subflows only
+   handle partial data, replacing their sk_prot is meaningless and will
+   cause traffic disruption.
+
+2. When the server has MPTCP enabled but the client sends a TCP SYN
+   without MPTCP, subflow_syn_recv_sock() performs a fallback on the
+   subflow, replacing the subflow sk's sk_prot with the native sk_prot.
+   '''
+   subflow_ulp_fallback()
+    subflow_drop_ctx()
+      mptcp_subflow_ops_undo_override()
+   '''
+   Subsequently, accept::mptcp_stream_accept::mptcp_fallback_tcp_ops()
+   converts the subflow to plain TCP.
+
+For the first case, we should prevent it from being combined with sockmap
+by setting sk_prot->psock_update_sk_prot to NULL, which will be blocked by
+sockmap's own flow.
+
+For the second case, since subflow_syn_recv_sock() has already restored
+sk_prot to native tcp_prot/tcpv6_prot, no further action is needed.
+
+Fixes: cec37a6e41aa ("mptcp: Handle MP_CAPABLE options for outgoing connections")
+Cc: stable@vger.kernel.org
+Signed-off-by: Jiayuan Chen <jiayuan.chen@linux.dev>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
