@@ -172,31 +172,34 @@ do_transfer()
 	mptcp_lib_nstat_init "${listener_ns}"
 	mptcp_lib_nstat_init "${connector_ns}"
 
-	timeout ${timeout_test} \
-		ip netns exec ${listener_ns} \
-			$mptcp_connect -t ${timeout_poll} -l -M 1 -p $port -s ${srv_proto} -c "${cmsg}" \
-				${local_addr} < "$sin" > "$sout" &
+	ip netns exec ${listener_ns} \
+		$mptcp_connect -t ${timeout_poll} -l -M 1 -p $port -s ${srv_proto} -c "${cmsg}" \
+			${local_addr} < "$sin" > "$sout" &
 	local spid=$!
 
 	mptcp_lib_wait_local_port_listen "${listener_ns}" "${port}"
 
-	timeout ${timeout_test} \
-		ip netns exec ${connector_ns} \
-			$mptcp_connect -t ${timeout_poll} -M 2 -p $port -s ${cl_proto} -c "${cmsg}" \
-				$connect_addr < "$cin" > "$cout" &
+	ip netns exec ${connector_ns} \
+		$mptcp_connect -t ${timeout_poll} -M 2 -p $port -s ${cl_proto} -c "${cmsg}" \
+			$connect_addr < "$cin" > "$cout" &
 
 	local cpid=$!
+
+	mptcp_lib_wait_timeout "${timeout_test}" "${listener_ns}" \
+		"${connector_ns}" "${port}" "${cpid}" "${spid}" &
+	local timeout_pid=$!
 
 	wait $cpid
 	local retc=$?
 	wait $spid
 	local rets=$?
+	kill $timeout_pid 2>/dev/null && timeout_pid=0
 
 	mptcp_lib_nstat_get "${listener_ns}"
 	mptcp_lib_nstat_get "${connector_ns}"
 
 	print_title "Transfer ${ip:2}"
-	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
+	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ] || [ ${timeout_pid} -ne 0 ]; then
 		mptcp_lib_pr_fail "client exit code $retc, server $rets"
 		mptcp_lib_pr_err_stats "${listener_ns}" "${connector_ns}" "${port}"
 
