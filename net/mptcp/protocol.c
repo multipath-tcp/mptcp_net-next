@@ -887,6 +887,8 @@ static bool __mptcp_finish_join(struct mptcp_sock *msk, struct sock *ssk)
 	mptcp_subflow_ctx(ssk)->subflow_id = msk->subflow_id++;
 	mptcp_sockopt_sync_locked(msk, ssk);
 	mptcp_stop_tout_timer(sk);
+	__mptcp_inherit_cgrp_data(sk, ssk);
+	__mptcp_inherit_memcg(sk, ssk, GFP_ATOMIC);
 	__mptcp_propagate_sndbuf(sk, ssk);
 	return true;
 }
@@ -3950,6 +3952,29 @@ unlock:
 	return err;
 }
 
+static void mptcp_graph_subflows(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool slow;
+
+		slow = lock_sock_fast(ssk);
+
+		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
+		 * This is needed so NOSPACE flag can be set from tcp stack.
+		 */
+		if (!ssk->sk_socket)
+			mptcp_sock_graft(ssk, sk->sk_socket);
+
+		__mptcp_inherit_cgrp_data(sk, ssk);
+		__mptcp_inherit_memcg(sk, ssk, GFP_KERNEL);
+		unlock_sock_fast(ssk, slow);
+	}
+}
+
 static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 			       struct proto_accept_arg *arg)
 {
@@ -3997,16 +4022,7 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		msk = mptcp_sk(newsk);
 		msk->in_accept_queue = 0;
 
-		/* set ssk->sk_socket of accept()ed flows to mptcp socket.
-		 * This is needed so NOSPACE flag can be set from tcp stack.
-		 */
-		mptcp_for_each_subflow(msk, subflow) {
-			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-
-			if (!ssk->sk_socket)
-				mptcp_sock_graft(ssk, newsock);
-		}
-
+		mptcp_graph_subflows(newsk);
 		mptcp_rps_record_subflows(msk);
 
 		/* Do late cleanup for the first subflow as necessary. Also
