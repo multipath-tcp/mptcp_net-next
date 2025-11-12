@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-get-stats-just-before-timing-out
+Subject: [PATCH] selftests: mptcp: get stats just before timing out
 
+Recently, some debugging happened around a test that was timing out. The
+stats were showing connections being closed which was confusing because
+the closing state was caused by the timeout stopping the transfer.
+
+To avoid such confusion, the timeout is no longer done per mptcp_connect
+process, but separately. In case of timeout, the stats are now printed,
+then the apps are killed.
+
+The stats will still be printed after the kill, but that's fine, and
+this might even be useful, just in case. Timeout should be exceptional.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
