@@ -15,6 +15,7 @@
 #include "mptcp_subflow.skel.h"
 #include "mptcp_sockmap.skel.h"
 #include "mptcp_bpf_first.skel.h"
+#include "mptcp_bpf_bkup.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -752,6 +753,18 @@ static void test_first(void)
 	mptcp_bpf_first__destroy(skel);
 }
 
+static void test_bkup(void)
+{
+	struct mptcp_bpf_bkup *skel;
+
+	skel = mptcp_bpf_bkup__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: bkup"))
+		return;
+
+	test_bpf_sched(skel->maps.bkup, "bkup", WITH_DATA, WITHOUT_DATA);
+	mptcp_bpf_bkup__destroy(skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -766,4 +779,6 @@ void test_mptcp(void)
 		test_default();
 	if (test__start_subtest("first"))
 		test_first();
+	if (test__start_subtest("bkup"))
+		test_bkup();
 }
