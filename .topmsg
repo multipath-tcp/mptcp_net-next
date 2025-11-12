@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-avoid-double-packet-traces
+Subject: [PATCH] selftests: mptcp: connect: avoid double packet traces
 
+When the same netns is used for the listener and the connector, no need
+to take exactly the same packet trace twice, one is enough.
+
+This avoids confusions when the traces are the same, and wasting
+resources which might not help reproducing an issue.
+
+While at it, avoid long lines and double spaces now that these lines are
+no longer aligned.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
