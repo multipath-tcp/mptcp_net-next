@@ -8,5 +8,5 @@ subflow basis, in different contexts.
 No functional changes intended.
 
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Geliang Tang <geliang@kernel.org>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Acked-by: Geliang Tang <geliang@kernel.org>
+Acked-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
