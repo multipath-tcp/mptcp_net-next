@@ -1,4 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-wait-for-port-instead-of-sleep
+Subject: [PATCH] selftests: mptcp: wait for port instead of sleep
 
+After having started mptcp_connect in listening mode,
+'mptcp_lib_wait_local_port_listen' can be used to wait for the listening
+socket to be ready.
+
+This is better than using the 'sleep' command, not to pause for a fixed
+amount of time, but waiting for an event. This helper is used in all
+other MPTCP selftests, but not in these two.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
