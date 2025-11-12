@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-memcg-accounting-for-passive-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix memcg accounting for passive sockets
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The passive sockets never got proper memcg accounting: the msk
+socket is associated with the memcg at accept time, but the
+passive subflows never got it right.
+
+At accept time, traverse the subflows list and associate each of them
+with the msk memcg, and try to do the same at join completion time, if
+the msk has been already accepted.
+
+Fixes: cf7da0d66cc1 ("mptcp: Create SUBFLOW socket for incoming connections")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/298
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/597
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
