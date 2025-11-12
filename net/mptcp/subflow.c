@@ -462,6 +462,7 @@ void __mptcp_sync_state(struct sock *sk, int state)
 
 	subflow = mptcp_subflow_ctx(ssk);
 	__mptcp_propagate_sndbuf(sk, ssk);
+	__mptcp_sync_rcvspace(sk);
 
 	if (sk->sk_state == TCP_SYN_SENT) {
 		/* subflow->idsn is always available is TCP_SYN_SENT state,
@@ -516,8 +517,10 @@ static void mptcp_propagate_state(struct sock *sk, struct sock *ssk,
 
 	if (!sock_owned_by_user(sk)) {
 		__mptcp_sync_state(sk, ssk->sk_state);
+		__mptcp_propagate_rcvspace(sk, ssk);
 	} else {
 		msk->pending_state = ssk->sk_state;
+		__mptcp_bl_rcvspace(sk, ssk);
 		__set_bit(MPTCP_SYNC_STATE, &msk->cb_flags);
 	}
 	mptcp_data_unlock(sk);
