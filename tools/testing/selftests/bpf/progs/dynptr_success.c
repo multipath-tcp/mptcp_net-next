@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include "bpf_kfuncs.h"
 #include "bpf_misc.h"
 #include "errno.h"
 
