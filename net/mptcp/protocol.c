@@ -913,12 +913,6 @@ static bool __mptcp_finish_join(struct mptcp_sock *msk, struct sock *ssk)
 	mptcp_subflow_joined(msk, ssk);
 	spin_unlock_bh(&msk->fallback_lock);
 
-	/* attach to msk socket only after we are sure we will deal with it
-	 * at close time
-	 */
-	if (sk->sk_socket && !ssk->sk_socket)
-		mptcp_sock_graft(ssk, sk->sk_socket);
-
 	mptcp_subflow_ctx(ssk)->subflow_id = msk->subflow_id++;
 	mptcp_sockopt_sync_locked(msk, ssk);
 	mptcp_stop_tout_timer(sk);
@@ -3734,6 +3728,20 @@ void mptcp_sock_graft(struct sock *sk, struct socket *parent)
 	write_unlock_bh(&sk->sk_callback_lock);
 }
 
+static void mptcp_check_graft(struct sock *sk, struct sock *ssk)
+{
+	struct socket *sock;
+
+	if (ssk->sk_socket)
+		return;
+
+	write_lock_bh(&sk->sk_callback_lock);
+	sock = sk->sk_socket;
+	write_lock_bh(&sk->sk_callback_lock);
+	if (sock)
+		mptcp_sock_graft(ssk, sock);
+}
+
 bool mptcp_finish_join(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
@@ -3758,6 +3766,7 @@ bool mptcp_finish_join(struct sock *ssk)
 		}
 		mptcp_subflow_joined(msk, ssk);
 		spin_unlock_bh(&msk->fallback_lock);
+		mptcp_check_graft(parent, ssk);
 		mptcp_propagate_sndbuf(parent, ssk);
 		return true;
 	}
@@ -3766,6 +3775,8 @@ bool mptcp_finish_join(struct sock *ssk)
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_JOINREJECTED);
 		goto err_prohibited;
 	}
+
+	mptcp_check_graft(parent, ssk);
 
 	/* If we can't acquire msk socket lock here, let the release callback
 	 * handle it
