@@ -1,5 +1,5 @@
 From: Jiayuan Chen <jiayuan.chen@linux.dev>
-Subject: [PATCH] mptcp: disallow MPTCP subflows from sockmap
+Subject: [PATCH] mptcp: Disallow MPTCP subflows from sockmap
 
 The sockmap feature allows bpf syscall from userspace, or based on bpf
 sockops, replacing the sk_prot of sockets during protocol stack processing
@@ -38,6 +38,8 @@ For the second case, since subflow_syn_recv_sock() has already restored
 sk_prot to native tcp_prot/tcpv6_prot, no further action is needed.
 
 Fixes: cec37a6e41aa ("mptcp: Handle MP_CAPABLE options for outgoing connections")
-Cc: stable@vger.kernel.org
 Signed-off-by: Jiayuan Chen <jiayuan.chen@linux.dev>
+Signed-off-by: Martin KaFai Lau <martin.lau@kernel.org>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Cc: <stable@vger.kernel.org>
+Link: https://patch.msgid.link/20251111060307.194196-2-jiayuan.chen@linux.dev
