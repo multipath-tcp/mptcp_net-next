@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-grafting-MPJ-subflow-earlier
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: grafting MPJ subflow earlier
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Later patches need to ensure that all MPJ subflows are grafted to the
+msk socket before accept() completion.
+
+Currently the grafting happens under the msk socket lock: potentially
+at msk release_cb time which make satisfying the above condition a bit
+tricky.
+
+Move the MPJ subflow grafting earlier, under the msk data lock, so that
+we can use such lock as a synchronization point.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
