@@ -193,7 +193,12 @@ do_transfer()
 	local retc=$?
 	wait $spid
 	local rets=$?
-	kill $timeout_pid 2>/dev/null && timeout_pid=0
+
+	if kill -0 $timeout_pid; then
+		# Finished before the timeout: kill the background job
+		mptcp_lib_kill_group_wait $timeout_pid
+		timeout_pid=0
+	fi
 
 	mptcp_lib_nstat_get "${listener_ns}"
 	mptcp_lib_nstat_get "${connector_ns}"
