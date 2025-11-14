@@ -8,4 +8,7 @@ Additionally, add test cases to ensure that sockmap correctly rejects
 MPTCP sockets as expected.
 
 Signed-off-by: Jiayuan Chen <jiayuan.chen@linux.dev>
+Signed-off-by: Martin KaFai Lau <martin.lau@kernel.org>
 Acked-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Link: https://patch.msgid.link/20251111060307.194196-4-jiayuan.chen@linux.dev
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
