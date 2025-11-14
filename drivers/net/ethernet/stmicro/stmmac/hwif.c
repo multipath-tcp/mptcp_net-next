@@ -103,12 +103,10 @@ static int stmmac_dwxlgmac_quirks(struct stmmac_priv *priv)
 	return 0;
 }
 
-int stmmac_reset(struct stmmac_priv *priv, void __iomem *ioaddr)
+int stmmac_reset(struct stmmac_priv *priv)
 {
-	struct plat_stmmacenet_data *plat = priv ? priv->plat : NULL;
-
-	if (!priv)
-		return -EINVAL;
+	struct plat_stmmacenet_data *plat = priv->plat;
+	void __iomem *ioaddr = priv->ioaddr;
 
 	if (plat && plat->fix_soc_reset)
 		return plat->fix_soc_reset(priv, ioaddr);
@@ -349,16 +347,18 @@ int stmmac_hwif_init(struct stmmac_priv *priv)
 			priv->estaddr = priv->ioaddr + EST_XGMAC_OFFSET;
 	}
 
-	/* Check for HW specific setup first */
-	if (priv->plat->setup) {
-		mac = priv->plat->setup(priv);
-		needs_setup = false;
-	} else {
-		mac = devm_kzalloc(priv->device, sizeof(*mac), GFP_KERNEL);
-	}
-
+	mac = devm_kzalloc(priv->device, sizeof(*mac), GFP_KERNEL);
 	if (!mac)
 		return -ENOMEM;
+
+	/* Check for HW specific setup first */
+	if (priv->plat->mac_setup) {
+		ret = priv->plat->mac_setup(priv, mac);
+		if (ret)
+			return ret;
+
+		needs_setup = false;
+	}
 
 	spin_lock_init(&mac->irq_ctrl_lock);
 
