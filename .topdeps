@@ -1,1 +1,1 @@
-t/mptcp-avoid-unneeded-subflow-level-drops
+t/mptcp-do-not-drop-partial-packets
