@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-do-not-drop-partial-packets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not drop partial packets
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Currently MPTCP drops partial packets for no good reason at all.
+Instead we should just skip the already acked bytes.
+
+Also add a missing check for zero window, which in turn requires
+properly initializing the rcv_wnd_sent at connection creation time.
+
+Fixes: ab174ad8ef76 ("mptcp: move ooo skbs into msk out of order queue.")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
