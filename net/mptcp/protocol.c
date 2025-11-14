@@ -61,13 +61,11 @@ static u64 mptcp_wnd_end(const struct mptcp_sock *msk)
 
 static const struct proto_ops *mptcp_fallback_tcp_ops(const struct sock *sk)
 {
-	unsigned short family = READ_ONCE(sk->sk_family);
-
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	if (family == AF_INET6)
+	if (sk->sk_prot == &tcpv6_prot)
 		return &inet6_stream_ops;
 #endif
-	WARN_ON_ONCE(family != AF_INET);
+	WARN_ON_ONCE(sk->sk_prot != &tcp_prot);
 	return &inet_stream_ops;
 }
 
