@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-do-not-fallback-when-OoO-is-present
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not fallback when OoO is present
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+In case of DSS corruption, the MPTCP protocol tries to avoid the subflow
+reset if fallback is possible. Such corruptions happen in the receive
+path; to ensure fallback is possible the stack additionally needs to
+check for OoO data, otherwise the fallback will break the data stream.
+
+Fixes: e32d262c89e2 ("mptcp: handle consistently DSS corruption")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/598
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
