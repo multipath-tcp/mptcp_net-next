@@ -405,7 +405,6 @@ static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
 	 * will retransmit as needed, if needed.
 	 */
 	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_DUPDATA);
-drop:
 	mptcp_drop(sk, skb);
 	return false;
 }
