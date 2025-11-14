@@ -678,6 +678,7 @@ static void __mptcp_add_backlog(struct sock *sk,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct sk_buff *tail = NULL;
+	struct sock *ssk = skb->sk;
 	bool fragstolen;
 	int delta;
 
@@ -691,18 +692,26 @@ static void __mptcp_add_backlog(struct sock *sk,
 		tail = list_last_entry(&msk->backlog_list, struct sk_buff, list);
 
 	if (tail && MPTCP_SKB_CB(skb)->map_seq == MPTCP_SKB_CB(tail)->end_seq &&
-	    skb->sk == tail->sk &&
+	    ssk == tail->sk &&
 	    __mptcp_try_coalesce(sk, tail, skb, &fragstolen, &delta)) {
 		skb->truesize -= delta;
 		kfree_skb_partial(skb, fragstolen);
 		__mptcp_subflow_lend_fwdmem(subflow, delta);
-		WRITE_ONCE(msk->backlog_len, msk->backlog_len + delta);
-		return;
+		goto account;
 	}
 
 	list_add_tail(&skb->list, &msk->backlog_list);
 	mptcp_subflow_lend_fwdmem(subflow, skb);
-	WRITE_ONCE(msk->backlog_len, msk->backlog_len + skb->truesize);
+	delta = skb->truesize;
+
+account:
+	WRITE_ONCE(msk->backlog_len, msk->backlog_len + delta);
+
+	/* Possibly not accept()ed yet, keep track of memory not CG
+	 * accounted, mptcp_graft_subflows() will handle it.
+	 */
+	if (!mem_cgroup_from_sk(ssk))
+		msk->backlog_unaccounted += delta;
 }
 
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
@@ -2178,6 +2187,12 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	/* After CG initialization, subflows should never add skb before
+	 * gaining the CG themself.
+	 */
+	DEBUG_NET_WARN_ON_ONCE(msk->backlog_unaccounted && sk->sk_socket &&
+			       mem_cgroup_from_sk(sk));
 
 	/* Don't spool the backlog if the rcvbuf is full. */
 	if (list_empty(&msk->backlog_list) ||
@@ -4089,6 +4104,22 @@ static void mptcp_graft_subflows(struct sock *sk)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
+	if (mem_cgroup_sockets_enabled) {
+		LIST_HEAD(join_list);
+
+		/* Subflows joining after __inet_accept() will get the
+		 * mem CG properly initialized at mptcp_finish_join() time,
+		 * but subflows pending in join_list need explicit
+		 * initialization before flushing `backlog_unaccounted`
+		 * or MPTCP can later unexpectedly observe unaccounted memory.
+		 */
+		mptcp_data_lock(sk);
+		list_splice_init(&msk->join_list, &join_list);
+		mptcp_data_unlock(sk);
+
+		__mptcp_flush_join_list(sk, &join_list);
+	}
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
@@ -4100,9 +4131,34 @@ static void mptcp_graft_subflows(struct sock *sk)
 		if (!ssk->sk_socket)
 			mptcp_sock_graft(ssk, sk->sk_socket);
 
+		if (!mem_cgroup_sk_enabled(sk))
+			goto unlock;
+
 		__mptcp_inherit_cgrp_data(sk, ssk);
 		__mptcp_inherit_memcg(sk, ssk, GFP_KERNEL);
+
+unlock:
 		release_sock(ssk);
+	}
+
+	if (mem_cgroup_sk_enabled(sk)) {
+		gfp_t gfp = GFP_KERNEL | __GFP_NOFAIL;
+		int amt;
+
+		/* Account the backlog memory; prior accept() is aware of
+		 * fwd and rmem only.
+		 */
+		mptcp_data_lock(sk);
+		amt = sk_mem_pages(sk->sk_forward_alloc +
+				   msk->backlog_unaccounted +
+				   atomic_read(&sk->sk_rmem_alloc)) -
+		      sk_mem_pages(sk->sk_forward_alloc +
+				   atomic_read(&sk->sk_rmem_alloc));
+		msk->backlog_unaccounted = 0;
+		mptcp_data_unlock(sk);
+
+		if (amt)
+			mem_cgroup_sk_charge(sk, amt, gfp);
 	}
 }
 
