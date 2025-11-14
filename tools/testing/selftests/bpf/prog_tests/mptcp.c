@@ -6,10 +6,9 @@
 #include <netinet/in.h>
 #include <test_progs.h>
 #include <unistd.h>
-#include <error.h>
+#include <errno.h>
 #include "cgroup_helpers.h"
 #include "network_helpers.h"
-#include "socket_helpers.h"
 #include "mptcp_sock.skel.h"
 #include "mptcpify.skel.h"
 #include "mptcp_subflow.skel.h"
@@ -514,23 +513,23 @@ static void test_sockmap_with_mptcp_fallback(struct mptcp_sockmap *skel)
 	if (!ASSERT_OK_FD(client_fd1, "sockmap-fb:connect_to_fd"))
 		goto end;
 
-	server_fd1 = xaccept_nonblock(listen_fd, NULL, NULL);
+	server_fd1 = accept(listen_fd, NULL, 0);
 	skel->bss->sk_index = 1;
 	client_fd2 = connect_to_fd_opts(listen_fd, NULL);
 	if (!ASSERT_OK_FD(client_fd2, "sockmap-fb:connect_to_fd"))
 		goto end;
 
-	server_fd2 = xaccept_nonblock(listen_fd, NULL, NULL);
+	server_fd2 = accept(listen_fd, NULL, 0);
 	/* test normal redirect behavior: data sent by client_fd1 can be
 	 * received by client_fd2
 	 */
 	skel->bss->redirect_idx = 1;
-	sent = xsend(client_fd1, snd, sizeof(snd), 0);
-	if (!ASSERT_EQ(sent, sizeof(snd), "sockmap-fb:xsend(client_fd1)"))
+	sent = send(client_fd1, snd, sizeof(snd), 0);
+	if (!ASSERT_EQ(sent, sizeof(snd), "sockmap-fb:send(client_fd1)"))
 		goto end;
 
 	/* try to recv more bytes to avoid truncation check */
-	recvd = recv_timeout(client_fd2, rcv, sizeof(rcv), MSG_DONTWAIT, 2);
+	recvd = recv(client_fd2, rcv, sizeof(rcv), 0);
 	if (!ASSERT_EQ(recvd, sizeof(snd), "sockmap-fb:recv(client_fd2)"))
 		goto end;
 
@@ -568,7 +567,7 @@ static void test_sockmap_reject_mptcp(struct mptcp_sockmap *skel)
 	if (!ASSERT_EQ(skel->bss->helper_ret, -EOPNOTSUPP, "should reject"))
 		goto end;
 
-	server_fd = xaccept_nonblock(listen_fd, NULL, NULL);
+	server_fd = accept(listen_fd, NULL, 0);
 	err = bpf_map_update_elem(bpf_map__fd(skel->maps.sock_map),
 				  &zero, &server_fd, BPF_NOEXIST);
 	if (!ASSERT_EQ(err, -EOPNOTSUPP, "server should be disallowed"))
