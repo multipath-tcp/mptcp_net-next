@@ -1,5 +1,5 @@
 From: Jiayuan Chen <jiayuan.chen@linux.dev>
-Subject: [PATCH] net,mptcp: fix proto fallback detection with BPF
+Subject: [PATCH] mptcp: Fix proto fallback detection with BPF
 
 The sockmap feature allows bpf syscall from userspace, or based
 on bpf sockops, replacing the sk_prot of sockets during protocol stack
@@ -54,9 +54,11 @@ RIP: 0033:0x7f87ac92b83d
 
 ---[ end trace 0000000000000000 ]---
 
-Fixes: cec37a6e41aa ("mptcp: Handle MP_CAPABLE options for outgoing connections")
-Cc: stable@vger.kernel.org
+Fixes: 0b4f33def7bb ("mptcp: fix tcp fallback crash")
 Signed-off-by: Jiayuan Chen <jiayuan.chen@linux.dev>
+Signed-off-by: Martin KaFai Lau <martin.lau@kernel.org>
 Reviewed-by: Jakub Sitnicki <jakub@cloudflare.com>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Fixes: 0b4f33def7bb ("mptcp: fix tcp fallback crash")
+Cc: <stable@vger.kernel.org>
+Link: https://patch.msgid.link/20251111060307.194196-3-jiayuan.chen@linux.dev
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
