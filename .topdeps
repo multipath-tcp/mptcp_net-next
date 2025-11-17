@@ -1,1 +1,1 @@
-t/mptcp-do-not-drop-partial-packets
+t/selftests-mptcp-join-userspace-longer-timeout
