@@ -29,6 +29,7 @@
 static int pf = AF_INET;
 static int proto_tx = IPPROTO_MPTCP;
 static int proto_rx = IPPROTO_MPTCP;
+static bool tls;
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -137,7 +138,7 @@ static void die_perror(const char *msg)
 
 static void die_usage(int r)
 {
-	fprintf(stderr, "Usage: mptcp_sockopt [-6] [-t tcp|mptcp] [-r tcp|mptcp]\n");
+	fprintf(stderr, "Usage: mptcp_sockopt [-6] [-t tcp|mptcp] [-r tcp|mptcp] [-c]\n");
 	exit(r);
 }
 
@@ -276,7 +277,7 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "h6t:r:")) != -1) {
+	while ((c = getopt(argc, argv, "h6t:r:c")) != -1) {
 		switch (c) {
 		case 'h':
 			die_usage(0);
@@ -289,6 +290,8 @@ static void parse_opts(int argc, char **argv)
 			break;
 		case 'r':
 			proto_rx = protostr_to_num(optarg);
+		case 'c':
+			tls = true;
 			break;
 		default:
 			die_usage(1);
