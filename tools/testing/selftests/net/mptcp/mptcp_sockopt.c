@@ -623,6 +623,9 @@ static void do_getsockopt_mptcp_full_info(struct so_state *s, int fd)
 
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
+	if (tls)
+		return;
+
 	do_getsockopt_mptcp_info(s, fd, w);
 
 	do_getsockopt_tcp_info(s, fd, r, w);
@@ -730,7 +733,7 @@ static void process_one_client(int fd, int pipefd)
 
 	/* wait for hangup */
 	ret3 = read(fd, buf, 1);
-	if (ret3 != 0)
+	if (!tls && ret3 != 0)
 		xerror("expected EOF, got %lu", ret3);
 
 	do_getsockopts(&s, fd, ret, ret2);

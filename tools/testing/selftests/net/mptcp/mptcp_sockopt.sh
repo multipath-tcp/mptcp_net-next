@@ -379,6 +379,18 @@ do_tls_tests()
 	fi
 	do_tls_test -6 -c -t tcp -r tcp
 	lret=$?
+	if [ $lret -ne 0 ] ; then
+		return $lret
+	fi
+
+	# MPTCP KTLS
+	do_tls_test -c
+	lret=$?
+	if [ $lret -ne 0 ] ; then
+		return $lret
+	fi
+	do_tls_test -6 -c
+	lret=$?
 	return $lret
 }
 
