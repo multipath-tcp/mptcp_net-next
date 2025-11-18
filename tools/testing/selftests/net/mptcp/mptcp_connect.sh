@@ -375,11 +375,15 @@ do_transfer()
 		local capfile="${rndh}-${connector_ns:0:3}-${listener_ns:0:3}-${cl_proto}-${srv_proto}-${connect_addr}-${port}"
 		local capopt="-i any -s 65535 -B 32768 ${capuser}"
 
-		ip netns exec ${listener_ns}  tcpdump ${capopt} -w "${capfile}-listener.pcap"  >> "${capout}" 2>&1 &
+		ip netns exec ${listener_ns} tcpdump ${capopt} \
+			-w "${capfile}-listener.pcap" >> "${capout}" 2>&1 &
 		local cappid_listener=$!
 
-		ip netns exec ${connector_ns} tcpdump ${capopt} -w "${capfile}-connector.pcap" >> "${capout}" 2>&1 &
-		local cappid_connector=$!
+		if [ ${listener_ns} != ${connector_ns} ]; then
+			ip netns exec ${connector_ns} tcpdump ${capopt} \
+				-w "${capfile}-connector.pcap" >> "${capout}" 2>&1 &
+			local cappid_connector=$!
+		fi
 
 		sleep 1
 	fi
@@ -389,26 +393,34 @@ do_transfer()
 		mptcp_lib_nstat_init "${connector_ns}"
 	fi
 
-	timeout ${timeout_test} \
-		ip netns exec ${listener_ns} \
-			./mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
-				$extra_args $local_addr < "$sin" > "$sout" &
+	ip netns exec ${listener_ns} \
+		./mptcp_connect -t ${timeout_poll} -l -p $port -s ${srv_proto} \
+			$extra_args $local_addr < "$sin" > "$sout" &
 	local spid=$!
 
 	mptcp_lib_wait_local_port_listen "${listener_ns}" "${port}"
 
 	local start
 	start=$(date +%s%3N)
-	timeout ${timeout_test} \
-		ip netns exec ${connector_ns} \
-			./mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
-				$extra_args $connect_addr < "$cin" > "$cout" &
+	ip netns exec ${connector_ns} \
+		./mptcp_connect -t ${timeout_poll} -p $port -s ${cl_proto} \
+			$extra_args $connect_addr < "$cin" > "$cout" &
 	local cpid=$!
+
+	mptcp_lib_wait_timeout "${timeout_test}" "${listener_ns}" \
+		"${connector_ns}" "${port}" "${cpid}" "${spid}" &
+	local timeout_pid=$!
 
 	wait $cpid
 	local retc=$?
 	wait $spid
 	local rets=$?
+
+	if kill -0 $timeout_pid; then
+		# Finished before the timeout: kill the background job
+		mptcp_lib_kill_group_wait $timeout_pid
+		timeout_pid=0
+	fi
 
 	local stop
 	stop=$(date +%s%3N)
@@ -416,7 +428,9 @@ do_transfer()
 	if $capture; then
 		sleep 1
 		kill ${cappid_listener}
-		kill ${cappid_connector}
+		if [ ${listener_ns} != ${connector_ns} ]; then
+			kill ${cappid_connector}
+		fi
 	fi
 
 	mptcp_lib_nstat_get "${listener_ns}"
@@ -427,7 +441,7 @@ do_transfer()
 	local duration
 	duration=$((stop-start))
 	printf "(duration %05sms) " "${duration}"
-	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ]; then
+	if [ ${rets} -ne 0 ] || [ ${retc} -ne 0 ] || [ ${timeout_pid} -ne 0 ]; then
 		mptcp_lib_pr_fail "client exit code $retc, server $rets"
 		mptcp_lib_pr_err_stats "${listener_ns}" "${connector_ns}" "${port}"
 
