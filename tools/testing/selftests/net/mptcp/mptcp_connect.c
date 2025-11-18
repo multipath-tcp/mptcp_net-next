@@ -79,6 +79,7 @@ static char *cfg_input;
 static int cfg_repeat = 1;
 static int cfg_truncate;
 static int cfg_rcv_trunc;
+static int cfg_disconnect = 0;
 
 struct cfg_cmsg_types {
 	unsigned int cmsg_enabled:1;
@@ -434,7 +435,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 	}
 
 	freeaddrinfo(addr);
-	if (sock != -1)
+	if (sock != -1 && cfg_disconnect == 0)
 		SOCK_TEST_TCPULP(sock, proto, is_mptcp(sock));
 	return sock;
 }
@@ -1373,7 +1374,9 @@ int main_loop(void)
 again:
 	check_getpeername_connect(fd);
 
-	SOCK_TEST_TCPULP(fd, cfg_sock_proto, -1);
+	/* Don't let TLS break disconnect tests */
+	if (cfg_disconnect == 0)
+		SOCK_TEST_TCPULP(fd, cfg_sock_proto, -1);
 
 	if (cfg_rcvbuf)
 		set_rcvbuf(fd, cfg_rcvbuf);
@@ -1532,6 +1535,7 @@ static void parse_opts(int argc, char **argv)
 			break;
 		case 'I':
 			cfg_repeat = atoi(optarg);
+			cfg_disconnect = 1;
 			break;
 		case 'l':
 			listen_mode = true;
