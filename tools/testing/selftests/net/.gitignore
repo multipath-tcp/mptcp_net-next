@@ -45,6 +45,7 @@ skf_net_off
 socket
 so_incoming_cpu
 so_netns_cookie
+so_peek_off
 so_txtime
 so_rcv_listener
 stress_reuseport_listen
@@ -65,3 +66,4 @@ udpgso
 udpgso_bench_rx
 udpgso_bench_tx
 unix_connect
+unix_connreset
