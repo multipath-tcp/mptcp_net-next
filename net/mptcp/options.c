@@ -1368,20 +1368,6 @@ static void mptcp_track_rwin(struct tcp_sock *tp)
 	WRITE_ONCE(msk->old_wspace, tp->rcv_wnd);
 }
 
-static void mptcp_track_rwin(struct tcp_sock *tp)
-{
-	const struct sock *ssk = (const struct sock *)tp;
-	struct mptcp_subflow_context *subflow;
-	struct mptcp_sock *msk;
-
-	if (!ssk)
-		return;
-
-	subflow = mptcp_subflow_ctx(ssk);
-	msk = mptcp_sk(subflow->conn);
-	WRITE_ONCE(msk->old_wspace, tp->rcv_wnd);
-}
-
 __sum16 __mptcp_make_csum(u64 data_seq, u32 subflow_seq, u16 data_len, __wsum sum)
 {
 	struct csum_pseudo_header header;
