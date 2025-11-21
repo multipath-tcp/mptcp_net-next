@@ -190,6 +190,44 @@ int stmmac_set_clk_tx_rate(void *bsp_priv, struct clk *clk_tx_i,
 EXPORT_SYMBOL_GPL(stmmac_set_clk_tx_rate);
 
 /**
+ * stmmac_axi_blen_to_mask() - convert a burst length array to reg value
+ * @regval: pointer to a u32 for the resulting register value
+ * @blen: pointer to an array of u32 containing the burst length values in bytes
+ * @len: the number of entries in the @blen array
+ */
+void stmmac_axi_blen_to_mask(u32 *regval, const u32 *blen, size_t len)
+{
+	size_t i;
+	u32 val;
+
+	for (val = i = 0; i < len; i++) {
+		u32 burst = blen[i];
+
+		/* Burst values of zero must be skipped. */
+		if (!burst)
+			continue;
+
+		/* The valid range for the burst length is 4 to 256 inclusive,
+		 * and it must be a power of two.
+		 */
+		if (burst < 4 || burst > 256 || !is_power_of_2(burst)) {
+			pr_err("stmmac: invalid burst length %u at index %zu\n",
+			       burst, i);
+			continue;
+		}
+
+		/* Since burst is a power of two, and the register field starts
+		 * with burst = 4, shift right by two bits so bit 0 of the field
+		 * corresponds with the minimum value.
+		 */
+		val |= burst >> 2;
+	}
+
+	*regval = FIELD_PREP(DMA_AXI_BLEN_MASK, val);
+}
+EXPORT_SYMBOL_GPL(stmmac_axi_blen_to_mask);
+
+/**
  * stmmac_verify_args - verify the driver parameters.
  * Description: it checks the driver parameters and set a default in case of
  * errors.
@@ -7493,7 +7531,8 @@ static int stmmac_dl_ts_coarse_set(struct devlink *dl, u32 id,
 }
 
 static int stmmac_dl_ts_coarse_get(struct devlink *dl, u32 id,
-				   struct devlink_param_gset_ctx *ctx)
+				   struct devlink_param_gset_ctx *ctx,
+				   struct netlink_ext_ack *extack)
 {
 	struct stmmac_devlink_priv *dl_priv = devlink_priv(dl);
 	struct stmmac_priv *priv = dl_priv->stmmac_priv;
@@ -7593,19 +7632,9 @@ struct plat_stmmacenet_data *stmmac_plat_dat_alloc(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(stmmac_plat_dat_alloc);
 
-/**
- * stmmac_dvr_probe
- * @device: device pointer
- * @plat_dat: platform data pointer
- * @res: stmmac resource pointer
- * Description: this is the main probe function used to
- * call the alloc_etherdev, allocate the priv structure.
- * Return:
- * returns 0 on success, otherwise errno.
- */
-int stmmac_dvr_probe(struct device *device,
-		     struct plat_stmmacenet_data *plat_dat,
-		     struct stmmac_resources *res)
+static int __stmmac_dvr_probe(struct device *device,
+			      struct plat_stmmacenet_data *plat_dat,
+			      struct stmmac_resources *res)
 {
 	struct net_device *ndev = NULL;
 	struct stmmac_priv *priv;
@@ -7906,6 +7935,34 @@ error_wq_init:
 
 	return ret;
 }
+
+/**
+ * stmmac_dvr_probe
+ * @dev: device pointer
+ * @plat_dat: platform data pointer
+ * @res: stmmac resource pointer
+ * Description: this is the main probe function used to
+ * call the alloc_etherdev, allocate the priv structure.
+ * Return:
+ * returns 0 on success, otherwise errno.
+ */
+int stmmac_dvr_probe(struct device *dev, struct plat_stmmacenet_data *plat_dat,
+		     struct stmmac_resources *res)
+{
+	int ret;
+
+	if (plat_dat->init) {
+		ret = plat_dat->init(dev, plat_dat->bsp_priv);
+		if (ret)
+			return ret;
+	}
+
+	ret = __stmmac_dvr_probe(dev, plat_dat, res);
+	if (ret && plat_dat->exit)
+		plat_dat->exit(dev, plat_dat->bsp_priv);
+
+	return ret;
+}
 EXPORT_SYMBOL_GPL(stmmac_dvr_probe);
 
 /**
@@ -7944,6 +8001,9 @@ void stmmac_dvr_remove(struct device *dev)
 
 	pm_runtime_disable(dev);
 	pm_runtime_put_noidle(dev);
+
+	if (priv->plat->exit)
+		priv->plat->exit(dev, priv->plat->bsp_priv);
 }
 EXPORT_SYMBOL_GPL(stmmac_dvr_remove);
 
