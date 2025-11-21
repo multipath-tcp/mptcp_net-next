@@ -113,7 +113,7 @@ struct stmmac_axi {
 	u32 axi_wr_osr_lmt;
 	u32 axi_rd_osr_lmt;
 	bool axi_kbbe;
-	u32 axi_blen[AXI_BLEN];
+	u32 axi_blen_regval;
 	bool axi_fb;
 	bool axi_mb;
 	bool axi_rb;
@@ -264,8 +264,8 @@ struct plat_stmmacenet_data {
 			  unsigned int mode,
 			  phy_interface_t interface);
 	void (*ptp_clk_freq_config)(struct stmmac_priv *priv);
-	int (*init)(struct platform_device *pdev, void *priv);
-	void (*exit)(struct platform_device *pdev, void *priv);
+	int (*init)(struct device *dev, void *priv);
+	void (*exit)(struct device *dev, void *priv);
 	int (*suspend)(struct device *dev, void *priv);
 	int (*resume)(struct device *dev, void *priv);
 	int (*mac_setup)(void *priv, struct mac_device_info *mac);
