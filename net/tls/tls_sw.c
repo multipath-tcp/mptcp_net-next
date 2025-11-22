@@ -1958,7 +1958,9 @@ tls_read_flush_backlog(struct sock *sk, struct tls_prot_info *prot,
 		return false;
 
 	max_rec = prot->overhead_size - prot->tail_size + TLS_MAX_PAYLOAD_SIZE;
-	if (done - *flushed_at < SZ_128K && tcp_inq(sk) > max_rec)
+	if (done - *flushed_at < SZ_128K && (sk->sk_protocol == IPPROTO_MPTCP ?
+					     mptcp_inq_hint(sk) :
+					     tcp_inq(sk)) > max_rec)
 		return false;
 
 	*flushed_at = done;
