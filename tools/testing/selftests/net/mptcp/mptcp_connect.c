@@ -266,13 +266,25 @@ static void set_mptfo(int fd, int pf)
 		perror("TCP_FASTOPEN");
 }
 
+static int fallback(int fd)
+{
+	int is_mptcp = 0;
+	socklen_t optlen;
+
+	optlen = sizeof(is_mptcp);
+	if (getsockopt(fd, IPPROTO_TCP, TCP_IS_MPTCP, &is_mptcp, &optlen) == -1)
+		perror("TCP_IS_MPTCP");
+
+	return !is_mptcp;
+}
+
 static int do_ulp_so(int sock, const char *name)
 {
 	return setsockopt(sock, IPPROTO_TCP, TCP_ULP, name, strlen(name));
 }
 
 #define X(m)	xerror("%s:%u: %s: failed for proto %d at line %u", __FILE__, __LINE__, (m), proto, line)
-static void sock_test_tcpulp(int sock, int proto, unsigned int line)
+static void sock_test_tcpulp(int sock, int proto, int expect, unsigned int line)
 {
 	socklen_t buflen = 8;
 	char buf[8] = "";
@@ -282,14 +294,14 @@ static void sock_test_tcpulp(int sock, int proto, unsigned int line)
 		X("getsockopt");
 
 	if (buflen > 0) {
-		if (strcmp(buf, "mptcp") != 0)
+		if (strcmp(buf, fallback(sock) ? "mptcp" : "tls") != 0)
 			xerror("unexpected ULP '%s' for proto %d at line %u", buf, proto, line);
 		ret = do_ulp_so(sock, "tls");
 		if (ret == 0)
 			X("setsockopt");
 	} else if (proto == IPPROTO_MPTCP) {
 		ret = do_ulp_so(sock, "tls");
-		if (ret != -1)
+		if (ret != expect)
 			X("setsockopt");
 	}
 
@@ -300,7 +312,7 @@ static void sock_test_tcpulp(int sock, int proto, unsigned int line)
 #undef X
 }
 
-#define SOCK_TEST_TCPULP(s, p) sock_test_tcpulp((s), (p), __LINE__)
+#define SOCK_TEST_TCPULP(s, p, e) sock_test_tcpulp((s), (p), (e), __LINE__)
 
 static int sock_listen_mptcp(const char * const listenaddr,
 			     const char * const port)
@@ -325,7 +337,7 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		if (sock < 0)
 			continue;
 
-		SOCK_TEST_TCPULP(sock, cfg_sock_proto);
+		SOCK_TEST_TCPULP(sock, cfg_sock_proto, -1);
 
 		if (-1 == setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &one,
 				     sizeof(one)))
@@ -352,7 +364,7 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		return sock;
 	}
 
-	SOCK_TEST_TCPULP(sock, cfg_sock_proto);
+	SOCK_TEST_TCPULP(sock, cfg_sock_proto, -1);
 
 	if (listen(sock, 20)) {
 		perror("listen");
@@ -360,7 +372,7 @@ static int sock_listen_mptcp(const char * const listenaddr,
 		return -1;
 	}
 
-	SOCK_TEST_TCPULP(sock, cfg_sock_proto);
+	SOCK_TEST_TCPULP(sock, cfg_sock_proto, -1);
 
 	return sock;
 }
@@ -388,7 +400,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			continue;
 		}
 
-		SOCK_TEST_TCPULP(sock, proto);
+		SOCK_TEST_TCPULP(sock, proto, -1);
 
 		if (cfg_mark)
 			set_mark(sock, cfg_mark);
@@ -425,7 +437,7 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 
 	freeaddrinfo(addr);
 	if (sock != -1)
-		SOCK_TEST_TCPULP(sock, proto);
+		SOCK_TEST_TCPULP(sock, proto, fallback(sock) ? -1 : 0);
 	return sock;
 }
 
@@ -1189,7 +1201,7 @@ again:
 				xerror("can't open %s: %d", cfg_input, errno);
 		}
 
-		SOCK_TEST_TCPULP(remotesock, 0);
+		SOCK_TEST_TCPULP(remotesock, 0, 0);
 
 		memset(&winfo, 0, sizeof(winfo));
 		err = copyfd_io(fd, remotesock, 1, true, &winfo);
@@ -1346,7 +1358,7 @@ void xdisconnect(int fd)
 int main_loop(void)
 {
 	int fd = 0, ret, fd_in = 0;
-	struct addrinfo *peer;
+	struct addrinfo *peer = NULL;
 	struct wstate winfo;
 
 	if (cfg_input && cfg_sockopt_types.mptfo) {
@@ -1363,7 +1375,7 @@ int main_loop(void)
 again:
 	check_getpeername_connect(fd);
 
-	SOCK_TEST_TCPULP(fd, cfg_sock_proto);
+	SOCK_TEST_TCPULP(fd, cfg_sock_proto, -1);
 
 	if (cfg_rcvbuf)
 		set_rcvbuf(fd, cfg_rcvbuf);
