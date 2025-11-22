@@ -372,7 +372,7 @@ do_tls_tests()
 	mptcp_lib_print_info "sockopt KTLS"
 
 	local args
-	for args in "-c -t tcp -r tcp" "-6 -c -t tcp -r tcp"; do
+	for args in "-c -t tcp -r tcp" "-6 -c -t tcp -r tcp" "-c" "-6 -c"; do
 		do_tls_test $args
 		lret=$?
 		if [ $lret -ne 0 ] ; then
