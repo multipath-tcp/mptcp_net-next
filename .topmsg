@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-initialize-raw_addr-to-Null
+From: Ankit Khushwaha <ankitkhushwaha.linux@gmail.com>
+Subject: [PATCH] selftests: mptcp: initialize raw_addr to Null
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The "void *raw_addr" is left uninitialized when else path is
+followed raising below warning.
+
+mptcp_connect.c:1262:11: warning: variable 'raw_addr' is used
+      uninitialized whenever 'if' condition is false
+      [-Wsometimes-uninitialized]
+
+so the fix is to assign *raw_addr to NULL to suppress the warning.
+
+Signed-off-by: Ankit Khushwaha <ankitkhushwaha.linux@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
