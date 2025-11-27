@@ -1,4 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-ignore-unknown-endpoint-flags
+Subject: [PATCH] mptcp: pm: ignore unknown endpoint flags
 
+Before this patch, the kernel was saving any flags set by the userspace,
+even unknown ones. This doesn't cause critical issues because the kernel
+is only looking at specific ones. But on the other hand, endpoints dumps
+could tell the userspace some recent flags seem to be supported on older
+kernel versions.
+
+Instead, ignore all unknown flags when parsing them. By doing that, the
+userspace can continue to set unsupported flags, but it has a way to
+verify what is supported by the kernel.
+
+Note that it sounds better to continue accepting unsupported flags not
+to change the behaviour, but also that eases things on the userspace
+side by adding "optional" endpoint types only supported by newer kernel
+versions without having to deal with the different kernel versions.
+
+A note for the backports: there will be conflicts in mptcp.h on older
+versions not having the mentioned flags, the new line should still be
+added last, and the '5' needs to be adapted to have the same value as
+the last entry.
+
+Fixes: 01cacb00b35c ("mptcp: add netlink-based PM")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
