@@ -208,6 +208,7 @@ static bool mptcp_rcvbuf_grow(struct sock *sk, u32 newval)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	const struct net *net = sock_net(sk);
 	u32 rcvwin, rcvbuf, cap, oldval;
+	u32 rtt_threshold, rtt_us;
 	u64 grow;
 
 	oldval = msk->rcvq_space.space;
@@ -219,10 +220,19 @@ static bool mptcp_rcvbuf_grow(struct sock *sk, u32 newval)
 	/* DRS is always one RTT late. */
 	rcvwin = newval << 1;
 
-	/* slow start: allow the sender to double its rate. */
-	grow = (u64)rcvwin * (newval - oldval);
-	do_div(grow, oldval);
-	rcvwin += grow << 1;
+	rtt_us = msk->rcvq_space.rtt_us >> 3;
+	rtt_threshold = READ_ONCE(net->ipv4.sysctl_tcp_rcvbuf_low_rtt);
+	if (rtt_us < rtt_threshold) {
+		/* For small RTT, we set @grow to rcvwin * rtt_us/rtt_threshold.
+		 * It might take few additional ms to reach 'line rate',
+		 * but will avoid sk_rcvbuf inflation and poor cache use.
+		 */
+		grow = div_u64((u64)rcvwin * rtt_us, rtt_threshold);
+	} else {
+		/* slow start: allow the sender to double its rate. */
+		grow = div_u64(((u64)rcvwin << 1) * (newval - oldval), oldval);
+	}
+	rcvwin += grow;
 
 	if (!RB_EMPTY_ROOT(&msk->out_of_order_queue))
 		rcvwin += MPTCP_SKB_CB(msk->ooo_last_skb)->end_seq - msk->ack_seq;
