@@ -1,4 +1,18 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-receive-space-timestamp-initialization
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix receive space timestamp initialization
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+MPTCP initialize the receive buffer stamp in mptcp_rcv_space_init(),
+using the provided subflow stamp. Such helper is invoked in several
+places; for passive sockets, space init happened at clone time.
+
+In such scenario, MPTCP ends-up accesses the subflow stamp before
+its initialization, leading to quite randomic timing for the first
+receive buffer auto-tune event, as the timestamp for newly created
+subflow is not refreshed there.
+
+Fix the issue moving the stamp initialization out of the mentioned helper,
+at the data transfer start, and always using a fresh timestamp.
+
+Fixes: 013e3179dbd2 ("mptcp: fix rcv space initialization")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
