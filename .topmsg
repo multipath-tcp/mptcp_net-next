@@ -1,4 +1,40 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-better-mptcp-level-RTT-estimator
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: better mptcp-level RTT estimator
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The current MPTCP-level RTT estimator has several issues. On high speed
+links, the MPTCP-level receive buffer auto-tuning happens with a frequency
+well above the TCP-level's one. That in turn can cause excessive/unneeded
+receive buffer increase.
+
+On such links, the initial rtt_us value is considerably higher
+than the actual delay, and the current mptcp_rcv_space_adjust() updates
+msk->rcvq_space.rtt_us with a period equal to the such field previous
+value. If the initial rtt_us is 40ms, its first update will happen after
+40ms, even if the subflows see actual RTT orders of magnitude lower.
+
+Additionally:
+- setting the msk rtt to the maximum among all the subflows RTTs makes DRS
+constantly overshooting the rcvbuf size when a subflow has considerable
+higher latency than the other(s).
+
+- during unidirectional bulk transfers with multiple active subflows, the
+TCP-level RTT estimator occasionally sees considerably higher value than
+the real link delay, i.e. when the packet scheduler reacts to an incoming
+ack on given subflow pushing data on a different subflow.
+
+- currently inactive but still open subflows (i.e. switched to backup mode)
+are always considered when computing the msk-level rtt.
+
+Address the all the issues above with a more accurate RTT estimation
+strategy: the MPTCP-level RTT is set to the minimum of all the subflows
+actually feeding data into the MPTCP receive buffer, using a small sliding
+window.
+
+While at it, also use EWMA to compute the msk-level scaling_ratio, to that
+mptcp can avoid traversing the subflow list is mptcp_rcv_space_adjust().
+
+Use some care to avoid updating msk and ssk level fields too often.
+
+Fixes: a6b118febbab ("mptcp: add receive buffer auto-tuning")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
