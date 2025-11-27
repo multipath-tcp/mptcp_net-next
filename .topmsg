@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-align-endpoint-flags-size-with-the-NL-specs
+Subject: [PATCH] mptcp: pm: align endpoint flags size with the NL specs
 
+The MPTCP Netlink specs describe the 'flags' as a u32 type. Internally,
+a u8 type was used.
+
+Using a u8 is currently fine, because only the 5 first bits are used.
+But there is also no reason not to be aligns with the specs, and
+to stick to a u8. Especially because there is a whole of 3 bytes after
+in both mptcp_pm_local and mptcp_pm_addr_entry structures.
+
+Also, setting it to a u32 will allow future flags, just in case.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
