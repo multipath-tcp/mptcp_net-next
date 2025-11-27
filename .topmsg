@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-consolidate-rcv-space-init
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: consolidate rcv space init
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+MPTCP uses several calls of the mptcp_rcv_space_init() helper to
+initialize the receive space, with a catch-up call in
+mptcp_rcv_space_adjust().
+
+Drop all the other strictly not needed invocations and move constant
+fields initialization at socket init/reset time.
+
+This removes a bit of complexity from mptcp DRS code. No functional
+changes intended.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
