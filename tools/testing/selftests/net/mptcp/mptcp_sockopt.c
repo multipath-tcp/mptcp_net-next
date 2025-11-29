@@ -25,6 +25,7 @@
 #include <netinet/in.h>
 
 #include <linux/tcp.h>
+#include <linux/compiler.h>
 
 static int pf = AF_INET;
 
@@ -139,7 +140,7 @@ static void die_usage(int r)
 	exit(r);
 }
 
-static void xerror(const char *fmt, ...)
+static void __noreturn xerror(const char *fmt, ...)
 {
 	va_list ap;
 

@@ -35,3 +35,7 @@ TEST_INCLUDES := ../lib.sh $(wildcard ../lib/sh/*.sh)
 EXTRA_CLEAN := *.pcap
 
 include ../../lib.mk
+
+$(OUTPUT)/mptcp_connect: CFLAGS += -I$(top_srcdir)/tools/include
+$(OUTPUT)/mptcp_sockopt: CFLAGS += -I$(top_srcdir)/tools/include
+$(OUTPUT)/mptcp_inq: CFLAGS += -I$(top_srcdir)/tools/include

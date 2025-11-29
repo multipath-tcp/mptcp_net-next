@@ -28,6 +28,7 @@
 
 #include <linux/tcp.h>
 #include <linux/sockios.h>
+#include <linux/compiler.h>
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -52,7 +53,7 @@ static void die_usage(int r)
 	exit(r);
 }
 
-static void xerror(const char *fmt, ...)
+static void __noreturn xerror(const char *fmt, ...)
 {
 	va_list ap;
 
