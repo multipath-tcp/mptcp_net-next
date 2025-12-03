@@ -2552,9 +2552,6 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	if (dispose_it)
 		list_del(&subflow->node);
 
-	if (subflow->send_fastclose && ssk->sk_state != TCP_CLOSE)
-		tcp_set_state(ssk, TCP_CLOSE);
-
 	need_push = (flags & MPTCP_CF_PUSH) && __mptcp_retransmit_pending_data(sk);
 	if (!dispose_it) {
 		__mptcp_subflow_disconnect(ssk, subflow, flags);
@@ -2573,6 +2570,10 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		WARN_ON_ONCE(!sock_flag(ssk, SOCK_DEAD));
 		kfree_rcu(subflow, rcu);
 	} else {
+		/* Prevent __tcp_close() from sending additional resets */
+		if (subflow->send_fastclose && ssk->sk_state != TCP_CLOSE)
+			tcp_set_state(ssk, TCP_CLOSE);
+
 		/* otherwise tcp will dispose of the ssk and subflow ctx */
 		__tcp_close(ssk, 0);
 
