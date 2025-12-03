@@ -2910,11 +2910,14 @@ static void mptcp_do_fastclose(struct sock *sk)
 
 		lock_sock(ssk);
 
+		/* Ensure that the MPC subflow will be fully disconnected/reset
+		 * by the later mptcp_destroy_common()/__mptcp_close_ssk().
+		 */
+		subflow->send_fastclose = 1;
+
 		/* Some subflow socket states don't allow/need a reset.*/
 		if ((1 << ssk->sk_state) & (TCPF_LISTEN | TCPF_CLOSE))
 			goto unlock;
-
-		subflow->send_fastclose = 1;
 
 		/* Initialize rcv_mss to TCP_MIN_MSS to avoid division by 0
 		 * issue in __tcp_select_window(), see tcp_disconnect().
