@@ -680,6 +680,7 @@ static int pseudo_fs_fill_super(struct super_block *s, struct fs_context *fc)
 	s->s_export_op = ctx->eops;
 	s->s_xattr = ctx->xattr;
 	s->s_time_gran = 1;
+	s->s_d_flags |= ctx->s_d_flags;
 	root = new_inode(s);
 	if (!root)
 		return -ENOMEM;
@@ -1542,9 +1543,9 @@ int __generic_file_fsync(struct file *file, loff_t start, loff_t end,
 
 	inode_lock(inode);
 	ret = sync_mapping_buffers(inode->i_mapping);
-	if (!(inode->i_state & I_DIRTY_ALL))
+	if (!(inode_state_read_once(inode) & I_DIRTY_ALL))
 		goto out;
-	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
+	if (datasync && !(inode_state_read_once(inode) & I_DIRTY_DATASYNC))
 		goto out;
 
 	err = sync_inode_metadata(inode, 1);
@@ -1664,7 +1665,7 @@ struct inode *alloc_anon_inode(struct super_block *s)
 	 * list because mark_inode_dirty() will think
 	 * that it already _is_ on the dirty list.
 	 */
-	inode->i_state = I_DIRTY;
+	inode_state_assign_raw(inode, I_DIRTY);
 	/*
 	 * Historically anonymous inodes don't have a type at all and
 	 * userspace has come to rely on this.
@@ -2289,27 +2290,25 @@ void stashed_dentry_prune(struct dentry *dentry)
 	cmpxchg(stashed, dentry, NULL);
 }
 
-/* parent must be held exclusive */
+/**
+ * simple_start_creating - prepare to create a given name
+ * @parent: directory in which to prepare to create the name
+ * @name:   the name to be created
+ *
+ * Required lock is taken and a lookup in performed prior to creating an
+ * object in a directory.  No permission checking is performed.
+ *
+ * Returns: a negative dentry on which vfs_create() or similar may
+ *  be attempted, or an error.
+ */
 struct dentry *simple_start_creating(struct dentry *parent, const char *name)
 {
-	struct dentry *dentry;
-	struct inode *dir = d_inode(parent);
+	struct qstr qname = QSTR(name);
+	int err;
 
-	inode_lock(dir);
-	if (unlikely(IS_DEADDIR(dir))) {
-		inode_unlock(dir);
-		return ERR_PTR(-ENOENT);
-	}
-	dentry = lookup_noperm(&QSTR(name), parent);
-	if (IS_ERR(dentry)) {
-		inode_unlock(dir);
-		return dentry;
-	}
-	if (dentry->d_inode) {
-		dput(dentry);
-		inode_unlock(dir);
-		return ERR_PTR(-EEXIST);
-	}
-	return dentry;
+	err = lookup_noperm_common(&qname, parent);
+	if (err)
+		return ERR_PTR(err);
+	return start_dirop(parent, &qname, LOOKUP_CREATE | LOOKUP_EXCL);
 }
 EXPORT_SYMBOL(simple_start_creating);
