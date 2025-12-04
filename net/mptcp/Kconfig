@@ -4,7 +4,7 @@ config MPTCP
 	depends on INET
 	select SKB_EXTENSIONS
 	select CRYPTO_LIB_SHA256
-	select CRYPTO
+	select CRYPTO_LIB_UTILS
 	default y
 	help
 	  Multipath TCP (MPTCP) connections send and receive data over multiple
