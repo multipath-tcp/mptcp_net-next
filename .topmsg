@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-bpf-Add-fms-extensions-to-bpf-build-flags
+From: Alexei Starovoitov <ast@kernel.org>
+Subject: [PATCH] selftests/bpf: Add -fms-extensions to bpf build flags
 
+The kernel is now built with -fms-extensions, therefore
+generated vmlinux.h contains types like:
+struct slab {
+   ..
+   struct freelist_counters;
+};
+
+Use -fms-extensions and -Wno-microsoft-anon-tag flags
+to build bpf programs that #include "vmlinux.h"
+
+Signed-off-by: Alexei Starovoitov <ast@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
