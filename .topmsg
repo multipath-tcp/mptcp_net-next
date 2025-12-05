@@ -1,4 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-select-CRYPTO_LIB_UTILS-instead-of-CRYPTO
+From: Eric Biggers <ebiggers@kernel.org>
+Subject: [PATCH] mptcp: select CRYPTO_LIB_UTILS instead of CRYPTO
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Since the only crypto functions used by the mptcp code are the SHA-256
+library functions and crypto_memneq(), select only the options needed
+for those: CRYPTO_LIB_SHA256 and CRYPTO_LIB_UTILS.
+
+Previously, CRYPTO was selected instead of CRYPTO_LIB_UTILS.  That does
+pull in CRYPTO_LIB_UTILS as well, but it's unnecessarily broad.
+
+Years ago, the CRYPTO_LIB_* options were visible only when CRYPTO.  That
+may be another reason why CRYPTO is selected here.  However, that was
+fixed years ago, and the libraries can now be selected directly.
+
+Signed-off-by: Eric Biggers <ebiggers@kernel.org>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
