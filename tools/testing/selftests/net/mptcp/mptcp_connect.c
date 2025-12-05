@@ -1248,8 +1248,8 @@ void xdisconnect(int fd)
 {
 	socklen_t addrlen = sizeof(struct sockaddr_storage);
 	struct sockaddr_storage addr, empty;
-	void *raw_addr = NULL;
 	int msec_sleep = 10;
+	void *raw_addr;
 	int i, cmdlen;
 	char cmd[128];
 
