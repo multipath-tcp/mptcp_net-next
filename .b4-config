@@ -1,4 +1,4 @@
 [b4]
 	send-series-to = MPTCP Upstream <mptcp@lists.linux.dev>
 	prep-pre-flight-checks = disable-needs-auto-to-cc
-	send-prefixes = mptcp-net
+	send-prefixes = mptcp-next
