@@ -1,5 +1,5 @@
 From: Eric Biggers <ebiggers@kernel.org>
-Subject: [PATCH] mptcp: select CRYPTO_LIB_UTILS instead of CRYPTO (other)
+Subject: [PATCH] mptcp: select CRYPTO_LIB_UTILS instead of CRYPTO
 
 Since the only crypto functions used by the mptcp code are the SHA-256
 library functions and crypto_memneq(), select only the options needed
