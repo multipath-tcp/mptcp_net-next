@@ -290,7 +290,7 @@ jobs:
                 echo "[]" > "${all}"
               fi
               # append tag, merge results, limit
-              jq -c '.tag += "${date}"' "${new}" > "${new}.tag"
+              jq -c ".tag += \"${date}\"" "${new}" > "${new}.tag"
               jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
               jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
             done
