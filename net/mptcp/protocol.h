@@ -404,7 +404,7 @@ static inline void msk_owned_by_me(const struct mptcp_sock *msk)
 })
 #define mptcp_sk(ptr) ({						\
 	typeof(ptr) _ptr = (ptr);					\
-	WARN_ON(_ptr->sk_protocol != IPPROTO_MPTCP);			\
+	WARN_ON(!sk_is_msk(_ptr));					\
 	container_of_const(_ptr, struct mptcp_sock, sk.icsk_inet.sk);	\
 })
 
