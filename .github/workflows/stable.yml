@@ -295,8 +295,8 @@ jobs:
             done
           done
 
-          d=($(ls html/results))
-          D=$(printf '"%s",' "${v[@]}")
+          d=($(basename -a $(ls -d html/results/*/)))
+          D=$(printf '"%s",' "${d[@]}")
           echo "[${D:0:-1}]" > html/results/dirs.json
 
           git add html/results/[0-9]*/*.json html/results/dirs.json
