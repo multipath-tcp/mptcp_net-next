@@ -308,8 +308,12 @@ jobs:
           for mode in normal debug btf-normal btf-debug; do
             new="results-${mode}/results.json"
             all="results/html/results/${{ github.ref_name }}/${mode}.json"
+            mkdir -p "$(dirname "${all}")"
             if [ ! -s "${new}" ]; then
               echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${new}"
+            fi
+            if [ ! -s "${all}" ]; then
+              echo "[]" > "${all}"
             fi
             # append tag, merge results, limit
             jq -c '.tag += "${{ steps.tag.outputs.tag }}"' "${new}" > "${new}.tag"
