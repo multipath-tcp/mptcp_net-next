@@ -193,7 +193,7 @@ static struct bpf_struct_ops bpf_mptcp_sched_ops = {
 
 struct mptcp_sock *bpf_mptcp_sock_from_subflow(struct sock *sk)
 {
-	if (sk && sk_fullsock(sk) && sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
+	if (sk && sk_fullsock(sk) && sk_is_tcp(sk) && sk_is_mptcp(sk))
 		return mptcp_sk(mptcp_subflow_ctx(sk)->conn);
 
 	return NULL;
@@ -294,7 +294,7 @@ __bpf_kfunc static bool bpf_sk_stream_memory_free(const struct sock *sk__ign)
 	const struct sock *sk = sk__ign;
 
 	if (sk && sk_fullsock(sk) &&
-	    sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
+	    sk_is_tcp(sk) && sk_is_mptcp(sk))
 		return sk_stream_memory_free(sk);
 
 	return NULL;

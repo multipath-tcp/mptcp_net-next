@@ -399,7 +399,7 @@ static inline void msk_owned_by_me(const struct mptcp_sock *msk)
 #undef tcp_sk
 #define tcp_sk(ptr) ({								\
 	typeof(ptr) _ptr = (ptr);						\
-	WARN_ON(_ptr->sk_protocol != IPPROTO_TCP);				\
+	WARN_ON(!sk_is_tcp(_ptr));						\
 	container_of_const(_ptr, struct tcp_sock, inet_conn.icsk_inet.sk);	\
 })
 #define mptcp_sk(ptr) ({						\
