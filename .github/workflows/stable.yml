@@ -12,6 +12,11 @@ on:
         required: true
         type: boolean
         default: true
+      latest_sft:
+        description: "Use latest kSelftests on stable kernels"
+        required: true
+        type: boolean
+        default: false
       versions:
         description: "Force checking specific versions separated with spaces, e.g. '6.6 6.1'"
         required: false
@@ -19,6 +24,7 @@ on:
 
   schedule:
     - cron: '3 7 * * 1-6'  # in UTC: after US Pacific work day and sync + tests
+    - cron: '33 5 * * 0'   # different mode
 
 # Idea: check if there was an update before continuing? Needs to track last
 
@@ -49,6 +55,10 @@ jobs:
             v=(${{ github.event.inputs.versions }})
           else
             v=($(curl ${CURL_OPT} -A "${AGENT}" "${RELEASES}" | jq -r ".releases.[] | select(.iseol == false and (.moniker == \"stable\" or .moniker == \"longterm\")).version" | cut -d. -f1-2))
+          fi
+          if [ "${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && '1' || '0' }}" = "1" ]; then
+            # v5.10 cannot be executed with latest kselftests
+            v=(${v[@]/5.10})
           fi
           V=$(printf '"%s",' "${v[@]}")
           echo "notif={\"version\":[${V:0:-1}]}" >> $GITHUB_OUTPUT
@@ -98,6 +108,24 @@ jobs:
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&state=handled-elsewhere&q=\\[${{ matrix.version }}.y"
 
+      - name: "Get latest kselftests"
+        if: ${{ github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0' }}
+        uses: actions/checkout@v4
+        with:
+          path: "kselftests_src"
+
+      - name: "Build latest kselftests"
+        if: ${{ github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0' }}
+        run: |
+          set -x
+          cd kselftests_src
+          make headers_install INSTALL_HDR_PATH="kselftests_include"
+          make KHDR_INCLUDES="-Ikselftests_include/include" \
+            -C tools/testing/selftests TARGETS=net/mptcp install \
+            INSTALL_PATH=$GITHUB_WORKSPACE/kselftests
+          cd ..
+          cp -r kselftests/net tools/testing/selftests/
+
       - name: "Docker image"
         run: |
           /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
@@ -113,6 +141,8 @@ jobs:
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_CCACHE_DISABLE=1" \
             -e "INPUT_PACKETDRILL_STABLE=1" \
+            -e "INPUT_SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES=${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && '0' || '1' }}" \
+            -e "INPUT_BUILD_SKIP_SELFTESTS=${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && '1' || '0' }}" \
             -e "INPUT_CI_TIMEOUT_SEC=10800" \
             -e "INPUT_GCOV=0" \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
@@ -194,9 +224,10 @@ jobs:
       - name: get test info
         id: test
         run: |
+          extra="${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && ' (latest kselftests)' || '' }}"
           for mode in normal debug; do
             ccl="$(cat "results-${{ matrix.version }}-${mode}/conclusion.txt")"
-            echo "ccl_${mode//-/_}=${{ matrix.version }}: ${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
+            echo "ccl_${mode//-/_}=${{ matrix.version }}${extra}: ${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
           done
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
 
@@ -243,11 +274,13 @@ jobs:
 
       - name: save flakes results
         run: |
+          set -x
           date="$(date --utc +%Y%m%d--%H%M%S)"
+          extra="${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && '-latest_sft' || '' }}"
           for version in ${{ needs.matrix.outputs.versions }}; do
             for mode in normal debug; do
               new="results-${version}-${mode}/results.json"
-              all="html/results/${version}/${mode}.json"
+              all="html/results/${version}${extra}/${mode}.json"
               mkdir -p "$(dirname "${all}")"
               if [ ! -s "${new}" ]; then
                 echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${new}"
