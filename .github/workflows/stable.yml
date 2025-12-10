@@ -159,12 +159,13 @@ jobs:
         if: always()
         run: |
           if [ -s "conclusion.txt" ]; then
+            title="${{ matrix.version }}${{ (github.event.inputs.latest_sft || github.event.schedule == '33 5 * * 0') && ' (latest kselftests)' || '' }}: ${{ matrix.mode }}"
             {
-              echo '## ${{ matrix.version }}: ${{ matrix.mode }}'
-              echo '### Conclusion (${{ matrix.version }}: ${{ matrix.mode }})'
+              echo "## ${title}"
+              echo "### Conclusion (${title})"
               cat "conclusion.txt"
               echo ''
-              echo '### Summary (${{ matrix.version }}: ${{ matrix.mode }})'
+              echo "### Summary (${title})"
               echo '```'
               cat "summary.txt"
               echo '```'
