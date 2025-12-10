@@ -293,6 +293,11 @@ jobs:
               jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
               jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
             done
+            for mode in btf-normal btf-debug; do
+              all="html/results/${version}${extra}/${mode}.json"
+              mkdir -p "$(dirname "${all}")"
+              echo "[]" > "${all}"
+            done
           done
 
           d=($(basename -a $(ls -d html/results/*/)))
