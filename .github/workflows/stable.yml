@@ -93,6 +93,7 @@ jobs:
           git -C stable-queue sparse-checkout init - cone
           git -C stable-queue sparse-checkout set queue-${{ matrix.version }}
           git -C stable-queue checkout master
+          git -C stable-queue rev-parse HEAD | tee stable-queue/HEAD.txt
           ln -s "stable-queue/queue-${{ matrix.version }}" patches
           sudo apt-get update
           sudo apt-get install -y quilt
@@ -103,6 +104,7 @@ jobs:
         run: |
           set -x
           for mbox in $(curl ${CURL_OPT} -A "${AGENT}" "${URL}" | jq -r ".[].mbox"); do
+            echo " - $(dirname "${mbox}")" | tee -a pending.txt
             curl ${CURL_OPT} -A "${AGENT}" "${mbox}" | patch -p1 --merge
           done
         env:
@@ -169,6 +171,10 @@ jobs:
               echo '```'
               cat "summary.txt"
               echo '```'
+              echo ''
+              echo "### Extra Info (${title})"
+              echo " - Queue: $(cat stable-queue/HEAD.txt 2>/dev/null || echo None)"
+              cat pending.txt 2>/dev/null || echo " - No pending patches"
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
 
@@ -290,7 +296,7 @@ jobs:
                 echo "[]" > "${all}"
               fi
               # append tag, merge results, limit
-              jq -c '.tag += "${date}"' "${new}" > "${new}.tag"
+              jq -c ".tag += \"${date}\"" "${new}" > "${new}.tag"
               jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
               jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
             done
