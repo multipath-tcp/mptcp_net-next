@@ -1,4 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-splice-io-mode
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add splice io mode
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch adds a new 'splice' io mode for mptcp_connect to test
+the newly added read_sock() and splice_read() functions of MPTCP.
+
+do_splice() efficiently transfers data directly between two file
+descriptors (infd and outfd) without copying to userspace, using
+Linux's splice() system call.
+
+Usage:
+	./mptcp_connect.sh -m splice
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
