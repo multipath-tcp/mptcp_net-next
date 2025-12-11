@@ -1,8 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] mptcp: add eat_recv_skb helper
-
-This patch extracts the free skb related code in __mptcp_recvmsg_mskq()
-into a new helper mptcp_eat_recv_skb().
-
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
