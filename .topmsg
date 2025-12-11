@@ -1,9 +1,0 @@
-From: Geliang Tang <tanggeliang@kylinos.cn>
-Subject: [PATCH] tcp: export tcp_splice_state
-
-Export struct tcp_splice_state and tcp_splice_data_recv() in net/tcp.h so
-that they can be used by MPTCP.
-
-Suggested-by: Paolo Abeni <pabeni@redhat.com>
-Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
-Reviewed-by: Mat Martineau <martineau@kernel.org>
