@@ -174,6 +174,7 @@ jobs:
               echo ''
               echo "### Extra Info (${title})"
               echo " - Queue: $(cat stable-queue/HEAD.txt 2>/dev/null || echo None)"
+              printf '   - `%s`\n' $(cat patches/series 2>/dev/null || echo "Nothing")
               cat pending.txt 2>/dev/null || echo " - No pending patches"
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
@@ -283,11 +284,11 @@ jobs:
         run: |
           set -x
           date="$(date --utc +%Y%m%d--%H%M%S)"
-          extra="${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && '-latest_sft' || '' }}"
+          extra="${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && 'latest' || 'stable' }}"
           for version in ${{ needs.matrix.outputs.versions }}; do
             for mode in normal debug; do
               new="results-${version}-${mode}/results.json"
-              all="html/results/${version}${extra}/${mode}.json"
+              all="html/results/${extra}-${version}/${mode}.json"
               mkdir -p "$(dirname "${all}")"
               if [ ! -s "${new}" ]; then
                 echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${new}"
@@ -307,7 +308,7 @@ jobs:
             done
           done
 
-          d=($(basename -a $(ls -d html/results/*/)))
+          d=($(basename -a $(ls -d html/results/*/ | sort -V)))
           D=$(printf '"%s",' "${d[@]}")
           echo "[${D:0:-1}]" > html/results/dirs.json
 
