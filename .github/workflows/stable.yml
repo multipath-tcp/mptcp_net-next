@@ -174,6 +174,7 @@ jobs:
               echo ''
               echo "### Extra Info (${title})"
               echo " - Queue: $(cat stable-queue/HEAD.txt 2>/dev/null || echo None)"
+              printf '   - `%s`\n' $(cat patches/series 2>/dev/null || echo "Nothing")
               cat pending.txt 2>/dev/null || echo " - No pending patches"
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
