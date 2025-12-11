@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-cover-splice-mode
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: connect: cover splice mode
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The "splice" alternate mode for mptcp_connect.sh/.c is available now,
+this patch adds mptcp_connect_splice.sh to test it in the MPTCP CI by
+default.
+
+Suggested-by: Matthieu Baerts <matttbe@kernel.org>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
