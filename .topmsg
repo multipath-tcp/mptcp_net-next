@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-implement-.splice_read
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: implement .splice_read
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+This patch implements .splice_read interface of mptcp struct proto_ops
+as mptcp_splice_read() with reference to tcp_splice_read().
+
+Corresponding to __tcp_splice_read(), __mptcp_splice_read() is defined,
+invoking mptcp_read_sock() instead of tcp_read_sock().
+
+mptcp_splice_read() is almost the same as tcp_splice_read(), except for
+sock_rps_record_flow().
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Mat Martineau <martineau@kernel.org>
