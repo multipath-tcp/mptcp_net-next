@@ -308,7 +308,7 @@ jobs:
             done
           done
 
-          d=($(basename -a $(ls -d html/results/*/)))
+          d=($(basename -a $(ls -d html/results/*/ | sort -V)))
           D=$(printf '"%s",' "${d[@]}")
           echo "[${D:0:-1}]" > html/results/dirs.json
 
