@@ -1407,7 +1407,7 @@ chk_join_tx_nr()
 
 	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxCreatSkErr")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$create" ]; then
 		rc=${KSFT_FAIL}
 		print_check "syn tx create socket error"
@@ -1416,7 +1416,7 @@ chk_join_tx_nr()
 
 	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxBindErr")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$bind" ]; then
 		rc=${KSFT_FAIL}
 		print_check "syn tx bind error"
@@ -1425,7 +1425,7 @@ chk_join_tx_nr()
 
 	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynTxConnectErr")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$connect" ]; then
 		rc=${KSFT_FAIL}
 		print_check "syn tx connect error"
@@ -1451,7 +1451,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtInfiniteMapTx")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$infinite_map_tx" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns infinite map tx fallback"
@@ -1460,7 +1460,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtDSSCorruptionFallback")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$dss_corruption" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns dss corruption fallback"
@@ -1469,7 +1469,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtSimultConnectFallback")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$simult_conn" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns simult conn fallback"
@@ -1478,7 +1478,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtMPCapableFallbackACK")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$mpc_passive" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns mpc passive fallback"
@@ -1487,7 +1487,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtMPCapableFallbackSYNACK")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$mpc_active" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns mpc active fallback"
@@ -1496,7 +1496,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtMPCapableDataFallback")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$mpc_data" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns mpc data fallback"
@@ -1505,7 +1505,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtMD5SigFallback")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$md5_sig" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns MD5 Sig fallback"
@@ -1514,7 +1514,7 @@ chk_fallback_nr()
 
 	count=$(mptcp_lib_get_counter ${!ns} "MPTcpExtDssFallback")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$dss" ]; then
 		rc=${KSFT_FAIL}
 		print_check "$ns dss fallback"
@@ -1590,7 +1590,7 @@ chk_join_nr()
 
 	count=$(mptcp_lib_get_counter ${ns2} "MPTcpExtMPJoinSynAckHMacFailure")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "0" ]; then
 		rc=${KSFT_FAIL}
 		print_check "synack HMAC"
@@ -1599,7 +1599,7 @@ chk_join_nr()
 
 	count=$(mptcp_lib_get_counter ${ns1} "MPTcpExtMPJoinAckRx")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$ack_nr" ]; then
 		rc=${KSFT_FAIL}
 		print_check "ack rx"
@@ -1608,7 +1608,7 @@ chk_join_nr()
 
 	count=$(mptcp_lib_get_counter ${ns1} "MPTcpExtMPJoinAckHMacFailure")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "0" ]; then
 		rc=${KSFT_FAIL}
 		print_check "ack HMAC"
@@ -1617,7 +1617,7 @@ chk_join_nr()
 
 	count=$(mptcp_lib_get_counter ${ns1} "MPTcpExtMPJoinRejected")
 	if [ -z "$count" ]; then
-		rc=${KSFT_SKIP}
+		: # ignore skip
 	elif [ "$count" != "$syn_rej" ]; then
 		rc=${KSFT_FAIL}
 		print_check "syn rejected"
