@@ -256,6 +256,8 @@ static inline __be32 mptcp_reset_option(const struct sk_buff *skb)
 void mptcp_active_detect_blackhole(struct sock *sk, bool expired);
 
 unsigned int mptcp_inq(const struct sock *sk);
+
+int mptcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t len);
 #else
 
 static inline void mptcp_init(void)
@@ -349,6 +351,12 @@ static inline __be32 mptcp_reset_option(const struct sk_buff *skb)  { return hto
 static inline void mptcp_active_detect_blackhole(struct sock *sk, bool expired) { }
 
 static inline unsigned int mptcp_inq(const struct sock *sk)
+{
+	return 0;
+}
+
+static inline int mptcp_sendmsg_locked(struct sock *sk, struct msghdr *msg,
+				       size_t len)
 {
 	return 0;
 }
