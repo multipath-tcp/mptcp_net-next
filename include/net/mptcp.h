@@ -260,6 +260,8 @@ unsigned int mptcp_inq(const struct sock *sk);
 int mptcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t len);
 
 struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off);
+
+void mptcp_read_done(struct sock *sk, size_t len);
 #else
 
 static inline void mptcp_init(void)
@@ -367,6 +369,8 @@ static inline struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off)
 {
 	return NULL;
 }
+
+static inline void mptcp_read_done(struct sock *sk, size_t len) { }
 #endif /* CONFIG_MPTCP */
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
