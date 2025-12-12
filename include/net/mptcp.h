@@ -132,6 +132,16 @@ struct mptcp_pm_ops {
 	void (*release)(struct mptcp_sock *msk);
 } ____cacheline_aligned_in_smp;
 
+struct mptcp_skb_cb {
+	u64 map_seq;
+	u64 end_seq;
+	u32 offset;
+	u8  has_rxtstamp;
+	u8  cant_coalesce;
+};
+
+#define MPTCP_SKB_CB(__skb)	((struct mptcp_skb_cb *)&((__skb)->cb[0]))
+
 #ifdef CONFIG_MPTCP
 void mptcp_init(void);
 

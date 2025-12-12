@@ -2489,7 +2489,9 @@ int tls_rx_msg_size(struct tls_strparser *strp, struct sk_buff *skb)
 	}
 
 	tls_device_rx_resync_new_rec(strp->sk, data_len + TLS_HEADER_SIZE,
-				     TCP_SKB_CB(skb)->seq + strp->stm.offset);
+				     (sk_is_msk(strp->sk) ?
+				      MPTCP_SKB_CB(skb)->map_seq :
+				      TCP_SKB_CB(skb)->seq) + strp->stm.offset);
 	return data_len + TLS_HEADER_SIZE;
 
 read_failure:
