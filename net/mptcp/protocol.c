@@ -2242,7 +2242,7 @@ static bool mptcp_move_skbs(struct sock *sk)
 	return enqueued;
 }
 
-static unsigned int mptcp_inq_hint(const struct sock *sk)
+unsigned int mptcp_inq(const struct sock *sk)
 {
 	const struct mptcp_sock *msk = mptcp_sk(sk);
 	const struct sk_buff *skb;
@@ -2256,6 +2256,16 @@ static unsigned int mptcp_inq_hint(const struct sock *sk)
 
 		return (unsigned int)hint_val;
 	}
+
+	return 0;
+}
+
+static unsigned int mptcp_inq_hint(const struct sock *sk)
+{
+	unsigned int inq = mptcp_inq(sk);
+
+	if (inq)
+		return inq;
 
 	if (sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN))
 		return 1;
