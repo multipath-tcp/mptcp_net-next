@@ -258,6 +258,8 @@ void mptcp_active_detect_blackhole(struct sock *sk, bool expired);
 unsigned int mptcp_inq(const struct sock *sk);
 
 int mptcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t len);
+
+struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off);
 #else
 
 static inline void mptcp_init(void)
@@ -359,6 +361,11 @@ static inline int mptcp_sendmsg_locked(struct sock *sk, struct msghdr *msg,
 				       size_t len)
 {
 	return 0;
+}
+
+static inline struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off)
+{
+	return NULL;
 }
 #endif /* CONFIG_MPTCP */
 
