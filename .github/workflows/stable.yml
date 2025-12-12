@@ -312,6 +312,6 @@ jobs:
           D=$(printf '"%s",' "${d[@]}")
           echo "[${D:0:-1}]" > html/results/dirs.json
 
-          git add html/results/[0-9]*/*.json html/results/dirs.json
+          git add html/results/${extra}-*/*.json html/results/dirs.json
           git commit -m "json: new: stable: ${date}"
           git push
