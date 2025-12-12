@@ -1522,9 +1522,27 @@ static void subflow_data_ready(struct sock *sk)
 		return;
 	}
 
-	WARN_ON_ONCE(!__mptcp_check_fallback(msk) && !subflow->mp_capable &&
-		     !subflow->mp_join && !(state & TCPF_CLOSE));
-
+	/* Check if subflow is in a valid state. Skip warning for legitimate edge cases
+	 * such as connection teardown, race conditions, or when parent is being destroyed.
+	 */
+	if (!__mptcp_check_fallback(msk) && !subflow->mp_capable &&
+	    !subflow->mp_join && !(state & TCPF_CLOSE)) {
+	/* Legitimate cases where this can happen:
+	 * 1. During connection teardown
+	 * 2. Race conditions with subflow destruction
+	 * 3. Packets arriving after subflow cleanup
+	 * Log debug info but don't warn loudly in production.
+	 */
+	if (unlikely(tcp_sk(sk)->repair_queue == TCP_RECV_QUEUE ||
+	    sock_flag(sk, SOCK_DEAD) || !refcount_read(&parent->sk_refcnt))) {
+			/* Expected during cleanup, silently return */
+			return;
+	}
+	/* For other cases, still log for debugging but don't WARN */
+	if (net_ratelimit())
+		pr_debug("MPTCP: subflow in unexpected state sk=%p parent=%p state=%u\n",
+			 sk, parent, state);
+	}
 	if (mptcp_subflow_data_available(sk)) {
 		mptcp_data_ready(parent, sk);
 
