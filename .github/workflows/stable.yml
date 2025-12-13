@@ -173,8 +173,18 @@ jobs:
               echo '```'
               echo ''
               echo "### Extra Info (${title})"
-              echo " - Queue: $(cat stable-queue/HEAD.txt 2>/dev/null || echo None)"
-              printf '   - `%s`\n' $(cat patches/series 2>/dev/null || echo "Nothing")
+              if [ -s patches/series ]; then
+                echo '<details>'
+                echo "<summary>Stable queue patches at $(cat stable-queue/HEAD.txt || true):</summary>"
+                echo '```'
+                cat patches/series
+                echo '```'
+                echo '</details>'
+              else
+                echo "No patches from the stable queue ($(cat stable-queue/HEAD.txt 2>/dev/null || echo None))."
+              fi
+              echo ''
+              echo 'Pending patches:'
               cat pending.txt 2>/dev/null || echo " - No pending patches"
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
