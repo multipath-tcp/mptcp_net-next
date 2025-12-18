@@ -1,0 +1,4 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] t/mptcp-Change-some-dubious-min_t-int-.-to-min
+
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
