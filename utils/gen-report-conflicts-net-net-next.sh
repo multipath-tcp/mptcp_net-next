@@ -40,7 +40,7 @@ The best is to avoid conflicts between 'net' and 'net-next' trees but if
 they cannot be avoided when preparing patches, a note about how to fix
 them is much appreciated.
 
-The conflict has been resolved on our side[1] and the resolution we
+The conflict has been resolved on our side [1] and the resolution we
 suggest is attached to this email. Please report any issues linked to
 this conflict resolution as it might be used by others. If you worked on
 the mentioned patches, don't hesitate to ACK this conflict resolution.
@@ -53,12 +53,12 @@ Rerere cache is available in [2].
 Cheers,
 Matt
 
-[1] https://github.com/multipath-tcp/mptcp_net-next/commit/$(short "${FIX}")
-[2] https://github.com/multipath-tcp/mptcp-upstream-rr-cache/commit/(...)
+1: https://github.com/multipath-tcp/mptcp_net-next/commit/$(short "${FIX}")
+2: https://github.com/multipath-tcp/mptcp-upstream-rr-cache/commit/(...)
 EOF
 
 PATCH="$(long "${FIX}").patch"
 diff "${FIX}" "${@}" > "${PATCH}"
 echo -e "\n\t=== Please include ${PATCH} in the email. ===\n"
-echo -e "\n\t=== Please append the subject with 'manual merge' and cc Stephen Rothwell <sfr@canb.auug.org.au>. ===\n"
+echo -e "\n\t=== Please append the subject with 'manual merge' and cc Stephen Rothwell <sfr@canb.auug.org.au> + Mark Brown <broonie@kernel.org>. ===\n"
 echo -e "\n\t=== Please commit + push the modif in '.git/rr-cache' + add sha above. ===\n"
