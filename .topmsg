@@ -1,4 +1,19 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-Change-some-dubious-min_t-int-.-to-min
+From: David Laight <david.laight.linux@gmail.com>
+Subject: [PATCH] mptcp: Change some dubious min_t(int, ...) to min()
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+There are two:
+
+	min_t(int, xxx, mptcp_wnd_end(msk) - msk->snd_nxt);
+
+Both mptcp_wnd_end(msk) and msk->snd_nxt are u64, their difference
+(aka the window size) might be limited to 32 bits - but that isn't
+knowable from this code.
+So checks being added to min_t() detect the potential discard of
+significant bits.
+
+Provided the 'avail_size' and return of mptcp_check_allowed_size()
+are changed to an unsigned type (size_t matches the type the caller
+uses) both min_t() can be changed to min().
+
+Signed-off-by: David Laight <david.laight.linux@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
