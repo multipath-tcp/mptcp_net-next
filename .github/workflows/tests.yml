@@ -301,6 +301,14 @@ jobs:
         run: |
           # merge split modes
           for mode in normal debug; do
+            for submode in join nojoin; do
+              d="results-${mode}_${submode}"
+              r="${d}/results.json"
+              if [ ! -s "${r}" ]; then
+                mkdir -p "${d}"
+                echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${r}"
+              fi
+            done
             mkdir -p "results-${mode}"
             jq -s ".[0] * .[1]" "results-${mode}_"*"/results.json" > "results-${mode}/results.json" || true
           done
