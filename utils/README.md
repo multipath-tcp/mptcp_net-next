@@ -317,7 +317,10 @@ Here is a checklist.
 
 * Mark the series as `Handled Elsewhere` in MPTCP PatchWork.
 
-* Check CI status in the Netdev PatchWork.
+* Check CI status in the
+  [Netdev PatchWork](https://patchwork.kernel.org/project/netdevbpf/list/?q=mptcp).
+
+* Check [Syzbot CI](https://ci.syzbot.org/?cc=mptcp%40lists.linux.dev).
 
 * Monitor for upstream merge or maintainer feedback.
 
