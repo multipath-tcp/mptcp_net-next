@@ -301,6 +301,7 @@ jobs:
         run: |
           # merge split modes
           for mode in normal debug; do
+            errors=()
             for submode in join nojoin; do
               d="results-${mode}_${submode}"
               r="${d}/results.json"
@@ -308,9 +309,18 @@ jobs:
                 mkdir -p "${d}"
                 echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${r}"
               fi
+              if grep -q '"error":' "${r}"; then
+                errors+=("$(jq -r ".error" "${r}")")
+              fi
             done
+            err=""
+            if [ "${#errors[@]}" -gt 0 ]; then
+              err=' | .error = "@"'
+              errs="$(printf '%s - ' "${errors[@]}")"
+              err="${err/@/${errs:0:-3}}"
+            fi
             mkdir -p "results-${mode}"
-            jq -s ".[0] * .[1]" "results-${mode}_"*"/results.json" > "results-${mode}/results.json" || true
+            jq -s ".[0] * .[1]${err}" "results-${mode}_"*"/results.json" > "results-${mode}/results.json" || true
           done
 
           for mode in normal debug btf-normal btf-debug; do
