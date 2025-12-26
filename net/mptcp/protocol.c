@@ -817,10 +817,9 @@ static bool __mptcp_ofo_queue(struct mptcp_sock *msk)
 
 static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 {
-	int err = sock_error(ssk);
 	int ssk_state;
 
-	if (!err)
+	if (!READ_ONCE(ssk->sk_err))
 		return false;
 
 	/* only propagate errors on fallen-back sockets or
@@ -837,7 +836,7 @@ static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 	ssk_state = inet_sk_state_load(ssk);
 	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD))
 		mptcp_set_state(sk, ssk_state);
-	WRITE_ONCE(sk->sk_err, -err);
+	WRITE_ONCE(sk->sk_err, -sock_error(ssk));
 
 	/* This barrier is coupled with smp_rmb() in mptcp_poll() */
 	smp_wmb();
