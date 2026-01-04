@@ -271,6 +271,18 @@ static int do_ulp_so(int sock, const char *name)
 	return setsockopt(sock, IPPROTO_TCP, TCP_ULP, name, strlen(name));
 }
 
+static int is_mptcp(int fd)
+{
+	socklen_t optlen;
+	int mptcp = 0;
+
+	optlen = sizeof(mptcp);
+	if (getsockopt(fd, IPPROTO_TCP, TCP_IS_MPTCP, &mptcp, &optlen) == -1)
+		perror("TCP_IS_MPTCP");
+
+	return mptcp;
+}
+
 #define X(m)	xerror("%s:%u: %s: failed for proto %d at line %u", __FILE__, __LINE__, (m), proto, line)
 static void sock_test_tcpulp(int sock, int proto, unsigned int line)
 {
@@ -282,13 +294,13 @@ static void sock_test_tcpulp(int sock, int proto, unsigned int line)
 		X("getsockopt");
 
 	if (buflen > 0) {
-		if (strcmp(buf, "mptcp") != 0)
+		if (strcmp(buf, is_mptcp(sock) ? "tls" : "mptcp") != 0)
 			xerror("unexpected ULP '%s' for proto %d at line %u", buf, proto, line);
-		ret = do_ulp_so(sock, "tls");
+		ret = do_ulp_so(sock, "smc");
 		if (ret == 0)
 			X("setsockopt");
 	} else if (proto == IPPROTO_MPTCP) {
-		ret = do_ulp_so(sock, "tls");
+		ret = do_ulp_so(sock, "smc");
 		if (ret != -1)
 			X("setsockopt");
 	}
