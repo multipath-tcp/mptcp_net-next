@@ -194,7 +194,7 @@ retry:
 		bvec_set_page(&bvec, p, size, offset);
 		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, size);
 
-		ret = tcp_sendmsg_locked(sk, &msg, size);
+		ret = ctx->ops->sendmsg_locked(sk, &msg, size);
 
 		if (ret != size) {
 			if (ret > 0) {
@@ -409,14 +409,14 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 	u8 shutdown;
 	int state;
 
-	mask = tcp_poll(file, sock, wait);
+	tls_ctx = tls_get_ctx(sk);
+	mask = tls_ctx->ops->poll(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
 	shutdown = READ_ONCE(sk->sk_shutdown);
 	if (unlikely(state != TCP_ESTABLISHED || shutdown & RCV_SHUTDOWN))
 		return mask;
 
-	tls_ctx = tls_get_ctx(sk);
 	ctx = tls_sw_ctx_rx(tls_ctx);
 	psock = sk_psock_get(sk);
 
@@ -809,6 +809,11 @@ static int do_tls_setsockopt_conf(struct sock *sk, sockptr_t optval,
 		ctx->tx_conf = conf;
 	else
 		ctx->rx_conf = conf;
+	spin_lock(&tls_prot_ops_lock);
+	ctx->ops = tls_prot_ops_find(sk->sk_protocol);
+	spin_unlock(&tls_prot_ops_lock);
+	if (!ctx->ops)
+		return -EINVAL;
 	update_sk_prot(sk, ctx);
 
 	if (update)
