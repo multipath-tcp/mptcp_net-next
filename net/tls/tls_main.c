@@ -632,6 +632,57 @@ static int validate_crypto_info(const struct tls_crypto_info *crypto_info,
 	return 0;
 }
 
+static DEFINE_SPINLOCK(tls_prot_ops_lock);
+static LIST_HEAD(tls_prot_ops_list);
+
+/* Must be called with rcu read lock held */
+static struct tls_prot_ops *tls_prot_ops_find(int protocol)
+{
+	struct tls_prot_ops *ops, *ret = NULL;
+
+	list_for_each_entry_rcu(ops, &tls_prot_ops_list, list) {
+		if (ops->protocol == protocol) {
+			ret = ops;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static int tls_validate_prot_ops(const struct tls_prot_ops *ops)
+{
+	if (!ops->inq || !ops->sendmsg_locked ||
+	    !ops->recv_skb || !ops->read_done ||
+	    !ops->get_seq || !ops->read_sock ||
+	    !ops->poll || !ops->epollin_ready) {
+		pr_err("%d does not implement required ops\n", ops->protocol);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int tls_register_prot_ops(struct tls_prot_ops *ops)
+{
+	int ret;
+
+	ret = tls_validate_prot_ops(ops);
+	if (ret)
+		return ret;
+
+	spin_lock(&tls_prot_ops_lock);
+	if (tls_prot_ops_find(ops->protocol)) {
+		spin_unlock(&tls_prot_ops_lock);
+		return -EEXIST;
+	}
+	list_add_tail_rcu(&ops->list, &tls_prot_ops_list);
+	spin_unlock(&tls_prot_ops_lock);
+
+	pr_debug("tls_prot_ops %d registered\n", ops->protocol);
+	return 0;
+}
+
 static int do_tls_setsockopt_conf(struct sock *sk, sockptr_t optval,
 				  unsigned int optlen, int tx)
 {
@@ -1044,12 +1095,31 @@ static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
 #endif
 }
 
+static u32 tcp_get_seq(struct sk_buff *skb)
+{
+	return TCP_SKB_CB(skb)->seq;
+}
+
+static struct tls_prot_ops tls_tcp_ops = {
+	.protocol	= IPPROTO_TCP,
+	.inq		= tcp_inq,
+	.sendmsg_locked	= tcp_sendmsg_locked,
+	.recv_skb	= tcp_recv_skb,
+	.read_done	= tcp_read_done,
+	.get_seq	= tcp_get_seq,
+	.read_sock	= tcp_read_sock,
+	.poll		= tcp_poll,
+	.epollin_ready	= tcp_epollin_ready,
+};
+
 static int tls_init(struct sock *sk)
 {
 	struct tls_context *ctx;
 	int rc = 0;
 
 	tls_build_proto(sk);
+
+	tls_register_prot_ops(&tls_tcp_ops);
 
 #ifdef CONFIG_TLS_TOE
 	if (tls_toe_bypass(sk))
