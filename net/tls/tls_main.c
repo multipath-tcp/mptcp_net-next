@@ -1117,6 +1117,10 @@ static struct tls_prot_ops tls_tcp_ops = {
 	.epollin_ready	= tcp_epollin_ready,
 };
 
+#ifdef CONFIG_MPTCP
+extern struct tls_prot_ops tls_mptcp_ops;
+#endif
+
 static int tls_init(struct sock *sk)
 {
 	struct tls_context *ctx;
@@ -1125,6 +1129,9 @@ static int tls_init(struct sock *sk)
 	tls_build_proto(sk);
 
 	tls_register_prot_ops(&tls_tcp_ops);
+#ifdef CONFIG_MPTCP
+	tls_register_prot_ops(&tls_mptcp_ops);
+#endif
 
 #ifdef CONFIG_TLS_TOE
 	if (tls_toe_bypass(sk))
