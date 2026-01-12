@@ -8,7 +8,7 @@ import time
 import traceback
 from collections import namedtuple
 from .consts import KSFT_MAIN_NAME
-from .utils import global_defer_queue
+from . import utils
 
 KSFT_RESULT = None
 KSFT_RESULT_ALL = True
@@ -153,14 +153,19 @@ def ktap_result(ok, cnt=1, case_name="", comment=""):
     print(res, flush=True)
 
 
+def _ksft_defer_arm(state):
+    """ Allow or disallow the use of defer() """
+    utils.GLOBAL_DEFER_ARMED = state
+
+
 def ksft_flush_defer():
     global KSFT_RESULT
 
     i = 0
-    qlen_start = len(global_defer_queue)
-    while global_defer_queue:
+    qlen_start = len(utils.GLOBAL_DEFER_QUEUE)
+    while utils.GLOBAL_DEFER_QUEUE:
         i += 1
-        entry = global_defer_queue.pop()
+        entry = utils.GLOBAL_DEFER_QUEUE.pop()
         try:
             entry.exec_only()
         except Exception:
@@ -315,6 +320,7 @@ def ksft_run(cases=None, globs=None, case_pfx=None, args=()):
         comment = ""
         cnt_key = ""
 
+        _ksft_defer_arm(True)
         try:
             func(*args)
         except KsftSkipEx as e:
@@ -332,6 +338,7 @@ def ksft_run(cases=None, globs=None, case_pfx=None, args=()):
                 ksft_pr(f"Stopping tests due to {type(e).__name__}.")
             KSFT_RESULT = False
             cnt_key = 'fail'
+        _ksft_defer_arm(False)
 
         try:
             ksft_flush_defer()
