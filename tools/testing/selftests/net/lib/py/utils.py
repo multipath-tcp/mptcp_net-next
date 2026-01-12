@@ -141,7 +141,8 @@ class bkg(cmd):
         return self.process(terminate=terminate, fail=self.check_fail)
 
 
-global_defer_queue = []
+GLOBAL_DEFER_QUEUE = []
+GLOBAL_DEFER_ARMED = False
 
 
 class defer:
@@ -153,7 +154,9 @@ class defer:
         self.args = args
         self.kwargs = kwargs
 
-        self._queue =  global_defer_queue
+        if not GLOBAL_DEFER_ARMED:
+            raise Exception("defer queue not armed, did you use defer() outside of a test case?")
+        self._queue = GLOBAL_DEFER_QUEUE
         self._queue.append(self)
 
     def __enter__(self):
