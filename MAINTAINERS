@@ -9417,6 +9417,7 @@ F:	include/linux/phy_link_topology.h
 F:	include/linux/phylib_stubs.h
 F:	include/linux/platform_data/mdio-bcm-unimac.h
 F:	include/linux/platform_data/mdio-gpio.h
+F:	include/net/phy/
 F:	include/trace/events/mdio.h
 F:	include/uapi/linux/mdio.h
 F:	include/uapi/linux/mii.h
@@ -17658,6 +17659,12 @@ F:	Documentation/ABI/testing/sysfs-bus-most
 F:	drivers/most/
 F:	drivers/staging/most/
 F:	include/linux/most.h
+
+MOTORCOMM DWMAC GLUE DRIVER
+M:	Yao Zi <me@ziyao.cc>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/ethernet/stmicro/stmmac/dwmac-motorcomm.c
 
 MOTORCOMM PHY DRIVER
 M:	Frank <Frank.Sae@motor-comm.com>
