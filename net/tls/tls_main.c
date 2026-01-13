@@ -1097,9 +1097,7 @@ static int tls_init(struct sock *sk)
 	ctx->tx_conf = TLS_BASE;
 	ctx->rx_conf = TLS_BASE;
 	ctx->tx_max_payload_len = TLS_MAX_PAYLOAD_SIZE;
-	spin_lock(&tls_prot_ops_lock);
 	ctx->ops = tls_prot_ops_find(sk->sk_protocol);
-	spin_unlock(&tls_prot_ops_lock);
 	if (!ctx->ops) {
 		rc = -EINVAL;
 		goto out;
