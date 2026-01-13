@@ -63,6 +63,7 @@ unset fastclose
 unset fullmesh
 unset speed
 unset bind_addr
+unset tls
 unset join_syn_rej
 unset join_csum_ns1
 unset join_csum_ns2
@@ -974,6 +975,7 @@ do_transfer()
 	local fastclose=${fastclose:-""}
 	local speed=${speed:-"fast"}
 	local bind_addr=${bind_addr:-"::"}
+	local tls=${tls:-""}
 	local listener_in="${sin}"
 	local connector_in="${cin}"
 	port=$(get_port)
@@ -993,6 +995,10 @@ do_transfer()
 		extra_args="-r 50"
 	elif [ $speed -gt 0 ]; then
 		extra_args="-r ${speed}"
+	fi
+
+	if [ -n "${tls}" ] && [ ${tls} = "1" ]; then
+		extra_args="$extra_args -o TLS"
 	fi
 
 	local extra_cl_args=""
@@ -1105,6 +1111,8 @@ run_tests()
 	local listener_ns="$1"
 	local connector_ns="$2"
 	local connect_addr="$3"
+	local cl_proto="${4:-MPTCP}"
+	local srv_proto="${5:-MPTCP}"
 
 	local size
 	local test_linkfail=${test_linkfail:-0}
@@ -1149,7 +1157,7 @@ run_tests()
 		make_file "$sinfail" "server" $size
 	fi
 
-	do_transfer ${listener_ns} ${connector_ns} MPTCP MPTCP ${connect_addr}
+	do_transfer ${listener_ns} ${connector_ns} ${cl_proto} ${srv_proto} ${connect_addr}
 }
 
 _dump_stats()
@@ -4306,6 +4314,40 @@ endpoint_tests()
 	fi
 }
 
+tls_tests()
+{
+	# single subflow, tls, TCP
+	if reset "single subflow, tls, TCP"; then
+		test_linkfail=128 tls=1 \
+			run_tests $ns1 $ns2 10.0.1.1 TCP TCP
+		chk_join_nr 0 0 0
+	fi
+
+	# multiple subflows, tls, TCP
+	if reset "multiple subflows, tls, TCP"; then
+		pm_nl_set_limits $ns1 0 2
+		pm_nl_set_limits $ns2 0 2
+		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+		test_linkfail=1024 tls=1 \
+			run_tests $ns1 $ns2 10.0.1.1 TCP TCP
+		chk_join_nr 0 0 0
+	fi
+
+	# multiple subflows, signal, tls, TCP
+	if reset "multiple subflows, signal, tls, TCP"; then
+		pm_nl_set_limits $ns1 0 3
+		pm_nl_add_endpoint $ns1 10.0.2.1 dev ns1eth2 flags signal
+		pm_nl_set_limits $ns2 1 3
+		pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.4.2 dev ns2eth4 flags subflow
+		test_linkfail=2048 tls=1 \
+			run_tests $ns1 $ns2 10.0.1.1 TCP TCP
+		chk_join_nr 0 0 0
+		chk_add_nr 0 0
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -4356,6 +4398,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	c@tls_tests
 )
 
 all_tests_args=""
