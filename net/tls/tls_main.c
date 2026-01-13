@@ -1097,16 +1097,18 @@ static int tls_init(struct sock *sk)
 	ctx->tx_conf = TLS_BASE;
 	ctx->rx_conf = TLS_BASE;
 	ctx->tx_max_payload_len = TLS_MAX_PAYLOAD_SIZE;
-	spin_lock(&tls_prot_ops_lock);
-	ctx->ops = tls_prot_ops_find(sk->sk_protocol);
-	spin_unlock(&tls_prot_ops_lock);
-	if (!ctx->ops) {
-		rc = -EINVAL;
-		goto out;
-	}
 	update_sk_prot(sk, ctx);
 out:
 	write_unlock_bh(&sk->sk_callback_lock);
+
+	if (!rc) {
+		spin_lock_bh(&tls_prot_ops_lock);
+		ctx->ops = tls_prot_ops_find(sk->sk_protocol);
+		spin_unlock_bh(&tls_prot_ops_lock);
+		if (!ctx->ops)
+			rc = -EINVAL;
+	}
+
 	return rc;
 }
 
