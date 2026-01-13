@@ -772,6 +772,9 @@ static int do_tls_setsockopt_conf(struct sock *sk, sockptr_t optval,
 			tls_sw_strparser_arm(sk, ctx);
 	}
 
+	if (conf == TLS_HW && sk->sk_protocol == IPPROTO_MPTCP)
+		return -EOPNOTSUPP;
+
 	if (tx)
 		ctx->tx_conf = conf;
 	else
@@ -1330,6 +1333,9 @@ static int __init tls_register(void)
 	tcp_register_ulp(&tcp_tls_ulp_ops);
 
 	tls_register_prot_ops(&tls_tcp_ops);
+#ifdef CONFIG_MPTCP
+	tls_register_prot_ops(&tls_mptcp_ops);
+#endif
 
 	return 0;
 err_strp:
