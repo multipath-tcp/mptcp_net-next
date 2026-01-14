@@ -1456,6 +1456,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 	       bool sendpg, unsigned int n_readers, unsigned int n_writers)
 {
 	const unsigned int n_children = n_readers + n_writers;
+	char tmpfile[] = "/tmp/tls_test_tmpfile_XXXXXX";
 	const size_t data = 6 * 1000 * 1000;
 	const size_t file_sz = data / 100;
 	size_t read_bias, write_bias;
@@ -1469,7 +1470,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 	write_bias = n_readers / n_writers ?: 1;
 
 	/* prep a file to send */
-	fd = open("/tmp/", O_TMPFILE | O_RDWR, 0600);
+	fd = mkstemp(tmpfile);
 	ASSERT_GE(fd, 0);
 
 	memset(buf, 0xac, file_sz);
@@ -1527,6 +1528,8 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 			left -= res;
 		}
 	}
+	close(fd);
+	unlink(tmpfile);
 }
 
 TEST_F(tls, mutliproc_even)
