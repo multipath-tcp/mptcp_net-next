@@ -467,6 +467,15 @@ TEST_F(tls, send_then_sendfile)
 	close(filefd);
 }
 
+static int create_temp_file(void)
+{
+	char filename[] = "/tmp/mytemp.XXXXXX";
+	int fd = mkstemp(filename);
+
+	unlink(filename);
+	return fd;
+}
+
 static void chunked_sendfile(struct __test_metadata *_metadata,
 			     struct _test_data_tls *self,
 			     uint16_t chunk_size,
@@ -476,11 +485,9 @@ static void chunked_sendfile(struct __test_metadata *_metadata,
 	uint16_t test_payload_size;
 	int size = 0;
 	int ret;
-	char filename[] = "/tmp/mytemp.XXXXXX";
-	int fd = mkstemp(filename);
+	int fd = create_temp_file();
 	off_t offset = 0;
 
-	unlink(filename);
 	ASSERT_GE(fd, 0);
 	EXPECT_GE(chunk_size, 1);
 	test_payload_size = chunk_size + extra_payload_size;
@@ -1469,7 +1476,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 	write_bias = n_readers / n_writers ?: 1;
 
 	/* prep a file to send */
-	fd = open("/tmp/", O_TMPFILE | O_RDWR, 0600);
+	fd = create_temp_file();
 	ASSERT_GE(fd, 0);
 
 	memset(buf, 0xac, file_sz);
@@ -1527,6 +1534,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 			left -= res;
 		}
 	}
+	close(fd);
 }
 
 TEST_F(tls, mutliproc_even)
