@@ -7,13 +7,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <linux/ethtool.h>
-#include <linux/hashtable.h>
-#include <linux/if_link.h>
-#include <linux/jhash.h>
-#include <linux/limits.h>
-#include <linux/list.h>
-#include <linux/sockios.h>
 #include <locale.h>
 #include <math.h>
 #include <net/if.h>
@@ -31,6 +24,14 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <linux/ethtool.h>
+#include <linux/hashtable.h>
+#include <linux/if_link.h>
+#include <linux/jhash.h>
+#include <linux/limits.h>
+#include <linux/list.h>
+#include <linux/sockios.h>
 
 #include "bpf_util.h"
 #include "xdp_sample_user.h"

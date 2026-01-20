@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2016 Facebook
  */
-#include <linux/bpf.h>
-#include <linux/if_link.h>
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -16,6 +14,8 @@
 #include <time.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <linux/bpf.h>
+#include <linux/if_link.h>
 #include "bpf_util.h"
 #include "xdp_tx_iptunnel_common.h"
 

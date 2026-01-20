@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (C) 2017 Cavium, Inc.
  */
-#include <linux/bpf.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -25,6 +22,9 @@
 #include <libgen.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <linux/bpf.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include "xdp_sample_user.h"
 #include "xdp_router_ipv4.skel.h"
 
