@@ -16,12 +16,12 @@
  * Author: Dmitry Safonov <dima@arista.com>
  */
 #include <inttypes.h>
-#include <linux/icmp.h>
-#include <linux/icmpv6.h>
-#include <linux/ipv6.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#include <linux/icmp.h>
+#include <linux/icmpv6.h>
+#include <linux/ipv6.h>
 #include "aolib.h"
 #include "../../../../include/linux/compiler.h"
 

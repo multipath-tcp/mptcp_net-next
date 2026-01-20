@@ -10,8 +10,6 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -30,6 +28,8 @@
 #include <errno.h>
 #include <getopt.h>
 
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/xfrm.h>
 #include <linux/ipsec.h>
 #include <linux/pfkeyv2.h>

@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2025, Kylin Software */
 
-#include <linux/sock_diag.h>
-#include <linux/rtnetlink.h>
-#include <linux/inet_diag.h>
-#include <linux/netlink.h>
-#include <linux/compiler.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <linux/tcp.h>
@@ -16,6 +11,12 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+
+#include <linux/sock_diag.h>
+#include <linux/rtnetlink.h>
+#include <linux/inet_diag.h>
+#include <linux/netlink.h>
+#include <linux/compiler.h>
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
