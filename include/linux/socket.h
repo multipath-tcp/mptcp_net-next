@@ -28,16 +28,6 @@ extern void socket_seq_show(struct seq_file *seq);
 
 typedef __kernel_sa_family_t	sa_family_t;
 
-/*
- *	1003.1g requires sa_family_t and that sa_data is char.
- */
-
-/* Deprecated for in-kernel use. Use struct sockaddr_unsized instead. */
-struct sockaddr {
-	sa_family_t	sa_family;	/* address family, AF_xxx	*/
-	char		sa_data[14];	/* 14 bytes of protocol address	*/
-};
-
 /**
  * struct sockaddr_unsized - Unspecified size sockaddr for callbacks
  * @sa_family: Address family (AF_UNIX, AF_INET, AF_INET6, etc.)

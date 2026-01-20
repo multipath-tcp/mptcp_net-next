@@ -2,6 +2,8 @@
 #ifndef _UAPI_LINUX_SOCKET_H
 #define _UAPI_LINUX_SOCKET_H
 
+#include <linux/libc-compat.h>          /* for compatibility with glibc */
+
 /*
  * Desired design of maximum size and alignment (see RFC2553)
  */
@@ -25,6 +27,18 @@ struct __kernel_sockaddr_storage {
 		void *__align; /* implementation specific desired alignment */
 	};
 };
+
+/*
+ *	1003.1g requires sa_family_t and that sa_data is char.
+ */
+
+/* Deprecated for in-kernel use. Use struct sockaddr_unsized instead. */
+#if __UAPI_DEF_SOCKADDR
+struct sockaddr {
+	__kernel_sa_family_t	sa_family;	/* address family, AF_xxx	*/
+	char			sa_data[14];	/* 14 bytes of protocol address	*/
+};
+#endif /* __UAPI_DEF_SOCKADDR */
 
 #define SOCK_SNDBUF_LOCK	1
 #define SOCK_RCVBUF_LOCK	2

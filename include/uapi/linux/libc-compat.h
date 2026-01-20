@@ -140,6 +140,13 @@
 
 #endif /* _NETINET_IN_H */
 
+/* Definitions for socket.h */
+#if defined(_SYS_SOCKET_H)
+#define __UAPI_DEF_SOCKADDR		0
+#else
+#define __UAPI_DEF_SOCKADDR		1
+#endif
+
 /* Definitions for xattr.h */
 #if defined(_SYS_XATTR_H)
 #define __UAPI_DEF_XATTR		0
@@ -219,6 +226,11 @@
 #endif
 #ifndef __UAPI_DEF_IP6_MTUINFO
 #define __UAPI_DEF_IP6_MTUINFO		1
+#endif
+
+/* Definitions for socket.h */
+#ifndef __UAPI_DEF_SOCKADDR
+#define __UAPI_DEF_SOCKADDR		1
 #endif
 
 /* Definitions for xattr.h */
