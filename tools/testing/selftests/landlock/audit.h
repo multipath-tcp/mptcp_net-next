@@ -7,9 +7,6 @@
 
 #define _GNU_SOURCE
 #include <errno.h>
-#include <linux/audit.h>
-#include <linux/limits.h>
-#include <linux/netlink.h>
 #include <regex.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -19,6 +16,10 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+#include <linux/audit.h>
+#include <linux/limits.h>
+#include <linux/netlink.h>
 
 #include "kselftest.h"
 
