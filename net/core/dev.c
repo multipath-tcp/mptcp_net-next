@@ -3802,7 +3802,7 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 				    inner_ip_hdr(skb) : ip_hdr(skb);
 
 		if (!(iph->frag_off & htons(IP_DF)))
-			features &= ~NETIF_F_TSO_MANGLEID;
+			features &= ~dev->mangleid_features;
 	}
 
 	/* NETIF_F_IPV6_CSUM does not support IPv6 extension headers,
@@ -11282,21 +11282,6 @@ static void netdev_free_phy_link_topology(struct net_device *dev)
 	}
 }
 
-static void init_rx_queue_cfgs(struct net_device *dev)
-{
-	const struct netdev_queue_mgmt_ops *qops = dev->queue_mgmt_ops;
-	struct netdev_rx_queue *rxq;
-	int i;
-
-	if (!qops || !qops->ndo_default_qcfg)
-		return;
-
-	for (i = 0; i < dev->num_rx_queues; i++) {
-		rxq = __netif_get_rx_queue(dev, i);
-		qops->ndo_default_qcfg(dev, &rxq->qcfg);
-	}
-}
-
 /**
  * register_netdevice() - register a network device
  * @dev: device to register
@@ -11341,8 +11326,6 @@ int register_netdevice(struct net_device *dev)
 	dev->name_node = netdev_name_node_head_alloc(dev);
 	if (!dev->name_node)
 		goto out;
-
-	init_rx_queue_cfgs(dev);
 
 	/* Init, if this function is available */
 	if (dev->netdev_ops->ndo_init) {
@@ -11401,6 +11384,9 @@ int register_netdevice(struct net_device *dev)
 		dev->mpls_features |= NETIF_F_TSO_MANGLEID;
 	if (dev->hw_enc_features & NETIF_F_TSO)
 		dev->hw_enc_features |= NETIF_F_TSO_MANGLEID;
+
+	/* TSO_MANGLEID belongs in mangleid_features by definition */
+	dev->mangleid_features |= NETIF_F_TSO_MANGLEID;
 
 	/* Make NETIF_F_HIGHDMA inheritable to VLAN devices.
 	 */
