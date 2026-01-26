@@ -5,6 +5,7 @@
 : "${STRESS_IN:=0}"
 : "${PRIO:=0}"
 : "${STASH:=0}"
+: "${STASH_IGNORE_CONFLICTS:=0}"
 : "${FIND_FIX:=0}"
 
 wait_vm() { local i=0
@@ -66,9 +67,14 @@ exit_trap() {
 if [ "${STASH}" = 1 ]; then
 	if ! git stash pop; then
 		git --no-pager diff
-		echo "========= Conflict with git stash pop: skip ========="
+		echo "========= Conflict with git stash pop ========="
 		git restore --staged --worktree . || true
-		exit 125 # skip
+		if [ "${STASH_IGNORE_CONFLICTS}" = 1 ]; then
+			echo "==> ignore git stash and continue"
+		else
+			echo "==> skip commit"
+			exit 125 # skip
+		fi
 	fi
 fi
 
