@@ -1,4 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-fix-local-endp-not-being-tracked
+Subject: [PATCH] selftests: mptcp: join: fix local endp not being tracked
 
+When running this mptcp_join.sh selftest on older kernel versions not
+supporting local endpoints tracking, this test fails because 3 MP_JOIN
+ACKs have been received, while only 2 were expected.
+
+It is not clear why only 2 MP_JOIN ACKs were expected on old kernel
+versions, while 3 MP_JOIN SYN and SYN+ACK were expected. When testing on
+the v5.15.197 kernel, 3 MP_JOIN ACKs are seen, which is also what is
+expected in the selftests included in this kernel version, see commit
+f4480eaad489 ("selftests: mptcp: add missing join check").
+
+Switch the expected MP_JOIN ACKs to 3. While at it, move this
+chk_join_nr helper out of the special condition for older kernel
+versions as it is now the same as with more recent ones. Also, invert
+the condition to be more logical: what's expected on newer kernel
+versions having such helper first.
+
+Fixes: d4c81bbb8600 ("selftests: mptcp: join: support local endpoint being tracked or not")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
