@@ -1,4 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-no-SKIP-mark-for-group-checks
+Subject: [PATCH] selftests: mptcp: join: no SKIP mark for group checks
 
+When executing the last MPTCP selftests on older kernels, this output is
+printed:
+
+  # 001 no JOIN
+  #       join Rx                             [SKIP]
+  #       join Tx                             [SKIP]
+  #       fallback                            [SKIP]
+
+In fact, behind each line, a few counters are checked, and likely not
+all of them have been skipped because the they are not available on
+these kernels. Instead, "new" and unsupported counters for these groups
+are now ignored, and [ OK ] will be printed instead of [SKIP].
+
+Note that on the MPTCP CI, when validating the dev versions, any
+unsupported counter will cause the tests to fail. So this is safe not to
+print 'SKIP' for these group checks.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
