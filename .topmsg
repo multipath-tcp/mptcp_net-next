@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-cleanup-TFO-setup
+Subject: [PATCH] selftests: mptcp: connect cleanup TFO setup
 
+To the TFO, only the file descriptor is needed, the family is not.
+
+Also, the error can be handled the same way when 'sendto()' or
+'connect()' are used. Only the printed error message is different.
+
+This avoids a bit of confusions.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
