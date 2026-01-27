@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-check-subflow-errors-in-close-events
+Subject: [PATCH] selftests: mptcp: check subflow errors in close events
 
+This validates the previous commit: subflow closed events should contain
+an error field when a subflow got closed with an error, e.g. reset or
+timeout.
+
+For this test, the chk_evt_nr helper has been extended to check
+attributes in the matched events.
+
+In this test, the 2 subflow closed events should have an error.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 15cc10453398 ("mptcp: deliver ssk errors to msk")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
