@@ -1,4 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-chk_stale_nr-avoid-dup-stats
+Subject: [PATCH] selftests: mptcp: join chk_stale_nr: avoid dup stats
 
+nstat outputs are already printed when calling 'fail_test', no need to
+do it again.
+
+While at it, no need to use the dump_stats variable, print the extra
+stats directly. And use 'ip -n $ns' instead of 'ip netns exec $ns',
+shorter and clearer.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
