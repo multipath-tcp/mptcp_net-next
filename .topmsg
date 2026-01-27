@@ -1,4 +1,10 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-avoid-declaring-i-if-not-used
+Subject: [PATCH] selftests: mptcp: join: avoid declaring i if not used
 
+A few loops were declaring 'i', but this variable was not used.
+
+To avoid confusions, use '_' instead: it is more explicit to mark that
+this variable is not needed.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
