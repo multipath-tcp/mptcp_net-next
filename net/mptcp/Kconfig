@@ -36,4 +36,13 @@ config MPTCP_KUNIT_TEST
 
 	  If unsure, say N.
 
+config GCOV_PROFILE_MPTCP
+	bool "Enable GCOV profiling on MPTCP"
+	depends on GCOV_KERNEL
+	help
+	  Enable GCOV profiling on MPTCP for checking which functions/lines
+	  are executed.
+
+	  If unsure, say N.
+
 endif
