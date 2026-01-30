@@ -1,5 +1,5 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] DO-NOT-MERGE: mark some simult flows tests as flaky
+Subject: [PATCH] TMP-FIX: mark some simult flows tests as flaky
 
 This is just to reduce the noise while we are working a solution for
 issue 607:
