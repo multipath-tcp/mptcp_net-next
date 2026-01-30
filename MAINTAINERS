@@ -13171,6 +13171,7 @@ F:	Documentation/devicetree/bindings/interconnect/
 F:	Documentation/driver-api/interconnect.rst
 F:	drivers/interconnect/
 F:	include/dt-bindings/interconnect/
+F:	include/linux/interconnect-clk.h
 F:	include/linux/interconnect-provider.h
 F:	include/linux/interconnect.h
 
@@ -20971,6 +20972,18 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/net/pse-pd/
 F:	drivers/net/pse-pd/
 F:	net/ethtool/pse-pd.c
+
+PSP SECURITY PROTOCOL
+M:	Daniel Zahka <daniel.zahka@gmail.com>
+M:	Jakub Kicinski <kuba@kernel.org>
+M:	Willem de Bruijn <willemdebruijn.kernel@gmail.com>
+F:	Documentation/netlink/specs/psp.yaml
+F:	Documentation/networking/psp.rst
+F:	include/net/psp/
+F:	include/net/psp.h
+F:	include/uapi/linux/psp.h
+F:	net/psp/
+K:	struct\ psp(_assoc|_dev|hdr)\b
 
 PSTORE FILESYSTEM
 M:	Kees Cook <kees@kernel.org>
