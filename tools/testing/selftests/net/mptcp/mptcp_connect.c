@@ -937,24 +937,40 @@ static int do_splice(const int infd, const int outfd, const size_t len,
 		     struct wstate *winfo)
 {
 	int pipefd[2];
-	ssize_t bytes;
+	ssize_t in_bytes, out_bytes;
 	int err;
 
 	err = pipe(pipefd);
-	if (err)
-		return err;
+	if (err) {
+		perror("pipe");
+		return 2;
+	}
 
-	while ((bytes = splice(infd, NULL, pipefd[1], NULL,
-			       len - winfo->total_len,
-			       SPLICE_F_MOVE | SPLICE_F_MORE)) > 0) {
-		splice(pipefd[0], NULL, outfd, NULL, bytes,
-		       SPLICE_F_MOVE | SPLICE_F_MORE);
+again:
+	in_bytes = splice(infd, NULL, pipefd[1], NULL, len - winfo->total_len,
+			  SPLICE_F_MOVE | SPLICE_F_MORE);
+	if (in_bytes < 0) {
+		perror("splice in");
+		err = 3;
+	} else if (in_bytes > 0) {
+		out_bytes = splice(pipefd[0], NULL, outfd, NULL, in_bytes,
+				   SPLICE_F_MOVE | SPLICE_F_MORE);
+		if (out_bytes < 0) {
+			perror("splice out");
+			err = 4;
+		} else if (in_bytes != out_bytes) {
+			fprintf(stderr, "Unexpected transfer: %zu vs %zu\n",
+				in_bytes, out_bytes);
+			err = 5;
+		} else {
+			goto again;
+		}
 	}
 
 	close(pipefd[0]);
 	close(pipefd[1]);
 
-	return 0;
+	return err;
 }
 
 static int copyfd_io_splice(int infd, int peerfd, int outfd, unsigned int size,
