@@ -4425,6 +4425,9 @@ static int __mptcp_splice_read(struct sock *sk, struct tcp_splice_state *tss)
  * Description:
  *    Will read pages from given socket and fill them into a pipe.
  *
+ * Return:
+ *    Amount of bytes that have been spliced.
+ *
  **/
 static ssize_t mptcp_splice_read(struct socket *sock, loff_t *ppos,
 				 struct pipe_inode_info *pipe, size_t len,
