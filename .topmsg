@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/DO-NOT-MERGE-mark-some-simult-flows-tests-as-flaky
+Subject: [PATCH] DO-NOT-MERGE: mark some simult flows tests as flaky
+
+This is just to reduce the noise while we are working a solution for
+issue 607:
+
+  selftests: simult_flows: "unbalanced bwidth with opposed, unbalanced
+  delay" (+ "reverse direction") are unstable
+
+Suggested by Paolo: commit "mptcp: better mptcp-level RTT estimator" is
+probably correct, but likely it uncovers some underlying issues (in ack
+generation?).
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
