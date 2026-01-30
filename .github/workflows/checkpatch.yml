@@ -19,6 +19,8 @@ env:
   CHECKPATCH_DETAILS: "./checkpatch-details.txt"
   SHELLCHECK_RESULTS: "./shellcheck-results.txt"
   SHELLCHECK_DETAILS: "./shellcheck-details.txt"
+  KDOC_RESULTS: "./kdoc-results.txt"
+  KDOC_DETAILS: "./kdoc-details.txt"
 
 permissions: {}
 
@@ -55,6 +57,10 @@ jobs:
             echo '## ShellCheck' >> ${GITHUB_STEP_SUMMARY}
             cat "${{ env.SHELLCHECK_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
           fi
+          if [ -s "${{ env.KDOC_DETAILS }}" ]; then
+            echo '## KDoc' >> ${GITHUB_STEP_SUMMARY}
+            cat "${{ env.KDOC_DETAILS }}" >> ${GITHUB_STEP_SUMMARY}
+          fi
 
       - name: "Artifacts"
         uses: actions/upload-artifact@v4
@@ -63,6 +69,7 @@ jobs:
           path: |
             ${{ env.CHECKPATCH_RESULTS }}
             ${{ env.SHELLCHECK_RESULTS }}
+            ${{ env.KDOC_RESULTS }}
 
       - name: "Artifacts"
         uses: actions/upload-artifact@v4
@@ -71,6 +78,7 @@ jobs:
           path: |
             ${{ env.CHECKPATCH_DETAILS }}
             ${{ env.SHELLCHECK_DETAILS }}
+            ${{ env.KDOC_DETAILS }}
 
   notif:
     name: "Notifications"
@@ -142,6 +150,7 @@ jobs:
           rc=0
           parse_results "${CHECKPATCH_RESULTS}" "checkpatch" || rc=1
           parse_results "${SHELLCHECK_RESULTS}" "shellcheck" || rc=1
+          parse_results "${KDOC_RESULTS}" "kdoc" || rc=1
           exit ${rc}
 
         env:
@@ -185,6 +194,7 @@ jobs:
           rc=0
           check "${CHECKPATCH_RESULTS}" "CheckPatch" || rc=1
           check "${SHELLCHECK_RESULTS}" "ShellCheck" || rc=1
+          check "${KDOC_RESULTS}" "KDoc" || rc=1
           [ ${rc} -eq 0 ] && exit 0
 
           echo
