@@ -947,14 +947,16 @@ static int do_splice(const int infd, const int outfd, const size_t len,
 	while ((bytes = splice(infd, NULL, pipefd[1], NULL,
 			       len - winfo->total_len,
 			       SPLICE_F_MOVE | SPLICE_F_MORE)) > 0) {
-		splice(pipefd[0], NULL, outfd, NULL, bytes,
-		       SPLICE_F_MOVE | SPLICE_F_MORE);
+		bytes = splice(pipefd[0], NULL, outfd, NULL, bytes,
+			       SPLICE_F_MOVE | SPLICE_F_MORE);
+		if (bytes <= 0)
+			break;
 	}
 
 	close(pipefd[0]);
 	close(pipefd[1]);
 
-	return 0;
+	return bytes < 0 ? bytes : 0;
 }
 
 static int copyfd_io_splice(int infd, int peerfd, int outfd, unsigned int size,
