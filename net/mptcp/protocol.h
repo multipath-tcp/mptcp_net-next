@@ -267,6 +267,7 @@ struct mptcp_data_frag {
 	u16 overhead;
 	u16 already_sent;
 	struct page *page;
+	u8 eor;					/* Is MSG_EOR marked? Prevents coalescing with next frag */
 };
 
 /* Arbitrary compromise between as low as possible to react timely to subflow
