@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-clarify-mptcp_pm_remove_anno_addr
+Subject: [PATCH] mptcp: pm: in-kernel: clarify mptcp_pm_remove_anno_addr()
 
+The variable 'ret' was used, but it was not cleared what it was, and
+probably led to an issue [1].
+
+Rename it to 'announced' to avoid confusions.
+
+While at it, remove the returned value of the helper: it is only used in
+one place, and the returned value is not used.
+
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/606 [1]
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
