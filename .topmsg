@@ -1,10 +1,20 @@
 From: Geliang Tang <tanggeliang@kylinos.cn>
 Subject: [PATCH] mptcp: allow overridden write_space to be invoked
 
-psock may override its own sk_write_space functions. This patch ensures
-that the overridden sk_write_space can be invoked by MPTCP.
+Future extensions with psock will override their own sk->sk_write_space
+callback. This patch ensures that the overridden sk_write_space can be
+invoked by MPTCP.
 
-Note: This patch was initially included in the NVME MPTCP set.
+INDIRECT_CALL is used to keep the default path optimised.
+
+Note that sk->sk_write_space was never called directly with MPTCP
+sockets, so changing it to sk_stream_write_space in the init, and using
+it from mptcp_write_space() is not supposed to change the current
+behaviour.
+
+This patch is shared early to ease discussions around future RFC and
+avoid confusions with this "fix" that is needed for different future
+extensions.
 
 Suggested-by: Paolo Abeni <pabeni@redhat.com>
 Co-developed-by: Gang Yan <yangang@kylinos.cn>
