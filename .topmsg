@@ -1,4 +1,69 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sched-mmcid-Prevent-live-lock-on-task-to-CPU-mode-transition
+From: Thomas Gleixner <tglx@kernel.org>
+Subject: [PATCH] sched/mmcid: Prevent live lock on task to CPU mode transition
 
+Ihor reported a BPF CI failure which turned out to be a live lock in the
+MM_CID management. The scenario is:
+
+A test program creates the 5th thread, which means the MM_CID users become
+more than the number of CPUs (four in this example), so it switches to per
+CPU ownership mode.
+
+At this point each live task of the program has a CID associated. Assume
+thread creation order assignment for simplicity.
+
+   T0     CID0  runs fork() and creates T4
+   T1 	  CID1
+   T2 	  CID2
+   T3 	  CID3
+   T4       ---   not visible yet
+
+T0 sets mm_cid::percpu = true and transfers its own CID to CPU0 where it
+runs on and then starts the fixup which walks through the threads to
+transfer the per task CIDs either to the CPU the task is running on or drop
+it back into the pool if the task is not on a CPU.
+
+During that T1 - T3 are free to schedule in and out before the fixup caught
+up with them. Going through all possible permutations with a python script
+revealed a few problematic cases. The most trivial one is:
+
+   T1 schedules in on CPU1 and observes percpu == true, so it transfers
+      its CID to CPU1
+
+   T1 is migrated to CPU2 and schedule in observes percpu == true, but
+      CPU2 does not have a CID associated and T1 transferred its own to
+      CPU1
+
+      So it has to allocate one with CPU2 runqueue lock held, but the
+      pool is empty, so it keeps looping in mm_get_cid().
+
+Now T0 reaches T1 in the thread walk and tries to lock the corresponding
+runqueue lock, which is held causing a full live lock.
+
+There is a similar scenario in the reverse direction of switching from per
+CPU to task mode which is way more obvious and got therefore addressed by
+an intermediate mode. In this mode the CIDs are marked with MM_CID_TRANSIT,
+which means that they are neither owned by the CPU nor by the task. When a
+task schedules out with a transit CID it drops the CID back into the pool
+making it available for others to use temporarily. Once the task which
+initiated the mode switch finished the fixup it clears the transit mode and
+the process goes back into per task ownership mode.
+
+Unfortunately this insight was not mapped back to the task to CPU mode
+switch as the above described scenario was not considered in the analysis.
+
+Apply the same transit mechanism to the task to CPU mode switch to handle
+these problematic cases correctly.
+
+As with the CPU to task transition this results in a potential temporary
+contention on the CID bitmap, but that's only for the time it takes to
+complete the transition. After that it stays in steady mode which does not
+touch the bitmap at all.
+
+Fixes: fbd0e71dc370 ("sched/mmcid: Provide CID ownership mode fixup functions")
+Closes: https://lore.kernel.org/2b7463d7-0f58-4e34-9775-6e2115cfb971@linux.dev
+Reported-by: Ihor Solodrai <ihor.solodrai@linux.dev>
+Signed-off-by: Thomas Gleixner <tglx@kernel.org>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Reviewed-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Link: https://patch.msgid.link/20260201192834.897115238@kernel.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
