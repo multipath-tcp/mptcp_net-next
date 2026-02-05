@@ -1187,8 +1187,9 @@ struct mptcp_sendmsg_info {
 	bool data_lock_held;
 };
 
-static size_t mptcp_check_allowed_size(const struct mptcp_sock *msk, struct sock *ssk,
-				       u64 data_seq, size_t avail_size)
+static size_t mptcp_check_allowed_size(const struct mptcp_sock *msk,
+				       struct sock *ssk, u64 data_seq,
+				       size_t avail_size)
 {
 	u64 window_end = mptcp_wnd_end(msk);
 	u64 mptcp_snd_wnd;
