@@ -5785,25 +5785,6 @@ static struct sk_buff *tcp_collapse_one(struct sock *sk, struct sk_buff *skb,
 	return next;
 }
 
-/* Insert skb into rb tree, ordered by TCP_SKB_CB(skb)->seq */
-void tcp_rbtree_insert(struct rb_root *root, struct sk_buff *skb)
-{
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct sk_buff *skb1;
-
-	while (*p) {
-		parent = *p;
-		skb1 = rb_to_skb(parent);
-		if (before(TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb1)->seq))
-			p = &parent->rb_left;
-		else
-			p = &parent->rb_right;
-	}
-	rb_link_node(&skb->rbnode, parent, p);
-	rb_insert_color(&skb->rbnode, root);
-}
-
 /* Collapse contiguous sequence of skbs head..tail with
  * sequence numbers start..end.
  *
@@ -6137,16 +6118,11 @@ static void tcp_new_space(struct sock *sk)
  *    small enough that tcp_stream_memory_free() decides it
  *    is time to generate EPOLLOUT.
  */
-void tcp_check_space(struct sock *sk)
+void __tcp_check_space(struct sock *sk)
 {
-	/* pairs with tcp_poll() */
-	smp_mb();
-	if (sk->sk_socket &&
-	    test_bit(SOCK_NOSPACE, &sk->sk_socket->flags)) {
-		tcp_new_space(sk);
-		if (!test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
-			tcp_chrono_stop(sk, TCP_CHRONO_SNDBUF_LIMITED);
-	}
+	tcp_new_space(sk);
+	if (!test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
+		tcp_chrono_stop(sk, TCP_CHRONO_SNDBUF_LIMITED);
 }
 
 static inline void tcp_data_snd_check(struct sock *sk)
