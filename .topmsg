@@ -1,5 +1,5 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: pm: in-kernel: always set as unavail when removing addr
+Subject: [PATCH] mptcp: pm: in-kernel: always set ID as avail when rm endp
 
 Syzkaller managed to find a combination of actions that was generating
 this warning:
@@ -71,15 +71,24 @@ The actions that caused that seem to be:
  - Recreate the endpoint with the same ID, but with the subflow flag
  - Change the same endpoint to add the fullmesh flag
 
-In this case, msk->pm.local_addr_used has been decremented, but the
-corresponding bit in msk->pm.id_avail_bitmap has not been reset.
+In this case, msk->pm.local_addr_used has been kept to 0 as expected,
+but the corresponding bit in msk->pm.id_avail_bitmap was still unset
+after having removed the endpoint, causing the splat later on.
 
 When removing an endpoint, the corresponding endpoint ID was only marked
-as available for announced addresses, not the other types. In these
-cases, re-creating an endpoint with the same ID didn't signal/create
-anything. Adding the fullmesh flag was creating the splat when calling
-__mark_subflow_endp_available() from mptcp_pm_nl_fullmesh(), because
-msk->pm.local_addr_used was set to 0 while the ID was marked as used.
+as available for "signal" types with an announced address, plus all
+"subflow" types, but not the other types like an endpoint corresponding
+to the initial subflow. In these cases, re-creating an endpoint with the
+same ID didn't signal/create anything. Here, adding the fullmesh flag
+was creating the splat when calling __mark_subflow_endp_available() from
+mptcp_pm_nl_fullmesh(), because msk->pm.local_addr_used was set to 0
+while the ID was marked as used.
+
+To fix this issue, the corresponding bit in msk->pm.id_avail_bitmap can
+always be set as available when removing an MPTCP in-kernel endpoint. In
+other words, moving the call to __set_bit() to do it in all cases,
+except for "subflow" types where this bit is handled in a dedicated
+helper.
 
 Note: instead of adding a new spin_(un)lock_bh that would be taken in
 all cases, do all the actions requiring the spin lock under the same
