@@ -1,4 +1,35 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sched-mmcid-Optimize-transitional-CIDs-when-scheduling-out
+From: Thomas Gleixner <tglx@kernel.org>
+Subject: [PATCH] sched/mmcid: Optimize transitional CIDs when scheduling out
 
+During the investigation of the various transition mode issues
+instrumentation revealed that the amount of bitmap operations can be
+significantly reduced when a task with a transitional CID schedules out
+after the fixup function completed and disabled the transition mode.
+
+At that point the mode is stable and therefore it is not required to drop
+the transitional CID back into the pool. As the fixup is complete the
+potential exhaustion of the CID pool is not longer possible, so the CID can
+be transferred to the scheduling out task or to the CPU depending on the
+current ownership mode.
+
+The racy snapshot of mm_cid::mode which contains both the ownership state
+and the transition bit is valid because runqueue lock is held and the fixup
+function of a concurrent mode switch is serialized.
+
+Assigning the ownership right there not only spares the bitmap access for
+dropping the CID it also avoids it when the task is scheduled back in as it
+directly hits the fast path in both modes when the CID is within the
+optimal range. If it's outside the range the next schedule in will need to
+converge so dropping it right away is sensible. In the good case this also
+allows to go into the fast path on the next schedule in operation.
+
+With a thread pool benchmark which is configured to cross the mode switch
+boundaries frequently this reduces the number of bitmap operations by about
+30% and increases the fastpath utilization in the low single digit
+percentage range.
+
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Reviewed-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Link: https://patch.msgid.link/20260201192835.100194627@kernel.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
