@@ -1,4 +1,21 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sched-mmcid-Drop-per-CPU-CID-immediately-when-switching-to-per-task-mode
+From: Thomas Gleixner <tglx@kernel.org>
+Subject: [PATCH] sched/mmcid: Drop per CPU CID immediately when switching to per task mode
 
+When a exiting task initiates the switch from per CPU back to per task
+mode, it has already dropped its CID and marked itself inactive. But a
+leftover from an earlier iteration of the rework then reassigns the per
+CPU CID to the exiting task with the transition bit set.
+
+That's wrong as the task is already marked CID inactive, which means it is
+inconsistent state. It's harmless because the CID is marked in transit and
+therefore dropped back into the pool when the exiting task schedules out
+either through preemption or the final schedule().
+
+Simply drop the per CPU CID when the exiting task triggered the transition.
+
+Fixes: fbd0e71dc370 ("sched/mmcid: Provide CID ownership mode fixup functions")
+Signed-off-by: Thomas Gleixner <tglx@kernel.org>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Reviewed-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Link: https://patch.msgid.link/20260201192835.032221009@kernel.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
