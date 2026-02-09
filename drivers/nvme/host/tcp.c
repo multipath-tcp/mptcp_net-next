@@ -1807,6 +1807,8 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 	nvme_tcp_reclassify_socket(queue->sock);
 
 	/* Single syn retry */
+	sk_is_msk(queue->sock->sk) ?
+	mptcp_sock_set_syncnt(queue->sock->sk, 1) :
 	tcp_sock_set_syncnt(queue->sock->sk, 1);
 
 	/* Set TCP no delay */
