@@ -18054,6 +18054,23 @@
 #define SPI_GDBG_WAVE_CNTL__STALL_VMID__SHIFT								      0x1
 #define SPI_GDBG_WAVE_CNTL__STALL_RA_MASK								      0x00000001L
 #define SPI_GDBG_WAVE_CNTL__STALL_VMID_MASK								      0x0001FFFEL
+//SPI_GDBG_TRAP_CONFIG
+#define SPI_GDBG_TRAP_CONFIG__ME_SEL__SHIFT                                                                   0x0
+#define SPI_GDBG_TRAP_CONFIG__PIPE_SEL__SHIFT                                                                 0x2
+#define SPI_GDBG_TRAP_CONFIG__QUEUE_SEL__SHIFT                                                                0x4
+#define SPI_GDBG_TRAP_CONFIG__ME_MATCH__SHIFT                                                                 0x7
+#define SPI_GDBG_TRAP_CONFIG__PIPE_MATCH__SHIFT                                                               0x8
+#define SPI_GDBG_TRAP_CONFIG__QUEUE_MATCH__SHIFT                                                              0x9
+#define SPI_GDBG_TRAP_CONFIG__TRAP_EN__SHIFT                                                                  0xf
+#define SPI_GDBG_TRAP_CONFIG__VMID_SEL__SHIFT                                                                 0x10
+#define SPI_GDBG_TRAP_CONFIG__ME_SEL_MASK                                                                     0x00000003L
+#define SPI_GDBG_TRAP_CONFIG__PIPE_SEL_MASK                                                                   0x0000000CL
+#define SPI_GDBG_TRAP_CONFIG__QUEUE_SEL_MASK                                                                  0x00000070L
+#define SPI_GDBG_TRAP_CONFIG__ME_MATCH_MASK                                                                   0x00000080L
+#define SPI_GDBG_TRAP_CONFIG__PIPE_MATCH_MASK                                                                 0x00000100L
+#define SPI_GDBG_TRAP_CONFIG__QUEUE_MATCH_MASK                                                                0x00000200L
+#define SPI_GDBG_TRAP_CONFIG__TRAP_EN_MASK                                                                    0x00008000L
+#define SPI_GDBG_TRAP_CONFIG__VMID_SEL_MASK                                                                   0xFFFF0000L
 //SPI_GDBG_TRAP_MASK
 #define SPI_GDBG_TRAP_MASK__EXCP_EN__SHIFT								      0x0
 #define SPI_GDBG_TRAP_MASK__REPLACE__SHIFT								      0x9
@@ -19076,6 +19093,13 @@
 #define TCP_WATCH3_CNTL__VMID_MASK                                                                            0x0F000000L
 #define TCP_WATCH3_CNTL__MODE_MASK                                                                            0x60000000L
 #define TCP_WATCH3_CNTL__VALID_MASK                                                                           0x80000000L
+//TCP_UTCL0_STATUS
+#define TCP_UTCL0_STATUS__FAULT_DETECTED__SHIFT                                                               0x0
+#define TCP_UTCL0_STATUS__RETRY_DETECTED__SHIFT                                                               0x1
+#define TCP_UTCL0_STATUS__PRT_DETECTED__SHIFT                                                                 0x2
+#define TCP_UTCL0_STATUS__FAULT_DETECTED_MASK                                                                 0x00000001L
+#define TCP_UTCL0_STATUS__RETRY_DETECTED_MASK                                                                 0x00000002L
+#define TCP_UTCL0_STATUS__PRT_DETECTED_MASK                                                                   0x00000004L
 //TCP_PERFCOUNTER_FILTER
 #define TCP_PERFCOUNTER_FILTER__BUFFER__SHIFT                                                                 0x0
 #define TCP_PERFCOUNTER_FILTER__FLAT__SHIFT                                                                   0x1
@@ -25836,6 +25860,9 @@
 //CP_CE_IB1_CMD_BUFSZ
 #define CP_CE_IB1_CMD_BUFSZ__IB1_CMD_REQSZ__SHIFT                                                             0x0
 #define CP_CE_IB1_CMD_BUFSZ__IB1_CMD_REQSZ_MASK                                                               0x000FFFFFL
+//CP_IB1_CMD_BUFSZ
+#define CP_IB1_CMD_BUFSZ__IB1_CMD_REQSZ__SHIFT                                                                0x0
+#define CP_IB1_CMD_BUFSZ__IB1_CMD_REQSZ_MASK                                                                  0x000FFFFFL
 //CP_CE_IB2_CMD_BUFSZ
 #define CP_CE_IB2_CMD_BUFSZ__IB2_CMD_REQSZ__SHIFT                                                             0x0
 #define CP_CE_IB2_CMD_BUFSZ__IB2_CMD_REQSZ_MASK                                                               0x000FFFFFL
