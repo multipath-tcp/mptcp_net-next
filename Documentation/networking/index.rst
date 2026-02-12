@@ -135,10 +135,3 @@ Contents:
    xfrm/index
    xdp-rx-metadata
    xsk-tx-metadata
-
-.. only::  subproject and html
-
-   Indices
-   =======
-
-   * :ref:`genindex`
