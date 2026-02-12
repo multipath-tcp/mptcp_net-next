@@ -3849,6 +3849,13 @@ static int gem_get_all_flow_entries(struct net_device *netdev,
 	return 0;
 }
 
+static u32 gem_get_rx_ring_count(struct net_device *netdev)
+{
+	struct macb *bp = netdev_priv(netdev);
+
+	return bp->num_queues;
+}
+
 static int gem_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 		u32 *rule_locs)
 {
@@ -3856,9 +3863,6 @@ static int gem_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 	int ret = 0;
 
 	switch (cmd->cmd) {
-	case ETHTOOL_GRXRINGS:
-		cmd->data = bp->num_queues;
-		break;
 	case ETHTOOL_GRXCLSRLCNT:
 		cmd->rule_cnt = bp->rx_fs_list.count;
 		break;
@@ -3940,6 +3944,7 @@ static const struct ethtool_ops gem_ethtool_ops = {
 	.set_ringparam		= macb_set_ringparam,
 	.get_rxnfc			= gem_get_rxnfc,
 	.set_rxnfc			= gem_set_rxnfc,
+	.get_rx_ring_count		= gem_get_rx_ring_count,
 };
 
 static int macb_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
@@ -4810,7 +4815,9 @@ static int at91ether_close(struct net_device *dev)
 
 	at91ether_stop(lp);
 
-	return pm_runtime_put(&lp->pdev->dev);
+	pm_runtime_put(&lp->pdev->dev);
+
+	return 0;
 }
 
 /* Transmit packet */
@@ -5430,9 +5437,9 @@ static const struct macb_config default_gem_config = {
 
 static int macb_probe(struct platform_device *pdev)
 {
-	const struct macb_config *macb_config = &default_gem_config;
-	struct device_node *np = pdev->dev.of_node;
 	struct clk *pclk, *hclk = NULL, *tx_clk = NULL, *rx_clk = NULL;
+	struct device_node *np = pdev->dev.of_node;
+	const struct macb_config *macb_config;
 	struct clk *tsu_clk = NULL;
 	phy_interface_t interface;
 	struct net_device *dev;
@@ -5448,13 +5455,9 @@ static int macb_probe(struct platform_device *pdev)
 	if (IS_ERR(mem))
 		return PTR_ERR(mem);
 
-	if (np) {
-		const struct of_device_id *match;
-
-		match = of_match_node(macb_dt_ids, np);
-		if (match && match->data)
-			macb_config = match->data;
-	}
+	macb_config = of_device_get_match_data(&pdev->dev);
+	if (!macb_config)
+		macb_config = &default_gem_config;
 
 	err = macb_config->clk_init(pdev, &pclk, &hclk, &tx_clk, &rx_clk, &tsu_clk);
 	if (err)
