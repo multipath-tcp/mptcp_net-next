@@ -6,6 +6,7 @@ source ./.lib.sh
 
 TG_TOP="${TG_TOP:-}"
 TG_UPSTREAM_RANGE="${TG_UPSTREAM_RANGE:-0}"
+REMOTE_KORG="${REMOTE_KORG:-mptcp-korg}"
 
 CI_URL="https://github.com/multipath-tcp/mptcp_net-next/commit/SHA/checks"
 CI_TAG="=TODO_CI_LINK="
@@ -89,6 +90,7 @@ tg_export() { local branch_top branch_export tag msg ci sha
 
 	tg export --force --notes "${branch_export}"
 	git push --force origin "${branch_export}"
+	git push --force "${REMOTE_KORG}" "${branch_export}"
 
 	if [ "${TG_NO_TAG}" = "1" ]; then
 		return
@@ -166,9 +168,40 @@ publish() { local top review branch_export old_rev new_rev tag top_txt results m
 	tg_export "${top}" "${branch_export}" "${tag}" "${msg}"
 }
 
+# $1: top
+sync_export() { local top branch_export old_rev new_rev korg_rev
+	top="${1}"
+
+	if [ "${top}" = "${TG_TOPIC_TOP_NET}" ]; then
+		branch_export="${TG_EXPORT_NET}"
+	elif [ "${top}" = "${TG_TOPIC_TOP_NET_NEXT}" ]; then
+		branch_export="${TG_EXPORT_NET_NEXT}"
+	else
+		printinfo "No sync export (top=${top})"
+		return 0
+	fi
+
+	git fetch origin "${branch_export}"
+	new_rev="$(git rev-parse "origin/${branch_export}")"
+	korg_rev="$(git rev-parse "${REMOTE_KORG}/${branch_export}")"
+
+	if [ "${korg_rev}" = "${new_rev}" ]; then
+		printinfo "No new modification, no sync"
+		return 0
+	fi
+
+	printinfo "Pushing to korg (remote=${REMOTE_KORG})"
+	git branch -f "${branch_export}" "${new_rev}"
+
+	if ! git push -f "${REMOTE_KORG}" "${branch_export}"; then
+		printerr "Unable to push to korg, continuing"
+	fi
+}
+
 if [ -n "${TG_TOP}" ]; then
 	git checkout "${TG_TOP}"
 	tg_update tg_up_conflicts
+	sync_export "${TG_TOP}"
 
 	exit 0
 fi
