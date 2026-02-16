@@ -96,6 +96,7 @@ tg_export() { local branch_top branch_export tag msg ci sha
 
 	sha="$(git rev-parse "${branch_export}")"
 	ci="$(printf "%s: %s" "- ${branch_export}" "${CI_URL//SHA/${sha}}")"
+	# shellcheck disable=SC2153 # TG_EXPORT_NET_NEXT is defined in .lib.sh
 	if [ "${branch_export}" = "${TG_EXPORT_NET_NEXT}" ]; then
 		TAG_EXPORT_NET_NEXT="${sha}"
 	elif [ -n "${TAG_EXPORT_NET_NEXT}" ]; then
@@ -114,11 +115,11 @@ tg_export() { local branch_top branch_export tag msg ci sha
 	git push origin "${tag}"
 }
 
-publish() { local top review old_rev new_rev tag top_txt results msg=""
+publish() { local top review branch_export old_rev new_rev tag top_txt results msg=""
 	top="${1}"
 	review="${2}"
-	export="${3}"
-	tag="${export}/${DATE}"
+	branch_export="${3}"
+	tag="${branch_export}/${DATE}"
 
 	git checkout -f "${top}"
 	tg_update tg_up_conflicts
@@ -142,10 +143,10 @@ publish() { local top review old_rev new_rev tag top_txt results msg=""
 	msg+="$(git log --format="- %h: %s" --reverse --no-merges "${old_rev}..${new_rev}" | \
 		grep -v -e "^- \S\+ tg " -e "^- \S\+ tg: " || true)"
 
-	results="- Results: ${old_rev}..${new_rev} (${export})"
+	results="- Results: ${old_rev}..${new_rev} (${branch_export})"
 	msg+="$(printf "%s" "\\n${results}")"
 
-	if [ "${export}" = "${TG_EXPORT_NET_NEXT}" ]; then
+	if [ "${branch_export}" = "${TG_EXPORT_NET_NEXT}" ]; then
 		RESULTS_EXPORT_NET_NEXT="${results}"
 	elif [ -n "${RESULTS_EXPORT_NET_NEXT}" ]; then
 		msg+="$(printf "%s" "\\n${RESULTS_EXPORT_NET_NEXT}")"
@@ -154,7 +155,7 @@ publish() { local top review old_rev new_rev tag top_txt results msg=""
 	msg+="$(printf "\\n\\nTests are now in progress:\\n\\n%s\\n\\n" "${CI_TAG}")"
 	printinfo "${msg}"
 
-	print "Publish ${export} and tag (${tag})? (Y/n)"
+	print "Publish ${branch_export} and tag (${tag})? (Y/n)"
 	read -n 1 -r
 	echo
 	if [[ $REPLY =~ ^[Nn]$ ]]; then
@@ -162,7 +163,7 @@ publish() { local top review old_rev new_rev tag top_txt results msg=""
 	fi
 
 	tg_for_review "${top}" "${review}"
-	tg_export "${top}" "${export}" "${tag}" "${msg}"
+	tg_export "${top}" "${branch_export}" "${tag}" "${msg}"
 }
 
 if [ -n "${TG_TOP}" ]; then
