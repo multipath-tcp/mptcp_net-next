@@ -50,5 +50,8 @@ gh_pr "multipath-tcp/packetdrill"
 title "mptcp.dev PRs"
 gh_pr "multipath-tcp/mptcp.dev"
 
+title "mptcp-upstream-virtme-docker PRs"
+gh_pr "multipath-tcp/mptcp-upstream-virtme-docker"
+
 title "mptcpd PRs"
 gh_pr "multipath-tcp/mptcpd"
