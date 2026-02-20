@@ -1147,6 +1147,7 @@ struct ftrace_page {
 };
 
 #define ENTRY_SIZE sizeof(struct dyn_ftrace)
+#define ENTRIES_PER_PAGE_GROUP(order) ((PAGE_SIZE << (order)) / ENTRY_SIZE)
 
 static struct ftrace_page	*ftrace_pages_start;
 static struct ftrace_page	*ftrace_pages;
@@ -3873,7 +3874,7 @@ static int ftrace_allocate_records(struct ftrace_page *pg, int count,
 	*num_pages += 1 << order;
 	ftrace_number_of_groups++;
 
-	cnt = (PAGE_SIZE << order) / ENTRY_SIZE;
+	cnt = ENTRIES_PER_PAGE_GROUP(order);
 	pg->order = order;
 
 	if (cnt > count)
@@ -7668,7 +7669,7 @@ static int ftrace_process_locs(struct module *mod,
 		long skip;
 
 		/* Count the number of entries unused and compare it to skipped. */
-		pg_remaining = (PAGE_SIZE << pg->order) / ENTRY_SIZE - pg->index;
+		pg_remaining = ENTRIES_PER_PAGE_GROUP(pg->order) - pg->index;
 
 		if (!WARN(skipped < pg_remaining, "Extra allocated pages for ftrace")) {
 
@@ -7676,7 +7677,7 @@ static int ftrace_process_locs(struct module *mod,
 
 			for (pg = pg_unuse; pg && skip > 0; pg = pg->next) {
 				remaining += 1 << pg->order;
-				skip -= (PAGE_SIZE << pg->order) / ENTRY_SIZE;
+				skip -= ENTRIES_PER_PAGE_GROUP(pg->order);
 			}
 
 			pages -= remaining;
@@ -8112,7 +8113,8 @@ ftrace_func_address_lookup(struct ftrace_mod_map *mod_map,
 
 int
 ftrace_mod_address_lookup(unsigned long addr, unsigned long *size,
-		   unsigned long *off, char **modname, char *sym)
+			  unsigned long *off, char **modname,
+			  const unsigned char **modbuildid, char *sym)
 {
 	struct ftrace_mod_map *mod_map;
 	int ret = 0;
@@ -8124,6 +8126,8 @@ ftrace_mod_address_lookup(unsigned long addr, unsigned long *size,
 		if (ret) {
 			if (modname)
 				*modname = mod_map->mod->name;
+			if (modbuildid)
+				*modbuildid = module_buildid(mod_map->mod);
 			break;
 		}
 	}
