@@ -29,10 +29,11 @@ update() {
 	git checkout "${base}"
 	before=$(git rev-parse HEAD)
 
+	# useful sync, but also to load the SSH key in the agent
+	git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" main
+
 	if sync_upstream; then
 		local new_base
-
-		git fetch "git://git.kernel.org/pub/scm/linux/kernel/git/netdev/${base}.git" main
 
 		if [ "${base}" = "${TG_BASE_NET_NEXT}" ] || sync_net; then
 			new_base=FETCH_HEAD
