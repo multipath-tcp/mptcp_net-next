@@ -14,10 +14,23 @@ b4 prep --check
 prefixes="$(b4 prep --show-info prefixes)"
 echo
 echo "Prefixes: ${prefixes}"
-if [[ "${prefixes}" == *"-next"* ]] &&
-   git log --format="%b" "$(b4 prep --show-info series-range)" | grep -q "^Fixes: "; then
-	echo -e "\n\tWARNING: Series is for ${prefixes}, but there are patches with 'Fixes' tags"
-	echo -e "\t\t$ b4 prep --set-prefixes 'mptcp-net'\n"
+
+has_fixes() {
+	git log --format="%b" "$(b4 prep --show-info series-range)" | grep -q "^Fixes: "
+}
+
+has_stable() {
+	git log --format="%b" "$(b4 prep --show-info series-range)" | grep -q "stable@vger.kernel.org"
+}
+
+if [[ "${prefixes}" == *"-next"* ]]; then
+	if has_fixes; then
+		echo -e "\n\tWARNING: Series is for ${prefixes}, but there are patches with 'Fixes' tags"
+		echo -e "\t\t$ b4 prep --set-prefixes 'mptcp-net'\n"
+		exit 1
+	fi
+elif [[ "${prefixes}" != "mptcp"* ]] && has_fixes && ! has_stable; then
+	echo -e "\n\tWARNING: Series is for ${prefixes}, there are patches with 'Fixes' tags but no patches Ccing Stable"
 	exit 1
 fi
 exit ${rc}
