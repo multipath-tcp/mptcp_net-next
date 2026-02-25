@@ -202,6 +202,17 @@ neigh/default/gc_thresh3 - INTEGER
 
 	Default: 1024
 
+neigh/default/gc_stale_time - INTEGER
+	Determines how long a neighbor entry can remain unused before it is
+	considered stale and eligible for garbage collection. Entries that have
+	not been used for longer than this time will be removed by the garbage
+	collector, unless they have active references, are marked as PERMANENT,
+	or carry the NTF_EXT_LEARNED or NTF_EXT_VALIDATED flag. Stale entries
+	are only removed by the periodic GC when there are at least gc_thresh1
+	neighbors in the table.
+
+	Default: 60 seconds
+
 neigh/default/unres_qlen_bytes - INTEGER
 	The maximum number of bytes which may be used by packets
 	queued for each	unresolved address by other network layers.
@@ -1747,14 +1758,14 @@ icmp_msgs_per_sec - INTEGER
 	controlled by this limit. For security reasons, the precise count
 	of messages per second is randomized.
 
-	Default: 1000
+	Default: 10000
 
 icmp_msgs_burst - INTEGER
 	icmp_msgs_per_sec controls number of ICMP packets sent per second,
-	while icmp_msgs_burst controls the burst size of these packets.
+	while icmp_msgs_burst controls the token bucket size.
 	For security reasons, the precise burst size is randomized.
 
-	Default: 50
+	Default: 10000
 
 icmp_ratemask - INTEGER
 	Mask made of ICMP types for which rates are being limited.
