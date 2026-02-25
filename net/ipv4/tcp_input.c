@@ -3552,7 +3552,7 @@ void tcp_rearm_rto(struct sock *sk)
 /* Try to schedule a loss probe; if that doesn't work, then schedule an RTO. */
 static void tcp_set_xmit_timer(struct sock *sk)
 {
-	if (!tcp_schedule_loss_probe(sk, true))
+	if (!tcp_sk(sk)->packets_out || !tcp_schedule_loss_probe(sk, true))
 		tcp_rearm_rto(sk);
 }
 
