@@ -1727,8 +1727,8 @@ static int __net_init icmp_sk_init(struct net *net)
 	net->ipv4.sysctl_icmp_ratemask = 0x1818;
 	net->ipv4.sysctl_icmp_errors_use_inbound_ifaddr = 0;
 	net->ipv4.sysctl_icmp_errors_extension_mask = 0;
-	net->ipv4.sysctl_icmp_msgs_per_sec = 1000;
-	net->ipv4.sysctl_icmp_msgs_burst = 50;
+	net->ipv4.sysctl_icmp_msgs_per_sec = 10000;
+	net->ipv4.sysctl_icmp_msgs_burst = 10000;
 
 	return 0;
 }
