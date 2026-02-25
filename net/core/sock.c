@@ -3175,7 +3175,7 @@ bool sk_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
 }
 EXPORT_SYMBOL(sk_page_frag_refill);
 
-void __lock_sock(struct sock *sk)
+static void __lock_sock(struct sock *sk)
 	__releases(&sk->sk_lock.slock)
 	__acquires(&sk->sk_lock.slock)
 {
@@ -3774,14 +3774,14 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 }
 EXPORT_SYMBOL(sock_init_data);
 
-void lock_sock_nested(struct sock *sk, int subclass)
+void noinline lock_sock_nested(struct sock *sk, int subclass)
 {
 	/* The sk_lock has mutex_lock() semantics here. */
 	mutex_acquire(&sk->sk_lock.dep_map, subclass, 0, _RET_IP_);
 
 	might_sleep();
 	spin_lock_bh(&sk->sk_lock.slock);
-	if (sock_owned_by_user_nocheck(sk))
+	if (unlikely(sock_owned_by_user_nocheck(sk)))
 		__lock_sock(sk);
 	sk->sk_lock.owned = 1;
 	spin_unlock_bh(&sk->sk_lock.slock);
@@ -3810,7 +3810,7 @@ bool __lock_sock_fast(struct sock *sk) __acquires(&sk->sk_lock.slock)
 	might_sleep();
 	spin_lock_bh(&sk->sk_lock.slock);
 
-	if (!sock_owned_by_user_nocheck(sk)) {
+	if (likely(!sock_owned_by_user_nocheck(sk))) {
 		/*
 		 * Fast path return with bottom halves disabled and
 		 * sock::sk_lock.slock held.
