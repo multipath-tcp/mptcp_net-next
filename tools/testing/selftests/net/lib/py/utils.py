@@ -281,9 +281,27 @@ def rand_port(stype=socket.SOCK_STREAM):
     """
     Get a random unprivileged port.
     """
-    with socket.socket(socket.AF_INET6, stype) as s:
-        s.bind(("", 0))
-        return s.getsockname()[1]
+    return rand_ports(1, stype)[0]
+
+
+def rand_ports(count, stype=socket.SOCK_STREAM):
+    """
+    Get a unique set of random unprivileged ports.
+    """
+    sockets = []
+    ports = []
+
+    try:
+        for _ in range(count):
+            s = socket.socket(socket.AF_INET6, stype)
+            sockets.append(s)
+            s.bind(("", 0))
+            ports.append(s.getsockname()[1])
+    finally:
+        for s in sockets:
+            s.close()
+
+    return ports
 
 
 def wait_port_listen(port, proto="tcp", ns=None, host=None, sleep=0.005, deadline=5):
