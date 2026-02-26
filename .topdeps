@@ -1,1 +1,1 @@
-t/selftests-mptcp-more-stable-simult_flows-tests
+t/selftests-mptcp-join-check-RM_ADDR-not-sent-over-same-subflow
