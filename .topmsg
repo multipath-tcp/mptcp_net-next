@@ -1,2 +1,21 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-removing-signal-subflow-endp
+Subject: [PATCH] selftests: mptcp: join: check removing signal+subflow endp
+
+This validates the previous commit: endpoints with both the signal and
+subflow flags should always be marked as used even if it was not
+possible to create new subflows due to the MPTCP PM limits.
+
+For this test, an extra endpoint is created with both the signal and the
+subflow flags, and limits are set not to create extra subflows. In this
+case, an ADD_ADDR is sent, but no subflows are created. Still, the local
+endpoint is marked as used, and no warning is fired when removing the
+endpoint, after having sent a RM_ADDR.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 85df533a787b ("mptcp: pm: do not ignore 'subflow' if 'signal' flag is also set")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
