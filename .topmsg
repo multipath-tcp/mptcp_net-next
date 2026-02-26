@@ -1,2 +1,27 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-RM_ADDR-not-sent-over-same-subflow
+Subject: [PATCH] selftests: mptcp: join: check RM_ADDR not sent over same subflow
+
+This validates the previous commit: RM_ADDR were sent over the first
+found active subflow which could be the same as the one being removed.
+It is more likely to loose this notification.
+
+For this check, RM_ADDR are explicitly dropped when trying to send them
+over the initial subflow, when removing the endpoint attached to it. If
+it is dropped, the test will complain because some RM_ADDR have not been
+received.
+
+Note that only the RM_ADDR are dropped, to allow the linked subflow to
+be quickly and cleanly closed. To only drop those RM_ADDR, a cBPF byte
+code is used. If the IPTables commands fail, that's OK, the tests will
+continue to pass, but not validate this part. This can be ignored:
+another subtest fully depends on such command, and will be marked as
+skipped.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 8dd5efb1f91b ("mptcp: send ack for rm_addr")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
