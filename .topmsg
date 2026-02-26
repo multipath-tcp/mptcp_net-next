@@ -1,2 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-remove-mptcp_pm_has_addr_attr_id
+Subject: [PATCH] mptcp: pm: in-kernel: remove mptcp_pm_has_addr_attr_id
+
+There is no need to call this helper: it will check if the address ID
+attribute is set, but this attribute has already been parsed previously.
+
+Indeed, the value has been set in 'entry->addr.id' if it was set and
+positive, which is what we were looking at. Then only looking at this
+already parsed value is enough, not need to re-extract all Netlink
+attributes again.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
