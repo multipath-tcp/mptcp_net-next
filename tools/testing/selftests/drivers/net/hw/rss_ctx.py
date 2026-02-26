@@ -11,7 +11,7 @@ from lib.py import NetDrvEpEnv
 from lib.py import EthtoolFamily, NetdevFamily
 from lib.py import KsftSkipEx, KsftFailEx
 from lib.py import ksft_disruptive
-from lib.py import rand_port
+from lib.py import rand_port, rand_ports
 from lib.py import cmd, ethtool, ip, defer, GenerateTraffic, CmdExitFailure, wait_file
 
 
@@ -454,7 +454,7 @@ def test_rss_context(cfg, ctx_cnt=1, create_with_cfg=None):
         except:
             raise KsftSkipEx("Not enough queues for the test")
 
-    ports = []
+    ports = rand_ports(ctx_cnt)
 
     # Use queues 0 and 1 for normal traffic
     ethtool(f"-X {cfg.ifname} equal 2")
@@ -488,7 +488,6 @@ def test_rss_context(cfg, ctx_cnt=1, create_with_cfg=None):
         ksft_eq(min(data['rss-indirection-table']), 2 + i * 2, "Unexpected context cfg: " + str(data))
         ksft_eq(max(data['rss-indirection-table']), 2 + i * 2 + 1, "Unexpected context cfg: " + str(data))
 
-        ports.append(rand_port())
         flow = f"flow-type tcp{cfg.addr_ipver} dst-ip {cfg.addr} dst-port {ports[i]} context {ctx_id}"
         ntuple = ethtool_create(cfg, "-N", flow)
         defer(ethtool, f"-N {cfg.ifname} delete {ntuple}")
@@ -544,7 +543,7 @@ def test_rss_context_out_of_order(cfg, ctx_cnt=4):
 
     ntuple = []
     ctx = []
-    ports = []
+    ports = rand_ports(ctx_cnt)
 
     def remove_ctx(idx):
         ntuple[idx].exec()
@@ -576,7 +575,6 @@ def test_rss_context_out_of_order(cfg, ctx_cnt=4):
         ctx_id = ethtool_create(cfg, "-X", f"context new start {2 + i * 2} equal 2")
         ctx.append(defer(ethtool, f"-X {cfg.ifname} context {ctx_id} delete"))
 
-        ports.append(rand_port())
         flow = f"flow-type tcp{cfg.addr_ipver} dst-ip {cfg.addr} dst-port {ports[i]} context {ctx_id}"
         ntuple_id = ethtool_create(cfg, "-N", flow)
         ntuple.append(defer(ethtool, f"-N {cfg.ifname} delete {ntuple_id}"))
@@ -790,9 +788,10 @@ def test_rss_default_context_rule(cfg):
     ethtool(f"-N {cfg.ifname} {flow_generic}")
     defer(ethtool, f"-N {cfg.ifname} delete 1")
 
+    ports = rand_ports(2)
     # Specific high-priority rule for a random port that should stay on context 0.
     # Assign loc 0 so it is evaluated before the generic rule.
-    port_main = rand_port()
+    port_main = ports[0]
     flow_main = f"flow-type tcp{cfg.addr_ipver} dst-ip {cfg.addr} dst-port {port_main} context 0 loc 0"
     ethtool(f"-N {cfg.ifname} {flow_main}")
     defer(ethtool, f"-N {cfg.ifname} delete 0")
@@ -805,7 +804,7 @@ def test_rss_default_context_rule(cfg):
                           'empty' : (2, 3) })
 
     # And that traffic for any other port is steered to the new context
-    port_other = rand_port()
+    port_other = ports[1]
     _send_traffic_check(cfg, port_other, f"context {ctx_id}",
                         { 'target': (2, 3),
                           'noise' : (0, 1) })
