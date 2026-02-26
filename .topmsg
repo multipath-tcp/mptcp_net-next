@@ -1,2 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-recreate-signal-endp-with-same-ID
+Subject: [PATCH] selftests: mptcp: join: recreate signal endp with same ID
+
+In this "delete re-add signal" MPTCP Join subtest, the endpoint linked
+to the initial subflow is removed, but readded once with different ID.
+
+It appears that there was an issue when reusing the same ID, recently
+fixed by commit d191101dee25 ("mptcp: pm: in-kernel: always set ID as
+avail when rm endp"). The test then now reuses the same ID the first
+time, but continue to use another one (88) the second time.
+
+This should then cover more cases.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/615
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
