@@ -652,7 +652,7 @@ static int ssam_serial_hub_probe(struct serdev_device *serdev)
 	}
 
 	/* Allocate controller. */
-	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
+	ctrl = kzalloc_obj(*ctrl);
 	if (!ctrl)
 		return -ENOMEM;
 
