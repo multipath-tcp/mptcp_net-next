@@ -5,14 +5,15 @@ import datetime
 import random
 import re
 import time
+from lib.py import ksft_disruptive
 from lib.py import ksft_run, ksft_pr, ksft_exit
 from lib.py import ksft_eq, ksft_ne, ksft_ge, ksft_in, ksft_lt, ksft_true, ksft_raises
 from lib.py import NetDrvEpEnv
 from lib.py import EthtoolFamily, NetdevFamily
 from lib.py import KsftSkipEx, KsftFailEx
-from lib.py import ksft_disruptive
 from lib.py import rand_port, rand_ports
-from lib.py import cmd, ethtool, ip, defer, GenerateTraffic, CmdExitFailure, wait_file
+from lib.py import cmd, ethtool, ip, defer, CmdExitFailure, wait_file
+from lib.py import GenerateTraffic
 
 
 def _rss_key_str(key):
