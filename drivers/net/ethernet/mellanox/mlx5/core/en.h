@@ -80,6 +80,7 @@ struct page_pool;
 #define MLX5_SKB_FRAG_SZ(len)	(SKB_DATA_ALIGN(len) +	\
 				 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
 
+#define MLX5E_PAGECNT_BIAS_MAX U16_MAX
 #define MLX5E_RX_MAX_HEAD (256)
 #define MLX5E_SHAMPO_LOG_HEADER_ENTRY_SIZE (8)
 #define MLX5E_SHAMPO_WQ_HEADER_PER_PAGE \
@@ -1060,13 +1061,15 @@ void mlx5e_timestamp_init(struct mlx5e_priv *priv);
 struct mlx5e_xsk_param;
 
 struct mlx5e_rq_param;
-int mlx5e_open_rq(struct mlx5e_params *params, struct mlx5e_rq_param *param,
-		  struct mlx5e_xsk_param *xsk, int node, u16 q_counter,
+struct mlx5e_rq_opt_param;
+int mlx5e_open_rq(struct mlx5e_params *params, struct mlx5e_rq_param *rq_param,
+		  struct mlx5e_rq_opt_param *rqo, int node, u16 q_counter,
 		  struct mlx5e_rq *rq);
 #define MLX5E_RQ_WQES_TIMEOUT 20000 /* msecs */
 int mlx5e_wait_for_min_rx_wqes(struct mlx5e_rq *rq, int wait_time);
 void mlx5e_close_rq(struct mlx5e_rq *rq);
-int mlx5e_create_rq(struct mlx5e_rq *rq, struct mlx5e_rq_param *param, u16 q_counter);
+int mlx5e_create_rq(struct mlx5e_rq *rq, struct mlx5e_rq_param *rq_param,
+		    u16 q_counter);
 void mlx5e_destroy_rq(struct mlx5e_rq *rq);
 
 bool mlx5e_reset_rx_moderation(struct dim_cq_moder *cq_moder, u8 cq_period_mode,
