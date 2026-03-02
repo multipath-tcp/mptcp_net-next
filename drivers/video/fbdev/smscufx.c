@@ -946,7 +946,7 @@ static int ufx_ops_ioctl(struct fb_info *info, unsigned int cmd,
 
 	/* TODO: Help propose a standard fb.h ioctl to report mmap damage */
 	if (cmd == UFX_IOCTL_REPORT_DAMAGE) {
-		struct dloarea *area __free(kfree) = kmalloc(sizeof(*area), GFP_KERNEL);
+		struct dloarea *area __free(kfree) = kmalloc_obj(*area);
 		if (!area)
 			return -ENOMEM;
 
@@ -1037,7 +1037,7 @@ static int ufx_ops_open(struct fb_info *info, int user)
 
 		struct fb_deferred_io *fbdefio;
 
-		fbdefio = kzalloc(sizeof(*fbdefio), GFP_KERNEL);
+		fbdefio = kzalloc_obj(*fbdefio);
 		if (fbdefio) {
 			fbdefio->delay = UFX_DEFIO_WRITE_DELAY;
 			fbdefio->deferred_io = ufx_dpy_deferred_io;
@@ -1594,7 +1594,7 @@ static int ufx_usb_probe(struct usb_interface *interface,
 	usbdev = interface_to_usbdev(interface);
 	BUG_ON(!usbdev);
 
-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	dev = kzalloc_obj(*dev);
 	if (dev == NULL) {
 		dev_err(&usbdev->dev, "ufx_usb_probe: failed alloc of dev struct\n");
 		return -ENOMEM;
@@ -1851,7 +1851,7 @@ static int ufx_alloc_urb_list(struct ufx_data *dev, int count, size_t size)
 	INIT_LIST_HEAD(&dev->urbs.list);
 
 	while (i < count) {
-		unode = kzalloc(sizeof(*unode), GFP_KERNEL);
+		unode = kzalloc_obj(*unode);
 		if (!unode)
 			break;
 		unode->dev = dev;
