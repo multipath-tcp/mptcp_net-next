@@ -273,7 +273,7 @@ static struct netdev_name_node *netdev_name_node_alloc(struct net_device *dev,
 {
 	struct netdev_name_node *name_node;
 
-	name_node = kmalloc(sizeof(*name_node), GFP_KERNEL);
+	name_node = kmalloc_obj(*name_node);
 	if (!name_node)
 		return NULL;
 	INIT_HLIST_NODE(&name_node->hlist);
@@ -4166,7 +4166,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 
 	qdisc_calculate_pkt_len(skb, q);
 
-	tcf_set_drop_reason(skb, SKB_DROP_REASON_QDISC_DROP);
+	tcf_set_qdisc_drop_reason(skb, QDISC_DROP_GENERIC);
 
 	if (q->flags & TCQ_F_NOLOCK) {
 		if (q->flags & TCQ_F_CAN_BYPASS && nolock_qdisc_is_empty(q) &&
@@ -4274,8 +4274,8 @@ unlock:
 	spin_unlock(root_lock);
 
 free_skbs:
-	tcf_kfree_skb_list(to_free);
-	tcf_kfree_skb_list(to_free2);
+	tcf_kfree_skb_list(to_free, q, txq, dev);
+	tcf_kfree_skb_list(to_free2, q, txq, dev);
 	return rc;
 }
 
@@ -4822,6 +4822,8 @@ int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 		 * to -1 or to their cpu id, but not to our id.
 		 */
 		if (READ_ONCE(txq->xmit_lock_owner) != cpu) {
+			bool is_list = false;
+
 			if (dev_xmit_recursion())
 				goto recursion_alert;
 
@@ -4832,17 +4834,28 @@ int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 			HARD_TX_LOCK(dev, txq, cpu);
 
 			if (!netif_xmit_stopped(txq)) {
+				is_list = !!skb->next;
+
 				dev_xmit_recursion_inc();
 				skb = dev_hard_start_xmit(skb, dev, txq, &rc);
 				dev_xmit_recursion_dec();
-				if (dev_xmit_complete(rc)) {
-					HARD_TX_UNLOCK(dev, txq);
-					goto out;
-				}
+
+				/* GSO segments a single SKB into
+				 * a list of frames. TCP expects error
+				 * to mean none of the data was sent.
+				 */
+				if (is_list)
+					rc = NETDEV_TX_OK;
 			}
 			HARD_TX_UNLOCK(dev, txq);
+			if (!skb) /* xmit completed */
+				goto out;
+
 			net_crit_ratelimited("Virtual device %s asks to queue packet!\n",
 					     dev->name);
+			/* NETDEV_TX_BUSY or queue was stopped */
+			if (!is_list)
+				rc = -ENETDOWN;
 		} else {
 			/* Recursion is detected! It is possible,
 			 * unfortunately
@@ -4850,10 +4863,10 @@ int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 recursion_alert:
 			net_crit_ratelimited("Dead loop on virtual device %s, fix it urgently!\n",
 					     dev->name);
+			rc = -ENETDOWN;
 		}
 	}
 
-	rc = -ENETDOWN;
 	rcu_read_unlock_bh();
 
 	dev_core_stats_tx_dropped_inc(dev);
@@ -5798,7 +5811,7 @@ static __latent_entropy void net_tx_action(void)
 			to_free = qdisc_run(q);
 			if (root_lock)
 				spin_unlock(root_lock);
-			tcf_kfree_skb_list(to_free);
+			tcf_kfree_skb_list(to_free, q, NULL, qdisc_dev(q));
 		}
 
 		rcu_read_unlock();
@@ -6508,8 +6521,7 @@ struct flush_backlogs {
 
 static struct flush_backlogs *flush_backlogs_alloc(void)
 {
-	return kmalloc(struct_size_t(struct flush_backlogs, w, nr_cpu_ids),
-		       GFP_KERNEL);
+	return kmalloc_flex(struct flush_backlogs, w, nr_cpu_ids);
 }
 
 static struct flush_backlogs *flush_backlogs_fallback;
@@ -8692,7 +8704,7 @@ static int __netdev_adjacent_dev_insert(struct net_device *dev,
 		return 0;
 	}
 
-	adj = kmalloc(sizeof(*adj), GFP_KERNEL);
+	adj = kmalloc_obj(*adj);
 	if (!adj)
 		return -ENOMEM;
 
@@ -9132,8 +9144,7 @@ static int netdev_offload_xstats_enable_l3(struct net_device *dev,
 	int err;
 	int rc;
 
-	dev->offload_xstats_l3 = kzalloc(sizeof(*dev->offload_xstats_l3),
-					 GFP_KERNEL);
+	dev->offload_xstats_l3 = kzalloc_obj(*dev->offload_xstats_l3);
 	if (!dev->offload_xstats_l3)
 		return -ENOMEM;
 
@@ -10658,7 +10669,7 @@ int bpf_xdp_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 		return -EINVAL;
 	}
 
-	link = kzalloc(sizeof(*link), GFP_USER);
+	link = kzalloc_obj(*link, GFP_USER);
 	if (!link) {
 		err = -ENOMEM;
 		goto unlock;
@@ -11939,7 +11950,7 @@ struct netdev_queue *dev_ingress_queue_create(struct net_device *dev)
 #ifdef CONFIG_NET_CLS_ACT
 	if (queue)
 		return queue;
-	queue = kzalloc(sizeof(*queue), GFP_KERNEL);
+	queue = kzalloc_obj(*queue);
 	if (!queue)
 		return NULL;
 	netdev_init_one_queue(dev, queue, NULL);
@@ -12014,8 +12025,8 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 
 	maxqs = max(txqs, rxqs);
 
-	dev = kvzalloc(struct_size(dev, priv, sizeof_priv),
-		       GFP_KERNEL_ACCOUNT | __GFP_RETRY_MAYFAIL);
+	dev = kvzalloc_flex(*dev, priv, sizeof_priv,
+			    GFP_KERNEL_ACCOUNT | __GFP_RETRY_MAYFAIL);
 	if (!dev)
 		return NULL;
 
@@ -12086,11 +12097,11 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	dev->real_num_rx_queues = rxqs;
 	if (netif_alloc_rx_queues(dev))
 		goto free_all;
-	dev->ethtool = kzalloc(sizeof(*dev->ethtool), GFP_KERNEL_ACCOUNT);
+	dev->ethtool = kzalloc_obj(*dev->ethtool, GFP_KERNEL_ACCOUNT);
 	if (!dev->ethtool)
 		goto free_all;
 
-	dev->cfg = kzalloc(sizeof(*dev->cfg), GFP_KERNEL_ACCOUNT);
+	dev->cfg = kzalloc_obj(*dev->cfg, GFP_KERNEL_ACCOUNT);
 	if (!dev->cfg)
 		goto free_all;
 	dev->cfg_pending = dev->cfg;
@@ -12856,7 +12867,7 @@ static struct hlist_head * __net_init netdev_create_hash(void)
 	int i;
 	struct hlist_head *hash;
 
-	hash = kmalloc_array(NETDEV_HASHENTRIES, sizeof(*hash), GFP_KERNEL);
+	hash = kmalloc_objs(*hash, NETDEV_HASHENTRIES);
 	if (hash != NULL)
 		for (i = 0; i < NETDEV_HASHENTRIES; i++)
 			INIT_HLIST_HEAD(&hash[i]);
