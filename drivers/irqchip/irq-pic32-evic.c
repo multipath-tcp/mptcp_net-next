@@ -221,7 +221,7 @@ static int __init pic32_of_init(struct device_node *node,
 	if (!evic_base)
 		return -ENOMEM;
 
-	priv = kcalloc(nchips, sizeof(*priv), GFP_KERNEL);
+	priv = kzalloc_objs(*priv, nchips);
 	if (!priv) {
 		ret = -ENOMEM;
 		goto err_iounmap;

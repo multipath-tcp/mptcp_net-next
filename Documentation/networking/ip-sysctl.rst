@@ -202,6 +202,13 @@ neigh/default/gc_thresh3 - INTEGER
 
 	Default: 1024
 
+neigh/default/gc_interval - INTEGER
+	Specifies how often the garbage collector for neighbor entries
+	should run. This value applies to the entire table, not
+	individual entries. Unused since kernel v2.6.8.
+
+	Default: 30 seconds
+
 neigh/default/gc_stale_time - INTEGER
 	Determines how long a neighbor entry can remain unused before it is
 	considered stale and eligible for garbage collection. Entries that have
