@@ -321,7 +321,7 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 			/* For downlink traffic consume SRAM memory for hw
 			 * forwarding descriptors queue.
 			 */
-			if (airhoa_is_lan_gdm_port(port))
+			if (airoha_is_lan_gdm_port(port))
 				val |= AIROHA_FOE_IB2_FAST_PATH;
 			if (dsa_port >= 0)
 				val |= FIELD_PREP(AIROHA_FOE_IB2_NBQ,
@@ -778,7 +778,7 @@ airoha_ppe_foe_commit_subflow_entry(struct airoha_ppe *ppe,
 	if (!hwe_p)
 		return -EINVAL;
 
-	f = kzalloc(sizeof(*f), GFP_ATOMIC);
+	f = kzalloc_obj(*f, GFP_ATOMIC);
 	if (!f)
 		return -ENOMEM;
 
@@ -1173,7 +1173,7 @@ static int airoha_ppe_flow_offload_replace(struct airoha_eth *eth,
 			return err;
 	}
 
-	e = kzalloc(sizeof(*e), GFP_KERNEL);
+	e = kzalloc_obj(*e);
 	if (!e)
 		return -ENOMEM;
 
