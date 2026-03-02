@@ -557,10 +557,21 @@ static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 	return 0;
 }
 
+static unsigned int macb_pcs_inband_caps(struct phylink_pcs *pcs,
+					 phy_interface_t interface)
+{
+	return LINK_INBAND_DISABLE | LINK_INBAND_ENABLE;
+}
+
 static void macb_pcs_get_state(struct phylink_pcs *pcs, unsigned int neg_mode,
 			       struct phylink_link_state *state)
 {
-	state->link = 0;
+	struct macb *bp = container_of(pcs, struct macb, phylink_sgmii_pcs);
+	u16 bmsr, lpa;
+
+	bmsr = gem_readl(bp, PCSSTS);
+	lpa = gem_readl(bp, PCSANLPBASE);
+	phylink_mii_c22_pcs_decode_state(state, neg_mode, bmsr, lpa);
 }
 
 static void macb_pcs_an_restart(struct phylink_pcs *pcs)
@@ -574,6 +585,26 @@ static int macb_pcs_config(struct phylink_pcs *pcs,
 			   const unsigned long *advertising,
 			   bool permit_pause_to_mac)
 {
+	struct macb *bp = container_of(pcs, struct macb, phylink_sgmii_pcs);
+	u32 old, new;
+
+	old = gem_readl(bp, PCSANADV);
+	new = phylink_mii_c22_pcs_encode_advertisement(interface, advertising);
+	if (new != -EINVAL && old != new)
+		gem_writel(bp, PCSANADV, new);
+
+	/* Disable AN if it's not to be used, enable otherwise.
+	 * Must be written after PCSSEL is set in NCFGR which is done in
+	 * macb_mac_config(), otherwise writes will not take effect.
+	 */
+	old = gem_readl(bp, PCSCNTRL);
+	if (neg_mode == PHYLINK_PCS_NEG_INBAND_ENABLED)
+		new = old | BMCR_ANENABLE;
+	else
+		new = old & ~BMCR_ANENABLE;
+	if (old != new)
+		gem_writel(bp, PCSCNTRL, new);
+
 	return 0;
 }
 
@@ -584,6 +615,7 @@ static const struct phylink_pcs_ops macb_phylink_usx_pcs_ops = {
 };
 
 static const struct phylink_pcs_ops macb_phylink_pcs_ops = {
+	.pcs_inband_caps = macb_pcs_inband_caps,
 	.pcs_get_state = macb_pcs_get_state,
 	.pcs_an_restart = macb_pcs_an_restart,
 	.pcs_config = macb_pcs_config,
@@ -627,22 +659,6 @@ static void macb_mac_config(struct phylink_config *config, unsigned int mode,
 
 	if (old_ncr ^ ncr)
 		macb_or_gem_writel(bp, NCR, ncr);
-
-	/* Disable AN for SGMII fixed link configuration, enable otherwise.
-	 * Must be written after PCSSEL is set in NCFGR,
-	 * otherwise writes will not take effect.
-	 */
-	if (macb_is_gem(bp) && state->interface == PHY_INTERFACE_MODE_SGMII) {
-		u32 pcsctrl, old_pcsctrl;
-
-		old_pcsctrl = gem_readl(bp, PCSCNTRL);
-		if (mode == MLO_AN_FIXED)
-			pcsctrl = old_pcsctrl & ~GEM_BIT(PCSAUTONEG);
-		else
-			pcsctrl = old_pcsctrl | GEM_BIT(PCSAUTONEG);
-		if (old_pcsctrl != pcsctrl)
-			gem_writel(bp, PCSCNTRL, pcsctrl);
-	}
 
 	spin_unlock_irqrestore(&bp->lock, flags);
 }
@@ -3734,7 +3750,7 @@ static int gem_add_flow_filter(struct net_device *netdev,
 	int ret = -EINVAL;
 	bool added = false;
 
-	newfs = kmalloc(sizeof(*newfs), GFP_KERNEL);
+	newfs = kmalloc_obj(*newfs);
 	if (newfs == NULL)
 		return -ENOMEM;
 	memcpy(&newfs->fs, fs, sizeof(newfs->fs));
