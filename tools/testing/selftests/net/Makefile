@@ -15,6 +15,7 @@ TEST_PROGS := \
 	big_tcp.sh \
 	bind_bhash.sh \
 	bpf_offload.py \
+	bridge_vlan_dump.sh \
 	broadcast_ether_dst.sh \
 	broadcast_pmtu.sh \
 	busy_poll_test.sh \
@@ -120,6 +121,7 @@ TEST_PROGS := \
 	vrf_route_leaking.sh \
 	vrf_strict_mode_test.sh \
 	xfrm_policy.sh \
+	xfrm_state.sh \
 # end of TEST_PROGS
 
 TEST_PROGS_EXTENDED := \
