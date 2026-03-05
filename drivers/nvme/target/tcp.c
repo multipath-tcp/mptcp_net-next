@@ -2086,6 +2086,8 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port->sock->sk->sk_user_data = port;
 	port->data_ready = port->sock->sk->sk_data_ready;
 	port->sock->sk->sk_data_ready = nvmet_tcp_listen_data_ready;
+	sk_is_msk(port->sock->sk) ?
+	mptcp_sock_set_reuseaddr(port->sock->sk) :
 	sock_set_reuseaddr(port->sock->sk);
 	sk_is_msk(port->sock->sk) ?
 	mptcp_sock_set_nodelay(port->sock->sk) :
