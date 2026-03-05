@@ -1810,6 +1810,8 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 	tcp_sock_set_syncnt(queue->sock->sk, 1);
 
 	/* Set TCP no delay */
+	sk_is_msk(queue->sock->sk) ?
+	mptcp_sock_set_nodelay(queue->sock->sk) :
 	tcp_sock_set_nodelay(queue->sock->sk);
 
 	/*
