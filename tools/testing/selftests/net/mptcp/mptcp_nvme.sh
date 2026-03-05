@@ -4,6 +4,7 @@
 . "$(dirname "$0")/mptcp_lib.sh"
 
 trtype="${1:-mptcp}"
+iopolicy=${2:-"numa"} # round-robin, queue-depth
 nqn=nqn.2014-08.org.nvmexpress.${trtype}dev
 ns=1
 port=1234
@@ -140,6 +141,12 @@ run_host()
 	echo "nvme list"
 	nvme list
 
+	subname=$(nvme list-subsys /dev/${devname}n1 |
+		  grep -o 'nvme-subsys[0-9]*' | head -1)
+
+	echo ${iopolicy} > /sys/class/nvme-subsystem/${subname}/iopolicy
+	cat /sys/class/nvme-subsystem/${subname}/iopolicy
+
 	echo "fio randread /dev/${devname}n1"
 	fio --name=global --direct=1 --norandommap --randrepeat=0 --ioengine=libaio \
 	    --thread=1 --blocksize=4k --runtime=10 --time_based --rw=randread --numjobs=4 \
@@ -164,6 +171,7 @@ losetup /dev/loop100 /tmp/test.raw
 run_test()
 {
 	export trtype nqn ns port trsvcid
+	export iopolicy
 
 	ip netns exec "$ns1" bash <<- EOF
 		$(declare -f run_target)
