@@ -1872,20 +1872,6 @@ int tcp_set_rcvlowat(struct sock *sk, int val)
 }
 EXPORT_IPV6_MOD(tcp_set_rcvlowat);
 
-void tcp_update_recv_tstamps(struct sk_buff *skb,
-			     struct scm_timestamping_internal *tss)
-{
-	if (skb->tstamp)
-		tss->ts[0] = ktime_to_timespec64(skb->tstamp);
-	else
-		tss->ts[0] = (struct timespec64) {0};
-
-	if (skb_hwtstamps(skb)->hwtstamp)
-		tss->ts[2] = ktime_to_timespec64(skb_hwtstamps(skb)->hwtstamp);
-	else
-		tss->ts[2] = (struct timespec64) {0};
-}
-
 #ifdef CONFIG_MMU
 static const struct vm_operations_struct tcp_vm_ops = {
 };
@@ -2377,22 +2363,23 @@ void tcp_recv_timestamp(struct msghdr *msg, const struct sock *sk,
 {
 	int new_tstamp = sock_flag(sk, SOCK_TSTAMP_NEW);
 	u32 tsflags = READ_ONCE(sk->sk_tsflags);
-	bool has_timestamping = false;
 
-	if (tss->ts[0].tv_sec || tss->ts[0].tv_nsec) {
+	if (tss->ts[0]) {
 		if (sock_flag(sk, SOCK_RCVTSTAMP)) {
+			struct timespec64 tv = ktime_to_timespec64(tss->ts[0]);
+
 			if (sock_flag(sk, SOCK_RCVTSTAMPNS)) {
 				if (new_tstamp) {
 					struct __kernel_timespec kts = {
-						.tv_sec = tss->ts[0].tv_sec,
-						.tv_nsec = tss->ts[0].tv_nsec,
+						.tv_sec = tv.tv_sec,
+						.tv_nsec = tv.tv_nsec,
 					};
 					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMPNS_NEW,
 						 sizeof(kts), &kts);
 				} else {
 					struct __kernel_old_timespec ts_old = {
-						.tv_sec = tss->ts[0].tv_sec,
-						.tv_nsec = tss->ts[0].tv_nsec,
+						.tv_sec = tv.tv_sec,
+						.tv_nsec = tv.tv_nsec,
 					};
 					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMPNS_OLD,
 						 sizeof(ts_old), &ts_old);
@@ -2400,41 +2387,37 @@ void tcp_recv_timestamp(struct msghdr *msg, const struct sock *sk,
 			} else {
 				if (new_tstamp) {
 					struct __kernel_sock_timeval stv = {
-						.tv_sec = tss->ts[0].tv_sec,
-						.tv_usec = tss->ts[0].tv_nsec / 1000,
+						.tv_sec = tv.tv_sec,
+						.tv_usec = tv.tv_nsec / 1000,
 					};
 					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP_NEW,
 						 sizeof(stv), &stv);
 				} else {
-					struct __kernel_old_timeval tv = {
-						.tv_sec = tss->ts[0].tv_sec,
-						.tv_usec = tss->ts[0].tv_nsec / 1000,
+					struct __kernel_old_timeval otv = {
+						.tv_sec = tv.tv_sec,
+						.tv_usec = tv.tv_nsec / 1000,
 					};
 					put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP_OLD,
-						 sizeof(tv), &tv);
+						 sizeof(otv), &otv);
 				}
 			}
 		}
 
-		if (tsflags & SOF_TIMESTAMPING_SOFTWARE &&
+		if (!(tsflags & SOF_TIMESTAMPING_SOFTWARE &&
 		    (tsflags & SOF_TIMESTAMPING_RX_SOFTWARE ||
-		     !(tsflags & SOF_TIMESTAMPING_OPT_RX_FILTER)))
-			has_timestamping = true;
-		else
-			tss->ts[0] = (struct timespec64) {0};
+		     !(tsflags & SOF_TIMESTAMPING_OPT_RX_FILTER))))
+			tss->ts[0] = 0;
 	}
 
-	if (tss->ts[2].tv_sec || tss->ts[2].tv_nsec) {
-		if (tsflags & SOF_TIMESTAMPING_RAW_HARDWARE &&
+	if (tss->ts[2]) {
+		if (!(tsflags & SOF_TIMESTAMPING_RAW_HARDWARE &&
 		    (tsflags & SOF_TIMESTAMPING_RX_HARDWARE ||
-		     !(tsflags & SOF_TIMESTAMPING_OPT_RX_FILTER)))
-			has_timestamping = true;
-		else
-			tss->ts[2] = (struct timespec64) {0};
+		     !(tsflags & SOF_TIMESTAMPING_OPT_RX_FILTER))))
+			tss->ts[2] = 0;
 	}
 
-	if (has_timestamping) {
-		tss->ts[1] = (struct timespec64) {0};
+	if (tss->ts[0] | tss->ts[2]) {
+		tss->ts[1] = 0;
 		if (sock_flag(sk, SOCK_TSTAMP_NEW))
 			put_cmsg_scm_timestamping64(msg, tss);
 		else
@@ -4986,6 +4969,60 @@ tcp_inbound_md5_hash(const struct sock *sk, const struct sk_buff *skb,
 	return SKB_NOT_DROPPED_YET;
 }
 
+#endif
+
+#if defined(CONFIG_TCP_MD5SIG) || defined(CONFIG_TCP_AO)
+/*
+ * Parse Signature options
+ */
+int tcp_do_parse_auth_options(const struct tcphdr *th,
+			      const u8 **md5_hash, const u8 **ao_hash)
+{
+	int length = (th->doff << 2) - sizeof(*th);
+	const u8 *ptr = (const u8 *)(th + 1);
+	unsigned int minlen = TCPOLEN_MD5SIG;
+
+	if (IS_ENABLED(CONFIG_TCP_AO))
+		minlen = sizeof(struct tcp_ao_hdr) + 1;
+
+	*md5_hash = NULL;
+	*ao_hash = NULL;
+
+	/* If not enough data remaining, we can short cut */
+	while (length >= minlen) {
+		int opcode = *ptr++;
+		int opsize;
+
+		switch (opcode) {
+		case TCPOPT_EOL:
+			return 0;
+		case TCPOPT_NOP:
+			length--;
+			continue;
+		default:
+			opsize = *ptr++;
+			if (opsize < 2 || opsize > length)
+				return -EINVAL;
+			if (opcode == TCPOPT_MD5SIG) {
+				if (opsize != TCPOLEN_MD5SIG)
+					return -EINVAL;
+				if (unlikely(*md5_hash || *ao_hash))
+					return -EEXIST;
+				*md5_hash = ptr;
+			} else if (opcode == TCPOPT_AO) {
+				if (opsize <= sizeof(struct tcp_ao_hdr))
+					return -EINVAL;
+				if (unlikely(*md5_hash || *ao_hash))
+					return -EEXIST;
+				*ao_hash = ptr;
+			}
+		}
+		ptr += opsize - 2;
+		length -= opsize;
+	}
+	return 0;
+}
+EXPORT_IPV6_MOD(tcp_do_parse_auth_options);
 #endif
 
 /* Called with rcu_read_lock() */
