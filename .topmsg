@@ -1,2 +1,31 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/Revert-sched-mmcid-Switch-over-to-the-new-mechanism
+Subject: [PATCH] Revert "sched/mmcid: Switch over to the new mechanism"
+
+This reverts commit 653fda7ae73d8033dedb65537acac0c2c287dc3f.
+
+I managed to locally reproduce the issue seen by the CI since v6.19-rc1
+using:
+
+  $ cd <kernel source code>
+  $ echo 'echo OK' > .virtme-exec-run
+  # docker run -v "${PWD}:${PWD}:rw" -w "${PWD}" --rm -it \
+      --privileged mptcp/mptcp-upstream-virtme-docker:latest \
+      build normal
+  # i=1; \
+    while docker run -v "${PWD}:${PWD}:rw" -w "${PWD}" --rm \
+    -it --privileged mptcp/mptcp-upstream-virtme-docker:latest \
+    vm auto normal; do \
+      echo "== Attempt: $i: OK =="; \
+      i=$((i+1)); \
+    done; \
+    echo "== Failure after $i attempts =="
+
+'git bisect' between v6.18 and v6.19-rc1 pointed me to this commit.
+Reverting it on top of v6.19-rc1 fixes the issue there. Reverting it on
+top of Linus' tree caused conflicts, resolved here. (I never touched
+kernel/sched/core.c, so hopefully my innocent conflicts resolution was
+OK.)
+
+Link: https://lore.kernel.org/b24ffcb3-09d5-4e48-9070-0b69bc654281@kernel.org
+Link: https://github.com/multipath-tcp/mptcp_net-next/issues/617
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
