@@ -82,7 +82,8 @@ trap 'exit_trap' EXIT
 
 export VIRTME_NO_INTERACTIVE=1
 
-SUFFIX=$(make kernelversion | cut -d. -f1-2)
+#SUFFIX=$(make kernelversion | cut -d. -f1-2)
+SUFFIX=tmp  # not to polute others, or to create too many different ones
 
 DEFAULT_ARG_BUILD=(-d WERROR)
 VIRTME_PACKETDRILL_STABLE=1 \
