@@ -1,0 +1,327 @@
+name: "MPTCP Upstream Stable Validation"
+on:
+  workflow_dispatch:
+    inputs:
+      pending:
+        description: "Query Patchwork for pending patches"
+        required: true
+        type: boolean
+        default: true
+      queue:
+        description: "Apply queued patches"
+        required: true
+        type: boolean
+        default: true
+      latest_sft:
+        description: "Use latest kSelftests on stable kernels"
+        required: true
+        type: boolean
+        default: false
+      versions:
+        description: "Force checking specific versions separated with spaces, e.g. '6.6 6.1'"
+        required: false
+        type: string
+
+  schedule:
+    - cron: '3 7 * * 1-6'  # in UTC: after US Pacific work day and sync + tests
+    - cron: '33 5 * * 0'   # different mode
+
+# Idea: check if there was an update before continuing? Needs to track last
+
+env:
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10"
+  PW: "https://patchwork.kernel.org/api/1.2"
+  AGENT: "mptcp-ci/1.0 (matttbe@kernel.org)"
+  RELEASES: "https://www.kernel.org/releases.json"
+
+permissions: {}
+
+jobs:
+  matrix:
+    name: "Set matrix"
+    if: github.repository_owner == 'multipath-tcp'
+    runs-on: ubuntu-latest
+    outputs:
+      notif: ${{ steps.set-matrix.outputs.notif }}
+      tests: ${{ steps.set-matrix.outputs.tests }}
+      versions: ${{ steps.set-matrix.outputs.versions }}
+
+    steps:
+      - id: set-matrix
+        name: Set Matrix
+        run: |
+          set -x
+          if [ -n "${{ github.event.inputs.versions }}" ]; then
+            v=(${{ github.event.inputs.versions }})
+          else
+            v=($(curl ${CURL_OPT} -A "${AGENT}" "${RELEASES}" | jq -r ".releases.[] | select(.iseol == false and (.moniker == \"stable\" or .moniker == \"longterm\")).version" | cut -d. -f1-2))
+          fi
+          if [ "${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && '1' || '0' }}" = "1" ]; then
+            # v5.10 cannot be executed with latest kselftests
+            v=(${v[@]/5.10})
+          fi
+          V=$(printf '"%s",' "${v[@]}")
+          echo "notif={\"version\":[${V:0:-1}]}" >> $GITHUB_OUTPUT
+          echo "tests={\"version\":[${V:0:-1}],\"mode\":[\"normal\",\"debug\"]}" >> $GITHUB_OUTPUT
+          echo "versions=${v[@]}" >> $GITHUB_OUTPUT
+
+  tests:
+    name: "Tests"
+    if: github.repository_owner == 'multipath-tcp'
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.tests) }}
+
+    steps:
+      - name: "Get source"
+        run: |
+          set -x
+          curl ${CURL_OPT} -A "${AGENT}" "${RELEASES}" |
+            jq -r ".releases.[] | select(.version | startswith(\"${{ matrix.version }}.\"))" > release.json
+          jq -r '.' release.json
+          curl ${CURL_OPT} -A "${AGENT}" "$(jq -r '.source' release.json)" | \
+            tar xJ --strip-components=1
+
+      - name: "Get queue"
+        if: ${{ github.event.inputs.queue == 'true' }}
+        run: |
+          set -x
+          # sparse to download only what is needed
+          git clone --depth 1 --filter=blob:none --no-checkout https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/stable-queue
+          git -C stable-queue sparse-checkout init - cone
+          git -C stable-queue sparse-checkout set queue-${{ matrix.version }}
+          git -C stable-queue checkout master
+          git -C stable-queue rev-parse HEAD | tee stable-queue/HEAD.txt
+          ln -s "stable-queue/queue-${{ matrix.version }}" patches
+          sudo apt-get update
+          sudo apt-get install -y quilt
+          quilt push -a
+
+      - name: "Get pending"
+        if: ${{ github.event.inputs.pending == 'true' }}
+        run: |
+          set -x
+          for mbox in $(curl ${CURL_OPT} -A "${AGENT}" "${URL}" | jq -r ".[].mbox"); do
+            echo " - $(dirname "${mbox}")" | tee -a pending.txt
+            curl ${CURL_OPT} -A "${AGENT}" "${mbox}" | patch -p1 --merge
+          done
+        env:
+          URL: "${{ env.PW }}/patches/?project=mptcp&state=handled-elsewhere&q=\\[${{ matrix.version }}.y"
+
+      - name: "Get latest kselftests"
+        if: ${{ github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0' }}
+        uses: actions/checkout@v4
+        with:
+          path: "kselftests_src"
+
+      - name: "Build latest kselftests"
+        if: ${{ github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0' }}
+        run: |
+          set -x
+          cd kselftests_src
+          make headers_install INSTALL_HDR_PATH="kselftests_include"
+          make KHDR_INCLUDES="-Ikselftests_include/include" \
+            -C tools/testing/selftests TARGETS=net/mptcp install \
+            INSTALL_PATH=$GITHUB_WORKSPACE/kselftests
+          cd ..
+          cp -r kselftests/net tools/testing/selftests/
+
+      - name: "Docker image"
+        run: |
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
+
+      - name: "Tests"
+        timeout-minutes: 180
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          set -x
+          /usr/bin/docker run --privileged --rm \
+            -e "INPUT_CCACHE_DISABLE=1" \
+            -e "INPUT_PACKETDRILL_STABLE=1" \
+            -e "INPUT_SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES=${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && '0' || '1' }}" \
+            -e "INPUT_BUILD_SKIP_SELFTESTS=${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && '1' || '0' }}" \
+            -e "INPUT_CI_TIMEOUT_SEC=10800" \
+            -e "INPUT_GCOV=0" \
+            -e "INPUT_TRACE=${RUNNER_DEBUG}" \
+            -e "GITHUB_SHA=$([ -d stable-queue ] && git -C stable-queue rev-parse HEAD || jq -r '.version' release.json)" \
+            -e "GITHUB_REF_NAME=$(jq -r '.version' release.json)" \
+            -e "GITHUB_RUN_ID" \
+            -e GITHUB_ACTIONS=true -e CI=true \
+            --workdir "${PWD}" \
+            -v "${PWD}:${PWD}" \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
+              auto-${{ matrix.mode }}
+
+      - name: "Publish conclusion"
+        if: always()
+        run: |
+          if [ -s "conclusion.txt" ]; then
+            title="${{ matrix.version }}${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && ' (latest kselftests)' || '' }}: ${{ matrix.mode }}"
+            {
+              echo "## ${title}"
+              echo "### Conclusion (${title})"
+              cat "conclusion.txt"
+              echo ''
+              echo "### Summary (${title})"
+              echo '```'
+              cat "summary.txt"
+              echo '```'
+              echo ''
+              echo "### Extra Info (${title})"
+              if [ -s patches/series ]; then
+                echo '<details>'
+                echo "<summary>Stable queue patches at $(cat stable-queue/HEAD.txt || true):</summary>"
+                echo '```'
+                cat patches/series
+                echo '```'
+                echo '</details>'
+              else
+                echo "No patches from the stable queue ($(cat stable-queue/HEAD.txt 2>/dev/null || echo None))."
+              fi
+              echo ''
+              echo 'Pending patches:'
+              cat pending.txt 2>/dev/null || echo " - No pending patches"
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: "Artifacts (always)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.version }}-${{ matrix.mode }}
+          path: |
+            conclusion.txt
+            summary.txt
+            *.tap
+            config.zstd
+            *.tap.xml
+            results.json
+
+      - name: "Artifacts (failure)"
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-info-${{ matrix.version }}-${{ matrix.mode }}
+          path: |
+            vmlinux.zstd
+            kmemleak.txt
+
+      - name: "Publish Test Results"
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          compare_to_earlier_commit: false
+          check_run: false
+          check_name: "Test Results (${{ matrix.version }} - ${{ matrix.mode }})"
+          files: |
+            *.tap.xml
+
+  notif:
+    name: "Notifications"
+    needs: [matrix, tests]
+    # only for the official repo
+    if: always() && github.repository_owner == 'multipath-tcp' && (needs.tests.result == 'success' || needs.tests.result == 'failure')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.notif) }}
+      max-parallel: 1
+
+    steps:
+      - name: get results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-${{ matrix.version }}-*
+          merge-multiple: false
+
+      - name: get test info
+        id: test
+        run: |
+          extra="${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && ' (latest kselftests)' || '' }}"
+          for mode in normal debug; do
+            ccl="$(cat "results-${{ matrix.version }}-${mode}/conclusion.txt")"
+            echo "ccl_${mode//-/_}=${{ matrix.version }}${extra}: ${ccl:-"KVM Validation: ${mode}: Critical: No conclusion ❓"}" >> ${GITHUB_OUTPUT}
+          done
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
+
+      - name: irc tests
+        uses: rectalogic/notify-irc@v2
+        with:
+          server: irc.libera.chat
+          channel: "#mptcp-ci"
+          nickname: gh-tests-bot
+          verbose: true
+          message: |-
+            New GH Actions Stable job validating ${{ matrix.version }} (by ${{ github.actor }}) just ended:
+            - ${{ steps.test.outputs.ccl_normal }}
+            - ${{ steps.test.outputs.ccl_debug }}
+            - Task: ${{ steps.test.outputs.url }}
+
+  publish-test-results:
+    name: "Publish Tests Results"
+    needs: [matrix, tests]
+    # only for the official repo
+    if: always() && github.repository_owner == 'multipath-tcp' && (needs.tests.result == 'success' || needs.tests.result == 'failure')
+    concurrency:
+      group: 'ci-notif'
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout results repo
+        uses: actions/checkout@v4
+        with:
+          repository: "multipath-tcp/mptcp-upstream-tests-results"
+          token: '${{ secrets.PAT_MATTTBE }}'
+
+      - name: get results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          merge-multiple: false
+
+      - name: setup results repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: save flakes results
+        run: |
+          set -x
+          date="$(date --utc +%Y%m%d--%H%M%S)"
+          extra="${{ (github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0') && 'latest' || 'stable' }}"
+          for version in ${{ needs.matrix.outputs.versions }}; do
+            for mode in normal debug; do
+              new="results-${version}-${mode}/results.json"
+              all="html/results/${extra}-${version}/${mode}.json"
+              mkdir -p "$(dirname "${all}")"
+              if [ ! -s "${new}" ]; then
+                echo '{"error": "all", "run_id": "${{ github.run_id }}"}' > "${new}"
+              fi
+              if [ ! -s "${all}" ]; then
+                echo "[]" > "${all}"
+              fi
+              # append tag, merge results, limit
+              jq -c ".tag += \"${date}\"" "${new}" > "${new}.tag"
+              jq -c '. += [input]' "${all}" "${new}.tag" > "${new}.all"
+              jq --indent 1 '.[-100:]' "${new}.all" > "${all}"
+            done
+            for mode in btf-normal btf-debug; do
+              all="html/results/${extra}-${version}/${mode}.json"
+              mkdir -p "$(dirname "${all}")"
+              echo "[]" > "${all}"
+            done
+          done
+
+          d=($(basename -a $(ls -d html/results/*/ | sort -V)))
+          D=$(printf '"%s",' "${d[@]}")
+          echo "[${D:0:-1}]" > html/results/dirs.json
+
+          git add html/results/${extra}-*/*.json html/results/dirs.json
+          git commit -m "json: new: stable: ${date}"
+          git push
