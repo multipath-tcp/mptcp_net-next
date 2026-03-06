@@ -7,6 +7,7 @@
 : "${STASH:=0}"
 : "${STASH_IGNORE_CONFLICTS:=0}"
 : "${FIND_FIX:=0}"
+: "${BOOT_RETRY:=1}"
 
 wait_vm() { local i=0
 	while [[ $((i++)) -lt "${1}" ]]; do
@@ -20,6 +21,7 @@ wait_vm() { local i=0
 stress() { local pid nproc2
 	wait_vm 500 30
 
+	pkill stress-ng || true
 	nproc2=$(nproc); nproc2=$((nproc2 * 2))
 	stress-ng --cpu "${nproc2}" --iomix "${nproc2}" --vm "${nproc2}" --vm-bytes 1G --timeout 60m &
 	pid=$!
@@ -93,22 +95,29 @@ VIRTME_PACKETDRILL_STABLE=1 \
 PID_VIRTME=$!
 wait ${PID_VIRTME} || exit 125 # skip
 
-INPUT_BUILD_SUFFIX=${SUFFIX} \
-	./.virtme.sh "vm-auto" "${MODE}" &
-PID_VIRTME=$!
-
-if [ "${STRESS}" != 0 ]; then
-	stress &
-fi
-if [ "${STRESS_IN}" != 0 ]; then
-	stress_in &
-fi
-if [ "${PRIO}" != 0 ]; then
-	prio &
-fi
-
 rc=0
-wait ${PID_VIRTME} || rc=${?}
+for i in $(seq "${BOOT_RETRY}"); do
+	[ "${BOOT_RETRY}" != 1 ] && echo -e "\n\n\t=== Attempt: ${i} ===\n\n"
+	INPUT_BUILD_SUFFIX=${SUFFIX} \
+		./.virtme.sh "vm-auto" "${MODE}" &
+	PID_VIRTME=$!
+
+	if [ "${STRESS}" != 0 ]; then
+		stress &
+	fi
+	if [ "${STRESS_IN}" != 0 ]; then
+		stress_in &
+	fi
+	if [ "${PRIO}" != 0 ]; then
+		prio &
+	fi
+
+	wait ${PID_VIRTME} || { rc=${?}; break; }
+done
+
+if [ "${rc}" != 0 ] && [ "${BOOT_RETRY}" != 1 ]; then
+	echo -e "\n\n\t == Failure after ${i} attempts ===\n\n"
+fi
 
 if [ "${FIND_FIX}" = 1 ] && [ "${rc}" != 125 ]; then
 	[ "${rc}" != 0 ] ## good is bad, bad is good
