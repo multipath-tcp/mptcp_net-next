@@ -131,18 +131,18 @@ struct rseq_data { };
 /**
  * struct sched_mm_cid - Storage for per task MM CID data
  * @active:	MM CID is active for the task
- * @cid:	The CID associated to the task either permanently or
- *		borrowed from the CPU
+ * @cid:	The CID associated to the task
+ * @last_cid:	The last CID associated to the task
  */
 struct sched_mm_cid {
 	unsigned int		active;
 	unsigned int		cid;
+	unsigned int		last_cid;
 };
 
 /**
  * struct mm_cid_pcpu - Storage for per CPU MM_CID data
- * @cid:	The CID associated to the CPU either permanently or
- *		while a task with a CID is running
+ * @cid:	The CID associated to the CPU
  */
 struct mm_cid_pcpu {
 	unsigned int	cid;
