@@ -60,5 +60,5 @@ EOF
 PATCH="$(long "${FIX}").patch"
 diff "${FIX}" "${@}" > "${PATCH}"
 echo -e "\n\t=== Please include ${PATCH} in the email. ===\n"
-echo -e "\n\t=== Please append the subject with 'manual merge' and cc Stephen Rothwell <sfr@canb.auug.org.au> + Mark Brown <broonie@kernel.org>. ===\n"
+echo -e "\n\t=== Please append the subject with 'manual merge' and cc Mark Brown <broonie@kernel.org> + <linux-next@vger.kernel.org>. ===\n"
 echo -e "\n\t=== Please commit + push the modif in '.git/rr-cache' + add sha above. ===\n"
