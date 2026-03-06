@@ -48,7 +48,6 @@ prio() { local envs=() env
 		bash -c "renice -n ${PRIO} -p \$(pidof qemu-system-x86_64)" || true
 }
 
-SYZK=0
 exit_trap() {
 	local rc=$?
 
