@@ -774,8 +774,37 @@ static void tcp_init_buffer_space(struct sock *sk)
 				    (u32)TCP_INIT_CWND * tp->advmss);
 }
 
+/* Try to grow sk_rcvbuf so the hard receive-memory limit covers @needed
+ * bytes beyond the memory already charged in sk_rmem_alloc.
+ */
+bool tcp_try_grow_rcvbuf(struct sock *sk, int needed)
+{
+	struct net *net = sock_net(sk);
+	int target;
+	int rmem2;
+
+	needed = max(needed, 0);
+	target = tcp_rmem_used(sk) + needed;
+
+	if (target <= READ_ONCE(sk->sk_rcvbuf))
+		return true;
+
+	rmem2 = READ_ONCE(net->ipv4.sysctl_tcp_rmem[2]);
+	if (READ_ONCE(sk->sk_rcvbuf) >= rmem2 ||
+	    (sk->sk_userlocks & SOCK_RCVBUF_LOCK) ||
+	    tcp_under_memory_pressure(sk) ||
+	    sk_memory_allocated(sk) >= sk_prot_mem_limits(sk, 0))
+		return false;
+
+	WRITE_ONCE(sk->sk_rcvbuf,
+		   min_t(int, rmem2,
+			 max_t(int, READ_ONCE(sk->sk_rcvbuf), target)));
+
+	return target <= READ_ONCE(sk->sk_rcvbuf);
+}
+
 /* 4. Recalculate window clamp after socket hit its memory bounds. */
-static void tcp_clamp_window(struct sock *sk)
+static void tcp_clamp_window_legacy(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -785,14 +814,42 @@ static void tcp_clamp_window(struct sock *sk)
 	icsk->icsk_ack.quick = 0;
 	rmem2 = READ_ONCE(net->ipv4.sysctl_tcp_rmem[2]);
 
-	if (sk->sk_rcvbuf < rmem2 &&
+	if (READ_ONCE(sk->sk_rcvbuf) < rmem2 &&
 	    !(sk->sk_userlocks & SOCK_RCVBUF_LOCK) &&
 	    !tcp_under_memory_pressure(sk) &&
 	    sk_memory_allocated(sk) < sk_prot_mem_limits(sk, 0)) {
 		WRITE_ONCE(sk->sk_rcvbuf,
 			   min(atomic_read(&sk->sk_rmem_alloc), rmem2));
 	}
-	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf)
+	if (atomic_read(&sk->sk_rmem_alloc) > READ_ONCE(sk->sk_rcvbuf))
+		tp->rcv_ssthresh = min(tp->window_clamp, 2U * tp->advmss);
+}
+
+static void tcp_clamp_window(struct sock *sk)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	u32 cur_rwnd = tcp_receive_window(tp);
+	int need;
+
+	if (!tcp_space_from_rcv_wnd(tp, cur_rwnd, &need)) {
+		tcp_clamp_window_legacy(sk);
+		return;
+	}
+
+	inet_csk(sk)->icsk_ack.quick = 0;
+	need = max_t(int, need, 0);
+
+	/* Keep the hard receive-memory cap large enough to honor the
+	 * remaining receive window we already exposed to the sender. Use
+	 * the scaling_ratio snapshot taken when tp->rcv_wnd was advertised,
+	 * not the mutable live ratio which may drift later in the flow.
+	 */
+	tcp_try_grow_rcvbuf(sk, need);
+
+	/* If the remaining advertised rwnd no longer fits the hard budget,
+	 * slow future window growth until the accounting converges again.
+	 */
+	if (need > tcp_rmem_avail(sk))
 		tp->rcv_ssthresh = min(tp->window_clamp, 2U * tp->advmss);
 }
 
@@ -5320,11 +5377,28 @@ static void tcp_ofo_queue(struct sock *sk)
 static bool tcp_prune_ofo_queue(struct sock *sk, const struct sk_buff *in_skb);
 static int tcp_prune_queue(struct sock *sk, const struct sk_buff *in_skb);
 
+/* Sequence checks run against the sender-visible receive window before this
+ * point. Convert the incoming payload back to the hard receive-memory budget
+ * using the scaling_ratio that was in force when tp->rcv_wnd was advertised,
+ * so admission keeps honoring the same exposed window even if the live ratio
+ * changes later in the flow. Legacy TCP_REPAIR restores do not have that
+ * advertise-time basis, so they fall back to the pre-series admission rule
+ * until a fresh local advertisement refreshes the pair.
+ *
+ * Do not subtract sk_backlog.len here. tcp_space() already reserves backlog
+ * bytes when selecting future advertised windows, and sk_backlog.len stays
+ * inflated until __release_sock() finishes draining backlog. Subtracting it
+ * again here would double count already-queued backlog packets as they move
+ * into sk_rmem_alloc.
+ */
 static bool tcp_can_ingest(const struct sock *sk, const struct sk_buff *skb)
 {
-	unsigned int rmem = atomic_read(&sk->sk_rmem_alloc);
+	int need;
 
-	return rmem <= sk->sk_rcvbuf;
+	if (!tcp_space_from_rcv_wnd(tcp_sk(sk), skb->len, &need))
+		return atomic_read(&sk->sk_rmem_alloc) <= READ_ONCE(sk->sk_rcvbuf);
+
+	return need <= tcp_rmem_avail(sk);
 }
 
 static int tcp_try_rmem_schedule(struct sock *sk, const struct sk_buff *skb,
@@ -5960,7 +6034,7 @@ static int tcp_prune_queue(struct sock *sk, const struct sk_buff *in_skb)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	/* Do nothing if our queues are empty. */
-	if (!atomic_read(&sk->sk_rmem_alloc))
+	if (!tcp_rmem_used(sk))
 		return -1;
 
 	NET_INC_STATS(sock_net(sk), LINUX_MIB_PRUNECALLED);
