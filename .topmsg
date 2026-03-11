@@ -1,2 +1,36 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sched-mmcid-Prevent-CID-stalls-due-to-concurrent-forks
+From: Thomas Gleixner <tglx@kernel.org>
+Subject: [PATCH] sched/mmcid: Prevent CID stalls due to concurrent forks
+
+A newly forked task is accounted as MMCID user before the task is visible
+in the process' thread list and the global task list. This creates the
+following problem:
+
+ CPU1			CPU2
+ fork()
+   sched_mm_cid_fork(tnew1)
+     tnew1->mm.mm_cid_users++;
+     tnew1->mm_cid.cid = getcid()
+-> preemption
+			fork()
+			  sched_mm_cid_fork(tnew2)
+   			    tnew2->mm.mm_cid_users++;
+                            // Reaches the per CPU threshold
+			    mm_cid_fixup_tasks_to_cpus()
+			    for_each_other(current, p)
+			         ....
+
+As tnew1 is not visible yet, this fails to fix up the already allocated CID
+of tnew1. As a consequence a subsequent schedule in might fail to acquire a
+(transitional) CID and the machine stalls.
+
+Move the invocation of sched_mm_cid_fork() after the new task becomes
+visible in the thread and the task list to prevent this.
+
+This also makes it symmetrical vs. exit() where the task is removed as CID
+user before the task is removed from the thread and task lists.
+
+Fixes: fbd0e71dc370 ("sched/mmcid: Provide CID ownership mode fixup functions")
+Signed-off-by: Thomas Gleixner <tglx@kernel.org>
+Link: https://lore.kernel.org/20260310202525.969061974@kernel.org
+[ Added #ifdef around sched_mm_cid_fork() declaration ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
