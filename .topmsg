@@ -13,7 +13,7 @@ following problem:
 -> preemption
 			fork()
 			  sched_mm_cid_fork(tnew2)
-   			    tnew2->mm.mm_cid_users++;
+			    tnew2->mm.mm_cid_users++;
                             // Reaches the per CPU threshold
 			    mm_cid_fixup_tasks_to_cpus()
 			    for_each_other(current, p)
@@ -31,6 +31,7 @@ user before the task is removed from the thread and task lists.
 
 Fixes: fbd0e71dc370 ("sched/mmcid: Provide CID ownership mode fixup functions")
 Signed-off-by: Thomas Gleixner <tglx@kernel.org>
-Link: https://lore.kernel.org/20260310202525.969061974@kernel.org
-[ Added #ifdef around sched_mm_cid_fork() declaration ]
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Tested-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Link: https://patch.msgid.link/20260310202525.969061974@kernel.org
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
