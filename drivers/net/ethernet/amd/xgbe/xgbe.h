@@ -146,10 +146,6 @@
 #define XGBE_MAX_PPS_OUT	4
 #define XGBE_MAX_AUX_SNAP	4
 
-/* Driver PMT macros */
-#define XGMAC_DRIVER_CONTEXT	1
-#define XGMAC_IOCTL_CONTEXT	2
-
 #define XGMAC_FIFO_MIN_ALLOC	2048
 #define XGMAC_FIFO_UNIT		256
 #define XGMAC_FIFO_ALIGN(_x)				\
@@ -1266,6 +1262,10 @@ struct xgbe_prv_data {
 	bool en_rx_adap;
 	int rx_adapt_retries;
 	bool rx_adapt_done;
+	/* Flag to track if data path (TX/RX) was stopped for RX adaptation.
+	 * This prevents packet corruption during the adaptation window.
+	 */
+	bool data_path_stopped;
 	bool mode_set;
 	bool sph;
 };
@@ -1309,8 +1309,8 @@ void xgbe_dump_rx_desc(struct xgbe_prv_data *, struct xgbe_ring *,
 		       unsigned int);
 void xgbe_print_pkt(struct net_device *, struct sk_buff *, bool);
 void xgbe_get_all_hw_features(struct xgbe_prv_data *);
-int xgbe_powerup(struct net_device *, unsigned int);
-int xgbe_powerdown(struct net_device *, unsigned int);
+int xgbe_powerup(struct net_device *netdev);
+int xgbe_powerdown(struct net_device *netdev);
 void xgbe_init_rx_coalesce(struct xgbe_prv_data *);
 void xgbe_init_tx_coalesce(struct xgbe_prv_data *);
 void xgbe_restart_dev(struct xgbe_prv_data *pdata);
