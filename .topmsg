@@ -1,2 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/sched-mmcid-Avoid-full-tasklist-walks
+From: Thomas Gleixner <tglx@kernel.org>
+Subject: [PATCH] sched/mmcid: Avoid full tasklist walks
+
+Chasing vfork()'ed tasks on a CID ownership mode switch requires a full
+task list walk, which is obviously expensive on large systems.
+
+Avoid that by keeping a list of tasks using a mm MMCID entity in mm::mm_cid
+and walk this list instead. This removes the proven to be flaky counting
+logic and avoids a full task list walk in the case of vfork()'ed tasks.
+
+Fixes: fbd0e71dc370 ("sched/mmcid: Provide CID ownership mode fixup functions")
+Signed-off-by: Thomas Gleixner <tglx@kernel.org>
+Link: https://lore.kernel.org/20260310202526.183824481@kernel.org
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
