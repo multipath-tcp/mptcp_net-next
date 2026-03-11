@@ -159,6 +159,7 @@ struct tcp_repair_window {
 
 	__u32	rcv_wnd;
 	__u32	rcv_wup;
+	__u32	rcv_wnd_scaling_ratio; /* 0 means advertise-time basis unknown */
 };
 
 enum {
