@@ -4729,14 +4729,11 @@ void sched_cancel_fork(struct task_struct *p)
 	scx_cancel_fork(p);
 }
 
-#ifdef CONFIG_SCHED_MM_CID
 static void sched_mm_cid_fork(struct task_struct *t);
-#endif
 
 void sched_post_fork(struct task_struct *p)
 {
-	if (IS_ENABLED(CONFIG_SCHED_MM_CID))
-		sched_mm_cid_fork(p);
+	sched_mm_cid_fork(p);
 	uclamp_post_fork(p);
 	scx_post_fork(p);
 }
@@ -10895,6 +10892,7 @@ void mm_init_cid(struct mm_struct *mm, struct task_struct *p)
 }
 #else /* CONFIG_SCHED_MM_CID */
 static inline void mm_update_cpus_allowed(struct mm_struct *mm, const struct cpumask *affmsk) { }
+static inline void sched_mm_cid_fork(struct task_struct *t) { }
 #endif /* !CONFIG_SCHED_MM_CID */
 
 static DEFINE_PER_CPU(struct sched_change_ctx, sched_change_ctx);
