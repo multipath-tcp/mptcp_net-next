@@ -66,8 +66,9 @@ static void test_sock_checkpoint_queue(int sk, int queue, int qlen,
 		test_error("recv(%d): %d", qlen, ret);
 }
 
-void __test_sock_checkpoint(int sk, struct tcp_sock_state *state,
-			    void *addr, size_t addr_size)
+void __test_sock_checkpoint_opt(int sk, struct tcp_sock_state *state,
+				socklen_t trw_len,
+				void *addr, size_t addr_size)
 {
 	socklen_t len = sizeof(state->info);
 	int ret;
@@ -82,9 +83,9 @@ void __test_sock_checkpoint(int sk, struct tcp_sock_state *state,
 	if (getsockname(sk, addr, &len) || len != addr_size)
 		test_error("getsockname(): %d", (int)len);
 
-	len = sizeof(state->trw);
+	len = trw_len;
 	ret = getsockopt(sk, SOL_TCP, TCP_REPAIR_WINDOW, &state->trw, &len);
-	if (ret || len != sizeof(state->trw))
+	if (ret || len != trw_len)
 		test_error("getsockopt(TCP_REPAIR_WINDOW): %d", (int)len);
 
 	if (ioctl(sk, SIOCOUTQ, &state->outq_len))
@@ -160,9 +161,10 @@ static void test_sock_restore_queue(int sk, int queue, void *buf, int len)
 	} while (len > 0);
 }
 
-void __test_sock_restore(int sk, const char *device,
-			 struct tcp_sock_state *state,
-			 void *saddr, void *daddr, size_t addr_size)
+void __test_sock_restore_opt(int sk, const char *device,
+			     struct tcp_sock_state *state,
+			     socklen_t trw_len,
+			     void *saddr, void *daddr, size_t addr_size)
 {
 	struct tcp_repair_opt opts[4];
 	unsigned int opt_nr = 0;
@@ -215,7 +217,7 @@ void __test_sock_restore(int sk, const char *device,
 	}
 	test_sock_restore_queue(sk, TCP_RECV_QUEUE, state->in.buf, state->inq_len);
 	test_sock_restore_queue(sk, TCP_SEND_QUEUE, state->out.buf, state->outq_len);
-	if (setsockopt(sk, SOL_TCP, TCP_REPAIR_WINDOW, &state->trw, sizeof(state->trw)))
+	if (setsockopt(sk, SOL_TCP, TCP_REPAIR_WINDOW, &state->trw, trw_len))
 		test_error("setsockopt(TCP_REPAIR_WINDOW)");
 }
 

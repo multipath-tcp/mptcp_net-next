@@ -13,6 +13,7 @@
 #include <linux/snmp.h>
 #include <linux/tcp.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -671,17 +672,42 @@ struct tcp_sock_state {
 	int timestamp;
 };
 
-extern void __test_sock_checkpoint(int sk, struct tcp_sock_state *state,
-				   void *addr, size_t addr_size);
+/* Legacy userspace stops before the snapshot field and therefore exercises
+ * the kernel's unknown-snapshot fallback path.
+ */
+static inline socklen_t test_tcp_repair_window_legacy_size(void)
+{
+	return offsetof(struct tcp_repair_window, rcv_wnd_scaling_ratio);
+}
+
+static inline socklen_t test_tcp_repair_window_exact_size(void)
+{
+	return sizeof(struct tcp_repair_window);
+}
+
+void __test_sock_checkpoint_opt(int sk, struct tcp_sock_state *state,
+				socklen_t trw_len,
+				void *addr, size_t addr_size);
 static inline void test_sock_checkpoint(int sk, struct tcp_sock_state *state,
 					sockaddr_af *saddr)
 {
-	__test_sock_checkpoint(sk, state, saddr, sizeof(*saddr));
+	__test_sock_checkpoint_opt(sk, state, test_tcp_repair_window_exact_size(),
+				   saddr, sizeof(*saddr));
+}
+
+static inline void test_sock_checkpoint_legacy(int sk,
+					       struct tcp_sock_state *state,
+					       sockaddr_af *saddr)
+{
+	__test_sock_checkpoint_opt(sk, state, test_tcp_repair_window_legacy_size(),
+				   saddr, sizeof(*saddr));
 }
 extern void test_ao_checkpoint(int sk, struct tcp_ao_repair *state);
-extern void __test_sock_restore(int sk, const char *device,
-				struct tcp_sock_state *state,
-				void *saddr, void *daddr, size_t addr_size);
+void __test_sock_restore_opt(int sk, const char *device,
+			     struct tcp_sock_state *state,
+			     socklen_t trw_len,
+			     void *saddr, void *daddr,
+			     size_t addr_size);
 static inline void test_sock_restore(int sk, struct tcp_sock_state *state,
 				     sockaddr_af *saddr,
 				     const union tcp_addr daddr,
@@ -690,7 +716,23 @@ static inline void test_sock_restore(int sk, struct tcp_sock_state *state,
 	sockaddr_af addr;
 
 	tcp_addr_to_sockaddr_in(&addr, &daddr, htons(dport));
-	__test_sock_restore(sk, veth_name, state, saddr, &addr, sizeof(addr));
+	__test_sock_restore_opt(sk, veth_name, state,
+				test_tcp_repair_window_exact_size(),
+				saddr, &addr, sizeof(addr));
+}
+
+static inline void test_sock_restore_legacy(int sk,
+					    struct tcp_sock_state *state,
+					    sockaddr_af *saddr,
+					    const union tcp_addr daddr,
+					    unsigned int dport)
+{
+	sockaddr_af addr;
+
+	tcp_addr_to_sockaddr_in(&addr, &daddr, htons(dport));
+	__test_sock_restore_opt(sk, veth_name, state,
+				test_tcp_repair_window_legacy_size(),
+				saddr, &addr, sizeof(addr));
 }
 extern void test_ao_restore(int sk, struct tcp_ao_repair *state);
 extern void test_sock_state_free(struct tcp_sock_state *state);

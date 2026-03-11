@@ -1,0 +1,97 @@
+// SPDX-License-Identifier: GPL-2.0
+
+--mss=1000
+
+`./defaults.sh
+sysctl -q net.ipv4.tcp_moderate_rcvbuf=0`
+
+// Establish a connection on the default receive buffer. Leave a large skb in
+// the queue, then deliver another one which still fits the remaining rwnd.
+// We should grow sk_rcvbuf to honor the already-advertised window instead of
+// dropping the packet.
+   +0 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+   +0 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+   +0 bind(3, ..., ...) = 0
+   +0 listen(3, 1) = 0
+
+   +0 < S 0:0(0) win 65535 <mss 1000,nop,nop,sackOK,nop,wscale 7>
+   +0 > S. 0:0(0) ack 1 <...>
+  +.1 < . 1:1(0) ack 1 win 257
+
+   +0 accept(3, ..., ...) = 4
+
+// Exchange enough data to get past the completely fresh-socket case while
+// still keeping the receive buffer at its 128kB default.
+   +0 < P. 1:65001(65000) ack 1 win 257
+   * > .  1:1(0) ack 65001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 65001:130001(65000) ack 1 win 257
+   * > .  1:1(0) ack 130001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 130001:195001(65000) ack 1 win 257
+   * > .  1:1(0) ack 195001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 195001:260001(65000) ack 1 win 257
+   * > .  1:1(0) ack 260001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 260001:325001(65000) ack 1 win 257
+   * > .  1:1(0) ack 325001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 325001:390001(65000) ack 1 win 257
+   * > .  1:1(0) ack 390001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 390001:455001(65000) ack 1 win 257
+   * > .  1:1(0) ack 455001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 455001:520001(65000) ack 1 win 257
+   * > .  1:1(0) ack 520001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 520001:585001(65000) ack 1 win 257
+   * > .  1:1(0) ack 585001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 585001:650001(65000) ack 1 win 257
+   * > .  1:1(0) ack 650001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 650001:715001(65000) ack 1 win 257
+   * > .  1:1(0) ack 715001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 715001:780001(65000) ack 1 win 257
+   * > .  1:1(0) ack 780001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 780001:845001(65000) ack 1 win 257
+   * > .  1:1(0) ack 845001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 845001:910001(65000) ack 1 win 257
+   * > .  1:1(0) ack 910001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 910001:975001(65000) ack 1 win 257
+   * > .  1:1(0) ack 975001
+   +0 read(4, ..., 65000) = 65000
+
+   +0 < P. 975001:1040001(65000) ack 1 win 257
+   * > .  1:1(0) ack 1040001
+   +0 read(4, ..., 65000) = 65000
+
+// Leave about 60kB queued, then accept another large skb which still fits
+// the rwnd we already exposed to the peer. The regression is the drop; the
+// exact sk_rcvbuf growth path is an implementation detail.
+   +0 < P. 1040001:1102001(62000) ack 1 win 257
+   * > .  1:1(0) ack 1102001
+
+   +0 < P. 1102001:1167001(65000) ack 1 win 257
+   * > .  1:1(0) ack 1167001
+   +0 read(4, ..., 127000) = 127000
