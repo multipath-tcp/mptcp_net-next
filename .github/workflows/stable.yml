@@ -85,7 +85,7 @@ jobs:
             tar xJ --strip-components=1
 
       - name: "Get queue"
-        if: ${{ github.event.inputs.queue == 'true' }}
+        if: ${{ github.event.inputs.queue == 'true' || github.event_name == 'schedule' }}
         run: |
           set -x
           # sparse to download only what is needed
@@ -100,7 +100,7 @@ jobs:
           quilt push -a
 
       - name: "Get pending"
-        if: ${{ github.event.inputs.pending == 'true' }}
+        if: ${{ github.event.inputs.pending == 'true' || github.event_name == 'schedule' }}
         run: |
           set -x
           for mbox in $(curl ${CURL_OPT} -A "${AGENT}" "${URL}" | jq -r ".[].mbox"); do
