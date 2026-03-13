@@ -815,6 +815,36 @@ run_tests_disconnect()
 	connect_per_transfer=1
 }
 
+run_tests_tls()
+{
+	TEST_GROUP="TLS"
+	local lret=0
+
+	if ! mptcp_lib_kallsyms_has "mptcp_read_done"; then
+		mptcp_lib_pr_skip "TLS not supported by the kernel"
+		mptcp_lib_result_skip "${TEST_GROUP}"
+		return
+	fi
+
+	mptcp_lib_pr_info "with TLS start"
+
+	do_transfer "$ns1" "$ns2" MPTCP MPTCP "10.0.1.1" "0.0.0.0" "-o TLS"
+	lret=$?
+	if [ $lret -ne 0 ]; then
+		ret=$lret
+		return 1
+	fi
+
+	do_transfer "$ns1" "$ns2" MPTCP MPTCP "dead:beef:1::1" "::" "-o TLS"
+	lret=$?
+	if [ $lret -ne 0 ]; then
+		ret=$lret
+		return 1
+	fi
+
+	mptcp_lib_pr_info "with TLS end"
+}
+
 display_time()
 {
 	time_end=$(date +%s)
@@ -958,6 +988,9 @@ log_if_error "Tests with tproxy have failed"
 
 run_tests_disconnect
 log_if_error "Tests of the full disconnection have failed"
+
+run_tests_tls
+log_if_error "Tests with TLS have failed"
 
 display_time
 mptcp_lib_result_print_all_tap
