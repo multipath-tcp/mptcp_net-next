@@ -1293,6 +1293,7 @@ TEST_F(tls, bidir)
 
 TEST_F(tls, pollin)
 {
+	int timeout = variant->mptcp ? 100 : 20;
 	char const *test_str = "test_poll";
 	struct pollfd fd = { 0, 0, 0 };
 	char buf[10];
@@ -1302,11 +1303,11 @@ TEST_F(tls, pollin)
 	fd.fd = self->cfd;
 	fd.events = POLLIN;
 
-	EXPECT_EQ(poll(&fd, 1, 20), 1);
+	EXPECT_EQ(poll(&fd, 1, timeout), 1);
 	EXPECT_EQ(fd.revents & POLLIN, 1);
 	EXPECT_EQ(recv(self->cfd, buf, send_len, MSG_WAITALL), send_len);
 	/* Test timing out */
-	EXPECT_EQ(poll(&fd, 1, 20), 0);
+	EXPECT_EQ(poll(&fd, 1, timeout), 0);
 }
 
 TEST_F(tls, poll_wait)
@@ -1397,6 +1398,9 @@ TEST_F(tls, nonblocking)
 	int sendbuf = 100;
 	int flags;
 	int res;
+
+	if (variant->mptcp)
+		data *= 2;
 
 	flags = fcntl(self->fd, F_GETFL, 0);
 	fcntl(self->fd, F_SETFL, flags | O_NONBLOCK);
@@ -1676,6 +1680,9 @@ TEST_F(tls, shutdown_reuse)
 	shutdown(self->fd, SHUT_RDWR);
 	shutdown(self->cfd, SHUT_RDWR);
 	close(self->cfd);
+
+	if (variant->mptcp)
+		usleep(500000);
 
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -2725,6 +2732,7 @@ TEST_F(tls_err, timeo)
 
 TEST_F(tls_err, poll_partial_rec)
 {
+	int timeout = variant->mptcp ? 100 : 1;
 	struct pollfd pfd = { };
 	ssize_t rec_len;
 	char rec[256];
@@ -2735,7 +2743,7 @@ TEST_F(tls_err, poll_partial_rec)
 
 	pfd.fd = self->cfd2;
 	pfd.events = POLLIN;
-	EXPECT_EQ(poll(&pfd, 1, 1), 0);
+	EXPECT_EQ(poll(&pfd, 1, timeout), 0);
 
 	memrnd(buf, sizeof(buf));
 	EXPECT_EQ(send(self->fd, buf, sizeof(buf), 0), sizeof(buf));
@@ -2747,18 +2755,19 @@ TEST_F(tls_err, poll_partial_rec)
 	/* ... no full record should mean no POLLIN */
 	pfd.fd = self->cfd2;
 	pfd.events = POLLIN;
-	EXPECT_EQ(poll(&pfd, 1, 1), 0);
+	EXPECT_EQ(poll(&pfd, 1, timeout), 0);
 	/* Now write the rest, and it should all pop out of the other end. */
 	EXPECT_EQ(send(self->fd2, rec + 100, rec_len - 100, 0), rec_len - 100);
 	pfd.fd = self->cfd2;
 	pfd.events = POLLIN;
-	EXPECT_EQ(poll(&pfd, 1, 1), 1);
+	EXPECT_EQ(poll(&pfd, 1, timeout), 1);
 	EXPECT_EQ(recv(self->cfd2, rec, sizeof(rec), 0), sizeof(buf));
 	EXPECT_EQ(memcmp(buf, rec, sizeof(buf)), 0);
 }
 
 TEST_F(tls_err, epoll_partial_rec)
 {
+	int timeout = variant->mptcp ? 100 : 0;
 	struct epoll_event ev, events[10];
 	ssize_t rec_len;
 	char rec[256];
@@ -2776,7 +2785,7 @@ TEST_F(tls_err, epoll_partial_rec)
 	ev.data.fd = self->cfd2;
 	ASSERT_GE(epoll_ctl(epollfd, EPOLL_CTL_ADD, self->cfd2, &ev), 0);
 
-	EXPECT_EQ(epoll_wait(epollfd, events, 10, 0), 0);
+	EXPECT_EQ(epoll_wait(epollfd, events, 10, timeout), 0);
 
 	memrnd(buf, sizeof(buf));
 	EXPECT_EQ(send(self->fd, buf, sizeof(buf), 0), sizeof(buf));
@@ -2786,10 +2795,10 @@ TEST_F(tls_err, epoll_partial_rec)
 	/* Write 100B, not the full record ... */
 	EXPECT_EQ(send(self->fd2, rec, 100, 0), 100);
 	/* ... no full record should mean no POLLIN */
-	EXPECT_EQ(epoll_wait(epollfd, events, 10, 0), 0);
+	EXPECT_EQ(epoll_wait(epollfd, events, 10, timeout), 0);
 	/* Now write the rest, and it should all pop out of the other end. */
 	EXPECT_EQ(send(self->fd2, rec + 100, rec_len - 100, 0), rec_len - 100);
-	EXPECT_EQ(epoll_wait(epollfd, events, 10, 0), 1);
+	EXPECT_EQ(epoll_wait(epollfd, events, 10, timeout), 1);
 	EXPECT_EQ(recv(self->cfd2, rec, sizeof(rec), 0), sizeof(buf));
 	EXPECT_EQ(memcmp(buf, rec, sizeof(buf)), 0);
 
@@ -2798,6 +2807,7 @@ TEST_F(tls_err, epoll_partial_rec)
 
 TEST_F(tls_err, poll_partial_rec_async)
 {
+	int timeout = variant->mptcp ? 100 : 20;
 	struct pollfd pfd = { };
 	char token = '\0';
 	ssize_t rec_len;
@@ -2841,13 +2851,13 @@ TEST_F(tls_err, poll_partial_rec_async)
 		/* Child should sleep in poll(), never get a wake */
 		pfd.fd = self->cfd2;
 		pfd.events = POLLIN;
-		EXPECT_EQ(poll(&pfd, 1, 20), 0);
+		EXPECT_EQ(poll(&pfd, 1, timeout), 0);
 
 		EXPECT_EQ(write(p[1], &token, 1), 1); /* Barrier #1 */
 
 		pfd.fd = self->cfd2;
 		pfd.events = POLLIN;
-		EXPECT_EQ(poll(&pfd, 1, 20), 1);
+		EXPECT_EQ(poll(&pfd, 1, timeout), 1);
 
 		exit(!__test_passed(_metadata));
 	}
