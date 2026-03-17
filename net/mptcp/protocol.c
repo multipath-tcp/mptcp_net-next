@@ -653,6 +653,33 @@ static void mptcp_dss_corruption(struct mptcp_sock *msk, struct sock *ssk)
 	}
 }
 
+static int mptcp_queue_backlog(struct mptcp_sock *msk, struct sk_buff *skb)
+{
+	u64 seq = MPTCP_SKB_CB(skb)->map_seq;
+	struct rb_node **p, *parent = NULL;
+
+	p = &msk->backlog_queue.rb_node;
+	if (RB_EMPTY_ROOT(&msk->backlog_queue))
+		goto insert;
+
+	while (*p) {
+		struct sk_buff *s;
+
+		parent = *p;
+		s = rb_to_skb(parent);
+
+		if (before64(seq, MPTCP_SKB_CB(s)->map_seq))
+			p = &parent->rb_left;
+		else
+			p = &parent->rb_right;
+	}
+
+insert:
+	rb_link_node(&skb->rbnode, parent, p);
+	rb_insert_color(&skb->rbnode, &msk->backlog_queue);
+	return 0;
+}
+
 static void __mptcp_add_backlog(struct sock *sk,
 				struct mptcp_subflow_context *subflow,
 				struct sk_buff *skb)
@@ -669,8 +696,8 @@ static void __mptcp_add_backlog(struct sock *sk,
 	}
 
 	/* Try to coalesce with the last skb in our backlog */
-	if (!list_empty(&msk->backlog_list))
-		tail = list_last_entry(&msk->backlog_list, struct sk_buff, list);
+	if (!RB_EMPTY_ROOT(&msk->backlog_queue))
+		tail = skb_rb_last(&msk->backlog_queue);
 
 	if (tail && MPTCP_SKB_CB(skb)->map_seq == MPTCP_SKB_CB(tail)->end_seq &&
 	    ssk == tail->sk &&
@@ -681,7 +708,7 @@ static void __mptcp_add_backlog(struct sock *sk,
 		goto account;
 	}
 
-	list_add_tail(&skb->list, &msk->backlog_list);
+	mptcp_queue_backlog(msk, skb);
 	mptcp_subflow_lend_fwdmem(subflow, skb);
 	delta = skb->truesize;
 
@@ -2197,6 +2224,29 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 	return moved;
 }
 
+static void mptcp_backlog_queue_to_list(struct mptcp_sock *msk,
+					struct list_head *list)
+{
+	struct sk_buff *skb;
+
+	while ((skb = skb_rb_first(&msk->backlog_queue)) != NULL) {
+		rb_erase(&skb->rbnode, &msk->backlog_queue);
+		RB_CLEAR_NODE(&skb->rbnode);
+		list_add_tail(&skb->list, list);
+	}
+}
+
+static void mptcp_backlog_list_to_queue(struct mptcp_sock *msk,
+					struct list_head *list)
+{
+	struct sk_buff *skb, *tmp;
+
+	list_for_each_entry_safe(skb, tmp, list, list) {
+		list_del(&skb->list);
+		mptcp_queue_backlog(msk, skb);
+	}
+}
+
 static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -2208,12 +2258,12 @@ static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
 			       mem_cgroup_from_sk(sk));
 
 	/* Don't spool the backlog if the rcvbuf is full. */
-	if (list_empty(&msk->backlog_list) ||
+	if (RB_EMPTY_ROOT(&msk->backlog_queue) ||
 	    sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
 		return false;
 
 	INIT_LIST_HEAD(skbs);
-	list_splice_init(&msk->backlog_list, skbs);
+	mptcp_backlog_queue_to_list(msk, skbs);
 	return true;
 }
 
@@ -2223,7 +2273,7 @@ static void mptcp_backlog_spooled(struct sock *sk, u32 moved,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
 	WRITE_ONCE(msk->backlog_len, msk->backlog_len - moved);
-	list_splice(skbs, &msk->backlog_list);
+	mptcp_backlog_list_to_queue(msk, skbs);
 }
 
 static bool mptcp_move_skbs(struct sock *sk)
@@ -2307,7 +2357,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 		copied += bytes_read;
 
-		if (!list_empty(&msk->backlog_list) && mptcp_move_skbs(sk))
+		if (!RB_EMPTY_ROOT(&msk->backlog_queue) && mptcp_move_skbs(sk))
 			continue;
 
 		/* only the MPTCP socket status is relevant here. The exit
@@ -2636,7 +2686,7 @@ void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	/* Remove any reference from the backlog to this ssk; backlog skbs consume
 	 * space in the msk receive queue, no need to touch sk->sk_rmem_alloc
 	 */
-	list_for_each_entry(skb, &msk->backlog_list, list) {
+	skb_rbtree_walk(skb, &msk->backlog_queue) {
 		if (skb->sk != ssk)
 			continue;
 
@@ -2892,7 +2942,7 @@ static void mptcp_backlog_purge(struct sock *sk)
 	LIST_HEAD(backlog);
 
 	mptcp_data_lock(sk);
-	list_splice_init(&msk->backlog_list, &backlog);
+	mptcp_backlog_queue_to_list(msk, &backlog);
 	msk->backlog_len = 0;
 	mptcp_data_unlock(sk);
 
@@ -2995,7 +3045,7 @@ static void __mptcp_init_sock(struct sock *sk)
 	INIT_LIST_HEAD(&msk->conn_list);
 	INIT_LIST_HEAD(&msk->join_list);
 	INIT_LIST_HEAD(&msk->rtx_queue);
-	INIT_LIST_HEAD(&msk->backlog_list);
+	msk->backlog_queue = RB_ROOT;
 	INIT_WORK(&msk->work, mptcp_worker);
 	msk->out_of_order_queue = RB_ROOT;
 	msk->first_pending = NULL;
@@ -4331,7 +4381,7 @@ static struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off)
 	struct sk_buff *skb;
 	u32 offset;
 
-	if (!list_empty(&msk->backlog_list))
+	if (!RB_EMPTY_ROOT(&msk->backlog_queue))
 		mptcp_move_skbs(sk);
 
 	while ((skb = skb_peek(&sk->sk_receive_queue)) != NULL) {

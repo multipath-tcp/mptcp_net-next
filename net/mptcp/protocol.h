@@ -372,7 +372,7 @@ struct mptcp_sock {
 					 * allow_join
 					 */
 
-	struct list_head backlog_list;	/* protected by the data lock */
+	struct rb_root	backlog_queue;	/* protected by the data lock */
 	u32		backlog_len;
 	u32		backlog_unaccounted;
 };
