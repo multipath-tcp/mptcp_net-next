@@ -1469,9 +1469,8 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 }
 EXPORT_SYMBOL(tcp_sendmsg);
 
-void tcp_splice_eof(struct socket *sock)
+void do_tcp_splice_eof(struct sock *sk)
 {
-	struct sock *sk = sock->sk;
 	struct tcp_sock *tp = tcp_sk(sk);
 	int mss_now, size_goal;
 
@@ -1482,6 +1481,11 @@ void tcp_splice_eof(struct socket *sock)
 	mss_now = tcp_send_mss(sk, &size_goal, 0);
 	tcp_push(sk, 0, mss_now, tp->nonagle, size_goal);
 	release_sock(sk);
+}
+
+void tcp_splice_eof(struct socket *sock)
+{
+	do_tcp_splice_eof(sock->sk);
 }
 EXPORT_IPV6_MOD_GPL(tcp_splice_eof);
 
