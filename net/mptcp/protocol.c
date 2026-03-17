@@ -29,6 +29,10 @@
 #include "mib.h"
 
 static unsigned int mptcp_inq_hint(const struct sock *sk);
+static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs);
+static void mptcp_backlog_spooled(struct sock *sk, u32 moved,
+				  struct list_head *skbs);
+static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delta);
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/mptcp.h>
@@ -892,6 +896,17 @@ static bool move_skbs_to_msk(struct mptcp_sock *msk, struct sock *ssk)
 	bool moved;
 
 	moved = __mptcp_move_skbs_from_subflow(msk, ssk, true);
+	if (!moved && skb_queue_empty(&sk->sk_receive_queue) &&
+	    !RB_EMPTY_ROOT(&msk->backlog_queue)) {
+		struct list_head skbs;
+		u32 delta;
+
+		while (mptcp_can_spool_backlog(sk, &skbs)) {
+			moved |= __mptcp_move_skbs(sk, &skbs, &delta);
+			mptcp_backlog_spooled(sk, moved, &skbs);
+		}
+	}
+
 	__mptcp_ofo_queue(msk);
 	if (unlikely(ssk->sk_err))
 		__mptcp_subflow_error_report(sk, ssk);
