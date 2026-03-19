@@ -26,6 +26,10 @@
 #define TLS_PAYLOAD_MAX_LEN 16384
 #define SOL_TLS 282
 
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP 262
+#endif
+
 static int fips_enabled;
 
 struct tls_crypto_info_keys {
@@ -109,7 +113,8 @@ static void memrnd(void *s, size_t n)
 }
 
 static void ulp_sock_pair(struct __test_metadata *_metadata,
-			  int *fd, int *cfd, bool *notls)
+			  int *fd, int *cfd, bool *notls,
+			  int cli_proto, int srv_proto)
 {
 	struct sockaddr_in addr;
 	socklen_t len;
@@ -122,8 +127,8 @@ static void ulp_sock_pair(struct __test_metadata *_metadata,
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = 0;
 
-	*fd = socket(AF_INET, SOCK_STREAM, 0);
-	sfd = socket(AF_INET, SOCK_STREAM, 0);
+	*fd = socket(AF_INET, SOCK_STREAM, cli_proto);
+	sfd = socket(AF_INET, SOCK_STREAM, srv_proto);
 
 	ret = bind(sfd, &addr, sizeof(addr));
 	ASSERT_EQ(ret, 0);
@@ -232,7 +237,7 @@ FIXTURE(tls_basic)
 
 FIXTURE_SETUP(tls_basic)
 {
-	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
+	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls, 0, 0);
 }
 
 FIXTURE_TEARDOWN(tls_basic)
@@ -310,6 +315,7 @@ FIXTURE_VARIANT(tls)
 	uint16_t tls_version;
 	uint16_t cipher_type;
 	bool nopad, fips_non_compliant;
+	bool mptcp;
 };
 
 FIXTURE_VARIANT_ADD(tls, 12_aes_gcm)
@@ -407,7 +413,9 @@ FIXTURE_SETUP(tls)
 	tls_crypto_info_init(variant->tls_version, variant->cipher_type,
 			     &tls12, 0);
 
-	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
+	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls,
+		      variant->mptcp ? IPPROTO_MPTCP : 0,
+		      variant->mptcp ? IPPROTO_MPTCP : 0);
 
 	if (self->notls)
 		return;
@@ -2473,7 +2481,7 @@ FIXTURE_SETUP(zero_len)
 	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_CCM_128,
 			     &tls12, 0);
 
-	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
+	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls, 0, 0);
 	if (self->notls)
 		return;
 
@@ -2554,8 +2562,8 @@ FIXTURE_SETUP(tls_err)
 	tls_crypto_info_init(variant->tls_version, TLS_CIPHER_AES_GCM_128,
 			     &tls12, 0);
 
-	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls);
-	ulp_sock_pair(_metadata, &self->fd2, &self->cfd2, &self->notls);
+	ulp_sock_pair(_metadata, &self->fd, &self->cfd, &self->notls, 0, 0);
+	ulp_sock_pair(_metadata, &self->fd2, &self->cfd2, &self->notls, 0, 0);
 	if (self->notls)
 		return;
 
@@ -2906,7 +2914,7 @@ TEST(tls_12_tx_max_payload_len)
 	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_CCM_128,
 			     &tls12, 0);
 
-	ulp_sock_pair(_metadata, &fd, &cfd, &notls);
+	ulp_sock_pair(_metadata, &fd, &cfd, &notls, 0, 0);
 
 	if (notls)
 		exit(KSFT_SKIP);
@@ -2955,7 +2963,7 @@ TEST(tls_12_tx_max_payload_len_open_rec)
 	tls_crypto_info_init(TLS_1_2_VERSION, TLS_CIPHER_AES_CCM_128,
 			     &tls12, 0);
 
-	ulp_sock_pair(_metadata, &fd, &cfd, &notls);
+	ulp_sock_pair(_metadata, &fd, &cfd, &notls, 0, 0);
 
 	if (notls)
 		exit(KSFT_SKIP);
@@ -3058,7 +3066,7 @@ TEST(keysizes) {
 	tls12.info.version = TLS_1_2_VERSION;
 	tls12.info.cipher_type = TLS_CIPHER_AES_GCM_256;
 
-	ulp_sock_pair(_metadata, &fd, &cfd, &notls);
+	ulp_sock_pair(_metadata, &fd, &cfd, &notls, 0, 0);
 
 	if (!notls) {
 		ret = setsockopt(fd, SOL_TLS, TLS_TX, &tls12,
@@ -3084,7 +3092,7 @@ TEST(no_pad) {
 	tls12.info.version = TLS_1_3_VERSION;
 	tls12.info.cipher_type = TLS_CIPHER_AES_GCM_256;
 
-	ulp_sock_pair(_metadata, &fd, &cfd, &notls);
+	ulp_sock_pair(_metadata, &fd, &cfd, &notls, 0, 0);
 
 	if (notls)
 		exit(KSFT_SKIP);
