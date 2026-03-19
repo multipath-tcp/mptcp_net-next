@@ -1,2 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/MPTCP-fix-lock-class-name-family-in-pm_nl_create_listen_socket
+From: Li Xiasong <lixiasong1@huawei.com>
+Subject: [PATCH] MPTCP: fix lock class name family in pm_nl_create_listen_socket
+
+In mptcp_pm_nl_create_listen_socket(), use entry->addr.family
+instead of sk->sk_family for lock class setup. The 'sk' parameter
+is a netlink socket, not the MPTCP subflow socket being created.
+
+Fixes: cee4034a3db1 ("mptcp: fix lockdep false positive in mptcp_pm_nl_create_listen_socket()")
+Signed-off-by: Li Xiasong <lixiasong1@huawei.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
