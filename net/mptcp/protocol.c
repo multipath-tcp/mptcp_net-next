@@ -561,12 +561,11 @@ static void mptcp_send_ack(struct mptcp_sock *msk)
 
 static void mptcp_subflow_cleanup_rbuf(struct sock *ssk, int copied)
 {
-	bool slow;
-
-	slow = lock_sock_fast(ssk);
-	if (tcp_can_send_ack(ssk))
+	if (!spin_trylock_bh(&ssk->sk_lock.slock))
+		return;
+	if (!sock_owned_by_user(ssk) && tcp_can_send_ack(ssk))
 		tcp_cleanup_rbuf(ssk, copied);
-	unlock_sock_fast(ssk, slow);
+	spin_unlock_bh(&ssk->sk_lock.slock);
 }
 
 static bool mptcp_subflow_could_cleanup(const struct sock *ssk, bool rx_empty)
@@ -2194,14 +2193,15 @@ static void mptcp_rcv_space_adjust(struct mptcp_sock *msk, int copied)
 		 */
 		mptcp_for_each_subflow(msk, subflow) {
 			struct sock *ssk;
-			bool slow;
 
 			ssk = mptcp_subflow_tcp_sock(subflow);
-			slow = lock_sock_fast(ssk);
+			if (!spin_trylock_bh(&ssk->sk_lock.slock))
+				continue;
 			/* subflows can be added before tcp_init_transfer() */
-			if (tcp_sk(ssk)->rcvq_space.space)
+			if (!sock_owned_by_user(ssk) &&
+			    tcp_sk(ssk)->rcvq_space.space)
 				tcp_rcvbuf_grow(ssk, copied);
-			unlock_sock_fast(ssk, slow);
+			spin_unlock_bh(&ssk->sk_lock.slock);
 		}
 	}
 
