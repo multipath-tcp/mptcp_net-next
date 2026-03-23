@@ -114,7 +114,7 @@ jobs:
 
       - name: "Get latest kselftests"
         if: ${{ github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: "kselftests_src"
 
@@ -194,7 +194,7 @@ jobs:
 
       - name: "Artifacts (always)"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.version }}-${{ matrix.mode }}
           path: |
@@ -207,7 +207,7 @@ jobs:
 
       - name: "Artifacts (failure)"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debug-info-${{ matrix.version }}-${{ matrix.mode }}
           path: |
@@ -237,7 +237,7 @@ jobs:
 
     steps:
       - name: get results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-${{ matrix.version }}-*
           merge-multiple: false
@@ -277,13 +277,13 @@ jobs:
 
     steps:
       - name: Checkout results repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: "multipath-tcp/mptcp-upstream-tests-results"
           token: '${{ secrets.PAT_MATTTBE }}'
 
       - name: get results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-*
           merge-multiple: false
