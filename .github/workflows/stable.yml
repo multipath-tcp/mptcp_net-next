@@ -178,6 +178,7 @@ jobs:
               if [ -s patches/series ]; then
                 echo '<details>'
                 echo "<summary>Stable queue patches at $(cat stable-queue/HEAD.txt || true):</summary>"
+                echo ''
                 echo '```'
                 cat patches/series
                 echo '```'
