@@ -41,13 +41,13 @@ jobs:
     steps:
       - name: "Checkout (light)"
         if: github.ref != 'refs/heads/export'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 100 # we should not have more commits on top of export and -net
 
       - name: "Checkout (export)"
         if: github.ref == 'refs/heads/export'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
 
@@ -65,7 +65,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.ccache
@@ -89,7 +89,7 @@ jobs:
 
       - name: "Artifacts"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.defconfig }}_${{ matrix.ipv6 }}_${{ matrix.mptcp }}
           path: ./build-*-results.txt
@@ -106,7 +106,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/.ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
@@ -160,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Get Results"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-*
           merge-multiple: true
@@ -299,7 +299,7 @@ jobs:
 
       - name: send email
         if: needs.build.result == 'failure'
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v16
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -307,7 +307,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           to: ${{ steps.commit.outputs.author }}
           cc: mptcp@lists.linux.dev
-          from: MPTCP CI
+          from: 'MPTCP CI <${{ secrets.MAIL_USERNAME }}>'
           reply_to: mptcp@lists.linux.dev
           in_reply_to: "<${{ steps.commit.outputs.mid }}>"
           subject: "Re: ${{ steps.commit.outputs.subject }}"
