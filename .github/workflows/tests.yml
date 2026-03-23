@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       #- name: "Collect Workflow Telemetry"
       #  uses: catchpoint/workflow-telemetry-action@v2
@@ -57,7 +57,7 @@ jobs:
           echo "realmode=${mode%_*}" >> ${GITHUB_OUTPUT}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
@@ -125,7 +125,7 @@ jobs:
 
       - name: "Artifacts (always)"
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.mode }}
           path: |
@@ -139,7 +139,7 @@ jobs:
 
       - name: "Artifacts (failure)"
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: debug-info-${{ matrix.mode }}
           path: |
@@ -147,7 +147,7 @@ jobs:
             kmemleak.txt
 
       - name: "Artifacts (LCov)"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lcov-${{ matrix.mode }}
           compression-level: 9
@@ -155,7 +155,7 @@ jobs:
             kernel.lcov
 
       - name: "Artifacts (code)"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: github.repository_owner == 'multipath-tcp' && matrix.mode == 'normal_nojoin' && (github.ref_name == 'export' || github.ref_name == 'export-net')
         with:
           name: code
@@ -187,7 +187,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
@@ -202,7 +202,7 @@ jobs:
 
     steps:
       - name: "Get results"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-*
           merge-multiple: false
@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: get results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-*
           merge-multiple: false
@@ -283,7 +283,7 @@ jobs:
 
       - name: Checkout results repo
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: "multipath-tcp/mptcp-upstream-tests-results"
           token: '${{ secrets.PAT_MATTTBE }}'
@@ -345,14 +345,14 @@ jobs:
 
       - name: get lcov
         if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: lcov-*
           merge-multiple: false
 
       - name: get code
         if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: code
           path: net/mptcp
@@ -520,7 +520,7 @@ jobs:
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v16
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -528,7 +528,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           to: ${{ steps.commit.outputs.author }}
           cc: mptcp@lists.linux.dev
-          from: MPTCP CI
+          from: 'MPTCP CI <${{ secrets.MAIL_USERNAME }}>'
           reply_to: mptcp@lists.linux.dev
           in_reply_to: "<${{ steps.series.outputs.mid }}>"
           subject: "Re: ${{ steps.series.outputs.subject }}"
@@ -582,7 +582,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Get Results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: results-*
           merge-multiple: false
