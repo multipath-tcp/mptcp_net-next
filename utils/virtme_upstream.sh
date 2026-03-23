@@ -40,6 +40,7 @@ if is_stable || is_net; then
    SUFFIX=$(make kernelversion | cut -d. -f1-2)
    PACKETDRILL_STABLE=1
    is_stable && [[ "${1}" != "vm"* ]] && CLEAN=1
+   : "${INPUT_CCACHE_MAXSIZE:=1G}"
 else
    SUFFIX=
    PACKETDRILL_STABLE=0
@@ -54,4 +55,5 @@ INPUT_BUILD_SKIP_PERF=1 \
    INPUT_CLEAN="${INPUT_CLEAN:-${CLEAN}}" \
    INPUT_BUILD_SUFFIX="${SUFFIX}" \
    INPUT_EXPECT_TIMEOUT=7200 \
+   INPUT_CCACHE_MAXSIZE="${INPUT_CCACHE_MAXSIZE:-5G}" \
    "./${VIRTME_SH:-.virtme.sh}" "${@:-auto-all}"
