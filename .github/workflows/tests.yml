@@ -520,7 +520,7 @@ jobs:
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v16
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -528,7 +528,7 @@ jobs:
           password: ${{ secrets.MAIL_PASSWORD }}
           to: ${{ steps.commit.outputs.author }}
           cc: mptcp@lists.linux.dev
-          from: MPTCP CI
+          from: 'MPTCP CI <${{ secrets.MAIL_USERNAME }}>'
           reply_to: mptcp@lists.linux.dev
           in_reply_to: "<${{ steps.series.outputs.mid }}>"
           subject: "Re: ${{ steps.series.outputs.subject }}"
