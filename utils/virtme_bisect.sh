@@ -99,6 +99,7 @@ rc=0
 for i in $(seq "${BOOT_RETRY}"); do
 	[ "${BOOT_RETRY}" != 1 ] && echo -e "\n\n\t=== Attempt: ${i} ===\n\n"
 	INPUT_BUILD_SUFFIX=${SUFFIX} \
+		INPUT_KOPTS="${INPUT_KOPTS:-panic_on_warn=1}" \
 		./.virtme.sh "vm-auto" "${MODE}" &
 	PID_VIRTME=$!
 
