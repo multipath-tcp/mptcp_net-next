@@ -47,6 +47,6 @@ R10: 0000000000000103 R11: 0000000000000246 R12: 00005605dbc00be0
 R13: 00007ffc3c4bb650 R14: 0000000000000000 R15: 0000000000000000
  </TASK>
 
-Fixes: 612f71d7328c ("mptcp: fix possible stall on recvmsg()")
+Fixes: 8e04ce45a8db ("mptcp: fix MSG_PEEK stream corruption")
 Signed-off-by: Li Xiasong <lixiasong1@huawei.com>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
