@@ -427,6 +427,7 @@ jobs:
           echo "committer=${COMMITTER}" >> ${GITHUB_OUTPUT}
 
       - name: set patchwork check
+        id: pwcheck
         if: startswith(github.ref, 'refs/tags/patchew/')
         run: |
           CHECK_URLS=()
@@ -475,6 +476,7 @@ jobs:
             exit 1
           fi
           echo "Found: ${#CHECK_URLS[@]} urls after ${i} attempts: ${CHECK_URLS[@]}"
+          echo "urls=$(printf '%s,' "${CHECK_URLS[@]}")" >> ${GITHUB_OUTPUT}
 
           submit "${{ steps.test.outputs.ccl_title_normal_nojoin }}" "${{ steps.test.outputs.ccl_status_normal_nojoin }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_normal_join }}" "${{ steps.test.outputs.ccl_status_normal_join }}" "${{ steps.test.outputs.url }}"
@@ -517,6 +519,65 @@ jobs:
           URL_LORE: "https://lore.kernel.org/mptcp/MID/raw"
           MID: "<${{ steps.commit.outputs.mid }}>"
           SUBJECT: "${{ steps.commit.outputs.subject }}"
+
+      - name: set sashiko status
+        if: startswith(github.ref, 'refs/tags/patchew/')
+        continue-on-error: true
+        run: |
+          IFS=',' read -r -a CHECK_URLS <<< "${CHECKS}"
+          if [ -z "${CHECK_URLS[*]}" ]; then
+            echo "No check URLs: exit"
+            exit 1
+          fi
+
+          if ! curl ${CURL_OPT} -A "${PW_AGENT}" -o sashiko.json \
+                    "https://sashiko.dev/api/patch?id=${CID}" ||
+             [ ! -s sashiko.json ]; then
+            echo "Unable to fetch sashiko reviews"
+            exit 1
+          fi
+
+          rc=0
+          i=0
+          for check_url in "${CHECK_URLS[@]}"; do
+            output=$(jq -er ".reviews.[${i}].output" sashiko.json | jq -er .review_inline | head -n1)
+            if [ -z "${output}" ]; then
+              echo "No review for patch ${i} yet"
+              state="pending"
+              description="Check on sashiko.dev."
+            elif [ "${output}" = "No issues found." ]; then
+              state="success"
+              description="${output}"
+            elif jq -er ".reviews.[${i}].output" sashiko.json | \
+                 jq -er ".findings.[].severity" | \
+                 grep -wq -e High -e Critical; then
+              state="fail"
+              description="High/Critical issues found."
+            else
+              state="warning"
+              description="Medium/Low issues found."
+            fi
+
+            if ! curl ${CURL_OPT} \
+                      -A "${PW_AGENT}" \
+                      -X POST \
+                      -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
+                      -F "state=${state}" \
+                      -F "target_url=https://sashiko.dev/#/patchset/${CID}" \
+                      -F "context=sashiko" \
+                      -F "description=${description}" \
+                      "${check_url}"; then
+              echo "Unable to add check on ${check_url}"
+              rc=1
+            fi
+
+            i=$((i+1))
+          done
+
+          exit ${rc}
+        env:
+          CHECKS: "${{ steps.pwcheck.outputs.urls }}"
+          CID: "${{ steps.series.outputs.mid }}"
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
