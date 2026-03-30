@@ -540,22 +540,30 @@ jobs:
           rc=0
           i=0
           for check_url in "${CHECK_URLS[@]}"; do
-            output=$(jq -er ".reviews.[${i}].output" sashiko.json | jq -er .review_inline | head -n1)
-            if [ -z "${output}" ] || [ "${output}" = "null" ]; then
+            output=$(jq -er ".reviews.[${i}].output" sashiko.json | \
+                     jq -er ".review_inline" | head -n1)
+            crit=0; high=0; med=0; low=0
+            for sev in $(jq -er ".reviews.[${i}].output" sashiko.json | \
+                         jq -er ".findings.[].severity" 2>/dev/null || true); do
+              case "${sev}" in
+                "Critical") crit=$((crit + 1));;
+                "High")     high=$((high + 1));;
+                "Medium")   med=$((med + 1));;
+                "Low")      low=$((low + 1));;
+              esac
+            done
+            desc="${crit} Critical, ${high} High, ${med} Medium, ${low} Low"
+            if [ "${output}" = "No issues found." ]; then
+              state="success"
+              desc="${output}"
+            elif [ "${crit}${high}" != "00" ]; then
+              state="fail"
+            elif [ "${med}${low}" != "00" ]; then
+              state="warning"
+            else
               echo "No reviews for patch ${i} yet"
               state="pending"
-              description="Check on sashiko.dev."
-            elif [ "${output}" = "No issues found." ]; then
-              state="success"
-              description="${output}"
-            elif jq -er ".reviews.[${i}].output" sashiko.json | \
-                 jq -er ".findings.[].severity" | \
-                 grep -wq -e High -e Critical; then
-              state="fail"
-              description="High/Critical issues found."
-            else
-              state="warning"
-              description="Medium/Low issues found."
+              desc="Check on sashiko.dev."
             fi
 
             if ! curl ${CURL_OPT} \
@@ -565,7 +573,7 @@ jobs:
                       -F "state=${state}" \
                       -F "target_url=https://sashiko.dev/#/patchset/${CID}" \
                       -F "context=sashiko" \
-                      -F "description=${description}" \
+                      -F "description=${desc}" \
                       "${check_url}"; then
               echo "Unable to add check on ${check_url}"
               rc=1
