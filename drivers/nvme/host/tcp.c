@@ -2906,6 +2906,15 @@ static const struct nvme_tcp_sockops nvme_tcp_sockops = {
 	.set_tos	= ip_sock_set_tos,
 };
 
+static const struct nvme_tcp_sockops nvme_mptcp_sockops = {
+	.proto		= IPPROTO_MPTCP,
+	.set_syncnt	= mptcp_sock_set_syncnt,
+	.set_nodelay	= mptcp_sock_set_nodelay,
+	.no_linger	= mptcp_sock_no_linger,
+	.set_priority	= mptcp_sock_set_priority,
+	.set_tos	= mptcp_sock_set_tos,
+};
+
 static struct nvme_tcp_ctrl *nvme_tcp_alloc_ctrl(struct device *dev,
 		struct nvmf_ctrl_options *opts)
 {
@@ -2982,6 +2991,10 @@ static struct nvme_tcp_ctrl *nvme_tcp_alloc_ctrl(struct device *dev,
 
 	if (!strcmp(ctrl->ctrl.opts->transport, "tcp")) {
 		ctrl->sockops = nvme_tcp_sockops;
+#ifdef CONFIG_MPTCP
+	} else if (!strcmp(ctrl->ctrl.opts->transport, "mptcp")) {
+		ctrl->sockops = nvme_mptcp_sockops;
+#endif
 	} else {
 		ret = -EINVAL;
 		goto out_kfree_queues;
