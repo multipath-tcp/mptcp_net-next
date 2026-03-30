@@ -2197,6 +2197,12 @@ new_measure:
 	msk->rcvq_space.time = mstamp;
 }
 
+static bool mptcp_can_dequeue_from_backlog(struct sock *sk)
+{
+	return sk_rmem_alloc_get(sk) <= sk->sk_rcvbuf ||
+	       skb_queue_empty(&sk->sk_receive_queue);
+}
+
 static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delta)
 {
 	struct sk_buff *skb = list_first_entry(skbs, struct sk_buff, list);
@@ -2206,7 +2212,7 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 	*delta = 0;
 	while (1) {
 		/* If the msk recvbuf is full stop, don't drop */
-		if (sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
+		if (!mptcp_can_dequeue_from_backlog(sk))
 			break;
 
 		prefetch(skb->next);
@@ -2261,7 +2267,7 @@ static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
 
 	/* Don't spool the backlog if the rcvbuf is full. */
 	if (RB_EMPTY_ROOT(&msk->backlog_queue) ||
-	    sk_rmem_alloc_get(sk) > sk->sk_rcvbuf)
+	    !mptcp_can_dequeue_from_backlog(sk))
 		return false;
 
 	INIT_LIST_HEAD(skbs);
