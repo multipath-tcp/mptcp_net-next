@@ -49,6 +49,11 @@ static struct percpu_counter mptcp_sockets_allocated ____cacheline_aligned_in_sm
 
 static void __mptcp_destroy_sock(struct sock *sk);
 static void mptcp_check_send_data_fin(struct sock *sk);
+static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs);
+static void mptcp_backlog_spooled(struct sock *sk, u32 moved,
+				  struct list_head *skbs);
+static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs,
+			      u32 *delta);
 
 DEFINE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions) = {
 	.bh_lock = INIT_LOCAL_LOCK(bh_lock),
@@ -906,6 +911,19 @@ static bool move_skbs_to_msk(struct mptcp_sock *msk, struct sock *ssk)
 	return moved;
 }
 
+static bool move_skbs_from_backlog(struct sock *sk)
+{
+	struct list_head skbs;
+	bool enqueued = false;
+	u32 moved;
+
+	while (mptcp_can_spool_backlog(sk, &skbs)) {
+		enqueued |= __mptcp_move_skbs(sk, &skbs, &moved);
+		mptcp_backlog_spooled(sk, moved, &skbs);
+	}
+	return enqueued;
+}
+
 static void mptcp_rcv_rtt_update(struct mptcp_sock *msk,
 				 struct mptcp_subflow_context *subflow)
 {
@@ -948,7 +966,9 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 	mptcp_rcv_rtt_update(msk, subflow);
 	if (!sock_owned_by_user(sk)) {
 		/* Wake-up the reader only for in-sequence data */
-		if (move_skbs_to_msk(msk, ssk) && mptcp_epollin_ready(sk))
+		if ((move_skbs_to_msk(msk, ssk) ||
+		     move_skbs_from_backlog(sk)) &&
+		    mptcp_epollin_ready(sk))
 			sk->sk_data_ready(sk);
 	} else {
 		__mptcp_move_skbs_from_subflow(msk, ssk, false);
