@@ -541,8 +541,8 @@ jobs:
           i=0
           for check_url in "${CHECK_URLS[@]}"; do
             output=$(jq -er ".reviews.[${i}].output" sashiko.json | jq -er .review_inline | head -n1)
-            if [ -z "${output}" ]; then
-              echo "No review for patch ${i} yet"
+            if [ -z "${output}" ] || [ "${output}" = "null" ]; then
+              echo "No reviews for patch ${i} yet"
               state="pending"
               description="Check on sashiko.dev."
             elif [ "${output}" = "No issues found." ]; then
