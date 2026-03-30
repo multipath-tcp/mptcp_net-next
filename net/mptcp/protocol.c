@@ -2050,6 +2050,7 @@ static int __mptcp_recvmsg_mskq(struct sock *sk, struct msghdr *msg,
 			/* skip already peeked skbs */
 			if (total_data_len + data_len <= copied_total) {
 				total_data_len += data_len;
+				*last = skb;
 				continue;
 			}
 
