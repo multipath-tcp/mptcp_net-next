@@ -4417,6 +4417,25 @@ endpoint_tests()
 	fi
 }
 
+rcvbuf_tests()
+{
+	if reset "4 subflows with reduced rcvbuf"; then
+		local tcp_rmem=$(ip netns exec $ns2 sysctl -n net.ipv4.tcp_rmem)
+		ip netns exec $ns2 sysctl -w net.ipv4.tcp_rmem="4096 4096 4096"
+
+		pm_nl_set_limits $ns1 0 4
+		pm_nl_set_limits $ns2 0 4
+		pm_nl_add_endpoint $ns2 10.0.2.2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.3.2 flags subflow
+		pm_nl_add_endpoint $ns2 10.0.4.2 flags subflow
+		speed=fast test_linkfail=1024 \
+			run_tests $ns1 $ns2 10.0.1.1
+		chk_join_nr 3 3 3
+
+		ip netns exec $ns2 sysctl -w net.ipv4.tcp_rmem="$tcp_rmem"
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -4467,6 +4486,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	R@rcvbuf_tests
 )
 
 all_tests_args=""
