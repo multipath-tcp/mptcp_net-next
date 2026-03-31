@@ -195,6 +195,7 @@ jobs:
               return 1
             fi
 
+            echo "Sending ${2} state: $(date -R)"
             curl ${CURL_OPT} \
               -A "${PW_AGENT}" \
               -X POST \
@@ -203,7 +204,10 @@ jobs:
               -F "target_url=${URL_GH}" \
               -F "context=build" \
               -F "description=${3}" \
-              "${check_url}"
+              "${check_url}" || return ${?}
+            echo "State ${2} sent: $(date -R)"
+
+            sleep 5
           }
 
           FIRST=1
