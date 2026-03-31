@@ -16,7 +16,7 @@ on:
       # So we test the "export" branch and we try to find the tag later
 
 env:
-  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10 --retry-all-errors"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors"
   CURL_ACC: "Accept: application/vnd.github.v3+json"
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
@@ -453,7 +453,9 @@ jobs:
               STATE="fail"
             fi
 
+            i=1
             for check_url in "${CHECK_URLS[@]}"; do
+              echo "Patch ${i}, sending ${STATE} state: $(date -R)"
               curl ${CURL_OPT} \
                 -A "${PW_AGENT}" \
                 -X POST \
@@ -463,6 +465,9 @@ jobs:
                 -F "context=${1//[ :()]/_}" \
                 -F "description=${2}" \
                 "${check_url}"
+              echo "Patch ${i}, ${STATE} state sent: $(date -R)"
+              sleep 5
+              i=$((i+1))
             done
           }
 
@@ -566,6 +571,7 @@ jobs:
               desc="Check on sashiko.dev."
             fi
 
+            echo "Patch $((i + 1)), sending ${state} state: $(date -R)"
             if ! curl ${CURL_OPT} \
                       -A "${PW_AGENT}" \
                       -X POST \
@@ -578,6 +584,8 @@ jobs:
               echo "Unable to add check on ${check_url}"
               rc=1
             fi
+            echo "Patch $((i + 1)), ${state} state sent: $(date -R)"
+            sleep 5
 
             i=$((i+1))
           done
