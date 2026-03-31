@@ -4625,6 +4625,10 @@ void __init mptcp_proto_init(void)
 	inet_register_protosw(&mptcp_protosw);
 
 	BUILD_BUG_ON(sizeof(struct mptcp_skb_cb) > sizeof_field(struct sk_buff, cb));
+	/* ensure 'overhead' (alignment + sizeof(struct mptcp_data_frag)) fits in u8.
+	 * 'ALIGN(1, sizeof(long)) - 1' represents the maximum of alignment.
+	 */
+	BUILD_BUG_ON(ALIGN(1, sizeof(long)) - 1 + sizeof(struct mptcp_data_frag) > U8_MAX);
 }
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
