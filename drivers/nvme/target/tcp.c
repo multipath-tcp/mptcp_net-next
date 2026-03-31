@@ -2052,6 +2052,17 @@ static const struct nvmet_tcp_sockops nvmet_tcp_sockops = {
 	.set_tos	= ip_sock_set_tos,
 };
 
+#ifdef CONFIG_MPTCP
+static const struct nvmet_tcp_sockops nvmet_mptcp_sockops = {
+	.proto		= IPPROTO_MPTCP,
+	.set_reuseaddr	= mptcp_sock_set_reuseaddr,
+	.set_nodelay	= mptcp_sock_set_nodelay,
+	.set_priority	= mptcp_sock_set_priority,
+	.no_linger	= mptcp_sock_no_linger,
+	.set_tos	= mptcp_sock_set_tos,
+};
+#endif
+
 static int nvmet_tcp_add_port(struct nvmet_port *nport)
 {
 	struct nvmet_tcp_port *port;
@@ -2078,6 +2089,10 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 
 	if (nport->disc_addr.trtype == NVMF_TRTYPE_TCP) {
 		port->sockops = &nvmet_tcp_sockops;
+#ifdef CONFIG_MPTCP
+	} else if (nport->disc_addr.trtype == NVMF_TRTYPE_MPTCP) {
+		port->sockops = &nvmet_mptcp_sockops;
+#endif
 	} else {
 		ret = -EINVAL;
 		goto err_port;
