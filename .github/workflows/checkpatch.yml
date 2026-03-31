@@ -12,7 +12,7 @@ on:
       - 'patchew/**'     # patchew is using tags
 
 env:
-  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 20 --retry-delay 10 --retry-all-errors"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors"
   PW: "https://patchwork.kernel.org/api/1.2"
   PW_AGENT: "mptcp-ci/1.0 (matttbe@kernel.org)"
   CHECKPATCH_RESULTS: "./checkpatch-results.txt"
@@ -102,6 +102,7 @@ jobs:
               return 1
             fi
 
+            echo "Sending ${2} state: $(date -R)"
             curl ${CURL_OPT} \
               -A "${PW_AGENT}" \
               -X POST \
@@ -110,7 +111,10 @@ jobs:
               -F "target_url=${URL_GH}" \
               -F "context=${4}" \
               -F "description=${3}" \
-              "${check_url}"
+              "${check_url}" || return ${?}
+            echo "State ${2} sent: $(date -R)"
+
+            sleep 5
           }
 
           FIRST=1
