@@ -207,7 +207,7 @@ jobs:
               "${check_url}" || return ${?}
             echo "State ${2} sent: $(date -R)"
 
-            sleep 5
+            sleep 1
           }
 
           FIRST=1
