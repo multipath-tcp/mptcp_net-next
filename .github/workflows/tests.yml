@@ -466,7 +466,7 @@ jobs:
                 -F "description=${2}" \
                 "${check_url}"
               echo "Patch ${i}, ${STATE} state sent: $(date -R)"
-              sleep 5
+              sleep 1
               i=$((i+1))
             done
           }
@@ -585,7 +585,7 @@ jobs:
               rc=1
             fi
             echo "Patch $((i + 1)), ${state} state sent: $(date -R)"
-            sleep 5
+            sleep 1
 
             i=$((i+1))
           done
