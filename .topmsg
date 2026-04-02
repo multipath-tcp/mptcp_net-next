@@ -1,2 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-preserve-MSG_EOR-semantics-in-sendmsg-path
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] mptcp: preserve MSG_EOR semantics in sendmsg path
+
+Extend MPTCP's sendmsg handling to recognize and honor the MSG_EOR flag,
+which marks the end of a record for application-level message boundaries.
+
+Data fragments tagged with MSG_EOR are explicitly marked in the
+mptcp_data_frag structure and skb context to prevent unintended
+coalescing with subsequent data chunks. This ensures the intent of
+applications using MSG_EOR is preserved across MPTCP subflows,
+maintaining consistent message segmentation behavior.
+
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
