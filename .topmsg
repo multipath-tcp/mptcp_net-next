@@ -1,2 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reduce-overhead-from-u16-to-u8
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] mptcp: reduce 'overhead' from u16 to u8
+
+The 'overhead' in struct mptcp_data_frag can safely use u8, as it
+represents 'alignment + sizeof(mptcp_data_frag)'. With a maximum
+alignment of 7('ALIGN(1, sizeof(long)) - 1'), the overhead is at most
+47, well below U8_MAX and validated with BUILD_BUG_ON().
+
+This patch also adds a field named 'unused' for further extensions.
+
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
