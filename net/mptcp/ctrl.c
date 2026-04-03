@@ -583,7 +583,11 @@ int __init mptcpv6_init(void)
 	int err;
 
 	err = mptcp_proto_v6_init();
+	if (err)
+		return err;
 
-	return err;
+	mptcp_subflow_v6_init();
+
+	return 0;
 }
 #endif
