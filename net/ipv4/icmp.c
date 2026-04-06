@@ -263,7 +263,6 @@ bool icmp_global_allow(struct net *net)
 	}
 	return true;
 }
-EXPORT_SYMBOL(icmp_global_allow);
 
 void icmp_global_consume(struct net *net)
 {
@@ -273,7 +272,6 @@ void icmp_global_consume(struct net *net)
 	if (credits)
 		atomic_sub(credits, &net->ipv4.icmp_global_credit);
 }
-EXPORT_SYMBOL(icmp_global_consume);
 
 static bool icmpv4_mask_allow(struct net *net, int type, int code)
 {
@@ -1345,6 +1343,13 @@ bool icmp_build_probe(struct sk_buff *skb, struct icmphdr *icmphdr)
 			if (iio->ident.addr.ctype3_hdr.addrlen != sizeof(struct in6_addr))
 				goto send_mal_query;
 			dev = ipv6_dev_find(net, &iio->ident.addr.ip_addr.ipv6_addr, dev);
+			/*
+			 * If IPv6 identifier lookup is unavailable, silently
+			 * discard the request instead of misreporting NO_IF.
+			 */
+			if (IS_ERR(dev))
+				return false;
+
 			dev_hold(dev);
 			break;
 #endif
@@ -1378,7 +1383,6 @@ send_mal_query:
 	icmphdr->code = ICMP_EXT_CODE_MAL_QUERY;
 	return true;
 }
-EXPORT_SYMBOL_GPL(icmp_build_probe);
 
 /*
  *	Handle ICMP Timestamp requests.
@@ -1600,7 +1604,6 @@ void ip_icmp_error_rfc4884(const struct sk_buff *skb,
 	if (!ip_icmp_error_rfc4884_validate(skb, off))
 		out->flags |= SO_EE_RFC4884_FLAG_INVALID;
 }
-EXPORT_SYMBOL_GPL(ip_icmp_error_rfc4884);
 
 int icmp_err(struct sk_buff *skb, u32 info)
 {
