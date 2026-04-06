@@ -1,13 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] mptcp: pm: in-kernel: remove mptcp_pm_has_addr_attr_id
+Subject: [PATCH] Revert "mptcp: add needs_id for netlink appending addr"
 
-There is no need to call this helper: it will check if the address ID
-attribute is set, but this attribute has already been parsed previously.
+This commit was originally adding the ability to add MPTCP endpoints
+with ID 0 by accident. The in-kernel PM, handling MPTCP endpoints at the
+net namespace level, is not supposed to handle endpoints with such ID,
+because this ID 0 is reserved to the initial subflow, as mentioned in
+the MPTCPv1 protocol [1], a per-connection setting.
 
-Indeed, the value has been set in 'entry->addr.id' if it was set and
-positive, which is what we were looking at. Then only looking at this
-already parsed value is enough, not need to re-extract all Netlink
-attributes again.
+Note that 'ip mptcp endpoint add id 0' stops early with an error, but
+other tools might still request the in-kernel PM to create MPTCP
+endpoints with this restricted ID 0.
 
+In other words, it was wrong to call the mptcp_pm_has_addr_attr_id
+helper to check whether the address ID attribute is set: if it was set
+to 0, a new MPTCP endpoint would be created with ID 0, which is not
+expected, and might cause various issues later.
+
+Fixes: 584f38942626 ("mptcp: add needs_id for netlink appending addr")
+Link: https://datatracker.ietf.org/doc/html/rfc8684#section-3.2-9 [1]
 Reviewed-by: Geliang Tang <geliang@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2:
+ - The v1 has been sent to net-next with a different commit message:
+   https://lore.kernel.org/20260403-net-next-mptcp-msg_eor-misc-v1-4-b0b33bea3fed@kernel.org
