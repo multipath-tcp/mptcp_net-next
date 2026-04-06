@@ -449,7 +449,7 @@ static inline void mptcp_init_rtt_est(struct mptcp_sock *msk)
 
 static inline u32 mptcp_rtt_us_est(const struct mptcp_sock *msk)
 {
-	u32 rtt_us = msk->rcv_rtt_est.samples[0];
+	u32 rtt_us = READ_ONCE(msk->rcv_rtt_est.samples[0]);
 	int i;
 
 	/* Lockless access of collected samples. */
@@ -559,7 +559,6 @@ struct mptcp_subflow_context {
 	u32	map_data_len;
 	__wsum	map_data_csum;
 	u32	map_csum_len;
-	u32	prev_rtt_us;
 	u32	prev_rtt_seq;
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_join : 1,   /* send MP_JOIN */
