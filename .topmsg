@@ -1,2 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/Revert-mptcp-add-needs_id-for-netlink-appending-addr
+Subject: [PATCH] Revert "mptcp: add needs_id for netlink appending addr"
+
+This commit was originally adding the ability to add MPTCP endpoints
+with ID 0 by accident. The in-kernel PM, handling MPTCP endpoints at the
+net namespace level, is not supposed to handle endpoints with such ID,
+because this ID 0 is reserved to the initial subflow, as mentioned in
+the MPTCPv1 protocol [1], a per-connection setting.
+
+Note that 'ip mptcp endpoint add id 0' stops early with an error, but
+other tools might still request the in-kernel PM to create MPTCP
+endpoints with this restricted ID 0.
+
+In other words, it was wrong to call the mptcp_pm_has_addr_attr_id
+helper to check whether the address ID attribute is set: if it was set
+to 0, a new MPTCP endpoint would be created with ID 0, which is not
+expected, and might cause various issues later.
+
+Fixes: 584f38942626 ("mptcp: add needs_id for netlink appending addr")
+Link: https://datatracker.ietf.org/doc/html/rfc8684#section-3.2-9 [1]
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
