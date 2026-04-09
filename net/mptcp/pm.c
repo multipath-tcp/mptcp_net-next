@@ -337,9 +337,6 @@ static void mptcp_pm_add_timer(struct timer_list *timer)
 	if (inet_sk_state_load(sk) == TCP_CLOSE)
 		return;
 
-	if (!entry->addr.id)
-		return;
-
 	timeout = mptcp_adjust_add_addr_timeout(msk);
 	if (!timeout)
 		goto out;
