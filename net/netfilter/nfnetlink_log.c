@@ -361,10 +361,10 @@ static void
 __nfulnl_send(struct nfulnl_instance *inst)
 {
 	if (inst->qlen > 1) {
-		struct nlmsghdr *nlh = nlmsg_put(inst->skb, 0, 0,
-						 NLMSG_DONE,
-						 sizeof(struct nfgenmsg),
-						 0);
+		struct nlmsghdr *nlh = nfnl_msg_put(inst->skb, 0, 0,
+						    NLMSG_DONE, 0,
+						    AF_UNSPEC, NFNETLINK_V0,
+						    htons(inst->group_num));
 		if (WARN_ONCE(!nlh, "bad nlskb size: %u, tailroom %d\n",
 			      inst->skb->len, skb_tailroom(inst->skb))) {
 			kfree_skb(inst->skb);
@@ -879,7 +879,9 @@ static const struct nla_policy nfula_cfg_policy[NFULA_CFG_MAX+1] = {
 	[NFULA_CFG_TIMEOUT]	= { .type = NLA_U32 },
 	[NFULA_CFG_QTHRESH]	= { .type = NLA_U32 },
 	[NFULA_CFG_NLBUFSIZ]	= { .type = NLA_U32 },
-	[NFULA_CFG_FLAGS]	= { .type = NLA_U16 },
+	[NFULA_CFG_FLAGS]	= NLA_POLICY_MASK(NLA_BE16, NFULNL_CFG_F_SEQ |
+						  NFULNL_CFG_F_SEQ_GLOBAL |
+						  NFULNL_CFG_F_CONNTRACK),
 };
 
 static int nfulnl_recv_config(struct sk_buff *skb, const struct nfnl_info *info,
