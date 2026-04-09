@@ -340,14 +340,14 @@ static void mptcp_pm_add_timer(struct timer_list *timer)
 	if (!entry->addr.id)
 		return;
 
-	if (mptcp_pm_should_add_signal_addr(msk)) {
-		sk_reset_timer(sk, timer, jiffies + TCP_RTO_MAX / 8);
-		goto out;
-	}
-
 	timeout = mptcp_adjust_add_addr_timeout(msk);
 	if (!timeout)
 		goto out;
+
+	if (mptcp_pm_should_add_signal_addr(msk)) {
+		sk_reset_timer(sk, timer, jiffies + timeout);
+		goto out;
+	}
 
 	spin_lock_bh(&msk->pm.lock);
 
