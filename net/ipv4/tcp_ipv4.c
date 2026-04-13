@@ -105,7 +105,7 @@ static DEFINE_PER_CPU(struct sock_bh_locked, ipv4_tcp_sk) = {
 
 static DEFINE_MUTEX(tcp_exit_batch_mutex);
 
-static union tcp_seq_and_ts_off
+INDIRECT_CALLABLE_SCOPE union tcp_seq_and_ts_off
 tcp_v4_init_seq_and_ts_off(const struct net *net, const struct sk_buff *skb)
 {
 	return secure_tcp_seq_and_ts_off(net,
@@ -1900,8 +1900,7 @@ err_discard:
 }
 EXPORT_SYMBOL(tcp_v4_do_rcv);
 
-bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb,
-		     enum skb_drop_reason *reason)
+enum skb_drop_reason tcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 {
 	u32 tail_gso_size, tail_gso_segs;
 	struct skb_shared_info *shinfo;
@@ -1929,10 +1928,9 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb,
 	if (unlikely(tcp_checksum_complete(skb))) {
 		bh_unlock_sock(sk);
 		trace_tcp_bad_csum(skb);
-		*reason = SKB_DROP_REASON_TCP_CSUM;
 		__TCP_INC_STATS(sock_net(sk), TCP_MIB_CSUMERRORS);
 		__TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
-		return true;
+		return SKB_DROP_REASON_TCP_CSUM;
 	}
 
 	/* Attempt coalescing to last skb in backlog, even if we are
@@ -2006,7 +2004,7 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb,
 		__NET_INC_STATS(sock_net(sk),
 				LINUX_MIB_TCPBACKLOGCOALESCE);
 		kfree_skb_partial(skb, fragstolen);
-		return false;
+		return SKB_NOT_DROPPED_YET;
 	}
 	__skb_push(skb, hdrlen);
 
@@ -2031,15 +2029,13 @@ no_coalesce:
 	if (unlikely(err)) {
 		bh_unlock_sock(sk);
 		if (err == -ENOMEM) {
-			*reason = SKB_DROP_REASON_PFMEMALLOC;
 			__NET_INC_STATS(sock_net(sk), LINUX_MIB_PFMEMALLOCDROP);
-		} else {
-			*reason = SKB_DROP_REASON_SOCKET_BACKLOG;
-			__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
+			return SKB_DROP_REASON_PFMEMALLOC;
 		}
-		return true;
+		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
+		return SKB_DROP_REASON_SOCKET_BACKLOG;
 	}
-	return false;
+	return SKB_NOT_DROPPED_YET;
 }
 
 static void tcp_v4_restore_cb(struct sk_buff *skb)
@@ -2164,7 +2160,8 @@ lookup:
 		}
 		refcounted = true;
 		nsk = NULL;
-		if (!tcp_filter(sk, skb, &drop_reason)) {
+		drop_reason = tcp_filter(sk, skb);
+		if (!drop_reason) {
 			th = (const struct tcphdr *)skb->data;
 			iph = ip_hdr(skb);
 			tcp_v4_fill_cb(skb, iph, th);
@@ -2225,7 +2222,8 @@ process:
 
 	nf_reset_ct(skb);
 
-	if (tcp_filter(sk, skb, &drop_reason))
+	drop_reason = tcp_filter(sk, skb);
+	if (drop_reason)
 		goto discard_and_relse;
 
 	th = (const struct tcphdr *)skb->data;
@@ -2247,7 +2245,8 @@ process:
 	if (!sock_owned_by_user(sk)) {
 		ret = tcp_v4_do_rcv(sk, skb);
 	} else {
-		if (tcp_add_backlog(sk, skb, &drop_reason))
+		drop_reason = tcp_add_backlog(sk, skb);
+		if (drop_reason)
 			goto discard_and_relse;
 	}
 	bh_unlock_sock(sk);
