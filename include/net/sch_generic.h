@@ -1200,7 +1200,7 @@ static inline void qdisc_dequeue_drop(struct Qdisc *q, struct sk_buff *skb,
 		skb->next = root->to_free;
 		root->to_free = skb;
 	} else {
-		kfree_skb_reason(skb, reason);
+		kfree_skb_reason(skb, (enum skb_drop_reason)reason);
 	}
 	rcu_read_unlock();
 }
