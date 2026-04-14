@@ -1132,16 +1132,17 @@ int mptcp_pm_mp_prio_send_ack(struct mptcp_sock *msk,
 			      struct mptcp_addr_info *addr,
 			      struct mptcp_addr_info *rem,
 			      u8 bkup);
-bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
+bool mptcp_pm_add_addr_alloc(struct mptcp_sock *msk,
+			     const struct mptcp_addr_info *addr);
+struct mptcp_pm_add_addr *
+mptcp_pm_add_addr_del_timer(struct mptcp_sock *msk,
+			    const struct mptcp_addr_info *addr, bool check_id);
+bool mptcp_pm_add_addr_remove(struct mptcp_sock *msk,
 			      const struct mptcp_addr_info *addr);
-bool mptcp_pm_sport_in_anno_list(struct mptcp_sock *msk, const struct sock *sk);
-struct mptcp_pm_add_entry *
-mptcp_pm_del_add_timer(struct mptcp_sock *msk,
-		       const struct mptcp_addr_info *addr, bool check_id);
-bool mptcp_lookup_subflow_by_saddr(const struct list_head *list,
-				   const struct mptcp_addr_info *saddr);
-bool mptcp_remove_anno_list_by_saddr(struct mptcp_sock *msk,
-				     const struct mptcp_addr_info *addr);
+bool mptcp_pm_add_addr_lookup_by_sk(struct mptcp_sock *msk,
+				    const struct sock *sk);
+bool mptcp_pm_subflow_lookup_by_saddr(struct mptcp_sock *msk,
+				      const struct mptcp_addr_info *saddr);
 int mptcp_pm_nl_set_flags(struct mptcp_pm_addr_entry *local,
 			  struct genl_info *info);
 int mptcp_userspace_pm_set_flags(struct mptcp_pm_addr_entry *local,
