@@ -536,7 +536,7 @@ jobs:
           fi
 
           if ! curl ${CURL_OPT} -A "${PW_AGENT}" -o sashiko.json \
-                    "https://sashiko.dev/api/patch?id=${CID}" ||
+                    "https://sashiko.dev/api/patchset?id=${CID}" ||
              [ ! -s sashiko.json ]; then
             echo "Unable to fetch sashiko reviews"
             exit 1
