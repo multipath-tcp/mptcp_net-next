@@ -952,6 +952,9 @@ static struct request_sock *inet_reqsk_clone(struct request_sock *req,
 	if (sk->sk_protocol == IPPROTO_TCP && tcp_rsk(nreq)->tfo_listener)
 		rcu_assign_pointer(tcp_sk(nreq->sk)->fastopen_rsk, nreq);
 
+	if (req->rsk_ops->init_clone)
+		req->rsk_ops->init_clone(req, nreq);
+
 	return nreq;
 }
 

@@ -36,6 +36,8 @@ struct request_sock_ops {
 				      struct sk_buff *skb,
 				      enum sk_rst_reason reason);
 	void		(*destructor)(struct request_sock *req);
+	void		(*init_clone)(const struct request_sock *req,
+				      struct request_sock *new_req);
 };
 
 struct saved_syn {
