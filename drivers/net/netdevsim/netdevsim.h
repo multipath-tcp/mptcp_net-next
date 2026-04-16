@@ -232,6 +232,10 @@ enum nsim_resource_id {
 	NSIM_RESOURCE_NEXTHOPS,
 };
 
+enum nsim_port_resource_id {
+	NSIM_PORT_RESOURCE_TEST = 1,
+};
+
 struct nsim_dev_health {
 	struct devlink_health_reporter *empty_reporter;
 	struct devlink_health_reporter *dummy_reporter;
@@ -462,6 +466,9 @@ nsim_do_psp(struct sk_buff *skb, struct netdevsim *ns,
 static inline void
 nsim_psp_handle_ext(struct sk_buff *skb, struct skb_ext *psp_ext) {}
 #endif
+
+int nsim_setup_tc(struct net_device *dev, enum tc_setup_type type,
+		  void *type_data);
 
 struct nsim_bus_dev {
 	struct device dev;
