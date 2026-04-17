@@ -3422,6 +3422,7 @@ static void mptcp_destroy_common(struct mptcp_sock *msk)
 
 	__mptcp_clear_xmit(sk);
 	mptcp_backlog_purge(sk);
+	tcp_cleanup_ulp(sk);
 
 	/* join list will be eventually flushed (with rst) at sock lock release time */
 	mptcp_for_each_subflow_safe(msk, subflow, tmp)
