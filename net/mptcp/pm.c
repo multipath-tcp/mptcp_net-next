@@ -881,19 +881,18 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, const struct sk_buff *skb,
 	}
 
 	*echo = mptcp_pm_should_add_signal_echo(msk);
+	add_addr = msk->pm.addr_signal &
+		~(*echo ? BIT(MPTCP_ADD_ADDR_ECHO) : BIT(MPTCP_ADD_ADDR_SIGNAL));
 	port = !!(*echo ? msk->pm.remote.port : msk->pm.local.port);
-
 	family = *echo ? msk->pm.remote.family : msk->pm.local.family;
-	if (remaining < mptcp_add_addr_len(family, *echo, port))
-		goto out_unlock;
 
-	if (*echo) {
-		*addr = msk->pm.remote;
-		add_addr = msk->pm.addr_signal & ~BIT(MPTCP_ADD_ADDR_ECHO);
-	} else {
-		*addr = msk->pm.local;
-		add_addr = msk->pm.addr_signal & ~BIT(MPTCP_ADD_ADDR_SIGNAL);
+	if (remaining < mptcp_add_addr_len(family, *echo, port)) {
+		if (*drop_other_suboptions)
+			WRITE_ONCE(msk->pm.addr_signal, add_addr);
+		goto out_unlock;
 	}
+
+	*addr = *echo ? msk->pm.remote : msk->pm.local;
 	WRITE_ONCE(msk->pm.addr_signal, add_addr);
 	ret = true;
 
