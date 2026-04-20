@@ -1001,7 +1001,7 @@ static void __wait_for_test(struct __test_metadata *t)
 		fprintf(TH_LOG_STREAM,
 			"# %s: unable to wait on child pidfd\n",
 			t->name);
-		return;
+		goto out;
 	} else if (ret == 0) {
 		timed_out = true;
 		/* signal process group */
@@ -1013,7 +1013,7 @@ static void __wait_for_test(struct __test_metadata *t)
 		fprintf(TH_LOG_STREAM,
 			"# %s: Failed to wait for PID %d (errno: %d)\n",
 			t->name, t->pid, errno);
-		return;
+		goto out;
 	}
 
 	if (timed_out) {
@@ -1066,6 +1066,8 @@ static void __wait_for_test(struct __test_metadata *t)
 			t->name,
 			status);
 	}
+out:
+	close(childfd);
 }
 
 static void test_harness_list_tests(void)
