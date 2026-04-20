@@ -161,7 +161,7 @@ static bool __mptcp_try_coalesce(struct sock *sk, struct sk_buff *to,
 
 	if (unlikely(MPTCP_SKB_CB(to)->cant_coalesce) ||
 	    MPTCP_SKB_CB(from)->offset ||
-	    ((to->len + from->len) > (limit >> 3)) ||
+	    ((to->len + from->len) > max(U16_MAX, (limit >> 3))) ||
 	    !skb_try_coalesce(to, from, fragstolen, delta))
 		return false;
 
