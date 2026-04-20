@@ -1158,15 +1158,29 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 	return hmac == mp_opt->ahmac;
 }
 
-static bool mptcp_over_limit(const struct sock *sk, struct sk_buff *skb)
+static bool mptcp_over_limit(struct sock *sk, struct sk_buff *skb, u32 seq)
 {
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	bool ret = true;
 	int limit;
 
 	if (!skb->len)
 		return false;
 
+	/* Allow some slack for backlog processing */
 	limit = READ_ONCE(sk->sk_rcvbuf) << 1;
-	return sk_rmem_alloc_get(sk) > limit;
+	if (sk_rmem_alloc_get(sk) < limit)
+		return false;
+
+	mptcp_data_lock(sk);
+	if (!sock_owned_by_user(sk)) {
+		__mptcp_check_prune(sk, seq);
+		ret = sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf);
+	} else {
+		__set_bit(MPTCP_PRUNE, &msk->cb_flags);
+	}
+	mptcp_data_unlock(sk);
+	return ret;
 }
 
 /* Return false when the caller must to drop the packet, i.e. in case of error,
@@ -1197,7 +1211,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
 
-		if (mptcp_over_limit(subflow->conn, skb))
+		if (mptcp_over_limit(subflow->conn, skb, msk->ack_seq))
 			return false;
 		return true;
 	}
@@ -1277,7 +1291,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		return true;
 	}
 
-	if (mptcp_over_limit(subflow->conn, skb))
+	if (mptcp_over_limit(subflow->conn, skb, mp_opt.use_map ? mp_opt.data_seq : msk->ack_seq))
 		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
