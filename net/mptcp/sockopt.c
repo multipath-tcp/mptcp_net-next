@@ -8,6 +8,8 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <net/ip.h>
+#include <net/ipv6.h>
 #include <net/sock.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
@@ -384,6 +386,72 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	return -EOPNOTSUPP;
 }
 
+static bool mptcp_recverr_enabled(const struct sock *sk, bool rfc4884)
+{
+	bool enabled;
+
+	enabled = rfc4884 ? inet_test_bit(RECVERR_RFC4884, sk) :
+			    inet_test_bit(RECVERR, sk);
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6)
+		enabled |= rfc4884 ? inet6_test_bit(RECVERR6_RFC4884, sk) :
+				     inet6_test_bit(RECVERR6, sk);
+#endif
+
+	return enabled;
+}
+
+static int mptcp_subflow_set_recverr(struct sock *sk, struct sock *ssk,
+				     bool rfc4884)
+{
+	int level, optname, val;
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (ssk->sk_family == AF_INET6) {
+		level = SOL_IPV6;
+		optname = rfc4884 ? IPV6_RECVERR_RFC4884 : IPV6_RECVERR;
+	} else
+#endif
+	{
+		level = SOL_IP;
+		optname = rfc4884 ? IP_RECVERR_RFC4884 : IP_RECVERR;
+	}
+
+	val = mptcp_recverr_enabled(sk, rfc4884);
+	return tcp_setsockopt(ssk, level, optname, KERNEL_SOCKPTR(&val),
+			      sizeof(val));
+}
+
+#if IS_ENABLED(CONFIG_IPV6)
+static int mptcp_setsockopt_v6_recverr(struct mptcp_sock *msk, int optname,
+				       sockptr_t optval, unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	int ret;
+
+	ret = ipv6_setsockopt(sk, SOL_IPV6, optname, optval, optlen);
+	if (ret)
+		return ret;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool rfc4884 = optname == IPV6_RECVERR_RFC4884;
+
+		ret = mptcp_subflow_set_recverr(sk, ssk, rfc4884);
+		if (ret)
+			break;
+		subflow->setsockopt_seq = msk->setsockopt_seq;
+	}
+	release_sock(sk);
+
+	return ret;
+}
+#endif
+
 static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 			       sockptr_t optval, unsigned int optlen)
 {
@@ -426,6 +494,12 @@ static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 
 		release_sock(sk);
 		break;
+#if IS_ENABLED(CONFIG_IPV6)
+	case IPV6_RECVERR:
+	case IPV6_RECVERR_RFC4884:
+		ret = mptcp_setsockopt_v6_recverr(msk, optname, optval, optlen);
+		break;
+#endif
 	}
 
 	return ret;
@@ -760,6 +834,33 @@ static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
 	return 0;
 }
 
+static int mptcp_setsockopt_v4_recverr(struct mptcp_sock *msk, int optname,
+				       sockptr_t optval, unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	int err;
+
+	err = ip_setsockopt(sk, SOL_IP, optname, optval, optlen);
+	if (err)
+		return err;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool rfc4884 = optname == IP_RECVERR_RFC4884;
+
+		err = mptcp_subflow_set_recverr(sk, ssk, rfc4884);
+		if (err)
+			break;
+		subflow->setsockopt_seq = msk->setsockopt_seq;
+	}
+	release_sock(sk);
+
+	return err;
+}
+
 static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 			       sockptr_t optval, unsigned int optlen)
 {
@@ -771,6 +872,9 @@ static int mptcp_setsockopt_v4(struct mptcp_sock *msk, int optname,
 		return mptcp_setsockopt_sol_ip_set(msk, optname, optval, optlen);
 	case IP_TOS:
 		return mptcp_setsockopt_v4_set_tos(msk, optname, optval, optlen);
+	case IP_RECVERR:
+	case IP_RECVERR_RFC4884:
+		return mptcp_setsockopt_v4_recverr(msk, optname, optval, optlen);
 	}
 
 	return -EOPNOTSUPP;
@@ -1459,6 +1563,12 @@ static int mptcp_getsockopt_v4(struct mptcp_sock *msk, int optname,
 	case IP_LOCAL_PORT_RANGE:
 		return mptcp_put_int_option(msk, optval, optlen,
 				READ_ONCE(inet_sk(sk)->local_port_range));
+	case IP_RECVERR:
+		return mptcp_put_int_option(msk, optval, optlen,
+				inet_test_bit(RECVERR, sk));
+	case IP_RECVERR_RFC4884:
+		return mptcp_put_int_option(msk, optval, optlen,
+				inet_test_bit(RECVERR_RFC4884, sk));
 	}
 
 	return -EOPNOTSUPP;
@@ -1479,6 +1589,12 @@ static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_FREEBIND:
 		return mptcp_put_int_option(msk, optval, optlen,
 					    inet_test_bit(FREEBIND, sk));
+	case IPV6_RECVERR:
+		return mptcp_put_int_option(msk, optval, optlen,
+					    inet6_test_bit(RECVERR6, sk));
+	case IPV6_RECVERR_RFC4884:
+		return mptcp_put_int_option(msk, optval, optlen,
+					    inet6_test_bit(RECVERR6_RFC4884, sk));
 	}
 
 	return -EOPNOTSUPP;
@@ -1536,6 +1652,7 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 {
 	static const unsigned int tx_rx_locks = SOCK_RCVBUF_LOCK | SOCK_SNDBUF_LOCK;
 	struct sock *sk = (struct sock *)msk;
+	bool recverr, recverr_rfc4884;
 	bool keep_open;
 
 	keep_open = sock_flag(sk, SOCK_KEEPOPEN);
@@ -1586,6 +1703,18 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	inet_assign_bit(FREEBIND, ssk, inet_test_bit(FREEBIND, sk));
 	inet_assign_bit(BIND_ADDRESS_NO_PORT, ssk, inet_test_bit(BIND_ADDRESS_NO_PORT, sk));
 	WRITE_ONCE(inet_sk(ssk)->local_port_range, READ_ONCE(inet_sk(sk)->local_port_range));
+	recverr = mptcp_recverr_enabled(sk, false);
+	recverr_rfc4884 = mptcp_recverr_enabled(sk, true);
+#if IS_ENABLED(CONFIG_IPV6)
+	if (ssk->sk_family == AF_INET6) {
+		inet6_assign_bit(RECVERR6, ssk, recverr);
+		inet6_assign_bit(RECVERR6_RFC4884, ssk, recverr_rfc4884);
+	} else
+#endif
+	{
+		inet_assign_bit(RECVERR, ssk, recverr);
+		inet_assign_bit(RECVERR_RFC4884, ssk, recverr_rfc4884);
+	}
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
