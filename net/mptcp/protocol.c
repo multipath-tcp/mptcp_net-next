@@ -818,27 +818,28 @@ static bool __mptcp_ofo_queue(struct mptcp_sock *msk)
 static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 {
 	int ssk_state;
-	int err;
+	int err = 0;
+	bool has_errqueue;
 
-	/* only propagate errors on fallen-back sockets or
-	 * on MPC connect
+	has_errqueue = !skb_queue_empty_lockless(&ssk->sk_error_queue);
+
+	/* Only fallback sockets and the MPC connect path inherit TCP's sk_err
+	 * semantics; consume ssk->sk_err only on those paths so steady-state
+	 * MPTCP doesn't silently drop TCP's one-shot errors.
 	 */
-	if (sk->sk_state != TCP_SYN_SENT && !__mptcp_check_fallback(mptcp_sk(sk)))
-		return false;
+	if (sk->sk_state == TCP_SYN_SENT ||
+	    __mptcp_check_fallback(mptcp_sk(sk))) {
+		err = sock_error(ssk);
+		if (err) {
+			ssk_state = inet_sk_state_load(ssk);
+			if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD))
+				mptcp_set_state(sk, ssk_state);
+			WRITE_ONCE(sk->sk_err, -err);
+		}
+	}
 
-	err = sock_error(ssk);
-	if (!err)
+	if (!err && !has_errqueue)
 		return false;
-
-	/* We need to propagate only transition to CLOSE state.
-	 * Orphaned socket will see such state change via
-	 * subflow_sched_work_if_closed() and that path will properly
-	 * destroy the msk as needed.
-	 */
-	ssk_state = inet_sk_state_load(ssk);
-	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD))
-		mptcp_set_state(sk, ssk_state);
-	WRITE_ONCE(sk->sk_err, -err);
 
 	/* This barrier is coupled with smp_rmb() in mptcp_poll() */
 	smp_wmb();
@@ -2286,6 +2287,68 @@ static unsigned int mptcp_inq_hint(const struct sock *sk)
 	return 0;
 }
 
+static struct sock *mptcp_pick_errqueue_subflow(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *ssk = NULL;
+
+	lock_sock(sk);
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
+		struct sock *subflow_sk = mptcp_subflow_tcp_sock(subflow);
+
+		if (skb_queue_empty_lockless(&subflow_sk->sk_error_queue))
+			continue;
+
+		if (!refcount_inc_not_zero(&subflow_sk->sk_refcnt))
+			continue;
+
+		ssk = subflow_sk;
+		break;
+	}
+	release_sock(sk);
+
+	return ssk;
+}
+
+static bool mptcp_has_error_queue(const struct sock *sk)
+{
+	return !skb_queue_empty_lockless(&sk->sk_error_queue);
+}
+
+static int mptcp_recv_error(struct sock *sk, struct msghdr *msg, int len)
+{
+	struct sk_buff *skb;
+	struct sock *ssk;
+	int ret, ret2;
+
+	if (READ_ONCE(sk->sk_err) || mptcp_has_error_queue(sk))
+		return inet_recv_error(sk, msg, len);
+
+	ssk = mptcp_pick_errqueue_subflow(sk);
+	if (!ssk)
+		return -EAGAIN;
+
+	skb = sock_dequeue_err_skb(ssk);
+	if (!skb)
+		goto put_ssk;
+
+	ret = sock_queue_err_skb(sk, skb);
+	if (ret) {
+		ret2 = sock_queue_err_skb(ssk, skb);
+		sock_put(ssk);
+		if (ret2)
+			kfree_skb(skb);
+		return ret;
+	}
+
+	sock_put(ssk);
+	return inet_recv_error(sk, msg, len);
+
+put_ssk:
+	sock_put(ssk);
+	return -EAGAIN;
+}
+
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			 int flags)
 {
@@ -2295,9 +2358,8 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	int target;
 	long timeo;
 
-	/* MSG_ERRQUEUE is really a no-op till we support IP_RECVERR */
 	if (unlikely(flags & MSG_ERRQUEUE))
-		return inet_recv_error(sk, msg, len);
+		return mptcp_recv_error(sk, msg, len);
 
 	lock_sock(sk);
 	if (unlikely(sk->sk_state == TCP_LISTEN)) {
@@ -4296,6 +4358,26 @@ static __poll_t mptcp_check_writeable(struct mptcp_sock *msk)
 	return 0;
 }
 
+static bool mptcp_subflow_has_error(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	bool has_error = false;
+
+	mptcp_data_lock(sk);
+	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (READ_ONCE(ssk->sk_err) ||
+		    !skb_queue_empty_lockless(&ssk->sk_error_queue)) {
+			has_error = true;
+			break;
+		}
+	}
+	mptcp_data_unlock(sk);
+
+	return has_error;
+}
+
 static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 			   struct poll_table_struct *wait)
 {
@@ -4339,7 +4421,8 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 
 	/* This barrier is coupled with smp_wmb() in __mptcp_error_report() */
 	smp_rmb();
-	if (READ_ONCE(sk->sk_err))
+	if (READ_ONCE(sk->sk_err) || mptcp_has_error_queue(sk) ||
+	    mptcp_subflow_has_error(sk))
 		mask |= EPOLLERR;
 
 	return mask;
