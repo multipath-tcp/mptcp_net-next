@@ -1,2 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sockopt-set-timestamp-flags-on-subflow-socket-not-msk
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] mptcp: sockopt: set timestamp flags on subflow socket, not msk
+
+Both mptcp_setsockopt_sol_socket_tstamp() and
+mptcp_setsockopt_sol_socket_timestamping() iterate over subflows,
+acquire the subflow socket lock, but then erroneously pass the MPTCP
+msk socket to sock_set_timestamp() / sock_set_timestamping() instead
+of the subflow ssk. As a result, the timestamp flags are set on the
+wrong socket and have no effect on the actual subflows.
+
+Pass ssk instead of sk to both helpers.
+
+Fixes: 9061f24bf82e ("mptcp: sockopt: propagate timestamp request to subflows")
+Assisted-by: GLM-5.1
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
