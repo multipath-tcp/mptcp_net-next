@@ -145,6 +145,7 @@ static void tls_proto_cleanup(void)
 		if (refcount_dec_and_test(&prot->refcnt)) {
 			list_del_rcu(&prot->list);
 			synchronize_rcu();
+			module_put(prot->ops->owner);
 			kfree(prot);
 		}
 	}
@@ -367,9 +368,11 @@ void tls_ctx_free(struct sock *sk, struct tls_context *ctx)
 		return;
 
 	if (ctx->proto) {
+		module_put(ctx->proto->ops->owner);
 		if (refcount_dec_and_test(&ctx->proto->refcnt)) {
 			list_del_rcu(&ctx->proto->list);
 			synchronize_rcu();
+			module_put(ctx->proto->ops->owner);
 			kfree(ctx->proto);
 		}
 	}
@@ -1021,6 +1024,7 @@ static struct tls_proto *tls_build_proto(struct sock *sk)
 {
 	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
 	struct proto *prot = READ_ONCE(sk->sk_prot);
+	struct tls_prot_ops *ops;
 	struct tls_proto *proto;
 
 	mutex_lock(&tls_proto_mutex);
@@ -1028,11 +1032,22 @@ static struct tls_proto *tls_build_proto(struct sock *sk)
 	if (proto)
 		goto out;
 
-	proto = kzalloc(sizeof(*proto), GFP_KERNEL);
-	if (!proto)
+	rcu_read_lock();
+	ops = tls_prot_ops_find(sk->sk_protocol);
+	if (!ops || !try_module_get(ops->owner)) {
+		rcu_read_unlock();
 		goto out;
+	}
+	rcu_read_unlock();
+
+	proto = kzalloc(sizeof(*proto), GFP_KERNEL);
+	if (!proto) {
+		module_put(ops->owner);
+		goto out;
+	}
 
 	proto->prot = prot;
+	proto->ops = ops;
 	refcount_set(&proto->refcnt, 2);
 	build_protos(proto->prots[ip_ver], prot);
 	build_proto_ops(proto->proto_ops[ip_ver],
@@ -1099,9 +1114,15 @@ static int tls_init(struct sock *sk)
 	if (!proto)
 		return -ENOMEM;
 
+	if (!try_module_get(proto->ops->owner)) {
+		refcount_dec(&proto->refcnt);
+		return -ENOENT;
+	}
+
 #ifdef CONFIG_TLS_TOE
 	if (tls_toe_bypass(sk, proto)) {
 		refcount_dec(&proto->refcnt);
+		module_put(proto->ops->owner);
 		return 0;
 	}
 #endif
@@ -1114,6 +1135,7 @@ static int tls_init(struct sock *sk)
 	 */
 	if (sk->sk_state != TCP_ESTABLISHED) {
 		refcount_dec(&proto->refcnt);
+		module_put(proto->ops->owner);
 		return -ENOTCONN;
 	}
 
@@ -1122,6 +1144,7 @@ static int tls_init(struct sock *sk)
 	ctx = tls_ctx_create(sk, proto);
 	if (!ctx) {
 		refcount_dec(&proto->refcnt);
+		module_put(proto->ops->owner);
 		rc = -ENOMEM;
 		goto out;
 	}
