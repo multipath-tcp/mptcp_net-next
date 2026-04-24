@@ -1191,7 +1191,12 @@ static bool mptcp_over_limit(struct sock *sk, struct sk_buff *skb,
 		__set_bit(MPTCP_PRUNE, &msk->cb_flags);
 	}
 	mptcp_data_unlock(sk);
-	return ret;
+
+	/* After pruning any packets ensure that MPTCP-driven drops do not
+	 * cause TCP-level retransmission
+	 */
+	return ret &&
+	       !before(READ_ONCE(msk->ack_seq), READ_ONCE(msk->pruned_seq));
 }
 
 /* Return false when the caller must drop the packet, i.e. in case of error,

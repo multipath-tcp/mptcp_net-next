@@ -306,6 +306,7 @@ struct mptcp_sock {
 	u64		bytes_acked;
 	u64		snd_una;
 	u64		wnd_end;
+	u32		pruned_seq;		/* if after ack_seq, highest seq pruned */
 	u32		last_data_sent;
 	u32		last_data_recv;
 	u32		last_ack_recv;
