@@ -1158,12 +1158,40 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 	return hmac == mp_opt->ahmac;
 }
 
-static bool mptcp_over_limit(const struct sock *sk, struct sk_buff *skb)
+static bool mptcp_over_limit(struct sock *sk, struct sk_buff *skb,
+			     const struct mptcp_options_received *mp_opt)
 {
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	bool ret;
+
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
 		return false;
 
-	return sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf);
+	/* Allow some slack for backlog processing */
+	if (sk_rmem_alloc_get(sk) < READ_ONCE(sk->sk_rcvbuf))
+		return false;
+
+	mptcp_data_lock(sk);
+	if (!sock_owned_by_user(sk)) {
+		/* When the data seqence is not (yet) available for the,
+		 * incoming skb, allow pruning the whole OoO queue
+		 */
+		u32 seq = !mp_opt->use_map || mp_opt->mpc_map ? msk->ack_seq :
+			  mp_opt->data_seq;
+
+		__mptcp_check_prune(sk, seq);
+		ret = sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf);
+	} else {
+		u64 limit = ((u64)READ_ONCE(sk->sk_rcvbuf)) << 1;
+
+		/* Pruning will take place later in the RX path, allow
+		 * some extra slack.
+		 */
+		ret = sk_rmem_alloc_get(sk) > limit;
+		__set_bit(MPTCP_PRUNE, &msk->cb_flags);
+	}
+	mptcp_data_unlock(sk);
+	return ret;
 }
 
 /* Return false when the caller must drop the packet, i.e. in case of error,
@@ -1194,7 +1222,11 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
 
-		if (mptcp_over_limit(subflow->conn, skb))
+		/* Will use ack_seq as limit for OoO pruning; any value would do
+		 * as OoO queue must be empty.
+		 */
+		mp_opt.use_map = 0;
+		if (mptcp_over_limit(subflow->conn, skb, &mp_opt))
 			return false;
 		return true;
 	}
@@ -1274,7 +1306,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		return true;
 	}
 
-	if (mptcp_over_limit(subflow->conn, skb))
+	if (mptcp_over_limit(subflow->conn, skb, &mp_opt))
 		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
