@@ -389,6 +389,7 @@ struct smu_table_context {
 	void				*metrics_table;
 	void				*clocks_table;
 	void				*watermarks_table;
+	struct mutex			metrics_lock;
 
 	void				*max_sustainable_clocks;
 	struct smu_bios_boot_up_values	boot_values;
@@ -1997,6 +1998,8 @@ const struct ras_smu_drv *smu_get_ras_smu_driver(void *handle);
 
 int amdgpu_smu_ras_send_msg(struct amdgpu_device *adev, enum smu_message_type msg,
 			    uint32_t param, uint32_t *readarg);
+int amdgpu_smu_ras_feature_is_enabled(struct amdgpu_device *adev,
+						enum smu_feature_mask mask);
 #endif
 
 void smu_feature_cap_set(struct smu_context *smu, enum smu_feature_cap_id fea_id);
@@ -2159,6 +2162,23 @@ static inline void smu_feature_init(struct smu_context *smu, int feature_num)
 	smu->smu_feature.feature_num = feature_num;
 	smu_feature_list_clear_all(smu, SMU_FEATURE_LIST_SUPPORTED);
 	smu_feature_list_clear_all(smu, SMU_FEATURE_LIST_ALLOWED);
+}
+
+/*
+ * smu_safe_u16_nn - Make u16 safe by filtering negative overflow errors
+ * @val: Input u16 value, may contain invalid negative overflows
+ *
+ * Convert u16 to non-negative value. Cast to s16 to detect negative values
+ * caused by calculation errors. Return 0 for negative errors, return
+ * original value if valid.
+ *
+ * Return: Valid u16 value or 0
+ */
+static inline u16 smu_safe_u16_nn(u16 val)
+{
+	s16 tmp = (s16)val;
+
+	return tmp < 0 ? 0 : val;
 }
 
 #endif
