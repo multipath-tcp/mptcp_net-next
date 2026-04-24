@@ -1158,8 +1158,16 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 	return hmac == mp_opt->ahmac;
 }
 
-/* Return false in case of error (or subflow has been reset),
- * else return true.
+static bool mptcp_over_limit(const struct sock *sk, struct sk_buff *skb)
+{
+	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
+		return false;
+
+	return sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf);
+}
+
+/* Return false when the caller must drop the packet, i.e. in case of error,
+ * subflow has been reset, or over memory limits.
  */
 bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 {
@@ -1185,6 +1193,9 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
+
+		if (mptcp_over_limit(subflow->conn, skb))
+			return false;
 		return true;
 	}
 
@@ -1262,6 +1273,9 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		return true;
 	}
+
+	if (mptcp_over_limit(subflow->conn, skb))
+		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
 	if (!mpext)
