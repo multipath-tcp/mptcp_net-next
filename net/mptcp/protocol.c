@@ -1187,13 +1187,6 @@ static void __mptcp_clean_una_wakeup(struct sock *sk)
 	mptcp_write_space(sk);
 }
 
-static void mptcp_clean_una_wakeup(struct sock *sk)
-{
-	mptcp_data_lock(sk);
-	__mptcp_clean_una_wakeup(sk);
-	mptcp_data_unlock(sk);
-}
-
 static void mptcp_enter_memory_pressure(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow;
@@ -2820,8 +2813,12 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 	sk_error_report(sk);
 }
 
-/* Retransmit the specified data fragment on all the selected subflows. */
-static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag)
+/*
+ * Retransmit the specified data fragment on all the selected subflows,
+ * starting from the specified sequence
+ */
+static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag,
+				u64 retrans_seq)
 {
 	struct mptcp_sendmsg_info info = { .data_lock_held = true, };
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -2840,7 +2837,7 @@ static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag)
 			lock_sock(ssk);
 
 			/* limit retransmission to the bytes already sent on some subflows */
-			info.sent = 0;
+			info.sent = retrans_seq - dfrag->data_seq;
 			info.limit = READ_ONCE(msk->csum_enabled) ? dfrag->data_len :
 								    dfrag->already_sent;
 
@@ -2886,42 +2883,55 @@ static void __mptcp_retrans(struct sock *sk)
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_data_frag *dfrag;
+	u64 retrans_seq;
 	int err, len;
 
-	mptcp_clean_una_wakeup(sk);
+	mptcp_data_lock(sk);
+	__mptcp_clean_una_wakeup(sk);
+	retrans_seq = msk->snd_una;
+	mptcp_data_unlock(sk);
 
-	/* first check ssk: need to kick "stale" logic */
-	err = mptcp_sched_get_retrans(msk);
-	dfrag = mptcp_rtx_head(sk);
-	if (!dfrag) {
-		if (mptcp_data_fin_enabled(msk)) {
-			struct inet_connection_sock *icsk = inet_csk(sk);
+	for (;;) {
+		/* first check ssk: need to kick "stale" logic */
+		err = mptcp_sched_get_retrans(msk);
+		dfrag = mptcp_rtx_head(sk);
+		if (!dfrag) {
+			if (mptcp_data_fin_enabled(msk)) {
+				struct inet_connection_sock *icsk = inet_csk(sk);
 
-			WRITE_ONCE(icsk->icsk_retransmits,
-				   icsk->icsk_retransmits + 1);
-			mptcp_set_datafin_timeout(sk);
-			mptcp_send_ack(msk);
+				WRITE_ONCE(icsk->icsk_retransmits,
+					   icsk->icsk_retransmits + 1);
+				mptcp_set_datafin_timeout(sk);
+				mptcp_send_ack(msk);
+				break;
+			}
 
-			goto reset_timer;
+			if (!mptcp_send_head(sk))
+				goto clear_scheduled;
+			break;
 		}
 
-		if (!mptcp_send_head(sk))
+		if (err)
+			break;
+
+		/* Skip the data already retransmitted in this run */
+		while (dfrag && !before64(retrans_seq, dfrag->data_seq +
+					  dfrag->already_sent))
+			dfrag = list_is_last(&dfrag->list, &msk->rtx_queue) ? NULL :
+				list_next_entry(dfrag, list);
+		if (!dfrag || !dfrag->already_sent)
+			break;
+
+		len = __mptcp_push_retrans(sk, dfrag, retrans_seq);
+		if (len < 0)
 			goto clear_scheduled;
+		if (!len)
+			break;
 
-		goto reset_timer;
+		retrans_seq += len;
+		msk->bytes_retrans += len;
+		dfrag->already_sent = max(dfrag->already_sent, len);
 	}
-
-	if (err)
-		goto reset_timer;
-
-	len = __mptcp_push_retrans(sk, dfrag);
-	if (len < 0)
-		goto clear_scheduled;
-
-	msk->bytes_retrans += len;
-	dfrag->already_sent = max(dfrag->already_sent, len);
-
-reset_timer:
 	mptcp_check_and_set_pending(sk);
 
 	if (!mptcp_rtx_timer_pending(sk))
