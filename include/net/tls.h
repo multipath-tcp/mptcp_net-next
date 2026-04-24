@@ -82,6 +82,12 @@ struct tls_rec;
 #define TLS_SM4_CCM_IV_B0_BYTE		2
 
 enum {
+	TLSV4,
+	TLSV6,
+	TLS_NUM_PROTS,
+};
+
+enum {
 	TLS_BASE,
 	TLS_SW,
 	TLS_HW,
@@ -220,6 +226,15 @@ struct tls_prot_info {
 	u16 tail_size;
 };
 
+struct tls_proto {
+	struct rcu_head			rcu;
+	refcount_t			refcnt;
+	struct list_head		list;
+	const struct proto		*prot;
+	struct proto prots[TLS_NUM_PROTS][TLS_NUM_CONFIG][TLS_NUM_CONFIG];
+	struct proto_ops proto_ops[TLS_NUM_PROTS][TLS_NUM_CONFIG][TLS_NUM_CONFIG];
+};
+
 struct tls_context {
 	/* read-only cache line */
 	struct tls_prot_info prot_info;
@@ -256,6 +271,8 @@ struct tls_context {
 	/* cache cold stuff */
 	struct proto *sk_proto;
 	struct sock *sk;
+
+	struct tls_proto *proto;
 
 	void (*sk_destruct)(struct sock *sk);
 
