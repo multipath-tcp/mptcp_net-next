@@ -90,12 +90,6 @@ static inline const void *pmd_page_vaddr(pmd_t pmd)
 }
 #define pmd_page_vaddr pmd_page_vaddr
 #endif
-/*
- * ZERO_PAGE is a global shared page that is always zero: used
- * for zero-mapped memory areas etc..
- */
-extern unsigned long empty_zero_page[];
-#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
 extern pgd_t swapper_pg_dir[];
 
@@ -219,11 +213,11 @@ static inline bool arch_supports_memmap_on_memory(unsigned long vmemmap_size)
 #endif /* CONFIG_PPC64 */
 
 #ifndef pmd_user_accessible_page
-#define pmd_user_accessible_page(pmd, addr)	false
+#define pmd_user_accessible_page(mm, addr, pmd)	false
 #endif
 
 #ifndef pud_user_accessible_page
-#define pud_user_accessible_page(pud, addr)	false
+#define pud_user_accessible_page(mm, addr, pud)	false
 #endif
 
 #endif /* __ASSEMBLER__ */
