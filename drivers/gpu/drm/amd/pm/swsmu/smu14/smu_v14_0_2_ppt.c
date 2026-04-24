@@ -68,6 +68,8 @@ static const struct smu_feature_bits smu_v14_0_2_dpm_features = {
 		  SMU_FEATURE_BIT_INIT(FEATURE_DPM_FCLK_BIT) }
 };
 
+#define SMU14_DRIVER_IF_VERSION_SMU_V14_0_2 0x2E
+
 #define MP0_MP1_DATA_REGION_SIZE_COMBOPPTABLE	0x4000
 #define DEBUGSMC_MSG_Mode1Reset        2
 #define LINK_SPEED_MAX					3
@@ -659,13 +661,13 @@ static int smu_v14_0_2_get_smu_metrics_data(struct smu_context *smu,
 			*value = metrics->AverageGfxclkFrequencyPreDs;
 		break;
 	case METRICS_AVERAGE_FCLK:
-		if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+		if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 			*value = metrics->AverageFclkFrequencyPostDs;
 		else
 			*value = metrics->AverageFclkFrequencyPreDs;
 		break;
 	case METRICS_AVERAGE_UCLK:
-		if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+		if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 			*value = metrics->AverageMemclkFrequencyPostDs;
 		else
 			*value = metrics->AverageMemclkFrequencyPreDs;
@@ -686,7 +688,7 @@ static int smu_v14_0_2_get_smu_metrics_data(struct smu_context *smu,
 		*value = metrics->AverageGfxActivity;
 		break;
 	case METRICS_AVERAGE_MEMACTIVITY:
-		*value = metrics->AverageUclkActivity;
+		*value = smu_safe_u16_nn(metrics->AverageUclkActivity);
 		break;
 	case METRICS_AVERAGE_VCNACTIVITY:
 		*value = max(metrics->AverageVcn0ActivityPercentage,
@@ -2145,7 +2147,7 @@ static ssize_t smu_v14_0_2_get_gpu_metrics(struct smu_context *smu,
 					     metrics->AvgTemperature[TEMP_VR_MEM1]);
 
 	gpu_metrics->average_gfx_activity = metrics->AverageGfxActivity;
-	gpu_metrics->average_umc_activity = metrics->AverageUclkActivity;
+	gpu_metrics->average_umc_activity = smu_safe_u16_nn(metrics->AverageUclkActivity);
 	gpu_metrics->average_mm_activity = max(metrics->AverageVcn0ActivityPercentage,
 					       metrics->Vcn1ActivityPercentage);
 
@@ -2157,7 +2159,7 @@ static ssize_t smu_v14_0_2_get_gpu_metrics(struct smu_context *smu,
 	else
 		gpu_metrics->average_gfxclk_frequency = metrics->AverageGfxclkFrequencyPreDs;
 
-	if (metrics->AverageUclkActivity <= SMU_14_0_2_BUSY_THRESHOLD)
+	if (smu_safe_u16_nn(metrics->AverageUclkActivity) <= SMU_14_0_2_BUSY_THRESHOLD)
 		gpu_metrics->average_uclk_frequency = metrics->AverageMemclkFrequencyPostDs;
 	else
 		gpu_metrics->average_uclk_frequency = metrics->AverageMemclkFrequencyPreDs;
@@ -2798,7 +2800,7 @@ static const struct pptable_funcs smu_v14_0_2_ppt_funcs = {
 	.fini_power = smu_v14_0_fini_power,
 	.check_fw_status = smu_v14_0_check_fw_status,
 	.setup_pptable = smu_v14_0_2_setup_pptable,
-	.check_fw_version = smu_v14_0_check_fw_version,
+	.check_fw_version = smu_cmn_check_fw_version,
 	.set_driver_table_location = smu_v14_0_set_driver_table_location,
 	.system_features_control = smu_v14_0_system_features_control,
 	.set_allowed_mask = smu_v14_0_set_allowed_mask,
@@ -2863,5 +2865,6 @@ void smu_v14_0_2_set_ppt_funcs(struct smu_context *smu)
 	smu->table_map = smu_v14_0_2_table_map;
 	smu->pwr_src_map = smu_v14_0_2_pwr_src_map;
 	smu->workload_map = smu_v14_0_2_workload_map;
+	smu->smc_driver_if_version = SMU14_DRIVER_IF_VERSION_SMU_V14_0_2;
 	smu_v14_0_2_init_msg_ctl(smu);
 }
