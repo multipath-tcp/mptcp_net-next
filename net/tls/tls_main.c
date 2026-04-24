@@ -1409,9 +1409,19 @@ static int __init tls_register(void)
 	if (err)
 		goto err_dev;
 
+#ifdef CONFIG_MPTCP
+	err = tls_register_prot_ops(&tls_mptcp_ops);
+	if (err)
+		goto err_prot_ops;
+#endif
+
 	tcp_register_ulp(&tcp_tls_ulp_ops);
 
 	return 0;
+#ifdef CONFIG_MPTCP
+err_prot_ops:
+	tls_unregister_prot_ops(&tls_tcp_ops);
+#endif
 err_dev:
 	tls_device_cleanup();
 err_strp:
@@ -1424,6 +1434,9 @@ err_pernet:
 static void __exit tls_unregister(void)
 {
 	tls_proto_cleanup();
+#ifdef CONFIG_MPTCP
+	tls_unregister_prot_ops(&tls_mptcp_ops);
+#endif
 	tls_unregister_prot_ops(&tls_tcp_ops);
 	tcp_unregister_ulp(&tcp_tls_ulp_ops);
 	tls_strp_dev_exit();
