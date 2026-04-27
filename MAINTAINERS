@@ -103,12 +103,6 @@ F:	Documentation/networking/6lowpan.rst
 F:	include/net/6lowpan.h
 F:	net/6lowpan/
 
-6PACK NETWORK DRIVER FOR AX.25
-M:	Andreas Koensgen <ajk@comnets.uni-bremen.de>
-L:	linux-hams@vger.kernel.org
-S:	Maintained
-F:	drivers/net/hamradio/6pack.c
-
 802.11 (including CFG80211/NL80211)
 M:	Johannes Berg <johannes@sipsolutions.net>
 L:	linux-wireless@vger.kernel.org
@@ -144,7 +138,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
 F:	drivers/tty/serial/8250*
 F:	include/linux/serial_8250.h
 
-8390 NETWORK DRIVERS [WD80x3/SMC-ELITE, SMC-ULTRA, NE2000, 3C503, etc.]
+8390 NETWORK DRIVERS [NE2000, 3C503, etc.]
 L:	netdev@vger.kernel.org
 S:	Orphan / Obsolete
 F:	drivers/net/ethernet/8390/
@@ -646,8 +640,11 @@ W:	https://ez.analog.com/linux-software-drivers
 F:	Documentation/devicetree/bindings/iio/accel/adi,adxl367.yaml
 F:	drivers/iio/accel/adxl367*
 
-ADXL372 THREE-AXIS DIGITAL ACCELEROMETER DRIVER
+ADXL371/ADXL372 THREE-AXIS DIGITAL ACCELEROMETER DRIVER
 M:	Michael Hennerich <michael.hennerich@analog.com>
+M:	Marcelo Schmitt <marcelo.schmitt@analog.com>
+M:	Nuno Sá <nuno.sa@analog.com>
+M:	Antoniu Miclaus <antoniu.miclaus@analog.com>
 S:	Supported
 W:	https://ez.analog.com/linux-software-drivers
 F:	Documentation/devicetree/bindings/iio/accel/adi,adxl372.yaml
@@ -1588,6 +1585,15 @@ W:	https://ez.analog.com/linux-software-drivers
 F:	Documentation/devicetree/bindings/iio/adc/adi,ad7780.yaml
 F:	drivers/iio/adc/ad7780.c
 
+ANALOG DEVICES INC AD8366 DRIVER
+M:	Michael Hennerich <Michael.Hennerich@analog.com>
+M:	Rodrigo Alencar <rodrigo.alencar@analog.com>
+L:	linux-iio@vger.kernel.org
+S:	Supported
+W:	https://ez.analog.com/linux-software-drivers
+F:	Documentation/devicetree/bindings/iio/amplifiers/adi,ad8366.yaml
+F:	drivers/iio/amplifiers/ad8366.c
+
 ANALOG DEVICES INC AD9467 DRIVER
 M:	Michael Hennerich <Michael.Hennerich@analog.com>
 M:	Nuno Sa <nuno.sa@analog.com>
@@ -1695,6 +1701,14 @@ L:	linux-iio@vger.kernel.org
 S:	Supported
 W:	https://ez.analog.com/linux-software-drivers
 F:	Documentation/devicetree/bindings/iio/imu/adi,adis16550.yaml
+
+ANALOG DEVICES INC ADL8113 DRIVER
+M:	Antoniu Miclaus <antoniu.miclaus@analog.com>
+L:	linux-iio@vger.kernel.org
+S:	Supported
+W:	https://ez.analog.com/linux-software-drivers
+F:	Documentation/devicetree/bindings/iio/amplifiers/adi,adl8113.yaml
+F:	drivers/iio/amplifiers/adl8113.c
 
 ANALOG DEVICES INC ADM1177 DRIVER
 M:	Michael Hennerich <Michael.Hennerich@analog.com>
@@ -2706,8 +2720,9 @@ N:	digicolor
 
 ARM/CORESIGHT FRAMEWORK AND DRIVERS
 M:	Suzuki K Poulose <suzuki.poulose@arm.com>
-R:	Mike Leach <mike.leach@linaro.org>
+R:	Mike Leach <mike.leach@arm.com>
 R:	James Clark <james.clark@linaro.org>
+R:	Leo Yan <leo.yan@arm.com>
 L:	coresight@lists.linaro.org (moderated for non-subscribers)
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
@@ -4158,10 +4173,12 @@ L:	netdev@vger.kernel.org
 S:	Maintained
 W:	http://linux-atm.sourceforge.net
 F:	drivers/atm/
+F:	drivers/usb/atm/
 F:	include/linux/atm*
 F:	include/linux/sonet.h
 F:	include/uapi/linux/atm*
 F:	include/uapi/linux/sonet.h
+F:	net/atm/
 
 ATMEL MACB ETHERNET DRIVER
 M:	Nicolas Ferre <nicolas.ferre@microchip.com>
@@ -4280,14 +4297,6 @@ M:	Junjie Cao <caojunjie650@gmail.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/leds/backlight/awinic,aw99706.yaml
 F:	drivers/video/backlight/aw99706.c
-
-AX.25 NETWORK LAYER
-L:	linux-hams@vger.kernel.org
-S:	Orphan
-W:	https://linux-ax25.in-berlin.de
-F:	include/net/ax25.h
-F:	include/uapi/linux/ax25.h
-F:	net/ax25/
 
 AXENTIA ARM DEVICES
 M:	Peter Rosin <peda@axentia.se>
@@ -4429,13 +4438,6 @@ F:	Documentation/networking/batman-adv.rst
 F:	include/uapi/linux/batadv_packet.h
 F:	include/uapi/linux/batman_adv.h
 F:	net/batman-adv/
-
-BAYCOM/HDLCDRV DRIVERS FOR AX.25
-M:	Thomas Sailer <t.sailer@alumni.ethz.ch>
-L:	linux-hams@vger.kernel.org
-S:	Maintained
-W:	http://www.baycom.org/~tom/ham/ham.html
-F:	drivers/net/hamradio/baycom*
 
 BCACHE (BLOCK LAYER CACHE)
 M:	Coly Li <colyli@fnnas.com>
@@ -5674,15 +5676,6 @@ S:	Orphan
 T:	git git://linuxtv.org/media.git
 F:	Documentation/admin-guide/media/cafe_ccic*
 F:	drivers/media/platform/marvell/
-
-CAIF NETWORK LAYER
-L:	netdev@vger.kernel.org
-S:	Orphan
-F:	Documentation/networking/caif/
-F:	drivers/net/caif/
-F:	include/net/caif/
-F:	include/uapi/linux/caif/
-F:	net/caif/
 
 CAKE QDISC
 M:	Toke Høiland-Jørgensen <toke@toke.dk>
@@ -7029,20 +7022,6 @@ M:	Joshua Kinard <linux@kumba.dev>
 S:	Maintained
 F:	drivers/rtc/rtc-ds1685.c
 F:	include/linux/rtc/ds1685.h
-
-DAMA SLAVE for AX.25
-M:	Joerg Reuter <jreuter@yaina.de>
-L:	linux-hams@vger.kernel.org
-S:	Maintained
-W:	http://yaina.de/jreuter/
-W:	http://www.qsl.net/dl1bke/
-F:	net/ax25/af_ax25.c
-F:	net/ax25/ax25_dev.c
-F:	net/ax25/ax25_ds_*
-F:	net/ax25/ax25_in.c
-F:	net/ax25/ax25_out.c
-F:	net/ax25/ax25_timer.c
-F:	net/ax25/sysctl_net_ax25.c
 
 DASHARO ACPI PLATFORM DRIVER
 M:	Michał Kopeć <michal.kopec@3mdeb.com>
@@ -8644,10 +8623,17 @@ S:	Maintained
 T:	git https://gitlab.freedesktop.org/drm/misc/kernel.git
 F:	drivers/gpu/drm/gma500/
 
-DRM DRIVERS FOR HISILICON
-M:	Xinliang Liu <xinliang.liu@linaro.org>
+DRM DRIVERS FOR HISILICON HIBMC
+M:	Yongbang Shi <shiyongbang@huawei.com>
 M:	Tian Tao  <tiantao6@hisilicon.com>
 R:	Xinwei Kong <kong.kongxinwei@hisilicon.com>
+L:	dri-devel@lists.freedesktop.org
+S:	Maintained
+T:	git https://gitlab.freedesktop.org/drm/misc/kernel.git
+F:	drivers/gpu/drm/hisilicon/hibmc
+
+DRM DRIVERS FOR HISILICON KIRIN
+M:	Xinliang Liu <xinliang.liu@linaro.org>
 R:	Sumit Semwal <sumit.semwal@linaro.org>
 R:	Yongqin Liu <yongqin.liu@linaro.org>
 R:	John Stultz <jstultz@google.com>
@@ -8655,7 +8641,7 @@ L:	dri-devel@lists.freedesktop.org
 S:	Maintained
 T:	git https://gitlab.freedesktop.org/drm/misc/kernel.git
 F:	Documentation/devicetree/bindings/display/hisilicon/
-F:	drivers/gpu/drm/hisilicon/
+F:	drivers/gpu/drm/hisilicon/kirin
 
 DRM DRIVERS FOR LIMA
 M:	Qiang Yu <yuq825@gmail.com>
@@ -11523,11 +11509,6 @@ T:	git https://github.com/Rust-for-Linux/linux.git timekeeping-next
 F:	rust/kernel/time.rs
 F:	rust/kernel/time/
 
-HIGH-SPEED SCC DRIVER FOR AX.25
-L:	linux-hams@vger.kernel.org
-S:	Orphan
-F:	drivers/net/hamradio/scc.c
-
 HIGHPOINT ROCKETRAID 3xxx RAID DRIVER
 M:	HighPoint Linux Team <linux@highpoint-tech.com>
 S:	Supported
@@ -13420,6 +13401,12 @@ F:	include/linux/interconnect-clk.h
 F:	include/linux/interconnect-provider.h
 F:	include/linux/interconnect.h
 
+INTERCONNECT KUNIT TESTS
+M:	Kuan-Wei Chiu <visitorckw@gmail.com>
+L:	linux-pm@vger.kernel.org
+S:	Maintained
+F:	drivers/interconnect/icc-kunit.c
+
 INTERRUPT COUNTER DRIVER
 M:	Oleksij Rempel <o.rempel@pengutronix.de>
 R:	Pengutronix Kernel Team <kernel@pengutronix.de>
@@ -13676,25 +13663,6 @@ L:	target-devel@vger.kernel.org
 S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nab/target-pending.git master
 F:	drivers/infiniband/ulp/isert
-
-ISDN/CMTP OVER BLUETOOTH
-L:	netdev@vger.kernel.org
-S:	Orphan
-W:	http://www.isdn4linux.de
-F:	Documentation/isdn/
-F:	drivers/isdn/capi/
-F:	include/linux/isdn/
-F:	include/uapi/linux/isdn/
-F:	net/bluetooth/cmtp/
-
-ISDN/mISDN SUBSYSTEM
-L:	netdev@vger.kernel.org
-S:	Orphan
-W:	http://www.isdn4linux.de
-F:	drivers/isdn/Kconfig
-F:	drivers/isdn/Makefile
-F:	drivers/isdn/hardware/
-F:	drivers/isdn/mISDN/
 
 ISL28022 HARDWARE MONITORING DRIVER
 M:	Carsten Spieß <mail@carsten-spiess.de>
@@ -18442,14 +18410,6 @@ F:	net/bridge/br_netfilter*.c
 F:	net/netfilter/
 F:	tools/testing/selftests/net/netfilter/
 
-NETROM NETWORK LAYER
-L:	linux-hams@vger.kernel.org
-S:	Orphan
-W:	https://linux-ax25.in-berlin.de
-F:	include/net/netrom.h
-F:	include/uapi/linux/netrom.h
-F:	net/netrom/
-
 NETRONIX EMBEDDED CONTROLLER
 M:	Jonathan Neuschäfer <j.neuschaefer@gmx.net>
 S:	Maintained
@@ -19440,8 +19400,8 @@ F:	drivers/net/dsa/ocelot/ocelot_ext.c
 F:	include/linux/mfd/ocelot.h
 
 OCXL (Open Coherent Accelerator Processor Interface OpenCAPI) DRIVER
-M:	Frederic Barrat <fbarrat@linux.ibm.com>
-M:	Andrew Donnellan <ajd@linux.ibm.com>
+M:	Mahesh J Salgaonkar <mahesh@linux.ibm.com>
+R:	Andrew Donnellan <andrew+kernel@donnellan.id.au>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Odd Fixes
 F:	Documentation/userspace-api/accelerators/ocxl.rst
@@ -20926,7 +20886,7 @@ PERFORMANCE EVENTS TOOLING ARM64
 R:	John Garry <john.g.garry@oracle.com>
 R:	Will Deacon <will@kernel.org>
 R:	James Clark <james.clark@linaro.org>
-R:	Mike Leach <mike.leach@linaro.org>
+R:	Mike Leach <mike.leach@arm.com>
 R:	Leo Yan <leo.yan@linux.dev>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Supported
@@ -23284,14 +23244,6 @@ F:	include/linux/mfd/rohm-bd96802.h
 F:	include/linux/mfd/rohm-generic.h
 F:	include/linux/mfd/rohm-shared.h
 
-ROSE NETWORK LAYER
-L:	linux-hams@vger.kernel.org
-S:	Orphan
-W:	https://linux-ax25.in-berlin.de
-F:	include/net/rose.h
-F:	include/uapi/linux/rose.h
-F:	net/rose/
-
 ROTATION DRIVER FOR ALLWINNER A83T
 M:	Jernej Skrabec <jernej.skrabec@gmail.com>
 L:	linux-media@vger.kernel.org
@@ -24662,7 +24614,7 @@ L:	linux-cifs@vger.kernel.org
 L:	samba-technical@lists.samba.org (moderated for non-subscribers)
 S:	Maintained
 F:	fs/smb/client/smbdirect.*
-F:	fs/smb/common/smbdirect/
+F:	fs/smb/smbdirect/
 F:	fs/smb/server/transport_rdma.*
 
 SMC91x ETHERNET DRIVER
@@ -24730,8 +24682,8 @@ F:	Documentation/devicetree/bindings/net/socionext,synquacer-netsec.yaml
 F:	drivers/net/ethernet/socionext/netsec.c
 
 SOCIONEXT (SNI) Synquacer SPI DRIVER
-M:	Masahisa Kojima <masahisa.kojima@linaro.org>
-M:	Jassi Brar <jaswinder.singh@linaro.org>
+M:	Masahisa Kojima <kojima.masahisa@socionext.com>
+M:	Jassi Brar <jassisinghbrar@gmail.com>
 L:	linux-spi@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/spi/socionext,synquacer-spi.yaml
@@ -25368,6 +25320,13 @@ L:	linux-iio@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/iio/proximity/st,vl53l0x.yaml
 F:	drivers/iio/proximity/vl53l0x-i2c.c
+
+ST VL53L1X ToF RANGER(I2C) IIO DRIVER
+M:	Siratul Islam <email@sirat.me>
+L:	linux-iio@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/iio/proximity/st,vl53l0x.yaml
+F:	drivers/iio/proximity/vl53l1x-i2c.c
 
 STABLE BRANCH
 M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
@@ -29346,13 +29305,6 @@ F:	lib/decompress_unxz.c
 F:	lib/xz/
 F:	scripts/xz_wrap.sh
 
-YAM DRIVER FOR AX.25
-M:	Jean-Paul Roubelat <jpr@f6fbb.org>
-L:	linux-hams@vger.kernel.org
-S:	Maintained
-F:	drivers/net/hamradio/yam*
-F:	include/linux/yam.h
-
 YAMA SECURITY MODULE
 M:	Kees Cook <kees@kernel.org>
 S:	Supported
@@ -29373,16 +29325,6 @@ M:	Henk Vergonet <Henk.Vergonet@gmail.com>
 S:	Maintained
 F:	Documentation/input/devices/yealink.rst
 F:	drivers/input/misc/yealink.*
-
-Z8530 DRIVER FOR AX.25
-M:	Joerg Reuter <jreuter@yaina.de>
-L:	linux-hams@vger.kernel.org
-S:	Maintained
-W:	http://yaina.de/jreuter/
-W:	http://www.qsl.net/dl1bke/
-F:	Documentation/networking/device_drivers/hamradio/z8530drv.rst
-F:	drivers/net/hamradio/*scc.c
-F:	drivers/net/hamradio/z8530.h
 
 ZD1211RW WIRELESS DRIVER
 L:	linux-wireless@vger.kernel.org
