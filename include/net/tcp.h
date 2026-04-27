@@ -1828,6 +1828,14 @@ extern void tcp_openreq_init_rwin(struct request_sock *req,
 
 void tcp_enter_memory_pressure(struct sock *sk);
 void tcp_leave_memory_pressure(struct sock *sk);
+unsigned int xtcp_collapse(struct sock *sk, struct sk_buff_head *list,
+			   struct rb_root *root, struct sk_buff *head,
+			   struct sk_buff *tail, u32 start, u32 end,
+			   u8 scaling_ratio);
+unsigned int xtcp_collapse_ofo_queue(struct sock *sk,
+				     struct rb_root *out_of_order_queue,
+				     struct sk_buff **ooo_last_skb,
+				     u8 scaling_ratio);
 
 static inline int keepalive_intvl_when(const struct tcp_sock *tp)
 {
