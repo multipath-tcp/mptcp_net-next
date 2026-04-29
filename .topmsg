@@ -1,2 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-in-kernel-explicitly-limit-batches-to-array-size
+Subject: [PATCH] mptcp: pm: in-kernel: explicitly limit batches to array size
+
+The in-kernel PM can create subflows in reply to ADD_ADDR by batch of
+maximum 8 subflows for the moment. Same when adding new "subflow"
+endpoints with the fullmesh flag. This limit is linked to the arrays
+used during these steps.
+
+There was no explicit limit to the arrays size (8), because the limit of
+extra subflows is the same (8). It seems safer to use an explicit limit,
+but also these two sizes are going to be different in the next commit.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
