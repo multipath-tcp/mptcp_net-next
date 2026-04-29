@@ -1,2 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-prio-skip-closed-subflows
+Subject: [PATCH] mptcp: pm: prio: skip closed subflows
+
+When sending an MP_PRIO, closed subflows need to be skipped.
+
+This fixes the case where the initial subflow got closed, re-opened
+later, then an MP_PRIO is needed for the same local address.
+
+Note that explicit MP_PRIO cannot be sent during the 3WHS, so it is fine
+to use __mptcp_subflow_active().
+
+Fixes: 067065422fcd ("mptcp: add the outgoing MP_PRIO support")
+Fixes: b29fcfb54cd7 ("mptcp: full disconnect implementation")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
