@@ -1,2 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-pm-restrict-unknown-check-to-pm_nl_ctl
+Subject: [PATCH] selftests: mptcp: pm: restrict 'unknown' check to pm_nl_ctl
+
+When pm_netlink.sh is executed with '-i', 'ip mptcp' is used instead of
+'pm_nl_ctl'. IPRoute2 doesn't support the 'unknown' flag, which has only
+been added to 'pm_nl_ctl' for this specific check: to ensure that the
+kernel ignores such unsupported flag.
+
+No reason to add this flag to 'ip mptcp'. Then, this check should be
+skipped when 'ip mptcp' is used.
+
+Fixes: 29f4801e9c8d ("selftests: mptcp: pm: ensure unknown flags are ignored")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
