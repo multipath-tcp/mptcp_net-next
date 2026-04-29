@@ -1,2 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-pm-validate-new-limits
+Subject: [PATCH] selftests: mptcp: pm: validate new limits
+
+These limits have been recently updated, from 8 to:
+
+- 64 for the subflows and accepted add_addr
+
+- 255 for the MPTCP endpoints
+
+These modifications validate the new limits, but are also compatible
+with the previous ones, to be able to continue to validate stable kernel
+using the last version of the selftests. That's why new variables are
+now used instead of hard-coded values.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
