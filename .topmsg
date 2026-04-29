@@ -1,2 +1,23 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-ADD_ADDR-rtx-resched-blocked-ADD_ADDR-quicker
+Subject: [PATCH] mptcp: pm: ADD_ADDR rtx: resched blocked ADD_ADDR quicker
+
+When an ADD_ADDR needs to be retransmitted and another one has already
+been prepared -- e.g. multiple ADD_ADDRs have been sent in a row and
+need to be retransmitted later -- this additional retransmission will
+need to wait.
+
+In this case, the timer was reset to TCP_RTO_MAX / 8, which is ~15
+seconds. This delay is unnecessary long: it should just be rescheduled
+at the next opportunity, e.g. after the retransmission timeout.
+
+Without this modification, some issues can be seen from time to time in
+the selftests when multiple ADD_ADDRs are sent, and the host takes time
+to process them, e.g. the "signal addresses, ADD_ADDR timeout" MPTCP
+Join selftest, especially with a debug kernel config.
+
+Note that on older kernels, 'timeout' is not available. It should be
+enough to replace it by one second (HZ).
+
+Fixes: 00cfd77b9063 ("mptcp: retransmit ADD_ADDR when timeout")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
