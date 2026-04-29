@@ -1,1 +1,1 @@
-t/mptcp-pm-add-get_priority-interface
+t/selftests-mptcp-pm-use-simpler-send-recv-forms
