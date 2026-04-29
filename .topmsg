@@ -1,2 +1,12 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-pm-use-simpler-send-recv-forms
+Subject: [PATCH] selftests: mptcp: pm: use simpler send/recv forms
+
+Instead of sendto() and recvfrom() which the NL address that was already
+provided before.
+
+Just simpler and easier to read without the to/from variants.
+
+While at it, fix a checkpatch warning by removing multiple assignments.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
