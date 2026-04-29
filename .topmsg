@@ -1,2 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-MPJoinSynAckHMacFailure-for-SynAck-HMAC-failure
+From: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Subject: [PATCH] mptcp: use MPJoinSynAckHMacFailure for SynAck HMAC failure
+
+In subflow_finish_connect(), HMAC validation of the server's HMAC
+in SYN/ACK + MP_JOIN increments MPTCP_MIB_JOINACKMAC ("HMAC was
+wrong on ACK + MP_JOIN") on failure. The function processes the
+SYN/ACK, not the ACK; the matching MPTCP_MIB_JOINSYNACKMAC counter
+("HMAC was wrong on SYN/ACK + MP_JOIN") exists but is not
+incremented anywhere in the tree.
+
+The mirror site on the server, subflow_syn_recv_sock(), already
+uses JOINACKMAC correctly for ACK HMAC failure. Use JOINSYNACKMAC
+at the SYN/ACK validation site so each counter reflects the packet
+whose HMAC actually failed.
+
+Suggested-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Fixes: fc518953bc9c ("mptcp: add and use MIB counter infrastructure")
+Cc: stable@vger.kernel.org
+Signed-off-by: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
