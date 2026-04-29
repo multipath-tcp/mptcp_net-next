@@ -1,2 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-kernel-correctly-retransmit-ADD_ADDR-ID-0
+Subject: [PATCH] mptcp: pm: kernel: correctly retransmit ADD_ADDR ID 0
+
+When adding the ADD_ADDR to the list, the address including the IP, port
+and ID are copied. On the other hand, when the endpoint corresponds to
+the one from the initial subflow, the ID is set to 0, as specified by
+the MPTCP protocol.
+
+The issue is that the ID was reset after having copied the ID in the
+ADD_ADDR entry. So the retransmission was done, but using a different ID
+than the initial one.
+
+Fixes: 8b8ed1b429f8 ("mptcp: pm: reuse ID 0 after delete and re-add")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
