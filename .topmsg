@@ -1,2 +1,18 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-validate-8x8-subflows
+Subject: [PATCH] selftests: mptcp: join: validate 8x8 subflows
+
+The limits have been recently increased, it is required to validate that
+having 64 subflows is allowed.
+
+Here, both the client and the server have 8 network interfaces. The
+server has 8 endpoints marked as 'signal' to announce all its v4
+addresses. The client also has 8 endpoints, but marked as 'subflow' and
+'fullmesh' in order to create 8 subflows to each address announced by
+the server. This means 63 additional subflows will be created after the
+initial one.
+
+If it is not possible to increase the limits to 64, it means an older
+kernel version is being used, and the test is skipped.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
