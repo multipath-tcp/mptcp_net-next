@@ -1,2 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-check-output-catch-cmd-errors
+Subject: [PATCH] selftests: mptcp: check output: catch cmd errors
+
+Using '${?}' inside the if-statement to check the returned value from
+the command that was evaluated as part of the if-statement is not
+correct: here, '${?}' will be linked to the previous instruction, not
+the one that is expected here (${cmd}).
+
+Instead, simply mark the error, except if an error is expected. If
+that's the case, 1 can be passed as the 4th argument of this helper.
+Three checks from pm_netlink.sh expect an error.
+
+While at it, improve the error message when the command unexpectedly
+fails or succeeds.
+
+Note that we could expect a specific returned value, but the checks
+currently expecting an error can be used with 'ip mptcp' or 'pm_nl_ctl',
+and these two tools don't return the same error code.
+
+Fixes: 2d0c1d27ea4e ("selftests: mptcp: add mptcp_lib_check_output helper")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
