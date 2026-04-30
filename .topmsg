@@ -1,2 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-rx-timestamp-corruption-on-fastopen
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix rx timestamp corruption on fastopen
+
+The skb cb offset containing the timestamp presence flag is cleared
+before loading such information. Cache such value before MPTCP CB
+initialization.
+
+Fixes: 36b122baf6a8 ("mptcp: add subflow_v(4,6)_send_synack()")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
