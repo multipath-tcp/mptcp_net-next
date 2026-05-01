@@ -325,6 +325,30 @@ dpll_msg_add_pin_on_dpll_state(struct sk_buff *msg, struct dpll_pin *pin,
 }
 
 static int
+dpll_msg_add_pin_operstate(struct sk_buff *msg, struct dpll_pin *pin,
+			   struct dpll_pin_ref *ref,
+			   struct netlink_ext_ack *extack)
+{
+	const struct dpll_pin_ops *ops = dpll_pin_ops(ref);
+	struct dpll_device *dpll = ref->dpll;
+	enum dpll_pin_operstate operstate;
+	int ret;
+
+	if (!ops->operstate_on_dpll_get)
+		return 0;
+	ret = ops->operstate_on_dpll_get(pin,
+					  dpll_pin_on_dpll_priv(dpll, pin),
+					  dpll, dpll_priv(dpll),
+					  &operstate, extack);
+	if (ret)
+		return ret;
+	if (nla_put_u32(msg, DPLL_A_PIN_OPERSTATE, operstate))
+		return -EMSGSIZE;
+
+	return 0;
+}
+
+static int
 dpll_msg_add_pin_direction(struct sk_buff *msg, struct dpll_pin *pin,
 			   struct dpll_pin_ref *ref,
 			   struct netlink_ext_ack *extack)
@@ -652,6 +676,9 @@ dpll_msg_add_pin_dplls(struct sk_buff *msg, struct dpll_pin *pin,
 		ret = dpll_msg_add_pin_on_dpll_state(msg, pin, ref, extack);
 		if (ret)
 			goto nest_cancel;
+		ret = dpll_msg_add_pin_operstate(msg, pin, ref, extack);
+		if (ret)
+			goto nest_cancel;
 		ret = dpll_msg_add_pin_prio(msg, pin, ref, extack);
 		if (ret)
 			goto nest_cancel;
@@ -900,11 +927,21 @@ int dpll_pin_delete_ntf(struct dpll_pin *pin)
 	return dpll_pin_event_send(DPLL_CMD_PIN_DELETE_NTF, pin);
 }
 
+/**
+ * __dpll_pin_change_ntf - notify that the pin has been changed
+ * @pin: registered pin pointer
+ *
+ * Context: caller must hold dpll_lock. Suitable for use inside pin
+ *          callbacks which are already invoked under dpll_lock.
+ * Return: 0 if succeeds, error code otherwise.
+ */
 int __dpll_pin_change_ntf(struct dpll_pin *pin)
 {
+	lockdep_assert_held(&dpll_lock);
 	dpll_pin_notify(pin, DPLL_PIN_CHANGED);
 	return dpll_pin_event_send(DPLL_CMD_PIN_CHANGE_NTF, pin);
 }
+EXPORT_SYMBOL_GPL(__dpll_pin_change_ntf);
 
 /**
  * dpll_pin_change_ntf - notify that the pin has been changed
