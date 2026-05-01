@@ -85,6 +85,12 @@ struct dpll_pin_ops {
 				 const struct dpll_device *dpll,
 				 void *dpll_priv, enum dpll_pin_state *state,
 				 struct netlink_ext_ack *extack);
+	int (*operstate_on_dpll_get)(const struct dpll_pin *pin,
+				     void *pin_priv,
+				     const struct dpll_device *dpll,
+				     void *dpll_priv,
+				     enum dpll_pin_operstate *operstate,
+				     struct netlink_ext_ack *extack);
 	int (*state_on_pin_set)(const struct dpll_pin *pin, void *pin_priv,
 				const struct dpll_pin *parent_pin,
 				void *parent_pin_priv,
@@ -286,6 +292,7 @@ int dpll_pin_ref_sync_pair_add(struct dpll_pin *pin,
 
 int dpll_device_change_ntf(struct dpll_device *dpll);
 
+int __dpll_pin_change_ntf(struct dpll_pin *pin);
 int dpll_pin_change_ntf(struct dpll_pin *pin);
 
 int register_dpll_notifier(struct notifier_block *nb);
