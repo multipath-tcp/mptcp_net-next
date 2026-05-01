@@ -14,6 +14,7 @@ TEST_PROGS := \
 	mptcp_connect_splice.sh \
 	mptcp_join.sh \
 	mptcp_sockopt.sh \
+	mptcp_v6_initcall.sh \
 	pm_netlink.sh \
 	simult_flows.sh \
 	userspace_pm.sh \
