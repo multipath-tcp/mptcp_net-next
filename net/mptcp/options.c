@@ -403,6 +403,8 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 
+	memset(opts, 0, sizeof(*opts));
+
 	/* we will use snd_isn to detect first pkt [re]transmission
 	 * in mptcp_established_options_mp()
 	 */
@@ -846,7 +848,7 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	bool snd_data_fin;
 	bool ret = false;
 
-	opts->suboptions = 0;
+	memset(opts, 0, sizeof(*opts));
 
 	/* Force later mptcp_write_options(), but do not use any actual
 	 * option space.
@@ -914,6 +916,8 @@ bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+
+	memset(opts, 0, sizeof(*opts));
 
 	if (subflow_req->mp_capable) {
 		opts->suboptions = OPTION_MPTCP_MPC_SYNACK;
