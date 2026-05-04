@@ -583,6 +583,8 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 				map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
 
 			opts->ext_copy = *mpext;
+		} else {
+			opts->ext_copy.use_map = 0;
 		}
 
 		dss_size = map_size;
