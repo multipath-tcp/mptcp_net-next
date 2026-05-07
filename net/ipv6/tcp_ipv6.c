@@ -1617,12 +1617,13 @@ int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (sk->sk_state == TCP_LISTEN) {
 		struct sock *nsk = tcp_v6_cookie_check(sk, skb);
 
+		if (!nsk)
+			return 0;
 		if (nsk != sk) {
-			if (nsk) {
-				reason = tcp_child_process(sk, nsk, skb);
-				if (reason)
-					goto reset;
-			}
+			reason = tcp_child_process(sk, nsk, skb);
+			sock_put(nsk);
+			if (reason)
+				goto reset;
 			return 0;
 		}
 	} else
@@ -1827,8 +1828,10 @@ lookup:
 
 				rst_reason = sk_rst_convert_drop_reason(drop_reason);
 				tcp_v6_send_reset(nsk, skb, rst_reason);
+				sock_put(nsk);
 				goto discard_and_relse;
 			}
+			sock_put(nsk);
 			sock_put(sk);
 			return 0;
 		}
