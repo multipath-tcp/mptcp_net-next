@@ -70,7 +70,6 @@ static int mlx5_lag_enable_mpesw(struct mlx5_lag *ldev)
 	int idx = mlx5_lag_get_dev_index_by_seq(ldev, MLX5_LAG_P1);
 	struct mlx5_core_dev *dev0;
 	int err;
-	int i;
 
 	if (ldev->mode == MLX5_LAG_MODE_MPESW)
 		return 0;
@@ -101,26 +100,21 @@ static int mlx5_lag_enable_mpesw(struct mlx5_lag *ldev)
 		goto err_add_devices;
 	}
 
-	dev0->priv.flags &= ~MLX5_PRIV_FLAGS_DISABLE_IB_ADEV;
-	mlx5_rescan_drivers_locked(dev0);
-	mlx5_ldev_for_each(i, 0, ldev) {
-		err = mlx5_eswitch_reload_ib_reps(mlx5_lag_pf(ldev, i)->dev->priv.eswitch);
-		if (err)
-			goto err_rescan_drivers;
-	}
+	mlx5_lag_rescan_dev_locked(ldev, dev0, true);
+	err = mlx5_lag_reload_ib_reps_from_locked(ldev, 0, false);
+	if (err)
+		goto err_rescan_drivers;
 
 	mlx5_lag_set_vports_agg_speed(ldev);
 
 	return 0;
 
 err_rescan_drivers:
-	dev0->priv.flags |= MLX5_PRIV_FLAGS_DISABLE_IB_ADEV;
-	mlx5_rescan_drivers_locked(dev0);
+	mlx5_lag_rescan_dev_locked(ldev, dev0, false);
 	mlx5_deactivate_lag(ldev);
 err_add_devices:
 	mlx5_lag_add_devices(ldev);
-	mlx5_ldev_for_each(i, 0, ldev)
-		mlx5_eswitch_reload_ib_reps(mlx5_lag_pf(ldev, i)->dev->priv.eswitch);
+	mlx5_lag_reload_ib_reps_from_locked(ldev, 0, true);
 	mlx5_mpesw_metadata_cleanup(ldev);
 	return err;
 }

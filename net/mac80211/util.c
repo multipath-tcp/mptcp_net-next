@@ -2147,6 +2147,9 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 				ieee80211_bss_info_change_notify(sdata,
 								 changed);
 			} else if (!WARN_ON(!link)) {
+				if (link->conf->npca.enabled)
+					changed |= BSS_CHANGED_NPCA;
+
 				ieee80211_link_info_change_notify(sdata, link,
 								  changed);
 				changed = BSS_CHANGED_ASSOC |
@@ -2210,6 +2213,7 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		case NL80211_IFTYPE_AP_VLAN:
 		case NL80211_IFTYPE_MONITOR:
 		case NL80211_IFTYPE_P2P_DEVICE:
+		case NL80211_IFTYPE_PD:
 			/* nothing to do */
 			break;
 		case NL80211_IFTYPE_UNSPECIFIED:
@@ -3702,11 +3706,11 @@ void ieee80211_dfs_radar_detected_work(struct wiphy *wiphy,
 	struct ieee80211_local *local =
 		container_of(work, struct ieee80211_local, radar_detected_work);
 	struct cfg80211_chan_def chandef;
-	struct ieee80211_chanctx *ctx;
+	struct ieee80211_chanctx *ctx, *tmp;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
-	list_for_each_entry(ctx, &local->chanctx_list, list) {
+	list_for_each_entry_safe(ctx, tmp, &local->chanctx_list, list) {
 		if (ctx->replace_state == IEEE80211_CHANCTX_REPLACES_OTHER)
 			continue;
 
@@ -3830,6 +3834,10 @@ again:
 							   &c->punctured);
 		c->width = new_primary_width;
 	}
+
+	/* whatever we do, downgrading removes NPCA */
+	c->npca_chan = NULL;
+	c->npca_punctured = 0;
 
 	/*
 	 * With an 80 MHz channel, we might have the puncturing in the primary
@@ -4640,8 +4648,7 @@ int ieee80211_put_uhr_cap(struct sk_buff *skb,
 	if (!uhr_cap)
 		return 0;
 
-	len = 2 + 1 + sizeof(struct ieee80211_uhr_cap) +
-	      sizeof(struct ieee80211_uhr_cap_phy);
+	len = 2 + 1 + sizeof(struct ieee80211_uhr_cap);
 
 	if (skb_tailroom(skb) < len)
 		return -ENOBUFS;
