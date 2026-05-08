@@ -349,6 +349,8 @@ static int lwmi_om_hwmon_write(struct device *dev, enum hwmon_sensor_types type,
 			 */
 			if (!relax_fan_constraint)
 				raw = val / LWMI_FAN_DIV * LWMI_FAN_DIV;
+			else
+				raw = val;
 
 			err = lwmi_om_fan_get_set(priv, channel, &raw, true);
 			if (err)
