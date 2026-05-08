@@ -1,2 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-cover-ADD_ADDR-tx-drop-and-list-progress
+From: Li Xiasong <lixiasong1@huawei.com>
+Subject: [PATCH] selftests: mptcp: join: cover ADD_ADDR tx drop and list progress
+
+Extend add_addr_ports_tests with IPv6 signaling cases that exercise
+ADD_ADDR tx-space shortage when tcp_timestamps are enabled.
+
+Add one case to verify PM still progresses to later signal endpoints
+after the first one is dropped.
+
+This covers both failure accounting and the non-blocking behavior of
+the announce list after a tx-space drop on pure ACK.
+
+Signed-off-by: Li Xiasong <lixiasong1@huawei.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
