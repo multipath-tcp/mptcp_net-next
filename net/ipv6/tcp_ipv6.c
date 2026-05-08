@@ -288,8 +288,10 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 		saddr = &fl6->saddr;
 
 		err = inet_bhash2_update_saddr(sk, saddr, AF_INET6);
-		if (err)
+		if (err) {
+			dst_release(dst);
 			goto failure;
+		}
 	}
 
 	/* set the source address */
