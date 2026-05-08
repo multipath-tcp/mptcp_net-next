@@ -3767,8 +3767,10 @@ err_out1:
 
 err_out2:
 	if (!rc) {
-		ksmbd_update_fstate(&work->sess->file_table, fp, FP_INITED);
-		rc = ksmbd_iov_pin_rsp(work, (void *)rsp, iov_len);
+		rc = ksmbd_update_fstate(&work->sess->file_table, fp,
+					 FP_INITED);
+		if (!rc)
+			rc = ksmbd_iov_pin_rsp(work, (void *)rsp, iov_len);
 	}
 	if (rc) {
 		if (rc == -EINVAL)
@@ -3946,7 +3948,13 @@ static int smb2_populate_readdir_entry(struct ksmbd_conn *conn, int info_level,
 		goto free_conv_name;
 	}
 
-	struct_sz = readdir_info_level_struct_sz(info_level) + conv_len;
+	struct_sz = readdir_info_level_struct_sz(info_level);
+	if (struct_sz == -EOPNOTSUPP) {
+		rc = -EINVAL;
+		goto free_conv_name;
+	}
+
+	struct_sz += conv_len;
 	next_entry_offset = ALIGN(struct_sz, KSMBD_DIR_INFO_ALIGNMENT);
 	d_info->last_entry_off_align = next_entry_offset - struct_sz;
 
