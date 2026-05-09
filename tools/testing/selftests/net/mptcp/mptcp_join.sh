@@ -76,6 +76,13 @@ unset join_create_err
 unset join_bind_err
 unset join_connect_err
 
+unset rst_md5sig_reset
+unset rst_synack_no_mpjoin
+unset rst_ack_no_mpjoin
+unset rst_ack_no_ctx
+unset rst_dss_reset
+unset rst_not_established
+
 unset fb_ns1
 unset fb_ns2
 unset fb_infinite_map_tx
@@ -1349,6 +1356,12 @@ chk_rst_nr()
 	local rst_tx=$1
 	local rst_rx=$2
 	local ns_invert=${3:-""}
+	local md5sig_reset=${rst_md5sig_reset:-0}
+	local synack_no_mpjoin=${rst_synack_no_mpjoin:-0}
+	local ack_no_mpjoin=${rst_ack_no_mpjoin:-0}
+	local ack_no_ctx=${rst_ack_no_ctx:-0}
+	local dss_reset=${rst_dss_reset:-0}
+	local not_established=${rst_not_established:-0}
 	local count
 	local ns_tx=$ns1
 	local ns_rx=$ns2
@@ -1384,6 +1397,43 @@ chk_rst_nr()
 		fail_test "got $count MP_RST[s] RX expected $rst_rx"
 	else
 		print_ok
+	fi
+
+	# Per-event MPTCP_RST_EMPTCP counters; default 0, gated on availability.
+	count=$(mptcp_lib_get_counter ${ns_tx} "MPTcpExtMD5SigReset")
+	if [ -n "$count" ] && [ "$count" != "$md5sig_reset" ]; then
+		print_check "MD5SigReset ${tx}"
+		fail_test "got $count MD5SigReset expected $md5sig_reset"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns_rx} "MPTcpExtMPJoinSynAckNoMPJoin")
+	if [ -n "$count" ] && [ "$count" != "$synack_no_mpjoin" ]; then
+		print_check "MPJoinSynAckNoMPJoin ${rx}"
+		fail_test "got $count MPJoinSynAckNoMPJoin expected $synack_no_mpjoin"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns_tx} "MPTcpExtMPJoinAckNoMPJoin")
+	if [ -n "$count" ] && [ "$count" != "$ack_no_mpjoin" ]; then
+		print_check "MPJoinAckNoMPJoin ${tx}"
+		fail_test "got $count MPJoinAckNoMPJoin expected $ack_no_mpjoin"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns_tx} "MPTcpExtMPJoinAckNoCtx")
+	if [ -n "$count" ] && [ "$count" != "$ack_no_ctx" ]; then
+		print_check "MPJoinAckNoCtx ${tx}"
+		fail_test "got $count MPJoinAckNoCtx expected $ack_no_ctx"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns_rx} "MPTcpExtDssReset")
+	if [ -n "$count" ] && [ "$count" != "$dss_reset" ]; then
+		print_check "DssReset ${rx}"
+		fail_test "got $count DssReset expected $dss_reset"
+	fi
+
+	count=$(mptcp_lib_get_counter ${ns_rx} "MPTcpExtMPJoinNotEstablished")
+	if [ -n "$count" ] && [ "$count" != "$not_established" ]; then
+		print_check "MPJoinNotEstablished ${rx}"
+		fail_test "got $count MPJoinNotEstablished expected $not_established"
 	fi
 }
 
@@ -4477,6 +4527,49 @@ endpoint_tests()
 	fi
 }
 
+rst_emptcp_tests()
+{
+	# Validate per-event MPTCP_RST_EMPTCP counters.  Use a third
+	# namespace (ns3) to trigger paths that aren't reachable in the
+	# standard ns1/ns2 setup: ns1 announces an address belonging to
+	# ns3, the client (ns2) JOINs to ns3 where the SYN/ACK arrives
+	# without an MP_JOIN option (MPTCP disabled there), and the
+	# MPJoinSynAckNoMPJoin counter increments on the client side.
+	local ns3
+
+	if reset "rst per event no mpj"; then
+		if ! setup_ns ns3; then
+			print_check "create ns3"
+			print_skip
+			return
+		fi
+
+		ip link add ns2eth5 netns "$ns2" type veth peer name ns3eth1 netns "$ns3"
+		ip -net "$ns2" addr add 10.0.6.2/24 dev ns2eth5
+		ip -net "$ns2" link set ns2eth5 up
+		ip -net "$ns3" addr add 10.0.6.1/24 dev ns3eth1
+		ip -net "$ns3" link set ns3eth1 up
+		ip -net "$ns3" link set lo up
+		ip netns exec $ns3 sysctl -q net.mptcp.enabled=0
+
+		pm_nl_add_endpoint $ns1 10.0.6.1 flags signal id 5
+		pm_nl_set_limits $ns2 1 1
+
+		local tport=$(get_port)
+		ip netns exec ${ns3} ./mptcp_connect -l -t -1 -s TCP \
+			-p $tport 10.0.6.1 &
+
+		speed=slow \
+			run_tests $ns1 $ns2 10.0.1.1
+		wait_attempt_fail "$ns2"
+
+		rst_synack_no_mpjoin=1 \
+			chk_rst_nr 0 0
+
+		cleanup_ns "$ns3"
+	fi
+}
+
 # [$1: error message]
 usage()
 {
@@ -4527,6 +4620,7 @@ all_tests_sorted=(
 	F@fail_tests
 	u@userspace_tests
 	I@endpoint_tests
+	R@rst_emptcp_tests
 )
 
 all_tests_args=""
