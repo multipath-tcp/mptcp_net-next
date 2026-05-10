@@ -17,6 +17,7 @@
 #include <net/inet_timewait_sock.h>
 #include <net/ip.h>
 #include <net/route.h>
+#include <net/mptcp.h>
 #include <net/tcp_states.h>
 #include <net/xfrm.h>
 #include <net/tcp.h>
@@ -949,8 +950,13 @@ static struct request_sock *inet_reqsk_clone(struct request_sock *req,
 	/* We need not acquire fastopenq->lock
 	 * because the child socket is locked in inet_csk_listen_stop().
 	 */
-	if (sk->sk_protocol == IPPROTO_TCP && tcp_rsk(nreq)->tfo_listener)
-		rcu_assign_pointer(tcp_sk(nreq->sk)->fastopen_rsk, nreq);
+	if (sk->sk_protocol == IPPROTO_TCP) {
+		if (tcp_rsk(nreq)->tfo_listener)
+			rcu_assign_pointer(tcp_sk(nreq->sk)->fastopen_rsk, nreq);
+
+		if (rsk_is_mptcp(req))
+			mptcp_subflow_reqsk_clone(req, nreq);
+	}
 
 	return nreq;
 }
@@ -1112,6 +1118,8 @@ static void reqsk_timer_handler(struct timer_list *t)
 			goto no_ownership;
 		}
 
+		if (rsk_is_mptcp(oreq))
+			mptcp_subflow_reqsk_migrated(oreq, nreq);
 		__NET_INC_STATS(net, LINUX_MIB_TCPMIGRATEREQSUCCESS);
 		reqsk_migrate_reset(oreq);
 		reqsk_queue_removed(&inet_csk(oreq->rsk_listener)->icsk_accept_queue, oreq);

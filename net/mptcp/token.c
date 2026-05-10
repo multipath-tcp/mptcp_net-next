@@ -207,6 +207,31 @@ void mptcp_token_accept(struct mptcp_subflow_request_sock *req,
 	spin_unlock_bh(&bucket->lock);
 }
 
+void mptcp_token_move_request(struct request_sock *req,
+			      struct request_sock *new_req)
+{
+	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
+	struct mptcp_subflow_request_sock *new_subflow_req;
+	struct mptcp_subflow_request_sock *pos;
+	struct token_bucket *bucket;
+
+	new_subflow_req = mptcp_subflow_rsk(new_req);
+
+	if (hlist_nulls_unhashed(&subflow_req->token_node))
+		return;
+
+	bucket = token_bucket(subflow_req->token);
+	spin_lock_bh(&bucket->lock);
+	/* Migrate the pending MP_CAPABLE token ownership to the cloned req. */
+	pos = __token_lookup_req(bucket, subflow_req->token);
+	if (!WARN_ON_ONCE(pos != subflow_req))
+		hlist_nulls_replace_init_rcu(&subflow_req->token_node,
+					     &new_subflow_req->token_node);
+	else
+		mptcp_token_init_request(new_req);
+	spin_unlock_bh(&bucket->lock);
+}
+
 bool mptcp_token_exists(u32 token)
 {
 	struct hlist_nulls_node *pos;
