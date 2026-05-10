@@ -1201,6 +1201,13 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 		__set_bit(MPTCP_PRUNE, &msk->cb_flags);
 	}
 	ret = sk_rmem_alloc_get(sk) + msk->backlog_len > limit;
+
+	/* After pruning any packets ensure that MPTCP-driven drops do not
+	 * cause TCP-level retransmission.
+	 */
+	if (before((u32)(msk->ack_seq), READ_ONCE(msk->pruned_seq)))
+		ret = false;
+
 	mptcp_data_unlock(sk);
 
 	if (ret) {
