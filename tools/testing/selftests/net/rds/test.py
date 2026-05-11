@@ -77,6 +77,10 @@ def stop_pcaps():
     completes after the signal handler is fired.  List will be empty
     if logdir is not set
     """
+
+    if not tcpdump_procs:
+        return
+
     ksft_pr("Stopping network packet captures")
     while tcpdump_procs:
         proc = tcpdump_procs.pop()
@@ -151,7 +155,7 @@ tcpdump_procs = []
 # Start a packet capture on each network
 if logdir is not None:
     for net in [NET0, NET1]:
-        pcap = logdir+'/'+net+'.pcap'
+        pcap = logdir+'/rds-'+net+'.pcap'
 
         tcpdump_cmd = ['ip', 'netns', 'exec', net, '/usr/sbin/tcpdump']
         sudo_user = os.environ.get('SUDO_USER')
@@ -279,6 +283,10 @@ for s in sockets:
                 pass
 
 ksft_pr(f"getsockopt(): {nr_success}/{nr_error}")
+
+# cancel timeout
+signal.alarm(0)
+
 stop_pcaps()
 
 # We're done sending and receiving stuff, now let's check if what
