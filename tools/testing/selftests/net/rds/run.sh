@@ -35,7 +35,7 @@ GCOV_CMD=gcov
 check_gcov_env()
 {
 	if ! which "$GCOV_CMD" > /dev/null 2>&1; then
-		echo "Warning: Could not find gcov. "
+		echo "# Warning: Could not find gcov. "
 		GENERATE_GCOV_REPORT=0
 		return
 	fi
@@ -48,7 +48,7 @@ check_gcov_env()
 		GCOV_CMD=gcov-$(gcc -dumpversion)
 
 		if ! which "$GCOV_CMD" > /dev/null 2>&1; then
-			echo "Warning: Could not find an appropriate gcov installation. \
+			echo "# Warning: Could not find an appropriate gcov installation. \
 				gcov version must match gcc version"
 			GENERATE_GCOV_REPORT=0
 			return
@@ -58,11 +58,11 @@ check_gcov_env()
 		GCOV_VER=$($GCOV_CMD -v | grep gcov | awk '{print $3}'| \
 			awk 'BEGIN {FS="-"}{print $1}')
 		if [ "$GCOV_VER" != "$GCC_VER" ]; then
-			echo "Warning: Could not find an appropriate gcov installation. \
+			echo "# Warning: Could not find an appropriate gcov installation. \
 				gcov version must match gcc version"
 			GENERATE_GCOV_REPORT=0
 		else
-			echo "Warning: Mismatched gcc and gcov detected.  Using $GCOV_CMD"
+			echo "# Warning: Mismatched gcc and gcov detected.  Using $GCOV_CMD"
 		fi
 	fi
 }
@@ -71,20 +71,20 @@ check_gcov_env()
 check_gcov_conf()
 {
 	if ! grep -x "CONFIG_GCOV_PROFILE_RDS=y" "$kconfig" > /dev/null 2>&1; then
-		echo "INFO: CONFIG_GCOV_PROFILE_RDS should be enabled for coverage reports"
+		echo "# INFO: CONFIG_GCOV_PROFILE_RDS should be enabled for coverage reports"
 		GENERATE_GCOV_REPORT=0
 	fi
 	if ! grep -x "CONFIG_GCOV_KERNEL=y" "$kconfig" > /dev/null 2>&1; then
-		echo "INFO: CONFIG_GCOV_KERNEL should be enabled for coverage reports"
+		echo "# INFO: CONFIG_GCOV_KERNEL should be enabled for coverage reports"
 		GENERATE_GCOV_REPORT=0
 	fi
 	if grep -x "CONFIG_GCOV_PROFILE_ALL=y" "$kconfig" > /dev/null 2>&1; then
-		echo "INFO: CONFIG_GCOV_PROFILE_ALL should be disabled for coverage reports"
+		echo "# INFO: CONFIG_GCOV_PROFILE_ALL should be disabled for coverage reports"
 		GENERATE_GCOV_REPORT=0
 	fi
 
 	if [ "$GENERATE_GCOV_REPORT" -eq 0 ]; then
-		echo "To enable gcov reports, please run "\
+		echo "# To enable gcov reports, please run "\
 			"\"tools/testing/selftests/net/rds/config.sh -g\" and rebuild the kernel"
 	else
 		# if we have the required kernel configs, proceed to check the environment to
@@ -189,28 +189,32 @@ check_gcov_conf
 
 TRACE_CMD=()
 if [[ -n "$LOG_DIR" ]]; then
-   rm -fr "$LOG_DIR"
    FLAGS+=("-d" "$LOG_DIR")
 
    TRACE_FILE="${LOG_DIR}/rds-strace.txt"
    COVR_DIR="${LOG_DIR}/coverage/"
+   DMESG_FILE="${LOG_DIR}/rds-dmesg.out"
+
    mkdir -p  "$LOG_DIR"
    mkdir -p "$COVR_DIR"
 
-   echo "#Traces will be logged to ${TRACE_FILE}"
    rm -f "$TRACE_FILE"
+   rm -f "$DMESG_FILE"
+   rm -f "$LOG_DIR"/rds-*.pcap
+   rm -f "$COVR_DIR"/gcovr*
 
+   echo "# Traces will be logged to ${TRACE_FILE}"
    TRACE_CMD=(strace -T -tt -o "${TRACE_FILE}")
 fi
 
 set +e
-echo "#running RDS tests..."
+echo "# running RDS tests..."
 "${TRACE_CMD[@]}" python3 "$(dirname "$0")/test.py" "${FLAGS[@]}" -t "$TIMEOUT"
 
 test_rc=$?
 
 if [[ -n "$LOG_DIR" ]]; then
-   dmesg > "${LOG_DIR}/dmesg.out"
+   dmesg > "${DMESG_FILE}"
 fi
 
 if [[ -n "$LOG_DIR" ]] && [ "$GENERATE_GCOV_REPORT" -eq 1 ]; then
