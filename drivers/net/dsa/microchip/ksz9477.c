@@ -5,6 +5,7 @@
  * Copyright (C) 2017-2025 Microchip Technology Inc.
  */
 
+#include <linux/dsa/ksz_common.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/iopoll.h>
@@ -17,6 +18,7 @@
 
 #include "ksz9477_reg.h"
 #include "ksz_common.h"
+#include "ksz_dcb.h"
 #include "ksz9477.h"
 
 static void ksz_cfg(struct ksz_device *dev, u32 addr, u8 bits, bool set)
@@ -43,7 +45,7 @@ static void ksz9477_port_cfg32(struct ksz_device *dev, int port, int offset,
 			   bits, set ? bits : 0);
 }
 
-int ksz9477_change_mtu(struct ksz_device *dev, int port, int mtu)
+static int ksz9477_change_mtu(struct ksz_device *dev, int port, int mtu)
 {
 	u16 frame_size;
 
@@ -308,7 +310,7 @@ static int ksz9477_pcs_write(struct mii_bus *bus, int phy, int mmd, int reg,
 	return 0;
 }
 
-int ksz9477_pcs_create(struct ksz_device *dev)
+static int ksz9477_pcs_create(struct ksz_device *dev)
 {
 	int port = ksz_get_sgmii_port(dev);
 	struct ksz_port *p = &dev->ports[port];
@@ -341,7 +343,7 @@ int ksz9477_pcs_create(struct ksz_device *dev)
 	return 0;
 }
 
-int ksz9477_reset_switch(struct ksz_device *dev)
+static int ksz9477_reset_switch(struct ksz_device *dev)
 {
 	u8 data8;
 	u32 data32;
@@ -516,7 +518,7 @@ static void ksz9477_r_phy_quirks(struct ksz_device *dev, u16 addr, u16 reg,
 		*data &= ~(BMSR_ESTATEN | BMSR_ERCAP);
 }
 
-int ksz9477_r_phy(struct ksz_device *dev, u16 addr, u16 reg, u16 *data)
+static int ksz9477_r_phy(struct ksz_device *dev, u16 addr, u16 reg, u16 *data)
 {
 	u16 val = 0xffff;
 	int ret;
@@ -572,7 +574,7 @@ int ksz9477_r_phy(struct ksz_device *dev, u16 addr, u16 reg, u16 *data)
 	return 0;
 }
 
-int ksz9477_w_phy(struct ksz_device *dev, u16 addr, u16 reg, u16 val)
+static int ksz9477_w_phy(struct ksz_device *dev, u16 addr, u16 reg, u16 val)
 {
 	u32 mask, val32;
 
@@ -1150,8 +1152,8 @@ static phy_interface_t ksz9477_get_interface(struct ksz_device *dev, int port)
 	return interface;
 }
 
-void ksz9477_get_caps(struct ksz_device *dev, int port,
-		      struct phylink_config *config)
+static void ksz9477_get_caps(struct ksz_device *dev, int port,
+			     struct phylink_config *config)
 {
 	config->mac_capabilities = MAC_10 | MAC_100 | MAC_ASYM_PAUSE |
 				   MAC_SYM_PAUSE;
@@ -1168,7 +1170,7 @@ void ksz9477_get_caps(struct ksz_device *dev, int port,
 	}
 }
 
-int ksz9477_set_ageing_time(struct ksz_device *dev, unsigned int msecs)
+static int ksz9477_set_ageing_time(struct ksz_device *dev, unsigned int msecs)
 {
 	u32 secs = msecs / 1000;
 	u8 data, mult, value;
@@ -1234,7 +1236,7 @@ void ksz9477_port_queue_split(struct ksz_device *dev, int port)
 	ksz_prmw8(dev, port, REG_PORT_CTRL_0, PORT_QUEUE_SPLIT_MASK, data);
 }
 
-void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
+static void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 {
 	const u16 *regs = dev->info->regs;
 	struct dsa_switch *ds = dev->ds;
@@ -1289,7 +1291,7 @@ void ksz9477_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 	ksz_pwrite8(dev, port, regs[REG_PORT_PME_CTRL], 0);
 }
 
-void ksz9477_config_cpu_port(struct dsa_switch *ds)
+static void ksz9477_config_cpu_port(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
 	struct ksz_port *p;
@@ -1454,7 +1456,7 @@ int ksz9477_enable_stp_addr(struct ksz_device *dev)
 	return 0;
 }
 
-int ksz9477_setup(struct dsa_switch *ds)
+static int ksz9477_setup(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
 	const u16 *regs = dev->info->regs;
@@ -1500,7 +1502,7 @@ u32 ksz9477_get_port_addr(int port, int offset)
 	return PORT_CTRL_ADDR(port, offset);
 }
 
-int ksz9477_tc_cbs_set_cinc(struct ksz_device *dev, int port, u32 val)
+static int ksz9477_tc_cbs_set_cinc(struct ksz_device *dev, int port, u32 val)
 {
 	val = val >> 8;
 
@@ -1584,7 +1586,7 @@ void ksz9477_hsr_leave(struct dsa_switch *ds, int port, struct net_device *hsr)
 	ksz_port_cfg(dev, port, REG_PORT_LUE_CTRL, PORT_SRC_ADDR_FILTER, false);
 }
 
-int ksz9477_switch_init(struct ksz_device *dev)
+static int ksz9477_switch_init(struct ksz_device *dev)
 {
 	u8 data8;
 	int ret;
@@ -1604,10 +1606,263 @@ int ksz9477_switch_init(struct ksz_device *dev)
 	return 0;
 }
 
-void ksz9477_switch_exit(struct ksz_device *dev)
+static void ksz9477_switch_exit(struct ksz_device *dev)
 {
 	ksz9477_reset_switch(dev);
 }
+
+static enum dsa_tag_protocol ksz9477_get_tag_protocol(struct dsa_switch *ds,
+						      int port,
+						      enum dsa_tag_protocol mp)
+{
+	struct ksz_device *dev = ds->priv;
+
+	if (dev->chip_id == KSZ8563_CHIP_ID ||
+	    dev->chip_id == KSZ9893_CHIP_ID ||
+	    dev->chip_id == KSZ9563_CHIP_ID)
+		return DSA_TAG_PROTO_KSZ9893;
+
+	return DSA_TAG_PROTO_KSZ9477;
+}
+
+static int ksz9477_connect_tag_protocol(struct dsa_switch *ds,
+					enum dsa_tag_protocol proto)
+{
+	struct ksz_tagger_data *tagger_data;
+
+	if (proto != DSA_TAG_PROTO_KSZ9893 && proto != DSA_TAG_PROTO_KSZ9477)
+		return -EPROTONOSUPPORT;
+
+	tagger_data = ksz_tagger_data(ds);
+	tagger_data->xmit_work_fn = ksz_port_deferred_xmit;
+
+	return 0;
+}
+
+static void ksz9477_set_gbit(struct ksz_device *dev, int port, bool gbit)
+{
+	const u8 *bitval = dev->info->xmii_ctrl1;
+	const u16 *regs = dev->info->regs;
+	u8 data8;
+
+	ksz_pread8(dev, port, regs[P_XMII_CTRL_1], &data8);
+
+	data8 &= ~P_GMII_1GBIT_M;
+
+	if (gbit)
+		data8 |= FIELD_PREP(P_GMII_1GBIT_M, bitval[P_GMII_1GBIT]);
+	else
+		data8 |= FIELD_PREP(P_GMII_1GBIT_M, bitval[P_GMII_NOT_1GBIT]);
+
+	/* Write the updated value */
+	ksz_pwrite8(dev, port, regs[P_XMII_CTRL_1], data8);
+}
+
+static void ksz9477_set_100_10mbit(struct ksz_device *dev, int port, int speed)
+{
+	const u8 *bitval = dev->info->xmii_ctrl0;
+	const u16 *regs = dev->info->regs;
+	u8 data8;
+
+	ksz_pread8(dev, port, regs[P_XMII_CTRL_0], &data8);
+
+	data8 &= ~P_MII_100MBIT_M;
+
+	if (speed == SPEED_100)
+		data8 |= FIELD_PREP(P_MII_100MBIT_M, bitval[P_MII_100MBIT]);
+	else
+		data8 |= FIELD_PREP(P_MII_100MBIT_M, bitval[P_MII_10MBIT]);
+
+	/* Write the updated value */
+	ksz_pwrite8(dev, port, regs[P_XMII_CTRL_0], data8);
+}
+
+static void ksz9477_port_set_xmii_speed(struct ksz_device *dev, int port,
+					int speed)
+{
+	if (speed == SPEED_1000)
+		ksz9477_set_gbit(dev, port, true);
+	else
+		ksz9477_set_gbit(dev, port, false);
+
+	if (speed == SPEED_100 || speed == SPEED_10)
+		ksz9477_set_100_10mbit(dev, port, speed);
+}
+
+static void ksz9477_duplex_flowctrl(struct ksz_device *dev, int port, int duplex,
+				    bool tx_pause, bool rx_pause)
+{
+	const u8 *bitval = dev->info->xmii_ctrl0;
+	const u32 *masks = dev->info->masks;
+	const u16 *regs = dev->info->regs;
+	u8 mask;
+	u8 val;
+
+	mask = P_MII_DUPLEX_M | masks[P_MII_TX_FLOW_CTRL] |
+	       masks[P_MII_RX_FLOW_CTRL];
+
+	if (duplex == DUPLEX_FULL)
+		val = FIELD_PREP(P_MII_DUPLEX_M, bitval[P_MII_FULL_DUPLEX]);
+	else
+		val = FIELD_PREP(P_MII_DUPLEX_M, bitval[P_MII_HALF_DUPLEX]);
+
+	if (tx_pause)
+		val |= masks[P_MII_TX_FLOW_CTRL];
+
+	if (rx_pause)
+		val |= masks[P_MII_RX_FLOW_CTRL];
+
+	ksz_prmw8(dev, port, regs[P_XMII_CTRL_0], mask, val);
+}
+
+void ksz9477_phylink_mac_link_up(struct phylink_config *config,
+				 struct phy_device *phydev,
+				 unsigned int mode,
+				 phy_interface_t interface,
+				 int speed, int duplex, bool tx_pause,
+				 bool rx_pause)
+{
+	struct dsa_port *dp = dsa_phylink_to_port(config);
+	struct ksz_device *dev = dp->ds->priv;
+	int port = dp->index;
+	struct ksz_port *p;
+
+	p = &dev->ports[port];
+
+	/* Internal PHYs */
+	if (dev->info->internal_phy[port])
+		return;
+
+	p->speed = speed;
+
+	ksz9477_port_set_xmii_speed(dev, port, speed);
+
+	ksz9477_duplex_flowctrl(dev, port, duplex, tx_pause, rx_pause);
+}
+
+static struct phylink_pcs *
+ksz9477_phylink_mac_select_pcs(struct phylink_config *config,
+			       phy_interface_t interface)
+{
+	struct dsa_port *dp = dsa_phylink_to_port(config);
+	struct ksz_device *dev = dp->ds->priv;
+	struct ksz_port *p = &dev->ports[dp->index];
+
+	if (ksz_is_sgmii_port(dev, dp->index) &&
+	    (interface == PHY_INTERFACE_MODE_SGMII ||
+	    interface == PHY_INTERFACE_MODE_1000BASEX))
+		return p->pcs;
+
+	return NULL;
+}
+
+const struct phylink_mac_ops ksz9477_phylink_mac_ops = {
+	.mac_config	= ksz_phylink_mac_config,
+	.mac_link_down	= ksz_phylink_mac_link_down,
+	.mac_link_up	= ksz9477_phylink_mac_link_up,
+	.mac_disable_tx_lpi = ksz_phylink_mac_disable_tx_lpi,
+	.mac_enable_tx_lpi = ksz_phylink_mac_enable_tx_lpi,
+	.mac_select_pcs	= ksz9477_phylink_mac_select_pcs,
+};
+
+const struct ksz_dev_ops ksz9477_dev_ops = {
+	.setup = ksz9477_setup,
+	.get_port_addr = ksz9477_get_port_addr,
+	.cfg_port_member = ksz9477_cfg_port_member,
+	.flush_dyn_mac_table = ksz9477_flush_dyn_mac_table,
+	.port_setup = ksz9477_port_setup,
+	.set_ageing_time = ksz9477_set_ageing_time,
+	.r_phy = ksz9477_r_phy,
+	.w_phy = ksz9477_w_phy,
+	.r_mib_cnt = ksz9477_r_mib_cnt,
+	.r_mib_pkt = ksz9477_r_mib_pkt,
+	.r_mib_stat64 = ksz_r_mib_stats64,
+	.freeze_mib = ksz9477_freeze_mib,
+	.port_init_cnt = ksz9477_port_init_cnt,
+	.vlan_filtering = ksz9477_port_vlan_filtering,
+	.vlan_add = ksz9477_port_vlan_add,
+	.vlan_del = ksz9477_port_vlan_del,
+	.mirror_add = ksz9477_port_mirror_add,
+	.mirror_del = ksz9477_port_mirror_del,
+	.get_caps = ksz9477_get_caps,
+	.fdb_dump = ksz9477_fdb_dump,
+	.fdb_add = ksz9477_fdb_add,
+	.fdb_del = ksz9477_fdb_del,
+	.mdb_add = ksz9477_mdb_add,
+	.mdb_del = ksz9477_mdb_del,
+	.change_mtu = ksz9477_change_mtu,
+	.pme_write8 = ksz_write8,
+	.pme_pread8 = ksz_pread8,
+	.pme_pwrite8 = ksz_pwrite8,
+	.config_cpu_port = ksz9477_config_cpu_port,
+	.tc_cbs_set_cinc = ksz9477_tc_cbs_set_cinc,
+	.enable_stp_addr = ksz9477_enable_stp_addr,
+	.reset = ksz9477_reset_switch,
+	.init = ksz9477_switch_init,
+	.exit = ksz9477_switch_exit,
+	.pcs_create = ksz9477_pcs_create,
+};
+
+const struct dsa_switch_ops ksz9477_switch_ops = {
+	.get_tag_protocol	= ksz9477_get_tag_protocol,
+	.connect_tag_protocol   = ksz9477_connect_tag_protocol,
+	.get_phy_flags		= ksz_get_phy_flags,
+	.setup			= ksz_setup,
+	.teardown		= ksz_teardown,
+	.phy_read		= ksz_phy_read16,
+	.phy_write		= ksz_phy_write16,
+	.phylink_get_caps	= ksz_phylink_get_caps,
+	.port_setup		= ksz_port_setup,
+	.set_ageing_time	= ksz_set_ageing_time,
+	.get_strings		= ksz_get_strings,
+	.get_ethtool_stats	= ksz_get_ethtool_stats,
+	.get_sset_count		= ksz_sset_count,
+	.port_bridge_join	= ksz_port_bridge_join,
+	.port_bridge_leave	= ksz_port_bridge_leave,
+	.port_hsr_join		= ksz_hsr_join,
+	.port_hsr_leave		= ksz_hsr_leave,
+	.port_set_mac_address	= ksz_port_set_mac_address,
+	.port_stp_state_set	= ksz_port_stp_state_set,
+	.port_teardown		= ksz_port_teardown,
+	.port_pre_bridge_flags	= ksz_port_pre_bridge_flags,
+	.port_bridge_flags	= ksz_port_bridge_flags,
+	.port_fast_age		= ksz_port_fast_age,
+	.port_vlan_filtering	= ksz_port_vlan_filtering,
+	.port_vlan_add		= ksz_port_vlan_add,
+	.port_vlan_del		= ksz_port_vlan_del,
+	.port_fdb_dump		= ksz_port_fdb_dump,
+	.port_fdb_add		= ksz_port_fdb_add,
+	.port_fdb_del		= ksz_port_fdb_del,
+	.port_mdb_add           = ksz_port_mdb_add,
+	.port_mdb_del           = ksz_port_mdb_del,
+	.port_mirror_add	= ksz_port_mirror_add,
+	.port_mirror_del	= ksz_port_mirror_del,
+	.get_stats64		= ksz_get_stats64,
+	.get_pause_stats	= ksz_get_pause_stats,
+	.port_change_mtu	= ksz_change_mtu,
+	.port_max_mtu		= ksz_max_mtu,
+	.get_wol		= ksz_get_wol,
+	.set_wol		= ksz_set_wol,
+	.suspend		= ksz_suspend,
+	.resume			= ksz_resume,
+	.get_ts_info		= ksz_get_ts_info,
+	.port_hwtstamp_get	= ksz_hwtstamp_get,
+	.port_hwtstamp_set	= ksz_hwtstamp_set,
+	.port_txtstamp		= ksz_port_txtstamp,
+	.port_rxtstamp		= ksz_port_rxtstamp,
+	.cls_flower_add		= ksz_cls_flower_add,
+	.cls_flower_del		= ksz_cls_flower_del,
+	.port_setup_tc		= ksz_setup_tc,
+	.support_eee		= ksz_support_eee,
+	.set_mac_eee		= ksz_set_mac_eee,
+	.port_get_default_prio	= ksz_port_get_default_prio,
+	.port_set_default_prio	= ksz_port_set_default_prio,
+	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
+	.port_add_dscp_prio	= ksz_port_add_dscp_prio,
+	.port_del_dscp_prio	= ksz_port_del_dscp_prio,
+	.port_get_apptrust	= ksz_port_get_apptrust,
+	.port_set_apptrust	= ksz_port_set_apptrust,
+};
 
 MODULE_AUTHOR("Woojung Huh <Woojung.Huh@microchip.com>");
 MODULE_DESCRIPTION("Microchip KSZ9477 Series Switch DSA Driver");
