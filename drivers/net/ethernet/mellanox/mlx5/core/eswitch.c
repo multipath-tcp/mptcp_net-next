@@ -806,7 +806,7 @@ static int mlx5_esw_vport_caps_get(struct mlx5_eswitch *esw, struct mlx5_vport *
 	void *hca_caps;
 	int err;
 
-	if (!MLX5_CAP_GEN(esw->dev, vhca_resource_manager))
+	if (!MLX5_CAP_GEN(esw->dev, vport_group_manager))
 		return 0;
 
 	query_ctx = kzalloc(query_out_sz, GFP_KERNEL);
@@ -850,6 +850,38 @@ bool mlx5_esw_vport_vhca_id(struct mlx5_eswitch *esw, u16 vportn, u16 *vhca_id)
 
 	*vhca_id = vport->vhca_id;
 	return true;
+}
+
+static enum mlx5_func_type
+esw_vport_to_func_type(struct mlx5_eswitch *esw, struct mlx5_vport *vport)
+{
+	u16 vport_num = vport->vport;
+
+	if (vport_num == MLX5_VPORT_HOST_PF)
+		return MLX5_HOST_PF;
+	if (xa_get_mark(&esw->vports, vport_num, MLX5_ESW_VPT_SF))
+		return MLX5_SF;
+	if (xa_get_mark(&esw->vports, vport_num, MLX5_ESW_VPT_VF))
+		return MLX5_VF;
+	return MLX5_EC_VF;
+}
+
+u16 mlx5_esw_vhca_id_to_func_type(struct mlx5_core_dev *dev, u16 vhca_id)
+{
+	struct mlx5_eswitch *esw = dev->priv.eswitch;
+	void *entry;
+
+	if (vhca_id == MLX5_CAP_GEN(dev, vhca_id))
+		return MLX5_SELF;
+
+	if (!esw)
+		return MLX5_FUNC_TYPE_NONE;
+
+	entry = xa_load(&esw->vhca_type_map, vhca_id);
+	if (entry)
+		return xa_to_value(entry);
+
+	return MLX5_FUNC_TYPE_NONE;
 }
 
 static int esw_vport_setup(struct mlx5_eswitch *esw, struct mlx5_vport *vport)
@@ -938,10 +970,15 @@ int mlx5_esw_vport_enable(struct mlx5_eswitch *esw, struct mlx5_vport *vport,
 		vport->info.trusted = true;
 
 	if (!mlx5_esw_is_manager_vport(esw, vport_num) &&
-	    MLX5_CAP_GEN(esw->dev, vhca_resource_manager)) {
+	    MLX5_CAP_GEN(esw->dev, vport_group_manager)) {
 		ret = mlx5_esw_vport_vhca_id_map(esw, vport);
 		if (ret)
 			goto err_vhca_mapping;
+		ret = xa_insert(&esw->vhca_type_map, vport->vhca_id,
+				xa_mk_value(esw_vport_to_func_type(esw, vport)),
+				GFP_KERNEL);
+		if (ret)
+			goto err_type_map;
 	}
 
 	esw_vport_change_handle_locked(vport);
@@ -952,6 +989,8 @@ done:
 	mutex_unlock(&esw->state_lock);
 	return ret;
 
+err_type_map:
+	mlx5_esw_vport_vhca_id_unmap(esw, vport);
 err_vhca_mapping:
 	esw_vport_cleanup(esw, vport);
 	mutex_unlock(&esw->state_lock);
@@ -976,8 +1015,10 @@ void mlx5_esw_vport_disable(struct mlx5_eswitch *esw, struct mlx5_vport *vport)
 		arm_vport_context_events_cmd(esw->dev, vport_num, 0);
 
 	if (!mlx5_esw_is_manager_vport(esw, vport_num) &&
-	    MLX5_CAP_GEN(esw->dev, vhca_resource_manager))
+	    MLX5_CAP_GEN(esw->dev, vport_group_manager)) {
+		xa_erase(&esw->vhca_type_map, vport->vhca_id);
 		mlx5_esw_vport_vhca_id_unmap(esw, vport);
+	}
 
 	if (vport->vport != MLX5_VPORT_HOST_PF &&
 	    (vport->info.ipsec_crypto_enabled || vport->info.ipsec_packet_enabled))
@@ -2094,6 +2135,7 @@ int mlx5_eswitch_init(struct mlx5_core_dev *dev)
 	atomic64_set(&esw->offloads.num_flows, 0);
 	ida_init(&esw->offloads.vport_metadata_ida);
 	xa_init_flags(&esw->offloads.vhca_map, XA_FLAGS_ALLOC);
+	xa_init(&esw->vhca_type_map);
 	mutex_init(&esw->state_lock);
 	init_rwsem(&esw->mode_lock);
 	refcount_set(&esw->qos.refcnt, 0);
@@ -2143,6 +2185,7 @@ void mlx5_eswitch_cleanup(struct mlx5_eswitch *esw)
 	mutex_destroy(&esw->state_lock);
 	WARN_ON(!xa_empty(&esw->offloads.vhca_map));
 	xa_destroy(&esw->offloads.vhca_map);
+	xa_destroy(&esw->vhca_type_map);
 	ida_destroy(&esw->offloads.vport_metadata_ida);
 	mlx5e_mod_hdr_tbl_destroy(&esw->offloads.mod_hdr);
 	mutex_destroy(&esw->offloads.encap_tbl_lock);
