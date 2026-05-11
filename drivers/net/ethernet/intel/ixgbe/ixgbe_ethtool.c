@@ -3558,17 +3558,6 @@ static const struct {
 	{ FW_PHY_ACT_UD_2_10G_KR_EEE, ETHTOOL_LINK_MODE_10000baseKR_Full_BIT},
 };
 
-static const struct {
-	u16 eee_cap_bit;
-	u32 link_mode;
-} ixgbe_eee_cap_map[] = {
-	{ IXGBE_ACI_PHY_EEE_EN_100BASE_TX, ETHTOOL_LINK_MODE_100baseT_Full_BIT },
-	{ IXGBE_ACI_PHY_EEE_EN_1000BASE_T, ETHTOOL_LINK_MODE_1000baseT_Full_BIT },
-	{ IXGBE_ACI_PHY_EEE_EN_10GBASE_T, ETHTOOL_LINK_MODE_10000baseT_Full_BIT },
-	{ IXGBE_ACI_PHY_EEE_EN_5GBASE_T, ETHTOOL_LINK_MODE_5000baseT_Full_BIT },
-	{ IXGBE_ACI_PHY_EEE_EN_2_5GBASE_T, ETHTOOL_LINK_MODE_2500baseT_Full_BIT },
-};
-
 static int ixgbe_validate_keee(struct net_device *netdev,
 			       struct ethtool_keee *keee_requested)
 {
@@ -3645,7 +3634,6 @@ static int ixgbe_get_eee_e610(struct net_device *netdev,
 	struct ixgbe_aci_cmd_get_phy_caps_data pcaps;
 	struct ixgbe_hw *hw = &adapter->hw;
 	struct ixgbe_link_status link;
-	u16 eee_cap;
 	int err;
 
 	linkmode_zero(kedata->lp_advertised);
@@ -3669,14 +3657,6 @@ static int ixgbe_get_eee_e610(struct net_device *netdev,
 
 	if (kedata->eee_enabled)
 		kedata->tx_lpi_timer = le16_to_cpu(pcaps.eee_entry_delay);
-
-	eee_cap = le16_to_cpu(pcaps.eee_cap);
-
-	for (int i = 0; i < ARRAY_SIZE(ixgbe_eee_cap_map); i++) {
-		if (eee_cap & ixgbe_eee_cap_map[i].eee_cap_bit)
-			linkmode_set_bit(ixgbe_eee_cap_map[i].link_mode,
-					 kedata->lp_advertised);
-	}
 
 	for (int i = 0; i < ARRAY_SIZE(ixgbe_ls_map); i++) {
 		if (hw->phy.eee_speeds_supported &
