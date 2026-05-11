@@ -1,2 +1,25 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-do-not-drop-partial-packets
+From: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Subject: [PATCH] mptcp: do not drop partial packets
+
+When a packet arrives with map_seq < ack_seq < end_seq, the beginning
+of the packet has already been acknowledged but the end contains new
+data.  Currently the entire packet is dropped as "old data," forcing
+the sender to retransmit.
+
+Instead, skip the already-acked bytes by adjusting the skb offset and
+enqueue only the new portion.  Update bytes_received and ack_seq to
+reflect the new data consumed.
+
+A previous attempt at this fix (commit 1d2ce718811a ("mptcp: do not
+drop partial packets"), reverted in commit bf39160c4218 ("Revert
+"mptcp: do not drop partial packets"")) also added a zero-window
+check and changed rcv_wnd_sent initialization, which caused test
+regressions.  This version addresses only the partial packet handling
+without modifying receive window accounting.
+
+Fixes: ab174ad8ef76 ("mptcp: move ooo skbs into msk out of order queue.")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/600
+Signed-off-by: Shardul Bankar <shardul.b@mpiricsoftware.com>
+[pabeni@redhat.com: update map]
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
