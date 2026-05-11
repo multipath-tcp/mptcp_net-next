@@ -69,6 +69,7 @@ TEST_PROGS := \
 	nl_netdev.py \
 	nl_nlctrl.py \
 	pmtu.sh \
+	protodown.sh \
 	psock_snd.sh \
 	reuseaddr_ports_exhausted.sh \
 	reuseport_addr_any.sh \
