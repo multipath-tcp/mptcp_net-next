@@ -10141,17 +10141,36 @@ bool netdev_port_same_parent_id(struct net_device *a, struct net_device *b)
 }
 EXPORT_SYMBOL(netdev_port_same_parent_id);
 
+static struct net_device *dev_get_iflink_dev(struct net_device *dev)
+{
+	struct net *net;
+
+	ASSERT_RTNL();
+
+	if (!dev->netdev_ops->ndo_get_iflink || !dev->rtnl_link_ops ||
+	    !dev->rtnl_link_ops->get_link_net)
+		return dev;
+
+	net = dev->rtnl_link_ops->get_link_net(dev);
+	return __dev_get_by_index(net, dev_get_iflink(dev));
+}
+
 int netif_change_proto_down(struct net_device *dev, bool proto_down)
 {
+	struct net_device *iflink_dev;
+
 	if (!dev->change_proto_down)
 		return -EOPNOTSUPP;
 	if (!netif_device_present(dev))
 		return -ENODEV;
+	iflink_dev = dev_get_iflink_dev(dev);
+	if (!iflink_dev)
+		return -ENODEV;
+	WRITE_ONCE(dev->proto_down, proto_down);
 	if (proto_down)
 		netif_carrier_off(dev);
-	else
+	else if (dev == iflink_dev || netif_carrier_ok(iflink_dev))
 		netif_carrier_on(dev);
-	WRITE_ONCE(dev->proto_down, proto_down);
 	return 0;
 }
 
