@@ -374,6 +374,7 @@ struct mlx5_eswitch {
 	struct dentry *debugfs_root;
 	struct workqueue_struct *work_queue;
 	struct xarray vports;
+	struct xarray vhca_type_map;
 	u32 flags;
 	int                     total_vports;
 	int                     enabled_vports;
@@ -864,6 +865,7 @@ void mlx5_esw_vport_vhca_id_unmap(struct mlx5_eswitch *esw,
 				  struct mlx5_vport *vport);
 int mlx5_eswitch_vhca_id_to_vport(struct mlx5_eswitch *esw, u16 vhca_id, u16 *vport_num);
 bool mlx5_esw_vport_vhca_id(struct mlx5_eswitch *esw, u16 vportn, u16 *vhca_id);
+u16 mlx5_esw_vhca_id_to_func_type(struct mlx5_core_dev *dev, u16 vhca_id);
 
 void mlx5_esw_offloads_rep_remove(struct mlx5_eswitch *esw,
 				  const struct mlx5_vport *vport);
@@ -1038,6 +1040,12 @@ static inline bool
 mlx5_esw_vport_vhca_id(struct mlx5_eswitch *esw, u16 vportn, u16 *vhca_id)
 {
 	return false;
+}
+
+static inline u16
+mlx5_esw_vhca_id_to_func_type(struct mlx5_core_dev *dev, u16 vhca_id)
+{
+	return MLX5_FUNC_TYPE_NONE;
 }
 
 static inline void
