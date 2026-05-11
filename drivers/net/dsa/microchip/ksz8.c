@@ -16,6 +16,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/delay.h>
+#include <linux/dsa/ksz_common.h>
 #include <linux/export.h>
 #include <linux/gpio.h>
 #include <linux/if_vlan.h>
@@ -31,6 +32,7 @@
 #include <linux/phylink.h>
 
 #include "ksz_common.h"
+#include "ksz_dcb.h"
 #include "ksz8_reg.h"
 #include "ksz8.h"
 
@@ -114,26 +116,26 @@ static int ksz8_ind_read8(struct ksz_device *dev, u8 table, u16 addr, u8 *val)
 	return ret;
 }
 
-int ksz8_pme_write8(struct ksz_device *dev, u32 reg, u8 value)
+static int ksz8_pme_write8(struct ksz_device *dev, u32 reg, u8 value)
 {
 	return ksz8_ind_write8(dev, (u8)(reg >> 8), (u8)(reg), value);
 }
 
-int ksz8_pme_pread8(struct ksz_device *dev, int port, int offset, u8 *data)
+static int ksz8_pme_pread8(struct ksz_device *dev, int port, int offset, u8 *data)
 {
 	u8 table = (u8)(offset >> 8 | (port + 1));
 
 	return ksz8_ind_read8(dev, table, (u8)(offset), data);
 }
 
-int ksz8_pme_pwrite8(struct ksz_device *dev, int port, int offset, u8 data)
+static int ksz8_pme_pwrite8(struct ksz_device *dev, int port, int offset, u8 data)
 {
 	u8 table = (u8)(offset >> 8 | (port + 1));
 
 	return ksz8_ind_write8(dev, table, (u8)(offset), data);
 }
 
-int ksz8_reset_switch(struct ksz_device *dev)
+static int ksz8_reset_switch(struct ksz_device *dev)
 {
 	if (ksz_is_ksz88x3(dev)) {
 		/* reset switch */
@@ -186,7 +188,7 @@ static int ksz8795_change_mtu(struct ksz_device *dev, int frame_size)
 	return ksz_rmw8(dev, REG_SW_CTRL_2, SW_LEGAL_PACKET_DISABLE, ctrl2);
 }
 
-int ksz8_change_mtu(struct ksz_device *dev, int port, int mtu)
+static int ksz8_change_mtu(struct ksz_device *dev, int port, int mtu)
 {
 	u16 frame_size;
 
@@ -267,22 +269,7 @@ static int ksz8_port_queue_split(struct ksz_device *dev, int port, int queues)
 	return ksz_prmw8(dev, port, reg_2q, mask_2q, data_2q);
 }
 
-int ksz8_all_queues_split(struct ksz_device *dev, int queues)
-{
-	struct dsa_switch *ds = dev->ds;
-	const struct dsa_port *dp;
-
-	dsa_switch_for_each_port(dp, ds) {
-		int ret = ksz8_port_queue_split(dev, dp->index, queues);
-
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
-void ksz8_r_mib_cnt(struct ksz_device *dev, int port, u16 addr, u64 *cnt)
+static void ksz8_r_mib_cnt(struct ksz_device *dev, int port, u16 addr, u64 *cnt)
 {
 	const u32 *masks;
 	const u16 *regs;
@@ -405,8 +392,8 @@ static void ksz8863_r_mib_pkt(struct ksz_device *dev, int port, u16 addr,
 	}
 }
 
-void ksz8_r_mib_pkt(struct ksz_device *dev, int port, u16 addr,
-		    u64 *dropped, u64 *cnt)
+static void ksz8_r_mib_pkt(struct ksz_device *dev, int port, u16 addr,
+			   u64 *dropped, u64 *cnt)
 {
 	if (is_ksz88xx(dev))
 		ksz8863_r_mib_pkt(dev, port, addr, dropped, cnt);
@@ -414,7 +401,7 @@ void ksz8_r_mib_pkt(struct ksz_device *dev, int port, u16 addr,
 		ksz8795_r_mib_pkt(dev, port, addr, dropped, cnt);
 }
 
-void ksz8_freeze_mib(struct ksz_device *dev, int port, bool freeze)
+static void ksz8_freeze_mib(struct ksz_device *dev, int port, bool freeze)
 {
 	if (is_ksz88xx(dev))
 		return;
@@ -429,7 +416,7 @@ void ksz8_freeze_mib(struct ksz_device *dev, int port, bool freeze)
 		ksz_cfg(dev, REG_SW_CTRL_6, BIT(port), false);
 }
 
-void ksz8_port_init_cnt(struct ksz_device *dev, int port)
+static void ksz8_port_init_cnt(struct ksz_device *dev, int port)
 {
 	struct ksz_port_mib *mib = &dev->ports[port].mib;
 	u64 *dropped;
@@ -954,7 +941,7 @@ static int ksz8_r_phy_bmcr(struct ksz_device *dev, u16 port, u16 *val)
 	return 0;
 }
 
-int ksz8_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
+static int ksz8_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 {
 	u8 ctrl, link, val1, val2;
 	int processed = true;
@@ -1218,7 +1205,7 @@ static int ksz8_w_phy_bmcr(struct ksz_device *dev, u16 port, u16 val)
 			 restart);
 }
 
-int ksz8_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
+static int ksz8_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 {
 	const u16 *regs;
 	u8 ctrl, data;
@@ -1278,7 +1265,7 @@ int ksz8_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 	return 0;
 }
 
-void ksz8_cfg_port_member(struct ksz_device *dev, int port, u8 member)
+static void ksz8_cfg_port_member(struct ksz_device *dev, int port, u8 member)
 {
 	int offset = P_MIRROR_CTRL;
 	u8 data;
@@ -1291,7 +1278,7 @@ void ksz8_cfg_port_member(struct ksz_device *dev, int port, u8 member)
 	ksz_pwrite8(dev, port, offset, data);
 }
 
-void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
+static void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 {
 	u8 learn[DSA_MAX_PORTS];
 	int first, index, cnt;
@@ -1326,8 +1313,8 @@ void ksz8_flush_dyn_mac_table(struct ksz_device *dev, int port)
 	}
 }
 
-int ksz8_fdb_dump(struct ksz_device *dev, int port,
-		  dsa_fdb_dump_cb_t *cb, void *data)
+static int ksz8_fdb_dump(struct ksz_device *dev, int port,
+			 dsa_fdb_dump_cb_t *cb, void *data)
 {
 	u8 mac[ETH_ALEN];
 	u8 src_port, fid;
@@ -1431,32 +1418,34 @@ static int ksz8_del_sta_mac(struct ksz_device *dev, int port,
 	return ksz8_w_sta_mac_table(dev, index, &alu);
 }
 
-int ksz8_mdb_add(struct ksz_device *dev, int port,
-		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+static int ksz8_mdb_add(struct ksz_device *dev, int port,
+			const struct switchdev_obj_port_mdb *mdb,
+			struct dsa_db db)
 {
 	return ksz8_add_sta_mac(dev, port, mdb->addr, mdb->vid);
 }
 
-int ksz8_mdb_del(struct ksz_device *dev, int port,
-		 const struct switchdev_obj_port_mdb *mdb, struct dsa_db db)
+static int ksz8_mdb_del(struct ksz_device *dev, int port,
+			const struct switchdev_obj_port_mdb *mdb,
+			struct dsa_db db)
 {
 	return ksz8_del_sta_mac(dev, port, mdb->addr, mdb->vid);
 }
 
-int ksz8_fdb_add(struct ksz_device *dev, int port, const unsigned char *addr,
-		 u16 vid, struct dsa_db db)
+static int ksz8_fdb_add(struct ksz_device *dev, int port,
+			const unsigned char *addr, u16 vid, struct dsa_db db)
 {
 	return ksz8_add_sta_mac(dev, port, addr, vid);
 }
 
-int ksz8_fdb_del(struct ksz_device *dev, int port, const unsigned char *addr,
-		 u16 vid, struct dsa_db db)
+static int ksz8_fdb_del(struct ksz_device *dev, int port,
+			const unsigned char *addr, u16 vid, struct dsa_db db)
 {
 	return ksz8_del_sta_mac(dev, port, addr, vid);
 }
 
-int ksz8_port_vlan_filtering(struct ksz_device *dev, int port, bool flag,
-			     struct netlink_ext_ack *extack)
+static int ksz8_port_vlan_filtering(struct ksz_device *dev, int port, bool flag,
+				    struct netlink_ext_ack *extack)
 {
 	if (ksz_is_ksz88x3(dev) || ksz_is_ksz8463(dev))
 		return -ENOTSUPP;
@@ -1485,9 +1474,9 @@ static void ksz8_port_enable_pvid(struct ksz_device *dev, int port, bool state)
 	}
 }
 
-int ksz8_port_vlan_add(struct ksz_device *dev, int port,
-		       const struct switchdev_obj_port_vlan *vlan,
-		       struct netlink_ext_ack *extack)
+static int ksz8_port_vlan_add(struct ksz_device *dev, int port,
+			      const struct switchdev_obj_port_vlan *vlan,
+			      struct netlink_ext_ack *extack)
 {
 	bool untagged = vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED;
 	struct ksz_port *p = &dev->ports[port];
@@ -1557,8 +1546,8 @@ int ksz8_port_vlan_add(struct ksz_device *dev, int port,
 	return 0;
 }
 
-int ksz8_port_vlan_del(struct ksz_device *dev, int port,
-		       const struct switchdev_obj_port_vlan *vlan)
+static int ksz8_port_vlan_del(struct ksz_device *dev, int port,
+			      const struct switchdev_obj_port_vlan *vlan)
 {
 	u16 data, pvid;
 	u8 fid, member, valid;
@@ -1589,9 +1578,9 @@ int ksz8_port_vlan_del(struct ksz_device *dev, int port,
 	return 0;
 }
 
-int ksz8_port_mirror_add(struct ksz_device *dev, int port,
-			 struct dsa_mall_mirror_tc_entry *mirror,
-			 bool ingress, struct netlink_ext_ack *extack)
+static int ksz8_port_mirror_add(struct ksz_device *dev, int port,
+				struct dsa_mall_mirror_tc_entry *mirror,
+				bool ingress, struct netlink_ext_ack *extack)
 {
 	int offset = P_MIRROR_CTRL;
 
@@ -1615,8 +1604,8 @@ int ksz8_port_mirror_add(struct ksz_device *dev, int port,
 	return 0;
 }
 
-void ksz8_port_mirror_del(struct ksz_device *dev, int port,
-			  struct dsa_mall_mirror_tc_entry *mirror)
+static void ksz8_port_mirror_del(struct ksz_device *dev, int port,
+				 struct dsa_mall_mirror_tc_entry *mirror)
 {
 	int offset = P_MIRROR_CTRL;
 	u8 data;
@@ -1654,7 +1643,7 @@ static void ksz8795_cpu_interface_select(struct ksz_device *dev, int port)
 	}
 }
 
-void ksz8_port_setup(struct ksz_device *dev, int port, bool cpu_port)
+static void ksz8_port_setup(struct ksz_device *dev, int port, bool cpu_port)
 {
 	const u16 *regs = dev->info->regs;
 	struct dsa_switch *ds = dev->ds;
@@ -1709,7 +1698,7 @@ static void ksz88x3_config_rmii_clk(struct ksz_device *dev)
 		KSZ88X3_PORT3_RMII_CLK_INTERNAL, rmii_clk_internal);
 }
 
-void ksz8_config_cpu_port(struct dsa_switch *ds)
+static void ksz8_config_cpu_port(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
 	struct ksz_port *p;
@@ -1883,10 +1872,12 @@ static void ksz8_cpu_port_link_up(struct ksz_device *dev, int speed, int duplex,
 		 SW_10_MBIT, ctrl);
 }
 
-void ksz8_phylink_mac_link_up(struct phylink_config *config,
-			      struct phy_device *phydev, unsigned int mode,
-			      phy_interface_t interface, int speed, int duplex,
-			      bool tx_pause, bool rx_pause)
+static void ksz8_phylink_mac_link_up(struct phylink_config *config,
+				     struct phy_device *phydev,
+				     unsigned int mode,
+				     phy_interface_t interface,
+				     int speed, int duplex,
+				     bool tx_pause, bool rx_pause)
 {
 	struct dsa_port *dp = dsa_phylink_to_port(config);
 	struct ksz_device *dev = dp->ds->priv;
@@ -1918,7 +1909,7 @@ static int ksz8_handle_global_errata(struct dsa_switch *ds)
 	return ret;
 }
 
-int ksz8_enable_stp_addr(struct ksz_device *dev)
+static int ksz8_enable_stp_addr(struct ksz_device *dev)
 {
 	struct alu_struct alu;
 
@@ -1932,7 +1923,7 @@ int ksz8_enable_stp_addr(struct ksz_device *dev)
 	return ksz8_w_sta_mac_table(dev, 0, &alu);
 }
 
-int ksz8_setup(struct dsa_switch *ds)
+static int ksz8_setup(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
 	const u16 *regs = dev->info->regs;
@@ -1995,8 +1986,8 @@ int ksz8_setup(struct dsa_switch *ds)
 		return ret;
 }
 
-void ksz8_get_caps(struct ksz_device *dev, int port,
-		   struct phylink_config *config)
+static void ksz8_get_caps(struct ksz_device *dev, int port,
+			  struct phylink_config *config)
 {
 	config->mac_capabilities = MAC_10 | MAC_100;
 
@@ -2013,12 +2004,12 @@ void ksz8_get_caps(struct ksz_device *dev, int port,
 		config->mac_capabilities |= MAC_ASYM_PAUSE;
 }
 
-u32 ksz8_get_port_addr(int port, int offset)
+static u32 ksz8_get_port_addr(int port, int offset)
 {
 	return PORT_CTRL_ADDR(port, offset);
 }
 
-u32 ksz8463_get_port_addr(int port, int offset)
+static u32 ksz8463_get_port_addr(int port, int offset)
 {
 	return offset + 0x18 * port;
 }
@@ -2028,7 +2019,7 @@ static u16 ksz8463_get_phy_addr(u16 phy, u16 reg, u16 offset)
 	return offset + reg * 2 + phy * (P2MBCR - P1MBCR);
 }
 
-int ksz8463_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
+static int ksz8463_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 {
 	u16 sw_reg = 0;
 	u16 data = 0;
@@ -2068,7 +2059,7 @@ int ksz8463_r_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 *val)
 	return 0;
 }
 
-int ksz8463_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
+static int ksz8463_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 {
 	u16 sw_reg = 0;
 	int ret;
@@ -2096,7 +2087,7 @@ int ksz8463_w_phy(struct ksz_device *dev, u16 phy, u16 reg, u16 val)
 	return 0;
 }
 
-int ksz8_switch_init(struct ksz_device *dev)
+static int ksz8_switch_init(struct ksz_device *dev)
 {
 	dev->cpu_port = fls(dev->info->cpu_ports) - 1;
 	dev->phy_port_cnt = dev->info->port_cnt - 1;
@@ -2105,10 +2096,391 @@ int ksz8_switch_init(struct ksz_device *dev)
 	return 0;
 }
 
-void ksz8_switch_exit(struct ksz_device *dev)
+static void ksz8_switch_exit(struct ksz_device *dev)
 {
 	ksz8_reset_switch(dev);
 }
+
+static enum dsa_tag_protocol ksz8463_get_tag_protocol(struct dsa_switch *ds,
+						      int port,
+						      enum dsa_tag_protocol mp)
+{
+	return DSA_TAG_PROTO_KSZ9893;
+}
+
+static int ksz8463_connect_tag_protocol(struct dsa_switch *ds,
+					enum dsa_tag_protocol proto)
+{
+	struct ksz_tagger_data *tagger_data;
+
+	if (proto != DSA_TAG_PROTO_KSZ9893)
+		return -EPROTONOSUPPORT;
+
+	tagger_data = ksz_tagger_data(ds);
+	tagger_data->xmit_work_fn = ksz_port_deferred_xmit;
+
+	return 0;
+}
+
+static enum dsa_tag_protocol ksz87xx_get_tag_protocol(struct dsa_switch *ds,
+						      int port,
+						      enum dsa_tag_protocol mp)
+{
+	return DSA_TAG_PROTO_KSZ8795;
+}
+
+static int ksz87xx_connect_tag_protocol(struct dsa_switch *ds,
+					enum dsa_tag_protocol proto)
+{
+	if (proto != DSA_TAG_PROTO_KSZ8795)
+		return -EPROTONOSUPPORT;
+
+	return 0;
+}
+
+static enum dsa_tag_protocol ksz88xx_get_tag_protocol(struct dsa_switch *ds,
+						      int port,
+						      enum dsa_tag_protocol mp)
+{
+	struct ksz_device *dev = ds->priv;
+
+	if (ksz_is_8895_family(dev)) /* KSZ8864, KSZ8895 */
+		return DSA_TAG_PROTO_KSZ8795;
+
+	return DSA_TAG_PROTO_KSZ9893;
+}
+
+static int ksz88xx_connect_tag_protocol(struct dsa_switch *ds,
+					enum dsa_tag_protocol proto)
+{
+	struct ksz_tagger_data *tagger_data;
+
+	if (ksz_is_8895_family(ds->priv)) { /* KSZ8864, KSZ8895 */
+		if (proto != DSA_TAG_PROTO_KSZ8795)
+			return -EPROTONOSUPPORT;
+
+		return 0;
+	}
+
+	if (proto != DSA_TAG_PROTO_KSZ9893)
+		return -EPROTONOSUPPORT;
+
+	tagger_data = ksz_tagger_data(ds);
+	tagger_data->xmit_work_fn = ksz_port_deferred_xmit;
+
+	return 0;
+}
+
+static void ksz88x3_phylink_mac_config(struct phylink_config *config,
+				       unsigned int mode,
+				       const struct phylink_link_state *state)
+{
+	struct dsa_port *dp = dsa_phylink_to_port(config);
+	struct ksz_device *dev = dp->ds->priv;
+
+	dev->ports[dp->index].manual_flow = !(state->pause & MLO_PAUSE_AN);
+}
+
+const struct phylink_mac_ops ksz88x3_phylink_mac_ops = {
+	.mac_config	= ksz88x3_phylink_mac_config,
+	.mac_link_down	= ksz_phylink_mac_link_down,
+	.mac_link_up	= ksz8_phylink_mac_link_up,
+	.mac_disable_tx_lpi = ksz_phylink_mac_disable_tx_lpi,
+	.mac_enable_tx_lpi = ksz_phylink_mac_enable_tx_lpi,
+};
+
+const struct phylink_mac_ops ksz8_phylink_mac_ops = {
+	.mac_config	= ksz_phylink_mac_config,
+	.mac_link_down	= ksz_phylink_mac_link_down,
+	.mac_link_up	= ksz8_phylink_mac_link_up,
+	.mac_disable_tx_lpi = ksz_phylink_mac_disable_tx_lpi,
+	.mac_enable_tx_lpi = ksz_phylink_mac_enable_tx_lpi,
+};
+
+const struct ksz_dev_ops ksz8463_dev_ops = {
+	.setup = ksz8_setup,
+	.get_port_addr = ksz8463_get_port_addr,
+	.cfg_port_member = ksz8_cfg_port_member,
+	.flush_dyn_mac_table = ksz8_flush_dyn_mac_table,
+	.port_setup = ksz8_port_setup,
+	.r_phy = ksz8463_r_phy,
+	.w_phy = ksz8463_w_phy,
+	.r_mib_cnt = ksz8_r_mib_cnt,
+	.r_mib_pkt = ksz8_r_mib_pkt,
+	.r_mib_stat64 = ksz88xx_r_mib_stats64,
+	.freeze_mib = ksz8_freeze_mib,
+	.port_init_cnt = ksz8_port_init_cnt,
+	.fdb_dump = ksz8_fdb_dump,
+	.fdb_add = ksz8_fdb_add,
+	.fdb_del = ksz8_fdb_del,
+	.mdb_add = ksz8_mdb_add,
+	.mdb_del = ksz8_mdb_del,
+	.vlan_filtering = ksz8_port_vlan_filtering,
+	.vlan_add = ksz8_port_vlan_add,
+	.vlan_del = ksz8_port_vlan_del,
+	.mirror_add = ksz8_port_mirror_add,
+	.mirror_del = ksz8_port_mirror_del,
+	.get_caps = ksz8_get_caps,
+	.config_cpu_port = ksz8_config_cpu_port,
+	.enable_stp_addr = ksz8_enable_stp_addr,
+	.reset = ksz8_reset_switch,
+	.init = ksz8_switch_init,
+	.exit = ksz8_switch_exit,
+	.change_mtu = ksz8_change_mtu,
+};
+
+const struct ksz_dev_ops ksz87xx_dev_ops = {
+	.setup = ksz8_setup,
+	.get_port_addr = ksz8_get_port_addr,
+	.cfg_port_member = ksz8_cfg_port_member,
+	.flush_dyn_mac_table = ksz8_flush_dyn_mac_table,
+	.port_setup = ksz8_port_setup,
+	.r_phy = ksz8_r_phy,
+	.w_phy = ksz8_w_phy,
+	.r_mib_cnt = ksz8_r_mib_cnt,
+	.r_mib_pkt = ksz8_r_mib_pkt,
+	.r_mib_stat64 = ksz_r_mib_stats64,
+	.freeze_mib = ksz8_freeze_mib,
+	.port_init_cnt = ksz8_port_init_cnt,
+	.fdb_dump = ksz8_fdb_dump,
+	.fdb_add = ksz8_fdb_add,
+	.fdb_del = ksz8_fdb_del,
+	.mdb_add = ksz8_mdb_add,
+	.mdb_del = ksz8_mdb_del,
+	.vlan_filtering = ksz8_port_vlan_filtering,
+	.vlan_add = ksz8_port_vlan_add,
+	.vlan_del = ksz8_port_vlan_del,
+	.mirror_add = ksz8_port_mirror_add,
+	.mirror_del = ksz8_port_mirror_del,
+	.get_caps = ksz8_get_caps,
+	.config_cpu_port = ksz8_config_cpu_port,
+	.enable_stp_addr = ksz8_enable_stp_addr,
+	.reset = ksz8_reset_switch,
+	.init = ksz8_switch_init,
+	.exit = ksz8_switch_exit,
+	.change_mtu = ksz8_change_mtu,
+	.pme_write8 = ksz8_pme_write8,
+	.pme_pread8 = ksz8_pme_pread8,
+	.pme_pwrite8 = ksz8_pme_pwrite8,
+};
+
+const struct ksz_dev_ops ksz88xx_dev_ops = {
+	.setup = ksz8_setup,
+	.get_port_addr = ksz8_get_port_addr,
+	.cfg_port_member = ksz8_cfg_port_member,
+	.flush_dyn_mac_table = ksz8_flush_dyn_mac_table,
+	.port_setup = ksz8_port_setup,
+	.r_phy = ksz8_r_phy,
+	.w_phy = ksz8_w_phy,
+	.r_mib_cnt = ksz8_r_mib_cnt,
+	.r_mib_pkt = ksz8_r_mib_pkt,
+	.r_mib_stat64 = ksz88xx_r_mib_stats64,
+	.freeze_mib = ksz8_freeze_mib,
+	.port_init_cnt = ksz8_port_init_cnt,
+	.fdb_dump = ksz8_fdb_dump,
+	.fdb_add = ksz8_fdb_add,
+	.fdb_del = ksz8_fdb_del,
+	.mdb_add = ksz8_mdb_add,
+	.mdb_del = ksz8_mdb_del,
+	.vlan_filtering = ksz8_port_vlan_filtering,
+	.vlan_add = ksz8_port_vlan_add,
+	.vlan_del = ksz8_port_vlan_del,
+	.mirror_add = ksz8_port_mirror_add,
+	.mirror_del = ksz8_port_mirror_del,
+	.get_caps = ksz8_get_caps,
+	.config_cpu_port = ksz8_config_cpu_port,
+	.enable_stp_addr = ksz8_enable_stp_addr,
+	.reset = ksz8_reset_switch,
+	.init = ksz8_switch_init,
+	.exit = ksz8_switch_exit,
+	.change_mtu = ksz8_change_mtu,
+	.pme_write8 = ksz8_pme_write8,
+	.pme_pread8 = ksz8_pme_pread8,
+	.pme_pwrite8 = ksz8_pme_pwrite8,
+};
+
+const struct dsa_switch_ops ksz8463_switch_ops = {
+	.get_tag_protocol	= ksz8463_get_tag_protocol,
+	.connect_tag_protocol   = ksz8463_connect_tag_protocol,
+	.get_phy_flags		= ksz_get_phy_flags,
+	.setup			= ksz_setup,
+	.teardown		= ksz_teardown,
+	.phy_read		= ksz_phy_read16,
+	.phy_write		= ksz_phy_write16,
+	.phylink_get_caps	= ksz_phylink_get_caps,
+	.port_setup		= ksz_port_setup,
+	.set_ageing_time	= ksz_set_ageing_time,
+	.get_strings		= ksz_get_strings,
+	.get_ethtool_stats	= ksz_get_ethtool_stats,
+	.get_sset_count		= ksz_sset_count,
+	.port_bridge_join	= ksz_port_bridge_join,
+	.port_bridge_leave	= ksz_port_bridge_leave,
+	.port_hsr_join		= ksz_hsr_join,
+	.port_hsr_leave		= ksz_hsr_leave,
+	.port_set_mac_address	= ksz_port_set_mac_address,
+	.port_stp_state_set	= ksz_port_stp_state_set,
+	.port_teardown		= ksz_port_teardown,
+	.port_pre_bridge_flags	= ksz_port_pre_bridge_flags,
+	.port_bridge_flags	= ksz_port_bridge_flags,
+	.port_fast_age		= ksz_port_fast_age,
+	.port_vlan_filtering	= ksz_port_vlan_filtering,
+	.port_vlan_add		= ksz_port_vlan_add,
+	.port_vlan_del		= ksz_port_vlan_del,
+	.port_fdb_dump		= ksz_port_fdb_dump,
+	.port_fdb_add		= ksz_port_fdb_add,
+	.port_fdb_del		= ksz_port_fdb_del,
+	.port_mdb_add           = ksz_port_mdb_add,
+	.port_mdb_del           = ksz_port_mdb_del,
+	.port_mirror_add	= ksz_port_mirror_add,
+	.port_mirror_del	= ksz_port_mirror_del,
+	.get_stats64		= ksz_get_stats64,
+	.get_pause_stats	= ksz_get_pause_stats,
+	.port_change_mtu	= ksz_change_mtu,
+	.port_max_mtu		= ksz_max_mtu,
+	.get_wol		= ksz_get_wol,
+	.set_wol		= ksz_set_wol,
+	.suspend		= ksz_suspend,
+	.resume			= ksz_resume,
+	.get_ts_info		= ksz_get_ts_info,
+	.port_hwtstamp_get	= ksz_hwtstamp_get,
+	.port_hwtstamp_set	= ksz_hwtstamp_set,
+	.port_txtstamp		= ksz_port_txtstamp,
+	.port_rxtstamp		= ksz_port_rxtstamp,
+	.cls_flower_add		= ksz_cls_flower_add,
+	.cls_flower_del		= ksz_cls_flower_del,
+	.port_setup_tc		= ksz_setup_tc,
+	.support_eee		= ksz_support_eee,
+	.set_mac_eee		= ksz_set_mac_eee,
+	.port_get_default_prio	= ksz_port_get_default_prio,
+	.port_set_default_prio	= ksz_port_set_default_prio,
+	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
+	.port_add_dscp_prio	= ksz_port_add_dscp_prio,
+	.port_del_dscp_prio	= ksz_port_del_dscp_prio,
+	.port_get_apptrust	= ksz_port_get_apptrust,
+	.port_set_apptrust	= ksz_port_set_apptrust,
+};
+
+const struct dsa_switch_ops ksz87xx_switch_ops = {
+	.get_tag_protocol	= ksz87xx_get_tag_protocol,
+	.connect_tag_protocol   = ksz87xx_connect_tag_protocol,
+	.get_phy_flags		= ksz_get_phy_flags,
+	.setup			= ksz_setup,
+	.teardown		= ksz_teardown,
+	.phy_read		= ksz_phy_read16,
+	.phy_write		= ksz_phy_write16,
+	.phylink_get_caps	= ksz_phylink_get_caps,
+	.port_setup		= ksz_port_setup,
+	.set_ageing_time	= ksz_set_ageing_time,
+	.get_strings		= ksz_get_strings,
+	.get_ethtool_stats	= ksz_get_ethtool_stats,
+	.get_sset_count		= ksz_sset_count,
+	.port_bridge_join	= ksz_port_bridge_join,
+	.port_bridge_leave	= ksz_port_bridge_leave,
+	.port_hsr_join		= ksz_hsr_join,
+	.port_hsr_leave		= ksz_hsr_leave,
+	.port_set_mac_address	= ksz_port_set_mac_address,
+	.port_stp_state_set	= ksz_port_stp_state_set,
+	.port_teardown		= ksz_port_teardown,
+	.port_pre_bridge_flags	= ksz_port_pre_bridge_flags,
+	.port_bridge_flags	= ksz_port_bridge_flags,
+	.port_fast_age		= ksz_port_fast_age,
+	.port_vlan_filtering	= ksz_port_vlan_filtering,
+	.port_vlan_add		= ksz_port_vlan_add,
+	.port_vlan_del		= ksz_port_vlan_del,
+	.port_fdb_dump		= ksz_port_fdb_dump,
+	.port_fdb_add		= ksz_port_fdb_add,
+	.port_fdb_del		= ksz_port_fdb_del,
+	.port_mdb_add           = ksz_port_mdb_add,
+	.port_mdb_del           = ksz_port_mdb_del,
+	.port_mirror_add	= ksz_port_mirror_add,
+	.port_mirror_del	= ksz_port_mirror_del,
+	.get_stats64		= ksz_get_stats64,
+	.get_pause_stats	= ksz_get_pause_stats,
+	.port_change_mtu	= ksz_change_mtu,
+	.port_max_mtu		= ksz_max_mtu,
+	.get_wol		= ksz_get_wol,
+	.set_wol		= ksz_set_wol,
+	.suspend		= ksz_suspend,
+	.resume			= ksz_resume,
+	.get_ts_info		= ksz_get_ts_info,
+	.port_hwtstamp_get	= ksz_hwtstamp_get,
+	.port_hwtstamp_set	= ksz_hwtstamp_set,
+	.port_txtstamp		= ksz_port_txtstamp,
+	.port_rxtstamp		= ksz_port_rxtstamp,
+	.cls_flower_add		= ksz_cls_flower_add,
+	.cls_flower_del		= ksz_cls_flower_del,
+	.port_setup_tc		= ksz_setup_tc,
+	.support_eee		= ksz_support_eee,
+	.set_mac_eee		= ksz_set_mac_eee,
+	.port_get_default_prio	= ksz_port_get_default_prio,
+	.port_set_default_prio	= ksz_port_set_default_prio,
+	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
+	.port_add_dscp_prio	= ksz_port_add_dscp_prio,
+	.port_del_dscp_prio	= ksz_port_del_dscp_prio,
+	.port_get_apptrust	= ksz_port_get_apptrust,
+	.port_set_apptrust	= ksz_port_set_apptrust,
+};
+
+const struct dsa_switch_ops ksz88xx_switch_ops = {
+	.get_tag_protocol	= ksz88xx_get_tag_protocol,
+	.connect_tag_protocol   = ksz88xx_connect_tag_protocol,
+	.get_phy_flags		= ksz_get_phy_flags,
+	.setup			= ksz_setup,
+	.teardown		= ksz_teardown,
+	.phy_read		= ksz_phy_read16,
+	.phy_write		= ksz_phy_write16,
+	.phylink_get_caps	= ksz_phylink_get_caps,
+	.port_setup		= ksz_port_setup,
+	.set_ageing_time	= ksz_set_ageing_time,
+	.get_strings		= ksz_get_strings,
+	.get_ethtool_stats	= ksz_get_ethtool_stats,
+	.get_sset_count		= ksz_sset_count,
+	.port_bridge_join	= ksz_port_bridge_join,
+	.port_bridge_leave	= ksz_port_bridge_leave,
+	.port_hsr_join		= ksz_hsr_join,
+	.port_hsr_leave		= ksz_hsr_leave,
+	.port_set_mac_address	= ksz_port_set_mac_address,
+	.port_stp_state_set	= ksz_port_stp_state_set,
+	.port_teardown		= ksz_port_teardown,
+	.port_pre_bridge_flags	= ksz_port_pre_bridge_flags,
+	.port_bridge_flags	= ksz_port_bridge_flags,
+	.port_fast_age		= ksz_port_fast_age,
+	.port_vlan_filtering	= ksz_port_vlan_filtering,
+	.port_vlan_add		= ksz_port_vlan_add,
+	.port_vlan_del		= ksz_port_vlan_del,
+	.port_fdb_dump		= ksz_port_fdb_dump,
+	.port_fdb_add		= ksz_port_fdb_add,
+	.port_fdb_del		= ksz_port_fdb_del,
+	.port_mdb_add           = ksz_port_mdb_add,
+	.port_mdb_del           = ksz_port_mdb_del,
+	.port_mirror_add	= ksz_port_mirror_add,
+	.port_mirror_del	= ksz_port_mirror_del,
+	.get_stats64		= ksz_get_stats64,
+	.get_pause_stats	= ksz_get_pause_stats,
+	.port_change_mtu	= ksz_change_mtu,
+	.port_max_mtu		= ksz_max_mtu,
+	.get_wol		= ksz_get_wol,
+	.set_wol		= ksz_set_wol,
+	.suspend		= ksz_suspend,
+	.resume			= ksz_resume,
+	.get_ts_info		= ksz_get_ts_info,
+	.port_hwtstamp_get	= ksz_hwtstamp_get,
+	.port_hwtstamp_set	= ksz_hwtstamp_set,
+	.port_txtstamp		= ksz_port_txtstamp,
+	.port_rxtstamp		= ksz_port_rxtstamp,
+	.cls_flower_add		= ksz_cls_flower_add,
+	.cls_flower_del		= ksz_cls_flower_del,
+	.port_setup_tc		= ksz_setup_tc,
+	.support_eee		= ksz_support_eee,
+	.set_mac_eee		= ksz_set_mac_eee,
+	.port_get_default_prio	= ksz_port_get_default_prio,
+	.port_set_default_prio	= ksz_port_set_default_prio,
+	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
+	.port_add_dscp_prio	= ksz_port_add_dscp_prio,
+	.port_del_dscp_prio	= ksz_port_del_dscp_prio,
+	.port_get_apptrust	= ksz_port_get_apptrust,
+	.port_set_apptrust	= ksz_port_set_apptrust,
+};
 
 MODULE_AUTHOR("Tristram Ha <Tristram.Ha@microchip.com>");
 MODULE_DESCRIPTION("Microchip KSZ8795 Series Switch DSA Driver");
