@@ -160,6 +160,7 @@ static int subflow_check_req(struct request_sock *req,
 	 * TCP option space.
 	 */
 	if (rcu_access_pointer(tcp_sk(sk_listener)->md5sig_info)) {
+		MPTCP_INC_STATS(sock_net(sk_listener), MPTCP_MIB_MD5SIGRESET);
 		subflow_add_reset_reason(skb, MPTCP_RST_EMPTCP);
 		return -EINVAL;
 	}
@@ -568,6 +569,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		u8 hmac[SHA256_DIGEST_SIZE];
 
 		if (!(mp_opt.suboptions & OPTION_MPTCP_MPJ_SYNACK)) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPJOINSYNACKNOMPJOIN);
 			subflow->reset_reason = MPTCP_RST_EMPTCP;
 			goto do_reset;
 		}
@@ -870,6 +872,12 @@ create_child:
 		 */
 		if (!ctx || fallback) {
 			if (fallback_is_fatal) {
+				if (!ctx)
+					MPTCP_INC_STATS(sock_net(sk),
+							MPTCP_MIB_MPJOINACKNOCTX);
+				else
+					MPTCP_INC_STATS(sock_net(sk),
+							MPTCP_MIB_MPJOINACKNOMPJOIN);
 				subflow_add_reset_reason(skb, MPTCP_RST_EMPTCP);
 				goto dispose_child;
 			}
@@ -1421,6 +1429,7 @@ fallback:
 			 * subflow_error_report() will introduce the appropriate barriers
 			 */
 			subflow->reset_transient = 0;
+			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSRESET);
 			subflow->reset_reason = status == MAPPING_NODSS ?
 						MPTCP_RST_EMIDDLEBOX :
 						MPTCP_RST_EMPTCP;
