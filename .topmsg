@@ -1,2 +1,13 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-simult_flows-disable-GSO
+Subject: [PATCH] selftests: mptcp: simult_flows: disable GSO
+
+Netem is used to apply a rate limit, and its 'limit' option is per
+packet.
+
+Disable GSO on both sides to work with packets of a specific size. That
+increases the number of packets, but stabilise the throughput. As a
+consequence, limits are more adapted, and the bufferbloat is reduced.
+
+Fixes: 8c09412e584d ("selftests: mptcp: more stable simult_flows tests")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
