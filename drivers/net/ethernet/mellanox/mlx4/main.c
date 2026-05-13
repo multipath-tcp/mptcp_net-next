@@ -4274,9 +4274,9 @@ int mlx4_restart_one(struct pci_dev *pdev)
 	return mlx4_restart_one_up(pdev, false, NULL);
 }
 
-#define MLX_SP(id) { PCI_VDEVICE(MELLANOX, id), MLX4_PCI_DEV_FORCE_SENSE_PORT }
-#define MLX_VF(id) { PCI_VDEVICE(MELLANOX, id), MLX4_PCI_DEV_IS_VF }
-#define MLX_GN(id) { PCI_VDEVICE(MELLANOX, id), 0 }
+#define MLX_SP(id) { PCI_VDEVICE(MELLANOX, id), .driver_data = MLX4_PCI_DEV_FORCE_SENSE_PORT }
+#define MLX_VF(id) { PCI_VDEVICE(MELLANOX, id), .driver_data = MLX4_PCI_DEV_IS_VF }
+#define MLX_GN(id) { PCI_VDEVICE(MELLANOX, id), .driver_data = 0 }
 
 static const struct pci_device_id mlx4_pci_table[] = {
 #ifdef CONFIG_MLX4_CORE_GEN2
