@@ -1313,7 +1313,8 @@ static inline bool skb_data_unref(const struct sk_buff *skb,
 	return true;
 }
 
-void __fix_address sk_skb_reason_drop(struct sock *sk, struct sk_buff *skb,
+void __fix_address sk_skb_reason_drop(const struct sock *sk,
+				      struct sk_buff *skb,
 				      enum skb_drop_reason reason);
 
 static inline void
