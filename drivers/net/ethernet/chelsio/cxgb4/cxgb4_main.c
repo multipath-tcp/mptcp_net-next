@@ -112,10 +112,10 @@ char cxgb4_driver_name[] = KBUILD_MODNAME;
 #define CH_PCI_DEVICE_ID_FUNCTION2 0x0
 
 #define CH_PCI_ID_TABLE_ENTRY(devid) \
-		{PCI_VDEVICE(CHELSIO, (devid)), CXGB4_UNIFIED_PF}
+		{ PCI_VDEVICE(CHELSIO, (devid)), .driver_data = CXGB4_UNIFIED_PF }
 
 #define CH_PCI_DEVICE_ID_TABLE_DEFINE_END \
-		{ 0, } \
+		{ } \
 	}
 
 #include "t4_pci_id_tbl.h"

@@ -448,12 +448,14 @@ attribute-sets:
         name: fractional-frequency-offset
         type: sint
         doc: |
-          The FFO (Fractional Frequency Offset) between the RX and TX
-          symbol rate on the media associated with the pin:
-          (rx_frequency-tx_frequency)/rx_frequency
+          The FFO (Fractional Frequency Offset) of the pin.
+          At top level this represents the RX vs TX symbol rate
+          offset on the media associated with the pin. Inside
+          the pin-parent-device nest it represents the frequency
+          offset between the pin and its parent DPLL device.
           Value is in PPM (parts per million).
-          This may be implemented for example for pin of type
-          PIN_TYPE_SYNCE_ETH_PORT.
+          This is a lower-precision version of
+          fractional-frequency-offset-ppt.
       -
         name: esync-frequency
         type: u64
@@ -492,12 +494,14 @@ attribute-sets:
         name: fractional-frequency-offset-ppt
         type: sint
         doc: |
-          The FFO (Fractional Frequency Offset) of the pin with respect to
-          the nominal frequency.
-          Value = (frequency_measured - frequency_nominal) / frequency_nominal
+          The FFO (Fractional Frequency Offset) of the pin.
+          At top level this represents the RX vs TX symbol rate
+          offset on the media associated with the pin. Inside
+          the pin-parent-device nest it represents the frequency
+          offset between the pin and its parent DPLL device.
           Value is in PPT (parts per trillion, 10^-12).
-          Note: This attribute provides higher resolution than the standard
-          fractional-frequency-offset (which is in PPM).
+          This is a higher-precision version of
+          fractional-frequency-offset.
       -
         name: measured-frequency
         type: u64
@@ -534,6 +538,10 @@ attribute-sets:
         name: operstate
       -
         name: phase-offset
+      -
+        name: fractional-frequency-offset
+      -
+        name: fractional-frequency-offset-ppt
   -
     name: pin-parent-pin
     subset-of: pin

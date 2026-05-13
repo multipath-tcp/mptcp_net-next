@@ -218,11 +218,9 @@ static u16 link_modes[] = {
 };
 
 static const struct pci_device_id cas_pci_tbl[] = {
-	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_CASSINI,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
-	{ PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SATURN,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
-	{ 0, }
+	{ PCI_VDEVICE(SUN, PCI_DEVICE_ID_SUN_CASSINI) },
+	{ PCI_VDEVICE(NS, PCI_DEVICE_ID_NS_SATURN) },
+	{ }
 };
 
 MODULE_DEVICE_TABLE(pci, cas_pci_tbl);
