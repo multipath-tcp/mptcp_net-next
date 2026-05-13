@@ -102,7 +102,8 @@ int inet6_csk_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl_unused
 		if (IS_ERR(dst)) {
 			WRITE_ONCE(sk->sk_err_soft, -PTR_ERR(dst));
 			sk->sk_route_caps = 0;
-			kfree_skb(skb);
+			sk_skb_reason_drop(sk, skb,
+					   SKB_DROP_REASON_IP_OUTNOROUTES);
 			return PTR_ERR(dst);
 		}
 		/* Restore final destination back after routing done */
