@@ -982,7 +982,7 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 		return;
 	}
 
-	kfree_skb(buff);
+	sk_skb_reason_drop(sk, buff, SKB_DROP_REASON_IP_OUTNOROUTES);
 }
 
 static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb,
