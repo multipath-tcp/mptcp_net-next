@@ -60,7 +60,20 @@ struct dpll_device_ops {
 				struct netlink_ext_ack *extack);
 };
 
+enum dpll_ffo_type {
+	DPLL_FFO_PORT_RXTX_RATE,
+	DPLL_FFO_PIN_DEVICE,
+
+	__DPLL_FFO_TYPE_MAX,
+};
+
+struct dpll_ffo_param {
+	enum dpll_ffo_type type;
+	s64 ffo;
+};
+
 struct dpll_pin_ops {
+	unsigned long supported_ffo;
 	int (*frequency_set)(const struct dpll_pin *pin, void *pin_priv,
 			     const struct dpll_device *dpll, void *dpll_priv,
 			     const u64 frequency,
@@ -121,7 +134,8 @@ struct dpll_pin_ops {
 				struct netlink_ext_ack *extack);
 	int (*ffo_get)(const struct dpll_pin *pin, void *pin_priv,
 		       const struct dpll_device *dpll, void *dpll_priv,
-		       s64 *ffo, struct netlink_ext_ack *extack);
+		       struct dpll_ffo_param *ffo,
+		       struct netlink_ext_ack *extack);
 	int (*measured_freq_get)(const struct dpll_pin *pin, void *pin_priv,
 				 const struct dpll_device *dpll,
 				 void *dpll_priv, u64 *measured_freq,
