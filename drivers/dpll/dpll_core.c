@@ -879,7 +879,8 @@ dpll_pin_register(struct dpll_device *dpll, struct dpll_pin *pin,
 	    WARN_ON(!ops->direction_get) ||
 	    WARN_ON(ops->measured_freq_get &&
 		    (!dpll_device_ops(dpll)->freq_monitor_get ||
-		     !dpll_device_ops(dpll)->freq_monitor_set)))
+		     !dpll_device_ops(dpll)->freq_monitor_set)) ||
+	    WARN_ON(ops->supported_ffo && !ops->ffo_get))
 		return -EINVAL;
 
 	mutex_lock(&dpll_lock);
