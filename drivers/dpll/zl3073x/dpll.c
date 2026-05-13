@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
+#include <linux/atomic.h>
 #include <linux/bits.h>
 #include <linux/bitfield.h>
 #include <linux/bug.h>
@@ -57,7 +58,7 @@ struct zl3073x_dpll_pin {
 	s32			phase_gran;
 	enum dpll_pin_operstate	operstate;
 	s64			phase_offset;
-	s64			freq_offset;
+	atomic64_t		freq_offset;
 	u32			measured_freq;
 };
 
@@ -295,11 +296,15 @@ zl3073x_dpll_input_pin_ref_sync_set(const struct dpll_pin *dpll_pin,
 static int
 zl3073x_dpll_input_pin_ffo_get(const struct dpll_pin *dpll_pin, void *pin_priv,
 			       const struct dpll_device *dpll, void *dpll_priv,
-			       s64 *ffo, struct netlink_ext_ack *extack)
+			       struct dpll_ffo_param *ffo,
+			       struct netlink_ext_ack *extack)
 {
 	struct zl3073x_dpll_pin *pin = pin_priv;
 
-	*ffo = pin->freq_offset;
+	if (pin->operstate != DPLL_PIN_OPERSTATE_ACTIVE)
+		return -ENODATA;
+
+	ffo->ffo = atomic64_read(&pin->freq_offset);
 
 	return 0;
 }
@@ -1274,6 +1279,7 @@ zl3073x_dpll_freq_monitor_set(const struct dpll_device *dpll,
 }
 
 static const struct dpll_pin_ops zl3073x_dpll_input_pin_ops = {
+	.supported_ffo = BIT(DPLL_FFO_PIN_DEVICE),
 	.direction_get = zl3073x_dpll_pin_direction_get,
 	.esync_get = zl3073x_dpll_input_pin_esync_get,
 	.esync_set = zl3073x_dpll_input_pin_esync_set,
@@ -1729,37 +1735,29 @@ zl3073x_dpll_pin_phase_offset_check(struct zl3073x_dpll_pin *pin)
 }
 
 /**
- * zl3073x_dpll_pin_ffo_check - check for pin fractional frequency offset change
+ * zl3073x_dpll_pin_ffo_check - check for FFO change on active pin
  * @pin: pin to check
  *
- * Check for the given pin's fractional frequency change.
- *
- * Return: true on fractional frequency offset change, false otherwise
+ * Return: true on change, false otherwise
  */
 static bool
 zl3073x_dpll_pin_ffo_check(struct zl3073x_dpll_pin *pin)
 {
 	struct zl3073x_dpll *zldpll = pin->dpll;
 	struct zl3073x_dev *zldev = zldpll->dev;
-	const struct zl3073x_ref *ref;
-	u8 ref_id;
+	const struct zl3073x_chan *chan;
 	s64 ffo;
 
-	/* Get reference monitor status */
-	ref_id = zl3073x_input_pin_ref_get(pin->id);
-	ref = zl3073x_ref_state_get(zldev, ref_id);
-
-	/* Do not report ffo changes if the reference monitor report errors */
-	if (!zl3073x_ref_is_status_ok(ref))
+	if (pin->operstate != DPLL_PIN_OPERSTATE_ACTIVE)
 		return false;
 
-	/* Compare with previous value */
-	ffo = zl3073x_ref_ffo_get(ref);
-	if (pin->freq_offset != ffo) {
-		dev_dbg(zldev->dev, "%s freq offset changed: %lld -> %lld\n",
-			pin->label, pin->freq_offset, ffo);
-		pin->freq_offset = ffo;
+	chan = zl3073x_chan_state_get(zldpll->dev, zldpll->id);
+	ffo = mul_s64_u64_shr(zl3073x_chan_df_offset_get(chan),
+			      244140625, 36);
 
+	if (atomic64_xchg(&pin->freq_offset, ffo) != ffo) {
+		dev_dbg(zldev->dev, "%s freq offset changed to: %lld\n",
+			pin->label, ffo);
 		return true;
 	}
 
