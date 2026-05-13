@@ -238,7 +238,7 @@ config LXT_PHY
 config INTEL_XWAY_PHY
 	tristate "Intel XWAY PHYs"
 	help
-	  Supports the Intel XWAY (former Lantiq) 11G and 22E PHYs.
+	  Supports the Intel XWAY (former Lantiq) 11G and 22F PHYs.
 	  These PHYs are marked as standalone chips under the names
 	  PEF 7061, PEF 7071 and PEF 7072 or integrated into the Intel
 	  SoCs xRX200, xRX300, xRX330, xRX350 and xRX550.
