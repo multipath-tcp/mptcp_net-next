@@ -258,6 +258,26 @@ in the ``DPLL_A_PIN_PHASE_OFFSET`` attribute.
   ``DPLL_A_PHASE_OFFSET_MONITOR`` attr state of a feature
   =============================== ========================
 
+Fractional frequency offset
+===========================
+
+The fractional frequency offset (FFO) is reported through two attributes
+that carry the same measurement at different precisions:
+
+- ``DPLL_A_PIN_FRACTIONAL_FREQUENCY_OFFSET`` in PPM (parts per million)
+- ``DPLL_A_PIN_FRACTIONAL_FREQUENCY_OFFSET_PPT`` in PPT (parts per trillion)
+
+Both attributes appear at the top level of a pin and inside each
+``pin-parent-device`` nest. Two FFO types are defined:
+
+- ``DPLL_FFO_PORT_RXTX_RATE`` - RX vs TX symbol rate offset (top-level)
+- ``DPLL_FFO_PIN_DEVICE`` - pin vs parent DPLL offset (per-parent)
+
+The driver declares which types it supports via the ``supported_ffo``
+bitmask in ``struct dpll_pin_ops``. The core only calls the ``ffo_get``
+callback for types the driver has opted into. The requested type is
+passed to the driver in the ``struct dpll_ffo_param``.
+
 Frequency monitor
 =================
 
