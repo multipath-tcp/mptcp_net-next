@@ -212,7 +212,7 @@ static int fq_codel_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 		q->new_flow_count++;
 		WRITE_ONCE(flow->deficit, q->quantum);
 	}
-	get_codel_cb(skb)->mem_usage = skb->truesize;
+	get_codel_cb(skb)->mem_usage = is_skb_wmem(skb) ? 0 : skb->truesize;
 	q->memory_usage += get_codel_cb(skb)->mem_usage;
 	memory_limited = q->memory_usage > q->memory_limit;
 	qdisc_qlen_inc(sch);
