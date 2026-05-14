@@ -3296,12 +3296,9 @@ static int mlx5e_num_channels_changed(struct mlx5e_priv *priv)
 	}
 
 	/* This function may be called on attach, before priv->rx_res is created. */
-	if (priv->rx_res) {
-		mlx5e_rx_res_rss_update_num_channels(priv->rx_res, count);
-
-		if (!netif_is_rxfh_configured(priv->netdev))
-			mlx5e_rx_res_rss_set_indir_uniform(priv->rx_res, count);
-	}
+	if (priv->rx_res)
+		mlx5e_rx_res_rss_update_num_channels(priv->rx_res, count,
+						     netdev);
 
 	return 0;
 }
