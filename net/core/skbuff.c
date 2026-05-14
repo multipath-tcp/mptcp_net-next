@@ -78,6 +78,7 @@
 #include <net/mpls.h>
 #include <net/mptcp.h>
 #include <net/mctp.h>
+#include <net/tcp.h>
 #include <net/can.h>
 #include <net/page_pool/helpers.h>
 #include <net/psp/types.h>
@@ -96,7 +97,6 @@
 #include "devmem.h"
 #include "net-sysfs.h"
 #include "netmem_priv.h"
-#include "sock_destructor.h"
 
 #ifdef CONFIG_SKB_EXTENSIONS
 static struct kmem_cache *skbuff_ext_cache __ro_after_init;
