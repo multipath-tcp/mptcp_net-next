@@ -410,6 +410,11 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 
 	lock_sock(sk);
 	err = __mptcp_subflow_connect(sk, &local, &addr_r);
+	if (!err) {
+		spin_lock_bh(&msk->pm.lock);
+		msk->pm.extra_subflows++;
+		spin_unlock_bh(&msk->pm.lock);
+	}
 	release_sock(sk);
 
 	if (err)
@@ -418,8 +423,6 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 	spin_lock_bh(&msk->pm.lock);
 	if (err)
 		mptcp_userspace_pm_delete_local_addr(msk, &entry);
-	else
-		msk->pm.extra_subflows++;
 	spin_unlock_bh(&msk->pm.lock);
 
  create_err:
