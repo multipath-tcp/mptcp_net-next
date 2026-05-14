@@ -2708,6 +2708,7 @@ EXPORT_SYMBOL(sock_wfree);
 /* This variant of sock_wfree() is used by TCP,
  * since it sets SOCK_USE_WRITE_QUEUE.
  */
+#ifdef CONFIG_INET
 void __sock_wfree(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
@@ -2715,6 +2716,8 @@ void __sock_wfree(struct sk_buff *skb)
 	if (refcount_sub_and_test(skb->truesize, &sk->sk_wmem_alloc))
 		__sk_free(sk);
 }
+EXPORT_SYMBOL_GPL(__sock_wfree);
+#endif
 
 void skb_set_owner_w(struct sk_buff *skb, struct sock *sk)
 {
