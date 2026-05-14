@@ -1716,7 +1716,8 @@ err_out:
 	/* we account subflows before the creation, and this failures will not
 	 * be caught by sk_state_change()
 	 */
-	mptcp_pm_close_subflow(msk);
+	if (!mptcp_pm_is_userspace(msk))
+		mptcp_pm_close_subflow(msk);
 	return err;
 }
 
