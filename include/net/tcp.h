@@ -390,7 +390,6 @@ static inline bool tcp_release_cb_cond(struct sock *sk)
 	return false;
 }
 
-void tcp_wfree(struct sk_buff *skb);
 void tcp_write_timer_handler(struct sock *sk);
 void tcp_delack_timer_handler(struct sock *sk);
 int tcp_ioctl(struct sock *sk, int cmd, int *karg);
