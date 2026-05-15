@@ -1070,13 +1070,13 @@ static inline int qdisc_qstats_copy(struct gnet_dump *d, const struct Qdisc *sch
 	return gnet_stats_copy_queue(d, sch->cpu_qstats, &sch->qstats, qlen);
 }
 
-static inline void qdisc_qstats_qlen_backlog(struct Qdisc *sch,  __u32 *qlen,
-					     __u32 *backlog)
+static inline void qdisc_qstats_qlen_backlog(const struct Qdisc *sch,
+					     u32 *qlen, u32 *backlog)
 {
 	struct gnet_stats_queue qstats = { 0 };
 
 	gnet_stats_add_queue(&qstats, sch->cpu_qstats, &sch->qstats);
-	*qlen = qstats.qlen + qdisc_qlen(sch);
+	*qlen = qstats.qlen + qdisc_qlen_lockless(sch);
 	*backlog = qstats.backlog;
 }
 
