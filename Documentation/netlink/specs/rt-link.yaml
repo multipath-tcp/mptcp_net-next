@@ -1700,6 +1700,9 @@ attribute-sets:
       -
         name: backup-nhid
         type: u32
+      -
+        name: neigh-forward-grat
+        type: u8
   -
     name: linkinfo-gre-attrs
     name-prefix: ifla-gre-
