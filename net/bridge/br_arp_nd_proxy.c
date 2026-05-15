@@ -132,6 +132,7 @@ void br_do_proxy_suppress_arp(struct sk_buff *skb, struct net_bridge *br,
 	__be32 sip, tip;
 
 	BR_INPUT_SKB_CB(skb)->proxyarp_replied = 0;
+	BR_INPUT_SKB_CB(skb)->grat_arp = 0;
 
 	if ((dev->flags & IFF_NOARP) ||
 	    !pskb_may_pull(skb, arp_hdr_len(dev)))
@@ -167,6 +168,7 @@ void br_do_proxy_suppress_arp(struct sk_buff *skb, struct net_bridge *br,
 		    sip == tip) {
 			/* prevent flooding to neigh suppress ports */
 			BR_INPUT_SKB_CB(skb)->proxyarp_replied = 1;
+			BR_INPUT_SKB_CB(skb)->grat_arp = 1;
 			return;
 		}
 	}
@@ -419,6 +421,7 @@ void br_do_suppress_nd(struct sk_buff *skb, struct net_bridge *br,
 	struct neighbour *n;
 
 	BR_INPUT_SKB_CB(skb)->proxyarp_replied = 0;
+	BR_INPUT_SKB_CB(skb)->grat_arp = 0;
 
 	if (br_is_neigh_suppress_enabled(p, vid))
 		return;
@@ -431,6 +434,7 @@ void br_do_suppress_nd(struct sk_buff *skb, struct net_bridge *br,
 	    !msg->icmph.icmp6_solicited) {
 		/* prevent flooding to neigh suppress ports */
 		BR_INPUT_SKB_CB(skb)->proxyarp_replied = 1;
+		BR_INPUT_SKB_CB(skb)->grat_arp = 1;
 		return;
 	}
 
@@ -520,5 +524,23 @@ bool br_is_neigh_suppress_enabled(const struct net_bridge_port *p, u16 vid)
 		return !!(v->priv_flags & BR_VLFLAG_NEIGH_SUPPRESS_ENABLED);
 	} else {
 		return !!(p->flags & BR_NEIGH_SUPPRESS);
+	}
+}
+
+bool br_is_neigh_forward_grat_enabled(const struct net_bridge_port *p, u16 vid)
+{
+	if (!vid)
+		return !!(p->flags & BR_NEIGH_FORWARD_GRAT);
+
+	if (p->flags & BR_NEIGH_VLAN_SUPPRESS) {
+		struct net_bridge_vlan_group *vg = nbp_vlan_group_rcu(p);
+		struct net_bridge_vlan *v;
+
+		v = br_vlan_find(vg, vid);
+		if (!v)
+			return false;
+		return !!(v->priv_flags & BR_VLFLAG_NEIGH_FORWARD_GRAT_ENABLED);
+	} else {
+		return !!(p->flags & BR_NEIGH_FORWARD_GRAT);
 	}
 }
