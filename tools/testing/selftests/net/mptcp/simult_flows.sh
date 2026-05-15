@@ -223,9 +223,11 @@ run_test()
 	local rate2=$2
 	local delay1=$3
 	local delay2=$4
+	local limit1=$5
+	local limit2=$6
 	local lret
 	local dev
-	shift 4
+	shift 6
 	local msg=$*
 
 	[ $delay1 -gt 0 ] && delay1="delay ${delay1}ms" || delay1=""
@@ -240,10 +242,10 @@ run_test()
 
 	# keep the queued pkts number low, or the RTT estimator will see
 	# increasing latency over time.
-	tc -n $ns1 qdisc add dev ns1eth1 root netem rate ${rate1}mbit $delay1 limit 50
-	tc -n $ns1 qdisc add dev ns1eth2 root netem rate ${rate2}mbit $delay2 limit 50
-	tc -n $ns2 qdisc add dev ns2eth1 root netem rate ${rate1}mbit $delay1 limit 50
-	tc -n $ns2 qdisc add dev ns2eth2 root netem rate ${rate2}mbit $delay2 limit 50
+	tc -n $ns1 qdisc add dev ns1eth1 root netem rate ${rate1}mbit $delay1 limit ${limit1}
+	tc -n $ns1 qdisc add dev ns1eth2 root netem rate ${rate2}mbit $delay2 limit ${limit2}
+	tc -n $ns2 qdisc add dev ns2eth1 root netem rate ${rate1}mbit $delay1 limit ${limit1}
+	tc -n $ns2 qdisc add dev ns2eth2 root netem rate ${rate2}mbit $delay2 limit ${limit2}
 
 	# time is measured in ms, account for transfer size, aggregated link speed
 	# and header overhead (10%)
@@ -301,13 +303,13 @@ done
 
 setup
 mptcp_lib_subtests_last_ts_reset
-run_test 10 10 0 0 "balanced bwidth"
-run_test 10 10 1 25 "balanced bwidth with unbalanced delay"
+run_test 10 10 0 0  20 20 "balanced bwidth"
+run_test 10 10 1 25 20 50 "balanced bwidth with unbalanced delay"
 
 # we still need some additional infrastructure to pass the following test-cases
-MPTCP_LIB_SUBTEST_FLAKY=1 run_test 10 3 0 0 "unbalanced bwidth"
-run_test 10 3 1 25 "unbalanced bwidth with unbalanced delay"
-run_test 10 3 25 1 "unbalanced bwidth with opposed, unbalanced delay"
+MPTCP_LIB_SUBTEST_FLAKY=1 run_test 10 3 0 0  30 20 "unbalanced bwidth"
+run_test 10 3 1 25 40 30 "unbalanced bwidth with unbalanced delay"
+run_test 10 3 25 1 50 30 "unbalanced bwidth with opposed, unbalanced delay"
 
 mptcp_lib_result_print_all_tap
 exit $ret
