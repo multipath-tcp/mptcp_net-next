@@ -1159,10 +1159,13 @@ static bool add_addr_hmac_valid(struct mptcp_sock *msk,
 }
 
 static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
-			     const struct sk_buff *skb)
+			     const struct sk_buff *skb,
+			     const struct mptcp_options_received *mp_opt)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	u64 mem = sk_rmem_alloc_get(sk);
+	u64 limit;
+	bool ret;
 
 	mem += READ_ONCE(msk->backlog_len);
 	if (likely(mem <= READ_ONCE(sk->sk_rcvbuf)))
@@ -1174,10 +1177,31 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 	    !after(TCP_SKB_CB(skb)->end_seq, tcp_sk(ssk)->rcv_nxt))
 		return false;
 
-	/* Dropped due to memory constraints, schedule an ack. */
-	inet_csk(ssk)->icsk_ack.pending |= ICSK_ACK_NOMEM | ICSK_ACK_NOW;
-	inet_csk_schedule_ack(ssk);
-	return true;
+	mptcp_data_lock(sk);
+	if (!sock_owned_by_user(sk)) {
+		/* When the data sequence is not (yet) available for the
+		 * incoming skb, allow pruning the whole OoO queue.
+		 */
+		u64 seq = (!mp_opt->use_map || mp_opt->mpc_map) ?
+			  msk->ack_seq : mp_opt->data_seq;
+
+		limit = sk->sk_rcvbuf;
+		__mptcp_check_prune(sk, seq);
+	} else {
+		/* Pruning will take place later in the RX path, allow
+		 * some extra slack.
+		 */
+		limit = ((u64)READ_ONCE(sk->sk_rcvbuf)) << 1;
+	}
+	ret = sk_rmem_alloc_get(sk) + msk->backlog_len > limit;
+	mptcp_data_unlock(sk);
+
+	if (ret) {
+		/* Dropped due to memory constraints, schedule an ack. */
+		inet_csk(ssk)->icsk_ack.pending |= ICSK_ACK_NOMEM | ICSK_ACK_NOW;
+		inet_csk_schedule_ack(ssk);
+	}
+	return ret;
 }
 
 /* Return false when the caller must drop the packet, i.e. in case of error,
@@ -1208,7 +1232,11 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
 
-		if (mptcp_over_limit(subflow->conn, sk, skb))
+		/* Will use ack_seq as limit for OoO pruning; any value would do
+		 * as OoO queue must be empty.
+		 */
+		mp_opt.use_map = 0;
+		if (mptcp_over_limit(subflow->conn, sk, skb, &mp_opt))
 			return false;
 		return true;
 	}
@@ -1288,7 +1316,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		return true;
 	}
 
-	if (mptcp_over_limit(subflow->conn, sk, skb))
+	if (mptcp_over_limit(subflow->conn, sk, skb, &mp_opt))
 		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
