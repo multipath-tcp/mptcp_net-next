@@ -6,6 +6,8 @@
 ret=0
 trtype="${1:-mptcp}"
 path="${2:-1}"
+iopolicy=${3:-"numa"} # round-robin, queue-depth
+loss=${4:-0}
 nqn="nqn.2014-08.org.nvmexpress.${trtype}dev.$$.${RANDOM}"
 ns=1
 port=$((RANDOM % 10000 + 20000))
@@ -21,10 +23,12 @@ usage()
 
 Usage:
 
-	$(basename "$0") [trtype] [path]
+	$(basename "$0") [trtype] [path] [iopolicy] [loss]
 
 	trtype		Transport type (mptcp|tcp) - default: mptcp
 	path		Number of multipath (1-4) - default: 4
+	iopolicy	I/O policy (numa|round-robin|queue-depth) - default: numa
+	loss		Enable packet loss (0|1) - default: 0
 
 EOF
 exit 0
@@ -45,6 +49,16 @@ validate_params()
 	if [ "${path}" -gt 4 ]; then
 		echo "Warning: path count ${path} > 4, limiting to 4"
 		path=4
+	fi
+
+	if [[ ! "${iopolicy}" =~ ^(numa|round-robin|queue-depth)$ ]]; then
+		echo "Error: Invalid iopolicy '${iopolicy}'."
+		usage
+	fi
+
+	if [[ ! "${loss}" =~ ^[01]$ ]]; then
+		echo "Error: Invalid loss value '${loss}'. Must be 0 or 1"
+		usage
 	fi
 }
 
@@ -103,6 +117,7 @@ cleanup()
 	wait "$monitor_pid_ns2" 2>/dev/null
 
 	unset -v trtype path nqn ns port trsvcid
+	unset iopolicy loss
 }
 
 init()
@@ -131,8 +146,10 @@ init()
 					dev ns2eth"$i" metric 10"$i"
 
 		# Add tc qdisc to both namespaces for bandwidth limiting
-		tc -n "$ns1" qdisc add dev ns1eth"$i" root netem rate 1000mbit
-		tc -n "$ns2" qdisc add dev ns2eth"$i" root netem rate 1000mbit
+		tc -n "$ns1" qdisc add dev ns1eth"$i" root netem rate 1000mbit \
+			$([ ${loss} -eq 1 ] && echo "delay 5ms loss 0.5%")
+		tc -n "$ns2" qdisc add dev ns2eth"$i" root netem rate 1000mbit \
+			$([ ${loss} -eq 1 ] && echo "delay 5ms loss 0.5%")
 
 		tc -n "$ns1" qdisc show dev ns1eth"$i"
 		tc -n "$ns2" qdisc show dev ns2eth"$i"
@@ -190,6 +207,41 @@ run_target()
 	done
 }
 
+set_io_policy()
+{
+	local nqn="$1"
+	local iopolicy="$2"
+	local subname
+	local policy
+	local current
+
+	subname=$(nvme list-subsys 2>/dev/null | grep -B 5 "${nqn}" |
+		  grep -o 'nvme-subsys[0-9]*' | head -1)
+	if [ -z "$subname" ]; then
+		return 1
+	fi
+
+	policy="/sys/class/nvme-subsystem/${subname}/iopolicy"
+	if [ ! -w "$policy" ]; then
+		return 1
+	fi
+
+	if ! echo "${iopolicy}" > "$policy" 2>/dev/null; then
+		return 1
+	fi
+
+	current=$(cat "$policy" 2>/dev/null)
+	if [ -z "$current" ]; then
+		return 1
+	fi
+
+	if [[ "$current" != *"${iopolicy}"* ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
 run_host()
 {
 	local traddr=10.1.1.1
@@ -234,6 +286,11 @@ run_host()
 
 	echo "nvme list"
 	nvme list
+
+	if ! set_io_policy "${nqn}" "${iopolicy}"; then
+		echo "Failed to set I/O policy to ${iopolicy}"
+		return 1
+	fi
 
 	sleep 1
 
@@ -282,6 +339,7 @@ run_test()
 {
 	export trtype path nqn ns port trsvcid
 	export loop_dev temp_file
+	export iopolicy loss
 
 	if ! ip netns exec "$ns1" unshare -m bash <<- EOF
 		mount -t configfs none /sys/kernel/config
@@ -294,6 +352,7 @@ run_test()
 	fi
 
 	if ! ip netns exec "$ns2" bash <<- EOF
+		$(declare -f set_io_policy)
 		$(declare -f run_host)
 		run_host
 		exit \$?
