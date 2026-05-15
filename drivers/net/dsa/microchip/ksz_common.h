@@ -363,9 +363,7 @@ struct ksz_dev_ops {
 	void (*teardown)(struct dsa_switch *ds);
 	u32 (*get_port_addr)(int port, int offset);
 	void (*cfg_port_member)(struct ksz_device *dev, int port, u8 member);
-	void (*flush_dyn_mac_table)(struct ksz_device *dev, int port);
 	void (*port_setup)(struct ksz_device *dev, int port, bool cpu_port);
-	int (*set_ageing_time)(struct ksz_device *dev, unsigned int msecs);
 
 	/**
 	 * @mdio_bus_preinit: Function pointer to pre-initialize the MDIO bus
@@ -410,33 +408,6 @@ struct ksz_dev_ops {
 	void (*r_mib_pkt)(struct ksz_device *dev, int port, u16 addr,
 			  u64 *dropped, u64 *cnt);
 	void (*r_mib_stat64)(struct ksz_device *dev, int port);
-	int  (*vlan_filtering)(struct ksz_device *dev, int port,
-			       bool flag, struct netlink_ext_ack *extack);
-	int  (*vlan_add)(struct ksz_device *dev, int port,
-			 const struct switchdev_obj_port_vlan *vlan,
-			 struct netlink_ext_ack *extack);
-	int  (*vlan_del)(struct ksz_device *dev, int port,
-			 const struct switchdev_obj_port_vlan *vlan);
-	int (*mirror_add)(struct ksz_device *dev, int port,
-			  struct dsa_mall_mirror_tc_entry *mirror,
-			  bool ingress, struct netlink_ext_ack *extack);
-	void (*mirror_del)(struct ksz_device *dev, int port,
-			   struct dsa_mall_mirror_tc_entry *mirror);
-	int (*fdb_add)(struct ksz_device *dev, int port,
-		       const unsigned char *addr, u16 vid, struct dsa_db db);
-	int (*fdb_del)(struct ksz_device *dev, int port,
-		       const unsigned char *addr, u16 vid, struct dsa_db db);
-	int (*fdb_dump)(struct ksz_device *dev, int port,
-			dsa_fdb_dump_cb_t *cb, void *data);
-	int (*mdb_add)(struct ksz_device *dev, int port,
-		       const struct switchdev_obj_port_mdb *mdb,
-		       struct dsa_db db);
-	int (*mdb_del)(struct ksz_device *dev, int port,
-		       const struct switchdev_obj_port_mdb *mdb,
-		       struct dsa_db db);
-	void (*get_caps)(struct ksz_device *dev, int port,
-			 struct phylink_config *config);
-	int (*change_mtu)(struct ksz_device *dev, int port, int mtu);
 	int (*pme_write8)(struct ksz_device *dev, u32 reg, u8 value);
 	int (*pme_pread8)(struct ksz_device *dev, int port, int offset,
 			  u8 *data);
@@ -444,11 +415,6 @@ struct ksz_dev_ops {
 			   u8 data);
 	void (*freeze_mib)(struct ksz_device *dev, int port, bool freeze);
 	void (*port_init_cnt)(struct ksz_device *dev, int port);
-	void (*phylink_mac_link_up)(struct ksz_device *dev, int port,
-				    unsigned int mode,
-				    phy_interface_t interface,
-				    struct phy_device *phydev, int speed,
-				    int duplex, bool tx_pause, bool rx_pause);
 	void (*setup_rgmii_delay)(struct ksz_device *dev, int port);
 	int (*tc_cbs_set_cinc)(struct ksz_device *dev, int port, u32 val);
 	void (*config_cpu_port)(struct dsa_switch *ds);
@@ -513,29 +479,6 @@ int ksz_port_pre_bridge_flags(struct dsa_switch *ds, int port,
 int ksz_port_bridge_flags(struct dsa_switch *ds, int port,
 			  struct switchdev_brport_flags flags,
 			  struct netlink_ext_ack *extack);
-int ksz_port_vlan_filtering(struct dsa_switch *ds, int port,
-			    bool flag, struct netlink_ext_ack *extack);
-int ksz_port_vlan_add(struct dsa_switch *ds, int port,
-		      const struct switchdev_obj_port_vlan *vlan,
-		      struct netlink_ext_ack *extack);
-int ksz_port_vlan_del(struct dsa_switch *ds, int port,
-		      const struct switchdev_obj_port_vlan *vlan);
-void ksz_port_fast_age(struct dsa_switch *ds, int port);
-int ksz_set_ageing_time(struct dsa_switch *ds, unsigned int msecs);
-int ksz_port_fdb_add(struct dsa_switch *ds, int port,
-		     const unsigned char *addr, u16 vid,
-		     struct dsa_db db);
-int ksz_port_fdb_del(struct dsa_switch *ds, int port,
-		     const unsigned char *addr,
-		     u16 vid, struct dsa_db db);
-int ksz_port_fdb_dump(struct dsa_switch *ds, int port,
-		      dsa_fdb_dump_cb_t *cb, void *data);
-int ksz_port_mdb_add(struct dsa_switch *ds, int port,
-		     const struct switchdev_obj_port_mdb *mdb,
-		     struct dsa_db db);
-int ksz_port_mdb_del(struct dsa_switch *ds, int port,
-		     const struct switchdev_obj_port_mdb *mdb,
-		     struct dsa_db db);
 
 void ksz_phylink_get_caps(struct dsa_switch *ds, int port,
 			  struct phylink_config *config);
@@ -549,12 +492,6 @@ void ksz_phylink_mac_link_down(struct phylink_config *config,
 			       unsigned int mode,
 			       phy_interface_t interface);
 
-int ksz_port_mirror_add(struct dsa_switch *ds, int port,
-			struct dsa_mall_mirror_tc_entry *mirror,
-			bool ingress, struct netlink_ext_ack *extack);
-void ksz_port_mirror_del(struct dsa_switch *ds, int port,
-			 struct dsa_mall_mirror_tc_entry *mirror);
-int ksz_change_mtu(struct dsa_switch *ds, int port, int mtu);
 int ksz_max_mtu(struct dsa_switch *ds, int port);
 
 bool ksz_support_eee(struct dsa_switch *ds, int port);
