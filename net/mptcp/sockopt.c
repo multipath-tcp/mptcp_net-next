@@ -67,7 +67,7 @@ static int mptcp_get_int_option(struct mptcp_sock *msk, sockptr_t optval,
 	return 0;
 }
 
-static inline void __mptcp_subflow_set_rcvbuf(struct sock *ssk, int val)
+static void __mptcp_subflow_set_rcvbuf(struct sock *ssk, int val)
 {
 	WRITE_ONCE(ssk->sk_rcvbuf, val);
 	tcp_set_rcvbuf(ssk, val);
