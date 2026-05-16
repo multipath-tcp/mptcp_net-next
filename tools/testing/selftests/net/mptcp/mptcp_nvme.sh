@@ -1,0 +1,315 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+
+. "$(dirname "$0")/mptcp_lib.sh"
+
+ret=0
+trtype="${1:-mptcp}"
+path="${2:-1}"
+nqn="nqn.2014-08.org.nvmexpress.${trtype}dev.$$.${RANDOM}"
+ns=1
+port=$((RANDOM % 10000 + 20000))
+trsvcid=$((RANDOM % 64512 + 1024))
+ns1=""
+ns2=""
+temp_file=""
+loop_dev=""
+
+usage()
+{
+	cat << EOF
+
+Usage:
+
+	$(basename "$0") [trtype] [path]
+
+	trtype   Transport type (tcp|mptcp) - default: mptcp
+	path     Number of multipath (1-4) - default: 1
+
+EOF
+exit 0
+}
+
+validate_params()
+{
+	if [[ ! "${trtype}" =~ ^(tcp|mptcp)$ ]]; then
+		echo "Error: Invalid trtype ${trtype}."
+		usage
+	fi
+
+	if [[ ! "${path}" =~ ^[0-9]+$ ]] || [ "${path}" -lt 1 ]; then
+		echo "Error: Invalid path count ${path}."
+		usage
+	fi
+
+	if [ "${path}" -gt 4 ]; then
+		echo "Warning: path count ${path} > 4, limiting to 4"
+		path=4
+	fi
+}
+
+# This function is invoked indirectly
+#shellcheck disable=SC2317,SC2329
+ns1_cleanup()
+{
+	pushd /sys/kernel/config/nvmet || exit 1
+
+	for i in $(seq 1 "${path}"); do
+		local portdir=$((port + i))
+
+		rm -rf "ports/${portdir}/subsystems/${nqn}"
+		rmdir "ports/${portdir}"
+	done
+
+	echo 0 > "subsystems/${nqn}/namespaces/${ns}/enable"
+	echo -n 0 > "subsystems/${nqn}/namespaces/${ns}/device_path"
+	rmdir "subsystems/${nqn}/namespaces/${ns}"
+	rmdir "subsystems/${nqn}"
+
+	popd || exit 1
+}
+
+# This function is invoked indirectly
+#shellcheck disable=SC2317,SC2329
+ns2_cleanup()
+{
+	nvme disconnect -n "${nqn}" || true
+}
+
+# This function is used in the cleanup trap
+#shellcheck disable=SC2317,SC2329
+cleanup()
+{
+	ip netns exec "$ns2" bash <<- EOF
+		$(declare -f ns2_cleanup)
+		ns2_cleanup
+	EOF
+
+	sleep 1
+
+	ip netns exec "$ns1" unshare -m bash <<- EOF
+		mount -t configfs none /sys/kernel/config
+		$(declare -f ns1_cleanup)
+		ns1_cleanup
+	EOF
+
+	if [ -n "${loop_dev}" ] && [ -b "${loop_dev}" ]; then
+		losetup -d "${loop_dev}" 2>/dev/null || true
+	fi
+	rm -rf "${temp_file}"
+
+	mptcp_lib_ns_exit "$ns1" "$ns2"
+
+	kill "$monitor_pid_ns1" 2>/dev/null
+	wait "$monitor_pid_ns1" 2>/dev/null
+
+	kill "$monitor_pid_ns2" 2>/dev/null
+	wait "$monitor_pid_ns2" 2>/dev/null
+
+	unset -v trtype path nqn ns port trsvcid
+}
+
+init()
+{
+	mptcp_lib_ns_init ns1 ns2
+
+	# ns1		ns2
+	# 10.1.1.1	10.1.1.2
+	# 10.1.2.1	10.1.2.2
+	# 10.1.3.1	10.1.3.2
+	# 10.1.4.1	10.1.4.2
+	for i in {1..4}; do
+		ip link add ns1eth"$i" netns "$ns1" type veth peer \
+					name ns2eth"$i" netns "$ns2"
+		ip -net "$ns1" addr add 10.1."$i".1/24 dev ns1eth"$i"
+		ip -net "$ns1" addr add dead:beef:"$i"::1/64 \
+					dev ns1eth"$i" nodad
+		ip -net "$ns1" link set ns1eth"$i" up
+		ip -net "$ns2" addr add 10.1."$i".2/24 dev ns2eth"$i"
+		ip -net "$ns2" addr add dead:beef:"$i"::2/64 \
+					dev ns2eth"$i" nodad
+		ip -net "$ns2" link set ns2eth"$i" up
+		ip -net "$ns2" route add default via 10.1."$i".1 \
+					dev ns2eth"$i" metric 10"$i"
+		ip -net "$ns2" route add default via dead:beef:"$i"::1 \
+					dev ns2eth"$i" metric 10"$i"
+
+		# Add tc qdisc to both namespaces for bandwidth limiting
+		tc -n "$ns1" qdisc add dev ns1eth"$i" root netem rate 1000mbit
+		tc -n "$ns2" qdisc add dev ns2eth"$i" root netem rate 1000mbit
+
+		tc -n "$ns1" qdisc show dev ns1eth"$i"
+		tc -n "$ns2" qdisc show dev ns2eth"$i"
+	done
+
+	mptcp_lib_pm_nl_set_limits "${ns1}" 8 8
+
+	mptcp_lib_pm_nl_add_endpoint "$ns1" 10.1.1.1 flags signal
+	mptcp_lib_pm_nl_add_endpoint "$ns1" 10.1.2.1 flags signal
+	mptcp_lib_pm_nl_add_endpoint "$ns1" 10.1.3.1 flags signal
+	mptcp_lib_pm_nl_add_endpoint "$ns1" 10.1.4.1 flags signal
+
+	mptcp_lib_pm_nl_set_limits "${ns2}" 8 8
+
+	mptcp_lib_pm_nl_add_endpoint "$ns2" 10.1.1.2 flags subflow
+	mptcp_lib_pm_nl_add_endpoint "$ns2" 10.1.2.2 flags subflow
+	mptcp_lib_pm_nl_add_endpoint "$ns2" 10.1.3.2 flags subflow
+	mptcp_lib_pm_nl_add_endpoint "$ns2" 10.1.4.2 flags subflow
+
+	ip -n "${ns1}" mptcp monitor &
+	monitor_pid_ns1=$!
+	ip -n "${ns2}" mptcp monitor &
+	monitor_pid_ns2=$!
+}
+
+# This function is invoked indirectly
+#shellcheck disable=SC2317,SC2329
+run_target()
+{
+	cd /sys/kernel/config/nvmet/subsystems || exit
+	mkdir -p "${nqn}"
+	cd "${nqn}" || exit
+	echo 1 > attr_allow_any_host
+	mkdir -p namespaces/"${ns}"
+	echo "${loop_dev}" > namespaces/"${ns}"/device_path
+	echo 1 > namespaces/"${ns}"/enable
+
+	# Create 4 ports, each on a different IP address
+	for i in $(seq 1 "${path}"); do
+		local portdir=$((port + i))
+
+		cd /sys/kernel/config/nvmet/ports || exit
+		mkdir -p "${portdir}"
+		cd "${portdir}" || exit 1
+		echo "${trtype}" > addr_trtype
+		echo ipv4 > addr_adrfam
+		if [ "${path}" -eq 1 ]; then
+			echo "0.0.0.0" > addr_traddr
+		else
+			echo "10.1.${i}.1" > addr_traddr
+		fi
+		echo "${trsvcid}" > addr_trsvcid
+
+		mkdir -p subsystems
+		ln -sf "../../subsystems/${nqn}" "subsystems/${nqn}"
+		cd - >/dev/null
+	done
+}
+
+# This function is invoked indirectly
+#shellcheck disable=SC2317,SC2329
+run_host()
+{
+	local traddr=10.1.1.1
+	local devname
+
+	echo "nvme discover -a ${traddr}"
+	if ! nvme discover -t "${trtype}" -a "${traddr}" -s "${trsvcid}"; then
+		return 1
+	fi
+
+	for i in $(seq 1 "${path}"); do
+		echo "Connecting to 10.1.${i}.1:${trsvcid}"
+
+		if ! nvme connect -t "${trtype}" -a "10.1.${i}.1" \
+				  -s "${trsvcid}" -n "${nqn}"; then
+			echo "Failed to connect to 10.1.${i}.1"
+			return 1
+		fi
+	done
+
+	sleep 1
+
+	# Scan all NVMe block devices
+	for dev in /dev/nvme*n1 /dev/nvme*cn1; do
+		if [ -b "$dev" ] 2>/dev/null; then
+			# Check if this device's controller matches our NQN
+			if nvme id-ctrl "$dev" 2>/dev/null |
+			   grep -q "${nqn}"; then
+				devname=$(basename "$dev")
+				break
+			fi
+		fi
+	done 2>/dev/null || exit
+
+	if [ -z "$devname" ]; then
+		echo "No block device found for NQN ${nqn}" >&2
+		return 1
+	fi
+
+	sleep 1
+
+	echo "nvme list"
+	nvme list
+
+	sleep 1
+
+	echo "fio randread /dev/${devname}"
+	if ! fio --name=global --direct=1 --norandommap --randrepeat=0 \
+		 --ioengine=libaio --thread=1 --blocksize=128k --runtime=10 \
+		 --time_based --rw=randread --numjobs=4 --iodepth=256 \
+		 --group_reporting --size=100% --name=libaio_4_256_4k_randread \
+		 --filename="/dev/${devname}"; then
+		return 1
+	fi
+
+	sleep 1
+
+	echo "fio randwrite /dev/${devname}"
+	if ! fio --name=global --direct=1 --norandommap --randrepeat=0 \
+		 --ioengine=libaio --thread=1 --blocksize=128k --runtime=10 \
+		 --time_based --rw=randwrite --numjobs=4 --iodepth=256 \
+		 --group_reporting --size=100% --name=libaio_4_256_4k_randwrite \
+		 --filename="/dev/${devname}"; then
+		return 1
+	fi
+
+	nvme flush "/dev/${devname}"
+}
+
+init
+trap cleanup EXIT
+
+mptcp_lib_check_tools nvme fio
+validate_params
+
+temp_file=$(mktemp /tmp/nvme_test.XXXXXX.raw)
+if [ $? -ne 0 ]; then
+	echo "Failed to create temp file"
+	exit 1
+fi
+
+dd if=/dev/zero of="${temp_file}" bs=1M count=0 seek=512
+loop_dev=$(losetup -f --show "${temp_file}")
+
+run_test()
+{
+	export trtype path nqn ns port trsvcid
+	export loop_dev temp_file
+
+	if ! ip netns exec "$ns1" unshare -m bash <<- EOF
+		mount -t configfs none /sys/kernel/config
+		$(declare -f run_target)
+		run_target
+		exit \$?
+	EOF
+	then
+		ret="${KSFT_FAIL}"
+	fi
+
+	if ! ip netns exec "$ns2" bash <<- EOF
+		$(declare -f run_host)
+		run_host
+		exit \$?
+	EOF
+	then
+		ret="${KSFT_FAIL}"
+	fi
+
+	sleep 1
+}
+
+run_test "$@"
+
+mptcp_lib_result_print_all_tap
+exit "$ret"
