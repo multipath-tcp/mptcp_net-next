@@ -6,6 +6,8 @@
 ret=0
 trtype="${1:-mptcp}"
 path="${2:-1}"
+iopolicy=${3:-"numa"} # round-robin, queue-depth
+loss=${4:-0}
 nqn="nqn.2014-08.org.nvmexpress.${trtype}dev.$$.${RANDOM}"
 ns=1
 port=$((RANDOM % 10000 + 20000))
@@ -21,10 +23,12 @@ usage()
 
 Usage:
 
-	$(basename "$0") [trtype] [path]
+	$(basename "$0") [trtype] [path] [iopolicy] [loss]
 
 	trtype   Transport type (tcp|mptcp) - default: mptcp
 	path     Number of multipath (1-4) - default: 1
+	iopolicy I/O policy (numa|round-robin|queue-depth) - default: numa
+	loss     Enable packet loss (0|1) - default: 0
 
 EOF
 exit 0
@@ -39,6 +43,16 @@ validate_params()
 
 	if [[ ! "${path}" =~ ^[1-4]$ ]]; then
 		echo "Invalid path count ${path}. Must be between 1 and 4"
+		usage
+	fi
+
+	if [[ ! "${iopolicy}" =~ ^(numa|round-robin|queue-depth)$ ]]; then
+		echo "Invalid iopolicy ${iopolicy}."
+		usage
+	fi
+
+	if [[ ! "${loss}" =~ ^[01]$ ]]; then
+		echo "Invalid loss value ${loss}. Must be 0 or 1"
 		usage
 	fi
 }
@@ -108,11 +122,16 @@ cleanup()
 	wait "$monitor_pid_ns2" 2>/dev/null
 
 	unset -v trtype path nqn ns port trsvcid
+	unset iopolicy loss
 }
 
 init()
 {
 	local tc_args="rate 1000mbit"
+
+	if [ "${loss}" -eq 1 ]; then
+		tc_args+=" delay 5ms loss 0.5%"
+	fi
 
 	mptcp_lib_ns_init ns1 ns2
 
@@ -201,6 +220,43 @@ run_target()
 
 # This function is invoked indirectly
 #shellcheck disable=SC2317,SC2329
+set_io_policy()
+{
+	local nqn="$1"
+	local iopolicy="$2"
+	local subname
+	local policy
+	local current
+
+	subname=$(nvme list-subsys 2>/dev/null | grep "${nqn}" |
+		  grep -o 'nvme-subsys[0-9]*' | head -1)
+	if [ -z "$subname" ]; then
+		return 1
+	fi
+
+	policy="/sys/class/nvme-subsystem/${subname}/iopolicy"
+	if [ ! -w "$policy" ]; then
+		return 1
+	fi
+
+	if ! echo "${iopolicy}" > "$policy" 2>/dev/null; then
+		return 1
+	fi
+
+	current=$(cat "$policy" 2>/dev/null)
+	if [ -z "$current" ]; then
+		return 1
+	fi
+
+	if [[ "$current" != *"${iopolicy}"* ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
+# This function is invoked indirectly
+#shellcheck disable=SC2317,SC2329
 run_host()
 {
 	local traddr=10.1.1.1
@@ -245,6 +301,11 @@ run_host()
 	echo "nvme list"
 	if ! nvme list; then
 		echo "nvme list failed" >&2
+		return 1
+	fi
+
+	if ! set_io_policy "${nqn}" "${iopolicy}"; then
+		echo "Failed to set I/O policy to ${iopolicy}"
 		return 1
 	fi
 
@@ -304,6 +365,7 @@ run_test()
 {
 	export trtype path nqn ns port trsvcid
 	export loop_dev temp_file
+	export iopolicy loss
 
 	if ! ip netns exec "$ns1" unshare -m bash <<- EOF
 		mount -t configfs none /sys/kernel/config
@@ -316,6 +378,7 @@ run_test()
 	fi
 
 	if ! ip netns exec "$ns2" bash <<- EOF
+		$(declare -f set_io_policy)
 		$(declare -f run_host)
 		run_host
 		exit \$?
