@@ -18,6 +18,7 @@
 #include <net/handshake.h>
 #include <linux/inet.h>
 #include <linux/llist.h>
+#include <linux/rcupdate.h>
 #include <trace/events/sock.h>
 
 #include "nvmet.h"
@@ -147,7 +148,7 @@ enum nvmet_tcp_queue_state {
 
 struct nvmet_tcp_queue {
 	struct socket		*sock;
-	struct nvmet_tcp_port	*port;
+	struct nvmet_tcp_port __rcu *port;
 	struct work_struct	io_work;
 	struct nvmet_cq		nvme_cq;
 	struct nvmet_sq		nvme_sq;
@@ -198,12 +199,23 @@ struct nvmet_tcp_queue {
 	void (*write_space)(struct sock *);
 };
 
+struct nvmet_tcp_proto {
+	int			protocol;
+	void (*set_reuseaddr)(struct sock *sk);
+	void (*set_nodelay)(struct sock *sk);
+	void (*set_priority)(struct sock *sk, u32 priority);
+	void (*no_linger)(struct sock *sk);
+	void (*set_tos)(struct sock *sk, int val);
+	const struct nvmet_fabrics_ops *ops;
+};
+
 struct nvmet_tcp_port {
 	struct socket		*sock;
 	struct work_struct	accept_work;
 	struct nvmet_port	*nport;
 	struct sockaddr_storage addr;
 	void (*data_ready)(struct sock *);
+	const struct nvmet_tcp_proto *proto;
 };
 
 static DEFINE_IDA(nvmet_tcp_queue_ida);
@@ -1044,6 +1056,8 @@ static int nvmet_tcp_done_recv_pdu(struct nvmet_tcp_queue *queue)
 {
 	struct nvme_tcp_hdr *hdr = &queue->pdu.cmd.hdr;
 	struct nvme_command *nvme_cmd = &queue->pdu.cmd.cmd;
+	const struct nvmet_tcp_proto *proto;
+	struct nvmet_tcp_port *port;
 	struct nvmet_req *req;
 	int ret;
 
@@ -1081,7 +1095,16 @@ static int nvmet_tcp_done_recv_pdu(struct nvmet_tcp_queue *queue)
 	req = &queue->cmd->req;
 	memcpy(req->cmd, nvme_cmd, sizeof(*nvme_cmd));
 
-	if (unlikely(!nvmet_req_init(req, &queue->nvme_sq, &nvmet_tcp_ops))) {
+	rcu_read_lock();
+	port = rcu_dereference(queue->port);
+	if (!port || !port->proto) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+	proto = port->proto;
+	rcu_read_unlock();
+
+	if (unlikely(!nvmet_req_init(req, &queue->nvme_sq, proto->ops))) {
 		pr_err("failed cmd %p id %d opcode %d, data_len: %d, status: %04x\n",
 			req->cmd, req->cmd->common.command_id,
 			req->cmd->common.opcode,
@@ -1466,9 +1489,17 @@ static int nvmet_tcp_alloc_cmd(struct nvmet_tcp_queue *queue,
 		struct nvmet_tcp_cmd *c)
 {
 	u8 hdgst = nvmet_tcp_hdgst_len(queue);
+	struct nvmet_tcp_port *port;
 
 	c->queue = queue;
-	c->req.port = queue->port->nport;
+	rcu_read_lock();
+	port = rcu_dereference(queue->port);
+	if (!port || !port->nport) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+	c->req.port = port->nport;
+	rcu_read_unlock();
 
 	c->cmd_pdu = page_frag_alloc(&queue->pf_cache,
 			sizeof(*c->cmd_pdu) + hdgst, GFP_KERNEL | __GFP_ZERO);
@@ -1697,6 +1728,8 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 {
 	struct socket *sock = queue->sock;
 	struct inet_sock *inet = inet_sk(sock->sk);
+	const struct nvmet_tcp_proto *proto;
+	struct nvmet_tcp_port *port;
 	int ret;
 
 	ret = kernel_getsockname(sock,
@@ -1709,19 +1742,29 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 	if (ret < 0)
 		return ret;
 
+	rcu_read_lock();
+	port = rcu_dereference(queue->port);
+	if (!port || !port->proto ||
+	    port->proto->protocol != sock->sk->sk_protocol) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+	proto = port->proto;
+	rcu_read_unlock();
+
 	/*
 	 * Cleanup whatever is sitting in the TCP transmit queue on socket
 	 * close. This is done to prevent stale data from being sent should
 	 * the network connection be restored before TCP times out.
 	 */
-	sock_no_linger(sock->sk);
+	proto->no_linger(sock->sk);
 
 	if (so_priority > 0)
-		sock_set_priority(sock->sk, so_priority);
+		proto->set_priority(sock->sk, so_priority);
 
 	/* Set socket type of service */
 	if (inet->rcv_tos > 0)
-		ip_sock_set_tos(sock->sk, inet->rcv_tos);
+		proto->set_tos(sock->sk, inet->rcv_tos);
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
@@ -1752,6 +1795,7 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 static int nvmet_tcp_try_peek_pdu(struct nvmet_tcp_queue *queue)
 {
 	struct nvme_tcp_hdr *hdr = &queue->pdu.cmd.hdr;
+	struct nvmet_tcp_port *port;
 	int len, ret;
 	struct kvec iov = {
 		.iov_base = (u8 *)&queue->pdu + queue->offset,
@@ -1764,8 +1808,18 @@ static int nvmet_tcp_try_peek_pdu(struct nvmet_tcp_queue *queue)
 		.msg_flags = MSG_PEEK,
 	};
 
-	if (nvmet_port_secure_channel_required(queue->port->nport))
+	rcu_read_lock();
+	port = rcu_dereference(queue->port);
+	if (!port || !port->nport) {
+		rcu_read_unlock();
 		return 0;
+	}
+
+	if (nvmet_port_secure_channel_required(port->nport)) {
+		rcu_read_unlock();
+		return 0;
+	}
+	rcu_read_unlock();
 
 	len = kernel_recvmsg(queue->sock, &msg, &iov, 1,
 			iov.iov_len, msg.msg_flags);
@@ -1876,11 +1930,22 @@ static int nvmet_tcp_tls_handshake(struct nvmet_tcp_queue *queue)
 {
 	int ret = -EOPNOTSUPP;
 	struct tls_handshake_args args;
+	struct nvmet_tcp_port *port;
+	key_serial_t keyring;
 
 	if (queue->state != NVMET_TCP_Q_TLS_HANDSHAKE) {
 		pr_warn("cannot start TLS in state %d\n", queue->state);
 		return -EINVAL;
 	}
+
+	rcu_read_lock();
+	port = rcu_dereference(queue->port);
+	if (!port || !port->nport || !port->nport->keyring) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+	keyring = key_serial(port->nport->keyring);
+	rcu_read_unlock();
 
 	kref_get(&queue->kref);
 	pr_debug("queue %d: TLS ServerHello\n", queue->idx);
@@ -1888,7 +1953,7 @@ static int nvmet_tcp_tls_handshake(struct nvmet_tcp_queue *queue)
 	args.ta_sock = queue->sock;
 	args.ta_done = nvmet_tcp_tls_handshake_done;
 	args.ta_data = queue;
-	args.ta_keyring = key_serial(queue->port->nport->keyring);
+	args.ta_keyring = keyring;
 	args.ta_timeout_ms = tls_handshake_timeout * 1000;
 
 	ret = tls_server_hello_psk(&args, GFP_KERNEL);
@@ -2042,6 +2107,16 @@ static void nvmet_tcp_listen_data_ready(struct sock *sk)
 	read_unlock_bh(&sk->sk_callback_lock);
 }
 
+static const struct nvmet_tcp_proto nvmet_tcp_proto = {
+	.protocol	= IPPROTO_TCP,
+	.set_reuseaddr	= sock_set_reuseaddr,
+	.set_nodelay	= tcp_sock_set_nodelay,
+	.set_priority	= sock_set_priority,
+	.no_linger	= sock_no_linger,
+	.set_tos	= ip_sock_set_tos,
+	.ops		= &nvmet_tcp_ops,
+};
+
 static int nvmet_tcp_add_port(struct nvmet_port *nport)
 {
 	struct nvmet_tcp_port *port;
@@ -2066,6 +2141,13 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 		goto err_port;
 	}
 
+	if (nport->disc_addr.trtype == NVMF_TRTYPE_TCP) {
+		port->proto = &nvmet_tcp_proto;
+	} else {
+		ret = -EINVAL;
+		goto err_port;
+	}
+
 	ret = inet_pton_with_scope(&init_net, af, nport->disc_addr.traddr,
 			nport->disc_addr.trsvcid, &port->addr);
 	if (ret) {
@@ -2080,7 +2162,7 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 		port->nport->inline_data_size = NVMET_TCP_DEF_INLINE_DATA_SIZE;
 
 	ret = sock_create(port->addr.ss_family, SOCK_STREAM,
-				IPPROTO_TCP, &port->sock);
+				port->proto->protocol, &port->sock);
 	if (ret) {
 		pr_err("failed to create a socket\n");
 		goto err_port;
@@ -2089,10 +2171,10 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port->sock->sk->sk_user_data = port;
 	port->data_ready = port->sock->sk->sk_data_ready;
 	port->sock->sk->sk_data_ready = nvmet_tcp_listen_data_ready;
-	sock_set_reuseaddr(port->sock->sk);
-	tcp_sock_set_nodelay(port->sock->sk);
+	port->proto->set_reuseaddr(port->sock->sk);
+	port->proto->set_nodelay(port->sock->sk);
 	if (so_priority > 0)
-		sock_set_priority(port->sock->sk, so_priority);
+		port->proto->set_priority(port->sock->sk, so_priority);
 
 	ret = kernel_bind(port->sock, (struct sockaddr_unsized *)&port->addr,
 			sizeof(port->addr));
@@ -2125,10 +2207,14 @@ static void nvmet_tcp_destroy_port_queues(struct nvmet_tcp_port *port)
 	struct nvmet_tcp_queue *queue;
 
 	mutex_lock(&nvmet_tcp_queue_mutex);
-	list_for_each_entry(queue, &nvmet_tcp_queue_list, queue_list)
-		if (queue->port == port)
+	list_for_each_entry(queue, &nvmet_tcp_queue_list, queue_list) {
+		if (rcu_access_pointer(queue->port) == port) {
+			rcu_assign_pointer(queue->port, NULL);
 			kernel_sock_shutdown(queue->sock, SHUT_RDWR);
+		}
+	}
 	mutex_unlock(&nvmet_tcp_queue_mutex);
+	synchronize_rcu();
 }
 
 static void nvmet_tcp_remove_port(struct nvmet_port *nport)
