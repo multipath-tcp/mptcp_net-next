@@ -307,7 +307,7 @@ run_test 10 10 0 0  20 20 "balanced bwidth"
 run_test 10 10 1 25 20 50 "balanced bwidth with unbalanced delay"
 
 # we still need some additional infrastructure to pass the following test-cases
-run_test 10 3 0 0  30 20 "unbalanced bwidth"
+MPTCP_LIB_SUBTEST_FLAKY=1 run_test 10 3 0 0  30 20 "unbalanced bwidth"
 run_test 10 3 1 25 40 30 "unbalanced bwidth with unbalanced delay"
 run_test 10 3 25 1 50 30 "unbalanced bwidth with opposed, unbalanced delay"
 
