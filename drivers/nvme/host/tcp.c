@@ -3152,7 +3152,8 @@ static int __init nvme_tcp_init_module(void)
 
 static void __exit nvme_tcp_cleanup_module(void)
 {
-	struct nvme_tcp_ctrl *ctrl;
+	struct nvme_tcp_ctrl *ctrl, *tmp;
+	LIST_HEAD(ctrl_list);
 
 #ifdef CONFIG_MPTCP
 	nvmf_unregister_transport(&nvme_mptcp_transport);
@@ -3160,10 +3161,16 @@ static void __exit nvme_tcp_cleanup_module(void)
 	nvmf_unregister_transport(&nvme_tcp_transport);
 
 	mutex_lock(&nvme_tcp_ctrl_mutex);
-	list_for_each_entry(ctrl, &nvme_tcp_ctrl_list, list)
-		nvme_delete_ctrl(&ctrl->ctrl);
+	list_for_each_entry_safe(ctrl, tmp, &nvme_tcp_ctrl_list, list) {
+		nvme_get_ctrl(&ctrl->ctrl);
+		list_move(&ctrl->list, &ctrl_list);
+	}
 	mutex_unlock(&nvme_tcp_ctrl_mutex);
-	flush_workqueue(nvme_delete_wq);
+
+	list_for_each_entry_safe(ctrl, tmp, &ctrl_list, list) {
+		nvme_delete_ctrl_sync(&ctrl->ctrl);
+		nvme_put_ctrl(&ctrl->ctrl);
+	}
 
 	destroy_workqueue(nvme_tcp_wq);
 }
