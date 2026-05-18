@@ -2541,6 +2541,22 @@ static void __mptcp_subflow_disconnect(struct sock *ssk,
 	}
 }
 
+static void mptcp_cleanup_ssk_backlog(struct sock *sk, struct sock *ssk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sk_buff *skb;
+
+	mptcp_data_lock(sk);
+	list_for_each_entry(skb, &msk->backlog_list, list) {
+		if (skb->sk != ssk)
+			continue;
+
+		atomic_sub(skb->truesize, &skb->sk->sk_rmem_alloc);
+		skb->sk = NULL;
+	}
+	mptcp_data_unlock(sk);
+}
+
 /* subflow sockets can be either outgoing (connect) or incoming
  * (accept).
  *
@@ -2554,6 +2570,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 			      unsigned int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sk_buff *skb;
 	bool dispose_it, need_push = false;
 	int fwd_remaining;
 
@@ -2563,6 +2580,22 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	 */
 	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 	subflow->closing = 1;
+
+	/* Remove any reference from the backlog to this ssk; backlog skbs
+	 * consume space in the msk receive queue, no need to touch
+	 * sk->sk_rmem_alloc. Serialize with mptcp_data_ready() under
+	 * mptcp_data_lock() while the ssk lock is still held, so the
+	 * cleanup is exhaustive: no new skb can be enqueued after this point.
+	 */
+	mptcp_data_lock(sk);
+	list_for_each_entry(skb, &msk->backlog_list, list) {
+		if (skb->sk != ssk)
+			continue;
+
+		atomic_sub(skb->truesize, &skb->sk->sk_rmem_alloc);
+		skb->sk = NULL;
+	}
+	mptcp_data_unlock(sk);
 
 	/* Borrow the fwd allocated page left-over; fwd memory for the subflow
 	 * could be negative at this point, but will be reach zero soon - when
@@ -2601,6 +2634,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		__mptcp_subflow_disconnect(ssk, subflow, msk->fastclosing);
 		release_sock(ssk);
 
+		mptcp_cleanup_ssk_backlog(sk, ssk);
 		goto out;
 	}
 
@@ -2655,9 +2689,6 @@ out:
 void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		     struct mptcp_subflow_context *subflow)
 {
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct sk_buff *skb;
-
 	/* The first subflow can already be closed or disconnected */
 	if (subflow->close_event_done || READ_ONCE(subflow->local_id) < 0)
 		return;
@@ -2666,17 +2697,6 @@ void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 
 	if (sk->sk_state == TCP_ESTABLISHED)
 		mptcp_event(MPTCP_EVENT_SUB_CLOSED, mptcp_sk(sk), ssk, GFP_KERNEL);
-
-	/* Remove any reference from the backlog to this ssk; backlog skbs consume
-	 * space in the msk receive queue, no need to touch sk->sk_rmem_alloc
-	 */
-	list_for_each_entry(skb, &msk->backlog_list, list) {
-		if (skb->sk != ssk)
-			continue;
-
-		atomic_sub(skb->truesize, &skb->sk->sk_rmem_alloc);
-		skb->sk = NULL;
-	}
 
 	/* subflow aborted before reaching the fully_established status
 	 * attempt the creation of the next subflow
