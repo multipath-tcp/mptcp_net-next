@@ -1851,10 +1851,9 @@ static inline struct sock *sk_clone_lock(const struct sock *sk, const gfp_t prio
 struct sk_buff *sock_wmalloc(struct sock *sk, unsigned long size, int force,
 			     gfp_t priority);
 void sock_wfree(struct sk_buff *skb);
-#ifdef CONFIG_INET
 void __sock_wfree(struct sk_buff *skb);
 void tcp_wfree(struct sk_buff *skb);
-#endif
+
 static inline bool is_skb_wmem(const struct sk_buff *skb)
 {
 	return skb->destructor == sock_wfree ||
