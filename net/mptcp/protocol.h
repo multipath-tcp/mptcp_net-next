@@ -223,6 +223,13 @@ struct mptcp_pm_data {
 
 	spinlock_t	lock;		/*protects the whole PM data */
 
+	/* set by mptcp_pm_destroy() before its pm.lock-held splice;
+	 * checked under pm.lock by alloc paths to refuse adds that would
+	 * be orphaned by destroy's splice.  Cleared in mptcp_pm_data_init()
+	 * so the field is correct after slab reuse.
+	 */
+	bool		destroying;
+
 	struct_group(reset,
 
 	u8		addr_signal;

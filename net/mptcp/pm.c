@@ -440,6 +440,9 @@ bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
 
 	lockdep_assert_held(&msk->pm.lock);
 
+	if (READ_ONCE(msk->pm.destroying))
+		return false;
+
 	add_entry = mptcp_lookup_anno_list_by_saddr(msk, addr);
 
 	if (add_entry) {
@@ -1133,6 +1136,8 @@ static void mptcp_pm_ops_release(struct mptcp_sock *msk)
 
 void mptcp_pm_destroy(struct mptcp_sock *msk)
 {
+	WRITE_ONCE(msk->pm.destroying, true);
+
 	mptcp_pm_free_anno_list(msk);
 	mptcp_pm_ops_release(msk);
 }
@@ -1159,6 +1164,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 	spin_lock_init(&msk->pm.lock);
 	INIT_LIST_HEAD(&msk->pm.anno_list);
 	INIT_LIST_HEAD(&msk->pm.userspace_pm_local_addr_list);
+	msk->pm.destroying = false;
 	mptcp_pm_data_reset(msk);
 }
 
