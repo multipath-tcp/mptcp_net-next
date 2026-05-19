@@ -38,6 +38,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/vmalloc.h>
 #include <linux/nodemask.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 #include <linux/mlx5/driver.h>
 
 #include "mlx5_core.h"
@@ -72,6 +74,13 @@ struct mlx5_dma_pool_page {
 
 struct mlx5_frag_buf_node_pools {
 	struct mlx5_dma_pool *pools[MLX5_FRAG_BUF_POOLS_NUM];
+};
+
+struct mlx5_dma_pool_stats {
+	int node;
+	size_t block_size;
+	size_t used_blocks;
+	size_t allocated_blocks;
 };
 
 /* Handling for queue buffers -- we allocate a bunch of memory and
@@ -225,6 +234,43 @@ static void mlx5_dma_pool_free(struct mlx5_dma_pool *pool,
 	mutex_unlock(&pool->lock);
 }
 
+static void mlx5_dma_pool_debugfs_get_stats(struct mlx5_dma_pool *pool,
+					    struct mlx5_dma_pool_stats *stats)
+{
+	int blocks_per_page = BIT(PAGE_SHIFT - pool->block_shift);
+	struct mlx5_dma_pool_page *page;
+	size_t free_blocks = 0;
+	size_t pages = 0;
+
+	mutex_lock(&pool->lock);
+	list_for_each_entry(page, &pool->page_list, pool_link) {
+		pages++;
+		free_blocks += bitmap_weight(page->bitmap, blocks_per_page);
+	}
+	mutex_unlock(&pool->lock);
+
+	stats->node = pool->node;
+	stats->block_size = BIT(pool->block_shift);
+	stats->allocated_blocks = pages * blocks_per_page;
+	stats->used_blocks = stats->allocated_blocks - free_blocks;
+}
+
+static void mlx5_dma_pool_debugfs_stats_print(struct seq_file *file,
+					      struct mlx5_dma_pool *pool)
+{
+	struct mlx5_dma_pool_stats stats = {};
+
+	mlx5_dma_pool_debugfs_get_stats(pool, &stats);
+	seq_printf(file, "%4d       %5zu      %7zu           %7zu\n",
+		   stats.node, stats.block_size, stats.used_blocks,
+		   stats.allocated_blocks);
+}
+
+static void mlx5_dma_pools_debugfs_print_header(struct seq_file *file)
+{
+	seq_puts(file, "node  block_size  used_blocks  allocated_blocks\n");
+}
+
 static void
 mlx5_frag_buf_node_pools_destroy(struct mlx5_frag_buf_node_pools *node_pools)
 {
@@ -257,10 +303,45 @@ mlx5_frag_buf_node_pools_create(struct mlx5_core_dev *dev, int node)
 	return node_pools;
 }
 
+static int
+mlx5_frag_buf_dma_pools_debugfs_show(struct seq_file *file, void *priv)
+{
+	struct mlx5_core_dev *dev = file->private;
+	int node;
+
+	mlx5_dma_pools_debugfs_print_header(file);
+
+	if (!dev->priv.frag_buf_node_pools)
+		return 0;
+
+	for_each_node_state(node, N_POSSIBLE) {
+		struct mlx5_frag_buf_node_pools *node_pools;
+
+		node_pools = dev->priv.frag_buf_node_pools[node];
+		if (!node_pools)
+			continue;
+
+		for (int i = 0; i < MLX5_FRAG_BUF_POOLS_NUM; i++) {
+			struct mlx5_dma_pool *pool = node_pools->pools[i];
+
+			if (!pool)
+				continue;
+
+			mlx5_dma_pool_debugfs_stats_print(file, pool);
+		}
+	}
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(mlx5_frag_buf_dma_pools_debugfs);
+
 void mlx5_frag_buf_pools_cleanup(struct mlx5_core_dev *dev)
 {
 	struct mlx5_priv *priv = &dev->priv;
 	int node;
+
+	debugfs_remove(priv->dbg.frag_buf_dma_pools_debugfs);
+	priv->dbg.frag_buf_dma_pools_debugfs = NULL;
 
 	for_each_node_state(node, N_POSSIBLE) {
 		struct mlx5_frag_buf_node_pools *node_pools;
@@ -296,6 +377,11 @@ int mlx5_frag_buf_pools_init(struct mlx5_core_dev *dev)
 		priv->frag_buf_node_pools[node] = node_pools;
 	}
 
+	priv->dbg.frag_buf_dma_pools_debugfs =
+		debugfs_create_file("frag_buf_dma_pools", 0444,
+				    priv->dbg.dbg_root, dev,
+				    &mlx5_frag_buf_dma_pools_debugfs_fops);
+
 	return 0;
 }
 
@@ -305,7 +391,7 @@ int mlx5_frag_buf_alloc_node(struct mlx5_core_dev *dev, int size,
 	struct mlx5_dma_pool *pool;
 	int pool_idx;
 
-	node = node == NUMA_NO_NODE ? first_online_node : node;
+	node = node == NUMA_NO_NODE ? numa_mem_id() : node;
 
 	buf->size = size;
 	buf->npages = DIV_ROUND_UP(size, PAGE_SIZE);
