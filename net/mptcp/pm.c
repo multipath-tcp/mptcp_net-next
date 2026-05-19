@@ -151,7 +151,7 @@ mptcp_pm_announced_lookup(const struct mptcp_sock *msk,
 
 static struct mptcp_pm_add_addr *
 mptcp_pm_announced_del_timer(struct mptcp_sock *msk,
-			     const struct mptcp_addr_info *addr, bool check_id)
+			     const struct mptcp_addr_info *addr, bool del_list)
 {
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_add_addr *entry;
@@ -161,23 +161,23 @@ mptcp_pm_announced_del_timer(struct mptcp_sock *msk,
 
 	spin_lock_bh(&msk->pm.lock);
 	entry = mptcp_pm_announced_lookup(msk, addr);
-	if (entry && (!check_id || entry->addr.id == addr->id)) {
+	if (entry && entry->addr.id == addr->id) {
 		entry->retrans_times = ADD_ADDR_RETRANS_MAX;
 		timer = &entry->timer;
 	}
-	if (!check_id && entry)
+	if (del_list && entry)
 		list_del(&entry->list);
 	spin_unlock_bh(&msk->pm.lock);
 
 	/* Note: entry might have been removed by another thread.
 	 * We hold rcu_read_lock() to ensure it is not freed under us.
 	 */
-	if (timer && check_id)
+	if (timer && !del_list)
 		sk_stop_timer(sk, timer);
 
 	rcu_read_unlock();
 
-	if (timer && !check_id)
+	if (timer && del_list)
 		sk_stop_timer_sync(sk, timer);
 
 	return entry;
@@ -189,7 +189,7 @@ bool mptcp_pm_announced_remove(struct mptcp_sock *msk,
 	struct mptcp_pm_add_addr *entry;
 	bool ret;
 
-	entry = mptcp_pm_announced_del_timer(msk, addr, false);
+	entry = mptcp_pm_announced_del_timer(msk, addr, true);
 	ret = entry;
 	kfree_rcu(entry, rcu);
 
@@ -734,7 +734,7 @@ void mptcp_pm_add_addr_echoed(struct mptcp_sock *msk,
 
 	pr_debug("msk=%p\n", msk);
 
-	entry = mptcp_pm_announced_del_timer(msk, addr, true);
+	entry = mptcp_pm_announced_del_timer(msk, addr, false);
 
 	if (!entry || !READ_ONCE(pm->work_pending))
 		return;
@@ -986,7 +986,7 @@ out_unlock:
 	 * let the PM state machine progress.
 	 */
 	if (skip_add_addr) {
-		mptcp_pm_announced_del_timer(msk, addr, true);
+		mptcp_pm_announced_del_timer(msk, addr, false);
 		mptcp_pm_subflow_established(msk);
 	}
 	return ret;
