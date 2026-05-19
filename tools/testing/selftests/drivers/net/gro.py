@@ -323,6 +323,12 @@ def _gro_variants():
         "ip_frag6", "ip_v6ext_same", "ip_v6ext_diff",
     ]
 
+    # Tests specific to PPPoE
+    pppoe_tests = [
+        "data_same", "data_lrg_sml", "data_sml_lrg", "data_lrg_1byte",
+        "data_burst", "pppoe_sid",
+    ]
+
     for mode in ["sw", "hw", "lro"]:
         for protocol in ["ipv4", "ipv6", "ipip", "ip6ip6"]:
             for test_name in common_tests:
@@ -334,6 +340,11 @@ def _gro_variants():
             elif protocol == "ipv6":
                 for test_name in ipv6_tests:
                     yield mode, protocol, test_name
+
+    for mode in ["sw"]:
+        for protocol in ["pppoev4", "pppoev6"]:
+            for test_name in pppoe_tests:
+                yield mode, protocol, test_name
 
 
 @ksft_variants(_gro_variants())
