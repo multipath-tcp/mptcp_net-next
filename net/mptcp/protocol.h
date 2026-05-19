@@ -303,6 +303,9 @@ struct mptcp_sock {
 	u64		bytes_acked;
 	u64		snd_una;
 	u64		wnd_end;
+	u64		pruned_seq;		/* If strictly above ack_seq,
+						 * the highest seq pruned.
+						 */
 	u32		last_data_sent;
 	u32		last_data_recv;
 	u32		last_ack_recv;
@@ -836,6 +839,12 @@ void mptcp_cancel_work(struct sock *sk);
 void __mptcp_unaccepted_force_close(struct sock *sk);
 void mptcp_set_state(struct sock *sk, int state);
 void mptcp_prune_ofo_queue(struct sock *sk, bool use_bl, u64 seq);
+
+static inline void mptcp_pruned(struct mptcp_sock *msk, u64 seq)
+{
+	if (after64(seq, msk->pruned_seq))
+		WRITE_ONCE(msk->pruned_seq, seq);
+}
 
 bool mptcp_addresses_equal(const struct mptcp_addr_info *a,
 			   const struct mptcp_addr_info *b, bool use_port);

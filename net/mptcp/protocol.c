@@ -396,6 +396,7 @@ void mptcp_prune_ofo_queue(struct sock *sk, bool use_bl, u64 seq)
 		pruned = true;
 		prev = rb_prev(node);
 		rb_erase(node, &msk->out_of_order_queue);
+		mptcp_pruned(msk, MPTCP_SKB_CB(skb)->end_seq);
 		mptcp_drop(sk, skb);
 		msk->ooo_last_skb = rb_to_skb(prev);
 
@@ -429,6 +430,8 @@ static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
 	    !__mptcp_check_fallback(msk)) {
 		mptcp_prune_ofo_queue(sk, false, MPTCP_SKB_CB(skb)->map_seq);
 		if (sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf)) {
+			mptcp_pruned(msk, MPTCP_SKB_CB(skb)->end_seq);
+
 			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
 			mptcp_drop(sk, skb);
 			return false;
@@ -742,6 +745,7 @@ static void __mptcp_add_backlog(struct sock *sk,
 	limit += (limit >> 1) + 64 * 1024;
 	limit = min_t(u64, limit, UINT_MAX);
 	if (msk->backlog_len > limit && !__mptcp_check_fallback(msk)) {
+		mptcp_pruned(msk, MPTCP_SKB_CB(skb)->end_seq);
 		kfree_skb_reason(skb, SKB_DROP_REASON_SOCKET_RCVBUFF);
 		return;
 	}
@@ -890,6 +894,8 @@ static bool __mptcp_ofo_queue(struct mptcp_sock *msk)
 		WRITE_ONCE(msk->ack_seq, end_seq);
 		moved = true;
 	}
+
+	mptcp_pruned(msk, msk->ack_seq);
 	return moved;
 }
 
@@ -3539,6 +3545,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	/* for fallback's sake */
 	WRITE_ONCE(msk->ack_seq, 0);
 	atomic64_set(&msk->rcv_wnd_sent, 0);
+	WRITE_ONCE(msk->pruned_seq, 0);
 
 	WRITE_ONCE(sk->sk_shutdown, 0);
 	sk_error_report(sk);

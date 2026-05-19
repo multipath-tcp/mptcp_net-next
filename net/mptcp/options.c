@@ -1193,6 +1193,13 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 		limit = ((u64)READ_ONCE(sk->sk_rcvbuf)) << 1;
 	}
 	ret = mptcp_mem(sk) > limit;
+
+	/* After pruning any packets ensure that MPTCP-driven drops do not
+	 * cause TCP-level retransmission.
+	 */
+	if (before64(READ_ONCE(msk->ack_seq), READ_ONCE(msk->pruned_seq)))
+		ret = false;
+
 	mptcp_data_unlock(sk);
 
 	if (ret) {
