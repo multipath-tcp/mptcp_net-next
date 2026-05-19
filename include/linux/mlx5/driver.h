@@ -547,6 +547,7 @@ struct mlx5_debugfs_entries {
 	struct dentry *eq_debugfs;
 	struct dentry *cq_debugfs;
 	struct dentry *cmdif_debugfs;
+	struct dentry *frag_buf_dma_pools_debugfs;
 	struct dentry *pages_debugfs;
 	struct dentry *lag_debugfs;
 };
