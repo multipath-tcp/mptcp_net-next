@@ -413,6 +413,14 @@ static inline void msk_owned_by_me(const struct mptcp_sock *msk)
 #define mptcp_sk(ptr) container_of_const(ptr, struct mptcp_sock, sk.icsk_inet.sk)
 #endif
 
+/* Be careful vs sign extension. */
+static inline u64 mptcp_mem(const struct sock *sk)
+{
+	u64 mem = (unsigned int)sk_rmem_alloc_get(sk);
+
+	return mem + (unsigned int)READ_ONCE(mptcp_sk(sk)->backlog_len);
+}
+
 static inline int mptcp_win_from_space(const struct sock *sk, int space)
 {
 	return __tcp_win_from_space(mptcp_sk(sk)->scaling_ratio, space);
