@@ -1293,8 +1293,6 @@ static void htb_offload_aggregate_stats(struct htb_sched *q,
 	struct htb_class *c;
 	unsigned int i;
 
-	gnet_stats_basic_sync_init(&cl->bstats);
-
 	for (i = 0; i < q->clhash.hashsize; i++) {
 		hlist_for_each_entry(c, &q->clhash.hash[i], common.hnode) {
 			struct htb_class *p = c;
@@ -1313,7 +1311,7 @@ static void htb_offload_aggregate_stats(struct htb_sched *q,
 			}
 		}
 	}
-	_bstats_update(&cl->bstats, bytes, packets);
+	_bstats_set(&cl->bstats, bytes, packets);
 }
 
 static int
@@ -1340,17 +1338,21 @@ htb_dump_class_stats(struct Qdisc *sch, unsigned long arg, struct gnet_dump *d)
 				 INT_MIN, INT_MAX);
 
 	if (q->offload) {
+		spin_lock_bh(qdisc_lock(sch));
 		if (!cl->level) {
-			if (cl->leaf.q)
-				cl->bstats = cl->leaf.q->bstats;
-			else
-				gnet_stats_basic_sync_init(&cl->bstats);
-			_bstats_update(&cl->bstats,
-				       u64_stats_read(&cl->bstats_bias.bytes),
-				       u64_stats_read(&cl->bstats_bias.packets));
+			u64 bytes = 0, packets = 0;
+
+			if (cl->leaf.q) {
+				bytes = u64_stats_read(&cl->leaf.q->bstats.bytes);
+				packets = u64_stats_read(&cl->leaf.q->bstats.packets);
+			}
+			bytes += u64_stats_read(&cl->bstats_bias.bytes);
+			packets += u64_stats_read(&cl->bstats_bias.packets);
+			_bstats_set(&cl->bstats, bytes, packets);
 		} else {
 			htb_offload_aggregate_stats(q, cl);
 		}
+		spin_unlock_bh(qdisc_lock(sch));
 	}
 
 	if (gnet_stats_copy_basic(d, NULL, &cl->bstats, true) < 0 ||
