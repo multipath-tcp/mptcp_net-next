@@ -198,12 +198,24 @@ struct nvmet_tcp_queue {
 	void (*write_space)(struct sock *);
 };
 
+struct nvmet_tcp_proto {
+	int			protocol;
+	void (*set_reuseaddr)(struct sock *sk);
+	void (*set_nodelay)(struct sock *sk);
+	void (*set_priority)(struct sock *sk, u32 priority);
+	void (*no_linger)(struct sock *sk);
+	void (*set_tos)(struct sock *sk);
+	const struct nvmet_fabrics_ops *ops;
+};
+
 struct nvmet_tcp_port {
 	struct socket		*sock;
 	struct work_struct	accept_work;
 	struct nvmet_port	*nport;
+	struct kref		kref;
 	struct sockaddr_storage addr;
 	void (*data_ready)(struct sock *);
+	const struct nvmet_tcp_proto *proto;
 };
 
 static DEFINE_IDA(nvmet_tcp_queue_ida);
@@ -1081,7 +1093,8 @@ static int nvmet_tcp_done_recv_pdu(struct nvmet_tcp_queue *queue)
 	req = &queue->cmd->req;
 	memcpy(req->cmd, nvme_cmd, sizeof(*nvme_cmd));
 
-	if (unlikely(!nvmet_req_init(req, &queue->nvme_sq, &nvmet_tcp_ops))) {
+	if (unlikely(!nvmet_req_init(req, &queue->nvme_sq,
+				     queue->port->proto->ops))) {
 		pr_err("failed cmd %p id %d opcode %d, data_len: %d, status: %04x\n",
 			req->cmd, req->cmd->common.command_id,
 			req->cmd->common.opcode,
@@ -1597,6 +1610,21 @@ static void nvmet_tcp_free_cmd_data_in_buffers(struct nvmet_tcp_queue *queue)
 	nvmet_tcp_free_cmd_buffers(&queue->connect);
 }
 
+static void nvmet_tcp_port_release(struct kref *kref)
+{
+	struct nvmet_tcp_port *port = container_of(kref,
+						   struct nvmet_tcp_port,
+						   kref);
+
+	kfree(port);
+}
+
+static void nvmet_tcp_port_put(struct nvmet_tcp_port *port)
+{
+	if (port)
+		kref_put(&port->kref, nvmet_tcp_port_release);
+}
+
 static void nvmet_tcp_release_queue_work(struct work_struct *w)
 {
 	struct nvmet_tcp_queue *queue =
@@ -1623,6 +1651,8 @@ static void nvmet_tcp_release_queue_work(struct work_struct *w)
 	nvmet_tcp_free_cmds(queue);
 	ida_free(&nvmet_tcp_queue_ida, queue->idx);
 	page_frag_cache_drain(&queue->pf_cache);
+	nvmet_tcp_port_put(queue->port);
+	queue->port = NULL;
 	kfree(queue);
 }
 
@@ -1696,7 +1726,6 @@ done:
 static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 {
 	struct socket *sock = queue->sock;
-	struct inet_sock *inet = inet_sk(sock->sk);
 	int ret;
 
 	ret = kernel_getsockname(sock,
@@ -1714,14 +1743,13 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 	 * close. This is done to prevent stale data from being sent should
 	 * the network connection be restored before TCP times out.
 	 */
-	sock_no_linger(sock->sk);
+	queue->port->proto->no_linger(sock->sk);
 
 	if (so_priority > 0)
-		sock_set_priority(sock->sk, so_priority);
+		queue->port->proto->set_priority(sock->sk, so_priority);
 
 	/* Set socket type of service */
-	if (inet->rcv_tos > 0)
-		ip_sock_set_tos(sock->sk, inet->rcv_tos);
+	queue->port->proto->set_tos(sock->sk);
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
@@ -1904,12 +1932,24 @@ static int nvmet_tcp_tls_handshake(struct nvmet_tcp_queue *queue)
 static void nvmet_tcp_tls_handshake_timeout(struct work_struct *w) {}
 #endif
 
+static struct nvmet_tcp_port *nvmet_tcp_port_get(struct nvmet_tcp_port *port)
+{
+	if (port)
+		kref_get(&port->kref);
+	return port;
+}
+
 static void nvmet_tcp_alloc_queue(struct nvmet_tcp_port *port,
 		struct socket *newsock)
 {
 	struct nvmet_tcp_queue *queue;
 	struct file *sock_file = NULL;
 	int ret;
+
+	if (port->proto->protocol != newsock->sk->sk_protocol) {
+		ret = -EINVAL;
+		goto out_release;
+	}
 
 	queue = kzalloc_obj(*queue);
 	if (!queue) {
@@ -1921,7 +1961,11 @@ static void nvmet_tcp_alloc_queue(struct nvmet_tcp_port *port,
 	INIT_WORK(&queue->io_work, nvmet_tcp_io_work);
 	kref_init(&queue->kref);
 	queue->sock = newsock;
-	queue->port = port;
+	queue->port = nvmet_tcp_port_get(port);
+	if (!queue->port) {
+		ret = -EINVAL;
+		goto out_free_queue;
+	}
 	queue->nr_cmds = 0;
 	spin_lock_init(&queue->state_lock);
 	if (queue->port->nport->disc_addr.tsas.tcp.sectype ==
@@ -1936,7 +1980,7 @@ static void nvmet_tcp_alloc_queue(struct nvmet_tcp_port *port,
 	sock_file = sock_alloc_file(queue->sock, O_CLOEXEC, NULL);
 	if (IS_ERR(sock_file)) {
 		ret = PTR_ERR(sock_file);
-		goto out_free_queue;
+		goto out_put_port;
 	}
 
 	queue->idx = ida_alloc(&nvmet_tcp_queue_ida, GFP_KERNEL);
@@ -1999,6 +2043,8 @@ out_ida_remove:
 	ida_free(&nvmet_tcp_queue_ida, queue->idx);
 out_sock:
 	fput(queue->sock->file);
+out_put_port:
+	nvmet_tcp_port_put(queue->port);
 out_free_queue:
 	kfree(queue);
 out_release:
@@ -2041,6 +2087,24 @@ static void nvmet_tcp_listen_data_ready(struct sock *sk)
 	read_unlock_bh(&sk->sk_callback_lock);
 }
 
+static void tcp_sock_set_tos(struct sock *sk)
+{
+	struct inet_sock *inet = inet_sk(sk);
+
+	if (inet->rcv_tos > 0)
+		ip_sock_set_tos(sk, inet->rcv_tos);
+}
+
+static const struct nvmet_tcp_proto nvmet_tcp_proto = {
+	.protocol	= IPPROTO_TCP,
+	.set_reuseaddr	= sock_set_reuseaddr,
+	.set_nodelay	= tcp_sock_set_nodelay,
+	.set_priority	= sock_set_priority,
+	.no_linger	= sock_no_linger,
+	.set_tos	= tcp_sock_set_tos,
+	.ops		= &nvmet_tcp_ops,
+};
+
 static int nvmet_tcp_add_port(struct nvmet_port *nport)
 {
 	struct nvmet_tcp_port *port;
@@ -2050,6 +2114,8 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port = kzalloc_obj(*port);
 	if (!port)
 		return -ENOMEM;
+
+	kref_init(&port->kref);
 
 	switch (nport->disc_addr.adrfam) {
 	case NVMF_ADDR_FAMILY_IP4:
@@ -2061,6 +2127,13 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	default:
 		pr_err("address family %d not supported\n",
 				nport->disc_addr.adrfam);
+		ret = -EINVAL;
+		goto err_port;
+	}
+
+	if (nport->disc_addr.trtype == NVMF_TRTYPE_TCP) {
+		port->proto = &nvmet_tcp_proto;
+	} else {
 		ret = -EINVAL;
 		goto err_port;
 	}
@@ -2079,7 +2152,7 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 		port->nport->inline_data_size = NVMET_TCP_DEF_INLINE_DATA_SIZE;
 
 	ret = sock_create(port->addr.ss_family, SOCK_STREAM,
-				IPPROTO_TCP, &port->sock);
+				port->proto->protocol, &port->sock);
 	if (ret) {
 		pr_err("failed to create a socket\n");
 		goto err_port;
@@ -2088,10 +2161,10 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port->sock->sk->sk_user_data = port;
 	port->data_ready = port->sock->sk->sk_data_ready;
 	port->sock->sk->sk_data_ready = nvmet_tcp_listen_data_ready;
-	sock_set_reuseaddr(port->sock->sk);
-	tcp_sock_set_nodelay(port->sock->sk);
+	port->proto->set_reuseaddr(port->sock->sk);
+	port->proto->set_nodelay(port->sock->sk);
 	if (so_priority > 0)
-		sock_set_priority(port->sock->sk, so_priority);
+		port->proto->set_priority(port->sock->sk, so_priority);
 
 	ret = kernel_bind(port->sock, (struct sockaddr_unsized *)&port->addr,
 			sizeof(port->addr));
@@ -2146,7 +2219,7 @@ static void nvmet_tcp_remove_port(struct nvmet_port *nport)
 	nvmet_tcp_destroy_port_queues(port);
 
 	sock_release(port->sock);
-	kfree(port);
+	nvmet_tcp_port_put(port);
 }
 
 static void nvmet_tcp_delete_ctrl(struct nvmet_ctrl *ctrl)
