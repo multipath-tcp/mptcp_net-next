@@ -285,9 +285,8 @@ static void bareudp_sock_release(struct bareudp_dev *bareudp)
 {
 	struct sock *sk;
 
-	sk = bareudp->sk;
+	sk = rtnl_dereference(bareudp->sk);
 	rcu_assign_pointer(bareudp->sk, NULL);
-	synchronize_net();
 	udp_tunnel_sock_release(sk);
 }
 
