@@ -220,6 +220,15 @@ struct tls_prot_info {
 	u16 tail_size;
 };
 
+struct tls_proto {
+	refcount_t			refcnt;
+	struct list_head		list;
+	int				ip_ver;
+	const struct proto		*prot;
+	struct proto prots[TLS_NUM_CONFIG][TLS_NUM_CONFIG];
+	struct proto_ops proto_ops[TLS_NUM_CONFIG][TLS_NUM_CONFIG];
+};
+
 struct tls_context {
 	/* read-only cache line */
 	struct tls_prot_info prot_info;
@@ -256,6 +265,8 @@ struct tls_context {
 	/* cache cold stuff */
 	struct proto *sk_proto;
 	struct sock *sk;
+
+	struct tls_proto *proto;
 
 	void (*sk_destruct)(struct sock *sk);
 
