@@ -1515,7 +1515,6 @@ static void vxlan_sock_release(struct vxlan_dev *vxlan)
 #endif
 
 	RCU_INIT_POINTER(vxlan->vn4_sock, NULL);
-	synchronize_net();
 
 	if (vxlan->cfg.flags & VXLAN_F_VNIFILTER)
 		vxlan_vs_del_vnigrp(vxlan);
