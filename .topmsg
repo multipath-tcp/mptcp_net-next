@@ -1,4 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-connect-test-name-in-pcap-file
+Subject: [PATCH] selftests: mptcp: connect: test name in pcap file
 
+Even if the pcap prefix is printed in the test, it is clearer if this
+prefix also include the test name: mptcp_connect.
+
+With this, it is easily possible to find out which pcap was produced by
+which test, and easily delete the right ones.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
