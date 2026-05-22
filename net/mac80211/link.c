@@ -2,7 +2,7 @@
 /*
  * MLO link handling
  *
- * Copyright (C) 2022-2025 Intel Corporation
+ * Copyright (C) 2022-2026 Intel Corporation
  */
 #include <linux/slab.h>
 #include <linux/kernel.h>
@@ -306,6 +306,9 @@ static int ieee80211_vif_update_links(struct ieee80211_sub_if_data *sdata,
 
 	if (old_links == new_links && dormant_links == sdata->vif.dormant_links)
 		return 0;
+
+	if (!old_links || !new_links)
+		WARN_ON(sta_info_flush(sdata, -1) > 0);
 
 	/* if there were no old links, need to clear the pointers to deflink */
 	if (!old_links)
