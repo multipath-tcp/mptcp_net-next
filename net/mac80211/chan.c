@@ -751,8 +751,14 @@ _ieee80211_recalc_chanctx_min_def(struct ieee80211_local *local,
 				  struct ieee80211_link_data *rsvd_for,
 				  bool check_reserved)
 {
-	u32 changed = __ieee80211_recalc_chanctx_min_def(local, ctx, rsvd_for,
-							 check_reserved);
+	u32 changed;
+
+	/* No recalc for S1G chan ctx's */
+	if (cfg80211_chandef_is_s1g(&ctx->conf.def))
+		return;
+
+	changed = __ieee80211_recalc_chanctx_min_def(local, ctx, rsvd_for,
+						     check_reserved);
 
 	/* check is BW narrowed */
 	ieee80211_chan_bw_change(local, ctx, false, true);
