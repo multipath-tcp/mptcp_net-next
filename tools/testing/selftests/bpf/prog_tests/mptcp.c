@@ -18,6 +18,7 @@
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
 #include "mptcp_bpf_burst.skel.h"
+#include "mptcp_setsockopt.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -813,6 +814,67 @@ skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
+static void test_setsockopt(void)
+{
+	struct mptcp_setsockopt *skel;
+	struct netns_obj *netns;
+	int cgroup_fd, server_fd, client_fd;
+	int map_fd, err;
+	__s32 val = 1024 * 1024, result;
+	__u32 key = 0;
+
+	cgroup_fd = test__join_cgroup("/mptcp_setsockopt");
+	if (!ASSERT_OK_FD(cgroup_fd, "join_cgroup"))
+		return;
+
+	skel = mptcp_setsockopt__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "skel_open_load"))
+		goto close_cgroup;
+
+	err = bpf_prog_attach(bpf_program__fd(skel->progs.mptcp_setsockopt),
+			      cgroup_fd, BPF_CGROUP_SETSOCKOPT, 0);
+	if (!ASSERT_OK(err, "bpf_prog_attach"))
+		goto skel_destroy;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		goto skel_destroy;
+
+	server_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
+		goto close_netns;
+
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
+		goto close_server;
+
+	/* Trigger cgroup/setsockopt BPF program by calling setsockopt.
+	 * The BPF program calls bpf_setsockopt(sk, SO_RCVLOWAT, ...) which
+	 * reaches mptcp_set_rcvlowat(). There has_current_bpf_ctx() is true,
+	 * so it should return -EOPNOTSUPP.
+	 */
+	err = setsockopt(client_fd, SOL_SOCKET, SO_RCVLOWAT, &val, sizeof(val));
+	ASSERT_OK(err, "setsockopt(SO_RCVLOWAT)");
+
+	map_fd = bpf_map__fd(skel->maps.results);
+	err = bpf_map_lookup_elem(map_fd, &key, &result);
+	if (!ASSERT_OK(err, "bpf_map_lookup_elem"))
+		goto close_client;
+
+	ASSERT_EQ(result, -EOPNOTSUPP, "bpf_setsockopt(SO_RCVLOWAT)");
+
+close_client:
+	close(client_fd);
+close_server:
+	close(server_fd);
+close_netns:
+	netns_free(netns);
+skel_destroy:
+	mptcp_setsockopt__destroy(skel);
+close_cgroup:
+	close(cgroup_fd);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -835,4 +897,6 @@ void test_mptcp(void)
 		test_red();
 	if (test__start_subtest("burst"))
 		test_burst();
+	if (test__start_subtest("setsockopt"))
+		test_setsockopt();
 }
