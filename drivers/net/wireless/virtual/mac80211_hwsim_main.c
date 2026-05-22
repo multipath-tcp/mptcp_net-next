@@ -4554,6 +4554,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_2ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -4667,6 +4670,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_2ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -4841,6 +4847,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_5ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -4971,6 +4980,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_5ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -5169,6 +5181,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_6ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -5320,6 +5335,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_6ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -5416,6 +5434,9 @@ static const struct ieee80211_sband_iftype_data sband_capa_6ghz[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
+			.mac.mac_cap = {
+				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP,
+			},
 			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
 				   IEEE80211_UHR_PHY_CAP_ELR_TX,
 		},
@@ -5714,8 +5735,6 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 
 		hw->wiphy->nan_capa.n_antennas = 0x22;
 		hw->wiphy->nan_capa.max_channel_switch_time = 0;
-		hw->wiphy->nan_capa.dev_capabilities =
-			NAN_DEV_CAPA_EXT_KEY_ID_SUPPORTED;
 
 		wiphy_ext_feature_set(hw->wiphy,
 				      NL80211_EXT_FEATURE_SECURE_NAN);
@@ -6766,9 +6785,15 @@ static int hwsim_new_radio_nl(struct sk_buff *msg, struct genl_info *info)
 		param.p2p_device = true;
 	}
 
-	if (param.nan_device)
+	if (param.nan_device) {
+		if (param.multi_radio) {
+			NL_SET_ERR_MSG(info->extack,
+				       "NAN is not supported on multi-radio wiphys");
+			return -EINVAL;
+		}
 		param.iftypes |= BIT(NL80211_IFTYPE_NAN) |
 				 BIT(NL80211_IFTYPE_NAN_DATA);
+	}
 
 	if (info->attrs[HWSIM_ATTR_CIPHER_SUPPORT]) {
 		u32 len = nla_len(info->attrs[HWSIM_ATTR_CIPHER_SUPPORT]);
