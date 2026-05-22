@@ -185,6 +185,9 @@ static int mptcp_setsockopt_sol_socket_int(struct mptcp_sock *msk, int optname,
 	if (ret)
 		return ret;
 
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
+
 	switch (optname) {
 	case SO_KEEPALIVE:
 	case SO_DEBUG:
@@ -217,6 +220,9 @@ static int mptcp_setsockopt_sol_socket_timestamping(struct mptcp_sock *msk,
 	struct sock *sk = (struct sock *)msk;
 	struct so_timestamping timestamping;
 	int ret;
+
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
 
 	if (optlen == sizeof(timestamping)) {
 		if (copy_from_sockptr(&timestamping, optval,
@@ -260,6 +266,9 @@ static int mptcp_setsockopt_sol_socket_linger(struct mptcp_sock *msk, sockptr_t 
 	struct linger ling;
 	sockptr_t kopt;
 	int ret;
+
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
 
 	if (optlen < sizeof(ling))
 		return -EINVAL;
@@ -606,6 +615,9 @@ static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t
 
 	cap_net_admin = sockopt_ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN);
 
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
+
 	ret = 0;
 	sockopt_lock_sock(sk);
 	sockopt_seq_inc(msk);
@@ -635,6 +647,9 @@ static int __mptcp_setsockopt_set_val(struct mptcp_sock *msk, int max,
 	struct mptcp_subflow_context *subflow;
 	int err = 0;
 
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		int ret;
@@ -658,6 +673,9 @@ static int __mptcp_setsockopt_sol_tcp_cork(struct mptcp_sock *msk, int val)
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
+
 	sockopt_seq_inc(msk);
 	msk->cork = !!val;
 	mptcp_for_each_subflow(msk, subflow) {
@@ -677,6 +695,9 @@ static int __mptcp_setsockopt_sol_tcp_nodelay(struct mptcp_sock *msk, int val)
 {
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
+
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
 
 	sockopt_seq_inc(msk);
 	msk->nodelay = !!val;
@@ -744,6 +765,9 @@ static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 	int err, val;
+
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
 
 	err = ip_setsockopt(sk, SOL_IP, optname, optval, optlen);
 
@@ -1647,6 +1671,9 @@ int mptcp_set_rcvlowat(struct sock *sk, int val)
 	space = mptcp_space_from_win(sk, val);
 	if (space <= sk->sk_rcvbuf)
 		return 0;
+
+	if (has_current_bpf_ctx())
+		return -EOPNOTSUPP;
 
 	/* propagate the rcvbuf changes to all the subflows */
 	WRITE_ONCE(sk->sk_rcvbuf, space);
