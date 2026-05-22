@@ -2030,6 +2030,7 @@ out_ida_remove:
 out_sock:
 	fput(queue->sock->file);
 out_free_queue:
+	page_frag_cache_drain(&queue->pf_cache);
 	kref_put(&queue->port->kref, nvmet_tcp_release_port);
 	kfree(queue);
 out_release:
