@@ -83,8 +83,8 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		bool slow = lock_sock_fast(ssk);
 
+		lock_sock(ssk);
 		switch (optname) {
 		case SO_DEBUG:
 			sock_valbool_flag(ssk, SOCK_DBG, !!val);
@@ -120,7 +120,7 @@ static void mptcp_sol_socket_sync_intval(struct mptcp_sock *msk, int optname, in
 		}
 
 		subflow->setsockopt_seq = msk->setsockopt_seq;
-		unlock_sock_fast(ssk, slow);
+		release_sock(ssk);
 	}
 
 	release_sock(sk);
@@ -276,8 +276,8 @@ static int mptcp_setsockopt_sol_socket_linger(struct mptcp_sock *msk, sockptr_t 
 	sockopt_seq_inc(msk);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		bool slow = lock_sock_fast(ssk);
 
+		lock_sock(ssk);
 		if (!ling.l_onoff) {
 			sock_reset_flag(ssk, SOCK_LINGER);
 		} else {
@@ -286,7 +286,7 @@ static int mptcp_setsockopt_sol_socket_linger(struct mptcp_sock *msk, sockptr_t 
 		}
 
 		subflow->setsockopt_seq = msk->setsockopt_seq;
-		unlock_sock_fast(ssk, slow);
+		release_sock(ssk);
 	}
 
 	release_sock(sk);
@@ -755,11 +755,10 @@ static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
 	val = READ_ONCE(inet_sk(sk)->tos);
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		bool slow;
 
-		slow = lock_sock_fast(ssk);
+		lock_sock(ssk);
 		__ip_sock_set_tos(ssk, val);
-		unlock_sock_fast(ssk, slow);
+		release_sock(ssk);
 	}
 	release_sock(sk);
 
@@ -1653,12 +1652,11 @@ int mptcp_set_rcvlowat(struct sock *sk, int val)
 	WRITE_ONCE(sk->sk_rcvbuf, space);
 	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
-		bool slow;
 
-		slow = lock_sock_fast(ssk);
+		lock_sock(ssk);
 		WRITE_ONCE(ssk->sk_rcvbuf, space);
 		WRITE_ONCE(tcp_sk(ssk)->window_clamp, val);
-		unlock_sock_fast(ssk, slow);
+		release_sock(ssk);
 	}
 	return 0;
 }
