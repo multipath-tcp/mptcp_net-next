@@ -604,7 +604,7 @@ static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t
 
 	name[ret] = 0;
 
-	cap_net_admin = ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN);
+	cap_net_admin = sockopt_ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN);
 
 	ret = 0;
 	sockopt_lock_sock(sk);
@@ -614,7 +614,7 @@ static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t
 		int err;
 
 		lock_sock(ssk);
-		err = tcp_set_congestion_control(ssk, name, true, cap_net_admin);
+		err = tcp_set_congestion_control(ssk, name, !has_current_bpf_ctx(), cap_net_admin);
 		if (err < 0 && ret == 0)
 			ret = err;
 		subflow->setsockopt_seq = msk->setsockopt_seq;
