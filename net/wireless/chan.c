@@ -619,6 +619,136 @@ int cfg80211_chandef_add_npca(struct wiphy *wiphy,
 }
 EXPORT_SYMBOL(cfg80211_chandef_add_npca);
 
+int cfg80211_chandef_add_dbe(struct cfg80211_chan_def *chandef,
+			     const struct ieee80211_uhr_dbe_info *dbe)
+{
+	struct cfg80211_chan_def new_chandef = *chandef;
+	u16 starting_freq, bw_mhz, start_old, start_new;
+	u8 bw, punct_shift;
+	int offset, index;
+
+	if (!dbe)
+		return 0;
+
+	if (!cfg80211_chandef_valid(chandef))
+		return -EINVAL;
+
+	if (chandef->width == NL80211_CHAN_WIDTH_20_NOHT)
+		return -EINVAL;
+
+	bw = u8_get_bits(dbe->params, IEEE80211_UHR_DBE_OPER_BANDWIDTH);
+
+	switch (chandef->chan->band) {
+	case NL80211_BAND_5GHZ:
+		if (bw > IEEE80211_UHR_DBE_OPER_BW_160)
+			return -EINVAL;
+		if (chandef->chan->center_freq < 5745)
+			starting_freq = 5180; /* channel 36 */
+		else
+			starting_freq = 5745; /* channel 149 */
+		break;
+	case NL80211_BAND_6GHZ:
+		starting_freq = 5955; /* channel 1 center */
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	switch (bw) {
+	case IEEE80211_UHR_DBE_OPER_BW_320_2:
+	case IEEE80211_UHR_DBE_OPER_BW_320_1:
+		if (chandef->width == NL80211_CHAN_WIDTH_160)
+			break;
+		fallthrough;
+	case IEEE80211_UHR_DBE_OPER_BW_160:
+		if (chandef->width == NL80211_CHAN_WIDTH_80)
+			break;
+		fallthrough;
+	case IEEE80211_UHR_DBE_OPER_BW_80:
+		if (chandef->width == NL80211_CHAN_WIDTH_40)
+			break;
+		fallthrough;
+	case IEEE80211_UHR_DBE_OPER_BW_40:
+		if (chandef->width == NL80211_CHAN_WIDTH_20)
+			break;
+		fallthrough;
+	default:
+		return -EINVAL;
+	}
+
+	switch (bw) {
+	case IEEE80211_UHR_DBE_OPER_BW_320_2:
+		/* 320-2 starts shifted by 160 */
+		starting_freq += 160;
+		fallthrough;
+	case IEEE80211_UHR_DBE_OPER_BW_320_1:
+		new_chandef.width = NL80211_CHAN_WIDTH_320;
+		bw_mhz = 320;
+		break;
+	case IEEE80211_UHR_DBE_OPER_BW_160:
+		new_chandef.width = NL80211_CHAN_WIDTH_160;
+		bw_mhz = 160;
+		break;
+	case IEEE80211_UHR_DBE_OPER_BW_80:
+		new_chandef.width = NL80211_CHAN_WIDTH_80;
+		bw_mhz = 80;
+		break;
+	case IEEE80211_UHR_DBE_OPER_BW_40:
+		new_chandef.width = NL80211_CHAN_WIDTH_40;
+		bw_mhz = 40;
+		break;
+	}
+
+	/* this should only happen for 320-2 and misconfigured AP */
+	if (chandef->chan->center_freq < starting_freq)
+		return -EINVAL;
+
+	offset = chandef->chan->center_freq - starting_freq;
+	index = offset / bw_mhz;
+	start_new = starting_freq - 10 + index * bw_mhz;
+	new_chandef.center_freq1 = start_new + bw_mhz / 2;
+
+	start_old = chandef->center_freq1 -
+		    cfg80211_chandef_get_width(chandef) / 2;
+
+	/*
+	 * If the DBE channel extends downward below the lower
+	 * edge of the BSS channel, we need to shift puncturing
+	 * bitmaps up to adjust for that.
+	 */
+	if (start_new < start_old)
+		punct_shift = (start_old - start_new) / 20;
+	else
+		punct_shift = 0;
+
+	new_chandef.punctured <<= punct_shift;
+	new_chandef.npca_punctured <<= punct_shift;
+
+	if (dbe->params & IEEE80211_UHR_DBE_OPER_DIS_SUBCHANNEL_BITMAP_PRES) {
+		u16 punct_mask = ((1 << (bw_mhz / 40)) - 1) << punct_shift;
+		u16 punctured = le16_to_cpu(dbe->dis_subch_bmap[0]);
+
+		if ((punctured & punct_mask) != (new_chandef.punctured & punct_mask))
+			return -EINVAL;
+
+		new_chandef.punctured = punctured;
+	}
+
+	if (!cfg80211_chandef_valid(&new_chandef))
+		return -EINVAL;
+
+	/*
+	 * If e.g. a 40 MHz BSS channel (erroneously) occupies the center of the
+	 * DBE 80 MHz channel, they would be incompatible; check and reject.
+	 */
+	if (!cfg80211_chandef_compatible(&new_chandef, chandef))
+		return -EINVAL;
+
+	*chandef = new_chandef;
+	return 0;
+}
+EXPORT_SYMBOL(cfg80211_chandef_add_dbe);
+
 static const struct cfg80211_chan_def *
 check_chandef_primary_compat(const struct cfg80211_chan_def *c1,
 			     const struct cfg80211_chan_def *c2,
