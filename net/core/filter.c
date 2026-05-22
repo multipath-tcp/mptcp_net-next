@@ -5600,6 +5600,12 @@ static int __bpf_setsockopt(struct sock *sk, int level, int optname,
 {
 	if (!sk_fullsock(sk))
 		return -EINVAL;
+	if (sk->sk_protocol == IPPROTO_MPTCP) {
+		struct socket *sock = sk->sk_socket;
+
+		return sock->ops->setsockopt(sock, level, optname,
+					     KERNEL_SOCKPTR(optval), optlen);
+	}
 
 	if (level == SOL_SOCKET)
 		return sol_socket_sockopt(sk, optname, optval, &optlen, false);
