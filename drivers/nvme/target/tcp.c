@@ -213,6 +213,7 @@ struct nvmet_tcp_port {
 	struct work_struct	accept_work;
 	struct nvmet_port	*nport;
 	struct sockaddr_storage addr;
+	struct kref		kref;
 	void (*data_ready)(struct sock *);
 	const struct nvmet_tcp_proto *proto;
 };
@@ -1609,6 +1610,14 @@ static void nvmet_tcp_free_cmd_data_in_buffers(struct nvmet_tcp_queue *queue)
 	nvmet_tcp_free_cmd_buffers(&queue->connect);
 }
 
+static void nvmet_tcp_release_port(struct kref *kref)
+{
+	struct nvmet_tcp_port *port =
+		container_of(kref, struct nvmet_tcp_port, kref);
+
+	kfree(port);
+}
+
 static void nvmet_tcp_release_queue_work(struct work_struct *w)
 {
 	struct nvmet_tcp_queue *queue =
@@ -1635,6 +1644,7 @@ static void nvmet_tcp_release_queue_work(struct work_struct *w)
 	nvmet_tcp_free_cmds(queue);
 	ida_free(&nvmet_tcp_queue_ida, queue->idx);
 	page_frag_cache_drain(&queue->pf_cache);
+	kref_put(&queue->port->kref, nvmet_tcp_release_port);
 	kfree(queue);
 }
 
@@ -1936,6 +1946,7 @@ static void nvmet_tcp_alloc_queue(struct nvmet_tcp_port *port,
 	INIT_WORK(&queue->io_work, nvmet_tcp_io_work);
 	kref_init(&queue->kref);
 	queue->sock = newsock;
+	kref_get(&port->kref);
 	queue->port = port;
 	queue->nr_cmds = 0;
 	spin_lock_init(&queue->state_lock);
@@ -2015,6 +2026,7 @@ out_ida_remove:
 out_sock:
 	fput(queue->sock->file);
 out_free_queue:
+	kref_put(&queue->port->kref, nvmet_tcp_release_port);
 	kfree(queue);
 out_release:
 	pr_err("failed to allocate queue, error %d\n", ret);
@@ -2083,6 +2095,8 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port = kzalloc_obj(*port);
 	if (!port)
 		return -ENOMEM;
+
+	kref_init(&port->kref);
 
 	switch (nport->disc_addr.adrfam) {
 	case NVMF_ADDR_FAMILY_IP4:
@@ -2186,7 +2200,7 @@ static void nvmet_tcp_remove_port(struct nvmet_port *nport)
 	nvmet_tcp_destroy_port_queues(port);
 
 	sock_release(port->sock);
-	kfree(port);
+	kref_put(&port->kref, nvmet_tcp_release_port);
 }
 
 static void nvmet_tcp_delete_ctrl(struct nvmet_ctrl *ctrl)
