@@ -1627,6 +1627,13 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0, err = 0;
 
+	/* Initialise mss_now/size_goal: mptcp_sendmsg_frag() may return
+	 * before reaching its own tcp_send_mss() (e.g. !__tcp_can_send()),
+	 * leaving __mptcp_push_pending()'s trailing mptcp_push_release()
+	 * with info.mss_now == 0 and tripping tcp_tso_segs() on the divide.
+	 */
+	info->mss_now = tcp_send_mss(ssk, &info->size_goal, info->flags);
+
 	while ((dfrag = mptcp_send_head(sk))) {
 		info->sent = dfrag->already_sent;
 		info->limit = dfrag->data_len;
