@@ -1549,7 +1549,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 			res = recv(self->cfd, rb,
 				   left > sizeof(rb) ? sizeof(rb) : left, 0);
 
-			EXPECT_GE(res, 0);
+			ASSERT_GE(res, 0);
 			left -= res;
 		}
 	} else {
@@ -1566,7 +1566,7 @@ test_mutliproc(struct __test_metadata *_metadata, struct _test_data_tls *self,
 				res = send(self->fd, buf,
 					   left > file_sz ? file_sz : left, 0);
 
-			EXPECT_GE(res, 0);
+			ASSERT_GE(res, 0);
 			left -= res;
 		}
 	}
