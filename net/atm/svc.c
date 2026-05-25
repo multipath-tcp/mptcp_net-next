@@ -21,6 +21,7 @@
 #include <linux/bitops.h>
 #include <net/sock.h>		/* for sock_no_* */
 #include <linux/uaccess.h>
+#include <linux/uio.h>
 #include <linux/export.h>
 
 #include "resources.h"
@@ -501,25 +502,23 @@ out:
 }
 
 static int svc_getsockopt(struct socket *sock, int level, int optname,
-			  char __user *optval, int __user *optlen)
+			  sockopt_t *opt)
 {
 	struct sock *sk = sock->sk;
 	int error = 0, len;
 
 	lock_sock(sk);
 	if (!__SO_LEVEL_MATCH(optname, level) || optname != SO_ATMSAP) {
-		error = vcc_getsockopt(sock, level, optname, optval, optlen);
+		error = vcc_getsockopt(sock, level, optname, opt);
 		goto out;
 	}
-	if (get_user(len, optlen)) {
-		error = -EFAULT;
-		goto out;
-	}
+	len = opt->optlen;
 	if (len != sizeof(struct atm_sap)) {
 		error = -EINVAL;
 		goto out;
 	}
-	if (copy_to_user(optval, &ATM_SD(sock)->sap, sizeof(struct atm_sap))) {
+	if (copy_to_iter(&ATM_SD(sock)->sap, sizeof(struct atm_sap),
+			 &opt->iter_out) != sizeof(struct atm_sap)) {
 		error = -EFAULT;
 		goto out;
 	}
@@ -650,7 +649,7 @@ static const struct proto_ops svc_proto_ops = {
 	.listen =	svc_listen,
 	.shutdown =	svc_shutdown,
 	.setsockopt =	svc_setsockopt,
-	.getsockopt =	svc_getsockopt,
+	.getsockopt_iter = svc_getsockopt,
 	.sendmsg =	vcc_sendmsg,
 	.recvmsg =	vcc_recvmsg,
 	.mmap =		sock_no_mmap,
