@@ -2047,6 +2047,7 @@ out_ida_remove:
 out_sock:
 	fput(queue->sock->file);
 out_free_queue:
+	page_frag_cache_drain(&queue->pf_cache);
 	kfree(queue);
 out_release:
 	pr_err("failed to allocate queue, error %d\n", ret);
