@@ -859,7 +859,7 @@ void qdisc_offload_graft_helper(struct net_device *dev, struct Qdisc *sch,
 	any_qdisc_is_offloaded |= old && old->flags & TCQ_F_OFFLOADED;
 
 	if (any_qdisc_is_offloaded)
-		NL_SET_ERR_MSG(extack, "Offloading graft operation failed.");
+		NL_SET_ERR_MSG_WEAK(extack, "Offloading graft operation failed.");
 }
 EXPORT_SYMBOL(qdisc_offload_graft_helper);
 
