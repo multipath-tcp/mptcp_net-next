@@ -1332,13 +1332,13 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			 info->limit > dfrag->data_len))
 		return 0;
 
-	if (unlikely(!__tcp_can_send(ssk)))
-		return -EAGAIN;
-
 	/* compute send limit */
 	if (unlikely(ssk->sk_gso_max_size > MPTCP_MAX_GSO_SIZE))
 		ssk->sk_gso_max_size = MPTCP_MAX_GSO_SIZE;
 	info->mss_now = tcp_send_mss(ssk, &info->size_goal, info->flags);
+	if (unlikely(!__tcp_can_send(ssk)))
+		return -EAGAIN;
+
 	copy = info->size_goal;
 
 	skb = tcp_write_queue_tail(ssk);
