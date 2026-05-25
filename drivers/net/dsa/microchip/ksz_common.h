@@ -359,11 +359,8 @@ struct alu_struct {
 };
 
 struct ksz_dev_ops {
-	int (*setup)(struct dsa_switch *ds);
-	void (*teardown)(struct dsa_switch *ds);
 	u32 (*get_port_addr)(int port, int offset);
 	void (*cfg_port_member)(struct ksz_device *dev, int port, u8 member);
-	void (*port_setup)(struct ksz_device *dev, int port, bool cpu_port);
 
 	/**
 	 * @mdio_bus_preinit: Function pointer to pre-initialize the MDIO bus
@@ -401,8 +398,6 @@ struct ksz_dev_ops {
 	 *  - Negative error code on failure (e.g., invalid configuration).
 	 */
 	int (*create_phy_addr_map)(struct ksz_device *dev, bool side_mdio);
-	int (*r_phy)(struct ksz_device *dev, u16 phy, u16 reg, u16 *val);
-	int (*w_phy)(struct ksz_device *dev, u16 phy, u16 reg, u16 val);
 	void (*r_mib_cnt)(struct ksz_device *dev, int port, u16 addr,
 			  u64 *cnt);
 	void (*r_mib_pkt)(struct ksz_device *dev, int port, u16 addr,
@@ -417,13 +412,7 @@ struct ksz_dev_ops {
 	void (*port_init_cnt)(struct ksz_device *dev, int port);
 	void (*setup_rgmii_delay)(struct ksz_device *dev, int port);
 	int (*tc_cbs_set_cinc)(struct ksz_device *dev, int port, u32 val);
-	void (*config_cpu_port)(struct dsa_switch *ds);
-	int (*enable_stp_addr)(struct ksz_device *dev);
-	int (*reset)(struct ksz_device *dev);
 	int (*init)(struct ksz_device *dev);
-	void (*exit)(struct ksz_device *dev);
-
-	int (*pcs_create)(struct ksz_device *dev);
 };
 
 struct ksz_device *ksz_switch_alloc(struct device *base,
@@ -434,9 +423,7 @@ void ksz_switch_remove(struct ksz_device *dev);
 int ksz_switch_suspend(struct device *dev);
 int ksz_switch_resume(struct device *dev);
 
-int ksz_setup(struct dsa_switch *ds);
 void ksz_teardown(struct dsa_switch *ds);
-int ksz_port_setup(struct dsa_switch *ds, int port);
 void ksz_port_teardown(struct dsa_switch *ds, int port);
 
 void ksz_init_mib_timer(struct ksz_device *dev);
@@ -453,8 +440,6 @@ void ksz_switch_macaddr_put(struct dsa_switch *ds);
 void ksz_switch_shutdown(struct ksz_device *dev);
 int ksz_handle_wake_reason(struct ksz_device *dev, int port);
 
-int ksz_phy_read16(struct dsa_switch *ds, int addr, int reg);
-int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
 u32 ksz_get_phy_flags(struct dsa_switch *ds, int port);
 
 int ksz_sset_count(struct dsa_switch *ds, int port, int sset);
@@ -518,6 +503,13 @@ int ksz_hsr_leave(struct dsa_switch *ds, int port,
 
 int ksz_suspend(struct dsa_switch *ds);
 int ksz_resume(struct dsa_switch *ds);
+
+int ksz_mdio_register(struct ksz_device *dev);
+int ksz_pirq_setup(struct ksz_device *dev, u8 p);
+int ksz_girq_setup(struct ksz_device *dev);
+void ksz_irq_free(struct ksz_irq *kirq);
+int ksz_parse_drive_strength(struct ksz_device *dev);
+int ksz9477_set_default_prio_queue_mapping(struct ksz_device *dev, int port);
 
 /* Common register access functions */
 static inline struct regmap *ksz_regmap_8(struct ksz_device *dev)
