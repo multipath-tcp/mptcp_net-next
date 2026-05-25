@@ -1711,6 +1711,12 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 					    (1 << ssk->sk_state) &
 					     (TCPF_FIN_WAIT1 | TCPF_FIN_WAIT2 | TCPF_CLOSE))
 						push_count--;
+
+					/* Prevent the trailing mptcp_push_release()
+					 * from pushing data with mss_now == 0.
+					 */
+					release_sock(ssk);
+					ssk = NULL;
 					continue;
 				}
 				copied = true;
