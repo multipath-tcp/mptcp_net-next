@@ -443,7 +443,14 @@ bool mptcp_pm_alloc_anno_list(struct mptcp_sock *msk,
 	add_entry = mptcp_lookup_anno_list_by_saddr(msk, addr);
 
 	if (add_entry) {
-		if (WARN_ON_ONCE(mptcp_pm_is_kernel(msk)))
+		/* The kernel PM can legitimately reselect an address whose
+		 * previous ADD_ADDR is still pending (option already sent,
+		 * echo not yet received) when the matching endpoint is
+		 * removed and re-added before the announcement completes.
+		 * Don't re-announce it: the in-flight ADD_ADDR will finish
+		 * on its own and the PM will be rescheduled afterwards.
+		 */
+		if (mptcp_pm_is_kernel(msk))
 			return false;
 
 		goto reset_timer;
