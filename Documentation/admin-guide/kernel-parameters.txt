@@ -558,9 +558,6 @@ Kernel parameters
 			1 -- enable.
 			Default value is set via kernel config option.
 
-	arcrimi=	[HW,NET] ARCnet - "RIM I" (entirely mem-mapped) cards
-			Format: <io>,<irq>,<nodeID>
-
 	arm64.no32bit_el0 [ARM64] Unconditionally disable the execution of
 			32 bit applications.
 
@@ -910,17 +907,6 @@ Kernel parameters
 	coherent_pool=nn[KMG]	[ARM,KNL,EARLY]
 			Sets the size of memory pool for coherent, atomic dma
 			allocations, by default set to 256K.
-
-	com20020=	[HW,NET] ARCnet - COM20020 chipset
-			Format:
-			<io>[,<irq>[,<nodeID>[,<backplane>[,<ckp>[,<timeout>]]]]]
-
-	com90io=	[HW,NET] ARCnet - COM90xx chipset (IO-mapped buffers)
-			Format: <io>[,<irq>]
-
-	com90xx=	[HW,NET]
-			ARCnet - COM90xx chipset (memory-mapped buffers)
-			Format: <io>[,<irq>[,<memstart>]]
 
 	condev=		[HW,S390] console device
 	conmode=
