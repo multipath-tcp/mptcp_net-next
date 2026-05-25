@@ -127,7 +127,8 @@ static int com20020pci_probe(struct pci_dev *pdev,
 	struct net_device *dev;
 	struct arcnet_local *lp;
 	struct com20020_priv *priv;
-	int i, ioaddr, ret;
+	int ioaddr, ret;
+	u8 i;
 	struct resource *r;
 
 	ret = 0;
@@ -195,8 +196,8 @@ static int com20020pci_probe(struct pci_dev *pdev,
 		 * ARCNET controller needs
 		 * this access to detect bustype
 		 */
-		arcnet_outb(0x00, ioaddr, COM20020_REG_W_COMMAND);
-		arcnet_inb(ioaddr, COM20020_REG_R_DIAGSTAT);
+		outb(0x00, ioaddr + COM20020_REG_W_COMMAND);
+		inb(ioaddr + COM20020_REG_R_DIAGSTAT);
 
 		SET_NETDEV_DEV(dev, &pdev->dev);
 		dev->base_addr = ioaddr;
@@ -224,7 +225,7 @@ static int com20020pci_probe(struct pci_dev *pdev,
 			snprintf(dev->name, sizeof(dev->name), "arc%d-%d", dev->dev_id, i);
 		}
 
-		if (arcnet_inb(ioaddr, COM20020_REG_R_STATUS) == 0xFF) {
+		if (inb(ioaddr + COM20020_REG_R_STATUS) == 0xFF) {
 			pr_err("IO address %Xh is empty!\n", ioaddr);
 			ret = -EIO;
 			goto err_free_arcdev;
