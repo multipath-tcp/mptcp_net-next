@@ -1727,7 +1727,6 @@ static inline int emac_rx_sg_append(struct emac_instance *dev, int slot)
 /* NAPI poll context */
 static int emac_poll_rx(void *param, int budget)
 {
-	LIST_HEAD(rx_list);
 	struct emac_instance *dev = param;
 	int slot = dev->rx_slot, received = 0;
 
@@ -1784,7 +1783,7 @@ static int emac_poll_rx(void *param, int budget)
 		skb->protocol = eth_type_trans(skb, dev->ndev);
 		emac_rx_csum(dev, skb, ctrl);
 
-		list_add_tail(&skb->list, &rx_list);
+		napi_gro_receive(&dev->mal->napi, skb);
 	next:
 		++dev->stats.rx_packets;
 	skip:
@@ -1827,8 +1826,6 @@ static int emac_poll_rx(void *param, int budget)
 		emac_recycle_rx_skb(dev, slot, 0);
 		goto next;
 	}
-
-	netif_receive_skb_list(&rx_list);
 
 	if (received) {
 		DBG2(dev, "rx %d BDs" NL, received);
