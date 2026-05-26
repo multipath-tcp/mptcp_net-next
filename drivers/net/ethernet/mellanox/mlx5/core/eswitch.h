@@ -77,6 +77,7 @@ struct mlx5_esw_pf_info {
 	u16 num_of_vfs;
 	u16 total_vfs;
 	u16 host_number;
+	u16 pf_num;
 };
 
 #ifdef CONFIG_MLX5_ESWITCH
@@ -333,7 +334,6 @@ struct mlx5_esw_offload {
 	u64 num_block_mode;
 	enum devlink_eswitch_encap_mode encap;
 	struct ida vport_metadata_ida;
-	unsigned int host_number; /* ECPF supports one external host */
 };
 
 /* E-Switch MC FDB table hash node */
@@ -350,11 +350,23 @@ struct mlx5_host_work {
 	void (*func)(struct mlx5_eswitch *esw);
 };
 
+struct mlx5_esw_spf {
+	u16 vport_num;
+	u16 vhca_id;
+	u16 host_number;
+	u16 pf_num;
+};
+
 struct mlx5_esw_functions {
 	struct mlx5_nb		nb;
 	bool			host_funcs_disabled;
 	u16			num_vfs;
 	u16			num_ec_vfs;
+	u16			hpf_host_number;
+	u16			hpf_pf_num;
+	bool			has_spf_sfs;
+	struct mlx5_esw_spf	*spfs;
+	int			num_spfs;
 };
 
 enum {
@@ -660,6 +672,10 @@ bool mlx5_esw_multipath_prereq(struct mlx5_core_dev *dev0,
 const u32 *mlx5_esw_query_functions(struct mlx5_core_dev *dev);
 struct mlx5_esw_pf_info mlx5_esw_get_host_pf_info(struct mlx5_core_dev *dev,
 						  const u32 *out);
+bool mlx5_esw_get_spf_disabled(struct mlx5_core_dev *dev, const u32 *out,
+			       u16 vhca_id);
+int mlx5_esw_pf_enable_hca(struct mlx5_core_dev *dev, u16 vport_num);
+int mlx5_esw_pf_disable_hca(struct mlx5_core_dev *dev, u16 vport_num);
 int mlx5_esw_host_pf_enable_hca(struct mlx5_core_dev *dev);
 int mlx5_esw_host_pf_disable_hca(struct mlx5_core_dev *dev);
 
@@ -667,6 +683,9 @@ void mlx5_esw_adjacent_vhcas_setup(struct mlx5_eswitch *esw);
 void mlx5_esw_adjacent_vhcas_cleanup(struct mlx5_eswitch *esw);
 int mlx5_esw_adj_vport_modify(struct mlx5_core_dev *dev, u16 vport,
 			      bool connect);
+int mlx5_esw_create_esw_vport(struct mlx5_core_dev *dev, u16 vhca_id,
+			      u16 *vport_num);
+void mlx5_esw_destroy_esw_vport(struct mlx5_core_dev *dev, u16 vport);
 
 #define MLX5_DEBUG_ESWITCH_MASK BIT(3)
 
@@ -772,6 +791,16 @@ void mlx5e_tc_clean_fdb_peer_flows(struct mlx5_eswitch *esw);
 			  MLX5_CAP_GEN_2((esw->dev), ec_vf_vport_base) +\
 			  (last) - 1)
 
+/* SPF vport numbers are not contiguous, iterate via the spfs array
+ * and look up each vport in the xarray.
+ */
+#define mlx5_esw_for_each_spf_vport(esw, index, vport)			\
+	for ((index) = 0;						\
+	     (index) < (esw)->esw_funcs.num_spfs &&			\
+	     ((vport) = xa_load(&(esw)->vports,				\
+		(esw)->esw_funcs.spfs[(index)].vport_num));		\
+	     (index)++)
+
 #define mlx5_esw_for_each_rep(esw, i, rep) \
 	xa_for_each(&((esw)->offloads.vport_reps), i, rep)
 
@@ -784,6 +813,8 @@ struct mlx5_vport *__must_check
 mlx5_eswitch_get_vport(struct mlx5_eswitch *esw, u16 vport_num);
 
 bool mlx5_eswitch_is_vf_vport(struct mlx5_eswitch *esw, u16 vport_num);
+int mlx5_esw_spf_vport_to_idx(struct mlx5_eswitch *esw, u16 vport_num);
+bool mlx5_esw_is_spf_vport(struct mlx5_eswitch *esw, u16 vport_num);
 bool mlx5_eswitch_is_pf_vf_vport(struct mlx5_eswitch *esw, u16 vport_num);
 bool mlx5_esw_is_sf_vport(struct mlx5_eswitch *esw, u16 vport_num);
 
@@ -869,6 +900,16 @@ void mlx5_esw_offloads_devlink_port_unregister(struct mlx5_vport *vport);
 struct devlink_port *mlx5_esw_offloads_devlink_port(struct mlx5_eswitch *esw, u16 vport_num);
 
 int mlx5_esw_sf_max_hpf_functions(struct mlx5_core_dev *dev, u16 *max_sfs, u16 *sf_base_id);
+int mlx5_esw_sf_max_spf_functions(struct mlx5_core_dev *dev, int spf_idx,
+				  u16 *max_sfs, u16 *sf_base_id);
+
+int mlx5_esw_get_num_spfs(struct mlx5_core_dev *dev);
+int mlx5_esw_spf_get_host_number(struct mlx5_core_dev *dev, int spf_idx,
+				 u16 *host_number);
+u16 mlx5_esw_get_hpf_host_number(struct mlx5_core_dev *dev);
+u16 mlx5_esw_get_hpf_pf_num(struct mlx5_core_dev *dev);
+u16 mlx5_esw_sf_controller_to_pfnum(struct mlx5_core_dev *dev, u32 controller);
+bool mlx5_esw_has_spf_sfs(struct mlx5_core_dev *dev);
 
 int mlx5_esw_vport_vhca_id_map(struct mlx5_eswitch *esw,
 			       struct mlx5_vport *vport);
