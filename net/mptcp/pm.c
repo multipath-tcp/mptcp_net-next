@@ -424,7 +424,7 @@ mptcp_pm_del_add_timer(struct mptcp_sock *msk,
 		if (check_id)
 			sk_stop_timer(sk, &entry->add_timer);
 		else
-			sk_stop_timer_sync(sk, &entry->add_timer);
+			sk_shutdown_timer_sync(sk, &entry->add_timer);
 	}
 
 	rcu_read_unlock();
@@ -483,7 +483,7 @@ static void mptcp_pm_free_anno_list(struct mptcp_sock *msk)
 
 	list_for_each_entry_safe(entry, tmp, &free_list, list) {
 		if (!entry->timer_done)
-			sk_stop_timer_sync(sk, &entry->add_timer);
+			sk_shutdown_timer_sync(sk, &entry->add_timer);
 		kfree_rcu(entry, rcu);
 	}
 }
