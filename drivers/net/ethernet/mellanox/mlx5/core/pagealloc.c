@@ -885,6 +885,9 @@ int mlx5_reclaim_startup_pages(struct mlx5_core_dev *dev)
 	WARN(dev->priv.page_counters[MLX5_HOST_PF],
 	     "External host PF FW pages counter is %d after reclaiming all pages\n",
 	     dev->priv.page_counters[MLX5_HOST_PF]);
+	WARN(dev->priv.page_counters[MLX5_SPF],
+	     "SPFs FW pages counter is %d after reclaiming all pages\n",
+	     dev->priv.page_counters[MLX5_SPF]);
 	WARN(dev->priv.page_counters[MLX5_EC_VF],
 	     "EC VFs FW pages counter is %d after reclaiming all pages\n",
 	     dev->priv.page_counters[MLX5_EC_VF]);
