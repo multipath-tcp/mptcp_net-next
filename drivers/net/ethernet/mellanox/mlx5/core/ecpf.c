@@ -102,6 +102,11 @@ void mlx5_ec_cleanup(struct mlx5_core_dev *dev)
 	if (err)
 		mlx5_core_warn(dev, "Timeout reclaiming external host PF pages err(%d)\n", err);
 
+	err = mlx5_wait_for_pages(dev, &dev->priv.page_counters[MLX5_SPF]);
+	if (err)
+		mlx5_core_warn(dev, "Timeout reclaiming SPF pages err(%d)\n",
+			       err);
+
 	err = mlx5_wait_for_pages(dev, &dev->priv.page_counters[MLX5_VF]);
 	if (err)
 		mlx5_core_warn(dev, "Timeout reclaiming external host VFs pages err(%d)\n", err);
