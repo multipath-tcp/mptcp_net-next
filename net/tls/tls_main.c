@@ -243,13 +243,13 @@ int tls_push_sg(struct sock *sk,
 	ctx->splicing_pages = true;
 	while (1) {
 		/* is sending application-limited? */
-		tcp_rate_check_app_limited(sk);
+		ctx->proto->ops->check_app_limited(sk);
 		p = sg_page(sg);
 retry:
 		bvec_set_page(&bvec, p, size, offset);
 		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, size);
 
-		ret = tcp_sendmsg_locked(sk, &msg, size);
+		ret = ctx->proto->ops->sendmsg_locked(sk, &msg, size);
 
 		if (ret != size) {
 			if (ret > 0) {
@@ -375,6 +375,7 @@ static void tls_proto_put(struct tls_proto *proto)
 		spin_lock_bh(&tls_proto_lock);
 		list_del_rcu(&proto->list);
 		spin_unlock_bh(&tls_proto_lock);
+		module_put(proto->ops->owner);
 		call_rcu(&proto->rcu, tls_proto_free);
 	}
 }
@@ -479,14 +480,21 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 	u8 shutdown;
 	int state;
 
-	mask = tcp_poll(file, sock, wait);
+	/* Paired with smp_store_release() in update_sk_prot().
+	 * Ensures that the read of icsk_ulp_data (tls_ctx) is ordered after
+	 * the read of sk->sk_socket->ops inside tls_ctx->proto->ops->poll().
+	 * Prevents seeing a new ops pointer but a stale (NULL) ulp_data.
+	 */
+	smp_rmb();
+
+	tls_ctx = tls_get_ctx(sk);
+	mask = tls_ctx->proto->ops->poll(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
 	shutdown = READ_ONCE(sk->sk_shutdown);
 	if (unlikely(state != TCP_ESTABLISHED || shutdown & RCV_SHUTDOWN))
 		return mask;
 
-	tls_ctx = tls_get_ctx(sk);
 	ctx = tls_sw_ctx_rx(tls_ctx);
 	psock = sk_psock_get(sk);
 
@@ -1045,6 +1053,7 @@ static struct tls_proto *tls_build_proto(struct sock *sk)
 	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
 	struct proto *prot = READ_ONCE(sk->sk_prot);
 	struct tls_proto *proto, *cache;
+	struct tls_prot_ops *ops;
 
 	proto = kzalloc_obj(*proto, GFP_KERNEL);
 	if (!proto)
@@ -1058,8 +1067,16 @@ static struct tls_proto *tls_build_proto(struct sock *sk)
 		return cache;
 	}
 
+	ops = tls_prot_ops_find(sk->sk_protocol);
+	if (!ops || !try_module_get(ops->owner)) {
+		spin_unlock_bh(&tls_proto_lock);
+		kfree(proto);
+		return NULL;
+	}
+
 	proto->ip_ver = ip_ver;
 	proto->prot = prot;
+	proto->ops = ops;
 	refcount_set(&proto->refcnt, 1);
 	build_protos(proto->prots, prot);
 	build_proto_ops(proto->proto_ops,
