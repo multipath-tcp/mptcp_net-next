@@ -316,6 +316,8 @@ void mlx5_pages_by_func_type_debugfs_init(struct mlx5_core_dev *dev)
 			   &dev->priv.page_counters[MLX5_SF]);
 	debugfs_create_u32("fw_pages_host_pf", 0400, pages,
 			   &dev->priv.page_counters[MLX5_HOST_PF]);
+	debugfs_create_u32("fw_pages_spfs", 0400, pages,
+			   &dev->priv.page_counters[MLX5_SPF]);
 }
 
 void mlx5_pages_by_func_type_debugfs_cleanup(struct mlx5_core_dev *dev)
@@ -329,6 +331,7 @@ void mlx5_pages_by_func_type_debugfs_cleanup(struct mlx5_core_dev *dev)
 	debugfs_lookup_and_remove("fw_pages_ec_vfs", pages);
 	debugfs_lookup_and_remove("fw_pages_sfs", pages);
 	debugfs_lookup_and_remove("fw_pages_host_pf", pages);
+	debugfs_lookup_and_remove("fw_pages_spfs", pages);
 }
 
 static u64 qp_read_field(struct mlx5_core_dev *dev, struct mlx5_core_qp *qp,
