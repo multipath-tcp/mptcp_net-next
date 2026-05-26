@@ -216,28 +216,28 @@ static int devlink_param_reset_default(struct devlink *devlink,
 
 static int
 devlink_nl_param_value_put(struct sk_buff *msg, enum devlink_param_type type,
-			   int nla_type, union devlink_param_value val,
+			   int nla_type, union devlink_param_value *val,
 			   bool flag_as_u8)
 {
 	switch (type) {
 	case DEVLINK_PARAM_TYPE_U8:
-		if (nla_put_u8(msg, nla_type, val.vu8))
+		if (nla_put_u8(msg, nla_type, val->vu8))
 			return -EMSGSIZE;
 		break;
 	case DEVLINK_PARAM_TYPE_U16:
-		if (nla_put_u16(msg, nla_type, val.vu16))
+		if (nla_put_u16(msg, nla_type, val->vu16))
 			return -EMSGSIZE;
 		break;
 	case DEVLINK_PARAM_TYPE_U32:
-		if (nla_put_u32(msg, nla_type, val.vu32))
+		if (nla_put_u32(msg, nla_type, val->vu32))
 			return -EMSGSIZE;
 		break;
 	case DEVLINK_PARAM_TYPE_U64:
-		if (devlink_nl_put_u64(msg, nla_type, val.vu64))
+		if (devlink_nl_put_u64(msg, nla_type, val->vu64))
 			return -EMSGSIZE;
 		break;
 	case DEVLINK_PARAM_TYPE_STRING:
-		if (nla_put_string(msg, nla_type, val.vstr))
+		if (nla_put_string(msg, nla_type, val->vstr))
 			return -EMSGSIZE;
 		break;
 	case DEVLINK_PARAM_TYPE_BOOL:
@@ -245,10 +245,10 @@ devlink_nl_param_value_put(struct sk_buff *msg, enum devlink_param_type type,
 		 * false can be distinguished from not present
 		 */
 		if (flag_as_u8) {
-			if (nla_put_u8(msg, nla_type, val.vbool))
+			if (nla_put_u8(msg, nla_type, val->vbool))
 				return -EMSGSIZE;
 		} else {
-			if (val.vbool && nla_put_flag(msg, nla_type))
+			if (val->vbool && nla_put_flag(msg, nla_type))
 				return -EMSGSIZE;
 		}
 		break;
@@ -260,8 +260,8 @@ static int
 devlink_nl_param_value_fill_one(struct sk_buff *msg,
 				enum devlink_param_type type,
 				enum devlink_param_cmode cmode,
-				union devlink_param_value val,
-				union devlink_param_value default_val,
+				union devlink_param_value *val,
+				union devlink_param_value *default_val,
 				bool has_default)
 {
 	struct nlattr *param_value_attr;
@@ -383,8 +383,8 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 		if (!param_value_set[i])
 			continue;
 		err = devlink_nl_param_value_fill_one(msg, param->type,
-						      i, param_value[i],
-						      default_value[i],
+						      i, &param_value[i],
+						      &default_value[i],
 						      default_value_set[i]);
 		if (err)
 			goto values_list_nest_cancel;
@@ -621,7 +621,7 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 		if (err)
 			return err;
 		if (param->validate) {
-			err = param->validate(devlink, param->id, value,
+			err = param->validate(devlink, param->id, &value,
 					      info->extack);
 			if (err)
 				return err;
@@ -888,7 +888,7 @@ EXPORT_SYMBOL_GPL(devl_param_driverinit_value_get);
  *	configuration mode default value.
  */
 void devl_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
-				     union devlink_param_value init_val)
+				     union devlink_param_value *init_val)
 {
 	struct devlink_param_item *param_item;
 
@@ -902,9 +902,9 @@ void devl_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
 						      DEVLINK_PARAM_CMODE_DRIVERINIT)))
 		return;
 
-	param_item->driverinit_value = init_val;
+	param_item->driverinit_value = *init_val;
 	param_item->driverinit_value_valid = true;
-	param_item->driverinit_default = init_val;
+	param_item->driverinit_default = *init_val;
 
 	devlink_param_notify(devlink, 0, param_item, DEVLINK_CMD_PARAM_NEW);
 }
