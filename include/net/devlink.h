@@ -501,7 +501,7 @@ struct devlink_param {
 		   struct devlink_param_gset_ctx *ctx,
 		   struct netlink_ext_ack *extack);
 	int (*validate)(struct devlink *devlink, u32 id,
-			union devlink_param_value val,
+			union devlink_param_value *val,
 			struct netlink_ext_ack *extack);
 	int (*get_default)(struct devlink *devlink, u32 id,
 			   struct devlink_param_gset_ctx *ctx,
@@ -1923,7 +1923,7 @@ void devlink_params_unregister(struct devlink *devlink,
 int devl_param_driverinit_value_get(struct devlink *devlink, u32 param_id,
 				    union devlink_param_value *val);
 void devl_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
-				     union devlink_param_value init_val);
+				     union devlink_param_value *init_val);
 void devl_param_value_changed(struct devlink *devlink, u32 param_id);
 struct devlink_region *devl_region_create(struct devlink *devlink,
 					  const struct devlink_region_ops *ops,
