@@ -2871,7 +2871,7 @@ static void __mptcp_retrans(struct sock *sk)
 
 	/* With csum enabled retransmission can send new data. */
 	if (after64(dfrag->already_sent + dfrag->data_seq, msk->snd_nxt))
-		msk->snd_nxt = dfrag->already_sent + dfrag->data_seq;
+		WRITE_ONCE(msk->snd_nxt, dfrag->already_sent + dfrag->data_seq);
 
 reset_timer:
 	mptcp_check_and_set_pending(sk);
