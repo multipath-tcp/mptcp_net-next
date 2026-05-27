@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-fix-extra_subflows-underflow-on-userspace-PM-subflow-creation
+From: Tao Cui <cuitao@kylinos.cn>
+Subject: [PATCH] mptcp: pm: fix extra_subflows underflow on userspace PM subflow creation
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The userspace PM increments extra_subflows after __mptcp_subflow_connect()
+succeeds, but __mptcp_subflow_connect() calls mptcp_pm_close_subflow()
+on failure to roll back the pre-increment done by the kernel PM's fill_*()
+helpers. Because the userspace PM hasn't incremented yet at that point,
+this decrement is spurious and causes extra_subflows to underflow.
+
+Fix it by aligning the userspace PM with the kernel PM: increment
+extra_subflows before calling __mptcp_subflow_connect(), so the existing
+error path in subflow.c correctly rolls it back on failure. Also simplify
+the error handling by taking pm.lock only when needed for cleanup.
+
+Fixes: 77e4b94a3de6 ("mptcp: update userspace pm infos")
+Signed-off-by: Tao Cui <cuitao@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
