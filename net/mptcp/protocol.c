@@ -2276,8 +2276,10 @@ static bool mptcp_move_skbs(struct sock *sk)
 		mptcp_backlog_spooled(sk, moved, &skbs);
 	}
 	mptcp_data_unlock(sk);
+
 	if (enqueued && mptcp_epollin_ready(sk))
 		sk->sk_data_ready(sk);
+
 	return enqueued;
 }
 
@@ -2869,7 +2871,7 @@ static void __mptcp_retrans(struct sock *sk)
 
 	/* With csum enabled retransmission can send new data. */
 	if (after64(dfrag->already_sent + dfrag->data_seq, msk->snd_nxt))
-		msk->snd_nxt = dfrag->already_sent + dfrag->data_seq;
+		WRITE_ONCE(msk->snd_nxt, dfrag->already_sent + dfrag->data_seq);
 
 reset_timer:
 	mptcp_check_and_set_pending(sk);
