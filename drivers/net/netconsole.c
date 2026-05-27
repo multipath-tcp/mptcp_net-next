@@ -1264,7 +1264,7 @@ static void userdatum_release(struct config_item *item)
 	kfree(to_userdatum(item));
 }
 
-static struct configfs_item_operations userdatum_ops = {
+static const struct configfs_item_operations userdatum_ops = {
 	.release = userdatum_release,
 };
 
@@ -1319,7 +1319,7 @@ static struct configfs_attribute *userdata_attrs[] = {
 	NULL,
 };
 
-static struct configfs_group_operations userdata_ops = {
+static const struct configfs_group_operations userdata_ops = {
 	.make_item		= userdatum_make_item,
 	.drop_item		= userdatum_drop,
 };
@@ -1370,7 +1370,7 @@ static void netconsole_target_release(struct config_item *item)
 	kfree(nt);
 }
 
-static struct configfs_item_operations netconsole_target_item_ops = {
+static const struct configfs_item_operations netconsole_target_item_ops = {
 	.release		= netconsole_target_release,
 };
 
@@ -1480,7 +1480,7 @@ static void drop_netconsole_target(struct config_group *group,
 	config_item_put(&nt->group.cg_item);
 }
 
-static struct configfs_group_operations netconsole_subsys_group_ops = {
+static const struct configfs_group_operations netconsole_subsys_group_ops = {
 	.make_group	= make_netconsole_target,
 	.drop_item	= drop_netconsole_target,
 };
