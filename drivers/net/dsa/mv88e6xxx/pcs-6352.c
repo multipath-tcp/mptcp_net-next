@@ -326,9 +326,7 @@ static int mv88e6352_pcs_init(struct mv88e6xxx_chip *chip, int port)
 	unsigned int irq;
 	int err;
 
-	mv88e6xxx_reg_lock(chip);
 	err = mv88e6352_g2_scratch_port_has_serdes(chip, port);
-	mv88e6xxx_reg_unlock(chip);
 	if (err <= 0)
 		return err;
 
