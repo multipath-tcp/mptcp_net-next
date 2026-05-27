@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-add-test-for-extra_subflows-underflow-on-userspace-PM
+From: Tao Cui <cuitao@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: add test for extra_subflows underflow on userspace PM
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Add a test to verify that when userspace PM fails to create a subflow
+(e.g. using an unreachable address), the extra_subflows counter is not
+decremented below zero.
+
+Fixes: 77e4b94a3de6 ("mptcp: update userspace pm infos")
+Signed-off-by: Tao Cui <cuitao@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
