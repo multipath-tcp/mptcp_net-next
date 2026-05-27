@@ -534,4 +534,21 @@ int xt_compat_check_entry_offsets(const void *base, const char *elems,
 				  unsigned int next_offset);
 
 #endif /* CONFIG_NETFILTER_XTABLES_COMPAT */
+
+static inline bool xt_compat_check(void)
+{
+#ifdef CONFIG_NETFILTER_XTABLES_COMPAT
+	if (!in_compat_syscall())
+		return true;
+
+	pr_warn_once("%s %s\n",
+		     "xtables 32bit compat interface no longer supported",
+		     "in namespaces and will be removed soon.");
+
+	if (!capable(CAP_NET_ADMIN))
+		return false;
+#endif
+	return true;
+}
+
 #endif /* _X_TABLES_H */
