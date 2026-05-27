@@ -58,6 +58,7 @@ static spinlock_t nf_conncount_locks[CONNCOUNT_SLOTS] __cacheline_aligned_in_smp
 
 struct nf_conncount_data {
 	unsigned int keylen;
+	u32 initval;
 	struct rb_root root[CONNCOUNT_SLOTS];
 	struct net *net;
 	struct work_struct gc_work;
@@ -65,7 +66,6 @@ struct nf_conncount_data {
 	unsigned int gc_tree;
 };
 
-static u_int32_t conncount_rnd __read_mostly;
 static struct kmem_cache *conncount_rb_cachep __read_mostly;
 static struct kmem_cache *conncount_conn_cachep __read_mostly;
 
@@ -496,7 +496,7 @@ count_tree(struct net *net,
 	struct nf_conncount_rb *rbconn;
 	unsigned int hash;
 
-	hash = jhash2(key, data->keylen, conncount_rnd) % CONNCOUNT_SLOTS;
+	hash = jhash2(key, data->keylen, data->initval) % CONNCOUNT_SLOTS;
 	root = &data->root[hash];
 
 	parent = rcu_dereference_raw(root->rb_node);
@@ -630,8 +630,6 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int keylen
 	    keylen == 0)
 		return ERR_PTR(-EINVAL);
 
-	net_get_random_once(&conncount_rnd, sizeof(conncount_rnd));
-
 	data = kmalloc_obj(*data);
 	if (!data)
 		return ERR_PTR(-ENOMEM);
@@ -641,6 +639,7 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int keylen
 
 	data->keylen = keylen / sizeof(u32);
 	data->net = net;
+	data->initval = get_random_u32();
 	INIT_WORK(&data->gc_work, tree_gc_worker);
 
 	return data;
