@@ -76,13 +76,13 @@ setup()
 
 	ip -net "$ns1" addr add 10.0.1.1/24 dev ns1eth1
 	ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth1 nodad
-	ip -net "$ns1" link set ns1eth1 up mtu 1500
+	ip -net "$ns1" link set ns1eth1 up mtu 1500 gso_max_segs 0
 	ip -net "$ns1" route add default via 10.0.1.2
 	ip -net "$ns1" route add default via dead:beef:1::2
 
 	ip -net "$ns1" addr add 10.0.2.1/24 dev ns1eth2
 	ip -net "$ns1" addr add dead:beef:2::1/64 dev ns1eth2 nodad
-	ip -net "$ns1" link set ns1eth2 up mtu 1500
+	ip -net "$ns1" link set ns1eth2 up mtu 1500 gso_max_segs 0
 	ip -net "$ns1" route add default via 10.0.2.2 metric 101
 	ip -net "$ns1" route add default via dead:beef:2::2 metric 101
 
@@ -91,21 +91,21 @@ setup()
 
 	ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
 	ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
-	ip -net "$ns2" link set ns2eth1 up mtu 1500
+	ip -net "$ns2" link set ns2eth1 up mtu 1500 gso_max_segs 0
 
 	ip -net "$ns2" addr add 10.0.2.2/24 dev ns2eth2
 	ip -net "$ns2" addr add dead:beef:2::2/64 dev ns2eth2 nodad
-	ip -net "$ns2" link set ns2eth2 up mtu 1500
+	ip -net "$ns2" link set ns2eth2 up mtu 1500 gso_max_segs 0
 
 	ip -net "$ns2" addr add 10.0.3.2/24 dev ns2eth3
 	ip -net "$ns2" addr add dead:beef:3::2/64 dev ns2eth3 nodad
-	ip -net "$ns2" link set ns2eth3 up mtu 1500
+	ip -net "$ns2" link set ns2eth3 up mtu 1500 gso_max_segs 0
 	ip netns exec "$ns2" sysctl -q net.ipv4.ip_forward=1
 	ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
 
 	ip -net "$ns3" addr add 10.0.3.3/24 dev ns3eth1
 	ip -net "$ns3" addr add dead:beef:3::3/64 dev ns3eth1 nodad
-	ip -net "$ns3" link set ns3eth1 up mtu 1500
+	ip -net "$ns3" link set ns3eth1 up mtu 1500 gso_max_segs 0
 	ip -net "$ns3" route add default via 10.0.3.2
 	ip -net "$ns3" route add default via dead:beef:3::2
 
