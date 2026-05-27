@@ -1,4 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-set-EXIT-trap-earlier
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: sockopt: set EXIT trap earlier
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Set the EXIT trap for cleanup immediately after creating temporary file
+variables, before init and make_file, to ensure cleanup runs on any
+failure or interruption during the early setup phase.
+
+Fixes: dc65fe82fb07 ("selftests: mptcp: add packet mark test case")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
