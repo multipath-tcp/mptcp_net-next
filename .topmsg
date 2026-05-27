@@ -1,4 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-retransmission-loop-when-csum-is-enabled
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix retransmission loop when csum is enabled
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Sashiko noted that retransmission with csum enabled can actually
+transmit new data, but currently the relevant code does not update
+accordingly snd_nxt.
+
+The may cause incoming ack drop and an endless retransmission loop.
+
+Address the issue incrementing snd_nxt as needed.
+
+Fixes: 4e14867d5e91 ("mptcp: tune re-injections for csum enabled mode")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
