@@ -454,6 +454,9 @@ struct mv88e6xxx_chip {
 
 	/* TCAM entries */
 	struct mv88e6xxx_tcam tcam;
+
+	/* Global2 scratch register config data3 */
+	u8 g2_scratch_config3;
 };
 
 #define TCAM_MATCH_SIZE 96
