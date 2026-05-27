@@ -1,4 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-missing-wakeups-in-edge-scenarios
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix missing wakeups in edge scenarios
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+The mptcp_recvmsg() can fill MPTCP socket receive queue via
+mptcp_move_skbs(), but currently does not try to wakeup any listener,
+because the same process is going to check the receive queue soon.
+
+When multiple threads are reading from the same fd, the above can
+cause stall. Add the missing wakeup.
+
+Fixes: 6771bfd9ee24 ("mptcp: update mptcp ack sequence from work queue")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
