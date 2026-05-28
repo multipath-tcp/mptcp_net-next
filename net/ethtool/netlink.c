@@ -526,13 +526,15 @@ static int ethnl_default_doit(struct sk_buff *skb, struct genl_info *info)
 		goto err_free;
 	ethnl_init_reply_data(reply_data, ops, req_info->dev);
 
-	rtnl_lock();
-	if (req_info->dev)
+	if (req_info->dev) {
+		rtnl_lock();
 		netdev_lock_ops(req_info->dev);
+	}
 	ret = ops->prepare_data(req_info, reply_data, info);
-	if (req_info->dev)
+	if (req_info->dev) {
 		netdev_unlock_ops(req_info->dev);
-	rtnl_unlock();
+		rtnl_unlock();
+	}
 	if (ret < 0)
 		goto err_dev;
 	ret = ops->reply_size(req_info, reply_data);
