@@ -1,4 +1,12 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-implemented-OoO-queue-pruning
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: implemented OoO queue pruning
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+When moving incoming skbs in the msk receive queue and the latter
+is above limits, prune it as needed quite alike what TCP is doing
+at the subflow level. The main difference relies in the stop condition:
+since MPTCP does not perform collapsing, it's better off dropping the
+bare minimum to fit the (newer) incoming packet.
+
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Tested-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
