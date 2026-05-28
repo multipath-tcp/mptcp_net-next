@@ -204,7 +204,7 @@ static irqreturn_t ngbe_intr(int __always_unused irq, void *data)
 		/* shared interrupt alert!
 		 * the interrupt that we masked before the EICR read.
 		 */
-		if (netif_running(wx->netdev))
+		if (!test_bit(WX_STATE_DOWN, wx->state))
 			ngbe_irq_enable(wx, true);
 		return IRQ_NONE;        /* Not our interrupt */
 	}
@@ -220,7 +220,7 @@ static irqreturn_t ngbe_intr(int __always_unused irq, void *data)
 	/* would disable interrupts here but it is auto disabled */
 	napi_schedule_irqoff(&q_vector->napi);
 
-	if (netif_running(wx->netdev))
+	if (!test_bit(WX_STATE_DOWN, wx->state))
 		ngbe_irq_enable(wx, false);
 
 	return IRQ_HANDLED;
@@ -235,7 +235,7 @@ static irqreturn_t __ngbe_msix_misc(struct wx *wx, u32 eicr)
 		wx_ptp_check_pps_event(wx);
 
 	/* re-enable the original interrupt state, no lsc, no queues */
-	if (netif_running(wx->netdev))
+	if (!test_bit(WX_STATE_DOWN, wx->state))
 		ngbe_irq_enable(wx, false);
 
 	return IRQ_HANDLED;
@@ -262,7 +262,7 @@ static irqreturn_t ngbe_misc_and_queue(int __always_unused irq, void *data)
 		/* queue */
 		q_vector = wx->q_vector[0];
 		napi_schedule_irqoff(&q_vector->napi);
-		if (netif_running(wx->netdev))
+		if (!test_bit(WX_STATE_DOWN, wx->state))
 			ngbe_irq_enable(wx, true);
 		return IRQ_HANDLED;
 	}
@@ -363,6 +363,9 @@ static void ngbe_disable_device(struct wx *wx)
 	struct net_device *netdev = wx->netdev;
 	u32 i;
 
+	if (test_and_set_bit(WX_STATE_DOWN, wx->state))
+		return;
+
 	if (wx->num_vfs) {
 		/* Clear EITR Select mapping */
 		wr32(wx, WX_PX_ITRSEL, 0);
@@ -401,8 +404,6 @@ static void ngbe_disable_device(struct wx *wx)
 
 		wr32(wx, WX_PX_TR_CFG(reg_idx), WX_PX_TR_CFG_SWFLSH);
 	}
-
-	wx_update_stats(wx);
 }
 
 static void ngbe_reset(struct wx *wx)
@@ -428,6 +429,7 @@ void ngbe_up(struct wx *wx)
 
 	/* make sure to complete pre-operations */
 	smp_mb__before_atomic();
+	clear_bit(WX_STATE_DOWN, wx->state);
 	wx_napi_enable_all(wx);
 	/* enable transmits */
 	netif_tx_start_all_queues(wx->netdev);
