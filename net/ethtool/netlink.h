@@ -333,7 +333,9 @@ int ethnl_sock_priv_set(struct sk_buff *skb, struct net *net, u32 portid,
  * @hdr_attr:         attribute type for request header
  * @req_info_size:    size of request info
  * @reply_data_size:  size of reply data
- * @allow_nodev_do:   allow non-dump request with no device identification
+ * @allow_nodev_do:
+ *	Allow non-dump request with no device identification.
+ *	Note that locks (rtnl_lock etc.) are only taken if device is set.
  * @set_ntf_cmd:      notification to generate on changes (SET)
  * @parse_request:
  *	Parse request except common header (struct ethnl_req_info). Common
