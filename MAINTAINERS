@@ -10843,7 +10843,7 @@ F:	include/linux/generic-radix-tree.h
 F:	lib/generic-radix-tree.c
 
 GENERIC RESISTIVE TOUCHSCREEN ADC DRIVER
-M:	Eugen Hristev <eugen.hristev@microchip.com>
+M:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-input@vger.kernel.org
 S:	Maintained
 F:	drivers/input/touchscreen/resistive-adc-touch.c
@@ -12799,7 +12799,6 @@ M:	Cezary Rojewski <cezary.rojewski@intel.com>
 M:	Liam Girdwood <liam.r.girdwood@linux.intel.com>
 M:	Peter Ujfalusi <peter.ujfalusi@linux.intel.com>
 M:	Bard Liao <yung-chuan.liao@linux.intel.com>
-M:	Ranjani Sridharan <ranjani.sridharan@linux.intel.com>
 M:	Kai Vehmanen <kai.vehmanen@linux.intel.com>
 R:	Pierre-Louis Bossart <pierre-louis.bossart@linux.dev>
 L:	linux-sound@vger.kernel.org
@@ -16515,7 +16514,7 @@ F:	drivers/usb/mtu3/
 
 MEGACHIPS STDPXXXX-GE-B850V3-FW LVDS/DP++ BRIDGES
 M:	Peter Senna Tschudin <peter.senna@gmail.com>
-M:	Ian Ray <ian.ray@ge.com>
+M:	Ian Ray <ian.ray@gehealthcare.com>
 M:	Martyn Welch <martyn.welch@collabora.co.uk>
 S:	Maintained
 F:	Documentation/devicetree/bindings/display/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
@@ -17354,7 +17353,7 @@ F:	Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt
 F:	sound/soc/atmel
 
 MICROCHIP CSI2DC DRIVER
-M:	Eugen Hristev <eugen.hristev@microchip.com>
+M:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-media@vger.kernel.org
 S:	Supported
 F:	Documentation/devicetree/bindings/media/microchip,csi2dc.yaml
@@ -17381,7 +17380,7 @@ F:	drivers/i2c/busses/i2c-at91-*.c
 F:	drivers/i2c/busses/i2c-at91.h
 
 MICROCHIP ISC DRIVER
-M:	Eugen Hristev <eugen.hristev@microchip.com>
+M:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-media@vger.kernel.org
 S:	Supported
 F:	Documentation/devicetree/bindings/media/atmel,isc.yaml
@@ -17393,7 +17392,7 @@ F:	drivers/staging/media/deprecated/atmel/atmel-sama*-isc*
 F:	include/linux/atmel-isc-media.h
 
 MICROCHIP ISI DRIVER
-M:	Eugen Hristev <eugen.hristev@microchip.com>
+M:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-media@vger.kernel.org
 S:	Supported
 F:	drivers/media/platform/atmel/atmel-isi.c
@@ -17583,7 +17582,7 @@ F:	Documentation/devicetree/bindings/display/bridge/microchip,sam9x75-lvds.yaml
 F:	drivers/gpu/drm/bridge/microchip-lvds.c
 
 MICROCHIP SAMA5D2-COMPATIBLE ADC DRIVER
-M:	Eugen Hristev <eugen.hristev@microchip.com>
+M:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-iio@vger.kernel.org
 S:	Supported
 F:	Documentation/devicetree/bindings/iio/adc/atmel,sama5d2-adc.yaml
@@ -18955,7 +18954,8 @@ F:	drivers/hid/hid-nintendo*
 
 NIOS2 ARCHITECTURE
 M:	Dinh Nguyen <dinguyen@kernel.org>
-S:	Maintained
+M:	Simon Schuster <schuster.simon@siemens-energy.com>
+S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
 F:	arch/nios2/
 
@@ -19480,7 +19480,6 @@ F:	include/misc/ocxl*
 F:	include/uapi/misc/ocxl.h
 
 OMAP AUDIO SUPPORT
-M:	Peter Ujfalusi <peter.ujfalusi@gmail.com>
 M:	Jarkko Nikula <jarkko.nikula@bitmer.com>
 L:	linux-sound@vger.kernel.org
 L:	linux-omap@vger.kernel.org
@@ -20763,15 +20762,13 @@ F:	Documentation/devicetree/bindings/pci/intel,keembay-pcie*
 F:	drivers/pci/controller/dwc/pcie-keembay.c
 
 PCIE DRIVER FOR INTEL LGM GW SOC
-M:	Chuanhua Lei <lchuanhua@maxlinear.com>
 L:	linux-pci@vger.kernel.org
-S:	Maintained
+S:	Orphan
 F:	Documentation/devicetree/bindings/pci/intel-gw-pcie.yaml
 F:	drivers/pci/controller/dwc/pcie-intel-gw.c
 
 PCIE DRIVER FOR MEDIATEK
 M:	Ryder Lee <ryder.lee@mediatek.com>
-M:	Jianjun Wang <jianjun.wang@mediatek.com>
 L:	linux-pci@vger.kernel.org
 L:	linux-mediatek@lists.infradead.org (moderated for non-subscribers)
 S:	Supported
@@ -24146,7 +24143,7 @@ F:	drivers/mmc/host/sdhci*
 
 SECURE DIGITAL HOST CONTROLLER INTERFACE (SDHCI) MICROCHIP DRIVER
 M:	Aubin Constans <aubin.constans@microchip.com>
-R:	Eugen Hristev <eugen.hristev@collabora.com>
+R:	Eugen Hristev <ehristev@kernel.org>
 L:	linux-mmc@vger.kernel.org
 S:	Supported
 F:	drivers/mmc/host/sdhci-of-at91.c
@@ -25091,7 +25088,6 @@ SOUND - SOUND OPEN FIRMWARE (SOF) DRIVERS
 M:	Liam Girdwood <lgirdwood@gmail.com>
 M:	Peter Ujfalusi <peter.ujfalusi@linux.intel.com>
 M:	Bard Liao <yung-chuan.liao@linux.intel.com>
-M:	Ranjani Sridharan <ranjani.sridharan@linux.intel.com>
 M:	Daniel Baluta <daniel.baluta@nxp.com>
 R:	Kai Vehmanen <kai.vehmanen@linux.intel.com>
 R:	Pierre-Louis Bossart <pierre-louis.bossart@linux.dev>
@@ -26384,7 +26380,7 @@ F:	arch/xtensa/
 F:	drivers/irqchip/irq-xtensa-*
 
 TEXAS INSTRUMENTS ASoC DRIVERS
-M:	Peter Ujfalusi <peter.ujfalusi@gmail.com>
+M:	Sen Wang <sen@ti.com>
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/sound/davinci-mcasp-audio.yaml
@@ -26885,12 +26881,6 @@ L:	linux-iio@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/iio/adc/ti,tsc2046.yaml
 F:	drivers/iio/adc/ti-tsc2046.c
-
-TI TWL4030 SERIES SOC CODEC DRIVER
-M:	Peter Ujfalusi <peter.ujfalusi@gmail.com>
-L:	linux-sound@vger.kernel.org
-S:	Maintained
-F:	sound/soc/codecs/twl4030*
 
 TI VPE/CAL DRIVERS
 M:	Yemike Abhilash Chandra <y-abhilashchandra@ti.com>
