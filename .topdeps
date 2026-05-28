@@ -1,1 +1,1 @@
-t/selftests-mptcp-sockopt-set-EXIT-trap-earlier
+t/mptcp-allow-subflow-rcv-wnd-to-shrink
