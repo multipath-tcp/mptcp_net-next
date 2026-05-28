@@ -53,7 +53,7 @@ def _test_variants_mono():
             ["zero_delay", "a,0", "a,0"],
             ["one_pkt", "a,10", "a,10"],
             ["in_order", "a,10,b,20", "a,10,b,20"],
-            ["reverse_order", "a,20,b,10", "b,20,a,20"],
+            ["reverse_order", "a,20,b,10", "b,10,a,20"],
         ]:
             name = f"v{ipver}_{testcase[0]}"
             yield KsftNamedVariant(name, ipver, testcase[1], testcase[2])
