@@ -73,7 +73,7 @@ int dns_query(struct net *net,
 	kenter("%s,%*.*s,%zu,%s",
 	       type, (int)namelen, (int)namelen, name, namelen, options);
 
-	if (!name || namelen == 0)
+	if (!name || namelen < 3 || namelen > 255)
 		return -EINVAL;
 
 	/* construct the query key description as "[<type>:]<name>" */
@@ -86,8 +86,6 @@ int dns_query(struct net *net,
 		desclen += typelen + 1;
 	}
 
-	if (namelen < 3 || namelen > 255)
-		return -EINVAL;
 	desclen += namelen + 1;
 
 	desc = kmalloc(desclen, GFP_KERNEL);
