@@ -1220,6 +1220,7 @@ bool nvmf_ip_options_match(struct nvme_ctrl *ctrl,
 		struct nvmf_ctrl_options *opts)
 {
 	if (!nvmf_ctlr_matches_baseopts(ctrl, opts) ||
+	    strcmp(opts->transport, ctrl->opts->transport) ||
 	    strcmp(opts->traddr, ctrl->opts->traddr) ||
 	    strcmp(opts->trsvcid, ctrl->opts->trsvcid))
 		return false;
