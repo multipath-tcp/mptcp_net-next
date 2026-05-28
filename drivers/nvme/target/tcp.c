@@ -2101,6 +2101,15 @@ static const struct nvmet_tcp_proto_ops nvmet_tcp_proto_ops = {
 	.set_priority	= sock_set_priority,
 };
 
+#ifdef CONFIG_MPTCP
+static const struct nvmet_tcp_proto_ops nvmet_mptcp_proto_ops = {
+	.protocol	= IPPROTO_MPTCP,
+	.set_reuseaddr	= mptcp_sock_set_reuseaddr,
+	.set_nodelay	= mptcp_sock_set_nodelay,
+	.set_priority	= mptcp_sock_set_priority,
+};
+#endif
+
 static int nvmet_tcp_add_port(struct nvmet_port *nport)
 {
 	const struct nvmet_tcp_proto_ops *ops;
@@ -2128,6 +2137,10 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 
 	if (nport->disc_addr.trtype == NVMF_TRTYPE_TCP) {
 		ops = &nvmet_tcp_proto_ops;
+#ifdef CONFIG_MPTCP
+	} else if (nport->disc_addr.trtype == NVMF_TRTYPE_MPTCP) {
+		ops = &nvmet_mptcp_proto_ops;
+#endif
 	} else {
 		ret = -EINVAL;
 		goto err_port;
