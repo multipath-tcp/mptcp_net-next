@@ -135,6 +135,8 @@ page_pool_nl_stats_fill(struct sk_buff *rsp, const struct page_pool *pool,
 		return -EMSGSIZE;
 
 	nest = nla_nest_start(rsp, NETDEV_A_PAGE_POOL_STATS_INFO);
+	if (!nest)
+		goto err_cancel_msg;
 
 	if (nla_put_uint(rsp, NETDEV_A_PAGE_POOL_ID, pool->user.id) ||
 	    (pool->slow.netdev->ifindex != LOOPBACK_IFINDEX &&
