@@ -482,14 +482,21 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 	u8 shutdown;
 	int state;
 
-	mask = tcp_poll(file, sock, wait);
+	/* Paired with smp_store_release() in update_sk_prot().
+	 * Ensures that the read of icsk_ulp_data (tls_ctx) is ordered after
+	 * the read of sk->sk_socket->ops inside tls_ctx->prot->ops->poll().
+	 * Prevents seeing a new ops pointer but a stale (NULL) ulp_data.
+	 */
+	smp_rmb();
+
+	tls_ctx = tls_get_ctx(sk);
+	mask = tls_ctx->prot->ops->poll(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
 	shutdown = READ_ONCE(sk->sk_shutdown);
 	if (unlikely(state != TCP_ESTABLISHED || shutdown & RCV_SHUTDOWN))
 		return mask;
 
-	tls_ctx = tls_get_ctx(sk);
 	ctx = tls_sw_ctx_rx(tls_ctx);
 	psock = sk_psock_get(sk);
 
