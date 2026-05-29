@@ -1082,6 +1082,12 @@ out:
 	return rc;
 }
 
+static void tls_clone(const struct request_sock *req,
+		      struct sock *newsk,
+		      const gfp_t priority)
+{
+}
+
 static void tls_update(struct sock *sk, struct proto *p,
 		       void (*write_space)(struct sock *sk))
 {
@@ -1231,6 +1237,7 @@ static struct tcp_ulp_ops tcp_tls_ulp_ops __read_mostly = {
 	.name			= "tls",
 	.owner			= THIS_MODULE,
 	.init			= tls_init,
+	.clone			= tls_clone,
 	.update			= tls_update,
 	.get_info		= tls_get_info,
 	.get_info_size		= tls_get_info_size,
