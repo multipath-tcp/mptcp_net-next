@@ -4486,8 +4486,8 @@ struct sk_buff *tcp_get_timestamping_opt_stats(const struct sock *sk,
 	return stats;
 }
 
-static int tcp_sock_get_ulp(struct sock *sk, sockptr_t optval,
-			    sockptr_t optlen)
+int tcp_sock_get_ulp(struct sock *sk, sockptr_t optval,
+		     sockptr_t optlen)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	int len;
