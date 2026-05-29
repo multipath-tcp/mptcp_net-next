@@ -1,1 +1,1 @@
-t/mptcp-allow-subflow-rcv-wnd-to-shrink
+t/mptcp-sockopt-set-sockopt-on-all-subflows
