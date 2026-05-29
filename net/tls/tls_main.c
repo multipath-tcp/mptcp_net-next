@@ -1059,11 +1059,6 @@ static int tls_init(struct sock *sk)
 
 	tls_build_proto(sk);
 
-#ifdef CONFIG_TLS_TOE
-	if (tls_toe_bypass(sk))
-		return 0;
-#endif
-
 	/* The TLS ulp is currently supported only for TCP sockets
 	 * in ESTABLISHED state.
 	 * Supporting sockets in LISTEN state will require us
@@ -1072,6 +1067,11 @@ static int tls_init(struct sock *sk)
 	 */
 	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
+
+#ifdef CONFIG_TLS_TOE
+	if (tls_toe_bypass(sk))
+		return 0;
+#endif
 
 	/* allocate tls context */
 	write_lock_bh(&sk->sk_callback_lock);
