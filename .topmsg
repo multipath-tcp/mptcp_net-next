@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sockopt-check-timestamping-ret-value
+Subject: [PATCH] mptcp: sockopt: check timestamping ret value
 
+sock_set_timestamping() can fail for different reasons. The returned
+value should then be checked.
+
+If sock_set_timestamping() fails for at least one subflow, the first
+error is now reported to the userspace, similar to what is done with
+other socket options.
+
+Fixes: 9061f24bf82e ("mptcp: sockopt: propagate timestamp request to subflows")
+Reported-by: Willem de Bruijn <willemdebruijn.kernel@gmail.com>
+Closes: https://lore.kernel.org/willemdebruijn.kernel.178a41a53d041@gmail.com
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
