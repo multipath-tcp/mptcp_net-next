@@ -1,4 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-sockopt-set-sockopt-on-all-subflows
+Subject: [PATCH] mptcp: sockopt: set sockopt on all subflows
 
+The mptcp_setsockopt_all_sf(), currently used only with TCP_MAXSEG,
+stopped when one subflow returned an error.
+
+Even if it is not wrong, this is different from the other helpers trying
+to set the option on all subflows, and then returning an error if at
+least one of them had an issue.
+
+Follow this behaviour, for a question of uniformity.
+
+Fixes: 51c5fd09e1b4 ("mptcp: add TCP_MAXSEG sockopt support")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
