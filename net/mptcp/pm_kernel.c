@@ -1138,6 +1138,7 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
 		struct mptcp_addr_info msk_local;
+		bool announced;
 
 		if (list_empty(&msk->conn_list) || mptcp_pm_is_userspace(msk))
 			goto next;
@@ -1147,7 +1148,16 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 			goto next;
 
 		lock_sock(sk);
+		/* Drop a possibly pending ADD_ADDR for this address: stop its
+		 * retransmit timer and unlink the anno_list entry, so a later
+		 * re-add cannot find a stale entry and hit the WARN_ON_ONCE()
+		 * in mptcp_pm_alloc_anno_list(). Mirrors the non-zero id path
+		 * in mptcp_pm_remove_anno_addr().
+		 */
+		announced = mptcp_remove_anno_list_by_saddr(msk, &msk_local);
 		spin_lock_bh(&msk->pm.lock);
+		if (announced)
+			msk->pm.add_addr_signaled--;
 		mptcp_pm_remove_addr(msk, &list);
 		mptcp_pm_rm_subflow(msk, &list);
 		__mark_subflow_endp_available(msk, 0);
