@@ -2213,3 +2213,7 @@ void __init mptcp_subflow_v6_init(void)
 #endif
 }
 #endif
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("MPTCP subflow");
+MODULE_ALIAS_TCP_ULP("mptcp");
