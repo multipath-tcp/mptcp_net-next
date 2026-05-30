@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-options-suboptions-sizes-can-be-negative
+Subject: [PATCH] mptcp: options: suboptions sizes can be negative
 
+Use a signed int for the returned size, because when other options are
+dropped, the size can be negative, e.g. to send an echo ADD_ADDR with a
+v4 address, and no port.
+
+The behaviour is not changed, because it was working as expected with an
+overflow. But it is clearer like this, and it will help later on.
+
+Even if, for the moment, only the ADD_ADDR size can be negative in some
+cases, a signed int is now used for all mptcp_established_options_*()
+helpers, not to mismatch the type, and as a question of uniformity.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
