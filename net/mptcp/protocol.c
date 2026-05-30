@@ -376,7 +376,7 @@ static void mptcp_init_skb(struct sock *ssk, struct sk_buff *skb, int offset,
 /* "Inspired" from the TCP version; main difference: stop as soon as the MPTCP
  * socket is under memory limit.
  */
-static void mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
+static bool mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct rb_node *node, *prev;
@@ -384,7 +384,7 @@ static void mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 	u64 mem;
 
 	if (RB_EMPTY_ROOT(&msk->out_of_order_queue))
-		return;
+		goto out;
 
 	node = &msk->ooo_last_skb->rbnode;
 
@@ -401,7 +401,7 @@ static void mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 		mptcp_drop(sk, skb);
 		msk->ooo_last_skb = rb_to_skb(prev);
 
-		mem = (unsigned int)atomic_read(&sk->sk_rmem_alloc);
+		mem = (unsigned int)sk_rmem_alloc_get(sk);
 		if (mem < sk->sk_rcvbuf)
 			break;
 
@@ -410,6 +410,10 @@ static void mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 
 	if (pruned)
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFO_PRUNED);
+
+out:
+	mem = (unsigned int)sk_rmem_alloc_get(sk);
+	return mem < sk->sk_rcvbuf;
 }
 
 static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
@@ -424,13 +428,11 @@ static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
 	 * will break.
 	 */
 	if (unlikely(sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf)) &&
-	    !__mptcp_check_fallback(msk)) {
-		mptcp_prune_ofo_queue(sk, MPTCP_SKB_CB(skb)->map_seq);
-		if (sk_rmem_alloc_get(sk) > READ_ONCE(sk->sk_rcvbuf)) {
-			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
-			mptcp_drop(sk, skb);
-			return false;
-		}
+	    !__mptcp_check_fallback(msk) &&
+	    !mptcp_prune_ofo_queue(sk, MPTCP_SKB_CB(skb)->map_seq)) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
+		mptcp_drop(sk, skb);
+		return false;
 	}
 
 	if (MPTCP_SKB_CB(skb)->map_seq == msk->ack_seq) {
