@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-remove-add_-prefix-from-timer
+Subject: [PATCH] mptcp: pm: remove add_ prefix from timer
 
+Similar to the two previous commits, using the 'add' prefix is
+confusing, also confirmed by [1].
+
+Now that the structure has been renamed to include 'add_addr' in its
+name, easier to know the timer is linked to the ADD_ADDR, no need to
+add the confusing prefix, or an unneeded longer one.
+
+While at it, also update the ADD_ADDR timer helper to clearly specify it
+is linked to ADD_ADDR, and it is not there to add a new timer.
+
+Link: https://lore.kernel.org/20251117100745.1913963-1-edumazet@google.com [1]
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
