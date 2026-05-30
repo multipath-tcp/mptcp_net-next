@@ -84,41 +84,84 @@ out:
 void tls_toe_unhash(struct sock *sk)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
-	struct tls_toe_device *dev;
+	struct tls_toe_device *dev, **devs;
+	int ndev = 0, i = 0;
+
+	spin_lock_bh(&device_spinlock);
+	list_for_each_entry(dev, &device_list, dev_list) {
+		if (dev->unhash)
+			ndev++;
+	}
+	spin_unlock_bh(&device_spinlock);
+
+	if (!ndev)
+		goto out;
+
+	devs = kmalloc_array(ndev, sizeof(*devs), GFP_KERNEL);
+	if (!devs)
+		goto out;
 
 	spin_lock_bh(&device_spinlock);
 	list_for_each_entry(dev, &device_list, dev_list) {
 		if (dev->unhash) {
 			kref_get(&dev->kref);
-			spin_unlock_bh(&device_spinlock);
-			dev->unhash(dev, sk);
-			kref_put(&dev->kref, dev->release);
-			spin_lock_bh(&device_spinlock);
+			devs[i++] = dev;
 		}
 	}
 	spin_unlock_bh(&device_spinlock);
+
+	for (i = 0; i < ndev; i++) {
+		dev = devs[i];
+		dev->unhash(dev, sk);
+		kref_put(&dev->kref, dev->release);
+	}
+	kfree(devs);
+
+out:
 	ctx->sk_proto->unhash(sk);
 }
 
 int tls_toe_hash(struct sock *sk)
 {
 	struct tls_context *ctx = tls_get_ctx(sk);
-	struct tls_toe_device *dev;
+	struct tls_toe_device *dev, **devs;
+	int ndev = 0, i = 0;
 	int err;
 
 	err = ctx->sk_proto->hash(sk);
 	spin_lock_bh(&device_spinlock);
 	list_for_each_entry(dev, &device_list, dev_list) {
+		if (dev->hash)
+			ndev++;
+	}
+	spin_unlock_bh(&device_spinlock);
+
+	if (!ndev)
+		goto out;
+
+	devs = kmalloc_array(ndev, sizeof(*devs), GFP_KERNEL);
+	if (!devs) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	spin_lock_bh(&device_spinlock);
+	list_for_each_entry(dev, &device_list, dev_list) {
 		if (dev->hash) {
 			kref_get(&dev->kref);
-			spin_unlock_bh(&device_spinlock);
-			err |= dev->hash(dev, sk);
-			kref_put(&dev->kref, dev->release);
-			spin_lock_bh(&device_spinlock);
+			devs[i++] = dev;
 		}
 	}
 	spin_unlock_bh(&device_spinlock);
 
+	for (i = 0; i < ndev; i++) {
+		dev = devs[i];
+		err |= dev->hash(dev, sk);
+		kref_put(&dev->kref, dev->release);
+	}
+	kfree(devs);
+
+out:
 	if (err)
 		tls_toe_unhash(sk);
 	return err;
