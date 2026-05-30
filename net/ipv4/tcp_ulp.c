@@ -112,19 +112,21 @@ void tcp_update_ulp(struct sock *sk, struct proto *proto,
 void tcp_cleanup_ulp(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	const struct tcp_ulp_ops *ulp_ops;
 
 	/* No sock_owned_by_me() check here as at the time the
 	 * stack calls this function, the socket is dead and
 	 * about to be destroyed.
 	 */
-	if (!icsk->icsk_ulp_ops)
+	ulp_ops = icsk->icsk_ulp_ops;
+	if (!ulp_ops)
 		return;
 
-	if (icsk->icsk_ulp_ops->release)
-		icsk->icsk_ulp_ops->release(sk);
-	module_put(icsk->icsk_ulp_ops->owner);
-
-	icsk->icsk_ulp_ops = NULL;
+	if (ulp_ops->release)
+		ulp_ops->release(sk);
+	/* Pairs with rcu_dereference() in tcp_diag readers. */
+	smp_store_release(&icsk->icsk_ulp_ops, NULL);
+	module_put(ulp_ops->owner);
 }
 
 static int __tcp_set_ulp(struct sock *sk, const struct tcp_ulp_ops *ulp_ops)
