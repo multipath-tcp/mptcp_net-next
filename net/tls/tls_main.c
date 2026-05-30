@@ -965,6 +965,9 @@ static void build_proto_ops(struct proto_ops ops[TLS_NUM_CONFIG][TLS_NUM_CONFIG]
 #endif
 #ifdef CONFIG_TLS_TOE
 	ops[TLS_HW_RECORD][TLS_HW_RECORD] = *base;
+
+	ops[TLS_SW][TLS_HW_RECORD] = *base;
+	ops[TLS_HW_RECORD][TLS_SW] = *base;
 #endif
 }
 
@@ -1041,6 +1044,9 @@ static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
 	prot[TLS_HW_RECORD][TLS_HW_RECORD] = *base;
 	prot[TLS_HW_RECORD][TLS_HW_RECORD].hash		= tls_toe_hash;
 	prot[TLS_HW_RECORD][TLS_HW_RECORD].unhash	= tls_toe_unhash;
+
+	prot[TLS_SW][TLS_HW_RECORD] = prot[TLS_SW][TLS_SW];
+	prot[TLS_HW_RECORD][TLS_SW] = prot[TLS_BASE][TLS_SW];
 #endif
 }
 
