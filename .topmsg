@@ -1,4 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-avoid-using-del_timer-directly
+Subject: [PATCH] mptcp: pm: avoid using del_timer directly
 
+mptcp_pm_announced_del_timer() removes the matched ADD_ADDR entry (if
+found) from the ADD_ADDR list only if check_id is false. That's
+dangerous, and not clear, because it means the caller should be free the
+entry only in some cases, and it easy to miss that.
+
+Instead, make it static, and call it from mptcp_pm_add_addr_echoed,
+which is the only other case where mptcp_pm_add_addr_del_timer should be
+called with check_id set to true. Bonus with that: a second call to
+mptcp_pm_add_addr_lookup_by_addr() can be avoided.
+
+Note that instead of adding the signature above to avoid a compilation
+issue because this helper is called before the definition of the
+function, the whole helper is moved above where it is first called. Its
+content is untouched, except the addition of the 'static' keyboard.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
