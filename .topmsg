@@ -1,4 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-avoid-sleeping-while-holding-rcu_read_lock
+Subject: [PATCH] mptcp: pm: avoid sleeping while holding rcu_read_lock
 
+sk_stop_timer_sync() calls del_timer_sync(), which spin-waits for the
+timer callback to complete on non-RT kernels. But on PREEMPT_RT, it can
+sleep. Sleeping inside an RCU read-side critical section might trigger a
+lockdep splat.
+
+Instead, keep a reference to the timer, under rcu_read_lock, and call
+sk_stop_timer*() without the RCU lock.
+
+While at it, apply the reversed Xmas order when declaring variables.
+
+Fixes: 426358d9be7c ("mptcp: fix a race in mptcp_pm_del_add_timer()")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
