@@ -1,4 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-validate-ADD_ADDRv6-TS-port
+Subject: [PATCH] selftests: mptcp: validate ADD_ADDRv6 + TS + port
 
+This validates the feature added by parent commit, where it is now
+possible to send an ADD_ADDR with a v6 IP address and a port number,
+while the connection is using TCP Timestamps.
+
+This test is simply a copy of the previous one: "signal address with
+port", but using IPv6 addresses. This test is only executed if the
+add_addr_v6_port_drop_ts sysctl knob is available. If not, it means the
+kernel doesn't support this feature.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
