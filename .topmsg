@@ -1,4 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-avoid-computing-add_addr-size-twice
+Subject: [PATCH] mptcp: pm: avoid computing add_addr size twice
 
+mptcp_add_addr_len helper was called twice: in mptcp_pm_add_addr_signal,
+then just after in mptcp_established_options_add_addr. Both to check
+the remaining space.
+
+The second call is not needed: if there is not enough space,
+mptcp_pm_add_addr_signal will return false, and the caller,
+mptcp_established_options_add_addr, will do the same without re-checking
+the size again. Instead, mptcp_pm_add_addr_signal can directly set the
+size.
+
+Note that the returned size can be negative when other suboptions are
+dropped, e.g. to send an echo ADD_ADDR with a v4 address, and no port.
+
+While at it:
+
+ - move mptcp_add_addr_len to pm.c, as it is now only used from there
+
+ - use 'int' in mptcp_add_addr_len for the size, instead of having a mix
+
+ - use a bool for 'ret' in mptcp_pm_add_addr_signal
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
