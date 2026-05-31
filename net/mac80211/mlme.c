@@ -8189,7 +8189,7 @@ ieee80211_send_neg_ttlm_res(struct ieee80211_sub_if_data *sdata,
 	ieee80211_tx_skb(sdata, skb);
 }
 
-static int
+VISIBLE_IF_MAC80211_KUNIT int
 ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 			 const struct ieee80211_ttlm_elem *ttlm,
 			 struct ieee80211_neg_ttlm *neg_ttlm,
@@ -8270,6 +8270,7 @@ ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
 	}
 	return 0;
 }
+EXPORT_SYMBOL_IF_MAC80211_KUNIT(ieee80211_parse_neg_ttlm);
 
 static void ieee80211_process_neg_ttlm_req(struct ieee80211_sub_if_data *sdata,
 					   struct ieee80211_mgmt *mgmt,
