@@ -2,7 +2,7 @@
 /*
  * KUnit tests for channel helper functions
  *
- * Copyright (C) 2024-2025 Intel Corporation
+ * Copyright (C) 2024-2026 Intel Corporation
  */
 #include <kunit/test.h>
 #include <kunit/test-bug.h>
@@ -68,8 +68,6 @@ int iwlmld_kunit_test_init(struct kunit *test)
 	return 0;
 }
 
-static IWL_MLD_ALLOC_FN(link, bss_conf)
-
 static void iwlmld_kunit_init_link(struct ieee80211_vif *vif,
 				   struct ieee80211_bss_conf *link,
 				   struct iwl_mld_link *mld_link, int link_id)
@@ -94,7 +92,7 @@ static void iwlmld_kunit_init_link(struct ieee80211_vif *vif,
 	rcu_assign_pointer(vif->link_conf[link_id], link);
 }
 
-static IWL_MLD_ALLOC_FN(vif, vif)
+IWL_MLD_ALLOC_FN_STATIC(vif, vif)
 
 /* Helper function to add and initialize a VIF for KUnit tests */
 struct ieee80211_vif *iwlmld_kunit_add_vif(bool mlo, enum nl80211_iftype type)
@@ -199,7 +197,7 @@ void iwlmld_kunit_assign_chanctx_to_link(struct ieee80211_vif *vif,
 		vif->active_links |= BIT(link->link_id);
 }
 
-static IWL_MLD_ALLOC_FN(link_sta, link_sta)
+IWL_MLD_ALLOC_FN_STATIC(link_sta, link_sta)
 
 static void iwlmld_kunit_add_link_sta(struct ieee80211_sta *sta,
 				      struct ieee80211_link_sta *link_sta,
