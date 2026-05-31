@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2021-2022, 2025 Intel Corporation
+ * Copyright (C) 2021-2022, 2025-2026 Intel Corporation
  */
 
 #include <net/mac80211.h>
@@ -123,6 +123,9 @@ int rs_pretty_print_rate(char *buf, int bufsz, const u32 rate)
 		break;
 	case RATE_MCS_MOD_TYPE_EHT:
 		type = "EHT";
+		break;
+	case RATE_MCS_MOD_TYPE_UHR:
+		type = "UHR";
 		break;
 	default:
 		type = "Unknown"; /* shouldn't happen */
