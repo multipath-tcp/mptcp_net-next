@@ -356,6 +356,14 @@ static struct net_device *hwsim_mon; /* global monitor netdev */
 	.hw_value = (_freq), \
 }
 
+#define CHANS1G(_freq, _offset, _flags) { \
+	.band = NL80211_BAND_S1GHZ, \
+	.center_freq = (_freq), \
+	.freq_offset = (_offset), \
+	.hw_value = (_freq), \
+	.flags = (_flags), \
+}
+
 static const struct ieee80211_channel hwsim_channels_2ghz[] = {
 	CHAN2G(2412), /* Channel 1 */
 	CHAN2G(2417), /* Channel 2 */
@@ -490,7 +498,38 @@ static const struct ieee80211_channel hwsim_channels_6ghz[] = {
 static_assert(HWSIM_NUM_CHANNELS_6GHZ == ARRAY_SIZE(hwsim_channels_6ghz),
 	      "Inconsistent 6 GHz channel count");
 
-static struct ieee80211_channel hwsim_channels_s1g[HWSIM_NUM_S1G_CHANNELS_US];
+/*
+ * US 2024 channels (op class 1). Additionally to emulate real world
+ * US operation, the edgeband 1MHz channels (1, 51) are marked as NO_PRIMARY.
+ */
+static const struct ieee80211_channel hwsim_channels_s1g[] = {
+	CHANS1G(902, 500, IEEE80211_CHAN_S1G_NO_PRIMARY), /* Channel 1 */
+	CHANS1G(903, 500, 0), /* Channel 3 */
+	CHANS1G(904, 500, 0), /* Channel 5 */
+	CHANS1G(905, 500, 0), /* Channel 7 */
+	CHANS1G(906, 500, 0), /* Channel 9 */
+	CHANS1G(907, 500, 0), /* Channel 11 */
+	CHANS1G(908, 500, 0), /* Channel 13 */
+	CHANS1G(909, 500, 0), /* Channel 15 */
+	CHANS1G(910, 500, 0), /* Channel 17 */
+	CHANS1G(911, 500, 0), /* Channel 19 */
+	CHANS1G(912, 500, 0), /* Channel 21 */
+	CHANS1G(913, 500, 0), /* Channel 23 */
+	CHANS1G(914, 500, 0), /* Channel 25 */
+	CHANS1G(915, 500, 0), /* Channel 27 */
+	CHANS1G(916, 500, 0), /* Channel 29 */
+	CHANS1G(917, 500, 0), /* Channel 31 */
+	CHANS1G(918, 500, 0), /* Channel 33 */
+	CHANS1G(919, 500, 0), /* Channel 35 */
+	CHANS1G(920, 500, 0), /* Channel 37 */
+	CHANS1G(921, 500, 0), /* Channel 39 */
+	CHANS1G(922, 500, 0), /* Channel 41 */
+	CHANS1G(923, 500, 0), /* Channel 43 */
+	CHANS1G(924, 500, 0), /* Channel 45 */
+	CHANS1G(925, 500, 0), /* Channel 47 */
+	CHANS1G(926, 500, 0), /* Channel 49 */
+	CHANS1G(927, 500, IEEE80211_CHAN_S1G_NO_PRIMARY), /* Channel 51 */
+};
 
 static const struct ieee80211_sta_s1g_cap hwsim_s1g_cap = {
 	.s1g = true,
@@ -518,19 +557,6 @@ static const struct ieee80211_sta_s1g_cap hwsim_s1g_cap = {
 	/* Tx Single spatial stream and S1G-MCS Map for 1MHz */
 		     0 },
 };
-
-static void hwsim_init_s1g_channels(struct ieee80211_channel *chans)
-{
-	int ch, freq;
-
-	for (ch = 0; ch < ARRAY_SIZE(hwsim_channels_s1g); ch++) {
-		freq = 902000 + (ch + 1) * 500;
-		chans[ch].band = NL80211_BAND_S1GHZ;
-		chans[ch].center_freq = KHZ_TO_MHZ(freq);
-		chans[ch].freq_offset = freq % 1000;
-		chans[ch].hw_value = ch + 1;
-	}
-}
 
 static const struct ieee80211_rate hwsim_rates[] = {
 	{ .bitrate = 10 },
@@ -2816,7 +2842,10 @@ static int mac80211_hwsim_sta_add(struct ieee80211_hw *hw,
 
 	hwsim_check_magic(vif);
 	hwsim_set_sta_magic(sta);
-	mac80211_hwsim_sta_rc_update(hw, vif, &sta->deflink, 0);
+
+	/* For now, don't run RC update on STAs on an S1G interface */
+	if (!vif->cfg.s1g)
+		mac80211_hwsim_sta_rc_update(hw, vif, &sta->deflink, 0);
 
 	if (sta->valid_links) {
 		WARN(hweight16(sta->valid_links) > 1,
@@ -3505,8 +3534,13 @@ static int mac80211_hwsim_change_vif_links(struct ieee80211_hw *hw,
 	if (!new_links)
 		add |= BIT(0);
 
-	for_each_set_bit(i, &rem, IEEE80211_MLD_MAX_NUM_LINKS)
+	wiphy_dbg(hw->wiphy, "%s:\n", __func__);
+
+	for_each_set_bit(i, &rem, IEEE80211_MLD_MAX_NUM_LINKS) {
 		mac80211_hwsim_config_mac_nl(hw, old[i]->addr, false);
+		wiphy_dbg(hw->wiphy,
+			  "  link [%d/%pM] removed\n", i, old[i]->addr);
+	}
 
 	for_each_set_bit(i, &add, IEEE80211_MLD_MAX_NUM_LINKS) {
 		struct ieee80211_bss_conf *link_conf;
@@ -3516,6 +3550,8 @@ static int mac80211_hwsim_change_vif_links(struct ieee80211_hw *hw,
 			continue;
 
 		mac80211_hwsim_config_mac_nl(hw, link_conf->addr, true);
+		wiphy_dbg(hw->wiphy,
+			  "  link [%d/%pM] added\n", i, link_conf->addr);
 	}
 
 	return 0;
@@ -7439,8 +7475,6 @@ static int __init init_mac80211_hwsim(void)
 	err = class_register(&hwsim_class);
 	if (err)
 		goto out_exit_virtio;
-
-	hwsim_init_s1g_channels(hwsim_channels_s1g);
 
 	for (i = 0; i < radios; i++) {
 		struct hwsim_new_radio_params param = { 0 };
