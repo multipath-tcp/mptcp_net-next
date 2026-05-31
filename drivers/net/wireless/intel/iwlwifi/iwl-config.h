@@ -416,6 +416,7 @@ struct iwl_mac_cfg {
  * @nvm_type: see &enum iwl_nvm_type
  * @uhb_supported: ultra high band channels supported
  * @eht_supported: EHT supported
+ * @uhr_supported: UHR supported
  * @num_rbds: number of receive buffer descriptors to use
  *	(only used for multi-queue capable devices)
  *
@@ -449,7 +450,8 @@ struct iwl_rf_cfg {
 	    lp_xtal_workaround:1,
 	    vht_mu_mimo_supported:1,
 	    uhb_supported:1,
-	    eht_supported:1;
+	    eht_supported:1,
+	    uhr_supported:1;
 	u8 valid_tx_ant;
 	u8 valid_rx_ant;
 	u8 non_shared_ant;
@@ -674,6 +676,7 @@ extern const char iwl_killer_be1750w_name[];
 extern const char iwl_killer_be1750x_name[];
 extern const char iwl_killer_be1790s_name[];
 extern const char iwl_killer_be1790i_name[];
+extern const char iwl_killer_be1730x_name[];
 extern const char iwl_be201_name[];
 extern const char iwl_be200_name[];
 extern const char iwl_be202_name[];
@@ -681,6 +684,7 @@ extern const char iwl_be401_name[];
 extern const char iwl_be213_name[];
 extern const char iwl_killer_be1775s_name[];
 extern const char iwl_killer_be1775i_name[];
+extern const char iwl_killer_be1735x_name[];
 extern const char iwl_be211_name[];
 extern const char iwl_killer_bn1850w2_name[];
 extern const char iwl_killer_bn1850i_name[];
@@ -744,7 +748,8 @@ extern const struct iwl_rf_cfg iwl_rf_fm_160mhz;
 #define iwl_rf_wh iwl_rf_fm
 #define iwl_rf_wh_160mhz iwl_rf_fm_160mhz
 extern const struct iwl_rf_cfg iwl_rf_wh_non_eht;
-#define iwl_rf_pe iwl_rf_fm
+extern const struct iwl_rf_cfg iwl_rf_pe;
+#define iwl_rf_pe_no_uhr iwl_rf_fm
 #endif /* CONFIG_IWLMLD */
 
 #endif /* __IWL_CONFIG_H__ */
