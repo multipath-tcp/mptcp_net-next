@@ -1946,6 +1946,11 @@ ieee80211_vif_get_num_mcast_if(struct ieee80211_sub_if_data *sdata)
 	return -1;
 }
 
+static inline bool ieee80211_sdata_running(struct ieee80211_sub_if_data *sdata)
+{
+	return test_bit(SDATA_STATE_RUNNING, &sdata->state);
+}
+
 int ieee80211_hw_config(struct ieee80211_local *local, int radio_idx,
 			u32 changed);
 int ieee80211_hw_conf_chan(struct ieee80211_local *local);
@@ -2054,6 +2059,29 @@ int ieee80211_nan_set_peer_sched(struct ieee80211_sub_if_data *sdata,
 				 struct cfg80211_nan_peer_sched *sched);
 void ieee80211_nan_free_peer_sched(struct ieee80211_nan_peer_sched *sched);
 void ieee80211_nan_update_ndi_carrier(struct ieee80211_sub_if_data *ndi_sdata);
+struct ieee80211_nan_channel *
+ieee80211_nan_find_evac_chan(struct ieee80211_local *local,
+			     struct ieee80211_sub_if_data *sdata,
+			     struct ieee80211_chanctx *ctx);
+void ieee80211_nan_evacuate_channel(struct ieee80211_sub_if_data *sdata,
+				    struct ieee80211_nan_channel *nan_channel);
+
+static inline struct ieee80211_sub_if_data *
+ieee80211_find_nan_sdata(struct ieee80211_local *local)
+{
+	struct ieee80211_sub_if_data *sdata;
+
+	lockdep_assert_wiphy(local->hw.wiphy);
+
+	/* Find the NAN interface - there can only be one */
+	list_for_each_entry(sdata, &local->interfaces, list) {
+		if (ieee80211_sdata_running(sdata) &&
+		    sdata->vif.type == NL80211_IFTYPE_NAN)
+			return sdata;
+	}
+
+	return NULL;
+}
 
 /* scan/BSS handling */
 void ieee80211_scan_work(struct wiphy *wiphy, struct wiphy_work *work);
@@ -2154,11 +2182,6 @@ bool __ieee80211_recalc_txpower(struct ieee80211_link_data *link);
 void ieee80211_recalc_txpower(struct ieee80211_link_data *link,
 			      bool update_bss);
 void ieee80211_recalc_offload(struct ieee80211_local *local);
-
-static inline bool ieee80211_sdata_running(struct ieee80211_sub_if_data *sdata)
-{
-	return test_bit(SDATA_STATE_RUNNING, &sdata->state);
-}
 
 /* link handling */
 void ieee80211_link_setup(struct ieee80211_link_data *link);
@@ -2818,10 +2841,36 @@ int ieee80211_send_action_csa(struct ieee80211_sub_if_data *sdata,
 			      struct cfg80211_csa_settings *csa_settings);
 void ieee80211_recalc_sb_count(struct ieee80211_sub_if_data *sdata, u64 tsf);
 void ieee80211_recalc_dtim(struct ieee80211_sub_if_data *sdata, u64 tsf);
-int ieee80211_check_combinations(struct ieee80211_sub_if_data *sdata,
-				 const struct cfg80211_chan_def *chandef,
-				 enum ieee80211_chanctx_mode chanmode,
-				 u8 radar_detect, int radio_idx);
+
+struct ieee80211_check_combinations_data {
+	const struct cfg80211_chan_def *chandef;
+	enum ieee80211_chanctx_mode chanmode;
+	u8 radar_detect;
+	int radio_idx;
+	bool (*chanctx_filter)(struct ieee80211_chanctx *ctx,
+			       void *filter_data);
+	void *filter_data;
+};
+
+int ieee80211_check_combinations_ext(struct ieee80211_sub_if_data *sdata,
+				     struct ieee80211_check_combinations_data *data);
+
+static inline int
+ieee80211_check_combinations(struct ieee80211_sub_if_data *sdata,
+			     const struct cfg80211_chan_def *chandef,
+			     enum ieee80211_chanctx_mode chanmode,
+			     u8 radar_detect, int radio_idx)
+{
+	struct ieee80211_check_combinations_data data = {
+		.chandef = chandef,
+		.chanmode = chanmode,
+		.radar_detect = radar_detect,
+		.radio_idx = radio_idx,
+	};
+
+	return ieee80211_check_combinations_ext(sdata, &data);
+}
+
 int ieee80211_max_num_channels(struct ieee80211_local *local, int radio_idx);
 u32 ieee80211_get_radio_mask(struct wiphy *wiphy, struct net_device *dev);
 void ieee80211_recalc_chanctx_chantype(struct ieee80211_local *local,
@@ -2926,6 +2975,10 @@ ieee80211_determine_chan_mode(struct ieee80211_sub_if_data *sdata,
 			      struct ieee80211_chan_req *chanreq,
 			      struct cfg80211_chan_def *ap_chandef,
 			      unsigned long *userspace_selectors);
+int ieee80211_parse_neg_ttlm(struct ieee80211_sub_if_data *sdata,
+			     const struct ieee80211_ttlm_elem *ttlm,
+			     struct ieee80211_neg_ttlm *neg_ttlm,
+			     u8 *direction);
 #else
 #define EXPORT_SYMBOL_IF_MAC80211_KUNIT(sym)
 #define VISIBLE_IF_MAC80211_KUNIT static
