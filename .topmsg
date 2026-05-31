@@ -1,4 +1,18 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-check-desc-count-in-read_sock
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] mptcp: check desc->count in read_sock
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+__tcp_read_sock() checks desc->count after each skb is consumed and
+breaks the loop when it reaches 0. The MPTCP variant lacks this check.
+
+This is a functional bug, other subsystems also rely on this check:
+TLS strparser sets desc->count to 0 once a full TLS record is assembled
+and depends on this break to stop reading.
+
+Add the same desc->count check to __mptcp_read_sock(), mirroring
+__tcp_read_sock().
+
+Fixes: 250d9766a984 ("mptcp: implement .read_sock")
+Co-developed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
