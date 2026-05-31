@@ -402,7 +402,7 @@ static bool mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 		msk->ooo_last_skb = rb_to_skb(prev);
 
 		mem = (unsigned int)sk_rmem_alloc_get(sk);
-		if (mem < sk->sk_rcvbuf)
+		if (mem <= sk->sk_rcvbuf)
 			break;
 
 		node = prev;
@@ -413,7 +413,7 @@ static bool mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 
 out:
 	mem = (unsigned int)sk_rmem_alloc_get(sk);
-	return mem < sk->sk_rcvbuf;
+	return mem <= sk->sk_rcvbuf;
 }
 
 static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
