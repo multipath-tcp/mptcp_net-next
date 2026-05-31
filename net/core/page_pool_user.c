@@ -127,8 +127,7 @@ page_pool_nl_stats_fill(struct sk_buff *rsp, const struct page_pool *pool,
 	struct nlattr *nest;
 	void *hdr;
 
-	if (!page_pool_get_stats(pool, &stats))
-		return 0;
+	page_pool_get_stats(pool, &stats);
 
 	hdr = genlmsg_iput(rsp, info);
 	if (!hdr)
