@@ -2216,6 +2216,64 @@ ieee80211_find_or_create_chanctx(struct ieee80211_sub_if_data *sdata,
 				     assign_on_failure, radio_idx);
 }
 
+static bool
+ieee80211_nan_evac_chanctx_filter(struct ieee80211_chanctx *ctx,
+				  void *filter_data)
+{
+	return ctx == filter_data;
+}
+
+static int
+ieee80211_try_nan_chan_evacuation(struct ieee80211_local *local,
+				  struct ieee80211_sub_if_data *sdata,
+				  const struct cfg80211_chan_def *chandef,
+				  enum ieee80211_chanctx_mode mode,
+				  u8 radar_detect_width)
+{
+	struct ieee80211_sub_if_data *nan_sdata = ieee80211_find_nan_sdata(local);
+	struct ieee80211_check_combinations_data comb_data = {
+		.chandef = chandef,
+		.chanmode = mode,
+		.radar_detect = radar_detect_width,
+		.radio_idx = -1,
+		.chanctx_filter = ieee80211_nan_evac_chanctx_filter,
+	};
+	struct ieee80211_nan_channel *evac_chan;
+	struct ieee80211_chanctx *evac_ctx;
+	int ret;
+
+	if (!nan_sdata)
+		return -ENOENT;
+
+	/* Find an evacuation candidate... */
+	evac_chan = ieee80211_nan_find_evac_chan(local, nan_sdata, NULL);
+	if (!evac_chan || WARN_ON(!evac_chan->chanctx_conf))
+		return -ENOENT;
+
+	evac_ctx = container_of(evac_chan->chanctx_conf,
+				struct ieee80211_chanctx, conf);
+
+	/*
+	 * ... check combinations assuming to-be-evacuated ctx is already
+	 * released
+	 */
+	comb_data.filter_data = evac_ctx;
+	ret = ieee80211_check_combinations_ext(sdata, &comb_data);
+	if (ret < 0)
+		return ret;
+
+	/* That helped! Let's evacuate the channel */
+	ieee80211_nan_evacuate_channel(nan_sdata, evac_chan);
+
+	/* Re-check, just to be on the safe-side */
+	ret = ieee80211_check_combinations(sdata, chandef, mode,
+					   radar_detect_width, -1);
+
+	/* That shouldn't happen, we checked before! */
+	WARN_ON(ret);
+	return ret;
+}
+
 int _ieee80211_link_use_channel(struct ieee80211_link_data *link,
 				const struct ieee80211_chan_req *chanreq,
 				enum ieee80211_chanctx_mode mode,
@@ -2247,23 +2305,21 @@ int _ieee80211_link_use_channel(struct ieee80211_link_data *link,
 
 	ret = ieee80211_check_combinations(sdata, &chanreq->oper, mode,
 					   radar_detect_width, -1);
-	if (ret < 0)
-		goto out;
+	if (ret < 0) {
+		/* Let's check if evacuating a NAN channel will help */
+		ret = ieee80211_try_nan_chan_evacuation(local, sdata,
+							&chanreq->oper,
+							mode,
+							radar_detect_width);
+		if (ret < 0)
+			goto out;
+	}
 
 	if (!local->in_reconfig)
 		__ieee80211_link_release_channel(link, false);
 
 	ctx = ieee80211_find_or_create_chanctx(sdata, chanreq, mode,
 					       assign_on_failure, &reused_ctx);
-	if (IS_ERR(ctx)) {
-		/* Try to evacuate a NAN channel to free up a chanctx */
-		if (ieee80211_nan_try_evacuate(&local->hw, NULL))
-			ctx = ieee80211_find_or_create_chanctx(sdata, chanreq,
-							       mode,
-							       assign_on_failure,
-							       &reused_ctx);
-	}
-
 	if (IS_ERR(ctx)) {
 		ret = PTR_ERR(ctx);
 		goto out;
