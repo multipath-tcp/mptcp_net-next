@@ -712,7 +712,7 @@ out:
 	return ret;
 }
 
-static void
+void
 ieee80211_nan_evacuate_channel(struct ieee80211_sub_if_data *sdata,
 			       struct ieee80211_nan_channel *nan_channel)
 {
@@ -754,33 +754,20 @@ ieee80211_nan_evacuate_channel(struct ieee80211_sub_if_data *sdata,
 		ieee80211_free_chanctx(sdata->local, ctx, false);
 }
 
-bool ieee80211_nan_try_evacuate(struct ieee80211_hw *hw,
-				struct ieee80211_chanctx_conf *conf)
+struct ieee80211_nan_channel *
+ieee80211_nan_find_evac_chan(struct ieee80211_local *local,
+			     struct ieee80211_sub_if_data *sdata,
+			     struct ieee80211_chanctx *ctx)
 {
-	struct ieee80211_sub_if_data *sdata = NULL, *tmp;
-	struct ieee80211_local *local = hw_to_local(hw);
-	struct ieee80211_nan_channel *evac_chan = NULL;
 	struct ieee80211_nan_sched_cfg *sched_cfg;
-	struct ieee80211_chanctx *ctx = NULL;
+	struct ieee80211_nan_channel *evac_chan = NULL;
 	int min_slot_count = INT_MAX;
 	int usable_channels = 0;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
 
-	if (conf)
-		ctx = container_of(conf, struct ieee80211_chanctx, conf);
-
-	/* Find the NAN interface - there can only be one */
-	list_for_each_entry(tmp, &local->interfaces, list) {
-		if (ieee80211_sdata_running(tmp) &&
-		    tmp->vif.type == NL80211_IFTYPE_NAN) {
-			sdata = tmp;
-			break;
-		}
-	}
-
-	if (!sdata)
-		return false;
+	if (WARN_ON(sdata->vif.type != NL80211_IFTYPE_NAN))
+		return NULL;
 
 	sched_cfg = &sdata->vif.cfg.nan_sched;
 
@@ -823,10 +810,34 @@ bool ieee80211_nan_try_evacuate(struct ieee80211_hw *hw,
 
 	/* No suitable NAN channel found */
 	if (!evac_chan)
-		return false;
+		return NULL;
 
 	/* NAN needs at least one remaining usable channel after evacuation */
 	if (usable_channels < 2)
+		return NULL;
+
+	return evac_chan;
+}
+
+bool ieee80211_nan_try_evacuate(struct ieee80211_hw *hw,
+				struct ieee80211_chanctx_conf *conf)
+{
+	struct ieee80211_local *local = hw_to_local(hw);
+	struct ieee80211_sub_if_data *sdata =
+		ieee80211_find_nan_sdata(local);
+	struct ieee80211_nan_channel *evac_chan;
+	struct ieee80211_chanctx *ctx = NULL;
+
+	lockdep_assert_wiphy(local->hw.wiphy);
+
+	if (!sdata)
+		return false;
+
+	if (conf)
+		ctx = container_of(conf, struct ieee80211_chanctx, conf);
+
+	evac_chan = ieee80211_nan_find_evac_chan(local, sdata, ctx);
+	if (!evac_chan)
 		return false;
 
 	ieee80211_nan_evacuate_channel(sdata, evac_chan);
