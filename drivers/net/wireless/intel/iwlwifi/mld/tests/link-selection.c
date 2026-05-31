@@ -2,7 +2,7 @@
 /*
  * KUnit tests for link selection functions
  *
- * Copyright (C) 2025 Intel Corporation
+ * Copyright (C) 2025-2026 Intel Corporation
  */
 #include <kunit/static_stub.h>
 
@@ -34,6 +34,7 @@ static const struct link_grading_test_case {
 			.link_id = 0,
 			.chandef = &chandef_2ghz_20mhz,
 			.active = false,
+			.signal = -70,
 			.has_chan_util_elem = true,
 			.chan_util = 128,
 		},
@@ -45,6 +46,7 @@ static const struct link_grading_test_case {
 			.link_id = 0,
 			.chandef = &chandef_2ghz_20mhz,
 			.active = false,
+			.signal = -70,
 			.has_chan_util_elem = true,
 			.chan_util = 180,
 		},
@@ -55,6 +57,7 @@ static const struct link_grading_test_case {
 		.input.link = {
 			.link_id = 0,
 			.chandef = &chandef_2ghz_20mhz,
+			.signal = -70,
 			.has_chan_util_elem = true,
 			.chan_util = 180,
 			.active = true,
@@ -67,6 +70,7 @@ static const struct link_grading_test_case {
 		.input.link = {
 			.link_id = 0,
 			.chandef = &chandef_2ghz_20mhz,
+			.signal = -70,
 			.active = true,
 		},
 		.expected_grade = 120,
