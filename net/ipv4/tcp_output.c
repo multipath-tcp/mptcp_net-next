@@ -1173,6 +1173,7 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
 
+#if IS_ENABLED(CONFIG_MPTCP)
 	/* MPTCP options have precedence over SACK for the limited TCP
 	 * option space because a MPTCP connection would be forced to
 	 * fall back to regular TCP if a required multipath option is
@@ -1181,18 +1182,21 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 	 */
 	if (sk_is_mptcp(sk)) {
 		unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
-		bool drop_ts = opts->options & OPTION_TS;
+		bool has_ts = opts->options & OPTION_TS;
 		unsigned int opt_size = 0;
 
+		opts->mptcp.drop_ts = 0;
+
 		if (mptcp_established_options(sk, skb, &opt_size, remaining,
-					      &drop_ts, &opts->mptcp)) {
+					      has_ts, &opts->mptcp)) {
 			opts->options |= OPTION_MPTCP;
 			size += opt_size;
 
-			if (drop_ts)
+			if (opts->mptcp.drop_ts)
 				opts->options &= ~OPTION_TS;
 		}
 	}
+#endif
 
 	eff_sacks = tp->rx_opt.num_sacks + tp->rx_opt.dsack;
 	if (unlikely(eff_sacks)) {
