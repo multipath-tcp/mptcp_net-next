@@ -46,7 +46,7 @@ Address the issue always zeroing all the extensions flags before
 eventually initializing the individual bits. To that extent, introduce
 and use a struct_group to avoid multiple bitwise operations.
 
-Fixes: 6d0060f600ad ("mptcp: Write MPTCP DSS headers to outgoing data packets")
+Fixes: cfcceb7a39fc ("tcp: shrink per-packet memset in __tcp_transmit_skb()")
 Reported-by: syzbot+ff020673c5e3d94d9478@syzkaller.appspotmail.com
 Closes: https://syzkaller.appspot.com/bug?extid=ff020673c5e3d94d9478
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
