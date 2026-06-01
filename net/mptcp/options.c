@@ -659,13 +659,14 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 static bool mptcp_established_options_add_addr(struct sock *sk,
 					       struct sk_buff *skb, int *size,
 					       unsigned int remaining,
-					       bool *drop_ts,
+					       bool has_ts,
 					       struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	bool drop_other_suboptions = false;
 	struct mptcp_addr_info addr;
+	bool drop_ts = has_ts;
 	bool echo;
 
 	/* add addr will strip the existing options, be sure to avoid breaking
@@ -674,7 +675,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk,
 	if (!mptcp_pm_should_add_signal(msk) ||
 	    (opts->suboptions & (OPTION_MPTCP_MPJ_ACK | OPTION_MPTCP_MPC_ACK)) ||
 	    !mptcp_pm_add_addr_signal(msk, skb, size, remaining, &addr, &echo,
-				      &drop_other_suboptions, drop_ts))
+				      &drop_other_suboptions, &drop_ts))
 		return false;
 
 	/*
@@ -695,6 +696,7 @@ static bool mptcp_established_options_add_addr(struct sock *sk,
 		 */
 		opts->ahmac = 0;
 	}
+	opts->drop_ts = drop_ts;
 	opts->addr = addr;
 	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
 	if (!echo) {
@@ -827,7 +829,6 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
-	bool add_addr_drop_ts = *drop_ts;
 	int total_size = 0;
 	bool snd_data_fin;
 	bool ret = false;
@@ -879,11 +880,10 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	total_size += opt_size;
 	remaining -= opt_size;
 	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining,
-					       &add_addr_drop_ts, opts)) {
+					       has_ts, opts)) {
 		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
-		*drop_ts = add_addr_drop_ts;
 	} else if (mptcp_established_options_rm_addr(sk, &opt_size, remaining, opts)) {
 		total_size += opt_size;
 		remaining -= opt_size;
