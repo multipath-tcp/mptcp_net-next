@@ -26,9 +26,15 @@ the header if the ADD_ADDR is first written, and then the TCP timestamps
 without the NOPs preceding it. But this means more modifications on TCP
 side, plus some middleboxes could still be disrupted by that.
 
-About the implementation, instead of passing a new boolean (drop_ts),
-another option would be to pass the whole option structure (opts),
-but 'struct tcp_out_options' is currently defined in tcp_output.c, and
+In this implementation, an unused bit is used in mptcp_out_options
+structure to avoid passing an address to a local variable. Reading and
+setting it needs CONFIG_MPTCP, so the whole block now has this #if
+condition: mptcp_established_options() is then no longer used without
+CONFIG_MPTCP.
+
+About alternatives, instead of passing a new boolean (has_ts), another
+option would be to pass the whole option structure (opts), but
+'struct tcp_out_options' is currently defined in tcp_output.c, and it
 would need to be exported. Plus that means the removal of the TCP TS
 option would be done on the MPTCP side, and not here on the TCP side.
 It feels clearer to remove other TCP options from the TCP side, than
