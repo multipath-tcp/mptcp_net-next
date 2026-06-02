@@ -97,7 +97,7 @@ const char *mptcp_get_scheduler(const struct net *net)
 
 unsigned int mptcp_add_addr_v6_port_drop_ts(const struct net *net)
 {
-	return mptcp_get_pernet(net)->add_addr_v6_port_drop_ts;
+	return READ_ONCE(mptcp_get_pernet(net)->add_addr_v6_port_drop_ts);
 }
 
 static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
