@@ -1,4 +1,9 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-options-rst-drop-unused-skb-parameter
+Subject: [PATCH] mptcp: options: rst: drop unused skb parameter
+
+It was passed since its introduction in commit dc87efdb1a5c ("mptcp: add
+mptcp reset option support"), but never used.
+
+Simply removes it.
 
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
