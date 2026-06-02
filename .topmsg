@@ -1,4 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-change-mptcp_established_options-to-return-opt_size
+From: Eric Dumazet <edumazet@google.com>
+Subject: [PATCH] mptcp: change mptcp_established_options() to return opt_size
 
+Instead of passing opt_size address to mptcp_established_options(),
+change this function to return it by value.
+
+This removes the need for an expensive stack canary in
+tcp_established_options() when CONFIG_STACKPROTECTOR_STRONG=y.
+
+$ scripts/bloat-o-meter -t vmlinux.old vmlinux.new
+add/remove: 0/0 grow/shrink: 0/3 up/down: 0/-92 (-92)
+Function                                     old     new   delta
+tcp_options_write.isra                      1423    1407     -16
+mptcp_established_options                   2746    2720     -26
+tcp_established_options                      553     503     -50
+Total: Before=22110750, After=22110658, chg -0.00%
+
+Signed-off-by: Eric Dumazet <edumazet@google.com>
+[ Fix mptcp_established_options signature without CONFIG_MPTCP ]
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
