@@ -2450,10 +2450,24 @@ read_sock_requeue:
 
 bool tls_sw_sock_is_readable(struct sock *sk)
 {
-	struct tls_context *tls_ctx = tls_get_ctx(sk);
-	struct tls_sw_context_rx *ctx = tls_sw_ctx_rx(tls_ctx);
+	struct tls_sw_context_rx *ctx;
+	struct tls_context *tls_ctx;
 	bool ingress_empty = true;
 	struct sk_psock *psock;
+
+	/* Paired with smp_store_release() in update_sk_prot()
+	 * for sk->sk_prot. Orders the read of icsk_ulp_data
+	 * after the read of sk->sk_prot in sk_is_readable().
+	 * Prevents seeing a new sk->sk_prot but a stale
+	 * icsk_ulp_data.
+	 */
+	smp_rmb();
+
+	tls_ctx = tls_get_ctx(sk);
+	if (!tls_ctx)
+		return false;
+
+	ctx = tls_sw_ctx_rx(tls_ctx);
 
 	rcu_read_lock();
 	psock = sk_psock(sk);
