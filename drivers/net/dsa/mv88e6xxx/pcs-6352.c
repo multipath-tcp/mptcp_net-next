@@ -324,17 +324,17 @@ static int mv88e6352_pcs_init(struct mv88e6xxx_chip *chip, int port)
 	struct mii_bus *bus;
 	struct device *dev;
 	unsigned int irq;
-	int err;
+	int lane, err;
 
-	err = mv88e6352_g2_scratch_port_has_serdes(chip, port);
-	if (err <= 0)
-		return err;
+	lane = mv88e6xxx_serdes_get_lane(chip, port);
+	if (lane < 0)
+		return 0;
 
 	irq = mv88e6xxx_serdes_irq_mapping(chip, port);
 	bus = mv88e6xxx_default_mdio_bus(chip);
 	dev = chip->dev;
 
-	mpcs = marvell_c22_pcs_alloc(dev, bus, MV88E6352_ADDR_SERDES);
+	mpcs = marvell_c22_pcs_alloc(dev, bus, lane);
 	if (!mpcs)
 		return -ENOMEM;
 
