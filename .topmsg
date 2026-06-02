@@ -1,0 +1,9 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] mptcp: pm: rename add_entry structure to add_addr
+
+Using only the 'add' prefix is confusing: does it refer to a generic
+added entry or address, or specifically to ADD_ADDRs. Using add_addr
+removes this confusion.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
