@@ -1,0 +1,21 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] mptcp: pm: drop TCP TS with ADD_ADDRv6 + port
+
+With TCP-timestamps (padded) taking 12 bytes and ADD_ADDR IPv6 + port
+taking 30 bytes, the 40-byte limit for the TCP options is reached. In
+this case, it is then not possible to send the signal.
+
+To be able to send this ADD_ADDR, the TCP timestamps option can now be
+dropped. This is done, when needed by setting the *drop_ts parameter
+from mptcp_established_options. This feature is controlled by a new
+net.mptcp.add_addr_v6_port_drop_ts sysctl knob, enabled by default.
+
+It is important to keep in mind that dropping the TCP timestamps option
+for one packet of the connection could eventually disrupt some
+middleboxes: even if it should be unlikely, they could drop the packet
+or even block the connection. That's why this new feature can be
+controlled by a sysctl knob.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/448
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
