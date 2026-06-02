@@ -1,0 +1,14 @@
+From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Subject: [PATCH] mptcp: pm: use for_each_subflow helper
+
+Similar to most places in the MPTCP code. So instead of passing the
+subflow list and use list_for_each_entry(subflow, list, node), pass the
+msk and use mptcp_for_each_subflow(msk, subflow).
+
+That's clearer and more uniform with the rest.
+
+While at it, add 'pm_' prefix for the exported one to easily identify
+the origin. Plus replace 'lookup' by 'has', because a bool is returned.
+
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
