@@ -90,14 +90,17 @@ struct otto_emdio_cmd_regs {
 };
 
 struct otto_emdio_info {
+	u32 cmd_fail;
+	u32 cmd_read;
+	u32 cmd_write;
 	struct otto_emdio_cmd_regs cmd_regs;
 	u8 num_buses;
 	u8 num_ports;
 	u16 num_pages;
-	int (*read_c22)(struct mii_bus *bus, int phy_id, int regnum);
-	int (*read_c45)(struct mii_bus *bus, int phy_id, int dev_addr, int regnum);
-	int (*write_c22)(struct mii_bus *bus, int phy_id, int regnum, u16 value);
-	int (*write_c45)(struct mii_bus *bus, int phy_id, int dev_addr, int regnum, u16 value);
+	int (*read_c22)(struct mii_bus *bus, int port, int regnum, u32 *value);
+	int (*read_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u32 *value);
+	int (*write_c22)(struct mii_bus *bus, int port, int regnum, u16 value);
+	int (*write_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u16 value);
 };
 
 struct otto_emdio_priv {
@@ -132,236 +135,197 @@ static int otto_emdio_phy_to_port(struct mii_bus *bus, int phy_id)
 	return -ENOENT;
 }
 
-static int otto_emdio_wait_ready(struct otto_emdio_priv *priv)
+static struct otto_emdio_priv *otto_emdio_bus_to_priv(struct mii_bus *bus)
 {
-	struct regmap *regmap = priv->regmap;
-	u32 cmd_reg, val;
+	struct otto_emdio_chan *chan = bus->priv;
+
+	return chan->priv;
+}
+
+static int otto_emdio_run_cmd(struct mii_bus *bus, u32 cmd,
+			      struct otto_emdio_cmd_regs *cmd_data)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	const struct otto_emdio_info *info = priv->info;
+	u32 cmdstate;
+	int ret;
+
+	/* Defensive pre check just in case something goes horrible wrong */
+	ret = regmap_read_poll_timeout(priv->regmap, info->cmd_regs.c22_data,
+				       cmdstate, !(cmdstate & PHY_CTRL_CMD), 10, 1000);
+	if (ret)
+		return ret;
+
+	/* Fill all registers. Hardware will read only the needed bits depending on command */
+	ret = regmap_write(priv->regmap, info->cmd_regs.port_mask_low, cmd_data->port_mask_low);
+	if (ret)
+		return ret;
+
+	ret = regmap_write(priv->regmap, info->cmd_regs.io_data, cmd_data->io_data);
+	if (ret)
+		return ret;
+
+	ret = regmap_write(priv->regmap, info->cmd_regs.c45_data, cmd_data->c45_data);
+	if (ret)
+		return ret;
+
+	/* C22 data and command bits share the same register. */
+	ret = regmap_write(priv->regmap, info->cmd_regs.c22_data,
+			   cmd_data->c22_data | cmd | PHY_CTRL_CMD);
+	if (ret)
+		return ret;
+
+	ret = regmap_read_poll_timeout(priv->regmap, info->cmd_regs.c22_data,
+				       cmdstate, !(cmdstate & PHY_CTRL_CMD), 10, 1000);
+	if (ret)
+		return ret;
+
+	return cmdstate & info->cmd_fail ? -ENXIO : 0;
+}
+
+static int otto_emdio_read_cmd(struct mii_bus *bus, u32 cmd,
+			       struct otto_emdio_cmd_regs *cmd_data, u32 *value)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	int ret;
 
 	lockdep_assert_held(&priv->lock);
-	cmd_reg = priv->info->cmd_regs.c22_data; /* shared command/C22 register */
+	ret = otto_emdio_run_cmd(bus, cmd | priv->info->cmd_read, cmd_data);
+	if (ret)
+		return ret;
 
-	return regmap_read_poll_timeout(regmap, cmd_reg, val, !(val & PHY_CTRL_CMD), 10, 1000);
-}
+	ret = regmap_read(priv->regmap, priv->info->cmd_regs.io_data, value);
+	if (ret)
+		return ret;
 
-static int otto_emdio_9300_read_c22(struct mii_bus *bus, int phy_id, int regnum)
-{
-	struct otto_emdio_chan *chan = bus->priv;
-	struct otto_emdio_priv *priv;
-	u32 io_reg, cmd_reg, val;
-	struct regmap *regmap;
-	int port;
-	int err;
+	*value = FIELD_GET(PHY_CTRL_DATA, *value);
 
-	priv = chan->priv;
-	regmap = priv->regmap;
-	io_reg = priv->info->cmd_regs.io_data;
-	cmd_reg = priv->info->cmd_regs.c22_data; /* shared command/C22 register */
-
-	port = otto_emdio_phy_to_port(bus, phy_id);
-	if (port < 0)
-		return port;
-
-	mutex_lock(&priv->lock);
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
-
-	err = regmap_write(regmap, io_reg, FIELD_PREP(PHY_CTRL_INDATA, port));
-	if (err)
-		goto out_err;
-
-	val = FIELD_PREP(PHY_CTRL_REG_ADDR, regnum) |
-	      FIELD_PREP(PHY_CTRL_PARK_PAGE, 0x1f) |
-	      FIELD_PREP(PHY_CTRL_MAIN_PAGE, RAW_PAGE(priv)) |
-	      PHY_CTRL_READ | PHY_CTRL_TYPE_C22 | PHY_CTRL_CMD;
-	err = regmap_write(regmap, cmd_reg, val);
-	if (err)
-		goto out_err;
-
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
-
-	err = regmap_read(regmap, io_reg, &val);
-	if (err)
-		goto out_err;
-
-	mutex_unlock(&priv->lock);
-	return FIELD_GET(PHY_CTRL_DATA, val);
-
-out_err:
-	mutex_unlock(&priv->lock);
-	return err;
-}
-
-static int otto_emdio_9300_write_c22(struct mii_bus *bus, int phy_id, int regnum, u16 value)
-{
-	struct otto_emdio_chan *chan = bus->priv;
-	struct otto_emdio_priv *priv;
-	u32 io_reg, cmd_reg, val;
-	struct regmap *regmap;
-	int port;
-	int err;
-
-	priv = chan->priv;
-	regmap = priv->regmap;
-	io_reg = priv->info->cmd_regs.io_data;
-	cmd_reg = priv->info->cmd_regs.c22_data; /* shared command/C22 register */
-
-	port = otto_emdio_phy_to_port(bus, phy_id);
-	if (port < 0)
-		return port;
-
-	mutex_lock(&priv->lock);
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
-
-	err = regmap_write(regmap, priv->info->cmd_regs.port_mask_low, BIT(port));
-	if (err)
-		goto out_err;
-
-	err = regmap_write(regmap, io_reg, FIELD_PREP(PHY_CTRL_INDATA, value));
-	if (err)
-		goto out_err;
-
-	val = FIELD_PREP(PHY_CTRL_REG_ADDR, regnum) |
-	      FIELD_PREP(PHY_CTRL_PARK_PAGE, 0x1f) |
-	      FIELD_PREP(PHY_CTRL_MAIN_PAGE, RAW_PAGE(priv)) |
-	      PHY_CTRL_WRITE | PHY_CTRL_TYPE_C22 | PHY_CTRL_CMD;
-	err = regmap_write(regmap, cmd_reg, val);
-	if (err)
-		goto out_err;
-
-	err = regmap_read_poll_timeout(regmap, cmd_reg, val, !(val & PHY_CTRL_CMD), 10, 100);
-	if (err)
-		goto out_err;
-
-	if (val & PHY_CTRL_FAIL) {
-		err = -ENXIO;
-		goto out_err;
-	}
-
-	mutex_unlock(&priv->lock);
 	return 0;
-
-out_err:
-	mutex_unlock(&priv->lock);
-	return err;
 }
 
-static int otto_emdio_9300_read_c45(struct mii_bus *bus, int phy_id, int dev_addr, int regnum)
+static int otto_emdio_write_cmd(struct mii_bus *bus, u32 cmd,
+				struct otto_emdio_cmd_regs *cmd_data)
 {
-	struct otto_emdio_chan *chan = bus->priv;
-	struct otto_emdio_priv *priv;
-	u32 io_reg, cmd_reg, val;
-	struct regmap *regmap;
-	int port;
-	int err;
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
 
-	priv = chan->priv;
-	regmap = priv->regmap;
-	io_reg = priv->info->cmd_regs.io_data;
-	cmd_reg = priv->info->cmd_regs.c22_data; /* shared command/C22 register */
+	lockdep_assert_held(&priv->lock);
+
+	return otto_emdio_run_cmd(bus, cmd | priv->info->cmd_write, cmd_data);
+}
+
+static int otto_emdio_9300_read_c22(struct mii_bus *bus, int port, int regnum, u32 *value)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	struct otto_emdio_cmd_regs cmd_data = {
+		.c22_data	= FIELD_PREP(PHY_CTRL_REG_ADDR, regnum) |
+				  FIELD_PREP(PHY_CTRL_PARK_PAGE, 0x1f) |
+				  FIELD_PREP(PHY_CTRL_MAIN_PAGE, RAW_PAGE(priv)),
+		.io_data	= FIELD_PREP(PHY_CTRL_INDATA, port),
+	};
+
+	return otto_emdio_read_cmd(bus, PHY_CTRL_TYPE_C22, &cmd_data, value);
+}
+
+static int otto_emdio_9300_write_c22(struct mii_bus *bus, int port, int regnum, u16 value)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	struct otto_emdio_cmd_regs cmd_data = {
+		.c22_data	= FIELD_PREP(PHY_CTRL_REG_ADDR, regnum) |
+				  FIELD_PREP(PHY_CTRL_PARK_PAGE, 0x1f) |
+				  FIELD_PREP(PHY_CTRL_MAIN_PAGE, RAW_PAGE(priv)),
+		.io_data	= FIELD_PREP(PHY_CTRL_INDATA, value),
+		.port_mask_low	= BIT(port),
+	};
+
+	return otto_emdio_write_cmd(bus, PHY_CTRL_TYPE_C22, &cmd_data);
+}
+
+static int otto_emdio_9300_read_c45(struct mii_bus *bus, int port,
+				    int dev_addr, int regnum, u32 *value)
+{
+	struct otto_emdio_cmd_regs cmd_data = {
+		.c45_data	= FIELD_PREP(PHY_CTRL_MMD_DEVAD, dev_addr) |
+				  FIELD_PREP(PHY_CTRL_MMD_REG, regnum),
+		.io_data	= FIELD_PREP(PHY_CTRL_INDATA, port),
+	};
+
+	return otto_emdio_read_cmd(bus, PHY_CTRL_TYPE_C45, &cmd_data, value);
+}
+
+static int otto_emdio_9300_write_c45(struct mii_bus *bus, int port,
+				     int dev_addr, int regnum, u16 value)
+{
+	struct otto_emdio_cmd_regs cmd_data = {
+		.c45_data	= FIELD_PREP(PHY_CTRL_MMD_DEVAD, dev_addr) |
+				  FIELD_PREP(PHY_CTRL_MMD_REG, regnum),
+		.io_data	= FIELD_PREP(PHY_CTRL_INDATA, value),
+		.port_mask_low	= BIT(port),
+	};
+
+	return otto_emdio_write_cmd(bus, PHY_CTRL_TYPE_C45, &cmd_data);
+}
+
+static int otto_emdio_read_c22(struct mii_bus *bus, int phy_id, int regnum)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	int ret, port;
+	u32 value;
 
 	port = otto_emdio_phy_to_port(bus, phy_id);
 	if (port < 0)
 		return port;
 
-	mutex_lock(&priv->lock);
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
+	scoped_guard(mutex, &priv->lock)
+		ret = priv->info->read_c22(bus, port, regnum, &value);
 
-	val = FIELD_PREP(PHY_CTRL_INDATA, port);
-	err = regmap_write(regmap, io_reg, val);
-	if (err)
-		goto out_err;
-
-	val = FIELD_PREP(PHY_CTRL_MMD_DEVAD, dev_addr) |
-	      FIELD_PREP(PHY_CTRL_MMD_REG, regnum);
-	err = regmap_write(regmap, priv->info->cmd_regs.c45_data, val);
-	if (err)
-		goto out_err;
-
-	err = regmap_write(regmap, cmd_reg, PHY_CTRL_READ | PHY_CTRL_TYPE_C45 | PHY_CTRL_CMD);
-	if (err)
-		goto out_err;
-
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
-
-	err = regmap_read(regmap, io_reg, &val);
-	if (err)
-		goto out_err;
-
-	mutex_unlock(&priv->lock);
-	return FIELD_GET(PHY_CTRL_DATA, val);
-
-out_err:
-	mutex_unlock(&priv->lock);
-	return err;
+	return ret ? ret : value;
 }
 
-static int otto_emdio_9300_write_c45(struct mii_bus *bus, int phy_id, int dev_addr,
-				  int regnum, u16 value)
+static int otto_emdio_write_c22(struct mii_bus *bus, int phy_id, int regnum, u16 value)
 {
-	struct otto_emdio_chan *chan = bus->priv;
-	struct otto_emdio_priv *priv;
-	u32 io_reg, cmd_reg, val;
-	struct regmap *regmap;
-	int port;
-	int err;
-
-	priv = chan->priv;
-	regmap = priv->regmap;
-	io_reg = priv->info->cmd_regs.io_data;
-	cmd_reg = priv->info->cmd_regs.c22_data; /* shared command/C22 register */
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	int ret, port;
 
 	port = otto_emdio_phy_to_port(bus, phy_id);
 	if (port < 0)
 		return port;
 
-	mutex_lock(&priv->lock);
-	err = otto_emdio_wait_ready(priv);
-	if (err)
-		goto out_err;
+	scoped_guard(mutex, &priv->lock)
+		ret = priv->info->write_c22(bus, port, regnum, value);
 
-	err = regmap_write(regmap, priv->info->cmd_regs.port_mask_low, BIT(port));
-	if (err)
-		goto out_err;
+	return ret;
+}
 
-	val = FIELD_PREP(PHY_CTRL_INDATA, value);
-	err = regmap_write(regmap, io_reg, val);
-	if (err)
-		goto out_err;
+static int otto_emdio_read_c45(struct mii_bus *bus, int phy_id, int dev_addr, int regnum)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	int ret, port;
+	u32 value;
 
-	val = FIELD_PREP(PHY_CTRL_MMD_DEVAD, dev_addr) |
-	      FIELD_PREP(PHY_CTRL_MMD_REG, regnum);
-	err = regmap_write(regmap, priv->info->cmd_regs.c45_data, val);
-	if (err)
-		goto out_err;
+	port = otto_emdio_phy_to_port(bus, phy_id);
+	if (port < 0)
+		return port;
 
-	err = regmap_write(regmap, cmd_reg, PHY_CTRL_TYPE_C45 | PHY_CTRL_WRITE | PHY_CTRL_CMD);
-	if (err)
-		goto out_err;
+	scoped_guard(mutex, &priv->lock)
+		ret = priv->info->read_c45(bus, port, dev_addr, regnum, &value);
 
-	err = regmap_read_poll_timeout(regmap, cmd_reg, val, !(val & PHY_CTRL_CMD), 10, 100);
-	if (err)
-		goto out_err;
+	return ret ? ret : value;
+}
 
-	if (val & PHY_CTRL_FAIL) {
-		err = -ENXIO;
-		goto out_err;
-	}
+static int otto_emdio_write_c45(struct mii_bus *bus, int phy_id,
+				int dev_addr, int regnum, u16 value)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	int ret, port;
 
-	mutex_unlock(&priv->lock);
-	return 0;
+	port = otto_emdio_phy_to_port(bus, phy_id);
+	if (port < 0)
+		return port;
 
-out_err:
-	mutex_unlock(&priv->lock);
-	return err;
+	scoped_guard(mutex, &priv->lock)
+		ret = priv->info->write_c45(bus, port, dev_addr, regnum, value);
+
+	return ret;
 }
 
 static int otto_emdio_9300_mdiobus_init(struct otto_emdio_priv *priv)
@@ -437,11 +401,11 @@ static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv
 
 	bus->name = "Realtek Switch MDIO Bus";
 	if (priv->smi_bus_is_c45[mdio_bus]) {
-		bus->read_c45 = priv->info->read_c45;
-		bus->write_c45 = priv->info->write_c45;
+		bus->read_c45 = otto_emdio_read_c45;
+		bus->write_c45 = otto_emdio_write_c45;
 	} else {
-		bus->read = priv->info->read_c22;
-		bus->write = priv->info->write_c22;
+		bus->read = otto_emdio_read_c22;
+		bus->write = otto_emdio_write_c22;
 	}
 	bus->parent = dev;
 	chan = bus->priv;
@@ -558,6 +522,9 @@ static int otto_emdio_probe(struct platform_device *pdev)
 }
 
 static const struct otto_emdio_info otto_emdio_9300_info = {
+	.cmd_fail = PHY_CTRL_FAIL,
+	.cmd_read = PHY_CTRL_READ,
+	.cmd_write = PHY_CTRL_WRITE,
 	.cmd_regs = {
 		.c22_data = RTL9300_SMI_ACCESS_PHY_CTRL_1,
 		.c45_data = RTL9300_SMI_ACCESS_PHY_CTRL_3,
