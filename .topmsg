@@ -1,4 +1,33 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-addr-always-drop-other-suboptions
+Subject: [PATCH] mptcp: add-addr: always drop other suboptions
 
+When an ADD_ADDR needs to be sent, it could be prepared if there is
+enough remaining space and even if the packet is not a pure ACK. But it
+would be dropped soon after.
+
+Indeed, in mptcp_pm_add_addr_signal(), there is enough space to fit a
+DSS of 20 octets and an ADD_ADDR echo containing an IPv4 address on 8
+octets for example. In this case, the packet would be prepared, the
+MPTCP_ADD_ADDR_ECHO bit would be removed from pm->addr_signal, but the
+option would be silently dropped in mptcp_established_options_add_addr()
+not to override DSS info in the union from 'struct mptcp_out_options',
+and also because mptcp_write_options() will enforce mutually exclusion
+with DSS.
+
+Instead, don't even try to send an ADD_ADDR if it is not a pure ACK.
+Retry for each new packet until a pure-ACK is emitted. That's fine to do
+that, because each time an ADD_ADDR (echo) is scheduled, a pure ACK is
+queued.
+
+This also simplifies the code, and the skb checks can be done earlier,
+before the lock.
+
+Note: also, since commit 6d0060f600ad ("mptcp: Write MPTCP DSS headers
+to outgoing data packets"), opts->ahmac would not have been set to 0
+when other suboptions were not dropped, and when sending an ADD_ADDR
+echo. That would have resulted in sending an ADD_ADDR using garbage
+info, where there was not enough space, instead of an echo one without
+the ADD_ADDR HMAC.
+
+Fixes: 1bff1e43a30e ("mptcp: optimize out option generation")
 Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
