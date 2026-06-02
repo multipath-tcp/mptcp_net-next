@@ -3359,7 +3359,7 @@ static int mana_dealloc_queues(struct net_device *ndev)
 		}
 
 		for (i = 0; i < apc->num_queues; i++) {
-			txq = &apc->tx_qp[i].txq;
+			txq = &apc->tx_qp[i]->txq;
 			while ((skb = skb_dequeue(&txq->pending_skbs))) {
 				mana_unmap_skb(skb, apc);
 				dev_kfree_skb_any(skb);
