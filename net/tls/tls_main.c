@@ -156,6 +156,7 @@ static void tls_prot_cleanup(void)
 	spin_lock_bh(&tls_prot_lock);
 	list_for_each_entry_safe(prot, tmp, &tls_prot_list, list) {
 		list_del_rcu(&prot->list);
+		module_put(prot->ops->owner);
 		call_rcu(&prot->rcu, tls_prot_free);
 	}
 	spin_unlock_bh(&tls_prot_lock);
@@ -248,13 +249,13 @@ int tls_push_sg(struct sock *sk,
 	ctx->splicing_pages = true;
 	while (1) {
 		/* is sending application-limited? */
-		tcp_rate_check_app_limited(sk);
+		ctx->prot->ops->check_app_limited(sk);
 		p = sg_page(sg);
 retry:
 		bvec_set_page(&bvec, p, size, offset);
 		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, size);
 
-		ret = tcp_sendmsg_locked(sk, &msg, size);
+		ret = ctx->prot->ops->sendmsg_locked(sk, &msg, size);
 
 		if (ret != size) {
 			if (ret > 0) {
@@ -380,6 +381,7 @@ static void tls_prot_put(struct tls_prot *prot)
 		spin_lock_bh(&tls_prot_lock);
 		list_del_rcu(&prot->list);
 		spin_unlock_bh(&tls_prot_lock);
+		module_put(prot->ops->owner);
 		call_rcu(&prot->rcu, tls_prot_free);
 	}
 }
@@ -492,14 +494,14 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 	 */
 	smp_rmb();
 
-	mask = tcp_poll(file, sock, wait);
+	tls_ctx = tls_get_ctx(sk);
+	mask = tls_ctx->prot->ops->poll(file, sock, wait);
 
 	state = inet_sk_state_load(sk);
 	shutdown = READ_ONCE(sk->sk_shutdown);
 	if (unlikely(state != TCP_ESTABLISHED || shutdown & RCV_SHUTDOWN))
 		return mask;
 
-	tls_ctx = tls_get_ctx(sk);
 	ctx = tls_sw_ctx_rx(tls_ctx);
 	psock = sk_psock_get(sk);
 
@@ -1057,6 +1059,7 @@ static struct tls_prot *tls_build_proto(struct sock *sk)
 	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
 	struct proto *proto = READ_ONCE(sk->sk_prot);
 	struct tls_prot *prot, *cache;
+	struct tls_prot_ops *ops;
 
 	if (!sk->sk_socket)
 		return NULL;
@@ -1077,8 +1080,16 @@ static struct tls_prot *tls_build_proto(struct sock *sk)
 		return cache;
 	}
 
+	ops = tls_prot_ops_find(sk->sk_protocol);
+	if (!ops || !try_module_get(ops->owner)) {
+		spin_unlock_bh(&tls_prot_lock);
+		kfree(prot);
+		return NULL;
+	}
+
 	prot->ip_ver = ip_ver;
 	prot->prot = proto;
+	prot->ops = ops;
 	refcount_set(&prot->refcnt, 1);
 	build_protos(prot->prots, proto);
 	build_proto_ops(prot->proto_ops,
