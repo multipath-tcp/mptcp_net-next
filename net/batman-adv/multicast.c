@@ -1099,7 +1099,7 @@ static int batadv_mcast_forw_mode_check(struct batadv_priv *bat_priv,
 {
 	struct ethhdr *ethhdr = eth_hdr(skb);
 
-	if (!atomic_read(&bat_priv->multicast_mode))
+	if (!READ_ONCE(bat_priv->multicast_mode))
 		return -EINVAL;
 
 	switch (ntohs(ethhdr->h_proto)) {
@@ -1204,7 +1204,7 @@ batadv_mcast_forw_mode_by_count(struct batadv_priv *bat_priv,
 	    batadv_mcast_forw_push(bat_priv, skb, vid, is_routable, count))
 		return BATADV_FORW_MCAST;
 
-	if (count <= atomic_read(&bat_priv->multicast_fanout))
+	if (count <= READ_ONCE(bat_priv->multicast_fanout))
 		return BATADV_FORW_UCASTS;
 
 	return BATADV_FORW_BCAST;
