@@ -1,4 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-let-the-retrans-scheduler-do-its-job
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: let the retrans scheduler do its job
 
-Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Currently the MPTCP core enforces that when MPTCP-level retrans timer
+fires, at most a single dfrag is retransmitted. If some corner-cases it
+may be necessary retransmit multiple dfrags, and the MPTCP socket will
+need to wait multiple retrans timeout to accomplish that.
+
+Remove the mentioned constraint, allowing to transmit multiple dfrags per
+retrans period, as long as the scheduler keeps selecting subflows for
+retransmissions and pending data is available in the rtx queue.
+The default scheduler will transmit a dfrag per available subflow.
+
+Tested-by: Gang Yan <yangang@kylinos.cn>
+Tested-by: Geliang Tang <geliang@kernel.org>
+Acked-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
