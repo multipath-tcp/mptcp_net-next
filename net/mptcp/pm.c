@@ -403,7 +403,7 @@ mptcp_pm_announced_del_timer(struct mptcp_sock *msk,
 {
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_add_addr *entry;
-	struct timer_list *timer = NULL;
+	bool stop_timer = false;
 
 	rcu_read_lock();
 
@@ -411,7 +411,7 @@ mptcp_pm_announced_del_timer(struct mptcp_sock *msk,
 	entry = mptcp_pm_announced_lookup(msk, addr);
 	if (entry && (!check_id || entry->addr.id == addr->id)) {
 		entry->retrans_times = ADD_ADDR_RETRANS_MAX;
-		timer = &entry->timer;
+		stop_timer = true;
 	}
 	if (!check_id && entry)
 		list_del(&entry->list);
@@ -420,14 +420,14 @@ mptcp_pm_announced_del_timer(struct mptcp_sock *msk,
 	/* Note: entry might have been removed by another thread.
 	 * We hold rcu_read_lock() to ensure it is not freed under us.
 	 */
-	if (timer && check_id)
-		sk_stop_timer(sk, timer);
+	if (stop_timer) {
+		if (check_id)
+			sk_stop_timer(sk, &entry->timer);
+		else
+			sk_stop_timer_sync(sk, &entry->timer);
+	}
 
 	rcu_read_unlock();
-
-	if (timer && !check_id)
-		sk_stop_timer_sync(sk, timer);
-
 	return entry;
 }
 
