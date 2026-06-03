@@ -21,6 +21,7 @@
 #include <linux/mutex.h>
 #include <linux/netdevice.h>
 #include <linux/netlink.h>
+#include <linux/rhashtable-types.h>
 #include <linux/sched.h> /* for linux/wait.h */
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
@@ -71,14 +72,28 @@ enum batadv_dhcp_recipient {
 #define BATADV_TT_SYNC_MASK	0x00F0
 
 /**
+ * struct batadv_ogm_buf - Buffer to construct an OGM with TVLV
+ */
+struct batadv_ogm_buf {
+	/** @buf: buffer holding the OGM packet */
+	void *buf;
+
+	/** @len: length of the OGM packet buffer data */
+	size_t len;
+
+	/** @capacity: size of allocated buf */
+	size_t capacity;
+
+	/** @header_length: fixed size header length (must be <= len) */
+	size_t header_length;
+};
+
+/**
  * struct batadv_hard_iface_bat_iv - per hard-interface B.A.T.M.A.N. IV data
  */
 struct batadv_hard_iface_bat_iv {
 	/** @ogm_buff: buffer holding the OGM packet */
-	unsigned char *ogm_buff;
-
-	/** @ogm_buff_len: length of the OGM packet buffer */
-	int ogm_buff_len;
+	struct batadv_ogm_buf ogm_buff;
 
 	/** @ogm_seqno: OGM sequence number - used to identify each OGM */
 	atomic_t ogm_seqno;
@@ -86,7 +101,7 @@ struct batadv_hard_iface_bat_iv {
 	/** @reschedule_work: recover OGM schedule after schedule error */
 	struct delayed_work reschedule_work;
 
-	/** @ogm_buff_mutex: lock protecting ogm_buff and ogm_buff_len */
+	/** @ogm_buff_mutex: lock protecting ogm_buff */
 	struct mutex ogm_buff_mutex;
 };
 
@@ -113,7 +128,7 @@ enum batadv_v_hard_iface_flags {
  */
 struct batadv_hard_iface_bat_v {
 	/** @elp_interval: time interval between two ELP transmissions */
-	atomic_t elp_interval;
+	u32 elp_interval;
 
 	/** @elp_seqno: current ELP sequence number */
 	atomic_t elp_seqno;
@@ -137,7 +152,7 @@ struct batadv_hard_iface_bat_v {
 	 * @throughput_override: throughput override to disable link
 	 *  auto-detection
 	 */
-	atomic_t throughput_override;
+	u32 throughput_override;
 
 	/** @flags: interface specific flags */
 	u8 flags;
@@ -167,6 +182,29 @@ enum batadv_hard_iface_wifi_flags {
 };
 
 /**
+ * struct batadv_wifi_net_device_state - cache of wifi information of net_devices
+ */
+struct batadv_wifi_net_device_state {
+	/** @l: anchor in rhashtable */
+	struct rhash_head l;
+
+	/** @netdev: pointer to the net_device */
+	struct net_device *netdev;
+
+	/** @dev_tracker: device tracker for @netdev */
+	netdevice_tracker dev_tracker;
+
+	/**
+	 * @wifi_flags: flags whether this is (directly or indirectly) a wifi
+	 *  interface
+	 */
+	u32 wifi_flags;
+
+	/** @rcu: struct used for freeing in an RCU-safe manner */
+	struct rcu_head rcu;
+};
+
+/**
  * struct batadv_hard_iface - network device known to batman-adv
  */
 struct batadv_hard_iface {
@@ -180,12 +218,6 @@ struct batadv_hard_iface {
 	 * @num_bcasts: number of payload re-broadcasts on this interface (ARQ)
 	 */
 	u8 num_bcasts;
-
-	/**
-	 * @wifi_flags: flags whether this is (directly or indirectly) a wifi
-	 *  interface
-	 */
-	u32 wifi_flags;
 
 	/** @net_dev: pointer to the net_device */
 	struct net_device *net_dev;
@@ -218,7 +250,7 @@ struct batadv_hard_iface {
 	 * @hop_penalty: penalty which will be applied to the tq-field
 	 * of an OGM received via this interface
 	 */
-	atomic_t hop_penalty;
+	u8 hop_penalty;
 
 	/** @bat_iv: per hard-interface B.A.T.M.A.N. IV data */
 	struct batadv_hard_iface_bat_iv bat_iv;
@@ -446,7 +478,7 @@ struct batadv_orig_node {
 	unsigned long capa_initialized;
 
 	/** @last_ttvn: last seen translation table version number */
-	atomic_t last_ttvn;
+	u8 last_ttvn;
 
 	/** @tt_buff: last tt changeset this node received from the orig node */
 	unsigned char *tt_buff;
@@ -631,8 +663,15 @@ struct batadv_neigh_node {
 	/** @list: list node for &batadv_orig_node.neigh_list */
 	struct hlist_node list;
 
-	/** @orig_node: pointer to corresponding orig_node */
-	struct batadv_orig_node *orig_node;
+#ifdef CONFIG_BATMAN_ADV_BATMAN_V
+	/**
+	 * @orig_node_id: pointer to corresponding orig_node. It must only be used
+	 * to identify the node but must NEVER be dereferenced. The reference counter
+	 * was not increased when this was assigned because it would otherwise create
+	 * a reference cycle.
+	 */
+	struct batadv_orig_node *__private orig_node_id;
+#endif
 
 	/** @addr: the MAC address of the neighboring interface */
 	u8 addr[ETH_ALEN];
@@ -1101,21 +1140,21 @@ struct batadv_priv_gw {
 	/**
 	 * @mode: gateway operation: off, client or server (see batadv_gw_modes)
 	 */
-	atomic_t mode;
+	enum batadv_gw_modes mode;
 
 	/** @sel_class: gateway selection class (applies if gw_mode client) */
-	atomic_t sel_class;
+	u32 sel_class;
 
 	/**
 	 * @bandwidth_down: advertised uplink download bandwidth (if gw_mode
 	 *  server)
 	 */
-	atomic_t bandwidth_down;
+	u32 bandwidth_down;
 
 	/**
 	 * @bandwidth_up: advertised uplink upload bandwidth (if gw_mode server)
 	 */
-	atomic_t bandwidth_up;
+	u32 bandwidth_up;
 
 	/** @reselect: bool indicating a gateway re-selection is in progress */
 	atomic_t reselect;
@@ -1441,7 +1480,7 @@ struct batadv_meshif_vlan {
 	unsigned short vid;
 
 	/** @ap_isolation: AP isolation state */
-	atomic_t ap_isolation;		/* boolean */
+	u8 ap_isolation;		/* boolean */
 
 	/** @tt: TT private attributes (VLAN specific) */
 	struct batadv_vlan_tt tt;
@@ -1463,15 +1502,12 @@ struct batadv_meshif_vlan {
  */
 struct batadv_priv_bat_v {
 	/** @ogm_buff: buffer holding the OGM packet */
-	unsigned char *ogm_buff;
-
-	/** @ogm_buff_len: length of the OGM packet buffer */
-	int ogm_buff_len;
+	struct batadv_ogm_buf ogm_buff;
 
 	/** @ogm_seqno: OGM sequence number - used to identify each OGM */
 	atomic_t ogm_seqno;
 
-	/** @ogm_buff_mutex: lock protecting ogm_buff and ogm_buff_len */
+	/** @ogm_buff_mutex: lock protecting ogm_buff */
 	struct mutex ogm_buff_mutex;
 
 	/** @ogm_wq: workqueue used to schedule OGM transmissions */
@@ -1486,7 +1522,7 @@ struct batadv_priv {
 	 * @mesh_state: current status of the mesh
 	 *  (inactive/active/deactivating)
 	 */
-	atomic_t mesh_state;
+	enum batadv_mesh_state mesh_state;
 
 	/** @mesh_iface: net device which holds this struct as private data */
 	struct net_device *mesh_iface;
@@ -1506,36 +1542,23 @@ struct batadv_priv {
 	/**
 	 * @aggregated_ogms: bool indicating whether OGM aggregation is enabled
 	 */
-	atomic_t aggregated_ogms;
+	u8 aggregated_ogms;
 
 	/** @bonding: bool indicating whether traffic bonding is enabled */
-	atomic_t bonding;
+	u8 bonding;
 
 	/**
 	 * @fragmentation: bool indicating whether traffic fragmentation is
 	 *  enabled
 	 */
-	atomic_t fragmentation;
-
-	/**
-	 * @packet_size_max: max packet size that can be transmitted via
-	 *  multiple fragmented skbs or a single frame if fragmentation is
-	 *  disabled
-	 */
-	atomic_t packet_size_max;
-
-	/**
-	 * @frag_seqno: incremental counter to identify chains of egress
-	 *  fragments
-	 */
-	atomic_t frag_seqno;
+	u8 fragmentation;
 
 #ifdef CONFIG_BATMAN_ADV_BLA
 	/**
 	 * @bridge_loop_avoidance: bool indicating whether bridge loop
 	 *  avoidance is enabled
 	 */
-	atomic_t bridge_loop_avoidance;
+	u8 bridge_loop_avoidance;
 #endif
 
 #ifdef CONFIG_BATMAN_ADV_DAT
@@ -1543,7 +1566,7 @@ struct batadv_priv {
 	 * @distributed_arp_table: bool indicating whether distributed ARP table
 	 *  is enabled
 	 */
-	atomic_t distributed_arp_table;
+	u8 distributed_arp_table;
 #endif
 
 #ifdef CONFIG_BATMAN_ADV_MCAST
@@ -1551,27 +1574,40 @@ struct batadv_priv {
 	 * @multicast_mode: Enable or disable multicast optimizations on this
 	 *  node's sender/originating side
 	 */
-	atomic_t multicast_mode;
+	u8 multicast_mode;
 
 	/**
 	 * @multicast_fanout: Maximum number of packet copies to generate for a
 	 *  multicast-to-unicast conversion
 	 */
-	atomic_t multicast_fanout;
+	u32 multicast_fanout;
 #endif
 
+	/**
+	 * @packet_size_max: max packet size that can be transmitted via
+	 *  multiple fragmented skbs or a single frame if fragmentation is
+	 *  disabled
+	 */
+	int packet_size_max;
+
+	/**
+	 * @frag_seqno: incremental counter to identify chains of egress
+	 *  fragments
+	 */
+	atomic_t frag_seqno;
+
 	/** @orig_interval: OGM broadcast interval in milliseconds */
-	atomic_t orig_interval;
+	u32 orig_interval;
 
 	/**
 	 * @hop_penalty: penalty which will be applied to an OGM's tq-field on
 	 *  every hop
 	 */
-	atomic_t hop_penalty;
+	u8 hop_penalty;
 
 #ifdef CONFIG_BATMAN_ADV_DEBUG
 	/** @log_level: configured log level (see batadv_dbg_level) */
-	atomic_t log_level;
+	u32 log_level;
 #endif
 
 	/**
