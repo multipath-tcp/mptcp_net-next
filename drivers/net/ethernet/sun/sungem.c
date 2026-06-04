@@ -2179,7 +2179,7 @@ static void gem_do_stop(struct net_device *dev, int wol)
 	 * if we did. This is not an issue however as the reset
 	 * task is synchronized vs. us (rtnl_lock) and will do
 	 * nothing if the device is down or suspended. We do
-	 * still clear reset_task_pending to avoid a spurrious
+	 * still clear reset_task_pending to avoid a spurious
 	 * reset later on in case we do resume before it gets
 	 * scheduled.
 	 */
@@ -2362,7 +2362,7 @@ static int __maybe_unused gem_resume(struct device *dev_d)
 	gem_do_start(dev);
 
 	/* If we had WOL enabled, the cell clock was never turned off during
-	 * sleep, so we end up beeing unbalanced. Fix that here
+	 * sleep, so we end up being unbalanced. Fix that here
 	 */
 	if (gp->asleep_wol)
 		gem_put_cell(gp);
