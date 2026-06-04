@@ -3296,6 +3296,18 @@ static int mlx5_esw_offloads_set_ns_peer(struct mlx5_eswitch *esw,
 	return 0;
 }
 
+bool mlx5_eswitch_is_peer(struct mlx5_eswitch *esw,
+			  struct mlx5_eswitch *peer_esw)
+{
+	u16 peer_esw_i;
+
+	if (!mlx5_esw_allowed(esw) || !mlx5_esw_allowed(peer_esw))
+		return false;
+
+	peer_esw_i = MLX5_CAP_GEN(peer_esw->dev, vhca_id);
+	return !!xa_load(&esw->paired, peer_esw_i);
+}
+
 static int mlx5_esw_offloads_devcom_event(int event,
 					  void *my_data,
 					  void *event_data)
@@ -3866,6 +3878,7 @@ bool mlx5_esw_offloads_controller_valid(const struct mlx5_eswitch *esw, u32 cont
 int esw_offloads_enable(struct mlx5_eswitch *esw)
 {
 	u8 mapping_id[MLX5_SW_IMAGE_GUID_MAX_BYTES];
+	struct mlx5_devcom_match_attr attr = {};
 	struct mapping_ctx *reg_c0_obj_pool;
 	struct mlx5_vport *vport;
 	unsigned long i;
@@ -3926,6 +3939,10 @@ int esw_offloads_enable(struct mlx5_eswitch *esw)
 	if (err)
 		goto err_vports;
 
+	memcpy(attr.key.buf, mapping_id, id_len);
+	attr.flags = MLX5_DEVCOM_MATCH_FLAGS_NS;
+	attr.net = mlx5_core_net(esw->dev);
+	mlx5_esw_offloads_devcom_init(esw, &attr);
 	return 0;
 
 err_vports:
@@ -3970,6 +3987,7 @@ static int esw_offloads_stop(struct mlx5_eswitch *esw,
 
 void esw_offloads_disable(struct mlx5_eswitch *esw)
 {
+	mlx5_esw_offloads_devcom_cleanup(esw);
 	mlx5_eswitch_disable_pf_vf_vports(esw);
 	mlx5_esw_offloads_rep_unload(esw, MLX5_VPORT_UPLINK);
 	esw_set_passing_vport_metadata(esw, false);
@@ -4672,8 +4690,11 @@ EXPORT_SYMBOL(mlx5_eswitch_unregister_vport_reps_nested);
 
 void *mlx5_eswitch_get_uplink_priv(struct mlx5_eswitch *esw, u8 rep_type)
 {
+	struct mlx5_core_dev *primary = mlx5_sd_get_primary(esw->dev);
 	struct mlx5_eswitch_rep *rep;
 
+	if (primary)
+		esw = primary->priv.eswitch;
 	rep = mlx5_eswitch_get_rep(esw, MLX5_VPORT_UPLINK);
 	return rep->rep_data[rep_type].priv;
 }
@@ -4695,6 +4716,11 @@ EXPORT_SYMBOL(mlx5_eswitch_get_proto_dev);
 
 void *mlx5_eswitch_uplink_get_proto_dev(struct mlx5_eswitch *esw, u8 rep_type)
 {
+	struct mlx5_core_dev *primary = mlx5_sd_get_primary(esw->dev);
+
+	if (primary)
+		esw = primary->priv.eswitch;
+
 	return mlx5_eswitch_get_proto_dev(esw, MLX5_VPORT_UPLINK, rep_type);
 }
 EXPORT_SYMBOL(mlx5_eswitch_uplink_get_proto_dev);

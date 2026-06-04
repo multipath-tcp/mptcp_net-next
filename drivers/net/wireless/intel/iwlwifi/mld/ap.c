@@ -9,7 +9,6 @@
 #include "ap.h"
 #include "hcmd.h"
 #include "tx.h"
-#include "power.h"
 #include "key.h"
 #include "phy.h"
 #include "iwl-utils.h"
@@ -324,9 +323,6 @@ int iwl_mld_start_ap_ibss(struct ieee80211_hw *hw,
 	struct iwl_mld_vif *mld_vif = iwl_mld_vif_from_mac80211(vif);
 	struct ieee80211_chanctx_conf *ctx;
 	int ret;
-
-	if (vif->type == NL80211_IFTYPE_AP)
-		iwl_mld_send_ap_tx_power_constraint_cmd(mld, vif, link);
 
 	/* the link should be already activated when assigning chan context,
 	 * and LINK_CONTEXT_MODIFY_EHT_PARAMS is deprecated

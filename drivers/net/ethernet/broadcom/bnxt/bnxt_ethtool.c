@@ -4594,7 +4594,7 @@ static int bnxt_set_tunable(struct net_device *dev,
 	switch (tuna->id) {
 	case ETHTOOL_RX_COPYBREAK:
 		rx_copybreak = *(u32 *)data;
-		if (rx_copybreak > BNXT_MAX_RX_COPYBREAK)
+		if (rx_copybreak > BNXT_MAX_RX_HDR_BUF)
 			return -ERANGE;
 		if (rx_copybreak != bp->rx_copybreak) {
 			if (netif_running(dev))
@@ -5172,7 +5172,7 @@ static int bnxt_run_loopback(struct bnxt *bp)
 	cpr = &rxr->bnapi->cp_ring;
 	if (bp->flags & BNXT_FLAG_CHIP_P5_PLUS)
 		cpr = rxr->rx_cpr;
-	pkt_size = min(bp->dev->mtu + ETH_HLEN, max(BNXT_DEFAULT_RX_COPYBREAK,
+	pkt_size = min(bp->dev->mtu + ETH_HLEN, max(BNXT_MIN_RX_HDR_BUF,
 						    bp->rx_copybreak));
 	skb = netdev_alloc_skb(bp->dev, pkt_size);
 	if (!skb)
