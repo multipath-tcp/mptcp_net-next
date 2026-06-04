@@ -1941,6 +1941,15 @@ attribute-sets:
       -
         name: gro-hint
         type: flag
+      -
+        name: local
+        type: u32
+        byte-order: big-endian
+        display-hint: ipv4
+      -
+        name: local6
+        type: binary
+        display-hint: ipv6
   -
     name: linkinfo-hsr-attrs
     name-prefix: ifla-hsr-
