@@ -6561,6 +6561,9 @@ nl80211_parse_rnr_elems(struct wiphy *wiphy, struct nlattr *attrs,
 		if (ret)
 			return ERR_PTR(ret);
 
+		if (num_elems >= 255)
+			return ERR_PTR(-EINVAL);
+
 		num_elems++;
 	}
 
@@ -6992,6 +6995,12 @@ static int nl80211_calculate_ap_capabilities(struct genl_info *info,
 			return -EINVAL;
 		}
 	}
+
+	if (!!params->he_cap != !!params->he_oper)
+		return -EINVAL;
+
+	if (!!params->eht_cap != !!params->eht_oper)
+		return -EINVAL;
 
 	return 0;
 }
