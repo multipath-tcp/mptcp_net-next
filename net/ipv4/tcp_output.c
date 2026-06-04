@@ -1183,10 +1183,11 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 	 */
 	if (sk_is_mptcp(sk)) {
 		unsigned int remaining = MAX_TCP_OPTION_SPACE - size;
-		unsigned int opt_size = 0;
+		int opt_size;
 
-		if (mptcp_established_options(sk, skb, &opt_size, remaining,
-					      &opts->mptcp)) {
+		opt_size = mptcp_established_options(sk, skb, remaining,
+						     &opts->mptcp);
+		if (opt_size >= 0) {
 			opts->options |= OPTION_MPTCP;
 			size += opt_size;
 		}

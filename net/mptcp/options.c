@@ -827,13 +827,14 @@ static bool mptcp_established_options_mp_fail(struct sock *sk,
 	return true;
 }
 
-bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
-			       unsigned int *size, unsigned int remaining,
-			       struct mptcp_out_options *opts)
+int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			      unsigned int remaining,
+			      struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	unsigned int opt_size = 0;
+	int total_size = 0;
 	bool snd_data_fin;
 	bool ret = false;
 
@@ -843,20 +844,20 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	 * option space.
 	 */
 	if (unlikely(__mptcp_check_fallback(msk) && !mptcp_check_infinite_map(skb)))
-		return true;
+		return 0;
 
 	if (unlikely(skb && TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
 		if (mptcp_established_options_fastclose(sk, &opt_size, remaining, opts) ||
 		    mptcp_established_options_mp_fail(sk, &opt_size, remaining, opts)) {
-			*size += opt_size;
+			total_size += opt_size;
 			remaining -= opt_size;
 		}
 		/* MP_RST can be used with MP_FASTCLOSE and MP_FAIL if there is room */
 		if (mptcp_established_options_rst(sk, skb, &opt_size, remaining, opts)) {
-			*size += opt_size;
+			total_size += opt_size;
 			remaining -= opt_size;
 		}
-		return true;
+		return total_size;
 	}
 
 	snd_data_fin = mptcp_data_fin_enabled(msk);
@@ -868,9 +869,9 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		ret = true;
 		if (mptcp_established_options_mp_fail(sk, &mp_fail_size,
 						      remaining - opt_size, opts)) {
-			*size += opt_size + mp_fail_size;
+			total_size += opt_size + mp_fail_size;
 			remaining -= opt_size - mp_fail_size;
-			return true;
+			return total_size;
 		}
 	}
 
@@ -878,27 +879,27 @@ bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	 * TCP option space would be fatal
 	 */
 	if (WARN_ON_ONCE(opt_size > remaining))
-		return false;
+		return -1;
 
-	*size += opt_size;
+	total_size += opt_size;
 	remaining -= opt_size;
 	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining, opts)) {
-		*size += opt_size;
+		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
 	} else if (mptcp_established_options_rm_addr(sk, &opt_size, remaining, opts)) {
-		*size += opt_size;
+		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
 	}
 
 	if (mptcp_established_options_mp_prio(sk, &opt_size, remaining, opts)) {
-		*size += opt_size;
+		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
 	}
 
-	return ret;
+	return ret ? total_size : -1;
 }
 
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
