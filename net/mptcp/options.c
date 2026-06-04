@@ -1486,7 +1486,7 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 			struct mptcp_sock *msk;
 			u64 ack_seq;
 
-			/* DSS option is set only by mptcp_established_option,
+			/* DSS option is set only by mptcp_established_options,
 			 * the caller is __tcp_transmit_skb() and ssk is always
 			 * not NULL.
 			 */
