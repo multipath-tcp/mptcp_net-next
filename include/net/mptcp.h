@@ -152,9 +152,9 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 		       unsigned int *size, struct mptcp_out_options *opts);
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts);
-bool mptcp_established_options(struct sock *sk, struct sk_buff *skb,
-			       unsigned int *size, unsigned int remaining,
-			       struct mptcp_out_options *opts);
+int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
+			      unsigned int remaining,
+			      struct mptcp_out_options *opts);
 bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb);
 
 void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
@@ -269,13 +269,12 @@ static inline bool mptcp_synack_options(const struct request_sock *req,
 	return false;
 }
 
-static inline bool mptcp_established_options(struct sock *sk,
-					     struct sk_buff *skb,
-					     unsigned int *size,
-					     unsigned int remaining,
-					     struct mptcp_out_options *opts)
+static inline int mptcp_established_options(struct sock *sk,
+					    struct sk_buff *skb,
+					    unsigned int remaining,
+					    struct mptcp_out_options *opts)
 {
-	return false;
+	return -1;
 }
 
 static inline bool mptcp_incoming_options(struct sock *sk,
