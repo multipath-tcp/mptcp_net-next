@@ -1336,21 +1336,10 @@ struct batadv_tp_unacked {
 };
 
 /**
- * enum batadv_tp_meter_role - Modus in tp meter session
+ * struct batadv_tp_vars_common - common tp meter private variables per session
  */
-enum batadv_tp_meter_role {
-	/** @BATADV_TP_RECEIVER: Initialized as receiver */
-	BATADV_TP_RECEIVER,
-
-	/** @BATADV_TP_SENDER: Initialized as sender */
-	BATADV_TP_SENDER
-};
-
-/**
- * struct batadv_tp_vars - tp meter private variables per session
- */
-struct batadv_tp_vars {
-	/** @list: list node for &bat_priv.tp_list */
+struct batadv_tp_vars_common {
+	/** @list: list node for &bat_priv.tp_sender_list/&bat_priv.tp_receiver_list */
 	struct hlist_node list;
 
 	/** @timer: timer for ack (receiver) and retry (sender) */
@@ -1359,49 +1348,38 @@ struct batadv_tp_vars {
 	/** @bat_priv: pointer to the mesh object */
 	struct batadv_priv *bat_priv;
 
-	/** @start_time: start time in jiffies */
-	unsigned long start_time;
-
 	/** @other_end: mac address of remote */
 	u8 other_end[ETH_ALEN];
-
-	/** @role: receiver/sender modi */
-	enum batadv_tp_meter_role role;
-
-	/**
-	 * @send_result: 0 when sending is ongoing and otherwise
-	 * enum batadv_tp_meter_reason
-	 */
-	atomic_t send_result;
-
-	/** @receiving: receiving binary semaphore: 1 if receiving, 0 is not */
-	atomic_t receiving;
-
-	/** @finish_work: work item for the finishing procedure */
-	struct delayed_work finish_work;
-
-	/** @finished: completion signaled when a sender thread exits */
-	struct completion finished;
-
-	/** @test_length: test length in milliseconds */
-	u32 test_length;
 
 	/** @session: TP session identifier */
 	u8 session[2];
 
-	/** @icmp_uid: local ICMP "socket" index */
-	u8 icmp_uid;
+	/** @unacked_list: list of unacked packets (meta-info only) */
+	struct list_head unacked_list;
 
-	/* sender variables */
+	/** @unacked_lock: protect unacked_list */
+	spinlock_t unacked_lock;
+
+	/** @refcount: number of context where the object is used */
+	struct kref refcount;
+
+	/** @rcu: struct used for freeing in an RCU-safe manner */
+	struct rcu_head rcu;
+};
+
+/** struct batadv_tp_sender_cc - congestion control variables */
+struct batadv_tp_sender_cc {
+	/** @fast_recovery: true if in Fast Recovery mode */
+	bool fast_recovery:1;
+
+	/** @dup_acks: duplicate ACKs counter */
+	u8 dup_acks;
 
 	/** @dec_cwnd: decimal part of the cwnd used during linear growth */
 	u16 dec_cwnd;
 
 	/** @cwnd: current size of the congestion window */
 	u32 cwnd;
-
-	/** @cwnd_lock: lock do protect @cwnd & @dec_cwnd */
-	spinlock_t cwnd_lock;
 
 	/**
 	 * @ss_threshold: Slow Start threshold. Once cwnd exceeds this value the
@@ -1410,19 +1388,10 @@ struct batadv_tp_vars {
 	u32 ss_threshold;
 
 	/** @last_acked: last acked byte */
-	atomic_t last_acked;
+	u32 last_acked;
 
 	/** @last_sent: last sent byte, not yet acked */
 	u32 last_sent;
-
-	/** @tot_sent: amount of data sent/ACKed so far */
-	atomic64_t tot_sent;
-
-	/** @dup_acks: duplicate ACKs counter */
-	atomic_t dup_acks;
-
-	/** @fast_recovery: true if in Fast Recovery mode */
-	unsigned char fast_recovery:1;
 
 	/** @recover: last sent seqno when entering Fast Recovery */
 	u32 recover;
@@ -1435,6 +1404,44 @@ struct batadv_tp_vars {
 
 	/** @rttvar: RTT variation scaled by 2^2 */
 	u32 rttvar;
+};
+
+/**
+ * struct batadv_tp_sender - sender tp meter private variables per session
+ */
+struct batadv_tp_sender {
+	/** @common: common batadv_tp_vars (best be first member) */
+	struct batadv_tp_vars_common common;
+
+	/** @start_time: start time in jiffies */
+	unsigned long start_time;
+
+	/**
+	 * @send_result: 0 when sending is ongoing and otherwise
+	 * enum batadv_tp_meter_reason
+	 */
+	atomic_t send_result;
+
+	/** @finish_work: work item for the finishing procedure */
+	struct delayed_work finish_work;
+
+	/** @finished: completion signaled when a sender thread exits */
+	struct completion finished;
+
+	/** @test_length: test length in milliseconds */
+	u32 test_length;
+
+	/** @icmp_uid: local ICMP "socket" index */
+	u8 icmp_uid;
+
+	/** @cc: congestion control variables */
+	struct batadv_tp_sender_cc cc;
+
+	/** @cc_lock: lock do protect @cc */
+	spinlock_t cc_lock;
+
+	/** @tot_sent: amount of data sent/ACKed so far */
+	atomic64_t tot_sent;
 
 	/**
 	 * @more_bytes: waiting queue anchor when waiting for more ack/retry
@@ -1447,26 +1454,23 @@ struct batadv_tp_vars {
 
 	/** @prerandom_lock: spinlock protecting access to prerandom_offset */
 	spinlock_t prerandom_lock;
+};
 
-	/* receiver variables */
+/**
+ * struct batadv_tp_receiver - receiver tp meter private variables per session
+ */
+struct batadv_tp_receiver {
+	/** @common: common batadv_tp_vars (best be first member) */
+	struct batadv_tp_vars_common common;
+
+	/** @receiving: receiving binary semaphore: 1 if receiving, 0 is not */
+	atomic_t receiving;
 
 	/** @last_recv: last in-order received packet */
 	u32 last_recv;
 
-	/** @unacked_list: list of unacked packets (meta-info only) */
-	struct list_head unacked_list;
-
-	/** @unacked_lock: protect unacked_list */
-	spinlock_t unacked_lock;
-
 	/** @last_recv_time: time (jiffies) a msg was received */
 	unsigned long last_recv_time;
-
-	/** @refcount: number of context where the object is used */
-	struct kref refcount;
-
-	/** @rcu: struct used for freeing in an RCU-safe manner */
-	struct rcu_head rcu;
 };
 
 /**
@@ -1643,8 +1647,11 @@ struct batadv_priv {
 	 */
 	struct hlist_head forw_bcast_list;
 
-	/** @tp_list: list of tp sessions */
-	struct hlist_head tp_list;
+	/** @tp_sender_list: list of tp sender sessions */
+	struct hlist_head tp_sender_list;
+
+	/** @tp_receiver_list: list of tp receiver sessions */
+	struct hlist_head tp_receiver_list;
 
 	/** @orig_hash: hash table containing mesh participants (orig nodes) */
 	struct batadv_hashtable *orig_hash;
