@@ -37,9 +37,6 @@ if [[ "$CONF_FILE" != "" ]]; then
 	FLAGS=(--file "$CONF_FILE")
 fi
 
-# no modules
-scripts/config "${FLAGS[@]}" --disable CONFIG_MODULES
-
 # enable RDS
 scripts/config "${FLAGS[@]}" --enable CONFIG_RDS
 scripts/config "${FLAGS[@]}" --enable CONFIG_RDS_TCP
