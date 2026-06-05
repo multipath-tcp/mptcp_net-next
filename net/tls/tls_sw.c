@@ -154,9 +154,11 @@ static int skb_nsg(struct sk_buff *skb, int offset, int len)
         return __skb_nsg(skb, offset, len, 0);
 }
 
-static int tls_padding_length(struct tls_prot_info *prot, struct sk_buff *skb,
+static int tls_padding_length(struct tls_context *tls_ctx, struct sk_buff *skb,
 			      struct tls_decrypt_arg *darg)
 {
+	const struct tls_prot_ops *ops = tls_ctx->prot->ops;
+	struct tls_prot_info *prot = &tls_ctx->prot_info;
 	struct strp_msg *rxm = strp_msg(skb);
 	struct tls_msg *tlm = tls_msg(skb);
 	int sub = 0;
@@ -170,8 +172,8 @@ static int tls_padding_length(struct tls_prot_info *prot, struct sk_buff *skb,
 		while (content_type == 0) {
 			if (offset < prot->prepend_size)
 				return -EBADMSG;
-			err = skb_copy_bits(skb, rxm->offset + offset,
-					    &content_type, 1);
+			err = ops->skb_copy_bits(skb, rxm->offset + offset,
+						 &content_type, 1);
 			if (err)
 				return err;
 			if (content_type)
@@ -1539,6 +1541,7 @@ static int tls_decrypt_sg(struct sock *sk, struct iov_iter *out_iov,
 {
 	struct tls_context *tls_ctx = tls_get_ctx(sk);
 	struct tls_sw_context_rx *ctx = tls_sw_ctx_rx(tls_ctx);
+	const struct tls_prot_ops *ops = tls_ctx->prot->ops;
 	struct tls_prot_info *prot = &tls_ctx->prot_info;
 	int n_sgin, n_sgout, aead_size, err, pages = 0;
 	struct sk_buff *skb = tls_strp_msg(ctx);
@@ -1618,9 +1621,9 @@ static int tls_decrypt_sg(struct sock *sk, struct iov_iter *out_iov,
 		memcpy(&dctx->iv[iv_offset], tls_ctx->rx.iv,
 		       prot->iv_size + prot->salt_size);
 	} else {
-		err = skb_copy_bits(skb, rxm->offset + TLS_HEADER_SIZE,
-				    &dctx->iv[iv_offset] + prot->salt_size,
-				    prot->iv_size);
+		err = ops->skb_copy_bits(skb, rxm->offset + TLS_HEADER_SIZE,
+					 &dctx->iv[iv_offset] + prot->salt_size,
+					 prot->iv_size);
 		if (err < 0)
 			goto exit_free;
 		memcpy(&dctx->iv[iv_offset], tls_ctx->rx.iv, prot->salt_size);
@@ -1734,7 +1737,7 @@ tls_decrypt_sw(struct sock *sk, struct tls_context *tls_ctx,
 		return tls_decrypt_sw(sk, tls_ctx, msg, darg);
 	}
 
-	pad = tls_padding_length(prot, darg->skb, darg);
+	pad = tls_padding_length(tls_ctx, darg->skb, darg);
 	if (pad < 0) {
 		if (darg->skb != tls_strp_msg(ctx))
 			consume_skb(darg->skb);
@@ -1763,7 +1766,7 @@ tls_decrypt_device(struct sock *sk, struct msghdr *msg,
 	if (err <= 0)
 		return err;
 
-	pad = tls_padding_length(prot, tls_strp_msg(ctx), darg);
+	pad = tls_padding_length(tls_ctx, tls_strp_msg(ctx), darg);
 	if (pad < 0)
 		return pad;
 
@@ -1811,7 +1814,7 @@ static int tls_check_pending_rekey(struct sock *sk, struct tls_context *ctx,
 	if (rxm->full_len < 1)
 		return 0;
 
-	err = skb_copy_bits(skb, rxm->offset, &hs_type, 1);
+	err = ctx->prot->ops->skb_copy_bits(skb, rxm->offset, &hs_type, 1);
 	if (err < 0) {
 		DEBUG_NET_WARN_ON_ONCE(1);
 		return err;
@@ -1987,7 +1990,8 @@ tls_read_flush_backlog(struct sock *sk, struct tls_prot_info *prot,
 		return false;
 
 	max_rec = prot->overhead_size - prot->tail_size + TLS_MAX_PAYLOAD_SIZE;
-	if (done - *flushed_at < SZ_128K && tcp_inq(sk) > max_rec)
+	if (done - *flushed_at < SZ_128K &&
+	    tls_get_ctx(sk)->prot->ops->inq(sk) > max_rec)
 		return false;
 
 	*flushed_at = done;
@@ -2485,7 +2489,8 @@ int tls_rx_msg_size(struct tls_strparser *strp, struct sk_buff *skb)
 	}
 
 	/* Linearize header to local buffer */
-	ret = skb_copy_bits(skb, strp->stm.offset, header, prot->prepend_size);
+	ret = tls_ctx->prot->ops->skb_copy_bits(skb, strp->stm.offset, header,
+						prot->prepend_size);
 	if (ret < 0)
 		goto read_failure;
 
@@ -2516,7 +2521,8 @@ int tls_rx_msg_size(struct tls_strparser *strp, struct sk_buff *skb)
 	}
 
 	tls_device_rx_resync_new_rec(strp->sk, data_len + TLS_HEADER_SIZE,
-				     TCP_SKB_CB(skb)->seq + strp->stm.offset);
+				     tls_ctx->prot->ops->get_skb_seq(skb) +
+				     strp->stm.offset);
 	return data_len + TLS_HEADER_SIZE;
 
 read_failure:
