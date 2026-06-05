@@ -1232,7 +1232,7 @@ static int _iwl_pci_resume(struct device *device, bool restore)
 		return 0;
 
 	if (test_bit(STATUS_DEVICE_ENABLED, &trans->status)) {
-		*
+		/*
 		 * Scratch value was altered, this means the device was powered
 		 * off, we need to reset it completely.
 		 * Note: MAC (bits 0:7) will be cleared upon suspend even with
