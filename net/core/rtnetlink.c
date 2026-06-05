@@ -4265,6 +4265,11 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 retry:
 	if (need_rtnl) {
 		rtnl_lock();
+		if (!dev_isalive(dev)) {
+			err = -ENODEV;
+			nskb = NULL;
+			goto unlock;
+		}
 		/* Synchronize the carrier state so we don't report a state
 		 * that we're not actually going to honour immediately; if
 		 * the driver just did a carrier off->on transition, we can
@@ -4282,6 +4287,7 @@ retry:
 				       nlh->nlmsg_seq, 0, 0, ext_filter_mask,
 				       0, NULL, 0, netnsid, GFP_KERNEL);
 
+unlock:
 	if (need_rtnl)
 		rtnl_unlock();
 
