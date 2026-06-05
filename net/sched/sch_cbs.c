@@ -327,7 +327,7 @@ static void cbs_set_port_rate(struct net_device *dev, struct cbs_sched_data *q)
 	s64 port_rate;
 	int err;
 
-	err = __ethtool_get_link_ksettings(dev, &ecmd);
+	err = netif_get_link_ksettings(dev, &ecmd);
 	if (err < 0)
 		goto skip;
 
