@@ -14,9 +14,9 @@ configs required for the RDMA transport.  The kernel may optionally be
 configured to omit the coverage report as well.
 
 USAGE:
-	run.sh [-d logdir] [-l packet_loss] [-c packet_corruption]
-	       [-u packet_duplicate] [-t timeout]
-	       [-T tcp|rdma|tcp,rdma]
+	rds_run.sh [-d logdir] [-l packet_loss] [-c packet_corruption]
+	           [-u packet_duplicate] [-t timeout]
+	           [-T tcp|rdma|tcp,rdma]
 
 OPTIONS:
 	-d	Log directory.  If set, logs will be stored in the
@@ -73,5 +73,5 @@ EXAMPLE:
         "export PYTHONPATH=tools/testing/selftests/net/; \
          export SUDO_USER=example_user; \
          export RDS_LOG_DIR=tools/testing/selftests/net/rds/rds_logs; \
-         tools/testing/selftests/net/rds/run.sh -T tcp,rdma"
+         tools/testing/selftests/net/rds/rds_run.sh -T tcp,rdma"
 
