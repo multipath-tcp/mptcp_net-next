@@ -372,8 +372,10 @@ static inline struct tls_context *tls_get_ctx(const struct sock *sk)
 
 	/* Use RCU on icsk_ulp_data only for sock diag code,
 	 * TLS data path doesn't need rcu_dereference().
+	 * Some callers (e.g., tls_sk_poll) are lockless
+	 * so READ_ONCE() is needed.
 	 */
-	return (__force void *)icsk->icsk_ulp_data;
+	return (__force void *)READ_ONCE(icsk->icsk_ulp_data);
 }
 
 static inline struct tls_sw_context_rx *tls_sw_ctx_rx(

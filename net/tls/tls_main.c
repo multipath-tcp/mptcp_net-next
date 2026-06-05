@@ -417,6 +417,9 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 		return mask;
 
 	tls_ctx = tls_get_ctx(sk);
+	if (!tls_ctx)
+		return mask;
+
 	ctx = tls_sw_ctx_rx(tls_ctx);
 	psock = sk_psock_get(sk);
 
