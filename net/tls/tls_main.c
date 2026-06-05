@@ -480,6 +480,10 @@ static __poll_t tls_prot_poll(struct file *file, struct socket *sock,
 
 		if (sk->sk_protocol == IPPROTO_TCP)
 			mask = tcp_poll(file, sock, wait);
+#ifdef CONFIG_MPTCP
+		else if (sk->sk_protocol == IPPROTO_MPTCP)
+			mask = mptcp_poll(file, sock, wait);
+#endif
 		return mask;
 	}
 
@@ -1445,6 +1449,12 @@ static int __init tls_register(void)
 	if (err)
 		goto err_strp;
 
+#ifdef CONFIG_MPTCP
+	err = tls_register_prot_ops(&tls_mptcp_ops);
+	if (err)
+		goto err_tcp;
+#endif
+
 	err = tls_device_init();
 	if (err)
 		goto err_ops;
@@ -1453,6 +1463,10 @@ static int __init tls_register(void)
 
 	return 0;
 err_ops:
+#ifdef CONFIG_MPTCP
+	tls_unregister_prot_ops(&tls_mptcp_ops);
+err_tcp:
+#endif
 	tls_unregister_prot_ops(&tls_tcp_ops);
 err_strp:
 	tls_strp_dev_exit();
@@ -1464,6 +1478,9 @@ err_pernet:
 static void __exit tls_unregister(void)
 {
 	tcp_unregister_ulp(&tcp_tls_ulp_ops);
+#ifdef CONFIG_MPTCP
+	tls_unregister_prot_ops(&tls_mptcp_ops);
+#endif
 	tls_unregister_prot_ops(&tls_tcp_ops);
 	tls_prot_cleanup();
 	tls_strp_dev_exit();
