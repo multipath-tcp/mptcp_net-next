@@ -93,42 +93,62 @@ check_gcov_conf()
 	fi
 }
 
+# Checks if a kconfig is enabled (set to =y or =m)
+# $1: kconfig symbol to check
+# $2: (optional) module name backing $1
+#     Ex: check_conf_enabled CONFIG_RDS_TCP rds_tcp
+#     Modules for configs set to  =m will be probed
+#     If omitted, only a built-in (=y) config is accepted.
+# Returns on success.  exits 4 on failure
 # Kselftest framework requirement - SKIP code is 4.
 check_conf_enabled() {
-	if ! grep -x "$1=y" "$kconfig" > /dev/null 2>&1; then
-		echo "selftests: [SKIP] This test requires $1 enabled"
-		echo "Please run tools/testing/selftests/net/rds/config.sh and rebuild the kernel"
-		exit 4
+	if grep -x "$1=y" "$kconfig" > /dev/null 2>&1; then
+		return
 	fi
+	if [ -n "${2:-}" ] && grep -x "$1=m" "$kconfig" > /dev/null 2>&1; then
+		probe_module "$2"
+		return
+	fi
+	echo "selftests: [SKIP] This test requires $1 enabled"
+	echo "Please run" \
+	     "tools/testing/selftests/net/rds/config.sh and rebuild the kernel"
+	exit 4
 }
 
 check_rdma_conf_enabled() {
-	if ! grep -x "$1=y" "$kconfig" > /dev/null 2>&1; then
-		echo "selftests: [SKIP] rdma transport requires $1 enabled"
-		echo "To enable, run " \
-		     "tools/testing/selftests/net/rds/config.sh -r and rebuild"
+	if grep -x "$1=y" "$kconfig" > /dev/null 2>&1; then
+		return
+	fi
+	if [ -n "${2:-}" ] && grep -x "$1=m" "$kconfig" > /dev/null 2>&1; then
+		probe_module "$2"
+		return
+	fi
+	echo "selftests: [XFAIL] rdma transport requires $1 enabled"
+	echo "To enable, run" \
+	     "tools/testing/selftests/net/rds/config.sh -r and rebuild"
+	exit 2
+}
+
+# Load the module backing a config that is built as a loadable module
+# (=m).  Built-in (=y) configs are already available and don't reach
+# here.  Exits with the SKIP code if a required module cannot be loaded.
+probe_module() {
+	if ! modprobe -q "$1"; then
+		echo "selftests: [SKIP] could not load required module $1"
 		exit 4
 	fi
 }
 
-check_conf_disabled() {
-	if grep -x "$1=y" "$kconfig" > /dev/null 2>&1; then
-		echo "selftests: [SKIP] This test requires $1 disabled"
-		echo "Please run tools/testing/selftests/net/rds/config.sh and rebuild the kernel"
-		exit 4
-	fi
-}
 check_conf() {
-	check_conf_enabled CONFIG_NET_SCH_NETEM
-	check_conf_enabled CONFIG_VETH
+	check_conf_enabled CONFIG_NET_SCH_NETEM sch_netem
+	check_conf_enabled CONFIG_VETH veth
 	check_conf_enabled CONFIG_NET_NS
-	check_conf_enabled CONFIG_RDS_TCP
-	check_conf_enabled CONFIG_RDS
-	check_conf_disabled CONFIG_MODULES
+	check_conf_enabled CONFIG_RDS_TCP rds_tcp
+	check_conf_enabled CONFIG_RDS rds
 }
 
 # Check kernel config and host environment for RDS-RDMA support.
-# Exits with SKIP (4) if the user requested rdma but prerequisites
+# Exits with XFAIL (2) if the user requested rdma but prerequisites
 # are not met.
 check_rdma_conf()
 {
@@ -139,13 +159,13 @@ check_rdma_conf()
 
 	# Kconfig will enforce CONFIG_INFINIBAND_* as dependencies
 	# of CONFIG_RDMA_RXE
-	check_rdma_conf_enabled CONFIG_RDMA_RXE
-	check_rdma_conf_enabled CONFIG_RDS_RDMA
+	check_rdma_conf_enabled CONFIG_RDMA_RXE rdma_rxe
+	check_rdma_conf_enabled CONFIG_RDS_RDMA rds_rdma
 
 	if ! which rdma > /dev/null 2>&1; then
-		echo "selftests: [SKIP] rdma transport requires the 'rdma'" \
-		      " tool (iproute2)"
-		exit 4
+		echo "selftests: [XFAIL] rdma transport requires the 'rdma'" \
+		      "tool (iproute2)"
+		exit 2
 	fi
 }
 
@@ -209,8 +229,9 @@ while getopts "d:l:c:u:t:T:" opt; do
       TRANSPORT=${OPTARG}
       ;;
     :)
-      echo "USAGE: run.sh [-d logdir] [-l packet_loss] [-c packet_corruption]" \
-           "[-u packet_duplicate] [-t timeout] [-T tcp|rdma|tcp,rdma]"
+      echo "USAGE: rds_run.sh [-d logdir] [-l packet_loss]" \
+           "[-c packet_corruption] [-u packet_duplicate] [-t timeout]" \
+           "[-T tcp|rdma|tcp,rdma]"
       exit 1
       ;;
     ?)
@@ -224,7 +245,7 @@ done
 IFS=',' read -ra transports <<< "$TRANSPORT"
 for t in "${transports[@]}"; do
     if [ "$t" != "tcp" ] && [ "$t" != "rdma" ]; then
-        echo "run.sh: unknown transport '$t' (expected tcp or rdma)"
+        echo "rds_run.sh: unknown transport '$t' (expected tcp or rdma)"
         exit 1
     fi
 done

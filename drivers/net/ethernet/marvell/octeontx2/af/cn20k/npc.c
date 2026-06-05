@@ -57,7 +57,7 @@ static struct npc_mcam_kex_extr npc_mkex_extr_default = {
 	.keyx_cfg = {
 		/* nibble: LA..LE (ltype only) + Error code + Channel */
 		[NIX_INTF_RX] = ((u64)NPC_MCAM_KEY_DYN << 32) |
-			NPC_PARSE_NIBBLE_INTF_RX |
+			NPC_CN20K_PARSE_NIBBLE_INTF_RX |
 				 NPC_CN20K_PARSE_NIBBLE_ERRCODE,
 
 		/* nibble: LA..LE (ltype only) */
