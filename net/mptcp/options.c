@@ -804,7 +804,7 @@ static bool mptcp_established_options_mp_fail(struct sock *sk, int *size,
 }
 
 int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
-			      unsigned int remaining,
+			      unsigned int remaining, bool has_ts,
 			      struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
