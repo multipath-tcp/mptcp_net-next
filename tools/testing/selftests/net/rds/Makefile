@@ -3,7 +3,7 @@
 all:
 	@echo mk_build_dir="$(shell pwd)" > include.sh
 
-TEST_PROGS := run.sh
+TEST_PROGS := rds_run.sh
 
 TEST_FILES := \
 	include.sh \
