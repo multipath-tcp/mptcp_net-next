@@ -325,6 +325,8 @@ struct ethtool_link_ksettings {
 extern int
 __ethtool_get_link_ksettings(struct net_device *dev,
 			     struct ethtool_link_ksettings *link_ksettings);
+int netif_get_link_ksettings(struct net_device *dev,
+			     struct ethtool_link_ksettings *link_ksettings);
 
 struct ethtool_keee {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported);
