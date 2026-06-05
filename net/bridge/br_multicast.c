@@ -2027,9 +2027,11 @@ void br_multicast_port_ctx_deinit(struct net_bridge_mcast_port *pmctx)
 	bool del = false;
 
 #if IS_ENABLED(CONFIG_IPV6)
-	timer_delete_sync(&pmctx->ip6_mc_router_timer);
+	timer_shutdown_sync(&pmctx->ip6_own_query.timer);
+	timer_shutdown_sync(&pmctx->ip6_mc_router_timer);
 #endif
-	timer_delete_sync(&pmctx->ip4_mc_router_timer);
+	timer_shutdown_sync(&pmctx->ip4_own_query.timer);
+	timer_shutdown_sync(&pmctx->ip4_mc_router_timer);
 
 	spin_lock_bh(&br->multicast_lock);
 	del |= br_ip6_multicast_rport_del(pmctx);
