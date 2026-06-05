@@ -396,4 +396,10 @@ int dev_get_hwtstamp_phylib(struct net_device *dev,
 			    struct kernel_hwtstamp_config *cfg);
 int net_hwtstamp_validate(const struct kernel_hwtstamp_config *cfg);
 
+/* Caller holds RTNL, netdev->lock or RCU */
+static inline bool dev_isalive(const struct net_device *dev)
+{
+	return READ_ONCE(dev->reg_state) <= NETREG_REGISTERED;
+}
+
 #endif
