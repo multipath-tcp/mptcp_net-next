@@ -194,7 +194,8 @@ int batadv_mesh_init(struct net_device *mesh_iface)
 	INIT_HLIST_HEAD(&bat_priv->tvlv.container_list);
 	INIT_HLIST_HEAD(&bat_priv->tvlv.handler_list);
 	INIT_HLIST_HEAD(&bat_priv->meshif_vlan_list);
-	INIT_HLIST_HEAD(&bat_priv->tp_list);
+	INIT_HLIST_HEAD(&bat_priv->tp_sender_list);
+	INIT_HLIST_HEAD(&bat_priv->tp_receiver_list);
 
 	bat_priv->gw.generation = 0;
 
