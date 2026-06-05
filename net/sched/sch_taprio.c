@@ -1299,7 +1299,7 @@ static void taprio_set_picos_per_byte(struct net_device *dev,
 	int picos_per_byte;
 	int err;
 
-	err = __ethtool_get_link_ksettings(dev, &ecmd);
+	err = netif_get_link_ksettings(dev, &ecmd);
 	if (err < 0)
 		goto skip;
 
