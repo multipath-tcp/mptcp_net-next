@@ -366,6 +366,28 @@ out:
 }
 
 /**
+ * batadv_netdev_get_wifi_flags() - retrieve wifi flags for net_device
+ * @net_dev: the device to check
+ *
+ * Return: batadv_hard_iface_wifi_flags flags of the device
+ */
+u32 batadv_netdev_get_wifi_flags(struct net_device *net_dev)
+{
+	struct batadv_wifi_net_device_state *device_state;
+	u32 wifi_flags = 0;
+
+	rcu_read_lock();
+	device_state = rhashtable_lookup_fast(&batadv_wifi_net_devices,
+					      &net_dev,
+					      batadv_wifi_net_devices_params);
+	if (device_state)
+		wifi_flags = READ_ONCE(device_state->wifi_flags);
+	rcu_read_unlock();
+
+	return wifi_flags;
+}
+
+/**
  * batadv_hardif_get_wifi_flags() - retrieve wifi flags for hard_iface
  * @hard_iface: the device to check
  *
@@ -373,21 +395,10 @@ out:
  */
 u32 batadv_hardif_get_wifi_flags(struct batadv_hard_iface *hard_iface)
 {
-	struct batadv_wifi_net_device_state *device_state;
-	u32 wifi_flags = 0;
-
 	if (!hard_iface)
 		return 0;
 
-	rcu_read_lock();
-	device_state = rhashtable_lookup_fast(&batadv_wifi_net_devices,
-					      &hard_iface->net_dev,
-					      batadv_wifi_net_devices_params);
-	if (device_state)
-		wifi_flags = READ_ONCE(device_state->wifi_flags);
-	rcu_read_unlock();
-
-	return wifi_flags;
+	return batadv_netdev_get_wifi_flags(hard_iface->net_dev);
 }
 
 /**
