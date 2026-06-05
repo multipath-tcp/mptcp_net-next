@@ -2605,13 +2605,19 @@ static int airoha_tc_htb_modify_queue(struct net_device *dev,
 {
 	u32 channel = TC_H_MIN(opt->classid) % AIROHA_NUM_QOS_CHANNELS;
 	u32 rate = div_u64(opt->rate, 1000) << 3; /* kbps */
+	int err;
 
 	if (opt->parent_classid != TC_HTB_CLASSID_ROOT) {
 		NL_SET_ERR_MSG_MOD(opt->extack, "invalid parent classid");
 		return -EINVAL;
 	}
 
-	return airoha_qdma_set_tx_rate_limit(dev, channel, rate, opt->quantum);
+	err = airoha_qdma_set_tx_rate_limit(dev, channel, rate, opt->quantum);
+	if (err)
+		NL_SET_ERR_MSG_MOD(opt->extack,
+				   "failed configuring htb offload");
+
+	return err;
 }
 
 static int airoha_tc_htb_alloc_leaf_queue(struct net_device *netdev,
