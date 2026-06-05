@@ -6996,10 +6996,10 @@ static int nl80211_calculate_ap_capabilities(struct genl_info *info,
 		}
 	}
 
-	if (!!params->he_cap != !!params->he_oper)
+	if (!!params->he_cap != !!params->beacon.he_oper)
 		return -EINVAL;
 
-	if (!!params->eht_cap != !!params->eht_oper)
+	if (!!params->eht_cap != !!params->beacon.eht_oper)
 		return -EINVAL;
 
 	return 0;
