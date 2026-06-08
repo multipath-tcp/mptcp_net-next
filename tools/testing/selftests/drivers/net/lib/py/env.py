@@ -9,7 +9,7 @@ from pathlib import Path
 from lib.py import KsftSkipEx, KsftXfailEx
 from lib.py import ksft_setup, wait_file
 from lib.py import cmd, ethtool, ip, CmdExitFailure
-from lib.py import NetNS, NetdevSimDev
+from lib.py import NetNS, NetdevSimDev, UserNetNS
 from .remote import Remote
 from . import bpftool, RtnlFamily, Netlink
 
@@ -337,8 +337,10 @@ class NetDrvContEnv(NetDrvEpEnv):
               +---------------+
     """
 
-    def __init__(self, src_path, rxqueues=1, primary_rx_redirect=False, **kwargs):
+    def __init__(self, src_path, rxqueues=1, primary_rx_redirect=False,
+                 userns=False, **kwargs):
         self.netns = None
+        self._userns = userns
         self._nk_host_ifname = None
         self.nk_guest_ifname = None
         self._tc_clsact_added = False
@@ -463,7 +465,7 @@ class NetDrvContEnv(NetDrvEpEnv):
         with open(ra_path, "w", encoding="utf-8") as f:
             f.write("2")
 
-        self.netns = NetNS()
+        self.netns = UserNetNS() if self._userns else NetNS()
         cmd("ip netns attach init 1")
         self._init_ns_attached = True
         ip("netns set init 0", ns=self.netns)
