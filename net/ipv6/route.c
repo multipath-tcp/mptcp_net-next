@@ -3044,7 +3044,6 @@ void ip6_sk_update_pmtu(struct sk_buff *skb, struct sock *sk, __be32 mtu)
 		ip6_datagram_dst_update(sk, false);
 	bh_unlock_sock(sk);
 }
-EXPORT_SYMBOL_GPL(ip6_sk_update_pmtu);
 
 void ip6_sk_dst_store_flow(struct sock *sk, struct dst_entry *dst,
 			   const struct flowi6 *fl6)
@@ -3255,7 +3254,6 @@ void ip6_sk_redirect(struct sk_buff *skb, struct sock *sk)
 	ip6_redirect(skb, sock_net(sk), sk->sk_bound_dev_if,
 		     READ_ONCE(sk->sk_mark), sk_uid(sk));
 }
-EXPORT_SYMBOL_GPL(ip6_sk_redirect);
 
 static unsigned int ip6_default_advmss(const struct dst_entry *dst)
 {
