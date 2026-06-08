@@ -47,6 +47,7 @@ TEST_PROGS = \
 	rss_input_xfrm.py \
 	toeplitz.py \
 	tso.py \
+	userns_devmem.py \
 	uso.py \
 	xdp_metadata.py \
 	xsk_reconfig.py \
