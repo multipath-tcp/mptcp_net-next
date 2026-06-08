@@ -51,35 +51,38 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 
-#define RTL9300_NUM_BUSES		4
-#define RTL9300_NUM_PAGES		4096
-#define RTL9300_NUM_PORTS		28
-#define SMI_GLB_CTRL			0xca00
-#define   GLB_CTRL_INTF_SEL(intf)	BIT(16 + (intf))
-#define SMI_PORT0_15_POLLING_SEL	0xca08
-#define RTL9300_SMI_ACCESS_PHY_CTRL_0	0xcb70
-#define RTL9300_SMI_ACCESS_PHY_CTRL_1	0xcb74
-#define   PHY_CTRL_REG_ADDR		GENMASK(24, 20)
-#define   PHY_CTRL_PARK_PAGE		GENMASK(19, 15)
-#define   PHY_CTRL_MAIN_PAGE		GENMASK(14, 3)
-#define   PHY_CTRL_WRITE		BIT(2)
-#define   PHY_CTRL_READ			0
-#define   PHY_CTRL_TYPE_C45		BIT(1)
-#define   PHY_CTRL_TYPE_C22		0
-#define   PHY_CTRL_CMD			BIT(0)
-#define   PHY_CTRL_FAIL			BIT(25)
-#define RTL9300_SMI_ACCESS_PHY_CTRL_2	0xcb78
-#define   PHY_CTRL_INDATA		GENMASK(31, 16)
-#define   PHY_CTRL_DATA			GENMASK(15, 0)
-#define RTL9300_SMI_ACCESS_PHY_CTRL_3	0xcb7c
-#define   PHY_CTRL_MMD_DEVAD		GENMASK(20, 16)
-#define   PHY_CTRL_MMD_REG		GENMASK(15, 0)
-#define SMI_PORT0_5_ADDR_CTRL		0xcb80
+#define RTL9300_NUM_BUSES			4
+#define RTL9300_NUM_PAGES			4096
+#define RTL9300_NUM_PORTS			28
+#define RTL9300_SMI_GLB_CTRL			0xca00
+#define   RTL9300_GLB_CTRL_INTF_SEL(intf)	BIT(16 + (intf))
+#define RTL9300_SMI_PORT0_15_POLLING_SEL	0xca08
+#define RTL9300_SMI_ACCESS_PHY_CTRL_0		0xcb70
+#define RTL9300_SMI_ACCESS_PHY_CTRL_1		0xcb74
+#define   PHY_CTRL_REG_ADDR			GENMASK(24, 20)
+#define   PHY_CTRL_PARK_PAGE			GENMASK(19, 15)
+#define   PHY_CTRL_MAIN_PAGE			GENMASK(14, 3)
+#define   PHY_CTRL_WRITE			BIT(2)
+#define   PHY_CTRL_READ				0
+#define   PHY_CTRL_TYPE_C45			BIT(1)
+#define   PHY_CTRL_TYPE_C22			0
+#define   PHY_CTRL_CMD				BIT(0)
+#define   PHY_CTRL_FAIL				BIT(25)
+#define RTL9300_SMI_ACCESS_PHY_CTRL_2		0xcb78
+#define   PHY_CTRL_INDATA			GENMASK(31, 16)
+#define   PHY_CTRL_DATA				GENMASK(15, 0)
+#define RTL9300_SMI_ACCESS_PHY_CTRL_3		0xcb7c
+#define   PHY_CTRL_MMD_DEVAD			GENMASK(20, 16)
+#define   PHY_CTRL_MMD_REG			GENMASK(15, 0)
+#define RTL9300_SMI_PORT0_5_ADDR_CTRL		0xcb80
 
-#define MAX_PORTS       28
-#define MAX_SMI_BUSSES  4
-#define MAX_SMI_ADDR	0x1f
-#define RAW_PAGE(priv)	((priv)->info->num_pages - 1)
+#define MAP_ADDRS_PER_REG			6
+#define MAP_BITS_PER_ADDR			5
+#define MAP_BITS_PER_BUS			2
+#define MAP_BUSES_PER_REG			16
+#define MAX_PORTS				28
+#define MAX_SMI_BUSSES				4
+#define RAW_PAGE(priv)				((priv)->info->num_pages - 1)
 
 
 struct otto_emdio_cmd_regs {
@@ -87,20 +90,6 @@ struct otto_emdio_cmd_regs {
 	u32 c45_data;
 	u32 io_data;
 	u32 port_mask_low;
-};
-
-struct otto_emdio_info {
-	u32 cmd_fail;
-	u32 cmd_read;
-	u32 cmd_write;
-	struct otto_emdio_cmd_regs cmd_regs;
-	u8 num_buses;
-	u8 num_ports;
-	u16 num_pages;
-	int (*read_c22)(struct mii_bus *bus, int port, int regnum, u32 *value);
-	int (*read_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u32 *value);
-	int (*write_c22)(struct mii_bus *bus, int port, int regnum, u16 value);
-	int (*write_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u16 value);
 };
 
 struct otto_emdio_priv {
@@ -112,6 +101,23 @@ struct otto_emdio_priv {
 	u8 smi_addr[MAX_PORTS];
 	bool smi_bus_is_c45[MAX_SMI_BUSSES];
 	struct mii_bus *bus[MAX_SMI_BUSSES];
+};
+
+struct otto_emdio_info {
+	u32 addr_map_base;
+	u32 bus_map_base;
+	u32 cmd_fail;
+	u32 cmd_read;
+	u32 cmd_write;
+	struct otto_emdio_cmd_regs cmd_regs;
+	u8 num_buses;
+	u8 num_ports;
+	u16 num_pages;
+	int (*setup_controller)(struct otto_emdio_priv *priv);
+	int (*read_c22)(struct mii_bus *bus, int port, int regnum, u32 *value);
+	int (*read_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u32 *value);
+	int (*write_c22)(struct mii_bus *bus, int port, int regnum, u16 value);
+	int (*write_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u16 value);
 };
 
 struct otto_emdio_chan {
@@ -328,42 +334,55 @@ static int otto_emdio_write_c45(struct mii_bus *bus, int phy_id,
 	return ret;
 }
 
-static int otto_emdio_9300_mdiobus_init(struct otto_emdio_priv *priv)
+static int otto_emdio_write_mapping(struct otto_emdio_priv *priv, u32 base, u32 port,
+				    u32 vals_per_reg, u32 bits_per_val, u32 value)
+{
+	u32 shift = (port % vals_per_reg) * bits_per_val;
+	u32 reg = base + (port / vals_per_reg) * 4;
+	u32 mask = GENMASK(bits_per_val - 1, 0);
+
+	return regmap_update_bits(priv->regmap, reg, mask << shift, value << shift);
+}
+
+static int otto_emdio_setup_topology(struct otto_emdio_priv *priv)
+{
+	const struct otto_emdio_info *info = priv->info;
+	u32 port;
+	int ret;
+
+	for_each_set_bit(port, priv->valid_ports, info->num_ports) {
+		if (info->bus_map_base) {
+			ret = otto_emdio_write_mapping(priv, info->bus_map_base, port,
+						       MAP_BUSES_PER_REG, MAP_BITS_PER_BUS,
+						       priv->smi_bus[port]);
+			if (ret)
+				return ret;
+		}
+		if (info->addr_map_base) {
+			ret = otto_emdio_write_mapping(priv, info->addr_map_base, port,
+						       MAP_ADDRS_PER_REG, MAP_BITS_PER_ADDR,
+						       priv->smi_addr[port]);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int otto_emdio_9300_setup_controller(struct otto_emdio_priv *priv)
 {
 	u32 glb_ctrl_mask = 0, glb_ctrl_val = 0;
 	struct regmap *regmap = priv->regmap;
-	u32 port_addr[5] = { 0 };
-	u32 poll_sel[2] = { 0 };
 	int i, err;
-
-	/* Associate the port with the SMI interface and PHY */
-	for_each_set_bit(i, priv->valid_ports, priv->info->num_ports) {
-		int pos;
-
-		pos = (i % 6) * 5;
-		port_addr[i / 6] |= (priv->smi_addr[i] & 0x1f) << pos;
-
-		pos = (i % 16) * 2;
-		poll_sel[i / 16] |= (priv->smi_bus[i] & 0x3) << pos;
-	}
 
 	/* Put the interfaces into C45 mode if required */
 	glb_ctrl_mask = GENMASK(19, 16);
 	for (i = 0; i < priv->info->num_buses; i++)
 		if (priv->smi_bus_is_c45[i])
-			glb_ctrl_val |= GLB_CTRL_INTF_SEL(i);
+			glb_ctrl_val |= RTL9300_GLB_CTRL_INTF_SEL(i);
 
-	err = regmap_bulk_write(regmap, SMI_PORT0_5_ADDR_CTRL,
-				port_addr, 5);
-	if (err)
-		return err;
-
-	err = regmap_bulk_write(regmap, SMI_PORT0_15_POLLING_SEL,
-				poll_sel, 2);
-	if (err)
-		return err;
-
-	err = regmap_update_bits(regmap, SMI_GLB_CTRL,
+	err = regmap_update_bits(regmap, RTL9300_SMI_GLB_CTRL,
 				 glb_ctrl_mask, glb_ctrl_val);
 	if (err)
 		return err;
@@ -381,19 +400,11 @@ static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv
 
 	err = fwnode_property_read_u32(node, "reg", &mdio_bus);
 	if (err)
-		return err;
+		return dev_err_probe(dev, err, "undefined smi bus number\n");
 
-	/* The MDIO accesses from the kernel work with the PHY polling unit in
-	 * the switch. We need to tell the PPU to operate either in GPHY (i.e.
-	 * clause 22) or 10GPHY mode (i.e. clause 45).
-	 *
-	 * We select 10GPHY mode if there is at least one PHY that declares
-	 * compatible = "ethernet-phy-ieee802.3-c45". This does mean we can't
-	 * support both c45 and c22 on the same MDIO bus.
-	 */
-	fwnode_for_each_child_node_scoped(node, child)
-		if (fwnode_device_is_compatible(child, "ethernet-phy-ieee802.3-c45"))
-			priv->smi_bus_is_c45[mdio_bus] = true;
+	if (mdio_bus >= priv->info->num_buses)
+		return dev_err_probe(dev, -EINVAL,
+				     "illegal (dangling) smi bus number %d\n", mdio_bus);
 
 	bus = devm_mdiobus_alloc_size(dev, sizeof(*chan));
 	if (!bus)
@@ -421,66 +432,107 @@ static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv
 	return 0;
 }
 
+static struct device_node *otto_emdio_get_bus_node(struct device_node *dn)
+{
+	struct device_node *parent = of_get_parent(dn);
+	struct device_node *grandparent;
+
+	if (parent && of_node_name_eq(parent, "ethernet-phy-package")) {
+		grandparent = of_get_parent(parent);
+		of_node_put(parent);
+
+		return grandparent;
+	}
+
+	return parent;
+}
+
 /* The mdio-controller is part of a switch block so we parse the sibling
  * ethernet-ports node and build a mapping of the switch port to MDIO bus/addr
  * based on the phy-handle.
  */
 static int otto_emdio_map_ports(struct device *dev)
 {
+	struct device_node *ports_dn, *phy_dn, *bus_dn, *ctrl_dn;
 	struct otto_emdio_priv *priv = dev_get_drvdata(dev);
 	struct device *parent = dev->parent;
-	int err;
+	int addr, err = 0;
+	u32 bus, pn;
 
-	struct fwnode_handle *ports __free(fwnode_handle) =
-		device_get_named_child_node(parent, "ethernet-ports");
-	if (!ports)
+	ports_dn = of_get_child_by_name(parent->of_node, "ethernet-ports");
+	if (!ports_dn)
 		return dev_err_probe(dev, -EINVAL, "%pfwP missing ethernet-ports\n",
 				     dev_fwnode(parent));
 
-	fwnode_for_each_child_node_scoped(ports, port) {
-		struct device_node *mdio_dn;
-		u32 addr;
-		u32 bus;
-		u32 pn;
-
-		struct device_node *phy_dn __free(device_node) =
-			of_parse_phandle(to_of_node(port), "phy-handle", 0);
+	for_each_available_child_of_node_scoped(ports_dn, port_dn) {
+		ctrl_dn = NULL;
+		bus_dn = NULL;
+		phy_dn = of_parse_phandle(port_dn, "phy-handle", 0);
 		/* skip ports without phys */
 		if (!phy_dn)
 			continue;
 
-		mdio_dn = phy_dn->parent;
+		bus_dn = otto_emdio_get_bus_node(phy_dn);
+		if (!bus_dn)
+			goto put_nodes;
+
+		ctrl_dn = of_get_parent(bus_dn);
 		/* only map ports that are connected to this mdio-controller */
-		if (mdio_dn->parent != dev->of_node)
-			continue;
+		if (ctrl_dn != dev->of_node)
+			goto put_nodes;
 
-		err = fwnode_property_read_u32(port, "reg", &pn);
+		err = of_property_read_u32(port_dn, "reg", &pn);
 		if (err)
-			return err;
+			goto put_nodes;
 
-		if (pn >= priv->info->num_ports)
-			return dev_err_probe(dev, -EINVAL, "illegal port number %d\n", pn);
+		if (pn >= priv->info->num_ports) {
+			err = dev_err_probe(dev, -EINVAL, "illegal port number %d\n", pn);
+			goto put_nodes;
+		}
 
-		if (test_bit(pn, priv->valid_ports))
-			return dev_err_probe(dev, -EINVAL, "duplicated port number %d\n", pn);
+		if (test_bit(pn, priv->valid_ports)) {
+			err = dev_err_probe(dev, -EINVAL, "duplicated port number %d\n", pn);
+			goto put_nodes;
+		}
 
-		err = of_property_read_u32(mdio_dn, "reg", &bus);
+		err = of_property_read_u32(bus_dn, "reg", &bus);
 		if (err)
-			return err;
+			goto put_nodes;
 
-		if (bus >= priv->info->num_buses)
-			return dev_err_probe(dev, -EINVAL, "illegal smi bus number %d\n", bus);
+		if (bus >= priv->info->num_buses) {
+			err = dev_err_probe(dev, -EINVAL, "illegal smi bus number %d\n", bus);
+			goto put_nodes;
+		}
 
-		err = of_property_read_u32(phy_dn, "reg", &addr);
-		if (err)
-			return err;
+		addr = of_mdio_parse_addr(dev, phy_dn);
+		if (addr < 0) {
+			err = addr;
+			goto put_nodes;
+		}
+
+		/*
+		 * The MDIO accesses from the kernel work with the PHY polling unit in the
+		 * switch. The PPU either operates in GPHY (i.e. clause 22) or 10GPHY mode
+		 * (i.e. clause 45). Select 10GPHY mode if there is at least one PHY that
+		 * declares compatible = "ethernet-phy-ieee802.3-c45".
+		 */
+		if (of_device_is_compatible(phy_dn, "ethernet-phy-ieee802.3-c45"))
+			priv->smi_bus_is_c45[bus] = true;
 
 		__set_bit(pn, priv->valid_ports);
 		priv->smi_bus[pn] = bus;
 		priv->smi_addr[pn] = addr;
+put_nodes:
+		of_node_put(bus_dn);
+		of_node_put(phy_dn);
+		of_node_put(ctrl_dn);
+		if (err)
+			break;
 	}
 
-	return 0;
+	of_node_put(ports_dn);
+
+	return err;
 }
 
 static int otto_emdio_probe(struct platform_device *pdev)
@@ -508,20 +560,28 @@ static int otto_emdio_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
+	err = otto_emdio_setup_topology(priv);
+	if (err)
+		return err;
+
+	if (priv->info->setup_controller) {
+		err = priv->info->setup_controller(priv);
+		if (err)
+			return dev_err_probe(dev, err, "failed to setup MDIO bus controller\n");
+	}
+
 	device_for_each_child_node_scoped(dev, child) {
 		err = otto_emdio_probe_one(dev, priv, child);
 		if (err)
 			return err;
 	}
 
-	err = otto_emdio_9300_mdiobus_init(priv);
-	if (err)
-		return dev_err_probe(dev, err, "failed to initialise MDIO bus controller\n");
-
 	return 0;
 }
 
 static const struct otto_emdio_info otto_emdio_9300_info = {
+	.addr_map_base = RTL9300_SMI_PORT0_5_ADDR_CTRL,
+	.bus_map_base = RTL9300_SMI_PORT0_15_POLLING_SEL,
 	.cmd_fail = PHY_CTRL_FAIL,
 	.cmd_read = PHY_CTRL_READ,
 	.cmd_write = PHY_CTRL_WRITE,
@@ -534,6 +594,7 @@ static const struct otto_emdio_info otto_emdio_9300_info = {
 	.num_buses = RTL9300_NUM_BUSES,
 	.num_ports = RTL9300_NUM_PORTS,
 	.num_pages = RTL9300_NUM_PAGES,
+	.setup_controller = otto_emdio_9300_setup_controller,
 	.read_c22 = otto_emdio_9300_read_c22,
 	.read_c45 = otto_emdio_9300_read_c45,
 	.write_c22 = otto_emdio_9300_write_c22,
