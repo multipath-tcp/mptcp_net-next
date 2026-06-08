@@ -167,9 +167,7 @@ static void airoha_ppe_hw_init(struct airoha_ppe *ppe)
 		airoha_fe_clear(eth, REG_PPE_PPE_FLOW_CFG(i),
 				PPE_FLOW_CFG_IP6_6RD_MASK);
 
-		for (p = 0; p < ARRAY_SIZE(eth->ports); p++) {
-			struct airoha_gdm_port *port = eth->ports[p];
-
+		for (p = 0; p < ARRAY_SIZE(eth->ports); p++)
 			airoha_fe_rmw(eth, REG_PPE_MTU(i, p),
 				      FP0_EGRESS_MTU_MASK |
 				      FP1_EGRESS_MTU_MASK,
@@ -177,11 +175,27 @@ static void airoha_ppe_hw_init(struct airoha_ppe *ppe)
 						 AIROHA_MAX_MTU) |
 				      FIELD_PREP(FP1_EGRESS_MTU_MASK,
 						 AIROHA_MAX_MTU));
-			if (!port)
+	}
+
+	for (i = 0; i < ARRAY_SIZE(eth->ports); i++) {
+		struct airoha_gdm_port *port = eth->ports[i];
+		int j;
+
+		if (!port)
+			continue;
+
+		for (j = 0; j < ARRAY_SIZE(port->devs); j++) {
+			struct airoha_gdm_dev *dev = port->devs[j];
+			int ppe_id;
+			u8 fport;
+
+			if (!dev)
 				continue;
 
-			airoha_ppe_set_cpu_port(port->dev, i,
-						airoha_get_fe_port(port->dev));
+			ppe_id = !airoha_is_lan_gdm_dev(dev) &&
+				 airoha_ppe_is_enabled(eth, 1);
+			fport = airoha_get_fe_port(dev);
+			airoha_ppe_set_cpu_port(dev, ppe_id, fport);
 		}
 	}
 }
@@ -341,7 +355,7 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 				return -EINVAL;
 
 			port = dev->port;
-			if (dsa_port >= 0 || eth->ports[1])
+			if (dsa_port >= 0 || airoha_is_lan_gdm_dev(dev))
 				pse_port = port->id == 4 ? FE_PSE_PORT_GDM4
 							 : port->id;
 			else
@@ -1473,12 +1487,10 @@ void airoha_ppe_check_skb(struct airoha_ppe_dev *dev, struct sk_buff *skb,
 	airoha_ppe_foe_insert_entry(ppe, skb, hash, rx_wlan);
 }
 
-void airoha_ppe_init_upd_mem(struct airoha_gdm_dev *dev)
+void airoha_ppe_init_upd_mem(struct airoha_gdm_dev *dev, const u8 *addr)
 {
 	struct airoha_gdm_port *port = dev->port;
-	struct net_device *netdev = dev->dev;
 	struct airoha_eth *eth = dev->eth;
-	const u8 *addr = netdev->dev_addr;
 	u32 val;
 
 	val = (addr[2] << 24) | (addr[3] << 16) | (addr[4] << 8) | addr[5];
