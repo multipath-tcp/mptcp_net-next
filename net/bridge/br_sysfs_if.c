@@ -83,7 +83,7 @@ static int store_flag(struct net_bridge_port *p, unsigned long v,
 
 static ssize_t show_path_cost(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", p->path_cost);
+	return sysfs_emit(buf, "%d\n", READ_ONCE(p->path_cost));
 }
 
 static int store_path_cost(struct net_bridge_port *p, unsigned long v)
@@ -100,7 +100,7 @@ static BRPORT_ATTR(path_cost, 0644, show_path_cost, store_path_cost);
 
 static ssize_t show_priority(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", p->priority);
+	return sysfs_emit(buf, "%d\n", READ_ONCE(p->priority));
 }
 
 static int store_priority(struct net_bridge_port *p, unsigned long v)
@@ -129,19 +129,19 @@ static BRPORT_ATTR(designated_bridge, 0444, show_designated_bridge, NULL);
 
 static ssize_t show_designated_port(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", p->designated_port);
+	return sysfs_emit(buf, "%d\n", READ_ONCE(p->designated_port));
 }
 static BRPORT_ATTR(designated_port, 0444, show_designated_port, NULL);
 
 static ssize_t show_designated_cost(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", p->designated_cost);
+	return sysfs_emit(buf, "%d\n", READ_ONCE(p->designated_cost));
 }
 static BRPORT_ATTR(designated_cost, 0444, show_designated_cost, NULL);
 
 static ssize_t show_port_id(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "0x%x\n", p->port_id);
+	return sysfs_emit(buf, "0x%x\n", READ_ONCE(p->port_id));
 }
 static BRPORT_ATTR(port_id, 0444, show_port_id, NULL);
 
@@ -160,7 +160,7 @@ static BRPORT_ATTR(change_ack, 0444, show_change_ack, NULL);
 
 static ssize_t show_config_pending(struct net_bridge_port *p, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", p->config_pending);
+	return sysfs_emit(buf, "%d\n", READ_ONCE(p->config_pending));
 }
 static BRPORT_ATTR(config_pending, 0444, show_config_pending, NULL);
 
