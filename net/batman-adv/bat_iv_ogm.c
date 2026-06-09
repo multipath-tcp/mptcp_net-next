@@ -230,7 +230,7 @@ static void batadv_iv_ogm_iface_disable(struct batadv_hard_iface *hard_iface)
 
 	mutex_unlock(&hard_iface->bat_iv.ogm_buff_mutex);
 
-	cancel_delayed_work_sync(&hard_iface->bat_iv.reschedule_work);
+	disable_delayed_work_sync(&hard_iface->bat_iv.reschedule_work);
 }
 
 static void batadv_iv_ogm_iface_update_mac(struct batadv_hard_iface *hard_iface)
