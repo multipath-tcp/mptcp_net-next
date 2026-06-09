@@ -771,12 +771,15 @@ static struct sock *geneve_create_sock(struct net *net,
 
 	memset(&udp_conf, 0, sizeof(udp_conf));
 
+#if IS_ENABLED(CONFIG_IPV6)
 	if (ipv6) {
 		udp_conf.family = AF_INET6;
 		udp_conf.ipv6_v6only = 1;
 		udp_conf.use_udp6_rx_checksums = geneve->cfg.use_udp6_rx_checksums;
 		udp_conf.local_ip6 = info->key.u.ipv6.src;
-	} else {
+	} else
+#endif
+	{
 		udp_conf.family = AF_INET;
 		udp_conf.local_ip.s_addr = info->key.u.ipv4.src;
 	}
