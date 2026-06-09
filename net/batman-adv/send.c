@@ -629,7 +629,7 @@ static void batadv_forw_packet_list_free(struct hlist_head *head)
 
 	hlist_for_each_entry_safe(forw_packet, safe_tmp_node, head,
 				  cleanup_list) {
-		cancel_delayed_work_sync(&forw_packet->delayed_work);
+		disable_delayed_work_sync(&forw_packet->delayed_work);
 
 		hlist_del(&forw_packet->cleanup_list);
 		batadv_forw_packet_free(forw_packet, true);

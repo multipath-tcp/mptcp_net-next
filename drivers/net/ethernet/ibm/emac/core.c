@@ -1162,6 +1162,17 @@ static void emac_clean_rx_ring(struct emac_instance *dev)
 	}
 }
 
+static void emac_clear_mal_desc(struct mal_descriptor *desc, int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		WRITE_ONCE(desc[i].ctrl, 0);
+		WRITE_ONCE(desc[i].data_len, 0);
+		WRITE_ONCE(desc[i].data_ptr, 0);
+	}
+}
+
 static int
 __emac_prepare_rx_skb(struct sk_buff *skb, struct emac_instance *dev, int slot)
 {
@@ -3089,8 +3100,8 @@ static int emac_probe(struct platform_device *ofdev)
 	DBG(dev, "rx_desc %p" NL, dev->rx_desc);
 
 	/* Clean rings */
-	memset(dev->tx_desc, 0, NUM_TX_BUFF * sizeof(struct mal_descriptor));
-	memset(dev->rx_desc, 0, NUM_RX_BUFF * sizeof(struct mal_descriptor));
+	emac_clear_mal_desc(dev->tx_desc, NUM_TX_BUFF);
+	emac_clear_mal_desc(dev->rx_desc, NUM_RX_BUFF);
 	memset(dev->tx_skb, 0, NUM_TX_BUFF * sizeof(struct sk_buff *));
 	memset(dev->rx_skb, 0, NUM_RX_BUFF * sizeof(struct sk_buff *));
 
@@ -3147,7 +3158,7 @@ static int emac_probe(struct platform_device *ofdev)
 
 	netif_carrier_off(ndev);
 
-	err = devm_register_netdev(&ofdev->dev, ndev);
+	err = register_netdev(ndev);
 	if (err) {
 		printk(KERN_ERR "%pOF: failed to register net device (%d)!\n",
 		       np, err);
@@ -3199,6 +3210,13 @@ static void emac_remove(struct platform_device *ofdev)
 	struct emac_instance *dev = platform_get_drvdata(ofdev);
 
 	DBG(dev, "remove" NL);
+
+	/* Unregister network device before tearing down hardware
+	 * to prevent use-after-free during deferred cleanup. This ensures
+	 * the network stack stops all operations before hardware resources
+	 * are released.
+	 */
+	unregister_netdev(dev->ndev);
 
 	cancel_work_sync(&dev->reset_work);
 
