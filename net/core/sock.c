@@ -3045,12 +3045,42 @@ int __sock_cmsg_send(struct sock *sk, struct cmsghdr *cmsg,
 		sockc->tsflags |= tsflags;
 		break;
 	case SCM_TXTIME:
+	{
+		ktime_t tmin;
+		u64 txtime;
+
 		if (!sock_flag(sk, SOCK_TXTIME))
 			return -EINVAL;
 		if (cmsg->cmsg_len != CMSG_LEN(sizeof(u64)))
 			return -EINVAL;
-		sockc->transmit_time = get_unaligned((u64 *)CMSG_DATA(cmsg));
+
+		txtime = get_unaligned((u64 *)CMSG_DATA(cmsg));
+
+		/* Allow sending without a delivery time: zero special case */
+		if (!txtime) {
+			sockc->transmit_time = 0;
+			break;
+		}
+
+		switch (sk->sk_clockid) {
+		case CLOCK_MONOTONIC:
+			tmin = 1;
+			break;
+		case CLOCK_REALTIME:
+			tmin = max(ktime_mono_to_real(0), 1);
+			break;
+		case CLOCK_TAI:
+			tmin = max(ktime_mono_to_any(0, TK_OFFS_TAI), 1);
+			break;
+		default:
+			tmin = 1;
+			WARN_ON_ONCE(1);
+			break;
+		}
+
+		sockc->transmit_time = max_t(ktime_t, txtime, tmin);
 		break;
+	}
 	case SCM_TS_OPT_ID:
 		if (sk_is_tcp(sk))
 			return -EINVAL;
