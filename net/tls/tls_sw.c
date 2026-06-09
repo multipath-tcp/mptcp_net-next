@@ -1982,12 +1982,14 @@ tls_read_flush_backlog(struct sock *sk, struct tls_prot_info *prot,
 		       size_t *flushed_at)
 {
 	size_t max_rec;
+	int inq;
 
 	if (len_left <= decrypted)
 		return false;
 
+	inq = sk->sk_socket->ops->peek_len(sk->sk_socket);
 	max_rec = prot->overhead_size - prot->tail_size + TLS_MAX_PAYLOAD_SIZE;
-	if (done - *flushed_at < SZ_128K && tcp_inq(sk) > max_rec)
+	if (done - *flushed_at < SZ_128K && inq > max_rec)
 		return false;
 
 	*flushed_at = done;
