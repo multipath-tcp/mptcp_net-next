@@ -439,7 +439,7 @@ out:
 }
 
 /**
- * batadv_neigh_ifinfo_get() - find the ifinfo from an neigh_node
+ * batadv_neigh_ifinfo_get() - find the ifinfo from a neigh_node
  * @neigh: the neigh node to be queried
  * @if_outgoing: the interface for which the ifinfo should be acquired
  *
@@ -472,7 +472,7 @@ batadv_neigh_ifinfo_get(struct batadv_neigh_node *neigh,
 }
 
 /**
- * batadv_neigh_ifinfo_new() - search and possibly create an neigh_ifinfo object
+ * batadv_neigh_ifinfo_new() - search and possibly create a neigh_ifinfo object
  * @neigh: the neigh node to be queried
  * @if_outgoing: the interface for which the ifinfo should be acquired
  *
@@ -908,7 +908,7 @@ void batadv_originator_free(struct batadv_priv *bat_priv)
 	if (!hash)
 		return;
 
-	cancel_delayed_work_sync(&bat_priv->orig_work);
+	disable_delayed_work_sync(&bat_priv->orig_work);
 
 	bat_priv->orig_hash = NULL;
 
