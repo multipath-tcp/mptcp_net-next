@@ -537,10 +537,10 @@ static void flow_queue_add(struct fq_flow *flow, struct sk_buff *skb)
 	rb_insert_color(&skb->rbnode, &flow->t_root);
 }
 
-static bool fq_packet_beyond_horizon(const struct sk_buff *skb,
+static bool fq_packet_beyond_horizon(ktime_t time_to_send,
 				     const struct fq_sched_data *q, u64 now)
 {
-	return unlikely((s64)skb->tstamp > (s64)(now + q->horizon));
+	return unlikely((s64)time_to_send > (s64)(now + q->horizon));
 }
 
 static void fq_flow_adjust_timer(struct fq_sched_data *q, struct fq_flow *flow,
@@ -561,6 +561,36 @@ static void fq_flow_adjust_timer(struct fq_sched_data *q, struct fq_flow *flow,
 	}
 }
 
+static ktime_t fq_skb_tstamp_to_mono(struct sk_buff *skb)
+{
+	const ktime_t mono_max = NSEC_PER_SEC * TIME_UPTIME_SEC_MAX;
+
+	if (likely(skb->tstamp_type == SKB_CLOCK_MONOTONIC))
+		return max(skb->tstamp, 1);
+
+	if (skb->tstamp_type == SKB_CLOCK_TAI)
+		return max(ktime_sub(skb->tstamp, ktime_mono_to_any(0, TK_OFFS_TAI)), 1);
+
+	if (likely(skb->tstamp > mono_max))
+		return max(ktime_sub(skb->tstamp, ktime_mono_to_real(0)), 1);
+
+	/* Handle BPF programs setting skb->stamp but not tstamp_type */
+	net_warn_ratelimited("fq: likely mono tstamp with tstamp_type 0\n");
+
+	skb->tstamp_type = SKB_CLOCK_MONOTONIC;
+	return max(skb->tstamp, 1);
+}
+
+static void fq_mono_to_skb_tstamp(struct sk_buff *skb, ktime_t time_to_send)
+{
+	if (skb->tstamp_type == SKB_CLOCK_MONOTONIC)
+		skb->tstamp = time_to_send;
+	else if (skb->tstamp_type == SKB_CLOCK_REALTIME)
+		skb->tstamp = ktime_mono_to_real(time_to_send);
+	else
+		skb->tstamp = ktime_mono_to_any(time_to_send, TK_OFFS_TAI);
+}
+
 static int fq_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 		      struct sk_buff **to_free)
 {
@@ -579,17 +609,20 @@ static int fq_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	if (!skb->tstamp) {
 		fq_skb_cb(skb)->time_to_send = now;
 	} else {
+		ktime_t time_to_send = fq_skb_tstamp_to_mono(skb);
+
 		/* Check if packet timestamp is too far in the future. */
-		if (fq_packet_beyond_horizon(skb, q, now)) {
+		if (fq_packet_beyond_horizon(time_to_send, q, now)) {
 			if (q->horizon_drop) {
 				q->stat_horizon_drops++;
 				return qdisc_drop_reason(skb, sch, to_free,
 							 QDISC_DROP_HORIZON_LIMIT);
 			}
 			q->stat_horizon_caps++;
-			skb->tstamp = now + q->horizon;
+			time_to_send = now + q->horizon;
+			fq_mono_to_skb_tstamp(skb, time_to_send);
 		}
-		fq_skb_cb(skb)->time_to_send = skb->tstamp;
+		fq_skb_cb(skb)->time_to_send = (u64)time_to_send;
 	}
 
 	f = fq_classify(sch, skb, now);
