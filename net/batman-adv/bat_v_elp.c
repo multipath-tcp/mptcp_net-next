@@ -115,7 +115,7 @@ static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
 			goto default_throughput;
 
 		/* only use rtnl_trylock because the elp worker will be cancelled while
-		 * the rntl_lock is held. the cancel_delayed_work_sync() would otherwise
+		 * the rntl_lock is held. the disable_delayed_work_sync() would otherwise
 		 * wait forever when the elp work_item was started and it is then also
 		 * trying to rtnl_lock
 		 */
@@ -162,7 +162,7 @@ static bool batadv_v_elp_get_throughput(struct batadv_hardif_neigh_node *neigh,
 	}
 
 	/* only use rtnl_trylock because the elp worker will be cancelled while
-	 * the rntl_lock is held. the cancel_delayed_work_sync() would otherwise
+	 * the rntl_lock is held. the disable_delayed_work_sync() would otherwise
 	 * wait forever when the elp work_item was started and it is then also
 	 * trying to rtnl_lock
 	 */
@@ -447,7 +447,7 @@ out:
  */
 void batadv_v_elp_iface_disable(struct batadv_hard_iface *hard_iface)
 {
-	cancel_delayed_work_sync(&hard_iface->bat_v.elp_wq);
+	disable_delayed_work_sync(&hard_iface->bat_v.elp_wq);
 
 	dev_kfree_skb(hard_iface->bat_v.elp_skb);
 	hard_iface->bat_v.elp_skb = NULL;
