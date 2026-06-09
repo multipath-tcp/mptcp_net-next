@@ -46,7 +46,7 @@ def _qdisc_setup(ifname, qdisc, optargs=""):
     tc(f"qdisc replace dev {ifname} root {qdisc} {optargs}")
 
 
-def _test_variants_mono():
+def _test_variants_fq():
     for ipver in ["4", "6"]:
         for testcase in [
             ["no_delay", "a,-1", "a,-1"],
@@ -59,11 +59,18 @@ def _test_variants_mono():
             yield KsftNamedVariant(name, ipver, testcase[1], testcase[2])
 
 
-@ksft_variants(_test_variants_mono())
-def test_so_txtime_mono(cfg, ipver, args_tx, args_rx):
+@ksft_variants(_test_variants_fq())
+def test_so_txtime_fq_mono(cfg, ipver, args_tx, args_rx):
     """Run all variants of monotonic (fq) tests."""
     _qdisc_setup(cfg.ifname, "fq")
     test_so_txtime(cfg, "mono", ipver, args_tx, args_rx, True)
+
+
+@ksft_variants(_test_variants_fq())
+def test_so_txtime_fq_tai(cfg, ipver, args_tx, args_rx):
+    """Run all variants of fq tests, but pass CLOCK_TAI to test conversion."""
+    _qdisc_setup(cfg.ifname, "fq")
+    test_so_txtime(cfg, "tai", ipver, args_tx, args_rx, True)
 
 
 def _test_variants_etf():
@@ -95,7 +102,10 @@ def test_so_txtime_etf(cfg, ipver, args_tx, args_rx, expect_fail):
 def main() -> None:
     """Boilerplate ksft main."""
     with NetDrvEpEnv(__file__) as cfg:
-        ksft_run([test_so_txtime_mono, test_so_txtime_etf], args=(cfg,))
+        ksft_run(
+            [test_so_txtime_fq_mono, test_so_txtime_fq_tai, test_so_txtime_etf],
+            args=(cfg,),
+        )
     ksft_exit()
 
 
