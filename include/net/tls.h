@@ -258,6 +258,8 @@ struct tls_context {
 	struct sock *sk;
 
 	void (*sk_destruct)(struct sock *sk);
+	__poll_t (*sk_poll)(struct file *file, struct socket *sock,
+			    struct poll_table_struct *wait);
 
 	union tls_crypto_context crypto_send;
 	union tls_crypto_context crypto_recv;
