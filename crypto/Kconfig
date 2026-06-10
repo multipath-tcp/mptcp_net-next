@@ -464,15 +464,6 @@ config CRYPTO_DES
 	  Triple DES EDE (Encrypt/Decrypt/Encrypt) (FIPS 46-3, ISO/IEC 18033-3)
 	  cipher algorithms
 
-config CRYPTO_FCRYPT
-	tristate "FCrypt"
-	select CRYPTO_ALGAPI
-	select CRYPTO_SKCIPHER
-	help
-	  FCrypt algorithm used by RxRPC
-
-	  See https://ota.polyonymo.us/fcrypt-paper.txt
-
 config CRYPTO_KHAZAD
 	tristate "Khazad"
 	depends on CRYPTO_USER_API_ENABLE_OBSOLETE
@@ -711,15 +702,6 @@ config CRYPTO_LRW
 	  rest is used to tie each cipher block to its logical position.
 
 	  See https://people.csail.mit.edu/rivest/pubs/LRW02.pdf
-
-config CRYPTO_PCBC
-	tristate "PCBC (Propagating Cipher Block Chaining)"
-	select CRYPTO_SKCIPHER
-	select CRYPTO_MANAGER
-	help
-	  PCBC (Propagating Cipher Block Chaining) mode
-
-	  This block cipher mode is required for RxRPC.
 
 config CRYPTO_XCTR
 	tristate
