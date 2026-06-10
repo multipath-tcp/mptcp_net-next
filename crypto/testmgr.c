@@ -4828,15 +4828,6 @@ static const struct alg_test_desc alg_test_descs[] = {
 			.cipher = __VECS(des3_ede_tv_template)
 		}
 	}, {
-		.alg = "ecb(fcrypt)",
-		.test = alg_test_skcipher,
-		.suite = {
-			.cipher = {
-				.vecs = fcrypt_pcbc_tv_template,
-				.count = 1
-			}
-		}
-	}, {
 		.alg = "ecb(khazad)",
 		.test = alg_test_skcipher,
 		.suite = {
@@ -5253,12 +5244,6 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.alg = "p1363(ecdsa-nist-p521)",
 		.test = alg_test_null,
 		.fips_allowed = 1,
-	}, {
-		.alg = "pcbc(fcrypt)",
-		.test = alg_test_skcipher,
-		.suite = {
-			.cipher = __VECS(fcrypt_pcbc_tv_template)
-		}
 	}, {
 #if IS_ENABLED(CONFIG_CRYPTO_PHMAC_S390)
 		.alg = "phmac(sha224)",
