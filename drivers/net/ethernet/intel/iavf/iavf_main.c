@@ -1134,10 +1134,12 @@ bool iavf_promiscuous_mode_changed(struct iavf_adapter *adapter)
  * @netdev: network interface device structure
  * @uc: snapshot of uc address list
  * @mc: snapshot of mc address list
+ *
+ * Return: 0 on success.
  **/
-static void iavf_set_rx_mode(struct net_device *netdev,
-			     struct netdev_hw_addr_list *uc,
-			     struct netdev_hw_addr_list *mc)
+static int iavf_set_rx_mode(struct net_device *netdev,
+			    struct netdev_hw_addr_list *uc,
+			    struct netdev_hw_addr_list *mc)
 {
 	struct iavf_adapter *adapter = netdev_priv(netdev);
 
@@ -1150,6 +1152,8 @@ static void iavf_set_rx_mode(struct net_device *netdev,
 	if (iavf_promiscuous_mode_changed(adapter))
 		adapter->aq_required |= IAVF_FLAG_AQ_CONFIGURE_PROMISC_MODE;
 	spin_unlock_bh(&adapter->current_netdev_promisc_flags_lock);
+
+	return 0;
 }
 
 /**
