@@ -76,6 +76,13 @@ netdev instance lock, that lock must be held as well. This should not be
 done from ndo_*_features callbacks. netdev->features should not be modified
 by driver except by means of ndo_fix_features callback.
 
+For "ops locked" drivers (see Documentation/networking/netdevices.rst),
+ethtool callbacks that may end up invoking netdev_update_features() must
+opt back into rtnl_lock by setting the matching ETHTOOL_OP_NEEDS_RTNL_*
+bit in ``ethtool_ops::op_needs_rtnl``. The ethtool core then keeps
+rtnl_lock held across those SET callbacks so the contract above still
+holds.
+
 ndo_features_check is called for each skb before that skb is passed to
 ndo_start_xmit. Driver may perform any non-trivial checks (e.g. exact
 header geometry / length) and withdraw features like HW_CSUM or TSO,
