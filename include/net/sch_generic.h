@@ -86,7 +86,7 @@ struct Qdisc {
 #define TCQ_F_WARN_NONWC	(1 << 16)
 #define TCQ_F_CPUSTATS		0x20 /* run using percpu statistics */
 #define TCQ_F_NOPARENT		0x40 /* root of its hierarchy :
-				      * qdisc_tree_decrease_qlen() should stop.
+				      * qdisc_tree_reduce_backlog() should stop.
 				      */
 #define TCQ_F_INVISIBLE		0x80 /* invisible by default in dump */
 #define TCQ_F_NOLOCK		0x100 /* qdisc does not require locking */
