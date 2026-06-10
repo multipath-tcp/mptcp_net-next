@@ -40,7 +40,7 @@ import glob
 import os
 import re
 from lib.py import ksft_run, ksft_exit, ksft_pr
-from lib.py import NetDrvEpEnv, KsftXfailEx
+from lib.py import NetDrvEpEnv, KsftFailEx, KsftXfailEx
 from lib.py import NetdevFamily, EthtoolFamily
 from lib.py import bkg, cmd, defer, ethtool, ip
 from lib.py import ksft_variants, KsftNamedVariant
@@ -369,6 +369,12 @@ def test(cfg, mode, protocol, test_name):
             return
 
         ksft_pr(rx_proc)
+
+        # ret==42 means the receiver detected over-coalescing.
+        # This is unambiguous proof of a bug, retries can only cause
+        # false negatives.
+        if rx_proc.ret == 42:
+            raise KsftFailEx(f"GRO over-coalesced in {protocol}/{test_name}")
 
         if test_name.startswith("large_") and os.environ.get("KSFT_MACHINE_SLOW"):
             ksft_pr(f"Ignoring {protocol}/{test_name} failure due to slow environment")
