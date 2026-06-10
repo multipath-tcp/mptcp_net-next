@@ -335,6 +335,24 @@ static void process_resume_target(struct work_struct *work)
 
 	resume_target(nt);
 
+	/* netpoll_setup() took a net_device reference and dropped the RTNL
+	 * before returning, all while this target was off target_list and
+	 * thus invisible to netconsole_netdev_event(). If the device was
+	 * unregistered in that window the NETDEV_UNREGISTER notifier could not
+	 * tear this target down, which would leak the reference and hang
+	 * unregister_netdevice(). Re-check under the RTNL before re-publishing:
+	 * taking it across the check and the list_add() serialises against the
+	 * notifier (which also runs under the RTNL), so the device is either
+	 * still registered (the notifier will find the re-added target) or
+	 * already unregistering (we drop the reference here).
+	 */
+	rtnl_lock();
+	if (nt->state == STATE_ENABLED && nt->np.dev &&
+	    nt->np.dev->reg_state != NETREG_REGISTERED) {
+		do_netpoll_cleanup(&nt->np);
+		nt->state = STATE_DISABLED;
+	}
+
 	/* At this point the target is either enabled or disabled and
 	 * was cleaned up before getting deactivated. Either way, add it
 	 * back to target list.
@@ -342,6 +360,7 @@ static void process_resume_target(struct work_struct *work)
 	spin_lock_irqsave(&target_list_lock, flags);
 	list_add(&nt->list, &target_list);
 	spin_unlock_irqrestore(&target_list_lock, flags);
+	rtnl_unlock();
 
 out_unlock:
 	dynamic_netconsole_mutex_unlock();
@@ -1449,10 +1468,21 @@ static void drop_netconsole_target(struct config_group *group,
 {
 	struct netconsole_target *nt = to_target(item);
 	unsigned long flags;
+	bool needs_cleanup;
 
 	dynamic_netconsole_mutex_lock();
 
+	mutex_lock(&target_cleanup_list_lock);
 	spin_lock_irqsave(&target_list_lock, flags);
+	/* A STATE_DEACTIVATED target may have been moved to
+	 * target_cleanup_list by netconsole_netdev_event() but not yet
+	 * processed by netconsole_process_cleanups_core(). Unlinking it below
+	 * hides it from the cleanup worker, so this path has to clean it up
+	 * itself. Record that the target still owns a netpoll before the
+	 * state is downgraded.
+	 */
+	needs_cleanup = nt->state == STATE_ENABLED ||
+			nt->state == STATE_DEACTIVATED;
 	/* Disable deactivated target to prevent races between resume attempt
 	 * and target removal.
 	 */
@@ -1460,6 +1490,7 @@ static void drop_netconsole_target(struct config_group *group,
 		nt->state = STATE_DISABLED;
 	list_del(&nt->list);
 	spin_unlock_irqrestore(&target_list_lock, flags);
+	mutex_unlock(&target_cleanup_list_lock);
 
 	dynamic_netconsole_mutex_unlock();
 
@@ -1473,8 +1504,10 @@ static void drop_netconsole_target(struct config_group *group,
 	/*
 	 * The target may have never been enabled, or was manually disabled
 	 * before being removed so netpoll may have already been cleaned up.
+	 * netpoll_cleanup() is idempotent (it skips when np->dev is NULL), so
+	 * it is safe even if the cleanup worker already tore the netpoll down.
 	 */
-	if (nt->state == STATE_ENABLED)
+	if (needs_cleanup)
 		netpoll_cleanup(&nt->np);
 
 	config_item_put(&nt->group.cg_item);
@@ -1654,6 +1687,41 @@ static struct notifier_block netconsole_netdev_notifier = {
 	.notifier_call  = netconsole_netdev_event,
 };
 
+/* Pop a pre-allocated skb from the pool and request a refill.
+ *
+ * The pool is refilled with MAX_SKB_SIZE buffers, so a pooled skb cannot
+ * satisfy a larger request. Return NULL in that case rather than handing
+ * back a too-small skb that would later trip skb_over_panic() in skb_put();
+ * the caller still polls and retries, and alloc_skb() itself can satisfy the
+ * oversized request once memory frees up.
+ *
+ * The refill is requested via schedule_work(), which takes the workqueue
+ * pool locks and is therefore not NMI-safe. Skip the refill when called
+ * from NMI context; the next non-NMI caller will top the pool back up.
+ */
+static struct sk_buff *netcons_skb_pop(struct netpoll *np, int len)
+{
+	struct sk_buff *skb;
+
+	if (len > MAX_SKB_SIZE) {
+		/* net_warn_ratelimited() pulls in printk machinery that is not
+		 * NMI-safe and could recurse into the nbcon console we are
+		 * servicing, so only warn outside NMI.
+		 */
+		if (!in_nmi())
+			net_warn_ratelimited("netconsole: dropping message, requested skb len %d exceeds pool buffer size %zu on %s\n",
+					     len, (size_t)MAX_SKB_SIZE,
+					     np->dev->name);
+		return NULL;
+	}
+
+	skb = skb_dequeue(&np->skb_pool);
+	if (!in_nmi())
+		schedule_work(&np->refill_wq);
+
+	return skb;
+}
+
 static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 {
 	int count = 0;
@@ -1663,10 +1731,8 @@ static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 repeat:
 
 	skb = alloc_skb(len, GFP_ATOMIC);
-	if (!skb) {
-		skb = skb_dequeue(&np->skb_pool);
-		schedule_work(&np->refill_wq);
-	}
+	if (!skb)
+		skb = netcons_skb_pop(np, len);
 
 	if (!skb) {
 		if (++count < 10) {
