@@ -2719,6 +2719,9 @@ const struct ethtool_ops mlx5e_ethtool_ops = {
 	.rxfh_per_ctx_fields	= true,
 	.rxfh_per_ctx_key	= true,
 	.rxfh_max_num_contexts	= MLX5E_MAX_NUM_RSS,
+	.op_needs_rtnl		= ETHTOOL_OP_NEEDS_RTNL_SCHANNELS |
+				  ETHTOOL_OP_NEEDS_RTNL_SRINGPARAM |
+				  ETHTOOL_OP_NEEDS_RTNL_SPFLAGS,
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
 				     ETHTOOL_COALESCE_MAX_FRAMES |
 				     ETHTOOL_COALESCE_USE_ADAPTIVE |
