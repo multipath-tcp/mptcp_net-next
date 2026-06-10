@@ -659,11 +659,13 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 static bool mptcp_established_options_add_addr(struct sock *sk,
 					       struct sk_buff *skb, int *size,
 					       unsigned int remaining,
+					       bool has_ts,
 					       struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
 	struct mptcp_addr_info addr;
+	bool drop_ts = has_ts;
 	bool echo;
 
 	/* add addr will strip the existing options, be sure to avoid breaking
@@ -672,11 +674,13 @@ static bool mptcp_established_options_add_addr(struct sock *sk,
 	if (!mptcp_pm_should_add_signal(msk) ||
 	    (opts->suboptions & (OPTION_MPTCP_MPJ_ACK | OPTION_MPTCP_MPC_ACK)) ||
 	    !skb || !skb_is_tcp_pure_ack(skb) ||
-	    !mptcp_pm_add_addr_signal(msk, size, remaining, &addr, &echo))
+	    !mptcp_pm_add_addr_signal(msk, size, remaining, &addr, &echo,
+				      &drop_ts))
 		return false;
 
 	pr_debug("drop other suboptions\n");
 	opts->suboptions = OPTION_MPTCP_ADD_ADDR;
+	opts->drop_ts = drop_ts;
 	opts->addr = addr;
 	if (!echo) {
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDRTX);
@@ -859,7 +863,8 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	total_size += opt_size;
 	remaining -= opt_size;
-	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining, opts)) {
+	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining,
+					       has_ts, opts)) {
 		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
