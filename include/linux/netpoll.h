@@ -13,11 +13,27 @@
 #include <linux/rcupdate.h>
 #include <linux/list.h>
 #include <linux/refcount.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
 
 union inet_addr {
 	__be32		ip;
 	struct in6_addr	in6;
 };
+
+/*
+ * Maximum payload netpoll's preallocated skb pool can carry. Keep this in
+ * sync with the buffer size used by refill_skbs() in net/core/netpoll.c;
+ * callers (e.g. netconsole) use it to detect requests the pool can never
+ * satisfy and avoid dequeuing a pooled skb that would later trip
+ * skb_over_panic() in skb_put().
+ */
+#define MAX_UDP_CHUNK	1460
+#define MAX_SKB_SIZE						\
+	(sizeof(struct ethhdr) +				\
+	 sizeof(struct iphdr) +					\
+	 sizeof(struct udphdr) +				\
+	 MAX_UDP_CHUNK)
 
 struct netpoll {
 	struct net_device *dev;
