@@ -220,8 +220,8 @@ static void igmp_stop_timer(struct ip_mc_list *im)
 	spin_lock_bh(&im->lock);
 	if (timer_delete(&im->timer))
 		refcount_dec(&im->refcnt);
-	im->tm_running = 0;
-	im->reporter = 0;
+	WRITE_ONCE(im->tm_running, 0);
+	WRITE_ONCE(im->reporter, 0);
 	im->unsolicit_count = 0;
 	spin_unlock_bh(&im->lock);
 }
@@ -231,7 +231,7 @@ static void igmp_start_timer(struct ip_mc_list *im, int max_delay)
 {
 	int tv = get_random_u32_below(max_delay);
 
-	im->tm_running = 1;
+	WRITE_ONCE(im->tm_running, 1);
 	if (refcount_inc_not_zero(&im->refcnt)) {
 		if (mod_timer(&im->timer, jiffies + tv + 2))
 			ip_ma_put(im);
@@ -267,7 +267,7 @@ static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
 	if (timer_delete(&im->timer)) {
 		if ((long)(im->timer.expires-jiffies) < max_delay) {
 			add_timer(&im->timer);
-			im->tm_running = 1;
+			WRITE_ONCE(im->tm_running, 1);
 			spin_unlock_bh(&im->lock);
 			return;
 		}
@@ -857,12 +857,12 @@ static void igmp_timer_expire(struct timer_list *t)
 	struct in_device *in_dev = im->interface;
 
 	spin_lock(&im->lock);
-	im->tm_running = 0;
+	WRITE_ONCE(im->tm_running, 0);
 
 	if (im->unsolicit_count && --im->unsolicit_count)
 		igmp_start_timer(im, unsolicited_report_interval(in_dev));
 
-	im->reporter = 1;
+	WRITE_ONCE(im->reporter, 1);
 	spin_unlock(&im->lock);
 
 	if (IGMP_V1_SEEN(in_dev))
@@ -1325,7 +1325,7 @@ static void __igmp_group_dropped(struct ip_mc_list *im, gfp_t gfp)
 	    !READ_ONCE(net->ipv4.sysctl_igmp_llm_reports))
 		return;
 
-	reporter = im->reporter;
+	reporter = READ_ONCE(im->reporter);
 	igmp_stop_timer(im);
 
 	if (!in_dev->dead) {
@@ -1566,7 +1566,7 @@ static void ____ip_mc_inc_group(struct in_device *in_dev, __be32 addr,
 #endif
 
 	im->next_rcu = in_dev->mc_list;
-	in_dev->mc_count++;
+	WRITE_ONCE(in_dev->mc_count, in_dev->mc_count + 1);
 	rcu_assign_pointer(in_dev->mc_list, im);
 
 	ip_mc_hash_add(in_dev, im);
@@ -1790,7 +1790,8 @@ void __ip_mc_dec_group(struct in_device *in_dev, __be32 addr, gfp_t gfp)
 			if (new_users == 0) {
 				ip_mc_hash_remove(in_dev, i);
 				*ip = i->next_rcu;
-				in_dev->mc_count--;
+				WRITE_ONCE(in_dev->mc_count,
+					   in_dev->mc_count - 1);
 				__igmp_group_dropped(i, gfp);
 				inet_ifmcaddr_notify(in_dev->dev, i,
 						     RTM_DELMULTICAST);
@@ -1922,7 +1923,7 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 
 	while ((i = rtnl_dereference(in_dev->mc_list)) != NULL) {
 		in_dev->mc_list = i->next_rcu;
-		in_dev->mc_count--;
+		WRITE_ONCE(in_dev->mc_count, in_dev->mc_count - 1);
 		ip_mc_clear_src(i);
 		ip_ma_put(i);
 	}
@@ -2962,6 +2963,7 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 		struct ip_mc_list *im = v;
 		struct igmp_mc_iter_state *state = igmp_mc_seq_private(seq);
 		char   *querier;
+		int tm_running;
 		long delta;
 
 #ifdef CONFIG_IP_MULTICAST
@@ -2974,16 +2976,19 @@ static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 
 		if (rcu_access_pointer(state->in_dev->mc_list) == im) {
 			seq_printf(seq, "%d\t%-10s: %5d %7s\n",
-				   state->dev->ifindex, state->dev->name, state->in_dev->mc_count, querier);
+				   state->dev->ifindex, state->dev->name,
+				   READ_ONCE(state->in_dev->mc_count),
+				   querier);
 		}
 
-		delta = im->timer.expires - jiffies;
+		tm_running = READ_ONCE(im->tm_running);
+		delta = READ_ONCE(im->timer.expires) - jiffies;
 		seq_printf(seq,
 			   "\t\t\t\t%08X %5d %d:%08lX\t\t%d\n",
 			   im->multiaddr, READ_ONCE(im->users),
-			   im->tm_running,
-			   im->tm_running ? jiffies_delta_to_clock_t(delta) : 0,
-			   im->reporter);
+			   tm_running,
+			   tm_running ? jiffies_delta_to_clock_t(delta) : 0,
+			   READ_ONCE(im->reporter));
 	}
 	return 0;
 }
