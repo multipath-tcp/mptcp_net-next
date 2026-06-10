@@ -108,6 +108,8 @@
 #define EXT_PAYLOAD_1 "\x00\x00\x00\x00\x00\x00"
 #define EXT_PAYLOAD_2 "\x11\x11\x11\x11\x11\x11"
 
+#define EXIT_OVER_COALESCE	42
+
 #define ipv6_optlen(p)  (((p)->hdrlen+1) << 3) /* calculate IPv6 extension header len */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
@@ -1165,6 +1167,8 @@ static void check_recv_pkts(int fd, int *correct_payload,
 	struct ipv6hdr *ip6h = (struct ipv6hdr *)(buffer + nhoff);
 	struct tcphdr *tcph;
 	bool bad_packet = false;
+	int bytes_expected = 0;
+	int bytes_received = 0;
 	int tcp_ext_len = 0;
 	int ip_ext_len = 0;
 	int pkt_size = -1;
@@ -1173,8 +1177,10 @@ static void check_recv_pkts(int fd, int *correct_payload,
 	int i;
 
 	vlog("Expected {");
-	for (i = 0; i < correct_num_pkts; i++)
+	for (i = 0; i < correct_num_pkts; i++) {
 		vlog("%d ", correct_payload[i]);
+		bytes_expected += correct_payload[i];
+	}
 	vlog("}, Total %d packets\nReceived {", correct_num_pkts);
 
 	while (1) {
@@ -1209,9 +1215,17 @@ static void check_recv_pkts(int fd, int *correct_payload,
 			vlog("[!=%d]", correct_payload[num_pkt]);
 			bad_packet = true;
 		}
+		bytes_received += data_len;
 		num_pkt++;
 	}
 	vlog("}, Total %d packets.\n", num_pkt);
+	/* Signal over-coalescing explicitly, it's a hard failure, unlike
+	 * under-coalescing which could be timing- or loss-related.
+	 */
+	if (num_pkt < correct_num_pkts && bytes_received == bytes_expected)
+		error(EXIT_OVER_COALESCE, 0,
+		      "over-coalesced: got %d pkts vs expected %d (%d B)",
+		      num_pkt, correct_num_pkts, bytes_received);
 	if (num_pkt != correct_num_pkts)
 		error(1, 0, "incorrect number of packets");
 	if (bad_packet)
