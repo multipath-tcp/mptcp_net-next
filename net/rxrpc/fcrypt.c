@@ -43,27 +43,10 @@
  */
 
 #include <asm/byteorder.h>
-#include <crypto/algapi.h>
-#include <linux/bitops.h>
-#include <linux/init.h>
-#include <linux/module.h>
-
-#define ROUNDS 16
-
-struct fcrypt_ctx {
-	__be32 sched[ROUNDS];
-};
-
-/* Rotate right two 32 bit numbers as a 56 bit number */
-#define ror56(hi, lo, n)					\
-do {								\
-	u32 t = lo & ((1 << n) - 1);				\
-	lo = (lo >> n) | ((hi & ((1 << n) - 1)) << (32 - n));	\
-	hi = (hi >> n) | (t << (24-n));				\
-} while (0)
-
-/* Rotate right one 64 bit number as a 56 bit number */
-#define ror56_64(k, n) (k = (k >> n) | ((k & ((1 << n) - 1)) << (56 - n)))
+#include <kunit/visibility.h>
+#include <linux/export.h>
+#include <linux/unaligned.h>
+#include "ar-internal.h"
 
 /*
  * Sboxes for Feistel network derived from
@@ -217,204 +200,153 @@ static const __be32 sbox3[256] = {
 	Z(0xa1), Z(0xc2), Z(0xc5), Z(0xe3), Z(0xba), Z(0xfc), Z(0x0e), Z(0x25)
 };
 
-/*
- * This is a 16 round Feistel network with permutation F_ENCRYPT
- */
-#define F_ENCRYPT(R, L, sched)						\
-do {									\
-	union lc4 { __be32 l; u8 c[4]; } u;				\
-	u.l = sched ^ R;						\
-	L ^= sbox0[u.c[0]] ^ sbox1[u.c[1]] ^ sbox2[u.c[2]] ^ sbox3[u.c[3]]; \
-} while (0)
-
-/*
- * encryptor
- */
-static void fcrypt_encrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
-{
-	const struct fcrypt_ctx *ctx = crypto_tfm_ctx(tfm);
+union fcrypt_block {
+	__be64 a;
 	struct {
 		__be32 l, r;
-	} X;
-
-	memcpy(&X, src, sizeof(X));
-
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x0]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x1]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x2]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x3]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x4]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x5]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x6]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x7]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x8]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x9]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xa]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xb]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xc]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xd]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xe]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xf]);
-
-	memcpy(dst, &X, sizeof(X));
-}
-
-/*
- * decryptor
- */
-static void fcrypt_decrypt(struct crypto_tfm *tfm, u8 *dst, const u8 *src)
-{
-	const struct fcrypt_ctx *ctx = crypto_tfm_ctx(tfm);
-	struct {
-		__be32 l, r;
-	} X;
-
-	memcpy(&X, src, sizeof(X));
-
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xf]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xe]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xd]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xc]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0xb]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0xa]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x9]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x8]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x7]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x6]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x5]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x4]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x3]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x2]);
-	F_ENCRYPT(X.l, X.r, ctx->sched[0x1]);
-	F_ENCRYPT(X.r, X.l, ctx->sched[0x0]);
-
-	memcpy(dst, &X, sizeof(X));
-}
-
-/*
- * Generate a key schedule from key, the least significant bit in each key byte
- * is parity and shall be ignored. This leaves 56 significant bits in the key
- * to scatter over the 16 key schedules. For each schedule extract the low
- * order 32 bits and use as schedule, then rotate right by 11 bits.
- */
-static int fcrypt_setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
-{
-	struct fcrypt_ctx *ctx = crypto_tfm_ctx(tfm);
-
-#if BITS_PER_LONG == 64  /* the 64-bit version can also be used for 32-bit
-			  * kernels - it seems to be faster but the code is
-			  * larger */
-
-	u64 k;	/* k holds all 56 non-parity bits */
-
-	/* discard the parity bits */
-	k = (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key++) >> 1;
-	k <<= 7;
-	k |= (*key) >> 1;
-
-	/* Use lower 32 bits for schedule, rotate by 11 each round (16 times) */
-	ctx->sched[0x0] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x1] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x2] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x3] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x4] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x5] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x6] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x7] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x8] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0x9] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xa] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xb] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xc] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xd] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xe] = cpu_to_be32(k); ror56_64(k, 11);
-	ctx->sched[0xf] = cpu_to_be32(k);
-
-	return 0;
-#else
-	u32 hi, lo;		/* hi is upper 24 bits and lo lower 32, total 56 */
-
-	/* discard the parity bits */
-	lo = (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	hi = lo >> 4;
-	lo &= 0xf;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key++) >> 1;
-	lo <<= 7;
-	lo |= (*key) >> 1;
-
-	/* Use lower 32 bits for schedule, rotate by 11 each round (16 times) */
-	ctx->sched[0x0] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x1] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x2] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x3] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x4] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x5] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x6] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x7] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x8] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0x9] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xa] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xb] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xc] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xd] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xe] = cpu_to_be32(lo); ror56(hi, lo, 11);
-	ctx->sched[0xf] = cpu_to_be32(lo);
-	return 0;
-#endif
-}
-
-static struct crypto_alg fcrypt_alg = {
-	.cra_name		=	"fcrypt",
-	.cra_driver_name	=	"fcrypt-generic",
-	.cra_flags		=	CRYPTO_ALG_TYPE_CIPHER,
-	.cra_blocksize		=	8,
-	.cra_ctxsize		=	sizeof(struct fcrypt_ctx),
-	.cra_module		=	THIS_MODULE,
-	.cra_u			=	{ .cipher = {
-	.cia_min_keysize	=	8,
-	.cia_max_keysize	=	8,
-	.cia_setkey		=	fcrypt_setkey,
-	.cia_encrypt		=	fcrypt_encrypt,
-	.cia_decrypt		=	fcrypt_decrypt } }
+	};
 };
 
-static int __init fcrypt_mod_init(void)
+#define F_ENCRYPT(R, L, sched)                                       \
+	do {                                                         \
+		union lc4 {                                          \
+			__be32 l;                                    \
+			u8 c[4];                                     \
+		} u;                                                 \
+		u.l = sched ^ R;                                     \
+		L ^= sbox0[u.c[0]] ^ sbox1[u.c[1]] ^ sbox2[u.c[2]] ^ \
+		     sbox3[u.c[3]];                                  \
+	} while (0)
+
+/* Encrypt one block using FCrypt. */
+static __be64 fcrypt_encrypt(const struct fcrypt_key *key, __be64 ptext)
 {
-	return crypto_register_alg(&fcrypt_alg);
+	union fcrypt_block X = { .a = ptext };
+
+	/* This is a 16 round Feistel network with permutation F_ENCRYPT. */
+	F_ENCRYPT(X.r, X.l, key->sched[0x0]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x1]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x2]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x3]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x4]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x5]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x6]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x7]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x8]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x9]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xa]);
+	F_ENCRYPT(X.l, X.r, key->sched[0xb]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xc]);
+	F_ENCRYPT(X.l, X.r, key->sched[0xd]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xe]);
+	F_ENCRYPT(X.l, X.r, key->sched[0xf]);
+	return X.a;
 }
 
-static void __exit fcrypt_mod_fini(void)
+/* Decrypt one block using FCrypt. */
+static __be64 fcrypt_decrypt(const struct fcrypt_key *key, __be64 ctext)
 {
-	crypto_unregister_alg(&fcrypt_alg);
+	union fcrypt_block X = { .a = ctext };
+
+	/* This is a 16 round Feistel network with permutation F_ENCRYPT. */
+	F_ENCRYPT(X.l, X.r, key->sched[0xf]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xe]);
+	F_ENCRYPT(X.l, X.r, key->sched[0xd]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xc]);
+	F_ENCRYPT(X.l, X.r, key->sched[0xb]);
+	F_ENCRYPT(X.r, X.l, key->sched[0xa]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x9]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x8]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x7]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x6]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x5]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x4]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x3]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x2]);
+	F_ENCRYPT(X.l, X.r, key->sched[0x1]);
+	F_ENCRYPT(X.r, X.l, key->sched[0x0]);
+	return X.a;
 }
 
-module_init(fcrypt_mod_init);
-module_exit(fcrypt_mod_fini);
+/**
+ * fcrypt_preparekey - Prepare a key for FCrypt encryption and decryption
+ * @key: (out) The prepared key
+ * @raw_key: The raw key as an 8-byte array
+ *
+ * This computes the FCrypt key schedule.
+ */
+void fcrypt_preparekey(struct fcrypt_key *key, const u8 raw_key[FCRYPT_BSIZE])
+{
+	u64 k = 0;
 
-MODULE_LICENSE("Dual BSD/GPL");
-MODULE_DESCRIPTION("FCrypt Cipher Algorithm");
-MODULE_AUTHOR("David Howells <dhowells@redhat.com>");
-MODULE_ALIAS_CRYPTO("fcrypt");
+	/* Load the 56 non-parity bits of the key.  Discard the parity bits. */
+	for (int i = 0; i < 8; i++)
+		k = (k << 7) | (raw_key[i] >> 1);
+
+	/* Generate the key schedule word for each round. */
+	for (int i = 0; i < FCRYPT_ROUNDS; i++) {
+		key->sched[i] = cpu_to_be32(k);
+		/* Rotate the low 56 bits of 'k' right by 11 bits. */
+		k = (k >> 11) | ((k & ((1 << 11) - 1)) << (56 - 11));
+	}
+}
+EXPORT_SYMBOL_IF_KUNIT(fcrypt_preparekey);
+
+/**
+ * fcrypt_pcbc_encrypt - Encrypt data using FCrypt cipher in PCBC mode
+ * @key: The key
+ * @iv: The 8-byte initialization vector
+ * @src: The source data
+ * @dst: The destination data.  Both in-place and out-of-place are supported.
+ * @nblocks: The number of 8-byte blocks to encrypt
+ *
+ * WARNING: This cipher is insecure.  Not only is the 56-bit key easily
+ * brute-forced, the cipher itself is cryptographically weak and doesn't even
+ * provide the intended 56-bit security level.  It effectively just acts as an
+ * obfuscation algorithm.  It is supported only for backwards compatibility.
+ */
+void fcrypt_pcbc_encrypt(const struct fcrypt_key *key,
+			 const u8 iv[FCRYPT_BSIZE], const void *src, void *dst,
+			 size_t nblocks)
+{
+	__be64 prev = get_unaligned((const __be64 *)iv);
+	const __be64 *src_blocks = src;
+	__be64 *dst_blocks = dst;
+
+	while (nblocks--) {
+		__be64 ptext, ctext;
+
+		ptext = get_unaligned(src_blocks++);
+		ctext = fcrypt_encrypt(key, prev ^ ptext);
+		put_unaligned(ctext, dst_blocks++);
+		prev = ptext ^ ctext;
+	}
+}
+EXPORT_SYMBOL_IF_KUNIT(fcrypt_pcbc_encrypt);
+
+/**
+ * fcrypt_pcbc_decrypt - Decrypt data using FCrypt cipher in PCBC mode
+ * @key: The key
+ * @iv: The 8-byte initialization vector
+ * @src: The source data
+ * @dst: The destination data.  Both in-place and out-of-place are supported.
+ * @nblocks: The number of 8-byte blocks to decrypt
+ */
+void fcrypt_pcbc_decrypt(const struct fcrypt_key *key,
+			 const u8 iv[FCRYPT_BSIZE], const void *src, void *dst,
+			 size_t nblocks)
+{
+	__be64 prev = get_unaligned((const __be64 *)iv);
+	const __be64 *src_blocks = src;
+	__be64 *dst_blocks = dst;
+
+	while (nblocks--) {
+		__be64 ptext, ctext;
+
+		ctext = get_unaligned(src_blocks++);
+		ptext = prev ^ fcrypt_decrypt(key, ctext);
+		put_unaligned(ptext, dst_blocks++);
+		prev = ptext ^ ctext;
+	}
+}
+EXPORT_SYMBOL_IF_KUNIT(fcrypt_pcbc_decrypt);
