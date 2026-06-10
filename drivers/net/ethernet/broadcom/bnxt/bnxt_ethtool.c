@@ -5729,6 +5729,10 @@ const struct ethtool_ops bnxt_ethtool_ops = {
 	.rxfh_max_num_contexts		= BNXT_MAX_ETH_RSS_CTX + 1,
 	.rxfh_indir_space		= BNXT_MAX_RSS_TABLE_ENTRIES_P5,
 	.rxfh_priv_size			= sizeof(struct bnxt_rss_ctx),
+	.op_needs_rtnl			= ETHTOOL_OP_NEEDS_RTNL_SCHANNELS |
+					  ETHTOOL_OP_NEEDS_RTNL_SRINGPARAM |
+					  ETHTOOL_OP_NEEDS_RTNL_SCOALESCE |
+					  ETHTOOL_OP_NEEDS_RTNL_RSS,
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
 				     ETHTOOL_COALESCE_MAX_FRAMES |
 				     ETHTOOL_COALESCE_USECS_IRQ |
