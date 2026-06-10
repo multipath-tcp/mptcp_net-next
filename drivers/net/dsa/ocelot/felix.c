@@ -2446,12 +2446,14 @@ struct net_device *felix_port_to_netdev(struct ocelot *ocelot, int port)
 }
 EXPORT_SYMBOL_GPL(felix_port_to_netdev);
 
-int felix_netdev_to_port(struct net_device *dev)
+int felix_netdev_to_port(struct ocelot *ocelot, struct net_device *dev)
 {
+	struct felix *felix = ocelot_to_felix(ocelot);
+	struct dsa_switch *ds = felix->ds;
 	struct dsa_port *dp;
 
 	dp = dsa_port_from_netdev(dev);
-	if (IS_ERR(dp))
+	if (IS_ERR(dp) || dp->ds != ds)
 		return -EINVAL;
 
 	return dp->index;
