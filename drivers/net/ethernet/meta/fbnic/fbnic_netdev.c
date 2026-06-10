@@ -240,9 +240,9 @@ void __fbnic_set_rx_mode(struct fbnic_dev *fbd,
 	fbnic_write_tce_tcam(fbd);
 }
 
-static void fbnic_set_rx_mode(struct net_device *netdev,
-			      struct netdev_hw_addr_list *uc,
-			      struct netdev_hw_addr_list *mc)
+static int fbnic_set_rx_mode(struct net_device *netdev,
+			     struct netdev_hw_addr_list *uc,
+			     struct netdev_hw_addr_list *mc)
 {
 	struct fbnic_net *fbn = netdev_priv(netdev);
 	struct fbnic_dev *fbd = fbn->fbd;
@@ -250,6 +250,8 @@ static void fbnic_set_rx_mode(struct net_device *netdev,
 	/* No need to update the hardware if we are not running */
 	if (netif_running(netdev))
 		__fbnic_set_rx_mode(fbd, uc, mc);
+
+	return 0;
 }
 
 static int fbnic_set_mac(struct net_device *netdev, void *p)
