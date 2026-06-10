@@ -186,11 +186,12 @@ static int netkit_get_iflink(const struct net_device *dev)
 	return iflink;
 }
 
-static void netkit_set_multicast(struct net_device *dev,
-				 struct netdev_hw_addr_list *uc,
-				 struct netdev_hw_addr_list *mc)
+static int netkit_set_multicast(struct net_device *dev,
+				struct netdev_hw_addr_list *uc,
+				struct netdev_hw_addr_list *mc)
 {
 	/* Nothing to do, we receive whatever gets pushed to us! */
+	return 0;
 }
 
 static int netkit_set_macaddr(struct net_device *dev, void *sa)
