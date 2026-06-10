@@ -351,10 +351,6 @@ virtual and the physical device. To prevent deadlocks, the virtual device's
 lock must always be acquired before the physical device's (see
 ``netdev_nl_queue_create_doit``).
 
-In the future, there will be an option for individual
-drivers to opt out of using ``rtnl_lock`` and instead perform their control
-operations directly under the netdev instance lock.
-
 Device drivers are encouraged to rely on the instance lock where possible.
 
 For the (mostly software) drivers that need to interact with the core stack,
@@ -375,9 +371,16 @@ the instance lock.
 struct ethtool_ops
 ------------------
 
-Similarly to ``ndos`` the instance lock is only held for select drivers.
-For "ops locked" drivers all ethtool ops without exceptions should
-be called under the instance lock.
+For non-"ops locked" drivers ethtool_ops are executed under ``rtnl_lock``.
+
+For "ops locked" drivers, ``ethtool_ops``, unlike ``ndos``, run under
+the instance lock **only**. Drivers may request that ``rtnl_lock``
+is held around specific operations (both SET and GET) by setting
+appropriate bits in ``ethtool_ops::op_needs_rtnl`` (if the necessary
+``ETHTOOL_OP_NEEDS_RTNL_*`` bit doesn't exist, just add it).
+Commonly used core helpers which force drivers to selectively opt-in to
+``rtnl_lock`` protection include ``netdev_update_features()``,
+``netif_set_real_num_tx_queues()``, and phylink helpers.
 
 struct netdev_stat_ops
 ----------------------
