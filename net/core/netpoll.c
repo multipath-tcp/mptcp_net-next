@@ -41,15 +41,8 @@
  * message gets out even in extreme OOM situations.
  */
 
-#define MAX_UDP_CHUNK 1460
 #define MAX_SKBS 32
 #define USEC_PER_POLL	50
-
-#define MAX_SKB_SIZE							\
-	(sizeof(struct ethhdr) +					\
-	 sizeof(struct iphdr) +						\
-	 sizeof(struct udphdr) +					\
-	 MAX_UDP_CHUNK)
 
 static unsigned int carrier_timeout = 4;
 module_param(carrier_timeout, uint, 0644);
