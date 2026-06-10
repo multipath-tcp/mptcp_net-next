@@ -1122,13 +1122,14 @@ struct netdev_net_notifier {
  *	Cannot sleep, called with netif_addr_lock_bh held.
  *	Deprecated in favor of ndo_set_rx_mode_async.
  *
- * void (*ndo_set_rx_mode_async)(struct net_device *dev,
- *				 struct netdev_hw_addr_list *uc,
- *				 struct netdev_hw_addr_list *mc);
+ * int (*ndo_set_rx_mode_async)(struct net_device *dev,
+ *				struct netdev_hw_addr_list *uc,
+ *				struct netdev_hw_addr_list *mc);
  *	Async version of ndo_set_rx_mode which runs in process context
  *	with rtnl_lock and netdev_lock_ops(dev) held. The uc/mc parameters
  *	are snapshots of the address lists - iterate with
- *	netdev_hw_addr_list_for_each(ha, uc).
+ *	netdev_hw_addr_list_for_each(ha, uc). Return 0 on success or a
+ *	negative errno to request a retry via the core backoff.
  *
  * int (*ndo_set_mac_address)(struct net_device *dev, void *addr);
  *	This function  is called when the Media Access Control address
@@ -1455,7 +1456,7 @@ struct net_device_ops {
 	void			(*ndo_change_rx_flags)(struct net_device *dev,
 						       int flags);
 	void			(*ndo_set_rx_mode)(struct net_device *dev);
-	void			(*ndo_set_rx_mode_async)(
+	int			(*ndo_set_rx_mode_async)(
 					struct net_device *dev,
 					struct netdev_hw_addr_list *uc,
 					struct netdev_hw_addr_list *mc);
@@ -1932,6 +1933,8 @@ enum netdev_reg_state {
  *	@rx_mode_node:		List entry for rx_mode work processing
  *	@rx_mode_tracker:	Refcount tracker for rx_mode work
  *	@rx_mode_addr_cache:	Recycled snapshot entries for rx_mode work
+ *	@rx_mode_retry_timer:	Timer that re-queues rx_mode work after failure
+ *	@rx_mode_retry_count:	Number of consecutive retries already scheduled
  *	@uc:			unicast mac addresses
  *	@mc:			multicast mac addresses
  *	@dev_addrs:		list of device hw addresses
@@ -2325,6 +2328,8 @@ struct net_device {
 	struct list_head	rx_mode_node;
 	netdevice_tracker	rx_mode_tracker;
 	struct netdev_hw_addr_list	rx_mode_addr_cache;
+	struct timer_list	rx_mode_retry_timer;
+	unsigned int		rx_mode_retry_count;
 #ifdef CONFIG_LOCKDEP
 	unsigned char		nested_level;
 #endif
@@ -2582,6 +2587,9 @@ struct net_device {
 	 *
 	 * Double protects:
 	 *	@up, @moving_ns, @nd_net, @xdp_features
+	 *
+	 * Ops protects:
+	 *	@cfg, @cfg_pending, @ethtool, @hwprov
 	 *
 	 * Double ops protects:
 	 *	@real_num_rx_queues, @real_num_tx_queues
@@ -5148,6 +5156,7 @@ static inline void __dev_mc_unsync(struct net_device *dev,
 
 /* Functions used for secondary unicast and multicast support */
 void dev_set_rx_mode(struct net_device *dev);
+void netif_rx_mode_schedule_retry(struct net_device *dev);
 int netif_set_promiscuity(struct net_device *dev, int inc);
 int dev_set_promiscuity(struct net_device *dev, int inc);
 int netif_set_allmulti(struct net_device *dev, int inc, bool notify);
