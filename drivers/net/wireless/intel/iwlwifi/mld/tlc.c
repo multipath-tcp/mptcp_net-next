@@ -114,8 +114,8 @@ iwl_mld_get_tlc_cmd_flags(struct iwl_mld *mld,
 	}
 
 	if (uhr_cap && uhr_cap->has_uhr && own_uhr_cap &&
-	    uhr_cap->phy.cap & IEEE80211_UHR_PHY_CAP_ELR_RX &&
-	    own_uhr_cap->phy.cap & IEEE80211_UHR_PHY_CAP_ELR_TX)
+	    uhr_cap->phy.cap & cpu_to_le32(IEEE80211_UHR_PHY_CAP_ELR_RX) &&
+	    own_uhr_cap->phy.cap & cpu_to_le32(IEEE80211_UHR_PHY_CAP_ELR_TX))
 		flags |= IWL_TLC_MNG_CFG_FLAGS_UHR_ELR_1_5_MBPS_MSK |
 			 IWL_TLC_MNG_CFG_FLAGS_UHR_ELR_3_MBPS_MSK;
 
@@ -467,65 +467,6 @@ iwl_mld_fill_supp_rates(struct iwl_mld *mld,
 	}
 }
 
-static int iwl_mld_convert_tlc_cmd_to_v5(struct iwl_tlc_config_cmd *cmd,
-					 struct iwl_tlc_config_cmd_v5 *cmd_v5)
-{
-	if (WARN_ON_ONCE(hweight32(le32_to_cpu(cmd->sta_mask)) != 1))
-		return -EINVAL;
-
-	/* Convert sta_mask to sta_id */
-	cmd_v5->sta_id = __ffs(le32_to_cpu(cmd->sta_mask));
-
-	/* Copy all the rest */
-	cmd_v5->max_ch_width = cmd->max_ch_width;
-	cmd_v5->mode = cmd->mode;
-	cmd_v5->chains = cmd->chains;
-	cmd_v5->sgi_ch_width_supp = cmd->sgi_ch_width_supp;
-	cmd_v5->flags = cmd->flags;
-	cmd_v5->non_ht_rates = cmd->non_ht_rates;
-
-	BUILD_BUG_ON(sizeof(cmd_v5->ht_rates) != sizeof(cmd->ht_rates));
-	memcpy(cmd_v5->ht_rates, cmd->ht_rates, sizeof(cmd->ht_rates));
-
-	cmd_v5->max_mpdu_len = cmd->max_mpdu_len;
-	cmd_v5->max_tx_op = cmd->max_tx_op;
-
-	return 0;
-}
-
-static int iwl_mld_convert_tlc_cmd_to_v4(struct iwl_tlc_config_cmd *cmd,
-					 struct iwl_tlc_config_cmd_v4 *cmd_v4)
-{
-	if (WARN_ON_ONCE(hweight32(le32_to_cpu(cmd->sta_mask)) != 1))
-		return -EINVAL;
-
-	/* Convert sta_mask to sta_id */
-	cmd_v4->sta_id = __ffs(le32_to_cpu(cmd->sta_mask));
-
-	/* Copy everything until ht_rates */
-	cmd_v4->max_ch_width = cmd->max_ch_width;
-	cmd_v4->mode = cmd->mode;
-	cmd_v4->chains = cmd->chains;
-	cmd_v4->sgi_ch_width_supp = cmd->sgi_ch_width_supp;
-	cmd_v4->flags = cmd->flags;
-	cmd_v4->non_ht_rates = cmd->non_ht_rates;
-
-	/* Convert ht_rates from __le32 to __le16 */
-	BUILD_BUG_ON(ARRAY_SIZE(cmd_v4->ht_rates) != ARRAY_SIZE(cmd->ht_rates));
-	BUILD_BUG_ON(ARRAY_SIZE(cmd_v4->ht_rates[0]) != ARRAY_SIZE(cmd->ht_rates[0]));
-
-	for (int nss = 0; nss < ARRAY_SIZE(cmd->ht_rates); nss++)
-		for (int bw = 0; bw < ARRAY_SIZE(cmd->ht_rates[nss]); bw++)
-			cmd_v4->ht_rates[nss][bw] =
-				cpu_to_le16(le32_to_cpu(cmd->ht_rates[nss][bw]));
-
-	/* Copy the rest */
-	cmd_v4->max_mpdu_len = cmd->max_mpdu_len;
-	cmd_v4->max_tx_op = cmd->max_tx_op;
-
-	return 0;
-}
-
 static void iwl_mld_send_tlc_cmd(struct iwl_mld *mld,
 				 struct ieee80211_vif *vif,
 				 struct iwl_mld_sta *mld_sta,
@@ -544,8 +485,6 @@ static void iwl_mld_send_tlc_cmd(struct iwl_mld *mld,
 	};
 	u32 cmd_id = WIDE_ID(DATA_PATH_GROUP, TLC_MNG_CONFIG_CMD);
 	u8 cmd_ver = iwl_fw_lookup_cmd_ver(mld->fw, cmd_id, 0);
-	struct iwl_tlc_config_cmd_v5 cmd_v5 = {};
-	struct iwl_tlc_config_cmd_v4 cmd_v4 = {};
 	void *cmd_ptr;
 	u8 cmd_size;
 	int ret;
@@ -558,19 +497,6 @@ static void iwl_mld_send_tlc_cmd(struct iwl_mld *mld,
 	if (cmd_ver == 6) {
 		cmd_ptr = &cmd;
 		cmd_size = sizeof(cmd);
-	} else if (cmd_ver == 5) {
-		/* TODO: remove support once FW moves to version 6 */
-		ret = iwl_mld_convert_tlc_cmd_to_v5(&cmd, &cmd_v5);
-		if (ret)
-			return;
-		cmd_ptr = &cmd_v5;
-		cmd_size = sizeof(cmd_v5);
-	} else if (cmd_ver == 4) {
-		ret = iwl_mld_convert_tlc_cmd_to_v4(&cmd, &cmd_v4);
-		if (ret)
-			return;
-		cmd_ptr = &cmd_v4;
-		cmd_size = sizeof(cmd_v4);
 	} else {
 		IWL_ERR(mld, "Unsupported TLC config cmd version %d\n",
 			cmd_ver);
