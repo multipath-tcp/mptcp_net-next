@@ -383,6 +383,8 @@ struct iwl_mvm_vif_link_info {
  * @pm_enabled: indicates powersave is enabled
  * @roc_activity: currently running ROC activity for this vif (or
  *	ROC_NUM_ACTIVITIES if no activity is running).
+ * @p2p_in_binding: indicates that this P2P-Device interface should be
+ *	added to the binding, i.e. is running ROC right now
  * @session_prot_connection_loss: the connection was lost due to session
  *	protection ending without receiving a beacon, so we need to now
  *	protect the deauth separately
@@ -492,6 +494,7 @@ struct iwl_mvm_vif {
 	struct iwl_mvm_time_event_data time_event_data;
 	struct iwl_mvm_time_event_data hs_time_event_data;
 	enum iwl_roc_activity roc_activity;
+	bool p2p_in_binding;
 
 	/* TCP Checksum Offload */
 	netdev_features_t features;
@@ -1646,6 +1649,7 @@ int __iwl_mvm_mac_start(struct iwl_mvm *mvm);
 int iwl_run_init_mvm_ucode(struct iwl_mvm *mvm);
 
 /* Utils */
+u8 iwl_mvm_rate_idx_to_plcp(int idx);
 int iwl_mvm_legacy_hw_idx_to_mac80211_idx(u32 rate_n_flags,
 					  enum nl80211_band band);
 int iwl_mvm_legacy_rate_to_mac80211_idx(u32 rate_n_flags,
@@ -1653,7 +1657,7 @@ int iwl_mvm_legacy_rate_to_mac80211_idx(u32 rate_n_flags,
 void iwl_mvm_hwrate_to_tx_rate(u32 rate_n_flags,
 			       enum nl80211_band band,
 			       struct ieee80211_tx_rate *r);
-u8 iwl_mvm_mac80211_idx_to_hwrate(const struct iwl_fw *fw, int rate_idx);
+u8 iwl_mvm_rate_idx_to_fw_idx(const struct iwl_fw *fw, int rate_idx);
 u8 iwl_mvm_mac80211_ac_to_ucode_ac(enum ieee80211_ac_numbers ac);
 bool iwl_mvm_is_nic_ack_enabled(struct iwl_mvm *mvm, struct ieee80211_vif *vif);
 
@@ -1669,16 +1673,16 @@ void iwl_mvm_get_sync_time(struct iwl_mvm *mvm, int clock_type, u32 *gp2,
 u32 iwl_mvm_get_systime(struct iwl_mvm *mvm);
 
 /* Tx / Host Commands */
-int __must_check iwl_mvm_send_cmd(struct iwl_mvm *mvm,
-				  struct iwl_host_cmd *cmd);
-int __must_check iwl_mvm_send_cmd_pdu(struct iwl_mvm *mvm, u32 id,
-				      u32 flags, u16 len, const void *data);
-int __must_check iwl_mvm_send_cmd_status(struct iwl_mvm *mvm,
-					 struct iwl_host_cmd *cmd,
-					 u32 *status);
-int __must_check iwl_mvm_send_cmd_pdu_status(struct iwl_mvm *mvm, u32 id,
-					     u16 len, const void *data,
-					     u32 *status);
+int iwl_mvm_send_cmd(struct iwl_mvm *mvm,
+		     struct iwl_host_cmd *cmd);
+int iwl_mvm_send_cmd_pdu(struct iwl_mvm *mvm, u32 id,
+			 u32 flags, u16 len, const void *data);
+int iwl_mvm_send_cmd_status(struct iwl_mvm *mvm,
+			    struct iwl_host_cmd *cmd,
+			    u32 *status);
+int iwl_mvm_send_cmd_pdu_status(struct iwl_mvm *mvm, u32 id,
+				u16 len, const void *data,
+				u32 *status);
 int iwl_mvm_tx_skb_sta(struct iwl_mvm *mvm, struct sk_buff *skb,
 		       struct ieee80211_sta *sta);
 int iwl_mvm_tx_skb_non_sta(struct iwl_mvm *mvm, struct sk_buff *skb);
