@@ -394,13 +394,23 @@ ieee80211_eht_oper_size_ok(const u8 *data, u8 len)
 }
 
 /* must validate ieee80211_eht_oper_size_ok() first */
+static inline const struct ieee80211_eht_operation_info *
+ieee80211_eht_oper_info(const struct ieee80211_eht_operation *eht_oper)
+{
+	if (!(eht_oper->params & IEEE80211_EHT_OPER_INFO_PRESENT))
+		return NULL;
+
+	return (const void *)eht_oper->optional;
+}
+
+/* must validate ieee80211_eht_oper_size_ok() first */
 static inline u16
 ieee80211_eht_oper_dis_subchan_bitmap(const struct ieee80211_eht_operation *eht_oper)
 {
-	const struct ieee80211_eht_operation_info *info =
-		(const void *)eht_oper->optional;
+	const struct ieee80211_eht_operation_info *info;
 
-	if (!(eht_oper->params & IEEE80211_EHT_OPER_INFO_PRESENT))
+	info = ieee80211_eht_oper_info(eht_oper);
+	if (!info)
 		return 0;
 
 	if (!(eht_oper->params & IEEE80211_EHT_OPER_DISABLED_SUBCHANNEL_BITMAP_PRESENT))
@@ -1038,13 +1048,17 @@ ieee80211_mle_basic_sta_prof_bss_param_ch_cnt(const struct ieee80211_mle_per_sta
 #define IEEE80211_MLE_STA_RECONF_CONTROL_COMPLETE_PROFILE		0x0010
 #define IEEE80211_MLE_STA_RECONF_CONTROL_STA_MAC_ADDR_PRESENT		0x0020
 #define IEEE80211_MLE_STA_RECONF_CONTROL_AP_REM_TIMER_PRESENT		0x0040
-#define	IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE                 0x0780
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_AP_REM          0
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_OP_PARAM_UPDATE 1
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_ADD_LINK        2
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_DEL_LINK        3
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_NSTR_STATUS     4
-#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_PARAMS_PRESENT       0x0800
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE			0x0780
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_AP_REM		0
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_OP_PARAM_UPDATE	1
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_ADD_LINK	2
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_DEL_LINK	3
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_NSTR_STATUS	4
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_UHR_OMP_UPD	5
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_PARAMS_PRESENT	0x0800
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_NSTR_BMAP_SIZE	0x1000
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_NSTR_IND_BMAP_PRES	0x2000
+#define IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_DSO_INFO_PRESENT	0x4000
 
 /**
  * ieee80211_mle_reconf_sta_prof_size_ok - validate reconfiguration multi-link
