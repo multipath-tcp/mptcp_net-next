@@ -280,12 +280,6 @@ int nl80211_chan_width_to_mhz(enum nl80211_chan_width chan_width)
 	case NL80211_CHAN_WIDTH_16:
 		mhz = 16;
 		break;
-	case NL80211_CHAN_WIDTH_5:
-		mhz = 5;
-		break;
-	case NL80211_CHAN_WIDTH_10:
-		mhz = 10;
-		break;
 	case NL80211_CHAN_WIDTH_20:
 	case NL80211_CHAN_WIDTH_20_NOHT:
 		mhz = 20;
@@ -347,8 +341,6 @@ cfg80211_chandef_valid_control_freq(const struct cfg80211_chan_def *chandef,
 				    u32 control_freq)
 {
 	switch (chandef->width) {
-	case NL80211_CHAN_WIDTH_5:
-	case NL80211_CHAN_WIDTH_10:
 	case NL80211_CHAN_WIDTH_20:
 	case NL80211_CHAN_WIDTH_20_NOHT:
 	case NL80211_CHAN_WIDTH_1:
@@ -415,8 +407,6 @@ bool cfg80211_chandef_valid(const struct cfg80211_chan_def *chandef)
 		return false;
 
 	switch (chandef->width) {
-	case NL80211_CHAN_WIDTH_5:
-	case NL80211_CHAN_WIDTH_10:
 	case NL80211_CHAN_WIDTH_20:
 	case NL80211_CHAN_WIDTH_20_NOHT:
 		if (ieee80211_chandef_to_khz(chandef) !=
@@ -803,18 +793,16 @@ _cfg80211_chandef_compatible(const struct cfg80211_chan_def *c1,
 		return NULL;
 
 	/*
-	 * can't be compatible if one of them is 5/10 MHz or S1G
+	 * can't be compatible if one of them is S1G
 	 * but they don't have the same width.
 	 */
-#define NARROW_OR_S1G(width)	((width) == NL80211_CHAN_WIDTH_5 || \
-				 (width) == NL80211_CHAN_WIDTH_10 || \
-				 (width) == NL80211_CHAN_WIDTH_1 || \
-				 (width) == NL80211_CHAN_WIDTH_2 || \
-				 (width) == NL80211_CHAN_WIDTH_4 || \
-				 (width) == NL80211_CHAN_WIDTH_8 || \
-				 (width) == NL80211_CHAN_WIDTH_16)
+#define IS_S1G(width)	((width) == NL80211_CHAN_WIDTH_1 || \
+			 (width) == NL80211_CHAN_WIDTH_2 || \
+			 (width) == NL80211_CHAN_WIDTH_4 || \
+			 (width) == NL80211_CHAN_WIDTH_8 || \
+			 (width) == NL80211_CHAN_WIDTH_16)
 
-	if (NARROW_OR_S1G(c1->width) || NARROW_OR_S1G(c2->width))
+	if (IS_S1G(c1->width) || IS_S1G(c2->width))
 		return NULL;
 
 	/*
@@ -1506,13 +1494,6 @@ bool _cfg80211_chandef_usable(struct wiphy *wiphy,
 	control_freq = chandef->chan->center_freq;
 
 	switch (chandef->width) {
-	case NL80211_CHAN_WIDTH_5:
-		width = 5;
-		break;
-	case NL80211_CHAN_WIDTH_10:
-		prohibited_flags |= IEEE80211_CHAN_NO_10MHZ;
-		width = 10;
-		break;
 	case NL80211_CHAN_WIDTH_20:
 		if (!ht_cap->ht_supported &&
 		    chandef->chan->band != NL80211_BAND_6GHZ)
