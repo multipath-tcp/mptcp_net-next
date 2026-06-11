@@ -5,6 +5,8 @@ all:
 
 TEST_PROGS := rds_run.sh
 
+TEST_GEN_PROGS := getsockopt
+
 TEST_FILES := \
 	include.sh \
 	settings \
@@ -15,5 +17,7 @@ EXTRA_CLEAN := \
 	include.sh \
 	/tmp/rds_logs \
 # end of EXTRA_CLEAN
+
+CFLAGS += $(KHDR_INCLUDES)
 
 include ../../lib.mk
