@@ -714,7 +714,11 @@ table inet mangle {
 EOF
 	then
 		mptcp_lib_pr_skip "$msg, could not load nft ruleset"
-		mptcp_lib_fail_if_expected_feature "nft rules"
+		if mptcp_lib_is_v6_enabled; then
+			mptcp_lib_fail_if_expected_feature "nft rules"
+		else
+			mptcp_lib_pr_info "nft inet table needs CONFIG_IPV6=y"
+		fi
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
 	fi
