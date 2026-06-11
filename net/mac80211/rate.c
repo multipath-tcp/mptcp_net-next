@@ -601,14 +601,8 @@ static void rate_idx_match_mask(s8 *rate_idx, u16 *rate_flags,
 			return;
 
 		/* if HT BSS, and we handle a data frame, also try HT rates */
-		switch (chan_width) {
-		case NL80211_CHAN_WIDTH_20_NOHT:
-		case NL80211_CHAN_WIDTH_5:
-		case NL80211_CHAN_WIDTH_10:
+		if (chan_width == NL80211_CHAN_WIDTH_20_NOHT)
 			return;
-		default:
-			break;
-		}
 
 		*rate_idx = 0;
 		/* keep protection flags */
