@@ -4192,7 +4192,12 @@ ath12k_wmi_copy_resource_config(struct ath12k_base *ab,
 			cpu_to_le32(1 << WMI_RSRC_CFG_HOST_SVC_FLAG_REO_QREF_SUPPORT_BIT);
 	wmi_cfg->ema_max_vap_cnt = cpu_to_le32(tg_cfg->ema_max_vap_cnt);
 	wmi_cfg->ema_max_profile_period = cpu_to_le32(tg_cfg->ema_max_profile_period);
-	wmi_cfg->flags2 |= cpu_to_le32(WMI_RSRC_CFG_FLAGS2_CALC_NEXT_DTIM_COUNT_SET);
+	wmi_cfg->flags2 |= cpu_to_le32(WMI_RSRC_CFG_FLAGS2_CALC_NEXT_DTIM_COUNT_SET |
+				       WMI_RSRC_CFG_FLAGS2_FW_AST_INDICATION_DISABLE);
+
+	if (tg_cfg->is_wds_null_frame_supported)
+		wmi_cfg->flags2 |=
+			cpu_to_le32(WMI_RSRC_CFG_FLAGS2_WDS_NULL_FRAME_SUPPORT);
 }
 
 static int ath12k_init_cmd_send(struct ath12k_wmi_pdev *wmi,
@@ -4401,6 +4406,9 @@ int ath12k_wmi_cmd_init(struct ath12k_base *ab)
 	if (test_bit(WMI_TLV_SERVICE_REG_CC_EXT_EVENT_SUPPORT,
 		     ab->wmi_ab.svc_map))
 		arg.res_cfg.is_reg_cc_ext_event_supported = true;
+
+	if (test_bit(WMI_TLV_SERVICE_WDS_NULL_FRAME_SUPPORT, ab->wmi_ab.svc_map))
+		arg.res_cfg.is_wds_null_frame_supported = true;
 
 	ab->hw_params->wmi_init(ab, &arg.res_cfg);
 	ab->wow.wmi_conf_rx_decap_mode = arg.res_cfg.rx_decap_mode;
@@ -7223,7 +7231,11 @@ static void ath12k_mgmt_rx_event(struct ath12k_base *ab, struct sk_buff *skb)
 	struct ath12k_wmi_mgmt_rx_arg rx_ev = {};
 	struct ath12k *ar;
 	struct ieee80211_rx_status *status = IEEE80211_SKB_RXCB(skb);
+	struct ieee80211_sta *pubsta = NULL;
+	struct ath12k_dp_link_peer *peer;
 	struct ieee80211_hdr *hdr;
+	bool is_4addr_null_pkt;
+	struct ath12k_dp *dp;
 	u16 fc;
 	struct ieee80211_supported_band *sband;
 	s32 noise_floor;
@@ -7298,6 +7310,38 @@ static void ath12k_mgmt_rx_event(struct ath12k_base *ab, struct sk_buff *skb)
 	hdr = (struct ieee80211_hdr *)skb->data;
 	fc = le16_to_cpu(hdr->frame_control);
 
+	is_4addr_null_pkt = (ieee80211_is_nullfunc(hdr->frame_control) ||
+			     ieee80211_is_qos_nullfunc(hdr->frame_control)) &&
+			    ieee80211_has_a4(hdr->frame_control);
+
+	/*
+	 * Add check to drop frames other than 4-address NULL frame. Since
+	 * firmware sends all NULL frames in this path (3-address and 4-address)
+	 */
+	if (ieee80211_is_data(hdr->frame_control) && !is_4addr_null_pkt) {
+		dev_kfree_skb(skb);
+		goto exit;
+	}
+
+	if (is_4addr_null_pkt) {
+		dp = ath12k_ab_to_dp(ar->ab);
+		spin_lock_bh(&dp->dp_lock);
+		peer = ath12k_dp_link_peer_find_by_pdev_and_addr(dp, ar->pdev_idx,
+								 hdr->addr2);
+		if (!peer) {
+			spin_unlock_bh(&dp->dp_lock);
+			dev_kfree_skb(skb);
+			goto exit;
+		}
+		pubsta = peer->sta;
+		if (pubsta && pubsta->valid_links) {
+			status->link_valid = 1;
+			status->link_id = peer->link_id;
+		}
+		spin_unlock_bh(&dp->dp_lock);
+		goto send_rx;
+	}
+
 	/* Firmware is guaranteed to report all essential management frames via
 	 * WMI while it can deliver some extra via HTT. Since there can be
 	 * duplicates split the reporting wrt monitor/sniffing.
@@ -7321,6 +7365,7 @@ static void ath12k_mgmt_rx_event(struct ath12k_base *ab, struct sk_buff *skb)
 	if (ieee80211_is_beacon(hdr->frame_control))
 		ath12k_mac_handle_beacon(ar, skb);
 
+send_rx:
 	ath12k_dbg(ab, ATH12K_DBG_MGMT,
 		   "event mgmt rx skb %p len %d ftype %02x stype %02x\n",
 		   skb, skb->len,
