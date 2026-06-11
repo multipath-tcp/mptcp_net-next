@@ -521,7 +521,6 @@ static int iwl_pcie_nic_init(struct iwl_trans *trans)
 
 #define HW_READY_TIMEOUT (50)
 
-/* Note: returns poll_bit return value, which is >= 0 if success */
 static int iwl_pcie_set_hw_ready(struct iwl_trans *trans)
 {
 	int ret;
@@ -2424,7 +2423,7 @@ bool iwl_trans_pcie_grab_nic_access(struct iwl_trans *trans)
 	return false;
 }
 
-static void iwl_trans_pcie_resched_with_nic_access(struct iwl_trans *trans)
+void iwl_trans_pcie_resched_with_nic_access(struct iwl_trans *trans)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
@@ -2591,7 +2590,7 @@ int iwl_trans_pcie_wait_txq_empty(struct iwl_trans *trans, int txq_idx)
 	struct iwl_txq *txq;
 	unsigned long now = jiffies;
 	bool overflow_tx;
-	u8 wr_ptr;
+	int wr_ptr;
 
 	/* Make sure the NIC is still alive in the bus */
 	if (test_bit(STATUS_TRANS_DEAD, &trans->status))
@@ -2614,7 +2613,7 @@ int iwl_trans_pcie_wait_txq_empty(struct iwl_trans *trans, int txq_idx)
 		overflow_tx) &&
 	       !time_after(jiffies,
 			   now + msecs_to_jiffies(IWL_FLUSH_WAIT_MS))) {
-		u8 write_ptr = READ_ONCE(txq->write_ptr);
+		int write_ptr = READ_ONCE(txq->write_ptr);
 
 		/*
 		 * If write pointer moved during the wait, warn only
