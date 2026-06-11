@@ -99,6 +99,7 @@ enum ieee80211_status_data {
 	IEEE80211_STATUS_TYPE_INVALID	= 0,
 	IEEE80211_STATUS_TYPE_SMPS	= 1,
 	IEEE80211_STATUS_TYPE_NEG_TTLM	= 2,
+	IEEE80211_STATUS_TYPE_UHR_OMP	= 3,
 	IEEE80211_STATUS_SUBDATA_MASK	= 0x1ff0,
 };
 
@@ -412,6 +413,7 @@ enum ieee80211_conn_bw_limit {
 struct ieee80211_conn_settings {
 	enum ieee80211_conn_mode mode;
 	enum ieee80211_conn_bw_limit bw_limit;
+	bool dbe_enabled;
 };
 
 extern const struct ieee80211_conn_settings ieee80211_conn_settings_unlimited;
@@ -639,6 +641,15 @@ struct ieee80211_if_managed {
 		bool enabled;
 		u8 dialog_token;
 	} epcs;
+
+	struct {
+		struct wiphy_hrtimer_work status_work;
+		u32 timeout_us;
+		u16 links;
+		u16 pending, pending_init;
+		u8 dialog_token;
+		bool acked;
+	} uhr_omp;
 };
 
 struct ieee80211_if_ibss {
@@ -1135,6 +1146,7 @@ struct ieee80211_link_data {
 
 	struct {
 		enum ieee80211_sta_rx_bandwidth he_and_lower;
+		enum ieee80211_sta_rx_bandwidth eht; /* and UHR non-DBE */
 	} bss_bw;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
@@ -1898,6 +1910,15 @@ struct ieee802_11_elems {
 	struct ieee80211_mle_per_sta_profile *prof;
 	size_t sta_prof_len;
 
+	/*
+	 * When parsing the beacon with MBSSID (from a transmitted BSS), this
+	 * indicates that the profile the parser was instructed to look for
+	 * (via the bss value in &struct ieee80211_elems_parse_params) couldn't
+	 * be found (due to EMA, or perhaps broken AP) and the result cannot be
+	 * considered complete.
+	 */
+	bool mbssid_nontx_profile_missing;
+
 	/* whether/which parse error occurred while retrieving these elements */
 	u8 parse_error;
 };
@@ -1983,6 +2004,7 @@ bool ieee80211_is_our_addr(struct ieee80211_sub_if_data *sdata,
 /* AP code */
 void ieee80211_ap_rx_queued_frame(struct ieee80211_sub_if_data *sdata,
 				  struct sk_buff *skb);
+void ieee80211_uhr_disable_dbe_all_stas(struct ieee80211_link_data *link);
 
 /* STA code */
 void ieee80211_sta_setup_sdata(struct ieee80211_sub_if_data *sdata);
@@ -2781,6 +2803,7 @@ ieee80211_chanreq_downgrade(struct ieee80211_chan_req *chanreq,
 		return;
 	if (conn->mode < IEEE80211_CONN_MODE_EHT)
 		chanreq->ap.chan = NULL;
+	conn->dbe_enabled = false;
 }
 
 bool ieee80211_chanreq_identical(const struct ieee80211_chan_req *a,
@@ -2971,7 +2994,8 @@ void ieee80211_rearrange_tpe_psd(struct ieee80211_parsed_tpe_psd *psd,
 struct ieee802_11_elems *
 ieee80211_determine_chan_mode(struct ieee80211_sub_if_data *sdata,
 			      struct ieee80211_conn_settings *conn,
-			      struct cfg80211_bss *cbss, int link_id,
+			      struct cfg80211_bss *cbss,
+			      struct link_sta_info *link_sta, int link_id,
 			      struct ieee80211_chan_req *chanreq,
 			      struct cfg80211_chan_def *ap_chandef,
 			      unsigned long *userspace_selectors);

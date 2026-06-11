@@ -466,8 +466,8 @@ enum iwl_legacy_cmds {
 	MCC_CHUB_UPDATE_CMD = 0xc9,
 
 	/**
-	 * @MARKER_CMD: trace marker command, uses &struct iwl_mvm_marker
-	 * with &struct iwl_mvm_marker_rsp
+	 * @MARKER_CMD: trace marker command, uses &struct iwl_marker
+	 * with &struct iwl_marker_rsp
 	 */
 	MARKER_CMD = 0xcb,
 
