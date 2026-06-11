@@ -103,7 +103,7 @@ static int iwl_dump_ini_prph_mac_iter_common(struct iwl_fw_runtime *fwrt,
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = size;
 	for (i = 0; i < le32_to_cpu(size); i += 4)
-		*val++ = cpu_to_le32(iwl_read_prph(fwrt->trans, addr + i));
+		*val++ = cpu_to_le32(iwl_trans_read_prph(fwrt->trans, addr + i));
 
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
@@ -158,9 +158,6 @@ static int iwl_dump_ini_prph_phy_iter_common(struct iwl_fw_runtime *fwrt,
 	indirect_wr_addr += le32_to_cpu(offset);
 	indirect_rd_addr += le32_to_cpu(offset);
 
-	if (!iwl_trans_grab_nic_access(fwrt->trans))
-		return -EBUSY;
-
 	dphy_addr = (offset) ? WFPM_LMAC2_PS_CTL_RW : WFPM_LMAC1_PS_CTL_RW;
 	dphy_state = iwl_read_umac_prph_no_grab(fwrt->trans, dphy_addr);
 
@@ -194,7 +191,6 @@ static int iwl_dump_ini_prph_phy_iter_common(struct iwl_fw_runtime *fwrt,
 		*val++ = cpu_to_le32(prph_val);
 	}
 
-	iwl_trans_release_nic_access(fwrt->trans);
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -283,8 +279,8 @@ static int iwl_dump_ini_dev_mem_iter(struct iwl_fw_runtime *fwrt,
 
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = reg->dev_addr.size;
-	iwl_trans_read_mem_bytes(fwrt->trans, addr, range->data,
-				 le32_to_cpu(reg->dev_addr.size));
+	iwl_trans_read_mem_bytes_no_grab(fwrt->trans, addr, range->data,
+					 le32_to_cpu(reg->dev_addr.size));
 
 	if (reg->sub_type == IWL_FW_INI_REGION_DEVICE_MEMORY_SUBTYPE_HW_SMEM &&
 	    fwrt->sanitize_ops && fwrt->sanitize_ops->frob_txf)
@@ -368,8 +364,8 @@ static int iwl_dump_ini_mon_smem_iter(struct iwl_fw_runtime *fwrt,
 
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = reg->internal_buffer.size;
-	iwl_trans_read_mem_bytes(fwrt->trans, addr, range->data,
-				 le32_to_cpu(reg->internal_buffer.size));
+	iwl_trans_read_mem_bytes_no_grab(fwrt->trans, addr, range->data,
+					 le32_to_cpu(reg->internal_buffer.size));
 
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
@@ -443,9 +439,6 @@ static int iwl_dump_ini_txf_iter(struct iwl_fw_runtime *fwrt,
 	if (!iwl_ini_txf_iter(fwrt, reg_data, idx))
 		return -EIO;
 
-	if (!iwl_trans_grab_nic_access(fwrt->trans))
-		return -EBUSY;
-
 	range->fifo_hdr.fifo_num = cpu_to_le32(iter->fifo);
 	range->fifo_hdr.num_of_registers = cpu_to_le32(registers_num);
 	range->range_data_size = cpu_to_le32(iter->fifo_size + registers_size);
@@ -489,8 +482,6 @@ static int iwl_dump_ini_txf_iter(struct iwl_fw_runtime *fwrt,
 					     reg_dump, iter->fifo_size);
 
 out:
-	iwl_trans_release_nic_access(fwrt->trans);
-
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -510,9 +501,6 @@ iwl_dump_ini_prph_snps_dphyip_iter(struct iwl_fw_runtime *fwrt,
 
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = reg->dev_addr.size;
-
-	if (!iwl_trans_grab_nic_access(fwrt->trans))
-		return -EBUSY;
 
 	indirect_rd_wr_addr += le32_to_cpu(offset);
 
@@ -537,7 +525,6 @@ iwl_dump_ini_prph_snps_dphyip_iter(struct iwl_fw_runtime *fwrt,
 				     DPHYIP_INDIRECT_RD_SHIFT);
 	}
 
-	iwl_trans_release_nic_access(fwrt->trans);
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -626,9 +613,6 @@ static int iwl_dump_ini_rxf_iter(struct iwl_fw_runtime *fwrt,
 	if (!rxf_data.size)
 		return -EIO;
 
-	if (!iwl_trans_grab_nic_access(fwrt->trans))
-		return -EBUSY;
-
 	range->fifo_hdr.fifo_num = cpu_to_le32(rxf_data.fifo_num);
 	range->fifo_hdr.num_of_registers = cpu_to_le32(registers_num);
 	range->range_data_size = cpu_to_le32(rxf_data.size + registers_size);
@@ -668,8 +652,6 @@ static int iwl_dump_ini_rxf_iter(struct iwl_fw_runtime *fwrt,
 		*data++ = cpu_to_le32(iwl_trans_read_prph(fwrt->trans, addr));
 
 out:
-	iwl_trans_release_nic_access(fwrt->trans);
-
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -686,8 +668,8 @@ iwl_dump_ini_err_table_iter(struct iwl_fw_runtime *fwrt,
 
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = err_table->size;
-	iwl_trans_read_mem_bytes(fwrt->trans, addr, range->data,
-				 le32_to_cpu(err_table->size));
+	iwl_trans_read_mem_bytes_no_grab(fwrt->trans, addr, range->data,
+					 le32_to_cpu(err_table->size));
 
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
@@ -707,8 +689,8 @@ iwl_dump_ini_special_mem_iter(struct iwl_fw_runtime *fwrt,
 
 	range->internal_base_addr = cpu_to_le32(addr);
 	range->range_data_size = special_mem->size;
-	iwl_trans_read_mem_bytes(fwrt->trans, addr, range->data,
-				 le32_to_cpu(special_mem->size));
+	iwl_trans_read_mem_bytes_no_grab(fwrt->trans, addr, range->data,
+					 le32_to_cpu(special_mem->size));
 
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
@@ -724,9 +706,6 @@ iwl_dump_ini_dbgi_sram_iter(struct iwl_fw_runtime *fwrt,
 	u32 prph_data;
 	int i;
 
-	if (!iwl_trans_grab_nic_access(fwrt->trans))
-		return -EBUSY;
-
 	range->range_data_size = reg->dev_addr.size;
 	for (i = 0; i < (le32_to_cpu(reg->dev_addr.size) / 4); i++) {
 		prph_data =
@@ -734,13 +713,11 @@ iwl_dump_ini_dbgi_sram_iter(struct iwl_fw_runtime *fwrt,
 					    (i % 2) ?
 						DBGI_SRAM_TARGET_ACCESS_RDATA_MSB :
 						DBGI_SRAM_TARGET_ACCESS_RDATA_LSB);
-		if (iwl_trans_is_hw_error_value(prph_data)) {
-			iwl_trans_release_nic_access(fwrt->trans);
+		if (iwl_trans_is_hw_error_value(prph_data))
 			return -EBUSY;
-		}
 		*val++ = cpu_to_le32(prph_data);
 	}
-	iwl_trans_release_nic_access(fwrt->trans);
+
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -787,8 +764,8 @@ static int iwl_dump_ini_imr_iter(struct iwl_fw_runtime *fwrt,
 	fwrt->trans->dbg.imr_data.imr_curr_addr = imr_curr_addr + size_to_dump;
 	fwrt->trans->dbg.imr_data.imr2sram_remainbyte -= size_to_dump;
 
-	iwl_trans_read_mem_bytes(fwrt->trans, sram_addr, range->data,
-				 size_to_dump);
+	iwl_trans_read_mem_bytes_no_grab(fwrt->trans, sram_addr, range->data,
+					 size_to_dump);
 	return sizeof(*range) + le32_to_cpu(range->range_data_size);
 }
 
@@ -842,11 +819,6 @@ iwl_dump_ini_mon_fill_header(struct iwl_fw_runtime *fwrt, u32 alloc_id,
 			     struct iwl_fw_ini_monitor_dump *data,
 			     const struct iwl_fw_mon_regs *addrs)
 {
-	if (!iwl_trans_grab_nic_access(fwrt->trans)) {
-		IWL_ERR(fwrt, "Failed to get monitor header\n");
-		return NULL;
-	}
-
 	data->write_ptr = iwl_get_mon_reg(fwrt, alloc_id,
 					  &addrs->write_ptr);
 	if (fwrt->trans->mac_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
@@ -858,8 +830,6 @@ iwl_dump_ini_mon_fill_header(struct iwl_fw_runtime *fwrt, u32 alloc_id,
 					  &addrs->cycle_cnt);
 	data->cur_frag = iwl_get_mon_reg(fwrt, alloc_id,
 					 &addrs->cur_frag);
-
-	iwl_trans_release_nic_access(fwrt->trans);
 
 	data->header.version = cpu_to_le32(IWL_INI_DUMP_VER);
 
@@ -1266,6 +1236,7 @@ iwl_dump_ini_imr_get_size(struct iwl_fw_runtime *fwrt,
  *	the first range or NULL if failed to fill headers.
  * @fill_range: copies a given memory range into the dump.
  *	Returns the size of the range or negative error value otherwise.
+ * @requires_nic_access: indicates to dump only if NIC access was acquired
  */
 struct iwl_dump_ini_mem_ops {
 	u32 (*get_num_of_ranges)(struct iwl_fw_runtime *fwrt,
@@ -1278,6 +1249,7 @@ struct iwl_dump_ini_mem_ops {
 	int (*fill_range)(struct iwl_fw_runtime *fwrt,
 			  struct iwl_dump_ini_region_data *reg_data,
 			  void *range, int idx);
+	bool requires_nic_access;
 };
 
 struct iwl_fw_ini_dump_entry {
@@ -1374,7 +1346,8 @@ static void iwl_dump_ini_mem_prep(struct iwl_fw_runtime *fwrt,
 }
 
 static u32 iwl_dump_ini_mem(struct iwl_fw_runtime *fwrt,
-			    struct iwl_fw_ini_dump_entry *entry)
+			    struct iwl_fw_ini_dump_entry *entry,
+			    bool have_nic_access)
 {
 	struct iwl_dump_ini_region_data *reg_data = &entry->reg_data;
 	struct iwl_fw_ini_region_tlv *reg = (void *)reg_data->reg_tlv->data;
@@ -1387,6 +1360,9 @@ static u32 iwl_dump_ini_mem(struct iwl_fw_runtime *fwrt,
 	u8 *range;
 	u32 free_size;
 	u64 header_size;
+
+	if (!have_nic_access && ops->requires_nic_access)
+		goto out_err;
 
 	tlv = (void *)entry->data;
 	header = (void *)tlv->data;
@@ -1541,36 +1517,42 @@ static const struct iwl_dump_ini_mem_ops iwl_dump_ini_region_ops[] = {
 		.get_size = iwl_dump_ini_mon_smem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mon_smem_fill_header,
 		.fill_range = iwl_dump_ini_mon_smem_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_DRAM_BUFFER] = {
 		.get_num_of_ranges = iwl_dump_ini_mon_dram_ranges,
 		.get_size = iwl_dump_ini_mon_dram_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mon_dram_fill_header,
 		.fill_range = iwl_dump_ini_mon_dram_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_TXF] = {
 		.get_num_of_ranges = iwl_dump_ini_txf_ranges,
 		.get_size = iwl_dump_ini_txf_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_txf_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_RXF] = {
 		.get_num_of_ranges = iwl_dump_ini_single_range,
 		.get_size = iwl_dump_ini_rxf_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_rxf_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_LMAC_ERROR_TABLE] = {
 		.get_num_of_ranges = iwl_dump_ini_single_range,
 		.get_size = iwl_dump_ini_err_table_get_size,
 		.fill_mem_hdr = iwl_dump_ini_err_table_fill_header,
 		.fill_range = iwl_dump_ini_err_table_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_UMAC_ERROR_TABLE] = {
 		.get_num_of_ranges = iwl_dump_ini_single_range,
 		.get_size = iwl_dump_ini_err_table_get_size,
 		.fill_mem_hdr = iwl_dump_ini_err_table_fill_header,
 		.fill_range = iwl_dump_ini_err_table_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_RSP_OR_NOTIF] = {
 		.get_num_of_ranges = iwl_dump_ini_single_range,
@@ -1583,30 +1565,35 @@ static const struct iwl_dump_ini_mem_ops iwl_dump_ini_region_ops[] = {
 		.get_size = iwl_dump_ini_mem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_dev_mem_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_MAC] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_ranges,
 		.get_size = iwl_dump_ini_mem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_prph_mac_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_PHY] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_ranges,
 		.get_size = iwl_dump_ini_mem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_prph_phy_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_MAC_RANGE] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_block_ranges,
 		.get_size = iwl_dump_ini_mem_block_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_prph_mac_block_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_PHY_RANGE] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_block_ranges,
 		.get_size = iwl_dump_ini_mem_block_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_prph_phy_block_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_AUX] = {},
 	[IWL_FW_INI_REGION_PAGING] = {
@@ -1626,6 +1613,7 @@ static const struct iwl_dump_ini_mem_ops iwl_dump_ini_region_ops[] = {
 		.get_size = iwl_dump_ini_imr_get_size,
 		.fill_mem_hdr = iwl_dump_ini_imr_fill_header,
 		.fill_range = iwl_dump_ini_imr_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PCI_IOSF_CONFIG] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_ranges,
@@ -1638,18 +1626,21 @@ static const struct iwl_dump_ini_mem_ops iwl_dump_ini_region_ops[] = {
 		.get_size = iwl_dump_ini_special_mem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_special_mem_fill_header,
 		.fill_range = iwl_dump_ini_special_mem_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_DBGI_SRAM] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_ranges,
 		.get_size = iwl_dump_ini_mon_dbgi_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mon_dbgi_fill_header,
 		.fill_range = iwl_dump_ini_dbgi_sram_iter,
+		.requires_nic_access = true,
 	},
 	[IWL_FW_INI_REGION_PERIPHERY_SNPS_DPHYIP] = {
 		.get_num_of_ranges = iwl_dump_ini_mem_ranges,
 		.get_size = iwl_dump_ini_mem_get_size,
 		.fill_mem_hdr = iwl_dump_ini_mem_fill_header,
 		.fill_range = iwl_dump_ini_prph_snps_dphyip_iter,
+		.requires_nic_access = true,
 	},
 };
 
@@ -1733,7 +1724,10 @@ iwl_dump_ini_dump_entries(struct iwl_fw_runtime *fwrt,
 			  enum iwl_dump_ini_region_selector which)
 {
 	struct iwl_fw_ini_dump_entry *entry, *tmp;
+	bool have_nic_access;
 	u32 size = 0;
+
+	have_nic_access = iwl_trans_grab_nic_access(fwrt->trans);
 
 	list_for_each_entry_safe(entry, tmp, list, list) {
 		u32 dp = entry->region_dump_policy;
@@ -1751,8 +1745,14 @@ iwl_dump_ini_dump_entries(struct iwl_fw_runtime *fwrt,
 			break;
 		}
 
-		size += iwl_dump_ini_mem(fwrt, entry);
+		size += iwl_dump_ini_mem(fwrt, entry, have_nic_access);
+
+		if (have_nic_access)
+			iwl_trans_resched_with_nic_access(fwrt->trans);
 	}
+
+	if (have_nic_access)
+		iwl_trans_release_nic_access(fwrt->trans);
 
 	return size;
 }
@@ -2383,8 +2383,8 @@ static int iwl_fw_dbg_restart_recording(struct iwl_trans *trans,
 
 int iwl_fw_send_timestamp_marker_cmd(struct iwl_fw_runtime *fwrt)
 {
-	struct iwl_mvm_marker marker = {
-		.dw_len = sizeof(struct iwl_mvm_marker) / 4,
+	struct iwl_marker marker = {
+		.dw_len = sizeof(struct iwl_marker) / 4,
 		.marker_id = MARKER_ID_SYNC_CLOCK,
 	};
 	struct iwl_host_cmd hcmd = {
@@ -2392,7 +2392,7 @@ int iwl_fw_send_timestamp_marker_cmd(struct iwl_fw_runtime *fwrt)
 		.id = WIDE_ID(LONG_GROUP, MARKER_CMD),
 		.dataflags = {},
 	};
-	struct iwl_mvm_marker_rsp *resp;
+	struct iwl_marker_rsp *resp;
 	int cmd_ver = iwl_fw_lookup_cmd_ver(fwrt->fw,
 					    WIDE_ID(LONG_GROUP, MARKER_CMD),
 					    IWL_FW_CMD_VER_UNKNOWN);
