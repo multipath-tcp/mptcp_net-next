@@ -693,8 +693,9 @@ static const struct ieee80211_sband_iftype_data iwl_iftype_cap[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
-			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
-				   IEEE80211_UHR_PHY_CAP_ELR_TX,
+			/* Note: asymmetry is fixed later */
+			.phy.cap = cpu_to_le32(IEEE80211_UHR_PHY_CAP_ELR_RX |
+					       IEEE80211_UHR_PHY_CAP_ELR_TX),
 			.mac.mac_cap = {
 				[0] = IEEE80211_UHR_MAC_CAP0_NPCA_SUPP |
 				      IEEE80211_UHR_MAC_CAP0_DPS_SUPP,
@@ -801,8 +802,9 @@ static const struct ieee80211_sband_iftype_data iwl_iftype_cap[] = {
 		},
 		.uhr_cap = {
 			.has_uhr = true,
-			.phy.cap = IEEE80211_UHR_PHY_CAP_ELR_RX |
-				   IEEE80211_UHR_PHY_CAP_ELR_TX,
+			/* Note: asymmetry is fixed later */
+			.phy.cap = cpu_to_le32(IEEE80211_UHR_PHY_CAP_ELR_RX |
+					       IEEE80211_UHR_PHY_CAP_ELR_TX),
 		},
 	},
 };
