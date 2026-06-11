@@ -3450,11 +3450,6 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 		if (nl80211_send_coalesce(msg, rdev))
 			goto nla_put_failure;
 
-		if ((rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_5_10_MHZ) &&
-		    (nla_put_flag(msg, NL80211_ATTR_SUPPORT_5_MHZ) ||
-		     nla_put_flag(msg, NL80211_ATTR_SUPPORT_10_MHZ)))
-			goto nla_put_failure;
-
 		if (rdev->wiphy.max_ap_assoc_sta &&
 		    nla_put_u32(msg, NL80211_ATTR_MAX_AP_ASSOC_STA,
 				rdev->wiphy.max_ap_assoc_sta))
@@ -4085,10 +4080,9 @@ static int _nl80211_parse_chandef(struct cfg80211_registered_device *rdev,
 		return -EINVAL;
 	}
 
-	if ((chandef->width == NL80211_CHAN_WIDTH_5 ||
-	     chandef->width == NL80211_CHAN_WIDTH_10) &&
-	    !(rdev->wiphy.flags & WIPHY_FLAG_SUPPORTS_5_10_MHZ)) {
-		NL_SET_ERR_MSG(extack, "5/10 MHz not supported");
+	if (chandef->width == NL80211_CHAN_WIDTH_5 ||
+	    chandef->width == NL80211_CHAN_WIDTH_10) {
+		NL_SET_ERR_MSG(extack, "5/10 MHz not supported any more");
 		return -EINVAL;
 	}
 
@@ -13419,8 +13413,6 @@ static int nl80211_join_ibss(struct sk_buff *skb, struct genl_info *info)
 		return -EINVAL;
 
 	switch (ibss.chandef.width) {
-	case NL80211_CHAN_WIDTH_5:
-	case NL80211_CHAN_WIDTH_10:
 	case NL80211_CHAN_WIDTH_20_NOHT:
 		break;
 	case NL80211_CHAN_WIDTH_20:
@@ -21372,7 +21364,7 @@ void nl80211_send_ibss_bssid(struct cfg80211_registered_device *rdev,
 }
 
 void cfg80211_notify_new_peer_candidate(struct net_device *dev, const u8 *addr,
-					const u8 *ie, u8 ie_len,
+					const u8 *ie, size_t ie_len,
 					int sig_dbm, gfp_t gfp)
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
