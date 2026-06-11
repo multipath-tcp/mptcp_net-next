@@ -18,14 +18,16 @@ def test_so_txtime(cfg, clockid, ipver, args_tx, args_rx, expect_success):
     """Main function. Run so_txtime as sender and receiver."""
     slow_machine = os.environ.get('KSFT_MACHINE_SLOW')
 
-    bin_path = cfg.test_dir / "so_txtime"
+    if not hasattr(cfg, "bin_remote"):
+        cfg.bin_local = cfg.test_dir / "so_txtime"
+        cfg.bin_remote = cfg.remote.deploy(cfg.bin_local)
 
     tstart = time.time_ns() + (2000_000_000 if slow_machine else 200_000_000)
 
     cmd_addr = f"-S {cfg.addr_v[ipver]} -D {cfg.remote_addr_v[ipver]}"
-    cmd_base = f"{bin_path} -{ipver} -c {clockid} -t {tstart} {cmd_addr}"
-    cmd_rx = f"{cmd_base} {args_rx} -r"
-    cmd_tx = f"{cmd_base} {args_tx}"
+    cmd_args = f"-{ipver} -c {clockid} -t {tstart} {cmd_addr}"
+    cmd_rx = f"{cfg.bin_remote} {cmd_args} {args_rx} -r"
+    cmd_tx = f"{cfg.bin_local} {cmd_args} {args_tx}"
 
     expect_fail = not expect_success
     if slow_machine:
@@ -62,6 +64,7 @@ def _test_variants_fq():
 @ksft_variants(_test_variants_fq())
 def test_so_txtime_fq_mono(cfg, ipver, args_tx, args_rx):
     """Run all variants of monotonic (fq) tests."""
+    cfg.require_ipver(ipver)
     _qdisc_setup(cfg.ifname, "fq")
     test_so_txtime(cfg, "mono", ipver, args_tx, args_rx, True)
 
@@ -69,6 +72,7 @@ def test_so_txtime_fq_mono(cfg, ipver, args_tx, args_rx):
 @ksft_variants(_test_variants_fq())
 def test_so_txtime_fq_tai(cfg, ipver, args_tx, args_rx):
     """Run all variants of fq tests, but pass CLOCK_TAI to test conversion."""
+    cfg.require_ipver(ipver)
     _qdisc_setup(cfg.ifname, "fq")
     test_so_txtime(cfg, "tai", ipver, args_tx, args_rx, True)
 
@@ -91,6 +95,7 @@ def _test_variants_etf():
 @ksft_variants(_test_variants_etf())
 def test_so_txtime_etf(cfg, ipver, args_tx, args_rx, expect_fail):
     """Run all variants of etf tests."""
+    cfg.require_ipver(ipver)
     try:
         _qdisc_setup(cfg.ifname, "etf", "clockid CLOCK_TAI delta 400000")
     except Exception as e:

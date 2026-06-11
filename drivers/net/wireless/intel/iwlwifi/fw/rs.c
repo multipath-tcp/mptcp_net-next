@@ -8,27 +8,6 @@
 #include "iwl-drv.h"
 #include "iwl-config.h"
 
-#define IWL_DECLARE_RATE_INFO(r) \
-	[IWL_RATE_##r##M_INDEX] = IWL_RATE_##r##M_PLCP
-
-/*
- * Translate from fw_rate_index (IWL_RATE_XXM_INDEX) to PLCP
- * */
-static const u8 fw_rate_idx_to_plcp[IWL_RATE_COUNT] = {
-	IWL_DECLARE_RATE_INFO(1),
-	IWL_DECLARE_RATE_INFO(2),
-	IWL_DECLARE_RATE_INFO(5),
-	IWL_DECLARE_RATE_INFO(11),
-	IWL_DECLARE_RATE_INFO(6),
-	IWL_DECLARE_RATE_INFO(9),
-	IWL_DECLARE_RATE_INFO(12),
-	IWL_DECLARE_RATE_INFO(18),
-	IWL_DECLARE_RATE_INFO(24),
-	IWL_DECLARE_RATE_INFO(36),
-	IWL_DECLARE_RATE_INFO(48),
-	IWL_DECLARE_RATE_INFO(54),
-};
-
 /* mbps, mcs */
 static const struct iwl_rate_mcs_info rate_mcs[IWL_RATE_COUNT] = {
 	{  "1", "BPSK DSSS"},
@@ -60,12 +39,6 @@ static const char * const pretty_bw[] = {
 	"160 Mhz",
 	"320Mhz",
 };
-
-u8 iwl_fw_rate_idx_to_plcp(int idx)
-{
-	return fw_rate_idx_to_plcp[idx];
-}
-IWL_EXPORT_SYMBOL(iwl_fw_rate_idx_to_plcp);
 
 const struct iwl_rate_mcs_info *iwl_rate_mcs(int idx)
 {
