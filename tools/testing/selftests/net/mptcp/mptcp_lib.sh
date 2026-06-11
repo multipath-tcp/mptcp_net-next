@@ -32,6 +32,7 @@ MPTCP_LIB_SUBTESTS_LAST_TS_NS=
 MPTCP_LIB_TEST_COUNTER=0
 MPTCP_LIB_TEST_FORMAT="%02u %-50s"
 MPTCP_LIB_IP_MPTCP=0
+MPTCP_LIB_IPV6_AVAILABLE=1
 
 # only if supported (or forced) and not disabled, see no-color.org
 if { [ -t 1 ] || [ "${SELFTESTS_MPTCP_LIB_COLOR_FORCE:-}" = "1" ]; } &&
@@ -176,6 +177,32 @@ mptcp_lib_check_kallsyms() {
 		mptcp_lib_pr_skip "CONFIG_KALLSYMS is missing"
 		exit ${KSFT_SKIP}
 	fi
+}
+
+# Detect whether the MPTCP IPv6 subsystem is available in the running kernel.
+#
+# This is meant to be called once at script init time. It is non-fatal by
+# design: instead of exiting on a missing feature, it just sets the cached
+# MPTCP_LIB_IPV6_AVAILABLE flag and returns 0/1. Callers can then decide
+# whether to skip a single subtest, fall back to a v4-only mode, etc.
+#
+# The check looks for the "mptcpv6_init" symbol in /proc/kallsyms, which is
+# only present when both CONFIG_IPV6=y and CONFIG_MPTCP_IPV6=y. This single
+# symbol gives the most accurate runtime answer.
+mptcp_lib_check_ipv6() {
+	if ! mptcp_lib_has_file "/proc/kallsyms"; then
+		MPTCP_LIB_IPV6_AVAILABLE=0
+		return 1
+	fi
+
+	if ! grep -q " mptcpv6_init$" /proc/kallsyms; then
+		MPTCP_LIB_IPV6_AVAILABLE=0
+		mptcp_lib_pr_skip "MPTCP IPv6 support is not available"
+		return 1
+	fi
+
+	MPTCP_LIB_IPV6_AVAILABLE=1
+	return 0
 }
 
 # Internal: use mptcp_lib_kallsyms_has() instead
@@ -396,6 +423,12 @@ mptcp_lib_kill_group_wait() {
 # $1: IP address
 mptcp_lib_is_v6() {
 	[ -z "${1##*:*}" ]
+}
+
+# Returns 0 (true) if the kernel has MPTCP IPv6 support, 1 (false) otherwise.
+# Cached after the first call to mptcp_lib_check_ipv6().
+mptcp_lib_is_v6_enabled() {
+	[ "${MPTCP_LIB_IPV6_AVAILABLE}" = "1" ]
 }
 
 mptcp_lib_nstat_init() {
