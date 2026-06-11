@@ -161,6 +161,10 @@ struct iwl_device_tx_cmd {
 
 #define TFD_MAX_PAYLOAD_SIZE (sizeof(struct iwl_device_cmd))
 
+/* Maximum payload size for a non-NOCOPY host command (excluding the header) */
+#define IWL_MAX_CMD_PAYLOAD_SIZE \
+	(TFD_MAX_PAYLOAD_SIZE - sizeof(struct iwl_cmd_header_wide))
+
 /*
  * number of transfer buffers (fragments) per transmit frame descriptor;
  * this is just the driver's idea, the hardware supports 20
@@ -980,6 +984,17 @@ void iwl_trans_set_bits_mask(struct iwl_trans *trans, u32 reg,
 			     u32 mask, u32 value);
 
 bool iwl_trans_grab_nic_access(struct iwl_trans *trans);
+
+/**
+ * iwl_trans_resched_with_nic_access - reschedule while holding NIC access
+ * @trans: the transport pointer
+ *
+ * This can be called while holding NIC access, during periods where
+ * the lock itself isn't interesting, the NIC should remain active,
+ * but a lot of processing is happening and the CPU may need to be
+ * released. In practice, this is only during FW dump.
+ */
+void iwl_trans_resched_with_nic_access(struct iwl_trans *trans);
 
 void __releases(nic_access)
 iwl_trans_release_nic_access(struct iwl_trans *trans);
