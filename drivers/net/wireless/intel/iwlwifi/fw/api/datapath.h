@@ -57,7 +57,7 @@ enum iwl_data_path_subcmd_ids {
 
 	/**
 	 * @TLC_MNG_CONFIG_CMD: &struct iwl_tlc_config_cmd_v4 or
-	 *	&struct iwl_tlc_config_cmd_v5 or &struct iwl_tlc_config_cmd.
+	 *	&struct iwl_tlc_config_cmd.
 	 */
 	TLC_MNG_CONFIG_CMD = 0xF,
 
