@@ -54,6 +54,7 @@ struct iwl_ucode_capabilities {
 	u32 num_links;
 	u32 num_beacons;
 	u32 num_mcast_key_entries;
+	u16 nan_max_chan_switch_time;
 	DECLARE_BITMAP(_api, NUM_IWL_UCODE_TLV_API);
 	DECLARE_BITMAP(_capa, NUM_IWL_UCODE_TLV_CAPA);
 
