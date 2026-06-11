@@ -8,6 +8,7 @@
 
 #include "driver-ops.h"
 #include "ieee80211_i.h"
+#include "rate.h"
 
 static void
 ieee80211_send_eml_op_mode_notif(struct ieee80211_sub_if_data *sdata,
@@ -186,6 +187,113 @@ ieee80211_rx_eml_op_mode_notif(struct ieee80211_sub_if_data *sdata,
 	ieee80211_send_eml_op_mode_notif(sdata, mgmt, opt_len);
 }
 
+static void
+ieee80211_rx_uhr_link_reconfig_req(struct ieee80211_sub_if_data *sdata,
+				   struct sk_buff *skb)
+{
+	struct ieee80211_mgmt *mgmt = (void *)skb->data;
+	const struct element *sub;
+	struct sta_info *sta;
+
+	/*
+	 * rx.c only accepts IEEE80211_UHR_LINK_RECONFIG_REQUEST_OMP_REQUEST
+	 * which is valid, so no need to check the frame type/format/etc.
+	 */
+
+	sta = sta_info_get_bss(sdata, mgmt->sa);
+	if (!sta)
+		return;
+
+	struct ieee802_11_elems *elems __free(kfree) =
+		ieee802_11_parse_elems(mgmt->u.action.uhr_link_reconf_req.variable,
+				       skb->len - IEEE80211_MIN_ACTION_SIZE(uhr_link_reconf_req),
+				       IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_ACTION,
+				       NULL);
+	/* STA will assume we processed it, not good */
+	if (!elems)
+		return;
+
+	if (!elems->ml_reconf)
+		return;
+
+	for_each_mle_subelement(sub, (u8 *)elems->ml_reconf,
+				elems->ml_reconf_len) {
+		const struct ieee80211_mle_per_sta_profile *prof =
+			 (const void *)sub->data;
+		struct ieee80211_chanctx_conf *chanctx_conf;
+		struct ieee80211_chanctx *chanctx;
+		struct ieee80211_link_data *link;
+		struct link_sta_info *link_sta;
+		const struct element *chg;
+		u16 control;
+		u8 link_id;
+
+		if (sub->id != IEEE80211_MLE_SUBELEM_PER_STA_PROFILE)
+			continue;
+
+		if (!ieee80211_mle_reconf_sta_prof_size_ok(sub->data,
+							   sub->datalen))
+			return;
+
+		control = le16_to_cpu(prof->control);
+		link_id = control & IEEE80211_MLE_STA_RECONF_CONTROL_LINK_ID;
+
+		if (link_id >= IEEE80211_MLD_MAX_NUM_LINKS)
+			return;
+
+		link = sdata_dereference(sdata->link[link_id], sdata);
+		if (!link)
+			continue;
+
+		chanctx_conf = sdata_dereference(link->conf->chanctx_conf,
+						 sdata);
+		if (!chanctx_conf)
+			continue;
+		chanctx = container_of(chanctx_conf, struct ieee80211_chanctx,
+				       conf);
+
+		link_sta = sdata_dereference(sta->link[link_id], sdata);
+		if (!link_sta)
+			continue;
+
+		/* do we need to handle any other bits? */
+		if (control & ~(IEEE80211_MLE_STA_RECONF_CONTROL_LINK_ID |
+				IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE))
+			continue;
+
+		if (u16_get_bits(control, IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE) !=
+				IEEE80211_MLE_STA_RECONF_CONTROL_OPERATION_TYPE_UHR_OMP_UPD)
+			continue;
+
+		for_each_element_extid(chg, WLAN_EID_EXT_UHR_MODE_CHG,
+				       prof->variable + prof->sta_info_len - 1,
+				       sub->datalen - sizeof(*prof) -
+				       prof->sta_info_len + 1) {
+			const struct ieee80211_uhr_mode_change_tuple *tuple;
+
+			for_each_uhr_mode_change_tuple(chg->data + 1,
+						       chg->datalen - 1,
+						       tuple) {
+				u8 id = le16_get_bits(tuple->control,
+						      IEEE80211_UHR_MODE_CHANGE_CONTROL_MODE_ID);
+				bool enabled = le16_get_bits(tuple->control,
+							     IEEE80211_UHR_MODE_CHANGE_CONTROL_MODE_ENABLE);
+
+				/* only handle DBE (for now?) */
+				if (id != IEEE80211_UHR_MODE_CHANGE_MODE_ID_DBE)
+					continue;
+
+				link_sta->uhr_dbe_enabled = enabled;
+				/* also recalculates and updates per-STA bw */
+				ieee80211_recalc_chanctx_min_def(sdata->local,
+								 chanctx);
+			}
+		}
+	}
+
+	/* TODO: send a response */
+}
+
 void ieee80211_ap_rx_queued_frame(struct ieee80211_sub_if_data *sdata,
 				  struct sk_buff *skb)
 {
@@ -203,5 +311,43 @@ void ieee80211_ap_rx_queued_frame(struct ieee80211_sub_if_data *sdata,
 			break;
 		}
 		break;
+	case WLAN_CATEGORY_PROTECTED_UHR:
+		switch (mgmt->u.action.action_code) {
+		case IEEE80211_PROTECTED_UHR_ACTION_LINK_RECONFIG_REQUEST:
+			ieee80211_rx_uhr_link_reconfig_req(sdata, skb);
+			break;
+		}
+		break;
 	}
+}
+
+void ieee80211_uhr_disable_dbe_all_stas(struct ieee80211_link_data *link)
+{
+	struct ieee80211_sub_if_data *sdata = link->sdata;
+	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_chanctx_conf *chanctx_conf;
+	struct ieee80211_chanctx *chanctx;
+	int link_id = link->link_id;
+	struct sta_info *sta;
+
+	chanctx_conf = sdata_dereference(link->conf->chanctx_conf, sdata);
+	if (!chanctx_conf)
+		return;
+	chanctx = container_of(chanctx_conf, struct ieee80211_chanctx, conf);
+
+	list_for_each_entry(sta, &local->sta_list, list) {
+		struct link_sta_info *link_sta;
+
+		if (sta->sdata->bss != sdata->bss)
+			continue;
+
+		link_sta = sdata_dereference(sta->link[link_id], sdata);
+		if (!link_sta)
+			continue;
+
+		link_sta->uhr_dbe_enabled = false;
+	}
+
+	/* also recalculates and updates per-STA bw */
+	ieee80211_recalc_chanctx_min_def(local, chanctx);
 }
