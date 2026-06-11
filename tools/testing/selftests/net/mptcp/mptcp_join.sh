@@ -1004,7 +1004,14 @@ do_transfer()
 	local FAILING_LINKS=${FAILING_LINKS:-""}
 	local fastclose=${fastclose:-""}
 	local speed=${speed:-"fast"}
-	local bind_addr=${bind_addr:-"::"}
+	local bind_addr=${bind_addr:-}
+	if [ -z "${bind_addr}" ]; then
+		if mptcp_lib_is_v6_enabled; then
+			bind_addr="::"
+		else
+			bind_addr="0.0.0.0"
+		fi
+	fi
 	local listener_in="${sin}"
 	local connector_in="${cin}"
 	port=$(get_port)
