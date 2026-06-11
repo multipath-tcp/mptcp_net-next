@@ -917,9 +917,7 @@ int wiphy_register(struct wiphy *wiphy)
 				  BIT(NL80211_CHAN_WIDTH_80) |
 				  BIT(NL80211_CHAN_WIDTH_80P80) |
 				  BIT(NL80211_CHAN_WIDTH_160) |
-				  BIT(NL80211_CHAN_WIDTH_320) |
-				  BIT(NL80211_CHAN_WIDTH_5) |
-				  BIT(NL80211_CHAN_WIDTH_10))))
+				  BIT(NL80211_CHAN_WIDTH_320))))
 			return -EINVAL;
 	}
 
