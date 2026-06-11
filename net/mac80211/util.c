@@ -3816,13 +3816,6 @@ again:
 		conn->mode = IEEE80211_CONN_MODE_S1G;
 		conn->bw_limit = IEEE80211_CONN_BW_LIMIT_20;
 		break;
-	case NL80211_CHAN_WIDTH_5:
-	case NL80211_CHAN_WIDTH_10:
-		WARN_ON_ONCE(1);
-		/* keep c->width */
-		conn->mode = IEEE80211_CONN_MODE_LEGACY;
-		conn->bw_limit = IEEE80211_CONN_BW_LIMIT_20;
-		break;
 	}
 
 	if (new_primary_width != NL80211_CHAN_WIDTH_20_NOHT) {
