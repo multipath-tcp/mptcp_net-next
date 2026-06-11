@@ -1337,6 +1337,12 @@ static int iwl_parse_tlv_firmware(struct iwl_drv *drv,
 			capa->num_mcast_key_entries =
 				le32_to_cpup((const __le32 *)tlv_data);
 			break;
+		case IWL_UCODE_TLV_FW_NAN_MAX_CHAN_SWITCH_TIME:
+			if (tlv_len != sizeof(u32))
+				goto invalid_tlv_len;
+			capa->nan_max_chan_switch_time =
+				le32_to_cpup((const __le32 *)tlv_data);
+			break;
 		case IWL_UCODE_TLV_UMAC_DEBUG_ADDRS: {
 			const struct iwl_umac_debug_addrs *dbg_ptrs =
 				(const void *)tlv_data;
