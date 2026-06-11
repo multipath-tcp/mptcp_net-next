@@ -25,7 +25,8 @@ bool iwl_mld_nan_supported(struct iwl_mld *mld)
 	    iwl_fw_lookup_cmd_ver(fw, WIDE_ID(MAC_CONF_GROUP, NAN_PEER_CMD), 0) >= 1 &&
 	    iwl_fw_lookup_cmd_ver(fw, WIDE_ID(MAC_CONF_GROUP, STA_CONFIG_CMD), 0) >= 3 &&
 	    iwl_fw_lookup_cmd_ver(fw, WIDE_ID(MAC_CONF_GROUP, MAC_CONFIG_CMD), 0) >= 4 &&
-	    iwl_fw_lookup_cmd_ver(fw, WIDE_ID(DATA_PATH_GROUP, TLC_MNG_CONFIG_CMD), 0) >= 6)
+	    iwl_fw_lookup_cmd_ver(fw, WIDE_ID(DATA_PATH_GROUP, TLC_MNG_CONFIG_CMD), 0) >= 6 &&
+		mld->nvm_data->nan_phy_capa.ht.ht_supported)
 		return true;
 	return false;
 }
