@@ -538,6 +538,12 @@ int iwl_mld_add_modify_sta_cmd(struct iwl_mld *mld,
 		break;
 	}
 
+	/* In NAN, there is no association request so no initial SMPS info */
+	if (mld_sta->vif->type == NL80211_IFTYPE_NAN_DATA) {
+		cmd.mimo = cpu_to_le32(1);
+		cmd.mimo_protection = cpu_to_le32(0);
+	}
+
 	iwl_mld_fill_ampdu_size_and_dens(link_sta, is_6ghz,
 					 &cmd.tx_ampdu_max_size,
 					 &cmd.tx_ampdu_spacing);
