@@ -247,7 +247,7 @@ out:
 	 * iov_iter_extract_will_pin() reports whether an unpin is owed here.
 	 */
 	if (pages && iov_iter_extract_will_pin(&opt->iter_out))
-		unpin_user_pages(pages, nr_pages);
+		unpin_user_pages_dirty_lock(pages, nr_pages, true);
 	kvfree(pages);
 
 	return ret;
