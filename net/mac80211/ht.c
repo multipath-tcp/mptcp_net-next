@@ -584,9 +584,10 @@ void ieee80211_ht_handle_chanwidth_notif(struct ieee80211_local *local,
 					 struct link_sta_info *link_sta,
 					 u8 chanwidth, enum nl80211_band band)
 {
-	enum ieee80211_sta_rx_bandwidth max_bw, new_bw;
-	struct ieee80211_supported_band *sband;
-	struct sta_opmode_info sta_opmode = {};
+	enum ieee80211_sta_rx_bandwidth max_bw;
+	struct sta_opmode_info sta_opmode = {
+		.changed = STA_OPMODE_MAX_BW_CHANGED,
+	};
 	struct ieee80211_link_data *link;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
@@ -602,21 +603,12 @@ void ieee80211_ht_handle_chanwidth_notif(struct ieee80211_local *local,
 
 	/* set op_mode_bw and recalc sta bw */
 	link_sta->op_mode_bw = max_bw;
-	new_bw = ieee80211_sta_current_bw(link_sta, &link->conf->chanreq.oper,
-					  IEEE80211_STA_BW_TX_TO_STA);
 
-	if (link_sta->pub->bandwidth == new_bw)
+	if (!ieee80211_link_sta_update_rc_bw(link, link_sta))
 		return;
 
-	link_sta->pub->bandwidth = new_bw;
-	sband = local->hw.wiphy->bands[band];
-	sta_opmode.bw = ieee80211_sta_rx_bw_to_chan_width(new_bw);
-	sta_opmode.changed = STA_OPMODE_MAX_BW_CHANGED;
+	sta_opmode.bw = ieee80211_sta_rx_bw_to_chan_width(link_sta->pub->bandwidth);
 
-	rate_control_rate_update(local, sband, link_sta,
-				 IEEE80211_RC_BW_CHANGED);
-	cfg80211_sta_opmode_change_notify(sdata->dev,
-					  sta->addr,
-					  &sta_opmode,
-					  GFP_KERNEL);
+	cfg80211_sta_opmode_change_notify(sdata->dev, sta->addr,
+					  &sta_opmode, GFP_KERNEL);
 }
