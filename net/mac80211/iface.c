@@ -648,6 +648,12 @@ static void ieee80211_do_stop(struct ieee80211_sub_if_data *sdata, bool going_do
 
 			spin_unlock_bh(&sdata->u.nan.de.func_lock);
 		}
+
+		/*
+		 * Free the remaining keys that might be associated with the
+		 * NAN interface, e.g., IGTK and BIGTK used for Tx.
+		 */
+		ieee80211_free_keys(sdata, true);
 		break;
 	case NL80211_IFTYPE_NAN_DATA:
 		RCU_INIT_POINTER(sdata->u.nan_data.nmi, NULL);
