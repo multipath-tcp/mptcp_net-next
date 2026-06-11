@@ -3,6 +3,8 @@
  * Copyright (C) 2024-2026 Intel Corporation
  */
 
+#include <kunit/static_stub.h>
+
 #include "constants.h"
 #include "link.h"
 #include "iface.h"
@@ -1024,13 +1026,16 @@ iwl_mld_get_avail_chan_load(struct iwl_mld *mld,
 	return MAX_CHAN_LOAD - iwl_mld_get_chan_load(mld, link_conf);
 }
 
-static s8
+VISIBLE_IF_IWLWIFI_KUNIT s8
 iwl_mld_get_dup_beacon_rssi_adjust(struct iwl_mld *mld,
 				   struct ieee80211_bss_conf *link_conf)
 {
 	const struct ieee80211_he_6ghz_oper *he_6ghz_oper;
 	const struct cfg80211_bss_ies *beacon_ies;
 	const struct element *elem;
+
+	KUNIT_STATIC_STUB_REDIRECT(iwl_mld_get_dup_beacon_rssi_adjust,
+				   mld, link_conf);
 
 	/* Duplicated beacon feature is only specific to 6 GHz */
 	if (WARN_ONCE(link_conf->chanreq.oper.chan->band != NL80211_BAND_6GHZ,
@@ -1077,6 +1082,7 @@ iwl_mld_get_dup_beacon_rssi_adjust(struct iwl_mld *mld,
 		return 0;
 	}
 }
+EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(iwl_mld_get_dup_beacon_rssi_adjust);
 
 static s8 iwl_mld_get_primary_psd(const struct ieee80211_parsed_tpe_psd *psd,
 				  const struct cfg80211_chan_def *chandef,
@@ -1097,7 +1103,8 @@ static s8 iwl_mld_get_primary_psd(const struct ieee80211_parsed_tpe_psd *psd,
 	return psd->power[primary_idx] / 2;
 }
 
-static s8 iwl_mld_get_psd_eirp_rssi_adjust(struct ieee80211_bss_conf *link_conf)
+VISIBLE_IF_IWLWIFI_KUNIT s8
+iwl_mld_get_psd_eirp_rssi_adjust(struct ieee80211_bss_conf *link_conf)
 {
 	const struct ieee80211_parsed_tpe *tpe = &link_conf->tpe;
 	s8 psd_20mhz, psd_oper, psd_local, psd_reg, psd_boost;
@@ -1106,6 +1113,9 @@ static s8 iwl_mld_get_psd_eirp_rssi_adjust(struct ieee80211_bss_conf *link_conf)
 	s8 eirp_20mhz, eirp_oper, eirp_local, eirp_reg;
 	int bw_mhz, num_subchans;
 	u8 bw_index;
+
+	KUNIT_STATIC_STUB_REDIRECT(iwl_mld_get_psd_eirp_rssi_adjust,
+				   link_conf);
 
 	/* PSD/EIRP adjustment is only specific to 6 GHz */
 	if (WARN_ONCE(link_conf->chanreq.oper.chan->band != NL80211_BAND_6GHZ,
@@ -1216,6 +1226,7 @@ static s8 iwl_mld_get_psd_eirp_rssi_adjust(struct ieee80211_bss_conf *link_conf)
 
 	return adjustment;
 }
+EXPORT_SYMBOL_IF_IWLWIFI_KUNIT(iwl_mld_get_psd_eirp_rssi_adjust);
 
 /* This function calculates the grade of a link. Returns 0 in error case */
 unsigned int iwl_mld_get_link_grade(struct iwl_mld *mld,
