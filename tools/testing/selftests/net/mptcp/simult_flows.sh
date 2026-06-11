@@ -48,6 +48,7 @@ cleanup()
 
 mptcp_lib_check_mptcp
 mptcp_lib_check_tools ip tc
+mptcp_lib_check_ipv6
 
 #  "$ns1"              ns2                    ns3
 #     ns1eth1    ns2eth1   ns2eth3      ns3eth1
@@ -81,39 +82,48 @@ setup()
 	ip link add ns2eth3 netns "$ns2" type veth peer name ns3eth1 netns "$ns3"
 
 	ip -net "$ns1" addr add 10.0.1.1/24 dev ns1eth1
-	ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth1 nodad
 	ip -net "$ns1" link set ns1eth1 up mtu 1500 gso_max_segs 0
 	ip -net "$ns1" route add default via 10.0.1.2
-	ip -net "$ns1" route add default via dead:beef:1::2
 
 	ip -net "$ns1" addr add 10.0.2.1/24 dev ns1eth2
-	ip -net "$ns1" addr add dead:beef:2::1/64 dev ns1eth2 nodad
 	ip -net "$ns1" link set ns1eth2 up mtu 1500 gso_max_segs 0
 	ip -net "$ns1" route add default via 10.0.2.2 metric 101
-	ip -net "$ns1" route add default via dead:beef:2::2 metric 101
 
 	mptcp_lib_pm_nl_set_limits "${ns1}" 1 1
 	mptcp_lib_pm_nl_add_endpoint "${ns1}" 10.0.2.1 dev ns1eth2 flags subflow
 
 	ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
-	ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
 	ip -net "$ns2" link set ns2eth1 up mtu 1500 gso_max_segs 0
 
 	ip -net "$ns2" addr add 10.0.2.2/24 dev ns2eth2
-	ip -net "$ns2" addr add dead:beef:2::2/64 dev ns2eth2 nodad
 	ip -net "$ns2" link set ns2eth2 up mtu 1500 gso_max_segs 0
 
 	ip -net "$ns2" addr add 10.0.3.2/24 dev ns2eth3
-	ip -net "$ns2" addr add dead:beef:3::2/64 dev ns2eth3 nodad
 	ip -net "$ns2" link set ns2eth3 up mtu 1500 gso_max_segs 0
 	ip netns exec "$ns2" sysctl -q net.ipv4.ip_forward=1
-	ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
 
 	ip -net "$ns3" addr add 10.0.3.3/24 dev ns3eth1
-	ip -net "$ns3" addr add dead:beef:3::3/64 dev ns3eth1 nodad
 	ip -net "$ns3" link set ns3eth1 up mtu 1500 gso_max_segs 0
 	ip -net "$ns3" route add default via 10.0.3.2
-	ip -net "$ns3" route add default via dead:beef:3::2
+
+	# IPv6 topology: only configured if MPTCP IPv6 is supported by the
+	# running kernel (CONFIG_MPTCP_IPV6=y). On a kernel without it,
+	# "ip -6 addr add", "ip -6 route add" and the v6 forwarding sysctl
+	# would fail and abort setup(), taking the v4 tests down with them.
+	if mptcp_lib_is_v6_enabled; then
+		ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth1 nodad
+		ip -net "$ns1" route add default via dead:beef:1::2
+		ip -net "$ns1" addr add dead:beef:2::1/64 dev ns1eth2 nodad
+		ip -net "$ns1" route add default via dead:beef:2::2 metric 101
+
+		ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
+		ip -net "$ns2" addr add dead:beef:2::2/64 dev ns2eth2 nodad
+		ip -net "$ns2" addr add dead:beef:3::2/64 dev ns2eth3 nodad
+		ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
+
+		ip -net "$ns3" addr add dead:beef:3::3/64 dev ns3eth1 nodad
+		ip -net "$ns3" route add default via dead:beef:3::2
+	fi
 
 	mptcp_lib_pm_nl_set_limits "${ns3}" 1 1
 
