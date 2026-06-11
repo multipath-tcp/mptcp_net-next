@@ -376,6 +376,7 @@ static void iwl_pcie_get_rf_name(struct iwl_trans *trans)
 void iwl_trans_pcie_gen2_fw_alive(struct iwl_trans *trans)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
+	u32 step_reg;
 
 	iwl_pcie_reset_ict(trans);
 
@@ -404,10 +405,13 @@ void iwl_trans_pcie_gen2_fw_alive(struct iwl_trans *trans)
 	iwl_pcie_get_rf_name(trans);
 	mutex_unlock(&trans_pcie->mutex);
 
-	if (trans->mac_cfg->device_family >= IWL_DEVICE_FAMILY_BZ)
-		trans->step_urm = !!(iwl_read_prph(trans,
-						   CNVI_PMU_STEP_FLOW) &
-				     CNVI_PMU_STEP_FLOW_FORCE_URM);
+	if (trans->mac_cfg->device_family < IWL_DEVICE_FAMILY_BZ)
+		return;
+
+	step_reg = trans->mac_cfg->device_family >= IWL_DEVICE_FAMILY_SC ?
+		   CNVI_PMU_STEP_FLOW_SC : CNVI_PMU_STEP_FLOW_BZ;
+	trans->step_urm = !!(iwl_read_prph(trans, step_reg) &
+			     CNVI_PMU_STEP_FLOW_FORCE_URM);
 }
 
 static bool iwl_pcie_set_ltr(struct iwl_trans *trans)
