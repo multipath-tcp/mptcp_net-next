@@ -355,9 +355,7 @@ static void _ieee80211_start_next_roc(struct ieee80211_local *local)
 		 * Note: scan can't run, tmp_channel is what we use, so this
 		 * must be the currently active channel.
 		 */
-		roc->on_channel = roc->chan == local->hw.conf.chandef.chan &&
-				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_5 &&
-				  local->hw.conf.chandef.width != NL80211_CHAN_WIDTH_10;
+		roc->on_channel = roc->chan == local->hw.conf.chandef.chan;
 
 		/* start this ROC */
 		ieee80211_recalc_idle(local);
