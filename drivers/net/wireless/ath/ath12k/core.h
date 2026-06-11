@@ -353,6 +353,9 @@ struct ath12k_link_vif {
 	u16 num_stations;
 	bool is_csa_in_progress;
 	struct wiphy_work bcn_tx_work;
+
+	bool set_wds_vdev_param;
+	bool nawds_enabled;
 };
 
 struct ath12k_vif {
@@ -492,6 +495,10 @@ struct ath12k_link_sta {
 	/* link address similar to ieee80211_link_sta */
 	u8 addr[ETH_ALEN];
 
+	u16 tcl_metadata;
+	u16 ast_hash;
+	u16 ast_idx;
+
 	/* the following are protected by ar->data_lock */
 	u32 changed; /* IEEE80211_RC_* */
 	u32 bw;
@@ -527,6 +534,8 @@ struct ath12k_sta {
 	u16 free_logical_link_idx_map;
 
 	enum ieee80211_sta_state state;
+
+	bool enable_4addr;
 };
 
 #define ATH12K_HALF_20MHZ_BW	10
