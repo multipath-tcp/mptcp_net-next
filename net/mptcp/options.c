@@ -744,7 +744,7 @@ static bool mptcp_established_options_mp_prio(struct sock *sk, int *size,
 	return true;
 }
 
-static noinline bool mptcp_established_options_rst(struct sock *sk, struct sk_buff *skb,
+static noinline bool mptcp_established_options_rst(struct sock *sk,
 						   int *size,
 						   unsigned int remaining,
 						   struct mptcp_out_options *opts)
@@ -833,7 +833,7 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			remaining -= opt_size;
 		}
 		/* MP_RST can be used with MP_FASTCLOSE and MP_FAIL if there is room */
-		if (mptcp_established_options_rst(sk, skb, &opt_size, remaining, opts)) {
+		if (mptcp_established_options_rst(sk, &opt_size, remaining, opts)) {
 			total_size += opt_size;
 			remaining -= opt_size;
 		}
