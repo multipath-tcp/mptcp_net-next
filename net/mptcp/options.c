@@ -659,14 +659,14 @@ static u64 add_addr_generate_hmac(u64 key1, u64 key2,
 static bool mptcp_established_options_add_addr(struct sock *sk,
 					       struct sk_buff *skb, int *size,
 					       unsigned int remaining,
+					       bool has_ts,
 					       struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
 	struct mptcp_sock *msk = mptcp_sk(subflow->conn);
-	unsigned int opt_size = *size;
 	struct mptcp_addr_info addr;
+	bool drop_ts = has_ts;
 	bool echo;
-	int len;
 
 	/* add addr will strip the existing options, be sure to avoid breaking
 	 * MPC/MPJ handshakes
@@ -674,21 +674,14 @@ static bool mptcp_established_options_add_addr(struct sock *sk,
 	if (!mptcp_pm_should_add_signal(msk) ||
 	    (opts->suboptions & (OPTION_MPTCP_MPJ_ACK | OPTION_MPTCP_MPC_ACK)) ||
 	    !skb || !skb_is_tcp_pure_ack(skb) ||
-	    !mptcp_pm_add_addr_signal(msk, opt_size, remaining, &addr, &echo))
+	    !mptcp_pm_add_addr_signal(msk, size, remaining, &addr, &echo,
+				      &drop_ts))
 		return false;
 
-	remaining += opt_size;
-
-	len = mptcp_add_addr_len(addr.family, echo, !!addr.port);
-	if (remaining < len)
-		return false;
-
-	*size = len;
 	pr_debug("drop other suboptions\n");
-	opts->suboptions = 0;
-	*size -= opt_size;
+	opts->suboptions = OPTION_MPTCP_ADD_ADDR;
+	opts->drop_ts = drop_ts;
 	opts->addr = addr;
-	opts->suboptions |= OPTION_MPTCP_ADD_ADDR;
 	if (!echo) {
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDRTX);
 		opts->ahmac = add_addr_generate_hmac(READ_ONCE(msk->local_key),
@@ -751,7 +744,7 @@ static bool mptcp_established_options_mp_prio(struct sock *sk, int *size,
 	return true;
 }
 
-static noinline bool mptcp_established_options_rst(struct sock *sk, struct sk_buff *skb,
+static noinline bool mptcp_established_options_rst(struct sock *sk,
 						   int *size,
 						   unsigned int remaining,
 						   struct mptcp_out_options *opts)
@@ -815,7 +808,7 @@ static bool mptcp_established_options_mp_fail(struct sock *sk, int *size,
 }
 
 int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
-			      unsigned int remaining,
+			      unsigned int remaining, bool has_ts,
 			      struct mptcp_out_options *opts)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(sk);
@@ -840,7 +833,7 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			remaining -= opt_size;
 		}
 		/* MP_RST can be used with MP_FASTCLOSE and MP_FAIL if there is room */
-		if (mptcp_established_options_rst(sk, skb, &opt_size, remaining, opts)) {
+		if (mptcp_established_options_rst(sk, &opt_size, remaining, opts)) {
 			total_size += opt_size;
 			remaining -= opt_size;
 		}
@@ -870,7 +863,8 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 
 	total_size += opt_size;
 	remaining -= opt_size;
-	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining, opts)) {
+	if (mptcp_established_options_add_addr(sk, skb, &opt_size, remaining,
+					       has_ts, opts)) {
 		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
@@ -1211,7 +1205,6 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ADDADDR);
 			} else {
 				mptcp_pm_add_addr_echoed(msk, &mp_opt.addr);
-				mptcp_pm_del_add_timer(msk, &mp_opt.addr, true);
 				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_ECHOADD);
 			}
 
