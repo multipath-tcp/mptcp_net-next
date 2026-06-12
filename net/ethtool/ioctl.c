@@ -3133,6 +3133,7 @@ static int ethtool_phy_tunable_valid(const struct ethtool_tunable *tuna)
 	switch (tuna->id) {
 	case ETHTOOL_PHY_DOWNSHIFT:
 	case ETHTOOL_PHY_FAST_LINK_DOWN:
+	case ETHTOOL_PHY_SHORT_CABLE_PRESET:
 		if (tuna->len != sizeof(u8) ||
 		    tuna->type_id != ETHTOOL_TUNABLE_U8)
 			return -EINVAL;
@@ -3140,6 +3141,12 @@ static int ethtool_phy_tunable_valid(const struct ethtool_tunable *tuna)
 	case ETHTOOL_PHY_EDPD:
 		if (tuna->len != sizeof(u16) ||
 		    tuna->type_id != ETHTOOL_TUNABLE_U16)
+			return -EINVAL;
+		break;
+	case ETHTOOL_PHY_LPF_BW:
+	case ETHTOOL_PHY_DSP_EQ_INIT_VALUE:
+		if (tuna->len != sizeof(u32) ||
+		    tuna->type_id != ETHTOOL_TUNABLE_U32)
 			return -EINVAL;
 		break;
 	default:
