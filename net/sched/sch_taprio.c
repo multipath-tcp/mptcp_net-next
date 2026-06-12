@@ -1321,7 +1321,7 @@ skip:
 	atomic64_set(&q->picos_per_byte, picos_per_byte);
 	netdev_dbg(dev, "taprio: set %s's picos_per_byte to: %lld, linkspeed: %d\n",
 		   dev->name, (long long)atomic64_read(&q->picos_per_byte),
-		   ecmd.base.speed);
+		   speed);
 }
 
 static int taprio_dev_notifier(struct notifier_block *nb, unsigned long event,
