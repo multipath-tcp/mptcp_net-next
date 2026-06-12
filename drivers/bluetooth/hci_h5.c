@@ -273,6 +273,7 @@ static int h5_close(struct hci_uart *hu)
 	if (!hu->serdev)
 		kfree(h5);
 
+	hu->priv = NULL;
 	return 0;
 }
 
