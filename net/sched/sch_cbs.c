@@ -340,7 +340,7 @@ skip:
 	atomic64_set(&q->port_rate, port_rate);
 	netdev_dbg(dev, "cbs: set %s's port_rate to: %lld, linkspeed: %d\n",
 		   dev->name, (long long)atomic64_read(&q->port_rate),
-		   ecmd.base.speed);
+		   speed);
 }
 
 static int cbs_dev_notifier(struct notifier_block *nb, unsigned long event,
