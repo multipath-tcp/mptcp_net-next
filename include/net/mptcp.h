@@ -72,7 +72,8 @@ struct mptcp_out_options {
 	u8 reset_reason:4,
 	   reset_transient:1,
 	   csum_reqd:1,
-	   allow_join_id0:1;
+	   allow_join_id0:1,
+	   drop_ts:1;
 	union {
 		struct {
 			u64 sndr_key;
@@ -153,7 +154,7 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 bool mptcp_synack_options(const struct request_sock *req, unsigned int *size,
 			  struct mptcp_out_options *opts);
 int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
-			      unsigned int remaining,
+			      unsigned int remaining, bool has_ts,
 			      struct mptcp_out_options *opts);
 bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb);
 
@@ -267,14 +268,6 @@ static inline bool mptcp_synack_options(const struct request_sock *req,
 					struct mptcp_out_options *opts)
 {
 	return false;
-}
-
-static inline int mptcp_established_options(struct sock *sk,
-					    struct sk_buff *skb,
-					    unsigned int remaining,
-					    struct mptcp_out_options *opts)
-{
-	return -1;
 }
 
 static inline bool mptcp_incoming_options(struct sock *sk,
