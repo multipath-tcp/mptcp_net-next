@@ -1326,5 +1326,189 @@
         "teardown": [
             "$TC qdisc del dev $DUMMY handle 1: root"
         ]
+    },
+    {
+        "id": "c797",
+        "name": "Verify fq_codel won't mistakenly deactivate QFQ parent class during peek",
+        "category": [
+            "qdisc",
+            "qfq",
+            "fq_codel"
+        ],
+        "plugins": {
+            "requires": "nsPlugin"
+        },
+        "setup": [
+            "$IP link set dev $DUMMY up || true",
+            "$IP addr add 10.10.10.10/24 dev $DUMMY || true",
+            "$TC qdisc add dev $DUMMY root handle 1: qfq",
+            "$TC class add dev $DUMMY parent 1: classid 1:1 qfq weight 1 maxpkt 1000",
+            "$TC class add dev $DUMMY parent 1: classid 1:2 qfq weight 1 maxpkt 1000",
+            "$TC qdisc add dev $DUMMY parent 1:1 handle 2:0 plug limit 1024",
+            "$IP l set dev $DUMMY mtu 1500",
+            "$TC qdisc add dev $DUMMY parent 1:2 handle 10: fq_codel target 1 interval 1 flows 1",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 1 u32 match ip dst 10.10.10.1/32 flowid 1:1",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 2 u32 match ip dst 10.10.10.2/32 flowid 1:2",
+            "$IP l set dev $DUMMY mtu 65336",
+            "ping -c 1 -I $DUMMY 10.10.10.1 -W0.01 > /dev/null || true",
+            "ping -c 3 -s 2000 -I $DUMMY 10.10.10.2 -W0.01 > /dev/null || true",
+            "sleep 0.1"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY handle 2:0 plug release_indefinite",
+        "expExitCode": "0",
+        "verifyCmd": "$TC -s -j qdisc show dev $DUMMY",
+        "matchJSON": [
+            {
+                "kind": "qfq",
+                "handle": "1:",
+                "packets": 3,
+                "drops": 1,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "plug",
+                "handle": "2:",
+                "packets": 1,
+                "drops": 0,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "fq_codel",
+                "handle": "10:",
+                "packets": 2,
+                "drops": 1,
+                "backlog": 0,
+                "qlen": 0
+            }
+        ],
+        "teardown": [
+            "$TC qdisc del dev $DUMMY root",
+            "$IP addr del 10.10.10.10/24 dev $DUMMY || true"
+        ]
+    },
+    {
+        "id": "82d9",
+        "name": "Verify codel won't mistakenly deactivate QFQ parent class during peek",
+        "category": [
+            "qdisc",
+            "qfq",
+            "codel"
+        ],
+        "plugins": {
+            "requires": "nsPlugin"
+        },
+        "setup": [
+            "$IP link set dev $DUMMY up || true",
+            "$IP addr add 10.10.10.10/24 dev $DUMMY || true",
+            "$TC qdisc add dev $DUMMY root handle 1: qfq",
+            "$TC class add dev $DUMMY parent 1: classid 1:1 qfq weight 1 maxpkt 1000",
+            "$TC class add dev $DUMMY parent 1: classid 1:2 qfq weight 1 maxpkt 1000",
+            "$TC qdisc add dev $DUMMY parent 1:1 handle 2:0 plug limit 1024",
+            "$IP l set dev $DUMMY mtu 1500",
+            "$TC qdisc add dev $DUMMY parent 1:2 handle 10: codel target 1ms interval 1ms",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 1 u32 match ip dst 10.10.10.1/32 flowid 1:1",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 2 u32 match ip dst 10.10.10.2/32 flowid 1:2",
+            "$IP l set dev $DUMMY mtu 65336",
+            "ping -c 1 -I $DUMMY 10.10.10.1 -W0.01 > /dev/null || true",
+            "ping -c 3 -s 2000 -I $DUMMY 10.10.10.2 -W0.01 > /dev/null || true",
+            "sleep 0.1"
+        ],
+        "cmdUnderTest": "$TC qdisc change dev $DUMMY handle 2:0 plug release_indefinite",
+        "expExitCode": "0",
+        "verifyCmd": "$TC -s -j qdisc show dev $DUMMY",
+        "matchJSON": [
+            {
+                "kind": "qfq",
+                "handle": "1:",
+                "packets": 3,
+                "drops": 1,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "plug",
+                "handle": "2:",
+                "packets": 1,
+                "drops": 0,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "codel",
+                "handle": "10:",
+                "packets": 2,
+                "drops": 1,
+                "backlog": 0,
+                "qlen": 0
+            }
+        ],
+        "teardown": [
+            "$TC qdisc del dev $DUMMY root",
+            "$IP addr del 10.10.10.10/24 dev $DUMMY || true"
+        ]
+    },
+    {
+        "id": "d3da",
+        "name": "Verify dualpi2 won't mistakenly deactivate QFQ parent class during peek",
+        "category": [
+            "qdisc",
+            "qfq",
+            "dualpi2"
+        ],
+        "plugins": {
+            "requires": "nsPlugin"
+        },
+        "setup": [
+            "$IP link set dev $DUMMY up || true",
+            "$IP addr add 10.10.10.10/24 dev $DUMMY || true" ,
+            "$TC qdisc add dev $DUMMY root handle 1: qfq",
+            "$TC class add dev $DUMMY parent 1: classid 1:1 qfq weight 1 maxpkt 1000",
+            "$TC class add dev $DUMMY parent 1: classid 1:2 qfq weight 1 maxpkt 1000",
+            "$TC qdisc add dev $DUMMY parent 1:1 handle 2:0 plug limit 1024",
+            "$TC qdisc add dev $DUMMY parent 1:2 handle 10: dualpi2 step_thresh 500ms",
+            "$TC filter add dev $DUMMY parent 10: protocol ip prio 1 matchall classid 10:1 action ok",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 1 u32 match ip dst 10.10.10.1/32 flowid 1:1",
+            "$TC filter add dev $DUMMY parent 1: protocol ip prio 2 u32 match ip dst 10.10.10.2/32 flowid 1:2",
+            "ping -c 1 -I $DUMMY 10.10.10.1 -W0.01 || true",
+            "ping -c 3 -i 0.1 -I $DUMMY 10.10.10.2 -W0.01 || true",
+            "sleep 0.7",
+            "ping -c 1 -I $DUMMY 10.10.10.2 -W0.01 || true",
+            "$TC qdisc change dev $DUMMY handle 2:0 plug release_indefinite"
+        ],
+        "cmdUnderTest": "ping -c 1 -I $DUMMY 10.10.10.1 -W0.01",
+        "expExitCode": "1",
+        "verifyCmd": "$TC -s -j qdisc show dev $DUMMY",
+        "matchJSON": [
+            {
+                "kind": "qfq",
+                "handle": "1:",
+                "packets": 4,
+                "drops": 2,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "plug",
+                "handle": "2:",
+                "packets": 2,
+                "drops": 0,
+                "backlog": 0,
+                "qlen": 0
+            },
+            {
+                "kind": "dualpi2",
+                "handle": "10:",
+                "packets": 2,
+                "drops": 2,
+                "backlog": 0,
+                "qlen": 0
+            }
+        ],
+        "teardown": [
+            "$TC qdisc del dev $DUMMY root",
+            "$IP addr del 10.10.10.10/24 dev $DUMMY || true"
+        ]
     }
 ]
