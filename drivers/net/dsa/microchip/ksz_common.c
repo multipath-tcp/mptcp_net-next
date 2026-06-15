@@ -16,7 +16,6 @@
 #include <linux/etherdevice.h>
 #include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
-#include <linux/if_hsr.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/of.h>
@@ -2257,7 +2256,7 @@ static void ksz_update_port_member(struct ksz_device *dev, int port)
 	dev->dev_ops->cfg_port_member(dev, port, port_member | cpu_port);
 }
 
-static int ksz_sw_mdio_read(struct mii_bus *bus, int addr, int regnum)
+int ksz_sw_mdio_read(struct mii_bus *bus, int addr, int regnum)
 {
 	struct ksz_device *dev = bus->priv;
 	struct dsa_switch *ds = dev->ds;
@@ -2265,8 +2264,7 @@ static int ksz_sw_mdio_read(struct mii_bus *bus, int addr, int regnum)
 	return ds->ops->phy_read(ds, addr, regnum);
 }
 
-static int ksz_sw_mdio_write(struct mii_bus *bus, int addr, int regnum,
-			     u16 val)
+int ksz_sw_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
 {
 	struct ksz_device *dev = bus->priv;
 	struct dsa_switch *ds = dev->ds;
@@ -2287,7 +2285,7 @@ static int ksz_sw_mdio_write(struct mii_bus *bus, int addr, int regnum,
  *
  * Return: Value of the PHY register, or a negative error code on failure.
  */
-static int ksz_parent_mdio_read(struct mii_bus *bus, int addr, int regnum)
+int ksz_parent_mdio_read(struct mii_bus *bus, int addr, int regnum)
 {
 	struct ksz_device *dev = bus->priv;
 
@@ -2307,8 +2305,7 @@ static int ksz_parent_mdio_read(struct mii_bus *bus, int addr, int regnum)
  *
  * Return: 0 on success, or a negative error code on failure.
  */
-static int ksz_parent_mdio_write(struct mii_bus *bus, int addr, int regnum,
-				 u16 val)
+int ksz_parent_mdio_write(struct mii_bus *bus, int addr, int regnum, u16 val)
 {
 	struct ksz_device *dev = bus->priv;
 
@@ -2416,8 +2413,8 @@ static void ksz_irq_phy_free(struct ksz_device *dev)
  *
  * Return: 0 on success, or a negative error code on failure.
  */
-static int ksz_parse_dt_phy_config(struct ksz_device *dev, struct mii_bus *bus,
-				   struct device_node *mdio_np)
+int ksz_parse_dt_phy_config(struct ksz_device *dev, struct mii_bus *bus,
+			    struct device_node *mdio_np)
 {
 	struct device_node *phy_node, *phy_parent_node;
 	bool phys_are_valid = true;
@@ -2520,20 +2517,8 @@ int ksz_mdio_register(struct ksz_device *dev)
 		goto put_mdio_node;
 	}
 
-	if (dev->dev_ops->mdio_bus_preinit) {
-		ret = dev->dev_ops->mdio_bus_preinit(dev, !!parent_bus);
-		if (ret)
-			goto put_mdio_node;
-	}
-
-	if (dev->dev_ops->create_phy_addr_map) {
-		ret = dev->dev_ops->create_phy_addr_map(dev, !!parent_bus);
-		if (ret)
-			goto put_mdio_node;
-	} else {
-		for (i = 0; i < dev->info->port_cnt; i++)
-			dev->phy_addr_map[i] = i;
-	}
+	for (i = 0; i < dev->info->port_cnt; i++)
+		dev->phy_addr_map[i] = i;
 
 	bus->priv = dev;
 	if (parent_bus) {
@@ -2838,24 +2823,6 @@ void ksz_init_mib_timer(struct ksz_device *dev)
 	}
 }
 
-u32 ksz_get_phy_flags(struct dsa_switch *ds, int port)
-{
-	struct ksz_device *dev = ds->priv;
-
-	switch (dev->chip_id) {
-	case KSZ88X3_CHIP_ID:
-		/* Silicon Errata Sheet (DS80000830A):
-		 * Port 1 does not work with LinkMD Cable-Testing.
-		 * Port 1 does not respond to received PAUSE control frames.
-		 */
-		if (!port)
-			return MICREL_KSZ8_P1_ERRATA;
-		break;
-	}
-
-	return 0;
-}
-
 void ksz_phylink_mac_link_down(struct phylink_config *config,
 			       unsigned int mode,
 			       phy_interface_t interface)
@@ -2986,25 +2953,6 @@ void ksz_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 	ksz_update_port_member(dev, port);
 }
 
-void ksz_port_teardown(struct dsa_switch *ds, int port)
-{
-	struct ksz_device *dev = ds->priv;
-
-	switch (dev->chip_id) {
-	case KSZ8563_CHIP_ID:
-	case KSZ8567_CHIP_ID:
-	case KSZ9477_CHIP_ID:
-	case KSZ9563_CHIP_ID:
-	case KSZ9567_CHIP_ID:
-	case KSZ9893_CHIP_ID:
-	case KSZ9896_CHIP_ID:
-	case KSZ9897_CHIP_ID:
-	case LAN9646_CHIP_ID:
-		if (dsa_is_user_port(ds, port))
-			ksz9477_port_acl_free(dev, port);
-	}
-}
-
 int ksz_port_pre_bridge_flags(struct dsa_switch *ds, int port,
 			      struct switchdev_brport_flags flags,
 			      struct netlink_ext_ack *extack)
@@ -3070,63 +3018,6 @@ int ksz_max_mtu(struct dsa_switch *ds, int port)
 	return -EOPNOTSUPP;
 }
 
-/**
- * ksz_support_eee - Determine Energy Efficient Ethernet (EEE) support for a
- *                   port
- * @ds: Pointer to the DSA switch structure
- * @port: Port number to check
- *
- * This function also documents devices where EEE was initially advertised but
- * later withdrawn due to reliability issues, as described in official errata
- * documents. These devices are explicitly listed to record known limitations,
- * even if there is no technical necessity for runtime checks.
- *
- * Returns: true if the internal PHY on the given port supports fully
- * operational EEE, false otherwise.
- */
-bool ksz_support_eee(struct dsa_switch *ds, int port)
-{
-	struct ksz_device *dev = ds->priv;
-
-	if (!dev->info->internal_phy[port])
-		return false;
-
-	switch (dev->chip_id) {
-	case KSZ8563_CHIP_ID:
-	case KSZ9563_CHIP_ID:
-	case KSZ9893_CHIP_ID:
-		return true;
-	case KSZ8567_CHIP_ID:
-		/* KSZ8567R Errata DS80000752C Module 4 */
-	case KSZ8765_CHIP_ID:
-	case KSZ8794_CHIP_ID:
-	case KSZ8795_CHIP_ID:
-		/* KSZ879x/KSZ877x/KSZ876x Errata DS80000687C Module 2 */
-	case KSZ9477_CHIP_ID:
-		/* KSZ9477S Errata DS80000754A Module 4 */
-	case KSZ9567_CHIP_ID:
-		/* KSZ9567S Errata DS80000756A Module 4 */
-	case KSZ9896_CHIP_ID:
-		/* KSZ9896C Errata DS80000757A Module 3 */
-	case KSZ9897_CHIP_ID:
-	case LAN9646_CHIP_ID:
-		/* KSZ9897R Errata DS80000758C Module 4 */
-		/* Energy Efficient Ethernet (EEE) feature select must be
-		 * manually disabled
-		 *   The EEE feature is enabled by default, but it is not fully
-		 *   operational. It must be manually disabled through register
-		 *   controls. If not disabled, the PHY ports can auto-negotiate
-		 *   to enable EEE, and this feature can cause link drops when
-		 *   linked to another device supporting EEE.
-		 *
-		 * The same item appears in the errata for all switches above.
-		 */
-		break;
-	}
-
-	return false;
-}
-
 int ksz_set_mac_eee(struct dsa_switch *ds, int port,
 		    struct ethtool_keee *e)
 {
@@ -3145,8 +3036,7 @@ int ksz_set_mac_eee(struct dsa_switch *ds, int port,
 	return 0;
 }
 
-static void ksz_set_xmii(struct ksz_device *dev, int port,
-			 phy_interface_t interface)
+void ksz_set_xmii(struct ksz_device *dev, int port, phy_interface_t interface)
 {
 	const u8 *bitval = dev->info->xmii_ctrl1;
 	struct ksz_port *p = &dev->ports[port];
@@ -3229,6 +3119,29 @@ phy_interface_t ksz_get_xmii(struct ksz_device *dev, int port, bool gbit)
 	return interface;
 }
 
+bool ksz_phylink_need_config(struct phylink_config *config,
+			     unsigned int mode)
+{
+	struct dsa_port *dp = dsa_phylink_to_port(config);
+	struct ksz_device *dev = dp->ds->priv;
+	int port = dp->index;
+
+	/* Internal PHYs */
+	if (dev->info->internal_phy[port])
+		return false;
+
+	/* No need to configure XMII control register when using SGMII. */
+	if (ksz_is_sgmii_port(dev, port))
+		return false;
+
+	if (phylink_autoneg_inband(mode)) {
+		dev_err(dev->dev, "In-band AN not supported!\n");
+		return false;
+	}
+
+	return true;
+}
+
 void ksz_phylink_mac_config(struct phylink_config *config,
 			    unsigned int mode,
 			    const struct phylink_link_state *state)
@@ -3237,23 +3150,8 @@ void ksz_phylink_mac_config(struct phylink_config *config,
 	struct ksz_device *dev = dp->ds->priv;
 	int port = dp->index;
 
-	/* Internal PHYs */
-	if (dev->info->internal_phy[port])
-		return;
-
-	/* No need to configure XMII control register when using SGMII. */
-	if (ksz_is_sgmii_port(dev, port))
-		return;
-
-	if (phylink_autoneg_inband(mode)) {
-		dev_err(dev->dev, "In-band AN not supported!\n");
-		return;
-	}
-
-	ksz_set_xmii(dev, port, state->interface);
-
-	if (dev->dev_ops->setup_rgmii_delay)
-		dev->dev_ops->setup_rgmii_delay(dev, port);
+	if (ksz_phylink_need_config(config, mode))
+		ksz_set_xmii(dev, port, state->interface);
 }
 
 bool ksz_get_gbit(struct ksz_device *dev, int port)
@@ -3371,48 +3269,6 @@ static int ksz_switch_detect(struct ksz_device *dev)
 		}
 	}
 	return 0;
-}
-
-int ksz_cls_flower_add(struct dsa_switch *ds, int port,
-		       struct flow_cls_offload *cls, bool ingress)
-{
-	struct ksz_device *dev = ds->priv;
-
-	switch (dev->chip_id) {
-	case KSZ8563_CHIP_ID:
-	case KSZ8567_CHIP_ID:
-	case KSZ9477_CHIP_ID:
-	case KSZ9563_CHIP_ID:
-	case KSZ9567_CHIP_ID:
-	case KSZ9893_CHIP_ID:
-	case KSZ9896_CHIP_ID:
-	case KSZ9897_CHIP_ID:
-	case LAN9646_CHIP_ID:
-		return ksz9477_cls_flower_add(ds, port, cls, ingress);
-	}
-
-	return -EOPNOTSUPP;
-}
-
-int ksz_cls_flower_del(struct dsa_switch *ds, int port,
-		       struct flow_cls_offload *cls, bool ingress)
-{
-	struct ksz_device *dev = ds->priv;
-
-	switch (dev->chip_id) {
-	case KSZ8563_CHIP_ID:
-	case KSZ8567_CHIP_ID:
-	case KSZ9477_CHIP_ID:
-	case KSZ9563_CHIP_ID:
-	case KSZ9567_CHIP_ID:
-	case KSZ9893_CHIP_ID:
-	case KSZ9896_CHIP_ID:
-	case KSZ9897_CHIP_ID:
-	case LAN9646_CHIP_ID:
-		return ksz9477_cls_flower_del(ds, port, cls, ingress);
-	}
-
-	return -EOPNOTSUPP;
 }
 
 /* Bandwidth is calculated by idle slope/transmission speed. Then the Bandwidth
@@ -3866,9 +3722,6 @@ void ksz_get_wol(struct dsa_switch *ds, int port,
 	u8 pme_ctrl;
 	int ret;
 
-	if (!is_ksz9477(dev) && !ksz_is_ksz87xx(dev))
-		return;
-
 	if (!dev->wakeup_source)
 		return;
 
@@ -3918,9 +3771,6 @@ int ksz_set_wol(struct dsa_switch *ds, int port,
 
 	if (wol->wolopts & ~(WAKE_PHY | WAKE_MAGIC))
 		return -EINVAL;
-
-	if (!is_ksz9477(dev) && !ksz_is_ksz87xx(dev))
-		return -EOPNOTSUPP;
 
 	if (!dev->wakeup_source)
 		return -EOPNOTSUPP;
@@ -3981,12 +3831,13 @@ static void ksz_wol_pre_shutdown(struct ksz_device *dev)
 {
 	const struct ksz_dev_ops *ops = dev->dev_ops;
 	const u16 *regs = dev->info->regs;
+	struct dsa_switch *ds = dev->ds;
 	u8 pme_pin_en = PME_ENABLE;
 	bool wol_enabled = false;
 	struct dsa_port *dp;
 	int ret;
 
-	if (!is_ksz9477(dev) && !ksz_is_ksz87xx(dev))
+	if (!ds->ops->set_wol)
 		return;
 
 	if (!dev->wakeup_source)
@@ -4034,7 +3885,8 @@ int ksz_port_set_mac_address(struct dsa_switch *ds, int port,
 	 */
 	wol.wolopts = 0;
 
-	ksz_get_wol(ds, dp->index, &wol);
+	if (ds->ops->get_wol)
+		ds->ops->get_wol(ds, dp->index, &wol);
 	if (wol.wolopts & WAKE_MAGIC) {
 		dev_err(ds->dev,
 			"Cannot change MAC address on port %d with active Wake on Magic Packet\n",
@@ -4167,72 +4019,6 @@ void ksz_switch_macaddr_put(struct dsa_switch *ds)
 
 	dev->switch_macaddr = NULL;
 	kfree(switch_macaddr);
-}
-
-int ksz_hsr_join(struct dsa_switch *ds, int port, struct net_device *hsr,
-		 struct netlink_ext_ack *extack)
-{
-	struct ksz_device *dev = ds->priv;
-	enum hsr_version ver;
-	int ret;
-
-	ret = hsr_get_version(hsr, &ver);
-	if (ret)
-		return ret;
-
-	if (dev->chip_id != KSZ9477_CHIP_ID) {
-		NL_SET_ERR_MSG_MOD(extack, "Chip does not support HSR offload");
-		return -EOPNOTSUPP;
-	}
-
-	/* KSZ9477 can support HW offloading of only 1 HSR device */
-	if (dev->hsr_dev && hsr != dev->hsr_dev) {
-		NL_SET_ERR_MSG_MOD(extack, "Offload supported for a single HSR");
-		return -EOPNOTSUPP;
-	}
-
-	/* KSZ9477 only supports HSR v0 and v1 */
-	if (!(ver == HSR_V0 || ver == HSR_V1)) {
-		NL_SET_ERR_MSG_MOD(extack, "Only HSR v0 and v1 supported");
-		return -EOPNOTSUPP;
-	}
-
-	/* KSZ9477 can only perform HSR offloading for up to two ports */
-	if (hweight8(dev->hsr_ports) >= 2) {
-		NL_SET_ERR_MSG_MOD(extack,
-				   "Cannot offload more than two ports - using software HSR");
-		return -EOPNOTSUPP;
-	}
-
-	/* Self MAC address filtering, to avoid frames traversing
-	 * the HSR ring more than once.
-	 */
-	ret = ksz_switch_macaddr_get(ds, port, extack);
-	if (ret)
-		return ret;
-
-	ksz9477_hsr_join(ds, port, hsr);
-	dev->hsr_dev = hsr;
-	dev->hsr_ports |= BIT(port);
-
-	return 0;
-}
-
-int ksz_hsr_leave(struct dsa_switch *ds, int port,
-		  struct net_device *hsr)
-{
-	struct ksz_device *dev = ds->priv;
-
-	WARN_ON(dev->chip_id != KSZ9477_CHIP_ID);
-
-	ksz9477_hsr_leave(ds, port, hsr);
-	dev->hsr_ports &= ~BIT(port);
-	if (!dev->hsr_ports)
-		dev->hsr_dev = NULL;
-
-	ksz_switch_macaddr_put(ds);
-
-	return 0;
 }
 
 int ksz_suspend(struct dsa_switch *ds)

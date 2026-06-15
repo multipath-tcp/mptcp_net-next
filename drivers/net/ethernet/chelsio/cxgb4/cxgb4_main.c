@@ -6795,8 +6795,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 						   NETIF_F_TSO | NETIF_F_TSO6;
 
 			netdev->hw_features |= NETIF_F_GSO_UDP_TUNNEL |
-					       NETIF_F_GSO_UDP_TUNNEL_CSUM |
-					       NETIF_F_HW_TLS_RECORD;
+					       NETIF_F_GSO_UDP_TUNNEL_CSUM;
 
 			if (adapter->rawf_cnt)
 				netdev->udp_tunnel_nic_info = &cxgb_udp_tunnels;
