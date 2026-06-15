@@ -1514,7 +1514,7 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 
 	trace_br_fdb_external_learn_add(br, p, addr, vid);
 
-	if (locked && (!p || !(p->flags & BR_PORT_MAB)))
+	if (locked && (!p || !test_bit(BR_PORT_MAB_BIT, &p->flags)))
 		return -EINVAL;
 
 	spin_lock_bh(&br->hash_lock);
