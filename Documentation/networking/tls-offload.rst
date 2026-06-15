@@ -13,7 +13,7 @@ Layer Protocol (ULP) and install the cryptographic connection state.
 For details regarding the user-facing interface refer to the TLS
 documentation in :ref:`Documentation/networking/tls.rst <kernel_tls>`.
 
-``ktls`` can operate in three modes:
+``ktls`` can operate in two modes:
 
  * Software crypto mode (``TLS_SW``) - CPU handles the cryptography.
    In most basic cases only crypto operations synchronous with the CPU
@@ -26,11 +26,6 @@ documentation in :ref:`Documentation/networking/tls.rst <kernel_tls>`.
    This mode integrates best with the kernel stack and is described in detail
    in the remaining part of this document
    (``ethtool`` flags ``tls-hw-tx-offload`` and ``tls-hw-rx-offload``).
- * Full TCP NIC offload mode (``TLS_HW_RECORD``) - mode of operation where
-   NIC driver and firmware replace the kernel networking stack
-   with its own TCP handling, it is not usable in production environments
-   making use of the Linux networking stack for example any firewalling
-   abilities or QoS and packet scheduling (``ethtool`` flag ``tls-hw-record``).
 
 The operation mode is selected automatically based on device configuration,
 offload opt-in or opt-out on per-connection basis is not currently supported.
