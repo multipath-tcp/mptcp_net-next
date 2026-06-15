@@ -29,7 +29,7 @@ void br_recalculate_neigh_suppress_enabled(struct net_bridge *br)
 	bool neigh_suppress = false;
 
 	list_for_each_entry(p, &br->port_list, list) {
-		if (p->flags & (BR_NEIGH_SUPPRESS | BR_NEIGH_VLAN_SUPPRESS)) {
+		if (READ_ONCE(p->flags) & (BR_NEIGH_SUPPRESS | BR_NEIGH_VLAN_SUPPRESS)) {
 			neigh_suppress = true;
 			break;
 		}
@@ -206,8 +206,8 @@ void br_do_proxy_suppress_arp(struct sk_buff *skb, struct net_bridge *br,
 			const struct net_bridge_port *dst = READ_ONCE(f->dst);
 			bool replied = false;
 
-			if ((p && (p->flags & BR_PROXYARP)) ||
-			    (dst && (dst->flags & BR_PROXYARP_WIFI)) ||
+			if ((p && test_bit(BR_PROXYARP_BIT, &p->flags)) ||
+			    (dst && test_bit(BR_PROXYARP_WIFI_BIT, &dst->flags)) ||
 			    br_is_neigh_suppress_enabled(dst, vid)) {
 				if (!vid)
 					br_arp_send(br, p, skb->dev, sip, tip,
@@ -511,10 +511,7 @@ bool br_is_neigh_suppress_enabled(const struct net_bridge_port *p, u16 vid)
 	if (!p)
 		return false;
 
-	if (!vid)
-		return !!(p->flags & BR_NEIGH_SUPPRESS);
-
-	if (p->flags & BR_NEIGH_VLAN_SUPPRESS) {
+	if (vid && test_bit(BR_NEIGH_VLAN_SUPPRESS_BIT, &p->flags)) {
 		struct net_bridge_vlan_group *vg = nbp_vlan_group_rcu(p);
 		struct net_bridge_vlan *v;
 
@@ -522,17 +519,13 @@ bool br_is_neigh_suppress_enabled(const struct net_bridge_port *p, u16 vid)
 		if (!v)
 			return false;
 		return !!(v->priv_flags & BR_VLFLAG_NEIGH_SUPPRESS_ENABLED);
-	} else {
-		return !!(p->flags & BR_NEIGH_SUPPRESS);
 	}
+	return test_bit(BR_NEIGH_SUPPRESS_BIT, &p->flags);
 }
 
 bool br_is_neigh_forward_grat_enabled(const struct net_bridge_port *p, u16 vid)
 {
-	if (!vid)
-		return !!(p->flags & BR_NEIGH_FORWARD_GRAT);
-
-	if (p->flags & BR_NEIGH_VLAN_SUPPRESS) {
+	if (vid && test_bit(BR_NEIGH_VLAN_SUPPRESS_BIT, &p->flags)) {
 		struct net_bridge_vlan_group *vg = nbp_vlan_group_rcu(p);
 		struct net_bridge_vlan *v;
 
@@ -540,7 +533,6 @@ bool br_is_neigh_forward_grat_enabled(const struct net_bridge_port *p, u16 vid)
 		if (!v)
 			return false;
 		return !!(v->priv_flags & BR_VLFLAG_NEIGH_FORWARD_GRAT_ENABLED);
-	} else {
-		return !!(p->flags & BR_NEIGH_FORWARD_GRAT);
 	}
+	return test_bit(BR_NEIGH_FORWARD_GRAT_BIT, &p->flags);
 }
