@@ -215,8 +215,6 @@ struct airoha_tx_irq_queue {
 };
 
 struct airoha_hw_stats {
-	/* protect concurrent hw_stats accesses */
-	spinlock_t lock;
 	struct u64_stats_sync syncp;
 
 	/* get_stats64 */
@@ -554,6 +552,8 @@ struct airoha_gdm_dev {
 
 	u32 flags;
 	int nbq;
+
+	struct airoha_hw_stats stats;
 };
 
 struct airoha_gdm_port {
@@ -561,7 +561,8 @@ struct airoha_gdm_port {
 	int id;
 	int users;
 
-	struct airoha_hw_stats stats;
+	/* protect concurrent hw_stats accesses */
+	spinlock_t stats_lock;
 
 	struct metadata_dst *dsa_meta[AIROHA_MAX_DSA_PORTS];
 };
