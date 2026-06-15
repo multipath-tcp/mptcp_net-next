@@ -283,6 +283,13 @@ static bool bound_by_mac(struct netconsole_target *nt)
 	return is_valid_ether_addr(nt->np.dev_mac);
 }
 
+static void netcons_release_dev(struct netconsole_target *nt)
+{
+	do_netpoll_cleanup(&nt->np);
+	if (bound_by_mac(nt))
+		memset(&nt->np.dev_name, 0, IFNAMSIZ);
+}
+
 /* Attempts to resume logging to a deactivated target. */
 static void resume_target(struct netconsole_target *nt)
 {
@@ -349,7 +356,7 @@ static void process_resume_target(struct work_struct *work)
 	rtnl_lock();
 	if (nt->state == STATE_ENABLED && nt->np.dev &&
 	    nt->np.dev->reg_state != NETREG_REGISTERED) {
-		do_netpoll_cleanup(&nt->np);
+		netcons_release_dev(nt);
 		nt->state = STATE_DISABLED;
 	}
 
@@ -408,9 +415,7 @@ static void netconsole_process_cleanups_core(void)
 	list_for_each_entry_safe(nt, tmp, &target_cleanup_list, list) {
 		/* all entries in the cleanup_list needs to be disabled */
 		WARN_ON_ONCE(nt->state == STATE_ENABLED);
-		do_netpoll_cleanup(&nt->np);
-		if (bound_by_mac(nt))
-			memset(&nt->np.dev_name, 0, IFNAMSIZ);
+		netcons_release_dev(nt);
 		/* moved the cleaned target to target_list. Need to hold both
 		 * locks
 		 */

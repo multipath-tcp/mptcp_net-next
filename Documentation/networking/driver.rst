@@ -128,3 +128,16 @@ to be freed up.
 If you return NETDEV_TX_BUSY from the ndo_start_xmit method, you
 must not keep any reference to that SKB and you must not attempt
 to free it up.
+
+Error message reporting
+=======================
+
+A number of driver configuration interfaces pass a Netlink extended ACK
+(``extack``) object to the driver (either directly as an argument or
+as a member of a parameter struct). The drivers should try to report
+most errors via the ``extack`` object. System level exceptions,
+indicating that system or device is misbehaving or is in bad state,
+should continue to be reported to system logs.
+
+Messages should be passed **either** via ``extack`` **or** to system logs.
+Drivers should not try to report the same information to both.
