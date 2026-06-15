@@ -113,6 +113,13 @@ ethtool_nl_msg_needs_rtnl(const struct net_device *dev, u8 cmd)
 		return ops->op_needs_rtnl & ETHTOOL_OP_NEEDS_RTNL_SPAUSEPARAM;
 	case ETHTOOL_MSG_RSS_SET:
 		return ops->op_needs_rtnl & ETHTOOL_OP_NEEDS_RTNL_RSS;
+	case ETHTOOL_MSG_TSCONFIG_GET:
+	case ETHTOOL_MSG_TSCONFIG_SET:
+		/* tsconfig calls ndos (ndo_hwtstamp_set/get), not ethtool ops.
+		 * Also, there is no corresponding ethtool ioctl, therefore
+		 * these cases are Netlink-only.
+		 */
+		return true;
 	}
 	return false;
 }
