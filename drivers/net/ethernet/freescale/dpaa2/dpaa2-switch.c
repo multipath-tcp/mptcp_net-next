@@ -51,52 +51,29 @@ dpaa2_switch_filter_block_get_unused(struct ethsw_core *ethsw)
 	return NULL;
 }
 
-static u16 dpaa2_switch_port_set_fdb(struct ethsw_port_priv *port_priv,
-				     struct net_device *bridge_dev)
+static bool dpaa2_switch_fdb_in_use_by_others(struct ethsw_core *ethsw,
+					      struct dpaa2_switch_fdb *fdb,
+					      struct ethsw_port_priv *except)
 {
-	struct ethsw_core *ethsw = port_priv->ethsw_data;
-	struct ethsw_port_priv *other_port_priv = NULL;
-	struct dpaa2_switch_fdb *fdb;
-	struct net_device *other_dev;
-	bool last_fdb_user = true;
-	struct list_head *iter;
 	int i;
 
-	/* If we leave a bridge (bridge_dev is NULL), find an unused
-	 * FDB and use that.
-	 */
-	if (!bridge_dev) {
-		/* First verify if this is the last port to leave this bridge */
-		for (i = 0; i < ethsw->sw_attr.num_ifs; i++) {
-			if (!ethsw->ports[i] || ethsw->ports[i] == port_priv)
-				continue;
-			if (ethsw->ports[i]->fdb == port_priv->fdb) {
-				last_fdb_user = false;
-				break;
-			}
-		}
-
-		/* If this is the last user of the FDB, just keep using it. */
-		if (last_fdb_user) {
-			port_priv->fdb->bridge_dev = NULL;
-			return 0;
-		}
-
-		/* Since we are not the last port which leaves a bridge,
-		 * acquire a new FDB and use it. The number of FDBs is sized to
-		 * accommodate all switch ports as standalone, each with its
-		 * private FDB, which means that dpaa2_switch_fdb_get_unused()
-		 * must succeed here. WARN if not.
-		 */
-		fdb = dpaa2_switch_fdb_get_unused(port_priv->ethsw_data);
-		if (WARN_ON(!fdb))
-			return 0;
-
-		port_priv->fdb = fdb;
-		port_priv->fdb->in_use = true;
-		port_priv->fdb->bridge_dev = NULL;
-		return 0;
+	for (i = 0; i < ethsw->sw_attr.num_ifs; i++) {
+		if (!ethsw->ports[i] || ethsw->ports[i] == except)
+			continue;
+		if (ethsw->ports[i]->fdb == fdb)
+			return true;
 	}
+
+	return false;
+}
+
+static struct dpaa2_switch_fdb *
+dpaa2_switch_fdb_for_join(struct ethsw_port_priv *port_priv,
+			  struct net_device *upper_dev)
+{
+	struct ethsw_port_priv *other_port_priv;
+	struct net_device *other_dev;
+	struct list_head *iter;
 
 	/* The below call to netdev_for_each_lower_dev() demands the RTNL lock
 	 * being held. Assert on it so that it's easier to catch new code
@@ -107,7 +84,7 @@ static u16 dpaa2_switch_port_set_fdb(struct ethsw_port_priv *port_priv,
 	/* If part of a bridge, use the FDB of the first dpaa2 switch interface
 	 * to be present in that bridge
 	 */
-	netdev_for_each_lower_dev(bridge_dev, other_dev, iter) {
+	netdev_for_each_lower_dev(upper_dev, other_dev, iter) {
 		if (!dpaa2_switch_port_dev_check(other_dev))
 			continue;
 
@@ -115,27 +92,62 @@ static u16 dpaa2_switch_port_set_fdb(struct ethsw_port_priv *port_priv,
 			continue;
 
 		other_port_priv = netdev_priv(other_dev);
-		break;
+		return other_port_priv->fdb;
 	}
 
-	/* The current port is about to change its FDB to the one used by the
-	 * first port that joined the bridge.
-	 */
-	if (other_port_priv) {
-		/* The previous FDB is about to become unused, since the
-		 * interface is no longer standalone.
-		 */
-		port_priv->fdb->in_use = false;
-		port_priv->fdb->bridge_dev = NULL;
+	return port_priv->fdb;
+}
 
-		/* Get a reference to the new FDB */
-		port_priv->fdb = other_port_priv->fdb;
+static struct dpaa2_switch_fdb *
+dpaa2_switch_fdb_for_leave(struct ethsw_port_priv *port_priv)
+{
+	struct ethsw_core *ethsw = port_priv->ethsw_data;
+
+	/* If this is the last user of the FDB, just keep using it. */
+	if (!dpaa2_switch_fdb_in_use_by_others(ethsw, port_priv->fdb,
+					       port_priv)) {
+		return port_priv->fdb;
+	}
+
+	/* Since we are not the last port which leaves a bridge,
+	 * acquire a new FDB and use it.
+	 */
+	return dpaa2_switch_fdb_get_unused(ethsw);
+}
+
+static void dpaa2_switch_port_set_fdb(struct ethsw_port_priv *port_priv,
+				      struct net_device *upper_dev,
+				      bool linking)
+{
+	struct dpaa2_switch_fdb *old_fdb = port_priv->fdb;
+	struct ethsw_core *ethsw = port_priv->ethsw_data;
+	struct dpaa2_switch_fdb *new_fdb;
+
+	new_fdb = linking ? dpaa2_switch_fdb_for_join(port_priv, upper_dev) :
+			    dpaa2_switch_fdb_for_leave(port_priv);
+	/* The number of FDBs is sized to accommodate all switch ports as
+	 * standalone, each with its private FDB, which means that FDB must be
+	 * valid here even on the leave path. WARN if not.
+	 */
+	if (WARN_ON(!new_fdb))
+		return;
+
+	if (old_fdb != new_fdb) {
+		/* The previous FDB is about to become unused, release
+		 * it if we are the last user.
+		 */
+		if (!dpaa2_switch_fdb_in_use_by_others(ethsw, port_priv->fdb,
+						       port_priv)) {
+			old_fdb->in_use = false;
+			old_fdb->bridge_dev = NULL;
+		}
+
+		new_fdb->in_use = true;
+		port_priv->fdb = new_fdb;
 	}
 
 	/* Keep track of the new upper bridge device */
-	port_priv->fdb->bridge_dev = bridge_dev;
-
-	return 0;
+	port_priv->fdb->bridge_dev = linking ? upper_dev : NULL;
 }
 
 static void dpaa2_switch_fdb_get_flood_cfg(struct ethsw_core *ethsw, u16 fdb_id,
@@ -2051,7 +2063,7 @@ static int dpaa2_switch_port_bridge_join(struct net_device *netdev,
 	if (err)
 		return err;
 
-	dpaa2_switch_port_set_fdb(port_priv, upper_dev);
+	dpaa2_switch_port_set_fdb(port_priv, upper_dev, true);
 
 	/* Inherit the initial bridge port learning state */
 	learn_ena = br_port_flag_is_set(netdev, BR_LEARNING);
@@ -2077,7 +2089,7 @@ static int dpaa2_switch_port_bridge_join(struct net_device *netdev,
 
 err_switchdev_offload:
 err_egress_flood:
-	dpaa2_switch_port_set_fdb(port_priv, NULL);
+	dpaa2_switch_port_set_fdb(port_priv, upper_dev, false);
 	return err;
 }
 
@@ -2124,7 +2136,7 @@ static int dpaa2_switch_port_bridge_leave(struct net_device *netdev)
 	if (err)
 		netdev_err(netdev, "Unable to clear RX VLANs from old FDB table, err (%d)\n", err);
 
-	dpaa2_switch_port_set_fdb(port_priv, NULL);
+	dpaa2_switch_port_set_fdb(port_priv, port_priv->fdb->bridge_dev, false);
 
 	/* Restore all RX VLANs into the new FDB table that we just joined */
 	err = vlan_for_each(netdev, dpaa2_switch_port_restore_rxvlan, netdev);
