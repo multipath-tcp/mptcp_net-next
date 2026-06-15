@@ -43,8 +43,6 @@
 
 #include <net/snmp.h>
 #include <net/tls.h>
-#include <net/tls_toe.h>
-
 #include "tls.h"
 
 MODULE_AUTHOR("Mellanox Technologies");
@@ -963,9 +961,6 @@ static void build_proto_ops(struct proto_ops ops[TLS_NUM_CONFIG][TLS_NUM_CONFIG]
 
 	ops[TLS_HW  ][TLS_HW  ] = ops[TLS_HW  ][TLS_SW  ];
 #endif
-#ifdef CONFIG_TLS_TOE
-	ops[TLS_HW_RECORD][TLS_HW_RECORD] = *base;
-#endif
 }
 
 static void tls_build_proto(struct sock *sk)
@@ -1037,11 +1032,6 @@ static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
 
 	prot[TLS_HW][TLS_HW] = prot[TLS_HW][TLS_SW];
 #endif
-#ifdef CONFIG_TLS_TOE
-	prot[TLS_HW_RECORD][TLS_HW_RECORD] = *base;
-	prot[TLS_HW_RECORD][TLS_HW_RECORD].hash		= tls_toe_hash;
-	prot[TLS_HW_RECORD][TLS_HW_RECORD].unhash	= tls_toe_unhash;
-#endif
 }
 
 static int tls_init(struct sock *sk)
@@ -1050,11 +1040,6 @@ static int tls_init(struct sock *sk)
 	int rc = 0;
 
 	tls_build_proto(sk);
-
-#ifdef CONFIG_TLS_TOE
-	if (tls_toe_bypass(sk))
-		return 0;
-#endif
 
 	/* The TLS ulp is currently supported only for TCP sockets
 	 * in ESTABLISHED state.
@@ -1111,8 +1096,6 @@ static u16 tls_user_config(struct tls_context *ctx, bool tx)
 		return TLS_CONF_SW;
 	case TLS_HW:
 		return TLS_CONF_HW;
-	case TLS_HW_RECORD:
-		return TLS_CONF_HW_RECORD;
 	}
 	return 0;
 }
