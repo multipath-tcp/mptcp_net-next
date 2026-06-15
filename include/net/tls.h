@@ -85,7 +85,6 @@ enum {
 	TLS_BASE,
 	TLS_SW,
 	TLS_HW,
-	TLS_HW_RECORD,
 	TLS_NUM_CONFIG,
 };
 
