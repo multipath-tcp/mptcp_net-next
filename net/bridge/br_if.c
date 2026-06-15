@@ -761,6 +761,6 @@ bool br_port_flag_is_set(const struct net_device *dev, unsigned long flag)
 	if (!p)
 		return false;
 
-	return p->flags & flag;
+	return READ_ONCE(p->flags) & flag;
 }
 EXPORT_SYMBOL_GPL(br_port_flag_is_set);
