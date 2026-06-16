@@ -1225,6 +1225,7 @@ int b53_get_sset_count(struct dsa_switch *ds, int port, int sset)
 EXPORT_SYMBOL(b53_get_sset_count);
 
 enum b53_devlink_resource_id {
+	B53_DEVLINK_PARAM_ID_NONE,  /* DEVLINK_RESOURCE_ID_PARENT_TOP */
 	B53_DEVLINK_PARAM_ID_VLAN_TABLE,
 };
 
