@@ -12,6 +12,7 @@ struct mlx5_sd;
 
 struct mlx5_core_dev *mlx5_sd_get_primary(struct mlx5_core_dev *dev);
 bool mlx5_sd_is_primary(struct mlx5_core_dev *dev);
+int mlx5_sd_pf_num_get(struct mlx5_core_dev *dev);
 struct mlx5_core_dev *mlx5_sd_primary_get_peer(struct mlx5_core_dev *primary, int idx);
 int mlx5_sd_ch_ix_get_dev_ix(struct mlx5_core_dev *dev, int ch_ix);
 int mlx5_sd_ch_ix_get_vec_ix(struct mlx5_core_dev *dev, int ch_ix);
@@ -42,6 +43,13 @@ mlx5_sd_get_devcom(struct mlx5_core_dev *dev)
 {
 	return NULL;
 }
+#endif
+
+#ifdef CONFIG_MLX5_ESWITCH
+void mlx5_sd_eswitch_mode_set(struct mlx5_core_dev *dev, u16 mlx5_mode);
+#else
+static inline void
+mlx5_sd_eswitch_mode_set(struct mlx5_core_dev *dev, u16 mlx5_mode) { return; }
 #endif
 
 #define mlx5_sd_for_each_dev_from_to(i, primary, ix_from, to, pos)	\
