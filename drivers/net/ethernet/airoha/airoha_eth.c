@@ -344,24 +344,24 @@ static void airoha_fe_pse_ports_init(struct airoha_eth *eth)
 			      FIELD_PREP(PSE_ALLRSV_MASK, all_rsv));
 	}
 
-	/* CMD1 */
+	/* CDM1 */
 	for (q = 0; q < pse_port_num_queues[FE_PSE_PORT_CDM1]; q++)
 		airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_CDM1, q,
 					 PSE_QUEUE_RSV_PAGES);
-	/* GMD1 */
+	/* GDM1 */
 	for (q = 0; q < pse_port_num_queues[FE_PSE_PORT_GDM1]; q++)
 		airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_GDM1, q,
 					 PSE_QUEUE_RSV_PAGES);
-	/* GMD2 */
+	/* GDM2 */
 	for (q = 6; q < pse_port_num_queues[FE_PSE_PORT_GDM2]; q++)
 		airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_GDM2, q, 0);
-	/* GMD3 */
+	/* GDM3 */
 	for (q = 0; q < pse_port_num_queues[FE_PSE_PORT_GDM3]; q++)
 		airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_GDM3, q,
 					 PSE_QUEUE_RSV_PAGES);
 	/* PPE1 */
 	for (q = 0; q < pse_port_num_queues[FE_PSE_PORT_PPE1]; q++) {
-		if (q < pse_port_num_queues[FE_PSE_PORT_PPE1])
+		if (q < pse_port_num_queues[FE_PSE_PORT_PPE1] / 2)
 			airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_PPE1, q,
 						 PSE_QUEUE_RSV_PAGES);
 		else
@@ -390,7 +390,7 @@ static void airoha_fe_pse_ports_init(struct airoha_eth *eth)
 							 q, 0);
 		}
 	}
-	/* GMD4 */
+	/* GDM4 */
 	for (q = 0; q < pse_port_num_queues[FE_PSE_PORT_GDM4]; q++)
 		airoha_fe_set_pse_oq_rsv(eth, FE_PSE_PORT_GDM4, q,
 					 PSE_QUEUE_RSV_PAGES);
@@ -1840,7 +1840,7 @@ static int airoha_dev_open(struct net_device *netdev)
 	airoha_qdma_set(qdma, REG_QDMA_GLOBAL_CFG,
 			GLOBAL_CFG_TX_DMA_EN_MASK |
 			GLOBAL_CFG_RX_DMA_EN_MASK);
-	atomic_inc(&qdma->users);
+	qdma->users++;
 
 	if (!airoha_is_lan_gdm_dev(dev) &&
 	    airoha_ppe_is_enabled(qdma->eth, 1))
@@ -1894,7 +1894,7 @@ static int airoha_dev_stop(struct net_device *netdev)
 					    REG_GDM_FWD_CFG(port->id),
 					    FE_PSE_PORT_DROP);
 
-	if (atomic_dec_and_test(&qdma->users)) {
+	if (!--qdma->users) {
 		airoha_qdma_clear(qdma, REG_QDMA_GLOBAL_CFG,
 				  GLOBAL_CFG_TX_DMA_EN_MASK |
 				  GLOBAL_CFG_RX_DMA_EN_MASK);
@@ -3710,6 +3710,6 @@ static struct platform_driver airoha_driver = {
 };
 module_platform_driver(airoha_driver);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Lorenzo Bianconi <lorenzo@kernel.org>");
 MODULE_DESCRIPTION("Ethernet driver for Airoha SoC");
