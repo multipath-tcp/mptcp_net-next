@@ -72,20 +72,29 @@ conn_max - INTEGER
 	Netfilter connection tracking) the connections can be
 	limited also by nf_conntrack_max.
 
-				soft limit	hard limit
-	=====================================================
-	init_net:
+	Limits for init_net:
+
+	======================= =============== =============
+	\			soft limit	hard limit
+	======================= =============== =============
 	create netns		platform	platform
 	priv admin		0 .. platform	0 .. platform
-	=====================================================
-	new netns:
+	======================= =============== =============
+
+	Limits for new netns:
+
+	======================= =============== =============
+	\			soft limit	hard limit
+	======================= =============== =============
 	create netns		init_net:soft	init_net:soft
 	priv admin		0 .. platform	0 .. platform
 	unpriv admin		0 .. hard	N/A
+	======================= =============== =============
 
 	Limits per platform:
-	1,073,741,824 (2^30 for 64-bit)
-	   16,777,216 (2^24 for 32-bit)
+
+	- 1,073,741,824 (2^30 for 64-bit)
+	- 16,777,216 (2^24 for 32-bit)
 
 	Possible values: 0 .. platform limit
 
