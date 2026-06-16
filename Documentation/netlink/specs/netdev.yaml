@@ -127,7 +127,14 @@ attribute-sets:
         enum: xsk-flags
   -
     name: io-uring-provider-info
-    attributes: []
+    attributes:
+      -
+        name: rx-buf-len
+        type: uint
+        doc: |
+          RX buffer length in bytes for this io_uring memory provider.
+          Reflects the rx_buf_len passed at io_uring zerocopy rx
+          registration time.
   -
     name: page-pool
     attributes:
