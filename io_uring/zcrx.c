@@ -1156,6 +1156,7 @@ static void io_pp_zc_destroy(struct page_pool *pp)
 static int io_pp_nl_fill(void *mp_priv, struct sk_buff *rsp,
 			 struct netdev_rx_queue *rxq)
 {
+	struct io_zcrx_ifq *ifq = mp_priv;
 	struct nlattr *nest;
 	int type;
 
@@ -1163,6 +1164,13 @@ static int io_pp_nl_fill(void *mp_priv, struct sk_buff *rsp,
 	nest = nla_nest_start(rsp, type);
 	if (!nest)
 		return -EMSGSIZE;
+
+	if (nla_put_uint(rsp, NETDEV_A_IO_URING_PROVIDER_INFO_RX_BUF_LEN,
+			 1ULL << ifq->niov_shift)) {
+		nla_nest_cancel(rsp, nest);
+		return -EMSGSIZE;
+	}
+
 	nla_nest_end(rsp, nest);
 
 	return 0;
