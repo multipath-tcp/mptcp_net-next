@@ -401,7 +401,7 @@ class NetDrvContEnv(NetDrvEpEnv):
         self.nk_guest_ifindex = netkit_links[0]['ifindex']
 
         self._setup_ns()
-        self._attach_bpf()
+        self.attach_bpf()
         if primary_rx_redirect:
             self._attach_primary_rx_redirect_bpf()
 
@@ -524,7 +524,13 @@ class NetDrvContEnv(NetDrvEpEnv):
             return bpf_obj
         return None
 
-    def _attach_bpf(self):
+    def detach_bpf(self):
+        if self._tc_attached:
+            cmd(f"tc filter del dev {self.ifname} ingress pref "
+                f"{self._bpf_prog_pref}", fail=False)
+            self._tc_attached = False
+
+    def attach_bpf(self):
         bpf_obj = self._find_bpf_obj("nk_forward.bpf.o")
         if not bpf_obj:
             raise KsftSkipEx("BPF prog nk_forward.bpf.o not found")
