@@ -88,7 +88,8 @@ struct fib_table *fib_new_table(struct net *net, u32 id)
 	if (id == RT_TABLE_LOCAL && !net->ipv4.fib_has_custom_rules)
 		alias = fib_new_table(net, RT_TABLE_MAIN);
 
-	tb = fib_trie_table(id, alias);
+	if (check_net(net))
+		tb = fib_trie_table(id, alias);
 	if (!tb)
 		return NULL;
 
@@ -1606,7 +1607,7 @@ static void ip_fib_net_exit(struct net *net)
 		struct fib_table *tb;
 
 		hlist_for_each_entry_safe(tb, tmp, head, tb_hlist) {
-			hlist_del(&tb->tb_hlist);
+			hlist_del_rcu(&tb->tb_hlist);
 			fib_table_flush(net, tb, true);
 			fib_free_table(tb);
 		}
@@ -1615,9 +1616,6 @@ static void ip_fib_net_exit(struct net *net)
 #ifdef CONFIG_IP_MULTIPLE_TABLES
 	fib4_rules_exit(net);
 #endif
-
-	kfree(net->ipv4.fib_table_hash);
-	fib4_notifier_exit(net);
 }
 
 static int __net_init fib_net_init(struct net *net)
@@ -1653,35 +1651,36 @@ out_semantics:
 	rtnl_net_lock(net);
 	ip_fib_net_exit(net);
 	rtnl_net_unlock(net);
+
+	kfree(net->ipv4.fib_table_hash);
+	fib4_notifier_exit(net);
 	goto out;
 }
 
-static void __net_exit fib_net_exit(struct net *net)
+static void __net_exit fib_net_pre_exit(struct net *net)
 {
 	fib_proc_exit(net);
 	nl_fib_lookup_exit(net);
 }
 
-static void __net_exit fib_net_exit_batch(struct list_head *net_list)
+static void __net_exit fib_net_exit_rtnl(struct net *net,
+					 struct list_head *dev_kill_list)
 {
-	struct net *net;
+	ip_fib_net_exit(net);
+}
 
-	rtnl_lock();
-	list_for_each_entry(net, net_list, exit_list) {
-		__rtnl_net_lock(net);
-		ip_fib_net_exit(net);
-		__rtnl_net_unlock(net);
-	}
-	rtnl_unlock();
-
-	list_for_each_entry(net, net_list, exit_list)
-		fib4_semantics_exit(net);
+static void __net_exit fib_net_exit(struct net *net)
+{
+	kfree(net->ipv4.fib_table_hash);
+	fib4_notifier_exit(net);
+	fib4_semantics_exit(net);
 }
 
 static struct pernet_operations fib_net_ops = {
 	.init = fib_net_init,
+	.pre_exit = fib_net_pre_exit,
+	.exit_rtnl = fib_net_exit_rtnl,
 	.exit = fib_net_exit,
-	.exit_batch = fib_net_exit_batch,
 };
 
 static const struct rtnl_msg_handler fib_rtnl_msg_handlers[] __initconst = {
