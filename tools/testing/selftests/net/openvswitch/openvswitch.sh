@@ -31,6 +31,7 @@ tests="
 	pop_vlan				vlan: POP_VLAN action strips tag
 	dec_ttl					ttl: dec_ttl decrements IP TTL
 	flow_set				flow-set: Flow modify
+	action_set				set: SET action rewrites fields
 	psample					psample: Sampling packets with psample"
 
 info() {
@@ -373,6 +374,71 @@ test_flow_set() {
 		10.0.0.2 >/dev/null 2>&1 \
 		&& { info "FAIL: ping should still fail after no-actions set"
 		     return 1; }
+
+	return 0
+}
+
+test_action_set() {
+	sbx_add "test_action_set" || return $?
+	ovs_add_dp "test_action_set" settest || return 1
+
+	info "create namespaces"
+	for ns in client server; do
+		ovs_add_netns_and_veths "test_action_set" "settest" "$ns" \
+			"${ns:0:1}0" "${ns:0:1}1" || return 1
+	done
+
+	ip netns exec client ip addr add 10.0.0.1/24 dev c1
+	ip netns exec client ip link set c1 up
+	ip netns exec server ip addr add 10.0.0.2/24 dev s1
+	ip netns exec server ip link set s1 up
+
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0800),ipv4()' '2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0800),ipv4()' '1' || return 1
+
+	info "verify connectivity without SET"
+	ovs_sbx "test_action_set" ip netns exec client ping -c 1 -W 2 \
+		10.0.0.2 || return 1
+
+	ovs_del_flows "test_action_set" settest
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+
+	info "set ipv4 dst to unreachable address"
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+		'set(ipv4(dst=10.0.0.99)),2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0800),ipv4()' '1' || return 1
+
+	info "verify ping fails with rewritten dst"
+	ovs_sbx "test_action_set" ip netns exec client ping -c 1 -W 2 \
+		10.0.0.2 >/dev/null 2>&1 \
+		&& { info "FAIL: ping should fail with dst rewritten"
+		     return 1; }
+
+	ovs_del_flows "test_action_set" settest
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(1),eth(),eth_type(0x0800),ipv4()' '2' || return 1
+	ovs_add_flow "test_action_set" settest \
+		'in_port(2),eth(),eth_type(0x0800),ipv4()' '1' || return 1
+
+	info "verify connectivity restored without SET"
+	ovs_sbx "test_action_set" ip netns exec client ping -c 1 -W 2 \
+		10.0.0.2 || return 1
 
 	return 0
 }
