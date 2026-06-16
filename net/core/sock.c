@@ -2399,7 +2399,7 @@ void sk_net_refcnt_upgrade(struct sock *sk)
 	__netns_tracker_free(net, &sk->ns_tracker, false);
 	net_passive_dec(net);
 	sk->sk_net_refcnt = 1;
-	get_net_track(net, &sk->ns_tracker, GFP_KERNEL);
+	get_net_track(net, &sk->ns_tracker, GFP_ATOMIC);
 	sock_inuse_add(net, 1);
 }
 EXPORT_SYMBOL_GPL(sk_net_refcnt_upgrade);
