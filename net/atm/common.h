@@ -28,8 +28,6 @@ void vcc_process_recv_queue(struct atm_vcc *vcc);
 
 int atmpvc_init(void);
 void atmpvc_exit(void);
-int atmsvc_init(void);
-void atmsvc_exit(void);
 int atm_sysfs_init(void);
 void atm_sysfs_exit(void);
 
@@ -47,9 +45,6 @@ static inline void atm_proc_exit(void)
 	/* nothing */
 }
 #endif /* CONFIG_PROC_FS */
-
-/* SVC */
-int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos);
 
 void atm_dev_release_vccs(struct atm_dev *dev);
 
