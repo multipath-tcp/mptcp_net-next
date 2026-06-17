@@ -475,51 +475,7 @@ Please see: Documentation/networking/ip-sysctl.rst and
 Documentation/admin-guide/sysctl/net.rst for descriptions of these entries.
 
 
-4. Appletalk
-------------
-
-The /proc/sys/net/appletalk  directory  holds the Appletalk configuration data
-when Appletalk is loaded. The configurable parameters are:
-
-aarp-expiry-time
-----------------
-
-The amount  of  time  we keep an ARP entry before expiring it. Used to age out
-old hosts.
-
-aarp-resolve-time
------------------
-
-The amount of time we will spend trying to resolve an Appletalk address.
-
-aarp-retransmit-limit
----------------------
-
-The number of times we will retransmit a query before giving up.
-
-aarp-tick-time
---------------
-
-Controls the rate at which expires are checked.
-
-The directory  /proc/net/appletalk  holds the list of active Appletalk sockets
-on a machine.
-
-The fields  indicate  the DDP type, the local address (in network:node format)
-the remote  address,  the  size of the transmit pending queue, the size of the
-received queue  (bytes waiting for applications to read) the state and the uid
-owning the socket.
-
-/proc/net/atalk_iface lists  all  the  interfaces  configured for appletalk.It
-shows the  name  of the interface, its Appletalk address, the network range on
-that address  (or  network number for phase 1 networks), and the status of the
-interface.
-
-/proc/net/atalk_route lists  each  known  network  route.  It lists the target
-(network) that the route leads to, the router (may be directly connected), the
-route flags, and the device the route is using.
-
-5. TIPC
+4. TIPC
 -------
 
 tipc_rmem
