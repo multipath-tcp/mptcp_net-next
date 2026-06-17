@@ -1250,7 +1250,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	 * present, needs to be updated here before the skb is freed.
 	 */
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
-		if (mp_opt.data_fin && mp_opt.data_len == 1 &&
+		if (mp_opt.use_map && mp_opt.data_fin && mp_opt.data_len == 1 &&
 		    mptcp_update_rcv_data_fin(msk, mp_opt.data_seq, mp_opt.dsn64))
 			mptcp_schedule_work((struct sock *)msk);
 
