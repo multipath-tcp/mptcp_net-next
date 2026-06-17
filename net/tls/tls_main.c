@@ -402,7 +402,6 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 	struct tls_sw_context_rx *ctx;
 	struct tls_context *tls_ctx;
 	struct sock *sk = sock->sk;
-	struct sk_psock *psock;
 	__poll_t mask = 0;
 	u8 shutdown;
 	int state;
@@ -416,16 +415,11 @@ static __poll_t tls_sk_poll(struct file *file, struct socket *sock,
 
 	tls_ctx = tls_get_ctx(sk);
 	ctx = tls_sw_ctx_rx(tls_ctx);
-	psock = sk_psock_get(sk);
 
 	if ((skb_queue_empty_lockless(&ctx->rx_list) &&
-	     !tls_strp_msg_ready(ctx) &&
-	     sk_psock_queue_empty(psock)) ||
+	     !tls_strp_msg_ready(ctx)) ||
 	    READ_ONCE(ctx->key_update_pending))
 		mask &= ~(EPOLLIN | EPOLLRDNORM);
-
-	if (psock)
-		sk_psock_put(sk, psock);
 
 	return mask;
 }
@@ -642,6 +636,17 @@ static int do_tls_setsockopt_conf(struct sock *sk, sockptr_t optval,
 	bool update = false;
 	int rc = 0;
 	int conf;
+
+	/* TLS and sockmap are mutually exclusive. A socket already in a
+	 * sockmap (i.e. with a psock attached) cannot be upgraded to TLS.
+	 * sockmap rejects TLS sockets already (see sk_psock_init()).
+	 */
+	rcu_read_lock();
+	if (sk_psock(sk)) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+	rcu_read_unlock();
 
 	if (sockptr_is_null(optval) || (optlen < sizeof(*crypto_info)))
 		return -EINVAL;
