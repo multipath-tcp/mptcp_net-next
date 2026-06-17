@@ -1800,17 +1800,17 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	/* the newly created socket has to be in the same cgroup as its parent */
 	mptcp_attach_cgroup(sk, sf->sk);
 
-	/* kernel sockets do not by default acquire net ref, but TCP timer
-	 * needs it.
-	 * Update ns_tracker to current stack trace and refcounted tracker.
-	 */
-	sk_net_refcnt_upgrade(sf->sk);
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	if (err)
 		goto err_free;
 
 	mptcp_sockopt_sync_locked(mptcp_sk(sk), sf->sk);
 	release_sock(sf->sk);
+
+	/* Upgrade net namespace refcount after releasing the socket lock
+	 * to avoid GFP_KERNEL allocation under lock (lockdep: fs_reclaim).
+	 */
+	sk_net_refcnt_upgrade(sf->sk);
 
 	/* the newly created socket really belongs to the owning MPTCP
 	 * socket, even if for additional subflows the allocation is performed
