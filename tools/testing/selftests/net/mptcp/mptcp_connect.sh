@@ -149,6 +149,14 @@ mptcp_lib_check_mptcp
 mptcp_lib_check_kallsyms
 mptcp_lib_check_tools ip tc
 
+# If MPTCP IPv6 is not available in the running kernel, transparently
+# downgrade to v4-only mode (unless the user already passed -4).
+# This keeps v4 tests running in IPV6=m / MPTCP_IPV6=n kernels.
+if ! mptcp_lib_check_ipv6 && ${ipv6}; then
+	ipv6=false
+	mptcp_lib_pr_info "MPTCP IPv6 not available, running IPv4-only tests"
+fi
+
 sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)
@@ -169,41 +177,51 @@ ip link add ns2eth3 netns "$ns2" type veth peer name ns3eth2 netns "$ns3"
 ip link add ns3eth4 netns "$ns3" type veth peer name ns4eth3 netns "$ns4"
 
 ip -net "$ns1" addr add 10.0.1.1/24 dev ns1eth2
-ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth2 nodad
 
 ip -net "$ns1" link set ns1eth2 up
 ip -net "$ns1" route add default via 10.0.1.2
-ip -net "$ns1" route add default via dead:beef:1::2
 
 ip -net "$ns2" addr add 10.0.1.2/24 dev ns2eth1
-ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
 ip -net "$ns2" link set ns2eth1 up
 
 ip -net "$ns2" addr add 10.0.2.1/24 dev ns2eth3
-ip -net "$ns2" addr add dead:beef:2::1/64 dev ns2eth3 nodad
 ip -net "$ns2" link set ns2eth3 up
 ip -net "$ns2" route add default via 10.0.2.2
-ip -net "$ns2" route add default via dead:beef:2::2
 ip netns exec "$ns2" sysctl -q net.ipv4.ip_forward=1
-ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
 
 ip -net "$ns3" addr add 10.0.2.2/24 dev ns3eth2
-ip -net "$ns3" addr add dead:beef:2::2/64 dev ns3eth2 nodad
 ip -net "$ns3" link set ns3eth2 up
 
 ip -net "$ns3" addr add 10.0.3.2/24 dev ns3eth4
-ip -net "$ns3" addr add dead:beef:3::2/64 dev ns3eth4 nodad
 ip -net "$ns3" link set ns3eth4 up
 ip -net "$ns3" route add default via 10.0.2.1
-ip -net "$ns3" route add default via dead:beef:2::1
 ip netns exec "$ns3" sysctl -q net.ipv4.ip_forward=1
-ip netns exec "$ns3" sysctl -q net.ipv6.conf.all.forwarding=1
 
 ip -net "$ns4" addr add 10.0.3.1/24 dev ns4eth3
-ip -net "$ns4" addr add dead:beef:3::1/64 dev ns4eth3 nodad
 ip -net "$ns4" link set ns4eth3 up
 ip -net "$ns4" route add default via 10.0.3.2
-ip -net "$ns4" route add default via dead:beef:3::2
+
+# IPv6 topology: only configured if MPTCP IPv6 is supported by the
+# running kernel (CONFIG_MPTCP_IPV6=y). On a kernel without it, "ip -6
+# addr add" and the v6 forwarding sysctl would fail and abort the
+# script, taking the v4 tests down with them.
+if $ipv6; then
+	ip -net "$ns1" addr add dead:beef:1::1/64 dev ns1eth2 nodad
+	ip -net "$ns1" route add default via dead:beef:1::2
+
+	ip -net "$ns2" addr add dead:beef:1::2/64 dev ns2eth1 nodad
+	ip -net "$ns2" addr add dead:beef:2::1/64 dev ns2eth3 nodad
+	ip -net "$ns2" route add default via dead:beef:2::2
+	ip netns exec "$ns2" sysctl -q net.ipv6.conf.all.forwarding=1
+
+	ip -net "$ns3" addr add dead:beef:2::2/64 dev ns3eth2 nodad
+	ip -net "$ns3" addr add dead:beef:3::2/64 dev ns3eth4 nodad
+	ip -net "$ns3" route add default via dead:beef:2::1
+	ip netns exec "$ns3" sysctl -q net.ipv6.conf.all.forwarding=1
+
+	ip -net "$ns4" addr add dead:beef:3::1/64 dev ns4eth3 nodad
+	ip -net "$ns4" route add default via dead:beef:3::2
+fi
 
 if $checksum; then
 	for i in "$ns1" "$ns2" "$ns3" "$ns4";do
