@@ -50,7 +50,7 @@ add_mark_rules()
 	local m=$2
 
 	local t
-	for t in ${iptables} ${ip6tables}; do
+	for t in ${iptables}; do
 		# just to debug: check we have multiple subflows connection requests
 		ip netns exec $ns $t -A OUTPUT -p tcp --syn -m mark --mark $m -j ACCEPT
 
@@ -60,6 +60,21 @@ add_mark_rules()
 		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark $m -j ACCEPT
 		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark 0 -j DROP
 	done
+	# ip6tables rules require MPTCP IPv6 support in the kernel, otherwise
+	# ip6tables will reject them (or, in some environments, the binary itself
+	# may behave oddly without IPv6 available).
+	if mptcp_lib_is_v6_enabled; then
+		for t in ${ip6tables}; do
+			# just to debug: check we have multiple subflows connection requests
+			ip netns exec $ns $t -A OUTPUT -p tcp --syn -m mark --mark $m -j ACCEPT
+
+			# RST packets might be handled by a internal dummy socket
+			ip netns exec $ns $t -A OUTPUT -p tcp --tcp-flags RST RST -m mark --mark 0 -j ACCEPT
+
+			ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark $m -j ACCEPT
+			ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark 0 -j DROP
+		done
+	fi
 }
 
 init()
@@ -70,21 +85,29 @@ init()
 	for i in $(seq 1 4); do
 		ip link add ns1eth$i netns "$ns1" type veth peer name ns2eth$i netns "$ns2"
 		ip -net "$ns1" addr add 10.0.$i.1/24 dev ns1eth$i
-		ip -net "$ns1" addr add dead:beef:$i::1/64 dev ns1eth$i nodad
+		if mptcp_lib_is_v6_enabled; then
+			ip -net "$ns1" addr add dead:beef:$i::1/64 dev ns1eth$i nodad
+		fi
 		ip -net "$ns1" link set ns1eth$i up
 
 		ip -net "$ns2" addr add 10.0.$i.2/24 dev ns2eth$i
-		ip -net "$ns2" addr add dead:beef:$i::2/64 dev ns2eth$i nodad
+		if mptcp_lib_is_v6_enabled; then
+			ip -net "$ns2" addr add dead:beef:$i::2/64 dev ns2eth$i nodad
+		fi
 		ip -net "$ns2" link set ns2eth$i up
 
 		# let $ns2 reach any $ns1 address from any interface
 		ip -net "$ns2" route add default via 10.0.$i.1 dev ns2eth$i metric 10$i
 
 		mptcp_lib_pm_nl_add_endpoint "${ns1}" "10.0.${i}.1" flags signal
-		mptcp_lib_pm_nl_add_endpoint "${ns1}" "dead:beef:${i}::1" flags signal
+		if mptcp_lib_is_v6_enabled; then
+			mptcp_lib_pm_nl_add_endpoint "${ns1}" "dead:beef:${i}::1" flags signal
+		fi
 
 		mptcp_lib_pm_nl_add_endpoint "${ns2}" "10.0.${i}.2" flags signal
-		mptcp_lib_pm_nl_add_endpoint "${ns2}" "dead:beef:${i}::2" flags signal
+		if mptcp_lib_is_v6_enabled; then
+			mptcp_lib_pm_nl_add_endpoint "${ns2}" "dead:beef:${i}::2" flags signal
+		fi
 	done
 
 	mptcp_lib_pm_nl_set_limits "${ns1}" 8 8
@@ -106,6 +129,7 @@ cleanup()
 mptcp_lib_check_mptcp
 mptcp_lib_check_kallsyms
 mptcp_lib_check_tools ip "${iptables}" "${ip6tables}"
+mptcp_lib_check_ipv6
 
 check_mark()
 {
@@ -162,6 +186,20 @@ do_transfer()
 	else
 		local_addr="0.0.0.0"
 		ip=ipv4
+	fi
+
+	# Skip v6 subtests when the running kernel has no MPTCP IPv6 support.
+	# Reuses the same ${ip}/${ip:2} naming as the normal path below so the
+	# console counter (MPTCP_LIB_TEST_COUNTER, bumped by print_title) and
+	# the TAP index (bumped by mptcp_lib_result_skip) stay in lock-step.
+	if [ "${ip}" = "ipv6" ] && ! mptcp_lib_is_v6_enabled; then
+		print_title "Transfer ${ip:2}"
+		mptcp_lib_pr_skip "MPTCP IPv6 not available"
+		mptcp_lib_result_skip "transfer ${ip}"
+		print_title "Mark ${ip:2}"
+		mptcp_lib_pr_skip "MPTCP IPv6 not available"
+		mptcp_lib_result_skip "mark ${ip}"
+		return 0
 	fi
 
 	cmsg="TIMESTAMPNS"
@@ -274,18 +312,23 @@ do_mptcp_sockopt_tests()
 	mptcp_lib_pr_ok
 	mptcp_lib_result_pass "sockopt v4"
 
-	ip netns exec "$ns_sbox" ./mptcp_sockopt -6
-	lret=$?
-
 	print_title "SOL_MPTCP sockopt v6"
-	if [ $lret -ne 0 ]; then
-		mptcp_lib_pr_fail
-		mptcp_lib_result_fail "sockopt v6"
-		ret=$lret
-		return
+	if ! mptcp_lib_is_v6_enabled; then
+		mptcp_lib_pr_skip "MPTCP IPv6 not available"
+		mptcp_lib_result_skip "sockopt v6"
+	else
+		ip netns exec "$ns_sbox" ./mptcp_sockopt -6
+		lret=$?
+
+		if [ $lret -ne 0 ]; then
+			mptcp_lib_pr_fail
+			mptcp_lib_result_fail "sockopt v6"
+			ret=$lret
+			return
+		fi
+		mptcp_lib_pr_ok
+		mptcp_lib_result_pass "sockopt v6"
 	fi
-	mptcp_lib_pr_ok
-	mptcp_lib_result_pass "sockopt v6"
 }
 
 run_tests()
@@ -308,6 +351,13 @@ run_tests()
 do_tcpinq_test()
 {
 	print_title "TCP_INQ cmsg/ioctl $*"
+
+	if [ "${1}" = "-6" ] && ! mptcp_lib_is_v6_enabled; then
+		mptcp_lib_pr_skip "MPTCP IPv6 not available"
+		mptcp_lib_result_skip "TCP_INQ: $*"
+		return 0
+	fi
+
 	ip netns exec "$ns_sbox" ./mptcp_inq "$@"
 	local lret=$?
 	if [ $lret -ne 0 ];then
@@ -339,10 +389,16 @@ do_tcpinq_tests()
 		if [ $lret -ne 0 ] ; then
 			return $lret
 		fi
-		do_tcpinq_test -6 $args
-		lret=$?
-		if [ $lret -ne 0 ] ; then
-			return $lret
+		if mptcp_lib_is_v6_enabled; then
+			do_tcpinq_test -6 $args
+			lret=$?
+			if [ $lret -ne 0 ] ; then
+				return $lret
+			fi
+		else
+			print_title "TCP_INQ cmsg/ioctl -6 $args"
+			mptcp_lib_pr_skip "MPTCP IPv6 not available"
+			mptcp_lib_result_skip "TCP_INQ: -6 $args"
 		fi
 	done
 
