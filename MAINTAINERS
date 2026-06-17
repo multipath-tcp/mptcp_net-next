@@ -1968,10 +1968,9 @@ F:	drivers/hwmon/applesmc.c
 
 APPLETALK NETWORK LAYER
 L:	netdev@vger.kernel.org
-S:	Odd fixes
-F:	include/linux/atalk.h
+S:	Obsolete
 F:	include/uapi/linux/atalk.h
-F:	net/appletalk/
+F:	include/uapi/linux/if_ltalk.h
 
 APPLIED MICRO (APM) X-GENE DEVICE TREE SUPPORT
 M:	Khuong Dinh <khuong@os.amperecomputing.com>
