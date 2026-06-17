@@ -1947,7 +1947,6 @@ enum netdev_reg_state {
  *	@vlan_info:	VLAN info
  *	@dsa_ptr:	dsa specific data
  *	@tipc_ptr:	TIPC specific data
- *	@atalk_ptr:	AppleTalk link
  *	@ip_ptr:	IPv4 specific data
  *	@ip6_ptr:	IPv6 specific data
  *	@ieee80211_ptr:	IEEE 802.11 specific data, assign before registering
@@ -2350,9 +2349,6 @@ struct net_device {
 #endif
 #if IS_ENABLED(CONFIG_TIPC)
 	struct tipc_bearer __rcu *tipc_ptr;
-#endif
-#if IS_ENABLED(CONFIG_ATALK)
-	void 			*atalk_ptr;
 #endif
 #if IS_ENABLED(CONFIG_CFG80211)
 	struct wireless_dev	*ieee80211_ptr;
