@@ -19,7 +19,6 @@
 #include <linux/vmalloc.h>
 #include <linux/sched/xacct.h>
 #include <linux/crc32c.h>
-#include <linux/namei.h>
 #include <linux/splice.h>
 
 #include "glob.h"
@@ -56,7 +55,7 @@ static int ksmbd_vfs_path_lookup(struct ksmbd_share_config *share_conf,
 {
 	struct qstr last;
 	const struct path *root_share_path = &share_conf->vfs_path;
-	int err, type;
+	int err;
 	struct dentry *d;
 
 	if (pathname[0] == '\0') {
@@ -67,16 +66,10 @@ static int ksmbd_vfs_path_lookup(struct ksmbd_share_config *share_conf,
 	}
 
 	CLASS(filename_kernel, filename)(pathname);
-	err = vfs_path_parent_lookup(filename, flags,
-				     path, &last, &type,
+	err = vfs_path_parent_lookup(filename, flags, path, &last,
 				     root_share_path);
 	if (err)
 		return err;
-
-	if (unlikely(type != LAST_NORM)) {
-		path_put(path);
-		return -ENOENT;
-	}
 
 	if (for_remove) {
 		err = mnt_want_write(path->mnt);
@@ -668,7 +661,6 @@ int ksmbd_vfs_rename(struct ksmbd_work *work, const struct path *old_path,
 	struct renamedata rd;
 	struct ksmbd_share_config *share_conf = work->tcon->share_conf;
 	struct ksmbd_file *parent_fp;
-	int new_type;
 	int err, lookup_flags = LOOKUP_NO_SYMLINKS;
 
 	if (ksmbd_override_fsids(work))
@@ -678,8 +670,7 @@ int ksmbd_vfs_rename(struct ksmbd_work *work, const struct path *old_path,
 
 retry:
 	err = vfs_path_parent_lookup(to, lookup_flags | LOOKUP_BENEATH,
-				     &new_path, &new_last, &new_type,
-				     &share_conf->vfs_path);
+				     &new_path, &new_last, &share_conf->vfs_path);
 	if (err)
 		goto out1;
 
