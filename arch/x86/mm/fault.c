@@ -169,6 +169,11 @@ is_prefetch(struct pt_regs *regs, unsigned long error_code, unsigned long addr)
 }
 
 DEFINE_SPINLOCK(pgd_lock);
+/*
+ * List of all process' PGD pages (excluding init_mm and some other special
+ * system-wide PGDs). Mainly used to keep the kernel portion of the address
+ * space in sync across mms.
+ */
 LIST_HEAD(pgd_list);
 
 #ifdef CONFIG_X86_32
