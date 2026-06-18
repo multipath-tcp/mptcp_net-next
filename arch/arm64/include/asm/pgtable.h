@@ -1007,7 +1007,7 @@ static inline pud_t *p4d_pgtable(p4d_t p4d)
 
 static inline phys_addr_t pud_offset_phys(p4d_t *p4dp, unsigned long addr)
 {
-	BUG_ON(!pgtable_l4_enabled());
+	VM_WARN_ON_ONCE(!pgtable_l4_enabled());
 
 	return p4d_page_paddr(READ_ONCE(*p4dp)) + pud_index(addr) * sizeof(pud_t);
 }
@@ -1130,7 +1130,7 @@ static inline p4d_t *pgd_to_folded_p4d(pgd_t *pgdp, unsigned long addr)
 
 static inline phys_addr_t p4d_offset_phys(pgd_t *pgdp, unsigned long addr)
 {
-	BUG_ON(!pgtable_l5_enabled());
+	VM_WARN_ON_ONCE(!pgtable_l5_enabled());
 
 	return pgd_page_paddr(READ_ONCE(*pgdp)) + p4d_index(addr) * sizeof(p4d_t);
 }
