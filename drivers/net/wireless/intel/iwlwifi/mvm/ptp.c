@@ -160,12 +160,13 @@ iwl_mvm_phc_get_crosstimestamp(struct ptp_clock_info *ptp,
 	/* System (wall) time */
 	ktime_t sys_time;
 
-	memset(xtstamp, 0, sizeof(struct system_device_crosststamp));
-
 	if (!mvm->ptp_data.ptp_clock) {
 		IWL_ERR(mvm, "No PHC clock registered\n");
 		return -ENODEV;
 	}
+
+	if (xtstamp->clock_id != CLOCK_REALTIME)
+		return -ENOTSUPP;
 
 	mutex_lock(&mvm->mutex);
 	if (fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_SYNCED_TIME)) {
@@ -184,7 +185,7 @@ iwl_mvm_phc_get_crosstimestamp(struct ptp_clock_info *ptp,
 
 	/* System monotonic raw time is not used */
 	xtstamp->device = (ktime_t)gp2_ns;
-	xtstamp->sys_realtime = sys_time;
+	xtstamp->sys_systime = sys_time;
 
 out:
 	mutex_unlock(&mvm->mutex);
