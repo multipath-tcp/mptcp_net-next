@@ -420,8 +420,7 @@ xrep_cow_alloc(
 	if (error)
 		return error;
 
-	error = xfs_alloc_vextent_start_ag(&args,
-			XFS_INO_TO_FSB(sc->mp, sc->ip->i_ino));
+	error = xfs_alloc_vextent_start_ag(&args, XFS_INODE_TO_FSB(sc->ip));
 	if (error)
 		return error;
 	if (args.fsbno == NULLFSBLOCK)
