@@ -6,6 +6,7 @@
  *
  */
 #include <linux/fs.h>
+#include <linux/fs_context.h>
 #include <linux/net.h>
 #include <linux/string.h>
 #include <linux/sched/mm.h>
@@ -2991,9 +2992,9 @@ static int match_prepath(struct super_block *sb,
 }
 
 int
-cifs_match_super(struct super_block *sb, void *data)
+cifs_match_super(struct super_block *sb, struct fs_context *fc)
 {
-	struct cifs_mnt_data *mnt_data = data;
+	struct cifs_mnt_data *mnt_data = fc->sget_key;
 	struct smb3_fs_context *ctx;
 	struct cifs_sb_info *cifs_sb;
 	struct TCP_Server_Info *tcp_srv;
