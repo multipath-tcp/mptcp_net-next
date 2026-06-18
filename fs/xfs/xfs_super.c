@@ -1901,7 +1901,6 @@ xfs_fs_fill_super(
 			error = -EINVAL;
 			goto out_filestream_unmount;
 		}
-		xfs_warn_experimental(mp, XFS_EXPERIMENTAL_ZONED);
 	}
 
 	if (xfs_has_reflink(mp)) {
