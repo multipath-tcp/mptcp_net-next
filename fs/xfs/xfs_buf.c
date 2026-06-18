@@ -623,7 +623,7 @@ _xfs_buf_read(
  * type.  If repair can't establish that, the buffer will be left in memory
  * with NULL buffer ops.
  */
-int
+static int
 xfs_buf_reverify(
 	struct xfs_buf		*bp,
 	const struct xfs_buf_ops *ops)
