@@ -142,10 +142,6 @@ static struct gpio_desc *acpi_get_gpiod(char *path, unsigned int pin)
 	if (!gdev)
 		return ERR_PTR(-EPROBE_DEFER);
 
-	/*
-	 * FIXME: keep track of the reference to the GPIO device somehow
-	 * instead of putting it here.
-	 */
 	return gpio_device_get_desc(gdev, pin);
 }
 

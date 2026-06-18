@@ -1189,10 +1189,10 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 	pte_t res;
 
 	res = ptep_xchg_lazy(mm, addr, ptep, __pte(_PAGE_INVALID));
+	page_table_check_pte_clear(mm, addr, res);
 	/* At this point the reference through the mapping is still present */
 	if (mm_is_protected(mm) && pte_present(res))
 		WARN_ON_ONCE(uv_convert_from_secure_pte(res));
-	page_table_check_pte_clear(mm, addr, res);
 	return res;
 }
 
@@ -1208,10 +1208,10 @@ static inline pte_t ptep_clear_flush(struct vm_area_struct *vma,
 	pte_t res;
 
 	res = ptep_xchg_direct(vma->vm_mm, addr, ptep, __pte(_PAGE_INVALID));
+	page_table_check_pte_clear(vma->vm_mm, addr, res);
 	/* At this point the reference through the mapping is still present */
 	if (mm_is_protected(vma->vm_mm) && pte_present(res))
 		WARN_ON_ONCE(uv_convert_from_secure_pte(res));
-	page_table_check_pte_clear(vma->vm_mm, addr, res);
 	return res;
 }
 
@@ -1235,26 +1235,23 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm,
 	} else {
 		res = ptep_xchg_lazy(mm, addr, ptep, __pte(_PAGE_INVALID));
 	}
-
 	page_table_check_pte_clear(mm, addr, res);
-
-	/* Nothing to do */
-	if (!mm_is_protected(mm) || !pte_present(res))
-		return res;
-	/*
-	 * At this point the reference through the mapping is still present.
-	 * The notifier should have destroyed all protected vCPUs at this
-	 * point, so the destroy should be successful.
-	 */
-	if (full && !uv_destroy_pte(res))
-		return res;
-	/*
-	 * If something went wrong and the page could not be destroyed, or
-	 * if this is not a mm teardown, the slower export is used as
-	 * fallback instead. If even that fails, print a warning and leak
-	 * the page, to avoid crashing the whole system.
-	 */
-	WARN_ON_ONCE(uv_convert_from_secure_pte(res));
+	/* At this point the reference through the mapping is still present */
+	if (mm_is_protected(mm) && pte_present(res)) {
+		/*
+		 * The notifier should have destroyed all protected vCPUs at
+		 * this point, so the destroy should be successful.
+		 */
+		if (full && !uv_destroy_pte(res))
+			return res;
+		/*
+		 * If something went wrong and the page could not be destroyed,
+		 * or if this is not a mm teardown, the slower export is used
+		 * as fallback instead. If even that fails, print a warning and
+		 * leak the page, to avoid crashing the whole system.
+		 */
+		WARN_ON_ONCE(uv_convert_from_secure_pte(res));
+	}
 	return res;
 }
 

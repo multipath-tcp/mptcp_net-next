@@ -230,9 +230,8 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent,
 	if (MREF_ERR(mref) == -ENOENT) {
 		ntfs_debug("Entry was not found, adding negative dentry.");
 		/* The dcache will handle negative entries. */
-		d_add(dent, NULL);
 		ntfs_debug("Done.");
-		return NULL;
+		return d_splice_alias(NULL, dent);
 	}
 	ntfs_error(vol->sb, "ntfs_lookup_ino_by_name() failed with error code %i.",
 			-MREF_ERR(mref));
