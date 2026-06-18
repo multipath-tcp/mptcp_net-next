@@ -243,12 +243,11 @@ static int xdp_recv_frames(struct xdp_frame **frames, int nframes,
 			   struct net_device *dev)
 {
 	gfp_t gfp = __GFP_ZERO | GFP_ATOMIC;
-	int i, n;
+	int i;
 	LIST_HEAD(list);
 
-	n = kmem_cache_alloc_bulk(net_hotdata.skbuff_cache, gfp, nframes,
-				  (void **)skbs);
-	if (unlikely(n == 0)) {
+	if (unlikely(!kmem_cache_alloc_bulk(net_hotdata.skbuff_cache, gfp,
+					    nframes, (void **)skbs))) {
 		for (i = 0; i < nframes; i++)
 			xdp_return_frame(frames[i]);
 		return -ENOMEM;
