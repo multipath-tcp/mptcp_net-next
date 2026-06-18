@@ -424,7 +424,6 @@ extern struct spi_device *devm_spi_new_ancillary_device(struct spi_device *spi, 
  * @flags: other constraints relevant to this driver
  * @slave: indicates that this is an SPI slave controller
  * @target: indicates that this is an SPI target controller
- * @devm_allocated: whether the allocation of this struct is devres-managed
  * @max_transfer_size: function that returns the max transfer size for
  *	a &spi_device; may be %NULL, so the default %SIZE_MAX will be used.
  * @max_message_size: function that returns the max message size for
@@ -628,9 +627,6 @@ struct spi_controller {
 	 * assert/de-assert more than one chip select at once.
 	 */
 #define SPI_CONTROLLER_MULTI_CS		BIT(7)
-
-	/* Flag indicating if the allocation of this struct is devres-managed */
-	bool			devm_allocated;
 
 	union {
 		/* Flag indicating this is an SPI slave controller */
