@@ -23,6 +23,7 @@
 
 #include <asm/pkru.h>
 #include <asm/trapnr.h>
+#include <asm/cpuid/api.h>
 #include <asm/fpu/xcr.h>
 #include <asm/fpu/xstate.h>
 #include <asm/debugreg.h>
