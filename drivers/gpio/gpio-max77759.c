@@ -502,7 +502,7 @@ static const struct of_device_id max77759_gpio_of_id[] = {
 MODULE_DEVICE_TABLE(of, max77759_gpio_of_id);
 
 static const struct platform_device_id max77759_gpio_platform_id[] = {
-	{ "max77759-gpio", },
+	{ .name = "max77759-gpio" },
 	{ }
 };
 MODULE_DEVICE_TABLE(platform, max77759_gpio_platform_id);
