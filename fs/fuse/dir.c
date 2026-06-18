@@ -177,8 +177,8 @@ static void fuse_dentry_tree_work(struct work_struct *work)
 			spin_lock(&fd->dentry->d_lock);
 			/* If dentry is still referenced, let next dput release it */
 			fd->dentry->d_flags |= DCACHE_OP_DELETE;
+			__move_to_shrink_list(fd->dentry, &dispose);
 			spin_unlock(&fd->dentry->d_lock);
-			d_dispose_if_unused(fd->dentry, &dispose);
 			if (need_resched()) {
 				spin_unlock(&dentry_hash[i].lock);
 				cond_resched();
