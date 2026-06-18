@@ -31,7 +31,10 @@ void account_idle_time_irq(void)
 	/* Account time spent with enabled wait psw loaded as idle time. */
 	__atomic64_add(idle_time, &idle->idle_time);
 	__atomic64_add_const(1, &idle->idle_count);
-	account_idle_time(cputime_to_nsecs(idle_time));
+
+	/* Dyntick idle time accounted by nohz/scheduler */
+	if (!idle->idle_dyntick)
+		account_idle_time(cputime_to_nsecs(idle_time));
 }
 
 void noinstr arch_cpu_idle(void)
