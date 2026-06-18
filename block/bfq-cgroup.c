@@ -300,6 +300,25 @@ static struct bfq_group *bfqg_parent(struct bfq_group *bfqg)
 	return pblkg ? blkg_to_bfqg(pblkg) : NULL;
 }
 
+static void bfqg_stats_exit(struct bfqg_stats *stats)
+{
+	blkg_rwstat_exit(&stats->bytes);
+	blkg_rwstat_exit(&stats->ios);
+#ifdef CONFIG_BFQ_CGROUP_DEBUG
+	blkg_rwstat_exit(&stats->merged);
+	blkg_rwstat_exit(&stats->service_time);
+	blkg_rwstat_exit(&stats->wait_time);
+	blkg_rwstat_exit(&stats->queued);
+	bfq_stat_exit(&stats->time);
+	bfq_stat_exit(&stats->avg_queue_size_sum);
+	bfq_stat_exit(&stats->avg_queue_size_samples);
+	bfq_stat_exit(&stats->dequeue);
+	bfq_stat_exit(&stats->group_wait_time);
+	bfq_stat_exit(&stats->idle_time);
+	bfq_stat_exit(&stats->empty_time);
+#endif
+}
+
 struct bfq_group *bfqq_group(struct bfq_queue *bfqq)
 {
 	struct bfq_entity *group_entity = bfqq->entity.parent;
@@ -321,8 +340,10 @@ static void bfqg_get(struct bfq_group *bfqg)
 
 static void bfqg_put(struct bfq_group *bfqg)
 {
-	if (refcount_dec_and_test(&bfqg->ref))
+	if (refcount_dec_and_test(&bfqg->ref)) {
+		bfqg_stats_exit(&bfqg->stats);
 		kfree(bfqg);
+	}
 }
 
 static void bfqg_and_blkg_get(struct bfq_group *bfqg)
@@ -433,25 +454,6 @@ void bfq_init_entity(struct bfq_entity *entity, struct bfq_group *bfqg)
 	entity->sched_data = &bfqg->sched_data;
 }
 
-static void bfqg_stats_exit(struct bfqg_stats *stats)
-{
-	blkg_rwstat_exit(&stats->bytes);
-	blkg_rwstat_exit(&stats->ios);
-#ifdef CONFIG_BFQ_CGROUP_DEBUG
-	blkg_rwstat_exit(&stats->merged);
-	blkg_rwstat_exit(&stats->service_time);
-	blkg_rwstat_exit(&stats->wait_time);
-	blkg_rwstat_exit(&stats->queued);
-	bfq_stat_exit(&stats->time);
-	bfq_stat_exit(&stats->avg_queue_size_sum);
-	bfq_stat_exit(&stats->avg_queue_size_samples);
-	bfq_stat_exit(&stats->dequeue);
-	bfq_stat_exit(&stats->group_wait_time);
-	bfq_stat_exit(&stats->idle_time);
-	bfq_stat_exit(&stats->empty_time);
-#endif
-}
-
 static int bfqg_stats_init(struct bfqg_stats *stats, gfp_t gfp)
 {
 	if (blkg_rwstat_init(&stats->bytes, gfp) ||
@@ -552,7 +554,6 @@ static void bfq_pd_free(struct blkg_policy_data *pd)
 {
 	struct bfq_group *bfqg = pd_to_bfqg(pd);
 
-	bfqg_stats_exit(&bfqg->stats);
 	bfqg_put(bfqg);
 }
 
@@ -1051,9 +1052,13 @@ static ssize_t bfq_io_set_device_weight(struct kernfs_open_file *of,
 
 	blkg_conf_init(&ctx, buf);
 
+	ret = blkg_conf_open_bdev(&ctx);
+	if (ret)
+		return ret;
+
 	ret = blkg_conf_prep(blkcg, &blkcg_policy_bfq, &ctx);
 	if (ret)
-		goto out;
+		goto close_bdev;
 
 	if (sscanf(ctx.body, "%llu", &v) == 1) {
 		/* require "default" on dfl */
@@ -1074,8 +1079,11 @@ static ssize_t bfq_io_set_device_weight(struct kernfs_open_file *of,
 		bfq_group_set_weight(bfqg, bfqg->entity.weight, v);
 		ret = 0;
 	}
+
 out:
-	blkg_conf_exit(&ctx);
+	blkg_conf_unprep(&ctx);
+close_bdev:
+	blkg_conf_close_bdev(&ctx);
 	return ret ?: nbytes;
 }
 
