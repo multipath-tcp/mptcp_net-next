@@ -285,6 +285,8 @@ const struct ethtool_ops mlx5i_ethtool_ops = {
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
 				     ETHTOOL_COALESCE_MAX_FRAMES |
 				     ETHTOOL_COALESCE_USE_ADAPTIVE,
+	.op_needs_rtnl	    = ETHTOOL_OP_NEEDS_RTNL_SCHANNELS |
+			      ETHTOOL_OP_NEEDS_RTNL_SRINGPARAM,
 	.get_drvinfo        = mlx5i_get_drvinfo,
 	.get_strings        = mlx5i_get_strings,
 	.get_sset_count     = mlx5i_get_sset_count,

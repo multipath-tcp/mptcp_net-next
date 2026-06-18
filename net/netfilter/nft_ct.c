@@ -897,8 +897,6 @@ static void nft_ct_timeout_obj_eval(struct nft_object *obj,
 		}
 	}
 
-	rcu_assign_pointer(timeout->timeout, priv->timeout);
-
 	/* adjust the timeout as per 'new' state. ct is unconfirmed,
 	 * so the current timestamp must not be added.
 	 */
@@ -949,6 +947,7 @@ static int nft_ct_timeout_obj_init(const struct nft_ctx *ctx,
 
 	timeout->l3num = l3num;
 	timeout->l4proto = l4proto;
+	refcount_set(&timeout->refcnt, 1);
 
 	ret = nf_ct_netns_get(ctx->net, ctx->family);
 	if (ret < 0)
@@ -969,10 +968,10 @@ static void nft_ct_timeout_obj_destroy(const struct nft_ctx *ctx,
 	struct nft_ct_timeout_obj *priv = nft_obj_data(obj);
 	struct nf_ct_timeout *timeout = priv->timeout;
 
-	nf_queue_nf_hook_drop(ctx->net);
 	nf_ct_untimeout(ctx->net, timeout);
 	nf_ct_netns_put(ctx->net, ctx->family);
-	kfree_rcu(priv->timeout, rcu);
+	if (refcount_dec_and_test(&timeout->refcnt))
+		kfree_rcu(priv->timeout, rcu);
 }
 
 static int nft_ct_timeout_obj_dump(struct sk_buff *skb,
@@ -1102,7 +1101,6 @@ static void nft_ct_helper_obj_destroy(const struct nft_ctx *ctx,
 {
 	struct nft_ct_helper_obj *priv = nft_obj_data(obj);
 
-	nf_queue_nf_hook_drop(ctx->net);
 	if (priv->helper4)
 		nf_conntrack_helper_put(priv->helper4);
 	if (priv->helper6)
@@ -1134,7 +1132,7 @@ static void nft_ct_helper_obj_eval(struct nft_object *obj,
 		to_assign = priv->helper6;
 		break;
 	default:
-		WARN_ON_ONCE(1);
+		DEBUG_NET_WARN_ON_ONCE(1);
 		return;
 	}
 
@@ -1145,7 +1143,7 @@ static void nft_ct_helper_obj_eval(struct nft_object *obj,
 		return;
 
 	help = nf_ct_helper_ext_add(ct, GFP_ATOMIC);
-	if (help) {
+	if (help && refcount_inc_not_zero(&to_assign->ct_refcnt)) {
 		rcu_assign_pointer(help->helper, to_assign);
 		set_bit(IPS_HELPER_BIT, &ct->status);
 
