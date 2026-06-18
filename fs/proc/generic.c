@@ -841,3 +841,13 @@ ssize_t proc_simple_write(struct file *f, const char __user *ubuf, size_t size,
 	kfree(buf);
 	return ret == 0 ? size : ret;
 }
+
+/*
+ * Not exported to modules:
+ * modules' /proc files aren't permanent because modules aren't permanent.
+ */
+void impl_proc_make_permanent(struct proc_dir_entry *pde)
+{
+	if (pde)
+		pde_make_permanent(pde);
+}
