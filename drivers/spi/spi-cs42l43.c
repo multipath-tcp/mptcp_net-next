@@ -438,8 +438,8 @@ static int cs42l43_spi_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id cs42l43_spi_id_table[] = {
-	{ "cs42l43-spi", },
-	{}
+	{ .name = "cs42l43-spi" },
+	{ }
 };
 MODULE_DEVICE_TABLE(platform, cs42l43_spi_id_table);
 
