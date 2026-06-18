@@ -713,7 +713,7 @@ static struct mlxsw_driver mlxsw_m_driver = {
 };
 
 static const struct i2c_device_id mlxsw_m_i2c_id[] = {
-	{ "mlxsw_minimal" },
+	{ .name = "mlxsw_minimal" },
 	{ }
 };
 
