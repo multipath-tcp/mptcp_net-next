@@ -79,7 +79,6 @@ static bool scx_idle_test_and_clear_cpu(int cpu)
 	int node = scx_cpu_node_if_enabled(cpu);
 	struct cpumask *idle_cpus = idle_cpumask(node)->cpu;
 
-#ifdef CONFIG_SCHED_SMT
 	/*
 	 * SMT mask should be cleared whether we can claim @cpu or not. The SMT
 	 * cluster is not wholly idle either way. This also prevents
@@ -104,7 +103,6 @@ static bool scx_idle_test_and_clear_cpu(int cpu)
 		else if (cpumask_test_cpu(cpu, idle_smts))
 			__cpumask_clear_cpu(cpu, idle_smts);
 	}
-#endif
 
 	return cpumask_test_and_clear_cpu(cpu, idle_cpus);
 }
@@ -622,7 +620,6 @@ s32 scx_select_cpu_dfl(struct task_struct *p, s32 prev_cpu, u64 wake_flags,
 		goto out_unlock;
 	}
 
-#ifdef CONFIG_SCHED_SMT
 	/*
 	 * Use @prev_cpu's sibling if it's idle.
 	 */
@@ -634,7 +631,6 @@ s32 scx_select_cpu_dfl(struct task_struct *p, s32 prev_cpu, u64 wake_flags,
 				goto out_unlock;
 		}
 	}
-#endif
 
 	/*
 	 * Search for any idle CPU in the same LLC domain.
@@ -714,7 +710,6 @@ static void update_builtin_idle(int cpu, bool idle)
 
 	assign_cpu(cpu, idle_cpus, idle);
 
-#ifdef CONFIG_SCHED_SMT
 	if (sched_smt_active()) {
 		const struct cpumask *smt = cpu_smt_mask(cpu);
 		struct cpumask *idle_smts = idle_cpumask(node)->smt;
@@ -731,7 +726,6 @@ static void update_builtin_idle(int cpu, bool idle)
 			cpumask_andnot(idle_smts, idle_smts, smt);
 		}
 	}
-#endif
 }
 
 /*
