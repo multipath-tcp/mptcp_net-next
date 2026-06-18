@@ -789,11 +789,9 @@ static void crypto_ahash_free_instance(struct crypto_instance *inst)
 static int __maybe_unused crypto_ahash_report(
 	struct sk_buff *skb, struct crypto_alg *alg)
 {
-	struct crypto_report_hash rhash;
-
-	memset(&rhash, 0, sizeof(rhash));
-
-	strscpy(rhash.type, "ahash", sizeof(rhash.type));
+	struct crypto_report_hash rhash = {
+		.type = "ahash",
+	};
 
 	rhash.blocksize = alg->cra_blocksize;
 	rhash.digestsize = __crypto_hash_alg_common(alg)->digestsize;
