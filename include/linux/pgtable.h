@@ -301,6 +301,28 @@ static inline void lazy_mmu_mode_disable(void)
 }
 
 /**
+ * __task_lazy_mmu_mode_pause() - Pause the lazy MMU mode for a task.
+ * @tsk: The task to check.
+ *
+ * Pauses the lazy MMU mode of @tsk.
+ *
+ * This function only operates on the state saved in task_struct; to pause
+ * current lazy_mmu_mode_pause() should be used instead.
+ *
+ * This function is intended for architectures that implement the lazy MMU
+ * mode; it must not be called from generic code.
+ */
+static inline void __task_lazy_mmu_mode_pause(struct task_struct *tsk)
+{
+	struct lazy_mmu_state *state = &tsk->lazy_mmu_state;
+
+	VM_WARN_ON_ONCE(state->pause_count == U8_MAX);
+
+	if (state->pause_count++ == 0 && state->enable_count > 0)
+		arch_leave_lazy_mmu_mode();
+}
+
+/**
  * lazy_mmu_mode_pause() - Pause the lazy MMU mode.
  *
  * Pauses the lazy MMU mode; if it is currently active, disables it and calls
@@ -315,15 +337,32 @@ static inline void lazy_mmu_mode_disable(void)
  */
 static inline void lazy_mmu_mode_pause(void)
 {
-	struct lazy_mmu_state *state = &current->lazy_mmu_state;
-
 	if (in_interrupt())
 		return;
 
-	VM_WARN_ON_ONCE(state->pause_count == U8_MAX);
+	__task_lazy_mmu_mode_pause(current);
+}
 
-	if (state->pause_count++ == 0 && state->enable_count > 0)
-		arch_leave_lazy_mmu_mode();
+/**
+ * __task_lazy_mmu_mode_resume() - Resume the lazy MMU mode for a task.
+ * @tsk: The task to check.
+ *
+ * Resumes the lazy MMU mode of @tsk.
+ *
+ * This function only operates on the state saved in task_struct; to resume
+ * current lazy_mmu_mode_resume() should be used instead.
+ *
+ * This function is intended for architectures that implement the lazy MMU
+ * mode; it must not be called from generic code.
+ */
+static inline void __task_lazy_mmu_mode_resume(struct task_struct *tsk)
+{
+	struct lazy_mmu_state *state = &tsk->lazy_mmu_state;
+
+	VM_WARN_ON_ONCE(state->pause_count == 0);
+
+	if (--state->pause_count == 0 && state->enable_count > 0)
+		arch_enter_lazy_mmu_mode();
 }
 
 /**
@@ -341,15 +380,10 @@ static inline void lazy_mmu_mode_pause(void)
  */
 static inline void lazy_mmu_mode_resume(void)
 {
-	struct lazy_mmu_state *state = &current->lazy_mmu_state;
-
 	if (in_interrupt())
 		return;
 
-	VM_WARN_ON_ONCE(state->pause_count == 0);
-
-	if (--state->pause_count == 0 && state->enable_count > 0)
-		arch_enter_lazy_mmu_mode();
+	__task_lazy_mmu_mode_resume(current);
 }
 #else
 static inline void lazy_mmu_mode_enable(void) {}
@@ -1993,7 +2027,7 @@ static inline unsigned long zero_pfn(unsigned long addr)
 	return zero_page_pfn;
 }
 
-extern uint8_t empty_zero_page[PAGE_SIZE];
+extern const uint8_t empty_zero_page[PAGE_SIZE];
 extern struct page *__zero_page;
 
 static inline struct page *_zero_page(unsigned long addr)

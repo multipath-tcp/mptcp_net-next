@@ -8,10 +8,12 @@
 #ifndef _S390_IDLE_H
 #define _S390_IDLE_H
 
+#include <linux/percpu-defs.h>
 #include <linux/types.h>
 #include <linux/device.h>
 
 struct s390_idle_data {
+	bool	      idle_dyntick;
 	unsigned long idle_count;
 	unsigned long idle_time;
 	unsigned long clock_idle_enter;
