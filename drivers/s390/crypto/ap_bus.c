@@ -744,6 +744,23 @@ void ap_send_online_uevent(struct ap_device *ap_dev, int online)
 }
 EXPORT_SYMBOL(ap_send_online_uevent);
 
+void ap_send_se_bind_uevent(struct ap_device *ap_dev)
+{
+	char *envp[] = { "SE_BIND=1", NULL };
+
+	kobject_uevent_env(&ap_dev->device.kobj, KOBJ_CHANGE, envp);
+}
+
+void ap_send_se_assoc_uevent(struct ap_device *ap_dev, unsigned int assoc_idx)
+{
+	char buf[32];
+	char *envp[] = { buf, NULL };
+
+	snprintf(buf, sizeof(buf), "SE_ASSOC=%u", assoc_idx);
+
+	kobject_uevent_env(&ap_dev->device.kobj, KOBJ_CHANGE, envp);
+}
+
 static void ap_send_mask_changed_uevent(unsigned long *newapm,
 					unsigned long *newaqm)
 {
