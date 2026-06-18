@@ -197,6 +197,9 @@ S: Hauptstrasse 19
 S: 79837 St. Blasien
 S: Germany
 
+N: Ferenc Bakonyi
+D: Hercules graphics adapter framebuffer driver
+
 N: Krishna Balasubramanian
 E: balasub@cis.ohio-state.edu
 D: Wrote SYS V IPC (part of standard kernel since 0.99.10)
@@ -2804,6 +2807,7 @@ D: Some of PAS 16 mixer & PCM support, inet6-apps
 
 N: William (Bill) Metzenthen
 E: billm@suburbia.net
+E: billm@melbpc.org.au
 D: Author of the FPU emulator.
 D: Minor kernel hacker for other lost causes (Hercules mono, etc).
 S: 22 Parker Street
