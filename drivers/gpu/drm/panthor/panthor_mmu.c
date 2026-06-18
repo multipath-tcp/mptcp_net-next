@@ -1274,13 +1274,13 @@ static int panthor_vm_prepare_map_op_ctx(struct panthor_vm_op_ctx *op_ctx,
 		goto err_cleanup;
 	}
 
-	ret = kmem_cache_alloc_bulk(pt_cache, GFP_KERNEL, pt_count,
-				    op_ctx->rsvd_page_tables.pages);
-	op_ctx->rsvd_page_tables.count = ret;
-	if (ret != pt_count) {
+	if (!kmem_cache_alloc_bulk(pt_cache, GFP_KERNEL, pt_count,
+			op_ctx->rsvd_page_tables.pages)) {
+		op_ctx->rsvd_page_tables.count = 0;
 		ret = -ENOMEM;
 		goto err_cleanup;
 	}
+	op_ctx->rsvd_page_tables.count = pt_count;
 
 	/* Insert BO into the extobj list last, when we know nothing can fail. */
 	dma_resv_lock(panthor_vm_resv(vm), NULL);
@@ -1328,9 +1328,8 @@ static int panthor_vm_prepare_unmap_op_ctx(struct panthor_vm_op_ctx *op_ctx,
 			goto err_cleanup;
 		}
 
-		ret = kmem_cache_alloc_bulk(pt_cache, GFP_KERNEL, pt_count,
-					    op_ctx->rsvd_page_tables.pages);
-		if (ret != pt_count) {
+		if (!kmem_cache_alloc_bulk(pt_cache, GFP_KERNEL, pt_count,
+				op_ctx->rsvd_page_tables.pages)) {
 			ret = -ENOMEM;
 			goto err_cleanup;
 		}
