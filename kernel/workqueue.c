@@ -8212,11 +8212,7 @@ static bool __init cpus_dont_share(int cpu0, int cpu1)
 
 static bool __init cpus_share_smt(int cpu0, int cpu1)
 {
-#ifdef CONFIG_SCHED_SMT
 	return cpumask_test_cpu(cpu0, cpu_smt_mask(cpu1));
-#else
-	return false;
-#endif
 }
 
 static bool __init cpus_share_numa(int cpu0, int cpu1)
