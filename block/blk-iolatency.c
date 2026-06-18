@@ -840,7 +840,7 @@ static ssize_t iolatency_set_limit(struct kernfs_open_file *of, char *buf,
 
 	ret = blkg_conf_open_bdev(&ctx);
 	if (ret)
-		goto out;
+		return ret;
 
 	/*
 	 * blk_iolatency_init() may fail after rq_qos_add() succeeds which can
@@ -850,11 +850,11 @@ static ssize_t iolatency_set_limit(struct kernfs_open_file *of, char *buf,
 	if (!iolat_rq_qos(ctx.bdev->bd_queue))
 		ret = blk_iolatency_init(ctx.bdev->bd_disk);
 	if (ret)
-		goto out;
+		goto close_bdev;
 
 	ret = blkg_conf_prep(blkcg, &blkcg_policy_iolatency, &ctx);
 	if (ret)
-		goto out;
+		goto close_bdev;
 
 	iolat = blkg_to_lat(ctx.blkg);
 	p = ctx.body;
@@ -865,7 +865,7 @@ static ssize_t iolatency_set_limit(struct kernfs_open_file *of, char *buf,
 		char val[21];	/* 18446744073709551616 */
 
 		if (sscanf(tok, "%15[^=]=%20s", key, val) != 2)
-			goto out;
+			goto unprep;
 
 		if (!strcmp(key, "target")) {
 			u64 v;
@@ -875,9 +875,9 @@ static ssize_t iolatency_set_limit(struct kernfs_open_file *of, char *buf,
 			else if (sscanf(val, "%llu", &v) == 1)
 				lat_val = v * NSEC_PER_USEC;
 			else
-				goto out;
+				goto unprep;
 		} else {
-			goto out;
+			goto unprep;
 		}
 	}
 
@@ -889,8 +889,11 @@ static ssize_t iolatency_set_limit(struct kernfs_open_file *of, char *buf,
 	if (oldval != iolat->min_lat_nsec)
 		iolatency_clear_scaling(blkg);
 	ret = 0;
-out:
-	blkg_conf_exit(&ctx);
+
+unprep:
+	blkg_conf_unprep(&ctx);
+close_bdev:
+	blkg_conf_close_bdev(&ctx);
 	return ret ?: nbytes;
 }
 
