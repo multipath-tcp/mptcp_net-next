@@ -5911,6 +5911,7 @@ static void scx_root_disable(struct scx_sched *sch)
 	struct scx_exit_info *ei = sch->exit_info;
 	struct scx_task_iter sti;
 	struct task_struct *p;
+	bool was_switched_all;
 	int cpu;
 
 	/* guarantee forward progress and wait for descendants to be disabled */
@@ -5936,6 +5937,8 @@ static void scx_root_disable(struct scx_sched *sch)
 	 * disable ops.
 	 */
 	mutex_lock(&scx_enable_mutex);
+
+	was_switched_all = scx_switched_all();
 
 	static_branch_disable(&__scx_switched_all);
 	WRITE_ONCE(scx_switching_all, false);
@@ -5986,10 +5989,34 @@ static void scx_root_disable(struct scx_sched *sch)
 	/*
 	 * Invalidate all the rq clocks to prevent getting outdated
 	 * rq clocks from a previous scx scheduler.
+	 *
+	 * Also re-balance the dl_server bandwidth reservations: detach
+	 * ext_server (no more sched_ext tasks) and reinstate fair_server if it
+	 * was previously detached because we were running in full mode.
+	 *
+	 * Unlike the enable path, this runs on a recovery path that cannot
+	 * fail, so we use dl_server_swap_bw() to atomically free ext_server's
+	 * bandwidth and reclaim it for fair_server under the same dl_b lock.
+	 *
+	 * The swap can still fail with -EBUSY if someone bumped ext_server's
+	 * runtime via debugfs between enable and disable; in that narrow case
+	 * both servers end up detached and we just WARN.
 	 */
 	for_each_possible_cpu(cpu) {
 		struct rq *rq = cpu_rq(cpu);
+
 		scx_rq_clock_invalidate(rq);
+
+		scoped_guard(rq_lock_irqsave, rq) {
+			update_rq_clock(rq);
+			if (was_switched_all) {
+				if (WARN_ON_ONCE(dl_server_swap_bw(&rq->ext_server,
+								   &rq->fair_server)))
+					pr_warn("failed to re-attach fair_server on CPU %d\n", cpu);
+			} else {
+				dl_server_detach_bw(&rq->ext_server);
+			}
+		}
 	}
 
 	/* no task is on scx, turn off all the switches and flush in-progress calls */
@@ -6928,6 +6955,31 @@ static void scx_root_enable_workfn(struct kthread_work *work)
 		goto err_disable;
 
 	/*
+	 * Attach the ext_server bandwidth reservation before anything is
+	 * committed so that we can fail the enable if the root domain cannot
+	 * accommodate it. The matching fair_server detach is deferred to the
+	 * tail of this function, after the switch is fully committed and can no
+	 * longer fail.
+	 *
+	 * On failure, err_disable funnels into scx_root_disable() which
+	 * detaches ext_server, so partially-attached state is cleaned up
+	 * automatically.
+	 */
+	for_each_possible_cpu(cpu) {
+		struct rq *rq = cpu_rq(cpu);
+
+		scoped_guard(rq_lock_irqsave, rq) {
+			update_rq_clock(rq);
+			ret = dl_server_attach_bw(&rq->ext_server);
+		}
+		if (ret) {
+			pr_warn("sched_ext: failed to attach ext_server on CPU %d (%d)\n",
+				cpu, ret);
+			goto err_disable;
+		}
+	}
+
+	/*
 	 * Once __scx_enabled is set, %current can be switched to SCX anytime.
 	 * This can lead to stalls as some BPF schedulers (e.g. userspace
 	 * scheduling) may not function correctly before all tasks are switched.
@@ -7072,6 +7124,25 @@ static void scx_root_enable_workfn(struct kthread_work *work)
 
 	if (!(ops->flags & SCX_OPS_SWITCH_PARTIAL))
 		static_branch_enable(&__scx_switched_all);
+
+	/*
+	 * Detach the fair_server bandwidth reservation now that the switch
+	 * is fully committed. In full mode (!SCX_OPS_SWITCH_PARTIAL) no
+	 * task will ever run in the fair class, so give that bandwidth
+	 * back to the RT class. The matching ext_server attach already
+	 * happened earlier; this only releases bandwidth and cannot fail.
+	 *
+	 * In partial mode keep fair_server attached.
+	 */
+	if (scx_switched_all()) {
+		for_each_possible_cpu(cpu) {
+			struct rq *rq = cpu_rq(cpu);
+
+			guard(rq_lock_irqsave)(rq);
+			update_rq_clock(rq);
+			dl_server_detach_bw(&rq->fair_server);
+		}
+	}
 
 	pr_info("sched_ext: BPF scheduler \"%s\" enabled%s\n",
 		sch->ops.name, scx_switched_all() ? "" : " (partial)");

@@ -5,6 +5,7 @@
 
 #include <kunit/test.h>
 #include <kunit/static_stub.h>
+#include <linux/fs_context.h>
 #include <linux/random.h>
 
 #include "ext4.h"
@@ -63,8 +64,14 @@ static void mbt_kill_sb(struct super_block *sb)
 	generic_shutdown_super(sb);
 }
 
+static int mbt_init_fs_context(struct fs_context *fc)
+{
+	return 0;
+}
+
 static struct file_system_type mbt_fs_type = {
 	.name			= "mballoc test",
+	.init_fs_context	= mbt_init_fs_context,
 	.kill_sb		= mbt_kill_sb,
 };
 
@@ -127,7 +134,7 @@ static void mbt_mb_release(struct super_block *sb)
 	kfree(sb->s_bdev);
 }
 
-static int mbt_set(struct super_block *sb, void *data)
+static int mbt_set(struct super_block *sb, struct fs_context *fc)
 {
 	return 0;
 }
@@ -136,13 +143,19 @@ static struct super_block *mbt_ext4_alloc_super_block(void)
 {
 	struct mbt_ext4_super_block *fsb;
 	struct super_block *sb;
+	struct fs_context *fc;
 	struct ext4_sb_info *sbi;
 
 	fsb = kzalloc_obj(*fsb);
 	if (fsb == NULL)
 		return NULL;
 
-	sb = sget(&mbt_fs_type, NULL, mbt_set, 0, NULL);
+	fc = fs_context_for_mount(&mbt_fs_type, 0);
+	if (IS_ERR(fc))
+		goto out;
+
+	sb = sget_fc(fc, NULL, mbt_set);
+	put_fs_context(fc);
 	if (IS_ERR(sb))
 		goto out;
 
