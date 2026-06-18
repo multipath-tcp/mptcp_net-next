@@ -1694,8 +1694,9 @@ static void __exit coresight_exit(void)
 module_init(coresight_init);
 module_exit(coresight_exit);
 
-int coresight_init_driver(const char *drv, struct amba_driver *amba_drv,
-			  struct platform_driver *pdev_drv, struct module *owner)
+int coresight_init_driver_with_owner(const char *drv, struct amba_driver *amba_drv,
+				     struct platform_driver *pdev_drv, struct module *owner,
+				     const char *mod_name)
 {
 	int ret;
 
@@ -1705,7 +1706,7 @@ int coresight_init_driver(const char *drv, struct amba_driver *amba_drv,
 		return ret;
 	}
 
-	ret = __platform_driver_register(pdev_drv, owner);
+	ret = __platform_driver_register(pdev_drv, owner, mod_name);
 	if (!ret)
 		return 0;
 
@@ -1713,7 +1714,7 @@ int coresight_init_driver(const char *drv, struct amba_driver *amba_drv,
 	amba_driver_unregister(amba_drv);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(coresight_init_driver);
+EXPORT_SYMBOL_GPL(coresight_init_driver_with_owner);
 
 void coresight_remove_driver(struct amba_driver *amba_drv,
 			     struct platform_driver *pdev_drv)
