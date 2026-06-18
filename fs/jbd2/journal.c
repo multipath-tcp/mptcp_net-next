@@ -1820,9 +1820,7 @@ static int jbd2_write_superblock(journal_t *journal, blk_opf_t write_flags)
 	}
 	if (jbd2_journal_has_csum_v2or3(journal))
 		sb->s_checksum = jbd2_superblock_csum(sb);
-	get_bh(bh);
-	bh->b_end_io = end_buffer_write_sync;
-	submit_bh(REQ_OP_WRITE | write_flags, bh);
+	bh_submit(bh, REQ_OP_WRITE | write_flags, bh_end_write);
 	wait_on_buffer(bh);
 	if (buffer_write_io_error(bh)) {
 		clear_buffer_write_io_error(bh);
@@ -2784,7 +2782,7 @@ void *jbd2_alloc(size_t size, gfp_t flags)
 	if (size < PAGE_SIZE)
 		ptr = kmem_cache_alloc(get_slab(size), flags);
 	else
-		ptr = (void *)__get_free_pages(flags, get_order(size));
+		ptr = kmalloc(size, flags);
 
 	/* Check alignment; SLUB has gotten this wrong in the past,
 	 * and this can lead to user data corruption! */
@@ -2795,10 +2793,7 @@ void *jbd2_alloc(size_t size, gfp_t flags)
 
 void jbd2_free(void *ptr, size_t size)
 {
-	if (size < PAGE_SIZE)
-		kmem_cache_free(get_slab(size), ptr);
-	else
-		free_pages((unsigned long)ptr, get_order(size));
+	kfree(ptr);
 };
 
 /*
