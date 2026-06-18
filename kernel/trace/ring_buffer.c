@@ -3791,13 +3791,6 @@ rb_add_time_stamp(struct ring_buffer_per_cpu *cpu_buffer,
 	return skip_time_extend(event);
 }
 
-#ifndef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
-static inline bool sched_clock_stable(void)
-{
-	return true;
-}
-#endif
-
 static void
 rb_check_timestamp(struct ring_buffer_per_cpu *cpu_buffer,
 		   struct rb_event_info *info)
