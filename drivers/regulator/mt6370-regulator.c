@@ -371,8 +371,8 @@ static int mt6370_regulator_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id mt6370_devid_table[] = {
-	{ "mt6370-regulator", 0},
-	{}
+	{ .name = "mt6370-regulator" },
+	{ }
 };
 MODULE_DEVICE_TABLE(platform, mt6370_devid_table);
 
