@@ -28,6 +28,7 @@ struct iomap_ioend *iomap_init_ioend(struct inode *inode,
 	ioend->io_offset = file_offset;
 	ioend->io_size = bio->bi_iter.bi_size;
 	ioend->io_sector = bio->bi_iter.bi_sector;
+	ioend->io_vi = NULL;
 	ioend->io_private = NULL;
 	return ioend;
 }
