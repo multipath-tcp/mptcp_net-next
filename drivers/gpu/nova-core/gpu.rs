@@ -278,7 +278,7 @@ impl Gpu {
     /// Called when the corresponding [`Device`](device::Device) is unbound.
     ///
     /// Note: This method must only be called from `Driver::unbind`.
-    pub(crate) fn unbind(&self, dev: &device::Device<device::Core>) {
+    pub(crate) fn unbind(&self, dev: &device::Device<device::Core<'_>>) {
         kernel::warn_on!(self
             .bar
             .access(dev)
