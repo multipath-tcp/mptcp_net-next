@@ -157,6 +157,11 @@ static void set_exec_queue_banned(struct xe_exec_queue *q)
 	atomic_or(EXEC_QUEUE_STATE_BANNED, &q->guc->state);
 }
 
+static void clear_exec_queue_banned(struct xe_exec_queue *q)
+{
+	atomic_andnot(EXEC_QUEUE_STATE_BANNED, &q->guc->state);
+}
+
 static bool exec_queue_suspended(struct xe_exec_queue *q)
 {
 	return atomic_read(&q->guc->state) & EXEC_QUEUE_STATE_SUSPENDED;
@@ -1361,7 +1366,8 @@ static bool check_timeout(struct xe_exec_queue *q, struct xe_sched_job *job)
 			   xe_sched_job_seqno(job), xe_sched_job_lrc_seqno(job),
 			   q->guc->id);
 
-		return xe_sched_invalidate_job(job, 2);
+		/* GuC never scheduled this job - let the caller trigger a GT reset. */
+		return true;
 	}
 
 	ctx_timestamp = lower_32_bits(xe_lrc_timestamp(q->lrc[0]));
@@ -1456,6 +1462,21 @@ static void disable_scheduling(struct xe_exec_queue *q, bool immediate)
 	else
 		xe_guc_ct_send(&guc->ct, action, ARRAY_SIZE(action),
 			       G2H_LEN_DW_SCHED_CONTEXT_MODE_SET, 1);
+}
+
+/*
+ * Recover via GT reset for a kernel queue, or for a GuC scheduling failure (job
+ * never started) on a queue that was not already killed or banned. An already
+ * banned queue must stay banned, so its unstarted jobs do not clear the ban or
+ * trigger a reset.
+ */
+static bool timeout_needs_gt_reset(struct xe_exec_queue *q, struct xe_sched_job *job,
+				   bool skip_timeout_check)
+{
+	if (q->flags & EXEC_QUEUE_FLAG_KERNEL)
+		return true;
+
+	return !skip_timeout_check && !xe_sched_job_started(job);
 }
 
 static enum drm_gpu_sched_stat
@@ -1606,19 +1627,19 @@ trigger_reset:
 			       xe_sched_job_seqno(job), xe_sched_job_lrc_seqno(job),
 			       q->guc->id, q->flags);
 
-	/*
-	 * Kernel jobs should never fail, nor should VM jobs if they do
-	 * somethings has gone wrong and the GT needs a reset
-	 */
-	xe_gt_WARN(q->gt, q->flags & EXEC_QUEUE_FLAG_KERNEL,
-		   "Kernel-submitted job timed out\n");
-	xe_gt_WARN(q->gt, q->flags & EXEC_QUEUE_FLAG_VM && !exec_queue_killed(q),
-		   "VM job timed out on non-killed execqueue\n");
-	if (!wedged && (q->flags & EXEC_QUEUE_FLAG_KERNEL ||
-			(q->flags & EXEC_QUEUE_FLAG_VM && !exec_queue_killed(q)))) {
-		if (!xe_sched_invalidate_job(job, 2)) {
-			xe_gt_reset_async(q->gt);
-			goto rearm;
+	if (!wedged) {
+		if (timeout_needs_gt_reset(q, job, skip_timeout_check)) {
+			if (!xe_sched_invalidate_job(job, 2)) {
+				clear_exec_queue_banned(q);
+				xe_gt_reset_async(q->gt);
+				goto rearm;
+			}
+			if (q->flags & EXEC_QUEUE_FLAG_KERNEL) {
+				xe_gt_WARN(q->gt, true, "Kernel-submitted job timed out\n");
+				xe_device_declare_wedged(gt_to_xe(q->gt));
+			}
+		} else if (q->flags & EXEC_QUEUE_FLAG_VM && !exec_queue_killed(q)) {
+			xe_gt_WARN(q->gt, true, "VM job timed out on non-killed execqueue\n");
 		}
 	}
 

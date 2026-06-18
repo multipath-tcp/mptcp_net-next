@@ -185,10 +185,11 @@ out_drop_cnt:
 	return NETDEV_TX_OK;
 }
 
-static void nsim_set_rx_mode(struct net_device *dev,
-			     struct netdev_hw_addr_list *uc,
-			     struct netdev_hw_addr_list *mc)
+static int nsim_set_rx_mode(struct net_device *dev,
+			    struct netdev_hw_addr_list *uc,
+			    struct netdev_hw_addr_list *mc)
 {
+	return 0;
 }
 
 static int nsim_change_mtu(struct net_device *dev, int new_mtu)

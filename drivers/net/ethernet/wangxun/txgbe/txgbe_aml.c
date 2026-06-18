@@ -186,19 +186,15 @@ static void txgbe_get_mac_link(struct wx *wx, int *speed)
 		*speed = SPEED_UNKNOWN;
 }
 
-int txgbe_set_phy_link(struct wx *wx)
+void txgbe_set_phy_link(struct wx *wx)
 {
 	int speed, autoneg, duplex, err;
 
 	txgbe_get_link_capabilities(wx, &speed, &autoneg, &duplex);
 
 	err = txgbe_set_phy_link_hostif(wx, speed, autoneg, duplex);
-	if (err) {
+	if (err)
 		wx_err(wx, "Failed to setup link\n");
-		return err;
-	}
-
-	return 0;
 }
 
 static int txgbe_sfp_to_linkmodes(struct wx *wx, struct txgbe_sff_id *id)
@@ -519,6 +515,7 @@ int txgbe_phylink_init_aml(struct txgbe *txgbe)
 	err = phylink_set_fixed_link(phylink, &state);
 	if (err) {
 		wx_err(wx, "Failed to set fixed link\n");
+		phylink_destroy(phylink);
 		return err;
 	}
 
