@@ -304,14 +304,15 @@ static void gfs2_metapath_ra(struct gfs2_glock *gl, __be64 *start, __be64 *end)
 		rabh = gfs2_getbuf(gl, be64_to_cpu(*t), CREATE);
 		if (trylock_buffer(rabh)) {
 			if (!buffer_uptodate(rabh)) {
-				rabh->b_end_io = end_buffer_read_sync;
-				submit_bh(REQ_OP_READ | REQ_RAHEAD | REQ_META |
-					  REQ_PRIO, rabh);
-				continue;
+				bh_submit(rabh,
+					REQ_OP_READ | REQ_RAHEAD | REQ_META |
+					REQ_PRIO,
+					bh_end_read);
+			} else {
+				unlock_buffer(rabh);
 			}
-			unlock_buffer(rabh);
 		}
-		brelse(rabh);
+		put_bh(rabh);
 	}
 }
 
