@@ -36,12 +36,11 @@ Table : Subdirectories in /proc/sys/net
  ========= =================== = ========== ===================
  802       E802 protocol         mptcp      Multipath TCP
  appletalk Appletalk protocol    netfilter  Network Filter
- ax25      AX25                  netrom     NET/ROM
- bridge    Bridging              rose       X.25 PLP layer
- core      General parameter     tipc       TIPC
- ethernet  Ethernet protocol     unix       Unix domain sockets
- ipv4      IP version 4          vsock      VSOCK sockets
- ipv6      IP version 6          x25        X.25 protocol
+ bridge    Bridging              tipc       TIPC
+ core      General parameter     unix       Unix domain sockets
+ ethernet  Ethernet protocol     vsock      VSOCK sockets
+ ipv4      IP version 4          x25        X.25 protocol
+ ipv6      IP version 6
  ========= =================== = ========== ===================
 
 1. /proc/sys/net/core - Network core options

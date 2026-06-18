@@ -184,8 +184,11 @@
 #include <trace/events/ext4.h>
 static struct kmem_cache *ext4_fc_dentry_cachep;
 
-static void ext4_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
+static void ext4_end_buffer_io_sync(struct bio *bio)
 {
+	struct buffer_head *bh;
+	bool uptodate = bio_endio_bh(bio, &bh);
+
 	BUFFER_TRACE(bh, "");
 	if (uptodate) {
 		ext4_debug("%s: Block %lld up-to-date",
@@ -659,8 +662,7 @@ static void ext4_fc_submit_bh(struct super_block *sb, bool is_tail)
 	lock_buffer(bh);
 	set_buffer_dirty(bh);
 	set_buffer_uptodate(bh);
-	bh->b_end_io = ext4_end_buffer_io_sync;
-	submit_bh(REQ_OP_WRITE | write_flags, bh);
+	bh_submit(bh, REQ_OP_WRITE | write_flags, ext4_end_buffer_io_sync);
 	EXT4_SB(sb)->s_fc_bh = NULL;
 }
 
