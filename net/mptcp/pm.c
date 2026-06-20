@@ -1170,6 +1170,12 @@ void mptcp_pm_destroy(struct mptcp_sock *msk)
 {
 	mptcp_pm_free_announced_list(msk);
 	mptcp_pm_ops_release(msk);
+	/* Free the userspace local address list unconditionally: the socket
+	 * can be reused (mptcp_disconnect()) and re-selected to a different
+	 * path manager, so entries queued under the userspace PM must be
+	 * reclaimed regardless of the PM in effect at teardown.
+	 */
+	mptcp_userspace_pm_free_local_addr_list(msk);
 }
 
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
