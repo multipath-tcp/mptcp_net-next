@@ -1176,6 +1176,12 @@ static void mptcp_pm_ops_release(struct mptcp_sock *msk)
 void mptcp_pm_destroy(struct mptcp_sock *msk)
 {
 	mptcp_pm_free_announced_list(msk);
+
+	/* Free the userspace local address list unconditionally: the socket
+	 * can be reused (mptcp_disconnect()) and re-selected to a different PM
+	 */
+	mptcp_userspace_pm_free_local_addr_list(msk);
+
 	mptcp_pm_ops_release(msk);
 }
 
