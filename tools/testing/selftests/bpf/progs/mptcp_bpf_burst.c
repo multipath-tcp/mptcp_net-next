@@ -18,9 +18,38 @@ char _license[] SEC("license") = "GPL";
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_set_timeout(struct sock *sk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
-extern bool bpf_sk_stream_memory_free(const struct sock *sk) __ksym;
 extern bool bpf_mptcp_subflow_queues_empty(struct sock *sk) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
+
+static __always_inline u32 mptcp_notsent_lowat(struct mptcp_sock *msk)
+{
+	return msk->notsent_lowat ?: UINT_MAX;
+}
+
+static __always_inline bool mptcp_stream_memory_free(struct mptcp_sock *msk,
+						     int wake)
+{
+	u32 notsent_bytes;
+
+	notsent_bytes = msk->write_seq - msk->snd_nxt;
+	return (notsent_bytes << wake) < mptcp_notsent_lowat(msk);
+}
+
+static __always_inline bool __sk_stream_memory_free(struct mptcp_sock *msk,
+						    const struct sock *ssk,
+						    int wake)
+{
+	if (ssk->sk_wmem_queued >= ssk->sk_sndbuf)
+		return false;
+
+	return mptcp_stream_memory_free(msk, wake);
+}
+
+static __always_inline bool sk_stream_memory_free(struct mptcp_sock *msk,
+						  const struct sock *ssk)
+{
+	return __sk_stream_memory_free(msk, ssk, 0);
+}
 
 static __always_inline __u64 div_u64(__u64 dividend, __u32 divisor)
 {
@@ -96,7 +125,7 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 		send_info[SSK_MODE_ACTIVE].ssk = send_info[SSK_MODE_BACKUP].ssk;
 
 	ssk = send_info[SSK_MODE_ACTIVE].ssk;
-	if (!ssk || !bpf_sk_stream_memory_free(ssk))
+	if (!ssk || !sk_stream_memory_free(msk, ssk))
 		return -1;
 
 	subflow = bpf_mptcp_subflow_ctx(ssk);
