@@ -220,10 +220,8 @@ struct bpf_iter_mptcp_subflow_kern {
 __bpf_kfunc_start_defs();
 
 __bpf_kfunc static struct mptcp_subflow_context *
-bpf_mptcp_subflow_ctx(const struct sock *sk__ign)
+bpf_mptcp_subflow_ctx(const struct sock *sk)
 {
-	const struct sock *sk = sk__ign;
-
 	if (sk && sk_fullsock(sk) &&
 	    sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
 		return mptcp_subflow_ctx(sk);
