@@ -296,15 +296,16 @@ __bpf_kfunc static bool bpf_mptcp_subflow_queues_empty(struct sock *sk)
 	return tcp_rtx_queue_empty(sk);
 }
 
-__bpf_kfunc static bool bpf_sk_stream_memory_free(const struct sock *sk__ign)
+__bpf_kfunc static bool
+bpf_sk_stream_memory_free(const struct mptcp_subflow_context *subflow)
 {
-	const struct sock *sk = sk__ign;
+	const struct sock *sk = mptcp_subflow_tcp_sock(subflow);
 
-	if (sk && sk_fullsock(sk) &&
+	if (sk && sk_fullsock(sk) && sk->sk_type == SOCK_STREAM &&
 	    sk->sk_protocol == IPPROTO_TCP && sk_is_mptcp(sk))
 		return sk_stream_memory_free(sk);
 
-	return NULL;
+	return false;
 }
 
 __bpf_kfunc_end_defs();
@@ -327,7 +328,7 @@ BTF_ID_FLAGS(func, mptcp_subflow_set_scheduled)
 BTF_ID_FLAGS(func, mptcp_subflow_active)
 BTF_ID_FLAGS(func, mptcp_set_timeout)
 BTF_ID_FLAGS(func, mptcp_wnd_end)
-BTF_ID_FLAGS(func, bpf_sk_stream_memory_free, KF_RET_NULL)
+BTF_ID_FLAGS(func, bpf_sk_stream_memory_free)
 BTF_ID_FLAGS(func, bpf_mptcp_subflow_queues_empty)
 BTF_ID_FLAGS(func, mptcp_pm_subflow_chk_stale, KF_SLEEPABLE)
 BTF_KFUNCS_END(bpf_mptcp_common_kfunc_ids)
