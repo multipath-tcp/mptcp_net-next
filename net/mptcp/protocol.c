@@ -4446,8 +4446,8 @@ static __poll_t mptcp_check_writeable(struct mptcp_sock *msk)
 	return 0;
 }
 
-static __poll_t mptcp_poll(struct file *file, struct socket *sock,
-			   struct poll_table_struct *wait)
+__poll_t mptcp_poll(struct file *file, struct socket *sock,
+		    struct poll_table_struct *wait)
 {
 	struct sock *sk = sock->sk;
 	struct mptcp_sock *msk;
@@ -4494,6 +4494,7 @@ static __poll_t mptcp_poll(struct file *file, struct socket *sock,
 
 	return mask;
 }
+EXPORT_SYMBOL_GPL(mptcp_poll);
 
 static struct sk_buff *mptcp_recv_skb(struct sock *sk, u32 *off)
 {
