@@ -968,35 +968,37 @@ static void build_proto_ops(struct proto_ops ops[TLS_NUM_CONFIG][TLS_NUM_CONFIG]
 #endif
 }
 
-static void tls_build_proto(struct sock *sk)
+static void __tls_build_proto(struct sock *sk,
+			      const struct proto *saved_prot,
+			      struct mutex *prot_mutex,
+			      int family)
 {
 	int ip_ver = sk->sk_family == AF_INET6 ? TLSV6 : TLSV4;
 	struct proto *prot = READ_ONCE(sk->sk_prot);
 
-	/* Build IPv6 TLS whenever the address of tcpv6 _prot changes */
-	if (ip_ver == TLSV6 &&
-	    unlikely(prot != smp_load_acquire(&saved_tcpv6_prot))) {
-		mutex_lock(&tcpv6_prot_mutex);
-		if (likely(prot != saved_tcpv6_prot)) {
-			build_protos(tls_prots[TLSV6], prot);
-			build_proto_ops(tls_proto_ops[TLSV6],
-					sk->sk_socket->ops);
-			smp_store_release(&saved_tcpv6_prot, prot);
+	if (ip_ver == family) {
+		/* smp_load_acquire pairs with smp_store_release below */
+		if (unlikely(prot != smp_load_acquire(&saved_prot))) {
+			mutex_lock(prot_mutex);
+			if (likely(prot != saved_prot)) {
+				build_protos(tls_prots[family], prot);
+				build_proto_ops(tls_proto_ops[family],
+						sk->sk_socket->ops);
+				/* pairs with smp_load_acquire above */
+				smp_store_release(&saved_prot, prot);
+			}
+			mutex_unlock(prot_mutex);
 		}
-		mutex_unlock(&tcpv6_prot_mutex);
 	}
+}
 
-	if (ip_ver == TLSV4 &&
-	    unlikely(prot != smp_load_acquire(&saved_tcpv4_prot))) {
-		mutex_lock(&tcpv4_prot_mutex);
-		if (likely(prot != saved_tcpv4_prot)) {
-			build_protos(tls_prots[TLSV4], prot);
-			build_proto_ops(tls_proto_ops[TLSV4],
-					sk->sk_socket->ops);
-			smp_store_release(&saved_tcpv4_prot, prot);
-		}
-		mutex_unlock(&tcpv4_prot_mutex);
-	}
+static void tls_build_proto(struct sock *sk)
+{
+	/* Build IPv6 TLS whenever the address of tcpv6 _prot changes */
+	__tls_build_proto(sk, saved_tcpv6_prot, &tcpv6_prot_mutex,
+			  TLSV6);
+	__tls_build_proto(sk, saved_tcpv4_prot, &tcpv4_prot_mutex,
+			  TLSV4);
 }
 
 static void build_protos(struct proto prot[TLS_NUM_CONFIG][TLS_NUM_CONFIG],
