@@ -262,6 +262,8 @@ struct tls_context {
 	struct sock *sk;
 
 	void (*sk_destruct)(struct sock *sk);
+	int (*sk_read_sock)(struct sock *sk, read_descriptor_t *desc,
+			    sk_read_actor_t recv_actor);
 
 	union tls_crypto_context crypto_send;
 	union tls_crypto_context crypto_recv;
