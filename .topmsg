@@ -1,2 +1,57 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/timekeeping-Register-default-clocksource-before-taking-tk_core-lock
+From: Mikhail Gavrilov <mikhail.v.gavrilov@gmail.com>
+Subject: [PATCH] timekeeping: Register default clocksource before taking tk_core lock
+
+Commit f24df84cbe05 ("time/jiffies: Register jiffies clocksource before
+usage") moved the jiffies clocksource registration into
+clocksource_default_clock(), so that it is registered lazily on the first
+call. __clocksource_register() acquires clocksource_mutex, but the first
+caller is timekeeping_init(), which invokes clocksource_default_clock()
+while holding tk_core.lock, a raw spinlock.
+
+Acquiring a sleeping mutex while holding a raw spinlock is invalid, and
+lockdep reports it on every boot when CONFIG_PROVE_RAW_LOCK_NESTING is
+enabled:
+
+  =============================
+  [ BUG: Invalid wait context ]
+  -----------------------------
+  swapper/0/0 is trying to lock:
+  ... (clocksource_mutex){....}-{4:4}, at: __clocksource_register_scale
+  other info that might help us debug this:
+  context-{5:5}
+  1 lock held by swapper/0/0:
+   #0: ... (&tkd->lock){....}-{2:2}, at: timekeeping_init+0x1d5/0x320
+  stack backtrace:
+   dump_stack_lvl+0x84/0xd0
+   __lock_acquire.cold+0x39/0x63
+   lock_acquire.part.0+0xc7/0x280
+   __mutex_lock+0x1b2/0x2440
+   __clocksource_register_scale.cold+0x289/0x609
+   clocksource_default_clock+0x31/0x50
+   timekeeping_init+0x1e3/0x320
+   start_kernel+0x243/0x3f0
+   x86_64_start_reservations+0x24/0x30
+   x86_64_start_kernel+0x134/0x140
+   common_startup_64+0x13e/0x151
+
+On PREEMPT_RT this is a genuine sleeping-while-atomic bug. On !RT
+clocksource_mutex is uncontended at this point, so the boot survives, but
+the locking rule is violated either way.
+
+The default clocksource only has to be registered before
+tk_setup_internals() consumes its mult/shift/maxadj. Neither
+clocksource_default_clock(), the ->enable() callback, nor the registration
+itself need tk_core.lock, so fetch and enable the clock before acquiring
+the lock. This preserves the "register before usage" ordering while
+keeping clocksource_mutex out of the raw spinlock section.
+
+clocksource_default_clock() has a second caller,
+clocksource_done_booting(), which invokes it with clocksource_mutex
+already held. That path avoids a recursive lock only because
+timekeeping_init() has already run and set cs_jiffies_registered, so the
+registration is skipped there. This change does not alter that; it only
+fixes the invalid wait context in timekeeping_init().
+
+Fixes: f24df84cbe05 ("time/jiffies: Register jiffies clocksource before usage")
+Signed-off-by: Mikhail Gavrilov <mikhail.v.gavrilov@gmail.com>
+Reviwed-by: Breno Leitao <leitao@debian.org>
