@@ -201,7 +201,7 @@ int tls_push_sg(struct sock *sk,
 	ctx->splicing_pages = true;
 	while (1) {
 		/* is sending application-limited? */
-		tcp_rate_check_app_limited(sk);
+		ctx->ops->check_app_limited(sk);
 		p = sg_page(sg);
 retry:
 		bvec_set_page(&bvec, p, size, offset);
@@ -339,6 +339,11 @@ void tls_ctx_free(struct sock *sk, struct tls_context *ctx)
 {
 	if (!ctx)
 		return;
+
+	if (ctx->ops) {
+		module_put(ctx->ops->owner);
+		ctx->ops = NULL;
+	}
 
 	memzero_explicit(&ctx->crypto_send, sizeof(ctx->crypto_send));
 	memzero_explicit(&ctx->crypto_recv, sizeof(ctx->crypto_recv));
@@ -1079,6 +1084,7 @@ static struct tls_prot_ops *tls_prot_ops_find(int protocol)
 
 static int tls_init(struct sock *sk)
 {
+	struct tls_prot_ops *ops;
 	struct tls_context *ctx;
 	int rc = 0;
 
@@ -1101,10 +1107,17 @@ static int tls_init(struct sock *sk)
 		goto out;
 	}
 
+	ops = tls_prot_ops_find(sk->sk_protocol);
+	if (!ops || !try_module_get(ops->owner)) {
+		rc = -EINVAL;
+		goto out;
+	}
+
 	ctx->tx_conf = TLS_BASE;
 	ctx->rx_conf = TLS_BASE;
 	ctx->tx_max_payload_len = TLS_MAX_PAYLOAD_SIZE;
 	ctx->sk_read_sock = sk->sk_socket->ops->read_sock;
+	ctx->ops = ops;
 	update_sk_prot(sk, ctx);
 out:
 	write_unlock_bh(&sk->sk_callback_lock);
