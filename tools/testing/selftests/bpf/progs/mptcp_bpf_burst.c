@@ -9,6 +9,11 @@ char _license[] SEC("license") = "GPL";
 
 #define MPTCP_SEND_BURST_SIZE	65428
 
+struct bpf_subflow_send_info {
+	struct mptcp_subflow_context *subflow;
+	u64 linger_time;
+};
+
 #define SSK_MODE_ACTIVE	0
 #define SSK_MODE_BACKUP	1
 #define SSK_MODE_MAX	2
@@ -18,7 +23,7 @@ char _license[] SEC("license") = "GPL";
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_set_timeout(struct sock *sk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
-extern bool bpf_sk_stream_memory_free(const struct sock *sk) __ksym;
+extern bool bpf_sk_stream_memory_free(const struct mptcp_subflow_context *subflow) __ksym;
 extern bool bpf_mptcp_subflow_queues_empty(struct sock *sk) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
 
@@ -52,7 +57,7 @@ void BPF_PROG(mptcp_sched_burst_release, struct mptcp_sock *msk)
 SEC("struct_ops")
 int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 {
-	struct subflow_send_info send_info[SSK_MODE_MAX];
+	struct bpf_subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
 	__u32 pace, burst, wmem;
@@ -62,7 +67,7 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 
 	/* pick the subflow with the lower wmem/wspace ratio */
 	for (i = 0; i < SSK_MODE_MAX; ++i) {
-		send_info[i].ssk = NULL;
+		send_info[i].subflow = NULL;
 		send_info[i].linger_time = -1;
 	}
 
@@ -85,7 +90,7 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 
 		linger_time = div_u64((__u64)ssk->sk_wmem_queued << 32, pace);
 		if (linger_time < send_info[backup].linger_time) {
-			send_info[backup].ssk = ssk;
+			send_info[backup].subflow = subflow;
 			send_info[backup].linger_time = linger_time;
 		}
 	}
@@ -93,18 +98,14 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 
 	/* pick the best backup if no other subflow is active */
 	if (!nr_active)
-		send_info[SSK_MODE_ACTIVE].ssk = send_info[SSK_MODE_BACKUP].ssk;
+		send_info[SSK_MODE_ACTIVE].subflow = send_info[SSK_MODE_BACKUP].subflow;
 
-	ssk = send_info[SSK_MODE_ACTIVE].ssk;
-	if (!ssk || !bpf_sk_stream_memory_free(ssk))
-		return -1;
-
-	subflow = bpf_mptcp_subflow_ctx(ssk);
-	if (!subflow)
+	subflow = send_info[SSK_MODE_ACTIVE].subflow;
+	if (!subflow || !bpf_sk_stream_memory_free(subflow))
 		return -1;
 
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
-	ssk = bpf_core_cast(ssk, struct sock);
+	ssk = mptcp_subflow_tcp_sock(subflow);
 	wmem = ssk->sk_wmem_queued;
 	if (!burst)
 		goto out;
