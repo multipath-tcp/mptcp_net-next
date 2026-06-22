@@ -33,33 +33,37 @@ void BPF_PROG(mptcp_sched_rr_release, struct mptcp_sock *msk)
 SEC("struct_ops")
 int BPF_PROG(bpf_rr_get_send, struct mptcp_sock *msk)
 {
-	struct mptcp_subflow_context *subflow, *next;
+	struct mptcp_subflow_context *subflow, *first = NULL, *next = NULL;
 	struct mptcp_rr_storage *ptr;
+	bool found = false;
 
 	ptr = bpf_sk_storage_get(&mptcp_rr_map, msk, 0,
 				 BPF_LOCAL_STORAGE_GET_F_CREATE);
 	if (!ptr)
 		return -1;
 
-	next = bpf_mptcp_subflow_ctx(msk->first);
-	if (!next)
-		return -1;
-
-	if (!ptr->last_snd)
-		goto out;
-
 	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk) {
-		if (mptcp_subflow_tcp_sock(subflow) == ptr->last_snd) {
-			subflow = bpf_iter_mptcp_subflow_next(&___it);
-			if (!subflow)
-				break;
+		if (!first)
+			first = subflow;
 
+		if (!ptr->last_snd)
+			break;
+
+		if (found) {
 			next = subflow;
 			break;
 		}
+
+		if (mptcp_subflow_tcp_sock(subflow) == ptr->last_snd)
+			found = true;
 	}
 
-out:
+	if (!first)
+		return -1;
+
+	if (!next)
+		next = first;
+
 	mptcp_subflow_set_scheduled(next, true);
 	ptr->last_snd = mptcp_subflow_tcp_sock(next);
 	return 0;
