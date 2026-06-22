@@ -20,13 +20,16 @@ SEC("struct_ops")
 int BPF_PROG(bpf_first_get_send, struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
+	struct sock *ssk;
 
-	subflow = bpf_mptcp_subflow_ctx(msk->first);
-	if (!subflow)
-		return -1;
-
-	mptcp_subflow_set_scheduled(subflow, true);
-	return 0;
+	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk) {
+		ssk = bpf_mptcp_subflow_tcp_sock(subflow);
+		if (ssk == msk->first) {
+			mptcp_subflow_set_scheduled(subflow, true);
+			return 0;
+		}
+	}
+	return -1;
 }
 
 SEC(".struct_ops.link")
