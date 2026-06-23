@@ -3,6 +3,7 @@
 #define __MPTCP_BPF_H__
 
 #include "bpf_experimental.h"
+#include "bpf_atomic.h"
 
 /* list helpers from include/linux/list.h */
 static inline int list_is_head(const struct list_head *list,
