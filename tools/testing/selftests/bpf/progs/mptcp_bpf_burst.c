@@ -19,12 +19,12 @@ struct bpf_subflow_send_info {
 #define SSK_MODE_MAX	2
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#define RB_EMPTY_ROOT(root)  (READ_ONCE((root)->rb_node) == NULL)
 
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_set_timeout(struct sock *sk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
 extern bool bpf_sk_stream_memory_free(const struct mptcp_subflow_context *subflow) __ksym;
-extern bool bpf_mptcp_subflow_queues_empty(struct sock *sk) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
 
 static __always_inline __u64 div_u64(__u64 dividend, __u32 divisor)
@@ -39,9 +39,14 @@ static __always_inline bool tcp_write_queue_empty(struct sock *sk)
 	return tp ? tp->write_seq == tp->snd_nxt : true;
 }
 
+static __always_inline bool tcp_rtx_queue_empty(const struct sock *sk)
+{
+	return RB_EMPTY_ROOT(&sk->tcp_rtx_queue);
+}
+
 static __always_inline bool tcp_rtx_and_write_queues_empty(struct sock *sk)
 {
-	return bpf_mptcp_subflow_queues_empty(sk) && tcp_write_queue_empty(sk);
+	return tcp_rtx_queue_empty(sk) && tcp_write_queue_empty(sk);
 }
 
 SEC("struct_ops")
