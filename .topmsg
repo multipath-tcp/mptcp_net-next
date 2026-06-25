@@ -35,7 +35,7 @@ Remove the unprotected traversal from mptcp_close_ssk() entirely.
 
 Fixes: ee458a3f314e ("mptcp: introduce mptcp-level backlog")
 Suggested-by: Paolo Abeni <pabeni@redhat.com>
-Reported-by: syzkaller <syzkaller@googlegroups.com>
+Reported-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/621
 Signed-off-by: Kalpan Jani <kalpan.jani@mpiricsoftware.com>
 Acked-by: Paolo Abeni <pabeni@redhat.com>
