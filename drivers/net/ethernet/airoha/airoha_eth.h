@@ -197,6 +197,7 @@ struct airoha_queue {
 	int free_thr;
 	int buf_size;
 	bool txq_stopped;
+	bool flushing;
 
 	struct napi_struct napi;
 	struct page_pool *page_pool;
@@ -523,8 +524,6 @@ struct airoha_irq_bank {
 struct airoha_qdma {
 	struct airoha_eth *eth;
 	void __iomem *regs;
-
-	int users;
 
 	struct airoha_irq_bank irq_banks[AIROHA_MAX_NUM_IRQ_BANKS];
 
