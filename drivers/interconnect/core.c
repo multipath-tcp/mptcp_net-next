@@ -432,7 +432,7 @@ struct icc_path *devm_of_icc_get(struct device *dev, const char *name)
 		return ERR_PTR(-ENOMEM);
 
 	path = of_icc_get(dev, name);
-	if (!IS_ERR(path)) {
+	if (!IS_ERR_OR_NULL(path)) {
 		*ptr = path;
 		devres_add(dev, ptr);
 	} else {
