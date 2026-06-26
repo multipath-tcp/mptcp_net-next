@@ -596,9 +596,9 @@ static void max30102_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id max30102_id[] = {
-	{ "max30101", max30105 },
-	{ "max30102", max30102 },
-	{ "max30105", max30105 },
+	{ .name = "max30101", .driver_data = max30105 },
+	{ .name = "max30102", .driver_data = max30102 },
+	{ .name = "max30105", .driver_data = max30105 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, max30102_id);
