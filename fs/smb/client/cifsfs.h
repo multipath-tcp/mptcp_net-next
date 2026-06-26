@@ -107,6 +107,7 @@ int cifs_closedir(struct inode *inode, struct file *file);
 ssize_t cifs_strict_readv(struct kiocb *iocb, struct iov_iter *to);
 ssize_t cifs_strict_writev(struct kiocb *iocb, struct iov_iter *from);
 ssize_t cifs_file_write_iter(struct kiocb *iocb, struct iov_iter *from);
+ssize_t cifs_direct_write_iter(struct kiocb *iocb, struct iov_iter *from);
 ssize_t cifs_loose_read_iter(struct kiocb *iocb, struct iov_iter *iter);
 int cifs_flock(struct file *file, int cmd, struct file_lock *fl);
 int cifs_lock(struct file *file, int cmd, struct file_lock *flock);
