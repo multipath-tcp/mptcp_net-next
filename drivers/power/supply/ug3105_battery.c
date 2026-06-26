@@ -195,7 +195,7 @@ static SIMPLE_DEV_PM_OPS(ug3105_pm_ops, ug3105_suspend,
 			ug3105_resume);
 
 static const struct i2c_device_id ug3105_id[] = {
-	{ "ug3105" },
+	{ .name = "ug3105" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ug3105_id);
