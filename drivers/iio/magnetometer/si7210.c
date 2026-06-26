@@ -413,7 +413,7 @@ static int si7210_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id si7210_id[] = {
-	{ "si7210" },
+	{ .name = "si7210" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, si7210_id);
