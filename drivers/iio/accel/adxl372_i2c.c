@@ -44,8 +44,8 @@ static int adxl372_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id adxl372_i2c_id[] = {
-	{ "adxl371", (kernel_ulong_t)&adxl371_chip_info },
-	{ "adxl372", (kernel_ulong_t)&adxl372_chip_info },
+	{ .name = "adxl371", .driver_data = (kernel_ulong_t)&adxl371_chip_info },
+	{ .name = "adxl372", .driver_data = (kernel_ulong_t)&adxl372_chip_info },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, adxl372_i2c_id);

@@ -1587,18 +1587,11 @@ static const struct of_device_id ep93xx_dma_of_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, ep93xx_dma_of_ids);
 
-static const struct platform_device_id ep93xx_dma_driver_ids[] = {
-	{ "ep93xx-dma-m2p", 0 },
-	{ "ep93xx-dma-m2m", 1 },
-	{ },
-};
-
 static struct platform_driver ep93xx_dma_driver = {
 	.driver		= {
 		.name	= "ep93xx-dma",
 		.of_match_table = ep93xx_dma_of_ids,
 	},
-	.id_table	= ep93xx_dma_driver_ids,
 	.probe		= ep93xx_dma_probe,
 };
 
