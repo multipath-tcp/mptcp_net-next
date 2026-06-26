@@ -19,6 +19,9 @@
 #define CLKOUT3	3
 #define CLKOUTMAX 4
 
+/* Maximum SSI count for per-SSI clocks */
+#define ADG_SSI_MAX	10
+
 #define BRGCKR_31	(1 << 31)
 #define BRRx_MASK(x) (0x3FF & x)
 
@@ -34,10 +37,14 @@ struct rsnd_adg {
 	struct clk *adg;
 	struct clk *clkin[CLKINMAX];
 	struct clk *clkout[CLKOUTMAX];
+	/* RZ/G3E: per-SSI ADG clocks (adg-ssi-0 through adg-ssi-9) */
+	struct clk *clk_adg_ssi[ADG_SSI_MAX];
+	struct clk *clk_ssif_supply;
 	struct clk *null_clk;
 	struct clk_onecell_data onecell;
 	struct rsnd_mod mod;
 	int clkin_rate[CLKINMAX];
+	bool ssi_clk_prepared;
 	int clkin_size;
 	int clkout_size;
 	u32 ckr;
@@ -68,6 +75,13 @@ static const char * const clkin_name_gen2[] = {
 	[CLKB]	= "clk_b",
 	[CLKC]	= "clk_c",
 	[CLKI]	= "clk_i",
+};
+
+static const char * const clkin_name_rzg3e[] = {
+	[CLKA]	= "audio-clka",
+	[CLKB]	= "audio-clkb",
+	[CLKC]	= "audio-clkc",
+	[CLKI]	= "audio-clki",
 };
 
 static const char * const clkout_name_gen2[] = {
@@ -343,7 +357,15 @@ int rsnd_adg_clk_query(struct rsnd_priv *priv, unsigned int rate)
 
 int rsnd_adg_ssi_clk_stop(struct rsnd_mod *ssi_mod)
 {
+	struct rsnd_priv *priv = rsnd_mod_to_priv(ssi_mod);
+	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+	int id = rsnd_mod_id(ssi_mod);
+
 	rsnd_adg_set_ssi_clk(ssi_mod, 0);
+
+	/* RZ/G3E: only disable here, unprepare is done in hw_free */
+	clk_disable(adg->clk_adg_ssi[id]);
+	clk_disable(adg->clk_ssif_supply);
 
 	return 0;
 }
@@ -354,7 +376,8 @@ int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
 	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
 	struct device *dev = rsnd_priv_to_dev(priv);
 	struct rsnd_mod *adg_mod = rsnd_mod_get(adg);
-	int data;
+	int id = rsnd_mod_id(ssi_mod);
+	int ret, data;
 	u32 ckr = 0;
 
 	data = rsnd_adg_clk_query(priv, rate);
@@ -376,7 +399,61 @@ int rsnd_adg_ssi_clk_try_start(struct rsnd_mod *ssi_mod, unsigned int rate)
 		(ckr) ?	adg->brg_rate[ADG_HZ_48] :
 			adg->brg_rate[ADG_HZ_441]);
 
+	/*
+	 * RZ/G3E: enable per-SSI and supply clocks
+	 */
+	ret = clk_enable(adg->clk_adg_ssi[id]);
+	if (ret) {
+		dev_err(dev, "Cannot enable adg-ssi-%d ADG clock\n", id);
+		return ret;
+	}
+
+	ret = clk_enable(adg->clk_ssif_supply);
+	if (ret) {
+		dev_err(dev, "Cannot enable SSIF supply clock\n");
+		clk_disable(adg->clk_adg_ssi[id]);
+		return ret;
+	}
+
 	return 0;
+}
+
+static int rsnd_adg_ssi_clk_prepare(struct rsnd_adg *adg)
+{
+	int i, ret;
+
+	if (adg->ssi_clk_prepared)
+		return 0;
+
+	for (i = 0; i < ADG_SSI_MAX; i++) {
+		ret = clk_prepare(adg->clk_adg_ssi[i]);
+		if (ret)
+			goto unwind;
+	}
+	ret = clk_prepare(adg->clk_ssif_supply);
+	if (ret)
+		goto unwind;
+
+	adg->ssi_clk_prepared = true;
+	return 0;
+
+unwind:
+	while (i--)
+		clk_unprepare(adg->clk_adg_ssi[i]);
+	return ret;
+}
+
+static void rsnd_adg_ssi_clk_unprepare(struct rsnd_adg *adg)
+{
+	int i;
+
+	if (!adg->ssi_clk_prepared)
+		return;
+	adg->ssi_clk_prepared = false;
+
+	clk_unprepare(adg->clk_ssif_supply);
+	for (i = 0; i < ADG_SSI_MAX; i++)
+		clk_unprepare(adg->clk_adg_ssi[i]);
 }
 
 int rsnd_adg_clk_control(struct rsnd_priv *priv, int enable)
@@ -415,6 +492,28 @@ int rsnd_adg_clk_control(struct rsnd_priv *priv, int enable)
 
 			adg->clkin_rate[i] = 0;
 		}
+	}
+
+	/*
+	 * rsnd_adg_clk_enable() might return error (_disable() will not).
+	 * We need to rollback in such case
+	 */
+	/*
+	 * RZ/G3E per-SSI ADG and SSIF supply clocks.
+	 *
+	 * Follow the same style as for_each_rsnd_clkin() above: on enable,
+	 * try to prepare every clock and accumulate the error. On disable,
+	 * unprepare every clock. Absent optional clocks are NULL, for
+	 * which clk_prepare() and clk_unprepare() are no-ops.
+	 */
+	if (enable) {
+		int sub_ret = rsnd_adg_ssi_clk_prepare(adg);
+
+		/* Preserve the first error from the clkin loop above. */
+		if (sub_ret && !ret)
+			ret = sub_ret;
+	} else {
+		rsnd_adg_ssi_clk_unprepare(adg);
 	}
 
 	/*
@@ -482,6 +581,9 @@ static int rsnd_adg_get_clkin(struct rsnd_priv *priv)
 	if (rsnd_is_gen4(priv)) {
 		clkin_name = clkin_name_gen4;
 		clkin_size = ARRAY_SIZE(clkin_name_gen4);
+	} else if (rsnd_is_rzg3e(priv)) {
+		clkin_name = clkin_name_rzg3e;
+		clkin_size = ARRAY_SIZE(clkin_name_rzg3e);
 	}
 
 	/*
@@ -769,8 +871,34 @@ void rsnd_adg_clk_dbg_info(struct rsnd_priv *priv, struct seq_file *m)
 #define rsnd_adg_clk_dbg_info(priv, m)
 #endif
 
+static int rsnd_adg_get_ssi_clks(struct rsnd_priv *priv)
+{
+	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+	struct device *dev = rsnd_priv_to_dev(priv);
+	char name[16];
+	int i;
+
+	/* SSIF supply clock */
+	adg->clk_ssif_supply = devm_clk_get_optional(dev, "ssif_supply");
+	if (IS_ERR(adg->clk_ssif_supply))
+		return dev_err_probe(dev, PTR_ERR(adg->clk_ssif_supply),
+				     "failed to get ssif_supply clock\n");
+
+	/* Per-SSI ADG clocks (RZ/G3E-only; no legacy dotted form exists) */
+	for (i = 0; i < ADG_SSI_MAX; i++) {
+		snprintf(name, sizeof(name), "adg-ssi-%d", i);
+		adg->clk_adg_ssi[i] = devm_clk_get_optional(dev, name);
+		if (IS_ERR(adg->clk_adg_ssi[i]))
+			return dev_err_probe(dev, PTR_ERR(adg->clk_adg_ssi[i]),
+					     "failed to get %s clock\n", name);
+	}
+
+	return 0;
+}
+
 int rsnd_adg_probe(struct rsnd_priv *priv)
 {
+	struct reset_control *rstc;
 	struct rsnd_adg *adg;
 	struct device *dev = rsnd_priv_to_dev(priv);
 	int ret;
@@ -779,8 +907,11 @@ int rsnd_adg_probe(struct rsnd_priv *priv)
 	if (!adg)
 		return -ENOMEM;
 
-	ret = rsnd_mod_init(priv, &adg->mod, &adg_ops,
-		      NULL, 0, 0);
+	rstc = devm_reset_control_get_optional_exclusive(dev, "adg");
+	if (IS_ERR(rstc))
+		return dev_err_probe(dev, PTR_ERR(rstc), "failed to get adg reset\n");
+
+	ret = rsnd_mod_init(priv, &adg->mod, &adg_ops, NULL, rstc, 0, 0);
 	if (ret)
 		return ret;
 
@@ -791,6 +922,11 @@ int rsnd_adg_probe(struct rsnd_priv *priv)
 		return ret;
 
 	ret = rsnd_adg_get_clkout(priv);
+	if (ret)
+		return ret;
+
+	/* RZ/G3E-specific: per-SSI ADG and SSIF supply clocks */
+	ret = rsnd_adg_get_ssi_clks(priv);
 	if (ret)
 		return ret;
 
@@ -816,4 +952,30 @@ void rsnd_adg_remove(struct rsnd_priv *priv)
 
 	/* It should be called after rsnd_adg_clk_disable() */
 	rsnd_adg_null_clk_clean(priv);
+}
+
+static struct rsnd_mod *rsnd_adg_mod_get(struct rsnd_priv *priv)
+{
+	struct rsnd_adg *adg = rsnd_priv_to_adg(priv);
+
+	if (!adg)
+		return NULL;
+
+	return rsnd_mod_get(adg);
+}
+
+void rsnd_adg_suspend(struct rsnd_priv *priv)
+{
+	struct rsnd_mod *mod = rsnd_adg_mod_get(priv);
+
+	if (mod)
+		rsnd_suspend_clk_reset(mod->clk, mod->rstc);
+}
+
+void rsnd_adg_resume(struct rsnd_priv *priv)
+{
+	struct rsnd_mod *mod = rsnd_adg_mod_get(priv);
+
+	if (mod)
+		rsnd_resume_clk_reset(mod->clk, mod->rstc);
 }
