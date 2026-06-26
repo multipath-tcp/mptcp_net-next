@@ -428,7 +428,7 @@ static const struct acpi_device_id jsa1212_acpi_match[] = {
 MODULE_DEVICE_TABLE(acpi, jsa1212_acpi_match);
 
 static const struct i2c_device_id jsa1212_id[] = {
-	{ JSA1212_DRIVER_NAME },
+	{ .name = JSA1212_DRIVER_NAME },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, jsa1212_id);
