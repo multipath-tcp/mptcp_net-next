@@ -130,7 +130,7 @@ static int sdp500_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id sdp500_id[] = {
-	{ "sdp500" },
+	{ .name = "sdp500" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, sdp500_id);

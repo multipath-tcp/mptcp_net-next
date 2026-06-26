@@ -551,8 +551,8 @@ static const struct ltr_chip_info ltrf216a_chip_info = {
 };
 
 static const struct i2c_device_id ltrf216a_id[] = {
-	{ "ltr308", .driver_data = (kernel_ulong_t)&ltr308_chip_info },
-	{ "ltrf216a", .driver_data = (kernel_ulong_t)&ltrf216a_chip_info },
+	{ .name = "ltr308", .driver_data = (kernel_ulong_t)&ltr308_chip_info },
+	{ .name = "ltrf216a", .driver_data = (kernel_ulong_t)&ltrf216a_chip_info },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ltrf216a_id);
