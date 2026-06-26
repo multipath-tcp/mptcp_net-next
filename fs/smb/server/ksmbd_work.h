@@ -67,12 +67,16 @@ struct ksmbd_work {
 	unsigned int                    response_sz;
 
 	void				*tr_buf;
+	/* Contiguous SMB2 compression transform owned by this work item. */
+	void				*compress_buf;
 
 	unsigned char			state;
 	/* No response for cancelled request */
 	bool                            send_no_response:1;
 	/* Request is encrypted */
 	bool                            encrypted:1;
+	/* READ response should be wrapped in a compression transform. */
+	bool                            compress_response:1;
 	/* Is this SYNC or ASYNC ksmbd_work */
 	bool                            asynchronous:1;
 	bool                            need_invalidate_rkey:1;
