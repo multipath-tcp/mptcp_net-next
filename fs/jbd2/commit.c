@@ -512,10 +512,8 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		 * leave undo-committed data.
 		 */
 		if (jh->b_committed_data) {
-			struct buffer_head *bh = jh2bh(jh);
-
 			spin_lock(&jh->b_state_lock);
-			jbd2_free(jh->b_committed_data, bh->b_size);
+			kfree(jh->b_committed_data);
 			jh->b_committed_data = NULL;
 			spin_unlock(&jh->b_state_lock);
 		}
@@ -976,7 +974,7 @@ restart_loop:
 		 * its triggers if they exist, so we can clear that too.
 		 */
 		if (jh->b_committed_data) {
-			jbd2_free(jh->b_committed_data, bh->b_size);
+			kfree(jh->b_committed_data);
 			jh->b_committed_data = NULL;
 			if (jh->b_frozen_data) {
 				jh->b_committed_data = jh->b_frozen_data;
@@ -984,7 +982,7 @@ restart_loop:
 				jh->b_frozen_triggers = NULL;
 			}
 		} else if (jh->b_frozen_data) {
-			jbd2_free(jh->b_frozen_data, bh->b_size);
+			kfree(jh->b_frozen_data);
 			jh->b_frozen_data = NULL;
 			jh->b_frozen_triggers = NULL;
 		}

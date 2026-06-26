@@ -821,7 +821,6 @@ static const struct dmi_system_id yc_acp_quirk_table[] = {
 static int acp6x_probe(struct platform_device *pdev)
 {
 	const struct dmi_system_id *dmi_id;
-	struct acp6x_pdm *machine = NULL;
 	struct snd_soc_card *card;
 	struct acpi_device *adev;
 	acpi_handle handle;
@@ -868,7 +867,6 @@ check_dmi_entry:
 	dev_info(&pdev->dev, "Enabling ACP DMIC support via %s", dmi_id ? "DMI" : "ACPI");
 	acp6x_card.dev = &pdev->dev;
 
-	snd_soc_card_set_drvdata(card, machine);
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret) {
 		return dev_err_probe(&pdev->dev, ret,
