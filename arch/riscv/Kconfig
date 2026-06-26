@@ -24,6 +24,7 @@ config RISCV
 	select ARCH_ENABLE_SPLIT_PMD_PTLOCK if PGTABLE_LEVELS > 2
 	select ARCH_ENABLE_THP_MIGRATION if TRANSPARENT_HUGEPAGE
 	select ARCH_HAS_BINFMT_FLAT
+	select ARCH_HAS_CC_CAN_LINK
 	select ARCH_HAS_CURRENT_STACK_POINTER
 	select ARCH_HAS_DEBUG_VIRTUAL if MMU
 	select ARCH_HAS_DEBUG_VM_PGTABLE
@@ -55,7 +56,7 @@ config RISCV
 	select ARCH_HAS_UBSAN
 	select ARCH_HAS_VDSO_ARCH_DATA if HAVE_GENERIC_VDSO
 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-	select ARCH_KEEP_MEMBLOCK if ACPI
+	select ARCH_KEEP_MEMBLOCK if ACPI || KEXEC
 	select ARCH_MHP_MEMMAP_ON_MEMORY_ENABLE	if 64BIT && MMU
 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
@@ -103,6 +104,7 @@ config RISCV
 	select FUNCTION_ALIGNMENT_8B if DYNAMIC_FTRACE_WITH_CALL_OPS
 	select GENERIC_ARCH_TOPOLOGY
 	select GENERIC_ATOMIC64 if !64BIT
+	select GENERIC_BITREVERSE if HAVE_ARCH_BITREVERSE
 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
 	select GENERIC_CPU_DEVICES
 	select GENERIC_CPU_VULNERABILITIES
@@ -126,6 +128,7 @@ config RISCV
 	select HAS_IOPORT if MMU
 	select HAVE_ALIGNED_STRUCT_PAGE
 	select HAVE_ARCH_AUDITSYSCALL
+	select HAVE_ARCH_BITREVERSE if RISCV_ISA_ZBKB && BITREVERSE
 	select HAVE_ARCH_HUGE_VMALLOC if HAVE_ARCH_HUGE_VMAP
 	select HAVE_ARCH_HUGE_VMAP if MMU && 64BIT
 	select HAVE_ARCH_JUMP_LABEL
@@ -149,6 +152,7 @@ config RISCV
 	select HAVE_ARCH_USERFAULTFD_WP if 64BIT && MMU && USERFAULTFD && RISCV_ISA_SVRSW60T59B
 	select HAVE_ARCH_VMAP_STACK if MMU && 64BIT
 	select HAVE_ASM_MODVERSIONS
+	select HAVE_BUILDTIME_MCOUNT_SORT
 	select HAVE_CONTEXT_TRACKING_USER
 	select HAVE_DEBUG_KMEMLEAK
 	select HAVE_DMA_CONTIGUOUS if MMU
@@ -402,9 +406,6 @@ config ARCH_RV32I
 	bool "RV32I"
 	depends on NONPORTABLE
 	select 32BIT
-	select GENERIC_LIB_ASHLDI3
-	select GENERIC_LIB_ASHRDI3
-	select GENERIC_LIB_LSHRDI3
 	select GENERIC_LIB_UCMPDI2
 
 config ARCH_RV64I
@@ -1020,7 +1021,6 @@ choice
 config RISCV_PROBE_VECTOR_UNALIGNED_ACCESS
 	bool "Probe speed of vector unaligned accesses"
 	select RISCV_VECTOR_MISALIGNED
-	depends on RISCV_ISA_V
 	help
 	  During boot, the kernel will run a series of tests to determine the
 	  speed of vector unaligned accesses if they are supported. This probing
@@ -1160,7 +1160,7 @@ config RELOCATABLE
 
 config RANDOMIZE_BASE
         bool "Randomize the address of the kernel image"
-        select RELOCATABLE
+        depends on RELOCATABLE
         depends on MMU && 64BIT
         help
           Randomizes the virtual address at which the kernel image is
@@ -1349,6 +1349,20 @@ config PORTABLE
 
 config ARCH_PROC_KCORE_TEXT
 	def_bool y
+
+config ARCH_CC_CAN_LINK
+	bool
+	default $(cc_can_link_user,-march=rv64g -mabi=lp64d) if 64BIT && FPU
+	default $(cc_can_link_user,-march=rv64g -mabi=lp64) if 64BIT
+	default $(cc_can_link_user,-march=rv32g -mabi=ilp32d) if FPU
+	default $(cc_can_link_user,-march=rv32g -mabi=ilp32)
+
+config ARCH_USERFLAGS
+	string
+	default "-march=rv64g -mabi=lp64d" if 64BIT && FPU
+	default "-march=rv64g -mabi=lp64" if 64BIT
+	default "-march=rv32g -mabi=ilp32d" if FPU
+	default "-march=rv32g -mabi=ilp32"
 
 menu "Power management options"
 
