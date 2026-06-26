@@ -188,4 +188,13 @@ int BPF_PROG(null_check, struct file *file)
 	return 0;
 }
 
+SEC("lsm_cgroup/file_open")
+__description("sleepable lsm_cgroup program is rejected")
+__failure __msg("Program of this type cannot be sleepable")
+__flag(BPF_F_SLEEPABLE)
+int BPF_PROG(sleepable_lsm_cgroup)
+{
+	return 0;
+}
+
 char _license[] SEC("license") = "GPL";

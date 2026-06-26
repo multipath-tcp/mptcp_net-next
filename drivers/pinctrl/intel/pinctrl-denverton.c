@@ -250,7 +250,7 @@ static const struct acpi_device_id dnv_pinctrl_acpi_match[] = {
 MODULE_DEVICE_TABLE(acpi, dnv_pinctrl_acpi_match);
 
 static const struct platform_device_id dnv_pinctrl_platform_ids[] = {
-	{ "denverton-pinctrl", (kernel_ulong_t)&dnv_soc_data },
+	{ .name = "denverton-pinctrl", .driver_data = (kernel_ulong_t)&dnv_soc_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(platform, dnv_pinctrl_platform_ids);
