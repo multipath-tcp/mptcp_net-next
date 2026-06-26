@@ -39,9 +39,9 @@ static void bmc150_magn_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id bmc150_magn_i2c_id[] = {
-	{ "bmc150_magn" },
-	{ "bmc156_magn" },
-	{ "bmm150_magn" },
+	{ .name = "bmc150_magn" },
+	{ .name = "bmc156_magn" },
+	{ .name = "bmm150_magn" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, bmc150_magn_i2c_id);

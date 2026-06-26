@@ -320,9 +320,10 @@ static int cros_chctl_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id cros_chctl_id[] = {
-	{ "cros-charge-control", 0 },
-	{}
+	{ .name = "cros-charge-control" },
+	{ }
 };
+MODULE_DEVICE_TABLE(platform, cros_chctl_id);
 
 static struct platform_driver cros_chctl_driver = {
 	.driver.name	= "cros-charge-control",
@@ -331,7 +332,6 @@ static struct platform_driver cros_chctl_driver = {
 };
 module_platform_driver(cros_chctl_driver);
 
-MODULE_DEVICE_TABLE(platform, cros_chctl_id);
 MODULE_DESCRIPTION("ChromeOS EC charge control");
 MODULE_AUTHOR("Thomas Weißschuh <linux@weissschuh.net>");
 MODULE_LICENSE("GPL");
