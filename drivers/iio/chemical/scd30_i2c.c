@@ -20,7 +20,7 @@
 #define SCD30_I2C_MAX_BUF_SIZE 18
 #define SCD30_I2C_CRC8_POLYNOMIAL 0x31
 
-static u16 scd30_i2c_cmd_lookup_tbl[] = {
+static const u16 scd30_i2c_cmd_lookup_tbl[] = {
 	[CMD_START_MEAS] = 0x0010,
 	[CMD_STOP_MEAS] = 0x0104,
 	[CMD_MEAS_INTERVAL] = 0x4600,
@@ -70,6 +70,9 @@ static int scd30_i2c_command(struct scd30_state *state, enum scd30_cmd cmd, u16 
 	char *rsp = response;
 	int i, ret;
 	char crc;
+
+	if (!response && size != 0)
+		return -EINVAL;
 
 	put_unaligned_be16(scd30_i2c_cmd_lookup_tbl[cmd], buf);
 	i = 2;
