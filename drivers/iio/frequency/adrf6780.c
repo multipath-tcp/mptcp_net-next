@@ -188,8 +188,11 @@ static int adrf6780_read_adc_raw(struct adrf6780_state *st, unsigned int *read_v
 	if (ret)
 		goto exit;
 
-	/* Recommended delay for the ADC to be ready*/
-	usleep_range(200, 250);
+	/*
+	 * Per ADRF6780 datasheet (Rev. D, page 23, ADC section),
+	 * wait approximately 200 us for the ADC to be ready.
+	 */
+	fsleep(200);
 
 	ret = __adrf6780_spi_read(st, ADRF6780_REG_ADC_OUTPUT, read_val);
 	if (ret)
