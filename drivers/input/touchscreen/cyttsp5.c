@@ -938,7 +938,7 @@ static const struct of_device_id cyttsp5_of_match[] = {
 MODULE_DEVICE_TABLE(of, cyttsp5_of_match);
 
 static const struct i2c_device_id cyttsp5_i2c_id[] = {
-	{ CYTTSP5_NAME },
+	{ .name = CYTTSP5_NAME },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, cyttsp5_i2c_id);
