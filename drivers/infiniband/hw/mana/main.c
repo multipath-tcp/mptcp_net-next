@@ -262,7 +262,7 @@ int mana_ib_create_queue(struct mana_ib_dev *mdev, u64 addr, u32 size,
 	queue->id = INVALID_QUEUE_ID;
 	queue->gdma_region = GDMA_INVALID_DMA_REGION;
 
-	umem = ib_umem_get(&mdev->ib_dev, addr, size, IB_ACCESS_LOCAL_WRITE);
+	umem = ib_umem_get_va(&mdev->ib_dev, addr, size, IB_ACCESS_LOCAL_WRITE);
 	if (IS_ERR(umem)) {
 		ibdev_dbg(&mdev->ib_dev, "Failed to get umem, %pe\n", umem);
 		return PTR_ERR(umem);
@@ -573,6 +573,11 @@ int mana_ib_query_device(struct ib_device *ibdev, struct ib_device_attr *props,
 {
 	struct mana_ib_dev *dev = container_of(ibdev, struct mana_ib_dev, ib_dev);
 	struct pci_dev *pdev = to_pci_dev(mdev_to_gc(dev)->dev);
+	int err;
+
+	err = ib_is_udata_in_empty(uhw);
+	if (err)
+		return err;
 
 	memset(props, 0, sizeof(*props));
 	props->vendor_id = pdev->vendor;
@@ -600,7 +605,7 @@ int mana_ib_query_device(struct ib_device *ibdev, struct ib_device_attr *props,
 	if (!mana_ib_is_rnic(dev))
 		props->raw_packet_caps = IB_RAW_PACKET_CAP_IP_CSUM;
 
-	return 0;
+	return ib_respond_empty_udata(uhw);
 }
 
 int mana_ib_query_port(struct ib_device *ibdev, u32 port,
@@ -624,8 +629,7 @@ int mana_ib_query_port(struct ib_device *ibdev, u32 port,
 		props->phys_state = IB_PORT_PHYS_STATE_DISABLED;
 	}
 
-	props->active_width = IB_WIDTH_4X;
-	props->active_speed = IB_SPEED_EDR;
+	ib_get_eth_speed(ibdev, port, &props->active_speed, &props->active_width);
 	props->pkey_tbl_len = 1;
 	if (mana_ib_is_rnic(dev)) {
 		props->gid_tbl_len = 16;

@@ -41,7 +41,7 @@ static int tps65086_restart_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id tps65086_restart_id_table[] = {
-	{ "tps65086-reset", },
+	{ .name = "tps65086-reset" },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(platform, tps65086_restart_id_table);
