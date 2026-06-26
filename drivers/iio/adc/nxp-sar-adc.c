@@ -326,11 +326,7 @@ static int nxp_sar_adc_read_data(struct nxp_sar_adc *info, unsigned int chan)
 
 	ceocfr = readl(NXP_SAR_ADC_CEOCFR0(info->regs));
 
-	/*
-	 * FIELD_GET() can not be used here because EOC_CH is not constant.
-	 * TODO: Switch to field_get() when it will be available.
-	 */
-	if (!(NXP_SAR_ADC_EOC_CH(chan) & ceocfr))
+	if (!field_get(NXP_SAR_ADC_EOC_CH(chan), ceocfr))
 		return -EIO;
 
 	cdr = readl(NXP_SAR_ADC_CDR(info->regs, chan));
@@ -350,6 +346,7 @@ static void nxp_sar_adc_isr_buffer(struct iio_dev *indio_dev)
 		ret = nxp_sar_adc_read_data(info, info->buffered_chan[i]);
 		if (ret < 0) {
 			nxp_sar_adc_read_notify(info);
+			iio_trigger_notify_done(indio_dev->trig);
 			return;
 		}
 
