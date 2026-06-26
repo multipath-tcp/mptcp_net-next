@@ -232,7 +232,7 @@ static int sps30_i2c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id sps30_i2c_id[] = {
-	{ "sps30" },
+	{ .name = "sps30" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, sps30_i2c_id);
