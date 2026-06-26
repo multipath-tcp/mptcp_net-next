@@ -199,9 +199,7 @@ struct snd_soc_component_driver {
 	bool use_dai_pcm_id;	/* use DAI link PCM ID as PCM device number */
 	int be_pcm_base;	/* base device ID for all BE PCMs */
 
-#ifdef CONFIG_DEBUG_FS
 	const char *debugfs_prefix;
-#endif
 };
 
 struct snd_soc_component {
@@ -250,7 +248,6 @@ struct snd_soc_component {
 	void *mark_pm;
 
 	struct dentry *debugfs_root;
-	const char *debugfs_prefix;
 };
 
 #define for_each_component_dais(component, dai)\
