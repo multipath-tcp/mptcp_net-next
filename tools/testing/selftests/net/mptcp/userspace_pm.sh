@@ -608,6 +608,10 @@ test_subflows()
 	   "$client4_token"
 	sleep 0.5
 
+	# RM_ADDR from server to client machine
+	ip netns exec "$ns1" ./pm_nl_ctl rem id 23 token "$server4_token"
+	sleep 0.5
+
 	# Attempt to add a listener at dead:beef:2::2:<subflow-port>
 	ip netns exec "$ns2" ./pm_nl_ctl listen dead:beef:2::2\
 	   "$client6_port" &
@@ -642,6 +646,8 @@ test_subflows()
 			      "dead:beef:2::1" "dead:beef:2::2" "$client6_port" "23"\
 			      "$client_addr_id" "ns1" "ns2"
 
+	# RM_ADDR from server to client machine
+	ip netns exec "$ns1" ./pm_nl_ctl rem id 23 token "$server6_token"
 	# RM_ADDR from client to server machine
 	ip netns exec "$ns2" ./pm_nl_ctl rem id $client_addr_id token\
 	   "$client6_token"
@@ -680,6 +686,8 @@ test_subflows()
 	verify_subflow_events "$server_evts" "$SUB_CLOSED" "$server4_token" "$AF_INET" "10.0.2.1"\
 			      "10.0.2.2" "$new4_port" "23" "$client_addr_id" "ns1" "ns2"
 
+	# RM_ADDR from server to client machine
+	ip netns exec "$ns1" ./pm_nl_ctl rem id 23 token "$server4_token"
 	# RM_ADDR from client to server machine
 	ip netns exec "$ns2" ./pm_nl_ctl rem id $client_addr_id token\
 	   "$client4_token"
@@ -721,6 +729,8 @@ test_subflows()
 	# RM_ADDR from server to client machine
 	ip netns exec "$ns1" ./pm_nl_ctl rem id $server_addr_id token\
 	   "$server4_token"
+	# RM_ADDR from client to server machine
+	ip netns exec "$ns2" ./pm_nl_ctl rem id 23 token "$client4_token"
 	sleep 0.5
 
 	# Attempt to add a listener at dead:beef:2::1:<subflow-port>
@@ -760,6 +770,8 @@ test_subflows()
 	# RM_ADDR6 from server to client machine
 	ip netns exec "$ns1" ./pm_nl_ctl rem id $server_addr_id token\
 	   "$server6_token"
+	# RM_ADDR6 from client to server machine
+	ip netns exec "$ns2" ./pm_nl_ctl rem id 23 token "$client6_token"
 	sleep 0.5
 
 	# Attempt to add a listener at 10.0.2.1:<new-port>
@@ -797,6 +809,8 @@ test_subflows()
 	# RM_ADDR from server to client machine
 	ip netns exec "$ns1" ./pm_nl_ctl rem id $server_addr_id token\
 	   "$server4_token"
+	# RM_ADDR from client to server machine
+	ip netns exec "$ns2" ./pm_nl_ctl rem id 23 token "$client4_token"
 }
 
 test_subflows_v4_v6_mix()
@@ -844,6 +858,8 @@ test_subflows_v4_v6_mix()
 	# RM_ADDR from server to client machine
 	ip netns exec "$ns1" ./pm_nl_ctl rem id $server_addr_id token\
 	   "$server6_token"
+	# RM_ADDR from client to server machine
+	ip netns exec "$ns2" ./pm_nl_ctl rem id 23 token "$client6_token"
 	sleep 0.5
 }
 
