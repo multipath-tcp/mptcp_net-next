@@ -1219,7 +1219,7 @@ static const struct acpi_device_id mma9553_acpi_match[] = {
 MODULE_DEVICE_TABLE(acpi, mma9553_acpi_match);
 
 static const struct i2c_device_id mma9553_id[] = {
-	{ "mma9553" },
+	{ .name = "mma9553" },
 	{ }
 };
 
