@@ -845,6 +845,10 @@ static void bpf_destroy_inode(struct inode *inode)
 	simple_xattrs_free(&opts->xa_cache, &bi->xattrs, NULL);
 }
 
+/*
+ * Called after RCU grace period - safe to free inode and anything
+ *  that might be accessed by RCU pathwalk (inode fields, i_link).
+ */
 static void bpf_free_inode(struct inode *inode)
 {
 	if (S_ISLNK(inode->i_mode))
