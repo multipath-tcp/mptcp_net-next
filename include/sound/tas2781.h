@@ -120,6 +120,7 @@ enum audio_device {
 	TAS2568,
 	TAS2570,
 	TAS2572,
+	TAS2573,
 	TAS2574,
 	TAS2781,
 	TAS5802,
