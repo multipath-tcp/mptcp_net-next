@@ -727,7 +727,7 @@ out:
 }
 
 static const struct platform_device_id rt5033_charger_id[] = {
-	{ "rt5033-charger", },
+	{ .name = "rt5033-charger" },
 	{ }
 };
 MODULE_DEVICE_TABLE(platform, rt5033_charger_id);
