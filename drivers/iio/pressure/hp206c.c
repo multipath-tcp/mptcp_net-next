@@ -395,7 +395,7 @@ static int hp206c_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id hp206c_id[] = {
-	{"hp206c"},
+	{ .name = "hp206c" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, hp206c_id);
