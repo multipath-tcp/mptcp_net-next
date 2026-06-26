@@ -1049,9 +1049,9 @@ static int iqs5xx_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id iqs5xx_id[] = {
-	{ "iqs550", 0 },
-	{ "iqs572", 1 },
-	{ "iqs525", 2 },
+	{ .name = "iqs550" },
+	{ .name = "iqs572" },
+	{ .name = "iqs525" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, iqs5xx_id);

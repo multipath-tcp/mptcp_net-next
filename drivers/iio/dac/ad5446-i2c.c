@@ -65,12 +65,12 @@ static const struct ad5446_chip_info ad5622_chip_info = {
 };
 
 static const struct i2c_device_id ad5446_i2c_ids[] = {
-	{"ad5301", (kernel_ulong_t)&ad5602_chip_info},
-	{"ad5311", (kernel_ulong_t)&ad5612_chip_info},
-	{"ad5321", (kernel_ulong_t)&ad5622_chip_info},
-	{"ad5602", (kernel_ulong_t)&ad5602_chip_info},
-	{"ad5612", (kernel_ulong_t)&ad5612_chip_info},
-	{"ad5622", (kernel_ulong_t)&ad5622_chip_info},
+	{ .name = "ad5301", .driver_data = (kernel_ulong_t)&ad5602_chip_info },
+	{ .name = "ad5311", .driver_data = (kernel_ulong_t)&ad5612_chip_info },
+	{ .name = "ad5321", .driver_data = (kernel_ulong_t)&ad5622_chip_info },
+	{ .name = "ad5602", .driver_data = (kernel_ulong_t)&ad5602_chip_info },
+	{ .name = "ad5612", .driver_data = (kernel_ulong_t)&ad5612_chip_info },
+	{ .name = "ad5622", .driver_data = (kernel_ulong_t)&ad5622_chip_info },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ad5446_i2c_ids);
