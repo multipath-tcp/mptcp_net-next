@@ -152,6 +152,7 @@
 #define __auxiliary		__test_tag("test_auxiliary")
 #define __auxiliary_unpriv	__test_tag("test_auxiliary_unpriv")
 #define __btf_path(path)	__test_tag("test_btf_path=" path)
+#define __btf_func_path(path)	__test_tag("test_btf_func_path=" path)
 #define __arch(arch)		__test_tag("test_arch=" arch)
 #define __arch_x86_64		__arch("X86_64")
 #define __arch_arm64		__arch("ARM64")
