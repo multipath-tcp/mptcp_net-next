@@ -103,7 +103,7 @@ static int qemu_virt_ctrl_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id qemu_virt_ctrl_id[] = {
-	{ "qemu-virt-ctrl", 0 },
+	{ .name = "qemu-virt-ctrl" },
 	{ }
 };
 MODULE_DEVICE_TABLE(platform, qemu_virt_ctrl_id);
