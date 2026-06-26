@@ -69,7 +69,7 @@ static const struct of_device_id mpr_i2c_match[] = {
 MODULE_DEVICE_TABLE(of, mpr_i2c_match);
 
 static const struct i2c_device_id mpr_i2c_id[] = {
-	{ "mprls0025pa" },
+	{ .name = "mprls0025pa" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, mpr_i2c_id);
