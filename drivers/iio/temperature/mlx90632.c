@@ -1276,7 +1276,7 @@ static int mlx90632_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id mlx90632_id[] = {
-	{ "mlx90632" },
+	{ .name = "mlx90632" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, mlx90632_id);

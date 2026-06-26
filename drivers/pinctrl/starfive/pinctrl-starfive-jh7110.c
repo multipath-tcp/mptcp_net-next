@@ -845,6 +845,7 @@ int jh7110_pinctrl_probe(struct platform_device *pdev)
 	struct jh7110_pinctrl *sfp;
 	struct pinctrl_desc *jh7110_pinctrl_desc;
 	struct reset_control *rst;
+	unsigned int num_saved_regs;
 	struct clk *clk;
 	int ret;
 
@@ -857,16 +858,12 @@ int jh7110_pinctrl_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	sfp = devm_kzalloc(dev, sizeof(*sfp), GFP_KERNEL);
+	num_saved_regs = IS_ENABLED(CONFIG_PM_SLEEP) ? info->nsaved_regs : 0;
+	sfp = devm_kzalloc(dev, struct_size(sfp, saved_regs, num_saved_regs),
+			   GFP_KERNEL);
 	if (!sfp)
 		return -ENOMEM;
-
-#if IS_ENABLED(CONFIG_PM_SLEEP)
-	sfp->saved_regs = devm_kcalloc(dev, info->nsaved_regs,
-				       sizeof(*sfp->saved_regs), GFP_KERNEL);
-	if (!sfp->saved_regs)
-		return -ENOMEM;
-#endif
+	sfp->num_saved_regs = num_saved_regs;
 
 	sfp->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(sfp->base))
