@@ -9,7 +9,9 @@ __success __retval(0)
 __arch_x86_64
 __jited("	addq	%gs:{{.*}}, %rax")
 __arch_arm64
-__jited("	mrs	x7, SP_EL0")
+__jited("	mrs	x8, SP_EL0")
+__arch_riscv64
+__jited("	mv	a5, tp")
 int inline_bpf_get_current_task(void)
 {
 	bpf_get_current_task();
