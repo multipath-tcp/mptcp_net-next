@@ -230,8 +230,8 @@ static int htu21_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id htu21_id[] = {
-	{"htu21", HTU21},
-	{"ms8607-humidity", MS8607},
+	{ .name = "htu21", .driver_data = HTU21 },
+	{ .name = "ms8607-humidity", .driver_data = MS8607 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, htu21_id);
