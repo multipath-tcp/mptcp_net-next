@@ -697,6 +697,13 @@ static int sdw_program_params(struct sdw_bus *bus, bool prepare)
 		if (scale_index < 0)
 			return scale_index;
 
+		/* Skip the unattached Peripherals */
+		if (!completion_done(&slave->enumeration_complete)) {
+			dev_warn(&slave->dev,
+				 "Not enumerated, skip programming BUSCLOCK_SCALE\n");
+			continue;
+		}
+
 		ret = sdw_write_no_pm(slave, addr1, scale_index);
 		if (ret < 0) {
 			dev_err(&slave->dev, "SDW_SCP_BUSCLOCK_SCALE register write failed\n");
@@ -2229,11 +2236,15 @@ EXPORT_SYMBOL(sdw_stream_add_slave);
  * @slave: SDW Slave instance
  * @stream: SoundWire stream
  *
- * This removes and frees port_rt and slave_rt from a stream
+ * This removes and frees port_rt and slave_rt from a stream.
+ * If stream is NULL or an ERR_PTR, do nothing and return 0.
  */
 int sdw_stream_remove_slave(struct sdw_slave *slave,
 			    struct sdw_stream_runtime *stream)
 {
+	if (IS_ERR_OR_NULL(stream))
+		return 0;
+
 	mutex_lock(&slave->bus->bus_lock);
 
 	sdw_slave_port_free(slave, stream);
