@@ -425,7 +425,7 @@ struct smb_version_operations {
 	int (*set_file_info)(struct inode *, const char *, FILE_BASIC_INFO *,
 			     const unsigned int);
 	int (*set_compression)(const unsigned int, struct cifs_tcon *,
-			       struct cifsFileInfo *);
+			       struct cifsFileInfo *, __u16);
 	/* check if we can send an echo or nor */
 	bool (*can_echo)(struct TCP_Server_Info *);
 	/* send echo request */
@@ -789,6 +789,8 @@ struct TCP_Server_Info {
 	struct {
 		bool requested; /* "compress" mount option set*/
 		bool enabled; /* actually negotiated with server */
+		bool chained; /* chained transforms were negotiated */
+		bool pattern; /* Pattern_V1 chained payloads were negotiated */
 		__le16 alg; /* preferred alg negotiated with server */
 	} compression;
 	__u16	signing_algorithm;
@@ -2387,9 +2389,12 @@ static inline int cifs_open_create_options(unsigned int oflags, int opts)
 }
 
 /*
- * The number of blocks is not related to (i_size / i_blksize), but instead
- * 512 byte (2**9) size is required for calculating num blocks.
+ * inode->i_blocks is counted in 512-byte units, independent of
+ * inode->i_blksize.
  */
-#define CIFS_INO_BLOCKS(size) DIV_ROUND_UP_ULL((u64)(size), 512)
+#define CIFS_INO_BLOCK_SIZE 512ULL
+#define CIFS_INO_BLOCKS(size) \
+	DIV_ROUND_UP_ULL((u64)(size), CIFS_INO_BLOCK_SIZE)
+#define CIFS_INO_BYTES(blocks) ((u64)(blocks) * CIFS_INO_BLOCK_SIZE)
 
 #endif	/* _CIFS_GLOB_H */

@@ -133,16 +133,11 @@ static void __init armada_370_coherency_init(struct device_node *np)
 
 	cpu_config_np = of_find_compatible_node(NULL, NULL,
 						"marvell,armada-xp-cpu-config");
-	if (!cpu_config_np)
-		goto exit;
 
 	cpu_config_base = of_iomap(cpu_config_np, 0);
-	if (!cpu_config_base) {
-		of_node_put(cpu_config_np);
-		goto exit;
-	}
-
 	of_node_put(cpu_config_np);
+	if (!cpu_config_base)
+		goto exit;
 
 	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_MVEBU_COHERENCY,
 				  "arm/mvebu/coherency:starting",
