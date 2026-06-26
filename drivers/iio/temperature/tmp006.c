@@ -350,7 +350,7 @@ static int tmp006_probe(struct i2c_client *client)
 
 		data->drdy_trig->ops = &tmp006_trigger_ops;
 		iio_trigger_set_drvdata(data->drdy_trig, indio_dev);
-		ret = iio_trigger_register(data->drdy_trig);
+		ret = devm_iio_trigger_register(&client->dev, data->drdy_trig);
 		if (ret)
 			return ret;
 
@@ -391,7 +391,7 @@ static const struct of_device_id tmp006_of_match[] = {
 MODULE_DEVICE_TABLE(of, tmp006_of_match);
 
 static const struct i2c_device_id tmp006_id[] = {
-	{ "tmp006" },
+	{ .name = "tmp006" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tmp006_id);
