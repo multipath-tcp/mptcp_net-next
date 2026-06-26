@@ -70,8 +70,8 @@ static int spacemit_p1_reboot_probe(struct platform_device *pdev)
 }
 
 static const struct platform_device_id spacemit_p1_reboot_id_table[] = {
-	{ "spacemit-p1-reboot", },
-	{ /* sentinel */ },
+	{ .name = "spacemit-p1-reboot" },
+	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(platform, spacemit_p1_reboot_id_table);
 
