@@ -798,6 +798,8 @@ int acpi_get_local_u64_address(acpi_handle handle, u64 *addr);
 int acpi_get_local_address(acpi_handle handle, u32 *addr);
 const char *acpi_get_subsystem_id(acpi_handle handle);
 
+struct device *acpi_bus_find_device_by_name(const char *name);
+
 #ifdef CONFIG_ACPI_MRRM
 int acpi_mrrm_max_mem_region(void);
 #endif
@@ -1104,6 +1106,11 @@ static inline int acpi_get_local_address(acpi_handle handle, u32 *addr)
 static inline const char *acpi_get_subsystem_id(acpi_handle handle)
 {
 	return ERR_PTR(-ENODEV);
+}
+
+static inline struct device *acpi_bus_find_device_by_name(const char *name)
+{
+	return NULL;
 }
 
 static inline int acpi_register_wakeup_handler(int wake_irq,
