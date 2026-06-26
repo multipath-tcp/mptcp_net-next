@@ -1104,7 +1104,7 @@ static const struct of_device_id bd79124_of_match[] = {
 MODULE_DEVICE_TABLE(of, bd79124_of_match);
 
 static const struct i2c_device_id bd79124_id[] = {
-	{ "bd79124" },
+	{ .name = "bd79124" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, bd79124_id);
