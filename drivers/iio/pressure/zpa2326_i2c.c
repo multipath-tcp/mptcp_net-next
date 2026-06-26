@@ -58,7 +58,7 @@ static void zpa2326_remove_i2c(struct i2c_client *client)
 }
 
 static const struct i2c_device_id zpa2326_i2c_ids[] = {
-	{ "zpa2326" },
+	{ .name = "zpa2326" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, zpa2326_i2c_ids);
