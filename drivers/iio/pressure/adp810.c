@@ -199,7 +199,7 @@ static int adp810_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id adp810_id_table[] = {
-	{ "adp810" },
+	{ .name = "adp810" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, adp810_id_table);
