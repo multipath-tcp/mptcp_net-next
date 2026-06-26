@@ -1525,7 +1525,7 @@ static void gp2ap020a00f_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id gp2ap020a00f_id[] = {
-	{ "gp2ap020a00f" },
+	{ .name = "gp2ap020a00f" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, gp2ap020a00f_id);

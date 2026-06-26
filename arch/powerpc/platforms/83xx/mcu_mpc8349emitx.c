@@ -15,6 +15,7 @@
 #include <linux/i2c.h>
 #include <linux/gpio/driver.h>
 #include <linux/slab.h>
+#include <linux/sysfs.h>
 #include <linux/kthread.h>
 #include <linux/property.h>
 #include <linux/reboot.h>
@@ -77,7 +78,7 @@ static ssize_t show_status(struct device *d,
 		return -ENODEV;
 	mcu->reg_ctrl = ret;
 
-	return sprintf(buf, "%02x\n", ret);
+	return sysfs_emit(buf, "%02x\n", ret);
 }
 static DEVICE_ATTR(status, 0444, show_status, NULL);
 
