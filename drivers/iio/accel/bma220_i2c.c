@@ -47,7 +47,7 @@ static const struct of_device_id bma220_i2c_match[] = {
 MODULE_DEVICE_TABLE(of, bma220_i2c_match);
 
 static const struct i2c_device_id bma220_i2c_id[] = {
-	{ "bma220" },
+	{ .name = "bma220" },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, bma220_i2c_id);
