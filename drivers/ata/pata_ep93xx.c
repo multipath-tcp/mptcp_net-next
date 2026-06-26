@@ -204,6 +204,7 @@ static void ep93xx_pata_enable_pio(void __iomem *base, int pio_mode)
  */
 static void ep93xx_pata_delay(unsigned long count)
 {
+#ifdef CONFIG_ARM
 	__asm__ volatile (
 		"0:\n"
 		"mov r0, r0\n"
@@ -212,6 +213,10 @@ static void ep93xx_pata_delay(unsigned long count)
 		: "=r" (count)
 		: "0" (count)
 	);
+#else
+	while (count--)
+		cpu_relax();
+#endif
 }
 
 static unsigned long ep93xx_pata_wait_for_iordy(void __iomem *base,
@@ -972,7 +977,7 @@ static int ep93xx_pata_probe(struct platform_device *pdev)
 
 		match = soc_device_match(ep93xx_soc_table);
 		if (match)
-			ap->udma_mask = (unsigned int) match->data;
+			ap->udma_mask = (unsigned long) match->data;
 		else
 			ap->udma_mask = ATA_UDMA2;
 	}

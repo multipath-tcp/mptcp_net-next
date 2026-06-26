@@ -2514,6 +2514,42 @@ int cifs_lock(struct file *file, int cmd, struct file_lock *flock)
 	return rc;
 }
 
+static void cifs_update_i_blocks_for_write(struct inode *inode, loff_t start,
+					     loff_t end)
+{
+	struct cifsInodeInfo *cinode = CIFS_I(inode);
+	u64 allocated_end = CIFS_INO_BYTES(inode->i_blocks);
+	u64 blocks;
+
+	if (cinode->cifsAttrs & FILE_ATTRIBUTE_SPARSE_FILE)
+		return;
+
+	/*
+	 * Grow the local estimate only across the currently known allocated
+	 * prefix. A write beyond that may leave a hole.
+	 */
+	if ((u64)start > allocated_end)
+		return;
+
+	blocks = CIFS_INO_BLOCKS(end);
+	if ((u64)inode->i_blocks < blocks)
+		inode->i_blocks = blocks;
+}
+
+static void cifs_update_i_blocks_after_write(struct kiocb *iocb,
+						ssize_t written)
+{
+	struct inode *inode = file_inode(iocb->ki_filp);
+	loff_t end = iocb->ki_pos;
+
+	if (written <= 0)
+		return;
+
+	spin_lock(&inode->i_lock);
+	cifs_update_i_blocks_for_write(inode, end - written, end);
+	spin_unlock(&inode->i_lock);
+}
+
 void cifs_write_subrequest_terminated(struct cifs_io_subrequest *wdata, ssize_t result)
 {
 	struct netfs_io_request *wreq = wdata->rreq;
@@ -2532,6 +2568,8 @@ void cifs_write_subrequest_terminated(struct cifs_io_subrequest *wdata, ssize_t 
 			netfs_write_zero_point(inode, wrend);
 		if (wrend > ictx->_remote_i_size)
 			netfs_resize_file(ictx, wrend, true);
+		cifs_update_i_blocks_for_write(inode, wdata->subreq.start,
+						 wrend);
 
 		spin_unlock(&inode->i_lock);
 	}
@@ -2920,6 +2958,7 @@ cifs_writev(struct kiocb *iocb, struct iov_iter *from)
 	}
 
 	rc = netfs_buffered_write_iter_locked(iocb, from, NULL);
+	cifs_update_i_blocks_after_write(iocb, rc);
 
 out:
 	up_read(&cinode->lock_sem);
@@ -2949,6 +2988,7 @@ cifs_strict_writev(struct kiocb *iocb, struct iov_iter *from)
 		    (CIFS_UNIX_FCNTL_CAP & le64_to_cpu(tcon->fsUnixInfo.Capability)) &&
 		    ((cifs_sb_flags(cifs_sb) & CIFS_MOUNT_NOPOSIXBRL) == 0)) {
 			written = netfs_file_write_iter(iocb, from);
+			cifs_update_i_blocks_after_write(iocb, written);
 			goto out;
 		}
 		written = cifs_writev(iocb, from);
@@ -2961,6 +3001,7 @@ cifs_strict_writev(struct kiocb *iocb, struct iov_iter *from)
 	 * these pages but not on the region from pos to ppos+len-1.
 	 */
 	written = netfs_file_write_iter(iocb, from);
+	cifs_update_i_blocks_after_write(iocb, written);
 	if (CIFS_CACHE_READ(cinode)) {
 		/*
 		 * We have read level caching and we have just sent a write
@@ -2976,6 +3017,15 @@ cifs_strict_writev(struct kiocb *iocb, struct iov_iter *from)
 	}
 out:
 	cifs_put_writer(cinode);
+	return written;
+}
+
+ssize_t cifs_direct_write_iter(struct kiocb *iocb, struct iov_iter *from)
+{
+	ssize_t written;
+
+	written = netfs_file_write_iter(iocb, from);
+	cifs_update_i_blocks_after_write(iocb, written);
 	return written;
 }
 
@@ -3003,6 +3053,7 @@ ssize_t cifs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
 	if (iocb->ki_filp->f_flags & O_DIRECT) {
 		written = netfs_unbuffered_write_iter(iocb, from);
+		cifs_update_i_blocks_after_write(iocb, written);
 		if (written > 0 && CIFS_CACHE_READ(cinode)) {
 			cifs_zap_mapping(inode);
 			cifs_dbg(FYI,
@@ -3018,6 +3069,7 @@ ssize_t cifs_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		return written;
 
 	written = netfs_file_write_iter(iocb, from);
+	cifs_update_i_blocks_after_write(iocb, written);
 
 	if (!CIFS_CACHE_WRITE(CIFS_I(inode))) {
 		rc = filemap_fdatawrite(inode->i_mapping);
