@@ -22,7 +22,7 @@ struct bpf_subflow_send_info {
 #define RB_EMPTY_ROOT(root)  (READ_ONCE((root)->rb_node) == NULL)
 
 extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
-extern void mptcp_set_timeout(struct sock *sk) __ksym;
+extern void bpf_mptcp_set_timeout(struct mptcp_sock *msk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
 extern bool bpf_sk_stream_memory_free(const struct mptcp_subflow_context *subflow) __ksym;
 extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
@@ -99,7 +99,7 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 			send_info[backup].linger_time = linger_time;
 		}
 	}
-	mptcp_set_timeout(sk);
+	bpf_mptcp_set_timeout(msk);
 
 	/* pick the best backup if no other subflow is active */
 	if (!nr_active)
