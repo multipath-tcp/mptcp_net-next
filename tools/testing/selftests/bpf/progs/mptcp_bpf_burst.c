@@ -25,7 +25,7 @@ extern bool mptcp_subflow_active(struct mptcp_subflow_context *subflow) __ksym;
 extern void bpf_mptcp_set_timeout(struct mptcp_sock *msk) __ksym;
 extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
 extern bool bpf_sk_stream_memory_free(const struct mptcp_subflow_context *subflow) __ksym;
-extern void mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
+extern void bpf_mptcp_pm_subflow_chk_stale(const struct mptcp_sock *msk, struct sock *ssk) __ksym;
 
 static __always_inline __u64 div_u64(__u64 dividend, __u32 divisor)
 {
@@ -140,7 +140,7 @@ int BPF_PROG(bpf_burst_get_retrans, struct mptcp_sock *msk)
 
 		/* still data outstanding at TCP level? skip this */
 		if (!tcp_rtx_and_write_queues_empty(ssk)) {
-			mptcp_pm_subflow_chk_stale(msk, ssk);
+			bpf_mptcp_pm_subflow_chk_stale(msk, ssk);
 			min_stale_count = min(min_stale_count, subflow->stale_count);
 			continue;
 		}
