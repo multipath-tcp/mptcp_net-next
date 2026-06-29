@@ -170,12 +170,19 @@ enum trtcm_param {
 #define TRTCM_TOKEN_RATE_MASK			GENMASK(23, 6)
 #define TRTCM_TOKEN_RATE_FRACTION_MASK		GENMASK(5, 0)
 
+enum airoha_dma_map_type {
+	AIROHA_DMA_UNMAPPED,
+	AIROHA_DMA_MAP_SINGLE,
+	AIROHA_DMA_MAP_PAGE,
+};
+
 struct airoha_queue_entry {
 	union {
 		void *buf;
 		struct {
 			struct list_head list;
 			struct sk_buff *skb;
+			enum airoha_dma_map_type dma_type;
 		};
 	};
 	dma_addr_t dma_addr;
