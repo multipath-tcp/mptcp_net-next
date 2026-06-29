@@ -18,6 +18,7 @@
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
 #include "mptcp_bpf_burst.skel.h"
+#include "mptcp_bpf_bad_sched.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -813,6 +814,34 @@ skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
+static void test_bad_sched(void)
+{
+	struct mptcp_bpf_bad_sched *skel;
+	char *log = NULL;
+	int err;
+
+	/* bad_sched_get_send() passes a subflow TCP socket to
+	 * bpf_mptcp_set_timeout(), which takes a struct mptcp_sock *. The
+	 * verifier must reject this socket type confusion at load time, and
+	 * for the right reason -- assert the specific verifier message.
+	 */
+	skel = mptcp_bpf_bad_sched__open();
+	if (!ASSERT_OK_PTR(skel, "open: bad_sched"))
+		return;
+
+	if (start_libbpf_log_capture())
+		goto destroy;
+
+	err = mptcp_bpf_bad_sched__load(skel);
+	log = stop_libbpf_log_capture();
+	ASSERT_ERR(err, "load: bad_sched must be rejected");
+	ASSERT_HAS_SUBSTR(log, "expected pointer to STRUCT mptcp_sock",
+			  "verifier rejects subflow sock to bpf_mptcp_set_timeout");
+	free(log);
+destroy:
+	mptcp_bpf_bad_sched__destroy(skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -835,4 +864,6 @@ void test_mptcp(void)
 		test_red();
 	if (test__start_subtest("burst"))
 		test_burst();
+	if (test__start_subtest("bad_sched"))
+		test_bad_sched();
 }
