@@ -944,6 +944,25 @@ static void airoha_qdma_wake_netdev_txqs(struct airoha_queue *q)
 	q->txq_stopped = false;
 }
 
+static void airoha_unmap_xmit_buf(struct airoha_eth *eth,
+				  struct airoha_queue_entry *e)
+{
+	switch (e->dma_type) {
+	case AIROHA_DMA_MAP_PAGE:
+		dma_unmap_page(eth->dev, e->dma_addr, e->dma_len,
+			       DMA_TO_DEVICE);
+		break;
+	case AIROHA_DMA_MAP_SINGLE:
+		dma_unmap_single(eth->dev, e->dma_addr, e->dma_len,
+				 DMA_TO_DEVICE);
+		break;
+	case AIROHA_DMA_UNMAPPED:
+	default:
+		break;
+	}
+	e->dma_type = AIROHA_DMA_UNMAPPED;
+}
+
 static int airoha_qdma_tx_napi_poll(struct napi_struct *napi, int budget)
 {
 	struct airoha_tx_irq_queue *irq_q;
@@ -1006,9 +1025,7 @@ static int airoha_qdma_tx_napi_poll(struct napi_struct *napi, int budget)
 		skb = e->skb;
 		e->skb = NULL;
 
-		dma_unmap_single(eth->dev, e->dma_addr, e->dma_len,
-				 DMA_TO_DEVICE);
-		e->dma_addr = 0;
+		airoha_unmap_xmit_buf(eth, e);
 		list_add_tail(&e->list, &q->tx_list);
 
 		WRITE_ONCE(desc->msg0, 0);
@@ -1177,12 +1194,10 @@ static void airoha_qdma_tx_cleanup(struct airoha_qdma *qdma)
 			struct airoha_qdma_desc *desc = &q->desc[j];
 			struct sk_buff *skb = e->skb;
 
-			if (!e->dma_addr)
+			if (e->dma_type == AIROHA_DMA_UNMAPPED)
 				continue;
 
-			dma_unmap_single(qdma->eth->dev, e->dma_addr,
-					 e->dma_len, DMA_TO_DEVICE);
-			e->dma_addr = 0;
+			airoha_unmap_xmit_buf(qdma->eth, e);
 			list_add_tail(&e->list, &q->tx_list);
 
 			WRITE_ONCE(desc->ctrl, 0);
@@ -2193,8 +2208,8 @@ static netdev_tx_t airoha_dev_xmit(struct sk_buff *skb,
 	struct netdev_queue *txq;
 	struct airoha_queue *q;
 	LIST_HEAD(tx_list);
+	dma_addr_t addr;
 	int i = 0, qid;
-	void *data;
 	u16 index;
 	u8 fport;
 
@@ -2250,23 +2265,21 @@ static netdev_tx_t airoha_dev_xmit(struct sk_buff *skb,
 		return NETDEV_TX_BUSY;
 	}
 
-	len = skb_headlen(skb);
-	data = skb->data;
-
 	e = list_first_entry(&q->tx_list, struct airoha_queue_entry,
 			     list);
+	len = skb_headlen(skb);
+	addr = dma_map_single(netdev->dev.parent, skb->data, len,
+			      DMA_TO_DEVICE);
+	if (unlikely(dma_mapping_error(netdev->dev.parent, addr)))
+		goto error_unlock;
+
+	e->dma_type = AIROHA_DMA_MAP_SINGLE;
 	index = e - q->entry;
 
 	while (true) {
 		struct airoha_qdma_desc *desc = &q->desc[index];
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-		dma_addr_t addr;
 		u32 val;
-
-		addr = dma_map_single(netdev->dev.parent, data, len,
-				      DMA_TO_DEVICE);
-		if (unlikely(dma_mapping_error(netdev->dev.parent, addr)))
-			goto error_unmap;
 
 		list_move_tail(&e->list, &tx_list);
 		e->skb = i == nr_frags - 1 ? skb : NULL;
@@ -2291,8 +2304,13 @@ static netdev_tx_t airoha_dev_xmit(struct sk_buff *skb,
 		if (++i == nr_frags)
 			break;
 
-		data = skb_frag_address(frag);
 		len = skb_frag_size(frag);
+		addr = skb_frag_dma_map(netdev->dev.parent, frag, 0, len,
+					DMA_TO_DEVICE);
+		if (unlikely(dma_mapping_error(netdev->dev.parent, addr)))
+			goto error_unmap;
+
+		e->dma_type = AIROHA_DMA_MAP_PAGE;
 	}
 	q->queued += i;
 
@@ -2313,11 +2331,8 @@ static netdev_tx_t airoha_dev_xmit(struct sk_buff *skb,
 	return NETDEV_TX_OK;
 
 error_unmap:
-	list_for_each_entry(e, &tx_list, list) {
-		dma_unmap_single(netdev->dev.parent, e->dma_addr, e->dma_len,
-				 DMA_TO_DEVICE);
-		e->dma_addr = 0;
-	}
+	list_for_each_entry(e, &tx_list, list)
+		airoha_unmap_xmit_buf(dev->eth, e);
 	list_splice(&tx_list, &q->tx_list);
 error_unlock:
 	spin_unlock_bh(&q->lock);
