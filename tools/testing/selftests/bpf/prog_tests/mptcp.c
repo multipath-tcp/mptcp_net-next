@@ -814,31 +814,57 @@ skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
-static void test_bad_sched(void)
+static void load_bad_sched(struct mptcp_bpf_bad_sched *skel, const char *msg)
 {
-	struct mptcp_bpf_bad_sched *skel;
 	char *log = NULL;
 	int err;
 
-	/* bad_sched_get_send() passes a subflow TCP socket to
-	 * bpf_mptcp_set_timeout(), which takes a struct mptcp_sock *. The
-	 * verifier must reject this socket type confusion at load time, and
-	 * for the right reason -- assert the specific verifier message.
-	 */
-	skel = mptcp_bpf_bad_sched__open();
-	if (!ASSERT_OK_PTR(skel, "open: bad_sched"))
-		return;
-
 	if (start_libbpf_log_capture())
-		goto destroy;
+		return;
 
 	err = mptcp_bpf_bad_sched__load(skel);
 	log = stop_libbpf_log_capture();
-	ASSERT_ERR(err, "load: bad_sched must be rejected");
-	ASSERT_HAS_SUBSTR(log, "expected pointer to STRUCT mptcp_sock",
-			  "verifier rejects subflow sock to bpf_mptcp_set_timeout");
+	ASSERT_ERR(err, "load: bad scheduler must be rejected");
+	ASSERT_HAS_SUBSTR(log, msg, "verifier type-mismatch message");
 	free(log);
-destroy:
+}
+
+static void test_bad_sched(void)
+{
+	struct mptcp_bpf_bad_sched *skel;
+
+	/* Each scheduler in mptcp_bpf_bad_sched passes a wrong-subtype socket
+	 * to a narrow-typed scheduler kfunc; the verifier must reject each at
+	 * load time with the specific type-mismatch message. The skel holds
+	 * several such schedulers, so enable one struct_ops map at a time --
+	 * loading them together would fail atomically.
+	 */
+
+	/* subflow sock -> bpf_mptcp_set_timeout(struct mptcp_sock *) */
+	skel = mptcp_bpf_bad_sched__open();
+	if (!ASSERT_OK_PTR(skel, "open: bad_sched"))
+		return;
+	bpf_map__set_autocreate(skel->maps.bad_wnd_end, false);
+	bpf_map__set_autocreate(skel->maps.bad_set_sched, false);
+	load_bad_sched(skel, "expected pointer to STRUCT mptcp_sock");
+	mptcp_bpf_bad_sched__destroy(skel);
+
+	/* subflow sock -> mptcp_wnd_end(struct mptcp_sock *) */
+	skel = mptcp_bpf_bad_sched__open();
+	if (!ASSERT_OK_PTR(skel, "open: bad_wnd_end"))
+		return;
+	bpf_map__set_autocreate(skel->maps.bad_sched, false);
+	bpf_map__set_autocreate(skel->maps.bad_set_sched, false);
+	load_bad_sched(skel, "expected pointer to STRUCT mptcp_sock");
+	mptcp_bpf_bad_sched__destroy(skel);
+
+	/* msk -> mptcp_subflow_set_scheduled(struct mptcp_subflow_context *) */
+	skel = mptcp_bpf_bad_sched__open();
+	if (!ASSERT_OK_PTR(skel, "open: bad_set_sched"))
+		return;
+	bpf_map__set_autocreate(skel->maps.bad_sched, false);
+	bpf_map__set_autocreate(skel->maps.bad_wnd_end, false);
+	load_bad_sched(skel, "expected pointer to STRUCT mptcp_subflow_context");
 	mptcp_bpf_bad_sched__destroy(skel);
 }
 
