@@ -1142,7 +1142,7 @@ static void mptcp_pm_ops_init(struct mptcp_sock *msk,
 {
 	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
 		pr_warn_once("pm %s fails, fallback to default pm",
-			     pm_ops->name);
+			     pm_ops ? pm_ops->name : "UNKNOWN");
 		pm_ops = &mptcp_pm_kernel;
 	}
 
