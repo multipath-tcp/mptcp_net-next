@@ -12,10 +12,19 @@
 	list_for_each_entry(__entry,						\
 			    &((__msk)->pm.userspace_pm_local_addr_list), list)
 
+static void mptcp_userspace_pm_free_entry(struct rcu_head *head)
+{
+	struct mptcp_pm_addr_entry *entry =
+		container_of(head, struct mptcp_pm_addr_entry, rcu);
+	struct sock *sk = entry->sk;
+
+	sock_kfree_s(sk, entry, sizeof(*entry));
+	sock_put(sk);
+}
+
 void mptcp_userspace_pm_free_local_addr_list(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_addr_entry *entry, *tmp;
-	struct sock *sk = (struct sock *)msk;
 	LIST_HEAD(free_list);
 
 	spin_lock_bh(&msk->pm.lock);
@@ -23,7 +32,7 @@ void mptcp_userspace_pm_free_local_addr_list(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 
 	list_for_each_entry_safe(entry, tmp, &free_list, list) {
-		sock_kfree_s(sk, entry, sizeof(*entry));
+		call_rcu(&entry->rcu, mptcp_userspace_pm_free_entry);
 	}
 }
 
@@ -73,6 +82,8 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 			ret = -ENOMEM;
 			goto append_err;
 		}
+		sock_hold(sk);
+		e->sk = sk;
 
 		if (!e->addr.id && needs_id)
 			e->addr.id = find_next_zero_bit(id_bitmap,
@@ -98,7 +109,6 @@ append_err:
 static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
 						struct mptcp_pm_addr_entry *addr)
 {
-	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_addr_entry *entry;
 
 	entry = mptcp_userspace_pm_lookup_addr(msk, &addr->addr);
@@ -109,7 +119,7 @@ static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
 	 * be used multiple times (e.g. fullmesh mode).
 	 */
 	list_del_rcu(&entry->list);
-	sock_kfree_s(sk, entry, sizeof(*entry));
+	call_rcu(&entry->rcu, mptcp_userspace_pm_free_entry);
 	msk->pm.local_addr_used--;
 	return 0;
 }
@@ -337,11 +347,7 @@ int mptcp_pm_nl_remove_doit(struct sk_buff *skb, struct genl_info *info)
 
 	release_sock(sk);
 
-	kfree_rcu_mightsleep(match);
-	/* Adjust sk_omem_alloc like sock_kfree_s() does, to match
-	 * with allocation of this memory by sock_kmemdup()
-	 */
-	atomic_sub(sizeof(*match), &sk->sk_omem_alloc);
+	call_rcu(&match->rcu, mptcp_userspace_pm_free_entry);
 
 	err = 0;
 out:
