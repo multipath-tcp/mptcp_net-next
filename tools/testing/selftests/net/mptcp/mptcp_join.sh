@@ -2775,6 +2775,16 @@ remove_tests()
 		chk_rm_nr 1 1 invert
 		chk_rst_nr 0 0 invert
 	fi
+	# id 0 stale anno list entry (issue #620)
+	if reset "id 0 stale anno"; then
+		pm_nl_set_limits $ns1 0 1
+		pm_nl_add_endpoint $ns1 10.0.2.1 flags signal
+		pm_nl_set_limits $ns2 1 1
+		addr_nr_ns1=-1 speed=slow \
+			run_tests $ns1 $ns2 10.0.1.1
+		chk_add_nr 1 1
+		chk_rm_nr 1 1 invert
+	fi
 }
 
 add_tests()
