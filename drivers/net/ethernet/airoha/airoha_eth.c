@@ -178,10 +178,15 @@ static void airoha_fe_maccr_init(struct airoha_eth *eth)
 {
 	int p;
 
-	for (p = 1; p <= ARRAY_SIZE(eth->ports); p++)
+	for (p = 1; p <= ARRAY_SIZE(eth->ports); p++) {
 		airoha_fe_set(eth, REG_GDM_FWD_CFG(p),
 			      GDM_TCP_CKSUM_MASK | GDM_UDP_CKSUM_MASK |
 			      GDM_IP4_CKSUM_MASK | GDM_DROP_CRC_ERR_MASK);
+		airoha_fe_rmw(eth, REG_GDM_LEN_CFG(p),
+			      GDM_SHORT_LEN_MASK | GDM_LONG_LEN_MASK,
+			      FIELD_PREP(GDM_SHORT_LEN_MASK, 60) |
+			      FIELD_PREP(GDM_LONG_LEN_MASK, AIROHA_MAX_RX_SIZE));
+	}
 
 	airoha_fe_rmw(eth, REG_CDM_VLAN_CTRL(1), CDM_VLAN_MASK,
 		      FIELD_PREP(CDM_VLAN_MASK, 0x8100));
@@ -1846,13 +1851,24 @@ static void airoha_update_hw_stats(struct airoha_gdm_dev *dev)
 	spin_unlock(&port->stats_lock);
 }
 
+static void airoha_dev_set_xmit_frame_size(struct net_device *netdev)
+{
+	struct airoha_gdm_dev *dev = netdev_priv(netdev);
+
+	airoha_ppe_set_xmit_frame_size(dev);
+	if (!airoha_is_lan_gdm_dev(dev))
+		airoha_fe_rmw(dev->eth, REG_WAN_MTU0, WAN_MTU0_MASK,
+			      FIELD_PREP(WAN_MTU0_MASK,
+					 VLAN_ETH_HLEN + netdev->mtu));
+}
+
 static int airoha_dev_open(struct net_device *netdev)
 {
-	int err, len = ETH_HLEN + netdev->mtu + ETH_FCS_LEN;
 	struct airoha_gdm_dev *dev = netdev_priv(netdev);
 	struct airoha_gdm_port *port = dev->port;
-	u32 cur_len, pse_port = FE_PSE_PORT_PPE1;
 	struct airoha_qdma *qdma = dev->qdma;
+	u32 pse_port = FE_PSE_PORT_PPE1;
+	int err;
 
 	netif_tx_start_all_queues(netdev);
 	err = airoha_set_vip_for_gdm_port(dev, true);
@@ -1866,19 +1882,7 @@ static int airoha_dev_open(struct net_device *netdev)
 		airoha_fe_clear(qdma->eth, REG_GDM_INGRESS_CFG(port->id),
 				GDM_STAG_EN_MASK);
 
-	cur_len = airoha_fe_get(qdma->eth, REG_GDM_LEN_CFG(port->id),
-				GDM_LONG_LEN_MASK);
-	if (!port->users || len > cur_len) {
-		/* Opening a sibling net_device with a larger MTU updates the
-		 * MTU of already running devices. This is required to allow
-		 * multiple net_devices with different MTUs to share the same
-		 * GDM port.
-		 */
-		airoha_fe_rmw(qdma->eth, REG_GDM_LEN_CFG(port->id),
-			      GDM_SHORT_LEN_MASK | GDM_LONG_LEN_MASK,
-			      FIELD_PREP(GDM_SHORT_LEN_MASK, 60) |
-			      FIELD_PREP(GDM_LONG_LEN_MASK, len));
-	}
+	airoha_dev_set_xmit_frame_size(netdev);
 	port->users++;
 
 	if (!airoha_is_lan_gdm_dev(dev) &&
@@ -1888,30 +1892,6 @@ static int airoha_dev_open(struct net_device *netdev)
 				    pse_port);
 
 	return 0;
-}
-
-static void airoha_set_port_mtu(struct airoha_eth *eth,
-				struct airoha_gdm_port *port)
-{
-	u32 len = 0;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(port->devs); i++) {
-		struct airoha_gdm_dev *dev = port->devs[i];
-		struct net_device *netdev;
-
-		if (!dev)
-			continue;
-
-		netdev = netdev_from_priv(dev);
-		if (netif_running(netdev))
-			len = max_t(u32, len, netdev->mtu);
-	}
-	len += ETH_HLEN + ETH_FCS_LEN;
-
-	airoha_fe_rmw(eth, REG_GDM_LEN_CFG(port->id),
-		      GDM_LONG_LEN_MASK,
-		      FIELD_PREP(GDM_LONG_LEN_MASK, len));
 }
 
 static int airoha_dev_stop(struct net_device *netdev)
@@ -1924,7 +1904,7 @@ static int airoha_dev_stop(struct net_device *netdev)
 	airoha_set_vip_for_gdm_port(dev, false);
 
 	if (--port->users)
-		airoha_set_port_mtu(dev->eth, port);
+		airoha_ppe_set_xmit_frame_size(dev);
 	else
 		airoha_set_gdm_port_fwd_cfg(qdma->eth,
 					    REG_GDM_FWD_CFG(port->id),
@@ -1977,10 +1957,6 @@ static int airoha_enable_gdm2_loopback(struct airoha_gdm_dev *dev)
 		      FIELD_PREP(LPBK_CHAN_MASK, chan) |
 		      LBK_GAP_MODE_MASK | LBK_LEN_MODE_MASK |
 		      LBK_CHAN_MODE_MASK | LPBK_EN_MASK);
-	airoha_fe_rmw(eth, REG_GDM_LEN_CFG(AIROHA_GDM2_IDX),
-		      GDM_SHORT_LEN_MASK | GDM_LONG_LEN_MASK,
-		      FIELD_PREP(GDM_SHORT_LEN_MASK, 60) |
-		      FIELD_PREP(GDM_LONG_LEN_MASK, AIROHA_MAX_MTU));
 	/* Forward the traffic to the proper GDM port */
 	pse_port = port->id == AIROHA_GDM3_IDX ? FE_PSE_PORT_GDM3
 					       : FE_PSE_PORT_GDM4;
@@ -2113,7 +2089,7 @@ static int airoha_dev_change_mtu(struct net_device *netdev, int mtu)
 
 	WRITE_ONCE(netdev->mtu, mtu);
 	if (port->users)
-		airoha_set_port_mtu(dev->eth, port);
+		airoha_dev_set_xmit_frame_size(netdev);
 
 	return 0;
 }
