@@ -1737,7 +1737,7 @@ static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 	netpoll_zap_completion_queue();
 repeat:
 
-	skb = alloc_skb(len, GFP_ATOMIC);
+	skb = alloc_skb(len, GFP_ATOMIC | __GFP_NOWARN);
 	if (!skb)
 		skb = netcons_skb_pop(np, len);
 
