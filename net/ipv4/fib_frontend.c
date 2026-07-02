@@ -76,7 +76,7 @@ fail:
 
 struct fib_table *fib_new_table(struct net *net, u32 id)
 {
-	struct fib_table *tb, *alias = NULL;
+	struct fib_table *tb, *new_tb, *alias = NULL;
 	unsigned int h;
 
 	if (id == 0)
@@ -85,13 +85,26 @@ struct fib_table *fib_new_table(struct net *net, u32 id)
 	if (tb)
 		return tb;
 
+	if (!check_net(net))
+		return NULL;
+
 	if (id == RT_TABLE_LOCAL && !net->ipv4.fib_has_custom_rules)
 		alias = fib_new_table(net, RT_TABLE_MAIN);
 
-	if (check_net(net))
-		tb = fib_trie_table(id, alias);
-	if (!tb)
+	new_tb = fib_trie_table(id, alias);
+	if (!new_tb)
 		return NULL;
+
+	spin_lock(&net->ipv4.fib_table_hash_lock);
+
+	tb = fib_get_table(net, id);
+	if (tb) {
+		spin_unlock(&net->ipv4.fib_table_hash_lock);
+		fib_free_table(new_tb);
+		return tb;
+	}
+
+	tb = new_tb;
 
 	switch (id) {
 	case RT_TABLE_MAIN:
@@ -106,28 +119,35 @@ struct fib_table *fib_new_table(struct net *net, u32 id)
 
 	h = id & (FIB_TABLE_HASHSZ - 1);
 	hlist_add_head_rcu(&tb->tb_hlist, &net->ipv4.fib_table_hash[h]);
+
+	spin_unlock(&net->ipv4.fib_table_hash_lock);
+
 	return tb;
 }
 EXPORT_SYMBOL_GPL(fib_new_table);
 
-/* caller must hold either rtnl or rcu read lock */
 struct fib_table *fib_get_table(struct net *net, u32 id)
 {
-	struct fib_table *tb;
+	struct fib_table *tb = NULL;
 	struct hlist_head *head;
 	unsigned int h;
 
 	if (id == 0)
 		id = RT_TABLE_MAIN;
 	h = id & (FIB_TABLE_HASHSZ - 1);
-
 	head = &net->ipv4.fib_table_hash[h];
-	hlist_for_each_entry_rcu(tb, head, tb_hlist,
-				 lockdep_rtnl_is_held()) {
+
+	/* fib_table is not destroyed until ip_fib_net_exit()
+	 * except for the merged main/local table.
+	 * fib_unmerge() is called under RTNL, so other readers
+	 * under RTNL (e.g. fib_flush(), fib_info_notify_update())
+	 * can safely traverse the list with rcu_dereference_raw().
+	 */
+	hlist_for_each_entry_rcu(tb, head, tb_hlist, true)
 		if (tb->tb_id == id)
-			return tb;
-	}
-	return NULL;
+			break;
+
+	return tb;
 }
 #endif /* CONFIG_IP_MULTIPLE_TABLES */
 
@@ -190,10 +210,9 @@ void fib_flush(struct net *net)
 
 	for (h = 0; h < FIB_TABLE_HASHSZ; h++) {
 		struct hlist_head *head = &net->ipv4.fib_table_hash[h];
-		struct hlist_node *tmp;
 		struct fib_table *tb;
 
-		hlist_for_each_entry_safe(tb, tmp, head, tb_hlist)
+		hlist_for_each_entry_rcu(tb, head, tb_hlist, true)
 			flushed += fib_table_flush(net, tb, false);
 	}
 
@@ -1565,6 +1584,7 @@ static int __net_init ip_fib_net_init(struct net *net)
 	net->ipv4.sysctl_fib_multipath_hash_fields =
 		FIB_MULTIPATH_HASH_FIELD_DEFAULT_MASK;
 #endif
+	spin_lock_init(&net->ipv4.fib_table_hash_lock);
 
 	/* Avoid false sharing : Use at least a full cache line */
 	size = max_t(size_t, size, L1_CACHE_BYTES);
