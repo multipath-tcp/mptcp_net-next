@@ -59,11 +59,6 @@
 #include "tp_meter.h"
 #include "translation-table.h"
 
-/* List manipulations on hardif_list have to be rtnl_lock()'ed,
- * list traversals just rcu-locked
- */
-struct list_head batadv_hardif_list;
-unsigned int batadv_hardif_generation;
 static int (*batadv_rx_handler[256])(struct sk_buff *skb,
 				     struct batadv_hard_iface *recv_if);
 
@@ -95,7 +90,6 @@ static int __init batadv_init(void)
 	if (ret < 0)
 		return ret;
 
-	INIT_LIST_HEAD(&batadv_hardif_list);
 	batadv_algo_init();
 
 	batadv_recv_handler_init();
@@ -448,9 +442,6 @@ int batadv_batman_skb_recv(struct sk_buff *skb, struct net_device *dev,
 
 	/* expect a valid ethernet header here. */
 	if (unlikely(skb->mac_len != ETH_HLEN || !skb_mac_header(skb)))
-		goto err_free;
-
-	if (!hard_iface->mesh_iface)
 		goto err_free;
 
 	bat_priv = netdev_priv(hard_iface->mesh_iface);
