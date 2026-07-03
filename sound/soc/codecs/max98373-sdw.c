@@ -272,8 +272,10 @@ static int max98373_resume(struct device *dev)
 		return 0;
 
 	ret = sdw_slave_wait_for_init(slave, MAX98373_PROBE_TIMEOUT);
-	if (ret)
+	if (ret) {
+		sdw_show_ping_status(slave->bus, true);
 		return ret;
+	}
 
 	regcache_cache_only(max98373->regmap, false);
 	regcache_sync(max98373->regmap);
