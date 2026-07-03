@@ -1111,8 +1111,10 @@ static int es9356_sdca_dev_resume(struct device *dev)
 		es9356->disable_irq = false;
 
 	ret = sdw_slave_wait_for_init(slave, es9356_PROBE_TIMEOUT);
-	if (ret)
+	if (ret) {
+		sdw_show_ping_status(slave->bus, true);
 		return ret;
+	}
 
 	regcache_cache_only(es9356->regmap, false);
 	regcache_sync(es9356->regmap);
