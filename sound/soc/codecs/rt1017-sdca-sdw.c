@@ -779,8 +779,10 @@ static int rt1017_sdca_dev_resume(struct device *dev)
 		return 0;
 
 	ret = sdw_slave_wait_for_init(slave, RT1017_PROBE_TIMEOUT);
-	if (ret)
+	if (ret) {
+		sdw_show_ping_status(slave->bus, true);
 		return ret;
+	}
 
 	regcache_cache_only(rt1017->regmap, false);
 	regcache_sync(rt1017->regmap);
