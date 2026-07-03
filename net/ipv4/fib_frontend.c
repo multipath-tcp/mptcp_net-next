@@ -1038,10 +1038,11 @@ static int inet_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 		.dump_routes = true,
 		.dump_exceptions = true,
 	};
-	unsigned int e = 0, s_e, h, s_h;
 	struct hlist_head *head;
 	int dumped = 0, err = 0;
 	struct fib_table *tb;
+	unsigned int h, s_h;
+	u32 s_id;
 
 	rcu_read_lock();
 	if (cb->strict_check) {
@@ -1073,29 +1074,28 @@ static int inet_dump_fib(struct sk_buff *skb, struct netlink_callback *cb)
 	}
 
 	s_h = cb->args[0];
-	s_e = cb->args[1];
+	s_id = cb->args[1];
 
 	err = 0;
-	for (h = s_h; h < FIB_TABLE_HASHSZ; h++, s_e = 0) {
-		e = 0;
+	for (h = s_h; h < FIB_TABLE_HASHSZ; h++, s_id = 0) {
 		head = &net->ipv4.fib_table_hash[h];
 		hlist_for_each_entry_rcu(tb, head, tb_hlist) {
-			if (e < s_e)
-				goto next;
+			if (s_id && tb->tb_id != s_id)
+				continue;
+
+			s_id = 0;
 			if (dumped)
 				memset(&cb->args[2], 0, sizeof(cb->args) -
 						 2 * sizeof(cb->args[0]));
+			cb->args[1] = tb->tb_id;
 			err = fib_table_dump(tb, skb, cb, &filter);
 			if (err < 0)
 				goto out;
 			dumped = 1;
-next:
-			e++;
 		}
 	}
 out:
 
-	cb->args[1] = e;
 	cb->args[0] = h;
 
 unlock:
