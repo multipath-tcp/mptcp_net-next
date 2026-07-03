@@ -81,8 +81,11 @@ jobs:
           curl ${CURL_OPT} -A "${AGENT}" "${RELEASES}" |
             jq -r ".releases.[] | select(.version | startswith(\"${{ matrix.version }}.\"))" > release.json
           jq -r '.' release.json
-          curl ${CURL_OPT} -A "${AGENT}" "$(jq -r '.source' release.json)" | \
-            tar xJ --strip-components=1
+          curl ${CURL_OPT} -A "${AGENT}" -o "${OUT}" "$(jq -r '.source' release.json)"
+          tar -xJf "${OUT}" --strip-components=1
+          rm "${OUT}"
+        env:
+          OUT: "${{ matrix.version }}.y.tar.xz"
 
       - name: "Get queue"
         if: ${{ github.event.inputs.queue == 'true' || github.event_name == 'schedule' }}
