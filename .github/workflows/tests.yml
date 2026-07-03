@@ -16,7 +16,7 @@ on:
       # So we test the "export" branch and we try to find the tag later
 
 env:
-  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors --fail"
   CURL_ACC: "Accept: application/vnd.github.v3+json"
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
@@ -429,6 +429,7 @@ jobs:
       - name: set patchwork check
         if: startswith(github.ref, 'refs/tags/patchew/')
         run: |
+          RC=0
           CHECK_URLS=()
           set_url() { local series_url
             series_url=$(curl ${CURL_OPT} -A "${PW_AGENT}" "${URL}" | jq -r 'last(last(.[].series)[].url)')
@@ -455,7 +456,7 @@ jobs:
             i=1
             for check_url in "${CHECK_URLS[@]}"; do
               echo "Patch ${i}, sending ${STATE} state: $(date -R)"
-              curl ${CURL_OPT} \
+              if curl ${CURL_OPT} \
                 -A "${PW_AGENT}" \
                 -X POST \
                 -H "Authorization: Token ${{ secrets.PW_TOKEN }}" \
@@ -463,8 +464,12 @@ jobs:
                 -F "target_url=${3}" \
                 -F "context=${1//[ :()]/_}" \
                 -F "description=${2}" \
-                "${check_url}"
-              echo "Patch ${i}, ${STATE} state sent: $(date -R)"
+                "${check_url}"; then
+                echo "Patch ${i}, ${STATE} state sent: $(date -R)"
+              else
+                echo "Unable to update patch ${i}'s state to ${STATE} ($(date -R))"
+                RC=1
+              fi
               sleep 1
               i=$((i+1))
             done
@@ -487,6 +492,7 @@ jobs:
           submit "${{ steps.test.outputs.ccl_title_debug_join }}" "${{ steps.test.outputs.ccl_status_debug_join }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf_normal }}" "${{ steps.test.outputs.ccl_status_btf_normal }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf_debug }}" "${{ steps.test.outputs.ccl_status_btf_debug }}" "${{ steps.test.outputs.url }}"
+          exit ${RC}
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
 
