@@ -1198,11 +1198,6 @@ static void __init map_mem(void)
 		__map_memblock(start, end, pgprot_tagged(PAGE_KERNEL),
 			       flags);
 	}
-
-	/* Map the kernel data/bss read-only in the linear map */
-	__map_memblock(init_end, kernel_end, PAGE_KERNEL_RO, flags);
-	flush_tlb_kernel_range((unsigned long)lm_alias(__init_end),
-			       (unsigned long)lm_alias(__bss_stop));
 }
 
 void mark_rodata_ro(void)
@@ -1220,6 +1215,12 @@ void mark_rodata_ro(void)
 	/* mark the range between _text and _stext as read only. */
 	update_mapping_prot(__pa_symbol(_text), (unsigned long)_text,
 			    (unsigned long)_stext - (unsigned long)_text,
+			    PAGE_KERNEL_RO);
+
+	/* Map the kernel data/bss read-only in the linear map */
+	update_mapping_prot(__pa_symbol(__init_end),
+			    (unsigned long)lm_alias(__init_end),
+			    (unsigned long)__bss_stop - (unsigned long)__init_end,
 			    PAGE_KERNEL_RO);
 }
 
