@@ -1850,7 +1850,7 @@ static const struct regmap_config gcc_nord_regmap_config = {
 	.fast_io = true,
 };
 
-static struct qcom_cc_driver_data gcc_nord_driver_data = {
+static const struct qcom_cc_driver_data gcc_nord_driver_data = {
 	.dfs_rcgs = gcc_nord_dfs_clocks,
 	.num_dfs_rcgs = ARRAY_SIZE(gcc_nord_dfs_clocks),
 };
