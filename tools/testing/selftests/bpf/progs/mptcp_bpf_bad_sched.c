@@ -12,6 +12,7 @@
 char _license[] SEC("license") = "GPL";
 
 extern void bpf_mptcp_set_timeout(struct mptcp_sock *msk) __ksym;
+extern __u64 mptcp_wnd_end(const struct mptcp_sock *msk) __ksym;
 
 SEC("struct_ops")
 void BPF_PROG(bad_sched_init, struct mptcp_sock *msk)
@@ -53,4 +54,51 @@ struct mptcp_sched_ops bad_sched = {
 	.release	= (void *)bad_sched_release,
 	.get_send	= (void *)bad_sched_get_send,
 	.name		= "bpf_bad_sched",
+};
+
+/*
+ * Same confusion class as bad_sched, on another struct mptcp_sock * kfunc:
+ * feed a subflow TCP socket to mptcp_wnd_end(). The verifier must reject it
+ * ("expected pointer to STRUCT mptcp_sock"). get_send is the only required
+ * scheduler op, so the rest are omitted.
+ */
+SEC("struct_ops")
+int BPF_PROG(bad_wnd_end_get_send, struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *ssk;
+
+	bpf_for_each(mptcp_subflow, subflow, (struct sock *)msk) {
+		ssk = bpf_mptcp_subflow_tcp_sock(subflow);
+		if (!ssk)
+			return -1;
+		if (mptcp_wnd_end((struct mptcp_sock *)ssk))
+			return 0;
+		return -1;
+	}
+	return -1;
+}
+
+SEC(".struct_ops.link")
+struct mptcp_sched_ops bad_wnd_end = {
+	.get_send	= (void *)bad_wnd_end_get_send,
+	.name		= "bpf_bad_wnd_end",
+};
+
+/*
+ * Inverse confusion: feed the msk to mptcp_subflow_set_scheduled(), which
+ * takes a struct mptcp_subflow_context *. The verifier must reject it
+ * ("expected pointer to STRUCT mptcp_subflow_context").
+ */
+SEC("struct_ops")
+int BPF_PROG(bad_set_sched_get_send, struct mptcp_sock *msk)
+{
+	mptcp_subflow_set_scheduled((struct mptcp_subflow_context *)msk, true);
+	return 0;
+}
+
+SEC(".struct_ops.link")
+struct mptcp_sched_ops bad_set_sched = {
+	.get_send	= (void *)bad_set_sched_get_send,
+	.name		= "bpf_bad_set_sch",
 };
