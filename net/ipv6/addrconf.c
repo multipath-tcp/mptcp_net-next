@@ -5264,6 +5264,7 @@ int inet6_fill_ifmcaddr(struct sk_buff *skb,
 
 	put_ifaddrmsg(nlh, 128, IFA_F_PERMANENT, scope, ifindex);
 	if (nla_put_in6_addr(skb, IFA_MULTICAST, &ifmca->mca_addr) < 0 ||
+	    nla_put_u32(skb, IFA_MC_USERS, READ_ONCE(ifmca->mca_users)) < 0 ||
 	    put_cacheinfo(skb, ifmca->mca_cstamp, READ_ONCE(ifmca->mca_tstamp),
 			  INFINITY_LIFE_TIME, INFINITY_LIFE_TIME) < 0) {
 		nlmsg_cancel(skb, nlh);
