@@ -976,4 +976,26 @@ l0_%=:	exit;						\
 	: __clobber_all);
 }
 
+SEC("socket")
+__description("unpriv: Spectre v4 stack write slot index")
+__success __success_unpriv
+__retval(0)
+#ifdef SPEC_V4
+__xlated_unpriv("r0 = 0")
+__xlated_unpriv("*(u32 *)(r10 -4) = r0")
+__xlated_unpriv("nospec")
+__xlated_unpriv("*(u32 *)(r10 -8) = r0")
+__xlated_unpriv("nospec")
+__xlated_unpriv("exit")
+#endif
+__naked void stack_write_nospec_slot_index(void)
+{
+	asm volatile ("					\
+	r0 = 0;					\
+	*(u32 *)(r10 - 4) = r0;			\
+	*(u32 *)(r10 - 8) = r0;			\
+	exit;					\
+"	::: __clobber_all);
+}
+
 char _license[] SEC("license") = "GPL";
