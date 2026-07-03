@@ -4305,6 +4305,13 @@ static int set_flowkey_fields(struct nix_rx_flowkey_alg *alg, u32 flow_cfg)
 				keyoff_marker = false;
 			}
 			break;
+		case NIX_FLOW_KEY_TYPE_ROCEV2:
+			field->hdr_offset = 5;
+			field->bytesm1 = 2; /* Destination QP */
+			field->ltype_mask = 0xF;
+			field->lid = NPC_LID_LE;
+			field->ltype_match = NPC_LT_LE_ROCEV2;
+			break;
 		}
 		field->ena = 1;
 
@@ -5392,7 +5399,7 @@ void rvu_nix_lf_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr, int nixlf)
 
 	/* reset HW config done for Switch headers */
 	rvu_npc_set_parse_mode(rvu, pcifunc, OTX2_PRIV_FLAGS_DEFAULT,
-			       (PKIND_TX | PKIND_RX), 0, 0, 0, 0);
+			       (PKIND_TX | PKIND_RX), 0, 0, 0, 0, 0);
 
 	/* Disabling CGX and NPC config done for PTP */
 	if (pfvf->hw_rx_tstamp_en) {
