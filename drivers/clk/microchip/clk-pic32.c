@@ -11,7 +11,7 @@
 #include <linux/iopoll.h>
 #include <linux/platform_data/pic32.h>
 
-#include "clk-core.h"
+#include "clk-pic32.h"
 
 /* OSCCON Reg fields */
 #define OSC_CUR_MASK		0x07
