@@ -616,8 +616,8 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 	unsigned int presence_offset;
 	unsigned int map_offset;
 	unsigned int offset;
+	unsigned int num_registers;
 	unsigned int reg;
-	int i;
 	int b;
 	int ret;
 
@@ -643,7 +643,7 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 	ret = rmi_read_block(d, addr, buf, size_presence_reg);
 	if (ret)
 		return ret;
-	addr += size_presence_reg;
+	++addr;
 
 	if (buf[0] == 0) {
 		if (size_presence_reg < 3)
@@ -657,7 +657,7 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 
 	memset(presence_map, 0, sizeof(presence_map));
 	map_offset = 0;
-	for (i = presence_offset; i < size_presence_reg; i++) {
+	for (int i = presence_offset; i < size_presence_reg; i++) {
 		for (b = 0; b < 8; b++) {
 			if (buf[i] & BIT(b)) {
 				if (map_offset >= RMI_REG_DESC_PRESENCE_BITS)
@@ -697,28 +697,41 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 	if (ret)
 		return ret;
 
-	reg = find_first_bit(presence_map, RMI_REG_DESC_PRESENCE_BITS);
 	offset = 0;
-	for (i = 0; i < rdesc->num_registers; i++) {
-		struct rmi_register_desc_item *item = &rdesc->registers[i];
+	num_registers = 0;
+	for_each_set_bit(reg, presence_map, RMI_REG_DESC_PRESENCE_BITS) {
+		struct rmi_register_desc_item *item = &rdesc->registers[num_registers];
 		int item_size;
+
+		if (offset >= rdesc->struct_size)
+			break;
 
 		item_size = rmi_parse_register_desc_item(item,
 							 &struct_buf[offset],
 							 rdesc->struct_size - offset);
-		if (item_size < 0)
-			return item_size;
+		if (item_size < 0) {
+			dev_warn(&d->dev,
+				 "%s: Failed to parse register %d descriptor, ignoring it\n",
+				 __func__, reg);
+			break;
+		}
 
 		item->reg = reg;
 		offset += item_size;
 
-		rmi_dbg(RMI_DEBUG_CORE, &d->dev,
-			"%s: reg: %d reg size: %u subpackets: %d\n", __func__,
-			item->reg, item->reg_size, item->num_subpackets);
+		if (item->reg_size == 0) {
+			dev_warn(&d->dev,
+				 "%s: Register %d has 0 size, ignoring it\n",
+				 __func__, item->reg);
+		} else {
+			rmi_dbg(RMI_DEBUG_CORE, &d->dev,
+				"%s: reg: %d reg size: %u subpackets: %d\n", __func__,
+				item->reg, item->reg_size, item->num_subpackets);
 
-		reg = find_next_bit(presence_map,
-				    RMI_REG_DESC_PRESENCE_BITS, reg + 1);
+			num_registers++;
+		}
 	}
+	rdesc->num_registers = num_registers;
 
 	return 0;
 }
