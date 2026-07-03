@@ -700,10 +700,18 @@ retry:
 	if (err)
 		goto out_drop_write;
 
+	if (!work->tcon->posix_extensions && d_is_dir(old_child) &&
+	    ksmbd_has_open_files(old_child)) {
+		err = -EACCES;
+		goto out3;
+	}
+
 	parent_fp = ksmbd_lookup_fd_inode(old_child->d_parent);
 	if (parent_fp) {
-		if (parent_fp->daccess & FILE_DELETE_LE) {
-			pr_err("parent dir is opened with delete access\n");
+		if ((parent_fp->daccess & FILE_DELETE_LE) ||
+		    (!parent_fp->attrib_only &&
+		     !(parent_fp->saccess & FILE_SHARE_DELETE_LE))) {
+			pr_err("parent dir blocks delete sharing\n");
 			err = -ESHARE;
 			ksmbd_fd_put(work, parent_fp);
 			goto out3;
