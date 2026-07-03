@@ -645,9 +645,12 @@ static int amd_pmc_verify_czn_rtc(struct amd_pmc_dev *pdev, u32 *arg)
 	rtc_device = rtc_class_open("rtc0");
 	if (!rtc_device)
 		return 0;
-	rc = rtc_read_alarm(rtc_device, &alarm);
-	if (rc)
-		return rc;
+	rc = rtc_read_next_alarm(rtc_device, &alarm);
+	if (rc) {
+		if (rc == -ENOENT)
+			dev_dbg(pdev->dev, "no alarm pending\n");
+		return rc == -ENOENT ? 0 : rc;
+	}
 	if (!alarm.enabled) {
 		dev_dbg(pdev->dev, "alarm not enabled\n");
 		return 0;
