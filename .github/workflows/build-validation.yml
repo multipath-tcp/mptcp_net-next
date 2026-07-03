@@ -16,7 +16,7 @@ on:
       # So we build the "export" branch and we try to find the tag later
 
 env:
-  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors"
+  CURL_OPT: "--no-progress-meter --connect-timeout 30 --retry 10 --retry-delay 31 --retry-all-errors --fail"
   CURL_ACC: "Accept: application/vnd.github.v3+json"
   URI: "https://api.github.com"
   PW: "https://patchwork.kernel.org/api/1.2"
