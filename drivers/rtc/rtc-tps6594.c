@@ -485,8 +485,8 @@ static int tps6594_rtc_suspend(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(tps6594_rtc_pm_ops, tps6594_rtc_suspend, tps6594_rtc_resume);
 
 static const struct platform_device_id tps6594_rtc_id_table[] = {
-	{ "tps6594-rtc", },
-	{}
+	{ .name = "tps6594-rtc" },
+	{ }
 };
 MODULE_DEVICE_TABLE(platform, tps6594_rtc_id_table);
 
