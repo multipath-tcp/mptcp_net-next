@@ -1826,9 +1826,22 @@ static int udpv6_setsockopt(struct sock *sk, int level, int optname,
 static int udpv6_getsockopt(struct sock *sk, int level, int optname,
 			    char __user *optval, int __user *optlen)
 {
-	if (level == SOL_UDP)
-		return udp_lib_getsockopt(sk, level, optname, optval, optlen);
-	return ipv6_getsockopt(sk, level, optname, optval, optlen);
+	sockopt_t opt;
+	int err;
+
+	if (level != SOL_UDP)
+		return ipv6_getsockopt(sk, level, optname, optval, optlen);
+
+	err = sockopt_init_user(&opt, optval, optlen);
+	if (err)
+		return err;
+
+	err = udp_lib_getsockopt(sk, level, optname, &opt);
+	if (err)
+		return err;
+	if (put_user(opt.optlen, optlen))
+		return -EFAULT;
+	return 0;
 }
 
 
