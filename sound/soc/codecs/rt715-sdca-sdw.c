@@ -230,8 +230,10 @@ static int rt715_dev_resume(struct device *dev)
 		return 0;
 
 	ret = sdw_slave_wait_for_init(slave, RT715_PROBE_TIMEOUT);
-	if (ret)
+	if (ret) {
+		sdw_show_ping_status(slave->bus, true);
 		return ret;
+	}
 
 	regcache_cache_only(rt715->regmap, false);
 	regcache_sync_region(rt715->regmap,
