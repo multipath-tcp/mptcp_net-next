@@ -11,6 +11,8 @@
  *   that always reports the required buffer length back via optlen,
  *   even when the user buffer is too small to receive any group bits.
  * - vsock:   SO_VM_SOCKETS_BUFFER_SIZE covers the u64 path.
+ * - raw:     ICMP_FILTER covers a fixed-size struct payload that clamps
+ *            the length down on a short buffer instead of failing.
  *
  * Author: Breno Leitao <leitao@debian.org>
  */
@@ -24,11 +26,19 @@
 #include <linux/rtnetlink.h>
 #include <linux/time_types.h>
 #include <linux/vm_sockets.h>
+#include <linux/icmp.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include "kselftest_harness.h"
 
 #ifndef AF_VSOCK
 #define AF_VSOCK 40
+#endif
+#ifndef SOL_RAW
+#define SOL_RAW 255
+#endif
+#ifndef ICMP_FILTER
+#define ICMP_FILTER 1
 #endif
 
 /* ---------- netlink ---------- */
@@ -295,6 +305,93 @@ TEST_F(vsock, connect_timeout_old_exact)
 				SO_VM_SOCKETS_CONNECT_TIMEOUT_OLD,
 				&tv, &optlen));
 	ASSERT_EQ(sizeof(tv), optlen);
+}
+
+/* ---------- raw (ipv4) ---------- */
+
+FIXTURE(raw)
+{
+	int fd;
+};
+
+FIXTURE_SETUP(raw)
+{
+	struct icmp_filter filt = { .data = 0xdeadbeef };
+
+	self->fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+	if (self->fd < 0)
+		SKIP(return, "SOCK_RAW/ICMP socket: %s", strerror(errno));
+
+	if (setsockopt(self->fd, SOL_RAW, ICMP_FILTER, &filt, sizeof(filt)) < 0)
+		SKIP(return, "set ICMP_FILTER: %s", strerror(errno));
+}
+
+FIXTURE_TEARDOWN(raw)
+{
+	if (self->fd >= 0)
+		close(self->fd);
+}
+
+TEST_F(raw, icmpfilter_exact)
+{
+	struct icmp_filter filt = {};
+	socklen_t optlen = sizeof(filt);
+
+	ASSERT_EQ(0, getsockopt(self->fd, SOL_RAW, ICMP_FILTER,
+				&filt, &optlen));
+	ASSERT_EQ(sizeof(filt), optlen);
+	ASSERT_EQ(0xdeadbeef, filt.data);
+}
+
+TEST_F(raw, icmpfilter_oversize_clamped)
+{
+	char buf[16] = {};
+	socklen_t optlen = sizeof(buf);
+
+	ASSERT_EQ(0, getsockopt(self->fd, SOL_RAW, ICMP_FILTER,
+				buf, &optlen));
+	ASSERT_EQ(sizeof(struct icmp_filter), optlen);
+}
+
+/* Unlike the int/u64 options above, ICMP_FILTER clamps the length down
+ * to the user buffer instead of returning EINVAL: a short buffer
+ * succeeds and reports the truncated length back via optlen.
+ */
+TEST_F(raw, icmpfilter_undersize_clamped)
+{
+	char buf[2] = {};
+	socklen_t optlen = sizeof(buf);
+
+	ASSERT_EQ(0, getsockopt(self->fd, SOL_RAW, ICMP_FILTER,
+				buf, &optlen));
+	ASSERT_EQ(sizeof(buf), optlen);
+}
+
+TEST_F(raw, icmpfilter_wrong_proto)
+{
+	struct icmp_filter filt;
+	socklen_t optlen = sizeof(filt);
+	int fd;
+
+	fd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
+	if (fd < 0)
+		SKIP(return, "SOCK_RAW/UDP socket: %s", strerror(errno));
+
+	ASSERT_EQ(-1, getsockopt(fd, SOL_RAW, ICMP_FILTER, &filt, &optlen));
+	ASSERT_EQ(EOPNOTSUPP, errno);
+	close(fd);
+}
+
+TEST_F(raw, bad_optname)
+{
+	socklen_t optlen;
+	int val;
+
+	optlen = sizeof(val);
+
+	ASSERT_EQ(-1, getsockopt(self->fd, SOL_RAW, 0x7fff, &val, &optlen));
+	ASSERT_EQ(ENOPROTOOPT, errno);
+	ASSERT_EQ(sizeof(val), optlen);
 }
 
 TEST_HARNESS_MAIN
