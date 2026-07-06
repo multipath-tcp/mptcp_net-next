@@ -2,8 +2,6 @@
 #ifndef _NF_CONNTRACK_TFTP_H
 #define _NF_CONNTRACK_TFTP_H
 
-#define TFTP_PORT 69
-
 #include <linux/netfilter.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
