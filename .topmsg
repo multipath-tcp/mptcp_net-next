@@ -12,5 +12,7 @@ which sets work_pending, accept_addr and accept_subflow.
 mptcp_pm_userspace_is_release() is defined as release() interface of the
 userspace PM, which is a wrapper of userspace_pm_free_local_addr_list().
 
+Co-developed-by: Gang Yan <yangang@kylinos.cn>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
 Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
