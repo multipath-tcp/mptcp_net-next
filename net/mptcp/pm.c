@@ -1136,12 +1136,13 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 }
 
-static void mptcp_pm_ops_init(struct mptcp_sock *msk,
-			      struct mptcp_pm_ops *pm_ops)
+static void mptcp_pm_ops_init(struct mptcp_sock *msk, const char *pm_name)
 {
+	struct mptcp_pm_ops *pm_ops;
+
+	pm_ops = mptcp_pm_find(pm_name);
 	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
-		pr_warn_once("pm %s fails, fallback to default pm",
-			     pm_ops->name);
+		pr_warn_once("pm %s fails, fallback to default pm", pm_name);
 		pm_ops = &mptcp_pm_kernel;
 	}
 
@@ -1160,9 +1161,9 @@ static void mptcp_pm_ops_release(struct mptcp_sock *msk)
 	if (pm_ops->release)
 		pm_ops->release(msk);
 
-	bpf_module_put(pm_ops, pm_ops->owner);
-
 	pr_debug("pm %s released\n", pm_ops->name);
+
+	bpf_module_put(pm_ops, pm_ops->owner);
 }
 
 void mptcp_pm_destroy(struct mptcp_sock *msk)
@@ -1184,7 +1185,7 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	WRITE_ONCE(pm->pm_type, pm_type);
 
 	rcu_read_lock();
-	mptcp_pm_ops_init(msk, mptcp_pm_find(pm_name));
+	mptcp_pm_ops_init(msk, pm_name);
 	rcu_read_unlock();
 }
 
