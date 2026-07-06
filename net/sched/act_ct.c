@@ -1527,8 +1527,8 @@ static int tcf_ct_dump_helper(struct sk_buff *skb,
 		return 0;
 
 	if (nla_put_string(skb, TCA_CT_HELPER_NAME, helper->name) ||
-	    nla_put_u8(skb, TCA_CT_HELPER_FAMILY, helper->tuple.src.l3num) ||
-	    nla_put_u8(skb, TCA_CT_HELPER_PROTO, helper->tuple.dst.protonum))
+	    nla_put_u8(skb, TCA_CT_HELPER_FAMILY, helper->nfproto) ||
+	    nla_put_u8(skb, TCA_CT_HELPER_PROTO, helper->l4proto))
 		return -1;
 
 	return 0;
