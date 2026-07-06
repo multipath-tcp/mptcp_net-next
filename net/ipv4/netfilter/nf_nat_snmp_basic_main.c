@@ -213,7 +213,7 @@ static int __init nf_nat_snmp_basic_init(void)
 	RCU_INIT_POINTER(nf_nat_snmp_hook, help);
 
 	nf_ct_helper_init(&snmp_trap_helper, AF_INET, IPPROTO_UDP,
-			  "snmp_trap", SNMP_TRAP_PORT, SNMP_TRAP_PORT, SNMP_TRAP_PORT,
+			  "snmp_trap",
 			  &snmp_exp_policy, 0, help, NULL, THIS_MODULE);
 
 	err = nf_conntrack_helper_register(&snmp_trap_helper, &snmp_trap_helper_ptr);
