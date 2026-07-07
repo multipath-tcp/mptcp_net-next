@@ -203,6 +203,7 @@ void fib_rules_unregister(struct fib_rules_ops *ops)
 	spin_unlock(&net->rules_mod_lock);
 
 	fib_rules_cleanup_ops(ops);
+	mutex_destroy(&ops->lock);
 	kfree_rcu(ops, rcu);
 }
 
