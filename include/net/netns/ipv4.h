@@ -118,6 +118,7 @@ struct netns_ipv4 {
 	struct fib_rules_ops	*rules_ops;
 	struct fib_table __rcu	*fib_main;
 	struct fib_table __rcu	*fib_default;
+	spinlock_t		fib_table_hash_lock;
 	unsigned int		fib_rules_require_fldissect;
 	bool			fib_has_custom_rules;
 #endif
@@ -127,7 +128,6 @@ struct netns_ipv4 {
 	atomic_t		fib_num_tclassid_users;
 #endif
 	struct hlist_head	*fib_table_hash;
-	spinlock_t		fib_table_hash_lock;
 	struct sock		*fibnl;
 	struct hlist_head	*fib_info_hash;
 	unsigned int		fib_info_hash_bits;
