@@ -884,7 +884,11 @@ dpll_pin_register(struct dpll_device *dpll, struct dpll_pin *pin,
 	    WARN_ON(ops->measured_freq_get &&
 		    (!dpll_device_ops(dpll)->freq_monitor_get ||
 		     !dpll_device_ops(dpll)->freq_monitor_set)) ||
-	    WARN_ON(ops->supported_ffo && !ops->ffo_get))
+	    WARN_ON(ops->supported_ffo && !ops->ffo_get) ||
+	    WARN_ON((pin->prop.capabilities &
+		     DPLL_PIN_CAPABILITIES_STATE_CONNECTED_OVERRIDE) &&
+		    !(pin->prop.capabilities &
+		      DPLL_PIN_CAPABILITIES_STATE_CAN_CHANGE)))
 		return -EINVAL;
 
 	mutex_lock(&dpll_lock);
