@@ -13,6 +13,7 @@ struct zl3073x_dev;
 
 /**
  * struct zl3073x_chan - DPLL channel state
+ * @ctrl: DPLL control register value
  * @mode_refsel: mode and reference selection register value
  * @ref_prio: reference priority registers (4 bits per ref, P/N packed)
  * @mon_status: monitor status register value
@@ -21,6 +22,7 @@ struct zl3073x_dev;
  */
 struct zl3073x_chan {
 	struct_group(cfg,
+		u8	ctrl;
 		u8	mode_refsel;
 		u8	ref_prio[ZL3073X_NUM_REFS / 2];
 	);
@@ -38,6 +40,7 @@ int zl3073x_chan_state_set(struct zl3073x_dev *zldev, u8 index,
 			   const struct zl3073x_chan *chan);
 
 int zl3073x_chan_state_update(struct zl3073x_dev *zldev, u8 index);
+int zl3073x_chan_nco_mode_set(struct zl3073x_dev *zldev, u8 index);
 
 /**
  * zl3073x_chan_df_offset_get - get cached df_offset vs tracked reference
@@ -150,6 +153,51 @@ zl3073x_chan_ref_is_selectable(const struct zl3073x_chan *chan, u8 ref)
 static inline u8 zl3073x_chan_lock_state_get(const struct zl3073x_chan *chan)
 {
 	return FIELD_GET(ZL_DPLL_MON_STATUS_STATE, chan->mon_status);
+}
+
+/**
+ * zl3073x_chan_is_locked - check if channel is locked to a reference
+ * @chan: pointer to channel state
+ *
+ * Return: true if channel is locked, false otherwise
+ */
+static inline bool zl3073x_chan_is_locked(const struct zl3073x_chan *chan)
+{
+	u8 lock_state = zl3073x_chan_lock_state_get(chan);
+	return lock_state == ZL_DPLL_MON_STATUS_STATE_LOCK;
+}
+
+/**
+ * zl3073x_chan_mode_is_auto - check if channel is in automatic mode
+ * @chan: pointer to channel state
+ *
+ * Return: true if channel is in automatic mode, false otherwise
+ */
+static inline bool zl3073x_chan_mode_is_auto(const struct zl3073x_chan *chan)
+{
+	return zl3073x_chan_mode_get(chan) == ZL_DPLL_MODE_REFSEL_MODE_AUTO;
+}
+
+/**
+ * zl3073x_chan_mode_is_nco - check if channel is in NCO mode
+ * @chan: pointer to channel state
+ *
+ * Return: true if channel is in NCO mode, false otherwise
+ */
+static inline bool zl3073x_chan_mode_is_nco(const struct zl3073x_chan *chan)
+{
+	return zl3073x_chan_mode_get(chan) == ZL_DPLL_MODE_REFSEL_MODE_NCO;
+}
+
+/**
+ * zl3073x_chan_mode_is_reflock - check if channel is in reflock mode
+ * @chan: pointer to channel state
+ *
+ * Return: true if channel is in reflock mode, false otherwise
+ */
+static inline bool zl3073x_chan_mode_is_reflock(const struct zl3073x_chan *chan)
+{
+	return zl3073x_chan_mode_get(chan) == ZL_DPLL_MODE_REFSEL_MODE_REFLOCK;
 }
 
 /**
