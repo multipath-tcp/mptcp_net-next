@@ -91,6 +91,13 @@ following pin states:
 - ``DPLL_PIN_STATE_DISCONNECTED`` - the pin shall be not considered as
   a valid input for automatic selection algorithm
 
+Pins that have the ``DPLL_PIN_CAPABILITIES_STATE_CONNECTED_OVERRIDE``
+capability can additionally be set to ``DPLL_PIN_STATE_CONNECTED`` in
+automatic mode, overriding the active input selection. This is useful
+for automatic-only DPLL devices where mode cannot be switched to manual.
+When such a pin is disconnected, the device returns to automatic input
+selection.
+
 The actual hardware status of a pin is reported via the operational
 state (``DPLL_A_PIN_OPERSTATE``) attribute nested under the parent
 device:
