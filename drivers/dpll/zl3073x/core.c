@@ -311,17 +311,17 @@ int zl3073x_write_u48(struct zl3073x_dev *zldev, unsigned int reg, u64 val)
  * @zldev: zl3073x device pointer
  * @reg: register to poll (has to be 8bit register)
  * @mask: bit mask for polling
+ * @timeout_us: timeout in microseconds
  *
  * Waits for bits specified by @mask in register @reg value to be cleared
  * by the device.
  *
  * Returns: 0 on success, <0 on error
  */
-int zl3073x_poll_zero_u8(struct zl3073x_dev *zldev, unsigned int reg, u8 mask)
+int zl3073x_poll_zero_u8(struct zl3073x_dev *zldev, unsigned int reg,
+			 u8 mask, unsigned int timeout_us)
 {
-	/* Register polling sleep & timeout */
-#define ZL_POLL_SLEEP_US   10
-#define ZL_POLL_TIMEOUT_US 2000000
+#define ZL_POLL_SLEEP_US 10
 	unsigned int val;
 
 	/* Check the register is 8bit */
@@ -335,7 +335,7 @@ int zl3073x_poll_zero_u8(struct zl3073x_dev *zldev, unsigned int reg, u8 mask)
 	reg = ZL_REG_ADDR(reg) + ZL_RANGE_OFFSET;
 
 	return regmap_read_poll_timeout(zldev->regmap, reg, val, !(val & mask),
-					ZL_POLL_SLEEP_US, ZL_POLL_TIMEOUT_US);
+					ZL_POLL_SLEEP_US, timeout_us);
 }
 
 int zl3073x_mb_op(struct zl3073x_dev *zldev, unsigned int op_reg, u8 op_val,
@@ -354,7 +354,8 @@ int zl3073x_mb_op(struct zl3073x_dev *zldev, unsigned int op_reg, u8 op_val,
 		return rc;
 
 	/* Wait for the operation to actually finish */
-	return zl3073x_poll_zero_u8(zldev, op_reg, op_val);
+	return zl3073x_poll_zero_u8(zldev, op_reg, op_val,
+				    ZL_POLL_MB_TIMEOUT_US);
 }
 
 /**
@@ -377,8 +378,8 @@ zl3073x_do_hwreg_op(struct zl3073x_dev *zldev, u8 op)
 		return rc;
 
 	/* Poll for completion - pending bit cleared */
-	return zl3073x_poll_zero_u8(zldev, ZL_REG_HWREG_OP,
-				    ZL_HWREG_OP_PENDING);
+	return zl3073x_poll_zero_u8(zldev, ZL_REG_HWREG_OP, ZL_HWREG_OP_PENDING,
+				    ZL_POLL_HWREG_TIMEOUT_US);
 }
 
 /**
@@ -566,19 +567,7 @@ zl3073x_dev_ref_states_update(struct zl3073x_dev *zldev)
 	}
 }
 
-static void
-zl3073x_dev_chan_states_update(struct zl3073x_dev *zldev)
-{
-	int i, rc;
 
-	for (i = 0; i < zldev->info->num_channels; i++) {
-		rc = zl3073x_chan_state_update(zldev, i);
-		if (rc)
-			dev_warn(zldev->dev,
-				 "Failed to get DPLL%u state: %pe\n", i,
-				 ERR_PTR(rc));
-	}
-}
 
 /**
  * zl3073x_ref_phase_offsets_update - update reference phase offsets
@@ -609,7 +598,8 @@ int zl3073x_ref_phase_offsets_update(struct zl3073x_dev *zldev, int channel)
 	 * to be zero to ensure that the measured data are coherent.
 	 */
 	rc = zl3073x_poll_zero_u8(zldev, ZL_REG_REF_PHASE_ERR_READ_RQST,
-				  ZL_REF_PHASE_ERR_READ_RQST_RD);
+				  ZL_REF_PHASE_ERR_READ_RQST_RD,
+				  ZL_POLL_PHASE_ERR_TIMEOUT_US);
 	if (rc)
 		return rc;
 
@@ -628,7 +618,8 @@ int zl3073x_ref_phase_offsets_update(struct zl3073x_dev *zldev, int channel)
 
 	/* Wait for finish */
 	return zl3073x_poll_zero_u8(zldev, ZL_REG_REF_PHASE_ERR_READ_RQST,
-				    ZL_REF_PHASE_ERR_READ_RQST_RD);
+				    ZL_REF_PHASE_ERR_READ_RQST_RD,
+				    ZL_POLL_PHASE_ERR_TIMEOUT_US);
 }
 
 /**
@@ -648,7 +639,8 @@ zl3073x_ref_freq_meas_latch(struct zl3073x_dev *zldev, u8 type)
 
 	/* Wait for previous measurement to finish */
 	rc = zl3073x_poll_zero_u8(zldev, ZL_REG_REF_FREQ_MEAS_CTRL,
-				  ZL_REF_FREQ_MEAS_CTRL);
+				  ZL_REF_FREQ_MEAS_CTRL,
+				  ZL_POLL_FREQ_MEAS_TIMEOUT_US);
 	if (rc)
 		return rc;
 
@@ -669,7 +661,8 @@ zl3073x_ref_freq_meas_latch(struct zl3073x_dev *zldev, u8 type)
 
 	/* Wait for finish */
 	return zl3073x_poll_zero_u8(zldev, ZL_REG_REF_FREQ_MEAS_CTRL,
-				    ZL_REF_FREQ_MEAS_CTRL);
+				    ZL_REF_FREQ_MEAS_CTRL,
+				    ZL_POLL_FREQ_MEAS_TIMEOUT_US);
 }
 
 /**
@@ -715,9 +708,6 @@ zl3073x_dev_periodic_work(struct kthread_work *work)
 	/* Update input references' states */
 	zl3073x_dev_ref_states_update(zldev);
 
-	/* Update DPLL channels' states */
-	zl3073x_dev_chan_states_update(zldev);
-
 	/* Update DPLL-to-connected-ref phase offsets registers */
 	rc = zl3073x_ref_phase_offsets_update(zldev, -1);
 	if (rc)
@@ -727,7 +717,7 @@ zl3073x_dev_periodic_work(struct kthread_work *work)
 	/* Update measured input reference frequencies if frequency
 	 * monitoring is enabled.
 	 */
-	if (zldev->freq_monitor) {
+	if (READ_ONCE(zldev->freq_monitor)) {
 		rc = zl3073x_ref_freq_meas_update(zldev);
 		if (rc)
 			dev_warn(zldev->dev,
@@ -763,7 +753,7 @@ int zl3073x_dev_phase_avg_factor_set(struct zl3073x_dev *zldev, u8 factor)
 		return rc;
 
 	/* Save the new factor */
-	zldev->phase_avg_factor = factor;
+	WRITE_ONCE(zldev->phase_avg_factor, factor);
 
 	return 0;
 }
