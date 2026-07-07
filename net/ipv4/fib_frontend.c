@@ -1584,7 +1584,10 @@ static int __net_init ip_fib_net_init(struct net *net)
 	net->ipv4.sysctl_fib_multipath_hash_fields =
 		FIB_MULTIPATH_HASH_FIELD_DEFAULT_MASK;
 #endif
+
+#ifdef CONFIG_IP_MULTIPLE_TABLES
 	spin_lock_init(&net->ipv4.fib_table_hash_lock);
+#endif
 
 	/* Avoid false sharing : Use at least a full cache line */
 	size = max_t(size_t, size, L1_CACHE_BYTES);
