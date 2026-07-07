@@ -627,7 +627,7 @@ devlink_param_get_from_info(struct xarray *params, struct genl_info *info)
 int devlink_nl_param_get_doit(struct sk_buff *skb,
 			      struct genl_info *info)
 {
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 	struct devlink_param_item *param_item;
 	struct sk_buff *msg;
 	int err;
@@ -728,7 +728,7 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 
 int devlink_nl_param_set_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 
 	return __devlink_nl_cmd_param_set_doit(devlink, 0, &devlink->params,
 					       info, DEVLINK_CMD_PARAM_NEW);
