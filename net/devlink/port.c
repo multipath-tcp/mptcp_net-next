@@ -594,7 +594,7 @@ void devlink_ports_notify_unregister(struct devlink *devlink)
 
 int devlink_nl_port_get_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink_port *devlink_port = info->user_ptr[1];
+	struct devlink_port *devlink_port = devlink_nl_ctx(info)->devlink_port;
 	struct sk_buff *msg;
 	int err;
 
@@ -830,7 +830,7 @@ static int devlink_port_function_set(struct devlink_port *port,
 
 int devlink_nl_port_set_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink_port *devlink_port = info->user_ptr[1];
+	struct devlink_port *devlink_port = devlink_nl_ctx(info)->devlink_port;
 	int err;
 
 	if (info->attrs[DEVLINK_ATTR_PORT_TYPE]) {
@@ -856,8 +856,8 @@ int devlink_nl_port_set_doit(struct sk_buff *skb, struct genl_info *info)
 
 int devlink_nl_port_split_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink_port *devlink_port = info->user_ptr[1];
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink_port *devlink_port = devlink_nl_ctx(info)->devlink_port;
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 	u32 count;
 
 	if (GENL_REQ_ATTR_CHECK(info, DEVLINK_ATTR_PORT_SPLIT_COUNT))
@@ -887,8 +887,8 @@ int devlink_nl_port_split_doit(struct sk_buff *skb, struct genl_info *info)
 
 int devlink_nl_port_unsplit_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink_port *devlink_port = info->user_ptr[1];
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink_port *devlink_port = devlink_nl_ctx(info)->devlink_port;
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 
 	if (!devlink_port->ops->port_unsplit)
 		return -EOPNOTSUPP;
@@ -899,7 +899,7 @@ int devlink_nl_port_new_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct netlink_ext_ack *extack = info->extack;
 	struct devlink_port_new_attrs new_attrs = {};
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 	struct devlink_port *devlink_port;
 	struct sk_buff *msg;
 	int err;
@@ -961,9 +961,9 @@ err_out_port_del:
 
 int devlink_nl_port_del_doit(struct sk_buff *skb, struct genl_info *info)
 {
-	struct devlink_port *devlink_port = info->user_ptr[1];
+	struct devlink_port *devlink_port = devlink_nl_ctx(info)->devlink_port;
 	struct netlink_ext_ack *extack = info->extack;
-	struct devlink *devlink = info->user_ptr[0];
+	struct devlink *devlink = devlink_nl_ctx(info)->devlink;
 
 	if (!devlink_port->ops->port_del)
 		return -EOPNOTSUPP;
