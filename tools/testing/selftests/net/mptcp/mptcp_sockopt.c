@@ -718,12 +718,23 @@ static void process_one_client(int fd, int pipefd)
 	close(fd);
 }
 
+static void do_setsockopt_inq(int fd)
+{
+	int on = 1;
+
+	if (setsockopt(fd, IPPROTO_TCP, TCP_INQ, &on, sizeof(on)))
+		die_perror("setsockopt(TCP_INQ)");
+}
+
 static int xaccept(int s)
 {
 	int fd = accept(s, NULL, 0);
 
 	if (fd < 0)
 		die_perror("accept");
+
+	if (inq)
+		do_setsockopt_inq(fd);
 
 	return fd;
 }
