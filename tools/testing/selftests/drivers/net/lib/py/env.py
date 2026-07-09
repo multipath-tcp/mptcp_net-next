@@ -159,13 +159,7 @@ class NetDrvEpEnv(NetDrvEnvBase):
 
         self.remote = Remote(kind, args, src_path)
 
-        self.addr_ipver = "6" if self.addr_v["6"] else "4"
-        self.addr = self.addr_v[self.addr_ipver]
-        self.remote_addr = self.remote_addr_v[self.addr_ipver]
-
-        # Bracketed addresses, some commands need IPv6 to be inside []
-        self.baddr = f"[{self.addr_v['6']}]" if self.addr_v["6"] else self.addr_v["4"]
-        self.remote_baddr = f"[{self.remote_addr_v['6']}]" if self.remote_addr_v["6"] else self.remote_addr_v["4"]
+        self.set_ipver("6" if self.addr_v["6"] else "4")
 
         self.ifname = self.dev['ifname']
         self.ifindex = self.dev['ifindex']
@@ -251,6 +245,25 @@ class NetDrvEpEnv(NetDrvEnvBase):
     def require_ipver(self, ipver):
         if not self.addr_v[ipver] or not self.remote_addr_v[ipver]:
             raise KsftSkipEx(f"Test requires IPv{ipver} connectivity")
+
+    def set_ipver(self, ipver):
+        """
+        Modify the IP version used by the generic address fields.
+        """
+        if ipver == getattr(self, "addr_ipver", None):
+            return
+
+        self.require_ipver(ipver)
+
+        self.addr_ipver = ipver
+        self.addr = self.addr_v[ipver]
+        self.remote_addr = self.remote_addr_v[ipver]
+
+        # Bracketed addresses, some commands need IPv6 to be inside []
+        self.baddr = (f"[{self.addr_v['6']}]" if ipver == "6"
+                      else self.addr_v["4"])
+        self.remote_baddr = (f"[{self.remote_addr_v['6']}]" if ipver == "6"
+                             else self.remote_addr_v["4"])
 
     def require_nsim(self, nsim_test=True):
         """Require or exclude netdevsim for this test"""
