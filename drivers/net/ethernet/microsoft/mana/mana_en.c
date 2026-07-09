@@ -1591,6 +1591,15 @@ int mana_create_wq_obj(struct mana_port_context *apc,
 
 	mana_gd_init_req_hdr(&req.hdr, MANA_CREATE_WQ_OBJ,
 			     sizeof(req), sizeof(resp));
+
+	/* Our driver uses different message versions for request and
+	 * response in this case.
+	 * Our firmware is forward compatible with newer message versions, so
+	 * the old firmware still properly handles this message, just the new
+	 * feature fields are ignored, and queue creation will be successful.
+	 */
+	req.hdr.req.msg_version = GDMA_MESSAGE_V3;
+	req.hdr.resp.msg_version = GDMA_MESSAGE_V2;
 	req.vport = vport;
 	req.wq_type = wq_type;
 	req.wq_gdma_region = wq_spec->gdma_region;
@@ -1599,6 +1608,9 @@ int mana_create_wq_obj(struct mana_port_context *apc,
 	req.cq_size = cq_spec->queue_size;
 	req.cq_moderation_ctx_id = cq_spec->modr_ctx_id;
 	req.cq_parent_qid = cq_spec->attached_eq;
+	req.req_cq_moderation = cq_spec->req_cq_moderation;
+	req.cq_moderation_comp = cq_spec->cq_moderation_comp;
+	req.cq_moderation_usec = cq_spec->cq_moderation_usec;
 
 	err = mana_send_request(apc->ac, &req, sizeof(req), &resp,
 				sizeof(resp));
@@ -1856,6 +1868,7 @@ static void mana_poll_tx_cq(struct mana_cq *cq)
 	struct gdma_posted_wqe_info *wqe_info;
 	unsigned int pkt_transmitted = 0;
 	unsigned int wqe_unit_cnt = 0;
+	unsigned int tx_bytes = 0;
 	struct mana_txq *txq = cq->txq;
 	struct mana_port_context *apc;
 	struct netdev_queue *net_txq;
@@ -1937,6 +1950,8 @@ static void mana_poll_tx_cq(struct mana_cq *cq)
 
 		mana_unmap_skb(skb, apc);
 
+		tx_bytes += skb->len;
+
 		napi_consume_skb(skb, cq->budget);
 
 		pkt_transmitted++;
@@ -1966,6 +1981,10 @@ static void mana_poll_tx_cq(struct mana_cq *cq)
 
 	if (atomic_sub_return(pkt_transmitted, &txq->pending_sends) < 0)
 		WARN_ON_ONCE(1);
+
+	/* Feed DIM with the completion rate observed here, in NAPI context. */
+	cq->tx_dim_pkts += pkt_transmitted;
+	cq->tx_dim_bytes += tx_bytes;
 
 	cq->work_done = pkt_transmitted;
 }
@@ -2318,6 +2337,117 @@ static void mana_poll_rx_cq(struct mana_cq *cq)
 		xdp_do_flush();
 }
 
+static void mana_rx_dim_work(struct work_struct *work)
+{
+	struct dim *dim = container_of(work, struct dim, work);
+	struct dim_cq_moder cur_moder;
+	struct mana_cq *cq;
+
+	cur_moder = net_dim_get_rx_moderation(dim->mode, dim->profile_ix);
+	cq = container_of(dim, struct mana_cq, dim);
+
+	cur_moder.usec = min_t(u16, cur_moder.usec, MANA_INTR_MODR_USEC_MAX);
+	cur_moder.pkts = min_t(u16, cur_moder.pkts, MANA_INTR_MODR_COMP_MAX);
+
+	mana_gd_ring_dim(cq->gdma_cq, cur_moder.usec, true,
+			 cur_moder.pkts, true);
+
+	dim->state = DIM_START_MEASURE;
+}
+
+static void mana_tx_dim_work(struct work_struct *work)
+{
+	struct dim *dim = container_of(work, struct dim, work);
+	struct dim_cq_moder cur_moder;
+	struct mana_cq *cq;
+
+	cur_moder = net_dim_get_tx_moderation(dim->mode, dim->profile_ix);
+	cq = container_of(dim, struct mana_cq, dim);
+
+	cur_moder.usec = min_t(u16, cur_moder.usec, MANA_INTR_MODR_USEC_MAX);
+	cur_moder.pkts = min_t(u16, cur_moder.pkts, MANA_INTR_MODR_COMP_MAX);
+
+	mana_gd_ring_dim(cq->gdma_cq, cur_moder.usec, true,
+			 cur_moder.pkts, true);
+
+	dim->state = DIM_START_MEASURE;
+}
+
+/* The caller must update apc->rx/tx_dim_enabled before disabling and
+ * after enabling. And synchronize_net() before draining the DIM work,
+ * so that NAPI cannot observe a stale flag.
+ */
+void mana_dim_change(struct mana_cq *cq, bool enable)
+{
+	bool is_rx = cq->type == MANA_CQ_TYPE_RX;
+	struct mana_port_context *apc;
+	work_func_t work_func;
+	u32 usec, comp;
+
+	if (is_rx) {
+		apc = netdev_priv(cq->rxq->ndev);
+		usec = apc->intr_modr_rx_usec;
+		comp = apc->intr_modr_rx_comp;
+		work_func = mana_rx_dim_work;
+	} else {
+		apc = netdev_priv(cq->txq->ndev);
+		usec = apc->intr_modr_tx_usec;
+		comp = apc->intr_modr_tx_comp;
+		work_func = mana_tx_dim_work;
+	}
+
+	/* On enable, zero the DIM state so net_dim() starts measuring from
+	 * scratch.
+	 * On disable, drain any pending DIM work and restore the static
+	 * moderation values.
+	 */
+	if (enable) {
+		memset(&cq->dim, 0, sizeof(cq->dim));
+		cq->dim.mode = DIM_CQ_PERIOD_MODE_START_FROM_EQE;
+		INIT_WORK(&cq->dim.work, work_func);
+	} else {
+		cancel_work_sync(&cq->dim.work);
+		mana_gd_ring_dim(cq->gdma_cq, usec, true, comp, true);
+	}
+}
+
+static void mana_update_rx_dim(struct mana_cq *cq)
+{
+	struct mana_port_context *apc = netdev_priv(cq->rxq->ndev);
+	struct dim_sample dim_sample = {};
+	struct mana_rxq *rxq = cq->rxq;
+
+	/* Pairs with smp_store_release() in mana_set_coalesce(): observing the
+	 * enable flag set guarantees the DIM (re)initialization is visible.
+	 */
+	if (!smp_load_acquire(&apc->rx_dim_enabled))
+		return;
+
+	dim_update_sample(READ_ONCE(cq->dim_event_ctr), rxq->stats.packets,
+			  rxq->stats.bytes, &dim_sample);
+	net_dim(&cq->dim, &dim_sample);
+}
+
+static void mana_update_tx_dim(struct mana_cq *cq)
+{
+	struct mana_port_context *apc = netdev_priv(cq->txq->ndev);
+	struct dim_sample dim_sample = {};
+
+	/* Pairs with smp_store_release() in mana_set_coalesce(): observing the
+	 * enable flag set guarantees the DIM (re)initialization is visible.
+	 */
+	if (!smp_load_acquire(&apc->tx_dim_enabled))
+		return;
+
+	/* cq->tx_dim_pkts/bytes are accumulated in mana_poll_tx_cq(), in the
+	 * same NAPI context as this read, so they track the hardware
+	 * completion rate and need no u64_stats_sync protection.
+	 */
+	dim_update_sample(READ_ONCE(cq->dim_event_ctr), cq->tx_dim_pkts,
+			  cq->tx_dim_bytes, &dim_sample);
+	net_dim(&cq->dim, &dim_sample);
+}
+
 static int mana_cq_handler(void *context, struct gdma_queue *gdma_queue)
 {
 	struct mana_cq *cq = context;
@@ -2336,6 +2466,15 @@ static int mana_cq_handler(void *context, struct gdma_queue *gdma_queue)
 	if (w < cq->budget) {
 		mana_gd_ring_cq(gdma_queue, SET_ARM_BIT);
 		cq->work_done_since_doorbell = 0;
+
+		/* Update DIM before napi_complete_done() to prevent running
+		 * net_dim() concurrently.
+		 */
+		if (cq->type == MANA_CQ_TYPE_RX)
+			mana_update_rx_dim(cq);
+		else
+			mana_update_tx_dim(cq);
+
 		napi_complete_done(&cq->napi, w);
 	} else if (cq->work_done_since_doorbell >=
 		   (cq->gdma_cq->queue_size / COMP_ENTRY_SIZE) * 4) {
@@ -2368,6 +2507,7 @@ static void mana_schedule_napi(void *context, struct gdma_queue *gdma_queue)
 {
 	struct mana_cq *cq = context;
 
+	WRITE_ONCE(cq->dim_event_ctr, cq->dim_event_ctr + 1);
 	napi_schedule_irqoff(&cq->napi);
 }
 
@@ -2410,6 +2550,7 @@ static void mana_destroy_txq(struct mana_port_context *apc)
 		if (apc->tx_qp[i]->txq.napi_initialized) {
 			napi_synchronize(napi);
 			napi_disable_locked(napi);
+			cancel_work_sync(&apc->tx_qp[i]->tx_cq.dim.work);
 			netif_napi_del_locked(napi);
 			apc->tx_qp[i]->txq.napi_initialized = false;
 		}
@@ -2543,6 +2684,11 @@ static int mana_create_txq(struct mana_port_context *apc,
 		cq_spec.modr_ctx_id = 0;
 		cq_spec.attached_eq = cq->gdma_cq->cq.parent->id;
 
+		/* DIM setting can be changed at runtime */
+		cq_spec.req_cq_moderation = true;
+		cq_spec.cq_moderation_usec = apc->intr_modr_tx_usec;
+		cq_spec.cq_moderation_comp = apc->intr_modr_tx_comp;
+
 		err = mana_create_wq_obj(apc, apc->port_handle, GDMA_SQ,
 					 &wq_spec, &cq_spec,
 					 &apc->tx_qp[i]->tx_object);
@@ -2573,6 +2719,13 @@ static int mana_create_txq(struct mana_port_context *apc,
 
 		set_bit(NAPI_STATE_NO_BUSY_POLL, &cq->napi.state);
 		netif_napi_add_locked(net, &cq->napi, mana_poll);
+
+		/* Initialize the DIM work before enabling NAPI, so that a poll
+		 * cannot reach net_dim() with an uninitialized cq->dim.work.
+		 */
+		INIT_WORK(&cq->dim.work, mana_tx_dim_work);
+		cq->dim.mode = DIM_CQ_PERIOD_MODE_START_FROM_EQE;
+
 		napi_enable_locked(&cq->napi);
 		txq->napi_initialized = true;
 
@@ -2610,6 +2763,7 @@ static void mana_destroy_rxq(struct mana_port_context *apc,
 		napi_synchronize(napi);
 
 		napi_disable_locked(napi);
+		cancel_work_sync(&rxq->rx_cq.dim.work);
 		netif_napi_del_locked(napi);
 	}
 
@@ -2848,6 +3002,11 @@ static struct mana_rxq *mana_create_rxq(struct mana_port_context *apc,
 	cq_spec.modr_ctx_id = 0;
 	cq_spec.attached_eq = cq->gdma_cq->cq.parent->id;
 
+	/* DIM setting can be changed at runtime */
+	cq_spec.req_cq_moderation = true;
+	cq_spec.cq_moderation_usec = apc->intr_modr_rx_usec;
+	cq_spec.cq_moderation_comp = apc->intr_modr_rx_comp;
+
 	err = mana_create_wq_obj(apc, apc->port_handle, GDMA_RQ,
 				 &wq_spec, &cq_spec, &rxq->rxobj);
 	if (err)
@@ -2879,6 +3038,12 @@ static struct mana_rxq *mana_create_rxq(struct mana_port_context *apc,
 				 cq->napi.napi_id));
 	WARN_ON(xdp_rxq_info_reg_mem_model(&rxq->xdp_rxq, MEM_TYPE_PAGE_POOL,
 					   rxq->page_pool));
+
+	/* Initialize the DIM work before enabling NAPI, so that a poll
+	 * cannot reach net_dim() with an uninitialized cq->dim.work.
+	 */
+	INIT_WORK(&cq->dim.work, mana_rx_dim_work);
+	cq->dim.mode = DIM_CQ_PERIOD_MODE_START_FROM_EQE;
 
 	napi_enable_locked(&cq->napi);
 
@@ -3545,6 +3710,16 @@ static int mana_probe_port(struct mana_context *ac, int port_idx,
 	apc->port_idx = port_idx;
 	apc->link_cfg_error = 1;
 	apc->cqe_coalescing_enable = 0;
+
+	/* Initialize interrupt moderation settings if supported by HW */
+	if (gc->pf_cap_flags1 & GDMA_PF_CAP_FLAG_1_DYN_INTERRUPT_MODERATION) {
+		apc->intr_modr_rx_usec = MANA_INTR_MODR_USEC_DEF;
+		apc->intr_modr_rx_comp = MANA_INTR_MODR_COMP_DEF;
+		apc->intr_modr_tx_usec = MANA_INTR_MODR_USEC_DEF;
+		apc->intr_modr_tx_comp = MANA_INTR_MODR_COMP_DEF;
+		apc->rx_dim_enabled = MANA_ADAPTIVE_RX_DEF;
+		apc->tx_dim_enabled = MANA_ADAPTIVE_TX_DEF;
+	}
 
 	mutex_init(&apc->vport_mutex);
 	apc->vport_use_count = 0;
