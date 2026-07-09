@@ -4,6 +4,7 @@
 #ifndef _MANA_H
 #define _MANA_H
 
+#include <linux/dim.h>
 #include <net/xdp.h>
 #include <net/net_shaper.h>
 
@@ -63,6 +64,19 @@ enum TRI_STATE {
 
 /* Maximum number of packets per coalesced CQE */
 #define MANA_RXCOMP_OOB_NUM_PPI 4
+
+/* Default/max interrupt moderation settings */
+#define MANA_INTR_MODR_USEC_DEF 0
+#define MANA_INTR_MODR_COMP_DEF 0
+
+#define MANA_ADAPTIVE_RX_DEF true
+#define MANA_ADAPTIVE_TX_DEF true
+
+/* DIM doorbell value field layout */
+#define MANA_INTR_MODR_USEC_MAX    GENMASK(9, 0)
+#define MANA_INTR_MODR_USEC_VLD    BIT(15)
+#define MANA_INTR_MODR_COMP_MAX    GENMASK(7, 0)
+#define MANA_INTR_MODR_COMP_MASK   GENMASK(23, 16)
 
 /* Update this count whenever the respective structures are changed */
 #define MANA_STATS_RX_COUNT (6 + MANA_RXCOMP_OOB_NUM_PPI - 1)
@@ -297,6 +311,17 @@ struct mana_cq {
 	int work_done;
 	int work_done_since_doorbell;
 	int budget;
+
+	/* DIM - Dynamic Interrupt Moderation */
+	struct dim dim;
+	u16 dim_event_ctr;
+
+	/* Cumulative TX completions fed to DIM. Updated and read only in
+	 * NAPI context (mana_poll_tx_cq() / mana_update_tx_dim()), so they
+	 * measure the hardware completion rate and need no u64_stats_sync.
+	 */
+	u64 tx_dim_pkts;
+	u64 tx_dim_bytes;
 };
 
 struct mana_recv_buf_oob {
@@ -573,6 +598,15 @@ struct mana_port_context {
 	u8 cqe_coalescing_enable;
 	u32 cqe_coalescing_timeout_ns;
 
+	/* Interrupt moderation settings */
+	u16 intr_modr_rx_usec;
+	u16 intr_modr_rx_comp;
+	u16 intr_modr_tx_usec;
+	u16 intr_modr_tx_comp;
+
+	bool rx_dim_enabled;
+	bool tx_dim_enabled;
+
 	struct mana_ethtool_stats eth_stats;
 
 	struct mana_ethtool_phy_stats phy_stats;
@@ -597,6 +631,8 @@ int mana_disable_vport_rx(struct mana_port_context *apc);
 int mana_alloc_queues(struct net_device *ndev);
 int mana_attach(struct net_device *ndev);
 int mana_detach(struct net_device *ndev, bool from_close);
+
+void mana_dim_change(struct mana_cq *cq, bool enable);
 
 int mana_probe(struct gdma_dev *gd, bool resuming);
 void mana_remove(struct gdma_dev *gd, bool suspending);
@@ -633,6 +669,9 @@ struct mana_obj_spec {
 	u32 queue_size;
 	u32 attached_eq;
 	u32 modr_ctx_id;
+	u8 req_cq_moderation;
+	u16 cq_moderation_comp;
+	u16 cq_moderation_usec;
 };
 
 enum mana_command_code {
@@ -764,6 +803,15 @@ struct mana_create_wqobj_req {
 	u32 cq_size;
 	u32 cq_moderation_ctx_id;
 	u32 cq_parent_qid;
+
+	/* V2 */
+	u8 allow_rqwqe_chain;
+
+	/* V3 */
+	u8 req_cq_moderation;
+	u16 cq_moderation_comp;
+	u16 cq_moderation_usec;
+	u8 reserved2[2];
 }; /* HW DATA */
 
 struct mana_create_wqobj_resp {
@@ -771,6 +819,12 @@ struct mana_create_wqobj_resp {
 	u32 wq_id;
 	u32 cq_id;
 	mana_handle_t wq_obj;
+
+	/* V2 */
+	u16 cq_moderation_comp;
+	u16 cq_moderation_usec;
+	u8 cq_moderation_enabled;
+	u8 reserved1[3];
 }; /* HW DATA */
 
 /* Destroy WQ Object */
