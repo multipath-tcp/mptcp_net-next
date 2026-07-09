@@ -107,6 +107,15 @@ doesn't have the eswitch. Local controller (identified by controller number = 0)
 has the eswitch. The Devlink instance on the local controller has eswitch
 devlink ports for both the controllers.
 
+A non-zero controller number may also be used for ports that are not external.
+For example, a SmartNIC may have additional local PCI physical functions
+that are managed by the eswitch but are not on an external host. These
+ports use a non-zero controller number to distinguish them from the eswitch
+manager's own functions, while the external flag remains unset.
+
+The ``phys_port_name`` includes the controller prefix (``c<controller_num>``)
+whenever the controller number is non-zero, regardless of the external flag.
+
 Function configuration
 ======================
 
