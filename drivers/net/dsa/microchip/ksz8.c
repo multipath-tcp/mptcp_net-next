@@ -36,6 +36,52 @@
 #include "ksz8_reg.h"
 #include "ksz8.h"
 
+/* ksz88x3_drive_strengths - Drive strength mapping for KSZ8863, KSZ8873, ..
+ *			     variants.
+ * This values are documented in KSZ8873 and KSZ8863 datasheets.
+ */
+static const struct ksz_drive_strength ksz88x3_drive_strengths[] = {
+	{ 0,  8000 },
+	{ KSZ8873_DRIVE_STRENGTH_16MA, 16000 },
+};
+
+struct ksz88xx_stats_raw {
+	u64 rx;
+	u64 rx_hi;
+	u64 rx_undersize;
+	u64 rx_fragments;
+	u64 rx_oversize;
+	u64 rx_jabbers;
+	u64 rx_symbol_err;
+	u64 rx_crc_err;
+	u64 rx_align_err;
+	u64 rx_mac_ctrl;
+	u64 rx_pause;
+	u64 rx_bcast;
+	u64 rx_mcast;
+	u64 rx_ucast;
+	u64 rx_64_or_less;
+	u64 rx_65_127;
+	u64 rx_128_255;
+	u64 rx_256_511;
+	u64 rx_512_1023;
+	u64 rx_1024_1522;
+	u64 tx;
+	u64 tx_hi;
+	u64 tx_late_col;
+	u64 tx_pause;
+	u64 tx_bcast;
+	u64 tx_mcast;
+	u64 tx_ucast;
+	u64 tx_deferred;
+	u64 tx_total_col;
+	u64 tx_exc_col;
+	u64 tx_single_col;
+	u64 tx_mult_col;
+	u64 rx_discards;
+	u64 tx_discards;
+};
+
 static void ksz_cfg(struct ksz_device *dev, u32 addr, u8 bits, bool set)
 {
 	ksz_rmw8(dev, addr, bits, set ? bits : 0);
@@ -158,9 +204,16 @@ static int ksz8_reset_switch(struct ksz_device *dev)
 	return 0;
 }
 
-static int ksz8863_change_mtu(struct ksz_device *dev, int frame_size)
+static int ksz88xx_change_mtu(struct dsa_switch *ds, int port, int mtu)
 {
+	struct ksz_device *dev = ds->priv;
+	int frame_size;
 	u8 ctrl2 = 0;
+
+	if (!dsa_is_cpu_port(dev->ds, port))
+		return 0;
+
+	frame_size = mtu + VLAN_ETH_HLEN + ETH_FCS_LEN;
 
 	if (frame_size <= KSZ8_LEGAL_PACKET_SIZE)
 		ctrl2 |= KSZ8863_LEGAL_PACKET_ENABLE;
@@ -171,10 +224,17 @@ static int ksz8863_change_mtu(struct ksz_device *dev, int frame_size)
 			KSZ8863_HUGE_PACKET_ENABLE, ctrl2);
 }
 
-static int ksz8795_change_mtu(struct ksz_device *dev, int frame_size)
+static int ksz87xx_change_mtu(struct dsa_switch *ds, int port, int mtu)
 {
+	struct ksz_device *dev = ds->priv;
 	u8 ctrl1 = 0, ctrl2 = 0;
+	u16 frame_size;
 	int ret;
+
+	if (!dsa_is_cpu_port(dev->ds, port))
+		return 0;
+
+	frame_size = mtu + VLAN_ETH_HLEN + ETH_FCS_LEN;
 
 	if (frame_size > KSZ8_LEGAL_PACKET_SIZE)
 		ctrl2 |= SW_LEGAL_PACKET_DISABLE;
@@ -188,29 +248,14 @@ static int ksz8795_change_mtu(struct ksz_device *dev, int frame_size)
 	return ksz_rmw8(dev, REG_SW_CTRL_2, SW_LEGAL_PACKET_DISABLE, ctrl2);
 }
 
-static int ksz8_change_mtu(struct dsa_switch *ds, int port, int mtu)
+static int ksz87xx_max_mtu(struct dsa_switch *ds, int port)
 {
-	struct ksz_device *dev = ds->priv;
-	u16 frame_size;
+	return KSZ8795_HUGE_PACKET_SIZE - VLAN_ETH_HLEN - ETH_FCS_LEN;
+}
 
-	if (!dsa_is_cpu_port(dev->ds, port))
-		return 0;
-
-	frame_size = mtu + VLAN_ETH_HLEN + ETH_FCS_LEN;
-
-	switch (dev->chip_id) {
-	case KSZ8795_CHIP_ID:
-	case KSZ8794_CHIP_ID:
-	case KSZ8765_CHIP_ID:
-		return ksz8795_change_mtu(dev, frame_size);
-	case KSZ8463_CHIP_ID:
-	case KSZ88X3_CHIP_ID:
-	case KSZ8864_CHIP_ID:
-	case KSZ8895_CHIP_ID:
-		return ksz8863_change_mtu(dev, frame_size);
-	}
-
-	return -EOPNOTSUPP;
+static int ksz88xx_max_mtu(struct dsa_switch *ds, int port)
+{
+	return KSZ8863_HUGE_PACKET_SIZE - VLAN_ETH_HLEN - ETH_FCS_LEN;
 }
 
 static int ksz8_port_queue_split(struct ksz_device *dev, int port, int queues)
@@ -1746,6 +1791,159 @@ static void ksz8_port_mirror_del(struct dsa_switch *ds, int port,
 			     PORT_MIRROR_SNIFFER, false);
 }
 
+static u8 ksz8463_tc_ctrl(int port, int queue)
+{
+	u8 reg;
+
+	reg = 0xC8 + port * 4;
+	reg += ((3 - queue) / 2) * 2;
+	reg++;
+	reg -= (queue & 1);
+	return reg;
+}
+
+/**
+ * ksz88x3_tc_ets_add - Configure ETS (Enhanced Transmission Selection)
+ *                      for a port on KSZ88x3 switch
+ * @dev: Pointer to the KSZ switch device structure
+ * @port: Port number to configure
+ * @p: Pointer to offload replace parameters describing ETS bands and mapping
+ *
+ * The KSZ88x3 supports two scheduling modes: Strict Priority and
+ * Weighted Fair Queuing (WFQ). Both modes have fixed behavior:
+ *   - No configurable queue-to-priority mapping
+ *   - No weight adjustment in WFQ mode
+ *
+ * This function configures the switch to use strict priority mode by
+ * clearing the WFQ enable bit for all queues associated with ETS bands.
+ * If strict priority is not explicitly requested, the switch will default
+ * to WFQ mode.
+ *
+ * Return: 0 on success, or a negative error code on failure
+ */
+static int ksz88x3_tc_ets_add(struct ksz_device *dev, int port,
+			      struct tc_ets_qopt_offload_replace_params *p)
+{
+	int ret, band;
+
+	/* Only strict priority mode is supported for now.
+	 * WFQ is implicitly enabled when strict mode is disabled.
+	 */
+	for (band = 0; band < p->bands; band++) {
+		int queue = ksz_ets_band_to_queue(p, band);
+		u8 reg;
+
+		/* Calculate TXQ Split Control register address for this
+		 * port/queue
+		 */
+		reg = KSZ8873_TXQ_SPLIT_CTRL_REG(port, queue);
+		if (ksz_is_ksz8463(dev))
+			reg = ksz8463_tc_ctrl(port, queue);
+
+		/* Clear WFQ enable bit to select strict priority scheduling */
+		ret = ksz_rmw8(dev, reg, KSZ8873_TXQ_WFQ_ENABLE, 0);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * ksz88x3_tc_ets_del - Reset ETS (Enhanced Transmission Selection) config
+ *                      for a port on KSZ88x3 switch
+ * @dev: Pointer to the KSZ switch device structure
+ * @port: Port number to reset
+ *
+ * The KSZ88x3 supports only fixed scheduling modes: Strict Priority or
+ * Weighted Fair Queuing (WFQ), with no reconfiguration of weights or
+ * queue mapping. This function resets the port’s scheduling mode to
+ * the default, which is WFQ, by enabling the WFQ bit for all queues.
+ *
+ * Return: 0 on success, or a negative error code on failure
+ */
+static int ksz88x3_tc_ets_del(struct ksz_device *dev, int port)
+{
+	int ret, queue;
+
+	/* Iterate over all transmit queues for this port */
+	for (queue = 0; queue < dev->info->num_tx_queues; queue++) {
+		u8 reg;
+
+		/* Calculate TXQ Split Control register address for this
+		 * port/queue
+		 */
+		reg = KSZ8873_TXQ_SPLIT_CTRL_REG(port, queue);
+		if (ksz_is_ksz8463(dev))
+			reg = ksz8463_tc_ctrl(port, queue);
+
+		/* Set WFQ enable bit to revert back to default scheduling
+		 * mode
+		 */
+		ret = ksz_rmw8(dev, reg, KSZ8873_TXQ_WFQ_ENABLE,
+			       KSZ8873_TXQ_WFQ_ENABLE);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int ksz8_tc_setup_qdisc_ets(struct dsa_switch *ds, int port,
+				   struct tc_ets_qopt_offload *qopt)
+{
+	struct ksz_device *dev = ds->priv;
+	int ret;
+
+	if (!(ksz_is_ksz88x3(dev) || ksz_is_ksz8463(dev)))
+		return -EOPNOTSUPP;
+
+	if (qopt->parent != TC_H_ROOT) {
+		dev_err(dev->dev, "Parent should be \"root\"\n");
+		return -EOPNOTSUPP;
+	}
+
+	switch (qopt->command) {
+	case TC_ETS_REPLACE:
+		ret = ksz_tc_ets_validate(dev, port, &qopt->replace_params);
+		if (ret)
+			return ret;
+
+		return ksz88x3_tc_ets_add(dev, port, &qopt->replace_params);
+	case TC_ETS_DESTROY:
+		return ksz88x3_tc_ets_del(dev, port);
+	case TC_ETS_STATS:
+	case TC_ETS_GRAFT:
+		return -EOPNOTSUPP;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int ksz87xx_setup_tc(struct dsa_switch *ds, int port,
+			    enum tc_setup_type type, void *type_data)
+{
+	switch (type) {
+	case TC_SETUP_QDISC_CBS:
+		return ksz_setup_tc_cbs(ds, port, type_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+static int ksz8_setup_tc(struct dsa_switch *ds, int port,
+			 enum tc_setup_type type, void *type_data)
+{
+	switch (type) {
+	case TC_SETUP_QDISC_CBS:
+		return ksz_setup_tc_cbs(ds, port, type_data);
+	case TC_SETUP_QDISC_ETS:
+		return ksz8_tc_setup_qdisc_ets(ds, port, type_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static void ksz8795_cpu_interface_select(struct ksz_device *dev, int port)
 {
 	struct ksz_port *p = &dev->ports[port];
@@ -2053,6 +2251,171 @@ static int ksz8_enable_stp_addr(struct ksz_device *dev)
 	return ksz8_w_sta_mac_table(dev, 0, &alu);
 }
 
+static void ksz88xx_r_mib_stats64(struct ksz_device *dev, int port)
+{
+	struct ethtool_pause_stats *pstats;
+	struct rtnl_link_stats64 *stats;
+	struct ksz88xx_stats_raw *raw;
+	struct ksz_port_mib *mib;
+
+	mib = &dev->ports[port].mib;
+	stats = &mib->stats64;
+	pstats = &mib->pause_stats;
+	raw = (struct ksz88xx_stats_raw *)mib->counters;
+
+	spin_lock(&mib->stats64_lock);
+
+	stats->rx_packets = raw->rx_bcast + raw->rx_mcast + raw->rx_ucast +
+		raw->rx_pause;
+	stats->tx_packets = raw->tx_bcast + raw->tx_mcast + raw->tx_ucast +
+		raw->tx_pause;
+
+	/* HW counters are counting bytes + FCS which is not acceptable
+	 * for rtnl_link_stats64 interface
+	 */
+	stats->rx_bytes = raw->rx + raw->rx_hi - stats->rx_packets * ETH_FCS_LEN;
+	stats->tx_bytes = raw->tx + raw->tx_hi - stats->tx_packets * ETH_FCS_LEN;
+
+	stats->rx_length_errors = raw->rx_undersize + raw->rx_fragments +
+		raw->rx_oversize;
+
+	stats->rx_crc_errors = raw->rx_crc_err;
+	stats->rx_frame_errors = raw->rx_align_err;
+	stats->rx_dropped = raw->rx_discards;
+	stats->rx_errors = stats->rx_length_errors + stats->rx_crc_errors +
+		stats->rx_frame_errors  + stats->rx_dropped;
+
+	stats->tx_window_errors = raw->tx_late_col;
+	stats->tx_fifo_errors = raw->tx_discards;
+	stats->tx_aborted_errors = raw->tx_exc_col;
+	stats->tx_errors = stats->tx_window_errors + stats->tx_fifo_errors +
+		stats->tx_aborted_errors;
+
+	stats->multicast = raw->rx_mcast;
+	stats->collisions = raw->tx_total_col;
+
+	pstats->tx_pause_frames = raw->tx_pause;
+	pstats->rx_pause_frames = raw->rx_pause;
+
+	spin_unlock(&mib->stats64_lock);
+}
+
+/**
+ * ksz88x3_drive_strength_write() - Set the drive strength configuration for
+ *				    KSZ8863 compatible chip variants.
+ * @dev:       ksz device
+ * @props:     Array of drive strength properties to be set
+ * @num_props: Number of properties in the array
+ *
+ * This function applies the specified drive strength settings to KSZ88X3 chip
+ * variants (KSZ8873, KSZ8863).
+ * It ensures the configurations align with what the chip variant supports and
+ * warns or errors out on unsupported settings.
+ *
+ * Return: 0 on success, error code otherwise
+ */
+static int ksz88x3_drive_strength_write(struct ksz_device *dev,
+					struct ksz_driver_strength_prop *props,
+					int num_props)
+{
+	size_t array_size = ARRAY_SIZE(ksz88x3_drive_strengths);
+	int microamp;
+	int i, ret;
+
+	for (i = 0; i < num_props; i++) {
+		if (props[i].value == -1 || i == KSZ_DRIVER_STRENGTH_IO)
+			continue;
+
+		dev_warn(dev->dev, "%s is not supported by this chip variant\n",
+			 props[i].name);
+	}
+
+	microamp = props[KSZ_DRIVER_STRENGTH_IO].value;
+	ret = ksz_drive_strength_to_reg(ksz88x3_drive_strengths, array_size,
+					microamp);
+	if (ret < 0) {
+		ksz_drive_strength_error(dev, ksz88x3_drive_strengths,
+					 array_size, microamp);
+		return ret;
+	}
+
+	return ksz_rmw8(dev, KSZ8873_REG_GLOBAL_CTRL_12,
+			KSZ8873_DRIVE_STRENGTH_16MA, ret);
+}
+
+/**
+ * ksz8_parse_drive_strength() - Extract and apply drive strength configurations
+ *				 from device tree properties.
+ * @dev:	ksz device
+ *
+ * This function reads the specified drive strength properties from the
+ * device tree, validates against the supported chip variants, and sets
+ * them accordingly. An error should be critical here, as the drive strength
+ * settings are crucial for EMI compliance.
+ *
+ * Return: 0 on success, error code otherwise
+ */
+static int ksz8_parse_drive_strength(struct ksz_device *dev)
+{
+	struct ksz_driver_strength_prop of_props[] = {
+		[KSZ_DRIVER_STRENGTH_HI] = {
+			.name = "microchip,hi-drive-strength-microamp",
+			.offset = SW_HI_SPEED_DRIVE_STRENGTH_S,
+			.value = -1,
+		},
+		[KSZ_DRIVER_STRENGTH_LO] = {
+			.name = "microchip,lo-drive-strength-microamp",
+			.offset = SW_LO_SPEED_DRIVE_STRENGTH_S,
+			.value = -1,
+		},
+		[KSZ_DRIVER_STRENGTH_IO] = {
+			.name = "microchip,io-drive-strength-microamp",
+			.offset = 0, /* don't care */
+			.value = -1,
+		},
+	};
+	struct device_node *np = dev->dev->of_node;
+	bool have_any_prop = false;
+	int i, ret;
+
+	for (i = 0; i < ARRAY_SIZE(of_props); i++) {
+		ret = of_property_read_u32(np, of_props[i].name,
+					   &of_props[i].value);
+		if (ret && ret != -EINVAL)
+			dev_warn(dev->dev, "Failed to read %s\n",
+				 of_props[i].name);
+		if (ret)
+			continue;
+
+		have_any_prop = true;
+	}
+
+	if (!have_any_prop)
+		return 0;
+
+	switch (dev->chip_id) {
+	case KSZ88X3_CHIP_ID:
+		return ksz88x3_drive_strength_write(dev, of_props,
+						    ARRAY_SIZE(of_props));
+	case KSZ8795_CHIP_ID:
+	case KSZ8794_CHIP_ID:
+	case KSZ8765_CHIP_ID:
+		return ksz_drive_strength_write(dev, of_props,
+						ARRAY_SIZE(of_props));
+	default:
+		/* KSZ8864, KSZ8895 */
+		for (i = 0; i < ARRAY_SIZE(of_props); i++) {
+			if (of_props[i].value == -1)
+				continue;
+
+			dev_warn(dev->dev, "%s is not supported by this chip variant\n",
+				 of_props[i].name);
+		}
+	}
+
+	return 0;
+}
+
 static int ksz8_setup(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
@@ -2075,7 +2438,7 @@ static int ksz8_setup(struct dsa_switch *ds)
 		return ret;
 	}
 
-	ret = ksz_parse_drive_strength(dev);
+	ret = ksz8_parse_drive_strength(dev);
 	if (ret)
 		return ret;
 
@@ -2551,8 +2914,8 @@ const struct dsa_switch_ops ksz8463_switch_ops = {
 	.port_mirror_del	= ksz8_port_mirror_del,
 	.get_stats64		= ksz_get_stats64,
 	.get_pause_stats	= ksz_get_pause_stats,
-	.port_change_mtu	= ksz8_change_mtu,
-	.port_max_mtu		= ksz_max_mtu,
+	.port_change_mtu	= ksz88xx_change_mtu,
+	.port_max_mtu		= ksz88xx_max_mtu,
 	.suspend		= ksz_suspend,
 	.resume			= ksz_resume,
 	.get_ts_info		= ksz_get_ts_info,
@@ -2560,7 +2923,7 @@ const struct dsa_switch_ops ksz8463_switch_ops = {
 	.port_hwtstamp_set	= ksz_hwtstamp_set,
 	.port_txtstamp		= ksz_port_txtstamp,
 	.port_rxtstamp		= ksz_port_rxtstamp,
-	.port_setup_tc		= ksz_setup_tc,
+	.port_setup_tc		= ksz8_setup_tc,
 	.port_get_default_prio	= ksz_port_get_default_prio,
 	.port_set_default_prio	= ksz_port_set_default_prio,
 	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
@@ -2601,8 +2964,8 @@ const struct dsa_switch_ops ksz87xx_switch_ops = {
 	.port_mirror_del	= ksz8_port_mirror_del,
 	.get_stats64		= ksz_get_stats64,
 	.get_pause_stats	= ksz_get_pause_stats,
-	.port_change_mtu	= ksz8_change_mtu,
-	.port_max_mtu		= ksz_max_mtu,
+	.port_change_mtu	= ksz87xx_change_mtu,
+	.port_max_mtu		= ksz87xx_max_mtu,
 	.suspend		= ksz_suspend,
 	.resume			= ksz_resume,
 	.get_ts_info		= ksz_get_ts_info,
@@ -2610,7 +2973,7 @@ const struct dsa_switch_ops ksz87xx_switch_ops = {
 	.port_hwtstamp_set	= ksz_hwtstamp_set,
 	.port_txtstamp		= ksz_port_txtstamp,
 	.port_rxtstamp		= ksz_port_rxtstamp,
-	.port_setup_tc		= ksz_setup_tc,
+	.port_setup_tc		= ksz87xx_setup_tc,
 	.port_get_default_prio	= ksz_port_get_default_prio,
 	.port_set_default_prio	= ksz_port_set_default_prio,
 	.port_get_dscp_prio	= ksz_port_get_dscp_prio,
@@ -2652,8 +3015,8 @@ const struct dsa_switch_ops ksz88xx_switch_ops = {
 	.port_mirror_del	= ksz8_port_mirror_del,
 	.get_stats64		= ksz_get_stats64,
 	.get_pause_stats	= ksz_get_pause_stats,
-	.port_change_mtu	= ksz8_change_mtu,
-	.port_max_mtu		= ksz_max_mtu,
+	.port_change_mtu	= ksz88xx_change_mtu,
+	.port_max_mtu		= ksz88xx_max_mtu,
 	.get_wol		= ksz_get_wol,
 	.set_wol		= ksz_set_wol,
 	.suspend		= ksz_suspend,
@@ -2663,7 +3026,7 @@ const struct dsa_switch_ops ksz88xx_switch_ops = {
 	.port_hwtstamp_set	= ksz_hwtstamp_set,
 	.port_txtstamp		= ksz_port_txtstamp,
 	.port_rxtstamp		= ksz_port_rxtstamp,
-	.port_setup_tc		= ksz_setup_tc,
+	.port_setup_tc		= ksz8_setup_tc,
 	.port_get_default_prio	= ksz_port_get_default_prio,
 	.port_set_default_prio	= ksz_port_set_default_prio,
 	.port_get_dscp_prio	= ksz_port_get_dscp_prio,

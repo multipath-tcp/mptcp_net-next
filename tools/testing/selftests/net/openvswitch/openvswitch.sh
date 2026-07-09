@@ -32,6 +32,7 @@ tests="
 	dec_ttl					ttl: dec_ttl decrements IP TTL
 	flow_set				flow-set: Flow modify
 	action_set				set: SET action rewrites fields
+	trunc					trunc: output truncation
 	psample					psample: Sampling packets with psample"
 
 info() {
@@ -439,6 +440,92 @@ test_action_set() {
 	info "verify connectivity restored without SET"
 	ovs_sbx "test_action_set" ip netns exec client ping -c 1 -W 2 \
 		10.0.0.2 || return 1
+
+	return 0
+}
+
+# trunc test
+# - trunc(14): truncate to ETH_HLEN, strips IP payload, ping fails
+# - trunc(1) and trunc(13): kernel rejects below ETH_HLEN (EINVAL)
+# - restore normal forwarding and verify recovery
+test_trunc() {
+	sbx_add "test_trunc" || return $?
+	ovs_add_dp "test_trunc" trunctest || return 1
+
+	info "create namespaces"
+	for ns in client server; do
+		ovs_add_netns_and_veths "test_trunc" "trunctest" \
+		    "$ns" "${ns:0:1}0" "${ns:0:1}1" || return 1
+	done
+
+	ip netns exec client ip addr add 10.0.0.1/24 dev c1
+	ip netns exec client ip link set c1 up
+	ip netns exec server ip addr add 10.0.0.2/24 dev s1
+	ip netns exec server ip link set s1 up
+
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+	    '2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0800),ipv4()' \
+	    '1' || return 1
+
+	info "verify connectivity without truncation"
+	ovs_sbx "test_trunc" ip netns exec client \
+	    ping -c 1 -W 2 10.0.0.2 || return 1
+
+	# trunc below ETH_HLEN must be rejected by the kernel
+	info "verify trunc(1) is rejected"
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+	    'trunc(1),2' &> /dev/null \
+	    && { info "trunc(1) should be rejected"; return 1; }
+
+	info "verify trunc(13) is rejected"
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+	    'trunc(13),2' &> /dev/null \
+	    && { info "trunc(13) should be rejected"; return 1; }
+
+	ovs_del_flows "test_trunc" trunctest
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+
+	info "add trunc(14) forwarding flow"
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+	    'trunc(14),2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0800),ipv4()' \
+	    '1' || return 1
+
+	info "verify ping fails with trunc(14)"
+	ovs_sbx "test_trunc" ip netns exec client \
+	    ping -c 1 -W 2 10.0.0.2 >/dev/null 2>&1 \
+	    && { info "ping should fail with trunc(14)"
+	         return 1; }
+
+	ovs_del_flows "test_trunc" trunctest
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0806),arp()' '2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0806),arp()' '1' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(1),eth(),eth_type(0x0800),ipv4()' \
+	    '2' || return 1
+	ovs_add_flow "test_trunc" trunctest \
+	    'in_port(2),eth(),eth_type(0x0800),ipv4()' \
+	    '1' || return 1
+
+	info "verify connectivity restored"
+	ovs_sbx "test_trunc" ip netns exec client \
+	    ping -c 1 -W 2 10.0.0.2 || return 1
 
 	return 0
 }
