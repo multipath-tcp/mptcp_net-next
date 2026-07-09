@@ -1529,7 +1529,7 @@ static int __devlink_port_phys_port_name_get(struct devlink_port *devlink_port,
 		WARN_ON(1);
 		return -EINVAL;
 	case DEVLINK_PORT_FLAVOUR_PCI_PF:
-		if (attrs->pci_pf.external) {
+		if (attrs->pci_pf.external || attrs->pci_pf.controller) {
 			n = snprintf(name, len, "c%u", attrs->pci_pf.controller);
 			if (n >= len)
 				return -EINVAL;
@@ -1539,7 +1539,7 @@ static int __devlink_port_phys_port_name_get(struct devlink_port *devlink_port,
 		n = snprintf(name, len, "pf%u", attrs->pci_pf.pf);
 		break;
 	case DEVLINK_PORT_FLAVOUR_PCI_VF:
-		if (attrs->pci_vf.external) {
+		if (attrs->pci_vf.external || attrs->pci_vf.controller) {
 			n = snprintf(name, len, "c%u", attrs->pci_vf.controller);
 			if (n >= len)
 				return -EINVAL;
@@ -1550,7 +1550,7 @@ static int __devlink_port_phys_port_name_get(struct devlink_port *devlink_port,
 			     attrs->pci_vf.pf, attrs->pci_vf.vf);
 		break;
 	case DEVLINK_PORT_FLAVOUR_PCI_SF:
-		if (attrs->pci_sf.external) {
+		if (attrs->pci_sf.external || attrs->pci_sf.controller) {
 			n = snprintf(name, len, "c%u", attrs->pci_sf.controller);
 			if (n >= len)
 				return -EINVAL;
