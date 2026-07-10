@@ -827,10 +827,21 @@ static size_t client_huge_transfer(int fd, int unixfd)
 static void process_one_client(int fd, int unixfd)
 {
 	ssize_t ret, ret2, ret3;
+	char msg_buf[4096];
 	struct so_state s;
 	size_t expect_len;
 	char buf[4096];
 	size_t r = 0;
+	struct iovec iov = {
+		.iov_base = buf,
+		.iov_len = 1,
+	};
+	struct msghdr msg = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+		.msg_control = msg_buf,
+		.msg_controllen = sizeof(msg_buf),
+	};
 
 	memset(&s, 0, sizeof(s));
 	do_getsockopts(&s, fd, 0, 0);
@@ -862,9 +873,20 @@ static void process_one_client(int fd, int unixfd)
 		nanosleep(&req, NULL);
 	}
 
-	ret = read(fd, buf, sizeof(buf));
+	/* read one byte */
+	ret = recvmsg(fd, &msg, 0);
 	if (ret < 0)
-		die_perror("read");
+		die_perror("recvmsg");
+
+	iov.iov_base = buf + 1;
+	iov.iov_len = sizeof(buf) - 1;
+	msg.msg_controllen = sizeof(msg_buf);
+	ret = recvmsg(fd, &msg, 0);
+	if (ret < 0)
+		die_perror("recvmsg");
+
+	/* add the first byte */
+	ret += 1;
 
 	assert(s.mptcpi_rcv_delta <= (uint64_t)ret);
 
@@ -879,7 +901,9 @@ static void process_one_client(int fd, int unixfd)
 		r = client_huge_transfer(fd, unixfd);
 
 	/* wait for hangup */
-	ret3 = read(fd, buf, 1);
+	iov.iov_len = 1;
+	msg.msg_controllen = sizeof(msg_buf);
+	ret3 = recvmsg(fd, &msg, 0);
 	if (ret3 != 0)
 		xerror("expected EOF, got %lu", ret3);
 
