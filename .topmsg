@@ -1,2 +1,38 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-only-set-DATA_FIN-when-a-mapping-is-present
+From: Michael Bommarito <michael.bommarito@gmail.com>
+Subject: [PATCH] mptcp: only set DATA_FIN when a mapping is present
+
+mptcp_get_options() clears only the status group of struct
+mptcp_options_received; data_seq, subflow_seq and data_len are filled in
+by mptcp_parse_option() exclusively inside the DSS mapping block, which
+runs only when the DSS M (mapping present) bit is set.
+
+A peer can send a DSS option with the DATA_FIN flag set but the mapping
+bit clear. The parser then records mp_opt->data_fin while leaving
+data_len and data_seq uninitialized. For a zero-length segment
+mptcp_incoming_options() evaluates
+
+	if (mp_opt.data_fin && mp_opt.data_len == 1 &&
+	    mptcp_update_rcv_data_fin(msk, mp_opt.data_seq, mp_opt.dsn64))
+
+which reads the uninitialized data_len and data_seq; KMSAN reports an
+uninit-value in mptcp_incoming_options(). The stale data_seq can also be
+fed into the receive-side DATA_FIN sequence tracking.
+
+Record the DATA_FIN flag only when the DSS option carries a mapping, so
+data_fin is never set without data_seq and data_len also being present.
+data_fin is part of the status group that mptcp_get_options() clears up
+front, so on the no-map path it stays zero and the zero-length DATA_FIN
+branch is simply skipped. A DATA_FIN is always transmitted together with
+a mapping (mptcp_write_data_fin() sets use_map along with data_seq and
+data_len), so legitimate DATA_FIN handling is unaffected.
+
+Move the pr_debug() that logs the parsed DSS flags below the mapping
+block, so it reports the final data_fin value instead of the stale one
+it would otherwise print before the assignment.
+
+Fixes: 43b54c6ee382 ("mptcp: Use full MPTCP-level disconnect state machine")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Cc: stable@vger.kernel.org
+Assisted-by: Claude:claude-opus-4-8
+Signed-off-by: Michael Bommarito <michael.bommarito@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
