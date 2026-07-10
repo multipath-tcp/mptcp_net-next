@@ -762,8 +762,28 @@ static void connect_one_server(int fd, int unixfd)
 	close(unixfd);
 }
 
+static void get_tcp_inq(struct msghdr *msgh, unsigned int *inqv)
+{
+	struct cmsghdr *cmsg;
+
+	for (cmsg = CMSG_FIRSTHDR(msgh); cmsg;
+	     cmsg = CMSG_NXTHDR(msgh, cmsg)) {
+		if (cmsg->cmsg_level == IPPROTO_TCP &&
+		    cmsg->cmsg_type == TCP_CM_INQ) {
+			if (cmsg->cmsg_len < CMSG_LEN(sizeof(*inqv)))
+				xerror("TCP_CM_INQ cmsg_len too small: %u",
+				       cmsg->cmsg_len);
+			memcpy(inqv, CMSG_DATA(cmsg), sizeof(*inqv));
+			return;
+		}
+	}
+
+	xerror("could not find TCP_CM_INQ cmsg type");
+}
+
 static size_t client_huge_transfer(int fd, int unixfd)
 {
+	unsigned int tcp_inq;
 	char msg_buf[4096];
 	size_t expect_len;
 	ssize_t ret, tot;
@@ -802,6 +822,14 @@ static size_t client_huge_transfer(int fd, int unixfd)
 			xerror("unexpected EOF in huge recv");
 
 		tot += ret;
+
+		get_tcp_inq(&msg, &tcp_inq);
+
+		if (tcp_inq > expect_len - tot)
+			xerror("inq %d, remaining %zu total_len %d\n",
+			       tcp_inq, expect_len - tot, (int)expect_len);
+
+		assert(tcp_inq <= expect_len - tot);
 	} while ((size_t)tot < expect_len);
 
 	ret = write(unixfd, "shut", 4);
@@ -821,12 +849,18 @@ static size_t client_huge_transfer(int fd, int unixfd)
 		die_perror("recvmsg");
 	assert(ret == 1);
 
+	get_tcp_inq(&msg, &tcp_inq);
+
+	/* tcp_inq should be 1 due to received fin. */
+	assert(tcp_inq == 1);
+
 	return tot + 1;
 }
 
 static void process_one_client(int fd, int unixfd)
 {
 	ssize_t ret, ret2, ret3;
+	unsigned int tcp_inq;
 	char msg_buf[4096];
 	struct so_state s;
 	size_t expect_len;
@@ -878,12 +912,31 @@ static void process_one_client(int fd, int unixfd)
 	if (ret < 0)
 		die_perror("recvmsg");
 
+	if (inq) {
+		if (msg.msg_controllen == 0)
+			xerror("msg_controllen is 0");
+
+		get_tcp_inq(&msg, &tcp_inq);
+
+		/* expect cmsg to return expected - 1 */
+		assert((size_t)tcp_inq == (expect_len - 1));
+	}
+
 	iov.iov_base = buf + 1;
 	iov.iov_len = sizeof(buf) - 1;
 	msg.msg_controllen = sizeof(msg_buf);
 	ret = recvmsg(fd, &msg, 0);
 	if (ret < 0)
 		die_perror("recvmsg");
+
+	if (inq) {
+		/* should have gotten exact remainder of all pending data */
+		assert(ret == (ssize_t)tcp_inq);
+
+		/* should be 0, all drained */
+		get_tcp_inq(&msg, &tcp_inq);
+		assert(tcp_inq == 0);
+	}
 
 	/* add the first byte */
 	ret += 1;
@@ -906,6 +959,11 @@ static void process_one_client(int fd, int unixfd)
 	ret3 = recvmsg(fd, &msg, 0);
 	if (ret3 != 0)
 		xerror("expected EOF, got %lu", ret3);
+
+	if (inq) {
+		get_tcp_inq(&msg, &tcp_inq);
+		assert(tcp_inq == 1);
+	}
 
 	do_getsockopts(&s, fd, ret + r, ret2);
 	if (proto_tx == IPPROTO_MPTCP && proto_rx == IPPROTO_MPTCP &&
