@@ -1058,10 +1058,20 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_addr_info skc_local;
+	struct mptcp_pm_ops *pm_ops;
+
+	/* Paired with WRITE_ONCE() in mptcp_pm_ops_release(). An inbound
+	 * MP_JOIN reaches this via subflow_token_join_request() on a msk
+	 * obtained from mptcp_token_get_sock(), i.e. holding only a refcount
+	 * and no socket lock, so a concurrent teardown may NULL pm.ops.
+	 */
+	pm_ops = READ_ONCE(msk->pm.ops);
+	if (!pm_ops)
+		return false;
 
 	mptcp_local_address((struct sock_common *)skc, &skc_local);
 
-	return msk->pm.ops->get_priority(msk, &skc_local);
+	return pm_ops->get_priority(msk, &skc_local);
 }
 
 static void mptcp_pm_subflows_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
