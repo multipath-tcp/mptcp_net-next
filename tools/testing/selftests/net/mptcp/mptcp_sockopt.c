@@ -849,7 +849,9 @@ static void process_one_client(int fd, int unixfd)
 	ssize_t ret, r, w;
 	struct so_state s;
 	size_t expect_len;
-	char buf[4096];
+	struct inq_msg m;
+
+	inq_msg_init(&m, 1);
 
 	memset(&s, 0, sizeof(s));
 	do_getsockopts(&s, fd, 0, 0);
@@ -860,7 +862,7 @@ static void process_one_client(int fd, int unixfd)
 	ret = read(unixfd, &expect_len, sizeof(expect_len));
 	assert(ret == (ssize_t)sizeof(expect_len));
 
-	if (expect_len > sizeof(buf))
+	if (expect_len > sizeof(m.buf))
 		xerror("expect len %zu exceeds buffer size", expect_len);
 
 	for (;;) {
@@ -881,17 +883,24 @@ static void process_one_client(int fd, int unixfd)
 		nanosleep(&req, NULL);
 	}
 
-	ret = read(fd, buf, sizeof(buf));
+	/* read one byte */
+	ret = recvmsg(fd, &m.hdr, 0);
 	if (ret < 0)
-		die_perror("read");
+		die_perror("recvmsg");
 	r = ret;
+
+	inq_msg_reset(&m, sizeof(m.buf) - 1, m.buf + 1);
+	ret = recvmsg(fd, &m.hdr, 0);
+	if (ret < 0)
+		die_perror("recvmsg");
+	r += ret;
 
 	assert(s.mptcpi_rcv_delta <= (uint64_t)ret);
 
 	if (s.tcpi_rcv_delta)
 		assert(s.tcpi_rcv_delta == (uint64_t)ret);
 
-	ret = write(fd, buf, r);
+	ret = write(fd, m.buf, r);
 	if (ret < 0)
 		die_perror("write");
 	w = ret;
@@ -900,7 +909,8 @@ static void process_one_client(int fd, int unixfd)
 		r += client_huge_transfer(fd, unixfd);
 
 	/* wait for hangup */
-	ret = read(fd, buf, 1);
+	inq_msg_reset(&m, 1, m.buf);
+	ret = recvmsg(fd, &m.hdr, 0);
 	if (ret != 0)
 		xerror("expected EOF, got %lu", ret);
 	r += ret;
