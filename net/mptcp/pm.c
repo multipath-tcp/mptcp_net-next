@@ -1158,7 +1158,10 @@ static void mptcp_pm_ops_release(struct mptcp_sock *msk)
 {
 	struct mptcp_pm_ops *pm_ops = msk->pm.ops;
 
-	msk->pm.ops = NULL;
+	/* Paired with READ_ONCE() in the lockless softirq MP_JOIN readers
+	 * mptcp_pm_is_backup() / mptcp_pm_get_local_id().
+	 */
+	WRITE_ONCE(msk->pm.ops, NULL);
 	if (pm_ops->release)
 		pm_ops->release(msk);
 
