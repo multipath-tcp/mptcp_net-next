@@ -624,9 +624,11 @@ static void connect_one_server(int fd, int unixfd)
 	/* un-block server */
 	ret = read(unixfd, buf2, 4);
 	assert(ret == 4);
-	close(unixfd);
 
 	assert(strncmp(buf2, "xmit", 4) == 0);
+
+	ret = write(unixfd, &len, sizeof(len));
+	assert(ret == (ssize_t)sizeof(len));
 
 	ret = write(fd, buf, len);
 	if (ret < 0)
@@ -665,12 +667,14 @@ static void connect_one_server(int fd, int unixfd)
 	if (proto_tx == IPPROTO_MPTCP && proto_rx == IPPROTO_MPTCP)
 		assert(s.mptcpi_rcv_delta == (uint64_t)total);
 	close(fd);
+	close(unixfd);
 }
 
 static void process_one_client(int fd, int unixfd)
 {
 	ssize_t ret, r, w;
 	struct so_state s;
+	size_t expect_len;
 	char buf[4096];
 
 	memset(&s, 0, sizeof(s));
@@ -678,6 +682,12 @@ static void process_one_client(int fd, int unixfd)
 
 	ret = write(unixfd, "xmit", 4);
 	assert(ret == 4);
+
+	ret = read(unixfd, &expect_len, sizeof(expect_len));
+	assert(ret == (ssize_t)sizeof(expect_len));
+
+	if (expect_len > sizeof(buf))
+		xerror("expect len %zu exceeds buffer size", expect_len);
 
 	ret = read(fd, buf, sizeof(buf));
 	if (ret < 0)
