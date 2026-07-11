@@ -1029,6 +1029,7 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 {
 	struct mptcp_pm_addr_entry skc_local = { 0 };
 	struct mptcp_addr_info msk_local;
+	struct mptcp_pm_ops *pm_ops;
 
 	if (WARN_ON_ONCE(!msk))
 		return -1;
@@ -1044,7 +1045,14 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	skc_local.addr.id = 0;
 	skc_local.flags = MPTCP_PM_ADDR_FLAG_IMPLICIT;
 
-	return msk->pm.ops->get_local_id(msk, &skc_local);
+	/* See mptcp_pm_is_backup(): reached locklessly from the softirq
+	 * MP_JOIN path, racing a concurrent mptcp_pm_ops_release().
+	 */
+	pm_ops = READ_ONCE(msk->pm.ops);
+	if (!pm_ops)
+		return -1;
+
+	return pm_ops->get_local_id(msk, &skc_local);
 }
 
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
