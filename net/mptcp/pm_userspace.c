@@ -132,12 +132,15 @@ static int mptcp_pm_userspace_get_local_id(struct mptcp_sock *msk,
 	__be16 msk_sport =  ((struct inet_sock *)
 			     inet_sk((struct sock *)msk))->inet_sport;
 	struct mptcp_pm_addr_entry *entry;
+	int id = -1;
 
 	spin_lock_bh(&msk->pm.lock);
 	entry = mptcp_userspace_pm_lookup_addr(msk, &skc->addr);
-	spin_unlock_bh(&msk->pm.lock);
 	if (entry)
-		return entry->addr.id;
+		id = entry->addr.id;
+	spin_unlock_bh(&msk->pm.lock);
+	if (id >= 0)
+		return id;
 
 	if (skc->addr.port == msk_sport)
 		skc->addr.port = 0;
