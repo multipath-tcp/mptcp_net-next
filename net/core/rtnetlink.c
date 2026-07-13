@@ -197,6 +197,7 @@ void __rtnl_net_unlock(struct net *net)
 {
 	ASSERT_RTNL();
 
+	unregister_netdevice_many_net(net);
 	mutex_unlock(&net->rtnl_mutex);
 }
 EXPORT_SYMBOL(__rtnl_net_unlock);
@@ -273,6 +274,29 @@ bool lockdep_rtnl_net_is_held(struct net *net)
 	return lockdep_rtnl_is_held() && lockdep_is_held(&net->rtnl_mutex);
 }
 EXPORT_SYMBOL(lockdep_rtnl_net_is_held);
+
+static struct workqueue_struct *rtnl_net_wq;
+
+void rtnl_net_queue_work(struct net *net)
+{
+	queue_work(rtnl_net_wq, &net->rtnl_work);
+}
+
+void rtnl_net_flush_workqueue(void)
+{
+	flush_workqueue(rtnl_net_wq);
+}
+
+void rtnl_net_work_func(struct work_struct *work)
+{
+	struct net *net = container_of(work, struct net, rtnl_work);
+
+	if (list_empty(&net->dev_unreg_head))
+		return;
+
+	rtnl_net_lock(net);
+	rtnl_net_unlock(net);
+}
 #else
 static int rtnl_net_cmp_locks(const struct net *net_a, const struct net *net_b)
 {
@@ -282,10 +306,11 @@ static int rtnl_net_cmp_locks(const struct net *net_a, const struct net *net_b)
 #endif
 
 struct rtnl_nets {
-	/* ->newlink() needs to freeze 3 netns at most;
-	 * 2 for the new device, 1 for its peer.
+	/* ->newlink() needs to freeze 4 netns at most;
+	 * 2 for the new device, 1 for its peer, 1 for
+	 * an existing device (do_setlink() path).
 	 */
-	struct net *net[3];
+	struct net *net[4];
 	unsigned char len;
 };
 
@@ -636,16 +661,15 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(rtnl_link_register);
 
-static void __rtnl_kill_links(struct net *net, struct rtnl_link_ops *ops)
+static void __rtnl_kill_links(struct net *net, struct rtnl_link_ops *ops,
+			      struct list_head *dev_kill_list)
 {
 	struct net_device *dev;
-	LIST_HEAD(list_kill);
 
 	for_each_netdev(net, dev) {
 		if (dev->rtnl_link_ops == ops)
-			ops->dellink(dev, &list_kill);
+			ops->dellink(dev, dev_kill_list);
 	}
-	unregister_netdevice_many(&list_kill);
 }
 
 /* Return with the rtnl_lock held when there are no network
@@ -676,6 +700,7 @@ static void rtnl_lock_unregistering_all(void)
  */
 void rtnl_link_unregister(struct rtnl_link_ops *ops)
 {
+	LIST_HEAD(dev_kill_list);
 	struct net *net;
 
 	mutex_lock(&link_ops_mutex);
@@ -689,8 +714,14 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	down_write(&pernet_ops_rwsem);
 	rtnl_lock_unregistering_all();
 
-	for_each_net(net)
-		__rtnl_kill_links(net, ops);
+	for_each_net(net) {
+		__rtnl_net_lock(net);
+		__rtnl_kill_links(net, ops, &dev_kill_list);
+		unregister_netdevice_queue_many_net(net, &dev_kill_list);
+		__rtnl_net_unlock(net);
+	}
+
+	unregister_netdevice_many(&dev_kill_list);
 
 	rtnl_unlock();
 	up_write(&pernet_ops_rwsem);
@@ -4158,6 +4189,8 @@ static int rtnl_newlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 		}
 	}
 
+	rtnl_nets_add(&rtnl_nets, get_net(sock_net(skb->sk)));
+
 	rtnl_nets_lock(&rtnl_nets);
 	ret = __rtnl_newlink(skb, nlh, ops, tgt_net, link_net, peer_net, tbs, data, extack);
 	rtnl_nets_unlock(&rtnl_nets);
@@ -7224,4 +7257,10 @@ void __init rtnetlink_init(void)
 	register_netdevice_notifier(&rtnetlink_dev_notifier);
 
 	rtnl_register_many(rtnetlink_rtnl_msg_handlers);
+
+#ifdef CONFIG_DEBUG_NET_SMALL_RTNL
+	rtnl_net_wq = create_workqueue("rtnl_net");
+	if (!rtnl_net_wq)
+		panic("Could not create rtnl_net workq");
+#endif
 }
