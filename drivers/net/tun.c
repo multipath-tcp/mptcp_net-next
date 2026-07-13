@@ -532,7 +532,7 @@ static void tun_disable_queue(struct tun_struct *tun, struct tun_file *tfile)
 {
 	tfile->detached = tun;
 	list_add_tail(&tfile->next, &tun->disabled);
-	++tun->numdisabled;
+	WRITE_ONCE(tun->numdisabled, tun->numdisabled + 1);
 }
 
 static struct tun_struct *tun_enable_queue(struct tun_file *tfile)
@@ -541,7 +541,7 @@ static struct tun_struct *tun_enable_queue(struct tun_file *tfile)
 
 	tfile->detached = NULL;
 	list_del_init(&tfile->next);
-	--tun->numdisabled;
+	WRITE_ONCE(tun->numdisabled, tun->numdisabled - 1);
 	return tun;
 }
 
@@ -600,7 +600,7 @@ static void __tun_detach(struct tun_file *tfile, bool clean)
 		rcu_assign_pointer(tun->tfiles[tun->numqueues - 1],
 				   NULL);
 
-		--tun->numqueues;
+		WRITE_ONCE(tun->numqueues, tun->numqueues - 1);
 		if (clean) {
 			RCU_INIT_POINTER(tfile->tun, NULL);
 			sock_put(&tfile->sk);
@@ -663,7 +663,7 @@ static void tun_detach_all(struct net_device *dev)
 		tfile->socket.sk->sk_shutdown = RCV_SHUTDOWN;
 		tfile->socket.sk->sk_data_ready(tfile->socket.sk);
 		RCU_INIT_POINTER(tfile->tun, NULL);
-		--tun->numqueues;
+		WRITE_ONCE(tun->numqueues, tun->numqueues - 1);
 	}
 	list_for_each_entry(tfile, &tun->disabled, next) {
 		tfile->socket.sk->sk_shutdown = RCV_SHUTDOWN;
@@ -786,7 +786,7 @@ static int tun_attach(struct tun_struct *tun, struct file *file,
 	if (publish_tun)
 		rcu_assign_pointer(tfile->tun, tun);
 	rcu_assign_pointer(tun->tfiles[tun->numqueues], tfile);
-	tun->numqueues++;
+	WRITE_ONCE(tun->numqueues, tun->numqueues + 1);
 	tun_set_real_num_queues(tun);
 out:
 	return err;
@@ -2370,32 +2370,36 @@ static size_t tun_get_size(const struct net_device *dev)
 
 static int tun_fill_info(struct sk_buff *skb, const struct net_device *dev)
 {
-	struct tun_struct *tun = netdev_priv(dev);
+	const struct tun_struct *tun = netdev_priv(dev);
+	unsigned int flags = READ_ONCE(tun->flags);
+	kuid_t owner = READ_ONCE(tun->owner);
+	kgid_t group = READ_ONCE(tun->group);
 
-	if (nla_put_u8(skb, IFLA_TUN_TYPE, tun->flags & TUN_TYPE_MASK))
+	if (nla_put_u8(skb, IFLA_TUN_TYPE, flags & TUN_TYPE_MASK))
 		goto nla_put_failure;
-	if (uid_valid(tun->owner) &&
+	if (uid_valid(owner) &&
 	    nla_put_u32(skb, IFLA_TUN_OWNER,
-			from_kuid_munged(current_user_ns(), tun->owner)))
+			from_kuid_munged(current_user_ns(), owner)))
 		goto nla_put_failure;
-	if (gid_valid(tun->group) &&
+	if (gid_valid(group) &&
 	    nla_put_u32(skb, IFLA_TUN_GROUP,
-			from_kgid_munged(current_user_ns(), tun->group)))
+			from_kgid_munged(current_user_ns(), group)))
 		goto nla_put_failure;
-	if (nla_put_u8(skb, IFLA_TUN_PI, !(tun->flags & IFF_NO_PI)))
+	if (nla_put_u8(skb, IFLA_TUN_PI, !(flags & IFF_NO_PI)))
 		goto nla_put_failure;
-	if (nla_put_u8(skb, IFLA_TUN_VNET_HDR, !!(tun->flags & IFF_VNET_HDR)))
+	if (nla_put_u8(skb, IFLA_TUN_VNET_HDR, !!(flags & IFF_VNET_HDR)))
 		goto nla_put_failure;
-	if (nla_put_u8(skb, IFLA_TUN_PERSIST, !!(tun->flags & IFF_PERSIST)))
+	if (nla_put_u8(skb, IFLA_TUN_PERSIST, !!(flags & IFF_PERSIST)))
 		goto nla_put_failure;
 	if (nla_put_u8(skb, IFLA_TUN_MULTI_QUEUE,
-		       !!(tun->flags & IFF_MULTI_QUEUE)))
+		       !!(flags & IFF_MULTI_QUEUE)))
 		goto nla_put_failure;
-	if (tun->flags & IFF_MULTI_QUEUE) {
-		if (nla_put_u32(skb, IFLA_TUN_NUM_QUEUES, tun->numqueues))
+	if (flags & IFF_MULTI_QUEUE) {
+		if (nla_put_u32(skb, IFLA_TUN_NUM_QUEUES,
+				READ_ONCE(tun->numqueues)))
 			goto nla_put_failure;
 		if (nla_put_u32(skb, IFLA_TUN_NUM_DISABLED_QUEUES,
-				tun->numdisabled))
+				READ_ONCE(tun->numdisabled)))
 			goto nla_put_failure;
 	}
 
@@ -2814,8 +2818,8 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 			return 0;
 		}
 
-		tun->flags = (tun->flags & ~TUN_FEATURES) |
-			      (ifr->ifr_flags & TUN_FEATURES);
+		WRITE_ONCE(tun->flags, (tun->flags & ~TUN_FEATURES) |
+				       (ifr->ifr_flags & TUN_FEATURES));
 
 		netdev_state_change(dev);
 	} else {
@@ -3213,13 +3217,13 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		/* Disable/Enable persist mode. Keep an extra reference to the
 		 * module to prevent the module being unprobed.
 		 */
-		if (arg && !(tun->flags & IFF_PERSIST)) {
-			tun->flags |= IFF_PERSIST;
+		if (arg && !(READ_ONCE(tun->flags) & IFF_PERSIST)) {
+			WRITE_ONCE(tun->flags, READ_ONCE(tun->flags) | IFF_PERSIST);
 			__module_get(THIS_MODULE);
 			do_notify = true;
 		}
-		if (!arg && (tun->flags & IFF_PERSIST)) {
-			tun->flags &= ~IFF_PERSIST;
+		if (!arg && (READ_ONCE(tun->flags) & IFF_PERSIST)) {
+			WRITE_ONCE(tun->flags, READ_ONCE(tun->flags) & ~IFF_PERSIST);
 			module_put(THIS_MODULE);
 			do_notify = true;
 		}
@@ -3235,10 +3239,10 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 			ret = -EINVAL;
 			break;
 		}
-		tun->owner = owner;
+		WRITE_ONCE(tun->owner, owner);
 		do_notify = true;
 		netif_info(tun, drv, tun->dev, "owner set to %u\n",
-			   from_kuid(&init_user_ns, tun->owner));
+			   from_kuid(&init_user_ns, owner));
 		break;
 
 	case TUNSETGROUP:
@@ -3248,10 +3252,10 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 			ret = -EINVAL;
 			break;
 		}
-		tun->group = group;
+		WRITE_ONCE(tun->group, group);
 		do_notify = true;
 		netif_info(tun, drv, tun->dev, "group set to %u\n",
-			   from_kgid(&init_user_ns, tun->group));
+			   from_kgid(&init_user_ns, group));
 		break;
 
 	case TUNSETLINK:
