@@ -795,9 +795,14 @@ static int mptcp_pm_nl_append_new_local_addr(struct pm_nl_pernet *pernet,
 
 	if (!entry->addr.id) {
 find_next:
-		entry->addr.id = find_next_zero_bit(pernet->id_bitmap,
-						    MPTCP_PM_MAX_ADDR_ID + 1,
-						    pernet->next_id);
+		unsigned int id = find_next_zero_bit(pernet->id_bitmap,
+						     MPTCP_PM_MAX_ADDR_ID + 1,
+						     pernet->next_id);
+		if (id > MPTCP_PM_MAX_ADDR_ID) {
+			ret = -ENOSPC;
+			goto out;
+		}
+		entry->addr.id = id;
 		if (!entry->addr.id && pernet->next_id != 1) {
 			pernet->next_id = 1;
 			goto find_next;
