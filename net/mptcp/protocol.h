@@ -587,6 +587,7 @@ struct mptcp_subflow_context {
 		__unused : 8;
 	bool	data_avail;
 	bool	scheduled;
+	bool	avoid;		    /* pkt scheduler: skip subflow if possible */
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
 	bool	fully_established;  /* path validated */
 	u32	lent_mem_frag;
@@ -896,6 +897,8 @@ static inline bool __mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 }
 
 void mptcp_subflow_set_active(struct mptcp_subflow_context *subflow);
+
+void mptcp_subflow_set_avoid(struct mptcp_subflow_context *subflow, bool avoid);
 
 bool mptcp_subflow_active(struct mptcp_subflow_context *subflow);
 
