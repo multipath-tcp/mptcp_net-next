@@ -638,6 +638,16 @@ static void connect_one_server(int fd, int pipefd)
 	close(fd);
 }
 
+static void check_stat_equal(const char *name, uint64_t actual,
+			     uint64_t expected)
+{
+	if (actual == expected)
+		return;
+
+	xerror("%s %" PRIu64 ", expect %" PRIu64 ", diff %" PRId64,
+	       name, actual, expected, (int64_t)(actual - expected));
+}
+
 static void process_one_client(int fd, int pipefd)
 {
 	ssize_t ret, ret2, ret3;
@@ -669,27 +679,20 @@ static void process_one_client(int fd, int pipefd)
 		xerror("expected EOF, got %lu", ret3);
 
 	do_getsockopts(&s, fd, ret, ret2);
-	if (s.mptcpi_rcv_delta != (uint64_t)ret + 1)
-		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64 ", diff %" PRId64,
-		       s.mptcpi_rcv_delta, ret + 1, s.mptcpi_rcv_delta - (ret + 1));
+	check_stat_equal("mptcpi_rcv_delta", s.mptcpi_rcv_delta,
+			 (uint64_t)ret + 1); /* +1 for FIN */
 
 	/* be nice when running on top of older kernel */
 	if (s.pkt_stats_avail) {
-		if (s.last_sample.mptcpi_bytes_sent != ret2)
-			xerror("mptcpi_bytes_sent %" PRIu64 ", expect %" PRIu64
-			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_sent, ret2,
-			       s.last_sample.mptcpi_bytes_sent - ret2);
-		if (s.last_sample.mptcpi_bytes_received != ret)
-			xerror("mptcpi_bytes_received %" PRIu64 ", expect %" PRIu64
-			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_received, ret,
-			       s.last_sample.mptcpi_bytes_received - ret);
-		if (s.last_sample.mptcpi_bytes_acked != ret)
-			xerror("mptcpi_bytes_acked %" PRIu64 ", expect %" PRIu64
-			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_acked, ret,
-			       s.last_sample.mptcpi_bytes_acked - ret);
+		check_stat_equal("mptcpi_bytes_sent",
+				 s.last_sample.mptcpi_bytes_sent,
+				 (uint64_t)ret2);
+		check_stat_equal("mptcpi_bytes_received",
+				 s.last_sample.mptcpi_bytes_received,
+				 (uint64_t)ret);
+		check_stat_equal("mptcpi_bytes_acked",
+				 s.last_sample.mptcpi_bytes_acked,
+				 (uint64_t)ret2);
 	}
 
 	close(fd);
