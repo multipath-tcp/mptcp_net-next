@@ -380,6 +380,8 @@ static void mptcp_pm_add_addr_timer(struct timer_list *timer)
 	struct mptcp_sock *msk = entry->sock;
 	struct sock *sk = (struct sock *)msk;
 	unsigned int timeout = 0;
+	bool completed = false;
+	u8 retrans_times;
 
 	pr_debug("msk=%p\n", msk);
 
@@ -399,27 +401,33 @@ static void mptcp_pm_add_addr_timer(struct timer_list *timer)
 
 	spin_lock_bh(&msk->pm.lock);
 
+	retrans_times = READ_ONCE(entry->retrans_times);
+
 	/* The cancel path (mptcp_pm_announced_del_timer()) can race with this
 	 * callback. Once cancel updates retrans_times to MAX, suppress further
 	 * retransmissions here. If this callback acquires pm.lock first, one
 	 * final transmit attempt is still possible.
 	 */
-	if (entry->retrans_times < ADD_ADDR_RETRANS_MAX &&
+	if (retrans_times < ADD_ADDR_RETRANS_MAX &&
 	    !mptcp_pm_should_add_signal_addr(msk)) {
 		pr_debug("retransmit ADD_ADDR id=%d\n", entry->addr.id);
 		mptcp_pm_announce_addr(msk, &entry->addr, false);
 		mptcp_pm_add_addr_send_ack(msk);
-		entry->retrans_times++;
+		retrans_times++;
+		WRITE_ONCE(entry->retrans_times, retrans_times);
 	}
 
-	if (entry->retrans_times < ADD_ADDR_RETRANS_MAX)
+	if (retrans_times >= ADD_ADDR_RETRANS_MAX)
+		completed = true;
+
+	if (retrans_times < ADD_ADDR_RETRANS_MAX)
 		timeout <<= entry->retrans_times;
 	else
 		timeout = 0;
 
 	spin_unlock_bh(&msk->pm.lock);
 
-	if (entry->retrans_times == ADD_ADDR_RETRANS_MAX)
+	if (completed)
 		mptcp_pm_subflow_established(msk);
 
 out:
