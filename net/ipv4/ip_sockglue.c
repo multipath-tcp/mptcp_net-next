@@ -504,6 +504,12 @@ static bool ipv4_datagram_support_cmsg(const struct sock *sk,
 	if (ee_origin == SO_EE_ORIGIN_LOCAL)
 		return false;
 
+	/* Zerocopy completion notifications don't have IP headers,
+	 * so IP_PKTINFO cmsg is not applicable.
+	 */
+	if (ee_origin == SO_EE_ORIGIN_ZEROCOPY)
+		return false;
+
 	/* Support IP_PKTINFO on tstamp packets if requested, to correlate
 	 * timestamp with egress dev. Not possible for packets without iif
 	 * or without payload (SOF_TIMESTAMPING_OPT_TSONLY).
