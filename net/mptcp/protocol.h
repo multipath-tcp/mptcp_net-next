@@ -262,12 +262,13 @@ struct mptcp_pm_addr_entry {
 struct mptcp_data_frag {
 	struct list_head list;
 	u64 data_seq;
-	u16 data_len;
+	u32 data_len;		/* u16 truncates on 64KB-page kernels */
 	u32 offset;		/* u16 wraps on 256KB-page kernels */
 	u8 overhead;
 	u8 eor;			/* currently using 1 bit */
-	u16 already_sent;
+	u32 already_sent;	/* u16 overflows when data_len > 65535 */
 	struct page *page;
+	struct ubuf_info *ubuf;
 };
 
 /* Arbitrary compromise between as low as possible to react timely to subflow
