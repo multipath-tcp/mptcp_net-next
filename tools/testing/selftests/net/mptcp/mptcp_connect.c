@@ -33,6 +33,7 @@
 #include <linux/tcp.h>
 #include <linux/time_types.h>
 #include <linux/sockios.h>
+#include <linux/errqueue.h>
 #include <linux/compiler.h>
 
 extern int optind;
@@ -53,6 +54,7 @@ enum cfg_mode {
 	CFG_MODE_MMAP,
 	CFG_MODE_SENDFILE,
 	CFG_MODE_SPLICE,
+	CFG_MODE_ZEROCOPY,
 };
 
 enum cfg_peek {
@@ -125,7 +127,7 @@ static void die_usage(void)
 	fprintf(stderr, "\t-j     -- add additional sleep at connection start and tear down "
 		"-- for MPJ tests\n");
 	fprintf(stderr, "\t-l     -- listens mode, accepts incoming connection\n");
-	fprintf(stderr, "\t-m [poll|mmap|sendfile|splice] -- use poll(default)/mmap+write/sendfile/splice\n");
+	fprintf(stderr, "\t-m [poll|mmap|sendfile|splice|zerocopy] -- use poll(default)/mmap+write/sendfile/splice/zerocopy\n");
 	fprintf(stderr, "\t-M mark -- set socket packet mark\n");
 	fprintf(stderr, "\t-o option -- test sockopt <option>\n");
 	fprintf(stderr, "\t-p num -- use port num\n");
@@ -998,6 +1000,167 @@ static int copyfd_io_splice(int infd, int peerfd, int outfd, unsigned int size,
 	return err;
 }
 
+static bool process_zc_cmsg(struct msghdr *errmsg, unsigned int size)
+{
+	struct sock_extended_err *err;
+	uint32_t bytes_completed = 0;
+	struct cmsghdr *cm;
+
+	for (cm = CMSG_FIRSTHDR(errmsg); cm; cm = CMSG_NXTHDR(errmsg, cm)) {
+		if (cm->cmsg_level != SOL_IP && cm->cmsg_level != SOL_IPV6)
+			continue;
+		if (cm->cmsg_type != IP_RECVERR &&
+		    cm->cmsg_type != IPV6_RECVERR)
+			continue;
+
+		err = (struct sock_extended_err *)CMSG_DATA(cm);
+		if (err->ee_origin != SO_EE_ORIGIN_ZEROCOPY)
+			continue;
+
+		bytes_completed += err->ee_data - err->ee_info + 1;
+		if (bytes_completed >= size)
+			return true;
+	}
+
+	return false;
+}
+
+static bool drain_errqueue(int peerfd, unsigned int size)
+{
+	size_t ctl_len = CMSG_SPACE(sizeof(struct sock_extended_err));
+	struct msghdr errmsg = {};
+	bool done = false;
+	char *ctl;
+
+	ctl = malloc(ctl_len);
+	if (!ctl) {
+		perror("malloc ctl");
+		return false;
+	}
+
+	errmsg.msg_control = ctl;
+	errmsg.msg_controllen = ctl_len;
+
+	while (1) {
+		errmsg.msg_controllen = ctl_len;
+		if (recvmsg(peerfd, &errmsg, MSG_ERRQUEUE) < 0)
+			break;
+
+		if (process_zc_cmsg(&errmsg, size)) {
+			done = true;
+			break;
+		}
+	}
+
+	free(ctl);
+	return done;
+}
+
+static void wait_for_zc_completions(int peerfd, unsigned int size)
+{
+	struct pollfd pfd = { .fd = peerfd, .events = POLLERR };
+	int total_ms = 5000;
+	int batch_ms = 200;
+	int max, i = 0;
+
+	if (cfg_time > 0)
+		total_ms = cfg_time;
+
+	max = total_ms / batch_ms;
+	if (max < 1)
+		max = 1;
+
+	while (i < max) {
+		if (poll(&pfd, 1, batch_ms) <= 0)
+			break;
+
+		i++;
+
+		if (drain_errqueue(peerfd, size))
+			break;
+	}
+}
+
+static int copyfd_io_zc(int infd, int peerfd, int outfd, unsigned int size,
+			bool *in_closed_after_out, struct wstate *winfo)
+{
+	struct msghdr msg = {};
+	int sndbuf = size * 2;
+	struct iovec iov;
+	socklen_t len;
+	int on = 1;
+	char *buf;
+	int err;
+
+	if (spool_buf(peerfd, winfo) < 0) {
+		perror("spool_buf");
+		return 1;
+	}
+
+	buf = malloc(size);
+	if (!buf) {
+		perror("malloc");
+		return 1;
+	}
+
+	if (read(infd, buf, size) != size) {
+		perror("read input");
+		err = 1;
+		goto free_bufs;
+	}
+
+	iov.iov_base = buf;
+	iov.iov_len = size;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	if (setsockopt(peerfd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)))
+		perror("setsockopt SO_SNDBUF");
+
+	len = sizeof(on);
+	if (setsockopt(peerfd, SOL_SOCKET, SO_ZEROCOPY, &on, len)) {
+		perror("setsockopt SO_ZEROCOPY");
+		err = 1;
+		goto free_bufs;
+	}
+
+	on = -1;
+	if (getsockopt(peerfd, SOL_SOCKET, SO_ZEROCOPY, &on, &len) ||
+	    on != 1) {
+		perror("getsockopt SO_ZEROCOPY");
+		err = 1;
+		goto free_bufs;
+	}
+
+	if (listen_mode) {
+		if (do_recvfile(peerfd, outfd) < 0) {
+			err = 1;
+			goto free_bufs;
+		}
+	}
+
+	err = sendmsg(peerfd, &msg, MSG_ZEROCOPY);
+	if (err < 0 || (unsigned int)err != size) {
+		perror("sendmsg MSG_ZEROCOPY");
+		err = 1;
+		goto free_bufs;
+	}
+	err = 0;
+
+	if (!listen_mode) {
+		shut_wr(peerfd);
+		if (do_recvfile(peerfd, outfd) < 0)
+			err = 1;
+		*in_closed_after_out = true;
+	}
+
+	wait_for_zc_completions(peerfd, size);
+
+free_bufs:
+	free(buf);
+	return err;
+}
+
 static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct wstate *winfo)
 {
 	bool in_closed_after_out = false;
@@ -1036,6 +1199,17 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct 
 			return file_size;
 		ret = copyfd_io_splice(infd, peerfd, outfd, file_size,
 				       &in_closed_after_out, winfo);
+		break;
+
+	case CFG_MODE_ZEROCOPY:
+		file_size = get_infd_size(infd);
+		if (file_size < 0)
+			return file_size;
+		if (cfg_sockopt_types.mptfo && winfo->total_len &&
+		    file_size >= winfo->total_len)
+			file_size -= winfo->total_len;
+		ret = copyfd_io_zc(infd, peerfd, outfd, file_size,
+				   &in_closed_after_out, winfo);
 		break;
 
 	default:
@@ -1453,6 +1627,8 @@ int parse_mode(const char *mode)
 		return CFG_MODE_SENDFILE;
 	if (!strcasecmp(mode, "splice"))
 		return CFG_MODE_SPLICE;
+	if (!strcasecmp(mode, "zerocopy"))
+		return CFG_MODE_ZEROCOPY;
 
 	fprintf(stderr, "Unknown test mode: %s\n", mode);
 	fprintf(stderr, "Supported modes are:\n");
@@ -1460,6 +1636,7 @@ int parse_mode(const char *mode)
 	fprintf(stderr, "\t\t\"mmap\" - send entire input file (mmap+write), then read response (-l will read input first)\n");
 	fprintf(stderr, "\t\t\"sendfile\" - send entire input file (sendfile), then read response (-l will read input first)\n");
 	fprintf(stderr, "\t\t\"splice\" - send entire input file (splice), then read response (-l will read input first)\n");
+	fprintf(stderr, "\t\t\"zerocopy\" - send entire input file (zerocopy), then read response (-l will read input first)\n");
 
 	die_usage();
 
