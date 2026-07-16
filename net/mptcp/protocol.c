@@ -1373,7 +1373,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			      struct mptcp_sendmsg_info *info)
 {
 	u64 data_seq = dfrag->data_seq + info->sent;
-	int offset = dfrag->offset + info->sent;
+	size_t offset = dfrag->offset + info->sent;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct tcp_sock *tp = tcp_sk(ssk);
 	bool zero_window_probe = false;
