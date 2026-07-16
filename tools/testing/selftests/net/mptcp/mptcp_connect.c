@@ -1340,12 +1340,15 @@ static void check_getpeername_connect(int fd)
 			cfg_host, a, cfg_port, b);
 }
 
-static void maybe_close(int fd)
+static bool maybe_close(int fd)
 {
 	unsigned int r = rand();
 
-	if (!(cfg_join || cfg_remove || cfg_repeat > 1) && (r & 1))
+	if (!(cfg_join || cfg_remove || cfg_repeat > 1) && (r & 1)) {
 		close(fd);
+		return true;
+	}
+	return false;
 }
 
 int main_loop_s(int listensock)
@@ -1355,27 +1358,30 @@ int main_loop_s(int listensock)
 	struct pollfd polls;
 	socklen_t salen;
 	int remotesock;
+	bool closed;
 	int err = 0;
 	int fd = 0;
 
 again:
+	closed = false;
 	polls.fd = listensock;
 	polls.events = POLLIN;
 
 	switch (poll(&polls, 1, poll_timeout)) {
 	case -1:
 		perror("poll");
-		return 1;
+		err = 1;
+		goto out;
 	case 0:
 		fprintf(stderr, "%s: timed out\n", __func__);
-		close(listensock);
-		return 2;
+		err = 2;
+		goto out;
 	}
 
 	salen = sizeof(ss);
 	remotesock = accept(listensock, (struct sockaddr *)&ss, &salen);
 	if (remotesock >= 0) {
-		maybe_close(listensock);
+		closed = maybe_close(listensock);
 		check_sockaddr(pf, &ss, salen);
 		check_getpeername(remotesock, &ss, salen);
 
@@ -1391,7 +1397,8 @@ again:
 		err = copyfd_io(fd, remotesock, 1, true, &winfo);
 	} else {
 		perror("accept");
-		return 1;
+		err = 1;
+		goto out;
 	}
 
 	if (cfg_input)
@@ -1400,6 +1407,9 @@ again:
 	if (!err && --cfg_repeat > 0)
 		goto again;
 
+out:
+	if (!closed)
+		close(listensock);
 	return err;
 }
 
