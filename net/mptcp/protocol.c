@@ -1234,12 +1234,13 @@ static bool mptcp_page_frag_refill(struct sock *sk, struct page_frag *pfrag)
 }
 
 static struct mptcp_data_frag *
-mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
-		      int orig_offset)
+mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag)
 {
-	int offset = ALIGN(orig_offset, sizeof(u64));
+	int orig_offset = pfrag->offset;
 	struct mptcp_data_frag *dfrag;
+	int offset;
 
+	offset = ALIGN(orig_offset, sizeof(u64));
 	dfrag = (struct mptcp_data_frag *)(page_to_virt(pfrag->page) + offset);
 	dfrag->data_len = 0;
 	dfrag->data_seq = msk->write_seq;
@@ -2031,7 +2032,7 @@ static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 			if (!mptcp_page_frag_refill(sk, pfrag))
 				goto wait_for_memory;
 
-			dfrag = mptcp_carve_data_frag(msk, pfrag, pfrag->offset);
+			dfrag = mptcp_carve_data_frag(msk, pfrag);
 			frag_truesize = dfrag->overhead;
 		}
 
