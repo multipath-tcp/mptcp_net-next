@@ -1237,7 +1237,7 @@ static struct mptcp_data_frag *
 mptcp_carve_data_frag(const struct mptcp_sock *msk, struct page_frag *pfrag,
 		      int orig_offset)
 {
-	int offset = ALIGN(orig_offset, sizeof(long));
+	int offset = ALIGN(orig_offset, sizeof(u64));
 	struct mptcp_data_frag *dfrag;
 
 	dfrag = (struct mptcp_data_frag *)(page_to_virt(pfrag->page) + offset);
@@ -4789,9 +4789,9 @@ void __init mptcp_proto_init(void)
 	BUILD_BUG_ON(sizeof(struct mptcp_skb_cb) > sizeof_field(struct sk_buff, cb));
 
 	/* struct mptcp_data_frag: 'overhead' corresponds to the alignment
-	 * (ALIGN(1, sizeof(long)) - 1, so 8-1) + the struct's size
+	 * (ALIGN(1, sizeof(u64)) - 1, so 8-1) + the struct's size
 	 */
-	BUILD_BUG_ON(ALIGN(1, sizeof(long)) - 1 + sizeof(struct mptcp_data_frag)
+	BUILD_BUG_ON(ALIGN(1, sizeof(u64)) - 1 + sizeof(struct mptcp_data_frag)
 		     > U8_MAX);
 }
 
