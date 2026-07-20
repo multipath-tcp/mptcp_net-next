@@ -21,20 +21,6 @@ union inet_addr {
 	struct in6_addr	in6;
 };
 
-/*
- * Maximum payload netpoll's preallocated skb pool can carry. Keep this in
- * sync with the buffer size used by refill_skbs() in net/core/netpoll.c;
- * callers (e.g. netconsole) use it to detect requests the pool can never
- * satisfy and avoid dequeuing a pooled skb that would later trip
- * skb_over_panic() in skb_put().
- */
-#define MAX_UDP_CHUNK	1460
-#define MAX_SKB_SIZE						\
-	(sizeof(struct ethhdr) +				\
-	 sizeof(struct iphdr) +					\
-	 sizeof(struct udphdr) +				\
-	 MAX_UDP_CHUNK)
-
 struct netpoll {
 	struct net_device *dev;
 	netdevice_tracker dev_tracker;
@@ -49,10 +35,6 @@ struct netpoll {
 
 	union inet_addr local_ip, remote_ip;
 	bool ipv6;
-	u16 local_port, remote_port;
-	u8 remote_mac[ETH_ALEN];
-	struct sk_buff_head skb_pool;
-	struct work_struct refill_wq;
 };
 
 #define np_info(np, fmt, ...)				\
