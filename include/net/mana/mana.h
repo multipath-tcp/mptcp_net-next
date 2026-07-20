@@ -530,6 +530,9 @@ struct mana_port_context {
 	struct net_device *ndev;
 	struct work_struct queue_reset_work;
 
+	/* Debug knob to log TX timeout but skip recovery reset */
+	bool tx_timeout_skip_reset;
+
 	u8 mac_addr[ETH_ALEN];
 
 	struct mana_eq *eqs;
