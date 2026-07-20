@@ -86,6 +86,11 @@ static inline void *mdiodev_get_drvdata(struct mdio_device *mdio)
 	return dev_get_drvdata(&mdio->dev);
 }
 
+static inline bool mdiodev_has_reset(struct mdio_device *mdio)
+{
+	return (mdio->reset_gpio || mdio->reset_ctrl);
+}
+
 void mdio_device_free(struct mdio_device *mdiodev);
 struct mdio_device *mdio_device_create(struct mii_bus *bus, int addr);
 int mdio_device_register(struct mdio_device *mdiodev);
