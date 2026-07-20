@@ -892,6 +892,17 @@ static void mana_tx_timeout(struct net_device *netdev, unsigned int txqueue)
 	struct mana_context *ac = apc->ac;
 	struct gdma_context *gc = ac->gdma_dev->gdma_context;
 
+	/* Debug knob for bringup/qualification: when set, log the timeout and
+	 * skip the reset so the failing state is preserved for telemetry.
+	 * Disabled by default; production behaviour is unchanged.
+	 */
+	if (READ_ONCE(apc->tx_timeout_skip_reset)) {
+		netdev_warn(netdev,
+			    "TX timeout on queue %u: reset skipped (tx_timeout_skip_reset enabled)\n",
+			    txqueue);
+		return;
+	}
+
 	/* Already in service, hence tx queue reset is not required.*/
 	if (test_bit(GC_IN_SERVICE, &gc->flags))
 		return;
@@ -3486,6 +3497,9 @@ static int mana_init_port(struct net_device *ndev)
 			   &apc->steer_cqe_coalescing);
 	debugfs_create_u32("current_speed", 0400, apc->mana_port_debugfs,
 			   &apc->speed);
+	debugfs_create_bool("tx_timeout_skip_reset", 0600,
+			    apc->mana_port_debugfs,
+			    &apc->tx_timeout_skip_reset);
 	return 0;
 
 reset_apc:
