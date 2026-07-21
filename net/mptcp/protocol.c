@@ -4149,6 +4149,12 @@ static int mptcp_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 	if (!msk->fastopening)
 		lock_sock(ssk);
 
+	/* Notify cgroup BPF on the msk before initiating the subflow connect.
+	 * Mirrors BPF_SOCK_OPS_TCP_CONNECT_CB; msk lock is held by the
+	 * caller (__inet_stream_connect) and ssk is held before.
+	 */
+	mptcp_call_bpf(sk, BPF_SOCK_OPS_TCP_CONNECT_CB, 0, NULL);
+
 	/* the following mirrors closely a very small chunk of code from
 	 * __inet_stream_connect()
 	 */

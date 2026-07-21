@@ -1374,4 +1374,33 @@ mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subflow_re
 static inline void mptcp_join_cookie_init(void) {}
 #endif
 
+#ifdef CONFIG_BPF_JIT
+static inline int mptcp_call_bpf(struct sock *sk, int op, u32 nargs, u32 *args)
+{
+	struct bpf_sock_ops_kern sock_ops;
+	int ret;
+
+	memset(&sock_ops, 0, offsetof(struct bpf_sock_ops_kern, temp));
+
+	if (sk_fullsock(sk)) {
+		sock_ops.is_fullsock = 1;
+		sock_owned_by_me(sk);
+	}
+
+	sock_ops.sk = sk;
+	sock_ops.op = op;
+
+	if (nargs > 0)
+		memcpy(sock_ops.args, args, nargs * sizeof(*args));
+
+	ret = BPF_CGROUP_RUN_PROG_SOCK_OPS(&sock_ops);
+	return ret == 0 ? sock_ops.reply : -1;
+}
+#else
+static inline int mptcp_call_bpf(struct sock *sk, int op, u32 nargs, u32 *args)
+{
+	return -1;
+}
+#endif
+
 #endif /* __MPTCP_PROTOCOL_H */
