@@ -5683,6 +5683,13 @@ static int __bpf_setsockopt(struct sock *sk, int level, int optname,
 	if (!sk_fullsock(sk))
 		return -EINVAL;
 
+	/* Route any bpf_setsockopt on the mptcp socket to mptcp_setsockopt,
+	 * which handles all levels.
+	 */
+	if (IS_ENABLED(CONFIG_MPTCP) && sk->sk_protocol == IPPROTO_MPTCP)
+		return mptcp_setsockopt(sk, level, optname,
+					KERNEL_SOCKPTR(optval), optlen);
+
 	if (level == SOL_SOCKET)
 		return sol_socket_sockopt(sk, optname, optval, &optlen, false);
 	else if (IS_ENABLED(CONFIG_INET) && level == SOL_IP)
