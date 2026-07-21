@@ -1,2 +1,15 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-decrement-subflows-counter-on-failed-passive-join
+From: Chenguang Zhao <zhaochenguang@kylinos.cn>
+Subject: [PATCH] mptcp: decrement subflows counter on failed passive join
+
+mptcp_pm_allow_new_subflow() increments extra_subflows before
+__mptcp_finish_join() on the passive MP_JOIN path.
+
+In case of race conditions, the subflow is dropped without calling
+mptcp_close_ssk(), so the counter is not rolled back.
+
+Call mptcp_pm_close_subflow() when the join completion fails to
+decrement the subflows counter.
+
+Fixes: 10f6d46c943d ("mptcp: fix race between MP_JOIN and close")
+Signed-off-by: Chenguang Zhao <zhaochenguang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
