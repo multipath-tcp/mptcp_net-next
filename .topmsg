@@ -1,2 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-userspace_pm-fix-undefined-variable-port
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: userspace_pm: fix undefined variable port
+
+In make_connection(), the variable "port" is used but never defined.
+This leads to an empty argument being passed to wait_local_port_listen(),
+causing "printf: : invalid number" errors:
+
+ # INFO: Init
+ # 01 Created network namespaces ns1, ns2                          [ OK ]
+ # INFO: Make connections
+ # ./../lib.sh: line 651: printf: : invalid number
+ # 02 Established IPv4 MPTCP Connection ns2 => ns1                 [ OK ]
+ # INFO: Connection info: 10.0.1.2:59516 -> 10.0.1.1:50002
+ # ./../lib.sh: line 651: printf: : invalid number
+ # 03 Established IPv6 MPTCP Connection ns2 => ns1                 [ OK ]
+
+Fix it by using the correctly defined variable "app_port", which holds the
+appropriate port number for the connection.
+
+Fixes: 39348f5f2f13 ("selftests: mptcp: wait for port instead of sleep")
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
