@@ -397,9 +397,20 @@ static void mvneta_bm_put_sram(struct mvneta_bm *priv)
 
 struct mvneta_bm *mvneta_bm_get(struct device_node *node)
 {
-	struct platform_device *pdev = of_find_device_by_node(node);
+	struct platform_device *pdev;
+	struct mvneta_bm *priv;
 
-	return pdev ? platform_get_drvdata(pdev) : NULL;
+	pdev = of_find_device_by_node(node);
+	if (!pdev)
+		return NULL;
+
+	priv = platform_get_drvdata(pdev);
+	if (!priv) {
+		platform_device_put(pdev);
+		return NULL;
+	}
+
+	return priv;
 }
 EXPORT_SYMBOL_GPL(mvneta_bm_get);
 
