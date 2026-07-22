@@ -380,6 +380,7 @@ static void mptcp_pm_add_addr_timer(struct timer_list *timer)
 	struct mptcp_sock *msk = entry->sock;
 	struct sock *sk = (struct sock *)msk;
 	unsigned int timeout = 0;
+	bool completed = false;
 
 	pr_debug("msk=%p\n", msk);
 
@@ -414,12 +415,14 @@ static void mptcp_pm_add_addr_timer(struct timer_list *timer)
 
 	if (entry->retrans_times < ADD_ADDR_RETRANS_MAX)
 		timeout <<= entry->retrans_times;
-	else
+	else {
 		timeout = 0;
+		completed = true;
+	}
 
 	spin_unlock_bh(&msk->pm.lock);
 
-	if (entry->retrans_times == ADD_ADDR_RETRANS_MAX)
+	if (completed)
 		mptcp_pm_subflow_established(msk);
 
 out:
