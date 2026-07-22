@@ -131,6 +131,8 @@ struct net_bridge_mcast_port {
 	unsigned char			multicast_router;
 	u32				mdb_n_entries;
 	u32				mdb_max_entries;
+	struct sk_buff_head             query_queue;
+	struct work_struct              query_queue_work;
 #endif /* CONFIG_BRIDGE_IGMP_SNOOPING */
 };
 
@@ -167,6 +169,8 @@ struct net_bridge_mcast {
 	struct bridge_mcast_own_query	ip6_own_query;
 	struct bridge_mcast_querier	ip6_querier;
 #endif /* IS_ENABLED(CONFIG_IPV6) */
+	struct sk_buff_head             query_queue;
+	struct work_struct              query_queue_work;
 #endif /* CONFIG_BRIDGE_IGMP_SNOOPING */
 };
 
