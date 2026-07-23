@@ -2561,7 +2561,7 @@ static void process_event(struct perf_script *script,
 
 	perf_sample__fprintf_ipc(sample, evsel, fp);
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 
 	if (PRINT_FIELD(SRCCODE)) {
 		if (map__fprintf_srccode(al->map, al->addr, stdout,
@@ -2815,7 +2815,7 @@ static int process_deferred_sample_event(const struct perf_tool *tool,
 				    cursor, symbol_conf.bt_stop_list, fp);
 	}
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 
 	if (verbose > 0)
 		fflush(fp);
@@ -3271,11 +3271,11 @@ static int list_available_languages_cb(struct scripting_ops *ops, const char *sp
 
 static void list_available_languages(void)
 {
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	fprintf(stderr, "Scripting language extensions (used in "
 		"perf script -s [spec:]script.[spec]):\n\n");
 	script_spec__for_each(&list_available_languages_cb);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 /* Find script file relative to current directory or exec path */

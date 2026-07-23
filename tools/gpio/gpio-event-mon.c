@@ -121,7 +121,7 @@ int monitor_device(const char *device_name,
 		default:
 			fprintf(stdout, "unknown event");
 		}
-		fprintf(stdout, "\n");
+		putchar('\n');
 
 		i++;
 		if (i == loops)

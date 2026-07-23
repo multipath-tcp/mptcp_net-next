@@ -9099,7 +9099,7 @@ void dump_cpuid_hypervisor(void)
 	dump_word_chars(ebx);
 	dump_word_chars(ecx);
 	dump_word_chars(edx);
-	fprintf(outf, "\n");
+	fputc(outf, '\n');
 }
 
 void process_cpuid()
@@ -9749,7 +9749,7 @@ void topology_probe(bool startup)
 		fprintf(outf, " siblings");
 		for (ht_id = 0; ht_id <= MAX_HT_ID; ++ht_id)
 			fprintf(outf, " %d", cpus[i].ht_sibling_cpu_id[ht_id]);
-		fprintf(outf, "\n");
+		fputc(outf, '\n');
 	}
 
 }

@@ -1605,7 +1605,7 @@ static void dump(__u32 prog_id, enum dump_mode mode, const char *file_name, cons
 	printf("DUMP (%s) %s/%s:\n", mode == DUMP_JITED ? "JITED" : "XLATED", file_name, prog_name);
 	while (fgets(buf, sizeof(buf), fp))
 		fputs(buf, stdout);
-	fprintf(stdout, "\n");
+	putchar('\n');
 
 	if (ferror(fp))
 		fprintf(stderr, "Failed to dump BPF prog with error: %d\n", errno);

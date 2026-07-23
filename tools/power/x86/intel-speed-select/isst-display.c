@@ -122,7 +122,7 @@ static void format_and_print(FILE *outf, int level, char *header, char *value)
 
 	if (level == 0) {
 		if (header)
-			fprintf(outf, "{");
+			fputc(outf, '{');
 		else
 			fprintf(outf, "\n}\n");
 
@@ -138,7 +138,7 @@ static void format_and_print(FILE *outf, int level, char *header, char *value)
 
 		if (value) {
 			if (last_level != level)
-				fprintf(outf, "\n");
+				fputc(outf, '\n');
 
 			fprintf(outf, "%s\"%s\": ", delimiters, header);
 			fprintf(outf, "\"%s\"", value);
@@ -156,7 +156,7 @@ static void format_and_print(FILE *outf, int level, char *header, char *value)
 					fprintf(outf, "\n%s}", delimiters);
 			}
 			if (abs(last_level - level) < 3)
-				fprintf(outf, "\n");
+				fputc(outf, '\n');
 			if (header)
 				fprintf(outf, "%s\"%s\": {", delimiters,
 					header);

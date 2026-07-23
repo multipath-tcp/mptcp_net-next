@@ -60,16 +60,16 @@ char **vfio_selftests_get_bdfs(int *argc, char *argv[], int *nr_bdfs)
 	}
 
 	fprintf(stderr, "Unable to determine which device(s) to use, skipping test.\n");
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	fprintf(stderr, "To pass the device address via environment variable:\n");
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	fprintf(stderr, "    export VFIO_SELFTESTS_BDF=\"segment:bus:device.function\"\n");
 	fprintf(stderr, "    %s [options]\n", argv[0]);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	fprintf(stderr, "To pass the device address(es) via argv:\n");
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	fprintf(stderr, "    %s [options] segment:bus:device.function ...\n", argv[0]);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	exit(KSFT_SKIP);
 }
 

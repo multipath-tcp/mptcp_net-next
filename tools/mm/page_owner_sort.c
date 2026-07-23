@@ -867,7 +867,7 @@ int main(int argc, char **argv)
 			}
 			if (cull & CULL_STACKTRACE)
 				fprintf(fout, ":\n%s", list[i].stacktrace);
-			fprintf(fout, "\n");
+			fputc(fout, '\n');
 		}
 	}
 

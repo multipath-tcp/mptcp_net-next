@@ -228,7 +228,7 @@ int get_jited_program_text(int fd, char *text, size_t text_sz)
 	for (pc = 0, i = 0; i < jited_funcs; ++i) {
 		fprintf(text_out, "func #%d:\n", i);
 		disasm_one_func(text_out, image + pc, func_lens[i]);
-		fprintf(text_out, "\n");
+		fputc(text_out, '\n');
 		pc += func_lens[i];
 	}
 

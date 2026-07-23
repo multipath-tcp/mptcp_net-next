@@ -522,7 +522,7 @@ int update_thermal_data()
 	}
 
 	if (tmon_log) {
-		fprintf(tmon_log, "\n");
+		fputc(tmon_log, '\n');
 		fflush(tmon_log);
 	}
 

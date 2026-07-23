@@ -116,7 +116,7 @@ static int pfsocket(int ver)
 static void status_bar_update(void)
 {
 	if (total_packets % 10 == 0) {
-		fprintf(stderr, ".");
+		fputc(stderr, '.');
 		fflush(stderr);
 	}
 }
@@ -825,7 +825,7 @@ static int test_tpacket(int version, int type)
 	unmap_ring(sock, &ring);
 	close(sock);
 
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	return 0;
 }
 

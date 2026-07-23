@@ -895,7 +895,7 @@ static void cs_etm__dump_event(struct cs_etm_queue *etmq,
 	const char *color = PERF_COLOR_BLUE;
 	size_t buffer_used = 0;
 
-	fprintf(stdout, "\n");
+	putchar('\n');
 	color_fprintf(stdout, color,
 		     ". ... CoreSight %s Trace data: size %#zx bytes\n",
 		     cs_etm_decoder__get_name(etmq->decoder), buffer->size);

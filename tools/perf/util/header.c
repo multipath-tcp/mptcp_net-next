@@ -2454,7 +2454,7 @@ static void __print_pmu_caps(FILE *fp, int nr_caps, char **caps, char *pmu_name)
 		delimiter = ", ";
 	}
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 }
 
 static void print_cpu_pmu_caps(struct feat_fd *ff, FILE *fp)
@@ -2513,7 +2513,7 @@ static void print_pmu_mappings(struct feat_fd *ff, FILE *fp)
 		pmu_num--;
 	}
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 
 	if (!pmu_num)
 		return;
@@ -4349,7 +4349,7 @@ int perf_header__fprintf_info(struct perf_session *session, FILE *fp, bool full)
 			fprintf(fp, "%s ", feat_ops[bit].name);
 	}
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 	return 0;
 }
 

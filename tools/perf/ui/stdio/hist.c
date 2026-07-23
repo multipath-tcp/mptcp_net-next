@@ -691,7 +691,7 @@ static int hists__fprintf_hierarchy_headers(struct hists *hists,
 		}
 
 next_line:
-		fprintf(fp, "\n");
+		fputc(fp, '\n');
 	}
 
 	fprintf(fp, "# ");
@@ -783,7 +783,7 @@ hists__fprintf_standard_headers(struct hists *hists,
 		if (line)
 			fprintf(fp, "# ");
 		fprintf_line(hists, hpp, line, fp);
-		fprintf(fp, "\n");
+		fputc(fp, '\n');
 	}
 
 	if (sep)
@@ -806,10 +806,10 @@ hists__fprintf_standard_headers(struct hists *hists,
 
 		width = fmt->width(fmt, hpp, hists);
 		for (i = 0; i < width; i++)
-			fprintf(fp, ".");
+			fputc(fp, '.');
 	}
 
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 	fprintf(fp, "#\n");
 	return hpp_list->nr_header_lines + 2;
 }

@@ -171,7 +171,7 @@ ap_dump_table_buffer(struct acpi_table_header *table,
 	acpi_ut_dump_buffer_to_file(gbl_output_file,
 				    ACPI_CAST_PTR(u8, table), table_length,
 				    DB_BYTE_DISPLAY, 0);
-	fprintf(gbl_output_file, "\n");
+	fputc(gbl_output_file, '\n');
 	return (0);
 }
 

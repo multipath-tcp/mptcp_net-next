@@ -208,7 +208,7 @@ static int capture_events(int fd, int event_group)
 		}
 		if (server_side)
 			fprintf(stderr, ",server_side:1");
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 	} while (1);
 
 	return 0;

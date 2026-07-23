@@ -117,7 +117,7 @@ static void dump_sk(const unsigned char skeys[], const char *descr)
 		fprintf(stderr, "# %3d: ", i);
 		for (j = 0; j < 32; j++)
 			fprintf(stderr, "%02x ", skeys[i + j]);
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 	}
 }
 

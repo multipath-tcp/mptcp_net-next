@@ -86,7 +86,7 @@ static void print_vsock_addr(FILE *fp, unsigned int cid, unsigned int port)
 		fprintf(fp, "%u:", cid);
 
 	if (port == VMADDR_PORT_ANY)
-		fprintf(fp, "*");
+		fputc(fp, '*');
 	else
 		fprintf(fp, "%u", port);
 }
@@ -94,7 +94,7 @@ static void print_vsock_addr(FILE *fp, unsigned int cid, unsigned int port)
 static void print_vsock_stat(FILE *fp, struct vsock_stat *st)
 {
 	print_vsock_addr(fp, st->msg.vdiag_src_cid, st->msg.vdiag_src_port);
-	fprintf(fp, " ");
+	fputc(fp, ' ');
 	print_vsock_addr(fp, st->msg.vdiag_dst_cid, st->msg.vdiag_dst_port);
 	fprintf(fp, " %s %s %s %u\n",
 		sock_type_str(st->msg.vdiag_type),

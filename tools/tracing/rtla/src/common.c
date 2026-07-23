@@ -449,7 +449,7 @@ void common_usage(const char *tool, const char *mode,
 		fprintf(stderr, "%s [-h] ", mode);
 
 	print_msg_array(start_msgs);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	print_msg_array(common_options);
 	print_msg_array(opt_msgs);
 

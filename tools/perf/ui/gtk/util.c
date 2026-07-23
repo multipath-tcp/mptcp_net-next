@@ -37,7 +37,7 @@ static int perf_gtk__error(const char *format, va_list args)
 	    vasprintf(&msg, format, args) < 0) {
 		fprintf(stderr, "Error:\n");
 		vfprintf(stderr, format, args);
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 		return -1;
 	}
 
@@ -62,7 +62,7 @@ static int perf_gtk__warning_info_bar(const char *format, va_list args)
 	    vasprintf(&msg, format, args) < 0) {
 		fprintf(stderr, "Warning:\n");
 		vfprintf(stderr, format, args);
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 		return -1;
 	}
 
@@ -83,7 +83,7 @@ static int perf_gtk__warning_statusbar(const char *format, va_list args)
 	    vasprintf(&msg, format, args) < 0) {
 		fprintf(stderr, "Warning:\n");
 		vfprintf(stderr, format, args);
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 		return -1;
 	}
 

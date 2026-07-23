@@ -152,9 +152,9 @@ int list_device(const char *device_name)
 		if (linfo.flags) {
 			fprintf(stdout, " [");
 			print_attributes(&linfo);
-			fprintf(stdout, "]");
+			putchar(']');
 		}
-		fprintf(stdout, "\n");
+		putchar('\n');
 
 	}
 

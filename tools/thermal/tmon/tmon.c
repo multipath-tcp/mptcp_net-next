@@ -199,7 +199,7 @@ static void prepare_logging(void)
 		fprintf(tmon_log, "%s%d ", ptdata.cdi[i].type,
 			ptdata.cdi[i].instance);
 
-	fprintf(tmon_log, "\n");
+	fputc(tmon_log, '\n');
 }
 
 static struct option opts[] = {

@@ -70,14 +70,14 @@ static void intel_pt_print_data(const unsigned char *buf, int len, uint64_t pos,
 	int i;
 
 	for (i = 0; i < indent; i++)
-		fprintf(f, " ");
+		fputc(f, ' ');
 
 	fprintf(f, "  %08" PRIx64 ": ", pos);
 	for (i = 0; i < len; i++)
 		fprintf(f, " %02x", buf[i]);
 	for (; i < 16; i++)
 		fprintf(f, "   ");
-	fprintf(f, " ");
+	fputc(f, ' ');
 }
 
 static void intel_pt_print_no_data(uint64_t pos, int indent)
@@ -85,12 +85,12 @@ static void intel_pt_print_no_data(uint64_t pos, int indent)
 	int i;
 
 	for (i = 0; i < indent; i++)
-		fprintf(f, " ");
+		fputc(f, ' ');
 
 	fprintf(f, "  %08" PRIx64 ": ", pos);
 	for (i = 0; i < 16; i++)
 		fprintf(f, "   ");
-	fprintf(f, " ");
+	fputc(f, ' ');
 }
 
 static ssize_t log_buf__write(void *cookie, const char *buf, size_t size)

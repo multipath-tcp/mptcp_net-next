@@ -363,7 +363,7 @@ int decompress_file(int argc, char **argv, void *devhandle)
 			goto err3;
 		fprintf(stderr, "%02x ", tmp[i]);
 		if (i == 5)
-			fprintf(stderr, "\n");
+			fputc(stderr, '\n');
 	}
 	fprintf(stderr, "gzHeader MTIME, XFL, OS ignored\n");
 

@@ -537,7 +537,7 @@ void disas_print_insn(FILE *stream, struct disas_context *dctx,
 		return;
 
 	if (strcmp(format, "\n") == 0) {
-		fprintf(stream, "\n");
+		fputc(stream, '\n');
 		return;
 	}
 

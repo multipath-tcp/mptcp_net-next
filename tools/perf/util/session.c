@@ -1257,7 +1257,7 @@ int perf_event__process_finished_round(const struct perf_tool *tool __maybe_unus
 				       struct ordered_events *oe)
 {
 	if (dump_trace)
-		fprintf(stdout, "\n");
+		putchar('\n');
 	return ordered_events__flush(oe, OE_FLUSH__ROUND);
 }
 
@@ -4000,7 +4000,7 @@ int perf_event__process_id_index(const struct perf_tool *tool __maybe_unused,
 				fprintf(stdout, "  machine_pid: %"PRI_ld64, e2->machine_pid);
 				fprintf(stdout, "  vcpu: %"PRI_lu64"\n", e2->vcpu);
 			} else {
-				fprintf(stdout, "\n");
+				putchar('\n');
 			}
 		}
 

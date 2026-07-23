@@ -350,7 +350,7 @@ void __dump_stack(FILE *file, void **stackdump, size_t stackdump_size)
 			fprintf(file, "    #%zd %p ", i, stackdump[i]);
 
 		map__fprintf_srcline(al.map, al.addr, "", file);
-		fprintf(file, "\n");
+		fputc(file, '\n');
 		addr_location__exit(&al);
 	}
 	thread__put(thread);

@@ -156,7 +156,7 @@ void p_err(const char *fmt, ...)
 	} else {
 		fprintf(stderr, "Error: ");
 		vfprintf(stderr, fmt, ap);
-		fprintf(stderr, "\n");
+		fputc(stderr, '\n');
 	}
 	va_end(ap);
 }
@@ -170,7 +170,7 @@ void p_info(const char *fmt, ...)
 
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	va_end(ap);
 }
 

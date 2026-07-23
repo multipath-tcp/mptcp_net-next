@@ -217,7 +217,7 @@ static void perf_read_values__display_pretty(FILE *fp,
 	fprintf(fp, "# %*s  %*s", pidwidth, "PID", tidwidth, "TID");
 	for (j = 0; j < values->num_counters; j++)
 		fprintf(fp, "  %*s", counterwidth[j], evsel__name(values->counters[j]));
-	fprintf(fp, "\n");
+	fputc(fp, '\n');
 
 	for (i = 0; i < values->threads; i++) {
 		fprintf(fp, "  %*d  %*d", pidwidth, values->pid[i],
@@ -225,7 +225,7 @@ static void perf_read_values__display_pretty(FILE *fp,
 		for (j = 0; j < values->num_counters; j++)
 			fprintf(fp, "  %*" PRIu64,
 				counterwidth[j], values->value[i][j]);
-		fprintf(fp, "\n");
+		fputc(fp, '\n');
 	}
 	free(counterwidth);
 }

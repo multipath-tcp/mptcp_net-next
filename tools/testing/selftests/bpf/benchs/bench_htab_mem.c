@@ -148,7 +148,7 @@ static const struct htab_mem_use_case *htab_mem_find_use_case_or_exit(const char
 	fprintf(stderr, "available use case:");
 	for (i = 0; i < ARRAY_SIZE(use_cases); i++)
 		fprintf(stderr, " %s", use_cases[i].name);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 	exit(1);
 }
 

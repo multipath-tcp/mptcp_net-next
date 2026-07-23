@@ -1319,9 +1319,9 @@ static void print_result(void)
 
 		list_for_each_entry(key, &lock_keys, list) {
 			key->print(key, st);
-			fprintf(lock_output, " ");
+			fputc(lock_output, ' ');
 		}
-		fprintf(lock_output, "\n");
+		fputc(lock_output, '\n');
 
 		if (++printed >= print_nr_entries)
 			break;
@@ -1598,7 +1598,7 @@ static void print_header_csv(const char *sep)
 		fprintf(lock_output, "%s%s %s", "type", sep, "caller");
 		if (verbose > 0)
 			fprintf(lock_output, "%s %s", sep, "stacktrace");
-		fprintf(lock_output, "\n");
+		fputc(lock_output, '\n');
 		break;
 	case LOCK_AGGR_ADDR:
 		fprintf(lock_output, "%s%s %s%s %s\n", "address", sep, "symbol", sep, "type");
@@ -1629,7 +1629,7 @@ static void print_lock_stat_stdio(struct lock_contention *con, struct lock_stat 
 
 	list_for_each_entry(key, &lock_keys, list) {
 		key->print(key, st);
-		fprintf(lock_output, " ");
+		fputc(lock_output, ' ');
 	}
 
 	switch (aggr_mode) {
@@ -1687,7 +1687,7 @@ static void print_lock_stat_csv(struct lock_contention *con, struct lock_stat *s
 	case LOCK_AGGR_CALLER:
 		fprintf(lock_output, "%s%s %s", get_type_flags_name(st->flags), sep, st->name);
 		if (verbose <= 0)
-			fprintf(lock_output, "\n");
+			fputc(lock_output, '\n');
 		break;
 	case LOCK_AGGR_TASK:
 		pid = st->addr;
@@ -1721,7 +1721,7 @@ static void print_lock_stat_csv(struct lock_contention *con, struct lock_stat *s
 			get_symbol_name_offset(kmap, sym, ip, buf, sizeof(buf));
 			fprintf(lock_output, "%s %#lx %s", i ? ":" : sep, (unsigned long) ip, buf);
 		}
-		fprintf(lock_output, "\n");
+		fputc(lock_output, '\n');
 	}
 }
 
@@ -1781,7 +1781,7 @@ static void print_footer_csv(int total, int bad, struct lock_contention_fails *f
 		for (i = 0; i < BROKEN_MAX; i++)
 			fprintf(lock_output, "%s bad_%s=%d", sep, name[i], bad_hist[i]);
 	}
-	fprintf(lock_output, "\n");
+	fputc(lock_output, '\n');
 }
 
 static void print_footer(int total, int bad, struct lock_contention_fails *fails)

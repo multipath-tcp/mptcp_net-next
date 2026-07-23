@@ -383,7 +383,7 @@ static void print_test_result(const struct prog_test_def *test, const struct tes
 	else
 		fprintf(env.stdout_saved, "OK (SKIP: %d/%d)", skipped_cnt, subtests_cnt);
 
-	fprintf(env.stdout_saved, "\n");
+	fputc(env.stdout_saved, '\n');
 }
 
 static void print_test_log(char *log_buf, size_t log_cnt)
@@ -391,7 +391,7 @@ static void print_test_log(char *log_buf, size_t log_cnt)
 	log_buf[log_cnt] = '\0';
 	fprintf(env.stdout_saved, "%s", log_buf);
 	if (log_buf[log_cnt - 1] != '\n')
-		fprintf(env.stdout_saved, "\n");
+		fputc(env.stdout_saved, '\n');
 }
 
 static void print_subtest_name(int test_num, int subtest_num,
@@ -409,7 +409,7 @@ static void print_subtest_name(int test_num, int subtest_num,
 	if (result)
 		fprintf(env.stdout_saved, ":%s", result);
 
-	fprintf(env.stdout_saved, "\n");
+	fputc(env.stdout_saved, '\n');
 }
 
 static void jsonw_write_log_message(json_writer_t *w, char *log_buf, size_t log_cnt)
@@ -1333,14 +1333,14 @@ void hexdump(const char *prefix, const void *buf, size_t len)
 	for (int i = 0; i < len; i++) {
 		if (!(i % 16)) {
 			if (i)
-				fprintf(stdout, "\n");
+				putchar('\n');
 			fprintf(stdout, "%s", prefix);
 		}
 		if (i && !(i % 8) && (i % 16))
-			fprintf(stdout, "\t");
+			putchar('\t');
 		fprintf(stdout, "%02X ", ((uint8_t *)(buf))[i]);
 	}
-	fprintf(stdout, "\n");
+	putchar('\n');
 }
 
 static void sigint_handler(int signum)

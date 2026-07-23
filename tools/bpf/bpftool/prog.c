@@ -1266,7 +1266,7 @@ static void hex_print(void *data, unsigned int size, FILE *f)
 			fprintf(f, "%c%s", c, j == i + 7 ? " " : "");
 		}
 
-		fprintf(f, "\n");
+		fputc(f, '\n');
 	}
 }
 

@@ -135,7 +135,7 @@ static void pr_err(const char *fmt, ...)
 
 	if (errno != 0)
 		fprintf(stderr, ": %s", strerror(errno));
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 static struct memory_buffer *udmabuf_alloc(size_t size)

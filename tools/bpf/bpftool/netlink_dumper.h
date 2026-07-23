@@ -25,7 +25,7 @@
 	if (json_output)				\
 		jsonw_start_object(json_wtr);		\
 	else						\
-		fprintf(stdout, "{");			\
+		putchar('{');				\
 }
 
 #define NET_END_OBJECT_NESTED				\
@@ -33,7 +33,7 @@
 	if (json_output)				\
 		jsonw_end_object(json_wtr);		\
 	else						\
-		fprintf(stdout, "}");			\
+		putchar('}');				\
 }
 
 #define NET_END_OBJECT					\
@@ -47,7 +47,7 @@
 	if (json_output)				\
 		jsonw_end_object(json_wtr);		\
 	else						\
-		fprintf(stdout, "\n");			\
+		putchar('\n');				\
 }
 
 #define NET_START_ARRAY(name, fmt_str)			\

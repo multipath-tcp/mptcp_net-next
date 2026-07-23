@@ -87,7 +87,7 @@ int hammer_device(const char *device_name, unsigned int *lines, int num_lines,
 		if (j == sizeof(swirr) - 1)
 			j = 0;
 
-		fprintf(stdout, "[");
+		putchar('[');
 		for (i = 0; i < num_lines; i++) {
 			fprintf(stdout, "%u: %d", lines[i],
 				gpiotools_test_bit(values.bits, i));
@@ -101,7 +101,7 @@ int hammer_device(const char *device_name, unsigned int *lines, int num_lines,
 		if (loops && iteration == loops)
 			break;
 	}
-	fprintf(stdout, "\n");
+	putchar('\n');
 	ret = 0;
 
 exit_close_error:

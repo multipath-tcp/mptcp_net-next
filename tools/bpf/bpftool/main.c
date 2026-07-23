@@ -273,7 +273,7 @@ void fprint_hex(FILE *f, void *arg, unsigned int n, const char *sep)
 		if (!i)
 			/* nothing */;
 		else if (!(i % 16))
-			fprintf(f, "\n");
+			fputc(f, '\n');
 		else if (!(i % 8))
 			fprintf(f, "  ");
 		else

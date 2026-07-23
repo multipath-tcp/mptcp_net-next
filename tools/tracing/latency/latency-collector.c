@@ -1999,7 +1999,7 @@ static void scan_arguments(int argc, char *argv[])
 "been enabled. Random sleep is intended for the following tracers:\n");
 			for (i = 0; random_tracers[i]; i++)
 				fprintf(stderr, "%s\n", random_tracers[i]);
-			fprintf(stderr, "\n");
+			fputc(stderr, '\n');
 		}
 	}
 

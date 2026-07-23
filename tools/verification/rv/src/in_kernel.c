@@ -667,7 +667,7 @@ static void ikm_usage_print_reactors(void)
 		end = strstr(start, "\n");
 	}
 
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 /*
  * ikm_usage - print usage

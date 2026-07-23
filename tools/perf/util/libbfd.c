@@ -603,7 +603,7 @@ int symbol__disassemble_bpf_libbfd(struct symbol *sym __maybe_unused,
 		} else
 			srcline = NULL;
 
-		fprintf(s, "\n");
+		fputc(s, '\n');
 		prev_buf_size = buf_size;
 		fflush(s);
 

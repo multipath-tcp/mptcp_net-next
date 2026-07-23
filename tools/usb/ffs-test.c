@@ -562,7 +562,7 @@ invalid:
 				fprintf(stderr, "%4zd:", len);
 			fprintf(stderr, " %02x", *p);
 			if (31 == (len % 32))
-				fprintf(stderr, "\n");
+				fputc(stderr, '\n');
 		}
 		fflush(stderr);
 		errno = EILSEQ;

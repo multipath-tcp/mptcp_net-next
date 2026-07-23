@@ -200,10 +200,10 @@ static void __print_timestamp(const char *name, struct timespec *cur,
 		ts_delta = timespec_to_ns64(cur) - timespec_to_ns64(&ts_usr);
 		fprintf(stderr, "  (USR +");
 		__print_ts_delta_formatted(ts_delta);
-		fprintf(stderr, ")");
+		fputc(stderr, ')');
 	}
 
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 static void record_timestamp_usr(void)
@@ -254,7 +254,7 @@ static void print_timing_event(char *name, struct timing_event *te)
 	__print_ts_delta_formatted(te->min);
 	fprintf(stderr, ", max=");
 	__print_ts_delta_formatted(te->max);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 /* TODO: convert to check_and_print payload once API is stable */
@@ -271,7 +271,7 @@ static void print_payload(char *data, int len)
 	fprintf(stderr, "payload: ");
 	for (i = 0; i < len; i++)
 		fprintf(stderr, "%02hhx ", data[i]);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 static void print_pktinfo(int family, int ifindex, void *saddr, void *daddr)
@@ -933,7 +933,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "protocol:     %s\n", sock_names[cfg_proto]);
 	fprintf(stderr, "payload:      %u\n", cfg_payload_len);
 	fprintf(stderr, "server port:  %u\n", dest_port);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 
 	if (do_ipv4) {
 		if (cfg_do_listen)

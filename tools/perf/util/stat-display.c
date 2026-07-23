@@ -529,7 +529,7 @@ static void print_metric_json(struct perf_stat_config *config __maybe_unused,
 		}
 	}
 	if (!config->metric_only)
-		fprintf(out, "}");
+		fputc(out, '}');
 }
 
 static void new_line_json(struct perf_stat_config *config, void *ctx)
@@ -1316,7 +1316,7 @@ static void print_header_std(struct perf_stat_config *config,
 	FILE *output = config->output;
 	int i;
 
-	fprintf(output, "\n");
+	fputc(output, '\n');
 	fprintf(output, " Performance counter stats for ");
 	if (_target->bpf_str)
 		fprintf(output, "\'BPF program(s) %s", _target->bpf_str);
@@ -1333,7 +1333,7 @@ static void print_header_std(struct perf_stat_config *config,
 	else
 		fprintf(output, "thread id \'%s", _target->tid);
 
-	fprintf(output, "\'");
+	fputc(output, '\'');
 	if (config->run_count > 1)
 		fprintf(output, " (%d runs)", config->run_count);
 	fprintf(output, ":\n\n");
@@ -1406,9 +1406,9 @@ static void print_table(struct perf_stat_config *config, FILE *output, double av
 		fprintf(output, " %17.9f (%+.9f) ", run, run - avg);
 
 		for (h = 0; h < n; h++)
-			fprintf(output, "#");
+			fputc(output, '#');
 
-		fprintf(output, "\n");
+		fputc(output, '\n');
 	}
 
 	fprintf(output, "\n%*s# Final result:\n", indent, "");
@@ -1428,7 +1428,7 @@ static void print_footer(struct perf_stat_config *config)
 		return;
 
 	if (!config->null_run)
-		fprintf(output, "\n");
+		fputc(output, '\n');
 
 	if (config->run_count == 1) {
 		fprintf(output, " %17.9f seconds time elapsed", avg);

@@ -691,7 +691,7 @@ static int cmd_session_list(struct daemon *daemon, union cmd *cmd, FILE *out)
 			/* session up time */
 			csv_sep, (uint64_t)((curr - daemon->start) / 60));
 
-		fprintf(out, "\n");
+		fputc(out, '\n');
 	} else {
 		fprintf(out, "[%d:daemon] base: %s\n", getpid(), daemon->base);
 		if (cmd->list.verbose) {
@@ -730,7 +730,7 @@ static int cmd_session_list(struct daemon *daemon, union cmd *cmd, FILE *out)
 				/* session up time */
 				csv_sep, (uint64_t)((curr - session->start) / 60));
 
-			fprintf(out, "\n");
+			fputc(out, '\n');
 		} else {
 			fprintf(out, "[%d:%s] perf record %s\n",
 				session->pid, session->name, session->run);

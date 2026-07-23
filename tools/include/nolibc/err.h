@@ -27,7 +27,7 @@ void vwarnx(const char *fmt, va_list args)
 {
 	fprintf(stderr, "%s: ", program_invocation_short_name);
 	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
+	fputc(stderr, '\n');
 }
 
 static __attribute__((unused))
