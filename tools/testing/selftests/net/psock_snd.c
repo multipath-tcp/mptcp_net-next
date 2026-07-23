@@ -39,6 +39,8 @@ static bool	cfg_use_gso;
 static bool	cfg_use_qdisc_bypass;
 static bool	cfg_use_vlan;
 static bool	cfg_use_vnet;
+static bool	cfg_drop;
+static bool	cfg_aux_data;
 
 static char	*cfg_ifname = "lo";
 static int	cfg_mtu	= 1500;
@@ -48,6 +50,8 @@ static uint16_t	cfg_port = 8000;
 
 /* test sending up to max mtu + 1 */
 #define TEST_SZ	(sizeof(struct virtio_net_hdr) + ETH_HLEN + ETH_MAX_MTU + 1)
+
+#define BURST_CNT (1000)
 
 static char tbuf[TEST_SZ], rbuf[TEST_SZ];
 
@@ -212,13 +216,14 @@ static void do_send(int fd, char *buf, int len)
 	if (ret != len)
 		error(1, 0, "write: %u %u", ret, len);
 
-	fprintf(stderr, "tx: %u\n", ret);
+	if (!cfg_drop)
+		fprintf(stderr, "tx: %u\n", ret);
 }
 
 static int do_tx(void)
 {
 	const int one = 1;
-	int fd, len;
+	int i, fd, len;
 
 	fd = socket(PF_PACKET, cfg_use_dgram ? SOCK_DGRAM : SOCK_RAW, 0);
 	if (fd == -1)
@@ -241,6 +246,10 @@ static int do_tx(void)
 		len = cfg_truncate_len;
 
 	do_send(fd, tbuf, len);
+
+	if (cfg_drop)
+		for (i = 0; i < BURST_CNT; i++)
+			do_send(fd, tbuf, len);
 
 	if (close(fd))
 		error(1, errno, "close t");
@@ -271,11 +280,54 @@ static int setup_rx(void)
 	return fd;
 }
 
-static void do_rx(int fd, int expected_len, char *expected)
+static void check_aux_data(struct cmsghdr *cmsg, int expected_len)
 {
+	struct tpacket_auxdata *adata;
+
+	if (!cmsg)
+		error(1, 0, "auxdata null");
+
+	if (cmsg->cmsg_level != SOL_PACKET)
+		error(1, 0, "cmsg_level != SOL_PACKET");
+
+	if (cmsg->cmsg_type != PACKET_AUXDATA)
+		error(1, 0, "cmsg_type != PACKET_AUXDATA");
+
+	adata = (struct tpacket_auxdata *)CMSG_DATA(cmsg);
+
+	if (adata->tp_net != ETH_HLEN)
+		error(1, 0, "cmsg tp_net != ETH_HLEN");
+
+	if (adata->tp_len != expected_len)
+		error(1, 0, "cmsg tp_len != %u", expected_len);
+
+	if (adata->tp_snaplen != expected_len)
+		error(1, 0, "cmsg tp_snaplen != %u", expected_len);
+}
+
+static void do_rx(int fd, int expected_len, char *expected, bool is_psock)
+{
+	char cmsg_buf[1024] __attribute__((aligned(8))) = {};
+	bool aux = is_psock && cfg_aux_data;
+	struct msghdr msg = {};
+	struct iovec iov[1];
 	int ret;
 
-	ret = recv(fd, rbuf, sizeof(rbuf), 0);
+	if (aux) {
+		iov[0].iov_base = rbuf;
+		iov[0].iov_len = sizeof(rbuf);
+
+		msg.msg_iov = iov;
+		msg.msg_iovlen = 1;
+
+		msg.msg_control = cmsg_buf;
+		msg.msg_controllen = sizeof(cmsg_buf);
+
+		ret = recvmsg(fd, &msg, 0);
+	} else {
+		ret = recv(fd, rbuf, sizeof(rbuf), 0);
+	}
+
 	if (ret == -1)
 		error(1, errno, "recv");
 	if (ret != expected_len)
@@ -284,12 +336,19 @@ static void do_rx(int fd, int expected_len, char *expected)
 	if (memcmp(rbuf, expected, ret))
 		error(1, 0, "recv: data mismatch");
 
+	if (aux) {
+		struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+
+		check_aux_data(cmsg, expected_len);
+	}
+
 	fprintf(stderr, "rx: %u\n", ret);
 }
 
 static int setup_sniffer(void)
 {
 	struct timeval tv = { .tv_usec = 100 * 1000 };
+	const int one = 1;
 	int fd;
 
 	fd = socket(PF_PACKET, SOCK_RAW, 0);
@@ -298,6 +357,14 @@ static int setup_sniffer(void)
 
 	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
 		error(1, errno, "setsockopt rcv timeout");
+
+	if (cfg_drop)
+		if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &one, sizeof(one)))
+			error(1, errno, "setsockopt SO_RCVBUF");
+
+	if (cfg_aux_data)
+		if (setsockopt(fd, SOL_PACKET, PACKET_AUXDATA, &one, sizeof(one)))
+			error(1, errno, "setsockopt PACKET_AUXDATA");
 
 	pair_udp_setfilter(fd);
 	do_bind(fd);
@@ -309,8 +376,11 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "bcCdgl:qt:vV")) != -1) {
+	while ((c = getopt(argc, argv, "abcCdDgl:qt:vV")) != -1) {
 		switch (c) {
+		case 'a':
+			cfg_aux_data = true;
+			break;
 		case 'b':
 			cfg_use_bind = true;
 			break;
@@ -322,6 +392,9 @@ static void parse_opts(int argc, char **argv)
 			break;
 		case 'd':
 			cfg_use_dgram = true;
+			break;
+		case 'D':
+			cfg_drop = true;
 			break;
 		case 'g':
 			cfg_use_gso = true;
@@ -357,6 +430,49 @@ static void parse_opts(int argc, char **argv)
 
 	if (cfg_use_gso && !cfg_use_csum_off)
 		error(1, 0, "option gso (-g) requires csum offload (-c)");
+
+	if (cfg_aux_data && cfg_drop)
+		error(1, 0, "option aux data (-a) conflicts with drop (-D)");
+}
+
+static void check_packet_stats(int fd)
+{
+	struct tpacket_stats st = {};
+	socklen_t len = sizeof(st);
+
+	if (getsockopt(fd, SOL_PACKET, PACKET_STATISTICS, &st, &len))
+		error(1, errno, "getsockopt packet statistics");
+
+	if (cfg_drop) {
+		/* PACKET_STATISTICS reports all packets seen (including
+		 * drops) in tp_packets
+		 */
+		if (st.tp_packets < st.tp_drops)
+			error(1, 0, "stats: tp_packets %u < tp_drops %u",
+			      st.tp_packets, st.tp_drops);
+
+		if (st.tp_drops == 0)
+			error(1, 0, "stats: expected drops but tp_drops == 0");
+	} else {
+		if (st.tp_packets != 1)
+			error(1, 0, "stats: tp_packets %u != 1", st.tp_packets);
+
+		if (st.tp_drops != 0)
+			error(1, 0, "stats: tp_drops %u != 0", st.tp_drops);
+	}
+
+	/* verify clear on read */
+	memset(&st, 0xff, sizeof(st));
+	len = sizeof(st);
+
+	if (getsockopt(fd, SOL_PACKET, PACKET_STATISTICS, &st, &len))
+		error(1, errno, "getsockopt packet statistics");
+
+	if (st.tp_packets != 0)
+		error(1, 0, "stats: tp_packets %u != 0 after clear", st.tp_packets);
+
+	if (st.tp_drops != 0)
+		error(1, 0, "stats: tp_drops %u != 0 after clear", st.tp_drops);
 }
 
 static void run_test(void)
@@ -368,13 +484,21 @@ static void run_test(void)
 
 	total_len = do_tx();
 
+	if (cfg_drop) {
+		check_packet_stats(fds);
+		goto out;
+	}
+
 	/* BPF filter accepts only this length, vlan changes MAC */
-	if (cfg_payload_len == DATA_LEN && !cfg_use_vlan)
+	if (cfg_payload_len == DATA_LEN && !cfg_use_vlan) {
 		do_rx(fds, total_len - sizeof(struct virtio_net_hdr),
-		      tbuf + sizeof(struct virtio_net_hdr));
+		      tbuf + sizeof(struct virtio_net_hdr), true);
+		check_packet_stats(fds);
+	}
 
-	do_rx(fdr, cfg_payload_len, tbuf + total_len - cfg_payload_len);
+	do_rx(fdr, cfg_payload_len, tbuf + total_len - cfg_payload_len, false);
 
+out:
 	if (close(fds))
 		error(1, errno, "close s");
 	if (close(fdr))
