@@ -3192,7 +3192,7 @@ static struct sk_buff *inet_rtm_getroute_build_skb(__be32 src, __be32 dst,
 		udph = skb_put_zero(skb, sizeof(struct udphdr));
 		udph->source = sport;
 		udph->dest = dport;
-		udph->len = htons(sizeof(struct udphdr));
+		udp_set_len_short(udph, sizeof(struct udphdr));
 		udph->check = 0;
 		break;
 	}

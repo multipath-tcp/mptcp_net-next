@@ -127,7 +127,7 @@ static int snmp_translate(struct nf_conn *ct, int dir, struct sk_buff *skb)
 {
 	struct iphdr *iph = ip_hdr(skb);
 	struct udphdr *udph = (struct udphdr *)((__be32 *)iph + iph->ihl);
-	u16 datalen = ntohs(udph->len) - sizeof(struct udphdr);
+	u16 datalen = udp_get_len_short(udph) - sizeof(struct udphdr);
 	char *data = (unsigned char *)udph + sizeof(struct udphdr);
 	struct snmp_ctx ctx;
 	int ret;
@@ -181,7 +181,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	 * enough room for a UDP header.  Just verify the UDP length field so we
 	 * can mess around with the payload.
 	 */
-	if (ntohs(udph->len) != skb->len - (iph->ihl << 2)) {
+	if (udp_get_len_short(udph) != skb->len - (iph->ihl << 2)) {
 		nf_ct_helper_log(skb, ct, "dropping malformed packet\n");
 		return NF_DROP;
 	}
