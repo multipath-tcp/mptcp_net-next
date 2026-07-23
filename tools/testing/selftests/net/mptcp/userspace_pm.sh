@@ -391,6 +391,17 @@ test_announce()
 	sleep 0.5
 	verify_announce_event "$client_evts" "$ANNOUNCED" "$client4_token" "10.0.2.1"\
 			      "$server_addr_id" "$new4_port"
+
+	# Check local_addr_used was incremented after announces on server
+	local addr_used
+	addr_used=$(ss -N "$ns1" -inmHM "sport = :$app4_port" | \
+		   mptcp_lib_get_info_value "local_addr_used" "local_addr_used")
+	print_test "local_addr_used > 0 after announce"
+	if [ "$addr_used" = 2 ] 2>/dev/null; then
+		test_pass
+	else
+		test_fail "local_addr_used=${addr_used} (expected 2)"
+	fi
 }
 
 verify_remove_event()
@@ -495,6 +506,26 @@ test_remove()
 	print_test "RM_ADDR6 id:server-1 ns1 => ns2"
 	sleep 0.5
 	verify_remove_event "$client_evts" "$REMOVED" "$client6_token" "$server_addr_id"
+
+	# Check local_addr_used was decremented back to 0 after all removes
+	local addr_used
+	addr_used=$(ss -N "$ns1" -inmHM "sport = :$app4_port" | \
+		   mptcp_lib_get_info_value "local_addr_used" "local_addr_used")
+	print_test "local_addr_used=0 on server after remove"
+	if [ "$addr_used" = "0" ]; then
+		test_pass
+	else
+		test_fail "local_addr_used=${addr_used} (expected 0)"
+	fi
+
+	addr_used=$(ss -N "$ns2" -inmHM "sport = :$client4_port" | \
+		   mptcp_lib_get_info_value "local_addr_used" "local_addr_used")
+	print_test "local_addr_used=0 on client after remove"
+	if [ "$addr_used" = "0" ]; then
+		test_pass
+	else
+		test_fail "local_addr_used=${addr_used} (expected 0)"
+	fi
 }
 
 verify_subflow_events()
