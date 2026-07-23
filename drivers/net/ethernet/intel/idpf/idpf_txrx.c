@@ -2871,7 +2871,7 @@ int idpf_tso(struct sk_buff *skb, struct idpf_tx_offload_params *off)
 				     (__force __wsum)htonl(paylen));
 		/* compute length of segmentation header */
 		off->tso_hdr_len = sizeof(struct udphdr) + l4_start;
-		l4.udp->len = htons(shinfo->gso_size + sizeof(struct udphdr));
+		udp_set_len_short(l4.udp, shinfo->gso_size + sizeof(struct udphdr));
 		break;
 	default:
 		return -EINVAL;
