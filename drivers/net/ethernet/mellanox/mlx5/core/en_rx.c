@@ -1081,7 +1081,7 @@ static void mlx5e_shampo_update_ipv4_udp_hdr(struct mlx5e_rq *rq, struct iphdr *
 	struct udphdr *uh;
 
 	uh = (struct udphdr *)(skb->data + udp_off);
-	uh->len = htons(skb->len - udp_off);
+	udp_set_len_short(uh, skb->len - udp_off);
 
 	if (uh->check)
 		uh->check = ~udp_v4_check(skb->len - udp_off, ipv4->saddr,
@@ -1100,7 +1100,7 @@ static void mlx5e_shampo_update_ipv6_udp_hdr(struct mlx5e_rq *rq, struct ipv6hdr
 	struct udphdr *uh;
 
 	uh = (struct udphdr *)(skb->data + udp_off);
-	uh->len = htons(skb->len - udp_off);
+	udp_set_len_short(uh, skb->len - udp_off);
 
 	if (uh->check)
 		uh->check = ~udp_v6_check(skb->len - udp_off, &ipv6->saddr,
