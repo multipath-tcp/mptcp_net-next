@@ -3936,6 +3936,11 @@ int rvu_mbox_handler_nix_get_hw_info(struct rvu *rvu, struct msg_req *req,
 	if (blkaddr < 0)
 		return NIX_AF_ERR_AF_LF_INVALID;
 
+	rsp->vwqe_delay = 0;
+	if (!is_rvu_otx2(rvu))
+		rsp->vwqe_delay = rvu_read64(rvu, blkaddr, NIX_AF_VWQE_TIMER) &
+				  GENMASK_ULL(9, 0);
+
 	if (is_lbk_vf(rvu, pcifunc))
 		rvu_get_lbk_link_max_frs(rvu, &rsp->max_mtu);
 	else
