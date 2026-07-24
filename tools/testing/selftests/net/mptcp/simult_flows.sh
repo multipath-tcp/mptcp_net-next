@@ -62,12 +62,11 @@ setup()
 	sout=$(mktemp)
 	cout=$(mktemp)
 	capout=$(mktemp)
+	trap cleanup EXIT
 	size=$((2 * 2048 * 4096))
 
 	dd if=/dev/zero of=$small bs=4096 count=20 >/dev/null 2>&1
 	dd if=/dev/zero of=$large bs=4096 count=$((size / 4096)) >/dev/null 2>&1
-
-	trap cleanup EXIT
 
 	mptcp_lib_ns_init ns1 ns2 ns3
 
