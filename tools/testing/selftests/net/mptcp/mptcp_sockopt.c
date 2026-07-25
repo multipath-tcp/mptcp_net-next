@@ -35,6 +35,9 @@ static int pf = AF_INET;
 #ifndef SOL_MPTCP
 #define SOL_MPTCP 284
 #endif
+#ifndef SOL_TCP
+#define SOL_TCP 6
+#endif
 
 #ifndef MPTCP_INFO
 struct mptcp_info {
@@ -229,6 +232,30 @@ static int sock_listen_mptcp(const char * const listenaddr,
 	return sock;
 }
 
+static void test_so_reuseaddr_sockopt(int fd)
+{
+	int val_in = 1, val_out, expected;
+	socklen_t s;
+	int r;
+
+	r = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val_in, sizeof(val_in));
+	if (r != 0)
+		die_perror("setsockopt SO_REUSEADDR");
+
+	s = sizeof(val_out);
+	r = getsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val_out, &s);
+	if (r != 0)
+		die_perror("getsockopt SO_REUSEADDR");
+
+	/* SO_REUSEADDR on MPTCP msk returns 1 (SK_CAN_REUSE) when set,
+	 * regardless of the input value. The actual reuse semantics are
+	 * applied to the nmpc subflow.
+	 */
+	expected = val_in ? 1 : 0;
+	if (val_out != expected)
+		xerror("SO_REUSEADDR %d != %d\n", expected, val_out);
+}
+
 static int sock_connect_mptcp(const char * const remoteaddr,
 			      const char * const port, int proto)
 {
@@ -246,6 +273,8 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 		sock = socket(a->ai_family, a->ai_socktype, proto);
 		if (sock < 0)
 			continue;
+
+		test_so_reuseaddr_sockopt(sock);
 
 		if (connect(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
@@ -769,6 +798,89 @@ static void test_ip_tos_sockopt(int fd)
 		xerror("expect socklen_t == -1");
 }
 
+static void test_so_linger_sockopt(int fd)
+{
+	struct linger ling_in, ling_out;
+	socklen_t s;
+	int r;
+
+	ling_in.l_onoff = 1;
+	ling_in.l_linger = 30;
+	r = setsockopt(fd, SOL_SOCKET, SO_LINGER, &ling_in, sizeof(ling_in));
+	if (r != 0)
+		die_perror("setsockopt SO_LINGER");
+
+	s = sizeof(ling_out);
+	memset(&ling_out, 0, sizeof(ling_out));
+	r = getsockopt(fd, SOL_SOCKET, SO_LINGER, &ling_out, &s);
+	if (r != 0)
+		die_perror("getsockopt SO_LINGER");
+
+	if (ling_in.l_onoff != ling_out.l_onoff ||
+	    ling_in.l_linger != ling_out.l_linger)
+		xerror("SO_LINGER %d/%d != %d/%d\n",
+		       ling_in.l_onoff, ling_in.l_linger,
+		       ling_out.l_onoff, ling_out.l_linger);
+}
+
+static void test_so_priority_sockopt(int fd)
+{
+	int prio_in, prio_out;
+	socklen_t s;
+	int r;
+
+	prio_in = 5;
+	r = setsockopt(fd, SOL_SOCKET, SO_PRIORITY, &prio_in, sizeof(prio_in));
+	if (r != 0)
+		die_perror("setsockopt SO_PRIORITY");
+
+	s = sizeof(prio_out);
+	r = getsockopt(fd, SOL_SOCKET, SO_PRIORITY, &prio_out, &s);
+	if (r != 0)
+		die_perror("getsockopt SO_PRIORITY");
+
+	if (prio_in != prio_out)
+		xerror("SO_PRIORITY %d != %d\n", prio_in, prio_out);
+}
+
+static void test_tcp_nodelay_sockopt(int fd)
+{
+	int val_in = 1, val_out;
+	socklen_t s;
+	int r;
+
+	r = setsockopt(fd, SOL_TCP, TCP_NODELAY, &val_in, sizeof(val_in));
+	if (r != 0)
+		die_perror("setsockopt TCP_NODELAY");
+
+	s = sizeof(val_out);
+	r = getsockopt(fd, SOL_TCP, TCP_NODELAY, &val_out, &s);
+	if (r != 0)
+		die_perror("getsockopt TCP_NODELAY");
+
+	if (val_in != val_out)
+		xerror("TCP_NODELAY %d != %d\n", val_in, val_out);
+}
+
+static void test_tcp_syncnt_sockopt(int fd)
+{
+	int val_in = 3, val_out;
+	socklen_t s;
+	int r;
+
+	r = setsockopt(fd, SOL_TCP, TCP_SYNCNT, &val_in, sizeof(val_in));
+	if (r != 0)
+		die_perror("setsockopt TCP_SYNCNT");
+
+	s = sizeof(val_out);
+	r = getsockopt(fd, SOL_TCP, TCP_SYNCNT, &val_out, &s);
+	if (r != 0)
+		die_perror("getsockopt TCP_SYNCNT");
+
+	if (val_in != val_out)
+		xerror("TCP_SYNCNT %d != %d\n", val_in, val_out);
+}
+
 static int client(int pipefd)
 {
 	int fd = -1;
@@ -787,6 +899,10 @@ static int client(int pipefd)
 	}
 
 	test_ip_tos_sockopt(fd);
+	test_so_linger_sockopt(fd);
+	test_so_priority_sockopt(fd);
+	test_tcp_nodelay_sockopt(fd);
+	test_tcp_syncnt_sockopt(fd);
 
 	connect_one_server(fd, pipefd);
 
