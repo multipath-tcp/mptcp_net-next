@@ -762,7 +762,8 @@ static int mptcp_setsockopt_v4_set_tos(struct mptcp_sock *msk, int optname,
 		bool slow;
 
 		slow = lock_sock_fast(ssk);
-		__ip_sock_set_tos(ssk, val);
+		if (val > 0)
+			__ip_sock_set_tos(ssk, val);
 		unlock_sock_fast(ssk, slow);
 	}
 	release_sock(sk);
@@ -1562,7 +1563,8 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	ssk->sk_bound_dev_if = sk->sk_bound_dev_if;
 	ssk->sk_incoming_cpu = sk->sk_incoming_cpu;
 	ssk->sk_ipv6only = sk->sk_ipv6only;
-	__ip_sock_set_tos(ssk, inet_sk(sk)->tos);
+	if (inet_sk(sk)->tos > 0)
+		__ip_sock_set_tos(ssk, inet_sk(sk)->tos);
 
 	if (sk->sk_userlocks & tx_rx_locks) {
 		ssk->sk_userlocks |= sk->sk_userlocks & tx_rx_locks;
