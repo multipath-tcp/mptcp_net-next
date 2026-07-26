@@ -898,6 +898,23 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		ret = mptcp_setsockopt_all_sf(msk, SOL_TCP, optname, optval,
 					      optlen);
 		break;
+	case TCP_SYNCNT: {
+		int syncnt;
+
+		if (val < 1 || val > MAX_TCP_SYNCNT) {
+			ret = -EINVAL;
+			break;
+		}
+
+		syncnt = val;
+		ret = __mptcp_setsockopt_set_val(msk, MAX_TCP_SYNCNT,
+						 &tcp_sock_set_syncnt,
+						 &syncnt,
+						 val);
+		if (ret == 0)
+			inet_csk(sk)->icsk_syn_retries = syncnt;
+		break;
+	}
 	default:
 		ret = -ENOPROTOOPT;
 	}
@@ -1450,6 +1467,10 @@ static int mptcp_getsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		return mptcp_put_int_option(msk, optval, optlen, msk->notsent_lowat);
 	case TCP_IS_MPTCP:
 		return mptcp_put_int_option(msk, optval, optlen, 1);
+	case TCP_SYNCNT:
+		return mptcp_put_int_option(msk, optval, optlen,
+					    inet_csk(sk)->icsk_syn_retries ? :
+					    READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_syn_retries));
 	}
 	return -EOPNOTSUPP;
 }
@@ -1604,6 +1625,11 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 
 	ssk->sk_reuse = sk->sk_reuse;
 	ssk->sk_reuseport = sk->sk_reuseport;
+	if (inet_csk(sk)->icsk_syn_retries > 0) {
+		if (tcp_sock_set_syncnt(ssk, inet_csk(sk)->icsk_syn_retries))
+			pr_warn("Failed to sync TCP_SYNCNT=%u to subflow\n",
+				inet_csk(sk)->icsk_syn_retries);
+	}
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
