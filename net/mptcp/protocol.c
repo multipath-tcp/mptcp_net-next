@@ -1575,6 +1575,23 @@ static bool mptcp_penalise_throttle_ok(struct mptcp_subflow_context *subflow)
 	return tcp_jiffies32 - subflow->last_penalise >= max_t(u32, rtt, 1);
 }
 
+/* Only penalise when the connection is not receive-window-limited: all the
+ * data the application has queued fits within the current send window
+ * (write_seq <= wnd_end). If it has queued past the window edge, the peer's
+ * receive window (not our congestion window) is the bottleneck: the fast
+ * path is capped by that shared window too and cannot use capacity freed from
+ * the slow path, so penalising would only shed the slow path's throughput.
+ *
+ * write_seq (application demand) and wnd_end (peer-advertised window) are both
+ * standing values and neither is derived from cwnd, so unlike the instantaneous
+ * window headroom this is not biased by the scheduler sampling just after an
+ * ACK opened the window, nor circular when the window is what suppresses cwnd.
+ */
+static bool mptcp_penalise_send_window_ok(const struct mptcp_sock *msk)
+{
+	return msk->write_seq <= mptcp_wnd_end(msk);
+}
+
 /* Halve the congestion window (and ssthresh, if cwnd is past it) of a subflow
  * the scheduler flagged. Runs in the push path under the subflow socket lock,
  * which protects snd_cwnd. The congestion control grows the window back,
@@ -1681,6 +1698,7 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 			    (u64)subflow->avg_pacing_rate * MPTCP_PENALISE_RATE_RATIO < max_pace &&
 			    inet_csk(ssk)->icsk_ca_state == TCP_CA_Open &&
 			    tcp_is_cwnd_limited(fastest) &&
+			    mptcp_penalise_send_window_ok(msk) &&
 			    mptcp_penalise_throttle_ok(subflow);
 
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
