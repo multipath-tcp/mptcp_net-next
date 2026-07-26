@@ -91,6 +91,8 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_BACKLOGDROP,		/* Backlog over memory limit */
 	MPTCP_MIB_RCVPRUNED,		/* Dropped due to memory constrains */
 	MPTCP_MIB_OFO_PRUNED,		/* MPTCP-level OoO queue pruned */
+	MPTCP_MIB_CWNDPENALIZED,	/* DEBUG: subflow cwnd halved by the scheduler (#345) */
+	MPTCP_MIB_PENALCAND,		/* DEBUG: picker chose a slow (low-rate) subflow */
 	__MPTCP_MIB_MAX
 };
 
