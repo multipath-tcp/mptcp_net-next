@@ -650,9 +650,10 @@ static void check_stat_equal(const char *name, uint64_t actual,
 
 static void process_one_client(int fd, int pipefd)
 {
-	ssize_t ret, ret2, ret3;
 	struct so_state s;
 	char buf[4096];
+	ssize_t ret;
+	size_t r, w;
 
 	memset(&s, 0, sizeof(s));
 	do_getsockopts(&s, fd, 0, 0);
@@ -663,36 +664,39 @@ static void process_one_client(int fd, int pipefd)
 	ret = read(fd, buf, sizeof(buf));
 	if (ret < 0)
 		die_perror("read");
+	r = ret;
 
-	assert(s.mptcpi_rcv_delta <= (uint64_t)ret);
+	assert(s.mptcpi_rcv_delta <= (uint64_t)r);
 
 	if (s.tcpi_rcv_delta)
-		assert(s.tcpi_rcv_delta == (uint64_t)ret);
+		assert(s.tcpi_rcv_delta == (uint64_t)r);
 
-	ret2 = write(fd, buf, ret);
-	if (ret2 < 0)
+	ret = write(fd, buf, r);
+	if (ret < 0)
 		die_perror("write");
+	w = ret;
 
 	/* wait for hangup */
-	ret3 = read(fd, buf, 1);
-	if (ret3 != 0)
-		xerror("expected EOF, got %lu", ret3);
+	ret = read(fd, buf, 1);
+	if (ret != 0)
+		xerror("expected EOF, got %zd", ret);
+	r += ret;
 
-	do_getsockopts(&s, fd, ret, ret2);
+	do_getsockopts(&s, fd, r, w);
 	check_stat_equal("mptcpi_rcv_delta", s.mptcpi_rcv_delta,
-			 (uint64_t)ret + 1); /* +1 for FIN */
+			 (uint64_t)r + 1); /* +1 for FIN */
 
 	/* be nice when running on top of older kernel */
 	if (s.pkt_stats_avail) {
 		check_stat_equal("mptcpi_bytes_sent",
 				 s.last_sample.mptcpi_bytes_sent,
-				 (uint64_t)ret2);
+				 (uint64_t)w);
 		check_stat_equal("mptcpi_bytes_received",
 				 s.last_sample.mptcpi_bytes_received,
-				 (uint64_t)ret);
+				 (uint64_t)r);
 		check_stat_equal("mptcpi_bytes_acked",
 				 s.last_sample.mptcpi_bytes_acked,
-				 (uint64_t)ret2);
+				 (uint64_t)w);
 	}
 
 	close(fd);
