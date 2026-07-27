@@ -4143,10 +4143,11 @@ userspace_tests()
 		wait_event ns2 MPTCP_LIB_EVENT_ESTABLISHED 1
 		chk_mptcp_info subflows 0 subflows 0
 		chk_subflows_total 1 1
-		userspace_pm_add_sf $ns2 10.0.3.2 0
+		# from an IP not linked to ID0: failure expected, no new MPJ
+		userspace_pm_add_sf $ns2 10.0.3.2 0 2>/dev/null
+		userspace_pm_add_sf $ns2 10.0.1.2 0
 		wait_event ns2 MPTCP_LIB_EVENT_SUB_ESTABLISHED 1
-		userspace_pm_chk_dump_addr "${ns2}" \
-			"id 0 flags subflow 10.0.3.2" "id 0 subflow"
+		userspace_pm_chk_dump_addr "${ns2}" "" "id 0 subflow"
 		chk_join_nr 1 1 1
 		chk_mptcp_info subflows 1 subflows 1
 		chk_subflows_total 2 2
