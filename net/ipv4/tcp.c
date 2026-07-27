@@ -3830,6 +3830,7 @@ int tcp_sock_set_maxseg(struct sock *sk, int val)
 	WRITE_ONCE(tcp_sk(sk)->rx_opt.user_mss, val);
 	return 0;
 }
+EXPORT_SYMBOL(tcp_sock_set_maxseg);
 
 /*
  *	Socket option code for TCP.
