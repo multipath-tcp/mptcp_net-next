@@ -1085,8 +1085,10 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 	mptcp_rcv_rtt_update(msk, subflow);
 	if (!sock_owned_by_user(sk)) {
 		/* Wake-up the reader only for in-sequence data */
-		if (move_skbs_to_msk(msk, ssk) && mptcp_epollin_ready(sk))
-			sk->sk_data_ready(sk);
+		if (move_skbs_to_msk(msk, ssk) && mptcp_epollin_ready(sk)) {
+			set_bit(MPTCP_WORK_DATA_READY, &msk->flags);
+			mptcp_schedule_work(sk);
+		}
 	} else {
 		__mptcp_move_skbs_from_subflow(msk, ssk, false);
 	}
@@ -3222,6 +3224,9 @@ static void mptcp_worker(struct work_struct *work)
 
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
+
+	if (test_and_clear_bit(MPTCP_WORK_DATA_READY, &msk->flags))
+		sk->sk_data_ready(sk);
 
 	fail_tout = msk->first ? READ_ONCE(mptcp_subflow_ctx(msk->first)->fail_tout) : 0;
 	if (fail_tout && time_after(jiffies, fail_tout))

@@ -115,6 +115,7 @@
 #define MPTCP_WORK_RTX		1
 #define MPTCP_FALLBACK_DONE	2
 #define MPTCP_WORK_CLOSE_SUBFLOW 3
+#define MPTCP_WORK_DATA_READY	4
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
