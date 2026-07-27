@@ -11,6 +11,7 @@
 #include <linux/netdevice.h>
 #include <linux/sched/signal.h>
 #include <linux/atomic.h>
+#include <linux/skbuff_ref.h>
 #include <net/aligned_data.h>
 #include <net/rps.h>
 #include <net/sock.h>
@@ -429,6 +430,62 @@ void __mptcp_sync_rcv_sequence(struct sock *sk)
 	MPTCP_SKB_CB(skb)->end_seq = MPTCP_SKB_CB(skb)->map_seq + skb->len;
 }
 
+static int mptcp_trim_dup_head(struct sk_buff *skb, int delta)
+{
+	struct skb_shared_info *shinfo;
+	int headlen, eat, i, k;
+
+	if (delta <= 0)
+		return 0;
+
+	/* Received skbs are not expected to carry a frag_list; the frag loop
+	 * below only handles the linear area and the paged frags.
+	 */
+	DEBUG_NET_WARN_ON_ONCE(skb_has_frag_list(skb));
+
+	if (skb_unclone_keeptruesize(skb, GFP_ATOMIC))
+		return -ENOMEM;
+
+	/* Eat the linear head first, then the paged frags. Note the skb
+	 * truesize is left unchanged on purpose: dropping only skb->len /
+	 * skb->data_len keeps the memory accounting over-reserved (hence
+	 * always safe) at both callers.
+	 */
+	headlen = skb_headlen(skb);
+	eat = min(delta, headlen);
+	if (eat) {
+		__skb_pull(skb, eat);
+		delta -= eat;
+	}
+	if (!delta)
+		return 0;
+
+	shinfo = skb_shinfo(skb);
+	eat = delta;
+	k = 0;
+	for (i = 0; i < shinfo->nr_frags; i++) {
+		int size = skb_frag_size(&shinfo->frags[i]);
+
+		if (size <= eat) {
+			skb_frag_unref(skb, i);
+			eat -= size;
+		} else {
+			shinfo->frags[k] = shinfo->frags[i];
+			if (eat) {
+				skb_frag_off_add(&shinfo->frags[k], eat);
+				skb_frag_size_sub(&shinfo->frags[k], eat);
+				eat = 0;
+			}
+			k++;
+		}
+	}
+	shinfo->nr_frags = k;
+
+	skb->data_len -= delta;
+	skb->len -= delta;
+	return 0;
+}
+
 static bool __mptcp_move_skb(struct sock *sk, struct sk_buff *skb)
 {
 	u32 copy_len = MPTCP_SKB_CB(skb)->end_seq - MPTCP_SKB_CB(skb)->map_seq;
@@ -474,6 +531,16 @@ add_queue:
 		/* Partial packet: map_seq < ack_seq < end_seq. */
 		int delta = (u32)msk->ack_seq - MPTCP_SKB_CB(skb)->map_seq;
 
+		if (mptcp_trim_dup_head(skb, delta)) {
+			/* skb is not owned yet: mptcp_borrow_fwdmem() added its
+			 * truesize to sk_forward_alloc and cleared skb->sk, so
+			 * mptcp_drop() won't refund it. Do it here.
+			 */
+			sk_forward_alloc_add(sk, -skb->truesize);
+			mptcp_drop(sk, skb);
+			return false;
+		}
+		MPTCP_SKB_CB(skb)->map_seq += delta;
 		copy_len -= delta;
 		goto add_queue;
 	}
@@ -889,10 +956,20 @@ static bool __mptcp_ofo_queue(struct mptcp_sock *msk)
 		if (!tail || !mptcp_try_coalesce(sk, tail, skb)) {
 			int delta = ack_seq - MPTCP_SKB_CB(skb)->map_seq;
 
-			/* skip overlapping data, if any */
+			/* Physically trim the overlapping prefix, if any,
+			 * so the receive queue stays contiguous.
+			 */
 			pr_debug("uncoalesced seq=%x ack seq=%x delta=%d\n",
 				 MPTCP_SKB_CB(skb)->map_seq, ack_seq,
 				 delta);
+			if (mptcp_trim_dup_head(skb, delta)) {
+				/* skb is msk-owned here; mptcp_drop() refunds
+				 * it. Skip advancing ack_seq/bytes_received.
+				 */
+				mptcp_drop(sk, skb);
+				continue;
+			}
+			MPTCP_SKB_CB(skb)->map_seq += delta;
 			__skb_queue_tail(&sk->sk_receive_queue, skb);
 		}
 		msk->bytes_received += seq_delta;
