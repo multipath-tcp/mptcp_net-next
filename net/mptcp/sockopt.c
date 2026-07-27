@@ -632,7 +632,7 @@ static int mptcp_setsockopt_sol_tcp_congestion(struct mptcp_sock *msk, sockptr_t
 	return ret;
 }
 
-static int __mptcp_setsockopt_set_val(struct mptcp_sock *msk, int max,
+static int __mptcp_setsockopt_set_val(struct mptcp_sock *msk,
 				      int (*set_val)(struct sock *, int),
 				      int *msk_val, int val)
 {
@@ -876,18 +876,15 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 		ret = __mptcp_setsockopt_sol_tcp_nodelay(msk, val);
 		break;
 	case TCP_KEEPIDLE:
-		ret = __mptcp_setsockopt_set_val(msk, MAX_TCP_KEEPIDLE,
-						 &tcp_sock_set_keepidle_locked,
+		ret = __mptcp_setsockopt_set_val(msk, &tcp_sock_set_keepidle_locked,
 						 &msk->keepalive_idle, val);
 		break;
 	case TCP_KEEPINTVL:
-		ret = __mptcp_setsockopt_set_val(msk, MAX_TCP_KEEPINTVL,
-						 &tcp_sock_set_keepintvl,
+		ret = __mptcp_setsockopt_set_val(msk, &tcp_sock_set_keepintvl,
 						 &msk->keepalive_intvl, val);
 		break;
 	case TCP_KEEPCNT:
-		ret = __mptcp_setsockopt_set_val(msk, MAX_TCP_KEEPCNT,
-						 &tcp_sock_set_keepcnt,
+		ret = __mptcp_setsockopt_set_val(msk, &tcp_sock_set_keepcnt,
 						 &msk->keepalive_cnt,
 						 val);
 		break;
