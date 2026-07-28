@@ -373,7 +373,7 @@ sticky_done:
 	return err;
 }
 
-static void __ip6_sock_set_tclass(struct sock *sk, int val)
+void __ip6_sock_set_tclass(struct sock *sk, int val)
 {
 	u8 old_tclass = inet6_sk(sk)->tclass;
 
