@@ -1699,7 +1699,6 @@ done:
 static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 {
 	struct socket *sock = queue->sock;
-	struct inet_sock *inet = inet_sk(sock->sk);
 	int ret;
 
 	ret = kernel_getsockname(sock,
@@ -1723,8 +1722,17 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 		sock_set_priority(sock->sk, so_priority);
 
 	/* Set socket type of service */
-	if (inet->rcv_tos > 0)
-		ip_sock_set_tos(sock->sk, inet->rcv_tos);
+	if (sock->sk->sk_family == AF_INET) {
+		struct inet_sock *inet = inet_sk(sock->sk);
+
+		if (inet->rcv_tos > 0)
+			ip_sock_set_tos(sock->sk, inet->rcv_tos);
+	} else if (sock->sk->sk_family == AF_INET6) {
+		struct ipv6_pinfo *np = inet6_sk(sock->sk);
+
+		if (np->tclass > 0)
+			ip6_sock_set_tclass(sock->sk, np->tclass);
+	}
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
