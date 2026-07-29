@@ -285,6 +285,65 @@ static int sk_diag_fill(struct sock *sk, struct sk_buff *skb,
 				 net_admin);
 }
 
+/* Process a maximum of SKARR_SZ sockets at a time when walking hash buckets
+ * with bh disabled.
+ */
+#define SKARR_SZ 16
+
+static void tcp_diag_save_cursor(struct inet_diag_dump_data *cb_data, int type,
+				 unsigned int slot, struct sock *sk)
+{
+	sock_hold(sk);
+	inet_diag_dump_clear_cursor(cb_data);
+	cb_data->dump_cursor = sk;
+	cb_data->dump_cursor_slot = slot;
+	cb_data->dump_cursor_type = type;
+}
+
+static bool tcp_diag_bind_collect_sock(struct sock *sk, struct sock **sk_arr,
+				       int *num_arr, int *accum, int num)
+{
+	sock_hold(sk);
+	num_arr[*accum] = num;
+	sk_arr[*accum] = sk;
+
+	return ++*accum == SKARR_SZ;
+}
+
+static bool tcp_diag_bind_collect_owners(struct hlist_head *owners,
+					 struct sock **sk_arr, int *num_arr,
+					 int *accum, int *num, int s_num)
+{
+	struct sock *sk;
+
+	sk_for_each_bound(sk, owners) {
+		if (*num < s_num) {
+			(*num)++;
+			continue;
+		}
+
+		if (tcp_diag_bind_collect_sock(sk, sk_arr, num_arr, accum, *num))
+			return true;
+		(*num)++;
+	}
+
+	return false;
+}
+
+static bool tcp_diag_bind_collect_owners_continue(struct sock *sk,
+						  struct sock **sk_arr,
+						  int *num_arr, int *accum,
+						  int *num)
+{
+	hlist_for_each_entry_continue(sk, sk_bind_node) {
+		if (tcp_diag_bind_collect_sock(sk, sk_arr, num_arr, accum, *num))
+			return true;
+		(*num)++;
+	}
+
+	return false;
+}
+
 static void twsk_build_assert(void)
 {
 	BUILD_BUG_ON(offsetof(struct inet_timewait_sock, tw_family) !=
@@ -335,8 +394,15 @@ static void tcp_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
 		for (i = s_i; i <= hashinfo->lhash2_mask; i++) {
 			struct inet_listen_hashbucket *ilb;
 			struct hlist_nulls_node *node;
+			struct sock *sk_arr[SKARR_SZ];
+			struct sock *cursor;
+			int num_arr[SKARR_SZ];
+			int idx, accum, res;
+			bool use_cursor;
 
+resume_listen_walk:
 			num = 0;
+			accum = 0;
 			ilb = &hashinfo->lhash2[i];
 
 			if (hlist_nulls_empty(&ilb->nulls_head)) {
@@ -344,51 +410,79 @@ static void tcp_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
 				continue;
 			}
 			spin_lock(&ilb->lock);
-			sk_nulls_for_each(sk, node, &ilb->nulls_head) {
-				struct inet_sock *inet = inet_sk(sk);
-
-				if (!net_eq(sock_net(sk), net))
-					continue;
-
-				if (num < s_num) {
-					num++;
-					continue;
-				}
-
-				if (r->sdiag_family != AF_UNSPEC &&
-				    sk->sk_family != r->sdiag_family)
+			cursor = cb_data->dump_cursor;
+			use_cursor = cursor &&
+				     cb_data->dump_cursor_type ==
+				     INET_DIAG_DUMP_CURSOR_TCP_LISTEN &&
+				     cb_data->dump_cursor_slot == i &&
+				     !hlist_nulls_unhashed(&cursor->sk_nulls_node) &&
+				     cursor->sk_nulls_node.pprev != LIST_POISON2;
+			node = use_cursor ? cursor->sk_nulls_node.next :
+					    ilb->nulls_head.first;
+			hlist_nulls_for_each_entry_from(sk, node, sk_nulls_node) {
+				if (!use_cursor && num < s_num)
 					goto next_listen;
 
-				if (r->id.idiag_sport != inet->inet_sport &&
-				    r->id.idiag_sport)
-					goto next_listen;
-
-				if (!inet_diag_bc_sk(cb_data, sk))
-					goto next_listen;
-
-				if (inet_sk_diag_fill(sk, inet_csk(sk), skb,
-						      cb, r, NLM_F_MULTI,
-						      net_admin) < 0) {
-					spin_unlock(&ilb->lock);
-					goto done;
-				}
+				sock_hold(sk);
+				num_arr[accum] = num;
+				sk_arr[accum] = sk;
+				if (++accum == SKARR_SZ)
+					break;
 
 next_listen:
 				++num;
 			}
 			spin_unlock(&ilb->lock);
 
+			res = 0;
+			for (idx = 0; idx < accum; idx++) {
+				struct inet_sock *inet;
+
+				sk = sk_arr[idx];
+				if (!net_eq(sock_net(sk), net))
+					goto processed_listen_sk;
+
+				inet = inet_sk(sk);
+				if (r->sdiag_family != AF_UNSPEC &&
+				    sk->sk_family != r->sdiag_family)
+					goto processed_listen_sk;
+
+				if (r->id.idiag_sport != inet->inet_sport &&
+				    r->id.idiag_sport)
+					goto processed_listen_sk;
+
+				if (res >= 0 && inet_diag_bc_sk(cb_data, sk)) {
+					res = inet_sk_diag_fill(sk, inet_csk(sk),
+								skb, cb, r, NLM_F_MULTI,
+								net_admin);
+					if (res < 0)
+						num = num_arr[idx];
+				}
+processed_listen_sk:
+				if (res >= 0)
+					tcp_diag_save_cursor(cb_data,
+							     INET_DIAG_DUMP_CURSOR_TCP_LISTEN,
+							     i, sk);
+				sock_put(sk);
+			}
+			if (res < 0)
+				goto done;
+
+			cond_resched();
+
+			if (accum == SKARR_SZ) {
+				s_num = 0;
+				goto resume_listen_walk;
+			}
+
+			inet_diag_dump_clear_cursor(cb_data);
 			s_num = 0;
 		}
 skip_listen_ht:
+		inet_diag_dump_clear_cursor(cb_data);
 		cb->args[0] = 1;
 		s_i = num = s_num = 0;
 	}
-
-/* Process a maximum of SKARR_SZ sockets at a time when walking hash buckets
- * with bh disabled.
- */
-#define SKARR_SZ 16
 
 	/* Dump bound but inactive (not listening, connecting, etc.) sockets */
 	if (cb->args[0] == 1) {
@@ -399,8 +493,10 @@ skip_listen_ht:
 			struct inet_bind_hashbucket *ibb;
 			struct inet_bind2_bucket *tb2;
 			struct sock *sk_arr[SKARR_SZ];
+			struct sock *cursor;
 			int num_arr[SKARR_SZ];
 			int idx, accum, res;
+			bool use_cursor;
 
 resume_bind_walk:
 			num = 0;
@@ -412,34 +508,38 @@ resume_bind_walk:
 				continue;
 			}
 			spin_lock_bh(&ibb->lock);
-			inet_bind_bucket_for_each(tb2, &ibb->chain) {
-				if (!net_eq(ib2_net(tb2), net))
-					continue;
-
-				sk_for_each_bound(sk, &tb2->owners) {
-					struct inet_sock *inet = inet_sk(sk);
-
-					if (num < s_num)
-						goto next_bind;
-
-					if (sk->sk_state != TCP_CLOSE ||
-					    !inet->inet_num)
-						goto next_bind;
-
-					if (r->sdiag_family != AF_UNSPEC &&
-					    r->sdiag_family != sk->sk_family)
-						goto next_bind;
-
-					if (!inet_diag_bc_sk(cb_data, sk))
-						goto next_bind;
-
-					sock_hold(sk);
-					num_arr[accum] = num;
-					sk_arr[accum] = sk;
-					if (++accum == SKARR_SZ)
+			cursor = cb_data->dump_cursor;
+			use_cursor = cursor &&
+				     cb_data->dump_cursor_type ==
+				     INET_DIAG_DUMP_CURSOR_TCP_BIND &&
+				     cb_data->dump_cursor_slot == i &&
+				     !hlist_unhashed(&cursor->sk_bind_node) &&
+				     cursor->sk_bind_node.pprev != LIST_POISON2 &&
+				     inet_csk(cursor)->icsk_bind2_hash;
+			if (use_cursor) {
+				tb2 = inet_csk(cursor)->icsk_bind2_hash;
+				sk = cursor;
+				if (tcp_diag_bind_collect_owners_continue(sk, sk_arr,
+									  num_arr,
+									  &accum,
+									  &num))
+					goto pause_bind_walk;
+				hlist_for_each_entry_continue(tb2, node) {
+					if (tcp_diag_bind_collect_owners(&tb2->owners,
+									 sk_arr,
+									 num_arr,
+									 &accum,
+									 &num, 0))
 						goto pause_bind_walk;
-next_bind:
-					num++;
+				}
+			} else {
+				inet_bind_bucket_for_each(tb2, &ibb->chain) {
+					if (tcp_diag_bind_collect_owners(&tb2->owners,
+									 sk_arr,
+									 num_arr,
+									 &accum,
+									 &num, s_num))
+						goto pause_bind_walk;
 				}
 			}
 pause_bind_walk:
@@ -447,15 +547,33 @@ pause_bind_walk:
 
 			res = 0;
 			for (idx = 0; idx < accum; idx++) {
-				if (res >= 0) {
-					res = inet_sk_diag_fill(sk_arr[idx],
-								NULL, skb, cb,
+				struct inet_sock *inet;
+
+				sk = sk_arr[idx];
+				if (!net_eq(sock_net(sk), net))
+					goto put_bind_sk;
+
+				inet = inet_sk(sk);
+				if (sk->sk_state != TCP_CLOSE || !inet->inet_num)
+					goto put_bind_sk;
+
+				if (r->sdiag_family != AF_UNSPEC &&
+				    r->sdiag_family != sk->sk_family)
+					goto put_bind_sk;
+
+				if (res >= 0 && inet_diag_bc_sk(cb_data, sk)) {
+					res = inet_sk_diag_fill(sk, NULL, skb, cb,
 								r, NLM_F_MULTI,
 								net_admin);
 					if (res < 0)
 						num = num_arr[idx];
 				}
-				sock_put(sk_arr[idx]);
+				if (res >= 0)
+					tcp_diag_save_cursor(cb_data,
+							     INET_DIAG_DUMP_CURSOR_TCP_BIND,
+							     i, sk);
+put_bind_sk:
+				sock_put(sk);
 			}
 			if (res < 0)
 				goto done;
@@ -463,13 +581,15 @@ pause_bind_walk:
 			cond_resched();
 
 			if (accum == SKARR_SZ) {
-				s_num = num + 1;
+				s_num = 0;
 				goto resume_bind_walk;
 			}
 
+			inet_diag_dump_clear_cursor(cb_data);
 			s_num = 0;
 		}
 skip_bind_ht:
+		inet_diag_dump_clear_cursor(cb_data);
 		cb->args[0] = 2;
 		s_i = num = s_num = 0;
 	}
@@ -482,42 +602,33 @@ skip_bind_ht:
 		spinlock_t *lock = inet_ehash_lockp(hashinfo, i);
 		struct hlist_nulls_node *node;
 		struct sock *sk_arr[SKARR_SZ];
+		struct sock *cursor;
 		int num_arr[SKARR_SZ];
 		int idx, accum, res;
+		bool use_cursor;
 
 		if (hlist_nulls_empty(&head->chain))
 			continue;
 
-		if (i > s_i)
+		if (i > s_i) {
+			inet_diag_dump_clear_cursor(cb_data);
 			s_num = 0;
+		}
 
 next_chunk:
 		num = 0;
 		accum = 0;
 		spin_lock_bh(lock);
-		sk_nulls_for_each(sk, node, &head->chain) {
-			int state;
-
-			if (!net_eq(sock_net(sk), net))
-				continue;
-			if (num < s_num)
-				goto next_normal;
-			state = (sk->sk_state == TCP_TIME_WAIT) ?
-				READ_ONCE(inet_twsk(sk)->tw_substate) : sk->sk_state;
-			if (!(idiag_states & (1 << state)))
-				goto next_normal;
-			if (r->sdiag_family != AF_UNSPEC &&
-			    sk->sk_family != r->sdiag_family)
-				goto next_normal;
-			if (r->id.idiag_sport != htons(READ_ONCE(sk->sk_num)) &&
-			    r->id.idiag_sport)
-				goto next_normal;
-			if (r->id.idiag_dport != sk->sk_dport &&
-			    r->id.idiag_dport)
-				goto next_normal;
-			twsk_build_assert();
-
-			if (!inet_diag_bc_sk(cb_data, sk))
+		cursor = cb_data->dump_cursor;
+		use_cursor = cursor &&
+			     cb_data->dump_cursor_type ==
+			     INET_DIAG_DUMP_CURSOR_TCP_EHASH &&
+			     cb_data->dump_cursor_slot == i &&
+			     !hlist_nulls_unhashed(&cursor->sk_nulls_node) &&
+			     cursor->sk_nulls_node.pprev != LIST_POISON2;
+		node = use_cursor ? cursor->sk_nulls_node.next : head->chain.first;
+		hlist_nulls_for_each_entry_from(sk, node, sk_nulls_node) {
+			if (!use_cursor && num < s_num)
 				goto next_normal;
 
 			if (!refcount_inc_not_zero(&sk->sk_refcnt))
@@ -534,13 +645,42 @@ next_normal:
 
 		res = 0;
 		for (idx = 0; idx < accum; idx++) {
-			if (res >= 0) {
-				res = sk_diag_fill(sk_arr[idx], skb, cb, r,
-						   NLM_F_MULTI, net_admin);
+			int state;
+
+			sk = sk_arr[idx];
+			if (!net_eq(sock_net(sk), net))
+				goto put_estab_sk;
+
+			state = (sk->sk_state == TCP_TIME_WAIT) ?
+				READ_ONCE(inet_twsk(sk)->tw_substate) : sk->sk_state;
+			if (!(idiag_states & (1 << state)))
+				goto put_estab_sk;
+
+			if (r->sdiag_family != AF_UNSPEC &&
+			    sk->sk_family != r->sdiag_family)
+				goto put_estab_sk;
+
+			if (r->id.idiag_sport != htons(READ_ONCE(sk->sk_num)) &&
+			    r->id.idiag_sport)
+				goto put_estab_sk;
+
+			if (r->id.idiag_dport != sk->sk_dport &&
+			    r->id.idiag_dport)
+				goto put_estab_sk;
+
+			twsk_build_assert();
+			if (res >= 0 && inet_diag_bc_sk(cb_data, sk)) {
+				res = sk_diag_fill(sk, skb, cb, r, NLM_F_MULTI,
+						   net_admin);
 				if (res < 0)
 					num = num_arr[idx];
 			}
-			sock_gen_put(sk_arr[idx]);
+			if (res >= 0)
+				tcp_diag_save_cursor(cb_data,
+						     INET_DIAG_DUMP_CURSOR_TCP_EHASH,
+						     i, sk);
+put_estab_sk:
+			sock_gen_put(sk);
 		}
 		if (res < 0)
 			break;
@@ -548,9 +688,11 @@ next_normal:
 		cond_resched();
 
 		if (accum == SKARR_SZ) {
-			s_num = num + 1;
+			s_num = 0;
 			goto next_chunk;
 		}
+
+		inet_diag_dump_clear_cursor(cb_data);
 	}
 
 done:

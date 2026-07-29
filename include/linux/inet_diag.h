@@ -6,6 +6,7 @@
 #include <uapi/linux/inet_diag.h>
 
 struct inet_hashinfo;
+struct sock;
 
 struct inet_diag_handler {
 	struct module	*owner;
@@ -32,12 +33,24 @@ struct inet_diag_handler {
 };
 
 struct bpf_sk_storage_diag;
+
+enum inet_diag_dump_cursor_type {
+	INET_DIAG_DUMP_CURSOR_NONE,
+	INET_DIAG_DUMP_CURSOR_TCP_LISTEN,
+	INET_DIAG_DUMP_CURSOR_TCP_BIND,
+	INET_DIAG_DUMP_CURSOR_TCP_EHASH,
+	INET_DIAG_DUMP_CURSOR_MPTCP_LISTEN,
+};
+
 struct inet_diag_dump_data {
 	struct nlattr *req_nlas[__INET_DIAG_REQ_MAX];
 #define inet_diag_nla_bc req_nlas[INET_DIAG_REQ_BYTECODE]
 #define inet_diag_nla_bpf_stgs req_nlas[INET_DIAG_REQ_SK_BPF_STORAGES]
 
 	struct bpf_sk_storage_diag *bpf_stg_diag;
+	struct sock *dump_cursor;
+	unsigned int dump_cursor_slot;
+	u8 dump_cursor_type;
 	bool mark_needed;	/* INET_DIAG_BC_MARK_COND present. */
 #ifdef CONFIG_SOCK_CGROUP_DATA
 	bool cgroup_needed;	/* INET_DIAG_BC_CGROUP_COND present. */
@@ -52,6 +65,8 @@ int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 		      u16 nlmsg_flags, bool net_admin);
 
 int inet_diag_bc_sk(const struct inet_diag_dump_data *cb_data, struct sock *sk);
+
+void inet_diag_dump_clear_cursor(struct inet_diag_dump_data *cb_data);
 
 void inet_diag_msg_common_fill(struct inet_diag_msg *r, struct sock *sk);
 

@@ -891,10 +891,23 @@ static int inet_diag_dump_start_compat(struct netlink_callback *cb)
 	return __inet_diag_dump_start(cb, sizeof(struct inet_diag_req));
 }
 
+void inet_diag_dump_clear_cursor(struct inet_diag_dump_data *cb_data)
+{
+	if (!cb_data->dump_cursor)
+		return;
+
+	sock_gen_put(cb_data->dump_cursor);
+	cb_data->dump_cursor = NULL;
+	cb_data->dump_cursor_slot = 0;
+	cb_data->dump_cursor_type = INET_DIAG_DUMP_CURSOR_NONE;
+}
+EXPORT_SYMBOL_GPL(inet_diag_dump_clear_cursor);
+
 static int inet_diag_dump_done(struct netlink_callback *cb)
 {
 	struct inet_diag_dump_data *cb_data = cb->data;
 
+	inet_diag_dump_clear_cursor(cb_data);
 	bpf_sk_storage_diag_free(cb_data->bpf_stg_diag);
 	kfree(cb->data);
 
