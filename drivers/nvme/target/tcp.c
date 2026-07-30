@@ -1725,6 +1725,14 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 	/* Set socket type of service */
 	if (inet->rcv_tos > 0)
 		ip_sock_set_tos(sock->sk, inet->rcv_tos);
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sock->sk->sk_family == AF_INET6) {
+		struct ipv6_pinfo *np = inet6_sk(sock->sk);
+
+		if (np->tclass > 0)
+			ip6_sock_set_tclass(sock->sk, np->tclass);
+	}
+#endif
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
