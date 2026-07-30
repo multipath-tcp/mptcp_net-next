@@ -396,6 +396,42 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 	return -EOPNOTSUPP;
 }
 
+#if IS_ENABLED(CONFIG_IPV6)
+static int mptcp_setsockopt_v6_set_tclass(struct mptcp_sock *msk, int optname,
+					  sockptr_t optval, unsigned int optlen)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *sk = (struct sock *)msk;
+	int err, val;
+
+	if (sk->sk_family != AF_INET6)
+		return -EOPNOTSUPP;
+
+	err = ipv6_setsockopt(sk, SOL_IPV6, optname, optval, optlen);
+
+	if (err != 0)
+		return err;
+
+	lock_sock(sk);
+	sockopt_seq_inc(msk);
+	val = READ_ONCE(inet6_sk(sk)->tclass);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		bool slow;
+
+		if (ssk->sk_family != AF_INET6)
+			continue;
+
+		slow = lock_sock_fast(ssk);
+		__ip6_sock_set_tclass(ssk, val);
+		unlock_sock_fast(ssk, slow);
+	}
+	release_sock(sk);
+
+	return 0;
+}
+#endif
+
 static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 			       sockptr_t optval, unsigned int optlen)
 {
@@ -438,6 +474,11 @@ static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 
 		release_sock(sk);
 		break;
+#if IS_ENABLED(CONFIG_IPV6)
+	case IPV6_TCLASS:
+		return mptcp_setsockopt_v6_set_tclass(msk, optname, optval,
+						      optlen);
+#endif
 	}
 
 	return ret;
@@ -1505,6 +1546,13 @@ static int mptcp_getsockopt_v6(struct mptcp_sock *msk, int optname,
 	case IPV6_FREEBIND:
 		return mptcp_put_int_option(msk, optval, optlen,
 					    inet_test_bit(FREEBIND, sk));
+#if IS_ENABLED(CONFIG_IPV6)
+	case IPV6_TCLASS:
+		if (sk->sk_family != AF_INET6)
+			return -EOPNOTSUPP;
+		return mptcp_put_int_option(msk, optval, optlen,
+					    READ_ONCE(inet6_sk(sk)->tclass));
+#endif
 	}
 
 	return -EOPNOTSUPP;
@@ -1619,6 +1667,10 @@ static void sync_socket_options(struct mptcp_sock *msk, struct sock *ssk)
 	syncnt = READ_ONCE(inet_csk(sk)->icsk_syn_retries);
 	if (syncnt > 0 && tcp_sock_set_syncnt(ssk, syncnt))
 		pr_warn("Failed to sync TCP_SYNCNT=%u to subflow\n", syncnt);
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6 && ssk->sk_family == AF_INET6)
+		__ip6_sock_set_tclass(ssk, READ_ONCE(inet6_sk(sk)->tclass));
+#endif
 }
 
 void mptcp_sockopt_sync_locked(struct mptcp_sock *msk, struct sock *ssk)
