@@ -1667,7 +1667,15 @@ int __mptcp_subflow_connect(struct sock *sk, const struct mptcp_pm_local *local,
 	if (addr.ss_family == AF_INET6)
 		addrlen = sizeof(struct sockaddr_in6);
 #endif
-	ssk->sk_bound_dev_if = local->ifindex;
+	/* Only override the bound device if the path manager picked one.
+	 * When local->ifindex == 0 the subflow must inherit sk_bound_dev_if
+	 * synced from the msk via mptcp_sockopt_sync_locked() - otherwise
+	 * SO_BINDTODEVICE / SO_BINDTOIFINDEX set on the master socket would
+	 * be silently cleared, letting traffic route over unintended
+	 * interfaces (bypassing VRF / interface-binding restrictions).
+	 */
+	if (local->ifindex)
+		ssk->sk_bound_dev_if = local->ifindex;
 	err = kernel_bind(sf, (struct sockaddr_unsized *)&addr, addrlen);
 	if (err) {
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_JOINSYNTXBINDERR);
