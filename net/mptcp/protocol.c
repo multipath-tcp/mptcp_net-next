@@ -3706,6 +3706,22 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 #endif
 		mptcp_copy_ip_options(nsk, sk);
 
+	if (ssk->sk_family == AF_INET) {
+		inet_sk(nsk)->rcv_tos = inet_sk(ssk)->rcv_tos;
+		__ip_sock_set_tos(nsk, inet_sk(ssk)->tos);
+	}
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	else if (ssk->sk_family == AF_INET6 &&
+		 ipv6_addr_v4mapped(&ssk->sk_v6_daddr)) {
+		inet_sk(nsk)->rcv_tos = inet_sk(ssk)->rcv_tos;
+		__ip_sock_set_tos(nsk, inet_sk(ssk)->tos);
+	}
+	else if (ssk->sk_family == AF_INET6) {
+		inet6_sk(nsk)->rcv_flowinfo = inet6_sk(ssk)->rcv_flowinfo;
+		__ip6_sock_set_tclass(nsk, inet6_sk(ssk)->tclass);
+	}
+#endif
+
 	msk = mptcp_sk(nsk);
 	WRITE_ONCE(msk->local_key, subflow_req->local_key);
 	WRITE_ONCE(msk->token, subflow_req->token);
