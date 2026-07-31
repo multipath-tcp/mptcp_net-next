@@ -6478,7 +6478,7 @@ L:	linux-cifs@vger.kernel.org
 L:	samba-technical@lists.samba.org (moderated for non-subscribers)
 S:	Supported
 W:	https://wiki.samba.org/index.php/LinuxCIFS
-T:	git https://git.samba.org/sfrench/cifs-2.6.git
+T:	git https://git.samba.org/sfrench/cifs-2.6.git for-next
 F:	Documentation/admin-guide/cifs/
 F:	fs/smb/client/
 F:	fs/smb/common/
@@ -9617,7 +9617,7 @@ M:	Chao Yu <chao@kernel.org>
 R:	Yue Hu <zbestahu@gmail.com>
 R:	Jeffle Xu <jefflexu@linux.alibaba.com>
 R:	Sandeep Dhavale <dhavale@google.com>
-R:	Hongbo Li <lihongbo22@huawei.com>
+R:	Hongbo Li <hongbohbli@tencent.com>
 R:	Chunhai Guo <guochunhai@vivo.com>
 L:	linux-erofs@lists.ozlabs.org
 S:	Maintained
@@ -11108,6 +11108,7 @@ F:	drivers/platform/x86/gpd-pocket-fan.c
 
 GPIB DRIVERS
 M:	Dave Penkler <dpenkler@gmail.com>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 S:	Maintained
 F:	drivers/gpib/
 F:	include/uapi/linux/gpib.h
@@ -14142,7 +14143,7 @@ R:	Sergey Senozhatsky <senozhatsky@chromium.org>
 R:	Tom Talpey <tom@talpey.com>
 L:	linux-cifs@vger.kernel.org
 S:	Maintained
-T:	git https://git.samba.org/ksmbd.git
+T:	git https://git.samba.org/ksmbd.git ksmbd-for-next
 F:	Documentation/filesystems/smb/ksmbd.rst
 F:	fs/smb/common/
 F:	fs/smb/server/
@@ -14192,7 +14193,7 @@ F:	virt/kvm/*
 KERNEL VIRTUAL MACHINE FOR ARM64 (KVM/arm64)
 M:	Marc Zyngier <maz@kernel.org>
 M:	Oliver Upton <oupton@kernel.org>
-R:	Fuad Tabba <tabba@google.com>
+R:	Fuad Tabba <fuad.tabba@linux.dev>
 R:	Joey Gouly <joey.gouly@arm.com>
 R:	Steffen Eiden <seiden@linux.ibm.com>
 R:	Suzuki K Poulose <suzuki.poulose@arm.com>
@@ -14886,7 +14887,7 @@ X:	drivers/macintosh/via-macii.c
 
 LINUX FOR POWERPC (32-BIT AND 64-BIT)
 M:	Madhavan Srinivasan <maddy@linux.ibm.com>
-M:	Michael Ellerman <mpe@ellerman.id.au>
+R:	Michael Ellerman <mpe@ellerman.id.au>
 R:	Nicholas Piggin <npiggin@gmail.com>
 R:	Christophe Leroy (CS GROUP) <chleroy@kernel.org>
 L:	linuxppc-dev@lists.ozlabs.org
@@ -19301,7 +19302,7 @@ F:	fs/ntfs3/
 
 NTSYNC SYNCHRONIZATION PRIMITIVE DRIVER
 M:	Elizabeth Figura <zfigura@codeweavers.com>
-L:	wine-devel@winehq.org
+L:	wine-devel@list.winehq.org
 S:	Supported
 F:	Documentation/userspace-api/ntsync.rst
 F:	drivers/misc/ntsync.c
@@ -29400,7 +29401,7 @@ F:	net/xdp/
 F:	tools/testing/selftests/bpf/*xsk*
 
 XEN BLOCK SUBSYSTEM
-M:	Roger Pau Monné <roger.pau@citrix.com>
+M:	Roger Pau Monné <roger@xenproject.org>
 L:	xen-devel@lists.xenproject.org (moderated for non-subscribers)
 S:	Supported
 F:	drivers/block/xen*
