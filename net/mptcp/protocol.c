@@ -416,7 +416,7 @@ static bool mptcp_prune_ofo_queue(struct sock *sk, u64 seq)
 	} while (node);
 
 	if (pruned)
-		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFO_PRUNED);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OFOPRUNED);
 
 out:
 	mem = (unsigned int)sk_rmem_alloc_get(sk);
