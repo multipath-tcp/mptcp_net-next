@@ -1,2 +1,30 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-diag-fix-stack-buffer-overflow-in-get_subflow_info
+From: Jiangshan Yi <yijiangshan@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: diag: fix stack buffer overflow in get_subflow_info()
+
+get_subflow_info() parses the subflow address string with:
+
+	char saddr[64], daddr[64];
+
+	ret = sscanf(subflow_addrs, "%[^:]:%d %[^:]:%d",
+		     saddr, &sport, daddr, &dport);
+
+The subflow_addrs buffer holds up to 1024 bytes and is taken directly
+from the command line ("-c" argument). The "%[^:]" conversions have no
+maximum field width, so if the address substring before the ':' exceeds
+63 bytes, sscanf() writes past the end of the 64-byte saddr/daddr stack
+buffers. This overflows the stack, corrupting adjacent stack data such
+as the saved return address, and can crash the tool or lead to
+out-of-bounds writes controlled by user-supplied input.
+
+Bound both string conversions to the destination buffer size by adding
+an explicit maximum field width of 63 (leaving room for the terminating
+NUL), so at most 63 bytes are written into each 64-byte buffer:
+
+	ret = sscanf(subflow_addrs, "%63[^:]:%d %63[^:]:%d",
+		     saddr, &sport, daddr, &dport);
+
+The subflow address can be passed in argument, so fixing this is helpful
+when the tool is manually used.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Jiangshan Yi <yijiangshan@kylinos.cn>
