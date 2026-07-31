@@ -1,2 +1,25 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-support-MSG_ERRQUEUE-on-the-parent-socket
+From: David Carlier <devnexen@gmail.com>
+Subject: [PATCH] mptcp: support MSG_ERRQUEUE on the parent socket
+
+Splice pending err skbs from each subflow's error queue onto the parent
+msk's error queue at error-report time, so poll() and recvmsg(MSG_ERRQUEUE)
+on the parent socket observe TX timestamps through the standard inet ABI.
+
+The splice filters by SO_EE_ORIGIN: TIMESTAMPING events forward to the
+parent because they are tied to user-handed data, not to a specific
+path; subflow-level ICMP errors are dropped because the legacy RECVERR
+ABI cannot meaningfully convey their per-subflow peer identity to
+single-path-aware userspace. Such events will be carried by a future
+MPTCP_RECERR channel.
+
+Forwarded events all go through sock_queue_err_skb(), which re-homes
+skb->sk onto the parent and charges sk_rmem_alloc, so the parent's error
+queue stays bounded by sk_rcvbuf and is dropped under rmem pressure
+(sk_rmem_alloc + truesize >= sk_rcvbuf), matching tcp's sk_rcvbuf-gated
+tx-timestamp path and ip_icmp_error() / ipv6_icmp_error(). The
+MSG_ERRQUEUE branch of mptcp_recvmsg() forwards to inet_recv_error()
+directly, and poll() advertises EPOLLERR purely on the parent's sk_err /
+sk_error_queue, matching tcp_poll().
+
+Signed-off-by: David Carlier <devnexen@gmail.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
