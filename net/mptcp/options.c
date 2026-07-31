@@ -1193,7 +1193,7 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 	if (likely(mem <= READ_ONCE(sk->sk_rcvbuf)))
 		return false;
 
-	/* Avoid silently dropping pure acks, fin or zero win probes. */
+	/* Avoid silently dropping pure acks, fin or already-acked segments. */
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq ||
 	    TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN ||
 	    !after(TCP_SKB_CB(skb)->end_seq, tcp_sk(ssk)->rcv_nxt))
@@ -1202,6 +1202,10 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 	/* Dropped due to memory constraints, schedule an ack. */
 	inet_csk(ssk)->icsk_ack.pending |= ICSK_ACK_NOMEM | ICSK_ACK_NOW;
 	inet_csk_schedule_ack(ssk);
+
+	/* In fallback mode: skb is dropped before the TCP recv queue. */
+	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
+
 	return true;
 }
 
