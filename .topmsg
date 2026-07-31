@@ -1,53 +1,36 @@
 From: Shardul Bankar <shardul.b@mpiricsoftware.com>
 Subject: [PATCH] mptcp: pm: fix memory leak from alloc-during-teardown race
 
-mptcp_pm_destroy() frees the entries on msk->pm.anno_list under
-msk->pm.lock and then, for the userspace PM, frees the entries on
-msk->pm.userspace_pm_local_addr_list under the same lock. The lock is
-dropped between the two.
+mptcp_pm_destroy() empties msk->pm.anno_list and
+msk->pm.userspace_pm_local_addr_list under msk->pm.lock during socket
+teardown, dropping the lock between the two.
 
 A concurrent userspace PM genl ANNOUNCE on the same msk holds a sock
 reference via mptcp_token_get_sock() and, in
 mptcp_pm_nl_announce_doit(), calls
 mptcp_userspace_pm_append_new_local_addr() and
-mptcp_pm_alloc_anno_list(). Both take msk->pm.lock briefly to add to
-their respective lists. Because the genl handler holds a sock
-reference, mptcp_pm_destroy() may run on the same msk via
-mptcp_disconnect(), which invokes mptcp_destroy_common() without
-dropping the sock refcount, before the handler completes.
+mptcp_pm_announced_alloc(). Both take msk->pm.lock briefly to add to
+their respective lists. Because the genl handler holds a sock reference,
+mptcp_pm_destroy() may run on the same msk via mptcp_disconnect(), which
+invokes mptcp_destroy_common() without dropping the sock refcount,
+before the handler completes.
 
 If the lock acquisitions interleave such that mptcp_pm_destroy() empties
 a list first, the later alloc adds its entry to a list head that nothing
 else iterates for this msk, and the entry leaks. kmemleak reports both
-192-byte mptcp_pm_add_entry objects (from mptcp_pm_alloc_anno_list())
-and 64-byte mptcp_pm_addr_entry objects (from
+mptcp_pm_add_addr objects (from mptcp_pm_announced_alloc()) and
+mptcp_pm_addr_entry objects (from
 mptcp_userspace_pm_append_new_local_addr()) under sustained concurrent
 ANNOUNCE + close load against the userspace PM.
 
 Add an MPTCP_PM_DESTROYING bit in msk->pm.status, set by
-mptcp_pm_destroy() under pm.lock before the lists are freed and checked
-under pm.lock by the alloc paths. Either the alloc takes pm.lock first,
-in which case its entry is on the list when mptcp_pm_destroy() frees it;
-or mptcp_pm_destroy() takes pm.lock first, in which case the later alloc
-observes the bit and refuses.
+mptcp_pm_destroy() under pm.lock before the lists are emptied and
+checked under pm.lock by the alloc paths. Either the alloc takes pm.lock
+first, in which case its entry is on the list when mptcp_pm_destroy()
+frees it; or mptcp_pm_destroy() takes pm.lock first, in which case the
+later alloc observes the bit and refuses.
 
-The bit lives in the pm data reset group, so mptcp_pm_data_reset()
-clears it. That is correct on the final-close path, where
-mptcp_pm_destroy() is not followed by mptcp_pm_data_reset(). On the
-mptcp_disconnect() reuse path, however, mptcp_pm_data_reset() runs after
-mptcp_pm_destroy() and clears the bit without pm.lock, so an append that
-takes pm.lock after the reset can still add an entry; and
-mptcp_pm_data_reset() may re-select a non-userspace path manager for the
-reused socket, whose mptcp_pm_destroy() would then not free
-userspace_pm_local_addr_list. Free that list unconditionally in
-mptcp_pm_destroy(), dropping the mptcp_pm_is_userspace() guard, so such
-an entry is always reclaimed; the list is empty for a kernel-PM socket,
-so this is a no-op there.
-
-Found by an MPTCP protocol-flow harness extending BRF
-(arXiv:2305.08782). The userspace PM baseline of ~0.3 kmemleak
-reports/minute is removed by the fence; the rarer disconnect/reuse
-residual is reclaimed by the unconditional free above.
+Found by an MPTCP protocol-flow harness extending BRF (arXiv:2305.08782).
 
 Fixes: 9ab4807c84a4 ("mptcp: netlink: Add MPTCP_PM_CMD_ANNOUNCE")
 Assisted-by: Claude:claude-opus-4-7
