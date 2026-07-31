@@ -1,2 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-cover-IP_RECVERR-sockopt-propagation
+From: David Carlier <devnexen@gmail.com>
+Subject: [PATCH] selftests: mptcp: cover IP_RECVERR sockopt propagation
+
+Exercise setsockopt/getsockopt of IP_RECVERR and IPV6_RECVERR on the
+MPTCP parent socket, including the empty-errqueue EAGAIN contract on
+MSG_ERRQUEUE|MSG_DONTWAIT.
+
+End-to-end errqueue delivery (ICMP, TX timestamps, zerocopy) depends on
+subflow-side producers that are out of scope for this series and will be
+covered by follow-up work.
+
+Assisted-by: Codex:gpt-5
+Signed-off-by: David Carlier <devnexen@gmail.com>
+Acked-by: Paolo Abeni <pabeni@redhat.com>
