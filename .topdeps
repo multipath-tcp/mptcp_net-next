@@ -1,1 +1,1 @@
-t/selftests-mptcp-cover-IP_RECVERR-sockopt-propagation
+t/selftests-mptcp-diag-fix-stack-buffer-overflow-in-get_subflow_info
