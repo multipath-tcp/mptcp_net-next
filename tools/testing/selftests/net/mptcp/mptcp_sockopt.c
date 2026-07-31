@@ -39,7 +39,7 @@ static int pf = AF_INET;
 #define SOL_MPTCP 284
 #endif
 #ifndef TCP_IS_MPTCP
-#define TCP_IS_MPTCP 76
+#define TCP_IS_MPTCP 43
 #endif
 
 static int proto_tx = IPPROTO_MPTCP;
@@ -591,16 +591,13 @@ static void do_getsockopt_mptcp_full_info(struct so_state *s, int fd)
 
 static int is_mptcp_socket(int fd)
 {
-	int is_mptcp = 0;
+	int is_mptcp = -1;
 	socklen_t optlen;
 
 	optlen = sizeof(is_mptcp);
 	if (getsockopt(fd, IPPROTO_TCP, TCP_IS_MPTCP, &is_mptcp, &optlen) < 0) {
-		if (errno == ENOPROTOOPT) {
-			perror("TCP_IS_MPTCP test skipped");
-			return 0;
-		}
-		xerror("getsockopt TCP_IS_MPTCP");
+		if (errno != ENOPROTOOPT && errno != EOPNOTSUPP)
+			xerror("getsockopt TCP_IS_MPTCP");
 	}
 
 	return is_mptcp;
@@ -608,7 +605,7 @@ static int is_mptcp_socket(int fd)
 
 static void do_getsockopts(struct so_state *s, int fd, size_t r, size_t w)
 {
-	if (!is_mptcp_socket(fd))
+	if (is_mptcp_socket(fd) <= 0)
 		return;
 
 	do_getsockopt_mptcp_info(s, fd, w);
@@ -777,7 +774,7 @@ static void connect_one_server(int fd, int unixfd)
 	if (eof)
 		total += 1; /* sequence advances due to FIN */
 
-	if (is_mptcp_socket(fd))
+	if (is_mptcp_socket(fd) > 0)
 		assert(s.mptcpi_rcv_delta == (uint64_t)total);
 
 	if (inq)
@@ -1012,7 +1009,7 @@ static void process_one_client(int fd, int unixfd)
 	r += ret;
 
 	do_getsockopts(&s, fd, r, w);
-	if (is_mptcp_socket(fd))
+	if (is_mptcp_socket(fd) > 0)
 		check_stat_equal("mptcpi_rcv_delta", s.mptcpi_rcv_delta,
 				 (uint64_t)r + 1); /* +1 for FIN */
 
