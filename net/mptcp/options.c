@@ -1202,7 +1202,7 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 	inet_csk(ssk)->icsk_ack.pending |= ICSK_ACK_NOMEM | ICSK_ACK_NOW;
 	inet_csk_schedule_ack(ssk);
 
-	/* In fallback mode: skb is dropped before the TCP recv queue. */
+	/* Plain TCP (fallback) and skb is dropped before the TCP recv queue. */
 	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
 
 	return true;
