@@ -183,6 +183,13 @@ again:
 	}
 }
 
+static bool expect_all_features(void)
+{
+	char *env = getenv("SELFTESTS_MPTCP_LIB_EXPECT_ALL_FEATURES");
+
+	return env && strcmp(env, "1") == 0;
+}
+
 static int sock_listen_mptcp(const char * const listenaddr,
 			     const char * const port)
 {
@@ -797,14 +804,21 @@ static void test_ip_recverr_sockopt(int fd)
 	}
 
 	r = setsockopt(fd, level, optname, &one, sizeof(one));
-	if (r)
-		die_perror("setsockopt recverr on");
+	if (r) {
+		/* For older kernels not supporting IP(V6)_RECVERR yet */
+		if (errno == EOPNOTSUPP && !expect_all_features()) {
+			fprintf(stderr, "IP(V6)_RECVERR not supported, SKIP\n");
+			return;
+		}
+
+		die_perror("setsockopt IP(V6)_RECVERR on");
+	}
 
 	r = getsockopt(fd, level, optname, &val, &s);
 	if (r)
-		die_perror("getsockopt recverr on");
+		die_perror("getsockopt IP(V6)_RECVERR on");
 	if (s != sizeof(val) || val != one)
-		xerror("recverr on mismatch val=%d len=%u", val, s);
+		xerror("IP(V6)_RECVERR on mismatch val=%d len=%u", val, s);
 
 	r = recvmsg(fd, &msg, MSG_ERRQUEUE | MSG_DONTWAIT);
 	if (r != -1 || errno != EAGAIN)
@@ -813,15 +827,15 @@ static void test_ip_recverr_sockopt(int fd)
 
 	r = setsockopt(fd, level, optname, &zero, sizeof(zero));
 	if (r)
-		die_perror("setsockopt recverr off");
+		die_perror("setsockopt IP(V6)_RECVERR off");
 
 	val = -1;
 	s = sizeof(val);
 	r = getsockopt(fd, level, optname, &val, &s);
 	if (r)
-		die_perror("getsockopt recverr off");
+		die_perror("getsockopt IP(V6)_RECVERR off");
 	if (s != sizeof(val) || val != zero)
-		xerror("recverr off mismatch val=%d len=%u", val, s);
+		xerror("IP(V6)_RECVERR off mismatch val=%d len=%u", val, s);
 }
 
 static int client(int pipefd)
