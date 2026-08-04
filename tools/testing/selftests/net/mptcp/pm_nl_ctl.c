@@ -32,7 +32,7 @@ static void syntax(char *argv[])
 	fprintf(stderr, "\tadd [flags signal|subflow|backup|fullmesh] [id <nr>] [dev <name>] <ip>\n");
 	fprintf(stderr, "\tann <local-ip> id <local-id> token <token> [port <local-port>] [dev <name>]\n");
 	fprintf(stderr, "\trem id <local-id> token <token>\n");
-	fprintf(stderr, "\tcsf lip <local-ip> lid <local-id> rip <remote-ip> rport <remote-port> token <token>\n");
+	fprintf(stderr, "\tcsf lip <local-ip> [lid <local-id>] rip <remote-ip> rport <remote-port> token <token>\n");
 	fprintf(stderr, "\tdsf lip <local-ip> lport <local-port> rip <remote-ip> rport <remote-port> token <token>\n");
 	fprintf(stderr, "\tdel <id> [<ip>]\n");
 	fprintf(stderr, "\tget <id>\n");
@@ -481,7 +481,7 @@ int csf(int fd, int pm_family, int argc, char *argv[])
 	off = init_genl_req(data, pm_family, MPTCP_PM_CMD_SUBFLOW_CREATE,
 			    MPTCP_PM_VER);
 
-	if (argc < 12)
+	if (argc < 10)
 		syntax(argv);
 
 	/* Params recorded in this order:
@@ -557,9 +557,9 @@ int csf(int fd, int pm_family, int argc, char *argv[])
 			off += NLMSG_ALIGN(rta->rta_len);
 		}
 
-		if (arg == 0) {
+		if (arg == 0 && params[1]) {
 			/* id */
-			id = atoi(params[arg + 1]);
+			id = atoi(params[1]);
 			rta = (void *)(data + off);
 			rta->rta_type = MPTCP_PM_ADDR_ATTR_ID;
 			rta->rta_len = RTA_LENGTH(1);

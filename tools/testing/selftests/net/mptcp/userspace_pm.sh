@@ -847,6 +847,68 @@ test_subflows_v4_v6_mix()
 	sleep 0.5
 }
 
+test_addr_id_overflow()
+{
+	print_title "Address ID overflow tests"
+
+	local i announced=0
+
+	:>"$server_evts"
+
+	# Clear leftover addresses from previous tests
+	for i in $(seq 0 255); do
+		ip netns exec "$ns2" ./pm_nl_ctl rem token "$client4_token" id "$i" > /dev/null 2>&1
+	done
+
+	# Announce 255 addresses (IDs 1-255) to exhaust all available IDs
+	for i in $(seq 1 255); do
+		if ip netns exec "$ns2" ./pm_nl_ctl ann 10.0.3."${i}" token "$client4_token" id \
+			"$i" dev ns2eth1 > /dev/null 2>&1; then
+			announced=$((announced + 1))
+		fi
+	done
+
+	print_test "ADD_ADDR with all IDs 1-255 exhausted"
+	sleep 1
+	if [ -s "$server_evts" ]; then
+		test_pass
+	else
+		test_fail "No events generated"
+		return
+	fi
+
+	# Start listener to ensure subflow creation doesn't fail on connectivity
+	ip netns exec "$ns1" ./pm_nl_ctl listen 10.0.1.1 "$app4_port" >/dev/null 2>&1 &
+	local listener_pid=$!
+	sleep 0.5
+
+	# Try to create a subflow without specifying a local ID.
+	# With all IDs exhausted, this should fail with -ENOSPC.
+	print_test "CSF without local ID after all IDs exhausted - expect failure"
+	local out
+	if out=$(ip netns exec "$ns2" ./pm_nl_ctl csf lip 10.0.1.2 \
+		rip 10.0.1.1 rport "$app4_port" token "$client4_token" 2>&1); then
+		test_fail "Expected failure but CSF succeeded"
+	else
+		# pm_nl_ctl prints the kernel error as "netlink error -28 (No space
+		# left on device)" for -ENOSPC. Match either form.
+		if echo "$out" | grep -qE "netlink error -?28|No space left on device"; then
+			test_pass
+		else
+			test_fail "CSF failed, but not with the expected ENOSPC: ${out}"
+		fi
+	fi
+
+	# Delete the listener from the server ns, if one was created
+	mptcp_lib_kill_wait $listener_pid
+
+	# Cleanup: remove all announced addresses
+	for i in $(seq 1 255); do
+		ip netns exec "$ns2" ./pm_nl_ctl rem token "$client4_token" id "$i" > /dev/null 2>&1
+	done
+	sleep 1
+}
+
 test_prio()
 {
 	print_title "Prio tests"
@@ -940,6 +1002,7 @@ test_subflows
 test_subflows_v4_v6_mix
 test_prio
 test_listener
+test_addr_id_overflow
 
 mptcp_lib_result_print_all_tap
 exit ${ret}
