@@ -78,10 +78,17 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 			goto append_err;
 		}
 
-		if (!e->addr.id && needs_id)
-			e->addr.id = find_next_zero_bit(id_bitmap,
-							MPTCP_PM_MAX_ADDR_ID + 1,
-							1);
+		if (!e->addr.id && needs_id) {
+			unsigned int id = find_next_zero_bit(id_bitmap,
+							     MPTCP_PM_MAX_ADDR_ID + 1,
+							     1);
+			if (id > MPTCP_PM_MAX_ADDR_ID) {
+				sock_kfree_s(sk, e, sizeof(*e));
+				ret = -ENOSPC;
+				goto append_err;
+			}
+			e->addr.id = id;
+		}
 		list_add_tail_rcu(&e->list, &msk->pm.userspace_pm_local_addr_list);
 		msk->pm.local_addr_used++;
 		ret = e->addr.id;
@@ -404,7 +411,8 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 		goto create_err;
 	}
 
-	err = mptcp_userspace_pm_append_new_local_addr(msk, &entry, false);
+	err = mptcp_userspace_pm_append_new_local_addr(msk, &entry,
+						       !entry.addr.id);
 	if (err < 0) {
 		NL_SET_ERR_MSG_ATTR(info->extack, laddr,
 				    "did not match address and id");
