@@ -2791,73 +2791,15 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 	sk_error_report(sk);
 }
 
-/* Retransmit the specified data fragment on all the selected subflows. */
-static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag)
+static void __mptcp_retrans(struct sock *sk)
 {
 	struct mptcp_sendmsg_info info = { .data_lock_held = true, };
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_subflow_context *subflow;
-	struct sock *ssk;
-	int ret, len = 0;
-
-	mptcp_for_each_subflow(msk, subflow) {
-		if (READ_ONCE(subflow->scheduled)) {
-			u16 copied = 0;
-
-			mptcp_subflow_set_scheduled(subflow, false);
-
-			ssk = mptcp_subflow_tcp_sock(subflow);
-
-			lock_sock(ssk);
-
-			/* limit retransmission to the bytes already sent on some subflows */
-			info.sent = 0;
-			info.limit = READ_ONCE(msk->csum_enabled) ? dfrag->data_len :
-								    dfrag->already_sent;
-
-			/*
-			 * make the whole retrans decision, xmit, disallow
-			 * fallback atomic, note that we can't retrans even
-			 * when an infinite fallback is in progress, i.e. new
-			 * subflows are disallowed.
-			 */
-			spin_lock_bh(&msk->fallback_lock);
-			if (__mptcp_check_fallback(msk) ||
-			    !msk->allow_subflows) {
-				spin_unlock_bh(&msk->fallback_lock);
-				release_sock(ssk);
-				return -1;
-			}
-
-			while (info.sent < info.limit) {
-				ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
-				if (ret <= 0)
-					break;
-
-				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RETRANSSEGS);
-				copied += ret;
-				info.sent += ret;
-			}
-			if (copied) {
-				len = max(copied, len);
-				tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
-					 info.size_goal);
-				msk->allow_infinite_fallback = false;
-			}
-			spin_unlock_bh(&msk->fallback_lock);
-
-			release_sock(ssk);
-		}
-	}
-	return len;
-}
-
-static void __mptcp_retrans(struct sock *sk)
-{
-	struct mptcp_sock *msk = mptcp_sk(sk);
-	struct mptcp_subflow_context *subflow;
 	struct mptcp_data_frag *dfrag;
-	int err, len;
+	struct sock *ssk;
+	int ret, err;
+	u16 len = 0;
 
 	mptcp_clean_una_wakeup(sk);
 
@@ -2885,9 +2827,55 @@ static void __mptcp_retrans(struct sock *sk)
 	if (err)
 		goto reset_timer;
 
-	len = __mptcp_push_retrans(sk, dfrag);
-	if (len < 0)
-		goto clear_scheduled;
+	mptcp_for_each_subflow(msk, subflow) {
+		if (READ_ONCE(subflow->scheduled)) {
+			u16 copied = 0;
+
+			mptcp_subflow_set_scheduled(subflow, false);
+
+			ssk = mptcp_subflow_tcp_sock(subflow);
+
+			lock_sock(ssk);
+
+			/* limit retransmission to the bytes already sent on some subflows */
+			info.sent = 0;
+			info.limit = READ_ONCE(msk->csum_enabled) ? dfrag->data_len :
+								    dfrag->already_sent;
+
+			/*
+			 * make the whole retrans decision, xmit, disallow
+			 * fallback atomic, note that we can't retrans even
+			 * when an infinite fallback is in progress, i.e. new
+			 * subflows are disallowed.
+			 */
+			spin_lock_bh(&msk->fallback_lock);
+			if (__mptcp_check_fallback(msk) ||
+			    !msk->allow_subflows) {
+				spin_unlock_bh(&msk->fallback_lock);
+				release_sock(ssk);
+				goto clear_scheduled;
+			}
+
+			while (info.sent < info.limit) {
+				ret = mptcp_sendmsg_frag(sk, ssk, dfrag, &info);
+				if (ret <= 0)
+					break;
+
+				MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RETRANSSEGS);
+				copied += ret;
+				info.sent += ret;
+			}
+			if (copied) {
+				len = max(copied, len);
+				tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
+					 info.size_goal);
+				msk->allow_infinite_fallback = false;
+			}
+			spin_unlock_bh(&msk->fallback_lock);
+
+			release_sock(ssk);
+		}
+	}
 
 	msk->bytes_retrans += len;
 	dfrag->already_sent = max(dfrag->already_sent, len);
