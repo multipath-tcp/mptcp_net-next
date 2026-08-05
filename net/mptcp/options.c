@@ -119,9 +119,9 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			mp_opt->data_len = get_unaligned_be16(ptr);
 			ptr += 2;
 		}
-		if (opsize == TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM) {
+		if (opsize == TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM &&
+		    (mp_opt->suboptions & OPTION_MPTCP_CSUMREQD)) {
 			mp_opt->csum = get_unaligned((__force __sum16 *)ptr);
-			mp_opt->suboptions |= OPTION_MPTCP_CSUMREQD;
 			ptr += 2;
 		}
 		pr_debug("MP_CAPABLE version=%x, flags=%x, optlen=%d sndr=%llu, rcvr=%llu len=%d csum=%u\n",
