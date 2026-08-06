@@ -3664,16 +3664,18 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	 */
 	mptcp_set_state(nsk, TCP_ESTABLISHED);
 
+	if (!mptcp_token_accept(subflow_req, msk)) {
+		mptcp_release_sched(msk);
+		inet_csk_prepare_forced_close(nsk);
+		tcp_done(nsk);
+		return NULL;
+	}
+
 	/* The msk maintain a ref to each subflow in the connections list */
 	WRITE_ONCE(msk->first, ssk);
 	subflow = mptcp_subflow_ctx(ssk);
 	list_add(&subflow->node, &msk->conn_list);
 	sock_hold(ssk);
-
-	/* new mpc subflow takes ownership of the newly
-	 * created mptcp socket
-	 */
-	mptcp_token_accept(subflow_req, msk);
 
 	/* set msk addresses early to ensure mptcp_pm_get_local_id()
 	 * uses the correct data

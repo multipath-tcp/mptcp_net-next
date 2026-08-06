@@ -56,6 +56,8 @@ void mptcp_subflow_reqsk_clone(struct request_sock *req,
 
 	if (subflow_req->msk)
 		sock_hold((struct sock *)subflow_req->msk);
+
+	mptcp_token_move_request(req, new_req);
 }
 
 static void subflow_generate_hmac(u64 key1, u64 key2, u32 nonce1, u32 nonce2,
