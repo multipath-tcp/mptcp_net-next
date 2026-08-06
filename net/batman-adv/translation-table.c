@@ -235,6 +235,162 @@ batadv_tt_global_hash_find(struct batadv_priv *bat_priv, const u8 *addr,
 }
 
 /**
+ * batadv_tt_len() - compute length in bytes of given number of tt changes
+ * @changes_num: number of tt changes
+ *
+ * Return: computed length in bytes.
+ */
+static int batadv_tt_len(int changes_num)
+{
+	return changes_num * sizeof(struct batadv_tvlv_tt_change);
+}
+
+/**
+ * batadv_tt_local_transmit_size() - calculate the size of a full table response
+ *  for a given number of VLANs and local TT entries
+ * @num_vlan: number of announced VLANs
+ * @num_entries: number of announced local TT entries
+ *
+ * Return: local translation table size in bytes.
+ */
+static int batadv_tt_local_transmit_size(u16 num_vlan, u16 num_entries)
+{
+	int hdr_size;
+
+	/* header size of tvlv encapsulated tt response payload */
+	hdr_size = sizeof(struct batadv_unicast_tvlv_packet);
+	hdr_size += sizeof(struct batadv_tvlv_hdr);
+	hdr_size += sizeof(struct batadv_tvlv_tt_data);
+	hdr_size += num_vlan * sizeof(struct batadv_tvlv_tt_vlan_data);
+
+	return hdr_size + batadv_tt_len(num_entries);
+}
+
+/**
+ * batadv_tt_local_reserve() - reserve room in the transmittable local table
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @num_vlan: number of VLANs to reserve
+ * @num_entries: number of local TT entries to reserve
+ * @table_size: stores the resulting worst case table size in bytes
+ *
+ * Add the requested number of VLANs and local TT entries to the reservation
+ * counters and check whether the local translation table would then still fit
+ * in a single full table response. The reservation is dropped again when it
+ * would not.
+ *
+ * The reservation has to happen before the related object is allocated. This
+ * way two parallel allocations cannot both observe enough room for themselves
+ * and end up with a local table which can no longer be transmitted.
+ *
+ * A granted reservation must be returned via batadv_tt_local_unreserve() when
+ * the related object is released or was never created.
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+static bool batadv_tt_local_reserve(struct batadv_priv *bat_priv, u16 num_vlan,
+				    u16 num_entries, int *table_size)
+{
+	int packet_size_max = READ_ONCE(bat_priv->packet_size_max);
+
+	scoped_guard(spinlock_bh, &bat_priv->tt.reserve_lock) {
+		bat_priv->tt.reserved_vlans += num_vlan;
+		bat_priv->tt.reserved_entries += num_entries;
+
+		*table_size = batadv_tt_local_transmit_size(bat_priv->tt.reserved_vlans,
+							    bat_priv->tt.reserved_entries);
+		if (*table_size <= packet_size_max)
+			return true;
+
+		bat_priv->tt.reserved_vlans -= num_vlan;
+		bat_priv->tt.reserved_entries -= num_entries;
+	}
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve() - return room in the transmittable local table
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @num_vlan: number of VLANs to return
+ * @num_entries: number of local TT entries to return
+ */
+static void batadv_tt_local_unreserve(struct batadv_priv *bat_priv,
+				      u16 num_vlan, u16 num_entries)
+{
+	scoped_guard(spinlock_bh, &bat_priv->tt.reserve_lock) {
+		bat_priv->tt.reserved_vlans -= num_vlan;
+		bat_priv->tt.reserved_entries -= num_entries;
+	}
+}
+
+/**
+ * batadv_tt_local_reserve_entry() - reserve room for a new local TT entry
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @addr: the mac address of the client to add
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+static bool batadv_tt_local_reserve_entry(struct batadv_priv *bat_priv,
+					  const u8 *addr)
+{
+	int table_size;
+
+	if (batadv_tt_local_reserve(bat_priv, 0, 1, &table_size))
+		return true;
+
+	net_ratelimited_function(batadv_info, bat_priv->mesh_iface,
+				 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new local tt entry: %pM\n",
+				 table_size,
+				 READ_ONCE(bat_priv->packet_size_max), addr);
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve_entry() - return the room of a local TT entry
+ * @bat_priv: the bat priv with all the mesh interface information
+ */
+static void batadv_tt_local_unreserve_entry(struct batadv_priv *bat_priv)
+{
+	batadv_tt_local_unreserve(bat_priv, 0, 1);
+}
+
+/**
+ * batadv_tt_local_reserve_vlan() - reserve room for a new VLAN
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @vid: the VLAN identifier
+ *
+ * Each VLAN adds a per VLAN header to the full table response and therefore
+ * has to be reserved before batadv_meshif_create_vlan() allocates it.
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+bool batadv_tt_local_reserve_vlan(struct batadv_priv *bat_priv,
+				  unsigned short vid)
+{
+	int table_size;
+
+	if (batadv_tt_local_reserve(bat_priv, 1, 0, &table_size))
+		return true;
+
+	net_ratelimited_function(batadv_info, bat_priv->mesh_iface,
+				 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new VLAN: %d\n",
+				 table_size, READ_ONCE(bat_priv->packet_size_max),
+				 batadv_print_vid(vid));
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve_vlan() - return the room of a VLAN
+ * @bat_priv: the bat priv with all the mesh interface information
+ */
+void batadv_tt_local_unreserve_vlan(struct batadv_priv *bat_priv)
+{
+	batadv_tt_local_unreserve(bat_priv, 1, 0);
+}
+
+/**
  * batadv_tt_local_entry_release() - release tt_local_entry from lists and queue
  *  for free after rcu grace period
  * @ref: kref pointer of the batadv_tt_local_entry
@@ -246,6 +402,7 @@ static void batadv_tt_local_entry_release(struct kref *ref)
 	tt_local_entry = container_of(ref, struct batadv_tt_local_entry,
 				      common.refcount);
 
+	batadv_tt_local_unreserve_entry(tt_local_entry->vlan->bat_priv);
 	batadv_meshif_vlan_put(tt_local_entry->vlan);
 
 	kfree_rcu(tt_local_entry, common.rcu);
@@ -551,17 +708,6 @@ static void batadv_tt_local_event(struct batadv_priv *bat_priv,
 }
 
 /**
- * batadv_tt_len() - compute length in bytes of given number of tt changes
- * @changes_num: number of tt changes
- *
- * Return: computed length in bytes.
- */
-static int batadv_tt_len(int changes_num)
-{
-	return changes_num * sizeof(struct batadv_tvlv_tt_change);
-}
-
-/**
  * batadv_tt_entries() - compute the number of entries fitting in tt_len bytes
  * @tt_len: available space
  *
@@ -584,7 +730,6 @@ static int batadv_tt_local_table_transmit_size(struct batadv_priv *bat_priv)
 	struct batadv_meshif_vlan *vlan;
 	u16 tt_local_entries = 0;
 	u16 num_vlan = 0;
-	int hdr_size;
 
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(vlan, &bat_priv->meshif_vlan_list, list) {
@@ -593,13 +738,7 @@ static int batadv_tt_local_table_transmit_size(struct batadv_priv *bat_priv)
 	}
 	rcu_read_unlock();
 
-	/* header size of tvlv encapsulated tt response payload */
-	hdr_size = sizeof(struct batadv_unicast_tvlv_packet);
-	hdr_size += sizeof(struct batadv_tvlv_hdr);
-	hdr_size += sizeof(struct batadv_tvlv_tt_data);
-	hdr_size += num_vlan * sizeof(struct batadv_tvlv_tt_vlan_data);
-
-	return hdr_size + batadv_tt_len(tt_local_entries);
+	return batadv_tt_local_transmit_size(num_vlan, tt_local_entries);
 }
 
 /**
@@ -803,23 +942,15 @@ batadv_tt_local_create(struct net_device *mesh_iface, const u8 *addr,
 	struct batadv_priv *bat_priv = netdev_priv(mesh_iface);
 	struct batadv_tt_local_entry *tt_local;
 	struct batadv_meshif_vlan *vlan;
-	int packet_size_max;
-	int table_size;
 
-	/* Ignore the client if we cannot send it in a full table response. */
-	table_size = batadv_tt_local_table_transmit_size(bat_priv);
-	table_size += batadv_tt_len(1);
-	packet_size_max = READ_ONCE(bat_priv->packet_size_max);
-	if (table_size > packet_size_max) {
-		net_ratelimited_function(batadv_info, mesh_iface,
-					 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new local tt entry: %pM\n",
-					 table_size, packet_size_max, addr);
+	if (!batadv_tt_local_reserve_entry(bat_priv, addr))
 		return NULL;
-	}
 
 	tt_local = kmem_cache_alloc(batadv_tl_cache, GFP_ATOMIC);
-	if (!tt_local)
+	if (!tt_local) {
+		batadv_tt_local_unreserve_entry(bat_priv);
 		return NULL;
+	}
 
 	/* increase the refcounter of the related vlan */
 	vlan = batadv_meshif_vlan_get(bat_priv, vid);
@@ -828,6 +959,7 @@ batadv_tt_local_create(struct net_device *mesh_iface, const u8 *addr,
 					 "adding TT local entry %pM to non-existent VLAN %d\n",
 					 addr, batadv_print_vid(vid));
 		kmem_cache_free(batadv_tl_cache, tt_local);
+		batadv_tt_local_unreserve_entry(bat_priv);
 		return NULL;
 	}
 
