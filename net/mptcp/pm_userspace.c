@@ -59,10 +59,19 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 		goto append_err;
 	}
 	mptcp_for_each_userspace_pm_addr(msk, e) {
-		addr_match = mptcp_addresses_equal(&e->addr, &entry->addr, true);
-		if (addr_match && entry->addr.id == 0 && needs_id)
-			entry->addr.id = e->addr.id;
-		id_match = (e->addr.id == entry->addr.id);
+		/* allow matching ID0 when no port is specified */
+		addr_match = mptcp_addresses_equal(&e->addr, &entry->addr,
+						   e->addr.id != 0 ||
+						   entry->addr.port != 0);
+		if (entry->addr.id == 0 && needs_id) {
+			/* If ID needed, only match ID0 if addr match */
+			if (addr_match) {
+				entry->addr.id = e->addr.id;
+				id_match = true;
+			}
+		} else {
+			id_match = (e->addr.id == entry->addr.id);
+		}
 		if (addr_match || id_match)
 			break;
 		__set_bit(e->addr.id, id_bitmap);
@@ -104,17 +113,24 @@ static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
 {
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_addr_entry *entry;
+	bool init_id0;
 
 	entry = mptcp_userspace_pm_lookup_addr(msk, &addr->addr);
 	if (!entry)
 		return -EINVAL;
+
+	/* The initial address ID doesn't increment local_addr_used */
+	init_id0 = entry->addr.id == 0 && entry->addr.port == 0;
 
 	/* TODO: a refcount is needed because the entry can
 	 * be used multiple times (e.g. fullmesh mode).
 	 */
 	list_del_rcu(&entry->list);
 	sock_kfree_s(sk, entry, sizeof(*entry));
-	msk->pm.local_addr_used--;
+
+	if (!init_id0)
+		msk->pm.local_addr_used--;
+
 	return 0;
 }
 
@@ -694,6 +710,25 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 
 	sock_put(sk);
 	return ret;
+}
+
+/* Add the initial local address (ID0) to the local list: easier that way */
+void mptcp_pm_userspace_created(struct mptcp_sock *msk, const struct sock *ssk)
+{
+	struct mptcp_pm_addr_entry *entry;
+
+	entry = sock_kmalloc((struct sock *)msk, sizeof(*entry), GFP_ATOMIC);
+	/* Fine not to handle the ID0 case in memory pressure */
+	if (!entry)
+		return;
+
+	memset(entry, 0, sizeof(*entry));
+	mptcp_local_address((struct sock_common *)ssk, &entry->addr);
+
+	spin_lock_bh(&msk->pm.lock);
+	list_add_tail_rcu(&entry->list, &msk->pm.userspace_pm_local_addr_list);
+	/* The initial address ID doesn't increment local_addr_used */
+	spin_unlock_bh(&msk->pm.lock);
 }
 
 static struct mptcp_pm_ops mptcp_pm_userspace = {
