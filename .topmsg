@@ -1,2 +1,29 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-check-per-event-MPTCP_RST_EMPTCP-counters
+From: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Subject: [PATCH] selftests: mptcp: check per-event MPTCP_RST_EMPTCP counters
+
+Add named env-var expectations for each per-event MPTCP_RST_EMPTCP
+counter, matching the pattern used by the existing JOIN/RST checks.
+Each defaults to 0 and is checked silently on success; a mismatch prints
+a check line and fails the test.  Counters absent from the running
+kernel are skipped silently so older kernels do not false-fail.
+
+The JOIN-related counters (MPJoinSynAckNoMPJoin, MPJoinAckNoMPJoin,
+MPJoinAckNoCtx, MPJoinNotEstablished, MPJoinNoIdFound) are checked in
+chk_join_nr() on fixed namespaces; the two remaining reset counters
+(MD5SigReset, DssReset) stay in chk_rst_nr().
+
+Add a test at the end of signal_address_tests that triggers
+MPJoinSynAckNoMPJoin: ns1 signals an address that is already bound on
+the client (ns2), where a TCP-only mptcp_connect listener is started.
+The client's MP_JOIN routes locally to the TCP listener, which responds
+with a plain SYN/ACK without the MP_JOIN option, and the new counter
+increments on the client side.
+
+Other per-event counters (MD5SigReset, MPJoinAckNoMPJoin, MPJoinAckNoCtx,
+DssReset, MPJoinNotEstablished, MPJoinNoIdFound) are not currently
+reachable from mptcp_join.sh; the env-var hooks are in place for future
+tests to set expectations explicitly.
+
+Assisted-by: Claude:claude-opus-4-7
+Signed-off-by: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
