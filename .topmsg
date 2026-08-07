@@ -1,2 +1,34 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-per-event-MIB-counters-for-MPTCP_RST_EMPTCP-resets
+From: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Subject: [PATCH] mptcp: add per-event MIB counters for MPTCP_RST_EMPTCP resets
+
+MPTCP_RST_EMPTCP (reset reason 1) is used as a catch-all for several
+distinct error conditions across subflow setup, authentication, and
+data-path validation.  The existing MPRstTx/MPRstRx counters only
+track aggregate reset volume, making it difficult to diagnose which
+code path is triggering subflow resets in production.
+
+Add per-event MIB counters covering each MPTCP_RST_EMPTCP use site
+that is not already covered by an existing counter, named after the
+underlying event or condition rather than the reset action:
+
+  MD5SigReset           MD5SIG enabled on listener (incompatible)
+  MPJoinSynAckNoMPJoin  SYN/ACK missing MP_JOIN option
+  MPJoinAckNoMPJoin     server-side ACK missing MP_JOIN option
+                          (fallback path, MPJoin required)
+  MPJoinAckNoCtx        server-side ACK with no subflow context
+  MPJoinNoIdFound       MP_JOIN with a valid token but no PM local ID
+  DssReset              data mapping invalid (also fires on
+                          MAPPING_NODSS / EMIDDLEBOX path)
+  MPJoinNotEstablished  JOIN attempted on a not-fully-established msk
+
+MPJoinNoIdFound covers the second half of the no-msk MP_JOIN reset:
+the existing MPJoinNoTokenFound (MPTCP_MIB_JOINNOTOKEN) only counts the
+missing-token case in subflow_token_join_request(), while a JOIN that
+carries a valid token but for which the path manager returns no local
+id reaches the same MPTCP_RST_EMPTCP in subflow_check_req() uncounted.
+
+The aggregate MPRstTx/MPRstRx counters are unchanged.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/511
+Signed-off-by: Shardul Bankar <shardul.b@mpiricsoftware.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
