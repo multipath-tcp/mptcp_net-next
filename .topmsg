@@ -1,5 +1,5 @@
 From: Qing Luo <luoqing@kylinos.cn>
-Subject: [PATCH] mptcp: pm: fix userspace PM address ID overflow when all IDs are exhausted
+Subject: [PATCH] mptcp: pm: userspace: fix address ID overflow
 
 When all MPTCP address IDs (1-255) are exhausted in the userspace PM,
 find_next_zero_bit() returns MPTCP_PM_MAX_ADDR_ID + 1 (256). This value
