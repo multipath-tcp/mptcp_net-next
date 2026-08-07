@@ -1539,9 +1539,11 @@ nxpwifi_cfg80211_del_station(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	eth_zero_addr(deauth_mac);
 
+	rcu_read_lock();
 	sta_node = nxpwifi_get_sta_entry(priv, params->mac);
 	if (sta_node)
 		ether_addr_copy(deauth_mac, params->mac);
+	rcu_read_unlock();
 
 	if (is_valid_ether_addr(deauth_mac)) {
 		ret = nxpwifi_uap_sta_deauth(priv, deauth_mac);
