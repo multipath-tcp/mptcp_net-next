@@ -1,5 +1,5 @@
 From: Kalpan Jani <kalpan.jani@mpiricsoftware.com>
-Subject: [PATCH] mptcp: pm: drop pending ADD_ADDR when removing id 0 endpoint
+Subject: [PATCH] mptcp: pm: kernel: drop pending ADD_ADDR when removing ID0
 
 The in-kernel MPTCP path manager can leave a stale ADD_ADDR announcement
 entry alive when removing the id 0 endpoint. This happens because the id 0
