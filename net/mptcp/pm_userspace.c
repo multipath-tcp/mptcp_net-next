@@ -633,7 +633,7 @@ int mptcp_userspace_pm_dump_addr(struct sk_buff *msg,
 	lock_sock(sk);
 	spin_lock_bh(&msk->pm.lock);
 	mptcp_for_each_userspace_pm_addr(msk, entry) {
-		if (test_bit(entry->addr.id, bitmap->map))
+		if (is_init_id0(entry) || test_bit(entry->addr.id, bitmap->map))
 			continue;
 
 		if (mptcp_pm_genl_fill_addr(msg, cb, entry) < 0)
