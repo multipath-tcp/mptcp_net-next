@@ -27,6 +27,12 @@ void mptcp_userspace_pm_free_local_addr_list(struct mptcp_sock *msk)
 	}
 }
 
+static bool
+is_init_id0(struct mptcp_pm_addr_entry *entry)
+{
+	return entry->addr.id == 0 && entry->addr.port == 0;
+}
+
 static struct mptcp_pm_addr_entry *
 mptcp_userspace_pm_lookup_addr(struct mptcp_sock *msk,
 			       const struct mptcp_addr_info *addr)
@@ -95,7 +101,9 @@ static int mptcp_userspace_pm_append_new_local_addr(struct mptcp_sock *msk,
 							MPTCP_PM_MAX_ADDR_ID + 1,
 							1);
 		list_add_tail_rcu(&e->list, &msk->pm.userspace_pm_local_addr_list);
-		msk->pm.local_addr_used++;
+		/* Just to avoid this counter not to decrease when deleted */
+		if (!is_init_id0(e))
+			msk->pm.local_addr_used++;
 		ret = e->addr.id;
 	} else if (addr_match && id_match) {
 		ret = entry->addr.id;
@@ -121,12 +129,15 @@ static int mptcp_userspace_pm_delete_local_addr(struct mptcp_sock *msk,
 	if (!entry)
 		return -EINVAL;
 
+	/* The initial address ID doesn't increment local_addr_used */
+	if (!is_init_id0(entry))
+		msk->pm.local_addr_used--;
+
 	/* TODO: a refcount is needed because the entry can
 	 * be used multiple times (e.g. fullmesh mode).
 	 */
 	list_del_rcu(&entry->list);
 	sock_kfree_s(sk, entry, sizeof(*entry));
-	msk->pm.local_addr_used--;
 	return 0;
 }
 
