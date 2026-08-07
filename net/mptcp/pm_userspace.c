@@ -33,10 +33,22 @@ mptcp_userspace_pm_lookup_addr(struct mptcp_sock *msk,
 {
 	struct mptcp_pm_addr_entry *entry;
 
+	/* Compare ports when set in addr */
 	mptcp_for_each_userspace_pm_addr(msk, entry) {
-		if (mptcp_addresses_equal(&entry->addr, addr, false))
+		if (mptcp_addresses_equal(&entry->addr, addr, addr->port != 0))
 			return entry;
 	}
+
+	if (addr->port == 0)
+		return NULL;
+
+	/* Check only wildcard ports if no exact match with the port */
+	mptcp_for_each_userspace_pm_addr(msk, entry) {
+		if (entry->addr.port == 0 &&
+		    mptcp_addresses_equal(&entry->addr, addr, false))
+			return entry;
+	}
+
 	return NULL;
 }
 
