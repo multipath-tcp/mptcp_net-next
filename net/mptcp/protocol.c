@@ -3750,7 +3750,8 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	__mptcp_init_sock(nsk);
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-	if (nsk->sk_family == AF_INET6)
+	if (nsk->sk_family == AF_INET6 &&
+	    !ipv6_addr_v4mapped(&nsk->sk_v6_daddr))
 		mptcp_copy_ip6_options(nsk, sk);
 	else
 #endif
