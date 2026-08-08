@@ -1256,10 +1256,15 @@ static int mptcp_getsockopt_tcpinfo(struct mptcp_sock *msk, char __user *optval,
 static void mptcp_get_sub_addrs(const struct sock *sk, struct mptcp_subflow_addrs *a)
 {
 	const struct inet_sock *inet = inet_sk(sk);
+	bool is_v4 = sk->sk_family == AF_INET;
 
 	memset(a, 0, sizeof(*a));
 
-	if (sk->sk_family == AF_INET) {
+#if IS_ENABLED(CONFIG_IPV6)
+	if (!is_v4 && sk->sk_family == AF_INET6)
+		is_v4 = ipv6_addr_v4mapped(&sk->sk_v6_daddr);
+#endif
+	if (is_v4) {
 		a->sin_local.sin_family = AF_INET;
 		a->sin_local.sin_port = inet->inet_sport;
 		a->sin_local.sin_addr.s_addr = inet->inet_rcv_saddr;
