@@ -4719,6 +4719,7 @@ S:	Supported
 W:	http://www.bluez.org/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bluetooth/bluetooth.git
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/bluetooth/bluetooth-next.git
+F:	Documentation/ABI/testing/sysfs-bus-pci-drivers-btintel_pcie
 F:	Documentation/devicetree/bindings/net/bluetooth/
 F:	drivers/bluetooth/
 
@@ -7861,6 +7862,7 @@ DPLL SUBSYSTEM
 M:	Vadim Fedorenko <vadim.fedorenko@linux.dev>
 M:	Arkadiusz Kubalewski <arkadiusz.kubalewski@intel.com>
 M:	Jiri Pirko <jiri@resnulli.us>
+R:	Ivan Vecera <ivecera@redhat.com>
 L:	netdev@vger.kernel.org
 S:	Supported
 F:	Documentation/devicetree/bindings/dpll/dpll-device.yaml
