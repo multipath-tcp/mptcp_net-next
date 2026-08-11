@@ -1796,6 +1796,12 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	if (err)
 		return err;
 
+	/* kernel sockets do not by default acquire net ref, but TCP timer
+	 * needs it.
+	 * Update ns_tracker to current stack trace and refcounted tracker.
+	 */
+	sk_net_refcnt_upgrade(sf->sk);
+
 	lock_sock_nested(sf->sk, SINGLE_DEPTH_NESTING);
 
 	err = security_mptcp_add_subflow(sk, sf->sk);
@@ -1805,11 +1811,6 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	/* the newly created socket has to be in the same cgroup as its parent */
 	mptcp_attach_cgroup(sk, sf->sk);
 
-	/* kernel sockets do not by default acquire net ref, but TCP timer
-	 * needs it.
-	 * Update ns_tracker to current stack trace and refcounted tracker.
-	 */
-	sk_net_refcnt_upgrade(sf->sk);
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	if (err)
 		goto err_free;
