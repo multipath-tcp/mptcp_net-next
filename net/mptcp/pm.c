@@ -882,6 +882,16 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 		spin_unlock_bh(&msk->fallback_lock);
 		return;
 	}
+
+	/* RFC8684 §3.7: Infinite mapping requires contiguous data */
+	if (!subflow->fail_tout &&
+	    !RB_EMPTY_ROOT(&msk->out_of_order_queue)) {
+		spin_unlock_bh(&msk->fallback_lock);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_FALLBACKFAILED);
+		mptcp_subflow_reset(sk);
+		return;
+	}
+
 	msk->allow_subflows = false;
 	spin_unlock_bh(&msk->fallback_lock);
 
