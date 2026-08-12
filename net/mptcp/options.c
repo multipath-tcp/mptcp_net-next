@@ -53,9 +53,12 @@ static void mptcp_parse_option(struct net *net,
 
 		/* Only the MPC + ACK can be used with a RM_ADDR */
 		if (subopt == OPTION_MPTCP_MPC_ACK) {
-			if ((mp_opt->suboptions & ~OPTION_MPTCP_RM_ADDR) != 0)
+			if ((mp_opt->suboptions & ~OPTION_MPTCP_RM_ADDR) != 0) {
+				MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 				break;
+			}
 		} else if (mp_opt->suboptions != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
 		}
 
@@ -71,22 +74,29 @@ static void mptcp_parse_option(struct net *net,
 		 */
 		if (opsize != expected_opsize &&
 		    (expected_opsize != TCPOLEN_MPTCP_MPC_ACK_DATA ||
-		     opsize != TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM))
+		     opsize != TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM)) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		/* try to be gentle vs future versions on the initial syn */
 		version = *ptr++ & MPTCP_VERSION_MASK;
 		if (opsize != TCPOLEN_MPTCP_MPC_SYN) {
-			if (version != MPTCP_SUPPORTED_VERSION)
+			if (version != MPTCP_SUPPORTED_VERSION) {
+				MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 				break;
+			}
 		} else if (version < MPTCP_SUPPORTED_VERSION) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
 		}
 
 		flags = *ptr++;
 		if (!mptcp_cap_flag_sha256(flags) ||
-		    (flags & MPTCP_CAP_EXTENSIBILITY))
+		    (flags & MPTCP_CAP_EXTENSIBILITY)) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		/* RFC 6824, Section 3.1:
 		 * "For the Checksum Required bit (labeled "A"), if either
@@ -133,8 +143,10 @@ static void mptcp_parse_option(struct net *net,
 	case MPTCPOPT_MP_JOIN:
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTION_MPTCP_RM_ADDR |
-					    OPTION_MPTCP_PRIO)) != 0)
+					    OPTION_MPTCP_PRIO)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		if (opsize == TCPOLEN_MPTCP_MPJ_SYN) {
 			mp_opt->suboptions |= OPTION_MPTCP_MPJ_SYN;
@@ -163,6 +175,8 @@ static void mptcp_parse_option(struct net *net,
 			ptr += 2;
 			memcpy(mp_opt->hmac, ptr, MPTCPOPT_HMAC_LEN);
 			pr_debug("MP_JOIN hmac\n");
+		} else {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 		}
 		break;
 
@@ -172,8 +186,10 @@ static void mptcp_parse_option(struct net *net,
 					    OPTION_MPTCP_RM_ADDR |
 					    OPTION_MPTCP_PRIO |
 					    OPTION_MPTCP_FASTCLOSE |
-					    OPTION_MPTCP_FAIL)) != 0)
+					    OPTION_MPTCP_FAIL)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		pr_debug("DSS\n");
 		ptr++;
@@ -216,6 +232,7 @@ static void mptcp_parse_option(struct net *net,
 			mp_opt->ack64 = 0;
 			mp_opt->use_ack = 0;
 			mp_opt->data_fin = 0;
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
 		}
 
@@ -265,32 +282,38 @@ static void mptcp_parse_option(struct net *net,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_RM_ADDR |
-					    OPTION_MPTCP_PRIO)) != 0)
+					    OPTION_MPTCP_PRIO)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		mp_opt->echo = (*ptr++) & MPTCP_ADDR_ECHO;
 		if (!mp_opt->echo) {
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR ||
-			    opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT)
+			    opsize == TCPOLEN_MPTCP_ADD_ADDR_PORT) {
 				mp_opt->addr.family = AF_INET;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-			else if (opsize == TCPOLEN_MPTCP_ADD_ADDR6 ||
-				 opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT)
+			} else if (opsize == TCPOLEN_MPTCP_ADD_ADDR6 ||
+				 opsize == TCPOLEN_MPTCP_ADD_ADDR6_PORT) {
 				mp_opt->addr.family = AF_INET6;
 #endif
-			else
+			} else {
+				MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 				break;
+			}
 		} else {
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE ||
-			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT)
+			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT) {
 				mp_opt->addr.family = AF_INET;
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
-			else if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE ||
-				 opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT)
+			} else if (opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE ||
+				 opsize == TCPOLEN_MPTCP_ADD_ADDR6_BASE_PORT) {
 				mp_opt->addr.family = AF_INET6;
 #endif
-			else
+			} else {
+				MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 				break;
+			}
 		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_ADD_ADDR;
@@ -332,12 +355,16 @@ static void mptcp_parse_option(struct net *net,
 					    OPTIONS_MPTCP_MPJ |
 					    OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
-					    OPTION_MPTCP_PRIO)) != 0)
+					    OPTION_MPTCP_PRIO)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		if (opsize < TCPOLEN_MPTCP_RM_ADDR_BASE + 1 ||
-		    opsize > TCPOLEN_MPTCP_RM_ADDR_BASE + MPTCP_RM_IDS_MAX)
+		    opsize > TCPOLEN_MPTCP_RM_ADDR_BASE + MPTCP_RM_IDS_MAX) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		ptr++;
 
@@ -353,11 +380,15 @@ static void mptcp_parse_option(struct net *net,
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_MPJ |
 					    OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
-					    OPTION_MPTCP_RM_ADDR)) != 0)
+					    OPTION_MPTCP_RM_ADDR)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
-		if (opsize != TCPOLEN_MPTCP_PRIO)
+		if (opsize != TCPOLEN_MPTCP_PRIO) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_PRIO;
 		mp_opt->backup = *ptr++ & MPTCP_PRIO_BKUP;
@@ -367,11 +398,15 @@ static void mptcp_parse_option(struct net *net,
 	case MPTCPOPT_MP_FASTCLOSE:
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
-					    OPTION_MPTCP_RST)) != 0)
+					    OPTION_MPTCP_RST)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
-		if (opsize != TCPOLEN_MPTCP_FASTCLOSE)
+		if (opsize != TCPOLEN_MPTCP_FASTCLOSE) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		ptr += 2;
 		mp_opt->rcvr_key = get_unaligned_be64(ptr);
@@ -383,14 +418,20 @@ static void mptcp_parse_option(struct net *net,
 	case MPTCPOPT_RST:
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTION_MPTCP_FAIL |
-					    OPTION_MPTCP_FASTCLOSE)) != 0)
+					    OPTION_MPTCP_FASTCLOSE)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
-		if (opsize != TCPOLEN_MPTCP_RST)
+		if (opsize != TCPOLEN_MPTCP_RST) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
-		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST))
+		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_RST;
 		flags = *ptr++;
@@ -403,11 +444,15 @@ static void mptcp_parse_option(struct net *net,
 	case MPTCPOPT_MP_FAIL:
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
-					    OPTION_MPTCP_RST)) != 0)
+					    OPTION_MPTCP_RST)) != 0) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
-		if (opsize != TCPOLEN_MPTCP_FAIL)
+		if (opsize != TCPOLEN_MPTCP_FAIL) {
+			MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 			break;
+		}
 
 		ptr += 2;
 		mp_opt->suboptions |= OPTION_MPTCP_FAIL;
@@ -416,6 +461,7 @@ static void mptcp_parse_option(struct net *net,
 		break;
 
 	default:
+		MPTCP_INC_STATS(net, MPTCP_MIB_INVALDOPTIONRX);
 		break;
 	}
 }
