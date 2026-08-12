@@ -876,7 +876,6 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 
 	pr_debug("fail_seq=%llu\n", fail_seq);
 
-	/* After accepting the fail, we can't create any other subflows */
 	spin_lock_bh(&msk->fallback_lock);
 	if (!msk->allow_infinite_fallback) {
 		spin_unlock_bh(&msk->fallback_lock);
@@ -891,8 +890,6 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 		mptcp_subflow_reset(sk);
 		return;
 	}
-
-	msk->allow_subflows = false;
 	spin_unlock_bh(&msk->fallback_lock);
 
 	if (!subflow->fail_tout) {
@@ -901,6 +898,12 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 		subflow->send_mp_fail = 1;
 		subflow->send_infinite_map = 1;
 		tcp_send_ack(sk);
+
+		/* RFC8684 §3.7: fallback with a single subflow */
+		if (!mptcp_try_fallback(sk, MPTCP_MIB_MPFAILFALLBACK)) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_FALLBACKFAILED);
+			mptcp_subflow_reset(sk);
+		}
 	} else {
 		pr_debug("MP_FAIL response received\n");
 		WRITE_ONCE(subflow->fail_tout, 0);
