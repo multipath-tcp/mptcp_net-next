@@ -957,8 +957,11 @@ static inline void mptcp_start_tout_timer(struct sock *sk)
 
 static inline bool mptcp_is_fully_established(struct sock *sk)
 {
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
 	return inet_sk_state_load(sk) == TCP_ESTABLISHED &&
-	       READ_ONCE(mptcp_sk(sk)->fully_established);
+	       READ_ONCE(msk->fully_established) &&
+	       !test_bit(MPTCP_FALLBACK_DONE, &msk->flags);
 }
 
 static inline u64 mptcp_stamp(void)
