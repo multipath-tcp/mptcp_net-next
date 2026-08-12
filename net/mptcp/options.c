@@ -1201,7 +1201,7 @@ static bool mptcp_over_limit(struct sock *sk, struct sock *ssk,
 		   READ_ONCE(msk->backlog_len) <= rcvbuf))
 		return false;
 
-	/* Avoid silently dropping pure acks, fin, rst or already-acked segments. */
+	/* Avoid silently dropping pure acks, fin, rst or already-acked segm. */
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq ||
 	    TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_FIN | TCPHDR_RST) ||
 	    !after(TCP_SKB_CB(skb)->end_seq, tcp_sk(ssk)->rcv_nxt))
