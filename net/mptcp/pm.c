@@ -681,8 +681,10 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 		return;
 
 	spin_lock_bh(&pm->lock);
-	if (update_subflows)
+	if (update_subflows) {
 		__mptcp_pm_close_subflow(msk);
+		mptcp_pm_nl_close_subflow(msk, subflow);
+	}
 
 	/* Even if this subflow is not really established, tell the PM to try
 	 * to pick the next ones, if possible.
@@ -786,7 +788,6 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 	for (i = 0; i < rm_list->nr; i++) {
 		u8 rm_id = rm_list->ids[i];
-		bool removed = false;
 
 		mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
@@ -807,7 +808,6 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 				 i, rm_id, id, remote_id, msk->mpc_endpoint_id);
 			spin_unlock_bh(&msk->pm.lock);
 			mptcp_subflow_shutdown(sk, ssk, how);
-			removed |= subflow->request_join;
 
 			/* the following takes care of updating the subflows counter */
 			mptcp_close_ssk(sk, ssk, subflow);
@@ -819,7 +819,7 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 		if (rm_type == MPTCP_MIB_RMADDR) {
 			__MPTCP_INC_STATS(sock_net(sk), rm_type);
-			if (removed && mptcp_pm_is_kernel(msk))
+			if (mptcp_pm_is_kernel(msk))
 				mptcp_pm_nl_rm_addr(msk, rm_id);
 		}
 	}
