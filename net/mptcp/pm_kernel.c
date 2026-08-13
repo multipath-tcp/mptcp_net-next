@@ -694,8 +694,13 @@ static void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 	spin_lock_bh(&msk->pm.lock);
 
 	if (sf_created) {
-		/* add_addr_accepted is not decr for ID 0 */
-		if (remote.id)
+		/* ID 0 is not accounted: the remote address of the initial
+		 * subflow is known from the beginning. Remember the other
+		 * accepted IDs, so the counter can be balanced later on even
+		 * if the linked subflows are gone by then.
+		 */
+		if (remote.id &&
+		    !__test_and_set_bit(remote.id, msk->pm.id_accepted_bitmap))
 			msk->pm.add_addr_accepted++;
 		if (msk->pm.add_addr_accepted >= limit_add_addr_accepted ||
 		    msk->pm.extra_subflows >= limit_extra_subflows)
@@ -705,16 +710,53 @@ static void mptcp_pm_nl_add_addr_received(struct mptcp_sock *msk)
 
 void mptcp_pm_nl_rm_addr(struct mptcp_sock *msk, u8 rm_id)
 {
-	if (rm_id && !WARN_ON_ONCE(msk->pm.add_addr_accepted == 0)) {
-		u8 limit_add_addr_accepted =
-			mptcp_pm_get_limit_add_addr_accepted(msk);
+	u8 limit_add_addr_accepted;
 
-		/* Note: if the subflow has been closed before, this
-		 * add_addr_accepted counter will not be decremented.
-		 */
-		if (--msk->pm.add_addr_accepted < limit_add_addr_accepted)
-			WRITE_ONCE(msk->pm.accept_addr, true);
+	/* Only remote addresses that have been accepted by this host are
+	 * accounted: not ID 0, and not MP_JOIN requests initiated by the peer.
+	 * The bit, not the presence of a subflow, is what tells them apart, so
+	 * this works even when the subflows are already closed, and a
+	 * duplicated RM_ADDR is a no-op.
+	 */
+	if (!rm_id || !__test_and_clear_bit(rm_id, msk->pm.id_accepted_bitmap))
+		return;
+
+	if (WARN_ON_ONCE(msk->pm.add_addr_accepted == 0))
+		return;
+
+	limit_add_addr_accepted = mptcp_pm_get_limit_add_addr_accepted(msk);
+	if (--msk->pm.add_addr_accepted < limit_add_addr_accepted)
+		WRITE_ONCE(msk->pm.accept_addr, true);
+}
+
+/* Called with the PM lock held, from the subflow close path, before the
+ * subflow is removed from conn_list.
+ */
+void mptcp_pm_nl_close_subflow(struct mptcp_sock *msk,
+			       const struct mptcp_subflow_context *subflow)
+{
+	u8 remote_id = READ_ONCE(subflow->remote_id);
+	struct mptcp_subflow_context *iter;
+
+	/* Only the subflows this host has created upon an ADD_ADDR reception
+	 * are accounted, and never the initial one.
+	 */
+	if (!subflow->request_join || !remote_id ||
+	    !test_bit(remote_id, msk->pm.id_accepted_bitmap))
+		return;
+
+	/* The remote address can still be used by another subflow, e.g. with
+	 * fullmesh endpoints.
+	 */
+	mptcp_for_each_subflow(msk, iter) {
+		if (iter == subflow || iter->close_event_done)
+			continue;
+		if (iter->request_join &&
+		    READ_ONCE(iter->remote_id) == remote_id)
+			return;
 	}
+
+	mptcp_pm_nl_rm_addr(msk, remote_id);
 }
 
 static bool address_use_port(struct mptcp_pm_addr_entry *entry)
@@ -1668,6 +1710,7 @@ static void mptcp_pm_kernel_init(struct mptcp_sock *msk)
 	WRITE_ONCE(pm->accept_subflow, subflows_allowed);
 
 	bitmap_fill(pm->id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
+	bitmap_zero(pm->id_accepted_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 }
 
 struct mptcp_pm_ops mptcp_pm_kernel = {
