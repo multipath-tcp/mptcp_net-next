@@ -368,7 +368,6 @@ static int sock_listen_mptcp(const char * const listenaddr,
 
 static int sock_connect_mptcp(const char * const remoteaddr,
 			      const char * const port, int proto,
-			      struct addrinfo **peer,
 			      int infd, struct wstate *winfo)
 {
 	struct addrinfo hints = {
@@ -404,13 +403,11 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			if (syn_copied >= 0) {
 				winfo->off = syn_copied;
 				winfo->len -= syn_copied;
-				*peer = a;
 				break; /* success */
 			}
 			perror("sendto()");
 		} else {
 			if (connect(sock, a->ai_addr, a->ai_addrlen) == 0) {
-				*peer = a;
 				break; /* success */
 			}
 			perror("connect()");
@@ -425,6 +422,22 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 	if (sock != -1)
 		SOCK_TEST_TCPULP(sock, proto);
 	return sock;
+}
+
+static int sock_reconnect(const char *host, const char *port, int fd)
+{
+	struct addrinfo hints = {
+		.ai_socktype = SOCK_STREAM,
+		.ai_family = pf,
+	};
+	struct addrinfo *addr;
+	int ret;
+
+	xgetaddrinfo(host, port, &hints, &addr);
+	ret = connect(fd, addr->ai_addr, addr->ai_addrlen);
+	freeaddrinfo(addr);
+
+	return ret;
 }
 
 static size_t do_rnd_write(const int fd, char *buf, const size_t len)
@@ -1367,7 +1380,6 @@ void xdisconnect(int fd)
 
 int main_loop(void)
 {
-	struct addrinfo *peer = NULL;
 	int fd = 0, ret, fd_in = 0;
 	struct wstate winfo;
 
@@ -1378,7 +1390,7 @@ int main_loop(void)
 	}
 
 	memset(&winfo, 0, sizeof(winfo));
-	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, &peer, fd_in, &winfo);
+	fd = sock_connect_mptcp(cfg_host, cfg_port, cfg_sock_proto, fd_in, &winfo);
 	if (fd < 0)
 		return 2;
 
@@ -1413,7 +1425,8 @@ again:
 		 * connect to be blocking
 		 */
 		set_nonblock(fd, false);
-		if (connect(fd, peer->ai_addr, peer->ai_addrlen))
+		fprintf(stderr, "reconnecting to %s:%s\n", cfg_host, cfg_port);
+		if (sock_reconnect(cfg_host, cfg_port, fd))
 			xerror("can't reconnect: %d", errno);
 		if (cfg_input)
 			close(fd_in);
