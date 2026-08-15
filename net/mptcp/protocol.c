@@ -1656,6 +1656,7 @@ static void mptcp_penalise_cwnd(struct sock *ssk)
 		return;
 	subflow->last_penalise = tcp_jiffies32;
 	tcp_snd_cwnd_set(tp, max_t(u32, cwnd >> 1, MPTCP_PENALISE_MIN_CWND));
+	MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_CWNDPENALISED);
 	if (cwnd >= tp->snd_ssthresh)
 		tp->snd_ssthresh = max_t(u32, tp->snd_ssthresh >> 1, 2);
 }
@@ -1739,12 +1740,17 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	subflow = mptcp_subflow_ctx(ssk);
 	penal_cand = fastest && ssk != fastest &&
 		     subflow->avg_pacing_rate < max_pace / MPTCP_PENALISE_RATE_RATIO;
+	if (penal_cand)
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_PENALCAND);
 	subflow->penalise = penal_cand &&
 			    tcp_snd_cwnd(tcp_sk(ssk)) > MPTCP_PENALISE_MIN_CWND &&
 			    inet_csk(ssk)->icsk_ca_state == TCP_CA_Open &&
 			    tcp_is_cwnd_limited(fastest) &&
 			    mptcp_snd_wnd_test(msk) &&
 			    mptcp_penalise_throttle_ok(subflow);
+
+	/* trace the penalise verdict, decided here after the selection loop */
+	trace_mptcp_subflow_penalise(subflow, max_pace);
 
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
 	wmem = READ_ONCE(ssk->sk_wmem_queued);
