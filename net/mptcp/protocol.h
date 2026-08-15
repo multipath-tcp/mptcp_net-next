@@ -588,6 +588,7 @@ struct mptcp_subflow_context {
 		__unused : 9;
 	bool	data_avail;
 	bool	scheduled;
+	bool	penalise;	    /* scheduler flagged this subflow for cwnd halving */
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
 	bool	fully_established;  /* path validated */
 	u32	lent_mem_frag;
@@ -611,6 +612,7 @@ struct mptcp_subflow_context {
 				     */
 
 	u32	subflow_id;
+	u32	last_penalise;	    /* tcp_jiffies32 of the last cwnd penalty */
 
 	long	delegated_status;
 	unsigned long	fail_tout;
