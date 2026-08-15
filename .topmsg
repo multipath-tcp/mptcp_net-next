@@ -1,2 +1,17 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-fix-an-UAF-in-mptcp_connect.c
+From: Gang Yan <yangang@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: fix an UAF in mptcp_connect.c
+
+At the end of 'sock_connect_mptcp()', it calls 'freeaddrinfo(addr)',
+the 'peer' pointer (which points into 'addr') remains. Later, the main
+loop uses this peer pointer for reconnection attempts. If the memory has
+been freed and reused, the address data could be overwritten, resulting
+in an invalid remote address.
+
+This patch keeps the addrinfo list allocated for the whole process
+lifetime so "peer" remains valid across reconnects; the memory will be
+released at exit() time.
+
+Fixes: 05be5e273c84 ("selftests: mptcp: add disconnect tests")
+Suggested-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Gang Yan <yangang@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
