@@ -1,2 +1,31 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-options-handle-MPC-data-csum-reqd-no-csum
+Subject: [PATCH] mptcp: options: handle MPC data + csum reqd + no csum
+
+Before this modification, a remote peer could send an MP_CAPABLE with
+data, with the checksum flag set, but without adding the actual 2 bytes
+of checksum. As a result, uninitialised bytes could be used for the
+'csum' field.
+
+That was not a critical issue, because this 'csum' field is only used to
+compare with the expected one, if previously negotiated in the 3WHS.
+Worst case, the checksum is likely wrong, a fallback is done without a
+reject if the negotiation was done earlier. That's OK.
+
+Yet, better to take the expected path with this case: only look at the
+checksum flag for MP_CAPABLEs not carrying a data-len.
+
+Such packet can be seen as a 3rd or 4th ACK. The RFC8684 mentions [1]
+that the 3rd packet should have the checksum flag set. When an MPC + ACK
+contains data, the checksum flag is redundant with the checksum field.
+It is not clear what should be done for the 4th ACK, nor if the flag has
+to be set if the checksum field is set.
+
+Therefore, it seems fine to only look at the presence of the checksum
+field, not to break the interaction with stacks that were not setting
+both.
+
+Fixes: 208e8f66926c ("mptcp: receive checksum for MP_CAPABLE with data")
+Link: https://datatracker.ietf.org/doc/html/rfc8684#section-3.1-23 [1]
+Closes: https://netdev-ai.bots.linux.dev/sashiko/#/patchset/20260803-net-mptcp-misc-fixes-7-2-rc6-v2-0-b8f496d71664%40kernel.org?part=1
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
