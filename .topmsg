@@ -1,2 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-reset-retrans_time-when-ADD_ADDR-entry-is-reused
+Subject: [PATCH] mptcp: pm: reset retrans_time when ADD_ADDR entry is reused
+
+When an ADD_ADDR entry is reused, the timer is re-armed, because the
+goal is to re-announce an ADD_ADDR, and eventually retransmit it if
+needed.
+
+In this case, the retransmission counter should be reset as well, so the
+re-announced address gets its retransmissions back instead of relying on
+what was left before, and possibly not being able to retransmit it.
+
+Fixes: 304ab97f4c7c ("mptcp: allow ADD_ADDR reissuance by userspace PMs")
+Link: https://netdev-ai.bots.linux.dev/sashiko/#/patchset/20260803-net-mptcp-misc-fixes-7-2-rc6-v2-0-b8f496d71664%40kernel.org?part=4
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
