@@ -1735,6 +1735,20 @@ static void nvmet_tcp_sock_set_tos(struct sock *sk)
 				   KERNEL_SOCKPTR(&tos), sizeof(tos));
 }
 
+static void nvmet_tcp_sock_set_tclass(struct sock *sk)
+{
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6) {
+		u8 tclass = ip6_tclass(inet6_sk(sk)->rcv_flowinfo);
+
+		if (tclass > 0)
+			do_sock_setsockopt(sk->sk_socket, false, SOL_IPV6,
+					   IPV6_TCLASS, KERNEL_SOCKPTR(&tclass),
+					   sizeof(tclass));
+	}
+#endif
+}
+
 static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 {
 	struct socket *sock = queue->sock;
@@ -1762,6 +1776,7 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 
 	/* Set socket type of service */
 	nvmet_tcp_sock_set_tos(sock->sk);
+	nvmet_tcp_sock_set_tclass(sock->sk);
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
