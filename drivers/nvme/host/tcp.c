@@ -1815,6 +1815,15 @@ static void nvme_tcp_sock_set_tos(struct sock *sk, int tos)
 			   KERNEL_SOCKPTR(&tos), sizeof(tos));
 }
 
+static void nvme_tcp_sock_set_tclass(struct sock *sk, int tclass)
+{
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6)
+		do_sock_setsockopt(sk->sk_socket, false, SOL_IPV6, IPV6_TCLASS,
+				   KERNEL_SOCKPTR(&tclass), sizeof(tclass));
+#endif
+}
+
 static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 				key_serial_t pskid)
 {
@@ -1876,8 +1885,10 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 		nvme_tcp_sock_set_priority(queue->sock->sk, so_priority);
 
 	/* Set socket type of service */
-	if (nctrl->opts->tos >= 0)
+	if (nctrl->opts->tos >= 0) {
 		nvme_tcp_sock_set_tos(queue->sock->sk, nctrl->opts->tos);
+		nvme_tcp_sock_set_tclass(queue->sock->sk, nctrl->opts->tos);
+	}
 
 	/* Set 10 seconds timeout for icresp recvmsg */
 	queue->sock->sk->sk_rcvtimeo = 10 * HZ;
