@@ -968,9 +968,9 @@ static int mptcp_setsockopt_sol_tcp(struct mptcp_sock *msk, int optname,
 						 val);
 		break;
 	case TCP_MAXSEG:
-		msk->maxseg = val;
-		ret = mptcp_setsockopt_all_sf(msk, SOL_TCP, optname, optval,
-					      optlen);
+		ret = __mptcp_setsockopt_set_val(msk, MAX_TCP_WINDOW,
+						 &tcp_sock_set_maxseg,
+						 &msk->maxseg, val);
 		break;
 	default:
 		ret = -ENOPROTOOPT;
