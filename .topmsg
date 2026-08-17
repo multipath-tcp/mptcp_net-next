@@ -1,2 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-uninitialized-local_id-in-syncookie-MP_JOIN-reconstruction
+From: Harshit Varu <harshitvaru666@gmail.com>
+Subject: [PATCH] mptcp: fix uninitialized local_id in syncookie MP_JOIN reconstruction
+
+mptcp_token_join_cookie_init_state() restores remote_nonce, local_nonce,
+backup, join_id, token and msk from the saved cookie entry when rebuilding
+the request socket for a MP_JOIN 4th-ACK handled under SYN cookies, but it
+does not restore local_id, even though the SYN path saved it.
+subflow_ulp_clone() then reads that uninitialized field and stores it as
+the joined subflow's address-ID. Because the request-sock slab is
+SLAB_TYPESAFE_BY_RCU and not zeroed on allocation, the value is the stale
+byte of a previously freed request socket, which an off-path peer can
+influence by sending concurrent MP_JOIN SYNs. This corrupts the path
+manager's id-based subflow bookkeeping for the connection.
+
+Restore subflow_req->local_id from the cookie entry, as done for the other
+fields.
+
+Fixes: 9466a1ccebbe ("mptcp: enable JOIN requests even if cookies are in use")
+Cc: stable@vger.kernel.org
+Assisted-by: opencode:deepseek-v4-flash
+Signed-off-by: Harshit Varu <harshitvaru666@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
