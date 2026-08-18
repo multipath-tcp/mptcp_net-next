@@ -895,6 +895,11 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 		pr_debug("MP_FAIL response received\n");
 		WRITE_ONCE(subflow->fail_tout, 0);
 	}
+
+	if (!mptcp_try_fallback(sk, MPTCP_MIB_MPFAILFALLBACK)) {
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_FALLBACKFAILED);
+		mptcp_subflow_reset(sk);
+	}
 }
 
 static int mptcp_add_addr_len(int family, bool echo, bool port)

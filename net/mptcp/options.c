@@ -639,7 +639,29 @@ static bool mptcp_established_options_dss(struct sock *sk, struct sk_buff *skb,
 	opts->csum_reqd = READ_ONCE(msk->csum_enabled);
 	mpext = skb ? mptcp_get_ext(skb) : NULL;
 
-	if (!skb || (mpext && mpext->use_map) || snd_data_fin_enable) {
+	if (unlikely(subflow->send_infinite_map)) {
+		unsigned int map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
+
+		if (opts->csum_reqd)
+			map_size += TCPOLEN_MPTCP_DSS_CHECKSUM;
+
+		if (mpext) {
+			opts->ext_copy = *mpext;
+			opts->ext_copy.infinite_map = 1;
+			opts->ext_copy.data_len = 0;
+		} else {
+			opts->ext_copy.use_map = 1;
+			opts->ext_copy.dsn64 = 1;
+			opts->ext_copy.infinite_map = 1;
+			opts->ext_copy.data_len = 0;
+			opts->ext_copy.data_seq = READ_ONCE(msk->snd_nxt);
+			opts->ext_copy.subflow_seq = subflow->rel_write_seq;
+		}
+
+		dss_size = map_size;
+		opts->suboptions = OPTION_MPTCP_DSS;
+		ret = true;
+	} else if (!skb || (mpext && mpext->use_map) || snd_data_fin_enable) {
 		unsigned int map_size = TCPOLEN_MPTCP_DSS_BASE + TCPOLEN_MPTCP_DSS_MAP64;
 
 		if (mpext) {
@@ -1567,6 +1589,15 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 						   TCPOPT_NOP << 8 | TCPOPT_NOP, ptr);
 			}
 			ptr += 1;
+
+			if (unlikely(mpext->infinite_map)) {
+				subflow = mptcp_subflow_ctx(ssk);
+				if (subflow->send_infinite_map) {
+					subflow->send_infinite_map = 0;
+					MPTCP_INC_STATS(sock_net(ssk),
+							MPTCP_MIB_INFINITEMAPTX);
+				}
+			}
 		}
 
 		/* We might need to add MP_FAIL options in rare cases */
