@@ -1815,6 +1815,17 @@ static int nvme_tcp_sock_set_tos(struct sock *sk, int tos)
 				  KERNEL_SOCKPTR(&tos), sizeof(tos));
 }
 
+static int nvme_tcp_sock_set_tclass(struct sock *sk, int tclass)
+{
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6)
+		return do_sock_setsockopt(sk->sk_socket, false, SOL_IPV6,
+					  IPV6_TCLASS, KERNEL_SOCKPTR(&tclass),
+					  sizeof(tclass));
+#endif
+	return 0;
+}
+
 static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 				key_serial_t pskid)
 {
@@ -1906,6 +1917,15 @@ static int nvme_tcp_alloc_queue(struct nvme_ctrl *nctrl, int qid,
 		if (ret) {
 			dev_err(nctrl->device,
 				"failed to set IP_TOS on queue %d err %d\n",
+				qid, ret);
+			goto err_sock;
+		}
+
+		ret = nvme_tcp_sock_set_tclass(queue->sock->sk,
+					       nctrl->opts->tos);
+		if (ret) {
+			dev_err(nctrl->device,
+				"failed to set IPV6_TCLASS on queue %d err %d\n",
 				qid, ret);
 			goto err_sock;
 		}
