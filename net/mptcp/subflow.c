@@ -785,8 +785,12 @@ void mptcp_subflow_drop_ctx(struct sock *ssk)
 	list_del(&mptcp_subflow_ctx(ssk)->node);
 	if (inet_csk(ssk)->icsk_ulp_ops) {
 		subflow_ulp_fallback(ssk, ctx);
-		if (ctx->conn)
-			sock_put(ctx->conn);
+		if (ctx->conn) {
+			struct sock *conn = ctx->conn;
+
+			WRITE_ONCE(ctx->conn, NULL);
+			sock_put(conn);
+		}
 	}
 
 	kfree_rcu(ctx, rcu);
@@ -816,6 +820,7 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	bool fallback, fallback_is_fatal;
 	enum sk_rst_reason reason;
 	struct mptcp_sock *owner;
+	struct sock *conn;
 	struct sock *child;
 
 	pr_debug("listener=%p, req=%p, conn=%p\n", listener, req, listener->conn);
@@ -884,12 +889,19 @@ create_child:
 		ctx->setsockopt_seq = listener->setsockopt_seq;
 
 		if (ctx->mp_capable) {
-			ctx->conn = mptcp_sk_clone_init(listener->conn, &mp_opt, child, req);
-			if (!ctx->conn)
+			conn = mptcp_sk_clone_init(listener->conn, &mp_opt, child, req);
+			if (!conn)
 				goto fallback;
 
 			ctx->subflow_id = 1;
-			owner = mptcp_sk(ctx->conn);
+			owner = mptcp_sk(conn);
+
+			/*
+			 * Publish the fully initialized parent. Pairs with
+			 * smp_load_acquire() in
+			 * bpf_mptcp_sock_from_subflow().
+			 */
+			smp_store_release(&ctx->conn, conn);
 
 			if (mp_opt.deny_join_id0)
 				WRITE_ONCE(owner->pm.remote_deny_join_id0, true);
@@ -924,7 +936,11 @@ create_child:
 
 			/* move the msk reference ownership to the subflow */
 			subflow_req->msk = NULL;
-			ctx->conn = (struct sock *)owner;
+			/*
+			 * Publish the parent. Pairs with smp_load_acquire()
+			 * in bpf_mptcp_sock_from_subflow().
+			 */
+			smp_store_release(&ctx->conn, (struct sock *)owner);
 
 			if (subflow_use_different_sport(owner, sk)) {
 				pr_debug("ack inet_sport=%d %d\n",
@@ -1832,7 +1848,11 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 
 	*new_sock = sf;
 	sock_hold(sk);
-	subflow->conn = sk;
+	/*
+	 * Publish the parent. Pairs with smp_load_acquire() in
+	 * bpf_mptcp_sock_from_subflow().
+	 */
+	smp_store_release(&subflow->conn, sk);
 	mptcp_subflow_ops_override(sf->sk);
 
 	return 0;
@@ -2029,6 +2049,12 @@ static void subflow_ulp_release(struct sock *ssk)
 		if (!release && !test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW,
 						  &mptcp_sk(sk)->flags))
 			mptcp_schedule_work(sk);
+
+		/*
+		 * Hide the parent from lockless readers (e.g. BPF)
+		 * before dropping the subflow-owned reference.
+		 */
+		WRITE_ONCE(ctx->conn, NULL);
 		sock_put(sk);
 	}
 
