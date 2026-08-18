@@ -40,7 +40,7 @@ struct mptcp_pernet {
 	u8 pm_type;
 	u8 add_addr_v6_port_drop_ts;
 	struct mptcp_sched_ops __rcu *scheduler;
-	char path_manager[MPTCP_PM_NAME_MAX];
+	struct mptcp_pm_ops __rcu *path_manager;
 };
 
 static struct mptcp_pernet *mptcp_get_pernet(const struct net *net)
@@ -85,9 +85,14 @@ int mptcp_get_pm_type(const struct net *net)
 	return mptcp_get_pernet(net)->pm_type;
 }
 
-const char *mptcp_get_path_manager(const struct net *net)
+void mptcp_get_path_manager(const struct net *net, char *name)
 {
-	return mptcp_get_pernet(net)->path_manager;
+	struct mptcp_pm_ops *pm_ops;
+
+	rcu_read_lock();
+	pm_ops = rcu_dereference(mptcp_get_pernet(net)->path_manager);
+	strscpy(name, pm_ops ? pm_ops->name : "kernel", MPTCP_PM_NAME_MAX);
+	rcu_read_unlock();
 }
 
 void mptcp_get_scheduler(const struct net *net, char *name)
@@ -119,8 +124,8 @@ static void mptcp_pernet_set_defaults(struct mptcp_pernet *pernet)
 	pernet->pm_type = MPTCP_PM_TYPE_KERNEL;
 
 	RCU_INIT_POINTER(pernet->scheduler, &mptcp_sched_default);
+	RCU_INIT_POINTER(pernet->path_manager, &mptcp_pm_kernel);
 
-	strscpy(pernet->path_manager, "kernel", sizeof(pernet->path_manager));
 	pernet->add_addr_v6_port_drop_ts = 1;
 }
 
@@ -201,7 +206,7 @@ static int proc_blackhole_detect_timeout(const struct ctl_table *table,
 	return ret;
 }
 
-static int mptcp_set_path_manager(char *path_manager, const char *name)
+static int mptcp_set_path_manager(struct mptcp_pernet *pernet, const char *name)
 {
 	struct mptcp_pm_ops *pm_ops;
 	int ret = 0;
@@ -209,7 +214,7 @@ static int mptcp_set_path_manager(char *path_manager, const char *name)
 	rcu_read_lock();
 	pm_ops = mptcp_pm_find(name);
 	if (pm_ops)
-		strscpy(path_manager, name, MPTCP_PM_NAME_MAX);
+		xchg(&pernet->path_manager, pm_ops);
 	else
 		ret = -ENOENT;
 	rcu_read_unlock();
@@ -223,7 +228,7 @@ static int proc_path_manager(const struct ctl_table *ctl, int write,
 	struct mptcp_pernet *pernet = container_of(ctl->data,
 						   struct mptcp_pernet,
 						   path_manager);
-	char (*path_manager)[MPTCP_PM_NAME_MAX] = ctl->data;
+	struct mptcp_pm_ops *pm_ops;
 	char pm_name[MPTCP_PM_NAME_MAX];
 	const struct ctl_table tbl = {
 		.data = pm_name,
@@ -231,11 +236,14 @@ static int proc_path_manager(const struct ctl_table *ctl, int write,
 	};
 	int ret;
 
-	strscpy(pm_name, *path_manager, MPTCP_PM_NAME_MAX);
+	rcu_read_lock();
+	pm_ops = rcu_dereference(pernet->path_manager);
+	strscpy(pm_name, pm_ops ? pm_ops->name : "kernel", MPTCP_PM_NAME_MAX);
+	rcu_read_unlock();
 
 	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 	if (write && ret == 0) {
-		ret = mptcp_set_path_manager(*path_manager, pm_name);
+		ret = mptcp_set_path_manager(pernet, pm_name);
 		if (ret == 0) {
 			u8 pm_type = __MPTCP_PM_TYPE_NR;
 
@@ -267,7 +275,7 @@ static int proc_pm_type(const struct ctl_table *ctl, int write,
 			pm_name = "kernel";
 		else if (pm_type == MPTCP_PM_TYPE_USERSPACE)
 			pm_name = "userspace";
-		mptcp_set_path_manager(pernet->path_manager, pm_name);
+		mptcp_set_path_manager(pernet, pm_name);
 	}
 
 	return ret;
