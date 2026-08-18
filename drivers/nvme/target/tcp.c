@@ -1696,10 +1696,50 @@ done:
 	read_unlock_bh(&sk->sk_callback_lock);
 }
 
+static int nvmet_tcp_sock_no_linger(struct sock *sk)
+{
+	struct linger ling = { .l_onoff = 1, .l_linger = 0 };
+
+	return do_sock_setsockopt(sk->sk_socket, false, SOL_SOCKET, SO_LINGER,
+				  KERNEL_SOCKPTR(&ling), sizeof(ling));
+}
+
+static int nvmet_tcp_sock_set_priority(struct sock *sk, u32 priority)
+{
+	return do_sock_setsockopt(sk->sk_socket, false, SOL_SOCKET, SO_PRIORITY,
+				  KERNEL_SOCKPTR(&priority), sizeof(priority));
+}
+
+static int nvmet_tcp_sock_set_reuseaddr(struct sock *sk)
+{
+	int val = SK_CAN_REUSE;
+
+	return do_sock_setsockopt(sk->sk_socket, false, SOL_SOCKET,
+				  SO_REUSEADDR, KERNEL_SOCKPTR(&val),
+				  sizeof(val));
+}
+
+static int nvmet_tcp_sock_set_nodelay(struct sock *sk)
+{
+	int val = 1;
+
+	return do_sock_setsockopt(sk->sk_socket, false, SOL_TCP, TCP_NODELAY,
+				  KERNEL_SOCKPTR(&val), sizeof(val));
+}
+
+static int nvmet_tcp_sock_set_tos(struct sock *sk)
+{
+	int tos = inet_sk(sk)->rcv_tos;
+
+	if (tos > 0)
+		return do_sock_setsockopt(sk->sk_socket, false, SOL_IP, IP_TOS,
+					  KERNEL_SOCKPTR(&tos), sizeof(tos));
+	return 0;
+}
+
 static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 {
 	struct socket *sock = queue->sock;
-	struct inet_sock *inet = inet_sk(sock->sk);
 	int ret;
 
 	ret = kernel_getsockname(sock,
@@ -1717,14 +1757,20 @@ static int nvmet_tcp_set_queue_sock(struct nvmet_tcp_queue *queue)
 	 * close. This is done to prevent stale data from being sent should
 	 * the network connection be restored before TCP times out.
 	 */
-	sock_no_linger(sock->sk);
+	ret = nvmet_tcp_sock_no_linger(sock->sk);
+	if (ret)
+		return ret;
 
-	if (so_priority > 0)
-		sock_set_priority(sock->sk, so_priority);
+	if (so_priority > 0) {
+		ret = nvmet_tcp_sock_set_priority(sock->sk, so_priority);
+		if (ret)
+			return ret;
+	}
 
 	/* Set socket type of service */
-	if (inet->rcv_tos > 0)
-		ip_sock_set_tos(sock->sk, inet->rcv_tos);
+	ret = nvmet_tcp_sock_set_tos(sock->sk);
+	if (ret)
+		return ret;
 
 	ret = 0;
 	write_lock_bh(&sock->sk->sk_callback_lock);
@@ -2098,10 +2144,26 @@ static int nvmet_tcp_add_port(struct nvmet_port *nport)
 	port->sock->sk->sk_user_data = port;
 	port->data_ready = port->sock->sk->sk_data_ready;
 	port->sock->sk->sk_data_ready = nvmet_tcp_listen_data_ready;
-	sock_set_reuseaddr(port->sock->sk);
-	tcp_sock_set_nodelay(port->sock->sk);
-	if (so_priority > 0)
-		sock_set_priority(port->sock->sk, so_priority);
+	ret = nvmet_tcp_sock_set_reuseaddr(port->sock->sk);
+	if (ret) {
+		pr_err("failed to set SO_REUSEADDR on port socket %d\n", ret);
+		goto err_sock;
+	}
+
+	ret = nvmet_tcp_sock_set_nodelay(port->sock->sk);
+	if (ret) {
+		pr_err("failed to set TCP_NODELAY on port socket %d\n", ret);
+		goto err_sock;
+	}
+
+	if (so_priority > 0) {
+		ret = nvmet_tcp_sock_set_priority(port->sock->sk, so_priority);
+		if (ret) {
+			pr_err("failed to set SO_PRIORITY on port socket %d\n",
+			       ret);
+			goto err_sock;
+		}
+	}
 
 	ret = kernel_bind(port->sock, (struct sockaddr_unsized *)&port->addr,
 			sizeof(port->addr));
