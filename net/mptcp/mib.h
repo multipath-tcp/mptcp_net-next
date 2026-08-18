@@ -91,6 +91,7 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_MD5SIGFALLBACK,	/* Conflicting TCP option enabled */
 	MPTCP_MIB_MD5SIGRESET,		/* MP_RST: MD5SIG enabled on listener */
 	MPTCP_MIB_DSSFALLBACK,		/* Bad or missing DSS */
+	MPTCP_MIB_MPFAILFALLBACK,	/* Received MP_FAIL, fallback */
 	MPTCP_MIB_DSSRESET,		/* MP_RST: bad data mapping */
 	MPTCP_MIB_SIMULTCONNFALLBACK,	/* Simultaneous connect */
 	MPTCP_MIB_FALLBACKFAILED,	/* Can't fallback due to msk status */
