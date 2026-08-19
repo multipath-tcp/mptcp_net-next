@@ -3603,15 +3603,11 @@ M:	Dinh Nguyen <dinguyen@kernel.org>
 S:	Maintained
 F:	drivers/clk/socfpga/
 
-ARM/SOCFPGA DWMAC GLUE LAYER BINDINGS
-M:	Matthew Gerlach <matthew.gerlach@altera.com>
-S:	Maintained
-F:	Documentation/devicetree/bindings/net/altr,gmii-to-sgmii-2.0.yaml
-F:	Documentation/devicetree/bindings/net/altr,socfpga-stmmac.yaml
-
 ARM/SOCFPGA DWMAC GLUE LAYER
 M:	Maxime Chevallier <maxime.chevallier@bootlin.com>
 S:	Maintained
+F:	Documentation/devicetree/bindings/net/altr,gmii-to-sgmii-2.0.yaml
+F:	Documentation/devicetree/bindings/net/altr,socfpga-stmmac.yaml
 F:	drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
 
 ARM/SOCFPGA EDAC BINDINGS
@@ -13038,8 +13034,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tnguy/next-queue.git
 F:	Documentation/networking/device_drivers/ethernet/intel/
 F:	drivers/net/ethernet/intel/
 F:	drivers/net/ethernet/intel/*/
-F:	include/linux/avf/virtchnl.h
-F:	include/linux/net/intel/*/
+F:	include/linux/net/intel/
 
 INTEL ETHERNET PROTOCOL DRIVER FOR RDMA
 M:	Tatyana Nikolova <tatyana.e.nikolova@intel.com>
@@ -19119,6 +19114,7 @@ F:	include/net/net_failover.h
 NFC SUBSYSTEM
 M:	David Heidelberg <david@ixit.cz>
 L:	oe-linux-nfc@lists.linux.dev
+C:	https://matrix.to/#/#linux-nfc:ixit.cz
 S:	Maintained
 T:	git https://codeberg.org/linux-nfc/linux.git
 F:	Documentation/devicetree/bindings/net/nfc/
@@ -22772,6 +22768,13 @@ L:	linux-watchdog@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/watchdog/realtek,otto-wdt.yaml
 F:	drivers/watchdog/realtek_otto_wdt.c
+
+REALTEK PSE MCU DRIVER
+M:	Jonas Jelonek <jelonek.jonas@gmail.com>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/net/pse-pd/realtek,pse-mcu-gen1.yaml
+F:	drivers/net/pse-pd/realtek-pse-mcu*
 
 REALTEK RTL83xx SMI DSA ROUTER CHIPS
 M:	Linus Walleij <linusw@kernel.org>
@@ -29573,7 +29576,7 @@ F:	Documentation/devicetree/bindings/net/xlnx,axi-ethernet.yaml
 F:	drivers/net/ethernet/xilinx/xilinx_axienet*
 
 XILINX CAN DRIVER
-M:	Appana Durga Kedareswara rao <appana.durga.rao@xilinx.com>
+M:	Harini T <harini.t@amd.com>
 L:	linux-can@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/can/xilinx,can.yaml
