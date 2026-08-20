@@ -1,2 +1,22 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-options-fix-uninit-value-in-mptcp_write_data_fin
+Subject: [PATCH] mptcp: options: fix uninit-value in mptcp_write_data_fin
+
+When sending a DATA_FIN without data, and because the DATA_FIN occupies
+1 octet of the connection-level sequence space [1], it is then required
+to add a DSS mapping with specific values.
+
+If the checksum has been negotiated, it also needs to be computed, and
+included in the outgoing packet, and thus the initial csum data needs to
+be reset to 0 as well. This is no longer the case since commit
+cfcceb7a39fc ("tcp: shrink per-packet memset in __tcp_transmit_skb()"),
+because the whole ext_copy structure is no longer zeroed by default.
+
+This seems to be the only case where use_map is changed and set
+afterwards, so initialising the csum field only in this case, along with
+other fields for this specific case.
+
+Fixes: cfcceb7a39fc ("tcp: shrink per-packet memset in __tcp_transmit_skb()")
+Link: https://datatracker.ietf.org/doc/html/rfc8684#section-3.3.3 [1]
+Link: https://sashiko.dev/#/patchset/20260812-net-next-mptcp-misc-feat-7-3-v1-0-1905a818f6cb%40kernel.org?part=2
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
