@@ -3325,6 +3325,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 	struct nxpwifi_adapter *adapter = priv->adapter;
 	struct sk_buff *skb;
 	u16 pkt_len, auth_alg;
+	size_t frame_len;
 	int ret;
 	struct ieee80211_mgmt *mgmt;
 	struct nxpwifi_txinfo *tx_info;
@@ -3398,13 +3399,23 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 
 	nxpwifi_cancel_scan(adapter);
 
-	pkt_len = (u16)req->ie_len + req->auth_data_len +
-		NXPWIFI_MGMT_HEADER_LEN + NXPWIFI_AUTH_BODY_LEN;
+	frame_len = req->ie_len + req->auth_data_len +
+		sizeof(struct ieee80211_hdr_3addr) + NXPWIFI_AUTH_BODY_LEN;
 
 	if (req->auth_data_len >= 4)
-		pkt_len -= 4;
+		frame_len -= 4;
 
-	mgmt = kzalloc(pkt_len, GFP_KERNEL);
+	/* nxpwifi_form_mgmt_frame() inserts address4, so the frame handed to
+	 * the firmware is ETH_ALEN longer than the one built here.
+	 */
+	if (frame_len > U16_MAX - ETH_ALEN) {
+		nxpwifi_dbg(adapter, ERROR,
+			    "auth frame too long: %zu bytes\n", frame_len);
+		return -EINVAL;
+	}
+	pkt_len = frame_len + ETH_ALEN;
+
+	mgmt = kzalloc(frame_len, GFP_KERNEL);
 
 	skb = dev_alloc_skb(NXPWIFI_MIN_DATA_HEADER_LEN +
 			    NXPWIFI_MGMT_FRAME_HEADER_SIZE +
@@ -3450,7 +3461,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 		memcpy((u8 *)varptr, req->ie, req->ie_len);
 	}
 
-	nxpwifi_form_mgmt_frame(skb, (const u8 *)mgmt, pkt_len);
+	nxpwifi_form_mgmt_frame(skb, (const u8 *)mgmt, frame_len);
 	kfree(mgmt);
 	priv->auth_flag = HOST_MLME_AUTH_PENDING;
 	priv->auth_alg = auth_alg;
