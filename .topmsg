@@ -1,2 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-remove-thmac-from-subflow-ctx
+Subject: [PATCH] mptcp: remove thmac from subflow ctx
+
+This entry is only used in subflow_finish_connect().
+
+Instead, use the original value from mp_opt, and pass it to
+subflow_thmac_valid() to do the validation with the given truncated
+hmac.
+
+While at it, rename the variables in subflow_thmac_valid() to avoid
+confusions about the received one vs the expected one.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
