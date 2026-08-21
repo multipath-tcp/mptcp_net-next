@@ -1,2 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-remove-unneeded-READ_ONCE-annotation
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: remove unneeded READ_ONCE() annotation
+
+The subflow->fully_established flag is always written under the subflow
+socket lock. Reading such value under the same lock does not require any
+ONCE annotation.
+
+Fixes: 581c8cbfa934 ("mptcp: annotate data-races around subflow->fully_established")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
