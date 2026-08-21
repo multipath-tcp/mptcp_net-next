@@ -1,2 +1,13 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-do-not-reschedule-the-RTX-timer-for-fallback-sockets
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: do not reschedule the RTX timer for fallback sockets
+
+On fallback socket the retrans timer is a quite convoluted no-op, but
+currently nothing prevents the MPTCP core to keep rescheduling it.
+
+Additionally gate RTX timer reset to the msk not being fallen back to
+TCP yet. To avoid adding multiple tests in fast-path, use a new flags
+bit for such condition.
+
+Fixes: b51f9b80c032 ("mptcp: introduce MPTCP retransmission timer")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
