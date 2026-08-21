@@ -1,2 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-being-below-memory-limit-is-a-likely-condition
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: being below memory limit is a likely() condition
+
+The current compiler hint annotation is wrong, due to inverted
+logic in the previous revision of the relevant code.
+
+Fixes: e468d371180d ("mptcp: implemented OoO queue pruning")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
