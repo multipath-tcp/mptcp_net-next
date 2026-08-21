@@ -477,6 +477,11 @@ static inline int __nf_ct_expect_check(struct nf_conntrack_expect *expect,
 
 	lockdep_nfct_expect_lock_held();
 
+	if (expect->flags & NF_CT_EXPECT_DEAD) {
+		DEBUG_NET_WARN_ON_ONCE(1);
+		return -EINVAL;
+	}
+
 	h = nf_ct_expect_dst_hash(net, &expect->tuple);
 	hlist_for_each_entry_safe(i, next, &nf_ct_expect_hash[h], hnode) {
 		if (nf_ct_exp_is_expired(i)) {
