@@ -1,2 +1,15 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-subflow-no-need-to-copy-thmac-during-ulp_clone
+Subject: [PATCH] mptcp: subflow: no need to copy thmac during ulp_clone
+
+'thmac' is not used after that point.
+
+Indeed, subflow_ulp_clone() is called when the request on the passive
+side is over, so when the truncated HMAC is no longer needed.
+
+Note that in case of SYN cookies, thmac will not be initialised. So
+better to remove it to avoid a warning from debug tools like KMSAN for
+reading uninitialised data.
+
+Fixes: f296234c98a8 ("mptcp: Add handling of incoming MP_JOIN requests")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
