@@ -2030,7 +2030,7 @@ static void mptcp_rps_record_subflows(const struct mptcp_sock *msk)
 	}
 }
 
-static int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
+int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct page_frag *pfrag;
@@ -2410,8 +2410,7 @@ static unsigned int mptcp_inq_hint(const struct sock *sk)
 	return 0;
 }
 
-static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
-			 int flags)
+int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct scm_timestamping_internal tss;
@@ -4277,7 +4276,7 @@ static void mptcp_splice_eof(struct socket *sock)
 	release_sock(sk);
 }
 
-static struct proto mptcp_prot = {
+struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
 	.init		= mptcp_init_sock,
@@ -4309,6 +4308,9 @@ static struct proto mptcp_prot = {
 	.slab_flags	= SLAB_TYPESAFE_BY_RCU,
 	.no_autobind	= true,
 	.splice_eof	= mptcp_splice_eof,
+#ifdef CONFIG_BPF_SYSCALL
+	.psock_update_sk_prot	= mptcp_bpf_update_proto,
+#endif
 };
 
 static int mptcp_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)
