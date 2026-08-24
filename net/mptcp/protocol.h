@@ -222,7 +222,7 @@ struct mptcp_pm_data {
 	struct mptcp_addr_info remote;
 	struct list_head anno_list;
 	struct list_head userspace_pm_local_addr_list;
-	struct mptcp_pm_ops *ops;
+	struct mptcp_pm_ops __rcu *ops;	/* RCU: read via mptcp_pm_rcu_deref() */
 
 	spinlock_t	lock;		/*protects the whole PM data */
 
@@ -1101,6 +1101,7 @@ void __init mptcp_pm_init(void);
 void mptcp_pm_data_init(struct mptcp_sock *msk);
 void mptcp_pm_data_reset(struct mptcp_sock *msk);
 void mptcp_pm_destroy(struct mptcp_sock *msk);
+void mptcp_pm_ops_release(struct mptcp_sock *msk);
 int mptcp_pm_parse_addr(struct nlattr *attr, struct genl_info *info,
 			struct mptcp_addr_info *addr);
 int mptcp_pm_parse_entry(struct nlattr *attr, struct genl_info *info,
