@@ -500,30 +500,36 @@ close_cgroup:
 	close(cgroup_fd);
 }
 
-/* Test sockmap on MPTCP server handling non-mp-capable clients. */
-static void test_sockmap_with_mptcp_fallback(struct mptcp_sockmap *skel)
+/* Test sockmap on MPTCP server handling MPTCP clients. */
+static void test_sockmap_with_mptcp(struct mptcp_sockmap *skel)
 {
 	int listen_fd = -1, client_fd1 = -1, client_fd2 = -1;
 	int server_fd1 = -1, server_fd2 = -1, sent, recvd;
 	char snd[9] = "123456789";
+	int zero = 0, err;
 	char rcv[10];
 
 	/* start server with MPTCP enabled */
 	listen_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
-	if (!ASSERT_OK_FD(listen_fd, "sockmap-fb:start_mptcp_server"))
+	if (!ASSERT_OK_FD(listen_fd, "sockmap:start_mptcp_server"))
 		return;
 
 	skel->bss->trace_port = ntohs(get_socket_local_port(listen_fd));
 	skel->bss->sk_index = 0;
-	/* create client without MPTCP enabled */
-	client_fd1 = connect_to_fd_opts(listen_fd, NULL);
-	if (!ASSERT_OK_FD(client_fd1, "sockmap-fb:connect_to_fd"))
+	/* create client with MPTCP enabled */
+	client_fd1 = connect_to_fd(listen_fd, 0);
+	if (!ASSERT_OK_FD(client_fd1, "sockmap:connect_to_fd"))
 		goto end;
 
 	server_fd1 = accept(listen_fd, NULL, 0);
+	err = bpf_map_update_elem(bpf_map__fd(skel->maps.sock_map),
+				  &zero, &server_fd1, BPF_NOEXIST);
+	if (!ASSERT_OK(err, "sockmap:add server_fd1"))
+		goto end;
+
 	skel->bss->sk_index = 1;
 	client_fd2 = connect_to_fd_opts(listen_fd, NULL);
-	if (!ASSERT_OK_FD(client_fd2, "sockmap-fb:connect_to_fd"))
+	if (!ASSERT_OK_FD(client_fd2, "sockmap:connect_to_fd"))
 		goto end;
 
 	server_fd2 = accept(listen_fd, NULL, 0);
@@ -532,12 +538,12 @@ static void test_sockmap_with_mptcp_fallback(struct mptcp_sockmap *skel)
 	 */
 	skel->bss->redirect_idx = 1;
 	sent = send(client_fd1, snd, sizeof(snd), 0);
-	if (!ASSERT_EQ(sent, sizeof(snd), "sockmap-fb:send(client_fd1)"))
+	if (!ASSERT_EQ(sent, sizeof(snd), "sockmap:send(client_fd1)"))
 		goto end;
 
 	/* try to recv more bytes to avoid truncation check */
 	recvd = recv(client_fd2, rcv, sizeof(rcv), 0);
-	if (!ASSERT_EQ(recvd, sizeof(snd), "sockmap-fb:recv(client_fd2)"))
+	if (!ASSERT_EQ(recvd, sizeof(snd), "sockmap:recv(client_fd2)"))
 		goto end;
 
 end:
@@ -552,11 +558,11 @@ end:
 	close(listen_fd);
 }
 
-/* Test sockmap rejection of MPTCP sockets - both server and client sides. */
-static void test_sockmap_reject_mptcp(struct mptcp_sockmap *skel)
+/* Test sockmap of MPTCP sockets - both server and client sides. */
+static void test_sockmap_mptcp_support(struct mptcp_sockmap *skel)
 {
 	int listen_fd = -1, server_fd = -1, client_fd1 = -1;
-	int err, zero = 0;
+	int err, zero = 0, one = 1;
 
 	/* start server with MPTCP enabled */
 	listen_fd = start_mptcp_server(AF_INET, NULL, 0, 0);
@@ -577,13 +583,13 @@ static void test_sockmap_reject_mptcp(struct mptcp_sockmap *skel)
 	server_fd = accept(listen_fd, NULL, 0);
 	err = bpf_map_update_elem(bpf_map__fd(skel->maps.sock_map),
 				  &zero, &server_fd, BPF_NOEXIST);
-	if (!ASSERT_EQ(err, -EOPNOTSUPP, "server should be disallowed"))
+	if (!ASSERT_EQ(err, 0, "server should be allowed"))
 		goto end;
 
-	/* MPTCP client should also be disallowed */
+	/* MPTCP client should also be allowed */
 	err = bpf_map_update_elem(bpf_map__fd(skel->maps.sock_map),
-				  &zero, &client_fd1, BPF_NOEXIST);
-	if (!ASSERT_EQ(err, -EOPNOTSUPP, "client should be disallowed"))
+				  &one, &client_fd1, BPF_NOEXIST);
+	if (!ASSERT_EQ(err, 0, "client should be allowed"))
 		goto end;
 end:
 	if (client_fd1 >= 0)
@@ -625,8 +631,8 @@ static void test_mptcp_sockmap(void)
 	if (endpoint_init("subflow", 2) < 0)
 		goto close_netns;
 
-	test_sockmap_with_mptcp_fallback(skel);
-	test_sockmap_reject_mptcp(skel);
+	test_sockmap_with_mptcp(skel);
+	test_sockmap_mptcp_support(skel);
 
 close_netns:
 	netns_free(netns);
