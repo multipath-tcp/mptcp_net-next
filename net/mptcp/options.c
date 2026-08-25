@@ -1169,7 +1169,8 @@ bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool us
 		return false;
 
 	WRITE_ONCE(msk->rcv_data_fin_seq,
-		   mptcp_expand_seq(READ_ONCE(msk->ack_seq), data_fin_seq, use_64bit));
+		   mptcp_expand_seq(atomic64_read(&msk->ack_seq),
+				    data_fin_seq, use_64bit));
 	WRITE_ONCE(msk->rcv_data_fin, 1);
 
 	return true;
@@ -1539,7 +1540,7 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 			 */
 			subflow = mptcp_subflow_ctx(ssk);
 			msk = mptcp_sk(subflow->conn);
-			ack_seq = READ_ONCE(msk->ack_seq);
+			ack_seq = atomic64_read(&msk->ack_seq);
 			if (mpext->ack64) {
 				put_unaligned_be64(ack_seq, ptr);
 				ptr += 2;
