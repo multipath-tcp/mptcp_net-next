@@ -466,6 +466,7 @@ void __mptcp_sync_state(struct sock *sk, int state)
 		 * even for the FASTOPEN scenarios
 		 */
 		WRITE_ONCE(msk->write_seq, subflow->idsn + 1);
+		WRITE_ONCE(msk->local_idsn, subflow->idsn);
 		WRITE_ONCE(msk->snd_nxt, msk->write_seq);
 		mptcp_set_state(sk, state);
 		sk->sk_state_change(sk);
@@ -485,6 +486,7 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 	subflow->remote_key_valid = 1;
 	subflow->remote_key = mp_opt->sndr_key;
 	mptcp_crypto_key_sha(subflow->remote_key, NULL, &subflow->iasn);
+	WRITE_ONCE(msk->remote_idsn, subflow->iasn);
 	subflow->iasn++;
 
 	/* for fallback's sake */
