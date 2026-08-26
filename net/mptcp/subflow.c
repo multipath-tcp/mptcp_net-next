@@ -634,6 +634,13 @@ static int subflow_chk_local_id(struct sock *sk)
 	if (likely(subflow->local_id >= 0))
 		return 0;
 
+	/* Slightly unrelated, leverage this code path being called once per
+	 * connection before sending the first packet. Early fallback could
+	 * take place at mptcp_connect() time.
+	 */
+	if (!__mptcp_check_fallback(msk))
+		set_bit(MPTCP_RTX_ENABLED, &msk->flags);
+
 	err = mptcp_pm_get_local_id(msk, (struct sock_common *)sk);
 	if (err < 0)
 		return err;

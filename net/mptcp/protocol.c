@@ -96,7 +96,7 @@ bool __mptcp_try_fallback(struct mptcp_sock *msk, int fb_mib)
 
 	msk->allow_subflows = false;
 	set_bit(MPTCP_FALLBACK_DONE, &msk->flags);
-	set_bit(MPTCP_RTX_DISABLED, &msk->flags);
+	clear_bit(MPTCP_RTX_ENABLED, &msk->flags);
 	__MPTCP_INC_STATS(net, fb_mib);
 	spin_unlock_bh(&msk->fallback_lock);
 	return true;
@@ -1126,7 +1126,7 @@ static void mptcp_reset_rtx_timer(struct sock *sk)
 	unsigned long tout;
 
 	/* Prevent rescheduling on close and in case of fallback. */
-	if (test_bit(MPTCP_RTX_DISABLED, &msk->flags))
+	if (!test_bit(MPTCP_RTX_ENABLED, &msk->flags))
 		return;
 
 	tout = msk->timer_ival;
@@ -3363,7 +3363,7 @@ void mptcp_set_state(struct sock *sk, int state)
 		 */
 		break;
 	case TCP_CLOSE:
-		set_bit(MPTCP_RTX_DISABLED, &mptcp_sk(sk)->flags);
+		clear_bit(MPTCP_RTX_ENABLED, &mptcp_sk(sk)->flags);
 		fallthrough;
 	default:
 		if (oldstate == TCP_ESTABLISHED || oldstate == TCP_CLOSE_WAIT)
@@ -3785,6 +3785,7 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	/* passive msk is created after the first/MPC subflow */
 	msk->subflow_id = 2;
 
+	set_bit(MPTCP_RTX_ENABLED, &msk->flags);
 	sock_reset_flag(nsk, SOCK_RCU_FREE);
 	security_inet_csk_clone(nsk, req);
 
