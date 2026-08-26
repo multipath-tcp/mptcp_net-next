@@ -3256,7 +3256,7 @@ static void mptcp_ca_reset(struct sock *sk)
 
 	/* no need to keep a reference to the ops, the name will suffice */
 	tcp_cleanup_congestion_control(sk);
-	icsk->icsk_ca_ops = NULL;
+	WRITE_ONCE(icsk->icsk_ca_ops, NULL);
 }
 
 static int mptcp_init_sock(struct sock *sk)
