@@ -306,6 +306,13 @@ struct mptcp_sock {
 	u64		bytes_acked;
 	u64		snd_una;
 	u64		wnd_end;
+	/*
+	 * cached IDSN/IASN, so mptcp_diag_fill_info() can report
+	 * write_seq/snd_una/rcv_nxt normalized to start near 0
+	 * instead of the raw, crypto-derived initial values.
+	 */
+	u64		local_idsn;
+	u64		remote_idsn;
 	u32		last_data_sent;
 	u32		last_data_recv;
 	u32		last_ack_recv;
