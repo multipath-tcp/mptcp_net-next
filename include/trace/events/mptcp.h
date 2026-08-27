@@ -215,7 +215,9 @@ TRACE_EVENT(mptcp_rcvbuf_grow,
 		struct inet_sock *inet = inet_sk(sk);
 		bool ofo_empty;
 		__be32 *p32;
+		u64 ack_seq;
 
+		ack_seq = atomic64_read(&msk->ack_seq);
 		__entry->time = time;
 		__entry->rtt_us = mptcp_rtt_us_est(msk) >> 3;
 		__entry->copied = msk->rcvq_space.copied;
@@ -224,11 +226,10 @@ TRACE_EVENT(mptcp_rcvbuf_grow,
 		ofo_empty = RB_EMPTY_ROOT(&msk->out_of_order_queue);
 		__entry->ooo_space = ofo_empty ? 0 :
 				     MPTCP_SKB_CB(msk->ooo_last_skb)->end_seq -
-				     msk->ack_seq;
+				     ack_seq;
 
 		__entry->rcvbuf = sk->sk_rcvbuf;
-		__entry->rcv_wnd = atomic64_read(&msk->rcv_wnd_sent) -
-				   msk->ack_seq;
+		__entry->rcv_wnd = atomic64_read(&msk->rcv_wnd_sent) - ack_seq;
 		__entry->scaling_ratio = msk->scaling_ratio;
 		__entry->sport = ntohs(inet->inet_sport);
 		__entry->dport = ntohs(inet->inet_dport);

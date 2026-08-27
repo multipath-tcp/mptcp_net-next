@@ -288,15 +288,15 @@ struct mptcp_sock {
 						 * lockless access read
 						 */
 	u64		remote_key;		/* same as above */
-	u64		write_seq;
+	atomic64_t	write_seq;
 	u64		bytes_sent;
-	u64		snd_nxt;
-	u64		bytes_received;
-	u64		ack_seq;
+	atomic64_t	snd_nxt;
+	atomic64_t	bytes_received;
+	atomic64_t	ack_seq;
 	atomic64_t	rcv_wnd_sent;
 	u64		rcv_data_fin_seq;
 	u64		bytes_retrans;
-	u64		bytes_consumed;
+	atomic64_t	bytes_consumed;
 	int		snd_burst;
 	int		old_wspace;
 	u64		recovery_snd_nxt;	/* in recovery mode accept up to this seq;
@@ -304,8 +304,8 @@ struct mptcp_sock {
 						 * protection
 						 */
 	u64		bytes_acked;
-	u64		snd_una;
-	u64		wnd_end;
+	atomic64_t	snd_una;
+	atomic64_t	wnd_end;
 	u32		last_data_sent;
 	u32		last_data_recv;
 	u32		last_ack_recv;
@@ -488,7 +488,7 @@ static inline struct mptcp_data_frag *mptcp_rtx_head(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 
-	if (msk->snd_una == msk->snd_nxt)
+	if (atomic64_read(&msk->snd_una) == atomic64_read(&msk->snd_nxt))
 		return NULL;
 
 	return list_first_entry_or_null(&msk->rtx_queue, struct mptcp_data_frag, list);
@@ -866,7 +866,8 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk);
 
 static inline u64 mptcp_data_avail(const struct mptcp_sock *msk)
 {
-	return READ_ONCE(msk->bytes_received) - READ_ONCE(msk->bytes_consumed);
+	return atomic64_read(&msk->bytes_received) -
+	       atomic64_read(&msk->bytes_consumed);
 }
 
 static inline bool mptcp_epollin_ready(const struct sock *sk)
@@ -989,7 +990,7 @@ bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool us
 static inline bool mptcp_data_fin_enabled(const struct mptcp_sock *msk)
 {
 	return READ_ONCE(msk->snd_data_fin_enable) &&
-	       READ_ONCE(msk->write_seq) == READ_ONCE(msk->snd_nxt);
+	       atomic64_read(&msk->write_seq) == atomic64_read(&msk->snd_nxt);
 }
 
 static inline u32 mptcp_notsent_lowat(const struct sock *sk)
@@ -1006,7 +1007,8 @@ static inline bool mptcp_stream_memory_free(const struct sock *sk, int wake)
 	const struct mptcp_sock *msk = mptcp_sk(sk);
 	u32 notsent_bytes;
 
-	notsent_bytes = READ_ONCE(msk->write_seq) - READ_ONCE(msk->snd_nxt);
+	notsent_bytes = atomic64_read(&msk->write_seq) -
+			atomic64_read(&msk->snd_nxt);
 	return (notsent_bytes << wake) < mptcp_notsent_lowat(sk);
 }
 

@@ -457,16 +457,18 @@ void __mptcp_sync_state(struct sock *sk, int state)
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct sock *ssk = msk->first;
+	u64 seq;
 
 	subflow = mptcp_subflow_ctx(ssk);
+	seq = subflow->idsn + 1;
 	__mptcp_propagate_sndbuf(sk, ssk);
 
 	if (sk->sk_state == TCP_SYN_SENT) {
 		/* subflow->idsn is always available is TCP_SYN_SENT state,
 		 * even for the FASTOPEN scenarios
 		 */
-		WRITE_ONCE(msk->write_seq, subflow->idsn + 1);
-		WRITE_ONCE(msk->snd_nxt, msk->write_seq);
+		atomic64_set(&msk->write_seq, seq);
+		atomic64_set(&msk->snd_nxt, seq);
 		mptcp_set_state(sk, state);
 		sk->sk_state_change(sk);
 	}
@@ -491,7 +493,7 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 	subflow->map_seq = subflow->iasn;
 
 	WRITE_ONCE(msk->remote_key, subflow->remote_key);
-	WRITE_ONCE(msk->ack_seq, subflow->iasn);
+	atomic64_set(&msk->ack_seq, subflow->iasn);
 	WRITE_ONCE(msk->can_ack, true);
 	atomic64_set(&msk->rcv_wnd_sent, subflow->iasn);
 }
@@ -501,14 +503,15 @@ static void mptcp_propagate_state(struct sock *sk, struct sock *ssk,
 				  const struct mptcp_options_received *mp_opt)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	u64 seq = subflow->idsn + 1;
 
 	mptcp_data_lock(sk);
 	if (mp_opt) {
 		/* Options are available only in the non fallback cases
 		 * avoid updating rx path fields otherwise
 		 */
-		WRITE_ONCE(msk->snd_una, subflow->idsn + 1);
-		WRITE_ONCE(msk->wnd_end, subflow->idsn + 1 + tcp_sk(ssk)->snd_wnd);
+		atomic64_set(&msk->snd_una, seq);
+		atomic64_set(&msk->wnd_end, seq + tcp_sk(ssk)->snd_wnd);
 		subflow_set_remote_key(msk, subflow, mp_opt);
 	}
 
@@ -1198,7 +1201,8 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		data_len--;
 	}
 
-	map_seq = mptcp_expand_seq(READ_ONCE(msk->ack_seq), mpext->data_seq, mpext->dsn64);
+	map_seq = mptcp_expand_seq(atomic64_read(&msk->ack_seq),
+				   mpext->data_seq, mpext->dsn64);
 	WRITE_ONCE(mptcp_sk(subflow->conn)->use_64bit_ack, !!mpext->dsn64);
 
 	if (subflow->map_valid) {
@@ -1386,7 +1390,7 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		if (unlikely(!READ_ONCE(msk->can_ack)))
 			goto fallback;
 
-		old_ack = READ_ONCE(msk->ack_seq);
+		old_ack = atomic64_read(&msk->ack_seq);
 		ack_seq = mptcp_subflow_get_mapped_dsn(subflow);
 		pr_debug("msk ack_seq=%llx subflow ack_seq=%llx\n", old_ack,
 			 ack_seq);

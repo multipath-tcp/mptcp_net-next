@@ -600,7 +600,8 @@ static void mptcp_write_data_fin(struct mptcp_subflow_context *subflow,
 	/* The write_seq value has already been incremented, so the actual
 	 * sequence number for the DATA_FIN is one less.
 	 */
-	u64 data_fin_tx_seq = READ_ONCE(mptcp_sk(subflow->conn)->write_seq) - 1;
+	u64 data_fin_tx_seq =
+		atomic64_read(&mptcp_sk(subflow->conn)->write_seq) - 1;
 
 	if (!ext->use_map || !skb->len) {
 		/* RFC6824 requires a DSS mapping with specific values
@@ -1086,8 +1087,8 @@ u64 __mptcp_expand_seq(u64 old_seq, u64 cur_seq)
 
 static void __mptcp_snd_una_update(struct mptcp_sock *msk, u64 new_snd_una)
 {
-	msk->bytes_acked += new_snd_una - msk->snd_una;
-	WRITE_ONCE(msk->snd_una, new_snd_una);
+	msk->bytes_acked += new_snd_una - atomic64_read(&msk->snd_una);
+	atomic64_set(&msk->snd_una, new_snd_una);
 }
 
 static void rwin_update(struct mptcp_sock *msk, struct sock *ssk,
@@ -1120,7 +1121,7 @@ static void ack_update_msk(struct mptcp_sock *msk,
 			   struct sock *ssk,
 			   struct mptcp_options_received *mp_opt)
 {
-	u64 new_wnd_end, new_snd_una, snd_nxt = READ_ONCE(msk->snd_nxt);
+	u64 new_wnd_end, new_snd_una, snd_nxt = atomic64_read(&msk->snd_nxt);
 	struct sock *sk = (struct sock *)msk;
 	u64 old_snd_una;
 
@@ -1130,7 +1131,7 @@ static void ack_update_msk(struct mptcp_sock *msk,
 	 * wrongly expanding to a future ack sequence number, which is way
 	 * more dangerous than missing an ack
 	 */
-	old_snd_una = msk->snd_una;
+	old_snd_una = atomic64_read(&msk->snd_una);
 	new_snd_una = mptcp_expand_seq(old_snd_una, mp_opt->data_ack, mp_opt->ack64);
 
 	/* ACK for data not even sent yet? Ignore.*/
@@ -1139,11 +1140,11 @@ static void ack_update_msk(struct mptcp_sock *msk,
 
 	new_wnd_end = new_snd_una + tcp_sk(ssk)->snd_wnd;
 
-	if (after64(new_wnd_end, msk->wnd_end))
-		WRITE_ONCE(msk->wnd_end, new_wnd_end);
+	if (after64(new_wnd_end, atomic64_read(&msk->wnd_end)))
+		atomic64_set(&msk->wnd_end, new_wnd_end);
 
 	/* this assumes mptcp_incoming_options() is invoked after tcp_ack() */
-	if (after64(msk->wnd_end, snd_nxt))
+	if (after64(atomic64_read(&msk->wnd_end), snd_nxt))
 		__mptcp_check_push(sk, ssk);
 
 	if (after64(new_snd_una, old_snd_una)) {
@@ -1155,7 +1156,7 @@ static void ack_update_msk(struct mptcp_sock *msk,
 
 	trace_ack_update_msk(mp_opt->data_ack,
 			     old_snd_una, new_snd_una,
-			     new_wnd_end, READ_ONCE(msk->wnd_end));
+			     new_wnd_end, atomic64_read(&msk->wnd_end));
 }
 
 bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool use_64bit)
@@ -1169,7 +1170,8 @@ bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool us
 		return false;
 
 	WRITE_ONCE(msk->rcv_data_fin_seq,
-		   mptcp_expand_seq(READ_ONCE(msk->ack_seq), data_fin_seq, use_64bit));
+		   mptcp_expand_seq(atomic64_read(&msk->ack_seq),
+				    data_fin_seq, use_64bit));
 	WRITE_ONCE(msk->rcv_data_fin, 1);
 
 	return true;
@@ -1242,7 +1244,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		/* on fallback we just need to ignore the msk-level snd_una, as
 		 * this is really plain TCP
 		 */
-		__mptcp_snd_una_update(msk, READ_ONCE(msk->snd_nxt));
+		__mptcp_snd_una_update(msk, atomic64_read(&msk->snd_nxt));
 
 		__mptcp_data_acked(subflow->conn);
 		mptcp_data_unlock(subflow->conn);
@@ -1539,7 +1541,7 @@ void mptcp_write_options(struct tcphdr *th, __be32 *ptr, struct tcp_sock *tp,
 			 */
 			subflow = mptcp_subflow_ctx(ssk);
 			msk = mptcp_sk(subflow->conn);
-			ack_seq = READ_ONCE(msk->ack_seq);
+			ack_seq = atomic64_read(&msk->ack_seq);
 			if (mpext->ack64) {
 				put_unaligned_be64(ack_seq, ptr);
 				ptr += 2;
