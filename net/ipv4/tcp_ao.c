@@ -1196,12 +1196,7 @@ void tcp_ao_connect_init(struct sock *sk)
 		ao_info->lisn = htonl(tp->write_seq);
 		ao_info->snd_sne = 0;
 	} else {
-		/* Can't happen: tcp_connect() verifies that there's
-		 * at least one tcp-ao key that matches the remote peer.
-		 */
-		WARN_ON_ONCE(1);
-		rcu_assign_pointer(tp->ao_info, NULL);
-		kfree(ao_info);
+		tcp_ao_destroy_sock(sk, false);
 	}
 }
 
@@ -1833,6 +1828,9 @@ static int tcp_ao_del_cmd(struct sock *sk, unsigned short int family,
 	 */
 	if (cmd.ifindex && !(cmd.keyflags & TCP_AO_KEYF_IFINDEX))
 		return -EINVAL;
+
+	if (cmd.keyflags & TCP_AO_KEYF_IFINDEX)
+		l3index = cmd.ifindex;
 
 	ao_info = setsockopt_ao_info(sk);
 	if (IS_ERR(ao_info))
