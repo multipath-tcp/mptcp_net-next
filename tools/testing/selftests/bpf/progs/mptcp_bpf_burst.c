@@ -108,7 +108,8 @@ int BPF_PROG(bpf_burst_get_send, struct mptcp_sock *msk)
 	if (!subflow || !bpf_sk_stream_memory_free(subflow))
 		return -1;
 
-	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
+	burst = min(MPTCP_SEND_BURST_SIZE,
+		    mptcp_wnd_end(msk) - READ_ONCE(msk->snd_nxt.counter));
 	ssk = mptcp_subflow_tcp_sock(subflow);
 	wmem = ssk->sk_wmem_queued;
 	if (!burst)
