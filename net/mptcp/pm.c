@@ -27,6 +27,14 @@ static LIST_HEAD(mptcp_pm_list);
 
 /* path manager helpers */
 
+static struct mptcp_pm_ops *mptcp_pm_rcu_deref(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_ops *pm_ops;
+
+	pm_ops = rcu_dereference(msk->pm.ops);
+	return pm_ops ? pm_ops : &mptcp_pm_kernel;
+}
+
 /* if sk is ipv4 or ipv6_only allows only same-family local and remote addresses,
  * otherwise allow any matching local/remote pair
  */
@@ -1049,7 +1057,7 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	skc_local.addr.id = 0;
 	skc_local.flags = MPTCP_PM_ADDR_FLAG_IMPLICIT;
 
-	return msk->pm.ops->get_local_id(msk, &skc_local);
+	return mptcp_pm_rcu_deref(msk)->get_local_id(msk, &skc_local);
 }
 
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
@@ -1058,7 +1066,7 @@ bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
 
 	mptcp_local_address((struct sock_common *)skc, &skc_local);
 
-	return msk->pm.ops->get_priority(msk, &skc_local);
+	return mptcp_pm_rcu_deref(msk)->get_priority(msk, &skc_local);
 }
 
 static void
@@ -1158,23 +1166,41 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 static void mptcp_pm_ops_init(struct mptcp_sock *msk,
 			      struct mptcp_pm_ops *pm_ops)
 {
-	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
-		pr_warn_once("pm %s fails, fallback to default pm", pm_ops->name);
-		pm_ops = &mptcp_pm_kernel;
-	}
+	struct mptcp_pm_ops *old;
+	bool need_sync = false;
 
-	msk->pm.ops = pm_ops;
-	if (msk->pm.ops->init)
-		msk->pm.ops->init(msk);
+	spin_lock_bh(&msk->pm.lock);
+	old = rcu_dereference_protected(msk->pm.ops,
+					lockdep_is_held(&msk->pm.lock));
+	if (old == pm_ops) {
+		need_sync = false;
+	} else {
+		rcu_assign_pointer(msk->pm.ops, pm_ops);
+		need_sync = !!old;
+	}
+	spin_unlock_bh(&msk->pm.lock);
+
+	if (need_sync)
+		synchronize_rcu();
+	if (old)
+		bpf_module_put(old, old->owner);
+
+	if (pm_ops->init)
+		pm_ops->init(msk);
 
 	pr_debug("pm %s initialized\n", pm_ops->name);
 }
 
-static void mptcp_pm_ops_release(struct mptcp_sock *msk)
+void mptcp_pm_ops_release(struct mptcp_sock *msk)
 {
-	struct mptcp_pm_ops *pm_ops = msk->pm.ops;
+	struct mptcp_pm_ops *pm_ops;
 
-	msk->pm.ops = NULL;
+	spin_lock_bh(&msk->pm.lock);
+	pm_ops = rcu_dereference_protected(msk->pm.ops,
+					   lockdep_is_held(&msk->pm.lock));
+	rcu_assign_pointer(msk->pm.ops, NULL);
+	spin_unlock_bh(&msk->pm.lock);
+
 	if (pm_ops->release)
 		pm_ops->release(msk);
 
@@ -1195,8 +1221,6 @@ void mptcp_pm_destroy(struct mptcp_sock *msk)
 	 * can be reused (mptcp_disconnect()) and re-selected to a different PM
 	 */
 	mptcp_userspace_pm_free_local_addr_list(msk);
-
-	mptcp_pm_ops_release(msk);
 }
 
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
@@ -1204,6 +1228,7 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	const struct net *net = sock_net((struct sock *)msk);
 	u8 pm_type = mptcp_get_pm_type(net);
 	struct mptcp_pm_data *pm = &msk->pm;
+	struct mptcp_pm_ops *pm_ops;
 
 	memset(&pm->reset, 0, sizeof(pm->reset));
 	pm->rm_list_tx.nr = 0;
@@ -1211,8 +1236,15 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	WRITE_ONCE(pm->pm_type, pm_type);
 
 	rcu_read_lock();
-	mptcp_pm_ops_init(msk, mptcp_get_path_manager(net));
+	pm_ops = mptcp_get_path_manager(net);
+	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
+		pr_warn_once("pm %s fails, fallback to default pm",
+			     pm_ops ? pm_ops->name : NULL);
+		pm_ops = &mptcp_pm_kernel;
+	}
 	rcu_read_unlock();
+
+	mptcp_pm_ops_init(msk, pm_ops);
 }
 
 void mptcp_pm_data_init(struct mptcp_sock *msk)

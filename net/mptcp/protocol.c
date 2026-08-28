@@ -3751,6 +3751,9 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 		inet_sk(nsk)->pinet6 = mptcp_inet6_sk(nsk);
 #endif
 
+	msk = mptcp_sk(nsk);
+	RCU_INIT_POINTER(msk->pm.ops, NULL);
+
 	__mptcp_init_sock(nsk);
 
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
@@ -3820,6 +3823,7 @@ static void mptcp_destroy(struct sock *sk)
 	/* allow the following to close even the initial subflow */
 	msk->free_first = 1;
 	mptcp_destroy_common(msk);
+	mptcp_pm_ops_release(msk);
 	sk_sockets_allocated_dec(sk);
 }
 
