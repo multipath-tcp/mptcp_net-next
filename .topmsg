@@ -8,6 +8,18 @@ Additionally gate RTX timer reset to the msk not being fallen back to
 TCP yet. To avoid adding multiple tests in fast-path, use a new flags
 bit for such condition.
 
+The RTX enable bit is clear at close time and set before the msk could
+start retransmitting, with a couple of caveats:
+
+- passive sockets inherit the bit from the listener msk; set the bit on
+  such socket to avoid flipping it in the fast-path, even if the
+  listener will obviously never retransmit.
+
+- while fastopening (MPTFO), mptcp_sendmsg_fastopen still ends-up
+  calling mptcp_connect via tcp_sendmsg_fastopen ->
+  __inet_stream_connect(ssk->sk_socket), and the first subflow's
+  sk_socket points to the msk one.
+
 Fixes: b51f9b80c032 ("mptcp: introduce MPTCP retransmission timer")
 Signed-off-by: Paolo Abeni <pabeni@redhat.com>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
