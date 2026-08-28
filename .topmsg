@@ -1,2 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-prevent-race-between-disconnect-and-rtx
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: prevent race between disconnect() and rtx
+
+Sashiko noted that the two event can race, leading to inconsistent
+status. Prevent the race using the synchronous timer stop operation.
+
+Fixes: b29fcfb54cd7 ("mptcp: full disconnect implementation")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
