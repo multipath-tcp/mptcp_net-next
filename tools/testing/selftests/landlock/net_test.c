@@ -40,6 +40,7 @@ enum sandbox_type {
 	/* This may be used to test rules that allow *and* deny accesses. */
 	TCP_SANDBOX,
 	UDP_SANDBOX,
+	MPTCP_SANDBOX,
 };
 
 static int set_service(struct service_fixture *const srv,
@@ -105,6 +106,12 @@ static bool prot_is_udp(const struct protocol_variant *const prot)
 	       (prot->protocol == IPPROTO_UDP || prot->protocol == IPPROTO_IP);
 }
 
+static bool prot_is_mptcp(const struct protocol_variant *const prot)
+{
+	return (prot->domain == AF_INET || prot->domain == AF_INET6) &&
+	       prot->type == SOCK_STREAM && prot->protocol == IPPROTO_MPTCP;
+}
+
 static bool is_restricted(const struct protocol_variant *const prot,
 			  const enum sandbox_type sandbox)
 {
@@ -113,6 +120,8 @@ static bool is_restricted(const struct protocol_variant *const prot,
 		return prot_is_tcp(prot);
 	case UDP_SANDBOX:
 		return prot_is_udp(prot);
+	case MPTCP_SANDBOX:
+		return prot_is_mptcp(prot);
 	case NO_SANDBOX:
 	default:
 		return false;
@@ -126,6 +135,8 @@ static __u64 sandbox_bind_access(const enum sandbox_type sandbox)
 		return LANDLOCK_ACCESS_NET_BIND_TCP;
 	case UDP_SANDBOX:
 		return LANDLOCK_ACCESS_NET_BIND_UDP;
+	case MPTCP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_BIND_MPTCP;
 	case NO_SANDBOX:
 	default:
 		return 0;
@@ -139,6 +150,8 @@ static __u64 sandbox_connect_access(const enum sandbox_type sandbox)
 		return LANDLOCK_ACCESS_NET_CONNECT_TCP;
 	case UDP_SANDBOX:
 		return LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+	case MPTCP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
 	case NO_SANDBOX:
 	default:
 		return 0;
@@ -815,6 +828,114 @@ FIXTURE_VARIANT_ADD(protocol, udp_sandbox_with_unix_datagram) {
 	},
 };
 
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv4_tcp1) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET,
+		.type = SOCK_STREAM,
+		/* IPPROTO_IP == 0 */
+		.protocol = IPPROTO_IP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv4_tcp2) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_TCP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv4_mptcp) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_MPTCP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv6_tcp1) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET6,
+		.type = SOCK_STREAM,
+		/* IPPROTO_IP == 0 */
+		.protocol = IPPROTO_IP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv6_tcp2) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET6,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_TCP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv6_mptcp) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET6,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_MPTCP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv4_udp) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET,
+		.type = SOCK_DGRAM,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_ipv6_udp) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_INET6,
+		.type = SOCK_DGRAM,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_unix_stream) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_UNIX,
+		.type = SOCK_STREAM,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(protocol, mptcp_sandbox_with_unix_datagram) {
+	/* clang-format on */
+	.sandbox = MPTCP_SANDBOX,
+	.prot = {
+		.domain = AF_UNIX,
+		.type = SOCK_DGRAM,
+	},
+};
+
 static void test_bind_and_connect(struct __test_metadata *const _metadata,
 				  const struct service_fixture *const srv,
 				  const bool deny_bind, const bool deny_connect)
@@ -1294,14 +1415,12 @@ TEST_F(protocol, connect_unspec)
 
 TEST_F(protocol, tcp_fastopen)
 {
-	const bool restricted = variant->sandbox == TCP_SANDBOX &&
-				variant->prot.type == SOCK_STREAM &&
-				(variant->prot.protocol == IPPROTO_TCP ||
-				 variant->prot.protocol == IPPROTO_IP) &&
-				(variant->prot.domain == AF_INET ||
-				 variant->prot.domain == AF_INET6);
+	const bool stream_sandbox = variant->sandbox == TCP_SANDBOX ||
+				    variant->sandbox == MPTCP_SANDBOX;
+	const bool restricted = stream_sandbox &&
+				is_restricted(&variant->prot, variant->sandbox);
 	const struct landlock_ruleset_attr ruleset_attr = {
-		.handled_access_net = LANDLOCK_ACCESS_NET_CONNECT_TCP,
+		.handled_access_net = sandbox_connect_access(variant->sandbox),
 	};
 	int bind_fd, client_fd, status;
 	char buf;
@@ -1324,7 +1443,7 @@ TEST_F(protocol, tcp_fastopen)
 		connect_fd = socket_variant(&self->srv0);
 		ASSERT_LE(0, connect_fd);
 
-		if (variant->sandbox == TCP_SANDBOX) {
+		if (stream_sandbox) {
 			const int ruleset_fd = landlock_create_ruleset(
 				&ruleset_attr, sizeof(ruleset_attr), 0);
 			ASSERT_LE(0, ruleset_fd);
@@ -2219,13 +2338,15 @@ FIXTURE_TEARDOWN(mini)
 
 /* clang-format off */
 
-#define ACCESS_LAST LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP
+#define ACCESS_LAST LANDLOCK_ACCESS_NET_CONNECT_MPTCP
 
 #define ACCESS_ALL ( \
 	LANDLOCK_ACCESS_NET_BIND_TCP | \
 	LANDLOCK_ACCESS_NET_CONNECT_TCP | \
 	LANDLOCK_ACCESS_NET_BIND_UDP | \
-	LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP)
+	LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP | \
+	LANDLOCK_ACCESS_NET_BIND_MPTCP | \
+	LANDLOCK_ACCESS_NET_CONNECT_MPTCP)
 
 /* clang-format on */
 
@@ -2949,6 +3070,28 @@ FIXTURE_VARIANT_ADD(audit, ipv6_udp) {
 	},
 };
 
+/* clang-format off */
+FIXTURE_VARIANT_ADD(audit, ipv4_mptcp) {
+	/* clang-format on */
+	.addr = "127\\.0\\.0\\.1",
+	.prot = {
+		.domain = AF_INET,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_MPTCP,
+	},
+};
+
+/* clang-format off */
+FIXTURE_VARIANT_ADD(audit, ipv6_mptcp) {
+	/* clang-format on */
+	.addr = "::1",
+	.prot = {
+		.domain = AF_INET6,
+		.type = SOCK_STREAM,
+		.protocol = IPPROTO_MPTCP,
+	},
+};
+
 FIXTURE_SETUP(audit)
 {
 	struct protocol_variant prot_unspec = variant->prot;
@@ -2975,17 +3118,56 @@ FIXTURE_TEARDOWN(audit)
 	clear_cap(_metadata, CAP_AUDIT_CONTROL);
 }
 
+static __u64 prot_bind_access(const struct protocol_variant *const prot)
+{
+	if (prot_is_mptcp(prot))
+		return LANDLOCK_ACCESS_NET_BIND_MPTCP;
+
+	if (prot->type == SOCK_STREAM)
+		return LANDLOCK_ACCESS_NET_BIND_TCP;
+
+	return LANDLOCK_ACCESS_NET_BIND_UDP;
+}
+
+static __u64 prot_connect_access(const struct protocol_variant *const prot)
+{
+	if (prot_is_mptcp(prot))
+		return LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
+
+	if (prot->type == SOCK_STREAM)
+		return LANDLOCK_ACCESS_NET_CONNECT_TCP;
+
+	return LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+}
+
+static const char *prot_bind_blocker(const struct protocol_variant *const prot)
+{
+	if (prot_is_mptcp(prot))
+		return "net\\.bind_mptcp";
+
+	if (prot->type == SOCK_STREAM)
+		return "net\\.bind_tcp";
+
+	return "net\\.bind_udp";
+}
+
+static const char *
+prot_connect_blocker(const struct protocol_variant *const prot)
+{
+	if (prot_is_mptcp(prot))
+		return "net\\.connect_mptcp";
+
+	if (prot->type == SOCK_STREAM)
+		return "net\\.connect_tcp";
+
+	return "net\\.connect_send_udp";
+}
+
 TEST_F(audit, bind)
 {
-	const char *audit_evt = (variant->prot.type == SOCK_STREAM ?
-					 "net\\.bind_tcp" :
-					 "net\\.bind_udp");
-	const __u64 access_rights =
-		(variant->prot.type == SOCK_STREAM ?
-			 LANDLOCK_ACCESS_NET_BIND_TCP |
-				 LANDLOCK_ACCESS_NET_CONNECT_TCP :
-			 LANDLOCK_ACCESS_NET_BIND_UDP |
-				 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+	const char *audit_evt = prot_bind_blocker(&variant->prot);
+	const __u64 access_rights = prot_bind_access(&variant->prot) |
+				    prot_connect_access(&variant->prot);
 	const struct landlock_ruleset_attr ruleset_attr = {
 		.handled_access_net = access_rights,
 		.quiet_access_net = access_rights,
@@ -3031,15 +3213,9 @@ TEST_F(audit, bind)
 
 TEST_F(audit, connect)
 {
-	const char *audit_evt = (variant->prot.type == SOCK_STREAM ?
-					 "net\\.connect_tcp" :
-					 "net\\.connect_send_udp");
-	const __u64 bind_right = (variant->prot.type == SOCK_STREAM ?
-					  LANDLOCK_ACCESS_NET_BIND_TCP :
-					  LANDLOCK_ACCESS_NET_BIND_UDP);
-	const __u64 conn_right = (variant->prot.type == SOCK_STREAM ?
-					  LANDLOCK_ACCESS_NET_CONNECT_TCP :
-					  LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+	const char *audit_evt = prot_connect_blocker(&variant->prot);
+	const __u64 bind_right = prot_bind_access(&variant->prot);
+	const __u64 conn_right = prot_connect_access(&variant->prot);
 	const __u64 access_rights = bind_right | conn_right;
 	const struct landlock_ruleset_attr ruleset_attr = {
 		.handled_access_net = access_rights,
@@ -3104,15 +3280,9 @@ TEST_F(audit, connect)
 /* Quieting bind access has no effect on connect. */
 TEST_F(audit, connect_quiet_bind)
 {
-	const char *audit_evt = (variant->prot.type == SOCK_STREAM ?
-					 "net\\.connect_tcp" :
-					 "net\\.connect_send_udp");
-	const int bind_right = (variant->prot.type == SOCK_STREAM ?
-					LANDLOCK_ACCESS_NET_BIND_TCP :
-					LANDLOCK_ACCESS_NET_BIND_UDP);
-	const int conn_right = (variant->prot.type == SOCK_STREAM ?
-					LANDLOCK_ACCESS_NET_CONNECT_TCP :
-					LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+	const char *audit_evt = prot_connect_blocker(&variant->prot);
+	const int bind_right = prot_bind_access(&variant->prot);
+	const int conn_right = prot_connect_access(&variant->prot);
 	const int access_rights = bind_right | conn_right;
 	const struct landlock_ruleset_attr ruleset_attr = {
 		.handled_access_net = access_rights,
@@ -3194,15 +3364,9 @@ static int matches_log_connect_bound(int audit_fd, const char *const blockers,
  */
 TEST_F(audit, connect_bound)
 {
-	const __u64 bind_right = (variant->prot.type == SOCK_STREAM ?
-					  LANDLOCK_ACCESS_NET_BIND_TCP :
-					  LANDLOCK_ACCESS_NET_BIND_UDP);
-	const __u64 conn_right = (variant->prot.type == SOCK_STREAM ?
-					  LANDLOCK_ACCESS_NET_CONNECT_TCP :
-					  LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
-	const char *const audit_evt = (variant->prot.type == SOCK_STREAM ?
-					       "net\\.connect_tcp" :
-					       "net\\.connect_send_udp");
+	const __u64 bind_right = prot_bind_access(&variant->prot);
+	const __u64 conn_right = prot_connect_access(&variant->prot);
+	const char *const audit_evt = prot_connect_blocker(&variant->prot);
 	const struct landlock_ruleset_attr ruleset_attr = {
 		.handled_access_net = bind_right | conn_right,
 	};
