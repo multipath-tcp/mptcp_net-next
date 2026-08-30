@@ -735,6 +735,7 @@ static void mptcp_check_data_fin(struct sock *sk)
 		WRITE_ONCE(msk->rcv_data_fin, 0);
 
 		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | RCV_SHUTDOWN);
+		sock_set_flag(sk, SOCK_DONE);
 		smp_mb__before_atomic(); /* SHUTDOWN must be visible first */
 
 		switch (sk->sk_state) {
@@ -2412,8 +2413,7 @@ static unsigned int mptcp_inq_hint(struct sock *sk)
 	if (hint_val >= INT_MAX)
 		return INT_MAX;
 
-	if (!hint_val &&
-	    (sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN)))
+	if (!hint_val && sock_flag(sk, SOCK_DONE))
 		return 1;
 
 	return (unsigned int)hint_val;
@@ -2485,6 +2485,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			    !timeo)
 				break;
 		} else {
+			if (sock_flag(sk, SOCK_DONE))
+				break;
+
 			if (sk->sk_err) {
 				copied = sock_error(sk);
 				break;
@@ -3729,6 +3732,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	msk->copied_seq = 0;
 
 	WRITE_ONCE(sk->sk_shutdown, 0);
+	sock_reset_flag(sk, SOCK_DONE);
 	sk_error_report(sk);
 	return 0;
 }
