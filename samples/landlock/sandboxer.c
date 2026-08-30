@@ -198,6 +198,10 @@ static int populate_ruleset_net(const char *const env_var, const int ruleset_fd,
 		.allowed_access = allowed_access,
 	};
 
+	/* A rule without access rights and flags is a no-op. */
+	if (!allowed_access && !flags)
+		return 0;
+
 	env_port_name = getenv(env_var);
 	if (!env_port_name)
 		return 0;
@@ -657,19 +661,27 @@ int main(const int argc, char *const argv[], char *const *const envp)
 	}
 
 	if (populate_ruleset_net(ENV_TCP_BIND_NAME, ruleset_fd,
-				 LANDLOCK_ACCESS_NET_BIND_TCP, 0)) {
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_BIND_TCP,
+				 0)) {
 		goto err_close_ruleset;
 	}
 	if (populate_ruleset_net(ENV_TCP_CONNECT_NAME, ruleset_fd,
-				 LANDLOCK_ACCESS_NET_CONNECT_TCP, 0)) {
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_CONNECT_TCP,
+				 0)) {
 		goto err_close_ruleset;
 	}
 	if (populate_ruleset_net(ENV_UDP_BIND_NAME, ruleset_fd,
-				 LANDLOCK_ACCESS_NET_BIND_UDP, 0)) {
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_BIND_UDP,
+				 0)) {
 		goto err_close_ruleset;
 	}
 	if (populate_ruleset_net(ENV_UDP_CONNECT_SEND_NAME, ruleset_fd,
-				 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP, 0)) {
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP,
+				 0)) {
 		goto err_close_ruleset;
 	}
 
