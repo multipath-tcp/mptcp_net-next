@@ -11,6 +11,7 @@
 #include <linux/net.h>
 #include <linux/socket.h>
 #include <net/ipv6.h>
+#include <net/mptcp.h>
 
 #include "common.h"
 #include "cred.h"
@@ -51,6 +52,26 @@ int landlock_append_net_rule(struct landlock_ruleset *const ruleset,
 	mutex_unlock(&ruleset->lock);
 
 	return err;
+}
+
+static bool sk_is_mptcp_socket(const struct sock *sk)
+{
+	return sk_is_inet(sk) && sk->sk_type == SOCK_STREAM &&
+	       sk->sk_protocol == IPPROTO_MPTCP;
+}
+
+static bool is_connect_access(const access_mask_t access_request)
+{
+	return access_request == LANDLOCK_ACCESS_NET_CONNECT_TCP ||
+	       access_request == LANDLOCK_ACCESS_NET_CONNECT_MPTCP ||
+	       access_request == LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+}
+
+static bool is_bind_access(const access_mask_t access_request)
+{
+	return access_request == LANDLOCK_ACCESS_NET_BIND_TCP ||
+	       access_request == LANDLOCK_ACCESS_NET_BIND_MPTCP ||
+	       access_request == LANDLOCK_ACCESS_NET_BIND_UDP;
 }
 
 static bool unmask_layers_net(const struct landlock_domain *const domain,
@@ -104,6 +125,7 @@ static int current_check_access_socket(struct socket *const sock,
 	switch (address->sa_family) {
 	case AF_UNSPEC:
 		if (access_request == LANDLOCK_ACCESS_NET_CONNECT_TCP ||
+		    access_request == LANDLOCK_ACCESS_NET_CONNECT_MPTCP ||
 		    (access_request == LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP &&
 		     connecting)) {
 			/*
@@ -147,17 +169,15 @@ static int current_check_access_socket(struct socket *const sock,
 					});
 				return -EACCES;
 			}
-		} else if (access_request == LANDLOCK_ACCESS_NET_BIND_TCP ||
-			   access_request == LANDLOCK_ACCESS_NET_BIND_UDP) {
+		} else if (is_bind_access(access_request)) {
 			/*
 			 * Binding to an AF_UNSPEC address is treated
 			 * differently by IPv4 and IPv6 sockets. The socket's
 			 * family may change under our feet due to
 			 * setsockopt(IPV6_ADDRFORM), but that's ok: we either
-			 * reject entirely for IPv6 or require
-			 * %LANDLOCK_ACCESS_NET_BIND_TCP or
-			 * %LANDLOCK_ACCESS_NET_BIND_UDP for IPv4, so it cannot
-			 * be used to bypass the policy.
+			 * reject entirely for IPv6 or require the relevant bind
+			 * access right for IPv4, so it cannot be used to bypass
+			 * the policy.
 			 *
 			 * IPv4 sockets map AF_UNSPEC to AF_INET for
 			 * retrocompatibility for bind accesses, only if the
@@ -204,12 +224,10 @@ static int current_check_access_socket(struct socket *const sock,
 		addr4 = (struct sockaddr_in *)address;
 		port = addr4->sin_port;
 
-		if (access_request == LANDLOCK_ACCESS_NET_CONNECT_TCP ||
-		    access_request == LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP) {
+		if (is_connect_access(access_request)) {
 			audit_net.dport = port;
 			audit_net.v4info.daddr = addr4->sin_addr.s_addr;
-		} else if (access_request == LANDLOCK_ACCESS_NET_BIND_TCP ||
-			   access_request == LANDLOCK_ACCESS_NET_BIND_UDP) {
+		} else if (is_bind_access(access_request)) {
 			audit_net.sport = port;
 			audit_net.v4info.saddr = addr4->sin_addr.s_addr;
 		} else {
@@ -228,12 +246,10 @@ static int current_check_access_socket(struct socket *const sock,
 		addr6 = (struct sockaddr_in6 *)address;
 		port = addr6->sin6_port;
 
-		if (access_request == LANDLOCK_ACCESS_NET_CONNECT_TCP ||
-		    access_request == LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP) {
+		if (is_connect_access(access_request)) {
 			audit_net.dport = port;
 			audit_net.v6info.daddr = addr6->sin6_addr;
-		} else if (access_request == LANDLOCK_ACCESS_NET_BIND_TCP ||
-			   access_request == LANDLOCK_ACCESS_NET_BIND_UDP) {
+		} else if (is_bind_access(access_request)) {
 			audit_net.sport = port;
 			audit_net.v6info.saddr = addr6->sin6_addr;
 		} else {
@@ -331,6 +347,8 @@ static int hook_socket_bind(struct socket *const sock,
 
 	if (sk_is_tcp(sock->sk))
 		access_request = LANDLOCK_ACCESS_NET_BIND_TCP;
+	else if (sk_is_mptcp_socket(sock->sk))
+		access_request = LANDLOCK_ACCESS_NET_BIND_MPTCP;
 	else if (sk_is_udp(sock->sk))
 		access_request = LANDLOCK_ACCESS_NET_BIND_UDP;
 	else
@@ -349,6 +367,8 @@ static int hook_socket_connect(struct socket *const sock,
 
 	if (sk_is_tcp(sock->sk))
 		access_request = LANDLOCK_ACCESS_NET_CONNECT_TCP;
+	else if (sk_is_mptcp_socket(sock->sk))
+		access_request = LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
 	else if (sk_is_udp(sock->sk))
 		access_request = LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
 	else
@@ -377,12 +397,20 @@ static int hook_socket_sendmsg(struct socket *const sock,
 	access_mask_t access_request;
 	int ret = 0;
 
-	if ((msg->msg_flags & MSG_FASTOPEN) && address && sk_is_tcp(sock->sk)) {
-		ret = current_check_access_socket(
-			sock, address, addrlen, LANDLOCK_ACCESS_NET_CONNECT_TCP,
-			true);
-		if (ret != 0)
-			return ret;
+	if ((msg->msg_flags & MSG_FASTOPEN) && address) {
+		access_mask_t fastopen_access = 0;
+
+		if (sk_is_tcp(sock->sk))
+			fastopen_access = LANDLOCK_ACCESS_NET_CONNECT_TCP;
+		else if (sk_is_mptcp_socket(sock->sk))
+			fastopen_access = LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
+
+		if (fastopen_access) {
+			ret = current_check_access_socket(
+				sock, address, addrlen, fastopen_access, true);
+			if (ret != 0)
+				return ret;
+		}
 	}
 
 	if (sk_is_udp(sock->sk))

@@ -448,6 +448,9 @@ struct landlock_net_port_attr {
  * - %LANDLOCK_ACCESS_NET_CONNECT_TCP: Connect TCP sockets to the given
  *   remote port. Support added in Landlock ABI version 4.
  *
+ * .. note:: These rights do not apply to MPTCP sockets, which have their own
+ *   access rights (see below).
+ *
  * And similarly for UDP port numbers:
  *
  * - %LANDLOCK_ACCESS_NET_BIND_UDP: Bind UDP sockets to the given local
@@ -474,12 +477,33 @@ struct landlock_net_port_attr {
  * .. note:: Sending datagrams to an ``AF_UNSPEC`` destination address
  *   family is not supported for IPv6 UDP sockets: you will need to use a
  *   ``NULL`` address instead.
+ *
+ * MPTCP sockets (created with ``IPPROTO_MPTCP``) use TCP port numbers, but
+ * they are controlled by their own access rights:
+ *
+ * - %LANDLOCK_ACCESS_NET_BIND_MPTCP: Bind MPTCP sockets to the given local
+ *   port. Support added in Landlock ABI version 12.
+ * - %LANDLOCK_ACCESS_NET_CONNECT_MPTCP: Connect MPTCP sockets to the given
+ *   remote port. Support added in Landlock ABI version 12.
+ *
+ * .. note:: The TCP and the MPTCP access rights are independent, even though
+ *   they refer to the same port number space. Handling only
+ *   %LANDLOCK_ACCESS_NET_BIND_TCP and %LANDLOCK_ACCESS_NET_CONNECT_TCP leaves
+ *   MPTCP sockets unrestricted, and vice versa. A sandbox that wants to
+ *   control all TCP-based traffic needs to handle both sets.
+ *
+ * .. note:: These MPTCP access rights restrict the ports passed to
+ *   :manpage:`bind(2)` and :manpage:`connect(2)`. The ports used in MPTCP
+ *   subflows are negotiated in the MPTCP protocol by the kernel and are not
+ *   subject to these restrictions.
  */
 /* clang-format off */
 #define LANDLOCK_ACCESS_NET_BIND_TCP			(1ULL << 0)
 #define LANDLOCK_ACCESS_NET_CONNECT_TCP			(1ULL << 1)
 #define LANDLOCK_ACCESS_NET_BIND_UDP			(1ULL << 2)
 #define LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP		(1ULL << 3)
+#define LANDLOCK_ACCESS_NET_BIND_MPTCP			(1ULL << 4)
+#define LANDLOCK_ACCESS_NET_CONNECT_MPTCP		(1ULL << 5)
 /* clang-format on */
 
 /**
