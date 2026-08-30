@@ -67,6 +67,8 @@ static inline int landlock_restrict_self(const int ruleset_fd,
 #define ENV_FORCE_LOG_NAME "LL_FORCE_LOG"
 #define ENV_UDP_BIND_NAME "LL_UDP_BIND"
 #define ENV_UDP_CONNECT_SEND_NAME "LL_UDP_CONNECT_SEND"
+#define ENV_MPTCP_BIND_NAME "LL_MPTCP_BIND"
+#define ENV_MPTCP_CONNECT_NAME "LL_MPTCP_CONNECT"
 #define ENV_DELIMITER ":"
 
 static int str2num(const char *numstr, __u64 *num_dst)
@@ -353,6 +355,12 @@ static int add_quiet_access(const char *const env_var,
 		else if (strcmp(str_access, "udp_connect") == 0)
 			ruleset_attr->quiet_access_net |=
 				LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+		else if (strcmp(str_access, "mptcp_bind") == 0)
+			ruleset_attr->quiet_access_net |=
+				LANDLOCK_ACCESS_NET_BIND_MPTCP;
+		else if (strcmp(str_access, "mptcp_connect") == 0)
+			ruleset_attr->quiet_access_net |=
+				LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
 		else if (strcmp(str_access, "abstract_unix_socket") == 0)
 			ruleset_attr->quiet_scoped |=
 				LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET;
@@ -373,7 +381,7 @@ static int add_quiet_access(const char *const env_var,
 	return 0;
 }
 
-#define LANDLOCK_ABI_LAST 11
+#define LANDLOCK_ABI_LAST 12
 
 #define XSTR(s) #s
 #define STR(s) XSTR(s)
@@ -401,6 +409,12 @@ static const char help[] =
 	"* " ENV_UDP_CONNECT_SEND_NAME ": remote UDP ports allowed to connect "
 	"or send to (client: use as destination port / server: receive only from it)\n"
 	"(caution: sending requires being able to bind to a local source port)\n"
+	"* " ENV_MPTCP_BIND_NAME ": ports allowed to bind with MPTCP sockets "
+	"(server)\n"
+	"* " ENV_MPTCP_CONNECT_NAME ": ports allowed to connect to with MPTCP "
+	"sockets (client)\n"
+	"(caution: MPTCP sockets use TCP ports but are not covered by "
+	ENV_TCP_BIND_NAME " nor " ENV_TCP_CONNECT_NAME ")\n"
 	"* " ENV_SCOPED_NAME ": actions denied on the outside of the landlock domain\n"
 	"  - \"a\" to restrict opening abstract unix sockets\n"
 	"  - \"s\" to restrict sending signals\n"
@@ -418,6 +432,8 @@ static const char help[] =
 	"  - \"tcp_connect\" to quiet tcp connect denials\n"
 	"  - \"udp_bind\" to quiet udp bind denials\n"
 	"  - \"udp_connect\" to quiet udp connect / send denials\n"
+	"  - \"mptcp_bind\" to quiet mptcp bind denials\n"
+	"  - \"mptcp_connect\" to quiet mptcp connect denials\n"
 	"  - \"abstract_unix_socket\" to quiet abstract unix socket denials\n"
 	"  - \"signal\" to quiet signal denials\n"
 	"\n"
@@ -449,7 +465,9 @@ int main(const int argc, char *const argv[], char *const *const envp)
 		.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP |
 				      LANDLOCK_ACCESS_NET_CONNECT_TCP |
 				      LANDLOCK_ACCESS_NET_BIND_UDP |
-				      LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP,
+				      LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP |
+				      LANDLOCK_ACCESS_NET_BIND_MPTCP |
+				      LANDLOCK_ACCESS_NET_CONNECT_MPTCP,
 		.scoped = LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET |
 			  LANDLOCK_SCOPE_SIGNAL,
 		.quiet_access_fs = 0,
@@ -556,6 +574,12 @@ int main(const int argc, char *const argv[], char *const *const envp)
 		supported_restrict_flags &=
 			~LANDLOCK_RESTRICT_SELF_NO_NEW_PRIVS;
 		set_restrict_flags &= ~LANDLOCK_RESTRICT_SELF_NO_NEW_PRIVS;
+		__attribute__((fallthrough));
+	case 11:
+		/* Removes MPTCP support for ABI < 12 */
+		ruleset_attr.handled_access_net &=
+			~(LANDLOCK_ACCESS_NET_BIND_MPTCP |
+			  LANDLOCK_ACCESS_NET_CONNECT_MPTCP);
 
 		/* Must be printed for any ABI < LANDLOCK_ABI_LAST. */
 		fprintf(stderr,
@@ -599,6 +623,18 @@ int main(const int argc, char *const argv[], char *const *const envp)
 	if (!env_port_name) {
 		ruleset_attr.handled_access_net &=
 			~LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+	}
+	/* Removes MPTCP bind access control if not supported by a user. */
+	env_port_name = getenv(ENV_MPTCP_BIND_NAME);
+	if (!env_port_name) {
+		ruleset_attr.handled_access_net &=
+			~LANDLOCK_ACCESS_NET_BIND_MPTCP;
+	}
+	/* Removes MPTCP connect access control if not supported by a user. */
+	env_port_name = getenv(ENV_MPTCP_CONNECT_NAME);
+	if (!env_port_name) {
+		ruleset_attr.handled_access_net &=
+			~LANDLOCK_ACCESS_NET_CONNECT_MPTCP;
 	}
 
 	if (check_ruleset_scope(ENV_SCOPED_NAME, &ruleset_attr))
@@ -681,6 +717,18 @@ int main(const int argc, char *const argv[], char *const *const envp)
 	if (populate_ruleset_net(ENV_UDP_CONNECT_SEND_NAME, ruleset_fd,
 				 ruleset_attr.handled_access_net &
 					 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP,
+				 0)) {
+		goto err_close_ruleset;
+	}
+	if (populate_ruleset_net(ENV_MPTCP_BIND_NAME, ruleset_fd,
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_BIND_MPTCP,
+				 0)) {
+		goto err_close_ruleset;
+	}
+	if (populate_ruleset_net(ENV_MPTCP_CONNECT_NAME, ruleset_fd,
+				 ruleset_attr.handled_access_net &
+					 LANDLOCK_ACCESS_NET_CONNECT_MPTCP,
 				 0)) {
 		goto err_close_ruleset;
 	}
