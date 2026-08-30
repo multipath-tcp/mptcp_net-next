@@ -108,11 +108,41 @@ static bool prot_is_udp(const struct protocol_variant *const prot)
 static bool is_restricted(const struct protocol_variant *const prot,
 			  const enum sandbox_type sandbox)
 {
-	if (sandbox == TCP_SANDBOX)
+	switch (sandbox) {
+	case TCP_SANDBOX:
 		return prot_is_tcp(prot);
-	else if (sandbox == UDP_SANDBOX)
+	case UDP_SANDBOX:
 		return prot_is_udp(prot);
-	return false;
+	case NO_SANDBOX:
+	default:
+		return false;
+	}
+}
+
+static __u64 sandbox_bind_access(const enum sandbox_type sandbox)
+{
+	switch (sandbox) {
+	case TCP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_BIND_TCP;
+	case UDP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_BIND_UDP;
+	case NO_SANDBOX:
+	default:
+		return 0;
+	}
+}
+
+static __u64 sandbox_connect_access(const enum sandbox_type sandbox)
+{
+	switch (sandbox) {
+	case TCP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_CONNECT_TCP;
+	case UDP_SANDBOX:
+		return LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP;
+	case NO_SANDBOX:
+	default:
+		return 0;
+	}
 }
 
 static int socket_variant(const struct service_fixture *const srv)
@@ -916,16 +946,10 @@ static void test_bind_and_connect(struct __test_metadata *const _metadata,
 
 TEST_F(protocol, bind)
 {
-	if (variant->sandbox == TCP_SANDBOX ||
-	    variant->sandbox == UDP_SANDBOX) {
-		const __u64 bind_access =
-			(variant->sandbox == TCP_SANDBOX ?
-				 LANDLOCK_ACCESS_NET_BIND_TCP :
-				 LANDLOCK_ACCESS_NET_BIND_UDP);
+	if (variant->sandbox != NO_SANDBOX) {
+		const __u64 bind_access = sandbox_bind_access(variant->sandbox);
 		const __u64 conn_access =
-			(variant->sandbox == TCP_SANDBOX ?
-				 LANDLOCK_ACCESS_NET_CONNECT_TCP :
-				 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+			sandbox_connect_access(variant->sandbox);
 		const struct landlock_ruleset_attr ruleset_attr = {
 			.handled_access_net = bind_access | conn_access,
 		};
@@ -987,16 +1011,10 @@ TEST_F(protocol, bind)
 
 TEST_F(protocol, connect)
 {
-	if (variant->sandbox == TCP_SANDBOX ||
-	    variant->sandbox == UDP_SANDBOX) {
-		const __u64 bind_access =
-			(variant->sandbox == TCP_SANDBOX ?
-				 LANDLOCK_ACCESS_NET_BIND_TCP :
-				 LANDLOCK_ACCESS_NET_BIND_UDP);
+	if (variant->sandbox != NO_SANDBOX) {
+		const __u64 bind_access = sandbox_bind_access(variant->sandbox);
 		const __u64 conn_access =
-			(variant->sandbox == TCP_SANDBOX ?
-				 LANDLOCK_ACCESS_NET_CONNECT_TCP :
-				 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+			sandbox_connect_access(variant->sandbox);
 		const struct landlock_ruleset_attr ruleset_attr = {
 			.handled_access_net = bind_access | conn_access,
 		};
@@ -1054,9 +1072,7 @@ TEST_F(protocol, connect)
 
 TEST_F(protocol, bind_unspec)
 {
-	const __u64 bind_access = (variant->sandbox == TCP_SANDBOX ?
-					   LANDLOCK_ACCESS_NET_BIND_TCP :
-					   LANDLOCK_ACCESS_NET_BIND_UDP);
+	const __u64 bind_access = sandbox_bind_access(variant->sandbox);
 	const struct landlock_ruleset_attr ruleset_attr = {
 		.handled_access_net = bind_access,
 	};
@@ -1066,8 +1082,7 @@ TEST_F(protocol, bind_unspec)
 	};
 	int bind_fd, ret;
 
-	if (variant->sandbox == TCP_SANDBOX ||
-	    variant->sandbox == UDP_SANDBOX) {
+	if (variant->sandbox != NO_SANDBOX) {
 		const int ruleset_fd = landlock_create_ruleset(
 			&ruleset_attr, sizeof(ruleset_attr), 0);
 		ASSERT_LE(0, ruleset_fd);
@@ -1103,8 +1118,7 @@ TEST_F(protocol, bind_unspec)
 	}
 	EXPECT_EQ(0, close(bind_fd));
 
-	if (variant->sandbox == TCP_SANDBOX ||
-	    variant->sandbox == UDP_SANDBOX) {
+	if (variant->sandbox != NO_SANDBOX) {
 		const int ruleset_fd = landlock_create_ruleset(
 			&ruleset_attr, sizeof(ruleset_attr), 0);
 		ASSERT_LE(0, ruleset_fd);
@@ -1150,13 +1164,8 @@ TEST_F(protocol, bind_unspec)
 
 TEST_F(protocol, connect_unspec)
 {
-	const __u64 connect_right =
-		(variant->sandbox == TCP_SANDBOX ?
-			 LANDLOCK_ACCESS_NET_CONNECT_TCP :
-			 LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
-	const __u64 bind_right = (variant->sandbox == TCP_SANDBOX ?
-					  LANDLOCK_ACCESS_NET_BIND_TCP :
-					  LANDLOCK_ACCESS_NET_BIND_UDP);
+	const __u64 connect_right = sandbox_connect_access(variant->sandbox);
+	const __u64 bind_right = sandbox_bind_access(variant->sandbox);
 	const struct landlock_ruleset_attr ruleset_conn = {
 		.handled_access_net = connect_right,
 	};
@@ -1197,8 +1206,7 @@ TEST_F(protocol, connect_unspec)
 			EXPECT_EQ(0, ret);
 		}
 
-		if (variant->sandbox == TCP_SANDBOX ||
-		    variant->sandbox == UDP_SANDBOX) {
+		if (variant->sandbox != NO_SANDBOX) {
 			const int ruleset_fd = landlock_create_ruleset(
 				&ruleset_conn, sizeof(ruleset_conn), 0);
 			ASSERT_LE(0, ruleset_fd);
@@ -1229,8 +1237,7 @@ TEST_F(protocol, connect_unspec)
 			EXPECT_EQ(0, ret);
 		}
 
-		if (variant->sandbox == TCP_SANDBOX ||
-		    variant->sandbox == UDP_SANDBOX) {
+		if (variant->sandbox != NO_SANDBOX) {
 			const int ruleset_fd = landlock_create_ruleset(
 				&ruleset_conn_bind, sizeof(ruleset_conn_bind),
 				0);
