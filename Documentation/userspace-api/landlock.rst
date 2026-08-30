@@ -40,7 +40,7 @@ Filesystem rules
     and the related filesystem actions are defined with
     `filesystem access rights`.
 
-Network rules (since ABI v4 for TCP and v10 for UDP)
+Network rules (since ABI v4 for TCP, v10 for UDP, and v12 for MPTCP)
     For these rules, the object is a TCP or UDP port,
     and the related actions are defined with `network access rights`.
 
@@ -51,7 +51,7 @@ We first need to define the ruleset that will contain our rules.
 
 For this example, the ruleset will contain rules that only allow some
 filesystem read actions and some specific UDP and TCP actions. Filesystem
-write actions and other TCP/UDP actions will be denied.
+write actions and other TCP/UDP/MPTCP actions will be denied.
 
 The ruleset then needs to handle all these kinds of actions.  This is
 required for backward and forward compatibility (i.e. the kernel and user
@@ -83,7 +83,9 @@ to be explicit about the denied-by-default access rights.
             LANDLOCK_ACCESS_NET_BIND_TCP |
             LANDLOCK_ACCESS_NET_CONNECT_TCP |
             LANDLOCK_ACCESS_NET_BIND_UDP |
-            LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP,
+            LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP |
+            LANDLOCK_ACCESS_NET_BIND_MPTCP |
+            LANDLOCK_ACCESS_NET_CONNECT_MPTCP,
         .scoped =
             LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET |
             LANDLOCK_SCOPE_SIGNAL,
@@ -140,6 +142,12 @@ version, and only use the available subset of access rights:
         ruleset_attr.handled_access_net &=
             ~(LANDLOCK_ACCESS_NET_BIND_UDP |
               LANDLOCK_ACCESS_NET_CONNECT_SEND_UDP);
+        __attribute__((fallthrough));
+    case 10 ... 11:
+        /* Removes LANDLOCK_ACCESS_NET_*_MPTCP for ABI < 12 */
+        ruleset_attr.handled_access_net &=
+            ~(LANDLOCK_ACCESS_NET_BIND_MPTCP |
+              LANDLOCK_ACCESS_NET_CONNECT_MPTCP);
     }
 
 This enables the creation of an inclusive ruleset that will contain our rules.
@@ -833,6 +841,19 @@ succeeds.  This removes the need for a prior :manpage:`prctl(2)`
 with ``LANDLOCK_RESTRICT_SELF_TSYNC``, no_new_privs is set on all threads
 of the process.  As explained in the tutorial above, leaving no_new_privs
 unset is risky even when Landlock does not require it.
+
+MPTCP bind and connect (ABI < 12)
+---------------------------------
+
+Starting with the Landlock ABI version 12, it is possible to restrict MPTCP
+bind and connect actions with the ``LANDLOCK_ACCESS_NET_BIND_MPTCP`` and
+``LANDLOCK_ACCESS_NET_CONNECT_MPTCP`` access rights.
+
+Because MPTCP works on the same TCP port number space as plain TCP, it
+is recommended that rulesets denying TCP operations should also deny
+the equivalent MPTCP operations.  In particular, a listening port
+created through an ``IPPROTO_MPTCP`` socket is compatible with plain
+TCP clients as well.
 
 .. _kernel_support:
 
