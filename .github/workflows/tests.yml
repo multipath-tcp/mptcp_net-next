@@ -209,7 +209,7 @@ jobs:
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          check_run_annotations_branch: "${{ steps.branch.outputs.name }}"
+          check_run_annotations_branch: "${{ github.ref_name }}"
           files: |
             results-*/*.tap.xml
 
