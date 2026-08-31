@@ -80,9 +80,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-          # remove old cache if any
-          rm -rvf "${{ github.workspace }}/.virtme/ccache-"* 2>/dev/null
-
           set -x
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_CCACHE_MAXSIZE=500M" \
