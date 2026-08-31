@@ -736,6 +736,7 @@ static void mptcp_check_data_fin(struct sock *sk)
 
 		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | RCV_SHUTDOWN);
 		smp_mb__before_atomic(); /* SHUTDOWN must be visible first */
+		sock_set_flag(sk, SOCK_DONE);
 
 		switch (sk->sk_state) {
 		case TCP_ESTABLISHED:
@@ -2399,7 +2400,11 @@ static bool mptcp_move_skbs(struct sock *sk)
 static unsigned int mptcp_inq_hint(struct sock *sk)
 {
 	const struct mptcp_sock *msk = mptcp_sk(sk);
+	bool sock_done = sock_flag(sk, SOCK_DONE);
 	u64 hint_val;
+
+	/* Pair with smp_mb in mptcp_check_data_fin(). */
+	smp_rmb();
 
 	/* Avoid races vs ack_seq updates and MPTCP_SYNC_SEQ flag. */
 	mptcp_data_lock(sk);
@@ -2412,8 +2417,7 @@ static unsigned int mptcp_inq_hint(struct sock *sk)
 	if (hint_val >= INT_MAX)
 		return INT_MAX;
 
-	if (!hint_val &&
-	    (sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN)))
+	if (!hint_val && sock_done)
 		return 1;
 
 	return (unsigned int)hint_val;
@@ -2485,6 +2489,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			    !timeo)
 				break;
 		} else {
+			if (sock_flag(sk, SOCK_DONE))
+				break;
+
 			if (sk->sk_err) {
 				copied = sock_error(sk);
 				break;
@@ -3729,6 +3736,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	msk->copied_seq = 0;
 
 	WRITE_ONCE(sk->sk_shutdown, 0);
+	sock_reset_flag(sk, SOCK_DONE);
 	sk_error_report(sk);
 	return 0;
 }
