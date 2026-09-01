@@ -1,2 +1,36 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/virtio_console-allocate-the-port_buffer-with-the-caller-s-gfp
+From: Breno Leitao <leitao@debian.org>
+Subject: [PATCH] virtio_console: allocate the port_buffer with the caller's gfp
+
+put_chars() runs from the hvc console write path with preemption
+disabled, so it asks alloc_buf() for GFP_ATOMIC. Only the data buffer
+gets it: the struct port_buffer itself keeps the GFP_KERNEL default, so
+the allocation can enter direct reclaim and sleep. A write to /dev/kmsg
+on a CONFIG_DEBUG_ATOMIC_SLEEP kernel splats:
+
+  BUG: sleeping function called from invalid context at ./include/linux/sched/mm.h:320
+  in_atomic(): 1, irqs_disabled(): 1, non_block: 0, pid: 1, name: virtme-ng-init
+  preempt_count: 1, expected: 0
+  Preemption disabled at:
+  [<ffffffff813fd90d>] vprintk_emit+0x17d/0x510
+  Call Trace:
+   <TASK>
+   dump_stack_lvl+0x69/0xa0
+   __might_resched+0x37a/0x4d0
+   __kmalloc_cache_noprof+0x94/0x5f0
+   put_chars+0x209/0x3e0
+   hvc_console_print+0x234/0x640
+   console_flush_all+0x4fc/0x950
+   console_unlock+0xbf/0x1b0
+   vprintk_emit+0x312/0x510
+   devkmsg_emit+0xba/0x110
+   devkmsg_write+0x21b/0x2e0
+   vfs_write+0x4dc/0x9d0
+   ksys_write+0x108/0x1e0
+   do_syscall_64+0xfa/0x460
+   </TASK>
+
+Pass gfp on to that allocation too.
+
+Fixes: fc220d6be3c7 ("virtio_console: refactor __send_to_port() buffer ownership")
+Signed-off-by: Breno Leitao <leitao@debian.org>
+Acked-by: Sungho Bae <baver.bae@lge.com>
