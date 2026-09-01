@@ -270,14 +270,18 @@ jobs:
             perf.json
             .virtme/perf_logs/
 
+      - name: "Prepare perf results artifacts"
+        if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
+        run: |
+          tar -cvJf perf-results.tar.xz results/perf_reg/${{ steps.branch.outputs.name }}
+
       - name: "Artifacts (Results)"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
         uses: actions/upload-artifact@v7
         with:
-          name: perf-results
-          compression-level: 9
+          archive: false
           path: |
-            results/perf_reg/${{ steps.branch.outputs.name }}
+            perf-results.tar.xz
 
       - name: "Artifacts (failure)"
         if: failure()
@@ -462,8 +466,7 @@ jobs:
         if: needs.perf.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
         uses: actions/download-artifact@v8
         with:
-          name: perf-results
-          path: results/perf_reg/${{ github.ref_name }}
+          name: perf-results.tar.xz
 
       - name: publish perf results
         if: needs.perf.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
@@ -479,6 +482,7 @@ jobs:
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"
 
+          tar xvJf perf-results.tar.xz
           cd results
           git add perf_reg/${{ github.ref_name }}
           git commit -m "perf: new: ${{ steps.tag.outputs.tag }}" || true
