@@ -250,6 +250,8 @@ jobs:
           set -x
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_TRACE=${RUNNER_DEBUG}" \
+            -e "INPUT_GCOV=0" \
+            -e "INPUT_CI_RESULTS_DIR=.virtme/perf_logs" \
             -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
@@ -266,6 +268,7 @@ jobs:
           compression-level: 9
           path: |
             perf.json
+            .virtme/perf_logs/
 
       - name: "Artifacts (Results)"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
