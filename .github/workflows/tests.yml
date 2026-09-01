@@ -80,9 +80,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-          # remove old cache if any
-          rm -rvf "${{ github.workspace }}/.virtme/ccache-"* 2>/dev/null
-
           set -x
           /usr/bin/docker run --privileged --rm \
             -e "INPUT_CCACHE_MAXSIZE=500M" \
@@ -128,6 +125,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: results-${{ matrix.mode }}
+          compression-level: 9
           path: |
             conclusion.txt
             summary.txt
@@ -142,6 +140,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: debug-info-${{ matrix.mode }}
+          compression-level: 9
           path: |
             vmlinux.zstd
             kmemleak.txt
@@ -192,6 +191,101 @@ jobs:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
+  perf:
+    name: "Perf"
+    if: "! startswith(github.ref, 'refs/tags/patchew/') || contains(github.event.head_commit.message, 'Message-Id: ')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v6
+
+      - name: "Find base branch"
+        id: branch
+        run: |
+          if [ "$(cat .git_markup)" = "MPTCP-related modifications only needed for our tests suite (mptcp-net)." ]; then
+            echo "name=export-net" >> ${GITHUB_OUTPUT}
+          else
+            echo "name=export" >> ${GITHUB_OUTPUT}
+          fi
+          echo "mode=normal_nojoin" >> ${GITHUB_OUTPUT}
+
+      - name: "Restore CCache"
+        uses: actions/cache/restore@v5
+        id: restore-ccache
+        with:
+          path: ${{ github.workspace }}/.virtme/ccache
+          key: ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.sha }}
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-${{ github.run_attempt }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-${{ github.run_id }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-${{ steps.branch.outputs.mode }}-
+            ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
+
+      - name: Checkout results repo
+        uses: actions/checkout@v6
+        with:
+          path: "results"
+          repository: "multipath-tcp/mptcp-upstream-tests-results"
+
+      - name: "Setup perf_reg"
+        run: |
+          mkdir -p results/perf_reg/${{ steps.branch.outputs.name }} .virtme
+          ln -s ../results/perf_reg/${{ steps.branch.outputs.name }} .virtme/perf_reg
+
+      - name: "Docker image"
+        run: |
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+
+      - name: "Tests"
+        timeout-minutes: 120
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          set -x
+          /usr/bin/docker run --privileged --rm \
+            -e "INPUT_TRACE=${RUNNER_DEBUG}" \
+            -e "GITHUB_SHA" -e "GITHUB_REF_NAME" -e "GITHUB_RUN_ID" \
+            -e GITHUB_ACTIONS=true -e CI=true \
+            --workdir "${PWD}" \
+            -v "${PWD}:${PWD}" \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+              perf-normal --build --json perf.json \
+                          --info "run_id:${GITHUB_RUN_ID}"
+
+      - name: "Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf
+          compression-level: 9
+          path: |
+            perf.json
+
+      - name: "Artifacts (Results)"
+        if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-results
+          compression-level: 9
+          path: |
+            results/perf_reg/${{ steps.branch.outputs.name }}
+
+      - name: "Artifacts (failure)"
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-debug-info
+          compression-level: 9
+          path: |
+            vmlinux.zstd
+            kmemleak.txt
+
   publish-test-results:
     name: "Publish Tests Results"
     needs: tests
@@ -210,7 +304,7 @@ jobs:
       - name: "Publish Test Results"
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          check_run_annotations_branch: "${{ steps.branch.outputs.name }}"
+          check_run_annotations_branch: "${{ github.ref_name }}"
           files: |
             results-*/*.tap.xml
 
@@ -224,7 +318,7 @@ jobs:
 
   notif:
     name: "Notifications"
-    needs: tests
+    needs: [tests, perf]
     # only for the official repo (patchew and export)
     if: always() && github.repository_owner == 'multipath-tcp' && (needs.tests.result == 'success' || needs.tests.result == 'failure')
     concurrency:
@@ -238,6 +332,11 @@ jobs:
           pattern: results-*
           merge-multiple: false
 
+      - name: get perf results
+        uses: actions/download-artifact@v8
+        with:
+          name: perf
+
       - name: get test info
         id: test
         run: |
@@ -247,6 +346,18 @@ jobs:
             echo "ccl_title_${mode//-/_}=$(echo "${ccl}" | cut -d: -f1-2)" >> ${GITHUB_OUTPUT}
             echo "ccl_status_${mode//-/_}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           done
+
+          if [ ! -s "perf.json" ]; then
+            echo "ccl_perf=Perf: Critical: No conclusion ❓" >> ${GITHUB_OUTPUT}
+          elif grep -q '"fail"' perf.json; then
+            echo "ccl_perf=Perf: Unstable ⚠️" >> ${GITHUB_OUTPUT}
+          else
+            echo "ccl_perf=Perf: Success! ✅" >> ${GITHUB_OUTPUT}
+          fi
+          echo "ccl_status_perf=$(echo "${ccl_perf}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+          mkdir -p results-perf
+          cp perf.json results-perf/results.json || true
+
           echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> ${GITHUB_OUTPUT}
 
       - name: get linked tag
@@ -279,6 +390,7 @@ jobs:
             - ${{ steps.test.outputs.ccl_debug_join }}
             - ${{ steps.test.outputs.ccl_btf_normal }}
             - ${{ steps.test.outputs.ccl_btf_debug }}
+            - ${{ steps.test.outputs.ccl_perf }}
             - Task: ${{ steps.test.outputs.url }}
 
       - name: Checkout results repo
@@ -323,7 +435,7 @@ jobs:
             jq -s ".[0] * .[1]${err}" "results-${mode}_"*"/results.json" > "results-${mode}/results.json" || true
           done
 
-          for mode in normal debug btf-normal btf-debug; do
+          for mode in normal debug btf-normal btf-debug perf; do
             new="results-${mode}/results.json"
             all="results/html/results/${{ github.ref_name }}/${mode}.json"
             mkdir -p "$(dirname "${all}")"
@@ -342,6 +454,31 @@ jobs:
           cd results
           git add html/results/${{ github.ref_name }}/*.json
           git commit -m "json: new: ${{ steps.tag.outputs.tag }}"
+
+      - name: get perf_reg
+        if: needs.perf.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
+        uses: actions/download-artifact@v8
+        with:
+          name: perf-results
+          path: results/perf_reg/${{ github.ref_name }}
+
+      - name: publish perf results
+        if: needs.perf.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
+        run: |
+          {
+            echo ''
+            echo '## Perf'
+            echo 'Branch: ${{ github.ref_name }}'
+            echo 'Tag: ${{ steps.tag.outputs.tag }}'
+            echo 'Summary:'
+            echo '```'
+            cat perf.json | jq -r || echo "ERROR"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          cd results
+          git add perf_reg/${{ github.ref_name }}
+          git commit -m "perf: new: ${{ steps.tag.outputs.tag }}" || true
 
       - name: get lcov
         if: needs.tests.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
@@ -492,6 +629,7 @@ jobs:
           submit "${{ steps.test.outputs.ccl_title_debug_join }}" "${{ steps.test.outputs.ccl_status_debug_join }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf_normal }}" "${{ steps.test.outputs.ccl_status_btf_normal }}" "${{ steps.test.outputs.url }}"
           submit "${{ steps.test.outputs.ccl_title_btf_debug }}" "${{ steps.test.outputs.ccl_status_btf_debug }}" "${{ steps.test.outputs.url }}"
+          submit "Perf" "${{ steps.test.outputs.ccl_status_perf }}" "${{ steps.test.outputs.url }}"
           exit ${RC}
         env:
           URL: "${{ env.PW }}/patches/?project=mptcp&msgid=${{ steps.commit.outputs.mid }}"
@@ -556,6 +694,7 @@ jobs:
             - ${{ steps.test.outputs.ccl_title_debug_join }}: ${{ steps.test.outputs.ccl_status_debug_join }}
             - ${{ steps.test.outputs.ccl_title_btf_normal }}: ${{ steps.test.outputs.ccl_status_btf_normal }}
             - ${{ steps.test.outputs.ccl_title_btf_debug }}: ${{ steps.test.outputs.ccl_status_btf_debug }}
+            - Perf: ${{ steps.test.outputs.ccl_status_perf }}
             - Task: ${{ steps.test.outputs.url }}
 
             Initiator: ${{ steps.commit.outputs.committer }}
@@ -587,7 +726,7 @@ jobs:
 
   status:
     name: "Status"
-    needs: tests
+    needs: [tests, perf]
     # only for the non official repos
     if: always() && github.repository_owner != 'multipath-tcp'
     runs-on: ubuntu-latest
@@ -598,6 +737,11 @@ jobs:
           pattern: results-*
           merge-multiple: false
 
+      - name: get perf results
+        uses: actions/download-artifact@v8
+        with:
+          name: perf
+
       - name: Check Status
         run: |
           issues=()
@@ -607,6 +751,9 @@ jobs:
               issues+=("${mode}")
             fi
           done
+          if [ ! -s "perf.json" ] || grep -q '"fail"' perf.json; then
+            issues+=("perf")
+          fi
           if [ ${#issues[@]} -eq 0 ]; then
             echo "Great, no issues!"
             exit 0
