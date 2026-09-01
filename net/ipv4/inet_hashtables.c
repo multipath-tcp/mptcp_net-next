@@ -331,24 +331,6 @@ error:
 	return -ENOMEM;
 }
 
-static struct inet_listen_hashbucket *
-inet_lhash2_bucket_sk(struct inet_hashinfo *h, struct sock *sk)
-{
-	u32 hash;
-
-#if IS_ENABLED(CONFIG_IPV6)
-	if (sk->sk_family == AF_INET6)
-		hash = ipv6_portaddr_hash(sock_net(sk),
-					  &sk->sk_v6_rcv_saddr,
-					  inet_sk(sk)->inet_num);
-	else
-#endif
-		hash = ipv4_portaddr_hash(sock_net(sk),
-					  inet_sk(sk)->inet_rcv_saddr,
-					  inet_sk(sk)->inet_num);
-	return inet_lhash2_bucket(h, hash);
-}
-
 static inline int compute_score(struct sock *sk, const struct net *net,
 				const unsigned short hnum, const __be32 daddr,
 				const int dif, const int sdif)

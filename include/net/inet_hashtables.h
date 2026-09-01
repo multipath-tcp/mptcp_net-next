@@ -188,6 +188,24 @@ inet_lhash2_bucket(struct inet_hashinfo *h, u32 hash)
 	return &h->lhash2[hash & h->lhash2_mask];
 }
 
+static inline struct inet_listen_hashbucket *
+inet_lhash2_bucket_sk(struct inet_hashinfo *h, struct sock *sk)
+{
+	u32 hash;
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (sk->sk_family == AF_INET6)
+		hash = ipv6_portaddr_hash(sock_net(sk),
+					  &sk->sk_v6_rcv_saddr,
+					  inet_sk(sk)->inet_num);
+	else
+#endif
+		hash = ipv4_portaddr_hash(sock_net(sk),
+					  inet_sk(sk)->inet_rcv_saddr,
+					  inet_sk(sk)->inet_num);
+	return inet_lhash2_bucket(h, hash);
+}
+
 static inline struct inet_ehash_bucket *inet_ehash_bucket(
 	struct inet_hashinfo *hashinfo,
 	unsigned int hash)
