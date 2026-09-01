@@ -1361,7 +1361,8 @@ static struct sk_buff *__mptcp_do_alloc_tx_skb(struct sock *sk, gfp_t gfp)
 
 	skb = alloc_skb_fclone(MAX_TCP_HEADER, gfp);
 	if (likely(skb)) {
-		if (likely(__mptcp_add_ext(skb, gfp))) {
+		if (unlikely(__mptcp_check_fallback(mptcp_sk(sk))) ||
+		    likely(__mptcp_add_ext(skb, gfp))) {
 			skb_reserve(skb, MAX_TCP_HEADER);
 			skb->ip_summed = CHECKSUM_PARTIAL;
 			INIT_LIST_HEAD(&skb->tcp_tsorted_anchor);
@@ -1537,6 +1538,12 @@ alloc_skb:
 	WRITE_ONCE(tcp_sk(ssk)->write_seq, tcp_sk(ssk)->write_seq + copy);
 	TCP_SKB_CB(skb)->end_seq += copy;
 	tcp_skb_pcount_set(skb, 0);
+
+	/* in fallback the msk ext is not allocated; skip DSS bookkeeping
+	 * entirely and let the subflow behave like a plain TCP socket
+	 */
+	if (__mptcp_check_fallback(msk))
+		goto out;
 
 	/* on skb reuse we just need to update the DSS len */
 	if (reuse_skb) {
