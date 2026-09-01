@@ -39,6 +39,7 @@ enum inet_diag_dump_cursor_type {
 	INET_DIAG_DUMP_CURSOR_TCP_LISTEN,
 	INET_DIAG_DUMP_CURSOR_TCP_BIND,
 	INET_DIAG_DUMP_CURSOR_TCP_EHASH,
+	INET_DIAG_DUMP_CURSOR_MPTCP_LISTEN,
 };
 
 struct inet_diag_dump_data {
