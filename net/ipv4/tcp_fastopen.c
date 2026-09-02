@@ -337,6 +337,11 @@ static struct sock *tcp_fastopen_create_child(struct sock *sk,
 	if (!child)
 		return NULL;
 
+	if (own_req && rsk_drop_req(req)) {
+		sock_put(child);
+		return NULL;
+	}
+
 	spin_lock(&queue->fastopenq.lock);
 	queue->fastopenq.qlen++;
 	spin_unlock(&queue->fastopenq.lock);
