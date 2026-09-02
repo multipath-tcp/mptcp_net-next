@@ -15,8 +15,6 @@ cin=""
 cout=""
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-iptables="iptables"
-ip6tables="ip6tables"
 
 ns1=""
 ns2=""
@@ -49,17 +47,23 @@ add_mark_rules()
 	local ns=$1
 	local m=$2
 
-	local t
-	for t in ${iptables} ${ip6tables}; do
-		# just to debug: check we have multiple subflows connection requests
-		ip netns exec $ns $t -A OUTPUT -p tcp --syn -m mark --mark $m -j ACCEPT
+	ip netns exec "$ns" nft add table inet msock_table
+	ip netns exec "$ns" nft add chain inet msock_table output \
+		'{ type filter hook output priority 0; policy accept; }'
 
-		# RST packets might be handled by a internal dummy socket
-		ip netns exec $ns $t -A OUTPUT -p tcp --tcp-flags RST RST -m mark --mark 0 -j ACCEPT
+	# just to debug: check we have multiple subflows connection requests
+	ip netns exec "$ns" nft add rule inet msock_table output \
+		 meta mark "$m" tcp flags syn accept
+	# RST packets might be handled by a internal dummy socket
+	ip netns exec "$ns" nft add rule inet msock_table output \
+		meta mark 0 tcp flags rst accept
+	ip netns exec "$ns" nft add rule inet msock_table output \
+		meta mark "$m" meta l4proto tcp accept
 
-		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark $m -j ACCEPT
-		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark 0 -j DROP
-	done
+	ip netns exec "$ns" nft add rule inet msock_table output \
+		meta nfproto ipv4 meta mark 0 meta l4proto tcp counter drop
+	ip netns exec "$ns" nft add rule inet msock_table output \
+		meta nfproto ipv6 meta mark 0 meta l4proto tcp counter drop
 }
 
 init()
@@ -105,32 +109,22 @@ cleanup()
 
 mptcp_lib_check_mptcp
 mptcp_lib_check_kallsyms
-mptcp_lib_check_tools ip "${iptables}" "${ip6tables}"
+mptcp_lib_check_tools ip nft
 
 check_mark()
 {
 	local ns=$1
 	local af=$2
 
-	local tables=${iptables}
+	drop=$(ip netns exec "$ns" nft list table inet msock_table | \
+		grep "ipv$af.*packets.*drop" | awk '{print $(NF-3)}')
 
-	if [ $af -eq 6 ];then
-		tables=${ip6tables}
+	if [ "$drop" -ne 0 ]; then
+		mptcp_lib_pr_fail "got $drop pkt drops in ns $ns IPv{$af} tables," \
+				  "not 0 - not all expected packets marked"
+		ret=${KSFT_FAIL}
+		return 1
 	fi
-
-	local counters values
-	counters=$(ip netns exec $ns $tables -v -L OUTPUT | grep DROP)
-	values=${counters%DROP*}
-
-	local v
-	for v in $values; do
-		if [ $v -ne 0 ]; then
-			mptcp_lib_pr_fail "got $tables $values in ns $ns," \
-					  "not 0 - not all expected packets marked"
-			ret=${KSFT_FAIL}
-			return 1
-		fi
-	done
 
 	return 0
 }
