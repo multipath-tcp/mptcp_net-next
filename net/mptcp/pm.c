@@ -563,9 +563,11 @@ bool mptcp_pm_allow_new_subflow(struct mptcp_sock *msk)
 	if (mptcp_pm_is_userspace(msk)) {
 		if (mptcp_userspace_pm_active(msk)) {
 			spin_lock_bh(&pm->lock);
-			pm->extra_subflows++;
+			ret = pm->extra_subflows < U8_MAX;
+			if (ret)
+				pm->extra_subflows++;
 			spin_unlock_bh(&pm->lock);
-			return true;
+			return ret;
 		}
 		return false;
 	}
