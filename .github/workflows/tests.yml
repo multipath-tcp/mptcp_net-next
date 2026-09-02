@@ -355,13 +355,14 @@ jobs:
           done
 
           if [ ! -s "perf.json" ]; then
-            echo "ccl_perf=Perf: Critical: No conclusion ❓" >> ${GITHUB_OUTPUT}
+            ccl="Perf: Critical: No conclusion ❓"
           elif grep -q '"fail"' perf.json; then
-            echo "ccl_perf=Perf: Unstable ⚠️" >> ${GITHUB_OUTPUT}
+            ccl="Perf: Unstable ⚠️"
           else
-            echo "ccl_perf=Perf: Success! ✅" >> ${GITHUB_OUTPUT}
+            ccl="Perf: Success! ✅"
           fi
-          echo "ccl_status_perf=$(echo "${ccl_perf}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
+          echo "ccl_perf=${ccl}" >> ${GITHUB_OUTPUT}
+          echo "ccl_status_perf=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           mkdir -p results-perf
           cp perf.json results-perf/results.json || true
 
