@@ -1153,15 +1153,20 @@ bool mptcp_schedule_work(struct sock *sk)
 
 static bool mptcp_skb_can_collapse_to(u64 write_seq,
 				      const struct sk_buff *skb,
-				      const struct mptcp_ext *mpext)
+				      const struct mptcp_ext *mpext,
+				      bool fallback)
 {
 	if (!tcp_skb_can_collapse_to(skb))
 		return false;
 
+	/* In fallback mode, allow coalescing into extension-less SKBs */
+	if (!mpext)
+		return fallback;
+
 	/* can collapse only if MPTCP level sequence is in order and this
 	 * mapping has not been xmitted yet
 	 */
-	return mpext && mpext->data_seq + mpext->data_len == write_seq &&
+	return mpext->data_seq + mpext->data_len == write_seq &&
 	       !mpext->frozen;
 }
 
@@ -1361,7 +1366,8 @@ static struct sk_buff *__mptcp_do_alloc_tx_skb(struct sock *sk, gfp_t gfp)
 
 	skb = alloc_skb_fclone(MAX_TCP_HEADER, gfp);
 	if (likely(skb)) {
-		if (likely(__mptcp_add_ext(skb, gfp))) {
+		if (unlikely(__mptcp_check_fallback(mptcp_sk(sk))) ||
+		    likely(__mptcp_add_ext(skb, gfp))) {
 			skb_reserve(skb, MAX_TCP_HEADER);
 			skb->ip_summed = CHECKSUM_PARTIAL;
 			INIT_LIST_HEAD(&skb->tcp_tsorted_anchor);
@@ -1471,7 +1477,8 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 		 * SSN association set here
 		 */
 		mpext = mptcp_get_ext(skb);
-		if (!mptcp_skb_can_collapse_to(data_seq, skb, mpext)) {
+		if (!mptcp_skb_can_collapse_to(data_seq, skb, mpext,
+					       __mptcp_check_fallback(msk))) {
 			TCP_SKB_CB(skb)->eor = 1;
 			tcp_mark_push(tcp_sk(ssk), skb);
 			goto alloc_skb;
@@ -1507,6 +1514,8 @@ alloc_skb:
 		 */
 		if (snd_una != msk->snd_nxt || skb->len ||
 		    skb != tcp_send_head(ssk)) {
+			if (unlikely(__mptcp_check_fallback(msk)) && mpext)
+				skb_ext_del(skb, SKB_EXT_MPTCP);
 			tcp_remove_empty_skb(ssk);
 			return 0;
 		}
@@ -1518,6 +1527,8 @@ alloc_skb:
 
 	copy = min_t(size_t, copy, info->limit - info->sent);
 	if (!sk_wmem_schedule(ssk, copy)) {
+		if (unlikely(__mptcp_check_fallback(msk)) && mpext)
+			skb_ext_del(skb, SKB_EXT_MPTCP);
 		tcp_remove_empty_skb(ssk);
 		return -ENOMEM;
 	}
@@ -1537,6 +1548,15 @@ alloc_skb:
 	WRITE_ONCE(tcp_sk(ssk)->write_seq, tcp_sk(ssk)->write_seq + copy);
 	TCP_SKB_CB(skb)->end_seq += copy;
 	tcp_skb_pcount_set(skb, 0);
+
+	/* in fallback mode, skip DSS bookkeeping and free the extension
+	 * if allocated
+	 */
+	if (unlikely(__mptcp_check_fallback(msk))) {
+		if (mpext)
+			skb_ext_del(skb, SKB_EXT_MPTCP);
+		goto fallback;
+	}
 
 	/* on skb reuse we just need to update the DSS len */
 	if (reuse_skb) {
@@ -1571,6 +1591,7 @@ out:
 	if (mptcp_subflow_ctx(ssk)->send_infinite_map)
 		mptcp_update_infinite_map(msk, ssk, mpext);
 	trace_mptcp_sendmsg_frag(mpext);
+fallback:
 	mptcp_subflow_ctx(ssk)->rel_write_seq += copy;
 
 	/* if this is the last chunk of a dfrag with MSG_EOR set,
