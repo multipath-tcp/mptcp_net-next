@@ -7669,6 +7669,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	tcp_rsk(req)->txhash = net_tx_rndhash();
 #if IS_ENABLED(CONFIG_MPTCP)
 	tcp_rsk(req)->is_mptcp = 0;
+	tcp_rsk(req)->drop_req = false;
 #endif
 
 	tcp_clear_options(&tmp_opt);
@@ -7775,6 +7776,10 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 		READ_ONCE(sk->sk_data_ready)(sk);
 		bh_unlock_sock(fastopen_sk);
 		sock_put(fastopen_sk);
+	} else if (rsk_drop_req(req)) {
+		reqsk_free(req);
+		dst_release(dst);
+		return 0;
 	} else {
 		tcp_rsk(req)->tfo_listener = false;
 		if (!want_cookie &&
