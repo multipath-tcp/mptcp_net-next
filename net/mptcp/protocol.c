@@ -3771,7 +3771,7 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 	WRITE_ONCE(msk->token, subflow_req->token);
 	msk->in_accept_queue = 1;
 	WRITE_ONCE(msk->fully_established, false);
-	if (mp_opt->suboptions & OPTION_MPTCP_CSUMREQD)
+	if (mp_opt->csum_reqd)
 		WRITE_ONCE(msk->csum_enabled, true);
 
 	WRITE_ONCE(msk->write_seq, subflow_req->idsn + 1);

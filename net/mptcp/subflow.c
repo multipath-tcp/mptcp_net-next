@@ -553,7 +553,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			goto fallback;
 		}
 
-		if (mp_opt.suboptions & OPTION_MPTCP_CSUMREQD)
+		if (mp_opt.csum_reqd)
 			WRITE_ONCE(msk->csum_enabled, true);
 		if (mp_opt.deny_join_id0)
 			WRITE_ONCE(msk->pm.remote_deny_join_id0, true);

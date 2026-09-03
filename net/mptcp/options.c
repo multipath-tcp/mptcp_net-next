@@ -93,9 +93,8 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		 * In other words, the only way for checksums not to be used
 		 * is if both hosts in their SYNs set A=0."
 		 */
-		if ((flags & MPTCP_CAP_CHECKSUM_REQD) &&
-		    opsize < TCPOLEN_MPTCP_MPC_ACK_DATA)
-			mp_opt->suboptions |= OPTION_MPTCP_CSUMREQD;
+		mp_opt->csum_reqd = (flags & MPTCP_CAP_CHECKSUM_REQD) &&
+				    opsize < TCPOLEN_MPTCP_MPC_ACK_DATA;
 
 		mp_opt->deny_join_id0 = !!(flags & MPTCP_CAP_DENY_JOIN_ID0);
 
@@ -122,7 +121,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		}
 		if (opsize == TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM) {
 			mp_opt->csum = get_unaligned((__force __sum16 *)ptr);
-			mp_opt->suboptions |= OPTION_MPTCP_CSUMREQD;
+			mp_opt->csum_reqd = 1;
 			ptr += 2;
 		}
 		pr_debug("MP_CAPABLE version=%x, flags=%x, optlen=%d sndr=%llu, rcvr=%llu len=%d csum=%u\n",
@@ -248,14 +247,14 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 2;
 
 			if (opsize == expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM) {
-				mp_opt->suboptions |= OPTION_MPTCP_CSUMREQD;
 				mp_opt->csum = get_unaligned((__force __sum16 *)ptr);
+				mp_opt->csum_reqd = 1;
 				ptr += 2;
 			}
 
 			pr_debug("data_seq=%llu subflow_seq=%u data_len=%u csum=%d:%u\n",
 				 mp_opt->data_seq, mp_opt->subflow_seq,
-				 mp_opt->data_len, !!(mp_opt->suboptions & OPTION_MPTCP_CSUMREQD),
+				 mp_opt->data_len, mp_opt->csum_reqd,
 				 mp_opt->csum);
 		}
 
@@ -263,7 +262,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 
 	case MPTCPOPT_ADD_ADDR:
 		/* Can be used with a restricted number of other options */
-		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
+		if ((mp_opt->suboptions & ~(OPTION_MPTCP_DSS |
 					    OPTION_MPTCP_RM_ADDR |
 					    OPTION_MPTCP_PRIO)) != 0)
 			break;
@@ -330,7 +329,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTION_MPTCP_MPC_ACK |
 					    OPTIONS_MPTCP_MPJ |
-					    OPTIONS_MPTCP_DSS |
+					    OPTION_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
 					    OPTION_MPTCP_PRIO)) != 0)
 			break;
@@ -351,7 +350,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 	case MPTCPOPT_MP_PRIO:
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_MPJ |
-					    OPTIONS_MPTCP_DSS |
+					    OPTION_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
 					    OPTION_MPTCP_RM_ADDR)) != 0)
 			break;
@@ -366,7 +365,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 
 	case MPTCPOPT_MP_FASTCLOSE:
 		/* Can be used with a restricted number of other options */
-		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
+		if ((mp_opt->suboptions & ~(OPTION_MPTCP_DSS |
 					    OPTION_MPTCP_RST)) != 0)
 			break;
 
@@ -402,7 +401,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 
 	case MPTCPOPT_MP_FAIL:
 		/* Can be used with a restricted number of other options */
-		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
+		if ((mp_opt->suboptions & ~(OPTION_MPTCP_DSS |
 					    OPTION_MPTCP_RST)) != 0)
 			break;
 
@@ -1349,7 +1348,7 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 		}
 		mpext->data_len = mp_opt.data_len;
 		mpext->use_map = 1;
-		mpext->csum_reqd = !!(mp_opt.suboptions & OPTION_MPTCP_CSUMREQD);
+		mpext->csum_reqd = mp_opt.csum_reqd;
 
 		if (mpext->csum_reqd)
 			mpext->csum = mp_opt.csum;
