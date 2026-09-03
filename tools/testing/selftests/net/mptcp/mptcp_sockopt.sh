@@ -15,8 +15,6 @@ cin=""
 cout=""
 timeout_poll=30
 timeout_test=$((timeout_poll * 2 + 1))
-iptables="iptables"
-ip6tables="ip6tables"
 
 ns1=""
 ns2=""
@@ -50,15 +48,25 @@ add_mark_rules()
 	local m=$2
 
 	local t
-	for t in ${iptables} ${ip6tables}; do
+	for t in ip ip6; do
+		ip netns exec "$ns" nft add table "$t" filter
+		ip netns exec "$ns" nft add chain "$t" filter OUTPUT \
+			'{ type filter hook output priority 0; policy accept; }'
+
 		# just to debug: check we have multiple subflows connection requests
-		ip netns exec $ns $t -A OUTPUT -p tcp --syn -m mark --mark $m -j ACCEPT
+		ip netns exec "$ns" nft add rule "$t" filter OUTPUT \
+			tcp flags \& \(fin \| syn \| rst \| ack\) == syn \
+			meta mark "$m" accept
 
 		# RST packets might be handled by a internal dummy socket
-		ip netns exec $ns $t -A OUTPUT -p tcp --tcp-flags RST RST -m mark --mark 0 -j ACCEPT
+		ip netns exec "$ns" nft add rule "$t" filter OUTPUT \
+			tcp flags \& rst == rst meta mark 0x0 accept
 
-		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark $m -j ACCEPT
-		ip netns exec $ns $t -A OUTPUT -p tcp -m mark --mark 0 -j DROP
+		ip netns exec "$ns" nft add rule "$t" filter OUTPUT \
+			meta l4proto tcp meta mark "$m" accept
+		ip netns exec "$ns" nft add rule "$t" filter OUTPUT \
+			meta l4proto tcp meta mark 0 counter drop
+
 	done
 }
 
@@ -105,32 +113,29 @@ cleanup()
 
 mptcp_lib_check_mptcp
 mptcp_lib_check_kallsyms
-mptcp_lib_check_tools ip "${iptables}" "${ip6tables}"
+mptcp_lib_check_tools ip nft
 
 check_mark()
 {
 	local ns=$1
 	local af=$2
 
-	local tables=${iptables}
+	local tables="ip"
 
 	if [ $af -eq 6 ];then
-		tables=${ip6tables}
+		tables="ip6"
 	fi
 
-	local counters values
-	counters=$(ip netns exec $ns $tables -v -L OUTPUT | grep DROP)
-	values=${counters%DROP*}
+	local values
+	values=$(ip netns exec "$ns" nft list table "$tables" filter | \
+		grep -o "packets.*drop" | awk '{print $2}')
 
-	local v
-	for v in $values; do
-		if [ $v -ne 0 ]; then
-			mptcp_lib_pr_fail "got $tables $values in ns $ns," \
-					  "not 0 - not all expected packets marked"
-			ret=${KSFT_FAIL}
-			return 1
-		fi
-	done
+	if [[ ! "$values" =~ ^[0-9]+$ ]] || [ "$values" -ne 0 ]; then
+		mptcp_lib_pr_fail "got $tables $values in ns $ns," \
+				  "not 0 - not all expected packets marked"
+		ret=${KSFT_FAIL}
+		return 1
+	fi
 
 	return 0
 }
