@@ -1705,16 +1705,10 @@ static void ice_vsi_set_rss_flow_fld(struct ice_vsi *vsi)
  */
 bool ice_pf_state_is_nominal(struct ice_pf *pf)
 {
-	DECLARE_BITMAP(check_bits, ICE_STATE_NBITS) = { 0 };
-
 	if (!pf)
 		return false;
 
-	bitmap_set(check_bits, 0, ICE_STATE_NOMINAL_CHECK_BITS);
-	if (bitmap_intersects(pf->state, check_bits, ICE_STATE_NBITS))
-		return false;
-
-	return true;
+	return bitmap_empty(pf->state, ICE_STATE_NOMINAL_CHECK_BITS);
 }
 
 #define ICE_FW_MODE_REC_M BIT(1)
