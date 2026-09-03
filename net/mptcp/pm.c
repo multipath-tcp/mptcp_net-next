@@ -671,9 +671,18 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 	update_subflows = subflow->request_join || subflow->mp_join;
 	if (mptcp_pm_is_userspace(msk)) {
 		if (update_subflows) {
+			/* The PM counters have already been cleared if the
+			 * msk got disconnected while this subflow was still
+			 * queued in the join list
+			 */
+			if (inet_sk_state_load(sk) == TCP_CLOSE)
+				return;
 			spin_lock_bh(&pm->lock);
-			if (!WARN_ON_ONCE(pm->extra_subflows == 0))
+			if (likely(pm->extra_subflows))
 				pm->extra_subflows--;
+			else
+				pr_warn_ratelimited("extra_subflows underflow, msk=%p\n",
+						    msk);
 			spin_unlock_bh(&pm->lock);
 		}
 		return;
