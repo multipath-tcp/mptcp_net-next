@@ -20,7 +20,7 @@ static bool mptcp_cap_flag_sha256(u8 flags)
 	return (flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA256;
 }
 
-static void mptcp_parse_option(const struct sock *sk, const struct sk_buff *skb,
+static bool mptcp_parse_option(const struct sock *sk, const struct sk_buff *skb,
 			       const unsigned char *ptr, int opsize,
 			       struct mptcp_options_received *mp_opt)
 {
@@ -211,14 +211,8 @@ static void mptcp_parse_option(const struct sock *sk, const struct sk_buff *skb,
 		 * RFC 8684 Section 3.3.0 checks later in subflow_data_ready
 		 */
 		if (opsize != expected_opsize &&
-		    opsize != expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM) {
-			mp_opt->dsn64 = 0;
-			mp_opt->use_map = 0;
-			mp_opt->ack64 = 0;
-			mp_opt->use_ack = 0;
-			mp_opt->data_fin = 0;
+		    opsize != expected_opsize + TCPOLEN_MPTCP_DSS_CHECKSUM)
 			goto invalid;
-		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_DSS;
 		if (mp_opt->use_ack) {
@@ -421,10 +415,11 @@ static void mptcp_parse_option(const struct sock *sk, const struct sk_buff *skb,
 		break;
 	}
 
-	return;
+	return true;
 
 invalid:
 	MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OPTINVALID);
+	return false;
 }
 
 void mptcp_get_options(const struct sock *sk, const struct sk_buff *skb,
@@ -461,9 +456,12 @@ void mptcp_get_options(const struct sock *sk, const struct sk_buff *skb,
 				return;
 			if (opsize > length)
 				return;	/* don't parse partial options */
-			if (opcode == TCPOPT_MPTCP)
-				mptcp_parse_option(sk, skb, ptr, opsize,
-						   mp_opt);
+			if (opcode == TCPOPT_MPTCP &&
+			    !mptcp_parse_option(sk, skb, ptr, opsize, mp_opt)) {
+				/* invalid option, drop previously parsed opt */
+				*(u32 *)&mp_opt->status = 0;
+				return;
+			}
 			ptr += opsize - 2;
 			length -= opsize;
 		}
