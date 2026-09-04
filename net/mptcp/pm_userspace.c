@@ -427,6 +427,12 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 	local.ifindex = entry.ifindex;
 
 	spin_lock_bh(&msk->pm.lock);
+	if (msk->pm.extra_subflows == U8_MAX) {
+		spin_unlock_bh(&msk->pm.lock);
+		GENL_SET_ERR_MSG(info, "too many extra subflows");
+		err = -ENOSPC;
+		goto delete_addr;
+	}
 	msk->pm.extra_subflows++;
 	spin_unlock_bh(&msk->pm.lock);
 
@@ -437,6 +443,7 @@ int mptcp_pm_nl_subflow_create_doit(struct sk_buff *skb, struct genl_info *info)
 	if (err) {
 		GENL_SET_ERR_MSG_FMT(info, "connect error: %d", err);
 
+delete_addr:
 		spin_lock_bh(&msk->pm.lock);
 		mptcp_userspace_pm_delete_local_addr(msk, &entry);
 		spin_unlock_bh(&msk->pm.lock);
