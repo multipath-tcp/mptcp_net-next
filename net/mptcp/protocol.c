@@ -606,7 +606,9 @@ static long mptcp_timeout_from_subflow(const struct mptcp_subflow_context *subfl
 {
 	const struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
-	return inet_csk(ssk)->icsk_pending && !subflow->stale_count ?
+	/* Pair this lockless read with TCP's store-release updates. */
+	return smp_load_acquire(&inet_csk(ssk)->icsk_pending) &&
+	       !subflow->stale_count ?
 	       tcp_timeout_expires(ssk) - jiffies : 0;
 }
 
