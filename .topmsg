@@ -1,2 +1,25 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-convert-iptables-to-nftables-for-mptcp_join.sh
+From: Hangbin Liu <liuhangbin@kylinos.cn>
+Subject: [PATCH] selftests: mptcp: convert iptables to nftables for mptcp_join.sh
+
+During conversion, we retain the same table and chain names used by the
+original iptables/ip6tables setup, so rule output is identical to the
+former iptables/ip6tables output. Add new function init_nftables so we
+only do nft table setup when test need set nft rules.
+
+Unlike iptables, nftables cannot match rules based on their full
+specification. Since endpoint_tests is the only test that delete rules,
+which inserts and deletes rules one by one. Flushing the table
+directly is safe and easier than using nft_handle.
+
+The BPF bytecode matching MPTCP add‑addr and remove‑addr suboptions
+is replaced with native nft matching using "tcp option mptcp subtype".
+
+The config file adds CONFIG_NFT_NUMGEN (replaces iptables statistic nth),
+CONFIG_NFT_REJECT and CONFIG_NFT_REJECT_INET for reject‑related rules.
+Remove CONFIG_NFT_COMPAT since we don't need it now.
+
+Remove the iptables/ip6tables check in mptcp_lib.sh since no script use
+it now.
+
+Signed-off-by: Hangbin Liu <liuhangbin@kylinos.cn>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
