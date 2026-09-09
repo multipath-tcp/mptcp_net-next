@@ -1,2 +1,10 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-split-FASTCLOSE-key-from-rcvr_key
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] mptcp: split FASTCLOSE key from rcvr_key
+
+MP_CAPABLE and MP_FASTCLOSE both stored their key in rcvr_key. Give
+FASTCLOSE a dedicated fc_recv_key overlapped with rcvr_key in a union.
+
+This helps shrink struct mptcp_options_received.
+
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
