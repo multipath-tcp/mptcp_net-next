@@ -1,0 +1,104 @@
+name: Bug Report
+description: Create a report to help us improve
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve! 🙏
+        Please answer these questions and provide as much information as possible about your problem.
+
+  - type: checkboxes
+    id: pre-req
+    attributes:
+      label: Pre-requisites
+      description: "Before opening this ticket, I checked that:"
+      options:
+        - label: "A similar [issue](https://github.com/multipath-tcp/mptcp_net-next/issues/) has not been reported before."
+        - label: "[mptcp.dev](https://www.mptcp.dev) website does not cover my case."
+        - label: "An up-to-date kernel is being used."
+        - label: "This case is not fixed with the latest stable (or LTS) version listed on [kernel.org](https://kernel.org)"
+
+  - type: textarea
+    id: what-did-you-do
+    attributes:
+      label: "What did you do?"
+      description: "If possible, provide a recipe for reproducing the error."
+      placeholder: |
+        Steps to reproduce the behavior:
+        1.
+        2.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: "What happened?"
+      description: Prefer copying text output over using screenshots.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "What did you expect to have?"
+      description: Why is the current behavior incorrect, and any additional context we may need to understand the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-client
+    attributes:
+      label: "System info: Client"
+      description: |
+        Output of these commands executed on the **client** side:
+        ```
+        uname -a
+        cat /etc/os-release
+        sysctl net.mptcp
+        ip mptcp endpoint show
+        ip mptcp limits show
+        ```
+      placeholder: |
+        $ uname -a
+        Linux my-client 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
+        (...)
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-server
+    attributes:
+      label: "System info: Server"
+      description: |
+        Output of these commands executed on the **server** side:
+        ```
+        uname -a
+        cat /etc/os-release
+        sysctl net.mptcp
+        ip mptcp endpoint show
+        ip mptcp limits show
+        ```
+      placeholder: |
+        $ uname -a
+        Linux my-server 6.12.24-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.24-1 (2025-02-01) x86_64 GNU/Linux
+        (...)
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: "Additional context"
+      description: |
+        Add any other context about the problem here.
+        Note: It might help to get the output of  `ip mptcp monitor` while reproducing the issue, in addition to the output from these commands executed just before **and** after the issue:
+        ```
+        ss -ManiH
+        nstat
+        ```
+        Packet traces (TCPDump / WireShark), configured IP addresses and routing can be helpful too. Check [here](https://www.mptcp.dev/debugging.html) for more details.
+        mptcpd's [`/usr/libexec/mptcp-get-debug`](https://raw.githubusercontent.com/multipath-tcp/mptcpd/refs/heads/main/scripts/mptcp-get-debug) script (mptcpd >= 0.13) can help to collect such infos.
