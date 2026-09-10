@@ -260,6 +260,25 @@ jobs:
               perf-normal --build --json perf.json \
                           --info "run_id:${GITHUB_RUN_ID}"
 
+      - name: "Publish conclusion"
+        if: always()
+        run: |
+          set +e
+          {
+            echo '## Perf'
+            echo 'Branch: ${{ github.ref_name }}'
+            echo 'Summary:'
+            { cat .virtme/perf_logs/*/regs.txt || echo "No regressions"; } | sed 's/^/- /g'
+            echo ''
+            echo '<details>'
+            echo '<summary>JSON file:</summary>'
+            echo ''
+            echo '```json'
+            cat perf.json | jq -r || echo "ERROR"
+            echo '```'
+            echo '</details>'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: "Artifacts"
         if: always()
         uses: actions/upload-artifact@v7
@@ -473,17 +492,6 @@ jobs:
       - name: publish perf results
         if: needs.perf.result == 'success' && (github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net')
         run: |
-          {
-            echo ''
-            echo '## Perf'
-            echo 'Branch: ${{ github.ref_name }}'
-            echo 'Tag: ${{ steps.tag.outputs.tag }}'
-            echo 'Summary:'
-            echo '```'
-            cat perf.json | jq -r || echo "ERROR"
-            echo '```'
-          } >> "${GITHUB_STEP_SUMMARY}"
-
           tar xvJf perf-results.tar.xz
           cd results
           git add perf_reg/${{ github.ref_name }}
