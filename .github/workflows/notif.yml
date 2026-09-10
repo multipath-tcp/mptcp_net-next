@@ -23,6 +23,7 @@ jobs:
           REF: ${{ github.event.ref }}
       - name: irc tag
         uses: rectalogic/notify-irc@v2
+        continue-on-error: true
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
@@ -46,6 +47,7 @@ jobs:
           ASSIGNEE: ${{ github.event.assignee.login }}
       - name: irc issues
         uses: rectalogic/notify-irc@v2
+        continue-on-error: true
         with:
           server: irc.libera.chat
           channel: "#mptcp"
