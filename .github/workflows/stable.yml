@@ -257,6 +257,7 @@ jobs:
 
       - name: irc tests
         uses: rectalogic/notify-irc@v2
+        continue-on-error: true
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
