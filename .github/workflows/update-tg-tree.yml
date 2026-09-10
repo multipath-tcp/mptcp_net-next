@@ -45,6 +45,7 @@ jobs:
       - name: irc topgit
         if: failure() && github.repository_owner == 'multipath-tcp'
         uses: rectalogic/notify-irc@v2
+        continue-on-error: true
         with:
           server: irc.libera.chat
           channel: "#mptcp"
