@@ -4176,6 +4176,24 @@ static int mptcp_ioctl(struct sock *sk, int cmd, int *karg)
 	return 0;
 }
 
+static void mptcp_connect_undo(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *ssk = msk->first;
+
+	mptcp_token_destroy(msk);
+	mptcp_set_state(sk, TCP_CLOSE);
+
+	spin_lock_bh(&msk->fallback_lock);
+	msk->allow_subflows = true;
+	msk->allow_infinite_fallback = true;
+	clear_bit(MPTCP_FALLBACK_DONE, &msk->flags);
+	spin_unlock_bh(&msk->fallback_lock);
+
+	if (ssk)
+		mptcp_subflow_ctx_reset(mptcp_subflow_ctx(ssk));
+}
+
 static int mptcp_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 			 int addr_len)
 {
@@ -4245,9 +4263,7 @@ out:
 	 * subflow_finish_connect()
 	 */
 	if (unlikely(err)) {
-		/* avoid leaving a dangling token in an unconnected socket */
-		mptcp_token_destroy(msk);
-		mptcp_set_state(sk, TCP_CLOSE);
+		mptcp_connect_undo(sk);
 		return err;
 	}
 
