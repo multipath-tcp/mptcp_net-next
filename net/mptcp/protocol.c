@@ -1637,6 +1637,14 @@ static bool mptcp_penalise_throttle_ok(struct mptcp_subflow_context *subflow)
 	return tcp_jiffies32 - subflow->last_penalise >= max_t(u32, rtt, 1);
 }
 
+/* Like tcp_snd_wnd_test() but without an skb: true while queued data still fits
+ * the send window, i.e. not receive-window-limited.
+ */
+static bool mptcp_snd_wnd_test(const struct mptcp_sock *msk)
+{
+	return !after64(msk->write_seq, mptcp_wnd_end(msk));
+}
+
 /* Halve cwnd, and ssthresh when cwnd is at or above it, under the subflow
  * socket lock: the scheduler only marks a candidate, the conditions on this
  * subflow are evaluated here, on current state.
@@ -1745,7 +1753,7 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
 	wmem = READ_ONCE(ssk->sk_wmem_queued);
 	/* the conditions on this subflow are re-checked on apply, under its lock */
-	subflow->penalise = burst && fast_limited;
+	subflow->penalise = burst && fast_limited && mptcp_snd_wnd_test(msk);
 	if (!burst)
 		return ssk;
 
