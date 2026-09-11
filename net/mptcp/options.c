@@ -885,8 +885,12 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	/* Force later mptcp_write_options(), but do not use any actual
 	 * option space.
 	 */
-	if (unlikely(__mptcp_check_fallback(msk) && !mptcp_check_infinite_map(skb)))
+	if (unlikely(__mptcp_check_fallback(msk) &&
+		     !mptcp_check_infinite_map(skb))) {
+		if (skb)
+			skb_ext_del(skb, SKB_EXT_MPTCP);
 		return 0;
+	}
 
 	if (unlikely(skb && TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
 		if (mptcp_established_options_fastclose(sk, &opt_size, remaining, opts) ||
