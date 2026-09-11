@@ -1662,6 +1662,7 @@ static void mptcp_penalise_cwnd(struct sock *ssk)
 		return;
 	subflow->last_penalise = tcp_jiffies32;
 	tcp_snd_cwnd_set(tp, max_t(u32, cwnd >> 1, MPTCP_PENALISE_MIN_CWND));
+	MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_CWNDPENALISED);
 	if (cwnd >= tp->snd_ssthresh)
 		tp->snd_ssthresh = max_t(u32, tp->snd_ssthresh >> 1, 2);
 }
@@ -1745,6 +1746,8 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	subflow = mptcp_subflow_ctx(ssk);
 	penal_cand = fastest && ssk != fastest &&
 		     subflow->avg_pacing_rate < max_pace / MPTCP_PENALISE_RATE_RATIO;
+	if (penal_cand)
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_PENALCAND);
 	/* We use data_race() because tcp_cwnd_validate() might change
 	 * is_cwnd_limited under us
 	 */
@@ -1754,6 +1757,7 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	wmem = READ_ONCE(ssk->sk_wmem_queued);
 	/* the conditions on this subflow are re-checked on apply, under its lock */
 	subflow->penalise = burst && fast_limited && mptcp_snd_wnd_test(msk);
+	trace_mptcp_subflow_penalise(subflow, max_pace, burst);
 	if (!burst)
 		return ssk;
 
