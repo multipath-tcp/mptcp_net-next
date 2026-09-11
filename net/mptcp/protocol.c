@@ -1619,6 +1619,45 @@ bool mptcp_subflow_active(struct mptcp_subflow_context *subflow)
 #define SSK_MODE_BACKUP	1
 #define SSK_MODE_MAX	2
 
+/* Penalise a subflow pacing below the fastest path's rate / this ratio */
+#define MPTCP_PENALISE_RATE_RATIO	2
+/* cwnd floor for the penalty: skip a subflow already there, and never reduce
+ * below it (halving at the floor only churns congestion control).
+ */
+#define MPTCP_PENALISE_MIN_CWND		2
+
+/* Rate-limit the penalty to at most once per subflow RTT, so the congestion
+ * control can grow the window back between reductions.
+ */
+static bool mptcp_penalise_throttle_ok(struct mptcp_subflow_context *subflow)
+{
+	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+	u32 rtt = usecs_to_jiffies(READ_ONCE(tcp_sk(ssk)->srtt_us) >> 3);
+
+	return tcp_jiffies32 - subflow->last_penalise >= max_t(u32, rtt, 1);
+}
+
+/* Halve cwnd, and ssthresh when cwnd is at or above it, under the subflow
+ * socket lock: the scheduler only marks a candidate, the conditions on this
+ * subflow are evaluated here, on current state.
+ */
+static void mptcp_penalise_cwnd(struct sock *ssk)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	struct tcp_sock *tp = tcp_sk(ssk);
+	u32 cwnd = tcp_snd_cwnd(tp);
+
+	subflow->penalise = false;
+	if (cwnd <= MPTCP_PENALISE_MIN_CWND ||
+	    inet_csk(ssk)->icsk_ca_state != TCP_CA_Open ||
+	    !mptcp_penalise_throttle_ok(subflow))
+		return;
+	subflow->last_penalise = tcp_jiffies32;
+	tcp_snd_cwnd_set(tp, max_t(u32, cwnd >> 1, MPTCP_PENALISE_MIN_CWND));
+	if (cwnd >= tp->snd_ssthresh)
+		tp->snd_ssthresh = max_t(u32, tp->snd_ssthresh >> 1, 2);
+}
+
 /* implement the mptcp packet scheduler;
  * returns the subflow that will transmit the next DSS
  * additionally updates the rtx timeout
@@ -1628,10 +1667,11 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	struct subflow_send_info send_info[SSK_MODE_MAX];
 	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
-	unsigned long pace;
+	unsigned long pace, max_pace = 0;
 	u32 burst, wmem;
+	bool penal_cand, fast_limited;
 	int i, nr_active = 0;
-	struct sock *ssk;
+	struct sock *ssk, *fastest = NULL;
 	u64 linger_time;
 	long tout = 0;
 
@@ -1658,6 +1698,12 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 			pace = subflow->avg_pacing_rate;
 			if (!pace)
 				continue;
+		}
+
+		/* fastest non-backup path; slower ones get throttled below */
+		if (!backup && pace > max_pace) {
+			max_pace = pace;
+			fastest = ssk;
 		}
 
 		linger_time = div64_u64((u64)READ_ONCE(ssk->sk_wmem_queued) << 32, pace);
@@ -1687,12 +1733,22 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk)
 	if (!ssk || !sk_stream_memory_free(ssk))
 		return NULL;
 
+	/* Flag a slow subflow for cwnd halving, applied in the push path */
+	subflow = mptcp_subflow_ctx(ssk);
+	penal_cand = fastest && ssk != fastest &&
+		     subflow->avg_pacing_rate < max_pace / MPTCP_PENALISE_RATE_RATIO;
+	/* We use data_race() because tcp_cwnd_validate() might change
+	 * is_cwnd_limited under us
+	 */
+	fast_limited = penal_cand && data_race(tcp_is_cwnd_limited(fastest));
+
 	burst = min(MPTCP_SEND_BURST_SIZE, mptcp_wnd_end(msk) - msk->snd_nxt);
 	wmem = READ_ONCE(ssk->sk_wmem_queued);
+	/* the conditions on this subflow are re-checked on apply, under its lock */
+	subflow->penalise = burst && fast_limited;
 	if (!burst)
 		return ssk;
 
-	subflow = mptcp_subflow_ctx(ssk);
 	/* 64-bit arithmetic overflows at high rate with a large queue */
 	subflow->avg_pacing_rate =
 		mul_u64_u64_div_u64(subflow->avg_pacing_rate, wmem,
@@ -1751,6 +1807,9 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0, err = 0;
+
+	if (mptcp_subflow_ctx(ssk)->penalise)
+		mptcp_penalise_cwnd(ssk);
 
 	while ((dfrag = mptcp_send_head(sk))) {
 		info->sent = dfrag->already_sent;
