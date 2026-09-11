@@ -3843,6 +3843,113 @@ fail_tests()
 	fi
 }
 
+# $1: ns ; $2: addr ; $3: port
+start_mptcp_listener()
+{
+	local ns="${1}"
+	local addr="${2}"
+	local port="${3}"
+	local pid
+
+	ip netns exec "${ns}" ./mptcp_connect -t ${timeout_poll} -l -p "${port}" \
+		-s MPTCP "${addr}" < "${sin}" > "${sout}" &
+	pid=$!
+	mptcp_lib_wait_local_port_listen "${ns}" "${port}"
+	echo "${pid}"
+}
+
+# Drop MP_CAPABLE SYNs until the client netns records a blackhole.
+trigger_mptcp_blackhole()
+{
+	local port spid rc=0
+	local count
+
+	print_check "trigger blackhole"
+
+	ip netns exec $ns2 sysctl -q net.mptcp.syn_retrans_before_tcp_fallback=0
+
+	if ! ip netns exec $ns2 ${iptables} -A OUTPUT -p tcp \
+			-m tcp --tcp-option 30 -j DROP; then
+		mark_as_skipped "unable to drop MP_CAPABLE SYNs"
+		return 1
+	fi
+
+	port=$(get_port)
+	spid=$(start_mptcp_listener "$ns1" 10.0.1.1 "${port}")
+
+	timeout ${timeout_test} ip netns exec $ns2 ./mptcp_connect \
+		-t ${timeout_poll} -p "${port}" -s MPTCP 10.0.1.1 \
+		< "$cin" > "$cout" || rc=$?
+	wait "${spid}" 2>/dev/null || true
+
+	ip netns exec $ns2 ${iptables} -D OUTPUT -p tcp \
+		-m tcp --tcp-option 30 -j DROP 2>/dev/null || true
+
+	if [ ${rc} -ne 0 ]; then
+		fail_test "blackhole helper connect failed (rc=${rc})"
+		return 1
+	fi
+
+	count=$(mptcp_lib_get_counter $ns2 "MPTcpExtBlackhole")
+	if [ "${count:-0}" -lt 1 ]; then
+		fail_test "got ${count:-0} Blackhole event(s) expected >= 1"
+		return 1
+	fi
+
+	print_ok
+	return 0
+}
+
+connect_retry_tests()
+{
+	# failed connect without fallback, then retry
+	if reset "retry connect after failed connect"; then
+		local port spid rc
+
+		port=$(get_port)
+		spid=$(start_mptcp_listener "$ns1" 10.0.1.1 "${port}")
+
+		print_check "MPTCP after failed connect"
+		ip netns exec $ns2 ./mptcp_connect_retry -e 10.0.1.1 "${port}"
+		rc=$?
+		wait "${spid}" 2>/dev/null || true
+
+		if [ ${rc} -eq 2 ]; then
+			mark_as_skipped "MPTCP_INFO not available"
+		elif [ ${rc} -ne 0 ]; then
+			fail_test "retry connect without fallback failed (rc=${rc})"
+		else
+			print_ok
+		fi
+	fi
+
+	# early fallback + failed connect, then retry with blackhole disabled
+	if reset_check_counter "retry connect after early fallback fail" \
+			       "MPTcpExtBlackhole"; then
+		local port spid rc
+
+		if ! trigger_mptcp_blackhole; then
+			return
+		fi
+
+		port=$(get_port)
+		spid=$(start_mptcp_listener "$ns1" 10.0.1.1 "${port}")
+
+		print_check "MPTCP after sticky fallback fail"
+		ip netns exec $ns2 ./mptcp_connect_retry -e -c 10.0.1.1 "${port}"
+		rc=$?
+		wait "${spid}" 2>/dev/null || true
+
+		if [ ${rc} -eq 2 ]; then
+			mark_as_skipped "MPTCP_INFO not available"
+		elif [ ${rc} -ne 0 ]; then
+			fail_test "sticky fallback survived failed connect() (rc=${rc})"
+		else
+			print_ok
+		fi
+	fi
+}
+
 # $1: ns ; $2: addr ; $3: id
 userspace_pm_add_addr()
 {
@@ -4584,6 +4691,7 @@ all_tests_sorted=(
 	m@fullmesh_tests
 	z@fastclose_tests
 	F@fail_tests
+	n@connect_retry_tests
 	u@userspace_tests
 	I@endpoint_tests
 )
