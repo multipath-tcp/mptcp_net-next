@@ -2878,6 +2878,7 @@ __tcp_bpf_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags,
 		  int (*recvmsg)(struct sock *, struct msghdr *, size_t, int));
 int __tcp_bpf_sendmsg(struct sock *sk, struct msghdr *msg, size_t size,
 		      int (*sendmsg)(struct sock *, struct msghdr *, size_t));
+int tcp_bpf_ioctl(struct sock *sk, int cmd, int *karg);
 #endif /* CONFIG_NET_SOCK_MSG */
 
 #if !defined(CONFIG_BPF_SYSCALL) || !defined(CONFIG_NET_SOCK_MSG)

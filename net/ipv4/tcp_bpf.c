@@ -331,15 +331,15 @@ unlock:
 	return copied;
 }
 
-static int tcp_bpf_ioctl(struct sock *sk, int cmd, int *karg)
+int tcp_bpf_ioctl(struct sock *sk, int cmd, int *karg)
 {
 	struct sk_psock *psock;
 	bool slow;
 
 	if (cmd != SIOCINQ)
-		return tcp_ioctl(sk, cmd, karg);
+		return sk->sk_prot->ioctl(sk, cmd, karg);
 
-	/* works similar as tcp_ioctl */
+	/* works similar as sk_prot->ioctl */
 	if (sk->sk_state == TCP_LISTEN)
 		return -EINVAL;
 
@@ -347,7 +347,7 @@ static int tcp_bpf_ioctl(struct sock *sk, int cmd, int *karg)
 	psock = sk_psock_get(sk);
 	if (unlikely(!psock)) {
 		unlock_sock_fast(sk, slow);
-		return tcp_ioctl(sk, cmd, karg);
+		return sk->sk_prot->ioctl(sk, cmd, karg);
 	}
 	*karg = sk_psock_get_msg_len_nolock(psock);
 	/* Without a verdict program, ingress data is never diverted to
@@ -357,7 +357,7 @@ static int tcp_bpf_ioctl(struct sock *sk, int cmd, int *karg)
 	 */
 	if (!READ_ONCE(psock->progs.stream_verdict) &&
 	    !READ_ONCE(psock->progs.skb_verdict))
-		*karg += tcp_inq(sk);
+		*karg += sk->sk_socket->ops->peek_len(sk->sk_socket);
 	sk_psock_put(sk, psock);
 	unlock_sock_fast(sk, slow);
 

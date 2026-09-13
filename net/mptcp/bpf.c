@@ -398,6 +398,7 @@ static void mptcp_bpf_rebuild_protos(struct proto prot[MPTCP_BPF_NUM_CFGS],
 	prot[MPTCP_BPF_BASE].close		= sock_map_close;
 	prot[MPTCP_BPF_BASE].recvmsg		= mptcp_bpf_recvmsg;
 	prot[MPTCP_BPF_BASE].sock_is_readable	= sk_msg_is_readable;
+	prot[MPTCP_BPF_BASE].ioctl		= tcp_bpf_ioctl;
 
 	prot[MPTCP_BPF_TX]			= prot[MPTCP_BPF_BASE];
 	prot[MPTCP_BPF_TX].sendmsg		= mptcp_bpf_sendmsg;
