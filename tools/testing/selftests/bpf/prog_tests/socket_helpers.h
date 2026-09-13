@@ -231,7 +231,8 @@ static inline int enable_reuseport(int s, int progfd)
 	return 0;
 }
 
-static inline int socket_loopback_reuseport(int family, int sotype, int progfd)
+static inline int socket_loopback_reuseport_proto(int family, int sotype,
+						  int proto, int progfd)
 {
 	struct sockaddr_storage addr;
 	socklen_t len = 0;
@@ -239,7 +240,7 @@ static inline int socket_loopback_reuseport(int family, int sotype, int progfd)
 
 	init_addr_loopback(family, &addr, &len);
 
-	s = xsocket(family, sotype, 0);
+	s = xsocket(family, sotype, proto);
 	if (s == -1)
 		return -1;
 
@@ -263,10 +264,16 @@ close:
 	return -1;
 }
 
-static inline int socket_loopback(int family, int sotype)
+#define socket_loopback_reuseport(family, sotype, progfd) \
+	socket_loopback_reuseport_proto(family, sotype, 0, progfd)
+
+static inline int socket_loopback_proto(int family, int sotype, int proto)
 {
-	return socket_loopback_reuseport(family, sotype, -1);
+	return socket_loopback_reuseport_proto(family, sotype, proto, -1);
 }
+
+#define socket_loopback(family, sotype) \
+	socket_loopback_proto(family, sotype, 0)
 
 static inline int poll_connect(int fd, unsigned int timeout_sec)
 {
@@ -329,18 +336,19 @@ static inline int recv_timeout(int fd, void *buf, size_t len, int flags,
 }
 
 
-static inline int create_pair(int family, int sotype, int *p0, int *p1)
+static inline int create_pair_proto(int family, int sotype, int proto,
+				    int *p0, int *p1)
 {
 	__close_fd int s, c = -1, p = -1;
 	struct sockaddr_storage addr;
 	socklen_t len;
 	int err;
 
-	s = socket_loopback(family, sotype);
+	s = socket_loopback_proto(family, sotype, proto);
 	if (s < 0)
 		return s;
 
-	c = xsocket(family, sotype, 0);
+	c = xsocket(family, sotype, proto);
 	if (c < 0)
 		return c;
 
@@ -396,6 +404,9 @@ static inline int create_pair(int family, int sotype, int *p0, int *p1)
 	*p1 = take_fd(c);
 	return 0;
 }
+
+#define create_pair(family, sotype, p0, p1) \
+	create_pair_proto(family, sotype, 0, p0, p1)
 
 static inline int create_socket_pairs(int family, int sotype, int *c0, int *c1,
 				      int *p0, int *p1)

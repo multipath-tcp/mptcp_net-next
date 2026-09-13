@@ -32,6 +32,8 @@
 #define SOL_TCP 6
 #endif
 
+static bool mptcp;
+
 static int connected_socket_v4(void)
 {
 	struct sockaddr_in addr = {
@@ -42,7 +44,7 @@ static int connected_socket_v4(void)
 	socklen_t len = sizeof(addr);
 	int s, repair, err;
 
-	s = socket(AF_INET, SOCK_STREAM, 0);
+	s = socket(AF_INET, SOCK_STREAM, mptcp ? IPPROTO_MPTCP : 0);
 	if (!ASSERT_GE(s, 0, "socket"))
 		goto error;
 
@@ -466,7 +468,8 @@ static void test_sockmap_skb_verdict_shutdown(void)
 	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
 
-	err = create_pair(AF_INET, SOCK_STREAM, &c1, &p1);
+	err = create_pair_proto(AF_INET, SOCK_STREAM,
+				mptcp ? IPPROTO_MPTCP : 0, &c1, &p1);
 	if (err < 0)
 		goto out;
 
@@ -568,7 +571,9 @@ out:
 static void test_sockmap_skb_verdict_fionread(bool pass_prog)
 {
 	do_test_sockmap_skb_verdict_fionread(SOCK_STREAM, pass_prog);
-	do_test_sockmap_skb_verdict_fionread(SOCK_DGRAM, pass_prog);
+	/* UDP is unaffected by MPTCP, only run it once (in tcp mode) */
+	if (!mptcp)
+		do_test_sockmap_skb_verdict_fionread(SOCK_DGRAM, pass_prog);
 }
 
 static void test_sockmap_skb_verdict_change_tail(void)
@@ -588,7 +593,8 @@ static void test_sockmap_skb_verdict_change_tail(void)
 	err = bpf_prog_attach(verdict, map, BPF_SK_SKB_STREAM_VERDICT, 0);
 	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
-	err = create_pair(AF_INET, SOCK_STREAM, &c1, &p1);
+	err = create_pair_proto(AF_INET, SOCK_STREAM,
+				mptcp ? IPPROTO_MPTCP : 0, &c1, &p1);
 	if (!ASSERT_OK(err, "create_pair()"))
 		goto out;
 	err = bpf_map_update_elem(map, &zero, &c1, BPF_NOEXIST);
@@ -639,7 +645,8 @@ static void test_sockmap_msg_verdict_pop_data(void)
 	if (!ASSERT_OK(err, "bpf_prog_attach"))
 		goto out;
 
-	err = create_pair(AF_INET, SOCK_STREAM, &c1, &p1);
+	err = create_pair_proto(AF_INET, SOCK_STREAM,
+				mptcp ? IPPROTO_MPTCP : 0, &c1, &p1);
 	if (!ASSERT_OK(err, "create_pair"))
 		goto out;
 
@@ -670,7 +677,8 @@ static void test_sockmap_skb_verdict_peek_helper(int map)
 	char snd[256] = "0123456789";
 	char rcv[256] = "0";
 
-	err = create_pair(AF_INET, SOCK_STREAM, &c1, &p1);
+	err = create_pair_proto(AF_INET, SOCK_STREAM,
+				mptcp ? IPPROTO_MPTCP : 0, &c1, &p1);
 	if (!ASSERT_OK(err, "create_pair()"))
 		return;
 
@@ -1362,7 +1370,7 @@ out:
 	test_sockmap_pass_prog__destroy(skel);
 }
 
-void test_sockmap_basic(void)
+static void run_basic_tests(void)
 {
 	if (test__start_subtest("sockmap create_update_free"))
 		test_sockmap_create_update_free(BPF_MAP_TYPE_SOCKMAP);
@@ -1436,6 +1444,15 @@ void test_sockmap_basic(void)
 		test_sockmap_copied_seq(true);
 	if (test__start_subtest("sockmap tcp multi channels"))
 		test_sockmap_multi_channels(SOCK_STREAM);
-	if (test__start_subtest("sockmap udp multi channels"))
+	/* UDP is unaffected by MPTCP, only run it once (in tcp mode) */
+	if (!mptcp && test__start_subtest("sockmap udp multi channels"))
 		test_sockmap_multi_channels(SOCK_DGRAM);
+}
+
+void test_sockmap_basic(void)
+{
+	for (int i = 0; i < 2; i++) {
+		mptcp = i;
+		run_basic_tests();
+	}
 }
