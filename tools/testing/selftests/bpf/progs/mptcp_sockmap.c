@@ -2,6 +2,9 @@
 
 #include "bpf_tracing_net.h"
 
+static long (*bpf_mptcp_sock_map_update)(struct bpf_sock_ops *, void *,
+					 void *, __u64) = (void *)212;
+
 char _license[] SEC("license") = "GPL";
 
 int sk_index;
@@ -16,7 +19,7 @@ struct {
 } sock_map SEC(".maps");
 
 SEC("sockops")
-int mptcp_sockmap_inject(struct bpf_sock_ops *skops)
+int mptcp_sockmap_update(struct bpf_sock_ops *skops)
 {
 	struct bpf_sock *sk;
 
@@ -30,7 +33,8 @@ int mptcp_sockmap_inject(struct bpf_sock_ops *skops)
 		return 1;
 
 	/* update sk handler */
-	helper_ret = bpf_sock_map_update(skops, &sock_map, &sk_index, BPF_NOEXIST);
+	helper_ret = bpf_mptcp_sock_map_update(skops, &sock_map, &sk_index,
+					       BPF_NOEXIST);
 
 	return 1;
 }
