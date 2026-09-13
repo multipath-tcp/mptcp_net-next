@@ -7,6 +7,9 @@
 
 #include <bpf/bpf_helpers.h>
 
+static long (*bpf_mptcp_sk_select_reuseport)(struct sk_reuseport_md *, void *,
+					     void *, __u64) = (void *)213;
+
 struct {
 	__uint(type, BPF_MAP_TYPE_SOCKMAP);
 	__uint(max_entries, 2);
@@ -128,6 +131,28 @@ int prog_reuseport(struct sk_reuseport_md *reuse)
 		err = bpf_sk_select_reuseport(reuse, &sock_map, &zero, 0);
 	else
 		err = bpf_sk_select_reuseport(reuse, &sock_hash, &zero, 0);
+	verdict = err ? SK_DROP : SK_PASS;
+
+	count = bpf_map_lookup_elem(&verdict_map, &verdict);
+	if (count)
+		(*count)++;
+
+	return verdict;
+}
+
+SEC("sk_reuseport")
+int prog_reuseport_mptcp(struct sk_reuseport_md *reuse)
+{
+	unsigned int *count;
+	int err, verdict;
+	__u32 zero = 0;
+
+	if (test_sockmap)
+		err = bpf_mptcp_sk_select_reuseport(reuse, &sock_map,
+						    &zero, 0);
+	else
+		err = bpf_mptcp_sk_select_reuseport(reuse, &sock_hash,
+						    &zero, 0);
 	verdict = err ? SK_DROP : SK_PASS;
 
 	count = bpf_map_lookup_elem(&verdict_map, &verdict);
