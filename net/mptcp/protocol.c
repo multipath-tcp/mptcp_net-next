@@ -3560,6 +3560,11 @@ bool __mptcp_close(struct sock *sk, long timeout)
 		__mptcp_wr_shutdown(sk);
 	}
 
+	if (msk->first && tcp_sk(msk->first)->repair) {
+		mptcp_set_state(sk, TCP_CLOSE);
+		goto cleanup;
+	}
+
 	sk_stream_wait_close(sk, timeout);
 
 cleanup:
@@ -4280,6 +4285,11 @@ static int mptcp_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 		goto out;
 
 	inet_assign_bit(DEFER_CONNECT, sk, inet_test_bit(DEFER_CONNECT, ssk));
+
+	if (unlikely(tcp_sk(ssk)->repair)) {
+		mptcp_set_state(sk, TCP_ESTABLISHED);
+		sk->sk_state_change(sk);
+	}
 
 out:
 	if (!msk->fastopening)
