@@ -338,6 +338,18 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 		}
 		release_sock(sk);
 		return ret;
+	case SO_ATTACH_REUSEPORT_EBPF:
+	case SO_DETACH_REUSEPORT_BPF:
+		lock_sock(sk);
+		ssk = __mptcp_nmpc_sk(msk);
+		if (IS_ERR(ssk)) {
+			release_sock(sk);
+			return PTR_ERR(ssk);
+		}
+
+		ret = sk_setsockopt(ssk, SOL_SOCKET, optname, optval, optlen);
+		release_sock(sk);
+		return ret;
 	case SO_KEEPALIVE:
 	case SO_PRIORITY:
 	case SO_SNDBUF:
@@ -385,11 +397,8 @@ static int mptcp_setsockopt_sol_socket(struct mptcp_sock *msk, int optname,
 
 	/* SO_OOBINLINE is not supported, let's avoid the related mess
 	 * SO_ATTACH_FILTER, SO_ATTACH_BPF, SO_ATTACH_REUSEPORT_CBPF,
-	 * SO_DETACH_REUSEPORT_BPF, SO_DETACH_FILTER, SO_LOCK_FILTER,
+	 * SO_DETACH_FILTER, SO_LOCK_FILTER,
 	 * we must be careful with subflows
-	 *
-	 * SO_ATTACH_REUSEPORT_EBPF is not supported, at it checks
-	 * explicitly the sk_protocol field
 	 *
 	 * SO_PEEK_OFF is unsupported, as it is for plain TCP
 	 * SO_MAX_PACING_RATE is unsupported, we must be careful with subflows
