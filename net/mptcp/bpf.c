@@ -490,3 +490,23 @@ static int __init mptcp_bpf_v4_build_proto(void)
 	return 0;
 }
 late_initcall(mptcp_bpf_v4_build_proto);
+
+BPF_CALL_4(mptcp_sock_map_update, struct bpf_sock_ops_kern *, sops,
+	   struct bpf_map *, map, void *, key, u64, flags)
+{
+	struct sock *sk = sops->sk;
+	struct mptcp_sock *msk;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+
+	msk = bpf_mptcp_sock_from_subflow(sk);
+	if (msk) {
+		if (sk != READ_ONCE(msk->first))
+			return -EINVAL;
+
+		sk = (struct sock *)msk;
+	}
+
+	return sock_map_update_common(map, *(u32 *)key, sk, flags);
+}
+EXPORT_SYMBOL_GPL(mptcp_sock_map_update);

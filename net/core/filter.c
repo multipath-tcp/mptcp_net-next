@@ -8830,6 +8830,10 @@ xdp_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 const struct bpf_func_proto bpf_sock_map_update_proto __weak;
 const struct bpf_func_proto bpf_sock_hash_update_proto __weak;
 
+#if IS_ENABLED(CONFIG_MPTCP)
+static const struct bpf_func_proto mptcp_sock_map_update_proto;
+#endif
+
 static const struct bpf_func_proto *
 sock_ops_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
@@ -8850,6 +8854,10 @@ sock_ops_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 		return &bpf_sock_map_update_proto;
 	case BPF_FUNC_sock_hash_update:
 		return &bpf_sock_hash_update_proto;
+#if IS_ENABLED(CONFIG_MPTCP)
+	case BPF_FUNC_mptcp_sock_map_update:
+		return &mptcp_sock_map_update_proto;
+#endif
 	case BPF_FUNC_get_socket_cookie:
 		return &bpf_get_socket_cookie_sock_ops_proto;
 	case BPF_FUNC_perf_event_output:
@@ -11787,6 +11795,16 @@ static const struct bpf_func_proto sk_select_reuseport_proto = {
 	.arg1_type	= ARG_PTR_TO_CTX,
 	.arg2_type      = ARG_CONST_MAP_PTR,
 	.arg3_type      = ARG_PTR_TO_MAP_KEY,
+	.arg4_type	= ARG_ANYTHING,
+};
+
+static const struct bpf_func_proto mptcp_sock_map_update_proto = {
+	.func		= mptcp_sock_map_update,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_CONST_MAP_PTR,
+	.arg3_type	= ARG_PTR_TO_MAP_KEY,
 	.arg4_type	= ARG_ANYTHING,
 };
 
