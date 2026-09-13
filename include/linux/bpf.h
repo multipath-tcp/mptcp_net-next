@@ -4026,8 +4026,14 @@ u32 bpf_xdp_sock_convert_ctx_access(enum bpf_access_type type,
 int sock_map_update_common(struct bpf_map *map, u32 idx,
 			   struct sock *sk, u64 flags);
 
+int sk_select_reuseport_lookup(struct sk_reuseport_kern *reuse_kern,
+			       struct sock *selected_sk,
+			       struct bpf_map *map);
+
 #ifdef CONFIG_MPTCP
 u64 mptcp_sock_map_update(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
+
+u64 mptcp_sk_select_reuseport(u64 r1, u64 r2, u64 r3, u64 r4, u64 r5);
 #endif
 #else
 static inline bool bpf_tcp_sock_is_valid_access(int off, int size,

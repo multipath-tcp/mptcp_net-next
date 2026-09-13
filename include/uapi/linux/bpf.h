@@ -6007,6 +6007,14 @@ union bpf_attr {
  *		it into the *map*.
  *	Return
  *		0 on success, or a negative error in case of failure.
+ *
+ * long bpf_mptcp_sk_select_reuseport(struct sk_reuseport_md *reuse, struct bpf_map *map, void *key, u64 flags)
+ *	Description
+ *		MPTCP-aware variant of **bpf_sk_select_reuseport**\ ().
+ *		When the *map* contains an MPTCP parent socket, it
+ *		resolves to the first subflow before selecting it.
+ *	Return
+ *		0 on success, or a negative error in case of failure.
  */
 #define ___BPF_FUNC_MAPPER(FN, ctx...)			\
 	FN(unspec, 0, ##ctx)				\
@@ -6222,6 +6230,7 @@ union bpf_attr {
 	FN(cgrp_storage_get, 210, ##ctx)		\
 	FN(cgrp_storage_delete, 211, ##ctx)		\
 	FN(mptcp_sock_map_update, 212, ##ctx)		\
+	FN(mptcp_sk_select_reuseport, 213, ##ctx)	\
 	/* This helper list is effectively frozen. If you are trying to	\
 	 * add a new helper, you should add a kfunc instead which has	\
 	 * less stability guarantees. See Documentation/bpf/kfuncs.rst	\
