@@ -1393,4 +1393,22 @@ mptcp_token_join_cookie_init_state(struct mptcp_subflow_request_sock *subflow_re
 static inline void mptcp_join_cookie_init(void) {}
 #endif
 
+extern struct proto mptcp_prot;
+int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags);
+int mptcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len);
+
+#ifdef CONFIG_BPF_SYSCALL
+int mptcp_bpf_update_proto(struct sock *sk, struct sk_psock *psock,
+			   bool restore);
+void mptcp_bpf_clone(const struct sock *sk, struct sock *newsk);
+#else
+static inline int
+mptcp_bpf_update_proto(struct sock *sk, struct sk_psock *psock, bool restore)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void mptcp_bpf_clone(const struct sock *sk, struct sock *newsk) {}
+#endif
+
 #endif /* __MPTCP_PROTOCOL_H */

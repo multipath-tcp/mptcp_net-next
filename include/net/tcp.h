@@ -2873,6 +2873,11 @@ static inline void tcp_eat_skb(struct sock *sk, struct sk_buff *skb)
 
 int tcp_bpf_sendmsg_redir(struct sock *sk, bool ingress,
 			  struct sk_msg *msg, u32 bytes, int flags);
+int
+__tcp_bpf_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int flags,
+		  int (*recvmsg)(struct sock *, struct msghdr *, size_t, int));
+int __tcp_bpf_sendmsg(struct sock *sk, struct msghdr *msg, size_t size,
+		      int (*sendmsg)(struct sock *, struct msghdr *, size_t));
 #endif /* CONFIG_NET_SOCK_MSG */
 
 #if !defined(CONFIG_BPF_SYSCALL) || !defined(CONFIG_NET_SOCK_MSG)
