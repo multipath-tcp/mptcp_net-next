@@ -1,9 +1,0 @@
-From: Paolo Abeni <pabeni@redhat.com>
-Subject: [PATCH] mptcp: avoid pruning for OoW data
-
-Pruning is expansive and destructive, do it only when we expect
-to accept the skb triggering the cleanup.
-
-Fixes: e468d371180d ("mptcp: implemented OoO queue pruning")
-Signed-off-by: Paolo Abeni <pabeni@redhat.com>
-Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
