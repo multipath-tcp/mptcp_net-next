@@ -2413,7 +2413,10 @@ signal_address_tests()
 		extra_bind=$!
 		mptcp_lib_wait_local_port_listen "$ns2" "$port"
 
+		# there will be traffic on the client side only: MPJ to loopback
+		cond_start_capture ${ns2}
 		run_tests $ns1 $ns2 10.0.1.1
+		cond_stop_capture
 		join_synack_no_mpjoin=1 join_syn_tx=1 \
 			chk_join_nr 0 0 0
 
