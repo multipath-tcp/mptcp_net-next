@@ -1163,7 +1163,7 @@ _dump_stats()
 	local ns="${1}"
 	local side="${2}"
 
-	mptcp_lib_print_err "${side} ns stats (${ns2})"
+	mptcp_lib_print_err "${side} ns stats (${ns})"
 	mptcp_lib_pr_nstat "${ns}"
 	echo
 }
