@@ -1,2 +1,9 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-bad-accounting-in-__mptcp_subflow_push_pending
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix bad accounting in __mptcp_subflow_push_pending()
+
+If __subflow_push_pending() errors out we should avoid updating the
+copied byte counters, to avoid mismatch push call later on.
+
+Fixes: 0fa1b3783a17 ("mptcp: use get_send wrapper")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
