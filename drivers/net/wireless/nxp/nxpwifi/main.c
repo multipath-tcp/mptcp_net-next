@@ -1119,7 +1119,10 @@ void nxpwifi_drv_info_dump(struct nxpwifi_adapter *adapter)
 				continue;
 			priv = adapter->priv[i];
 			nxpwifi_get_debug_info(priv, debug_info);
-			p += nxpwifi_debug_info_to_buffer(priv, p, debug_info);
+			p += nxpwifi_debug_info_to_buffer(priv, p,
+					  NXPWIFI_FW_DUMP_SIZE -
+					  (p - (char *)adapter->devdump_data),
+					  debug_info);
 			break;
 		}
 		kfree(debug_info);

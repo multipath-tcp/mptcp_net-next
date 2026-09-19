@@ -304,7 +304,7 @@ nxpwifi_debug_read(struct file *file, char __user *ubuf,
 	if (ret)
 		goto free_and_exit;
 
-	p += nxpwifi_debug_info_to_buffer(priv, p, &info);
+	p += nxpwifi_debug_info_to_buffer(priv, p, PAGE_SIZE, &info);
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
 				      (unsigned long)p - page);
