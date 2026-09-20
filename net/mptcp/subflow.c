@@ -348,6 +348,10 @@ static void subflow_prep_synack(const struct sock *sk, struct request_sock *req,
 	if (foc && foc->len > -1)
 		ireq->tstamp_ok = 0;
 
+	/* MP_JOIN cannot use TFO, do not send a cookie in the SYN/ACK */
+	if (foc && mptcp_subflow_rsk(req)->mp_join)
+		foc->len = -1;
+
 	if (synack_type == TCP_SYNACK_FASTOPEN)
 		mptcp_fastopen_subflow_synack_set_params(subflow, req);
 }
@@ -835,6 +839,12 @@ static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 	fallback = !tcp_rsk(req)->is_mptcp;
 	if (fallback)
 		goto create_child;
+
+	/* a SYN skb here comes from TFO, which MP_JOIN cannot use: just
+	 * fall back to the regular path.
+	 */
+	if (subflow_req->mp_join && (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN))
+		return NULL;
 
 	/* if the sk is MP_CAPABLE, we try to fetch the client key */
 	if (subflow_req->mp_capable) {
