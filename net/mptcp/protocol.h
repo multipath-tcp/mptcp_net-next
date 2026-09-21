@@ -273,7 +273,11 @@ struct mptcp_pm_addr_entry {
 	struct mptcp_addr_info	addr;
 	u32			flags;
 	int			ifindex;
-	struct socket		*lsk;
+	union {
+		struct socket	*lsk;	/* kernel PM: listener socket */
+		struct sock	*sk;	/* userspace PM: owning msk */
+	};
+	struct rcu_head		rcu;
 };
 
 struct mptcp_data_frag {
