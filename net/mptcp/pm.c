@@ -891,6 +891,11 @@ void mptcp_pm_mp_fail_received(struct sock *sk, u64 fail_seq)
 		subflow->send_mp_fail = 1;
 		subflow->send_infinite_map = 1;
 		tcp_send_ack(sk);
+
+		mptcp_data_lock(subflow->conn);
+		if (sk_stream_memory_free(sk))
+			__mptcp_check_push(subflow->conn, sk);
+		mptcp_data_unlock(subflow->conn);
 	} else {
 		pr_debug("MP_FAIL response received\n");
 		WRITE_ONCE(subflow->fail_tout, 0);
