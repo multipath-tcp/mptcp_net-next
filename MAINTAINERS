@@ -9859,7 +9859,7 @@ L:	linux-ext4@vger.kernel.org
 S:	Maintained
 W:	http://ext4.wiki.kernel.org
 Q:	http://patchwork.ozlabs.org/project/linux-ext4/list/
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4.git dev
 F:	Documentation/filesystems/ext4/
 F:	fs/ext4/
 F:	include/trace/events/ext4.h
