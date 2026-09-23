@@ -265,7 +265,13 @@ static int proc_path_manager(const struct ctl_table *ctl, int write,
 				pm_type = MPTCP_PM_TYPE_KERNEL;
 			else if (strncmp(pm_name, "userspace", MPTCP_PM_NAME_MAX) == 0)
 				pm_type = MPTCP_PM_TYPE_USERSPACE;
-			pernet->pm_type = pm_type;
+
+			/* Pre-existing race: two sequential writes, a socket
+			 * created in between may see the new ops with the old
+			 * pm_type. The knob is deprecated since v6.15 and will
+			 * be removed: not fixed on purpose.
+			 */
+			WRITE_ONCE(pernet->pm_type, pm_type);
 		}
 	}
 
