@@ -986,6 +986,9 @@ static void __sock_set_rcvbuf(struct sock *sk, int val)
 	 */
 	WRITE_ONCE(sk->sk_rcvbuf, max_t(int, val * 2, SOCK_MIN_RCVBUF));
 
+	/* Charge the new budget to the memcg (or refund the released one). */
+	sk_memcg_budget_sync(sk, gfp_memcg_charge());
+
 	if (sock) {
 		const struct proto_ops *ops = READ_ONCE(sock->ops);
 
@@ -1026,12 +1029,13 @@ static void sock_release_reserved_memory(struct sock *sk, int bytes)
 	WARN_ON(bytes > sk->sk_reserved_mem);
 	WRITE_ONCE(sk->sk_reserved_mem, sk->sk_reserved_mem - bytes);
 	sk_mem_reclaim(sk);
+	/* The released reservation shrank the memcg budget charge. */
+	sk_memcg_budget_sync(sk, gfp_memcg_charge());
 }
 
 static int sock_reserve_memory(struct sock *sk, int bytes)
 {
 	long allocated;
-	bool charged;
 	int pages;
 
 	if (!mem_cgroup_sk_enabled(sk) || !sk_has_account(sk))
@@ -1041,12 +1045,6 @@ static int sock_reserve_memory(struct sock *sk, int bytes)
 		return 0;
 
 	pages = sk_mem_pages(bytes);
-
-	/* pre-charge to memcg */
-	charged = mem_cgroup_sk_charge(sk, pages,
-				       GFP_KERNEL | __GFP_RETRY_MAYFAIL);
-	if (!charged)
-		return -ENOMEM;
 
 	if (sk->sk_bypass_prot_mem)
 		goto success;
@@ -1060,15 +1058,28 @@ static int sock_reserve_memory(struct sock *sk, int bytes)
 	 */
 	if (allocated > sk_prot_mem_limits(sk, 1)) {
 		sk_memory_allocated_sub(sk, pages);
-		mem_cgroup_sk_uncharge(sk, pages);
 		return -ENOMEM;
 	}
 
 success:
-	sk_forward_alloc_add(sk, pages << PAGE_SHIFT);
-
+	/* The reservation joins the socket budget, so publish it before
+	 * syncing the memcg charge and roll it back if the sync fails.
+	 * The forward_alloc credit is committed last, after all fallible
+	 * steps: softirq reclaim may fold it back into the protocol
+	 * counter, and that cannot be rolled back.
+	 */
 	WRITE_ONCE(sk->sk_reserved_mem,
 		   sk->sk_reserved_mem + (pages << PAGE_SHIFT));
+
+	if (!sk_memcg_budget_sync(sk, GFP_KERNEL | __GFP_RETRY_MAYFAIL)) {
+		WRITE_ONCE(sk->sk_reserved_mem,
+			   sk->sk_reserved_mem - (pages << PAGE_SHIFT));
+		if (!sk->sk_bypass_prot_mem)
+			sk_memory_allocated_sub(sk, pages);
+		return -ENOMEM;
+	}
+
+	sk_forward_alloc_add(sk, pages << PAGE_SHIFT);
 
 	return 0;
 }
@@ -1349,6 +1360,10 @@ set_sndbuf:
 		sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
 		WRITE_ONCE(sk->sk_sndbuf,
 			   max_t(int, val * 2, SOCK_MIN_SNDBUF));
+		/* Charge the new budget to the memcg (or refund the
+		 * released one).
+		 */
+		sk_memcg_budget_sync(sk, gfp_memcg_charge());
 		/* Wake up sending tasks if we upped the value. */
 		sk->sk_write_space(sk);
 		break;
@@ -2319,6 +2334,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 
 		sk->sk_kern_sock = kern;
 		sock_lock_init(sk);
+		spin_lock_init(&sk->sk_memcg_budget_lock);
 
 		sk->sk_net_refcnt = kern ? 0 : 1;
 		if (likely(sk->sk_net_refcnt)) {
@@ -2355,6 +2371,12 @@ static void __sk_destruct(struct rcu_head *head)
 
 	if (sk->sk_destruct)
 		sk->sk_destruct(sk);
+
+	/* All queues are purged and no reference is left: return the
+	 * remaining memcg budget charge exactly once, before the memcg
+	 * association is dropped by sk_prot_free() below.
+	 */
+	sk_memcg_budget_release(sk);
 
 	filter = rcu_dereference_check(sk->sk_filter,
 				       refcount_read(&sk->sk_wmem_alloc) == 0);
@@ -2535,6 +2557,12 @@ struct sock *sk_clone(const struct sock *sk, const gfp_t priority,
 	newsk->sk_wmem_queued	= 0;
 	newsk->sk_forward_alloc = 0;
 	newsk->sk_reserved_mem  = 0;
+	/* The child has not charged anything to the memcg yet: it will be
+	 * charged for its budget at accept() time (__sk_charge()).
+	 * sock_copy() copied the parent's lock bytes: re-init the lock.
+	 */
+	newsk->sk_memcg_budget = 0;
+	spin_lock_init(&newsk->sk_memcg_budget_lock);
 	DEBUG_NET_WARN_ON_ONCE(newsk->sk_drop_counters);
 	sk_drops_reset(newsk);
 	newsk->sk_send_head	= NULL;
@@ -3334,28 +3362,18 @@ EXPORT_SYMBOL(sk_wait_data);
  *
  *	Similar to __sk_mem_schedule(), but does not update sk_forward_alloc.
  *
- *	Unlike the globally shared limits among the sockets under same protocol,
- *	consuming the budget of a memcg won't have direct effect on other ones.
- *	So be optimistic about memcg's tolerance, and leave the callers to decide
- *	whether or not to raise allocated through sk_under_memory_pressure() or
- *	its variants.
+ *	Charges the global protocol counter only. The memcg is charged for
+ *	the socket's full memory budget when that budget is established or
+ *	resized (see sk_memcg_budget_sync()), not per allocation.
  */
 int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 {
-	bool memcg_enabled = false, charged = false;
 	struct proto *prot = sk->sk_prot;
 	long allocated = 0;
 
 	if (!sk->sk_bypass_prot_mem) {
 		sk_memory_allocated_add(sk, amt);
 		allocated = sk_memory_allocated(sk);
-	}
-
-	if (mem_cgroup_sk_enabled(sk)) {
-		memcg_enabled = true;
-		charged = mem_cgroup_sk_charge(sk, amt, gfp_memcg_charge());
-		if (!charged)
-			goto suppress_allocation;
 	}
 
 	if (!allocated)
@@ -3428,22 +3446,14 @@ suppress_allocation:
 		/* Fail only if socket is _under_ its sndbuf.
 		 * In this case we cannot block, so that we have to fail.
 		 */
-		if (sk->sk_wmem_queued + size >= sk->sk_sndbuf) {
-			/* Force charge with __GFP_NOFAIL */
-			if (memcg_enabled && !charged)
-				mem_cgroup_sk_charge(sk, amt,
-						     gfp_memcg_charge() | __GFP_NOFAIL);
+		if (sk->sk_wmem_queued + size >= sk->sk_sndbuf)
 			return 1;
-		}
 	}
 
 	trace_sock_exceed_buf_limit(sk, prot, allocated, kind);
 
 	if (allocated)
 		sk_memory_allocated_sub(sk, amt);
-
-	if (charged)
-		mem_cgroup_sk_uncharge(sk, amt);
 
 	return 0;
 }
@@ -3475,13 +3485,12 @@ EXPORT_SYMBOL(__sk_mem_schedule);
  *	@sk: socket
  *	@amount: number of quanta
  *
- *	Similar to __sk_mem_reclaim(), but does not update sk_forward_alloc
+ *	Similar to __sk_mem_reclaim(), but does not update sk_forward_alloc.
+ *	Only returns pages to the global protocol counter; the memcg charge
+ *	follows the socket budget, see sk_memcg_budget_sync().
  */
 void __sk_mem_reduce_allocated(struct sock *sk, int amount)
 {
-	if (mem_cgroup_sk_enabled(sk))
-		mem_cgroup_sk_uncharge(sk, amount);
-
 	if (sk->sk_bypass_prot_mem)
 		return;
 
@@ -3505,20 +3514,150 @@ void __sk_mem_reclaim(struct sock *sk, int amount)
 }
 EXPORT_SYMBOL(__sk_mem_reclaim);
 
+/* Pages of the socket's currently established memory budget: the send
+ * and receive buffers plus the SO_RESERVE_MEM reservation.
+ */
+static int sk_memcg_budget_pages(const struct sock *sk)
+{
+	long budget = READ_ONCE(sk->sk_sndbuf) + READ_ONCE(sk->sk_rcvbuf) +
+		      READ_ONCE(sk->sk_reserved_mem);
+
+	return (int)DIV_ROUND_UP(budget, PAGE_SIZE);
+}
+
+/**
+ *	sk_memcg_budget_sync - charge the socket budget to the memcg
+ *	@sk: socket
+ *	@gfp: reclaim mode for the memcg charge
+ *
+ *	Make the memcg charge match the socket's current budget: charge the
+ *	difference when the budget grew, refund it when the budget shrank.
+ *
+ *	Growth: the memcg is charged first and only a successful charge is
+ *	accounted in sk->sk_memcg_budget. A failed charge leaves the tracker
+ *	unchanged: the new budget is used uncharged (the safe direction) and
+ *	a later call retries the whole difference.
+ *
+ *	Concurrency: budget growth usually runs under the socket lock, but
+ *	some setsockopt(2) paths run without it, and shrinks may run
+ *	locklessly (sk_mem_reclaim() from skb destructors), so the tracker
+ *	is a plain int guarded by sk_memcg_budget_lock. The lock is a leaf
+ *	lock taken with _bh (sk_memcg_budget_release() runs from RCU
+ * callbacks); the memcg charge and uncharge run outside of it because
+ *	they may sleep (memcg reclaim). Charging before publishing the
+ *	tracker, and refunding only the excess claimed under the lock, keep
+ *	every charged page accounted in the tracker exactly once and every
+ *	tracker page refundable exactly once: concurrent growths can
+ *	transiently over-count (the next shrink refunds the excess), while
+ *	cumulative refunds can never exceed cumulative charges, so the
+ *	memcg balance can not underflow.
+ *
+ *	Returns false when a growth charge failed.
+ */
+bool sk_memcg_budget_sync(struct sock *sk, gfp_t gfp)
+{
+	int want, have, delta;
+
+	if (!mem_cgroup_sk_enabled(sk) || !sk_has_account(sk))
+		return true;
+
+	/* The snapshot is unlocked on purpose: the memcg charge below
+	 * may sleep, so the lock cannot be held across it, and a
+	 * lock-coherent snapshot would go stale the same way.
+	 */
+	want = sk_memcg_budget_pages(sk);
+	have = READ_ONCE(sk->sk_memcg_budget);
+
+	if (want > have) {
+		delta = want - have;
+		if (!mem_cgroup_sk_charge(sk, delta, gfp))
+			return false;
+
+		/* Add the full @delta unconditionally: every charged page
+		 * must land in the tracker exactly once, so the release
+		 * can refund it exactly once. @have may be stale, the
+		 * resulting over-count is refunded by the next shrink.
+		 */
+		spin_lock_bh(&sk->sk_memcg_budget_lock);
+		WRITE_ONCE(sk->sk_memcg_budget, sk->sk_memcg_budget + delta);
+		spin_unlock_bh(&sk->sk_memcg_budget_lock);
+	} else if (want < have) {
+		sk_memcg_budget_shrink(sk);
+	}
+
+	return true;
+}
+EXPORT_SYMBOL(sk_memcg_budget_sync);
+
+/**
+ *	sk_memcg_budget_shrink - refund budget shrinks to the memcg
+ *	@sk: socket
+ *
+ *	Return the part of the memcg charge that is no longer backed by the
+ *	socket's budget. Never charges and never fails, so it is safe to
+ *	call from arbitrary (including lockless softirq) contexts, e.g.
+ *	from sk_mem_reclaim() to catch budget shrinks done by writers the
+ *	budget sync is not hooked into.
+ */
+void sk_memcg_budget_shrink(struct sock *sk)
+{
+	int want, refund = 0;
+
+	if (!mem_cgroup_sk_enabled(sk) || !sk_has_account(sk))
+		return;
+
+	/* Claim the excess under the lock, then refund it outside:
+	 * the memcg uncharge may sleep, and the claim guarantees each
+	 * tracker page is refunded exactly once. @want follows the
+	 * socket buffers, which are protected by the socket lock, not
+	 * the budget lock; a claim made stale by a concurrent budget
+	 * update is corrected by the next sync.
+	 */
+	spin_lock_bh(&sk->sk_memcg_budget_lock);
+	want = sk_memcg_budget_pages(sk);
+	if (want < sk->sk_memcg_budget) {
+		refund = sk->sk_memcg_budget - want;
+		WRITE_ONCE(sk->sk_memcg_budget, want);
+	}
+	spin_unlock_bh(&sk->sk_memcg_budget_lock);
+
+	if (refund)
+		mem_cgroup_sk_uncharge(sk, refund);
+}
+EXPORT_SYMBOL(sk_memcg_budget_shrink);
+
+/**
+ *	sk_memcg_budget_release - return the socket's memcg budget charge
+ *	@sk: socket
+ *
+ *	Return the whole remaining budget charge of the socket to its memcg
+ *	and reset the tracker. Used when the socket dies (__sk_destruct(),
+ *	no budget change can happen anymore, the refund is exactly the
+ * amount that was charged) and when the memcg association of the
+ *	socket moves (the charge is re-established against the new memcg).
+ */
+void sk_memcg_budget_release(struct sock *sk)
+{
+	int refund;
+
+	spin_lock_bh(&sk->sk_memcg_budget_lock);
+	refund = sk->sk_memcg_budget;
+	WRITE_ONCE(sk->sk_memcg_budget, 0);
+	spin_unlock_bh(&sk->sk_memcg_budget_lock);
+
+	if (refund)
+		mem_cgroup_sk_uncharge(sk, refund);
+}
+EXPORT_SYMBOL(sk_memcg_budget_release);
+
 void __sk_charge(struct sock *sk, gfp_t gfp)
 {
-	int amt;
-
 	gfp |= __GFP_NOFAIL;
-	if (mem_cgroup_from_sk(sk)) {
-		/* The socket has not been accepted yet, no need
-		 * to look at newsk->sk_wmem_queued.
-		 */
-		amt = sk_mem_pages(sk->sk_forward_alloc +
-				   atomic_read(&sk->sk_rmem_alloc));
-		if (amt)
-			mem_cgroup_sk_charge(sk, amt, gfp);
-	}
+
+	/* Charge the child's full memory budget to its memcg: the budget
+	 * covers whatever the child queued before being accepted.
+	 */
+	sk_memcg_budget_sync(sk, gfp);
 
 	kmem_cache_charge(sk, gfp);
 }
@@ -3760,6 +3899,10 @@ void sock_init_data_uid(struct socket *sock, struct sock *sk, kuid_t uid)
 	sk->sk_allocation	=	GFP_KERNEL;
 	sk->sk_rcvbuf		=	READ_ONCE(sysctl_rmem_default);
 	sk->sk_sndbuf		=	READ_ONCE(sysctl_wmem_default);
+	/* The socket's memory budget starts here: charge it to the memcg
+	 * upfront. Protocols raising the default buffers later re-sync.
+	 */
+	sk_memcg_budget_sync(sk, gfp_memcg_charge());
 	sk->sk_state		=	TCP_CLOSE;
 	sk->sk_use_task_frag	=	true;
 	sk_set_socket(sk, sock);
@@ -4581,6 +4724,8 @@ static int __init sock_struct_check(void)
 
 	CACHELINE_ASSERT_GROUP_MEMBER(struct sock, sock_read_rxtx, sk_err);
 	CACHELINE_ASSERT_GROUP_MEMBER(struct sock, sock_read_rxtx, sk_socket);
+	CACHELINE_ASSERT_GROUP_MEMBER(struct sock, sock_read_rxtx, sk_memcg_budget);
+	CACHELINE_ASSERT_GROUP_MEMBER(struct sock, sock_read_rxtx, sk_memcg_budget_lock);
 #ifdef CONFIG_MEMCG
 	CACHELINE_ASSERT_GROUP_MEMBER(struct sock, sock_read_rxtx, sk_memcg);
 #endif

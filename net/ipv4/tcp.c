@@ -917,9 +917,9 @@ void sk_forced_mem_schedule(struct sock *sk, int size)
 	amt = sk_mem_pages(delta);
 	sk_forward_alloc_add(sk, amt << PAGE_SHIFT);
 
-	if (mem_cgroup_sk_enabled(sk))
-		mem_cgroup_sk_charge(sk, amt, gfp_memcg_charge() | __GFP_NOFAIL);
-
+	/* Only the global protocol counter: the memcg side follows the
+	 * socket budget (sk_memcg_budget_sync()).
+	 */
 	if (sk->sk_bypass_prot_mem)
 		return;
 

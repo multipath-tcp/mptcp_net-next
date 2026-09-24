@@ -458,6 +458,15 @@ struct sock {
 	__cacheline_group_begin(sock_read_rxtx);
 	int			sk_err;
 	struct socket		*sk_socket;
+	/* Pages of the socket's memory budget (sndbuf + rcvbuf +
+	 * SO_RESERVE_MEM) currently charged to the memcg. Paired with
+	 * every mem_cgroup_sk_charge()/mem_cgroup_sk_uncharge() done on
+	 * behalf of this socket, so it can be refunded exactly once.
+	 * Guarded by sk_memcg_budget_lock; the charge/uncharge run
+	 * outside the lock (they may sleep/reclaim).
+	 */
+	int			sk_memcg_budget;
+	spinlock_t		sk_memcg_budget_lock;
 #ifdef CONFIG_MEMCG
 	struct mem_cgroup	*sk_memcg;
 #endif
@@ -1553,6 +1562,9 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind);
 int __sk_mem_schedule(struct sock *sk, int size, int kind);
 void __sk_mem_reduce_allocated(struct sock *sk, int amount);
 void __sk_mem_reclaim(struct sock *sk, int amount);
+bool sk_memcg_budget_sync(struct sock *sk, gfp_t gfp);
+void sk_memcg_budget_shrink(struct sock *sk);
+void sk_memcg_budget_release(struct sock *sk);
 
 #define SK_MEM_SEND	0
 #define SK_MEM_RECV	1
@@ -1621,6 +1633,12 @@ static inline void sk_mem_reclaim(struct sock *sk)
 
 	if (!sk_has_account(sk))
 		return;
+
+	/* Return the part of the memcg budget charge that a budget
+	 * shrink (by any writer) no longer backs. Never charges, so
+	 * it is safe to call locklessly from skb destructors.
+	 */
+	sk_memcg_budget_shrink(sk);
 
 	reclaimable = sk->sk_forward_alloc - sk_unused_reserved_mem(sk);
 
@@ -2640,6 +2658,9 @@ static inline void sk_stream_moderate_sndbuf(struct sock *sk)
 	val = max_t(u32, val, sk_unused_reserved_mem(sk));
 
 	WRITE_ONCE(sk->sk_sndbuf, max_t(u32, val, SOCK_MIN_SNDBUF));
+
+	/* The sndbuf shrink released part of the memcg budget charge. */
+	sk_memcg_budget_shrink(sk);
 }
 
 /**
