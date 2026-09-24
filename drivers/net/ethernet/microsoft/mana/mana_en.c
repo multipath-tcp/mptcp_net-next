@@ -3957,8 +3957,9 @@ static int add_adev(struct gdma_dev *gd, const char *name)
 
 	/* madev is owned by the auxiliary device */
 	madev = NULL;
-	/* Keep the established mana.{eth,rdma} auxiliary match names. */
-	ret = __auxiliary_device_add(adev, "mana");
+	/* Keep match names independent of the common module's name. */
+	ret = __auxiliary_device_add(adev,
+				     gd->gdma_context->bus_ops->adev_prefix);
 	if (ret)
 		goto add_fail;
 

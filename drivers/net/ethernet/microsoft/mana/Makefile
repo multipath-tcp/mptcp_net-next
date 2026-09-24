@@ -8,3 +8,6 @@ gdma_core-y := gdma_main.o shm_channel.o hw_channel.o mana_en.o mana_ethtool.o \
 
 obj-$(CONFIG_MICROSOFT_MANA) += mana.o
 mana-y := gdma_pci.o
+
+obj-$(CONFIG_MICROSOFT_MANA_CDX) += mana_cdx.o
+mana_cdx-y := gdma_cdx.o

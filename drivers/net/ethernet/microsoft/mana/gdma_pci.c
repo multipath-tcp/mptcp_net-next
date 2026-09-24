@@ -619,6 +619,7 @@ static void mana_pci_remove_irqs(struct gdma_context *gc)
 
 static const struct gdma_bus_ops mana_pci_bus_ops = {
 	.bus_name		= "pci",
+	.adev_prefix		= "mana",
 	.msix_can_alloc_dyn	= mana_pci_msix_can_alloc_dyn,
 	.msix_virq		= mana_pci_msix_virq,
 	.msix_alloc_at		= mana_pci_msix_alloc_at,

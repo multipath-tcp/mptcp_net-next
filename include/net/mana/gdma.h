@@ -432,6 +432,7 @@ struct gdma_context;
  * instance in gdma_context.bus_ops at probe time.
  *
  * @bus_name: Bus token used to build the per-vector IRQ names.
+ * @adev_prefix: Prefix used for auxiliary-device match names.
  * @msix_can_alloc_dyn: True if the bus can allocate MSI-X vectors after
  *	probe time. Buses that size their vector pool at probe and cannot
  *	grow it later leave this NULL.
@@ -459,6 +460,7 @@ struct gdma_context;
  */
 struct gdma_bus_ops {
 	const char *bus_name;
+	const char *adev_prefix;
 	bool (*msix_can_alloc_dyn)(struct gdma_context *gc);
 	int (*msix_virq)(struct gdma_context *gc, int msi);
 	int (*msix_alloc_at)(struct gdma_context *gc, int *msi);
@@ -683,6 +685,8 @@ struct gdma_eqe {
 #define MANA_PF_DEVICE_ID 0x00B9
 #define MANA_PF2_DEVICE_ID 0x00C1
 #define MANA_VF_DEVICE_ID 0x00BA
+
+#define MANA_CDX_DEVICE_ID 0x00C2
 
 struct gdma_posted_wqe_info {
 	u32 wqe_size_in_bu;
