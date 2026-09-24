@@ -79,6 +79,7 @@ static int mptcp_get_int_option(struct mptcp_sock *msk, sockptr_t optval,
 static void __mptcp_subflow_set_rcvbuf(struct sock *ssk, int val)
 {
 	WRITE_ONCE(ssk->sk_rcvbuf, val);
+	sk_memcg_budget_sync(ssk, gfp_memcg_charge());
 	tcp_set_rcvbuf(ssk, val);
 }
 
@@ -1761,12 +1762,14 @@ int mptcp_set_rcvlowat(struct sock *sk, int val)
 
 	/* propagate the rcvbuf changes to all the subflows */
 	WRITE_ONCE(sk->sk_rcvbuf, space);
+	sk_memcg_budget_sync(sk, gfp_memcg_charge());
 	mptcp_for_each_subflow(mptcp_sk(sk), subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		bool slow;
 
 		slow = lock_sock_fast(ssk);
 		WRITE_ONCE(ssk->sk_rcvbuf, space);
+		sk_memcg_budget_sync(ssk, gfp_memcg_charge());
 		WRITE_ONCE(tcp_sk(ssk)->window_clamp, val);
 		unlock_sock_fast(ssk, slow);
 	}

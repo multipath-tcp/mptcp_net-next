@@ -1735,6 +1735,11 @@ void __mptcp_inherit_memcg(struct sock *sk, struct sock *ssk, gfp_t gfp)
 	if (!mem_cgroup_sockets_enabled || !sk->sk_socket)
 		return;
 
+	/* The subflow's budget charge went to its previous memcg: return
+	 * it before the memcg association moves to the msk's one, the
+	 * __sk_charge() below re-charges the budget there.
+	 */
+	sk_memcg_budget_release(ssk);
 	mem_cgroup_sk_inherit(sk, ssk);
 	__sk_charge(ssk, gfp);
 }
