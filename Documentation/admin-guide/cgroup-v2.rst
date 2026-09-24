@@ -1309,7 +1309,11 @@ following types of memory usages are tracked.
 
 - Kernel data structures such as dentries and inodes.
 
-- TCP socket buffers.
+- TCP socket buffers. These are charged upfront for the socket's
+  established memory budget (send buffer, receive buffer and
+  SO_RESERVE_MEM reservation) when the budget is created or resized,
+  and returned when the budget shrinks or the socket is closed; the
+  charge is not tied to per-packet buffer usage.
 
 The above list may expand in the future for better coverage.
 
