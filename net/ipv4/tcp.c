@@ -471,6 +471,10 @@ void tcp_init_sock(struct sock *sk)
 
 	WRITE_ONCE(sk->sk_sndbuf, READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_wmem[1]));
 	WRITE_ONCE(sk->sk_rcvbuf, READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_rmem[1]));
+	/* The default buffers grew from the generic sock_init_data()
+	 * values: charge the difference to the memcg.
+	 */
+	sk_memcg_budget_sync(sk, gfp_memcg_charge());
 	tcp_scaling_ratio_init(sk);
 
 	set_bit(SOCK_SUPPORT_ZC, &sk->sk_socket->flags);
@@ -1850,6 +1854,7 @@ int tcp_set_rcvlowat(struct sock *sk, int val)
 	space = tcp_space_from_win(sk, val);
 	if (space > sk->sk_rcvbuf) {
 		WRITE_ONCE(sk->sk_rcvbuf, space);
+		sk_memcg_budget_sync(sk, gfp_memcg_charge());
 
 		if (tp->window_clamp && tp->window_clamp < val)
 			WRITE_ONCE(tp->window_clamp, val);
