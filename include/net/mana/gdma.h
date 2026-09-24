@@ -1175,4 +1175,7 @@ int mana_gd_query_device_cfg(struct gdma_context *gc, u32 proto_major_ver,
 			     u16 *max_num_vports, u8 *bm_hostmode);
 int mana_gd_dev_reset(struct gdma_context *gc);
 
+int mana_pci_driver_register(void);
+void mana_pci_driver_unregister(void);
+
 #endif /* _GDMA_H */
