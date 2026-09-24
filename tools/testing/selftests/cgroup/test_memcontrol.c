@@ -1335,9 +1335,12 @@ static int tcp_client(const char *cgroup, unsigned short port)
 	char servport[6];
 	int retries = 0x10; /* nice round number */
 	int sk, ret;
-	long allocated;
+	long allocated, sock_pre;
 
 	allocated = cg_read_long(cgroup, "memory.current");
+	sock_pre = cg_read_key_long(cgroup, "memory.stat", "sock ");
+	if (sock_pre < 0)
+		return KSFT_FAIL;
 	snprintf(servport, sizeof(servport), "%hd", port);
 	ret = getaddrinfo(server, servport, NULL, &ai);
 	if (ret)
@@ -1365,8 +1368,12 @@ static int tcp_client(const char *cgroup, unsigned short port)
 		if (current < 0 || sock < 0)
 			goto close_sk;
 
-		/* exclude the memory not related to socket connection */
-		if (values_close(current - allocated, sock, 10)) {
+		/* exclude the memory not related to socket connection;
+		 * compare the growth of both counters since the baseline,
+		 * as the listening socket may already hold socket memory
+		 * (e.g. its pre-charged memory budget) at the baseline.
+		 */
+		if (values_close(current - allocated, sock - sock_pre, 10)) {
 			ret = KSFT_PASS;
 			break;
 		}
@@ -1384,8 +1391,9 @@ free_ainfo:
  * The test forks a TCP server listens on a random port between 1000
  * and 61000. Once it gets a client connection, it starts writing to
  * its socket.
- * The TCP client interleaves reads from the socket with check whether
- * memory.current and memory.stat.sock are similar.
+ * The TCP client interleaves reads from the socket with checking whether
+ * the growth of memory.current and memory.stat.sock since the baseline
+ * are similar.
  */
 static int test_memcg_sock(const char *root)
 {
