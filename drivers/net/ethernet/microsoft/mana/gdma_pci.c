@@ -878,7 +878,7 @@ static struct pci_driver mana_driver = {
 
 MODULE_DEVICE_TABLE(pci, mana_id_table);
 
-int mana_pci_driver_register(void)
+static int __init mana_driver_init(void)
 {
 	INIT_LIST_HEAD(&mana_dev_recovery_work.dev_list);
 	spin_lock_init(&mana_dev_recovery_work.lock);
@@ -888,7 +888,7 @@ int mana_pci_driver_register(void)
 	return pci_register_driver(&mana_driver);
 }
 
-void mana_pci_driver_unregister(void)
+static void __exit mana_driver_exit(void)
 {
 	struct mana_dev_recovery *dev;
 	unsigned long flags;
@@ -907,3 +907,10 @@ void mana_pci_driver_unregister(void)
 
 	pci_unregister_driver(&mana_driver);
 }
+
+module_init(mana_driver_init);
+module_exit(mana_driver_exit);
+
+MODULE_LICENSE("Dual BSD/GPL");
+MODULE_DESCRIPTION("Microsoft Azure Network Adapter driver");
+MODULE_IMPORT_NS("NET_MANA");

@@ -3957,7 +3957,8 @@ static int add_adev(struct gdma_dev *gd, const char *name)
 
 	/* madev is owned by the auxiliary device */
 	madev = NULL;
-	ret = auxiliary_device_add(adev);
+	/* Keep the established mana.{eth,rdma} auxiliary match names. */
+	ret = __auxiliary_device_add(adev, "mana");
 	if (ret)
 		goto add_fail;
 
@@ -4194,6 +4195,7 @@ out:
 
 	return err;
 }
+EXPORT_SYMBOL_NS(mana_probe, "NET_MANA");
 
 void mana_remove(struct gdma_dev *gd, bool suspending)
 {
@@ -4272,6 +4274,7 @@ void mana_remove(struct gdma_dev *gd, bool suspending)
 	kfree(ac);
 	dev_dbg(dev, "%s succeeded\n", __func__);
 }
+EXPORT_SYMBOL_NS(mana_remove, "NET_MANA");
 
 int mana_rdma_probe(struct gdma_dev *gd)
 {
@@ -4307,6 +4310,7 @@ int mana_rdma_probe(struct gdma_dev *gd)
 
 	return err;
 }
+EXPORT_SYMBOL_NS(mana_rdma_probe, "NET_MANA");
 
 void mana_rdma_remove(struct gdma_dev *gd)
 {
@@ -4327,6 +4331,7 @@ void mana_rdma_remove(struct gdma_dev *gd)
 
 	mana_gd_deregister_device(gd);
 }
+EXPORT_SYMBOL_NS(mana_rdma_remove, "NET_MANA");
 
 struct net_device *mana_get_primary_netdev(struct mana_context *ac,
 					   u32 port_index,

@@ -1991,6 +1991,7 @@ remove_debugfs:
 	dev_err(gc->dev, "%s failed (error %d)\n", __func__, err);
 	return err;
 }
+EXPORT_SYMBOL_NS(mana_gd_setup, "NET_MANA");
 
 void mana_gd_cleanup(struct gdma_context *gc)
 {
@@ -2005,36 +2006,24 @@ void mana_gd_cleanup(struct gdma_context *gc)
 
 	dev_dbg(gc->dev, "mana gdma cleanup successful\n");
 }
+EXPORT_SYMBOL_NS(mana_gd_cleanup, "NET_MANA");
 
-static int __init mana_driver_init(void)
+static int __init gdma_core_init(void)
 {
-	int err;
-
 	mana_debugfs_root = debugfs_create_dir("mana", NULL);
 
-	err = mana_pci_driver_register();
-	if (err)
-		goto err_debugfs;
-
 	return 0;
-
-err_debugfs:
-	debugfs_remove(mana_debugfs_root);
-	mana_debugfs_root = NULL;
-	return err;
 }
 
-static void __exit mana_driver_exit(void)
+static void __exit gdma_core_exit(void)
 {
-	mana_pci_driver_unregister();
-
 	debugfs_remove(mana_debugfs_root);
 
 	mana_debugfs_root = NULL;
 }
 
-module_init(mana_driver_init);
-module_exit(mana_driver_exit);
+module_init(gdma_core_init);
+module_exit(gdma_core_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_DESCRIPTION("Microsoft Azure Network Adapter driver");
+MODULE_DESCRIPTION("Microsoft Azure Network Adapter GDMA core");

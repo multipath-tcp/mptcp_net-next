@@ -15,15 +15,19 @@ config NET_VENDOR_MICROSOFT
 
 if NET_VENDOR_MICROSOFT
 
+config MICROSOFT_GDMA_CORE
+	tristate
+	select AUXILIARY_BUS
+	select DIMLIB
+	select PAGE_POOL
+	select NET_SHAPER
+
 config MICROSOFT_MANA
 	tristate "Microsoft Azure Network Adapter (MANA) support"
 	depends on PCI_MSI
 	depends on X86_64 || (ARM64 && !CPU_BIG_ENDIAN)
 	depends on PCI_HYPERV
-	select AUXILIARY_BUS
-	select DIMLIB
-	select PAGE_POOL
-	select NET_SHAPER
+	select MICROSOFT_GDMA_CORE
 	help
 	  This driver supports Microsoft Azure Network Adapter (MANA).
 	  So far, the driver is only supported on X86_64.
