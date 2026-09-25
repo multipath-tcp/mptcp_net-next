@@ -954,17 +954,12 @@ unlock:
 	return ret;
 }
 
-static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+static int __ksz_ptp_adjtime(struct ksz_device *dev, s64 delta)
 {
-	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
-	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
-	struct timespec64 delta64 = ns_to_timespec64(delta);
 	const u16 *regs = dev->info->regs;
 	s32 sec, nsec;
 	u16 data16;
 	int ret;
-
-	mutex_lock(&ptp_data->lock);
 
 	/* do not use ns_to_timespec64(),
 	 * both sec and nsec are subtracted by hw
@@ -973,15 +968,15 @@ static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 
 	ret = ksz_write32(dev, regs[PTP_RTC_NANOSEC], abs(nsec));
 	if (ret)
-		goto unlock;
+		return ret;
 
 	ret = ksz_write32(dev, regs[PTP_RTC_SEC], abs(sec));
 	if (ret)
-		goto unlock;
+		return ret;
 
 	ret = ksz_read16(dev, regs[PTP_CLK_CTRL], &data16);
 	if (ret)
-		goto unlock;
+		return ret;
 
 	data16 |= PTP_STEP_ADJ;
 
@@ -992,6 +987,22 @@ static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 		data16 |= PTP_STEP_DIR;
 
 	ret = ksz_write16(dev, regs[PTP_CLK_CTRL], data16);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
+	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
+	struct timespec64 delta64 = ns_to_timespec64(delta);
+	int ret;
+
+	mutex_lock(&ptp_data->lock);
+
+	ret = __ksz_ptp_adjtime(dev, delta);
 	if (ret)
 		goto unlock;
 
