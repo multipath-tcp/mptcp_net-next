@@ -183,6 +183,26 @@ static int ksz_ptp_configure_perout(struct ksz_device *dev,
 	return 0;
 }
 
+static int ksz_ptp_get_pin(struct ksz_device *dev,
+			   struct ptp_perout_request const *request)
+{
+	struct ksz_ptp_data *ptp_data = &dev->ptp_data;
+	int pin;
+
+	if (request->flags & ~PTP_PEROUT_DUTY_CYCLE)
+		return -EOPNOTSUPP;
+
+	if (ptp_data->tou_mode != KSZ_PTP_TOU_PEROUT &&
+	    ptp_data->tou_mode != KSZ_PTP_TOU_IDLE)
+		return -EBUSY;
+
+	pin = ptp_find_pin(ptp_data->clock, PTP_PF_PEROUT, request->index);
+	if (pin < 0)
+		return -EINVAL;
+
+	return pin;
+}
+
 static int ksz_ptp_enable_perout(struct ksz_device *dev,
 				 struct ptp_perout_request const *request,
 				 int on)
@@ -196,16 +216,9 @@ static int ksz_ptp_enable_perout(struct ksz_device *dev,
 	u32 data32;
 	int ret;
 
-	if (request->flags & ~PTP_PEROUT_DUTY_CYCLE)
-		return -EOPNOTSUPP;
-
-	if (ptp_data->tou_mode != KSZ_PTP_TOU_PEROUT &&
-	    ptp_data->tou_mode != KSZ_PTP_TOU_IDLE)
-		return -EBUSY;
-
-	pin = ptp_find_pin(ptp_data->clock, PTP_PF_PEROUT, request->index);
+	pin = ksz_ptp_get_pin(dev, request);
 	if (pin < 0)
-		return -EINVAL;
+		return pin;
 
 	data32 = FIELD_PREP(PTP_GPIO_INDEX, pin) |
 		 FIELD_PREP(PTP_TOU_INDEX, request->index);
