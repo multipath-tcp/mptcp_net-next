@@ -1054,7 +1054,7 @@ int ksz_ptp_clock_register(struct dsa_switch *ds)
 	ptp_data->caps.enable		= ksz_ptp_enable;
 	ptp_data->caps.verify		= ksz_ptp_verify_pin;
 	ptp_data->caps.n_pins		= dev->info->n_pins;
-	ptp_data->caps.n_per_out	= 3;
+	ptp_data->caps.n_per_out	= dev->info->n_per_out;
 
 	ret = ksz_ptp_start_clock(dev);
 	if (ret)
