@@ -896,19 +896,31 @@ static void fbnic_clean_bdq(struct fbnic_ring *ring, unsigned int hw_head,
 	ring->head = head;
 }
 
+static u16 fbnic_rcd_bd_idx(const struct fbnic_ring *bdq, u64 rcd)
+{
+	return FIELD_GET(FBNIC_RCD_AL_BUFF_ID_MASK, rcd) >> bdq->bd_page_shift;
+}
+
+static unsigned int fbnic_rcd_bd_page_offset(const struct fbnic_ring *bdq,
+					     u64 rcd)
+{
+	u16 id = FIELD_GET(FBNIC_RCD_AL_BUFF_ID_MASK, rcd);
+	u16 page_id = id & (fbnic_bd_page_count(bdq) - 1);
+
+	return page_id * FBNIC_BD_PAGE_SIZE;
+}
+
 static void fbnic_bd_prep(struct fbnic_ring *bdq, u16 id, netmem_ref netmem)
 {
-	__le64 *bdq_desc = &bdq->desc[id * FBNIC_BD_FRAG_COUNT];
+	__le64 *bdq_desc = &bdq->desc[id * fbnic_bd_page_count(bdq)];
 	dma_addr_t dma = page_pool_get_dma_addr_netmem(netmem);
-	u64 bd, i = FBNIC_BD_FRAG_COUNT;
+	u64 bd, i = fbnic_bd_page_count(bdq);
 
-	bd = (FBNIC_BD_PAGE_ADDR_MASK & dma) |
-	     FIELD_PREP(FBNIC_BD_PAGE_ID_MASK, id);
+	bd = (FBNIC_BD_DESC_ADDR_MASK & dma) |
+	     FIELD_PREP(FBNIC_BD_DESC_ID_MASK, (u64)id << bdq->bd_page_shift);
 
-	/* In the case that a page size is larger than 4K we will map a
-	 * single page to multiple fragments. The fragments will be
-	 * FBNIC_BD_FRAG_COUNT in size and the lower n bits will be use
-	 * to indicate the individual fragment IDs.
+	/* Posted pages larger than 4 KiB use consecutive device-page IDs in
+	 * the low bits of the software page ID.
 	 */
 	do {
 		*bdq_desc = cpu_to_le64(bd);
@@ -953,7 +965,7 @@ static void fbnic_fill_bdq(struct fbnic_ring *bdq)
 		/* Force DMA writes to flush before writing to tail */
 		dma_wmb();
 
-		writel(i * FBNIC_BD_FRAG_COUNT, bdq->doorbell);
+		writel(i * fbnic_bd_page_count(bdq), bdq->doorbell);
 	}
 }
 
@@ -984,26 +996,27 @@ static void fbnic_pkt_prepare(struct fbnic_napi_vector *nv, u64 rcd,
 			      struct fbnic_pkt_buff *pkt,
 			      struct fbnic_q_triad *qt)
 {
-	unsigned int hdr_pg_idx = FIELD_GET(FBNIC_RCD_AL_BUFF_PAGE_MASK, rcd);
 	unsigned int hdr_pg_off = FIELD_GET(FBNIC_RCD_AL_BUFF_OFF_MASK, rcd);
-	struct page *page = fbnic_page_pool_get_head(qt, hdr_pg_idx);
 	unsigned int len = FIELD_GET(FBNIC_RCD_AL_BUFF_LEN_MASK, rcd);
+	unsigned int hdr_pg_idx = fbnic_rcd_bd_idx(&qt->sub0, rcd);
 	unsigned int frame_sz, hdr_pg_start, hdr_pg_end, headroom;
 	unsigned char *hdr_start;
+	struct page *page;
 
 	/* data_hard_start should always be NULL when this is called */
 	WARN_ON_ONCE(pkt->buff.data_hard_start);
 
+	page = fbnic_page_pool_get_head(qt, hdr_pg_idx);
+
 	/* Short-cut the end calculation if we know page is fully consumed */
 	hdr_pg_end = FIELD_GET(FBNIC_RCD_AL_PAGE_FIN, rcd) ?
-		     FBNIC_BD_FRAG_SIZE : fbnic_hdr_pg_end(hdr_pg_off, len);
+		     FBNIC_BD_PAGE_SIZE : fbnic_hdr_pg_end(hdr_pg_off, len);
 	hdr_pg_start = fbnic_hdr_pg_start(hdr_pg_off);
 
 	headroom = hdr_pg_off - hdr_pg_start + FBNIC_RX_PAD;
 	frame_sz = hdr_pg_end - hdr_pg_start;
 	xdp_init_buff(&pkt->buff, frame_sz, &qt->xdp_rxq);
-	hdr_pg_start += (FBNIC_RCD_AL_BUFF_FRAG_MASK & rcd) *
-			FBNIC_BD_FRAG_SIZE;
+	hdr_pg_start += fbnic_rcd_bd_page_offset(&qt->sub0, rcd);
 
 	/* Sync DMA buffer */
 	dma_sync_single_range_for_cpu(nv->dev, page_pool_get_dma_addr(page),
@@ -1024,18 +1037,19 @@ static void fbnic_add_rx_frag(struct fbnic_napi_vector *nv, u64 rcd,
 			      struct fbnic_pkt_buff *pkt,
 			      struct fbnic_q_triad *qt)
 {
-	unsigned int pg_idx = FIELD_GET(FBNIC_RCD_AL_BUFF_PAGE_MASK, rcd);
 	unsigned int pg_off = FIELD_GET(FBNIC_RCD_AL_BUFF_OFF_MASK, rcd);
 	unsigned int len = FIELD_GET(FBNIC_RCD_AL_BUFF_LEN_MASK, rcd);
-	netmem_ref netmem = fbnic_page_pool_get_data(qt, pg_idx);
+	unsigned int pg_idx = fbnic_rcd_bd_idx(&qt->sub1, rcd);
 	unsigned int truesize;
+	netmem_ref netmem;
 	bool added;
 
-	truesize = FIELD_GET(FBNIC_RCD_AL_PAGE_FIN, rcd) ?
-		   FBNIC_BD_FRAG_SIZE - pg_off : ALIGN(len, 128);
+	netmem = fbnic_page_pool_get_data(qt, pg_idx);
 
-	pg_off += (FBNIC_RCD_AL_BUFF_FRAG_MASK & rcd) *
-		  FBNIC_BD_FRAG_SIZE;
+	truesize = FIELD_GET(FBNIC_RCD_AL_PAGE_FIN, rcd) ?
+		   FBNIC_BD_PAGE_SIZE - pg_off : ALIGN(len, 128);
+
+	pg_off += fbnic_rcd_bd_page_offset(&qt->sub1, rcd);
 
 	/* Sync DMA buffer */
 	page_pool_dma_sync_netmem_for_cpu(qt->sub1.page_pool, netmem,
@@ -1283,12 +1297,12 @@ static int fbnic_clean_rcq(struct fbnic_napi_vector *nv,
 
 		switch (FIELD_GET(FBNIC_RCD_TYPE_MASK, rcd)) {
 		case FBNIC_RCD_TYPE_HDR_AL:
-			head0 = FIELD_GET(FBNIC_RCD_AL_BUFF_PAGE_MASK, rcd);
+			head0 = fbnic_rcd_bd_idx(&qt->sub0, rcd);
 			fbnic_pkt_prepare(nv, rcd, pkt, qt);
 
 			break;
 		case FBNIC_RCD_TYPE_PAY_AL:
-			head1 = FIELD_GET(FBNIC_RCD_AL_BUFF_PAGE_MASK, rcd);
+			head1 = fbnic_rcd_bd_idx(&qt->sub1, rcd);
 			fbnic_add_rx_frag(nv, rcd, pkt, qt);
 
 			break;
@@ -1629,6 +1643,16 @@ err_destroy_sub0:
 	return PTR_ERR(pp);
 }
 
+static u8 fbnic_bdq_page_shift(u32 page_size)
+{
+	return ilog2(page_size / FBNIC_BD_PAGE_SIZE);
+}
+
+static void fbnic_bdq_set_page_size(struct fbnic_ring *bdq, u32 page_size)
+{
+	bdq->bd_page_shift = fbnic_bdq_page_shift(page_size);
+}
+
 static void fbnic_ring_init(struct fbnic_ring *ring, u32 __iomem *doorbell,
 			    int q_idx, u8 flags)
 {
@@ -1636,6 +1660,7 @@ static void fbnic_ring_init(struct fbnic_ring *ring, u32 __iomem *doorbell,
 	ring->doorbell = doorbell;
 	ring->q_idx = q_idx;
 	ring->flags = flags;
+	fbnic_bdq_set_page_size(ring, PAGE_SIZE);
 	ring->deferred_head = -1;
 }
 
@@ -1920,12 +1945,12 @@ static int fbnic_alloc_rx_ring_desc(struct fbnic_net *fbn,
 
 	switch (rxr->doorbell - fbnic_ring_csr_base(rxr)) {
 	case FBNIC_QUEUE_BDQ_HPQ_TAIL:
-		rxq_size = fbn->hpq_size / FBNIC_BD_FRAG_COUNT;
-		desc_size *= FBNIC_BD_FRAG_COUNT;
+		rxq_size = fbn->hpq_size / fbnic_bd_page_count(rxr);
+		desc_size *= fbnic_bd_page_count(rxr);
 		break;
 	case FBNIC_QUEUE_BDQ_PPQ_TAIL:
-		rxq_size = fbn->ppq_size / FBNIC_BD_FRAG_COUNT;
-		desc_size *= FBNIC_BD_FRAG_COUNT;
+		rxq_size = fbn->ppq_size / fbnic_bd_page_count(rxr);
+		desc_size *= fbnic_bd_page_count(rxr);
 		break;
 	case FBNIC_QUEUE_RCQ_HEAD:
 		rxq_size = fbn->rcq_size;
@@ -2592,7 +2617,7 @@ static void fbnic_enable_bdq(struct fbnic_ring *hpq, struct fbnic_ring *ppq)
 	hpq->tail = 0;
 	hpq->head = 0;
 
-	log_size = fls(hpq->size_mask) + ilog2(FBNIC_BD_FRAG_COUNT);
+	log_size = fls(hpq->size_mask) + hpq->bd_page_shift;
 
 	/* Store descriptor ring address and size */
 	fbnic_ring_wr32(hpq, FBNIC_QUEUE_BDQ_HPQ_BAL, lower_32_bits(hpq->dma));
@@ -2604,7 +2629,7 @@ static void fbnic_enable_bdq(struct fbnic_ring *hpq, struct fbnic_ring *ppq)
 	if (!ppq->size_mask)
 		goto write_ctl;
 
-	log_size = fls(ppq->size_mask) + ilog2(FBNIC_BD_FRAG_COUNT);
+	log_size = fls(ppq->size_mask) + ppq->bd_page_shift;
 
 	/* Add enabling of PPQ to BDQ control */
 	bdq_ctl |= FBNIC_QUEUE_BDQ_CTL_PPQ_ENABLE;
@@ -2908,8 +2933,10 @@ static int fbnic_queue_mem_alloc(struct net_device *dev,
 
 	fbnic_ring_init(&qt->sub0, real->sub0.doorbell, real->sub0.q_idx,
 			real->sub0.flags);
+	qt->sub0.bd_page_shift = real->sub0.bd_page_shift;
 	fbnic_ring_init(&qt->sub1, real->sub1.doorbell, real->sub1.q_idx,
 			real->sub1.flags);
+	qt->sub1.bd_page_shift = real->sub1.bd_page_shift;
 	fbnic_ring_init(&qt->cmpl, real->cmpl.doorbell, real->cmpl.q_idx,
 			real->cmpl.flags);
 
