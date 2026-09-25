@@ -853,30 +853,42 @@ static int ksz_ptp_restart_perout(struct ksz_device *dev)
 	return ksz_ptp_enable_perout(dev, &request, 1);
 }
 
+static int __ksz_ptp_settime(struct ksz_device *dev,
+			     const struct timespec64 *ts)
+{
+	const u16 *regs = dev->info->regs;
+	int ret;
+
+	/* Write to shadow registers and Load PTP clock */
+	ret = ksz_write16(dev, regs[PTP_RTC_SUB_NANOSEC], PTP_RTC_0NS);
+	if (ret)
+		return ret;
+
+	ret = ksz_write32(dev, regs[PTP_RTC_NANOSEC], ts->tv_nsec);
+	if (ret)
+		return ret;
+
+	ret = ksz_write32(dev, regs[PTP_RTC_SEC], ts->tv_sec);
+	if (ret)
+		return ret;
+
+	ret = ksz_rmw16(dev, regs[PTP_CLK_CTRL], PTP_LOAD_TIME, PTP_LOAD_TIME);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static int ksz_ptp_settime(struct ptp_clock_info *ptp,
 			   const struct timespec64 *ts)
 {
 	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
 	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
-	const u16 *regs = dev->info->regs;
 	int ret;
 
 	mutex_lock(&ptp_data->lock);
 
-	/* Write to shadow registers and Load PTP clock */
-	ret = ksz_write16(dev, regs[PTP_RTC_SUB_NANOSEC], PTP_RTC_0NS);
-	if (ret)
-		goto unlock;
-
-	ret = ksz_write32(dev, regs[PTP_RTC_NANOSEC], ts->tv_nsec);
-	if (ret)
-		goto unlock;
-
-	ret = ksz_write32(dev, regs[PTP_RTC_SEC], ts->tv_sec);
-	if (ret)
-		goto unlock;
-
-	ret = ksz_rmw16(dev, regs[PTP_CLK_CTRL], PTP_LOAD_TIME, PTP_LOAD_TIME);
+	ret = __ksz_ptp_settime(dev, ts);
 	if (ret)
 		goto unlock;
 
