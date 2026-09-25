@@ -189,6 +189,7 @@ static int ksz_ptp_enable_perout(struct ksz_device *dev,
 {
 	struct ksz_ptp_data *ptp_data = &dev->ptp_data;
 	u64 req_pulse_width_ns;
+	struct timespec64 tmp;
 	u64 cycle_width_ns;
 	u64 pulse_width_ns;
 	int pin = 0;
@@ -222,13 +223,9 @@ static int ksz_ptp_enable_perout(struct ksz_device *dev,
 		return 0;
 	}
 
-	ptp_data->perout_target_time_first.tv_sec  = request->start.sec;
-	ptp_data->perout_target_time_first.tv_nsec = request->start.nsec;
-
-	ptp_data->perout_period.tv_sec = request->period.sec;
-	ptp_data->perout_period.tv_nsec = request->period.nsec;
-
-	cycle_width_ns = timespec64_to_ns(&ptp_data->perout_period);
+	tmp.tv_sec = request->period.sec;
+	tmp.tv_nsec = request->period.nsec;
+	cycle_width_ns = timespec64_to_ns(&tmp);
 	if ((cycle_width_ns & TRIG_CYCLE_WIDTH_M) != cycle_width_ns)
 		return -EINVAL;
 
@@ -249,9 +246,10 @@ static int ksz_ptp_enable_perout(struct ksz_device *dev,
 	if (ret)
 		return ret;
 
+	tmp.tv_sec = request->start.sec;
+	tmp.tv_nsec = request->start.nsec;
 	ret = ksz_ptp_configure_perout(dev, cycle_width_ns, pulse_width_ns,
-				       &ptp_data->perout_target_time_first,
-				       pin);
+				       &tmp, pin);
 	if (ret)
 		return ret;
 
@@ -263,6 +261,8 @@ static int ksz_ptp_enable_perout(struct ksz_device *dev,
 	if (ret)
 		return ret;
 
+	memcpy(&ptp_data->perout_request, request,
+	       sizeof(struct ptp_perout_request));
 	ptp_data->tou_mode = KSZ_PTP_TOU_PEROUT;
 
 	return 0;
@@ -763,6 +763,7 @@ static int ksz_ptp_restart_perout(struct ksz_device *dev)
 	struct ptp_perout_request request;
 	struct timespec64 next;
 	struct timespec64 now;
+	struct timespec64 tmp;
 	unsigned int count;
 	int ret;
 
@@ -773,10 +774,14 @@ static int ksz_ptp_restart_perout(struct ksz_device *dev)
 		return ret;
 
 	now_ns = timespec64_to_ns(&now);
-	first_ns = timespec64_to_ns(&ptp_data->perout_target_time_first);
+	tmp.tv_sec = ptp_data->perout_request.start.sec;
+	tmp.tv_nsec = ptp_data->perout_request.start.nsec;
+	first_ns = timespec64_to_ns(&tmp);
 
 	/* Calculate next perout event based on start time and period */
-	period_ns = timespec64_to_ns(&ptp_data->perout_period);
+	tmp.tv_sec = ptp_data->perout_request.period.sec;
+	tmp.tv_nsec = ptp_data->perout_request.period.nsec;
+	period_ns = timespec64_to_ns(&tmp);
 
 	if (first_ns < now_ns) {
 		count = div_u64(now_ns - first_ns, period_ns);
@@ -791,12 +796,10 @@ static int ksz_ptp_restart_perout(struct ksz_device *dev)
 
 	/* Restart periodic output signal */
 	next = ns_to_timespec64(next_ns);
+	memcpy(&request, &ptp_data->perout_request,
+	       sizeof(struct ptp_perout_request));
 	request.start.sec  = next.tv_sec;
 	request.start.nsec = next.tv_nsec;
-	request.period.sec  = ptp_data->perout_period.tv_sec;
-	request.period.nsec = ptp_data->perout_period.tv_nsec;
-	request.index = 0;
-	request.flags = 0;
 
 	return ksz_ptp_enable_perout(dev, &request, 1);
 }
