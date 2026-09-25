@@ -2589,6 +2589,7 @@ static int ksz8463_setup(struct dsa_switch *ds)
 		if (ret)
 			goto free_girq;
 
+		ksz_ptp_set_caps(ds);
 		ret = ksz_ptp_clock_register(ds);
 		if (ret) {
 			dev_err(dev->dev, "Failed to register PTP clock: %d\n",
@@ -2898,6 +2899,7 @@ static int ksz8_setup(struct dsa_switch *ds)
 	}
 
 	if (dev->info->ptp_capable) {
+		ksz_ptp_set_caps(ds);
 		ret = ksz_ptp_clock_register(ds);
 		if (ret) {
 			dev_err(dev->dev, "Failed to register PTP clock: %d\n",
