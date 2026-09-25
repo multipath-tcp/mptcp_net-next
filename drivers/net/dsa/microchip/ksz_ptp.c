@@ -26,6 +26,7 @@
  */
 #define KSZ_MAX_DRIFT_CORR 6249999
 #define KSZ_MAX_PULSE_WIDTH 125000000LL
+#define KSZ8463_MAX_PULSE_WIDTH 500000LL
 
 #define KSZ_PTP_INC_NS 40ULL  /* HW clock is incremented every 40 ns (by 40) */
 #define KSZ_PTP_SUBNS_BITS 32
@@ -61,6 +62,17 @@ static int ksz_ptp_tou_gpio(struct ksz_device *dev)
 	return ksz_rmw32(dev, REG_SW_GLOBAL_LED_SRC__4,
 			 LED_SRC_PTP_GPIO_1 | LED_SRC_PTP_GPIO_2,
 			 LED_SRC_PTP_GPIO_1 | LED_SRC_PTP_GPIO_2);
+}
+
+static int ksz8463_ptp_tou_reset(struct ksz_device *dev, u8 unit)
+{
+	int ret;
+
+	ret = ksz_rmw16(dev, KSZ8463_TOU_SW_RST, BIT(unit), BIT(unit));
+	if (ret)
+		return ret;
+
+	return ksz_rmw16(dev, KSZ8463_TOU_SW_RST, BIT(unit), 0);
 }
 
 static int ksz_ptp_tou_reset(struct ksz_device *dev, u8 unit)
@@ -120,6 +132,28 @@ static int ksz_ptp_tou_target_time_set(struct ksz_device *dev,
 	return 0;
 }
 
+static int ksz8463_ptp_tou_start(struct ksz_device *dev, u8 unit)
+{
+	u16 data;
+	int ret;
+
+	ret = ksz_rmw16(dev, KSZ8463_TOU_EN, BIT(unit), BIT(unit));
+	if (ret)
+		return ret;
+
+	ret = ksz_read16(dev, KSZ8463_TOU_ACTIVE, &data);
+	if (ret)
+		return ret;
+
+	if (!(data & BIT(unit))) {
+		dev_err(dev->dev, "%s: Trigger unit%d error!\n", __func__,
+			unit);
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static int ksz_ptp_tou_start(struct ksz_device *dev, u8 unit)
 {
 	u32 data;
@@ -143,6 +177,56 @@ static int ksz_ptp_tou_start(struct ksz_device *dev, u8 unit)
 		/* Unit will be reset on next access */
 		return ret;
 	}
+
+	return 0;
+}
+
+static int ksz8463_ptp_configure_perout(struct ksz_device *dev,
+					struct ptp_perout_request const *request,
+					u32 cycle_width_ns, u32 pulse_width_ns,
+					u8 index)
+{
+	struct ptp_pin_desc *pin = &dev->ptp_data.pin_config[index];
+	u16 cfg_base = KSZ8463_TRIG1_CFG + KSZ8463_TRIGN_CFG_SIZE * pin->chan;
+	u16 data;
+	int ret;
+
+	/* Hardware has only 32 bit for the second field */
+	if ((request->start.sec & 0xffffffff) != request->start.sec)
+		return -EINVAL;
+
+	data = KSZ8463_NOTIFY_BIT |
+	       FIELD_PREP(KSZ8463_PATTERN_M, TRIG_POS_PERIOD) |
+	       pin->index;
+	ret = ksz_write16(dev, cfg_base + KSZ8463_PATTERN_OFF, data);
+	if (ret)
+		return ret;
+
+	ret = ksz_write32(dev, cfg_base + KSZ8463_CYCLE_WIDTH_OFF,
+			  cycle_width_ns);
+	if (ret)
+		return ret;
+
+	/* Set cycle count 0 - Infinite */
+	ret = ksz_write16(dev, cfg_base + KSZ8463_CYCLE_CNT_OFF, 0);
+	if (ret)
+		return ret;
+
+	/* KSZ8463 uses a 8 ns unit value to compute the pulse width */
+	data = (pulse_width_ns / 8);
+	ret = ksz_write16(dev, cfg_base + KSZ8463_PULSE_WIDTH_OFF, data);
+	if (ret)
+		return ret;
+
+	ret = ksz_write32(dev, cfg_base + KSZ8463_TARGET_NSEC,
+			  request->start.nsec);
+	if (ret)
+		return ret;
+
+	ret = ksz_write32(dev, cfg_base + KSZ8463_TARGET_SEC,
+			  request->start.sec);
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -238,6 +322,61 @@ static int ksz_ptp_compute_perout_cycle(struct ksz_device *dev,
 	*pulse_width_ns = (request->period.sec * NSEC_PER_SEC +
 			   request->period.nsec) / 2;
 	*pulse_width_ns = min_t(u64, *pulse_width_ns, max_pulse_width);
+
+	return 0;
+}
+
+static int ksz8463_ptp_enable_perout(struct ksz_device *dev,
+				     struct ptp_perout_request const *request,
+				     int on)
+{
+	struct ksz_ptp_data *ptp_data = &dev->ptp_data;
+	u64 cycle_width_ns;
+	u64 pulse_width_ns;
+	int pin;
+	int ret;
+
+	pin = ksz_ptp_get_pin(dev, request);
+	if (pin < 0)
+		return pin;
+
+	ret = ksz8463_ptp_tou_reset(dev, request->index);
+	if (ret)
+		return ret;
+
+	if (!on) {
+		ptp_data->tou_mode = KSZ_PTP_TOU_IDLE;
+		return 0;
+	}
+
+	ret = ksz_ptp_compute_perout_cycle(dev, request,
+					   KSZ8463_MAX_PULSE_WIDTH,
+					   &cycle_width_ns, &pulse_width_ns);
+	if (ret)
+		return ret;
+
+	ret = ksz_ptp_tou_pulse_verify(pulse_width_ns,
+				       KSZ8463_TRIG_PULSE_WIDTH_M);
+	if (ret)
+		return ret;
+
+	ret = ksz8463_ptp_configure_perout(dev, request,
+					   cycle_width_ns, pulse_width_ns,
+					   pin);
+	if (ret)
+		return ret;
+
+	ret = ksz_ptp_tou_gpio(dev);
+	if (ret)
+		return ret;
+
+	ret = ksz8463_ptp_tou_start(dev, request->index);
+	if (ret)
+		return ret;
+
+	memcpy(&ptp_data->perout_request, request,
+	       sizeof(struct ptp_perout_request));
+	ptp_data->tou_mode = KSZ_PTP_TOU_PEROUT;
 
 	return 0;
 }
@@ -853,6 +992,18 @@ static int ksz_ptp_restart_perout(struct ksz_device *dev)
 	return ksz_ptp_enable_perout(dev, &request, 1);
 }
 
+static int ksz8463_ptp_restart_perout(struct ksz_device *dev)
+{
+	struct ptp_perout_request request;
+	int ret;
+
+	ret = ksz_ptp_prepare_restart_perout(dev, &request);
+	if (ret)
+		return ret;
+
+	return ksz8463_ptp_enable_perout(dev, &request, 1);
+}
+
 static int __ksz_ptp_settime(struct ksz_device *dev,
 			     const struct timespec64 *ts)
 {
@@ -877,6 +1028,41 @@ static int __ksz_ptp_settime(struct ksz_device *dev,
 		return ret;
 
 	return 0;
+}
+
+static int ksz8463_ptp_settime(struct ptp_clock_info *ptp,
+			       const struct timespec64 *ts)
+{
+	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
+	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
+	int ret;
+
+	mutex_lock(&ptp_data->lock);
+
+	ret = __ksz_ptp_settime(dev, ts);
+	if (ret)
+		goto unlock;
+
+	switch (ptp_data->tou_mode) {
+	case KSZ_PTP_TOU_IDLE:
+		break;
+
+	case KSZ_PTP_TOU_PEROUT:
+		ret = ksz8463_ptp_restart_perout(dev);
+		if (ret)
+			goto unlock;
+
+		break;
+	}
+
+	spin_lock_bh(&ptp_data->clock_lock);
+	ptp_data->clock_time = *ts;
+	spin_unlock_bh(&ptp_data->clock_lock);
+
+unlock:
+	mutex_unlock(&ptp_data->lock);
+
+	return ret;
 }
 
 static int ksz_ptp_settime(struct ptp_clock_info *ptp,
@@ -993,6 +1179,40 @@ static int __ksz_ptp_adjtime(struct ksz_device *dev, s64 delta)
 	return 0;
 }
 
+static int ksz8463_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
+{
+	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
+	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
+	struct timespec64 delta64 = ns_to_timespec64(delta);
+	int ret;
+
+	mutex_lock(&ptp_data->lock);
+
+	ret = __ksz_ptp_adjtime(dev, delta);
+	if (ret)
+		goto unlock;
+
+	switch (ptp_data->tou_mode) {
+	case KSZ_PTP_TOU_IDLE:
+		break;
+
+	case KSZ_PTP_TOU_PEROUT:
+		ret = ksz8463_ptp_restart_perout(dev);
+		if (ret)
+			goto unlock;
+
+		break;
+	}
+
+	spin_lock_bh(&ptp_data->clock_lock);
+	ptp_data->clock_time = timespec64_add(ptp_data->clock_time, delta64);
+	spin_unlock_bh(&ptp_data->clock_lock);
+
+unlock:
+	mutex_unlock(&ptp_data->lock);
+	return ret;
+}
+
 static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 {
 	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
@@ -1024,6 +1244,26 @@ static int ksz_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 
 unlock:
 	mutex_unlock(&ptp_data->lock);
+	return ret;
+}
+
+static int ksz8463_ptp_enable(struct ptp_clock_info *ptp,
+			      struct ptp_clock_request *req, int on)
+{
+	struct ksz_ptp_data *ptp_data = ptp_caps_to_data(ptp);
+	struct ksz_device *dev = ptp_data_to_ksz_dev(ptp_data);
+	int ret;
+
+	switch (req->type) {
+	case PTP_CLK_REQ_PEROUT:
+		mutex_lock(&ptp_data->lock);
+		ret = ksz8463_ptp_enable_perout(dev, &req->perout, on);
+		mutex_unlock(&ptp_data->lock);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
 	return ret;
 }
 
@@ -1101,6 +1341,27 @@ static int ksz_ptp_start_clock(struct ksz_device *dev)
 	ptp_data->clock_time.tv_nsec = 0;
 
 	return 0;
+}
+
+void ksz8463_ptp_set_caps(struct dsa_switch *ds)
+{
+	struct ksz_device *dev = ds->priv;
+	struct ksz_ptp_data *ptp_data;
+
+	ptp_data = &dev->ptp_data;
+
+	ptp_data->caps.owner		= THIS_MODULE;
+	snprintf(ptp_data->caps.name, 16, "Microchip Clock");
+	ptp_data->caps.max_adj		= KSZ_MAX_DRIFT_CORR;
+	ptp_data->caps.gettime64	= ksz_ptp_gettime;
+	ptp_data->caps.settime64	= ksz8463_ptp_settime;
+	ptp_data->caps.adjfine		= ksz_ptp_adjfine;
+	ptp_data->caps.adjtime		= ksz8463_ptp_adjtime;
+	ptp_data->caps.do_aux_work	= ksz_ptp_do_aux_work;
+	ptp_data->caps.enable		= ksz8463_ptp_enable;
+	ptp_data->caps.verify		= ksz_ptp_verify_pin;
+	ptp_data->caps.n_pins		= dev->info->n_pins;
+	ptp_data->caps.n_per_out	= dev->info->n_per_out;
 }
 
 void ksz_ptp_set_caps(struct dsa_switch *ds)

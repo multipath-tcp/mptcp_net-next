@@ -1175,6 +1175,8 @@ const struct ksz_chip_data ksz_switch_chips[] = {
 		.supports_mii = {false, false, true},
 		.supports_rmii = {false, false, true},
 		.internal_phy = {true, true, false},
+		.n_pins = 12,
+		.n_per_out = 12,
 	},
 
 	[KSZ8563] = {
