@@ -461,23 +461,21 @@ static u16 batadv_tt_flags_get(struct batadv_tt_common_entry *common)
 }
 
 /**
- * batadv_tt_local_event() - store a local TT event (ADD/DEL)
+ * __batadv_tt_local_event() - store a local TT event (ADD/DEL) with given flags
  * @bat_priv: the bat priv with all the mesh interface information
- * @tt_local_entry: the TT entry involved in the event
- * @event_flags: flags to store in the event structure
+ * @common: the TT entry involved in the event
+ * @flags: flags of the TT entry combined with the event flags
  */
-static void batadv_tt_local_event(struct batadv_priv *bat_priv,
-				  struct batadv_tt_local_entry *tt_local_entry,
-				  u8 event_flags)
+static void __batadv_tt_local_event(struct batadv_priv *bat_priv,
+				    const struct batadv_tt_common_entry *common,
+				    u8 flags)
 {
-	struct batadv_tt_common_entry *common = &tt_local_entry->common;
 	struct batadv_tt_change_node *tt_change_node;
 	struct batadv_tt_change_node *entry;
 	struct batadv_tt_change_node *safe;
 	bool del_op_requested;
 	bool del_op_entry;
 	size_t changes;
-	u8 flags;
 
 	tt_change_node = kmem_cache_alloc(batadv_tt_change_cache, GFP_ATOMIC);
 	if (!tt_change_node)
@@ -487,8 +485,6 @@ static void batadv_tt_local_event(struct batadv_priv *bat_priv,
 	       sizeof(tt_change_node->change.reserved));
 	ether_addr_copy(tt_change_node->change.addr, common->addr);
 	tt_change_node->change.vid = htons(common->vid);
-
-	flags = batadv_tt_flags_get(common) | event_flags;
 
 	tt_change_node->change.flags = flags;
 	del_op_requested = flags & BATADV_TT_CLIENT_DEL;
@@ -535,6 +531,23 @@ static void batadv_tt_local_event(struct batadv_priv *bat_priv,
 update_changes:
 	WRITE_ONCE(bat_priv->tt.local_changes, changes);
 	spin_unlock_bh(&bat_priv->tt.changes_list_lock);
+}
+
+/**
+ * batadv_tt_local_event() - store a local TT event (ADD/DEL)
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @tt_local_entry: the TT entry involved in the event
+ * @event_flags: flags to store in the event structure
+ */
+static void batadv_tt_local_event(struct batadv_priv *bat_priv,
+				  struct batadv_tt_local_entry *tt_local_entry,
+				  u8 event_flags)
+{
+	struct batadv_tt_common_entry *common = &tt_local_entry->common;
+	u8 flags;
+
+	flags = batadv_tt_flags_get(common) | event_flags;
+	__batadv_tt_local_event(bat_priv, common, flags);
 }
 
 /**
@@ -1420,28 +1433,37 @@ int batadv_tt_local_dump(struct sk_buff *msg, struct netlink_callback *cb)
 }
 
 /**
- * batadv_tt_local_set_pending_event() - trigger events for TT pending removal
+ * batadv_tt_local_set_pending() - mark local TT entry as pending removal
  * @bat_priv: the bat priv with all the mesh interface information
- * @tt_local_entry: local TT entry which was marked as BATADV_TT_CLIENT_PENDING
+ * @tt_local_entry: local TT entry to mark as BATADV_TT_CLIENT_PENDING
  * @flags: TT change flags to announce together with the pending removal
  * @message: debug message describing the reason for the change
  *
- * Schedule the TT change announcement for the entry. The caller must already
- * have added BATADV_TT_CLIENT_PENDING to the @tt_local_entry and must hold the
- * hash bucket list_lock of @tt_local_entry since setting the flag.
+ * Schedule the TT change announcement and set BATADV_TT_CLIENT_PENDING on the
+ * entry. The entry is kept in the local table until the next TTVN increment
+ * so that a consistency-check response can still be answered.
+ *
+ * Next to the flags_lock of the entry, the caller must hold the hash bucket
+ * list_lock of @tt_local_entry. Otherwise
+ * batadv_tt_local_purge_pending_clients() could remove the entry before its
+ * change was queued.
  */
 static void
-batadv_tt_local_set_pending_event(struct batadv_priv *bat_priv,
-				  struct batadv_tt_local_entry *tt_local_entry,
-				  u16 flags, const char *message)
+batadv_tt_local_set_pending(struct batadv_priv *bat_priv,
+			    struct batadv_tt_local_entry *tt_local_entry,
+			    u16 flags, const char *message)
+	__must_hold(&tt_local_entry->common.flags_lock)
 {
+	struct batadv_tt_common_entry *common = &tt_local_entry->common;
 	struct batadv_hashtable *hash = bat_priv->tt.local_hash;
 	u32 i;
 
-	i = batadv_choose_tt(&tt_local_entry->common, hash->size);
+	i = batadv_choose_tt(common, hash->size);
 	lockdep_assert_held(&hash->list_locks[i]);
+	lockdep_assert_held(&common->flags_lock);
 
-	batadv_tt_local_event(bat_priv, tt_local_entry, flags);
+	__batadv_tt_local_event(bat_priv, common, common->flags | flags);
+	common->flags |= BATADV_TT_CLIENT_PENDING;
 
 	batadv_dbg(BATADV_DBG_TT, bat_priv,
 		   "Local tt entry (%pM, vid: %d) pending to be removed: %s\n",
@@ -1460,7 +1482,8 @@ batadv_tt_local_set_pending_event(struct batadv_priv *bat_priv,
  * An already announced entry is marked as BATADV_TT_CLIENT_PENDING and the
  * (roamed) DEL change is queued. Both happen under the hash bucket list_lock
  * of the entry to prevent concurrent batadv_tt_local_purge_pending_clients()
- * from removing the entry.
+ * from removing the entry and batadv_tt_local_transition_new() from clearing
+ * BATADV_TT_CLIENT_NEW after it was checked.
  *
  * Return: true if the entry has to be kept in the local table until the next
  * ttvn increment, false if it can be purged immediately.
@@ -1492,19 +1515,16 @@ batadv_tt_local_mark_removed(struct batadv_priv *bat_priv,
 		if (roaming)
 			common->flags |= BATADV_TT_CLIENT_ROAM;
 
-		if (!(common->flags & BATADV_TT_CLIENT_NEW)) {
-			common->flags |= BATADV_TT_CLIENT_PENDING;
-			pending = true;
-		}
-	}
+		if (common->flags & BATADV_TT_CLIENT_NEW)
+			break;
 
-	if (pending) {
 		flags = BATADV_TT_CLIENT_DEL;
 		if (roaming)
 			flags |= BATADV_TT_CLIENT_ROAM;
 
-		batadv_tt_local_set_pending_event(bat_priv, tt_local_entry,
-						  flags, message);
+		batadv_tt_local_set_pending(bat_priv, tt_local_entry, flags,
+					    message);
+		pending = true;
 	}
 
 	spin_unlock_bh(list_lock);
@@ -1601,37 +1621,25 @@ static void batadv_tt_local_purge_list(struct batadv_priv *bat_priv,
 
 	hlist_for_each_entry_safe(tt_common_entry, node_tmp, head,
 				  hash_entry) {
-		bool cont = false;
-
 		tt_local_entry = container_of(tt_common_entry,
 					      struct batadv_tt_local_entry,
 					      common);
 
 		scoped_guard(spinlock_bh, &tt_local_entry->common.flags_lock) {
-			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_NOPURGE) {
-				cont = true;
+			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_NOPURGE)
 				break;
-			}
 
 			/* entry already marked for deletion */
-			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_PENDING) {
-				cont = true;
+			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_PENDING)
 				break;
-			}
 
-			if (!batadv_has_timed_out(tt_local_entry->last_seen, timeout)) {
-				cont = true;
+			if (!batadv_has_timed_out(tt_local_entry->last_seen, timeout))
 				break;
-			}
 
-			tt_local_entry->common.flags |= BATADV_TT_CLIENT_PENDING;
+			batadv_tt_local_set_pending(bat_priv, tt_local_entry,
+						    BATADV_TT_CLIENT_DEL,
+						    "timed out");
 		}
-
-		if (cont)
-			continue;
-
-		batadv_tt_local_set_pending_event(bat_priv, tt_local_entry,
-						  BATADV_TT_CLIENT_DEL, "timed out");
 	}
 }
 
