@@ -236,7 +236,10 @@ static int rds_rdma_listen_init_common(rdma_cm_event_handler handler,
 		goto out;
 	}
 
-	rdsdebug("cm %p listening on port %u\n", cm_id, RDS_PORT);
+	rdsdebug("cm %p listening on port %u\n", cm_id,
+		 ntohs(sa->sa_family == AF_INET6 ?
+		       ((struct sockaddr_in6 *)sa)->sin6_port :
+		       ((struct sockaddr_in *)sa)->sin_port));
 
 	*ret_cm_id = cm_id;
 	cm_id = NULL;
