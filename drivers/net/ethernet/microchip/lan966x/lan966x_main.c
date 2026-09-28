@@ -50,6 +50,7 @@ struct lan966x_main_io_resource {
 static const struct lan966x_main_io_resource lan966x_main_iomap[] =  {
 	{ TARGET_CPU,                   0xc0000, 0 }, /* 0xe00c0000 */
 	{ TARGET_FDMA,                  0xc0400, 0 }, /* 0xe00c0400 */
+	{ TARGET_PCIE_DBI,             0x400000, 0 }, /* 0xe0400000 */
 	{ TARGET_ORG,                         0, 1 }, /* 0xe2000000 */
 	{ TARGET_GCB,                    0x4000, 1 }, /* 0xe2004000 */
 	{ TARGET_QS,                     0x8000, 1 }, /* 0xe2008000 */
@@ -873,7 +874,8 @@ static int lan966x_probe_port(struct lan966x *lan966x, u32 p,
 
 	port->phylink = phylink;
 
-	if (lan966x->fdma)
+	/* XDP is not supported on the PCIe FDMA path. */
+	if (lan966x->fdma && !lan966x_is_pci(lan966x))
 		dev->xdp_features = NETDEV_XDP_ACT_BASIC |
 				    NETDEV_XDP_ACT_REDIRECT |
 				    NETDEV_XDP_ACT_NDO_XMIT;
@@ -1128,7 +1130,8 @@ static int lan966x_probe(struct platform_device *pdev)
 	lan966x->dev = &pdev->dev;
 	lan966x->dma_dev = lan966x_get_dma_dev(lan966x->dev);
 
-	lan966x->ops = &lan966x_fdma_ops;
+	lan966x->ops = lan966x_is_pci(lan966x) ? &lan966x_fdma_pci_ops :
+						 &lan966x_fdma_ops;
 
 	if (!device_get_mac_address(&pdev->dev, mac_addr)) {
 		ether_addr_copy(lan966x->base_mac, mac_addr);
@@ -1187,7 +1190,9 @@ static int lan966x_probe(struct platform_device *pdev)
 		if (err)
 			return dev_err_probe(&pdev->dev, err, "Unable to use ptp irq");
 
-		lan966x->ptp = 1;
+		/* PTP is not supported on the PCIe path yet. */
+		if (!lan966x_is_pci(lan966x))
+			lan966x->ptp = 1;
 	}
 
 	lan966x->fdma_irq = platform_get_irq_byname(pdev, "fdma");
