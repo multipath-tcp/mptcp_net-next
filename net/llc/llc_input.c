@@ -6,8 +6,6 @@
  * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  */
 #include <linux/netdevice.h>
-#include <linux/slab.h>
-#include <net/net_namespace.h>
 #include <net/llc.h>
 #include <net/llc_pdu.h>
 

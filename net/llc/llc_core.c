@@ -7,13 +7,10 @@
  */
 
 #include <linux/module.h>
-#include <linux/interrupt.h>
 #include <linux/if_ether.h>
 #include <linux/netdevice.h>
 #include <linux/slab.h>
-#include <linux/string.h>
 #include <linux/init.h>
-#include <net/net_namespace.h>
 #include <net/llc.h>
 
 static LIST_HEAD(llc_sap_list);
