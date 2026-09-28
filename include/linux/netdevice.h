@@ -5323,7 +5323,6 @@ void netdev_lower_state_changed(struct net_device *lower_dev,
 				void *lower_state_info);
 
 #define NETDEV_RSS_KEY_LEN 256
-extern u8 netdev_rss_key[NETDEV_RSS_KEY_LEN] __read_mostly;
 void netdev_rss_key_fill(void *buffer, size_t len);
 
 int skb_checksum_help(struct sk_buff *skb);
