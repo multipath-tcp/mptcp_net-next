@@ -20,15 +20,15 @@ static int lan966x_xdp_setup(struct net_device *dev, struct netdev_bpf *xdp)
 		return -EOPNOTSUPP;
 	}
 
-	if (lan966x_is_pci(lan966x)) {
-		NL_SET_ERR_MSG_MOD(xdp->extack,
-				   "XDP is not supported on the PCIe FDMA path");
-		return -EOPNOTSUPP;
-	}
-
 	old_xdp = lan966x_xdp_present(lan966x);
 	old_prog = xchg(&port->xdp_prog, xdp->prog);
 	new_xdp = lan966x_xdp_present(lan966x);
+
+	/* PCIe FDMA uses contiguous buffers, so no page_pool reload
+	 * is needed.
+	 */
+	if (lan966x_is_pci(lan966x))
+		goto out;
 
 	if (old_xdp == new_xdp)
 		goto out;
