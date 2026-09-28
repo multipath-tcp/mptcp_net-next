@@ -233,7 +233,10 @@ int dpaa2_eth_dl_port_add(struct dpaa2_eth_priv *priv)
 	priv->dl_port_valid = true;
 	mutex_unlock(&priv->mac_lock);
 
-	attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
+	if (port_number)
+		attrs.flavour = DEVLINK_PORT_FLAVOUR_PHYSICAL;
+	else
+		attrs.flavour = DEVLINK_PORT_FLAVOUR_VIRTUAL;
 	attrs.phys.port_number = port_number;
 	devlink_port_attrs_set(devlink_port, &attrs);
 	err = devlink_port_register(priv->devlink, devlink_port, 0);
