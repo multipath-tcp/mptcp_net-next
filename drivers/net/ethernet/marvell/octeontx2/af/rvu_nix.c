@@ -324,15 +324,23 @@ static bool is_valid_txschq(struct rvu *rvu, int blkaddr,
 	if (lvl >= hw->cap.nix_tx_aggr_lvl) {
 		if ((nix_get_tx_link(rvu, map_func) !=
 		     nix_get_tx_link(rvu, pcifunc)) &&
-		     (rvu_get_pf(rvu->pdev, map_func) !=
-				rvu_get_pf(rvu->pdev, pcifunc)))
+		    (rvu_get_pf(rvu->pdev, map_func) !=
+		     rvu_get_pf(rvu->pdev, pcifunc))) {
+			dev_err_ratelimited(rvu->dev,
+					    "NIX TX schq %u lvl %d: pcifunc %x PF/link mismatch\n",
+					    schq, lvl, pcifunc);
 			return false;
-		else
+		} else {
 			return true;
+		}
 	}
 
-	if (map_func != pcifunc)
+	if (map_func != pcifunc) {
+		dev_err_ratelimited(rvu->dev,
+				    "NIX TX schq %u lvl %d: not owned by pcifunc %x\n",
+				    schq, lvl, pcifunc);
 		return false;
+	}
 
 	return true;
 }
