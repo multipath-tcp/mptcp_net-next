@@ -193,6 +193,17 @@ enum vcap_is1_port_sel_rt {
 	VCAP_IS1_PS_RT_FOLLOW_OTHER = 7,
 };
 
+struct lan966x;
+
+struct lan966x_fdma_ops {
+	int (*fdma_init)(struct lan966x *lan966x);
+	void (*fdma_deinit)(struct lan966x *lan966x);
+	int (*fdma_xmit)(struct sk_buff *skb, __be32 *ifh,
+			 struct net_device *dev);
+	int (*fdma_poll)(struct napi_struct *napi, int weight);
+	int (*fdma_resize)(struct lan966x *lan966x);
+};
+
 struct lan966x_port;
 
 struct lan966x_rx {
@@ -272,6 +283,8 @@ struct lan966x {
 
 	/* Device used for DMA; the PCIe endpoint when enumerated over PCIe. */
 	struct device *dma_dev;
+
+	const struct lan966x_fdma_ops *ops;
 
 	u8 num_phys_ports;
 	struct lan966x_port **ports;
