@@ -7,6 +7,8 @@
 #include <linux/etherdevice.h>
 #include <linux/types.h>
 
+#include "fdma_pci.h"
+
 /* This provides a common set of functions and data structures for interacting
  * with the Frame DMA engine on multiple Microchip switchcores.
  *
@@ -109,6 +111,11 @@ struct fdma {
 	u32 channel_id;
 
 	struct fdma_ops ops;
+
+#if IS_ENABLED(CONFIG_MCHP_LAN966X_PCI)
+	/* PCI ATU region for this FDMA instance. */
+	struct fdma_pci_atu_region *atu_region;
+#endif
 };
 
 /* Advance the DCB index and wrap if required. */
@@ -233,9 +240,16 @@ int __fdma_dcb_add(struct fdma *fdma, int dcb_idx, u64 info, u64 status,
 
 int fdma_alloc_coherent(struct device *dev, struct fdma *fdma);
 int fdma_alloc_phys(struct fdma *fdma);
+#if IS_ENABLED(CONFIG_MCHP_LAN966X_PCI)
+int fdma_alloc_coherent_and_map(struct device *dev, struct fdma *fdma,
+				struct fdma_pci_atu *atu);
+#endif
 
 void fdma_free_coherent(struct device *dev, struct fdma *fdma);
 void fdma_free_phys(struct fdma *fdma);
+#if IS_ENABLED(CONFIG_MCHP_LAN966X_PCI)
+void fdma_free_coherent_and_unmap(struct device *dev, struct fdma *fdma);
+#endif
 
 u32 fdma_get_size(struct fdma *fdma);
 u32 fdma_get_size_contiguous(struct fdma *fdma);

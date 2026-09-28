@@ -127,6 +127,50 @@ void fdma_free_phys(struct fdma *fdma)
 }
 EXPORT_SYMBOL_GPL(fdma_free_phys);
 
+#if IS_ENABLED(CONFIG_MCHP_LAN966X_PCI)
+/* Allocate coherent DMA memory and map it in the ATU. */
+int fdma_alloc_coherent_and_map(struct device *dev, struct fdma *fdma,
+				struct fdma_pci_atu *atu)
+{
+	struct fdma_pci_atu_region *region;
+	int err;
+
+	if (WARN_ON(fdma->atu_region))
+		return -EBUSY;
+
+	/* The ATU cannot express a limit finer than the region granularity, so
+	 * the hardware widens the programmed limit to that boundary. Pad the
+	 * allocation to match, or the outbound window would extend past the
+	 * memory we own.
+	 */
+	fdma->size = ALIGN(fdma->size, FDMA_PCI_ATU_REGION_ALIGN);
+
+	err = fdma_alloc_coherent(dev, fdma);
+	if (err)
+		return err;
+
+	region = fdma_pci_atu_region_map(atu, fdma->dma, fdma->size);
+	if (IS_ERR(region)) {
+		fdma_free_coherent(dev, fdma);
+		return PTR_ERR(region);
+	}
+
+	fdma->atu_region = region;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(fdma_alloc_coherent_and_map);
+
+/* Free coherent DMA memory and unmap the memory in the ATU. */
+void fdma_free_coherent_and_unmap(struct device *dev, struct fdma *fdma)
+{
+	fdma_pci_atu_region_unmap(fdma->atu_region);
+	fdma->atu_region = NULL;
+	fdma_free_coherent(dev, fdma);
+}
+EXPORT_SYMBOL_GPL(fdma_free_coherent_and_unmap);
+#endif
+
 /* Get the size of the FDMA memory */
 u32 fdma_get_size(struct fdma *fdma)
 {
