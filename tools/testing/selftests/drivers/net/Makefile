@@ -25,6 +25,7 @@ TEST_PROGS := \
 	psp.py \
 	queues.py \
 	ring_reconfig.py \
+	rss_key.py \
 	shaper.py \
 	so_txtime.py \
 	stats.py \
