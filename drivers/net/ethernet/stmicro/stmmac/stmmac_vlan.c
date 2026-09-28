@@ -162,7 +162,7 @@ static void vlan_restore_hw_rx_fltr(struct net_device *dev,
 }
 
 static void vlan_update_hash(struct mac_device_info *hw, u32 hash,
-			     bool is_double)
+			     bool is_svlan)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value;
@@ -173,7 +173,7 @@ static void vlan_update_hash(struct mac_device_info *hw, u32 hash,
 
 	if (hash) {
 		value |= VLAN_VTHM | VLAN_ETV;
-		if (is_double) {
+		if (is_svlan) {
 			value |= VLAN_ESVL;
 			value |= VLAN_DOVLTC;
 		} else {
@@ -235,7 +235,7 @@ static void vlan_set_hw_mode(struct mac_device_info *hw)
 }
 
 static void dwxgmac2_update_vlan_hash(struct mac_device_info *hw, u32 hash,
-				      bool is_double)
+				      bool is_svlan)
 {
 	void __iomem *ioaddr = hw->pcsr;
 
@@ -251,7 +251,7 @@ static void dwxgmac2_update_vlan_hash(struct mac_device_info *hw, u32 hash,
 		value = readl(ioaddr + VLAN_TAG);
 
 		value |= VLAN_VTHM | VLAN_ETV;
-		if (is_double) {
+		if (is_svlan) {
 			value |= VLAN_ESVL;
 			value |= VLAN_DOVLTC;
 		} else {
