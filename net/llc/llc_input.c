@@ -11,7 +11,6 @@
 #include <net/net_namespace.h>
 #include <net/llc.h>
 #include <net/llc_pdu.h>
-#include <net/llc_sap.h>
 
 #if 0
 #define dprintk(args...) printk(KERN_DEBUG args)
