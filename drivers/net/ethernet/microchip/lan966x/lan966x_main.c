@@ -823,7 +823,8 @@ static int lan966x_probe_port(struct lan966x *lan966x, u32 p,
 	port->chip_port = p;
 	lan966x->ports[p] = port;
 
-	dev->max_mtu = ETH_MAX_MTU;
+	dev->max_mtu = lan966x_is_pci(lan966x) && lan966x->fdma ?
+		       FDMA_PCI_MAX_MTU : ETH_MAX_MTU;
 
 	dev->netdev_ops = &lan966x_port_netdev_ops;
 	dev->ethtool_ops = &lan966x_ethtool_ops;

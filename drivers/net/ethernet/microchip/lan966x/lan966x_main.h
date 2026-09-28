@@ -7,6 +7,7 @@
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/jiffies.h>
+#include <linux/mmzone.h>
 #include <linux/phy.h>
 #include <linux/phylink.h>
 #include <linux/ptp_clock_kernel.h>
@@ -86,6 +87,33 @@
 #define FDMA_XTR_CHANNEL		6
 #define FDMA_INJ_CHANNEL		0
 #define FDMA_DCB_MAX			512
+
+/* Ring must fit in one MAX_PAGE_ORDER DMA block; 512 DCBs overflows
+ * at jumbo MTU.
+ */
+#define FDMA_PCI_DCB_MAX		256
+
+#define FDMA_OVERHEAD							\
+	(IFH_LEN_BYTES +						\
+	 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) +		\
+	 VLAN_HLEN * 2 +						\
+	 XDP_PACKET_HEADROOM)
+
+/* Largest db_size keeping the ATU-padded ring inside one MAX_PAGE_ORDER
+ * block and within the 16-bit DCB DATAL field. Inverts ALIGN(x, R) <= L
+ * into x <= ALIGN_DOWN(L, R) to bound x directly.
+ */
+#define FDMA_PCI_DB_SIZE_MAX						\
+	MIN_T(u32,							\
+	      (ALIGN_DOWN(PAGE_SIZE << MAX_PAGE_ORDER,			\
+			  FDMA_PCI_ATU_REGION_ALIGN) -			\
+	       FDMA_PCI_DCB_MAX * sizeof(struct fdma_dcb)) /		\
+	      (FDMA_PCI_DCB_MAX * FDMA_RX_DCB_MAX_DBS),			\
+	      ALIGN_DOWN(GENMASK(15, 0), FDMA_PCI_DB_ALIGN))
+
+#define FDMA_PCI_MAX_MTU						\
+	(FDMA_PCI_DB_SIZE_MAX - FDMA_OVERHEAD -				\
+	 (ETH_HLEN + ETH_FCS_LEN))
 
 #define SE_IDX_QUEUE			0  /* 0-79 : Queue scheduler elements */
 #define SE_IDX_PORT			80 /* 80-89 : Port schedular elements */

@@ -890,11 +890,7 @@ restore:
 
 int lan966x_fdma_get_max_frame(struct lan966x *lan966x)
 {
-	return lan966x_fdma_get_max_mtu(lan966x) +
-	       IFH_LEN_BYTES +
-	       SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) +
-	       VLAN_HLEN * 2 +
-	       XDP_PACKET_HEADROOM;
+	return lan966x_fdma_get_max_mtu(lan966x) + FDMA_OVERHEAD;
 }
 
 static int __lan966x_fdma_reload(struct lan966x *lan966x, int max_mtu)
