@@ -7982,7 +7982,7 @@ ieee80211_mgd_check_cross_link_csa(struct ieee80211_sub_if_data *sdata,
 	subelems = (u8 *)elems->ml_basic + common_size;
 	subelems_len = elems->ml_basic_len - common_size;
 
-	for_each_element_id(sub, IEEE80211_MLE_SUBELEM_PER_STA_PROFILE,
+	for_each_element_id(sub, (u8)IEEE80211_MLE_SUBELEM_PER_STA_PROFILE,
 			    subelems, subelems_len) {
 		struct ieee80211_mle_per_sta_profile *prof = (void *)sub->data;
 		struct ieee80211_link_data *link;

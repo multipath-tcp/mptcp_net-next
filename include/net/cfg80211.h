@@ -7858,7 +7858,8 @@ unsigned int cfg80211_classify8021d(struct sk_buff *skb,
  * byte array to match.
  */
 const struct element *
-cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
+cfg80211_find_elem_match(enum ieee80211_eid eid,
+			 const u8 *ies, unsigned int len,
 			 const u8 *match, unsigned int match_len,
 			 unsigned int match_offset);
 
@@ -7887,7 +7888,7 @@ cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
  * byte array to match.
  */
 static inline const u8 *
-cfg80211_find_ie_match(u8 eid, const u8 *ies, unsigned int len,
+cfg80211_find_ie_match(enum ieee80211_eid eid, const u8 *ies, unsigned int len,
 		       const u8 *match, unsigned int match_len,
 		       unsigned int match_offset)
 {
@@ -7920,7 +7921,7 @@ cfg80211_find_ie_match(u8 eid, const u8 *ies, unsigned int len,
  * having to fit into the given data.
  */
 static inline const struct element *
-cfg80211_find_elem(u8 eid, const u8 *ies, int len)
+cfg80211_find_elem(enum ieee80211_eid eid, const u8 *ies, int len)
 {
 	return cfg80211_find_elem_match(eid, ies, len, NULL, 0, 0);
 }
@@ -7940,7 +7941,8 @@ cfg80211_find_elem(u8 eid, const u8 *ies, int len)
  * Note: There are no checks on the element length other than
  * having to fit into the given data.
  */
-static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
+static inline const u8 *cfg80211_find_ie(enum ieee80211_eid eid,
+					 const u8 *ies, int len)
 {
 	return cfg80211_find_ie_match(eid, ies, len, NULL, 0, 0);
 }
@@ -7961,10 +7963,13 @@ static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
  * having to fit into the given data.
  */
 static inline const struct element *
-cfg80211_find_ext_elem(u8 ext_eid, const u8 *ies, int len)
+cfg80211_find_ext_elem(enum ieee80211_eid_ext ext_eid,
+		       const u8 *ies, int len)
 {
+	u8 _ext_eid = ext_eid;
+
 	return cfg80211_find_elem_match(WLAN_EID_EXTENSION, ies, len,
-					&ext_eid, 1, 0);
+					&_ext_eid, 1, 0);
 }
 
 /**
