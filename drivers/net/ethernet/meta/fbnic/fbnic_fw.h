@@ -55,6 +55,10 @@ enum {
 	FBNIC_FW_CAP_F_BMC_MACDA_SYNC,
 };
 
+#define FBNIC_FW_CAP_BMC_PENDING	\
+	(BIT(FBNIC_FW_CAP_F_BMC_TCAM_REINIT) |	\
+	 BIT(FBNIC_FW_CAP_F_BMC_MACDA_SYNC))
+
 struct fbnic_fw_cap {
 	unsigned long state;
 	struct {
