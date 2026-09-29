@@ -575,7 +575,7 @@ static int netdev_lock_cmp_fn(const struct lockdep_map *a,
 	if (a == b)
 		return 0;
 
-	/* @a and @b must be of same class - both virtual or physical.
+	/* @a and @b are of same lock class.
 	 * cmp_fn won't be called for devices of different classes.
 	 *
 	 * For the same class only allow nesting under the protection
@@ -589,12 +589,13 @@ static int netdev_lock_cmp_fn(const struct lockdep_map *a,
  * queues from, see netdev_nl_queue_create_doit(). Keep the two kinds
  * in separate classes so the dependency graph enforces the order;
  * netdev_lock_cmp_fn() then only has to rule on same-class nesting.
+ * Other virtual devices stay in the default class.
  */
 void netdev_set_instance_lock_class(struct net_device *dev)
 {
 	static struct lock_class_key netdev_virt_instance_lock_key;
 
-	if (dev->dev.parent)
+	if (!netdev_can_create_queue(dev, NULL))
 		return;
 
 	lockdep_set_class(&dev->lock, &netdev_virt_instance_lock_key);
@@ -12462,19 +12463,31 @@ static void netif_close_many_and_unlock(struct list_head *close_head)
 	}
 }
 
-static void netif_close_many_and_unlock_cond(struct list_head *close_head)
+/* Handle one class of ops-locked devices. Since close requires the lock
+ * we need to be careful about which classes we allow to nest.
+ */
+static void netdev_lock_ops_close_many(struct list_head *head,
+				       struct list_head *close_head,
+				       bool leasing)
 {
-#ifdef CONFIG_LOCKDEP
-	/* We can only track up to MAX_LOCK_DEPTH locks per task.
-	 *
-	 * Reserve half the available slots for additional locks possibly
-	 * taken by notifiers and (soft)irqs.
-	 */
-	unsigned int limit = MAX_LOCK_DEPTH / 2;
+	struct net_device *dev;
 
-	if (lockdep_depth(current) > limit)
-		netif_close_many_and_unlock(close_head);
+	list_for_each_entry(dev, head, unreg_list) {
+		if (!(dev->flags & IFF_UP) || !netdev_need_ops_lock(dev) ||
+		    netdev_can_create_queue(dev, NULL) != leasing)
+			continue;
+		list_add_tail(&dev->close_list, close_head);
+		netdev_lock(dev);
+
+#ifdef CONFIG_LOCKDEP
+		/* We can only track up to MAX_LOCK_DEPTH locks per task.
+		 * Reserve half the available slots for additional locks
+		 * possibly taken by notifiers and (soft)irqs.
+		 */
+		if (lockdep_depth(current) > MAX_LOCK_DEPTH / 2)
+			netif_close_many_and_unlock(close_head);
 #endif
+	}
 }
 
 bool unregister_netdevice_queued(const struct net_device *dev)
@@ -12514,15 +12527,8 @@ void unregister_netdevice_many_notify(struct list_head *head,
 	}
 
 	/* If device is running, close it first. Start with ops locked... */
-	list_for_each_entry(dev, head, unreg_list) {
-		if (!(dev->flags & IFF_UP))
-			continue;
-		if (netdev_need_ops_lock(dev)) {
-			list_add_tail(&dev->close_list, &close_head);
-			netdev_lock(dev);
-		}
-		netif_close_many_and_unlock_cond(&close_head);
-	}
+	netdev_lock_ops_close_many(head, &close_head, true); /* queue leasing */
+	netdev_lock_ops_close_many(head, &close_head, false); /* the rest */
 	netif_close_many_and_unlock(&close_head);
 	/* ... now go over the rest. */
 	list_for_each_entry(dev, head, unreg_list) {
