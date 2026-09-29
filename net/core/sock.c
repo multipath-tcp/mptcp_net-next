@@ -2969,8 +2969,15 @@ void sk_set_nospace(struct sock *sk)
 {
 	struct socket *sock = sk->sk_socket;
 
-	if (sock)
-		set_bit(SOCK_NOSPACE, &sock->flags);
+	if (!sock)
+		return;
+	/* Set SOCK_NOSPACE before tp->tcp_nospace (paired with
+	 * sk_clear_nospace() clearing tp->tcp_nospace before SOCK_NOSPACE)
+	 * so a concurrent clear cannot leave SOCK_NOSPACE set with
+	 * tp->tcp_nospace cleared.
+	 */
+	set_bit(SOCK_NOSPACE, &sock->flags);
+	tcp_set_nospace(sk);
 }
 EXPORT_SYMBOL(sk_set_nospace);
 
@@ -2985,8 +2992,10 @@ void sk_clear_nospace(struct sock *sk)
 {
 	struct socket *sock = sk->sk_socket;
 
-	if (sock)
-		clear_bit(SOCK_NOSPACE, &sock->flags);
+	if (!sock)
+		return;
+	tcp_clear_nospace(sk);
+	clear_bit(SOCK_NOSPACE, &sock->flags);
 }
 EXPORT_SYMBOL(sk_clear_nospace);
 
