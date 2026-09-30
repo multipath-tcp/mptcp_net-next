@@ -33,11 +33,6 @@ struct mlx5_data_direct_resources {
 int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev);
 void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev);
 
-int mlx5_data_direct_query_vuid(struct mlx5_core_dev *dev, char *out_vuid);
-int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid,
-			    struct notifier_block *nb);
-void mlx5_data_direct_ib_unreg(struct mlx5_ib_dev *ibdev,
-			       struct notifier_block *nb);
 int mlx5_data_direct_driver_register(void);
 void mlx5_data_direct_driver_unregister(void);
 

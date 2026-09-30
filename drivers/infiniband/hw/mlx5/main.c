@@ -3945,33 +3945,41 @@ static int mlx5_ib_data_direct_event(struct notifier_block *nb,
 	struct mlx5_ib_dev *dev =
 		container_of(nb, struct mlx5_ib_dev, data_direct_nb);
 
-	if (action == MLX5_DATA_DIRECT_UNBIND)
-		mlx5_ib_data_direct_unbind(dev);
+	if (action != MLX5_DATA_DIRECT_UNBIND)
+		return NOTIFY_DONE;
+
+	mlx5_ib_revoke_data_direct_mrs(dev);
 
 	return NOTIFY_OK;
 }
 
 static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 {
-	char vuid[MLX5_ST_SZ_BYTES(array1024_auto) + 1] = {};
 	int ret;
 
 	if (!mlx5_data_direct_supported(dev->mdev))
 		return 0;
 
-	ret = mlx5_data_direct_query_vuid(dev->mdev, vuid);
+	ret = mlx5_data_direct_init(dev);
 	if (ret)
 		return ret;
 
 	ret = mlx5_data_direct_create_resources(dev);
 	if (ret)
-		return ret;
+		goto err_resources;
 
 	INIT_LIST_HEAD(&dev->data_direct_mr_list);
 	dev->data_direct_nb.notifier_call = mlx5_ib_data_direct_event;
-	ret = mlx5_data_direct_ib_reg(dev, vuid, &dev->data_direct_nb);
+	ret = mlx5_data_direct_register(dev, &dev->data_direct_nb);
 	if (ret)
-		mlx5_data_direct_free_resources(dev);
+		goto err_register;
+
+	return ret;
+
+err_register:
+	mlx5_data_direct_free_resources(dev);
+err_resources:
+	mlx5_data_direct_cleanup(dev);
 
 	return ret;
 }
@@ -3981,8 +3989,9 @@ static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 	if (!mlx5_data_direct_supported(dev->mdev))
 		return;
 
-	mlx5_data_direct_ib_unreg(dev, &dev->data_direct_nb);
+	mlx5_data_direct_unregister(dev, &dev->data_direct_nb);
 	mlx5_data_direct_free_resources(dev);
+	mlx5_data_direct_cleanup(dev);
 }
 
 static int mlx5_ib_init_multiport_master(struct mlx5_ib_dev *dev)
@@ -5006,22 +5015,6 @@ static void mlx5_ib_stage_dev_notifier_cleanup(struct mlx5_ib_dev *dev)
 
 	for (port = 0; port < ARRAY_SIZE(devr->ports); ++port)
 		cancel_work_sync(&devr->ports[port].pkey_change_work);
-}
-
-void mlx5_ib_data_direct_bind(struct mlx5_ib_dev *ibdev,
-			      struct mlx5_data_direct_dev *dev)
-{
-	mutex_lock(&ibdev->data_direct_lock);
-	ibdev->data_direct_dev = dev;
-	mutex_unlock(&ibdev->data_direct_lock);
-}
-
-void mlx5_ib_data_direct_unbind(struct mlx5_ib_dev *ibdev)
-{
-	mutex_lock(&ibdev->data_direct_lock);
-	mlx5_ib_revoke_data_direct_mrs(ibdev);
-	ibdev->data_direct_dev = NULL;
-	mutex_unlock(&ibdev->data_direct_lock);
 }
 
 void __mlx5_ib_remove(struct mlx5_ib_dev *dev,
