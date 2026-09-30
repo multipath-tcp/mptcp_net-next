@@ -203,7 +203,7 @@ static int UVERBS_HANDLER(MLX5_IB_METHOD_GET_DATA_DIRECT_SYSFS_PATH)(
 		return PTR_ERR(c);
 	dev = to_mdev(c->ibucontext.device);
 	mutex_lock(&dev->data_direct_lock);
-	data_direct_dev = dev->data_direct_dev;
+	data_direct_dev = READ_ONCE(dev->data_direct_dev);
 	if (!data_direct_dev) {
 		ret = -ENODEV;
 		goto end;

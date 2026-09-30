@@ -997,7 +997,7 @@ reg_user_mr_dmabuf_by_data_direct(struct ib_pd *pd, u64 offset,
 		return ERR_PTR(-EOPNOTSUPP);
 
 	mutex_lock(&dev->data_direct_lock);
-	data_direct_dev = dev->data_direct_dev;
+	data_direct_dev = READ_ONCE(dev->data_direct_dev);
 	if (!data_direct_dev) {
 		ret = -EINVAL;
 		goto end;

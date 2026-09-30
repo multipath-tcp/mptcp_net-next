@@ -3948,7 +3948,9 @@ static int mlx5_ib_data_direct_event(struct notifier_block *nb,
 	if (action != MLX5_DATA_DIRECT_UNBIND)
 		return NOTIFY_DONE;
 
+	mutex_lock(&dev->data_direct_lock);
 	mlx5_ib_revoke_data_direct_mrs(dev);
+	mutex_unlock(&dev->data_direct_lock);
 
 	return NOTIFY_OK;
 }

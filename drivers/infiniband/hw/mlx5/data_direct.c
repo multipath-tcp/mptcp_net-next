@@ -197,9 +197,7 @@ mlx5_data_direct_get_reg(struct mlx5_ib_dev *ibdev)
 static void mlx5_data_direct_bind(struct mlx5_ib_dev *ibdev,
 				  struct mlx5_data_direct_dev *dev)
 {
-	mutex_lock(&ibdev->data_direct_lock);
-	ibdev->data_direct_dev = dev;
-	mutex_unlock(&ibdev->data_direct_lock);
+	WRITE_ONCE(ibdev->data_direct_dev, dev);
 }
 
 static void
@@ -207,11 +205,9 @@ mlx5_data_direct_do_unbind(struct mlx5_data_direct_registration *reg)
 {
 	struct mlx5_ib_dev *ibdev = reg->ibdev;
 
-	mutex_lock(&ibdev->data_direct_lock);
+	WRITE_ONCE(ibdev->data_direct_dev, NULL);
 	blocking_notifier_call_chain(&reg->users, MLX5_DATA_DIRECT_UNBIND,
 				     NULL);
-	ibdev->data_direct_dev = NULL;
-	mutex_unlock(&ibdev->data_direct_lock);
 }
 
 int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)

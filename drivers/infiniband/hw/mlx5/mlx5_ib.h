@@ -1092,7 +1092,9 @@ struct mlx5_ib_dev {
 	struct ib_device		ib_dev;
 	struct mlx5_core_dev		*mdev;
 	struct mlx5_data_direct_dev	*data_direct_dev;
-	/* protect accessing data_direct_dev */
+	/* Protects data_direct_mr_list and serializes mr
+	 * registration/deregistration with data direct device unbind.
+	 */
 	struct mutex			data_direct_lock;
 	struct notifier_block		mdev_events;
 	struct notifier_block		sys_error_events;
