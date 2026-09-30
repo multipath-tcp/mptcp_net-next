@@ -4036,8 +4036,7 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	char vuid[MLX5_ST_SZ_BYTES(array1024_auto) + 1] = {};
 	int ret;
 
-	if (!MLX5_CAP_GEN(dev->mdev, data_direct) ||
-	    !MLX5_CAP_GEN_2(dev->mdev, query_vuid))
+	if (!mlx5_data_direct_supported(dev->mdev))
 		return 0;
 
 	ret = mlx5_cmd_query_vuid(dev->mdev, true, vuid);
@@ -4059,8 +4058,7 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 
 static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 {
-	if (!MLX5_CAP_GEN(dev->mdev, data_direct) ||
-	    !MLX5_CAP_GEN_2(dev->mdev, query_vuid))
+	if (!mlx5_data_direct_supported(dev->mdev))
 		return;
 
 	mlx5_data_direct_ib_unreg(dev, &dev->data_direct_nb);

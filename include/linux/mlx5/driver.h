@@ -1395,4 +1395,10 @@ static inline struct net *mlx5_core_net(struct mlx5_core_dev *dev)
 
 #define MLX5_SW_IMAGE_GUID_MAX_BYTES 9
 
+static inline bool mlx5_data_direct_supported(struct mlx5_core_dev *mdev)
+{
+	return MLX5_CAP_GEN(mdev, data_direct) &&
+	       MLX5_CAP_GEN_2(mdev, query_vuid);
+}
+
 #endif /* MLX5_DRIVER_H */
