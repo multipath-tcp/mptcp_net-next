@@ -1047,6 +1047,8 @@ out:
 void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 {
 	struct sock *sk = (struct sock *)msk;
+	u64 local_idsn = 0, remote_idsn = 0;
+	struct sock *first;
 	u32 flags = 0;
 	bool slow;
 	u32 now;
@@ -1084,9 +1086,37 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	info->mptcpi_flags = flags;
 
 	slow = lock_sock_fast(sk);
+	/* msk->first is only ever NULL once the whole msk is already in
+	 * TCP_CLOSE (see __mptcp_close_ssk()); mptcp_close() holds the same
+	 * sk lock this function acquires via lock_sock_fast(), so no caller
+	 * can observe that transition mid-flight. If it does happen, write_seq
+	 * and snd_una below are just left unnormalized, which is harmless
+	 * since the socket is already gone.
+	 *
+	 * first is snapshotted once here, rather than re-read later, so
+	 * local_idsn and remote_idsn below both come from the same subflow
+	 * and stay consistent with each other even if msk->first changes
+	 * between the two normalizations. __mptcp_close_ssk() can drop the
+	 * last reference on this subflow (sock_put()) before it clears
+	 * msk->first, so refcount_inc_not_zero() is used instead of
+	 * sock_hold(): if the count has already reached zero, first is
+	 * treated the same as NULL instead of resurrecting a dying socket.
+	 * On success, the extra reference keeps the subflow context alive
+	 * for the rest of this function; it is released with sock_put() at
+	 * the end.
+	 */
+	rcu_read_lock();
+	first = READ_ONCE(msk->first);
+	if (first && !refcount_inc_not_zero(&first->sk_refcnt))
+		first = NULL;
+	rcu_read_unlock();
+
+	if (first)
+		local_idsn = mptcp_subflow_ctx(first)->idsn;
+
 	info->mptcpi_csum_enabled = READ_ONCE(msk->csum_enabled);
 	info->mptcpi_token = msk->token;
-	info->mptcpi_write_seq = msk->write_seq;
+	info->mptcpi_write_seq = msk->write_seq - local_idsn;
 	info->mptcpi_retransmits = inet_csk(sk)->icsk_retransmits;
 	info->mptcpi_bytes_sent = msk->bytes_sent;
 	info->mptcpi_bytes_received = msk->bytes_received;
@@ -1099,11 +1129,28 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	unlock_sock_fast(sk, slow);
 
 	mptcp_data_lock(sk);
+	if (first) {
+		struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(first);
+
+		/* subflow->iasn is incremented once in subflow_set_remote_key(),
+		 * which runs under this same mptcp_data_lock() (see
+		 * mptcp_propagate_state()); compute remote_idsn here, under the
+		 * same lock as the writer, and atomically with ack_seq below.
+		 * first is the same held reference from earlier in this
+		 * function, so it is guaranteed to still be valid here and to
+		 * be the same subflow local_idsn was computed from above.
+		 */
+		remote_idsn = subflow->remote_key_valid ? subflow->iasn - 1 : 0;
+	}
+
 	info->mptcpi_last_ack_recv = jiffies_to_msecs(now - msk->last_ack_recv);
-	info->mptcpi_snd_una = msk->snd_una;
-	info->mptcpi_rcv_nxt = msk->ack_seq;
+	info->mptcpi_snd_una = msk->snd_una - local_idsn;
+	info->mptcpi_rcv_nxt = msk->ack_seq - remote_idsn;
 	info->mptcpi_bytes_acked = msk->bytes_acked;
 	mptcp_data_unlock(sk);
+
+	if (first)
+		sock_put(first);
 }
 EXPORT_SYMBOL_GPL(mptcp_diag_fill_info);
 
