@@ -3966,10 +3966,6 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	if (ret)
 		return ret;
 
-	ret = mlx5_data_direct_create_resources(dev);
-	if (ret)
-		goto err_resources;
-
 	INIT_LIST_HEAD(&dev->data_direct_mr_list);
 	dev->data_direct_nb.notifier_call = mlx5_ib_data_direct_event;
 	ret = mlx5_data_direct_register(dev, &dev->data_direct_nb);
@@ -3979,8 +3975,6 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	return ret;
 
 err_register:
-	mlx5_data_direct_free_resources(dev);
-err_resources:
 	mlx5_data_direct_cleanup(dev);
 
 	return ret;
@@ -3992,7 +3986,6 @@ static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 		return;
 
 	mlx5_data_direct_unregister(dev, &dev->data_direct_nb);
-	mlx5_data_direct_free_resources(dev);
 	mlx5_data_direct_cleanup(dev);
 }
 

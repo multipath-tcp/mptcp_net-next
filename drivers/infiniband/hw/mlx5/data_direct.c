@@ -103,7 +103,7 @@ static int mlx5_data_direct_set_dma_caps(struct pci_dev *pdev)
 	return 0;
 }
 
-int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
+static int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
 {
 	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
 	struct mlx5_core_dev *mdev = dev->mdev;
@@ -172,15 +172,13 @@ err:
 	return err;
 }
 
-void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev)
+static void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev)
 {
 	if (dev->data_direct->mkey_ro_valid)
 		mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey_ro);
 
 	mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey);
 	mlx5_core_dealloc_pd(dev->mdev, dev->data_direct->pdn);
-
-	memset(dev->data_direct, 0, sizeof(*dev->data_direct));
 }
 
 static void mlx5_data_direct_bind(struct mlx5_data_direct_registration *reg,
@@ -222,6 +220,10 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 
 	ibdev->data_direct = &reg->dd;
 
+	err = mlx5_data_direct_create_resources(ibdev);
+	if (err)
+		goto err_resources;
+
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_for_each_entry(dev, &mlx5_data_direct_dev_list, list) {
 		if (strcmp(dev->vuid, reg->vuid) == 0) {
@@ -236,6 +238,11 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 	list_add_tail(&reg->list, &mlx5_data_direct_reg_list);
 	mutex_unlock(&mlx5_data_direct_mutex);
 	return 0;
+
+err_resources:
+	ibdev->data_direct = NULL;
+	kfree(reg);
+	return err;
 }
 
 void mlx5_data_direct_cleanup(struct mlx5_ib_dev *ibdev)
@@ -252,6 +259,7 @@ void mlx5_data_direct_cleanup(struct mlx5_ib_dev *ibdev)
 	mlx5_data_direct_do_unbind(reg);
 	mutex_unlock(&mlx5_data_direct_mutex);
 
+	mlx5_data_direct_free_resources(ibdev);
 	ibdev->data_direct = NULL;
 	kfree(reg);
 }

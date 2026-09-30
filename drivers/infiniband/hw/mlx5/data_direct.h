@@ -23,9 +23,6 @@ struct mlx5_data_direct_dev {
 	struct list_head list;
 };
 
-int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev);
-void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev);
-
 int mlx5_data_direct_driver_register(void);
 void mlx5_data_direct_driver_unregister(void);
 
