@@ -583,13 +583,13 @@ out:
 /* Called under RCU */
 static bool __allowed_ingress(const struct net_bridge *br,
 			      struct net_bridge_vlan_group *vg,
-			      struct sk_buff *skb, u16 *vid,
-			      u8 *state,
+			      struct sk_buff *skb, u8 *state,
 			      struct net_bridge_vlan **vlan)
 {
 	struct pcpu_sw_netstats *stats;
 	struct net_bridge_vlan *v;
 	bool tagged;
+	u16 vid;
 
 	BR_INPUT_SKB_CB(skb)->vlan_filtered = true;
 	/* If vlan tx offload is disabled on bridge device and frame was
@@ -603,7 +603,7 @@ static bool __allowed_ingress(const struct net_bridge *br,
 			return false;
 	}
 
-	if (!br_vlan_get_tag(skb, vid)) {
+	if (!br_vlan_get_tag(skb, &vid)) {
 		/* Tagged frame */
 		if (skb->vlan_proto != br->vlan_proto) {
 			/* Protocol-mismatch, empty out vlan_tci for new tag */
@@ -615,7 +615,7 @@ static bool __allowed_ingress(const struct net_bridge *br,
 
 			skb_pull(skb, ETH_HLEN);
 			skb_reset_mac_len(skb);
-			*vid = 0;
+			vid = 0;
 			tagged = false;
 		} else {
 			tagged = true;
@@ -625,7 +625,7 @@ static bool __allowed_ingress(const struct net_bridge *br,
 		tagged = false;
 	}
 
-	if (!*vid) {
+	if (!vid) {
 		v = vg ? rcu_dereference(vg->pvid) : NULL;
 		/* Frame had a tag with VID 0 or did not have a tag.
 		 * See if pvid is set on this port.  That tells us which
@@ -637,7 +637,6 @@ static bool __allowed_ingress(const struct net_bridge *br,
 		/* PVID is set on this port.  Any untagged or priority-tagged
 		 * ingress frame is considered to belong to this vlan.
 		 */
-		*vid = v->vid;
 		if (likely(!tagged))
 			/* Untagged Frame. */
 			__vlan_hwaccel_put_tag(skb, br->vlan_proto, v->vid);
@@ -649,7 +648,7 @@ static bool __allowed_ingress(const struct net_bridge *br,
 			 */
 			skb->vlan_tci |= v->vid;
 	} else {
-		v = br_vlan_find(vg, *vid);
+		v = br_vlan_find(vg, vid);
 	}
 
 	if (!v || !br_vlan_should_use(v))
@@ -680,8 +679,7 @@ drop:
 
 bool br_allowed_ingress(const struct net_bridge *br,
 			struct net_bridge_vlan_group *vg, struct sk_buff *skb,
-			u16 *vid, u8 *state,
-			struct net_bridge_vlan **vlan)
+			u8 *state, struct net_bridge_vlan **vlan)
 {
 	/* If VLAN filtering is disabled on the bridge, all packets are
 	 * permitted.
@@ -692,7 +690,7 @@ bool br_allowed_ingress(const struct net_bridge *br,
 		return true;
 	}
 
-	return __allowed_ingress(br, vg, skb, vid, state, vlan);
+	return __allowed_ingress(br, vg, skb, state, vlan);
 }
 
 /* Called under RCU. */
@@ -716,11 +714,15 @@ bool br_allowed_egress(struct net_bridge_vlan_group *vg,
 }
 
 /* Called under RCU */
-bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb, u16 *vid)
+bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb,
+		     struct net_bridge_vlan **vlan)
 {
 	struct net_bridge_vlan_group *vg;
 	struct net_bridge *br = p->br;
 	struct net_bridge_vlan *v;
+	u16 vid;
+
+	*vlan = NULL;
 
 	/* If filtering was disabled at input, let it pass. */
 	if (!br_opt_get(br, BROPT_VLAN_ENABLED))
@@ -730,20 +732,22 @@ bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb, u16 *vid)
 	if (!vg || !READ_ONCE(vg->num_vlans))
 		return false;
 
-	if (!br_vlan_get_tag(skb, vid) && skb->vlan_proto != br->vlan_proto)
-		*vid = 0;
+	if (!br_vlan_get_tag(skb, &vid) && skb->vlan_proto != br->vlan_proto)
+		vid = 0;
 
-	if (!*vid) {
+	if (!vid) {
 		v = rcu_dereference(vg->pvid);
 		if (!v || !br_vlan_state_allowed(br_vlan_get_state(v), true))
 			return false;
-		*vid = v->vid;
+		*vlan = v;
 		return true;
 	}
 
-	v = br_vlan_find(vg, *vid);
-	if (v && br_vlan_state_allowed(br_vlan_get_state(v), true))
+	v = br_vlan_find(vg, vid);
+	if (v && br_vlan_state_allowed(br_vlan_get_state(v), true)) {
+		*vlan = v;
 		return true;
+	}
 
 	return false;
 }

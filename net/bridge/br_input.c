@@ -86,8 +86,8 @@ int br_handle_frame_finish(struct net *net, struct sock *sk, struct sk_buff *skb
 	struct net_bridge_vlan *vlan;
 	struct net_bridge *br;
 	bool promisc;
-	u16 vid = 0;
 	u8 state;
+	u16 vid;
 
 	if (!p)
 		goto drop;
@@ -107,9 +107,10 @@ int br_handle_frame_finish(struct net *net, struct sock *sk, struct sk_buff *skb
 
 	brmctx = &p->br->multicast_ctx;
 	pmctx = &p->multicast_ctx;
-	if (!br_allowed_ingress(p->br, nbp_vlan_group_rcu(p), skb, &vid,
-				&state, &vlan))
+	if (!br_allowed_ingress(p->br, nbp_vlan_group_rcu(p), skb, &state,
+				&vlan))
 		goto out;
+	vid = vlan ? vlan->vid : 0;
 
 	if (test_bit(BR_PORT_LOCKED_BIT, &p->flags)) {
 		struct net_bridge_fdb_entry *fdb_src =
@@ -245,14 +246,15 @@ EXPORT_SYMBOL_GPL(br_handle_frame_finish);
 static void __br_handle_local_finish(struct sk_buff *skb)
 {
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
-	u16 vid = 0;
+	struct net_bridge_vlan *vlan;
 
 	/* check if vlan is allowed, to avoid spoofing */
 	if (test_bit(BR_LEARNING_BIT, &p->flags) &&
 	    nbp_state_should_learn(p) &&
 	    !br_opt_get(p->br, BROPT_NO_LL_LEARN) &&
-	    br_should_learn(p, skb, &vid))
-		br_fdb_update(p->br, p, eth_hdr(skb)->h_source, vid, 0);
+	    br_should_learn(p, skb, &vlan))
+		br_fdb_update(p->br, p, eth_hdr(skb)->h_source,
+			      vlan ? vlan->vid : 0, 0);
 }
 
 /* note: already called with rcu_read_lock */
