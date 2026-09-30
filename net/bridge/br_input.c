@@ -121,8 +121,9 @@ int br_handle_frame_finish(struct net *net, struct sock *sk, struct sk_buff *skb
 			 * and drop the packet.
 			 */
 			if (test_bit(BR_PORT_MAB_BIT, &p->flags))
-				br_fdb_update(br, p, eth_hdr(skb)->h_source,
-					      vid, BIT(BR_FDB_LOCKED));
+				br_fdb_update(br, p, vlan,
+					      eth_hdr(skb)->h_source,
+					      BIT(BR_FDB_LOCKED));
 			goto drop;
 		} else if (br_fdb_dst_port(fdb_src) != p ||
 			   test_bit(BR_FDB_LOCAL, &fdb_src->flags)) {
@@ -132,7 +133,7 @@ int br_handle_frame_finish(struct net *net, struct sock *sk, struct sk_buff *skb
 			/* FDB match, but entry is locked. Refresh it and drop
 			 * the packet.
 			 */
-			br_fdb_update(br, p, eth_hdr(skb)->h_source, vid,
+			br_fdb_update(br, p, vlan, eth_hdr(skb)->h_source,
 				      BIT(BR_FDB_LOCKED));
 			goto drop;
 		}
@@ -142,7 +143,7 @@ int br_handle_frame_finish(struct net *net, struct sock *sk, struct sk_buff *skb
 
 	/* insert into forwarding database after filtering to avoid spoofing */
 	if (test_bit(BR_LEARNING_BIT, &p->flags))
-		br_fdb_update(br, p, eth_hdr(skb)->h_source, vid, 0);
+		br_fdb_update(br, p, vlan, eth_hdr(skb)->h_source, 0);
 
 	promisc = !!(br->dev->flags & IFF_PROMISC);
 	local_rcv = promisc;
@@ -253,8 +254,7 @@ static void __br_handle_local_finish(struct sk_buff *skb)
 	    nbp_state_should_learn(p) &&
 	    !br_opt_get(p->br, BROPT_NO_LL_LEARN) &&
 	    br_should_learn(p, skb, &vlan))
-		br_fdb_update(p->br, p, eth_hdr(skb)->h_source,
-			      vlan ? vlan->vid : 0, 0);
+		br_fdb_update(p->br, p, vlan, eth_hdr(skb)->h_source, 0);
 }
 
 /* note: already called with rcu_read_lock */

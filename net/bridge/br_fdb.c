@@ -974,9 +974,11 @@ static bool __fdb_mark_active(struct net_bridge_fdb_entry *fdb)
 }
 
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
-		   const unsigned char *addr, u16 vid, unsigned long flags)
+		   struct net_bridge_vlan *vlan, const unsigned char *addr,
+		   unsigned long flags)
 {
 	struct net_bridge_fdb_entry *fdb;
+	u16 vid = vlan ? vlan->vid : 0;
 
 	/* some users want to always flood. */
 	if (hold_time(br) == 0)
@@ -1247,9 +1249,11 @@ static int fdb_add_entry(struct net_bridge *br, struct net_bridge_port *source,
 
 static int __br_fdb_add(struct ndmsg *ndm, struct net_bridge *br,
 			struct net_bridge_port *p, const unsigned char *addr,
-			u16 nlh_flags, u16 vid, struct nlattr *nfea_tb[],
+			u16 nlh_flags, struct net_bridge_vlan *vlan,
+			struct nlattr *nfea_tb[],
 			bool *notified, struct netlink_ext_ack *extack)
 {
+	u16 vid = vlan ? vlan->vid : 0;
 	int err = 0;
 
 	if (ndm->ndm_flags & NTF_USE) {
@@ -1263,7 +1267,7 @@ static int __br_fdb_add(struct ndmsg *ndm, struct net_bridge *br,
 
 		local_bh_disable();
 		rcu_read_lock();
-		br_fdb_update(br, p, addr, vid, BIT(BR_FDB_ADDED_BY_USER));
+		br_fdb_update(br, p, vlan, addr, BIT(BR_FDB_ADDED_BY_USER));
 		rcu_read_unlock();
 		local_bh_enable();
 	} else if (ndm->ndm_flags & NTF_EXT_LEARNED) {
@@ -1355,10 +1359,10 @@ int br_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 		}
 
 		/* VID was specified, so use it. */
-		err = __br_fdb_add(ndm, br, p, addr, nlh_flags, vid, nfea_tb,
+		err = __br_fdb_add(ndm, br, p, addr, nlh_flags, v, nfea_tb,
 				   notified, extack);
 	} else {
-		err = __br_fdb_add(ndm, br, p, addr, nlh_flags, 0, nfea_tb,
+		err = __br_fdb_add(ndm, br, p, addr, nlh_flags, NULL, nfea_tb,
 				   notified, extack);
 		if (err || !vg || !vg->num_vlans)
 			goto out;
@@ -1370,7 +1374,7 @@ int br_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 		list_for_each_entry(v, &vg->vlan_list, vlist) {
 			if (!br_vlan_should_use(v))
 				continue;
-			err = __br_fdb_add(ndm, br, p, addr, nlh_flags, v->vid,
+			err = __br_fdb_add(ndm, br, p, addr, nlh_flags, v,
 					   nfea_tb, notified, extack);
 			if (err)
 				goto out;
