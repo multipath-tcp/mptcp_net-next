@@ -306,6 +306,10 @@ struct net_bridge_fdb_key {
 	u16 vlan_id;
 };
 
+struct net_bridge_dst {
+	unsigned long __private value;
+};
+
 struct net_bridge_fdb_entry {
 	struct rhash_head		rhnode;
 	struct net_bridge_port		*dst;
@@ -669,6 +673,40 @@ struct br_input_skb_cb {
 
 #define br_debug(br, format, args...)			\
 	pr_debug("%s: " format,  (br)->dev->name, ##args)
+
+static inline struct net_bridge_dst
+br_dst_read(const struct net_bridge_dst *src)
+{
+	struct net_bridge_dst dst;
+
+	ACCESS_PRIVATE(&dst, value) =
+		READ_ONCE(ACCESS_PRIVATE(src, value));
+
+	return dst;
+}
+
+static inline void br_dst_write(struct net_bridge_dst *dst,
+				struct net_bridge_dst src)
+{
+	WRITE_ONCE(ACCESS_PRIVATE(dst, value),
+		   ACCESS_PRIVATE(&src, value));
+}
+
+static inline struct net_bridge_dst
+br_port_to_dst(const struct net_bridge_port *p)
+{
+	struct net_bridge_dst dst;
+
+	ACCESS_PRIVATE(&dst, value) = (unsigned long)p;
+
+	return dst;
+}
+
+static inline struct net_bridge_port *
+br_dst_port(struct net_bridge_dst dst)
+{
+	return (struct net_bridge_port *)ACCESS_PRIVATE(&dst, value);
+}
 
 /* called under bridge lock */
 static inline int br_is_root_bridge(const struct net_bridge *br)
