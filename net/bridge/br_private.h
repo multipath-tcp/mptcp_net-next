@@ -312,7 +312,7 @@ struct net_bridge_dst {
 
 struct net_bridge_fdb_entry {
 	struct rhash_head		rhnode;
-	struct net_bridge_port		*dst;
+	struct net_bridge_dst		dst;
 
 	struct net_bridge_fdb_key	key;
 	struct hlist_node		fdb_node;
@@ -706,6 +706,24 @@ static inline struct net_bridge_port *
 br_dst_port(struct net_bridge_dst dst)
 {
 	return (struct net_bridge_port *)ACCESS_PRIVATE(&dst, value);
+}
+
+static inline struct net_bridge_dst
+br_fdb_dst_read(const struct net_bridge_fdb_entry *fdb)
+{
+	return br_dst_read(&fdb->dst);
+}
+
+static inline void br_fdb_dst_write(struct net_bridge_fdb_entry *fdb,
+				    struct net_bridge_dst dst)
+{
+	br_dst_write(&fdb->dst, dst);
+}
+
+static inline struct net_bridge_port *
+br_fdb_dst_port(const struct net_bridge_fdb_entry *fdb)
+{
+	return br_dst_port(br_fdb_dst_read(fdb));
 }
 
 /* called under bridge lock */
