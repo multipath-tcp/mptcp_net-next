@@ -385,7 +385,7 @@ void br_fdb_find_delete_local(struct net_bridge *br,
 }
 
 static struct net_bridge_fdb_entry *fdb_create(struct net_bridge *br,
-					       struct net_bridge_port *source,
+					       struct net_bridge_dst dst,
 					       const unsigned char *addr,
 					       __u16 vid,
 					       unsigned long flags)
@@ -409,7 +409,7 @@ static struct net_bridge_fdb_entry *fdb_create(struct net_bridge *br,
 		return NULL;
 
 	memcpy(fdb->key.addr.addr, addr, ETH_ALEN);
-	br_fdb_dst_write(fdb, br_port_to_dst(source));
+	br_fdb_dst_write(fdb, dst);
 	fdb->key.vlan_id = vid;
 	fdb->flags = flags;
 	fdb->updated = fdb->used = jiffies;
@@ -448,7 +448,7 @@ static int fdb_add_local(struct net_bridge *br, struct net_bridge_port *source,
 		fdb_delete(br, fdb, true);
 	}
 
-	fdb = fdb_create(br, source, addr, vid,
+	fdb = fdb_create(br, br_port_to_dst(source), addr, vid,
 			 BIT(BR_FDB_LOCAL) | BIT(BR_FDB_STATIC));
 	if (!fdb)
 		return -ENOMEM;
@@ -907,8 +907,8 @@ void br_fdb_cleanup_by_dst(struct net_bridge *br,
 				 * back to the raw port destination
 				 */
 				if (vlan && br_dst_vlan(dst) == vlan)
-					br_fdb_dst_write(f,
-							 br_port_to_dst(p));
+					br_fdb_dst_replace(f, dst,
+							   br_port_to_dst(p));
 				continue;
 			}
 		}
@@ -997,9 +997,12 @@ static bool __fdb_mark_active(struct net_bridge_fdb_entry *fdb)
 static void __fdb_update(struct net_bridge *br,
 			 struct net_bridge_fdb_entry *fdb,
 			 struct net_bridge_port *source,
+			 struct net_bridge_dst dst,
 			 const unsigned char *addr, u16 vid,
 			 unsigned long flags)
 {
+	struct net_bridge_port *old_port;
+	struct net_bridge_dst old_dst;
 	bool fdb_modified = false;
 	unsigned long now;
 
@@ -1017,18 +1020,30 @@ static void __fdb_update(struct net_bridge *br,
 		fdb_modified = __fdb_mark_active(fdb);
 	}
 
+	old_dst = br_fdb_dst_read(fdb);
+	old_port = br_dst_port(old_dst);
 	/* fastpath: update of existing entry */
-	if (unlikely(source != br_fdb_dst_port(fdb) &&
-		     !test_bit(BR_FDB_STICKY, &fdb->flags))) {
-		br_switchdev_fdb_notify(br, fdb, RTM_DELNEIGH);
-		br_fdb_dst_write(fdb, br_port_to_dst(source));
-		fdb_modified = true;
-		/* Take over HW learned entry */
-		if (unlikely(test_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags)))
-			clear_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags);
-		/* Clear locked flag when roaming to an unlocked port */
-		if (unlikely(test_bit(BR_FDB_LOCKED, &fdb->flags)))
-			clear_bit(BR_FDB_LOCKED, &fdb->flags);
+	if (unlikely(!br_dst_equal(dst, old_dst) &&
+		     (source == old_port ||
+		      !test_bit(BR_FDB_STICKY, &fdb->flags)))) {
+		if (source != old_port) {
+			br_switchdev_fdb_notify(br, fdb, RTM_DELNEIGH);
+			br_fdb_dst_write(fdb, dst);
+			fdb_modified = true;
+			/* take over HW learned entry */
+			if (unlikely(test_bit(BR_FDB_ADDED_BY_EXT_LEARN,
+					      &fdb->flags)))
+				clear_bit(BR_FDB_ADDED_BY_EXT_LEARN,
+					  &fdb->flags);
+			/* clear locked flag when roaming to an unlocked port */
+			if (unlikely(test_bit(BR_FDB_LOCKED, &fdb->flags)))
+				clear_bit(BR_FDB_LOCKED, &fdb->flags);
+		} else {
+			/* raw port-to-VLAN promotion shouldn't overwrite a
+			 * concurrent roam to another port
+			 */
+			br_fdb_dst_replace(fdb, old_dst, dst);
+		}
 	}
 
 	if (unlikely(test_bit(BR_FDB_ADDED_BY_USER, &flags))) {
@@ -1047,6 +1062,8 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   struct net_bridge_vlan *vlan, const unsigned char *addr,
 		   unsigned long flags)
 {
+	struct net_bridge_dst dst = vlan ? br_vlan_to_dst(vlan) :
+					   br_port_to_dst(source);
 	struct net_bridge_fdb_entry *fdb;
 	u16 vid = vlan ? vlan->vid : 0;
 
@@ -1056,10 +1073,10 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 
 	fdb = fdb_find_rcu(&br->fdb_hash_tbl, addr, vid);
 	if (likely(fdb)) {
-		__fdb_update(br, fdb, source, addr, vid, flags);
+		__fdb_update(br, fdb, source, dst, addr, vid, flags);
 	} else {
 		spin_lock(&br->hash_lock);
-		fdb = fdb_create(br, source, addr, vid, flags);
+		fdb = fdb_create(br, dst, addr, vid, flags);
 		if (fdb) {
 			trace_br_fdb_update(br, source, addr, vid, flags);
 			fdb_notify(br, fdb, RTM_NEWNEIGH, true);
@@ -1213,7 +1230,7 @@ static int fdb_add_entry(struct net_bridge *br, struct net_bridge_port *source,
 		if (!(flags & NLM_F_CREATE))
 			return -ENOENT;
 
-		fdb = fdb_create(br, source, addr, vid,
+		fdb = fdb_create(br, br_port_to_dst(source), addr, vid,
 				 BIT(BR_FDB_ADDED_BY_USER));
 		if (!fdb)
 			return -ENOMEM;
@@ -1564,7 +1581,7 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 		if (locked)
 			flags |= BIT(BR_FDB_LOCKED);
 
-		fdb = fdb_create(br, p, addr, vid, flags);
+		fdb = fdb_create(br, br_port_to_dst(p), addr, vid, flags);
 		if (!fdb) {
 			err = -ENOMEM;
 			goto err_unlock;

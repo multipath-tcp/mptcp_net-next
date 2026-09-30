@@ -694,6 +694,13 @@ static inline void br_dst_write(struct net_bridge_dst *dst,
 		   ACCESS_PRIVATE(&src, value));
 }
 
+static inline bool br_dst_equal(struct net_bridge_dst dst1,
+				struct net_bridge_dst dst2)
+{
+	return ACCESS_PRIVATE(&dst1, value) ==
+	       ACCESS_PRIVATE(&dst2, value);
+}
+
 static inline struct net_bridge_dst
 br_port_to_dst(const struct net_bridge_port *p)
 {
@@ -766,6 +773,17 @@ static inline void br_fdb_dst_write(struct net_bridge_fdb_entry *fdb,
 				    struct net_bridge_dst dst)
 {
 	br_dst_write(&fdb->dst, dst);
+}
+
+static inline bool
+br_fdb_dst_replace(struct net_bridge_fdb_entry *fdb,
+		   struct net_bridge_dst old,
+		   struct net_bridge_dst new)
+{
+	unsigned long old_value = ACCESS_PRIVATE(&old, value);
+
+	return cmpxchg(&ACCESS_PRIVATE(&fdb->dst, value), old_value,
+		       ACCESS_PRIVATE(&new, value)) == old_value;
 }
 
 static inline struct net_bridge_port *
