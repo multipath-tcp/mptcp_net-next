@@ -306,6 +306,8 @@ struct net_bridge_fdb_key {
 	u16 vlan_id;
 };
 
+#define BR_DST_VLAN_TAG	BIT(0)
+
 struct net_bridge_dst {
 	unsigned long __private value;
 };
@@ -702,10 +704,56 @@ br_port_to_dst(const struct net_bridge_port *p)
 	return dst;
 }
 
+static inline struct net_bridge_dst
+br_vlan_to_dst(const struct net_bridge_vlan *v)
+{
+	struct net_bridge_dst dst;
+
+	ACCESS_PRIVATE(&dst, value) = (unsigned long)v | BR_DST_VLAN_TAG;
+
+	return dst;
+}
+
+static inline void br_dst_decode(struct net_bridge_dst dst,
+				 struct net_bridge_port **port,
+				 struct net_bridge_vlan **vlan)
+{
+	struct net_bridge_vlan *v;
+	unsigned long value;
+
+	value = ACCESS_PRIVATE(&dst, value);
+	if (!(value & BR_DST_VLAN_TAG)) {
+		*port = (struct net_bridge_port *)value;
+		*vlan = NULL;
+		return;
+	}
+
+	v = (struct net_bridge_vlan *)(value & ~BR_DST_VLAN_TAG);
+	*port = v->port;
+	*vlan = v;
+}
+
 static inline struct net_bridge_port *
 br_dst_port(struct net_bridge_dst dst)
 {
-	return (struct net_bridge_port *)ACCESS_PRIVATE(&dst, value);
+	struct net_bridge_port *p;
+	struct net_bridge_vlan *v;
+
+	br_dst_decode(dst, &p, &v);
+
+	return p;
+}
+
+static inline struct net_bridge_vlan *
+br_dst_vlan(struct net_bridge_dst dst)
+{
+	unsigned long value;
+
+	value = ACCESS_PRIVATE(&dst, value);
+	if (!(value & BR_DST_VLAN_TAG))
+		return NULL;
+
+	return (struct net_bridge_vlan *)(value & ~BR_DST_VLAN_TAG);
 }
 
 static inline struct net_bridge_dst
