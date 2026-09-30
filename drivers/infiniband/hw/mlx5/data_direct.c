@@ -18,10 +18,10 @@ static LIST_HEAD(mlx5_data_direct_reg_list);
 static DEFINE_MUTEX(mlx5_data_direct_mutex);
 
 struct mlx5_data_direct_registration {
-	struct mlx5_ib_dev *ibdev;
 	char vuid[MLX5_ST_SZ_BYTES(array1024_auto) + 1];
 	struct list_head list;
 	struct blocking_notifier_head users;
+	struct mlx5_data_direct dd;
 };
 
 static int mlx5_data_direct_query_vuid(struct mlx5_core_dev *dev,
@@ -139,8 +139,8 @@ int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
 	if (err)
 		goto err_mkey;
 
-	dev->ddr.mkey = mkey;
-	dev->ddr.pdn = pdn;
+	dev->data_direct->mkey = mkey;
+	dev->data_direct->pdn = pdn;
 
 	/* create another mkey with RO support */
 	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write)) {
@@ -157,8 +157,8 @@ int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
 		err = mlx5_core_create_mkey(mdev, &mkey, in, inlen);
 		/* RO is defined as best effort */
 		if (!err) {
-			dev->ddr.mkey_ro = mkey;
-			dev->ddr.mkey_ro_valid = true;
+			dev->data_direct->mkey_ro = mkey;
+			dev->data_direct->mkey_ro_valid = true;
 		}
 	}
 
@@ -174,38 +174,25 @@ err:
 
 void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev)
 {
-	if (dev->ddr.mkey_ro_valid)
-		mlx5_core_destroy_mkey(dev->mdev, dev->ddr.mkey_ro);
+	if (dev->data_direct->mkey_ro_valid)
+		mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey_ro);
 
-	mlx5_core_destroy_mkey(dev->mdev, dev->ddr.mkey);
-	mlx5_core_dealloc_pd(dev->mdev, dev->ddr.pdn);
+	mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey);
+	mlx5_core_dealloc_pd(dev->mdev, dev->data_direct->pdn);
 
-	memset(&dev->ddr, 0, sizeof(dev->ddr));
+	memset(dev->data_direct, 0, sizeof(*dev->data_direct));
 }
 
-static struct mlx5_data_direct_registration *
-mlx5_data_direct_get_reg(struct mlx5_ib_dev *ibdev)
-{
-	struct mlx5_data_direct_registration *reg;
-
-	list_for_each_entry(reg, &mlx5_data_direct_reg_list, list)
-		if (reg->ibdev == ibdev)
-			return reg;
-	return NULL;
-}
-
-static void mlx5_data_direct_bind(struct mlx5_ib_dev *ibdev,
+static void mlx5_data_direct_bind(struct mlx5_data_direct_registration *reg,
 				  struct mlx5_data_direct_dev *dev)
 {
-	WRITE_ONCE(ibdev->data_direct_dev, dev);
+	WRITE_ONCE(reg->dd.dev, dev);
 }
 
 static void
 mlx5_data_direct_do_unbind(struct mlx5_data_direct_registration *reg)
 {
-	struct mlx5_ib_dev *ibdev = reg->ibdev;
-
-	WRITE_ONCE(ibdev->data_direct_dev, NULL);
+	WRITE_ONCE(reg->dd.dev, NULL);
 	blocking_notifier_call_chain(&reg->users, MLX5_DATA_DIRECT_UNBIND,
 				     NULL);
 }
@@ -223,7 +210,6 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 	if (!reg)
 		return -ENOMEM;
 
-	reg->ibdev = ibdev;
 	BLOCKING_INIT_NOTIFIER_HEAD(&reg->users);
 
 	err = mlx5_data_direct_query_vuid(ibdev->mdev, reg->vuid);
@@ -234,10 +220,12 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 		return err;
 	}
 
+	ibdev->data_direct = &reg->dd;
+
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_for_each_entry(dev, &mlx5_data_direct_dev_list, list) {
 		if (strcmp(dev->vuid, reg->vuid) == 0) {
-			mlx5_data_direct_bind(ibdev, dev);
+			mlx5_data_direct_bind(reg, dev);
 			break;
 		}
 	}
@@ -257,14 +245,14 @@ void mlx5_data_direct_cleanup(struct mlx5_ib_dev *ibdev)
 	if (!mlx5_data_direct_supported(ibdev->mdev))
 		return;
 
+	reg = container_of(ibdev->data_direct,
+			    struct mlx5_data_direct_registration, dd);
 	mutex_lock(&mlx5_data_direct_mutex);
-	reg = mlx5_data_direct_get_reg(ibdev);
-	if (reg) {
-		list_del(&reg->list);
-		mlx5_data_direct_do_unbind(reg);
-	}
+	list_del(&reg->list);
+	mlx5_data_direct_do_unbind(reg);
 	mutex_unlock(&mlx5_data_direct_mutex);
 
+	ibdev->data_direct = NULL;
 	kfree(reg);
 }
 
@@ -276,11 +264,10 @@ int mlx5_data_direct_register(struct mlx5_ib_dev *ibdev,
 	if (!mlx5_data_direct_supported(ibdev->mdev))
 		return 0;
 
-	mutex_lock(&mlx5_data_direct_mutex);
-	reg = mlx5_data_direct_get_reg(ibdev);
-	if (reg)
-		blocking_notifier_chain_register(&reg->users, nb);
-	mutex_unlock(&mlx5_data_direct_mutex);
+	reg = container_of(ibdev->data_direct,
+			    struct mlx5_data_direct_registration, dd);
+	blocking_notifier_chain_register(&reg->users, nb);
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mlx5_data_direct_register);
@@ -293,11 +280,9 @@ void mlx5_data_direct_unregister(struct mlx5_ib_dev *ibdev,
 	if (!mlx5_data_direct_supported(ibdev->mdev))
 		return;
 
-	mutex_lock(&mlx5_data_direct_mutex);
-	reg = mlx5_data_direct_get_reg(ibdev);
-	if (reg)
-		blocking_notifier_chain_unregister(&reg->users, nb);
-	mutex_unlock(&mlx5_data_direct_mutex);
+	reg = container_of(ibdev->data_direct,
+			    struct mlx5_data_direct_registration, dd);
+	blocking_notifier_chain_unregister(&reg->users, nb);
 }
 EXPORT_SYMBOL_GPL(mlx5_data_direct_unregister);
 
@@ -308,7 +293,7 @@ static void mlx5_data_direct_dev_reg(struct mlx5_data_direct_dev *dev)
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_for_each_entry(reg, &mlx5_data_direct_reg_list, list) {
 		if (strcmp(dev->vuid, reg->vuid) == 0)
-			mlx5_data_direct_bind(reg->ibdev, dev);
+			mlx5_data_direct_bind(reg, dev);
 	}
 
 	/* Add the data direct device to the global list, further IB devices may
