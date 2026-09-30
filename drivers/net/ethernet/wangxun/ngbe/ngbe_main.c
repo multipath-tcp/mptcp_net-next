@@ -494,7 +494,7 @@ static int ngbe_open(struct net_device *netdev)
 
 	err = wx_setup_resources(wx);
 	if (err)
-		return err;
+		goto err_control_hw;
 
 	wx_configure(wx);
 
@@ -526,6 +526,8 @@ err_free_irq:
 err_free_resources:
 	wx_free_isb_resources(wx);
 	wx_free_resources(wx);
+err_control_hw:
+	wx_control_hw(wx, false);
 	return err;
 }
 
