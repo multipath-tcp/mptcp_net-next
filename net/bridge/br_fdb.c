@@ -994,6 +994,55 @@ static bool __fdb_mark_active(struct net_bridge_fdb_entry *fdb)
 		  test_and_clear_bit(BR_FDB_NOTIFY_INACTIVE, &fdb->flags));
 }
 
+static void __fdb_update(struct net_bridge *br,
+			 struct net_bridge_fdb_entry *fdb,
+			 struct net_bridge_port *source,
+			 const unsigned char *addr, u16 vid,
+			 unsigned long flags)
+{
+	bool fdb_modified = false;
+	unsigned long now;
+
+	/* attempt to update an entry for a local interface */
+	if (unlikely(test_bit(BR_FDB_LOCAL, &fdb->flags))) {
+		if (net_ratelimit())
+			br_warn(br, "received packet on %s with own address as source address (addr:%pM, vlan:%u)\n",
+				source->dev->name, addr, vid);
+		return;
+	}
+
+	now = jiffies;
+	if (now != READ_ONCE(fdb->updated)) {
+		WRITE_ONCE(fdb->updated, now);
+		fdb_modified = __fdb_mark_active(fdb);
+	}
+
+	/* fastpath: update of existing entry */
+	if (unlikely(source != br_fdb_dst_port(fdb) &&
+		     !test_bit(BR_FDB_STICKY, &fdb->flags))) {
+		br_switchdev_fdb_notify(br, fdb, RTM_DELNEIGH);
+		br_fdb_dst_write(fdb, br_port_to_dst(source));
+		fdb_modified = true;
+		/* Take over HW learned entry */
+		if (unlikely(test_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags)))
+			clear_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags);
+		/* Clear locked flag when roaming to an unlocked port */
+		if (unlikely(test_bit(BR_FDB_LOCKED, &fdb->flags)))
+			clear_bit(BR_FDB_LOCKED, &fdb->flags);
+	}
+
+	if (unlikely(test_bit(BR_FDB_ADDED_BY_USER, &flags))) {
+		set_bit(BR_FDB_ADDED_BY_USER, &fdb->flags);
+		if (test_and_clear_bit(BR_FDB_DYNAMIC_LEARNED, &fdb->flags))
+			atomic_dec(&br->fdb_n_learned);
+	}
+
+	if (unlikely(fdb_modified)) {
+		trace_br_fdb_update(br, source, addr, vid, flags);
+		fdb_notify(br, fdb, RTM_NEWNEIGH, true);
+	}
+}
+
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   struct net_bridge_vlan *vlan, const unsigned char *addr,
 		   unsigned long flags)
@@ -1007,49 +1056,7 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 
 	fdb = fdb_find_rcu(&br->fdb_hash_tbl, addr, vid);
 	if (likely(fdb)) {
-		/* attempt to update an entry for a local interface */
-		if (unlikely(test_bit(BR_FDB_LOCAL, &fdb->flags))) {
-			if (net_ratelimit())
-				br_warn(br, "received packet on %s with own address as source address (addr:%pM, vlan:%u)\n",
-					source->dev->name, addr, vid);
-		} else {
-			unsigned long now = jiffies;
-			bool fdb_modified = false;
-
-			if (now != READ_ONCE(fdb->updated)) {
-				WRITE_ONCE(fdb->updated, now);
-				fdb_modified = __fdb_mark_active(fdb);
-			}
-
-			/* fastpath: update of existing entry */
-			if (unlikely(source != br_fdb_dst_port(fdb) &&
-				     !test_bit(BR_FDB_STICKY, &fdb->flags))) {
-				br_switchdev_fdb_notify(br, fdb, RTM_DELNEIGH);
-				br_fdb_dst_write(fdb, br_port_to_dst(source));
-				fdb_modified = true;
-				/* Take over HW learned entry */
-				if (unlikely(test_bit(BR_FDB_ADDED_BY_EXT_LEARN,
-						      &fdb->flags)))
-					clear_bit(BR_FDB_ADDED_BY_EXT_LEARN,
-						  &fdb->flags);
-				/* Clear locked flag when roaming to an
-				 * unlocked port.
-				 */
-				if (unlikely(test_bit(BR_FDB_LOCKED, &fdb->flags)))
-					clear_bit(BR_FDB_LOCKED, &fdb->flags);
-			}
-
-			if (unlikely(test_bit(BR_FDB_ADDED_BY_USER, &flags))) {
-				set_bit(BR_FDB_ADDED_BY_USER, &fdb->flags);
-				if (test_and_clear_bit(BR_FDB_DYNAMIC_LEARNED,
-						       &fdb->flags))
-					atomic_dec(&br->fdb_n_learned);
-			}
-			if (unlikely(fdb_modified)) {
-				trace_br_fdb_update(br, source, addr, vid, flags);
-				fdb_notify(br, fdb, RTM_NEWNEIGH, true);
-			}
-		}
+		__fdb_update(br, fdb, source, addr, vid, flags);
 	} else {
 		spin_lock(&br->hash_lock);
 		fdb = fdb_create(br, source, addr, vid, flags);
@@ -1057,9 +1064,6 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 			trace_br_fdb_update(br, source, addr, vid, flags);
 			fdb_notify(br, fdb, RTM_NEWNEIGH, true);
 		}
-		/* else  we lose race and someone else inserts
-		 * it first, don't bother updating
-		 */
 		spin_unlock(&br->hash_lock);
 	}
 }
