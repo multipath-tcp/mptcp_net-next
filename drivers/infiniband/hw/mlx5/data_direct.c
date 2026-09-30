@@ -240,7 +240,7 @@ static void mlx5_data_direct_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver mlx5_data_direct_driver = {
-	.name = KBUILD_MODNAME,
+	.name = "mlx5_dd",
 	.id_table = mlx5_data_direct_pci_table,
 	.probe = mlx5_data_direct_probe,
 	.remove = mlx5_data_direct_remove,
