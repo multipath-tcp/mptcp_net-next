@@ -3474,87 +3474,6 @@ static void mlx5_ib_dev_res_cleanup(struct mlx5_ib_dev *dev)
 	mutex_destroy(&devr->srq_lock);
 }
 
-static int
-mlx5_ib_create_data_direct_resources(struct mlx5_ib_dev *dev)
-{
-	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
-	struct mlx5_core_dev *mdev = dev->mdev;
-	bool ro_supp = false;
-	void *mkc;
-	u32 mkey;
-	u32 pdn;
-	u32 *in;
-	int err;
-
-	err = mlx5_core_alloc_pd(mdev, &pdn);
-	if (err)
-		return err;
-
-	in = kvzalloc(inlen, GFP_KERNEL);
-	if (!in) {
-		err = -ENOMEM;
-		goto err;
-	}
-
-	MLX5_SET(create_mkey_in, in, data_direct, 1);
-	mkc = MLX5_ADDR_OF(create_mkey_in, in, memory_key_mkey_entry);
-	MLX5_SET(mkc, mkc, access_mode_1_0, MLX5_MKC_ACCESS_MODE_PA);
-	MLX5_SET(mkc, mkc, lw, 1);
-	MLX5_SET(mkc, mkc, lr, 1);
-	MLX5_SET(mkc, mkc, rw, 1);
-	MLX5_SET(mkc, mkc, rr, 1);
-	MLX5_SET(mkc, mkc, a, 1);
-	MLX5_SET(mkc, mkc, pd, pdn);
-	MLX5_SET(mkc, mkc, length64, 1);
-	MLX5_SET(mkc, mkc, qpn, 0xffffff);
-	err = mlx5_core_create_mkey(mdev, &mkey, in, inlen);
-	if (err)
-		goto err_mkey;
-
-	dev->ddr.mkey = mkey;
-	dev->ddr.pdn = pdn;
-
-	/* create another mkey with RO support */
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write)) {
-		MLX5_SET(mkc, mkc, relaxed_ordering_write, 1);
-		ro_supp = true;
-	}
-
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read)) {
-		MLX5_SET(mkc, mkc, relaxed_ordering_read, 1);
-		ro_supp = true;
-	}
-
-	if (ro_supp) {
-		err = mlx5_core_create_mkey(mdev, &mkey, in, inlen);
-		/* RO is defined as best effort */
-		if (!err) {
-			dev->ddr.mkey_ro = mkey;
-			dev->ddr.mkey_ro_valid = true;
-		}
-	}
-
-	kvfree(in);
-	return 0;
-
-err_mkey:
-	kvfree(in);
-err:
-	mlx5_core_dealloc_pd(mdev, pdn);
-	return err;
-}
-
-static void
-mlx5_ib_free_data_direct_resources(struct mlx5_ib_dev *dev)
-{
-
-	if (dev->ddr.mkey_ro_valid)
-		mlx5_core_destroy_mkey(dev->mdev, dev->ddr.mkey_ro);
-
-	mlx5_core_destroy_mkey(dev->mdev, dev->ddr.mkey);
-	mlx5_core_dealloc_pd(dev->mdev, dev->ddr.pdn);
-}
-
 static u32 get_core_cap_flags(struct ib_device *ibdev,
 			      struct mlx5_hca_vport_context *rep)
 {
@@ -4044,7 +3963,7 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	if (ret)
 		return ret;
 
-	ret = mlx5_ib_create_data_direct_resources(dev);
+	ret = mlx5_data_direct_create_resources(dev);
 	if (ret)
 		return ret;
 
@@ -4052,7 +3971,7 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	dev->data_direct_nb.notifier_call = mlx5_ib_data_direct_event;
 	ret = mlx5_data_direct_ib_reg(dev, vuid, &dev->data_direct_nb);
 	if (ret)
-		mlx5_ib_free_data_direct_resources(dev);
+		mlx5_data_direct_free_resources(dev);
 
 	return ret;
 }
@@ -4063,7 +3982,7 @@ static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 		return;
 
 	mlx5_data_direct_ib_unreg(dev, &dev->data_direct_nb);
-	mlx5_ib_free_data_direct_resources(dev);
+	mlx5_data_direct_free_resources(dev);
 }
 
 static int mlx5_ib_init_multiport_master(struct mlx5_ib_dev *dev)

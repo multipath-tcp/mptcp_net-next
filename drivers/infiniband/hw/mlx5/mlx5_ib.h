@@ -24,6 +24,7 @@
 #include <rdma/mlx5_user_ioctl_cmds.h>
 #include <rdma/mlx5_user_ioctl_verbs.h>
 
+#include "data_direct.h"
 #include "srq.h"
 #include "qp.h"
 #include "macsec.h"
@@ -779,13 +780,6 @@ struct umr_common {
 struct mlx5_ib_port_resources {
 	struct mlx5_ib_gsi_qp *gsi;
 	struct work_struct pkey_change_work;
-};
-
-struct mlx5_data_direct_resources {
-	u32 pdn;
-	u32 mkey;
-	u32 mkey_ro;
-	u8 mkey_ro_valid :1;
 };
 
 struct mlx5_ib_resources {

@@ -23,6 +23,16 @@ struct mlx5_data_direct_dev {
 	struct list_head list;
 };
 
+struct mlx5_data_direct_resources {
+	u32 pdn;
+	u32 mkey;
+	u32 mkey_ro;
+	u8 mkey_ro_valid :1;
+};
+
+int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev);
+void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev);
+
 int mlx5_data_direct_query_vuid(struct mlx5_core_dev *dev, char *out_vuid);
 int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid,
 			    struct notifier_block *nb);
