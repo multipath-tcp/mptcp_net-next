@@ -870,7 +870,7 @@ int br_vlan_delete(struct net_bridge *br, u16 vid)
 		return -ENOENT;
 
 	br_fdb_find_delete_local(br, NULL, br->dev->dev_addr, vid);
-	br_fdb_delete_by_port(br, NULL, vid, 0);
+	br_fdb_cleanup_by_dst(br, br_port_to_dst(NULL), vid, 0);
 
 	vlan_tunnel_info_del(vg, v);
 	__vlan_del(v);
@@ -1396,8 +1396,7 @@ int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
 	v = br_vlan_find(nbp_vlan_group(port), vid);
 	if (!v)
 		return -ENOENT;
-	br_fdb_find_delete_local(port->br, port, port->dev->dev_addr, vid);
-	br_fdb_delete_by_port(port->br, port, vid, 0);
+	br_fdb_cleanup_by_dst(port->br, br_vlan_to_dst(v), vid, 0);
 	__vlan_del(v);
 
 	return 0;

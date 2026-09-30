@@ -868,15 +868,16 @@ int br_fdb_delete_bulk(struct nlmsghdr *nlh, struct net_device *dev,
 	return 0;
 }
 
-/* Flush all entries referring to a specific port.
+/* Clean up all entries referring to a specific destination.
  * if do_all is set also flush static entries
  * if vid is set delete all entries that match the vlan_id
  */
-void br_fdb_delete_by_port(struct net_bridge *br,
-			   const struct net_bridge_port *p,
-			   u16 vid,
+void br_fdb_cleanup_by_dst(struct net_bridge *br,
+			   struct net_bridge_dst cleanup_dst, u16 vid,
 			   int do_all)
 {
+	const struct net_bridge_vlan *vlan = br_dst_vlan(cleanup_dst);
+	const struct net_bridge_port *p = br_dst_port(cleanup_dst);
 	struct net_bridge_fdb_entry *f;
 	struct hlist_node *tmp;
 
@@ -884,6 +885,14 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	hlist_for_each_entry_safe(f, tmp, &br->fdb_list, fdb_node) {
 		if (br_fdb_dst_port(f) != p)
 			continue;
+
+		if (vlan && f->key.vlan_id == vlan->vid &&
+		    test_bit(BR_FDB_LOCAL, &f->flags) &&
+		    !test_bit(BR_FDB_ADDED_BY_USER, &f->flags) &&
+		    ether_addr_equal(f->key.addr.addr, p->dev->dev_addr)) {
+			fdb_delete_local(br, p, f);
+			continue;
+		}
 
 		if (!do_all)
 			if (test_bit(BR_FDB_STATIC, &f->flags) ||

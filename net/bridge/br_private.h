@@ -983,8 +983,8 @@ void br_fdb_change_mac_address(struct net_bridge *br, const u8 *newaddr);
 void br_fdb_cleanup(struct work_struct *work);
 int br_fdb_toggle_local_vlan_0(struct net_bridge *br, bool on,
 			       struct netlink_ext_ack *extack);
-void br_fdb_delete_by_port(struct net_bridge *br,
-			   const struct net_bridge_port *p, u16 vid, int do_all);
+void br_fdb_cleanup_by_dst(struct net_bridge *br,
+			   struct net_bridge_dst dst, u16 vid, int do_all);
 struct net_bridge_fdb_entry *br_fdb_find_rcu(struct net_bridge *br,
 					     const unsigned char *addr,
 					     __u16 vid);

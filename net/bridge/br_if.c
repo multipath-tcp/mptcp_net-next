@@ -355,7 +355,7 @@ static void del_nbp(struct net_bridge_port *p)
 	netdev_reset_rx_headroom(dev);
 
 	nbp_vlan_flush(p);
-	br_fdb_delete_by_port(br, p, 0, 1);
+	br_fdb_cleanup_by_dst(br, br_port_to_dst(p), 0, 1);
 	switchdev_deferred_process();
 	nbp_backup_clear(p);
 
@@ -390,7 +390,7 @@ void br_dev_delete(struct net_device *dev, struct list_head *head)
 	br_mst_uninit(br);
 	br_recalculate_neigh_suppress_enabled(br);
 
-	br_fdb_delete_by_port(br, NULL, 0, 1);
+	br_fdb_cleanup_by_dst(br, br_port_to_dst(NULL), 0, 1);
 
 	timer_shutdown_sync(&br->hello_timer);
 	timer_shutdown_sync(&br->topology_change_timer);
@@ -696,7 +696,7 @@ err6:
 	if (fdb_synced)
 		br_fdb_unsync_static(br, p);
 	list_del_rcu(&p->list);
-	br_fdb_delete_by_port(br, p, 0, 1);
+	br_fdb_cleanup_by_dst(br, br_port_to_dst(p), 0, 1);
 	nbp_update_port_count(br);
 	netdev_upper_dev_unlink(dev, br->dev);
 err5:
