@@ -3,11 +3,14 @@
  * Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved
  */
 
-#include "mlx5_ib.h"
+#include <linux/list.h>
+#include <linux/mlx5/driver.h>
+#include <linux/mlx5/data_direct.h>
+#include <linux/mlx5/mlx5_ifc.h>
+#include <linux/pci.h>
+#include <linux/slab.h>
 
-#include <linux/notifier.h>
-
-#include "data_direct.h"
+#include "mlx5_core.h"
 
 static LIST_HEAD(mlx5_data_direct_dev_list);
 static LIST_HEAD(mlx5_data_direct_reg_list);
@@ -103,10 +106,9 @@ static int mlx5_data_direct_set_dma_caps(struct pci_dev *pdev)
 	return 0;
 }
 
-static int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
+static int mlx5_data_direct_create_resources(struct mlx5_core_dev *mdev)
 {
 	int inlen = MLX5_ST_SZ_BYTES(create_mkey_in);
-	struct mlx5_core_dev *mdev = dev->mdev;
 	bool ro_supp = false;
 	void *mkc;
 	u32 mkey;
@@ -139,16 +141,16 @@ static int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
 	if (err)
 		goto err_mkey;
 
-	dev->data_direct->mkey = mkey;
-	dev->data_direct->pdn = pdn;
+	mdev->data_direct->mkey = mkey;
+	mdev->data_direct->pdn = pdn;
 
 	/* create another mkey with RO support */
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_write)) {
+	if (MLX5_CAP_GEN(mdev, relaxed_ordering_write)) {
 		MLX5_SET(mkc, mkc, relaxed_ordering_write, 1);
 		ro_supp = true;
 	}
 
-	if (MLX5_CAP_GEN(dev->mdev, relaxed_ordering_read)) {
+	if (MLX5_CAP_GEN(mdev, relaxed_ordering_read)) {
 		MLX5_SET(mkc, mkc, relaxed_ordering_read, 1);
 		ro_supp = true;
 	}
@@ -157,8 +159,8 @@ static int mlx5_data_direct_create_resources(struct mlx5_ib_dev *dev)
 		err = mlx5_core_create_mkey(mdev, &mkey, in, inlen);
 		/* RO is defined as best effort */
 		if (!err) {
-			dev->data_direct->mkey_ro = mkey;
-			dev->data_direct->mkey_ro_valid = true;
+			mdev->data_direct->mkey_ro = mkey;
+			mdev->data_direct->mkey_ro_valid = true;
 		}
 	}
 
@@ -172,13 +174,15 @@ err:
 	return err;
 }
 
-static void mlx5_data_direct_free_resources(struct mlx5_ib_dev *dev)
+static void mlx5_data_direct_free_resources(struct mlx5_core_dev *mdev)
 {
-	if (dev->data_direct->mkey_ro_valid)
-		mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey_ro);
+	struct mlx5_data_direct *data_direct = mdev->data_direct;
 
-	mlx5_core_destroy_mkey(dev->mdev, dev->data_direct->mkey);
-	mlx5_core_dealloc_pd(dev->mdev, dev->data_direct->pdn);
+	if (data_direct->mkey_ro_valid)
+		mlx5_core_destroy_mkey(mdev, data_direct->mkey_ro);
+
+	mlx5_core_destroy_mkey(mdev, data_direct->mkey);
+	mlx5_core_dealloc_pd(mdev, data_direct->pdn);
 }
 
 static void mlx5_data_direct_bind(struct mlx5_data_direct_registration *reg,
@@ -195,13 +199,13 @@ mlx5_data_direct_do_unbind(struct mlx5_data_direct_registration *reg)
 				     NULL);
 }
 
-int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
+int mlx5_data_direct_init(struct mlx5_core_dev *mdev)
 {
 	struct mlx5_data_direct_registration *reg;
 	struct mlx5_data_direct_dev *dev;
 	int err;
 
-	if (!mlx5_data_direct_supported(ibdev->mdev))
+	if (!mlx5_data_direct_supported(mdev))
 		return 0;
 
 	reg = kzalloc_obj(*reg);
@@ -210,17 +214,16 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&reg->users);
 
-	err = mlx5_data_direct_query_vuid(ibdev->mdev, reg->vuid);
+	err = mlx5_data_direct_query_vuid(mdev, reg->vuid);
 	if (err) {
-		mlx5_ib_warn(ibdev, "Failed to query VUID, disabling data direct, err=%d\n",
-			     err);
+		mlx5_core_warn(mdev, "Failed to query VUID, err=%d\n", err);
 		kfree(reg);
-		return err;
+		return -EINVAL;
 	}
 
-	ibdev->data_direct = &reg->dd;
+	mdev->data_direct = &reg->dd;
 
-	err = mlx5_data_direct_create_resources(ibdev);
+	err = mlx5_data_direct_create_resources(mdev);
 	if (err)
 		goto err_resources;
 
@@ -233,63 +236,63 @@ int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev)
 	}
 
 	/* Add the registration to its global list, to be used upon bind/unbind
-	 * of its affiliated data direct device
+	 * of its affiliated data direct device.
 	 */
 	list_add_tail(&reg->list, &mlx5_data_direct_reg_list);
 	mutex_unlock(&mlx5_data_direct_mutex);
 	return 0;
 
 err_resources:
-	ibdev->data_direct = NULL;
+	mdev->data_direct = NULL;
 	kfree(reg);
 	return err;
 }
 
-void mlx5_data_direct_cleanup(struct mlx5_ib_dev *ibdev)
+void mlx5_data_direct_cleanup(struct mlx5_core_dev *mdev)
 {
 	struct mlx5_data_direct_registration *reg;
 
-	if (!mlx5_data_direct_supported(ibdev->mdev))
+	if (!mlx5_data_direct_supported(mdev))
 		return;
 
-	reg = container_of(ibdev->data_direct,
-			    struct mlx5_data_direct_registration, dd);
+	reg = container_of(mdev->data_direct,
+			   struct mlx5_data_direct_registration, dd);
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_del(&reg->list);
 	mlx5_data_direct_do_unbind(reg);
 	mutex_unlock(&mlx5_data_direct_mutex);
 
-	mlx5_data_direct_free_resources(ibdev);
-	ibdev->data_direct = NULL;
+	mlx5_data_direct_free_resources(mdev);
+	mdev->data_direct = NULL;
 	kfree(reg);
 }
 
-int mlx5_data_direct_register(struct mlx5_ib_dev *ibdev,
+int mlx5_data_direct_register(struct mlx5_core_dev *mdev,
 			      struct notifier_block *nb)
 {
 	struct mlx5_data_direct_registration *reg;
 
-	if (!mlx5_data_direct_supported(ibdev->mdev))
+	if (!mlx5_data_direct_supported(mdev))
 		return 0;
 
-	reg = container_of(ibdev->data_direct,
-			    struct mlx5_data_direct_registration, dd);
+	reg = container_of(mdev->data_direct,
+			   struct mlx5_data_direct_registration, dd);
 	blocking_notifier_chain_register(&reg->users, nb);
 
 	return 0;
 }
 EXPORT_SYMBOL_GPL(mlx5_data_direct_register);
 
-void mlx5_data_direct_unregister(struct mlx5_ib_dev *ibdev,
+void mlx5_data_direct_unregister(struct mlx5_core_dev *mdev,
 				 struct notifier_block *nb)
 {
 	struct mlx5_data_direct_registration *reg;
 
-	if (!mlx5_data_direct_supported(ibdev->mdev))
+	if (!mlx5_data_direct_supported(mdev))
 		return;
 
-	reg = container_of(ibdev->data_direct,
-			    struct mlx5_data_direct_registration, dd);
+	reg = container_of(mdev->data_direct,
+			   struct mlx5_data_direct_registration, dd);
 	blocking_notifier_chain_unregister(&reg->users, nb);
 }
 EXPORT_SYMBOL_GPL(mlx5_data_direct_unregister);
@@ -304,8 +307,8 @@ static void mlx5_data_direct_dev_reg(struct mlx5_data_direct_dev *dev)
 			mlx5_data_direct_bind(reg, dev);
 	}
 
-	/* Add the data direct device to the global list, further IB devices may
-	 * use it later as well
+	/* Add the data direct device to the global list, further mlx5 devices
+	 * may use it later as well.
 	 */
 	list_add_tail(&dev->list, &mlx5_data_direct_dev_list);
 	mutex_unlock(&mlx5_data_direct_mutex);

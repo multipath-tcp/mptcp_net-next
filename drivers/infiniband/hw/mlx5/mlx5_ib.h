@@ -24,7 +24,7 @@
 #include <rdma/mlx5_user_ioctl_cmds.h>
 #include <rdma/mlx5_user_ioctl_verbs.h>
 
-#include "data_direct.h"
+#include <linux/mlx5/data_direct.h>
 #include "srq.h"
 #include "qp.h"
 #include "macsec.h"
@@ -1091,7 +1091,6 @@ struct mlx5_macsec {
 struct mlx5_ib_dev {
 	struct ib_device		ib_dev;
 	struct mlx5_core_dev		*mdev;
-	struct mlx5_data_direct		*data_direct;
 	/* Protects data_direct_mr_list and serializes mr
 	 * registration/deregistration with data direct device unbind.
 	 */

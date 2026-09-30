@@ -7,11 +7,23 @@
 #define _MLX5_DATA_DIRECT_H
 
 #include <linux/compiler.h>
+#include <linux/list.h>
 
+struct device;
 struct mlx5_core_dev;
-struct mlx5_data_direct_dev;
-struct mlx5_ib_dev;
 struct notifier_block;
+struct pci_dev;
+
+enum mlx5_data_direct_event {
+	MLX5_DATA_DIRECT_UNBIND,
+};
+
+struct mlx5_data_direct_dev {
+	struct device *device;
+	struct pci_dev *pdev;
+	char *vuid;
+	struct list_head list;
+};
 
 struct mlx5_data_direct {
 	struct mlx5_data_direct_dev *dev;
@@ -27,12 +39,9 @@ mlx5_data_direct_get_dev(struct mlx5_data_direct *dd)
 	return dd ? READ_ONCE(dd->dev) : NULL;
 }
 
-int mlx5_data_direct_init(struct mlx5_ib_dev *ibdev);
-void mlx5_data_direct_cleanup(struct mlx5_ib_dev *ibdev);
-
-int mlx5_data_direct_register(struct mlx5_ib_dev *ibdev,
+int mlx5_data_direct_register(struct mlx5_core_dev *mdev,
 			      struct notifier_block *nb);
-void mlx5_data_direct_unregister(struct mlx5_ib_dev *ibdev,
+void mlx5_data_direct_unregister(struct mlx5_core_dev *mdev,
 				 struct notifier_block *nb);
 
 #endif

@@ -52,7 +52,6 @@
 #include <rdma/mlx5_user_ioctl_cmds.h>
 #include <rdma/ib_ucaps.h>
 #include "macsec.h"
-#include "data_direct.h"
 #include "dmah.h"
 
 #define UVERBS_MODULE_NAME mlx5_ib
@@ -3962,20 +3961,9 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 	if (!mlx5_data_direct_supported(dev->mdev))
 		return 0;
 
-	ret = mlx5_data_direct_init(dev);
-	if (ret)
-		return ret;
-
 	INIT_LIST_HEAD(&dev->data_direct_mr_list);
 	dev->data_direct_nb.notifier_call = mlx5_ib_data_direct_event;
-	ret = mlx5_data_direct_register(dev, &dev->data_direct_nb);
-	if (ret)
-		goto err_register;
-
-	return ret;
-
-err_register:
-	mlx5_data_direct_cleanup(dev);
+	ret = mlx5_data_direct_register(dev->mdev, &dev->data_direct_nb);
 
 	return ret;
 }
@@ -3985,8 +3973,7 @@ static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 	if (!mlx5_data_direct_supported(dev->mdev))
 		return;
 
-	mlx5_data_direct_unregister(dev, &dev->data_direct_nb);
-	mlx5_data_direct_cleanup(dev);
+	mlx5_data_direct_unregister(dev->mdev, &dev->data_direct_nb);
 }
 
 static int mlx5_ib_init_multiport_master(struct mlx5_ib_dev *dev)
@@ -5438,9 +5425,6 @@ static int __init mlx5_ib_init(void)
 	ret = mlx5r_rep_init();
 	if (ret)
 		goto rep_err;
-	ret = mlx5_data_direct_driver_register();
-	if (ret)
-		goto dd_err;
 	ret = auxiliary_driver_register(&mlx5r_mp_driver);
 	if (ret)
 		goto mp_err;
@@ -5453,8 +5437,6 @@ static int __init mlx5_ib_init(void)
 drv_err:
 	auxiliary_driver_unregister(&mlx5r_mp_driver);
 mp_err:
-	mlx5_data_direct_driver_unregister();
-dd_err:
 	mlx5r_rep_cleanup();
 rep_err:
 	mlx5_ib_qp_event_cleanup();
@@ -5466,7 +5448,6 @@ qp_event_err:
 
 static void __exit mlx5_ib_cleanup(void)
 {
-	mlx5_data_direct_driver_unregister();
 	auxiliary_driver_unregister(&mlx5r_driver);
 	auxiliary_driver_unregister(&mlx5r_mp_driver);
 	mlx5r_rep_cleanup();

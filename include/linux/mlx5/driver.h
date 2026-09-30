@@ -707,6 +707,7 @@ struct mlx5_rsvd_gids {
 
 struct mlx5_clock;
 struct mlx5_clock_dev_state;
+struct mlx5_data_direct;
 struct mlx5_dm;
 struct mlx5_fw_tracer;
 struct mlx5_vxlan;
@@ -801,6 +802,7 @@ struct mlx5_core_dev {
 	/* sync write combining state */
 	struct mutex wc_state_lock;
 	struct devlink *shd;
+	struct mlx5_data_direct *data_direct;
 };
 
 struct mlx5_db {

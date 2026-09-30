@@ -760,7 +760,7 @@ static int _mlx5r_umr_update_mr_pas(struct mlx5_ib_mr *mr, unsigned int flags,
 		}
 
 		if (dd) {
-			struct mlx5_data_direct *mdd = dev->data_direct;
+			struct mlx5_data_direct *mdd = dev->mdev->data_direct;
 
 			cur_ksm->va = cpu_to_be64(rdma_block_iter_dma_address(&biter));
 			if (mr->access_flags & IB_ACCESS_RELAXED_ORDERING &&
@@ -813,7 +813,7 @@ int mlx5r_umr_update_data_direct_ksm_pas_range(struct mlx5_ib_mr *mr,
 		return -EINVAL;
 
 	return _mlx5r_umr_update_mr_pas(mr, flags,
-					mr_to_mdev(mr)->data_direct->pdn,
+					mr_to_mdev(mr)->mdev->data_direct->pdn,
 					true, start_block, nblocks);
 }
 
