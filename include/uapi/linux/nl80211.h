@@ -3228,6 +3228,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_CIP_CAPABILITIES: The Control Integrity Protocol for the
  *	station.
  *
+ * @NL80211_ATTR_ASSOC_PROTECTED_TWT: Enable protected TWT for the association,
+ *	requires protected TWT support (flag attribute)
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -3832,6 +3835,8 @@ enum nl80211_attrs {
 
 	NL80211_ATTR_ASSOC_CIP,
 	NL80211_ATTR_CIP_CAPABILITIES,
+
+	NL80211_ATTR_ASSOC_PROTECTED_TWT,
 
 	/* add attributes here, update the policy in nl80211.c */
 
