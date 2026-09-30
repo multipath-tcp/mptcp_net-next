@@ -883,7 +883,9 @@ void br_fdb_cleanup_by_dst(struct net_bridge *br,
 
 	spin_lock_bh(&br->hash_lock);
 	hlist_for_each_entry_safe(f, tmp, &br->fdb_list, fdb_node) {
-		if (br_fdb_dst_port(f) != p)
+		struct net_bridge_dst dst = br_fdb_dst_read(f);
+
+		if (br_dst_port(dst) != p)
 			continue;
 
 		if (vlan && f->key.vlan_id == vlan->vid &&
@@ -894,12 +896,22 @@ void br_fdb_cleanup_by_dst(struct net_bridge *br,
 			continue;
 		}
 
-		if (!do_all)
+		if (!do_all) {
+			if (vid && f->key.vlan_id != vid)
+				continue;
+
 			if (test_bit(BR_FDB_STATIC, &f->flags) ||
 			    (test_bit(BR_FDB_ADDED_BY_EXT_LEARN, &f->flags) &&
-			     !test_bit(BR_FDB_OFFLOADED, &f->flags)) ||
-			    (vid && f->key.vlan_id != vid))
+			     !test_bit(BR_FDB_OFFLOADED, &f->flags))) {
+				/* The entry outlives the VLAN, so it must fall
+				 * back to the raw port destination
+				 */
+				if (vlan && br_dst_vlan(dst) == vlan)
+					br_fdb_dst_write(f,
+							 br_port_to_dst(p));
 				continue;
+			}
+		}
 
 		if (test_bit(BR_FDB_LOCAL, &f->flags))
 			fdb_delete_local(br, p, f);

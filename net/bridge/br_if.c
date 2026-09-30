@@ -333,8 +333,9 @@ static void update_headroom(struct net_bridge *br, int new_hr)
  */
 static void del_nbp(struct net_bridge_port *p)
 {
-	struct net_bridge *br = p->br;
+	struct net_bridge_vlan_group *vg;
 	struct net_device *dev = p->dev;
+	struct net_bridge *br = p->br;
 
 	sysfs_remove_link(br->ifobj, p->dev->name);
 
@@ -354,8 +355,10 @@ static void del_nbp(struct net_bridge_port *p)
 		update_headroom(br, get_max_headroom(br));
 	netdev_reset_rx_headroom(dev);
 
-	nbp_vlan_flush(p);
+	vg = nbp_vlan_group(p);
+	nbp_vlan_group_unpublish(p);
 	br_fdb_cleanup_by_dst(br, br_port_to_dst(p), 0, 1);
+	nbp_vlan_flush(p, vg);
 	switchdev_deferred_process();
 	nbp_backup_clear(p);
 

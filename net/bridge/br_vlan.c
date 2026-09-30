@@ -1406,23 +1406,32 @@ int nbp_vlan_delete(struct net_bridge_port *port, u16 vid)
 	v = br_vlan_find(vg, vid);
 	if (!v)
 		return -ENOENT;
-	br_fdb_cleanup_by_dst(port->br, br_vlan_to_dst(v), vid, 0);
 	__vlan_unpublish(vg, v);
+	synchronize_net();
+	/* Traffic may still use v through cached fdb dsts until they are
+	 * cleaned below. This is acceptable during vlan deletion. Above we
+	 * drain the readers that could republish the dst before cleaning it
+	 */
+	br_fdb_cleanup_by_dst(port->br, br_vlan_to_dst(v), vid, 0);
 	__vlan_del(vg, v);
 
 	return 0;
 }
 
-void nbp_vlan_flush(struct net_bridge_port *port)
+void nbp_vlan_group_unpublish(struct net_bridge_port *port)
 {
-	struct net_bridge_vlan_group *vg;
-
 	ASSERT_RTNL();
 
-	vg = nbp_vlan_group(port);
-	__vlan_flush(port->br, port, vg);
 	RCU_INIT_POINTER(port->vlgrp, NULL);
 	synchronize_net();
+}
+
+void nbp_vlan_flush(struct net_bridge_port *port,
+		    struct net_bridge_vlan_group *vg)
+{
+	ASSERT_RTNL();
+
+	__vlan_flush(port->br, port, vg);
 	__vlan_group_free(vg);
 }
 
