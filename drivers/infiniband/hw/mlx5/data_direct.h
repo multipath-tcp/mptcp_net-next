@@ -6,7 +6,13 @@
 #ifndef _MLX5_IB_DATA_DIRECT_H
 #define _MLX5_IB_DATA_DIRECT_H
 
+#include <linux/notifier.h>
+
 struct mlx5_ib_dev;
+
+enum mlx5_data_direct_event {
+	MLX5_DATA_DIRECT_UNBIND,
+};
 
 struct mlx5_data_direct_dev {
 	struct device *device;
@@ -15,8 +21,10 @@ struct mlx5_data_direct_dev {
 	struct list_head list;
 };
 
-int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid);
-void mlx5_data_direct_ib_unreg(struct mlx5_ib_dev *ibdev);
+int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid,
+			    struct notifier_block *nb);
+void mlx5_data_direct_ib_unreg(struct mlx5_ib_dev *ibdev,
+			       struct notifier_block *nb);
 int mlx5_data_direct_driver_register(void);
 void mlx5_data_direct_driver_unregister(void);
 

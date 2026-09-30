@@ -4019,6 +4019,18 @@ unbind:
 	return false;
 }
 
+static int mlx5_ib_data_direct_event(struct notifier_block *nb,
+				     unsigned long action, void *data)
+{
+	struct mlx5_ib_dev *dev =
+		container_of(nb, struct mlx5_ib_dev, data_direct_nb);
+
+	if (action == MLX5_DATA_DIRECT_UNBIND)
+		mlx5_ib_data_direct_unbind(dev);
+
+	return NOTIFY_OK;
+}
+
 static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 {
 	char vuid[MLX5_ST_SZ_BYTES(array1024_auto) + 1] = {};
@@ -4037,7 +4049,8 @@ static int mlx5_ib_data_direct_init(struct mlx5_ib_dev *dev)
 		return ret;
 
 	INIT_LIST_HEAD(&dev->data_direct_mr_list);
-	ret = mlx5_data_direct_ib_reg(dev, vuid);
+	dev->data_direct_nb.notifier_call = mlx5_ib_data_direct_event;
+	ret = mlx5_data_direct_ib_reg(dev, vuid, &dev->data_direct_nb);
 	if (ret)
 		mlx5_ib_free_data_direct_resources(dev);
 
@@ -4050,7 +4063,7 @@ static void mlx5_ib_data_direct_cleanup(struct mlx5_ib_dev *dev)
 	    !MLX5_CAP_GEN_2(dev->mdev, query_vuid))
 		return;
 
-	mlx5_data_direct_ib_unreg(dev);
+	mlx5_data_direct_ib_unreg(dev, &dev->data_direct_nb);
 	mlx5_ib_free_data_direct_resources(dev);
 }
 

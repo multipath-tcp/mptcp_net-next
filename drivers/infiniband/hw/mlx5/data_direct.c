@@ -4,6 +4,9 @@
  */
 
 #include "mlx5_ib.h"
+
+#include <linux/notifier.h>
+
 #include "data_direct.h"
 
 static LIST_HEAD(mlx5_data_direct_dev_list);
@@ -18,6 +21,7 @@ struct mlx5_data_direct_registration {
 	struct mlx5_ib_dev *ibdev;
 	char vuid[MLX5_ST_SZ_BYTES(array1024_auto) + 1];
 	struct list_head list;
+	struct blocking_notifier_head users;
 };
 
 static const struct pci_device_id mlx5_data_direct_pci_table[] = {
@@ -78,7 +82,8 @@ static int mlx5_data_direct_set_dma_caps(struct pci_dev *pdev)
 	return 0;
 }
 
-int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid)
+int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid,
+			    struct notifier_block *nb)
 {
 	struct mlx5_data_direct_registration *reg;
 	struct mlx5_data_direct_dev *dev;
@@ -89,6 +94,8 @@ int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid)
 
 	reg->ibdev = ibdev;
 	strscpy(reg->vuid, vuid);
+	BLOCKING_INIT_NOTIFIER_HEAD(&reg->users);
+	blocking_notifier_chain_register(&reg->users, nb);
 
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_for_each_entry(dev, &mlx5_data_direct_dev_list, list) {
@@ -106,13 +113,15 @@ int mlx5_data_direct_ib_reg(struct mlx5_ib_dev *ibdev, char *vuid)
 	return 0;
 }
 
-void mlx5_data_direct_ib_unreg(struct mlx5_ib_dev *ibdev)
+void mlx5_data_direct_ib_unreg(struct mlx5_ib_dev *ibdev,
+			       struct notifier_block *nb)
 {
 	struct mlx5_data_direct_registration *reg;
 
 	mutex_lock(&mlx5_data_direct_mutex);
 	list_for_each_entry(reg, &mlx5_data_direct_reg_list, list) {
 		if (reg->ibdev == ibdev) {
+			blocking_notifier_chain_unregister(&reg->users, nb);
 			list_del(&reg->list);
 			kfree(reg);
 			goto end;
@@ -150,7 +159,9 @@ static void mlx5_data_direct_dev_unreg(struct mlx5_data_direct_dev *dev)
 	list_del(&dev->list);
 	list_for_each_entry(reg, &mlx5_data_direct_reg_list, list) {
 		if (strcmp(dev->vuid, reg->vuid) == 0)
-			mlx5_ib_data_direct_unbind(reg->ibdev);
+			blocking_notifier_call_chain(&reg->users,
+						     MLX5_DATA_DIRECT_UNBIND,
+						     NULL);
 	}
 	mutex_unlock(&mlx5_data_direct_mutex);
 }

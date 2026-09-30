@@ -1131,6 +1131,7 @@ struct mlx5_ib_dev {
 	spinlock_t		reset_flow_resource_lock;
 	struct list_head	qp_list;
 	struct list_head data_direct_mr_list;
+	struct notifier_block data_direct_nb;
 	/* Array with num_ports elements */
 	struct mlx5_ib_port	*port;
 	struct mlx5_sq_bfreg	bfreg;
