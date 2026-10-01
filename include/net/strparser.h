@@ -32,7 +32,6 @@ struct strp_aggr_stats {
 	unsigned int msg_too_big;
 	unsigned int msg_timeouts;
 	unsigned int bad_hdr_len;
-	unsigned int aborts;
 	unsigned int interrupted;
 	unsigned int unrecov_intr;
 };
@@ -90,7 +89,6 @@ struct strparser {
 
 	u32 stopped : 1;
 	u32 paused : 1;
-	u32 aborted : 1;
 	u32 interrupted : 1;
 	u32 unrecov_intr : 1;
 
@@ -128,8 +126,6 @@ static inline void save_strp_stats(struct strparser *strp,
 	SAVE_PSOCK_STATS(bad_hdr_len);
 #undef SAVE_PSOCK_STATS
 
-	if (strp->aborted)
-		agg_stats->aborts++;
 	if (strp->interrupted)
 		agg_stats->interrupted++;
 	if (strp->unrecov_intr)
@@ -147,7 +143,6 @@ static inline void aggregate_strp_stats(struct strp_aggr_stats *stats,
 	SAVE_PSOCK_STATS(msg_too_big);
 	SAVE_PSOCK_STATS(msg_timeouts);
 	SAVE_PSOCK_STATS(bad_hdr_len);
-	SAVE_PSOCK_STATS(aborts);
 	SAVE_PSOCK_STATS(interrupted);
 	SAVE_PSOCK_STATS(unrecov_intr);
 #undef SAVE_PSOCK_STATS
