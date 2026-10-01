@@ -384,7 +384,7 @@ static unsigned int __mpnic_fill_bdq(struct mpnic_ring *bdq)
 static void __mpnic_bdq_commit_tail(struct mpnic_ring *bdq, unsigned int tail)
 {
 	if (bdq->tail != tail) {
-		bdq->tail = tail;
+		WRITE_ONCE(bdq->tail, tail);
 
 		writeq(tail, bdq->doorbell);
 	}
@@ -483,7 +483,7 @@ mpnic_pkt_prepare(u64 rcd, struct mpnic_rcq_state *state,
 	pg_start = mpnic_hdr_pg_start(pg_off);
 
 	page = mpnic_page_pool_get(&state->hdr, &qt->sub0, pg_idx);
-	qt->sub0.head = (pg_idx + 1) & qt->sub0.size_mask;
+	WRITE_ONCE(qt->sub0.head, (pg_idx + 1) & qt->sub0.size_mask);
 
 	/* Short-cut the end calculation if the page is fully consumed */
 	pg_end = fin ? page_size(page) : mpnic_hdr_pg_end(pg_off, len);
@@ -513,7 +513,7 @@ mpnic_add_rx_frag(u64 rcd, struct mpnic_rcq_state *state,
 	struct page *page;
 
 	page = mpnic_page_pool_get(&state->payld, &qt->sub1, pg_idx);
-	qt->sub1.head = (pg_idx + 1) & qt->sub1.size_mask;
+	WRITE_ONCE(qt->sub1.head, (pg_idx + 1) & qt->sub1.size_mask);
 
 	truesz = (fin ? page_size(page) : ALIGN(pg_off + len, 128)) - pg_off;
 
