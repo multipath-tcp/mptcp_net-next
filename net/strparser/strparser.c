@@ -84,11 +84,11 @@ static inline int strp_peek_len(struct strparser *strp)
 }
 
 /* Lower socket lock held */
-static int __strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
-		       unsigned int orig_offset, size_t orig_len,
-		       size_t max_msg_size, long timeo)
+static int strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
+		     unsigned int orig_offset, size_t orig_len)
 {
 	struct strparser *strp = (struct strparser *)desc->arg.data;
+	long timeo = READ_ONCE(strp->sk->sk_rcvtimeo);
 	struct _strp_msg *stm;
 	struct sk_buff *head, *skb;
 	size_t eaten = 0, cand_len;
@@ -230,7 +230,7 @@ static int __strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
 				}
 				strp_parser_err(strp, len, desc);
 				break;
-			} else if (len > max_msg_size) {
+			} else if (len > strp->sk->sk_rcvbuf) {
 				/* Message length exceeds maximum allowed */
 				STRP_STATS_INCR(strp->stats.msg_too_big);
 				strp_parser_err(strp, -EMSGSIZE, desc);
@@ -310,28 +310,6 @@ static int __strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
 	STRP_STATS_ADD(strp->stats.bytes, eaten);
 
 	return eaten;
-}
-
-int strp_process(struct strparser *strp, struct sk_buff *orig_skb,
-		 unsigned int orig_offset, size_t orig_len,
-		 size_t max_msg_size, long timeo)
-{
-	read_descriptor_t desc; /* Dummy arg to strp_recv */
-
-	desc.arg.data = strp;
-
-	return __strp_recv(&desc, orig_skb, orig_offset, orig_len,
-			   max_msg_size, timeo);
-}
-EXPORT_SYMBOL_GPL(strp_process);
-
-static int strp_recv(read_descriptor_t *desc, struct sk_buff *orig_skb,
-		     unsigned int orig_offset, size_t orig_len)
-{
-	struct strparser *strp = (struct strparser *)desc->arg.data;
-
-	return __strp_recv(desc, orig_skb, orig_offset, orig_len,
-			   strp->sk->sk_rcvbuf, READ_ONCE(strp->sk->sk_rcvtimeo));
 }
 
 static int default_read_sock_done(struct strparser *strp, int err)

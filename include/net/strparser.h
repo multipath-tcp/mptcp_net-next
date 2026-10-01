@@ -160,8 +160,5 @@ void strp_check_rcv(struct strparser *strp);
 int strp_init(struct strparser *strp, struct sock *sk,
 	      const struct strp_callbacks *cb);
 void strp_data_ready(struct strparser *strp);
-int strp_process(struct strparser *strp, struct sk_buff *orig_skb,
-		 unsigned int orig_offset, size_t orig_len,
-		 size_t max_msg_size, long timeo);
 
 #endif /* __NET_STRPARSER_H_ */
