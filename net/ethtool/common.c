@@ -959,6 +959,14 @@ void ethtool_ringparam_get_cfg(struct net_device *dev,
 	kparam->hds_thresh = dev->cfg->hds_thresh;
 }
 
+void ethtool_ringparam_set_cfg(struct netdev_config *cfg,
+			       const struct ethtool_ringparam *param)
+{
+	cfg->rings.rx_pending = param->rx_pending;
+	cfg->rings.rx_mini_pending = param->rx_mini_pending;
+	cfg->rings.rx_jumbo_pending = param->rx_jumbo_pending;
+}
+
 static void ethtool_init_tsinfo(struct kernel_ethtool_ts_info *info)
 {
 	memset(info, 0, sizeof(*info));

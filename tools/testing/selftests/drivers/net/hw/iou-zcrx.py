@@ -221,9 +221,13 @@ def test_zcrx_large_chunks(cfg) -> None:
 
     single(cfg)
     page_size = resource.getpagesize()
+    mtu = cfg.dev["mtu"]
     nr_pages = 2
+    while nr_pages * page_size <= 2 * mtu:
+        nr_pages *= 2
     rx_buf_len = nr_pages * page_size
-    rx_cmd = f"{cfg.bin_local} -s -p {cfg.port} -i {cfg.ifname} -q {cfg.target} -x {nr_pages}"
+    rx_cmd = (f"{cfg.bin_local} -s -p {cfg.port} -i {cfg.ifname} "
+              f"-q {cfg.target} -x {nr_pages}")
     tx_cmd = f"{cfg.bin_remote} -c -h {cfg.addr_v['6']} -p {cfg.port} -l 12840"
 
     probe = cmd(rx_cmd + " -d", fail=False)

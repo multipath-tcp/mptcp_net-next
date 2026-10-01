@@ -4606,9 +4606,6 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		stmmac_set_mss(priv, mss_desc, mss);
 		tx_q->mss = mss;
-		tx_q->cur_tx = STMMAC_NEXT_ENTRY(tx_q->cur_tx,
-						priv->dma_conf.dma_tx_size);
-		WARN_ON(tx_q->tx_skbuff[tx_q->cur_tx]);
 	}
 
 	if (netif_msg_tx_queued(priv)) {
@@ -4619,6 +4616,9 @@ static netdev_tx_t stmmac_tso_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	first_entry = tx_q->cur_tx;
+	if (mss_desc)
+		first_entry = STMMAC_NEXT_ENTRY(first_entry,
+						priv->dma_conf.dma_tx_size);
 	entry = first_entry;
 
 	WARN_ON(tx_q->tx_skbuff[entry]);
@@ -4787,6 +4787,16 @@ error_dma_unmap:
 						priv->dma_conf.dma_tx_size);
 	}
 error:
+	if (mss_desc) {
+		/* The context descriptor never reached the DMA, so the MAC is
+		 * still programmed with the previous MSS. Invalidate the cache
+		 * instead of leaving it ahead of the hardware; zero is the
+		 * value stmmac_reset_tx_queue() leaves behind.
+		 */
+		stmmac_release_tx_desc(priv, mss_desc, priv->descriptor_mode);
+		tx_q->mss = 0;
+	}
+
 	dev_err(priv->device, "Tx dma map failed\n");
 	dev_kfree_skb(skb);
 	priv->xstats.tx_dropped++;
