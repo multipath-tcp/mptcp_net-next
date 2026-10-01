@@ -36,6 +36,8 @@ static inline struct _strp_msg *_strp_msg(struct sk_buff *skb)
 /* Lower lock held */
 static void strp_abort_strp(struct strparser *strp, int err)
 {
+	struct sock *sk = strp->sk;
+
 	/* Unrecoverable error in receive */
 
 	cancel_delayed_work(&strp->msg_timer_work);
@@ -53,13 +55,9 @@ static void strp_abort_strp(struct strparser *strp, int err)
 	strp->skb_nextp = NULL;
 	strp->need_bytes = 0;
 
-	if (strp->sk) {
-		struct sock *sk = strp->sk;
-
-		/* Report an error on the lower socket */
-		sk->sk_err = -err;
-		sk_error_report(sk);
-	}
+	/* Report an error on the lower socket */
+	sk->sk_err = -err;
+	sk_error_report(sk);
 }
 
 static void strp_start_timer(struct strparser *strp, long timeo)
@@ -80,17 +78,9 @@ static void strp_parser_err(struct strparser *strp, int err,
 
 static inline int strp_peek_len(struct strparser *strp)
 {
-	if (strp->sk) {
-		struct socket *sock = strp->sk->sk_socket;
+	struct socket *sock = strp->sk->sk_socket;
 
-		return sock->ops->peek_len(sock);
-	}
-
-	/* If we don't have an associated socket there's nothing to peek.
-	 * Return int max to avoid stopping the strparser.
-	 */
-
-	return INT_MAX;
+	return sock->ops->peek_len(sock);
 }
 
 /* Lower socket lock held */
