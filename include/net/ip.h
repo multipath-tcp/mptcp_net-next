@@ -584,6 +584,13 @@ static inline void ip_select_ident_segs(struct net *net, struct sk_buff *skb,
 {
 	struct iphdr *iph = ip_hdr(skb);
 
+	/* RFC 6864: the IPv4 ID of atomic datagrams has no meaning.
+	 * DF packets without ignore_df can not be fragmented.
+	 */
+	if ((iph->frag_off & htons(IP_DF)) && !skb->ignore_df) {
+		iph->id = 0;
+		return;
+	}
 	/* We had many attacks based on IPID, use the private
 	 * generator as much as we can.
 	 */
@@ -603,12 +610,8 @@ static inline void ip_select_ident_segs(struct net *net, struct sk_buff *skb,
 		iph->id = htons(val);
 		return;
 	}
-	if ((iph->frag_off & htons(IP_DF)) && !skb->ignore_df) {
-		iph->id = 0;
-	} else {
-		/* Unfortunately we need the big hammer to get a suitable IPID */
-		__ip_select_ident(net, iph, segs);
-	}
+	/* Unfortunately we need the big hammer to get a suitable IPID */
+	__ip_select_ident(net, iph, segs);
 }
 
 static inline void ip_select_ident(struct net *net, struct sk_buff *skb,
