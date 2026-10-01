@@ -75,7 +75,7 @@ static void strp_parser_err(struct strparser *strp, int err,
 	desc->error = err;
 	kfree_skb(strp->skb_head);
 	strp->skb_head = NULL;
-	strp->cb.abort_parser(strp, err);
+	strp_abort_strp(strp, err);
 }
 
 static inline int strp_peek_len(struct strparser *strp)
@@ -409,7 +409,7 @@ static void do_strp_work(struct strparser *strp)
 	/* We need the read lock to synchronize with strp_data_ready. We
 	 * need the socket lock for calling strp_read_sock.
 	 */
-	strp->cb.lock(strp);
+	lock_sock(strp->sk);
 
 	if (unlikely(strp->stopped))
 		goto out;
@@ -421,7 +421,7 @@ static void do_strp_work(struct strparser *strp)
 		queue_work(strp_wq, &strp->work);
 
 out:
-	strp->cb.unlock(strp);
+	release_sock(strp->sk);
 }
 
 static void strp_work(struct work_struct *w)
@@ -436,18 +436,8 @@ static void strp_msg_timeout(struct work_struct *w)
 
 	/* Message assembly timed out */
 	STRP_STATS_INCR(strp->stats.msg_timeouts);
-	strp->cb.lock(strp);
-	strp->cb.abort_parser(strp, -ETIMEDOUT);
-	strp->cb.unlock(strp);
-}
-
-static void strp_sock_lock(struct strparser *strp)
-{
 	lock_sock(strp->sk);
-}
-
-static void strp_sock_unlock(struct strparser *strp)
-{
+	strp_abort_strp(strp, -ETIMEDOUT);
 	release_sock(strp->sk);
 }
 
@@ -455,36 +445,17 @@ int strp_init(struct strparser *strp, struct sock *sk,
 	      const struct strp_callbacks *cb)
 {
 
-	if (!cb || !cb->rcv_msg || !cb->parse_msg)
+	if (!cb || !cb->rcv_msg || !cb->parse_msg || !sk)
 		return -EINVAL;
-
-	/* The sk (sock) arg determines the mode of the stream parser.
-	 *
-	 * If the sock is set then the strparser is in receive callback mode.
-	 * The upper layer calls strp_data_ready to kick receive processing
-	 * and strparser calls the read_sock function on the socket to
-	 * get packets.
-	 *
-	 * If the sock is not set then the strparser is in general mode.
-	 * The upper layer calls strp_process for each skb to be parsed.
-	 */
-
-	if (!sk) {
-		if (!cb->lock || !cb->unlock)
-			return -EINVAL;
-	}
 
 	memset(strp, 0, sizeof(*strp));
 
 	strp->sk = sk;
 
-	strp->cb.lock = cb->lock ? : strp_sock_lock;
-	strp->cb.unlock = cb->unlock ? : strp_sock_unlock;
 	strp->cb.rcv_msg = cb->rcv_msg;
 	strp->cb.parse_msg = cb->parse_msg;
 	strp->cb.read_sock = cb->read_sock;
 	strp->cb.read_sock_done = cb->read_sock_done ? : default_read_sock_done;
-	strp->cb.abort_parser = cb->abort_parser ? : strp_abort_strp;
 
 	INIT_DELAYED_WORK(&strp->msg_timer_work, strp_msg_timeout);
 	INIT_WORK(&strp->work, strp_work);
