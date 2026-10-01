@@ -12,8 +12,6 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/init.h>
-#include <linux/llc.h>
-#include <net/llc.h>
 #include <net/stp.h>
 #include <net/switchdev.h>
 
