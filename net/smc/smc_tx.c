@@ -570,8 +570,10 @@ static int smcr_tx_sndbuf_nonempty(struct smc_connection *conn)
 			if (conn->killed)
 				return -EPIPE;
 			rc = 0;
-			mod_delayed_work(conn->lgr->tx_wq, &conn->tx_work,
-					 SMC_TX_WORK_DELAY);
+			sock_hold(&smc->sk);
+			if (!queue_delayed_work(conn->lgr->tx_wq, &conn->tx_work,
+						SMC_TX_WORK_DELAY))
+				sock_put(&smc->sk);
 		}
 		return rc;
 	}
@@ -667,7 +669,7 @@ void smc_tx_pending(struct smc_connection *conn)
 	struct smc_sock *smc = container_of(conn, struct smc_sock, conn);
 	int rc;
 
-	if (smc->sk.sk_err)
+	if (smc->sk.sk_err || conn->freed)
 		return;
 
 	rc = smc_tx_sndbuf_nonempty(conn);
@@ -690,6 +692,7 @@ void smc_tx_work(struct work_struct *work)
 	lock_sock(&smc->sk);
 	smc_tx_pending(conn);
 	release_sock(&smc->sk);
+	sock_put(&smc->sk);
 }
 
 void smc_tx_consumer_update(struct smc_connection *conn, bool force)
@@ -718,8 +721,13 @@ void smc_tx_consumer_update(struct smc_connection *conn, bool force)
 			return;
 		if ((smc_cdc_get_slot_and_msg_send(conn) < 0) &&
 		    !conn->killed) {
-			queue_delayed_work(conn->lgr->tx_wq, &conn->tx_work,
-					   SMC_TX_WORK_DELAY);
+			struct smc_sock *smc =
+				container_of(conn, struct smc_sock, conn);
+
+			sock_hold(&smc->sk);
+			if (!queue_delayed_work(conn->lgr->tx_wq, &conn->tx_work,
+						SMC_TX_WORK_DELAY))
+				sock_put(&smc->sk);
 			return;
 		}
 	}
