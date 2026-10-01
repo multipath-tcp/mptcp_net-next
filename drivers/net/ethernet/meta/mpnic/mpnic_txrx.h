@@ -58,6 +58,12 @@ struct mpnic_net;
 
 #define MPNIC_MAX_JUMBO_FRAME_SIZE	9742
 
+#define MPNIC_RX_HPQ_DROP_THRS \
+	DIV_ROUND_UP(MPNIC_RX_HROOM + MPNIC_RX_MAX_HDR + MPNIC_RX_TROOM, \
+		     PAGE_SIZE)
+#define MPNIC_RX_PPQ_DROP_THRS \
+	DIV_ROUND_UP(MPNIC_MAX_JUMBO_FRAME_SIZE, PAGE_SIZE)
+
 /* The page a buffer descriptor queue is currently handing out. Records
  * how many of the references taken on it are still unused.
  */
