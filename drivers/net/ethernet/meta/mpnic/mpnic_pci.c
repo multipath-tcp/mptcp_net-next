@@ -53,6 +53,20 @@ u64 mpnic_rd64(struct mpnic_dev *mpd, u32 reg)
 	return ~0ULL;
 }
 
+static void mpnic_service_task(struct work_struct *work)
+{
+	struct mpnic_dev *mpd = container_of(to_delayed_work(work),
+					     struct mpnic_dev, service_task);
+	struct net_device *netdev = mpd->netdev;
+
+	netdev_lock(netdev);
+
+	if (netif_running(netdev))
+		schedule_delayed_work(&mpd->service_task, HZ);
+
+	netdev_unlock(netdev);
+}
+
 static struct mpnic_dev *mpnic_alloc(struct pci_dev *pdev)
 {
 	struct mpnic_dev *mpd;
@@ -68,6 +82,8 @@ static struct mpnic_dev *mpnic_alloc(struct pci_dev *pdev)
 	mpd->mps = pcie_get_mps(pdev);
 	mpd->readrq = pcie_get_readrq(pdev);
 	mpd->relaxed_ord = pcie_relaxed_ordering_enabled(pdev);
+
+	INIT_DELAYED_WORK(&mpd->service_task, mpnic_service_task);
 
 	return mpd;
 }
@@ -162,6 +178,7 @@ static void mpnic_remove(struct pci_dev *pdev)
 	struct mpnic_dev *mpd = pci_get_drvdata(pdev);
 
 	unregister_netdev(mpd->netdev);
+	cancel_delayed_work_sync(&mpd->service_task);
 	mpnic_netdev_free(mpd);
 	mpnic_free_irqs(mpd);
 	kfree(mpd);
