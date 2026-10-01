@@ -11,6 +11,7 @@
 
 #include "mpnic.h"
 #include "mpnic_netdev.h"
+#include "mpnic_txrx.h"
 
 #define PCI_DEVICE_ID_META_MPNIC	0x0014
 
@@ -60,6 +61,9 @@ static void mpnic_service_task(struct work_struct *work)
 	struct net_device *netdev = mpd->netdev;
 
 	netdev_lock(netdev);
+
+	if (netif_carrier_ok(netdev))
+		mpnic_napi_depletion_check(netdev_priv(netdev));
 
 	if (netif_running(netdev))
 		schedule_delayed_work(&mpd->service_task, HZ);

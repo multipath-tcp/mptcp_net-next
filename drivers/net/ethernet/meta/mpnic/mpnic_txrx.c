@@ -55,6 +55,12 @@ static unsigned int mpnic_desc_unused(struct mpnic_ring *ring)
 	return (ring->head - ring->tail - 1) & ring->size_mask;
 }
 
+static unsigned int mpnic_desc_used(struct mpnic_ring *ring)
+{
+	return (READ_ONCE(ring->tail) - READ_ONCE(ring->head)) &
+	       ring->size_mask;
+}
+
 static struct netdev_queue *mpnic_txring_txq(const struct net_device *dev,
 					     const struct mpnic_ring *ring)
 {
@@ -1390,6 +1396,31 @@ void mpnic_napi_enable(struct mpnic_net *mpn)
 	 */
 	for (i = 0; i < mpn->num_napi; i++)
 		mpnic_nv_irq_trigger(mpn->napi[i]);
+
+	mpnic_wrfl(mpn->mpd);
+}
+
+void mpnic_napi_depletion_check(struct mpnic_net *mpn)
+{
+	int i, j, t;
+
+	for (i = 0; i < mpn->num_napi; i++) {
+		struct mpnic_napi_vector *nv = mpn->napi[i];
+
+		for (t = nv->txt_count, j = 0; j < nv->rxt_count; j++, t++) {
+			/* Check if BDs posted covers a max sized frame
+			 *  + 1 BD held by RDE as a spare
+			 *  + 1 BD of extra safety margin
+			 */
+			if (mpnic_desc_used(&nv->qt[t].sub0) <
+			    MPNIC_RX_HPQ_DROP_THRS + 2 ||
+			    mpnic_desc_used(&nv->qt[t].sub1) <
+			    MPNIC_RX_PPQ_DROP_THRS + 2) {
+				mpnic_nv_irq_trigger(nv);
+				break;
+			}
+		}
+	}
 
 	mpnic_wrfl(mpn->mpd);
 }
