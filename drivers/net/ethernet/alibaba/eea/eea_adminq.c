@@ -517,18 +517,19 @@ void eea_adminq_config_host_info(struct eea_net *enet)
 
 	rc = eea_adminq_exec(enet, EEA_AQ_CMD_HOST_INFO,
 			     cfg, sizeof(*cfg), rep, sizeof(*rep), NULL);
+	if (rc)
+		goto err_free_rep;
 
-	if (!rc) {
-		if (rep->op_code == EEA_HINFO_REP_BAD)
-			dev_warn(dev, "The hardware-driven state validation may be abnormal.\n");
+	if (rep->op_code == EEA_HINFO_REP_BAD)
+		dev_warn(dev, "The hardware-driven state validation may be abnormal.\n");
 
-		if (rep->has_reply) {
-			rep->reply_str[EEA_HINFO_MAX_REP_LEN - 1] = '\0';
-			dev_warn(dev, "Device replied: %*pEhp\n",
-				 (int)strlen(rep->reply_str), rep->reply_str);
-		}
+	if (rep->has_reply) {
+		rep->reply_str[EEA_HINFO_MAX_REP_LEN - 1] = '\0';
+		dev_warn(dev, "Device replied: %*pEhp\n",
+			 (int)strlen(rep->reply_str), rep->reply_str);
 	}
 
+err_free_rep:
 	kfree(rep);
 err_free_cfg:
 	kfree(cfg);
