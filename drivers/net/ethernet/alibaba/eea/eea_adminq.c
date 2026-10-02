@@ -266,7 +266,7 @@ int eea_create_adminq(struct eea_net *enet, u32 qid)
 	u32 db_size, q_size, num;
 	struct eea_ring *ering;
 	struct eea_aq *aq;
-	int err = -ENOMEM;
+	int err;
 
 	num = enet->edev->rx_num + enet->edev->tx_num;
 	aq = &enet->adminq;
@@ -347,11 +347,12 @@ static void qcfg_fill(struct eea_aq_create *qcfg, struct eea_ring *ering,
 
 int eea_adminq_create_q(struct eea_net *enet, u32 num, u32 flags)
 {
-	int i, db_size, q_size, err = -ENOMEM;
 	struct eea_net_cfg *cfg;
 	struct eea_ring *ering;
+	int i, db_size, q_size;
 	struct eea_aq *aq;
 	u32 reply_len;
+	int err;
 
 	cfg = &enet->cfg;
 	aq = &enet->adminq;
@@ -483,7 +484,7 @@ void eea_adminq_config_host_info(struct eea_net *enet)
 	struct device *dev = enet->edev->dma_dev;
 	struct eea_aq_host_info_cfg *cfg;
 	struct eea_aq_host_info_rep *rep;
-	int rc = -ENOMEM;
+	int rc;
 
 	cfg = kzalloc_obj(*cfg);
 	if (!cfg)
