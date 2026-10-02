@@ -11462,6 +11462,11 @@ static int netdev_check_ops(struct net_device *dev)
 		return -EINVAL;
 	}
 
+	if (!ops->ndo_hwtstamp_get != !ops->ndo_hwtstamp_set) {
+		netdev_WARN(dev, "driver implements only one hwtstamp NDO\n");
+		return -EINVAL;
+	}
+
 	if (netdev_need_ops_lock(dev) && ops->ndo_set_rx_mode &&
 	    !ops->ndo_set_rx_mode_async) {
 		netdev_WARN(dev, "ops-locked drivers should use ndo_set_rx_mode_async\n");
