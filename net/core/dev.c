@@ -11463,8 +11463,10 @@ static int netdev_check_ops(struct net_device *dev)
 	}
 
 	if (netdev_need_ops_lock(dev) && ops->ndo_set_rx_mode &&
-	    !ops->ndo_set_rx_mode_async)
+	    !ops->ndo_set_rx_mode_async) {
 		netdev_WARN(dev, "ops-locked drivers should use ndo_set_rx_mode_async\n");
+		return -EINVAL;
+	}
 
 	return 0;
 }
