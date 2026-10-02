@@ -522,16 +522,9 @@ void eea_adminq_config_host_info(struct eea_net *enet)
 			dev_warn(dev, "The hardware-driven state validation may be abnormal.\n");
 
 		if (rep->has_reply) {
-			char buf[EEA_HINFO_MAX_REP_LEN] = {0};
-
 			rep->reply_str[EEA_HINFO_MAX_REP_LEN - 1] = '\0';
-
-			string_escape_str(rep->reply_str, buf, sizeof(buf),
-					  ESCAPE_NP, NULL);
-
-			buf[EEA_HINFO_MAX_REP_LEN - 1] = '\0';
-
-			dev_warn(dev, "Device replied: %s\n", buf);
+			dev_warn(dev, "Device replied: %*pEhp\n",
+				 (int)strlen(rep->reply_str), rep->reply_str);
 		}
 	}
 
