@@ -512,8 +512,8 @@ void eea_adminq_config_host_info(struct eea_net *enet)
 	cfg->pci_bdf            = cpu_to_le16(eea_pci_bdf(enet->edev));
 	cfg->pci_domain         = cpu_to_le32(eea_pci_domain_nr(enet->edev));
 
-	strscpy(cfg->os_ver_str, utsname()->release, sizeof(cfg->os_ver_str));
-	strscpy(cfg->isa_str, utsname()->machine, sizeof(cfg->isa_str));
+	strscpy(cfg->os_ver_str, utsname()->release);
+	strscpy(cfg->isa_str, utsname()->machine);
 
 	rc = eea_adminq_exec(enet, EEA_AQ_CMD_HOST_INFO,
 			     cfg, sizeof(*cfg), rep, sizeof(*rep), NULL);
