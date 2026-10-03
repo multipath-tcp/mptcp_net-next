@@ -690,7 +690,7 @@ ___neigh_create(struct neigh_table *tbl, const void *pkey,
 
 	hash_val = tbl->hash(n->primary_key, dev, nht->hash_rnd) >> (32 - nht->hash_shift);
 
-	if (n->parms->dead) {
+	if (n->parms->dead || n->parms->tbl != tbl) {
 		rc = ERR_PTR(-EINVAL);
 		goto out_tbl_unlock;
 	}
