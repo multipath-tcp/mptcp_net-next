@@ -438,7 +438,6 @@ void mlx5e_tc_update_neigh_used_value(struct mlx5e_neigh_hash_entry *nhe)
 
 	if (neigh_used) {
 		struct net_device *dev = READ_ONCE(nhe->neigh_dev);
-		struct net *net = dev_net(dev);
 
 		nhe->reported_lastuse = jiffies;
 
@@ -450,7 +449,7 @@ void mlx5e_tc_update_neigh_used_value(struct mlx5e_neigh_hash_entry *nhe)
 			n = ipv6_neigh_lookup(dev, &m_neigh->dst_ip);
 		else
 #endif
-			n = neigh_lookup(arp_table(net), &m_neigh->dst_ip, dev);
+			n = ipv4_neigh_lookup(dev, &m_neigh->dst_ip);
 		if (!n)
 			return;
 

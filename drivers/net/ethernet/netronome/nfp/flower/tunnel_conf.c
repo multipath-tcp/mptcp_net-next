@@ -209,7 +209,6 @@ void nfp_tunnel_keep_alive(struct nfp_app *app, struct sk_buff *skb)
 {
 	struct nfp_tun_active_tuns *payload;
 	struct net_device *netdev;
-	struct neigh_table *tbl;
 	int count, i, pay_len;
 	struct neighbour *n;
 	__be32 ipv4_addr;
@@ -236,8 +235,7 @@ void nfp_tunnel_keep_alive(struct nfp_app *app, struct sk_buff *skb)
 		if (!netdev)
 			continue;
 
-		tbl = arp_table(dev_net(netdev));
-		n = neigh_lookup(tbl, &ipv4_addr, netdev);
+		n = ipv4_neigh_lookup(netdev, &ipv4_addr);
 		if (!n)
 			continue;
 

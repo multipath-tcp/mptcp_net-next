@@ -229,8 +229,6 @@ static int mlxsw_sp_span_dmac(int family,
 			      struct net_device *dev,
 			      unsigned char dmac[ETH_ALEN])
 {
-	struct net *net = dev_net(dev);
-	struct neigh_table *tbl;
 	struct neighbour *neigh;
 	int err = 0;
 
@@ -245,10 +243,9 @@ static int mlxsw_sp_span_dmac(int family,
 	} else
 #endif
 	{
-		tbl = arp_table(net);
-		neigh = neigh_lookup(tbl, pkey, dev);
+		neigh = ipv4_neigh_lookup(dev, pkey);
 		if (!neigh) {
-			neigh = neigh_create(tbl, pkey, dev);
+			neigh = ipv4_neigh_create(dev, pkey);
 			if (IS_ERR(neigh))
 				return PTR_ERR(neigh);
 		}
