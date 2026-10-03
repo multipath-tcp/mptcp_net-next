@@ -1569,8 +1569,13 @@ struct neighbour *neigh_event_ns(struct neigh_table *tbl,
 				 u8 *lladdr, void *saddr,
 				 struct net_device *dev)
 {
-	struct neighbour *neigh = __neigh_lookup(tbl, saddr, dev,
-						 lladdr || !dev->addr_len);
+	struct neighbour *neigh = neigh_lookup(tbl, saddr, dev);
+
+	if (!neigh && (lladdr || !dev->addr_len)) {
+		neigh = neigh_create(tbl, saddr, dev);
+		if (IS_ERR(neigh))
+			neigh = NULL;
+	}
 	if (neigh)
 		neigh_update(neigh, lladdr, NUD_STALE,
 			     NEIGH_UPDATE_F_OVERRIDE, 0);
