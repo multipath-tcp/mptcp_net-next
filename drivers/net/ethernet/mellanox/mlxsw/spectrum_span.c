@@ -224,14 +224,24 @@ struct mlxsw_sp_span_entry_ops mlxsw_sp_span_entry_ops_phys = {
 	.deconfigure = mlxsw_sp_span_entry_phys_deconfigure,
 };
 
-static int mlxsw_sp_span_dmac(struct neigh_table *tbl,
+static int mlxsw_sp_span_dmac(int family,
 			      const void *pkey,
 			      struct net_device *dev,
 			      unsigned char dmac[ETH_ALEN])
 {
-	struct neighbour *neigh = neigh_lookup(tbl, pkey, dev);
+	struct net *net = dev_net(dev);
+	struct neigh_table *tbl;
+	struct neighbour *neigh;
 	int err = 0;
 
+#if IS_ENABLED(CONFIG_IPV6_GRE)
+	if (family == AF_INET6)
+		tbl = nd_table(net);
+	else
+#endif
+		tbl = arp_table(net);
+
+	neigh = neigh_lookup(tbl, pkey, dev);
 	if (!neigh) {
 		neigh = neigh_create(tbl, pkey, dev);
 		if (IS_ERR(neigh))
@@ -355,8 +365,7 @@ mlxsw_sp_span_entry_tunnel_parms_common(struct net_device *edev,
 					union mlxsw_sp_l3addr saddr,
 					union mlxsw_sp_l3addr daddr,
 					union mlxsw_sp_l3addr gw,
-					__u8 ttl,
-					struct neigh_table *tbl,
+					__u8 ttl, int family,
 					struct mlxsw_sp_span_parms *sparmsp)
 {
 	unsigned char dmac[ETH_ALEN];
@@ -365,7 +374,7 @@ mlxsw_sp_span_entry_tunnel_parms_common(struct net_device *edev,
 	if (mlxsw_sp_l3addr_is_zero(gw))
 		gw = daddr;
 
-	if (!edev || mlxsw_sp_span_dmac(tbl, &gw, edev, dmac))
+	if (!edev || mlxsw_sp_span_dmac(family, &gw, edev, dmac))
 		goto unoffloadable;
 
 	if (is_vlan_dev(edev))
@@ -456,7 +465,6 @@ mlxsw_sp_span_entry_gretap4_parms(struct mlxsw_sp *mlxsw_sp,
 	bool inherit_tos = tparm.iph.tos & 0x1;
 	bool inherit_ttl = !tparm.iph.ttl;
 	union mlxsw_sp_l3addr gw = daddr;
-	struct neigh_table *tbl = NULL;
 	struct net_device *l3edev;
 
 	if (!(to_dev->flags & IFF_UP) ||
@@ -470,11 +478,10 @@ mlxsw_sp_span_entry_gretap4_parms(struct mlxsw_sp *mlxsw_sp,
 		return mlxsw_sp_span_entry_unoffloadable(sparmsp);
 
 	l3edev = mlxsw_sp_span_gretap4_route(to_dev, &saddr.addr4, &gw.addr4);
-	if (l3edev)
-		tbl = arp_table(dev_net(l3edev));
+
 	return mlxsw_sp_span_entry_tunnel_parms_common(l3edev, saddr, daddr, gw,
 						       tparm.iph.ttl,
-						       tbl, sparmsp);
+						       AF_INET, sparmsp);
 }
 
 static int
@@ -564,7 +571,6 @@ mlxsw_sp_span_entry_gretap6_parms(struct mlxsw_sp *mlxsw_sp,
 	union mlxsw_sp_l3addr daddr = { .addr6 = tparm.raddr };
 	bool inherit_ttl = !tparm.hop_limit;
 	union mlxsw_sp_l3addr gw = daddr;
-	struct neigh_table *tbl = NULL;
 	struct net_device *l3edev;
 
 	if (!(to_dev->flags & IFF_UP) ||
@@ -578,11 +584,10 @@ mlxsw_sp_span_entry_gretap6_parms(struct mlxsw_sp *mlxsw_sp,
 		return mlxsw_sp_span_entry_unoffloadable(sparmsp);
 
 	l3edev = mlxsw_sp_span_gretap6_route(to_dev, &saddr.addr6, &gw.addr6);
-	if (l3edev)
-		tbl = nd_table(dev_net(l3edev));
+
 	return mlxsw_sp_span_entry_tunnel_parms_common(l3edev, saddr, daddr, gw,
 						       tparm.hop_limit,
-						       tbl, sparmsp);
+						       AF_INET6, sparmsp);
 }
 
 static int
