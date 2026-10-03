@@ -146,9 +146,9 @@ static u32 *ipv4_cow_metrics(struct dst_entry *dst, unsigned long old)
 	return NULL;
 }
 
-static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
-					   struct sk_buff *skb,
-					   const void *daddr);
+static struct neighbour *ipv4_dst_neigh_lookup(const struct dst_entry *dst,
+					       struct sk_buff *skb,
+					       const void *daddr);
 static void ipv4_confirm_neigh(const struct dst_entry *dst, const void *daddr);
 
 static struct dst_ops ipv4_dst_ops = {
@@ -163,7 +163,7 @@ static struct dst_ops ipv4_dst_ops = {
 	.update_pmtu =		ip_rt_update_pmtu,
 	.redirect =		ip_do_redirect,
 	.local_out =		__ip_local_out,
-	.neigh_lookup =		ipv4_neigh_lookup,
+	.neigh_lookup =		ipv4_dst_neigh_lookup,
 	.confirm_neigh =	ipv4_confirm_neigh,
 };
 
@@ -409,9 +409,9 @@ void rt_cache_flush(struct net *net)
 	rt_genid_bump_ipv4(net);
 }
 
-static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
-					   struct sk_buff *skb,
-					   const void *daddr)
+static struct neighbour *ipv4_dst_neigh_lookup(const struct dst_entry *dst,
+					       struct sk_buff *skb,
+					       const void *daddr)
 {
 	const struct rtable *rt = container_of(dst, struct rtable, dst);
 	struct net_device *dev;
@@ -2917,7 +2917,7 @@ out:
 static struct dst_ops ipv4_dst_blackhole_ops = {
 	.family			= AF_INET,
 	.default_advmss		= ipv4_default_advmss,
-	.neigh_lookup		= ipv4_neigh_lookup,
+	.neigh_lookup		= ipv4_dst_neigh_lookup,
 	.check			= dst_blackhole_check,
 	.cow_metrics		= dst_blackhole_cow_metrics,
 	.update_pmtu		= dst_blackhole_update_pmtu,
