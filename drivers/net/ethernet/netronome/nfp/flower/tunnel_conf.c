@@ -253,7 +253,6 @@ void nfp_tunnel_keep_alive_v6(struct nfp_app *app, struct sk_buff *skb)
 #if IS_ENABLED(CONFIG_IPV6)
 	struct nfp_tun_active_tuns_v6 *payload;
 	struct net_device *netdev;
-	struct neigh_table *tbl;
 	int count, i, pay_len;
 	struct neighbour *n;
 	void *ipv6_add;
@@ -280,8 +279,7 @@ void nfp_tunnel_keep_alive_v6(struct nfp_app *app, struct sk_buff *skb)
 		if (!netdev)
 			continue;
 
-		tbl = nd_table(dev_net(netdev));
-		n = neigh_lookup(tbl, ipv6_add, netdev);
+		n = ipv6_neigh_lookup(netdev, ipv6_add);
 		if (!n)
 			continue;
 

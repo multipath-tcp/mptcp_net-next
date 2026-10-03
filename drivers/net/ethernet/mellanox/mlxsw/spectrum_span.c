@@ -235,17 +235,23 @@ static int mlxsw_sp_span_dmac(int family,
 	int err = 0;
 
 #if IS_ENABLED(CONFIG_IPV6_GRE)
-	if (family == AF_INET6)
-		tbl = nd_table(net);
-	else
+	if (family == AF_INET6) {
+		neigh = ipv6_neigh_lookup(dev, pkey);
+		if (!neigh) {
+			neigh = ipv6_neigh_create(dev, pkey);
+			if (IS_ERR(neigh))
+				return PTR_ERR(neigh);
+		}
+	} else
 #endif
+	{
 		tbl = arp_table(net);
-
-	neigh = neigh_lookup(tbl, pkey, dev);
-	if (!neigh) {
-		neigh = neigh_create(tbl, pkey, dev);
-		if (IS_ERR(neigh))
-			return PTR_ERR(neigh);
+		neigh = neigh_lookup(tbl, pkey, dev);
+		if (!neigh) {
+			neigh = neigh_create(tbl, pkey, dev);
+			if (IS_ERR(neigh))
+				return PTR_ERR(neigh);
+		}
 	}
 
 	neigh_event_send(neigh, NULL);

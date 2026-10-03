@@ -423,11 +423,8 @@ static inline struct neighbour *ip_neigh_gw6(struct net_device *dev,
 	struct neighbour *neigh;
 
 	neigh = __ipv6_neigh_lookup_noref(dev, addr);
-	if (unlikely(!neigh)) {
-		struct neigh_table *tbl = nd_table(dev_net(dev));
-
-		neigh = __neigh_create(tbl, addr, dev, false);
-	}
+	if (unlikely(!neigh))
+		neigh = ipv6_neigh_create_noref(dev, addr);
 
 	return neigh;
 #else

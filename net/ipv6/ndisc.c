@@ -947,8 +947,12 @@ have_ifp:
 	 *	update / create cache entry
 	 *	for the source address
 	 */
-	neigh = __neigh_lookup(tbl, saddr, dev,
-			       !inc || lladdr || !dev->addr_len);
+	neigh = ipv6_neigh_lookup(dev, saddr);
+	if (!neigh && (!inc || lladdr || !dev->addr_len)) {
+		neigh = ipv6_neigh_create(dev, saddr);
+		if (IS_ERR(neigh))
+			neigh = NULL;
+	}
 	if (neigh)
 		ndisc_update(dev, neigh, lladdr, NUD_STALE,
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
@@ -998,7 +1002,6 @@ static enum skb_drop_reason ndisc_recv_na(struct sk_buff *skb)
 	struct net *net = dev_net(dev);
 	struct ndisc_options ndopts;
 	struct inet6_ifaddr *ifp;
-	struct neigh_table *tbl;
 	struct neighbour *neigh;
 	struct inet6_dev *idev;
 	u8 *lladdr = NULL;
@@ -1063,8 +1066,7 @@ static enum skb_drop_reason ndisc_recv_na(struct sk_buff *skb)
 		return reason;
 	}
 
-	tbl = nd_table(net);
-	neigh = neigh_lookup(tbl, &msg->target, dev);
+	neigh = ipv6_neigh_lookup(dev, &msg->target);
 
 	/* RFC 9131 updates original Neighbour Discovery RFC 4861.
 	 * NAs with Target LL Address option can now create a STALE neighbor
@@ -1093,7 +1095,7 @@ static enum skb_drop_reason ndisc_recv_na(struct sk_buff *skb)
 			return reason;
 		}
 		if (!neigh)
-			neigh = neigh_create(tbl, &msg->target, dev);
+			neigh = ipv6_neigh_create(dev, &msg->target);
 		new_state = NUD_STALE;
 	}
 
@@ -1108,7 +1110,7 @@ static enum skb_drop_reason ndisc_recv_na(struct sk_buff *skb)
 		if (lladdr && !memcmp(lladdr, dev->dev_addr, dev->addr_len) &&
 		    READ_ONCE(net->ipv6.devconf_all->forwarding) &&
 		    READ_ONCE(net->ipv6.devconf_all->proxy_ndp) &&
-		    pneigh_lookup(tbl, &msg->target, dev)) {
+		    pneigh_lookup(nd_table(dev_net(dev)), &msg->target, dev)) {
 			/* XXX: idev->cnf.proxy_ndp */
 			goto out;
 		}
@@ -1141,7 +1143,6 @@ static enum skb_drop_reason ndisc_recv_rs(struct sk_buff *skb)
 	unsigned long ndoptlen = skb->len - sizeof(*rs_msg);
 	struct net_device *dev = skb->dev;
 	struct ndisc_options ndopts;
-	struct neigh_table *tbl;
 	struct neighbour *neigh;
 	struct inet6_dev *idev;
 	u8 *lladdr = NULL;
@@ -1177,8 +1178,12 @@ static enum skb_drop_reason ndisc_recv_rs(struct sk_buff *skb)
 			goto out;
 	}
 
-	tbl = nd_table(dev_net(dev));
-	neigh = __neigh_lookup(tbl, saddr, dev, 1);
+	neigh = ipv6_neigh_lookup(dev, saddr);
+	if (!neigh) {
+		neigh = ipv6_neigh_create(dev, saddr);
+		if (IS_ERR(neigh))
+			goto out;
+	}
 	if (neigh) {
 		ndisc_update(dev, neigh, lladdr, NUD_STALE,
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
@@ -1478,9 +1483,14 @@ skip_linkparms:
 	 *	Process options.
 	 */
 
-	if (!neigh)
-		neigh = __neigh_lookup(nd_table(net), &ipv6_hdr(skb)->saddr,
-				       skb->dev, 1);
+	if (!neigh) {
+		neigh = ipv6_neigh_lookup(skb->dev, &ipv6_hdr(skb)->saddr);
+		if (!neigh) {
+			neigh = ipv6_neigh_create(skb->dev, &ipv6_hdr(skb)->saddr);
+			if (IS_ERR(neigh))
+				neigh = NULL;
+		}
+	}
 	if (neigh) {
 		u8 *lladdr = NULL;
 		if (ndopts.nd_opts_src_lladdr) {

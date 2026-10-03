@@ -226,7 +226,7 @@ struct neighbour *__ip6_dst_neigh_lookup(const struct in6_addr *gw,
 	if (n)
 		return n;
 
-	n = neigh_create(nd_table(dev_net(dev)), daddr, dev);
+	n = ipv6_neigh_create(dev, daddr);
 	return IS_ERR(n) ? NULL : n;
 }
 
@@ -4285,9 +4285,12 @@ static void rt6_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_bu
 	 */
 	dst_confirm_neigh(&rt->dst, &ipv6_hdr(skb)->saddr);
 
-	neigh = __neigh_lookup(nd_table(dev_net(dev)), &msg->target, dev, 1);
-	if (!neigh)
-		return;
+	neigh = ipv6_neigh_lookup(dev, &msg->target);
+	if (!neigh) {
+		neigh = ipv6_neigh_create(dev, &msg->target);
+		if (IS_ERR(neigh))
+			return;
+	}
 
 	/*
 	 *	We have finally decided to accept it.

@@ -439,21 +439,18 @@ void mlx5e_tc_update_neigh_used_value(struct mlx5e_neigh_hash_entry *nhe)
 	if (neigh_used) {
 		struct net_device *dev = READ_ONCE(nhe->neigh_dev);
 		struct net *net = dev_net(dev);
-		struct neigh_table *tbl;
 
 		nhe->reported_lastuse = jiffies;
-
-#if IS_ENABLED(CONFIG_IPV6)
-		if (m_neigh->family != AF_INET)
-			tbl = nd_table(net);
-		else
-#endif
-			tbl = arp_table(net);
 
 		/* find the relevant neigh according to the cached device and
 		 * dst ip pair
 		 */
-		n = neigh_lookup(tbl, &m_neigh->dst_ip, dev);
+#if IS_ENABLED(CONFIG_IPV6)
+		if (m_neigh->family != AF_INET)
+			n = ipv6_neigh_lookup(dev, &m_neigh->dst_ip);
+		else
+#endif
+			n = neigh_lookup(arp_table(net), &m_neigh->dst_ip, dev);
 		if (!n)
 			return;
 

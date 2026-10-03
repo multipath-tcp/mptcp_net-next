@@ -2450,8 +2450,6 @@ static void mlxsw_sp_router_neigh_ent_ipv6_process(struct mlxsw_sp *mlxsw_sp,
 						   char *rauhtd_pl,
 						   int rec_index)
 {
-	struct net *net = mlxsw_sp_net(mlxsw_sp);
-	struct neigh_table *tbl;
 	struct net_device *dev;
 	struct neighbour *n;
 	struct in6_addr dip;
@@ -2465,9 +2463,8 @@ static void mlxsw_sp_router_neigh_ent_ipv6_process(struct mlxsw_sp *mlxsw_sp,
 		return;
 	}
 
-	tbl = nd_table(net);
 	dev = mlxsw_sp_rif_dev(mlxsw_sp->router->rifs[rif]);
-	n = neigh_lookup(tbl, &dip, dev);
+	n = ipv6_neigh_lookup(dev, &dip);
 	if (!n)
 		return;
 
@@ -4313,17 +4310,23 @@ mlxsw_sp_nexthop_neigh_lookup(struct mlxsw_sp_nexthop *nh)
 	net = dev_net(dev);
 
 #if IS_ENABLED(CONFIG_IPV6)
-	if (nh->family == AF_INET6)
-		tbl = nd_table(net);
-	else
+	if (nh->family == AF_INET6) {
+		n = ipv6_neigh_lookup(dev, &nh->gw_addr);
+		if (!n) {
+			n = ipv6_neigh_create(dev, &nh->gw_addr);
+			if (!IS_ERR(n))
+				neigh_event_send(n, NULL);
+		}
+	} else
 #endif
+	{
 		tbl = arp_table(net);
-
-	n = neigh_lookup(tbl, &nh->gw_addr, dev);
-	if (!n) {
-		n = neigh_create(tbl, &nh->gw_addr, dev);
-		if (!IS_ERR(n))
-			neigh_event_send(n, NULL);
+		n = neigh_lookup(tbl, &nh->gw_addr, dev);
+		if (!n) {
+			n = neigh_create(tbl, &nh->gw_addr, dev);
+			if (!IS_ERR(n))
+				neigh_event_send(n, NULL);
+		}
 	}
 
 	return n;

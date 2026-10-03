@@ -16,6 +16,7 @@
 #include <linux/skbuff.h>
 #include <linux/moduleparam.h>
 #include <net/dst.h>
+#include <net/ndisc.h>
 #include <net/neighbour.h>
 #include <net/pkt_sched.h>
 
@@ -257,7 +258,16 @@ __teql_resolve(struct sk_buff *skb, struct sk_buff *skb_res,
 	if (dst->dev != dev) {
 		struct neighbour *mn;
 
-		mn = __neigh_lookup_errno(n->tbl, n->primary_key, dev);
+#if IS_ENABLED(CONFIG_IPV6)
+		if (n->tbl->family == AF_INET6) {
+			mn = ipv6_neigh_lookup(dev, n->primary_key);
+			if (!mn)
+				mn = ipv6_neigh_create(dev, n->primary_key);
+		} else
+#endif
+		{
+			mn = __neigh_lookup_errno(n->tbl, n->primary_key, dev);
+		}
 		neigh_release(n);
 		if (IS_ERR(mn))
 			return PTR_ERR(mn);
