@@ -885,6 +885,15 @@ struct yt921x_mib_stats {
 	u64 tx_oam;
 };
 
+struct yt921x_mib {
+	struct yt921x_port *port;
+
+	struct delayed_work work;
+	struct yt921x_mib_stats stats;
+	u64 rx_frames;
+	u64 tx_frames;
+};
+
 struct yt921x_acl_entry {
 	u32 key[2];
 	u32 mask[2];
@@ -917,11 +926,6 @@ struct yt921x_port {
 	/* BR_ISOLATED */
 	bool isolated:1;
 
-	struct delayed_work mib_read;
-	struct yt921x_mib_stats mib;
-	u64 rx_frames;
-	u64 tx_frames;
-
 #if IS_ENABLED(CONFIG_NET_DSA_YT921X_LEDS)
 	unsigned char led_duty;
 	unsigned short led_cycle;
@@ -932,6 +936,7 @@ struct yt921x_port {
 	struct yt921x_led *leds[YT921X_LED_GROUP_NUM];
 #endif
 
+	struct yt921x_mib *mib;
 	struct phylink_pcs pcs;
 };
 
@@ -954,6 +959,11 @@ struct yt921x_info {
 	u16 xmii_mask;
 	u16 serdes_mask;
 };
+
+static inline u16 yt921x_info_ports_mask(const struct yt921x_info *info)
+{
+	return info->internal_mask | info->xmii_mask | info->serdes_mask;
+}
 
 struct yt921x_priv {
 	struct dsa_switch ds;
