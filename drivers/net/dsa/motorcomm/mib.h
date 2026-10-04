@@ -125,13 +125,19 @@ struct yt921x_mib_stats {
 	u64_stats_t tx_oam;
 };
 
+#define YT921X_MIB_STAT_NUM	(sizeof(struct yt921x_mib_stats) / sizeof(u64_stats_t))
+
 struct yt921x_mib {
 	struct yt921x_port *port;
 
 	struct delayed_work work;
+	struct u64_stats_sync syncp;
+	/* writers: priv->reg_lock + syncp; readers: priv->reg_lock or syncp */
 	struct yt921x_mib_stats stats;
 	u64_stats_t rx_frames;
 	u64_stats_t tx_frames;
+	/* protected by priv->reg_lock */
+	u64 data[YT921X_MIB_STAT_NUM];
 };
 
 void yt921x_mib_poll(struct work_struct *work);
