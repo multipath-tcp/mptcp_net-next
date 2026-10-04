@@ -5830,7 +5830,9 @@ ieee80211_color_change(struct wiphy *wiphy, struct net_device *dev,
 	cfg80211_color_change_started_notify(sdata->dev, params->count, link_id);
 
 	if (changed)
-		ieee80211_color_change_bss_config_notify(link, 0, 0, changed);
+		ieee80211_color_change_bss_config_notify(link,
+							 link_conf->he_bss_color.color,
+							 0, changed);
 	else
 		/* if the beacon didn't change, we can finalize immediately */
 		ieee80211_color_change_finalize(link);
