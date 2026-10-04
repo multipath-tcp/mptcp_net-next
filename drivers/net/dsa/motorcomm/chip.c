@@ -171,9 +171,6 @@ struct yt921x_reg_mdio {
 
 /* TODO: SPI/I2C */
 
-#define to_yt921x_priv(_ds) container_of_const(_ds, struct yt921x_priv, ds)
-#define to_device(priv) ((priv)->ds.dev)
-
 static u32 ethaddr_hi4_to_u32(const unsigned char *addr)
 {
 	return (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3];
@@ -271,8 +268,8 @@ static const struct yt921x_reg_ops yt921x_reg_ops_mdio = {
 /* Read and handle overflow of 32bit MIBs. MIB buffer must be zeroed before. */
 static int yt921x_read_mib(struct yt921x_priv *priv, int port)
 {
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct yt921x_port *pp = &priv->ports[port];
-	struct device *dev = to_device(priv);
 	struct yt921x_mib *mib = &pp->mib;
 	int res = 0;
 
@@ -364,7 +361,7 @@ yt921x_dsa_get_strings(struct dsa_switch *ds, int port, u32 stringset,
 static void
 yt921x_dsa_get_ethtool_stats(struct dsa_switch *ds, int port, uint64_t *data)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 	size_t j;
@@ -406,7 +403,7 @@ static void
 yt921x_dsa_get_eth_mac_stats(struct dsa_switch *ds, int port,
 			     struct ethtool_eth_mac_stats *mac_stats)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 
@@ -442,7 +439,7 @@ static void
 yt921x_dsa_get_eth_ctrl_stats(struct dsa_switch *ds, int port,
 			      struct ethtool_eth_ctrl_stats *ctrl_stats)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 
@@ -471,7 +468,7 @@ yt921x_dsa_get_rmon_stats(struct dsa_switch *ds, int port,
 			  struct ethtool_rmon_stats *rmon_stats,
 			  const struct ethtool_rmon_hist_range **ranges)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 
@@ -507,7 +504,7 @@ static void
 yt921x_dsa_get_stats64(struct dsa_switch *ds, int port,
 		       struct rtnl_link_stats64 *stats)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 
@@ -543,7 +540,7 @@ static void
 yt921x_dsa_get_pause_stats(struct dsa_switch *ds, int port,
 			   struct ethtool_pause_stats *pause_stats)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *mib = &pp->mib;
 
@@ -598,7 +595,7 @@ yt921x_set_eee(struct yt921x_priv *priv, int port, struct ethtool_keee *e)
 static int
 yt921x_dsa_set_mac_eee(struct dsa_switch *ds, int port, struct ethtool_keee *e)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -622,7 +619,7 @@ yt921x_dsa_port_change_mtu(struct dsa_switch *ds, int port, int new_mtu)
 	 * maximum after reset
 	 */
 
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct dsa_port *dp = dsa_to_port(ds, port);
 	int frame_size;
 	int res;
@@ -697,7 +694,7 @@ yt921x_marker_tfm(struct yt921x_marker *marker, u64 rate, u64 burst,
 {
 	const int C = flags & YT921X_MARKER_PKT_MODE ? YT921X_TOKEN_PKT_C :
 		      YT921X_TOKEN_BYTE_C;
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct yt921x_marker m;
 	u64 burst_est;
 	u64 burst_sug;
@@ -873,8 +870,8 @@ yt921x_meter_config(struct yt921x_priv *priv, unsigned int id,
 
 static void yt921x_dsa_port_policer_del(struct dsa_switch *ds, int port)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -891,7 +888,7 @@ yt921x_dsa_port_policer_add(struct dsa_switch *ds, int port,
 			    const struct flow_action_police *police,
 			    struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_marker marker;
 	u32 ctrl;
 	int res;
@@ -921,7 +918,7 @@ static int
 yt921x_dsa_port_setup_tc_tbf_port(struct dsa_switch *ds, int port,
 				  const struct tc_tbf_qopt_offload *qopt)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct netlink_ext_ack *extack = qopt->extack;
 	u32 ctrls[2];
 	int res;
@@ -1970,7 +1967,7 @@ static int
 yt921x_dsa_cls_flower_del(struct dsa_switch *ds, int port,
 			  struct flow_cls_offload *cls, bool ingress)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -1985,7 +1982,7 @@ yt921x_dsa_cls_flower_add(struct dsa_switch *ds, int port,
 			  struct flow_cls_offload *cls, bool ingress)
 {
 	struct netlink_ext_ack *extack = cls->common.extack;
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_acl_rule_ext ruleext;
 	int res;
 
@@ -2056,8 +2053,8 @@ static void
 yt921x_dsa_port_mirror_del(struct dsa_switch *ds, int port,
 			   struct dsa_mall_mirror_tc_entry *mirror)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2074,7 +2071,7 @@ yt921x_dsa_port_mirror_add(struct dsa_switch *ds, int port,
 			   struct dsa_mall_mirror_tc_entry *mirror,
 			   bool ingress, struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2143,7 +2140,7 @@ static int yt921x_lag_set(struct yt921x_priv *priv, u8 index, u16 ports_mask)
 static int
 yt921x_dsa_port_lag_leave(struct dsa_switch *ds, int port, struct dsa_lag lag)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct dsa_port *dp;
 	u32 ctrl;
 	int res;
@@ -2206,7 +2203,7 @@ yt921x_dsa_port_lag_join(struct dsa_switch *ds, int port, struct dsa_lag lag,
 			 struct netdev_lag_upper_info *info,
 			 struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct dsa_port *dp;
 	bool unique_lag;
 	unsigned int i;
@@ -2269,7 +2266,7 @@ yt921x_dsa_port_lag_join(struct dsa_switch *ds, int port, struct dsa_lag lag,
 
 static int yt921x_fdb_wait(struct yt921x_priv *priv, u32 *valp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u32 val = YT921X_FDB_RESULT_DONE;
 	int res;
 
@@ -2338,7 +2335,7 @@ static int
 yt921x_fdb_read(struct yt921x_priv *priv, unsigned char *addr, u16 *vidp,
 		u16 *ports_maskp, u16 *indexp, u8 *statusp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u16 index;
 	u32 data0;
 	u32 data1;
@@ -2629,7 +2626,7 @@ static int
 yt921x_dsa_port_fdb_dump(struct dsa_switch *ds, int port,
 			 dsa_fdb_dump_cb_t *cb, void *data)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2644,8 +2641,8 @@ yt921x_dsa_port_fdb_dump(struct dsa_switch *ds, int port,
 
 static void yt921x_dsa_port_fast_age(struct dsa_switch *ds, int port)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2660,7 +2657,7 @@ static void yt921x_dsa_port_fast_age(struct dsa_switch *ds, int port)
 static int
 yt921x_dsa_set_ageing_time(struct dsa_switch *ds, unsigned int msecs)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 ctrl;
 	int res;
 
@@ -2678,7 +2675,7 @@ static int
 yt921x_dsa_port_fdb_del(struct dsa_switch *ds, int port,
 			const unsigned char *addr, u16 vid, struct dsa_db db)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2692,7 +2689,7 @@ static int
 yt921x_dsa_port_fdb_add(struct dsa_switch *ds, int port,
 			const unsigned char *addr, u16 vid, struct dsa_db db)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -2707,7 +2704,7 @@ yt921x_dsa_port_mdb_del(struct dsa_switch *ds, int port,
 			const struct switchdev_obj_port_mdb *mdb,
 			struct dsa_db db)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	const unsigned char *addr = mdb->addr;
 	u16 vid = mdb->vid;
 	int res;
@@ -2724,7 +2721,7 @@ yt921x_dsa_port_mdb_add(struct dsa_switch *ds, int port,
 			const struct switchdev_obj_port_mdb *mdb,
 			struct dsa_db db)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	const unsigned char *addr = mdb->addr;
 	u16 vid = mdb->vid;
 	int res;
@@ -2889,7 +2886,7 @@ yt921x_dsa_port_vlan_filtering(struct dsa_switch *ds, int port,
 			       bool vlan_filtering,
 			       struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	if (dsa_is_cpu_port(ds, port))
@@ -2906,7 +2903,7 @@ static int
 yt921x_dsa_port_vlan_del(struct dsa_switch *ds, int port,
 			 const struct switchdev_obj_port_vlan *vlan)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u16 vid = vlan->vid;
 	u16 pvid;
 	int res;
@@ -2940,7 +2937,7 @@ yt921x_dsa_port_vlan_add(struct dsa_switch *ds, int port,
 			 const struct switchdev_obj_port_vlan *vlan,
 			 struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u16 vid = vlan->vid;
 	u16 pvid;
 	int res;
@@ -3185,7 +3182,7 @@ yt921x_dsa_port_bridge_flags(struct dsa_switch *ds, int port,
 			     struct switchdev_brport_flags flags,
 			     struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	if (dsa_is_cpu_port(ds, port))
@@ -3202,8 +3199,8 @@ static void
 yt921x_dsa_port_bridge_leave(struct dsa_switch *ds, int port,
 			     struct dsa_bridge bridge)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int res;
 
 	if (dsa_is_cpu_port(ds, port))
@@ -3223,7 +3220,7 @@ yt921x_dsa_port_bridge_join(struct dsa_switch *ds, int port,
 			    struct dsa_bridge bridge, bool *tx_fwd_offload,
 			    struct netlink_ext_ack *extack)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u16 ports_mask;
 	int res;
 
@@ -3244,7 +3241,7 @@ static int
 yt921x_dsa_port_mst_state_set(struct dsa_switch *ds, int port,
 			      const struct switchdev_mst_state *st)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 mask;
 	u32 ctrl;
 	int res;
@@ -3278,7 +3275,7 @@ static int
 yt921x_dsa_vlan_msti_set(struct dsa_switch *ds, struct dsa_bridge bridge,
 			 const struct switchdev_vlan_msti *msti)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 masks[2];
 	u32 ctrls[2];
 	int res;
@@ -3304,9 +3301,9 @@ yt921x_dsa_vlan_msti_set(struct dsa_switch *ds, struct dsa_bridge bridge,
 static void
 yt921x_dsa_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct dsa_port *dp = dsa_to_port(ds, port);
-	struct device *dev = to_device(priv);
 	bool learning;
 	u32 mask;
 	u32 ctrl;
@@ -3356,7 +3353,7 @@ yt921x_dsa_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 static int __maybe_unused
 yt921x_dsa_port_get_default_prio(struct dsa_switch *ds, int port)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 val;
 	int res;
 
@@ -3373,7 +3370,7 @@ yt921x_dsa_port_get_default_prio(struct dsa_switch *ds, int port)
 static int __maybe_unused
 yt921x_dsa_port_set_default_prio(struct dsa_switch *ds, int port, u8 prio)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 mask;
 	u32 ctrl;
 	int res;
@@ -3399,7 +3396,7 @@ static int __maybe_unused
 yt921x_dsa_port_get_apptrust(struct dsa_switch *ds, int port, u8 *sel,
 			     int *nselp)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u8 appprios[2][2] = {};
 	int nsel;
 	u32 val;
@@ -3433,8 +3430,8 @@ static int __maybe_unused
 yt921x_dsa_port_set_apptrust(struct dsa_switch *ds, int port, const u8 *sel,
 			     int nsel)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u32 ctrl;
 	int res;
 
@@ -3574,9 +3571,9 @@ static int
 yt921x_port_config(struct yt921x_priv *priv, int port, unsigned int mode,
 		   phy_interface_t interface)
 {
+	struct device *dev = yt921x_priv_to_device(priv);
 	const struct yt921x_info *info = priv->info;
 	struct yt921x_port *pp = &priv->ports[port];
-	struct device *dev = to_device(priv);
 	u32 mask;
 	int res;
 
@@ -3628,7 +3625,7 @@ yt921x_phylink_mac_select_pcs(struct phylink_config *config,
 			      phy_interface_t interface)
 {
 	struct dsa_port *dp = dsa_phylink_to_port(config);
-	struct yt921x_priv *priv = to_yt921x_priv(dp->ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(dp->ds);
 	const struct yt921x_info *info = priv->info;
 	int port = dp->index;
 
@@ -3651,7 +3648,7 @@ yt921x_phylink_mac_link_down(struct phylink_config *config, unsigned int mode,
 			     phy_interface_t interface)
 {
 	struct dsa_port *dp = dsa_phylink_to_port(config);
-	struct yt921x_priv *priv = to_yt921x_priv(dp->ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(dp->ds);
 	int port = dp->index;
 	int res;
 
@@ -3674,7 +3671,7 @@ yt921x_phylink_mac_link_up(struct phylink_config *config,
 			   bool tx_pause, bool rx_pause)
 {
 	struct dsa_port *dp = dsa_phylink_to_port(config);
-	struct yt921x_priv *priv = to_yt921x_priv(dp->ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(dp->ds);
 	int port = dp->index;
 	int res;
 
@@ -3695,7 +3692,7 @@ yt921x_phylink_mac_config(struct phylink_config *config, unsigned int mode,
 			  const struct phylink_link_state *state)
 {
 	struct dsa_port *dp = dsa_phylink_to_port(config);
-	struct yt921x_priv *priv = to_yt921x_priv(dp->ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(dp->ds);
 	int port = dp->index;
 	int res;
 
@@ -3712,7 +3709,7 @@ static void
 yt921x_dsa_phylink_get_caps(struct dsa_switch *ds, int port,
 			    struct phylink_config *config)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	const struct yt921x_info *info = priv->info;
 
 	config->mac_capabilities = MAC_ASYM_PAUSE | MAC_SYM_PAUSE |
@@ -3803,7 +3800,7 @@ yt921x_dsa_get_tag_protocol(struct dsa_switch *ds, int port,
 
 static int yt921x_dsa_port_setup(struct dsa_switch *ds, int port)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	mutex_lock(&priv->reg_lock);
@@ -3817,7 +3814,7 @@ static int yt921x_dsa_port_setup(struct dsa_switch *ds, int port)
 static int __maybe_unused
 yt921x_dsa_port_get_dscp_prio(struct dsa_switch *ds, int port, u8 dscp)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 val;
 	int res;
 
@@ -3834,7 +3831,7 @@ yt921x_dsa_port_get_dscp_prio(struct dsa_switch *ds, int port, u8 dscp)
 static int __maybe_unused
 yt921x_dsa_port_del_dscp_prio(struct dsa_switch *ds, int port, u8 dscp, u8 prio)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	u32 val;
 	int res;
 
@@ -3859,7 +3856,7 @@ yt921x_dsa_port_del_dscp_prio(struct dsa_switch *ds, int port, u8 dscp, u8 prio)
 static int __maybe_unused
 yt921x_dsa_port_add_dscp_prio(struct dsa_switch *ds, int port, u8 dscp, u8 prio)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	int res;
 
 	if (prio >= YT921X_PRIO_NUM)
@@ -3920,7 +3917,7 @@ static int yt921x_edata_read(struct yt921x_priv *priv, u8 addr, u8 *valp)
 static void yt921x_dsa_teardown(struct dsa_switch *ds)
 {
 #if IS_ENABLED(CONFIG_NET_DSA_YT921X_LEDS)
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 
 	yt921x_leds_remove(priv);
 #endif
@@ -3928,7 +3925,7 @@ static void yt921x_dsa_teardown(struct dsa_switch *ds)
 
 static int yt921x_chip_detect(struct yt921x_priv *priv)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	const struct yt921x_info *info;
 	u8 extmode;
 	u32 chipid;
@@ -3995,7 +3992,7 @@ static int yt921x_chip_detect(struct yt921x_priv *priv)
 
 static int yt921x_chip_reset(struct yt921x_priv *priv)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u16 eth_p_tag;
 	u32 val;
 	int res;
@@ -4243,8 +4240,8 @@ static int yt921x_chip_setup(struct yt921x_priv *priv)
 
 static int yt921x_dsa_setup(struct dsa_switch *ds)
 {
-	struct yt921x_priv *priv = to_yt921x_priv(ds);
-	struct device *dev = to_device(priv);
+	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct device_node *np = dev->of_node;
 	struct device_node *child;
 	unsigned long mask;
