@@ -37,6 +37,7 @@
 #include <linux/stddef.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/u64_stats_sync.h>
 #include <linux/utsname.h>
 #include <net/netlink.h>
 #include <net/rtnetlink.h>
@@ -92,13 +93,21 @@ int batadv_skb_head_push(struct sk_buff *skb, unsigned int len)
  */
 static u64 batadv_sum_counter(struct batadv_priv *bat_priv,  size_t idx)
 {
-	u64 *counters;
+	struct batadv_pcpu_counters *counters;
+	unsigned int start;
 	u64 sum = 0;
+	u64 val;
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
 		counters = per_cpu_ptr(bat_priv->bat_counters, cpu);
-		sum += counters[idx];
+
+		do {
+			start = u64_stats_fetch_begin(&counters->syncp);
+			val = u64_stats_read(&counters->cnt[idx]);
+		} while (u64_stats_fetch_retry(&counters->syncp, start));
+
+		sum += val;
 	}
 
 	return sum;
@@ -802,9 +811,10 @@ static void batadv_set_lockdep_class(struct net_device *dev)
  */
 static int batadv_meshif_init_late(struct net_device *dev)
 {
-	size_t cnt_len = sizeof(u64) * BATADV_CNT_NUM;
+	struct batadv_pcpu_counters *counters;
 	struct batadv_priv *bat_priv;
 	u32 random_seqno;
+	int cpu;
 	int ret;
 
 	batadv_set_lockdep_class(dev);
@@ -815,9 +825,14 @@ static int batadv_meshif_init_late(struct net_device *dev)
 	/* batadv_interface_stats() needs to be available as soon as
 	 * register_netdevice() has been called
 	 */
-	bat_priv->bat_counters = __alloc_percpu(cnt_len, __alignof__(u64));
+	bat_priv->bat_counters = alloc_percpu(struct batadv_pcpu_counters);
 	if (!bat_priv->bat_counters)
 		return -ENOMEM;
+
+	for_each_possible_cpu(cpu) {
+		counters = per_cpu_ptr(bat_priv->bat_counters, cpu);
+		u64_stats_init(&counters->syncp);
+	}
 
 	WRITE_ONCE(bat_priv->aggregated_ogms, 1);
 	WRITE_ONCE(bat_priv->bonding, 0);
