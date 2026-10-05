@@ -1775,6 +1775,7 @@ struct tx_iter_data {
 	struct ieee80211_channel *channel;
 	struct ieee80211_rx_status *rx_status;
 	struct ieee80211_hw *hw;
+	struct sk_buff *skb;
 	bool receive;
 };
 
@@ -1787,6 +1788,7 @@ static void mac80211_hwsim_tx_iter(void *_data, u8 *addr,
 	if (vif->type == NL80211_IFTYPE_NAN ||
 	    vif->type == NL80211_IFTYPE_NAN_DATA) {
 		data->receive = mac80211_hwsim_nan_receive(data->hw,
+							   data->skb,
 							   data->channel,
 							   data->rx_status);
 		return;
@@ -1968,6 +1970,7 @@ static bool mac80211_hwsim_tx_frame_no_nl(struct ieee80211_hw *hw,
 			.hw = data2->hw,
 			.channel = chan,
 			.rx_status = &rx_status,
+			.skb = skb,
 		};
 
 		if (data == data2)
@@ -5841,7 +5844,8 @@ static int mac80211_hwsim_new_radio(struct genl_info *info,
 						 BIT(NL80211_BAND_5GHZ);
 
 		hw->wiphy->nan_capa.flags = WIPHY_NAN_FLAGS_CONFIGURABLE_SYNC |
-					    WIPHY_NAN_FLAGS_USERSPACE_DE;
+					    WIPHY_NAN_FLAGS_USERSPACE_DE |
+					    WIPHY_NAN_FLAGS_INSTANT_COMM;
 		hw->wiphy->nan_capa.op_mode = NAN_OP_MODE_PHY_MODE_MASK |
 					      NAN_OP_MODE_80P80MHZ |
 					      NAN_OP_MODE_160MHZ;
@@ -6644,6 +6648,7 @@ static int hwsim_cloned_frame_received_nl(struct sk_buff *skb_2,
 		struct tx_iter_data iter_data = {
 			.hw = data2->hw,
 			.rx_status = &rx_status,
+			.skb = skb,
 		};
 
 		/* throw away off-channel packets, but allow both the temporary
