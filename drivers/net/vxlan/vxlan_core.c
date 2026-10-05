@@ -1700,7 +1700,7 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 	if (!(vh->vx_flags & VXLAN_HF_VNI)) {
 		netdev_dbg(skb->dev, "invalid vxlan flags=%#x vni=%#x\n",
 			   ntohl(vh->vx_flags), ntohl(vh->vx_vni));
-		reason = SKB_DROP_REASON_VXLAN_INVALID_HDR;
+		reason = SKB_DROP_REASON_TUNNEL_INVALID_HDR;
 		/* Return non vxlan pkt */
 		goto drop;
 	}
@@ -1713,7 +1713,7 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 
 	vxlan = vxlan_vs_find_vni(vs, skb->dev->ifindex, vni, &vninode);
 	if (!vxlan) {
-		reason = SKB_DROP_REASON_VXLAN_VNI_NOT_FOUND;
+		reason = SKB_DROP_REASON_TUNNEL_NOT_FOUND;
 		goto drop;
 	}
 
@@ -1729,7 +1729,7 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 		 * previous stack code, and also is more robust and provides a
 		 * little more security in adding extensions to VXLAN.
 		 */
-		reason = SKB_DROP_REASON_VXLAN_INVALID_HDR;
+		reason = SKB_DROP_REASON_TUNNEL_INVALID_HDR;
 		DEV_STATS_INC(vxlan->dev, rx_frame_errors);
 		DEV_STATS_INC(vxlan->dev, rx_errors);
 		vxlan_vnifilter_count(vxlan, cfg, vni, vninode,
@@ -2383,7 +2383,7 @@ static int encap_bypass_if_local(struct sk_buff *skb, struct net_device *dev,
 			DEV_STATS_INC(dev, tx_errors);
 			vxlan_vnifilter_count(vxlan, cfg, vni, NULL,
 					      VXLAN_VNI_STATS_TX_ERRORS, 0);
-			kfree_skb_reason(skb, SKB_DROP_REASON_VXLAN_VNI_NOT_FOUND);
+			kfree_skb_reason(skb, SKB_DROP_REASON_TUNNEL_NOT_FOUND);
 
 			return -ENOENT;
 		}
