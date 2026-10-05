@@ -1000,7 +1000,6 @@ static void __fdb_update(struct net_bridge *br,
 			 struct net_bridge_fdb_entry *fdb,
 			 struct net_bridge_port *source,
 			 struct net_bridge_dst dst,
-			 const unsigned char *addr, u16 vid,
 			 unsigned long flags)
 {
 	struct net_bridge_port *old_port;
@@ -1012,7 +1011,8 @@ static void __fdb_update(struct net_bridge *br,
 	if (unlikely(test_bit(BR_FDB_LOCAL, &fdb->flags))) {
 		if (net_ratelimit())
 			br_warn(br, "received packet on %s with own address as source address (addr:%pM, vlan:%u)\n",
-				source->dev->name, addr, vid);
+				source->dev->name, fdb->key.addr.addr,
+				fdb->key.vlan_id);
 		return;
 	}
 
@@ -1055,7 +1055,8 @@ static void __fdb_update(struct net_bridge *br,
 	}
 
 	if (unlikely(fdb_modified)) {
-		trace_br_fdb_update(br, source, addr, vid, flags);
+		trace_br_fdb_update(br, source, fdb->key.addr.addr,
+				    fdb->key.vlan_id, flags);
 		fdb_notify(br, fdb, RTM_NEWNEIGH, true);
 	}
 }
@@ -1075,7 +1076,7 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 
 	fdb = fdb_find_rcu(&br->fdb_hash_tbl, addr, vid);
 	if (likely(fdb)) {
-		__fdb_update(br, fdb, source, dst, addr, vid, flags);
+		__fdb_update(br, fdb, source, dst, flags);
 	} else {
 		spin_lock(&br->hash_lock);
 		fdb = fdb_create(br, dst, addr, vid, flags);
