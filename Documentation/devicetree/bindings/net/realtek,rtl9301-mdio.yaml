@@ -67,6 +67,10 @@ patternProperties:
 
     unevaluatedProperties: false
 
+required:
+  - compatible
+  - reg
+
 allOf:
   - if:
       properties:
@@ -77,8 +81,16 @@ allOf:
               - realtek,rtl8381-mdio
               - realtek,rtl8382-mdio
     then:
+      properties:
+        mdio-bus@0:
+          properties:
+            clock-frequency:
+              enum: [2500000, 10000000]
+              default: 2500000
+
       patternProperties:
         '^mdio-bus@[1-3]$': false
+
   - if:
       properties:
         compatible:
@@ -89,11 +101,37 @@ allOf:
               - realtek,rtl8393-mdio
     then:
       patternProperties:
+        '^mdio-bus@[01]$':
+          properties:
+            clock-frequency:
+              enum: [1250000, 2500000, 5000000]
+              description: |
+                RTL839x has one clock selector shared by both MDIO buses. All explicitly
+                specified clock-frequency values must be identical. A bus without this
+                property inherits the shared frequency selected by another available bus.
+                If neither available bus specifies a frequency, 2500000 Hz is used.
+
         '^mdio-bus@[2-3]$': false
 
-required:
-  - compatible
-  - reg
+  - if:
+      properties:
+        compatible:
+          contains:
+            enum:
+              - realtek,rtl9301-mdio
+              - realtek,rtl9302b-mdio
+              - realtek,rtl9302c-mdio
+              - realtek,rtl9303-mdio
+              - realtek,rtl9311-mdio
+              - realtek,rtl9312-mdio
+              - realtek,rtl9313-mdio
+    then:
+      patternProperties:
+        '^mdio-bus@[0-3]$':
+          properties:
+            clock-frequency:
+              enum: [1250000, 2500000, 5000000]
+              default: 2500000
 
 unevaluatedProperties: false
 
