@@ -687,6 +687,7 @@ nl80211_nan_conf_policy[NL80211_NAN_CONF_ATTR_MAX + 1] = {
 	[NL80211_NAN_CONF_DISCOVERY_BEACON_INTERVAL] =
 		NLA_POLICY_RANGE(NLA_U8, 50, 200),
 	[NL80211_NAN_CONF_NOTIFY_DW] = { .type = NLA_FLAG },
+	[NL80211_NAN_CONF_INSTANT_COMM] = { .type = NLA_FLAG },
 };
 
 static const struct netlink_range_validation nl80211_punct_bitmap_range = {
@@ -3035,6 +3036,10 @@ static int nl80211_put_nan_capa(struct wiphy *wiphy, struct sk_buff *msg)
 
 	if ((wiphy->nan_capa.flags & WIPHY_NAN_FLAGS_USERSPACE_DE) &&
 	    nla_put_flag(msg, NL80211_NAN_CAPA_USERSPACE_DE))
+		goto fail;
+
+	if ((wiphy->nan_capa.flags & WIPHY_NAN_FLAGS_INSTANT_COMM) &&
+	    nla_put_flag(msg, NL80211_NAN_CAPA_INSTANT_COMM))
 		goto fail;
 
 	if (nla_put_u8(msg, NL80211_NAN_CAPA_OP_MODE,
@@ -16788,6 +16793,23 @@ static int nl80211_parse_nan_conf(struct wiphy *wiphy,
 	if (attrs[NL80211_NAN_CONF_NOTIFY_DW])
 		conf->enable_dw_notification =
 			nla_get_flag(attrs[NL80211_NAN_CONF_NOTIFY_DW]);
+
+	conf->instant_comm = nla_get_flag(attrs[NL80211_NAN_CONF_INSTANT_COMM]);
+	if (conf->instant_comm) {
+		if (!(wiphy->nan_capa.flags & WIPHY_NAN_FLAGS_INSTANT_COMM)) {
+			NL_SET_ERR_MSG_ATTR(info->extack,
+					    attrs[NL80211_NAN_CONF_INSTANT_COMM],
+					    "Instant Communication is not supported");
+			return -EOPNOTSUPP;
+		}
+
+		if (!conf->discovery_beacon_interval) {
+			NL_SET_ERR_MSG_ATTR(info->extack,
+					    attrs[NL80211_NAN_CONF_INSTANT_COMM],
+					    "Instant Communication requires a discovery beacon interval");
+			return -EINVAL;
+		}
+	}
 
 out:
 	if (!conf->band_cfgs[NL80211_BAND_5GHZ].chan &&

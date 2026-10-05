@@ -964,6 +964,11 @@ int wiphy_register(struct wiphy *wiphy)
 		    (!wiphy->nan_capa.phy.ht.ht_supported || wiphy->n_radio > 1)))
 		return -EINVAL;
 
+	if (WARN_ON((wiphy->nan_capa.flags & WIPHY_NAN_FLAGS_INSTANT_COMM) &&
+		    !(wiphy->nan_capa.flags &
+		      WIPHY_NAN_FLAGS_CONFIGURABLE_SYNC)))
+		return -EINVAL;
+
 	if (WARN_ON(wiphy->interface_modes & BIT(NL80211_IFTYPE_WDS)))
 		return -EINVAL;
 
