@@ -32,6 +32,9 @@ struct mac80211_hwsim_nan_data {
 	/* Later members are protected by this lock */
 	spinlock_t state_lock;
 
+	const u8 *extra_nan_attrs;
+	u16 extra_nan_attrs_len;
+
 	u8 master_pref;
 	u8 random_factor;
 
@@ -52,6 +55,8 @@ struct mac80211_hwsim_nan_data {
 
 	bool tsf_adjusted;
 	bool tsf_discontinuity;
+
+	u8 discovery_beacon_interval;
 
 	/*
 	 * Local schedule - stores channel definition for each 16TU slot.

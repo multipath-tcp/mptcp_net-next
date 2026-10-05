@@ -36,6 +36,9 @@ static_assert(DW0_TSF_MASK + 1 == 8192 * 1024);
 /* Size of the NAN vendor element carrying the mandatory attributes */
 #define NAN_BEACON_ELEM_LEN		27
 
+/* Space left in the NAN vendor element for the configured attributes */
+#define NAN_BEACON_EXTRA_ATTRS_LEN	(255 - (NAN_BEACON_ELEM_LEN - 2))
+
 /* Quiet time at the end of each slot where TX is suppressed */
 #define NAN_CHAN_SWITCH_TIME_US		256
 
@@ -704,15 +707,26 @@ mac80211_hwsim_nan_tx_beacon(struct mac80211_hwsim_data *data,
 	struct sk_buff *skb;
 
 	/*
-	 * TODO: Should the configured vendor elements or NAN attributes be
-	 * included in some of these beacons?
+	 * TODO: Should the configured vendor elements be included in some of
+	 * these beacons?
 	 */
+
+	/* Allocate maximal size for NAN IE */
+	if (is_discovery)
+		alloc_size += NAN_BEACON_EXTRA_ATTRS_LEN;
 
 	skb = alloc_skb(alloc_size, GFP_ATOMIC);
 	if (!skb)
 		return;
 
 	spin_lock(&data->nan.state_lock);
+
+	/*
+	 * The attributes configured by user space are appended to the
+	 * mandatory ones.
+	 */
+	if (is_discovery)
+		nan_ie.len += data->nan.extra_nan_attrs_len;
 
 	skb_reserve(skb, IEEE80211_TX_STATUS_HEADROOM);
 	mgmt = skb_put(skb, offsetofend(struct ieee80211_mgmt, u.beacon));
@@ -724,7 +738,9 @@ mac80211_hwsim_nan_tx_beacon(struct mac80211_hwsim_data *data,
 
 	mgmt->frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT |
 					  IEEE80211_STYPE_BEACON);
-	mgmt->u.beacon.beacon_int = cpu_to_le16(is_discovery ? 100 : DWST_TU);
+	mgmt->u.beacon.beacon_int =
+		cpu_to_le16(is_discovery ? data->nan.discovery_beacon_interval :
+			    DWST_TU);
 	mgmt->u.beacon.capab_info =
 		cpu_to_le16(WLAN_CAPABILITY_SHORT_SLOT_TIME |
 			    WLAN_CAPABILITY_SHORT_PREAMBLE);
@@ -754,6 +770,10 @@ mac80211_hwsim_nan_tx_beacon(struct mac80211_hwsim_data *data,
 	skb_put_data(skb, &nan_attr, sizeof(nan_attr));
 	skb_put_data(skb, &data->nan.current_ami,
 		     sizeof(data->nan.current_ami));
+
+	if (is_discovery && data->nan.extra_nan_attrs_len)
+		skb_put_data(skb, data->nan.extra_nan_attrs,
+			     data->nan.extra_nan_attrs_len);
 
 	spin_unlock(&data->nan.state_lock);
 
@@ -884,10 +904,11 @@ mac80211_hwsim_nan_discovery_beacon_timer(struct hrtimer *timer)
 	tsf_now = mac80211_hwsim_get_tsf(data->hw, data->nan.device_vif);
 
 	/* Wrap value to be after the next TBTT */
-	tbtt = tsf_now + ieee80211_tu_to_usec(100);
+	tbtt = tsf_now + ieee80211_tu_to_usec(data->nan.discovery_beacon_interval);
 
 	/* Round TBTT down to the correct time */
-	div_u64_rem(tbtt, ieee80211_tu_to_usec(100), &remainder);
+	div_u64_rem(tbtt, ieee80211_tu_to_usec(data->nan.discovery_beacon_interval),
+		    &remainder);
 	tbtt = tbtt - remainder;
 
 	hrtimer_set_expires(&data->nan.discovery_beacon_timer,
@@ -911,7 +932,36 @@ mac80211_hwsim_nan_sched_update_work(struct wiphy *wiphy,
 static int mac80211_hwsim_nan_set_config(struct mac80211_hwsim_data *data,
 					 struct cfg80211_nan_conf *conf)
 {
+	const u8 *extra_nan_attrs = NULL;
+	const u8 *old;
+
+	if (conf->extra_nan_attrs_len > NAN_BEACON_EXTRA_ATTRS_LEN)
+		return -EINVAL;
+
+	if (conf->extra_nan_attrs_len) {
+		extra_nan_attrs = kmemdup(conf->extra_nan_attrs,
+					  conf->extra_nan_attrs_len,
+					  GFP_KERNEL);
+		if (!extra_nan_attrs)
+			return -ENOMEM;
+	}
+
 	data->nan.notify_dw = conf->enable_dw_notification;
+
+	scoped_guard(spinlock_bh, &data->nan.state_lock) {
+		/*
+		 * Fall back to the device default if user space did not
+		 * configure it
+		 */
+		data->nan.discovery_beacon_interval =
+			conf->discovery_beacon_interval ? : 100;
+
+		old = data->nan.extra_nan_attrs;
+		data->nan.extra_nan_attrs = extra_nan_attrs;
+		data->nan.extra_nan_attrs_len = conf->extra_nan_attrs_len;
+	}
+
+	kfree(old);
 
 	return 0;
 }
@@ -968,6 +1018,7 @@ int mac80211_hwsim_nan_stop(struct ieee80211_hw *hw,
 			    struct ieee80211_vif *vif)
 {
 	struct mac80211_hwsim_data *data = hw->priv;
+	const u8 *old;
 
 	if (vif->type != NL80211_IFTYPE_NAN || !data->nan.device_vif ||
 	    data->nan.device_vif != vif)
@@ -978,6 +1029,14 @@ int mac80211_hwsim_nan_stop(struct ieee80211_hw *hw,
 	hrtimer_cancel(&data->nan.discovery_beacon_timer);
 	wiphy_delayed_work_cancel(hw->wiphy, &data->nan.sched_update_work);
 	data->nan.device_vif = NULL;
+
+	scoped_guard(spinlock_bh, &data->nan.state_lock) {
+		old = data->nan.extra_nan_attrs;
+		data->nan.extra_nan_attrs = NULL;
+		data->nan.extra_nan_attrs_len = 0;
+	}
+
+	kfree(old);
 
 	return 0;
 }
