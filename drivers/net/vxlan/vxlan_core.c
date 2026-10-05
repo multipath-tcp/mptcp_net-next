@@ -2541,7 +2541,10 @@ void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 					   tos, use_cache ? dst_cache : NULL);
 		if (IS_ERR(rt)) {
 			err = PTR_ERR(rt);
-			reason = SKB_DROP_REASON_IP_OUTNOROUTES;
+			if (err == -ELOOP)
+				reason = SKB_DROP_REASON_RECURSION_LIMIT;
+			else
+				reason = SKB_DROP_REASON_IP_OUTNOROUTES;
 			goto tx_error;
 		}
 
@@ -2627,7 +2630,10 @@ void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		if (IS_ERR(ndst)) {
 			err = PTR_ERR(ndst);
 			ndst = NULL;
-			reason = SKB_DROP_REASON_IP_OUTNOROUTES;
+			if (err == -ELOOP)
+				reason = SKB_DROP_REASON_RECURSION_LIMIT;
+			else
+				reason = SKB_DROP_REASON_IP_OUTNOROUTES;
 			goto tx_error;
 		}
 
