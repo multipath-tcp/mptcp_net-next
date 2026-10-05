@@ -1044,7 +1044,7 @@ static int br_setport(struct net_bridge_port *p, struct nlattr *tb[],
 	}
 
 	if (tb[IFLA_BRPORT_FLUSH])
-		br_fdb_delete_by_port(p->br, p, 0, 0);
+		br_fdb_cleanup_by_dst(p->br, br_port_to_dst(p), 0, 0);
 
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
 	if (tb[IFLA_BRPORT_MULTICAST_ROUTER]) {
