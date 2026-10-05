@@ -33,6 +33,9 @@ static_assert(DW0_TSF_MASK + 1 == 8192 * 1024);
 #define NAN_RSSI_CLOSE (-60)
 #define NAN_RSSI_MIDDLE (-75)
 
+/* Size of the NAN vendor element carrying the mandatory attributes */
+#define NAN_BEACON_ELEM_LEN		27
+
 /* Quiet time at the end of each slot where TX is suppressed */
 #define NAN_CHAN_SWITCH_TIME_US		256
 
@@ -685,7 +688,7 @@ mac80211_hwsim_nan_tx_beacon(struct mac80211_hwsim_data *data,
 {
 	struct ieee80211_vendor_ie nan_ie = {
 		.element_id = WLAN_EID_VENDOR_SPECIFIC,
-		.len = 27 - 2,
+		.len = NAN_BEACON_ELEM_LEN - 2,
 		.oui = { u32_get_bits(WLAN_OUI_WFA, 0xff0000),
 			 u32_get_bits(WLAN_OUI_WFA, 0xff00),
 			 u32_get_bits(WLAN_OUI_WFA, 0xff) },
@@ -694,7 +697,7 @@ mac80211_hwsim_nan_tx_beacon(struct mac80211_hwsim_data *data,
 	size_t alloc_size =
 		IEEE80211_TX_STATUS_HEADROOM +
 		offsetofend(struct ieee80211_mgmt, u.beacon) +
-		27 /* size of NAN vendor element */;
+		NAN_BEACON_ELEM_LEN;
 	struct ieee80211_nan_master_indication master_indication;
 	struct ieee80211_nan_attr nan_attr;
 	struct ieee80211_mgmt *mgmt;
@@ -905,17 +908,30 @@ mac80211_hwsim_nan_sched_update_work(struct wiphy *wiphy,
 		ieee80211_nan_sched_update_done(data->nan.device_vif);
 }
 
+static int mac80211_hwsim_nan_set_config(struct mac80211_hwsim_data *data,
+					 struct cfg80211_nan_conf *conf)
+{
+	data->nan.notify_dw = conf->enable_dw_notification;
+
+	return 0;
+}
+
 int mac80211_hwsim_nan_start(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif,
 			     struct cfg80211_nan_conf *conf)
 {
 	struct mac80211_hwsim_data *data = hw->priv;
+	int err;
 
 	if (vif->type != NL80211_IFTYPE_NAN)
 		return -EINVAL;
 
 	if (data->nan.device_vif)
 		return -EALREADY;
+
+	err = mac80211_hwsim_nan_set_config(data, conf);
+	if (err)
+		return err;
 
 	/* set this before starting the timer, as preemption might occur */
 	data->nan.device_vif = vif;
@@ -944,8 +960,6 @@ int mac80211_hwsim_nan_start(struct ieee80211_hw *hw,
 		      HRTIMER_MODE_REL_SOFT);
 
 	ether_addr_copy(data->nan.cluster_id, conf->cluster_id);
-
-	data->nan.notify_dw = conf->enable_dw_notification;
 
 	return 0;
 }
@@ -983,12 +997,16 @@ int mac80211_hwsim_nan_change_config(struct ieee80211_hw *hw,
 
 	wiphy_debug(hw->wiphy, "nan_config_changed: changes=0x%x\n", changes);
 
+	if (changes & CFG80211_NAN_CONF_CHANGED_CONFIG) {
+		int err = mac80211_hwsim_nan_set_config(data, conf);
+
+		if (err)
+			return err;
+	}
+
 	/* Handle only the changes we care about for simulation purposes */
 	if (changes & CFG80211_NAN_CONF_CHANGED_BANDS)
 		data->nan.bands = conf->bands;
-
-	if (changes & CFG80211_NAN_CONF_CHANGED_CONFIG)
-		data->nan.notify_dw = conf->enable_dw_notification;
 
 	if (changes & CFG80211_NAN_CONF_CHANGED_PREF) {
 		scoped_guard(spinlock_bh, &data->nan.state_lock)
