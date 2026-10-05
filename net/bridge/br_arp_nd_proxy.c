@@ -223,7 +223,7 @@ void br_do_proxy_suppress_arp(struct sk_buff *skb, struct net_bridge *br,
 		neigh_ha_snapshot(ha, n, n->dev);
 		f = br_fdb_find_rcu(br, ha, vid);
 		if (f) {
-			const struct net_bridge_port *dst = READ_ONCE(f->dst);
+			const struct net_bridge_port *dst = br_fdb_dst_port(f);
 			bool replied = false;
 
 			if ((p && test_bit(BR_PROXYARP_BIT, &p->flags)) ||
@@ -500,7 +500,7 @@ void br_do_suppress_nd(struct sk_buff *skb, struct net_bridge *br,
 		neigh_ha_snapshot(ha, n, n->dev);
 		f = br_fdb_find_rcu(br, ha, vid);
 		if (f) {
-			const struct net_bridge_port *dst = READ_ONCE(f->dst);
+			const struct net_bridge_port *dst = br_fdb_dst_port(f);
 			bool replied = false;
 
 			if (br_is_neigh_suppress_enabled_vid(dst, vid)) {
