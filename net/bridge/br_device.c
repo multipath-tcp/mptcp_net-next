@@ -65,9 +65,10 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb_reset_mac_header(skb);
 	skb_pull(skb, ETH_HLEN);
 
-	if (!br_allowed_ingress(br, br_vlan_group_rcu(br), skb, &vid,
-				&state, &vlan))
+	if (!br_allowed_ingress(br, br_vlan_group_rcu(br), skb, &state,
+				&vlan))
 		goto out;
+	vid = vlan ? vlan->vid : 0;
 
 	if (IS_ENABLED(CONFIG_INET) &&
 	    (eth_hdr(skb)->h_proto == htons(ETH_P_ARP) ||
@@ -107,7 +108,7 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 		else
 			br_flood(br, vlan, skb, BR_PKT_MULTICAST, false, true);
 	} else if ((dst = br_fdb_find_rcu(br, dest, vid)) != NULL) {
-		br_forward(READ_ONCE(dst->dst), skb, false, true);
+		br_forward(br_fdb_dst_read(dst), skb, false, true);
 	} else {
 		br_flood(br, vlan, skb, BR_PKT_UNICAST, false, true);
 	}
@@ -400,7 +401,7 @@ static int br_fill_forward_path(struct net_device_path_ctx *ctx,
 	if (!f)
 		return -1;
 
-	dst = READ_ONCE(f->dst);
+	dst = br_fdb_dst_port(f);
 	if (!dst)
 		return -1;
 
