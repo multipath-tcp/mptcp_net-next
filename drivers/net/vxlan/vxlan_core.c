@@ -1743,11 +1743,11 @@ static int vxlan_rcv(struct sock *sk, struct sk_buff *skb)
 		raw_proto = true;
 	}
 
-	if (__iptunnel_pull_header(skb, VXLAN_HLEN, protocol, raw_proto,
-				   !net_eq(vxlan->net, dev_net(vxlan->dev)))) {
-		reason = SKB_DROP_REASON_NOMEM;
+	reason = __iptunnel_pull_header(skb, VXLAN_HLEN, protocol, raw_proto,
+					!net_eq(vxlan->net,
+						dev_net(vxlan->dev)));
+	if (reason)
 		goto drop;
-	}
 
 	if (cfg->flags & VXLAN_F_REMCSUM_RX) {
 		reason = vxlan_remcsum(skb, cfg->flags);
