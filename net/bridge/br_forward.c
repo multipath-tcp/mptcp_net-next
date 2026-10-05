@@ -17,7 +17,7 @@
 #include "br_private.h"
 
 struct br_fwd_dst {
-	const struct net_bridge_port *port;
+	struct net_bridge_port *port;
 	struct net_bridge_vlan *vlan;
 };
 
@@ -149,35 +149,37 @@ static int deliver_clone(const struct br_fwd_dst *fwd,
 
 /**
  * br_forward - forward a packet to a specific port
- * @to: destination port
+ * @dst: bridge destination
  * @skb: packet being forwarded
  * @local_rcv: packet will be received locally after forwarding
  * @local_orig: packet is locally originated
  *
  * Should be called with rcu_read_lock.
  */
-void br_forward(const struct net_bridge_port *to,
+void br_forward(struct net_bridge_dst dst,
 		struct sk_buff *skb, bool local_rcv, bool local_orig)
 {
 	struct br_fwd_dst fwd;
 
-	if (unlikely(!to))
+	br_dst_decode(dst, &fwd.port, &fwd.vlan);
+
+	if (unlikely(!fwd.port))
 		goto out;
 
 	/* redirect to backup link if the destination port is down */
-	if (rcu_access_pointer(to->backup_port) &&
-	    (!netif_carrier_ok(to->dev) || !netif_running(to->dev))) {
+	if (rcu_access_pointer(fwd.port->backup_port) &&
+	    (!netif_carrier_ok(fwd.port->dev) ||
+	     !netif_running(fwd.port->dev))) {
 		struct net_bridge_port *backup_port;
 
-		backup_port = rcu_dereference(to->backup_port);
+		backup_port = rcu_dereference(fwd.port->backup_port);
 		if (unlikely(!backup_port))
 			goto out;
-		BR_INPUT_SKB_CB(skb)->backup_nhid = READ_ONCE(to->backup_nhid);
-		to = backup_port;
+		BR_INPUT_SKB_CB(skb)->backup_nhid = READ_ONCE(fwd.port->backup_nhid);
+		fwd.port = backup_port;
+		fwd.vlan = NULL;
 	}
 
-	fwd.port = to;
-	fwd.vlan = NULL;
 	if (should_deliver(&fwd, skb)) {
 		if (local_rcv)
 			deliver_clone(&fwd, skb, local_orig);
