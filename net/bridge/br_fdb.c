@@ -868,9 +868,11 @@ int br_fdb_delete_bulk(struct nlmsghdr *nlh, struct net_device *dev,
 	return 0;
 }
 
-/* Clean up all entries referring to a specific destination.
- * if do_all is set also flush static entries
- * if vid is set delete all entries that match the vlan_id
+/* Clean up entries referring to cleanup_dst's port.
+ * If do_all is set ignore vid and entry flags. Otherwise vid selects
+ * the VLAN (0 means all), keeping static and non-offloaded ext learned entries.
+ * For a port-VLAN dst, vid must match its VLAN ID. Always clean up its local
+ * entry unless user-added and fall back to the port dst for retained entries.
  */
 void br_fdb_cleanup_by_dst(struct net_bridge *br,
 			   struct net_bridge_dst cleanup_dst, u16 vid,
