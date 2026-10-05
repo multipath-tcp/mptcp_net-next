@@ -230,9 +230,7 @@ void mac80211_hwsim_nan_rx(struct ieee80211_hw *hw,
 	ssize_t data_len;
 	u8 slot;
 
-	/* Need a NAN vendor element at the start */
-	if (skb->len < (offsetofend(struct ieee80211_mgmt, u.beacon) + 6) ||
-	    !ieee80211_is_beacon(mgmt->frame_control))
+	if (!ieee80211_is_nan_beacon(mgmt, skb->len))
 		return;
 
 	data_len = skb->len - offsetofend(struct ieee80211_mgmt, u.beacon);
@@ -277,17 +275,6 @@ void mac80211_hwsim_nan_rx(struct ieee80211_hw *hw,
 
 	/* Just ignore low RSSI beacons that we cannot sync to */
 	if (rx_status.signal < NAN_RSSI_MIDDLE)
-		return;
-
-	/* Needs to be a valid NAN cluster ID in A3 */
-	if (get_unaligned_be32(mgmt->bssid) != ((WLAN_OUI_WFA << 8) | 0x01))
-		return;
-
-	/* We are only interested in NAN beacons */
-	if (nan_elem->id != WLAN_EID_VENDOR_SPECIFIC ||
-	    nan_elem->datalen < 4 ||
-	    get_unaligned_be32(nan_elem->data) !=
-	    (WLAN_OUI_WFA << 8 | WLAN_OUI_TYPE_WFA_NAN))
 		return;
 
 	u8 *nan_defragmented __free(kfree) = kzalloc(data_len, GFP_ATOMIC);
