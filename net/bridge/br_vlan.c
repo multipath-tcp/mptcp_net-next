@@ -742,21 +742,16 @@ bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb,
 	if (!br_vlan_get_tag(skb, &vid) && skb->vlan_proto != br->vlan_proto)
 		vid = 0;
 
-	if (!vid) {
+	if (vid)
+		v = br_vlan_find(vg, vid);
+	else
 		v = rcu_dereference(vg->pvid);
-		if (!v || !br_vlan_state_allowed(br_vlan_get_state(v), true))
-			return false;
-		*vlan = v;
-		return true;
-	}
 
-	v = br_vlan_find(vg, vid);
-	if (v && br_vlan_state_allowed(br_vlan_get_state(v), true)) {
-		*vlan = v;
-		return true;
-	}
+	if (!v || !br_vlan_state_allowed(br_vlan_get_state(v), true))
+		return false;
 
-	return false;
+	*vlan = v;
+	return true;
 }
 
 static int br_vlan_add_existing(struct net_bridge *br,
