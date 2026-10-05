@@ -3339,6 +3339,10 @@ cfg80211_inform_bss_frame_data(struct wiphy *wiphy,
 	if (WARN_ON(!wiphy))
 		return NULL;
 
+	/* NAN beacons are not a BSS, don't add to the BSS table */
+	if (ieee80211_is_nan_beacon(mgmt, len))
+		return NULL;
+
 	BUILD_BUG_ON(offsetof(struct ieee80211_mgmt, u.probe_resp.variable) !=
 		     offsetof(struct ieee80211_mgmt, u.beacon.variable));
 

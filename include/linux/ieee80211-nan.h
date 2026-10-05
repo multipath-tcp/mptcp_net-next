@@ -74,4 +74,30 @@ struct ieee80211_nan_anchor_master_info {
 	     _attr = (const struct ieee80211_nan_attr *)		\
 		(_attr->data + le16_to_cpu(_attr->length)))
 
+static inline bool ieee80211_is_nan_beacon(const struct ieee80211_mgmt *mgmt,
+					   size_t len)
+{
+	const struct element *elem;
+
+	/* The NAN IE is at least 6 octets */
+	if (len < offsetofend(struct ieee80211_mgmt, u.beacon) + 6)
+		return false;
+
+	if (!ieee80211_is_beacon(mgmt->frame_control))
+		return false;
+
+	/* NAN Cluster IDs range from 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF */
+	if (get_unaligned_be32(mgmt->bssid) != ((WLAN_OUI_WFA << 8) | 0x01))
+		return false;
+
+	elem = (const struct element *)mgmt->u.beacon.variable;
+	if (elem->id != WLAN_EID_VENDOR_SPECIFIC ||
+	    elem->datalen < 4 ||
+	    get_unaligned_be32(elem->data) !=
+	    (WLAN_OUI_WFA << 8 | WLAN_OUI_TYPE_WFA_NAN))
+		return false;
+
+	return true;
+}
+
 #endif /* LINUX_IEEE80211_NAN_H */
