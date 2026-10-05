@@ -123,7 +123,6 @@
 #include <linux/of_mdio.h>
 #include <linux/phy.h>
 #include <linux/platform_device.h>
-#include <linux/property.h>
 #include <linux/regmap.h>
 
 #define RTL8380_NUM_BUSES			1
@@ -837,14 +836,14 @@ static void otto_emdio_notify_phy_detach(struct phy_device *phydev)
 }
 
 static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv,
-				 struct fwnode_handle *node)
+				struct device_node *node)
 {
 	struct otto_emdio_chan *chan;
 	struct mii_bus *bus;
 	u32 mdio_bus;
 	int err;
 
-	err = fwnode_property_read_u32(node, "reg", &mdio_bus);
+	err = of_property_read_u32(node, "reg", &mdio_bus);
 	if (err)
 		return dev_err_probe(dev, err, "undefined smi bus number\n");
 
@@ -871,7 +870,7 @@ static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv
 
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d", dev_name(dev), mdio_bus);
 
-	err = devm_of_mdiobus_register(dev, bus, to_of_node(node));
+	err = devm_of_mdiobus_register(dev, bus, node);
 	if (err)
 		return dev_err_probe(dev, err, "cannot register MDIO bus\n");
 
@@ -907,8 +906,8 @@ static int otto_emdio_map_ports(struct device *dev)
 
 	ports_dn = of_get_child_by_name(parent->of_node, "ethernet-ports");
 	if (!ports_dn)
-		return dev_err_probe(dev, -EINVAL, "%pfwP missing ethernet-ports\n",
-				     dev_fwnode(parent));
+		return dev_err_probe(dev, -EINVAL, "%pOFP missing ethernet-ports\n",
+				     parent->of_node);
 
 	for_each_available_child_of_node_scoped(ports_dn, port_dn) {
 		ctrl_dn = NULL;
@@ -1008,7 +1007,7 @@ static int otto_emdio_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	priv->info = device_get_match_data(dev);
+	priv->info = of_device_get_match_data(dev);
 	priv->regmap = syscon_node_to_regmap(dev->parent->of_node);
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
@@ -1033,7 +1032,7 @@ static int otto_emdio_probe(struct platform_device *pdev)
 			return dev_err_probe(dev, err, "failed to setup MDIO bus controller\n");
 	}
 
-	device_for_each_child_node_scoped(dev, child) {
+	for_each_available_child_of_node_scoped(dev->of_node, child) {
 		err = otto_emdio_probe_one(dev, priv, child);
 		if (err)
 			return err;
