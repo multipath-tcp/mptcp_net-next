@@ -191,7 +191,8 @@ static BRPORT_ATTR(hold_timer, 0444, show_hold_timer, NULL);
 
 static int store_flush(struct net_bridge_port *p, unsigned long v)
 {
-	br_fdb_delete_by_port(p->br, p, 0, 0); // Don't delete local entry
+	/* Don't delete local entry */
+	br_fdb_cleanup_by_dst(p->br, br_port_to_dst(p), 0, 0);
 	return 0;
 }
 static BRPORT_ATTR(flush, 0200, NULL, store_flush);
