@@ -239,6 +239,16 @@
 #define RTL_PHYSR_MASTER			BIT(11)
 #define RTL_PHYSR_SPEED_MASK			(RTL_PHYSR_SPEEDL | RTL_PHYSR_SPEEDH)
 
+/* MDI-X control and status of the RTL8365MB-VC internal PHY. The resolved
+ * MDI-X state is reported in RTL_PHYSR; the configuration lives in a
+ * chip-specific control register. Both are only known to apply to this model.
+ * On this chip a set select/resolved bit means MDI, not MDI-X (measured).
+ */
+#define RTL8365MB_VC_PHYCR1			0x18
+#define RTL8365MB_VC_PHYCR1_MDIX_FORCE		BIT(9)
+#define RTL8365MB_VC_PHYCR1_MDI			BIT(8)
+#define RTL8365MB_VC_PHYSR_MDI			BIT(1)
+
 #define	RTL_MDIO_PCS_EEE_ABLE			0xa5c4
 #define	RTL_MDIO_AN_EEE_ADV			0xa5d0
 #define	RTL_MDIO_AN_EEE_LPABLE			0xa5d2
@@ -3058,6 +3068,74 @@ static irqreturn_t rtl8221b_handle_interrupt(struct phy_device *phydev)
 	return IRQ_HANDLED;
 }
 
+static int rtl8365mb_config_mdix(struct phy_device *phydev)
+{
+	u16 val;
+
+	switch (phydev->mdix_ctrl) {
+	case ETH_TP_MDI:
+		val = RTL8365MB_VC_PHYCR1_MDIX_FORCE |
+		      RTL8365MB_VC_PHYCR1_MDI;
+		break;
+	case ETH_TP_MDI_X:
+		val = RTL8365MB_VC_PHYCR1_MDIX_FORCE;
+		break;
+	case ETH_TP_MDI_AUTO:
+		val = 0;
+		break;
+	default:
+		/* Leave the hardware configuration alone until user space
+		 * asks for a specific mode.
+		 */
+		return 0;
+	}
+
+	return phy_modify_changed(phydev, RTL8365MB_VC_PHYCR1,
+				  RTL8365MB_VC_PHYCR1_MDIX_FORCE |
+				  RTL8365MB_VC_PHYCR1_MDI, val);
+}
+
+static int rtl8365mb_config_aneg(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = rtl8365mb_config_mdix(phydev);
+	if (ret < 0)
+		return ret;
+
+	/* The pair assignment is only evaluated while the link is brought up,
+	 * so renegotiate if the crossover configuration changed.
+	 */
+	return __genphy_config_aneg(phydev, ret);
+}
+
+static int rtl8365mb_read_status(struct phy_device *phydev)
+{
+	int ret;
+
+	ret = phy_read(phydev, RTL8365MB_VC_PHYCR1);
+	if (ret < 0)
+		return ret;
+
+	if (ret & RTL8365MB_VC_PHYCR1_MDIX_FORCE) {
+		if (ret & RTL8365MB_VC_PHYCR1_MDI)
+			phydev->mdix_ctrl = ETH_TP_MDI;
+		else
+			phydev->mdix_ctrl = ETH_TP_MDI_X;
+	} else {
+		phydev->mdix_ctrl = ETH_TP_MDI_AUTO;
+	}
+
+	ret = phy_read(phydev, RTL_PHYSR);
+	if (ret < 0)
+		return ret;
+
+	phydev->mdix = (ret & RTL8365MB_VC_PHYSR_MDI) ? ETH_TP_MDI :
+							ETH_TP_MDI_X;
+
+	return genphy_read_status(phydev);
+}
+
 static struct phy_driver realtek_drvs[] = {
 	{
 		PHY_ID_MATCH_EXACT(0x00008201),
@@ -3354,6 +3432,8 @@ static struct phy_driver realtek_drvs[] = {
 		/* Interrupt handling analogous to RTL8366RB */
 		.config_intr	= genphy_no_config_intr,
 		.handle_interrupt = genphy_handle_interrupt_no_ack,
+		.config_aneg	= rtl8365mb_config_aneg,
+		.read_status	= rtl8365mb_read_status,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
 	}, {
