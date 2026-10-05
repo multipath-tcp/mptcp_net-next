@@ -1193,6 +1193,22 @@ static bool fdb_handle_notify(struct net_bridge_fdb_entry *fdb, u8 notify)
 	return modified;
 }
 
+static bool fdb_update_dst(struct net_bridge_fdb_entry *fdb,
+			   struct net_bridge_dst old_dst,
+			   struct net_bridge_dst dst)
+{
+	if (br_dst_equal(old_dst, dst))
+		return false;
+
+	if (br_dst_port(old_dst) == br_dst_port(dst)) {
+		br_fdb_dst_replace(fdb, old_dst, dst);
+		return false;
+	}
+
+	br_fdb_dst_write(fdb, dst);
+	return true;
+}
+
 /* Update (create or replace) forwarding database entry */
 static int fdb_add_entry(struct net_bridge *br, struct net_bridge_dst dst,
 			 const u8 *addr, struct ndmsg *ndm, u16 flags, u16 vid,
@@ -1246,14 +1262,7 @@ static int fdb_add_entry(struct net_bridge *br, struct net_bridge_dst dst,
 			return -EEXIST;
 
 		old_dst = br_fdb_dst_read(fdb);
-		if (!br_dst_equal(old_dst, dst)) {
-			if (br_dst_port(old_dst) != source) {
-				modified = true;
-				br_fdb_dst_write(fdb, dst);
-			} else {
-				br_fdb_dst_replace(fdb, old_dst, dst);
-			}
-		}
+		modified = fdb_update_dst(fdb, old_dst, dst);
 
 		set_bit(BR_FDB_ADDED_BY_USER, &fdb->flags);
 		if (test_and_clear_bit(BR_FDB_DYNAMIC_LEARNED, &fdb->flags))
@@ -1634,14 +1643,7 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 
 		WRITE_ONCE(fdb->updated, jiffies);
 
-		if (!br_dst_equal(old_dst, dst)) {
-			if (br_dst_port(old_dst) != p) {
-				modified = true;
-				br_fdb_dst_write(fdb, dst);
-			} else {
-				br_fdb_dst_replace(fdb, old_dst, dst);
-			}
-		}
+		modified = fdb_update_dst(fdb, old_dst, dst);
 
 		if (test_and_set_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags)) {
 			/* Refresh entry */
