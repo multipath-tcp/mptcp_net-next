@@ -40,6 +40,8 @@
 /* NAN attributes, as defined in Wi-Fi Aware (TM) specification 4.0 Table 42 */
 #define NAN_ATTR_MASTER_INDICATION		0x00
 #define NAN_ATTR_CLUSTER_INFO			0x01
+#define NAN_ATTR_SERVICE_ID_LIST		0x02
+#define NAN_ATTR_SUBSCRIBE_SERVICE_ID_LIST	0x28
 
 struct ieee80211_nan_attr {
 	u8 attr;
