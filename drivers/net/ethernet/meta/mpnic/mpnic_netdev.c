@@ -35,6 +35,8 @@ static int mpnic_open(struct net_device *netdev)
 	netif_tx_wake_all_queues(netdev);
 	netif_carrier_on(netdev);
 
+	schedule_delayed_work(&mpn->mpd->service_task, HZ);
+
 	return 0;
 
 err_free_resources:
@@ -48,6 +50,7 @@ static int mpnic_stop(struct net_device *netdev)
 {
 	struct mpnic_net *mpn = netdev_priv(netdev);
 
+	cancel_delayed_work(&mpn->mpd->service_task);
 	netif_carrier_off(netdev);
 
 	mpnic_napi_disable(mpn);
