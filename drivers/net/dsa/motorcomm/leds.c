@@ -420,13 +420,15 @@ yt921x_led_setup(struct yt921x_priv *priv, int port,
 	char name[LED_MAX_NAME_SIZE];
 	enum led_default_state state;
 	struct yt921x_led *led;
+	int polarity_orig;
 	bool force_high;
 	bool force_low;
-	u32 led2_val;
-	u32 inv_val;
+	u32 led2_orig;
+	int polarity;
 	u32 group;
 	u32 mask;
 	u32 ctrl;
+	u32 val;
 	bool on;
 	int res;
 	int ret;
@@ -452,6 +454,7 @@ yt921x_led_setup(struct yt921x_priv *priv, int port,
 			port, group);
 		return -EINVAL;
 	}
+	polarity = force_high ? 1 : force_low ? -1 : 0;
 
 	led = devm_kzalloc(dev, sizeof(*led), GFP_KERNEL);
 	if (!led) {
@@ -470,23 +473,27 @@ yt921x_led_setup(struct yt921x_priv *priv, int port,
 	/* Inversion is internal - force on will give low logic.
 	 * In the rest of the file, treat LEDs as if active-low.
 	 */
-	inv_val = U32_MAX;
-	if (force_high || force_low) {
-		res = yt921x_reg_read(priv, YT921X_LED_PAR_INV, &inv_val);
+	polarity_orig = 0;
+	if (polarity) {
+		res = yt921x_reg_read(priv, YT921X_LED_PAR_INV, &val);
 		if (res)
-			goto revoke_inv;
+			goto err_inv;
 
 		mask = YT921X_LED_PAR_INV_INVnm(group, port);
-		ctrl = force_high ? inv_val | mask : inv_val & ~mask;
-		res = yt921x_reg_write(priv, YT921X_LED_PAR_INV, ctrl);
-		if (res)
-			goto revoke_inv;
+		ctrl = polarity > 0 ? val | mask : val & ~mask;
+		if (ctrl != val) {
+			res = yt921x_reg_write(priv, YT921X_LED_PAR_INV, ctrl);
+			if (res)
+				goto err_inv;
+
+			polarity_orig = -polarity;
+		}
 	}
 
-	led2_val = U32_MAX;
-	res = yt921x_reg_read(priv, YT921X_LED2_PORTn(port), &led2_val);
+	led2_orig = U32_MAX;
+	res = yt921x_reg_read(priv, YT921X_LED2_PORTn(port), &val);
 	if (res)
-		goto revoke_led2;
+		goto err_led2;
 	mask = YT921X_LED2_PORT_FORCEn_M(group);
 
 	switch (state) {
@@ -494,16 +501,20 @@ yt921x_led_setup(struct yt921x_priv *priv, int port,
 	case LEDS_DEFSTATE_ON:
 	default:
 		on = state == LEDS_DEFSTATE_ON;
-		ctrl = on ? YT921X_LED2_PORT_FORCEn_ON(group) :
-		       YT921X_LED2_PORT_FORCEn_OFF(group);
-		res = yt921x_reg_write(priv, YT921X_LED2_PORTn(port),
-				       (led2_val & ~mask) | ctrl);
-		if (res)
-			goto revoke_led2;
+		ctrl = (val & ~mask) |
+		       (on ? YT921X_LED2_PORT_FORCEn_ON(group) :
+			YT921X_LED2_PORT_FORCEn_OFF(group));
+		if (ctrl != val) {
+			res = yt921x_reg_write(priv, YT921X_LED2_PORTn(port),
+					       ctrl);
+			if (res)
+				goto err_led2;
+
+			led2_orig = val & mask;
+		}
 		break;
 	case LEDS_DEFSTATE_KEEP:
-		on = (led2_val & mask) == YT921X_LED2_PORT_FORCEn_ON(group);
-		led2_val = U32_MAX;
+		on = (val & mask) == YT921X_LED2_PORT_FORCEn_ON(group);
 		break;
 	}
 
@@ -539,22 +550,26 @@ yt921x_led_setup(struct yt921x_priv *priv, int port,
 
 revoke:
 	mutex_lock(&priv->reg_lock);
-revoke_led2:
-	if (led2_val != U32_MAX) {
-		ret = yt921x_reg_write(priv, YT921X_LED2_PORTn(port), led2_val);
+	if (led2_orig != U32_MAX) {
+		ret = yt921x_reg_update_bits(priv, YT921X_LED2_PORTn(port),
+					     YT921X_LED2_PORT_FORCEn_M(group),
+					     led2_orig);
 		if (ret)
 			dev_err(dev,
 				"Failed to restore %s for LED %02d:%02u: %d\n",
 				"LED2_PORT", port, group, ret);
 	}
-revoke_inv:
-	if (inv_val != U32_MAX) {
-		ret = yt921x_reg_write(priv, YT921X_LED_PAR_INV, inv_val);
+err_led2:
+	if (polarity_orig) {
+		ret = yt921x_reg_toggle_bits(priv, YT921X_LED_PAR_INV,
+					     YT921X_LED_PAR_INV_INVnm(group, port),
+					     polarity_orig > 0);
 		if (ret)
 			dev_err(dev,
 				"Failed to restore %s for LED %02d:%02u: %d\n",
 				"LED_PAR_INV", port, group, ret);
 	}
+err_inv:
 	mutex_unlock(&priv->reg_lock);
 
 	pp->leds[group] = NULL;
