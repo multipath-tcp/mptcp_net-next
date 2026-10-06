@@ -783,14 +783,42 @@ void tcp_done_with_error(struct sock *sk, int err);
 void tcp_reset(struct sock *sk, struct sk_buff *skb);
 void tcp_fin(struct sock *sk);
 void __tcp_check_space(struct sock *sk);
+
+/* Mirror of SOCK_NOSPACE in tcp_sock, maintained by sk_set_nospace()
+ * and sk_clear_nospace().
+ *
+ * MPTCP subflows share the parent socket, and thus its SOCK_NOSPACE bit.
+ * Keep their mirror always set (see subflow_ulp_init()) so that they
+ * always reach __tcp_check_space() and behave as before.
+ */
+static inline void tcp_set_nospace(struct sock *sk)
+{
+	if (sk_is_tcp(sk)) {
+		/* pairs with smp_mb__before_atomic() in tcp_clear_nospace() */
+		smp_mb__after_atomic();
+		/* pairs with smp_mb() in tcp_check_space() */
+		smp_store_mb(tcp_sk(sk)->tcp_nospace, 1);
+	}
+}
+
+static inline void tcp_clear_nospace(struct sock *sk)
+{
+	if (sk_is_tcp(sk) && !sk_is_mptcp(sk)) {
+		WRITE_ONCE(tcp_sk(sk)->tcp_nospace, 0);
+		/* pairs with smp_mb__after_atomic() in tcp_set_nospace() */
+		smp_mb__before_atomic();
+	}
+}
+
 static inline void tcp_check_space(struct sock *sk)
 {
 	/* pairs with tcp_poll() */
 	smp_mb();
 
-	if (sk->sk_socket && test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
+	if (unlikely(READ_ONCE(tcp_sk(sk)->tcp_nospace)))
 		__tcp_check_space(sk);
 }
+
 void tcp_sack_compress_send_ack(struct sock *sk);
 
 static inline void tcp_cleanup_skb(struct sk_buff *skb)
