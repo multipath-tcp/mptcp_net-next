@@ -120,6 +120,7 @@ static bool has_subflow_daddr(const struct mptcp_sock *msk,
 static bool
 select_local_address(const struct pm_nl_pernet *pernet,
 		     const struct mptcp_sock *msk,
+		     const unsigned long *skip,
 		     struct mptcp_pm_local *new_local)
 {
 	struct mptcp_pm_addr_entry *entry;
@@ -133,6 +134,9 @@ select_local_address(const struct pm_nl_pernet *pernet,
 			continue;
 
 		if (!test_bit(entry->addr.id, msk->pm.id_avail_bitmap))
+			continue;
+
+		if (skip && test_bit(entry->addr.id, skip))
 			continue;
 
 		new_local->addr = entry->addr;
@@ -401,7 +405,7 @@ subflow:
 
 		if (signal_and_subflow)
 			signal_and_subflow = false;
-		else if (!select_local_address(pernet, msk, &local))
+		else if (!select_local_address(pernet, msk, NULL, &local))
 			break;
 
 		fullmesh = !!(local.flags & MPTCP_PM_ADDR_FLAG_FULLMESH);
@@ -574,22 +578,28 @@ fill_local_addresses_vec_c_flag(struct mptcp_sock *msk,
 	u8 endp_subflow_max = mptcp_pm_get_endp_subflow_max(msk);
 	struct sock *sk = (struct sock *)msk;
 	struct mptcp_pm_local *local;
+	DECLARE_BITMAP(skip, MPTCP_PM_MAX_ADDR_ID + 1);
 	int i = 0;
+
+	bitmap_zero(skip, MPTCP_PM_MAX_ADDR_ID + 1);
 
 	while (msk->pm.local_addr_used < endp_subflow_max) {
 		local = &locals[i];
 
-		if (!select_local_address(pernet, msk, local))
+		if (!select_local_address(pernet, msk, skip, local))
 			break;
 
+		if (!mptcp_pm_addr_families_match(sk, &local->addr, remote)) {
+			__set_bit(local->addr.id, skip);
+			continue;
+		}
+
+		if (local->addr.id == msk->mpc_endpoint_id) {
+			__set_bit(local->addr.id, skip);
+			continue;
+		}
+
 		__clear_bit(local->addr.id, msk->pm.id_avail_bitmap);
-
-		if (!mptcp_pm_addr_families_match(sk, &local->addr, remote))
-			continue;
-
-		if (local->addr.id == msk->mpc_endpoint_id)
-			continue;
-
 		msk->pm.local_addr_used++;
 		msk->pm.extra_subflows++;
 		i++;
