@@ -561,6 +561,8 @@ void batadv_meshif_vlan_release(struct kref *ref)
 	hlist_del_rcu(&vlan->list);
 	spin_unlock_bh(&vlan->bat_priv->meshif_vlan_list_lock);
 
+	batadv_tt_local_unreserve_vlan(vlan->bat_priv);
+
 	kfree_rcu(vlan, rcu);
 }
 
@@ -614,9 +616,15 @@ int batadv_meshif_create_vlan(struct batadv_priv *bat_priv, unsigned short vid)
 		return -EEXIST;
 	}
 
+	if (!batadv_tt_local_reserve_vlan(bat_priv, vid)) {
+		spin_unlock_bh(&bat_priv->meshif_vlan_list_lock);
+		return -EMSGSIZE;
+	}
+
 	vlan = kzalloc_obj(*vlan, GFP_ATOMIC);
 	if (!vlan) {
 		spin_unlock_bh(&bat_priv->meshif_vlan_list_lock);
+		batadv_tt_local_unreserve_vlan(bat_priv);
 		return -ENOMEM;
 	}
 
