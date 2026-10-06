@@ -601,64 +601,31 @@ static void stmmac_get_rx_hwtstamp(struct stmmac_priv *priv, struct dma_desc *p,
 	}
 }
 
-static void stmmac_restore_subsecond_increment(struct stmmac_priv *priv,
-					       u32 default_addend)
+static void stmmac_update_subsecond_increment(struct stmmac_priv *priv)
 {
 	bool xmac = dwmac_is_xmac(priv->plat->core_type);
 	u32 sec_inc = 0;
-
-	stmmac_config_addend(priv, priv->ptpaddr, default_addend);
-	stmmac_config_hw_tstamping(priv, priv->ptpaddr, priv->systime_flags);
-	stmmac_config_sub_second_increment(priv, priv->ptpaddr,
-					   priv->plat->clk_ptp_rate,
-					   xmac, &sec_inc);
-	priv->default_addend = default_addend;
-	priv->sub_second_inc = sec_inc;
-}
-
-static int stmmac_update_subsecond_increment(struct stmmac_priv *priv,
-					     u32 systime_flags)
-{
-	bool xmac = dwmac_is_xmac(priv->plat->core_type);
-	u32 sec_inc = 0, val;
 	u64 temp = 0;
-	int ret;
 
-	stmmac_config_hw_tstamping(priv, priv->ptpaddr, systime_flags);
+	stmmac_config_hw_tstamping(priv, priv->ptpaddr, priv->systime_flags);
 
 	/* program Sub Second Increment reg */
 	stmmac_config_sub_second_increment(priv, priv->ptpaddr,
 					   priv->plat->clk_ptp_rate,
 					   xmac, &sec_inc);
-	if (!sec_inc) {
-		ret = -EINVAL;
-		goto error;
-	}
+	temp = div_u64(1000000000ULL, sec_inc);
+
+	/* Store sub second increment for later use */
+	priv->sub_second_inc = sec_inc;
 
 	/* calculate default added value:
 	 * formula is :
 	 * addend = (2^32)/freq_div_ratio;
 	 * where, freq_div_ratio = 1e9ns/sec_inc
 	 */
-	temp = div_u64(1000000000ULL, sec_inc);
 	temp = (u64)(temp << 32);
-	val = div_u64(temp, priv->plat->clk_ptp_rate);
-
-	ret = stmmac_config_addend(priv, priv->ptpaddr, val);
-	if (ret)
-		goto error;
-
-	priv->sub_second_inc = sec_inc;
-	priv->default_addend = val;
-
-	return 0;
-error:
-	/* Restore previous configuration */
-	stmmac_config_hw_tstamping(priv, priv->ptpaddr, priv->systime_flags);
-	stmmac_config_sub_second_increment(priv, priv->ptpaddr,
-					   priv->plat->clk_ptp_rate, xmac,
-					   NULL);
-	return ret;
+	priv->default_addend = div_u64(temp, priv->plat->clk_ptp_rate);
+	stmmac_config_addend(priv, priv->ptpaddr, priv->default_addend);
 }
 
 /**
@@ -888,37 +855,35 @@ static int stmmac_hwtstamp_get(struct net_device *dev,
 /**
  * stmmac_init_tstamp_counter - init hardware timestamping counter
  * @priv: driver private structure
+ * @systime_flags: timestamping flags
  * Description:
  * Initialize hardware counter for packet timestamping.
  * This is valid as long as the interface is open and not suspended.
  * Will be rerun after resuming from suspend, case in which the timestamping
  * flags updated by stmmac_hwtstamp_set() also need to be restored.
  */
-static int stmmac_init_tstamp_counter(struct stmmac_priv *priv)
+static int stmmac_init_tstamp_counter(struct stmmac_priv *priv,
+				      u32 systime_flags)
 {
-	u32 default_addend = priv->default_addend;
 	struct timespec64 now;
-	int ret;
 
-	ret = stmmac_update_subsecond_increment(priv, priv->systime_flags);
-	if (ret)
-		return ret;
+	if (!priv->plat->clk_ptp_rate) {
+		netdev_err(priv->dev, "Invalid PTP clock rate");
+		return -EINVAL;
+	}
+
+	stmmac_config_hw_tstamping(priv, priv->ptpaddr, systime_flags);
+	priv->systime_flags = systime_flags;
+
+	stmmac_update_subsecond_increment(priv);
 
 	/* initialize system time */
 	ktime_get_real_ts64(&now);
 
 	/* lower 32 bits of tv_sec are safe until y2106 */
-	ret = stmmac_init_systime(priv, priv->ptpaddr, (u32)now.tv_sec,
-				  now.tv_nsec);
-	if (ret)
-		goto error;
+	stmmac_init_systime(priv, priv->ptpaddr, (u32)now.tv_sec, now.tv_nsec);
 
 	return 0;
-error:
-	/* Restore previous configuration */
-	stmmac_restore_subsecond_increment(priv, default_addend);
-
-	return ret;
 }
 
 static int stmmac_init_ptp_clk_freq(struct stmmac_priv *priv)
@@ -952,14 +917,16 @@ static int stmmac_init_timestamping(struct stmmac_priv *priv)
 	bool xmac = dwmac_is_xmac(priv->plat->core_type);
 	int ret;
 
-	/* Reset hw ts configuration */
-	memset(&priv->tstamp_config, 0, sizeof(priv->tstamp_config));
-	priv->systime_flags = STMMAC_HWTS_ACTIVE | PTP_TCR_TSCFUPDT;
-	priv->tsfupdt_coarse = false;
-	priv->hwts_tx_en = 0;
-	priv->hwts_rx_en = 0;
+	if (priv->plat->ptp_clk_freq_config)
+		priv->plat->ptp_clk_freq_config(priv);
 
-	ret = stmmac_init_tstamp_counter(priv);
+	if (!(priv->dma_cap.time_stamp || priv->dma_cap.atime_stamp)) {
+		netdev_info(priv->dev, "PTP not supported by HW\n");
+		return -EOPNOTSUPP;
+	}
+
+	ret = stmmac_init_tstamp_counter(priv, STMMAC_HWTS_ACTIVE |
+					       PTP_TCR_TSCFUPDT);
 	if (ret) {
 		netdev_warn(priv->dev, "PTP init failed\n");
 		return ret;
@@ -979,6 +946,10 @@ static int stmmac_init_timestamping(struct stmmac_priv *priv)
 	if (priv->adv_ts)
 		netdev_info(priv->dev,
 			    "IEEE 1588-2008 Advanced Timestamp supported\n");
+
+	memset(&priv->tstamp_config, 0, sizeof(priv->tstamp_config));
+	priv->hwts_tx_en = 0;
+	priv->hwts_rx_en = 0;
 
 	if (priv->plat->flags & STMMAC_FLAG_HWTSTAMP_CORRECT_LATENCY)
 		stmmac_hwtstamp_correct_latency(priv, priv);
@@ -6315,6 +6286,13 @@ static netdev_features_t stmmac_fix_features(struct net_device *dev,
 	if (priv->plat->bugged_jumbo && (dev->mtu > ETH_DATA_LEN))
 		features &= ~NETIF_F_CSUM_MASK;
 
+	if (priv->plat->core_type == DWMAC_CORE_XGMAC) {
+		if (features & NETIF_F_HW_VLAN_CTAG_RX)
+			features |= NETIF_F_HW_VLAN_STAG_RX;
+		else
+			features &= ~NETIF_F_HW_VLAN_STAG_RX;
+	}
+
 	return features;
 }
 
@@ -6933,32 +6911,21 @@ static u32 stmmac_vid_crc32_le(__le16 vid_le)
 	return crc;
 }
 
-static int stmmac_vlan_update(struct stmmac_priv *priv, bool is_double)
+static int stmmac_vlan_update(struct stmmac_priv *priv, bool is_svlan)
 {
 	u32 crc, hash = 0;
-	u16 pmatch = 0;
-	int count = 0;
 	u16 vid = 0;
 
 	for_each_set_bit(vid, priv->active_vlans, VLAN_N_VID) {
 		__le16 vid_le = cpu_to_le16(vid);
 		crc = bitrev32(~stmmac_vid_crc32_le(vid_le)) >> 28;
 		hash |= (1 << crc);
-		count++;
-	}
-
-	if (!priv->dma_cap.vlhash) {
-		if (count > 2) /* VID = 0 always passes filter */
-			return -EOPNOTSUPP;
-
-		pmatch = vid;
-		hash = 0;
 	}
 
 	if (!netif_running(priv->dev))
 		return 0;
 
-	return stmmac_update_vlan_hash(priv, priv->hw, hash, pmatch, is_double);
+	return stmmac_update_vlan_hash(priv, priv->hw, hash, is_svlan);
 }
 
 /* FIXME: This may need RXC to be running, but it may be called with BH
@@ -6967,8 +6934,8 @@ static int stmmac_vlan_update(struct stmmac_priv *priv, bool is_double)
 static int stmmac_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid)
 {
 	struct stmmac_priv *priv = netdev_priv(ndev);
-	unsigned int num_double_vlans;
-	bool is_double = false;
+	unsigned int num_svlans;
+	bool is_svlan = false;
 	int ret;
 
 	ret = pm_runtime_resume_and_get(priv->device);
@@ -6976,11 +6943,11 @@ static int stmmac_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid
 		return ret;
 
 	if (be16_to_cpu(proto) == ETH_P_8021AD)
-		is_double = true;
+		is_svlan = true;
 
 	set_bit(vid, priv->active_vlans);
-	num_double_vlans = priv->num_double_vlans + is_double;
-	ret = stmmac_vlan_update(priv, num_double_vlans);
+	num_svlans = priv->num_svlans + is_svlan;
+	ret = stmmac_vlan_update(priv, num_svlans);
 	if (ret) {
 		clear_bit(vid, priv->active_vlans);
 		goto err_pm_put;
@@ -6990,12 +6957,12 @@ static int stmmac_vlan_rx_add_vid(struct net_device *ndev, __be16 proto, u16 vid
 		ret = stmmac_add_hw_vlan_rx_fltr(priv, ndev, priv->hw, proto, vid);
 		if (ret) {
 			clear_bit(vid, priv->active_vlans);
-			stmmac_vlan_update(priv, priv->num_double_vlans);
+			stmmac_vlan_update(priv, priv->num_svlans);
 			goto err_pm_put;
 		}
 	}
 
-	priv->num_double_vlans = num_double_vlans;
+	priv->num_svlans = num_svlans;
 
 err_pm_put:
 	pm_runtime_put(priv->device);
@@ -7009,8 +6976,8 @@ err_pm_put:
 static int stmmac_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vid)
 {
 	struct stmmac_priv *priv = netdev_priv(ndev);
-	unsigned int num_double_vlans;
-	bool is_double = false;
+	unsigned int num_svlans;
+	bool is_svlan = false;
 	int ret;
 
 	ret = pm_runtime_resume_and_get(priv->device);
@@ -7018,11 +6985,11 @@ static int stmmac_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vi
 		return ret;
 
 	if (be16_to_cpu(proto) == ETH_P_8021AD)
-		is_double = true;
+		is_svlan = true;
 
 	clear_bit(vid, priv->active_vlans);
-	num_double_vlans = priv->num_double_vlans - is_double;
-	ret = stmmac_vlan_update(priv, num_double_vlans);
+	num_svlans = priv->num_svlans - is_svlan;
+	ret = stmmac_vlan_update(priv, num_svlans);
 	if (ret) {
 		set_bit(vid, priv->active_vlans);
 		goto del_vlan_error;
@@ -7032,12 +6999,12 @@ static int stmmac_vlan_rx_kill_vid(struct net_device *ndev, __be16 proto, u16 vi
 		ret = stmmac_del_hw_vlan_rx_fltr(priv, ndev, priv->hw, proto, vid);
 		if (ret) {
 			set_bit(vid, priv->active_vlans);
-			stmmac_vlan_update(priv, priv->num_double_vlans);
+			stmmac_vlan_update(priv, priv->num_svlans);
 			goto del_vlan_error;
 		}
 	}
 
-	priv->num_double_vlans = num_double_vlans;
+	priv->num_svlans = num_svlans;
 
 del_vlan_error:
 	pm_runtime_put(priv->device);
@@ -7053,7 +7020,7 @@ static void stmmac_vlan_restore(struct stmmac_priv *priv)
 	if (priv->hw->num_vlan)
 		stmmac_restore_hw_vlan_rx_fltr(priv, priv->dev, priv->hw);
 
-	stmmac_vlan_update(priv, priv->num_double_vlans);
+	stmmac_vlan_update(priv, priv->num_svlans);
 }
 
 static int stmmac_bpf(struct net_device *dev, struct netdev_bpf *bpf)
@@ -7822,26 +7789,18 @@ static int stmmac_dl_ts_coarse_set(struct devlink *dl, u32 id,
 {
 	struct stmmac_devlink_priv *dl_priv = devlink_priv(dl);
 	struct stmmac_priv *priv = dl_priv->stmmac_priv;
-	u32 systime_flags = priv->systime_flags;
-	int ret;
 
-	if (ctx->val.vbool)
-		systime_flags &= ~PTP_TCR_TSCFUPDT;
+	priv->tsfupdt_coarse = ctx->val.vbool;
+
+	if (priv->tsfupdt_coarse)
+		priv->systime_flags &= ~PTP_TCR_TSCFUPDT;
 	else
-		systime_flags |= PTP_TCR_TSCFUPDT;
+		priv->systime_flags |= PTP_TCR_TSCFUPDT;
 
 	/* In Coarse mode, we can use a smaller subsecond increment, let's
 	 * reconfigure the systime, subsecond increment and addend.
 	 */
-	ret = stmmac_update_subsecond_increment(priv, systime_flags);
-	if (ret) {
-		NL_SET_ERR_MSG_MOD(extack,
-				   "failed to reconfigure PTP adjustment");
-		return ret;
-	}
-
-	priv->tsfupdt_coarse = ctx->val.vbool;
-	priv->systime_flags = systime_flags;
+	stmmac_update_subsecond_increment(priv);
 
 	return 0;
 }
@@ -8127,14 +8086,18 @@ static int __stmmac_dvr_probe(struct device *device,
 	ndev->watchdog_timeo = msecs_to_jiffies(watchdog);
 #ifdef STMMAC_VLAN_TAG_USED
 	/* Both mac100 and gmac support receive VLAN tag detection */
-	ndev->features |= NETIF_F_HW_VLAN_CTAG_RX | NETIF_F_HW_VLAN_STAG_RX;
+	ndev->features |= NETIF_F_HW_VLAN_CTAG_RX;
+	if (priv->plat->core_type == DWMAC_CORE_XGMAC)
+		ndev->features |= NETIF_F_HW_VLAN_STAG_RX;
+
 	if (dwmac_is_xmac(priv->plat->core_type)) {
 		ndev->hw_features |= NETIF_F_HW_VLAN_CTAG_RX;
 		priv->hw->hw_vlan_en = true;
 	}
 	if (priv->dma_cap.vlhash) {
 		ndev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
-		ndev->features |= NETIF_F_HW_VLAN_STAG_FILTER;
+		if (priv->plat->core_type == DWMAC_CORE_XGMAC)
+			ndev->features |= NETIF_F_HW_VLAN_STAG_FILTER;
 	}
 	if (priv->dma_cap.vlins)
 		ndev->features |= NETIF_F_HW_VLAN_CTAG_TX;
