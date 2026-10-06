@@ -556,6 +556,7 @@ static struct mlxsw_sp_fib *mlxsw_sp_fib_create(struct mlxsw_sp *mlxsw_sp,
 
 err_lpm_tree_bind:
 	mlxsw_sp_lpm_tree_put(mlxsw_sp, lpm_tree);
+	rhashtable_destroy(&fib->ht);
 err_rhashtable_init:
 	kfree(fib);
 	return ERR_PTR(err);
