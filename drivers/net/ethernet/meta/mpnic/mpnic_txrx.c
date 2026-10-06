@@ -55,6 +55,12 @@ static unsigned int mpnic_desc_unused(struct mpnic_ring *ring)
 	return (ring->head - ring->tail - 1) & ring->size_mask;
 }
 
+static unsigned int mpnic_desc_used(struct mpnic_ring *ring)
+{
+	return (READ_ONCE(ring->tail) - READ_ONCE(ring->head)) &
+	       ring->size_mask;
+}
+
 static struct netdev_queue *mpnic_txring_txq(const struct net_device *dev,
 					     const struct mpnic_ring *ring)
 {
@@ -384,7 +390,7 @@ static unsigned int __mpnic_fill_bdq(struct mpnic_ring *bdq)
 static void __mpnic_bdq_commit_tail(struct mpnic_ring *bdq, unsigned int tail)
 {
 	if (bdq->tail != tail) {
-		bdq->tail = tail;
+		WRITE_ONCE(bdq->tail, tail);
 
 		writeq(tail, bdq->doorbell);
 	}
@@ -483,7 +489,7 @@ mpnic_pkt_prepare(u64 rcd, struct mpnic_rcq_state *state,
 	pg_start = mpnic_hdr_pg_start(pg_off);
 
 	page = mpnic_page_pool_get(&state->hdr, &qt->sub0, pg_idx);
-	qt->sub0.head = (pg_idx + 1) & qt->sub0.size_mask;
+	WRITE_ONCE(qt->sub0.head, (pg_idx + 1) & qt->sub0.size_mask);
 
 	/* Short-cut the end calculation if the page is fully consumed */
 	pg_end = fin ? page_size(page) : mpnic_hdr_pg_end(pg_off, len);
@@ -513,7 +519,7 @@ mpnic_add_rx_frag(u64 rcd, struct mpnic_rcq_state *state,
 	struct page *page;
 
 	page = mpnic_page_pool_get(&state->payld, &qt->sub1, pg_idx);
-	qt->sub1.head = (pg_idx + 1) & qt->sub1.size_mask;
+	WRITE_ONCE(qt->sub1.head, (pg_idx + 1) & qt->sub1.size_mask);
 
 	truesz = (fin ? page_size(page) : ALIGN(pg_off + len, 128)) - pg_off;
 
@@ -1390,6 +1396,31 @@ void mpnic_napi_enable(struct mpnic_net *mpn)
 	 */
 	for (i = 0; i < mpn->num_napi; i++)
 		mpnic_nv_irq_trigger(mpn->napi[i]);
+
+	mpnic_wrfl(mpn->mpd);
+}
+
+void mpnic_napi_depletion_check(struct mpnic_net *mpn)
+{
+	int i, j, t;
+
+	for (i = 0; i < mpn->num_napi; i++) {
+		struct mpnic_napi_vector *nv = mpn->napi[i];
+
+		for (t = nv->txt_count, j = 0; j < nv->rxt_count; j++, t++) {
+			/* Check if BDs posted covers a max sized frame
+			 *  + 1 BD held by RDE as a spare
+			 *  + 1 BD of extra safety margin
+			 */
+			if (mpnic_desc_used(&nv->qt[t].sub0) <
+			    MPNIC_RX_HPQ_DROP_THRS + 2 ||
+			    mpnic_desc_used(&nv->qt[t].sub1) <
+			    MPNIC_RX_PPQ_DROP_THRS + 2) {
+				mpnic_nv_irq_trigger(nv);
+				break;
+			}
+		}
+	}
 
 	mpnic_wrfl(mpn->mpd);
 }
