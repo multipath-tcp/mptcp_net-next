@@ -10,6 +10,7 @@
 #include <linux/sizes.h>
 
 #include "mpnic.h"
+#include "mpnic_txrx.h"
 
 #define MPNIC_MEM_INIT_POLL_US		500
 #define MPNIC_MEM_INIT_TO_US		5000
@@ -272,10 +273,14 @@ static void mpnic_rxglb_init(struct mpnic_dev *mpd)
 	 * the per-queue prefetch FIFO.
 	 */
 	mpnic_wr64(mpd, MPNIC_RDE_CTL,
-		   FIELD_PREP(MPNIC_RDE_CTL_HPQ_DROP_THRESHOLD, 16) |
-		   FIELD_PREP(MPNIC_RDE_CTL_PPQ_DROP_THRESHOLD, 16) |
-		   FIELD_PREP(MPNIC_RDE_CTL_HPQ_LOCAL_DROP_THRESHOLD, 16) |
-		   FIELD_PREP(MPNIC_RDE_CTL_PPQ_LOCAL_DROP_THRESHOLD, 16));
+		   FIELD_PREP(MPNIC_RDE_CTL_HPQ_DROP_THRESHOLD,
+			      MPNIC_RX_HPQ_DROP_THRS - 1) |
+		   FIELD_PREP(MPNIC_RDE_CTL_PPQ_DROP_THRESHOLD,
+			      MPNIC_RX_PPQ_DROP_THRS - 1) |
+		   FIELD_PREP(MPNIC_RDE_CTL_HPQ_LOCAL_DROP_THRESHOLD,
+			      MPNIC_RX_HPQ_DROP_THRS - 1) |
+		   FIELD_PREP(MPNIC_RDE_CTL_PPQ_LOCAL_DROP_THRESHOLD,
+			      MPNIC_RX_PPQ_DROP_THRS - 1));
 
 	/* Receive side coalescing is not supported yet */
 	mpnic_wr64(mpd, MPNIC_RSC_GLOBAL_CONF,

@@ -11451,6 +11451,31 @@ static void netdev_free_phy_link_topology(struct net_device *dev)
 	}
 }
 
+static int netdev_check_ops(struct net_device *dev)
+{
+	const struct net_device_ops *ops = dev->netdev_ops;
+
+	if (((dev->hw_features | dev->features) &
+	     NETIF_F_HW_VLAN_CTAG_FILTER) &&
+	    (!ops->ndo_vlan_rx_add_vid || !ops->ndo_vlan_rx_kill_vid)) {
+		netdev_WARN(dev, "Buggy VLAN acceleration in driver!\n");
+		return -EINVAL;
+	}
+
+	if (!ops->ndo_hwtstamp_get != !ops->ndo_hwtstamp_set) {
+		netdev_WARN(dev, "driver implements only one hwtstamp NDO\n");
+		return -EINVAL;
+	}
+
+	if (netdev_need_ops_lock(dev) && ops->ndo_set_rx_mode &&
+	    !ops->ndo_set_rx_mode_async) {
+		netdev_WARN(dev, "ops-locked drivers should use ndo_set_rx_mode_async\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * register_netdevice() - register a network device
  * @dev: device to register
@@ -11506,19 +11531,9 @@ int register_netdevice(struct net_device *dev)
 		}
 	}
 
-	if (((dev->hw_features | dev->features) &
-	     NETIF_F_HW_VLAN_CTAG_FILTER) &&
-	    (!dev->netdev_ops->ndo_vlan_rx_add_vid ||
-	     !dev->netdev_ops->ndo_vlan_rx_kill_vid)) {
-		netdev_WARN(dev, "Buggy VLAN acceleration in driver!\n");
-		ret = -EINVAL;
+	ret = netdev_check_ops(dev);
+	if (ret)
 		goto err_uninit;
-	}
-
-	if (netdev_need_ops_lock(dev) &&
-	    dev->netdev_ops->ndo_set_rx_mode &&
-	    !dev->netdev_ops->ndo_set_rx_mode_async)
-		netdev_WARN(dev, "ops-locked drivers should use ndo_set_rx_mode_async\n");
 
 	ret = netdev_do_alloc_pcpu_stats(dev);
 	if (ret)
