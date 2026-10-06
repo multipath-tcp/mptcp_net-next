@@ -1,2 +1,19 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reset-msk-state-on-early-connect-failure
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] mptcp: reset msk state on early connect failure
+
+mptcp_connect() can fall back before the subflow SYN is sent, for
+example when the netns is in an MPTCP blackhole, token allocation
+fails, or MD5SIG is in use. If the subsequent subflow connect()
+fails immediately (EAFNOSUPPORT, ENETUNREACH, ...),
+__inet_stream_connect() returns while the socket is still
+SS_UNCONNECTED and never calls ->disconnect().
+
+The error path only dropped the token and moved the msk back to
+TCP_CLOSE. MPTCP_FALLBACK_DONE, allow_subflows and
+request_mptcp were left as after early fallback, so a later
+connect() on the same fd stayed TCP-only.
+
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/633
+Fixes: 0235d075a592 ("mptcp: mark as fallback even early ones")
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
