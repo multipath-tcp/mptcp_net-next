@@ -4360,7 +4360,7 @@ static int rtnl_getlink(struct sk_buff *skb, struct nlmsghdr *nlh,
 retry:
 	if (need_rtnl) {
 		rtnl_lock();
-		if (!dev_isalive(dev)) {
+		if (!netif_is_alive(dev)) {
 			err = -ENODEV;
 			nskb = NULL;
 			goto unlock;

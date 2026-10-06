@@ -129,7 +129,9 @@
 #include <linux/ip.h>
 #include <net/ip.h>
 #include <net/mpls.h>
+#include <net/route.h>
 #include <linux/ipv6.h>
+#include <net/ip6_route.h>
 #include <linux/in.h>
 #include <linux/jhash.h>
 #include <linux/random.h>
@@ -11884,6 +11886,11 @@ void netdev_run_todo(void)
 		WRITE_ONCE(dev->reg_state, NETREG_UNREGISTERED);
 		netdev_unlock(dev);
 		linkwatch_sync_dev(dev);
+	}
+
+	if (!list_empty(&list)) {
+		rt_flush_dev(NULL);
+		rt6_uncached_list_flush_dev(NULL);
 	}
 
 	cnt = 0;
