@@ -1625,6 +1625,7 @@ int batadv_bla_init(struct batadv_priv *bat_priv)
 	bat_priv->bla.backbone_hash = batadv_hash_new(32);
 	if (!bat_priv->bla.backbone_hash) {
 		batadv_hash_destroy(bat_priv->bla.claim_hash);
+		bat_priv->bla.claim_hash = NULL;
 		return -ENOMEM;
 	}
 
