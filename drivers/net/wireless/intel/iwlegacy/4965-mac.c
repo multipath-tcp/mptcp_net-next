@@ -4526,49 +4526,6 @@ il4965_irq_tasklet(struct tasklet_struct *t)
  *
  *****************************************************************************/
 
-#ifdef CONFIG_IWLEGACY_DEBUG
-
-/*
- * The following adds a new attribute to the sysfs representation
- * of this device driver (i.e. a new file in /sys/class/net/wlan0/device/)
- * used for controlling the debug level.
- *
- * See the level definitions in iwl for details.
- *
- * The debug_level being managed using sysfs below is a per device debug
- * level that is used instead of the global debug level if it (the per
- * device debug level) is set.
- */
-static ssize_t
-il4965_show_debug_level(struct device *d, struct device_attribute *attr,
-			char *buf)
-{
-	struct il_priv *il = dev_get_drvdata(d);
-	return sprintf(buf, "0x%08X\n", il_get_debug_level(il));
-}
-
-static ssize_t
-il4965_store_debug_level(struct device *d, struct device_attribute *attr,
-			 const char *buf, size_t count)
-{
-	struct il_priv *il = dev_get_drvdata(d);
-	unsigned long val;
-	int ret;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret)
-		IL_ERR("%s is not in hex or decimal form.\n", buf);
-	else
-		il->debug_level = val;
-
-	return strnlen(buf, count);
-}
-
-static DEVICE_ATTR(debug_level, 0644, il4965_show_debug_level,
-		   il4965_store_debug_level);
-
-#endif /* CONFIG_IWLEGACY_DEBUG */
-
 static ssize_t
 il4965_show_temperature(struct device *d, struct device_attribute *attr,
 			char *buf)
@@ -4623,9 +4580,6 @@ static DEVICE_ATTR(tx_power, 0644, il4965_show_tx_power,
 static struct attribute *il_sysfs_entries[] = {
 	&dev_attr_temperature.attr,
 	&dev_attr_tx_power.attr,
-#ifdef CONFIG_IWLEGACY_DEBUG
-	&dev_attr_debug_level.attr,
-#endif
 	NULL
 };
 

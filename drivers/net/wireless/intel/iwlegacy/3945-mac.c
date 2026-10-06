@@ -3010,49 +3010,6 @@ il3945_configure_filter(struct ieee80211_hw *hw, unsigned int changed_flags,
  *
  *****************************************************************************/
 
-#ifdef CONFIG_IWLEGACY_DEBUG
-
-/*
- * The following adds a new attribute to the sysfs representation
- * of this device driver (i.e. a new file in /sys/bus/pci/drivers/iwl/)
- * used for controlling the debug level.
- *
- * See the level definitions in iwl for details.
- *
- * The debug_level being managed using sysfs below is a per device debug
- * level that is used instead of the global debug level if it (the per
- * device debug level) is set.
- */
-static ssize_t
-il3945_show_debug_level(struct device *d, struct device_attribute *attr,
-			char *buf)
-{
-	struct il_priv *il = dev_get_drvdata(d);
-	return sprintf(buf, "0x%08X\n", il_get_debug_level(il));
-}
-
-static ssize_t
-il3945_store_debug_level(struct device *d, struct device_attribute *attr,
-			 const char *buf, size_t count)
-{
-	struct il_priv *il = dev_get_drvdata(d);
-	unsigned long val;
-	int ret;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret)
-		IL_INFO("%s is not in hex or decimal form.\n", buf);
-	else
-		il->debug_level = val;
-
-	return strnlen(buf, count);
-}
-
-static DEVICE_ATTR(debug_level, 0644, il3945_show_debug_level,
-		   il3945_store_debug_level);
-
-#endif /* CONFIG_IWLEGACY_DEBUG */
-
 static ssize_t
 il3945_show_temperature(struct device *d, struct device_attribute *attr,
 			char *buf)
@@ -3385,9 +3342,6 @@ static struct attribute *il3945_sysfs_entries[] = {
 	&dev_attr_status.attr,
 	&dev_attr_temperature.attr,
 	&dev_attr_tx_power.attr,
-#ifdef CONFIG_IWLEGACY_DEBUG
-	&dev_attr_debug_level.attr,
-#endif
 	NULL
 };
 
