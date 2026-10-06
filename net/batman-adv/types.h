@@ -1055,6 +1055,25 @@ struct batadv_priv_tt {
 	 */
 	spinlock_t commit_lock;
 
+	/**
+	 * @reserved_entries: number of local TT entries which are currently
+	 *  allocated or about to be allocated. Together with @reserved_vlans it
+	 *  describes the worst case size of a full table response.
+	 */
+	u16 reserved_entries;
+
+	/**
+	 * @reserved_vlans: number of mesh interface VLANs which are currently
+	 *  allocated or about to be allocated. Together with @reserved_entries
+	 *  it describes the worst case size of a full table response.
+	 */
+	u16 reserved_vlans;
+
+	/**
+	 * @reserve_lock: lock protecting @reserved_entries & @reserved_vlans
+	 */
+	spinlock_t reserve_lock;
+
 	/** @work: work queue callback item for translation table purging */
 	struct delayed_work work;
 };
