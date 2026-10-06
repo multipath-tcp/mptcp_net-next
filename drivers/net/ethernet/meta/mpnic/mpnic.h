@@ -7,6 +7,7 @@
 #include <linux/interrupt.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/types.h>
+#include <linux/workqueue.h>
 
 #include "mpnic_csr.h"
 
@@ -26,6 +27,8 @@ struct mpnic_dev {
 	struct net_device *netdev;
 
 	u32 __iomem *uc_addr0;
+
+	struct delayed_work service_task;
 
 	u16 num_irqs;
 
