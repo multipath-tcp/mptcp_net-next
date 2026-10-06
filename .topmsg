@@ -1,2 +1,14 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-fix-subflow-bitfield-misuse
+From: Paolo Abeni <pabeni@redhat.com>
+Subject: [PATCH] mptcp: fix subflow bitfield misuse
+
+The subflow status bitfield is protected by the subflow socket lock,
+with one notable exception: the `close_event_done` bit is actually under
+the msk socket lock protection.
+
+Flipping the latter bit may corrupt other entries in the same bitfield.
+
+Move the `close_event_done` outside the bitfield, in a 32bit hole.
+
+Fixes: d82809b6c5f2 ("mptcp: avoid duplicated SUB_CLOSED events")
+Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
