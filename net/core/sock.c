@@ -2496,7 +2496,7 @@ struct sock *sk_clone(const struct sock *sk, const gfp_t priority,
 	RCU_INIT_POINTER(newsk->sk_bpf_storage, NULL);
 #endif
 #if IS_ENABLED(CONFIG_INET_PSP)
-	RCU_INIT_POINTER(newsk->psp_assoc, NULL);
+	DEBUG_NET_WARN_ON_ONCE(rcu_access_pointer(sk->psp_assoc));
 #endif
 
 	/* SANITY */
@@ -2957,6 +2957,48 @@ void sock_kzfree_s(struct sock *sk, void *mem, int size)
 }
 EXPORT_SYMBOL(sock_kzfree_s);
 
+/**
+ *	sk_set_nospace - tell the transport a writer is waiting for space
+ *	@sk: socket
+ *
+ *	Must be called before the final check of the available send space,
+ *	so that the transport can not miss the request and forget to call
+ *	sk->sk_write_space() once space is available again.
+ */
+void sk_set_nospace(struct sock *sk)
+{
+	struct socket *sock = sk->sk_socket;
+
+	if (!sock)
+		return;
+	/* Set SOCK_NOSPACE before tp->tcp_nospace (paired with
+	 * sk_clear_nospace() clearing tp->tcp_nospace before SOCK_NOSPACE)
+	 * so a concurrent clear cannot leave SOCK_NOSPACE set with
+	 * tp->tcp_nospace cleared.
+	 */
+	set_bit(SOCK_NOSPACE, &sock->flags);
+	tcp_set_nospace(sk);
+}
+EXPORT_SYMBOL(sk_set_nospace);
+
+/**
+ *	sk_clear_nospace - tell the transport no writer is waiting for space
+ *	@sk: socket
+ *
+ *	Called from ->sk_write_space() handlers, once send space has been
+ *	made available to writers.
+ */
+void sk_clear_nospace(struct sock *sk)
+{
+	struct socket *sock = sk->sk_socket;
+
+	if (!sock)
+		return;
+	tcp_clear_nospace(sk);
+	clear_bit(SOCK_NOSPACE, &sock->flags);
+}
+EXPORT_SYMBOL(sk_clear_nospace);
+
 /* It is almost wait_for_tcp_memory minus release_sock/lock_sock.
    I think, these locks should be removed for datagram sockets.
  */
@@ -2970,7 +3012,7 @@ static long sock_wait_for_wmem(struct sock *sk, long timeo)
 			break;
 		if (signal_pending(current))
 			break;
-		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		sk_set_nospace(sk);
 		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 		if (refcount_read(&sk->sk_wmem_alloc) < READ_ONCE(sk->sk_sndbuf))
 			break;
@@ -3011,7 +3053,7 @@ struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
 			break;
 
 		sk_set_bit(SOCKWQ_ASYNC_NOSPACE, sk);
-		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		sk_set_nospace(sk);
 		err = -EAGAIN;
 		if (!timeo)
 			goto failure;
