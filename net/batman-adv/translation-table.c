@@ -235,6 +235,162 @@ batadv_tt_global_hash_find(struct batadv_priv *bat_priv, const u8 *addr,
 }
 
 /**
+ * batadv_tt_len() - compute length in bytes of given number of tt changes
+ * @changes_num: number of tt changes
+ *
+ * Return: computed length in bytes.
+ */
+static int batadv_tt_len(int changes_num)
+{
+	return changes_num * sizeof(struct batadv_tvlv_tt_change);
+}
+
+/**
+ * batadv_tt_local_transmit_size() - calculate the size of a full table response
+ *  for a given number of VLANs and local TT entries
+ * @num_vlan: number of announced VLANs
+ * @num_entries: number of announced local TT entries
+ *
+ * Return: local translation table size in bytes.
+ */
+static int batadv_tt_local_transmit_size(u16 num_vlan, u16 num_entries)
+{
+	int hdr_size;
+
+	/* header size of tvlv encapsulated tt response payload */
+	hdr_size = sizeof(struct batadv_unicast_tvlv_packet);
+	hdr_size += sizeof(struct batadv_tvlv_hdr);
+	hdr_size += sizeof(struct batadv_tvlv_tt_data);
+	hdr_size += num_vlan * sizeof(struct batadv_tvlv_tt_vlan_data);
+
+	return hdr_size + batadv_tt_len(num_entries);
+}
+
+/**
+ * batadv_tt_local_reserve() - reserve room in the transmittable local table
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @num_vlan: number of VLANs to reserve
+ * @num_entries: number of local TT entries to reserve
+ * @table_size: stores the resulting worst case table size in bytes
+ *
+ * Add the requested number of VLANs and local TT entries to the reservation
+ * counters and check whether the local translation table would then still fit
+ * in a single full table response. The reservation is dropped again when it
+ * would not.
+ *
+ * The reservation has to happen before the related object is allocated. This
+ * way two parallel allocations cannot both observe enough room for themselves
+ * and end up with a local table which can no longer be transmitted.
+ *
+ * A granted reservation must be returned via batadv_tt_local_unreserve() when
+ * the related object is released or was never created.
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+static bool batadv_tt_local_reserve(struct batadv_priv *bat_priv, u16 num_vlan,
+				    u16 num_entries, int *table_size)
+{
+	int packet_size_max = READ_ONCE(bat_priv->packet_size_max);
+
+	scoped_guard(spinlock_bh, &bat_priv->tt.reserve_lock) {
+		bat_priv->tt.reserved_vlans += num_vlan;
+		bat_priv->tt.reserved_entries += num_entries;
+
+		*table_size = batadv_tt_local_transmit_size(bat_priv->tt.reserved_vlans,
+							    bat_priv->tt.reserved_entries);
+		if (*table_size <= packet_size_max)
+			return true;
+
+		bat_priv->tt.reserved_vlans -= num_vlan;
+		bat_priv->tt.reserved_entries -= num_entries;
+	}
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve() - return room in the transmittable local table
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @num_vlan: number of VLANs to return
+ * @num_entries: number of local TT entries to return
+ */
+static void batadv_tt_local_unreserve(struct batadv_priv *bat_priv,
+				      u16 num_vlan, u16 num_entries)
+{
+	scoped_guard(spinlock_bh, &bat_priv->tt.reserve_lock) {
+		bat_priv->tt.reserved_vlans -= num_vlan;
+		bat_priv->tt.reserved_entries -= num_entries;
+	}
+}
+
+/**
+ * batadv_tt_local_reserve_entry() - reserve room for a new local TT entry
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @addr: the mac address of the client to add
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+static bool batadv_tt_local_reserve_entry(struct batadv_priv *bat_priv,
+					  const u8 *addr)
+{
+	int table_size;
+
+	if (batadv_tt_local_reserve(bat_priv, 0, 1, &table_size))
+		return true;
+
+	net_ratelimited_function(batadv_info, bat_priv->mesh_iface,
+				 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new local tt entry: %pM\n",
+				 table_size,
+				 READ_ONCE(bat_priv->packet_size_max), addr);
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve_entry() - return the room of a local TT entry
+ * @bat_priv: the bat priv with all the mesh interface information
+ */
+static void batadv_tt_local_unreserve_entry(struct batadv_priv *bat_priv)
+{
+	batadv_tt_local_unreserve(bat_priv, 0, 1);
+}
+
+/**
+ * batadv_tt_local_reserve_vlan() - reserve room for a new VLAN
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @vid: the VLAN identifier
+ *
+ * Each VLAN adds a per VLAN header to the full table response and therefore
+ * has to be reserved before batadv_meshif_create_vlan() allocates it.
+ *
+ * Return: true when the reservation was granted, false otherwise.
+ */
+bool batadv_tt_local_reserve_vlan(struct batadv_priv *bat_priv,
+				  unsigned short vid)
+{
+	int table_size;
+
+	if (batadv_tt_local_reserve(bat_priv, 1, 0, &table_size))
+		return true;
+
+	net_ratelimited_function(batadv_info, bat_priv->mesh_iface,
+				 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new VLAN: %d\n",
+				 table_size, READ_ONCE(bat_priv->packet_size_max),
+				 batadv_print_vid(vid));
+
+	return false;
+}
+
+/**
+ * batadv_tt_local_unreserve_vlan() - return the room of a VLAN
+ * @bat_priv: the bat priv with all the mesh interface information
+ */
+void batadv_tt_local_unreserve_vlan(struct batadv_priv *bat_priv)
+{
+	batadv_tt_local_unreserve(bat_priv, 1, 0);
+}
+
+/**
  * batadv_tt_local_entry_release() - release tt_local_entry from lists and queue
  *  for free after rcu grace period
  * @ref: kref pointer of the batadv_tt_local_entry
@@ -246,6 +402,7 @@ static void batadv_tt_local_entry_release(struct kref *ref)
 	tt_local_entry = container_of(ref, struct batadv_tt_local_entry,
 				      common.refcount);
 
+	batadv_tt_local_unreserve_entry(tt_local_entry->vlan->bat_priv);
 	batadv_meshif_vlan_put(tt_local_entry->vlan);
 
 	kfree_rcu(tt_local_entry, common.rcu);
@@ -461,23 +618,21 @@ static u16 batadv_tt_flags_get(struct batadv_tt_common_entry *common)
 }
 
 /**
- * batadv_tt_local_event() - store a local TT event (ADD/DEL)
+ * __batadv_tt_local_event() - store a local TT event (ADD/DEL) with given flags
  * @bat_priv: the bat priv with all the mesh interface information
- * @tt_local_entry: the TT entry involved in the event
- * @event_flags: flags to store in the event structure
+ * @common: the TT entry involved in the event
+ * @flags: flags of the TT entry combined with the event flags
  */
-static void batadv_tt_local_event(struct batadv_priv *bat_priv,
-				  struct batadv_tt_local_entry *tt_local_entry,
-				  u8 event_flags)
+static void __batadv_tt_local_event(struct batadv_priv *bat_priv,
+				    const struct batadv_tt_common_entry *common,
+				    u8 flags)
 {
-	struct batadv_tt_common_entry *common = &tt_local_entry->common;
 	struct batadv_tt_change_node *tt_change_node;
 	struct batadv_tt_change_node *entry;
 	struct batadv_tt_change_node *safe;
 	bool del_op_requested;
 	bool del_op_entry;
 	size_t changes;
-	u8 flags;
 
 	tt_change_node = kmem_cache_alloc(batadv_tt_change_cache, GFP_ATOMIC);
 	if (!tt_change_node)
@@ -487,8 +642,6 @@ static void batadv_tt_local_event(struct batadv_priv *bat_priv,
 	       sizeof(tt_change_node->change.reserved));
 	ether_addr_copy(tt_change_node->change.addr, common->addr);
 	tt_change_node->change.vid = htons(common->vid);
-
-	flags = batadv_tt_flags_get(common) | event_flags;
 
 	tt_change_node->change.flags = flags;
 	del_op_requested = flags & BATADV_TT_CLIENT_DEL;
@@ -538,14 +691,20 @@ update_changes:
 }
 
 /**
- * batadv_tt_len() - compute length in bytes of given number of tt changes
- * @changes_num: number of tt changes
- *
- * Return: computed length in bytes.
+ * batadv_tt_local_event() - store a local TT event (ADD/DEL)
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @tt_local_entry: the TT entry involved in the event
+ * @event_flags: flags to store in the event structure
  */
-static int batadv_tt_len(int changes_num)
+static void batadv_tt_local_event(struct batadv_priv *bat_priv,
+				  struct batadv_tt_local_entry *tt_local_entry,
+				  u8 event_flags)
 {
-	return changes_num * sizeof(struct batadv_tvlv_tt_change);
+	struct batadv_tt_common_entry *common = &tt_local_entry->common;
+	u8 flags;
+
+	flags = batadv_tt_flags_get(common) | event_flags;
+	__batadv_tt_local_event(bat_priv, common, flags);
 }
 
 /**
@@ -571,7 +730,6 @@ static int batadv_tt_local_table_transmit_size(struct batadv_priv *bat_priv)
 	struct batadv_meshif_vlan *vlan;
 	u16 tt_local_entries = 0;
 	u16 num_vlan = 0;
-	int hdr_size;
 
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(vlan, &bat_priv->meshif_vlan_list, list) {
@@ -580,13 +738,7 @@ static int batadv_tt_local_table_transmit_size(struct batadv_priv *bat_priv)
 	}
 	rcu_read_unlock();
 
-	/* header size of tvlv encapsulated tt response payload */
-	hdr_size = sizeof(struct batadv_unicast_tvlv_packet);
-	hdr_size += sizeof(struct batadv_tvlv_hdr);
-	hdr_size += sizeof(struct batadv_tvlv_tt_data);
-	hdr_size += num_vlan * sizeof(struct batadv_tvlv_tt_vlan_data);
-
-	return hdr_size + batadv_tt_len(tt_local_entries);
+	return batadv_tt_local_transmit_size(num_vlan, tt_local_entries);
 }
 
 /**
@@ -790,23 +942,15 @@ batadv_tt_local_create(struct net_device *mesh_iface, const u8 *addr,
 	struct batadv_priv *bat_priv = netdev_priv(mesh_iface);
 	struct batadv_tt_local_entry *tt_local;
 	struct batadv_meshif_vlan *vlan;
-	int packet_size_max;
-	int table_size;
 
-	/* Ignore the client if we cannot send it in a full table response. */
-	table_size = batadv_tt_local_table_transmit_size(bat_priv);
-	table_size += batadv_tt_len(1);
-	packet_size_max = READ_ONCE(bat_priv->packet_size_max);
-	if (table_size > packet_size_max) {
-		net_ratelimited_function(batadv_info, mesh_iface,
-					 "Local translation table size (%i) exceeds maximum packet size (%i); Ignoring new local tt entry: %pM\n",
-					 table_size, packet_size_max, addr);
+	if (!batadv_tt_local_reserve_entry(bat_priv, addr))
 		return NULL;
-	}
 
 	tt_local = kmem_cache_alloc(batadv_tl_cache, GFP_ATOMIC);
-	if (!tt_local)
+	if (!tt_local) {
+		batadv_tt_local_unreserve_entry(bat_priv);
 		return NULL;
+	}
 
 	/* increase the refcounter of the related vlan */
 	vlan = batadv_meshif_vlan_get(bat_priv, vid);
@@ -815,6 +959,7 @@ batadv_tt_local_create(struct net_device *mesh_iface, const u8 *addr,
 					 "adding TT local entry %pM to non-existent VLAN %d\n",
 					 addr, batadv_print_vid(vid));
 		kmem_cache_free(batadv_tl_cache, tt_local);
+		batadv_tt_local_unreserve_entry(bat_priv);
 		return NULL;
 	}
 
@@ -1420,21 +1565,37 @@ int batadv_tt_local_dump(struct sk_buff *msg, struct netlink_callback *cb)
 }
 
 /**
- * batadv_tt_local_set_pending_event() - trigger events for TT pending removal
+ * batadv_tt_local_set_pending() - mark local TT entry as pending removal
  * @bat_priv: the bat priv with all the mesh interface information
- * @tt_local_entry: local TT entry which was marked as BATADV_TT_CLIENT_PENDING
+ * @tt_local_entry: local TT entry to mark as BATADV_TT_CLIENT_PENDING
  * @flags: TT change flags to announce together with the pending removal
  * @message: debug message describing the reason for the change
  *
- * Schedule the TT change announcement for the entry. The caller must already
- * have added BATADV_TT_CLIENT_PENDING to the @tt_local_entry
+ * Schedule the TT change announcement and set BATADV_TT_CLIENT_PENDING on the
+ * entry. The entry is kept in the local table until the next TTVN increment
+ * so that a consistency-check response can still be answered.
+ *
+ * Next to the flags_lock of the entry, the caller must hold the hash bucket
+ * list_lock of @tt_local_entry. Otherwise
+ * batadv_tt_local_purge_pending_clients() could remove the entry before its
+ * change was queued.
  */
 static void
-batadv_tt_local_set_pending_event(struct batadv_priv *bat_priv,
-				  struct batadv_tt_local_entry *tt_local_entry,
-				  u16 flags, const char *message)
+batadv_tt_local_set_pending(struct batadv_priv *bat_priv,
+			    struct batadv_tt_local_entry *tt_local_entry,
+			    u16 flags, const char *message)
+	__must_hold(&tt_local_entry->common.flags_lock)
 {
-	batadv_tt_local_event(bat_priv, tt_local_entry, flags);
+	struct batadv_tt_common_entry *common = &tt_local_entry->common;
+	struct batadv_hashtable *hash = bat_priv->tt.local_hash;
+	u32 i;
+
+	i = batadv_choose_tt(common, hash->size);
+	lockdep_assert_held(&hash->list_locks[i]);
+	lockdep_assert_held(&common->flags_lock);
+
+	__batadv_tt_local_event(bat_priv, common, common->flags | flags);
+	common->flags |= BATADV_TT_CLIENT_PENDING;
 
 	batadv_dbg(BATADV_DBG_TT, bat_priv,
 		   "Local tt entry (%pM, vid: %d) pending to be removed: %s\n",
@@ -1443,45 +1604,77 @@ batadv_tt_local_set_pending_event(struct batadv_priv *bat_priv,
 }
 
 /**
- * batadv_tt_local_mark_removed() - mark a local entry as removed
+ * batadv_tt_local_mark_removed() - mark a local entry as removed and queue DEL
+ * @bat_priv: the bat priv with all the mesh interface information
  * @tt_local_entry: local TT entry to mark
+ * @message: message to append to the log on deletion
  * @roaming: true if the deletion is due to a roaming event
  * @curr_flags: pointer to store the flags of the entry before it was marked
+ *
+ * An already announced entry is marked as BATADV_TT_CLIENT_PENDING and the
+ * (roamed) DEL change is queued. Both happen under the hash bucket list_lock
+ * of the entry to prevent concurrent batadv_tt_local_purge_pending_clients()
+ * from removing the entry and batadv_tt_local_transition_new() from clearing
+ * BATADV_TT_CLIENT_NEW after it was checked.
  *
  * Return: true if the entry has to be kept in the local table until the next
  * ttvn increment, false if it can be purged immediately.
  */
 static bool
-batadv_tt_local_mark_removed(struct batadv_tt_local_entry *tt_local_entry,
-			     bool roaming, u16 *curr_flags)
+batadv_tt_local_mark_removed(struct batadv_priv *bat_priv,
+			     struct batadv_tt_local_entry *tt_local_entry,
+			     const char *message, bool roaming, u16 *curr_flags)
 {
+	spinlock_t *list_lock; /* protects write access to the hash lists */
 	struct batadv_tt_common_entry *common = &tt_local_entry->common;
+	struct batadv_hashtable *hash = bat_priv->tt.local_hash;
 	bool pending = false;
+	u16 flags;
+	u32 i;
+
+	i = batadv_choose_tt(common, hash->size);
+	list_lock = &hash->list_locks[i];
+
+	spin_lock_bh(list_lock);
 
 	scoped_guard(spinlock_bh, &common->flags_lock) {
 		*curr_flags = common->flags;
 
-		/* mark the local client as ROAMed */
+		/* if this global entry addition is due to a roaming, the node
+		 * has to mark the local entry as "roamed" in order to
+		 * correctly reroute packets later
+		 */
 		if (roaming)
 			common->flags |= BATADV_TT_CLIENT_ROAM;
 
-		if (!(common->flags & BATADV_TT_CLIENT_NEW)) {
-			common->flags |= BATADV_TT_CLIENT_PENDING;
-			pending = true;
-		}
+		if (common->flags & BATADV_TT_CLIENT_NEW)
+			break;
+
+		flags = BATADV_TT_CLIENT_DEL;
+		if (roaming)
+			flags |= BATADV_TT_CLIENT_ROAM;
+
+		batadv_tt_local_set_pending(bat_priv, tt_local_entry, flags,
+					    message);
+		pending = true;
 	}
+
+	spin_unlock_bh(list_lock);
 
 	return pending;
 }
 
 /**
- * batadv_tt_local_remove_now() - purge a local entry which was never announced
+ * batadv_tt_local_remove_now() - purge a local entry which was not (yet) announced
  * @bat_priv: the bat priv with all the mesh interface information
  * @tt_local_entry: local TT entry to purge
  *
- * A client which was added right after the last ttvn increment was never sent
- * to the other nodes. It can therefore be dropped from the local table without
- * waiting for the next ttvn increment.
+ * A client which was added right after the last ttvn increment was not (yet)
+ * sent to the other nodes. It can therefore be dropped from the local table
+ * without waiting for the next ttvn increment.
+ *
+ * If it was still announced by a parallel context before it was removed from
+ * the hash, then the local TT size adjustment will be handled automatically.
  */
 static void
 batadv_tt_local_remove_now(struct batadv_priv *bat_priv,
@@ -1490,14 +1683,14 @@ batadv_tt_local_remove_now(struct batadv_priv *bat_priv,
 	struct batadv_tt_common_entry *common = &tt_local_entry->common;
 	struct hlist_node *tt_removed_node;
 
-	batadv_tt_local_event(bat_priv, tt_local_entry, BATADV_TT_CLIENT_DEL);
-
 	/* remove exactly this object when still present in hash */
 	tt_removed_node = batadv_hash_remove(bat_priv->tt.local_hash,
 					     batadv_compare_tt_entry,
 					     batadv_choose_tt, common);
 	if (!tt_removed_node)
 		return;
+
+	batadv_tt_local_event(bat_priv, tt_local_entry, BATADV_TT_CLIENT_DEL);
 
 	/* batadv_tt_local_transition_new() may have committed the entry and
 	 * thus counted it in the local table size since the
@@ -1526,27 +1719,16 @@ u16 batadv_tt_local_remove(struct batadv_priv *bat_priv, const u8 *addr,
 {
 	struct batadv_tt_local_entry *tt_local_entry;
 	u16 curr_flags;
-	u16 flags;
 
 	tt_local_entry = batadv_tt_local_hash_find(bat_priv, addr, vid);
 	if (!tt_local_entry)
 		return BATADV_NO_FLAGS;
 
-	flags = BATADV_TT_CLIENT_DEL;
-	/* if this global entry addition is due to a roaming, the node has to
-	 * mark the local entry as "roamed" in order to correctly reroute
-	 * packets later
+	/* if this client has been added right now, it is possible to
+	 * immediately purge it
 	 */
-	if (roaming)
-		flags |= BATADV_TT_CLIENT_ROAM;
-
-	if (batadv_tt_local_mark_removed(tt_local_entry, roaming, &curr_flags))
-		batadv_tt_local_set_pending_event(bat_priv, tt_local_entry,
-						  flags, message);
-	else
-		/* if this client has been added right now, it is possible to
-		 * immediately purge it
-		 */
+	if (!batadv_tt_local_mark_removed(bat_priv, tt_local_entry, message,
+					  roaming, &curr_flags))
 		batadv_tt_local_remove_now(bat_priv, tt_local_entry);
 
 	batadv_tt_local_entry_put(tt_local_entry);
@@ -1571,37 +1753,25 @@ static void batadv_tt_local_purge_list(struct batadv_priv *bat_priv,
 
 	hlist_for_each_entry_safe(tt_common_entry, node_tmp, head,
 				  hash_entry) {
-		bool cont = false;
-
 		tt_local_entry = container_of(tt_common_entry,
 					      struct batadv_tt_local_entry,
 					      common);
 
 		scoped_guard(spinlock_bh, &tt_local_entry->common.flags_lock) {
-			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_NOPURGE) {
-				cont = true;
+			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_NOPURGE)
 				break;
-			}
 
 			/* entry already marked for deletion */
-			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_PENDING) {
-				cont = true;
+			if (tt_local_entry->common.flags & BATADV_TT_CLIENT_PENDING)
 				break;
-			}
 
-			if (!batadv_has_timed_out(tt_local_entry->last_seen, timeout)) {
-				cont = true;
+			if (!batadv_has_timed_out(tt_local_entry->last_seen, timeout))
 				break;
-			}
 
-			tt_local_entry->common.flags |= BATADV_TT_CLIENT_PENDING;
+			batadv_tt_local_set_pending(bat_priv, tt_local_entry,
+						    BATADV_TT_CLIENT_DEL,
+						    "timed out");
 		}
-
-		if (cont)
-			continue;
-
-		batadv_tt_local_set_pending_event(bat_priv, tt_local_entry,
-						  BATADV_TT_CLIENT_DEL, "timed out");
 	}
 }
 
@@ -1870,9 +2040,10 @@ out:
  * @tt_global_entry: the global TT entry of the announced client
  * @flags: TT flags announced for this non-mesh client
  *
- * A client which is announced by another originator is no longer a local
- * client. Remove it from the local table and take over the WIFI flag it was
- * tracked with.
+ * A non-multicast client which is announced by another originator is no longer
+ * a local client. Remove it from the local table and (for the global entry)
+ * take over the WIFI flag it was tracked with. Reset the roaming flag in case
+ * the announcement didn't contain the roaming flag.
  */
 static void
 batadv_tt_global_purge_local(struct batadv_priv *bat_priv,
