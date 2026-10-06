@@ -2435,6 +2435,7 @@ static int macb_pad_and_fcs(struct sk_buff **skb, bool add_fcs)
 		      skb_is_nonlinear(*skb);
 	int padlen = ETH_ZLEN - (*skb)->len;
 	int tailroom = skb_tailroom(*skb);
+	bool shared = skb_shared(*skb);
 	struct sk_buff *nskb;
 	u32 fcs;
 
@@ -2443,7 +2444,8 @@ static int macb_pad_and_fcs(struct sk_buff **skb, bool add_fcs)
 
 	if (padlen <= 0) {
 		/* FCS could be appended to tailroom. */
-		if (!skb_is_nonlinear(*skb) && tailroom >= ETH_FCS_LEN)
+		if (!shared && !skb_is_nonlinear(*skb) &&
+		    tailroom >= ETH_FCS_LEN)
 			goto add_fcs;
 		/* Reallocate with room for the FCS. */
 		padlen = ETH_FCS_LEN;
@@ -2452,7 +2454,7 @@ static int macb_pad_and_fcs(struct sk_buff **skb, bool add_fcs)
 		padlen += ETH_FCS_LEN;
 	}
 
-	if (cloned || tailroom < padlen) {
+	if (shared || cloned || tailroom < padlen) {
 		nskb = skb_copy_expand(*skb, 0, padlen, GFP_ATOMIC);
 		if (!nskb)
 			return -ENOMEM;
