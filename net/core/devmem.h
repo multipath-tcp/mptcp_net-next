@@ -112,8 +112,7 @@ static inline unsigned long net_iov_virtual_addr(const struct net_iov *niov)
 	struct net_devmem_dmabuf_binding *binding =
 		net_devmem_iov_binding(niov);
 
-	return net_iov_owner(niov)->base_virtual +
-	       ((unsigned long)net_iov_idx(niov) << binding->niov_shift);
+	return (unsigned long)net_iov_idx(niov) << binding->niov_shift;
 }
 
 static inline bool
