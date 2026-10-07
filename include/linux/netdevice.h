@@ -5715,6 +5715,12 @@ static inline const char *netdev_name(const struct net_device *dev)
 	return dev->name;
 }
 
+/* Caller holds RTNL, netdev->lock or RCU */
+static inline bool netif_is_alive(const struct net_device *dev)
+{
+	return READ_ONCE(dev->reg_state) <= NETREG_REGISTERED;
+}
+
 static inline const char *netdev_reg_state(const struct net_device *dev)
 {
 	u8 reg_state = READ_ONCE(dev->reg_state);
