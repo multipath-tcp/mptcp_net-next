@@ -1243,7 +1243,7 @@ static int bnge_alloc_core(struct bnge_net *bn)
 
 	bn->rx_ring = kzalloc_objs(struct bnge_rx_ring_info, bd->rx_nr_rings);
 	if (!bn->rx_ring)
-		goto err_free_core;
+		goto err_free_bnapi;
 
 	for (i = 0; i < bd->rx_nr_rings; i++) {
 		struct bnge_rx_ring_info *rxr = &bn->rx_ring[i];
@@ -1258,12 +1258,12 @@ static int bnge_alloc_core(struct bnge_net *bn)
 
 	bn->tx_ring = kzalloc_objs(struct bnge_tx_ring_info, bd->tx_nr_rings);
 	if (!bn->tx_ring)
-		goto err_free_core;
+		goto err_free_rx_ring;
 
 	bn->tx_ring_map = kcalloc(bd->tx_nr_rings, sizeof(u16),
 				  GFP_KERNEL);
 	if (!bn->tx_ring_map)
-		goto err_free_core;
+		goto err_free_tx_ring;
 
 	if (bd->flags & BNGE_EN_SHARED_CHNL)
 		j = 0;
@@ -1289,42 +1289,64 @@ static int bnge_alloc_core(struct bnge_net *bn)
 
 	rc = bnge_alloc_ring_stats(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_tx_ring_map;
 
 	bnge_init_stats(bn);
 
 	rc = bnge_alloc_vnics(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_ring_stats;
 
 	rc = bnge_alloc_nq_arrays(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_vnics;
 
 	bnge_init_ring_struct(bn);
 
 	rc = bnge_alloc_rx_rings(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_nq_arrays;
 
 	rc = bnge_alloc_tx_rings(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_rx_rings;
 
 	rc = bnge_alloc_nq_tree(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_tx_rings;
 
 	bn->vnic_info[BNGE_VNIC_DEFAULT].flags |= BNGE_VNIC_RSS_FLAG |
 						  BNGE_VNIC_MCAST_FLAG |
 						  BNGE_VNIC_UCAST_FLAG;
 	rc = bnge_alloc_vnic_attributes(bn);
 	if (rc)
-		goto err_free_core;
+		goto err_free_nq_tree;
 	return 0;
 
-err_free_core:
-	bnge_free_core(bn);
+err_free_nq_tree:
+	bnge_free_nq_tree(bn);
+err_free_tx_rings:
+	bnge_free_tx_rings(bn);
+err_free_rx_rings:
+	bnge_free_rx_rings(bn);
+err_free_nq_arrays:
+	bnge_free_nq_arrays(bn);
+err_free_vnics:
+	bnge_free_vnics(bn);
+err_free_ring_stats:
+	bnge_free_ring_stats(bn);
+err_free_tx_ring_map:
+	kfree(bn->tx_ring_map);
+	bn->tx_ring_map = NULL;
+err_free_tx_ring:
+	kfree(bn->tx_ring);
+	bn->tx_ring = NULL;
+err_free_rx_ring:
+	kfree(bn->rx_ring);
+	bn->rx_ring = NULL;
+err_free_bnapi:
+	kfree(bn->bnapi);
+	bn->bnapi = NULL;
 	return rc;
 }
 
@@ -2644,12 +2666,10 @@ static int bnge_request_irq(struct bnge_net *bn)
 			irq->have_cpumask = 1;
 			cpumask_set_cpu(cpumask_local_spread(i, numa_node),
 					irq->cpu_mask);
-			rc = irq_set_affinity_hint(irq->vector, irq->cpu_mask);
-			if (rc) {
+			if (irq_set_affinity_hint(irq->vector, irq->cpu_mask)) {
 				netdev_warn(bn->netdev,
 					    "Set affinity failed, IRQ = %d\n",
 					    irq->vector);
-				goto err_free_irq;
 			}
 		}
 	}
@@ -3531,6 +3551,7 @@ err_free_workq:
 	destroy_workqueue(bn->bnge_pf_wq);
 err_netdev:
 	free_netdev(netdev);
+	bd->netdev = NULL;
 	return rc;
 }
 
