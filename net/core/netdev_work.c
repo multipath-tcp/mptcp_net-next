@@ -30,7 +30,7 @@ static void netdev_work_enqueue(struct net_device *dev, unsigned long events,
 		return;
 
 	spin_lock_bh(&netdev_work_lock);
-	if (!dev_isalive(dev)) {
+	if (!netif_is_alive(dev)) {
 		spin_unlock_bh(&netdev_work_lock);
 		return;
 	}
@@ -154,7 +154,7 @@ static void netdev_work_proc(struct work_struct *work)
 			/* We took another ref above */
 			netdev_put(dev, &dev->work_tracker);
 
-			if (!dev_isalive(dev))
+			if (!netif_is_alive(dev))
 				core = events = 0;
 		}
 		spin_unlock_bh(&netdev_work_lock);

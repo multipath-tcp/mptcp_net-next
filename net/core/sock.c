@@ -129,6 +129,7 @@
 #include <net/request_sock.h>
 #include <net/sock.h>
 #include <net/proto_memory.h>
+#include <net/page_pool/types.h>
 #include <linux/net_tstamp.h>
 #include <net/xfrm.h>
 #include <linux/ipsec.h>
@@ -1086,7 +1087,7 @@ success:
 static noinline_for_stack int
 sock_devmem_dontneed(struct sock *sk, sockptr_t optval, unsigned int optlen)
 {
-	unsigned int num_tokens, i, j, k, netmem_num = 0;
+	unsigned int num_tokens, i, j, netmem_num = 0;
 	struct dmabuf_token *tokens;
 	int ret = 0, num_frags = 0;
 	netmem_ref netmems[16];
@@ -1123,8 +1124,8 @@ sock_devmem_dontneed(struct sock *sk, sockptr_t optval, unsigned int optlen)
 			netmems[netmem_num++] = netmem;
 			if (netmem_num == ARRAY_SIZE(netmems)) {
 				xa_unlock_bh(&sk->sk_user_frags);
-				for (k = 0; k < netmem_num; k++)
-					WARN_ON_ONCE(!napi_pp_put_page(netmems[k]));
+				page_pool_put_netmem_bulk(netmems,
+							  ARRAY_SIZE(netmems));
 				netmem_num = 0;
 				xa_lock_bh(&sk->sk_user_frags);
 			}
@@ -1134,8 +1135,7 @@ sock_devmem_dontneed(struct sock *sk, sockptr_t optval, unsigned int optlen)
 
 frag_limit_reached:
 	xa_unlock_bh(&sk->sk_user_frags);
-	for (k = 0; k < netmem_num; k++)
-		WARN_ON_ONCE(!napi_pp_put_page(netmems[k]));
+	page_pool_put_netmem_bulk(netmems, netmem_num);
 
 	kvfree(tokens);
 	return ret;
