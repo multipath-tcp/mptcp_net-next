@@ -3,6 +3,7 @@
 #define __MPTCP_BPF_H__
 
 #include "bpf_experimental.h"
+#include "bpf_atomic.h"
 
 /* list helpers from include/linux/list.h */
 static inline int list_is_head(const struct list_head *list,
@@ -42,6 +43,8 @@ mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow)
 /* ksym */
 extern struct mptcp_subflow_context *
 bpf_mptcp_subflow_ctx(const struct sock *sk) __ksym;
+extern struct sock *
+bpf_mptcp_subflow_tcp_sock(const struct mptcp_subflow_context *subflow) __ksym;
 
 extern void mptcp_subflow_set_scheduled(struct mptcp_subflow_context *subflow,
 					bool scheduled) __ksym;
