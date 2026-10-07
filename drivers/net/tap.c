@@ -932,6 +932,9 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 		if (get_user(u, &ifr->ifr_flags))
 			return -EFAULT;
 
+		/* TUNGETIFF may report IFF_DETACH_QUEUE, ignore it here */
+		u &= ~IFF_DETACH_QUEUE;
+
 		ret = 0;
 		if ((u & ~TAP_IFFEATURES) != (IFF_NO_PI | IFF_TAP))
 			ret = -EINVAL;
@@ -950,6 +953,8 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 
 		ret = 0;
 		u = q->flags;
+		if (!q->enabled)
+			u |= IFF_DETACH_QUEUE;
 		if (copy_to_user(&ifr->ifr_name, tap->dev->name, IFNAMSIZ) ||
 		    put_user(u, &ifr->ifr_flags))
 			ret = -EFAULT;
