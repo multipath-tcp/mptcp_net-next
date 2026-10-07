@@ -129,7 +129,13 @@ struct in_device;
 
 int ip_rt_init(void);
 void rt_cache_flush(struct net *net);
+#ifdef CONFIG_INET
 void rt_flush_dev(struct net_device *dev);
+#else
+static inline void rt_flush_dev(struct net_device *dev)
+{
+}
+#endif
 
 static inline void inet_sk_init_flowi4(const struct inet_sock *inet,
 				       struct flowi4 *fl4)
