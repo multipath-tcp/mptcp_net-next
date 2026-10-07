@@ -868,9 +868,11 @@ int br_fdb_delete_bulk(struct nlmsghdr *nlh, struct net_device *dev,
 	return 0;
 }
 
-/* Clean up all entries referring to a specific destination.
- * if do_all is set also flush static entries
- * if vid is set delete all entries that match the vlan_id
+/* Clean up entries referring to cleanup_dst's port.
+ * If do_all is set ignore vid and entry flags. Otherwise vid selects
+ * the VLAN (0 means all), keeping static and non-offloaded ext learned entries.
+ * For a port-VLAN dst, vid must match its VLAN ID. Always clean up its local
+ * entry unless user-added and fall back to the port dst for retained entries.
  */
 void br_fdb_cleanup_by_dst(struct net_bridge *br,
 			   struct net_bridge_dst cleanup_dst, u16 vid,
@@ -998,7 +1000,6 @@ static void __fdb_update(struct net_bridge *br,
 			 struct net_bridge_fdb_entry *fdb,
 			 struct net_bridge_port *source,
 			 struct net_bridge_dst dst,
-			 const unsigned char *addr, u16 vid,
 			 unsigned long flags)
 {
 	struct net_bridge_port *old_port;
@@ -1010,7 +1011,8 @@ static void __fdb_update(struct net_bridge *br,
 	if (unlikely(test_bit(BR_FDB_LOCAL, &fdb->flags))) {
 		if (net_ratelimit())
 			br_warn(br, "received packet on %s with own address as source address (addr:%pM, vlan:%u)\n",
-				source->dev->name, addr, vid);
+				source->dev->name, fdb->key.addr.addr,
+				fdb->key.vlan_id);
 		return;
 	}
 
@@ -1053,7 +1055,8 @@ static void __fdb_update(struct net_bridge *br,
 	}
 
 	if (unlikely(fdb_modified)) {
-		trace_br_fdb_update(br, source, addr, vid, flags);
+		trace_br_fdb_update(br, source, fdb->key.addr.addr,
+				    fdb->key.vlan_id, flags);
 		fdb_notify(br, fdb, RTM_NEWNEIGH, true);
 	}
 }
@@ -1073,7 +1076,7 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 
 	fdb = fdb_find_rcu(&br->fdb_hash_tbl, addr, vid);
 	if (likely(fdb)) {
-		__fdb_update(br, fdb, source, dst, addr, vid, flags);
+		__fdb_update(br, fdb, source, dst, flags);
 	} else {
 		spin_lock(&br->hash_lock);
 		fdb = fdb_create(br, dst, addr, vid, flags);
@@ -1191,6 +1194,22 @@ static bool fdb_handle_notify(struct net_bridge_fdb_entry *fdb, u8 notify)
 	return modified;
 }
 
+static bool fdb_update_dst(struct net_bridge_fdb_entry *fdb,
+			   struct net_bridge_dst old_dst,
+			   struct net_bridge_dst dst)
+{
+	if (br_dst_equal(old_dst, dst))
+		return false;
+
+	if (br_dst_port(old_dst) == br_dst_port(dst)) {
+		br_fdb_dst_replace(fdb, old_dst, dst);
+		return false;
+	}
+
+	br_fdb_dst_write(fdb, dst);
+	return true;
+}
+
 /* Update (create or replace) forwarding database entry */
 static int fdb_add_entry(struct net_bridge *br, struct net_bridge_dst dst,
 			 const u8 *addr, struct ndmsg *ndm, u16 flags, u16 vid,
@@ -1244,14 +1263,7 @@ static int fdb_add_entry(struct net_bridge *br, struct net_bridge_dst dst,
 			return -EEXIST;
 
 		old_dst = br_fdb_dst_read(fdb);
-		if (!br_dst_equal(old_dst, dst)) {
-			if (br_dst_port(old_dst) != source) {
-				modified = true;
-				br_fdb_dst_write(fdb, dst);
-			} else {
-				br_fdb_dst_replace(fdb, old_dst, dst);
-			}
-		}
+		modified = fdb_update_dst(fdb, old_dst, dst);
 
 		set_bit(BR_FDB_ADDED_BY_USER, &fdb->flags);
 		if (test_and_clear_bit(BR_FDB_DYNAMIC_LEARNED, &fdb->flags))
@@ -1632,14 +1644,7 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 
 		WRITE_ONCE(fdb->updated, jiffies);
 
-		if (!br_dst_equal(old_dst, dst)) {
-			if (br_dst_port(old_dst) != p) {
-				modified = true;
-				br_fdb_dst_write(fdb, dst);
-			} else {
-				br_fdb_dst_replace(fdb, old_dst, dst);
-			}
-		}
+		modified = fdb_update_dst(fdb, old_dst, dst);
 
 		if (test_and_set_bit(BR_FDB_ADDED_BY_EXT_LEARN, &fdb->flags)) {
 			/* Refresh entry */
