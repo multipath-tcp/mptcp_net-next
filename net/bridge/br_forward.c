@@ -291,7 +291,7 @@ static int br_flood_vlan(struct br_fwd_dst *prev,
 {
 	struct net_bridge_vlan_port_array *array;
 	struct net_bridge_vlan *masterv, *pv;
-	struct br_fwd_dst dst;
+	struct br_fwd_dst fwd;
 	int err;
 
 	masterv = br_vlan_is_master(v) ? v : v->brvlan;
@@ -301,18 +301,18 @@ static int br_flood_vlan(struct br_fwd_dst *prev,
 
 		for (i = 0; i < array->count; i++) {
 			pv = array->vlans[i];
-			dst.port = pv->port;
-			dst.vlan = pv;
-			err = br_flood_port(prev, &dst, skb, pkt_type,
+			fwd.port = pv->port;
+			fwd.vlan = pv;
+			err = br_flood_port(prev, &fwd, skb, pkt_type,
 					    local_orig);
 			if (err)
 				return err;
 		}
 	} else {
 		list_for_each_entry_rcu(pv, &masterv->port_vlist, port_vlist) {
-			dst.port = pv->port;
-			dst.vlan = pv;
-			err = br_flood_port(prev, &dst, skb, pkt_type,
+			fwd.port = pv->port;
+			fwd.vlan = pv;
+			err = br_flood_port(prev, &fwd, skb, pkt_type,
 					    local_orig);
 			if (err)
 				return err;
