@@ -1217,4 +1217,4 @@ out_unregister_tcp_proto:
 	proto_unregister(&tcpv6_prot);
 	goto out;
 }
-device_initcall(inet6_init);
+fs_initcall_sync(inet6_init);
