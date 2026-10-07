@@ -231,6 +231,13 @@ void rt6_multipath_rebalance(struct fib6_info *f6i);
 
 void rt6_uncached_list_add(struct rt6_info *rt);
 void rt6_uncached_list_del(struct rt6_info *rt);
+#ifdef CONFIG_IPV6
+void rt6_uncached_list_flush_dev(struct net_device *dev);
+#else
+static inline void rt6_uncached_list_flush_dev(struct net_device *dev)
+{
+}
+#endif
 
 static inline const struct rt6_info *skb_rt6_info(const struct sk_buff *skb)
 {
