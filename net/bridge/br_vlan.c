@@ -34,24 +34,6 @@ static struct net_bridge_vlan *br_vlan_lookup(struct rhashtable *tbl, u16 vid)
 	return rhashtable_lookup_fast(tbl, &vid, br_vlan_rht_params);
 }
 
-static void __vlan_add_pvid(struct net_bridge_vlan_group *vg,
-			    struct net_bridge_vlan *v)
-{
-	if (rcu_access_pointer(vg->pvid) == v)
-		return;
-
-	RCU_INIT_POINTER(vg->pvid, v);
-}
-
-static void __vlan_delete_pvid(struct net_bridge_vlan_group *vg,
-			       struct net_bridge_vlan *v)
-{
-	if (rcu_access_pointer(vg->pvid) != v)
-		return;
-
-	RCU_INIT_POINTER(vg->pvid, NULL);
-}
-
 /* Update the BRIDGE_VLAN_INFO_PVID and BRIDGE_VLAN_INFO_UNTAGGED flags of @v.
  * If @commit is false, return just whether the BRIDGE_VLAN_INFO_PVID and
  * BRIDGE_VLAN_INFO_UNTAGGED bits of @flags would produce any change onto @v.
@@ -78,10 +60,12 @@ static bool __vlan_flags_update(struct net_bridge_vlan *v, u16 flags,
 	if (!commit)
 		goto out;
 
-	if (flags & BRIDGE_VLAN_INFO_PVID)
-		__vlan_add_pvid(vg, v);
-	else
-		__vlan_delete_pvid(vg, v);
+	if (flags & BRIDGE_VLAN_INFO_PVID) {
+		if (pvid != v)
+			RCU_INIT_POINTER(vg->pvid, v);
+	} else if (pvid == v) {
+		RCU_INIT_POINTER(vg->pvid, NULL);
+	}
 
 	if (flags & BRIDGE_VLAN_INFO_UNTAGGED)
 		vlan_flags |= BRIDGE_VLAN_INFO_UNTAGGED;
@@ -432,7 +416,8 @@ out_filt:
 static void __vlan_unpublish(struct net_bridge_vlan_group *vg,
 			     struct net_bridge_vlan *v)
 {
-	__vlan_delete_pvid(vg, v);
+	if (rcu_access_pointer(vg->pvid) == v)
+		RCU_INIT_POINTER(vg->pvid, NULL);
 	if (!br_vlan_is_master(v)) {
 		struct net_bridge_vlan *masterv = v->brvlan;
 
@@ -503,7 +488,7 @@ static void __vlan_flush(const struct net_bridge *br,
 	struct net_bridge_vlan *vlan, *tmp;
 	u16 v_start = 0, v_end = 0;
 
-	__vlan_delete_pvid(vg, rtnl_dereference(vg->pvid));
+	RCU_INIT_POINTER(vg->pvid, NULL);
 	list_for_each_entry_safe(vlan, tmp, &vg->vlan_list, vlist) {
 		/* take care of disjoint ranges */
 		if (!v_start) {
@@ -742,21 +727,16 @@ bool br_should_learn(struct net_bridge_port *p, struct sk_buff *skb,
 	if (!br_vlan_get_tag(skb, &vid) && skb->vlan_proto != br->vlan_proto)
 		vid = 0;
 
-	if (!vid) {
+	if (vid)
+		v = br_vlan_find(vg, vid);
+	else
 		v = rcu_dereference(vg->pvid);
-		if (!v || !br_vlan_state_allowed(br_vlan_get_state(v), true))
-			return false;
-		*vlan = v;
-		return true;
-	}
 
-	v = br_vlan_find(vg, vid);
-	if (v && br_vlan_state_allowed(br_vlan_get_state(v), true)) {
-		*vlan = v;
-		return true;
-	}
+	if (!v || !br_vlan_state_allowed(br_vlan_get_state(v), true))
+		return false;
 
-	return false;
+	*vlan = v;
+	return true;
 }
 
 static int br_vlan_add_existing(struct net_bridge *br,
