@@ -1082,6 +1082,8 @@ static void __ip_rt_update_pmtu(struct rtable *rt, struct flowi4 *fl4, u32 mtu)
 
 			for (nhsel = 0; nhsel < fib_info_num_path(res.fi); nhsel++) {
 				nhc = fib_info_nhc(res.fi, nhsel);
+				if (!nhc)
+					break;
 				update_or_create_fnhe(nhc, fl4->daddr, 0, mtu, lock,
 						      jiffies + net->ipv4.ip_rt_mtu_expires);
 			}
@@ -1587,6 +1589,9 @@ void rt_flush_dev(struct net_device *dev)
 	struct rtable *rt, *safe;
 	int cpu;
 
+	if (dev && dev->dismantle)
+		return;
+
 	for_each_possible_cpu(cpu) {
 		struct uncached_list *ul = &per_cpu(rt_uncached_list, cpu);
 
@@ -1595,10 +1600,14 @@ void rt_flush_dev(struct net_device *dev)
 
 		spin_lock_bh(&ul->lock);
 		list_for_each_entry_safe(rt, safe, &ul->head, dst.rt_uncached) {
-			if (rt->dst.dev != dev)
+			struct net_device *rt_dev = rt->dst.dev;
+
+			if (dev ? rt_dev != dev :
+			    READ_ONCE(rt_dev->reg_state) != NETREG_UNREGISTERED)
 				continue;
+
 			rcu_assign_pointer(rt->dst.dev_rcu, blackhole_netdev);
-			netdev_ref_replace(dev, blackhole_netdev,
+			netdev_ref_replace(rt_dev, blackhole_netdev,
 					   &rt->dst.dev_tracker, GFP_ATOMIC);
 			list_del_init(&rt->dst.rt_uncached);
 		}
@@ -3167,6 +3176,9 @@ int fib_dump_info_fnhe(struct sk_buff *skb, struct netlink_callback *cb,
 		struct fib_nh_common *nhc = fib_info_nhc(fi, nhsel);
 		struct fnhe_hash_bucket *bucket;
 		int err;
+
+		if (!nhc)
+			break;
 
 		if (nhc->nhc_flags & RTNH_F_DEAD)
 			continue;
