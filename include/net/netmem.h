@@ -102,9 +102,6 @@ struct net_iov_area {
 	/* Array of net_iovs for this area. */
 	struct net_iov *niovs;
 	size_t num_niovs;
-
-	/* Offset into the dma-buf where this chunk starts.  */
-	unsigned long base_virtual;
 };
 
 static inline struct net_iov_area *net_iov_owner(const struct net_iov *niov)
