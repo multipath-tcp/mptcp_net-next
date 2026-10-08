@@ -63,6 +63,13 @@
 /* Minimum bearer MTU */
 #define TIPC_MIN_BEARER_MTU	(MAX_H_SIZE + INT_H_SIZE)
 
+/* Maximum bearer MTU
+ *
+ * struct tipc_link stores the link MTU in a u16, so a larger bearer MTU would
+ * be truncated when a link is created on the bearer.
+ */
+#define TIPC_MAX_BEARER_MTU	U16_MAX
+
 /* Identifiers for distinguishing between broadcast/multicast and replicast
  */
 #define TIPC_BROADCAST_SUPPORT  1
@@ -255,12 +262,13 @@ static inline void tipc_loopback_trace(struct net *net,
 		tipc_clone_to_loopback(net, pkts);
 }
 
-/* check if device MTU is too low for tipc headers */
+/* check if device MTU is usable for tipc bearers */
 static inline bool tipc_mtu_bad(struct net_device *dev)
 {
-	if (dev->mtu >= TIPC_MIN_BEARER_MTU)
+	if (dev->mtu >= TIPC_MIN_BEARER_MTU &&
+	    dev->mtu <= TIPC_MAX_BEARER_MTU)
 		return false;
-	netdev_warn(dev, "MTU too low for tipc bearer\n");
+	netdev_warn(dev, "MTU not usable for tipc bearer\n");
 	return true;
 }
 
