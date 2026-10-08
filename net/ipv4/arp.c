@@ -892,7 +892,7 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 
 	/* Update our ARP tables */
 
-	n = __neigh_lookup(tbl, &sip, dev, 0);
+	n = ipv4_neigh_lookup(dev, &sip);
 
 	addr_type = -1;
 	if (n || arp_accept(in_dev, sip)) {
@@ -911,9 +911,14 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 		      (addr_type == RTN_UNICAST ||
 		       (addr_type < 0 &&
 			/* postpone calculation to as late as possible */
-			inet_addr_type_dev_table(net, dev, sip) ==
-				RTN_UNICAST)))))
-			n = __neigh_lookup(tbl, &sip, dev, 1);
+			inet_addr_type_dev_table(net, dev, sip) == RTN_UNICAST))))) {
+			n = ipv4_neigh_lookup(dev, &sip);
+			if (!n) {
+				n = ipv4_neigh_create(dev, &sip);
+				if (IS_ERR(n))
+					n = NULL;
+			}
+		}
 	}
 
 	if (n) {
@@ -1102,7 +1107,6 @@ static int arp_req_set_public(struct net *net, struct arpreq *r,
 
 static int arp_req_set(struct net *net, struct arpreq *r)
 {
-	struct neigh_table *tbl = arp_table(net);
 	struct neighbour *neigh;
 	struct net_device *dev;
 	__be32 ip;
@@ -1138,7 +1142,9 @@ static int arp_req_set(struct net *net, struct arpreq *r)
 
 	ip = ((struct sockaddr_in *)&r->arp_pa)->sin_addr.s_addr;
 
-	neigh = __neigh_lookup_errno(tbl, &ip, dev);
+	neigh = ipv4_neigh_lookup(dev, &ip);
+	if (!neigh)
+		neigh = ipv4_neigh_create(dev, &ip);
 	err = PTR_ERR(neigh);
 	if (!IS_ERR(neigh)) {
 		unsigned int state = NUD_STALE;
@@ -1174,7 +1180,6 @@ static unsigned int arp_state_to_flags(struct neighbour *neigh)
 static int arp_req_get(struct net *net, struct arpreq *r)
 {
 	__be32 ip = ((struct sockaddr_in *) &r->arp_pa)->sin_addr.s_addr;
-	struct neigh_table *tbl = arp_table(net);
 	struct neighbour *neigh;
 	struct net_device *dev;
 
@@ -1185,7 +1190,7 @@ static int arp_req_get(struct net *net, struct arpreq *r)
 	if (IS_ERR(dev))
 		return PTR_ERR(dev);
 
-	neigh = neigh_lookup(tbl, &ip, dev);
+	neigh = ipv4_neigh_lookup(dev, &ip);
 	if (!neigh)
 		return -ENXIO;
 
@@ -1210,12 +1215,13 @@ static int arp_req_get(struct net *net, struct arpreq *r)
 
 int arp_invalidate(struct net_device *dev, __be32 ip, bool force)
 {
-	struct neigh_table *tbl = arp_table(dev_net(dev));
 	struct neighbour *neigh;
 	int err = -ENXIO;
 
-	neigh = neigh_lookup(tbl, &ip, dev);
+	neigh = ipv4_neigh_lookup(dev, &ip);
 	if (neigh) {
+		struct neigh_table *tbl = neigh->tbl;
+
 		if ((READ_ONCE(neigh->nud_state) & NUD_VALID) && !force) {
 			neigh_release(neigh);
 			return 0;
