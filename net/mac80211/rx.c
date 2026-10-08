@@ -4345,7 +4345,10 @@ static bool ieee80211_rx_data_set_link_sta(struct ieee80211_rx_data *rx,
 	if (!rx->link)
 		return false;
 
-	rx->link_id = rx->link->link_id;
+	if (ieee80211_vif_is_mld(&sta->sdata->vif))
+		rx->link_id = rx->link->link_id;
+	else
+		rx->link_id = -1;
 	rx->link_sta = link_sta;
 
 	return true;
@@ -4687,7 +4690,8 @@ static bool ieee80211_accept_frame(struct ieee80211_rx_data *rx)
 		 * Accept only frames that are addressed to the NAN cluster
 		 * (based on the Cluster ID). From these frames, accept only
 		 *  - public action frames,
-		 *  - authentication frames to the local address, and
+		 *  - authentication frames to the local address,
+		 *  - NAN beacons, when Instant Communication is enabled, and
 		 *  - robust management frames except disassoc.
 		 */
 		if (!ether_addr_equal(sdata->u.nan.conf.cluster_id, hdr->addr3))
@@ -4697,6 +4701,9 @@ static bool ieee80211_accept_frame(struct ieee80211_rx_data *rx)
 		if (ieee80211_is_auth(hdr->frame_control) &&
 		    ether_addr_equal(sdata->vif.addr, hdr->addr1))
 			return true;
+		if (ieee80211_is_nan_beacon((struct ieee80211_mgmt *)hdr,
+					    skb->len))
+			return sdata->u.nan.conf.instant_comm;
 		if (!ieee80211_is_disassoc(hdr->frame_control) &&
 		    ieee80211_is_robust_mgmt_frame(skb))
 			return true;
@@ -5292,6 +5299,7 @@ static void __ieee80211_rx_handle_8023(struct ieee80211_hw *hw,
 	struct ieee80211_fast_rx *fast_rx;
 	struct ieee80211_rx_data rx;
 	struct sta_info *sta;
+	int link_id = -1;
 
 	memset(&rx, 0, sizeof(rx));
 	rx.skb = skb;
@@ -5308,10 +5316,10 @@ static void __ieee80211_rx_handle_8023(struct ieee80211_hw *hw,
 		goto drop;
 
 	sta = container_of(link_pubsta->sta, struct sta_info, sta);
-	if (!ieee80211_rx_data_set_sta(&rx, sta, link_pubsta->link_id))
+	if (sta->sta.valid_links)
+		link_id = link_pubsta->link_id;
+	if (!ieee80211_rx_data_set_sta(&rx, sta, link_id))
 		goto drop;
-
-	rx.link_id = link_pubsta->link_id;
 
 	fast_rx = rcu_dereference(rx.sta->fast_rx);
 	if (!fast_rx)
@@ -5575,7 +5583,7 @@ static void __ieee80211_rx_handle_packet(struct ieee80211_hw *hw,
 		rx.sdata = sdata;
 		rx.local = sdata->local;
 		rx.link = link;
-		rx.link_id = link->link_id;
+		rx.link_id = link != &sdata->deflink ? link->link_id : -1;
 		rx.sta = NULL;
 		rx.link_sta = NULL;
 
