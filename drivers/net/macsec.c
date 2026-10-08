@@ -4175,9 +4175,6 @@ static void macsec_init_secy(struct net_device *dev, sci_t sci, u8 icv_len)
 	struct macsec_dev *macsec = macsec_priv(dev);
 	struct macsec_secy *secy = &macsec->secy;
 
-	if (sci == MACSEC_UNDEF_SCI)
-		sci = dev_to_sci(dev, MACSEC_PORT_ES);
-
 	secy->netdev = dev;
 	secy->operational = true;
 	secy->key_len = DEFAULT_SAK_LEN;
@@ -4210,7 +4207,7 @@ static int macsec_newlink(struct net_device *dev,
 	u8 icv_len = MACSEC_DEFAULT_ICV_LEN;
 	struct net_device *real_dev;
 	int err, mtu;
-	sci_t sci;
+	sci_t sci = MACSEC_UNDEF_SCI;
 
 	if (!tb[IFLA_LINK])
 		return -EINVAL;
@@ -4263,7 +4260,8 @@ static int macsec_newlink(struct net_device *dev,
 		sci = nla_get_sci(data[IFLA_MACSEC_SCI]);
 	else if (data && data[IFLA_MACSEC_PORT])
 		sci = dev_to_sci(dev, nla_get_be16(data[IFLA_MACSEC_PORT]));
-	else
+
+	if (sci == MACSEC_UNDEF_SCI)
 		sci = dev_to_sci(dev, MACSEC_PORT_ES);
 
 	/* Registration can notify listeners before returning. */
