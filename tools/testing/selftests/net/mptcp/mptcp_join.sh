@@ -4375,7 +4375,12 @@ endpoint_tests()
 		local nft=1
 		ip netns exec "${ns2}" nft insert rule ip filter OUTPUT \
 			ip saddr 10.0.1.2 meta l4proto tcp \
-			tcp option mptcp subtype remove-addr drop || nft=0
+			@th,96,4 == 12 \
+			@th,256,8 == 30 \
+			@th,264,8 == 12 \
+			@th,352,8 == 30 \
+			@th,368,4 == 4 \
+			drop || nft=0
 		local i
 		for i in $(seq 3); do
 			pm_nl_del_endpoint $ns2 1 10.0.1.2
@@ -4454,7 +4459,12 @@ endpoint_tests()
 		local nft=1
 		ip netns exec "${ns1}" nft insert rule ip filter OUTPUT \
 			ip saddr 10.0.1.1 meta l4proto tcp \
-			tcp option mptcp subtype remove-addr drop || nft=0
+			@th,96,4 == 12 \
+			@th,256,8 == 30 \
+			@th,264,8 == 12 \
+			@th,352,8 == 30 \
+			@th,368,4 == 4 \
+			drop || nft=0
 		pm_nl_del_endpoint $ns1 42 10.0.1.1
 		sleep 0.5
 		chk_subflow_nr "after delete ID 0" 2
