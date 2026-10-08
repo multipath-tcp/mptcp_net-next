@@ -640,7 +640,6 @@ struct ieee80211_bss_npca_params {
  *	mode only, set if the AP advertises TWT responder role)
  * @twt_responder: does this BSS support TWT requester (relevant for managed
  *	mode only, set if the AP advertises TWT responder role)
- * @twt_protected: does this BSS support protected TWT frames
  * @twt_broadcast: does this BSS support broadcast TWT
  * @use_cts_prot: use CTS protection
  * @use_short_preamble: use 802.11b short preamble
@@ -812,7 +811,6 @@ struct ieee80211_bss_conf {
 	bool he_support;
 	bool twt_requester;
 	bool twt_responder;
-	bool twt_protected;
 	bool twt_broadcast;
 	/* erp related data */
 	bool use_cts_prot;
@@ -2728,6 +2726,7 @@ struct ieee80211_link_sta {
  * @spp_amsdu: indicates whether the STA uses SPP A-MSDU or not.
  * @epp_peer: indicates that the peer is an EPP peer.
  * @cip: indicates whether the STA uses control frame protection or not.
+ * @twt_protected: does this STA support protected TWT frames
  * @nmi: For NDI stations, pointer to the NMI station of the peer.
  * @nan_sched: NAN peer schedule for this station. Valid only for NMI stations.
  * @ext_mld_capa_ops: the MLD's extended MLD capabilities and operations
@@ -2750,6 +2749,7 @@ struct ieee80211_sta {
 	u16 eml_cap;
 
 	bool cip;
+	bool twt_protected;
 
 	struct ieee80211_sta_aggregates *cur;
 
