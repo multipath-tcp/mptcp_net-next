@@ -927,32 +927,30 @@ static void ieee80211_teardown_sdata(struct ieee80211_sub_if_data *sdata)
 	}
 }
 
-/*
- * The netdev can be unregistered without mac80211 doing it, e.g. by the netdev
- * core when cfg80211 couldn't move it out of a network namespace that's being
- * destroyed. Drop it from the interface list either way.
- */
-static void ieee80211_unlist_sdata(struct ieee80211_sub_if_data *sdata)
+static void ieee80211_uninit(struct net_device *dev)
 {
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_sub_if_data *iter;
 
 	ASSERT_RTNL();
 
+	/*
+	 * The netdev can be unregistered without mac80211 doing it, e.g. by the
+	 * netdev core when cfg80211 couldn't move it out of a network namespace
+	 * that's being destroyed. If so, it's still listed and the wiphy mutex
+	 * isn't held yet.
+	 */
 	list_for_each_entry(iter, &local->interfaces, list) {
 		if (iter != sdata)
 			continue;
-		guard(mutex)(&local->iflist_mtx);
-		list_del_rcu(&sdata->list);
+		guard(wiphy)(local->hw.wiphy);
+		scoped_guard(mutex, &local->iflist_mtx)
+			list_del_rcu(&sdata->list);
+		ieee80211_teardown_sdata(sdata);
 		return;
 	}
-}
 
-static void ieee80211_uninit(struct net_device *dev)
-{
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	ieee80211_unlist_sdata(sdata);
 	ieee80211_teardown_sdata(sdata);
 }
 
