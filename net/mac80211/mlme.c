@@ -6168,13 +6168,6 @@ static bool ieee80211_assoc_config_link(struct ieee80211_link_data *link,
 						  link_sta);
 
 		bss_conf->he_support = link_sta->pub->he_cap.has_he;
-		if (elems->rsnx && elems->rsnx_len &&
-		    (elems->rsnx[0] & WLAN_RSNX_CAPA_PROTECTED_TWT) &&
-		    wiphy_ext_feature_isset(local->hw.wiphy,
-					    NL80211_EXT_FEATURE_PROTECTED_TWT))
-			bss_conf->twt_protected = true;
-		else
-			bss_conf->twt_protected = false;
 
 		*changed |= ieee80211_recalc_twt_req(sdata, sband, link,
 						     link_sta, elems);
@@ -6207,7 +6200,6 @@ static bool ieee80211_assoc_config_link(struct ieee80211_link_data *link,
 	} else {
 		bss_conf->he_support = false;
 		bss_conf->twt_requester = false;
-		bss_conf->twt_protected = false;
 		bss_conf->eht_support = false;
 		bss_conf->epcs_support = false;
 	}
@@ -7016,6 +7008,18 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 
 	sta->sta.spp_amsdu = assoc_data->spp_amsdu;
 	sta->sta.cip = assoc_data->cip;
+	sta->sta.twt_protected = assoc_data->protected_twt;
+
+	/*
+	 * backward compatibility - assumes that RSNX will not
+	 * indicate anything (if present at all) _less_ than
+	 * security profile RSNX content might
+	 */
+	if (elems->rsnx && elems->rsnx_len &&
+	    (elems->rsnx[0] & WLAN_RSNX_CAPA_PROTECTED_TWT) &&
+	    wiphy_ext_feature_isset(local->hw.wiphy,
+				    NL80211_EXT_FEATURE_PROTECTED_TWT))
+		sta->sta.twt_protected = true;
 
 	if (ieee80211_vif_is_mld(&sdata->vif)) {
 		if (!elems->ml_basic)
@@ -7982,7 +7986,7 @@ ieee80211_mgd_check_cross_link_csa(struct ieee80211_sub_if_data *sdata,
 	subelems = (u8 *)elems->ml_basic + common_size;
 	subelems_len = elems->ml_basic_len - common_size;
 
-	for_each_element_id(sub, IEEE80211_MLE_SUBELEM_PER_STA_PROFILE,
+	for_each_element_id(sub, (u8)IEEE80211_MLE_SUBELEM_PER_STA_PROFILE,
 			    subelems, subelems_len) {
 		struct ieee80211_mle_per_sta_profile *prof = (void *)sub->data;
 		struct ieee80211_link_data *link;
@@ -10596,6 +10600,7 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 
 	assoc_data->spp_amsdu = req->flags & ASSOC_REQ_SPP_AMSDU;
 	assoc_data->cip = req->flags & ASSOC_REQ_CIP;
+	assoc_data->protected_twt = req->flags & ASSOC_REQ_PROTECTED_TWT;
 
 	if (ifmgd->auth_data && !ifmgd->auth_data->done) {
 		err = -EBUSY;
