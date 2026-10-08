@@ -28,6 +28,7 @@
 #include <linux/compiler.h>
 
 static int pf = AF_INET;
+static bool do_tfo;
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
@@ -254,6 +255,14 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 		if (sock < 0)
 			continue;
 
+		if (do_tfo) {
+			int one = 1;
+
+			if (setsockopt(sock, IPPROTO_TCP, TCP_FASTOPEN_CONNECT,
+				       &one, sizeof(one)) < 0)
+				die_perror("setsockopt TCP_FASTOPEN_CONNECT");
+		}
+
 		if (connect(sock, a->ai_addr, a->ai_addrlen) == 0)
 			break; /* success */
 
@@ -271,13 +280,16 @@ static void parse_opts(int argc, char **argv)
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "h6")) != -1) {
+	while ((c = getopt(argc, argv, "h6f")) != -1) {
 		switch (c) {
 		case 'h':
 			die_usage(0);
 			break;
 		case '6':
 			pf = AF_INET6;
+			break;
+		case 'f':
+			do_tfo = true;
 			break;
 		default:
 			die_usage(1);
@@ -726,13 +738,36 @@ static int server(int pipefd)
 		break;
 	}
 
+	if (do_tfo) {
+		int qlen = 5;
+
+		if (setsockopt(fd, IPPROTO_TCP, TCP_FASTOPEN, &qlen, sizeof(qlen)) < 0)
+			die_perror("setsockopt TCP_FASTOPEN");
+	}
+
 	r = write(pipefd, "conn", 4);
 	assert(r == 4);
 
 	alarm(15);
 	r = xaccept(fd);
 
-	process_one_client(r, pipefd);
+	if (do_tfo) {
+		char buf[64] = {0};
+		ssize_t n;
+
+		n = read(r, buf, sizeof(buf) - 1);
+		if (n <= 0)
+			die_perror("read tfo syn data");
+
+		n = write(r, "PONG_REPLY", 10);
+		if (n != 10)
+			die_perror("write tfo reply");
+
+		n = read(r, buf, 1);
+		close(r);
+	} else {
+		process_one_client(r, pipefd);
+	}
 
 	close(fd);
 	return 0;
@@ -843,6 +878,26 @@ static int client(int pipefd)
 	int fd = -1;
 
 	alarm(15);
+
+	if (do_tfo) {
+		const char *addr = (pf == AF_INET) ? "127.0.0.1" : "::1";
+		struct timeval tv = {.tv_sec = 5, .tv_usec = 0};
+		char buf[64] = {0};
+		ssize_t n;
+
+		fd = sock_connect_mptcp(addr, "15432", IPPROTO_MPTCP);
+		n = write(fd, "PING_DATA", 9);
+		if (n != 9)
+			die_perror("write PING_DATA");
+
+		setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+		n = read(fd, buf, sizeof(buf) - 1);
+		if (n <= 0 || strcmp(buf, "PONG_REPLY") != 0)
+			xerror("Fastopen early write failed: received %zd bytes '%s'", n, buf);
+
+		close(fd);
+		return 0;
+	}
 
 	switch (pf) {
 	case AF_INET:

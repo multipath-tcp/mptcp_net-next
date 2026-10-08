@@ -359,6 +359,39 @@ do_tcpinq_tests()
 	return $?
 }
 
+do_fastopen_tests()
+{
+	local lret=0
+
+	ip netns exec "$ns_sbox" sysctl -q net.ipv4.tcp_fastopen=3
+
+	ip netns exec "$ns_sbox" ./mptcp_sockopt -f
+	lret=$?
+
+	print_title "Fast Open early write v4"
+	if [ $lret -ne 0 ]; then
+		mptcp_lib_pr_fail
+		mptcp_lib_result_fail "Fast Open early write v4"
+		ret=$lret
+		return
+	fi
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "Fast Open early write v4"
+
+	ip netns exec "$ns_sbox" ./mptcp_sockopt -6 -f
+	lret=$?
+
+	print_title "Fast Open early write v6"
+	if [ $lret -ne 0 ]; then
+		mptcp_lib_pr_fail
+		mptcp_lib_result_fail "Fast Open early write v6"
+		ret=$lret
+		return
+	fi
+	mptcp_lib_pr_ok
+	mptcp_lib_result_pass "Fast Open early write v6"
+}
+
 sin=$(mktemp)
 sout=$(mktemp)
 cin=$(mktemp)
@@ -374,6 +407,7 @@ run_tests $ns1 $ns2 dead:beef:1::1
 
 do_mptcp_sockopt_tests
 do_tcpinq_tests
+do_fastopen_tests
 
 mptcp_lib_result_print_all_tap
 exit $ret
