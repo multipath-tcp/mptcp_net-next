@@ -381,6 +381,30 @@ static inline struct neighbour *__ipv6_neigh_lookup(struct net_device *dev, cons
 	return n;
 }
 
+static inline struct neighbour *ipv6_neigh_lookup(struct net_device *dev,
+						  const void *pkey)
+{
+	struct neigh_table *tbl = nd_table(dev_net(dev));
+
+	return neigh_lookup(tbl, pkey, dev);
+}
+
+static inline struct neighbour *ipv6_neigh_create(struct net_device *dev,
+						  const void *pkey)
+{
+	struct neigh_table *tbl = nd_table(dev_net(dev));
+
+	return neigh_create(tbl, pkey, dev);
+}
+
+static inline struct neighbour *ipv6_neigh_create_noref(struct net_device *dev,
+							const void *pkey)
+{
+	struct neigh_table *tbl = nd_table(dev_net(dev));
+
+	return __neigh_create(tbl, pkey, dev, false);
+}
+
 static inline void __ipv6_confirm_neigh(struct net_device *dev,
 					const void *pkey)
 {
@@ -399,11 +423,8 @@ static inline struct neighbour *ip_neigh_gw6(struct net_device *dev,
 	struct neighbour *neigh;
 
 	neigh = __ipv6_neigh_lookup_noref(dev, addr);
-	if (unlikely(!neigh)) {
-		struct neigh_table *tbl = nd_table(dev_net(dev));
-
-		neigh = __neigh_create(tbl, addr, dev, false);
-	}
+	if (unlikely(!neigh))
+		neigh = ipv6_neigh_create_noref(dev, addr);
 
 	return neigh;
 #else
