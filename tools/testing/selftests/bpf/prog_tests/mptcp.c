@@ -270,7 +270,7 @@ static int verify_mptcpify(int server_fd, int client_fd)
 	return err;
 }
 
-static int run_mptcpify(int cgroup_fd, int type)
+static int run_mptcpify(int type)
 {
 	int server_fd, client_fd, err = 0;
 	struct mptcpify *mptcpify_skel;
@@ -323,13 +323,13 @@ static void test_mptcpify(void)
 	if (!ASSERT_OK_PTR(netns, "netns_new"))
 		goto fail;
 
-	ASSERT_OK(run_mptcpify(cgroup_fd, SOCK_STREAM), "run_mptcpify");
+	ASSERT_OK(run_mptcpify(SOCK_STREAM), "run_mptcpify");
 	/* userspace sets flags such as SOCK_CLOEXEC together with the type;
 	 * the BPF prog must still upgrade the socket to MPTCP. See
 	 * update_socket_protocol() in net/socket.c, which runs before the
 	 * type is masked with SOCK_TYPE_MASK.
 	 */
-	ASSERT_OK(run_mptcpify(cgroup_fd, SOCK_STREAM | SOCK_CLOEXEC),
+	ASSERT_OK(run_mptcpify(SOCK_STREAM | SOCK_CLOEXEC),
 		  "run_mptcpify_cloexec");
 
 fail:
