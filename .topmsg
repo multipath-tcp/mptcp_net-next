@@ -16,10 +16,10 @@ is replaced with native nft matching using "tcp option mptcp subtype".
 
 The config file adds CONFIG_NFT_NUMGEN (replaces iptables statistic nth),
 CONFIG_NFT_REJECT and CONFIG_NFT_REJECT_INET for reject‑related rules.
-Remove CONFIG_NFT_COMPAT since we don't need it now.
 
 Remove the iptables/ip6tables check in mptcp_lib.sh since no script use
-it now.
+it now. While at it, also remove all kernel config entries that were
+required for the previous IPTables rules.
 
 Signed-off-by: Hangbin Liu <liuhangbin@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
