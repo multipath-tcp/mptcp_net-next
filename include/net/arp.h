@@ -51,6 +51,22 @@ static inline struct neighbour *__ipv4_neigh_lookup(struct net_device *dev, u32 
 	return n;
 }
 
+static inline struct neighbour *ipv4_neigh_lookup(struct net_device *dev,
+						  const void *pkey)
+{
+	struct neigh_table *tbl = arp_table(dev_net(dev));
+
+	return neigh_lookup(tbl, pkey, dev);
+}
+
+static inline struct neighbour *ipv4_neigh_create(struct net_device *dev,
+						  const void *pkey)
+{
+	struct neigh_table *tbl = arp_table(dev_net(dev));
+
+	return neigh_create(tbl, pkey, dev);
+}
+
 static inline void __ipv4_confirm_neigh(struct net_device *dev, u32 key)
 {
 	struct neighbour *n;
