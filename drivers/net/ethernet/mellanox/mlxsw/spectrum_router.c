@@ -2416,8 +2416,6 @@ static void mlxsw_sp_router_neigh_ent_ipv4_process(struct mlxsw_sp *mlxsw_sp,
 						   int ent_index)
 {
 	u64 max_rifs = MLXSW_CORE_RES_GET(mlxsw_sp->core, MAX_RIFS);
-	struct net *net = mlxsw_sp_net(mlxsw_sp);
-	struct neigh_table *tbl;
 	struct net_device *dev;
 	struct neighbour *n;
 	__be32 dipn;
@@ -2433,10 +2431,9 @@ static void mlxsw_sp_router_neigh_ent_ipv4_process(struct mlxsw_sp *mlxsw_sp,
 		return;
 	}
 
-	tbl = arp_table(net);
 	dipn = htonl(dip);
 	dev = mlxsw_sp_rif_dev(mlxsw_sp->router->rifs[rif]);
-	n = neigh_lookup(tbl, &dipn, dev);
+	n = ipv4_neigh_lookup(dev, &dipn);
 	if (!n)
 		return;
 
@@ -2450,8 +2447,6 @@ static void mlxsw_sp_router_neigh_ent_ipv6_process(struct mlxsw_sp *mlxsw_sp,
 						   char *rauhtd_pl,
 						   int rec_index)
 {
-	struct net *net = mlxsw_sp_net(mlxsw_sp);
-	struct neigh_table *tbl;
 	struct net_device *dev;
 	struct neighbour *n;
 	struct in6_addr dip;
@@ -2465,9 +2460,8 @@ static void mlxsw_sp_router_neigh_ent_ipv6_process(struct mlxsw_sp *mlxsw_sp,
 		return;
 	}
 
-	tbl = nd_table(net);
 	dev = mlxsw_sp_rif_dev(mlxsw_sp->router->rifs[rif]);
-	n = neigh_lookup(tbl, &dip, dev);
+	n = ipv6_neigh_lookup(dev, &dip);
 	if (!n)
 		return;
 
@@ -3073,9 +3067,9 @@ struct mlxsw_sp_nexthop {
 						   * this nexthop belongs to
 						   */
 	struct rhash_head ht_node;
-	struct neigh_table *neigh_tbl;
 	struct mlxsw_sp_nexthop_key key;
 	unsigned char gw_addr[sizeof(struct in6_addr)];
+	int family;
 	int ifindex;
 	int nh_weight;
 	int norm_nh_weight;
@@ -4301,28 +4295,51 @@ static void __mlxsw_sp_nexthop_neigh_update(struct mlxsw_sp_nexthop *nh,
 	nh->update = 1;
 }
 
+static struct neighbour *
+mlxsw_sp_nexthop_neigh_lookup(struct mlxsw_sp_nexthop *nh)
+{
+	struct net_device *dev;
+	struct neighbour *n;
+
+	dev = mlxsw_sp_nexthop_dev(nh);
+
+#if IS_ENABLED(CONFIG_IPV6)
+	if (nh->family == AF_INET6) {
+		n = ipv6_neigh_lookup(dev, &nh->gw_addr);
+		if (!n) {
+			n = ipv6_neigh_create(dev, &nh->gw_addr);
+			if (!IS_ERR(n))
+				neigh_event_send(n, NULL);
+		}
+	} else
+#endif
+	{
+		n = ipv4_neigh_lookup(dev, &nh->gw_addr);
+		if (!n) {
+			n = ipv4_neigh_create(dev, &nh->gw_addr);
+			if (!IS_ERR(n))
+				neigh_event_send(n, NULL);
+		}
+	}
+
+	return n;
+}
+
 static int
 mlxsw_sp_nexthop_dead_neigh_replace(struct mlxsw_sp *mlxsw_sp,
 				    struct mlxsw_sp_neigh_entry *neigh_entry)
 {
 	struct neighbour *n, *old_n = neigh_entry->key.n;
 	struct mlxsw_sp_nexthop *nh;
-	struct net_device *dev;
 	bool entry_connected;
 	u8 nud_state, dead;
 	int err;
 
 	nh = list_first_entry(&neigh_entry->nexthop_list,
 			      struct mlxsw_sp_nexthop, neigh_list_node);
-	dev = mlxsw_sp_nexthop_dev(nh);
-
-	n = neigh_lookup(nh->neigh_tbl, &nh->gw_addr, dev);
-	if (!n) {
-		n = neigh_create(nh->neigh_tbl, &nh->gw_addr, dev);
-		if (IS_ERR(n))
-			return PTR_ERR(n);
-		neigh_event_send(n, NULL);
-	}
+	n = mlxsw_sp_nexthop_neigh_lookup(nh);
+	if (IS_ERR(n))
+		return PTR_ERR(n);
 
 	mlxsw_sp_neigh_entry_remove(mlxsw_sp, neigh_entry);
 	neigh_entry->key.n = n;
@@ -4403,7 +4420,6 @@ static int mlxsw_sp_nexthop_neigh_init(struct mlxsw_sp *mlxsw_sp,
 				       struct mlxsw_sp_nexthop *nh)
 {
 	struct mlxsw_sp_neigh_entry *neigh_entry;
-	struct net_device *dev;
 	struct neighbour *n;
 	u8 nud_state, dead;
 	int err;
@@ -4413,20 +4429,16 @@ static int mlxsw_sp_nexthop_neigh_init(struct mlxsw_sp *mlxsw_sp,
 
 	if (!nh->nhgi->gateway || nh->neigh_entry)
 		return 0;
-	dev = mlxsw_sp_nexthop_dev(nh);
 
 	/* Take a reference of neigh here ensuring that neigh would
 	 * not be destructed before the nexthop entry is finished.
 	 * The reference is taken either in neigh_lookup() or
 	 * in neigh_create() in case n is not found.
 	 */
-	n = neigh_lookup(nh->neigh_tbl, &nh->gw_addr, dev);
-	if (!n) {
-		n = neigh_create(nh->neigh_tbl, &nh->gw_addr, dev);
-		if (IS_ERR(n))
-			return PTR_ERR(n);
-		neigh_event_send(n, NULL);
-	}
+	n = mlxsw_sp_nexthop_neigh_lookup(nh);
+	if (IS_ERR(n))
+		return PTR_ERR(n);
+
 	neigh_entry = mlxsw_sp_neigh_entry_lookup(mlxsw_sp, n);
 	if (!neigh_entry) {
 		neigh_entry = mlxsw_sp_neigh_entry_create(mlxsw_sp, n);
@@ -4631,7 +4643,7 @@ static int mlxsw_sp_nexthop4_init(struct mlxsw_sp *mlxsw_sp,
 	nh->nh_weight = 1;
 #endif
 	memcpy(&nh->gw_addr, &fib_nh->fib_nh_gw4, sizeof(fib_nh->fib_nh_gw4));
-	nh->neigh_tbl = arp_table(mlxsw_sp_net(mlxsw_sp));
+	nh->family = AF_INET;
 	err = mlxsw_sp_nexthop_insert(mlxsw_sp, nh);
 	if (err)
 		return err;
@@ -5121,7 +5133,6 @@ mlxsw_sp_nexthop_obj_init(struct mlxsw_sp *mlxsw_sp,
 			  struct nh_notifier_single_info *nh_obj, int weight)
 {
 	struct net_device *dev = nh_obj->dev;
-	struct net *net = dev_net(dev);
 	int err;
 
 	nh->nhgi = nh_grp->nhgi;
@@ -5130,12 +5141,12 @@ mlxsw_sp_nexthop_obj_init(struct mlxsw_sp *mlxsw_sp,
 	switch (nh_obj->gw_family) {
 	case AF_INET:
 		memcpy(&nh->gw_addr, &nh_obj->ipv4, sizeof(nh_obj->ipv4));
-		nh->neigh_tbl = arp_table(net);
+		nh->family = AF_INET;
 		break;
 	case AF_INET6:
 		memcpy(&nh->gw_addr, &nh_obj->ipv6, sizeof(nh_obj->ipv6));
 #if IS_ENABLED(CONFIG_IPV6)
-		nh->neigh_tbl = nd_table(net);
+		nh->family = AF_INET6;
 #endif
 		break;
 	}
@@ -6991,7 +7002,7 @@ static int mlxsw_sp_nexthop6_init(struct mlxsw_sp *mlxsw_sp,
 	nh->nh_weight = rt->fib6_nh->fib_nh_weight;
 	memcpy(&nh->gw_addr, &rt->fib6_nh->fib_nh_gw6, sizeof(nh->gw_addr));
 #if IS_ENABLED(CONFIG_IPV6)
-	nh->neigh_tbl = nd_table(mlxsw_sp_net(mlxsw_sp));
+	nh->family = AF_INET6;
 #endif
 
 	err = mlxsw_sp_nexthop_counter_enable(mlxsw_sp, nh);
