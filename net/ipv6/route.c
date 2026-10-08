@@ -214,10 +214,10 @@ static inline const void *choose_neigh_daddr(const struct in6_addr *p,
 	return daddr;
 }
 
-struct neighbour *ip6_neigh_lookup(const struct in6_addr *gw,
-				   struct net_device *dev,
-				   struct sk_buff *skb,
-				   const void *daddr)
+struct neighbour *__ip6_dst_neigh_lookup(const struct in6_addr *gw,
+					 struct net_device *dev,
+					 struct sk_buff *skb,
+					 const void *daddr)
 {
 	struct neighbour *n;
 
@@ -226,7 +226,7 @@ struct neighbour *ip6_neigh_lookup(const struct in6_addr *gw,
 	if (n)
 		return n;
 
-	n = neigh_create(nd_table(dev_net(dev)), daddr, dev);
+	n = ipv6_neigh_create(dev, daddr);
 	return IS_ERR(n) ? NULL : n;
 }
 
@@ -236,8 +236,8 @@ static struct neighbour *ip6_dst_neigh_lookup(const struct dst_entry *dst,
 {
 	const struct rt6_info *rt = dst_rt6_info(dst);
 
-	return ip6_neigh_lookup(rt6_nexthop(rt, &in6addr_any),
-				dst_dev(dst), skb, daddr);
+	return __ip6_dst_neigh_lookup(rt6_nexthop(rt, &in6addr_any),
+				      dst_dev(dst), skb, daddr);
 }
 
 static void ip6_confirm_neigh(const struct dst_entry *dst, const void *daddr)
@@ -4285,9 +4285,12 @@ static void rt6_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_bu
 	 */
 	dst_confirm_neigh(&rt->dst, &ipv6_hdr(skb)->saddr);
 
-	neigh = __neigh_lookup(nd_table(dev_net(dev)), &msg->target, dev, 1);
-	if (!neigh)
-		return;
+	neigh = ipv6_neigh_lookup(dev, &msg->target);
+	if (!neigh) {
+		neigh = ipv6_neigh_create(dev, &msg->target);
+		if (IS_ERR(neigh))
+			return;
+	}
 
 	/*
 	 *	We have finally decided to accept it.
