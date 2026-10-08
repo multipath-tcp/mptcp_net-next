@@ -2731,13 +2731,13 @@ end:
 void ieee80211_put_reg_conn(struct ieee80211_sub_if_data *sdata,
 			    struct sk_buff *skb)
 {
+	u32 flags = IEEE80211_CHAN_NO_6GHZ_AFC_CLIENT;
 	struct ieee80211_local *local = sdata->local;
 	u8 reg_conn = IEEE80211_REG_CONN_LPI_VALID |
 		      IEEE80211_REG_CONN_LPI_VALUE |
 		      IEEE80211_REG_CONN_SP_VALID;
 	struct ieee80211_supported_band *sband;
 	bool available_channels = false;
-	u32 flags = 0;
 	int i;
 
 	sband = local->hw.wiphy->bands[NL80211_BAND_6GHZ];
@@ -2747,7 +2747,7 @@ void ieee80211_put_reg_conn(struct ieee80211_sub_if_data *sdata,
 	for (i = 0; i < sband->n_channels; i++) {
 		if (sband->channels[i].flags & IEEE80211_CHAN_DISABLED)
 			continue;
-		flags |= sband->channels[i].flags;
+		flags &= sband->channels[i].flags;
 		available_channels = true;
 	}
 
