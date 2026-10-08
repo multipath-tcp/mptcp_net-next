@@ -3407,6 +3407,7 @@ struct cfg80211_ml_reconf_req {
  * @ASSOC_REQ_SPP_AMSDU: SPP A-MSDUs will be used on this connection (if any)
  * @ASSOC_REQ_DISABLE_UHR: Disable UHR
  * @ASSOC_REQ_CIP: Enable Control Integrity Protocol
+ * @ASSOC_REQ_PROTECTED_TWT: Enable protected TWT
  */
 enum cfg80211_assoc_req_flags {
 	ASSOC_REQ_DISABLE_HT			= BIT(0),
@@ -3419,6 +3420,7 @@ enum cfg80211_assoc_req_flags {
 	ASSOC_REQ_SPP_AMSDU			= BIT(7),
 	ASSOC_REQ_DISABLE_UHR			= BIT(8),
 	ASSOC_REQ_CIP				= BIT(9),
+	ASSOC_REQ_PROTECTED_TWT			= BIT(10),
 };
 
 /**
@@ -4191,9 +4193,12 @@ struct cfg80211_nan_band_config {
  *	that can take a value from 50-6F-9A-01-00-00 to 50-6F-9A-01-FF-FF.
  * @scan_period: period (in seconds) between NAN scans.
  * @scan_dwell_time: dwell time (in milliseconds) for NAN scans.
- * @discovery_beacon_interval: interval (in TUs) for discovery beacons.
+ * @discovery_beacon_interval: interval (in TUs) for discovery beacons. Must be
+ *	greater than 0 when @instant_comm is true.
  * @enable_dw_notification: flag to enable/disable discovery window
  *	notifications.
+ * @instant_comm: if true, start Instant Communication (IC) as defined in
+ *	Chapter 13 of the Wi-Fi Aware Specification v4.0.
  * @band_cfgs: array of band specific configurations, indexed by
  *	&enum nl80211_band values.
  * @extra_nan_attrs: pointer to additional NAN attributes.
@@ -4209,6 +4214,7 @@ struct cfg80211_nan_conf {
 	u16 scan_dwell_time;
 	u8 discovery_beacon_interval;
 	bool enable_dw_notification;
+	bool instant_comm;
 	struct cfg80211_nan_band_config band_cfgs[NUM_NL80211_BANDS];
 	const u8 *extra_nan_attrs;
 	u16 extra_nan_attrs_len;
@@ -6305,10 +6311,13 @@ struct wiphy_radio {
  * @WIPHY_NAN_FLAGS_CONFIGURABLE_SYNC: Device supports NAN configurable
  *     synchronization.
  * @WIPHY_NAN_FLAGS_USERSPACE_DE: Device doesn't support DE offload.
+ * @WIPHY_NAN_FLAGS_INSTANT_COMM: Device can switch to Instant Communication
+ *     (IC) mode. Can only be set along with %WIPHY_NAN_FLAGS_CONFIGURABLE_SYNC.
  */
 enum wiphy_nan_flags {
 	WIPHY_NAN_FLAGS_CONFIGURABLE_SYNC = BIT(0),
 	WIPHY_NAN_FLAGS_USERSPACE_DE   = BIT(1),
+	WIPHY_NAN_FLAGS_INSTANT_COMM = BIT(2),
 };
 
 /**
@@ -7858,7 +7867,8 @@ unsigned int cfg80211_classify8021d(struct sk_buff *skb,
  * byte array to match.
  */
 const struct element *
-cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
+cfg80211_find_elem_match(enum ieee80211_eid eid,
+			 const u8 *ies, unsigned int len,
 			 const u8 *match, unsigned int match_len,
 			 unsigned int match_offset);
 
@@ -7887,7 +7897,7 @@ cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
  * byte array to match.
  */
 static inline const u8 *
-cfg80211_find_ie_match(u8 eid, const u8 *ies, unsigned int len,
+cfg80211_find_ie_match(enum ieee80211_eid eid, const u8 *ies, unsigned int len,
 		       const u8 *match, unsigned int match_len,
 		       unsigned int match_offset)
 {
@@ -7920,7 +7930,7 @@ cfg80211_find_ie_match(u8 eid, const u8 *ies, unsigned int len,
  * having to fit into the given data.
  */
 static inline const struct element *
-cfg80211_find_elem(u8 eid, const u8 *ies, int len)
+cfg80211_find_elem(enum ieee80211_eid eid, const u8 *ies, int len)
 {
 	return cfg80211_find_elem_match(eid, ies, len, NULL, 0, 0);
 }
@@ -7940,7 +7950,8 @@ cfg80211_find_elem(u8 eid, const u8 *ies, int len)
  * Note: There are no checks on the element length other than
  * having to fit into the given data.
  */
-static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
+static inline const u8 *cfg80211_find_ie(enum ieee80211_eid eid,
+					 const u8 *ies, int len)
 {
 	return cfg80211_find_ie_match(eid, ies, len, NULL, 0, 0);
 }
@@ -7961,10 +7972,13 @@ static inline const u8 *cfg80211_find_ie(u8 eid, const u8 *ies, int len)
  * having to fit into the given data.
  */
 static inline const struct element *
-cfg80211_find_ext_elem(u8 ext_eid, const u8 *ies, int len)
+cfg80211_find_ext_elem(enum ieee80211_eid_ext ext_eid,
+		       const u8 *ies, int len)
 {
+	u8 _ext_eid = ext_eid;
+
 	return cfg80211_find_elem_match(WLAN_EID_EXTENSION, ies, len,
-					&ext_eid, 1, 0);
+					&_ext_eid, 1, 0);
 }
 
 /**
