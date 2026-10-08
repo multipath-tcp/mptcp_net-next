@@ -2730,6 +2730,10 @@ struct element {
 	u8 data[];
 } __packed;
 
+/* trigger enum comparison warnings if applicable (constant id) */
+#define element_iteration_typecheck(type, id)				\
+	(((type)0 == (id)) || true)
+
 /* element iteration helpers */
 #define for_each_element(_elem, _data, _datalen)			\
 	for (_elem = (const struct element *)(_data);			\
@@ -2741,11 +2745,15 @@ struct element {
 
 #define for_each_element_id(element, _id, data, datalen)		\
 	for_each_element(element, data, datalen)			\
-		if (element->id == (_id))
+		if (element_iteration_typecheck(enum ieee80211_eid,	\
+						_id) &&			\
+		    element->id == (_id))
 
 #define for_each_element_extid(element, extid, _data, _datalen)		\
 	for_each_element(element, _data, _datalen)			\
-		if (element->id == WLAN_EID_EXTENSION &&		\
+		if (element_iteration_typecheck(enum ieee80211_eid_ext,	\
+						extid) &&		\
+		    element->id == WLAN_EID_EXTENSION &&		\
 		    element->datalen > 0 &&				\
 		    element->data[0] == (extid))
 
@@ -2753,10 +2761,11 @@ struct element {
 	for_each_element(sub, (element)->data, (element)->datalen)
 
 #define for_each_subelement_id(sub, id, element)			\
-	for_each_element_id(sub, id, (element)->data, (element)->datalen)
+	for_each_element_id(sub, (u8)id, (element)->data, (element)->datalen)
 
 #define for_each_subelement_extid(sub, extid, element)			\
-	for_each_element_extid(sub, extid, (element)->data, (element)->datalen)
+	for_each_element_extid(sub, (u8)extid, (element)->data,		\
+			       (element)->datalen)
 
 /**
  * for_each_element_completed - determine if element parsing consumed all data
