@@ -1454,6 +1454,13 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
 	lockdep_assert_wiphy(wdev->wiphy);
 
 	/*
+	 * Pending events may still change the state we're about to reason
+	 * about (e.g. a deferred disconnect clearing ssid_len), so process
+	 * them before looking at it.
+	 */
+	cfg80211_process_rdev_events(rdev);
+
+	/*
 	 * If we have an ssid_len, we're trying to connect or are
 	 * already connected, so reject a new SSID unless it's the
 	 * same (which is the case for re-association.)
@@ -1558,6 +1565,13 @@ int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 	int err = 0;
 
 	lockdep_assert_wiphy(wdev->wiphy);
+
+	/*
+	 * Pending events may still change the state we're about to reason
+	 * about (e.g. a deferred disconnect clearing ssid_len), so process
+	 * them before looking at it.
+	 */
+	cfg80211_process_rdev_events(rdev);
 
 	kfree_sensitive(wdev->connect_keys);
 	wdev->connect_keys = NULL;
