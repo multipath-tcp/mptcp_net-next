@@ -5135,6 +5135,79 @@ brcmf_config_ap_mgmt_ie(struct brcmf_cfg80211_vif *vif,
 }
 
 static s32
+brcmf_parse_configure_sae_pwe(struct brcmf_if *ifp,
+			      struct cfg80211_ap_settings *settings)
+{
+	const struct brcmf_tlv *rsnx_ie;
+	const struct brcmf_tlv *ext_rate_ie;
+	const struct brcmf_tlv *supp_rate_ie;
+	u8 ie_len, i;
+	u32 wpa_auth = 0;
+	u32 sae_pwe = 0; /* 0 = Hunting-and-Pecking only, 1 = H2E only, 2 = both */
+	s32 err = 0;
+
+	if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_SAE_EXT))
+		return 0;
+
+	err = brcmf_fil_bsscfg_int_get(ifp, "wpa_auth", &wpa_auth);
+	if (err || (wpa_auth & WPA3_AUTH_SAE_PSK) == 0) {
+		brcmf_dbg(INFO, "wpa_auth is not SAE:0x%x\n", wpa_auth);
+		return 0;
+	}
+
+	rsnx_ie = brcmf_parse_tlvs((u8 *)settings->beacon.tail,
+				   settings->beacon.tail_len, WLAN_EID_RSNX);
+
+	if (rsnx_ie && rsnx_ie->len &&
+	    (rsnx_ie->data[0] & WLAN_RSNX_CAPA_SAE_H2E))
+		sae_pwe = 2;
+
+	/* Found rsnx_ie with SAE_H2E, check the bss selector to know if it is
+	 * a H2E only.
+	 */
+
+	if (sae_pwe == 2) {
+		supp_rate_ie = brcmf_parse_tlvs((u8 *)settings->beacon.head,
+						settings->beacon.head_len,
+						WLAN_EID_SUPP_RATES);
+		ext_rate_ie = brcmf_parse_tlvs((u8 *)settings->beacon.tail,
+					       settings->beacon.tail_len,
+					       WLAN_EID_EXT_SUPP_RATES);
+		if (ext_rate_ie) {
+			ie_len = ext_rate_ie->len;
+			for (i = 0; i < ie_len; i++) {
+				if ((ext_rate_ie->data[i] & 0x7f) ==
+				    BSS_MEMBERSHIP_SELECTOR_SAE_H2E) {
+					sae_pwe = 1;
+					break;
+				}
+			}
+		}
+
+		/* If we cannot found H2E only selector in ext_supp_rate IE,
+		 * traversal supp_rate IE to make sure it really doesn't exist
+		 */
+		if (sae_pwe == 2 && supp_rate_ie) {
+			ie_len = supp_rate_ie->len;
+			for (i = 0; i < ie_len; i++) {
+				if ((supp_rate_ie->data[i] & 0x7f) ==
+				    BSS_MEMBERSHIP_SELECTOR_SAE_H2E) {
+					sae_pwe = 1;
+					break;
+				}
+			}
+		}
+	}
+
+	err = brcmf_fwvid_configure_sae_pwe(ifp, sae_pwe);
+	if (err == -EOPNOTSUPP)
+		return 0;
+
+	brcmf_dbg(TRACE, "extsae_pwe=%u\n", sae_pwe);
+	return err;
+}
+
+static s32
 brcmf_parse_configure_security(struct brcmf_if *ifp,
 			       struct cfg80211_ap_settings *settings,
 			       enum nl80211_iftype dev_role)
@@ -5165,6 +5238,10 @@ brcmf_parse_configure_security(struct brcmf_if *ifp,
 
 			/* RSN IE */
 			err = brcmf_configure_wpaie(ifp, tmp_ie, true);
+			if (err < 0)
+				return err;
+
+			err = brcmf_parse_configure_sae_pwe(ifp, settings);
 			if (err < 0)
 				return err;
 		}
@@ -6588,6 +6665,21 @@ done:
 	return err;
 }
 
+static bool
+brcmf_fwsup_is_authorized(struct brcmf_cfg80211_profile *profile,
+			  struct cfg80211_connect_resp_params *conn_params)
+{
+	if ((profile->use_fwsup == BRCMF_PROFILE_FWSUP_1X ||
+	     profile->use_fwsup == BRCMF_PROFILE_FWSUP_ROAM) &&
+	    brcmf_has_pmkid(conn_params->req_ie, conn_params->req_ie_len))
+		return true;
+	if (profile->use_fwsup == BRCMF_PROFILE_FWSUP_SAE ||
+	    profile->use_fwsup == BRCMF_PROFILE_FWSUP_PSK)
+		return true;
+
+	return false;
+}
+
 static s32
 brcmf_bss_connect_done(struct brcmf_cfg80211_info *cfg,
 		       struct net_device *ndev, const struct brcmf_event_msg *e,
@@ -6625,10 +6717,7 @@ brcmf_bss_connect_done(struct brcmf_cfg80211_info *cfg,
 		conn_params.resp_ie = conn_info->resp_ie;
 		conn_params.resp_ie_len = conn_info->resp_ie_len;
 		authorized = completed &&
-			     (profile->use_fwsup == BRCMF_PROFILE_FWSUP_1X ||
-			      profile->use_fwsup == BRCMF_PROFILE_FWSUP_ROAM) &&
-			     brcmf_has_pmkid(conn_params.req_ie,
-					     conn_params.req_ie_len);
+			     brcmf_fwsup_is_authorized(profile, &conn_params);
 		cfg80211_connect_done(ndev, &conn_params, GFP_KERNEL);
 		if (authorized)
 			cfg80211_port_authorized(ndev, profile->bssid, NULL, 0,
@@ -8079,6 +8168,7 @@ static bool brmcf_use_iso3166_ccode_fallback(struct brcmf_pub *drvr)
 	switch (drvr->bus_if->chip) {
 	case BRCM_CC_43430_CHIP_ID:
 	case BRCM_CC_4345_CHIP_ID:
+	case BRCM_CC_4350_CHIP_ID:
 	case BRCM_CC_4356_CHIP_ID:
 	case BRCM_CC_43602_CHIP_ID:
 		return true;

@@ -437,7 +437,7 @@ u32 ip6_mtu_from_fib6(const struct fib6_result *res,
 		      const struct in6_addr *daddr,
 		      const struct in6_addr *saddr);
 
-struct neighbour *ip6_neigh_lookup(const struct in6_addr *gw,
-				   struct net_device *dev, struct sk_buff *skb,
-				   const void *daddr);
+struct neighbour *__ip6_dst_neigh_lookup(const struct in6_addr *gw,
+					 struct net_device *dev, struct sk_buff *skb,
+					 const void *daddr);
 #endif
