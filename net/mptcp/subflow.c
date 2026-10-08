@@ -1931,6 +1931,13 @@ static void subflow_state_change(struct sock *sk)
 	if (subflow->resetting)
 		return;
 
+	if (subflow->is_mptfo && sk->sk_state == TCP_ESTABLISHED) {
+		subflow->is_mptfo = 0;
+		mptcp_data_lock(parent);
+		__mptcp_check_push(parent, sk);
+		mptcp_data_unlock(parent);
+	}
+
 	/* as recvmsg() does not acquire the subflow socket for ssk selection
 	 * a fin packet carrying a DSS can be unnoticed if we don't trigger
 	 * the data available machinery here.
