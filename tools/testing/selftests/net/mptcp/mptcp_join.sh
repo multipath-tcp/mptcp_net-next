@@ -97,19 +97,16 @@ unset add_addr_tx_nr
 unset add_addr_echo_tx_nr
 unset add_addr_drop_tx_nr
 
+# nft cannot process the RM_ADDR option because it stops parsing after matching
+# the first DSS option. Use hard-coded byte offsets to match RM_ADDR messages.
 # A tcpdump capture of the RM_ADDR message looks like:
+#  [TCP header: 20 bytes] [nop] [nop] [timestamp: 10 bytes]
+#  [MPTCP DSS: 12 bytes] [MPTCP RM_ADDR: 4 bytes]
 #
-#   [TCP header: 20 bytes] [nop] [nop] [timestamp: 10 bytes] \
-#         [MPTCP DSS: 12 bytes] [MPTCP RM_ADDR: 4 bytes]
-#
-# nft cannot process the RM_ADDR option because it stops parsing after
-# matching the first DSS option. Use hard-coded byte offsets to match
-# RM_ADDR messages. We verify:
-#
-# TCP Data Offset (12 x 4 = 48 bytes), DSS (TCP[32] x 8) kind (MPTCP 0x1e)
-# and length (0x0c). RM_ADDR (TCP[44] x 8) kind (MPTCP 0x1e) and subtype (4)
-
-RM_ADDR_OFFSETS="tcp doff 12 @th,256,16 == 0x1e0c @th,352,8 == 0x1e @th,368,4 == 4"
+# - TCP Data Offset (12 x 4 = 48 bytes)
+# - DSS (TCP[32] x 8) kind (MPTCP 0x1e), length (0x0c) and subtype (2)
+# - RM_ADDR (TCP[44] x 8) kind (MPTCP 0x1e), variable length and subtype (4)
+RM_ADDR_OFFSETS="tcp doff 12 @th,256,20 == 0x1e0c2 @th,352,8 == 0x1e @th,368,4 == 4"
 
 init_partial()
 {
