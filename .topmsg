@@ -3,8 +3,11 @@ Subject: [PATCH] selftests: mptcp: convert iptables to nftables for mptcp_sockop
 
 During the conversion, we retain the same filter and chain names previously
 used by iptables/ip6tables. Counters are not added to accept rules because
-the test does not inspect them. After conversion, the generated output
-matches the original iptables/ip6tables behavior.
+the test does not inspect them. The syn mark rule is removed as it is
+only for debugging, which could be added easily when needed.
+
+After conversion, the generated output matches the original
+iptables/ip6tables behavior.
 
 Signed-off-by: Hangbin Liu <liuhangbin@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
