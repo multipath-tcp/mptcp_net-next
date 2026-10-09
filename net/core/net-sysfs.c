@@ -757,6 +757,7 @@ static ssize_t threaded_show(struct device *dev,
 
 static int modify_napi_threaded(struct net_device *dev, unsigned long val)
 {
+	struct napi_struct *napi;
 	int ret;
 
 	if (list_empty(&dev->napi_list))
@@ -764,6 +765,13 @@ static int modify_napi_threaded(struct net_device *dev, unsigned long val)
 
 	if (val != 0 && val != 1)
 		return -EOPNOTSUPP;
+
+	if (val) {
+		list_for_each_entry(napi, &dev->napi_list, dev_list) {
+			if (test_bit(NAPI_STATE_PERCPU, &napi->state))
+				return -EOPNOTSUPP;
+		}
+	}
 
 	ret = netif_set_threaded(dev, val);
 
