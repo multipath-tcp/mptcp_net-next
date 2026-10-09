@@ -97,6 +97,17 @@ unset add_addr_tx_nr
 unset add_addr_echo_tx_nr
 unset add_addr_drop_tx_nr
 
+# nft cannot process the RM_ADDR option because it stops parsing after matching
+# the first DSS option. Use hard-coded byte offsets to match RM_ADDR messages.
+# A tcpdump capture of the RM_ADDR message looks like:
+#  [TCP header: 20 bytes] [nop] [nop] [timestamp: 10 bytes]
+#  [MPTCP DSS: 12 bytes] [MPTCP RM_ADDR: 4 bytes]
+#
+# - TCP Data Offset (12 x 4 = 48 bytes)
+# - DSS (TCP[32] x 8) kind (MPTCP 0x1e), length (0x0c) and subtype (2)
+# - RM_ADDR (TCP[44] x 8) kind (MPTCP 0x1e), variable length and subtype (4)
+RM_ADDR_OFFSETS="tcp doff 12 @th,256,20 == 0x1e0c2 @th,352,8 == 0x1e @th,368,4 == 4"
+
 init_partial()
 {
 	capout=$(mktemp)
@@ -4375,7 +4386,7 @@ endpoint_tests()
 		local nft=1
 		ip netns exec "${ns2}" nft insert rule ip filter OUTPUT \
 			ip saddr 10.0.1.2 meta l4proto tcp \
-			tcp option mptcp subtype remove-addr drop || nft=0
+			"${RM_ADDR_OFFSETS}" drop || nft=0
 		local i
 		for i in $(seq 3); do
 			pm_nl_del_endpoint $ns2 1 10.0.1.2
@@ -4454,7 +4465,7 @@ endpoint_tests()
 		local nft=1
 		ip netns exec "${ns1}" nft insert rule ip filter OUTPUT \
 			ip saddr 10.0.1.1 meta l4proto tcp \
-			tcp option mptcp subtype remove-addr drop || nft=0
+			"${RM_ADDR_OFFSETS}" drop || nft=0
 		pm_nl_del_endpoint $ns1 42 10.0.1.1
 		sleep 0.5
 		chk_subflow_nr "after delete ID 0" 2
