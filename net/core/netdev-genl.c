@@ -338,6 +338,12 @@ netdev_nl_napi_set_config(struct napi_struct *napi, struct genl_info *info)
 		int ret;
 
 		threaded = nla_get_uint(info->attrs[NETDEV_A_NAPI_THREADED]);
+		if (threaded && test_bit(NAPI_STATE_PERCPU, &napi->state)) {
+			NL_SET_BAD_ATTR(info->extack,
+					info->attrs[NETDEV_A_NAPI_THREADED]);
+			return -EOPNOTSUPP;
+		}
+
 		ret = napi_set_threaded(napi, threaded);
 		if (ret)
 			return ret;

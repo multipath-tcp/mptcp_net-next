@@ -512,7 +512,7 @@ static int ip6erspan_rcv(struct sk_buff *skb,
 
 		if (__iptunnel_pull_header(skb, len,
 					   htons(ETH_P_TEB),
-					   false, false) < 0)
+					   false, false))
 			return PACKET_REJECT;
 
 		if (tunnel->parms.collect_md) {
@@ -828,7 +828,12 @@ static inline int ip6gre_xmit_ipv6(struct sk_buff *skb, struct net_device *dev)
 	__u32 mtu;
 	int err;
 
-	if (ipv6_addr_equal(&t->parms.raddr, &ipv6h->saddr))
+	/* The outer destination of a collect_md tunnel comes from the
+	 * metadata, so raddr is not its exit point, and hosts on the link
+	 * bridged into an L2 one do send from :: (DAD, early MLD).
+	 */
+	if (!(t->parms.collect_md && dev->type == ARPHRD_ETHER) &&
+	    ipv6_addr_equal(&t->parms.raddr, &ipv6h->saddr))
 		return -1;
 
 	if (!t->parms.collect_md &&
