@@ -11,15 +11,19 @@ specification. Since endpoint_tests is the only test that delete rules,
 which inserts and deletes rules one by one. Flushing the table
 directly is safe and easier than using nft_handle.
 
-The BPF bytecode matching MPTCP add‑addr and remove‑addr suboptions
-is replaced with native nft matching using "tcp option mptcp subtype".
+The cBPF bytecode matching MPTCP add‑addr is replaced with native nft
+matching using "tcp option mptcp subtype add-addr". But the RM_ADDR
+suboption is added after the MPTCP DSS option, and nft is unable to
+handle this because it stops parsing further TCP options once it matches
+the first one. We therefore use hard-coded offsets to match the RM_ADDR
+suboption.
 
 The config file adds CONFIG_NFT_NUMGEN (replaces iptables statistic nth),
 CONFIG_NFT_REJECT and CONFIG_NFT_REJECT_INET for reject‑related rules.
+Remove other unneeded configs.
 
 Remove the iptables/ip6tables check in mptcp_lib.sh since no script use
-it now. While at it, also remove all kernel config entries that were
-required for the previous IPTables rules.
+it now.
 
 Signed-off-by: Hangbin Liu <liuhangbin@kylinos.cn>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
