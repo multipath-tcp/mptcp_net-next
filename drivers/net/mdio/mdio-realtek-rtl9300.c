@@ -123,13 +123,13 @@
 #include <linux/of_mdio.h>
 #include <linux/phy.h>
 #include <linux/platform_device.h>
-#include <linux/property.h>
 #include <linux/regmap.h>
 
 #define RTL8380_NUM_BUSES			1
 #define RTL8380_NUM_PAGES			4096
 #define RTL8380_NUM_PORTS			28
 #define RTL8380_SMI_GLB_CTRL			0xa100
+#define   RTL8380_SMI_FREQ_SEL			BIT(1)
 #define   RTL8380_SMI_PHY_PATCH_DONE		BIT(15)
 #define RTL8380_SMI_ACCESS_PHY_CTRL_0		0xa1b8
 #define RTL8380_SMI_ACCESS_PHY_CTRL_1		0xa1bc
@@ -169,12 +169,15 @@
 #define RTL8390_PHYREG_PORT_CTRL_LOW		0x03e4
 #define RTL8390_PHYREG_PORT_CTRL_HIGH		0x03e8
 #define RTL8390_SMI_PORT_POLLING_CTRL		0x03fc
+#define RTL8390_SMI_GLB_CTRL			0x03f8
+#define   RTL8390_SMI_FREQ_SEL			GENMASK(6, 5)
 
 #define RTL9300_NUM_BUSES			4
 #define RTL9300_NUM_PAGES			4096
 #define RTL9300_NUM_PORTS			28
 #define RTL9300_SMI_GLB_CTRL			0xca00
 #define   RTL9300_GLB_CTRL_INTF_SEL(intf)	BIT(16 + (intf))
+#define   RTL9300_SMI_FREQ_SEL(intf)		GENMASK((intf) * 2 + 9, (intf) * 2 + 8)
 #define RTL9300_SMI_PORT0_15_POLLING_SEL	0xca08
 #define RTL9300_SMI_ACCESS_PHY_CTRL_0		0xcb70
 #define RTL9300_SMI_ACCESS_PHY_CTRL_1		0xcb74
@@ -196,6 +199,8 @@
 #define RTL9310_NUM_BUSES			4
 #define RTL9310_NUM_PAGES			8192
 #define RTL9310_NUM_PORTS			56
+#define RTL9310_SMI_GLB_CTRL0			0x0cc0
+#define   RTL9310_SMI_FREQ_SEL(intf)		GENMASK((intf) * 2 + 5, (intf) * 2 + 4)
 #define RTL9310_SMI_GLB_CTRL1			0x0cbc
 #define   RTL9310_SMI_GLB_FMT_SEL_C45(intf)	BIT((intf) * 2 + 1)
 #define RTL9310_SMI_INDRT_ACCESS_CTRL_0		0x0c00
@@ -271,6 +276,7 @@ struct otto_emdio_info {
 	u8 num_ports;
 	u16 num_pages;
 	u32 poll_ctrl;
+	int (*set_bus_frequency)(struct mii_bus *bus, u32 freq);
 	int (*setup_controller)(struct otto_emdio_priv *priv);
 	int (*read_c22)(struct mii_bus *bus, int port, int regnum, u32 *value);
 	int (*read_c45)(struct mii_bus *bus, int port, int dev_addr, int regnum, u32 *value);
@@ -746,6 +752,17 @@ static int otto_emdio_setup_topology(struct otto_emdio_priv *priv)
 	return 0;
 }
 
+static int otto_emdio_8380_set_bus_frequency(struct mii_bus *bus, u32 freq)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+
+	if (freq != 2500000 && freq != 10000000)
+		return -EINVAL;
+
+	return regmap_assign_bits(priv->regmap, RTL8380_SMI_GLB_CTRL,
+				  RTL8380_SMI_FREQ_SEL, freq == 10000000);
+}
+
 static int otto_emdio_8380_setup_controller(struct otto_emdio_priv *priv)
 {
 	/*
@@ -753,6 +770,60 @@ static int otto_emdio_8380_setup_controller(struct otto_emdio_priv *priv)
 	 * patching and must be set before the PHYs are probed.
 	 */
 	return regmap_set_bits(priv->regmap, RTL8380_SMI_GLB_CTRL, RTL8380_SMI_PHY_PATCH_DONE);
+}
+
+static int otto_emdio_8390_set_bus_frequency(struct mii_bus *bus, u32 freq)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	u32 mdio_bus, child_freq, val;
+	bool freq_set = false;
+	int err;
+
+	/*
+	 * RTL839x uses one frequency shared by both MDIO buses. Use the frequency passed by the
+	 * caller as fallback, but prefer an explicitly requested frequency from any valid,
+	 * available bus. Reject conflicting explicit requests. Only the first call programs the
+	 * shared frequency.
+	 */
+	if (priv->bus[0] || priv->bus[1])
+		return 0;
+
+	for_each_available_child_of_node_scoped(bus->parent->of_node, child) {
+		err = of_property_read_u32(child, "reg", &mdio_bus);
+		if (err || mdio_bus >= priv->info->num_buses)
+			continue;
+
+		if (of_property_read_u32(child, "clock-frequency", &child_freq))
+			continue;
+
+		if (freq_set && freq != child_freq)
+			return -EINVAL;
+
+		freq = child_freq;
+		freq_set = true;
+	}
+
+	if (freq != 1250000 && freq != 2500000 && freq != 5000000)
+		return -EINVAL;
+
+	val = FIELD_PREP(RTL8390_SMI_FREQ_SEL, freq / 2500000);
+
+	return regmap_update_bits(priv->regmap, RTL8390_SMI_GLB_CTRL, RTL8390_SMI_FREQ_SEL, val);
+}
+
+static int otto_emdio_9300_set_bus_frequency(struct mii_bus *bus, u32 freq)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	struct otto_emdio_chan *chan = bus->priv;
+	u32 mask, val;
+
+	if (freq != 1250000 && freq != 2500000 && freq != 5000000)
+		return -EINVAL;
+
+	mask = RTL9300_SMI_FREQ_SEL(chan->mdio_bus);
+	val = field_prep(mask, freq / 2500000);
+
+	return regmap_update_bits(priv->regmap, RTL9300_SMI_GLB_CTRL, mask, val);
 }
 
 static int otto_emdio_9300_setup_controller(struct otto_emdio_priv *priv)
@@ -773,6 +844,21 @@ static int otto_emdio_9300_setup_controller(struct otto_emdio_priv *priv)
 		return err;
 
 	return 0;
+}
+
+static int otto_emdio_9310_set_bus_frequency(struct mii_bus *bus, u32 freq)
+{
+	struct otto_emdio_priv *priv = otto_emdio_bus_to_priv(bus);
+	struct otto_emdio_chan *chan = bus->priv;
+	u32 mask, val;
+
+	if (freq != 1250000 && freq != 2500000 && freq != 5000000)
+		return -EINVAL;
+
+	mask = RTL9310_SMI_FREQ_SEL(chan->mdio_bus);
+	val = field_prep(mask, freq / 2500000);
+
+	return regmap_update_bits(priv->regmap, RTL9310_SMI_GLB_CTRL0, mask, val);
 }
 
 static int otto_emdio_9310_setup_controller(struct otto_emdio_priv *priv)
@@ -837,20 +923,23 @@ static void otto_emdio_notify_phy_detach(struct phy_device *phydev)
 }
 
 static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv,
-				 struct fwnode_handle *node)
+				struct device_node *node)
 {
 	struct otto_emdio_chan *chan;
 	struct mii_bus *bus;
-	u32 mdio_bus;
+	u32 mdio_bus, freq;
 	int err;
 
-	err = fwnode_property_read_u32(node, "reg", &mdio_bus);
+	err = of_property_read_u32(node, "reg", &mdio_bus);
 	if (err)
 		return dev_err_probe(dev, err, "undefined smi bus number\n");
 
 	if (mdio_bus >= priv->info->num_buses)
 		return dev_err_probe(dev, -EINVAL,
 				     "illegal (dangling) smi bus number %d\n", mdio_bus);
+
+	if (priv->bus[mdio_bus])
+		return dev_err_probe(dev, -EINVAL, "duplicated smi bus number %d\n", mdio_bus);
 
 	bus = devm_mdiobus_alloc_size(dev, sizeof(*chan));
 	if (!bus)
@@ -871,9 +960,18 @@ static int otto_emdio_probe_one(struct device *dev, struct otto_emdio_priv *priv
 
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d", dev_name(dev), mdio_bus);
 
-	err = devm_of_mdiobus_register(dev, bus, to_of_node(node));
+	if (of_property_read_u32(node, "clock-frequency", &freq))
+		freq = 2500000;
+	err = priv->info->set_bus_frequency(bus, freq);
+	if (err)
+		return dev_err_probe(dev, err, "cannot set frequency %u for MDIO bus %d\n",
+				     freq, mdio_bus);
+
+	err = devm_of_mdiobus_register(dev, bus, node);
 	if (err)
 		return dev_err_probe(dev, err, "cannot register MDIO bus\n");
+
+	priv->bus[mdio_bus] = bus;
 
 	return 0;
 }
@@ -907,8 +1005,8 @@ static int otto_emdio_map_ports(struct device *dev)
 
 	ports_dn = of_get_child_by_name(parent->of_node, "ethernet-ports");
 	if (!ports_dn)
-		return dev_err_probe(dev, -EINVAL, "%pfwP missing ethernet-ports\n",
-				     dev_fwnode(parent));
+		return dev_err_probe(dev, -EINVAL, "%pOFP missing ethernet-ports\n",
+				     parent->of_node);
 
 	for_each_available_child_of_node_scoped(ports_dn, port_dn) {
 		ctrl_dn = NULL;
@@ -1008,7 +1106,7 @@ static int otto_emdio_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	priv->info = device_get_match_data(dev);
+	priv->info = of_device_get_match_data(dev);
 	priv->regmap = syscon_node_to_regmap(dev->parent->of_node);
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
@@ -1033,7 +1131,7 @@ static int otto_emdio_probe(struct platform_device *pdev)
 			return dev_err_probe(dev, err, "failed to setup MDIO bus controller\n");
 	}
 
-	device_for_each_child_node_scoped(dev, child) {
+	for_each_available_child_of_node_scoped(dev->of_node, child) {
 		err = otto_emdio_probe_one(dev, priv, child);
 		if (err)
 			return err;
@@ -1057,6 +1155,7 @@ static const struct otto_emdio_info otto_emdio_8380_info = {
 	.num_pages = RTL8380_NUM_PAGES,
 	.num_ports = RTL8380_NUM_PORTS,
 	.poll_ctrl = RTL8380_SMI_POLL_CTRL,
+	.set_bus_frequency = otto_emdio_8380_set_bus_frequency,
 	.setup_controller = otto_emdio_8380_setup_controller,
 	.read_c22 = otto_emdio_8380_read_c22,
 	.read_c45 = otto_emdio_8380_read_c45,
@@ -1081,6 +1180,7 @@ static const struct otto_emdio_info otto_emdio_8390_info = {
 	.num_pages = RTL8390_NUM_PAGES,
 	.num_ports = RTL8390_NUM_PORTS,
 	.poll_ctrl = RTL8390_SMI_PORT_POLLING_CTRL,
+	.set_bus_frequency = otto_emdio_8390_set_bus_frequency,
 	.read_c22 = otto_emdio_8390_read_c22,
 	.read_c45 = otto_emdio_8390_read_c45,
 	.write_c22 = otto_emdio_8390_write_c22,
@@ -1103,6 +1203,7 @@ static const struct otto_emdio_info otto_emdio_9300_info = {
 	.num_ports = RTL9300_NUM_PORTS,
 	.num_pages = RTL9300_NUM_PAGES,
 	.poll_ctrl = RTL9300_SMI_POLL_CTRL,
+	.set_bus_frequency = otto_emdio_9300_set_bus_frequency,
 	.setup_controller = otto_emdio_9300_setup_controller,
 	.read_c22 = otto_emdio_9300_read_c22,
 	.read_c45 = otto_emdio_9300_read_c45,
@@ -1129,6 +1230,7 @@ static const struct otto_emdio_info otto_emdio_9310_info = {
 	.num_pages = RTL9310_NUM_PAGES,
 	.num_ports = RTL9310_NUM_PORTS,
 	.poll_ctrl = RTL9310_SMI_PORT_POLLING_CTRL,
+	.set_bus_frequency = otto_emdio_9310_set_bus_frequency,
 	.setup_controller = otto_emdio_9310_setup_controller,
 	.read_c22 = otto_emdio_9310_read_c22,
 	.read_c45 = otto_emdio_9310_read_c45,
