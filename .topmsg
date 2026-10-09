@@ -1,2 +1,14 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-options-dss-avoid-printing-uninit-csum
+Subject: [PATCH] mptcp: options: dss: avoid printing uninit csum
+
+When parsing the DSS suboption, this pr_debug() might read and print
+uninit checksum value.
+
+That's mostly harmless, but that's also confusing. Fixing that also
+avoids some tools to complain about accessing unint data.
+
+So read this csum field only if it has been set.
+
+Fixes: 390b95a5fb84 ("mptcp: receive checksum for DSS")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
