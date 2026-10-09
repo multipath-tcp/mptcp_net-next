@@ -12,7 +12,6 @@
 #define to_yt921x_led(led_cdev) \
 	container_of_const((led_cdev), struct yt921x_led, cdev)
 #define to_yt921x_port(led) ((led)->port)
-#define to_device(priv) ((priv)->ds.dev)
 
 static u32 yt921x_led_regaddr(struct yt921x_priv *priv, int port, int group)
 {
@@ -413,8 +412,8 @@ static int
 yt921x_led_setup(struct yt921x_priv *priv, int port,
 		 struct fwnode_handle *fwnode)
 {
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct yt921x_port *pp = &priv->ports[port];
-	struct device *dev = to_device(priv);
 	struct led_init_data init_data;
 	struct led_classdev *led_cdev;
 	char name[LED_MAX_NAME_SIZE];
@@ -583,8 +582,8 @@ err:
 
 static void yt921x_leds_remove_port(struct yt921x_priv *priv, int port)
 {
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct yt921x_port *pp = &priv->ports[port];
-	struct device *dev = to_device(priv);
 
 	for (int group = 0; group < YT921X_LED_GROUP_NUM; group++) {
 		struct yt921x_led *led = pp->leds[group];
@@ -602,7 +601,7 @@ static void yt921x_leds_remove_port(struct yt921x_priv *priv, int port)
 
 static int yt921x_leds_setup_port(struct yt921x_priv *priv, int port)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct dsa_switch *ds = &priv->ds;
 	struct device_node *leds_np;
 	struct dsa_port *dp;
