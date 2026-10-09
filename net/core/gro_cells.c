@@ -95,6 +95,7 @@ int gro_cells_init(struct gro_cells *gcells, struct net_device *dev)
 		local_lock_init(&cell->bh_lock);
 
 		set_bit(NAPI_STATE_NO_BUSY_POLL, &cell->napi.state);
+		set_bit(NAPI_STATE_PERCPU, &cell->napi.state);
 
 		netif_napi_add(dev, &cell->napi, gro_cell_poll);
 		napi_enable(&cell->napi);
