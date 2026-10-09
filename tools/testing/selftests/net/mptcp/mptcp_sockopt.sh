@@ -54,11 +54,6 @@ add_mark_rules()
 			add chain $table filter OUTPUT \
 				{ type filter hook output priority 0; policy accept; }
 
-			# just to debug: check we have multiple subflows connection requests
-			add rule $table filter OUTPUT \
-				tcp flags & (fin | syn | rst | ack) == syn \
-				meta mark $m accept
-
 			# RST packets might be handled by a internal dummy socket
 			add rule $table filter OUTPUT \
 				tcp flags & rst == rst meta mark 0x0 accept
