@@ -8,8 +8,6 @@
 #include "pcs.h"
 #include "smi.h"
 
-#define to_device(priv) ((priv)->ds.dev)
-
 static int
 yt921x_serdes_config(struct yt921x_priv *priv, int port, unsigned int neg_mode,
 		     phy_interface_t interface,
@@ -116,7 +114,7 @@ yt921x_phylink_pcs_get_state(struct phylink_pcs *pcs, unsigned int neg_mode,
 {
 	struct yt921x_port *pp = pcs_to_yt921x_port(pcs);
 	struct yt921x_priv *priv = yt921x_port_to_priv(pp);
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int port = pp->index;
 	u16 bmsr;
 	u16 lpa;
@@ -155,7 +153,7 @@ static void yt921x_phylink_pcs_an_restart(struct phylink_pcs *pcs)
 {
 	struct yt921x_port *pp = pcs_to_yt921x_port(pcs);
 	struct yt921x_priv *priv = yt921x_port_to_priv(pp);
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int port = pp->index;
 	u16 val;
 	int res;
@@ -181,7 +179,7 @@ static void yt921x_phylink_pcs_disable(struct phylink_pcs *pcs)
 {
 	struct yt921x_port *pp = pcs_to_yt921x_port(pcs);
 	struct yt921x_priv *priv = yt921x_port_to_priv(pp);
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	int port = pp->index;
 	int res;
 
