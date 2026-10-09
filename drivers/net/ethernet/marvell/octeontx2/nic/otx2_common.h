@@ -785,7 +785,7 @@ static inline u64 otx2_atomic64_add(u64 incr, void __iomem *addr)
 	u64 __iomem *ptr = addr;
 	u64 result;
 
-	__asm__ volatile(".cpu   generic+lse\n"
+	__asm__ volatile(".arch_extension lse\n"
 			 "ldadd %x[i], %x[r], [%[b]]"
 			 : [r]"=r"(result), "+m"(*ptr)
 			 : [i]"r"(incr), [b]"r"(ptr)
