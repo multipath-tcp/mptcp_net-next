@@ -9,8 +9,6 @@
 #include "mdio_bus.h"
 #include "smi.h"
 
-#define to_device(priv) ((priv)->ds.dev)
-
 static int yt921x_intif_wait(struct yt921x_priv *priv)
 {
 	u32 val = 0;
@@ -21,7 +19,7 @@ static int yt921x_intif_wait(struct yt921x_priv *priv)
 
 int yt921x_intif_read(struct yt921x_priv *priv, int port, int reg, u16 *valp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u32 mask;
 	u32 ctrl;
 	u32 val;
@@ -145,7 +143,7 @@ yt921x_mbus_int_write(struct mii_bus *mbus, int port, int reg, u16 data)
 
 int yt921x_mbus_int_init(struct yt921x_priv *priv, struct device_node *mnp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct mii_bus *mbus;
 	int res;
 
@@ -181,7 +179,7 @@ static int yt921x_extif_wait(struct yt921x_priv *priv)
 static int
 yt921x_extif_read(struct yt921x_priv *priv, int port, int reg, u16 *valp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	u32 mask;
 	u32 ctrl;
 	u32 val;
@@ -275,7 +273,7 @@ yt921x_mbus_ext_write(struct mii_bus *mbus, int port, int reg, u16 data)
 
 int yt921x_mbus_ext_init(struct yt921x_priv *priv, struct device_node *mnp)
 {
-	struct device *dev = to_device(priv);
+	struct device *dev = yt921x_priv_to_device(priv);
 	struct mii_bus *mbus;
 	int res;
 
