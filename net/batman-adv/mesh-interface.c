@@ -833,6 +833,8 @@ static int batadv_meshif_init_late(struct net_device *dev)
 	atomic_set(&bat_priv->mcast.num_want_all_unsnoopables, 0);
 	atomic_set(&bat_priv->mcast.num_want_all_ipv4, 0);
 	atomic_set(&bat_priv->mcast.num_want_all_ipv6, 0);
+	atomic_set(&bat_priv->mcast.num_want_all_rtr4, 0);
+	atomic_set(&bat_priv->mcast.num_want_all_rtr6, 0);
 	atomic_set(&bat_priv->mcast.num_no_mc_ptype_capa, 0);
 #endif
 	WRITE_ONCE(bat_priv->gw.mode, BATADV_GW_MODE_OFF);
