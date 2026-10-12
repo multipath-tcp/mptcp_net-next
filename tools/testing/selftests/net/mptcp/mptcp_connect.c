@@ -711,6 +711,14 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd,
 
 				bw = do_rnd_write(peerfd, winfo->buf + winfo->off, winfo->len);
 				if (bw < 0) {
+					/* POLLOUT does not guarantee the next write
+					 * will not block: the MPTCP send buffer can
+					 * shrink in between, e.g. when a subflow is
+					 * closed. Wait for more space.
+					 */
+					if (errno == EAGAIN)
+						continue;
+
 					/* expected reset, continue to read */
 					if (cfg_rcv_trunc &&
 					    (errno == ECONNRESET ||
