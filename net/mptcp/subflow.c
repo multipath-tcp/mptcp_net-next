@@ -1446,10 +1446,32 @@ no_data:
 	return false;
 
 fallback:
-	if (!__mptcp_check_fallback(msk)) {
+	if (subflow->mp_join || ssk != READ_ONCE(msk->first)) {
 		/* RFC 8684 section 3.7. */
 		if (status == MAPPING_BAD_CSUM &&
 		    (subflow->mp_join || subflow->valid_csum_seen)) {
+			subflow->send_mp_fail = 1;
+
+			if (!mptcp_subflow_fail(msk, ssk)) {
+				subflow->reset_transient = 0;
+				subflow->reset_reason = MPTCP_RST_EMIDDLEBOX;
+				goto reset;
+			}
+			WRITE_ONCE(subflow->data_avail, true);
+			return true;
+		}
+
+		subflow->reset_transient = 0;
+		subflow->reset_reason = status == MAPPING_NODSS ?
+					MPTCP_RST_EMIDDLEBOX :
+					MPTCP_RST_EMPTCP;
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSRESET);
+		goto reset;
+	}
+
+	if (!__mptcp_check_fallback(msk)) {
+		/* RFC 8684 section 3.7. */
+		if (status == MAPPING_BAD_CSUM && subflow->valid_csum_seen) {
 			subflow->send_mp_fail = 1;
 
 			if (!mptcp_subflow_fail(msk, ssk)) {
