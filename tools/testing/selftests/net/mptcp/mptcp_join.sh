@@ -2151,6 +2151,78 @@ wait_attempt_fail()
 	return 1
 }
 
+# $1: ns
+wait_sf_retry()
+{
+	local ns="${1}"
+	local cnt
+
+	for _ in $(seq $((timeout_poll * 10))); do
+		cnt=$(mptcp_lib_get_counter "${ns}" "MPTcpExtSubflowRetry")
+		[ "${cnt:-0}" -gt 0 ] && return 0
+		sleep 0.1
+	done
+
+	return 1
+}
+
+# $1: ns ; $2: minimum number of retries
+chk_sf_retry_nr()
+{
+	local ns="${1}"
+	local retry_min="${2}"
+	local count
+
+	print_check "subflow retry"
+	count=$(mptcp_lib_get_counter "${ns}" "MPTcpExtSubflowRetry")
+	if [ -z "${count}" ]; then
+		print_skip
+	elif [ "${count}" -lt "${retry_min}" ]; then
+		fail_test "got ${count} subflow retry[s] expected at least ${retry_min}"
+	else
+		print_ok
+	fi
+}
+
+# $1: index of the client link to break
+#
+# The link stays up, but all the packets sent by the client on it are dropped:
+# the subflow using it is closed after a few retransmissions, then re-created
+# by the client once the link is back.
+run_sf_retry()
+{
+	local link="${1}"
+	local retry_nr
+	local tests_pid
+
+	init_shapers
+	ip netns exec $ns2 sysctl -q net.mptcp.subflow_retry_timeout=1
+	ip netns exec $ns2 sysctl -q net.ipv4.tcp_retries2=3
+	pm_nl_set_limits $ns1 0 2
+	pm_nl_set_limits $ns2 0 2
+	pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+	test_linkfail=32768 \
+		run_tests $ns1 $ns2 10.0.1.1 &
+	tests_pid=$!
+
+	wait_mpj 1
+	tc -n $ns2 qdisc change dev ns2eth${link} root netem rate 20mbit \
+		delay 1ms loss 100%
+	wait_sf_retry $ns2
+	tc -n $ns2 qdisc change dev ns2eth${link} root netem rate 20mbit \
+		delay 1ms
+	if ! wait ${tests_pid}; then
+		fail_test "transfer failed"
+		return
+	fi
+
+	# one MPJ SYN per attempt, then a single successful re-creation
+	retry_nr=$(mptcp_lib_get_counter $ns2 "MPTcpExtSubflowRetry")
+	join_syn_tx=$((1 + ${retry_nr:-0})) \
+		chk_join_nr 2 2 2
+	chk_sf_retry_nr $ns2 1
+}
+
 set_userspace_pm()
 {
 	local ns=$1
@@ -2584,6 +2656,18 @@ link_failure_tests()
 		chk_add_nr 1 1
 		chk_stale_nr $ns2 1 -1 2
 		chk_link_usage $ns2 ns2eth3 $cinsent 50
+	fi
+
+	# MPJ subflow closed after a silent link failure, then re-created
+	if reset "subflow retry after link failure" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/subflow_retry_timeout'; then
+		run_sf_retry 3
+	fi
+
+	# same with the initial subflow: re-created with an MPJ using ID 0
+	if reset "initial subflow retry after link failure" &&
+	   continue_if mptcp_lib_has_file '/proc/sys/net/mptcp/subflow_retry_timeout'; then
+		run_sf_retry 1
 	fi
 }
 
