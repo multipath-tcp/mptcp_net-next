@@ -22,6 +22,20 @@ struct mptcp_pm_add_addr {
 	struct rcu_head		rcu;
 };
 
+struct mptcp_pm_retry {
+	struct list_head	list;
+	struct mptcp_pm_local	local;
+	struct mptcp_addr_info	remote;
+	u8			attempts;
+	bool			pending;	/* timer fired, worker not run yet */
+	bool			disabled;	/* local or remote address removed */
+	bool			timer_done;
+	struct timer_list	timer;
+	struct mptcp_sock	*sock;
+};
+
+#define MPTCP_PM_RETRY_MAX	8
+
 static DEFINE_SPINLOCK(mptcp_pm_list_lock);
 static LIST_HEAD(mptcp_pm_list);
 
@@ -261,6 +275,8 @@ static bool subflow_in_rm_list(const struct mptcp_subflow_context *subflow,
 }
 
 static void mptcp_pm_add_addr_send_ack(struct mptcp_sock *msk);
+static bool mptcp_pm_schedule_work(struct mptcp_sock *msk,
+				   enum mptcp_pm_status new_status);
 static void
 mptcp_pm_addr_send_ack_avoid_list(struct mptcp_sock *msk,
 				  const struct mptcp_rm_list *rm_list)
@@ -493,6 +509,250 @@ static void mptcp_pm_free_announced_list(struct mptcp_sock *msk)
 	}
 }
 
+/* Subflows closed after an error can be re-created later on, see the
+ * 'subflow_retry_timeout' sysctl. Entries are kept until the msk is destroyed
+ * to track the exponential backoff, and are disabled when the corresponding
+ * local endpoint or remote address is removed.
+ */
+static void mptcp_pm_retry_timer(struct timer_list *timer)
+{
+	struct mptcp_pm_retry *entry = timer_container_of(entry, timer, timer);
+	struct mptcp_sock *msk = entry->sock;
+	struct sock *sk = (struct sock *)msk;
+
+	pr_debug("msk=%p\n", msk);
+
+	spin_lock_bh(&msk->pm.lock);
+	/* the timer might have been re-armed while this callback was waiting
+	 * for the PM lock: let the next expiration handle the entry.
+	 */
+	if (!timer_pending(&entry->timer)) {
+		if (!entry->disabled &&
+		    !(msk->pm.status & BIT(MPTCP_PM_DESTROYING))) {
+			entry->pending = true;
+			mptcp_pm_schedule_work(msk, MPTCP_PM_SUBFLOW_RETRY);
+		}
+
+		/* if sock_put calls sk_free: avoid waiting for this timer */
+		entry->timer_done = true;
+	}
+	spin_unlock_bh(&msk->pm.lock);
+
+	sock_put(sk);
+}
+
+/* To be called while pm->lock is held */
+static void mptcp_pm_retry_arm(struct mptcp_sock *msk,
+			       struct mptcp_pm_retry *entry)
+{
+	unsigned long max = mptcp_subflow_retry_timeout(sock_net((struct sock *)msk));
+	unsigned long timeout = TCP_TIMEOUT_INIT << min_t(u8, entry->attempts, 16);
+
+	entry->pending = false;
+	entry->timer_done = false;
+	if (entry->attempts < U8_MAX)
+		entry->attempts++;
+
+	sk_reset_timer((struct sock *)msk, &entry->timer,
+		       jiffies + min(timeout, max));
+}
+
+static bool mptcp_pm_retry_path_error(int err)
+{
+	switch (err) {
+	case ETIMEDOUT:
+	case EHOSTUNREACH:
+	case ENETUNREACH:
+	case EHOSTDOWN:
+	case ENETDOWN:
+		return true;
+	}
+
+	return false;
+}
+
+static void mptcp_pm_retry_add(struct mptcp_sock *msk,
+			       const struct mptcp_subflow_context *subflow)
+{
+	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+	bool established = READ_ONCE(subflow->fully_established);
+	struct mptcp_addr_info local, remote;
+	int err = READ_ONCE(ssk->sk_err);
+	struct sock *sk = (struct sock *)msk;
+	struct mptcp_pm_retry *entry;
+	int nr = 0;
+
+	if (!err || !mptcp_subflow_retry_timeout(sock_net(sk)))
+		return;
+
+	/* A subflow that never got established is retried only after network
+	 * errors: if the peer rejected it, trying again will not help.
+	 */
+	if (!established && !mptcp_pm_retry_path_error(err))
+		return;
+
+	/* Only re-create subflows initiated by this side: MP_JOIN ones, or the
+	 * initial one on the client side.
+	 */
+	if (!subflow->request_join &&
+	    (subflow->mp_join || READ_ONCE(msk->pm.server_side)))
+		return;
+
+	if (sk->sk_state != TCP_ESTABLISHED || __mptcp_check_fallback(msk))
+		return;
+
+	mptcp_local_address((struct sock_common *)ssk, &local);
+	local.port = 0;
+	local.id = subflow_get_local_id(subflow);
+	mptcp_remote_address((struct sock_common *)ssk, &remote);
+	remote.id = READ_ONCE(subflow->remote_id);
+
+	if (!remote.id && READ_ONCE(msk->pm.remote_deny_join_id0))
+		return;
+
+	spin_lock_bh(&msk->pm.lock);
+	if (msk->pm.status & BIT(MPTCP_PM_DESTROYING))
+		goto unlock;
+
+	list_for_each_entry(entry, &msk->pm.retry_list, list) {
+		if (mptcp_addresses_equal(&entry->local.addr, &local, false) &&
+		    mptcp_addresses_equal(&entry->remote, &remote, true))
+			goto found;
+		nr++;
+	}
+
+	if (nr >= MPTCP_PM_RETRY_MAX)
+		goto unlock;
+
+	entry = kzalloc_obj(*entry, GFP_ATOMIC);
+	if (!entry)
+		goto unlock;
+
+	entry->sock = msk;
+	timer_setup(&entry->timer, mptcp_pm_retry_timer, 0);
+	list_add_tail(&entry->list, &msk->pm.retry_list);
+
+found:
+	/* the path worked for a while: restart the backoff */
+	if (established)
+		entry->attempts = 0;
+
+	entry->local.addr = local;
+	entry->local.flags = subflow->request_bkup || subflow->backup ?
+			     MPTCP_PM_ADDR_FLAG_BACKUP : 0;
+	entry->local.ifindex = ssk->sk_bound_dev_if;
+	entry->remote = remote;
+	entry->disabled = false;
+
+	pr_debug("msk=%p local_id=%d remote_id=%d err=%d attempts=%u\n", msk,
+		 local.id, remote.id, err, entry->attempts);
+	mptcp_pm_retry_arm(msk, entry);
+
+unlock:
+	spin_unlock_bh(&msk->pm.lock);
+}
+
+static bool mptcp_pm_retry_has_subflow(const struct mptcp_sock *msk,
+				       const struct mptcp_pm_retry *entry)
+{
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_addr_info local, remote;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (!((1 << inet_sk_state_load(ssk)) &
+		      (TCPF_ESTABLISHED | TCPF_SYN_SENT | TCPF_SYN_RECV)))
+			continue;
+
+		mptcp_local_address((struct sock_common *)ssk, &local);
+		mptcp_remote_address((struct sock_common *)ssk, &remote);
+		if (mptcp_addresses_equal(&entry->local.addr, &local, false) &&
+		    mptcp_addresses_equal(&entry->remote, &remote, true))
+			return true;
+	}
+
+	return false;
+}
+
+/* Called under PM lock */
+static void mptcp_pm_retry_subflows(struct mptcp_sock *msk)
+{
+	struct sock *sk = (struct sock *)msk;
+	struct mptcp_pm_retry *entry;
+
+	/* Entries are only freed at destroy time, and new ones are added at
+	 * the tail: it is safe to release the PM lock while iterating.
+	 */
+	list_for_each_entry(entry, &msk->pm.retry_list, list) {
+		struct mptcp_addr_info remote;
+		struct mptcp_pm_local local;
+
+		if (!entry->pending || entry->disabled)
+			continue;
+
+		entry->pending = false;
+		if (sk->sk_state != TCP_ESTABLISHED ||
+		    mptcp_pm_retry_has_subflow(msk, entry))
+			continue;
+
+		if (msk->pm.extra_subflows >= mptcp_pm_get_limit_extra_subflows(msk)) {
+			mptcp_pm_retry_arm(msk, entry);
+			continue;
+		}
+
+		msk->pm.extra_subflows++;
+		local = entry->local;
+		remote = entry->remote;
+
+		spin_unlock_bh(&msk->pm.lock);
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_SUBFLOWRETRY);
+		if (__mptcp_subflow_connect(sk, &local, &remote)) {
+			spin_lock_bh(&msk->pm.lock);
+			mptcp_pm_retry_arm(msk, entry);
+			continue;
+		}
+		spin_lock_bh(&msk->pm.lock);
+	}
+}
+
+/* To be called while pm->lock is held. A NULL local address and a negative
+ * remote ID disable all entries.
+ */
+void mptcp_pm_retry_disable(struct mptcp_sock *msk,
+			    const struct mptcp_addr_info *local, int remote_id)
+{
+	struct mptcp_pm_retry *entry;
+
+	list_for_each_entry(entry, &msk->pm.retry_list, list) {
+		if (local && !mptcp_addresses_equal(&entry->local.addr, local, false))
+			continue;
+		if (remote_id >= 0 && entry->remote.id != remote_id)
+			continue;
+
+		entry->disabled = true;
+		entry->pending = false;
+		sk_stop_timer((struct sock *)msk, &entry->timer);
+	}
+}
+
+static void mptcp_pm_free_retry_list(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_retry *entry, *tmp;
+	struct sock *sk = (struct sock *)msk;
+	LIST_HEAD(free_list);
+
+	spin_lock_bh(&msk->pm.lock);
+	list_splice_init(&msk->pm.retry_list, &free_list);
+	spin_unlock_bh(&msk->pm.lock);
+
+	list_for_each_entry_safe(entry, tmp, &free_list, list) {
+		if (!entry->timer_done)
+			sk_stop_timer_sync(sk, &entry->timer);
+		kfree(entry);
+	}
+}
+
 /* path manager command handlers */
 
 int mptcp_pm_announce_addr(struct mptcp_sock *msk,
@@ -667,6 +927,9 @@ void mptcp_pm_subflow_check_next(struct mptcp_sock *msk,
 	bool update_subflows;
 
 	update_subflows = subflow->request_join || subflow->mp_join;
+	if (mptcp_pm_is_kernel(msk))
+		mptcp_pm_retry_add(msk, subflow);
+
 	if (mptcp_pm_is_userspace(msk)) {
 		if (update_subflows) {
 			spin_lock_bh(&pm->lock);
@@ -787,6 +1050,9 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 	for (i = 0; i < rm_list->nr; i++) {
 		u8 rm_id = rm_list->ids[i];
 		bool removed = false;
+
+		if (rm_type == MPTCP_MIB_RMADDR)
+			mptcp_pm_retry_disable(msk, NULL, rm_id);
 
 		mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 			struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
@@ -1150,6 +1416,10 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 		pm->status &= ~BIT(MPTCP_PM_RM_ADDR_RECEIVED);
 		mptcp_pm_rm_addr_recv(msk);
 	}
+	if (pm->status & BIT(MPTCP_PM_SUBFLOW_RETRY)) {
+		pm->status &= ~BIT(MPTCP_PM_SUBFLOW_RETRY);
+		mptcp_pm_retry_subflows(msk);
+	}
 	__mptcp_pm_kernel_worker(msk);
 
 	spin_unlock_bh(&msk->pm.lock);
@@ -1192,6 +1462,7 @@ void mptcp_pm_destroy(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 
 	mptcp_pm_free_announced_list(msk);
+	mptcp_pm_free_retry_list(msk);
 
 	/* Free the userspace local address list unconditionally: the socket
 	 * can be reused (mptcp_disconnect()) and re-selected to a different PM
@@ -1222,6 +1493,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 {
 	spin_lock_init(&msk->pm.lock);
 	INIT_LIST_HEAD(&msk->pm.anno_list);
+	INIT_LIST_HEAD(&msk->pm.retry_list);
 	INIT_LIST_HEAD(&msk->pm.userspace_pm_local_addr_list);
 	mptcp_pm_data_reset(msk);
 }

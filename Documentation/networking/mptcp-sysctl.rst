@@ -149,6 +149,21 @@ stale_loss_cnt - INTEGER
 
 	Default: 4
 
+subflow_retry_timeout - INTEGER (seconds)
+	Maximum interval between two attempts to re-create a subflow closed
+	after an error, e.g. a timeout or an unreachable path, while the MPTCP
+	connection is still established. When set, the in-kernel path manager
+	tries again to create such subflows, using the same local and remote
+	addresses, one second after the closure, then doubling the interval
+	after each failed attempt, up to this value. Only subflows initiated
+	by this side are re-created, within the limits set for the path
+	manager. Attempts stop when the corresponding endpoint is removed, or
+	when the peer removes the corresponding address.
+
+	0 disables the retries. This is a per-namespace sysctl.
+
+	Default: 0
+
 syn_retrans_before_tcp_fallback - INTEGER
 	The number of SYN + MP_CAPABLE retransmissions before falling back to
 	TCP, i.e. dropping the MPTCP options. In other words, if all the packets

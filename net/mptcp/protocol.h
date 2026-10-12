@@ -204,6 +204,7 @@ enum mptcp_pm_status {
 	MPTCP_PM_RM_ADDR_RECEIVED,
 	MPTCP_PM_ESTABLISHED,
 	MPTCP_PM_SUBFLOW_ESTABLISHED,
+	MPTCP_PM_SUBFLOW_RETRY,
 	MPTCP_PM_ALREADY_ESTABLISHED,	/* persistent status, set after ESTABLISHED event */
 	MPTCP_PM_MPC_ENDPOINT_ACCOUNTED, /* persistent status, set after MPC local address is
 					  * accounted int id_avail_bitmap
@@ -235,6 +236,7 @@ struct mptcp_pm_data {
 	struct mptcp_addr_info local;
 	struct mptcp_addr_info remote;
 	struct list_head anno_list;
+	struct list_head retry_list;
 	struct list_head userspace_pm_local_addr_list;
 	struct mptcp_pm_ops *ops;
 
@@ -818,6 +820,7 @@ int mptcp_is_checksum_enabled(const struct net *net);
 int mptcp_allow_join_id0(const struct net *net);
 unsigned int mptcp_stale_loss_cnt(const struct net *net);
 unsigned int mptcp_close_timeout(const struct sock *sk);
+unsigned int mptcp_subflow_retry_timeout(const struct net *net);
 int mptcp_get_pm_type(const struct net *net);
 const char *mptcp_get_path_manager(const struct net *net);
 const char *mptcp_get_scheduler(const struct net *net);
@@ -853,6 +856,8 @@ void mptcp_set_state(struct sock *sk, int state);
 
 bool mptcp_addresses_equal(const struct mptcp_addr_info *a,
 			   const struct mptcp_addr_info *b, bool use_port);
+void mptcp_pm_retry_disable(struct mptcp_sock *msk,
+			    const struct mptcp_addr_info *local, int remote_id);
 void mptcp_local_address(const struct sock_common *skc,
 			 struct mptcp_addr_info *addr);
 void mptcp_remote_address(const struct sock_common *skc,

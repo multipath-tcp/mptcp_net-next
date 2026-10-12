@@ -1106,6 +1106,7 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		list.ids[0] = mptcp_endp_get_local_id(msk, addr);
 
 		spin_lock_bh(&msk->pm.lock);
+		mptcp_pm_retry_disable(msk, addr, -1);
 		if (remove_subflow)
 			mptcp_pm_rm_subflow(msk, &list);
 		if (entry->flags & MPTCP_PM_ADDR_FLAG_SUBFLOW)
@@ -1156,6 +1157,7 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 		spin_lock_bh(&msk->pm.lock);
 		if (announced)
 			msk->pm.add_addr_signaled--;
+		mptcp_pm_retry_disable(msk, &msk_local, -1);
 		mptcp_pm_remove_addr(msk, &list);
 		mptcp_pm_rm_subflow(msk, &list);
 		__mark_subflow_endp_available(msk, 0);
@@ -1267,6 +1269,7 @@ again:
 		mptcp_pm_rm_subflow(msk, &slist);
 	/* Reset counters: maybe some subflows have been removed before */
 	if (!more) {
+		mptcp_pm_retry_disable(msk, NULL, -1);
 		bitmap_fill(msk->pm.id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 		msk->pm.local_addr_used = 0;
 	}

@@ -31,6 +31,7 @@ struct mptcp_pernet {
 	unsigned int blackhole_timeout;
 	unsigned int close_timeout;
 	unsigned int stale_loss_cnt;
+	unsigned int subflow_retry_timeout;
 	atomic_t active_disable_times;
 	unsigned long active_disable_stamp;
 	u8 syn_retrans_before_tcp_fallback;
@@ -71,6 +72,11 @@ int mptcp_allow_join_id0(const struct net *net)
 unsigned int mptcp_stale_loss_cnt(const struct net *net)
 {
 	return mptcp_get_pernet(net)->stale_loss_cnt;
+}
+
+unsigned int mptcp_subflow_retry_timeout(const struct net *net)
+{
+	return READ_ONCE(mptcp_get_pernet(net)->subflow_retry_timeout);
 }
 
 unsigned int mptcp_close_timeout(const struct sock *sk)
@@ -377,6 +383,12 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.extra1       = SYSCTL_ZERO,
 		.extra2       = SYSCTL_ONE
 	},
+	{
+		.procname = "subflow_retry_timeout",
+		.maxlen = sizeof(unsigned int),
+		.mode = 0644,
+		.proc_handler = proc_dointvec_jiffies,
+	},
 };
 
 static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
@@ -405,6 +417,7 @@ static int mptcp_pernet_new_table(struct net *net, struct mptcp_pernet *pernet)
 	table[11].data = &pernet->path_manager;
 	/* table[12] is for available_path_managers which is read-only info */
 	table[13].data = &pernet->add_addr_v6_port_drop_ts;
+	table[14].data = &pernet->subflow_retry_timeout;
 
 	hdr = register_net_sysctl_sz(net, MPTCP_SYSCTL_PATH, table,
 				     ARRAY_SIZE(mptcp_sysctl_table));
