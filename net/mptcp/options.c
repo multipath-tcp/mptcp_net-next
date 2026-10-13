@@ -20,7 +20,8 @@ static bool mptcp_cap_flag_sha256(u8 flags)
 	return (flags & MPTCP_CAP_FLAG_MASK) == MPTCP_CAP_HMAC_SHA256;
 }
 
-static void mptcp_parse_option(const struct sk_buff *skb,
+static void mptcp_parse_option(struct net *net,
+			       const struct sk_buff *skb,
 			       const unsigned char *ptr, int opsize,
 			       struct mptcp_options_received *mp_opt)
 {
@@ -53,9 +54,9 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Only the MPC + ACK can be used with a RM_ADDR */
 		if (subopt == OPTION_MPTCP_MPC_ACK) {
 			if ((mp_opt->suboptions & ~OPTION_MPTCP_RM_ADDR) != 0)
-				break;
+				goto bad_opt;
 		} else if (mp_opt->suboptions != 0) {
-			break;
+			goto bad_opt;
 		}
 
 		/* Cfr RFC 8684 Section 3.3.0:
@@ -71,21 +72,21 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		if (opsize != expected_opsize &&
 		    (expected_opsize != TCPOLEN_MPTCP_MPC_ACK_DATA ||
 		     opsize != TCPOLEN_MPTCP_MPC_ACK_DATA_CSUM))
-			break;
+			goto bad_opt;
 
 		/* try to be gentle vs future versions on the initial syn */
 		version = *ptr++ & MPTCP_VERSION_MASK;
 		if (opsize != TCPOLEN_MPTCP_MPC_SYN) {
 			if (version != MPTCP_SUPPORTED_VERSION)
-				break;
+				goto bad_opt;
 		} else if (version < MPTCP_SUPPORTED_VERSION) {
-			break;
+			goto bad_opt;
 		}
 
 		flags = *ptr++;
 		if (!mptcp_cap_flag_sha256(flags) ||
 		    (flags & MPTCP_CAP_EXTENSIBILITY))
-			break;
+			goto bad_opt;
 
 		/* RFC 6824, Section 3.1:
 		 * "For the Checksum Required bit (labeled "A"), if either
@@ -137,7 +138,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTION_MPTCP_RM_ADDR |
 					    OPTION_MPTCP_PRIO)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize == TCPOLEN_MPTCP_MPJ_SYN) {
 			mp_opt->suboptions |= OPTION_MPTCP_MPJ_SYN;
@@ -166,6 +167,8 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			ptr += 2;
 			memcpy(mp_opt->hmac, ptr, MPTCPOPT_HMAC_LEN);
 			pr_debug("MP_JOIN hmac\n");
+		} else {
+			goto bad_opt;
 		}
 		break;
 
@@ -176,7 +179,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 					    OPTION_MPTCP_PRIO |
 					    OPTION_MPTCP_FASTCLOSE |
 					    OPTION_MPTCP_FAIL)) != 0)
-			break;
+			goto bad_opt;
 
 		pr_debug("DSS\n");
 		ptr++;
@@ -219,7 +222,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 			mp_opt->ack64 = 0;
 			mp_opt->use_ack = 0;
 			mp_opt->data_fin = 0;
-			break;
+			goto bad_opt;
 		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_DSS;
@@ -269,7 +272,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_RM_ADDR |
 					    OPTION_MPTCP_PRIO)) != 0)
-			break;
+			goto bad_opt;
 
 		mp_opt->echo = (*ptr++) & MPTCP_ADDR_ECHO;
 		if (!mp_opt->echo) {
@@ -282,7 +285,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 				mp_opt->addr.family = AF_INET6;
 #endif
 			else
-				break;
+				goto bad_opt;
 		} else {
 			if (opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE ||
 			    opsize == TCPOLEN_MPTCP_ADD_ADDR_BASE_PORT)
@@ -293,7 +296,7 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 				mp_opt->addr.family = AF_INET6;
 #endif
 			else
-				break;
+				goto bad_opt;
 		}
 
 		mp_opt->suboptions |= OPTION_MPTCP_ADD_ADDR;
@@ -336,11 +339,11 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 					    OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
 					    OPTION_MPTCP_PRIO)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize < TCPOLEN_MPTCP_RM_ADDR_BASE + 1 ||
 		    opsize > TCPOLEN_MPTCP_RM_ADDR_BASE + MPTCP_RM_IDS_MAX)
-			break;
+			goto bad_opt;
 
 		ptr++;
 
@@ -357,10 +360,10 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 					    OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_ADD_ADDR |
 					    OPTION_MPTCP_RM_ADDR)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize != TCPOLEN_MPTCP_PRIO)
-			break;
+			goto bad_opt;
 
 		mp_opt->suboptions |= OPTION_MPTCP_PRIO;
 		mp_opt->backup = *ptr++ & MPTCP_PRIO_BKUP;
@@ -371,10 +374,10 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_RST)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize != TCPOLEN_MPTCP_FASTCLOSE)
-			break;
+			goto bad_opt;
 
 		ptr += 2;
 		mp_opt->fc_recv_key = get_unaligned_be64(ptr);
@@ -387,13 +390,13 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTION_MPTCP_FAIL |
 					    OPTION_MPTCP_FASTCLOSE)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize != TCPOLEN_MPTCP_RST)
-			break;
+			goto bad_opt;
 
 		if (!(TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST))
-			break;
+			goto bad_opt;
 
 		mp_opt->suboptions |= OPTION_MPTCP_RST;
 		flags = *ptr++;
@@ -407,10 +410,10 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		/* Can be used with a restricted number of other options */
 		if ((mp_opt->suboptions & ~(OPTIONS_MPTCP_DSS |
 					    OPTION_MPTCP_RST)) != 0)
-			break;
+			goto bad_opt;
 
 		if (opsize != TCPOLEN_MPTCP_FAIL)
-			break;
+			goto bad_opt;
 
 		ptr += 2;
 		mp_opt->suboptions |= OPTION_MPTCP_FAIL;
@@ -419,13 +422,28 @@ static void mptcp_parse_option(const struct sk_buff *skb,
 		break;
 
 	default:
+bad_opt:
+		if (net)
+			MPTCP_INC_STATS(net, MPTCP_MIB_RCVINVALIDOPT);
 		break;
 	}
+}
+
+static inline struct net *mptcp_skb_net(const struct sk_buff *skb)
+{
+	if (skb->sk)
+		return sock_net(skb->sk);
+	if (skb->dev)
+		return dev_net_rcu(skb->dev);
+	if (skb_dst(skb) && skb_dst_dev_rcu(skb))
+		return skb_dst_dev_net_rcu(skb);
+	return NULL;
 }
 
 void mptcp_get_options(const struct sk_buff *skb,
 		       struct mptcp_options_received *mp_opt)
 {
+	struct net *net = mptcp_skb_net(skb);
 	const struct tcphdr *th = tcp_hdr(skb);
 	const unsigned char *ptr;
 	int length;
@@ -458,7 +476,7 @@ void mptcp_get_options(const struct sk_buff *skb,
 			if (opsize > length)
 				return;	/* don't parse partial options */
 			if (opcode == TCPOPT_MPTCP)
-				mptcp_parse_option(skb, ptr, opsize, mp_opt);
+				mptcp_parse_option(net, skb, ptr, opsize, mp_opt);
 			ptr += opsize - 2;
 			length -= opsize;
 		}
