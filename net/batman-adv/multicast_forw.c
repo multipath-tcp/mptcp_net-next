@@ -187,13 +187,13 @@ static bool batadv_mcast_forw_push_dest(struct batadv_priv *bat_priv,
  *
  * Return: true on success, false otherwise.
  */
-static int batadv_mcast_forw_push_dests_list(struct batadv_priv *bat_priv,
-					     struct sk_buff *skb,
-					     unsigned short vid,
-					     struct hlist_head *head,
-					     size_t entry_offset,
-					     unsigned short *num_dests,
-					     unsigned short *tvlv_len)
+static bool batadv_mcast_forw_push_dests_list(struct batadv_priv *bat_priv,
+					      struct sk_buff *skb,
+					      unsigned short vid,
+					      struct hlist_head *head,
+					      size_t entry_offset,
+					      unsigned short *num_dests,
+					      unsigned short *tvlv_len)
 {
 	struct batadv_orig_node *orig_node;
 	struct hlist_node *node;
@@ -278,7 +278,7 @@ static bool batadv_mcast_forw_push_want_all(struct batadv_priv *bat_priv,
 {
 	struct hlist_head *head = NULL;
 	size_t offset;
-	int ret;
+	bool ret;
 
 	switch (eth_hdr(skb)->h_proto) {
 	case htons(ETH_P_IP):
@@ -324,7 +324,7 @@ static bool batadv_mcast_forw_push_want_rtr(struct batadv_priv *bat_priv,
 {
 	struct hlist_head *head = NULL;
 	size_t offset;
-	int ret;
+	bool ret;
 
 	switch (eth_hdr(skb)->h_proto) {
 	case htons(ETH_P_IP):
