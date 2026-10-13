@@ -712,7 +712,7 @@ static void batadv_iv_ogm_aggregate(struct batadv_forw_packet *forw_packet_aggr,
  * Return: whether forward packet was scheduled
  */
 static bool batadv_iv_ogm_queue_add(struct batadv_priv *bat_priv,
-				    unsigned char *packet_buff,
+				    const unsigned char *packet_buff,
 				    int packet_len,
 				    struct batadv_hard_iface *if_incoming,
 				    struct batadv_hard_iface *if_outgoing,
@@ -723,12 +723,12 @@ static bool batadv_iv_ogm_queue_add(struct batadv_priv *bat_priv,
 	 */
 	struct batadv_forw_packet *forw_packet_aggr = NULL;
 	struct batadv_forw_packet *forw_packet_pos = NULL;
-	struct batadv_ogm_packet *batadv_ogm_packet;
+	const struct batadv_ogm_packet *batadv_ogm_packet;
 	unsigned long max_aggregation_jiffies;
 	bool aggregated_ogms;
 	bool direct_link;
 
-	batadv_ogm_packet = (struct batadv_ogm_packet *)packet_buff;
+	batadv_ogm_packet = (const struct batadv_ogm_packet *)packet_buff;
 	direct_link = !!(batadv_ogm_packet->flags & BATADV_DIRECTLINK);
 	max_aggregation_jiffies = msecs_to_jiffies(BATADV_MAX_AGGREGATION_MS);
 
@@ -1487,7 +1487,7 @@ out:
  * address. Bonding candidates are ignored.
  */
 static struct batadv_neigh_node *
-batadv_orig_to_direct_router(struct batadv_priv *bat_priv, u8 *orig_addr,
+batadv_orig_to_direct_router(struct batadv_priv *bat_priv, const u8 *orig_addr,
 			     struct batadv_hard_iface *if_outgoing)
 {
 	struct batadv_neigh_node *neigh_node;

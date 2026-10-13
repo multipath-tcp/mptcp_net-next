@@ -68,7 +68,7 @@ static struct kmem_cache *batadv_tt_roam_cache __read_mostly;
 static struct lock_class_key batadv_tt_local_hash_lock_class_key;
 static struct lock_class_key batadv_tt_global_hash_lock_class_key;
 
-static void batadv_send_roam_adv(struct batadv_priv *bat_priv, u8 *client,
+static void batadv_send_roam_adv(struct batadv_priv *bat_priv, const u8 *client,
 				 unsigned short vid,
 				 struct batadv_orig_node *orig_node);
 static void batadv_tt_purge(struct work_struct *work);
@@ -3705,7 +3705,7 @@ out:
  */
 static bool batadv_send_other_tt_response(struct batadv_priv *bat_priv,
 					  struct batadv_tvlv_tt_data *tt_data,
-					  u8 *req_src, u8 *req_dst)
+					  const u8 *req_src, const u8 *req_dst)
 {
 	struct batadv_orig_node *res_dst_orig_node = NULL;
 	struct batadv_tvlv_tt_data *tvlv_tt_data = NULL;
@@ -3836,7 +3836,7 @@ out:
  */
 static bool batadv_send_my_tt_response(struct batadv_priv *bat_priv,
 				       struct batadv_tvlv_tt_data *tt_data,
-				       u8 *req_src)
+				       const u8 *req_src)
 {
 	struct batadv_tvlv_tt_data *tvlv_tt_data = NULL;
 	struct batadv_hard_iface *primary_if = NULL;
@@ -3955,7 +3955,7 @@ out:
  */
 static bool batadv_send_tt_response(struct batadv_priv *bat_priv,
 				    struct batadv_tvlv_tt_data *tt_data,
-				    u8 *req_src, u8 *req_dst)
+				    const u8 *req_src, const u8 *req_dst)
 {
 	if (batadv_is_my_mac(bat_priv, req_dst))
 		return batadv_send_my_tt_response(bat_priv, tt_data, req_src);
@@ -4031,7 +4031,7 @@ static void _batadv_tt_update_changes(struct batadv_priv *bat_priv,
  */
 static void batadv_tt_fill_gtable(struct batadv_priv *bat_priv,
 				  struct batadv_tvlv_tt_change *tt_change,
-				  u8 ttvn, u8 *resp_src,
+				  u8 ttvn, const u8 *resp_src,
 				  u16 num_entries)
 {
 	struct batadv_orig_node *orig_node;
@@ -4121,7 +4121,7 @@ bool batadv_is_my_client(struct batadv_priv *bat_priv, const u8 *addr,
  */
 static void batadv_handle_tt_response(struct batadv_priv *bat_priv,
 				      struct batadv_tvlv_tt_data *tt_data,
-				      u8 *resp_src, u16 num_entries)
+				      const u8 *resp_src, u16 num_entries)
 {
 	struct batadv_orig_node *orig_node = NULL;
 	struct batadv_tvlv_tt_change *tt_change;
@@ -4222,7 +4222,8 @@ static void batadv_tt_roam_purge(struct batadv_priv *bat_priv)
  *
  * Return: true if the ROAMING_ADV can be sent, false otherwise
  */
-static bool batadv_tt_check_roam_count(struct batadv_priv *bat_priv, u8 *client, u16 vid)
+static bool batadv_tt_check_roam_count(struct batadv_priv *bat_priv,
+				       const u8 *client, u16 vid)
 {
 	struct batadv_tt_roam_node *tt_roam_node;
 	bool ret = false;
@@ -4282,7 +4283,7 @@ unlock:
  * for this particular roamed client has to be forwarded to the sender of the
  * roaming message.
  */
-static void batadv_send_roam_adv(struct batadv_priv *bat_priv, u8 *client,
+static void batadv_send_roam_adv(struct batadv_priv *bat_priv, const u8 *client,
 				 unsigned short vid,
 				 struct batadv_orig_node *orig_node)
 {
@@ -4539,8 +4540,8 @@ void batadv_tt_local_commit_changes(struct batadv_priv *bat_priv)
  *
  * Return: true when src+dst(+vid) pair should be isolated, false otherwise
  */
-bool batadv_is_ap_isolated(struct batadv_priv *bat_priv, u8 *src, u8 *dst,
-			   unsigned short vid)
+bool batadv_is_ap_isolated(struct batadv_priv *bat_priv, const u8 *src,
+			   const u8 *dst, unsigned short vid)
 {
 	struct batadv_tt_global_entry *tt_global_entry;
 	struct batadv_tt_local_entry *tt_local_entry;
@@ -4669,7 +4670,7 @@ request_table:
  * deleted later by a DEL or because of timeout
  */
 bool batadv_tt_global_client_is_roaming(struct batadv_priv *bat_priv,
-					u8 *addr, unsigned short vid)
+					const u8 *addr, unsigned short vid)
 {
 	struct batadv_tt_global_entry *tt_global_entry;
 	bool ret;
@@ -4696,7 +4697,7 @@ bool batadv_tt_global_client_is_roaming(struct batadv_priv *bat_priv,
  * to keep the latter consistent with the node TTVN
  */
 bool batadv_tt_local_client_is_roaming(struct batadv_priv *bat_priv,
-				       u8 *addr, unsigned short vid)
+				       const u8 *addr, unsigned short vid)
 {
 	struct batadv_tt_local_entry *tt_local_entry;
 	bool ret;
