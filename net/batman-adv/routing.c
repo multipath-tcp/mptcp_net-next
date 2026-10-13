@@ -891,7 +891,7 @@ static bool batadv_check_unicast_ttvn(struct batadv_priv *bat_priv,
 	struct batadv_orig_node *orig_node;
 	struct ethhdr *ethhdr;
 	unsigned short vid;
-	int is_old_ttvn;
+	bool is_old_ttvn;
 	u8 curr_ttvn;
 	u8 old_ttvn;
 

@@ -623,7 +623,7 @@ static bool batadv_iv_ogm_aggregate_new(const unsigned char *packet_buff,
 					bool direct_link,
 					struct batadv_hard_iface *if_incoming,
 					struct batadv_hard_iface *if_outgoing,
-					int own_packet)
+					bool own_packet)
 {
 	struct batadv_priv *bat_priv = netdev_priv(if_incoming->mesh_iface);
 	struct batadv_forw_packet *forw_packet_aggr;
@@ -716,7 +716,7 @@ static bool batadv_iv_ogm_queue_add(struct batadv_priv *bat_priv,
 				    int packet_len,
 				    struct batadv_hard_iface *if_incoming,
 				    struct batadv_hard_iface *if_outgoing,
-				    int own_packet, unsigned long send_time)
+				    bool own_packet, unsigned long send_time)
 {
 	/* _aggr -> pointer to the packet we want to aggregate with
 	 * _pos -> pointer to the position in the queue
@@ -843,7 +843,7 @@ static void batadv_iv_ogm_forward(struct batadv_orig_node *orig_node,
 
 	batadv_iv_ogm_queue_add(bat_priv, (unsigned char *)batadv_ogm_packet,
 				BATADV_OGM_HLEN + tvlv_len,
-				if_incoming, if_outgoing, 0,
+				if_incoming, if_outgoing, false,
 				batadv_iv_ogm_fwd_send_time());
 }
 
@@ -955,7 +955,7 @@ static void batadv_iv_ogm_schedule_buff(struct batadv_hard_iface *hard_iface)
 		 * respective interfaces.
 		 */
 		scheduled = batadv_iv_ogm_queue_add(bat_priv, ogm_buff->buf, ogm_buff->len,
-						    hard_iface, hard_iface, 1, send_time);
+						    hard_iface, hard_iface, true, send_time);
 		if (!scheduled)
 			reschedule = true;
 
@@ -972,7 +972,7 @@ static void batadv_iv_ogm_schedule_buff(struct batadv_hard_iface *hard_iface)
 
 		scheduled = batadv_iv_ogm_queue_add(bat_priv, ogm_buff->buf,
 						    ogm_buff->len, hard_iface,
-						    tmp_hard_iface, 1, send_time);
+						    tmp_hard_iface, true, send_time);
 		batadv_hardif_put(tmp_hard_iface);
 
 		if (!scheduled && tmp_hard_iface == hard_iface)

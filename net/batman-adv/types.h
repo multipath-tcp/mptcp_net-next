@@ -2047,7 +2047,7 @@ struct batadv_forw_packet {
 	 * @own: bool for locally generated packets (local OGMs are re-scheduled
 	 * after sending)
 	 */
-	u8 own;
+	bool own:1;
 
 	/** @skb: bcast packet's skb buffer */
 	struct sk_buff *skb;
