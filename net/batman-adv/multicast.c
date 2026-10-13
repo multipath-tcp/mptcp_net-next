@@ -984,7 +984,7 @@ static bool batadv_mcast_is_report_ipv4(struct sk_buff *skb)
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the IPv4 packet to check
  * @is_unsnoopable: stores whether the destination is snoopable
- * @is_routable: stores whether the destination is routable
+ * @is_routable: stores ETH_P_IP when destination is routable
  *
  * Checks whether the given IPv4 packet has the potential to be forwarded with a
  * mode more optimal than classic flooding.
@@ -1052,7 +1052,7 @@ static bool batadv_mcast_is_report_ipv6(struct sk_buff *skb)
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the IPv6 packet to check
  * @is_unsnoopable: stores whether the destination is snoopable
- * @is_routable: stores whether the destination is routable
+ * @is_routable: stores ETH_P_IPV6 when destination is routable
  *
  * Checks whether the given IPv6 packet has the potential to be forwarded with a
  * mode more optimal than classic flooding.
@@ -1094,7 +1094,8 @@ static int batadv_mcast_forw_mode_check_ipv6(struct batadv_priv *bat_priv,
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the multicast frame to check
  * @is_unsnoopable: stores whether the destination is snoopable
- * @is_routable: stores whether the destination is routable
+ * @is_routable: stores the protocol (ETH_P_IP or ETH_P_IPV6) if the destination
+ *  is routable
  *
  * Checks whether the given multicast ethernet frame has the potential to be
  * forwarded with a mode more optimal than classic flooding.
@@ -1180,7 +1181,8 @@ static int batadv_mcast_forw_rtr_count(struct batadv_priv *bat_priv,
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the multicast packet to check
  * @vid: the vlan identifier
- * @is_routable: stores whether the destination is routable
+ * @is_routable: 0 if the destination is not routable, otherwise the protocol
+ *  (ETH_P_IP or ETH_P_IPV6) of the routable destination
  * @count: the number of originators the multicast packet need to be sent to
  *
  * For a multicast packet with multiple destination originators, checks which
@@ -1224,7 +1226,8 @@ batadv_mcast_forw_mode_by_count(struct batadv_priv *bat_priv,
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the multicast packet to check
  * @vid: the vlan identifier
- * @is_routable: stores whether the destination is routable
+ * @is_routable: stores the protocol (ETH_P_IP or ETH_P_IPV6) if the destination
+ *  is routable
  *
  * Return: The forwarding mode as enum batadv_forw_mode.
  */
@@ -1554,7 +1557,8 @@ batadv_mcast_forw_want_rtr(struct batadv_priv *bat_priv,
  * @bat_priv: the bat priv with all the mesh interface information
  * @skb: the multicast packet to transmit
  * @vid: the vlan identifier
- * @is_routable: stores whether the destination is routable
+ * @is_routable: 0 if the destination is not routable, otherwise the protocol
+ *  (ETH_P_IP or ETH_P_IPV6) of the routable destination
  *
  * Sends copies of a frame with multicast destination to any node that signaled
  * interest in it, that is either via the translation table or the according
