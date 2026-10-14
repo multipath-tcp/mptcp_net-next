@@ -794,6 +794,14 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 			int how = RCV_SHUTDOWN | SEND_SHUTDOWN;
 			u8 id = subflow_get_local_id(subflow);
 
+			/* a dead subflow still waiting to be closed must not
+			 * be re-created on a removed address
+			 */
+			if ((rm_type == MPTCP_MIB_RMADDR &&
+			     remote_id == rm_id) ||
+			    (rm_type == MPTCP_MIB_RMSUBFLOW && id == rm_id))
+				subflow->retries = MPTCP_SUBFLOW_NO_RETRY;
+
 			if ((1 << inet_sk_state_load(ssk)) &
 			    (TCPF_FIN_WAIT1 | TCPF_FIN_WAIT2 | TCPF_CLOSING | TCPF_CLOSE))
 				continue;

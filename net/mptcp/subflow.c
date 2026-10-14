@@ -1766,6 +1766,69 @@ err_out:
 	return err;
 }
 
+/* Connect again an MPJ subflow that failed to connect, with the same socket.
+ * The subflow never carried data: like for the initial subflow in
+ * __mptcp_subflow_disconnect(), resetting the TCP and the subflow states is
+ * enough. Called with the msk socket lock held.
+ */
+int mptcp_subflow_reconnect(struct sock *sk, struct sock *ssk,
+			    const struct mptcp_pm_local *local,
+			    const struct mptcp_addr_info *remote)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	struct sockaddr_unsized *uaddr;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sockaddr_storage addr;
+	u32 remote_token;
+	int addrlen;
+	int err;
+
+	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
+	err = tcp_disconnect(ssk, 0);
+	if (err)
+		goto out;
+
+	mptcp_subflow_ctx_reset(subflow);
+	subflow->request_mptcp = 0;
+	do {
+		subflow->local_nonce = get_random_u32();
+	} while (!subflow->local_nonce);
+	subflow_set_local_id(subflow, local->addr.id);
+	subflow->remote_key_valid = 1;
+	subflow->remote_key = READ_ONCE(msk->remote_key);
+	subflow->local_key = READ_ONCE(msk->local_key);
+	subflow->token = msk->token;
+	mptcp_crypto_key_sha(subflow->remote_key, &remote_token, NULL);
+	subflow->remote_token = remote_token;
+	WRITE_ONCE(subflow->remote_id, remote->id);
+	subflow->request_join = 1;
+	subflow->request_bkup = !!(local->flags & MPTCP_PM_ADDR_FLAG_BACKUP);
+	subflow->subflow_id = msk->subflow_id++;
+
+	mptcp_info2sockaddr(remote, &addr, ssk->sk_family);
+	addrlen = sizeof(struct sockaddr_in);
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	if (addr.ss_family == AF_INET6)
+		addrlen = sizeof(struct sockaddr_in6);
+#endif
+	uaddr = (struct sockaddr_unsized *)&addr;
+
+	/* like __inet_stream_connect() for __mptcp_subflow_connect() */
+	if (BPF_CGROUP_PRE_CONNECT_ENABLED(ssk)) {
+		err = ssk->sk_prot->pre_connect(ssk, uaddr, addrlen);
+		if (err)
+			goto out;
+	}
+
+	err = ssk->sk_prot->connect(ssk, uaddr, addrlen);
+
+out:
+	release_sock(ssk);
+	MPTCP_INC_STATS(sock_net(sk), err ? MPTCP_MIB_JOINSYNTXCONNECTERR :
+					    MPTCP_MIB_JOINSYNTX);
+	return err;
+}
+
 void __mptcp_inherit_memcg(struct sock *sk, struct sock *ssk, gfp_t gfp)
 {
 	/* Only if the msk has been accepted already (and not orphaned).*/

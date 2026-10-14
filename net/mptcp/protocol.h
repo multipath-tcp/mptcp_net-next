@@ -622,6 +622,8 @@ struct mptcp_subflow_context {
 	u8	reset_transient:1;
 	u8	reset_reason:4;
 	u8	stale_count;	    /* Protected by the msk socket lock */
+	u8	retries;	    /* re-creation attempts, msk socket lock */
+	u32	retry_stamp;	    /* creation of a re-created subflow */
 	u8	stale;		    /* Protected by the msk socket lock,
 				     * if set the subflow is unable to snd/rcv
 				     * data, the schedule should skip it
@@ -818,6 +820,7 @@ int mptcp_is_checksum_enabled(const struct net *net);
 int mptcp_allow_join_id0(const struct net *net);
 unsigned int mptcp_stale_loss_cnt(const struct net *net);
 unsigned int mptcp_close_timeout(const struct sock *sk);
+u8 mptcp_subflow_retries(const struct net *net);
 int mptcp_get_pm_type(const struct net *net);
 const char *mptcp_get_path_manager(const struct net *net);
 const char *mptcp_get_scheduler(const struct net *net);
@@ -859,6 +862,9 @@ void mptcp_remote_address(const struct sock_common *skc,
 			  struct mptcp_addr_info *addr);
 
 /* called with sk socket lock held */
+int mptcp_subflow_reconnect(struct sock *sk, struct sock *ssk,
+			    const struct mptcp_pm_local *local,
+			    const struct mptcp_addr_info *remote);
 int __mptcp_subflow_connect(struct sock *sk, const struct mptcp_pm_local *local,
 			    const struct mptcp_addr_info *remote);
 int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
@@ -1258,6 +1264,24 @@ void __init mptcp_pm_userspace_register(void);
 void __init mptcp_pm_nl_init(void);
 void mptcp_pm_worker(struct mptcp_sock *msk);
 void __mptcp_pm_kernel_worker(struct mptcp_sock *msk);
+
+/* subflow->retries value preventing any re-creation */
+#define MPTCP_SUBFLOW_NO_RETRY	U8_MAX
+
+struct mptcp_pm_retry {
+	struct mptcp_pm_local	local;
+	struct mptcp_addr_info	remote;
+	u8			retries;
+	bool			reuse;	/* failed attempt: same socket */
+};
+
+bool mptcp_pm_kernel_retry_check(struct mptcp_sock *msk,
+				 const struct mptcp_subflow_context *subflow,
+				 struct mptcp_pm_retry *retry);
+void mptcp_pm_kernel_retry(struct mptcp_sock *msk,
+			   const struct mptcp_pm_retry *retry);
+bool mptcp_pm_kernel_retry_reconnect(struct mptcp_sock *msk, struct sock *ssk,
+				     const struct mptcp_pm_retry *retry);
 u8 mptcp_pm_get_endp_signal_max(const struct mptcp_sock *msk);
 u8 mptcp_pm_get_endp_subflow_max(const struct mptcp_sock *msk);
 u8 mptcp_pm_get_endp_laminar_max(const struct mptcp_sock *msk);
