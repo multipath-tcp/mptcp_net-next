@@ -1046,7 +1046,10 @@ out:
 
 void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 {
+	struct mptcp_subflow_context *subflow;
 	struct sock *sk = (struct sock *)msk;
+	u64 local_idsn = 0, remote_idsn = 0;
+	struct sock *first;
 	u32 flags = 0;
 	bool slow;
 	u32 now;
@@ -1058,7 +1061,8 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	info->mptcpi_add_addr_accepted = READ_ONCE(msk->pm.add_addr_accepted);
 	info->mptcpi_local_addr_used = READ_ONCE(msk->pm.local_addr_used);
 
-	if (inet_sk_state_load(sk) == TCP_LISTEN)
+	if (inet_sk_state_load(sk) == TCP_LISTEN ||
+	    inet_sk_state_load(sk) == TCP_CLOSE)
 		return;
 
 	/* The following limits only make sense for the in-kernel PM */
@@ -1084,9 +1088,23 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	info->mptcpi_flags = flags;
 
 	slow = lock_sock_fast(sk);
+	/* Hold a reference to the first subflow while accessing its context. */
+	rcu_read_lock();
+	first = READ_ONCE(msk->first);
+	if (first && !refcount_inc_not_zero(&first->sk_refcnt))
+		first = NULL;
+	rcu_read_unlock();
+
+	rcu_read_lock();
+	subflow = first ?
+		rcu_dereference(inet_csk(first)->icsk_ulp_data) : NULL;
+	if (subflow)
+		local_idsn = subflow->idsn;
+	rcu_read_unlock();
+
 	info->mptcpi_csum_enabled = READ_ONCE(msk->csum_enabled);
 	info->mptcpi_token = msk->token;
-	info->mptcpi_write_seq = msk->write_seq;
+	info->mptcpi_write_seq = msk->write_seq - local_idsn;
 	info->mptcpi_retransmits = inet_csk(sk)->icsk_retransmits;
 	info->mptcpi_bytes_sent = msk->bytes_sent;
 	info->mptcpi_bytes_received = msk->bytes_received;
@@ -1099,17 +1117,26 @@ void mptcp_diag_fill_info(struct mptcp_sock *msk, struct mptcp_info *info)
 	unlock_sock_fast(sk, slow);
 
 	mptcp_data_lock(sk);
+	rcu_read_lock();
+	subflow = first ?
+		rcu_dereference(inet_csk(first)->icsk_ulp_data) : NULL;
+	if (subflow && subflow->remote_key_valid)
+		remote_idsn = subflow->iasn - 1;
+	rcu_read_unlock();
 	info->mptcpi_last_ack_recv = jiffies_to_msecs(now - msk->last_ack_recv);
-	info->mptcpi_snd_una = msk->snd_una;
-	info->mptcpi_rcv_nxt = msk->ack_seq;
+	info->mptcpi_snd_una = msk->snd_una - local_idsn;
+	info->mptcpi_rcv_nxt = msk->ack_seq - remote_idsn;
 	info->mptcpi_bytes_acked = msk->bytes_acked;
 	mptcp_data_unlock(sk);
+
+	if (first)
+		sock_put(first);
 }
 EXPORT_SYMBOL_GPL(mptcp_diag_fill_info);
 
 static int mptcp_getsockopt_info(struct mptcp_sock *msk, char __user *optval, int __user *optlen)
 {
-	struct mptcp_info m_info;
+	struct mptcp_info m_info = {};
 	int len;
 
 	if (get_user(len, optlen))
