@@ -1985,8 +1985,10 @@ TEST_F(tls_basic, disconnect)
 	int send_len = strlen(test_str) + 1;
 	struct tls_crypto_info_keys key;
 	struct sockaddr_in addr;
+	socklen_t len;
 	char buf[20];
 	int ret;
+	int sfd;
 
 	if (self->notls)
 		return;
@@ -2005,14 +2007,65 @@ TEST_F(tls_basic, disconnect)
 	ret = setsockopt(self->cfd, SOL_TLS, TLS_RX, &key, key.len);
 	ASSERT_EQ(ret, 0);
 
+	bzero(buf, sizeof(buf));
+	EXPECT_EQ(recv(self->cfd, buf, send_len, 0), send_len);
+	EXPECT_EQ(memcmp(buf, test_str, send_len), 0);
+
 	addr.sin_family = AF_UNSPEC;
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_port = 0;
 	ret = connect(self->cfd, &addr, sizeof(addr));
-	EXPECT_EQ(ret, -1);
-	EXPECT_EQ(errno, EOPNOTSUPP);
+	EXPECT_EQ(ret, 0);
 
+	/* Verify send/recv fail after disconnect. */
+	EXPECT_EQ(send(self->cfd, buf, sizeof(buf),
+		       MSG_DONTWAIT | MSG_NOSIGNAL), -1);
+	EXPECT_TRUE(errno == EPIPE || errno == ECONNRESET);
+	EXPECT_EQ(recv(self->cfd, buf, sizeof(buf), MSG_DONTWAIT), -1);
+	EXPECT_EQ(errno, ENOTCONN);
+
+	/* Disconnect fd as well. */
+	ret = connect(self->fd, &addr, sizeof(addr));
+	ASSERT_EQ(ret, 0);
+	EXPECT_EQ(send(self->fd, buf, sizeof(buf),
+		       MSG_DONTWAIT | MSG_NOSIGNAL), -1);
+	EXPECT_TRUE(errno == EPIPE || errno == ECONNRESET);
+	EXPECT_EQ(recv(self->fd, buf, sizeof(buf), MSG_DONTWAIT), -1);
+	EXPECT_EQ(errno, ENOTCONN);
+
+	/* Reconnect fd to a new server and re-setup TLS. */
+	addr.sin_family = AF_INET;
+	addr.sin_port = 0;
+	sfd = socket(AF_INET, SOCK_STREAM, 0);
+	EXPECT_GE(sfd, 0);
+	if (sfd < 0)
+		return;
+
+	/* sfd not closed on ASSERT failure, kernel cleans up on test abort */
+	ASSERT_EQ(bind(sfd, &addr, sizeof(addr)), 0);
+	ASSERT_EQ(listen(sfd, 10), 0);
+	len = sizeof(addr);
+	ASSERT_EQ(getsockname(sfd, &addr, &len), 0);
+	ASSERT_EQ(connect(self->fd, (struct sockaddr *)&addr, sizeof(addr)), 0);
+
+	ret = accept(sfd, &addr, &len);
+	close(sfd);
+	ASSERT_GE(ret, 0);
+	close(self->cfd);
+	self->cfd = ret;
+
+	ASSERT_EQ(setsockopt(self->fd, IPPROTO_TCP, TCP_ULP, "tls",
+			     sizeof("tls")), 0);
+	ASSERT_EQ(setsockopt(self->cfd, IPPROTO_TCP, TCP_ULP, "tls",
+			     sizeof("tls")), 0);
+	ASSERT_EQ(setsockopt(self->fd, SOL_TLS, TLS_TX, &key, key.len), 0);
+	ASSERT_EQ(setsockopt(self->cfd, SOL_TLS, TLS_RX, &key, key.len), 0);
+
+	/* Verify data transfer works after reconnect. */
+	EXPECT_EQ(send(self->fd, test_str, send_len, 0), send_len);
+	bzero(buf, sizeof(buf));
 	EXPECT_EQ(recv(self->cfd, buf, send_len, 0), send_len);
+	EXPECT_EQ(memcmp(buf, test_str, send_len), 0);
 }
 
 TEST_F(tls, rekey)
