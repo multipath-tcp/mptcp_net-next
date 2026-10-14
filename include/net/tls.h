@@ -193,6 +193,10 @@ enum tls_context_flags {
 	 * tls_dev_del call in tls_device_down if it happens simultaneously.
 	 */
 	TLS_RX_DEV_CLOSED = 2,
+	/* tls_disconnect() is in progress, prevent concurrent close() from
+	 * freeing resources while disconnect is using them.
+	 */
+	TLS_DISCONNECTING = 3,
 };
 
 struct cipher_context {
@@ -259,6 +263,7 @@ struct tls_context {
 
 	/* cache cold stuff */
 	struct proto *sk_proto;
+	const struct proto_ops *sk_proto_ops;
 	struct sock *sk;
 
 	void (*sk_destruct)(struct sock *sk);
@@ -374,10 +379,11 @@ static inline struct tls_context *tls_get_ctx(const struct sock *sk)
 {
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 
-	/* Use RCU on icsk_ulp_data only for sock diag code,
-	 * TLS data path doesn't need rcu_dereference().
+	/* Use rcu_access_pointer() to safely read icsk_ulp_data,
+	 * as it can be cleared concurrently by tls_disconnect()
+	 * or tls_sk_proto_close().
 	 */
-	return (__force void *)icsk->icsk_ulp_data;
+	return (__force void *)rcu_access_pointer(icsk->icsk_ulp_data);
 }
 
 static inline struct tls_sw_context_rx *tls_sw_ctx_rx(

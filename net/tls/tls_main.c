@@ -358,32 +358,71 @@ static void tls_sk_proto_cleanup(struct sock *sk,
 	}
 }
 
-static void tls_sk_proto_close(struct sock *sk, long timeout)
+static void tls_sk_proto_free(struct sock *sk,
+			      struct tls_context *ctx,
+			      bool free_ctx)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct tls_context *ctx = tls_get_ctx(sk);
 	long timeo = sock_sndtimeo(sk, 0);
-	bool free_ctx;
-
-	if (ctx->tx_conf == TLS_SW)
-		tls_sw_cancel_work_tx(ctx);
-
-	lock_sock(sk);
-	free_ctx = ctx->tx_conf != TLS_HW && ctx->rx_conf != TLS_HW;
 
 	if (ctx->tx_conf != TLS_BASE || ctx->rx_conf != TLS_BASE)
 		tls_sk_proto_cleanup(sk, ctx, timeo);
 
 	write_lock_bh(&sk->sk_callback_lock);
-	if (free_ctx)
-		rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
 	WRITE_ONCE(sk->sk_prot, ctx->sk_proto);
+	if (sk->sk_socket)
+		WRITE_ONCE(sk->sk_socket->ops, ctx->sk_proto_ops);
 	if (sk->sk_write_space == tls_write_space)
 		sk->sk_write_space = ctx->sk_write_space;
+	if (sk->sk_destruct == tls_device_sk_destruct)
+		sk->sk_destruct = ctx->sk_destruct;
+	if (free_ctx) {
+		rcu_assign_pointer(icsk->icsk_ulp_data, NULL);
+		if (icsk->icsk_ulp_ops) {
+			/* Balance try_module_get in __tcp_ulp_find_autoload */
+			module_put(icsk->icsk_ulp_ops->owner);
+			icsk->icsk_ulp_ops = NULL;
+		}
+	}
 	write_unlock_bh(&sk->sk_callback_lock);
-	release_sock(sk);
 	if (ctx->tx_conf == TLS_SW)
 		tls_sw_free_ctx_tx(ctx);
+}
+
+static void tls_sk_proto_close(struct sock *sk, long timeout)
+{
+	struct tls_context *ctx;
+	bool free_ctx;
+
+	ctx = tls_get_ctx(sk);
+	if (!ctx) {
+		sk->sk_prot->close(sk, timeout);
+		return;
+	}
+
+	if (ctx->tx_conf == TLS_SW)
+		tls_sw_cancel_work_tx(ctx);
+
+	lock_sock(sk);
+	/* Re-read ctx under lock, as it may have been cleared by disconnect */
+	ctx = tls_get_ctx(sk);
+	if (!ctx) {
+		release_sock(sk);
+		sk->sk_prot->close(sk, timeout);
+		return;
+	}
+
+	/* Check if disconnect is in progress after acquiring lock */
+	if (test_bit(TLS_DISCONNECTING, &ctx->flags)) {
+		release_sock(sk);
+		ctx->sk_proto->close(sk, timeout);
+		return;
+	}
+
+	free_ctx = ctx->tx_conf != TLS_HW && ctx->rx_conf != TLS_HW;
+	tls_sk_proto_free(sk, ctx, free_ctx);
+	release_sock(sk);
+
 	if (ctx->rx_conf == TLS_SW || ctx->rx_conf == TLS_HW)
 		tls_sw_strparser_done(ctx);
 	if (ctx->rx_conf == TLS_SW)
@@ -904,7 +943,52 @@ static int tls_setsockopt(struct sock *sk, int level, int optname,
 
 static int tls_disconnect(struct sock *sk, int flags)
 {
-	return -EOPNOTSUPP;
+	struct tls_context *ctx;
+	bool free_ctx;
+	int rc;
+
+	ctx = tls_get_ctx(sk);
+	if (!ctx)
+		return 0;
+
+	if (!ctx->sk_proto->disconnect)
+		return -EOPNOTSUPP;
+
+	set_bit(TLS_DISCONNECTING, &ctx->flags);
+
+	rc = ctx->sk_proto->disconnect(sk, flags);
+	if (rc) {
+		clear_bit(TLS_DISCONNECTING, &ctx->flags);
+		return rc;
+	}
+
+	if (ctx->tx_conf == TLS_SW) {
+		struct tls_sw_context_tx *sw_ctx_tx = tls_sw_ctx_tx(ctx);
+
+		set_bit(BIT_TX_CLOSING, &sw_ctx_tx->tx_bitmask);
+		set_bit(BIT_TX_SCHEDULED, &sw_ctx_tx->tx_bitmask);
+
+		release_sock(sk);
+		disable_delayed_work_sync(&sw_ctx_tx->tx_work.work);
+		lock_sock(sk);
+	}
+
+	free_ctx = ctx->tx_conf != TLS_HW && ctx->rx_conf != TLS_HW;
+	tls_sk_proto_free(sk, ctx, free_ctx);
+
+	if (ctx->rx_conf == TLS_SW) {
+		struct tls_sw_context_rx *sw_ctx = tls_sw_ctx_rx(ctx);
+
+		release_sock(sk);
+		tls_strp_done(&sw_ctx->strp);
+		tls_sw_free_ctx_rx(ctx);
+		lock_sock(sk);
+	}
+
+	if (free_ctx)
+		tls_ctx_free(sk, ctx);
+
+	return 0;
 }
 
 struct tls_context *tls_ctx_create(struct sock *sk)
@@ -918,6 +1002,8 @@ struct tls_context *tls_ctx_create(struct sock *sk)
 
 	mutex_init(&ctx->tx_lock);
 	ctx->sk_proto = READ_ONCE(sk->sk_prot);
+	if (sk->sk_socket)
+		ctx->sk_proto_ops = READ_ONCE(sk->sk_socket->ops);
 	ctx->sk = sk;
 	/* Release semantic of rcu_assign_pointer() ensures that
 	 * ctx->sk_proto is visible before changing sk->sk_prot in
