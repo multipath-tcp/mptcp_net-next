@@ -432,12 +432,14 @@ static inline void msk_owned_by_me(const struct mptcp_sock *msk)
 
 static inline int mptcp_win_from_space(const struct sock *sk, int space)
 {
-	return __tcp_win_from_space(mptcp_sk(sk)->scaling_ratio, space);
+	return __tcp_win_from_space(READ_ONCE(mptcp_sk(sk)->scaling_ratio),
+				    space);
 }
 
 static inline int mptcp_space_from_win(const struct sock *sk, int win)
 {
-	return __tcp_space_from_win(mptcp_sk(sk)->scaling_ratio, win);
+	return __tcp_space_from_win(READ_ONCE(mptcp_sk(sk)->scaling_ratio),
+				    win);
 }
 
 static inline int __mptcp_space(const struct sock *sk)
