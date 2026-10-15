@@ -56,6 +56,41 @@ DEFINE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions) = {
 };
 static struct net_device *mptcp_napi_dev;
 
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+/* distinct lockdep class for MPTCP sockets */
+static struct lock_class_key mptcp_sk_key[2];
+static struct lock_class_key mptcp_slock_key[2];
+
+static void mptcp_reclassify_socket(struct socket *sock)
+{
+	struct sock *sk = sock->sk;
+
+	if (WARN_ON_ONCE(!sock_allow_reclassification(sk)))
+		return;
+
+	switch (sk->sk_family) {
+	case AF_INET:
+		sock_lock_init_class_and_name(sk, "slock-AF_INET-MPTCP",
+					      &mptcp_slock_key[0],
+					      "sk_lock-AF_INET-MPTCP",
+					      &mptcp_sk_key[0]);
+		break;
+#if IS_ENABLED(CONFIG_MPTCP_IPV6)
+	case AF_INET6:
+		sock_lock_init_class_and_name(sk, "slock-AF_INET6-MPTCP",
+					      &mptcp_slock_key[1],
+					      "sk_lock-AF_INET6-MPTCP",
+					      &mptcp_sk_key[1]);
+		break;
+#endif
+	default:
+		WARN_ON_ONCE(1);
+	}
+}
+#else
+static void mptcp_reclassify_socket(struct socket *sock) { }
+#endif
+
 /* Returns end sequence number of the receiver's advertised window */
 u64 mptcp_wnd_end(const struct mptcp_sock *msk)
 {
@@ -3291,6 +3326,8 @@ static int mptcp_init_sock(struct sock *sk)
 	sk->sk_rcvbuf = READ_ONCE(net->ipv4.sysctl_tcp_rmem[1]);
 	sk->sk_sndbuf = READ_ONCE(net->ipv4.sysctl_tcp_wmem[1]);
 	sk->sk_write_space = sk_stream_write_space;
+
+	mptcp_reclassify_socket(sk->sk_socket);
 
 	return 0;
 }
