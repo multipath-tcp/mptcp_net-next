@@ -3649,11 +3649,13 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 
 	mptcp_pm_connection_closed(msk);
 
-	/* msk->subflow is still intact, the following will not free the first
+	/* msk->first is still intact, the following will not free the first
 	 * subflow
 	 */
 	mptcp_do_fastclose(sk);
 	mptcp_destroy_common(msk);
+	if (msk->first)
+		WRITE_ONCE(mptcp_subflow_ctx(msk->first)->local_id, 0);
 
 	/* The first subflow is already in TCP_CLOSE status, the following
 	 * can't overlap with a fallback anymore
