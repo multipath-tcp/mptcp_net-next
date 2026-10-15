@@ -3217,6 +3217,8 @@ static void __mptcp_init_sock(struct sock *sk)
 	INIT_WORK(&msk->work, mptcp_worker);
 	msk->out_of_order_queue = RB_ROOT;
 	msk->first_pending = NULL;
+	WRITE_ONCE(msk->local_idsn, 0);
+	WRITE_ONCE(msk->remote_idsn, 0);
 
 	/* msk does not go through tcp_init_sock(); seed RTO bounds. */
 	icsk->icsk_rto_min =
@@ -3788,6 +3790,7 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 
 	msk = mptcp_sk(nsk);
 	WRITE_ONCE(msk->local_key, subflow_req->local_key);
+	WRITE_ONCE(msk->local_idsn, subflow_req->idsn);
 	WRITE_ONCE(msk->token, subflow_req->token);
 	msk->in_accept_queue = 1;
 	WRITE_ONCE(msk->fully_established, false);
@@ -4230,6 +4233,7 @@ static int mptcp_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 					     MPTCP_MIB_TOKENFALLBACKINIT);
 	}
 
+	WRITE_ONCE(msk->local_idsn, subflow->idsn);
 	WRITE_ONCE(msk->write_seq, subflow->idsn);
 	WRITE_ONCE(msk->snd_nxt, subflow->idsn);
 	WRITE_ONCE(msk->snd_una, subflow->idsn);
