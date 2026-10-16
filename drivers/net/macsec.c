@@ -487,6 +487,9 @@ static pn_t tx_sa_update_pn(struct macsec_tx_sa *tx_sa,
 	spin_lock_bh(&tx_sa->lock);
 
 	pn = tx_sa->next_pn_halves;
+	if (unlikely(pn.full64 == 0))
+		goto out;
+
 	if (secy->xpn)
 		tx_sa->next_pn++;
 	else
@@ -494,6 +497,8 @@ static pn_t tx_sa_update_pn(struct macsec_tx_sa *tx_sa,
 
 	if (tx_sa->next_pn == 0)
 		__macsec_pn_wrapped(secy, tx_sa);
+
+out:
 	spin_unlock_bh(&tx_sa->lock);
 
 	return pn;
@@ -4264,6 +4269,9 @@ static int macsec_newlink(struct net_device *dev,
 	if (sci == MACSEC_UNDEF_SCI)
 		sci = dev_to_sci(dev, MACSEC_PORT_ES);
 
+	if (rx_handler && sci_exists(real_dev, sci))
+		return -EBUSY;
+
 	/* Registration can notify listeners before returning. */
 	macsec_init_secy(dev, sci, icv_len);
 	if (data) {
@@ -4283,11 +4291,6 @@ static int macsec_newlink(struct net_device *dev,
 	err = netdev_upper_dev_link(real_dev, dev, extack);
 	if (err < 0)
 		goto unregister;
-
-	if (rx_handler && sci_exists(real_dev, sci)) {
-		err = -EBUSY;
-		goto unlink;
-	}
 
 	/* If h/w offloading is available, propagate to the device */
 	if (macsec_is_offloaded(macsec)) {
@@ -4320,7 +4323,6 @@ static int macsec_newlink(struct net_device *dev,
 
 del_dev:
 	macsec_del_dev(macsec);
-unlink:
 	netdev_upper_dev_unlink(real_dev, dev);
 unregister:
 	unregister_netdevice(dev);
