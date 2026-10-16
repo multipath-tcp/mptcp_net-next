@@ -3245,6 +3245,9 @@ static void __mptcp_init_sock(struct sock *sk)
 	/* re-use the csk retrans timer for MPTCP-level retrans */
 	timer_setup(&sk->mptcp_retransmit_timer, mptcp_retransmit_timer, 0);
 	timer_setup(&msk->sk.mptcp_tout_timer, mptcp_tout_timer, 0);
+
+	if (sk->sk_socket)
+		mptcp_reclassify_socket(sk);
 }
 
 static void mptcp_ca_reset(struct sock *sk)
