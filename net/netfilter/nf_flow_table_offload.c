@@ -1120,6 +1120,12 @@ void nf_flow_offload_refresh(struct nf_flowtable *flowtable,
 	if (!offload)
 		return;
 
+	if (test_bit(NF_FLOW_TEARDOWN, &flow->flags)) {
+		clear_bit(NF_FLOW_PENDING, &flow->flags);
+		kfree(offload);
+		return;
+	}
+
 	flow_offload_queue_work(offload);
 }
 
