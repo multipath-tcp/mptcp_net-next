@@ -2151,6 +2151,69 @@ wait_attempt_fail()
 	return 1
 }
 
+# $1: ns ; $2: counter ; $3: expected minimum value
+wait_counter()
+{
+	local cnt
+
+	for _ in $(seq $((timeout_poll * 10))); do
+		cnt=$(mptcp_lib_get_counter "${1}" "${2}")
+		[ "${cnt:-0}" -ge "${3}" ] && return 0
+		sleep 0.1
+	done
+
+	return 1
+}
+
+# $1: client address ; prints the local address and port of its subflow
+sf_from()
+{
+	ip netns exec $ns2 ss -tnH state established src "${1}" |
+		awk '{ print $3; exit }'
+}
+
+# $1: client address to block
+#
+# The link stays up, but the client packets from this address are dropped:
+# the subflow using it is closed after a few retransmissions, and re-created.
+# The packets go through again later than tcp_syn_retries allows: the new
+# subflow still connects thanks to the subflow-retries limit.
+sf_retry_after_block()
+{
+	local syn_tx ack_rx before after
+
+	syn_tx=$(mptcp_lib_get_counter $ns2 "MPTcpExtMPJoinSynTx")
+	ack_rx=$(mptcp_lib_get_counter $ns1 "MPTcpExtMPJoinAckRx")
+	before=$(sf_from "${1}")
+
+	print_check "subflow from ${1}"
+	if [ -z "${before}" ]; then
+		fail_test "no established subflow from ${1} before the block"
+		return
+	fi
+
+	ip netns exec $ns2 nft add rule ip filter OUTPUT ip saddr "${1}" drop
+	if ! wait_counter $ns2 "MPTcpExtMPJoinSynTx" $((${syn_tx:-0} + 1)); then
+		ip netns exec $ns2 nft flush chain ip filter OUTPUT
+		fail_test "subflow from ${1} not re-created"
+		return
+	fi
+	sleep 5
+	ip netns exec $ns2 nft flush chain ip filter OUTPUT
+
+	if ! wait_counter $ns1 "MPTcpExtMPJoinAckRx" $((${ack_rx:-0} + 1)); then
+		fail_test "re-created subflow from ${1} not established"
+		return
+	fi
+
+	after=$(sf_from "${1}")
+	if [ -z "${after}" ] || [ "${after}" = "${before}" ]; then
+		fail_test "no new subflow from ${1}: ${before} -> ${after}"
+	else
+		print_ok
+	fi
+}
+
 set_userspace_pm()
 {
 	local ns=$1
@@ -2584,6 +2647,67 @@ link_failure_tests()
 		chk_add_nr 1 1
 		chk_stale_nr $ns2 1 -1 2
 		chk_link_usage $ns2 ns2eth3 $cinsent 50
+	fi
+
+	# subflows closed after a silent link failure, then re-created: the
+	# additional one, then the initial one. Then close the connection
+	# while a subflow is being re-created.
+	if reset_with_events "subflow retry after link failure" &&
+	   continue_if mptcp_lib_kallsyms_has "mptcp_pm_kernel_retry$"; then
+		init_nftables
+		init_shapers
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_retries2=3
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_syn_retries=1
+		ip netns exec $ns2 sysctl -q net.mptcp.close_timeout=5
+		pm_nl_set_limits $ns1 0 4
+		pm_nl_set_limits $ns2 0 2
+		pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		# created here, not in the background job, for cleanup()
+		if [ -z "$cinfail" ]; then
+			cinfail=$(mktemp)
+		fi
+		if [ -z "$sinfail" ]; then
+			sinfail=$(mktemp)
+		fi
+		{ timeout_test=120 test_linkfail=131072 \
+			run_tests $ns1 $ns2 10.0.1.1 & } 2>/dev/null
+		local tests_pid=$!
+
+		wait_counter $ns1 "MPTcpExtMPJoinAckRx" 1
+		sf_retry_after_block 10.0.3.2
+		sf_retry_after_block 10.0.1.2
+
+		ip netns exec $ns2 nft add rule ip filter OUTPUT \
+			ip saddr 10.0.3.2 drop
+		wait_counter $ns2 "MPTcpExtMPJoinSynTx" 4
+		local retrying=$?
+		mptcp_lib_kill_group_wait $tests_pid
+
+		# stopped at the latest by the close timeout
+		print_check "no subflow connecting after close"
+		for _ in $(seq $((timeout_poll * 10))); do
+			ip netns exec $ns2 ss -tnH state syn-sent | grep -q . ||
+				break
+			sleep 0.1
+		done
+		if [ "${retrying}" -ne 0 ]; then
+			fail_test "no subflow re-created before the close"
+		elif ip netns exec $ns2 ss -tnH state syn-sent | grep -q .; then
+			fail_test "subflow still connecting after close"
+		else
+			print_ok
+		fi
+		ip netns exec $ns2 nft flush chain ip filter OUTPUT
+		kill_events_pids
+
+		join_syn_tx=4 chk_join_nr 3 3 3
+		chk_evt_nr ns2 MPTCP_LIB_EVENT_SUB_ESTABLISHED 3
+		chk_evt_nr ns2 MPTCP_LIB_EVENT_SUB_CLOSED 3 error 3
+
+		# big files: do not keep them, the next tests create their own
+		rm -f "$cinfail" "$sinfail"
+		cinfail=""
+		sinfail=""
 	fi
 }
 
