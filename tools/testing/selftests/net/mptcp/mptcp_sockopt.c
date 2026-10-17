@@ -645,7 +645,7 @@ static void connect_one_server(int fd, int pipefd)
 
 static void process_one_client(int fd, int pipefd)
 {
-	ssize_t ret, ret2, ret3;
+	ssize_t ret, ret2, n, w;
 	struct so_state s;
 	char buf[4096];
 
@@ -655,23 +655,27 @@ static void process_one_client(int fd, int pipefd)
 	ret = write(pipefd, "xmit", 4);
 	assert(ret == 4);
 
-	ret = read(fd, buf, sizeof(buf));
-	if (ret < 0)
+	ret = 0;
+	ret2 = 0;
+	while ((n = read(fd, buf, sizeof(buf))) > 0) {
+		if (!ret) {
+			assert(s.mptcpi_rcv_delta <= (uint64_t)n);
+
+			if (s.tcpi_rcv_delta)
+				assert(s.tcpi_rcv_delta <= (uint64_t)n);
+		}
+
+		w = write(fd, buf, n);
+		if (w < 0)
+			die_perror("write");
+		if (w != n)
+			xerror("short write");
+
+		ret += n;
+		ret2 += w;
+	}
+	if (n < 0)
 		die_perror("read");
-
-	assert(s.mptcpi_rcv_delta <= (uint64_t)ret);
-
-	if (s.tcpi_rcv_delta)
-		assert(s.tcpi_rcv_delta == (uint64_t)ret);
-
-	ret2 = write(fd, buf, ret);
-	if (ret2 < 0)
-		die_perror("write");
-
-	/* wait for hangup */
-	ret3 = read(fd, buf, 1);
-	if (ret3 != 0)
-		xerror("expected EOF, got %lu", ret3);
 
 	do_getsockopts(&s, fd, ret, ret2);
 	if (s.mptcpi_rcv_delta != (uint64_t)ret + 1)
