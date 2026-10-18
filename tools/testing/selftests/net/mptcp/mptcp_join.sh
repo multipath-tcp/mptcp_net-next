@@ -2151,6 +2151,111 @@ wait_attempt_fail()
 	return 1
 }
 
+# $1: timeout in seconds ; $2: ns ; $3: counter ; $4: increment, 1 by default
+wait_counter_inc()
+{
+	slowwait_for_counter "${1}" "${4:-1}" \
+		mptcp_lib_get_counter "${2}" "${3}" >/dev/null
+}
+
+# $1: client address ; prints the local address and port of its subflow
+sf_from()
+{
+	ip netns exec $ns2 ss -tnH state established src "${1}" |
+		awk '{ print $3; exit }'
+}
+
+has_subflow_retries()
+{
+	ip netns exec $ns2 ./pm_nl_ctl limits | grep -q "^subflow_retries"
+}
+
+# the client packets are dropped with rules in this chain
+init_nft_filter()
+{
+	init_nftables
+	if ! ip netns exec $ns2 nft list chain ip filter OUTPUT \
+	     &>/dev/null; then
+		mark_as_skipped "unable to set the filter rules"
+		return 1
+	fi
+}
+
+# $1: client address
+nft_drop_from()
+{
+	ip netns exec $ns2 nft add rule ip filter OUTPUT ip saddr "${1}" drop
+}
+
+# $1: client address to block
+#
+# The link stays up, but the client packets from this address are dropped:
+# the subflow using it is closed after a few retransmissions, and re-created.
+# The packets go through again once the SYN has been retransmitted more times
+# than tcp_syn_retries allows: the new subflow still connects thanks to the
+# subflow-retries limit.
+sf_retry_after_block()
+{
+	local before after
+
+	before=$(sf_from "${1}")
+
+	print_check "subflow from ${1}"
+	if [ -z "${before}" ]; then
+		fail_test "no established subflow from ${1} before the block"
+		return
+	fi
+
+	if ! nft_drop_from "${1}"; then
+		fail_test "unable to drop the packets from ${1}"
+		return
+	fi
+	if ! wait_counter_inc "${timeout_poll}" $ns2 "MPTcpExtMPJoinSynTx"; then
+		ip netns exec $ns2 nft flush chain ip filter OUTPUT
+		fail_test "subflow from ${1} not re-created"
+		return
+	fi
+	# tcp_syn_retries=1: one more retransmission than allowed
+	if ! wait_counter_inc "${timeout_poll}" \
+		$ns2 "TcpExtTCPSynRetrans" 2; then
+		ip netns exec $ns2 nft flush chain ip filter OUTPUT
+		fail_test "SYN from ${1} not retransmitted enough"
+		return
+	fi
+	ip netns exec $ns2 nft flush chain ip filter OUTPUT
+
+	if ! wait_counter_inc "${timeout_poll}" $ns1 "MPTcpExtMPJoinAckRx"; then
+		fail_test "re-created subflow from ${1} not established"
+		return
+	fi
+
+	after=$(sf_from "${1}")
+	if [ -z "${after}" ] || [ "${after}" = "${before}" ]; then
+		fail_test "no new subflow from ${1}: ${before} -> ${after}"
+	else
+		print_ok
+	fi
+}
+
+no_sf_connecting()
+{
+	! ip netns exec $ns2 ss -tnH state syn-sent | grep -q .
+}
+
+# $1: result of the wait for the subflow being re-created before the close
+chk_no_sf_connecting()
+{
+	print_check "no subflow connecting after close"
+	if [ "${1}" -ne 0 ]; then
+		fail_test "no subflow re-created before the close"
+	# closed with the MPTCP socket
+	elif slowwait "${timeout_poll}" no_sf_connecting; then
+		print_ok
+	else
+		fail_test "subflow still connecting after close"
+	fi
+}
+
 set_userspace_pm()
 {
 	local ns=$1
@@ -2584,6 +2689,65 @@ link_failure_tests()
 		chk_add_nr 1 1
 		chk_stale_nr $ns2 1 -1 2
 		chk_link_usage $ns2 ns2eth3 $cinsent 50
+	fi
+
+	# subflows closed after a silent link failure, then re-created: the
+	# additional one, then the initial one. Then close the connection
+	# while a subflow is being re-created.
+	if reset_with_events "subflow retry after link failure" &&
+	   continue_if has_subflow_retries && init_nft_filter; then
+		# slow links, short queues: the transfer lasts the whole test on
+		# any machine, and the blocked subflow always has data in flight
+		local i
+		for i in 1 3; do
+			tc -n $ns1 qdisc add dev ns1eth$i root netem \
+				rate 4mbit limit 30 delay 1ms
+			tc -n $ns2 qdisc add dev ns2eth$i root netem \
+				rate 4mbit limit 30 delay 1ms
+		done
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_retries2=3
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_syn_retries=1
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_syn_linear_timeouts=0
+		pm_nl_set_limits $ns1 0 4
+		pm_nl_set_limits $ns2 0 2
+		pm_nl_add_endpoint $ns2 10.0.3.2 dev ns2eth3 flags subflow
+		# created here, not in the background job, for cleanup()
+		if [ -z "$cinfail" ]; then
+			cinfail=$(mktemp)
+		fi
+		if [ -z "$sinfail" ]; then
+			sinfail=$(mktemp)
+		fi
+		# killed at the end: the timeout only stops a stuck test
+		{ timeout_test=600 test_linkfail=131072 \
+			run_tests $ns1 $ns2 10.0.1.1 & } 2>/dev/null
+		local tests_pid=$!
+
+		# the 128 MB files are created first, that can take a while
+		wait_counter_inc $((timeout_poll * 4)) \
+			$ns1 "MPTcpExtMPJoinAckRx"
+		sf_retry_after_block 10.0.3.2
+		sf_retry_after_block 10.0.1.2
+
+		local retrying=1
+		if nft_drop_from 10.0.3.2; then
+			wait_counter_inc "${timeout_poll}" \
+				$ns2 "MPTcpExtMPJoinSynTx"
+			retrying=$?
+		fi
+		mptcp_lib_kill_group_wait $tests_pid
+		chk_no_sf_connecting ${retrying}
+		ip netns exec $ns2 nft flush chain ip filter OUTPUT
+		kill_events_pids
+
+		join_syn_tx=4 chk_join_nr 3 3 3
+		chk_evt_nr ns2 MPTCP_LIB_EVENT_SUB_ESTABLISHED 3
+		chk_evt_nr ns2 MPTCP_LIB_EVENT_SUB_CLOSED 3 error 3
+
+		# big files: empty them, the next tests write their own content
+		: > "$cinfail"
+		: > "$sinfail"
+		: > "$cinsent"
 	fi
 }
 
