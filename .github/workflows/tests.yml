@@ -71,7 +71,7 @@ jobs:
 
       - name: "Docker image"
         run: |
-          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
 
       - name: "Tests"
         timeout-minutes: 120
@@ -94,7 +94,7 @@ jobs:
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
-            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
               auto-${{ steps.branch.outputs.realmode }}
 
       - name: "Publish conclusion"
@@ -238,7 +238,7 @@ jobs:
 
       - name: "Docker image"
         run: |
-          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
 
       - name: "Tests"
         timeout-minutes: 120
@@ -256,7 +256,7 @@ jobs:
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
-            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
               perf-normal --build --json perf.json \
                           --info "run_id:${GITHUB_RUN_ID}"
 
