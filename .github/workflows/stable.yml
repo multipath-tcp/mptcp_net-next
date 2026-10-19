@@ -117,7 +117,7 @@ jobs:
 
       - name: "Get latest kselftests"
         if: ${{ github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0' }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: "kselftests_src"
 
@@ -281,7 +281,7 @@ jobs:
 
     steps:
       - name: Checkout results repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: "multipath-tcp/mptcp-upstream-tests-results"
           token: '${{ secrets.PAT_MATTTBE }}'
