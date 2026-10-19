@@ -57,7 +57,7 @@ jobs:
           echo "realmode=${mode%_*}" >> ${GITHUB_OUTPUT}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
@@ -186,7 +186,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
@@ -213,7 +213,7 @@ jobs:
           echo "mode=normal_nojoin" >> ${GITHUB_OUTPUT}
 
       - name: "Restore CCache"
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
