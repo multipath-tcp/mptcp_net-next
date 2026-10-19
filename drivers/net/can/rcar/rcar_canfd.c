@@ -2220,11 +2220,14 @@ static int rcar_canfd_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, PTR_ERR(gpriv->clkp),
 				     "cannot get peripheral clock\n");
 
-	/* fCAN clock: Pick External clock. If not available fallback to
-	 * CANFD clock
+	/* fCAN clock: Pick External clock. If not available or its rate is
+	 * zero fallback to CANFD clock or fck (when info->fcan_pclk = 1).
 	 */
-	gpriv->can_clk = devm_clk_get(dev, "can_clk");
-	if (IS_ERR(gpriv->can_clk) || (clk_get_rate(gpriv->can_clk) == 0)) {
+	gpriv->can_clk = devm_clk_get_optional(dev, "can_clk");
+	if (IS_ERR(gpriv->can_clk))
+		return dev_err_probe(dev, PTR_ERR(gpriv->can_clk), "cannot get can_clk");
+
+	if (!gpriv->can_clk || (clk_get_rate(gpriv->can_clk) == 0)) {
 		if (info->fcan_pclk) {
 			fcan_freq = clk_get_rate(gpriv->clkp);
 			gpriv->can_clk = NULL;
