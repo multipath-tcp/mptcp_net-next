@@ -65,7 +65,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.ccache
@@ -106,7 +106,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ${{ github.workspace }}/.ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
