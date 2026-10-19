@@ -113,7 +113,7 @@ jobs:
             curl ${CURL_OPT} -A "${AGENT}" "${mbox}" | patch -p1 --merge
           done
         env:
-          URL: "${{ env.PW }}/patches/?project=mptcp&state=handled-elsewhere&q=\\[${{ matrix.version }}.y"
+          URL: "${{ env.PW }}/patches/?project=mptcp&state=handled-elsewhere&archived=false&q=\\[${{ matrix.version }}.y"
 
       - name: "Get latest kselftests"
         if: ${{ github.event.inputs.latest_sft == 'true' || github.event.schedule == '33 5 * * 0' }}
