@@ -3260,10 +3260,42 @@ static void mptcp_ca_reset(struct sock *sk)
 	icsk->icsk_ca_ops = NULL;
 }
 
+/* The subflow socket lock is acquired in a nested to the msk one
+ * in several places, even by the TCP stack: lockdep complains when
+ * both are kernel sockets. Instead of propagating the _nested modifiers
+ * in several places, re-init the lock class for the msk socket to an
+ * mptcp specific one. Separate lock classes are used for kernel and
+ * user sockets to prevent lockdep from conflating their usage patterns.
+ */
+static struct lock_class_key mptcp_slock_keys[2][2];
+static struct lock_class_key mptcp_keys[2][2];
+
+static void mptcp_reclassify_socket(struct sock *sk)
+{
+	bool is_ipv6 = sk->sk_family == AF_INET6;
+	const char *slock_name, *lock_name;
+	bool is_kern = !!sk->sk_kern_sock;
+
+	if (is_kern) {
+		slock_name = is_ipv6 ? "kmlock-AF_INET6" : "kmlock-AF_INET";
+		lock_name = is_ipv6 ? "kmsk_lock-AF_INET6" :
+				      "kmsk_lock-AF_INET";
+	} else {
+		slock_name = is_ipv6 ? "mlock-AF_INET6" : "mlock-AF_INET";
+		lock_name = is_ipv6 ? "msk_lock-AF_INET6" : "msk_lock-AF_INET";
+	}
+
+	sock_lock_init_class_and_name(sk, slock_name,
+				      &mptcp_slock_keys[is_kern][is_ipv6],
+				      lock_name, &mptcp_keys[is_kern][is_ipv6]);
+}
+
 static int mptcp_init_sock(struct sock *sk)
 {
 	struct net *net = sock_net(sk);
 	int ret;
+
+	mptcp_reclassify_socket(sk);
 
 	__mptcp_init_sock(sk);
 
@@ -3765,13 +3797,16 @@ struct sock *mptcp_sk_clone_init(const struct sock *sk,
 				 struct request_sock *req)
 {
 	struct mptcp_subflow_request_sock *subflow_req = mptcp_subflow_rsk(req);
-	struct sock *nsk = sk_clone_lock(sk, GFP_ATOMIC);
+	struct sock *nsk = sk_clone(sk, GFP_ATOMIC, false);
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk;
 
 	if (!nsk)
 		return NULL;
 
+	mptcp_reclassify_socket(nsk);
+
+	bh_lock_sock(nsk);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	if (nsk->sk_family == AF_INET6)
 		inet_sk(nsk)->pinet6 = mptcp_inet6_sk(nsk);
