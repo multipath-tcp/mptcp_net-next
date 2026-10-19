@@ -2312,7 +2312,7 @@ static int rcar_canfd_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, gpriv);
 	dev_info(dev, "global operational state (%s clk, %s mode)\n",
-		 gpriv->extclk ? "ext" : "canfd",
+		 gpriv->extclk ? "can_clk" : (info->fcan_pclk ? "fck" : "canfd"),
 		 gpriv->fdmode ? (gpriv->fd_only_mode ? "fd-only" : "fd") : "classical");
 	return 0;
 
