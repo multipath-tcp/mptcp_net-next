@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       #- name: "Collect Workflow Telemetry"
       #  uses: catchpoint/workflow-telemetry-action@v2
@@ -57,7 +57,7 @@ jobs:
           echo "realmode=${mode%_*}" >> ${GITHUB_OUTPUT}
 
       - name: "Restore cache for CCache"
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
@@ -71,7 +71,7 @@ jobs:
 
       - name: "Docker image"
         run: |
-          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
 
       - name: "Tests"
         timeout-minutes: 120
@@ -94,7 +94,7 @@ jobs:
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
-            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
               auto-${{ steps.branch.outputs.realmode }}
 
       - name: "Publish conclusion"
@@ -186,7 +186,7 @@ jobs:
 
       - name: "Save cache for CCache"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ${{ github.workspace }}/.virtme/ccache
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
@@ -200,7 +200,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: "Find base branch"
         id: branch
@@ -213,7 +213,7 @@ jobs:
           echo "mode=normal_nojoin" >> ${GITHUB_OUTPUT}
 
       - name: "Restore CCache"
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         id: restore-ccache
         with:
           path: ${{ github.workspace }}/.virtme/ccache
@@ -226,7 +226,7 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: Checkout results repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: "results"
           repository: "multipath-tcp/mptcp-upstream-tests-results"
@@ -238,7 +238,7 @@ jobs:
 
       - name: "Docker image"
         run: |
-          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }}
+          /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
 
       - name: "Tests"
         timeout-minutes: 120
@@ -256,7 +256,7 @@ jobs:
             -e GITHUB_ACTIONS=true -e CI=true \
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
-            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:${{ steps.branch.outputs.name == 'export' && 'latest' || 'net' }} \
+            ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
               perf-normal --build --json perf.json \
                           --info "run_id:${GITHUB_RUN_ID}"
 
@@ -423,7 +423,7 @@ jobs:
 
       - name: Checkout results repo
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: "multipath-tcp/mptcp-upstream-tests-results"
           token: '${{ secrets.PAT_MATTTBE }}'
@@ -686,7 +686,7 @@ jobs:
 
       - name: send email
         if: startswith(github.ref, 'refs/tags/patchew/')
-        uses: dawidd6/action-send-mail@v16
+        uses: dawidd6/action-send-mail@v22
         with:
           server_address: smtp.gmail.com
           server_port: 465
