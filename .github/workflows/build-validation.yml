@@ -41,13 +41,13 @@ jobs:
     steps:
       - name: "Checkout (light)"
         if: github.ref != 'refs/heads/export'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 100 # we should not have more commits on top of export and -net
 
       - name: "Checkout (export)"
         if: github.ref == 'refs/heads/export'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # we need to fetch all commits between net and net-next, quicker to get everything
 

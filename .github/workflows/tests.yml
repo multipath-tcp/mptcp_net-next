@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       #- name: "Collect Workflow Telemetry"
       #  uses: catchpoint/workflow-telemetry-action@v2
@@ -200,7 +200,7 @@ jobs:
 
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: "Find base branch"
         id: branch
@@ -226,7 +226,7 @@ jobs:
             ${{ runner.os }}_tests_${{ steps.branch.outputs.name }}-
 
       - name: Checkout results repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: "results"
           repository: "multipath-tcp/mptcp-upstream-tests-results"
@@ -423,7 +423,7 @@ jobs:
 
       - name: Checkout results repo
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: "multipath-tcp/mptcp-upstream-tests-results"
           token: '${{ secrets.PAT_MATTTBE }}'
