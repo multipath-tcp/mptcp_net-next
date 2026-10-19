@@ -305,7 +305,7 @@ jobs:
 
       - name: send email
         if: needs.build.result == 'failure'
-        uses: dawidd6/action-send-mail@v16
+        uses: dawidd6/action-send-mail@v22
         with:
           server_address: smtp.gmail.com
           server_port: 465
