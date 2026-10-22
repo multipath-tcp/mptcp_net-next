@@ -1,0 +1,28 @@
+name: Question
+description: Ask any questions not related to an issue or a feature request here
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping us improve! 🙏
+        Please answer these questions and provide as much information as possible about your idea.
+
+  - type: checkboxes
+    id: pre-req
+    attributes:
+      label: Pre-requisites
+      description: "Before opening this ticket, I checked that:"
+      options:
+        - label: "A similar [question](https://github.com/multipath-tcp/mptcp_net-next/issues?q=label%3question) has not been reported before."
+        - label: "[mptcp.dev](https://www.mptcp.dev) website does not cover my case."
+        - label: "The [wiki](https://github.com/multipath-tcp/mptcp_net-next/wiki) doesn't cover my case."
+        - label: "This is not a question related to the current behavior, an issue or a feature requst: if it is, please use [another template](https://github.com/multipath-tcp/mptcp_net-next/issues/new/choose) **even if it is a question**: we will need details about your system: kernel version, config, etc."
+
+  - type: textarea
+    id: question
+    attributes:
+      label: "My question"
+      description: "A clear and concise description of your question"
+    validations:
+      required: true
