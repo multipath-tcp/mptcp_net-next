@@ -1,2 +1,26 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-push-pending-data-after-a-sendmsg-copy-fault
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] mptcp: push pending data after a sendmsg copy fault
+
+mptcp_sendmsg() copies into the msk write queue first, then
+__mptcp_push_pending() on the success path. tcp_sendmsg_locked()
+does the opposite: its do_error path jumps to out, and out
+calls tcp_push() when copied > 0.
+
+A later iovec fault (copy_from_iter / -EFAULT) after a successful
+iteration therefore returns the partial byte count but leaves the
+already-queued dfrag on rtx_queue. No subflow packet is sent, no
+retransmission timer is armed, and DATA_FIN stays blocked on
+first_pending.
+
+Push in do_error when copied is already non-zero. Do not move
+the push to out: copied is a size_t, and sk_stream_error()
+stores a negative errno there.
+
+The issue was spot by Sashiko, but easy to reproduce with Packetdrill:
+
+  writev(4, [{..., 32728}, {NULL, 4096}], 2) = 32728
+
+Fixes: 69800e516e96 ("mptcp: propagate fastclose error")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/640
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
