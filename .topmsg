@@ -1,2 +1,11 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-dump-stats-with-right-title
+Subject: [PATCH] selftests: mptcp: join: dump stats with right title
+
+This fixes a typo when dumping stats to print the right netns.
+
+Indeed, the client netns was hardcoded instead of taking the netns given
+in argument. Fixing that to avoid confusions when debugging issues.
+
+Fixes: 658e53141780 ("selftests: mptcp: join: dump stats from history")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
