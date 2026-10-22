@@ -1,2 +1,47 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-annotate-lockless-access-to-msk-scaling_ratio
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] mptcp: annotate lockless access to msk->scaling_ratio
+
+mptcp_rcv_rtt_update() writes msk->scaling_ratio from BH while holding
+the msk data lock (sk->sk_lock.slock). mptcp_cleanup_rbuf() reads the
+same byte via mptcp_win_from_space() after mptcp_release_cb() drops
+that lock, so it can run concurrently with the RX path.
+
+KCSAN reports:
+
+  BUG: KCSAN: data-race in mptcp_cleanup_rbuf / mptcp_data_ready
+
+  write to 0xffff888014978790 of 1 bytes by interrupt on cpu 1:
+   mptcp_rcv_rtt_update net/mptcp/protocol.c:1045 [inline]
+   mptcp_data_ready+0x1c1/0x4d0 net/mptcp/protocol.c:1062
+   subflow_data_ready+0x271/0x350 net/mptcp/subflow.c:1536
+   tcp_data_ready+0x92/0x2c0 net/ipv4/tcp_input.c:5604
+   tcp_data_queue+0x1236/0x26c0 net/ipv4/tcp_input.c:5694
+   tcp_rcv_established+0x695/0x1fb0 net/ipv4/tcp_input.c:6689
+   tcp_v4_do_rcv+0x356/0x6e0 net/ipv4/tcp_ipv4.c:1854
+   tcp_v4_rcv+0x1b04/0x26b0 net/ipv4/tcp_ipv4.c:2248
+
+  read to 0xffff888014978790 of 1 bytes by task 2624 on cpu 0:
+   mptcp_win_from_space net/mptcp/protocol.h:421 [inline]
+   __mptcp_space net/mptcp/protocol.h:431 [inline]
+   mptcp_cleanup_rbuf+0x8a/0x380 net/mptcp/protocol.c:680
+   mptcp_release_cb+0x375/0x900 net/mptcp/protocol.c:3889
+   release_sock+0x100/0x150 net/core/sock.c:3866
+   sk_wait_data+0x141/0x2f0 net/core/sock.c:3314
+   mptcp_recvmsg+0x6cd/0xd50 net/mptcp/protocol.c:2496
+
+  value changed: 0xd0 -> 0xd5
+
+  Reported by Kernel Concurrency Sanitizer on:
+  CPU: 0 UID: 0 PID: 2624 Comm: syz.7.22 Not tainted 7.3.0-rc1-gbaff4b3d06ef #77 PREEMPT(full)
+
+The u8 EWMA is used only to convert sk_rcvbuf occupancy into an
+advertised window. A slightly stale ratio is acceptable, so annotate
+the lockless accesses with READ_ONCE()/WRITE_ONCE() instead of
+widening the data lock. Do the same in mptcp_space_from_win(), which
+reads the same field from DRS and SO_RCVLOWAT.
+
+Fixes: d2000361e4dd ("mptcp: better mptcp-level RTT estimator")
+Reported-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/634
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
