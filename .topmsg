@@ -1,2 +1,20 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-pass-total-bytes-to-do_getsockopts
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] selftests: mptcp: sockopt: pass total bytes to do_getsockopts
+
+connect_one_server() reads the echoed payload in a loop because read()
+on a stream socket can return a partial chunk. After the loop, it still
+passed the last read() return value to do_getsockopts() instead of the
+accumulated byte count.
+
+do_getsockopts() checks MPTCP_INFO first. The client samples
+mptcpi_write_seq before write(), and write() has already advanced
+msk->write_seq by the full length, so a partial last read() makes
+the write_seq assert fail. Pass the total instead.
+
+This issue has been reported by Sashiko and not seen in CI environments.
+Yet, it could be visible, especially when the test is launched manually.
+
+Fixes: ce9979129a0b ("selftests: mptcp: add mptcp getsockopt test cases")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/638
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
