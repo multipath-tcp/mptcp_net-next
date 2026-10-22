@@ -1,2 +1,22 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-sockopt-drop-unreachable-FIN-accounting
+From: Quanye Yang <quanyeyang@proton.me>
+Subject: [PATCH] selftests: mptcp: sockopt: drop unreachable FIN accounting
+
+connect_one_server() sets eof when read() returns 0, then immediately
+checks total != len. The receive loop only observes EOF while total is
+still below len, so that check always fires and xerror() terminates the
+process. The later if (eof) block that increments total for DATA_FIN is
+therefore unreachable.
+
+The client also does not wait for the peer to close: process_one_client()
+blocks on hangup first, so a peer DATA_FIN cannot arrive before this
+assertion. DATA_FIN sequence advancement is already checked on the server
+after EOF. Treat an early EOF as a hard error and drop the dead
+adjustment.
+
+This issue has been reported by Sashiko and not seen in CI environments.
+Yet, it could be visible, especially when the test is launched manually.
+
+Fixes: ce9979129a0b ("selftests: mptcp: add mptcp getsockopt test cases")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/637
+Signed-off-by: Quanye Yang <quanyeyang@proton.me>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
