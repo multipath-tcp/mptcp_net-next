@@ -1,2 +1,16 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-add-msk_is_mptcp-helper
+From: Geliang Tang <tanggeliang@kylinos.cn>
+Subject: [PATCH] mptcp: add msk_is_mptcp() helper
+
+Introduce msk_is_mptcp() to check whether a socket is an MPTCP socket
+(IPPROTO_MPTCP on SOCK_STREAM), modeled after sk_is_tcp(). Unlike
+sk_is_mptcp() which tests a TCP subflow socket, this helper takes an
+MPTCP socket directly.
+
+The naming follows the convention of rsk_is_mptcp() to distinguish it
+from sk_is_mptcp(). This helper will be used alongside sk_is_tcp() to
+add MPTCP support for BPF sockmap, Landlock and in other places where
+MPTCP socket type checking is going to be needed.
+
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
+Reviewed-by: Günther Noack <gnoack3000@gmail.com>
+Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
