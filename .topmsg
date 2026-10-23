@@ -16,5 +16,7 @@ Yet, it could be visible, especially when the test is launched manually.
 
 Fixes: ce9979129a0b ("selftests: mptcp: add mptcp getsockopt test cases")
 Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/638
+Co-developed-by: Geliang Tang <tanggeliang@kylinos.cn>
+Signed-off-by: Geliang Tang <tanggeliang@kylinos.cn>
 Signed-off-by: Quanye Yang <quanyeyang@proton.me>
 Reviewed-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
