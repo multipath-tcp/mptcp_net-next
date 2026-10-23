@@ -25,7 +25,7 @@ config MICROSOFT_GDMA_CORE
 config MICROSOFT_MANA
 	tristate "Microsoft Azure Network Adapter (MANA) support"
 	depends on PCI_MSI
-	depends on X86_64 || (ARM64 && !CPU_BIG_ENDIAN)
+	depends on X86_64 || ARM64
 	depends on PCI_HYPERV
 	select MICROSOFT_GDMA_CORE
 	help
