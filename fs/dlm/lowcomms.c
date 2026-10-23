@@ -1982,4 +1982,5 @@ void dlm_lowcomms_exit(void)
 		}
 	}
 	srcu_read_unlock(&connections_srcu, idx);
+	srcu_barrier(&connections_srcu);
 }
