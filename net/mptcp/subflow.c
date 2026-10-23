@@ -537,6 +537,8 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 	atomic64_set(&msk->rcv_wnd_sent, subflow->iasn);
 
 	if (!sock_owned_by_user(sk)) {
+		/* User space could have already read partially the TFO skb */
+		msk->copied_seq += subflow->iasn;
 		__mptcp_sync_rcv_sequence(sk);
 	} else {
 		/* Ensure ack_seq is visible before setting the flag */
@@ -559,6 +561,17 @@ static void mptcp_propagate_state(struct sock *sk, struct sock *ssk,
 		WRITE_ONCE(msk->snd_una, subflow->idsn + 1);
 		WRITE_ONCE(msk->wnd_end, subflow->idsn + 1 + tcp_sk(ssk)->snd_wnd);
 		subflow_set_remote_key(msk, subflow, mp_opt);
+	} else {
+		/* Fallback (no MPTCP options at SYN-ACK): initialise the
+		 * sequence space to 0 so that skb map_seq starts from 0
+		 * to match msk->copied_seq.  Safe without deferral because
+		 * mptcp_data_lock() is already held.
+		 */
+		subflow->map_seq = 0;
+		subflow->map_subflow_seq = tcp_sk(ssk)->copied_seq -
+					   subflow->ssn_offset;
+		WRITE_ONCE(msk->ack_seq, 0);
+		msk->copied_seq = 0;
 	}
 
 	if (!sock_owned_by_user(sk)) {
