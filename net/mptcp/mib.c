@@ -95,6 +95,8 @@ static const struct snmp_mib mptcp_snmp_list[] = {
 	SNMP_MIB_ITEM("BacklogDrop", MPTCP_MIB_BACKLOGDROP),
 	SNMP_MIB_ITEM("RcvPruned", MPTCP_MIB_RCVPRUNED),
 	SNMP_MIB_ITEM("OFOPruned", MPTCP_MIB_OFOPRUNED),
+	SNMP_MIB_ITEM("OppReinject", MPTCP_MIB_OPPREINJ),
+	SNMP_MIB_ITEM("OppReinjectBytes", MPTCP_MIB_OPPREINJBYTES),
 };
 
 /* mptcp_mib_alloc - allocate percpu mib counters

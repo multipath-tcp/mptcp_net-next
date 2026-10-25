@@ -2964,6 +2964,294 @@ static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag,
 	return len;
 }
 
+/* Opportunistic reinjection, "opportunistic retransmission" in section 4.2
+ * of Raiciu et al., NSDI 2012.
+ *
+ * With paths of different speeds, data sent on a slow or lossy path holds
+ * back the DATA_ACK while the fast path keeps delivering what comes after
+ * it. Once the receive window or the send buffer is used up, nothing new
+ * can be sent: the fast path drains and stays idle until the slow path
+ * delivers, or until the MPTCP-level RTO fires.
+ *
+ * That state can be seen when a DATA_ACK comes in: no new data can go out,
+ * and an active subflow has nothing queued or in flight. The data at
+ * snd_una is then held by another subflow, so resend on the idle subflow
+ * the ranges that the other subflows still hold, taken from the DSS
+ * mappings in their queues, instead of everything from snd_una: most of
+ * that already reached the peer.
+ *
+ * Only data held by a subflow that is gone, or that is slower than the
+ * idle one and whose RTT is long enough for a copy to arrive at least one
+ * RTT of the idle subflow sooner. Below that, the copies cost the idle
+ * subflow more than they save. This is done at most once per snd_una
+ * value, and at most what the idle subflow can send in the time saved.
+ */
+#define MPTCP_OPPR_MIN		(16 * 1024)
+#define MPTCP_OPPR_BUDGET	(256 * 1024)
+#define MPTCP_OPPR_MAX_RANGES	32
+
+struct mptcp_oppr_range {
+	u64 start;
+	u64 end;
+};
+
+/* the active subflow with nothing to send or retransmit and the lowest RTT */
+static struct sock *mptcp_oppr_idle_ssk(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct sock *pick = NULL;
+	u32 best = U32_MAX;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		u32 rtt = READ_ONCE(tcp_sk(ssk)->srtt_us);
+
+		if (!__mptcp_subflow_active(subflow) || subflow->backup ||
+		    subflow->request_bkup || subflow->stale || !rtt)
+			continue;
+		if (!tcp_rtx_and_write_queues_empty(ssk))
+			continue;
+		if (rtt < best) {
+			best = rtt;
+			pick = ssk;
+		}
+	}
+	return pick;
+}
+
+static bool mptcp_oppr_blocked(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	u64 snd_una = READ_ONCE(msk->snd_una);
+
+	if (snd_una == READ_ONCE(msk->snd_nxt) ||
+	    snd_una == READ_ONCE(msk->oppr_una) ||
+	    __mptcp_check_fallback(msk))
+		return false;
+
+	/* new data can still go out: the scheduler will use the idle subflow */
+	if (mptcp_send_head(sk) &&
+	    mptcp_wnd_end(msk) - READ_ONCE(msk->snd_nxt) >= MPTCP_OPPR_MIN)
+		return false;
+	return true;
+}
+
+/* How much earlier, in us, a copy sent now on @idle would reach the peer
+ * than the data held by @ssk: about half an RTT of each, the current one of
+ * @ssk and the base one of @idle, whose queue is empty. 0 if @ssk is not
+ * slower than @idle, or if the copy would not save at least one RTT of
+ * @idle: with a smaller gain, the copies cost more than they save.
+ */
+static u32 mptcp_oppr_gain(const struct sock *ssk, const struct sock *idle)
+{
+	u32 srtt = READ_ONCE(tcp_sk(ssk)->srtt_us) >> 3;
+	u32 min_rtt = tcp_min_rtt(tcp_sk(idle));
+
+	/* A retransmission timeout without progress since: the subflow may
+	 * be broken, which the stale detection handles (it needs the
+	 * MPTCP-level timeouts that copies would avoid).
+	 */
+	if (READ_ONCE(inet_csk(ssk)->icsk_retransmits))
+		return 0;
+	if (READ_ONCE(ssk->sk_pacing_rate) >= READ_ONCE(idle->sk_pacing_rate) ||
+	    min_rtt == ~0U || srtt <= 3 * min_rtt)
+		return 0;
+	return (srtt - min_rtt) / 2;
+}
+
+/* Does a subflow other than @idle hold data worth resending on it: one
+ * that is gone, or one slow enough for the copies to arrive sooner?
+ */
+static bool mptcp_oppr_worth(struct mptcp_sock *msk, struct sock *idle)
+{
+	struct mptcp_subflow_context *subflow;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		if (ssk == idle || tcp_rtx_and_write_queues_empty(ssk))
+			continue;
+		if (!__mptcp_subflow_active(subflow) ||
+		    mptcp_oppr_gain(ssk, idle))
+			return true;
+	}
+	return false;
+}
+
+/* called on each DATA_ACK, under the msk data lock */
+void mptcp_oppr_check(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *idle;
+
+	if (!mptcp_oppr_blocked(sk))
+		return;
+	idle = mptcp_oppr_idle_ssk(msk);
+	if (!idle || !mptcp_oppr_worth(msk, idle))
+		return;
+	if (!test_and_set_bit(MPTCP_WORK_OPPR, &msk->flags))
+		mptcp_schedule_work(sk);
+}
+
+static int mptcp_oppr_add_skb(const struct sk_buff *skb, u64 una, u64 *last,
+			      struct mptcp_oppr_range *r, int n)
+{
+	const struct mptcp_ext *mpext = mptcp_get_ext(skb);
+	u64 start, end;
+
+	if (!mpext || !mpext->use_map || !mpext->data_len ||
+	    mpext->data_seq == *last || n >= MPTCP_OPPR_MAX_RANGES)
+		return n;
+
+	/* one mapping can span several skbs after a TCP split */
+	*last = mpext->data_seq;
+	start = mpext->data_seq;
+	end = start + mpext->data_len;
+	if (!after64(end, una))
+		return n;
+
+	r[n].start = before64(start, una) ? una : start;
+	r[n].end = end;
+	return n + 1;
+}
+
+/* The DSN ranges at or after @una that the subflows slower than @idle still
+ * hold, sent or not: the data the peer is waiting for. Sorted by start.
+ * @gain is set to the largest time the copies can save.
+ */
+static int mptcp_oppr_collect(struct mptcp_sock *msk, struct sock *idle,
+			      u64 una, struct mptcp_oppr_range *r, u32 *gain)
+{
+	struct mptcp_subflow_context *subflow;
+	int n = 0, i, k;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		struct sk_buff *skb;
+		u64 last = 0;
+		u32 g = 0;
+
+		if (ssk == idle)
+			continue;
+		if (__mptcp_subflow_active(subflow)) {
+			g = mptcp_oppr_gain(ssk, idle);
+			if (!g)
+				continue;
+		}
+		*gain = max(*gain, g);
+
+		lock_sock(ssk);
+		skb_rbtree_walk(skb, &ssk->tcp_rtx_queue)
+			n = mptcp_oppr_add_skb(skb, una, &last, r, n);
+		skb_queue_walk(&ssk->sk_write_queue, skb)
+			n = mptcp_oppr_add_skb(skb, una, &last, r, n);
+		release_sock(ssk);
+	}
+
+	for (i = 1; i < n; i++) {
+		struct mptcp_oppr_range t = r[i];
+
+		for (k = i; k > 0 && after64(r[k - 1].start, t.start); k--)
+			r[k] = r[k - 1];
+		r[k] = t;
+	}
+	return n;
+}
+
+/* resend [start, end) on @ssk from the msk rtx queue; < 0 on a send error */
+static int mptcp_oppr_send_range(struct sock *sk, struct sock *ssk, u64 start,
+				 u64 end, int budget,
+				 struct mptcp_sendmsg_info *info)
+{
+	struct mptcp_data_frag *dfrag;
+	int copied = 0, ret;
+
+	list_for_each_entry(dfrag, &mptcp_sk(sk)->rtx_queue, list) {
+		if (!dfrag->already_sent || !before64(dfrag->data_seq, end))
+			break;
+		if (!after64(dfrag->data_seq + dfrag->already_sent, start))
+			continue;
+
+		info->sent = before64(dfrag->data_seq, start) ?
+			     start - dfrag->data_seq : 0;
+		info->limit = min_t(u64, dfrag->already_sent,
+				    end - dfrag->data_seq);
+		while (info->sent < info->limit && copied < budget) {
+			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, info);
+			if (ret <= 0)
+				return copied ? : -1;
+			copied += ret;
+			info->sent += ret;
+		}
+		if (copied >= budget)
+			break;
+	}
+	return copied;
+}
+
+static void __mptcp_oppr(struct sock *sk)
+{
+	struct mptcp_sendmsg_info info = { .data_lock_held = true, };
+	struct mptcp_oppr_range r[MPTCP_OPPR_MAX_RANGES];
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	int copied = 0, budget, ret, n, i;
+	struct sock *ssk;
+	u32 gain = 0;
+	u64 una;
+
+	mptcp_data_lock(sk);
+	__mptcp_clean_una_wakeup(sk);
+	mptcp_data_unlock(sk);
+
+	/* with csum, the retransmission could send new data */
+	if (!mptcp_oppr_blocked(sk) || READ_ONCE(msk->csum_enabled))
+		return;
+	ssk = mptcp_oppr_idle_ssk(msk);
+	if (!ssk || !mptcp_rtx_head(sk))
+		return;
+
+	una = msk->snd_una;
+	WRITE_ONCE(msk->oppr_una, una);
+	n = mptcp_oppr_collect(msk, ssk, una, r, &gain);
+	if (!n)
+		return;
+
+	lock_sock(ssk);
+	/* The copies delay what @ssk sends next: no more than it can send in
+	 * the time they save. A subflow that is gone saves an MPTCP RTO.
+	 */
+	budget = min_t(int, MPTCP_OPPR_BUDGET,
+		       tcp_snd_cwnd(tcp_sk(ssk)) * tcp_sk(ssk)->mss_cache);
+	if (gain)
+		budget = min_t(u64, budget,
+			       div_u64((u64)READ_ONCE(ssk->sk_pacing_rate) * gain,
+				       USEC_PER_SEC));
+
+	spin_lock_bh(&msk->fallback_lock);
+	if (__mptcp_check_fallback(msk) || !msk->allow_subflows)
+		goto unlock;
+
+	for (i = 0; i < n && copied < budget; i++) {
+		ret = mptcp_oppr_send_range(sk, ssk, r[i].start, r[i].end,
+					    budget - copied, &info);
+		if (ret < 0)
+			break;
+		copied += ret;
+	}
+
+	if (copied) {
+		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
+			 info.size_goal);
+		msk->allow_infinite_fallback = false;
+		msk->bytes_retrans += copied;
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OPPREINJ);
+		MPTCP_ADD_STATS(sock_net(sk), MPTCP_MIB_OPPREINJBYTES, copied);
+	}
+unlock:
+	spin_unlock_bh(&msk->fallback_lock);
+	release_sock(ssk);
+}
+
 static void __mptcp_retrans(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -3201,6 +3489,9 @@ static void mptcp_worker(struct work_struct *work)
 
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
+
+	if (test_and_clear_bit(MPTCP_WORK_OPPR, &msk->flags))
+		__mptcp_oppr(sk);
 
 	fail_tout = msk->first ? READ_ONCE(mptcp_subflow_ctx(msk->first)->fail_tout) : 0;
 	if (fail_tout && time_after(jiffies, fail_tout))
