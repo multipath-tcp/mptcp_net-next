@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <net/sock.h>
+#include <net/mptcp.h>
 #include <linux/net.h>
 #include <linux/kthread.h>
 #include <linux/types.h>
@@ -1222,8 +1223,9 @@ static struct socket *nbd_get_socket(struct nbd_device *nbd, unsigned long fd,
 		return NULL;
 
 	if (!sk_is_tcp(sock->sk) &&
+	    !msk_is_mptcp(sock->sk) &&
 	    !sk_is_stream_unix(sock->sk)) {
-		dev_err(disk_to_dev(nbd->disk), "Unsupported socket: should be TCP or UNIX.\n");
+		dev_err(disk_to_dev(nbd->disk), "Unsupported socket: should be TCP, MPTCP or UNIX.\n");
 		*err = -EINVAL;
 		sockfd_put(sock);
 		return NULL;
