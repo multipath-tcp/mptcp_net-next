@@ -2910,11 +2910,10 @@ static int wx_setup_rx_resources(struct wx_ring *rx_ring)
 	set_dev_node(dev, numa_node);
 	rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
 					   &rx_ring->dma, GFP_KERNEL);
-	if (!rx_ring->desc) {
-		set_dev_node(dev, orig_node);
+	set_dev_node(dev, orig_node);
+	if (!rx_ring->desc)
 		rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
 						   &rx_ring->dma, GFP_KERNEL);
-	}
 
 	if (!rx_ring->desc)
 		goto err;
@@ -3019,11 +3018,10 @@ static int wx_setup_tx_resources(struct wx_ring *tx_ring)
 	set_dev_node(dev, numa_node);
 	tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 					   &tx_ring->dma, GFP_KERNEL);
-	if (!tx_ring->desc) {
-		set_dev_node(dev, orig_node);
+	set_dev_node(dev, orig_node);
+	if (!tx_ring->desc)
 		tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 						   &tx_ring->dma, GFP_KERNEL);
-	}
 
 	if (!tx_ring->desc)
 		goto err;
