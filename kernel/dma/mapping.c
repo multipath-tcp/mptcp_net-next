@@ -642,6 +642,13 @@ EXPORT_SYMBOL_GPL(dma_get_required_mask);
  * Same as dma_alloc_attrs() but places the memory on @node rather than on the
  * node of @dev. Like with kmalloc_node() the node is only a preference,
  * the page allocator may fall back to other nodes if @node is out of memory.
+ * The contiguous memory allocator (CMA) does not: only the CMA area of @node
+ * and the global CMA area are tried. The allocation may fail even though the
+ * CMA area of another node, e.g. that of @dev, still has free space.
+ *
+ * Allocations served from per-device or global coherent pools, per-device CMA
+ * areas, restricted or atomic pools, arch_dma_alloc() or dma_map_ops
+ * implementations do not take @node into account.
  *
  * Return: the CPU address of the allocation, or NULL on failure.
  */
