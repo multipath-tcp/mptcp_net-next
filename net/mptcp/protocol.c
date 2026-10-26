@@ -4327,6 +4327,26 @@ out:
 	return 0;
 }
 
+static void mptcp_set_memalloc(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+	bool memalloc;
+
+	lock_sock(sk);
+	memalloc = sock_flag(sk, SOCK_MEMALLOC);
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
+		sock_valbool_flag(ssk, SOCK_MEMALLOC, memalloc);
+		ssk->sk_allocation = sk->sk_allocation;
+		ssk->sk_use_task_frag = sk->sk_use_task_frag;
+		release_sock(ssk);
+	}
+	release_sock(sk);
+}
+
 static struct proto mptcp_prot = {
 	.name		= "MPTCP",
 	.owner		= THIS_MODULE,
@@ -4358,6 +4378,7 @@ static struct proto mptcp_prot = {
 	.obj_size	= sizeof(struct mptcp_sock),
 	.slab_flags	= SLAB_TYPESAFE_BY_RCU,
 	.no_autobind	= true,
+	.set_memalloc	= mptcp_set_memalloc,
 };
 
 static int mptcp_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)

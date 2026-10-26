@@ -306,6 +306,10 @@ void sk_set_memalloc(struct sock *sk)
 	sock_set_flag(sk, SOCK_MEMALLOC);
 	sk->sk_allocation |= __GFP_MEMALLOC;
 	static_branch_inc(&memalloc_socks_key);
+
+	/* Call protocol-specific callback if available */
+	if (sk->sk_prot->set_memalloc)
+		sk->sk_prot->set_memalloc(sk);
 }
 EXPORT_SYMBOL_GPL(sk_set_memalloc);
 
@@ -314,6 +318,10 @@ void sk_clear_memalloc(struct sock *sk)
 	sock_reset_flag(sk, SOCK_MEMALLOC);
 	sk->sk_allocation &= ~__GFP_MEMALLOC;
 	static_branch_dec(&memalloc_socks_key);
+
+	/* Call protocol-specific callback if available */
+	if (sk->sk_prot->set_memalloc)
+		sk->sk_prot->set_memalloc(sk);
 
 	/*
 	 * SOCK_MEMALLOC is allowed to ignore rmem limits to ensure forward

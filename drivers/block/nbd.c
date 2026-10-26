@@ -579,6 +579,7 @@ static int __sock_xmit(struct nbd_device *nbd, struct socket *sock, int send,
 		do {
 			sock->sk->sk_allocation = GFP_NOIO | __GFP_MEMALLOC;
 			sock->sk->sk_use_task_frag = false;
+			sk_set_memalloc(sock->sk);
 			msg.msg_flags = msg_flags | MSG_NOSIGNAL;
 
 			if (send)
