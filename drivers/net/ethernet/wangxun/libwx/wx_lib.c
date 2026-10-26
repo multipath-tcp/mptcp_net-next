@@ -2888,7 +2888,6 @@ static int wx_alloc_page_pool(struct wx_ring *rx_ring)
 static int wx_setup_rx_resources(struct wx_ring *rx_ring)
 {
 	struct device *dev = rx_ring->dev;
-	int orig_node = dev_to_node(dev);
 	int numa_node = NUMA_NO_NODE;
 	int size, ret;
 
@@ -2907,10 +2906,9 @@ static int wx_setup_rx_resources(struct wx_ring *rx_ring)
 	rx_ring->size = rx_ring->count * sizeof(union wx_rx_desc);
 	rx_ring->size = ALIGN(rx_ring->size, 4096);
 
-	set_dev_node(dev, numa_node);
-	rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
-					   &rx_ring->dma, GFP_KERNEL);
-	set_dev_node(dev, orig_node);
+	rx_ring->desc = dma_alloc_coherent_node(dev, rx_ring->size,
+						&rx_ring->dma, GFP_KERNEL,
+						numa_node);
 	if (!rx_ring->desc)
 		rx_ring->desc = dma_alloc_coherent(dev, rx_ring->size,
 						   &rx_ring->dma, GFP_KERNEL);
@@ -2996,7 +2994,6 @@ static void wx_setup_headwb_resources(struct wx_ring *tx_ring)
 static int wx_setup_tx_resources(struct wx_ring *tx_ring)
 {
 	struct device *dev = tx_ring->dev;
-	int orig_node = dev_to_node(dev);
 	int numa_node = NUMA_NO_NODE;
 	int size;
 
@@ -3015,10 +3012,9 @@ static int wx_setup_tx_resources(struct wx_ring *tx_ring)
 	tx_ring->size = tx_ring->count * sizeof(union wx_tx_desc);
 	tx_ring->size = ALIGN(tx_ring->size, 4096);
 
-	set_dev_node(dev, numa_node);
-	tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
-					   &tx_ring->dma, GFP_KERNEL);
-	set_dev_node(dev, orig_node);
+	tx_ring->desc = dma_alloc_coherent_node(dev, tx_ring->size,
+						&tx_ring->dma, GFP_KERNEL,
+						numa_node);
 	if (!tx_ring->desc)
 		tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 						   &tx_ring->dma, GFP_KERNEL);
