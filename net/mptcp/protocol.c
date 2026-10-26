@@ -2697,8 +2697,11 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 	subflow->closing = 1;
 
-	if (flags & MPTCP_CF_PUSH)
-		mptcp_cleanup_ssk_backlog(sk, ssk);
+	/* also without MPTCP_CF_PUSH: a re-created subflow closed with the msk
+	 * can have been established in between, see
+	 * mptcp_close_retry_subflows()
+	 */
+	mptcp_cleanup_ssk_backlog(sk, ssk);
 
 	/* Borrow the fwd allocated page left-over; fwd memory for the subflow
 	 * could be negative at this point, but will be reach zero soon - when
@@ -2788,6 +2791,78 @@ out:
 	}
 }
 
+/* Re-created subflows still connecting are useless once the msk is closed,
+ * or no longer established: they cannot join anymore, see
+ * mptcp_finish_join(), and would keep it around.
+ */
+static void mptcp_close_retry_subflows(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow, *tmp;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+		int state;
+
+		if (!subflow->retry || READ_ONCE(subflow->fully_established))
+			continue;
+
+		/* still connecting, or already disconnected by
+		 * mptcp_subflow_shutdown(), e.g. after shutdown(SHUT_WR)
+		 */
+		state = inet_sk_state_load(ssk);
+		if (state != TCP_SYN_SENT && state != TCP_CLOSE)
+			continue;
+
+		/* Checked without the ssk lock: it can have been established
+		 * in between. __mptcp_close_ssk() cleans its data in the msk
+		 * backlog, and the MPTCP retransmissions cover what it sent.
+		 * No need to push the pending data again.
+		 */
+		mptcp_pm_subflow_check_next(msk, subflow);
+		__mptcp_close_ssk(sk, ssk, subflow, 0);
+	}
+}
+
+static bool mptcp_has_active_subflow(struct mptcp_sock *msk)
+{
+	struct mptcp_subflow_context *subflow;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		if (__mptcp_subflow_active(subflow))
+			return true;
+	}
+
+	return false;
+}
+
+/* With no subflow left to send data, a re-created subflow still connecting
+ * must not keep the connection open longer than the close timeout, as when
+ * all the subflows are closed, see __mptcp_close_ssk(). mptcp_worker() keeps
+ * the connection if the subflow connected in the meantime.
+ */
+static void mptcp_retry_check_tout(struct sock *sk)
+{
+	struct mptcp_subflow_context *subflow;
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	bool connecting = false;
+
+	if (inet_csk(sk)->icsk_mtup.probe_timestamp ||
+	    mptcp_has_active_subflow(msk))
+		return;
+
+	mptcp_for_each_subflow(msk, subflow)
+		connecting |= subflow->retry &&
+			      !READ_ONCE(subflow->fully_established);
+	if (!connecting)
+		return;
+
+	if (sk->sk_state == TCP_ESTABLISHED)
+		mptcp_start_tout_timer(sk);
+	else
+		mptcp_close_retry_subflows(sk);
+}
+
 void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		     struct mptcp_subflow_context *subflow)
 {
@@ -2806,6 +2881,7 @@ void mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	mptcp_pm_subflow_check_next(mptcp_sk(sk), subflow);
 
 	__mptcp_close_ssk(sk, ssk, subflow, MPTCP_CF_PUSH);
+	mptcp_retry_check_tout(sk);
 }
 
 static unsigned int mptcp_sync_mss(struct sock *sk, u32 pmtu)
@@ -2823,6 +2899,8 @@ static void __mptcp_close_subflow(struct sock *sk)
 	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 		int ssk_state = inet_sk_state_load(ssk);
+		struct mptcp_pm_retry retry;
+		bool do_retry;
 
 		if (ssk_state != TCP_CLOSE &&
 		    (ssk_state != TCP_CLOSE_WAIT ||
@@ -2834,7 +2912,13 @@ static void __mptcp_close_subflow(struct sock *sk)
 		if (!skb_queue_empty_lockless(&ssk->sk_receive_queue))
 			continue;
 
+		do_retry = mptcp_pm_subflow_retry_check(msk, subflow, &retry);
 		mptcp_close_ssk(sk, ssk, subflow);
+		if (do_retry) {
+			mptcp_pm_subflow_retry(msk, &retry);
+			/* creating a subflow stopped the close timeout */
+			mptcp_retry_check_tout(sk);
+		}
 	}
 
 }
@@ -3188,10 +3272,19 @@ static void mptcp_worker(struct work_struct *work)
 	if (mptcp_close_tout_expired(sk)) {
 		struct mptcp_subflow_context *subflow, *tmp;
 
-		mptcp_do_fastclose(sk);
-		mptcp_for_each_subflow_safe(msk, subflow, tmp)
-			__mptcp_close_ssk(sk, subflow->tcp_sock, subflow, 0);
-		mptcp_close_wake_up(sk);
+		/* a re-created subflow connected in the meantime, see
+		 * mptcp_retry_check_tout()
+		 */
+		if (sk->sk_state == TCP_ESTABLISHED &&
+		    mptcp_has_active_subflow(msk)) {
+			mptcp_stop_tout_timer(sk);
+		} else {
+			mptcp_do_fastclose(sk);
+			mptcp_for_each_subflow_safe(msk, subflow, tmp)
+				__mptcp_close_ssk(sk, subflow->tcp_sock,
+						  subflow, 0);
+			mptcp_close_wake_up(sk);
+		}
 	}
 
 	if (sock_flag(sk, SOCK_DEAD) && sk->sk_state == TCP_CLOSE) {
@@ -3515,6 +3608,9 @@ bool __mptcp_close(struct sock *sk, long timeout)
 		mptcp_set_state(sk, TCP_CLOSE);
 		goto cleanup;
 	}
+
+	/* before __mptcp_wr_shutdown() disconnects them */
+	mptcp_close_retry_subflows(sk);
 
 	if (mptcp_data_avail(msk) || timeout < 0 ||
 	    (sock_flag(sk, SOCK_LINGER) && !sk->sk_lingertime)) {
