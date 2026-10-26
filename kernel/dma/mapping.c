@@ -640,7 +640,8 @@ EXPORT_SYMBOL_GPL(dma_get_required_mask);
  * @node: NUMA node to allocate the memory on, NUMA_NO_NODE for no preference
  *
  * Same as dma_alloc_attrs() but places the memory on @node rather than on the
- * node of @dev. Like with kmalloc_node() the node is only a preference.
+ * node of @dev. Like with kmalloc_node() the node is only a preference,
+ * the page allocator may fall back to other nodes if @node is out of memory.
  *
  * Return: the CPU address of the allocation, or NULL on failure.
  */
@@ -679,7 +680,8 @@ void *dma_alloc_attrs_node(struct device *dev, size_t size,
 	flag &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
 
 	if (dma_alloc_direct(dev, ops) || arch_dma_alloc_direct(dev)) {
-		cpu_addr = dma_direct_alloc(dev, size, dma_handle, flag, attrs);
+		cpu_addr = dma_direct_alloc_node(dev, size, dma_handle, flag,
+						 attrs, node);
 	} else if (use_dma_iommu(dev)) {
 		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs);
 	} else if (ops->alloc) {

@@ -115,9 +115,8 @@ static struct page *dma_direct_alloc_swiotlb(struct device *dev, size_t size,
 }
 
 static struct page *__dma_direct_alloc_pages(struct device *dev, size_t size,
-		gfp_t gfp, bool allow_highmem)
+		gfp_t gfp, bool allow_highmem, int node)
 {
-	int node = dev_to_node(dev);
 	struct page *page;
 	u64 phys_limit;
 	void *va;
@@ -198,11 +197,12 @@ static bool dma_direct_use_no_mapping(struct device *dev, unsigned long attrs)
 }
 
 static void *dma_direct_alloc_no_mapping(struct device *dev, size_t size,
-		dma_addr_t *dma_handle, gfp_t gfp)
+		dma_addr_t *dma_handle, gfp_t gfp, int node)
 {
 	struct page *page;
 
-	page = __dma_direct_alloc_pages(dev, size, gfp & ~__GFP_ZERO, true);
+	page = __dma_direct_alloc_pages(dev, size, gfp & ~__GFP_ZERO, true,
+					node);
 	if (!page)
 		return NULL;
 
@@ -217,8 +217,8 @@ static void *dma_direct_alloc_no_mapping(struct device *dev, size_t size,
 	return page;
 }
 
-void *dma_direct_alloc(struct device *dev, size_t size,
-		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
+void *dma_direct_alloc_node(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs, int node)
 {
 	bool remap = false, set_uncached = false;
 	bool mark_mem_decrypt = false;
@@ -245,7 +245,8 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 		gfp |= __GFP_NOWARN;
 
 	if (dma_direct_use_no_mapping(dev, attrs))
-		return dma_direct_alloc_no_mapping(dev, size, dma_handle, gfp);
+		return dma_direct_alloc_no_mapping(dev, size, dma_handle, gfp,
+						   node);
 
 	if (!dev_is_dma_coherent(dev)) {
 		if (IS_ENABLED(CONFIG_ARCH_HAS_DMA_ALLOC) &&
@@ -303,7 +304,8 @@ void *dma_direct_alloc(struct device *dev, size_t size,
 	}
 
 	/* we always manually zero the memory once we are done */
-	page = __dma_direct_alloc_pages(dev, size, gfp & ~__GFP_ZERO, allow_highmem);
+	page = __dma_direct_alloc_pages(dev, size, gfp & ~__GFP_ZERO, allow_highmem,
+					node);
 	if (!page)
 		return NULL;
 
@@ -468,7 +470,7 @@ struct page *dma_direct_alloc_pages(struct device *dev, size_t size,
 		goto setup_page;
 	}
 
-	page = __dma_direct_alloc_pages(dev, size, gfp, false);
+	page = __dma_direct_alloc_pages(dev, size, gfp, false, dev_to_node(dev));
 	if (!page)
 		return NULL;
 

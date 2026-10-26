@@ -68,7 +68,8 @@ rather than on the node of the device. This is useful for memory accessed
 frequently by both the device and a CPU on a different node, for example
 descriptor rings serviced by that CPU.
 
-Like with kmalloc_node() the node is only a preference.
+Like with kmalloc_node() the node is only a preference, the page allocator
+may fall back to other nodes if the given node is out of memory.
 
 ::
 
