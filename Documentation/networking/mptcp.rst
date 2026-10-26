@@ -73,6 +73,24 @@ To be able to use multiple IP addresses on a host to create multiple *subflows*
 addresses can be used. This can be configured with ``ip mptcp endpoint`` for
 example.
 
+When TCP gives up on an established subflow created by this host, after a
+retransmission or keepalive timeout, the in-kernel path manager creates it
+again, with the ``subflow-retries`` limit as its number of SYN retries, like
+``TCP_SYNCNT``: 127 by default, about 4 hours, and 0 to not re-create it. This
+is done for the additional subflows, and for the initial one on the client side:
+the new subflow then takes one of the additional subflows allowed by the
+``subflows`` limit. This is a single connection attempt: an ICMP error, or a
+local error when connecting, ends it, and it is not created again. This is only
+done while another subflow can send data: otherwise the connection is closed
+after ``close_timeout``, as before, and the subflows being re-created are closed
+too. A subflow reset by the peer, or by anything on the path, is not created
+again either. TCP only gives up on a subflow after ``tcp_retries2``
+retransmissions, about 15 minutes by default: shorter outages are handled by TCP
+itself. A subflow that only receives data does not notice that its path stopped
+working: the application should then enable TCP keepalive on the MPTCP socket
+(``SO_KEEPALIVE``, ``TCP_KEEPIDLE``, ``TCP_KEEPINTVL`` and ``TCP_KEEPCNT``),
+which MPTCP applies to all its subflows.
+
 Packet Scheduler
 ----------------
 
