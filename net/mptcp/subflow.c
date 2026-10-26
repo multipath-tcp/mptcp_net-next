@@ -1327,6 +1327,9 @@ out:
 
 static bool subflow_is_done(const struct sock *sk)
 {
+	if (READ_ONCE(sk->sk_err))
+		return false;
+
 	return sk->sk_shutdown & RCV_SHUTDOWN || sk->sk_state == TCP_CLOSE;
 }
 
