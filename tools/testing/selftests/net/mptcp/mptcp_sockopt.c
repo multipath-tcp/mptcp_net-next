@@ -640,7 +640,8 @@ static void connect_one_server(int fd, int pipefd)
 
 static void process_one_client(int fd, int pipefd)
 {
-	ssize_t ret, ret2, ret3;
+	size_t nread = 0, nwritten = 0;
+	ssize_t ret, n, w, off;
 	struct so_state s;
 	char buf[4096];
 
@@ -650,46 +651,53 @@ static void process_one_client(int fd, int pipefd)
 	ret = write(pipefd, "xmit", 4);
 	assert(ret == 4);
 
-	ret = read(fd, buf, sizeof(buf));
-	if (ret < 0)
+read_more:
+	n = read(fd, buf, sizeof(buf));
+	if (n < 0)
 		die_perror("read");
+	if (n == 0)
+		goto hangup;
 
-	assert(s.mptcpi_rcv_delta <= (uint64_t)ret);
+	for (off = 0; off < n; off += w) {
+		w = write(fd, buf + off, n - off);
+		if (w < 0)
+			die_perror("write");
+		if (w == 0)
+			xerror("write returned 0");
+	}
+	nread += n;
+	nwritten += n;
+	goto read_more;
+
+hangup:
+	assert(s.mptcpi_rcv_delta <= nread);
 
 	if (s.tcpi_rcv_delta)
-		assert(s.tcpi_rcv_delta == (uint64_t)ret);
+		assert(s.tcpi_rcv_delta <= nread);
 
-	ret2 = write(fd, buf, ret);
-	if (ret2 < 0)
-		die_perror("write");
-
-	/* wait for hangup */
-	ret3 = read(fd, buf, 1);
-	if (ret3 != 0)
-		xerror("expected EOF, got %lu", ret3);
-
-	do_getsockopts(&s, fd, ret, ret2);
-	if (s.mptcpi_rcv_delta != (uint64_t)ret + 1)
+	do_getsockopts(&s, fd, nread, nwritten);
+	if (s.mptcpi_rcv_delta != (uint64_t)nread + 1)
 		xerror("mptcpi_rcv_delta %" PRIu64 ", expect %" PRIu64 ", diff %" PRId64,
-		       s.mptcpi_rcv_delta, ret + 1, s.mptcpi_rcv_delta - (ret + 1));
+		       s.mptcpi_rcv_delta, (uint64_t)nread + 1,
+		       s.mptcpi_rcv_delta - ((uint64_t)nread + 1));
 
 	/* be nice when running on top of older kernel */
 	if (s.pkt_stats_avail) {
-		if (s.last_sample.mptcpi_bytes_sent != ret2)
+		if (s.last_sample.mptcpi_bytes_sent != nwritten)
 			xerror("mptcpi_bytes_sent %" PRIu64 ", expect %" PRIu64
 			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_sent, ret2,
-			       s.last_sample.mptcpi_bytes_sent - ret2);
-		if (s.last_sample.mptcpi_bytes_received != ret)
+			       s.last_sample.mptcpi_bytes_sent, (uint64_t)nwritten,
+			       s.last_sample.mptcpi_bytes_sent - (uint64_t)nwritten);
+		if (s.last_sample.mptcpi_bytes_received != nread)
 			xerror("mptcpi_bytes_received %" PRIu64 ", expect %" PRIu64
 			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_received, ret,
-			       s.last_sample.mptcpi_bytes_received - ret);
-		if (s.last_sample.mptcpi_bytes_acked != ret)
+			       s.last_sample.mptcpi_bytes_received, (uint64_t)nread,
+			       s.last_sample.mptcpi_bytes_received - (uint64_t)nread);
+		if (s.last_sample.mptcpi_bytes_acked != nread)
 			xerror("mptcpi_bytes_acked %" PRIu64 ", expect %" PRIu64
 			       ", diff %" PRId64,
-			       s.last_sample.mptcpi_bytes_acked, ret,
-			       s.last_sample.mptcpi_bytes_acked - ret);
+			       s.last_sample.mptcpi_bytes_acked, (uint64_t)nread,
+			       s.last_sample.mptcpi_bytes_acked - (uint64_t)nread);
 	}
 
 	close(fd);
