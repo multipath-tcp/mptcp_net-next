@@ -59,6 +59,19 @@ the location of the returned memory, like GFP_DMA).
 
 ::
 
+	void *
+	dma_alloc_coherent_node(struct device *dev, size_t size,
+				dma_addr_t *dma_handle, gfp_t flag, int node)
+
+Same as dma_alloc_coherent(), but places the memory on the given NUMA node
+rather than on the node of the device. This is useful for memory accessed
+frequently by both the device and a CPU on a different node, for example
+descriptor rings serviced by that CPU.
+
+Like with kmalloc_node() the node is only a preference.
+
+::
+
 	void
 	dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
 			  dma_addr_t dma_handle)
