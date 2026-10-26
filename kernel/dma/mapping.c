@@ -683,7 +683,8 @@ void *dma_alloc_attrs_node(struct device *dev, size_t size,
 		cpu_addr = dma_direct_alloc_node(dev, size, dma_handle, flag,
 						 attrs, node);
 	} else if (use_dma_iommu(dev)) {
-		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs);
+		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs,
+					   node);
 	} else if (ops->alloc) {
 		cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
 	} else {

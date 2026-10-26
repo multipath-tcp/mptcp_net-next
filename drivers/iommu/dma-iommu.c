@@ -883,10 +883,10 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
 }
 
 static struct page **__iommu_dma_alloc_pages(struct device *dev,
-		unsigned int count, unsigned long order_mask, gfp_t gfp)
+		unsigned int count, unsigned long order_mask, gfp_t gfp, int nid)
 {
 	struct page **pages;
-	unsigned int i = 0, nid = dev_to_node(dev);
+	unsigned int i = 0;
 
 	order_mask &= GENMASK(MAX_PAGE_ORDER, 0);
 	if (!order_mask)
@@ -939,7 +939,8 @@ static struct page **__iommu_dma_alloc_pages(struct device *dev,
  * but an IOMMU which supports smaller pages might not map the whole thing.
  */
 static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
-		size_t size, struct sg_table *sgt, gfp_t gfp, unsigned long attrs)
+		size_t size, struct sg_table *sgt, gfp_t gfp, unsigned long attrs,
+		int node)
 {
 	struct iommu_domain *domain = iommu_get_dma_domain(dev);
 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
@@ -967,7 +968,7 @@ static struct page **__iommu_dma_alloc_noncontiguous(struct device *dev,
 
 	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	pages = __iommu_dma_alloc_pages(dev, count, alloc_sizes >> PAGE_SHIFT,
-					gfp);
+					gfp, node);
 	if (!pages)
 		return NULL;
 
@@ -1013,14 +1014,15 @@ out_free_pages:
 }
 
 static void *iommu_dma_alloc_remap(struct device *dev, size_t size,
-		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
+		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs, int node)
 {
 	struct page **pages;
 	struct sg_table sgt;
 	void *vaddr;
 	pgprot_t prot = dma_pgprot(dev, PAGE_KERNEL, attrs);
 
-	pages = __iommu_dma_alloc_noncontiguous(dev, size, &sgt, gfp, attrs);
+	pages = __iommu_dma_alloc_noncontiguous(dev, size, &sgt, gfp, attrs,
+						node);
 	if (!pages)
 		return NULL;
 	*dma_handle = sgt.sgl->dma_address;
@@ -1061,7 +1063,8 @@ struct sg_table *iommu_dma_alloc_noncontiguous(struct device *dev, size_t size,
 	if (!sh)
 		return NULL;
 
-	sh->pages = __iommu_dma_alloc_noncontiguous(dev, size, &sh->sgt, gfp, attrs);
+	sh->pages = __iommu_dma_alloc_noncontiguous(dev, size, &sh->sgt, gfp,
+						    attrs, dev_to_node(dev));
 	if (!sh->pages) {
 		kfree(sh);
 		return NULL;
@@ -1638,11 +1641,10 @@ void iommu_dma_free(struct device *dev, size_t size, void *cpu_addr,
 }
 
 static void *iommu_dma_alloc_pages(struct device *dev, size_t size,
-		struct page **pagep, gfp_t gfp, unsigned long attrs)
+		struct page **pagep, gfp_t gfp, unsigned long attrs, int node)
 {
 	bool coherent = dev_is_dma_coherent(dev);
 	size_t alloc_size = PAGE_ALIGN(size);
-	int node = dev_to_node(dev);
 	struct page *page = NULL;
 	void *cpu_addr;
 
@@ -1677,7 +1679,7 @@ out_free_pages:
 }
 
 void *iommu_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-		gfp_t gfp, unsigned long attrs)
+		gfp_t gfp, unsigned long attrs, int node)
 {
 	bool coherent = dev_is_dma_coherent(dev);
 	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
@@ -1693,7 +1695,8 @@ void *iommu_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 
 	if (gfpflags_allow_blocking(gfp) &&
 	    !(attrs & DMA_ATTR_FORCE_CONTIGUOUS)) {
-		return iommu_dma_alloc_remap(dev, size, handle, gfp, attrs);
+		return iommu_dma_alloc_remap(dev, size, handle, gfp, attrs,
+					     node);
 	}
 
 	if (IS_ENABLED(CONFIG_DMA_DIRECT_REMAP) &&
@@ -1703,7 +1706,8 @@ void *iommu_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 		if (!page)
 			return NULL;
 	} else {
-		cpu_addr = iommu_dma_alloc_pages(dev, size, &page, gfp, attrs);
+		cpu_addr = iommu_dma_alloc_pages(dev, size, &page, gfp, attrs,
+						 node);
 		if (!cpu_addr)
 			return NULL;
 	}
