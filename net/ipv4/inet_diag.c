@@ -276,7 +276,7 @@ int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 	}
 
 	if (!icsk) {
-		handler->idiag_get_info(sk, r, NULL);
+		handler->idiag_get_info(sk, r, NULL, net_admin);
 		goto out;
 	}
 
@@ -327,7 +327,7 @@ int inet_sk_diag_fill(struct sock *sk, struct inet_connection_sock *icsk,
 			goto errout;
 	}
 
-	handler->idiag_get_info(sk, r, info);
+	handler->idiag_get_info(sk, r, info, net_admin);
 
 	if (ext & (1 << (INET_DIAG_INFO - 1)) && handler->idiag_get_aux)
 		if (handler->idiag_get_aux(sk, net_admin, skb) < 0)
@@ -1027,7 +1027,7 @@ int inet_diag_handler_get_info(struct sk_buff *skb, struct sock *sk)
 	if (attr)
 		info = nla_data(attr);
 
-	handler->idiag_get_info(sk, r, info);
+	handler->idiag_get_info(sk, r, info, false);
 	inet_diag_unlock_handler(handler);
 
 	nlmsg_end(skb, nlh);

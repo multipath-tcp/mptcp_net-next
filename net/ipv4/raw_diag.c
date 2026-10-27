@@ -185,7 +185,7 @@ out_unlock:
 }
 
 static void raw_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-			      void *info)
+			      void *info, bool net_admin)
 {
 	r->idiag_rqueue = sk_rmem_alloc_get(sk);
 	r->idiag_wqueue = sk_wmem_alloc_get(sk);

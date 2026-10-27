@@ -16,6 +16,7 @@ static int subflow_get_info(struct sock *sk, struct sk_buff *skb, bool net_admin
 {
 	struct mptcp_subflow_context *sf;
 	struct nlattr *start;
+	u64 map_seq;
 	u32 flags = 0;
 	bool slow;
 	int err;
@@ -34,6 +35,11 @@ static int subflow_get_info(struct sock *sk, struct sk_buff *skb, bool net_admin
 		err = 0;
 		goto nla_failure;
 	}
+
+	map_seq = 0;
+	if (sf->conn && sf->map_seq)
+		map_seq = sf->map_seq -
+			  READ_ONCE(mptcp_sk(sf->conn)->remote_idsn);
 
 	if (sf->mp_capable)
 		flags |= MPTCP_SUBFLOW_FLAG_MCAP_REM;
@@ -67,7 +73,7 @@ static int subflow_get_info(struct sock *sk, struct sk_buff *skb, bool net_admin
 	if (net_admin &&
 	    (nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_RELWRITE_SEQ,
 			 sf->rel_write_seq) ||
-	     nla_put_u64_64bit(skb, MPTCP_SUBFLOW_ATTR_MAP_SEQ, sf->map_seq,
+	     nla_put_u64_64bit(skb, MPTCP_SUBFLOW_ATTR_MAP_SEQ, map_seq,
 			       MPTCP_SUBFLOW_ATTR_PAD) ||
 	     nla_put_u32(skb, MPTCP_SUBFLOW_ATTR_MAP_SFSEQ,
 			 sf->map_subflow_seq) ||

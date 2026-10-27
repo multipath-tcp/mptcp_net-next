@@ -302,6 +302,8 @@ struct mptcp_sock {
 						 * lockless access read
 						 */
 	u64		remote_key;		/* same as above */
+	u64		local_idsn;
+	u64		remote_idsn;
 	u64		write_seq;
 	u64		bytes_sent;
 	u64		snd_nxt;

@@ -20,7 +20,7 @@
 #include <net/sctp/sctp.h>
 
 static void sctp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-			       void *info);
+			       void *info, bool net_admin);
 
 /* define some functions to make asoc/ep fill look clean */
 static void inet_diag_msg_sctpasoc_fill(struct inet_diag_msg *r,
@@ -200,7 +200,7 @@ static int inet_sctp_diag_fill(struct sock *sk, struct sctp_association *asoc,
 	}
 	infox.sctpinfo = (struct sctp_info *)info;
 	infox.asoc = asoc;
-	sctp_diag_get_info(sk, r, &infox);
+	sctp_diag_get_info(sk, r, &infox, net_admin);
 
 	addr_list = asoc ? &asoc->base.bind_addr.address_list
 			 : &ep->base.bind_addr.address_list;
@@ -412,7 +412,7 @@ out:
 
 /* define the functions for sctp_diag_handler*/
 static void sctp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-			       void *info)
+			       void *info, bool net_admin)
 {
 	struct sctp_infox *infox = (struct sctp_infox *)info;
 
