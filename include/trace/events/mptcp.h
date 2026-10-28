@@ -68,6 +68,39 @@ TRACE_EVENT(mptcp_subflow_get_send,
 		  __entry->backup, __entry->ratio)
 );
 
+TRACE_EVENT(mptcp_subflow_penalise,
+
+	TP_PROTO(struct mptcp_subflow_context *subflow, unsigned long max_pace,
+		 u32 burst),
+
+	TP_ARGS(subflow, max_pace, burst),
+
+	TP_STRUCT__entry(
+		__field(u64, pace)
+		__field(u64, max_pace)
+		__field(u32, cwnd)
+		__field(u32, burst)
+		__field(bool, penalise)
+	),
+
+	TP_fast_assign(
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		__entry->pace = subflow->avg_pacing_rate;
+		__entry->max_pace = max_pace;
+		if (ssk && sk_fullsock(ssk))
+			__entry->cwnd = tcp_snd_cwnd(tcp_sk(ssk));
+		else
+			__entry->cwnd = 0;
+		__entry->burst = burst;
+		__entry->penalise = subflow->penalise;
+	),
+
+	TP_printk("pace=%llu max_pace=%llu cwnd=%u burst=%u penalise=%d",
+		  __entry->pace, __entry->max_pace,
+		  __entry->cwnd, __entry->burst, __entry->penalise)
+);
+
 DECLARE_EVENT_CLASS(mptcp_dump_mpext,
 
 	TP_PROTO(struct mptcp_ext *mpext),
