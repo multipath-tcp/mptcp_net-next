@@ -389,13 +389,9 @@ jobs:
             echo "ccl_status_${mode//-/_}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           done
 
-          if [ ! -s "perf.json" ]; then
-            ccl="Perf: Critical: No conclusion ❓"
-          elif grep -q '"fail"' perf.json; then
-            ccl="Perf: Unstable ⚠️"
-          else
-            ccl="Perf: Success! ✅"
-          fi
+          # Perf
+          ccl="$(cut -d: -f3- ".virtme/perf_logs/conclusion.txt" | sed 's/^ //' || true)"
+          ccl="Perf: ${ccl:-"Critical: No conclusion ❓"}"
           echo "ccl_perf=${ccl}" >> ${GITHUB_OUTPUT}
           echo "ccl_status_perf=$(echo "${ccl}" | cut -d: -f2- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           mkdir -p results-perf
