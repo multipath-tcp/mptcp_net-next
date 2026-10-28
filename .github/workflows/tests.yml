@@ -257,7 +257,7 @@ jobs:
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
             ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
-              perf-normal --build --json perf.json \
+              perf-normal --build --json perf.json --json-only-fails -C /perf \
                           --info "run_id:${GITHUB_RUN_ID}"
 
       - name: "Publish conclusion"
