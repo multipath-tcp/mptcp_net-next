@@ -398,9 +398,17 @@ static int sock_connect_mptcp(const char * const remoteaddr,
 			set_mark(sock, cfg_mark);
 
 		if (cfg_sockopt_types.mptfo) {
-			if (!winfo->total_len)
-				winfo->total_len = winfo->len = read(infd, winfo->buf,
-								     sizeof(winfo->buf));
+			if (!winfo->total_len) {
+				ssize_t ret = read(infd, winfo->buf,
+						   sizeof(winfo->buf));
+
+				if (ret < 0) {
+					perror("read");
+					close(sock);
+					return -1;
+				}
+				winfo->total_len = winfo->len = ret;
+			}
 
 			syn_copied = sendto(sock, winfo->buf, winfo->len, MSG_FASTOPEN,
 					    a->ai_addr, a->ai_addrlen);
@@ -698,8 +706,17 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd,
 
 		if (fds.revents & POLLOUT) {
 			if (winfo->len == 0) {
+				ssize_t ret;
+
 				winfo->off = 0;
-				winfo->len = read(infd, winfo->buf, sizeof(winfo->buf));
+				ret = read(infd, winfo->buf, sizeof(winfo->buf));
+				if (ret < 0) {
+					if (errno == EINTR)
+						continue;
+					perror("read");
+					return 4;
+				}
+				winfo->len = ret;
 			}
 
 			if (winfo->len > 0) {
@@ -726,7 +743,7 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd,
 				winfo->off += bw;
 				winfo->len -= bw;
 				total_wlen += bw;
-			} else if (winfo->len == 0) {
+			} else {
 				/* We have no more data to send. */
 				fds.events &= ~POLLOUT;
 
@@ -735,11 +752,6 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd,
 					break;
 
 				shut_wr(peerfd);
-			} else {
-				if (errno == EINTR)
-					continue;
-				perror("read");
-				return 4;
 			}
 		}
 
