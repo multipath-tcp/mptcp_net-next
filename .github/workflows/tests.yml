@@ -257,7 +257,7 @@ jobs:
             --workdir "${PWD}" \
             -v "${PWD}:${PWD}" \
             ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
-              perf-normal --build --json perf.json \
+              perf-normal --build --json perf.json --json-only-fails -C /perf \
                           --info "run_id:${GITHUB_RUN_ID}"
 
       - name: "Publish conclusion"
@@ -267,10 +267,13 @@ jobs:
           {
             echo '## Perf'
             echo 'Branch: ${{ github.ref_name }}'
-            echo 'Summary:'
-            [ -s perf.json ] && echo "- Has results" || echo "- No results: error"
-            { cat .virtme/perf_logs/*/validations.txt || echo "No validations errors"; } | sed 's/^/- /g'
-            { cat .virtme/perf_logs/*/regs.txt || echo "No regressions"; } | sed 's/^/- /g'
+            echo '### Conclusion'
+            cat ".virtme/perf_logs/conclusion.txt" || echo "No conclusion"
+            echo ''
+            echo '### Summary'
+            echo '```'
+            cat ".virtme/perf_logs/summary.txt"
+            echo '```'
             echo ''
             echo '<details>'
             echo '<summary>JSON file:</summary>'
@@ -279,6 +282,16 @@ jobs:
             cat perf.json | jq -r || echo "ERROR"
             echo '```'
             echo '</details>'
+            echo ''
+            echo '<details>'
+            if ls .virtme/perf_logs/*/*/outliers.txt &>/dev/null; then
+              echo '<summary>Outliers:</summary>'
+              echo ''
+              echo '```'
+              cat .virtme/perf_logs/*/*/outliers.txt || echo "Read error"
+              echo '```'
+              echo '</details>'
+            fi
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: "Artifacts"
@@ -287,6 +300,7 @@ jobs:
         with:
           name: perf
           compression-level: 9
+          include-hidden-files: true # .virtme
           path: |
             perf.json
             .virtme/perf_logs/
@@ -375,13 +389,9 @@ jobs:
             echo "ccl_status_${mode//-/_}=$(echo "${ccl}" | cut -d: -f3- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           done
 
-          if [ ! -s "perf.json" ]; then
-            ccl="Perf: Critical: No conclusion ❓"
-          elif grep -q '"fail"' perf.json; then
-            ccl="Perf: Unstable ⚠️"
-          else
-            ccl="Perf: Success! ✅"
-          fi
+          # Perf
+          ccl="$(cut -d: -f3- ".virtme/perf_logs/conclusion.txt" | sed 's/^ //' || true)"
+          ccl="Perf: ${ccl:-"Critical: No conclusion ❓"}"
           echo "ccl_perf=${ccl}" >> ${GITHUB_OUTPUT}
           echo "ccl_status_perf=$(echo "${ccl}" | cut -d: -f2- | sed 's/^ //')" >> ${GITHUB_OUTPUT}
           mkdir -p results-perf
