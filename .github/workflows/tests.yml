@@ -300,6 +300,7 @@ jobs:
         with:
           name: perf
           compression-level: 9
+          include-hidden-files: true # .virtme
           path: |
             perf.json
             .virtme/perf_logs/
