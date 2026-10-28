@@ -18,7 +18,8 @@ struct inet_diag_handler {
 
 	void		(*idiag_get_info)(struct sock *sk,
 					  struct inet_diag_msg *r,
-					  void *info);
+					  void *info,
+					  bool net_admin);
 
 	int		(*idiag_get_aux)(struct sock *sk,
 					 bool net_admin,

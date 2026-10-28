@@ -190,7 +190,7 @@ next:
 }
 
 static void mptcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-				void *_info)
+				void *_info, bool net_admin)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_info *info = _info;

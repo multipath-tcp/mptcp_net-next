@@ -19,7 +19,7 @@
 #include <net/tcp.h>
 
 static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-			      void *_info)
+			      void *_info, bool net_admin)
 {
 	struct tcp_info *info = _info;
 

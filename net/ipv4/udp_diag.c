@@ -142,7 +142,7 @@ done:
 }
 
 static void udp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-		void *info)
+		void *info, bool net_admin)
 {
 	r->idiag_rqueue = udp_rqueue_get(sk);
 	r->idiag_wqueue = sk_wmem_alloc_get(sk);
