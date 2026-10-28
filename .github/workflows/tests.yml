@@ -267,10 +267,13 @@ jobs:
           {
             echo '## Perf'
             echo 'Branch: ${{ github.ref_name }}'
-            echo 'Summary:'
-            [ -s perf.json ] && echo "- Has results" || echo "- No results: error"
-            { cat .virtme/perf_logs/*/validations.txt || echo "No validations errors"; } | sed 's/^/- /g'
-            { cat .virtme/perf_logs/*/regs.txt || echo "No regressions"; } | sed 's/^/- /g'
+            echo '### Conclusion'
+            cat ".virtme/perf_logs/conclusion.txt" || echo "No conclusion"
+            echo ''
+            echo '### Summary'
+            echo '```'
+            cat ".virtme/perf_logs/summary.txt"
+            echo '```'
             echo ''
             echo '<details>'
             echo '<summary>JSON file:</summary>'
