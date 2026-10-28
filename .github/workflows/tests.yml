@@ -282,6 +282,16 @@ jobs:
             cat perf.json | jq -r || echo "ERROR"
             echo '```'
             echo '</details>'
+            echo ''
+            echo '<details>'
+            if ls .virtme/perf_logs/*/*/outliers.txt &>/dev/null; then
+              echo '<summary>Outliers:</summary>'
+              echo ''
+              echo '```'
+              cat .virtme/perf_logs/*/*/outliers.txt || echo "Read error"
+              echo '```'
+              echo '</details>'
+            fi
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: "Artifacts"
