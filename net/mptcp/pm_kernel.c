@@ -970,7 +970,7 @@ static int mptcp_nl_add_subflow_or_signal_addr(struct net *net,
 		struct mptcp_addr_info mpc_addr;
 
 		if (!mptcp_is_fully_established(sk) ||
-		    mptcp_pm_is_userspace(msk))
+		    !mptcp_pm_is_kernel(msk))
 			goto next;
 
 		/* if the endp linked to the init sf is re-added with a != ID */
@@ -1096,7 +1096,7 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		bool remove_subflow;
 
 		if (!READ_ONCE(msk->fully_established) ||
-		    mptcp_pm_is_userspace(msk))
+		    !mptcp_pm_is_kernel(msk))
 			goto next;
 
 		lock_sock(sk);
@@ -1144,7 +1144,7 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 
 		if (list_empty(&msk->conn_list) ||
 		    !READ_ONCE(msk->fully_established) ||
-		    mptcp_pm_is_userspace(msk))
+		    !mptcp_pm_is_kernel(msk))
 			goto next;
 
 		mptcp_local_address((struct sock_common *)msk, &msk_local);
@@ -1292,7 +1292,7 @@ static void mptcp_nl_flush_addrs_list(struct net *net,
 		struct sock *sk = (struct sock *)msk;
 
 		if (READ_ONCE(msk->fully_established) &&
-		    !mptcp_pm_is_userspace(msk)) {
+		    mptcp_pm_is_kernel(msk)) {
 			lock_sock(sk);
 			mptcp_pm_flush_addrs_and_subflows(msk, rm_list, NULL);
 			release_sock(sk);
@@ -1508,7 +1508,7 @@ static void mptcp_pm_nl_set_flags_all(struct net *net,
 
 		if (list_empty(&msk->conn_list) ||
 		    !READ_ONCE(msk->fully_established) ||
-		    mptcp_pm_is_userspace(msk))
+		    !mptcp_pm_is_kernel(msk))
 			goto next;
 
 		lock_sock(sk);
