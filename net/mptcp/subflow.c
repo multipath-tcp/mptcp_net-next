@@ -542,6 +542,7 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 		skb = skb_peek(&sk->sk_receive_queue);
 		if (skb) {
 			MPTCP_SKB_CB(skb)->map_seq = subflow->iasn - skb->len;
+			MPTCP_SKB_CB(skb)->map_seq64 = subflow->iasn - skb->len;
 			MPTCP_SKB_CB(skb)->end_seq = subflow->iasn;
 			msk->copied_seq -= skb->len;
 		}
