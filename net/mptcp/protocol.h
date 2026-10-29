@@ -31,13 +31,10 @@
 #define OPTION_MPTCP_DSS	BIT(11)
 #define OPTION_MPTCP_FAIL	BIT(12)
 
-#define OPTION_MPTCP_CSUMREQD	BIT(13)
-
 #define OPTIONS_MPTCP_MPC	(OPTION_MPTCP_MPC_SYN | OPTION_MPTCP_MPC_SYNACK | \
 				 OPTION_MPTCP_MPC_ACK)
 #define OPTIONS_MPTCP_MPJ	(OPTION_MPTCP_MPJ_SYN | OPTION_MPTCP_MPJ_SYNACK | \
 				 OPTION_MPTCP_MPJ_ACK)
-#define OPTIONS_MPTCP_DSS	(OPTION_MPTCP_DSS | OPTION_MPTCP_CSUMREQD)
 
 /* MPTCP option subtypes */
 #define MPTCPOPT_MP_CAPABLE	0
@@ -165,7 +162,8 @@ struct mptcp_options_received {
 		    echo:1,
 		    backup:1,
 		    deny_join_id0:1,
-		    __unused:2;
+		    csum_reqd:1,
+		    __unused:1;
 	);
 	struct mptcp_rm_list rm_list;
 	/* Options below are mutually exclusive, see mptcp_parse_option() */
