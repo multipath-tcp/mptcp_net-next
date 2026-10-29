@@ -707,6 +707,26 @@ int mptcp_userspace_pm_get_addr(u8 id, struct mptcp_pm_addr_entry *addr,
 	return ret;
 }
 
+/* Add the initial local address (ID0) to the local list: easier that way */
+void mptcp_pm_userspace_created(struct mptcp_sock *msk, const struct sock *ssk)
+{
+	struct mptcp_pm_addr_entry *entry;
+
+	entry = sock_kmalloc((struct sock *)msk, sizeof(*entry), GFP_ATOMIC);
+	/* Fine not to handle the ID0 case in memory pressure */
+	if (!entry)
+		return;
+
+	memset(entry, 0, sizeof(*entry));
+	mptcp_local_address((struct sock_common *)ssk, &entry->addr);
+	entry->addr.port = 0; /* msk port */
+
+	spin_lock_bh(&msk->pm.lock);
+	list_add_tail_rcu(&entry->list, &msk->pm.userspace_pm_local_addr_list);
+	/* The initial address ID doesn't increment local_addr_used */
+	spin_unlock_bh(&msk->pm.lock);
+}
+
 static struct mptcp_pm_ops mptcp_pm_userspace = {
 	.get_local_id		= mptcp_pm_userspace_get_local_id,
 	.get_priority		= mptcp_pm_userspace_get_priority,
