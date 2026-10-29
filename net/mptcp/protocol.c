@@ -2748,7 +2748,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	 */
 	if (!inet_csk(ssk)->icsk_ulp_ops) {
 		WARN_ON_ONCE(!sock_flag(ssk, SOCK_DEAD));
-		kfree_rcu(subflow, rcu);
+		mptcp_subflow_ctx_retire(subflow);
 	} else {
 		/* otherwise tcp will dispose of the ssk and subflow ctx */
 		__tcp_close(ssk, 0);
@@ -4837,7 +4837,18 @@ static int mptcp_napi_poll(struct napi_struct *napi, int budget)
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
 		bh_lock_sock_nested(ssk);
-		if (!sock_owned_by_user(ssk)) {
+		if (unlikely(!READ_ONCE(inet_csk(ssk)->icsk_ulp_ops))) {
+			/* The ULP is gone, released or fallen back to plain
+			 * TCP: there is nothing left to process, and the msk
+			 * may be gone too. The ops are cleared with the socket
+			 * owned or under its bh lock, so a racing read lands
+			 * in the owned branch below. Both free a context that
+			 * was retired while queued.
+			 */
+			if (xchg(&subflow->delegated_status, 0) &
+			    BIT(MPTCP_DELEGATE_RETIRED))
+				kfree_rcu(subflow, rcu);
+		} else if (!sock_owned_by_user(ssk)) {
 			mptcp_subflow_process_delegated(ssk, xchg(&subflow->delegated_status, 0));
 		} else {
 			/* tcp_release_cb_override already processed
@@ -4846,7 +4857,10 @@ static int mptcp_napi_poll(struct napi_struct *napi, int budget)
 			 * CPU that scheduled it.
 			 */
 			smp_wmb();
-			clear_bit(MPTCP_DELEGATE_SCHEDULED, &subflow->delegated_status);
+			if (set_mask_bits(&subflow->delegated_status,
+					  BIT(MPTCP_DELEGATE_SCHEDULED), 0) &
+			    BIT(MPTCP_DELEGATE_RETIRED))
+				kfree_rcu(subflow, rcu);
 		}
 		bh_unlock_sock(ssk);
 		sock_put(ssk);

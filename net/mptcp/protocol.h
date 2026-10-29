@@ -556,8 +556,10 @@ DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 #define MPTCP_DELEGATE_SEND		1
 #define MPTCP_DELEGATE_ACK		2
 #define MPTCP_DELEGATE_SNDBUF		3
+#define MPTCP_DELEGATE_RETIRED		4	/* the ULP is gone, NAPI frees the ctx */
 
-#define MPTCP_DELEGATE_ACTIONS_MASK	(~BIT(MPTCP_DELEGATE_SCHEDULED))
+#define MPTCP_DELEGATE_ACTIONS_MASK	(~(BIT(MPTCP_DELEGATE_SCHEDULED) | \
+					   BIT(MPTCP_DELEGATE_RETIRED)))
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
@@ -631,11 +633,11 @@ struct mptcp_subflow_context {
 
 	u32	subflow_id;
 
-	long	delegated_status;
 	unsigned long	fail_tout;
 
 	);
 
+	long	delegated_status;	    /* not reset, the ctx may still be queued */
 	struct	list_head delegated_node;   /* link into delegated_action, protected by local BH */
 
 	u32	setsockopt_seq;
@@ -674,6 +676,8 @@ mptcp_subflow_ctx_reset(struct mptcp_subflow_context *subflow)
 	memset(&subflow->reset, 0, sizeof(subflow->reset));
 	subflow->request_mptcp = 1;
 	WRITE_ONCE(subflow->local_id, -1);
+	/* a queued delegated action stays queued, only its payload goes */
+	set_mask_bits(&subflow->delegated_status, MPTCP_DELEGATE_ACTIONS_MASK, 0);
 }
 
 /* Convert reset reasons in MPTCP to enum sk_rst_reason type */
@@ -792,6 +796,18 @@ static inline void mptcp_subflow_delegate(struct mptcp_subflow_context *subflow,
 		if (schedule)
 			napi_schedule(&delegated->napi);
 	}
+}
+
+/* Retire a subflow context whose ULP is gone: free it, unless a delegated
+ * action is still queued for it, in which case mptcp_napi_poll() frees it
+ * once the entry is dequeued.
+ */
+static inline void mptcp_subflow_ctx_retire(struct mptcp_subflow_context *subflow)
+{
+	if (!(set_mask_bits(&subflow->delegated_status, 0,
+			    BIT(MPTCP_DELEGATE_RETIRED)) &
+	      BIT(MPTCP_DELEGATE_SCHEDULED)))
+		kfree_rcu(subflow, rcu);
 }
 
 static inline struct mptcp_subflow_context *
