@@ -241,7 +241,7 @@ jobs:
           /usr/bin/docker pull ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest
 
       - name: "Tests"
-        timeout-minutes: 120
+        timeout-minutes: 180
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -417,6 +417,7 @@ jobs:
         if: github.ref == 'refs/heads/export' || github.ref == 'refs/heads/export-net'
         uses: rectalogic/notify-irc@v2
         continue-on-error: true
+        timeout-minutes: 5
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
