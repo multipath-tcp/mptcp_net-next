@@ -969,7 +969,7 @@ static int mptcp_nl_add_subflow_or_signal_addr(struct net *net,
 		struct sock *sk = (struct sock *)msk;
 		struct mptcp_addr_info mpc_addr;
 
-		if (!READ_ONCE(msk->fully_established) ||
+		if (!mptcp_is_fully_established(sk) ||
 		    mptcp_pm_is_userspace(msk))
 			goto next;
 
@@ -1095,7 +1095,8 @@ static int mptcp_nl_remove_subflow_and_signal_addr(struct net *net,
 		struct sock *sk = (struct sock *)msk;
 		bool remove_subflow;
 
-		if (mptcp_pm_is_userspace(msk))
+		if (!READ_ONCE(msk->fully_established) ||
+		    mptcp_pm_is_userspace(msk))
 			goto next;
 
 		lock_sock(sk);
@@ -1141,7 +1142,9 @@ static int mptcp_nl_remove_id_zero_address(struct net *net,
 		struct mptcp_addr_info anno_addr;
 		bool announced;
 
-		if (list_empty(&msk->conn_list) || mptcp_pm_is_userspace(msk))
+		if (list_empty(&msk->conn_list) ||
+		    !READ_ONCE(msk->fully_established) ||
+		    mptcp_pm_is_userspace(msk))
 			goto next;
 
 		mptcp_local_address((struct sock_common *)msk, &msk_local);
@@ -1288,7 +1291,8 @@ static void mptcp_nl_flush_addrs_list(struct net *net,
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
 
-		if (!mptcp_pm_is_userspace(msk)) {
+		if (READ_ONCE(msk->fully_established) &&
+		    !mptcp_pm_is_userspace(msk)) {
 			lock_sock(sk);
 			mptcp_pm_flush_addrs_and_subflows(msk, rm_list, NULL);
 			release_sock(sk);
@@ -1502,7 +1506,9 @@ static void mptcp_pm_nl_set_flags_all(struct net *net,
 	while ((msk = mptcp_token_iter_next(net, &s_slot, &s_num)) != NULL) {
 		struct sock *sk = (struct sock *)msk;
 
-		if (list_empty(&msk->conn_list) || mptcp_pm_is_userspace(msk))
+		if (list_empty(&msk->conn_list) ||
+		    !READ_ONCE(msk->fully_established) ||
+		    mptcp_pm_is_userspace(msk))
 			goto next;
 
 		lock_sock(sk);
