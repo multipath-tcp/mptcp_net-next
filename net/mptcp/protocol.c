@@ -2761,10 +2761,13 @@ out_release:
 	__mptcp_subflow_error_report(sk, ssk);
 	release_sock(ssk);
 
-	sock_put(ssk);
-
+	/* the diag code reads msk->first under RCU only: clear it before
+	 * dropping the reference that keeps the subflow alive
+	 */
 	if (ssk == msk->first)
 		WRITE_ONCE(msk->first, NULL);
+
+	sock_put(ssk);
 
 out:
 	__mptcp_sync_sndbuf(sk);

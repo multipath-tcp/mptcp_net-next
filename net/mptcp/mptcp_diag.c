@@ -200,8 +200,10 @@ static void mptcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 	r->idiag_wqueue = sk_wmem_alloc_get(sk);
 
 	if (inet_sk_state_load(sk) == TCP_LISTEN) {
-		struct sock *lsk = READ_ONCE(msk->first);
+		struct sock *lsk;
 
+		rcu_read_lock();
+		lsk = READ_ONCE(msk->first);
 		if (lsk) {
 			/* override with settings from tcp listener,
 			 * so Send-Q will show accept queue.
@@ -209,6 +211,7 @@ static void mptcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 			r->idiag_rqueue = READ_ONCE(lsk->sk_ack_backlog);
 			r->idiag_wqueue = READ_ONCE(lsk->sk_max_ack_backlog);
 		}
+		rcu_read_unlock();
 	}
 
 	if (!info)
