@@ -134,6 +134,7 @@ jobs:
       - name: irc build
         uses: rectalogic/notify-irc@v2
         continue-on-error: true
+        timeout-minutes: 5
         with:
           server: irc.libera.chat
           channel: "#mptcp-ci"
@@ -146,6 +147,7 @@ jobs:
         if: needs.build.result == 'failure'
         uses: rectalogic/notify-irc@v2
         continue-on-error: true
+        timeout-minutes: 5
         with:
           server: irc.libera.chat
           channel: "#mptcp"
