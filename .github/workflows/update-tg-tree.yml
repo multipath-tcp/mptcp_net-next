@@ -46,6 +46,7 @@ jobs:
         if: failure() && github.repository_owner == 'multipath-tcp'
         uses: rectalogic/notify-irc@v2
         continue-on-error: true
+        timeout-minutes: 5
         with:
           server: irc.libera.chat
           channel: "#mptcp"
