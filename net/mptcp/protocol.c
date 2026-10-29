@@ -94,6 +94,7 @@ bool __mptcp_try_fallback(struct mptcp_sock *msk, int fb_mib)
 		return false;
 	}
 
+	WRITE_ONCE(msk->fully_established, false);
 	msk->allow_subflows = false;
 	set_bit(MPTCP_FALLBACK_DONE, &msk->flags);
 	clear_bit(MPTCP_RTX_ENABLED, &msk->flags);
