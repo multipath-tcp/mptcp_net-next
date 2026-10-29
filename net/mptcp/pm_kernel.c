@@ -584,13 +584,15 @@ fill_local_addresses_vec_c_flag(struct mptcp_sock *msk,
 
 		__clear_bit(local->addr.id, msk->pm.id_avail_bitmap);
 
-		if (!mptcp_pm_addr_families_match(sk, &local->addr, remote))
-			continue;
-
 		if (local->addr.id == msk->mpc_endpoint_id)
 			continue;
 
+		/* Increment before checking families, similar to non C-flag */
 		msk->pm.local_addr_used++;
+
+		if (!mptcp_pm_addr_families_match(sk, &local->addr, remote))
+			continue;
+
 		msk->pm.extra_subflows++;
 		i++;
 
