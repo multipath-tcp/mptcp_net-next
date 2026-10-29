@@ -282,9 +282,9 @@ jobs:
             cat perf.json | jq -r || echo "ERROR"
             echo '```'
             echo '</details>'
-            echo ''
-            echo '<details>'
             if ls .virtme/perf_logs/*/*/outliers.txt &>/dev/null; then
+              echo ''
+              echo '<details>'
               echo '<summary>Outliers:</summary>'
               echo ''
               echo '```'
