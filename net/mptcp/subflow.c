@@ -542,7 +542,8 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 		if (skb) {
 			u64 tfo_map_seq = subflow->iasn - skb->len;
 
-			WRITE_ONCE(MPTCP_SKB_CB(skb)->map_seq, tfo_map_seq);
+			WRITE_ONCE(MPTCP_SKB_CB(skb)->map_seq, (u32)tfo_map_seq);
+			WRITE_ONCE(MPTCP_SKB_CB(skb)->map_seq64, tfo_map_seq);
 			WRITE_ONCE(MPTCP_SKB_CB(skb)->end_seq, subflow->iasn);
 
 			if (READ_ONCE(msk->copied_seq) != -(u64)skb->len)
