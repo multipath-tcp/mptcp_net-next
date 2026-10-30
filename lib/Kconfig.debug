@@ -425,12 +425,30 @@ config PAHOLE_HAS_LANG_EXCLUDE
 	  otherwise it would emit malformed kernel and module binaries when
 	  using DEBUG_INFO_BTF_MODULES.
 
+config PAHOLE_HAS_INLINE
+	def_bool PAHOLE_VERSION >= 132
+	help
+	  Support for the "inline" BTF feature is available. It encodes
+	  information about inline sites and how to retrieve their parameters.
+
 config DEBUG_INFO_BTF_MODULES
 	bool "Generate BTF type information for kernel modules"
 	default y
 	depends on DEBUG_INFO_BTF && MODULES
 	help
 	  Generate compact split BTF type information for kernel modules.
+
+config DEBUG_INFO_BTF_INLINE
+	tristate "Provide information about inline sites in BTF"
+	default n
+	depends on DEBUG_INFO_BTF && PAHOLE_HAS_INLINE && SYSFS
+	select DEBUG_INFO_BTF_MODULES if MODULES
+	help
+	  Generate information about inline sites in .BTF.inline sections.
+	  These sections contain split BTF relative to the kernel or module BTF
+	  and are made available in /sys/kernel/btf with a ".inline" suffix.
+	  The information describes inline locations and how to retrieve their
+	  associated parameters.
 
 config MODULE_ALLOW_BTF_MISMATCH
 	bool "Allow loading modules with non-matching BTF type info"
@@ -2649,19 +2667,6 @@ config TEST_WORKQUEUE
 
 	  If unsure, say N.
 
-config TEST_BPF
-	tristate "Test BPF filter functionality"
-	depends on m && NET
-	help
-	  This builds the "test_bpf" module that runs various test vectors
-	  against the BPF interpreter or BPF JIT compiler depending on the
-	  current setting. This is in particular useful for BPF JIT compiler
-	  development, but also to run regression tests against changes in
-	  the interpreter code. It also enables test stubs for eBPF maps and
-	  verifier used by user space verifier testsuite.
-
-	  If unsure, say N.
-
 config FIND_BIT_BENCHMARK
 	tristate "Test find_bit functions"
 	help
@@ -2805,7 +2810,6 @@ config RESOURCE_KUNIT_TEST
 	tristate "KUnit test for resource API" if !KUNIT_ALL_TESTS
 	depends on KUNIT
 	default KUNIT_ALL_TESTS
-	select GET_FREE_REGION
 	help
 	  This builds the resource API unit test.
 	  Tests the logic of API provided by resource.c and ioport.h.
@@ -2821,6 +2825,21 @@ config SYSCTL_KUNIT_TEST
 	help
 	  This builds the proc sysctl unit test, which runs on boot.
 	  Tests the API contract and implementation correctness of sysctl.
+	  For more information on KUnit and unit tests in general please refer
+	  to the KUnit documentation in Documentation/dev-tools/kunit/.
+
+	  If unsure, say N.
+
+config ERRSEQ_KUNIT_TEST
+	tristate "KUnit test for errseq" if !KUNIT_ALL_TESTS
+	depends on KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  This builds the errseq KUnit test suite.
+	  It tests the documented semantics of the errseq_t error-tracking
+	  infrastructure (lib/errseq.c), which underpins writeback error
+	  reporting.
+
 	  For more information on KUnit and unit tests in general please refer
 	  to the KUnit documentation in Documentation/dev-tools/kunit/.
 
