@@ -100,6 +100,8 @@ enum linux_mptcp_mib_field {
 	MPTCP_MIB_OFOPRUNED,		/* MPTCP-level OoO queue pruned */
 	MPTCP_MIB_CWNDPENALISED,	/* subflow cwnd halved by the scheduler */
 	MPTCP_MIB_PENALCAND,		/* scheduler picked a slow (low-rate) subflow */
+	MPTCP_MIB_OPPREINJ,		/* Opportunistic reinjections on an idle subflow */
+	MPTCP_MIB_OPPREINJBYTES,	/* Bytes sent by opportunistic reinjections */
 	__MPTCP_MIB_MAX
 };
 

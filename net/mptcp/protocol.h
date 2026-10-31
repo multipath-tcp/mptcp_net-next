@@ -117,6 +117,7 @@
 #define MPTCP_FALLBACK_DONE	2
 #define MPTCP_WORK_CLOSE_SUBFLOW 3
 #define MPTCP_RTX_ENABLED	4
+#define MPTCP_WORK_OPPR		5
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
@@ -294,6 +295,40 @@ struct mptcp_data_frag {
  */
 #define MPTCP_RTT_SAMPLES	5
 
+/* Why get_retrans is called, in msk->sched_retrans */
+enum mptcp_sched_retrans {
+	/* the MPTCP-level retransmission timer fired */
+	MPTCP_SCHED_RETRANS_RTO,
+	/* A subflow is idle, nothing new can be sent, and other subflows
+	 * hold data the peer is waiting for. The core resends that data on
+	 * the subflow the scheduler marks, up to the reinject_limit bytes it
+	 * sets there: 0, the default, sends nothing. Nothing new can be sent
+	 * because:
+	 */
+	/* the peer's receive window is nearly full */
+	MPTCP_SCHED_RETRANS_IDLE_WND,
+	/* the application waits for send buffer space */
+	MPTCP_SCHED_RETRANS_IDLE_SNDBUF,
+	/* the application has nothing more to send for now */
+	MPTCP_SCHED_RETRANS_IDLE_APP,
+};
+
+#define MPTCP_OPPR_MAX_RANGES	32
+
+struct mptcp_oppr_range {
+	u64 start;
+	u64 end;
+};
+
+/* What __mptcp_oppr() resends: see mptcp_sched_oppr_get() */
+struct mptcp_sched_oppr {
+	struct sock *ssk;
+	u32 limit;
+	u64 una;
+	int n;
+	struct mptcp_oppr_range r[MPTCP_OPPR_MAX_RANGES];
+};
+
 /* MPTCP connection sock */
 struct mptcp_sock {
 	/* inet_connection_sock must be the first member */
@@ -310,6 +345,10 @@ struct mptcp_sock {
 	atomic64_t	rcv_wnd_sent;
 	u64		rcv_data_fin_seq;
 	u64		bytes_retrans;
+	u64		oppr_una;	/* snd_una of the last opportunistic
+					 * reinjection, or of its refusal
+					 */
+	u8		sched_retrans;	/* enum mptcp_sched_retrans */
 	u64		bytes_consumed;
 	int		snd_burst;
 	int		old_wspace;
@@ -610,6 +649,9 @@ struct mptcp_subflow_context {
 				     * most this many bytes before it is
 				     * asked again; 0 for no limit
 				     */
+	u32	reinject_limit;	    /* set by the scheduler, on an
+				     * MPTCP_SCHED_RETRANS_IDLE_* reason
+				     */
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
 	bool	fully_established;  /* path validated */
 	bool	close_event_done;   /* has done the post-closed part,
@@ -888,6 +930,8 @@ struct sock *mptcp_subflow_get_send(struct mptcp_sock *msk);
 struct sock *mptcp_subflow_get_retrans(struct mptcp_sock *msk);
 int mptcp_sched_get_send(struct mptcp_sock *msk);
 int mptcp_sched_get_retrans(struct mptcp_sock *msk);
+bool mptcp_sched_oppr_get(struct mptcp_sock *msk,
+			  struct mptcp_sched_oppr *oppr);
 
 static inline u64 mptcp_data_avail(const struct mptcp_sock *msk)
 {

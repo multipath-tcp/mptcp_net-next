@@ -3057,6 +3057,92 @@ static int __mptcp_push_retrans(struct sock *sk, struct mptcp_data_frag *dfrag,
 	return len;
 }
 
+/* resend [start, end) on @ssk from the msk rtx queue; < 0 on a send error */
+static int mptcp_oppr_send_range(struct sock *sk, struct sock *ssk, u64 start,
+				 u64 end, int budget,
+				 struct mptcp_sendmsg_info *info)
+{
+	struct mptcp_data_frag *dfrag;
+	int copied = 0, ret;
+
+	list_for_each_entry(dfrag, &mptcp_sk(sk)->rtx_queue, list) {
+		if (!dfrag->already_sent || !before64(dfrag->data_seq, end))
+			break;
+		if (!after64(dfrag->data_seq + dfrag->already_sent, start))
+			continue;
+
+		info->sent = before64(dfrag->data_seq, start) ?
+			     start - dfrag->data_seq : 0;
+		info->limit = min_t(u64, dfrag->already_sent,
+				    end - dfrag->data_seq);
+		info->limit = min_t(u64, info->limit,
+				    info->sent + budget - copied);
+		while (info->sent < info->limit && copied < budget) {
+			ret = mptcp_sendmsg_frag(sk, ssk, dfrag, info);
+			if (ret <= 0)
+				return copied ? : -1;
+			copied += ret;
+			info->sent += ret;
+		}
+		if (copied >= budget)
+			break;
+	}
+	return copied;
+}
+
+/* Opportunistic reinjection: the scheduling part is in sched.c */
+static void __mptcp_oppr(struct sock *sk)
+{
+	struct mptcp_sendmsg_info info = { .data_lock_held = true, };
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	int copied = 0, budget, ret, i;
+	struct mptcp_sched_oppr oppr;
+	struct sock *ssk;
+
+	mptcp_data_lock(sk);
+	__mptcp_clean_una_wakeup(sk);
+	oppr.una = msk->snd_una;
+	mptcp_data_unlock(sk);
+
+	if (!mptcp_sched_oppr_get(msk, &oppr))
+		return;
+
+	ssk = oppr.ssk;
+	lock_sock(ssk);
+	/* the scheduler's limit, and no more than one cwnd */
+	budget = min_t(u64, oppr.limit,
+		       tcp_snd_cwnd(tcp_sk(ssk)) * tcp_sk(ssk)->mss_cache);
+
+	spin_lock_bh(&msk->fallback_lock);
+	if (__mptcp_check_fallback(msk) || !msk->allow_subflows)
+		goto unlock;
+
+	for (i = 0; i < oppr.n && copied < budget; i++) {
+		ret = mptcp_oppr_send_range(sk, ssk, oppr.r[i].start,
+					    oppr.r[i].end, budget - copied,
+					    &info);
+		if (ret < 0)
+			break;
+		copied += ret;
+	}
+
+	if (copied) {
+		/* once per snd_una value; after a failed send, the next
+		 * DATA_ACK tries again
+		 */
+		WRITE_ONCE(msk->oppr_una, oppr.una);
+		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
+			 info.size_goal);
+		msk->allow_infinite_fallback = false;
+		msk->bytes_retrans += copied;
+		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_OPPREINJ);
+		MPTCP_ADD_STATS(sock_net(sk), MPTCP_MIB_OPPREINJBYTES, copied);
+	}
+unlock:
+	spin_unlock_bh(&msk->fallback_lock);
+	release_sock(ssk);
+}
+
 static void __mptcp_retrans(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -3294,6 +3380,9 @@ static void mptcp_worker(struct work_struct *work)
 
 	if (test_and_clear_bit(MPTCP_WORK_RTX, &msk->flags))
 		__mptcp_retrans(sk);
+
+	if (test_and_clear_bit(MPTCP_WORK_OPPR, &msk->flags))
+		__mptcp_oppr(sk);
 
 	fail_tout = msk->first ? READ_ONCE(mptcp_subflow_ctx(msk->first)->fail_tout) : 0;
 	if (fail_tout && time_after(jiffies, fail_tout))
