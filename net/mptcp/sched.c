@@ -28,6 +28,9 @@ static int mptcp_sched_default_get_send(struct mptcp_sock *msk)
 	return 0;
 }
 
+#define MPTCP_OPPR_BUDGET	(256 * 1024)
+#define MPTCP_OPPR_GONE		U32_MAX
+
 /* the active subflow with nothing to send or retransmit and the lowest RTT */
 static struct sock *mptcp_sched_oppr_idle_ssk(struct mptcp_sock *msk)
 {
@@ -53,11 +56,98 @@ static struct sock *mptcp_sched_oppr_idle_ssk(struct mptcp_sock *msk)
 	return pick;
 }
 
+/* How much earlier, in us, a copy sent now on @idle would reach the peer
+ * than the data held by @subflow: about half an RTT of each, the current one
+ * of @subflow and the base one of @idle, whose queue is empty. 0 if @subflow
+ * holds nothing, is not slower than @idle, or if the copy would not save at
+ * least one RTT of @idle: with a smaller gain, the copies cost more than they
+ * save. MPTCP_OPPR_GONE if @subflow is gone.
+ */
+static u32 mptcp_sched_oppr_gain(struct mptcp_subflow_context *subflow,
+				 const struct sock *idle)
+{
+	struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+	u32 srtt, min_rtt;
+
+	/* racy on a DATA_ACK, only a hint: the worker checks again */
+	if (ssk == idle || data_race(tcp_rtx_and_write_queues_empty(ssk)))
+		return 0;
+
+	/* A joining subflow only holds its SYN, and a closed one nothing, even
+	 * if its queues look used: tcp_disconnect() moves the write_seq.
+	 */
+	if ((1 << inet_sk_state_load(ssk)) &
+	    (TCPF_SYN_SENT | TCPF_SYN_RECV | TCPF_CLOSE))
+		return 0;
+
+	if (!__mptcp_subflow_active(subflow))
+		return MPTCP_OPPR_GONE;
+
+	/* A retransmission timeout without progress since: the subflow may
+	 * be broken, which the stale detection handles (it needs the
+	 * MPTCP-level timeouts that copies would avoid).
+	 */
+	if (READ_ONCE(inet_csk(ssk)->icsk_retransmits))
+		return 0;
+
+	srtt = READ_ONCE(tcp_sk(ssk)->srtt_us) >> 3;
+	/* same here, @idle is not locked */
+	min_rtt = data_race(tcp_min_rtt(tcp_sk(idle)));
+	if (READ_ONCE(ssk->sk_pacing_rate) >= READ_ONCE(idle->sk_pacing_rate) ||
+	    min_rtt == ~0U || srtt <= 3 * min_rtt)
+		return 0;
+	return (srtt - min_rtt) / 2;
+}
+
+/* The largest gain of the subflows, 0 if nothing is worth resending on @idle */
+static u32 mptcp_sched_oppr_max_gain(struct mptcp_sock *msk,
+				     const struct sock *idle)
+{
+	struct mptcp_subflow_context *subflow;
+	u32 gain = 0;
+
+	mptcp_for_each_subflow(msk, subflow)
+		gain = max(gain, mptcp_sched_oppr_gain(subflow, idle));
+	return gain;
+}
+
+/* The default scheduler's choice on an MPTCP_SCHED_RETRANS_IDLE_* reason,
+ * whichever it is: the idle subflow with the lowest RTT, if another subflow
+ * holds data worth resending on it. The limit is what the idle subflow can
+ * send in the time the copies save; a subflow that is gone saves an MPTCP
+ * RTO.
+ */
+static struct sock *mptcp_sched_oppr_default(struct mptcp_sock *msk)
+{
+	struct sock *idle;
+	u64 limit;
+	u32 gain;
+
+	idle = mptcp_sched_oppr_idle_ssk(msk);
+	if (!idle)
+		return NULL;
+
+	gain = mptcp_sched_oppr_max_gain(msk, idle);
+	if (!gain)
+		return NULL;
+
+	limit = MPTCP_OPPR_BUDGET;
+	if (gain != MPTCP_OPPR_GONE)
+		limit = min_t(u64, limit,
+			      div_u64((u64)READ_ONCE(idle->sk_pacing_rate) * gain,
+				      USEC_PER_SEC));
+	mptcp_subflow_ctx(idle)->reinject_limit = limit;
+	return idle;
+}
+
 static int mptcp_sched_default_get_retrans(struct mptcp_sock *msk)
 {
 	struct sock *ssk;
 
-	ssk = mptcp_subflow_get_retrans(msk);
+	if (msk->sched_retrans != MPTCP_SCHED_RETRANS_RTO)
+		ssk = mptcp_sched_oppr_default(msk);
+	else
+		ssk = mptcp_subflow_get_retrans(msk);
 	if (!ssk)
 		return -EINVAL;
 
@@ -263,23 +353,36 @@ int mptcp_sched_get_retrans(struct mptcp_sock *msk)
  * that already reached the peer.
  *
  * The scheduler decides on which subflow, and how much, through get_retrans
- * with the reason in msk->sched_retrans. This is done at most once per
- * snd_una value.
+ * with the reason in msk->sched_retrans. The default one resends only data
+ * held by a subflow that is gone, or that is slower than the idle one and
+ * whose RTT is long enough for a copy to arrive at least one RTT of the
+ * idle subflow sooner. Below that, the copies cost the idle subflow more
+ * than they save. This is done at most once per snd_una value, and at most
+ * what the idle subflow can send in the time saved, or MPTCP_OPPR_BUDGET for
+ * a subflow that is gone.
  */
 #define MPTCP_OPPR_MIN		(16 * 1024)
+
+/* the in-kernel default scheduler */
+static bool mptcp_sched_is_default(const struct mptcp_sock *msk)
+{
+	const struct mptcp_sched_ops *sched = READ_ONCE(msk->sched);
+
+	return !sched || sched == &mptcp_sched_default;
+}
 
 /* can the scheduler be asked to reinject: see mptcp_sched_get_reinject() */
 static bool mptcp_sched_has_reinject(const struct mptcp_sock *msk)
 {
 	const struct mptcp_sched_ops *sched = READ_ONCE(msk->sched);
 
-	return sched && sched != &mptcp_sched_default && sched->get_retrans;
+	return !sched || sched->get_retrans;
 }
 
 /* Ask the scheduler where to resend the data other subflows hold, because a
  * subflow is idle while nothing new can be sent, for @reason: see
- * MPTCP_SCHED_RETRANS_IDLE_WND. Only a scheduler with its own get_retrans is
- * asked; the default one does not reinject.
+ * MPTCP_SCHED_RETRANS_IDLE_WND. Only the default scheduler and one with its
+ * own get_retrans are asked.
  */
 static int mptcp_sched_get_reinject(struct mptcp_sock *msk, u8 reason)
 {
@@ -301,7 +404,10 @@ static int mptcp_sched_get_reinject(struct mptcp_sock *msk, u8 reason)
 		return -EOPNOTSUPP;
 
 	msk->sched_retrans = reason;
-	err = msk->sched->get_retrans(msk);
+	if (mptcp_sched_is_default(msk))
+		err = mptcp_sched_default_get_retrans(msk);
+	else
+		err = msk->sched->get_retrans(msk);
 	msk->sched_retrans = MPTCP_SCHED_RETRANS_RTO;
 	return err;
 }
@@ -344,14 +450,20 @@ static u8 mptcp_sched_oppr_reason(struct sock *sk)
 /* called on each DATA_ACK, or when the msk socket lock is released if a process
  * owned it: see __mptcp_check_oppr(). Under the msk data lock, with a stable
  * subflow list. The worker takes the msk socket lock, which delays the receive
- * path, so wake it only when the scheduler may reinject: if a subflow is idle.
+ * path, so wake it only when the scheduler may reinject: when a subflow is idle
+ * and, for the default one, when mptcp_sched_oppr_default() would pick it.
  */
 void mptcp_sched_oppr_check(struct sock *sk)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *idle;
 
-	if (!mptcp_sched_has_reinject(msk) || !mptcp_sched_oppr_reason(sk) ||
-	    !mptcp_sched_oppr_idle_ssk(msk))
+	if (!mptcp_sched_has_reinject(msk) || !mptcp_sched_oppr_reason(sk))
+		return;
+
+	idle = mptcp_sched_oppr_idle_ssk(msk);
+	if (!idle || (mptcp_sched_is_default(msk) &&
+		      !mptcp_sched_oppr_max_gain(msk, idle)))
 		return;
 
 	if (!test_and_set_bit(MPTCP_WORK_OPPR, &msk->flags))
@@ -396,8 +508,9 @@ static int mptcp_sched_oppr_add_skb(const struct sk_buff *skb, u64 una,
 }
 
 /* The DSN ranges at or after @una that the subflows other than @idle still
- * hold, sent or not: the data the peer is waiting for. Sorted by start, and
- * merged: data resent before can sit on more than one subflow.
+ * hold, sent or not: the data the peer is waiting for. With the default
+ * scheduler, only from the subflows this is worth it for. Sorted by start,
+ * and merged: data resent before can sit on more than one subflow.
  */
 static int mptcp_sched_oppr_collect(struct mptcp_sock *msk, struct sock *idle,
 				    u64 una, struct mptcp_oppr_range *r)
@@ -411,6 +524,9 @@ static int mptcp_sched_oppr_collect(struct mptcp_sock *msk, struct sock *idle,
 		u64 last = 0;
 
 		if (ssk == idle)
+			continue;
+		if (mptcp_sched_is_default(msk) &&
+		    !mptcp_sched_oppr_gain(subflow, idle))
 			continue;
 
 		lock_sock(ssk);
