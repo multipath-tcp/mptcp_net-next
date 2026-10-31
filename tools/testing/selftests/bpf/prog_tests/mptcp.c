@@ -18,6 +18,7 @@
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
 #include "mptcp_bpf_burst.skel.h"
+#include "mptcp_bpf_limit.skel.h"
 
 #define NS_TEST "mptcp_ns"
 #define ADDR_1	"10.0.1.1"
@@ -820,6 +821,109 @@ skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
+struct big_send_arg {
+	int lfd;
+	int err;
+};
+
+/* send total_bytes in 64 KB writes, so that data fragments get larger than
+ * the scheduler's limit
+ */
+static void *big_send(void *data)
+{
+	struct big_send_arg *a = data;
+	static char buf[64 * 1024];
+	unsigned int sent = 0;
+	ssize_t ret;
+	int fd;
+
+	fd = accept(a->lfd, NULL, NULL);
+	if (fd < 0) {
+		a->err = -errno;
+		return NULL;
+	}
+	while (sent < total_bytes) {
+		ret = send(fd, buf, MIN(total_bytes - sent, sizeof(buf)), 0);
+		if (ret < 0 && errno == EINTR)
+			continue;
+		if (ret < 0) {
+			a->err = -errno;
+			break;
+		}
+		sent += ret;
+	}
+	close(fd);
+	return NULL;
+}
+
+/* At most 4 KB per decision, also inside a data fragment: no subflow gets
+ * more than that between two calls of the scheduler.
+ */
+static void test_limit(void)
+{
+	struct big_send_arg arg = {};
+	struct mptcp_bpf_limit *skel;
+	int server_fd = -1, client_fd = -1;
+	struct netns_obj *netns = NULL;
+	unsigned int recvd = 0;
+	struct bpf_link *link;
+	pthread_t thread;
+	char buf[64 * 1024];
+	ssize_t ret;
+
+	skel = mptcp_bpf_limit__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: limit"))
+		return;
+
+	link = bpf_map__attach_struct_ops(skel->maps.limit);
+	if (!ASSERT_OK_PTR(link, "attach_struct_ops"))
+		goto destroy;
+
+	netns = netns_new(NS_TEST, true);
+	if (!ASSERT_OK_PTR(netns, "netns_new"))
+		goto detach;
+	if (!ASSERT_OK(sched_init("subflow", "bpf_limit"), "sched_init"))
+		goto close_netns;
+
+	server_fd = start_mptcp_server(AF_INET, ADDR_1, PORT_1, 0);
+	if (!ASSERT_OK_FD(server_fd, "start_mptcp_server"))
+		goto close_netns;
+	client_fd = connect_to_fd(server_fd, 0);
+	if (!ASSERT_OK_FD(client_fd, "connect_to_fd"))
+		goto close_server;
+
+	arg.lfd = server_fd;
+	if (!ASSERT_OK(pthread_create(&thread, NULL, big_send, &arg),
+		       "pthread_create"))
+		goto close_client;
+	while (recvd < total_bytes) {
+		ret = recv(client_fd, buf, sizeof(buf), 0);
+		if (ret < 0 && errno == EINTR)
+			continue;
+		if (ret <= 0)
+			break;
+		recvd += ret;
+	}
+	pthread_join(thread, NULL);
+
+	ASSERT_OK(arg.err, "send");
+	ASSERT_EQ(recvd, total_bytes, "recv");
+	CHECK(has_bytes_sent(ADDR_2), "limit", "should have bytes_sent on addr2\n");
+	ASSERT_GT(skel->bss->max_given, 0, "bytes given per decision");
+	ASSERT_LE(skel->bss->max_given, 4096, "bytes given per decision");
+
+close_client:
+	close(client_fd);
+close_server:
+	close(server_fd);
+close_netns:
+	netns_free(netns);
+detach:
+	bpf_link__destroy(link);
+destroy:
+	mptcp_bpf_limit__destroy(skel);
+}
+
 void test_mptcp(void)
 {
 	if (test__start_subtest("base"))
@@ -842,4 +946,6 @@ void test_mptcp(void)
 		test_red();
 	if (test__start_subtest("burst"))
 		test_burst();
+	if (test__start_subtest("limit"))
+		test_limit();
 }
