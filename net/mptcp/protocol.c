@@ -4057,6 +4057,15 @@ void __mptcp_check_push(struct sock *sk, struct sock *ssk)
 		__set_bit(MPTCP_PUSH_PENDING, &mptcp_sk(sk)->cb_flags);
 }
 
+/* the subflow list is only stable while no process owns the msk */
+void __mptcp_check_oppr(struct sock *sk)
+{
+	if (!sock_owned_by_user(sk))
+		mptcp_sched_oppr_check(sk);
+	else
+		__set_bit(MPTCP_OPPR_CHECK, &mptcp_sk(sk)->cb_flags);
+}
+
 #define MPTCP_FLAGS_PROCESS_CTX_NEED (BIT(MPTCP_PUSH_PENDING) | \
 				      BIT(MPTCP_RETRANSMIT) | \
 				      BIT(MPTCP_FLUSH_JOIN_LIST))
@@ -4121,6 +4130,8 @@ static void mptcp_release_cb(struct sock *sk)
 			__mptcp_error_report(sk);
 		if (__test_and_clear_bit(MPTCP_SYNC_SNDBUF, &msk->cb_flags))
 			__mptcp_sync_sndbuf(sk);
+		if (__test_and_clear_bit(MPTCP_OPPR_CHECK, &msk->cb_flags))
+			mptcp_sched_oppr_check(sk);
 	}
 }
 

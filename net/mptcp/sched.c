@@ -341,6 +341,23 @@ static u8 mptcp_sched_oppr_reason(struct sock *sk)
 	return MPTCP_SCHED_RETRANS_IDLE_APP;
 }
 
+/* called on each DATA_ACK, or when the msk socket lock is released if a process
+ * owned it: see __mptcp_check_oppr(). Under the msk data lock, with a stable
+ * subflow list. The worker takes the msk socket lock, which delays the receive
+ * path, so wake it only when the scheduler may reinject: if a subflow is idle.
+ */
+void mptcp_sched_oppr_check(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+
+	if (!mptcp_sched_has_reinject(msk) || !mptcp_sched_oppr_reason(sk) ||
+	    !mptcp_sched_oppr_idle_ssk(msk))
+		return;
+
+	if (!test_and_set_bit(MPTCP_WORK_OPPR, &msk->flags))
+		mptcp_schedule_work(sk);
+}
+
 /* Add what @skb holds to @r, sorted by start. When @r is full, keep the lowest
  * ones: the data at snd_una is the one the peer is waiting for.
  */
