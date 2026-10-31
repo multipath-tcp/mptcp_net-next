@@ -606,6 +606,10 @@ struct mptcp_subflow_context {
 	bool	data_avail;
 	bool	scheduled;
 	bool	penalise;	    /* scheduler flagged this subflow for cwnd halving */
+	u32	send_limit;	    /* set by the scheduler in get_send: at
+				     * most this many bytes before it is
+				     * asked again; 0 for no limit
+				     */
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
 	bool	fully_established;  /* path validated */
 	bool	close_event_done;   /* has done the post-closed part,

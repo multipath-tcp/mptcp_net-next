@@ -189,6 +189,10 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 
 	if (msk->sched == &mptcp_sched_default || !msk->sched)
 		return mptcp_sched_default_get_send(msk);
+
+	/* limits are per decision: a retransmission can leave some behind */
+	mptcp_for_each_subflow(msk, subflow)
+		subflow->send_limit = 0;
 	return msk->sched->get_send(msk);
 }
 

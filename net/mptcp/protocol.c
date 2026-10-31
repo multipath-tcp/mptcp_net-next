@@ -1823,17 +1823,25 @@ void mptcp_check_and_set_pending(struct sock *sk)
 static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 				  struct mptcp_sendmsg_info *info)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	struct mptcp_data_frag *dfrag;
 	int len, copied = 0, err = 0;
+	u32 limit;
 
-	if (mptcp_subflow_ctx(ssk)->penalise)
+	if (subflow->penalise)
 		mptcp_penalise_cwnd(ssk);
+
+	/* the scheduler's limit for this decision only */
+	limit = subflow->send_limit;
+	subflow->send_limit = 0;
 
 	while ((dfrag = mptcp_send_head(sk))) {
 		info->sent = dfrag->already_sent;
 		info->limit = dfrag->data_len;
-		len = dfrag->data_len - dfrag->already_sent;
+		if (limit && dfrag->data_len - info->sent > limit - copied)
+			info->limit = info->sent + limit - copied;
+		len = info->limit - info->sent;
 		while (len > 0) {
 			int ret = 0;
 
@@ -1848,6 +1856,16 @@ static int __subflow_push_pending(struct sock *sk, struct sock *ssk,
 			len -= ret;
 
 			mptcp_update_post_push(msk, dfrag, ret);
+		}
+
+		/* Stopped inside the dfrag: it stays the send head, as when the
+		 * subflow runs out of space, and the scheduler is asked again.
+		 */
+		if (limit && copied >= limit) {
+			if (dfrag->already_sent == dfrag->data_len)
+				msk->first_pending = mptcp_send_next(sk);
+			err = copied;
+			goto out;
 		}
 		msk->first_pending = mptcp_send_next(sk);
 
