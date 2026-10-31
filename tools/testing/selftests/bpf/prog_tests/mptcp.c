@@ -18,6 +18,7 @@
 #include "mptcp_bpf_rr.skel.h"
 #include "mptcp_bpf_red.skel.h"
 #include "mptcp_bpf_burst.skel.h"
+#include "mptcp_bpf_reinject.skel.h"
 #include "mptcp_bpf_limit.skel.h"
 
 #define NS_TEST "mptcp_ns"
@@ -821,6 +822,27 @@ skel_destroy:
 	mptcp_bpf_burst__destroy(skel);
 }
 
+/* New data only goes on the first subflow, so the second one only carries
+ * what the scheduler asks the core to reinject when it goes idle.
+ */
+static void test_reinject(void)
+{
+	struct mptcp_bpf_reinject *skel;
+	__u64 idle;
+
+	skel = mptcp_bpf_reinject__open_and_load();
+	if (!ASSERT_OK_PTR(skel, "open_and_load: reinject"))
+		return;
+
+	test_bpf_sched(skel->maps.reinject, "reinject", WITH_DATA, WITH_DATA);
+
+	/* calls[0] counts the MPTCP RTOs, the others the idle reasons */
+	idle = skel->bss->calls[1] + skel->bss->calls[2] + skel->bss->calls[3];
+	ASSERT_GT(idle, 0, "get_retrans called on an idle subflow");
+
+	mptcp_bpf_reinject__destroy(skel);
+}
+
 struct big_send_arg {
 	int lfd;
 	int err;
@@ -946,6 +968,8 @@ void test_mptcp(void)
 		test_red();
 	if (test__start_subtest("burst"))
 		test_burst();
+	if (test__start_subtest("reinject"))
+		test_reinject();
 	if (test__start_subtest("limit"))
 		test_limit();
 }
