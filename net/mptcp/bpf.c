@@ -63,6 +63,12 @@ static int bpf_mptcp_sched_btf_struct_access(struct bpf_verifier_log *log,
 		case offsetof(struct mptcp_subflow_context, avg_pacing_rate):
 			end = offsetofend(struct mptcp_subflow_context, avg_pacing_rate);
 			break;
+		case offsetof(struct mptcp_subflow_context, send_limit):
+			end = offsetofend(struct mptcp_subflow_context, send_limit);
+			break;
+		case offsetof(struct mptcp_subflow_context, reinject_limit):
+			end = offsetofend(struct mptcp_subflow_context, reinject_limit);
+			break;
 		default:
 			bpf_log(log, "no write support to mptcp_subflow_context at off %d\n",
 				off);
