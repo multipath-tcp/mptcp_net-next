@@ -25,6 +25,7 @@ struct pm_nl_pernet {
 	u8			endp_fullmesh_max;
 	u8			limit_add_addr_accepted;
 	u8			limit_extra_subflows;
+	u8			limit_subflow_retries;
 	u8			next_id;
 	DECLARE_BITMAP(id_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
 };
@@ -94,6 +95,13 @@ u8 mptcp_pm_get_limit_extra_subflows(const struct mptcp_sock *msk)
 	return READ_ONCE(pernet->limit_extra_subflows);
 }
 EXPORT_SYMBOL_GPL(mptcp_pm_get_limit_extra_subflows);
+
+u8 mptcp_pm_get_limit_subflow_retries(const struct mptcp_sock *msk)
+{
+	struct pm_nl_pernet *pernet = pm_nl_get_pernet_from_msk(msk);
+
+	return READ_ONCE(pernet->limit_subflow_retries);
+}
 
 static bool has_subflow_daddr(const struct mptcp_sock *msk,
 			      const struct mptcp_addr_info *daddr)
@@ -1401,8 +1409,8 @@ int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 int mptcp_pm_nl_set_limits_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
+	unsigned int rcv_addrs, subflows, retries;
 	struct nlattr **attrs = info->attrs;
-	unsigned int rcv_addrs, subflows;
 
 	/* the maximums are checked by the policy */
 	spin_lock_bh(&pernet->lock);
@@ -1410,9 +1418,12 @@ int mptcp_pm_nl_set_limits_doit(struct sk_buff *skb, struct genl_info *info)
 					pernet->limit_add_addr_accepted);
 	subflows = nla_get_u32_default(attrs[MPTCP_PM_ATTR_SUBFLOWS],
 				       pernet->limit_extra_subflows);
+	retries = nla_get_u32_default(attrs[MPTCP_PM_ATTR_SUBFLOW_RETRIES],
+				      pernet->limit_subflow_retries);
 
 	WRITE_ONCE(pernet->limit_add_addr_accepted, rcv_addrs);
 	WRITE_ONCE(pernet->limit_extra_subflows, subflows);
+	WRITE_ONCE(pernet->limit_subflow_retries, retries);
 	spin_unlock_bh(&pernet->lock);
 
 	return 0;
@@ -1439,6 +1450,10 @@ int mptcp_pm_nl_get_limits_doit(struct sk_buff *skb, struct genl_info *info)
 
 	if (nla_put_u32(msg, MPTCP_PM_ATTR_SUBFLOWS,
 			READ_ONCE(pernet->limit_extra_subflows)))
+		goto fail;
+
+	if (nla_put_u32(msg, MPTCP_PM_ATTR_SUBFLOW_RETRIES,
+			READ_ONCE(pernet->limit_subflow_retries)))
 		goto fail;
 
 	genlmsg_end(msg, reply);
@@ -1595,6 +1610,8 @@ static int __net_init pm_nl_init_net(struct net *net)
 
 	/* Cit. 2 subflows ought to be enough for anybody. */
 	pernet->limit_extra_subflows = 2;
+	/* the maximum: about 4 hours with the default RTOs */
+	pernet->limit_subflow_retries = MAX_TCP_SYNCNT;
 	pernet->next_id = 1;
 	spin_lock_init(&pernet->lock);
 
