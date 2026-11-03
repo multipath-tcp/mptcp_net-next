@@ -30,7 +30,6 @@ struct pm_nl_pernet {
 };
 
 #define MPTCP_PM_ADDR_MAX	8
-#define MPTCP_PM_SUBFLOWS_MAX	64
 
 static struct pm_nl_pernet *pm_nl_get_pernet(const struct net *net)
 {
@@ -1399,46 +1398,24 @@ int mptcp_pm_nl_dump_addr(struct sk_buff *msg,
 	return msg->len;
 }
 
-static int parse_limit(struct genl_info *info, int id, unsigned int *limit)
-{
-	struct nlattr *attr = info->attrs[id];
-
-	if (!attr)
-		return 0;
-
-	*limit = nla_get_u32(attr);
-	if (*limit > MPTCP_PM_SUBFLOWS_MAX) {
-		NL_SET_ERR_MSG_ATTR_FMT(info->extack, attr,
-					"limit greater than maximum (%u)",
-					MPTCP_PM_SUBFLOWS_MAX);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 int mptcp_pm_nl_set_limits_doit(struct sk_buff *skb, struct genl_info *info)
 {
 	struct pm_nl_pernet *pernet = genl_info_pm_nl(info);
+	struct nlattr **attrs = info->attrs;
 	unsigned int rcv_addrs, subflows;
-	int ret;
 
+	/* the maximums are checked by the policy */
 	spin_lock_bh(&pernet->lock);
-	rcv_addrs = pernet->limit_add_addr_accepted;
-	ret = parse_limit(info, MPTCP_PM_ATTR_RCV_ADD_ADDRS, &rcv_addrs);
-	if (ret)
-		goto unlock;
-
-	subflows = pernet->limit_extra_subflows;
-	ret = parse_limit(info, MPTCP_PM_ATTR_SUBFLOWS, &subflows);
-	if (ret)
-		goto unlock;
+	rcv_addrs = nla_get_u32_default(attrs[MPTCP_PM_ATTR_RCV_ADD_ADDRS],
+					pernet->limit_add_addr_accepted);
+	subflows = nla_get_u32_default(attrs[MPTCP_PM_ATTR_SUBFLOWS],
+				       pernet->limit_extra_subflows);
 
 	WRITE_ONCE(pernet->limit_add_addr_accepted, rcv_addrs);
 	WRITE_ONCE(pernet->limit_extra_subflows, subflows);
-
-unlock:
 	spin_unlock_bh(&pernet->lock);
-	return ret;
+
+	return 0;
 }
 
 int mptcp_pm_nl_get_limits_doit(struct sk_buff *skb, struct genl_info *info)
