@@ -1016,6 +1016,10 @@ static int mlx5_cmd_modify_header_alloc(struct mlx5_flow_root_namespace *ns,
 		max_actions = MLX5_CAP_FLOWTABLE_RDMA_TX(dev, max_modify_header_actions);
 		table_type = FS_FT_RDMA_TX;
 		break;
+	case MLX5_FLOW_NAMESPACE_NIC_RX_CLASS:
+		max_actions = MLX5_CAP_FLOWTABLE_NIC_RX_CLASS(dev, max_modify_header_actions);
+		table_type = FS_FT_NIC_RX_CLASS;
+		break;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -1177,6 +1181,7 @@ const struct mlx5_flow_cmds *mlx5_fs_cmd_get_default(enum fs_flow_table_type typ
 	case FS_FT_PORT_SEL:
 	case FS_FT_RDMA_TRANSPORT_RX:
 	case FS_FT_RDMA_TRANSPORT_TX:
+	case FS_FT_NIC_RX_CLASS:
 		return mlx5_fs_cmd_get_fw_cmds();
 	default:
 		return mlx5_fs_cmd_get_stub_cmds();

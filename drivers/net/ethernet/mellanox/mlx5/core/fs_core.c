@@ -2833,6 +2833,14 @@ mlx5_get_flow_vport_namespace(struct mlx5_core_dev *dev,
 			return &steering->rdma_transport_tx.root_ns[vport_idx]->ns;
 		else
 			return NULL;
+	case MLX5_FLOW_NAMESPACE_NIC_RX_CLASS:
+		if (vport_idx >= steering->nic_rx_class.vports)
+			return NULL;
+		if (steering->nic_rx_class.root_ns &&
+		    steering->nic_rx_class.root_ns[vport_idx])
+			return &steering->nic_rx_class.root_ns[vport_idx]->ns;
+		else
+			return NULL;
 	default:
 		return NULL;
 	}
@@ -3303,6 +3311,10 @@ int mlx5_fs_set_root_dev(struct mlx5_core_dev *dev,
 	case FS_FT_RDMA_TRANSPORT_RX:
 		root = dev->priv.steering->rdma_transport_rx.root_ns;
 		total_vports = dev->priv.steering->rdma_transport_rx.vports;
+		break;
+	case FS_FT_NIC_RX_CLASS:
+		root = dev->priv.steering->nic_rx_class.root_ns;
+		total_vports = dev->priv.steering->nic_rx_class.vports;
 		break;
 	default:
 		WARN_ON_ONCE(true);
@@ -3807,6 +3819,7 @@ void mlx5_fs_core_cleanup(struct mlx5_core_dev *dev)
 	cleanup_root_ns(steering->egress_root_ns);
 	cleanup_transport_manager_root_ns(&steering->rdma_transport_rx);
 	cleanup_transport_manager_root_ns(&steering->rdma_transport_tx);
+	cleanup_transport_manager_root_ns(&steering->nic_rx_class);
 
 	devl_params_unregister(priv_to_devlink(dev), mlx5_fs_params,
 			       ARRAY_SIZE(mlx5_fs_params));
@@ -3888,6 +3901,14 @@ int mlx5_fs_core_init(struct mlx5_core_dev *dev)
 		err = init_transport_manager_root_ns(steering,
 						     &steering->rdma_transport_tx,
 						     FS_FT_RDMA_TRANSPORT_TX);
+		if (err)
+			goto err;
+	}
+
+	if (MLX5_CAP_FLOWTABLE_NIC_RX_CLASS(dev, ft_support)) {
+		err = init_transport_manager_root_ns(steering,
+						     &steering->nic_rx_class,
+						     FS_FT_NIC_RX_CLASS);
 		if (err)
 			goto err;
 	}
@@ -4048,7 +4069,8 @@ mlx5_get_root_namespace(struct mlx5_core_dev *dev, enum mlx5_flow_namespace_type
 	if (ns_type == MLX5_FLOW_NAMESPACE_ESW_EGRESS ||
 	    ns_type == MLX5_FLOW_NAMESPACE_ESW_INGRESS ||
 	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_TX ||
-	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_RX)
+	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_RX ||
+	    ns_type == MLX5_FLOW_NAMESPACE_NIC_RX_CLASS)
 		ns = mlx5_get_flow_vport_namespace(dev, ns_type, 0);
 	else
 		ns = mlx5_get_flow_namespace(dev, ns_type);
