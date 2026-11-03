@@ -1929,6 +1929,7 @@ static bool check_conflicting_actions(const struct mlx5_flow_act *act1,
 		return false;
 
 	if (xored_actions & (MLX5_FLOW_CONTEXT_ACTION_DROP  |
+			     MLX5_FLOW_CONTEXT_ACTION_ALLOW |
 			     MLX5_FLOW_CONTEXT_ACTION_PACKET_REFORMAT |
 			     MLX5_FLOW_CONTEXT_ACTION_DECAP |
 			     MLX5_FLOW_CONTEXT_ACTION_MOD_HDR  |
