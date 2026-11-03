@@ -1836,6 +1836,11 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	enum skb_drop_reason reason;
 
+	if (unlikely(skb->protocol != htons(ETH_P_IP))) {
+		reason = SKB_DROP_REASON_INVALID_PROTO;
+		goto err_discard;
+	}
+
 	reason = psp_sk_rx_policy_check(sk, skb);
 	if (reason)
 		goto err_discard;
