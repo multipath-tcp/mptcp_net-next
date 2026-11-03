@@ -13690,7 +13690,14 @@ struct mlx5_ifc_adv_rdma_cap_bits {
 
 	struct mlx5_ifc_flow_table_fields_supported_2_bits rdma_transport_tx_ft_field_bitmask_support_2;
 
-	u8         reserved_at_800[0x3800];
+	u8         reserved_at_800[0x400];
+	u8         reserved_at_c00[0x400];
+
+	struct mlx5_ifc_flow_table_prop_layout_bits nic_rx_class_flow_table_properties;
+
+	u8         reserved_at_1200[0x500];
+
+	u8         reserved_at_1700[0x2900];
 };
 
 struct mlx5_ifc_adv_virtualization_cap_bits {
