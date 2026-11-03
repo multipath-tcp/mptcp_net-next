@@ -125,6 +125,11 @@ enum mlx5_flow_steering_capabilty {
 	MLX5_FLOW_STEERING_CAP_DUPLICATE_MATCH = 1UL << 3,
 };
 
+struct mlx5_transport_manager_ns {
+	struct mlx5_flow_root_namespace **root_ns;
+	int vports;
+};
+
 struct mlx5_flow_steering {
 	struct mlx5_core_dev *dev;
 	enum   mlx5_flow_steering_mode	mode;
@@ -141,10 +146,8 @@ struct mlx5_flow_steering {
 	struct mlx5_flow_root_namespace	*rdma_tx_root_ns;
 	struct mlx5_flow_root_namespace	*egress_root_ns;
 	struct mlx5_flow_root_namespace	*port_sel_root_ns;
-	struct mlx5_flow_root_namespace **rdma_transport_rx_root_ns;
-	struct mlx5_flow_root_namespace **rdma_transport_tx_root_ns;
-	int rdma_transport_rx_vports;
-	int rdma_transport_tx_vports;
+	struct mlx5_transport_manager_ns rdma_transport_rx;
+	struct mlx5_transport_manager_ns rdma_transport_tx;
 };
 
 struct fs_node {
