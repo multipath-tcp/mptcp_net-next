@@ -1524,7 +1524,7 @@ static void netmem_ref_test_skb_segment(struct kunit *test)
 	/* 5. Linear head_skb (nr_frags=0) + mixed pp_recycle frag_list where
 	 * member A has linear + frag (pp_recycle=1) and tail member B has
 	 * linear len == skb_headlen(A) (pp_recycle=0): keeps SG clone path
-	 * synchronized without hitting BUG_ON(i >= nfrags).
+	 * synchronized without failing the i >= nfrags check.
 	 */
 	head = alloc_skb(64, GFP_KERNEL);
 	list = alloc_skb(64, GFP_KERNEL);
