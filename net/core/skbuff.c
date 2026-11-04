@@ -3795,8 +3795,7 @@ static noinline int skb_copy_and_csum_frag_list(const struct sk_buff *skb,
 	if (unlikely(len)) {
 		DEBUG_NET_WARN_ON_ONCE(1);
 		/* Don't hand the caller a buffer with stale bytes in it. */
-		if (len > 0)
-			memset(to, 0, len);
+		memset(to, 0, len);
 		return -EFAULT;
 	}
 out:
@@ -3812,9 +3811,10 @@ out:
  *	@len: number of bytes to copy
  *	@csump: where to store the checksum of the copied bytes
  *
- *	Return: 0 on success, or -EFAULT if @skb has unreadable frags or runs
- *	out before @len does.  On failure *@csump is not set and the part of
- *	@to that couldn't be filled is zeroed.
+ *	Return: 0 on success, -EINVAL if @len is negative, or -EFAULT if @skb
+ *	has unreadable frags or runs out before @len does.  On failure *@csump
+ *	is not set.  On -EFAULT the part of @to that couldn't be filled is
+ *	zeroed, and on -EINVAL @to is not touched.
  */
 int skb_copy_and_csum_bits(const struct sk_buff *skb, int offset,
 			   u8 *to, int len, __wsum *csump)
@@ -3823,6 +3823,14 @@ int skb_copy_and_csum_bits(const struct sk_buff *skb, int offset,
 	int i, copy = start - offset;
 	int pos = 0;
 	__wsum csum = 0;
+
+	/* Everything below clamps its copy to @len, so a negative one would
+	 * turn into a huge copy.
+	 */
+	if (unlikely(len < 0)) {
+		DEBUG_NET_WARN_ON_ONCE(1);
+		return -EINVAL;
+	}
 
 	/* Copy header. */
 	if (copy > 0) {
@@ -3839,8 +3847,7 @@ int skb_copy_and_csum_bits(const struct sk_buff *skb, int offset,
 
 	if (!skb_frags_readable(skb)) {
 		/* Don't hand the caller a buffer with stale bytes in it. */
-		if (len > 0)
-			memset(to, 0, len);
+		memset(to, 0, len);
 		return -EFAULT;
 	}
 
