@@ -3949,11 +3949,28 @@ u32 skb_crc32c(const struct sk_buff *skb, int offset, int len, u32 crc)
 EXPORT_SYMBOL(skb_crc32c);
 #endif /* CONFIG_NET_CRC32C */
 
+/* The data can't be checksummed, so it can't be valid either.  The caller has
+ * put the pseudo header's checksum in skb->csum, so don't leave the skb
+ * CHECKSUM_COMPLETE for a later validator to take that for the packet's.
+ */
+static __sum16 skb_checksum_complete_failed(struct sk_buff *skb)
+{
+	if (!skb_shared(skb)) {
+		skb_checksum_complete_unset(skb);
+		skb->csum_valid = 0;
+	}
+	return (__force __sum16)1;
+}
+
 __sum16 __skb_checksum_complete_head(struct sk_buff *skb, int len)
 {
+	__wsum csum = skb->csum;
 	__sum16 sum;
 
-	sum = csum_fold(skb_checksum(skb, 0, len, skb->csum));
+	if (skb_checksum_full(skb, 0, len, &csum))
+		return skb_checksum_complete_failed(skb);
+
+	sum = csum_fold(csum);
 	/* See comments in __skb_checksum_complete(). */
 	if (likely(!sum)) {
 		if (unlikely(skb->ip_summed == CHECKSUM_COMPLETE) &&
@@ -3973,14 +3990,16 @@ EXPORT_SYMBOL(__skb_checksum_complete_head);
  *
  * It returns non-zero if the recomputed checksum is still invalid, otherwise
  * zero. The new checksum is stored back into skb->csum unless the skb is
- * shared.
+ * shared. If the skb can't be checksummed it returns non-zero, skb->csum is
+ * left alone, and the skb is no longer CHECKSUM_COMPLETE unless it's shared.
  */
 __sum16 __skb_checksum_complete(struct sk_buff *skb)
 {
-	__wsum csum;
+	__wsum csum = 0;
 	__sum16 sum;
 
-	csum = skb_checksum(skb, 0, skb->len, 0);
+	if (skb_checksum_full(skb, 0, skb->len, &csum))
+		return skb_checksum_complete_failed(skb);
 
 	sum = csum_fold(csum_add(skb->csum, csum));
 	/* This check is inverted, because we already knew the hardware
