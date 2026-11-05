@@ -301,6 +301,25 @@ int sparx5_update_port_policer_stats(struct net_device *ndev,
 	return 0;
 }
 
+static bool sparx5_port_policer_act_in_use(struct sparx5_port *port,
+					   unsigned long act_cookie)
+{
+	struct sparx5 *sparx5 = port->sparx5;
+	struct sparx5_port *other;
+	int i;
+
+	for (i = 0; i < sparx5->data->consts->n_ports; i++) {
+		other = sparx5->ports[i];
+		if (!other || other == port)
+			continue;
+		if (other->tc.port_policer[0].policer &&
+		    other->tc.port_policer[0].act_cookie == act_cookie)
+			return true;
+	}
+
+	return false;
+}
+
 int sparx5_add_port_policer(struct sparx5_mall_entry *entry,
 			    struct netlink_ext_ack *extack)
 {
@@ -319,6 +338,13 @@ int sparx5_add_port_policer(struct sparx5_mall_entry *entry,
 	if (entry->port->tc.ingress_block_shared) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Policer is not supported on shared ingress blocks");
+		return -EOPNOTSUPP;
+	}
+
+	if (sparx5_port_policer_act_in_use(port,
+					   entry->port_policer.act_cookie)) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Police action shared between ports is not supported");
 		return -EOPNOTSUPP;
 	}
 
@@ -388,6 +414,7 @@ int sparx5_add_port_policer(struct sparx5_mall_entry *entry,
 		return err;
 
 	port->tc.port_policer[idx].policer = entry->cookie;
+	port->tc.port_policer[idx].act_cookie = entry->port_policer.act_cookie;
 
 	return 0;
 }

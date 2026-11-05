@@ -218,6 +218,8 @@ struct sparx5_port_policer {
 	struct flow_stats prev;
 	/* Port policers hold the client reference (cookie) */
 	unsigned long policer;
+	/* tc police action, the same for every filter bound to it */
+	unsigned long act_cookie;
 };
 
 struct sparx5_port_tc {
@@ -304,6 +306,7 @@ struct sparx5_mall_mirror_entry {
 
 struct sparx5_mall_port_policer_entry {
 	struct flow_action_police police;
+	unsigned long act_cookie;
 };
 
 struct sparx5_mall_entry {
