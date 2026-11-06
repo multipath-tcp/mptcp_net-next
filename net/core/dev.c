@@ -4215,6 +4215,15 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 	if (unlikely(!skb))
 		goto out_null;
 
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		if (skb->encapsulation)
+			skb_set_inner_transport_header(skb,
+						       skb_checksum_start_offset(skb));
+		else
+			skb_set_transport_header(skb,
+						 skb_checksum_start_offset(skb));
+	}
+
 	features = netif_skb_features(skb);
 	skb = validate_xmit_vlan(skb, features);
 	if (unlikely(!skb))
@@ -4247,16 +4256,9 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 		 * support checksumming for this protocol, complete
 		 * checksumming here.
 		 */
-		if (skb->ip_summed == CHECKSUM_PARTIAL) {
-			if (skb->encapsulation)
-				skb_set_inner_transport_header(skb,
-							       skb_checksum_start_offset(skb));
-			else
-				skb_set_transport_header(skb,
-							 skb_checksum_start_offset(skb));
-			if (skb_csum_hwoffload_help(skb, features))
-				goto out_kfree_skb;
-		}
+		if (skb->ip_summed == CHECKSUM_PARTIAL &&
+		    skb_csum_hwoffload_help(skb, features))
+			goto out_kfree_skb;
 	}
 
 	skb = validate_xmit_xfrm(skb, features, again);
