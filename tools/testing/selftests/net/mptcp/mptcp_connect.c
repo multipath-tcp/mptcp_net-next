@@ -34,6 +34,7 @@
 #include <linux/time_types.h>
 #include <linux/sockios.h>
 #include <linux/compiler.h>
+#include <linux/mptcp.h>
 
 extern int optind;
 
@@ -1176,6 +1177,24 @@ static void maybe_close(int fd)
 		close(fd);
 }
 
+static bool wait_for_remote_key(int fd)
+{
+	struct mptcp_info info;
+	int retries = 10;
+	socklen_t olen;
+
+	while (retries > 0) {
+		olen = sizeof(info);
+		if (getsockopt(fd, SOL_MPTCP, MPTCP_INFO, &info, &olen) < 0)
+			return false;
+		if (info.mptcpi_flags & MPTCP_INFO_FLAG_REMOTE_KEY_RECEIVED)
+			return true;
+		usleep(10000);
+		retries--;
+	}
+	return false;
+}
+
 int main_loop_s(int listensock)
 {
 	struct sockaddr_storage ss;
@@ -1206,6 +1225,24 @@ again:
 		maybe_close(listensock);
 		check_sockaddr(pf, &ss, salen);
 		check_getpeername(remotesock, &ss, salen);
+
+		if (cfg_sockopt_types.mptfo) {
+			int avail;
+
+			if (!wait_for_remote_key(remotesock)) {
+				fprintf(stderr,
+					"TFO: timeout waiting for third ACK\n");
+				close(remotesock);
+				return 1;
+			}
+
+			if (ioctl(remotesock, SIOCINQ, &avail) == 0 &&
+			    avail == INT_MAX) {
+				fprintf(stderr, "TFO SIOCINQ overflow\n");
+				close(remotesock);
+				return 1;
+			}
+		}
 
 		if (cfg_input) {
 			fd = open(cfg_input, O_RDONLY);
