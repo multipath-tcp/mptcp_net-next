@@ -1837,10 +1837,9 @@ yt921x_phylink_mac_link_down(struct phylink_config *config, unsigned int mode,
 	int port = dp->index;
 	int res;
 
-	/* No need to sync; port control block is hold until device remove */
 	pm = priv->ports[port].mib;
 	if (pm)
-		cancel_delayed_work(&pm->work);
+		cancel_delayed_work_sync(&pm->work);
 
 	mutex_lock(&priv->reg_lock);
 	res = yt921x_port_down(priv, port);
