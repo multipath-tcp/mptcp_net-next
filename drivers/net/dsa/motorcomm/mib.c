@@ -336,7 +336,7 @@ yt921x_dsa_get_rmon_stats(struct dsa_switch *ds, int port,
 
 	rmon_stats->undersize_pkts = u64_stats_read(&mib->rx_undersize_errors);
 	rmon_stats->oversize_pkts = u64_stats_read(&mib->rx_oversize_errors);
-	rmon_stats->fragments = u64_stats_read(&mib->rx_alignment_errors);
+	rmon_stats->fragments = u64_stats_read(&mib->rx_fragment_errors);
 	/* rmon_stats->jabbers */
 
 	rmon_stats->hist[0] = u64_stats_read(&mib->rx_64byte);
