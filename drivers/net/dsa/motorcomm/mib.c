@@ -50,7 +50,7 @@ static const struct yt921x_mib_desc yt921x_mib_descs[] = {
 	MIB_DESC(1, YT921X_MIB_DATA_TX_PAUSE, NULL),
 	MIB_DESC(1, YT921X_MIB_DATA_TX_MULTICAST, NULL),
 
-	MIB_DESC(1, YT921X_MIB_DATA_TX_UNDERSIZE_ERR, NULL),
+	MIB_DESC(1, YT921X_MIB_DATA_TX_UNDERSIZE_ERR, "TxUndersize"),
 	MIB_DESC(1, YT921X_MIB_DATA_TX_PKT_SZ_64, NULL),
 	MIB_DESC(1, YT921X_MIB_DATA_TX_PKT_SZ_65_TO_127, NULL),
 	MIB_DESC(1, YT921X_MIB_DATA_TX_PKT_SZ_128_TO_255, NULL),
@@ -366,6 +366,7 @@ yt921x_dsa_get_stats64(struct dsa_switch *ds, int port,
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *pm = pp->mib;
 	struct yt921x_mib_stats *mib;
+	u64 tx_undersize_errors;
 	unsigned int start;
 
 	if (!pm)
@@ -376,8 +377,9 @@ yt921x_dsa_get_stats64(struct dsa_switch *ds, int port,
 		start = u64_stats_fetch_begin(&pm->syncp);
 
 		stats->rx_length_errors = u64_stats_read(&mib->rx_undersize_errors) +
-					  u64_stats_read(&mib->rx_fragment_errors);
-		stats->rx_over_errors = u64_stats_read(&mib->rx_oversize_errors);
+					  u64_stats_read(&mib->rx_fragment_errors) +
+					  u64_stats_read(&mib->rx_oversize_errors);
+		/* stats->rx_over_errors */
 		stats->rx_crc_errors = u64_stats_read(&mib->rx_crc_errors);
 		stats->rx_frame_errors = u64_stats_read(&mib->rx_alignment_errors);
 		/* stats->rx_fifo_errors */
@@ -385,7 +387,7 @@ yt921x_dsa_get_stats64(struct dsa_switch *ds, int port,
 
 		stats->tx_aborted_errors = u64_stats_read(&mib->tx_aborted_errors);
 		/* stats->tx_carrier_errors */
-		stats->tx_fifo_errors = u64_stats_read(&mib->tx_undersize_errors);
+		/* stats->tx_fifo_errors */
 		/* stats->tx_heartbeat_errors */
 		stats->tx_window_errors = u64_stats_read(&mib->tx_late_collisions);
 
@@ -399,12 +401,14 @@ yt921x_dsa_get_stats64(struct dsa_switch *ds, int port,
 		/* stats->tx_dropped */
 		stats->multicast = u64_stats_read(&mib->rx_multicast);
 		stats->collisions = u64_stats_read(&mib->tx_collisions);
+
+		tx_undersize_errors = u64_stats_read(&mib->tx_undersize_errors);
 	} while (u64_stats_fetch_retry(&pm->syncp, start));
 
-	stats->rx_errors = stats->rx_length_errors + stats->rx_over_errors +
-			   stats->rx_crc_errors + stats->rx_frame_errors;
-	stats->tx_errors = stats->tx_aborted_errors + stats->tx_fifo_errors +
-			   stats->tx_window_errors;
+	stats->rx_errors = stats->rx_length_errors + stats->rx_crc_errors +
+			   stats->rx_frame_errors;
+	stats->tx_errors = stats->tx_aborted_errors + stats->tx_window_errors +
+			   tx_undersize_errors;
 }
 
 void
