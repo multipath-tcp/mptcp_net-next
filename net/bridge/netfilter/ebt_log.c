@@ -79,7 +79,7 @@ ebt_log_packet(struct net *net, u_int8_t pf, unsigned int hooknum,
 	unsigned int bitmask;
 
 	/* FIXME: Disabled from containers until syslog ns is supported */
-	if (!net_eq(net, &init_net) && !sysctl_nf_log_all_netns)
+	if (!net_eq(net, &init_net) && !READ_ONCE(sysctl_nf_log_all_netns))
 		return;
 
 	spin_lock_bh(&ebt_log_lock);

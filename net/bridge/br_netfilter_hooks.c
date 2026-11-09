@@ -94,7 +94,7 @@ static inline bool is_vlan_ip(const struct sk_buff *skb, const struct net *net)
 {
 	struct brnf_net *brnet = net_generic(net, brnf_net_id);
 
-	return vlan_proto(skb) == htons(ETH_P_IP) && brnet->filter_vlan_tagged;
+	return vlan_proto(skb) == htons(ETH_P_IP) && READ_ONCE(brnet->filter_vlan_tagged);
 }
 
 static inline bool is_vlan_ipv6(const struct sk_buff *skb,
@@ -103,14 +103,14 @@ static inline bool is_vlan_ipv6(const struct sk_buff *skb,
 	struct brnf_net *brnet = net_generic(net, brnf_net_id);
 
 	return vlan_proto(skb) == htons(ETH_P_IPV6) &&
-	       brnet->filter_vlan_tagged;
+	       READ_ONCE(brnet->filter_vlan_tagged);
 }
 
 static inline bool is_vlan_arp(const struct sk_buff *skb, const struct net *net)
 {
 	struct brnf_net *brnet = net_generic(net, brnf_net_id);
 
-	return vlan_proto(skb) == htons(ETH_P_ARP) && brnet->filter_vlan_tagged;
+	return vlan_proto(skb) == htons(ETH_P_ARP) && READ_ONCE(brnet->filter_vlan_tagged);
 }
 
 static inline __be16 pppoe_proto(const struct sk_buff *skb)
@@ -124,7 +124,7 @@ static inline bool is_pppoe_ip(const struct sk_buff *skb, const struct net *net)
 	struct brnf_net *brnet = net_generic(net, brnf_net_id);
 
 	return skb->protocol == htons(ETH_P_PPP_SES) &&
-	       pppoe_proto(skb) == htons(PPP_IP) && brnet->filter_pppoe_tagged;
+	       pppoe_proto(skb) == htons(PPP_IP) && READ_ONCE(brnet->filter_pppoe_tagged);
 }
 
 static inline bool is_pppoe_ipv6(const struct sk_buff *skb,
@@ -134,7 +134,7 @@ static inline bool is_pppoe_ipv6(const struct sk_buff *skb,
 
 	return skb->protocol == htons(ETH_P_PPP_SES) &&
 	       pppoe_proto(skb) == htons(PPP_IPV6) &&
-	       brnet->filter_pppoe_tagged;
+	       READ_ONCE(brnet->filter_pppoe_tagged);
 }
 
 /* largest possible L2 header, see br_nf_dev_queue_xmit() */
@@ -442,7 +442,7 @@ static struct net_device *brnf_get_logical_dev(struct sk_buff *skb,
 
 	br = bridge_parent(dev);
 
-	if (brnet->pass_vlan_indev == 0 || !skb_vlan_tag_present(skb))
+	if (READ_ONCE(brnet->pass_vlan_indev) == 0 || !skb_vlan_tag_present(skb))
 		return br;
 
 	vlan = __vlan_find_dev_deep_rcu(br, skb->vlan_proto,
@@ -502,7 +502,7 @@ static unsigned int br_nf_pre_routing(void *priv,
 	brnet = net_generic(state->net, brnf_net_id);
 	if (IS_IPV6(skb) || is_vlan_ipv6(skb, state->net) ||
 	    is_pppoe_ipv6(skb, state->net)) {
-		if (!brnet->call_ip6tables &&
+		if (!READ_ONCE(brnet->call_ip6tables) &&
 		    !br_opt_get(br, BROPT_NF_CALL_IP6TABLES))
 			return NF_ACCEPT;
 		if (!ipv6_mod_enabled()) {
@@ -514,7 +514,7 @@ static unsigned int br_nf_pre_routing(void *priv,
 		return br_nf_pre_routing_ipv6(priv, skb, state);
 	}
 
-	if (!brnet->call_iptables && !br_opt_get(br, BROPT_NF_CALL_IPTABLES))
+	if (!READ_ONCE(brnet->call_iptables) && !br_opt_get(br, BROPT_NF_CALL_IPTABLES))
 		return NF_ACCEPT;
 
 	if (!IS_IP(skb) && !is_vlan_ip(skb, state->net) &&
@@ -740,7 +740,7 @@ static unsigned int br_nf_forward_arp(struct sk_buff *skb,
 	br = p->br;
 
 	brnet = net_generic(state->net, brnf_net_id);
-	if (!brnet->call_arptables && !br_opt_get(br, BROPT_NF_CALL_ARPTABLES))
+	if (!READ_ONCE(brnet->call_arptables) && !br_opt_get(br, BROPT_NF_CALL_ARPTABLES))
 		return NF_ACCEPT;
 
 	if (is_vlan_arp(skb, state->net))
@@ -1178,7 +1178,7 @@ int brnf_sysctl_call_tables(const struct ctl_table *ctl, int write,
 	ret = proc_dointvec(ctl, write, buffer, lenp, ppos);
 
 	if (write && *(int *)(ctl->data))
-		*(int *)(ctl->data) = 1;
+		WRITE_ONCE(*(int *)(ctl->data), 1);
 	return ret;
 }
 

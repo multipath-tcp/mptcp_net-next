@@ -43,7 +43,7 @@ struct arppayload {
 /* Guard against containers flooding syslog. */
 static bool nf_log_allowed(const struct net *net)
 {
-	return net_eq(net, &init_net) || sysctl_nf_log_all_netns;
+	return net_eq(net, &init_net) || READ_ONCE(sysctl_nf_log_all_netns);
 }
 
 static void nf_log_dump_vlan(struct nf_log_buf *m, const struct sk_buff *skb)
