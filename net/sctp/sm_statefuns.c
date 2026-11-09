@@ -653,7 +653,7 @@ static bool sctp_auth_chunk_verify(struct net *net, struct sctp_chunk *chunk,
 	 */
 
 	/* Make sure that we and the peer are AUTH capable */
-	if (!net->sctp.auth_enable || !asoc->peer.auth_capable)
+	if (!READ_ONCE(net->sctp.auth_enable) || !asoc->peer.auth_capable)
 		return false;
 
 	/* set-up our fake chunk so that we can process it */
@@ -3944,7 +3944,7 @@ enum sctp_disposition sctp_sf_do_asconf(struct net *net,
 	 * described in [I-D.ietf-tsvwg-sctp-auth].
 	 */
 	if (!asoc->peer.asconf_capable ||
-	    (!net->sctp.addip_noauth && !chunk->auth))
+	    (!READ_ONCE(net->sctp.addip_noauth) && !chunk->auth))
 		return sctp_sf_pdiscard(net, ep, asoc, type, arg, commands);
 
 	hdr = (struct sctp_addiphdr *)chunk->skb->data;
@@ -4087,7 +4087,7 @@ enum sctp_disposition sctp_sf_do_asconf_ack(struct net *net,
 	 * described in [I-D.ietf-tsvwg-sctp-auth].
 	 */
 	if (!asoc->peer.asconf_capable ||
-	    (!net->sctp.addip_noauth && !asconf_ack->auth))
+	    (!READ_ONCE(net->sctp.addip_noauth) && !asconf_ack->auth))
 		return sctp_sf_pdiscard(net, ep, asoc, type, arg, commands);
 
 	addip_hdr = (struct sctp_addiphdr *)asconf_ack->skb->data;

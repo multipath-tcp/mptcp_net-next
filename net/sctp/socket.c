@@ -403,7 +403,7 @@ static void sctp_auto_asconf_init(struct sctp_sock *sp)
 {
 	struct net *net = sock_net(&sp->inet.sk);
 
-	if (net->sctp.default_auto_asconf) {
+	if (READ_ONCE(net->sctp.default_auto_asconf)) {
 		spin_lock_bh(&net->sctp.addr_wq_lock);
 		list_add_tail(&sp->auto_asconf_list, &net->sctp.auto_asconf_splist);
 		spin_unlock_bh(&net->sctp.addr_wq_lock);
@@ -2326,6 +2326,7 @@ static int sctp_setsockopt_autoclose(struct sock *sk, u32 *optval,
 {
 	struct sctp_sock *sp = sctp_sk(sk);
 	struct net *net = sock_net(sk);
+	unsigned long max_autoclose;
 
 	/* Applicable to UDP-style socket only */
 	if (sctp_style(sk, TCP))
@@ -2333,9 +2334,10 @@ static int sctp_setsockopt_autoclose(struct sock *sk, u32 *optval,
 	if (optlen != sizeof(int))
 		return -EINVAL;
 
+	max_autoclose = READ_ONCE(net->sctp.max_autoclose);
 	sp->autoclose = *optval;
-	if (sp->autoclose > net->sctp.max_autoclose)
-		sp->autoclose = net->sctp.max_autoclose;
+	if (sp->autoclose > max_autoclose)
+		sp->autoclose = max_autoclose;
 
 	return 0;
 }
@@ -4296,7 +4298,7 @@ static int sctp_setsockopt_interleaving_supported(struct sock *sk,
 	if (!asoc && p->assoc_id != SCTP_FUTURE_ASSOC && sctp_style(sk, UDP))
 		return -EINVAL;
 
-	if (!sock_net(sk)->sctp.intl_enable || !sp->frag_interleave) {
+	if (!READ_ONCE(sock_net(sk)->sctp.intl_enable) || !sp->frag_interleave) {
 		return -EPERM;
 	}
 
@@ -5098,9 +5100,9 @@ static int sctp_init_sock(struct sock *sk)
 	sp->default_timetolive = 0;
 
 	sp->default_rcv_context = 0;
-	sp->max_burst = net->sctp.max_burst;
+	sp->max_burst = READ_ONCE(net->sctp.max_burst);
 
-	sp->cookie_auth_enable = net->sctp.cookie_auth_enable;
+	sp->cookie_auth_enable = READ_ONCE(net->sctp.cookie_auth_enable);
 
 	/* Initialize default setup parameters. These parameters
 	 * can be modified with the SCTP_INITMSG socket option or
@@ -5108,24 +5110,24 @@ static int sctp_init_sock(struct sock *sk)
 	 */
 	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
 	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
-	sp->initmsg.sinit_max_attempts   = net->sctp.max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = net->sctp.rto_max;
+	sp->initmsg.sinit_max_attempts   = READ_ONCE(net->sctp.max_retrans_init);
+	sp->initmsg.sinit_max_init_timeo = READ_ONCE(net->sctp.rto_max);
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 */
-	sp->rtoinfo.srto_initial = net->sctp.rto_initial;
-	sp->rtoinfo.srto_max     = net->sctp.rto_max;
-	sp->rtoinfo.srto_min     = net->sctp.rto_min;
+	sp->rtoinfo.srto_initial = READ_ONCE(net->sctp.rto_initial);
+	sp->rtoinfo.srto_max     = READ_ONCE(net->sctp.rto_max);
+	sp->rtoinfo.srto_min     = READ_ONCE(net->sctp.rto_min);
 
 	/* Initialize default association related parameters. These parameters
 	 * can be modified with the SCTP_ASSOCINFO socket option.
 	 */
-	sp->assocparams.sasoc_asocmaxrxt = net->sctp.max_retrans_association;
+	sp->assocparams.sasoc_asocmaxrxt = READ_ONCE(net->sctp.max_retrans_association);
 	sp->assocparams.sasoc_number_peer_destinations = 0;
 	sp->assocparams.sasoc_peer_rwnd = 0;
 	sp->assocparams.sasoc_local_rwnd = 0;
-	sp->assocparams.sasoc_cookie_life = net->sctp.valid_cookie_life;
+	sp->assocparams.sasoc_cookie_life = READ_ONCE(net->sctp.valid_cookie_life);
 
 	/* Initialize default event subscriptions. By default, all the
 	 * options are off.
@@ -5135,15 +5137,15 @@ static int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_PEER_ADDR_PARAMS
 	 */
-	sp->hbinterval  = net->sctp.hb_interval;
-	sp->udp_port    = htons(net->sctp.udp_port);
-	sp->encap_port  = htons(net->sctp.encap_port);
-	sp->pathmaxrxt  = net->sctp.max_retrans_path;
-	sp->pf_retrans  = net->sctp.pf_retrans;
-	sp->ps_retrans  = net->sctp.ps_retrans;
-	sp->pf_expose   = net->sctp.pf_expose;
+	sp->hbinterval  = READ_ONCE(net->sctp.hb_interval);
+	sp->udp_port    = htons(READ_ONCE(net->sctp.udp_port));
+	sp->encap_port  = htons(READ_ONCE(net->sctp.encap_port));
+	sp->pathmaxrxt  = READ_ONCE(net->sctp.max_retrans_path);
+	sp->pf_retrans  = READ_ONCE(net->sctp.pf_retrans);
+	sp->ps_retrans  = READ_ONCE(net->sctp.ps_retrans);
+	sp->pf_expose   = READ_ONCE(net->sctp.pf_expose);
 	sp->pathmtu     = 0; /* allow default discovery */
-	sp->sackdelay   = net->sctp.sack_timeout;
+	sp->sackdelay   = READ_ONCE(net->sctp.sack_timeout);
 	sp->sackfreq	= 2;
 	sp->param_flags = SPP_HB_ENABLE |
 			  SPP_PMTUD_ENABLE |
@@ -5182,7 +5184,7 @@ static int sctp_init_sock(struct sock *sk)
 	atomic_set(&sp->pd_mode, 0);
 	skb_queue_head_init(&sp->pd_lobby);
 	sp->frag_interleave = 0;
-	sp->probe_interval = net->sctp.probe_interval;
+	sp->probe_interval = READ_ONCE(net->sctp.probe_interval);
 
 	/* Create a per socket endpoint structure.  Even if we
 	 * change the data structure relationships, this may still

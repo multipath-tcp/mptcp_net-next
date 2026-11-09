@@ -530,7 +530,7 @@ int sctp_in_scope(struct net *net, const union sctp_addr *addr,
 	 * Address scoping can be selectively controlled via sysctl
 	 * option
 	 */
-	switch (net->sctp.scope_policy) {
+	switch (READ_ONCE(net->sctp.scope_policy)) {
 	case SCTP_SCOPE_POLICY_DISABLE:
 		return 1;
 	case SCTP_SCOPE_POLICY_ENABLE:

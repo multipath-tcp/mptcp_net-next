@@ -2038,7 +2038,7 @@ static int sctp_verify_ext_param(struct net *net,
 	 * only if ADD-IP is turned on and we are not backward-compatible
 	 * mode.
 	 */
-	if (net->sctp.addip_noauth)
+	if (READ_ONCE(net->sctp.addip_noauth))
 		return 1;
 
 	if (ep->asconf_enable && !have_auth && have_asconf)
@@ -2425,7 +2425,7 @@ int sctp_process_init(struct sctp_association *asoc, struct sctp_chunk *chunk,
 	 * also give us an option to silently ignore the packet, which
 	 * is what we'll do here.
 	 */
-	if (!asoc->base.net->sctp.addip_noauth &&
+	if (!READ_ONCE(asoc->base.net->sctp.addip_noauth) &&
 	    (asoc->peer.asconf_capable && !asoc->peer.auth_capable)) {
 		asoc->peer.addip_disabled_mask |= (SCTP_PARAM_ADD_IP |
 						  SCTP_PARAM_DEL_IP |
@@ -2583,7 +2583,7 @@ static int sctp_process_param(struct sctp_association *asoc,
 		break;
 
 	case SCTP_PARAM_COOKIE_PRESERVATIVE:
-		if (!net->sctp.cookie_preserve_enable)
+		if (!READ_ONCE(net->sctp.cookie_preserve_enable))
 			break;
 
 		stale = ntohl(param.life->lifespan_increment);

@@ -55,7 +55,7 @@ static void sctp_transport_init(struct net *net,
 	 * given destination transport address, set RTO to the protocol
 	 * parameter 'RTO.Initial'.
 	 */
-	peer->rto = msecs_to_jiffies(net->sctp.rto_initial);
+	peer->rto = msecs_to_jiffies(READ_ONCE(net->sctp.rto_initial));
 
 	peer->last_time_heard = 0;
 	peer->last_time_ecne_reduced = jiffies;
@@ -65,8 +65,8 @@ static void sctp_transport_init(struct net *net,
 			    SPP_SACKDELAY_ENABLE;
 
 	/* Initialize the default path max_retrans.  */
-	peer->pathmaxrxt  = net->sctp.max_retrans_path;
-	peer->pf_retrans  = net->sctp.pf_retrans;
+	peer->pathmaxrxt  = READ_ONCE(net->sctp.max_retrans_path);
+	peer->pf_retrans  = READ_ONCE(net->sctp.pf_retrans);
 
 	INIT_LIST_HEAD(&peer->transmitted);
 	INIT_LIST_HEAD(&peer->send_ready);

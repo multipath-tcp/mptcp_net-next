@@ -1276,7 +1276,7 @@ static struct sctp_association *__sctp_rcv_walk_lookup(struct net *net,
 			break;
 
 		case SCTP_CID_ASCONF:
-			if (have_auth || net->sctp.addip_noauth)
+			if (have_auth || READ_ONCE(net->sctp.addip_noauth))
 				asoc = __sctp_rcv_asconf_lookup(
 						net, ch, laddr,
 						sctp_hdr(skb)->source,

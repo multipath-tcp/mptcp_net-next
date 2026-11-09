@@ -402,11 +402,11 @@ static int proc_sctp_do_hmac_alg(const struct ctl_table *ctl, int write,
 		if (ret)
 			return ret;
 		if (!strcmp(tmp, "sha256")) {
-			net->sctp.cookie_auth_enable = 1;
+			WRITE_ONCE(net->sctp.cookie_auth_enable, 1);
 			return 0;
 		}
 		if (!strcmp(tmp, "none")) {
-			net->sctp.cookie_auth_enable = 0;
+			WRITE_ONCE(net->sctp.cookie_auth_enable, 0);
 			return 0;
 		}
 		return -EINVAL;
@@ -441,7 +441,7 @@ static int proc_sctp_do_rto_min(const struct ctl_table *ctl, int write,
 		if (new_value > max || new_value < min)
 			return -EINVAL;
 
-		net->sctp.rto_min = new_value;
+		WRITE_ONCE(net->sctp.rto_min, new_value);
 	}
 
 	return ret;
@@ -469,7 +469,7 @@ static int proc_sctp_do_rto_max(const struct ctl_table *ctl, int write,
 		if (new_value > max || new_value < min)
 			return -EINVAL;
 
-		net->sctp.rto_max = new_value;
+		WRITE_ONCE(net->sctp.rto_max, new_value);
 	}
 
 	return ret;
@@ -504,7 +504,7 @@ static int proc_sctp_do_auth(const struct ctl_table *ctl, int write,
 	if (write && ret == 0) {
 		struct sock *sk = net->sctp.ctl_sock;
 
-		net->sctp.auth_enable = new_value;
+		WRITE_ONCE(net->sctp.auth_enable, new_value);
 		/* Update the value in the control socket */
 		lock_sock(sk);
 		sctp_sk(sk)->ep->auth_enable = new_value;
@@ -541,12 +541,12 @@ static int proc_sctp_do_udp_port(const struct ctl_table *ctl, int write,
 			return -EINVAL;
 
 		mutex_lock(&sctp_sysctl_mutex);
-		net->sctp.udp_port = new_value;
+		WRITE_ONCE(net->sctp.udp_port, new_value);
 		sctp_udp_sock_stop(net);
 		if (new_value) {
 			ret = sctp_udp_sock_start(net);
 			if (ret)
-				net->sctp.udp_port = 0;
+				WRITE_ONCE(net->sctp.udp_port, 0);
 		}
 
 		/* Update the value in the control socket */
@@ -580,7 +580,7 @@ static int proc_sctp_do_probe_interval(const struct ctl_table *ctl, int write,
 		if (new_value && new_value < SCTP_PROBE_TIMER_MIN)
 			return -EINVAL;
 
-		net->sctp.probe_interval = new_value;
+		WRITE_ONCE(net->sctp.probe_interval, new_value);
 	}
 
 	return ret;

@@ -591,7 +591,7 @@ static void sctp_do_8_2_transport_strike(struct sctp_cmd_seq *commands,
 	 * is SCTP_ACTIVE, then mark this transport as Partially Failed,
 	 * see SCTP Quick Failover Draft, section 5.1
 	 */
-	if (asoc->base.net->sctp.pf_enable &&
+	if (READ_ONCE(asoc->base.net->sctp.pf_enable) &&
 	    transport->state == SCTP_ACTIVE &&
 	    transport->error_count < transport->pathmaxrxt &&
 	    transport->error_count > transport->pf_retrans) {

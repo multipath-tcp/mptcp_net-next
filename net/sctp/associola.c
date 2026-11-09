@@ -1454,7 +1454,7 @@ static inline bool sctp_peer_needs_update(struct sctp_association *asoc)
 	case SCTP_STATE_SHUTDOWN_SENT:
 		if ((asoc->rwnd > asoc->a_rwnd) &&
 		    ((asoc->rwnd - asoc->a_rwnd) >= max_t(__u32,
-			   (asoc->base.sk->sk_rcvbuf >> net->sctp.rwnd_upd_shift),
+			   (asoc->base.sk->sk_rcvbuf >> READ_ONCE(net->sctp.rwnd_upd_shift)),
 			   asoc->pathmtu)))
 			return true;
 		break;
