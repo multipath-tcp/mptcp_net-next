@@ -271,6 +271,12 @@ struct enic {
 	u16 num_vfs;
 	enum enic_vf_type vf_type;
 	bool vf_registered;
+	u16 vf_id;
+	/* A statistics-command timeout leaves its persistent coherent target
+	 * device-owned until completion of a blocking QP or close command is
+	 * observed.
+	 */
+	bool sriov_stats_dma_unresolved;
 	u32 pf_cap_version;
 	unsigned int enable_count;
 	spinlock_t enic_api_lock;
