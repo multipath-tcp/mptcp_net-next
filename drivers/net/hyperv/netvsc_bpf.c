@@ -176,8 +176,9 @@ int netvsc_vf_setxdp(struct net_device *vf_netdev, struct bpf_prog *prog)
 
 	netdev_assert_locked_ops_compat(vf_netdev);
 
+	/* as with bonding, a VF which can't run XDP can't carry ours */
 	if (!vf_netdev->netdev_ops->ndo_bpf)
-		return 0;
+		return prog ? -EOPNOTSUPP : 0;
 
 	memset(&xdp, 0, sizeof(xdp));
 
@@ -210,6 +211,18 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 
 	switch (bpf->command) {
 	case XDP_SETUP_PROG:
+		/* The VF's own program is not ours: refuse to install over
+		 * it, as bonding does, and leave it be on removal.
+		 */
+		if (vf_netdev && dev_xdp_prog_count(vf_netdev)) {
+			if (bpf->prog) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "VF has an XDP program of its own");
+				return -EOPNOTSUPP;
+			}
+			vf_netdev = NULL;
+		}
+
 		/* Hold on to the old program, to put it back on the channels
 		 * if the VF refuses the change.
 		 */
