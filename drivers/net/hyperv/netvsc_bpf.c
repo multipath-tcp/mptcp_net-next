@@ -14,6 +14,7 @@
 #include <linux/bpf.h>
 #include <linux/bpf_trace.h>
 #include <linux/kernel.h>
+#include <net/netdev_lock.h>
 #include <net/xdp.h>
 
 #include <linux/mutex.h>
@@ -162,6 +163,7 @@ int netvsc_xdp_set(struct net_device *dev, struct bpf_prog *prog,
 	return 0;
 }
 
+/* Caller holds the VF's lock, see netdev_lock_ops() */
 int netvsc_vf_setxdp(struct net_device *vf_netdev, struct bpf_prog *prog)
 {
 	struct netdev_bpf xdp;
@@ -171,6 +173,8 @@ int netvsc_vf_setxdp(struct net_device *vf_netdev, struct bpf_prog *prog)
 
 	if (!vf_netdev)
 		return 0;
+
+	netdev_assert_locked_ops_compat(vf_netdev);
 
 	if (!vf_netdev->netdev_ops->ndo_bpf)
 		return 0;
@@ -218,7 +222,15 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 		if (ret)
 			goto put_old_prog;
 
-		ret = netvsc_vf_setxdp(vf_netdev, bpf->prog);
+		/* Unlike netvsc_register_vf() we don't get the VF's lock
+		 * handed to us here.
+		 */
+		ret = 0;
+		if (vf_netdev) {
+			netdev_lock_ops(vf_netdev);
+			ret = netvsc_vf_setxdp(vf_netdev, bpf->prog);
+			netdev_unlock_ops(vf_netdev);
+		}
 
 		if (ret) {
 			netdev_err(dev, "vf_setxdp failed:%d\n", ret);
