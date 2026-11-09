@@ -1104,7 +1104,7 @@ ipv6_add_addr(struct inet6_dev *idev, struct ifa6_config *cfg,
 		goto out;
 	}
 
-	if (idev->cnf.disable_ipv6) {
+	if (READ_ONCE(idev->cnf.disable_ipv6)) {
 		NL_SET_ERR_MSG_MOD(extack, "IPv6 is disabled on this device");
 		err = -EACCES;
 		goto out;
@@ -2215,7 +2215,7 @@ void addrconf_dad_failure(struct sk_buff *skb, struct inet6_ifaddr *ifp)
 			.scope = ifp->scope,
 		};
 
-		if (retries > net->ipv6.sysctl.idgen_retries) {
+		if (retries > READ_ONCE(net->ipv6.sysctl.idgen_retries)) {
 			net_info_ratelimited("%s: privacy stable address generation failed because of DAD conflicts!\n",
 					     ifp->idev->dev->name);
 			goto errdad;
@@ -2248,7 +2248,7 @@ void addrconf_dad_failure(struct sk_buff *skb, struct inet6_ifaddr *ifp)
 		spin_unlock_bh(&ifp2->lock);
 
 		if (start_dad)
-			addrconf_mod_dad_work(ifp2, net->ipv6.sysctl.idgen_delay);
+			addrconf_mod_dad_work(ifp2, READ_ONCE(net->ipv6.sysctl.idgen_delay));
 		in6_ifa_put(ifp2);
 lock_errdad:
 		spin_lock_bh(&ifp->lock);
@@ -2706,8 +2706,10 @@ static void manage_tempaddrs(struct inet6_dev *idev,
 
 static bool is_addr_mode_generate_stable(struct inet6_dev *idev)
 {
-	return idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_STABLE_PRIVACY ||
-	       idev->cnf.addr_gen_mode == IN6_ADDR_GEN_MODE_RANDOM;
+	u32 mode = READ_ONCE(idev->cnf.addr_gen_mode);
+
+	return mode == IN6_ADDR_GEN_MODE_STABLE_PRIVACY ||
+	       mode == IN6_ADDR_GEN_MODE_RANDOM;
 }
 
 int addrconf_prefix_rcv_add_addr(struct net *net, struct net_device *dev,
@@ -2735,7 +2737,7 @@ int addrconf_prefix_rcv_add_addr(struct net *net, struct net_device *dev,
 #ifdef CONFIG_IPV6_OPTIMISTIC_DAD
 		if ((READ_ONCE(net->ipv6.devconf_all->optimistic_dad) ||
 		     READ_ONCE(in6_dev->cnf.optimistic_dad)) &&
-		    !net->ipv6.devconf_all->forwarding && sllao)
+		    !READ_ONCE(net->ipv6.devconf_all->forwarding) && sllao)
 			cfg.ifa_flags |= IFA_F_OPTIMISTIC;
 #endif
 
@@ -2857,7 +2859,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 		return;
 	}
 
-	if (valid_lft != 0 && valid_lft < in6_dev->cnf.accept_ra_min_lft)
+	if (valid_lft != 0 && valid_lft < READ_ONCE(in6_dev->cnf.accept_ra_min_lft))
 		goto put;
 
 	/*
@@ -2928,7 +2930,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 	/* Try to figure out our local address for this prefix */
 
 	ignore_autoconf = READ_ONCE(in6_dev->cnf.ra_honor_pio_pflag) && pinfo->preferpd;
-	if (pinfo->autoconf && in6_dev->cnf.autoconf && !ignore_autoconf) {
+	if (pinfo->autoconf && READ_ONCE(in6_dev->cnf.autoconf) && !ignore_autoconf) {
 		struct in6_addr addr;
 		bool tokenized = false, dev_addr_generated = false;
 
@@ -3434,7 +3436,7 @@ retry:
 
 	if (ipv6_reserved_interfaceid(temp)) {
 		dad_count++;
-		if (dad_count > dev_net(idev->dev)->ipv6.sysctl.idgen_retries)
+		if (dad_count > READ_ONCE(dev_net(idev->dev)->ipv6.sysctl.idgen_retries))
 			return -1;
 		goto retry;
 	}
@@ -3805,7 +3807,7 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 			 * when the interface up, the changed MTU must be
 			 * reflected in the idev as well as routers.
 			 */
-			if (idev->cnf.mtu6 != dev->mtu &&
+			if (READ_ONCE(idev->cnf.mtu6) != dev->mtu &&
 			    dev->mtu >= IPV6_MIN_MTU) {
 				rt6_mtu_change(dev, dev->mtu);
 				WRITE_ONCE(idev->cnf.mtu6, dev->mtu);

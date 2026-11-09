@@ -2065,7 +2065,7 @@ static bool rt6_mtu_change_route_allowed(struct inet6_dev *idev,
 	if (dmtu >= mtu)
 		return true;
 
-	if (dmtu == idev->cnf.mtu6)
+	if (dmtu == READ_ONCE(idev->cnf.mtu6))
 		return true;
 
 	return false;
@@ -3666,7 +3666,7 @@ int fib6_nh_init(struct net *net, struct fib6_nh *fib6_nh,
 	if (!dev)
 		goto out;
 
-	if (!idev || idev->cnf.disable_ipv6) {
+	if (!idev || READ_ONCE(idev->cnf.disable_ipv6)) {
 		NL_SET_ERR_MSG(extack, "IPv6 is disabled on nexthop device");
 		err = -EACCES;
 		goto out;
@@ -4533,7 +4533,7 @@ restart:
 		struct inet6_dev *idev = dev ? __in6_dev_get(dev) : NULL;
 
 		if (rt->fib6_flags & (RTF_DEFAULT | RTF_ADDRCONF) &&
-		    (!idev || idev->cnf.accept_ra != 2) &&
+		    (!idev || READ_ONCE(idev->cnf.accept_ra) != 2) &&
 		    fib6_info_hold_safe(rt)) {
 			rcu_read_unlock();
 			ip6_del_rt(net, rt, false);
@@ -5075,7 +5075,7 @@ static int fib6_nh_mtu_change(struct fib6_nh *nh, void *_arg)
 			return 0;
 
 		if (mtu >= arg->mtu ||
-		    (mtu < arg->mtu && mtu == idev->cnf.mtu6))
+		    (mtu < arg->mtu && mtu == READ_ONCE(idev->cnf.mtu6)))
 			fib6_metric_set(f6i, RTAX_MTU, arg->mtu);
 
 		spin_lock_bh(&rt6_exception_lock);
