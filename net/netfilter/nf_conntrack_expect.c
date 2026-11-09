@@ -518,7 +518,7 @@ static inline int __nf_ct_expect_check(struct nf_conntrack_expect *expect,
 	}
 
 	cnet = nf_ct_pernet(net);
-	if (cnet->expect_count >= nf_ct_expect_max) {
+	if (cnet->expect_count >= READ_ONCE(nf_ct_expect_max)) {
 		net_warn_ratelimited("nf_conntrack: expectation table full\n");
 		ret = -EMFILE;
 	}

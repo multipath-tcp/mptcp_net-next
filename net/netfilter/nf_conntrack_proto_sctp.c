@@ -304,7 +304,7 @@ static bool sctp_error(struct sk_buff *skb,
 		goto out_invalid;
 	}
 	if (state->hook == NF_INET_PRE_ROUTING &&
-	    state->net->ct.sysctl_checksum &&
+	    READ_ONCE(state->net->ct.sysctl_checksum) &&
 	    skb->ip_summed == CHECKSUM_NONE) {
 		if (skb_ensure_writable(skb, dataoff + sizeof(*sh))) {
 			logmsg = "nf_ct_sctp: failed to read header ";

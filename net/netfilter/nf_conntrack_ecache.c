@@ -321,7 +321,7 @@ bool nf_ct_ecache_ext_add(struct nf_conn *ct, u16 ctmask, u16 expmask, gfp_t gfp
 	struct net *net = nf_ct_net(ct);
 	struct nf_conntrack_ecache *e;
 
-	switch (net->ct.sysctl_events) {
+	switch (READ_ONCE(net->ct.sysctl_events)) {
 	case 0:
 		 /* assignment via template / ruleset? ignore sysctl. */
 		if (ctmask || expmask)

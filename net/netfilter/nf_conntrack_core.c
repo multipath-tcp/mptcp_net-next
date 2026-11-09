@@ -1508,7 +1508,7 @@ static void gc_worker(struct work_struct *work)
 
 	i = gc_work->next_bucket;
 	if (gc_work->early_drop)
-		nf_conntrack_max95 = nf_conntrack_max / 100u * 95u;
+		nf_conntrack_max95 = READ_ONCE(nf_conntrack_max) / 100u * 95u;
 
 	if (i == 0) {
 		gc_work->avg_timeout = GC_SCAN_INTERVAL_INIT;
@@ -1658,7 +1658,7 @@ __nf_conntrack_alloc(struct net *net,
 	/* We don't want any race condition at early drop stage */
 	ct_count = atomic_inc_return(&cnet->count);
 
-	if (unlikely(ct_count > nf_conntrack_max)) {
+	if (unlikely(ct_count > READ_ONCE(nf_conntrack_max))) {
 		if (!early_drop(net, hash)) {
 			if (!conntrack_gc_work.early_drop)
 				conntrack_gc_work.early_drop = true;
@@ -1793,7 +1793,7 @@ init_conntrack(struct net *net, struct nf_conn *tmpl,
 #ifdef CONFIG_NF_CONNTRACK_EVENTS
 	ecache = tmpl ? nf_ct_ecache_find(tmpl) : NULL;
 
-	if ((ecache || net->ct.sysctl_events) &&
+	if ((ecache || READ_ONCE(net->ct.sysctl_events)) &&
 	    !nf_ct_ecache_ext_add(ct, ecache ? ecache->ctmask : 0,
 				  ecache ? ecache->expmask : 0,
 				  GFP_ATOMIC)) {

@@ -82,7 +82,7 @@ static bool udp_error(struct sk_buff *skb,
 	 * because the checksum is assumed to be correct.
 	 * FIXME: Source route IP option packets --RR */
 	if (state->hook == NF_INET_PRE_ROUTING &&
-	    state->net->ct.sysctl_checksum &&
+	    READ_ONCE(state->net->ct.sysctl_checksum) &&
 	    nf_checksum(skb, state->hook, dataoff, IPPROTO_UDP, state->pf)) {
 		udp_error_log(skb, state, "bad checksum");
 		return true;

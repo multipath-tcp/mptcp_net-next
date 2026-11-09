@@ -51,12 +51,12 @@ void nf_l4proto_log_invalid(const struct sk_buff *skb,
 			    u8 protonum,
 			    const char *fmt, ...)
 {
+	u8 log_invalid = READ_ONCE(state->net->ct.sysctl_log_invalid);
 	struct net *net = state->net;
 	struct va_format vaf;
 	va_list args;
 
-	if (net->ct.sysctl_log_invalid != protonum &&
-	    net->ct.sysctl_log_invalid != IPPROTO_RAW)
+	if (log_invalid != protonum && log_invalid != IPPROTO_RAW)
 		return;
 
 	va_start(args, fmt);
@@ -86,7 +86,7 @@ void nf_ct_l4proto_log_invalid(const struct sk_buff *skb,
 	lockdep_assert_not_held(&ct->lock);
 
 	net = nf_ct_net(ct);
-	if (likely(net->ct.sysctl_log_invalid == 0))
+	if (likely(READ_ONCE(net->ct.sysctl_log_invalid) == 0))
 		return;
 
 	va_start(args, fmt);

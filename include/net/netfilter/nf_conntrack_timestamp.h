@@ -29,7 +29,7 @@ struct nf_conn_tstamp *nf_ct_tstamp_ext_add(struct nf_conn *ct, gfp_t gfp)
 #ifdef CONFIG_NF_CONNTRACK_TIMESTAMP
 	struct net *net = nf_ct_net(ct);
 
-	if (!net->ct.sysctl_tstamp)
+	if (!READ_ONCE(net->ct.sysctl_tstamp))
 		return NULL;
 
 	return nf_ct_ext_add(ct, NF_CT_EXT_TSTAMP, gfp);

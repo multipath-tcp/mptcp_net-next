@@ -33,7 +33,7 @@ struct nf_conn_acct *nf_ct_acct_ext_add(struct nf_conn *ct, gfp_t gfp)
 	struct net *net = nf_ct_net(ct);
 	struct nf_conn_acct *acct;
 
-	if (!net->ct.sysctl_acct)
+	if (!READ_ONCE(net->ct.sysctl_acct))
 		return NULL;
 
 	acct = nf_ct_ext_add(ct, NF_CT_EXT_ACCT, gfp);
@@ -51,7 +51,7 @@ struct nf_conn_acct *nf_ct_acct_ext_add(struct nf_conn *ct, gfp_t gfp)
 static inline bool nf_ct_acct_enabled(struct net *net)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
-	return net->ct.sysctl_acct != 0;
+	return READ_ONCE(net->ct.sysctl_acct) != 0;
 #else
 	return false;
 #endif
@@ -61,7 +61,7 @@ static inline bool nf_ct_acct_enabled(struct net *net)
 static inline void nf_ct_set_acct(struct net *net, bool enable)
 {
 #if IS_ENABLED(CONFIG_NF_CONNTRACK)
-	net->ct.sysctl_acct = enable;
+	WRITE_ONCE(net->ct.sysctl_acct, enable);
 #endif
 }
 

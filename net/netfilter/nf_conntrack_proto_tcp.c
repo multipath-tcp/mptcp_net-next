@@ -856,7 +856,7 @@ static bool tcp_error(const struct tcphdr *th,
 	 * because the checksum is assumed to be correct.
 	 */
 	/* FIXME: Source route IP option packets --RR */
-	if (state->net->ct.sysctl_checksum &&
+	if (READ_ONCE(state->net->ct.sysctl_checksum) &&
 	    state->hook == NF_INET_PRE_ROUTING &&
 	    nf_checksum(skb, state->hook, dataoff, IPPROTO_TCP, state->pf)) {
 		tcp_error_log(skb, state, "bad checksum");
