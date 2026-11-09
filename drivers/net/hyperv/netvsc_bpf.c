@@ -206,7 +206,21 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 	int ret;
 
 	if (!nvdev || nvdev->destroy) {
-		return -ENODEV;
+		struct netvsc_device_info *saved;
+
+		if (bpf->command != XDP_SETUP_PROG || bpf->prog || vf_netdev)
+			return -ENODEV;
+
+		/* The channels and the VF are gone, and so is the program,
+		 * except for the reference netvsc_suspend() keeps for
+		 * netvsc_resume().
+		 */
+		saved = ndevctx->saved_netvsc_dev_info;
+		if (saved && saved->bprog) {
+			bpf_prog_put(saved->bprog);
+			saved->bprog = NULL;
+		}
+		return 0;
 	}
 
 	switch (bpf->command) {
