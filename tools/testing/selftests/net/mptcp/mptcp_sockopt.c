@@ -579,7 +579,6 @@ static void connect_one_server(int fd, int pipefd)
 	char buf[4096], buf2[4096];
 	size_t len, i, total;
 	struct so_state s;
-	bool eof = false;
 	ssize_t ret;
 
 	memset(&s, 0, sizeof(s));
@@ -617,16 +616,15 @@ static void connect_one_server(int fd, int pipefd)
 		ret = read(fd, buf2 + total, sizeof(buf2) - total);
 		if (ret < 0)
 			die_perror("read");
-		if (ret == 0) {
-			eof = true;
-			break;
-		}
+		if (ret == 0)
+			xerror("unexpected EOF, total %lu, len %lu\n",
+			       total, len);
 
 		total += ret;
 	} while (total < len);
 
 	if (total != len)
-		xerror("total %lu, len %lu eof %d\n", total, len, eof);
+		xerror("total %lu, len %lu\n", total, len);
 
 	if (memcmp(buf, buf2, len))
 		xerror("data corruption");
@@ -635,9 +633,6 @@ static void connect_one_server(int fd, int pipefd)
 		assert(s.tcpi_rcv_delta <= total);
 
 	do_getsockopts(&s, fd, total, total);
-
-	if (eof)
-		total += 1; /* sequence advances due to FIN */
 
 	assert(s.mptcpi_rcv_delta == (uint64_t)total);
 	close(fd);
