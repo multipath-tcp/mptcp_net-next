@@ -137,7 +137,7 @@ void rds_queue_reconnect(struct rds_conn_path *cp)
 
 	set_bit(RDS_RECONNECT_PENDING, &cp->cp_flags);
 	if (cp->cp_reconnect_jiffies == 0) {
-		cp->cp_reconnect_jiffies = rds_sysctl_reconnect_min_jiffies;
+		cp->cp_reconnect_jiffies = READ_ONCE(rds_sysctl_reconnect_min_jiffies);
 		rcu_read_lock();
 		if (!rds_destroy_pending(cp->cp_conn))
 			queue_delayed_work(cp->cp_wq, &cp->cp_conn_w, 0);
@@ -156,7 +156,7 @@ void rds_queue_reconnect(struct rds_conn_path *cp)
 	rcu_read_unlock();
 
 	cp->cp_reconnect_jiffies = min(cp->cp_reconnect_jiffies * 2,
-					rds_sysctl_reconnect_max_jiffies);
+					READ_ONCE(rds_sysctl_reconnect_max_jiffies));
 }
 
 void rds_connect_worker(struct work_struct *work)
