@@ -1993,11 +1993,11 @@ static void yt921x_dsa_port_teardown(struct dsa_switch *ds, int port)
 	struct yt921x_port *pp = &priv->ports[port];
 	struct yt921x_mib *pm = pp->mib;
 
-	/* get_stats64() might not be synchronized with port_teardown(), hold
-	 * the MIB block till the device teardown
-	 */
-	if (pm)
+	if (pm) {
 		disable_delayed_work_sync(&pm->work);
+		pp->mib = NULL;
+		kvfree(pm);
+	}
 }
 
 static int yt921x_dsa_port_setup(struct dsa_switch *ds, int port)
@@ -2005,12 +2005,11 @@ static int yt921x_dsa_port_setup(struct dsa_switch *ds, int port)
 	struct yt921x_priv *priv = dsa_to_yt921x_priv(ds);
 	struct yt921x_port *pp = &priv->ports[port];
 	const struct yt921x_info *info = priv->info;
-	struct device *dev = yt921x_priv_to_device(priv);
-	struct yt921x_mib *pm = pp->mib;
+	struct yt921x_mib *pm;
 	int res;
 
-	if (!pm && (BIT(port) & yt921x_info_ports_mask(info))) {
-		pm = devm_kzalloc(dev, sizeof(*pm), GFP_KERNEL);
+	if (BIT(port) & yt921x_info_ports_mask(info)) {
+		pm = kvzalloc_obj(*pm);
 		if (!pm)
 			return -ENOMEM;
 		pp->mib = pm;
@@ -2018,20 +2017,15 @@ static int yt921x_dsa_port_setup(struct dsa_switch *ds, int port)
 		pm->port = pp;
 		u64_stats_init(&pm->syncp);
 		INIT_DELAYED_WORK(&pm->work, yt921x_mib_poll);
-		/* Start disabled, so that the enable below always pairs with
-		 * either this disable or the one from a previous teardown
-		 */
-		disable_delayed_work_sync(&pm->work);
 	}
 
 	mutex_lock(&priv->reg_lock);
 	res = yt921x_port_setup(priv, port);
 	mutex_unlock(&priv->reg_lock);
-	if (res)
+	if (res) {
+		yt921x_dsa_port_teardown(ds, port);
 		return res;
-
-	if (pm)
-		enable_delayed_work(&pm->work);
+	}
 
 	return 0;
 }
