@@ -197,6 +197,7 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 	struct netvsc_device *nvdev = rtnl_dereference(ndevctx->nvdev);
 	struct net_device *vf_netdev = rtnl_dereference(ndevctx->vf_netdev);
 	struct netlink_ext_ack *extack = bpf->extack;
+	struct bpf_prog *old_prog;
 	int ret;
 
 	if (!nvdev || nvdev->destroy) {
@@ -205,10 +206,17 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 
 	switch (bpf->command) {
 	case XDP_SETUP_PROG:
+		/* Hold on to the old program, to put it back on the channels
+		 * if the VF refuses the change.
+		 */
+		old_prog = netvsc_xdp_get(nvdev);
+		if (old_prog)
+			bpf_prog_inc(old_prog);
+
 		ret = netvsc_xdp_set(dev, bpf->prog, extack, nvdev);
 
 		if (ret)
-			return ret;
+			goto put_old_prog;
 
 		ret = netvsc_vf_setxdp(vf_netdev, bpf->prog);
 
@@ -216,9 +224,22 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 			netdev_err(dev, "vf_setxdp failed:%d\n", ret);
 			NL_SET_ERR_MSG_MOD(extack, "vf_setxdp failed");
 
-			netvsc_xdp_set(dev, NULL, extack, nvdev);
+			/* The caller hands us its reference to bpf->prog only
+			 * on success, take one so that putting the num_chn
+			 * channel references below doesn't consume it.
+			 */
+			if (bpf->prog)
+				bpf_prog_inc(bpf->prog);
+			/* Can't fail, old_prog has passed the same checks
+			 * before. The channels take over our reference to it.
+			 */
+			netvsc_xdp_set(dev, old_prog, extack, nvdev);
+			return ret;
 		}
 
+put_old_prog:
+		if (old_prog)
+			bpf_prog_put(old_prog);
 		return ret;
 
 	default:
