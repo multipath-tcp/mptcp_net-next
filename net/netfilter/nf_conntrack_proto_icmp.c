@@ -327,11 +327,11 @@ static int icmp_timeout_nlattr_to_obj(struct nlattr *tb[],
 	if (tb[CTA_TIMEOUT_ICMP_TIMEOUT]) {
 		if (!timeout)
 			timeout = &in->timeout;
-		*timeout =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_ICMP_TIMEOUT])) * HZ;
+		WRITE_ONCE(*timeout,
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_ICMP_TIMEOUT])) * HZ);
 	} else if (timeout) {
 		/* Set default ICMP timeout. */
-		*timeout = in->timeout;
+		WRITE_ONCE(*timeout, READ_ONCE(in->timeout));
 	}
 	return 0;
 }
@@ -341,7 +341,7 @@ icmp_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 {
 	const unsigned int *timeout = data;
 
-	if (nla_put_be32(skb, CTA_TIMEOUT_ICMP_TIMEOUT, htonl(*timeout / HZ)))
+	if (nla_put_be32(skb, CTA_TIMEOUT_ICMP_TIMEOUT, htonl(READ_ONCE(*timeout) / HZ)))
 		goto nla_put_failure;
 	return 0;
 

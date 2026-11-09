@@ -1523,55 +1523,56 @@ static int tcp_timeout_nlattr_to_obj(struct nlattr *tb[],
 		timeouts = tn->timeouts;
 	/* set default TCP timeouts. */
 	for (i=0; i<TCP_CONNTRACK_TIMEOUT_MAX; i++)
-		timeouts[i] = tn->timeouts[i];
+		WRITE_ONCE(timeouts[i], READ_ONCE(tn->timeouts[i]));
 
 	if (tb[CTA_TIMEOUT_TCP_SYN_SENT]) {
-		timeouts[TCP_CONNTRACK_SYN_SENT] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_SENT]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_SYN_SENT],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_SENT])) * HZ);
 	}
 
 	if (tb[CTA_TIMEOUT_TCP_SYN_RECV]) {
-		timeouts[TCP_CONNTRACK_SYN_RECV] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_RECV]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_SYN_RECV],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_RECV])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_ESTABLISHED]) {
-		timeouts[TCP_CONNTRACK_ESTABLISHED] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_ESTABLISHED]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_ESTABLISHED],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_ESTABLISHED])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_FIN_WAIT]) {
-		timeouts[TCP_CONNTRACK_FIN_WAIT] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_FIN_WAIT]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_FIN_WAIT],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_FIN_WAIT])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_CLOSE_WAIT]) {
-		timeouts[TCP_CONNTRACK_CLOSE_WAIT] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_CLOSE_WAIT]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_CLOSE_WAIT],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_CLOSE_WAIT])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_LAST_ACK]) {
-		timeouts[TCP_CONNTRACK_LAST_ACK] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_LAST_ACK]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_LAST_ACK],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_LAST_ACK])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_TIME_WAIT]) {
-		timeouts[TCP_CONNTRACK_TIME_WAIT] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_TIME_WAIT]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_TIME_WAIT],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_TIME_WAIT])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_CLOSE]) {
-		timeouts[TCP_CONNTRACK_CLOSE] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_CLOSE]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_CLOSE],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_CLOSE])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_SYN_SENT2]) {
-		timeouts[TCP_CONNTRACK_SYN_SENT2] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_SENT2]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_SYN_SENT2],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_SYN_SENT2])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_RETRANS]) {
-		timeouts[TCP_CONNTRACK_RETRANS] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_RETRANS]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_RETRANS],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_RETRANS])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_TCP_UNACK]) {
-		timeouts[TCP_CONNTRACK_UNACK] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_UNACK]))*HZ;
+		WRITE_ONCE(timeouts[TCP_CONNTRACK_UNACK],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_TCP_UNACK])) * HZ);
 	}
 
-	timeouts[CTA_TIMEOUT_TCP_UNSPEC] = timeouts[CTA_TIMEOUT_TCP_SYN_SENT];
+	WRITE_ONCE(timeouts[CTA_TIMEOUT_TCP_UNSPEC],
+		   READ_ONCE(timeouts[CTA_TIMEOUT_TCP_SYN_SENT]));
 	return 0;
 }
 
@@ -1581,27 +1582,27 @@ tcp_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 	const unsigned int *timeouts = data;
 
 	if (nla_put_be32(skb, CTA_TIMEOUT_TCP_SYN_SENT,
-			htonl(timeouts[TCP_CONNTRACK_SYN_SENT] / HZ)) ||
+			htonl(READ_ONCE(timeouts[TCP_CONNTRACK_SYN_SENT]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_SYN_RECV,
-			 htonl(timeouts[TCP_CONNTRACK_SYN_RECV] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_SYN_RECV]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_ESTABLISHED,
-			 htonl(timeouts[TCP_CONNTRACK_ESTABLISHED] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_ESTABLISHED]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_FIN_WAIT,
-			 htonl(timeouts[TCP_CONNTRACK_FIN_WAIT] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_FIN_WAIT]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_CLOSE_WAIT,
-			 htonl(timeouts[TCP_CONNTRACK_CLOSE_WAIT] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_CLOSE_WAIT]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_LAST_ACK,
-			 htonl(timeouts[TCP_CONNTRACK_LAST_ACK] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_LAST_ACK]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_TIME_WAIT,
-			 htonl(timeouts[TCP_CONNTRACK_TIME_WAIT] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_TIME_WAIT]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_CLOSE,
-			 htonl(timeouts[TCP_CONNTRACK_CLOSE] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_CLOSE]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_SYN_SENT2,
-			 htonl(timeouts[TCP_CONNTRACK_SYN_SENT2] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_SYN_SENT2]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_RETRANS,
-			 htonl(timeouts[TCP_CONNTRACK_RETRANS] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_RETRANS]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_TCP_UNACK,
-			 htonl(timeouts[TCP_CONNTRACK_UNACK] / HZ)))
+			 htonl(READ_ONCE(timeouts[TCP_CONNTRACK_UNACK]) / HZ)))
 		goto nla_put_failure;
 	return 0;
 

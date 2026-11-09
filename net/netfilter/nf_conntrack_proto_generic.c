@@ -27,11 +27,11 @@ static int generic_timeout_nlattr_to_obj(struct nlattr *tb[],
 		timeout = &gn->timeout;
 
 	if (tb[CTA_TIMEOUT_GENERIC_TIMEOUT])
-		*timeout =
-		    ntohl(nla_get_be32(tb[CTA_TIMEOUT_GENERIC_TIMEOUT])) * HZ;
+		WRITE_ONCE(*timeout,
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_GENERIC_TIMEOUT])) * HZ);
 	else {
 		/* Set default generic timeout. */
-		*timeout = gn->timeout;
+		WRITE_ONCE(*timeout, READ_ONCE(gn->timeout));
 	}
 
 	return 0;
@@ -42,7 +42,7 @@ generic_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 {
 	const unsigned int *timeout = data;
 
-	if (nla_put_be32(skb, CTA_TIMEOUT_GENERIC_TIMEOUT, htonl(*timeout / HZ)))
+	if (nla_put_be32(skb, CTA_TIMEOUT_GENERIC_TIMEOUT, htonl(READ_ONCE(*timeout) / HZ)))
 		goto nla_put_failure;
 
 	return 0;

@@ -650,16 +650,17 @@ static int sctp_timeout_nlattr_to_obj(struct nlattr *tb[],
 
 	/* set default SCTP timeouts. */
 	for (i=0; i<SCTP_CONNTRACK_MAX; i++)
-		timeouts[i] = sn->timeouts[i];
+		WRITE_ONCE(timeouts[i], READ_ONCE(sn->timeouts[i]));
 
 	/* there's a 1:1 mapping between attributes and protocol states. */
 	for (i=CTA_TIMEOUT_SCTP_UNSPEC+1; i<CTA_TIMEOUT_SCTP_MAX+1; i++) {
 		if (tb[i]) {
-			timeouts[i] = ntohl(nla_get_be32(tb[i])) * HZ;
+			WRITE_ONCE(timeouts[i], ntohl(nla_get_be32(tb[i])) * HZ);
 		}
 	}
 
-	timeouts[CTA_TIMEOUT_SCTP_UNSPEC] = timeouts[CTA_TIMEOUT_SCTP_CLOSED];
+	WRITE_ONCE(timeouts[CTA_TIMEOUT_SCTP_UNSPEC],
+		   READ_ONCE(timeouts[CTA_TIMEOUT_SCTP_CLOSED]));
 	return 0;
 }
 
@@ -670,7 +671,7 @@ sctp_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 	int i;
 
 	for (i=CTA_TIMEOUT_SCTP_UNSPEC+1; i<CTA_TIMEOUT_SCTP_MAX+1; i++) {
-	        if (nla_put_be32(skb, i, htonl(timeouts[i] / HZ)))
+		if (nla_put_be32(skb, i, htonl(READ_ONCE(timeouts[i]) / HZ)))
 			goto nla_put_failure;
 	}
         return 0;

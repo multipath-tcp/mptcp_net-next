@@ -318,16 +318,16 @@ static int gre_timeout_nlattr_to_obj(struct nlattr *tb[],
 	if (!timeouts)
 		timeouts = gre_get_timeouts(net);
 	/* set default timeouts for GRE. */
-	timeouts[GRE_CT_UNREPLIED] = net_gre->timeouts[GRE_CT_UNREPLIED];
-	timeouts[GRE_CT_REPLIED] = net_gre->timeouts[GRE_CT_REPLIED];
+	WRITE_ONCE(timeouts[GRE_CT_UNREPLIED], READ_ONCE(net_gre->timeouts[GRE_CT_UNREPLIED]));
+	WRITE_ONCE(timeouts[GRE_CT_REPLIED], READ_ONCE(net_gre->timeouts[GRE_CT_REPLIED]));
 
 	if (tb[CTA_TIMEOUT_GRE_UNREPLIED]) {
-		timeouts[GRE_CT_UNREPLIED] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_GRE_UNREPLIED])) * HZ;
+		WRITE_ONCE(timeouts[GRE_CT_UNREPLIED],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_GRE_UNREPLIED])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_GRE_REPLIED]) {
-		timeouts[GRE_CT_REPLIED] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_GRE_REPLIED])) * HZ;
+		WRITE_ONCE(timeouts[GRE_CT_REPLIED],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_GRE_REPLIED])) * HZ);
 	}
 	return 0;
 }
@@ -338,9 +338,9 @@ gre_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 	const unsigned int *timeouts = data;
 
 	if (nla_put_be32(skb, CTA_TIMEOUT_GRE_UNREPLIED,
-			 htonl(timeouts[GRE_CT_UNREPLIED] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[GRE_CT_UNREPLIED]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_GRE_REPLIED,
-			 htonl(timeouts[GRE_CT_REPLIED] / HZ)))
+			 htonl(READ_ONCE(timeouts[GRE_CT_REPLIED]) / HZ)))
 		goto nla_put_failure;
 	return 0;
 

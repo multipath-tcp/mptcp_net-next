@@ -155,16 +155,16 @@ static int udp_timeout_nlattr_to_obj(struct nlattr *tb[],
 		timeouts = un->timeouts;
 
 	/* set default timeouts for UDP. */
-	timeouts[UDP_CT_UNREPLIED] = un->timeouts[UDP_CT_UNREPLIED];
-	timeouts[UDP_CT_REPLIED] = un->timeouts[UDP_CT_REPLIED];
+	WRITE_ONCE(timeouts[UDP_CT_UNREPLIED], READ_ONCE(un->timeouts[UDP_CT_UNREPLIED]));
+	WRITE_ONCE(timeouts[UDP_CT_REPLIED], READ_ONCE(un->timeouts[UDP_CT_REPLIED]));
 
 	if (tb[CTA_TIMEOUT_UDP_UNREPLIED]) {
-		timeouts[UDP_CT_UNREPLIED] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_UDP_UNREPLIED])) * HZ;
+		WRITE_ONCE(timeouts[UDP_CT_UNREPLIED],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_UDP_UNREPLIED])) * HZ);
 	}
 	if (tb[CTA_TIMEOUT_UDP_REPLIED]) {
-		timeouts[UDP_CT_REPLIED] =
-			ntohl(nla_get_be32(tb[CTA_TIMEOUT_UDP_REPLIED])) * HZ;
+		WRITE_ONCE(timeouts[UDP_CT_REPLIED],
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_UDP_REPLIED])) * HZ);
 	}
 	return 0;
 }
@@ -175,9 +175,9 @@ udp_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 	const unsigned int *timeouts = data;
 
 	if (nla_put_be32(skb, CTA_TIMEOUT_UDP_UNREPLIED,
-			 htonl(timeouts[UDP_CT_UNREPLIED] / HZ)) ||
+			 htonl(READ_ONCE(timeouts[UDP_CT_UNREPLIED]) / HZ)) ||
 	    nla_put_be32(skb, CTA_TIMEOUT_UDP_REPLIED,
-			 htonl(timeouts[UDP_CT_REPLIED] / HZ)))
+			 htonl(READ_ONCE(timeouts[UDP_CT_REPLIED]) / HZ)))
 		goto nla_put_failure;
 	return 0;
 

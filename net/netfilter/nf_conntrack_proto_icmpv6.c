@@ -305,11 +305,11 @@ static int icmpv6_timeout_nlattr_to_obj(struct nlattr *tb[],
 	if (!timeout)
 		timeout = icmpv6_get_timeouts(net);
 	if (tb[CTA_TIMEOUT_ICMPV6_TIMEOUT]) {
-		*timeout =
-		    ntohl(nla_get_be32(tb[CTA_TIMEOUT_ICMPV6_TIMEOUT])) * HZ;
+		WRITE_ONCE(*timeout,
+			   ntohl(nla_get_be32(tb[CTA_TIMEOUT_ICMPV6_TIMEOUT])) * HZ);
 	} else {
 		/* Set default ICMPv6 timeout. */
-		*timeout = in->timeout;
+		WRITE_ONCE(*timeout, READ_ONCE(in->timeout));
 	}
 	return 0;
 }
@@ -319,7 +319,7 @@ icmpv6_timeout_obj_to_nlattr(struct sk_buff *skb, const void *data)
 {
 	const unsigned int *timeout = data;
 
-	if (nla_put_be32(skb, CTA_TIMEOUT_ICMPV6_TIMEOUT, htonl(*timeout / HZ)))
+	if (nla_put_be32(skb, CTA_TIMEOUT_ICMPV6_TIMEOUT, htonl(READ_ONCE(*timeout) / HZ)))
 		goto nla_put_failure;
 	return 0;
 
