@@ -118,7 +118,7 @@ int nf_conntrack_icmpv6_packet(struct nf_conn *ct,
 	/* Do not immediately delete the connection after the first
 	   successful reply to avoid excessive conntrackd traffic
 	   and also to handle correctly ICMP echo reply duplicates. */
-	nf_ct_refresh_acct(ct, ctinfo, skb, *timeout);
+	nf_ct_refresh_acct(ct, ctinfo, skb, READ_ONCE(*timeout));
 
 	return NF_ACCEPT;
 }

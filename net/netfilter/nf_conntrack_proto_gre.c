@@ -279,8 +279,8 @@ int nf_conntrack_gre_packet(struct nf_conn *ct,
 
 		/* initialize to sane value.  Ideally a conntrack helper
 		 * (e.g. in case of pptp) is increasing them */
-		ct->proto.gre.stream_timeout = timeouts[GRE_CT_REPLIED];
-		ct->proto.gre.timeout = timeouts[GRE_CT_UNREPLIED];
+		ct->proto.gre.stream_timeout = READ_ONCE(timeouts[GRE_CT_REPLIED]);
+		ct->proto.gre.timeout = READ_ONCE(timeouts[GRE_CT_UNREPLIED]);
 	}
 
 	status = READ_ONCE(ct->status);

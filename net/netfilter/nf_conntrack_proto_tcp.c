@@ -505,7 +505,7 @@ nf_tcp_store_invalid(const struct nf_conn *ct,
 	const struct nf_tcp_net *tn = nf_tcp_pernet(nf_ct_net(ct));
 	bool be_liberal;
 
-	be_liberal = sender->flags & IP_CT_TCP_FLAG_BE_LIBERAL || tn->tcp_be_liberal;
+	be_liberal = sender->flags & IP_CT_TCP_FLAG_BE_LIBERAL || READ_ONCE(tn->tcp_be_liberal);
 	if (be_liberal)
 		return NFCT_TCP_ACCEPT;
 
@@ -904,7 +904,7 @@ static noinline bool tcp_new(struct nf_conn *ct, const struct sk_buff *skb,
 			ct->proto.tcp.seen[0].td_end;
 
 		tcp_options(skb, dataoff, th, &ct->proto.tcp.seen[0]);
-	} else if (tn->tcp_loose == 0) {
+	} else if (READ_ONCE(tn->tcp_loose) == 0) {
 		/* Don't try to pick up connections. */
 		return false;
 	} else {
@@ -979,7 +979,7 @@ void nf_conntrack_tcp_set_closing(struct nf_conn *ct)
 		timeouts = tn->timeouts;
 	}
 
-	timeout = timeouts[TCP_CONNTRACK_CLOSE];
+	timeout = READ_ONCE(timeouts[TCP_CONNTRACK_CLOSE]);
 	WRITE_ONCE(ct->timeout, timeout + nfct_time_stamp);
 
 	spin_unlock_bh(&ct->lock);
@@ -1010,6 +1010,7 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 	struct nf_tcp_invalid_log log = {};
 	unsigned int index, *timeouts;
 	bool lowered_timeout = false;
+	unsigned int retrans, unack;
 	enum nf_ct_tcp_action res;
 	enum ip_conntrack_dir dir;
 	const struct tcphdr *th;
@@ -1235,7 +1236,7 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 				break;
 
 			if (before(seq, ct->proto.tcp.seen[!dir].td_maxack) &&
-			    !tn->tcp_ignore_invalid_rst) {
+			    !READ_ONCE(tn->tcp_ignore_invalid_rst)) {
 				/* Invalid RST  */
 				spin_unlock_bh(&ct->lock);
 				nf_ct_l4proto_log_invalid(skb, ct, state, "invalid rst");
@@ -1322,22 +1323,24 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 	if (!timeouts)
 		timeouts = tn->timeouts;
 
-	if (ct->proto.tcp.retrans >= tn->tcp_max_retrans &&
-	    timeouts[new_state] > timeouts[TCP_CONNTRACK_RETRANS])
-		timeout = timeouts[TCP_CONNTRACK_RETRANS];
+	timeout = READ_ONCE(timeouts[new_state]);
+	retrans = READ_ONCE(timeouts[TCP_CONNTRACK_RETRANS]);
+	unack = READ_ONCE(timeouts[TCP_CONNTRACK_UNACK]);
+
+	if (ct->proto.tcp.retrans >= READ_ONCE(tn->tcp_max_retrans) &&
+	    timeout > retrans)
+		timeout = retrans;
 	else if (unlikely(index == TCP_RST_SET &&
 			  new_state == TCP_CONNTRACK_ESTABLISHED) &&
-		 timeouts[new_state] > timeouts[TCP_CONNTRACK_UNACK])
-		timeout = timeouts[TCP_CONNTRACK_UNACK];
+		 timeout > unack)
+		timeout = unack;
 	else if ((ct->proto.tcp.seen[0].flags | ct->proto.tcp.seen[1].flags) &
 		 IP_CT_TCP_FLAG_DATA_UNACKNOWLEDGED &&
-		 timeouts[new_state] > timeouts[TCP_CONNTRACK_UNACK])
-		timeout = timeouts[TCP_CONNTRACK_UNACK];
+		 timeout > unack)
+		timeout = unack;
 	else if (ct->proto.tcp.last_win == 0 &&
-		 timeouts[new_state] > timeouts[TCP_CONNTRACK_RETRANS])
-		timeout = timeouts[TCP_CONNTRACK_RETRANS];
-	else
-		timeout = timeouts[new_state];
+		 timeout > retrans)
+		timeout = retrans;
 	spin_unlock_bh(&ct->lock);
 
 	if (new_state != old_state)
@@ -1366,8 +1369,8 @@ int nf_conntrack_tcp_packet(struct nf_conn *ct,
 		 * pickup with loose=1. Avoid large ESTABLISHED timeout.
 		 */
 		if (new_state == TCP_CONNTRACK_ESTABLISHED &&
-		    timeout > timeouts[TCP_CONNTRACK_UNACK])
-			timeout = timeouts[TCP_CONNTRACK_UNACK];
+		    timeout > unack)
+			timeout = unack;
 	} else if (!test_bit(IPS_ASSURED_BIT, &ct->status)
 		   && (old_state == TCP_CONNTRACK_SYN_RECV
 		       || old_state == TCP_CONNTRACK_ESTABLISHED)

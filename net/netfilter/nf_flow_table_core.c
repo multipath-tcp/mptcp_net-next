@@ -322,11 +322,11 @@ unsigned long flow_offload_get_timeout(struct flow_offload *flow)
 	if (l4num == IPPROTO_TCP) {
 		struct nf_tcp_net *tn = nf_tcp_pernet(net);
 
-		timeout = tn->offload_timeout;
+		timeout = READ_ONCE(tn->offload_timeout);
 	} else if (l4num == IPPROTO_UDP) {
 		struct nf_udp_net *tn = nf_udp_pernet(net);
 
-		timeout = tn->offload_timeout;
+		timeout = READ_ONCE(tn->offload_timeout);
 	}
 
 	return timeout;

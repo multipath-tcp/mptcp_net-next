@@ -98,7 +98,7 @@ int nf_conntrack_icmp_packet(struct nf_conn *ct,
 	if (!timeout)
 		timeout = &nf_icmp_pernet(nf_ct_net(ct))->timeout;
 
-	nf_ct_refresh_acct(ct, ctinfo, skb, *timeout);
+	nf_ct_refresh_acct(ct, ctinfo, skb, READ_ONCE(*timeout));
 	return NF_ACCEPT;
 }
 

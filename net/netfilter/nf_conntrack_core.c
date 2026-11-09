@@ -1959,7 +1959,7 @@ static int generic_packet(struct nf_conn *ct, struct sk_buff *skb,
 	if (!timeout)
 		timeout = &nf_generic_pernet(nf_ct_net(ct))->timeout;
 
-	nf_ct_refresh_acct(ct, ctinfo, skb, *timeout);
+	nf_ct_refresh_acct(ct, ctinfo, skb, READ_ONCE(*timeout));
 	return NF_ACCEPT;
 }
 

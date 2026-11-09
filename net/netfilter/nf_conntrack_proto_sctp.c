@@ -523,7 +523,7 @@ int nf_conntrack_sctp_packet(struct nf_conn *ct,
 	if (!timeouts)
 		timeouts = nf_sctp_pernet(nf_ct_net(ct))->timeouts;
 
-	nf_ct_refresh_acct(ct, ctinfo, skb, timeouts[new_state]);
+	nf_ct_refresh_acct(ct, ctinfo, skb, READ_ONCE(timeouts[new_state]));
 
 	return NF_ACCEPT;
 
