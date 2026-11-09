@@ -829,7 +829,7 @@ static void __ip_do_redirect(struct rtable *rt, struct sk_buff *skb, struct flow
 				nhc = FIB_RES_NHC(res);
 				update_or_create_fnhe(nhc, fl4->daddr, new_gw,
 						0, false,
-						jiffies + ip_rt_gc_timeout);
+						jiffies + READ_ONCE(ip_rt_gc_timeout));
 			}
 			if (kill_route)
 				WRITE_ONCE(rt->dst.obsolete, DST_OBSOLETE_KILL);
@@ -930,7 +930,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* No redirected packets during ip_rt_redirect_silence;
 	 * reset the algorithm.
 	 */
-	if (time_after(jiffies, peer->rate_last + ip_rt_redirect_silence)) {
+	if (time_after(jiffies, peer->rate_last + READ_ONCE(ip_rt_redirect_silence))) {
 		peer->rate_tokens = 0;
 		peer->n_redirects = 0;
 	}
@@ -938,7 +938,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* Too many ignored redirects; do not send anything
 	 * set dst.rate_last to the last seen redirected packet.
 	 */
-	if (peer->n_redirects >= ip_rt_redirect_number) {
+	if (peer->n_redirects >= READ_ONCE(ip_rt_redirect_number)) {
 		peer->rate_last = jiffies;
 		goto out_unlock;
 	}
@@ -946,7 +946,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* Check for load limit; set rate_last to the latest sent
 	 * redirect.
 	 */
-	backoff = (u64)ip_rt_redirect_load << min(peer->n_redirects, 31U);
+	backoff = (u64)READ_ONCE(ip_rt_redirect_load) << min(peer->n_redirects, 31U);
 	backoff = min_t(u64, backoff, MAX_JIFFY_OFFSET);
 	if (peer->n_redirects == 0 ||
 	    time_after(jiffies, peer->rate_last + (unsigned long)backoff)) {
@@ -956,7 +956,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 		peer->rate_last = jiffies;
 		++peer->n_redirects;
 		if (IS_ENABLED(CONFIG_IP_ROUTE_VERBOSE) && log_martians &&
-		    peer->n_redirects == ip_rt_redirect_number)
+		    peer->n_redirects == READ_ONCE(ip_rt_redirect_number))
 			net_warn_ratelimited("host %pI4/if%d ignores redirects for %pI4 to %pI4\n",
 					     &ip_hdr(skb)->saddr, inet_iif(skb),
 					     &ip_hdr(skb)->daddr, &gw);
@@ -1027,13 +1027,16 @@ static int ip_error(struct sk_buff *skb)
 			       l3mdev_master_ifindex_rcu(skb->dev));
 	send = true;
 	if (peer) {
+		int burst = READ_ONCE(ip_rt_error_burst);
+		int cost = READ_ONCE(ip_rt_error_cost);
+
 		now = jiffies;
 		peer->rate_tokens += now - peer->rate_last;
-		if (peer->rate_tokens > ip_rt_error_burst)
-			peer->rate_tokens = ip_rt_error_burst;
+		if (peer->rate_tokens > burst)
+			peer->rate_tokens = burst;
 		peer->rate_last = now;
-		if (peer->rate_tokens >= ip_rt_error_cost)
-			peer->rate_tokens -= ip_rt_error_cost;
+		if (peer->rate_tokens >= cost)
+			peer->rate_tokens -= cost;
 		else
 			send = false;
 	}
@@ -1063,14 +1066,14 @@ static void __ip_rt_update_pmtu(struct rtable *rt, struct flowi4 *fl4, u32 mtu)
 
 	rcu_read_lock();
 	net = dst_dev_net_rcu(dst);
-	if (mtu < net->ipv4.ip_rt_min_pmtu) {
+	if (mtu < READ_ONCE(net->ipv4.ip_rt_min_pmtu)) {
 		lock = true;
-		mtu = min(old_mtu, net->ipv4.ip_rt_min_pmtu);
+		mtu = min(old_mtu, READ_ONCE(net->ipv4.ip_rt_min_pmtu));
 	}
 
 	if (rt->rt_pmtu == mtu && !lock &&
 	    time_before(jiffies, READ_ONCE(dst->expires) -
-				 net->ipv4.ip_rt_mtu_expires / 2))
+				 READ_ONCE(net->ipv4.ip_rt_mtu_expires) / 2))
 		goto out;
 
 	if (fib_lookup(net, fl4, &res, 0) == 0) {
@@ -1086,14 +1089,15 @@ static void __ip_rt_update_pmtu(struct rtable *rt, struct flowi4 *fl4, u32 mtu)
 				if (!nhc)
 					break;
 				update_or_create_fnhe(nhc, fl4->daddr, 0, mtu, lock,
-						      jiffies + net->ipv4.ip_rt_mtu_expires);
+						      jiffies +
+						      READ_ONCE(net->ipv4.ip_rt_mtu_expires));
 			}
 			goto out;
 		}
 #endif /* CONFIG_IP_ROUTE_MULTIPATH */
 		nhc = FIB_RES_NHC(res);
 		update_or_create_fnhe(nhc, fl4->daddr, 0, mtu, lock,
-				      jiffies + net->ipv4.ip_rt_mtu_expires);
+				      jiffies + READ_ONCE(net->ipv4.ip_rt_mtu_expires));
 	}
 out:
 	rcu_read_unlock();
@@ -1367,7 +1371,7 @@ static unsigned int ipv4_default_advmss(const struct dst_entry *dst)
 	rcu_read_lock();
 	net = dst_dev_net_rcu(dst);
 	advmss = max_t(unsigned int, ipv4_mtu(dst) - header_size,
-				   net->ipv4.ip_rt_min_advmss);
+				   READ_ONCE(net->ipv4.ip_rt_min_advmss));
 	rcu_read_unlock();
 
 	return min(advmss, IPV4_MAX_PMTU - header_size);
