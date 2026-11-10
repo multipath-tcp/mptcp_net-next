@@ -76,6 +76,8 @@
 struct mac_delay_struct {
 	u32 tx_delay;
 	u32 rx_delay;
+	u32 rgmii_tx_delay;
+	u32 rgmii_rx_delay;
 	bool tx_inv;
 	bool rx_inv;
 };
@@ -103,8 +105,8 @@ struct mediatek_dwmac_variant {
 	const char * const *clk_list;
 	int num_clks;
 
-	u32 rx_delay_max;
-	u32 tx_delay_max;
+	u32 mii_delay_max;
+	u32 rgmii_delay_max;
 	u8 dma_bit_mask;
 };
 
@@ -223,9 +225,9 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_ID:
-		rx_delay_stage_val = mac_delay->rx_delay
+		rx_delay_stage_val = mac_delay->rgmii_rx_delay
 				     / MT2712_RGMII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
+		tx_delay_stage_val = mac_delay->rgmii_tx_delay
 				     / MT2712_RGMII_DLY_STAGE_DIV;
 
 		fine_val = ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC;
@@ -257,8 +259,8 @@ static const struct mediatek_dwmac_variant mt2712_gmac_variant = {
 	.dwmac_set_delay = mt2712_set_delay,
 	.clk_list = mt2712_dwmac_clk_l,
 	.num_clks = ARRAY_SIZE(mt2712_dwmac_clk_l),
-	.rx_delay_max = MT2712_MII_DELAY_MAX,
-	.tx_delay_max = MT2712_MII_DELAY_MAX,
+	.mii_delay_max = MT2712_MII_DELAY_MAX,
+	.rgmii_delay_max = MT2712_RGMII_DELAY_MAX,
 	.dma_bit_mask = 33,
 };
 
@@ -370,9 +372,9 @@ static int mt8195_set_delay(struct mediatek_dwmac_plat_data *plat)
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_ID:
-		rx_delay_stage_val = mac_delay->rx_delay
+		rx_delay_stage_val = mac_delay->rgmii_rx_delay
 				     / MT8195_RGMII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
+		tx_delay_stage_val = mac_delay->rgmii_tx_delay
 				     / MT8195_RGMII_DLY_STAGE_DIV;
 
 		gtxc_delay_val |= FIELD_PREP(MT8195_DLY_GTXC_ENABLE,
@@ -411,15 +413,18 @@ static const struct mediatek_dwmac_variant mt8195_gmac_variant = {
 	.dwmac_set_delay = mt8195_set_delay,
 	.clk_list = mt8195_dwmac_clk_l,
 	.num_clks = ARRAY_SIZE(mt8195_dwmac_clk_l),
-	.rx_delay_max = MT8195_MII_DELAY_MAX,
-	.tx_delay_max = MT8195_MII_DELAY_MAX,
+	.mii_delay_max = MT8195_MII_DELAY_MAX,
+	.rgmii_delay_max = MT8195_RGMII_DELAY_MAX,
 	.dma_bit_mask = 35,
 };
 
 static int mediatek_dwmac_config_dt(struct mediatek_dwmac_plat_data *plat)
 {
 	struct mac_delay_struct *mac_delay = &plat->mac_delay;
-	u32 tx_delay_ps, rx_delay_ps;
+	u32 rgmii_tx_delay_ps = 0;
+	u32 rgmii_rx_delay_ps = 0;
+	u32 tx_delay_ps = 0;
+	u32 rx_delay_ps = 0;
 
 	plat->peri_regmap = syscon_regmap_lookup_by_phandle(plat->np, "mediatek,pericfg");
 	if (IS_ERR(plat->peri_regmap)) {
@@ -427,24 +432,58 @@ static int mediatek_dwmac_config_dt(struct mediatek_dwmac_plat_data *plat)
 		return PTR_ERR(plat->peri_regmap);
 	}
 
-	if (!of_property_read_u32(plat->np, "mediatek,tx-delay-ps", &tx_delay_ps)) {
-		if (tx_delay_ps < plat->variant->tx_delay_max) {
-			mac_delay->tx_delay = tx_delay_ps;
-		} else {
-			dev_err(plat->dev, "Invalid TX clock delay: %dps\n", tx_delay_ps);
-			return -EINVAL;
-		}
+	of_property_read_u32(plat->np, "mediatek,tx-delay-ps", &tx_delay_ps);
+	if (tx_delay_ps >= plat->variant->mii_delay_max) {
+		dev_err(plat->dev, "Invalid TX clock delay: %dps\n",
+			tx_delay_ps);
+		return -EINVAL;
 	}
 
-	if (!of_property_read_u32(plat->np, "mediatek,rx-delay-ps", &rx_delay_ps)) {
-		if (rx_delay_ps < plat->variant->rx_delay_max) {
-			mac_delay->rx_delay = rx_delay_ps;
-		} else {
-			dev_err(plat->dev, "Invalid RX clock delay: %dps\n", rx_delay_ps);
+	/* Read RGMII TX internal delay standard property */
+	if (!of_property_read_u32(plat->np, "tx-internal-delay-ps",
+				  &rgmii_tx_delay_ps)) {
+		if (rgmii_tx_delay_ps >= plat->variant->rgmii_delay_max) {
+			dev_err(plat->dev, "Invalid RGMII TX clock delay: %dps\n",
+				rgmii_tx_delay_ps);
 			return -EINVAL;
 		}
+	} else {
+		/*
+		 * standard property value not available, fallback on vendor
+		 * value instead and cap it to max RGMII delay value
+		 */
+		rgmii_tx_delay_ps = min(tx_delay_ps,
+					plat->variant->rgmii_delay_max);
 	}
 
+	of_property_read_u32(plat->np, "mediatek,rx-delay-ps", &rx_delay_ps);
+	if (rx_delay_ps >= plat->variant->mii_delay_max) {
+		dev_err(plat->dev, "Invalid RX clock delay: %dps\n",
+			rx_delay_ps);
+		return -EINVAL;
+	}
+
+	/* Read RGMII RX internal delay standard property */
+	if (!of_property_read_u32(plat->np, "rx-internal-delay-ps",
+				  &rgmii_rx_delay_ps)) {
+		if (rgmii_rx_delay_ps >= plat->variant->rgmii_delay_max) {
+			dev_err(plat->dev, "Invalid RGMII RX clock delay: %dps\n",
+				rgmii_rx_delay_ps);
+			return -EINVAL;
+		}
+	} else {
+		/*
+		 * standard property value not available, fallback on vendor
+		 * value instead and cap it to max RGMII delay value
+		 */
+		rgmii_rx_delay_ps = min(rx_delay_ps,
+					plat->variant->rgmii_delay_max);
+	}
+
+	mac_delay->rx_delay = rx_delay_ps;
+	mac_delay->tx_delay = tx_delay_ps;
+	mac_delay->rgmii_rx_delay = rgmii_rx_delay_ps;
+	mac_delay->rgmii_tx_delay = rgmii_tx_delay_ps;
 	mac_delay->tx_inv = of_property_read_bool(plat->np, "mediatek,txc-inverse");
 	mac_delay->rx_inv = of_property_read_bool(plat->np, "mediatek,rxc-inverse");
 	plat->rmii_rxc = of_property_read_bool(plat->np, "mediatek,rmii-rxc");
