@@ -41,6 +41,9 @@
 #define MT2712_RGMII_DLY_STAGE_DIV	170 /* 170ps per stage */
 #define MT2712_RGMII_DELAY_MAX		5440 /* 32 x 170ps */
 
+/* Peri Configuration register for mt8189 */
+#define MT8189_CTRL0_TXC_OUT_OP_EN	BIT(20)
+
 /* Peri Configuration register for mt8195 */
 #define MT8195_PERI_ETH_CTRL_OFFSET	0xFD0
 
@@ -113,6 +116,7 @@ struct mediatek_dwmac_variant {
 	u16 rgmii_delay_stage_div;
 	u32 peri_eth_ctrl_offset;
 	u8 dma_bit_mask;
+	bool mac_txclk_out_en;
 };
 
 /* list of clocks required for mac */
@@ -306,6 +310,9 @@ static int mt8195_set_interface(struct mediatek_dwmac_plat_data *plat,
 
 	/* MT8195 only support external PHY */
 	intf_val |= MT8195_EXT_PHY_MODE;
+
+	if (plat->variant->mac_txclk_out_en)
+		intf_val |= MT8189_CTRL0_TXC_OUT_OP_EN;
 
 	regmap_write(plat->peri_regmap,
 		     reg_offset + MT8195_PERI_ETH_CTRL0,
