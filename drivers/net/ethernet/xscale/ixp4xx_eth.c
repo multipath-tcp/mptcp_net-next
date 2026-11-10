@@ -1454,6 +1454,7 @@ static struct eth_plat_info *ixp4xx_of_get_platdata(struct device *dev)
 	}
 	/* NPE ID 0x00, 0x10, 0x20... */
 	plat->npe = (npe_spec.args[0] << 4);
+	of_node_put(npe_spec.np);
 
 	/* Check if this device has an MDIO bus */
 	mdio_np = of_get_child_by_name(np, "mdio");
@@ -1471,6 +1472,7 @@ static struct eth_plat_info *ixp4xx_of_get_platdata(struct device *dev)
 		return NULL;
 	}
 	plat->rxq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 
 	/* Get the txready queue as resource from queue manager */
 	ret = of_parse_phandle_with_fixed_args(np, "queue-txready", 1, 0,
@@ -1480,6 +1482,7 @@ static struct eth_plat_info *ixp4xx_of_get_platdata(struct device *dev)
 		return NULL;
 	}
 	plat->txreadyq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 
 	ret = of_get_mac_address(np, mac);
 	if (!ret) {
