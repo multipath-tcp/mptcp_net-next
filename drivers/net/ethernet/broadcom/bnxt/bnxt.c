@@ -17573,21 +17573,50 @@ static int bnxt_suspend(struct device *device)
 	return rc;
 }
 
+#define BNXT_RESUME_MAX_RETRY	10
+
 static int bnxt_resume(struct device *device)
 {
 	struct net_device *dev = dev_get_drvdata(device);
 	struct bnxt *bp = netdev_priv(dev);
-	int rc = 0;
+	int i, rc;
 
-	rtnl_lock();
-	netdev_lock(dev);
 	rc = pci_enable_device(bp->pdev);
 	if (rc) {
 		netdev_err(dev, "Cannot re-enable PCI device during resume, err = %d\n",
 			   rc);
-		goto resume_exit;
+		return rc;
 	}
 	pci_set_master(bp->pdev);
+	if (BNXT_VF(bp)) {
+		for (i = 0; i < BNXT_RESUME_MAX_RETRY; i++) {
+			rc = bnxt_hwrm_poll(bp);
+			if (rc != -EAGAIN && rc != -EBUSY && rc != -ECOMM)
+				break;
+
+			/* Wait briefly for -EAGAIN (FW busy), a bit longer for
+			 * -ECOMM (PF down) to allow the PF to fully initialize.
+			 * For -EBUSY, the message typically has timed out, so
+			 * try again immediately.
+			 */
+			if (i < BNXT_RESUME_MAX_RETRY - 1) {
+				if (rc == -EAGAIN)
+					msleep(250);
+				else if (rc == -ECOMM)
+					msleep(750);
+			}
+		}
+		if (rc) {
+			netdev_err(dev,
+				   "Firmware not responding during resume, rc = %d\n",
+				   rc);
+			return -ENODEV;
+		}
+	}
+
+	rtnl_lock();
+	netdev_lock(dev);
+
 	if (bnxt_hwrm_ver_get(bp)) {
 		rc = -ENODEV;
 		goto resume_exit;
