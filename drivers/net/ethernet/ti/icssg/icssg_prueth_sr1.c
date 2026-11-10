@@ -922,24 +922,34 @@ static int prueth_probe(struct platform_device *pdev)
 		if (ret < 0) {
 			dev_err(dev, "%pOF error reading port_id %d\n",
 				eth_node, ret);
+			continue;
 		}
 
-		of_node_get(eth_node);
+		if (reg != 0 && reg != 1) {
+			dev_err(dev, "port reg should be 0 or 1\n");
+			continue;
+		}
+
+		if ((reg == 0 && eth0_node) || (reg == 1 && eth1_node)) {
+			dev_err(dev, "port reg %d already in use\n", reg);
+			ret = -ENODEV;
+			of_node_put(eth_node);
+			of_node_put(eth_ports_node);
+			goto put_cores;
+		}
 
 		if (reg == 0) {
-			eth0_node = eth_node;
+			eth0_node = of_node_get(eth_node);
 			if (!of_device_is_available(eth0_node)) {
 				of_node_put(eth0_node);
 				eth0_node = NULL;
 			}
 		} else if (reg == 1) {
-			eth1_node = eth_node;
+			eth1_node = of_node_get(eth_node);
 			if (!of_device_is_available(eth1_node)) {
 				of_node_put(eth1_node);
 				eth1_node = NULL;
 			}
-		} else {
-			dev_err(dev, "port reg should be 0 or 1\n");
 		}
 	}
 
@@ -948,12 +958,6 @@ static int prueth_probe(struct platform_device *pdev)
 	/* At least one node must be present and available else we fail */
 	if (!eth0_node && !eth1_node) {
 		dev_err(dev, "neither port0 nor port1 node available\n");
-		return -ENODEV;
-	}
-
-	if (eth0_node == eth1_node) {
-		dev_err(dev, "port0 and port1 can't have same reg\n");
-		of_node_put(eth0_node);
 		return -ENODEV;
 	}
 
