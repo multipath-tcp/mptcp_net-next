@@ -2128,6 +2128,12 @@ static void sbmac_setmulti(struct sbmac_softc *sc)
 	}
 }
 
+static const struct ethtool_ops sbmac_ethtool_ops = {
+	.get_link		= ethtool_op_get_link,
+	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
+	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
+};
+
 static const struct net_device_ops sbmac_netdev_ops = {
 	.ndo_open		= sbmac_open,
 	.ndo_stop		= sbmac_close,
@@ -2197,6 +2203,7 @@ static int sbmac_init(struct platform_device *pldev, long long base)
 	spin_lock_init(&(sc->sbm_lock));
 
 	dev->netdev_ops = &sbmac_netdev_ops;
+	dev->ethtool_ops = &sbmac_ethtool_ops;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->min_mtu = 0;
 	dev->max_mtu = ENET_PACKET_SIZE;
