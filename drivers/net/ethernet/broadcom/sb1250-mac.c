@@ -1142,8 +1142,8 @@ again:
 				 * the kernel
 				 */
 				sb->protocol = eth_type_trans(sb,d->sbdma_eth->sbm_dev);
-				/* Check hw IPv4/TCP checksum if supported */
-				if (sc->rx_hw_checksum == ENABLE) {
+				/* Honor the RX checksum offload feature setting. */
+				if (dev->features & NETIF_F_RXCSUM) {
 					if (!((dsc->dscr_a) & M_DMA_ETHRX_BADIP4CS) &&
 					    !((dsc->dscr_a) & M_DMA_ETHRX_BADTCPCS)) {
 						sb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -2214,6 +2214,10 @@ static int sbmac_init(struct platform_device *pldev, long long base)
 
 	/* This is needed for PASS2 for Rx H/W checksum feature */
 	sbmac_set_iphdr_offset(sc);
+	if (sc->rx_hw_checksum == ENABLE) {
+		dev->hw_features |= NETIF_F_RXCSUM;
+		dev->features |= NETIF_F_RXCSUM;
+	}
 
 	sc->mii_bus = mdiobus_alloc();
 	if (sc->mii_bus == NULL) {
