@@ -107,6 +107,8 @@ struct mediatek_dwmac_variant {
 
 	u32 mii_delay_max;
 	u32 rgmii_delay_max;
+	u16 mii_delay_stage_div;
+	u16 rgmii_delay_stage_div;
 	u8 dma_bit_mask;
 };
 
@@ -118,6 +120,36 @@ static const char * const mt2712_dwmac_clk_l[] = {
 static const char * const mt8195_dwmac_clk_l[] = {
 	"axi", "apb", "mac_cg", "mac_main", "ptp_ref"
 };
+
+static int get_delay_stage(struct mediatek_dwmac_plat_data *plat,
+			   u32 *rx_val, u32 *tx_val)
+{
+	struct mac_delay_struct *mac_delay = &plat->mac_delay;
+	u32 rx_delay_conf_val, tx_delay_conf_val;
+	u16 delay_stage_div;
+
+	if (phy_interface_mode_is_rgmii(plat->phy_mode)) {
+		/* RGMII case */
+		delay_stage_div = plat->variant->rgmii_delay_stage_div;
+		rx_delay_conf_val = mac_delay->rgmii_rx_delay;
+		tx_delay_conf_val = mac_delay->rgmii_tx_delay;
+	} else {
+		/* MII/RMII case */
+		delay_stage_div = plat->variant->mii_delay_stage_div;
+		rx_delay_conf_val = mac_delay->rx_delay;
+		tx_delay_conf_val = mac_delay->tx_delay;
+	}
+
+	if (!delay_stage_div) {
+		dev_err(plat->dev, "Invalid internal delay stage divider\n");
+		return -EINVAL;
+	}
+
+	*rx_val = rx_delay_conf_val / delay_stage_div;
+	*tx_val = tx_delay_conf_val / delay_stage_div;
+
+	return 0;
+}
 
 static int mt2712_set_interface(struct mediatek_dwmac_plat_data *plat,
 				u8 phy_intf_sel)
@@ -142,14 +174,14 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
 	u32 rx_delay_stage_val, tx_delay_stage_val;
 	u32 delay_val = 0;
 	u32 fine_val = 0;
+	int ret;
+
+	ret = get_delay_stage(plat, &rx_delay_stage_val, &tx_delay_stage_val);
+	if (ret)
+		return ret;
 
 	switch (plat->phy_mode) {
 	case PHY_INTERFACE_MODE_MII:
-		rx_delay_stage_val = mac_delay->rx_delay
-				     / MT2712_MII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
-				     / MT2712_MII_DLY_STAGE_DIV;
-
 		delay_val |= FIELD_PREP(ETH_DLY_TXC_ENABLE,
 					!!tx_delay_stage_val);
 		delay_val |= FIELD_PREP(ETH_DLY_TXC_STAGES,
@@ -163,11 +195,6 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
 		delay_val |= FIELD_PREP(ETH_DLY_RXC_INV, mac_delay->rx_inv);
 		break;
 	case PHY_INTERFACE_MODE_RMII:
-		rx_delay_stage_val = mac_delay->rx_delay
-				     / MT2712_MII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
-				     / MT2712_MII_DLY_STAGE_DIV;
-
 		if (plat->rmii_clk_from_mac) {
 			/* case 1: mac provides the rmii reference clock,
 			 * and the clock output to TXC pin.
@@ -225,11 +252,6 @@ static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_ID:
-		rx_delay_stage_val = mac_delay->rgmii_rx_delay
-				     / MT2712_RGMII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->rgmii_tx_delay
-				     / MT2712_RGMII_DLY_STAGE_DIV;
-
 		fine_val = ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC;
 
 		delay_val |= FIELD_PREP(ETH_DLY_GTXC_ENABLE,
@@ -261,6 +283,8 @@ static const struct mediatek_dwmac_variant mt2712_gmac_variant = {
 	.num_clks = ARRAY_SIZE(mt2712_dwmac_clk_l),
 	.mii_delay_max = MT2712_MII_DELAY_MAX,
 	.rgmii_delay_max = MT2712_RGMII_DELAY_MAX,
+	.mii_delay_stage_div = MT2712_MII_DLY_STAGE_DIV,
+	.rgmii_delay_stage_div = MT2712_RGMII_DLY_STAGE_DIV,
 	.dma_bit_mask = 33,
 };
 
@@ -291,14 +315,14 @@ static int mt8195_set_delay(struct mediatek_dwmac_plat_data *plat)
 	u32 gtxc_delay_val = 0;
 	u32 rmii_delay_val = 0;
 	u32 delay_val = 0;
+	int ret;
+
+	ret = get_delay_stage(plat, &rx_delay_stage_val, &tx_delay_stage_val);
+	if (ret)
+		return ret;
 
 	switch (plat->phy_mode) {
 	case PHY_INTERFACE_MODE_MII:
-		rx_delay_stage_val = mac_delay->rx_delay
-				     / MT8195_MII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
-				     / MT8195_MII_DLY_STAGE_DIV;
-
 		delay_val |= FIELD_PREP(MT8195_DLY_TXC_ENABLE,
 					!!tx_delay_stage_val);
 		delay_val |= FIELD_PREP(MT8195_DLY_TXC_STAGES,
@@ -312,11 +336,6 @@ static int mt8195_set_delay(struct mediatek_dwmac_plat_data *plat)
 		delay_val |= FIELD_PREP(MT8195_DLY_RXC_INV, mac_delay->rx_inv);
 		break;
 	case PHY_INTERFACE_MODE_RMII:
-		rx_delay_stage_val = mac_delay->rx_delay
-				     / MT8195_MII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->tx_delay
-				     / MT8195_MII_DLY_STAGE_DIV;
-
 		if (plat->rmii_clk_from_mac) {
 			/* case 1: mac provides the rmii reference clock,
 			 * and the clock output to TXC pin.
@@ -372,11 +391,6 @@ static int mt8195_set_delay(struct mediatek_dwmac_plat_data *plat)
 	case PHY_INTERFACE_MODE_RGMII_TXID:
 	case PHY_INTERFACE_MODE_RGMII_RXID:
 	case PHY_INTERFACE_MODE_RGMII_ID:
-		rx_delay_stage_val = mac_delay->rgmii_rx_delay
-				     / MT8195_RGMII_DLY_STAGE_DIV;
-		tx_delay_stage_val = mac_delay->rgmii_tx_delay
-				     / MT8195_RGMII_DLY_STAGE_DIV;
-
 		gtxc_delay_val |= FIELD_PREP(MT8195_DLY_GTXC_ENABLE,
 					     !!tx_delay_stage_val);
 		gtxc_delay_val |= FIELD_PREP(MT8195_DLY_GTXC_STAGES,
@@ -415,6 +429,8 @@ static const struct mediatek_dwmac_variant mt8195_gmac_variant = {
 	.num_clks = ARRAY_SIZE(mt8195_dwmac_clk_l),
 	.mii_delay_max = MT8195_MII_DELAY_MAX,
 	.rgmii_delay_max = MT8195_RGMII_DELAY_MAX,
+	.mii_delay_stage_div = MT8195_MII_DLY_STAGE_DIV,
+	.rgmii_delay_stage_div = MT8195_RGMII_DLY_STAGE_DIV,
 	.dma_bit_mask = 35,
 };
 
