@@ -495,6 +495,7 @@ int main(int argc, char *argv[])
 		goto err_free_buff;
 	}
 
+	opt.sock.family = ai->ai_family;
 	if (ai->ai_family == AF_INET6 && opt.sock.proto == IPPROTO_ICMP)
 		opt.sock.proto = IPPROTO_ICMPV6;
 
