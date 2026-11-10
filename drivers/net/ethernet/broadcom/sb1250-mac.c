@@ -2129,6 +2129,7 @@ static void sbmac_setmulti(struct sbmac_softc *sc)
 }
 
 static const struct ethtool_ops sbmac_ethtool_ops = {
+	.nway_reset		= phy_ethtool_nway_reset,
 	.get_link		= ethtool_op_get_link,
 	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
