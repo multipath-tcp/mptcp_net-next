@@ -613,6 +613,7 @@ bool tcp_fastopen_active_should_disable(struct sock *sk)
 	unsigned long timeout;
 	int tfo_da_times;
 	int multiplier;
+	u64 delay;
 
 	if (!tfo_bh_timeout)
 		return false;
@@ -626,10 +627,11 @@ bool tcp_fastopen_active_should_disable(struct sock *sk)
 
 	/* Limit timeout to max: 2^6 * initial timeout */
 	multiplier = 1 << min(tfo_da_times - 1, 6);
+	delay = (u64)multiplier * tfo_bh_timeout * HZ;
 
 	/* Paired with the WRITE_ONCE() in tcp_fastopen_active_disable(). */
 	timeout = READ_ONCE(sock_net(sk)->ipv4.tfo_active_disable_stamp) +
-		  multiplier * tfo_bh_timeout * HZ;
+		  min(delay, MAX_JIFFY_OFFSET);
 	if (time_before(jiffies, timeout))
 		return true;
 
