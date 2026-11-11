@@ -2122,13 +2122,6 @@ skip_mac_set:
 	if (res && bond_needs_speed_duplex(bond))
 		new_slave->link = BOND_LINK_DOWN;
 
-	new_slave->last_rx = jiffies -
-		(msecs_to_jiffies(bond->params.arp_interval) + 1);
-	for (i = 0; i < BOND_MAX_ARP_TARGETS; i++)
-		new_slave->target_last_arp_rx[i] = new_slave->last_rx;
-
-	new_slave->last_tx = new_slave->last_rx;
-
 	/* check for initial state */
 	new_slave->link = BOND_LINK_NOCHANGE;
 	if (bond->params.miimon) {
@@ -2157,8 +2150,27 @@ skip_mac_set:
 					  BOND_SLAVE_NOTIFY_NOW);
 	}
 
-	if (new_slave->link != BOND_LINK_DOWN)
+	/* The ARP monitor's up test includes arp_interval/2 of slack, see
+	 * bond_time_in_interval(). Seed a slave that starts DOWN outside
+	 * that window, so it stays DOWN until it receives traffic.
+	 */
+	if (new_slave->link == BOND_LINK_DOWN) {
+		new_slave->last_rx = jiffies -
+			(2 * msecs_to_jiffies(bond->params.arp_interval) + 1);
+	} else {
+		/* Give a slave that starts UP a full arp_missed_max window.
+		 * Not seeding it later than last_link_up keeps bond_arp_rcv()
+		 * from trusting ARPs on backup slaves before the active one
+		 * got a reply.
+		 */
 		new_slave->last_link_up = jiffies;
+		new_slave->last_rx = new_slave->last_link_up;
+	}
+	for (i = 0; i < BOND_MAX_ARP_TARGETS; i++)
+		new_slave->target_last_arp_rx[i] = new_slave->last_rx;
+
+	new_slave->last_tx = new_slave->last_rx;
+
 	slave_dbg(bond_dev, slave_dev, "Initial state of slave is BOND_LINK_%s\n",
 		  new_slave->link == BOND_LINK_DOWN ? "DOWN" :
 		  (new_slave->link == BOND_LINK_UP ? "UP" : "BACK"));
@@ -2305,7 +2317,7 @@ skip_mac_set:
 			SLAVE_NL_ERR(bond_dev, slave_dev, extack,
 				     "Slave does not support XDP");
 			res = -EOPNOTSUPP;
-			goto err_sysfs_del;
+			goto err_dec_slave_cnt;
 		}
 	} else if (bond->xdp_prog) {
 		struct netdev_bpf xdp = {
@@ -2319,14 +2331,14 @@ skip_mac_set:
 			SLAVE_NL_ERR(bond_dev, slave_dev, extack,
 				     "Slave has XDP program loaded, please unload before enslaving");
 			res = -EOPNOTSUPP;
-			goto err_sysfs_del;
+			goto err_dec_slave_cnt;
 		}
 
 		res = dev_xdp_propagate(slave_dev, &xdp);
 		if (res < 0) {
 			/* ndo_bpf() sets extack error message */
 			slave_dbg(bond_dev, slave_dev, "Error %d calling ndo_bpf\n", res);
-			goto err_sysfs_del;
+			goto err_dec_slave_cnt;
 		}
 		if (bond->xdp_prog)
 			bpf_prog_inc(bond->xdp_prog);
@@ -2348,6 +2360,9 @@ skip_mac_set:
 	return 0;
 
 /* Undo stages on error */
+err_dec_slave_cnt:
+	WRITE_ONCE(bond->slave_cnt, bond->slave_cnt - 1);
+
 err_sysfs_del:
 	bond_sysfs_slave_del(new_slave);
 

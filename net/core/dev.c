@@ -4209,6 +4209,18 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 	if (unlikely(!skb))
 		goto out_null;
 
+	/* Only fraglist GSO, whose segments already carry valid checksums,
+	 * can be handed to a device as CHECKSUM_UNNECESSARY. Any other GSO
+	 * skb has no csum_start for the device to segment from. NONE means
+	 * the same on transmit, but makes netif_needs_gso() send it to the
+	 * GSO code, which turns TCP into CHECKSUM_PARTIAL for TSO and
+	 * segments anything the device cannot offload in software.
+	 */
+	if (unlikely(skb->ip_summed == CHECKSUM_UNNECESSARY &&
+		     skb_is_gso(skb) &&
+		     !(skb_shinfo(skb)->gso_type & SKB_GSO_FRAGLIST)))
+		skb->ip_summed = CHECKSUM_NONE;
+
 	features = netif_skb_features(skb);
 	skb = validate_xmit_vlan(skb, features);
 	if (unlikely(!skb))
@@ -5855,26 +5867,48 @@ static u32 netif_receive_generic_xdp(struct sk_buff **pskb,
  * and DDOS attacks will be more effective. In-driver-XDP use dedicated TX
  * queues, so they do not have this starvation issue.
  */
-void generic_xdp_tx(struct sk_buff *skb, const struct bpf_prog *xdp_prog)
+void generic_xdp_tx(struct sk_buff *skb, const struct bpf_prog *xdp_prog,
+		    u32 act)
 {
 	struct net_device *dev = skb->dev;
+	enum skb_drop_reason reason;
 	struct netdev_queue *txq;
-	bool free_skb = true;
+	bool again = false;
 	int cpu, rc;
 
+	reason = qdisc_pkt_len_segs_init(skb);
+	if (unlikely(reason)) {
+		trace_xdp_exception(dev, xdp_prog, act);
+		dev_core_stats_tx_dropped_inc(dev);
+		kfree_skb_reason(skb, reason);
+		return;
+	}
+
 	txq = netdev_core_pick_tx(dev, skb, NULL);
+	skb = validate_xmit_skb_list(skb, dev, &again);
+	if (!skb) {
+		trace_xdp_exception(dev, xdp_prog, act);
+		return;
+	}
+
 	cpu = smp_processor_id();
 	HARD_TX_LOCK(dev, txq, cpu);
-	if (!netif_xmit_frozen_or_drv_stopped(txq)) {
-		rc = netdev_start_xmit(skb, dev, txq, 0);
-		if (dev_xmit_complete(rc))
-			free_skb = false;
+	while (skb && !netif_xmit_frozen_or_drv_stopped(txq)) {
+		struct sk_buff *next = skb->next;
+
+		skb_mark_not_on_list(skb);
+		rc = netdev_start_xmit(skb, dev, txq, false);
+		if (!dev_xmit_complete(rc)) {
+			skb->next = next;
+			break;
+		}
+		skb = next;
 	}
 	HARD_TX_UNLOCK(dev, txq);
-	if (free_skb) {
-		trace_xdp_exception(dev, xdp_prog, XDP_TX);
+	if (skb) {
+		trace_xdp_exception(dev, xdp_prog, act);
 		dev_core_stats_tx_dropped_inc(dev);
-		kfree_skb(skb);
+		kfree_skb_list(skb);
 	}
 }
 
@@ -5900,7 +5934,7 @@ int do_xdp_generic(const struct bpf_prog *xdp_prog, struct sk_buff **pskb)
 					goto out_redir;
 				break;
 			case XDP_TX:
-				generic_xdp_tx(*pskb, xdp_prog);
+				generic_xdp_tx(*pskb, xdp_prog, XDP_TX);
 				break;
 			}
 			bpf_net_ctx_clear(bpf_net_ctx);
