@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 
 TEST_PROGS := \
+	devmem.py \
 	iperf.py \
 # end of TEST_PROGS
 
