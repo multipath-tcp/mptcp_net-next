@@ -4627,6 +4627,13 @@ static netdev_features_t mlx5e_fix_features(struct net_device *netdev,
 		features |= NETIF_F_GRO_HW;
 	}
 
+	/* HW GRO cannot be enabled if header-data split is disabled. */
+	if (cfg && cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_DISABLED &&
+	    features & NETIF_F_GRO_HW) {
+		netdev_warn(netdev, "Disabling HW-GRO, TCP header-data split is disabled\n");
+		features &= ~NETIF_F_GRO_HW;
+	}
+
 	if (mlx5e_is_uplink_rep(priv)) {
 		features = mlx5e_fix_uplink_rep_features(netdev, features);
 		netdev->netns_immutable = true;
