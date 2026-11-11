@@ -18326,6 +18326,7 @@ M:	UNGLinuxDriver@microchip.com
 L:	netdev@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/net/dsa/microchip,lan96455s-switch.yaml
+F:	drivers/net/dsa/microchip/lan9645x/*
 F:	include/linux/dsa/lan9645x.h
 F:	net/dsa/tag_lan9645x.c
 
