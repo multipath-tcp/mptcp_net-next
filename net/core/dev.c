@@ -10580,17 +10580,23 @@ int netif_xdp_propagate(struct net_device *dev, struct netdev_bpf *bpf)
 	if (!dev->netdev_ops->ndo_bpf)
 		return -EOPNOTSUPP;
 
-	if (dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
-	    bpf->command == XDP_SETUP_PROG &&
-	    bpf->prog && !bpf->prog->aux->xdp_has_frags) {
-		NL_SET_ERR_MSG(bpf->extack,
-			       "unable to propagate XDP to device using tcp-data-split");
-		return -EBUSY;
-	}
+	/* setup requires extra handling, bypass those for other commands */
+	if (bpf->command != XDP_SETUP_PROG)
+		return dev->netdev_ops->ndo_bpf(dev, bpf);
 
-	if (dev_get_min_mp_channel_count(dev)) {
-		NL_SET_ERR_MSG(bpf->extack, "unable to propagate XDP to device using memory provider");
-		return -EBUSY;
+	if (bpf->prog) {
+		if (dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
+		    !bpf->prog->aux->xdp_has_frags) {
+			NL_SET_ERR_MSG(bpf->extack,
+				       "unable to propagate XDP to device using tcp-data-split");
+			return -EBUSY;
+		}
+
+		if (dev_get_min_mp_channel_count(dev)) {
+			NL_SET_ERR_MSG(bpf->extack,
+				       "unable to propagate XDP to device using memory provider");
+			return -EBUSY;
+		}
 	}
 
 	return dev->netdev_ops->ndo_bpf(dev, bpf);
@@ -10656,17 +10662,17 @@ static int dev_xdp_install(struct net_device *dev, enum bpf_xdp_mode mode,
 			NL_SET_ERR_MSG(extack, "BPF_XDP_CPUMAP programs can not be attached to a device");
 			return -EINVAL;
 		}
-	}
-
-	if (dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
-	    prog && !prog->aux->xdp_has_frags) {
-		NL_SET_ERR_MSG(extack, "unable to install XDP to device using tcp-data-split");
-		return -EBUSY;
-	}
-
-	if (dev_get_min_mp_channel_count(dev)) {
-		NL_SET_ERR_MSG(extack, "unable to install XDP to device using memory provider");
-		return -EBUSY;
+		if (dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
+		    !prog->aux->xdp_has_frags) {
+			NL_SET_ERR_MSG(extack,
+				       "unable to install XDP to device using tcp-data-split");
+			return -EBUSY;
+		}
+		if (dev_get_min_mp_channel_count(dev)) {
+			NL_SET_ERR_MSG(extack,
+				       "unable to install XDP to device using memory provider");
+			return -EBUSY;
+		}
 	}
 
 	memset(&xdp, 0, sizeof(xdp));
