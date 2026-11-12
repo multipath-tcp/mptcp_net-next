@@ -45,7 +45,7 @@ TC_INDIRECT_SCOPE int tcf_skbedit_act(struct sk_buff *skb,
 	struct tcf_skbedit_params *params;
 
 	tcf_lastuse_update(&d->tcf_tm);
-	bstats_update(this_cpu_ptr(d->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&d->common, skb);
 
 	params = rcu_dereference_bh(d->params);
 
@@ -85,7 +85,7 @@ TC_INDIRECT_SCOPE int tcf_skbedit_act(struct sk_buff *skb,
 	return params->action;
 
 err:
-	qstats_cpu_drop_inc(d->common.cpu_qstats);
+	tcf_action_inc_drop_qstats(&d->common);
 	return TC_ACT_SHOT;
 }
 
@@ -221,8 +221,9 @@ static int tcf_skbedit_init(struct net *net, struct nlattr *nla,
 	}
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, est, a,
-				     &act_skbedit_ops, bind, true, act_flags);
+		ret = tcf_idr_create_from_flags(tn, index, est, a,
+						&act_skbedit_ops, bind,
+						act_flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
