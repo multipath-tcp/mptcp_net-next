@@ -18,6 +18,7 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/xilinx_spi.h>
 #include <linux/spi/altera.h>
+#include <linux/slab.h>
 #include <net/devlink.h>
 #include <linux/i2c.h>
 #include <linux/iopoll.h>
@@ -5281,7 +5282,7 @@ ptp_ocp_summary_show(struct seq_file *s, void *data)
 	bool on, map;
 	int i;
 
-	buf = (char *)__get_free_page(GFP_KERNEL);
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -5497,7 +5498,7 @@ ptp_ocp_summary_show(struct seq_file *s, void *data)
 			   post_ns - pre_ns);
 	}
 
-	free_page((unsigned long)buf);
+	kfree(buf);
 	return 0;
 }
 DEFINE_SHOW_ATTRIBUTE(ptp_ocp_summary);

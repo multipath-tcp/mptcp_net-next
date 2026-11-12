@@ -231,9 +231,14 @@ static void sparx5_get_ana_ac_stats_stats(struct sparx5 *sparx5, int portno)
 {
 	u64 *portstats = &sparx5->stats[portno * sparx5->num_stats];
 
+	/* Serialize with the port policer, which reads the LSB and MSB of the
+	 * port stat counters as a pair.
+	 */
+	mutex_lock(&sparx5->queue_stats_lock);
 	sparx5_update_counter(&portstats[spx5_stats_ana_ac_port_stat_lsb_cnt],
 			      spx5_rd(sparx5, ANA_AC_PORT_STAT_LSB_CNT(portno,
 								       SPX5_PORT_POLICER_DROPS)));
+	mutex_unlock(&sparx5->queue_stats_lock);
 }
 
 static void sparx5_get_dev_phy_stats(u64 *portstats, void __iomem *inst, u32
@@ -1116,6 +1121,7 @@ static void sparx5_update_port_stats(struct sparx5 *sparx5, int portno)
 		sparx5_get_asm_stats(sparx5, portno);
 	sparx5_get_ana_ac_stats_stats(sparx5, portno);
 	sparx5_get_queue_sys_stats(sparx5, portno);
+	sparx5_port_policer_stats_poll(sparx5->ports[portno]);
 }
 
 static void sparx5_update_stats(struct sparx5 *sparx5)
