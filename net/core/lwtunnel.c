@@ -70,7 +70,7 @@ struct lwtunnel_state *lwtunnel_state_alloc(int encap_len)
 {
 	struct lwtunnel_state *lws;
 
-	lws = kzalloc(sizeof(*lws) + encap_len, GFP_ATOMIC);
+	lws = kzalloc(sizeof(*lws) + encap_len, GFP_KERNEL);
 
 	return lws;
 }
