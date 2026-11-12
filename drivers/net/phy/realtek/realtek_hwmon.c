@@ -30,13 +30,17 @@ static int rtl822x_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 
 	switch (attr) {
 	case hwmon_temp_input:
-		raw = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL822X_VND2_TSRR) & 0x3ff;
-		*val = rtl822x_hwmon_get_temp(raw);
+		raw = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL822X_VND2_TSRR);
+		if (raw < 0)
+			return raw;
+		*val = rtl822x_hwmon_get_temp(raw & 0x3ff);
 		break;
 	case hwmon_temp_max:
 		/* Chip reduces speed to 1G if threshold is exceeded */
-		raw = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL822X_VND2_TSSR) >> 6;
-		*val = rtl822x_hwmon_get_temp(raw);
+		raw = phy_read_mmd(phydev, MDIO_MMD_VEND2, RTL822X_VND2_TSSR);
+		if (raw < 0)
+			return raw;
+		*val = rtl822x_hwmon_get_temp(raw >> 6);
 		break;
 	default:
 		return -EINVAL;

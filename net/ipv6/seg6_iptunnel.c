@@ -871,11 +871,11 @@ static int seg6_build_state(struct net *net, struct nlattr *nla,
 
 	slwt = seg6_lwt_lwtunnel(newts);
 
-	err = dst_cache_init(&slwt->cache_input, GFP_ATOMIC);
+	err = dst_cache_init(&slwt->cache_input, GFP_KERNEL);
 	if (err)
 		goto err_free_newts;
 
-	err = dst_cache_init(&slwt->cache_output, GFP_ATOMIC);
+	err = dst_cache_init(&slwt->cache_output, GFP_KERNEL);
 	if (err)
 		goto err_destroy_input;
 
