@@ -110,9 +110,24 @@ static u16 bnge_nqs_demand(struct bnge_dev *bd)
 	return bd->nq_nr_rings + bnge_aux_get_msix(bd);
 }
 
+static u16 bnge_tx_rings_demand(struct bnge_dev *bd)
+{
+	u16 tx_rings = bd->tx_nr_rings;
+
+	if (bnge_is_roce_en(bd))
+		tx_rings += 1; /* For MPC TX ring */
+
+	return tx_rings;
+}
+
 static u16 bnge_cprs_demand(struct bnge_dev *bd)
 {
-	return bd->tx_nr_rings + bd->rx_nr_rings;
+	u16 cprs = bd->tx_nr_rings + bd->rx_nr_rings;
+
+	if (bnge_is_roce_en(bd))
+		cprs += 1; /* For MPC CQ ring */
+
+	return cprs;
 }
 
 static u16 bnge_get_avail_msix(struct bnge_dev *bd, int num)
@@ -251,7 +266,7 @@ static bool bnge_need_reserve_rings(struct bnge_dev *bd)
 	u16 nqs = bnge_nqs_demand(bd);
 	u16 vnic;
 
-	if (hw_resc->resv_tx_rings != bd->tx_nr_rings)
+	if (hw_resc->resv_tx_rings != bnge_tx_rings_demand(bd))
 		return true;
 
 	vnic = bnge_get_total_vnics(bd, rx);
@@ -271,8 +286,8 @@ static bool bnge_need_reserve_rings(struct bnge_dev *bd)
 int bnge_reserve_rings(struct bnge_dev *bd)
 {
 	u16 aux_dflt_msix = bnge_aux_get_dflt_msix(bd);
+	u16 rx_rings, old_rx_rings, old_rx_nr_rings;
 	struct bnge_hw_rings hwr = {0};
-	u16 rx_rings, old_rx_rings;
 	u16 nq = bd->nq_nr_rings;
 	u16 aux_msix = 0;
 	bool sh = false;
@@ -294,11 +309,11 @@ int bnge_reserve_rings(struct bnge_dev *bd)
 		hwr.nq = bnge_nqs_demand(bd);
 	}
 
-	hwr.tx = bd->tx_nr_rings;
+	hwr.tx = bnge_tx_rings_demand(bd);
 	hwr.rx = bd->rx_nr_rings;
 	if (bd->flags & BNGE_EN_SHARED_CHNL)
 		sh = true;
-	hwr.cmpl = hwr.rx + hwr.tx;
+	hwr.cmpl = bnge_cprs_demand(bd);
 
 	hwr.vnic = bnge_get_total_vnics(bd, hwr.rx);
 
@@ -308,12 +323,21 @@ int bnge_reserve_rings(struct bnge_dev *bd)
 	hwr.rss_ctx = bnge_rss_ctxs_in_use(bd, &hwr);
 	hwr.stat = bnge_func_stat_ctxs_demand(bd);
 	old_rx_rings = bd->hw_resc.resv_rx_rings;
+	old_rx_nr_rings = bd->rx_nr_rings;
 
 	rc = bnge_hwrm_reserve_rings(bd, &hwr);
 	if (rc)
 		return rc;
 
 	bnge_copy_reserved_rings(bd, &hwr);
+
+	/* Exclude the MPC reservation before adjusting the L2 rings. */
+	if (bnge_is_roce_en(bd)) {
+		if (hwr.tx <= 1 || hwr.cmpl <= 2)
+			return -ENOMEM;
+		hwr.tx--;
+		hwr.cmpl--;
+	}
 
 	rx_rings = hwr.rx;
 	if (bnge_is_agg_reqd(bd)) {
@@ -330,12 +354,19 @@ int bnge_reserve_rings(struct bnge_dev *bd)
 	hwr.nq = min_t(u16, hwr.nq, hwr.stat);
 
 	/* Adjust the rings */
+	rc = bnge_fix_rings_count(&rx_rings, &hwr.tx, hwr.cmpl, false);
+	if (rc)
+		return rc;
 	rc = bnge_adjust_rings(bd, &rx_rings, &hwr.tx, hwr.nq, sh);
+	if (rc)
+		return rc;
 	if (bnge_is_agg_reqd(bd))
 		hwr.rx = rx_rings << 1;
 	tx_cp = hwr.tx;
 	hwr.nq = sh ? max_t(u16, tx_cp, rx_rings) : tx_cp + rx_rings;
 	bd->tx_nr_rings = hwr.tx;
+	if (!bd->num_tc)
+		bd->tx_nr_rings_per_tc = bd->tx_nr_rings;
 
 	if (rx_rings != bd->rx_nr_rings)
 		dev_warn(bd->dev, "RX rings resv reduced to %d than earlier %d requested\n",
@@ -347,7 +378,8 @@ int bnge_reserve_rings(struct bnge_dev *bd)
 	if (!bnge_rings_ok(&hwr))
 		return -ENOMEM;
 
-	if (old_rx_rings != bd->hw_resc.resv_rx_rings)
+	if (old_rx_rings != bd->hw_resc.resv_rx_rings ||
+	    old_rx_nr_rings != bd->rx_nr_rings)
 		bnge_set_dflt_rss_indir_tbl(bd);
 
 	if (!bnge_aux_registered(bd)) {
@@ -451,6 +483,17 @@ static void _bnge_get_max_rings(struct bnge_dev *bd, u16 *max_rx,
 		*max_rx >>= 1;
 
 	max_cp = bnge_get_max_func_cp_rings(bd);
+
+	/* Leave one TX ring and one completion ring for RoCE MPC. */
+	if (bnge_is_roce_en(bd)) {
+		if (*max_tx <= 1 || max_cp <= 2) {
+			*max_rx = 0;
+			*max_tx = 0;
+			return;
+		}
+		(*max_tx)--;
+		max_cp--;
+	}
 
 	/* Fix RX and TX rings according to number of CPs available */
 	rc = bnge_fix_rings_count(max_rx, max_tx, max_cp, false);
@@ -595,6 +638,7 @@ int bnge_net_init_dflt_config(struct bnge_dev *bd)
 	if (rc)
 		goto err_free_tbl;
 
+	bnge_set_dflt_rss_indir_tbl(bd);
 	hw_resc = &bd->hw_resc;
 	bd->max_fltr = hw_resc->max_rx_em_flows + hw_resc->max_rx_wm_flows +
 		       BNGE_L2_FLTR_MAX_FLTR;
