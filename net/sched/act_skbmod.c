@@ -32,7 +32,7 @@ TC_INDIRECT_SCOPE int tcf_skbmod_act(struct sk_buff *skb,
 	u64 flags;
 
 	tcf_lastuse_update(&d->tcf_tm);
-	bstats_update(this_cpu_ptr(d->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&d->common, skb);
 
 	p = rcu_dereference_bh(d->skbmod_p);
 	if (unlikely(p->action == TC_ACT_SHOT))
@@ -91,7 +91,7 @@ out:
 	return p->action;
 
 drop:
-	qstats_cpu_overlimit_inc(d->common.cpu_qstats);
+	tcf_action_inc_overlimit_qstats(&d->common);
 	return TC_ACT_SHOT;
 }
 
@@ -171,8 +171,8 @@ static int tcf_skbmod_init(struct net *net, struct nlattr *nla,
 	}
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, est, a,
-				     &act_skbmod_ops, bind, true, flags);
+		ret = tcf_idr_create_from_flags(tn, index, est, a,
+						&act_skbmod_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
