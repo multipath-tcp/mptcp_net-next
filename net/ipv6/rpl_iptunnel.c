@@ -102,7 +102,7 @@ static int rpl_build_state(struct net *net, struct nlattr *nla,
 
 	rlwt = rpl_lwt_lwtunnel(newts);
 
-	err = dst_cache_init(&rlwt->cache, GFP_ATOMIC);
+	err = dst_cache_init(&rlwt->cache, GFP_KERNEL);
 	if (err) {
 		kfree(newts);
 		return err;
