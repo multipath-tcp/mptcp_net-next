@@ -17,9 +17,14 @@ description:
   bus. These should follow the generic ethernet-phy.yaml document, or
   a device specific binding document.
 
+select:
+  properties:
+    $nodename:
+      pattern: '^mdio(-(bus|external))?(@.+|-([0-9]+))?$'
+
 properties:
   $nodename:
-    pattern: '^mdio(-(bus|external))?(@.+|-([0-9]+))?$'
+    pattern: '^(ethernet|mdio(-(bus|external))?)(@.+|-([0-9]+))?$'
 
   "#address-cells":
     const: 1
