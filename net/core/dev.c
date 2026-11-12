@@ -9326,6 +9326,9 @@ static void __netdev_upper_dev_unlink(struct net_device *dev,
 
 	__netdev_adjacent_dev_unlink_neighbour(dev, upper_dev);
 
+	if (changeupper_info.master)
+		dev->xdp_from_upper = 0;
+
 	call_netdevice_notifiers_info(NETDEV_CHANGEUPPER,
 				      &changeupper_info.info);
 
@@ -10561,6 +10564,15 @@ u8 dev_xdp_prog_count(struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(dev_xdp_prog_count);
 
+/* Does the device have an XDP program, and was it installed directly on the
+ * device rather than propagated down by an upper with netif_xdp_propagate()?
+ */
+bool dev_xdp_has_own_prog(struct net_device *dev)
+{
+	return dev_xdp_prog_count(dev) && !dev->xdp_from_upper;
+}
+EXPORT_SYMBOL_GPL(dev_xdp_has_own_prog);
+
 u8 dev_xdp_sb_prog_count(struct net_device *dev)
 {
 	struct bpf_prog *prog;
@@ -10591,12 +10603,23 @@ static void dev_xdp_set_prog(struct net_device *dev, enum bpf_xdp_mode mode,
 
 int netif_xdp_propagate(struct net_device *dev, struct netdev_bpf *bpf)
 {
+	struct bpf_prog *old_prog;
+	int err;
+
+	netdev_assert_locked_ops_compat(dev);
+
 	if (!dev->netdev_ops->ndo_bpf)
 		return -EOPNOTSUPP;
 
 	/* setup requires extra handling, bypass those for other commands */
 	if (bpf->command != XDP_SETUP_PROG)
 		return dev->netdev_ops->ndo_bpf(dev, bpf);
+
+	if (dev_xdp_has_own_prog(dev)) {
+		NL_SET_ERR_MSG(bpf->extack,
+			       "unable to propagate XDP to device with an XDP program of its own");
+		return -EBUSY;
+	}
 
 	if (bpf->prog) {
 		if (dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
@@ -10613,7 +10636,26 @@ int netif_xdp_propagate(struct net_device *dev, struct netdev_bpf *bpf)
 		}
 	}
 
-	return dev->netdev_ops->ndo_bpf(dev, bpf);
+	err = dev->netdev_ops->ndo_bpf(dev, bpf);
+	if (err)
+		return err;
+	if (bpf->prog)
+		bpf_prog_inc(bpf->prog);
+
+	/* Record it like a program of our own, so that everything which asks
+	 * whether XDP is running here gets the right answer. @xdp_from_upper
+	 * keeps the two apart where it matters. Register it with the
+	 * dispatcher too, dev_xdp_uninstall() will drop it from there if this
+	 * device goes away first.
+	 */
+	old_prog = dev_xdp_prog(dev, XDP_MODE_DRV);
+	bpf_prog_change_xdp(old_prog, bpf->prog);
+	dev_xdp_set_prog(dev, XDP_MODE_DRV, bpf->prog);
+	dev->xdp_from_upper = !!bpf->prog;
+	if (old_prog)
+		bpf_prog_put(old_prog);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(netif_xdp_propagate);
 
@@ -10731,6 +10773,7 @@ static void dev_xdp_uninstall(struct net_device *dev)
 
 		dev_xdp_set_link(dev, mode, NULL);
 	}
+	dev->xdp_from_upper = 0;
 }
 
 static int dev_xdp_attach(struct net_device *dev, struct netlink_ext_ack *extack,
@@ -10773,6 +10816,10 @@ static int dev_xdp_attach(struct net_device *dev, struct netlink_ext_ack *extack
 	}
 
 	mode = dev_xdp_mode(dev, flags);
+	if (dev->xdp_from_upper) {
+		NL_SET_ERR_MSG(extack, "Can't replace an XDP program installed by an upper device");
+		return -EBUSY;
+	}
 	/* can't replace attached link */
 	if (dev_xdp_link(dev, mode)) {
 		NL_SET_ERR_MSG(extack, "Can't replace active BPF XDP link");
