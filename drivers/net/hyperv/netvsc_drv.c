@@ -2331,6 +2331,13 @@ static int netvsc_register_vf(struct net_device *vf_netdev, int context)
 	if (!netvsc_dev || rtnl_dereference(net_device_ctx->vf_netdev))
 		return NOTIFY_DONE;
 
+	prog = netvsc_xdp_get(netvsc_dev);
+	if (prog && dev_xdp_prog_count(vf_netdev)) {
+		netdev_warn(ndev, "not using VF %s, it has an XDP program attached\n",
+			    vf_netdev->name);
+		return NOTIFY_DONE;
+	}
+
 	/* if synthetic interface is a different namespace,
 	 * then move the VF to that namespace; join will be
 	 * done again in that context.
@@ -2349,10 +2356,31 @@ static int netvsc_register_vf(struct net_device *vf_netdev, int context)
 		return NOTIFY_DONE;
 	}
 
+	/* Install netvsc's program before joining, so that a VF which
+	 * refuses it never gets used. Syncing the features first turns
+	 * off LRO, which the VF may not run XDP with.
+	 */
+	if (prog) {
+		vf_netdev->wanted_features = ndev->features;
+		netdev_update_features(vf_netdev);
+
+		ret = netvsc_vf_setxdp(vf_netdev, prog);
+		if (ret) {
+			netdev_warn(ndev, "not using VF %s, it refused netvsc's XDP program: %d\n",
+				    vf_netdev->name, ret);
+			return NOTIFY_DONE;
+		}
+	}
+
 	netdev_info(ndev, "VF registering: %s\n", vf_netdev->name);
 
-	if (netvsc_vf_join(vf_netdev, ndev, context) != 0)
+	if (netvsc_vf_join(vf_netdev, ndev, context) != 0) {
+		ret = prog ? netvsc_vf_setxdp(vf_netdev, NULL) : 0;
+		if (ret)
+			netdev_warn(ndev, "failed to remove XDP program from VF %s: %d\n",
+				    vf_netdev->name, ret);
 		return NOTIFY_DONE;
+	}
 
 	dev_hold(vf_netdev);
 	rcu_assign_pointer(net_device_ctx->vf_netdev, vf_netdev);
@@ -2362,9 +2390,6 @@ static int netvsc_register_vf(struct net_device *vf_netdev, int context)
 
 	vf_netdev->wanted_features = ndev->features;
 	netdev_update_features(vf_netdev);
-
-	prog = netvsc_xdp_get(netvsc_dev);
-	netvsc_vf_setxdp(vf_netdev, prog);
 
 	return NOTIFY_OK;
 }
@@ -2441,6 +2466,8 @@ static int netvsc_unregister_vf(struct net_device *vf_netdev)
 {
 	struct net_device *ndev;
 	struct net_device_context *net_device_ctx;
+	struct netvsc_device *nvdev;
+	int ret;
 
 	ndev = get_netvsc_byref(vf_netdev);
 	if (!ndev)
@@ -2453,6 +2480,20 @@ static int netvsc_unregister_vf(struct net_device *vf_netdev)
 
 	reinit_completion(&net_device_ctx->vf_add);
 	netdev_rx_handler_unregister(vf_netdev);
+
+	/* Take our program back now that frames from the VF no longer
+	 * reach netvsc, but leave a program of the VF's own be.
+	 */
+	nvdev = rtnl_dereference(net_device_ctx->nvdev);
+	if (nvdev && netvsc_xdp_get(nvdev) && !dev_xdp_prog_count(vf_netdev)) {
+		netdev_lock_ops(vf_netdev);
+		ret = netvsc_vf_setxdp(vf_netdev, NULL);
+		netdev_unlock_ops(vf_netdev);
+		if (ret)
+			netdev_warn(ndev, "failed to remove XDP program from VF %s: %d\n",
+				    vf_netdev->name, ret);
+	}
+
 	netdev_upper_dev_unlink(vf_netdev, ndev);
 	RCU_INIT_POINTER(net_device_ctx->vf_netdev, NULL);
 	dev_put(vf_netdev);
@@ -2664,21 +2705,21 @@ static void netvsc_remove(struct hv_device *dev)
 	cancel_delayed_work_sync(&ndev_ctx->vfns_work);
 
 	nvdev = rtnl_dereference(ndev_ctx->nvdev);
-	if (nvdev) {
+	if (nvdev)
 		cancel_work_sync(&nvdev->subchan_work);
-		netvsc_xdp_set(net, NULL, NULL, nvdev);
-	}
+
+	vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
+	if (vf_netdev)
+		netvsc_unregister_vf(vf_netdev);
 
 	/*
 	 * Call to the vsc driver to let it know that the device is being
 	 * removed. Also blocks mtu and channel changes.
 	 */
-	vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
-	if (vf_netdev)
-		netvsc_unregister_vf(vf_netdev);
-
-	if (nvdev)
+	if (nvdev) {
+		netvsc_xdp_set(net, NULL, NULL, nvdev);
 		rndis_filter_device_remove(dev, nvdev);
+	}
 
 	unregister_netdevice(net);
 	list_del(&ndev_ctx->list);
