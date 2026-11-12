@@ -60,7 +60,7 @@ TC_INDIRECT_SCOPE int tcf_mpls_act(struct sk_buff *skb,
 	int mac_len;
 
 	tcf_lastuse_update(&m->tcf_tm);
-	bstats_update(this_cpu_ptr(m->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&m->common, skb);
 
 	/* Ensure 'data' points at mac_header prior calling mpls manipulating
 	 * functions.
@@ -123,7 +123,7 @@ TC_INDIRECT_SCOPE int tcf_mpls_act(struct sk_buff *skb,
 	return p->action;
 
 drop:
-	qstats_cpu_drop_inc(m->common.cpu_qstats);
+	tcf_action_inc_drop_qstats(&m->common);
 	return TC_ACT_SHOT;
 }
 
@@ -196,8 +196,8 @@ static int tcf_mpls_init(struct net *net, struct nlattr *nla,
 		return ACT_P_BOUND;
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, est, a, &act_mpls_ops, bind,
-				     true, flags);
+		ret = tcf_idr_create_from_flags(tn, index, est, a,
+						&act_mpls_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
