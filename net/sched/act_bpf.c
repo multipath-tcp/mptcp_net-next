@@ -42,7 +42,7 @@ TC_INDIRECT_SCOPE int tcf_bpf_act(struct sk_buff *skb,
 	int action, filter_res;
 
 	tcf_lastuse_update(&prog->tcf_tm);
-	bstats_update(this_cpu_ptr(prog->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&prog->common, skb);
 
 	filter = rcu_dereference_bh(prog->filter);
 	if (at_ingress) {
@@ -76,7 +76,7 @@ TC_INDIRECT_SCOPE int tcf_bpf_act(struct sk_buff *skb,
 		break;
 	case TC_ACT_SHOT:
 		action = filter_res;
-		qstats_cpu_drop_inc(prog->common.cpu_qstats);
+		tcf_action_inc_drop_qstats(&prog->common);
 		break;
 	case TC_ACT_UNSPEC:
 		action = prog->tcf_action;
@@ -305,8 +305,8 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 	index = parm->index;
 	ret = tcf_idr_check_alloc(tn, &index, act, bind);
 	if (!ret) {
-		ret = tcf_idr_create(tn, index, est, act,
-				     &act_bpf_ops, bind, true, flags);
+		ret = tcf_idr_create_from_flags(tn, index, est, act,
+						&act_bpf_ops, bind, flags);
 		if (ret < 0) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
