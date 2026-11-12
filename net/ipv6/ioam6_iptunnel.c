@@ -166,7 +166,7 @@ static int ioam6_build_state(struct net *net, struct nlattr *nla,
 		return -ENOMEM;
 
 	ilwt = ioam6_lwt_state(lwt);
-	err = dst_cache_init(&ilwt->cache, GFP_ATOMIC);
+	err = dst_cache_init(&ilwt->cache, GFP_KERNEL);
 	if (err)
 		goto free_lwt;
 
