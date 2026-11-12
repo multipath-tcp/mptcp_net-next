@@ -71,7 +71,7 @@
 #define X2_START_BP_BUFNUM_1	0x20
 #define X2_START_RING_NUM_1	256
 
-#define IRQ_ID_SIZE		16
+#define IRQ_ID_SIZE		32
 
 #define PHY_POLL_LINK_ON	(10 * HZ)
 #define PHY_POLL_LINK_OFF	(PHY_POLL_LINK_ON / 5)
