@@ -273,28 +273,16 @@ __default_test_do()
 	log_test "$what: drops reported"
 }
 
-default_test_do()
+default_test()
 {
 	vxlan_device_add
 	__default_test_do 0 "Default"
 }
 
-default_test()
-{
-	in_defer_scope \
-	    default_test_do
-}
-
-plain_test_do()
+plain_test()
 {
 	vxlan_device_add reserved_bits 0xf7ffffff000000ff
 	__default_test_do 0 "reserved_bits 0xf7ffffff000000ff"
-}
-
-plain_test()
-{
-	in_defer_scope \
-	    plain_test_do
 }
 
 reserved_test()
@@ -311,46 +299,35 @@ reserved_test()
 
 reserved_0_test()
 {
-	in_defer_scope \
-	    reserved_test 0
+	reserved_test 0
 }
 
 reserved_10_test()
 {
-	in_defer_scope \
-	    reserved_test 10
+	reserved_test 10
 }
 
 reserved_31_test()
 {
-	in_defer_scope \
-	    reserved_test 31
+	reserved_test 31
 }
 
 reserved_56_test()
 {
-	in_defer_scope \
-	    reserved_test 56
+	reserved_test 56
 }
 
 reserved_63_test()
 {
-	in_defer_scope \
-	    reserved_test 63
+	reserved_test 63
 }
 
-gbp_changelink_test_do()
+gbp_changelink_test()
 {
 	vxlan_device_add gbp
 	__default_test_do 25 "gbp"
 	ip link set dev vx1 type vxlan ageing 300
 	__default_test_do 25 "gbp after changelink"
-}
-
-gbp_changelink_test()
-{
-	in_defer_scope \
-	    gbp_changelink_test_do
 }
 
 trap cleanup EXIT
