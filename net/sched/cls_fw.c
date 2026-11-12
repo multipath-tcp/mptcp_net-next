@@ -204,7 +204,8 @@ static const struct nla_policy fw_policy[TCA_FW_MAX + 1] = {
 
 static int fw_set_parms(struct net *net, struct tcf_proto *tp,
 			struct fw_filter *f, struct nlattr **tb,
-			struct nlattr **tca, unsigned long base, u32 flags,
+			struct nlattr **tca, unsigned long base,
+			bool new_filter, u32 flags,
 			struct netlink_ext_ack *extack)
 {
 	struct fw_head *head = rtnl_dereference(tp->root);
@@ -229,8 +230,10 @@ static int fw_set_parms(struct net *net, struct tcf_proto *tp,
 		mask = nla_get_u32(tb[TCA_FW_MASK]);
 		if (mask != head->mask)
 			return err;
-	} else if (head->mask != 0xFFFFFFFF)
+	} else if (head->mask != 0xFFFFFFFF && new_filter) {
+		NL_SET_ERR_MSG(extack, "Mask must be provided for new filter");
 		return err;
+	}
 
 	if (tb[TCA_FW_CLASSID]) {
 		f->res.classid = nla_get_u32(tb[TCA_FW_CLASSID]);
@@ -291,7 +294,8 @@ static int fw_change(struct net *net, struct sk_buff *in_skb,
 			return err;
 		}
 
-		err = fw_set_parms(net, tp, fnew, tb, tca, base, flags, extack);
+		err = fw_set_parms(net, tp, fnew, tb, tca, base, false,
+				   flags, extack);
 		if (err < 0) {
 			tcf_exts_destroy(&fnew->exts);
 			kfree(fnew);
@@ -340,7 +344,7 @@ static int fw_change(struct net *net, struct sk_buff *in_skb,
 	f->id = handle;
 	f->tp = tp;
 
-	err = fw_set_parms(net, tp, f, tb, tca, base, flags, extack);
+	err = fw_set_parms(net, tp, f, tb, tca, base, true, flags, extack);
 	if (err < 0)
 		goto errout;
 
