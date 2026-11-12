@@ -109,8 +109,15 @@ XDP support
 
   Setting / unsetting XDP program on synthetic NIC (netvsc) propagates to
   VF NIC automatically. Setting / unsetting XDP program on VF NIC directly
-  is not recommended, also not propagated to synthetic NIC, and may be
-  overwritten by setting of synthetic NIC.
+  is not recommended, and not propagated to synthetic NIC. If the
+  synthetic NIC has a program when a VF NIC shows up, a VF NIC which runs
+  a program of its own, or which can't or won't run the synthetic NIC's,
+  is not used until it is registered again. The synthetic NIC then keeps
+  its traffic on the synthetic data path; what the VF NIC receives if it
+  is brought up on its own is outside of the synthetic NIC's control.
+  For a VF NIC already in use which runs a program of its own, or can't
+  or won't run the synthetic NIC's, setting the program on the synthetic
+  NIC fails instead.
 
   XDP program cannot run with LRO (RSC) enabled, so you need to disable LRO
   before running XDP::
