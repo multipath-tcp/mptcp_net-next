@@ -441,7 +441,8 @@ static int bnge_hwrm_get_rings(struct bnge_dev *bd)
 	tx = hw_resc->resv_tx_rings;
 	if (bnge_is_agg_reqd(bd))
 		rx >>= 1;
-	if (cp < (rx + tx)) {
+	/* RoCE ring counts are adjusted after excluding MPC resources. */
+	if (!bnge_is_roce_en(bd) && cp < (rx + tx)) {
 		rc = bnge_fix_rings_count(&rx, &tx, cp, false);
 		if (rc)
 			goto get_rings_exit;
