@@ -63,6 +63,41 @@ int yt921x_reg_update_bits(struct yt921x_priv *priv, u32 reg, u32 mask, u32 val)
 	return yt921x_reg_write(priv, reg, u);
 }
 
+/* Reliably read a 64-bit counter, assuming the counter isn't that "fast" */
+int yt921x_counter_read(struct yt921x_priv *priv, u32 reg, u64 *valp)
+{
+	u32 old_lo;
+	int res;
+	u32 hi;
+	u32 lo;
+
+	res = yt921x_reg_read(priv, reg, &old_lo);
+	if (res)
+		return res;
+
+	res = yt921x_reg_read(priv, reg + 4, &hi);
+	if (res)
+		return res;
+
+	res = yt921x_reg_read(priv, reg, &lo);
+	if (res)
+		return res;
+
+	if (lo < old_lo) {
+		u32 new_hi;
+
+		res = yt921x_reg_read(priv, reg + 4, &new_hi);
+		if (res)
+			return res;
+		if (new_hi != hi && new_hi != hi + 1)
+			return -EIO;
+		hi = new_hi;
+	}
+
+	*valp = ((u64)hi << 32) | lo;
+	return 0;
+}
+
 static int
 yt921x_regs_read(struct yt921x_priv *priv, u32 reg, u32 *vals,
 		 unsigned int num_regs)
