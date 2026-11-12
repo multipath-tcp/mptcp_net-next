@@ -233,9 +233,10 @@ static size_t tcf_gact_get_fill_size(const struct tc_action *act)
 	size_t sz = nla_total_size(sizeof(struct tc_gact)); /* TCA_GACT_PARMS */
 
 #ifdef CONFIG_GACT_PROB
-	if (to_gact(act)->tcfg_ptype)
-		/* TCA_GACT_PROB */
-		sz += nla_total_size(sizeof(struct tc_gact_p));
+	/* tcfg_ptype may be set by a concurrent replace after this budget has
+	 * been computed, so account for TCA_GACT_PROB unconditionally.
+	 */
+	sz += nla_total_size(sizeof(struct tc_gact_p));
 #endif
 
 	return sz;
