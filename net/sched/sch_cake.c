@@ -2052,7 +2052,8 @@ static struct sk_buff *cake_dequeue(struct Qdisc *sch)
 		if (num_active_qs > 1)
 			new_rate = div64_u64(new_rate, num_active_qs);
 
-		cake_configure_rates(sch, new_rate, true);
+		if (new_rate != q->tins[0].tin_rate_bps)
+			cake_configure_rates(sch, new_rate, true);
 		q->last_checked_active = now;
 		WRITE_ONCE(q->active_queues, num_active_qs);
 	}

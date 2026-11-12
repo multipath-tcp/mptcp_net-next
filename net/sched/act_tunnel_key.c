@@ -481,9 +481,13 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 		}
 
 #ifdef CONFIG_DST_CACHE
-		ret = dst_cache_init(&metadata->u.tun_info.dst_cache, GFP_KERNEL);
-		if (ret)
-			goto release_tun_meta;
+		if (!((exists ? (*a)->tcfa_flags : act_flags) &
+		      TCA_ACT_FLAGS_SKIP_SW)) {
+			ret = dst_cache_init(&metadata->u.tun_info.dst_cache,
+					     GFP_KERNEL);
+			if (ret)
+				goto release_tun_meta;
+		}
 #endif
 
 		if (opts_len) {

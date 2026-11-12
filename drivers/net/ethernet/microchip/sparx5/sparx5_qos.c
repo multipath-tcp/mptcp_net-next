@@ -449,6 +449,10 @@ int sparx5_qos_init(struct sparx5 *sparx5)
 {
 	int ret;
 
+	ret = sparx5_port_policer_init(sparx5);
+	if (ret)
+		return ret;
+
 	ret = sparx5_leak_groups_init(sparx5);
 	if (ret < 0)
 		return ret;
