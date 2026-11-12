@@ -184,7 +184,7 @@ static int phylink_is_empty_linkmode(const unsigned long *linkmode)
 
 static const char *phylink_an_mode_str(unsigned int mode)
 {
-	static const char *modestr[] = {
+	static const char * const modestr[] = {
 		[MLO_AN_PHY] = "phy",
 		[MLO_AN_FIXED] = "fixed",
 		[MLO_AN_INBAND] = "inband",
