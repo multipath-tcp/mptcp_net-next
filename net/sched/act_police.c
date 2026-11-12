@@ -80,8 +80,8 @@ static int tcf_police_init(struct net *net, struct nlattr *nla,
 		return ACT_P_BOUND;
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, NULL, a,
-				     &act_police_ops, bind, true, flags);
+		ret = tcf_idr_create_from_flags(tn, index, NULL, a,
+						&act_police_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
@@ -259,7 +259,7 @@ TC_INDIRECT_SCOPE int tcf_police_act(struct sk_buff *skb,
 	int ret;
 
 	tcf_lastuse_update(&police->tcf_tm);
-	bstats_update(this_cpu_ptr(police->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&police->common, skb);
 
 	p = rcu_dereference_bh(police->params);
 	ret = p->action;
@@ -313,10 +313,10 @@ TC_INDIRECT_SCOPE int tcf_police_act(struct sk_buff *skb,
 	}
 
 inc_overlimits:
-	qstats_cpu_overlimit_inc(police->common.cpu_qstats);
+	tcf_action_inc_overlimit_qstats(&police->common);
 inc_drops:
 	if (ret == TC_ACT_SHOT)
-		qstats_cpu_drop_inc(police->common.cpu_qstats);
+		tcf_action_inc_drop_qstats(&police->common);
 end:
 	return ret;
 }
