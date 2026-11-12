@@ -245,8 +245,14 @@ void hsr_del_port(struct hsr_port *port)
 		netdev_rx_handler_unregister(port->dev);
 		if (!port->hsr->fwd_offloaded || port->type == HSR_PT_INTERLINK)
 			dev_set_promiscuity(port->dev, -1);
-		if (port->type == HSR_PT_SLAVE_A || port->type == HSR_PT_SLAVE_B)
+		if (port->type == HSR_PT_SLAVE_A ||
+		    port->type == HSR_PT_SLAVE_B) {
 			vlan_vids_del_by_dev(port->dev, master->dev);
+			dev_uc_unsync(port->dev, master->dev);
+			dev_mc_unsync(port->dev, master->dev);
+			if (master->dev->flags & IFF_ALLMULTI)
+				dev_set_allmulti(port->dev, -1);
+		}
 		netdev_upper_dev_unlink(port->dev, master->dev);
 		if (hsr->prot_version == PRP_V1 &&
 		    port->type == HSR_PT_SLAVE_B) {
