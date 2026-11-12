@@ -517,6 +517,99 @@ out:
 }
 
 /*
+ * Replace, then detach the program on a bond through its link. The link only
+ * knows about the bond, the slave has to follow it, and the replaced program
+ * has to be released.
+ */
+static void test_xdp_bonding_link_update(struct skeletons *skeletons)
+{
+	LIBBPF_OPTS(bpf_prog_load_opts, opts, .expected_attach_type = BPF_XDP);
+	struct bpf_program *new_prog = skeletons->xdp_dummy->progs.xdp_dummy_prog;
+	struct bpf_insn insns[] = {
+		BPF_MOV64_IMM(BPF_REG_0, XDP_PASS),
+		BPF_EXIT_INSN(),
+	};
+	int veth, bond, err, fd, old_fd = -1, link_fd = -1;
+	struct bpf_prog_info info = {};
+	__u32 old_id, new_id, id, len;
+
+	if (!ASSERT_OK(system("ip link add veth type veth"), "add veth"))
+		goto out;
+	if (!ASSERT_OK(system("ip link add bond type bond"), "add bond"))
+		goto out;
+
+	veth = if_nametoindex("veth");
+	if (!ASSERT_GT(veth, 0, "if_nametoindex veth"))
+		goto out;
+	bond = if_nametoindex("bond");
+	if (!ASSERT_GT(bond, 0, "if_nametoindex bond"))
+		goto out;
+
+	err = system("ip link set veth master bond");
+	if (!ASSERT_OK(err, "set veth master"))
+		goto out;
+
+	/* same attach type as the skeleton's, or the link won't take it */
+	old_fd = bpf_prog_load(BPF_PROG_TYPE_XDP, "xdp_old", "GPL", insns,
+			       ARRAY_SIZE(insns), &opts);
+	if (!ASSERT_GE(old_fd, 0, "load old program"))
+		goto out;
+	len = sizeof(info);
+	if (!ASSERT_OK(bpf_prog_get_info_by_fd(old_fd, &info, &len), "old program info"))
+		goto out;
+	old_id = info.id;
+
+	memset(&info, 0, sizeof(info));
+	len = sizeof(info);
+	err = bpf_prog_get_info_by_fd(bpf_program__fd(new_prog), &info, &len);
+	if (!ASSERT_OK(err, "new program info"))
+		goto out;
+	new_id = info.id;
+
+	link_fd = bpf_link_create(old_fd, bond, BPF_XDP, NULL);
+	if (!ASSERT_GE(link_fd, 0, "attach old program to bond"))
+		goto out;
+
+	err = bpf_xdp_query_id(veth, XDP_FLAGS_DRV_MODE, &id);
+	if (!ASSERT_OK(err, "query veth") ||
+	    !ASSERT_EQ(id, old_id, "veth runs the old program"))
+		goto out;
+
+	err = bpf_link_update(link_fd, bpf_program__fd(new_prog), NULL);
+	if (!ASSERT_OK(err, "replace the program through the link"))
+		goto out;
+
+	err = bpf_xdp_query_id(veth, XDP_FLAGS_DRV_MODE, &id);
+	if (!ASSERT_OK(err, "query veth") ||
+	    !ASSERT_EQ(id, new_id, "veth follows to the new program"))
+		goto out;
+
+	/* nothing but our fd should be holding on to the old program now */
+	close(old_fd);
+	old_fd = -1;
+	fd = bpf_prog_get_fd_by_id(old_id);
+	if (!ASSERT_EQ(fd, -ENOENT, "old program released") && fd >= 0)
+		close(fd);
+
+	err = bpf_link_detach(link_fd);
+	if (!ASSERT_OK(err, "detach the link"))
+		goto out;
+
+	err = bpf_xdp_query_id(veth, XDP_FLAGS_DRV_MODE, &id);
+	if (!ASSERT_OK(err, "query veth"))
+		goto out;
+	ASSERT_EQ(id, 0, "veth has no program left");
+
+out:
+	if (link_fd >= 0)
+		close(link_fd);
+	if (old_fd >= 0)
+		close(old_fd);
+	system("ip link del veth");
+	system("ip link del bond");
+}
+
+/*
  * Test that XDP redirect via xdp_master_redirect() does not crash when
  * the bond master device is not up. When bond is in round-robin mode but
  * never opened, rr_tx_counter is NULL.
@@ -825,6 +918,9 @@ void serial_test_xdp_bonding(void)
 
 	if (test__start_subtest("xdp_bonding_nested"))
 		test_xdp_bonding_nested(&skeletons);
+
+	if (test__start_subtest("xdp_bonding_link_update"))
+		test_xdp_bonding_link_update(&skeletons);
 
 	if (test__start_subtest("xdp_bonding_features"))
 		test_xdp_bonding_features(&skeletons);
