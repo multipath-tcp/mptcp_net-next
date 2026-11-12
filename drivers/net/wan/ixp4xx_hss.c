@@ -1426,6 +1426,7 @@ static int ixp4xx_hss_probe(struct platform_device *pdev)
 		return dev_err_probe(dev, err, "no NPE engine specified\n");
 	/* NPE ID 0x00, 0x10, 0x20... */
 	port->npe = npe_request(npe_spec.args[0] << 4);
+	of_node_put(npe_spec.np);
 	if (!port->npe) {
 		dev_err(dev, "unable to obtain NPE instance\n");
 		return -ENODEV;
@@ -1437,36 +1438,42 @@ static int ixp4xx_hss_probe(struct platform_device *pdev)
 	if (err)
 		return dev_err_probe(dev, err, "no txready queue phandle\n");
 	port->txreadyq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 	/* Get the RX trig queue as resource from queue manager */
 	err = of_parse_phandle_with_fixed_args(np, "intek,queue-chl-rxtrig", 1, 0,
 					       &queue_spec);
 	if (err)
 		return dev_err_probe(dev, err, "no rxtrig queue phandle\n");
 	port->rxtrigq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 	/* Get the RX queue as resource from queue manager */
 	err = of_parse_phandle_with_fixed_args(np, "intek,queue-pkt-rx", 1, 0,
 					       &queue_spec);
 	if (err)
 		return dev_err_probe(dev, err, "no RX queue phandle\n");
 	port->rxq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 	/* Get the TX queue as resource from queue manager */
 	err = of_parse_phandle_with_fixed_args(np, "intek,queue-pkt-tx", 1, 0,
 					       &queue_spec);
 	if (err)
 		return dev_err_probe(dev, err, "no RX queue phandle\n");
 	port->txq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 	/* Get the RX free queue as resource from queue manager */
 	err = of_parse_phandle_with_fixed_args(np, "intek,queue-pkt-rxfree", 1, 0,
 					       &queue_spec);
 	if (err)
 		return dev_err_probe(dev, err, "no RX free queue phandle\n");
 	port->rxfreeq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 	/* Get the TX done queue as resource from queue manager */
 	err = of_parse_phandle_with_fixed_args(np, "intek,queue-pkt-txdone", 1, 0,
 					       &queue_spec);
 	if (err)
 		return dev_err_probe(dev, err, "no TX done queue phandle\n");
 	port->txdoneq = queue_spec.args[0];
+	of_node_put(queue_spec.np);
 
 	/* Obtain all the line control GPIOs */
 	port->cts = devm_gpiod_get(dev, "cts", GPIOD_OUT_LOW);
