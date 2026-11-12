@@ -69,8 +69,8 @@ static int tcf_sample_init(struct net *net, struct nlattr *nla,
 		return ACT_P_BOUND;
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, est, a,
-				     &act_sample_ops, bind, true, flags);
+		ret = tcf_idr_create_from_flags(tn, index, est, a,
+						&act_sample_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
@@ -173,7 +173,7 @@ TC_INDIRECT_SCOPE int tcf_sample_act(struct sk_buff *skb,
 	int retval;
 
 	tcf_lastuse_update(&s->tcf_tm);
-	bstats_update(this_cpu_ptr(s->common.cpu_bstats), skb);
+	tcf_action_update_bstats(&s->common, skb);
 	retval = READ_ONCE(s->tcf_action);
 
 	psample_group = rcu_dereference_bh(s->psample_group);
