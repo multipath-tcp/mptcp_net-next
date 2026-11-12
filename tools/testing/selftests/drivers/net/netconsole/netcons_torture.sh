@@ -46,6 +46,7 @@ create_and_delete_random_target() {
 
 		# Basic population so the target can come up
 		_create_dynamic_target "${FORMAT}" "${RND_TARGET_PATH}"
+		echo 1 > "${RND_TARGET_PATH}"/enabled 2> /dev/null || true
 	done
 
 	echo "netconsole selftest: ${COUNT} additional targets were created" > /dev/kmsg

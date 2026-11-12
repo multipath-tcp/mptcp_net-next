@@ -14,6 +14,7 @@
 #include <linux/bpf.h>
 #include <linux/bpf_trace.h>
 #include <linux/kernel.h>
+#include <net/netdev_lock.h>
 #include <net/xdp.h>
 
 #include <linux/mutex.h>
@@ -162,6 +163,7 @@ int netvsc_xdp_set(struct net_device *dev, struct bpf_prog *prog,
 	return 0;
 }
 
+/* Caller holds the VF's lock, see netdev_lock_ops() */
 int netvsc_vf_setxdp(struct net_device *vf_netdev, struct bpf_prog *prog)
 {
 	struct netdev_bpf xdp;
@@ -172,8 +174,11 @@ int netvsc_vf_setxdp(struct net_device *vf_netdev, struct bpf_prog *prog)
 	if (!vf_netdev)
 		return 0;
 
+	netdev_assert_locked_ops_compat(vf_netdev);
+
+	/* as with bonding, a VF which can't run XDP can't carry ours */
 	if (!vf_netdev->netdev_ops->ndo_bpf)
-		return 0;
+		return prog ? -EOPNOTSUPP : 0;
 
 	memset(&xdp, 0, sizeof(xdp));
 
@@ -197,28 +202,83 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 	struct netvsc_device *nvdev = rtnl_dereference(ndevctx->nvdev);
 	struct net_device *vf_netdev = rtnl_dereference(ndevctx->vf_netdev);
 	struct netlink_ext_ack *extack = bpf->extack;
+	struct bpf_prog *old_prog;
 	int ret;
 
 	if (!nvdev || nvdev->destroy) {
-		return -ENODEV;
+		struct netvsc_device_info *saved;
+
+		if (bpf->command != XDP_SETUP_PROG || bpf->prog || vf_netdev)
+			return -ENODEV;
+
+		/* The channels and the VF are gone, and so is the program,
+		 * except for the reference netvsc_suspend() keeps for
+		 * netvsc_resume().
+		 */
+		saved = ndevctx->saved_netvsc_dev_info;
+		if (saved && saved->bprog) {
+			bpf_prog_put(saved->bprog);
+			saved->bprog = NULL;
+		}
+		return 0;
 	}
 
 	switch (bpf->command) {
 	case XDP_SETUP_PROG:
+		/* The VF's own program is not ours: refuse to install over
+		 * it, as bonding does, and leave it be on removal.
+		 */
+		if (vf_netdev && dev_xdp_prog_count(vf_netdev)) {
+			if (bpf->prog) {
+				NL_SET_ERR_MSG_MOD(extack,
+						   "VF has an XDP program of its own");
+				return -EOPNOTSUPP;
+			}
+			vf_netdev = NULL;
+		}
+
+		/* Hold on to the old program, to put it back on the channels
+		 * if the VF refuses the change.
+		 */
+		old_prog = netvsc_xdp_get(nvdev);
+		if (old_prog)
+			bpf_prog_inc(old_prog);
+
 		ret = netvsc_xdp_set(dev, bpf->prog, extack, nvdev);
 
 		if (ret)
-			return ret;
+			goto put_old_prog;
 
-		ret = netvsc_vf_setxdp(vf_netdev, bpf->prog);
+		/* Unlike netvsc_register_vf() we don't get the VF's lock
+		 * handed to us here.
+		 */
+		ret = 0;
+		if (vf_netdev) {
+			netdev_lock_ops(vf_netdev);
+			ret = netvsc_vf_setxdp(vf_netdev, bpf->prog);
+			netdev_unlock_ops(vf_netdev);
+		}
 
 		if (ret) {
 			netdev_err(dev, "vf_setxdp failed:%d\n", ret);
 			NL_SET_ERR_MSG_MOD(extack, "vf_setxdp failed");
 
-			netvsc_xdp_set(dev, NULL, extack, nvdev);
+			/* The caller hands us its reference to bpf->prog only
+			 * on success, take one so that putting the num_chn
+			 * channel references below doesn't consume it.
+			 */
+			if (bpf->prog)
+				bpf_prog_inc(bpf->prog);
+			/* Can't fail, old_prog has passed the same checks
+			 * before. The channels take over our reference to it.
+			 */
+			netvsc_xdp_set(dev, old_prog, extack, nvdev);
+			return ret;
 		}
 
+put_old_prog:
+		if (old_prog)
+			bpf_prog_put(old_prog);
 		return ret;
 
 	default:
