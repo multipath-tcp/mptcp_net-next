@@ -3151,7 +3151,7 @@ int phylink_ethtool_ksettings_get(struct phylink *pl,
 EXPORT_SYMBOL_GPL(phylink_ethtool_ksettings_get);
 
 static bool phylink_validate_pcs_inband_autoneg(struct phylink *pl,
-					        phy_interface_t interface,
+						phy_interface_t interface,
 						unsigned long *adv)
 {
 	unsigned int inband = phylink_inband_caps(pl, interface);
@@ -4080,11 +4080,11 @@ static int phylink_sfp_module_start(void *upstream)
 	if (pl->phydev) {
 		phy_start(pl->phydev);
 		return 0;
-	} else {
-		ret = phylink_add_sfp_mod_port(pl);
-		if (ret)
-			return ret;
 	}
+
+	ret = phylink_add_sfp_mod_port(pl);
+	if (ret)
+		return ret;
 
 	/* If the module may have a PHY but we didn't detect one we
 	 * need to configure the MAC here.
@@ -4207,6 +4207,7 @@ void phylink_resolve_c73(struct phylink_link_state *state)
 
 	for (i = 0; i < ARRAY_SIZE(phylink_c73_priority_resolution); i++) {
 		int bit = phylink_c73_priority_resolution[i].bit;
+
 		if (linkmode_test_bit(bit, state->advertising) &&
 		    linkmode_test_bit(bit, state->lp_advertising))
 			break;
@@ -4635,7 +4636,8 @@ void phylink_replay_link_end(struct phylink *pl)
 
 	if (WARN(!test_bit(PHYLINK_DISABLE_REPLAY,
 			   &pl->phylink_disable_state),
-		 "phylink_replay_link_end() called without a prior phylink_replay_link_begin()\n"))
+		 "%s called without a prior phylink_replay_link_begin()\n",
+		 __func__))
 		return;
 
 	pl->force_major_config = true;
