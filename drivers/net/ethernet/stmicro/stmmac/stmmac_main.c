@@ -3906,7 +3906,7 @@ static int stmmac_msi_init(struct stmmac_priv *priv,
 {
 	int i;
 
-	priv->msi = devm_kmalloc(priv->device, sizeof(*priv->msi), GFP_KERNEL);
+	priv->msi = devm_kmalloc_obj(priv->device, *priv->msi);
 	if (!priv->msi)
 		return -ENOMEM;
 
@@ -5639,7 +5639,7 @@ static void stmmac_dispatch_skb_zc(struct stmmac_priv *priv, u32 queue,
 	napi_gro_receive(&ch->rxtx_napi, skb);
 
 	u64_stats_update_begin(&rxq_stats->napi_syncp);
-	u64_stats_inc(&rxq_stats->napi.rx_pkt_n);
+	u64_stats_inc(&rxq_stats->napi.rx_packets);
 	u64_stats_add(&rxq_stats->napi.rx_bytes, len);
 	u64_stats_update_end(&rxq_stats->napi_syncp);
 }
@@ -8043,7 +8043,7 @@ struct plat_stmmacenet_data *stmmac_plat_dat_alloc(struct device *dev)
 	struct plat_stmmacenet_data *plat_dat;
 	int i;
 
-	plat_dat = devm_kzalloc(dev, sizeof(*plat_dat), GFP_KERNEL);
+	plat_dat = devm_kzalloc_obj(dev, *plat_dat);
 	if (!plat_dat)
 		return NULL;
 
