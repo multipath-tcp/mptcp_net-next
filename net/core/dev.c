@@ -10575,6 +10575,20 @@ u8 dev_xdp_sb_prog_count(struct net_device *dev)
 	return count;
 }
 
+static void dev_xdp_set_link(struct net_device *dev, enum bpf_xdp_mode mode,
+			     struct bpf_xdp_link *link)
+{
+	dev->xdp_state[mode].link = link;
+	dev->xdp_state[mode].prog = NULL;
+}
+
+static void dev_xdp_set_prog(struct net_device *dev, enum bpf_xdp_mode mode,
+			     struct bpf_prog *prog)
+{
+	dev->xdp_state[mode].link = NULL;
+	dev->xdp_state[mode].prog = prog;
+}
+
 int netif_xdp_propagate(struct net_device *dev, struct netdev_bpf *bpf)
 {
 	if (!dev->netdev_ops->ndo_bpf)
@@ -10608,20 +10622,6 @@ u32 dev_xdp_prog_id(struct net_device *dev, enum bpf_xdp_mode mode)
 	struct bpf_prog *prog = dev_xdp_prog(dev, mode);
 
 	return prog ? prog->aux->id : 0;
-}
-
-static void dev_xdp_set_link(struct net_device *dev, enum bpf_xdp_mode mode,
-			     struct bpf_xdp_link *link)
-{
-	dev->xdp_state[mode].link = link;
-	dev->xdp_state[mode].prog = NULL;
-}
-
-static void dev_xdp_set_prog(struct net_device *dev, enum bpf_xdp_mode mode,
-			     struct bpf_prog *prog)
-{
-	dev->xdp_state[mode].link = NULL;
-	dev->xdp_state[mode].prog = prog;
 }
 
 static int dev_xdp_install(struct net_device *dev, enum bpf_xdp_mode mode,
