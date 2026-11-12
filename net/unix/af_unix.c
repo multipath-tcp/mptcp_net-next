@@ -163,7 +163,7 @@ static int unix_state_lock_cmp_fn(const struct lockdep_map *_a,
 
 	/* Should never happen.  Just to be symmetric. */
 	if (b->sk.sk_state == TCP_LISTEN) {
-		switch (b->sk.sk_state) {
+		switch (a->sk.sk_state) {
 		case TCP_CLOSE:
 		case TCP_ESTABLISHED:
 			return 1;
