@@ -228,7 +228,7 @@ static int ila_build_state(struct net *net, struct nlattr *nla,
 		return -ENOMEM;
 
 	ilwt = ila_lwt_lwtunnel(newts);
-	ret = dst_cache_init(&ilwt->dst_cache, GFP_ATOMIC);
+	ret = dst_cache_init(&ilwt->dst_cache, GFP_KERNEL);
 	if (ret) {
 		kfree(newts);
 		return ret;
