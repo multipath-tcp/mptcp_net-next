@@ -312,6 +312,15 @@ static int bnge_probe_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	max_irqs = bnge_get_max_irq(pdev);
 	bnge_set_max_func_irqs(bd, max_irqs);
 
+	/* Preserve L2 operation if the additional MPC rings cannot fit. */
+	if (bnge_is_roce_en(bd) &&
+	    (bd->hw_resc.max_tx_rings <= 1 ||
+	     bd->hw_resc.max_cp_rings <= 2)) {
+		dev_warn(bd->dev,
+			 "Not enough rings for RoCE MPC, disabling RoCE\n");
+		bd->flags &= ~BNGE_EN_ROCE;
+	}
+
 	bnge_aux_init_dflt_config(bd);
 
 	rc = bnge_net_init_dflt_config(bd);
