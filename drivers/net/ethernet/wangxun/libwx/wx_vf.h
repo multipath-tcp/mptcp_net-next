@@ -109,6 +109,8 @@ struct wx_link_reg_fields {
 };
 
 void wx_init_hw_vf(struct wx *wx);
+int wx_mbx_write_and_read_reply(struct wx *wx, u32 *req_buf,
+				u32 *resp_buf, u16 size);
 int wx_reset_hw_vf(struct wx *wx);
 void wx_get_mac_addr_vf(struct wx *wx, u8 *mac_addr);
 void wx_stop_adapter_vf(struct wx *wx);
