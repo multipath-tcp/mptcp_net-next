@@ -143,6 +143,10 @@ struct rds_ib_device;
 struct rds_ib_connection {
 
 	struct list_head	ib_node;
+	/* set under ib_nodev_conns_lock once a transport teardown has
+	 * claimed ib_node; from then on only the teardown touches it
+	 */
+	bool			i_ib_node_detached;
 	struct rds_ib_device	*rds_ibdev;
 	struct rds_connection	*conn;
 
