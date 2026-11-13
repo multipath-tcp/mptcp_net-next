@@ -2794,8 +2794,13 @@ out:
 	 */
 	if (list_is_singular(&msk->conn_list) && msk->first &&
 	    inet_sk_state_load(msk->first) == TCP_CLOSE) {
-		if (sk->sk_state != TCP_ESTABLISHED ||
-		    msk->in_accept_queue || sock_flag(sk, SOCK_DEAD)) {
+		if (sock_flag(sk, SOCK_DEAD)) {
+			/* let the worker close and destroy the orphan */
+			mptcp_set_close_tout(sk, tcp_jiffies32 -
+					     (mptcp_close_timeout(sk) + 1));
+			mptcp_schedule_work(sk);
+		} else if (sk->sk_state != TCP_ESTABLISHED ||
+			   msk->in_accept_queue) {
 			mptcp_set_state(sk, TCP_CLOSE);
 			mptcp_close_wake_up(sk);
 		} else {
