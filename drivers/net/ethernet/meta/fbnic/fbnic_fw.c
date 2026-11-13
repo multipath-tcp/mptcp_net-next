@@ -538,8 +538,8 @@ static bool fbnic_mbx_event(struct fbnic_dev *fbd)
  */
 int fbnic_fw_xmit_ownership_msg(struct fbnic_dev *fbd, bool take_ownership)
 {
-	unsigned long req_time = jiffies;
 	struct fbnic_tlv_msg *msg;
+	unsigned long req_time;
 	int err = 0;
 
 	if (!fbnic_fw_present(fbd))
@@ -556,8 +556,10 @@ int fbnic_fw_xmit_ownership_msg(struct fbnic_dev *fbd, bool take_ownership)
 	}
 
 	/* Initialize heartbeat, set last response to 1 second in the past
-	 * so that we will trigger a timeout if the firmware doesn't respond
+	 * so that we will trigger a timeout if the firmware doesn't respond.
+	 * Take the time after the allocation, as for the heartbeat request.
 	 */
+	req_time = jiffies;
 	fbd->last_heartbeat_response = req_time - HZ;
 	fbd->last_heartbeat_request = req_time;
 
@@ -793,8 +795,8 @@ static int fbnic_fw_parse_heartbeat_resp(void *opaque,
 
 static int fbnic_fw_xmit_heartbeat_message(struct fbnic_dev *fbd)
 {
-	unsigned long req_time = jiffies;
 	struct fbnic_tlv_msg *msg;
+	unsigned long req_time;
 	int err = 0;
 
 	if (!fbnic_fw_present(fbd))
@@ -803,6 +805,12 @@ static int fbnic_fw_xmit_heartbeat_message(struct fbnic_dev *fbd)
 	msg = fbnic_tlv_msg_alloc(FBNIC_TLV_MSG_ID_HEARTBEAT_REQ);
 	if (!msg)
 		return -ENOMEM;
+
+	/* Stamp the request after the allocation, which can stall in
+	 * reclaim, but before posting it, so the response can never be
+	 * recorded as older than the request.
+	 */
+	req_time = jiffies;
 
 	err = fbnic_mbx_map_tlv_msg(fbd, msg);
 	if (err)
