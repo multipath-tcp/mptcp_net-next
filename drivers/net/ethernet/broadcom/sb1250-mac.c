@@ -280,6 +280,7 @@ static void sbdma_tx_process(struct sbmac_softc *sc, struct sbmacdma *d,
 			     int poll);
 static int sbmac_initctx(struct sbmac_softc *s);
 static void sbmac_channel_start(struct sbmac_softc *s);
+static void sbmac_set_iphdr_offset(struct sbmac_softc *sc);
 static void sbmac_channel_stop(struct sbmac_softc *s);
 static enum sbmac_state sbmac_set_channel_state(struct sbmac_softc *,
 						enum sbmac_state);
@@ -1142,10 +1143,10 @@ again:
 				 * the kernel
 				 */
 				sb->protocol = eth_type_trans(sb,d->sbdma_eth->sbm_dev);
-				/* Check hw IPv4/TCP checksum if supported */
-				if (sc->rx_hw_checksum == ENABLE) {
+				/* Honor the RX checksum offload feature setting. */
+				if (dev->features & NETIF_F_RXCSUM) {
 					if (!((dsc->dscr_a) & M_DMA_ETHRX_BADIP4CS) &&
-					    !((dsc->dscr_a) & M_DMA_ETHRX_BADTCPCS)) {
+					    !((dsc->dscr_b) & M_DMA_ETHRX_BADTCPCS)) {
 						sb->ip_summed = CHECKSUM_UNNECESSARY;
 						/* don't need to set sb->csum */
 					} else {
@@ -1496,6 +1497,7 @@ static void sbmac_channel_start(struct sbmac_softc *s)
 	 */
 
 	__raw_writeq(0, s->sbm_rxfilter);
+	sbmac_set_iphdr_offset(s);
 	__raw_writeq(0, s->sbm_imr);
 	__raw_writeq(framecfg, s->sbm_framecfg);
 	__raw_writeq(fifo, s->sbm_fifocfg);
@@ -1549,7 +1551,9 @@ static void sbmac_channel_start(struct sbmac_softc *s)
 	 * Enable receiving unicasts and broadcasts
 	 */
 
-	__raw_writeq(M_MAC_UCAST_EN | M_MAC_BCAST_EN, s->sbm_rxfilter);
+	reg = __raw_readq(s->sbm_rxfilter);
+	reg |= M_MAC_UCAST_EN | M_MAC_BCAST_EN;
+	__raw_writeq(reg, s->sbm_rxfilter);
 
 	/*
 	 * we're running now.
@@ -1717,7 +1721,8 @@ static void sbmac_set_iphdr_offset(struct sbmac_softc *sc)
 
 	/* Hard code the off set to 15 for now */
 	reg = __raw_readq(sc->sbm_rxfilter);
-	reg &= ~M_MAC_IPHDR_OFFSET | V_MAC_IPHDR_OFFSET(15);
+	reg &= ~M_MAC_IPHDR_OFFSET;
+	reg |= V_MAC_IPHDR_OFFSET(15);
 	__raw_writeq(reg, sc->sbm_rxfilter);
 
 	/* BCM1250 pass1 didn't have hardware checksum.  Everything
@@ -2128,6 +2133,13 @@ static void sbmac_setmulti(struct sbmac_softc *sc)
 	}
 }
 
+static const struct ethtool_ops sbmac_ethtool_ops = {
+	.nway_reset		= phy_ethtool_nway_reset,
+	.get_link		= ethtool_op_get_link,
+	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
+	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
+};
+
 static const struct net_device_ops sbmac_netdev_ops = {
 	.ndo_open		= sbmac_open,
 	.ndo_stop		= sbmac_close,
@@ -2197,6 +2209,7 @@ static int sbmac_init(struct platform_device *pldev, long long base)
 	spin_lock_init(&(sc->sbm_lock));
 
 	dev->netdev_ops = &sbmac_netdev_ops;
+	dev->ethtool_ops = &sbmac_ethtool_ops;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->min_mtu = 0;
 	dev->max_mtu = ENET_PACKET_SIZE;
@@ -2207,6 +2220,10 @@ static int sbmac_init(struct platform_device *pldev, long long base)
 
 	/* This is needed for PASS2 for Rx H/W checksum feature */
 	sbmac_set_iphdr_offset(sc);
+	if (sc->rx_hw_checksum == ENABLE) {
+		dev->hw_features |= NETIF_F_RXCSUM;
+		dev->features |= NETIF_F_RXCSUM;
+	}
 
 	sc->mii_bus = mdiobus_alloc();
 	if (sc->mii_bus == NULL) {
