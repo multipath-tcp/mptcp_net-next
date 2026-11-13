@@ -76,7 +76,7 @@ int batadv_hardif_min_mtu(struct net_device *mesh_iface);
 void batadv_update_min_mtu(struct net_device *mesh_iface);
 void batadv_hardif_release(struct kref *ref);
 int batadv_hardif_no_broadcast(struct batadv_hard_iface *if_outgoing,
-			       u8 *orig_addr, u8 *orig_neigh);
+			       const u8 *orig_addr, const u8 *orig_neigh);
 int __init batadv_wifi_net_devices_init(void);
 void batadv_wifi_net_devices_deinit(void);
 
