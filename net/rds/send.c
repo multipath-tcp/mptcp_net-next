@@ -290,6 +290,8 @@ restart:
 			}
 			rm->data.op_active = 1;
 			rm->m_inc.i_conn_path = cp;
+			/* put in rds_message_put() */
+			rds_conn_get(cp->cp_conn);
 			rm->m_inc.i_conn = cp->cp_conn;
 
 			cp->cp_xmit_rm = rm;
@@ -947,6 +949,7 @@ static int rds_send_queue_rm(struct rds_sock *rs, struct rds_connection *conn,
 		/* The code ordering is a little weird, but we're
 		   trying to minimize the time we hold c_lock */
 		rds_message_populate_header(&rm->m_inc.i_hdr, sport, dport, 0);
+		rds_conn_get(conn);	/* put in rds_message_put() */
 		rm->m_inc.i_conn = conn;
 		rm->m_inc.i_conn_path = cp;
 		rds_message_addref(rm);
@@ -1532,6 +1535,7 @@ rds_send_probe(struct rds_conn_path *cp, __be16 sport,
 	list_add_tail(&rm->m_conn_item, &cp->cp_send_queue);
 	set_bit(RDS_MSG_ON_CONN, &rm->m_flags);
 	rds_message_addref(rm);
+	rds_conn_get(cp->cp_conn);	/* put in rds_message_put() */
 	rm->m_inc.i_conn = cp->cp_conn;
 	rm->m_inc.i_conn_path = cp;
 
