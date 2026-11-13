@@ -2363,9 +2363,15 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 	}
 
 	__mptcp_ofo_queue(msk);
-	if (moved)
-		mptcp_check_data_fin((struct sock *)msk);
-	return moved;
+	if (!moved)
+		return false;
+
+	/* Only the worker can close an orphan, as it must then destroy it */
+	if (!sock_flag(sk, SOCK_DEAD))
+		mptcp_check_data_fin(sk);
+	else if (mptcp_pending_data_fin(sk, NULL))
+		mptcp_schedule_work(sk);
+	return true;
 }
 
 static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
