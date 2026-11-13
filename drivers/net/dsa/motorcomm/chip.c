@@ -2618,11 +2618,11 @@ static int yt921x_mdio_probe(struct mdio_device *mdiodev)
 	struct yt921x_priv *priv;
 	struct dsa_switch *ds;
 
-	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	priv = devm_kzalloc_obj(dev, *priv);
 	if (!priv)
 		return -ENOMEM;
 
-	mdio = devm_kzalloc(dev, sizeof(*mdio), GFP_KERNEL);
+	mdio = devm_kzalloc_obj(dev, *mdio);
 	if (!mdio)
 		return -ENOMEM;
 
