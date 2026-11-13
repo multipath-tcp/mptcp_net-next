@@ -119,7 +119,8 @@ int rds_ib_update_ipaddr(struct rds_ib_device *rds_ibdev,
 	return 0;
 }
 
-void rds_ib_add_conn(struct rds_ib_device *rds_ibdev, struct rds_connection *conn)
+int rds_ib_add_conn(struct rds_ib_device *rds_ibdev,
+		    struct rds_connection *conn)
 {
 	struct rds_ib_connection *ic = conn->c_transport_data;
 
@@ -127,15 +128,27 @@ void rds_ib_add_conn(struct rds_ib_device *rds_ibdev, struct rds_connection *con
 	spin_lock_irq(&ib_nodev_conns_lock);
 	BUG_ON(list_empty(&ib_nodev_conns));
 	BUG_ON(list_empty(&ic->ib_node));
-	list_del(&ic->ib_node);
 
 	spin_lock(&rds_ibdev->spinlock);
+	/* rds_ib_dev_shutdown() has walked conn_list, or is about to
+	 * with this lock held: a connection attached now would never be
+	 * dropped by it, so leave the connection on the nodev list for
+	 * the caller to fail and the transport exit to find.
+	 */
+	if (rds_ibdev->shutting_down) {
+		spin_unlock(&rds_ibdev->spinlock);
+		spin_unlock_irq(&ib_nodev_conns_lock);
+		return -ENODEV;
+	}
+	list_del(&ic->ib_node);
 	list_add_tail(&ic->ib_node, &rds_ibdev->conn_list);
 	spin_unlock(&rds_ibdev->spinlock);
 	spin_unlock_irq(&ib_nodev_conns_lock);
 
 	ic->rds_ibdev = rds_ibdev;
 	refcount_inc(&rds_ibdev->refcount);
+
+	return 0;
 }
 
 void rds_ib_remove_conn(struct rds_ib_device *rds_ibdev, struct rds_connection *conn)
