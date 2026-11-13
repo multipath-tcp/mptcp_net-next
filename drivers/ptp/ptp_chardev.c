@@ -593,6 +593,9 @@ __poll_t ptp_poll(struct posix_clock_context *pccontext, struct file *fp,
 
 	poll_wait(fp, &ptp->tsev_wq, wait);
 
+	if (READ_ONCE(ptp->defunct))
+		return EPOLLERR;
+
 	return queue_cnt(queue) ? EPOLLIN : 0;
 }
 
@@ -616,10 +619,11 @@ ssize_t ptp_read(struct posix_clock_context *pccontext, uint rdflags,
 	if (cnt > EXTTS_BUFSIZE)
 		cnt = EXTTS_BUFSIZE;
 
-	if (wait_event_interruptible(ptp->tsev_wq, ptp->defunct || queue_cnt(queue)))
+	if (wait_event_interruptible(ptp->tsev_wq,
+				     READ_ONCE(ptp->defunct) || queue_cnt(queue)))
 		return -ERESTARTSYS;
 
-	if (ptp->defunct)
+	if (READ_ONCE(ptp->defunct))
 		return -ENODEV;
 
 	event = kmalloc(EXTTS_BUFSIZE, GFP_KERNEL);
