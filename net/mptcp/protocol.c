@@ -1387,13 +1387,17 @@ static struct sk_buff *__mptcp_alloc_tx_skb(struct sock *sk, struct sock *ssk, g
 	if (!skb)
 		return NULL;
 
-	if (likely(sk_wmem_schedule(ssk, skb->truesize))) {
-		tcp_skb_entail(ssk, skb);
-		return skb;
+	/* like TCP, force the charge if nothing is queued */
+	if (tcp_rtx_and_write_queues_empty(ssk)) {
+		sk_forced_mem_schedule(ssk, skb->truesize);
+	} else if (unlikely(!sk_wmem_schedule(ssk, skb->truesize))) {
+		tcp_skb_tsorted_anchor_cleanup(skb);
+		kfree_skb(skb);
+		return NULL;
 	}
-	tcp_skb_tsorted_anchor_cleanup(skb);
-	kfree_skb(skb);
-	return NULL;
+
+	tcp_skb_entail(ssk, skb);
+	return skb;
 }
 
 static struct sk_buff *mptcp_alloc_tx_skb(struct sock *sk, struct sock *ssk, bool data_lock_held)
@@ -1449,6 +1453,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	bool reuse_skb = true;
 	struct sk_buff *skb;
 	size_t copy;
+	int avail;
 	int i;
 
 	pr_debug("msk=%p ssk=%p sending dfrag at seq=%llu len=%u already sent=%u\n",
@@ -1522,10 +1527,14 @@ alloc_skb:
 	}
 
 	copy = min_t(size_t, copy, info->limit - info->sent);
-	if (!sk_wmem_schedule(ssk, copy)) {
+
+	/* like TCP, allow some progress up to tcp_wmem[0] */
+	avail = tcp_wmem_schedule(ssk, copy);
+	if (avail <= 0) {
 		tcp_remove_empty_skb(ssk);
 		return -ENOMEM;
 	}
+	copy = avail;
 
 	if (can_coalesce) {
 		skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
