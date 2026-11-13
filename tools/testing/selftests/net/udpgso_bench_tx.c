@@ -642,7 +642,7 @@ int main(int argc, char **argv)
 
 	parse_opts(argc, argv);
 
-	if (cfg_cpu > 0)
+	if (cfg_cpu >= 0)
 		set_cpu(cfg_cpu);
 
 	for (i = 0; i < sizeof(buf[0]); i++)
