@@ -199,6 +199,7 @@ enum batadv_uev_type {
 /* Kernel headers */
 
 #include <linux/atomic.h>
+#include <linux/bottom_half.h>
 #include <linux/compiler.h>
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
@@ -207,6 +208,7 @@ enum batadv_uev_type {
 #include <linux/percpu.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
+#include <linux/u64_stats_sync.h>
 #include <uapi/linux/batadv_packet.h>
 
 #include "types.h"
@@ -339,12 +341,21 @@ static inline bool batadv_has_timed_out(unsigned long timestamp,
  * @idx: counter index which should be modified
  * @count: value to increase counter by
  *
- * Stop preemption on local cpu while incrementing the counter
+ * Stop bottom halves on local cpu while incrementing the counter. The 64 bit
+ * update is additionally guarded by the u64_stats_sync to allow (for 32 bit)
+ * readers on other CPUs to detect torn reads.
  */
 static inline void batadv_add_counter(struct batadv_priv *bat_priv, size_t idx,
 				      size_t count)
 {
-	this_cpu_add(bat_priv->bat_counters[idx], count);
+	struct batadv_pcpu_counters *counters;
+
+	local_bh_disable();
+	counters = this_cpu_ptr(bat_priv->bat_counters);
+	u64_stats_update_begin(&counters->syncp);
+	u64_stats_add(&counters->cnt[idx], count);
+	u64_stats_update_end(&counters->syncp);
+	local_bh_enable();
 }
 
 /**
