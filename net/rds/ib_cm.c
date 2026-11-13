@@ -876,6 +876,15 @@ int rds_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 	 * see the comment above rds_queue_reconnect()
 	 */
 	mutex_lock(&conn->c_cm_lock);
+	/* Defensive: a destroy that has quiesced this conn also unhashed
+	 * it, so rds_conn_create() cannot have returned it, and the
+	 * listeners are stopped before any IB connection is destroyed at
+	 * unload.  Should a request reach a conn in RDS_CONN_DOWN with
+	 * its destroy begun all the same, do not install a new cm_id and
+	 * QP that nothing would tear down.
+	 */
+	if (rds_destroy_pending(conn))
+		goto out;
 	if (!rds_conn_transition(conn, RDS_CONN_DOWN, RDS_CONN_CONNECTING)) {
 		if (rds_conn_state(conn) == RDS_CONN_UP) {
 			rdsdebug("incoming connect while connecting\n");
@@ -904,6 +913,10 @@ int rds_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 	BUG_ON(ic->i_cm_id);
 
 	ic->i_cm_id = cm_id;
+	/* The id owns a reference on the connection it points at, put
+	 * after rdma_destroy_id() in rds_ib_conn_path_shutdown().
+	 */
+	rds_conn_get(conn);
 	cm_id->context = conn;
 
 	/* We got halfway through setting up the ib_connection, if we
@@ -928,10 +941,8 @@ int rds_ib_cm_handle_connect(struct rdma_cm_id *cm_id,
 out:
 	if (conn) {
 		mutex_unlock(&conn->c_cm_lock);
-		/* Drop the reference rds_conn_create() handed us.  The
-		 * conn stays reachable through cm_id->context without a
-		 * reference of its own for now; the CM event handler is
-		 * given one of its own by a following patch.
+		/* Drop the reference rds_conn_create() handed us; the
+		 * cm_id holds its own from here on.
 		 */
 		rds_conn_put(conn);
 	}
@@ -949,6 +960,18 @@ int rds_ib_cm_initiate_connect(struct rdma_cm_id *cm_id, bool isv6)
 	struct rdma_conn_param conn_param;
 	union rds_ib_conn_priv dp;
 	int ret;
+
+	/* Defensive: a destroy that began while the address and route
+	 * were being resolved either waits on c_cm_lock behind this
+	 * handler, and its shutdown pass then tears down whatever is
+	 * set up here, or has already destroyed the id this event
+	 * arrived on, in which case the event never gets here.  Decline
+	 * to set up a QP all the same, and return success: the id is
+	 * still ic->i_cm_id, for that shutdown to destroy, and a
+	 * non-zero return would have the rdma_cm destroy it instead.
+	 */
+	if (rds_destroy_pending(conn))
+		return 0;
 
 	/* If the peer doesn't do protocol negotiation, we must
 	 * default to RDSv3.0 */
@@ -1007,6 +1030,10 @@ int rds_ib_conn_path_connect(struct rds_conn_path *cp)
 		rdsdebug("rdma_create_id() failed: %d\n", ret);
 		goto out;
 	}
+	/* The id owns a reference on the connection it points at, put
+	 * after rdma_destroy_id() wherever the id is destroyed.
+	 */
+	rds_conn_get(conn);
 
 	/* rds_ib_laddr_check() only vouched for the local address being
 	 * on an IB device; the address resolution below picks the device
@@ -1017,6 +1044,7 @@ int rds_ib_conn_path_connect(struct rds_conn_path *cp)
 		rdsdebug("rdma_restrict_node_type() failed: %d\n", ret);
 		rdma_destroy_id(ic->i_cm_id);
 		ic->i_cm_id = NULL;
+		rds_conn_put(conn);
 		goto out;
 	}
 
@@ -1058,6 +1086,7 @@ int rds_ib_conn_path_connect(struct rds_conn_path *cp)
 			 ret);
 		rdma_destroy_id(ic->i_cm_id);
 		ic->i_cm_id = NULL;
+		rds_conn_put(conn);
 	}
 
 out:
@@ -1188,6 +1217,10 @@ void rds_ib_conn_path_shutdown(struct rds_conn_path *cp)
 			rds_ib_recv_clear_ring(ic);
 
 		rdma_destroy_id(ic->i_cm_id);
+		/* The id's reference on the connection.  Never the last
+		 * one: whoever runs this shutdown holds its own.
+		 */
+		rds_conn_put(conn);
 
 		/*
 		 * Move connection back to the nodev list.
