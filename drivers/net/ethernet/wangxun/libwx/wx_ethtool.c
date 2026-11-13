@@ -790,6 +790,9 @@ static int wx_set_ringparam_vf(struct net_device *netdev,
 	struct wx_ring *temp_ring;
 	int i, err = 0;
 
+	if (!wx->num_q_vectors)
+		return -EBUSY;
+
 	new_tx_count = clamp_t(u32, ring->tx_pending, WX_MIN_TXD, WX_MAX_TXD);
 	new_tx_count = ALIGN(new_tx_count, WX_REQ_TX_DESCRIPTOR_MULTIPLE);
 

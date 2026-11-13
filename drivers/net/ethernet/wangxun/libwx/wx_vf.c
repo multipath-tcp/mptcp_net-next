@@ -38,8 +38,8 @@ void wx_init_hw_vf(struct wx *wx)
 }
 EXPORT_SYMBOL(wx_init_hw_vf);
 
-static int wx_mbx_write_and_read_reply(struct wx *wx, u32 *req_buf,
-				       u32 *resp_buf, u16 size)
+int wx_mbx_write_and_read_reply(struct wx *wx, u32 *req_buf,
+				u32 *resp_buf, u16 size)
 {
 	int ret;
 
