@@ -442,7 +442,7 @@ bool batadv_is_wifi_hardif(struct batadv_hard_iface *hard_iface)
  *	BATADV_HARDIF_BCAST_OK: Several neighbors, must broadcast
  */
 int batadv_hardif_no_broadcast(struct batadv_hard_iface *if_outgoing,
-			       u8 *orig_addr, u8 *orig_neigh)
+			       const u8 *orig_addr, const u8 *orig_neigh)
 {
 	struct batadv_hardif_neigh_node *hardif_neigh;
 	int ret = BATADV_HARDIF_BCAST_OK;
