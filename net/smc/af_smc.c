@@ -581,7 +581,7 @@ static int smcr_lgr_reg_rmbs(struct smc_link *link,
 	for (i = 0; i < SMC_LINKS_PER_LGR_MAX; i++) {
 		if (!smc_link_active(&lgr->lnk[i]))
 			continue;
-		if (!rmb_desc->is_reg_mr[link->link_idx]) {
+		if (!rmb_desc->is_reg_mr[lgr->lnk[i].link_idx]) {
 			up_read(&lgr->llc_conf_mutex);
 			goto slow_path;
 		}
