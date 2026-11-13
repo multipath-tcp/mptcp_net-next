@@ -1444,6 +1444,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 			      struct mptcp_data_frag *dfrag,
 			      struct mptcp_sendmsg_info *info)
 {
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
 	u64 data_seq = dfrag->data_seq + info->sent;
 	int offset = dfrag->offset + info->sent;
 	struct mptcp_sock *msk = mptcp_sk(sk);
@@ -1527,9 +1528,27 @@ alloc_skb:
 			return 0;
 		}
 
+		/* a new probe would move old_data_end: one at a time */
+		if (!tcp_rtx_queue_empty(ssk)) {
+			tcp_remove_empty_skb(ssk);
+			return 0;
+		}
+
 		zero_window_probe = true;
 		data_seq = snd_una - 1;
 		copy = 1;
+	}
+
+	/* old data acked without MPTCP opts: the peer may have fallen back */
+	if (unlikely(before64(data_seq, msk->snd_nxt) &&
+		     subflow->old_data_pending &&
+		     !before(tcp_sk(ssk)->snd_una, subflow->old_data_end))) {
+		tcp_remove_empty_skb(ssk);
+		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_FALLBACKFAILED);
+		subflow->reset_transient = 0;
+		subflow->reset_reason = MPTCP_RST_EMIDDLEBOX;
+		mptcp_subflow_reset(ssk);
+		return -EAGAIN;
 	}
 
 	copy = min_t(size_t, copy, info->limit - info->sent);
