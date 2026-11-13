@@ -4465,10 +4465,26 @@ unlock:
 	return err;
 }
 
+/* The msk and its subflows share pages: charge their rounded-up sum */
+static int mptcp_charge_subflow(struct sock *sk, struct sock *ssk, int mem)
+{
+	int new_mem = mem + ssk->sk_forward_alloc +
+		      atomic_read(&ssk->sk_rmem_alloc);
+	int amt = sk_mem_pages(new_mem) - sk_mem_pages(mem);
+	gfp_t gfp = GFP_KERNEL | __GFP_NOFAIL;
+
+	mem_cgroup_sk_inherit(sk, ssk);
+	if (amt > 0)
+		mem_cgroup_sk_charge(ssk, amt, gfp);
+	kmem_cache_charge(ssk, gfp);
+	return new_mem;
+}
+
 static void mptcp_graft_subflows(struct sock *sk)
 {
 	struct mptcp_subflow_context *subflow;
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	int mem;
 
 	if (mem_cgroup_sockets_enabled) {
 		LIST_HEAD(join_list);
@@ -4486,6 +4502,9 @@ static void mptcp_graft_subflows(struct sock *sk)
 		__mptcp_flush_join_list(sk, &join_list);
 	}
 
+	/* What __inet_accept() just charged for the msk, before rounding up. */
+	mem = sk->sk_forward_alloc + atomic_read(&sk->sk_rmem_alloc);
+
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
@@ -4501,7 +4520,7 @@ static void mptcp_graft_subflows(struct sock *sk)
 			goto unlock;
 
 		__mptcp_inherit_cgrp_data(sk, ssk);
-		__mptcp_inherit_memcg(sk, ssk, GFP_KERNEL);
+		mem = mptcp_charge_subflow(sk, ssk, mem);
 
 unlock:
 		release_sock(ssk);
