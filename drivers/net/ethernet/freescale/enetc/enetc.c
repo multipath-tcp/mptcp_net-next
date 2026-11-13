@@ -3641,6 +3641,13 @@ int enetc_alloc_msix(struct enetc_ndev_priv *priv)
 	if (n != nvec)
 		return -EPERM;
 
+	priv->int_vector = devm_kcalloc(&pdev->dev, priv->bdr_int_num,
+					sizeof(*priv->int_vector), GFP_KERNEL);
+	if (!priv->int_vector) {
+		err = -ENOMEM;
+		goto fail_int_vector;
+	}
+
 	/* # of tx rings per int vector */
 	v_tx_rings = priv->num_tx_rings / priv->bdr_int_num;
 	v_remainder = priv->num_tx_rings % priv->bdr_int_num;
@@ -3676,6 +3683,7 @@ fail:
 	while (i--)
 		enetc_int_vector_destroy(priv, i);
 
+fail_int_vector:
 	pci_free_irq_vectors(pdev);
 
 	return err;
