@@ -16,9 +16,23 @@ int wxvf_suspend(struct device *dev_d)
 	struct pci_dev *pdev = to_pci_dev(dev_d);
 	struct wx *wx = pci_get_drvdata(pdev);
 
+	rtnl_lock();
 	netif_device_detach(wx->netdev);
+	if (netif_running(wx->netdev))
+		wxvf_close(wx->netdev);
+
+	clear_bit(WX_FLAG_NEED_REOPEN, wx->flags);
 	wx_clear_interrupt_scheme(wx);
-	pci_disable_device(pdev);
+	set_bit(WX_STATE_RES_FREED, wx->state);
+	rtnl_unlock();
+
+	timer_delete_sync(&wx->service_timer);
+	cancel_work_sync(&wx->service_task);
+	clear_bit(WX_STATE_SERVICE_SCHED, wx->state);
+
+	pci_clear_master(pdev);
+	if (!test_and_set_bit(WX_STATE_DISABLED, wx->state))
+		pci_disable_device(pdev);
 
 	return 0;
 }
@@ -34,11 +48,20 @@ int wxvf_resume(struct device *dev_d)
 {
 	struct pci_dev *pdev = to_pci_dev(dev_d);
 	struct wx *wx = pci_get_drvdata(pdev);
+	int err;
 
+	err = pci_enable_device_mem(pdev);
+	if (err) {
+		dev_err(&pdev->dev, "Cannot enable PCI device from suspend\n");
+		return err;
+	}
+
+	clear_bit(WX_STATE_DISABLED, wx->state);
 	pci_set_master(pdev);
-	wx_init_interrupt_scheme(wx);
-	netif_device_attach(wx->netdev);
-
+	rtnl_lock();
+	mod_timer(&wx->service_timer, jiffies + HZ);
+	set_bit(WX_FLAG_NEED_REOPEN, wx->flags);
+	rtnl_unlock();
 	return 0;
 }
 EXPORT_SYMBOL(wxvf_resume);
@@ -52,13 +75,15 @@ void wxvf_remove(struct pci_dev *pdev)
 	unregister_netdev(netdev);
 	timer_shutdown_sync(&wx->service_timer);
 	cancel_work_sync(&wx->service_task);
+	clear_bit(WX_STATE_SERVICE_SCHED, wx->state);
 	kfree(wx->vfinfo);
 	kfree(wx->rss_key);
 	kfree(wx->mac_table);
 	wx_clear_interrupt_scheme(wx);
 	pci_release_selected_regions(pdev,
 				     pci_select_bars(pdev, IORESOURCE_MEM));
-	pci_disable_device(pdev);
+	if (!test_and_set_bit(WX_STATE_DISABLED, wx->state))
+		pci_disable_device(pdev);
 }
 EXPORT_SYMBOL(wxvf_remove);
 
@@ -137,7 +162,7 @@ void wx_negotiate_api_vf(struct wx *wx)
 }
 EXPORT_SYMBOL(wx_negotiate_api_vf);
 
-void wx_reset_vf(struct wx *wx)
+int wx_reset_vf(struct wx *wx)
 {
 	struct net_device *netdev = wx->netdev;
 	int ret = 0;
@@ -150,6 +175,8 @@ void wx_reset_vf(struct wx *wx)
 		eth_hw_addr_set(netdev, wx->mac.addr);
 		ether_addr_copy(netdev->perm_addr, wx->mac.addr);
 	}
+
+	return ret;
 }
 EXPORT_SYMBOL(wx_reset_vf);
 
@@ -279,6 +306,7 @@ void wxvf_up_complete(struct wx *wx)
 	wx_configure_msix_vf(wx);
 	smp_mb__before_atomic();
 	clear_bit(WX_STATE_DOWN, wx->state);
+	clear_bit(WX_STATE_RES_FREED, wx->state);
 	wx_napi_enable_all(wx);
 
 	/* clear any pending interrupts, may auto mask */
@@ -376,6 +404,9 @@ int wxvf_close(struct net_device *netdev)
 {
 	struct wx *wx = netdev_priv(netdev);
 
+	if (test_and_set_bit(WX_STATE_RES_FREED, wx->state))
+		return 0;
+
 	wxvf_down(wx);
 	wx_free_irq(wx);
 	wx_free_resources(wx);
@@ -388,25 +419,101 @@ static void wxvf_link_config_subtask(struct wx *wx)
 {
 	struct net_device *netdev = wx->netdev;
 
+	rtnl_lock();
+	if (test_bit(WX_STATE_DOWN, wx->state) ||
+	    test_bit(WX_FLAG_NEED_REOPEN, wx->flags))
+		goto out;
+
 	wxvf_watchdog_update_link(wx);
 	if (wx->link) {
 		if (netif_carrier_ok(netdev))
-			return;
+			goto out;
 		netif_carrier_on(netdev);
 		netdev_info(netdev, "Link is Up - %s\n",
 			    phy_speed_to_str(wx->speed));
 	} else {
 		if (!netif_carrier_ok(netdev))
-			return;
+			goto out;
 		netif_carrier_off(netdev);
 		netdev_info(netdev, "Link is Down\n");
 	}
+
+out:
+	rtnl_unlock();
+}
+
+static void wxvf_reopen_subtask(struct wx *wx)
+{
+	u32 ping[2] = { WX_VF_GET_FW_VERSION };
+	int ret;
+
+	if (!test_bit(WX_FLAG_NEED_REOPEN, wx->flags))
+		return;
+
+	rtnl_lock();
+	if (!test_bit(WX_FLAG_NEED_REOPEN, wx->flags) ||
+	    test_bit(WX_STATE_DISABLED, wx->state) ||
+	    wx->netdev->reg_state != NETREG_REGISTERED) {
+		rtnl_unlock();
+		return;
+	}
+
+	/* Serialize the ping with other VF mailbox accesses.
+	 * The helper sends the request and waits for the PF reply.
+	 */
+	spin_lock_bh(&wx->mbx.mbx_lock);
+	ret = wx_mbx_write_and_read_reply(wx, ping, ping, ARRAY_SIZE(ping));
+	spin_unlock_bh(&wx->mbx.mbx_lock);
+	if (ret) {
+		rtnl_unlock();
+		return;
+	}
+
+	ret = wx_reset_vf(wx);
+	if (ret) {
+		rtnl_unlock();
+		return;
+	}
+
+	if (wx_init_interrupt_scheme(wx)) {
+		dev_err(&wx->pdev->dev, "Failed to initialize interrupt scheme\n");
+		goto err_disable_device;
+	}
+
+	if (netif_running(wx->netdev) && wxvf_open(wx->netdev))
+		goto err_disable_device;
+
+	clear_bit(WX_FLAG_NEED_REOPEN, wx->flags);
+	if (!netif_running(wx->netdev))
+		timer_delete_sync(&wx->service_timer);
+	netif_device_attach(wx->netdev);
+	rtnl_unlock();
+	return;
+err_disable_device:
+	/* Do not retry interrupt setup or reopen from the service task. Keep the
+	 * netdev detached and down, and disable PCI.
+	 * Retry by rebinding the driver or through a later PM resume; bring the
+	 * interface up after recovery.
+	 */
+	timer_delete_sync(&wx->service_timer);
+	wx_clear_interrupt_scheme(wx);
+	clear_bit(WX_FLAG_NEED_REOPEN, wx->flags);
+	set_bit(WX_STATE_DOWN, wx->state);
+
+	if (netif_running(wx->netdev))
+		dev_close(wx->netdev);
+
+	rtnl_unlock();
+	if (!test_and_set_bit(WX_STATE_DISABLED, wx->state))
+		pci_disable_device(wx->pdev);
+	dev_err(&wx->pdev->dev, "Failed to fully resume device\n");
 }
 
 static void wxvf_service_task(struct work_struct *work)
 {
 	struct wx *wx = container_of(work, struct wx, service_task);
 
+	wxvf_reopen_subtask(wx);
 	wxvf_link_config_subtask(wx);
 	wxvf_reset_subtask(wx);
 	wx_service_event_complete(wx);
