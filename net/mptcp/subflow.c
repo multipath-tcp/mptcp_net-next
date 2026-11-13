@@ -151,6 +151,9 @@ static void subflow_init_req(struct request_sock *req, const struct sock *sk_lis
 	subflow_req->allow_join_id0 = mptcp_allow_join_id0(sock_net(sk_listener));
 	subflow_req->msk = NULL;
 	mptcp_token_init_request(req);
+
+	/* read by tcp_check_req() even after migration to a TCP listener */
+	tcp_rsk(req)->drop_req = false;
 }
 
 static bool subflow_use_different_sport(struct mptcp_sock *msk, const struct sock *sk)
