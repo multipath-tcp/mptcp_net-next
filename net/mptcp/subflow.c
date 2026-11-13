@@ -312,6 +312,11 @@ int mptcp_subflow_init_cookie_req(struct request_sock *req,
 
 	opt_mp_capable = !!(mp_opt.suboptions & OPTION_MPTCP_MPC_ACK);
 	opt_mp_join = !!(mp_opt.suboptions & OPTION_MPTCP_MPJ_ACK);
+
+	/* PM listeners only take MP_JOIN, like in subflow_check_req() */
+	if (unlikely(listener->pm_listener) && !opt_mp_join)
+		return subflow_reset_req_endp(req, skb);
+
 	if (opt_mp_capable && listener->request_mptcp) {
 		if (mp_opt.sndr_key == 0)
 			return -EINVAL;
