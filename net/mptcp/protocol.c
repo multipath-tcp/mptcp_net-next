@@ -197,6 +197,9 @@ static bool mptcp_try_coalesce(struct sock *sk, struct sk_buff *to,
 	sk_mem_charge(sk, delta);
 	kfree_skb_partial(from, fragstolen);
 
+	/* release what is left of the borrowed 'from' truesize */
+	sk_mem_reclaim(sk);
+
 	return true;
 }
 
@@ -422,6 +425,9 @@ merge_right:
 end:
 	skb_condense(skb);
 	skb_set_owner_r(skb, sk);
+
+	/* skb_condense() can shrink the truesize borrowed from the subflow */
+	sk_mem_reclaim(sk);
 }
 
 static void mptcp_init_skb(struct sock *ssk, struct sk_buff *skb, int offset,
