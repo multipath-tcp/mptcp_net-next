@@ -382,7 +382,7 @@ static void fbnic_fw_release_cmpl_data(struct kref *kref)
 
 	cmpl_data = container_of(kref, struct fbnic_fw_completion,
 				 ref_count);
-	kfree(cmpl_data);
+	kvfree(cmpl_data);
 }
 
 static struct fbnic_fw_completion *
@@ -2108,7 +2108,8 @@ struct fbnic_fw_completion *__fbnic_fw_alloc_cmpl(u32 msg_type,
 {
 	struct fbnic_fw_completion *cmpl;
 
-	cmpl = kzalloc(sizeof(*cmpl) + priv_size, GFP_KERNEL);
+	/* Can be large, and the device never accesses it, so allow vmalloc */
+	cmpl = kvzalloc(sizeof(*cmpl) + priv_size, GFP_KERNEL);
 	if (!cmpl)
 		return NULL;
 
