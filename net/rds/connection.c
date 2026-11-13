@@ -540,6 +540,8 @@ void rds_conn_shutdown(struct rds_conn_path *cp)
 static void rds_conn_path_quiesce(struct rds_conn_path *cp)
 {
 	struct rds_message *rm, *rtmp;
+	unsigned long flags;
+	LIST_HEAD(purge);
 
 	if (!cp->cp_transport_data)
 		return;
@@ -551,12 +553,29 @@ static void rds_conn_path_quiesce(struct rds_conn_path *cp)
 	rds_conn_path_drop(cp, true);
 	flush_work(&cp->cp_down_w);
 
-	/* tear down queued messages */
-	list_for_each_entry_safe(rm, rtmp,
-				 &cp->cp_send_queue,
-				 m_conn_item) {
+	/* Tear down queued messages.  Every path that adds to
+	 * cp_send_queue does so under cp_lock; take it here too.  No
+	 * sender can still be running at any destroy trigger, so this is
+	 * lock discipline rather than a race fix: nothing here tells a
+	 * sender that the queue is closed.
+	 */
+	spin_lock_irqsave(&cp->cp_lock, flags);
+	list_splice_init(&cp->cp_send_queue, &purge);
+	/* Give up the queue's claim on each message while still under
+	 * the lock, so that rds_send_drop_to(), which decides ownership
+	 * of the connection-queue reference by this bit, neither drops
+	 * it a second time nor unlinks the message from our list.
+	 */
+	list_for_each_entry(rm, &purge, m_conn_item)
+		clear_bit(RDS_MSG_ON_CONN, &rm->m_flags);
+	spin_unlock_irqrestore(&cp->cp_lock, flags);
+	list_for_each_entry_safe(rm, rtmp, &purge, m_conn_item) {
+		/* No socket can still have messages queued on a connection
+		 * at any destroy trigger; say so if one does, since the
+		 * socket side then retires the message on its own.
+		 */
+		WARN_ON_ONCE(!list_empty(&rm->m_sock_item));
 		list_del_init(&rm->m_conn_item);
-		BUG_ON(!list_empty(&rm->m_sock_item));
 		rds_message_put(rm);
 	}
 	if (cp->cp_xmit_rm)
