@@ -4215,6 +4215,15 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 	if (unlikely(!skb))
 		goto out_null;
 
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		if (skb->encapsulation)
+			skb_set_inner_transport_header(skb,
+						       skb_checksum_start_offset(skb));
+		else
+			skb_set_transport_header(skb,
+						 skb_checksum_start_offset(skb));
+	}
+
 	/* Only fraglist GSO, whose segments already carry valid checksums,
 	 * can be handed to a device as CHECKSUM_UNNECESSARY. Any other GSO
 	 * skb has no csum_start for the device to segment from. NONE means
