@@ -3718,6 +3718,9 @@ static void mptcp_copy_ip6_options(struct sock *newsk, const struct sock *sk)
 
 	newnp = inet6_sk(newsk);
 
+	/* The IPv4 options belong to the listener, which frees them */
+	RCU_INIT_POINTER(inet_sk(newsk)->inet_opt, NULL);
+
 	rcu_read_lock();
 	opt = rcu_dereference(np->opt);
 	if (opt) {
