@@ -233,6 +233,8 @@ void rds_loop_exit(void)
 	spin_unlock_irq(&loop_conns_lock);
 
 	rds_loop_destroy_gathered_conns(&tmp_list);
+
+	rds_conn_wait_conns_freed(&rds_loop_transport, NULL);
 }
 
 static void rds_loop_kill_conns(struct net *net)
