@@ -471,9 +471,6 @@ static int sparx5_init_switchcore(struct sparx5 *sparx5)
 	spx5_wr(ANA_AC_STAT_RESET_RESET_SET(1), sparx5, ANA_AC_STAT_RESET);
 	spx5_wr(ASM_STAT_CFG_STAT_CNT_CLR_SHOT_SET(1), sparx5, ASM_STAT_CFG);
 
-	/* Enable switch-core and queue system */
-	spx5_wr(HSCH_RESET_CFG_CORE_ENA_SET(1), sparx5, HSCH_RESET_CFG);
-
 	return 0;
 }
 
@@ -927,6 +924,9 @@ static int mchp_sparx5_probe(struct platform_device *pdev)
 		dev_err(sparx5->dev, "LC-PLL initialization error\n");
 		goto cleanup_config;
 	}
+
+	/* Enable switch-core and queue system */
+	spx5_wr(HSCH_RESET_CFG_CORE_ENA_SET(1), sparx5, HSCH_RESET_CFG);
 
 	for (idx = 0; idx < sparx5->port_count; ++idx) {
 		config = &configs[idx];
