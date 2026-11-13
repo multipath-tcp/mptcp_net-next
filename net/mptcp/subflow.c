@@ -1499,8 +1499,8 @@ fallback:
 		}
 
 		if (!mptcp_try_fallback(ssk, MPTCP_MIB_DSSFALLBACK)) {
-			/* fatal protocol error, close the socket.
-			 * subflow_error_report() will introduce the appropriate barriers
+			/* fatal protocol error, reset the subflow and let the
+			 * worker close it
 			 */
 			subflow->reset_transient = 0;
 			MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_DSSRESET);
@@ -1515,6 +1515,7 @@ reset:
 				sk_eat_skb(ssk, skb);
 			mptcp_send_active_reset_reason(ssk);
 			WRITE_ONCE(subflow->data_avail, false);
+			subflow_sched_work_if_closed(msk, ssk);
 			return false;
 		}
 	}
