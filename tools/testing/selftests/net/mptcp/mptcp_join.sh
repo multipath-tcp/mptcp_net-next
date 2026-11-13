@@ -4387,17 +4387,23 @@ endpoint_tests()
 		ip netns exec "${ns2}" nft insert rule ip filter OUTPUT \
 			ip saddr 10.0.1.2 meta l4proto tcp \
 			"${RM_ADDR_OFFSETS}" drop || nft=0
-		local i
+		# No ADD_ADDR to ns1: it could try to connect back to ns2's port
+		ip netns exec "${ns2}" sysctl -q net.mptcp.add_addr_timeout=0
+		ip netns exec "${ns2}" nft insert rule ip filter OUTPUT \
+			meta l4proto tcp \
+			tcp option mptcp subtype add-addr drop || nft=0
+		local i flags="subflow"
 		for i in $(seq 3); do
 			pm_nl_del_endpoint $ns2 1 10.0.1.2
 			sleep 0.5
 			chk_subflow_nr "after delete id 0 ($i)" 2
 			chk_mptcp_info subflows 2 subflows 2 # only decr for additional sf
 
-			pm_nl_add_endpoint $ns2 10.0.1.2 id 1 dev ns2eth1 flags subflow
+			pm_nl_add_endpoint $ns2 10.0.1.2 id 1 dev ns2eth1 flags "${flags}"
 			wait_mpj $((3 + i))
 			chk_subflow_nr "after re-add id 0 ($i)" 3
 			chk_mptcp_info subflows 3 subflows 3
+			flags="signal,subflow" # ID 0 not counted as used either
 		done
 		[ "${nft}" = 1 ] && ip netns exec "${ns2}" nft flush chain ip filter OUTPUT
 
