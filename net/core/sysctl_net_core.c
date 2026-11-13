@@ -105,34 +105,36 @@ static int rps_default_mask_sysctl(const struct ctl_table *table, int write,
 				   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct net *net = (struct net *)table->data;
+	struct cpumask *new_mask = NULL;
 	struct cpumask *mask;
 	int err = 0;
+
+	if (write) {
+		new_mask = kzalloc(cpumask_size(), GFP_KERNEL);
+		if (!new_mask)
+			return -ENOMEM;
+
+		err = cpumask_parse(buffer, new_mask);
+		if (err)
+			goto out;
+
+		err = rps_cpumask_housekeeping(new_mask);
+		if (err)
+			goto out;
+	}
 
 	mutex_lock(&rps_default_mask_mutex);
 	mask = net->core.rps_default_mask;
 	if (write) {
-		if (!mask) {
-			mask = kzalloc(cpumask_size(), GFP_KERNEL);
-			net->core.rps_default_mask = mask;
-		}
-		err = -ENOMEM;
-		if (!mask)
-			goto done;
-
-		err = cpumask_parse(buffer, mask);
-		if (err)
-			goto done;
-
-		err = rps_cpumask_housekeeping(mask);
-		if (err)
-			goto done;
+		swap(net->core.rps_default_mask, new_mask);
 	} else {
 		err = dump_cpumask(buffer, lenp, ppos,
 				   mask ?: cpu_none_mask);
 	}
 
-done:
 	mutex_unlock(&rps_default_mask_mutex);
+out:
+	kfree(new_mask);
 	return err;
 }
 
