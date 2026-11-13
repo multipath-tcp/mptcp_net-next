@@ -849,6 +849,22 @@ void __mptcp_subflow_fully_established(struct mptcp_sock *msk,
 	WRITE_ONCE(msk->fully_established, true);
 }
 
+/* Children of a kernel listener need a netns ref for their timers */
+static bool subflow_child_get_net(struct sock *child)
+{
+	struct net *net = sock_net(child);
+
+	if (likely(child->sk_net_refcnt))
+		return true;
+
+	if (!maybe_get_net(net))
+		return false;
+
+	__sk_net_refcnt_upgrade(child, GFP_ATOMIC);
+	put_net(net);
+	return true;
+}
+
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
 					  struct sk_buff *skb,
 					  struct request_sock *req,
@@ -916,6 +932,11 @@ create_child:
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
 		tcp_rsk(req)->drop_req = false;
+
+		if (!subflow_child_get_net(child)) {
+			subflow_add_reset_reason(skb, MPTCP_RST_EUNSPEC);
+			goto dispose_child;
+		}
 
 		/* we need to fallback on ctx allocation failure and on pre-reqs
 		 * checking above. In the latter scenario we additionally need
@@ -1865,8 +1886,10 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	/* kernel sockets do not by default acquire net ref, but TCP timer
 	 * needs it.
 	 * Update ns_tracker to current stack trace and refcounted tracker.
+	 * Not for a kernel msk, e.g. a PM listener: it would pin the netns.
 	 */
-	sk_net_refcnt_upgrade(sf->sk);
+	if (sk->sk_net_refcnt)
+		sk_net_refcnt_upgrade(sf->sk);
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	if (err)
 		goto err_free;
