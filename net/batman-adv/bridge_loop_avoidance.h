@@ -42,8 +42,8 @@ bool batadv_bla_is_backbone_gw(struct sk_buff *skb,
 			       int hdr_size);
 int batadv_bla_claim_dump(struct sk_buff *msg, struct netlink_callback *cb);
 int batadv_bla_backbone_dump(struct sk_buff *msg, struct netlink_callback *cb);
-bool batadv_bla_is_backbone_gw_orig(struct batadv_priv *bat_priv, u8 *orig,
-				    unsigned short vid);
+bool batadv_bla_is_backbone_gw_orig(struct batadv_priv *bat_priv,
+				    const u8 *orig, unsigned short vid);
 bool batadv_bla_check_bcast_duplist(struct batadv_priv *bat_priv,
 				    struct sk_buff *skb);
 void batadv_bla_update_orig_address(struct batadv_priv *bat_priv,
@@ -53,7 +53,7 @@ void batadv_bla_status_update(struct net_device *net_dev);
 int batadv_bla_init(struct batadv_priv *bat_priv);
 void batadv_bla_free(struct batadv_priv *bat_priv);
 #ifdef CONFIG_BATMAN_ADV_DAT
-bool batadv_bla_check_claim(struct batadv_priv *bat_priv, u8 *addr,
+bool batadv_bla_check_claim(struct batadv_priv *bat_priv, const u8 *addr,
 			    unsigned short vid);
 #endif
 #define BATADV_BLA_CRC_INIT	0
@@ -80,7 +80,8 @@ static inline bool batadv_bla_is_backbone_gw(struct sk_buff *skb,
 }
 
 static inline bool batadv_bla_is_backbone_gw_orig(struct batadv_priv *bat_priv,
-						  u8 *orig, unsigned short vid)
+						  const u8 *orig,
+						  unsigned short vid)
 {
 	return false;
 }
@@ -121,7 +122,7 @@ static inline int batadv_bla_backbone_dump(struct sk_buff *msg,
 }
 
 static inline
-bool batadv_bla_check_claim(struct batadv_priv *bat_priv, u8 *addr,
+bool batadv_bla_check_claim(struct batadv_priv *bat_priv, const u8 *addr,
 			    unsigned short vid)
 {
 	return true;
