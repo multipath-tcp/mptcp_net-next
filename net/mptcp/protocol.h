@@ -602,7 +602,8 @@ struct mptcp_subflow_context {
 		is_mptfo : 1,	    /* subflow is doing TFO */
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		resetting : 1,	    /* subflow is resetting */
-		__unused : 9;
+		old_data_pending : 1, /* old_data_end not acked with a DSS */
+		__unused : 8;
 	bool	data_avail;
 	bool	scheduled;
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
@@ -630,6 +631,7 @@ struct mptcp_subflow_context {
 				     */
 
 	u32	subflow_id;
+	u32	old_data_end;	    /* TCP write_seq after the last old data */
 
 	long	delegated_status;
 	unsigned long	fail_tout;
@@ -1330,6 +1332,11 @@ static inline bool mptcp_try_fallback(struct sock *ssk, int fb_mib)
 	struct mptcp_sock *msk;
 
 	msk = mptcp_sk(sk);
+
+	/* queued old data would be sent without mapping after a fallback */
+	if (subflow->old_data_pending && !__mptcp_check_fallback(msk))
+		return false;
+
 	if (!__mptcp_try_fallback(msk, fb_mib))
 		return false;
 	if (READ_ONCE(msk->snd_data_fin_enable) && !(ssk->sk_shutdown & SEND_SHUTDOWN)) {
