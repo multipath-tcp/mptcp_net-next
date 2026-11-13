@@ -540,6 +540,8 @@ static void subflow_set_remote_key(struct mptcp_sock *msk,
 
 	/* for fallback's sake */
 	subflow->map_seq = subflow->iasn;
+	subflow->dsn_base = subflow->iasn;
+	subflow->dsn_end = subflow->iasn;
 
 	WRITE_ONCE(msk->remote_key, subflow->remote_key);
 	WRITE_ONCE(msk->ack_seq, subflow->iasn);
@@ -1434,6 +1436,17 @@ static bool mptcp_subflow_fail(struct mptcp_sock *msk, struct sock *ssk)
 	return true;
 }
 
+/* Fallback: dummy maps go on from the last valid one, unless it is old */
+static void subflow_update_dsn_base(struct mptcp_subflow_context *subflow)
+{
+	u32 end = subflow->map_seq + subflow->map_data_len;
+
+	subflow->dsn_base = subflow->map_seq - subflow->map_subflow_seq + 1;
+	subflow->map_old = before(end, subflow->dsn_end);
+	if (!subflow->map_old)
+		subflow->dsn_end = end;
+}
+
 static bool subflow_check_data_avail(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
@@ -1467,6 +1480,8 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		if (unlikely(!READ_ONCE(msk->can_ack)))
 			goto fallback;
 
+		subflow_update_dsn_base(subflow);
+
 		old_ack = READ_ONCE(msk->ack_seq);
 		ack_seq = mptcp_subflow_get_mapped_dsn(subflow);
 		pr_debug("msk ack_seq=%llx subflow ack_seq=%llx\n", old_ack,
@@ -1497,6 +1512,7 @@ fallback:
 				subflow->reset_reason = MPTCP_RST_EMIDDLEBOX;
 				goto reset;
 			}
+			subflow_update_dsn_base(subflow);
 			WRITE_ONCE(subflow->data_avail, true);
 			return true;
 		}
@@ -1528,9 +1544,8 @@ reset:
 	subflow->map_data_len = skb->len;
 	subflow->map_subflow_seq = TCP_SKB_CB(skb)->seq - subflow->ssn_offset;
 	subflow->map_seq = __mptcp_expand_seq(subflow->map_seq,
-					      subflow->iasn +
-					      TCP_SKB_CB(skb)->seq -
-					      subflow->ssn_offset - 1);
+					      subflow->dsn_base +
+					      subflow->map_subflow_seq - 1);
 	WRITE_ONCE(subflow->data_avail, true);
 	return true;
 }

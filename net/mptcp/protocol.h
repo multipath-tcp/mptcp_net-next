@@ -578,6 +578,8 @@ struct mptcp_subflow_context {
 	__wsum	map_data_csum;
 	u32	map_csum_len;
 	u32	prev_rtt_seq;
+	u32	dsn_base;	    /* MPC: DSN - SSN + 1 of peer's last map */
+	u32	dsn_end;	    /* MPC: highest end of the peer's maps */
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_join : 1,   /* send MP_JOIN */
 		request_bkup : 1,
@@ -602,7 +604,8 @@ struct mptcp_subflow_context {
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		resetting : 1,	    /* subflow is resetting */
 		old_data_pending : 1, /* old data not acked with MPTCP opts */
-		__unused : 8;
+		map_old : 1,	    /* MPC: peer's last map is below dsn_end */
+		__unused : 7;
 	bool	data_avail;
 	bool	scheduled;
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
@@ -1331,6 +1334,10 @@ static inline bool mptcp_try_fallback(struct sock *ssk, int fb_mib)
 	struct mptcp_sock *msk;
 
 	msk = mptcp_sk(sk);
+
+	/* the peer might still be resending old data */
+	if (subflow->map_old && !__mptcp_check_fallback(msk))
+		return false;
 
 	/* queued old data would be sent without mapping after a fallback */
 	if (subflow->old_data_pending && !__mptcp_check_fallback(msk))
