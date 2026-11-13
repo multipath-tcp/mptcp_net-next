@@ -170,7 +170,7 @@ static void rds_loop_destroy_gathered_conns(struct list_head *tmp_list)
 
 	list_for_each_entry_safe(lc, _lc, tmp_list, loop_node) {
 		conn = lc->conn;
-		WARN_ON(conn->c_passive);
+		WARN_ON(rcu_access_pointer(conn->c_passive));
 
 		spin_lock_irq(&loop_conns_lock);
 		list_del_init(&lc->loop_node);

@@ -156,7 +156,10 @@ struct rds_connection {
 	/* Set once, by rds_conn_destroy() under rds_conn_lock - a
 	 * test-and-set, so a second destroy of the same connection
 	 * returns at once - before it cancels the path works.  Read
-	 * through rds_destroy_pending().  A site that arms
+	 * through rds_destroy_pending(), which also reports netns
+	 * teardown and module unload; the c_passive handling in
+	 * __rds_conn_create() uses the same predicate, since those rule
+	 * a passive connection out just as well.  A site that arms
 	 * a path work must test the predicate and queue the work inside
 	 * one rcu_read_lock() section: the synchronize_rcu() that
 	 * follows the store is what keeps a queue issued after the
@@ -168,7 +171,7 @@ struct rds_connection {
 	 * destroys - and so flushes - that connection afterwards.
 	 */
 	bool			c_destroy_in_prog;
-	struct rds_connection	*c_passive;
+	struct rds_connection __rcu *c_passive;
 	struct rds_transport	*c_trans;
 
 	struct rds_cong_map	*c_lcong;
@@ -678,7 +681,12 @@ struct rds_sock {
 
 	/*
 	 * rds_sendmsg caches the conn it used the last time around.
-	 * This helps avoid costly lookups.
+	 * This helps avoid costly lookups.  The cache owns a connection
+	 * reference, dropped when it is replaced, when rds_sendmsg()
+	 * evicts a connection whose destroy has begun, or when the
+	 * socket is released, and is read and written under rs_lock -
+	 * except by
+	 * rds_release(), which runs once no one else can reach the socket.
 	 */
 	struct rds_connection	*rs_conn;
 
@@ -687,7 +695,11 @@ struct rds_sock {
 	/* seen congestion (ENOBUFS) when sending? */
 	int			rs_seen_congestion;
 
-	/* rs_lock protects all these adjacent members before the newline */
+	/* rs_lock protects all these adjacent members before the newline,
+	 * as well as rs_conn above and rs_tos at the end of the struct -
+	 * except that rds_sendmsg() samples rs_tos locklessly, with
+	 * READ_ONCE(), for the create, and re-checks it under the lock.
+	 */
 	spinlock_t		rs_lock;
 	struct list_head	rs_send_queue;
 	u32			rs_snd_bytes;
