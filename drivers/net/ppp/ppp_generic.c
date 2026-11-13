@@ -1746,18 +1746,15 @@ pad_compress_skb(struct ppp *ppp, struct sk_buff *skb)
 		skb = new_skb;
 		skb_put(skb, len);
 		skb_pull(skb, 2);	/* pull off A/C bytes */
-	} else if (len == 0) {
+	} else if (len == 0 ||
+		   (len > 0 && ppp->xcomp->compress_proto != CI_MPPE)) {
 		/* didn't compress, or CCP not up yet */
 		consume_skb(new_skb);
 		new_skb = skb;
 	} else {
-		/*
-		 * (len < 0)
-		 * MPPE requires that we do not send unencrypted
-		 * frames.  The compressor will return -1 if we
-		 * should drop the frame.  We cannot simply test
-		 * the compress_proto because MPPE and MPPC share
-		 * the same number.
+		/* A negative return means the original packet must not be sent.
+		 * Also prevent MPPE/MPPC from falling back to plaintext while
+		 * CCP is not up.
 		 */
 		if (net_ratelimit())
 			netdev_err(dev, "ppp: compressor dropped pkt\n");

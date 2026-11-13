@@ -117,11 +117,10 @@ batadv_dat_snoop_incoming_arp_request(struct batadv_priv *bat_priv,
 	return false;
 }
 
-static inline bool
+static inline void
 batadv_dat_snoop_outgoing_arp_reply(struct batadv_priv *bat_priv,
 				    struct sk_buff *skb)
 {
-	return false;
 }
 
 static inline bool
