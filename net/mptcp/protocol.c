@@ -4503,7 +4503,8 @@ static void mptcp_graft_subflows(struct sock *sk)
 		if (!ssk->sk_socket)
 			mptcp_sock_graft(ssk, sk->sk_socket);
 
-		if (!mem_cgroup_sk_enabled(sk))
+		/* Got the memcg when joining: its memory is already charged */
+		if (!mem_cgroup_sk_enabled(sk) || mem_cgroup_from_sk(ssk))
 			goto unlock;
 
 		__mptcp_inherit_cgrp_data(sk, ssk);
