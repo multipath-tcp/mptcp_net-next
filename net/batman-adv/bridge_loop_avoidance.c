@@ -850,8 +850,9 @@ free_claim:
  *
  * Return: true if handled
  */
-static bool batadv_handle_announce(struct batadv_priv *bat_priv, u8 *an_addr,
-				   u8 *backbone_addr, unsigned short vid)
+static bool batadv_handle_announce(struct batadv_priv *bat_priv,
+				   const u8 *an_addr, const u8 *backbone_addr,
+				   unsigned short vid)
 {
 	struct batadv_bla_backbone_gw *backbone_gw;
 	u16 backbone_crc;
@@ -868,7 +869,7 @@ static bool batadv_handle_announce(struct batadv_priv *bat_priv, u8 *an_addr,
 
 	/* handle as ANNOUNCE frame */
 	WRITE_ONCE(backbone_gw->lasttime, jiffies);
-	crc = ntohs(*((__force __be16 *)(&an_addr[4])));
+	crc = ntohs(*((__force const __be16 *)(&an_addr[4])));
 
 	batadv_dbg(BATADV_DBG_BLA, bat_priv,
 		   "%s(): ANNOUNCE vid %d (sent by %pM)... CRC = %#.4x\n",
@@ -914,8 +915,8 @@ static bool batadv_handle_announce(struct batadv_priv *bat_priv, u8 *an_addr,
  */
 static bool batadv_handle_request(struct batadv_priv *bat_priv,
 				  struct batadv_hard_iface *primary_if,
-				  u8 *backbone_addr, struct ethhdr *ethhdr,
-				  unsigned short vid)
+				  const u8 *backbone_addr,
+				  struct ethhdr *ethhdr, unsigned short vid)
 {
 	/* check for REQUEST frame */
 	if (!batadv_compare_eth(backbone_addr, ethhdr->h_dest))
@@ -1788,8 +1789,8 @@ bool batadv_bla_check_bcast_duplist(struct batadv_priv *bat_priv,
  *
  * Return: true if orig is a backbone for this vid, false otherwise.
  */
-bool batadv_bla_is_backbone_gw_orig(struct batadv_priv *bat_priv, u8 *orig,
-				    unsigned short vid)
+bool batadv_bla_is_backbone_gw_orig(struct batadv_priv *bat_priv,
+				    const u8 *orig, unsigned short vid)
 {
 	struct batadv_hashtable *hash = bat_priv->bla.backbone_hash;
 	struct batadv_bla_backbone_gw *backbone_gw;
@@ -2363,6 +2364,7 @@ batadv_bla_backbone_dump_entry(struct sk_buff *msg, u32 portid,
 			       struct batadv_bla_backbone_gw *backbone_gw)
 {
 	const u8 *primary_addr = primary_if->net_dev->dev_addr;
+	unsigned long lasttime;
 	int ret = -EINVAL;
 	u16 backbone_crc;
 	bool is_own;
@@ -2385,7 +2387,8 @@ batadv_bla_backbone_dump_entry(struct sk_buff *msg, u32 portid,
 	backbone_crc = backbone_gw->crc;
 	spin_unlock_bh(&backbone_gw->crc_lock);
 
-	msecs = jiffies_to_msecs(jiffies - READ_ONCE(backbone_gw->lasttime));
+	lasttime = READ_ONCE(backbone_gw->lasttime);
+	msecs = jiffies_delta_to_msecs(jiffies - lasttime);
 
 	if (is_own)
 		if (nla_put_flag(msg, BATADV_ATTR_BLA_OWN)) {
@@ -2520,7 +2523,7 @@ out:
  * false if the device addr is already claimed by another gateway
  */
 bool batadv_bla_check_claim(struct batadv_priv *bat_priv,
-			    u8 *addr, unsigned short vid)
+			    const u8 *addr, unsigned short vid)
 {
 	struct batadv_hard_iface *primary_if = NULL;
 	struct batadv_bla_backbone_gw *backbone_gw;
