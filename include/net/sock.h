@@ -1847,6 +1847,7 @@ static inline bool sock_allow_reclassification(const struct sock *csk)
 struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		      struct proto *prot, int kern);
 void sk_free(struct sock *sk);
+void __sk_net_refcnt_upgrade(struct sock *sk, gfp_t gfp);
 void sk_net_refcnt_upgrade(struct sock *sk);
 void sk_destruct(struct sock *sk);
 struct sock *sk_clone(const struct sock *sk, const gfp_t priority, bool lock);
