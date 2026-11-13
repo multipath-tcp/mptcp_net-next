@@ -308,7 +308,8 @@ struct request_sock *cookie_bpf_check(struct sock *sk, struct sk_buff *skb)
 	skb->sk = NULL;
 	skb->destructor = NULL;
 
-	if (cookie_tcp_reqsk_init(sk, skb, req)) {
+	/* reuseport can pick an MPTCP listener: req is too small for it */
+	if (sk_is_mptcp(sk) || cookie_tcp_reqsk_init(sk, skb, req)) {
 		reqsk_free(req);
 		req = NULL;
 	}
