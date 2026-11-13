@@ -1128,7 +1128,7 @@ static void rwin_update(struct mptcp_sock *msk, struct sock *ssk,
 	subflow->rcv_wnd_sent = mptcp_rcv_wnd;
 }
 
-static void ack_update_msk(struct mptcp_sock *msk,
+static bool ack_update_msk(struct mptcp_sock *msk,
 			   struct sock *ssk,
 			   const struct sk_buff *skb,
 			   struct mptcp_options_received *mp_opt)
@@ -1137,6 +1137,7 @@ static void ack_update_msk(struct mptcp_sock *msk,
 	u32 win = ntohs(tcp_hdr(skb)->window);
 	struct sock *sk = (struct sock *)msk;
 	u64 snd_nxt;
+	bool acked;
 
 	mptcp_data_lock(sk);
 
@@ -1169,7 +1170,8 @@ static void ack_update_msk(struct mptcp_sock *msk,
 	if (after64(msk->wnd_end, snd_nxt))
 		__mptcp_check_push(sk, ssk);
 
-	if (after64(new_snd_una, old_snd_una)) {
+	acked = after64(new_snd_una, old_snd_una);
+	if (acked) {
 		__mptcp_snd_una_update(msk, new_snd_una);
 		__mptcp_data_acked(sk);
 	}
@@ -1179,6 +1181,7 @@ static void ack_update_msk(struct mptcp_sock *msk,
 	trace_ack_update_msk(mp_opt->data_ack,
 			     old_snd_una, new_snd_una,
 			     new_wnd_end, READ_ONCE(msk->wnd_end));
+	return acked;
 }
 
 bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool use_64bit)
@@ -1335,8 +1338,8 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	/* we can't wait for recvmsg() to update the ack_seq, otherwise
 	 * monodirectional flows will stuck
 	 */
-	if (mp_opt.use_ack)
-		ack_update_msk(msk, sk, skb, &mp_opt);
+	if (mp_opt.use_ack && ack_update_msk(msk, sk, skb, &mp_opt))
+		subflow->dss_confirmed = 1; /* MPTCP opts pass both ways */
 	rwin_update(msk, sk, skb);
 
 	/* Zero-data-length packets are dropped by the caller and not

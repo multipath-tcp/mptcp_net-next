@@ -605,7 +605,8 @@ struct mptcp_subflow_context {
 		resetting : 1,	    /* subflow is resetting */
 		old_data_pending : 1, /* old data not acked with MPTCP opts */
 		map_old : 1,	    /* MPC: peer's last map is below dsn_end */
-		__unused : 7;
+		dss_confirmed : 1,  /* a DATA_ACK acked our data */
+		__unused : 6;
 	bool	data_avail;
 	bool	scheduled;
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
