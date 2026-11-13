@@ -4381,6 +4381,11 @@ static int mptcp_listen(struct socket *sock, int backlog)
 
 	lock_sock(ssk);
 	err = __inet_listen_sk(ssk, backlog);
+	if (err && ssk->sk_state == TCP_CLOSE) {
+		/* inet_csk_listen_start() leaves this drain to MPTCP */
+		mptcp_subflow_queue_clean(sk, ssk);
+		inet_csk_listen_stop(ssk);
+	}
 	release_sock(ssk);
 	mptcp_set_state(sk, inet_sk_state_load(ssk));
 
