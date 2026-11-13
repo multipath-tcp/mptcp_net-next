@@ -523,7 +523,7 @@ int ptp_clock_unregister(struct ptp_clock *ptp)
 	get_device(&ptp->dev);
 
 	/* Wake up any userspace waiting for an event. */
-	ptp->defunct = 1;
+	WRITE_ONCE(ptp->defunct, 1);
 	wake_up_interruptible(&ptp->tsev_wq);
 
 	/* Tear down the POSIX clock, which removes the user interface. */
