@@ -1491,7 +1491,7 @@ static inline void mlxsw_reg_slcor_col_disable_pack(char *payload,
 						    u16 local_port, u16 lag_id)
 {
 	mlxsw_reg_slcor_pack(payload, local_port, lag_id,
-			     MLXSW_REG_SLCOR_COL_LAG_COLLECTOR_ENABLED);
+			     MLXSW_REG_SLCOR_COL_LAG_COLLECTOR_DISABLED);
 }
 
 /* SPMLR - Switch Port MAC Learning Register

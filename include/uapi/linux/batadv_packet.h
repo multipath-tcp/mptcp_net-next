@@ -12,6 +12,14 @@
 #include <linux/stddef.h>
 #include <linux/types.h>
 
+/* Note on reserved space.
+ * Reserved fields must not be accessed directly by user space because
+ * they may be replaced by a different field in the future. They must
+ * be initialized to zero before making the request, e.g. via memset
+ * of the entire structure or implicitly by not being set in a structure
+ * initializer.
+ */
+
 /**
  * batadv_tp_is_error() - Check throughput meter return code for error
  * @n: throughput meter return code
@@ -216,7 +224,7 @@ struct batadv_bla_claim_dst {
  * @seqno: sequence identification
  * @orig: address of the source node
  * @prev_sender: address of the previous sender
- * @reserved: reserved byte for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  * @tq: transmission quality
  * @tvlv_len: length of tvlv data following the ogm header
  */
@@ -312,7 +320,7 @@ struct batadv_icmp_header {
  * @dst: address of the destination node
  * @orig: address of the source node
  * @uid: local ICMP socket identifier
- * @reserved: not used - useful for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  * @seqno: ICMP sequence number
  */
 struct batadv_icmp_packet {
@@ -433,7 +441,7 @@ struct batadv_unicast_packet {
  * @u: common unicast packet header
  * @src: address of the source
  * @subtype: packet subtype
- * @reserved: reserved byte for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  */
 struct batadv_unicast_4addr_packet {
 	struct batadv_unicast_packet u;
@@ -454,7 +462,7 @@ struct batadv_unicast_4addr_packet {
  * @orig: originator of the fragment used when merging the packet
  * @no: fragment number within this sequence
  * @priority: priority of frame, from ToS IP precedence or 802.1p
- * @reserved: reserved byte for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  * @seqno: sequence identification
  * @total_size: size of the merged packet
  */
@@ -484,7 +492,7 @@ struct batadv_frag_packet {
  * @packet_type: batman-adv packet type, part of the general header
  * @version: batman-adv protocol version, part of the general header
  * @ttl: time to live for this packet, part of the general header
- * @reserved: reserved byte for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  * @seqno: sequence identification
  * @orig: originator of the broadcast packet
  */
@@ -505,7 +513,7 @@ struct batadv_bcast_packet {
  * @packet_type: batman-adv packet type, part of the general header
  * @version: batman-adv protocol version, part of the general header
  * @ttl: time to live for this packet, part of the general header
- * @reserved: reserved byte for alignment
+ * @reserved: reserved for alignment; also see note on reserved space
  * @tvlv_len: length of the appended tvlv buffer (in bytes)
  */
 struct batadv_mcast_packet {
@@ -559,7 +567,7 @@ struct batadv_coded_packet {
  * @packet_type: batman-adv packet type, part of the general header
  * @version: batman-adv protocol version, part of the general header
  * @ttl: time to live for this packet, part of the general header
- * @reserved: reserved field (for packet alignment)
+ * @reserved: reserved for alignment; also see note on reserved space
  * @dst: address of the destination
  * @src: address of the source
  * @tvlv_len: length of tvlv data following the unicast tvlv header
@@ -604,7 +612,7 @@ struct batadv_tvlv_gateway_data {
  *  the tt tvlv container
  * @crc: crc32 checksum of the entries belonging to this vlan
  * @vid: vlan identifier
- * @reserved: unused, useful for alignment purposes
+ * @reserved: reserved for alignment; also see note on reserved space
  */
 struct batadv_tvlv_tt_vlan_data {
 	__be32 crc;
@@ -631,7 +639,7 @@ struct batadv_tvlv_tt_data {
  * struct batadv_tvlv_tt_change - translation table diff data
  * @flags: status indicators concerning the non-mesh client (see
  *  batadv_tt_client_flags)
- * @reserved: reserved field - useful for alignment purposes only
+ * @reserved: reserved for alignment; also see note on reserved space
  * @addr: mac address of non-mesh client that triggered this tt change
  * @vid: VLAN identifier
  */
@@ -655,7 +663,7 @@ struct batadv_tvlv_roam_adv {
 /**
  * struct batadv_tvlv_mcast_data - payload of a multicast tvlv
  * @flags: multicast flags announced by the orig node
- * @reserved: reserved field
+ * @reserved: reserved for alignment; also see note on reserved space
  */
 struct batadv_tvlv_mcast_data {
 	__u8 flags;
