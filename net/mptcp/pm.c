@@ -827,7 +827,10 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 static void mptcp_pm_rm_addr_recv(struct mptcp_sock *msk)
 {
-	mptcp_pm_rm_addr_or_subflow(msk, &msk->pm.rm_list_rx, MPTCP_MIB_RMADDR);
+	/* pm.lock is dropped on the way: the next RM_ADDR may come in */
+	struct mptcp_rm_list rm_list = msk->pm.rm_list_rx;
+
+	mptcp_pm_rm_addr_or_subflow(msk, &rm_list, MPTCP_MIB_RMADDR);
 }
 
 void mptcp_pm_rm_subflow(struct mptcp_sock *msk,
