@@ -319,16 +319,21 @@ free:
 void ax88179_set_multicast(struct net_device *net)
 {
 	struct usbnet *dev = netdev_priv(net);
-	struct ax88179_data *data = dev->driver_priv;
 	u8 *m_filter = ((u8 *)dev->data);
+	struct ax88179_data *data;
+	u16 rxctl = 0;
 
-	data->rxctl = (AX_RX_CTL_START | AX_RX_CTL_AB | AX_RX_CTL_IPE);
+	data = dev->driver_priv;
+
+	rxctl = (AX_RX_CTL_START | AX_RX_CTL_AB | AX_RX_CTL_DROPCRCERR);
+	if (data->ip_align)
+		rxctl |= AX_RX_CTL_IPE;
 
 	if (net->flags & IFF_PROMISC) {
-		data->rxctl |= AX_RX_CTL_PRO;
+		rxctl |= AX_RX_CTL_PRO;
 	} else if (net->flags & IFF_ALLMULTI ||
 		   netdev_mc_count(net) > AX_MAX_MCAST) {
-		data->rxctl |= AX_RX_CTL_AMALL;
+		rxctl |= AX_RX_CTL_AMALL;
 	} else if (netdev_mc_empty(net)) {
 		/* just broadcast and directed */
 	} else {
@@ -349,9 +354,10 @@ void ax88179_set_multicast(struct net_device *net)
 					AX_MCAST_FLTSIZE, AX_MCAST_FLTSIZE,
 					m_filter);
 
-		data->rxctl |= AX_RX_CTL_AM;
+		rxctl |= AX_RX_CTL_AM;
 	}
 
+	WRITE_ONCE(data->rxctl, rxctl);
 	ax88179_write_cmd_async(dev, AX_ACCESS_MAC, AX_RX_CTL,
 				2, 2, &data->rxctl);
 }
