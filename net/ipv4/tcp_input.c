@@ -5407,19 +5407,20 @@ tcp_try_rmem_schedule(struct sock *sk, const struct sk_buff *skb,
 {
 	enum skb_drop_reason reason;
 
-	if (!tcp_can_ingest(sk, skb))
+	if (!tcp_can_ingest(sk, skb)) {
 		reason = SKB_DROP_REASON_SOCKET_RCVBUFF;
-	else if (!sk_rmem_schedule(sk, skb, size))
-		reason = SKB_DROP_REASON_PROTO_MEM;
-	else
-		return SKB_NOT_DROPPED_YET;
+	} else {
+		reason = sk_rmem_schedule_reason(sk, skb, size);
+		if (!reason)
+			return SKB_NOT_DROPPED_YET;
+	}
 
 	if (tcp_prune_queue(sk, skb) < 0)
 		return reason;
 
-	while (!sk_rmem_schedule(sk, skb, size)) {
+	while ((reason = sk_rmem_schedule_reason(sk, skb, size))) {
 		if (!tcp_prune_ofo_queue(sk, skb))
-			return SKB_DROP_REASON_PROTO_MEM;
+			return reason;
 	}
 	return SKB_NOT_DROPPED_YET;
 }

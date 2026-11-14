@@ -3409,13 +3409,17 @@ int sk_wait_data(struct sock *sk, long *timeo, const struct sk_buff *skb)
 EXPORT_SYMBOL(sk_wait_data);
 
 /**
- *	__sk_mem_raise_allocated - increase memory_allocated
+ *	__sk_mem_raise_allocated_reason - increase memory_allocated
  *	@sk: socket
  *	@size: memory size to allocate
  *	@amt: pages to allocate
  *	@kind: allocation type
  *
- *	Similar to __sk_mem_schedule(), but does not update sk_forward_alloc.
+ *	Similar to __sk_mem_schedule_reason(), but does not update
+ *	sk_forward_alloc.
+ *
+ *	Return: SKB_NOT_DROPPED_YET on success, SKB_DROP_REASON_MEMCG if the
+ *	memcg charge failed, SKB_DROP_REASON_PROTO_MEM otherwise.
  *
  *	Unlike the globally shared limits among the sockets under same protocol,
  *	consuming the budget of a memcg won't have direct effect on other ones.
@@ -3423,8 +3427,10 @@ EXPORT_SYMBOL(sk_wait_data);
  *	whether or not to raise allocated through sk_under_memory_pressure() or
  *	its variants.
  */
-int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
+enum skb_drop_reason __sk_mem_raise_allocated_reason(struct sock *sk, int size,
+						     int amt, int kind)
 {
+	enum skb_drop_reason reason = SKB_DROP_REASON_PROTO_MEM;
 	bool memcg_enabled = false, charged = false;
 	struct proto *prot = sk->sk_prot;
 	long allocated = 0;
@@ -3437,17 +3443,19 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 	if (mem_cgroup_sk_enabled(sk)) {
 		memcg_enabled = true;
 		charged = mem_cgroup_sk_charge(sk, amt, gfp_memcg_charge());
-		if (!charged)
+		if (!charged) {
+			reason = SKB_DROP_REASON_MEMCG;
 			goto suppress_allocation;
+		}
 	}
 
 	if (sk->sk_bypass_prot_mem)
-		return 1;
+		return SKB_NOT_DROPPED_YET;
 
 	/* Under limit. */
 	if (allocated <= sk_prot_mem_limits(sk, 0)) {
 		sk_leave_memory_pressure(sk);
-		return 1;
+		return SKB_NOT_DROPPED_YET;
 	}
 
 	/* Under pressure. */
@@ -3468,16 +3476,16 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 	 */
 	if (kind == SK_MEM_RECV) {
 		if (atomic_read(&sk->sk_rmem_alloc) < sk_get_rmem0(sk, prot))
-			return 1;
+			return SKB_NOT_DROPPED_YET;
 
 	} else { /* SK_MEM_SEND */
 		int wmem0 = sk_get_wmem0(sk, prot);
 
 		if (sk->sk_type == SOCK_STREAM) {
 			if (sk->sk_wmem_queued < wmem0)
-				return 1;
+				return SKB_NOT_DROPPED_YET;
 		} else if (refcount_read(&sk->sk_wmem_alloc) < wmem0) {
-				return 1;
+			return SKB_NOT_DROPPED_YET;
 		}
 	}
 
@@ -3489,7 +3497,7 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 		 * sense for global memory pressure.
 		 */
 		if (!sk_under_global_memory_pressure(sk))
-			return 1;
+			return SKB_NOT_DROPPED_YET;
 
 		/* Try to be fair among all the sockets under global
 		 * pressure by allowing the ones that below average
@@ -3500,7 +3508,7 @@ int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind)
 		    sk_mem_pages(sk->sk_wmem_queued +
 				 atomic_read(&sk->sk_rmem_alloc) +
 				 sk->sk_forward_alloc))
-			return 1;
+			return SKB_NOT_DROPPED_YET;
 	}
 
 suppress_allocation:
@@ -3516,7 +3524,7 @@ suppress_allocation:
 			if (memcg_enabled && !charged)
 				mem_cgroup_sk_charge(sk, amt,
 						     gfp_memcg_charge() | __GFP_NOFAIL);
-			return 1;
+			return SKB_NOT_DROPPED_YET;
 		}
 	}
 
@@ -3528,11 +3536,11 @@ suppress_allocation:
 	if (charged)
 		mem_cgroup_sk_uncharge(sk, amt);
 
-	return 0;
+	return reason;
 }
 
 /**
- *	__sk_mem_schedule - increase sk_forward_alloc and memory_allocated
+ *	__sk_mem_schedule_reason - increase sk_forward_alloc and memory_allocated
  *	@sk: socket
  *	@size: memory size to allocate
  *	@kind: allocation type
@@ -3540,16 +3548,26 @@ suppress_allocation:
  *	If kind is SK_MEM_SEND, it means wmem allocation. Otherwise it means
  *	rmem allocation. This function assumes that protocols which have
  *	memory_pressure use sk_wmem_queued as write buffer accounting.
+ *
+ *	Return: SKB_NOT_DROPPED_YET on success, or the drop reason.
  */
-int __sk_mem_schedule(struct sock *sk, int size, int kind)
+enum skb_drop_reason __sk_mem_schedule_reason(struct sock *sk, int size,
+					      int kind)
 {
-	int ret, amt = sk_mem_pages(size);
+	int amt = sk_mem_pages(size);
+	enum skb_drop_reason reason;
 
 	sk_forward_alloc_add(sk, amt << PAGE_SHIFT);
-	ret = __sk_mem_raise_allocated(sk, size, amt, kind);
-	if (!ret)
+	reason = __sk_mem_raise_allocated_reason(sk, size, amt, kind);
+	if (reason)
 		sk_forward_alloc_add(sk, -(amt << PAGE_SHIFT));
-	return ret;
+	return reason;
+}
+EXPORT_SYMBOL(__sk_mem_schedule_reason);
+
+int __sk_mem_schedule(struct sock *sk, int size, int kind)
+{
+	return __sk_mem_schedule_reason(sk, size, kind) == SKB_NOT_DROPPED_YET;
 }
 EXPORT_SYMBOL(__sk_mem_schedule);
 
