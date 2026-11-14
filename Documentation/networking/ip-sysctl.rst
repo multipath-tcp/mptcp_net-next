@@ -1055,6 +1055,7 @@ tcp_fastopen_blackhole_timeout_sec - INTEGER
 	get detected right after Fastopen is re-enabled and will reset to
 	initial value when the blackhole issue goes away.
 	0 to disable the blackhole detection.
+	The maximum value is one day (86400 seconds).
 
 	By default, it is set to 0 (feature is disabled).
 

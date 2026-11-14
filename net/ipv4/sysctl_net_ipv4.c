@@ -1152,6 +1152,7 @@ static const struct ctl_table ipv4_net_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_tfo_blackhole_detect_timeout,
 		.extra1		= SYSCTL_ZERO,
+		.extra2		= &one_day_secs,
 	},
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	{
