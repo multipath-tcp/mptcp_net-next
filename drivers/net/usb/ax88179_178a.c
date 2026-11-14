@@ -685,6 +685,19 @@ static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->driver_priv = ax179_data;
 	mutex_init(&ax179_data->medium_status_mutex);
 
+	ret = ax88179_read_cmd(dev, AX_ACCESS_MAC, AX_CHIP_STATUS,
+			       1, 1, &ax179_data->chip_version);
+	if (ret < 0)
+		goto err_nodev;
+
+	ax179_data->chip_version = (ax179_data->chip_version & 0xf0) >> 4;
+	ax179_data->is_ax88772d = 0;
+	ax179_data->ip_align = 1;
+	ax179_data->eeprom_read_cmd = AX_ACCESS_EEPROM;
+	ax179_data->eeprom_write_cmd = AX_ACCESS_EEPROM;
+	ax179_data->eeprom_block = 2;
+	ax179_data->eeprom_wen = 0;
+
 	dev->net->netdev_ops = &ax88179_netdev_ops;
 	dev->net->ethtool_ops = &ax88179_ethtool_ops;
 	dev->net->needed_headroom = 8;
@@ -709,6 +722,12 @@ static int ax88179_bind(struct usbnet *dev, struct usb_interface *intf)
 	ax88179_reset(dev);
 
 	return 0;
+
+err_nodev:
+	kfree(ax179_data);
+	ax179_data = NULL;
+
+	return ret;
 }
 
 static void ax88179_unbind(struct usbnet *dev, struct usb_interface *intf)
@@ -1271,6 +1290,18 @@ static const struct driver_info at_umc2000sp_info = {
 
 static const struct usb_device_id products[] = {
 {
+	/* ASIX AX88179A USB 3.2 1000Mbit Ethernet */
+	USB_DEVICE_VER(0x0b95, 0x1790, 0x0200, 0x0200),
+	.driver_info = (unsigned long)&ax88179a_info,
+}, {
+	/* ASIX AX88772D USB 2.0 100Mbit Ethernet */
+	USB_DEVICE_VER(0x0b95, 0x1790, 0x0300, 0x0300),
+	.driver_info = (unsigned long)&ax88772d_info,
+}, {
+	/* ASIX AX88279 USB 3.2 2500Mbit Ethernet */
+	USB_DEVICE_VER(0x0b95, 0x1790, 0x0400, 0x0400),
+	.driver_info = (unsigned long)&ax88279_info,
+}, {
 	/* ASIX AX88179 10/100/1000 */
 	USB_DEVICE_AND_INTERFACE_INFO(0x0b95, 0x1790, 0xff, 0xff, 0),
 	.driver_info = (unsigned long)&ax88179_info,

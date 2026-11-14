@@ -129,6 +129,28 @@ int ax88179_write_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
 	return ret;
 }
 
+int ax88179_write_u16(struct usbnet *dev, u8 cmd, u16 value, u16 index, u16 data)
+{
+	u16 buf = data;
+
+	cpu_to_le16s(&buf);
+	return __ax88179_write_cmd(dev, cmd, value, index, 2, &buf);
+}
+
+int ax88179_write_u8(struct usbnet *dev, u8 cmd, u16 value, u16 index, u8 data)
+{
+	u8 buf = data;
+
+	return __ax88179_write_cmd(dev, cmd, value, index, 1, &buf);
+}
+
+struct ax88179_data *netdev2data(struct net_device *net)
+{
+	struct usbnet *dev = netdev_priv(net);
+
+	return dev->driver_priv;
+}
+
 void ax88179_status(struct usbnet *dev, struct urb *urb)
 {
 	struct ax88179_int_data *event;
@@ -338,6 +360,7 @@ int ax88179_set_features(struct net_device *net, netdev_features_t features)
 {
 	u8 tmp;
 	struct usbnet *dev = netdev_priv(net);
+	struct ax88179_data *data = dev->driver_priv;
 	netdev_features_t changed = net->features ^ features;
 
 	if (changed & NETIF_F_IP_CSUM) {
@@ -353,10 +376,17 @@ int ax88179_set_features(struct net_device *net, netdev_features_t features)
 	}
 
 	if (changed & NETIF_F_RXCSUM) {
+		/* When we disable rx-checksumming, we need to clear the rx_checksum
+		 * flag before disabling the engine
+		 */
+		if (!(features & NETIF_F_RXCSUM))
+			data->rx_checksum = 0;
+
 		ax88179_read_cmd(dev, AX_ACCESS_MAC, AX_RXCOE_CTL, 1, 1, &tmp);
 		tmp ^= AX_RXCOE_IP | AX_RXCOE_TCP | AX_RXCOE_UDP |
 		       AX_RXCOE_TCPV6 | AX_RXCOE_UDPV6;
 		ax88179_write_cmd(dev, AX_ACCESS_MAC, AX_RXCOE_CTL, 1, 1, &tmp);
+		data->rx_checksum = !!(features & NETIF_F_RXCSUM);
 	}
 
 	return 0;
