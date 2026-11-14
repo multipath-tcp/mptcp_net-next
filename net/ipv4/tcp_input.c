@@ -6100,6 +6100,8 @@ static int tcp_prune_queue(struct sock *sk, const struct sk_buff *in_skb)
 
 		if (tcp_can_ingest(sk, in_skb))
 			return 0;
+	} else {
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVCOLLAPSESKIPPED);
 	}
 
 	/* Collapsing did not help (or was not allowed),
