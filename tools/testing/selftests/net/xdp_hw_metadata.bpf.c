@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0
 
-#include <vmlinux.h>
+#include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/in.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/udp.h>
 #include "xdp_metadata.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
+
+/* Mirror of struct vlan_hdr from include/linux/if_vlan.h, which is not
+ * part of the UAPI headers.
+ */
+struct vlan_hdr {
+	__be16 h_vlan_TCI;
+	__be16 h_vlan_encapsulated_proto;
+};
 
 struct {
 	__uint(type, BPF_MAP_TYPE_XSKMAP);
@@ -39,25 +52,29 @@ int rx(struct xdp_md *ctx)
 	data_end = (void *)(long)ctx->data_end;
 	eth = data;
 
-	if (eth + 1 < data_end && (eth->h_proto == bpf_htons(ETH_P_8021AD) ||
-				   eth->h_proto == bpf_htons(ETH_P_8021Q)))
+	if ((void *)(eth + 1) < data_end &&
+	    (eth->h_proto == bpf_htons(ETH_P_8021AD) ||
+	     eth->h_proto == bpf_htons(ETH_P_8021Q)))
 		eth = (void *)eth + sizeof(struct vlan_hdr);
 
-	if (eth + 1 < data_end && eth->h_proto == bpf_htons(ETH_P_8021Q))
+	if ((void *)(eth + 1) < data_end &&
+	    eth->h_proto == bpf_htons(ETH_P_8021Q))
 		eth = (void *)eth + sizeof(struct vlan_hdr);
 
-	if (eth + 1 < data_end) {
+	if ((void *)(eth + 1) < data_end) {
 		if (eth->h_proto == bpf_htons(ETH_P_IP)) {
 			iph = (void *)(eth + 1);
-			if (iph + 1 < data_end && iph->protocol == IPPROTO_UDP)
+			if ((void *)(iph + 1) < data_end &&
+			    iph->protocol == IPPROTO_UDP)
 				udp = (void *)(iph + 1);
 		}
 		if (eth->h_proto == bpf_htons(ETH_P_IPV6)) {
 			ip6h = (void *)(eth + 1);
-			if (ip6h + 1 < data_end && ip6h->nexthdr == IPPROTO_UDP)
+			if ((void *)(ip6h + 1) < data_end &&
+			    ip6h->nexthdr == IPPROTO_UDP)
 				udp = (void *)(ip6h + 1);
 		}
-		if (udp && udp + 1 > data_end)
+		if (udp && (void *)(udp + 1) > data_end)
 			udp = NULL;
 	}
 
@@ -82,7 +99,7 @@ int rx(struct xdp_md *ctx)
 	data_meta = (void *)(long)ctx->data_meta;
 	meta = data_meta;
 
-	if (meta + 1 > data) {
+	if ((void *)(meta + 1) > data) {
 		__sync_add_and_fetch(&pkts_fail, 1);
 		return XDP_PASS;
 	}
