@@ -25,8 +25,12 @@
  */
 static void __hw_addr_changed(struct netdev_hw_addr_list *list)
 {
-	if (list->mc_dev)
-		atomic_inc(&dev_net(list->mc_dev)->dev_mc_genid);
+	struct net_device *dev;
+
+	if (!list->is_dev_mc)
+		return;
+	dev = container_of(list, struct net_device, mc);
+	atomic_inc(&dev_net(dev)->dev_mc_genid);
 }
 
 static void __hw_addr_count_add(struct netdev_hw_addr_list *list, int value)
@@ -538,7 +542,7 @@ void __hw_addr_init(struct netdev_hw_addr_list *list)
 	INIT_LIST_HEAD(&list->list);
 	list->_count = 0;
 	list->tree = RB_ROOT;
-	list->mc_dev = NULL;
+	list->is_dev_mc = false;
 }
 EXPORT_SYMBOL(__hw_addr_init);
 
@@ -1215,7 +1219,7 @@ EXPORT_SYMBOL(dev_mc_flush);
 void dev_mc_init(struct net_device *dev)
 {
 	__hw_addr_init(&dev->mc);
-	dev->mc.mc_dev = dev;
+	dev->mc.is_dev_mc = true;
 }
 EXPORT_SYMBOL(dev_mc_init);
 
