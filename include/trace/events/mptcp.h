@@ -229,7 +229,7 @@ TRACE_EVENT(mptcp_rcvbuf_grow,
 		__entry->rcvbuf = sk->sk_rcvbuf;
 		__entry->rcv_wnd = atomic64_read(&msk->rcv_wnd_sent) -
 				   msk->ack_seq;
-		__entry->scaling_ratio = msk->scaling_ratio;
+		__entry->scaling_ratio = READ_ONCE(msk->scaling_ratio);
 		__entry->sport = ntohs(inet->inet_sport);
 		__entry->dport = ntohs(inet->inet_dport);
 		__entry->family = sk->sk_family;
