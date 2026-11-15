@@ -8,7 +8,7 @@ ksft_xfail=2
 ksft_xpass=3
 ksft_skip=4
 
-XSKOBJ=xskxceiver
+XSKOBJ=lib/xskxceiver
 
 validate_root_exec()
 {
