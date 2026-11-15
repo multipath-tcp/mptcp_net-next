@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Rules to generate bpf objs
 CLANG ?= clang
+BPFTOOL ?= bpftool
 SCRATCH_DIR := $(OUTPUT)/tools
 BUILD_DIR := $(SCRATCH_DIR)/build
 BPFDIR := $(top_srcdir)/tools/lib/bpf
@@ -35,12 +36,20 @@ endif
 
 CLANG_SYS_INCLUDES = $(call get_sys_includes,$(CLANG),$(CLANG_TARGET_ARCH))
 
-BPF_PROG_OBJS := $(patsubst %.c,$(OUTPUT)/%.o,$(wildcard *.bpf.c))
+# Programs come from *.bpf.c here and in the subdirectories in BPF_PROG_DIRS.
+BPF_PROG_SRCS := $(wildcard *.bpf.c $(addsuffix /*.bpf.c,$(BPF_PROG_DIRS)))
+BPF_PROG_OBJS := $(patsubst %.c,$(OUTPUT)/%.o,$(notdir $(BPF_PROG_SRCS)))
+vpath %.bpf.c $(BPF_PROG_DIRS)
 
 $(BPF_PROG_OBJS): $(OUTPUT)/%.o : %.c $(BPFOBJ) | $(MAKE_DIRS)
 	$(call msg,BPF_PROG,,$@)
 	$(Q)$(CLANG) -O2 -g --target=bpf $(CCINCLUDE) $(CLANG_SYS_INCLUDES) \
 	-c $< -o $@
+
+$(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o
+	$(call msg,GEN-SKEL,,$@)
+	$(Q)$(BPFTOOL) gen skeleton $< name $(notdir $*) > $@ || \
+		{ rm -f $@; exit 1; }
 
 $(BPFOBJ): $(wildcard $(BPFDIR)/*.[ch] $(BPFDIR)/Makefile)		       \
 	   $(APIDIR)/linux/bpf.h					       \
@@ -50,4 +59,4 @@ $(BPFOBJ): $(wildcard $(BPFDIR)/*.[ch] $(BPFDIR)/Makefile)		       \
 		    EXTRA_CFLAGS='-g -O0'				       \
 		    DESTDIR=$(SCRATCH_DIR) prefix= all install_headers
 
-EXTRA_CLEAN += $(SCRATCH_DIR)
+EXTRA_CLEAN += $(SCRATCH_DIR) $(BPF_PROG_OBJS) $(BPF_PROG_OBJS:.bpf.o=.skel.h)
