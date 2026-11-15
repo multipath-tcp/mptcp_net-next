@@ -103,6 +103,11 @@ do
 	esac
 done
 
+if [ ! -x "./${XSKOBJ}" ]; then
+	echo "xskxceiver was not built; skipping"
+	exit $ksft_skip
+fi
+
 TEST_NAME="PREREQUISITES"
 
 URANDOM=/dev/urandom
