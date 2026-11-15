@@ -211,7 +211,7 @@ Libbpf
 
 Libbpf is a helper library for eBPF and XDP that makes using these
 technologies a lot simpler. It also contains specific helper functions
-in tools/testing/selftests/bpf/xsk.h for facilitating the use of
+in tools/testing/selftests/net/lib/xsk/xsk.h for facilitating the use of
 AF_XDP. It contains two types of functions: those that can be used to
 make the setup of AF_XDP socket easier and ones that can be used in the
 data plane to access the rings safely and quickly.
@@ -751,7 +751,7 @@ return values:
      returned number signifies the max number of frags supported.
 
 For an example on how these are used through libbpf, please take a
-look at tools/testing/selftests/bpf/xskxceiver.c.
+look at tools/testing/selftests/net/lib/xsk/xskxceiver.c.
 
 Multi-Buffer Support for Zero-Copy Drivers
 ------------------------------------------
@@ -785,7 +785,7 @@ can be displayed with "-h", as usual.
 This sample application uses libbpf to make the setup and usage of
 AF_XDP simpler. If you want to know how the raw uapi of AF_XDP is
 really used to make something more advanced, take a look at the libbpf
-code in tools/testing/selftests/bpf/xsk.[ch].
+code in tools/testing/selftests/net/lib/xsk/xsk.[ch].
 
 FAQ
 =======
