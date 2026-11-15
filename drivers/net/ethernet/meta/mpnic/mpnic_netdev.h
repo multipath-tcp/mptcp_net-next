@@ -16,6 +16,8 @@ struct mpnic_base_stats {
 		u64 packets;
 		u64 bytes;
 		u64 dropped;
+		u64 csum_partial;
+		u64 hw_gso_wire;
 		u64 stop;
 		u64 wake;
 	} tx;
@@ -25,6 +27,9 @@ struct mpnic_base_stats {
 		u64 dropped;
 		u64 alloc_failed;
 		u64 errors;
+		u64 csum_complete;
+		u64 csum_unnecessary;
+		u64 csum_none;
 	} rx;
 
 	unsigned int num_tx_queues;
