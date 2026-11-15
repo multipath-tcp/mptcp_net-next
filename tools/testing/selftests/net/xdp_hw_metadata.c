@@ -16,11 +16,11 @@
  * - TX launch time HW offload is requested for transmission
  */
 
-#include <test_progs.h>
-#include <network_helpers.h>
 #include "xdp_hw_metadata.skel.h"
-#include "xsk.h"
+#include "lib/xsk/xsk.h"
 
+#include <bpf/bpf.h>
+#include <errno.h>
 #include <error.h>
 #include <linux/kernel.h>
 #include <linux/bits.h>
@@ -47,6 +47,9 @@
 #include <linux/ethtool.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <signal.h>
 
 #include "xdp_metadata.h"
 
@@ -87,7 +90,69 @@ int launch_time_queue;
 	system(command);					\
 })
 
-void test__fail(void) { /* for network_helpers.c */ }
+static __u16 csum_fold(__u32 csum)
+{
+	csum = (csum & 0xffff) + (csum >> 16);
+	csum = (csum & 0xffff) + (csum >> 16);
+
+	return (__u16)~csum;
+}
+
+static __sum16 csum_tcpudp_magic(__be32 saddr, __be32 daddr, __u32 len,
+				 __u8 proto, __wsum csum)
+{
+	__u64 s = csum;
+
+	s += (__u32)saddr;
+	s += (__u32)daddr;
+	s += htons(proto + len);
+	s = (s & 0xffffffff) + (s >> 32);
+	s = (s & 0xffffffff) + (s >> 32);
+
+	return csum_fold((__u32)s);
+}
+
+static __sum16 csum_ipv6_magic(const struct in6_addr *saddr,
+			       const struct in6_addr *daddr, __u32 len,
+			       __u8 proto, __wsum csum)
+{
+	__u64 s = csum;
+	int i;
+
+	for (i = 0; i < 4; i++)
+		s += (__u32)saddr->s6_addr32[i];
+	for (i = 0; i < 4; i++)
+		s += (__u32)daddr->s6_addr32[i];
+	s += htons(proto + len);
+	s = (s & 0xffffffff) + (s >> 32);
+	s = (s & 0xffffffff) + (s >> 32);
+
+	return csum_fold((__u32)s);
+}
+
+static int open_udp_server(__u16 port)
+{
+	struct sockaddr_in6 addr = {
+		.sin6_family = AF_INET6,
+		.sin6_port = htons(port),
+		.sin6_addr = IN6ADDR_ANY_INIT,
+	};
+	struct timeval timeo = { .tv_sec = 1 };
+	int fd;
+
+	fd = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (fd < 0)
+		return -1;
+
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeo, sizeof(timeo)) ||
+	    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeo, sizeof(timeo)) ||
+	    bind(fd, (struct sockaddr *)&addr, sizeof(addr))) {
+		close(fd);
+		return -1;
+	}
+
+	return fd;
+}
 
 static int open_xsk(int ifindex, struct xsk *xsk, __u32 queue_id)
 {
@@ -550,7 +615,7 @@ static int rxq_num(const char *ifname)
 	struct ifreq ifr = {
 		.ifr_data = (void *)&ch,
 	};
-	strscpy(ifr.ifr_name, ifname);
+	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", ifname);
 	int fd, ret;
 
 	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -571,7 +636,7 @@ static void hwtstamp_ioctl(int op, const char *ifname, struct hwtstamp_config *c
 	struct ifreq ifr = {
 		.ifr_data = (void *)cfg,
 	};
-	strscpy(ifr.ifr_name, ifname);
+	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", ifname);
 	int fd, ret;
 
 	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -853,9 +918,9 @@ int main(int argc, char *argv[])
 		error(1, -ret, "xdp_hw_metadata__load");
 
 	printf("prepare skb endpoint...\n");
-	server_fd = start_server(AF_INET6, SOCK_DGRAM, NULL, 9092, 1000);
+	server_fd = open_udp_server(9092);
 	if (server_fd < 0)
-		error(1, errno, "start_server");
+		error(1, errno, "open_udp_server");
 	timestamping_enable(server_fd,
 			    SOF_TIMESTAMPING_SOFTWARE |
 			    SOF_TIMESTAMPING_RAW_HARDWARE);

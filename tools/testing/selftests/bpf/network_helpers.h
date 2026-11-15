@@ -89,8 +89,6 @@ int make_sockaddr(int family, const char *addr_str, __u16 port,
 		  struct sockaddr_storage *addr, socklen_t *len);
 char *ping_command(int family);
 int get_socket_local_port(int sock_fd);
-int get_hw_ring_size(char *ifname, struct ethtool_ringparam *ring_param);
-int set_hw_ring_size(char *ifname, struct ethtool_ringparam *ring_param);
 
 int open_tuntap(const char *dev_name, bool need_mac);
 
