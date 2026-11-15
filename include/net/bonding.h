@@ -594,6 +594,7 @@ static inline void bond_set_slave_active_flags(struct slave *slave,
 static inline void bond_set_slave_rx_enabled_flags(struct slave *slave,
 					       bool notify)
 {
+	slave->inactive = 0;
 	slave->rx_disabled = 0;
 }
 

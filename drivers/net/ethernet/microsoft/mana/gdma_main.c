@@ -1907,44 +1907,45 @@ struct gdma_irq_context *mana_gd_get_gic(struct gdma_context *gc,
 	const struct gdma_bus_ops *ops = gc->bus_ops;
 	struct gdma_irq_context *gic;
 	bool dyn_msix = false;
-	int msi, irq, err;
+	int msix_index, irq, err;
 
 	mutex_lock(&gc->gic_mutex);
 
 	if (use_msi_bitmap) {
-		msi = find_first_zero_bit(gc->msi_bitmap, gc->num_msix_usable);
-		if (msi >= gc->num_msix_usable) {
+		msix_index = find_first_zero_bit(gc->msi_bitmap,
+						 gc->num_msix_usable);
+		if (msix_index >= gc->num_msix_usable) {
 			dev_err(gc->dev, "No free MSI vectors available\n");
 			gic = ERR_PTR(-ENOSPC);
 			goto out;
 		}
-		*msi_requested = msi;
+		*msi_requested = msix_index;
 	} else {
-		msi = *msi_requested;
+		msix_index = *msi_requested;
 	}
 
-	gic = xa_load(&gc->irq_contexts, msi);
+	gic = xa_load(&gc->irq_contexts, msix_index);
 	if (gic) {
 		refcount_inc(&gic->refcount);
 		if (use_msi_bitmap) {
 			gic->bitmap_refs++;
-			set_bit(msi, gc->msi_bitmap);
+			set_bit(msix_index, gc->msi_bitmap);
 		}
 		goto out;
 	}
 
-	irq = ops->msix_virq(gc, msi);
+	irq = ops->msix_virq(gc, msix_index);
 	if (irq == -EINVAL) {
 		/* A bus that sizes its vector pool up front has nothing left
 		 * to hand out once every vector has been claimed.
 		 */
 		if (!ops->msix_alloc_at) {
-			dev_err(gc->dev, "No IRQ for MSI %d\n", msi);
+			dev_err(gc->dev, "No IRQ for MSI %d\n", msix_index);
 			gic = ERR_PTR(-ENOENT);
 			goto out;
 		}
 
-		irq = ops->msix_alloc_at(gc, &msi);
+		irq = ops->msix_alloc_at(gc, &msix_index);
 		if (irq < 0) {
 			dev_err(gc->dev, "Failed to alloc irq msi %d err %d\n",
 				*msi_requested, irq);
@@ -1953,19 +1954,19 @@ struct gdma_irq_context *mana_gd_get_gic(struct gdma_context *gc,
 		}
 
 		dyn_msix = true;
-		*msi_requested = msi;
+		*msi_requested = msix_index;
 	}
 
 	gic = kzalloc_obj(*gic);
 	if (!gic) {
 		gic = ERR_PTR(-ENOMEM);
 		if (dyn_msix)
-			ops->msix_free(gc, msi, irq);
+			ops->msix_free(gc, msix_index, irq);
 		goto out;
 	}
 
 	gic->handler = mana_gd_process_eq_events;
-	gic->msi = msi;
+	gic->msi = msix_index;
 	gic->irq = irq;
 	INIT_LIST_HEAD(&gic->eq_list);
 	spin_lock_init(&gic->lock);
@@ -1984,28 +1985,41 @@ struct gdma_irq_context *mana_gd_get_gic(struct gdma_context *gc,
 		kfree(gic);
 		gic = ERR_PTR(err);
 		if (dyn_msix)
-			ops->msix_free(gc, msi, irq);
+			ops->msix_free(gc, msix_index, irq);
 		goto out;
+	}
+
+	if (dyn_msix && ops->setup_dyn_affinity) {
+		err = ops->setup_dyn_affinity(gc, irq, msix_index);
+		if (err) {
+			free_irq(irq, gic);
+			kfree(gic);
+			gic = ERR_PTR(err);
+			ops->msix_free(gc, msix_index, irq);
+			goto out;
+		}
 	}
 
 	gic->dyn_msix = dyn_msix;
 	refcount_set(&gic->refcount, 1);
 	gic->bitmap_refs = use_msi_bitmap ? 1 : 0;
 
-	err = xa_err(xa_store(&gc->irq_contexts, msi, gic, GFP_KERNEL));
+	err = xa_err(xa_store(&gc->irq_contexts, msix_index, gic, GFP_KERNEL));
 	if (err) {
 		dev_err(gc->dev, "Failed to store irq context for msi %d: %d\n",
-			msi, err);
+			msix_index, err);
+		if (dyn_msix)
+			irq_update_affinity_hint(irq, NULL);
 		free_irq(irq, gic);
 		kfree(gic);
 		gic = ERR_PTR(err);
 		if (dyn_msix)
-			ops->msix_free(gc, msi, irq);
+			ops->msix_free(gc, msix_index, irq);
 		goto out;
 	}
 
 	if (use_msi_bitmap)
-		set_bit(msi, gc->msi_bitmap);
+		set_bit(msix_index, gc->msi_bitmap);
 
 out:
 	mutex_unlock(&gc->gic_mutex);
