@@ -148,6 +148,30 @@ chk_queue_napi() {
 	fi
 }
 
+get_napi_ids() {
+	local ns=$BASE$1
+	local ifindex
+
+	ifindex=`ip netns exec $ns cat /sys/class/net/veth$1/ifindex`
+	ip netns exec $ns "$YNL" --family netdev --dump queue-get \
+		--output-json --json "{\"ifindex\": $ifindex}" |
+		jq -c 'sort_by(.id) | map(select(.type == "rx") | ."napi-id")'
+}
+
+chk_napi_ids() {
+	local msg="$1"
+	local ids
+
+	ids=`get_napi_ids $2`
+	printf "%-60s" "$msg"
+	if [ -n "$ids" ] && [ "$ids" = "$NAPI_IDS" ]; then
+		echo " ok "
+	else
+		echo " fail - expected $NAPI_IDS found $ids"
+		ret=1
+	fi
+}
+
 chk_channels() {
 	local msg="$1"
 	local target=$2
@@ -492,11 +516,13 @@ if [ -f "$YNL" ] && [ -x "$(command -v jq)" ]; then
 	chk_queue_napi "queue napi - default" $DST 0
 	ip netns exec $NS_DST ethtool -K veth$DST gro on
 	chk_queue_napi "           - with gro on" $DST $RXQ
+	NAPI_IDS=`get_napi_ids $DST`
 	if [ $CPUS -gt 1 ]; then
 		ip netns exec $NS_DST ethtool -L veth$DST rx 1
 		chk_queue_napi "           - fewer rx channels with gro" $DST 1
 		ip netns exec $NS_DST ethtool -L veth$DST rx 2
 		chk_queue_napi "           - more rx channels with gro" $DST 2
+		chk_napi_ids "           - same napi ids" $DST
 	fi
 	ip -n $NS_DST link set dev veth$DST xdp object ${BPF_FILE} section xdp
 	chk_queue_napi "           - with gro and xdp on" $DST $RXQ
@@ -506,15 +532,18 @@ if [ -f "$YNL" ] && [ -x "$(command -v jq)" ]; then
 	chk_queue_napi "           - after gro off" $DST 0
 	ip -n $NS_DST link set dev veth$DST xdp object ${BPF_FILE} section xdp
 	chk_queue_napi "           - with xdp on" $DST $RXQ
+	chk_napi_ids "           - same napi ids" $DST
 	if [ $CPUS -gt 1 ]; then
 		ip netns exec $NS_DST ethtool -L veth$DST rx 1
 		chk_queue_napi "           - fewer rx channels with xdp" $DST 1
 		ip netns exec $NS_DST ethtool -L veth$DST rx 2
 		chk_queue_napi "           - more rx channels with xdp" $DST 2
+		chk_napi_ids "           - same napi ids" $DST
 	fi
 	ip -n $NS_DST link set dev veth$DST down
 	ip -n $NS_DST link set dev veth$DST up
 	chk_queue_napi "           - after down and up" $DST $RXQ
+	chk_napi_ids "           - same napi ids" $DST
 	ip -n $NS_DST link set dev veth$DST xdp off
 	chk_queue_napi "           - after xdp off" $DST 0
 	cleanup
