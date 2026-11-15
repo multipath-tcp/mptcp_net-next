@@ -917,6 +917,14 @@ static int addrconf_fixup_forwarding(const struct ctl_table *table, int *p, int 
 						     net->ipv6.devconf_dflt);
 
 		addrconf_forward_change(net, newf);
+		/* Disabling all.forwarding also resets all.force_forwarding */
+		if (newf == 0 && net->ipv6.devconf_all->force_forwarding) {
+			WRITE_ONCE(net->ipv6.devconf_all->force_forwarding, 0);
+			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
+						     NETCONFA_FORCE_FORWARDING,
+						     NETCONFA_IFINDEX_ALL,
+						     net->ipv6.devconf_all);
+		}
 		if ((!newf) ^ (!old))
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
 						     NETCONFA_FORWARDING,
