@@ -144,6 +144,6 @@ See ``tools/net/ynl/samples/netdev.c`` on how to query this information.
 Example
 =======
 
-See ``tools/testing/selftests/bpf/xdp_hw_metadata.c`` for an example
+See ``tools/testing/selftests/net/xdp_hw_metadata.c`` for an example
 program that handles TX metadata. Also see https://github.com/fomichev/xskgen
 for a more bare-bones example.
