@@ -2,3 +2,5 @@
 csum
 gro
 xdp_helper
+xsk_xdp_progs.skel.h
+xskxceiver
