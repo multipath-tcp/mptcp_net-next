@@ -8,6 +8,7 @@
 #include <linux/iopoll.h>
 #include <linux/log2.h>
 #include <linux/sizes.h>
+#include <net/tcp.h>
 
 #include "mpnic.h"
 #include "mpnic_txrx.h"
@@ -298,6 +299,19 @@ static void mpnic_txglb_init(struct mpnic_dev *mpd)
 	 * programmed with its addresses.
 	 */
 	mpnic_wr64(mpd, MPNIC_TOF_TCAM_DEST_REMAP, 0);
+	mpnic_wr64(mpd, MPNIC_TOF_MODE,
+		   FIELD_PREP(MPNIC_TOF_MODE_IPV4_ID_MODE,
+			      MPNIC_IPV4_ID_MODE_INCREMENT) |
+		   FIELD_PREP(MPNIC_TOF_MODE_IPV4_ZERO_CSUM, 1) |
+		   FIELD_PREP(MPNIC_TOF_MODE_TCP_ZERO_CSUM, 1) |
+		   FIELD_PREP(MPNIC_TOF_MODE_UDP_ZERO_CSUM, 0) |
+		   FIELD_PREP(MPNIC_TOF_MODE_L4_ZERO_CSUM, 0));
+	mpnic_wr64(mpd, MPNIC_TOF_TCP_FLAG_CLR,
+		   FIELD_PREP(MPNIC_TOF_TCP_FLAG_CLR_FIRST_SEGMENT,
+			      TCPHDR_PSH | TCPHDR_FIN) |
+		   FIELD_PREP(MPNIC_TOF_TCP_FLAG_CLR_MIDDLE_SEGMENT,
+			      TCPHDR_PSH | TCPHDR_CWR | TCPHDR_FIN) |
+		   FIELD_PREP(MPNIC_TOF_TCP_FLAG_CLR_LAST_SEGMENT, TCPHDR_CWR));
 
 	mpnic_wr64(mpd, MPNIC_TCM_MEM_INIT_REQ, MPNIC_MEM_INIT_TCM_VAL);
 	mpnic_wr64(mpd, MPNIC_TDE_MEM_INIT_REQ, MPNIC_MEM_INIT_TDE_VAL);
