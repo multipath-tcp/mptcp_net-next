@@ -74,7 +74,8 @@ COMMON_CFLAGS = -g $(OPT_FLAGS) -rdynamic -std=gnu11				\
 	  $(GENFLAGS) $(SAN_CFLAGS) $(LIBELF_CFLAGS)			\
 	  -I$(CURDIR) -I$(INCLUDE_DIR) -I$(GENDIR) -I$(LIBDIR)		\
 	  -I$(TOOLSINCDIR) -I$(TOOLSARCHINCDIR) -I$(APIDIR) -I$(OUTPUT)	\
-	  -I$(CURDIR)/libarena/include
+	  -I$(CURDIR)/libarena/include					\
+	  -I$(CURDIR)/../net/lib/xsk
 LDLIBS += $(LIBELF_LIBS) -lz -lrt -lpthread
 
 PCAP_CFLAGS	:= $(shell $(PKG_CONFIG) --cflags libpcap 2>/dev/null && echo "-DTRAFFIC_MONITOR=1")
@@ -156,7 +157,6 @@ RUNNER_OBJS-test_progs := $(addprefix $(OUTPUT)/,			\
 	cap_helpers.o unpriv_helpers.o sysctl_helpers.o			\
 	netlink_helpers.o jit_disasm_helpers.o io_helpers.o		\
 	test_loader.o xsk.o disasm.o disasm_helpers.o			\
-	json_writer.o bpftool_helpers.o usdt_1.o usdt_2.o		\
-	find_bit.o)
+	json_writer.o bpftool_helpers.o usdt_1.o usdt_2.o)
 RUNNER_OBJS-test_maps := $(addprefix $(OUTPUT)/,			\
 	test_maps.o testing_helpers.o)
