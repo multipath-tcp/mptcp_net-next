@@ -64,7 +64,7 @@ SEC("xdp") int xsk_xdp_shared_umem(struct xdp_md *xdp)
 	void *data_end = (void *)(long)xdp->data_end;
 	struct ethhdr *eth = data;
 
-	if (eth + 1 > data_end)
+	if ((void *)(eth + 1) > data_end)
 		return XDP_DROP;
 
 	/* Redirecting packets based on the destination MAC address */

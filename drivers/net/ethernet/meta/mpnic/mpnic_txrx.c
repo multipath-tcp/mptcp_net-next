@@ -8,6 +8,7 @@
 #include <linux/slab.h>
 #include <net/netdev_lock.h>
 #include <net/page_pool/helpers.h>
+#include <net/tcp.h>
 
 #include "mpnic.h"
 #include "mpnic_netdev.h"
@@ -15,7 +16,15 @@
 
 struct mpnic_xmit_cb {
 	u32 bytecount;
+	u16 gso_segs;
 	u8 desc_count;
+};
+
+struct mpnic_tx_hdrs {
+	unsigned int i3len;
+	unsigned int o3len;
+	unsigned int l3_type;
+	unsigned int l4_type;
 };
 
 #define MPNIC_XMIT_CB(__skb) ((struct mpnic_xmit_cb *)((__skb)->cb))
@@ -208,6 +217,115 @@ err_dma:
 	return true;
 }
 
+static void mpnic_tx_fill_hdrs(struct sk_buff *skb, struct mpnic_tx_hdrs *hdrs)
+{
+	unsigned int net_off = skb_network_offset(skb);
+	unsigned int inner_off;
+
+	if (!skb_is_gso(skb)) {
+		hdrs->i3len = skb_checksum_start(skb) - skb_network_header(skb);
+		return;
+	}
+
+	if (skb_shinfo(skb)->gso_type & (SKB_GSO_TCPV4 | SKB_GSO_TCPV6))
+		hdrs->l4_type = MPNIC_TWD_L4_TYPE_TCP;
+	else
+		hdrs->l4_type = MPNIC_TWD_L4_TYPE_UDP;
+
+	if (!skb->encapsulation) {
+		hdrs->i3len = skb_transport_offset(skb) - net_off;
+		hdrs->l3_type = ip_hdr(skb)->version == 4 ?
+				MPNIC_TWD_L3_TYPE_IPV4 : MPNIC_TWD_L3_TYPE_IPV6;
+	} else if (skb_shinfo(skb)->gso_type & SKB_GSO_PARTIAL) {
+		hdrs->i3len = skb_checksum_start_offset(skb) - net_off;
+		hdrs->l3_type = MPNIC_TWD_L3_TYPE_OTHER;
+	} else {
+		inner_off = skb_inner_network_offset(skb);
+		hdrs->o3len = inner_off - net_off;
+		hdrs->i3len = skb_checksum_start_offset(skb) - inner_off;
+		hdrs->l3_type = inner_ip_hdr(skb)->version == 4 ?
+				MPNIC_TWD_L3_TYPE_V6V4 : MPNIC_TWD_L3_TYPE_V6V6;
+	}
+}
+
+static bool
+mpnic_tx_lso(struct mpnic_ring *ring, struct sk_buff *skb, __le64 *meta,
+	     const struct mpnic_tx_hdrs *hdrs)
+{
+	struct skb_shared_info *shinfo;
+	unsigned int l4len, hdrlen;
+	unsigned char *l4hdr;
+
+	if (skb_cow_head(skb, 0))
+		return true;
+
+	shinfo = skb_shinfo(skb);
+	l4hdr = skb_checksum_start(skb);
+
+	if (hdrs->l4_type == MPNIC_TWD_L4_TYPE_TCP) {
+		struct tcphdr *tcph = (struct tcphdr *)l4hdr;
+		__be16 payload_len;
+
+		l4len = __tcp_hdrlen(tcph);
+		payload_len = cpu_to_be16(skb->len -
+					  skb_checksum_start_offset(skb));
+		csum_replace_by_diff(&tcph->check, (__force __wsum)payload_len);
+	} else {
+		struct udphdr *udph = (struct udphdr *)l4hdr;
+
+		l4len = sizeof(*udph);
+		csum_replace_by_diff(&udph->check, (__force __wsum)udph->len);
+	}
+
+	*meta |= cpu_to_le64(FIELD_PREP(MPNIC_TWD_L4_HLEN, l4len / 4) |
+			     FIELD_PREP(MPNIC_TWD_MSS, shinfo->gso_size) |
+			     MPNIC_TWD_FLAG_REQ_LSO);
+
+	hdrlen = skb_checksum_start_offset(skb) + l4len;
+	MPNIC_XMIT_CB(skb)->bytecount += (shinfo->gso_segs - 1) * hdrlen;
+	MPNIC_XMIT_CB(skb)->gso_segs = shinfo->gso_segs;
+
+	u64_stats_update_begin(&ring->stats.syncp);
+	u64_stats_add(&ring->stats.twq.hw_gso_wire, shinfo->gso_segs);
+	u64_stats_update_end(&ring->stats.syncp);
+
+	return false;
+}
+
+static bool
+mpnic_tx_offloads(struct mpnic_ring *ring, struct sk_buff *skb, __le64 *meta)
+{
+	struct mpnic_tx_hdrs hdrs = {};
+
+	if (skb->ip_summed != CHECKSUM_PARTIAL)
+		return false;
+
+	mpnic_tx_fill_hdrs(skb, &hdrs);
+
+	*meta |= cpu_to_le64(FIELD_PREP(MPNIC_TWD_CSUM_OFFSET,
+					skb->csum_offset / 2));
+
+	if (skb_is_gso(skb)) {
+		if (mpnic_tx_lso(ring, skb, meta, &hdrs))
+			return true;
+	} else {
+		*meta |= cpu_to_le64(MPNIC_TWD_FLAG_REQ_CSO);
+
+		u64_stats_update_begin(&ring->stats.syncp);
+		u64_stats_inc(&ring->stats.twq.csum_partial);
+		u64_stats_update_end(&ring->stats.syncp);
+	}
+
+	*meta |= cpu_to_le64(FIELD_PREP(MPNIC_TWD_L2_HLEN,
+					skb_mac_header_len(skb) / 2) |
+			     FIELD_PREP(MPNIC_TWD_L3_IHLEN, hdrs.i3len / 2) |
+			     FIELD_PREP(MPNIC_TWD_L3_OHLEN, hdrs.o3len / 2) |
+			     FIELD_PREP(MPNIC_TWD_L3_TYPE, hdrs.l3_type) |
+			     FIELD_PREP(MPNIC_TWD_L4_TYPE, hdrs.l4_type));
+
+	return false;
+}
+
 #define MPNIC_MIN_FRAME_LEN	60
 
 static netdev_tx_t mpnic_xmit_frame_ring(struct sk_buff *skb,
@@ -228,7 +346,11 @@ static netdev_tx_t mpnic_xmit_frame_ring(struct sk_buff *skb,
 	*meta = cpu_to_le64(MPNIC_TWD_FLAG_DEST_MAC);
 
 	MPNIC_XMIT_CB(skb)->bytecount = skb->len;
+	MPNIC_XMIT_CB(skb)->gso_segs = 1;
 	MPNIC_XMIT_CB(skb)->desc_count = 0;
+
+	if (mpnic_tx_offloads(ring, skb, meta))
+		goto err_free;
 
 	if (mpnic_tx_map(ring, skb, meta))
 		goto err_free;
@@ -256,11 +378,88 @@ netdev_tx_t mpnic_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 	return mpnic_xmit_frame_ring(skb, mpn->tx[skb_get_queue_mapping(skb)]);
 }
 
+static bool mpnic_ipxip6_gso_ok(struct sk_buff *skb)
+{
+	struct ipv6hdr *ip6h;
+	__be16 frag_off;
+	u8 nexthdr;
+	int start;
+
+	ip6h = ipv6_hdr(skb);
+	if (ip6h->version != 6)
+		return false;
+
+	nexthdr = ip6h->nexthdr;
+	start = skb_network_offset(skb) + sizeof(*ip6h);
+	start = ipv6_skip_exthdr(skb, start, &nexthdr, &frag_off);
+
+	return !frag_off && start == skb_inner_network_offset(skb) &&
+	       (nexthdr == IPPROTO_IPV6 || nexthdr == IPPROTO_IPIP);
+}
+
+static netdev_features_t
+mpnic_features_check_encap_gso(struct sk_buff *skb, netdev_features_t features)
+{
+	struct iphdr *iph;
+
+	if (skb_shinfo(skb)->gso_type & SKB_GSO_IPXIP6 &&
+	    mpnic_ipxip6_gso_ok(skb))
+		return features;
+
+	features &= ~NETIF_F_GSO_IPXIP6;
+
+	iph = ip_hdr(skb);
+	if (iph->version == 4 && !(iph->frag_off & htons(IP_DF)))
+		return features & ~NETIF_F_GSO_MASK;
+
+	/* HW can segment inner udp4 with fixed IDs, but there is no UDP
+	 * analog for MANGLEID, so defer to SW GSO.
+	 */
+	if (inner_ip_hdr(skb)->version == 4)
+		features &= ~NETIF_F_GSO_UDP_L4;
+	if (!(features & NETIF_F_TSO_MANGLEID))
+		features &= ~NETIF_F_TSO;
+
+	return features;
+}
+
+netdev_features_t mpnic_features_check(struct sk_buff *skb,
+				       struct net_device *dev,
+				       netdev_features_t features)
+{
+	unsigned int l2len, i3len;
+
+	if (skb->ip_summed != CHECKSUM_PARTIAL)
+		return features;
+
+	l2len = skb_network_offset(skb);
+	if (skb_vlan_tag_present(skb))
+		l2len += VLAN_HLEN;
+	i3len = skb_checksum_start(skb) - skb_network_header(skb);
+
+	if ((l2len | i3len | skb->csum_offset) % 2 ||
+	    !FIELD_FIT(MPNIC_TWD_L2_HLEN, l2len / 2) ||
+	    !FIELD_FIT(MPNIC_TWD_L3_IHLEN, i3len / 2) ||
+	    !FIELD_FIT(MPNIC_TWD_CSUM_OFFSET, skb->csum_offset / 2) ||
+	    l2len + i3len + sizeof(struct tcphdr) + MAX_TCP_OPTION_SPACE > 256)
+		return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
+
+	if (skb_is_gso(skb) &&
+	    (skb->len < MPNIC_MIN_FRAME_LEN ||
+	     !FIELD_FIT(MPNIC_TWD_MSS, skb_shinfo(skb)->gso_size)))
+		return features & ~NETIF_F_GSO_MASK;
+
+	if (!skb->encapsulation || !skb_is_gso(skb))
+		return features;
+
+	return mpnic_features_check_encap_gso(skb, features);
+}
+
 static void mpnic_clean_twq0(struct mpnic_napi_vector *nv, int napi_budget,
 			     struct mpnic_q_triad *qt, bool discard,
 			     unsigned int hw_head)
 {
-	u64 total_bytes = 0, total_packets = 0;
+	u64 total_bytes = 0, total_packets = 0, total_skbs = 0;
 	struct mpnic_ring *ring = &qt->sub0;
 	struct mpnic_ring *cmpl = &qt->cmpl;
 	unsigned int head = ring->head;
@@ -298,7 +497,8 @@ static void mpnic_clean_twq0(struct mpnic_napi_vector *nv, int napi_budget,
 		}
 
 		total_bytes += MPNIC_XMIT_CB(skb)->bytecount;
-		total_packets++;
+		total_packets += MPNIC_XMIT_CB(skb)->gso_segs;
+		total_skbs++;
 
 		napi_consume_skb(skb, napi_budget);
 	}
@@ -311,7 +511,7 @@ static void mpnic_clean_twq0(struct mpnic_napi_vector *nv, int napi_budget,
 	if (discard) {
 		local_bh_disable();
 		u64_stats_update_begin(&ring->stats.syncp);
-		u64_stats_add(&ring->stats.twq.dropped, total_packets);
+		u64_stats_add(&ring->stats.twq.dropped, total_skbs);
 		u64_stats_update_end(&ring->stats.syncp);
 		local_bh_enable();
 		return;
@@ -596,9 +796,34 @@ static void mpnic_put_pkt_buff(struct mpnic_pkt_ctxt *ctxt, bool napi)
 	page_pool_put_full_page(page->pp, page, napi);
 }
 
+static void mpnic_rx_csum(u64 rcd, struct sk_buff *skb,
+			  unsigned int *csum_complete,
+			  unsigned int *csum_unnecessary,
+			  unsigned int *csum_none)
+{
+	skb_checksum_none_assert(skb);
+
+	if (!(skb->dev->features & NETIF_F_RXCSUM)) {
+		(*csum_none)++;
+		return;
+	}
+
+	if (FIELD_GET(MPNIC_RCD_META_L4_CSUM_UNNECESSARY, rcd)) {
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		(*csum_unnecessary)++;
+	} else {
+		u16 csum = FIELD_GET(MPNIC_RCD_META_L2_CSUM, rcd);
+
+		skb->ip_summed = CHECKSUM_COMPLETE;
+		skb->csum = csum_unfold((__force __sum16)cpu_to_le16(csum));
+		(*csum_complete)++;
+	}
+}
+
 static int mpnic_clean_rcq(struct mpnic_napi_vector *nv,
 			   struct mpnic_q_triad *qt, int budget)
 {
+	unsigned int csum_complete = 0, csum_unnecessary = 0, csum_none = 0;
 	unsigned int packets = 0, bytes = 0, dropped = 0, errors = 0;
 	struct mpnic_ring *rcq = &qt->cmpl;
 	struct mpnic_rcq_state *state;
@@ -641,6 +866,8 @@ static int mpnic_clean_rcq(struct mpnic_napi_vector *nv,
 			}
 
 			if (likely(skb)) {
+				mpnic_rx_csum(rcd, skb, &csum_complete,
+					      &csum_unnecessary, &csum_none);
 				napi_gro_receive(&nv->napi, skb);
 			} else {
 				mpnic_put_pkt_buff(&state->pkt, true);
@@ -673,6 +900,9 @@ static int mpnic_clean_rcq(struct mpnic_napi_vector *nv,
 	u64_stats_add(&rcq->stats.rcq.dropped, dropped);
 	u64_stats_add(&rcq->stats.rcq.alloc_failed, alloc_failed);
 	u64_stats_add(&rcq->stats.rcq.errors, errors);
+	u64_stats_add(&rcq->stats.rcq.csum_complete, csum_complete);
+	u64_stats_add(&rcq->stats.rcq.csum_unnecessary, csum_unnecessary);
+	u64_stats_add(&rcq->stats.rcq.csum_none, csum_none);
 	u64_stats_update_end(&rcq->stats.syncp);
 
 	/* Allocate buffers, force dma_wmb(), and then start writing tails */
@@ -721,6 +951,8 @@ static void mpnic_aggregate_ring_twq_counters(struct mpnic_base_stats *base,
 					      struct mpnic_ring *twq)
 {
 	base->tx.dropped += u64_stats_read(&twq->stats.twq.dropped);
+	base->tx.csum_partial += u64_stats_read(&twq->stats.twq.csum_partial);
+	base->tx.hw_gso_wire += u64_stats_read(&twq->stats.twq.hw_gso_wire);
 	base->tx.stop += u64_stats_read(&twq->stats.twq.stop);
 }
 
@@ -746,6 +978,10 @@ static void mpnic_aggregate_ring_rcq_counters(struct mpnic_base_stats *base,
 	base->rx.dropped += u64_stats_read(&rcq->stats.rcq.dropped);
 	base->rx.alloc_failed += u64_stats_read(&rcq->stats.rcq.alloc_failed);
 	base->rx.errors += u64_stats_read(&rcq->stats.rcq.errors);
+	base->rx.csum_complete += u64_stats_read(&rcq->stats.rcq.csum_complete);
+	base->rx.csum_unnecessary +=
+		u64_stats_read(&rcq->stats.rcq.csum_unnecessary);
+	base->rx.csum_none += u64_stats_read(&rcq->stats.rcq.csum_none);
 }
 
 static struct mpnic_base_stats *mpnic_base_stats_prepare(struct mpnic_net *mpn)
