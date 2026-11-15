@@ -494,6 +494,12 @@ static int ip6erspan_rcv(struct sk_buff *skb,
 	struct ip6_tnl *tunnel;
 	u8 ver;
 
+	/* There is no type I (ETH_P_ERSPAN with a 4-byte GRE header) on
+	 * IPv6, and such a packet carries no ERSPAN header to look at.
+	 */
+	if (unlikely(tpi->proto == htons(ETH_P_ERSPAN) && gre_hdr_len == 4))
+		return PACKET_REJECT;
+
 	if (unlikely(!pskb_may_pull(skb, sizeof(*ershdr))))
 		return PACKET_REJECT;
 
@@ -506,6 +512,9 @@ static int ip6erspan_rcv(struct sk_buff *skb,
 				      tpi->proto);
 	if (tunnel) {
 		int len = erspan_hdr_len(ver);
+
+		if (unlikely(ver != ERSPAN_VERSION && ver != ERSPAN_VERSION2))
+			return PACKET_REJECT;
 
 		if (unlikely(!pskb_may_pull(skb, len)))
 			return PACKET_REJECT;
