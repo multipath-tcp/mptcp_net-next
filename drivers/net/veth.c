@@ -1057,7 +1057,7 @@ static int veth_napi_enable_range(struct net_device *dev, int start, int end)
 	}
 
 	for (i = start; i < end; i++)
-		netif_napi_add(dev, &priv->rq[i].xdp_napi, veth_poll);
+		netif_napi_add_config(dev, &priv->rq[i].xdp_napi, veth_poll, i);
 
 	for (i = start; i < end; i++) {
 		struct veth_rq *rq = &priv->rq[i];
