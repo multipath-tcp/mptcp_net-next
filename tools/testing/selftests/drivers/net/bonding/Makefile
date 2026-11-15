@@ -7,6 +7,7 @@ TEST_PROGS := \
 	bond-eth-type-change.sh \
 	bond-lladdr-target.sh \
 	bond_ipsec_offload.sh \
+	bond_lacp_independent_control.sh \
 	bond_lacp_prio.sh \
 	bond_lacp_strict.sh \
 	bond_macvlan_ipvlan.sh \
