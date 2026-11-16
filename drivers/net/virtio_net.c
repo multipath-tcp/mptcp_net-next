@@ -5017,6 +5017,9 @@ static int __virtnet_get_hw_stats(struct virtnet_info *vi,
 
 	for (p = reply; p - reply < res_size; p += le16_to_cpu(hdr->size)) {
 		hdr = p;
+		if (!hdr->size)
+			return -EINVAL;
+
 		qid = le16_to_cpu(hdr->vq_index);
 		/* The vqs of the queue pairs beyond curr_queue_pairs lie
 		 * between last_vq and the control vq.
@@ -5091,7 +5094,7 @@ static int virtnet_get_hw_stats(struct virtnet_info *vi,
 	if (!req)
 		return -ENOMEM;
 
-	reply = kmalloc(res_size, GFP_KERNEL);
+	reply = kzalloc(res_size, GFP_KERNEL);
 	if (!reply) {
 		kfree(req);
 		return -ENOMEM;
