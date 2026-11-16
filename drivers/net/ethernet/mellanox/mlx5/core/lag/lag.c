@@ -95,23 +95,25 @@ static int mlx5_cmd_create_lag(struct mlx5_core_dev *dev, struct mlx5_lag *ldev,
 	int port_sel_mode = get_port_sel_mode(mode, flags);
 	u32 in[MLX5_ST_SZ_DW(create_lag_in)] = {};
 	u8 *ports = ldev->v2p_map;
-	int idx0, idx1;
 	void *lag_ctx;
 
 	lag_ctx = MLX5_ADDR_OF(create_lag_in, in, ctx);
 	MLX5_SET(create_lag_in, in, opcode, MLX5_CMD_OP_CREATE_LAG);
 	MLX5_SET(lagc, lag_ctx, fdb_selection_mode, fdb_sel_mode);
-	idx0 = mlx5_lag_get_dev_index_by_seq(ldev, 0);
-	idx1 = mlx5_lag_get_dev_index_by_seq(ldev, 1);
-
-	if (idx0 < 0 || idx1 < 0)
-		return -EINVAL;
-
 	switch (port_sel_mode) {
-	case MLX5_LAG_PORT_SELECT_MODE_QUEUE_AFFINITY:
+	case MLX5_LAG_PORT_SELECT_MODE_QUEUE_AFFINITY: {
+		int idx0, idx1;
+
+		idx0 = mlx5_lag_get_dev_index_by_seq(ldev, 0);
+		idx1 = mlx5_lag_get_dev_index_by_seq(ldev, 1);
+
+		if (idx0 < 0 || idx1 < 0)
+			return -EINVAL;
+
 		MLX5_SET(lagc, lag_ctx, tx_remap_affinity_1, ports[idx0]);
 		MLX5_SET(lagc, lag_ctx, tx_remap_affinity_2, ports[idx1]);
 		break;
+	}
 	case MLX5_LAG_PORT_SELECT_MODE_PORT_SELECT_FT: {
 		u8 active_port;
 		int ret;
