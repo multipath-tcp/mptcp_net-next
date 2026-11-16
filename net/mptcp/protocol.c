@@ -811,6 +811,25 @@ account:
 		msk->backlog_unaccounted += delta;
 }
 
+static bool mptcp_seq_after_data_fin(struct mptcp_sock *msk,
+				     struct sock *ssk, u32 len)
+{
+	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
+	struct sock *sk = (struct sock *)msk;
+
+	if (READ_ONCE(msk->rcv_data_fin) || (sk->sk_shutdown & RCV_SHUTDOWN)) {
+		u64 seq = mptcp_subflow_get_mapped_dsn(subflow);
+		u64 fin_seq;
+
+		smp_rmb(); /* ensure we see the updated rcv_data_fin_seq */
+		fin_seq = READ_ONCE(msk->rcv_data_fin_seq);
+		if (!before64(seq, fin_seq) ||
+		    !before64(seq + len, fin_seq + 1))
+			return true;
+	}
+	return false;
+}
+
 static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 					   struct sock *ssk, bool own_msk)
 {
@@ -826,7 +845,8 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 		u32 map_remaining, offset;
 		u32 seq = tp->copied_seq;
 		struct sk_buff *skb;
-		bool fin;
+		bool fin, data_fin;
+		size_t len;
 
 		/* try to move as much data as available */
 		map_remaining = subflow->map_data_len -
@@ -850,9 +870,9 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 		if (fin)
 			seq++;
 
-		if (offset < skb->len) {
-			size_t len = skb->len - offset;
-
+		len = skb->len - offset;
+		data_fin = mptcp_seq_after_data_fin(msk, ssk, len);
+		if (len > 0 && !data_fin) {
 			mptcp_init_skb(ssk, skb, offset, len);
 
 			if (own_msk) {
@@ -870,7 +890,7 @@ static bool __mptcp_move_skbs_from_subflow(struct mptcp_sock *msk,
 		} else {
 			sk_eat_skb(ssk, skb);
 
-			if (unlikely(!fin)) {
+			if (len == 0 && unlikely(!fin)) {
 				DEBUG_NET_WARN_ON_ONCE(1);
 				mptcp_dss_corruption(msk, ssk);
 			}
