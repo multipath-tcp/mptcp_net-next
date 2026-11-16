@@ -12913,6 +12913,7 @@ enum mlx5_ifc_vhca_state {
 enum {
 	MLX5_PCI_PF_TYPE_EXTERNAL_HOST_PF = 0x0,
 	MLX5_PCI_PF_TYPE_SATELLITE_PF = 0x1,
+	MLX5_PCI_PF_TYPE_QUERY_PF = 0x2,
 };
 
 struct mlx5_ifc_network_function_params_bits {
