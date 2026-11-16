@@ -1340,9 +1340,7 @@ void mlx5_lag_rescan_dev_locked(struct mlx5_lag *ldev,
 static void mlx5_lag_rescan_devices_locked_filter(struct mlx5_lag *ldev,
 						  bool enable, u32 filter)
 {
-	struct mlx5_core_dev *devs[MLX5_MAX_PORTS];
 	struct lag_fn *fn;
-	int num_devs = 0;
 	int i;
 
 	mlx5_lag_assert_locked_transition(ldev, filter);
@@ -1356,12 +1354,16 @@ static void mlx5_lag_rescan_devices_locked_filter(struct mlx5_lag *ldev,
 			fn->dev->priv.flags &= ~MLX5_PRIV_FLAGS_DISABLE_IB_ADEV;
 		else
 			fn->dev->priv.flags |= MLX5_PRIV_FLAGS_DISABLE_IB_ADEV;
-		devs[num_devs++] = fn->dev;
 	}
 
 	mlx5_lag_drop_lock_for_reps(ldev, filter);
-	for (i = 0; i < num_devs; i++)
-		mlx5_rescan_drivers_locked(devs[i]);
+	mlx5_lag_for_each(i, 0, ldev, filter) {
+		fn = mlx5_lag_fn(ldev, i);
+		if (fn->dev->priv.flags & MLX5_PRIV_FLAGS_DISABLE_ALL_ADEV)
+			continue;
+
+		mlx5_rescan_drivers_locked(fn->dev);
+	}
 	mlx5_lag_retake_lock_after_reps(ldev);
 }
 
