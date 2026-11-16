@@ -199,12 +199,9 @@ static void mpnic_txb_init(struct mpnic_dev *mpd)
 
 static void mpnic_rxb_init(struct mpnic_dev *mpd)
 {
-	/* Accept all packets that miss dmac tcam, until l2 filtering is
-	 * implemented.
-	 */
 	mpnic_wr64(mpd, MPNIC_RXB_PORT_CLASS_CFG(0),
 		   FIELD_PREP(MPNIC_RXB_PORT_CLASS_CFG_DEFAULT_L2_ACTION,
-			      MPNIC_L2_ACTION_PASS));
+			      MPNIC_L2_ACTION_DROP));
 	mpnic_wr64(mpd, MPNIC_RXB_PORT_CFG(0),
 		   FIELD_PREP(MPNIC_RXB_PORT_CFG_FCS_STRIP_MODE,
 			      MPNIC_FCS_MODE_STRIP));

@@ -7,6 +7,33 @@
 #include "mpnic.h"
 #include "mpnic_rpc.h"
 
+void mpnic_promisc_sync(struct mpnic_dev *mpd, bool uc_promisc,
+			bool mc_promisc)
+{
+	struct mpnic_mac_addr *mac_addr;
+
+	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_PROMISC_IDX];
+	if (uc_promisc) {
+		if (!is_zero_ether_addr(mac_addr->value) ||
+		    mac_addr->state != MPNIC_TCAM_S_VALID) {
+			eth_zero_addr(mac_addr->value);
+			eth_zero_addr(mac_addr->mask);
+			mac_addr->state = MPNIC_TCAM_S_ADD;
+		}
+	} else if (mc_promisc) {
+		if (!is_multicast_ether_addr(mac_addr->value) ||
+		    mac_addr->state != MPNIC_TCAM_S_VALID) {
+			eth_zero_addr(mac_addr->value);
+			eth_zero_addr(mac_addr->mask);
+			mac_addr->value[0] ^= 1;
+			mac_addr->mask[0] ^= 1;
+			mac_addr->state = MPNIC_TCAM_S_ADD;
+		}
+	} else if (mac_addr->state == MPNIC_TCAM_S_VALID) {
+		mac_addr->state = MPNIC_TCAM_S_DELETE;
+	}
+}
+
 static void mpnic_write_macda_entry(struct mpnic_dev *mpd, unsigned int idx,
 				    struct mpnic_mac_addr *mac_addr)
 {

@@ -31,6 +31,7 @@ enum {
 
 #define MPNIC_TCAM_MACDA_BROADCAST_IDX	0
 #define MPNIC_TCAM_MACDA_HOST_ADDR_IDX	(MPNIC_RXB_DMAC_TCAM_CNT - 2)
+#define MPNIC_TCAM_MACDA_PROMISC_IDX	(MPNIC_RXB_DMAC_TCAM_CNT - 1)
 
 struct mpnic_mac_addr {
 	u8 mask[ETH_ALEN];
@@ -38,6 +39,8 @@ struct mpnic_mac_addr {
 	u8 state;
 } __aligned(2);
 
+void mpnic_promisc_sync(struct mpnic_dev *mpd, bool uc_promisc,
+			bool mc_promisc);
 void mpnic_write_macda(struct mpnic_dev *mpd);
 
 #endif /* _MPNIC_RPC_H_ */

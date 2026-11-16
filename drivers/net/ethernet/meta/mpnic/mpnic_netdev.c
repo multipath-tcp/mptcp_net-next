@@ -12,8 +12,10 @@
 #include "mpnic_netdev.h"
 #include "mpnic_txrx.h"
 
-static void __mpnic_set_rx_mode(struct mpnic_dev *mpd)
+static void __mpnic_set_rx_mode(struct mpnic_dev *mpd,
+				struct netdev_hw_addr_list *mc)
 {
+	bool uc_promisc = false, mc_promisc = false;
 	struct net_device *netdev = mpd->netdev;
 	struct mpnic_mac_addr *mac_addr;
 
@@ -33,6 +35,14 @@ static void __mpnic_set_rx_mode(struct mpnic_dev *mpd)
 		mac_addr->state = MPNIC_TCAM_S_ADD;
 	}
 
+	if (!netdev_hw_addr_list_empty(mc))
+		mc_promisc = true;
+
+	uc_promisc |= netdev->flags & IFF_PROMISC;
+	mc_promisc |= netdev->flags & IFF_ALLMULTI;
+
+	mpnic_promisc_sync(mpd, uc_promisc, mc_promisc);
+
 	mpnic_write_macda(mpd);
 }
 
@@ -43,7 +53,7 @@ static int mpnic_set_rx_mode(struct net_device *netdev,
 	struct mpnic_net *mpn = netdev_priv(netdev);
 
 	if (netif_running(netdev))
-		__mpnic_set_rx_mode(mpn->mpd);
+		__mpnic_set_rx_mode(mpn->mpd, mc);
 
 	return 0;
 }
@@ -54,6 +64,7 @@ static void mpnic_clear_rx_mode(struct mpnic_dev *mpd)
 
 	mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX].state = MPNIC_TCAM_S_DELETE;
 	mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX].state = MPNIC_TCAM_S_DELETE;
+	mac_addr[MPNIC_TCAM_MACDA_PROMISC_IDX].state = MPNIC_TCAM_S_DELETE;
 
 	mpnic_write_macda(mpd);
 }
@@ -79,7 +90,11 @@ static int mpnic_open(struct net_device *netdev)
 
 	mpnic_enable(mpn);
 	mpnic_fill(mpn);
-	__mpnic_set_rx_mode(mpn->mpd);
+
+	netif_addr_lock_bh(netdev);
+	__mpnic_set_rx_mode(mpn->mpd, &netdev->mc);
+	netif_addr_unlock_bh(netdev);
+
 	mpnic_napi_enable(mpn);
 
 	netif_tx_wake_all_queues(netdev);
