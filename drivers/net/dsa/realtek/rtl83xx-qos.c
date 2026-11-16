@@ -5,7 +5,7 @@
  * is an 802.1Q traffic type. dcbnl uses 802.1p priorities. An 802.1p priority
  * equals the PCP value in the default PCP decoding (IEEE 802.1Q-2022 6.9.3).
  * This layer converts at its edges: every priority it hands a backend is an
- * internal priority.
+ * internal priority, except the 802.1p PCP given to untagged frames.
  *
  * The backend maps internal priorities to its egress queues itself.
  */
@@ -60,6 +60,7 @@ EXPORT_SYMBOL_NS_GPL(rtl83xx_qos_init, "REALTEK_DSA");
 int rtl83xx_qos_init_port(struct dsa_switch *ds, int port)
 {
 	struct realtek_priv *priv = ds->priv;
+	int untag_pcp;
 
 	if (!priv->ops->qos_set_port_prio)
 		return -EOPNOTSUPP;
@@ -68,8 +69,13 @@ int rtl83xx_qos_init_port(struct dsa_switch *ds, int port)
 	if (dsa_is_unused_port(ds, port))
 		return 0;
 
-	/* Best Effort, not internal priority 0, which is Background */
-	return priv->ops->qos_set_port_prio(priv, port, IEEE8021Q_TT_BE);
+	untag_pcp = ieee8021q_tt_to_pcp(IEEE8021Q_TT_BE);
+	if (untag_pcp < 0)
+		return untag_pcp;
+
+	/* iprio is Best Effort, not 0, which is Background */
+	return priv->ops->qos_set_port_prio(priv, port, IEEE8021Q_TT_BE,
+					    untag_pcp);
 }
 EXPORT_SYMBOL_NS_GPL(rtl83xx_qos_init_port, "REALTEK_DSA");
 
@@ -104,6 +110,6 @@ int rtl83xx_port_set_default_prio(struct dsa_switch *ds, int port, u8 prio)
 	if (tt < 0)
 		return tt;
 
-	return priv->ops->qos_set_port_prio(priv, port, tt);
+	return priv->ops->qos_set_port_prio(priv, port, tt, prio);
 }
 EXPORT_SYMBOL_NS_GPL(rtl83xx_port_set_default_prio, "REALTEK_DSA");

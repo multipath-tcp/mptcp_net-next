@@ -165,8 +165,12 @@ struct realtek_ops {
 	 * priority. A *_prio getter returns an iprio or a negative errno.
 	 */
 	int	(*qos_get_port_prio)(struct realtek_priv *priv, int port);
+	/* Set the priority of @port to @iprio, and make @untag_pcp the PCP
+	 * given to untagged frames on @port. @untag_pcp is an 802.1p
+	 * priority, not an iprio.
+	 */
 	int	(*qos_set_port_prio)(struct realtek_priv *priv, int port,
-				     u8 iprio);
+				     u8 iprio, u8 untag_pcp);
 	int	(*qos_set_pcp_prio)(struct realtek_priv *priv, u8 pcp,
 				    u8 iprio);
 	int	(*qos_set_dscp_prio)(struct realtek_priv *priv, u8 dscp,

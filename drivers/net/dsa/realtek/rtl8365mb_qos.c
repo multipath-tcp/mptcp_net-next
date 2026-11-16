@@ -64,6 +64,14 @@ static_assert(RTL8365MB_QOS_QMAP_DEFAULT < RTL8365MB_QOS_NUM_QMAPS);
 #define RTL8365MB_QOS_1Q_REMAP_REG(_pcp) \
 	(0x0865 + (_pcp) / RTL8365MB_QOS_SELS_PER_REG)
 
+/* PCP given to untagged frames, one 3-bit field per port */
+#define RTL8365MB_QOS_PORT_UNTAG_PCP_REG(_p) \
+	(0x0851 + (_p) / RTL8365MB_QOS_SELS_PER_REG)
+
+/* Ports 0..7 fit in 0x0851..0x0852 */
+static_assert(RTL8365MB_QOS_PORT_UNTAG_PCP_REG(RTL8365MB_QOS_MAX_PORTS - 1) <=
+	      0x0852);
+
 /* Port-based (default) priority, one select per port */
 #define RTL8365MB_QOS_PORT_PRI_REG(_p) \
 	(0x0877 + (_p) / RTL8365MB_QOS_SELS_PER_REG)
@@ -184,13 +192,20 @@ int rtl8365mb_qos_get_port_prio(struct realtek_priv *priv, int port)
 					       rtl8365mb_qos_sel_mask(port));
 }
 
-int rtl8365mb_qos_set_port_prio(struct realtek_priv *priv, int port, u8 iprio)
+int rtl8365mb_qos_set_port_prio(struct realtek_priv *priv, int port, u8 iprio,
+				u8 untag_pcp)
 {
+	u32 untag_reg = RTL8365MB_QOS_PORT_UNTAG_PCP_REG(port);
 	u32 reg = RTL8365MB_QOS_PORT_PRI_REG(port);
 	u32 mask = rtl8365mb_qos_sel_mask(port);
 	int ret;
 
 	ret = rtl8365mb_qos_check_port(priv, port);
+	if (ret)
+		return ret;
+
+	ret = rtl8365mb_qos_regmap_update_field(priv, untag_reg, mask,
+						untag_pcp);
 	if (ret)
 		return ret;
 
