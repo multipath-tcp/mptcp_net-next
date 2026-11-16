@@ -42,6 +42,7 @@ enum ieee8021q_traffic_type {
 
 int ietf_dscp_to_ieee8021q_tt(u8 dscp);
 int ieee8021q_pcp_to_tt(u8 pcp);
+int ieee8021q_tt_to_pcp(enum ieee8021q_traffic_type tt);
 int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues);
 
 #else
@@ -52,6 +53,11 @@ static inline int ietf_dscp_to_ieee8021q_tt(u8 dscp)
 }
 
 static inline int ieee8021q_pcp_to_tt(u8 pcp)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int ieee8021q_tt_to_pcp(enum ieee8021q_traffic_type tt)
 {
 	return -EOPNOTSUPP;
 }

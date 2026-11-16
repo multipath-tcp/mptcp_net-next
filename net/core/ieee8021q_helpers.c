@@ -245,6 +245,8 @@ static const u8 ieee8021q_pcp_to_tt_map[] = {
 
 static_assert(ARRAY_SIZE(ieee8021q_pcp_to_tt_map) ==
 	      (VLAN_PRIO_MASK >> VLAN_PRIO_SHIFT) + 1);
+/* ieee8021q_tt_to_pcp() needs one entry per traffic type. */
+static_assert(ARRAY_SIZE(ieee8021q_pcp_to_tt_map) == IEEE8021Q_TT_MAX);
 
 /**
  * ieee8021q_pcp_to_tt - Map an IEEE 802.1Q PCP to a traffic type
@@ -269,3 +271,27 @@ int ieee8021q_pcp_to_tt(u8 pcp)
 	return ieee8021q_pcp_to_tt_map[pcp];
 }
 EXPORT_SYMBOL_GPL(ieee8021q_pcp_to_tt);
+
+/**
+ * ieee8021q_tt_to_pcp - Map an IEEE 802.1Q traffic type to a PCP
+ * @tt: IEEE 802.1Q traffic type
+ *
+ * Encode @tt to its priority per Table I-2 (IEEE 802.1Q-2022, I.4). Then
+ * encode the priority to its PCP per the 8P0D row of Table 6-2 (6.9.3). This
+ * is the inverse of ieee8021q_pcp_to_tt(). The enum values of Best Effort and
+ * Background are not their priorities, see &enum ieee8021q_traffic_type.
+ *
+ * Return: the PCP (0..7), or -EINVAL if @tt is not a traffic type. Without
+ * CONFIG_NET_IEEE8021Q_HELPERS, the stub returns -EOPNOTSUPP.
+ */
+int ieee8021q_tt_to_pcp(enum ieee8021q_traffic_type tt)
+{
+	int pcp;
+
+	for (pcp = 0; pcp < ARRAY_SIZE(ieee8021q_pcp_to_tt_map); pcp++)
+		if (ieee8021q_pcp_to_tt_map[pcp] == tt)
+			return pcp;
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(ieee8021q_tt_to_pcp);
