@@ -100,6 +100,15 @@ struct realtek_priv {
 	void			*chip_data; /* Per-chip extra variant data */
 };
 
+/* apptrust selector slots: the index into the trust[] array of the
+ * qos_get/set_apptrust callbacks, in precedence order (highest first)
+ */
+enum rtl83xx_apptrust_slot {
+	RTL83XX_APPTRUST_DSCP,
+	RTL83XX_APPTRUST_PCP,
+	RTL83XX_APPTRUST_COUNT,
+};
+
 /*
  * struct realtek_ops - vtable for the per-SMI-chiptype operations
  * @detect: detects the chiptype
@@ -175,6 +184,13 @@ struct realtek_ops {
 				    u8 iprio);
 	int	(*qos_set_dscp_prio)(struct realtek_priv *priv, u8 dscp,
 				     u8 iprio);
+	/* @trust is indexed by enum rtl83xx_apptrust_slot and has @n entries.
+	 * The trust scope (per port or switch-wide) differs between chips.
+	 */
+	int	(*qos_set_apptrust)(struct realtek_priv *priv, int port,
+				    const bool *trust, unsigned int n);
+	int	(*qos_get_apptrust)(struct realtek_priv *priv, int port,
+				    bool *trust, unsigned int n);
 };
 
 struct realtek_variant {

@@ -12,6 +12,7 @@
 #include <linux/build_bug.h>
 #include <linux/dcbnl.h>
 #include <linux/regmap.h>
+#include <linux/string.h>
 #include <net/dsa.h>
 #include <net/dscp.h>
 #include <net/ieee8021q.h>
@@ -114,6 +115,8 @@ static_assert(RTL8365MB_QOS_WEIGHT_BITS * RTL8365MB_QOS_WEIGHTS_PER_REG <=
 #define RTL8365MB_QOS_PRIDEC_TABLE_UNTRUSTED		0
 #define RTL8365MB_QOS_PRIDEC_TABLE_TRUSTED		1
 
+static_assert(RTL8365MB_QOS_MAX_PORTS <= RTL8365MB_QOS_REG_BITS);
+
 /* Priority-decision sources, in the hardware's numbering */
 enum rtl8365mb_qos_pridec_src {
 	RTL8365MB_QOS_PRIDEC_PORT = 0,
@@ -140,6 +143,36 @@ static_assert(RTL8365MB_QOS_PRIDEC_REG(RTL8365MB_QOS_PRIDEC_TABLE_TRUSTED,
  */
 #define RTL8365MB_QOS_WEIGHT_DISABLED			0
 #define RTL8365MB_QOS_WEIGHT_PORT			BIT(0)
+
+/* Priority-decision source of each apptrust slot */
+static const u8 rtl8365mb_qos_apptrust_src[] = {
+	[RTL83XX_APPTRUST_DSCP]	= RTL8365MB_QOS_PRIDEC_DSCP,
+	[RTL83XX_APPTRUST_PCP]	= RTL8365MB_QOS_PRIDEC_1Q,
+};
+
+/* The 1Q source also classifies untagged frames, by the PCP given to untagged
+ * frames. Ranked above DSCP, it would hide DSCP from untagged IP frames.
+ */
+static_assert(RTL83XX_APPTRUST_DSCP < RTL83XX_APPTRUST_PCP);
+
+static_assert(ARRAY_SIZE(rtl8365mb_qos_apptrust_src) ==
+	      RTL83XX_APPTRUST_COUNT);
+
+/* Register of source @_s in the trusted decision table */
+#define RTL8365MB_QOS_APPTRUST_REG(_s) \
+	RTL8365MB_QOS_PRIDEC_REG(RTL8365MB_QOS_PRIDEC_TABLE_TRUSTED, _s)
+
+/* The top trusted rank must fit in the weight field */
+static_assert((RTL8365MB_QOS_WEIGHT_PORT <<
+	       ARRAY_SIZE(rtl8365mb_qos_apptrust_src)) <
+	      BIT(RTL8365MB_QOS_WEIGHT_BITS));
+
+/* Each trusted slot outranks the port default and every later slot */
+static u8 rtl8365mb_qos_apptrust_weight(unsigned int slot)
+{
+	return RTL8365MB_QOS_WEIGHT_PORT <<
+	       (ARRAY_SIZE(rtl8365mb_qos_apptrust_src) - slot);
+}
 
 static u32 rtl8365mb_qos_sel_mask(unsigned int idx)
 {
@@ -303,6 +336,15 @@ static int rtl8365mb_qos_set_pridec(struct realtek_priv *priv, int table,
 	return rtl8365mb_qos_regmap_update_field(priv, reg, mask, weight);
 }
 
+static int rtl8365mb_qos_get_pridec(struct realtek_priv *priv, int table,
+				    int src)
+{
+	u32 reg = RTL8365MB_QOS_PRIDEC_REG(table, src);
+	u32 mask = rtl8365mb_qos_weight_mask(src);
+
+	return rtl8365mb_qos_regmap_read_field(priv, reg, mask);
+}
+
 /* Program every source in both tables rather than relying on the reset state */
 int rtl8365mb_qos_pridec_init(struct realtek_priv *priv)
 {
@@ -326,4 +368,134 @@ int rtl8365mb_qos_pridec_init(struct realtek_priv *priv)
 
 	/* In the driver's model, a clear bit selects the untrusted table */
 	return regmap_write(priv->map, RTL8365MB_QOS_PRIDEC_TBL_SEL_REG, 0);
+}
+
+/* Read the trust state of each apptrust slot from the trusted table */
+static int rtl8365mb_qos_apptrust_read(struct realtek_priv *priv, bool *trust)
+{
+	int table = RTL8365MB_QOS_PRIDEC_TABLE_TRUSTED;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(rtl8365mb_qos_apptrust_src); i++) {
+		u8 src = rtl8365mb_qos_apptrust_src[i];
+		int weight;
+
+		weight = rtl8365mb_qos_get_pridec(priv, table, src);
+		if (weight < 0)
+			return weight;
+
+		trust[i] = weight != RTL8365MB_QOS_WEIGHT_DISABLED;
+	}
+
+	return 0;
+}
+
+int rtl8365mb_qos_get_apptrust(struct realtek_priv *priv, int port, bool *trust,
+			       unsigned int n)
+{
+	u32 trusted_ports;
+	int ret;
+
+	if (n != ARRAY_SIZE(rtl8365mb_qos_apptrust_src))
+		return -EINVAL;
+
+	ret = regmap_read(priv->map, RTL8365MB_QOS_PRIDEC_TBL_SEL_REG,
+			  &trusted_ports);
+	if (ret)
+		return ret;
+
+	/* On the untrusted table nothing but the port default is trusted. */
+	if (!(trusted_ports & BIT(port))) {
+		memset(trust, 0, n * sizeof(*trust));
+		return 0;
+	}
+
+	return rtl8365mb_qos_apptrust_read(priv, trust);
+}
+
+/* The trusted table is shared by all ports. A port may switch to it only if it
+ * trusts the same sources as the other ports already on it.
+ */
+static int rtl8365mb_qos_apptrust_check_shared(struct realtek_priv *priv,
+					       int port, const bool *trust)
+{
+	bool other[ARRAY_SIZE(rtl8365mb_qos_apptrust_src)];
+	u32 trusted_ports;
+	int ret;
+
+	ret = regmap_read(priv->map, RTL8365MB_QOS_PRIDEC_TBL_SEL_REG,
+			  &trusted_ports);
+	if (ret)
+		return ret;
+
+	if (!(trusted_ports & ~BIT(port)))
+		return 0;
+
+	ret = rtl8365mb_qos_apptrust_read(priv, other);
+	if (ret)
+		return ret;
+
+	if (memcmp(trust, other, sizeof(other))) {
+		dev_err(priv->dev,
+			"trust profile is switch-wide; another port already trusts different sources\n");
+		return -EBUSY;
+	}
+
+	return 0;
+}
+
+int rtl8365mb_qos_set_apptrust(struct realtek_priv *priv, int port,
+			       const bool *trust, unsigned int n)
+{
+	u32 reg = RTL8365MB_QOS_APPTRUST_REG(rtl8365mb_qos_apptrust_src[0]);
+	u32 mask = 0, val = 0;
+	bool any = false;
+	int ret, i;
+
+	if (n != ARRAY_SIZE(rtl8365mb_qos_apptrust_src))
+		return -EINVAL;
+
+	ret = rtl8365mb_qos_check_port(priv, port);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < n; i++)
+		any |= trust[i];
+
+	if (!any)
+		return regmap_clear_bits(priv->map,
+					 RTL8365MB_QOS_PRIDEC_TBL_SEL_REG,
+					 BIT(port));
+
+	ret = rtl8365mb_qos_apptrust_check_shared(priv, port, trust);
+	if (ret)
+		return ret;
+
+	/* Collect all slot weights into one mask and value and write them once,
+	 * so a failed write cannot leave the trusted table half programmed.
+	 */
+	for (i = 0; i < n; i++) {
+		u8 weight = trust[i] ? rtl8365mb_qos_apptrust_weight(i) :
+				       RTL8365MB_QOS_WEIGHT_DISABLED;
+		u8 src = rtl8365mb_qos_apptrust_src[i];
+		u32 src_mask = rtl8365mb_qos_weight_mask(src);
+
+		/* A slot missing from rtl8365mb_qos_apptrust_src[] is 0, which
+		 * is the port source. Reject it. Also reject a source whose
+		 * weight is in a different register than reg.
+		 */
+		if (WARN_ON_ONCE(src == RTL8365MB_QOS_PRIDEC_PORT ||
+				 RTL8365MB_QOS_APPTRUST_REG(src) != reg))
+			return -EINVAL;
+
+		mask |= src_mask;
+		val |= field_prep(src_mask, weight);
+	}
+
+	ret = regmap_update_bits(priv->map, reg, mask, val);
+	if (ret)
+		return ret;
+
+	return regmap_set_bits(priv->map, RTL8365MB_QOS_PRIDEC_TBL_SEL_REG,
+			       BIT(port));
 }

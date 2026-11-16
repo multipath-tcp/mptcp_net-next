@@ -10,6 +10,7 @@
  * The backend maps internal priorities to its egress queues itself.
  */
 
+#include <linux/build_bug.h>
 #include <linux/dcbnl.h>
 #include <linux/errno.h>
 #include <net/dscp.h>
@@ -18,6 +19,25 @@
 
 #include "realtek.h"
 #include "rtl83xx-qos.h"
+
+/* dcbnl selector of each apptrust slot */
+static const u8 rtl83xx_apptrust_sel[] = {
+	[RTL83XX_APPTRUST_DSCP]	= IEEE_8021QAZ_APP_SEL_DSCP,
+	[RTL83XX_APPTRUST_PCP]	= DCB_APP_SEL_PCP,
+};
+
+static_assert(ARRAY_SIZE(rtl83xx_apptrust_sel) == RTL83XX_APPTRUST_COUNT);
+
+static int rtl83xx_apptrust_sel_to_slot(u8 sel)
+{
+	int slot;
+
+	for (slot = 0; slot < ARRAY_SIZE(rtl83xx_apptrust_sel); slot++)
+		if (rtl83xx_apptrust_sel[slot] == sel)
+			return slot;
+
+	return -EINVAL;
+}
 
 /* Seed the PCP and DSCP tables, although neither source is trusted yet */
 int rtl83xx_qos_init(struct dsa_switch *ds)
@@ -113,3 +133,59 @@ int rtl83xx_port_set_default_prio(struct dsa_switch *ds, int port, u8 prio)
 	return priv->ops->qos_set_port_prio(priv, port, tt, prio);
 }
 EXPORT_SYMBOL_NS_GPL(rtl83xx_port_set_default_prio, "REALTEK_DSA");
+
+int rtl83xx_port_get_apptrust(struct dsa_switch *ds, int port, u8 *sel,
+			      int *nsel)
+{
+	bool trust[ARRAY_SIZE(rtl83xx_apptrust_sel)];
+	struct realtek_priv *priv = ds->priv;
+	int i, ret;
+
+	if (!priv->ops->qos_get_apptrust)
+		return -EOPNOTSUPP;
+
+	ret = priv->ops->qos_get_apptrust(priv, port, trust,
+					  ARRAY_SIZE(trust));
+	if (ret)
+		return ret;
+
+	*nsel = 0;
+
+	for (i = 0; i < ARRAY_SIZE(rtl83xx_apptrust_sel); i++)
+		if (trust[i])
+			sel[(*nsel)++] = rtl83xx_apptrust_sel[i];
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(rtl83xx_port_get_apptrust, "REALTEK_DSA");
+
+int rtl83xx_port_set_apptrust(struct dsa_switch *ds, int port, const u8 *sel,
+			      int nsel)
+{
+	bool trust[ARRAY_SIZE(rtl83xx_apptrust_sel)] = { };
+	struct realtek_priv *priv = ds->priv;
+	int i, prev = -1;
+
+	if (!priv->ops->qos_set_apptrust)
+		return -EOPNOTSUPP;
+
+	/* The backends use a fixed precedence, so the selector list
+	 * must follow the slot order.
+	 */
+	for (i = 0; i < nsel; i++) {
+		int slot = rtl83xx_apptrust_sel_to_slot(sel[i]);
+
+		if (slot < 0 || slot <= prev) {
+			dev_err(priv->dev,
+				"unsupported apptrust order; supported: dscp, pcp, dscp pcp\n");
+			return -EOPNOTSUPP;
+		}
+
+		prev = slot;
+		trust[slot] = true;
+	}
+
+	return priv->ops->qos_set_apptrust(priv, port, trust,
+					   ARRAY_SIZE(trust));
+}
+EXPORT_SYMBOL_NS_GPL(rtl83xx_port_set_apptrust, "REALTEK_DSA");
