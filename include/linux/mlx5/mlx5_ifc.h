@@ -3448,7 +3448,7 @@ struct mlx5_ifc_nic_cap_reg_bits {
 	u8	   vhca_icm_ctrl[0x1];
 	u8	   reserved_at_1b[0x5];
 
-	u8	   reserved_at_20[0x60];
+	u8	   reserved_at_20[0x3e0];
 };
 
 struct mlx5_ifc_default_timeout_bits {
