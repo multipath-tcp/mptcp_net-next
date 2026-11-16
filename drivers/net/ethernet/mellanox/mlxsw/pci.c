@@ -89,9 +89,6 @@ struct mlxsw_pci_queue {
 			struct page_pool *page_pool;
 		} cq;
 		struct {
-			struct tasklet_struct tasklet;
-		} eq;
-		struct {
 			struct mlxsw_pci_queue *cq;
 		} rdq;
 	} u;
@@ -1111,15 +1108,18 @@ static char *mlxsw_pci_eq_sw_eqe_get(struct mlxsw_pci_queue *q)
 	return elem;
 }
 
-static void mlxsw_pci_eq_tasklet(struct tasklet_struct *t)
+static irqreturn_t mlxsw_pci_eq_irq_handler(int irq, void *dev_id)
 {
 	unsigned long active_cqns[BITS_TO_LONGS(MLXSW_PCI_CQS_MAX)];
-	struct mlxsw_pci_queue *q = from_tasklet(q, t, u.eq.tasklet);
-	struct mlxsw_pci *mlxsw_pci = q->pci;
-	int credits = q->count >> 1;
+	struct mlxsw_pci *mlxsw_pci = dev_id;
+	struct mlxsw_pci_queue *q;
 	u8 cqn, cq_count;
 	int items = 0;
+	int credits;
 	char *eqe;
+
+	q = mlxsw_pci_eq_get(mlxsw_pci);
+	credits = q->count >> 1;
 
 	memset(&active_cqns, 0, sizeof(active_cqns));
 
@@ -1132,7 +1132,7 @@ static void mlxsw_pci_eq_tasklet(struct tasklet_struct *t)
 	}
 
 	if (!items)
-		return;
+		return IRQ_HANDLED;
 
 	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 	mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
@@ -1140,8 +1140,10 @@ static void mlxsw_pci_eq_tasklet(struct tasklet_struct *t)
 	cq_count = mlxsw_pci->num_cqs;
 	for_each_set_bit(cqn, active_cqns, cq_count) {
 		q = mlxsw_pci_cq_get(mlxsw_pci, cqn);
-		napi_schedule(&q->u.cq.napi);
+		napi_schedule_irqoff(&q->u.cq.napi);
 	}
+
+	return IRQ_HANDLED;
 }
 
 static int mlxsw_pci_eq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
@@ -1176,7 +1178,6 @@ static int mlxsw_pci_eq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	err = mlxsw_cmd_sw2hw_eq(mlxsw_pci->core, mbox, q->num);
 	if (err)
 		return err;
-	tasklet_setup(&q->u.eq.tasklet, mlxsw_pci_eq_tasklet);
 	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 	mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 	return 0;
@@ -1728,16 +1729,6 @@ static void mlxsw_pci_fw_area_fini(struct mlxsw_pci *mlxsw_pci)
 				  mem_item->buf, mem_item->mapaddr);
 	}
 	kfree(mlxsw_pci->fw_area.items);
-}
-
-static irqreturn_t mlxsw_pci_eq_irq_handler(int irq, void *dev_id)
-{
-	struct mlxsw_pci *mlxsw_pci = dev_id;
-	struct mlxsw_pci_queue *q;
-
-	q = mlxsw_pci_eq_get(mlxsw_pci);
-	tasklet_schedule(&q->u.eq.tasklet);
-	return IRQ_HANDLED;
 }
 
 static int mlxsw_pci_mbox_alloc(struct mlxsw_pci *mlxsw_pci,
