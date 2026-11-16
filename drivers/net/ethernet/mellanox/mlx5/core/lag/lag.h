@@ -51,7 +51,7 @@ enum mlx5_lag_mode {
 	MLX5_LAG_MODE_MPESW,
 };
 
-struct lag_func {
+struct lag_fn {
 	struct mlx5_core_dev *dev;
 	struct net_device    *netdev;
 	bool has_drop;
@@ -83,13 +83,13 @@ struct mlx5_lag {
 	unsigned long		  mode_flags;
 	unsigned long		  state_flags;
 	u8			  ports;
-	u8			  max_funcs;
+	u8			  max_fns;
 	u8			  buckets;
 	bool			  virt_lag;
 	int			  mode_changes_in_progress;
 	u8			  *v2p_map;
 	struct kref               ref;
-	struct xarray             pfs;
+	struct xarray             fns;
 	struct lag_tracker        tracker;
 	struct workqueue_struct   *wq;
 	struct delayed_work       bond_work;
@@ -109,44 +109,44 @@ mlx5_lag_dev(struct mlx5_core_dev *dev)
 	return dev->priv.lag;
 }
 
-static inline struct lag_func *
-mlx5_lag_pf(struct mlx5_lag *ldev, unsigned int idx)
+static inline struct lag_fn *
+mlx5_lag_fn(struct mlx5_lag *ldev, unsigned int idx)
 {
-	return xa_load(&ldev->pfs, idx);
+	return xa_load(&ldev->fns, idx);
 }
 
 /* Get device index (mlx5_get_dev_index) from xarray index */
 static inline int mlx5_lag_xa_to_dev_idx(struct mlx5_lag *ldev, int xa_idx)
 {
-	struct lag_func *pf = mlx5_lag_pf(ldev, xa_idx);
+	struct lag_fn *fn = mlx5_lag_fn(ldev, xa_idx);
 
-	return pf ? mlx5_get_dev_index(pf->dev) : -ENOENT;
+	return fn ? mlx5_get_dev_index(fn->dev) : -ENOENT;
 }
 
-/* Find lag_func by device index (reverse lookup from mlx5_get_dev_index) */
-static inline struct lag_func *
-mlx5_lag_pf_by_dev_idx(struct mlx5_lag *ldev, int dev_idx)
+/* Find lag_fn by device index (reverse lookup from mlx5_get_dev_index) */
+static inline struct lag_fn *
+mlx5_lag_fn_by_dev_idx(struct mlx5_lag *ldev, int dev_idx)
 {
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	unsigned long idx;
 
-	xa_for_each(&ldev->pfs, idx, pf) {
-		if (mlx5_get_dev_index(pf->dev) == dev_idx)
-			return pf;
+	xa_for_each(&ldev->fns, idx, fn) {
+		if (mlx5_get_dev_index(fn->dev) == dev_idx)
+			return fn;
 	}
 	return NULL;
 }
 
-/* Find lag_func by mlx5_core_dev pointer */
-static inline struct lag_func *
-mlx5_lag_pf_by_dev(struct mlx5_lag *ldev, struct mlx5_core_dev *dev)
+/* Find lag_fn by mlx5_core_dev pointer */
+static inline struct lag_fn *
+mlx5_lag_fn_by_dev(struct mlx5_lag *ldev, struct mlx5_core_dev *dev)
 {
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	unsigned long idx;
 
-	xa_for_each(&ldev->pfs, idx, pf) {
-		if (pf->dev == dev)
-			return pf;
+	xa_for_each(&ldev->fns, idx, fn) {
+		if (fn->dev == dev)
+			return fn;
 	}
 	return NULL;
 }
@@ -154,17 +154,17 @@ mlx5_lag_pf_by_dev(struct mlx5_lag *ldev, struct mlx5_core_dev *dev)
 static inline bool
 __mlx5_lag_is_sd(struct mlx5_lag *ldev, struct mlx5_core_dev *dev)
 {
-	struct lag_func *pf = mlx5_lag_pf_by_dev(ldev, dev);
+	struct lag_fn *fn = mlx5_lag_fn_by_dev(ldev, dev);
 
-	return pf && pf->group_id != 0;
+	return fn && fn->group_id != 0;
 }
 
 static inline bool
 __mlx5_lag_dev_is_port(struct mlx5_lag *ldev, struct mlx5_core_dev *dev)
 {
-	struct lag_func *pf = mlx5_lag_pf_by_dev(ldev, dev);
+	struct lag_fn *fn = mlx5_lag_fn_by_dev(ldev, dev);
 
-	return pf && xa_get_mark(&ldev->pfs, pf->idx, MLX5_LAG_XA_MARK_PORT);
+	return fn && xa_get_mark(&ldev->fns, fn->idx, MLX5_LAG_XA_MARK_PORT);
 }
 
 static inline bool
@@ -290,7 +290,7 @@ static inline bool mlx5_lag_is_supported(struct mlx5_core_dev *dev)
 #define mlx5_lag_for_each(i, start_index, ldev, filter) \
 	for (int tmp = start_index; \
 	     tmp = mlx5_get_next_lag_func(ldev, tmp, filter), \
-	     i = tmp, tmp < (ldev)->max_funcs; tmp++)
+	     i = tmp, tmp < (ldev)->max_fns; tmp++)
 
 #define mlx5_lag_for_each_reverse(i, start_index, end_index, ldev, filter) \
 	for (int tmp = start_index, tmp1 = end_index; \

@@ -16,7 +16,7 @@ static void mlx5_mpesw_metadata_cleanup(struct mlx5_lag *ldev)
 	int i;
 
 	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
-		dev = mlx5_lag_pf(ldev, i)->dev;
+		dev = mlx5_lag_fn(ldev, i)->dev;
 		esw = dev->priv.eswitch;
 		pf_metadata = ldev->lag_mpesw.pf_metadata[i];
 		if (!pf_metadata)
@@ -37,7 +37,7 @@ static int mlx5_mpesw_metadata_set(struct mlx5_lag *ldev)
 	int i, err;
 
 	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
-		dev = mlx5_lag_pf(ldev, i)->dev;
+		dev = mlx5_lag_fn(ldev, i)->dev;
 		esw = dev->priv.eswitch;
 		pf_metadata = mlx5_esw_match_metadata_alloc(esw);
 		if (!pf_metadata) {
@@ -53,7 +53,7 @@ static int mlx5_mpesw_metadata_set(struct mlx5_lag *ldev)
 	}
 
 	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
-		dev = mlx5_lag_pf(ldev, i)->dev;
+		dev = mlx5_lag_fn(ldev, i)->dev;
 		mlx5_notifier_call_chain(dev->priv.events, MLX5_DEV_EVENT_MULTIPORT_ESW,
 					 (void *)0);
 	}
@@ -67,14 +67,14 @@ err_metadata:
 
 static void mlx5_mpesw_restore_sd_fdb(struct mlx5_lag *ldev)
 {
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int err, i;
 
 	mlx5_ldev_for_each(i, 0, ldev) {
-		pf = mlx5_lag_pf(ldev, i);
-		err = mlx5_lag_shared_fdb_create(ldev, NULL, 0, pf->group_id);
+		fn = mlx5_lag_fn(ldev, i);
+		err = mlx5_lag_shared_fdb_create(ldev, NULL, 0, fn->group_id);
 		if (err)
-			mlx5_core_warn(pf->dev,
+			mlx5_core_warn(fn->dev,
 				       "Failed to restore SD shared FDB (%d)\n",
 				       err);
 	}
@@ -82,26 +82,26 @@ static void mlx5_mpesw_restore_sd_fdb(struct mlx5_lag *ldev)
 
 static int mlx5_mpesw_teardown_sd_fdb(struct mlx5_lag *ldev)
 {
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int i;
 
 	mlx5_ldev_for_each(i, 0, ldev) {
-		pf = mlx5_lag_pf(ldev, i);
-		if (!pf->sd_fdb_active)
+		fn = mlx5_lag_fn(ldev, i);
+		if (!fn->sd_fdb_active)
 			continue;
-		mlx5_lag_shared_fdb_destroy(ldev, pf->group_id);
+		mlx5_lag_shared_fdb_destroy(ldev, fn->group_id);
 	}
 	return 0;
 }
 
 static bool mlx5_lag_has_sd_group(struct mlx5_lag *ldev)
 {
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int i;
 
 	mlx5_ldev_for_each(i, 0, ldev) {
-		pf = mlx5_lag_pf(ldev, i);
-		if (pf->group_id)
+		fn = mlx5_lag_fn(ldev, i);
+		if (fn->group_id)
 			return true;
 	}
 	return false;
@@ -155,7 +155,7 @@ static int mlx5_lag_enable_mpesw(struct mlx5_lag *ldev)
 		goto err_clear_master;
 	}
 
-	dev0 = mlx5_lag_pf(ldev, idx)->dev;
+	dev0 = mlx5_lag_fn(ldev, idx)->dev;
 	valid = ldev->virt_lag ? mlx5_virt_mpesw_validate(ldev, dev0) :
 		mlx5_phys_mpesw_validate(ldev, dev0);
 	if (!valid) {
@@ -212,7 +212,7 @@ void mlx5_mpesw_sd_devcoms_lock(struct mlx5_lag *ldev)
 	int i;
 
 	mlx5_ldev_for_each(i, 0, ldev) {
-		sd_devcom = mlx5_sd_get_devcom(mlx5_lag_pf(ldev, i)->dev);
+		sd_devcom = mlx5_sd_get_devcom(mlx5_lag_fn(ldev, i)->dev);
 		if (sd_devcom)
 			mlx5_devcom_comp_lock(sd_devcom);
 	}
@@ -223,8 +223,8 @@ void mlx5_mpesw_sd_devcoms_unlock(struct mlx5_lag *ldev)
 	struct mlx5_devcom_comp_dev *sd_devcom;
 	int i;
 
-	mlx5_ldev_for_each_reverse(i, ldev->max_funcs, 0, ldev) {
-		sd_devcom = mlx5_sd_get_devcom(mlx5_lag_pf(ldev, i)->dev);
+	mlx5_ldev_for_each_reverse(i, ldev->max_fns, 0, ldev) {
+		sd_devcom = mlx5_sd_get_devcom(mlx5_lag_fn(ldev, i)->dev);
 		if (sd_devcom)
 			mlx5_devcom_comp_unlock(sd_devcom);
 	}
@@ -348,10 +348,10 @@ int mlx5_lag_mpesw_port_change_event(struct notifier_block *nb,
 				     unsigned long event, void *data)
 {
 	struct mlx5_nb *mlx5_nb = container_of(nb, struct mlx5_nb, nb);
-	struct lag_func *lag_func = container_of(mlx5_nb,
-						 struct lag_func,
+	struct lag_fn *lag_fn = container_of(mlx5_nb,
+						 struct lag_fn,
 						 port_change_nb);
-	struct mlx5_core_dev *dev = lag_func->dev;
+	struct mlx5_core_dev *dev = lag_fn->dev;
 	struct mlx5_lag *ldev = dev->priv.lag;
 	struct mlx5_eqe *eqe = data;
 
