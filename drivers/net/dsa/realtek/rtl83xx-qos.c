@@ -134,6 +134,25 @@ int rtl83xx_port_set_default_prio(struct dsa_switch *ds, int port, u8 prio)
 }
 EXPORT_SYMBOL_NS_GPL(rtl83xx_port_set_default_prio, "REALTEK_DSA");
 
+int rtl83xx_port_get_dscp_prio(struct dsa_switch *ds, int port, u8 dscp)
+{
+	struct realtek_priv *priv = ds->priv;
+	int tt;
+
+	if (!priv->ops->qos_get_dscp_prio)
+		return -EOPNOTSUPP;
+
+	if (dscp >= DSCP_MAX)
+		return -EINVAL;
+
+	tt = priv->ops->qos_get_dscp_prio(priv, dscp);
+	if (tt < 0)
+		return tt;
+
+	return ieee8021q_tt_to_pcp(tt);
+}
+EXPORT_SYMBOL_NS_GPL(rtl83xx_port_get_dscp_prio, "REALTEK_DSA");
+
 int rtl83xx_port_get_apptrust(struct dsa_switch *ds, int port, u8 *sel,
 			      int *nsel)
 {

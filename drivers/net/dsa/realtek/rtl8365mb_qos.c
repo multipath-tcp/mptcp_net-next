@@ -253,6 +253,13 @@ int rtl8365mb_qos_set_pcp_prio(struct realtek_priv *priv, u8 pcp, u8 iprio)
 	return rtl8365mb_qos_regmap_update_field(priv, reg, mask, iprio);
 }
 
+int rtl8365mb_qos_get_dscp_prio(struct realtek_priv *priv, u8 dscp)
+{
+	return rtl8365mb_qos_regmap_read_field(priv,
+					       RTL8365MB_QOS_DSCP_PRI_REG(dscp),
+					       rtl8365mb_qos_sel_mask(dscp));
+}
+
 int rtl8365mb_qos_set_dscp_prio(struct realtek_priv *priv, u8 dscp, u8 iprio)
 {
 	u32 reg = RTL8365MB_QOS_DSCP_PRI_REG(dscp);

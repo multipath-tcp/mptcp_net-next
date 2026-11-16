@@ -15,5 +15,6 @@ int rtl83xx_port_get_apptrust(struct dsa_switch *ds, int port, u8 *sel,
 			      int *nsel);
 int rtl83xx_port_set_apptrust(struct dsa_switch *ds, int port, const u8 *sel,
 			      int nsel);
+int rtl83xx_port_get_dscp_prio(struct dsa_switch *ds, int port, u8 dscp);
 
 #endif /* _RTL83XX_QOS_H */

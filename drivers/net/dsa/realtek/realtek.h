@@ -182,6 +182,7 @@ struct realtek_ops {
 				     u8 iprio, u8 untag_pcp);
 	int	(*qos_set_pcp_prio)(struct realtek_priv *priv, u8 pcp,
 				    u8 iprio);
+	int	(*qos_get_dscp_prio)(struct realtek_priv *priv, u8 dscp);
 	int	(*qos_set_dscp_prio)(struct realtek_priv *priv, u8 dscp,
 				     u8 iprio);
 	/* @trust is indexed by enum rtl83xx_apptrust_slot and has @n entries.
