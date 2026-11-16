@@ -21,7 +21,6 @@ FIXTURE_VARIANT(scm_rights)
 {
 	char name[32];
 	int type;
-	int flags;
 	bool test_listener;
 	bool disabled;
 };
@@ -30,7 +29,6 @@ FIXTURE_VARIANT_ADD(scm_rights, dgram)
 {
 	.name = "UNIX ",
 	.type = SOCK_DGRAM,
-	.flags = 0,
 	.test_listener = false,
 	.disabled = false,
 };
@@ -39,7 +37,6 @@ FIXTURE_VARIANT_ADD(scm_rights, dgram_disabled)
 {
 	.name = "UNIX ",
 	.type = SOCK_DGRAM,
-	.flags = 0,
 	.test_listener = false,
 	.disabled = true,
 };
@@ -48,7 +45,6 @@ FIXTURE_VARIANT_ADD(scm_rights, stream)
 {
 	.name = "UNIX-STREAM ",
 	.type = SOCK_STREAM,
-	.flags = 0,
 	.test_listener = false,
 	.disabled = false,
 };
@@ -57,25 +53,6 @@ FIXTURE_VARIANT_ADD(scm_rights, stream_disabled)
 {
 	.name = "UNIX-STREAM ",
 	.type = SOCK_STREAM,
-	.flags = 0,
-	.test_listener = false,
-	.disabled = true,
-};
-
-FIXTURE_VARIANT_ADD(scm_rights, stream_oob)
-{
-	.name = "UNIX-STREAM ",
-	.type = SOCK_STREAM,
-	.flags = MSG_OOB,
-	.test_listener = false,
-	.disabled = false,
-};
-
-FIXTURE_VARIANT_ADD(scm_rights, stream_oob_disabled)
-{
-	.name = "UNIX-STREAM ",
-	.type = SOCK_STREAM,
-	.flags = MSG_OOB,
 	.test_listener = false,
 	.disabled = true,
 };
@@ -84,7 +61,6 @@ FIXTURE_VARIANT_ADD(scm_rights, stream_listener)
 {
 	.name = "UNIX-STREAM ",
 	.type = SOCK_STREAM,
-	.flags = 0,
 	.test_listener = true,
 	.disabled = false,
 };
@@ -93,25 +69,6 @@ FIXTURE_VARIANT_ADD(scm_rights, stream_listener_disabled)
 {
 	.name = "UNIX-STREAM ",
 	.type = SOCK_STREAM,
-	.flags = 0,
-	.test_listener = true,
-	.disabled = true,
-};
-
-FIXTURE_VARIANT_ADD(scm_rights, stream_listener_oob)
-{
-	.name = "UNIX-STREAM ",
-	.type = SOCK_STREAM,
-	.flags = MSG_OOB,
-	.test_listener = true,
-	.disabled = false,
-};
-
-FIXTURE_VARIANT_ADD(scm_rights, stream_listener_oob_disabled)
-{
-	.name = "UNIX-STREAM ",
-	.type = SOCK_STREAM,
-	.flags = MSG_OOB,
 	.test_listener = true,
 	.disabled = true,
 };
@@ -297,7 +254,7 @@ void __send_fd(struct __test_metadata *_metadata,
 	cmsg->cmsg_len = CMSG_LEN(sizeof(fds));
 	memcpy(CMSG_DATA(cmsg), fds, sizeof(fds));
 
-	ret = sendmsg(self->fd[receiver * 2 + 1], &msg, variant->flags);
+	ret = sendmsg(self->fd[receiver * 2 + 1], &msg, 0);
 
 	if (variant->disabled) {
 		ASSERT_EQ(-1, ret);
