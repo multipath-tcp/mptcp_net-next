@@ -128,10 +128,13 @@
 #define MPTCP_SYNC_SNDBUF	7
 #define MPTCP_SYNC_SEQ		8
 
+#define MPTCP_SKB_CB_F_OFFSET	(TCPHDR_FLAGS_MASK + 1)
+
 struct mptcp_skb_cb {
 	u64 map_seq;
 	u64 end_seq;
 	u32 offset;
+	u16 flags;
 	u8  has_rxtstamp;
 };
 
