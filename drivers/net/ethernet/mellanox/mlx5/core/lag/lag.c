@@ -173,9 +173,11 @@ static u32 mlx5_lag_dev_group_id(struct mlx5_core_dev *dev)
 	return 0;
 }
 
-static int mlx5_lag_is_sw_lag(struct mlx5_core_dev *dev)
+bool mlx5_lag_is_sw_managed(struct mlx5_core_dev *dev)
 {
-	return mlx5_lag_is_sd(dev);
+	struct mlx5_lag *ldev = mlx5_lag_dev(dev);
+
+	return mlx5_lag_is_sd(dev) || (ldev && ldev->virt_lag);
 }
 
 int mlx5_cmd_create_vport_lag(struct mlx5_core_dev *dev)
@@ -184,7 +186,7 @@ int mlx5_cmd_create_vport_lag(struct mlx5_core_dev *dev)
 	struct mlx5_lag *ldev = mlx5_lag_dev(dev);
 	int ret;
 
-	if (mlx5_lag_is_sw_lag(dev)) {
+	if (mlx5_lag_is_sw_managed(dev)) {
 		if (!ldev)
 			return -ENODEV;
 
@@ -206,7 +208,7 @@ int mlx5_cmd_destroy_vport_lag(struct mlx5_core_dev *dev)
 	u32 in[MLX5_ST_SZ_DW(destroy_vport_lag_in)] = {};
 	struct mlx5_lag *ldev = mlx5_lag_dev(dev);
 
-	if (mlx5_lag_is_sw_lag(dev)) {
+	if (mlx5_lag_is_sw_managed(dev)) {
 		if (!ldev)
 			return 0;
 
@@ -1911,7 +1913,7 @@ int mlx5_lag_demux_init(struct mlx5_core_dev *dev,
 
 	xa_init(&pf->lag_demux_rules);
 
-	if (mlx5_lag_is_sw_lag(dev))
+	if (mlx5_lag_is_sw_managed(dev))
 		return mlx5_lag_demux_ft_fg_init(dev, ft_attr, pf);
 
 	return mlx5_lag_demux_fw_init(dev, ft_attr, pf);
