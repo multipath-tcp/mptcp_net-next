@@ -1025,6 +1025,7 @@ static void mptcp_rcv_rtt_update(struct mptcp_sock *msk,
 {
 	const struct tcp_sock *tp = tcp_sk(subflow->tcp_sock);
 	u32 rtt_us = tp->rcv_rtt_est.rtt_us;
+	u8 scaling_ratio;
 	int id;
 
 	/* Update once per subflow per rcvwnd to avoid touching the msk
@@ -1041,9 +1042,13 @@ static void mptcp_rcv_rtt_update(struct mptcp_sock *msk,
 	if (++msk->rcv_rtt_est.next_sample == MPTCP_RTT_SAMPLES)
 		msk->rcv_rtt_est.next_sample = 0;
 
-	/* EWMA among the incoming subflows */
-	msk->scaling_ratio = ((msk->scaling_ratio << 3) - msk->scaling_ratio +
-			     tp->scaling_ratio) >> 3;
+	/* EWMA among the incoming subflows.
+	 * Pairs with READ_ONCE() in mptcp_win_from_space().
+	 */
+	scaling_ratio = READ_ONCE(msk->scaling_ratio);
+	WRITE_ONCE(msk->scaling_ratio,
+		   ((scaling_ratio << 3) - scaling_ratio +
+		    tp->scaling_ratio) >> 3);
 }
 
 void mptcp_data_ready(struct sock *sk, struct sock *ssk)
