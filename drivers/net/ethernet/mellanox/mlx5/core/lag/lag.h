@@ -83,6 +83,7 @@ struct mlx5_lag {
 	unsigned long		  mode_flags;
 	unsigned long		  state_flags;
 	u8			  ports;
+	u8			  max_funcs;
 	u8			  buckets;
 	bool			  virt_lag;
 	int			  mode_changes_in_progress;
@@ -289,7 +290,7 @@ static inline bool mlx5_lag_is_supported(struct mlx5_core_dev *dev)
 #define mlx5_lag_for_each(i, start_index, ldev, filter) \
 	for (int tmp = start_index; \
 	     tmp = mlx5_get_next_lag_func(ldev, tmp, filter), \
-	     i = tmp, tmp < MLX5_MAX_PORTS; tmp++)
+	     i = tmp, tmp < (ldev)->max_funcs; tmp++)
 
 #define mlx5_lag_for_each_reverse(i, start_index, end_index, ldev, filter) \
 	for (int tmp = start_index, tmp1 = end_index; \

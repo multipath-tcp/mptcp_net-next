@@ -71,7 +71,7 @@ static int mlx5_lag_create_single_fdb_filter(struct mlx5_lag *ldev, u32 filter)
 
 		err = mlx5_eswitch_offloads_single_fdb_add_one(master_esw,
 							       slave_esw,
-							       ldev->ports);
+							       ldev->max_funcs);
 		if (err)
 			goto err;
 	}

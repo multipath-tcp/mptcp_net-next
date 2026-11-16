@@ -395,6 +395,7 @@ static struct mlx5_lag *mlx5_lag_dev_alloc(struct mlx5_core_dev *dev)
 		mlx5_core_err(dev, "Failed to init multipath lag err=%d\n",
 			      err);
 
+	ldev->max_funcs = ldev->ports;
 	return ldev;
 
 err_wq:
@@ -1283,7 +1284,7 @@ static void mlx5_lag_assert_locked_transition(struct mlx5_lag *ldev, u32 filter)
 	lockdep_assert_held(&ldev->lock);
 
 	i = mlx5_get_next_lag_func(ldev, 0, filter);
-	if (i < MLX5_MAX_PORTS) {
+	if (i < ldev->max_funcs) {
 		pf = mlx5_lag_pf(ldev, i);
 		if (filter == MLX5_LAG_FILTER_PORTS ||
 		    filter == MLX5_LAG_FILTER_ALL)
@@ -1830,7 +1831,7 @@ struct mlx5_devcom_comp_dev *mlx5_lag_get_devcom_comp(struct mlx5_lag *ldev)
 	filter = ldev->virt_lag ? MLX5_LAG_FILTER_ALL :
 		MLX5_LAG_FILTER_PORTS;
 	i = mlx5_get_next_lag_func(ldev, 0, filter);
-	if (i < MLX5_MAX_PORTS) {
+	if (i < ldev->max_funcs) {
 		pf = mlx5_lag_pf(ldev, i);
 		devcom = pf->dev->priv.hca_devcom_comp;
 	}
@@ -2094,7 +2095,7 @@ static int mlx5_handle_changeupper_event(struct mlx5_lag *ldev,
 				break;
 			}
 		}
-		if (i < MLX5_MAX_PORTS) {
+		if (i < ldev->ports) {
 			if (netif_is_bond_master(upper)) {
 				slave = bond_slave_get_rcu(ndev_tmp);
 				if (slave)
@@ -2359,13 +2360,16 @@ int mlx5_ldev_add_mdev(struct mlx5_lag *ldev,
 	if (!pf)
 		return -ENOMEM;
 
-	err = xa_alloc(&ldev->pfs, &idx, pf, XA_LIMIT(0, MLX5_MAX_PORTS - 1),
+	err = xa_alloc(&ldev->pfs, &idx, pf, XA_LIMIT(0, U8_MAX - 1),
 		       GFP_KERNEL);
 	if (err) {
 		kfree(pf);
 		return err;
 	}
 
+	/* max_funcs is the iteration ceiling; grow it, never shrink. */
+	if (idx >= ldev->max_funcs)
+		ldev->max_funcs = idx + 1;
 	pf->idx = idx;
 	pf->dev = dev;
 	pf->group_id = group_id;
@@ -2394,7 +2398,7 @@ void mlx5_ldev_remove_mdev(struct mlx5_lag *ldev,
 		if (pf->dev == dev)
 			break;
 	}
-	if (i >= MLX5_MAX_PORTS)
+	if (i >= ldev->max_funcs)
 		return;
 
 	if (pf->port_change_nb.nb.notifier_call)
@@ -2607,7 +2611,7 @@ int mlx5_get_next_lag_func(struct mlx5_lag *ldev, int start_idx, u32 filter)
 					 MLX5_LAG_XA_MARK_PORT, start_idx)
 			if (pf->dev)
 				return idx;
-		return MLX5_MAX_PORTS;
+		return ldev->max_funcs;
 	}
 
 	xa_for_each_start(&ldev->pfs, idx, pf, start_idx) {
@@ -2617,7 +2621,7 @@ int mlx5_get_next_lag_func(struct mlx5_lag *ldev, int start_idx, u32 filter)
 		    filter == pf->group_id)
 			return idx;
 	}
-	return MLX5_MAX_PORTS;
+	return ldev->max_funcs;
 }
 
 bool mlx5_lag_is_roce(struct mlx5_core_dev *dev)
@@ -2867,7 +2871,7 @@ struct mlx5_core_dev *mlx5_lag_get_next_peer_mdev(struct mlx5_core_dev *dev, int
 	if (!ldev)
 		goto unlock;
 
-	if (*i == MLX5_MAX_PORTS)
+	if (*i == ldev->max_funcs)
 		goto unlock;
 	mlx5_lag_for_each(idx, *i, ldev, mlx5_lag_get_filter(ldev, dev)) {
 		pf = mlx5_lag_pf(ldev, idx);
@@ -2875,7 +2879,7 @@ struct mlx5_core_dev *mlx5_lag_get_next_peer_mdev(struct mlx5_core_dev *dev, int
 			break;
 	}
 
-	if (idx == MLX5_MAX_PORTS) {
+	if (idx == ldev->max_funcs) {
 		*i = idx;
 		goto unlock;
 	}

@@ -223,7 +223,7 @@ void mlx5_mpesw_sd_devcoms_unlock(struct mlx5_lag *ldev)
 	struct mlx5_devcom_comp_dev *sd_devcom;
 	int i;
 
-	mlx5_ldev_for_each_reverse(i, MLX5_MAX_PORTS, 0, ldev) {
+	mlx5_ldev_for_each_reverse(i, ldev->max_funcs, 0, ldev) {
 		sd_devcom = mlx5_sd_get_devcom(mlx5_lag_pf(ldev, i)->dev);
 		if (sd_devcom)
 			mlx5_devcom_comp_unlock(sd_devcom);
