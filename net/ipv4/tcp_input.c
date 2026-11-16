@@ -5850,8 +5850,10 @@ static void
 tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
 	     struct sk_buff *head, struct sk_buff *tail, u32 start)
 {
+	int old_truesize, new_truesize;
 	struct sk_buff *skb = head, *n;
 	struct sk_buff_head tmp;
+	int remainder, nskbs;
 	u8 scaling_ratio;
 	u32 sub_end;
 
@@ -5891,6 +5893,7 @@ restart:
 
 	/* Second, find consecutive collapsible skb. */
 	sub_end = TCP_SKB_CB(skb)->end_seq;
+	old_truesize = skb->truesize;
 
 	for (n = tcp_skb_next(skb, list); n && n != tail; n = tcp_skb_next(n, list)) {
 		if (!skb_frags_readable(n) ||
@@ -5898,8 +5901,10 @@ restart:
 		    !tcp_skb_can_collapse_rx(skb, n))
 			break;
 
-		if (!after(TCP_SKB_CB(n)->end_seq, sub_end))
+		if (!after(TCP_SKB_CB(n)->end_seq, sub_end)) {
+			old_truesize += n->truesize;
 			continue;
+		}
 
 		/* seq and end_seq must increase monotonically for rbtree. */
 		if ((list || !before(TCP_SKB_CB(n)->seq, sub_end)) &&
@@ -5908,6 +5913,23 @@ restart:
 			break;
 
 		sub_end = TCP_SKB_CB(n)->end_seq;
+		old_truesize += n->truesize;
+	}
+
+	/* Third, check if the new skbs have high density. */
+	nskbs = (sub_end - start) / TCP_COLLAPSE_MAX_SIZE;
+	new_truesize = nskbs * SKB_TRUESIZE(TCP_COLLAPSE_MAX_SIZE);
+
+	remainder = (sub_end - start) % TCP_COLLAPSE_MAX_SIZE;
+	if (remainder) {
+		nskbs++;
+		new_truesize += compute_skb_truesize(remainder, GFP_ATOMIC);
+	}
+
+	if (old_truesize <= new_truesize) {
+		start = sub_end;
+		skb = n;
+		goto restart;
 	}
 
 	while (before(start, sub_end)) {
