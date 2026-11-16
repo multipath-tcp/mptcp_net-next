@@ -159,6 +159,18 @@ struct realtek_ops {
 				int regnum);
 	int	(*phy_write_c45)(struct realtek_priv *priv, int phy, int devad,
 				 int regnum, u16 val);
+
+	/* QoS/DCB backend callbacks for rtl83xx-qos.c. An iprio is an internal
+	 * priority holding an enum ieee8021q_traffic_type value, not an 802.1p
+	 * priority. A *_prio getter returns an iprio or a negative errno.
+	 */
+	int	(*qos_get_port_prio)(struct realtek_priv *priv, int port);
+	int	(*qos_set_port_prio)(struct realtek_priv *priv, int port,
+				     u8 iprio);
+	int	(*qos_set_pcp_prio)(struct realtek_priv *priv, u8 pcp,
+				    u8 iprio);
+	int	(*qos_set_dscp_prio)(struct realtek_priv *priv, u8 dscp,
+				     u8 iprio);
 };
 
 struct realtek_variant {
