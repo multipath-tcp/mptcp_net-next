@@ -83,6 +83,25 @@ static int mpnic_set_rx_mode(struct net_device *netdev,
 	return 0;
 }
 
+static int mpnic_set_mac(struct net_device *netdev, void *p)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+	struct sockaddr *addr = p;
+
+	if (!is_valid_ether_addr(addr->sa_data))
+		return -EADDRNOTAVAIL;
+
+	eth_hw_addr_set(netdev, addr->sa_data);
+
+	if (netif_running(netdev)) {
+		netif_addr_lock_bh(netdev);
+		__mpnic_set_rx_mode(mpn->mpd, &netdev->uc, &netdev->mc);
+		netif_addr_unlock_bh(netdev);
+	}
+
+	return 0;
+}
+
 static void mpnic_clear_rx_mode(struct mpnic_dev *mpd)
 {
 	struct mpnic_mac_addr *mac_addr = mpd->mac_addr;
@@ -237,6 +256,7 @@ static const struct net_device_ops mpnic_netdev_ops = {
 	.ndo_open		= mpnic_open,
 	.ndo_stop		= mpnic_stop,
 	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= mpnic_set_mac,
 	.ndo_start_xmit		= mpnic_xmit_frame,
 	.ndo_features_check	= mpnic_features_check,
 	.ndo_set_rx_mode_async	= mpnic_set_rx_mode,
