@@ -1,2 +1,54 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-push-queued-data-on-subflows-falling-back-at-the-handshake
+Subject: [PATCH] mptcp: push queued data on subflows falling back at the handshake
+
+With TCP Fast Open, the data written by an MPTCP server before the 3rd
+ACK is not sent when this ACK arrives without MPTCP options, but only
+when another event triggers a push, e.g. new data from the peer.
+
+The previous commit pushes this data when the third ACK, with the
+MP_CAPABLE option, makes a passive TFO subflow fully established. If
+this ACK has no MPTCP options, e.g. because a middlebox removed them,
+check_fully_established() falls back to TCP, and returns before this
+push. The fallback case of mptcp_incoming_options(), which pushes the
+pending data, is only reached with the next packets.
+
+The fix used here is to push the pending data after this fallback too.
+Not only for the passive TFO subflows: data can also be pending on the
+client side, when the first ACK from the server has no MPTCP options,
+e.g. if the window announced by the SYN+ACK was too small for it. Same
+here, this data was then only sent when another event triggered a push.
+
+This issue has been found by an AI code review agent (Clashiko), while
+reviewing an earlier version of the previous commit. It has been
+reproduced with a new Packetdrill test, where the MPTCP options are
+removed from the third ACK. Without this patch, and before the earlier
+commit "mptcp: arm the rtx timer if a push leaves data behind", this
+data was not sent:
+
+  server-tfo-fallback-write-before-3rd-ack.pkt:26: error handling packet: Timed out waiting for packet
+
+Since this earlier commit, this data is sent, but only when the MPTCP
+retransmission timer fires, here after one second, as the test increases
+its interval:
+
+  server-tfo-fallback-write-before-3rd-ack.pkt:26: error handling packet: timing error: expected outbound packet at 0.235869 sec but happened at 1.144189 sec; tolerance 0.100000 sec
+
+The client side case has been reported by Sashiko, while reviewing an
+earlier version of this commit, and confirmed with another new
+Packetdrill test, where the client writes more data than the window of
+the SYN+ACK, before an ACK without MPTCP options. Without this patch:
+
+  v1_connect_fallback_pending_data.pkt:30: error handling packet: timing error: expected outbound packet at 0.251394 sec but happened at 1.195904 sec; tolerance 0.100000 sec
+
+Two Fixes tags: the passive TFO case comes from the first commit, and
+the client side one from the second one.
+
+Fixes: 36b122baf6a8 ("mptcp: add subflow_v(4,6)_send_synack()")
+Fixes: 6f8a612a33e4 ("mptcp: keep track of advertised windows right edge")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: also push on the client side, not only for passive TFO (Sashiko)
+
+Note (Sashiko on v1): with passive TFO, the pushed data stays in
+msk->rtx_queue until the next ACK, as the data in flight at fallback
+time.
