@@ -1384,6 +1384,16 @@ static inline bool subflow_simultaneous_connect(struct sock *sk)
 	return sk->sk_state == TCP_SYN_RECV && is_active_ssk(subflow);
 }
 
+static inline u64 mptcp_end_dsn(const struct sk_buff *skb)
+{
+	return MPTCP_SKB_CB(skb)->end_seq;
+}
+
+static inline u64 mptcp_dsn(const struct sk_buff *skb)
+{
+	return MPTCP_SKB_CB(skb)->map_seq;
+}
+
 #ifdef CONFIG_SYN_COOKIES
 void subflow_init_req_cookie_join_save(const struct mptcp_subflow_request_sock *subflow_req,
 				       struct sk_buff *skb);

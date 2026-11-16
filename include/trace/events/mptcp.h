@@ -223,7 +223,7 @@ TRACE_EVENT(mptcp_rcvbuf_grow,
 		__entry->space = msk->rcvq_space.space;
 		ofo_empty = RB_EMPTY_ROOT(&msk->out_of_order_queue);
 		__entry->ooo_space = ofo_empty ? 0 :
-				     MPTCP_SKB_CB(msk->ooo_last_skb)->end_seq -
+				     (u32)mptcp_end_dsn(msk->ooo_last_skb) -
 				     msk->ack_seq;
 
 		__entry->rcvbuf = sk->sk_rcvbuf;
