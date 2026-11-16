@@ -99,7 +99,7 @@ static const u8 ieee8021q_1queue_tt_tc_map[] = {
 int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues)
 {
 	if (tt < 0 || tt >= IEEE8021Q_TT_MAX) {
-		pr_err("Requested Traffic Type (%d) is out of range (%d)\n", tt,
+		pr_err("Requested Traffic Type (%u) is out of range (%u)\n", tt,
 		       IEEE8021Q_TT_MAX);
 		return -EINVAL;
 	}
@@ -131,7 +131,7 @@ int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues)
 		return ieee8021q_1queue_tt_tc_map[tt];
 	}
 
-	pr_err("Invalid number of queues %d\n", num_queues);
+	pr_err("Invalid number of queues %u\n", num_queues);
 
 	return -EINVAL;
 }
