@@ -13,10 +13,10 @@
 	compiletime_assert(ARRAY_SIZE(tbl) == IEEE8021Q_TT_MAX, \
 			   #tbl " size mismatch")
 
-/* The following arrays map Traffic Types (TT) to traffic classes (TC) for
- * different number of queues as shown in the example provided by
- * IEEE 802.1Q-2022 in Annex I "I.3 Traffic type to traffic class mapping" and
- * Table I-1 "Traffic type to traffic class mapping".
+/* The following arrays map a traffic type (TT) to a traffic class (TC) for
+ * each supported number of queues. The mapping is the traffic-type -> priority
+ * -> traffic-class composition documented in the ieee8021q_tt_to_tc() kdoc
+ * below, reduced for the given number of queues.
  */
 static const u8 ieee8021q_8queue_tt_tc_map[] = {
 	[IEEE8021Q_TT_BK] = 0,
@@ -85,17 +85,22 @@ static const u8 ieee8021q_1queue_tt_tc_map[] = {
 };
 
 /**
- * ieee8021q_tt_to_tc - Map IEEE 802.1Q Traffic Type to Traffic Class
- * @tt: IEEE 802.1Q Traffic Type
- * @num_queues: Number of queues
+ * ieee8021q_tt_to_tc - Map an IEEE 802.1Q traffic type to a traffic class
+ * @tt: IEEE 802.1Q traffic type
+ * @num_queues: number of traffic classes (queues) available, 1..8
  *
- * This function maps an IEEE 802.1Q Traffic Type to a Traffic Class (TC) based
- * on the number of queues configured on the NIC. The mapping is based on the
- * example provided by IEEE 802.1Q-2022 in Annex I "I.3 Traffic type to traffic
- * class mapping" and Table I-1 "Traffic type to traffic class mapping".
+ * Return the traffic-class number for @tt. It is the pre-computed composition
+ * of two IEEE 802.1Q-2022 mappings::
  *
- * Return: Traffic Class corresponding to the given Traffic Type or negative
- * value in case of error.
+ *   traffic type --[Table I-2]--> priority --[Table 8-5]--> traffic class
+ *
+ * Table 8-5 is the recommended priority-to-traffic-class mapping for
+ * implementations that do NOT support the credit-based shaper (8.6.8.2).
+ * Credit-based-shaper implementations have a different recommended mapping
+ * (Table 34-1 for SR classes A and B, or Table 34-2 for SR class B only),
+ * which this helper does not implement.
+ *
+ * Return: the traffic class, or a negative value on error.
  */
 int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues)
 {
