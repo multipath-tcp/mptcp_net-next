@@ -12,12 +12,30 @@
 #include "mpnic_netdev.h"
 #include "mpnic_txrx.h"
 
+static int mpnic_addr_sync(struct net_device *netdev,
+			   const unsigned char *addr)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	return mpnic_macda_sync(mpn->mpd, addr);
+}
+
+static int mpnic_addr_unsync(struct net_device *netdev,
+			     const unsigned char *addr)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	return mpnic_macda_unsync(mpn->mpd, addr);
+}
+
 static void __mpnic_set_rx_mode(struct mpnic_dev *mpd,
+				struct netdev_hw_addr_list *uc,
 				struct netdev_hw_addr_list *mc)
 {
 	bool uc_promisc = false, mc_promisc = false;
 	struct net_device *netdev = mpd->netdev;
 	struct mpnic_mac_addr *mac_addr;
+	int err;
 
 	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX];
 	if (!ether_addr_equal(mac_addr->value, netdev->dev_addr) ||
@@ -35,7 +53,14 @@ static void __mpnic_set_rx_mode(struct mpnic_dev *mpd,
 		mac_addr->state = MPNIC_TCAM_S_ADD;
 	}
 
-	if (!netdev_hw_addr_list_empty(mc))
+	err = __hw_addr_sync_dev(uc, netdev, mpnic_addr_sync,
+				 mpnic_addr_unsync);
+	if (err == -ENOSPC)
+		uc_promisc = true;
+
+	err = __hw_addr_sync_dev(mc, netdev, mpnic_addr_sync,
+				 mpnic_addr_unsync);
+	if (err == -ENOSPC)
 		mc_promisc = true;
 
 	uc_promisc |= netdev->flags & IFF_PROMISC;
@@ -53,7 +78,7 @@ static int mpnic_set_rx_mode(struct net_device *netdev,
 	struct mpnic_net *mpn = netdev_priv(netdev);
 
 	if (netif_running(netdev))
-		__mpnic_set_rx_mode(mpn->mpd, mc);
+		__mpnic_set_rx_mode(mpn->mpd, uc, mc);
 
 	return 0;
 }
@@ -61,6 +86,12 @@ static int mpnic_set_rx_mode(struct net_device *netdev,
 static void mpnic_clear_rx_mode(struct mpnic_dev *mpd)
 {
 	struct mpnic_mac_addr *mac_addr = mpd->mac_addr;
+	struct net_device *netdev = mpd->netdev;
+
+	netif_addr_lock_bh(netdev);
+	__dev_uc_unsync(netdev, mpnic_addr_unsync);
+	__dev_mc_unsync(netdev, mpnic_addr_unsync);
+	netif_addr_unlock_bh(netdev);
 
 	mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX].state = MPNIC_TCAM_S_DELETE;
 	mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX].state = MPNIC_TCAM_S_DELETE;
@@ -92,7 +123,7 @@ static int mpnic_open(struct net_device *netdev)
 	mpnic_fill(mpn);
 
 	netif_addr_lock_bh(netdev);
-	__mpnic_set_rx_mode(mpn->mpd, &netdev->mc);
+	__mpnic_set_rx_mode(mpn->mpd, &netdev->uc, &netdev->mc);
 	netif_addr_unlock_bh(netdev);
 
 	mpnic_napi_enable(mpn);
@@ -366,6 +397,7 @@ struct net_device *mpnic_netdev_alloc(struct mpnic_dev *mpd)
 	netdev->netdev_ops = &mpnic_netdev_ops;
 	netdev->stat_ops = &mpnic_stat_ops;
 	netdev->request_ops_lock = true;
+	netdev->priv_flags |= IFF_UNICAST_FLT;
 
 	mpn = netdev_priv(netdev);
 	mpn->netdev = netdev;

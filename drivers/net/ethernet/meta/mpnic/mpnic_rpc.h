@@ -21,6 +21,8 @@ struct mpnic_dev;
  *
  *  Valid     1	-> Delete     3
  *  Delete    3	-> Disabled   0
+ *
+ *  Delete    3	-> Add	      2
  */
 enum {
 	MPNIC_TCAM_S_DISABLED	= 0,
@@ -37,8 +39,11 @@ struct mpnic_mac_addr {
 	u8 mask[ETH_ALEN];
 	u8 value[ETH_ALEN];
 	u8 state;
+	u8 users;
 } __aligned(2);
 
+int mpnic_macda_sync(struct mpnic_dev *mpd, const u8 *addr);
+int mpnic_macda_unsync(struct mpnic_dev *mpd, const u8 *addr);
 void mpnic_promisc_sync(struct mpnic_dev *mpd, bool uc_promisc,
 			bool mc_promisc);
 void mpnic_write_macda(struct mpnic_dev *mpd);
