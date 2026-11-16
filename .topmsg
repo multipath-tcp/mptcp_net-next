@@ -1,2 +1,16 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-use-sk-instead-of-casting-msk-in-check_fully_established
+Subject: [PATCH] mptcp: use sk instead of casting msk in check_fully_established()
+
+The MPTCP socket is cast to a struct sock in check_fully_established(),
+to take its data lock. The next commits need it more, to push the
+pending data.
+
+Add a local 'sk' variable instead of casting msk each time: no
+functional change.
+
+The 'Fixes' tag here below is the same as the one from the next
+commits: this patch is needed to fix the issues introduced by this
+commit ID.
+
+Fixes: 36b122baf6a8 ("mptcp: add subflow_v(4,6)_send_synack()")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
