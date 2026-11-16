@@ -227,6 +227,16 @@ static void mpnic_rxb_init(struct mpnic_dev *mpd)
 
 	mpnic_wr64(mpd, MPNIC_RXB_BMC_CRDTS(0), MPNIC_RXB_INIT_BMC_CRDTS);
 
+	/* One bit per DMAC TCAM entry, set means pass on hit */
+	for (int i = 0; i < MPNIC_RXB_DMAC_ACTION_CNT; i++)
+		mpnic_wr64(mpd, MPNIC_RXB_DMAC_ACTION(i), ~0ULL);
+
+	/* Start with all DMAC TCAM entries disabled */
+	for (int i = 0; i < MPNIC_RXB_DMAC_TCAM_CNT; i++)
+		mpnic_wr64(mpd, MPNIC_RXB_DMAC_TCAM_OP,
+			   FIELD_PREP(MPNIC_RXB_DMAC_TCAM_OP_TCAM_ENTRY, i) |
+			   MPNIC_RXB_DMAC_TCAM_OP_UNLOAD_TRIG);
+
 	mpnic_wr64(mpd, MPNIC_RXB_MEM_INIT_REQ, MPNIC_MEM_INIT_RXB_VAL);
 }
 

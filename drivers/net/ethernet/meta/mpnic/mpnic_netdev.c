@@ -12,6 +12,52 @@
 #include "mpnic_netdev.h"
 #include "mpnic_txrx.h"
 
+static void __mpnic_set_rx_mode(struct mpnic_dev *mpd)
+{
+	struct net_device *netdev = mpd->netdev;
+	struct mpnic_mac_addr *mac_addr;
+
+	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX];
+	if (!ether_addr_equal(mac_addr->value, netdev->dev_addr) ||
+	    mac_addr->state != MPNIC_TCAM_S_VALID) {
+		ether_addr_copy(mac_addr->value, netdev->dev_addr);
+		eth_broadcast_addr(mac_addr->mask);
+		mac_addr->state = MPNIC_TCAM_S_ADD;
+	}
+
+	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX];
+	if (!is_broadcast_ether_addr(mac_addr->value) ||
+	    mac_addr->state != MPNIC_TCAM_S_VALID) {
+		eth_broadcast_addr(mac_addr->value);
+		eth_broadcast_addr(mac_addr->mask);
+		mac_addr->state = MPNIC_TCAM_S_ADD;
+	}
+
+	mpnic_write_macda(mpd);
+}
+
+static int mpnic_set_rx_mode(struct net_device *netdev,
+			     struct netdev_hw_addr_list *uc,
+			     struct netdev_hw_addr_list *mc)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	if (netif_running(netdev))
+		__mpnic_set_rx_mode(mpn->mpd);
+
+	return 0;
+}
+
+static void mpnic_clear_rx_mode(struct mpnic_dev *mpd)
+{
+	struct mpnic_mac_addr *mac_addr = mpd->mac_addr;
+
+	mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX].state = MPNIC_TCAM_S_DELETE;
+	mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX].state = MPNIC_TCAM_S_DELETE;
+
+	mpnic_write_macda(mpd);
+}
+
 static int mpnic_open(struct net_device *netdev)
 {
 	struct mpnic_net *mpn = netdev_priv(netdev);
@@ -33,6 +79,7 @@ static int mpnic_open(struct net_device *netdev)
 
 	mpnic_enable(mpn);
 	mpnic_fill(mpn);
+	__mpnic_set_rx_mode(mpn->mpd);
 	mpnic_napi_enable(mpn);
 
 	netif_tx_wake_all_queues(netdev);
@@ -59,6 +106,7 @@ static int mpnic_stop(struct net_device *netdev)
 	mpnic_napi_disable(mpn);
 	netif_tx_disable(netdev);
 
+	mpnic_clear_rx_mode(mpn->mpd);
 	mpnic_disable(mpn);
 	mpnic_wait_all_queues_idle(mpn->mpd);
 	mpnic_flush(mpn);
@@ -145,6 +193,7 @@ static const struct net_device_ops mpnic_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_start_xmit		= mpnic_xmit_frame,
 	.ndo_features_check	= mpnic_features_check,
+	.ndo_set_rx_mode_async	= mpnic_set_rx_mode,
 	.ndo_get_stats64	= mpnic_get_stats64,
 };
 
