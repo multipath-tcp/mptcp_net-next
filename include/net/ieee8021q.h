@@ -7,11 +7,14 @@
 #include <linux/errno.h>
 
 /**
- * enum ieee8021q_traffic_type - 802.1Q traffic type priority values (802.1Q-2022)
+ * enum ieee8021q_traffic_type - 802.1Q traffic types (802.1Q-2022)
  *
  * @IEEE8021Q_TT_BK: Background
- * @IEEE8021Q_TT_BE: Best Effort (default). According to 802.1Q-2022, BE is 0
- * but has higher priority than BK which is 1.
+ * @IEEE8021Q_TT_BE: Best Effort (default). The enum value is not the 802.1Q
+ * priority. IEEE 802.1Q-2022 (Annex I.4, Table I-2) gives Best Effort priority
+ * 0 and Background priority 1, and says that priority 1 is lower than priority
+ * 0. The enum orders the traffic types lowest first, so Background is 0 and
+ * Best Effort is 1.
  * @IEEE8021Q_TT_EE: Excellent Effort
  * @IEEE8021Q_TT_CA: Critical Applications
  * @IEEE8021Q_TT_VI: Video, < 100 ms latency and jitter
@@ -38,11 +41,17 @@ enum ieee8021q_traffic_type {
 #if IS_ENABLED(CONFIG_NET_IEEE8021Q_HELPERS)
 
 int ietf_dscp_to_ieee8021q_tt(u8 dscp);
+int ieee8021q_pcp_to_tt(u8 pcp);
 int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues);
 
 #else
 
 static inline int ietf_dscp_to_ieee8021q_tt(u8 dscp)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int ieee8021q_pcp_to_tt(u8 pcp)
 {
 	return -EOPNOTSUPP;
 }

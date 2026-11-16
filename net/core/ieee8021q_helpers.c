@@ -2,6 +2,7 @@
 // Copyright (c) 2024 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
 
 #include <linux/array_size.h>
+#include <linux/if_vlan.h>
 #include <linux/printk.h>
 #include <linux/types.h>
 #include <net/dscp.h>
@@ -222,3 +223,44 @@ int ietf_dscp_to_ieee8021q_tt(u8 dscp)
 	return SIMPLE_IETF_DSCP_TO_IEEE8021Q_TT(dscp);
 }
 EXPORT_SYMBOL_GPL(ietf_dscp_to_ieee8021q_tt);
+
+/* Index: the PCP, which in 8P0D is the 802.1Q priority. Priority 0 is Best
+ * Effort and priority 1 Background, the reverse of their enum order.
+ */
+static const u8 ieee8021q_pcp_to_tt_map[] = {
+	[0] = IEEE8021Q_TT_BE,
+	[1] = IEEE8021Q_TT_BK,
+	[2] = IEEE8021Q_TT_EE,
+	[3] = IEEE8021Q_TT_CA,
+	[4] = IEEE8021Q_TT_VI,
+	[5] = IEEE8021Q_TT_VO,
+	[6] = IEEE8021Q_TT_IC,
+	[7] = IEEE8021Q_TT_NC,
+};
+
+static_assert(ARRAY_SIZE(ieee8021q_pcp_to_tt_map) ==
+	      (VLAN_PRIO_MASK >> VLAN_PRIO_SHIFT) + 1);
+
+/**
+ * ieee8021q_pcp_to_tt - Map an IEEE 802.1Q PCP to a traffic type
+ * @pcp: IEEE 802.1Q Priority Code Point value
+ *
+ * Decode @pcp with the 8P0D row of Table 6-3 (IEEE 802.1Q-2022, 6.9.3). In that
+ * row the priority equals the PCP, and no PCP carries drop eligibility. Then
+ * look up the traffic type for that priority in Table I-2. The enum values of
+ * Best Effort and Background are not their priorities, see
+ * &enum ieee8021q_traffic_type.
+ *
+ * The other rows of Table 6-3 (7P1D, 6P2D, 5P3D) are not decoded here.
+ *
+ * Return: the traffic type, or -EINVAL if @pcp is above 7. Without
+ * CONFIG_NET_IEEE8021Q_HELPERS, the stub returns -EOPNOTSUPP.
+ */
+int ieee8021q_pcp_to_tt(u8 pcp)
+{
+	if (pcp >= ARRAY_SIZE(ieee8021q_pcp_to_tt_map))
+		return -EINVAL;
+
+	return ieee8021q_pcp_to_tt_map[pcp];
+}
+EXPORT_SYMBOL_GPL(ieee8021q_pcp_to_tt);
