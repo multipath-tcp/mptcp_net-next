@@ -63,6 +63,7 @@ blackhole_timeout - INTEGER (seconds)
 	blackhole issue goes away.
 
 	0 to disable the blackhole detection. This is a per-namespace sysctl.
+	The maximum value is one day (86400 seconds).
 
 	Default: 3600
 

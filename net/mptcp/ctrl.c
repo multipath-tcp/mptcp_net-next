@@ -20,6 +20,7 @@ static int mptcp_pernet_id;
 
 #ifdef CONFIG_SYSCTL
 static int mptcp_pm_type_max = __MPTCP_PM_TYPE_MAX;
+static int mptcp_blackhole_timeout_max = 24 * 3600;
 #endif
 
 struct mptcp_pernet {
@@ -350,6 +351,7 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.mode = 0644,
 		.proc_handler = proc_blackhole_detect_timeout,
 		.extra1 = SYSCTL_ZERO,
+		.extra2 = &mptcp_blackhole_timeout_max,
 	},
 	{
 		.procname = "syn_retrans_before_tcp_fallback",
