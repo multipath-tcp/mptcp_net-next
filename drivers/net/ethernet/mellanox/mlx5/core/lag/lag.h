@@ -84,6 +84,7 @@ struct mlx5_lag {
 	unsigned long		  state_flags;
 	u8			  ports;
 	u8			  buckets;
+	bool			  virt_lag;
 	int			  mode_changes_in_progress;
 	u8			  *v2p_map;
 	struct kref               ref;
@@ -225,6 +226,8 @@ static inline bool mlx5_lag_shared_fdb_supported(struct mlx5_lag *ldev)
 }
 #endif
 bool mlx5_lag_check_prereq(struct mlx5_lag *ldev);
+void mlx5_virt_lag_mark_master(struct mlx5_lag *ldev);
+void mlx5_lag_clear_master(struct mlx5_lag *ldev);
 bool mlx5_lag_is_sd(struct mlx5_core_dev *dev);
 int mlx5_lag_demux_init(struct mlx5_core_dev *dev,
 			struct mlx5_flow_table_attr *ft_attr);

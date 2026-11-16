@@ -39,6 +39,7 @@
 #include "lib/mlx5.h"
 #include "lib/devcom.h"
 #include "mlx5_core.h"
+#include "sf/dev/dev.h"
 #include "eswitch.h"
 #include "esw/acl/ofld.h"
 #include "lag.h"
@@ -598,7 +599,43 @@ static void mlx5_lag_mark_master(struct mlx5_lag *ldev)
 		xa_set_mark(&ldev->pfs, master_xa_idx, MLX5_LAG_XA_MARK_MASTER);
 }
 
-static void mlx5_lag_clear_master(struct mlx5_lag *ldev)
+static u64 mlx5_lag_member_tiebreak(struct mlx5_core_dev *dev)
+{
+	struct pci_dev *pdev = dev->pdev;
+
+	if (mlx5_core_is_sf(dev))
+		return mlx5_sf_coredev_sfnum(dev);
+
+	return ((u64)pci_domain_nr(pdev->bus) << 16) | pci_dev_id(pdev);
+}
+
+void mlx5_virt_lag_mark_master(struct mlx5_lag *ldev)
+{
+	u64 lowest_tiebreak = U64_MAX;
+	int lowest_dev_idx = INT_MAX;
+	int master_xa_idx = -1;
+	struct lag_func *pf;
+	u64 tiebreak;
+	int dev_idx;
+	int i;
+
+	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
+		pf = mlx5_lag_pf(ldev, i);
+		dev_idx = mlx5_get_dev_index(pf->dev);
+		tiebreak = mlx5_lag_member_tiebreak(pf->dev);
+		if (dev_idx < lowest_dev_idx ||
+		    (dev_idx == lowest_dev_idx && tiebreak < lowest_tiebreak)) {
+			lowest_dev_idx = dev_idx;
+			lowest_tiebreak = tiebreak;
+			master_xa_idx = i;
+		}
+	}
+
+	if (master_xa_idx >= 0)
+		xa_set_mark(&ldev->pfs, master_xa_idx, MLX5_LAG_XA_MARK_MASTER);
+}
+
+void mlx5_lag_clear_master(struct mlx5_lag *ldev)
 {
 	unsigned long idx = 0;
 	void *entry;
@@ -618,7 +655,7 @@ static int mlx5_lag_devcom_event(int event, void *my_data, void *event_data)
 	int idx;
 
 	ldev = mlx5_lag_dev(dev);
-	if (!ldev)
+	if (!ldev || ldev->virt_lag)
 		return 0;
 
 	mutex_lock(&ldev->lock);
@@ -1784,10 +1821,13 @@ struct mlx5_devcom_comp_dev *mlx5_lag_get_devcom_comp(struct mlx5_lag *ldev)
 {
 	struct mlx5_devcom_comp_dev *devcom = NULL;
 	struct lag_func *pf;
+	u32 filter;
 	int i;
 
 	mutex_lock(&ldev->lock);
-	i = mlx5_get_next_lag_func(ldev, 0, MLX5_LAG_FILTER_PORTS);
+	filter = ldev->virt_lag ? MLX5_LAG_FILTER_ALL :
+		MLX5_LAG_FILTER_PORTS;
+	i = mlx5_get_next_lag_func(ldev, 0, filter);
 	if (i < MLX5_MAX_PORTS) {
 		pf = mlx5_lag_pf(ldev, i);
 		devcom = pf->dev->priv.hca_devcom_comp;
