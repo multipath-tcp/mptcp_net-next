@@ -107,9 +107,32 @@ static bool mlx5_lag_has_sd_group(struct mlx5_lag *ldev)
 	return false;
 }
 
+static bool mlx5_phys_mpesw_validate(struct mlx5_lag *ldev,
+				     struct mlx5_core_dev *dev0)
+{
+	if (mlx5_eswitch_mode(dev0) != MLX5_ESWITCH_OFFLOADS ||
+	    !MLX5_CAP_PORT_SELECTION(dev0, port_select_flow_table) ||
+	    !MLX5_CAP_GEN(dev0, create_lag_when_not_master_up) ||
+	    !mlx5_lag_check_prereq(ldev) ||
+	    !mlx5_lag_shared_fdb_supported_filter(ldev, MLX5_LAG_FILTER_ALL))
+		return false;
+	return true;
+}
+
+static bool mlx5_virt_mpesw_validate(struct mlx5_lag *ldev,
+				     struct mlx5_core_dev *dev0)
+{
+	if (mlx5_eswitch_mode(dev0) != MLX5_ESWITCH_OFFLOADS ||
+	    !MLX5_CAP_PORT_SELECTION(dev0, port_select_eswitch) ||
+	    !mlx5_lag_shared_fdb_supported_filter(ldev, MLX5_LAG_FILTER_ALL))
+		return false;
+	return true;
+}
+
 static int mlx5_lag_enable_mpesw(struct mlx5_lag *ldev)
 {
 	struct mlx5_core_dev *dev0;
+	bool valid;
 	int idx;
 	int err;
 
@@ -133,11 +156,9 @@ static int mlx5_lag_enable_mpesw(struct mlx5_lag *ldev)
 	}
 
 	dev0 = mlx5_lag_pf(ldev, idx)->dev;
-	if (mlx5_eswitch_mode(dev0) != MLX5_ESWITCH_OFFLOADS ||
-	    !MLX5_CAP_PORT_SELECTION(dev0, port_select_flow_table) ||
-	    !MLX5_CAP_GEN(dev0, create_lag_when_not_master_up) ||
-	    !mlx5_lag_check_prereq(ldev) ||
-	    !mlx5_lag_shared_fdb_supported_filter(ldev, MLX5_LAG_FILTER_ALL)) {
+	valid = ldev->virt_lag ? mlx5_virt_mpesw_validate(ldev, dev0) :
+		mlx5_phys_mpesw_validate(ldev, dev0);
+	if (!valid) {
 		err = -EOPNOTSUPP;
 		goto err_clear_master;
 	}
