@@ -3448,7 +3448,13 @@ struct mlx5_ifc_nic_cap_reg_bits {
 	u8	   vhca_icm_ctrl[0x1];
 	u8	   reserved_at_1b[0x5];
 
-	u8	   reserved_at_20[0x3e0];
+	u8	   reserved_at_20[0x80];
+
+	u8	   reserved_at_a0[0x4];
+	u8	   sw_roce_monitor_classifier[0x4];
+	u8	   reserved_at_a8[0x18];
+
+	u8	   reserved_at_c0[0x340];
 };
 
 struct mlx5_ifc_default_timeout_bits {
@@ -4077,7 +4083,11 @@ struct mlx5_ifc_vnic_diagnostic_statistics_bits {
 
 	u8         odp_remote_triggered_page_fault[0x20];
 
-	u8         reserved_at_3c0[0xc20];
+	u8         reserved_at_3e0[0x20];
+
+	u8         sw_roce_monitor_matched_packets[0x20];
+
+	u8         reserved_at_420[0xbe0];
 };
 
 struct mlx5_ifc_traffic_counter_bits {
