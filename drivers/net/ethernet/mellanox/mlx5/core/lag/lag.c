@@ -2916,7 +2916,9 @@ int mlx5_lag_query_cong_counters(struct mlx5_core_dev *dev,
 	if (!out)
 		return -ENOMEM;
 
-	mdev = kvzalloc(sizeof(mdev[0]) * MLX5_MAX_PORTS, GFP_KERNEL);
+	ldev = mlx5_lag_dev(dev);
+	num_ports = ldev ? max_t(int, ldev->ports, 1) : 1;
+	mdev = kcalloc(num_ports, sizeof(mdev[0]), GFP_KERNEL);
 	if (!mdev) {
 		ret = -ENOMEM;
 		goto free_out;
@@ -2925,20 +2927,17 @@ int mlx5_lag_query_cong_counters(struct mlx5_core_dev *dev,
 	memset(values, 0, sizeof(*values) * num_counters);
 
 	spin_lock_irqsave(&lag_lock, flags);
-	ldev = mlx5_lag_dev(dev);
-	if (ldev && __mlx5_lag_is_active(ldev)) {
-		num_ports = ldev->ports;
+	if (ldev && __mlx5_lag_is_active(ldev) && !ldev->virt_lag) {
 		mlx5_ldev_for_each(i, 0, ldev) {
 			fn = mlx5_lag_fn(ldev, i);
 			mdev[idx++] = fn->dev;
 		}
 	} else {
-		num_ports = 1;
-		mdev[MLX5_LAG_P1] = dev;
+		mdev[idx++] = dev;
 	}
 	spin_unlock_irqrestore(&lag_lock, flags);
 
-	for (i = 0; i < num_ports; ++i) {
+	for (i = 0; i < idx; ++i) {
 		u32 in[MLX5_ST_SZ_DW(query_cong_statistics_in)] = {};
 
 		MLX5_SET(query_cong_statistics_in, in, opcode,
@@ -2953,7 +2952,7 @@ int mlx5_lag_query_cong_counters(struct mlx5_core_dev *dev,
 	}
 
 free_mdev:
-	kvfree(mdev);
+	kfree(mdev);
 free_out:
 	kvfree(out);
 	return ret;

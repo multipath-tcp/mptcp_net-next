@@ -15,6 +15,9 @@ static void mlx5_mpesw_metadata_cleanup(struct mlx5_lag *ldev)
 	u32 pf_metadata;
 	int i;
 
+	if (!ldev->lag_mpesw.pf_metadata)
+		return;
+
 	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
 		dev = mlx5_lag_fn(ldev, i)->dev;
 		esw = dev->priv.eswitch;
@@ -27,6 +30,9 @@ static void mlx5_mpesw_metadata_cleanup(struct mlx5_lag *ldev)
 		mlx5_esw_match_metadata_free(esw, pf_metadata);
 		ldev->lag_mpesw.pf_metadata[i] = 0;
 	}
+
+	kfree(ldev->lag_mpesw.pf_metadata);
+	ldev->lag_mpesw.pf_metadata = NULL;
 }
 
 static int mlx5_mpesw_metadata_set(struct mlx5_lag *ldev)
@@ -35,6 +41,12 @@ static int mlx5_mpesw_metadata_set(struct mlx5_lag *ldev)
 	struct mlx5_eswitch *esw;
 	u32 pf_metadata;
 	int i, err;
+
+	ldev->lag_mpesw.pf_metadata =
+		kcalloc(ldev->max_fns, sizeof(*ldev->lag_mpesw.pf_metadata),
+			GFP_KERNEL);
+	if (!ldev->lag_mpesw.pf_metadata)
+		return -ENOMEM;
 
 	mlx5_lag_for_each(i, 0, ldev, MLX5_LAG_FILTER_ALL) {
 		dev = mlx5_lag_fn(ldev, i)->dev;
