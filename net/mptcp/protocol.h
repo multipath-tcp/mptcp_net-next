@@ -133,7 +133,6 @@
 struct mptcp_skb_cb {
 	u64 map_seq;
 	u64 end_seq;
-	u32 offset;
 	u16 flags;
 	u8  has_rxtstamp;
 };
@@ -314,6 +313,7 @@ struct mptcp_sock {
 	u64		rcv_data_fin_seq;
 	u64		bytes_retrans;
 	u64		bytes_consumed;
+	u64		copied_seq;
 	int		snd_burst;
 	int		old_wspace;
 	u64		recovery_snd_nxt;	/* in recovery mode accept up to this seq;
@@ -1386,12 +1386,13 @@ static inline bool subflow_simultaneous_connect(struct sock *sk)
 
 static inline u64 mptcp_end_dsn(const struct sk_buff *skb)
 {
-	return MPTCP_SKB_CB(skb)->end_seq;
+	return MPTCP_SKB_CB(skb)->map_seq + skb->len;
 }
 
 static inline u64 mptcp_dsn(const struct sk_buff *skb)
 {
-	return MPTCP_SKB_CB(skb)->map_seq;
+	return MPTCP_SKB_CB(skb)->map_seq + skb->len -
+	       (MPTCP_SKB_CB(skb)->end_seq - MPTCP_SKB_CB(skb)->map_seq);
 }
 
 #ifdef CONFIG_SYN_COOKIES
