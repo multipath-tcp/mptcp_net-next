@@ -1024,6 +1024,13 @@ this counter will be updated. It means the 'prune' fails.
 
 This counter indicates how many skbs are freed during 'collapse'.
 
+* TcpExtTCPRcvCollapseSkipped
+
+'Collapse' was skipped, because less than 1/8 of the receive buffer of
+new memory was queued since the previous 'collapse'.
+A high rate can indicate a peer repeatedly sending segments that can
+not be queued.
+
 examples
 ========
 
