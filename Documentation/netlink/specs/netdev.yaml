@@ -378,6 +378,11 @@ attribute-sets:
       up to the total number of events, will only be reported for currently
       active objects, and will likely report the number of events since last
       reconfiguration.
+      Basic Tx counters (`tx-packets` and `tx-bytes`) count only packets which
+      successfully reached the device, while offload-related counters
+      (e.g. `tx-needs-csum`, `tx-hw-gso-packets`) may be incremented at
+      submission time, and so may include packets which never reached
+      the device (e.g. dropped due to a queue flush or reconfiguration).
     attributes:
       -
         name: ifindex
@@ -510,9 +515,8 @@ attribute-sets:
       -
         name: tx-needs-csum
         doc: |
-          Number of packets that required the device to calculate the checksum.
-          This counter includes the number of GSO wire packets for which device
-          calculated the L4 checksum.
+          Number of packets which requested the device to fill in the checksum.
+          For GSO packets, this counter counts wire packets.
         type: uint
       -
         name: tx-hw-gso-packets
