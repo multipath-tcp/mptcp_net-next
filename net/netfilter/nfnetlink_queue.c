@@ -1830,10 +1830,15 @@ static int nfqa_parse_bridge(struct nf_queue_entry *entry,
 
 		if (mac_header_len != nla_len(nfqa[NFQA_L2HDR]))
 			return -EINVAL;
-		else if (mac_header_len > 0)
+
+		if (mac_header_len > 0) {
+			if (skb_ensure_writable(entry->skb, 0))
+				return -ENOMEM;
+
 			memcpy(skb_mac_header(entry->skb),
 			       nla_data(nfqa[NFQA_L2HDR]),
 			       mac_header_len);
+		}
 	}
 
 	return 0;
