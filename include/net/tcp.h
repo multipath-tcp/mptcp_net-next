@@ -1806,7 +1806,7 @@ static inline int __tcp_space_from_win(u8 scaling_ratio, int win)
 	u64 val = (u64)win << TCP_RMEM_TO_WIN_SCALE;
 
 	do_div(val, scaling_ratio);
-	return val;
+	return min_t(u64, val, INT_MAX);
 }
 
 static inline int tcp_space_from_win(const struct sock *sk, int win)
