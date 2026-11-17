@@ -45,6 +45,21 @@ irqreturn_t bnge_msix(int irq, void *dev_instance)
 	return IRQ_HANDLED;
 }
 
+/* NQ0 outlives ndo_stop(). While the interface is up it is polled by NAPI
+ * like any other NQ; while it is down it has no NAPI and nq0_work services it.
+ */
+irqreturn_t bnge_nq0_msix(int irq, void *dev_instance)
+{
+	struct bnge_napi *bnapi = dev_instance;
+	struct bnge_net *bn = bnapi->bn;
+
+	if (test_bit(BNGE_STATE_NQ0_NAPI, &bn->state))
+		return bnge_msix(irq, dev_instance);
+
+	queue_work(bn->nq0_wq, &bn->nq0_work);
+	return IRQ_HANDLED;
+}
+
 static struct rx_agg_cmp *bnge_get_tpa_agg(struct bnge_net *bn,
 					   struct bnge_rx_ring_info *rxr,
 					   u16 agg_id, u16 curr)
@@ -1394,6 +1409,47 @@ int bnge_napi_poll(struct napi_struct *napi, int budget)
 	}
 poll_done:
 	return work_done;
+}
+
+/* Poll NQ0 without NAPI: handle its own events, drop notifications for CQs
+ * that no longer exist, and re-arm it.
+ *
+ * Single consumer only: call from nq0_work, or with NQ0's IRQ disabled,
+ * nq0_work cancelled and all NAPI disabled.
+ */
+void bnge_nq0_poll(struct bnge_net *bn)
+{
+	struct bnge_nq_ring_info *nqr = &bn->nq0->nq_ring;
+	u32 raw_cons = nqr->nq_raw_cons;
+
+	while (1) {
+		u32 cons = RING_CMP(bn, raw_cons);
+		struct nqe_cn *nqcmp;
+		u16 type;
+
+		nqcmp = &nqr->desc_ring[CP_RING(cons)][CP_IDX(cons)];
+		if (!NQ_CMP_VALID(bn, nqcmp, raw_cons))
+			break;
+
+		/* The valid test of the entry must be done first before
+		 * reading any further.
+		 */
+		dma_rmb();
+
+		type = le16_to_cpu(nqcmp->type);
+		if (NQE_CN_TYPE(type) != NQ_CN_TYPE_CQ_NOTIFICATION)
+			bnge_hwrm_handler(bn, (struct tx_cmp *)nqcmp);
+		raw_cons = NEXT_RAW_CMP(raw_cons);
+	}
+
+	nqr->has_more_work = 0;
+	nqr->nq_raw_cons = raw_cons;
+	BNGE_DB_NQ_ARM(bn->bd, &nqr->nq_db, raw_cons);
+}
+
+void bnge_nq0_work(struct work_struct *work)
+{
+	bnge_nq0_poll(container_of(work, struct bnge_net, nq0_work));
 }
 
 static u16 bnge_xmit_get_cfa_action(struct sk_buff *skb)

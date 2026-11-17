@@ -238,12 +238,14 @@ struct bnge_dev {
 #define bnge_warn(bd, fmt, ...)	bnge_log(warn, bd, fmt, ##__VA_ARGS__)
 #define bnge_dbg(bd, fmt, ...)	bnge_log(dbg, bd, fmt, ##__VA_ARGS__)
 
-/* Index of the first NQ created in ndo_open() and destroyed in ndo_stop();
- * lower NQs live from probe to remove.
+/* Index of the first NQ created in ndo_open() and destroyed in ndo_stop().
+ * NQ0 (index 0) lives from probe to remove and is managed by
+ * bnge_nq0_init()/uninit() and the nq0 handoff helpers; therefore,
+ * bnge_for_each_open_nq() skips it.
  *
- * irq_tbl order: probe-time NQs, aux (RoCE) vectors, open-time NQs.
+ * irq_tbl order: NQ0, aux (RoCE) vectors, open-time NQs.
  */
-#define BNGE_FIRST_OPEN_NQ	0
+#define BNGE_FIRST_OPEN_NQ	1
 
 #define bnge_for_each_open_nq(i, bd) \
 	for ((i) = BNGE_FIRST_OPEN_NQ; (i) < (bd)->nq_nr_rings; (i)++)
