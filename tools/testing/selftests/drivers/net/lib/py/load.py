@@ -3,8 +3,16 @@
 import re
 import time
 import json
+from dataclasses import dataclass
 
 from lib.py import ksft_pr, cmd, ip, rand_port, wait_port_listen
+
+
+@dataclass
+class Iperf3Result:
+    """Average throughput (Gbps) of an iperf3 run."""
+
+    throughput: float
 
 
 class Iperf3Runner:
@@ -53,9 +61,9 @@ class Iperf3Runner:
             kwargs["timeout"] = duration + 5
         return cmd(cmdline, **kwargs)
 
-    def measure_bandwidth(self, reverse=False):
+    def measure(self, reverse=False):
         """
-        Runs an iperf3 measurement and returns the average bandwidth (Gbps).
+        Runs an iperf3 measurement and returns an Iperf3Result.
         Discards the first and last few reporting intervals and uses only the
         middle part of the run where throughput is typically stable.
         """
@@ -78,7 +86,13 @@ class Iperf3Runner:
 
         avg = sum(stable) / len(stable)
 
-        return avg
+        return Iperf3Result(avg)
+
+    def measure_bandwidth(self, reverse=False):
+        """
+        Runs an iperf3 measurement and returns the average bandwidth (Gbps).
+        """
+        return self.measure(reverse=reverse).throughput
 
 
 class GenerateTraffic:
