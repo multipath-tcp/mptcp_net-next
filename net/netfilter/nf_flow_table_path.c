@@ -121,7 +121,12 @@ static int nft_dev_path_info(struct net_device_path_stack *stack,
 		case DEV_PATH_PPPOE:
 		case DEV_PATH_TUN:
 			info->dev = path->dev;
-			if (is_zero_ether_addr(info->h_source))
+			/* A tunnel device has no Ethernet address: its dev_addr
+			 * is the tunnel local IP address. Take h_source from the
+			 * real link-layer device further down the path.
+			 */
+			if (path->type != DEV_PATH_TUN &&
+			    is_zero_ether_addr(info->h_source))
 				memcpy(info->h_source, path->dev->dev_addr, ETH_ALEN);
 
 			if (path->type == DEV_PATH_ETHERNET ||
