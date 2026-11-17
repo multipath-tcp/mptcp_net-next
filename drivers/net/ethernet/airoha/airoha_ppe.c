@@ -1285,6 +1285,23 @@ free_entry:
 	return err;
 }
 
+static void airoha_ppe_flow_update_stats(struct airoha_eth *eth,
+					 struct flow_cls_offload *f,
+					 struct airoha_flow_table_entry *e)
+{
+	u32 idle = airoha_ppe_entry_idle_time(eth->ppe, e);
+
+	f->stats.lastused = jiffies - idle * HZ;
+	if (e->hash != 0xffff) {
+		struct airoha_foe_stats64 stats = {};
+
+		airoha_ppe_foe_entry_get_stats(eth->ppe, e->hash, &stats);
+		f->stats.pkts += (stats.packets - e->stats.packets);
+		f->stats.bytes += (stats.bytes - e->stats.bytes);
+		e->stats = stats;
+	}
+}
+
 static int airoha_ppe_flow_offload_destroy(struct airoha_eth *eth,
 					   struct flow_cls_offload *f)
 {
@@ -1295,6 +1312,7 @@ static int airoha_ppe_flow_offload_destroy(struct airoha_eth *eth,
 	if (!e)
 		return -ENOENT;
 
+	airoha_ppe_flow_update_stats(eth, f, e);
 	airoha_ppe_foe_flow_remove_entry(eth->ppe, e);
 	rhashtable_remove_fast(&eth->flow_table, &e->node,
 			       airoha_flow_table_params);
@@ -1342,24 +1360,13 @@ static int airoha_ppe_flow_offload_stats(struct airoha_eth *eth,
 					 struct flow_cls_offload *f)
 {
 	struct airoha_flow_table_entry *e;
-	u32 idle;
 
 	e = rhashtable_lookup(&eth->flow_table, &f->cookie,
 			      airoha_flow_table_params);
 	if (!e)
 		return -ENOENT;
 
-	idle = airoha_ppe_entry_idle_time(eth->ppe, e);
-	f->stats.lastused = jiffies - idle * HZ;
-
-	if (e->hash != 0xffff) {
-		struct airoha_foe_stats64 stats = {};
-
-		airoha_ppe_foe_entry_get_stats(eth->ppe, e->hash, &stats);
-		f->stats.pkts += (stats.packets - e->stats.packets);
-		f->stats.bytes += (stats.bytes - e->stats.bytes);
-		e->stats = stats;
-	}
+	airoha_ppe_flow_update_stats(eth, f, e);
 
 	return 0;
 }
