@@ -1894,9 +1894,12 @@ int bond_enslave(struct net_device *bond_dev, struct net_device *slave_dev,
 	struct sockaddr_storage ss;
 	int res = 0, i;
 
-	if (slave_dev->type == ARPHRD_CAN) {
+	if (slave_dev->type == ARPHRD_CAN ||
+	    slave_dev->type == ARPHRD_IEEE802154 ||
+	    slave_dev->type == ARPHRD_IEEE802154_MONITOR ||
+	    slave_dev->type == ARPHRD_6LOWPAN) {
 		BOND_NL_ERR(bond_dev, extack,
-			    "CAN devices cannot be enslaved");
+			    "CAN, IEEE 802.15.4 and 6LoWPAN devices cannot be enslaved");
 		return -EPERM;
 	}
 
@@ -2327,7 +2330,7 @@ skip_mac_set:
 			.extack  = extack,
 		};
 
-		if (dev_xdp_prog_count(slave_dev) > 0) {
+		if (dev_xdp_has_own_prog(slave_dev)) {
 			SLAVE_NL_ERR(bond_dev, slave_dev, extack,
 				     "Slave has XDP program loaded, please unload before enslaving");
 			res = -EOPNOTSUPP;
@@ -5736,7 +5739,7 @@ static int bond_xdp_set(struct net_device *dev, struct bpf_prog *prog,
 			goto err;
 		}
 
-		if (dev_xdp_prog_count(slave_dev) > 0) {
+		if (dev_xdp_has_own_prog(slave_dev)) {
 			SLAVE_NL_ERR(dev, slave_dev, extack,
 				     "Slave has XDP program loaded, please unload before enslaving");
 			err = -EOPNOTSUPP;
