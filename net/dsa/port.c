@@ -876,10 +876,11 @@ int dsa_port_ageing_time(struct dsa_port *dp, clock_t ageing_clock)
 {
 	unsigned long ageing_jiffies = clock_t_to_jiffies(ageing_clock);
 	unsigned int ageing_time = jiffies_to_msecs(ageing_jiffies);
-	struct dsa_notifier_ageing_time_info info;
+	struct dsa_notifier_ageing_time_info info = {
+		.dp = dp,
+		.ageing_time = ageing_time,
+	};
 	int err;
-
-	info.ageing_time = ageing_time;
 
 	err = dsa_port_notify(dp, DSA_NOTIFIER_AGEING_TIME, &info);
 	if (err)
