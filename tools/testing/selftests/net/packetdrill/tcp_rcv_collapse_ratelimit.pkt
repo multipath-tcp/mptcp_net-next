@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: GPL-2.0
+//
+// A peer can repeatedly send an out-of-order segment that can not be
+// queued because the socket is over its receive buffer limit. Check that
+// tcp_prune_queue() does not collapse the queues for every such segment
+// (TcpExtTCPRcvCollapseSkipped), and that filling the hole still works.
+
+--mss=1000
+
+`./defaults.sh`
+
+// Small locked receive buffer: sk_rcvbuf = 20000, can not grow.
+   +0 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+   +0 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+   +0 setsockopt(3, SOL_SOCKET, SO_RCVBUF, [10000], 4) = 0
+   +0 bind(3, ..., ...) = 0
+   +0 listen(3, 1) = 0
+
+   +0 < S 0:0(0) win 32792 <mss 1000,nop,wscale 7>
+   +0 > S. 0:0(0) ack 1 <mss 1460,nop,wscale 0>
+  +.1 < . 1:1(0) ack 1 win 257
+
+   +0 accept(3, ..., ...) = 4
+
+// Leave a hole at 1:201, then send small non-contiguous out-of-order
+// segments until the socket goes over its limit. Exactly when this
+// happens depends on skb->truesize, so ACKs are not checked here.
+   +0 < . 201:301(100) ack 1 win 257
+   +0 < . 401:501(100) ack 1 win 257
+   +0 < . 601:701(100) ack 1 win 257
+   +0 < . 801:901(100) ack 1 win 257
+   +0 < . 1001:1101(100) ack 1 win 257
+   +0 < . 1201:1301(100) ack 1 win 257
+   +0 < . 1401:1501(100) ack 1 win 257
+   +0 < . 1601:1701(100) ack 1 win 257
+   +0 < . 1801:1901(100) ack 1 win 257
+   +0 < . 2001:2101(100) ack 1 win 257
+   +0 < . 2201:2301(100) ack 1 win 257
+   +0 < . 2401:2501(100) ack 1 win 257
+   +0 < . 2601:2701(100) ack 1 win 257
+   +0 < . 2801:2901(100) ack 1 win 257
+   +0 < . 3001:3101(100) ack 1 win 257
+   +0 < . 3201:3301(100) ack 1 win 257
+   +0 < . 3401:3501(100) ack 1 win 257
+   +0 < . 3601:3701(100) ack 1 win 257
+   +0 < . 3801:3901(100) ack 1 win 257
+   +0 < . 4001:4101(100) ack 1 win 257
+   +0 < . 4201:4301(100) ack 1 win 257
+   +0 < . 4401:4501(100) ack 1 win 257
+   +0 < . 4601:4701(100) ack 1 win 257
+   +0 < . 4801:4901(100) ack 1 win 257
+   +0 < . 5001:5101(100) ack 1 win 257
+   +0 < . 5201:5301(100) ack 1 win 257
+   +0 < . 5401:5501(100) ack 1 win 257
+   +0 < . 5601:5701(100) ack 1 win 257
+   +0 < . 5801:5901(100) ack 1 win 257
+   +0 < . 6001:6101(100) ack 1 win 257
+   +0 < . 6201:6301(100) ack 1 win 257
+   +0 < . 6401:6501(100) ack 1 win 257
+   +0 < . 6601:6701(100) ack 1 win 257
+   +0 < . 6801:6901(100) ack 1 win 257
+   +0 < . 7001:7101(100) ack 1 win 257
+   +0 < . 7201:7301(100) ack 1 win 257
+   +0 < . 7401:7501(100) ack 1 win 257
+   +0 < . 7601:7701(100) ack 1 win 257
+   +0 < . 7801:7901(100) ack 1 win 257
+   +0 < . 8001:8101(100) ack 1 win 257
+
+   +0 `nstat -n`
+
+// A segment beyond all the previous ones, sent 10 times. It lands last
+// in the out-of-order queue, can not be queued, and must not trigger
+// a collapse: no new memory was added to the out-of-order queue.
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+   +0 < . 8201:8301(100) ack 1 win 257
+
+   +0 `nstat -sz | grep -q "TcpExtPruneCalled  *10 "`
+   +0 `nstat -sz | grep -q "TcpExtTCPRcvCollapseSkipped  *10 "`
+
+// Fill the hole: in-order segments are rate limited too, so the collapse
+// is skipped again. tcp_prune_ofo_queue() frees room from the tail of the
+// out-of-order queue, and 201:301 is moved to the receive queue.
+   +0 < . 1:201(200) ack 1 win 257
+   +0 read(4, ..., 1000) = 300
+
+   +0 `nstat -sz | grep -q "TcpExtPruneCalled  *11 "`
+   +0 `nstat -sz | grep -q "TcpExtTCPRcvCollapseSkipped  *11 "`
+   +0 `nstat -sz | grep -q "TcpExtOfoPruned  *1 "`
