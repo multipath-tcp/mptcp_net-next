@@ -4,6 +4,7 @@ import fnmatch
 import functools
 import getopt
 import inspect
+import json
 import os
 import signal
 import sys
@@ -91,6 +92,25 @@ def ksft_pr(*objs, **kwargs):
     text = sep.join(str(obj) for obj in objs)
     prefixed = f"\n{pfx} ".join(text.split('\n'))
     print(pfx, prefixed, **kwargs)
+
+
+def ksft_metric(name, value, *, goal):
+    """
+    Report a numeric measurement of the current test case.
+
+    Metrics are printed right away. They do not affect the result.
+
+    Args:
+      name - name of the metric, e.g. "throughput"
+      value - the measured number
+      goal - "higher" or "lower" for a performance metric, depending on
+             which way is better, "zero" for an error metric, which must
+             be zero
+    """
+    metric = {"name": name, "value": value, "goal": goal}
+    payload = json.dumps(metric, allow_nan=False, separators=(",", ":"),
+                         sort_keys=True)
+    ksft_pr(f"ktap-metric-json: {payload}")
 
 
 def _fail(*args):
