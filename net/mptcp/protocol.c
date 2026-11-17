@@ -1435,8 +1435,8 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	info->mss_now = tcp_send_mss(ssk, &info->size_goal, info->flags);
 	copy = info->size_goal;
 
-	/* After the fallback, the MSS no longer includes the DSS option of the
-	 * infinite mapping: send it in a single segment.
+	/* Once the infinite mapping is sent, the MSS no longer includes its DSS
+	 * option: send it in a single segment.
 	 */
 	if (unlikely(mptcp_subflow_ctx(ssk)->send_infinite_map))
 		copy = info->mss_now;
