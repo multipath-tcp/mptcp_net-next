@@ -402,16 +402,13 @@ def pause_setup(cfg):
     if "auto-negotiation" not in link:
         raise KsftSkipEx(f"{cfg.ifname} doesn't report its link modes")
 
-    if link["auto-negotiation"]:
-        defer(cmd, f"ethtool -s {cfg.ifname} autoneg on")
-    elif "speed" in link and "duplex" in link:
-        defer(cmd, f"ethtool -s {cfg.ifname} autoneg off speed {link['speed']} "
-                   f"duplex {link['duplex'].lower()}")
-
     # Local interface admin up, link aneg on
     ip(f"link set {cfg.ifname} up")
     if link["supports-auto-negotiation"] and not link["auto-negotiation"]:
         ethtool(f"-s {cfg.ifname} autoneg on")
+        if "speed" in link and "duplex" in link:
+            defer(cmd, f"ethtool -s {cfg.ifname} autoneg off speed {link['speed']} "
+                       f"duplex {link['duplex'].lower()}")
 
     # Get remote pause params
     ret, params = ethtool_ret(f"-a {cfg.remote_ifname}", host=cfg.remote)
@@ -426,18 +423,14 @@ def pause_setup(cfg):
     if "auto-negotiation" not in link:
         raise KsftSkipEx(f"{cfg.remote_ifname} doesn't report its link modes")
 
-    if link["auto-negotiation"]:
-        defer(cmd, f"ethtool -s {cfg.remote_ifname} autoneg on",
-              host=cfg.remote)
-    elif "speed" in link and "duplex" in link:
-        defer(cmd, f"ethtool -s {cfg.remote_ifname} autoneg off "
-                   f"speed {link['speed']} duplex {link['duplex'].lower()}",
-                   host=cfg.remote)
-
     # Remote interface admin up, link aneg on
     ip(f"link set {cfg.remote_ifname} up", host=cfg.remote)
     if link["supports-auto-negotiation"] and not link["auto-negotiation"]:
         ethtool(f"-s {cfg.remote_ifname} autoneg on", host=cfg.remote)
+        if "speed" in link and "duplex" in link:
+            defer(cmd, f"ethtool -s {cfg.remote_ifname} autoneg off "
+                       f"speed {link['speed']} duplex {link['duplex'].lower()}",
+                       host=cfg.remote)
 
     wait_for_link(cfg)
 
@@ -470,9 +463,12 @@ def pause_test_support(cfg, pauseparams):
 
     forced = forced_link_settings(cfg)
     _, supported = get_local_pause_supported(cfg)
+    link_config_tested = False
 
     # We check that what we can configure in the pause params matches what we
-    # support under various contditions : Link aneg on/off, pause aneg on/off
+    # support under various conditions: link aneg on/off, and pause aneg
+    # on/off. If no link configuration change is supported, fall back to
+    # checking forced MAC pause on the current link.
     ret, _ = ethtool_ret(f"-s {cfg.ifname} autoneg on", is_get = False)
     if ret != 0:
         ksft_pr("link autoneg on refused, not tested")
@@ -481,18 +477,23 @@ def pause_test_support(cfg, pauseparams):
                                "link autoneg on")
         expect_pauseparams_set(cfg, pauseparams, True, supported,
                                "link autoneg on")
+        link_config_tested = True
 
     if not forced:
         ksft_pr("link speed unknown, the forced link is not tested")
-        return
+    else:
+        ret, _ = ethtool_ret(f"-s {cfg.ifname} autoneg off {forced}", is_get = False)
+        if ret != 0:
+            ksft_pr(f"link autoneg off {forced} refused, not tested")
+        else:
+            if link_config_tested:
+                defer(cmd, f"ethtool -s {cfg.ifname} autoneg on")
+            expect_pauseparams_set(cfg, pauseparams, False, supported, "link autoneg off")
+            expect_pauseparams_set(cfg, pauseparams, True, supported, "link autoneg off")
+            link_config_tested = True
 
-    ret, _ = ethtool_ret(f"-s {cfg.ifname} autoneg off {forced}", is_get = False)
-    if ret != 0:
-        ksft_pr(f"link autoneg off {forced} refused, not tested")
-        return
-
-    expect_pauseparams_set(cfg, pauseparams, False, supported, "link autoneg off")
-    expect_pauseparams_set(cfg, pauseparams, True, supported, "link autoneg off")
+    if not link_config_tested:
+        expect_pauseparams_set(cfg, pauseparams, False, supported, "current link")
 
 @ksft_variants(pauseparams_variants)
 @ksft_disruptive
@@ -902,11 +903,14 @@ def pause_autoneg_link_autoneg(cfg):
                          is_get=False, host=cfg.remote)
     if ret != 0:
         raise KsftSkipEx(f"Can't force the peer's link at {forced}")
+    remote_restore = defer(cmd, f"ethtool -s {cfg.remote_ifname} autoneg on",
+                           host=cfg.remote)
 
     ret, _ = ethtool_ret(f"-s {cfg.ifname} autoneg off {forced}",
                          is_get=False)
     if ret != 0:
         raise KsftSkipEx(f"Can't force the link at {forced}")
+    local_restore = defer(cmd, f"ethtool -s {cfg.ifname} autoneg on")
 
     try:
         wait_for_aneg(cfg)
@@ -917,8 +921,8 @@ def pause_autoneg_link_autoneg(cfg):
     check_local_pauseparams(cfg, True, rx, tx)
 
     # Re-enable autoneg
-    ethtool(f"-s {cfg.remote_ifname} autoneg on", host=cfg.remote)
-    ethtool(f"-s {cfg.ifname} autoneg on")
+    remote_restore.exec()
+    local_restore.exec()
     wait_for_aneg(cfg)
 
     # Pause autoneg must still be on
