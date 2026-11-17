@@ -49,11 +49,13 @@ try:
 
     from .env import NetDrvEnv, NetDrvEpEnv, NetDrvContEnv
     from .feat import set_ethtool_feat
+    from .kperf import KperfResult, KperfRunner
     from .load import GenerateTraffic, Iperf3Runner
     from .remote import Remote
 
     __all__ += ["NetDrvEnv", "NetDrvEpEnv", "NetDrvContEnv", "GenerateTraffic",
-                "Remote", "Iperf3Runner", "set_ethtool_feat"]
+                "Remote", "Iperf3Runner", "KperfResult", "KperfRunner",
+                "set_ethtool_feat"]
 except ModuleNotFoundError as e:
     print("Failed importing `net` library from kernel sources")
     print(str(e))
