@@ -351,7 +351,7 @@ static int mainloop(void)
 		if (opts.out_of_order) {
 			ooo_ids[ooo_count] = id;
 			if (ooo_count >= 15) {
-				for (ooo_count; ooo_count >= 0; ooo_count--) {
+				for (; ooo_count >= 0; ooo_count--) {
 					nlh = nfq_build_verdict(buf, ooo_ids[ooo_count],
 								opts.queue_num, opts.verdict);
 					if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {

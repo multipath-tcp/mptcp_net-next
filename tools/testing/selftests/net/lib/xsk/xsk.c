@@ -13,7 +13,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <asm/barrier.h>
 #include <linux/compiler.h>
 #include <linux/ethtool.h>
 #include <linux/filter.h>
