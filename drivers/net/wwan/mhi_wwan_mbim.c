@@ -561,6 +561,7 @@ static int mhi_mbim_newlink(void *ctxt, struct net_device *ndev, u32 if_id,
 {
 	struct mhi_mbim_link *link = wwan_netdev_drvpriv(ndev);
 	struct mhi_mbim_context *mbim = ctxt;
+	int ret;
 
 	link->mbim = mbim;
 	link->session = mhi_mbim_get_link_mux_id(link->mbim->mdev->mhi_cntrl) + if_id;
@@ -575,10 +576,14 @@ static int mhi_mbim_newlink(void *ctxt, struct net_device *ndev, u32 if_id,
 	}
 	rcu_read_unlock();
 
+	ret = register_netdevice(ndev);
+	if (ret)
+		return ret;
+
 	/* Already protected by RTNL lock */
 	hlist_add_head_rcu(&link->hlnode, &mbim->link_list[LINK_HASH(if_id)]);
 
-	return register_netdevice(ndev);
+	return 0;
 }
 
 static void mhi_mbim_dellink(void *ctxt, struct net_device *ndev,
