@@ -5400,21 +5400,29 @@ static bool tcp_can_ingest(const struct sock *sk, const struct sk_buff *skb)
 	return rmem <= sk->sk_rcvbuf;
 }
 
-static int tcp_try_rmem_schedule(struct sock *sk, const struct sk_buff *skb,
-				 unsigned int size)
+/* Return SKB_NOT_DROPPED_YET if @skb can be queued, or the drop reason. */
+static enum skb_drop_reason
+tcp_try_rmem_schedule(struct sock *sk, const struct sk_buff *skb,
+		      unsigned int size)
 {
-	if (!tcp_can_ingest(sk, skb) ||
-	    !sk_rmem_schedule(sk, skb, size)) {
+	enum skb_drop_reason reason;
 
-		if (tcp_prune_queue(sk, skb) < 0)
-			return -1;
-
-		while (!sk_rmem_schedule(sk, skb, size)) {
-			if (!tcp_prune_ofo_queue(sk, skb))
-				return -1;
-		}
+	if (!tcp_can_ingest(sk, skb)) {
+		reason = SKB_DROP_REASON_SOCKET_RCVBUFF;
+	} else {
+		reason = sk_rmem_schedule_reason(sk, skb, size);
+		if (!reason)
+			return SKB_NOT_DROPPED_YET;
 	}
-	return 0;
+
+	if (tcp_prune_queue(sk, skb) < 0)
+		return reason;
+
+	while ((reason = sk_rmem_schedule_reason(sk, skb, size))) {
+		if (!tcp_prune_ofo_queue(sk, skb))
+			return reason;
+	}
+	return SKB_NOT_DROPPED_YET;
 }
 
 /* Credit the memory added to the receive queues since @rmem was sampled
@@ -5434,6 +5442,7 @@ static void tcp_collapse_credit_add(struct sock *sk, int rmem)
 static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	enum skb_drop_reason reason;
 	struct rb_node **p, *parent;
 	struct sk_buff *skb1;
 	u32 seq, end_seq;
@@ -5443,10 +5452,11 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	tcp_save_lrcv_flowlabel(sk, skb);
 	tcp_data_ecn_check(sk, skb);
 
-	if (unlikely(tcp_try_rmem_schedule(sk, skb, skb->truesize))) {
+	reason = tcp_try_rmem_schedule(sk, skb, skb->truesize);
+	if (unlikely(reason)) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFODROP);
 		READ_ONCE(sk->sk_data_ready)(sk);
-		tcp_drop_reason(sk, skb, SKB_DROP_REASON_PROTO_MEM);
+		tcp_drop_reason(sk, skb, reason);
 		return;
 	}
 	/* Sampled after tcp_try_rmem_schedule(), which can prune. */
@@ -5716,7 +5726,8 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 
 		/* Ok. In sequence. In window. */
 queue_and_out:
-		if (tcp_try_rmem_schedule(sk, skb, skb->truesize)) {
+		reason = tcp_try_rmem_schedule(sk, skb, skb->truesize);
+		if (reason) {
 			/* TODO: maybe ratelimit these WIN 0 ACK ? */
 			inet_csk(sk)->icsk_ack.pending |=
 					(ICSK_ACK_NOMEM | ICSK_ACK_NOW);
@@ -5724,7 +5735,6 @@ queue_and_out:
 			READ_ONCE(sk->sk_data_ready)(sk);
 
 			if (skb_queue_len(&sk->sk_receive_queue) && skb->len) {
-				reason = SKB_DROP_REASON_PROTO_MEM;
 				NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
 				goto drop;
 			}
@@ -6100,6 +6110,8 @@ static int tcp_prune_queue(struct sock *sk, const struct sk_buff *in_skb)
 
 		if (tcp_can_ingest(sk, in_skb))
 			return 0;
+	} else {
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVCOLLAPSESKIPPED);
 	}
 
 	/* Collapsing did not help (or was not allowed),
@@ -6800,7 +6812,6 @@ void tcp_init_transfer(struct sock *sk, int bpf_op, struct sk_buff *skb)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 
-	tcp_mtup_init(sk);
 	icsk->icsk_af_ops->rebuild_header(sk);
 	tcp_init_metrics(sk);
 
@@ -7057,6 +7068,7 @@ consume:
 			tp->tcp_header_len = sizeof(struct tcphdr);
 		}
 
+		tcp_mtup_init(sk);
 		tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
 

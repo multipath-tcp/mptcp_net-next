@@ -17,14 +17,20 @@ description:
   The other 2 (that this schema describe) live under the SCU
   register supporting both C22 and C45 PHYs.
 
+  The Airoha AN7589 has a third controller of this kind under the SCU.
+
 $ref: mdio.yaml#
 
 properties:
   compatible:
-    const: airoha,an7583-mdio
+    oneOf:
+      - const: airoha,an7583-mdio
+      - items:
+          - const: airoha,an7589-mdio
+          - const: airoha,an7583-mdio
 
   reg:
-    enum: [0xc8, 0xcc]
+    maxItems: 1
 
   clocks:
     maxItems: 1
@@ -40,6 +46,21 @@ required:
   - reg
   - clocks
   - resets
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: airoha,an7589-mdio
+    then:
+      properties:
+        reg:
+          enum: [0xc8, 0xcc, 0xd8]
+    else:
+      properties:
+        reg:
+          enum: [0xc8, 0xcc]
 
 unevaluatedProperties: false
 
