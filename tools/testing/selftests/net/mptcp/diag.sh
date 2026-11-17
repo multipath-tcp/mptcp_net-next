@@ -205,6 +205,7 @@ chk_dump_one()
 	local ss_token
 	local token
 	local msg
+	local zero_msg
 
 	ss_token="$(ss -inmHMN $ns |
 		    mptcp_lib_get_info_value "token" "token")"
@@ -221,6 +222,18 @@ chk_dump_one()
 	else
 		mptcp_lib_pr_fail "expected $ss_token found $token"
 		mptcp_lib_result_fail "${msg}"
+		ret=${KSFT_FAIL}
+	fi
+
+	zero_msg="....chk dump_one zero sequence fields"
+	mptcp_lib_print_title "$zero_msg"
+	if [ -n "$ss_token" ] &&
+	   ip netns exec "$ns" ./mptcp_diag -z -t "$ss_token"; then
+		mptcp_lib_pr_ok
+		mptcp_lib_result_pass "${zero_msg}"
+	else
+		mptcp_lib_pr_fail "MPTCP diagnostic sequence fields are not zero"
+		mptcp_lib_result_fail "${zero_msg}"
 		ret=${KSFT_FAIL}
 	fi
 }

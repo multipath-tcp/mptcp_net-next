@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -29,6 +30,7 @@
 			    NLA_F_NESTED))
 
 struct params {
+	bool check_zero_seq;
 	__u32 target_token;
 	char subflow_addrs[1024];
 };
@@ -101,6 +103,7 @@ static void die_usage(int r)
 {
 	fprintf(stderr, "Usage:\n"
 			"mptcp_diag -t <token>\n"
+			"mptcp_diag -z -t <token>  (check zero sequence fields)\n"
 			"mptcp_diag -s \"<saddr>:<sport> <daddr>:<dport>\"\n");
 	exit(r);
 }
@@ -168,6 +171,22 @@ static void parse_rtattr_flags(struct rtattr *tb[], int max, struct rtattr *rta,
 			tb[type] = rta;
 		rta = RTA_NEXT(rta, len);
 	}
+}
+
+static bool check_zero_seq(struct mptcp_info *info)
+{
+	if (info->mptcpi_write_seq ||
+	    info->mptcpi_snd_una ||
+	    info->mptcpi_rcv_nxt) {
+		fprintf(stderr,
+			"Unexpected sequence values: write_seq=%llu snd_una=%llu rcv_nxt=%llu\n",
+			(unsigned long long)info->mptcpi_write_seq,
+			(unsigned long long)info->mptcpi_snd_una,
+			(unsigned long long)info->mptcpi_rcv_nxt);
+		return false;
+	}
+
+	return true;
 }
 
 static void print_info_msg(struct mptcp_info *info)
@@ -262,7 +281,7 @@ static void print_subflow_info(struct rtattr *tb[])
 	printf("\n");
 }
 
-static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto)
+static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto, bool check_zero, bool *seen_info)
 {
 	struct inet_diag_msg *r = NLMSG_DATA(nlh);
 	struct rtattr *tb[INET_DIAG_MAX + 1];
@@ -284,6 +303,11 @@ static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto)
 			info = RTA_DATA(tb[INET_DIAG_INFO]);
 		}
 		print_info_msg(info);
+		if (check_zero) {
+			*seen_info = true;
+			if (!check_zero_seq(info))
+				exit(EXIT_FAILURE);
+		}
 	}
 	if (proto == IPPROTO_TCP && tb[INET_DIAG_ULP_INFO]) {
 		struct rtattr *ulpinfo[INET_ULP_INFO_MAX + 1] = { 0 };
@@ -303,10 +327,10 @@ static void parse_nlmsg(struct nlmsghdr *nlh, __u32 proto)
 	}
 }
 
-static void recv_nlmsg(int fd, __u32 proto)
+static void recv_nlmsg(int fd, __u32 proto, bool check_zero)
 {
 	char rcv_buff[8192];
-	struct nlmsghdr *nlh = (struct nlmsghdr *)rcv_buff;
+	struct nlmsghdr *nlh;
 	struct sockaddr_nl rcv_nladdr = {
 		.nl_family = AF_NETLINK
 	};
@@ -320,28 +344,70 @@ static void recv_nlmsg(int fd, __u32 proto)
 		.msg_iov = &rcv_iov,
 		.msg_iovlen = 1
 	};
-	int len;
+	bool seen_info = false;
+	bool done = false;
 
-	len = recvmsg(fd, &rcv_msg, 0);
+	while (!done) {
+		int len;
 
-	while (NLMSG_OK(nlh, len)) {
-		if (nlh->nlmsg_type == NLMSG_DONE) {
-			printf("NLMSG_DONE\n");
-			break;
-		} else if (nlh->nlmsg_type == NLMSG_ERROR) {
-			struct nlmsgerr *err;
-
-			err = (struct nlmsgerr *)NLMSG_DATA(nlh);
-			printf("Error %d:%s\n",
-			       -(err->error), strerror(-(err->error)));
-			break;
+		nlh = (struct nlmsghdr *)rcv_buff;
+		len = recvmsg(fd, &rcv_msg, 0);
+		if (len < 0)
+			die_perror("Netlink recvmsg");
+		if (!len) {
+			fprintf(stderr, "Empty Netlink response\n");
+			exit(EXIT_FAILURE);
 		}
-		parse_nlmsg(nlh, proto);
-		nlh = NLMSG_NEXT(nlh, len);
+
+		while (NLMSG_OK(nlh, len)) {
+			if (nlh->nlmsg_type == NLMSG_DONE) {
+				int error = 0;
+
+				if (nlh->nlmsg_len >= NLMSG_LENGTH(sizeof(error)))
+					memcpy(&error, NLMSG_DATA(nlh), sizeof(error));
+
+				if (error) {
+					fprintf(stderr, "Netlink dump failed: %s\n",
+						strerror(-error));
+					exit(EXIT_FAILURE);
+				}
+
+				done = true;
+				break;
+			} else if (nlh->nlmsg_type == NLMSG_ERROR) {
+				struct nlmsgerr *err;
+
+				err = (struct nlmsgerr *)NLMSG_DATA(nlh);
+				if (err->error) {
+					fprintf(stderr,
+						"Netlink request failed: %s\n",
+						strerror(-err->error));
+					exit(EXIT_FAILURE);
+				}
+			} else {
+				parse_nlmsg(nlh, proto, check_zero, &seen_info);
+
+				/*
+				 * Single-socket diagnostic responses are not
+				 * multipart and do not end with NLMSG_DONE.
+				 */
+				if (!(nlh->nlmsg_flags & NLM_F_MULTI)) {
+					done = true;
+					break;
+				}
+			}
+
+			nlh = NLMSG_NEXT(nlh, len);
+		}
+	}
+
+	if (check_zero && !seen_info) {
+		fprintf(stderr, "No MPTCP diagnostic info received\n");
+		exit(EXIT_FAILURE);
 	}
 }
 
-static void get_mptcpinfo(__u32 token)
+static void get_mptcpinfo(__u32 token, bool check_zero)
 {
 	struct inet_diag_req_v2 r = {
 		.sdiag_family           = AF_INET,
@@ -358,7 +424,7 @@ static void get_mptcpinfo(__u32 token)
 		die_perror("Netlink socket");
 
 	send_query(fd, &r, proto);
-	recv_nlmsg(fd, proto);
+	recv_nlmsg(fd, proto, check_zero);
 
 	close(fd);
 }
@@ -394,7 +460,7 @@ static void get_subflow_info(char *subflow_addrs)
 	inet_pton(AF_INET, saddr, &r.id.idiag_src);
 	inet_pton(AF_INET, daddr, &r.id.idiag_dst);
 	send_query(fd, &r, IPPROTO_TCP);
-	recv_nlmsg(fd, IPPROTO_TCP);
+	recv_nlmsg(fd, IPPROTO_TCP, false);
 }
 
 static void parse_opts(int argc, char **argv, struct params *p)
@@ -404,8 +470,11 @@ static void parse_opts(int argc, char **argv, struct params *p)
 	if (argc < 2)
 		die_usage(1);
 
-	while ((c = getopt(argc, argv, "ht:s:")) != -1) {
+	while ((c = getopt(argc, argv, "ht:s:z")) != -1) {
 		switch (c) {
+		case 'z':
+			p->check_zero_seq = true;
+			break;
 		case 'h':
 			die_usage(0);
 			break;
@@ -429,8 +498,13 @@ int main(int argc, char *argv[])
 
 	parse_opts(argc, argv, &p);
 
+	if (p.check_zero_seq && !p.target_token) {
+		fprintf(stderr, "-z requires -t <token>\n");
+		return EXIT_FAILURE;
+	}
+
 	if (p.target_token)
-		get_mptcpinfo(p.target_token);
+		get_mptcpinfo(p.target_token, p.check_zero_seq);
 
 	if (p.subflow_addrs[0] != '\0')
 		get_subflow_info(p.subflow_addrs);
