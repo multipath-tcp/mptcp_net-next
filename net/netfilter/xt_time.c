@@ -13,8 +13,8 @@
 
 #include <linux/ktime.h>
 #include <linux/module.h>
-#include <linux/rtc.h>
 #include <linux/skbuff.h>
+#include <linux/time.h>
 #include <linux/types.h>
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter/xt_time.h>
@@ -31,38 +31,7 @@ struct xtm {
 
 extern struct timezone sys_tz; /* ouch */
 
-static const u_int16_t days_since_year[] = {
-	0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
-};
-
-static const u_int16_t days_since_leapyear[] = {
-	0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335,
-};
-
-/*
- * Since time progresses forward, it is best to organize this array in reverse,
- * to minimize lookup time.
- */
-enum {
-	DSE_FIRST = 2039,
-	SECONDS_PER_DAY = 86400,
-};
-static const u_int16_t days_since_epoch[] = {
-	/* 2039 - 2030 */
-	25202, 24837, 24472, 24106, 23741, 23376, 23011, 22645, 22280, 21915,
-	/* 2029 - 2020 */
-	21550, 21184, 20819, 20454, 20089, 19723, 19358, 18993, 18628, 18262,
-	/* 2019 - 2010 */
-	17897, 17532, 17167, 16801, 16436, 16071, 15706, 15340, 14975, 14610,
-	/* 2009 - 2000 */
-	14245, 13879, 13514, 13149, 12784, 12418, 12053, 11688, 11323, 10957,
-	/* 1999 - 1990 */
-	10592, 10227, 9862, 9496, 9131, 8766, 8401, 8035, 7670, 7305,
-	/* 1989 - 1980 */
-	6940, 6574, 6209, 5844, 5479, 5113, 4748, 4383, 4018, 3652,
-	/* 1979 - 1970 */
-	3287, 2922, 2557, 2191, 1826, 1461, 1096, 730, 365, 0,
-};
+#define SECONDS_PER_DAY 86400
 
 /*
  * Each network packet has a (nano)seconds-since-the-epoch (SSTE) timestamp.
@@ -102,51 +71,12 @@ static inline void localtime_2(struct xtm *r, time64_t time)
 
 static void localtime_3(struct xtm *r, time64_t time)
 {
-	unsigned int year, i, w = r->dse;
+	struct tm tm;
 
-	/*
-	 * In each year, a certain number of days-since-the-epoch have passed.
-	 * Find the year that is closest to said days.
-	 *
-	 * Consider, for example, w=21612 (2029-03-04). Loop will abort on
-	 * dse[i] <= w, which happens when dse[i] == 21550. This implies
-	 * year == 2009. w will then be 62.
-	 */
-	for (i = 0, year = DSE_FIRST; days_since_epoch[i] > w;
-	    ++i, --year)
-		/* just loop */;
+	time64_to_tm(time, 0, &tm);
 
-	w -= days_since_epoch[i];
-
-	/*
-	 * By now we have the current year, and the day of the year.
-	 * r->yearday = w;
-	 *
-	 * On to finding the month (like above). In each month, a certain
-	 * number of days-since-New Year have passed, and find the closest
-	 * one.
-	 *
-	 * Consider w=62 (in a non-leap year). Loop will abort on
-	 * dsy[i] < w, which happens when dsy[i] == 31+28 (i == 2).
-	 * Concludes i == 2, i.e. 3rd month => March.
-	 *
-	 * (A different approach to use would be to subtract a monthlength
-	 * from w repeatedly while counting.)
-	 */
-	if (is_leap_year(year)) {
-		/* use days_since_leapyear[] in a leap year */
-		for (i = ARRAY_SIZE(days_since_leapyear) - 1;
-		    i > 0 && days_since_leapyear[i] > w; --i)
-			/* just loop */;
-		r->monthday = w - days_since_leapyear[i] + 1;
-	} else {
-		for (i = ARRAY_SIZE(days_since_year) - 1;
-		    i > 0 && days_since_year[i] > w; --i)
-			/* just loop */;
-		r->monthday = w - days_since_year[i] + 1;
-	}
-
-	r->month    = i + 1;
+	r->monthday = tm.tm_mday;	/* 1-31 */
+	r->month    = tm.tm_mon + 1;	/* 1-12 */
 }
 
 static bool
