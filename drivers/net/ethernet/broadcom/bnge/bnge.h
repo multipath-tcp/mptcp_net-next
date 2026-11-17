@@ -240,6 +240,8 @@ struct bnge_dev {
 
 /* Index of the first NQ created in ndo_open() and destroyed in ndo_stop();
  * lower NQs live from probe to remove.
+ *
+ * irq_tbl order: probe-time NQs, aux (RoCE) vectors, open-time NQs.
  */
 #define BNGE_FIRST_OPEN_NQ	0
 
@@ -288,5 +290,22 @@ static inline void bnge_db_write(struct bnge_dev *bd, struct bnge_db_info *db,
 
 bool bnge_aux_registered(struct bnge_dev *bd);
 u16 bnge_aux_get_msix(struct bnge_dev *bd);
+
+/* irq_tbl index of the i-th aux vector, also used as its ring_idx */
+static inline int bnge_aux_irq_idx(int i)
+{
+	return BNGE_FIRST_OPEN_NQ + i;
+}
+
+/* irq_tbl index of NQ nq_idx. @aux_msix is a single bnge_aux_get_msix()
+ * sample shared by all NQs of one allocation.
+ */
+static inline int bnge_nq_irq_idx(u16 aux_msix, int nq_idx)
+{
+	if (nq_idx < BNGE_FIRST_OPEN_NQ)
+		return nq_idx;
+
+	return aux_msix + nq_idx;
+}
 
 #endif /* _BNGE_H_ */
