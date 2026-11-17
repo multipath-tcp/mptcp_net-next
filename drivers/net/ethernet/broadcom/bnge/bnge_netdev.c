@@ -503,52 +503,87 @@ err_free_desc_ring:
 	return -ENOMEM;
 }
 
-static void bnge_free_nq_arrays(struct bnge_net *bn)
+static void bnge_free_nq(struct bnge_net *bn, struct bnge_napi *bnapi)
+{
+	struct bnge_nq_ring_info *nqr = &bnapi->nq_ring;
+
+	bnge_free_ring(bn->bd, &nqr->ring_struct.ring_mem);
+	bnge_free_nq_desc_arr(nqr);
+}
+
+static int bnge_alloc_nq(struct bnge_net *bn, struct bnge_napi *bnapi,
+			 u16 aux_msix)
+{
+	struct bnge_nq_ring_info *nqr = &bnapi->nq_ring;
+	struct bnge_ring_mem_info *rmem;
+	struct bnge_ring_struct *ring;
+	int rc;
+
+	ring = &nqr->ring_struct;
+	rmem = &ring->ring_mem;
+
+	rc = bnge_alloc_nq_desc_arr(nqr, bn->cp_nr_pages);
+	if (rc)
+		return rc;
+
+	nqr->bnapi = bnapi;
+	rmem->nr_pages = bn->cp_nr_pages;
+	rmem->page_size = HW_CMPD_RING_SIZE;
+	rmem->pg_arr = (void **)nqr->desc_ring;
+	rmem->dma_arr = nqr->desc_mapping;
+	rmem->vmem_size = 0;
+	rmem->flags = BNGE_RMEM_RING_PTE_FLAG;
+	rc = bnge_alloc_ring(bn->bd, rmem);
+	if (rc) {
+		bnge_free_nq_desc_arr(nqr);
+		return rc;
+	}
+
+	ring->fw_ring_id = INVALID_HW_RING_ID_32BIT;
+	ring->map_idx = aux_msix + bnapi->index;
+	return 0;
+}
+
+static void bnge_free_nqs(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
 	int i;
 
-	for (i = 0; i < bd->nq_nr_rings; i++) {
-		struct bnge_napi *bnapi = bn->bnapi[i];
-
-		bnge_free_nq_desc_arr(&bnapi->nq_ring);
-	}
+	for (i = 0; i < bd->nq_nr_rings; i++)
+		bnge_free_nq(bn, bn->bnapi[i]);
 }
 
-static int bnge_alloc_nq_arrays(struct bnge_net *bn)
+static int bnge_alloc_nqs(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
+	u16 aux_msix;
 	int i, rc;
 
+	/* RoCE can be disabled concurrently; sample the aux vector count once
+	 * so every NQ gets a distinct irq_tbl index.
+	 */
+	aux_msix = bnge_aux_get_msix(bd);
 	for (i = 0; i < bd->nq_nr_rings; i++) {
-		struct bnge_napi *bnapi = bn->bnapi[i];
-
-		rc = bnge_alloc_nq_desc_arr(&bnapi->nq_ring, bn->cp_nr_pages);
+		rc = bnge_alloc_nq(bn, bn->bnapi[i], aux_msix);
 		if (rc)
-			goto err_free_nq_arrays;
+			goto err_free_nqs;
 	}
 	return 0;
 
-err_free_nq_arrays:
-	bnge_free_nq_arrays(bn);
+err_free_nqs:
+	while (--i >= 0)
+		bnge_free_nq(bn, bn->bnapi[i]);
 	return rc;
 }
 
-static void bnge_free_nq_tree(struct bnge_net *bn)
+static void bnge_free_cp_rings(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
 	int i;
 
 	for (i = 0; i < bd->nq_nr_rings; i++) {
-		struct bnge_napi *bnapi = bn->bnapi[i];
-		struct bnge_nq_ring_info *nqr;
-		struct bnge_ring_struct *ring;
+		struct bnge_nq_ring_info *nqr = &bn->bnapi[i]->nq_ring;
 		int j;
-
-		nqr = &bnapi->nq_ring;
-		ring = &nqr->ring_struct;
-
-		bnge_free_ring(bd, &ring->ring_mem);
 
 		if (!nqr->cp_ring_arr)
 			continue;
@@ -556,8 +591,7 @@ static void bnge_free_nq_tree(struct bnge_net *bn)
 		for (j = 0; j < nqr->cp_ring_count; j++) {
 			struct bnge_cp_ring_info *cpr = &nqr->cp_ring_arr[j];
 
-			ring = &cpr->ring_struct;
-			bnge_free_ring(bd, &ring->ring_mem);
+			bnge_free_ring(bd, &cpr->ring_struct.ring_mem);
 			bnge_free_cp_desc_arr(cpr);
 		}
 		kfree(nqr->cp_ring_arr);
@@ -594,31 +628,21 @@ err_free_cp_desc_arr:
 	return rc;
 }
 
-static int bnge_alloc_nq_tree(struct bnge_net *bn)
+static int bnge_alloc_cp_rings(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
-	int i, j, ulp_msix, rc;
+	int i, j, rc;
 	int tcs = 1;
 
-	ulp_msix = bnge_aux_get_msix(bd);
 	for (i = 0, j = 0; i < bd->nq_nr_rings; i++) {
 		bool sh = !!(bd->flags & BNGE_EN_SHARED_CHNL);
 		struct bnge_napi *bnapi = bn->bnapi[i];
 		struct bnge_nq_ring_info *nqr;
 		struct bnge_cp_ring_info *cpr;
-		struct bnge_ring_struct *ring;
 		int cp_count = 0, k;
 		int rx = 0, tx = 0;
 
 		nqr = &bnapi->nq_ring;
-		nqr->bnapi = bnapi;
-		ring = &nqr->ring_struct;
-
-		rc = bnge_alloc_ring(bd, &ring->ring_mem);
-		if (rc)
-			goto err_free_nq_tree;
-
-		ring->map_idx = ulp_msix + i;
 
 		if (i < bd->rx_nr_rings) {
 			cp_count++;
@@ -634,7 +658,7 @@ static int bnge_alloc_nq_tree(struct bnge_net *bn)
 		nqr->cp_ring_arr = kzalloc_objs(*cpr, cp_count);
 		if (!nqr->cp_ring_arr) {
 			rc = -ENOMEM;
-			goto err_free_nq_tree;
+			goto err_free_cp_rings;
 		}
 
 		nqr->cp_ring_count = cp_count;
@@ -643,7 +667,7 @@ static int bnge_alloc_nq_tree(struct bnge_net *bn)
 			cpr = &nqr->cp_ring_arr[k];
 			rc = alloc_one_cp_ring(bn, cpr);
 			if (rc)
-				goto err_free_nq_tree;
+				goto err_free_cp_rings;
 
 			cpr->bnapi = bnapi;
 			cpr->cp_idx = k;
@@ -663,8 +687,8 @@ static int bnge_alloc_nq_tree(struct bnge_net *bn)
 	}
 	return 0;
 
-err_free_nq_tree:
-	bnge_free_nq_tree(bn);
+err_free_cp_rings:
+	bnge_free_cp_rings(bn);
 	return rc;
 }
 
@@ -1200,8 +1224,8 @@ static void bnge_free_core(struct bnge_net *bn)
 	bnge_free_vnic_attributes(bn);
 	bnge_free_tx_rings(bn);
 	bnge_free_rx_rings(bn);
-	bnge_free_nq_tree(bn);
-	bnge_free_nq_arrays(bn);
+	bnge_free_cp_rings(bn);
+	bnge_free_nqs(bn);
 	bnge_free_ring_stats(bn);
 	bnge_free_ring_grps(bn);
 	bnge_free_vnics(bn);
@@ -1232,13 +1256,9 @@ static int bnge_alloc_core(struct bnge_net *bn)
 	bn->bnapi = bnapi;
 	bnapi += arr_size;
 	for (i = 0; i < bd->nq_nr_rings; i++, bnapi += size) {
-		struct bnge_nq_ring_info *nqr;
-
 		bn->bnapi[i] = bnapi;
 		bn->bnapi[i]->index = i;
 		bn->bnapi[i]->bn = bn;
-		nqr = &bn->bnapi[i]->nq_ring;
-		nqr->ring_struct.ring_mem.flags = BNGE_RMEM_RING_PTE_FLAG;
 	}
 
 	bn->rx_ring = kzalloc_objs(struct bnge_rx_ring_info, bd->rx_nr_rings);
@@ -1297,7 +1317,7 @@ static int bnge_alloc_core(struct bnge_net *bn)
 	if (rc)
 		goto err_free_ring_stats;
 
-	rc = bnge_alloc_nq_arrays(bn);
+	rc = bnge_alloc_nqs(bn);
 	if (rc)
 		goto err_free_vnics;
 
@@ -1305,13 +1325,13 @@ static int bnge_alloc_core(struct bnge_net *bn)
 
 	rc = bnge_alloc_rx_rings(bn);
 	if (rc)
-		goto err_free_nq_arrays;
+		goto err_free_nqs;
 
 	rc = bnge_alloc_tx_rings(bn);
 	if (rc)
 		goto err_free_rx_rings;
 
-	rc = bnge_alloc_nq_tree(bn);
+	rc = bnge_alloc_cp_rings(bn);
 	if (rc)
 		goto err_free_tx_rings;
 
@@ -1320,17 +1340,17 @@ static int bnge_alloc_core(struct bnge_net *bn)
 						  BNGE_VNIC_UCAST_FLAG;
 	rc = bnge_alloc_vnic_attributes(bn);
 	if (rc)
-		goto err_free_nq_tree;
+		goto err_free_cp_rings;
 	return 0;
 
-err_free_nq_tree:
-	bnge_free_nq_tree(bn);
+err_free_cp_rings:
+	bnge_free_cp_rings(bn);
 err_free_tx_rings:
 	bnge_free_tx_rings(bn);
 err_free_rx_rings:
 	bnge_free_rx_rings(bn);
-err_free_nq_arrays:
-	bnge_free_nq_arrays(bn);
+err_free_nqs:
+	bnge_free_nqs(bn);
 err_free_vnics:
 	bnge_free_vnics(bn);
 err_free_ring_stats:
@@ -1389,21 +1409,18 @@ static int bnge_cp_num_to_irq_num(struct bnge_net *bn, int n)
 	return nqr->ring_struct.map_idx;
 }
 
-static void bnge_init_nq_tree(struct bnge_net *bn)
+static void bnge_init_cp_rings(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
 	int i, j;
 
 	for (i = 0; i < bd->nq_nr_rings; i++) {
 		struct bnge_nq_ring_info *nqr = &bn->bnapi[i]->nq_ring;
-		struct bnge_ring_struct *ring = &nqr->ring_struct;
 
-		ring->fw_ring_id = INVALID_HW_RING_ID_32BIT;
 		for (j = 0; j < nqr->cp_ring_count; j++) {
 			struct bnge_cp_ring_info *cpr = &nqr->cp_ring_arr[j];
 
-			ring = &cpr->ring_struct;
-			ring->fw_ring_id = INVALID_HW_RING_ID_32BIT;
+			cpr->ring_struct.fw_ring_id = INVALID_HW_RING_ID_32BIT;
 		}
 	}
 }
@@ -1914,6 +1931,44 @@ static int bnge_hwrm_rx_ring_alloc(struct bnge_net *bn,
 	return 0;
 }
 
+static int bnge_hwrm_nq_alloc(struct bnge_net *bn, struct bnge_napi *bnapi)
+{
+	struct bnge_nq_ring_info *nqr = &bnapi->nq_ring;
+	u32 type = HWRM_RING_ALLOC_NQ;
+	struct bnge_ring_struct *ring;
+	unsigned int vector;
+	u32 map_idx;
+	int rc;
+
+	ring = &nqr->ring_struct;
+	map_idx = ring->map_idx;
+
+	vector = bn->bd->irq_tbl[map_idx].vector;
+	disable_irq_nosync(vector);
+	rc = hwrm_ring_alloc_send_msg(bn, ring, type, map_idx);
+	if (rc) {
+		enable_irq(vector);
+		return rc;
+	}
+	bnge_set_db(bn, &nqr->nq_db, type, map_idx, ring->fw_ring_id);
+	bnge_db_nq(bn, &nqr->nq_db, nqr->nq_raw_cons);
+	enable_irq(vector);
+
+	return 0;
+}
+
+static void bnge_hwrm_nq_free(struct bnge_net *bn, struct bnge_napi *bnapi)
+{
+	struct bnge_ring_struct *ring = &bnapi->nq_ring.ring_struct;
+
+	if (ring->fw_ring_id == INVALID_HW_RING_ID_32BIT)
+		return;
+
+	hwrm_ring_free_send_msg(bn, ring, RING_FREE_REQ_RING_TYPE_NQ,
+				INVALID_HW_RING_ID);
+	ring->fw_ring_id = INVALID_HW_RING_ID_32BIT;
+}
+
 static int bnge_hwrm_ring_alloc(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
@@ -1923,22 +1978,11 @@ static int bnge_hwrm_ring_alloc(struct bnge_net *bn)
 	agg_rings = !!(bnge_is_agg_reqd(bd));
 	for (i = 0; i < bd->nq_nr_rings; i++) {
 		struct bnge_napi *bnapi = bn->bnapi[i];
-		struct bnge_nq_ring_info *nqr = &bnapi->nq_ring;
-		struct bnge_ring_struct *ring = &nqr->ring_struct;
-		u32 type = HWRM_RING_ALLOC_NQ;
-		u32 map_idx = ring->map_idx;
-		unsigned int vector;
+		struct bnge_ring_struct *ring = &bnapi->nq_ring.ring_struct;
 
-		vector = bd->irq_tbl[map_idx].vector;
-		disable_irq_nosync(vector);
-		rc = hwrm_ring_alloc_send_msg(bn, ring, type, map_idx);
-		if (rc) {
-			enable_irq(vector);
+		rc = bnge_hwrm_nq_alloc(bn, bnapi);
+		if (rc)
 			goto err_out;
-		}
-		bnge_set_db(bn, &nqr->nq_db, type, map_idx, ring->fw_ring_id);
-		bnge_db_nq(bn, &nqr->nq_db, nqr->nq_raw_cons);
-		enable_irq(vector);
 		bn->grp_info[i].nq_fw_ring_id = (u16)ring->fw_ring_id;
 
 		if (!i) {
@@ -2566,23 +2610,14 @@ static void bnge_hwrm_ring_free(struct bnge_net *bn, bool close_path)
 	bnge_disable_int_sync(bn);
 
 	for (i = 0; i < bd->nq_nr_rings; i++) {
-		struct bnge_napi *bnapi = bn->bnapi[i];
-		struct bnge_nq_ring_info *nqr;
-		struct bnge_ring_struct *ring;
+		struct bnge_nq_ring_info *nqr = &bn->bnapi[i]->nq_ring;
 		int j;
 
-		nqr = &bnapi->nq_ring;
 		for (j = 0; j < nqr->cp_ring_count && nqr->cp_ring_arr; j++)
 			bnge_hwrm_cp_ring_free(bn, &nqr->cp_ring_arr[j]);
 
-		ring = &nqr->ring_struct;
-		if (ring->fw_ring_id != INVALID_HW_RING_ID_32BIT) {
-			hwrm_ring_free_send_msg(bn, ring,
-						RING_FREE_REQ_RING_TYPE_NQ,
-						INVALID_HW_RING_ID);
-			ring->fw_ring_id = INVALID_HW_RING_ID_32BIT;
-			bn->grp_info[i].nq_fw_ring_id = INVALID_HW_RING_ID;
-		}
+		bnge_hwrm_nq_free(bn, bn->bnapi[i]);
+		bn->grp_info[i].nq_fw_ring_id = INVALID_HW_RING_ID;
 	}
 }
 
@@ -2627,27 +2662,60 @@ static void bnge_hwrm_resource_free(struct bnge_net *bn, bool close_path)
 	bnge_hwrm_stat_ctx_free(bn);
 }
 
+static void bnge_nq_free_irq(struct bnge_net *bn, struct bnge_napi *bnapi)
+{
+	int map_idx = bnapi->nq_ring.ring_struct.map_idx;
+	struct bnge_irq *irq = &bn->bd->irq_tbl[map_idx];
+
+	if (irq->requested) {
+		if (irq->have_cpumask) {
+			irq_set_affinity_hint(irq->vector, NULL);
+			free_cpumask_var(irq->cpu_mask);
+			irq->have_cpumask = 0;
+		}
+		free_irq(irq->vector, bnapi);
+	}
+
+	irq->requested = 0;
+}
+
+static int bnge_nq_request_irq(struct bnge_net *bn, struct bnge_napi *bnapi)
+{
+	int map_idx = bnapi->nq_ring.ring_struct.map_idx;
+	struct bnge_dev *bd = bn->bd;
+	struct bnge_irq *irq;
+	int rc;
+
+	irq = &bd->irq_tbl[map_idx];
+
+	rc = request_irq(irq->vector, irq->handler, 0, irq->name, bnapi);
+	if (rc)
+		return rc;
+
+	netif_napi_set_irq_locked(&bnapi->napi, irq->vector);
+	irq->requested = 1;
+
+	if (zalloc_cpumask_var(&irq->cpu_mask, GFP_KERNEL)) {
+		int numa_node = dev_to_node(&bd->pdev->dev);
+
+		irq->have_cpumask = 1;
+		cpumask_set_cpu(cpumask_local_spread(bnapi->index, numa_node),
+				irq->cpu_mask);
+		if (irq_set_affinity_hint(irq->vector, irq->cpu_mask))
+			netdev_warn(bn->netdev,
+				    "Set affinity failed, IRQ = %d\n",
+				    irq->vector);
+	}
+	return 0;
+}
+
 static void bnge_free_irq(struct bnge_net *bn)
 {
 	struct bnge_dev *bd = bn->bd;
-	struct bnge_irq *irq;
 	int i;
 
-	for (i = 0; i < bd->nq_nr_rings; i++) {
-		int map_idx = bnge_cp_num_to_irq_num(bn, i);
-
-		irq = &bd->irq_tbl[map_idx];
-		if (irq->requested) {
-			if (irq->have_cpumask) {
-				irq_set_affinity_hint(irq->vector, NULL);
-				free_cpumask_var(irq->cpu_mask);
-				irq->have_cpumask = 0;
-			}
-			free_irq(irq->vector, bn->bnapi[i]);
-		}
-
-		irq->requested = 0;
-	}
+	for (i = 0; i < bd->nq_nr_rings; i++)
+		bnge_nq_free_irq(bn, bn->bnapi[i]);
 }
 
 static int bnge_request_irq(struct bnge_net *bn)
@@ -2661,29 +2729,9 @@ static int bnge_request_irq(struct bnge_net *bn)
 		return rc;
 	}
 	for (i = 0; i < bd->nq_nr_rings; i++) {
-		int map_idx = bnge_cp_num_to_irq_num(bn, i);
-		struct bnge_irq *irq = &bd->irq_tbl[map_idx];
-
-		rc = request_irq(irq->vector, irq->handler, 0, irq->name,
-				 bn->bnapi[i]);
+		rc = bnge_nq_request_irq(bn, bn->bnapi[i]);
 		if (rc)
 			goto err_free_irq;
-
-		netif_napi_set_irq_locked(&bn->bnapi[i]->napi, irq->vector);
-		irq->requested = 1;
-
-		if (zalloc_cpumask_var(&irq->cpu_mask, GFP_KERNEL)) {
-			int numa_node = dev_to_node(&bd->pdev->dev);
-
-			irq->have_cpumask = 1;
-			cpumask_set_cpu(cpumask_local_spread(i, numa_node),
-					irq->cpu_mask);
-			if (irq_set_affinity_hint(irq->vector, irq->cpu_mask)) {
-				netdev_warn(bn->netdev,
-					    "Set affinity failed, IRQ = %d\n",
-					    irq->vector);
-			}
-		}
 	}
 	return 0;
 
@@ -2830,7 +2878,7 @@ static int bnge_init_nic(struct bnge_net *bn)
 {
 	int rc;
 
-	bnge_init_nq_tree(bn);
+	bnge_init_cp_rings(bn);
 
 	bnge_init_rx_rings(bn);
 	rc = bnge_alloc_rx_ring_pair_bufs(bn);
