@@ -259,6 +259,22 @@ ksft_pr()
 
 Use ``ksft_pr()`` instead of ``print()`` to avoid breaking TAP format.
 
+ksft_metric()
+~~~~~~~~~~~~~
+
+Use ``ksft_metric()`` to report a numeric measurement of the current test
+case. Metrics are printed right away as compact JSON. For example::
+
+  ksft_metric("throughput", 100.5, goal="higher")
+
+prints::
+
+  # ktap-metric-json: {"goal":"higher","name":"throughput","value":100.5}
+
+``goal`` tells a performance metric, which is better ``higher`` or ``lower``,
+from an error metric, which must be ``zero``. Metrics do not affect the
+result of the test.
+
 ksft_disruptive
 ~~~~~~~~~~~~~~~
 
