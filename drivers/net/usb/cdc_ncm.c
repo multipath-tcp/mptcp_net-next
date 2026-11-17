@@ -1698,8 +1698,9 @@ int cdc_ncm_rx_verify_ndp32(struct sk_buff *skb_in, int ndpoffset)
 	int ret = -EINVAL;
 	size_t ndp_len;
 
-	if ((ndpoffset + sizeof(struct usb_cdc_ncm_ndp32)) > skb_in->len) {
-		netif_dbg(dev, rx_err, dev->net, "invalid NDP offset  <%u>\n",
+	if (ndpoffset < 0 ||
+	    (ndpoffset + sizeof(struct usb_cdc_ncm_ndp32)) > skb_in->len) {
+		netif_dbg(dev, rx_err, dev->net, "invalid NDP offset  <%d>\n",
 			  ndpoffset);
 		goto error;
 	}

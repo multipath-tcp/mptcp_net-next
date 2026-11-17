@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/can/bosch,cc770.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Bosch CC770 and Intel AN82527 CAN controllers
+
+maintainers:
+  - Marc Kleine-Budde <mkl@pengutronix.de>
+
+description:
+  The CC770 is a CAN controller from Bosch which is 100% compatible with the
+  older AN82527 from Intel, except that some bugs have been fixed.
+
+allOf:
+  - $ref: can-controller.yaml#
+
+properties:
+  compatible:
+    enum:
+      - bosch,cc770
+      - intc,82527
+
+  reg:
+    description:
+      Register window of the controller. On a PowerPC system the controller
+      sits on the local bus and the property describes the chip select, the
+      address offset and the size, the size usually being 0x80.
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  bosch,external-clock-frequency:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Frequency of the external oscillator clock in Hz. The internal clock
+      frequency used by the controller is half of this value.
+    default: 16000000
+
+  bosch,clock-out-frequency:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Clock frequency in Hz on the CLKOUT pin. If not specified or if the
+      value is 0 the CLKOUT pin is disabled.
+    default: 0
+
+  bosch,slew-rate:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      Slew rate of the CLKOUT signal. If not specified a reasonable value
+      is calculated. Only used when bosch,clock-out-frequency is set.
+
+  bosch,divide-memory-clock:
+    description: Divide the memory clock for slower memories.
+    type: boolean
+
+  bosch,iso-low-speed-mux:
+    description: Use the ISO low speed multiplexed bus configuration.
+    type: boolean
+
+  bosch,no-comperator-bypass:
+    description:
+      Disable the comparator bypass. When this property is absent the
+      comparator bypass is enabled.
+    type: boolean
+
+  bosch,disconnect-rx0-input:
+    description: Disconnect the RX0 input.
+    type: boolean
+
+  bosch,disconnect-rx1-input:
+    description: Disconnect the RX1 input.
+    type: boolean
+
+  bosch,disconnect-tx1-output:
+    description: Disconnect the TX1 output.
+    type: boolean
+
+  bosch,polarity-dominant:
+    description: Use dominant polarity on the bus.
+    type: boolean
+
+required:
+  - compatible
+  - reg
+  - interrupts
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    localbus {
+        #address-cells = <2>;
+        #size-cells = <1>;
+
+        can@2,100 {
+            compatible = "bosch,cc770";
+            reg = <2 0x100 0x100>;
+            interrupts = <4 1>;
+            interrupt-parent = <&mpic>;
+            bosch,external-clock-frequency = <16000000>;
+            bosch,disconnect-rx1-input;
+            bosch,disconnect-tx1-output;
+            bosch,iso-low-speed-mux;
+        };
+    };
+...
