@@ -630,7 +630,7 @@ static int nf_flow_tunnel_ip_push(struct net *net, struct sk_buff *skb,
 	if (err)
 		return err;
 
-	skb_scrub_packet(skb, true);
+	skb_scrub_packet(skb, false);
 	skb_clear_hash_if_not_l4(skb);
 
 	/* Push down and install the IP header. */
@@ -699,7 +699,7 @@ static int nf_flow_tunnel_ip6_push(struct net *net, struct sk_buff *skb,
 	if (err)
 		return err;
 
-	skb_scrub_packet(skb, true);
+	skb_scrub_packet(skb, false);
 	mtu = dst_mtu(dst) - sizeof(*ip6h);
 	mtu = max(mtu, IPV6_MIN_MTU);
 	skb_dst_update_pmtu_no_confirm(skb, mtu);

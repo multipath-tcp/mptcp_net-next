@@ -228,7 +228,7 @@ int netvsc_bpf(struct net_device *dev, struct netdev_bpf *bpf)
 		/* The VF's own program is not ours: refuse to install over
 		 * it, as bonding does, and leave it be on removal.
 		 */
-		if (vf_netdev && dev_xdp_prog_count(vf_netdev)) {
+		if (vf_netdev && dev_xdp_has_own_prog(vf_netdev)) {
 			if (bpf->prog) {
 				NL_SET_ERR_MSG_MOD(extack,
 						   "VF has an XDP program of its own");

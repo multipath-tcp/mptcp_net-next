@@ -1557,7 +1557,10 @@ static inline struct inode *SOCK_INODE(struct socket *socket)
 /*
  * Functions for memory accounting
  */
-int __sk_mem_raise_allocated(struct sock *sk, int size, int amt, int kind);
+enum skb_drop_reason __sk_mem_raise_allocated_reason(struct sock *sk, int size,
+						     int amt, int kind);
+enum skb_drop_reason __sk_mem_schedule_reason(struct sock *sk, int size,
+					      int kind);
 int __sk_mem_schedule(struct sock *sk, int size, int kind);
 void __sk_mem_reduce_allocated(struct sock *sk, int amount);
 void __sk_mem_reclaim(struct sock *sk, int amount);
@@ -1592,16 +1595,35 @@ static inline bool sk_wmem_schedule(struct sock *sk, int size)
 	return delta <= 0 || __sk_mem_schedule(sk, delta, SK_MEM_SEND);
 }
 
-static inline bool
-__sk_rmem_schedule(struct sock *sk, int size, bool pfmemalloc)
+/* Return SKB_NOT_DROPPED_YET on success, or the drop reason. */
+static inline enum skb_drop_reason
+__sk_rmem_schedule_reason(struct sock *sk, int size, bool pfmemalloc)
 {
+	enum skb_drop_reason reason;
 	int delta;
 
 	if (!sk_has_account(sk))
-		return true;
+		return SKB_NOT_DROPPED_YET;
 	delta = size - sk->sk_forward_alloc;
-	return delta <= 0 || __sk_mem_schedule(sk, delta, SK_MEM_RECV) ||
-	       pfmemalloc;
+	if (delta <= 0)
+		return SKB_NOT_DROPPED_YET;
+	reason = __sk_mem_schedule_reason(sk, delta, SK_MEM_RECV);
+	if (reason && pfmemalloc)
+		return SKB_NOT_DROPPED_YET;
+	return reason;
+}
+
+static inline bool
+__sk_rmem_schedule(struct sock *sk, int size, bool pfmemalloc)
+{
+	return __sk_rmem_schedule_reason(sk, size, pfmemalloc) ==
+	       SKB_NOT_DROPPED_YET;
+}
+
+static inline enum skb_drop_reason
+sk_rmem_schedule_reason(struct sock *sk, const struct sk_buff *skb, int size)
+{
+	return __sk_rmem_schedule_reason(sk, size, skb_pfmemalloc(skb));
 }
 
 static inline bool
