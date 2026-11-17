@@ -13,6 +13,7 @@ static const struct sparx5_main_io_resource lan969x_main_iomap[] =  {
 	{ TARGET_CPU,                   0xc0000, 0 }, /* 0xe00c0000 */
 	{ TARGET_FDMA,                  0xc0400, 0 }, /* 0xe00c0400 */
 	{ TARGET_GCB,                 0x2010000, 1 }, /* 0xe2010000 */
+	{ TARGET_CHIP_TOP,            0x2020000, 1 }, /* 0xe2020000 */
 	{ TARGET_QS,                  0x2030000, 1 }, /* 0xe2030000 */
 	{ TARGET_PTP,                 0x2040000, 1 }, /* 0xe2040000 */
 	{ TARGET_ANA_ACL,             0x2050000, 1 }, /* 0xe2050000 */
