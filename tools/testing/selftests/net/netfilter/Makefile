@@ -30,6 +30,7 @@ TEST_PROGS := \
 	nft_fib.sh \
 	nft_fib_nexthop.sh \
 	nft_flowtable.sh \
+	nft_flowtable_udp.sh \
 	nft_interface_stress.sh \
 	nft_meta.sh \
 	nft_nat.sh \
