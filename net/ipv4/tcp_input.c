@@ -940,9 +940,9 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 {
 	const struct net *net = sock_net(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	u32 rcvwin, rcvbuf, cap, oldval;
+	u32 rcvbuf, cap, oldval;
 	u32 rtt_threshold, rtt_us;
-	u64 grow;
+	u64 rcvwin, grow;
 
 	oldval = tp->rcvq_space.space;
 	tp->rcvq_space.space = newval;
@@ -952,7 +952,7 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 		return;
 
 	/* DRS is always one RTT late. */
-	rcvwin = newval << 1;
+	rcvwin = (u64)newval << 1;
 
 	rtt_us = tp->rcv_rtt_est.rtt_us >> 3;
 	rtt_threshold = READ_ONCE(net->ipv4.sysctl_tcp_rcvbuf_low_rtt);
@@ -961,10 +961,10 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 		 * It might take few additional ms to reach 'line rate',
 		 * but will avoid sk_rcvbuf inflation and poor cache use.
 		 */
-		grow = div_u64((u64)rcvwin * rtt_us, rtt_threshold);
+		grow = div_u64(rcvwin * rtt_us, rtt_threshold);
 	} else {
 		/* slow start: allow the sender to double its rate. */
-		grow = div_u64(((u64)rcvwin << 1) * (newval - oldval), oldval);
+		grow = div_u64((rcvwin << 1) * (newval - oldval), oldval);
 	}
 	rcvwin += grow;
 
@@ -973,6 +973,7 @@ void tcp_rcvbuf_grow(struct sock *sk, u32 newval)
 
 	cap = READ_ONCE(net->ipv4.sysctl_tcp_rmem[2]);
 
+	rcvwin = min_t(u64, rcvwin, INT_MAX);
 	rcvbuf = min_t(u32, tcp_space_from_win(sk, rcvwin), cap);
 	if (rcvbuf > sk->sk_rcvbuf) {
 		WRITE_ONCE(sk->sk_rcvbuf, rcvbuf);

@@ -217,8 +217,8 @@ static bool mptcp_rcvbuf_grow(struct sock *sk, u32 newval)
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	const struct net *net = sock_net(sk);
-	u32 rcvwin, rcvbuf, cap, oldval;
-	u64 grow;
+	u32 rcvbuf, cap, oldval;
+	u64 rcvwin, grow;
 
 	oldval = msk->rcvq_space.space;
 	msk->rcvq_space.space = newval;
@@ -227,15 +227,16 @@ static bool mptcp_rcvbuf_grow(struct sock *sk, u32 newval)
 		return false;
 
 	/* DRS is always one RTT late. */
-	rcvwin = newval << 1;
+	rcvwin = (u64)newval << 1;
 
 	/* slow start: allow the sender to double its rate. */
-	grow = (u64)rcvwin * (newval - oldval);
+	grow = rcvwin * (newval - oldval);
 	do_div(grow, oldval);
 	rcvwin += grow << 1;
 
 	cap = READ_ONCE(net->ipv4.sysctl_tcp_rmem[2]);
 
+	rcvwin = min_t(u64, rcvwin, INT_MAX);
 	rcvbuf = min_t(u32, mptcp_space_from_win(sk, rcvwin), cap);
 	if (rcvbuf > sk->sk_rcvbuf) {
 		WRITE_ONCE(sk->sk_rcvbuf, rcvbuf);
