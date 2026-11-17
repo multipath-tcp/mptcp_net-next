@@ -266,6 +266,12 @@ struct sparx5_port {
 	} tas_lists[SPX5_TAS_ENTRIES_PER_PORT];
 };
 
+/* lan969x core PLL reference clock, from CHIP_TOP:HW_STAT.REFCLK_SEL */
+enum sparx5_core_clockref {
+	SPX5_CORE_CLOCK_REF_25MHZ,
+	SPX5_CORE_CLOCK_REF_39MHZ,
+};
+
 enum sparx5_core_clockfreq {
 	SPX5_CORE_CLOCK_DEFAULT,  /* Defaults to the highest supported frequency */
 	SPX5_CORE_CLOCK_250MHZ,   /* 250MHZ core clock frequency */
@@ -415,6 +421,7 @@ struct sparx5 {
 	/* port structures are in net device */
 	struct sparx5_port *ports[SPX5_PORTS];
 	enum sparx5_core_clockfreq coreclock;
+	enum sparx5_core_clockref coreclockref;
 	/* Statistics */
 	u32 num_stats;
 	u32 num_ethtool_stats;

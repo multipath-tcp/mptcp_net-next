@@ -2332,7 +2332,7 @@ static int netvsc_register_vf(struct net_device *vf_netdev, int context)
 		return NOTIFY_DONE;
 
 	prog = netvsc_xdp_get(netvsc_dev);
-	if (prog && dev_xdp_prog_count(vf_netdev)) {
+	if (prog && dev_xdp_has_own_prog(vf_netdev)) {
 		netdev_warn(ndev, "not using VF %s, it has an XDP program attached\n",
 			    vf_netdev->name);
 		return NOTIFY_DONE;
@@ -2485,7 +2485,8 @@ static int netvsc_unregister_vf(struct net_device *vf_netdev)
 	 * reach netvsc, but leave a program of the VF's own be.
 	 */
 	nvdev = rtnl_dereference(net_device_ctx->nvdev);
-	if (nvdev && netvsc_xdp_get(nvdev) && !dev_xdp_prog_count(vf_netdev)) {
+	if (nvdev && netvsc_xdp_get(nvdev) &&
+	    !dev_xdp_has_own_prog(vf_netdev)) {
 		netdev_lock_ops(vf_netdev);
 		ret = netvsc_vf_setxdp(vf_netdev, NULL);
 		netdev_unlock_ops(vf_netdev);
