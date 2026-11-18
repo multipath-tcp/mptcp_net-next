@@ -80,25 +80,6 @@ struct mlx5_dma_pool_stats {
  * register it in a memory region at HCA virtual address 0.
  */
 
-static void *mlx5_dma_zalloc_coherent_node(struct mlx5_core_dev *dev,
-					   size_t size, dma_addr_t *dma_handle,
-					   int node)
-{
-	struct device *device = mlx5_core_dma_dev(dev);
-	struct mlx5_priv *priv = &dev->priv;
-	int original_node;
-	void *cpu_handle;
-
-	mutex_lock(&priv->alloc_mutex);
-	original_node = dev_to_node(device);
-	set_dev_node(device, node);
-	cpu_handle = dma_alloc_coherent(device, size, dma_handle,
-					GFP_KERNEL);
-	set_dev_node(device, original_node);
-	mutex_unlock(&priv->alloc_mutex);
-	return cpu_handle;
-}
-
 static void mlx5_dma_pool_destroy(struct mlx5_dma_pool *pool)
 {
 	mutex_destroy(&pool->lock);
@@ -139,8 +120,9 @@ mlx5_dma_pool_page_alloc(struct mlx5_dma_pool *pool)
 		goto err_free_page;
 
 	bitmap_fill(page->bitmap, blocks_per_page);
-	page->buf = mlx5_dma_zalloc_coherent_node(pool->dev, PAGE_SIZE,
-						  &page->dma, node);
+	page->buf = dma_alloc_coherent_node(mlx5_core_dma_dev(pool->dev),
+					    PAGE_SIZE, &page->dma, GFP_KERNEL,
+					    node);
 	if (!page->buf)
 		goto err_free_bitmap;
 
