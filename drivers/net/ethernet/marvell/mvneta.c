@@ -118,6 +118,7 @@
 #define      MVNETA_HSGMII_SERDES_PROTO		 0x1107
 #define MVNETA_TYPE_PRIO                         0x24bc
 #define      MVNETA_FORCE_UNI                    BIT(21)
+#define MVETH_TXQ_FIXED_PRIO_REG                 0x24dc
 #define MVNETA_TXQ_CMD_1                         0x24e4
 #define MVNETA_TXQ_CMD                           0x2448
 #define      MVNETA_TXQ_DISABLE_SHIFT            8
@@ -196,6 +197,7 @@
 #define      MVNETA_RXQ_ENABLE_MASK              0x000000ff
 #define MVETH_TXQ_TOKEN_COUNT_REG(q)             (0x2700 + ((q) << 4))
 #define MVETH_TXQ_TOKEN_CFG_REG(q)               (0x2704 + ((q) << 4))
+#define MVETH_TXQ_WRR_ARB_REG(q)                 (0x2708 + ((q) << 4))
 #define MVNETA_GMAC_CTRL_0                       0x2c00
 #define      MVNETA_GMAC_MAX_RX_SIZE_SHIFT       2
 #define      MVNETA_GMAC_MAX_RX_SIZE_MASK        0x7ffc
@@ -253,6 +255,8 @@
 #define MVNETA_TXQ_CMD1_REG			 0x3e00
 #define      MVNETA_TXQ_CMD1_BW_LIM_SEL_V1	 BIT(3)
 #define      MVNETA_TXQ_CMD1_BW_LIM_EN		 BIT(0)
+#define MVNETA_TXQ_FIXED_PRIO_REG		 0x3e04
+#define      MVNETA_TXQ_FIXED_PRIO_ALL		 0xff
 #define MVNETA_REFILL_NUM_CLK_REG		 0x3e08
 #define      MVNETA_REFILL_MAX_NUM_CLK		 0x0000ffff
 #define MVNETA_TX_MTU                            0x3e0c
@@ -264,6 +268,8 @@
 #define      MVNETA_TXQ_BUCKET_REFILL_VALUE_MAX	 0x0007ffff
 #define MVNETA_TXQ_TOKEN_SIZE_REG(q)             (0x3e40 + ((q) << 2))
 #define      MVNETA_TXQ_TOKEN_SIZE_MAX           0x7fffffff
+#define MVNETA_TXQ_WRR_ARB_REG(q)		 (0x3e80 + ((q) << 2))
+#define      MVNETA_TXQ_WRR_WEIGHT_MASK		 0xff
 
 /* The values of the bucket refill base period and refill period are taken from
  * the reference manual, and adds up to a base resolution of 10Kbps. This allows
@@ -518,6 +524,8 @@ struct mvneta_port {
 	 */
 	spinlock_t lock;
 	bool is_stopped;
+	/* An mqprio offload keeps the TX queues in fixed priority */
+	bool txq_fixed_prio;
 
 	u32 cause_rx_tx;
 	struct napi_struct napi;
@@ -1630,6 +1638,39 @@ static void mvneta_txq_max_tx_size_set(struct mvneta_port *pp, int max_tx_size)
 			mvreg_write(pp, MVNETA_TXQ_TOKEN_SIZE_REG(queue), val);
 		}
 	}
+}
+
+static void mvneta_txq_wrr_weight(struct mvneta_port *pp, u32 reg, u32 weight)
+{
+	u32 val = mvreg_read(pp, reg);
+
+	val &= ~MVNETA_TXQ_WRR_WEIGHT_MASK;
+	mvreg_write(pp, reg, val | weight);
+}
+
+/* With the default fixed priority, a busy queue starves the others.
+ * The Armada 370 and XP manuals list separate registers for the
+ * version 1 arbiter, which runs without a shaper, so set both.
+ */
+static void mvneta_txq_wrr_set(struct mvneta_port *pp, int max_tx_size)
+{
+	/* In units of 256 bytes, must exceed the largest packet */
+	u32 weight = max_tx_size / 256 + 1;
+	int queue;
+
+	for (queue = 0; queue < txq_number; queue++) {
+		mvneta_txq_wrr_weight(pp, MVNETA_TXQ_WRR_ARB_REG(queue), weight);
+		mvneta_txq_wrr_weight(pp, MVETH_TXQ_WRR_ARB_REG(queue), weight);
+	}
+}
+
+/* Only the traffic classes of an mqprio offload keep the fixed priority */
+static void mvneta_txq_fixed_prio_set(struct mvneta_port *pp)
+{
+	u32 val = pp->txq_fixed_prio ? MVNETA_TXQ_FIXED_PRIO_ALL : 0;
+
+	mvreg_write(pp, MVNETA_TXQ_FIXED_PRIO_REG, val);
+	mvreg_write(pp, MVETH_TXQ_FIXED_PRIO_REG, val);
 }
 
 /* Set unicast address */
@@ -3765,6 +3806,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
 
 	mvneta_max_rx_size_set(pp, pp->pkt_size);
 	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
+	mvneta_txq_wrr_set(pp, pp->pkt_size);
+	mvneta_txq_fixed_prio_set(pp);
 	mvneta_restore_per_queue_rate_limit(pp);
 
 	/* start the Rx/Tx activity */
@@ -5345,9 +5388,20 @@ static int mvneta_setup_mqprio(struct net_device *dev,
 static int mvneta_setup_tc(struct net_device *dev, enum tc_setup_type type,
 			   void *type_data)
 {
+	struct mvneta_port *pp = netdev_priv(dev);
+	struct tc_mqprio_qopt_offload *mqprio;
+	int ret;
+
 	switch (type) {
 	case TC_SETUP_QDISC_MQPRIO:
-		return mvneta_setup_mqprio(dev, type_data);
+		mqprio = type_data;
+		ret = mvneta_setup_mqprio(dev, mqprio);
+		if (ret)
+			return ret;
+
+		pp->txq_fixed_prio = mqprio->qopt.num_tc;
+		mvneta_txq_fixed_prio_set(pp);
+		return 0;
 	default:
 		return -EOPNOTSUPP;
 	}
