@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config NET_DSA_MICROCHIP_LAN9645X
+	tristate "Microchip LAN9645x switch support"
+	depends on NET_DSA
+	select NET_DSA_TAG_LAN9645X
+	select REGMAP
+	help
+	  This driver adds DSA support for Microchip LAN9645x switch chips.
+	  The lan9645x switch is a multi-port Gigabit AVB/TSN Ethernet Switch
+	  with five integrated 10/100/1000Base-T PHYs. In addition to the
+	  integrated PHYs, it supports up to 2 RGMII/RMII, up to 2
+	  BASE-X/SERDES/2.5GBASE-X and one Quad-SGMII/Quad-USGMII interfaces.
