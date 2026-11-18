@@ -60,6 +60,13 @@ static int rds_rdma_cm_event_handler_cmn(struct rdma_cm_id *cm_id,
 	rdsdebug("conn %p id %p handling event %u (%s)\n", conn, cm_id,
 		 event->event, rdma_event_msg(event->event));
 
+	/* cm_id->context owns a reference on the connection, dropped
+	 * only after rdma_destroy_id() has returned, and that waits for
+	 * a running handler.  The connection, and the mutex released at
+	 * out: that lives in its path array, therefore outlive this
+	 * handler whatever the callbacks below do to the other holders.
+	 */
+
 	/* Prevent shutdown from tearing down the connection
 	 * while we're executing. */
 	if (conn) {
