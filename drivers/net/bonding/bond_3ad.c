@@ -2608,7 +2608,7 @@ void bond_3ad_state_machine_handler(struct work_struct *work)
 
 re_arm:
 	bond_for_each_slave_rcu(bond, slave, iter) {
-		if (slave->should_notify) {
+		if (slave->should_notify || slave->should_notify_rx) {
 			should_notify_rtnl = BOND_SLAVE_NOTIFY_NOW;
 			break;
 		}
