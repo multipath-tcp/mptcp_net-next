@@ -502,6 +502,48 @@ static bool rds_tcp_is_unloading(struct rds_connection *conn)
 	return atomic_read(&rds_tcp_unloading) != 0;
 }
 
+/* Gather @tc's connection for destruction: move the node to the
+ * caller's @tmp_list and take a reference that keeps the connection,
+ * and so the node, alive until rds_tcp_destroy_gathered_conns() has
+ * dealt with it.  Called with rds_tcp_conn_lock held.  A connection
+ * whose free is already running gets no reference; its free unlinks
+ * the node itself, under the same lock, once we drop it.
+ */
+static void rds_tcp_gather_conn(struct rds_tcp_connection *tc,
+				struct list_head *tmp_list)
+{
+	if (rds_conn_get_unless_zero(tc->t_cpath->cp_conn))
+		list_move_tail(&tc->t_tcp_node, tmp_list);
+}
+
+/* Destroy the connections whose nodes were gathered on @tmp_list.
+ *
+ * rds_conn_destroy() can return before the connection is freed, and
+ * it is the free - rds_tcp_conn_free() - that unlinks t_tcp_node.
+ * Since @tmp_list lives on the caller's stack, unlink each node here
+ * and mark it detached before its destroy, so that a free that runs
+ * after the caller has returned does not write into a dead frame.
+ * Every entry holds a reference taken by rds_tcp_gather_conn(), so
+ * none can be freed under the walk; each is dropped after its destroy.
+ */
+static void rds_tcp_destroy_gathered_conns(struct list_head *tmp_list)
+{
+	struct rds_tcp_connection *tc, *_tc;
+	struct rds_connection *conn;
+
+	list_for_each_entry_safe(tc, _tc, tmp_list, t_tcp_node) {
+		conn = tc->t_cpath->cp_conn;
+
+		spin_lock_irq(&rds_tcp_conn_lock);
+		list_del_init(&tc->t_tcp_node);
+		tc->t_tcp_node_detached = true;
+		spin_unlock_irq(&rds_tcp_conn_lock);
+
+		rds_conn_destroy(conn);
+		rds_conn_put(conn);
+	}
+}
+
 static void rds_tcp_destroy_conns(void)
 {
 	struct rds_tcp_connection *tc, *_tc;
@@ -511,12 +553,11 @@ static void rds_tcp_destroy_conns(void)
 	spin_lock_irq(&rds_tcp_conn_lock);
 	list_for_each_entry_safe(tc, _tc, &rds_tcp_conn_list, t_tcp_node) {
 		if (!list_has_conn(&tmp_list, tc->t_cpath->cp_conn))
-			list_move_tail(&tc->t_tcp_node, &tmp_list);
+			rds_tcp_gather_conn(tc, &tmp_list);
 	}
 	spin_unlock_irq(&rds_tcp_conn_lock);
 
-	list_for_each_entry_safe(tc, _tc, &tmp_list, t_tcp_node)
-		rds_conn_destroy(tc->t_cpath->cp_conn);
+	rds_tcp_destroy_gathered_conns(&tmp_list);
 }
 
 static void rds_tcp_exit(void);
@@ -691,15 +732,14 @@ static void rds_tcp_kill_sock(struct net *net)
 		if (net != c_net)
 			continue;
 		if (!list_has_conn(&tmp_list, tc->t_cpath->cp_conn)) {
-			list_move_tail(&tc->t_tcp_node, &tmp_list);
+			rds_tcp_gather_conn(tc, &tmp_list);
 		} else {
 			list_del(&tc->t_tcp_node);
 			tc->t_tcp_node_detached = true;
 		}
 	}
 	spin_unlock_irq(&rds_tcp_conn_lock);
-	list_for_each_entry_safe(tc, _tc, &tmp_list, t_tcp_node)
-		rds_conn_destroy(tc->t_cpath->cp_conn);
+	rds_tcp_destroy_gathered_conns(&tmp_list);
 }
 
 static void __net_exit rds_tcp_exit_net(struct net *net)
@@ -805,6 +845,7 @@ static void rds_tcp_exit(void)
 #endif
 	unregister_pernet_device(&rds_tcp_net_ops);
 	rds_tcp_destroy_conns();
+	rds_conn_wait_conns_freed(&rds_tcp_transport, NULL);
 	rds_trans_unregister(&rds_tcp_transport);
 	rds_tcp_recv_exit();
 	kmem_cache_destroy(rds_tcp_conn_slab);

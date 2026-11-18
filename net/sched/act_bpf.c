@@ -305,8 +305,8 @@ static int tcf_bpf_init(struct net *net, struct nlattr *nla,
 	index = parm->index;
 	ret = tcf_idr_check_alloc(tn, &index, act, bind);
 	if (!ret) {
-		ret = tcf_idr_create_from_flags(tn, index, est, act,
-						&act_bpf_ops, bind, flags);
+		ret = tcf_idr_create(tn, index, est, act,
+				     &act_bpf_ops, bind, flags);
 		if (ret < 0) {
 			tcf_idr_cleanup(tn, index);
 			return ret;

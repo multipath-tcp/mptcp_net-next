@@ -468,6 +468,15 @@ of CPU to queues is automatically deduced from the IRQ affinities
 configured for each receive queue by the driver, so no additional
 configuration should be necessary.
 
+When the flow's previous target CPU and the new target CPU share the
+last level cache (LLC), the hardware steering update can be skipped,
+since the application's cache locality is preserved either way. This
+reduces contention on driver-internal locks when application threads
+migrate frequently between CPUs sharing an LLC. The functionality
+remains disabled until explicitly enabled through::
+
+  /proc/sys/net/core/arfs_llc_affinity
+
 
 Suggested Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
