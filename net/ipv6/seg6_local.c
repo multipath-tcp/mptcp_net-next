@@ -1749,6 +1749,12 @@ static int input_action_end_bpf(struct sk_buff *skb,
 		goto drop;
 	local_unlock_nested_bh(&seg6_bpf_srh_states.bh_lock);
 
+	/* The program may have changed the packet and seg6_bpf_has_valid_srh()
+	 * may have rewritten the SRH Hdr Ext Len.
+	 * skb->csum may then no longer be the checksum of the full packet.
+	 */
+	skb_checksum_complete_unset(skb);
+
 	if (ret != BPF_REDIRECT)
 		seg6_lookup_nexthop_noref(skb, NULL, 0);
 
