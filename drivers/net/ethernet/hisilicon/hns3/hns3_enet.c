@@ -78,6 +78,8 @@ module_param(page_pool_enabled, bool, 0400);
 #define HNS3_MIN_TX_LEN		33U
 #define HNS3_MIN_TUN_PKT_LEN	65U
 
+#define HNS3_OOM_POLL_INTERVAL_MS	250
+
 /* hns3_pci_tbl - PCI Device ID Table
  *
  * Last entry must be all 0s
@@ -4161,6 +4163,7 @@ static int hns3_add_frag(struct hns3_enet_ring *ring)
 			if (unlikely(!new_skb)) {
 				hns3_rl_err(ring_to_netdev(ring),
 					    "alloc rx fraglist skb fail\n");
+				hns3_ring_set_oom_state(ring);
 				return -ENXIO;
 			}
 
@@ -4450,6 +4453,30 @@ static int hns3_handle_rx_bd(struct hns3_enet_ring *ring)
 	return 0;
 }
 
+static void hns3_oom_task(struct work_struct *work)
+{
+	struct hns3_nic_priv *priv = container_of(work, struct hns3_nic_priv,
+						  oom_task.work);
+	bool down = test_bit(HNS3_NIC_STATE_DOWN, &priv->state);
+	struct hnae3_handle *h = priv->ae_handle;
+	struct hns3_enet_ring *ring;
+	u16 i;
+
+	for (i = 0; i < h->kinfo.num_tqps; i++)
+		if (test_and_clear_bit(i, priv->rx_ring_oom_bm) && !down) {
+			ring = &priv->ring[i + h->kinfo.num_tqps];
+			napi_schedule(&ring->tqp_vector->napi);
+		}
+}
+
+static void hns3_oom_task_schedule(struct hns3_enet_ring *ring)
+{
+	struct hns3_nic_priv *priv = netdev_priv(ring_to_netdev(ring));
+
+	schedule_delayed_work(&priv->oom_task,
+			      msecs_to_jiffies(HNS3_OOM_POLL_INTERVAL_MS));
+}
+
 int hns3_clean_rx_ring(struct hns3_enet_ring *ring, int budget,
 		       void (*rx_fn)(struct hns3_enet_ring *, struct sk_buff *))
 {
@@ -4471,6 +4498,9 @@ int hns3_clean_rx_ring(struct hns3_enet_ring *ring, int budget,
 
 		/* Poll one pkt */
 		err = hns3_handle_rx_bd(ring);
+		if (unlikely(err == -ENOMEM))
+			failure = true;
+
 		/* Do not get FE for the packet or failed to alloc skb */
 		if (unlikely(!ring->skb || err == -ENXIO)) {
 			goto out;
@@ -4489,10 +4519,15 @@ out:
 	 * FBD number with head pointer
 	 */
 	if (unused_count > 0)
-		failure = failure ||
-			  hns3_nic_alloc_rx_buffers(ring, unused_count);
+		failure |= hns3_nic_alloc_rx_buffers(ring, unused_count);
 
-	return failure ? budget : recv_pkts;
+	if (unlikely(failure))
+		hns3_ring_set_oom_state(ring);
+
+	if (unlikely(hns3_ring_is_oom_state(ring)))
+		hns3_oom_task_schedule(ring);
+
+	return recv_pkts;
 }
 
 static void hns3_update_rx_int_coalesce(struct hns3_enet_tqp_vector *tqp_vector)
@@ -4787,6 +4822,7 @@ static int hns3_nic_init_vector_data(struct hns3_nic_priv *priv)
 			       hns3_nic_common_poll);
 	}
 
+	INIT_DELAYED_WORK(&priv->oom_task, hns3_oom_task);
 	return 0;
 
 map_ring_fail:
@@ -4885,6 +4921,8 @@ static void hns3_nic_uninit_vector_data(struct hns3_nic_priv *priv)
 	struct hnae3_handle *h = priv->ae_handle;
 	struct hns3_enet_tqp_vector *tqp_vector;
 	int i;
+
+	cancel_delayed_work_sync(&priv->oom_task);
 
 	for (i = 0; i < priv->vector_num; i++) {
 		tqp_vector = &priv->tqp_vector[i];
@@ -5201,6 +5239,16 @@ int hns3_init_all_ring(struct hns3_nic_priv *priv)
 		cond_resched();
 	}
 
+	/* hns3_set_ringparam() calls this without hns3_uninit_all_ring(). */
+	if (!priv->rx_ring_oom_bm) {
+		priv->rx_ring_oom_bm = bitmap_zalloc(h->kinfo.num_tqps,
+						     GFP_KERNEL);
+		if (!priv->rx_ring_oom_bm) {
+			ret = -ENOMEM;
+			goto out_when_alloc_ring_memory;
+		}
+	}
+
 	return 0;
 
 out_when_alloc_ring_memory:
@@ -5214,6 +5262,12 @@ static void hns3_uninit_all_ring(struct hns3_nic_priv *priv)
 {
 	struct hnae3_handle *h = priv->ae_handle;
 	int i;
+
+	cancel_delayed_work_sync(&priv->oom_task);
+	if (priv->rx_ring_oom_bm) {
+		bitmap_free(priv->rx_ring_oom_bm);
+		priv->rx_ring_oom_bm = NULL;
+	}
 
 	for (i = 0; i < h->kinfo.num_tqps; i++) {
 		hns3_fini_ring(&priv->ring[i]);
