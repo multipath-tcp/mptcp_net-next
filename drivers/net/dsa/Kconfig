@@ -82,6 +82,8 @@ config NET_DSA_MV88E6060
 
 source "drivers/net/dsa/microchip/Kconfig"
 
+source "drivers/net/dsa/microchip/lan9645x/Kconfig"
+
 source "drivers/net/dsa/motorcomm/Kconfig"
 
 source "drivers/net/dsa/mv88e6xxx/Kconfig"

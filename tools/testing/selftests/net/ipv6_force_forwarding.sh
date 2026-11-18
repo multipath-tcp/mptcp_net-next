@@ -86,12 +86,63 @@ test_force_forwarding() {
     return $ret
 }
 
+check_force_forwarding() {
+    local dev=$1
+    local expected=$2
+    local msg=$3
+    local val
+
+    val=$(ip netns exec $ns2 sysctl -n net.ipv6.conf.$dev.force_forwarding) || return 1
+    if [ "$val" = "$expected" ]; then
+        echo "PASS: $msg"
+        return 0
+    fi
+
+    echo "FAIL: $msg (got $val, expected $expected)"
+    return 1
+}
+
+test_all_force_forwarding() {
+    local ret=0
+
+    echo "TEST: all.force_forwarding"
+
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.veth21.force_forwarding=0 || return 1
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.all.force_forwarding=1 || return 1
+    check_force_forwarding veth21 1 "all.force_forwarding applied to interfaces" || ret=1
+
+    # Rewriting the same value to all re-applies it to every interface
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.veth21.force_forwarding=0 || return 1
+    check_force_forwarding veth21 0 "interface force_forwarding overridden" || return 1
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.all.force_forwarding=1 || return 1
+    check_force_forwarding veth21 1 "unchanged all.force_forwarding re-applied" || ret=1
+
+    if ip netns exec $ns1 ping -6 -c 1 -W 2 2001:db8:2::2 &>/dev/null; then
+        echo "PASS: forwarding after re-applying all.force_forwarding"
+    else
+        echo "FAIL: ping failed after re-applying all.force_forwarding"
+        ret=1
+    fi
+
+    # Disabling all.forwarding resets force_forwarding, including on all
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.all.forwarding=1 || return 1
+    ip netns exec $ns2 sysctl -qw net.ipv6.conf.all.forwarding=0 || return 1
+    check_force_forwarding all 0 "all.forwarding=0 resets all.force_forwarding" || ret=1
+    check_force_forwarding veth21 0 "all.forwarding=0 resets interface force_forwarding" || ret=1
+
+    return $ret
+}
+
 echo "IPv6 force_forwarding test"
 echo "=========================="
 
 setup_test
 test_force_forwarding
 ret=$?
+if [ $ret -eq 0 ]; then
+    test_all_force_forwarding
+    ret=$?
+fi
 
 if [ $ret -eq 0 ]; then
     echo "OK"
