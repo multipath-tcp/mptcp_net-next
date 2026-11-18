@@ -412,12 +412,7 @@ static bool pse_pw_d_is_sw_pw_control(struct pse_controller_dev *pcdev,
 static int pse_pi_is_enabled(struct regulator_dev *rdev)
 {
 	struct pse_controller_dev *pcdev = rdev_get_drvdata(rdev);
-	const struct pse_controller_ops *ops;
 	int id, ret;
-
-	ops = pcdev->ops;
-	if (!ops->pi_get_admin_state)
-		return -EOPNOTSUPP;
 
 	id = rdev_get_id(rdev);
 	mutex_lock(&pcdev->lock);
@@ -1420,11 +1415,6 @@ pse_control_get_internal(struct pse_controller_dev *pcdev, unsigned int index,
 
 	if (!try_module_get(pcdev->owner)) {
 		ret = -ENODEV;
-		goto free_psec;
-	}
-
-	if (!pcdev->ops->pi_get_admin_state) {
-		ret = -EOPNOTSUPP;
 		goto free_psec;
 	}
 
