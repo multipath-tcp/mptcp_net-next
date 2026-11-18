@@ -553,7 +553,7 @@ out:
 }
 
 static int mlx4_buf_direct_alloc(struct mlx4_dev *dev, int size,
-				 struct mlx4_buf *buf)
+				 struct mlx4_buf *buf, int node)
 {
 	dma_addr_t t;
 
@@ -561,8 +561,8 @@ static int mlx4_buf_direct_alloc(struct mlx4_dev *dev, int size,
 	buf->npages       = 1;
 	buf->page_shift   = get_order(size) + PAGE_SHIFT;
 	buf->direct.buf   =
-		dma_alloc_coherent(&dev->persist->pdev->dev, size, &t,
-				   GFP_KERNEL);
+		dma_alloc_coherent_node(&dev->persist->pdev->dev, size, &t,
+					GFP_KERNEL, node);
 	if (!buf->direct.buf)
 		return -ENOMEM;
 
@@ -585,7 +585,7 @@ int mlx4_buf_alloc(struct mlx4_dev *dev, int size, int max_direct,
 		   struct mlx4_buf *buf)
 {
 	if (size <= max_direct) {
-		return mlx4_buf_direct_alloc(dev, size, buf);
+		return mlx4_buf_direct_alloc(dev, size, buf, dev->numa_node);
 	} else {
 		dma_addr_t t;
 		int i;
@@ -749,7 +749,7 @@ void mlx4_db_free(struct mlx4_dev *dev, struct mlx4_db *db)
 EXPORT_SYMBOL_GPL(mlx4_db_free);
 
 int mlx4_alloc_hwq_res(struct mlx4_dev *dev, struct mlx4_hwq_resources *wqres,
-		       int size)
+		       int size, int node)
 {
 	int err;
 
@@ -759,7 +759,7 @@ int mlx4_alloc_hwq_res(struct mlx4_dev *dev, struct mlx4_hwq_resources *wqres,
 
 	*wqres->db.db = 0;
 
-	err = mlx4_buf_direct_alloc(dev, size, &wqres->buf);
+	err = mlx4_buf_direct_alloc(dev, size, &wqres->buf, node);
 	if (err)
 		goto err_db;
 
