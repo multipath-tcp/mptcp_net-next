@@ -329,8 +329,8 @@ static void bgmac_remove(struct bcma_device *core)
 {
 	struct bgmac *bgmac = bcma_get_drvdata(core);
 
-	bcma_mdio_mii_unregister(bgmac->mii_bus);
 	bgmac_enet_remove(bgmac);
+	bcma_mdio_mii_unregister(bgmac->mii_bus);
 	bcma_set_drvdata(core, NULL);
 }
 
