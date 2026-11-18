@@ -197,7 +197,8 @@ out_rcu_unlock:
  * this IP datagram, and create new one, if nothing is found.
  */
 static struct ipq *ip_find(struct net *net, struct iphdr *iph,
-			   u32 user, int vif)
+			   u32 user, int vif,
+			   enum skb_drop_reason *reason)
 {
 	struct frag_v4_compare_key key = {
 		.saddr = iph->saddr,
@@ -209,7 +210,7 @@ static struct ipq *ip_find(struct net *net, struct iphdr *iph,
 	};
 	struct inet_frag_queue *q;
 
-	q = inet_frag_find(net->ipv4.fqdir, &key);
+	q = inet_frag_find(net->ipv4.fqdir, &key, reason);
 	if (!q)
 		return NULL;
 
@@ -475,6 +476,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 {
 	struct net_device *dev;
 	struct ipq *qp;
+	SKB_DR(reason);
 	int vif;
 
 	__IP_INC_STATS(net, IPSTATS_MIB_REASMREQDS);
@@ -483,7 +485,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 	rcu_read_lock();
 	dev = skb->dev ? : skb_dst_dev_rcu(skb);
 	vif = l3mdev_master_ifindex_rcu(dev);
-	qp = ip_find(net, ip_hdr(skb), user, vif);
+	qp = ip_find(net, ip_hdr(skb), user, vif, &reason);
 	if (qp) {
 		int ret, refs = 0;
 
@@ -499,7 +501,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 	rcu_read_unlock();
 
 	__IP_INC_STATS(net, IPSTATS_MIB_REASMFAILS);
-	kfree_skb(skb);
+	kfree_skb_reason(skb, reason);
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(ip_defrag);
