@@ -5452,6 +5452,7 @@ static int hns3_client_init(struct hnae3_handle *handle)
 	priv->min_tx_copybreak = 0;
 	priv->min_tx_spare_buf_size = 0;
 	set_bit(HNS3_NIC_STATE_DOWN, &priv->state);
+	mutex_init(&handle->dbg_mutex);
 
 	handle->msg_enable = netif_msg_init(debug, DEFAULT_MSG_LEVEL);
 
@@ -5565,6 +5566,7 @@ out_alloc_vector_data:
 	priv->ring = NULL;
 out_get_ring_cfg:
 	priv->ae_handle = NULL;
+	mutex_destroy(&handle->dbg_mutex);
 	free_netdev(netdev);
 	return ret;
 }
@@ -5588,6 +5590,7 @@ static void hns3_client_uninit(struct hnae3_handle *handle, bool reset)
 
 	hns3_free_rx_cpu_rmap(netdev);
 
+	mutex_lock(&handle->dbg_mutex);
 	hns3_nic_uninit_irq(priv);
 
 	hns3_clear_all_ring(handle, true);
@@ -5599,9 +5602,11 @@ static void hns3_client_uninit(struct hnae3_handle *handle, bool reset)
 	hns3_uninit_all_ring(priv);
 
 	hns3_put_ring_config(priv);
+	mutex_unlock(&handle->dbg_mutex);
 
 out_netdev_free:
 	hns3_dbg_uninit(handle);
+	mutex_destroy(&handle->dbg_mutex);
 	free_netdev(netdev);
 }
 
@@ -5878,6 +5883,7 @@ static int hns3_reset_notify_uninit_enet(struct hnae3_handle *handle)
 		return 0;
 	}
 
+	mutex_lock(&handle->dbg_mutex);
 	hns3_free_rx_cpu_rmap(netdev);
 	hns3_nic_uninit_irq(priv);
 	hns3_clear_all_ring(handle, true);
@@ -5890,6 +5896,7 @@ static int hns3_reset_notify_uninit_enet(struct hnae3_handle *handle)
 	hns3_uninit_all_ring(priv);
 
 	hns3_put_ring_config(priv);
+	mutex_unlock(&handle->dbg_mutex);
 
 	return 0;
 }

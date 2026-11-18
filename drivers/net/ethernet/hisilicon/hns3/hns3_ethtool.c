@@ -1252,6 +1252,7 @@ static int hns3_set_ringparam(struct net_device *ndev,
 	if (if_running)
 		ndev->netdev_ops->ndo_stop(ndev);
 
+	mutex_lock(&h->dbg_mutex);
 	hns3_change_all_ring_bd_num(priv, new_ringparam.tx_desc_num,
 				    new_ringparam.rx_desc_num);
 	hns3_change_rx_buf_len(ndev, new_ringparam.rx_buf_len);
@@ -1270,6 +1271,7 @@ static int hns3_set_ringparam(struct net_device *ndev,
 		for (i = 0; i < h->kinfo.num_tqps * 2; i++)
 			hns3_fini_ring(&tmp_rings[i]);
 	}
+	mutex_unlock(&h->dbg_mutex);
 
 	kfree(tmp_rings);
 
