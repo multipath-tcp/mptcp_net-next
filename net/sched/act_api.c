@@ -799,7 +799,7 @@ static int tcf_idr_delete_index(struct tcf_idrinfo *idrinfo, u32 index)
 
 int tcf_idr_create(struct tc_action_net *tn, u32 index, struct nlattr *est,
 		   struct tc_action **a, const struct tc_action_ops *ops,
-		   int bind, bool cpustats, u32 flags)
+		   int bind, u32 flags)
 {
 	struct tc_action *p = kzalloc(ops->size, GFP_KERNEL);
 	struct tcf_idrinfo *idrinfo = tn->idrinfo;
@@ -811,7 +811,7 @@ int tcf_idr_create(struct tc_action_net *tn, u32 index, struct nlattr *est,
 	if (bind)
 		atomic_set(&p->tcfa_bindcnt, 1);
 
-	if (cpustats) {
+	if (!(flags & TCA_ACT_FLAGS_NO_PERCPU_STATS)) {
 		p->cpu_bstats = netdev_alloc_pcpu_stats(struct gnet_stats_basic_sync);
 		if (!p->cpu_bstats)
 			goto err1;
@@ -854,17 +854,6 @@ err1:
 	return err;
 }
 EXPORT_SYMBOL(tcf_idr_create);
-
-int tcf_idr_create_from_flags(struct tc_action_net *tn, u32 index,
-			      struct nlattr *est, struct tc_action **a,
-			      const struct tc_action_ops *ops, int bind,
-			      u32 flags)
-{
-	/* Set cpustats according to actions flags. */
-	return tcf_idr_create(tn, index, est, a, ops, bind,
-			      !(flags & TCA_ACT_FLAGS_NO_PERCPU_STATS), flags);
-}
-EXPORT_SYMBOL(tcf_idr_create_from_flags);
 
 /* Cleanup idr index that was allocated but not initialized. */
 
