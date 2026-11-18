@@ -15,6 +15,7 @@
 # shellcheck disable=SC2034,SC2329
 ALL_TESTS="
 	collecting
+	collecting_notify
 	distributing
 "
 NUM_NETIFS=2
@@ -119,6 +120,46 @@ collecting()
 	check_err $? "Packets not received in COLLECTING state"
 
 	log_test "Receive in COLLECTING state"
+}
+
+collecting_notify()
+{
+	local tmp_file
+
+	RET=0
+
+	partner_state_clear 0x18
+	defer tc filter del dev "$h1" ingress pref 1 handle 101 flower
+	lacp_state_wait "$h1" 0x0f
+	check_err $? "Port did not reach ATTACHED state"
+
+	tmp_file=$(mktemp)
+	defer rm "$tmp_file"
+	ip -d monitor link dev "$h1" >> "$tmp_file" &
+	defer kill_process $!
+	sleep 1
+
+	partner_state_clear 0x10
+	lacp_state_wait "$h1" 0x1f
+	check_err $? "Port did not reach COLLECTING state"
+
+	slowwait "$WAIT_TIMEOUT" grep -qw \
+		"ad_actor_oper_port_state $((0x1f))" "$tmp_file"
+	check_err $? "No notification upon entering COLLECTING state"
+
+	# Discard previous notifications so that only a notification upon
+	# leaving COLLECTING state can match below. The monitor appends to
+	# the file, so truncating it is safe.
+	: > "$tmp_file"
+	partner_state_clear 0x18
+	lacp_state_wait "$h1" 0x0f
+	check_err $? "Port did not reach ATTACHED state"
+
+	slowwait "$WAIT_TIMEOUT" grep -qw \
+		"ad_actor_oper_port_state $((0x0f))" "$tmp_file"
+	check_err $? "No notification upon leaving COLLECTING state"
+
+	log_test "Notifications in COLLECTING state"
 }
 
 distributing()
