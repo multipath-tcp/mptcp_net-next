@@ -18,6 +18,11 @@ int psp_dev_check_access(struct psp_dev *psd, struct net *net, bool admin);
 bool psp_has_assoc_dev_in_ns(struct psp_dev *psd, struct net *net);
 int psp_attach_netdev_notifier(void);
 
+int psp_deferred_del_init(struct psp_dev *psd);
+void psp_deferred_del_stop(struct psp_dev *psd);
+void psp_deferred_del_uninit(struct psp_dev *psd, bool unpublished);
+void psp_deferred_del_queue(struct psp_dev *psd, struct psp_assoc *pas);
+
 void psp_nl_notify_dev(struct psp_dev *psd, u32 cmd);
 void psp_nl_notify_disassoc(struct psp_dev *psd, struct net *net);
 

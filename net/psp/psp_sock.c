@@ -114,8 +114,23 @@ static void psp_assoc_free(struct work_struct *work)
 
 	mutex_lock(&psd->lock);
 	if (psp_dev_is_registered(psd)) {
-		if (psp_assoc_needs_tx_key_del(pas))
+		if (psp_assoc_needs_tx_key_del(pas)) {
+			if (pas->flags & PSP_ASSOC_DEFER_TX_KEY_DEL) {
+				psp_deferred_del_queue(psd, pas);
+
+				/* The deferred queue now owns pas's reference
+				 * on psd and may drop it as soon as psd->lock
+				 * is released. Take another reference to psd
+				 * to ensure that psd isn't freed until
+				 * mutex_unlock() returns.
+				 */
+				psp_dev_get(psd);
+				mutex_unlock(&psd->lock);
+				psp_dev_put(psd);
+				return;
+			}
 			psp_dev_tx_key_del(psd, pas);
+		}
 		list_del(&pas->assocs_list);
 	}
 	mutex_unlock(&psd->lock);
@@ -287,10 +302,6 @@ psp_sock_tx_rekey(struct sock *sk, struct psp_dev *psd, struct psp_assoc *pas,
 	struct psp_assoc *new;
 	int err;
 
-	if (psp_dev_has_sadb(psd)) {
-		NL_SET_ERR_MSG(extack, "Tx rekey not supported on this device");
-		return -EOPNOTSUPP;
-	}
 	if (!pas->peer_tx) {
 		NL_SET_ERR_MSG(extack, "Socket PSP state is not fully established");
 		return -EBUSY;
@@ -322,6 +333,7 @@ psp_sock_tx_rekey(struct sock *sk, struct psp_dev *psd, struct psp_assoc *pas,
 	list_move(&pas->assocs_list, &psd->stale_assocs);
 
 	rcu_assign_pointer(sk->psp_assoc, new);
+	pas->flags |= PSP_ASSOC_DEFER_TX_KEY_DEL;
 	psp_assoc_put(pas);
 
 	return 0;
