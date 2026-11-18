@@ -137,6 +137,17 @@ config NET_DSA_TAG_KSZ
 	  Say Y if you want to enable support for tagging frames for the
 	  Microchip 8795/937x/9477/9893 families of switches.
 
+config NET_DSA_TAG_LAN9645X
+	tristate "Tag driver for Microchip LAN9645x switches"
+	help
+	  Say Y or M if you want to enable NPI tagging for the Microchip
+	  LAN9645x switches. In this mode, the frames over the Ethernet CPU
+	  port are prepended with a hardware-defined injection/extraction frame
+	  header. On injection a 28 byte internal frame header (IFH) is used.
+	  On extraction a 16 byte prefix is prepended before the internal frame
+	  header. This prefix starts with a broadcast MAC, to ease passage
+	  through the host side RX filter.
+
 config NET_DSA_TAG_NETC
 	tristate "Tag driver for NXP NETC switches"
 	help
