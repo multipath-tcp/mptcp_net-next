@@ -89,7 +89,6 @@ enum {
 #define RDS_RECONNECT_PENDING	1
 #define RDS_IN_XMIT		2
 #define RDS_RECV_REFILL		3
-#define	RDS_DESTROY_PENDING	4
 
 /* Max number of multipaths per RDS connection. Must be a power of 2 */
 #define	RDS_MPATH_WORKERS	8
@@ -138,6 +137,12 @@ struct rds_conn_path {
 /* One rds_connection per RDS address pair */
 struct rds_connection {
 	struct hlist_node	c_hash_node;
+	/* rds_conn_destroy() quiesces the connection synchronously;
+	 * freeing it - the connection memory, the path workqueues and
+	 * the transport's per-connection state - is deferred until the
+	 * last reference is dropped via rds_conn_put().
+	 */
+	struct kref		c_refcount;
 	struct in6_addr		c_laddr;
 	struct in6_addr		c_faddr;
 	int			c_dev_if; /* ifindex used for this conn */
@@ -148,7 +153,25 @@ struct rds_connection {
 				c_pad_to_32:29;
 	int			c_npaths;
 	bool			c_with_sport_idx;
-	struct rds_connection	*c_passive;
+	/* Set once, by rds_conn_destroy() under rds_conn_lock - a
+	 * test-and-set, so a second destroy of the same connection
+	 * returns at once - before it cancels the path works.  Read
+	 * through rds_destroy_pending(), which also reports netns
+	 * teardown and module unload; the c_passive handling in
+	 * __rds_conn_create() uses the same predicate, since those rule
+	 * a passive connection out just as well.  A site that arms
+	 * a path work must test the predicate and queue the work inside
+	 * one rcu_read_lock() section: the synchronize_rcu() that
+	 * follows the store is what keeps a queue issued after the
+	 * cancellation from landing on a destroyed workqueue.  Two kinds
+	 * of site are exempt: the workers' own self-requeues, which the
+	 * sync cancel in the destroy path rejects, and the destroy == true
+	 * rds_conn_path_drop(): the destroy issues and flushes it itself,
+	 * and IB device removal issues it ahead of the module exit, which
+	 * destroys - and so flushes - that connection afterwards.
+	 */
+	bool			c_destroy_in_prog;
+	struct rds_connection __rcu *c_passive;
 	struct rds_transport	*c_trans;
 
 	struct rds_cong_map	*c_lcong;
@@ -544,6 +567,12 @@ struct rds_transport {
 	unsigned int		t_prefer_loopback:1,
 				t_mp_capable:1;
 	unsigned int		t_type;
+	/* Connections of this transport not yet freed; freeing runs
+	 * asynchronously once rds_conn_destroy() has quiesced a
+	 * connection, so transport module unload has to wait for this
+	 * to reach zero (rds_conn_wait_conns_freed()).
+	 */
+	atomic_t		t_conn_count;
 
 	int (*laddr_check)(struct net *net, const struct in6_addr *addr,
 			   __u32 scope_id);
@@ -652,7 +681,12 @@ struct rds_sock {
 
 	/*
 	 * rds_sendmsg caches the conn it used the last time around.
-	 * This helps avoid costly lookups.
+	 * This helps avoid costly lookups.  The cache owns a connection
+	 * reference, dropped when it is replaced, when rds_sendmsg()
+	 * evicts a connection whose destroy has begun, or when the
+	 * socket is released, and is read and written under rs_lock -
+	 * except by
+	 * rds_release(), which runs once no one else can reach the socket.
 	 */
 	struct rds_connection	*rs_conn;
 
@@ -661,7 +695,11 @@ struct rds_sock {
 	/* seen congestion (ENOBUFS) when sending? */
 	int			rs_seen_congestion;
 
-	/* rs_lock protects all these adjacent members before the newline */
+	/* rs_lock protects all these adjacent members before the newline,
+	 * as well as rs_conn above and rs_tos at the end of the struct -
+	 * except that rds_sendmsg() samples rs_tos locklessly, with
+	 * READ_ONCE(), for the create, and re-checks it under the lock.
+	 */
 	spinlock_t		rs_lock;
 	struct list_head	rs_send_queue;
 	u32			rs_snd_bytes;
@@ -821,6 +859,21 @@ struct rds_connection *rds_conn_create_outgoing(struct net *net,
 						u8 tos, gfp_t gfp, int dev_if);
 void rds_conn_shutdown(struct rds_conn_path *cpath);
 void rds_conn_destroy(struct rds_connection *conn);
+void rds_conn_get(struct rds_connection *conn);
+void rds_conn_put(struct rds_connection *conn);
+/* take a reference unless the connection is already being freed */
+static inline bool rds_conn_get_unless_zero(struct rds_connection *conn)
+{
+	return kref_get_unless_zero(&conn->c_refcount);
+}
+
+/* transport unload waits for its connections to be freed, polling at
+ * the first interval and warning at the second
+ */
+#define RDS_CONN_FREE_POLL_MS		100
+#define RDS_CONN_FREE_WARN_INTERVAL_MS	10000
+void rds_conn_wait_conns_freed(struct rds_transport *trans,
+			       void (*resweep)(void));
 void rds_conn_drop(struct rds_connection *conn);
 void rds_conn_path_drop(struct rds_conn_path *cpath, bool destroy);
 void rds_conn_connect_if_down(struct rds_connection *conn);
@@ -996,7 +1049,8 @@ void __rds_put_mr_final(struct kref *kref);
 
 static inline bool rds_destroy_pending(struct rds_connection *conn)
 {
-	return !check_net(rds_conn_net(conn)) ||
+	return READ_ONCE(conn->c_destroy_in_prog) ||
+	       !check_net(rds_conn_net(conn)) ||
 	       (conn->c_trans->t_unloading && conn->c_trans->t_unloading(conn));
 }
 
