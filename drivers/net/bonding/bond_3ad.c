@@ -251,6 +251,19 @@ static int __port_is_collecting_distributing(struct port *port)
 }
 
 /**
+ * __port_rx_notify_pending - check if the port's Rx state change was not
+ * notified yet when coupled control is disabled
+ * @port: the port we're looking at
+ *
+ * Return: true if the notification is pending, false otherwise.
+ */
+static bool __port_rx_notify_pending(struct port *port)
+{
+	return !port->slave->bond->params.coupled_control &&
+	       port->slave->should_notify_rx;
+}
+
+/**
  * __get_agg_selection_mode - get the aggregator selection mode
  * @port: the port we're looking at
  *
@@ -903,6 +916,9 @@ static inline void __update_lacpdu_from_port(struct port *port)
 	lacpdu->actor_port_priority = htons(port->actor_port_priority);
 	lacpdu->actor_port = htons(port->actor_port_number);
 	lacpdu->actor_state = port->actor_oper_port_state;
+	/* Collection is only enabled once the Rx state change is notified */
+	if (__port_rx_notify_pending(port))
+		lacpdu->actor_state &= ~LACP_STATE_COLLECTING;
 	slave_dbg(port->slave->bond->dev, port->slave->dev,
 		  "update lacpdu: actor port state %x\n",
 		  port->actor_oper_port_state);
@@ -1440,6 +1456,12 @@ static void ad_churn_machine(struct port *port)
  */
 static void ad_tx_machine(struct port *port)
 {
+	/* Advertise Collecting if it was masked in the last LACPDU */
+	if ((port->actor_oper_port_state & LACP_STATE_COLLECTING) &&
+	    !(port->lacpdu.actor_state & LACP_STATE_COLLECTING) &&
+	    !__port_rx_notify_pending(port))
+		port->ntt = true;
+
 	/* check if tx timer expired, to verify that we do not send more than
 	 * 3 packets per second
 	 */
