@@ -31,7 +31,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
 		enum dma_data_direction dir, unsigned long attrs);
 void *iommu_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-		gfp_t gfp, unsigned long attrs);
+		gfp_t gfp, unsigned long attrs, int node);
 int iommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
 		unsigned long attrs);

@@ -143,6 +143,10 @@ struct rds_ib_device;
 struct rds_ib_connection {
 
 	struct list_head	ib_node;
+	/* set under ib_nodev_conns_lock once a transport teardown has
+	 * claimed ib_node; from then on only the teardown touches it
+	 */
+	bool			i_ib_node_detached;
 	struct rds_ib_device	*rds_ibdev;
 	struct rds_connection	*conn;
 
@@ -258,6 +262,10 @@ struct rds_ib_device {
 	unsigned int		max_initiator_depth;
 	unsigned int		max_responder_resources;
 	spinlock_t		spinlock;	/* protect the above */
+	/* set under spinlock by rds_ib_dev_shutdown(): the device is
+	 * going away and no connection may attach to it any more
+	 */
+	bool			shutting_down;
 	refcount_t		refcount;
 	struct work_struct	free_work;
 	int			*vector_load;
@@ -384,7 +392,8 @@ void rds_ib_cm_connect_complete(struct rds_connection *conn,
 struct rds_ib_device *rds_ib_get_device(__be32 ipaddr);
 int rds_ib_update_ipaddr(struct rds_ib_device *rds_ibdev,
 			 struct in6_addr *ipaddr);
-void rds_ib_add_conn(struct rds_ib_device *rds_ibdev, struct rds_connection *conn);
+int rds_ib_add_conn(struct rds_ib_device *rds_ibdev,
+		    struct rds_connection *conn);
 void rds_ib_remove_conn(struct rds_ib_device *rds_ibdev, struct rds_connection *conn);
 void rds_ib_destroy_nodev_conns(void);
 void rds_ib_mr_cqe_handler(struct rds_ib_connection *ic, struct ib_wc *wc);

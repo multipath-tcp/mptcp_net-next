@@ -549,8 +549,8 @@ static int tcf_ife_init(struct net *net, struct nlattr *nla,
 	}
 
 	if (!exists) {
-		ret = tcf_idr_create_from_flags(tn, index, est, a,
-						&act_ife_ops, bind, flags);
+		ret = tcf_idr_create(tn, index, est, a,
+				     &act_ife_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			kfree(p);
