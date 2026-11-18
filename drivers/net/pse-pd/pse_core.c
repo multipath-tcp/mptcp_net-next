@@ -149,6 +149,11 @@ static void pse_release_pis(struct pse_controller_dev *pcdev)
 	kfree(pcdev->pi);
 }
 
+static void devm_pse_release_pis(void *data)
+{
+	pse_release_pis(data);
+}
+
 /**
  * of_load_pse_pis - load all the PSE PIs
  * @pcdev: a pointer to the PSE controller device
@@ -1121,6 +1126,13 @@ int pse_controller_register(struct pse_controller_dev *pcdev)
 	if (ret)
 		return ret;
 
+	/* The PI regulator ops use pcdev->pi until devres unregisters the
+	 * regulators, so free it from devres too, after them.
+	 */
+	ret = devm_add_action_or_reset(pcdev->dev, devm_pse_release_pis, pcdev);
+	if (ret)
+		return ret;
+
 	if (pcdev->ops->setup_pi_matrix) {
 		ret = pcdev->ops->setup_pi_matrix(pcdev);
 		if (ret)
@@ -1191,7 +1203,6 @@ void pse_controller_unregister(struct pse_controller_dev *pcdev)
 	mutex_unlock(&pse_list_mutex);
 	cancel_work_sync(&pcdev->ntf_work);
 	pse_flush_pw_ds(pcdev);
-	pse_release_pis(pcdev);
 	kfifo_free(&pcdev->ntf_fifo);
 }
 EXPORT_SYMBOL_GPL(pse_controller_unregister);
