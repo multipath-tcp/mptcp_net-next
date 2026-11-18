@@ -630,8 +630,30 @@ u64 dma_get_required_mask(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(dma_get_required_mask);
 
-void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
-		gfp_t flag, unsigned long attrs)
+/**
+ * dma_alloc_attrs_node - allocate coherent memory on a given NUMA node
+ * @dev: device to allocate the memory for
+ * @size: size of the allocation
+ * @dma_handle: returns the DMA address of the allocation
+ * @flag: GFP flags for the allocation
+ * @attrs: DMA_ATTR_* flags for the allocation
+ * @node: NUMA node to allocate the memory on, NUMA_NO_NODE for no preference
+ *
+ * Same as dma_alloc_attrs() but places the memory on @node rather than on the
+ * node of @dev. Like with kmalloc_node() the node is only a preference,
+ * the page allocator may fall back to other nodes if @node is out of memory.
+ * The contiguous memory allocator (CMA) does not: only the CMA area of @node
+ * and the global CMA area are tried. The allocation may fail even though the
+ * CMA area of another node, e.g. that of @dev, still has free space.
+ *
+ * Allocations served from per-device or global coherent pools, per-device CMA
+ * areas, restricted or atomic pools, arch_dma_alloc() or dma_map_ops
+ * implementations do not take @node into account.
+ *
+ * Return: the CPU address of the allocation, or NULL on failure.
+ */
+void *dma_alloc_attrs_node(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t flag, unsigned long attrs, int node)
 {
 	const struct dma_map_ops *ops = get_dma_ops(dev);
 	void *cpu_addr;
@@ -665,9 +687,11 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 	flag &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
 
 	if (dma_alloc_direct(dev, ops) || arch_dma_alloc_direct(dev)) {
-		cpu_addr = dma_direct_alloc(dev, size, dma_handle, flag, attrs);
+		cpu_addr = dma_direct_alloc_node(dev, size, dma_handle, flag,
+						 attrs, node);
 	} else if (use_dma_iommu(dev)) {
-		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs);
+		cpu_addr = iommu_dma_alloc(dev, size, dma_handle, flag, attrs,
+					   node);
 	} else if (ops->alloc) {
 		cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
 	} else {
@@ -680,6 +704,14 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 			flag, attrs);
 	debug_dma_alloc_coherent(dev, size, *dma_handle, cpu_addr, attrs);
 	return cpu_addr;
+}
+EXPORT_SYMBOL_GPL(dma_alloc_attrs_node);
+
+void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		gfp_t flag, unsigned long attrs)
+{
+	return dma_alloc_attrs_node(dev, size, dma_handle, flag, attrs,
+				    dev_to_node(dev));
 }
 EXPORT_SYMBOL(dma_alloc_attrs);
 
