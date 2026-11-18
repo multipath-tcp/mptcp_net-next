@@ -564,6 +564,15 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= rps_sock_flow_sysctl
 	},
+#ifdef CONFIG_RFS_ACCEL
+	{
+		.procname	= "arfs_llc_affinity",
+		.data		= &arfs_llc_affinity.key,
+		.maxlen		= sizeof(arfs_llc_affinity.key),
+		.mode		= 0644,
+		.proc_handler	= proc_do_static_key
+	},
+#endif
 #endif
 #ifdef CONFIG_NET_FLOW_LIMIT
 	{
