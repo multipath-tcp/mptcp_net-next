@@ -46,6 +46,7 @@ void rds_inc_init(struct rds_incoming *inc, struct rds_connection *conn,
 {
 	refcount_set(&inc->i_refcount, 1);
 	INIT_LIST_HEAD(&inc->i_item);
+	rds_conn_get(conn);	/* put in rds_inc_put() */
 	inc->i_conn = conn;
 	inc->i_conn_path = NULL;
 	inc->i_saddr = *saddr;
@@ -61,6 +62,7 @@ void rds_inc_path_init(struct rds_incoming *inc, struct rds_conn_path *cp,
 {
 	refcount_set(&inc->i_refcount, 1);
 	INIT_LIST_HEAD(&inc->i_item);
+	rds_conn_get(cp->cp_conn);	/* put in rds_inc_put() */
 	inc->i_conn = cp->cp_conn;
 	inc->i_conn_path = cp;
 	inc->i_saddr = *saddr;
@@ -81,9 +83,19 @@ void rds_inc_put(struct rds_incoming *inc)
 {
 	rdsdebug("put inc %p ref %d\n", inc, refcount_read(&inc->i_refcount));
 	if (refcount_dec_and_test(&inc->i_refcount)) {
+		struct rds_connection *conn = inc->i_conn;
+
 		BUG_ON(!list_empty(&inc->i_item));
 
-		inc->i_conn->c_trans->inc_free(inc);
+		/* inc_free() can free the memory @inc lives in, so the
+		 * connection reference has to be dropped through the
+		 * copy taken above.
+		 */
+		conn->c_trans->inc_free(inc);
+		/* get in rds_inc_init(), rds_inc_path_init() or
+		 * rds_recv_incoming()
+		 */
+		rds_conn_put(conn);
 	}
 }
 EXPORT_SYMBOL_GPL(rds_inc_put);
@@ -325,6 +337,13 @@ void rds_recv_incoming(struct rds_connection *conn, struct in6_addr *saddr,
 	unsigned long flags;
 	struct rds_conn_path *cp;
 
+	/* every caller initialized @inc with rds_inc_init() or
+	 * rds_inc_path_init() first, so i_conn already holds a reference.
+	 * Take the new one before dropping the old, so that re-pointing an
+	 * inc at the connection it already refers to cannot free it.
+	 */
+	rds_conn_get(conn);
+	rds_conn_put(inc->i_conn);
 	inc->i_conn = conn;
 	inc->i_rx_jiffies = jiffies;
 	if (conn->c_trans->t_mp_capable)
@@ -408,8 +427,9 @@ void rds_recv_incoming(struct rds_connection *conn, struct in6_addr *saddr,
 	 * rds_find_bound() uses a global (netns-agnostic) hash table.
 	 * An RDS connection created in netns A can match a socket bound
 	 * in the init netns, delivering inc cross-netns with inc->i_conn
-	 * pointing into netns A.  When cleanup_net() then frees that conn,
-	 * any subsequent dereference of inc->i_conn is a use-after-free.
+	 * pointing into netns A.  Cross-netns delivery is wrong on its
+	 * own, and the inc's connection reference would keep a
+	 * connection of a dead netns around, with a stale c_net.
 	 * Drop the inc if the receiving socket lives in a different netns.
 	 */
 	if (!net_eq(sock_net(rds_rs_to_sk(rs)), rds_conn_net(conn))) {
@@ -484,7 +504,6 @@ static int rds_still_queued(struct rds_sock *rs, struct rds_incoming *inc,
 	if (!list_empty(&inc->i_item)) {
 		ret = 1;
 		if (drop) {
-			/* XXX make sure this i_conn is reliable */
 			rds_recv_rcvbuf_delta(rs, sk, inc->i_conn->c_lcong,
 					      -be32_to_cpu(inc->i_hdr.h_len),
 					      inc->i_hdr.h_dport);
