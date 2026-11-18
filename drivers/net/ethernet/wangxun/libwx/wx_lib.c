@@ -1734,7 +1734,7 @@ netdev_tx_t wx_xmit_frame(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 
-	num_tx_queues = wx->num_tx_queues;
+	num_tx_queues = READ_ONCE(wx->num_tx_queues);
 	if (unlikely(!num_tx_queues))
 		goto drop;
 
@@ -1897,8 +1897,8 @@ static bool wx_set_vmdq_queues(struct wx *wx)
 	wx->num_rx_pools = vmdq_i;
 	wx->num_rx_queues_per_pool = rss_i;
 
-	wx->num_rx_queues = vmdq_i * rss_i;
-	wx->num_tx_queues = vmdq_i * rss_i;
+	WRITE_ONCE(wx->num_rx_queues, vmdq_i * rss_i);
+	WRITE_ONCE(wx->num_tx_queues, vmdq_i * rss_i);
 
 	return true;
 }
@@ -1943,15 +1943,15 @@ static void wx_set_rss_queues(struct wx *wx)
 	}
 
 out:
-	wx->num_rx_queues = f->indices;
-	wx->num_tx_queues = f->indices;
+	WRITE_ONCE(wx->num_rx_queues, f->indices);
+	WRITE_ONCE(wx->num_tx_queues, f->indices);
 }
 
 static void wx_set_num_queues(struct wx *wx)
 {
 	/* Start with base case */
-	wx->num_rx_queues = 1;
-	wx->num_tx_queues = 1;
+	WRITE_ONCE(wx->num_rx_queues, 1);
+	WRITE_ONCE(wx->num_tx_queues, 1);
 	wx->queues_per_pool = 1;
 
 	if (wx_set_vmdq_queues(wx))
@@ -2288,8 +2288,8 @@ static int wx_alloc_q_vectors(struct wx *wx)
 	return 0;
 
 err_out:
-	wx->num_tx_queues = 0;
-	wx->num_rx_queues = 0;
+	WRITE_ONCE(wx->num_tx_queues, 0);
+	WRITE_ONCE(wx->num_rx_queues, 0);
 	wx->num_q_vectors = 0;
 
 	while (v_idx--)
@@ -2310,8 +2310,8 @@ static void wx_free_q_vectors(struct wx *wx)
 {
 	int v_idx = wx->num_q_vectors;
 
-	wx->num_tx_queues = 0;
-	wx->num_rx_queues = 0;
+	WRITE_ONCE(wx->num_tx_queues, 0);
+	WRITE_ONCE(wx->num_rx_queues, 0);
 	wx->num_q_vectors = 0;
 
 	while (v_idx--)
@@ -3079,13 +3079,16 @@ void wx_get_stats64(struct net_device *netdev,
 		    struct rtnl_link_stats64 *stats)
 {
 	struct wx *wx = netdev_priv(netdev);
+	int num_rx_queues, num_tx_queues;
 	struct wx_hw_stats *hwstats;
 	int i;
 
 	wx_update_stats(wx);
 
+	num_rx_queues = READ_ONCE(wx->num_rx_queues);
+	num_tx_queues = READ_ONCE(wx->num_tx_queues);
 	rcu_read_lock();
-	for (i = 0; i < wx->num_rx_queues; i++) {
+	for (i = 0; i < num_rx_queues; i++) {
 		struct wx_ring *ring = rcu_dereference(wx->rx_ring[i]);
 		u64 bytes, packets;
 		unsigned int start;
@@ -3101,7 +3104,7 @@ void wx_get_stats64(struct net_device *netdev,
 		}
 	}
 
-	for (i = 0; i < wx->num_tx_queues; i++) {
+	for (i = 0; i < num_tx_queues; i++) {
 		struct wx_ring *ring = rcu_dereference(wx->tx_ring[i]);
 		u64 bytes, packets;
 		unsigned int start;

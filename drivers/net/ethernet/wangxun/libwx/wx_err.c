@@ -199,10 +199,11 @@ EXPORT_SYMBOL(wx_init_err_task);
 
 static bool wx_ring_tx_pending(struct wx *wx)
 {
+	int num_tx_queues = READ_ONCE(wx->num_tx_queues);
 	int i;
 
 	rcu_read_lock();
-	for (i = 0; i < wx->num_tx_queues; i++) {
+	for (i = 0; i < num_tx_queues; i++) {
 		struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
 
 		if (!tx_ring)
@@ -261,6 +262,7 @@ static void wx_watchdog_flush_tx(struct wx *wx)
 
 static void wx_detect_tx_hang(struct wx *wx)
 {
+	int num_tx_queues;
 	int i;
 
 	/* If we're down or resetting, just bail */
@@ -270,8 +272,9 @@ static void wx_detect_tx_hang(struct wx *wx)
 
 	/* Force detection of hung controller */
 	if (netif_carrier_ok(wx->netdev)) {
+		num_tx_queues = READ_ONCE(wx->num_tx_queues);
 		rcu_read_lock();
-		for (i = 0; i < wx->num_tx_queues; i++) {
+		for (i = 0; i < num_tx_queues; i++) {
 			struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
 
 			if (tx_ring)

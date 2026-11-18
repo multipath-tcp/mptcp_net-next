@@ -296,8 +296,8 @@ static void wx_ptp_rx_hang(struct wx *wx)
 {
 	struct wx_ring *rx_ring;
 	unsigned long rx_event;
+	int num_rx_queues, n;
 	u32 tsyncrxctl;
-	int n;
 
 	tsyncrxctl = rd32(wx, WX_PSR_1588_CTL);
 
@@ -311,8 +311,9 @@ static void wx_ptp_rx_hang(struct wx *wx)
 
 	/* determine the most recent watchdog or rx_timestamp event */
 	rx_event = wx->last_rx_ptp_check;
+	num_rx_queues = READ_ONCE(wx->num_rx_queues);
 	rcu_read_lock();
-	for (n = 0; n < wx->num_rx_queues; n++) {
+	for (n = 0; n < num_rx_queues; n++) {
 		rx_ring = rcu_dereference(wx->rx_ring[n]);
 		if (!rx_ring)
 			continue;
