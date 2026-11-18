@@ -19,6 +19,8 @@ struct mutex psp_devs_lock;
  *
  * psp_devs_lock protects the psp_devs xarray.
  * Ordering is take the psp_devs_lock and then the instance lock.
+ * The PSP instance lock must be taken before its main netdev's instance
+ * lock.
  * Each instance is protected by RCU, and has a refcount.
  * When driver unregisters the instance gets flushed, but struct sticks around.
  */
@@ -53,6 +55,7 @@ int psp_dev_check_access(struct psp_dev *psd, struct net *net, bool admin)
  * @psd_caps:	device capabilities
  * @priv_ptr:	back-pointer to driver private data
  *
+ * Context: Must not be called with the netdev instance lock held.
  * Return: pointer to allocated PSP device, or ERR_PTR.
  */
 struct psp_dev *
@@ -63,6 +66,8 @@ psp_dev_create(struct net_device *netdev,
 	struct psp_dev *psd;
 	static u32 last_id;
 	int err;
+
+	lockdep_assert_not_held(&netdev->lock);
 
 	if (WARN_ON(!psd_caps->versions ||
 		    !psd_ops->set_config ||
@@ -127,11 +132,15 @@ void psp_dev_free(struct psp_dev *psd)
 /**
  * psp_dev_unregister() - unregister PSP device
  * @psd:	PSP device structure
+ *
+ * Context: Must not be called with the netdev instance lock held.
  */
 void psp_dev_unregister(struct psp_dev *psd)
 {
 	struct psp_assoc_dev *entry, *entry_tmp;
 	struct psp_assoc *pas, *next;
+
+	lockdep_assert_not_held(&psd->main_netdev->lock);
 
 	mutex_lock(&psp_devs_lock);
 	mutex_lock(&psd->lock);
