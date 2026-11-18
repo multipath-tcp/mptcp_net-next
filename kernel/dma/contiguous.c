@@ -402,22 +402,20 @@ static struct page *cma_alloc_aligned(struct cma *cma, size_t size, gfp_t gfp)
  * @dev:   Pointer to device for which the allocation is performed.
  * @size:  Requested allocation size.
  * @gfp:   Allocation flags.
+ * @nid:   NUMA node to allocate the memory on.
  *
  * tries to use device specific contiguous memory area if available, or it
- * tries to use per-numa cma, if the allocation fails, it will fallback to
- * try default global one.
+ * tries to use per-numa cma of @nid, if the allocation fails, it will fallback
+ * to try default global one.
  *
  * Note that it bypass one-page size of allocations from the per-numa and
  * global area as the addresses within one page are always contiguous, so
  * there is no need to waste CMA pages for that kind; it also helps reduce
  * fragmentations.
  */
-struct page *dma_alloc_contiguous(struct device *dev, size_t size, gfp_t gfp)
+struct page *dma_alloc_contiguous(struct device *dev, size_t size, gfp_t gfp,
+				  int nid)
 {
-#ifdef CONFIG_DMA_NUMA_CMA
-	int nid = dev_to_node(dev);
-#endif
-
 	/* CMA can be used only in the context which permits sleeping */
 	if (!gfpflags_allow_blocking(gfp))
 		return NULL;
