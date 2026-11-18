@@ -5224,11 +5224,10 @@ static void mvneta_disable_per_queue_rate_limit(struct mvneta_port *pp)
 	}
 }
 
-static int mvneta_setup_queue_rates(struct mvneta_port *pp, int queue,
-				    u64 min_rate, u64 max_rate)
+/* Convert a rate limit to the token bucket refill of a TX queue */
+static int mvneta_txq_refill_val(u64 min_rate, u64 max_rate, u32 *val)
 {
 	u32 refill_val, rem;
-	u32 val = 0;
 
 	/* Convert to from Bps to bps */
 	max_rate *= 8;
@@ -5243,12 +5242,8 @@ static int mvneta_setup_queue_rates(struct mvneta_port *pp, int queue,
 	    refill_val > MVNETA_TXQ_BUCKET_REFILL_VALUE_MAX)
 		return -EINVAL;
 
-	val = refill_val;
-	val |= (MVNETA_TXQ_BUCKET_REFILL_PERIOD <<
-		MVNETA_TXQ_BUCKET_REFILL_PERIOD_SHIFT);
-
-	pp->txqs[queue].bucket_refill = val;
-	mvreg_write(pp, MVNETA_TXQ_BUCKET_REFILL_REG(queue), val);
+	*val = refill_val | (MVNETA_TXQ_BUCKET_REFILL_PERIOD <<
+			     MVNETA_TXQ_BUCKET_REFILL_PERIOD_SHIFT);
 
 	return 0;
 }
@@ -5276,8 +5271,10 @@ static void mvneta_restore_per_queue_rate_limit(struct mvneta_port *pp)
 static int mvneta_setup_mqprio(struct net_device *dev,
 			       struct tc_mqprio_qopt_offload *mqprio)
 {
+	bool shaper = mqprio->shaper == TC_MQPRIO_SHAPER_BW_RATE;
 	struct mvneta_port *pp = netdev_priv(dev);
-	int rxq, txq, tc, ret;
+	u32 refill[TC_QOPT_MAX_QUEUE];
+	int queue, last, tc, ret;
 	u8 num_tc;
 
 	num_tc = mqprio->qopt.num_tc;
@@ -5286,58 +5283,59 @@ static int mvneta_setup_mqprio(struct net_device *dev,
 	if (num_tc && mqprio->qopt.hw != TC_MQPRIO_HW_OFFLOAD_TCS)
 		return 0;
 
-	if (num_tc > rxq_number)
-		return -EINVAL;
-
-	mvneta_clear_rx_prio_map(pp);
-
 	if (!num_tc) {
+		mvneta_clear_rx_prio_map(pp);
 		mvneta_disable_per_queue_rate_limit(pp);
 		netdev_reset_tc(dev);
 		return 0;
 	}
 
-	netdev_set_num_tc(dev, mqprio->qopt.num_tc);
+	/* Check everything first, a rejected setup must not change anything */
+	if (num_tc > rxq_number || (shaper && num_tc > txq_number))
+		return -EINVAL;
 
-	for (tc = 0; tc < mqprio->qopt.num_tc; tc++) {
+	for (tc = 0; tc < num_tc; tc++) {
+		if (!mqprio->qopt.count[tc])
+			continue;
+
+		last = mqprio->qopt.offset[tc] + mqprio->qopt.count[tc];
+		if (last > rxq_number || last > txq_number)
+			return -EINVAL;
+
+		if (!shaper)
+			continue;
+
+		ret = mvneta_txq_refill_val(mqprio->min_rate[tc],
+					    mqprio->max_rate[tc], &refill[tc]);
+		if (ret)
+			return ret;
+	}
+
+	/* This can only fail before it writes to the hardware */
+	if (shaper) {
+		ret = mvneta_enable_per_queue_rate_limit(pp);
+		if (ret)
+			return ret;
+	} else {
+		mvneta_disable_per_queue_rate_limit(pp);
+	}
+
+	mvneta_clear_rx_prio_map(pp);
+	netdev_set_num_tc(dev, num_tc);
+
+	for (tc = 0; tc < num_tc; tc++) {
 		netdev_set_tc_queue(dev, tc, mqprio->qopt.count[tc],
 				    mqprio->qopt.offset[tc]);
 
-		for (rxq = mqprio->qopt.offset[tc];
-		     rxq < mqprio->qopt.count[tc] + mqprio->qopt.offset[tc];
-		     rxq++) {
-			/* The range sets the TX queues of the class as well */
-			if (rxq >= rxq_number || rxq >= txq_number)
-				return -EINVAL;
+		last = mqprio->qopt.offset[tc] + mqprio->qopt.count[tc];
+		for (queue = mqprio->qopt.offset[tc]; queue < last; queue++) {
+			mvneta_map_vlan_prio_to_rxq(pp, tc, queue);
+			if (!shaper)
+				continue;
 
-			mvneta_map_vlan_prio_to_rxq(pp, tc, rxq);
-		}
-	}
-
-	if (mqprio->shaper != TC_MQPRIO_SHAPER_BW_RATE) {
-		mvneta_disable_per_queue_rate_limit(pp);
-		return 0;
-	}
-
-	if (mqprio->qopt.num_tc > txq_number)
-		return -EINVAL;
-
-	ret = mvneta_enable_per_queue_rate_limit(pp);
-	if (ret)
-		return ret;
-
-	for (tc = 0; tc < mqprio->qopt.num_tc; tc++) {
-		for (txq = mqprio->qopt.offset[tc];
-		     txq < mqprio->qopt.count[tc] + mqprio->qopt.offset[tc];
-		     txq++) {
-			if (txq >= txq_number)
-				return -EINVAL;
-
-			ret = mvneta_setup_queue_rates(pp, txq,
-						       mqprio->min_rate[tc],
-						       mqprio->max_rate[tc]);
-			if (ret)
-				return ret;
+			pp->txqs[queue].bucket_refill = refill[tc];
+			mvreg_write(pp, MVNETA_TXQ_BUCKET_REFILL_REG(queue),
+				    refill[tc]);
 		}
 	}
 
