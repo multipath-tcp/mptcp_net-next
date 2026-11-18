@@ -3299,7 +3299,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	/* Allocate page for receive rings */
 	err = mlx4_alloc_hwq_res(mdev->dev, &priv->res,
-				MLX4_EN_PAGE_SIZE);
+				 MLX4_EN_PAGE_SIZE, mdev->dev->numa_node);
 	if (err) {
 		en_err(priv, "Failed to allocate page for rx qps\n");
 		goto out;
