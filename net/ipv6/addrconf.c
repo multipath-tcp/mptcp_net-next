@@ -6849,7 +6849,7 @@ static int addrconf_sysctl_force_forwarding(const struct ctl_table *ctl, int wri
 	struct net *net = ctl->extra2;
 	int *valp = ctl->data;
 	int new_val = *valp;
-	int old_val = *valp;
+	int old_val;
 	int ret;
 
 	tmp_ctl.extra1 = SYSCTL_ZERO;
@@ -6857,35 +6857,41 @@ static int addrconf_sysctl_force_forwarding(const struct ctl_table *ctl, int wri
 	tmp_ctl.data = &new_val;
 
 	ret = proc_douintvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
+	if (ret || !write)
+		return ret;
 
-	if (write && old_val != new_val) {
-		if (!rtnl_net_trylock(net))
-			return restart_syscall();
+	if (!rtnl_net_trylock(net))
+		return restart_syscall();
 
-		WRITE_ONCE(*valp, new_val);
+	old_val = *valp;
+	WRITE_ONCE(*valp, new_val);
 
-		if (valp == &net->ipv6.devconf_dflt->force_forwarding) {
+	if (valp == &net->ipv6.devconf_dflt->force_forwarding) {
+		if (old_val != new_val)
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
 						     NETCONFA_FORCE_FORWARDING,
 						     NETCONFA_IFINDEX_DEFAULT,
 						     net->ipv6.devconf_dflt);
-		} else if (valp == &net->ipv6.devconf_all->force_forwarding) {
+	} else if (valp == &net->ipv6.devconf_all->force_forwarding) {
+		if (old_val != new_val)
 			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
 						     NETCONFA_FORCE_FORWARDING,
 						     NETCONFA_IFINDEX_ALL,
 						     net->ipv6.devconf_all);
 
-			addrconf_force_forward_change(net, new_val);
-		} else {
-			inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
-						     NETCONFA_FORCE_FORWARDING,
-						     idev->dev->ifindex,
-						     &idev->cnf);
-		}
-		rtnl_net_unlock(net);
+		/* Like all.forwarding, apply to every interface even if
+		 * all.force_forwarding did not change.
+		 */
+		addrconf_force_forward_change(net, new_val);
+	} else if (old_val != new_val) {
+		inet6_netconf_notify_devconf(net, RTM_NEWNETCONF,
+					     NETCONFA_FORCE_FORWARDING,
+					     idev->dev->ifindex,
+					     &idev->cnf);
 	}
+	rtnl_net_unlock(net);
 
-	return ret;
+	return 0;
 }
 
 static int minus_one = -1;

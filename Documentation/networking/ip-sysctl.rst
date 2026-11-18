@@ -2683,6 +2683,8 @@ force_forwarding - BOOLEAN
 	Enable forwarding on this interface only -- regardless of the setting on
 	``conf/all/forwarding``. When setting ``conf.all.forwarding`` to 0,
 	the ``force_forwarding`` flag will be reset on all interfaces.
+	Writing to ``conf/all/force_forwarding`` applies the value to all
+	interfaces, even if the value did not change.
 
 fwmark_reflect - BOOLEAN
 	Controls the fwmark of kernel-generated IPv6 reply packets that are not
