@@ -406,29 +406,6 @@ static int vlan_hwtstamp_set(struct net_device *dev,
 	return generic_hwtstamp_set_lower(real_dev, cfg, extack);
 }
 
-static int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-{
-	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
-	struct ifreq ifrr;
-	int err = -EOPNOTSUPP;
-
-	strscpy_pad(ifrr.ifr_name, real_dev->name, IFNAMSIZ);
-	ifrr.ifr_ifru = ifr->ifr_ifru;
-
-	switch (cmd) {
-	case SIOCGMIIPHY:
-	case SIOCGMIIREG:
-	case SIOCSMIIREG:
-		err = dev_eth_ioctl(real_dev, &ifrr, cmd);
-		break;
-	}
-
-	if (!err)
-		ifr->ifr_ifru = ifrr.ifr_ifru;
-
-	return err;
-}
-
 static int vlan_dev_neigh_setup(struct net_device *dev, struct neigh_parms *pa)
 {
 	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
@@ -1105,7 +1082,6 @@ static const struct net_device_ops vlan_netdev_ops = {
 	.ndo_set_rx_mode	= vlan_dev_set_rx_mode,
 	.ndo_change_rx_flags	= vlan_dev_change_rx_flags,
 	.ndo_work		= vlan_dev_work,
-	.ndo_eth_ioctl		= vlan_dev_ioctl,
 	.ndo_neigh_setup	= vlan_dev_neigh_setup,
 	.ndo_get_stats64	= vlan_dev_get_stats64,
 #if IS_ENABLED(CONFIG_FCOE)
