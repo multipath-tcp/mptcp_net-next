@@ -728,6 +728,12 @@ def _data_basic_send_netkit_psp_assoc(cfg, version, ipver):
     """
     _assoc_nk_guest(cfg)
 
+    # Version 0 is required by spec, don't let it skip
+    if version:
+        name = cfg.pspnl.consts["version"].entries_by_val[version].name
+        if name not in cfg.psp_info['psp-versions-cap']:
+            raise KsftSkipEx("PSP version not supported", name)
+
     # Enter guest namespace (netns) to run PSP test
     with NetNSEnter(cfg.netns.name):
         cfg.pspnl = PSPFamily()
