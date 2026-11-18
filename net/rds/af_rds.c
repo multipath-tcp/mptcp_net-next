@@ -80,6 +80,14 @@ static int rds_release(struct socket *sock)
 	rds_notify_queue_get(rs, NULL);
 	rds_notify_msg_zcopy_purge(&rs->rs_zcookie_queue);
 
+	/* drop the cached connection reference; no sendmsg can race
+	 * with us here, the socket is going away
+	 */
+	if (rs->rs_conn) {
+		rds_conn_put(rs->rs_conn);
+		rs->rs_conn = NULL;
+	}
+
 	spin_lock_bh(&rds_sock_lock);
 	list_del_init(&rs->rs_item);
 	spin_unlock_bh(&rds_sock_lock);
@@ -254,6 +262,7 @@ static int rds_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct rds_sock *rs = rds_sk_to_rs(sock->sk);
 	rds_tos_t utos, tos = 0;
+	unsigned long flags;
 
 	switch (cmd) {
 	case SIOCRDSSETTOS:
@@ -266,18 +275,23 @@ static int rds_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		else
 			return -ENOIOCTLCMD;
 
-		spin_lock_bh(&rds_sock_lock);
+		/* rs_conn is serialized by rs_lock (see rds_sendmsg());
+		 * hold it across the "no connection yet" check and the
+		 * rs_tos store so a racing sendmsg cannot cache a conn
+		 * whose c_tos then disagrees with rs_tos.
+		 */
+		spin_lock_irqsave(&rs->rs_lock, flags);
 		if (rs->rs_tos || rs->rs_conn) {
-			spin_unlock_bh(&rds_sock_lock);
+			spin_unlock_irqrestore(&rs->rs_lock, flags);
 			return -EINVAL;
 		}
-		rs->rs_tos = tos;
-		spin_unlock_bh(&rds_sock_lock);
+		WRITE_ONCE(rs->rs_tos, tos);
+		spin_unlock_irqrestore(&rs->rs_lock, flags);
 		break;
 	case SIOCRDSGETTOS:
-		spin_lock_bh(&rds_sock_lock);
+		spin_lock_irqsave(&rs->rs_lock, flags);
 		tos = rs->rs_tos;
-		spin_unlock_bh(&rds_sock_lock);
+		spin_unlock_irqrestore(&rs->rs_lock, flags);
 		if (put_user(tos, (rds_tos_t __user *)arg))
 			return -EFAULT;
 		break;
