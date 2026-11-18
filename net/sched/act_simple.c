@@ -134,8 +134,9 @@ static int tcf_simp_init(struct net *net, struct nlattr *nla,
 	}
 
 	if (!exists) {
-		ret = tcf_idr_create(tn, index, est, a,
-				     &act_simp_ops, bind, false, flags);
+		/* tcf_simp_act() prints the packet count of tcf_bstats */
+		ret = tcf_idr_create(tn, index, est, a, &act_simp_ops, bind,
+				     flags | TCA_ACT_FLAGS_NO_PERCPU_STATS);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;
