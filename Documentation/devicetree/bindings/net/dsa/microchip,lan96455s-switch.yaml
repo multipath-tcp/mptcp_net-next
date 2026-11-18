@@ -1,0 +1,208 @@
+# SPDX-License-Identifier: GPL-2.0-only OR BSD-2-Clause
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/net/dsa/microchip,lan96455s-switch.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Microchip LAN9645x Ethernet switch
+
+maintainers:
+  - Jens Emil Schulz Østergaard <jensemil.schulzostergaard@microchip.com>
+
+description: |
+  The LAN9645x switch is a multi-port Gigabit AVB/TSN Ethernet switch with
+  five integrated 10/100/1000Base-T PHYs. In addition to the integrated PHYs,
+  it supports up to 2 RGMII/RMII, up to 2 BASE-X/SERDES/2.5GBASE-X and one
+  Quad-SGMII interfaces.
+
+  The part number encodes the SKU. The last digit is the number of usable
+  front ports, 5, 7 or 9. The letter is the feature set, f for full and s for
+  standard, where full adds HSR, PRP, TAS, frame preemption and PSFP.
+
+properties:
+  compatible:
+    oneOf:
+      - enum:
+          - microchip,lan96455s-switch
+      - items:
+          - enum:
+              - microchip,lan96455f-switch
+              - microchip,lan96457f-switch
+              - microchip,lan96459f-switch
+              - microchip,lan96457s-switch
+              - microchip,lan96459s-switch
+          - const: microchip,lan96455s-switch
+
+  reg:
+    items:
+      - description: General configuration block target
+      - description:
+          CPU device queue system target, the register based frame injection
+          and extraction interface
+      - description: Precision Time Protocol target
+      - description: Chip top level target
+      - description: Time aware shaper target
+      - description: Rewriter target
+      - description: VCAP ES0 target, egress stage 0 classification
+      - description: OAM MEP target
+      - description: VCAP S1 target, ingress stage 1 classification
+      - description: VCAP S2 target, ingress stage 2 classification
+      - description: Switching engine target
+      - description: HSIO target
+      - description: Port 0 device target
+      - description: Port 1 device target
+      - description: Port 2 device target
+      - description: Port 3 device target
+      - description: Port 4 device target
+      - description: Port 5 device target
+      - description: Port 6 device target
+      - description: Port 7 device target
+      - description: Port 8 device target
+      - description: Queue system target
+      - description: Automatic frame injector target
+      - description: Analyzer target
+
+  reg-names:
+    items:
+      - const: gcb
+      - const: qs
+      - const: ptp
+      - const: chip_top
+      - const: tas
+      - const: rew
+      - const: vcap0
+      - const: mep
+      - const: vcap1
+      - const: vcap2
+      - const: sys
+      - const: hsio
+      - const: dev0
+      - const: dev1
+      - const: dev2
+      - const: dev3
+      - const: dev4
+      - const: dev5
+      - const: dev6
+      - const: dev7
+      - const: dev8
+      - const: qsys
+      - const: afi
+      - const: ana
+
+  interrupts:
+    items:
+      - description: PTP timestamp ready interrupt
+      - description: PTP synchronization interrupt from the PTP pins
+      - description: Analyzer interrupt
+
+  interrupt-names:
+    items:
+      - const: ptp
+      - const: ptp-ext
+      - const: ana
+
+  ethernet-ports:
+    type: object
+    additionalProperties: true
+    patternProperties:
+      "^(ethernet-)?port@[0-8]$":
+        type: object
+        description: Ethernet switch ports
+        additionalProperties: true
+
+        allOf:
+          - if:
+              properties:
+                phy-mode:
+                  contains:
+                    enum:
+                      - rgmii
+                      - rgmii-rxid
+                      - rgmii-txid
+                      - rgmii-id
+            then:
+              properties:
+                rx-internal-delay-ps:
+                  $ref: "#/$defs/internal-delay-ps"
+                tx-internal-delay-ps:
+                  $ref: "#/$defs/internal-delay-ps"
+
+$ref: dsa.yaml#/$defs/ethernet-ports
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - ethernet-ports
+
+unevaluatedProperties: false
+
+$defs:
+  internal-delay-ps:
+    description:
+      Disable the delay line using 0 ps, or enable the 2000 ps delay. The
+      delay line is not tunable, so no other phase can be selected.
+    enum: [0, 2000]
+    default: 0
+
+examples:
+  - |
+    ethernet-switch@4000 {
+        compatible = "microchip,lan96459f-switch", "microchip,lan96455s-switch";
+        reg = <0x4000 0x244>, <0x8000 0x4c>, <0xc000 0x1f0>,
+              <0x10000 0x134>, <0x14000 0x2c8>, <0x18000 0x1910>,
+              <0x1c000 0x468>, <0x20000 0x1480>, <0x24000 0x468>,
+              <0x28000 0x468>, <0x2c000 0x12d4>, <0x30000 0xe4>,
+              <0x38000 0xb8>, <0x3c000 0xb8>, <0x40000 0xb8>,
+              <0x44000 0xb8>, <0x48000 0xb8>, <0x4c000 0xb8>,
+              <0x50000 0xb8>, <0x54000 0xb8>, <0x58000 0xb8>,
+              <0x100000 0xa000>, <0x120000 0x1998>, <0x140000 0x7468>;
+        reg-names = "gcb", "qs", "ptp", "chip_top", "tas", "rew", "vcap0",
+                    "mep", "vcap1", "vcap2", "sys", "hsio", "dev0", "dev1",
+                    "dev2", "dev3", "dev4", "dev5", "dev6", "dev7", "dev8",
+                    "qsys", "afi", "ana";
+        interrupts = <27>, <26>, <17>;
+        interrupt-names = "ptp", "ptp-ext", "ana";
+
+        ethernet-ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            ethernet-port@0 {
+                reg = <0>;
+                phy-handle = <&cuphy0>;
+                phy-mode = "gmii";
+            };
+
+            ethernet-port@1 {
+                reg = <1>;
+                phy-handle = <&cuphy1>;
+                phy-mode = "gmii";
+            };
+
+            ethernet-port@2 {
+                reg = <2>;
+                phy-handle = <&cuphy2>;
+                phy-mode = "gmii";
+            };
+
+            ethernet-port@3 {
+                reg = <3>;
+                phy-handle = <&cuphy3>;
+                phy-mode = "gmii";
+            };
+
+            ethernet-port@7 {
+                reg = <7>;
+                ethernet = <&cpu_host_port>;
+                phy-mode = "rgmii";
+
+                fixed-link {
+                    full-duplex;
+                    pause;
+                    speed = <1000>;
+                };
+            };
+        };
+    };
+...
