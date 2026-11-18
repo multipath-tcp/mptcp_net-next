@@ -5277,7 +5277,8 @@ static int mvneta_setup_mqprio(struct net_device *dev,
 		for (rxq = mqprio->qopt.offset[tc];
 		     rxq < mqprio->qopt.count[tc] + mqprio->qopt.offset[tc];
 		     rxq++) {
-			if (rxq >= rxq_number)
+			/* The range sets the TX queues of the class as well */
+			if (rxq >= rxq_number || rxq >= txq_number)
 				return -EINVAL;
 
 			mvneta_map_vlan_prio_to_rxq(pp, tc, rxq);
