@@ -21,21 +21,19 @@ void *fun_alloc_ring_mem(struct device *dma_dev, size_t depth,
 			 int numa_node, dma_addr_t *dma_addr, void **sw_va,
 			 volatile __be64 **wb_va)
 {
-	int dev_node = dev_to_node(dma_dev);
 	size_t dma_sz;
 	void *va;
 
 	if (numa_node == NUMA_NO_NODE)
-		numa_node = dev_node;
+		numa_node = dev_to_node(dma_dev);
 
 	/* Place optional write-back area at end of descriptor ring. */
 	dma_sz = hw_desc_sz * depth;
 	if (wb)
 		dma_sz += sizeof(u64);
 
-	set_dev_node(dma_dev, numa_node);
-	va = dma_alloc_coherent(dma_dev, dma_sz, dma_addr, GFP_KERNEL);
-	set_dev_node(dma_dev, dev_node);
+	va = dma_alloc_coherent_node(dma_dev, dma_sz, dma_addr, GFP_KERNEL,
+				     numa_node);
 	if (!va)
 		return NULL;
 
