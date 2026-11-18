@@ -596,8 +596,6 @@ struct mlx5_priv {
 	struct mlx5_debugfs_entries dbg;
 
 	/* start: alloc stuff */
-	/* protect buffer allocation according to numa node */
-	struct mutex            alloc_mutex;
 	int                     numa_node;
 
 	struct mlx5_frag_buf_node_pools **frag_buf_node_pools;
