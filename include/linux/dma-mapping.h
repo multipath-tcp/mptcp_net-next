@@ -188,6 +188,8 @@ void dma_unmap_resource(struct device *dev, dma_addr_t addr, size_t size,
 		enum dma_data_direction dir, unsigned long attrs);
 void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
 		gfp_t flag, unsigned long attrs);
+void *dma_alloc_attrs_node(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t flag, unsigned long attrs, int node);
 void dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
 		dma_addr_t dma_handle, unsigned long attrs);
 void *dmam_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
@@ -270,6 +272,11 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
 }
 static inline void *dma_alloc_attrs(struct device *dev, size_t size,
 		dma_addr_t *dma_handle, gfp_t flag, unsigned long attrs)
+{
+	return NULL;
+}
+static inline void *dma_alloc_attrs_node(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t flag, unsigned long attrs, int node)
 {
 	return NULL;
 }
@@ -624,6 +631,13 @@ static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 {
 	return dma_alloc_attrs(dev, size, dma_handle, gfp,
 			(gfp & __GFP_NOWARN) ? DMA_ATTR_NO_WARN : 0);
+}
+
+static inline void *dma_alloc_coherent_node(struct device *dev, size_t size,
+		dma_addr_t *dma_handle, gfp_t gfp, int node)
+{
+	return dma_alloc_attrs_node(dev, size, dma_handle, gfp,
+			(gfp & __GFP_NOWARN) ? DMA_ATTR_NO_WARN : 0, node);
 }
 
 static inline void dma_free_coherent(struct device *dev, size_t size,
