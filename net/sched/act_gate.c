@@ -411,8 +411,8 @@ static int tcf_gate_init(struct net *net, struct nlattr *nla,
 		return ACT_P_BOUND;
 
 	if (!err) {
-		ret = tcf_idr_create_from_flags(tn, index, est, a,
-						&act_gate_ops, bind, flags);
+		ret = tcf_idr_create(tn, index, est, a,
+				     &act_gate_ops, bind, flags);
 		if (ret) {
 			tcf_idr_cleanup(tn, index);
 			return ret;

@@ -156,6 +156,45 @@ static int rds_loop_conn_alloc(struct rds_connection *conn, gfp_t gfp)
 	return 0;
 }
 
+/* Destroy the connections whose nodes were gathered on @tmp_list.
+ *
+ * rds_conn_destroy() can return before the connection is freed, and
+ * it is the free - rds_loop_conn_free() - that unlinks loop_node.
+ * @tmp_list lives on the caller's stack, so unlink each node before
+ * its destroy; the free then finds it empty and leaves it alone.
+ */
+static void rds_loop_destroy_gathered_conns(struct list_head *tmp_list)
+{
+	struct rds_loop_connection *lc, *_lc;
+	struct rds_connection *conn;
+
+	list_for_each_entry_safe(lc, _lc, tmp_list, loop_node) {
+		conn = lc->conn;
+		WARN_ON(rcu_access_pointer(conn->c_passive));
+
+		spin_lock_irq(&loop_conns_lock);
+		list_del_init(&lc->loop_node);
+		spin_unlock_irq(&loop_conns_lock);
+
+		rds_conn_destroy(conn);
+		rds_conn_put(conn);
+	}
+}
+
+/* Gather @lc's connection for destruction: move the node to the
+ * caller's @tmp_list and take a reference that keeps the connection,
+ * and so the node, alive until rds_loop_destroy_gathered_conns() has
+ * dealt with it.  Called with loop_conns_lock held.  A connection
+ * whose free is already running gets no reference; its free unlinks
+ * the node itself, under the same lock, once we drop it.
+ */
+static void rds_loop_gather_conn(struct rds_loop_connection *lc,
+				 struct list_head *tmp_list)
+{
+	if (rds_conn_get_unless_zero(lc->conn))
+		list_move_tail(&lc->loop_node, tmp_list);
+}
+
 static void rds_loop_conn_free(void *arg)
 {
 	struct rds_loop_connection *lc = arg;
@@ -163,7 +202,9 @@ static void rds_loop_conn_free(void *arg)
 
 	rdsdebug("lc %p\n", lc);
 	spin_lock_irqsave(&loop_conns_lock, flags);
-	list_del(&lc->loop_node);
+	/* already unlinked if a transport teardown gathered us first */
+	if (!list_empty(&lc->loop_node))
+		list_del(&lc->loop_node);
 	spin_unlock_irqrestore(&loop_conns_lock, flags);
 	kfree(lc);
 }
@@ -187,14 +228,13 @@ void rds_loop_exit(void)
 	synchronize_rcu();
 	/* avoid calling conn_destroy with irqs off */
 	spin_lock_irq(&loop_conns_lock);
-	list_splice(&loop_conns, &tmp_list);
-	INIT_LIST_HEAD(&loop_conns);
+	list_for_each_entry_safe(lc, _lc, &loop_conns, loop_node)
+		rds_loop_gather_conn(lc, &tmp_list);
 	spin_unlock_irq(&loop_conns_lock);
 
-	list_for_each_entry_safe(lc, _lc, &tmp_list, loop_node) {
-		WARN_ON(lc->conn->c_passive);
-		rds_conn_destroy(lc->conn);
-	}
+	rds_loop_destroy_gathered_conns(&tmp_list);
+
+	rds_conn_wait_conns_freed(&rds_loop_transport, NULL);
 }
 
 static void rds_loop_kill_conns(struct net *net)
@@ -208,14 +248,11 @@ static void rds_loop_kill_conns(struct net *net)
 
 		if (net != c_net)
 			continue;
-		list_move_tail(&lc->loop_node, &tmp_list);
+		rds_loop_gather_conn(lc, &tmp_list);
 	}
 	spin_unlock_irq(&loop_conns_lock);
 
-	list_for_each_entry_safe(lc, _lc, &tmp_list, loop_node) {
-		WARN_ON(lc->conn->c_passive);
-		rds_conn_destroy(lc->conn);
-	}
+	rds_loop_destroy_gathered_conns(&tmp_list);
 }
 
 static void __net_exit rds_loop_exit_net(struct net *net)
