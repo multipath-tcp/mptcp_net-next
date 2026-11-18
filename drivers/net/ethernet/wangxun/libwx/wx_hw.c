@@ -1598,13 +1598,17 @@ static void wx_vlan_strip_control(struct wx *wx, bool enable)
 {
 	int i, j;
 
+	rcu_read_lock();
 	for (i = 0; i < wx->num_rx_queues; i++) {
-		struct wx_ring *ring = wx->rx_ring[i];
+		struct wx_ring *ring = rcu_dereference(wx->rx_ring[i]);
 
+		if (!ring)
+			continue;
 		j = ring->reg_idx;
 		wr32m(wx, WX_PX_RR_CFG(j), WX_PX_RR_CFG_VLAN,
 		      enable ? WX_PX_RR_CFG_VLAN : 0);
 	}
+	rcu_read_unlock();
 }
 
 static void wx_vlan_promisc_enable(struct wx *wx)
@@ -1797,7 +1801,7 @@ static void wx_set_rx_buffer_len(struct wx *wx)
 	 * the Base and Length of the Rx Descriptor Ring
 	 */
 	for (i = 0; i < wx->num_rx_queues; i++) {
-		rx_ring = wx->rx_ring[i];
+		rx_ring = rtnl_dereference(wx->rx_ring[i]);
 		rx_ring->rx_buf_len = WX_RXBUFFER_2K;
 #if (PAGE_SIZE < 8192)
 		if (test_bit(WX_FLAG_RSC_ENABLED, wx->flags))
@@ -2021,8 +2025,11 @@ static void wx_configure_tx(struct wx *wx)
 	      WX_TDM_CTL_TE, WX_TDM_CTL_TE);
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
-	for (i = 0; i < wx->num_tx_queues; i++)
-		wx_configure_tx_ring(wx, wx->tx_ring[i]);
+	for (i = 0; i < wx->num_tx_queues; i++) {
+		struct wx_ring *tx_ring = rtnl_dereference(wx->tx_ring[i]);
+
+		wx_configure_tx_ring(wx, tx_ring);
+	}
 
 	wr32m(wx, WX_TSC_BUF_AE, WX_TSC_BUF_AE_THR, 0x10);
 
@@ -2247,8 +2254,11 @@ void wx_configure_rx(struct wx *wx)
 	/* Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring
 	 */
-	for (i = 0; i < wx->num_rx_queues; i++)
-		wx_configure_rx_ring(wx, wx->rx_ring[i]);
+	for (i = 0; i < wx->num_rx_queues; i++) {
+		struct wx_ring *rx_ring = rtnl_dereference(wx->rx_ring[i]);
+
+		wx_configure_rx_ring(wx, rx_ring);
+	}
 
 	/* Enable all receives, disable security engine prior to block traffic */
 	ret = wx_disable_sec_rx_path(wx);
@@ -2838,13 +2848,25 @@ int wx_fc_enable(struct wx *wx, bool tx_pause, bool rx_pause)
 	 *  This allows us to avoid head of line blocking for security
 	 *  and performance reasons.
 	 */
+	rcu_read_lock();
 	if (wx->num_rx_queues > 1 && !tx_pause) {
-		for (i = 0; i < wx->num_rx_queues; i++)
-			wx_enable_rx_drop(wx, wx->rx_ring[i]);
+		for (i = 0; i < wx->num_rx_queues; i++) {
+			struct wx_ring *rx_ring = rcu_dereference(wx->rx_ring[i]);
+
+			if (!rx_ring)
+				continue;
+			wx_enable_rx_drop(wx, rx_ring);
+		}
 	} else {
-		for (i = 0; i < wx->num_rx_queues; i++)
-			wx_disable_rx_drop(wx, wx->rx_ring[i]);
+		for (i = 0; i < wx->num_rx_queues; i++) {
+			struct wx_ring *rx_ring = rcu_dereference(wx->rx_ring[i]);
+
+			if (!rx_ring)
+				continue;
+			wx_disable_rx_drop(wx, rx_ring);
+		}
 	}
+	rcu_read_unlock();
 
 	return 0;
 }
@@ -2871,8 +2893,15 @@ static void wx_update_xoff_rx_lfc(struct wx *wx)
 	if (!data)
 		return;
 
-	for (i = 0; i < wx->num_tx_queues; i++)
-		clear_bit(WX_HANG_CHECK_ARMED, wx->tx_ring[i]->state);
+	rcu_read_lock();
+	for (i = 0; i < wx->num_tx_queues; i++) {
+		struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
+
+		if (!tx_ring)
+			continue;
+		clear_bit(WX_HANG_CHECK_ARMED, tx_ring->state);
+	}
+	rcu_read_unlock();
 }
 
 /**
@@ -2894,10 +2923,13 @@ void wx_update_stats(struct wx *wx)
 
 	spin_lock(&wx->hw_stats_lock);
 
+	rcu_read_lock();
 	/* gather some stats to the wx struct that are per queue */
 	for (i = 0; i < wx->num_rx_queues; i++) {
-		struct wx_ring *rx_ring = wx->rx_ring[i];
+		struct wx_ring *rx_ring = rcu_dereference(wx->rx_ring[i]);
 
+		if (!rx_ring)
+			continue;
 		non_eop_descs += rx_ring->rx_stats.non_eop_descs;
 		alloc_rx_buff_failed += rx_ring->rx_stats.alloc_rx_buff_failed;
 		hw_csum_rx_good += rx_ring->rx_stats.csum_good_cnt;
@@ -2913,19 +2945,28 @@ void wx_update_stats(struct wx *wx)
 		u64 rsc_flush = 0;
 
 		for (i = 0; i < wx->num_rx_queues; i++) {
-			rsc_count += wx->rx_ring[i]->rx_stats.rsc_count;
-			rsc_flush += wx->rx_ring[i]->rx_stats.rsc_flush;
+			struct wx_ring *rx_ring = rcu_dereference(wx->rx_ring[i]);
+
+			if (!rx_ring)
+				continue;
+
+			rsc_count += rx_ring->rx_stats.rsc_count;
+			rsc_flush += rx_ring->rx_stats.rsc_flush;
 		}
 		wx->rsc_count = rsc_count;
 		wx->rsc_flush = rsc_flush;
 	}
 
 	for (i = 0; i < wx->num_tx_queues; i++) {
-		struct wx_ring *tx_ring = wx->tx_ring[i];
+		struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
+
+		if (!tx_ring)
+			continue;
 
 		restart_queue += tx_ring->tx_stats.restart_queue;
 		tx_busy += tx_ring->tx_stats.tx_busy;
 	}
+	rcu_read_unlock();
 	wx->restart_queue = restart_queue;
 	wx->tx_busy = tx_busy;
 
