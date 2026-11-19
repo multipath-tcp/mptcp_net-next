@@ -18,6 +18,7 @@
 #include <linux/phy/phy-common-props.h>
 #include <linux/property.h>
 #include <linux/regmap.h>
+#include <linux/reset.h>
 #include <linux/workqueue.h>
 #include <net/dsa.h>
 
@@ -719,6 +720,7 @@ static int gsw1xx_serdes_pcs_init(struct gsw1xx_priv *priv)
 static int gsw1xx_probe(struct mdio_device *mdiodev)
 {
 	struct device *dev = &mdiodev->dev;
+	struct reset_control *reset;
 	struct gsw1xx_priv *priv;
 	u32 version, val;
 	u8 shellver;
@@ -736,6 +738,30 @@ static int gsw1xx_probe(struct mdio_device *mdiodev)
 	priv->gswip.hw_info = of_device_get_match_data(dev);
 	if (!priv->gswip.hw_info)
 		return -EINVAL;
+
+	/* The MDIO core handles reset-gpios only for PHYs. Reset the switch
+	 * here, so it does not run with whatever the bootloader configured.
+	 */
+	reset = devm_reset_control_get_optional_exclusive(dev, NULL);
+	if (IS_ERR(reset))
+		return dev_err_probe(dev, PTR_ERR(reset),
+				     "failed to get reset control\n");
+
+	if (reset) {
+		ret = reset_control_assert(reset);
+		if (ret)
+			return dev_err_probe(dev, ret,
+					     "failed to assert reset\n");
+
+		fsleep(GSW1XX_RESET_ASSERT_US);
+
+		ret = reset_control_deassert(reset);
+		if (ret)
+			return dev_err_probe(dev, ret,
+					     "failed to deassert reset\n");
+
+		fsleep(GSW1XX_RESET_DEASSERT_US);
+	}
 
 	priv->gswip.gswip = gsw1xx_regmap_init(priv, "switch",
 					       GSW1XX_SWITCH_BASE, 0xfff);
