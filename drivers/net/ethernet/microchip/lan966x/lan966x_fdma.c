@@ -54,9 +54,11 @@ static void lan966x_fdma_rx_free_pages(struct lan966x_rx *rx)
 	int i, j;
 
 	for (i = 0; i < fdma->n_dcbs; ++i) {
-		for (j = 0; j < fdma->n_dbs; ++j)
-			page_pool_put_full_page(rx->page_pool,
-						rx->page[i][j], false);
+		for (j = 0; j < fdma->n_dbs; ++j) {
+			if (rx->page[i][j])
+				page_pool_put_full_page(rx->page_pool,
+							rx->page[i][j], false);
+		}
 	}
 }
 
@@ -999,6 +1001,7 @@ int lan966x_fdma_init(struct lan966x *lan966x)
 
 	err = lan966x_fdma_tx_alloc(&lan966x->tx);
 	if (err) {
+		lan966x_fdma_rx_free_pages(&lan966x->rx);
 		fdma_free_coherent(lan966x->dma_dev, &lan966x->rx.fdma);
 		page_pool_destroy(lan966x->rx.page_pool);
 		return err;
