@@ -868,6 +868,11 @@ static int stmmac_init_tstamp_counter(struct stmmac_priv *priv,
 {
 	struct timespec64 now;
 
+	if (!priv->plat->clk_ptp_rate) {
+		netdev_err(priv->dev, "Invalid PTP clock rate");
+		return -EINVAL;
+	}
+
 	stmmac_config_hw_tstamping(priv, priv->ptpaddr, systime_flags);
 	priv->systime_flags = systime_flags;
 
@@ -912,6 +917,14 @@ static int stmmac_init_timestamping(struct stmmac_priv *priv)
 {
 	bool xmac = dwmac_is_xmac(priv->plat->core_type);
 	int ret;
+
+	if (priv->plat->ptp_clk_freq_config)
+		priv->plat->ptp_clk_freq_config(priv);
+
+	if (!(priv->dma_cap.time_stamp || priv->dma_cap.atime_stamp)) {
+		netdev_info(priv->dev, "PTP not supported by HW\n");
+		return -EOPNOTSUPP;
+	}
 
 	ret = stmmac_init_tstamp_counter(priv, STMMAC_HWTS_ACTIVE |
 					       PTP_TCR_TSCFUPDT);
@@ -3195,6 +3208,22 @@ static int stmmac_napi_check(struct stmmac_priv *priv, u32 chan, u32 dir)
 	}
 
 	return status;
+}
+
+static void stmmac_dma_err_interrupt(struct stmmac_priv *priv)
+{
+	u8 channels_to_check = max(priv->plat->rx_queues_to_use,
+				   priv->plat->tx_queues_to_use);
+	int status;
+	u8 chan;
+
+	for (chan = 0; chan < channels_to_check; chan++) {
+		status = stmmac_dma_interrupt_status(priv, priv->ioaddr,
+						     &priv->xstats, chan,
+						     DMA_DIR_ERR);
+		if (unlikely(status & tx_hard_error))
+			stmmac_global_err(priv);
+	}
 }
 
 /**
@@ -6081,7 +6110,7 @@ read_again:
 							 buf->page);
 				buf->page = NULL;
 				rx_dropped++;
-				count++;
+				error = 1;
 				goto drain_data;
 			}
 
@@ -6117,7 +6146,7 @@ drain_data:
 		if (likely(status & rx_not_ls))
 			goto read_again;
 		if (!skb)
-			continue;
+			goto next;
 
 		/* Got entire packet into SKB. Finish it. */
 
@@ -6550,6 +6579,9 @@ static irqreturn_t stmmac_mac_interrupt(int irq, void *dev_id)
 	/* To handle Common interrupts */
 	stmmac_common_interrupt(priv);
 
+	if (priv->plat->core_type == DWMAC_CORE_GMAC4)
+		stmmac_dma_err_interrupt(priv);
+
 	return IRQ_HANDLED;
 }
 
@@ -6818,9 +6850,9 @@ static int stmmac_dma_cap_show(struct seq_file *seq, void *v)
 	};
 	static const char * const dwxgmac_safety_feature_desc[] = {
 		"No",
-		"All Safety Features with ECC and Parity",
-		"All Safety Features without ECC or Parity",
-		"All Safety Features with Parity Only",
+		"All Safety Features with ECC and Parity Ports on External Application Interface",
+		"All Safety Features without ECC or Parity Ports on External Application Interface",
+		"All Safety Features with Parity Ports on External Application Interface",
 		"ECC Only",
 		"UNDEFINED",
 		"UNDEFINED",
