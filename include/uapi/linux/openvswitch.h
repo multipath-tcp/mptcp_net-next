@@ -293,7 +293,9 @@ enum ovs_vport_type {
  * packets sent or received through the vport.
  * @OVS_VPORT_ATTR_IFINDEX: Provides the ifindex of a vport, or sets the desired
  * ifindex while creating a new vport with type %OVS_VPORT_TYPE_INTERNAL.
- * @OVS_VPORT_ATTR_NETNSID: Provides the netns id of the vport if it's not local.
+ * @OVS_VPORT_ATTR_NETNSID: Provides the netns id of the vport if it's not
+ * local, as a signed 32-bit value.  The value is -1 when the identifier could
+ * not be assigned.
  * @OVS_VPORT_ATTR_UPCALL_STATS: Provides upcall statistics for a vport.
  * Contains nested %OVS_VPORT_UPCALL_ATTR_* attributes.
  *
@@ -303,12 +305,14 @@ enum ovs_vport_type {
  * For %OVS_VPORT_CMD_NEW requests, the %OVS_VPORT_ATTR_TYPE and
  * %OVS_VPORT_ATTR_NAME attributes are required.  %OVS_VPORT_ATTR_PORT_NO is
  * optional; if not specified a free port number is automatically selected.
- * Whether %OVS_VPORT_ATTR_OPTIONS is required or optional depends on the type
- * of vport.  None of currently supported vport types support options.
+ * None of currently supported vport types support options, so
+ * %OVS_VPORT_ATTR_OPTIONS is ignored in a %OVS_VPORT_CMD_NEW request and
+ * rejected with -EOPNOTSUPP in a %OVS_VPORT_CMD_SET request.
  *
- * For other requests, if %OVS_VPORT_ATTR_NAME is specified then it is used to
- * look up the vport to operate on; otherwise dp_idx from the &struct
- * ovs_header plus %OVS_VPORT_ATTR_PORT_NO determine the vport.
+ * For requests other than new and dump, if %OVS_VPORT_ATTR_NAME is specified
+ * then it is used to look up the vport to operate on; otherwise dp_ifindex
+ * from the &struct ovs_header plus %OVS_VPORT_ATTR_PORT_NO determine the
+ * vport.
  */
 enum ovs_vport_attr {
 	/* private: */

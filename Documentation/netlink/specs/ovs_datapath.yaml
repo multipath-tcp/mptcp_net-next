@@ -12,6 +12,8 @@ definitions:
   -
     name: ovs-header
     type: struct
+    doc: |
+      Header for OVS Generic Netlink messages.
     members:
       -
         name: dp-ifindex
@@ -118,24 +120,28 @@ operations:
   list:
     -
       name: get
-      doc: Get / dump OVS data path configuration and state
+      doc: |
+        Get one OVS data path by name, or by the ifindex in the header when
+        the request carries no name.
       value: 3
       attribute-set: datapath
       dont-validate: [strict, dump]
-      do: &dp-get-op
+      do:
         request:
           attributes:
             - name
-        reply:
+        reply: &dp-reply
           attributes:
             - name
-            - upcall-pid
             - stats
             - megaflow-stats
             - user-features
             - masks-cache-size
             - per-cpu-pids
-      dump: *dp-get-op
+      dump:
+        request:
+          attributes: []
+        reply: *dp-reply
     -
       name: new
       doc: |
