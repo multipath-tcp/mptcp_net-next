@@ -518,6 +518,19 @@ static int an8811hb_load_firmware(struct phy_device *phydev)
 	return en8811h_wait_mcu_ready(phydev);
 }
 
+/* No firmware files, but the bootloader may have started the MCU */
+static int en8811h_use_running_fw(struct phy_device *phydev, int err)
+{
+	int status;
+
+	status = phy_read_mmd(phydev, MDIO_MMD_VEND1, EN8811H_PHY_FW_STATUS);
+	if (status != EN8811H_PHY_READY)
+		return err;
+
+	en8811h_print_fw_version(phydev);
+	return 1;
+}
+
 static int en8811h_load_firmware(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -526,11 +539,13 @@ static int en8811h_load_firmware(struct phy_device *phydev)
 
 	ret = request_firmware_direct(&fw1, EN8811H_MD32_DM, dev);
 	if (ret < 0)
-		return ret;
+		return en8811h_use_running_fw(phydev, ret);
 
 	ret = request_firmware_direct(&fw2, EN8811H_MD32_DSP, dev);
-	if (ret < 0)
+	if (ret < 0) {
+		ret = en8811h_use_running_fw(phydev, ret);
 		goto en8811h_load_firmware_rel1;
+	}
 
 	ret = air_phy_buckpbus_reg_write(phydev, EN8811H_FW_CTRL_1,
 					 EN8811H_FW_CTRL_1_START);
@@ -1212,8 +1227,8 @@ static int en8811h_probe(struct phy_device *phydev)
 	if (ret < 0)
 		return ret;
 
-	/* mcu has just restarted after firmware load */
-	priv->mcu_needs_restart = false;
+	/* drop whatever state the bootloader left in a running mcu */
+	priv->mcu_needs_restart = ret > 0;
 
 	/* MDIO_DEVS1/2 empty, so set mmds_present bits here */
 	phydev->c45_ids.mmds_present |= MDIO_DEVS_PMAPMD | MDIO_DEVS_AN;
