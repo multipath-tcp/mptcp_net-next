@@ -4,6 +4,7 @@ menuconfig NET_DSA_REALTEK
 	depends on NET_DSA
 	select FIXED_PHY
 	select IRQ_DOMAIN
+	select NET_IEEE8021Q_HELPERS
 	select REALTEK_PHY
 	select REGMAP
 	help

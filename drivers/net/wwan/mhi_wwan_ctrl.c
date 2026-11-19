@@ -68,7 +68,8 @@ struct mhi_wwan_dev {
 	unsigned int rx_budget;
 
 	/* Latest DTR/RTS state for the modem, sent from dtr_work so a burst of
-	 * changes is coalesced and only the final state has to get through
+	 * changes is coalesced and only the final state has to get through.
+	 * A DTR drop is flushed out on its own, see mhi_wwan_ctrl_dtr_rts().
 	 */
 	unsigned int dtr_mdmbits;
 	struct delayed_work dtr_work;
@@ -216,7 +217,9 @@ static void mhi_wwan_ctrl_dtr_rts(struct wwan_port *port, unsigned int mdmbits)
 	schedule_delayed_work(&mhiwwan->dtr_work, 0);
 
 	/* A DTR drop matters on its own, e.g. to hang up a modem set to AT&D2,
-	 * so send it now rather than let a following raise coalesce it away
+	 * so try to send it now rather than let a following raise coalesce it
+	 * away. This is best effort, a drop that hits a full UL ring or a failed
+	 * allocation is retried with whatever state is latest by then.
 	 */
 	if (drop)
 		flush_delayed_work(&mhiwwan->dtr_work);
@@ -254,7 +257,10 @@ static void mhi_wwan_ctrl_stop(struct wwan_port *port)
 
 	cancel_work_sync(&mhiwwan->rx_refill);
 
-	/* Send any pending DTR/RTS state before the channel stops */
+	/* Try to send any pending DTR/RTS state before the channel stops. This
+	 * is best effort too, a send that has to be retried goes out from
+	 * dtr_work after the channel has stopped.
+	 */
 	flush_delayed_work(&mhiwwan->dtr_work);
 
 	mhi_unprepare_from_transfer(mhiwwan->mhi_dev);
@@ -376,7 +382,7 @@ static void mhi_wwan_ctrl_remove(struct mhi_device *mhi_dev)
 	struct mhi_wwan_dev *mhiwwan = dev_get_drvdata(&mhi_dev->dev);
 
 	wwan_remove_port(mhiwwan->wwan_port);
-	/* Give the DTR/RTS drop from removal one attempt, then stop the work */
+	/* Give any pending DTR/RTS state a last attempt, then stop the work */
 	flush_delayed_work(&mhiwwan->dtr_work);
 	disable_delayed_work_sync(&mhiwwan->dtr_work);
 	kfree(mhiwwan);
