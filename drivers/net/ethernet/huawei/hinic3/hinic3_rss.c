@@ -311,10 +311,8 @@ void hinic3_try_to_enable_rss(struct net_device *netdev)
 		goto err_reset_q_params;
 
 	err = alloc_rss_resource(netdev);
-	if (err) {
-		nic_dev->max_qps = 1;
+	if (err)
 		goto err_reset_q_params;
-	}
 
 	set_bit(HINIC3_RSS_ENABLE, &nic_dev->flags);
 	decide_num_qps(netdev);
@@ -323,7 +321,6 @@ void hinic3_try_to_enable_rss(struct net_device *netdev)
 	if (err) {
 		dev_err(hwdev->dev, "Failed to set hardware rss parameters\n");
 		hinic3_clear_rss_config(netdev);
-		nic_dev->max_qps = 1;
 		goto err_reset_q_params;
 	}
 
@@ -331,5 +328,5 @@ void hinic3_try_to_enable_rss(struct net_device *netdev)
 
 err_reset_q_params:
 	clear_bit(HINIC3_RSS_ENABLE, &nic_dev->flags);
-	nic_dev->q_params.num_qps = nic_dev->max_qps;
+	nic_dev->q_params.num_qps = 1;
 }

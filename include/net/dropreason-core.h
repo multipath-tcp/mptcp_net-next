@@ -10,7 +10,6 @@
 	FN(SOCKET_FILTER)		\
 	FN(SOCKET_RCVBUFF)		\
 	FN(UNIX_DISCONNECT)		\
-	FN(UNIX_SKIP_OOB)		\
 	FN(PKT_TOO_SMALL)		\
 	FN(TCP_CSUM)			\
 	FN(UDP_CSUM)			\
@@ -165,11 +164,6 @@ enum skb_drop_reason {
 	 * during send() that the peer has been close()d.
 	 */
 	SKB_DROP_REASON_UNIX_DISCONNECT,
-	/**
-	 * @SKB_DROP_REASON_UNIX_SKIP_OOB: Out-Of-Band data is skipped by
-	 * recv() without MSG_OOB so dropped.
-	 */
-	SKB_DROP_REASON_UNIX_SKIP_OOB,
 	/** @SKB_DROP_REASON_PKT_TOO_SMALL: packet size is too small */
 	SKB_DROP_REASON_PKT_TOO_SMALL,
 	/** @SKB_DROP_REASON_TCP_CSUM: TCP checksum error */
