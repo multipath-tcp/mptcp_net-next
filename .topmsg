@@ -1,2 +1,19 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-print-stats-before-socket-closure
+Subject: [PATCH] selftests: mptcp: print stats before socket closure
+
+In case of poll timeout, it might be too late to print the stats after
+the socket closure.
+
+Now, in case of poll timeout, 'ss' and 'nstat' are invoked from
+mptcp_connect to print the stats before exiting. This should help
+debugging poll timeout issues.
+
+Note: for this "workaround", system() is used for debugging purposes
+only. The returned result can then be safely ignored, hence the (void)!
+to avoid unused-result warnings.
+
+Also, 'nstat *Tcp*' will print '#kernel' at the top, but that's OK, and
+it seems better to avoid using a pipe here.
+
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
