@@ -721,20 +721,12 @@ static void unix_release_sock(struct sock *sk, int embrion)
 
 	unix_state_unlock(sk);
 
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-	u->oob_skb = NULL;
-#endif
-
 	wake_up_interruptible_all(&u->peer_wait);
 
 	if (skpair != NULL) {
 		if (sk->sk_type == SOCK_STREAM || sk->sk_type == SOCK_SEQPACKET) {
 			struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-			if (skb && !unix_skb_len(skb))
-				skb = skb_peek_next(skb, &sk->sk_receive_queue);
-#endif
 			unix_state_lock(skpair);
 			/* No more writes */
 			WRITE_ONCE(skpair->sk_shutdown, SHUTDOWN_MASK);
@@ -2336,67 +2328,6 @@ out:
  */
 #define UNIX_SKB_FRAGS_SZ (PAGE_SIZE << get_order(32768))
 
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-static int queue_oob(struct sock *sk, struct msghdr *msg, struct sock *other,
-		     struct scm_cookie *scm, bool fds_sent)
-{
-	struct unix_sock *ousk = unix_sk(other);
-	struct sk_buff *skb;
-	int err;
-
-	skb = sock_alloc_send_skb(sk, 1, msg->msg_flags & MSG_DONTWAIT, &err);
-
-	if (!skb)
-		return err;
-
-	err = unix_scm_to_skb(scm, skb, !fds_sent);
-	if (err < 0)
-		goto out;
-
-	err = unix_maybe_add_creds(skb, sk, other);
-	if (err)
-		goto out;
-
-	skb_put(skb, 1);
-	err = skb_copy_datagram_from_iter(skb, 0, &msg->msg_iter, 1);
-
-	if (err)
-		goto out;
-
-	unix_state_lock(other);
-
-	if (sock_flag(other, SOCK_DEAD) ||
-	    (other->sk_shutdown & RCV_SHUTDOWN)) {
-		err = -EPIPE;
-		goto out_unlock;
-	}
-
-	if (UNIXCB(skb).fp && !other->sk_scm_rights) {
-		err = -EPERM;
-		goto out_unlock;
-	}
-
-	scm_stat_add(other, skb);
-
-	spin_lock(&other->sk_receive_queue.lock);
-	WRITE_ONCE(ousk->oob_skb, skb);
-	WRITE_ONCE(ousk->inq_len, ousk->inq_len + 1);
-	__skb_queue_tail(&other->sk_receive_queue, skb);
-	spin_unlock(&other->sk_receive_queue.lock);
-
-	sk_send_sigurg(other);
-	unix_state_unlock(other);
-	READ_ONCE(other->sk_data_ready)(other);
-
-	return 0;
-out_unlock:
-	unix_state_unlock(other);
-out:
-	consume_skb(skb);
-	return err;
-}
-#endif
-
 static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 			       size_t len)
 {
@@ -2414,12 +2345,7 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 
 	if (msg->msg_flags & MSG_OOB) {
 		err = -EOPNOTSUPP;
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-		if (len)
-			len--;
-		else
-#endif
-			goto out_err;
+		goto out_err;
 	}
 
 	if (msg->msg_namelen) {
@@ -2515,15 +2441,6 @@ static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg,
 		READ_ONCE(other->sk_data_ready)(other);
 		sent += size;
 	}
-
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-	if (msg->msg_flags & MSG_OOB) {
-		err = queue_oob(sk, msg, other, &scm, fds_sent);
-		if (err)
-			goto out_err;
-		sent++;
-	}
-#endif
 
 	scm_destroy(&scm);
 
@@ -2776,115 +2693,6 @@ struct unix_stream_read_state {
 	unsigned int splice_flags;
 };
 
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-static int unix_stream_recv_urg(struct unix_stream_read_state *state)
-{
-	struct sk_buff *oob_skb, *read_skb = NULL;
-	struct socket *sock = state->socket;
-	struct sock *sk = sock->sk;
-	struct unix_sock *u = unix_sk(sk);
-	int chunk = 1;
-
-	mutex_lock(&u->iolock);
-	unix_state_lock(sk);
-	spin_lock(&sk->sk_receive_queue.lock);
-
-	if (sock_flag(sk, SOCK_URGINLINE) || !u->oob_skb) {
-		spin_unlock(&sk->sk_receive_queue.lock);
-		unix_state_unlock(sk);
-		mutex_unlock(&u->iolock);
-		return -EINVAL;
-	}
-
-	oob_skb = u->oob_skb;
-
-	if (!(state->flags & MSG_PEEK)) {
-		WRITE_ONCE(u->oob_skb, NULL);
-		WRITE_ONCE(u->inq_len, u->inq_len - 1);
-
-		if (oob_skb->prev != (struct sk_buff *)&sk->sk_receive_queue &&
-		    !unix_skb_len(oob_skb->prev)) {
-			read_skb = oob_skb->prev;
-			__skb_unlink(read_skb, &sk->sk_receive_queue);
-		}
-	}
-
-	spin_unlock(&sk->sk_receive_queue.lock);
-	unix_state_unlock(sk);
-
-	chunk = state->recv_actor(oob_skb, 0, chunk, state);
-
-	if (!(state->flags & MSG_PEEK))
-		UNIXCB(oob_skb).consumed += 1;
-
-	mutex_unlock(&u->iolock);
-
-	consume_skb(read_skb);
-
-	if (chunk < 0)
-		return -EFAULT;
-
-	state->msg->msg_flags |= MSG_OOB;
-	return 1;
-}
-
-static struct sk_buff *manage_oob(struct sk_buff *skb, struct sk_buff **last,
-				  struct sock *sk, int flags, int copied)
-{
-	struct sk_buff *read_skb = NULL, *unread_skb = NULL;
-	struct unix_sock *u = unix_sk(sk);
-
-	if (likely(unix_skb_len(skb) && skb != READ_ONCE(u->oob_skb)))
-		return skb;
-
-	spin_lock(&sk->sk_receive_queue.lock);
-
-	if (!unix_skb_len(skb)) {
-		if (copied && (!u->oob_skb || skb == u->oob_skb)) {
-			skb = NULL;
-		} else if (flags & MSG_PEEK) {
-			*last = skb;
-			skb = skb_peek_next(skb, &sk->sk_receive_queue);
-		} else {
-			read_skb = skb;
-			skb = skb_peek_next(skb, &sk->sk_receive_queue);
-			__skb_unlink(read_skb, &sk->sk_receive_queue);
-			*last = skb;
-		}
-
-		if (!skb)
-			goto unlock;
-	}
-
-	if (skb != u->oob_skb)
-		goto unlock;
-
-	if (copied) {
-		skb = NULL;
-	} else if (!(flags & MSG_PEEK)) {
-		WRITE_ONCE(u->oob_skb, NULL);
-
-		if (!sock_flag(sk, SOCK_URGINLINE)) {
-			__skb_unlink(skb, &sk->sk_receive_queue);
-			unread_skb = skb;
-			skb = skb_peek(&sk->sk_receive_queue);
-			*last = skb;
-		}
-	} else if (!sock_flag(sk, SOCK_URGINLINE)) {
-		*last = skb;
-		skb = skb_peek_next(skb, &sk->sk_receive_queue);
-	}
-
-unlock:
-	spin_unlock(&sk->sk_receive_queue.lock);
-
-	consume_skb(read_skb);
-	kfree_skb_reason(unread_skb, SKB_DROP_REASON_UNIX_SKIP_OOB);
-
-	return skb;
-}
-#endif
-
 static int unix_stream_read_skb(struct sock *sk, skb_read_actor_t recv_actor)
 {
 	struct sk_buff_head *queue = &sk->sk_receive_queue;
@@ -2910,17 +2718,6 @@ static int unix_stream_read_skb(struct sock *sk, skb_read_actor_t recv_actor)
 	}
 
 	WRITE_ONCE(u->inq_len, u->inq_len - unix_skb_len(skb));
-
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-	if (skb == u->oob_skb) {
-		WRITE_ONCE(u->oob_skb, NULL);
-		spin_unlock(&queue->lock);
-		mutex_unlock(&u->iolock);
-
-		kfree_skb_reason(skb, SKB_DROP_REASON_UNIX_SKIP_OOB);
-		return -EAGAIN;
-	}
-#endif
 
 	spin_unlock(&queue->lock);
 
@@ -2956,9 +2753,6 @@ static int unix_stream_read_generic(struct unix_stream_read_state *state,
 
 	if (unlikely(flags & MSG_OOB)) {
 		err = -EOPNOTSUPP;
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-		err = unix_stream_recv_urg(state);
-#endif
 		goto out;
 	}
 
@@ -2989,15 +2783,6 @@ redo:
 		last = skb = skb_peek(&sk->sk_receive_queue);
 
 again:
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-		if (skb) {
-			skb = manage_oob(skb, &last, sk, flags, copied);
-			if (!skb && (copied || !state->size)) {
-				unix_state_unlock(sk);
-				break;
-			}
-		}
-#endif
 		if (skb == NULL) {
 			if (copied >= target)
 				goto unlock;
@@ -3333,37 +3118,6 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCUNIXFILE:
 		err = unix_open_file(sk);
 		break;
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-	case SIOCATMARK:
-		{
-			struct unix_sock *u = unix_sk(sk);
-			struct sk_buff *skb;
-			int answ = 0;
-
-			if (sk->sk_type != SOCK_STREAM)
-				return -EOPNOTSUPP;
-
-			mutex_lock(&u->iolock);
-
-			skb = skb_peek(&sk->sk_receive_queue);
-			if (skb) {
-				struct sk_buff *oob_skb = READ_ONCE(u->oob_skb);
-				struct sk_buff *next_skb;
-
-				next_skb = skb_peek_next(skb, &sk->sk_receive_queue);
-
-				if (skb == oob_skb ||
-				    (!unix_skb_len(skb) &&
-				     (!oob_skb || next_skb == oob_skb)))
-					answ = 1;
-			}
-
-			mutex_unlock(&u->iolock);
-
-			err = put_user(answ, (int __user *)arg);
-		}
-		break;
-#endif
 	default:
 		err = -ENOIOCTLCMD;
 		break;
@@ -3403,10 +3157,6 @@ static __poll_t unix_poll(struct file *file, struct socket *sock, poll_table *wa
 		mask |= EPOLLIN | EPOLLRDNORM;
 	if (sk_is_readable(sk))
 		mask |= EPOLLIN | EPOLLRDNORM;
-#if IS_ENABLED(CONFIG_AF_UNIX_OOB)
-	if (READ_ONCE(unix_sk(sk)->oob_skb))
-		mask |= EPOLLPRI;
-#endif
 
 	/* Connection-based need to check for termination and startup */
 	if ((sk->sk_type == SOCK_STREAM || sk->sk_type == SOCK_SEQPACKET) &&
