@@ -388,6 +388,13 @@ static void mlx5e_get_ringparam(struct net_device *dev,
 	struct mlx5e_priv *priv = netdev_priv(dev);
 
 	mlx5e_ethtool_get_ringparam(priv, param, kernel_param);
+
+	if (dev->hw_features & NETIF_F_GRO_HW)
+		kernel_param->tcp_data_split =
+			priv->channels.params.packet_merge.type ==
+			MLX5E_PACKET_MERGE_SHAMPO ?
+			ETHTOOL_TCP_DATA_SPLIT_ENABLED :
+			ETHTOOL_TCP_DATA_SPLIT_DISABLED;
 }
 
 static bool mlx5e_ethtool_set_tcp_data_split(struct mlx5e_priv *priv,
@@ -399,7 +406,14 @@ static bool mlx5e_ethtool_set_tcp_data_split(struct mlx5e_priv *priv,
 	if (tcp_data_split == ETHTOOL_TCP_DATA_SPLIT_ENABLED &&
 	    !(dev->features & NETIF_F_GRO_HW)) {
 		NL_SET_ERR_MSG_MOD(extack,
-				   "TCP-data-split is not supported when GRO HW is disabled");
+				   "TCP-data-split can not be enabled without HW-GRO, set it to 'auto' and enable HW-GRO first");
+		return false;
+	}
+
+	if (tcp_data_split == ETHTOOL_TCP_DATA_SPLIT_DISABLED &&
+	    dev->features & NETIF_F_GRO_HW) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "TCP-data-split can not be disabled while HW-GRO is on, set it to 'auto' and disable HW-GRO first");
 		return false;
 	}
 
@@ -474,9 +488,8 @@ static int mlx5e_set_ringparam(struct net_device *dev,
 	if (err)
 		return err;
 
-	/* Might need to disable HW-GRO if it was kept on due to hds. */
-	if (kernel_param->tcp_data_split == ETHTOOL_TCP_DATA_SPLIT_DISABLED &&
-	    dev->cfg->hds_config == ETHTOOL_TCP_DATA_SPLIT_ENABLED)
+	/* Might need to adjust HW-GRO if it was kept on/off due to hds. */
+	if (dev->cfg->hds_config != kernel_param->tcp_data_split)
 		netdev_update_features(priv->netdev);
 
 	return 0;
