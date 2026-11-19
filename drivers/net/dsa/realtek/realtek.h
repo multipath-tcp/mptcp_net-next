@@ -100,6 +100,15 @@ struct realtek_priv {
 	void			*chip_data; /* Per-chip extra variant data */
 };
 
+/* apptrust selector slots: the index into the trust[] array of the
+ * qos_get/set_apptrust callbacks, in precedence order (highest first)
+ */
+enum rtl83xx_apptrust_slot {
+	RTL83XX_APPTRUST_DSCP,
+	RTL83XX_APPTRUST_PCP,
+	RTL83XX_APPTRUST_COUNT,
+};
+
 /*
  * struct realtek_ops - vtable for the per-SMI-chiptype operations
  * @detect: detects the chiptype
@@ -159,6 +168,30 @@ struct realtek_ops {
 				int regnum);
 	int	(*phy_write_c45)(struct realtek_priv *priv, int phy, int devad,
 				 int regnum, u16 val);
+
+	/* QoS/DCB backend callbacks for rtl83xx-qos.c. An iprio is an internal
+	 * priority holding an enum ieee8021q_traffic_type value, not an 802.1p
+	 * priority. A *_prio getter returns an iprio or a negative errno.
+	 */
+	int	(*qos_get_port_prio)(struct realtek_priv *priv, int port);
+	/* Set the priority of @port to @iprio, and make @untag_pcp the PCP
+	 * given to untagged frames on @port. @untag_pcp is an 802.1p
+	 * priority, not an iprio.
+	 */
+	int	(*qos_set_port_prio)(struct realtek_priv *priv, int port,
+				     u8 iprio, u8 untag_pcp);
+	int	(*qos_set_pcp_prio)(struct realtek_priv *priv, u8 pcp,
+				    u8 iprio);
+	int	(*qos_get_dscp_prio)(struct realtek_priv *priv, u8 dscp);
+	int	(*qos_set_dscp_prio)(struct realtek_priv *priv, u8 dscp,
+				     u8 iprio);
+	/* @trust is indexed by enum rtl83xx_apptrust_slot and has @n entries.
+	 * The trust scope (per port or switch-wide) differs between chips.
+	 */
+	int	(*qos_set_apptrust)(struct realtek_priv *priv, int port,
+				    const bool *trust, unsigned int n);
+	int	(*qos_get_apptrust)(struct realtek_priv *priv, int port,
+				    bool *trust, unsigned int n);
 };
 
 struct realtek_variant {
