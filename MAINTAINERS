@@ -4123,6 +4123,12 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/net/asix,ax88796c.yaml
 F:	drivers/net/ethernet/asix/ax88796c_*
 
+ASIX AX88179 USB ETHERNET DRIVER
+M:	Birger Koblitz <mail@birger-koblitz.de>
+L:	netdev@vger.kernel.org
+S:	Maintained
+F:	drivers/net/usb/ax88179*
+
 ASIX PHY DRIVER [RUST]
 M:	FUJITA Tomonori <fujita.tomonori@gmail.com>
 R:	Trevor Gross <tmgross@umich.edu>

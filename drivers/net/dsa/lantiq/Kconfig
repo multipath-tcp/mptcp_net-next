@@ -16,6 +16,7 @@ config NET_DSA_MXL_GSW1XX
 	select NET_DSA_TAG_MXL_GSW1XX
 	select NET_DSA_LANTIQ_COMMON
 	select PHY_COMMON_PROPS
+	imply RESET_GPIO
 	help
 	  This enables support for the Intel/MaxLinear GSW1xx family of 1GE
 	  switches.
@@ -25,3 +26,7 @@ config NET_DSA_MXL_GSW1XX
 	    GSW141 6 port, 4 PHYs, RGMII & SGMII
 	    GSW145 6 port, 4 PHYs, RGMII & SGMII/2500Base-X, industrial temperature
 	    GSW150 7 port, 5 PHYs, 1x GMII/RGMII, 1x RGMII
+
+	  A switch whose hardware reset is described with reset-gpios is
+	  only reset when RESET_GPIO is enabled as well, which this option
+	  does by default.
