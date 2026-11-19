@@ -150,6 +150,13 @@ static inline bool rsk_drop_req(const struct request_sock *req)
 	return tcp_rsk(req)->is_mptcp && tcp_rsk(req)->drop_req;
 }
 
+static inline bool msk_is_mptcp(const struct sock *sk)
+{
+	return sk_is_inet(sk) &&
+	       sk->sk_type == SOCK_STREAM &&
+	       sk->sk_protocol == IPPROTO_MPTCP;
+}
+
 void mptcp_space(const struct sock *ssk, int *space, int *full_space);
 bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 		       unsigned int *size, struct mptcp_out_options *opts);
@@ -257,6 +264,11 @@ static inline bool rsk_is_mptcp(const struct request_sock *req)
 }
 
 static inline bool rsk_drop_req(const struct request_sock *req)
+{
+	return false;
+}
+
+static inline bool msk_is_mptcp(const struct sock *sk)
 {
 	return false;
 }
