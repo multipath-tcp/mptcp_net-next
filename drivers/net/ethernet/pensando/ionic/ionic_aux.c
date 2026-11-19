@@ -250,6 +250,6 @@ EXPORT_SYMBOL_NS(ionic_request_rdma_reset, "NET_IONIC");
 
 u8 ionic_cmd_timeout(struct ionic_lif *lif)
 {
-	return lif->ionic->cmd_timeout;
+	return READ_ONCE(lif->ionic->cmd_timeout);
 }
 EXPORT_SYMBOL_NS(ionic_cmd_timeout, "NET_IONIC");

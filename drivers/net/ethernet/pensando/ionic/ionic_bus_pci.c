@@ -239,7 +239,6 @@ static int ionic_setup_one(struct ionic *ionic)
 	struct device *dev = ionic->dev;
 	int err;
 
-	ionic->cmd_timeout = IONIC_CMD_TIMEOUT_DEF;
 	ionic_debugfs_add_dev(ionic);
 
 	/* Setup PCI device */
@@ -273,6 +272,7 @@ static int ionic_setup_one(struct ionic *ionic)
 		dev_err(dev, "Cannot identify device: %d, aborting\n", err);
 		goto err_out_teardown;
 	}
+	ionic_update_cmd_timeout(ionic);
 	ionic_debugfs_add_ident(ionic);
 
 	ionic_map_cmb(ionic);
@@ -323,6 +323,8 @@ static int ionic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ionic->dev = dev;
 	pci_set_drvdata(pdev, ionic);
 	mutex_init(&ionic->dev_cmd_lock);
+	ionic->cmd_timeout = IONIC_CMD_TIMEOUT_DEF;
+	ionic->cmd_timeout_param = -EOPNOTSUPP;
 
 	err = ida_alloc(&ionic_ida, GFP_KERNEL);
 	if (err < 0)

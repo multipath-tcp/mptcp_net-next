@@ -67,7 +67,14 @@ struct ionic {
 	void *hwmon_caps_buf;
 	dma_addr_t hwmon_caps_pa;
 	u8 cmd_timeout;
+	int cmd_timeout_param;
 };
+
+static inline bool ionic_cmd_timeout_supported(struct ionic *ionic)
+{
+	return ionic->ident.dev.capabilities &
+	       cpu_to_le64(IONIC_DEV_CAP_CMD_TIMEOUT);
+}
 
 int ionic_adminq_post(struct ionic_lif *lif, struct ionic_admin_ctx *ctx);
 int ionic_adminq_wait(struct ionic_lif *lif, struct ionic_admin_ctx *ctx,

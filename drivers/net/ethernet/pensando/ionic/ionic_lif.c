@@ -3495,6 +3495,7 @@ static void ionic_lif_handle_fw_up(struct ionic_lif *lif)
 	err = ionic_identify(ionic);
 	if (err)
 		goto err_out;
+	ionic_update_cmd_timeout(ionic);
 	err = ionic_port_identify(ionic);
 	if (err)
 		goto err_out;

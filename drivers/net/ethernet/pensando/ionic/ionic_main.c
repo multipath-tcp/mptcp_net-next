@@ -439,7 +439,8 @@ int ionic_adminq_wait(struct ionic_lif *lif, struct ionic_admin_ctx *ctx,
 	}
 
 	time_start = jiffies;
-	time_limit = time_start + HZ * (ulong)lif->ionic->cmd_timeout;
+	time_limit = time_start +
+		     HZ * (ulong)READ_ONCE(lif->ionic->cmd_timeout);
 	do {
 		remaining = wait_for_completion_timeout(&ctx->work,
 							IONIC_ADMINQ_TIME_SLICE);
