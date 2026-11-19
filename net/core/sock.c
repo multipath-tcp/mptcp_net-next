@@ -3836,7 +3836,11 @@ void sock_init_data_uid(struct socket *sock, struct sock *sk, kuid_t uid)
 	sk->sk_sndbuf		=	READ_ONCE(sysctl_wmem_default);
 	sk->sk_state		=	TCP_CLOSE;
 	sk->sk_use_task_frag	=	true;
-	sk_set_socket(sk, sock);
+	/* tun and tap pass a socket that is not part of a socket_alloc, so
+	 * SOCK_INODE() must not be used here. sock_init_data() sets sk_ino.
+	 */
+	sk->sk_socket = sock;
+	sk->sk_ino = 0;
 
 	sock_set_flag(sk, SOCK_ZAPPED);
 
@@ -3902,6 +3906,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 		make_kuid(sock_net(sk)->user_ns, 0);
 
 	sock_init_data_uid(sock, sk, uid);
+	if (sock)
+		sk->sk_ino = SOCK_INODE(sock)->i_ino;
 }
 EXPORT_SYMBOL(sock_init_data);
 
