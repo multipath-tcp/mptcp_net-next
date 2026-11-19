@@ -121,8 +121,9 @@ static void hinic3_destroy_num_qps(struct net_device *netdev)
 	kfree(nic_dev->qps_msix_entries);
 }
 
-static int hinic3_alloc_txrxq_resources(struct net_device *netdev,
-					struct hinic3_dyna_txrxq_params *q_params)
+static int
+hinic3_alloc_txrxq_resources(struct net_device *netdev,
+			     struct hinic3_dyna_txrxq_params *q_params)
 {
 	int err;
 
@@ -176,8 +177,9 @@ err_free_txqs_res_arr:
 	return err;
 }
 
-static void hinic3_free_txrxq_resources(struct net_device *netdev,
-					struct hinic3_dyna_txrxq_params *q_params)
+static void
+hinic3_free_txrxq_resources(struct net_device *netdev,
+			    struct hinic3_dyna_txrxq_params *q_params)
 {
 	hinic3_free_rxqs_res(netdev, q_params->num_qps, q_params->rq_depth,
 			     q_params->rxqs_res);
@@ -251,16 +253,17 @@ static void hinic3_remove_configure(struct net_device *netdev)
 		hinic3_rss_uninit(netdev);
 }
 
-static int hinic3_alloc_channel_resources(struct net_device *netdev,
-					  struct hinic3_dyna_qp_params *qp_params,
-					  struct hinic3_dyna_txrxq_params *trxq_params)
+static int
+hinic3_alloc_channel_resources(struct net_device *netdev,
+			       struct hinic3_dyna_qp_params *qp_params,
+			       struct hinic3_dyna_txrxq_params *q_params)
 {
 	struct hinic3_nic_dev *nic_dev = netdev_priv(netdev);
 	int err;
 
-	qp_params->num_qps = trxq_params->num_qps;
-	qp_params->sq_depth = trxq_params->sq_depth;
-	qp_params->rq_depth = trxq_params->rq_depth;
+	qp_params->num_qps = q_params->num_qps;
+	qp_params->sq_depth = q_params->sq_depth;
+	qp_params->rq_depth = q_params->rq_depth;
 
 	err = hinic3_alloc_qps(nic_dev, qp_params);
 	if (err) {
@@ -268,7 +271,7 @@ static int hinic3_alloc_channel_resources(struct net_device *netdev,
 		return err;
 	}
 
-	err = hinic3_alloc_txrxq_resources(netdev, trxq_params);
+	err = hinic3_alloc_txrxq_resources(netdev, q_params);
 	if (err) {
 		netdev_err(netdev, "Failed to alloc txrxq resources\n");
 		hinic3_free_qps(nic_dev, qp_params);
@@ -278,13 +281,14 @@ static int hinic3_alloc_channel_resources(struct net_device *netdev,
 	return 0;
 }
 
-static void hinic3_free_channel_resources(struct net_device *netdev,
-					  struct hinic3_dyna_qp_params *qp_params,
-					  struct hinic3_dyna_txrxq_params *trxq_params)
+static void
+hinic3_free_channel_resources(struct net_device *netdev,
+			      struct hinic3_dyna_qp_params *qp_params,
+			      struct hinic3_dyna_txrxq_params *q_params)
 {
 	struct hinic3_nic_dev *nic_dev = netdev_priv(netdev);
 
-	hinic3_free_txrxq_resources(netdev, trxq_params);
+	hinic3_free_txrxq_resources(netdev, q_params);
 	hinic3_free_qps(nic_dev, qp_params);
 }
 
@@ -791,49 +795,36 @@ static void hinic3_get_stats64(struct net_device *netdev,
 	unsigned int start;
 	int i;
 
-	bytes = 0;
-	packets = 0;
-	dropped = 0;
 	for (i = 0; i < nic_dev->max_qps; i++) {
-		if (!nic_dev->txqs)
-			break;
-
 		txq = &nic_dev->txqs[i];
 		txq_stats = &txq->txq_stats;
 		do {
 			start = u64_stats_fetch_begin(&txq_stats->syncp);
-			bytes += txq_stats->bytes;
-			packets += txq_stats->packets;
-			dropped += txq_stats->dropped;
+			bytes = txq_stats->bytes;
+			packets = txq_stats->packets;
+			dropped = txq_stats->dropped;
 		} while (u64_stats_fetch_retry(&txq_stats->syncp, start));
+		stats->tx_packets += packets;
+		stats->tx_bytes   += bytes;
+		stats->tx_dropped += dropped;
 	}
-	stats->tx_packets = packets;
-	stats->tx_bytes   = bytes;
-	stats->tx_dropped = dropped;
 
-	bytes = 0;
-	packets = 0;
-	errors = 0;
-	dropped = 0;
 	for (i = 0; i < nic_dev->max_qps; i++) {
-		if (!nic_dev->rxqs)
-			break;
-
 		rxq = &nic_dev->rxqs[i];
 		rxq_stats = &rxq->rxq_stats;
 		do {
 			start = u64_stats_fetch_begin(&rxq_stats->syncp);
-			bytes += rxq_stats->bytes;
-			packets += rxq_stats->packets;
-			errors += rxq_stats->csum_errors +
-				rxq_stats->other_errors;
-			dropped += rxq_stats->dropped;
+			bytes = rxq_stats->bytes;
+			packets = rxq_stats->packets;
+			errors = rxq_stats->csum_errors +
+				 rxq_stats->other_errors;
+			dropped = rxq_stats->dropped;
 		} while (u64_stats_fetch_retry(&rxq_stats->syncp, start));
+		stats->rx_packets += packets;
+		stats->rx_bytes   += bytes;
+		stats->rx_errors  += errors;
+		stats->rx_dropped += dropped;
 	}
-	stats->rx_packets = packets;
-	stats->rx_bytes   = bytes;
-	stats->rx_errors  = errors;
-	stats->rx_dropped = dropped;
 }
 
 static void hinic3_nic_set_rx_mode(struct net_device *netdev)
