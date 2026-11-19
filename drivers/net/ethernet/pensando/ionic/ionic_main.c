@@ -439,7 +439,7 @@ int ionic_adminq_wait(struct ionic_lif *lif, struct ionic_admin_ctx *ctx,
 	}
 
 	time_start = jiffies;
-	time_limit = time_start + HZ * (ulong)DEVCMD_TIMEOUT;
+	time_limit = time_start + HZ * (ulong)lif->ionic->cmd_timeout;
 	do {
 		remaining = wait_for_completion_timeout(&ctx->work,
 							IONIC_ADMINQ_TIME_SLICE);
@@ -635,7 +635,7 @@ int ionic_identify(struct ionic *ionic)
 	memcpy_toio(&idev->dev_cmd_regs->data, &ident->drv, sz);
 
 	ionic_dev_cmd_identify(idev, IONIC_DEV_IDENTITY_VERSION_2);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	if (!err) {
 		sz = min(sizeof(ident->dev), sizeof(idev->dev_cmd_regs->data));
 		memcpy_fromio(&ident->dev, &idev->dev_cmd_regs->data, sz);
@@ -679,7 +679,7 @@ int ionic_init(struct ionic *ionic)
 
 	mutex_lock(&ionic->dev_cmd_lock);
 	ionic_dev_cmd_init(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	mutex_unlock(&ionic->dev_cmd_lock);
 
 	return err;
@@ -695,7 +695,7 @@ int ionic_reset(struct ionic *ionic)
 
 	mutex_lock(&ionic->dev_cmd_lock);
 	ionic_dev_cmd_reset(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	mutex_unlock(&ionic->dev_cmd_lock);
 
 	return err;
@@ -711,7 +711,7 @@ int ionic_port_identify(struct ionic *ionic)
 	mutex_lock(&ionic->dev_cmd_lock);
 
 	ionic_dev_cmd_port_identify(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	if (!err) {
 		sz = min(sizeof(ident->port), sizeof(idev->dev_cmd_regs->data));
 		memcpy_fromio(&ident->port, &idev->dev_cmd_regs->data, sz);
@@ -756,10 +756,10 @@ int ionic_port_init(struct ionic *ionic)
 
 	memcpy_toio(&idev->dev_cmd_regs->data, &ident->port.config, sz);
 	ionic_dev_cmd_port_init(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 
 	ionic_dev_cmd_port_state(&ionic->idev, IONIC_PORT_ADMIN_STATE_UP);
-	ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 
 	mutex_unlock(&ionic->dev_cmd_lock);
 	if (err) {
@@ -786,7 +786,7 @@ int ionic_port_reset(struct ionic *ionic)
 	if (ionic_is_fw_running(idev)) {
 		mutex_lock(&ionic->dev_cmd_lock);
 		ionic_dev_cmd_port_reset(idev);
-		err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+		err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 		mutex_unlock(&ionic->dev_cmd_lock);
 	}
 

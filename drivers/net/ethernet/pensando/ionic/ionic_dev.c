@@ -212,7 +212,7 @@ static void ionic_map_disc_cmb(struct ionic *ionic)
 	mutex_lock(&ionic->dev_cmd_lock);
 
 	ionic_dev_cmd_discover_cmb(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	if (!err) {
 		sz = min(sizeof(ident->cmb_layout),
 			 sizeof(idev->dev_cmd_regs->data));
@@ -590,10 +590,11 @@ do_check_time:
 		return -ENXIO;
 
 	/* Because of some variability in the actual FW heartbeat, we
-	 * wait longer than the DEVCMD_TIMEOUT before checking again.
+	 * wait longer than the command timeout before checking again.
 	 */
 	last_check_time = idev->last_hb_time;
-	if (time_before(check_time, last_check_time + DEVCMD_TIMEOUT * 2 * HZ))
+	if (time_before(check_time,
+			last_check_time + ionic->cmd_timeout * 2 * HZ))
 		return 0;
 
 	fw_hb = ioread32(&idev->dev_info_regs->fw_heartbeat);
@@ -795,7 +796,7 @@ int ionic_set_vf_config(struct ionic *ionic, int vf,
 
 	mutex_lock(&ionic->dev_cmd_lock);
 	ionic_dev_cmd_go(&ionic->idev, &cmd);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	mutex_unlock(&ionic->dev_cmd_lock);
 
 	return err;
@@ -812,7 +813,7 @@ void ionic_vf_start(struct ionic *ionic)
 		return;
 
 	ionic_dev_cmd_go(&ionic->idev, &cmd);
-	ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 }
 
 /* LIF commands */

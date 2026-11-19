@@ -239,7 +239,7 @@ void ionic_request_rdma_reset(struct ionic_lif *lif)
 	mutex_lock(&ionic->dev_cmd_lock);
 
 	ionic_dev_cmd_go(&ionic->idev, &cmd);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 
 	mutex_unlock(&ionic->dev_cmd_lock);
 
@@ -247,3 +247,9 @@ void ionic_request_rdma_reset(struct ionic_lif *lif)
 		pr_warn("%s request_reset: error %d\n", __func__, err);
 }
 EXPORT_SYMBOL_NS(ionic_request_rdma_reset, "NET_IONIC");
+
+u8 ionic_cmd_timeout(struct ionic_lif *lif)
+{
+	return lif->ionic->cmd_timeout;
+}
+EXPORT_SYMBOL_NS(ionic_cmd_timeout, "NET_IONIC");
