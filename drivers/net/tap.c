@@ -102,6 +102,9 @@ out:
 static int tap_set_queue(struct tap_dev *tap, struct file *file,
 			 struct tap_queue *q)
 {
+	if (tap->dead)
+		return -ENODEV;
+
 	if (tap->numqueues == MAX_TAP_QUEUES)
 		return -EBUSY;
 
@@ -248,7 +251,7 @@ void tap_del_queues(struct tap_dev *tap)
 	BUG_ON(tap->numvtaps);
 	BUG_ON(tap->numqueues);
 	/* guarantee that any future tap_set_queue will fail */
-	tap->numvtaps = MAX_TAP_QUEUES;
+	tap->dead = true;
 }
 EXPORT_SYMBOL_GPL(tap_del_queues);
 

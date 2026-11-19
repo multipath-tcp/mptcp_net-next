@@ -120,10 +120,7 @@ static int macvtap_newlink(struct net_device *dev,
 static void macvtap_dellink(struct net_device *dev,
 			    struct list_head *head)
 {
-	struct macvtap_dev *vlantap = netdev_priv(dev);
-
 	netdev_rx_handler_unregister(dev);
-	tap_del_queues(&vlantap->tap);
 	macvlan_dellink(dev, head);
 }
 
@@ -186,6 +183,11 @@ static int macvtap_device_event(struct notifier_block *unused,
 			return notifier_from_errno(err);
 		break;
 	case NETDEV_UNREGISTER:
+		/* NETDEV_UNREGISTER is also sent when the device moves to
+		 * another netns, queues must survive this.
+		 */
+		if (dev->reg_state == NETREG_UNREGISTERING)
+			tap_del_queues(&vlantap->tap);
 		/* vlan->minor == 0 if NETDEV_REGISTER above failed */
 		if (vlantap->tap.minor == 0)
 			break;

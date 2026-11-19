@@ -112,10 +112,7 @@ static int ipvtap_newlink(struct net_device *dev,
 static void __ipvtap_dellink(struct net *net, struct net_device *dev,
 			     struct list_head *head)
 {
-	struct ipvtap_dev *vlantap = netdev_priv(dev);
-
 	netdev_rx_handler_unregister(dev);
-	tap_del_queues(&vlantap->tap);
 	__ipvlan_link_delete(net, dev, head);
 }
 
@@ -185,6 +182,11 @@ static int ipvtap_device_event(struct notifier_block *unused,
 			return notifier_from_errno(err);
 		break;
 	case NETDEV_UNREGISTER:
+		/* NETDEV_UNREGISTER is also sent when the device moves to
+		 * another netns, queues must survive this.
+		 */
+		if (dev->reg_state == NETREG_UNREGISTERING)
+			tap_del_queues(&vlantap->tap);
 		/* vlan->minor == 0 if NETDEV_REGISTER above failed */
 		if (vlantap->tap.minor == 0)
 			break;
