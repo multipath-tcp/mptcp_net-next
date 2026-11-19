@@ -405,24 +405,6 @@ static int setup_signal_handler(int signal)
 	return sigaction(SIGURG, &sa, NULL);
 }
 
-/*
- * MSG_OOB might be disabled in the kernel via the CONFIG_AF_UNIX_OOB
- * switch, so this function can be used for probing for its availability.
- */
-static bool has_af_unix_oob(void)
-{
-	bool available = false;
-	int sp[2];
-
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sp) == 0) {
-		available = (send(sp[0], ".", 1, MSG_OOB) == 1);
-		close(sp[0]);
-		close(sp[1]);
-	}
-
-	return available;
-}
-
 /* clang-format off */
 FIXTURE(fown) {};
 /* clang-format on */
@@ -473,8 +455,8 @@ FIXTURE_TEARDOWN(fown)
 }
 
 /*
- * Sending an out of bound message will trigger the SIGURG signal
- * through file_send_sigiotask.
+ * Sending a message to a socket with O_ASYNC will trigger
+ * the SIGURG signal through file_send_sigiotask.
  */
 TEST_F(fown, sigurg_socket)
 {
@@ -484,9 +466,6 @@ TEST_F(fown, sigurg_socket)
 	int status;
 	int pipe_parent[2], pipe_child[2];
 	pid_t child;
-
-	if (!has_af_unix_oob())
-		SKIP(return, "CONFIG_AF_UNIX_OOB / MSG_OOB not available");
 
 	memset(&server_address, 0, sizeof(server_address));
 	set_unix_address(&server_address, 0);
@@ -521,14 +500,14 @@ TEST_F(fown, sigurg_socket)
 		 */
 		ASSERT_EQ(1, read(pipe_parent[0], &buffer_child, 1));
 		/* May signal itself. */
-		ASSERT_EQ(1, send(client_socket, ".", 1, MSG_OOB));
-		EXPECT_EQ(0, close(client_socket));
+		ASSERT_EQ(1, send(client_socket, ".", 1, 0));
 		ASSERT_EQ(1, write(pipe_child[1], ".", 1));
 		EXPECT_EQ(0, close(pipe_child[1]));
 
 		/* Waits for the message to be received. */
 		ASSERT_EQ(1, read(pipe_parent[0], &buffer_child, 1));
 		EXPECT_EQ(0, close(pipe_parent[0]));
+		EXPECT_EQ(0, close(client_socket));
 
 		if (variant->sandbox_setown == SANDBOX_BEFORE_SETOWN) {
 			ASSERT_EQ(0, signal_received);
@@ -560,20 +539,22 @@ TEST_F(fown, sigurg_socket)
 		create_scoped_domain(_metadata, LANDLOCK_SCOPE_SIGNAL);
 
 	/*
-	 * Sets the child to receive SIGURG for MSG_OOB.  This uncommon use is
+	 * Sets the child to receive SIGURG.  This uncommon use is
 	 * a valid attack scenario which also simplifies this test.
 	 */
 	ASSERT_EQ(0, fcntl(recv_socket, F_SETOWN, child));
+	ASSERT_EQ(0, fcntl(recv_socket, F_SETSIG, SIGURG));
+	ASSERT_EQ(0, fcntl(recv_socket, F_SETFL, O_ASYNC));
 
 	if (variant->sandbox_setown == SANDBOX_AFTER_SETOWN)
 		create_scoped_domain(_metadata, LANDLOCK_SCOPE_SIGNAL);
 
 	ASSERT_EQ(1, write(pipe_parent[1], ".", 1));
 
-	/* Waits for the child to send MSG_OOB. */
+	/* Waits for the child to send data. */
 	ASSERT_EQ(1, read(pipe_child[0], &buffer_parent, 1));
 	EXPECT_EQ(0, close(pipe_child[0]));
-	ASSERT_EQ(1, recv(recv_socket, &buffer_parent, 1, MSG_OOB));
+	ASSERT_EQ(1, recv(recv_socket, &buffer_parent, 1, 0));
 	EXPECT_EQ(0, close(recv_socket));
 	EXPECT_EQ(0, close(server_socket));
 	ASSERT_EQ(1, write(pipe_parent[1], ".", 1));
@@ -1085,10 +1066,14 @@ TEST_F(trace_fown, deny_scope_fown)
 		 */
 		ASSERT_EQ(1, read(pipe_parent[0], &buffer_child, 1));
 		/* Triggers the asynchronous SIGURG to this file owner. */
-		ASSERT_EQ(1, send(client_socket, ".", 1, MSG_OOB));
-		EXPECT_EQ(0, close(client_socket));
+		ASSERT_EQ(1, send(client_socket, ".", 1, 0));
 		ASSERT_EQ(1, write(pipe_child[1], ".", 1));
 		EXPECT_EQ(0, close(pipe_child[1]));
+
+		/* Waits for the message to be received. */
+		ASSERT_EQ(1, read(pipe_parent[0], &buffer_child, 1));
+		EXPECT_EQ(0, close(pipe_parent[0]));
+		EXPECT_EQ(0, close(client_socket));
 
 		_exit(0);
 		return;
@@ -1114,19 +1099,23 @@ TEST_F(trace_fown, deny_scope_fown)
 		create_scoped_domain(_metadata, LANDLOCK_SCOPE_SIGNAL);
 
 	/*
-	 * Sets the child to receive SIGURG for MSG_OOB.  This uncommon use is a
+	 * Sets the child to receive SIGURG.  This uncommon use is a
 	 * valid attack scenario which also simplifies this test.
 	 */
 	ASSERT_EQ(0, fcntl(recv_socket, F_SETOWN, child));
+	ASSERT_EQ(0, fcntl(recv_socket, F_SETSIG, SIGURG));
+	ASSERT_EQ(0, fcntl(recv_socket, F_SETFL, O_ASYNC));
 
 	ASSERT_EQ(1, write(pipe_parent[1], ".", 1));
 
-	/* Waits for the child to send MSG_OOB. */
+	/* Waits for the child to send data. */
 	ASSERT_EQ(1, read(pipe_child[0], &buffer_parent, 1));
 	EXPECT_EQ(0, close(pipe_child[0]));
-	ASSERT_EQ(1, recv(recv_socket, &buffer_parent, 1, MSG_OOB));
+	ASSERT_EQ(1, recv(recv_socket, &buffer_parent, 1, 0));
 	EXPECT_EQ(0, close(recv_socket));
 	EXPECT_EQ(0, close(server_socket));
+	ASSERT_EQ(1, write(pipe_parent[1], ".", 1));
+	EXPECT_EQ(0, close(pipe_parent[1]));
 
 	ASSERT_EQ(child, waitpid(child, &status, 0));
 	ASSERT_TRUE(WIFEXITED(status));
