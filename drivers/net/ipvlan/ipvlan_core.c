@@ -276,7 +276,7 @@ void ipvlan_process_multicast(struct work_struct *work)
 			if (!(ipvlan->dev->flags & IFF_UP))
 				continue;
 			ret = NET_RX_DROP;
-			len = skb->len + ETH_HLEN;
+			len = skb->len + (tx_pkt ? 0 : ETH_HLEN);
 			nskb = skb_clone(skb, GFP_ATOMIC);
 			local_bh_disable();
 			if (nskb) {
@@ -331,7 +331,7 @@ static int ipvlan_rcv_frame(struct ipvl_addr *addr, struct sk_buff **pskb,
 	bool success = false;
 	struct sk_buff *skb = *pskb;
 
-	len = skb->len + ETH_HLEN;
+	len = skb->len + (local ? 0 : ETH_HLEN);
 	/* Only packets exchanged between two local slaves need to have
 	 * device-up check as well as skb-share check.
 	 */
