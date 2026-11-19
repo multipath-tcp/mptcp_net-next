@@ -40,6 +40,11 @@ properties:
       - const: mdio
       - const: mii
 
+  reset-gpios:
+    maxItems: 1
+    description:
+      GPIO connected to the hardware reset input of a standalone switch.
+
   mdio:
     $ref: /schemas/net/mdio.yaml#
     unevaluatedProperties: false
@@ -120,7 +125,8 @@ patternProperties:
                 1: Slow
 
               If not present, the configuration made by the switch bootloader is
-              preserved.
+              preserved, or the power-on default after a reset through
+              reset-gpios.
           maxlinear,slew-rate-txd:
             $ref: /schemas/types.yaml#/definitions/uint32
             enum: [0, 1]
@@ -131,7 +137,8 @@ patternProperties:
                 1: Slow
 
               If not present, the configuration made by the switch bootloader is
-              preserved.
+              preserved, or the power-on default after a reset through
+              reset-gpios.
           maxlinear,rmii-refclk-out:
             type: boolean
             description:
@@ -173,6 +180,7 @@ allOf:
         mdio:
           required:
             - compatible
+        reset-gpios: false
     else:
       properties:
         reg:
