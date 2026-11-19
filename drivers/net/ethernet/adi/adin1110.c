@@ -885,6 +885,7 @@ static int adin1110_net_open(struct net_device *net_dev)
 {
 	struct adin1110_port_priv *port_priv = netdev_priv(net_dev);
 	struct adin1110_priv *priv = port_priv->priv;
+	u32 common, own, peer, irq_mask;
 	u32 val;
 	int ret;
 
@@ -895,12 +896,24 @@ static int adin1110_net_open(struct net_device *net_dev)
 	if (ret < 0)
 		goto out;
 
-	val = ADIN1110_TX_RDY_IRQ | ADIN1110_RX_RDY_IRQ | ADIN1110_SPI_ERR_IRQ;
-	if (priv->cfg->id == ADIN2111_MAC)
-		val |= ADIN2111_RX_RDY_IRQ;
+	common = ADIN1110_TX_RDY_IRQ | ADIN1110_SPI_ERR_IRQ;
+	own = !port_priv->nr ? ADIN1110_RX_RDY_IRQ : ADIN2111_RX_RDY_IRQ;
+	peer = !port_priv->nr ? ADIN2111_RX_RDY_IRQ : ADIN1110_RX_RDY_IRQ;
 
-	priv->irq_mask = val;
-	ret = adin1110_write_reg(priv, ADIN1110_IMASK1, ~val);
+	/*
+	 * The write below is absolute, so only keep the peer port's
+	 * RX-ready IRQ enabled while that port is running; a stopped peer
+	 * must stay masked until it is opened again.
+	 */
+	irq_mask = common | own;
+	priv->irq_mask = common | ADIN1110_RX_RDY_IRQ;
+	if (priv->cfg->id == ADIN2111_MAC) {
+		priv->irq_mask |= ADIN2111_RX_RDY_IRQ;
+		if (netif_running(priv->ports[!port_priv->nr]->netdev))
+			irq_mask |= peer;
+	}
+
+	ret = adin1110_write_reg(priv, ADIN1110_IMASK1, ~irq_mask);
 	if (ret < 0) {
 		netdev_err(net_dev, "Failed to enable chip IRQs: %d\n", ret);
 		goto out;
@@ -945,7 +958,7 @@ static int adin1110_net_stop(struct net_device *net_dev)
 	u32 mask;
 	int ret;
 
-	mask = !port_priv->nr ? ADIN2111_RX_RDY_IRQ : ADIN1110_RX_RDY_IRQ;
+	mask = !port_priv->nr ? ADIN1110_RX_RDY_IRQ : ADIN2111_RX_RDY_IRQ;
 
 	/* Disable RX RDY IRQs */
 	mutex_lock(&priv->lock);
