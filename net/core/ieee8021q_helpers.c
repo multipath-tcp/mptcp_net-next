@@ -2,6 +2,7 @@
 // Copyright (c) 2024 Pengutronix, Oleksij Rempel <kernel@pengutronix.de>
 
 #include <linux/array_size.h>
+#include <linux/if_vlan.h>
 #include <linux/printk.h>
 #include <linux/types.h>
 #include <net/dscp.h>
@@ -12,10 +13,10 @@
 	compiletime_assert(ARRAY_SIZE(tbl) == IEEE8021Q_TT_MAX, \
 			   #tbl " size mismatch")
 
-/* The following arrays map Traffic Types (TT) to traffic classes (TC) for
- * different number of queues as shown in the example provided by
- * IEEE 802.1Q-2022 in Annex I "I.3 Traffic type to traffic class mapping" and
- * Table I-1 "Traffic type to traffic class mapping".
+/* The following arrays map a traffic type (TT) to a traffic class (TC) for
+ * each supported number of queues. The mapping is the traffic-type -> priority
+ * -> traffic-class composition documented in the ieee8021q_tt_to_tc() kdoc
+ * below, reduced for the given number of queues.
  */
 static const u8 ieee8021q_8queue_tt_tc_map[] = {
 	[IEEE8021Q_TT_BK] = 0,
@@ -84,22 +85,27 @@ static const u8 ieee8021q_1queue_tt_tc_map[] = {
 };
 
 /**
- * ieee8021q_tt_to_tc - Map IEEE 802.1Q Traffic Type to Traffic Class
- * @tt: IEEE 802.1Q Traffic Type
- * @num_queues: Number of queues
+ * ieee8021q_tt_to_tc - Map an IEEE 802.1Q traffic type to a traffic class
+ * @tt: IEEE 802.1Q traffic type
+ * @num_queues: number of traffic classes (queues) available, 1..8
  *
- * This function maps an IEEE 802.1Q Traffic Type to a Traffic Class (TC) based
- * on the number of queues configured on the NIC. The mapping is based on the
- * example provided by IEEE 802.1Q-2022 in Annex I "I.3 Traffic type to traffic
- * class mapping" and Table I-1 "Traffic type to traffic class mapping".
+ * Return the traffic-class number for @tt. It is the pre-computed composition
+ * of two IEEE 802.1Q-2022 mappings::
  *
- * Return: Traffic Class corresponding to the given Traffic Type or negative
- * value in case of error.
+ *   traffic type --[Table I-2]--> priority --[Table 8-5]--> traffic class
+ *
+ * Table 8-5 is the recommended priority-to-traffic-class mapping for
+ * implementations that do NOT support the credit-based shaper (8.6.8.2).
+ * Credit-based-shaper implementations have a different recommended mapping
+ * (Table 34-1 for SR classes A and B, or Table 34-2 for SR class B only),
+ * which this helper does not implement.
+ *
+ * Return: the traffic class, or a negative value on error.
  */
 int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues)
 {
 	if (tt < 0 || tt >= IEEE8021Q_TT_MAX) {
-		pr_err("Requested Traffic Type (%d) is out of range (%d)\n", tt,
+		pr_err("Requested Traffic Type (%u) is out of range (%u)\n", tt,
 		       IEEE8021Q_TT_MAX);
 		return -EINVAL;
 	}
@@ -131,7 +137,7 @@ int ieee8021q_tt_to_tc(enum ieee8021q_traffic_type tt, unsigned int num_queues)
 		return ieee8021q_1queue_tt_tc_map[tt];
 	}
 
-	pr_err("Invalid number of queues %d\n", num_queues);
+	pr_err("Invalid number of queues %u\n", num_queues);
 
 	return -EINVAL;
 }
@@ -222,3 +228,70 @@ int ietf_dscp_to_ieee8021q_tt(u8 dscp)
 	return SIMPLE_IETF_DSCP_TO_IEEE8021Q_TT(dscp);
 }
 EXPORT_SYMBOL_GPL(ietf_dscp_to_ieee8021q_tt);
+
+/* Index: the PCP, which in 8P0D is the 802.1Q priority. Priority 0 is Best
+ * Effort and priority 1 Background, the reverse of their enum order.
+ */
+static const u8 ieee8021q_pcp_to_tt_map[] = {
+	[0] = IEEE8021Q_TT_BE,
+	[1] = IEEE8021Q_TT_BK,
+	[2] = IEEE8021Q_TT_EE,
+	[3] = IEEE8021Q_TT_CA,
+	[4] = IEEE8021Q_TT_VI,
+	[5] = IEEE8021Q_TT_VO,
+	[6] = IEEE8021Q_TT_IC,
+	[7] = IEEE8021Q_TT_NC,
+};
+
+static_assert(ARRAY_SIZE(ieee8021q_pcp_to_tt_map) ==
+	      (VLAN_PRIO_MASK >> VLAN_PRIO_SHIFT) + 1);
+/* ieee8021q_tt_to_pcp() needs one entry per traffic type. */
+static_assert(ARRAY_SIZE(ieee8021q_pcp_to_tt_map) == IEEE8021Q_TT_MAX);
+
+/**
+ * ieee8021q_pcp_to_tt - Map an IEEE 802.1Q PCP to a traffic type
+ * @pcp: IEEE 802.1Q Priority Code Point value
+ *
+ * Decode @pcp with the 8P0D row of Table 6-3 (IEEE 802.1Q-2022, 6.9.3). In that
+ * row the priority equals the PCP, and no PCP carries drop eligibility. Then
+ * look up the traffic type for that priority in Table I-2. The enum values of
+ * Best Effort and Background are not their priorities, see
+ * &enum ieee8021q_traffic_type.
+ *
+ * The other rows of Table 6-3 (7P1D, 6P2D, 5P3D) are not decoded here.
+ *
+ * Return: the traffic type, or -EINVAL if @pcp is above 7. Without
+ * CONFIG_NET_IEEE8021Q_HELPERS, the stub returns -EOPNOTSUPP.
+ */
+int ieee8021q_pcp_to_tt(u8 pcp)
+{
+	if (pcp >= ARRAY_SIZE(ieee8021q_pcp_to_tt_map))
+		return -EINVAL;
+
+	return ieee8021q_pcp_to_tt_map[pcp];
+}
+EXPORT_SYMBOL_GPL(ieee8021q_pcp_to_tt);
+
+/**
+ * ieee8021q_tt_to_pcp - Map an IEEE 802.1Q traffic type to a PCP
+ * @tt: IEEE 802.1Q traffic type
+ *
+ * Encode @tt to its priority per Table I-2 (IEEE 802.1Q-2022, I.4). Then
+ * encode the priority to its PCP per the 8P0D row of Table 6-2 (6.9.3). This
+ * is the inverse of ieee8021q_pcp_to_tt(). The enum values of Best Effort and
+ * Background are not their priorities, see &enum ieee8021q_traffic_type.
+ *
+ * Return: the PCP (0..7), or -EINVAL if @tt is not a traffic type. Without
+ * CONFIG_NET_IEEE8021Q_HELPERS, the stub returns -EOPNOTSUPP.
+ */
+int ieee8021q_tt_to_pcp(enum ieee8021q_traffic_type tt)
+{
+	int pcp;
+
+	for (pcp = 0; pcp < ARRAY_SIZE(ieee8021q_pcp_to_tt_map); pcp++)
+		if (ieee8021q_pcp_to_tt_map[pcp] == tt)
+			return pcp;
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL_GPL(ieee8021q_tt_to_pcp);
