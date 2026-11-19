@@ -82,6 +82,8 @@ static int ipvtap_newlink(struct net_device *dev,
 	int err;
 
 	INIT_LIST_HEAD(&vlantap->tap.queue_list);
+	vlantap->tap.dev = dev;
+	vlantap->tap.ring_size = dev->tx_queue_len;
 
 	/* Since macvlan supports all offloads by default, make
 	 * tap support all offloads also.
@@ -103,8 +105,6 @@ static int ipvtap_newlink(struct net_device *dev,
 		netdev_rx_handler_unregister(dev);
 		return err;
 	}
-
-	vlantap->tap.dev = vlantap->vlan.dev;
 
 	return err;
 }
@@ -128,11 +128,22 @@ static void ipvtap_dellink(struct net_device *dev,
 	mutex_unlock(&port->pnodes_lock);
 }
 
+static void ipvtap_dev_free(struct net_device *dev)
+{
+	struct ipvtap_dev *vlantap = netdev_priv(dev);
+
+	mutex_destroy(&vlantap->tap.lock);
+}
+
 static void ipvtap_setup(struct net_device *dev)
 {
+	struct ipvtap_dev *vlantap = netdev_priv(dev);
+
 	ipvlan_link_setup(dev);
 	dev->tx_queue_len = TUN_READQ_SIZE;
 	dev->priv_flags &= ~IFF_NO_QUEUE;
+	dev->priv_destructor = ipvtap_dev_free;
+	mutex_init(&vlantap->tap.lock);
 }
 
 static struct rtnl_link_ops ipvtap_link_ops __read_mostly = {

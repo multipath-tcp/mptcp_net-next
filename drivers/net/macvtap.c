@@ -86,6 +86,8 @@ static int macvtap_newlink(struct net_device *dev,
 	int err;
 
 	INIT_LIST_HEAD(&vlantap->tap.queue_list);
+	vlantap->tap.dev = dev;
+	vlantap->tap.ring_size = dev->tx_queue_len;
 
 	/* Since macvlan supports all offloads by default, make
 	 * tap support all offloads also.
@@ -112,8 +114,6 @@ static int macvtap_newlink(struct net_device *dev,
 		return err;
 	}
 
-	vlantap->tap.dev = vlantap->vlan.dev;
-
 	return 0;
 }
 
@@ -124,10 +124,22 @@ static void macvtap_dellink(struct net_device *dev,
 	macvlan_dellink(dev, head);
 }
 
+static void macvtap_dev_free(struct net_device *dev)
+{
+	struct macvtap_dev *vlantap = netdev_priv(dev);
+
+	mutex_destroy(&vlantap->tap.lock);
+	macvlan_dev_free(dev);
+}
+
 static void macvtap_setup(struct net_device *dev)
 {
+	struct macvtap_dev *vlantap = netdev_priv(dev);
+
 	macvlan_common_setup(dev);
 	dev->tx_queue_len = TUN_READQ_SIZE;
+	dev->priv_destructor = macvtap_dev_free;
+	mutex_init(&vlantap->tap.lock);
 }
 
 static struct net *macvtap_link_net(const struct net_device *dev)

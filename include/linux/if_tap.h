@@ -35,12 +35,22 @@ struct tap_queue;
 struct tap_dev {
 	struct net_device	*dev;
 	u16			flags;
+	/* Protects taps[], queue_list, numvtaps, numqueues, ring_size, dead,
+	 * and the tap, enabled and queue_index fields of the attached queues.
+	 * Nests inside RTNL.
+	 */
+	struct mutex		lock;
 	/* This array tracks active taps. */
 	struct tap_queue    __rcu *taps[MAX_TAP_QUEUES];
 	/* This list tracks all taps (both enabled and disabled) */
 	struct list_head	queue_list;
 	int			numvtaps;
 	int			numqueues;
+	/* Size of the ptr_ring of all queues, as last set by
+	 * tap_queue_resize(). Can differ from dev->tx_queue_len
+	 * if a change of the latter failed after our notifier ran.
+	 */
+	unsigned int		ring_size;
 	netdev_features_t	tap_features;
 	int			minor;
 	/* Set once the net_device is unregistered, no queue can be added. */
