@@ -118,6 +118,7 @@ struct netc_switch {
 	struct device *dev;
 	struct dsa_switch *ds;
 	u16 revision;
+	bool configured;
 
 	const struct netc_switch_info *info;
 	struct netc_switch_regs regs;
