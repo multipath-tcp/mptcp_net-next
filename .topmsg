@@ -1,2 +1,27 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-kernel-c-flag-keep-local_addr_used-in-sync
+Subject: [PATCH] mptcp: pm: kernel: c-flag: keep local_addr_used in sync
+
+The ID was marked as used before incrementing local_addr_used counter
+when the families were not matching.
+
+Marking endpoints as used while they are not can have an impact on the
+local_addr_used counter when endpoints not linked to the initial subflow
+are removed -- CAP_NET_ADMIN is required -- and active connections have
+such badly marked endpoints. In this case, the local counter will be
+decremented while it shouldn't. If the counter was already at 0, this
+warning will be emitted:
+
+  WARNING: net/mptcp/pm_kernel.c:1080 at __mark_subflow_endp_available+0x46/0x50, CPU#0: a.out/149
+  RIP: 0010:__mark_subflow_endp_available (net/mptcp/pm_kernel.c:1080 (discriminator 2) net/mptcp/pm_kernel.c:1076 (discriminator 2))
+  Call Trace:
+   mptcp_pm_nl_del_addr_doit (net/mptcp/pm_kernel.c:1112 net/mptcp/pm_kernel.c:1227)
+   genl_family_rcv_msg_doit (net/netlink/genetlink.c:1114)
+
+The fix is easy: increment local_addr_used similar to what is done in
+mptcp_pm_create_subflow_or_signal_addr() for the non C-flag case.
+
+Fixes: 4b1ff850e0c1 ("mptcp: pm: in-kernel: usable client side with C-flag")
+Reported-by: Yiming Qian <yimingqian591@gmail.com>
+Closes: https://lore.kernel.org/20261006114409.117190-1-yimingqian591@gmail.com
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
