@@ -6652,8 +6652,12 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 	}
 
 	/* @from claims more data than it has memory for.  Leave @to alone. */
-	if (WARN_ON_ONCE(delta < 0 || delta < len))
+	if (WARN_ON_ONCE(delta < 0 || delta < len)) {
+		pr_err("skb len %d delta %d truesize %d headlen %d end %d\n",
+		       len, delta, from->truesize, skb_headlen(from),
+		       skb_end_offset(from));
 		return false;
+	}
 
 	if (skb_headlen(from) != 0) {
 		struct page *page = virt_to_head_page(from->head);
