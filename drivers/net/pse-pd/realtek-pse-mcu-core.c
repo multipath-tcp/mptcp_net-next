@@ -43,6 +43,7 @@
 #include "realtek-pse-mcu.h"
 
 #define RTPSE_MCU_DEVICE_ID_RTL8238B		0x0138
+#define RTPSE_MCU_DEVICE_ID_RTL8238C		0x0238
 #define RTPSE_MCU_DEVICE_ID_RTL8239		0x0039
 #define RTPSE_MCU_DEVICE_ID_RTL8239C		0x0139
 #define RTPSE_MCU_DEVICE_ID_BCM59111		0xe111
@@ -154,6 +155,14 @@ struct rtpse_mcu_chip_info {
 static const struct rtpse_mcu_chip_info rtl8238b_info = {
 	.max_mW_per_port = 30000,
 	.name = "RTL8238B",
+	.pw_read_lsb_mW = 200,
+	.pw_set_cmd = RTPSE_MCU_CMD_PORT_SET_POWER_LIMIT,
+	.pw_set_lsb_mW = 200,
+};
+
+static const struct rtpse_mcu_chip_info rtl8238c_info = {
+	.max_mW_per_port = 30000,
+	.name = "RTL8238C",
 	.pw_read_lsb_mW = 200,
 	.pw_set_cmd = RTPSE_MCU_CMD_PORT_SET_POWER_LIMIT,
 	.pw_set_lsb_mW = 200,
@@ -745,6 +754,9 @@ static int rtpse_mcu_discover(struct rtpse_mcu_ctrl *pse, struct rtpse_mcu_info 
 	switch (info->device_id) {
 	case RTPSE_MCU_DEVICE_ID_RTL8238B:
 		pse->chip = &rtl8238b_info;
+		break;
+	case RTPSE_MCU_DEVICE_ID_RTL8238C:
+		pse->chip = &rtl8238c_info;
 		break;
 	case RTPSE_MCU_DEVICE_ID_RTL8239:
 		pse->chip = &rtl8239_info;
