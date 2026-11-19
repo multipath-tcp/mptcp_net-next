@@ -393,9 +393,9 @@ static int smcr_tx_rdma_writes(struct smc_connection *conn, size_t len,
 			sge[srcchunk].addr = conn->sndbuf_desc->is_vm ?
 				(virt_addr + src_off) : (base_addr + src_off);
 			sge[srcchunk].length = src_len;
-			if (conn->sndbuf_desc->is_vm)
-				sge[srcchunk].lkey =
-					conn->sndbuf_desc->mr[link->link_idx]->lkey;
+			sge[srcchunk].lkey = conn->sndbuf_desc->is_vm ?
+				conn->sndbuf_desc->mr[link->link_idx]->lkey :
+				link->roce_pd->local_dma_lkey;
 			num_sges++;
 
 			src_off += src_len;
