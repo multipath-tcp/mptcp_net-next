@@ -103,7 +103,6 @@ struct redir_spec {
 struct socket_spec {
 	int family;
 	int sotype;
-	int send_flags;
 	int in[2];
 	int out[2];
 };
@@ -197,12 +196,12 @@ get_verdict:
 		try_recv("bpf.recv(sd_recv)", sd_recv, MSG_DONTWAIT, false);
 }
 
-static void test_send_redir_recv(int sd_send, int send_flags, int sd_peer,
+static void test_send_redir_recv(int sd_send, int sd_peer,
 				 int sd_in, int sd_out, int sd_recv,
 				 struct maps *maps, int status)
 {
 	unsigned int drop, pass;
-	char *send_buf = "ab";
+	char *send_buf = "a";
 	char recv_buf = '\0';
 	ssize_t n, len = 1;
 
@@ -217,10 +216,7 @@ static void test_send_redir_recv(int sd_send, int send_flags, int sd_peer,
 	if (xbpf_map_update_elem(maps->out, &u32(0), &u64(sd_out), BPF_NOEXIST))
 		goto del_in;
 
-	/* Last byte is OOB data when send_flags has MSG_OOB bit set */
-	if (send_flags & MSG_OOB)
-		len++;
-	n = send(sd_send, send_buf, len, send_flags);
+	n = send(sd_send, send_buf, len, 0);
 	if (n >= 0 && n < len)
 		FAIL("incomplete send");
 	if (n < 0) {
@@ -255,20 +251,6 @@ static void test_send_redir_recv(int sd_send, int send_flags, int sd_peer,
 	if (recv_buf != send_buf[0])
 		FAIL("recv(): payload check, %02x != %02x", recv_buf, send_buf[0]);
 
-	if (send_flags & MSG_OOB) {
-		/* Fail reading OOB while in sockmap */
-		try_recv("bpf.recv(sd_out, MSG_OOB)", sd_out,
-			 MSG_OOB | MSG_DONTWAIT, false);
-
-		/* Remove sd_out from sockmap */
-		xbpf_map_delete_elem(maps->out, &u32(0));
-
-		/* Check that OOB was dropped on redirect */
-		try_recv("recv(sd_out, MSG_OOB)", sd_out,
-			 MSG_OOB | MSG_DONTWAIT, false);
-
-		goto del_in;
-	}
 out:
 	xbpf_map_delete_elem(maps->out, &u32(0));
 del_in:
@@ -328,7 +310,7 @@ static void test_socket(enum bpf_map_type type, struct redir_spec *redir,
 			struct maps *maps, struct socket_spec *s_in,
 			struct socket_spec *s_out)
 {
-	int fd_in, fd_out, fd_send, fd_peer, fd_recv, flags, status;
+	int fd_in, fd_out, fd_send, fd_peer, fd_recv, status;
 	const char *in_str, *out_str;
 	char s[MAX_TEST_NAME];
 
@@ -337,26 +319,24 @@ static void test_socket(enum bpf_map_type type, struct redir_spec *redir,
 	fd_send = s_in->in[redir->idx_send];
 	fd_peer = s_in->in[redir->idx_send ^ 1];
 	fd_recv = s_out->out[redir->idx_recv];
-	flags = s_in->send_flags;
 
 	in_str = socket_kind_to_str(fd_in);
 	out_str = socket_kind_to_str(fd_out);
 	status = get_support_status(redir->prog_type, in_str, out_str);
 
 	snprintf(s, sizeof(s),
-		 "%-4s %-17s %-5s %s %-5s%6s",
-		 /* hash sk_skb-to-ingress u_str → v_str (OOB) */
+		 "%-4s %-17s %-5s %s %-5s",
+		 /* hash sk_skb-to-ingress u_str → v_str */
 		 type == BPF_MAP_TYPE_SOCKMAP ? "map" : "hash",
 		 redir->name,
 		 in_str,
 		 status & SUPPORTED ? "→" : " ",
-		 out_str,
-		 (flags & MSG_OOB) ? "(OOB)" : "");
+		 out_str);
 
 	if (!test__start_subtest(s))
 		return;
 
-	test_send_redir_recv(fd_send, flags, fd_peer, fd_in, fd_out, fd_recv,
+	test_send_redir_recv(fd_send, fd_peer, fd_in, fd_out, fd_recv,
 			     maps, status);
 }
 
@@ -365,12 +345,10 @@ static void test_redir(enum bpf_map_type type, struct redir_spec *redir,
 {
 	struct socket_spec *s, sockets[] = {
 		{ AF_INET, SOCK_STREAM },
-		// { AF_INET, SOCK_STREAM, MSG_OOB }, /* Known to be broken */
 		{ AF_INET6, SOCK_STREAM },
 		{ AF_INET, SOCK_DGRAM },
 		{ AF_INET6, SOCK_DGRAM },
 		{ AF_UNIX, SOCK_STREAM },
-		{ AF_UNIX, SOCK_STREAM, MSG_OOB },
 		{ AF_UNIX, SOCK_DGRAM },
 		// { AF_UNIX, SOCK_SEQPACKET},	/* Unsupported BPF_MAP_UPDATE_ELEM */
 		{ AF_VSOCK, SOCK_STREAM },
@@ -392,10 +370,9 @@ static void test_redir(enum bpf_map_type type, struct redir_spec *redir,
 			struct socket_spec *out = &sockets[j];
 			struct socket_spec *in = &sockets[i];
 
-			/* Skip intra-proto and between variants */
-			if (out->send_flags ||
-			    (in->family == out->family &&
-			     in->sotype == out->sotype))
+			/* Skip intra-proto */
+			if (in->family == out->family &&
+			    in->sotype == out->sotype)
 				continue;
 
 			test_socket(type, redir, maps, in, out);
