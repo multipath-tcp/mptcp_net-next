@@ -5875,8 +5875,10 @@ static void
 tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
 	     struct sk_buff *head, struct sk_buff *tail, u32 start)
 {
+	unsigned int old_truesize, new_truesize;
 	struct sk_buff *skb = head, *n;
 	struct sk_buff_head tmp;
+	int remainder, nskbs;
 	u8 scaling_ratio;
 	u32 sub_end;
 
@@ -5916,6 +5918,7 @@ restart:
 
 	/* Second, find consecutive collapsible skb. */
 	sub_end = TCP_SKB_CB(skb)->end_seq;
+	old_truesize = skb->truesize;
 	n = tcp_skb_next(skb, list);
 
 	while (n && n != tail) {
@@ -5943,8 +5946,20 @@ restart:
 			break;
 
 		sub_end = TCP_SKB_CB(n)->end_seq;
+		old_truesize += n->truesize;
 		n = tcp_skb_next(n, list);
 	}
+
+	/* Third, check if the new skbs have high density. */
+	nskbs = (sub_end - start) / TCP_COLLAPSE_MAX_SIZE;
+	new_truesize = nskbs * SKB_TRUESIZE(TCP_COLLAPSE_MAX_SIZE);
+
+	remainder = (sub_end - start) % TCP_COLLAPSE_MAX_SIZE;
+	if (remainder)
+		new_truesize += skb_head_truesize(remainder, GFP_ATOMIC);
+
+	if (old_truesize <= new_truesize)
+		goto skip;
 
 	while (before(start, sub_end)) {
 		int copy = min_t(int, TCP_COLLAPSE_MAX_SIZE, sub_end - start);
