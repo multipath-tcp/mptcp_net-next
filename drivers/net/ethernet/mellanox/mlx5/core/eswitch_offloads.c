@@ -3572,6 +3572,10 @@ void mlx5_esw_offloads_devcom_init(struct mlx5_eswitch *esw,
 	xa_init(&esw->offloads.peer_flows);
 	mutex_init(&esw->offloads.peer_mutex);
 
+	/* do not pair a virt LAG capable VF/SF that is not part of a LAG */
+	if (!mlx5_core_is_pf(esw->dev) && mlx5_virt_lag_nonmember(esw->dev))
+		return;
+
 	if (!MLX5_CAP_ESW(esw->dev, merged_eswitch))
 		return;
 
