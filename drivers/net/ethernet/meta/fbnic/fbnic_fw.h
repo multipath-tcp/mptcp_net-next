@@ -40,6 +40,11 @@ struct fbnic_fw_mbx {
 #define FBNIC_FW_MAX_LOG_HISTORY		14
 #define FBNIC_MBX_RX_TO_SEC			10
 
+/* The FW keeps its core dump, header included, in a 256K region of its
+ * QSPI flash, so no valid dump is larger than that.
+ */
+#define FBNIC_FW_COREDUMP_MAX_SIZE	SZ_256K
+
 struct fbnic_fw_ver {
 	u32 version;
 	char commit[FBNIC_FW_CAP_RESP_COMMIT_MAX_SIZE];
