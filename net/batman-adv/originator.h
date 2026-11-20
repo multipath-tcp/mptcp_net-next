@@ -22,46 +22,46 @@ int batadv_originator_init(struct batadv_priv *bat_priv);
 void batadv_originator_free(struct batadv_priv *bat_priv);
 void batadv_purge_orig_ref(struct batadv_priv *bat_priv);
 void batadv_orig_node_release(struct kref *ref);
-struct batadv_orig_node *batadv_orig_node_new(struct batadv_priv *bat_priv,
-					      const u8 *addr);
-struct batadv_hardif_neigh_node *
+struct batadv_orig_node * __must_check
+batadv_orig_node_new(struct batadv_priv *bat_priv, const u8 *addr);
+struct batadv_hardif_neigh_node * __must_check
 batadv_hardif_neigh_get(const struct batadv_hard_iface *hard_iface,
 			const u8 *neigh_addr);
 void batadv_hardif_neigh_release(struct kref *ref);
-struct batadv_neigh_node *
+struct batadv_neigh_node * __must_check
 batadv_neigh_node_get_or_create(struct batadv_orig_node *orig_node,
 				struct batadv_hard_iface *hard_iface,
 				const u8 *neigh_addr);
 void batadv_neigh_node_release(struct kref *ref);
-struct batadv_neigh_node *
+struct batadv_neigh_node * __must_check
 batadv_orig_router_get(struct batadv_orig_node *orig_node,
 		       const struct batadv_hard_iface *if_outgoing);
-struct batadv_neigh_node *
+struct batadv_neigh_node * __must_check
 batadv_orig_to_router(struct batadv_priv *bat_priv, const u8 *orig_addr,
 		      struct batadv_hard_iface *if_outgoing);
-struct batadv_neigh_ifinfo *
+struct batadv_neigh_ifinfo * __must_check
 batadv_neigh_ifinfo_new(struct batadv_neigh_node *neigh,
 			struct batadv_hard_iface *if_outgoing);
-struct batadv_neigh_ifinfo *
+struct batadv_neigh_ifinfo * __must_check
 batadv_neigh_ifinfo_get(struct batadv_neigh_node *neigh,
 			struct batadv_hard_iface *if_outgoing);
 void batadv_neigh_ifinfo_release(struct kref *ref);
 
 int batadv_hardif_neigh_dump(struct sk_buff *msg, struct netlink_callback *cb);
 
-struct batadv_orig_ifinfo *
+struct batadv_orig_ifinfo * __must_check
 batadv_orig_ifinfo_get(struct batadv_orig_node *orig_node,
 		       struct batadv_hard_iface *if_outgoing);
-struct batadv_orig_ifinfo *
+struct batadv_orig_ifinfo * __must_check
 batadv_orig_ifinfo_new(struct batadv_orig_node *orig_node,
 		       struct batadv_hard_iface *if_outgoing);
 void batadv_orig_ifinfo_release(struct kref *ref);
 
 int batadv_orig_dump(struct sk_buff *msg, struct netlink_callback *cb);
-struct batadv_orig_node_vlan *
+struct batadv_orig_node_vlan * __must_check
 batadv_orig_node_vlan_new(struct batadv_orig_node *orig_node,
 			  unsigned short vid);
-struct batadv_orig_node_vlan *
+struct batadv_orig_node_vlan * __must_check
 batadv_orig_node_vlan_get(struct batadv_orig_node *orig_node,
 			  unsigned short vid);
 void batadv_orig_node_vlan_release(struct kref *ref);
@@ -82,8 +82,8 @@ static inline u32 batadv_choose_orig(const void *data, u32 size)
 	return hash % size;
 }
 
-struct batadv_orig_node *
-batadv_orig_hash_find(struct batadv_priv *bat_priv, const void *data);
+struct batadv_orig_node * __must_check
+batadv_orig_hash_find(struct batadv_priv *bat_priv, const u8 *addr);
 
 /**
  * batadv_orig_node_vlan_put() - decrement the refcounter and possibly release
