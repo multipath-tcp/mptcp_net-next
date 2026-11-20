@@ -24,8 +24,8 @@ int batadv_meshif_create_vlan(struct batadv_priv *bat_priv, unsigned short vid);
 void batadv_meshif_destroy_vlan(struct batadv_priv *bat_priv,
 				struct batadv_meshif_vlan *vlan);
 void batadv_meshif_vlan_release(struct kref *ref);
-struct batadv_meshif_vlan *batadv_meshif_vlan_get(struct batadv_priv *bat_priv,
-						  unsigned short vid);
+struct batadv_meshif_vlan * __must_check
+batadv_meshif_vlan_get(struct batadv_priv *bat_priv, unsigned short vid);
 
 /**
  * batadv_meshif_vlan_put() - decrease the vlan object refcounter and

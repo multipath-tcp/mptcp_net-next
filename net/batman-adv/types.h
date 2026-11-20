@@ -1788,9 +1788,10 @@ enum batadv_bla_backbone_gw_state {
 };
 
 /**
- * struct batadv_bla_backbone_gw - batman-adv gateway bridged into the LAN
+ * struct batadv_bla_backbone_gw_key - key of a backbone gateway in
+ *  &batadv_priv_bla.backbone_hash
  */
-struct batadv_bla_backbone_gw {
+struct batadv_bla_backbone_gw_key {
 	/**
 	 * @orig: originator address of backbone node (mac address of primary
 	 *  iface)
@@ -1799,6 +1800,14 @@ struct batadv_bla_backbone_gw {
 
 	/** @vid: vlan id this gateway was detected on */
 	unsigned short vid;
+};
+
+/**
+ * struct batadv_bla_backbone_gw - batman-adv gateway bridged into the LAN
+ */
+struct batadv_bla_backbone_gw {
+	/** @key: hash key identifying the backbone gateway */
+	struct batadv_bla_backbone_gw_key key;
 
 	/** @hash_entry: hlist node for &batadv_priv_bla.backbone_hash */
 	struct hlist_node hash_entry;
@@ -1836,14 +1845,22 @@ struct batadv_bla_backbone_gw {
 };
 
 /**
- * struct batadv_bla_claim - claimed non-mesh client structure
+ * struct batadv_bla_claim_key - key of a claim in &batadv_priv_bla.claim_hash
  */
-struct batadv_bla_claim {
+struct batadv_bla_claim_key {
 	/** @addr: mac address of claimed non-mesh client */
 	u8 addr[ETH_ALEN] __aligned(2);
 
 	/** @vid: vlan id this client was detected on */
 	unsigned short vid;
+};
+
+/**
+ * struct batadv_bla_claim - claimed non-mesh client structure
+ */
+struct batadv_bla_claim {
+	/** @key: hash key identifying the claim */
+	struct batadv_bla_claim_key key;
 
 	/** @backbone_gw: pointer to backbone gw claiming this client */
 	struct batadv_bla_backbone_gw *backbone_gw;
@@ -1866,14 +1883,23 @@ struct batadv_bla_claim {
 #endif
 
 /**
- * struct batadv_tt_common_entry - tt local & tt global common data
+ * struct batadv_tt_common_entry_key - key of a TT entry in
+ *  &batadv_priv_tt.local_hash or &batadv_priv_tt.global_hash
  */
-struct batadv_tt_common_entry {
+struct batadv_tt_common_entry_key {
 	/** @addr: mac address of non-mesh client */
 	u8 addr[ETH_ALEN] __aligned(2);
 
 	/** @vid: VLAN identifier */
 	unsigned short vid;
+};
+
+/**
+ * struct batadv_tt_common_entry - tt local & tt global common data
+ */
+struct batadv_tt_common_entry {
+	/** @key: hash key identifying the TT client */
+	struct batadv_tt_common_entry_key key;
 
 	/**
 	 * @hash_entry: hlist node for &batadv_priv_tt.local_hash or for
@@ -2213,18 +2239,27 @@ struct batadv_algo_ops {
 };
 
 /**
+ * struct batadv_dat_entry_key - key of a DAT entry in &batadv_priv_dat.hash
+ *  and in the DHT
+ */
+struct batadv_dat_entry_key {
+	/** @ip: the IPv4 corresponding to this DAT/ARP entry */
+	__be32 ip;
+
+	/** @vid: the vlan ID associated to this entry */
+	unsigned short vid;
+};
+
+/**
  * struct batadv_dat_entry - it is a single entry of batman-adv ARP backend. It
  * is used to stored ARP entries needed for the global DAT cache
  */
 struct batadv_dat_entry {
-	/** @ip: the IPv4 corresponding to this DAT/ARP entry */
-	__be32 ip;
+	/** @key: hash key identifying the DAT entry */
+	struct batadv_dat_entry_key key;
 
 	/** @mac_addr: the MAC address associated to the stored IPv4 */
 	atomic64_t mac_addr;
-
-	/** @vid: the vlan ID associated to this entry */
-	unsigned short vid;
 
 	/**
 	 * @last_update: time in jiffies when this entry was refreshed last time

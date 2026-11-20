@@ -551,8 +551,10 @@ orig_free:
  * @skb: the received packet
  * @if_incoming: the interface this packet was received through
  *
- * Return: NET_RX_SUCCESS and consumes the skb if the packet was properly
- * processed or NET_RX_DROP in case of failure.
+ * The skb is always consumed by this function.
+ *
+ * Return: NET_RX_SUCCESS if the packet was properly processed or NET_RX_DROP
+ * in case of failure.
  */
 int batadv_v_elp_packet_recv(struct sk_buff *skb,
 			     struct batadv_hard_iface *if_incoming)
