@@ -4996,27 +4996,35 @@ drv_stats:
 static int __virtnet_get_hw_stats(struct virtnet_info *vi,
 				  struct virtnet_stats_ctx *ctx,
 				  struct virtio_net_ctrl_queue_stats *req,
-				  int req_size, void *reply, int res_size)
+				  int req_size, void *reply, int res_size,
+				  int first_vq, int last_vq, bool enable_cvq)
 {
 	struct virtio_net_stats_reply_hdr *hdr;
 	struct scatterlist sgs_in, sgs_out;
 	void *p;
 	u32 qid;
-	int ok;
 
 	sg_init_one(&sgs_out, req, req_size);
 	sg_init_one(&sgs_in, reply, res_size);
 
-	ok = virtnet_send_command_reply(vi, VIRTIO_NET_CTRL_STATS,
+	if (!virtnet_send_command_reply(vi, VIRTIO_NET_CTRL_STATS,
 					VIRTIO_NET_CTRL_STATS_GET,
-					&sgs_out, &sgs_in);
-
-	if (!ok)
-		return ok;
+					&sgs_out, &sgs_in))
+		return -EINVAL;
 
 	for (p = reply; p - reply < res_size; p += le16_to_cpu(hdr->size)) {
 		hdr = p;
+		if (!hdr->size)
+			return -EINVAL;
+
 		qid = le16_to_cpu(hdr->vq_index);
+		/* The vqs of the queue pairs beyond curr_queue_pairs lie
+		 * between last_vq and the control vq.
+		 */
+		if ((qid < first_vq || qid > last_vq) &&
+		    !(enable_cvq && qid == vi->max_queue_pairs * 2))
+			return -EINVAL;
+
 		virtnet_fill_stats(vi, qid, ctx, p, false, hdr->type);
 	}
 
@@ -5083,7 +5091,13 @@ static int virtnet_get_hw_stats(struct virtnet_info *vi,
 	if (!req)
 		return -ENOMEM;
 
-	reply = kmalloc(res_size, GFP_KERNEL);
+	/* virtnet_fill_stats() parses the whole payload of a record's type,
+	 * so reserve zeroed space after the reply to hold any payload.
+	 */
+	reply = kzalloc(res_size + max3(ctx->size[VIRTNET_Q_TYPE_RX],
+					ctx->size[VIRTNET_Q_TYPE_TX],
+					ctx->size[VIRTNET_Q_TYPE_CQ]),
+			GFP_KERNEL);
 	if (!reply) {
 		kfree(req);
 		return -ENOMEM;
@@ -5096,7 +5110,8 @@ static int virtnet_get_hw_stats(struct virtnet_info *vi,
 	if (enable_cvq)
 		virtnet_make_stat_req(vi, ctx, req, vi->max_queue_pairs * 2, &j);
 
-	ok = __virtnet_get_hw_stats(vi, ctx, req, sizeof(*req) * j, reply, res_size);
+	ok = __virtnet_get_hw_stats(vi, ctx, req, sizeof(*req) * j, reply,
+				    res_size, first_vq, last_vq, enable_cvq);
 
 	kfree(req);
 	kfree(reply);
