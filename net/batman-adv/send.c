@@ -109,6 +109,8 @@ send_skb_err:
  * @skb: packet to be transmitted (with batadv header and no outer eth header)
  * @hard_iface: outgoing interface
  *
+ * The skb is always consumed by this function.
+ *
  * Return: A negative errno code is returned on a failure. A success does not
  * guarantee the frame will be transmitted as it may be dropped due
  * to congestion or traffic shaping.
@@ -125,6 +127,8 @@ int batadv_send_broadcast_skb(struct sk_buff *skb,
  * batadv_send_unicast_skb() - Send unicast packet to neighbor
  * @skb: packet to be transmitted (with batadv header and no outer eth header)
  * @neigh: neighbor which is used as next hop to destination
+ *
+ * The skb is always consumed by this function.
  *
  * Return: A negative errno code is returned on a failure. A success does not
  * guarantee the frame will be transmitted as it may be dropped due
@@ -163,9 +167,10 @@ int batadv_send_unicast_skb(struct sk_buff *skb,
  * host, NULL can be passed as recv_if and no interface alternating is
  * attempted.
  *
- * Return: negative errno code on a failure, -EINPROGRESS if the skb is
- * buffered for later transmit or the NET_XMIT status returned by the
- * lower routine if the packet has been passed down.
+ * The skb is always consumed by this function.
+ *
+ * Return: negative errno code on a failure or the NET_XMIT status returned by
+ * the lower routine if the packet has been passed down.
  */
 int batadv_send_skb_to_orig(struct sk_buff *skb,
 			    struct batadv_orig_node *orig_node,
@@ -313,6 +318,8 @@ out:
  * depending on whether BATADV_UNICAST or BATADV_UNICAST_4ADDR was supplied
  * as packet_type. Then send this frame to the given orig_node.
  *
+ * The skb is always consumed by this function.
+ *
  * Return: NET_XMIT_DROP in case of error or NET_XMIT_SUCCESS otherwise.
  */
 int batadv_send_skb_unicast(struct batadv_priv *bat_priv,
@@ -389,6 +396,8 @@ out:
  * BATADV_UNICAST_4ADDR was supplied as packet_type. Then send this frame
  * to the according destination node.
  *
+ * The skb is always consumed by this function.
+ *
  * Return: NET_XMIT_DROP in case of error or NET_XMIT_SUCCESS otherwise.
  */
 int batadv_send_skb_via_tt_generic(struct batadv_priv *bat_priv,
@@ -428,6 +437,8 @@ int batadv_send_skb_via_tt_generic(struct batadv_priv *bat_priv,
  *
  * Look up the currently selected gateway. Wrap the given skb into a batman-adv
  * unicast header and send this frame to this gateway node.
+ *
+ * The skb is always consumed by this function.
  *
  * Return: NET_XMIT_DROP in case of error or NET_XMIT_SUCCESS otherwise.
  */
@@ -481,6 +492,9 @@ void batadv_forw_packet_free(struct batadv_forw_packet *forw_packet,
  * (optional) if_incoming, if_outgoing and queue_left. If queue_left
  * is NULL then bat_priv is optional, too.
  *
+ * The skb is always consumed: on success, it is owned by the returned
+ * forwarding packet, on failure it is freed.
+ *
  * Return: An allocated forwarding packet on success, NULL otherwise.
  */
 struct batadv_forw_packet *
@@ -505,6 +519,7 @@ batadv_forw_packet_alloc(struct batadv_hard_iface *if_incoming,
 		batadv_dbg(BATADV_DBG_BATMAN, bat_priv,
 			   "%s queue is full\n", qname);
 
+		kfree_skb(skb);
 		return NULL;
 	}
 
@@ -532,6 +547,7 @@ err:
 	if (queue_left)
 		atomic_inc(queue_left);
 
+	kfree_skb(skb);
 	return NULL;
 }
 
@@ -753,13 +769,13 @@ static int batadv_forw_bcast_packet_to_list(struct batadv_priv *bat_priv,
 
 	newskb = skb_clone(skb, GFP_ATOMIC);
 	if (!newskb)
-		goto err;
+		return NETDEV_TX_BUSY;
 
 	forw_packet = batadv_forw_packet_alloc(if_in, if_out,
 					       &bat_priv->bcast_queue_left,
 					       bat_priv, newskb);
 	if (!forw_packet)
-		goto err_packet_free;
+		return NETDEV_TX_BUSY;
 
 	forw_packet->own = own_packet;
 
@@ -770,11 +786,6 @@ static int batadv_forw_bcast_packet_to_list(struct batadv_priv *bat_priv,
 
 	batadv_forw_packet_bcast_queue(bat_priv, forw_packet, send_time);
 	return NETDEV_TX_OK;
-
-err_packet_free:
-	kfree_skb(newskb);
-err:
-	return NETDEV_TX_BUSY;
 }
 
 /**

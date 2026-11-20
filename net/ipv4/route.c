@@ -2859,36 +2859,33 @@ struct rtable *ip_route_output_key_hash_rcu(struct net *net, struct flowi4 *fl4,
 		goto make_route;
 	}
 
-	err = fib_lookup(net, fl4, res, 0);
+	err = fib_lookup(net, fl4, res, FIB_LOOKUP_REPORT_MISS);
 	if (err) {
 		res->fi = NULL;
 		res->table = NULL;
 		if (fl4->flowi4_oif &&
-		    (ipv4_is_multicast(fl4->daddr) || !fl4->flowi4_l3mdev)) {
-			/* Apparently, routing tables are wrong. Assume,
-			 * that the destination is on link.
+		    (ipv4_is_multicast(fl4->daddr) ||
+		     (!fl4->flowi4_l3mdev && err == -ESRCH))) {
+			/* When oif is specified, fib_lookup() is called
+			 * primarily to determine if the destination is
+			 * accessible directly or through a gateway. It also
+			 * checks whether there are any traffic restrictions
+			 * (blackhole, prohibit, unreachable), or if there's a
+			 * routing lookup miss.
 			 *
-			 * WHY? DW.
-			 * Because we are allowed to send to iface
-			 * even if it has NO routes and NO assigned
-			 * addresses. When oif is specified, routing
-			 * tables are looked up with only one purpose:
-			 * to catch if destination is gatewayed, rather than
-			 * direct. Moreover, if MSG_DONTROUTE is set,
-			 * we send packet, ignoring both routing tables
-			 * and ifaddr state. --ANK
-			 *
-			 *
-			 * We could make it even if oif is unknown,
-			 * likely IPv6, but we do not.
+			 * Multicast is sent regardless of restriction or miss.
+			 * Non-vrf unicast honors restrictions but allows
+			 * oif-bound sends even when oif has no routes. In both
+			 * cases the destination is assumed on-link.
 			 */
-
 			if (fl4->saddr == 0)
 				fl4->saddr = inet_select_addr(dev_out, 0,
 							      RT_SCOPE_LINK);
 			res->type = RTN_UNICAST;
 			goto make_route;
 		}
+		/* Reverse the mapping induced by FIB_LOOKUP_REPORT_MISS. */
+		err = err == -ESRCH ? -ENETUNREACH : err;
 		rth = ERR_PTR(err);
 		goto out;
 	}

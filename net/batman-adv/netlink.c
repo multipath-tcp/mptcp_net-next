@@ -1138,7 +1138,7 @@ static int batadv_netlink_set_vlan(struct sk_buff *skb, struct genl_info *info)
  * Return: Pointer to mesh interface (with increased refcnt) on success, error
  *  pointer on error
  */
-static struct net_device *
+static struct net_device * __must_check
 batadv_netlink_get_meshif_from_ifindex(struct net *net, int ifindex)
 {
 	struct net_device *mesh_iface;
@@ -1166,7 +1166,7 @@ err_put_meshif:
  * Return: Pointer to mesh interface (with increased refcnt) on success, error
  *  pointer on error
  */
-static struct net_device *
+static struct net_device * __must_check
 batadv_netlink_get_meshif_from_info(struct net *net, struct genl_info *info)
 {
 	int ifindex;
@@ -1206,7 +1206,7 @@ struct net_device *batadv_netlink_get_meshif(struct netlink_callback *cb)
  * Return: Pointer to hard interface (with increased refcnt) on success, error
  *  pointer on error
  */
-static struct batadv_hard_iface *
+static struct batadv_hard_iface * __must_check
 batadv_netlink_get_hardif_from_ifindex(struct batadv_priv *bat_priv,
 				       struct net *net, int ifindex)
 {
@@ -1248,7 +1248,7 @@ err_put_harddev:
  * Return: Pointer to hard interface (with increased refcnt) on success, error
  *  pointer on error
  */
-static struct batadv_hard_iface *
+static struct batadv_hard_iface * __must_check
 batadv_netlink_get_hardif_from_info(struct batadv_priv *bat_priv,
 				    struct net *net, struct genl_info *info)
 {
@@ -1293,7 +1293,7 @@ batadv_netlink_get_hardif(struct batadv_priv *bat_priv,
  * Return: Pointer to vlan on success (with increased refcnt), error pointer
  *  on error
  */
-static struct batadv_meshif_vlan *
+static struct batadv_meshif_vlan * __must_check
 batadv_get_vlan_from_info(struct batadv_priv *bat_priv, struct net *net,
 			  struct genl_info *info)
 {
