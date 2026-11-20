@@ -45,6 +45,14 @@ The following functions are provided for managing shared devlink instances:
 * ``devlink_shd_get()``: Get or create a shared devlink instance identified by a string ID
 * ``devlink_shd_put()``: Release a reference on a shared devlink instance
 * ``devlink_shd_get_priv()``: Get private data from shared devlink instance
+* ``shd_priv_to_devlink()``: Get shared devlink instance from its private data
+
+``devlink_shd_get()`` returns ``ERR_PTR()`` on failure.
+
+The driver may initialize and clean up its private data of the shared
+instance in the optional ``shd_init()`` and ``shd_fini()`` callbacks of
+``struct devlink_ops``. The ``init_param`` argument of ``devlink_shd_get()``
+is passed to ``shd_init()``.
 
 Initialization Flow
 -------------------
@@ -55,7 +63,9 @@ Initialization Flow
 
    * The function looks up existing instance by identifier
    * If none exists, creates new instance:
-     - Allocates and registers devlink instance
+     - Allocates devlink instance
+     - Calls ``shd_init()`` (if set), on failure frees it and returns the error
+     - Registers devlink instance
      - Adds to global shared instances list
      - Increments reference count
 
@@ -67,7 +77,8 @@ Cleanup Flow
 
 1. **Cleanup** when PF is removed
 2. **Call** ``devlink_shd_put()`` to release reference (decrements reference count)
-3. **Shared instance is automatically destroyed** when the last PF removes (reference count reaches zero)
+3. **Shared instance is automatically destroyed** when the last PF removes (reference count reaches zero),
+   ``shd_fini()`` (if set) is called after unregistering it
 
 Chip Identification
 -------------------
@@ -84,6 +95,10 @@ Locking
 -------
 
 A global mutex (``shd_mutex``) protects the shared instances list during registration/deregistration.
+
+``shd_init()`` and ``shd_fini()`` are called with ``shd_mutex`` and the devlink
+lock of the shared instance held, thus must not call ``devlink_shd_get()`` nor
+``devlink_shd_put()``, and must use ``devl_*()`` variants of devlink API.
 
 Similarly to other nested devlink instance relationships, devlink lock of
 the shared instance should be always taken after the devlink lock of PF.
