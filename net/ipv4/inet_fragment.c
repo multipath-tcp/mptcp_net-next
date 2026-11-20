@@ -416,19 +416,23 @@ static struct inet_frag_queue *inet_frag_create(struct fqdir *fqdir,
 		inet_frag_putn(q, 2);
 		return NULL;
 	}
-	mod_timer(&q->timer, jiffies + fqdir->timeout);
+	mod_timer(&q->timer, jiffies + READ_ONCE(fqdir->timeout));
 	spin_unlock_bh(&q->lock);
 	return q;
 }
 
-struct inet_frag_queue *inet_frag_find(struct fqdir *fqdir, void *key)
+struct inet_frag_queue *inet_frag_find(struct fqdir *fqdir, void *key,
+				       enum skb_drop_reason *reason)
 {
 	/* This pairs with WRITE_ONCE() in fqdir_pre_exit(). */
 	long high_thresh = READ_ONCE(fqdir->high_thresh);
 	struct inet_frag_queue *fq = NULL, *prev;
 
-	if (!high_thresh || frag_mem_limit(fqdir) > high_thresh)
+	if (!high_thresh || frag_mem_limit(fqdir) > high_thresh) {
+		if (reason)
+			*reason = SKB_DROP_REASON_FRAG_MEM_LIMIT;
 		return NULL;
+	}
 
 	prev = rhashtable_lookup(&fqdir->rhashtable, key, fqdir->f->rhash_params);
 	if (!prev)
