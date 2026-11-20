@@ -89,7 +89,7 @@ static void ip4_frag_init(struct inet_frag_queue *q, const void *a)
 
 	q->key.v4 = *key;
 	qp->ecn = 0;
-	if (q->fqdir->max_dist) {
+	if (READ_ONCE(q->fqdir->max_dist)) {
 		rcu_read_lock();
 		p = inet_getpeer_v4(net->ipv4.peers, key->saddr, key->vif);
 		if (p && !refcount_inc_not_zero(&p->refcnt))
@@ -197,7 +197,8 @@ out_rcu_unlock:
  * this IP datagram, and create new one, if nothing is found.
  */
 static struct ipq *ip_find(struct net *net, struct iphdr *iph,
-			   u32 user, int vif)
+			   u32 user, int vif,
+			   enum skb_drop_reason *reason)
 {
 	struct frag_v4_compare_key key = {
 		.saddr = iph->saddr,
@@ -209,7 +210,7 @@ static struct ipq *ip_find(struct net *net, struct iphdr *iph,
 	};
 	struct inet_frag_queue *q;
 
-	q = inet_frag_find(net->ipv4.fqdir, &key);
+	q = inet_frag_find(net->ipv4.fqdir, &key, reason);
 	if (!q)
 		return NULL;
 
@@ -220,7 +221,7 @@ static struct ipq *ip_find(struct net *net, struct iphdr *iph,
 static int ip_frag_too_far(struct ipq *qp)
 {
 	struct inet_peer *peer = qp->peer;
-	unsigned int max = qp->q.fqdir->max_dist;
+	unsigned int max = READ_ONCE(qp->q.fqdir->max_dist);
 	unsigned int start, end;
 
 	int rc;
@@ -242,7 +243,7 @@ static int ip_frag_too_far(struct ipq *qp)
 
 static int ip_frag_reinit(struct ipq *qp)
 {
-	if (!mod_timer_pending(&qp->q.timer, jiffies + qp->q.fqdir->timeout))
+	if (!mod_timer_pending(&qp->q.timer, jiffies + READ_ONCE(qp->q.fqdir->timeout)))
 		return -ETIMEDOUT;
 
 	inet_frag_queue_flush(&qp->q, SKB_DROP_REASON_FRAG_TOO_FAR);
@@ -475,6 +476,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 {
 	struct net_device *dev;
 	struct ipq *qp;
+	SKB_DR(reason);
 	int vif;
 
 	__IP_INC_STATS(net, IPSTATS_MIB_REASMREQDS);
@@ -483,7 +485,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 	rcu_read_lock();
 	dev = skb->dev ? : skb_dst_dev_rcu(skb);
 	vif = l3mdev_master_ifindex_rcu(dev);
-	qp = ip_find(net, ip_hdr(skb), user, vif);
+	qp = ip_find(net, ip_hdr(skb), user, vif, &reason);
 	if (qp) {
 		int ret, refs = 0;
 
@@ -499,7 +501,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 	rcu_read_unlock();
 
 	__IP_INC_STATS(net, IPSTATS_MIB_REASMFAILS);
-	kfree_skb(skb);
+	kfree_skb_reason(skb, reason);
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(ip_defrag);
