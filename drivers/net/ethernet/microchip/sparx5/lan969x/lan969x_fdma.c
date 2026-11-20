@@ -131,7 +131,7 @@ static struct sk_buff *lan969x_fdma_rx_get_frame(struct sparx5 *sparx5,
 		goto free_page;
 	}
 
-	skb = build_skb(page_address(page), fdma->db_size);
+	skb = build_skb(page_address(page), PAGE_SIZE << rx->page_order);
 	if (unlikely(!skb))
 		goto free_page;
 
@@ -161,21 +161,27 @@ free_page:
 	return NULL;
 }
 
+/* Get the page order needed for a page to hold the largest frame */
+static u8 lan969x_fdma_get_page_order(struct sparx5 *sparx5)
+{
+	return get_order(ALIGN(sparx5_fdma_get_max_frame(sparx5), 128) +
+			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+}
+
 static int lan969x_fdma_rx_alloc(struct sparx5 *sparx5, struct sparx5_rx *rx)
 {
 	struct fdma *fdma = &rx->fdma;
 	int err;
 
 	struct page_pool_params pp_params = {
-		.order = 0,
+		.order = rx->page_order,
 		.flags = PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV,
 		.pool_size = fdma->n_dcbs * fdma->n_dbs,
 		.nid = NUMA_NO_NODE,
 		.dev = sparx5->dev,
 		.dma_dir = DMA_FROM_DEVICE,
 		.offset = 0,
-		.max_len = fdma->db_size -
-			   SKB_DATA_ALIGN(sizeof(struct skb_shared_info)),
+		.max_len = fdma->db_size,
 	};
 
 	rx->page_pool = page_pool_create(&pp_params);
@@ -267,7 +273,11 @@ static void lan969x_fdma_rx_init(struct sparx5 *sparx5, struct sparx5_rx *rx)
 	fdma->n_dbs = 1;
 	fdma->priv = sparx5;
 	fdma->size = fdma_get_size(fdma);
-	fdma->db_size = PAGE_SIZE;
+	/* Keep the FDMA from writing into the skb_shared_info at the end of
+	 * the page. The DB size must be a multiple of 128 bytes.
+	 */
+	fdma->db_size = SKB_WITH_OVERHEAD(PAGE_SIZE << rx->page_order);
+	fdma->db_size = ALIGN_DOWN(fdma->db_size, 128);
 	fdma->ops.dataptr_cb = &lan969x_fdma_rx_dataptr_cb;
 	fdma->ops.nextptr_cb = &fdma_nextptr_cb;
 
@@ -411,6 +421,7 @@ int lan969x_fdma_init(struct sparx5 *sparx5)
 	struct sparx5_rx *rx = &sparx5->rx;
 	int err;
 
+	rx->page_order = lan969x_fdma_get_page_order(sparx5);
 	lan969x_fdma_rx_init(sparx5, rx);
 	lan969x_fdma_tx_init(sparx5);
 	sparx5_fdma_injection_mode(sparx5);

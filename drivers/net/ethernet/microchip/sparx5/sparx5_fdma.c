@@ -18,7 +18,6 @@
 #include "sparx5_main.h"
 #include "sparx5_port.h"
 
-#define FDMA_XTR_BUFFER_SIZE		2048
 #define FDMA_WEIGHT			4
 #define SPX5_FDMA_STOP_SLEEP_US		500
 #define SPX5_FDMA_STOP_TIMEOUT_US	10000
@@ -224,6 +223,10 @@ int sparx5_fdma_xmit(struct sparx5 *sparx5, u32 *ifh, struct sk_buff *skb,
 	struct fdma *fdma = &tx->fdma;
 	void *virt_addr;
 
+	/* Drop frames that do not fit in the TX buffers */
+	if (unlikely(IFH_LEN * 4 + skb->len + ETH_FCS_LEN > fdma->db_size))
+		return -EMSGSIZE;
+
 	if (!fdma_db_is_done(fdma_db_get(fdma, fdma->dcb_index, 0)))
 		return -EINVAL;
 
@@ -293,6 +296,33 @@ static int sparx5_fdma_tx_alloc(struct sparx5_tx *tx)
 		       FDMA_DCB_STATUS_DONE);
 
 	return 0;
+}
+
+/* Get the size of the largest frame, including IFH and VLAN tags, that can be
+ * received on any of the ports.
+ */
+u32 sparx5_fdma_get_max_frame(struct sparx5 *sparx5)
+{
+	u32 max_mtu = 0;
+
+	for (int i = 0; i < sparx5->data->consts->n_ports; i++) {
+		struct sparx5_port *port = sparx5->ports[i];
+
+		if (!port)
+			continue;
+
+		max_mtu = max(max_mtu, READ_ONCE(port->ndev->mtu));
+	}
+
+	return SPX5_HW_MTU(max_mtu) + IFH_LEN * sizeof(u32) + VLAN_HLEN * 2;
+}
+
+/* Get the DB size needed to hold the largest frame. The DB size must be a
+ * multiple of 128 bytes.
+ */
+static u32 sparx5_fdma_get_db_size(struct sparx5 *sparx5)
+{
+	return ALIGN(sparx5_fdma_get_max_frame(sparx5), 128);
 }
 
 static void sparx5_fdma_rx_init(struct sparx5 *sparx5,
@@ -424,7 +454,7 @@ void sparx5_fdma_injection_mode(struct sparx5 *sparx5)
 
 int sparx5_fdma_init(struct sparx5 *sparx5)
 {
-	u32 db_size = ALIGN(FDMA_XTR_BUFFER_SIZE, PAGE_SIZE);
+	u32 db_size;
 	int err;
 
 	/* Reset FDMA state */
@@ -441,6 +471,7 @@ int sparx5_fdma_init(struct sparx5 *sparx5)
 		 sparx5, CPU_PROC_CTRL);
 
 	sparx5_fdma_injection_mode(sparx5);
+	db_size = sparx5_fdma_get_db_size(sparx5);
 	sparx5_fdma_rx_init(sparx5, &sparx5->rx, FDMA_XTR_CHANNEL, db_size);
 	sparx5_fdma_tx_init(sparx5, &sparx5->tx, FDMA_INJ_CHANNEL, db_size);
 	err = sparx5_fdma_rx_alloc(&sparx5->rx);
