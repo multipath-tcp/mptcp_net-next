@@ -97,6 +97,7 @@
 	FN(DUP_FRAG)			\
 	FN(FRAG_REASM_TIMEOUT)		\
 	FN(FRAG_TOO_FAR)		\
+	FN(FRAG_MEM_LIMIT)		\
 	FN(TCP_MINTTL)			\
 	FN(IPV6_BAD_EXTHDR)		\
 	FN(IPV6_TOO_MANY_EXTHDRS)	\
@@ -488,6 +489,12 @@ enum skb_drop_reason {
 	 * (/proc/sys/net/ipv4/ipfrag_max_dist)
 	 */
 	SKB_DROP_REASON_FRAG_TOO_FAR,
+	/**
+	 * @SKB_DROP_REASON_FRAG_MEM_LIMIT: reassembly memory is over the limit.
+	 * (/proc/sys/net/ipv4/ipfrag_high_thresh,
+	 * /proc/sys/net/ipv6/ip6frag_high_thresh)
+	 */
+	SKB_DROP_REASON_FRAG_MEM_LIMIT,
 	/**
 	 * @SKB_DROP_REASON_TCP_MINTTL: ipv4 ttl or ipv6 hoplimit below
 	 * the threshold (IP_MINTTL or IPV6_MINHOPCOUNT).
