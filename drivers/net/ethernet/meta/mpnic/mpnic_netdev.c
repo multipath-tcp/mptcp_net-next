@@ -12,6 +12,113 @@
 #include "mpnic_netdev.h"
 #include "mpnic_txrx.h"
 
+static int mpnic_addr_sync(struct net_device *netdev,
+			   const unsigned char *addr)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	return mpnic_macda_sync(mpn->mpd, addr);
+}
+
+static int mpnic_addr_unsync(struct net_device *netdev,
+			     const unsigned char *addr)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	return mpnic_macda_unsync(mpn->mpd, addr);
+}
+
+static void __mpnic_set_rx_mode(struct mpnic_dev *mpd,
+				struct netdev_hw_addr_list *uc,
+				struct netdev_hw_addr_list *mc)
+{
+	bool uc_promisc = false, mc_promisc = false;
+	struct net_device *netdev = mpd->netdev;
+	struct mpnic_mac_addr *mac_addr;
+	int err;
+
+	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX];
+	if (!ether_addr_equal(mac_addr->value, netdev->dev_addr) ||
+	    mac_addr->state != MPNIC_TCAM_S_VALID) {
+		ether_addr_copy(mac_addr->value, netdev->dev_addr);
+		eth_broadcast_addr(mac_addr->mask);
+		mac_addr->state = MPNIC_TCAM_S_ADD;
+	}
+
+	mac_addr = &mpd->mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX];
+	if (!is_broadcast_ether_addr(mac_addr->value) ||
+	    mac_addr->state != MPNIC_TCAM_S_VALID) {
+		eth_broadcast_addr(mac_addr->value);
+		eth_broadcast_addr(mac_addr->mask);
+		mac_addr->state = MPNIC_TCAM_S_ADD;
+	}
+
+	err = __hw_addr_sync_dev(uc, netdev, mpnic_addr_sync,
+				 mpnic_addr_unsync);
+	if (err == -ENOSPC)
+		uc_promisc = true;
+
+	err = __hw_addr_sync_dev(mc, netdev, mpnic_addr_sync,
+				 mpnic_addr_unsync);
+	if (err == -ENOSPC)
+		mc_promisc = true;
+
+	uc_promisc |= netdev->flags & IFF_PROMISC;
+	mc_promisc |= netdev->flags & IFF_ALLMULTI;
+
+	mpnic_promisc_sync(mpd, uc_promisc, mc_promisc);
+
+	mpnic_write_macda(mpd);
+}
+
+static int mpnic_set_rx_mode(struct net_device *netdev,
+			     struct netdev_hw_addr_list *uc,
+			     struct netdev_hw_addr_list *mc)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+
+	if (netif_running(netdev))
+		__mpnic_set_rx_mode(mpn->mpd, uc, mc);
+
+	return 0;
+}
+
+static int mpnic_set_mac(struct net_device *netdev, void *p)
+{
+	struct mpnic_net *mpn = netdev_priv(netdev);
+	struct sockaddr *addr = p;
+
+	if (!is_valid_ether_addr(addr->sa_data))
+		return -EADDRNOTAVAIL;
+
+	eth_hw_addr_set(netdev, addr->sa_data);
+
+	if (netif_running(netdev)) {
+		netif_addr_lock_bh(netdev);
+		__mpnic_set_rx_mode(mpn->mpd, &netdev->uc, &netdev->mc);
+		netif_addr_unlock_bh(netdev);
+	}
+
+	return 0;
+}
+
+static void mpnic_clear_rx_mode(struct mpnic_dev *mpd)
+{
+	struct mpnic_mac_addr *mac_addr = mpd->mac_addr;
+	struct net_device *netdev = mpd->netdev;
+
+	netif_addr_lock_bh(netdev);
+	__dev_uc_unsync(netdev, mpnic_addr_unsync);
+	__dev_mc_unsync(netdev, mpnic_addr_unsync);
+	netif_addr_unlock_bh(netdev);
+
+	mac_addr[MPNIC_TCAM_MACDA_BROADCAST_IDX].state = MPNIC_TCAM_S_DELETE;
+	mac_addr[MPNIC_TCAM_MACDA_HOST_ADDR_IDX].state = MPNIC_TCAM_S_DELETE;
+	mac_addr[MPNIC_TCAM_MACDA_PROMISC_IDX].state = MPNIC_TCAM_S_DELETE;
+
+	mpnic_write_macda(mpd);
+}
+
 static int mpnic_open(struct net_device *netdev)
 {
 	struct mpnic_net *mpn = netdev_priv(netdev);
@@ -33,6 +140,11 @@ static int mpnic_open(struct net_device *netdev)
 
 	mpnic_enable(mpn);
 	mpnic_fill(mpn);
+
+	netif_addr_lock_bh(netdev);
+	__mpnic_set_rx_mode(mpn->mpd, &netdev->uc, &netdev->mc);
+	netif_addr_unlock_bh(netdev);
+
 	mpnic_napi_enable(mpn);
 
 	netif_tx_wake_all_queues(netdev);
@@ -59,6 +171,7 @@ static int mpnic_stop(struct net_device *netdev)
 	mpnic_napi_disable(mpn);
 	netif_tx_disable(netdev);
 
+	mpnic_clear_rx_mode(mpn->mpd);
 	mpnic_disable(mpn);
 	mpnic_wait_all_queues_idle(mpn->mpd);
 	mpnic_flush(mpn);
@@ -143,8 +256,10 @@ static const struct net_device_ops mpnic_netdev_ops = {
 	.ndo_open		= mpnic_open,
 	.ndo_stop		= mpnic_stop,
 	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= mpnic_set_mac,
 	.ndo_start_xmit		= mpnic_xmit_frame,
 	.ndo_features_check	= mpnic_features_check,
+	.ndo_set_rx_mode_async	= mpnic_set_rx_mode,
 	.ndo_get_stats64	= mpnic_get_stats64,
 };
 
@@ -302,6 +417,7 @@ struct net_device *mpnic_netdev_alloc(struct mpnic_dev *mpd)
 	netdev->netdev_ops = &mpnic_netdev_ops;
 	netdev->stat_ops = &mpnic_stat_ops;
 	netdev->request_ops_lock = true;
+	netdev->priv_flags |= IFF_UNICAST_FLT;
 
 	mpn = netdev_priv(netdev);
 	mpn->netdev = netdev;
