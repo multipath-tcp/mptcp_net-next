@@ -3641,6 +3641,13 @@ int enetc_alloc_msix(struct enetc_ndev_priv *priv)
 	if (n != nvec)
 		return -EPERM;
 
+	priv->int_vector = devm_kcalloc(&pdev->dev, priv->bdr_int_num,
+					sizeof(*priv->int_vector), GFP_KERNEL);
+	if (!priv->int_vector) {
+		err = -ENOMEM;
+		goto fail_int_vector;
+	}
+
 	/* # of tx rings per int vector */
 	v_tx_rings = priv->num_tx_rings / priv->bdr_int_num;
 	v_remainder = priv->num_tx_rings % priv->bdr_int_num;
@@ -3676,6 +3683,7 @@ fail:
 	while (i--)
 		enetc_int_vector_destroy(priv, i);
 
+fail_int_vector:
 	pci_free_irq_vectors(pdev);
 
 	return err;
@@ -3832,6 +3840,20 @@ static const struct enetc_drvdata enetc4_vf_data = {
 	.eth_ops = &enetc_vf_ethtool_ops,
 };
 
+static const struct enetc_drvdata enetc4_s32n79_ppm_data = {
+	.sysclk_freq = ENETC_CLK_500M,
+	.tx_csum = true,
+	.max_frags = ENETC4_MAX_SKB_FRAGS,
+	.eth_ops = &enetc4_ppm_ethtool_ops,
+};
+
+static const struct enetc_drvdata enetc4_s32n79_vf_data = {
+	.sysclk_freq = ENETC_CLK_500M,
+	.tx_csum = true,
+	.max_frags = ENETC4_MAX_SKB_FRAGS,
+	.eth_ops = &enetc_vf_ethtool_ops,
+};
+
 static const struct enetc_platform_info enetc_info[] = {
 	{ .revision = ENETC_REV_1_0,
 	  .dev_id = ENETC_DEV_ID_PF,
@@ -3861,6 +3883,18 @@ static const struct enetc_platform_info enetc_info[] = {
 	{ .revision = ENETC_REV_4_3,
 	  .dev_id = NXP_ENETC_VF_DEV_ID,
 	  .data = &enetc4_vf_data,
+	},
+	{ .revision = ENETC_REV_4_4,
+	  .dev_id = NXP_ENETC_PPM_DEV_ID,
+	  .data = &enetc4_s32n79_ppm_data,
+	},
+	{ .revision = ENETC_REV_4_4,
+	  .dev_id = NXP_ENETC_PF_DEV_ID,
+	  .data = &enetc4_s32n79_ppm_data,
+	},
+	{ .revision = ENETC_REV_4_4,
+	  .dev_id = NXP_ENETC_VF_DEV_ID,
+	  .data = &enetc4_s32n79_vf_data,
 	},
 };
 
