@@ -76,7 +76,7 @@ fq_find(struct net *net, const struct lowpan_802154_cb *cb,
 	key.src = *src;
 	key.dst = *dst;
 
-	q = inet_frag_find(ieee802154_lowpan->fqdir, &key);
+	q = inet_frag_find(ieee802154_lowpan->fqdir, &key, NULL);
 	if (!q)
 		return NULL;
 
