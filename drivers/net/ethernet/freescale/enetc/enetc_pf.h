@@ -67,6 +67,8 @@ struct enetc_pf {
 	bool sriov_enabled;
 	bool link_up;
 	u16 link_status_ms_mask;
+
+	struct of_changeset *ppm_ocs; /* pseudo-MAC fixed-link changeset */
 };
 
 #define phylink_to_enetc_pf(config) \
