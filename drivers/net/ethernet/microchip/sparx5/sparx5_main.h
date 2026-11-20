@@ -788,6 +788,7 @@ int sparx5_tas_enable(struct sparx5_port *port,
 		      struct tc_taprio_qopt_offload *qopt);
 int sparx5_tas_disable(struct sparx5_port *port);
 void sparx5_tas_speed(struct sparx5_port *port, int speed);
+void sparx5_tas_gb_update(struct sparx5 *sparx5);
 
 /* sparx5_mirror.c */
 int sparx5_mirror_add(struct sparx5_mall_entry *entry);

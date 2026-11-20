@@ -5611,6 +5611,18 @@ extern const struct sparx5_regs *regs;
 #define HSCH_TAS_STATEMACHINE_CFG_REVISIT_DLY_GET(x)\
 	FIELD_GET(HSCH_TAS_STATEMACHINE_CFG_REVISIT_DLY, x)
 
+/* HSCH:TAS_PROFILE_CFG:TAS_QMAXSDU_CFG */
+#define HSCH_TAS_QMAXSDU_CFG(g, r)                                             \
+	__REG(TARGET_HSCH, 0, 1, regs->gaddr[GA_HSCH_TAS_PROFILE_CFG], g,       \
+	      regs->gcnt[GC_HSCH_TAS_PROFILE_CFG],                              \
+	      regs->gsize[GW_HSCH_TAS_PROFILE_CFG], 0, r, 8, 4)
+
+#define HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL         GENMASK(7, 0)
+#define HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL_SET(x)\
+	FIELD_PREP(HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL, x)
+#define HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL_GET(x)\
+	FIELD_GET(HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL, x)
+
 /* HSCH:TAS_PROFILE_CFG:TAS_PROFILE_CONFIG */
 #define HSCH_TAS_PROFILE_CONFIG(g)                                             \
 	__REG(TARGET_HSCH, 0, 1, regs->gaddr[GA_HSCH_TAS_PROFILE_CFG], g,       \
