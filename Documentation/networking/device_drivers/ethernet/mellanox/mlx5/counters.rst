@@ -930,7 +930,7 @@ like flow control, FEC and more.
    * - `rx_crc_errors_phy`
      - The number of dropped received packets due to FCS (Frame Check Sequence)
        error on the physical port. If this counter is increased in high rate,
-       check the link quality using `rx_symbol_error_phy` and
+       check the link quality using `rx_symbol_err_phy` and
        `rx_corrected_bits_phy` counters below.
      - Error
 
