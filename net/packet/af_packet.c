@@ -3224,6 +3224,15 @@ static int packet_release(struct socket *sock)
 
 	packet_flush_mclist(sk);
 
+	f = fanout_release(sk);
+
+	/* The socket is no longer reachable from the receive path:
+	 * unregister_prot_hook() removed it from the ptype lists and
+	 * from its fanout group, if any. Wait once for packets currently
+	 * being received, this covers the rings, po->rollover and @f.
+	 */
+	synchronize_net();
+
 	lock_sock(sk);
 	if (po->rx_ring.pg_vec) {
 		memset(&req_u, 0, sizeof(req_u));
@@ -3235,10 +3244,6 @@ static int packet_release(struct socket *sock)
 		packet_set_ring(sk, &req_u, 1, 1);
 	}
 	release_sock(sk);
-
-	f = fanout_release(sk);
-
-	synchronize_net();
 
 	kfree(po->rollover);
 	if (f) {
@@ -4674,7 +4679,9 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 
 	spin_unlock(&po->bind_lock);
 
-	synchronize_net();
+	/* packet_release() already detached the socket and waited. */
+	if (!closing)
+		synchronize_net();
 
 	err = -EBUSY;
 	mutex_lock(&po->pg_vec_lock);

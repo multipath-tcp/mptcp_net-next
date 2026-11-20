@@ -522,7 +522,7 @@ void batadv_interface_rx(struct net_device *mesh_iface,
 	 * not handle it, we can safely push it up.
 	 */
 	if (batadv_bla_rx(bat_priv, skb, vid, packet_type))
-		goto out;
+		goto dropped;
 
 	if (orig_node)
 		batadv_tt_add_temporary_global_entry(bat_priv, orig_node,
@@ -547,12 +547,10 @@ void batadv_interface_rx(struct net_device *mesh_iface,
 	}
 
 	netif_rx(skb);
-	goto out;
+	return;
 
 dropped:
 	kfree_skb(skb);
-out:
-	return;
 }
 
 /**
