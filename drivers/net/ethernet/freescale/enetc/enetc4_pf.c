@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-/* Copyright 2024 NXP */
+/* Copyright 2024, 2026 NXP */
 
 #include <linux/clk.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/of_net.h>
 #include <linux/of_platform.h>
 #include <linux/unaligned.h>
@@ -932,6 +933,14 @@ static void enetc4_pl_mac_link_down(struct phylink_config *config,
 	enetc4_mac_tx_graceful_stop(pf);
 }
 
+static void enetc4_get_pcr_speed(struct enetc_hw *hw, int *speed)
+{
+	u32 val = enetc_port_rd(hw, ENETC4_PCR);
+	int pspeed = FIELD_GET(PCR_PSPEED, val);
+
+	*speed = (pspeed + 1) * 10;
+}
+
 static const struct phylink_mac_ops enetc_pl_mac_ops = {
 	.mac_select_pcs = enetc4_pl_mac_select_pcs,
 	.mac_config = enetc4_pl_mac_config,
@@ -946,23 +955,108 @@ static void enetc4_pci_remove(void *data)
 	enetc_pci_remove(pdev);
 }
 
+static void enetc4_put_ppm_fixed_link(struct enetc_pf *pf)
+{
+	if (!pf->ppm_ocs)
+		return;
+
+	of_changeset_revert(pf->ppm_ocs);
+	of_changeset_destroy(pf->ppm_ocs);
+	kfree(pf->ppm_ocs);
+	pf->ppm_ocs = NULL;
+}
+
+/* Pseudo-MAC ports have no real PHY; the link is fixed, with the operating
+ * speed set at probe time from PCR[PSPEED]. Describe this with a fixed-link
+ * subnode synthesized at runtime onto the port's own OF node, so phylink
+ * picks it up through dev_fwnode() exactly as if it came from static DT.
+ */
+static int enetc4_add_ppm_fixed_link(struct enetc_pf *pf,
+				     struct device_node *np)
+{
+	struct device_node *fixed_link;
+	struct of_changeset *ocs;
+	int speed, err;
+
+	enetc4_get_pcr_speed(&pf->si->hw, &speed);
+	speed = enetc_phylink_match_pseudo_mac_speed(speed);
+
+	ocs = kzalloc_obj(*ocs);
+	if (!ocs)
+		return -ENOMEM;
+
+	of_changeset_init(ocs);
+
+	fixed_link = of_changeset_create_node(ocs, np, "fixed-link");
+	if (!fixed_link) {
+		err = -ENOMEM;
+		goto err_destroy;
+	}
+
+	err = of_changeset_add_prop_u32(ocs, fixed_link, "speed", speed);
+	if (err)
+		goto err_put_node;
+
+	err = of_changeset_add_prop_bool(ocs, fixed_link, "full-duplex");
+	if (err)
+		goto err_put_node;
+
+	err = of_changeset_apply(ocs);
+	if (err)
+		goto err_put_node;
+
+	of_node_put(fixed_link);
+	pf->ppm_ocs = ocs;
+
+	return 0;
+
+err_put_node:
+	of_node_put(fixed_link);
+err_destroy:
+	of_changeset_destroy(ocs);
+	kfree(ocs);
+
+	return err;
+}
+
 static int enetc4_link_init(struct enetc_ndev_priv *priv,
 			    struct device_node *node)
 {
+	bool dynamic = node && of_node_check_flag(node, OF_DYNAMIC);
 	struct enetc_pf *pf = enetc_si_priv(priv->si);
 	struct device *dev = priv->dev;
 	int err;
 
-	err = of_get_phy_mode(node, &pf->if_mode);
-	if (err) {
-		dev_err(dev, "Failed to get PHY mode\n");
-		return err;
+	/* Pseudo-MAC ENETCs are described by a runtime-synthesized fixed-link
+	 * node rather than static DT. This covers both a missing OF node and a
+	 * PCI-synthesized (OF_DYNAMIC) node, which is an empty node created
+	 * by the PCI core and thus carries no fixed-link description.
+	 */
+	if (enetc_is_pseudo_mac(priv->si) && (!node || dynamic)) {
+		pf->if_mode = PHY_INTERFACE_MODE_INTERNAL;
+
+		if (!node) {
+			dev_err(dev, "Missing of_node for Pseudo-MAC port\n");
+			return -ENODEV;
+		}
+
+		err = enetc4_add_ppm_fixed_link(pf, node);
+		if (err) {
+			dev_err(dev, "Failed to add fixed-link node\n");
+			return err;
+		}
+	} else {
+		err = of_get_phy_mode(node, &pf->if_mode);
+		if (err) {
+			dev_err(dev, "Failed to get PHY mode\n");
+			return err;
+		}
 	}
 
 	err = enetc_mdiobus_create(pf, node);
 	if (err) {
 		dev_err(dev, "Failed to create MDIO bus\n");
-		return err;
+		goto err_mdiobus_create;
 	}
 
 	err = enetc_phylink_create(priv, node, &enetc_pl_mac_ops);
@@ -975,6 +1069,8 @@ static int enetc4_link_init(struct enetc_ndev_priv *priv,
 
 err_phylink_create:
 	enetc_mdiobus_destroy(pf);
+err_mdiobus_create:
+	enetc4_put_ppm_fixed_link(pf);
 
 	return err;
 }
@@ -985,6 +1081,7 @@ static void enetc4_link_deinit(struct enetc_ndev_priv *priv)
 
 	enetc_phylink_destroy(priv);
 	enetc_mdiobus_destroy(pf);
+	enetc4_put_ppm_fixed_link(pf);
 }
 
 static void enetc4_pf_link_status_task(struct work_struct *work)
