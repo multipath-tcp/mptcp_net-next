@@ -21,7 +21,7 @@
 /**
  * typedef batadv_hashdata_compare_cb - hash element comparison callback
  * @node: hlist node of the element currently stored in the bucket
- * @key: opaque payload to compare @node's key against
+ * @key: key to compare @node's key against
  *
  * Compare hash element by its keys.
  *
@@ -32,7 +32,7 @@ typedef bool (*batadv_hashdata_compare_cb)(const struct hlist_node *node,
 
 /**
  * typedef batadv_hashdata_choose_cb - hash bucket selection callback
- * @key: opaque payload whose key selects the bucket
+ * @key: key which selects the bucket
  * @size: number of buckets in the hash table
  *
  * Return: bucket index derived from the key in @key and the table @size.
@@ -66,7 +66,7 @@ struct batadv_hashtable {
 };
 
 /* allocates and clears the hash */
-struct batadv_hashtable *batadv_hash_new(u32 size);
+struct batadv_hashtable * __must_check batadv_hash_new(u32 size);
 
 /* set class key for all locks */
 void batadv_hash_set_lock_class(struct batadv_hashtable *hash,
@@ -80,7 +80,8 @@ void batadv_hash_destroy(struct batadv_hashtable *hash);
  *	@hash: storage hash table
  *	@compare: callback to determine if 2 hash elements are identical
  *	@choose: callback calculating the hash index
- *	@data: data passed to the aforementioned callbacks as argument
+ *	@data: key of the element to add (the key embedded in the element),
+ *	 passed to the aforementioned callbacks as argument
  *	@data_node: to be added element
  *
  *	Return: 0 on success, 1 if the element already is in the hash
@@ -132,10 +133,8 @@ out:
  * @hash: hash table
  * @compare: callback to determine if 2 hash elements are identical
  * @choose: callback calculating the hash index
- * @data: data passed to the aforementioned callbacks as argument
- *
- * data could be the structure you use with just the key filled, we just need
- * the key for comparing.
+ * @data: key of the element to remove, passed to the aforementioned callbacks
+ *  as argument
  *
  * Return: returns pointer to hlist_node on success, so you can remove the used
  * structure yourself, or NULL on error

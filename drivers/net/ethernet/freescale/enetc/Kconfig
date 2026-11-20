@@ -49,12 +49,14 @@ config NXP_ENETC4
 	tristate "ENETC4 PF driver"
 	depends on PTP_1588_CLOCK_OPTIONAL
 	depends on PCI_MSI
+	depends on OF
 	select FSL_ENETC_CORE
 	select FSL_ENETC_MDIO
 	select NXP_ENETC_PF_COMMON
 	select NXP_NTMP
 	select PHYLINK
 	select DIMLIB
+	select OF_DYNAMIC
 	help
 	  This driver supports NXP ENETC devices with major revision 4. ENETC is
 	  as the NIC functionality in NETC, it supports virtualization/isolation

@@ -131,6 +131,8 @@ static bool batadv_frag_init_chain(struct batadv_frag_table_entry *chain,
  * Insert a new fragment into the reverse ordered chain in the right table
  * entry. The hash table entry is cleared if "old" fragments exist in it.
  *
+ * The skb is always consumed by this function.
+ *
  * Return: true if skb is buffered, false on error. If the chain has all the
  * fragments needed to merge the packet, the chain is moved to the passed head
  * to avoid locking the chain in the table.
@@ -257,7 +259,7 @@ err:
  *
  * Return: the merged skb or NULL on error.
  */
-static struct sk_buff *
+static struct sk_buff * __must_check
 batadv_frag_merge_packets(struct hlist_head *chain)
 {
 	int hdr_size = sizeof(struct batadv_frag_packet);
@@ -385,70 +387,79 @@ out_err:
 }
 
 /**
- * batadv_frag_skb_fwd() - forward fragments that would exceed MTU when merged
- * @skb: skb to forward
+ * batadv_frag_fwd_neigh_get() - get next-hop for fragments that would exceed
+ *  MTU when merged
+ * @skb: received fragment
  * @recv_if: interface that the skb is received on
- * @orig_node_src: originator that the skb is received from
- * @rx_result: set to NET_RX_SUCCESS when the fragment was forwarded and
- *  NET_RX_DROP when it was dropped; only valid when true is returned
  *
  * Look up the next-hop of the fragments payload and check if the merged packet
- * will exceed the MTU towards the next-hop. If so, the fragment is forwarded
- * without merging it.
+ * will exceed the MTU towards the next-hop.
  *
- * Return: true if the fragment is consumed/forwarded, false otherwise.
+ * Return: the next-hop neighbor (with increased refcounter) when the fragment
+ * has to be forwarded without merging it, NULL otherwise
  */
-bool batadv_frag_skb_fwd(struct sk_buff *skb,
-			 struct batadv_hard_iface *recv_if,
-			 struct batadv_orig_node *orig_node_src,
-			 int *rx_result)
+struct batadv_neigh_node *
+batadv_frag_fwd_neigh_get(const struct sk_buff *skb,
+			  struct batadv_hard_iface *recv_if)
 {
 	struct batadv_priv *bat_priv = netdev_priv(recv_if->mesh_iface);
-	struct batadv_neigh_node *neigh_node = NULL;
-	struct batadv_frag_packet *packet;
-	bool ret = false;
+	const struct batadv_frag_packet *packet;
+	struct batadv_neigh_node *neigh_node;
 	u16 total_size;
 
-	packet = (struct batadv_frag_packet *)skb->data;
+	packet = (const struct batadv_frag_packet *)skb->data;
 
 	neigh_node = batadv_orig_to_router(bat_priv, packet->dest, recv_if);
 	if (!neigh_node)
-		goto out;
+		return NULL;
 
-	/* Forward the fragment, if the merged packet would be too big to
-	 * be assembled.
-	 */
 	total_size = ntohs(packet->total_size);
-	if (total_size > neigh_node->if_incoming->net_dev->mtu) {
-		if (packet->ttl < 2) {
-			kfree_skb(skb);
-			*rx_result = NET_RX_DROP;
-			ret = true;
-			goto out;
-		}
-
-		if (skb_cow(skb, ETH_HLEN) < 0) {
-			kfree_skb(skb);
-			*rx_result = NET_RX_DROP;
-			ret = true;
-			goto out;
-		}
-
-		packet = (struct batadv_frag_packet *)skb->data;
-
-		batadv_inc_counter(bat_priv, BATADV_CNT_FRAG_FWD);
-		batadv_add_counter(bat_priv, BATADV_CNT_FRAG_FWD_BYTES,
-				   skb->len + ETH_HLEN);
-
-		packet->ttl--;
-		batadv_send_unicast_skb(skb, neigh_node);
-		*rx_result = NET_RX_SUCCESS;
-		ret = true;
+	if (total_size <= neigh_node->if_incoming->net_dev->mtu) {
+		batadv_neigh_node_put(neigh_node);
+		return NULL;
 	}
 
-out:
-	batadv_neigh_node_put(neigh_node);
-	return ret;
+	return neigh_node;
+}
+
+/**
+ * batadv_frag_skb_fwd() - forward fragment without merging it
+ * @bat_priv: the bat priv with all the mesh interface information
+ * @skb: skb to forward
+ * @neigh_node: next-hop to forward the fragment to
+ *
+ * The skb is always consumed by this function.
+ *
+ * Return: NET_RX_SUCCESS when the fragment was forwarded and NET_RX_DROP when
+ * it was dropped
+ */
+int batadv_frag_skb_fwd(struct batadv_priv *bat_priv, struct sk_buff *skb,
+			struct batadv_neigh_node *neigh_node)
+{
+	struct batadv_frag_packet *packet;
+
+	packet = (struct batadv_frag_packet *)skb->data;
+
+	if (packet->ttl < 2)
+		goto free_skb;
+
+	if (skb_cow(skb, ETH_HLEN) < 0)
+		goto free_skb;
+
+	packet = (struct batadv_frag_packet *)skb->data;
+
+	batadv_inc_counter(bat_priv, BATADV_CNT_FRAG_FWD);
+	batadv_add_counter(bat_priv, BATADV_CNT_FRAG_FWD_BYTES,
+			   skb->len + ETH_HLEN);
+
+	packet->ttl--;
+	batadv_send_unicast_skb(skb, neigh_node);
+
+	return NET_RX_SUCCESS;
+
+free_skb:
+	kfree_skb(skb);
+	return NET_RX_DROP;
 }
 
 /**
@@ -464,10 +475,10 @@ out:
  *
  * Return: the new fragment, NULL on error.
  */
-static struct sk_buff *batadv_frag_create(struct net_device *net_dev,
-					  struct sk_buff *skb,
-					  struct batadv_frag_packet *frag_head,
-					  unsigned int fragment_size)
+static struct sk_buff * __must_check
+batadv_frag_create(struct net_device *net_dev, struct sk_buff *skb,
+		   struct batadv_frag_packet *frag_head,
+		   unsigned int fragment_size)
 {
 	unsigned int ll_reserved = LL_RESERVED_SPACE(net_dev);
 	unsigned int tailroom = net_dev->needed_tailroom;
