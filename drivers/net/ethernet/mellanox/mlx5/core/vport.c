@@ -1308,10 +1308,37 @@ u64 mlx5_query_nic_system_image_guid(struct mlx5_core_dev *mdev)
 }
 EXPORT_SYMBOL_GPL(mlx5_query_nic_system_image_guid);
 
+static u8 mlx5_sw_guid_load_balance(const struct mlx5_core_dev *mdev)
+{
+	if (MLX5_CAP_GEN_2(mdev, load_balance_id) &&
+	    MLX5_CAP_GEN_2(mdev, lag_per_mp_group))
+		return MLX5_CAP_GEN_2(mdev, load_balance_id);
+	return 0;
+}
+
+static u8 mlx5_sw_guid_sf(const struct mlx5_core_dev *mdev)
+{
+	return mlx5_core_is_sf(mdev) && mlx5_virt_lag_is_supported(mdev);
+}
+
+static u8 mlx5_sw_guid_vf(const struct mlx5_core_dev *mdev)
+{
+	return mlx5_core_is_vf(mdev) && mlx5_virt_lag_is_supported(mdev);
+}
+
+static u8 (* const mlx5_sw_guid_fields[])(const struct mlx5_core_dev *mdev) = {
+	mlx5_sw_guid_load_balance,
+	mlx5_sw_guid_vf,
+	mlx5_sw_guid_sf,
+	/* New fields should be added at the end */
+};
+
 void mlx5_query_nic_sw_system_image_guid(struct mlx5_core_dev *mdev, u8 *buf,
 					 u8 *len)
 {
 	u64 fw_system_image_guid;
+	u8 trim_len;
+	int i;
 
 	*len = 0;
 
@@ -1321,10 +1348,17 @@ void mlx5_query_nic_sw_system_image_guid(struct mlx5_core_dev *mdev, u8 *buf,
 
 	memcpy(buf, &fw_system_image_guid, sizeof(fw_system_image_guid));
 	*len += sizeof(fw_system_image_guid);
+	trim_len = *len;
 
-	if (MLX5_CAP_GEN_2(mdev, load_balance_id) &&
-	    MLX5_CAP_GEN_2(mdev, lag_per_mp_group))
-		buf[(*len)++] = MLX5_CAP_GEN_2(mdev, load_balance_id);
+	for (i = 0; i < ARRAY_SIZE(mlx5_sw_guid_fields); i++) {
+		u8 val = mlx5_sw_guid_fields[i](mdev);
+
+		buf[(*len)++] = val;
+		if (val)
+			trim_len = *len;
+	}
+
+	*len = trim_len;
 }
 
 bool mlx5_vport_use_vhca_id_as_func_id(struct mlx5_core_dev *dev,

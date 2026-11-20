@@ -389,7 +389,7 @@ void rds_recv_incoming(struct rds_connection *conn, struct in6_addr *saddr,
 	}
 	cp->cp_next_rx_seq = be64_to_cpu(inc->i_hdr.h_sequence) + 1;
 
-	if (rds_sysctl_ping_enable && inc->i_hdr.h_dport == 0) {
+	if (READ_ONCE(rds_sysctl_ping_enable) && inc->i_hdr.h_dport == 0) {
 		if (inc->i_hdr.h_sport == 0) {
 			rdsdebug("ignore ping with 0 sport from %pI6c\n",
 				 saddr);
