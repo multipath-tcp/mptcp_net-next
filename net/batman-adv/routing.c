@@ -542,7 +542,7 @@ static int batadv_check_unicast_packet(struct batadv_priv *bat_priv,
  *
  * The object is returned with refcounter increased by 1.
  */
-static struct batadv_orig_ifinfo *
+static struct batadv_orig_ifinfo * __must_check
 batadv_last_bonding_get(struct batadv_orig_node *orig_node)
 {
 	struct batadv_orig_ifinfo *last_bonding_candidate;
@@ -1109,11 +1109,12 @@ int batadv_recv_unicast_packet(struct sk_buff *skb,
 		}
 
 		if (batadv_dat_snoop_incoming_arp_request(bat_priv, skb,
-							  hdr_size))
+							  hdr_size) ||
+		    batadv_dat_snoop_incoming_arp_reply(bat_priv, skb,
+							hdr_size)) {
+			kfree_skb(skb);
 			goto rx_success;
-		if (batadv_dat_snoop_incoming_arp_reply(bat_priv, skb,
-							hdr_size))
-			goto rx_success;
+		}
 
 		batadv_dat_snoop_incoming_dhcp_ack(bat_priv, skb, hdr_size);
 
@@ -1205,6 +1206,7 @@ int batadv_recv_frag_packet(struct sk_buff *skb,
 	struct batadv_priv *bat_priv = netdev_priv(recv_if->mesh_iface);
 	struct batadv_orig_node *orig_node_src = NULL;
 	struct batadv_frag_packet *frag_packet;
+	struct batadv_neigh_node *neigh_node;
 	int ret = NET_RX_DROP;
 
 	if (batadv_check_unicast_packet(bat_priv, skb,
@@ -1219,11 +1221,15 @@ int batadv_recv_frag_packet(struct sk_buff *skb,
 	skb->priority = frag_packet->priority + 256;
 
 	/* Route the fragment if it is not for us and too big to be merged. */
-	if (!batadv_is_my_mac(bat_priv, frag_packet->dest) &&
-	    batadv_frag_skb_fwd(skb, recv_if, orig_node_src, &ret)) {
-		/* skb was consumed */
-		skb = NULL;
-		goto put_orig_node;
+	if (!batadv_is_my_mac(bat_priv, frag_packet->dest)) {
+		neigh_node = batadv_frag_fwd_neigh_get(skb, recv_if);
+		if (neigh_node) {
+			ret = batadv_frag_skb_fwd(bat_priv, skb, neigh_node);
+			batadv_neigh_node_put(neigh_node);
+			/* skb was consumed */
+			skb = NULL;
+			goto put_orig_node;
+		}
 	}
 
 	batadv_inc_counter(bat_priv, BATADV_CNT_FRAG_RX);
@@ -1351,10 +1357,11 @@ int batadv_recv_bcast_packet(struct sk_buff *skb,
 	if (batadv_bla_is_backbone_gw(skb, orig_node, hdr_size))
 		goto free_skb;
 
-	if (batadv_dat_snoop_incoming_arp_request(bat_priv, skb, hdr_size))
+	if (batadv_dat_snoop_incoming_arp_request(bat_priv, skb, hdr_size) ||
+	    batadv_dat_snoop_incoming_arp_reply(bat_priv, skb, hdr_size)) {
+		kfree_skb(skb);
 		goto rx_success;
-	if (batadv_dat_snoop_incoming_arp_reply(bat_priv, skb, hdr_size))
-		goto rx_success;
+	}
 
 	batadv_dat_snoop_incoming_dhcp_ack(bat_priv, skb, hdr_size);
 
