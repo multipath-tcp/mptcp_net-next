@@ -50,7 +50,7 @@ static int mlx5_lag_create_port_sel_table(struct mlx5_lag *ldev,
 	if (first_idx < 0)
 		return -EINVAL;
 
-	dev = mlx5_lag_pf(ldev, first_idx)->dev;
+	dev = mlx5_lag_fn(ldev, first_idx)->dev;
 	ft_attr.max_fte = ldev->ports * ldev->buckets;
 	ft_attr.level = MLX5_LAG_FT_LEVEL_DEFINER;
 
@@ -79,6 +79,7 @@ static int mlx5_lag_create_port_sel_table(struct mlx5_lag *ldev,
 	flow_act.flags |= FLOW_ACT_NO_APPEND;
 	mlx5_ldev_for_each(i, 0, ldev) {
 		for (j = 0; j < ldev->buckets; j++) {
+			struct mlx5_core_dev *mdev;
 			u8 affinity;
 
 			idx = i * ldev->buckets + j;
@@ -87,9 +88,8 @@ static int mlx5_lag_create_port_sel_table(struct mlx5_lag *ldev,
 			/* affinity is 1-indexed device index,
 			 * use reverse lookup.
 			 */
-			dest.vport.vhca_id =
-				MLX5_CAP_GEN(mlx5_lag_pf_by_dev_idx(ldev, affinity - 1)->dev,
-					     vhca_id);
+			mdev = mlx5_lag_fn_by_dev_idx(ldev, affinity - 1)->dev;
+			dest.vport.vhca_id = MLX5_CAP_GEN(mdev, vhca_id);
 			lag_definer->rules[idx] = mlx5_add_flow_rules(lag_definer->ft,
 								      NULL, &flow_act,
 								      &dest, 1);
@@ -311,7 +311,7 @@ mlx5_lag_create_definer(struct mlx5_lag *ldev, enum netdev_lag_hash hash,
 	if (first_idx < 0)
 		return ERR_PTR(-EINVAL);
 
-	dev = mlx5_lag_pf(ldev, first_idx)->dev;
+	dev = mlx5_lag_fn(ldev, first_idx)->dev;
 	lag_definer = kzalloc_obj(*lag_definer);
 	if (!lag_definer)
 		return ERR_PTR(-ENOMEM);
@@ -360,7 +360,7 @@ static void mlx5_lag_destroy_definer(struct mlx5_lag *ldev,
 	if (first_idx < 0)
 		return;
 
-	dev = mlx5_lag_pf(ldev, first_idx)->dev;
+	dev = mlx5_lag_fn(ldev, first_idx)->dev;
 	mlx5_ldev_for_each(i, 0, ldev) {
 		for (j = 0; j < ldev->buckets; j++) {
 			idx = i * ldev->buckets + j;
@@ -524,7 +524,7 @@ static int mlx5_lag_create_ttc_table(struct mlx5_lag *ldev)
 	if (first_idx < 0)
 		return -EINVAL;
 
-	dev = mlx5_lag_pf(ldev, first_idx)->dev;
+	dev = mlx5_lag_fn(ldev, first_idx)->dev;
 	mlx5_lag_set_outer_ttc_params(ldev, &ttc_params);
 	port_sel->outer.ttc = mlx5_create_ttc_table(dev, &ttc_params);
 	return PTR_ERR_OR_ZERO(port_sel->outer.ttc);
@@ -540,7 +540,7 @@ static int mlx5_lag_create_inner_ttc_table(struct mlx5_lag *ldev)
 	if (first_idx < 0)
 		return -EINVAL;
 
-	dev = mlx5_lag_pf(ldev, first_idx)->dev;
+	dev = mlx5_lag_fn(ldev, first_idx)->dev;
 	mlx5_lag_set_inner_ttc_params(ldev, &ttc_params);
 	port_sel->inner.ttc = mlx5_create_inner_ttc_table(dev, &ttc_params);
 	return PTR_ERR_OR_ZERO(port_sel->inner.ttc);
@@ -594,6 +594,9 @@ static int __mlx5_lag_modify_definers_destinations(struct mlx5_lag *ldev,
 
 	mlx5_ldev_for_each(i, 0, ldev) {
 		for (j = 0; j < ldev->buckets; j++) {
+			struct mlx5_core_dev *mdev;
+			u8 affinity;
+
 			idx = i * ldev->buckets + j;
 			if (ldev->v2p_map[idx] == ports[idx])
 				continue;
@@ -601,9 +604,9 @@ static int __mlx5_lag_modify_definers_destinations(struct mlx5_lag *ldev,
 			/* ports[] contains 1-indexed device indices,
 			 * use reverse lookup.
 			 */
-			dest.vport.vhca_id =
-				MLX5_CAP_GEN(mlx5_lag_pf_by_dev_idx(ldev, ports[idx] - 1)->dev,
-					     vhca_id);
+			affinity = ports[idx];
+			mdev = mlx5_lag_fn_by_dev_idx(ldev, affinity - 1)->dev;
+			dest.vport.vhca_id = MLX5_CAP_GEN(mdev, vhca_id);
 			err = mlx5_modify_rule_destination(def->rules[idx], &dest, NULL);
 			if (err)
 				return err;

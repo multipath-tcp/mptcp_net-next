@@ -82,7 +82,8 @@ static void ip6_frag_expire(struct timer_list *t)
 }
 
 static struct frag_queue *
-fq_find(struct net *net, __be32 id, const struct ipv6hdr *hdr, int iif)
+fq_find(struct net *net, __be32 id, const struct ipv6hdr *hdr, int iif,
+	enum skb_drop_reason *reason)
 {
 	struct frag_v6_compare_key key = {
 		.id = id,
@@ -97,7 +98,7 @@ fq_find(struct net *net, __be32 id, const struct ipv6hdr *hdr, int iif)
 					    IPV6_ADDR_LINKLOCAL)))
 		key.iif = 0;
 
-	q = inet_frag_find(net->ipv6.fqdir, &key);
+	q = inet_frag_find(net->ipv6.fqdir, &key, reason);
 	if (!q)
 		return NULL;
 
@@ -337,6 +338,7 @@ static int ipv6_frag_rcv(struct sk_buff *skb)
 	struct inet6_dev *idev;
 	struct frag_hdr *fhdr;
 	struct frag_queue *fq;
+	SKB_DR(reason);
 	u8 nexthdr;
 	int iif;
 
@@ -385,7 +387,7 @@ static int ipv6_frag_rcv(struct sk_buff *skb)
 
 	iif = skb->dev ? skb->dev->ifindex : 0;
 	rcu_read_lock();
-	fq = fq_find(net, fhdr->identification, hdr, iif);
+	fq = fq_find(net, fhdr->identification, hdr, iif, &reason);
 	if (fq) {
 		u32 prob_offset = 0;
 		int ret, refs = 0;
@@ -409,7 +411,7 @@ static int ipv6_frag_rcv(struct sk_buff *skb)
 	rcu_read_unlock();
 
 	__IP6_INC_STATS(net, idev, IPSTATS_MIB_REASMFAILS);
-	kfree_skb(skb);
+	kfree_skb_reason(skb, reason);
 	return -1;
 
 fail_hdr:
