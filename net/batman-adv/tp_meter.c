@@ -264,7 +264,7 @@ static void batadv_tp_batctl_error_notify(enum batadv_tp_meter_reason reason,
  *
  * Return: matching tp_vars or NULL when no tp_vars with @dst was found
  */
-static struct batadv_tp_sender *
+static struct batadv_tp_sender * __must_check
 batadv_tp_list_find_sender(struct batadv_priv *bat_priv, const u8 *dst)
 {
 	struct batadv_tp_sender *tp_vars = NULL;
@@ -329,7 +329,7 @@ static bool batadv_tp_list_active(struct batadv_priv *bat_priv, const u8 *dst)
  *
  * Return: matching tp_vars or NULL when no tp_vars was found
  */
-static struct batadv_tp_sender *
+static struct batadv_tp_sender * __must_check
 batadv_tp_list_find_sender_session(struct batadv_priv *bat_priv, const u8 *dst,
 				   const u8 *session)
 {
@@ -1212,7 +1212,7 @@ out_put_orig_node:
  *
  * Return: matching tp_vars or NULL when no tp_vars was found
  */
-static struct batadv_tp_receiver *
+static struct batadv_tp_receiver * __must_check
 batadv_tp_list_find_receiver_session(struct batadv_priv *bat_priv, const u8 *dst,
 				     const u8 *session)
 {
@@ -1569,7 +1569,7 @@ static void batadv_tp_ack_unordered(struct batadv_tp_receiver *tp_vars)
  *
  * Return: corresponding tp_vars or NULL on errors
  */
-static struct batadv_tp_receiver *
+static struct batadv_tp_receiver * __must_check
 batadv_tp_init_recv(struct batadv_priv *bat_priv,
 		    const struct batadv_icmp_tp_packet *icmp)
 {
