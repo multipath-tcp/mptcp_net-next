@@ -137,7 +137,7 @@ static u8 batadv_ring_buffer_avg(const u8 lq_recv[])
  * on failure.
  * If the object does not exist, it is created and initialised.
  */
-static struct batadv_orig_node *
+static struct batadv_orig_node * __must_check
 batadv_iv_ogm_orig_get(struct batadv_priv *bat_priv, const u8 *addr)
 {
 	struct batadv_orig_node *orig_node;
@@ -155,7 +155,7 @@ batadv_iv_ogm_orig_get(struct batadv_priv *bat_priv, const u8 *addr)
 
 	kref_get(&orig_node->refcount);
 	hash_added = batadv_hash_add(bat_priv->orig_hash, batadv_compare_orig,
-				     batadv_choose_orig, orig_node,
+				     batadv_choose_orig, orig_node->orig,
 				     &orig_node->hash_entry);
 	if (hash_added != 0)
 		goto free_orig_node_hash;
@@ -179,7 +179,7 @@ free_orig_node_hash:
  *
  * Return: pointer to the neigh_node or NULL in case of failure
  */
-static struct batadv_neigh_node *
+static struct batadv_neigh_node * __must_check
 batadv_iv_ogm_neigh_new(struct batadv_hard_iface *hard_iface,
 			const u8 *neigh_addr,
 			struct batadv_orig_node *orig_node)
@@ -647,10 +647,8 @@ static bool batadv_iv_ogm_aggregate_new(const unsigned char *packet_buff,
 	queue_left = own_packet ? NULL : &bat_priv->batman_queue_left;
 	forw_packet_aggr = batadv_forw_packet_alloc(if_incoming, if_outgoing,
 						    queue_left, bat_priv, skb);
-	if (!forw_packet_aggr) {
-		kfree_skb(skb);
+	if (!forw_packet_aggr)
 		return false;
-	}
 
 	forw_packet_aggr->skb->priority = TC_PRIO_CONTROL;
 	skb_reserve(forw_packet_aggr->skb, ETH_HLEN);
@@ -1486,7 +1484,7 @@ out:
  * Return: A neighbor node which is the best router towards the given originator
  * address. Bonding candidates are ignored.
  */
-static struct batadv_neigh_node *
+static struct batadv_neigh_node * __must_check
 batadv_orig_to_direct_router(struct batadv_priv *bat_priv, const u8 *orig_addr,
 			     struct batadv_hard_iface *if_outgoing)
 {
@@ -2492,7 +2490,7 @@ static void batadv_iv_init_sel_class(struct batadv_priv *bat_priv)
  * Return: gateway node with the highest score for the current selection class,
  *  or NULL if no eligible gateway exists.
  */
-static struct batadv_gw_node *
+static struct batadv_gw_node * __must_check
 batadv_iv_gw_get_best_gw_node(struct batadv_priv *bat_priv)
 {
 	struct batadv_neigh_ifinfo *router_ifinfo;
