@@ -180,6 +180,7 @@ struct sparx5_tx_buf {
 	dma_addr_t dma_addr;
 	bool used;
 	bool ptp;
+	u32 len;
 };
 
 /* Frame DMA transmit state:
