@@ -19,6 +19,13 @@ struct mlx5_sf_dev {
 	u16 fn_id;
 };
 
+static inline u32 mlx5_sf_coredev_sfnum(struct mlx5_core_dev *mdev)
+{
+	struct auxiliary_device *adev = mlx5_sf_coredev_to_adev(mdev);
+
+	return container_of(adev, struct mlx5_sf_dev, adev)->sfnum;
+}
+
 struct mlx5_sf_peer_devlink_event_ctx {
 	u16 fn_id;
 	struct devlink *devlink;
@@ -66,6 +73,11 @@ static inline void mlx5_sf_driver_unregister(void)
 static inline bool mlx5_sf_dev_allocated(const struct mlx5_core_dev *dev)
 {
 	return false;
+}
+
+static inline u32 mlx5_sf_coredev_sfnum(struct mlx5_core_dev *mdev)
+{
+	return 0;
 }
 
 #endif
