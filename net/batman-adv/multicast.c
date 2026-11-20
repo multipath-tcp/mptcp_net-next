@@ -81,7 +81,8 @@ static void batadv_mcast_start_timer(struct batadv_priv *bat_priv)
  * Return: NULL if no such bridge exists. Otherwise the net device of the
  * bridge.
  */
-static struct net_device *batadv_mcast_get_bridge(struct net_device *mesh_iface)
+static struct net_device * __must_check
+batadv_mcast_get_bridge(struct net_device *mesh_iface)
 {
 	struct net_device *upper = mesh_iface;
 
