@@ -40,11 +40,11 @@
 #include <net/route.h>
 #include <net/inet_common.h>
 #include <net/checksum.h>
+#include <net/addrconf.h>
 
 #if IS_ENABLED(CONFIG_IPV6)
 #include <linux/in6.h>
 #include <linux/icmpv6.h>
-#include <net/addrconf.h>
 #include <net/ipv6.h>
 #include <net/transp_v6.h>
 #endif
@@ -439,12 +439,8 @@ int ping_bind(struct sock *sk, struct sockaddr_unsized *uaddr, int addr_len)
 		 sk->sk_bound_dev_if);
 
 	err = 0;
-	if (sk->sk_family == AF_INET && isk->inet_rcv_saddr)
+	if (!inet_rcv_saddr_any(sk))
 		sk->sk_userlocks |= SOCK_BINDADDR_LOCK;
-#if IS_ENABLED(CONFIG_IPV6)
-	if (sk->sk_family == AF_INET6 && !ipv6_addr_any(&sk->sk_v6_rcv_saddr))
-		sk->sk_userlocks |= SOCK_BINDADDR_LOCK;
-#endif
 
 	if (snum)
 		sk->sk_userlocks |= SOCK_BINDPORT_LOCK;
