@@ -12,5 +12,6 @@ mpnic-y := \
 	mpnic_irq.o \
 	mpnic_netdev.o \
 	mpnic_pci.o \
+	mpnic_rpc.o \
 	mpnic_txrx.o \
 # End of mpnic-y
