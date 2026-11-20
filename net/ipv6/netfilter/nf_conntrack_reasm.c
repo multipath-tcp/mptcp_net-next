@@ -159,7 +159,7 @@ static struct frag_queue *fq_find(struct net *net, __be32 id, u32 user,
 					    IPV6_ADDR_LINKLOCAL)))
 		key.iif = 0;
 
-	q = inet_frag_find(nf_frag->fqdir, &key);
+	q = inet_frag_find(nf_frag->fqdir, &key, NULL);
 	if (!q)
 		return NULL;
 

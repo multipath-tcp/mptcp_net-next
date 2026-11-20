@@ -688,12 +688,24 @@ static int aqr107_set_tunable(struct phy_device *phydev,
 #define AQR_FW_WAIT_SLEEP_US	20000
 #define AQR_FW_WAIT_TIMEOUT_US	2000000
 
+static bool aqr_need_provision_id_check(struct phy_device *phydev)
+{
+	return phy_id_compare(phydev->drv->phy_id, PHY_ID_AQR113,
+			      phydev->drv->phy_id_mask) ||
+	       phy_id_compare(phydev->drv->phy_id, PHY_ID_AQR113C,
+			      phydev->drv->phy_id_mask);
+}
+
 /* If we configure settings whilst firmware is still initializing the chip,
  * then these settings may be overwritten. Therefore make sure chip
  * initialization has completed. Use presence of the firmware ID as
  * indicator for initialization having completed.
  * The chip also provides a "reset completed" bit, but it's cleared after
  * read. Therefore function would time out if called again.
+ *
+ * On AQR113 and AQR113C, additionally wait for the provisioning ID to
+ * become non-zero, indicating that firmware provisioning is complete.
+ * Without this polling, link issue can be seen after phy boot.
  */
 int aqr_wait_reset_complete(struct phy_device *phydev)
 {
@@ -709,7 +721,26 @@ int aqr_wait_reset_complete(struct phy_device *phydev)
 		return val;
 	}
 
-	return ret;
+	if (ret)
+		return ret;
+
+	if (aqr_need_provision_id_check(phydev)) {
+		ret = read_poll_timeout(phy_read_mmd, val,
+					val < 0 ||
+					FIELD_GET(VEND1_GLOBAL_RSVD_STAT1_PROV_ID, val),
+					AQR_FW_WAIT_SLEEP_US, AQR_FW_WAIT_TIMEOUT_US,
+					false, phydev, MDIO_MMD_VEND1,
+					VEND1_GLOBAL_RSVD_STAT1);
+		if (val < 0) {
+			phydev_err(phydev, "Failed to read VEND1_GLOBAL_RSVD_STAT1: %pe\n",
+				   ERR_PTR(val));
+			return val;
+		}
+		if (ret)
+			phydev_warn(phydev, "Firmware provisioning ID not ready\n");
+	}
+
+	return 0;
 }
 
 static int aqr_build_fingerprint(struct phy_device *phydev)

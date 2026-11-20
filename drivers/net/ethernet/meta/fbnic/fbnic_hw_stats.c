@@ -22,6 +22,10 @@ static void fbnic_hw_stat_rd32(struct fbnic_dev *fbd, u32 reg,
 	u32 new_reg_value;
 
 	new_reg_value = rd32(fbd, reg);
+	/* A failed read disables CSR access and returns all ones */
+	if (!fbnic_present(fbd))
+		return;
+
 	stat->value += new_reg_value - stat->u.old_reg_value_32;
 	stat->u.old_reg_value_32 = new_reg_value;
 }
@@ -68,6 +72,10 @@ static void fbnic_hw_stat_rd64(struct fbnic_dev *fbd, u32 reg, s32 offset,
 	u64 new_reg_value;
 
 	new_reg_value = fbnic_stat_rd64(fbd, reg, offset);
+	/* A failed read disables CSR access and returns all ones */
+	if (!fbnic_present(fbd))
+		return;
+
 	stat->value += new_reg_value - stat->u.old_reg_value_64;
 	stat->u.old_reg_value_64 = new_reg_value;
 }

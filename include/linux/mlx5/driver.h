@@ -1268,6 +1268,15 @@ static inline int mlx5_lag_is_lacp_owner(struct mlx5_core_dev *dev)
 		    MLX5_CAP_GEN(dev, lag_master);
 }
 
+static inline bool mlx5_virt_lag_is_supported(const struct mlx5_core_dev *dev)
+{
+	if (!MLX5_CAP_GEN(dev, multi_uplink_eswitch) ||
+	    !MLX5_CAP_GEN(dev, lag_master) ||
+	    MLX5_CAP_GEN(dev, num_lag_ports) >= 2)
+		return false;
+	return true;
+}
+
 static inline u16 mlx5_core_max_ec_vfs(const struct mlx5_core_dev *dev)
 {
 	return dev->priv.sriov.max_ec_vfs;
@@ -1397,7 +1406,7 @@ static inline struct net *mlx5_core_net(struct mlx5_core_dev *dev)
 	return devlink_net(priv_to_devlink(dev));
 }
 
-#define MLX5_SW_IMAGE_GUID_MAX_BYTES 9
+#define MLX5_SW_IMAGE_GUID_MAX_BYTES 11
 
 static inline bool mlx5_data_direct_supported(struct mlx5_core_dev *mdev)
 {
