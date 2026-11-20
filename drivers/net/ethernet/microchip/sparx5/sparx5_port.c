@@ -373,11 +373,14 @@ static int sparx5_port_disable(struct sparx5 *sparx5, struct sparx5_port *port, 
 		 sparx5,
 		 HSCH_PORT_MODE(port->portno));
 
-	/* 5: Disable Flowcontrol */
+	/* 5: Disable Flowcontrol, and keep an MTU change from re-enabling it */
+	mutex_lock(&port->wm_lock);
+	port->wm_pause = 0;
 	spx5_rmw(QSYS_PAUSE_CFG_PAUSE_STOP_SET(0xFFF - 1),
 		 QSYS_PAUSE_CFG_PAUSE_STOP,
 		 sparx5,
 		 QSYS_PAUSE_CFG(port->portno));
+	mutex_unlock(&port->wm_lock);
 
 	spd_prm = spd == SPEED_10 ? 1000 : spd == SPEED_100 ? 100 : 10;
 	/* 6: Wait while the last frame is exiting the queues */
@@ -676,12 +679,46 @@ int sparx5_port_fwd_urg(struct sparx5 *sparx5, u32 speed)
 	return urg / clk_period_ps - 1;
 }
 
+/* The top bit of the watermark field is a x16 multiplier */
 static u16 sparx5_wm_enc(u16 value)
 {
-	if (value >= 2048)
-		return 2048 + value / 16;
+	u16 mult = BIT(regs->fsize[FW_QSYS_ATOP_ATOP] - 1);
+
+	if (value >= mult)
+		return mult + value / 16;
 
 	return value;
+}
+
+/* Pause start/stop and tail drop at 6/4/20 frames of the port MTU */
+static void sparx5_port_wm_set(struct sparx5 *sparx5, struct sparx5_port *port,
+			       u8 pause)
+{
+	u32 len = SPX5_HW_MTU(READ_ONCE(port->ndev->mtu)) + 2 * VLAN_HLEN;
+	u32 cells = DIV_ROUND_UP(len, SPX5_BUFFER_CELL_SZ);
+	u32 pause_stop = 0xFFF - 1; /* FC gen disabled */
+
+	if (pause & MLO_PAUSE_TX)
+		pause_stop = sparx5_wm_enc(4 * cells);
+
+	spx5_rmw(QSYS_PAUSE_CFG_PAUSE_START_SET(sparx5_wm_enc(6 * cells)) |
+		 QSYS_PAUSE_CFG_PAUSE_STOP_SET(pause_stop),
+		 QSYS_PAUSE_CFG_PAUSE_START |
+		 QSYS_PAUSE_CFG_PAUSE_STOP,
+		 sparx5,
+		 QSYS_PAUSE_CFG(port->portno));
+
+	/* Port ATOP. Frames are tail dropped when this WM is hit */
+	spx5_wr(QSYS_ATOP_ATOP_SET(sparx5_wm_enc(20 * cells)),
+		sparx5,
+		QSYS_ATOP(port->portno));
+}
+
+void sparx5_port_wm_update(struct sparx5 *sparx5, struct sparx5_port *port)
+{
+	mutex_lock(&port->wm_lock);
+	sparx5_port_wm_set(sparx5, port, port->wm_pause);
+	mutex_unlock(&port->wm_lock);
 }
 
 static int sparx5_port_fc_setup(struct sparx5 *sparx5,
@@ -689,11 +726,6 @@ static int sparx5_port_fc_setup(struct sparx5 *sparx5,
 				struct sparx5_port_config *conf)
 {
 	bool fc_obey = conf->pause & MLO_PAUSE_RX ? 1 : 0;
-	u32 pause_stop = 0xFFF - 1; /* FC gen disabled */
-
-	if (conf->pause & MLO_PAUSE_TX)
-		pause_stop = sparx5_wm_enc(4  * (ETH_MAXLEN /
-						 SPX5_BUFFER_CELL_SZ));
 
 	/* Set HDX flowcontrol */
 	spx5_rmw(DSM_MAC_CFG_HDX_BACKPREASSURE_SET(conf->duplex == DUPLEX_HALF),
@@ -714,10 +746,10 @@ static int sparx5_port_fc_setup(struct sparx5 *sparx5,
 		 QSYS_FWD_PRESSURE(port->portno));
 
 	/* Generate pause frames */
-	spx5_rmw(QSYS_PAUSE_CFG_PAUSE_STOP_SET(pause_stop),
-		 QSYS_PAUSE_CFG_PAUSE_STOP,
-		 sparx5,
-		 QSYS_PAUSE_CFG(port->portno));
+	mutex_lock(&port->wm_lock);
+	port->wm_pause = conf->pause;
+	sparx5_port_wm_set(sparx5, port, conf->pause);
+	mutex_unlock(&port->wm_lock);
 
 	return 0;
 }
@@ -1101,15 +1133,12 @@ int sparx5_port_init(struct sparx5 *sparx5,
 		     struct sparx5_port *port,
 		     struct sparx5_port_config *conf)
 {
-	u32 pause_start = sparx5_wm_enc(6  * (ETH_MAXLEN / SPX5_BUFFER_CELL_SZ));
-	u32 atop = sparx5_wm_enc(20 * (ETH_MAXLEN / SPX5_BUFFER_CELL_SZ));
 	const struct sparx5_ops *ops = sparx5->data->ops;
 	u32 pix = sparx5_port_dev_index(sparx5, port->portno);
 	u32 pcs = sparx5_to_pcs_dev(sparx5, port->portno);
 	bool sd_pol = port->signd_active_high;
 	bool sd_sel = !port->signd_internal;
 	bool sd_ena = port->signd_enable;
-	u32 pause_stop = 0xFFF - 1; /* FC generate disabled */
 	void __iomem *pcsinst;
 	int err;
 
@@ -1120,20 +1149,12 @@ int sparx5_port_init(struct sparx5 *sparx5,
 	if (err)
 		return err;
 
-	/* Set Pause WM hysteresis */
-	spx5_rmw(QSYS_PAUSE_CFG_PAUSE_START_SET(pause_start) |
-		 QSYS_PAUSE_CFG_PAUSE_STOP_SET(pause_stop) |
-		 QSYS_PAUSE_CFG_PAUSE_ENA_SET(1),
-		 QSYS_PAUSE_CFG_PAUSE_START |
-		 QSYS_PAUSE_CFG_PAUSE_STOP |
+	/* Set Pause WM hysteresis and ATOP, FC generate disabled */
+	sparx5_port_wm_set(sparx5, port, 0);
+	spx5_rmw(QSYS_PAUSE_CFG_PAUSE_ENA_SET(1),
 		 QSYS_PAUSE_CFG_PAUSE_ENA,
 		 sparx5,
 		 QSYS_PAUSE_CFG(port->portno));
-
-	/* Port ATOP. Frames are tail dropped when this WM is hit */
-	spx5_wr(QSYS_ATOP_ATOP_SET(atop),
-		sparx5,
-		QSYS_ATOP(port->portno));
 
 	/* Discard pause frame 01-80-C2-00-00-01 */
 	spx5_wr(PAUSE_DISCARD, sparx5, ANA_CL_CAPTURE_BPDU_CFG(port->portno));

@@ -236,6 +236,8 @@ struct sparx5_port {
 	struct device_node *of_node;
 	struct phy *serdes;
 	struct sparx5_port_config conf;
+	struct mutex wm_lock; /* Protects the QSYS watermarks and wm_pause */
+	u8 wm_pause;
 	struct phylink_config phylink_config;
 	struct phylink *phylink;
 	struct phylink_pcs phylink_pcs;

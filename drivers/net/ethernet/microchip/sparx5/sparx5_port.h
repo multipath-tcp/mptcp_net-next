@@ -91,6 +91,7 @@ int sparx5_port_init(struct sparx5 *sparx5,
 void sparx5_port_max_len_set(struct sparx5 *sparx5,
 			     struct sparx5_port *port,
 			     u32 len);
+void sparx5_port_wm_update(struct sparx5 *sparx5, struct sparx5_port *port);
 
 int sparx5_port_config(struct sparx5 *sparx5,
 		       struct sparx5_port *spx5_port,
