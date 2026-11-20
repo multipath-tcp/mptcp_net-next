@@ -341,14 +341,6 @@ the software port.
      - The number of wrong opcodes received on ring i.
      - Error
 
-   * - `rx[i]_mpwqe_frag`
-     - The number of WQEs that failed to allocate compound page and hence
-       fragmented MPWQE’s (Multi Packet WQEs) were used on ring i. If this
-       counter raise, it may suggest that there is no enough memory for large
-       pages, the driver allocated fragmented pages. This is not abnormal
-       condition.
-     - Informative
-
    * - `rx[i]_mpwqe_filler_cqes`
      - The number of filler CQEs events that were issued on ring i.
      - Informative
@@ -1132,29 +1124,18 @@ like flow control, FEC and more.
      - Failed to allocate a buffer to received packet (or SKB) on ring i.
      - Error
 
-   * - `rx_bits_phy`
-     - This counter provides information on the total amount of traffic that
-       could have been received and can be used as a guideline to measure the
-       ratio of errored traffic in `rx_pcs_symbol_err_phy` and
-       `rx_corrected_bits_phy`.
-     - Informative
-
    * - `rx_pcs_symbol_err_phy`
      - This counter counts the number of symbol errors that wasn’t corrected by
        FEC correction algorithm or that FEC algorithm was not active on this
        interface. If this counter is increasing, it implies that the link
        between the NIC and the network is suffering from high BER, and that
-       traffic is lost. You may need to replace the cable/transceiver. The error
-       rate is the number of `rx_pcs_symbol_err_phy` divided by the number of
-       `rx_bits_phy` on a specific time frame.
+       traffic is lost. You may need to replace the cable/transceiver.
      - Error
 
    * - `rx_corrected_bits_phy`
      - The number of corrected bits on this port according to active FEC
        (RS/FC). If this counter is increasing, it implies that the link between
-       the NIC and the network is suffering from high BER. The corrected bit
-       rate is the number of `rx_corrected_bits_phy` divided by the number of
-       `rx_bits_phy` on a specific time frame.
+       the NIC and the network is suffering from high BER.
      - Error
 
    * - `rx_err_lane_[l]_phy`
@@ -1336,11 +1317,6 @@ Device Counters
    * - `outbound_pci_stalled_wr_events`
      - The number of seconds where `outbound_pci_stalled_wr` was above 30%.
      - Informative
-
-   * - `dev_out_of_buffer`
-     - The number of times the device owned queue had not enough buffers
-       allocated.
-     - Error
 
    * - `pci_bw_inbound_high`
      - The number of times the device crossed the high inbound pcie bandwidth
