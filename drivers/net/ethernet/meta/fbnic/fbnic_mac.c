@@ -405,6 +405,10 @@ static void __fbnic_mac_stat_rd64(struct fbnic_dev *fbd, bool reset, u32 reg,
 	u64 new_reg_value;
 
 	new_reg_value = fbnic_stat_rd64(fbd, reg, 1);
+	/* A failed read disables CSR access and returns all ones */
+	if (!fbnic_present(fbd))
+		return;
+
 	if (!reset)
 		stat->value += new_reg_value - stat->u.old_reg_value_64;
 	stat->u.old_reg_value_64 = new_reg_value;
@@ -417,6 +421,10 @@ static void fbnic_mac_stat_rd32(struct fbnic_dev *fbd, bool reset, u32 reg,
 	u32 new_reg_value;
 
 	new_reg_value = rd32(fbd, reg);
+	/* A failed read disables CSR access and returns all ones */
+	if (!fbnic_present(fbd))
+		return;
+
 	if (!reset)
 		stat->value += new_reg_value - stat->u.old_reg_value_32;
 	stat->u.old_reg_value_32 = new_reg_value;
