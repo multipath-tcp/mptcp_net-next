@@ -614,7 +614,7 @@ out:
  *
  * Return: the GW node having the best GW-metric, NULL if no GW is known
  */
-static struct batadv_gw_node *
+static struct batadv_gw_node * __must_check
 batadv_v_gw_get_best_gw_node(struct batadv_priv *bat_priv)
 {
 	struct batadv_gw_node *curr_gw = NULL;

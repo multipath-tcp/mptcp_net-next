@@ -87,8 +87,8 @@ void rds_send_path_reset(struct rds_conn_path *cp)
 
 	cp->cp_conn->c_map_queued = 0;
 
-	cp->cp_unacked_packets = rds_sysctl_max_unacked_packets;
-	cp->cp_unacked_bytes = rds_sysctl_max_unacked_bytes;
+	cp->cp_unacked_packets = READ_ONCE(rds_sysctl_max_unacked_packets);
+	cp->cp_unacked_bytes = READ_ONCE(rds_sysctl_max_unacked_bytes);
 
 	/* Mark messages as retransmissions, and move them to the send q */
 	spin_lock_irqsave(&cp->cp_lock, flags);
@@ -382,9 +382,9 @@ restart:
 				set_bit(RDS_MSG_ACK_REQUIRED, &rm->m_flags);
 
 				cp->cp_unacked_packets =
-					rds_sysctl_max_unacked_packets;
+					READ_ONCE(rds_sysctl_max_unacked_packets);
 				cp->cp_unacked_bytes =
-					rds_sysctl_max_unacked_bytes;
+					READ_ONCE(rds_sysctl_max_unacked_bytes);
 				rds_stats_inc(s_send_ack_required);
 			} else {
 				cp->cp_unacked_bytes -= len;
