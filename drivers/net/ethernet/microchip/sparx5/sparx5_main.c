@@ -1216,6 +1216,7 @@ static const struct sparx5_ops sparx5_ops = {
 	.fdma_deinit             = &sparx5_fdma_deinit,
 	.fdma_poll               = &sparx5_fdma_napi_callback,
 	.fdma_xmit               = &sparx5_fdma_xmit,
+	.fdma_resize             = &sparx5_fdma_resize,
 };
 
 static const struct sparx5_match_data sparx5_desc = {
