@@ -1178,43 +1178,48 @@ static int rk_gmac_clk_init(struct plat_stmmacenet_data *plat)
 	return 0;
 }
 
-static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
+static int gmac_clk_enable(struct rk_priv_data *bsp_priv)
 {
 	int ret;
 
-	if (enable) {
-		if (!bsp_priv->clk_enabled) {
-			ret = clk_bulk_prepare_enable(bsp_priv->num_clks,
-						      bsp_priv->clks);
-			if (ret)
-				return ret;
+	if (bsp_priv->clk_enabled)
+		return 0;
 
-			ret = clk_prepare_enable(bsp_priv->clk_phy);
-			if (ret) {
-				clk_bulk_disable_unprepare(bsp_priv->num_clks,
-							   bsp_priv->clks);
-				return ret;
-			}
+	ret = clk_bulk_prepare_enable(bsp_priv->num_clks,
+				      bsp_priv->clks);
+	if (ret)
+		return ret;
 
-			rk_configure_io_clksel(bsp_priv);
-			rk_ungate_rmii_clock(bsp_priv);
+	ret = clk_prepare_enable(bsp_priv->clk_phy);
+	if (ret)
+		goto err_clk_phy;
 
-			mdelay(5);
-			bsp_priv->clk_enabled = true;
-		}
-	} else {
-		if (bsp_priv->clk_enabled) {
-			rk_gate_rmii_clock(bsp_priv);
+	rk_configure_io_clksel(bsp_priv);
+	rk_ungate_rmii_clock(bsp_priv);
 
-			clk_bulk_disable_unprepare(bsp_priv->num_clks,
-						   bsp_priv->clks);
-			clk_disable_unprepare(bsp_priv->clk_phy);
-
-			bsp_priv->clk_enabled = false;
-		}
-	}
+	mdelay(5);
+	bsp_priv->clk_enabled = true;
 
 	return 0;
+
+err_clk_phy:
+	clk_bulk_disable_unprepare(bsp_priv->num_clks,
+				   bsp_priv->clks);
+	return ret;
+}
+
+static void gmac_clk_disable(struct rk_priv_data *bsp_priv)
+{
+	if (!bsp_priv->clk_enabled)
+		return;
+
+	rk_gate_rmii_clock(bsp_priv);
+
+	clk_bulk_disable_unprepare(bsp_priv->num_clks,
+				   bsp_priv->clks);
+	clk_disable_unprepare(bsp_priv->clk_phy);
+
+	bsp_priv->clk_enabled = false;
 }
 
 static int rk_phy_powerup(struct rk_priv_data *bsp_priv)
@@ -1464,7 +1469,7 @@ static int rk_gmac_powerup(struct rk_priv_data *bsp_priv)
 	if (ret)
 		return ret;
 
-	ret = gmac_clk_enable(bsp_priv, true);
+	ret = gmac_clk_enable(bsp_priv);
 	if (ret)
 		return ret;
 
@@ -1555,7 +1560,7 @@ set_mode:
 	return 0;
 
 clk_disable:
-	gmac_clk_enable(bsp_priv, false);
+	gmac_clk_disable(bsp_priv);
 	return ret;
 }
 
@@ -1567,7 +1572,7 @@ static void rk_gmac_powerdown(struct rk_priv_data *gmac)
 	pm_runtime_put_sync(gmac->dev);
 
 	rk_phy_powerdown(gmac);
-	gmac_clk_enable(gmac, false);
+	gmac_clk_disable(gmac);
 }
 
 static void rk_get_interfaces(struct stmmac_priv *priv, void *bsp_priv,

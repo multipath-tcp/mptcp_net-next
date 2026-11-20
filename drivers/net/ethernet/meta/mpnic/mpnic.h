@@ -10,6 +10,7 @@
 #include <linux/workqueue.h>
 
 #include "mpnic_csr.h"
+#include "mpnic_rpc.h"
 
 #define MPNIC_DRV_NAME		"mpnic"
 
@@ -36,6 +37,8 @@ struct mpnic_dev {
 	u32 mps;
 	u32 readrq;
 	u8 relaxed_ord;
+
+	struct mpnic_mac_addr mac_addr[MPNIC_RXB_DMAC_TCAM_CNT];
 };
 
 u64 mpnic_rd64(struct mpnic_dev *mpd, u32 reg);
