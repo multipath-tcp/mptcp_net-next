@@ -819,7 +819,6 @@ static void sun4ican_remove(struct platform_device *pdev)
 
 static int sun4ican_probe(struct platform_device *pdev)
 {
-	struct device_node *np = pdev->dev.of_node;
 	struct clk *clk;
 	struct reset_control *reset = NULL;
 	void __iomem *addr;
@@ -844,16 +843,16 @@ static int sun4ican_probe(struct platform_device *pdev)
 		}
 	}
 
-	clk = of_clk_get(np, 0);
+	clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(clk)) {
-		dev_err(&pdev->dev, "unable to request clock\n");
-		err = -ENODEV;
+		err = PTR_ERR(clk);
+		dev_err_probe(&pdev->dev, err, "unable to request clock\n");
 		goto exit;
 	}
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
-		err = -ENODEV;
+		err = irq;
 		goto exit;
 	}
 

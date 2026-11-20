@@ -62,12 +62,14 @@ enum batadv_hard_if_bcast {
 
 extern struct notifier_block batadv_hard_if_notifier;
 
-struct net_device *__batadv_get_real_netdev(struct net_device *net_device);
-struct net_device *batadv_get_real_netdev(struct net_device *net_device);
+struct net_device * __must_check
+__batadv_get_real_netdev(struct net_device *net_device);
+struct net_device * __must_check
+batadv_get_real_netdev(struct net_device *net_device);
 u32 batadv_netdev_get_wifi_flags(struct net_device *net_dev);
 u32 batadv_hardif_get_wifi_flags(struct batadv_hard_iface *hard_iface);
 bool batadv_is_wifi_hardif(struct batadv_hard_iface *hard_iface);
-struct batadv_hard_iface*
+struct batadv_hard_iface * __must_check
 batadv_hardif_get_by_netdev(struct net_device *net_dev);
 int batadv_hardif_enable_interface(struct net_device *net_dev,
 				   struct net_device *mesh_iface);
@@ -99,7 +101,7 @@ static inline void batadv_hardif_put(struct batadv_hard_iface *hard_iface)
  *
  * Return: primary interface (with increased refcnt), otherwise NULL
  */
-static inline struct batadv_hard_iface *
+static inline struct batadv_hard_iface * __must_check
 batadv_primary_if_get_selected(struct batadv_priv *bat_priv)
 {
 	struct batadv_hard_iface *hard_iface;

@@ -101,7 +101,7 @@ int __fib_lookup(struct net *net, struct flowi4 *flp,
 		res->tclassid = 0;
 #endif
 
-	if (err == -ESRCH)
+	if (err == -ESRCH && !(flags & FIB_LOOKUP_REPORT_MISS))
 		err = -ENETUNREACH;
 
 	return err;
