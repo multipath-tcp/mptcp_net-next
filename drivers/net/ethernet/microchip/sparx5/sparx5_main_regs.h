@@ -4900,6 +4900,17 @@ extern const struct sparx5_regs *regs;
 	__REG(TARGET_FDMA, 0, 1, 8, 0, 1, regs->gsize[GW_FDMA_FDMA], 148, r, 8,\
 	      4)
 
+/* FDMA:FDMA:FDMA_CH_ACTIVE */
+#define FDMA_CH_ACTIVE                                                         \
+	__REG(TARGET_FDMA, 0, 1, 8, 0, 1, regs->gsize[GW_FDMA_FDMA], 180, 0, 1,\
+	      4)
+
+#define FDMA_CH_ACTIVE_CH_ACTIVE                 GENMASK(7, 0)
+#define FDMA_CH_ACTIVE_CH_ACTIVE_SET(x)\
+	FIELD_PREP(FDMA_CH_ACTIVE_CH_ACTIVE, x)
+#define FDMA_CH_ACTIVE_CH_ACTIVE_GET(x)\
+	FIELD_GET(FDMA_CH_ACTIVE_CH_ACTIVE, x)
+
 /* FDMA:FDMA:FDMA_CH_CFG */
 #define FDMA_CH_CFG(r)                                                         \
 	__REG(TARGET_FDMA, 0, 1, 8, 0, 1, regs->gsize[GW_FDMA_FDMA], 224, r, 8,\

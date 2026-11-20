@@ -20,6 +20,8 @@
 
 #define FDMA_XTR_BUFFER_SIZE		2048
 #define FDMA_WEIGHT			4
+#define SPX5_FDMA_STOP_SLEEP_US		500
+#define SPX5_FDMA_STOP_TIMEOUT_US	10000
 
 static int sparx5_fdma_tx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 				     u64 *dataptr)
@@ -86,10 +88,6 @@ static void sparx5_fdma_rx_deactivate(struct sparx5 *sparx5, struct sparx5_rx *r
 {
 	struct fdma *fdma = &rx->fdma;
 
-	/* Deactivate the RX channel */
-	spx5_rmw(0, BIT(fdma->channel_id) & FDMA_CH_ACTIVATE_CH_ACTIVATE,
-		 sparx5, FDMA_CH_ACTIVATE);
-
 	/* Disable RX channel DB interrupt */
 	spx5_rmw(0, BIT(fdma->channel_id) & FDMA_INTR_DB_ENA_INTR_DB_ENA,
 		 sparx5, FDMA_INTR_DB_ENA);
@@ -125,9 +123,9 @@ static void sparx5_fdma_tx_activate(struct sparx5 *sparx5, struct sparx5_tx *tx)
 
 static void sparx5_fdma_tx_deactivate(struct sparx5 *sparx5, struct sparx5_tx *tx)
 {
-	/* Disable the channel */
-	spx5_rmw(0, BIT(tx->fdma.channel_id) & FDMA_CH_ACTIVATE_CH_ACTIVATE,
-		 sparx5, FDMA_CH_ACTIVATE);
+	/* Stop TX fdma */
+	spx5_rmw(FDMA_PORT_CTRL_INJ_STOP_SET(1), FDMA_PORT_CTRL_INJ_STOP,
+		 sparx5, FDMA_PORT_CTRL(0));
 }
 
 void sparx5_fdma_reload(struct sparx5 *sparx5, struct fdma *fdma)
@@ -453,6 +451,11 @@ static u32 sparx5_fdma_port_ctrl(struct sparx5 *sparx5)
 	return spx5_rd(sparx5, FDMA_PORT_CTRL(0));
 }
 
+static u32 sparx5_fdma_ch_active(struct sparx5 *sparx5)
+{
+	return spx5_rd(sparx5, FDMA_CH_ACTIVE);
+}
+
 int sparx5_fdma_start(struct sparx5 *sparx5)
 {
 	const struct sparx5_ops *ops = sparx5->data->ops;
@@ -474,20 +477,39 @@ int sparx5_fdma_start(struct sparx5 *sparx5)
 
 int sparx5_fdma_stop(struct sparx5 *sparx5)
 {
+	u32 channels = BIT(sparx5->rx.fdma.channel_id) |
+		       BIT(sparx5->tx.fdma.channel_id);
 	struct sparx5_rx *rx = &sparx5->rx;
 	struct sparx5_tx *tx = &sparx5->tx;
 	u32 val;
 
 	napi_disable(&rx->napi);
 
-	/* Stop the fdma and channel interrupts */
+	/* Disable the channels, and wait for them to finish the current DCB */
+	spx5_wr(FDMA_CH_DISABLE_CH_DISABLE_SET(channels), sparx5,
+		FDMA_CH_DISABLE);
+
+	if (read_poll_timeout(sparx5_fdma_ch_active,
+			      val,
+			      !(FDMA_CH_ACTIVE_CH_ACTIVE_GET(val) & channels),
+			      SPX5_FDMA_STOP_SLEEP_US,
+			      SPX5_FDMA_STOP_TIMEOUT_US,
+			      false,
+			      sparx5))
+		dev_warn(sparx5->dev, "Failed to stop FDMA channels\n");
+
+	/* Stop the fdma and the RX channel interrupt */
 	sparx5_fdma_rx_deactivate(sparx5, rx);
 	sparx5_fdma_tx_deactivate(sparx5, tx);
 
-	/* Wait for the RX channel to stop */
-	read_poll_timeout(sparx5_fdma_port_ctrl, val,
-			  FDMA_PORT_CTRL_XTR_BUF_IS_EMPTY_GET(val) == 0,
-			  500, 10000, 0, sparx5);
+	/* Wait for the extraction buffer to be empty */
+	read_poll_timeout(sparx5_fdma_port_ctrl,
+			  val,
+			  FDMA_PORT_CTRL_XTR_BUF_IS_EMPTY_GET(val),
+			  SPX5_FDMA_STOP_SLEEP_US,
+			  SPX5_FDMA_STOP_TIMEOUT_US,
+			  false,
+			  sparx5);
 
 	return 0;
 }
