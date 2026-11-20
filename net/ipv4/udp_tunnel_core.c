@@ -3,6 +3,7 @@
 #include <linux/errno.h>
 #include <linux/socket.h>
 #include <linux/kernel.h>
+#include <net/addrconf.h>
 #include <net/dst_metadata.h>
 #include <net/flow.h>
 #include <net/udp.h>
@@ -59,15 +60,6 @@ error:
 }
 EXPORT_SYMBOL(udp_sock_create4);
 
-static bool sk_saddr_any(struct sock *sk)
-{
-#if IS_ENABLED(CONFIG_IPV6)
-	if (sk->sk_family == AF_INET6)
-		return ipv6_addr_any(&sk->sk_v6_rcv_saddr);
-#endif
-	return !sk->sk_rcv_saddr;
-}
-
 void setup_udp_tunnel_sock(struct net *net, struct sock *sk,
 			   struct udp_tunnel_sock_cfg *cfg)
 {
@@ -91,7 +83,7 @@ void setup_udp_tunnel_sock(struct net *net, struct sock *sk,
 
 	udp_tunnel_update_gro_rcv(sk, true);
 
-	if (!sk->sk_dport && !sk->sk_bound_dev_if && sk_saddr_any(sk) &&
+	if (!sk->sk_dport && !sk->sk_bound_dev_if && inet_rcv_saddr_any(sk) &&
 	    sk->sk_kern_sock)
 		udp_tunnel_update_gro_lookup(net, sk, true);
 }
