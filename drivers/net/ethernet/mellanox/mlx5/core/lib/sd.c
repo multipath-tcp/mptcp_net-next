@@ -300,7 +300,7 @@ static int sd_lag_state_show(struct seq_file *file, void *priv)
 {
 	struct mlx5_core_dev *dev = file->private;
 	struct mlx5_lag *ldev;
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	bool active = false;
 	int i;
 
@@ -310,9 +310,9 @@ static int sd_lag_state_show(struct seq_file *file, void *priv)
 
 	mutex_lock(&ldev->lock);
 	mlx5_ldev_for_each(i, 0, ldev) {
-		pf = mlx5_lag_pf(ldev, i);
-		if (pf->dev == dev) {
-			active = pf->sd_fdb_active;
+		fn = mlx5_lag_fn(ldev, i);
+		if (fn->dev == dev) {
+			active = fn->sd_fdb_active;
 			break;
 		}
 	}
@@ -334,7 +334,7 @@ static void sd_lag_init(struct mlx5_core_dev *dev)
 	struct mlx5_sd *sd = mlx5_get_sd(primary);
 	struct mlx5_core_dev *pos, *to;
 	struct mlx5_lag *ldev;
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int err;
 	int i;
 
@@ -346,14 +346,14 @@ static void sd_lag_init(struct mlx5_core_dev *dev)
 	}
 
 	mutex_lock(&ldev->lock);
-	pf = mlx5_lag_pf_by_dev(ldev, primary);
-	if (!pf) {
+	fn = mlx5_lag_fn_by_dev(ldev, primary);
+	if (!fn) {
 		sd_warn(primary, "%s: primary not registered in ldev, skipping\n",
 			__func__);
 		goto out;
 	}
 
-	pf->group_id = sd->group_id;
+	fn->group_id = sd->group_id;
 
 	mlx5_sd_for_each_secondary(i, primary, pos) {
 		err = mlx5_ldev_add_mdev(ldev, pos, sd->group_id);
@@ -372,7 +372,7 @@ err:
 	to = pos;
 	mlx5_sd_for_each_secondary_to(i, primary, to, pos)
 		mlx5_ldev_remove_mdev(ldev, pos);
-	pf->group_id = 0;
+	fn->group_id = 0;
 	mutex_unlock(&ldev->lock);
 }
 
@@ -381,7 +381,7 @@ static void sd_lag_cleanup(struct mlx5_core_dev *dev)
 	struct mlx5_core_dev *primary = mlx5_sd_get_primary(dev);
 	struct mlx5_core_dev *pos;
 	struct mlx5_lag *ldev;
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int i;
 
 	ldev = mlx5_lag_dev(primary);
@@ -392,9 +392,9 @@ static void sd_lag_cleanup(struct mlx5_core_dev *dev)
 	mlx5_sd_for_each_secondary(i, primary, pos)
 		mlx5_ldev_remove_mdev(ldev, pos);
 
-	pf = mlx5_lag_pf_by_dev(ldev, primary);
-	if (pf)
-		pf->group_id = 0;
+	fn = mlx5_lag_fn_by_dev(ldev, primary);
+	if (fn)
+		fn->group_id = 0;
 	mutex_unlock(&ldev->lock);
 }
 
@@ -989,7 +989,7 @@ static void mlx5_sd_activate_shared_fdb(struct mlx5_core_dev *primary)
 	struct mlx5_sd *sd = mlx5_get_sd(primary);
 	struct mlx5_core_dev *pos;
 	struct mlx5_lag *ldev;
-	struct lag_func *pf;
+	struct lag_fn *fn;
 	int err;
 	int i;
 
@@ -1009,8 +1009,8 @@ static void mlx5_sd_activate_shared_fdb(struct mlx5_core_dev *primary)
 
 	/* Check if SD FDB is already active for this group */
 	mlx5_lag_for_each(i, 0, ldev, sd->group_id) {
-		pf = mlx5_lag_pf(ldev, i);
-		if (pf->sd_fdb_active)
+		fn = mlx5_lag_fn(ldev, i);
+		if (fn->sd_fdb_active)
 			goto unlock;
 		break;
 	}
