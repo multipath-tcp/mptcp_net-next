@@ -17,7 +17,7 @@
 
 void batadv_forw_packet_free(struct batadv_forw_packet *forw_packet,
 			     bool dropped);
-struct batadv_forw_packet *
+struct batadv_forw_packet * __must_check
 batadv_forw_packet_alloc(struct batadv_hard_iface *if_incoming,
 			 struct batadv_hard_iface *if_outgoing,
 			 atomic_t *queue_left,

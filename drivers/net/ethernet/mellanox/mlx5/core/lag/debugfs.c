@@ -154,7 +154,7 @@ static int members_show(struct seq_file *file, void *priv)
 	mutex_lock(&ldev->lock);
 	mlx5_ldev_for_each(i, 0, ldev)
 		seq_printf(file, "%s\n",
-			   dev_name(mlx5_lag_pf(ldev, i)->dev->device));
+			   dev_name(mlx5_lag_fn(ldev, i)->dev->device));
 	mutex_unlock(&ldev->lock);
 
 	return 0;
