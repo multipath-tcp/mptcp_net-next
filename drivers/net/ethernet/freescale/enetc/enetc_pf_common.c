@@ -436,6 +436,43 @@ void enetc_mdiobus_destroy(struct enetc_pf *pf)
 }
 EXPORT_SYMBOL_GPL(enetc_mdiobus_destroy);
 
+static struct {
+	unsigned long mac_cap;
+	int speed; /* descending order sorted  */
+} enetc_phylink_pseudo_mac_caps[] = {
+	{ MAC_25000FD,  SPEED_25000 },
+	{ MAC_20000FD,  SPEED_20000 },
+	{ MAC_10000FD,  SPEED_10000 },
+	{ MAC_5000FD,   SPEED_5000  },
+	{ MAC_2500FD,   SPEED_2500  },
+	{ MAC_1000FD,   SPEED_1000  },
+	{ MAC_100FD,    SPEED_100   },
+	{ MAC_10FD,     SPEED_10    },
+};
+
+static unsigned long enetc_phylink_get_pseudo_mac_caps(void)
+{
+	unsigned long mac_caps = 0;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(enetc_phylink_pseudo_mac_caps); i++)
+		mac_caps |= enetc_phylink_pseudo_mac_caps[i].mac_cap;
+
+	return mac_caps;
+}
+
+int enetc_phylink_match_pseudo_mac_speed(int speed)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(enetc_phylink_pseudo_mac_caps); i++)
+		if (enetc_phylink_pseudo_mac_caps[i].speed <= speed)
+			return enetc_phylink_pseudo_mac_caps[i].speed;
+
+	return SPEED_UNKNOWN;
+}
+EXPORT_SYMBOL_GPL(enetc_phylink_match_pseudo_mac_speed);
+
 int enetc_phylink_create(struct enetc_ndev_priv *priv, struct device_node *node,
 			 const struct phylink_mac_ops *ops)
 {
@@ -471,9 +508,7 @@ int enetc_phylink_create(struct enetc_ndev_priv *priv, struct device_node *node,
 
 		phy_interface_set_rgmii(pf->phylink_config.supported_interfaces);
 	} else {
-		mac_caps |= MAC_10FD | MAC_100FD | MAC_1000FD | MAC_2500FD |
-			    MAC_5000FD | MAC_10000FD | MAC_20000FD |
-			    MAC_25000FD;
+		mac_caps |= enetc_phylink_get_pseudo_mac_caps();
 	}
 
 	pf->phylink_config.mac_capabilities = mac_caps;

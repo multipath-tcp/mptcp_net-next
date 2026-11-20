@@ -414,6 +414,11 @@ static int fbnic_fw_reporter_dump(struct devlink_health_reporter *reporter,
 				   "Firmware core dump returned size 0");
 		return -EIO;
 	}
+	if (size > FBNIC_FW_COREDUMP_MAX_SIZE) {
+		NL_SET_ERR_MSG_MOD(extack,
+				   "Firmware core dump size is too large");
+		return -EIO;
+	}
 
 	/* Read the dump, we can only transfer TLV_MAX_DATA at a time */
 	index_count = DIV_ROUND_UP(size, TLV_MAX_DATA);

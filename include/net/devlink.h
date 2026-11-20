@@ -1608,6 +1608,34 @@ struct devlink_ops {
 	 */
 	bool supported_cross_device_rate_nodes;
 	/**
+	 * @shd_init: Shared devlink instance initializer.
+	 *
+	 * Gets the driver's priv data of the shared instance (the same as
+	 * devlink_shd_get_priv() returns) and the init_param passed to
+	 * devlink_shd_get(). Should initialize the priv data. May be NULL.
+	 *
+	 * Called when devlink_shd_get() creates the shared instance, before
+	 * it is registered. If it fails, the instance is freed without calling
+	 * @shd_fini, and the next devlink_shd_get() for the same id will try to
+	 * create it (and call @shd_init) again.
+	 *
+	 * Called with the global shared devlink mutex and the devlink lock of
+	 * the shared instance held, thus must not call devlink_shd_get() nor
+	 * devlink_shd_put(), and must use devl_*() variants of devlink API.
+	 *
+	 * Return: 0 on success, negative errno to fail the creation.
+	 */
+	int (*shd_init)(void *priv, void *init_param);
+	/**
+	 * @shd_fini: Shared devlink instance finalizer.
+	 *
+	 * Gets the driver's priv data of the shared instance. Called when the
+	 * last reference is dropped, after the shared instance is unregistered,
+	 * in the same locking context as @shd_init. Should clean up the priv
+	 * data. May be NULL.
+	 */
+	void (*shd_fini)(void *priv);
+	/**
 	 * selftests_check() - queries if selftest is supported
 	 * @devlink: devlink instance
 	 * @id: test index
@@ -1672,9 +1700,11 @@ void devlink_free(struct devlink *devlink);
 struct devlink *devlink_shd_get(const char *id,
 				const struct devlink_ops *ops,
 				size_t priv_size,
+				void *init_param,
 				const struct device_driver *driver);
 void devlink_shd_put(struct devlink *devlink);
 void *devlink_shd_get_priv(struct devlink *devlink);
+struct devlink *shd_priv_to_devlink(void *priv);
 
 /**
  * struct devlink_port_ops - Port operations
