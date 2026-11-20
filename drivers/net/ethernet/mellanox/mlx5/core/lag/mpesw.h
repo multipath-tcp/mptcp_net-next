@@ -9,7 +9,7 @@
 
 struct lag_mpesw {
 	struct work_struct mpesw_work;
-	u32 pf_metadata[MLX5_MAX_PORTS];
+	u32 *pf_metadata;
 };
 
 enum mpesw_op {
