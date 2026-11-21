@@ -4540,6 +4540,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct sock *sk = sock->sk;
 	struct sock *ssk;
+	bool listening;
 	int err;
 
 	pr_debug("msk=%p\n", msk);
@@ -4556,6 +4557,7 @@ static int mptcp_listen(struct socket *sock, int backlog)
 		goto unlock;
 	}
 
+	listening = sk->sk_state == TCP_LISTEN;
 	set_bit(MPTCP_RTX_ENABLED, &msk->flags);
 	mptcp_set_state(sk, TCP_LISTEN);
 	sock_set_flag(sk, SOCK_RCU_FREE);
@@ -4570,7 +4572,8 @@ static int mptcp_listen(struct socket *sock, int backlog)
 	release_sock(ssk);
 	mptcp_set_state(sk, inet_sk_state_load(ssk));
 
-	if (!err) {
+	/* only the backlog changes when listening already */
+	if (!err && !listening) {
 		sock_prot_inuse_add(sock_net(sk), sk->sk_prot, 1);
 		mptcp_copy_inaddrs(sk, ssk);
 		mptcp_event_pm_listener(ssk, MPTCP_EVENT_LISTENER_CREATED);
