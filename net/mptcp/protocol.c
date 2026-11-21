@@ -979,9 +979,13 @@ static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 	/* a FIN received before still leads to EOF, as with TCP */
 	if (sock_flag(ssk, SOCK_DONE) && mptcp_pending_data_fin(sk, NULL))
 		sock_set_flag(sk, SOCK_DONE);
-	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD))
-		mptcp_set_state(sk, ssk_state);
 	WRITE_ONCE(sk->sk_err, -err);
+	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD)) {
+		/* This barrier is coupled with smp_rmb() in mptcp_poll() */
+		smp_wmb();
+		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | SEND_SHUTDOWN);
+		mptcp_set_state(sk, ssk_state);
+	}
 	report = true;
 	propagated = true;
 
