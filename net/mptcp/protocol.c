@@ -3245,10 +3245,7 @@ static void mptcp_do_fastclose(struct sock *sk)
 	mptcp_backlog_purge(sk);
 	msk->fastclosing = 1;
 
-	/* Explicitly send the fastclose reset as need */
-	if (__mptcp_check_fallback(msk))
-		return;
-
+	/* Explicitly send the fastclose reset, a plain one after a fallback */
 	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
