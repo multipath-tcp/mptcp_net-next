@@ -3666,7 +3666,8 @@ static void __mptcp_wr_shutdown(struct sock *sk)
 
 	/* will be ignored by fallback sockets */
 	WRITE_ONCE(msk->write_seq, msk->write_seq + 1);
-	WRITE_ONCE(msk->snd_data_fin_enable, 1);
+	/* pairs with the acquire in mptcp_try_fallback() */
+	smp_store_release(&msk->snd_data_fin_enable, 1);
 
 	mptcp_check_send_data_fin(sk);
 }
