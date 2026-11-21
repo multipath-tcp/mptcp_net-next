@@ -1850,14 +1850,11 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	if (ssk)
 		mptcp_push_release(ssk, &info);
 
-	/* Avoid scheduling the rtx timer if no data has been pushed; the timer
-	 * will be updated on positive acks by __mptcp_cleanup_una().
-	 */
-	if (copied) {
-		if (!mptcp_rtx_timer_pending(sk))
-			mptcp_reset_rtx_timer(sk);
+	/* also retry later if unsent data is left: no ack may trigger it */
+	if ((copied || mptcp_send_head(sk)) && !mptcp_rtx_timer_pending(sk))
+		mptcp_reset_rtx_timer(sk);
+	if (copied)
 		mptcp_check_send_data_fin(sk);
-	}
 }
 
 static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool first)
@@ -1919,13 +1916,15 @@ out:
 	if (copied) {
 		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
 			 info.size_goal);
-		if (!mptcp_rtx_timer_pending(sk))
-			mptcp_reset_rtx_timer(sk);
 
 		if (msk->snd_data_fin_enable &&
 		    msk->snd_nxt + 1 == msk->write_seq)
 			mptcp_schedule_work(sk);
 	}
+
+	/* see __mptcp_push_pending() */
+	if ((copied || mptcp_send_head(sk)) && !mptcp_rtx_timer_pending(sk))
+		mptcp_reset_rtx_timer(sk);
 }
 
 static int mptcp_disconnect(struct sock *sk, int flags);
