@@ -3297,6 +3297,10 @@ static void mptcp_do_fastclose(struct sock *sk)
 
 		subflow->send_fastclose = 1;
 
+		/* no reset in SYN_SENT, as TCP does */
+		if (ssk->sk_state == TCP_SYN_SENT)
+			goto unlock;
+
 		/* Initialize rcv_mss to TCP_MIN_MSS to avoid division by 0
 		 * issue in __tcp_select_window(), see tcp_disconnect().
 		 */
