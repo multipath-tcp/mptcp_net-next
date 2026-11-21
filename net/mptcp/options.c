@@ -1055,6 +1055,10 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		WARN_ONCE(1, "bogus mpc option on established client sk");
 
 set_fully_established:
+	/* the peer can no longer fall back to TCP */
+	if (subflow->request_join)
+		set_bit(MPTCP_JOINED, &msk->flags);
+
 	if (mp_opt->deny_join_id0)
 		WRITE_ONCE(msk->pm.remote_deny_join_id0, true);
 
@@ -1287,11 +1291,16 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	if (!check_fully_established(msk, sk, subflow, skb, &mp_opt))
 		return sk->sk_state != TCP_CLOSE;
 
-	/* MPTCP opt acking the old data, not an infinite map: no fallback */
-	if (unlikely(subflow->old_data_pending) && mp_opt.suboptions &&
-	    !(mp_opt.use_map && !mp_opt.data_len) &&
-	    !before(TCP_SKB_CB(skb)->ack_seq, subflow->old_data_end))
-		subflow->old_data_pending = 0;
+	/* MPTCP opts, not an infinite map: the peer did not fall back */
+	if (mp_opt.suboptions && !(mp_opt.use_map && !mp_opt.data_len)) {
+		u32 ack_seq = TCP_SKB_CB(skb)->ack_seq;
+
+		if (after(ack_seq, subflow->opt_ack_seq))
+			subflow->opt_ack_seq = ack_seq;
+		if (unlikely(subflow->old_data_pending) &&
+		    !before(ack_seq, subflow->old_data_end))
+			subflow->old_data_pending = 0;
+	}
 
 	if (unlikely(mp_opt.suboptions != OPTION_MPTCP_DSS)) {
 		if ((mp_opt.suboptions & OPTION_MPTCP_FASTCLOSE) &&
