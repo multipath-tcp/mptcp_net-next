@@ -714,6 +714,10 @@ static void mptcp_check_data_fin(struct sock *sk)
 		WRITE_ONCE(msk->rcv_data_fin, 0);
 
 		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | RCV_SHUTDOWN);
+		/* on fallback, also emulated after a reset: check for a FIN */
+		if (!__mptcp_check_fallback(msk) ||
+		    (msk->first && sock_flag(msk->first, SOCK_DONE)))
+			sock_set_flag(sk, SOCK_DONE);
 		smp_mb__before_atomic(); /* SHUTDOWN must be visible first */
 
 		switch (sk->sk_state) {
@@ -972,6 +976,9 @@ static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 	 * destroy the msk as needed.
 	 */
 	ssk_state = inet_sk_state_load(ssk);
+	/* a FIN received before still leads to EOF, as with TCP */
+	if (sock_flag(ssk, SOCK_DONE) && mptcp_pending_data_fin(sk, NULL))
+		sock_set_flag(sk, SOCK_DONE);
 	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD))
 		mptcp_set_state(sk, ssk_state);
 	WRITE_ONCE(sk->sk_err, -err);
@@ -2494,6 +2501,9 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 			    !timeo)
 				break;
 		} else {
+			if (sock_flag(sk, SOCK_DONE))
+				break;
+
 			copied = sock_error(sk);
 			if (copied)
 				break;
@@ -2937,6 +2947,11 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 
 	if (likely(!READ_ONCE(msk->rcv_fastclose)))
 		return;
+
+	/* a DATA_FIN received before still leads to EOF, as with TCP */
+	if (READ_ONCE(msk->rcv_data_fin))
+		mptcp_move_skbs(sk);
+	mptcp_check_data_fin(sk);
 
 	mptcp_token_destroy(msk);
 
@@ -3797,6 +3812,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	atomic64_set(&msk->rcv_wnd_sent, 0);
 
 	WRITE_ONCE(sk->sk_shutdown, 0);
+	sock_reset_flag(sk, SOCK_DONE);
 	sk_error_report(sk);
 	return 0;
 }
