@@ -189,6 +189,9 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 
 	if (msk->sched == &mptcp_sched_default || !msk->sched)
 		return mptcp_sched_default_get_send(msk);
+
+	/* as the default scheduler: the rtx timer needs an interval */
+	mptcp_set_timeout((struct sock *)msk);
 	return msk->sched->get_send(msk);
 }
 
