@@ -2813,6 +2813,8 @@ out:
 		} else if (sk->sk_state != TCP_ESTABLISHED ||
 			   msk->in_accept_queue) {
 			mptcp_set_state(sk, TCP_CLOSE);
+			WRITE_ONCE(sk->sk_shutdown,
+				   sk->sk_shutdown | SEND_SHUTDOWN);
 			mptcp_close_wake_up(sk);
 		} else {
 			mptcp_start_tout_timer(sk);
@@ -3306,6 +3308,7 @@ static void mptcp_worker(struct work_struct *work)
 		mptcp_do_fastclose(sk);
 		mptcp_for_each_subflow_safe(msk, subflow, tmp)
 			__mptcp_close_ssk(sk, subflow->tcp_sock, subflow, 0);
+		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | SEND_SHUTDOWN);
 		mptcp_close_wake_up(sk);
 	}
 
