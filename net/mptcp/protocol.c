@@ -4650,8 +4650,8 @@ static void mptcp_graft_subflows(struct sock *sk)
 
 		/* Subflows joining after __inet_accept() will get the
 		 * mem CG properly initialized at mptcp_finish_join() time,
-		 * but subflows pending in join_list need explicit
-		 * initialization by the loop below.
+		 * even if pending in join_list. The ones that joined before
+		 * need explicit initialization by the loop below.
 		 */
 		mptcp_data_lock(sk);
 		list_splice_init(&msk->join_list, &join_list);
@@ -4674,7 +4674,8 @@ static void mptcp_graft_subflows(struct sock *sk)
 		if (!ssk->sk_socket)
 			mptcp_sock_graft(ssk, sk->sk_socket);
 
-		if (!mem_cgroup_sk_enabled(sk))
+		/* Got the memcg when joining: its memory is already charged */
+		if (!mem_cgroup_sk_enabled(sk) || mem_cgroup_from_sk(ssk))
 			goto unlock;
 
 		__mptcp_inherit_cgrp_data(sk, ssk);
