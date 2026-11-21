@@ -2871,6 +2871,28 @@ static bool mptcp_close_tout_expired(const struct sock *sk)
 		  inet_csk(sk)->icsk_mtup.probe_timestamp + mptcp_close_timeout(sk));
 }
 
+/* Before its DATA_FIN, keep an orphan while a subflow can send its data */
+static bool mptcp_orphan_keep(struct sock *sk)
+{
+	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct mptcp_subflow_context *subflow;
+
+	if (!sock_flag(sk, SOCK_DEAD) || msk->snd_nxt == msk->write_seq)
+		return false;
+
+	mptcp_for_each_subflow(msk, subflow) {
+		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
+
+		/* a live peer acks at least the probes, every TCP_RTO_MAX */
+		if (__mptcp_subflow_active(subflow) &&
+		    tcp_jiffies32 - READ_ONCE(tcp_sk(ssk)->rcv_tstamp) <
+		    2 * TCP_RTO_MAX)
+			return true;
+	}
+
+	return false;
+}
+
 static void mptcp_check_fastclose(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
@@ -3208,6 +3230,11 @@ static void mptcp_worker(struct work_struct *work)
 	if (test_and_clear_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
 		__mptcp_close_subflow(sk);
 
+	if (mptcp_close_tout_expired(sk) && mptcp_orphan_keep(sk)) {
+		mptcp_start_tout_timer(sk);
+		__mptcp_push_pending(sk, 0);
+	}
+
 	if (mptcp_close_tout_expired(sk)) {
 		struct mptcp_subflow_context *subflow, *tmp;
 
@@ -3448,6 +3475,10 @@ static void mptcp_check_send_data_fin(struct sock *sk)
 		return;
 
 	WRITE_ONCE(msk->snd_nxt, msk->write_seq);
+
+	/* an orphan's close timeout is for the DATA_FIN exchange */
+	if (sock_flag(sk, SOCK_DEAD))
+		mptcp_start_tout_timer(sk);
 
 	mptcp_for_each_subflow(msk, subflow) {
 		struct sock *tcp_sk = mptcp_subflow_tcp_sock(subflow);
