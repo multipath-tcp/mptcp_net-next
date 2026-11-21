@@ -526,10 +526,11 @@ int mptcp_pm_announce_addr(struct mptcp_sock *msk,
 int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_list)
 {
 	u8 rm_addr = READ_ONCE(msk->pm.addr_signal);
+	int i;
 
 	pr_debug("msk=%p, rm_list_nr=%d\n", msk, rm_list->nr);
 
-	if (rm_addr) {
+	if (mptcp_pm_should_rm_signal(msk)) {
 		MPTCP_ADD_STATS(sock_net((struct sock *)msk),
 				MPTCP_MIB_RMADDRTXDROP, rm_list->nr);
 		return -EINVAL;
@@ -538,7 +539,16 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 	msk->pm.rm_list_tx = *rm_list;
 	rm_addr |= BIT(MPTCP_RM_ADDR_SIGNAL);
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
-	mptcp_pm_addr_send_ack_avoid_list(msk, rm_list);
+
+	/* pending ADD_ADDR and echo take the first ACKs: one more each */
+	for (i = 0; i < 3 && mptcp_pm_should_rm_signal(msk); i++) {
+		u8 signal = READ_ONCE(msk->pm.addr_signal);
+
+		mptcp_pm_addr_send_ack_avoid_list(msk, rm_list);
+		/* no signal sent, e.g. after a fallback: no more ACKs */
+		if (READ_ONCE(msk->pm.addr_signal) == signal)
+			break;
+	}
 	return 0;
 }
 
