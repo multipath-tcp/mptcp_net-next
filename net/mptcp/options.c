@@ -474,6 +474,11 @@ bool mptcp_syn_options(struct sock *sk, const struct sk_buff *skb,
 	 * in mptcp_established_options_mp()
 	 */
 	subflow->snd_isn = TCP_SKB_CB(skb)->end_seq;
+
+	/* simult connect: the peer's SYN-ACK will not set ssn_offset */
+	if (unlikely(sk->sk_state == TCP_SYN_RECV))
+		subflow->ssn_offset = tcp_sk(sk)->rcv_nxt - 1;
+
 	if (subflow->request_mptcp) {
 		if (unlikely(subflow_simultaneous_connect(sk))) {
 			WARN_ON_ONCE(!mptcp_try_fallback(sk, MPTCP_MIB_SIMULTCONNFALLBACK));

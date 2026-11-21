@@ -591,7 +591,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 	subflow->rel_write_seq = 1;
 	subflow->opt_ack_seq = tcp_sk(sk)->snd_una;
 	subflow->conn_finished = 1;
-	subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
+	/* simult connect: not a SYN-ACK, see mptcp_syn_options() */
+	if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)
+		subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 	pr_debug("subflow=%p synack seq=%x\n", subflow, subflow->ssn_offset);
 
 	mptcp_get_options(skb, &mp_opt);
