@@ -2299,6 +2299,7 @@ static int __mptcp_recvmsg_mskq(struct sock *sk, struct msghdr *msg,
 			delta = copied_total - total_data_len;
 			offset += delta;
 			data_len -= delta;
+			total_data_len += delta;
 		}
 
 		count = min_t(size_t, len - copied, data_len);
