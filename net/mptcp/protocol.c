@@ -2004,11 +2004,12 @@ static int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 		 */
 		if (ret && ret != -EINPROGRESS && ret != -ERESTARTSYS && ret != -EINTR)
 			*copied_syn = 0;
-	} else if (ret && ret != -EINPROGRESS) {
+	} else if (ret && ret != -EINPROGRESS && sk->sk_state != TCP_LISTEN) {
 		/* The disconnect() op called by tcp_sendmsg_fastopen()/
 		 * __inet_stream_connect() can fail, due to looking check,
 		 * see mptcp_disconnect().
 		 * Attempt it again outside the problematic scope.
+		 * A listener is not disconnected there, as with TCP.
 		 */
 		if (!mptcp_disconnect(sk, 0)) {
 			sk->sk_disconnects++;
