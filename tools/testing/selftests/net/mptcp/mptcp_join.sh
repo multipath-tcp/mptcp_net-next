@@ -3828,6 +3828,12 @@ fail_tests()
 	# single subflow
 	if reset_with_fail "Infinite map" 1; then
 		MPTCP_LIB_SUBTEST_FLAKY=1
+		# MPTCP retransmissions prevent the fallback: avoid spurious
+		# ones during the 200ms pause of the 'fast' mode
+		ip netns exec $ns1 sysctl -q net.ipv4.tcp_rto_min_us=1000000 \
+			2>/dev/null || true
+		ip netns exec $ns2 sysctl -q net.ipv4.tcp_rto_min_us=1000000 \
+			2>/dev/null || true
 		test_linkfail=128 \
 			run_tests $ns1 $ns2 10.0.1.1
 		join_csum_ns1=+1 join_csum_ns2=+0 \
