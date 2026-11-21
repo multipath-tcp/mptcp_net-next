@@ -1287,6 +1287,12 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	if (!check_fully_established(msk, sk, subflow, skb, &mp_opt))
 		return sk->sk_state != TCP_CLOSE;
 
+	/* MPTCP opt acking the old data, not an infinite map: no fallback */
+	if (unlikely(subflow->old_data_pending) && mp_opt.suboptions &&
+	    !(mp_opt.use_map && !mp_opt.data_len) &&
+	    !before(TCP_SKB_CB(skb)->ack_seq, subflow->old_data_end))
+		subflow->old_data_pending = 0;
+
 	if (unlikely(mp_opt.suboptions != OPTION_MPTCP_DSS)) {
 		if ((mp_opt.suboptions & OPTION_MPTCP_FASTCLOSE) &&
 		    READ_ONCE(msk->local_key) == mp_opt.fc_recv_key) {
@@ -1333,12 +1339,6 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 			return true;
 	}
 
-	/* DSS acking the old data, not an infinite map: no peer fallback */
-	if (unlikely(subflow->old_data_pending) &&
-	    !(mp_opt.use_map && !mp_opt.data_len) &&
-	    !before(TCP_SKB_CB(skb)->ack_seq, subflow->old_data_end))
-		subflow->old_data_pending = 0;
-
 	/* we can't wait for recvmsg() to update the ack_seq, otherwise
 	 * monodirectional flows will stuck
 	 */
@@ -1358,6 +1358,10 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		return true;
 	}
+
+	/* the push from ack_update_msk() can reset the subflow */
+	if (unlikely(sk->sk_state == TCP_CLOSE))
+		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
 	if (!mpext)
