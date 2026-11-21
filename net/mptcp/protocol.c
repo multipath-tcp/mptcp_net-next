@@ -1083,6 +1083,10 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 	} else {
 		__mptcp_move_skbs_from_subflow(msk, ssk, false);
 	}
+
+	/* mptcp_incoming_options() can't push if this data caused a fallback */
+	if (__mptcp_check_fallback(msk) && sk_stream_memory_free(ssk))
+		__mptcp_check_push(sk, ssk);
 	mptcp_data_unlock(sk);
 }
 
