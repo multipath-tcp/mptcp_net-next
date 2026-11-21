@@ -1961,6 +1961,9 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 				keep_pushing = false;
 			else
 				copied += ret;
+		} else {
+			/* a BPF scheduler might not pick any subflow */
+			keep_pushing = false;
 		}
 
 		mptcp_for_each_subflow(msk, subflow) {
