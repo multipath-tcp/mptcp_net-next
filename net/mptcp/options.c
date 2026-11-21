@@ -891,9 +891,11 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	opts->suboptions = 0;
 
 	/* Force later mptcp_write_options(), but do not use any actual
-	 * option space.
+	 * option space, except for an infinite mapping still to be sent.
 	 */
-	if (unlikely(__mptcp_check_fallback(msk) && !mptcp_check_infinite_map(skb)))
+	if (unlikely(__mptcp_check_fallback(msk) &&
+		     !mptcp_check_infinite_map(skb) &&
+		     (skb || !subflow->send_infinite_map)))
 		return 0;
 
 	if (unlikely(skb && TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
