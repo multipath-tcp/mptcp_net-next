@@ -2940,6 +2940,18 @@ static bool mptcp_orphan_keep(struct sock *sk)
 	return false;
 }
 
+/* On fallback, TCP can send what an orphan gave to the subflow. As in
+ * __mptcp_close(), unread data requires a reset, also in the backlog.
+ */
+static bool mptcp_orphan_handover(const struct sock *sk)
+{
+	const struct mptcp_sock *msk = mptcp_sk(sk);
+
+	return sock_flag(sk, SOCK_DEAD) && __mptcp_check_fallback(msk) &&
+	       msk->snd_nxt == msk->write_seq && !mptcp_data_avail(msk) &&
+	       !READ_ONCE(msk->backlog_len);
+}
+
 static void mptcp_check_fastclose(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow, *tmp;
@@ -3286,6 +3298,10 @@ static void mptcp_worker(struct work_struct *work)
 		mptcp_start_tout_timer(sk);
 		__mptcp_push_pending(sk, 0);
 	}
+
+	/* TCP will close the subflow, as with its own orphans */
+	if (mptcp_close_tout_expired(sk) && mptcp_orphan_handover(sk))
+		mptcp_set_state(sk, TCP_CLOSE);
 
 	if (mptcp_close_tout_expired(sk)) {
 		struct mptcp_subflow_context *subflow, *tmp;
