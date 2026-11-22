@@ -760,14 +760,14 @@ static void sun8i_dwmac_flow_ctrl(struct mac_device_info *hw,
 	u32 v;
 
 	v = readl(ioaddr + EMAC_RX_CTL0);
-	if (fc == FLOW_AUTO)
+	if (fc & FLOW_RX)
 		v |= EMAC_RX_FLOW_CTL_EN;
 	else
 		v &= ~EMAC_RX_FLOW_CTL_EN;
 	writel(v, ioaddr + EMAC_RX_CTL0);
 
 	v = readl(ioaddr + EMAC_TX_FLOW_CTL);
-	if (fc == FLOW_AUTO)
+	if (fc & FLOW_TX)
 		v |= EMAC_TX_FLOW_CTL_EN;
 	else
 		v &= ~EMAC_TX_FLOW_CTL_EN;
