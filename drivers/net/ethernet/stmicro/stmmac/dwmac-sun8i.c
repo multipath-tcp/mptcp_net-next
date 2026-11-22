@@ -232,6 +232,8 @@ static const struct emac_variant emac_variant_h616_emac1 = {
 
 /* Used in EMAC_TX_FLOW_CTL */
 #define EMAC_TX_FLOW_CTL_EN             BIT(0)
+#define EMAC_TX_FLOW_CTL_ZQP_FRM_EN	BIT(1)
+#define EMAC_TX_FLOW_CTL_PAUSE_TIME	GENMASK(19, 4)
 
 /* Used in EMAC_INT_STA */
 #define EMAC_TX_INT             BIT(0)
@@ -784,10 +786,11 @@ static void sun8i_dwmac_flow_ctrl(struct mac_device_info *hw,
 	writel(v, ioaddr + EMAC_RX_CTL1);
 
 	v = readl(ioaddr + EMAC_TX_FLOW_CTL);
+	v &= ~(EMAC_TX_FLOW_CTL_EN | EMAC_TX_FLOW_CTL_ZQP_FRM_EN |
+	       EMAC_TX_FLOW_CTL_PAUSE_TIME);
 	if (fc & FLOW_TX)
-		v |= EMAC_TX_FLOW_CTL_EN;
-	else
-		v &= ~EMAC_TX_FLOW_CTL_EN;
+		v |= EMAC_TX_FLOW_CTL_EN | EMAC_TX_FLOW_CTL_ZQP_FRM_EN |
+		     FIELD_PREP(EMAC_TX_FLOW_CTL_PAUSE_TIME, pause_time);
 	writel(v, ioaddr + EMAC_TX_FLOW_CTL);
 }
 
