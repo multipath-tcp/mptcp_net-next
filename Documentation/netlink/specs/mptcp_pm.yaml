@@ -183,9 +183,13 @@ attribute-sets:
       -
         name: rcv-add-addrs
         type: u32
+        checks:
+          max: 64
       -
         name: subflows
         type: u32
+        checks:
+          max: 64
       -
         name: token
         type: u32

@@ -45,14 +45,14 @@ const struct nla_policy mptcp_pm_flush_addrs_nl_policy[MPTCP_PM_ENDPOINT_ADDR + 
 
 /* MPTCP_PM_CMD_SET_LIMITS - do */
 const struct nla_policy mptcp_pm_set_limits_nl_policy[MPTCP_PM_ATTR_SUBFLOWS + 1] = {
-	[MPTCP_PM_ATTR_RCV_ADD_ADDRS] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_SUBFLOWS] = { .type = NLA_U32, },
+	[MPTCP_PM_ATTR_RCV_ADD_ADDRS] = NLA_POLICY_MAX(NLA_U32, 64),
+	[MPTCP_PM_ATTR_SUBFLOWS] = NLA_POLICY_MAX(NLA_U32, 64),
 };
 
 /* MPTCP_PM_CMD_GET_LIMITS - do */
 const struct nla_policy mptcp_pm_get_limits_nl_policy[MPTCP_PM_ATTR_SUBFLOWS + 1] = {
-	[MPTCP_PM_ATTR_RCV_ADD_ADDRS] = { .type = NLA_U32, },
-	[MPTCP_PM_ATTR_SUBFLOWS] = { .type = NLA_U32, },
+	[MPTCP_PM_ATTR_RCV_ADD_ADDRS] = NLA_POLICY_MAX(NLA_U32, 64),
+	[MPTCP_PM_ATTR_SUBFLOWS] = NLA_POLICY_MAX(NLA_U32, 64),
 };
 
 /* MPTCP_PM_CMD_SET_FLAGS - do */
