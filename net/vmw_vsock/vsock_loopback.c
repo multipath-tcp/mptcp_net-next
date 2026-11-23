@@ -138,7 +138,7 @@ static void vsock_loopback_work(struct work_struct *work)
 		 * It is freed by the receiver.
 		 */
 		virtio_transport_consume_skb_sent(skb, false);
-		virtio_transport_deliver_tap_pkt(skb);
+		virtio_transport_deliver_tap_pkt(skb, sock_net(skb->sk));
 		virtio_transport_recv_pkt(&loopback_transport, skb,
 					  sock_net(skb->sk));
 	}
