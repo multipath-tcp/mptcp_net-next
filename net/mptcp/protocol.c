@@ -559,6 +559,21 @@ static void mptcp_check_data_fin_ack(struct sock *sk)
 	}
 }
 
+static bool mptcp_data_fin(const struct mptcp_sock *msk, u64 *seq)
+{
+	u64 rcv_data_fin_seq;
+
+	smp_rmb(); /* pair with smp_wmb() in mptcp_update_rcv_data_fin() */
+	rcv_data_fin_seq = READ_ONCE(msk->rcv_data_fin_seq);
+	if (!before64(READ_ONCE(msk->ack_seq), rcv_data_fin_seq)) {
+		if (seq)
+			*seq = rcv_data_fin_seq;
+
+		return true;
+	}
+	return false;
+}
+
 /* can be called with no lock acquired */
 static bool mptcp_pending_data_fin(struct sock *sk, u64 *seq)
 {
@@ -567,16 +582,7 @@ static bool mptcp_pending_data_fin(struct sock *sk, u64 *seq)
 	if (READ_ONCE(msk->rcv_data_fin) &&
 	    ((1 << inet_sk_state_load(sk)) &
 	     (TCPF_ESTABLISHED | TCPF_FIN_WAIT1 | TCPF_FIN_WAIT2))) {
-		u64 rcv_data_fin_seq;
-
-		smp_rmb(); /* pair with smp_wmb in mptcp_update_rcv_data_fin */
-		rcv_data_fin_seq = READ_ONCE(msk->rcv_data_fin_seq);
-		if (!before64(READ_ONCE(msk->ack_seq), rcv_data_fin_seq)) {
-			if (seq)
-				*seq = rcv_data_fin_seq;
-
-			return true;
-		}
+		return mptcp_data_fin(msk, seq);
 	}
 
 	return false;
@@ -2407,22 +2413,17 @@ static bool mptcp_move_skbs(struct sock *sk)
 static unsigned int mptcp_inq_hint(const struct sock *sk)
 {
 	const struct mptcp_sock *msk = mptcp_sk(sk);
-	const struct sk_buff *skb;
+	u64 hint_val = mptcp_data_avail(msk);
 
-	skb = skb_peek(&sk->sk_receive_queue);
-	if (skb) {
-		u64 hint_val = READ_ONCE(msk->ack_seq) - MPTCP_SKB_CB(skb)->map_seq;
+	if (hint_val >= INT_MAX)
+		return INT_MAX;
 
-		if (hint_val >= INT_MAX)
-			return INT_MAX;
+	if (((sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN)) &&
+	     !READ_ONCE(msk->rcv_fastclose)) ||
+	    (READ_ONCE(msk->rcv_data_fin) && mptcp_data_fin(msk, NULL)))
+		hint_val += 1;
 
-		return (unsigned int)hint_val;
-	}
-
-	if (sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN))
-		return 1;
-
-	return 0;
+	return (unsigned int)hint_val;
 }
 
 static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
@@ -3682,6 +3683,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	WRITE_ONCE(msk->can_ack, false);
 	WRITE_ONCE(msk->fully_established, false);
 	WRITE_ONCE(msk->rcv_data_fin, false);
+	WRITE_ONCE(msk->rcv_data_fin_seq, 0);
 	WRITE_ONCE(msk->snd_data_fin_enable, false);
 	WRITE_ONCE(msk->rcv_fastclose, false);
 	WRITE_ONCE(msk->use_64bit_ack, false);
