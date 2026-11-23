@@ -5365,7 +5365,6 @@ static int stmmac_xdp_xmit_xdpf(struct stmmac_priv *priv, int queue,
 {
 	struct skb_shared_info *sinfo = xdp_get_shared_info_from_frame(xdpf);
 	struct stmmac_tx_queue *tx_q = &priv->dma_conf.tx_queue[queue];
-	bool csum = !priv->plat->tx_queues_cfg[queue].coe_unsupported;
 	unsigned int txq_thr = STMMAC_TX_THRESH(priv);
 	unsigned int first_entry = tx_q->cur_tx;
 	unsigned int entry = tx_q->cur_tx;
@@ -5386,14 +5385,6 @@ static int stmmac_xdp_xmit_xdpf(struct stmmac_priv *priv, int queue,
 		priv->xstats.max_sdu_txq_drop[queue]++;
 		return STMMAC_XDP_CONSUMED;
 	}
-
-	/* Disable TX checksum offload for jumbo frames on cores where
-	 * checksum insertion is broken for oversized frames, matching the
-	 * stmmac_fix_features() workaround used by the skb path.
-	 */
-	if (priv->plat->bugged_jumbo &&
-	    xdp_get_frame_len(xdpf) > ETH_FRAME_LEN)
-		csum = false;
 
 	while (true) {
 		skb_frag_t *frag = i ? &sinfo->frags[i - 1] : NULL;
@@ -5434,7 +5425,7 @@ static int stmmac_xdp_xmit_xdpf(struct stmmac_priv *priv, int queue,
 		stmmac_set_tx_dma_entry(tx_q, entry, buf_type, dma_addr, len,
 					dma_map && frag);
 		stmmac_set_desc_addr(priv, desc, dma_addr);
-		stmmac_prepare_tx_desc(priv, desc, !i, len, csum,
+		stmmac_prepare_tx_desc(priv, desc, !i, len, false,
 				       priv->descriptor_mode, !!i, last_frame,
 				       xdp_get_frame_len(xdpf));
 		tx_q->xdpf[entry] = last_frame ? xdpf : NULL;

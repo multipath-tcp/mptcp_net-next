@@ -1289,13 +1289,16 @@ static void ksz9477_phylink_get_caps(struct dsa_switch *ds, int port,
 	ksz_phylink_get_caps(ds, port, config);
 }
 
+/* The datasheet gives no pulse length. A 2 ms pulse worked on a KSZ9893. */
+#define KSZ9477_FAST_AGE_PULSE_US	(2 * USEC_PER_MSEC)
+
 static int ksz9477_set_ageing_time(struct dsa_switch *ds, unsigned int msecs)
 {
+	u8 data, mult, value, old_period, new_period;
 	struct ksz_device *dev = ds->priv;
+	u32 old_secs, new_secs, max_val;
 	u32 secs = msecs / 1000;
-	u8 data, mult, value;
-	u32 max_val;
-	int ret;
+	int ret, err;
 
 #define MAX_TIMER_VAL	((1 << 8) - 1)
 
@@ -1311,6 +1314,10 @@ static int ksz9477_set_ageing_time(struct dsa_switch *ds, unsigned int msecs)
 		return -EINVAL;
 
 	ret = ksz_read8(dev, REG_SW_LUE_CTRL_0, &value);
+	if (ret < 0)
+		return ret;
+
+	ret = ksz_read8(dev, REG_SW_LUE_CTRL_3, &old_period);
 	if (ret < 0)
 		return ret;
 
@@ -1336,8 +1343,32 @@ static int ksz9477_set_ageing_time(struct dsa_switch *ds, unsigned int msecs)
 			return ret;
 	}
 
-	value = DIV_ROUND_UP(secs, data);
-	return ksz_write8(dev, REG_SW_LUE_CTRL_3, value);
+	new_period = DIV_ROUND_UP(secs, data);
+	ret = ksz_write8(dev, REG_SW_LUE_CTRL_3, new_period);
+	if (ret < 0)
+		return ret;
+
+	/* data is the new Age Count and mult is the old one. An entry
+	 * stores the Age Count when it is updated. The datasheet does not
+	 * say when a new Age Period applies. On a KSZ9893, entries outlived
+	 * the new ageing time after it got shorter, and after the Age Count
+	 * got smaller. Pulse Fast Aging in both cases. Fast Aging is a
+	 * control for the whole switch. On a KSZ9893 the pulse removes the
+	 * dynamic entries of all ports and starts the new period.
+	 */
+	old_secs = mult * old_period;
+	new_secs = data * new_period;
+	if (new_secs >= old_secs && data >= mult)
+		return 0;
+
+	ret = ksz_rmw8(dev, REG_SW_LUE_CTRL_1, SW_FAST_AGING, SW_FAST_AGING);
+	if (!ret)
+		fsleep(KSZ9477_FAST_AGE_PULSE_US);
+
+	/* Clear the bit even after an error. */
+	err = ksz_rmw8(dev, REG_SW_LUE_CTRL_1, SW_FAST_AGING, 0);
+
+	return ret ?: err;
 }
 
 void ksz9477_port_queue_split(struct ksz_device *dev, int port)

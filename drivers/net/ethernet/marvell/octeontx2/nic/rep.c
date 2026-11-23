@@ -638,8 +638,8 @@ void rvu_rep_destroy(struct otx2_nic *priv)
 		rep = priv->reps[rep_id];
 		unregister_netdev(rep->netdev);
 		rvu_rep_devlink_port_unregister(rep);
-		free_netdev(rep->netdev);
 		kfree(rep->flow_cfg);
+		free_netdev(rep->netdev);
 	}
 	kfree(priv->reps);
 	rvu_rep_rsrc_free(priv);
