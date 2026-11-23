@@ -1,2 +1,42 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-leak-an-orphan-when-the-PM-closes-its-last-subflow
+Subject: [PATCH] mptcp: don't leak an orphan when the PM closes its last subflow
+
+Once close() has returned, an orphaned MPTCP socket is only destroyed by
+mptcp_worker(), in the run that sees it in TCP_CLOSE: later on, the
+worker returns at once for an msk in this state, and
+mptcp_schedule_work() no longer queues it.
+
+__mptcp_close_ssk() moves an orphan to TCP_CLOSE when, after the closure
+of a subflow, only the initial one remains, and it is closed. This
+function is not only called by the worker: path manager commands also
+close subflows of any msk of the netns, orphans included, under the msk
+lock: e.g. 'ip mptcp endpoint delete' or 'flush' with the in-kernel PM,
+or MPTCP_PM_CMD_SUBFLOW_DESTROY with the userspace one. In this case,
+nothing destroys the orphan: it stays in TCP_CLOSE until the reboot,
+with its token, its initial subflow, and its reference to the netns,
+which is then never freed.
+
+This can happen when the initial subflow has been reset or has timed
+out, and the connection is closed -- the orphan then waits for the end
+of the DATA_FIN exchange, up to TCP_TIMEWAIT_LEN -- before the endpoint
+used by another subflow is removed, e.g. when an interface goes down.
+
+Only the worker can close an orphan, as it must then destroy it. So
+here, mark its close timeout as expired, and queue the worker, like it
+is done for an msk in the accept queue. The worker then closes the
+orphan with mptcp_do_fastclose() -- nothing is sent: the only subflow
+left is closed -- and destroys it. If __mptcp_close_ssk() was called by
+the worker, this happens later in the same run.
+
+This issue has been found by an AI code review agent, while reviewing
+the code of the commit "mptcp: leave an orphan's DATA_FIN to the
+worker", and confirmed with a new Packetdrill test: the initial subflow
+of an orphan waiting for the end of the DATA_FIN exchange is reset, then
+the endpoint of the other subflow is removed. Without this patch, the
+orphan stayed:
+
+  UNCONN 0      0      192.168.0.1:8080 192.0.2.1:39933
+  kernel_orphan_last_subflow.pkt:39: error executing `! ss -HMan | grep -v LISTEN` command: non-zero status 1
+
+Fixes: 27e5ccc2d5a5 ("mptcp: fix dangling connection hang-up")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
