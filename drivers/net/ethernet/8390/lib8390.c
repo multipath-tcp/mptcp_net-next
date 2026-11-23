@@ -660,7 +660,8 @@ static void ei_receive(struct net_device *dev)
 {
 	unsigned long e8390_base = dev->base_addr;
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned char rxing_page, this_frame, next_frame;
+	unsigned char rxing_page, this_frame;
+	int next_frame;
 	unsigned short current_offset;
 	int rx_pkt_count = 0;
 	struct e8390_pkt_hdr rx_frame;

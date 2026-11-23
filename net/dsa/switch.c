@@ -20,14 +20,23 @@
 #include "trace.h"
 #include "user.h"
 
-static unsigned int dsa_switch_fastest_ageing_time(struct dsa_switch *ds,
-						   unsigned int ageing_time)
+static unsigned int
+dsa_switch_fastest_ageing_time(struct dsa_switch *ds,
+			       const struct dsa_notifier_ageing_time_info *info)
 {
+	unsigned int ageing_time = info->ageing_time;
 	struct dsa_port *dp;
 
-	dsa_switch_for_each_port(dp, ds)
+	dsa_switch_for_each_port(dp, ds) {
+		/* info->dp is the port being changed. Its cached value is
+		 * stale until the notifier returns. Skip it.
+		 */
+		if (dp == info->dp)
+			continue;
+
 		if (dp->ageing_time && dp->ageing_time < ageing_time)
 			ageing_time = dp->ageing_time;
+	}
 
 	return ageing_time;
 }
@@ -44,7 +53,7 @@ static int dsa_switch_ageing_time(struct dsa_switch *ds,
 		return -ERANGE;
 
 	/* Program the fastest ageing time in case of multiple bridges */
-	ageing_time = dsa_switch_fastest_ageing_time(ds, ageing_time);
+	ageing_time = dsa_switch_fastest_ageing_time(ds, info);
 
 	if (ds->ops->set_ageing_time)
 		return ds->ops->set_ageing_time(ds, ageing_time);

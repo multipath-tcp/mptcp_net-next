@@ -39,6 +39,7 @@ enum {
 
 /* DSA_NOTIFIER_AGEING_TIME */
 struct dsa_notifier_ageing_time_info {
+	const struct dsa_port *dp;
 	unsigned int ageing_time;
 };
 
