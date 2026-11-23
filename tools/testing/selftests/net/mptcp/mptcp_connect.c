@@ -33,6 +33,7 @@
 #include <linux/tcp.h>
 #include <linux/time_types.h>
 #include <linux/sockios.h>
+#include <linux/errqueue.h>
 #include <linux/compiler.h>
 
 extern int optind;
@@ -53,6 +54,7 @@ enum cfg_mode {
 	CFG_MODE_MMAP,
 	CFG_MODE_SENDFILE,
 	CFG_MODE_SPLICE,
+	CFG_MODE_ZEROCOPY,
 };
 
 enum cfg_peek {
@@ -125,7 +127,7 @@ static void die_usage(void)
 	fprintf(stderr, "\t-j     -- add additional sleep at connection start and tear down "
 		"-- for MPJ tests\n");
 	fprintf(stderr, "\t-l     -- listens mode, accepts incoming connection\n");
-	fprintf(stderr, "\t-m [poll|mmap|sendfile|splice] -- use poll(default)/mmap+write/sendfile/splice\n");
+	fprintf(stderr, "\t-m [poll|mmap|sendfile|splice|zerocopy] -- use poll(default)/mmap+write/sendfile/splice/zerocopy\n");
 	fprintf(stderr, "\t-M mark -- set socket packet mark\n");
 	fprintf(stderr, "\t-o option -- test sockopt <option>\n");
 	fprintf(stderr, "\t-p num -- use port num\n");
@@ -1014,6 +1016,180 @@ static int copyfd_io_splice(int infd, int peerfd, int outfd, unsigned int size,
 	return err;
 }
 
+static bool process_cmsg_zc(struct msghdr *errmsg)
+{
+	struct sock_extended_err *serr;
+	struct cmsghdr *cm;
+
+	for (cm = CMSG_FIRSTHDR(errmsg); cm; cm = CMSG_NXTHDR(errmsg, cm)) {
+		if (cm->cmsg_level != SOL_IP && cm->cmsg_level != SOL_IPV6)
+			continue;
+		if (cm->cmsg_type != IP_RECVERR &&
+		    cm->cmsg_type != IPV6_RECVERR)
+			continue;
+
+		serr = (struct sock_extended_err *)CMSG_DATA(cm);
+		if (serr->ee_origin == SO_EE_ORIGIN_ZEROCOPY)
+			return true;
+	}
+
+	return false;
+}
+
+static bool drain_errqueue_zc(int peerfd)
+{
+	size_t ctl_len = CMSG_SPACE(sizeof(struct sock_extended_err));
+	struct msghdr errmsg = {};
+	bool found = false;
+	char *ctl;
+
+	ctl = malloc(ctl_len);
+	if (!ctl) {
+		perror("malloc ctl");
+		return false;
+	}
+
+	errmsg.msg_control = ctl;
+
+	while (!found) {
+		errmsg.msg_controllen = ctl_len;
+		if (recvmsg(peerfd, &errmsg, MSG_ERRQUEUE) < 0)
+			break;
+
+		found = process_cmsg_zc(&errmsg);
+	}
+
+	free(ctl);
+	return found;
+}
+
+static void wait_for_completions_zc(int peerfd)
+{
+	struct pollfd pfd = { .fd = peerfd, .events = POLLERR };
+	struct timespec start, now;
+	int timeout_ms = 5000;
+
+	if (cfg_time > 0)
+		timeout_ms = cfg_time;
+
+	clock_gettime(CLOCK_MONOTONIC, &start);
+	for (;;) {
+		long elapsed_ms, remaining_ms;
+
+		if (drain_errqueue_zc(peerfd))
+			break;
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		elapsed_ms = (now.tv_sec - start.tv_sec) * 1000L +
+			     (now.tv_nsec - start.tv_nsec) / 1000000L;
+		if (elapsed_ms >= timeout_ms)
+			break;
+
+		remaining_ms = timeout_ms - elapsed_ms;
+		if (remaining_ms > 200)
+			remaining_ms = 200;
+		if (poll(&pfd, 1, remaining_ms) < 0)
+			break;
+	}
+}
+
+static int do_sendmsg_zc(int infd, int peerfd, size_t size,
+			 struct wstate *winfo)
+{
+	struct iovec iov = {};
+	struct msghdr msg = {
+		.msg_iov = &iov,
+		.msg_iovlen = 1,
+	};
+	size_t sent = 0;
+	ssize_t ret;
+	void *buf;
+	int err;
+
+	err = spool_buf(peerfd, winfo);
+	if (err)
+		return err;
+
+	buf = malloc(size);
+	if (!buf) {
+		perror("malloc");
+		return 1;
+	}
+
+	if (read(infd, buf, size) != (ssize_t)size) {
+		perror("read input");
+		err = 1;
+		goto out;
+	}
+
+	while (sent < size) {
+		iov.iov_base = buf + sent;
+		iov.iov_len = size - sent;
+
+		ret = sendmsg(peerfd, &msg, MSG_ZEROCOPY);
+		if (ret <= 0) {
+			if (ret < 0) {
+				perror("sendmsg MSG_ZEROCOPY");
+				err = 1;
+			}
+			break;
+		}
+		sent += ret;
+	}
+	if (sent != size)
+		fprintf(stderr, "sendmsg short: %zu/%zu bytes queued\n",
+			sent, size);
+
+	if (size > 0)
+		wait_for_completions_zc(peerfd);
+
+out:
+	free(buf);
+	return err;
+}
+
+static int copyfd_io_zc(int infd, int peerfd, int outfd, unsigned int size,
+			bool *in_closed_after_out, struct wstate *winfo)
+{
+	socklen_t len;
+	int on = 1;
+	int err;
+
+	set_sndbuf(peerfd, size * 2);
+
+	len = sizeof(on);
+	if (setsockopt(peerfd, SOL_SOCKET, SO_ZEROCOPY, &on, len)) {
+		perror("setsockopt SO_ZEROCOPY");
+		return 1;
+	}
+
+	on = -1;
+	if (getsockopt(peerfd, SOL_SOCKET, SO_ZEROCOPY, &on, &len) ||
+	    on != 1) {
+		perror("getsockopt SO_ZEROCOPY");
+		return 1;
+	}
+
+	if (listen_mode) {
+		err = do_recvfile(peerfd, outfd);
+		if (err)
+			return err;
+
+		err = do_sendmsg_zc(infd, peerfd, size, winfo);
+	} else {
+		err = do_sendmsg_zc(infd, peerfd, size, winfo);
+		if (err)
+			return err;
+
+		shut_wr(peerfd);
+
+		err = do_recvfile(peerfd, outfd);
+		*in_closed_after_out = true;
+	}
+
+	return err;
+}
+
 static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct wstate *winfo)
 {
 	bool in_closed_after_out = false;
@@ -1052,6 +1228,17 @@ static int copyfd_io(int infd, int peerfd, int outfd, bool close_peerfd, struct 
 			return file_size;
 		ret = copyfd_io_splice(infd, peerfd, outfd, file_size,
 				       &in_closed_after_out, winfo);
+		break;
+
+	case CFG_MODE_ZEROCOPY:
+		file_size = get_infd_size(infd);
+		if (file_size < 0)
+			return file_size;
+		if (cfg_sockopt_types.mptfo && winfo->total_len &&
+		    file_size >= winfo->total_len)
+			file_size -= winfo->total_len;
+		ret = copyfd_io_zc(infd, peerfd, outfd, file_size,
+				   &in_closed_after_out, winfo);
 		break;
 
 	default:
@@ -1470,6 +1657,8 @@ int parse_mode(const char *mode)
 		return CFG_MODE_SENDFILE;
 	if (!strcasecmp(mode, "splice"))
 		return CFG_MODE_SPLICE;
+	if (!strcasecmp(mode, "zerocopy"))
+		return CFG_MODE_ZEROCOPY;
 
 	fprintf(stderr, "Unknown test mode: %s\n", mode);
 	fprintf(stderr, "Supported modes are:\n");
@@ -1477,6 +1666,7 @@ int parse_mode(const char *mode)
 	fprintf(stderr, "\t\t\"mmap\" - send entire input file (mmap+write), then read response (-l will read input first)\n");
 	fprintf(stderr, "\t\t\"sendfile\" - send entire input file (sendfile), then read response (-l will read input first)\n");
 	fprintf(stderr, "\t\t\"splice\" - send entire input file (splice), then read response (-l will read input first)\n");
+	fprintf(stderr, "\t\t\"zerocopy\" - send entire input file (zerocopy), then read response (-l will read input first)\n");
 
 	die_usage();
 
