@@ -1,2 +1,89 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-clear-inet_opt-in-the-child-of-an-IPv6-listener
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: clear inet_opt in the child of an IPv6 listener
+
+With SELinux, an IPv6 MPTCP listener and its children can cause a double
+free of one CIPSO option, and then a use-after-free read of it, if
+NetLabel uses CIPSO for IPv4 and selects the IPv6 labels by address.
+
+mptcp_sk_clone_init() creates the child of a listener with
+sk_clone_lock(), as a byte copy of the listener, so each pointer in the
+copy that the socket destructor frees has to be replaced or cleared.
+mptcp_copy_ip_options() duplicates inet_opt, the IPv4 options, for
+AF_INET, and mptcp_copy_ip6_options() duplicates the IPv6 options for
+AF_INET6. But an AF_INET6 socket has an inet_opt pointer too, and its
+child keeps the listener's pointer.
+
+MPTCP does not support setsockopt(IP_OPTIONS), so that pointer is
+usually NULL. But if connect() gets a struct sockaddr_in,
+netlbl_conn_setattr() does not look at the family of the socket, so the
+connect() hook of SELinux can store a CIPSO option in inet_opt of an
+AF_INET6 MPTCP listener. inet_sock_destruct() then passes that option to
+kfree_rcu() for each child and again for the listener, and after a child
+has freed it, another such connect() on the listener reads it in
+cipso_v4_sock_setattr().
+
+The fix used here is to clear inet_opt of the child in
+mptcp_copy_ip6_options().
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch,
+with SELinux, NetLabel -- CIPSO for some IPv4 addresses, and the
+address-based selection used for IPv6 too -- and KASAN: an unprivileged
+user calls connect() with an IPv4 address on an IPv6 MPTCP listener.
+Without this patch, an object is freed twice:
+
+  BUG: KASAN: double-free in rcu_free_sheaf+0x23/0x100
+  Free of addr ffff888012c27a80 by task kworker/1:1/50
+  CPU: 1 UID: 0 PID: 50 Comm: kworker/1:1 Not tainted 7.4.0-rc1+ #1 PREEMPT(full)
+  Workqueue: events mptcp_worker
+  Call Trace:
+   <IRQ>
+   kasan_report_invalid_free+0xd4/0x1b0
+   check_slab_allocation+0xc2/0xf0
+   __rcu_free_sheaf_prepare+0x102/0x2a0
+   rcu_free_sheaf+0x23/0x100
+   rcu_do_batch+0x29a/0xf80
+   rcu_core+0x33c/0x830
+   handle_softirqs+0x212/0x980
+   do_softirq+0xb4/0xf0
+   </IRQ>
+   <TASK>
+   __local_bh_enable_ip+0x11c/0x150
+   mptcp_token_destroy+0x1c9/0x360
+   mptcp_destroy_common+0x2d9/0x430
+   mptcp_destroy+0x86/0x110
+   __mptcp_destroy_sock+0x176/0x350
+   mptcp_worker+0xbb5/0xf80
+  [...]
+  Allocated by task 176:
+  [...]
+   cipso_v4_sock_setattr+0x9b/0x3d0
+   netlbl_conn_setattr+0x3ac/0x500
+   selinux_netlbl_socket_connect_locked+0x102/0x210
+   selinux_netlbl_socket_connect+0x23/0x40
+   security_socket_connect+0x2e/0x60
+   __sys_connect_file+0xcb/0x200
+  [...]
+
+In another case, the CIPSO option is used after having been freed:
+
+  BUG: KASAN: slab-use-after-free in cipso_v4_sock_setattr+0x3c7/0x3d0
+  Read of size 1 at addr ffff8880161c2f18 by task python3/177
+  CPU: 1 UID: 65534 PID: 177 Comm: python3 Not tainted 7.4.0-rc1+ #1 PREEMPT(full)
+  Call Trace:
+   <TASK>
+   kasan_report+0x101/0x140
+   cipso_v4_sock_setattr+0x3c7/0x3d0
+   netlbl_conn_setattr+0x3ac/0x500
+   selinux_netlbl_socket_connect_locked+0x102/0x210
+   selinux_netlbl_socket_connect+0x23/0x40
+   security_socket_connect+0x2e/0x60
+   __sys_connect_file+0xcb/0x200
+   __sys_connect+0xfd/0x130
+   __x64_sys_connect+0x72/0xd0
+  [...]
+
+Fixes: cf7da0d66cc1 ("mptcp: Create SUBFLOW socket for incoming connections")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Commit message: how the issue was found, and its symptoms ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
