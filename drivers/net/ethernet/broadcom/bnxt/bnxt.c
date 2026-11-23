@@ -869,6 +869,11 @@ static bool __bnxt_tx_int(struct bnxt *bp, struct bnxt_tx_ring_info *txr,
 		cons = NEXT_TX(cons);
 		tx_pkts++;
 		tx_bytes += skb->len;
+		if (skb_is_gso(skb) && !tx_buf->is_sw_gso) {
+			txr->tx_hw_gso_packets++;
+			txr->tx_hw_gso_wire_packets +=
+				skb_shinfo(skb)->gso_segs;
+		}
 		tx_buf->skb = NULL;
 		tx_buf->is_ts_pkt = 0;
 
@@ -13820,6 +13825,17 @@ void bnxt_get_ring_drv_stats(struct bnxt *bp,
 
 	for (i = 0; i < bp->cp_nr_rings; i++)
 		bnxt_get_one_ring_drv_stats(bp, stats, &bp->bnapi[i]->cp_ring);
+
+	if (!bp->tx_ring)
+		return;
+
+	for (i = 0; i < bp->tx_nr_rings; i++) {
+		struct bnxt_tx_ring_info *txr = &bp->tx_ring[i];
+
+		stats->tx_total_hw_gso_packets += txr->tx_hw_gso_packets;
+		stats->tx_total_hw_gso_wire_packets +=
+			txr->tx_hw_gso_wire_packets;
+	}
 }
 
 static bool bnxt_mc_list_updated(struct bnxt *bp, u32 *rx_mask,
@@ -16350,15 +16366,15 @@ static void bnxt_get_queue_stats_tx(struct net_device *dev, int i,
 				    struct netdev_queue_stats_tx *stats)
 {
 	struct bnxt *bp = netdev_priv(dev);
-	struct bnxt_napi *bnapi;
+	struct bnxt_tx_ring_info *txr;
 	u64 *sw;
 
 	if (!bp->tx_ring)
 		return;
 
 	bnxt_sync_ring_stats(bp);
-	bnapi = bp->tx_ring[bp->tx_ring_map[i]].bnapi;
-	sw = bnapi->cp_ring.stats.sw_stats;
+	txr = &bp->tx_ring[bp->tx_ring_map[i]];
+	sw = txr->bnapi->cp_ring.stats.sw_stats;
 
 	stats->packets = 0;
 	stats->packets += BNXT_GET_RING_STATS64(sw, tx_ucast_pkts);
@@ -16369,6 +16385,9 @@ static void bnxt_get_queue_stats_tx(struct net_device *dev, int i,
 	stats->bytes += BNXT_GET_RING_STATS64(sw, tx_ucast_bytes);
 	stats->bytes += BNXT_GET_RING_STATS64(sw, tx_mcast_bytes);
 	stats->bytes += BNXT_GET_RING_STATS64(sw, tx_bcast_bytes);
+
+	stats->hw_gso_packets = txr->tx_hw_gso_packets;
+	stats->hw_gso_wire_packets = txr->tx_hw_gso_wire_packets;
 }
 
 static void bnxt_get_base_stats(struct net_device *dev,
@@ -16385,6 +16404,9 @@ static void bnxt_get_base_stats(struct net_device *dev,
 
 	tx->packets = bp->net_stats_prev.tx_packets;
 	tx->bytes = bp->net_stats_prev.tx_bytes;
+	tx->hw_gso_packets = bp->ring_drv_stats_prev.tx_total_hw_gso_packets;
+	tx->hw_gso_wire_packets =
+		bp->ring_drv_stats_prev.tx_total_hw_gso_wire_packets;
 }
 
 static const struct netdev_stat_ops bnxt_stat_ops = {
