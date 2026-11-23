@@ -1,2 +1,50 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-force-the-charge-for-the-first-skb-of-a-subflow
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: force the charge for the first skb of a subflow
+
+After a fallback to TCP, an MPTCP connection can stay stalled once TCP
+memory use is back below the hard limit of net.ipv4.tcp_mem, and above
+that limit send() on an idle MPTCP socket can leave its data unsent.
+
+A push moves data from the write queue of the MPTCP socket to a subflow,
+and charges the subflow twice: for a new skb in __mptcp_alloc_tx_skb()
+and for the payload in mptcp_sendmsg_frag(). On an idle socket, with
+nothing queued, TCP forces both charges past the limit, in
+tcp_stream_alloc_skb() and tcp_wmem_schedule(), since no ACK would ever
+restart such a socket. But a push forces neither, so above the hard
+limit both can be refused, and the push then moves no data.
+
+The earlier commit "mptcp: arm the rtx timer if a push leaves data
+behind" repeats such a push from the MPTCP retransmission (rtx) timer.
+But each attempt fails while memory use stays above the limit. After a
+fallback that timer is disabled, so the data stays unsent until another
+event, such as the next send(), repeats the push.
+
+The fix used here is to:
+- force the charge for the skb if the subflow has nothing queued
+- charge the payload with tcp_wmem_schedule()
+- send only the bytes that tcp_wmem_schedule() grants
+
+The first skb of an MPTCP-level reinjection is then forced too, as it is
+sent on a subflow with nothing queued. This is bounded the same way.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch:
+a TCP memory shortage, for 30 seconds, during which each of ten idle
+MPTCP clients calls send() once. Without this patch, only 5 of them had
+their answer during the shortage, versus 8 with it: the 2 others are
+blocked in send() during the shortage, which is not fixed here. Some
+answers only came after the next send(), 300 seconds later, because of
+the issue fixed by the previous commit:
+
+  IDLE label=behind-the-second-send t=338.9 conn=0 [...] answer_at=336.4
+  IDLE label=behind-the-second-send t=338.9 conn=1 [...] answer_at=4.2
+
+Fixes: 724cfd2ee8aa ("mptcp: allocate TX skbs in msk context")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comments. Commit message: the first skb of a reinjection is
+  forced too + how the issue was found, and its symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+Note (Sashiko on v1): info.mss_now and size_goal cannot be stale in net:
+the in-kernel scheduler only picks a subflow that can send, which can
+then only move to TCP_CLOSE, where tcp_push() does nothing.
