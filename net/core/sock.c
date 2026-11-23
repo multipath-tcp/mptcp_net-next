@@ -1726,8 +1726,10 @@ static int sk_getsockopt_peerpidfd(struct sock *sk, enum pid_type type,
 	struct pid *peer_pid;
 	int pidfd;
 
-	if (len > sizeof(pidfd))
-		len = sizeof(pidfd);
+	/* Userspace can't close a pidfd whose number it didn't get. */
+	if (len < sizeof(pidfd))
+		return -EINVAL;
+	len = sizeof(pidfd);
 
 	spin_lock(&sk->sk_peer_lock);
 	peer_pid = get_pid(sk->sk_peer_pid[type]);
@@ -2407,7 +2409,7 @@ static void __sk_destruct(struct rcu_head *head)
 	sk_prot_free(sk->sk_prot_creator, sk);
 }
 
-void sk_net_refcnt_upgrade(struct sock *sk)
+void __sk_net_refcnt_upgrade(struct sock *sk, gfp_t gfp)
 {
 	struct net *net = sock_net(sk);
 
@@ -2415,8 +2417,13 @@ void sk_net_refcnt_upgrade(struct sock *sk)
 	__netns_tracker_free(net, &sk->ns_tracker, false);
 	net_passive_dec(net);
 	sk->sk_net_refcnt = 1;
-	get_net_track(net, &sk->ns_tracker, GFP_KERNEL);
+	get_net_track(net, &sk->ns_tracker, gfp);
 	sock_inuse_add(net, 1);
+}
+
+void sk_net_refcnt_upgrade(struct sock *sk)
+{
+	__sk_net_refcnt_upgrade(sk, GFP_KERNEL);
 }
 EXPORT_SYMBOL_GPL(sk_net_refcnt_upgrade);
 
@@ -2532,6 +2539,7 @@ struct sock *sk_clone(const struct sock *sk, const gfp_t priority,
 
 	sk_node_init(&newsk->sk_node);
 	sock_lock_init(newsk);
+	spin_lock_init(&newsk->sk_peer_lock);
 
 	if (lock)
 		bh_lock_sock(newsk);
