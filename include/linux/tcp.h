@@ -235,7 +235,8 @@ struct tcp_sock {
 		tcp_usec_ts : 1, /* TSval values in usec */
 		is_sack_reneg:1,    /* in recovery from loss with SACK reneg? */
 		is_cwnd_limited:1,/* forward progress limited by snd_cwnd? */
-		recvmsg_inq : 1;/* Indicate # of bytes in queue upon recvmsg */
+		recvmsg_inq : 1,/* Indicate # of bytes in queue upon recvmsg */
+		bytes_acked_syn:1;/* bytes_acked includes our SYN */
 #ifdef CONFIG_BPF
 	u32	bpf_tcp_ops_flags;
 #define BPF_TCP_OPS_TEST_FLAG(TP, ARG) \
@@ -515,6 +516,9 @@ struct tcp_sock {
 	u32     plb_rehash;     /* PLB-triggered rehash attempts */
 #if IS_ENABLED(CONFIG_MPTCP)
 	bool	is_mptcp;
+#endif
+#if IS_ENABLED(CONFIG_AF_KCM)
+	bool	kcm_attached;
 #endif
 #if IS_ENABLED(CONFIG_SMC)
 	bool	syn_smc;	/* SYN includes SMC */

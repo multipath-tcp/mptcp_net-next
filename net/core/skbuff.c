@@ -589,6 +589,17 @@ struct sk_buff *napi_build_skb(void *data, unsigned int frag_size)
 }
 EXPORT_SYMBOL(napi_build_skb);
 
+static __always_inline size_t kmalloc_reserve_size(unsigned int size, gfp_t flags)
+{
+	size_t obj_size = SKB_HEAD_ALIGN(size);
+
+	if (obj_size <= SKB_SMALL_HEAD_CACHE_SIZE &&
+	    !(flags & KMALLOC_NOT_NORMAL_BITS))
+		return 0;
+
+	return kmalloc_size_roundup(obj_size);
+}
+
 static void *kmalloc_pfmemalloc(size_t obj_size, gfp_t flags, int node)
 {
 	if (!gfp_pfmemalloc_allowed(flags))
@@ -612,9 +623,8 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 	size_t obj_size;
 	void *obj;
 
-	obj_size = SKB_HEAD_ALIGN(*size);
-	if (obj_size <= SKB_SMALL_HEAD_CACHE_SIZE &&
-	    !(flags & KMALLOC_NOT_NORMAL_BITS)) {
+	obj_size = kmalloc_reserve_size(*size, flags);
+	if (!obj_size) {
 		obj = kmem_cache_alloc_node(net_hotdata.skb_small_head_cache,
 				flags | __GFP_NOMEMALLOC | __GFP_NOWARN,
 				node);
@@ -627,7 +637,6 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 		return kmalloc_pfmemalloc(0, flags, node);
 	}
 
-	obj_size = kmalloc_size_roundup(obj_size);
 	/* The following cast might truncate high-order bits of obj_size, this
 	 * is harmless because kmalloc(obj_size >= 2^32) will fail anyway.
 	 */
@@ -649,6 +658,16 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 	obj = kmalloc_pfmemalloc(obj_size, flags, node);
 out:
 	return obj;
+}
+
+unsigned int skb_head_truesize(unsigned int size, gfp_t flags)
+{
+	size_t obj_size = kmalloc_reserve_size(size, flags);
+
+	if (!obj_size)
+		obj_size = SKB_SMALL_HEAD_CACHE_SIZE;
+
+	return obj_size + SKB_DATA_ALIGN(sizeof(struct sk_buff));
 }
 
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
@@ -7247,17 +7266,40 @@ struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
 	while (data_len) {
 		if (nr_frags == MAX_SKB_FRAGS)
 			goto failure;
-		while (order && PAGE_ALIGN(data_len) < (PAGE_SIZE << order))
-			order--;
+		if (order && PAGE_ALIGN(data_len) < (PAGE_SIZE << order)) {
+			unsigned long pages = DIV_ROUND_UP(data_len, PAGE_SIZE);
+
+			/* If splitting the rest into smaller pages would need
+			 * more frags than we have left, use one larger page.
+			 */
+			if (hweight_long(pages) > MAX_SKB_FRAGS - nr_frags)
+				order = order_base_2(pages);
+			else
+				order = ilog2(pages);
+		}
 
 		if (order) {
 			page = alloc_pages((gfp_mask & ~__GFP_DIRECT_RECLAIM) |
 					   __GFP_COMP |
 					   __GFP_NOWARN,
 					   order);
-			if (!page) {
-				order--;
-				continue;
+			if (unlikely(!page)) {
+				unsigned int shift = PAGE_SHIFT + order - 1;
+
+				/* Can smaller pages hold the rest? */
+				if (((data_len - 1) >> shift) + 1 <=
+				    MAX_SKB_FRAGS - nr_frags) {
+					order--;
+					continue;
+				}
+				/* No, retry this order with direct reclaim. */
+				if (!gfpflags_allow_blocking(gfp_mask))
+					goto failure;
+				page = alloc_pages(gfp_mask | __GFP_COMP |
+						   __GFP_NOWARN | __GFP_NORETRY,
+						   order);
+				if (!page)
+					goto failure;
 			}
 		} else {
 			page = alloc_page(gfp_mask);
@@ -7291,7 +7333,6 @@ static void skb_carve_reset_headers(struct sk_buff *skb)
 	skb_unset_mac_header(skb);
 	skb_unset_transport_header(skb);
 	skb_reset_network_header(skb);
-	skb->mac_len = 0;
 
 	/* Inner offsets have no "unset" marker, zero them so that
 	 * skb_inner_network_header_was_set() becomes false and no

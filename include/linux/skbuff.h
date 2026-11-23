@@ -275,6 +275,8 @@
 			 SKB_DATA_ALIGN(sizeof(struct sk_buff)) +	\
 			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
 
+unsigned int skb_head_truesize(unsigned int size, gfp_t flags);
+
 struct net_device;
 struct scatterlist;
 struct pipe_inode_info;
@@ -3194,6 +3196,7 @@ static inline u32 skb_mac_header_len(const struct sk_buff *skb)
 static inline void skb_unset_mac_header(struct sk_buff *skb)
 {
 	skb->mac_header = (typeof(skb->mac_header))~0U;
+	skb->mac_len = 0;
 }
 
 static inline void skb_reset_mac_header(struct sk_buff *skb)
