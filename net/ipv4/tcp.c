@@ -3472,6 +3472,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->segs_out = 0;
 	tp->bytes_sent = 0;
 	tp->bytes_acked = 0;
+	tp->bytes_acked_syn = 0;
 	tp->bytes_received = 0;
 	tp->bytes_retrans = 0;
 	tp->data_segs_in = 0;
