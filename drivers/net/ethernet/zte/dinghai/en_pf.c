@@ -6,6 +6,8 @@
 
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/io.h>
+#include <linux/iopoll.h>
 #include <net/devlink.h>
 #include <linux/dma-mapping.h>
 #include "en_pf.h"
@@ -369,6 +371,120 @@ err_map_notify:
 	return ret;
 }
 
+/* The firmware fills the compatibility block field by field, so it is
+ * only ready to be read once every field we consume has lost its
+ * erased value.
+ */
+static bool zxdh_pf_fw_compat_ready(struct zxdh_fw_compat __iomem *compat)
+{
+	return ioread8(&compat->module_id) != 0xffU &&
+	       ioread8(&compat->major) != 0xffU &&
+	       ioread8(&compat->fw_minor) != 0xffU &&
+	       ioread8(&compat->drv_minor) != 0xffU &&
+	       ioread16(&compat->patch) != 0xffffU;
+}
+
+/* Read the firmware version block and verify the driver/firmware
+ * version contract.
+ */
+static int zxdh_pf_fw_compat_check(struct zxdh_core_dev *zxdh_dev)
+{
+	struct zxdh_pf_dev *pf_dev = zxdh_dev->priv;
+	struct zxdh_fw_compat __iomem *compat;
+	struct zxdh_fw_compat *fw_compat;
+	bool ready;
+	int err;
+
+	fw_compat = &pf_dev->fw_compat;
+	compat = pf_dev->pci_ioremap_addr[0] + ZXDH_FW_COMPAT_OFFSET;
+
+	/* The firmware publishes the block within 10 s of boot; wait twice
+	 * that to leave margin.
+	 */
+	err = readx_poll_timeout(zxdh_pf_fw_compat_ready, compat, ready,
+				 ready, USEC_PER_SEC,
+				 ZXDH_FW_COMPAT_TIMEOUT_SEC * USEC_PER_SEC);
+	if (err)
+		dev_info(zxdh_dev->device,
+			 "compat region not populated, assuming legacy firmware\n");
+
+	/* Firmware predating the compatibility region keeps the erased
+	 * pattern, which fails the module id check below and defers the
+	 * decision to the readiness wait.
+	 */
+	fw_compat->module_id = ioread8(&compat->module_id);
+	fw_compat->major = ioread8(&compat->major);
+	fw_compat->fw_minor = ioread8(&compat->fw_minor);
+	fw_compat->drv_minor = ioread8(&compat->drv_minor);
+	fw_compat->patch = ioread16(&compat->patch);
+
+	if (fw_compat->module_id != ZXDH_MODULE_ID) {
+		dev_info(zxdh_dev->device,
+			 "unknown module id %u, skip fw compat check\n",
+			 fw_compat->module_id);
+		/* Unknown firmware is treated as predating the HPIRQ
+		 * patch, so that the readiness wait is skipped.
+		 */
+		fw_compat->patch = 0;
+		return 0;
+	}
+
+	if (fw_compat->major != ZXDH_MAJOR) {
+		dev_err(zxdh_dev->device,
+			"driver major %u incompatible with firmware major %u\n",
+			ZXDH_MAJOR, fw_compat->major);
+		return -EINVAL;
+	}
+
+	if (fw_compat->fw_minor < ZXDH_FW_MINOR) {
+		dev_err(zxdh_dev->device,
+			"firmware fw_minor %u older than required %u\n",
+			fw_compat->fw_minor, ZXDH_FW_MINOR);
+		return -EINVAL;
+	}
+
+	if (fw_compat->drv_minor > ZXDH_DRV_MINOR) {
+		dev_err(zxdh_dev->device,
+			"driver drv_minor %u older than required by firmware %u\n",
+			ZXDH_DRV_MINOR, fw_compat->drv_minor);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/* Wait for the RISC-V management core of the firmware to finish
+ * booting, so that later probe steps can talk to it.
+ */
+static int zxdh_pf_wait_riscv_ready(struct zxdh_core_dev *zxdh_dev)
+{
+	struct zxdh_pf_dev *pf_dev = zxdh_dev->priv;
+	struct zxdh_health_buffer __iomem *hb;
+	u8 health_version;
+	u8 power_on;
+	int err;
+
+	hb = pf_dev->pci_ioremap_addr[0] + ZXDH_RISCV_HB_OFFSET;
+	health_version = ioread8(&hb->health_version);
+
+	/* Firmware that supports neither self-healing nor hot-plug
+	 * interrupts does not report the power-on flag.
+	 */
+	if (health_version != 1 &&
+	    pf_dev->fw_compat.patch < ZXDH_HPIRQ_PATCH)
+		return 0;
+
+	err = readx_poll_timeout(ioread8, &hb->riscv_power_on, power_on,
+				 power_on == 1, USEC_PER_SEC,
+				 ZXDH_RISCV_READY_TIMEOUT_SEC * USEC_PER_SEC);
+	if (err) {
+		dev_err(zxdh_dev->device, "timed out waiting for riscv power on\n");
+		return err;
+	}
+
+	return 0;
+}
+
 static int zxdh_pf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct zxdh_core_dev *zxdh_dev;
@@ -405,10 +521,24 @@ static int zxdh_pf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_cfg_init;
 	}
 
+	ret = zxdh_pf_fw_compat_check(zxdh_dev);
+	if (ret) {
+		dev_err(&pdev->dev, "zxdh_pf_fw_compat_check failed: %d\n", ret);
+		goto err_modern_cfg;
+	}
+
+	ret = zxdh_pf_wait_riscv_ready(zxdh_dev);
+	if (ret) {
+		dev_err(&pdev->dev, "zxdh_pf_wait_riscv_ready failed: %d\n", ret);
+		goto err_modern_cfg;
+	}
+
 	devlink_register(devlink);
 
 	return 0;
 
+err_modern_cfg:
+	zxdh_pf_modern_cfg_uninit(zxdh_dev);
 err_cfg_init:
 	zxdh_pf_pci_close(zxdh_dev);
 err_pci_init:

@@ -460,6 +460,10 @@ looped_back:
 	}
 
 	if (skb_dst_dev(skb)->flags & IFF_LOOPBACK) {
+		/* payload_len, nexthdr and hop_limit */
+		__be32 *hlim_word = (__be32 *)ipv6_hdr(skb) + 1;
+		__be32 old;
+
 		if (ipv6_hdr(skb)->hop_limit <= 1) {
 			__IP6_INC_STATS(net, idev, IPSTATS_MIB_INHDRERRORS);
 			icmpv6_send(skb, ICMPV6_TIME_EXCEED,
@@ -467,7 +471,11 @@ looped_back:
 			kfree_skb_reason(skb, SKB_DROP_REASON_IP_TTL_EXCEEDED);
 			return -1;
 		}
+		old = *hlim_word;
 		ipv6_hdr(skb)->hop_limit--;
+
+		if (skb->ip_summed == CHECKSUM_COMPLETE)
+			update_csum_diff4(skb, old, *hlim_word);
 
 		skb_pull(skb, skb_transport_offset(skb));
 		goto looped_back;
