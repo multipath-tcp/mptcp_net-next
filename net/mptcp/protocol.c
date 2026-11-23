@@ -1387,13 +1387,17 @@ static struct sk_buff *__mptcp_alloc_tx_skb(struct sock *sk, struct sock *ssk, g
 	if (!skb)
 		return NULL;
 
-	if (likely(sk_wmem_schedule(ssk, skb->truesize))) {
-		tcp_skb_entail(ssk, skb);
-		return skb;
+	/* like TCP, force the charge if nothing is queued */
+	if (tcp_rtx_and_write_queues_empty(ssk)) {
+		sk_forced_mem_schedule(ssk, skb->truesize);
+	} else if (unlikely(!sk_wmem_schedule(ssk, skb->truesize))) {
+		tcp_skb_tsorted_anchor_cleanup(skb);
+		kfree_skb(skb);
+		return NULL;
 	}
-	tcp_skb_tsorted_anchor_cleanup(skb);
-	kfree_skb(skb);
-	return NULL;
+
+	tcp_skb_entail(ssk, skb);
+	return skb;
 }
 
 static struct sk_buff *mptcp_alloc_tx_skb(struct sock *sk, struct sock *ssk, bool data_lock_held)
@@ -1449,6 +1453,7 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	bool reuse_skb = true;
 	struct sk_buff *skb;
 	size_t copy;
+	int avail;
 	int i;
 
 	pr_debug("msk=%p ssk=%p sending dfrag at seq=%llu len=%u already sent=%u\n",
@@ -1522,10 +1527,14 @@ alloc_skb:
 	}
 
 	copy = min_t(size_t, copy, info->limit - info->sent);
-	if (!sk_wmem_schedule(ssk, copy)) {
+
+	/* like TCP, allow some progress up to tcp_wmem[0] */
+	avail = tcp_wmem_schedule(ssk, copy);
+	if (avail <= 0) {
 		tcp_remove_empty_skb(ssk);
 		return -ENOMEM;
 	}
+	copy = avail;
 
 	if (can_coalesce) {
 		skb_frag_size_add(&skb_shinfo(skb)->frags[i - 1], copy);
@@ -1850,14 +1859,11 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 	if (ssk)
 		mptcp_push_release(ssk, &info);
 
-	/* Avoid scheduling the rtx timer if no data has been pushed; the timer
-	 * will be updated on positive acks by __mptcp_cleanup_una().
-	 */
-	if (copied) {
-		if (!mptcp_rtx_timer_pending(sk))
-			mptcp_reset_rtx_timer(sk);
+	/* also retry later if unsent data is left: no ack may trigger it */
+	if ((copied || mptcp_send_head(sk)) && !mptcp_rtx_timer_pending(sk))
+		mptcp_reset_rtx_timer(sk);
+	if (copied)
 		mptcp_check_send_data_fin(sk);
-	}
 }
 
 static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool first)
@@ -1919,13 +1925,15 @@ out:
 	if (copied) {
 		tcp_push(ssk, 0, info.mss_now, tcp_sk(ssk)->nonagle,
 			 info.size_goal);
-		if (!mptcp_rtx_timer_pending(sk))
-			mptcp_reset_rtx_timer(sk);
 
 		if (msk->snd_data_fin_enable &&
 		    msk->snd_nxt + 1 == msk->write_seq)
 			mptcp_schedule_work(sk);
 	}
+
+	/* see __mptcp_push_pending() */
+	if ((copied || mptcp_send_head(sk)) && !mptcp_rtx_timer_pending(sk))
+		mptcp_reset_rtx_timer(sk);
 }
 
 static int mptcp_disconnect(struct sock *sk, int flags);
@@ -2356,9 +2364,15 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 	}
 
 	__mptcp_ofo_queue(msk);
-	if (moved)
-		mptcp_check_data_fin((struct sock *)msk);
-	return moved;
+	if (!moved)
+		return false;
+
+	/* Only the worker can close an orphan, as it must then destroy it */
+	if (!sock_flag(sk, SOCK_DEAD))
+		mptcp_check_data_fin(sk);
+	else if (mptcp_pending_data_fin(sk, NULL))
+		mptcp_schedule_work(sk);
+	return true;
 }
 
 static bool mptcp_can_spool_backlog(struct sock *sk, struct list_head *skbs)
@@ -2781,8 +2795,13 @@ out:
 	 */
 	if (list_is_singular(&msk->conn_list) && msk->first &&
 	    inet_sk_state_load(msk->first) == TCP_CLOSE) {
-		if (sk->sk_state != TCP_ESTABLISHED ||
-		    msk->in_accept_queue || sock_flag(sk, SOCK_DEAD)) {
+		if (sock_flag(sk, SOCK_DEAD)) {
+			/* let the worker close and destroy the orphan */
+			mptcp_set_close_tout(sk, tcp_jiffies32 -
+					     (mptcp_close_timeout(sk) + 1));
+			mptcp_schedule_work(sk);
+		} else if (sk->sk_state != TCP_ESTABLISHED ||
+			   msk->in_accept_queue) {
 			mptcp_set_state(sk, TCP_CLOSE);
 			mptcp_close_wake_up(sk);
 		} else {
@@ -3720,6 +3739,9 @@ static void mptcp_copy_ip6_options(struct sock *newsk, const struct sock *sk)
 
 	newnp = inet6_sk(newsk);
 
+	/* The IPv4 options belong to the listener, which frees them */
+	RCU_INIT_POINTER(inet_sk(newsk)->inet_opt, NULL);
+
 	rcu_read_lock();
 	opt = rcu_dereference(np->opt);
 	if (opt) {
@@ -4383,6 +4405,11 @@ static int mptcp_listen(struct socket *sock, int backlog)
 
 	lock_sock(ssk);
 	err = __inet_listen_sk(ssk, backlog);
+	if (err && ssk->sk_state == TCP_CLOSE) {
+		/* inet_csk_listen_start() leaves this drain to MPTCP */
+		mptcp_subflow_queue_clean(sk, ssk);
+		inet_csk_listen_stop(ssk);
+	}
 	release_sock(ssk);
 	mptcp_set_state(sk, inet_sk_state_load(ssk));
 
