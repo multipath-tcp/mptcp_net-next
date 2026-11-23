@@ -828,9 +828,9 @@ static void ovs_fragment(struct net *net, struct vport *vport,
 		ip6_fragment(net, skb->sk, skb, ovs_vport_output);
 		refdst_drop(orig_dst);
 	} else {
-		WARN_ONCE(1, "Failed fragment ->%s: eth=%04x, MRU=%d, MTU=%d.",
-			  ovs_vport_name(vport), ntohs(key->eth.type), mru,
-			  vport->dev->mtu);
+		net_warn_ratelimited("Failed fragment ->%s: eth=%04x, MRU=%d, MTU=%d.\n",
+				     ovs_vport_name(vport), ntohs(key->eth.type),
+				     mru, vport->dev->mtu);
 		reason = OVS_DROP_FRAG_INVALID_PROTO;
 		goto err;
 	}

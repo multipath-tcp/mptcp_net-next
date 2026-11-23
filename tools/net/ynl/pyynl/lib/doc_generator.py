@@ -17,7 +17,7 @@
         2) YAML Netlink (YNL) doc generator: Generate docs from YAML data
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import yaml
 
 LINE_STR = '__lineno__'
@@ -181,7 +181,8 @@ class YnlDocGenerator:
 
         return "\n".join(lines)
 
-    def parse_operations(self, operations: List[Dict[str, Any]], namespace: str) -> str:
+    def parse_operations(self, operations: List[Dict[str, Any]], namespace: str,
+                         default_fixed_header: Optional[str] = None) -> str:
         """Parse operations block"""
         preprocessed = ["name", "doc", "title", "do", "dump", "flags", "event"]
         linkable = ["fixed-header", "attribute-set"]
@@ -206,6 +207,13 @@ class YnlDocGenerator:
                 if key in linkable:
                     value = self.fmt.rst_ref(namespace, key, value)
                 lines.append(self.fmt.rst_fields(key, value, 0))
+
+            # Show the family-wide default when the op does not set its own
+            if default_fixed_header and "fixed-header" not in operation:
+                value = self.fmt.rst_ref(namespace, "fixed-header",
+                                         default_fixed_header)
+                lines.append(self.fmt.rst_fields("fixed-header", value, 0))
+
             if 'flags' in operation:
                 lines.append(self.fmt.rst_fields('flags',
                                                  self.fmt.rst_list_inline(operation['flags'])))
@@ -367,8 +375,10 @@ class YnlDocGenerator:
         # Operations
         if "operations" in obj:
             lines.append(self.fmt.rst_subtitle("Operations"))
-            lines.append(self.parse_operations(obj["operations"]["list"],
-                                               family))
+            lines.append(self.parse_operations(
+                obj["operations"]["list"],
+                family,
+                obj["operations"].get("fixed-header")))
 
         # Multicast groups
         if "mcast-groups" in obj:
