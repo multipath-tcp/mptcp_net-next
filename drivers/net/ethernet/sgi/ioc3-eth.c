@@ -848,6 +848,7 @@ static int ioc3eth_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
+	platform_set_drvdata(pdev, dev);
 
 	ip = netdev_priv(dev);
 	ip->dma_dev = pdev->dev.parent;
