@@ -1,2 +1,45 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-initialize-drop_req-in-subflow_init_req
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: initialize drop_req in subflow_init_req()
+
+With CONFIG_MPTCP and SO_REUSEPORT migration, which
+net.ipv4.tcp_migrate_req=1 or a BPF program enables, TCP sockets can
+leak until reboot, and each keeps its network namespace alive.
+
+tcp_check_req() keeps a child off the accept queue if drop_req is true
+in a request socket that an MPTCP listener created. drop_req has one
+writer, subflow_syn_recv_sock(), which tcp_check_req() calls before that
+test only for an MPTCP listener. But if SO_REUSEPORT migration moves the
+request socket to a plain TCP listener, the test reads what the
+allocation left in drop_req, and nothing drops the last reference of a
+child that stays off the accept queue.
+
+The fix used here is to set drop_req to false in subflow_init_req(),
+which runs when the request socket of an MPTCP listener is set up.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch,
+run as an unprivileged user in a user namespace, with
+net.ipv4.tcp_migrate_req=1: an MPTCP listener and a TCP one sharing a
+port with SO_REUSEPORT, the MPTCP one being closed while handshakes
+complete. Without this patch, the children were leaked, with their
+network namespace, without any message from the kernel:
+
+  repro: step 3 to 6: 32 SYNs, 16 went to A. A closed, 16 third ACKs. accept() on B returned 0
+  [...]
+  repro: RESULT: 16 children never reached an accept queue
+  repro: one RST for each connection. TCP: inuse 0 orphan 0 tw 0 alloc 16 mem 0
+  === exit code 0. The process and its namespaces are gone
+  === after:  TCP sockets allocated, all namespaces: 16 [...]
+
+With UBSAN, the original version of this patch also reported:
+
+  UBSAN: invalid-load in [...]/include/net/mptcp.h:144:47
+  load of value 14 is not a valid value for type '_Bool'
+   tcp_check_req.cold+0xb6/0x189
+   tcp_v4_rcv+0x11f4/0x4230
+
+Fixes: c905dee62232 ("tcp: Migrate TCP_NEW_SYN_RECV requests at retransmitting SYN+ACKs.")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Commit message: how the issue was found, and its
+  symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
