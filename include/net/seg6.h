@@ -19,7 +19,7 @@ static inline void update_csum_diff4(struct sk_buff *skb, __be32 from,
 {
 	__be32 diff[] = { ~from, to };
 
-	skb->csum = ~csum_partial((char *)diff, sizeof(diff), ~skb->csum);
+	skb->csum = csum_partial(diff, sizeof(diff), skb->csum);
 }
 
 static inline void update_csum_diff16(struct sk_buff *skb, __be32 *from,
@@ -30,7 +30,7 @@ static inline void update_csum_diff16(struct sk_buff *skb, __be32 *from,
 		to[0], to[1], to[2], to[3],
 	};
 
-	skb->csum = ~csum_partial((char *)diff, sizeof(diff), ~skb->csum);
+	skb->csum = csum_partial(diff, sizeof(diff), skb->csum);
 }
 
 struct seg6_pernet_data {
