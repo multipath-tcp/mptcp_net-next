@@ -529,7 +529,7 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 
 	pr_debug("msk=%p, rm_list_nr=%d\n", msk, rm_list->nr);
 
-	if (rm_addr) {
+	if (mptcp_pm_should_rm_signal(msk)) {
 		MPTCP_ADD_STATS(sock_net((struct sock *)msk),
 				MPTCP_MIB_RMADDRTXDROP, rm_list->nr);
 		return -EINVAL;
@@ -827,7 +827,10 @@ static void mptcp_pm_rm_addr_or_subflow(struct mptcp_sock *msk,
 
 static void mptcp_pm_rm_addr_recv(struct mptcp_sock *msk)
 {
-	mptcp_pm_rm_addr_or_subflow(msk, &msk->pm.rm_list_rx, MPTCP_MIB_RMADDR);
+	/* pm.lock is dropped on the way: the next RM_ADDR may come in */
+	struct mptcp_rm_list rm_list = msk->pm.rm_list_rx;
+
+	mptcp_pm_rm_addr_or_subflow(msk, &rm_list, MPTCP_MIB_RMADDR);
 }
 
 void mptcp_pm_rm_subflow(struct mptcp_sock *msk,
@@ -840,17 +843,30 @@ void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
 			       const struct mptcp_rm_list *rm_list)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
+	bool drop = false;
 	u8 i;
 
 	pr_debug("msk=%p remote_ids_nr=%d\n", msk, rm_list->nr);
 
-	for (i = 0; i < rm_list->nr; i++)
-		mptcp_event_addr_removed(msk, rm_list->ids[i]);
-
 	spin_lock_bh(&pm->lock);
 	if (mptcp_pm_schedule_work(msk, MPTCP_PM_RM_ADDR_RECEIVED))
-		pm->rm_list_rx = *rm_list;
-	else
+		pm->rm_list_rx.nr = 0;
+
+	/* the worker may not have got to the previous RM_ADDR yet */
+	for (i = 0; i < rm_list->nr; i++) {
+		u8 id = rm_list->ids[i];
+
+		if (!memchr(pm->rm_list_rx.ids, id, pm->rm_list_rx.nr)) {
+			if (pm->rm_list_rx.nr == MPTCP_RM_IDS_MAX) {
+				drop = true;
+				continue;
+			}
+			pm->rm_list_rx.ids[pm->rm_list_rx.nr++] = id;
+		}
+		/* not for the dropped ids, and before the worker acts */
+		mptcp_event_addr_removed(msk, id);
+	}
+	if (drop)
 		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_RMADDRDROP);
 	spin_unlock_bh(&pm->lock);
 }
@@ -1000,7 +1016,8 @@ static int mptcp_rm_addr_len(const struct mptcp_rm_list *rm_list)
 }
 
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			     struct mptcp_rm_list *rm_list, int *size)
+			     struct mptcp_rm_list *rm_list, int *size,
+			     bool size_only)
 {
 	int ret = false, len;
 	u8 rm_addr;
@@ -1021,9 +1038,12 @@ bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 		goto out_unlock;
 
 	*size = len;
+	ret = true;
+	if (size_only)
+		goto out_unlock;
+
 	*rm_list = msk->pm.rm_list_tx;
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
-	ret = true;
 
 out_unlock:
 	spin_unlock_bh(&msk->pm.lock);
