@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: GPL-2.0
+//
+// Passive open counterpart of tcp_rfc5961_ack-iss-client.pkt.
+//
+// Once the connection is established, a segment with SEG.ACK = ISS
+// acknowledges bytes we never sent.  It must be dropped and a challenge
+// ACK sent back (RFC 5961 Section 5.2), whatever amount of payload was
+// acked so far.
+
+`./defaults.sh
+sysctl -q net.ipv4.tcp_invalid_ratelimit=0
+`
+
+   0 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+  +0 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+  +0 bind(3, ..., ...) = 0
+  +0 listen(3, 1) = 0
+
+  +0 < S 0:0(0) win 10000 <mss 1000,nop,nop,sackOK,nop,wscale 0>
+  +0 > S. 0:0(0) ack 1 <...>
++.01 < . 1:1(0) ack 1 win 10000
+  +0 accept(3, ..., ...) = 4
+
+// SND.UNA = SND.NXT = ISS + 1, no payload acked yet.
+// SEG.ACK = ISS must trigger a challenge ACK.
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1:1(0) ack 1
+
+// Get 1000 bytes of payload acked.
+  +0 write(4, ..., 1000) = 1000
+  +0 > P. 1:1001(1000) ack 1
++.01 < . 1:1(0) ack 1001 win 10000
+
+// SND.UNA = ISS + 1001.  Old ACKs in [ISS + 1, ISS + 1001] are valid
+// duplicates, but SEG.ACK = ISS is still below anything the peer could
+// have legitimately sent.
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1001:1001(0) ack 1
+
+// SEG.ACK = ISS + 1 is a genuine old ACK: silently accepted, no
+// challenge ACK.  The next packet on the wire must be our new data.
++.01 < . 1:1(0) ack 1 win 10000
++.01 write(4, ..., 1000) = 1000
+  +0 > P. 1001:2001(1000) ack 1
++.01 < . 1:1(0) ack 2001 win 10000

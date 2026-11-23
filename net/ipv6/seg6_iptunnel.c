@@ -472,7 +472,7 @@ static int seg6_do_srh(struct sk_buff *skb, struct dst_entry *cache_dst)
 			return err;
 
 		skb_mac_header_rebuild(skb);
-		skb_push(skb, skb->mac_len);
+		skb_push_rcsum(skb, skb->mac_len);
 
 		if (tinfo->mode == SEG6_IPTUN_MODE_L2ENCAP)
 			err = __seg6_do_srh_encap(skb, tinfo->srh,
