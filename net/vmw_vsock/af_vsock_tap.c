@@ -73,19 +73,23 @@ static int __vsock_deliver_tap_skb(struct sk_buff *skb,
 	return ret;
 }
 
-static void __vsock_deliver_tap(struct sk_buff *skb)
+static void __vsock_deliver_tap(struct sk_buff *skb, struct net *net)
 {
 	int ret;
 	struct vsock_tap *tmp;
 
 	list_for_each_entry_rcu(tmp, &vsock_tap_all, list) {
+		if (!vsock_net_check_mode(dev_net(tmp->dev), net))
+			continue;
+
 		ret = __vsock_deliver_tap_skb(skb, tmp->dev);
 		if (unlikely(ret))
 			break;
 	}
 }
 
-void vsock_deliver_tap(struct sk_buff *build_skb(void *opaque), void *opaque)
+void vsock_deliver_tap(struct sk_buff *build_skb(void *opaque), void *opaque,
+		       struct net *net)
 {
 	struct sk_buff *skb;
 
@@ -96,7 +100,7 @@ void vsock_deliver_tap(struct sk_buff *build_skb(void *opaque), void *opaque)
 
 	skb = build_skb(opaque);
 	if (skb) {
-		__vsock_deliver_tap(skb);
+		__vsock_deliver_tap(skb, net);
 		consume_skb(skb);
 	}
 
