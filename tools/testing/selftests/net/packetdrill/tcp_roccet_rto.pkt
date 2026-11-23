@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: GPL-2.0
+// Test that ROCCET does not take its "restart after idle" path on RTO.
+//
+// An RTO retransmit raises CA_EVENT_TX_START, because all outstanding
+// packets were just marked lost (tcp_packets_in_flight() == 0) while
+// tp->packets_out is not zero. If (now - tp->lsndtime) >= icsk_rto,
+// roccet_cwnd_event_tx_start() used to overwrite the snd_ssthresh
+// that tcp_enter_loss() had just set with TCP_INIT_CWND.
+//
+// TLP is enabled here. The RTO timer is rearmed for a full icsk_rto when
+// the loss probe is sent, and the probe is the last transmit, so the
+// very first RTO is affected.
+
+`./defaults.sh
+./set_sysctls.py /proc/sys/net/ipv4/tcp_slow_start_after_idle=1`
+
+    0 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+   +0 setsockopt(3, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
+   +0 setsockopt(3, SOL_TCP, TCP_CONGESTION, "roccet", 6) = 0
+   +0 bind(3, ..., ...) = 0
+   +0 listen(3, 1) = 0
+
+   +0 < S 0:0(0) win 65535 <mss 1000,sackOK,nop,nop,nop,wscale 7>
+   +0 > S. 0:0(0) ack 1 <mss 1460,nop,nop,sackOK,nop,wscale 8>
+  +.1 < . 1:1(0) ack 1 win 511
+   +0 accept(3, ..., ...) = 4
+
+// ROCCET paces its packets: do not expect precise outgoing packets,
+// rely on TCP_INFO instead.
+   +0 write(4, ..., 10000) = 10000
+  +.1 < . 1:1(0) ack 10001 win 511
+   +0 %{ assert tcpi_snd_cwnd == 20, tcpi_snd_cwnd }%
+
+// RTT is 100ms, RTO is ~300ms. Nothing is acked from now on.
+   +0 write(4, ..., 20000) = 20000
+
+// TLP fires ~250ms after the write.
+  +.4 %{
+assert tcpi_ca_state == TCP_CA_Open, tcpi_ca_state
+assert tcpi_total_retrans == 1, tcpi_total_retrans
+}%
+
+// First RTO, ~300ms after the TLP probe.
+// ROCCET is still in LAUNCH state: ssthresh is set to the prior cwnd.
+  +.3 %{
+assert tcpi_ca_state == TCP_CA_Loss, tcpi_ca_state
+assert tcpi_backoff == 1, tcpi_backoff
+assert tcpi_total_retrans == 2, tcpi_total_retrans
+assert tcpi_snd_cwnd == 10, tcpi_snd_cwnd
+assert tcpi_snd_ssthresh == 20, tcpi_snd_ssthresh
+}%
+
+// Second RTO, ~600ms after the first one.
+  +.6 %{
+assert tcpi_ca_state == TCP_CA_Loss, tcpi_ca_state
+assert tcpi_backoff == 2, tcpi_backoff
+assert tcpi_total_retrans == 3, tcpi_total_retrans
+assert tcpi_snd_cwnd == 10, tcpi_snd_cwnd
+assert tcpi_snd_ssthresh == 20, tcpi_snd_ssthresh
+}%
+
+// Reset sysctls
+`/tmp/sysctl_restore_${PPID}.sh`
