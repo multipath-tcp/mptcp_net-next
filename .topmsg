@@ -1,2 +1,33 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-don-t-drop-an-RM_ADDR-behind-a-pending-one
+From: Josef Bacik <josef@toxicpanda.com>
+Subject: [PATCH] mptcp: pm: don't drop an RM_ADDR behind a pending one
+
+There is room for one received list of address ids.  An RM_ADDR that
+arrives before the worker has taken the previous one is counted as
+RmAddrDrop and forgotten, although the netlink events for its ids have
+been sent already.  Two options follow each other at once if, for
+instance, the path manager in user space of the peer removes two of its
+addresses.  The subflows to the second address stay.
+
+Add the new ids to the pending list.  Only the ids that do not fit in
+the list of MPTCP_RM_IDS_MAX ids are dropped, and the RM_ADDR is then
+counted as RmAddrDrop.  The netlink events are not sent for the
+dropped ids, and they are sent before the worker can act on the others.
+
+This issue has been found with the help of an LLM. It has not been
+reproduced: the second RM_ADDR has to be processed before the PM worker
+gets to the first one, a window that a Packetdrill script cannot
+target. This fix is based on code inspection only, which is acceptable
+here: the issue is clear from the code, and the fix is simple.
+
+Fixes: d0876b2284cf ("mptcp: add the incoming RM_ADDR support")
+Signed-off-by: Josef Bacik <josef@toxicpanda.com>
+[ Commit message: only the ids that do not fit are dropped + how the
+  issue was found, and why it is fine without a reproducer. No netlink
+  event for the dropped ids. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: no netlink event for the dropped ids (Clashiko), but still for the
+    next pending ones (Sashiko)
+
+Note (Clashiko on v1): as before, an event is sent for each id of each
+received RM_ADDR, even if this id is already pending.
