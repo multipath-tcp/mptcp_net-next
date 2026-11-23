@@ -1,2 +1,23 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-work-on-a-copy-of-the-received-RM_ADDR-list
+From: Josef Bacik <josef@toxicpanda.com>
+Subject: [PATCH] mptcp: pm: work on a copy of the received RM_ADDR list
+
+The worker clears MPTCP_PM_RM_ADDR_RECEIVED and walks pm.rm_list_rx in
+place.  For every subflow it closes, mptcp_pm_rm_addr_or_subflow() drops
+pm.lock.  If the peer's next RM_ADDR arrives then, the flag is clear and
+mptcp_pm_rm_addr_received() overwrites the list.  The walk goes on at
+its index in the new list: the ids of the first list that were still to
+come are never handled, and their subflows stay.
+
+Hand a copy of the list to the walk.
+
+This issue has been found with the help of an LLM. It has not been
+reproduced: the next RM_ADDR has to be processed while the worker has
+dropped pm.lock to close a subflow, a window that a Packetdrill script
+cannot target. This fix is based on code inspection only, which is
+acceptable here: it is simple, and the issue is clear from the code.
+
+Fixes: d0b698ca9a27 ("mptcp: remove multi addresses in PM")
+Signed-off-by: Josef Bacik <josef@toxicpanda.com>
+[ Commit message: how the issue was found, and why it is fine without
+  a reproducer. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
