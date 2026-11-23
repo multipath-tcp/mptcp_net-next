@@ -1,2 +1,39 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-drain-the-queues-of-a-listen-that-fails
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: drain the queues of a listen() that fails
+
+Sockets and their network namespace can leak, if a handshake completes
+while listen() fails on an MPTCP socket that has listened before.
+
+mptcp_listen() passes the first subflow through __inet_listen_sk() to
+inet_csk_listen_start(), which sets TCP_LISTEN, then calls get_port()
+and hash(), and sets TCP_CLOSE again if either fails. Until then the
+subflow is in TCP_LISTEN, so a request sock of a previous listen() that
+still points to it can get a new child and be added to the subflow's
+accept queue. But neither close() nor the next listen() frees what is
+queued, and the earlier commit "tcp: drain the queues of a listen() that
+fails" only purges the RST queue of an MPTCP subflow, which needs
+mptcp_subflow_queue_clean() before a drain.
+
+The fix used here is to call mptcp_subflow_queue_clean() and then
+inet_csk_listen_stop() on the subflow in mptcp_listen(), if
+__inet_listen_sk() returns an error with the subflow in TCP_CLOSE.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer of the previous commit, modified to use MPTCP
+sockets, on both sides. Without this patch, sockets were leaked, and
+network namespaces too when each round was in its own one, without any
+message from the kernel:
+
+  result: request socks: 10000 made, 1151 left. Sockets: 64982 made, 5755 left
+  [...]
+  result: namespaces: 1000 made, 923 taken down, 77 left
+
+Fixes: 76e2a55d1625 ("mptcp: better msk-level shutdown.")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Add a Fixes tag. Commit message: how the issue was
+  found, and its symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: commit msg: reproduced, with MPTCP sockets. Only the accept queue is
+left, after commit 342e62fd34c2 ("tcp: purge Fast Open RST queue when
+listen() fails").
