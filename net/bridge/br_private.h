@@ -18,6 +18,7 @@
 #include <net/pkt_cls.h>
 #include <linux/if_vlan.h>
 #include <linux/rhashtable.h>
+#include <linux/hashtable.h>
 #include <linux/refcount.h>
 
 #define BR_HASH_BITS 8
@@ -29,6 +30,7 @@
 #define BR_MAX_PORTS	(1<<BR_PORT_BITS)
 
 #define BR_MULTICAST_DEFAULT_HASH_MAX 4096
+#define BR_MDB_VLAN_HASH_BITS 6
 #define BR_MULTICAST_QUERY_INTVL_MIN msecs_to_jiffies(1000)
 #define BR_MULTICAST_STARTUP_QUERY_INTVL_MIN BR_MULTICAST_QUERY_INTVL_MIN
 #define BR_MULTICAST_QUERY_INTVL_MAX msecs_to_jiffies(86400000) /* 24 hours */
@@ -386,6 +388,7 @@ struct net_bridge_port_group {
 	struct timer_list		timer;
 	struct timer_list		rexmit_timer;
 	struct hlist_node		mglist;
+	struct hlist_node		vlan_node;
 	struct rb_root			eht_set_tree;
 	struct rb_root			eht_host_tree;
 
@@ -449,6 +452,7 @@ struct net_bridge_port {
 	u32				multicast_eht_hosts_limit;
 	u32				multicast_eht_hosts_cnt;
 	struct hlist_head		mglist;
+	DECLARE_HASHTABLE(mdb_vlan_hash, BR_MDB_VLAN_HASH_BITS);
 #endif
 
 #ifdef CONFIG_SYSFS
