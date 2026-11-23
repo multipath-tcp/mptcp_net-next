@@ -1,2 +1,48 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-arm-the-rtx-timer-if-a-push-leaves-data-behind
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: arm the rtx timer if a push leaves data behind
+
+In a memory shortage, send() on an idle MPTCP socket can succeed but
+leave its data unsent, and the connection stays stalled after the
+shortage has ended.
+
+send() puts its data in the write queue of the MPTCP socket, and the
+push to a subflow leaves the data there if the memory charge to the
+subflow is refused or no skb can be allocated. A push that leaves data
+in the write queue has to be tried again, on the acknowledgment of data
+in flight or from the handler of the MPTCP retransmission (rtx) timer.
+But __mptcp_push_pending() and __mptcp_subflow_push_pending() arm that
+timer only if they have pushed data, so with no data in flight and no
+timer pending, the data waits for another event, such as the next
+send().
+
+The fix used here is to also arm the timer, in both functions, if unsent
+data is left in the write queue.
+
+This does not help a socket that has fallen back to TCP, as its rtx
+timer is disabled since commit e2ab913f68c7 ("mptcp: do not reschedule
+the RTX timer for fallback sockets"). "mptcp: force the charge for the
+first skb of a subflow" avoids a refused charge in this case, but not a
+failed skb allocation.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch,
+with fault injection: one skb allocation made to fail during a send().
+Without this patch, the data accepted by this send() was only sent with
+the next one, 60 seconds later here:
+
+  3.007 s: CLIENT send() of 1,000 bytes returned 1000. Allocations that were made to fail in it: 1
+  [...]
+  63.008 s: CLIENT the second send(), of 100 bytes, returned 100
+  63.008 s: SERVER has 1200 bytes
+  RESULT-FAILSLAB [...] the_1000_bytes_at_the_server_at=never [...]
+  [...] arrived_before_the_second_send=no [...]
+
+Fixes: 2ea6190f42d0 ("mptcp: schedule rtx timer only after pushing data")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Commit message: sockets that fell back to TCP are not
+  covered + how the issue was found, and its symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+Note (Clashiko on v1): timer_ival cannot be 0 here in net: the in-kernel
+scheduler sets it before it can fail, and the timer is disabled after a
+fallback. Only the BPF schedulers, not in net, are affected.
