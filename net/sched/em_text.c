@@ -128,8 +128,8 @@ static int em_text_dump(struct sk_buff *skb, struct tcf_ematch *m)
 
 	if (nla_put_nohdr(skb, sizeof(conf), &conf) < 0)
 		goto nla_put_failure;
-	if (nla_append(skb, conf.pattern_len,
-		       textsearch_get_pattern(tm->config)) < 0)
+	if (nla_put_nohdr(skb, conf.pattern_len,
+			  textsearch_get_pattern(tm->config)) < 0)
 		goto nla_put_failure;
 	return 0;
 
