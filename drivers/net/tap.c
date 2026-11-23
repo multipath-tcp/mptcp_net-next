@@ -65,7 +65,7 @@ static struct tap_dev *tap_dev_get_rcu(const struct net_device *dev)
  * RCU usage:
  * The tap_queue and the macvlan_dev are loosely coupled, the
  * pointers from one to the other can only be read while rcu_read_lock
- * or rtnl is held.
+ * or tap->lock is held.
  *
  * Both the file and the macvlan_dev hold a reference on the tap_queue
  * through sock_hold(&q->sk). When the macvlan_dev goes away first,
@@ -76,14 +76,55 @@ static struct tap_dev *tap_dev_get_rcu(const struct net_device *dev)
  * queue from outbound SKBs, but these never reference back to the
  * file or the dev. The data structure is freed through __sk_free
  * when both our references and any pending SKBs are gone.
+ *
+ * Locking:
+ * tap->lock protects the queues attached to a tap_dev, see the comment
+ * in struct tap_dev. RTNL is only needed by the ioctls calling into
+ * the core networking stack. They can use rtnl_dereference(q->tap),
+ * because tap_del_queues() is called with RTNL held and the only other
+ * place clearing q->tap is the release of the file they operate on.
  */
+
+/* Returns the tap_dev @q is attached to, with tap->lock held and a
+ * reference on tap->dev keeping the mutex alive, or NULL if the queue
+ * is detached.
+ */
+static struct tap_dev *tap_queue_lock_dev(struct tap_queue *q)
+{
+	struct tap_dev *tap;
+
+	/* q->tap is cleared before the synchronize_net() calls done at
+	 * device unregistration, tap->dev can not be freed under us.
+	 */
+	rcu_read_lock();
+	tap = rcu_dereference(q->tap);
+	if (tap)
+		dev_hold(tap->dev);
+	rcu_read_unlock();
+	if (!tap)
+		return NULL;
+
+	mutex_lock(&tap->lock);
+	if (unlikely(rcu_access_pointer(q->tap) != tap)) {
+		mutex_unlock(&tap->lock);
+		dev_put(tap->dev);
+		return NULL;
+	}
+	return tap;
+}
+
+static void tap_queue_unlock_dev(struct tap_dev *tap)
+{
+	mutex_unlock(&tap->lock);
+	dev_put(tap->dev);
+}
 
 static int tap_enable_queue(struct tap_dev *tap, struct file *file,
 			    struct tap_queue *q)
 {
 	int err = -EINVAL;
 
-	ASSERT_RTNL();
+	lockdep_assert_held(&tap->lock);
 
 	if (q->enabled)
 		goto out;
@@ -93,15 +134,19 @@ static int tap_enable_queue(struct tap_dev *tap, struct file *file,
 	q->queue_index = tap->numvtaps;
 	q->enabled = true;
 
-	tap->numvtaps++;
+	WRITE_ONCE(tap->numvtaps, tap->numvtaps + 1);
 out:
 	return err;
 }
 
-/* Requires RTNL */
 static int tap_set_queue(struct tap_dev *tap, struct file *file,
 			 struct tap_queue *q)
 {
+	lockdep_assert_held(&tap->lock);
+
+	if (tap->dead)
+		return -ENODEV;
+
 	if (tap->numqueues == MAX_TAP_QUEUES)
 		return -EBUSY;
 
@@ -115,35 +160,32 @@ static int tap_set_queue(struct tap_dev *tap, struct file *file,
 	file->private_data = q;
 	list_add_tail(&q->next, &tap->queue_list);
 
-	tap->numvtaps++;
+	WRITE_ONCE(tap->numvtaps, tap->numvtaps + 1);
 	tap->numqueues++;
 
 	return 0;
 }
 
-static int tap_disable_queue(struct tap_queue *q)
+static int tap_disable_queue(struct tap_dev *tap, struct tap_queue *q)
 {
-	struct tap_dev *tap;
 	struct tap_queue *nq;
+	int index;
 
-	ASSERT_RTNL();
+	lockdep_assert_held(&tap->lock);
 	if (!q->enabled)
 		return -EINVAL;
 
-	tap = rtnl_dereference(q->tap);
+	index = q->queue_index;
+	BUG_ON(index >= tap->numvtaps);
+	nq = rcu_dereference_protected(tap->taps[tap->numvtaps - 1],
+				       lockdep_is_held(&tap->lock));
+	nq->queue_index = index;
 
-	if (tap) {
-		int index = q->queue_index;
-		BUG_ON(index >= tap->numvtaps);
-		nq = rtnl_dereference(tap->taps[tap->numvtaps - 1]);
-		nq->queue_index = index;
+	rcu_assign_pointer(tap->taps[index], nq);
+	RCU_INIT_POINTER(tap->taps[tap->numvtaps - 1], NULL);
+	q->enabled = false;
 
-		rcu_assign_pointer(tap->taps[index], nq);
-		RCU_INIT_POINTER(tap->taps[tap->numvtaps - 1], NULL);
-		q->enabled = false;
-
-		tap->numvtaps--;
-	}
+	WRITE_ONCE(tap->numvtaps, tap->numvtaps - 1);
 
 	return 0;
 }
@@ -153,27 +195,23 @@ static int tap_disable_queue(struct tap_queue *q)
  * the reference that the files holds as well as the
  * one from the macvlan_dev if that still exists.
  *
- * Using the spinlock makes sure that we don't get
+ * Using tap->lock makes sure that we don't get
  * to the queue again after destroying it.
  */
 static void tap_put_queue(struct tap_queue *q)
 {
-	struct tap_dev *tap;
-
-	rtnl_lock();
-	tap = rtnl_dereference(q->tap);
+	struct tap_dev *tap = tap_queue_lock_dev(q);
 
 	if (tap) {
 		if (q->enabled)
-			BUG_ON(tap_disable_queue(q));
+			BUG_ON(tap_disable_queue(tap, q));
 
 		tap->numqueues--;
 		RCU_INIT_POINTER(q->tap, NULL);
 		sock_put(&q->sk);
 		list_del_init(&q->next);
+		tap_queue_unlock_dev(tap);
 	}
-
-	rtnl_unlock();
 
 	synchronize_rcu();
 	sock_put(&q->sk);
@@ -236,19 +274,22 @@ void tap_del_queues(struct tap_dev *tap)
 {
 	struct tap_queue *q, *tmp;
 
+	/* The ioctls using rtnl_dereference(q->tap) depend on this. */
 	ASSERT_RTNL();
+	mutex_lock(&tap->lock);
 	list_for_each_entry_safe(q, tmp, &tap->queue_list, next) {
 		list_del_init(&q->next);
 		RCU_INIT_POINTER(q->tap, NULL);
 		if (q->enabled)
-			tap->numvtaps--;
+			WRITE_ONCE(tap->numvtaps, tap->numvtaps - 1);
 		tap->numqueues--;
 		sock_put(&q->sk);
 	}
 	BUG_ON(tap->numvtaps);
 	BUG_ON(tap->numqueues);
 	/* guarantee that any future tap_set_queue will fail */
-	tap->numvtaps = MAX_TAP_QUEUES;
+	tap->dead = true;
+	mutex_unlock(&tap->lock);
 }
 EXPORT_SYMBOL_GPL(tap_del_queues);
 
@@ -447,11 +488,11 @@ static void tap_sock_destruct(struct sock *sk)
 static int tap_open(struct inode *inode, struct file *file)
 {
 	struct net *net = current->nsproxy->net_ns;
+	netdev_features_t features;
 	struct tap_dev *tap;
 	struct tap_queue *q;
 	int err = -ENODEV;
 
-	rtnl_lock();
 	tap = dev_get_by_tap_file(imajor(inode), iminor(inode));
 	if (!tap)
 		goto err;
@@ -461,7 +502,14 @@ static int tap_open(struct inode *inode, struct file *file)
 					     &tap_proto, 0);
 	if (!q)
 		goto err;
-	if (ptr_ring_init(&q->ring, tap->dev->tx_queue_len, GFP_KERNEL)) {
+
+	/* Use tap->ring_size instead of dev->tx_queue_len, which might be
+	 * changing: a concurrent tap_queue_resize() either sees this queue
+	 * or has already updated tap->ring_size.
+	 */
+	mutex_lock(&tap->lock);
+	if (ptr_ring_init(&q->ring, tap->ring_size, GFP_KERNEL)) {
+		mutex_unlock(&tap->lock);
 		sk_free(&q->sk);
 		goto err;
 	}
@@ -484,10 +532,12 @@ static int tap_open(struct inode *inode, struct file *file)
 	 * The macvlan supports zerocopy iff the lower device supports zero
 	 * copy so we don't have to look at the lower device directly.
 	 */
-	if ((tap->dev->features & NETIF_F_HIGHDMA) && (tap->dev->features & NETIF_F_SG))
+	features = READ_ONCE(tap->dev->features);
+	if ((features & NETIF_F_HIGHDMA) && (features & NETIF_F_SG))
 		sock_set_flag(&q->sk, SOCK_ZEROCOPY);
 
 	err = tap_set_queue(tap, file, q);
+	mutex_unlock(&tap->lock);
 	if (err) {
 		/* tap_sock_destruct() will take care of freeing ptr_ring */
 		goto err_put;
@@ -498,7 +548,6 @@ static int tap_open(struct inode *inode, struct file *file)
 
 	dev_put(tap->dev);
 
-	rtnl_unlock();
 	return err;
 
 err_put:
@@ -507,7 +556,6 @@ err:
 	if (tap)
 		dev_put(tap->dev);
 
-	rtnl_unlock();
 	return err;
 }
 
@@ -818,41 +866,24 @@ static ssize_t tap_read_iter(struct kiocb *iocb, struct iov_iter *to)
 	return ret;
 }
 
-static struct tap_dev *tap_get_tap_dev(struct tap_queue *q)
-{
-	struct tap_dev *tap;
-
-	ASSERT_RTNL();
-	tap = rtnl_dereference(q->tap);
-	if (tap)
-		dev_hold(tap->dev);
-
-	return tap;
-}
-
-static void tap_put_tap_dev(struct tap_dev *tap)
-{
-	dev_put(tap->dev);
-}
-
 static int tap_ioctl_set_queue(struct file *file, unsigned int flags)
 {
 	struct tap_queue *q = file->private_data;
 	struct tap_dev *tap;
 	int ret;
 
-	tap = tap_get_tap_dev(q);
+	tap = tap_queue_lock_dev(q);
 	if (!tap)
 		return -EINVAL;
 
 	if (flags & IFF_ATTACH_QUEUE)
 		ret = tap_enable_queue(tap, file, q);
 	else if (flags & IFF_DETACH_QUEUE)
-		ret = tap_disable_queue(q);
+		ret = tap_disable_queue(tap, q);
 	else
 		ret = -EINVAL;
 
-	tap_put_tap_dev(tap);
+	tap_queue_unlock_dev(tap);
 	return ret;
 }
 
@@ -920,6 +951,7 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 	struct sockaddr_storage ss = {};
 	struct ifreq __user *ifr = argp;
 	unsigned int __user *up = argp;
+	char name[IFNAMSIZ] = {};
 	unsigned short u;
 	int __user *sp = argp;
 	int s;
@@ -943,31 +975,25 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 		return ret;
 
 	case TUNGETIFF:
-		rtnl_lock();
-		tap = tap_get_tap_dev(q);
-		if (!tap) {
-			rtnl_unlock();
+		tap = tap_queue_lock_dev(q);
+		if (!tap)
 			return -ENOLINK;
-		}
 
-		ret = 0;
 		u = q->flags;
 		if (!q->enabled)
 			u |= IFF_DETACH_QUEUE;
-		if (copy_to_user(&ifr->ifr_name, tap->dev->name, IFNAMSIZ) ||
+		netdev_copy_name(tap->dev, name);
+		tap_queue_unlock_dev(tap);
+
+		if (copy_to_user(&ifr->ifr_name, name, IFNAMSIZ) ||
 		    put_user(u, &ifr->ifr_flags))
-			ret = -EFAULT;
-		tap_put_tap_dev(tap);
-		rtnl_unlock();
-		return ret;
+			return -EFAULT;
+		return 0;
 
 	case TUNSETQUEUE:
 		if (get_user(u, &ifr->ifr_flags))
 			return -EFAULT;
-		rtnl_lock();
-		ret = tap_ioctl_set_queue(file, u);
-		rtnl_unlock();
-		return ret;
+		return tap_ioctl_set_queue(file, u);
 
 	case TUNGETFEATURES:
 		if (put_user(IFF_TAP | IFF_NO_PI | TAP_IFFEATURES, up))
@@ -997,7 +1023,7 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 
 	case SIOCGIFHWADDR:
 		rtnl_lock();
-		tap = tap_get_tap_dev(q);
+		tap = rtnl_dereference(q->tap);
 		if (!tap) {
 			rtnl_unlock();
 			return -ENOLINK;
@@ -1008,7 +1034,6 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 		if (copy_to_user(&ifr->ifr_name, tap->dev->name, IFNAMSIZ) ||
 		    copy_to_user(&ifr->ifr_hwaddr, &ss, sizeof(ifr->ifr_hwaddr)))
 			ret = -EFAULT;
-		tap_put_tap_dev(tap);
 		rtnl_unlock();
 		return ret;
 
@@ -1016,7 +1041,7 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 		if (copy_from_user(&ss, &ifr->ifr_hwaddr, sizeof(ifr->ifr_hwaddr)))
 			return -EFAULT;
 		rtnl_lock();
-		tap = tap_get_tap_dev(q);
+		tap = rtnl_dereference(q->tap);
 		if (!tap) {
 			rtnl_unlock();
 			return -ENOLINK;
@@ -1025,7 +1050,6 @@ static long tap_ioctl(struct file *file, unsigned int cmd,
 			ret = -EINVAL;
 		else
 			ret = dev_set_mac_address_user(tap->dev, &ss, NULL);
-		tap_put_tap_dev(tap);
 		rtnl_unlock();
 		return ret;
 
@@ -1204,12 +1228,14 @@ int tap_queue_resize(struct tap_dev *tap)
 	struct net_device *dev = tap->dev;
 	struct tap_queue *q;
 	struct ptr_ring **rings;
-	int n = tap->numqueues;
-	int ret, i = 0;
+	int ret = -ENOMEM;
+	int n, i = 0;
 
+	mutex_lock(&tap->lock);
+	n = tap->numqueues;
 	rings = kmalloc_objs(*rings, n);
 	if (!rings)
-		return -ENOMEM;
+		goto unlock;
 
 	list_for_each_entry(q, &tap->queue_list, next)
 		rings[i++] = &q->ring;
@@ -1217,8 +1243,12 @@ int tap_queue_resize(struct tap_dev *tap)
 	ret = ptr_ring_resize_multiple_bh(rings, n,
 					  dev->tx_queue_len, GFP_KERNEL,
 					  __skb_array_destroy_skb);
+	if (!ret)
+		tap->ring_size = dev->tx_queue_len;
 
 	kfree(rings);
+unlock:
+	mutex_unlock(&tap->lock);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(tap_queue_resize);

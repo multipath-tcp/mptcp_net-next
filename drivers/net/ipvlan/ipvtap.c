@@ -82,6 +82,8 @@ static int ipvtap_newlink(struct net_device *dev,
 	int err;
 
 	INIT_LIST_HEAD(&vlantap->tap.queue_list);
+	vlantap->tap.dev = dev;
+	vlantap->tap.ring_size = dev->tx_queue_len;
 
 	/* Since macvlan supports all offloads by default, make
 	 * tap support all offloads also.
@@ -104,18 +106,13 @@ static int ipvtap_newlink(struct net_device *dev,
 		return err;
 	}
 
-	vlantap->tap.dev = vlantap->vlan.dev;
-
 	return err;
 }
 
 static void __ipvtap_dellink(struct net *net, struct net_device *dev,
 			     struct list_head *head)
 {
-	struct ipvtap_dev *vlantap = netdev_priv(dev);
-
 	netdev_rx_handler_unregister(dev);
-	tap_del_queues(&vlantap->tap);
 	__ipvlan_link_delete(net, dev, head);
 }
 
@@ -131,11 +128,22 @@ static void ipvtap_dellink(struct net_device *dev,
 	mutex_unlock(&port->pnodes_lock);
 }
 
+static void ipvtap_dev_free(struct net_device *dev)
+{
+	struct ipvtap_dev *vlantap = netdev_priv(dev);
+
+	mutex_destroy(&vlantap->tap.lock);
+}
+
 static void ipvtap_setup(struct net_device *dev)
 {
+	struct ipvtap_dev *vlantap = netdev_priv(dev);
+
 	ipvlan_link_setup(dev);
 	dev->tx_queue_len = TUN_READQ_SIZE;
 	dev->priv_flags &= ~IFF_NO_QUEUE;
+	dev->priv_destructor = ipvtap_dev_free;
+	mutex_init(&vlantap->tap.lock);
 }
 
 static struct rtnl_link_ops ipvtap_link_ops __read_mostly = {
@@ -185,6 +193,11 @@ static int ipvtap_device_event(struct notifier_block *unused,
 			return notifier_from_errno(err);
 		break;
 	case NETDEV_UNREGISTER:
+		/* NETDEV_UNREGISTER is also sent when the device moves to
+		 * another netns, queues must survive this.
+		 */
+		if (dev->reg_state == NETREG_UNREGISTERING)
+			tap_del_queues(&vlantap->tap);
 		/* vlan->minor == 0 if NETDEV_REGISTER above failed */
 		if (vlantap->tap.minor == 0)
 			break;
