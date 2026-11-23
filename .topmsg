@@ -1,2 +1,7 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/tmp-tun-merge-fix
+Subject: [PATCH] tmp-tun-merge-fix
+
+Taken from NIPA, will be removed after the merge.
+
+Link: https://lore.kernel.org/20261113232843.2338734-1-antonio@mandelbit.com
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
