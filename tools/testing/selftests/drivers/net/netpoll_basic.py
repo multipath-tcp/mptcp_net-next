@@ -236,7 +236,8 @@ def bpftrace_call() -> None:
     global MAPS  # pylint: disable=W0603
 
     # This will be passed to bpftrace as in bpftrace -e "expr"
-    expr = "kprobe:netpoll_poll_dev { @hits = count(); }"
+    # Init @hits: bpftrace doesn't print empty maps
+    expr = "BEGIN { @hits = 0; } kprobe:netpoll_poll_dev { @hits++; }"
 
     MAPS = bpftrace(expr, timeout=BPFTRACE_TIMEOUT, json=True)
     logging.debug("BPFtrace output: %s", MAPS)

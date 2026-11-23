@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: GPL-2.0
+//
+// Active open: once the connection is established, SND.UNA is at least
+// ISS + 1.  A segment with SEG.ACK = ISS acknowledges nothing we ever
+// sent past the SYN, and the SYN itself can not be acked "again" as a
+// stale duplicate: no ACK carrying ISS was ever valid on this
+// connection.  It must be treated like any other ACK for bytes we never
+// sent (RFC 5961 Section 5.2): dropped, and a challenge ACK sent back.
+//
+// The SYN consumes one sequence number but is not a payload byte, so it
+// must not widen the range of acceptable old ACKs.
+
+`./defaults.sh
+sysctl -q net.ipv4.tcp_invalid_ratelimit=0
+`
+
+   0 socket(..., SOCK_STREAM, IPPROTO_TCP) = 3
+  +0 fcntl(3, F_GETFL) = 0x2 (flags O_RDWR)
+  +0 fcntl(3, F_SETFL, O_RDWR|O_NONBLOCK) = 0
+  +0 connect(3, ..., ...) = -1 EINPROGRESS (Operation now in progress)
+  +0 > S 0:0(0) <...>
++.01 < S. 0:0(0) ack 1 win 10000 <mss 1000,nop,nop,sackOK,nop,wscale 0>
+  +0 > . 1:1(0) ack 1
+
+// SND.UNA = SND.NXT = ISS + 1, no payload acked yet.
+// SEG.ACK = ISS must trigger a challenge ACK.
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1:1(0) ack 1
+
+// Get 1000 bytes of payload acked.
+  +0 write(3, ..., 1000) = 1000
+  +0 > P. 1:1001(1000) ack 1
++.01 < . 1:1(0) ack 1001 win 10000
+
+// SND.UNA = ISS + 1001.  Old ACKs in [ISS + 1, ISS + 1001] are valid
+// duplicates, but SEG.ACK = ISS is still below anything the peer could
+// have legitimately sent.
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1001:1001(0) ack 1
+
+// SEG.ACK = ISS + 1 is a genuine old ACK: silently accepted, no
+// challenge ACK.  The next packet on the wire must be our new data.
++.01 < . 1:1(0) ack 1 win 10000
++.01 write(3, ..., 1000) = 1000
+  +0 > P. 1001:2001(1000) ack 1
++.01 < . 1:1(0) ack 2001 win 10000
