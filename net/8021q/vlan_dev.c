@@ -269,6 +269,12 @@ int vlan_dev_change_flags(const struct net_device *dev, u32 flags, u32 mask)
 		return -EINVAL;
 
 	new_flags = (old_flags & ~mask) | (flags & mask);
+
+	/* GVRP and MVRP act on the real device, which may be in another netns */
+	if (((new_flags ^ old_flags) & (VLAN_FLAG_GVRP | VLAN_FLAG_MVRP)) &&
+	    !rtnl_dev_link_net_capable(dev, dev_net(vlan->real_dev)))
+		return -EPERM;
+
 	WRITE_ONCE(vlan->flags, new_flags);
 
 	if (netif_running(dev) && (new_flags ^ old_flags) & VLAN_FLAG_GVRP) {

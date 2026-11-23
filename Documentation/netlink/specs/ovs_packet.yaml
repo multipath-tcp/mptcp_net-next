@@ -22,6 +22,8 @@ definitions:
   -
     name: ovs-header
     type: struct
+    doc: |
+      Header for OVS Generic Netlink messages.
     members:
       -
         name: dp-ifindex
@@ -97,6 +99,17 @@ operations:
       value: 1
       attribute-set: packet
       event:
+        attributes:
+          - packet
+          - key
+          - mru
+          - hash
+    -
+      name: action
+      doc: Notify userspace as requested by an OVS_ACTION_ATTR_USERSPACE action.
+      value: 2
+      attribute-set: packet
+      event:
         attributes: &event-attrs
           - packet
           - key
@@ -107,17 +120,12 @@ operations:
           - len
           - hash
     -
-      name: action
-      doc: Notify userspace as requested by an OVS_ACTION_ATTR_USERSPACE action.
-      value: 2
-      attribute-set: packet
-      event:
-        attributes: *event-attrs
-    -
       name: execute
       doc: Apply actions to a packet.
       value: 3
       attribute-set: packet
+      dont-validate: [strict, dump]
+      flags: [uns-admin-perm]
       do:
         request:
           attributes:
