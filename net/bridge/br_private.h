@@ -1244,24 +1244,15 @@ br_multicast_get_first_rport_node(struct net_bridge_mcast *brmctx,
 	return rcu_dereference(hlist_first_rcu(&brmctx->ip4_mc_router_list));
 }
 
-static inline struct net_bridge_port *
-br_multicast_rport_from_node_skb(struct hlist_node *rp, struct sk_buff *skb)
+static inline struct net_bridge_mcast_port *
+br_multicast_rport_ctx_from_node_skb(struct hlist_node *rp, struct sk_buff *skb)
 {
-	struct net_bridge_mcast_port *mctx;
-
 #if IS_ENABLED(CONFIG_IPV6)
 	if (skb->protocol == htons(ETH_P_IPV6))
-		mctx = hlist_entry_safe(rp, struct net_bridge_mcast_port,
-					ip6_rlist);
-	else
+		return hlist_entry_safe(rp, struct net_bridge_mcast_port,
+				       ip6_rlist);
 #endif
-		mctx = hlist_entry_safe(rp, struct net_bridge_mcast_port,
-					ip4_rlist);
-
-	if (mctx)
-		return mctx->port;
-	else
-		return NULL;
+	return hlist_entry_safe(rp, struct net_bridge_mcast_port, ip4_rlist);
 }
 
 static inline bool br_ip4_multicast_is_router(struct net_bridge_mcast *brmctx)

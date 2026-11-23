@@ -412,10 +412,12 @@ void br_multicast_flood(struct net_bridge_mdb_entry *mdst,
 
 	while (p || rp) {
 		struct net_bridge_port *port, *lport, *rport;
+		struct net_bridge_mcast_port *rpmctx;
 		struct br_fwd_dst fwd = {};
 
 		lport = p ? p->key.port : NULL;
-		rport = br_multicast_rport_from_node_skb(rp, skb);
+		rpmctx = br_multicast_rport_ctx_from_node_skb(rp, skb);
+		rport = rpmctx ? rpmctx->port : NULL;
 
 		if ((unsigned long)lport > (unsigned long)rport) {
 			port = lport;
@@ -432,6 +434,7 @@ void br_multicast_flood(struct net_bridge_mdb_entry *mdst,
 				goto delivered;
 		} else {
 			port = rport;
+			fwd.vlan = rpmctx->vlan;
 		}
 
 		fwd.port = port;
