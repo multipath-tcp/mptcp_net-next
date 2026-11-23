@@ -1016,6 +1016,10 @@ struct bnxt_tx_ring_info {
 	struct bnxt_ring_struct	tx_ring_struct;
 	/* Synchronize simultaneous xdp_xmit on same ring */
 	spinlock_t		xdp_tx_lock;
+
+	/* Updated on TX completion, kept per ring */
+	u64			tx_hw_gso_packets;
+	u64			tx_hw_gso_wire_packets;
 };
 
 #define BNXT_LEGACY_COAL_CMPL_PARAMS					\
@@ -1176,6 +1180,8 @@ struct bnxt_total_ring_drv_stats {
 	/* end of ethtool -S stats */
 	u64			rx_total_hw_gro_packets;
 	u64			rx_total_hw_gro_wire_packets;
+	u64			tx_total_hw_gso_packets;
+	u64			tx_total_hw_gso_wire_packets;
 };
 
 struct bnxt_stats_mem {

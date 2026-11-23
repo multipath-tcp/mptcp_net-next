@@ -3864,7 +3864,10 @@ static irqreturn_t idpf_vport_intr_clean_queues(int __always_unused irq,
 static void idpf_vport_intr_napi_del_all(struct idpf_q_vec_rsrc *rsrc)
 {
 	for (u16 v_idx = 0; v_idx < rsrc->num_q_vectors; v_idx++)
-		netif_napi_del(&rsrc->q_vectors[v_idx].napi);
+		__netif_napi_del(&rsrc->q_vectors[v_idx].napi);
+
+	/* Observe an RCU grace period after __netif_napi_del() calls. */
+	synchronize_net();
 }
 
 /**
