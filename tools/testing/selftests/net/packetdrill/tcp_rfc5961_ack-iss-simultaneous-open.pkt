@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: GPL-2.0
+//
+// Simultaneous open variant of tcp_rfc5961_ack-iss-client.pkt.
+//
+// Our SYN is acked by the SYN-ACK of the peer while we are in SYN-RECV
+// state.  Once established, SEG.ACK = ISS must trigger a challenge ACK.
+
+`./defaults.sh
+sysctl -q net.ipv4.tcp_invalid_ratelimit=0
+`
+
+   0 socket(..., SOCK_STREAM|SOCK_NONBLOCK, IPPROTO_TCP) = 3
+  +0 connect(3, ..., ...) = -1 EINPROGRESS (Operation now in progress)
+  +0 > S 0:0(0) <...>
+
+// Crossed SYN.
++.01 < S 0:0(0) win 10000 <mss 1000,nop,nop,sackOK,nop,wscale 0>
+  +0 > S. 0:0(0) ack 1 <...>
++.01 < S. 0:0(0) ack 1 win 10000 <mss 1000,nop,nop,sackOK,nop,wscale 0>
+// The SYN part of this SYN-ACK is a duplicate, and is DSACKed.
+  +0 > . 1:1(0) ack 1 <nop,nop,sack 0:1>
+  +0 %{ assert tcpi_state == TCP_ESTABLISHED, tcpi_state }%
+
+// SND.UNA = SND.NXT = ISS + 1, no payload acked yet.
+// SEG.ACK = ISS must trigger a challenge ACK.
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1:1(0) ack 1
+
+// Get 1000 bytes of payload acked.
+  +0 write(3, ..., 1000) = 1000
+  +0 > P. 1:1001(1000) ack 1
++.01 < . 1:1(0) ack 1001 win 10000
+
++.01 < . 1:1(0) ack 0 win 10000
+  +0 > . 1001:1001(0) ack 1
+
+// SEG.ACK = ISS + 1 is a genuine old ACK: silently accepted, no
+// challenge ACK.  The next packet on the wire must be our new data.
++.01 < . 1:1(0) ack 1 win 10000
++.01 write(3, ..., 1000) = 1000
+  +0 > P. 1001:2001(1000) ack 1
++.01 < . 1:1(0) ack 2001 win 10000
