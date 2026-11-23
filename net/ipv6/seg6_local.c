@@ -305,7 +305,9 @@ static struct ipv6_sr_hdr *advance_nextseg(struct sk_buff *skb,
 					   struct ipv6_sr_hdr *srh,
 					   enum skb_drop_reason *reason)
 {
+	struct in6_addr *daddr;
 	struct in6_addr *addr;
+	__be32 old;
 	int srhoff;
 	int wlen;
 
@@ -323,10 +325,19 @@ static struct ipv6_sr_hdr *advance_nextseg(struct sk_buff *skb,
 
 	/* skb_ensure_writable() may change skb pointers; evaluate srh again */
 	srh = (struct ipv6_sr_hdr *)(skb->data + srhoff);
+	daddr = &ipv6_hdr(skb)->daddr;
+	/* nexthdr, hdrlen, type and segments_left */
+	old = *(__be32 *)srh;
 
 	srh->segments_left--;
 	addr = srh->segments + srh->segments_left;
-	ipv6_hdr(skb)->daddr = *addr;
+
+	if (skb->ip_summed == CHECKSUM_COMPLETE) {
+		update_csum_diff4(skb, old, *(__be32 *)srh);
+		update_csum_diff16(skb, (__be32 *)daddr, (__be32 *)addr);
+	}
+
+	*daddr = *addr;
 
 	return srh;
 }
@@ -464,11 +475,13 @@ seg6_next_csid_advance_arg(struct sk_buff *skb,
 	__u8 fnc_octects = seg6_flv_lcnode_func_octects(finfo);
 	__u8 blk_octects = seg6_flv_lcblock_octects(finfo);
 	struct in6_addr *addr;
+	struct in6_addr old;
 
 	if (unlikely(skb_ensure_writable(skb, sizeof(struct ipv6hdr))))
 		return SKB_DROP_REASON_NOMEM;
 
 	addr = &ipv6_hdr(skb)->daddr;
+	old = *addr;
 
 	/* advance DA.Argument */
 	memmove(&addr->s6_addr[blk_octects],
@@ -476,6 +489,9 @@ seg6_next_csid_advance_arg(struct sk_buff *skb,
 		16 - blk_octects - fnc_octects);
 
 	memset(&addr->s6_addr[16 - fnc_octects], 0x00, fnc_octects);
+
+	if (skb->ip_summed == CHECKSUM_COMPLETE)
+		update_csum_diff16(skb, (__be32 *)&old, (__be32 *)addr);
 
 	return SKB_NOT_DROPPED_YET;
 }
@@ -1732,6 +1748,12 @@ static int input_action_end_bpf(struct sk_buff *skb,
 	if (srh_state->srh && !seg6_bpf_has_valid_srh(skb))
 		goto drop;
 	local_unlock_nested_bh(&seg6_bpf_srh_states.bh_lock);
+
+	/* The program may have changed the packet and seg6_bpf_has_valid_srh()
+	 * may have rewritten the SRH Hdr Ext Len.
+	 * skb->csum may then no longer be the checksum of the full packet.
+	 */
+	skb_checksum_complete_unset(skb);
 
 	if (ret != BPF_REDIRECT)
 		seg6_lookup_nexthop_noref(skb, NULL, 0);
