@@ -266,6 +266,7 @@ struct bnge_stats_mem {
 enum bnge_net_state {
 	BNGE_STATE_NAPI_DISABLED,
 	BNGE_STATE_STATS_ENABLE,
+	BNGE_STATE_NQ0_NAPI,
 };
 
 #define BNGE_TIMER_INTERVAL	HZ
@@ -315,6 +316,8 @@ struct bnge_net {
 	u32			hash_seed;
 	u64			toeplitz_prefix;
 
+	/* Lives from probe to remove. bnapi[0] points to it. */
+	struct bnge_napi		*nq0;
 	struct bnge_napi		**bnapi;
 
 	struct bnge_rx_ring_info	*rx_ring;
@@ -350,7 +353,9 @@ struct bnge_net {
 	unsigned int		current_interval;
 	struct timer_list	timer;
 	struct workqueue_struct *bnge_pf_wq;
+	struct workqueue_struct *nq0_wq;
 	struct work_struct	sp_task;
+	struct work_struct	nq0_work;
 	unsigned long		sp_event;
 
 	struct bnge_ethtool_link_info	eth_link_info;

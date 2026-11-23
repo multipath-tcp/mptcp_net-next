@@ -492,7 +492,8 @@ __must_hold(&busdevs_lock)
 	}
 
 	kfree_skb(mbus->tx_skb);
-	list_del(&mbus->list);
+	mbus->tx_skb = NULL;
+	list_del_init(&mbus->list);
 }
 
 static void mctp_i3c_ndo_uninit(struct net_device *ndev)
@@ -624,7 +625,7 @@ __must_hold(&busdevs_lock)
 	rc = mctp_register_netdev(ndev, NULL, MCTP_PHYS_BINDING_I3C);
 	if (rc < 0) {
 		dev_warn(&ndev->dev, "netdev register failed: %d\n", rc);
-		goto err_free_netdev;
+		goto err_free_uninit;
 	}
 	return mbus;
 
@@ -634,7 +635,6 @@ err_free_uninit:
 	 */
 	mctp_i3c_bus_free(mbus);
 
-err_free_netdev:
 	free_netdev(ndev);
 
 err:
