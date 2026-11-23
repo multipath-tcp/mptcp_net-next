@@ -16,9 +16,8 @@ static void ovs_print_datapath(struct __test_metadata *_metadata,
 		return;
 
 	EXPECT_TRUE((bool)dp->_hdr.dp_ifindex);
-	ksft_print_msg("%s(%d): pid:%u cache:%u\n",
-		       dp->name, dp->_hdr.dp_ifindex,
-		       dp->upcall_pid, dp->masks_cache_size);
+	ksft_print_msg("%s(%d): cache:%u\n",
+		       dp->name, dp->_hdr.dp_ifindex, dp->masks_cache_size);
 }
 
 FIXTURE(ovs)

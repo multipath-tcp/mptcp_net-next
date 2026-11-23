@@ -229,7 +229,7 @@ vhost_transport_do_send_pkt(struct vhost_vsock *vsock,
 		/* Deliver to monitoring devices all packets that we
 		 * will transmit.
 		 */
-		virtio_transport_deliver_tap_pkt(skb);
+		virtio_transport_deliver_tap_pkt(skb, vsock->net);
 
 		vhost_add_used(vq, head, sizeof(*hdr) + payload_len);
 		added = true;
@@ -567,7 +567,7 @@ static void vhost_vsock_handle_tx_kick(struct vhost_work *work)
 		total_len += sizeof(*hdr) + skb->len;
 
 		/* Deliver to monitoring devices all received packets */
-		virtio_transport_deliver_tap_pkt(skb);
+		virtio_transport_deliver_tap_pkt(skb, vsock->net);
 
 		hdr = virtio_vsock_hdr(skb);
 
