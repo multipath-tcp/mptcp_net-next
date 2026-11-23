@@ -1,2 +1,51 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-leave-an-orphan-s-DATA_FIN-to-the-worker
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: leave an orphan's DATA_FIN to the worker
+
+Closed MPTCP sockets can leak until reboot, with the data in their
+receive queues, which can exhaust tcp_mem and stall other TCP
+connections.
+
+Once close() has returned, only mptcp_worker() destroys an orphaned msk,
+and only in the run that moves it to TCP_CLOSE: a later run returns at
+once, and mptcp_schedule_work() queues no work for an msk in that state.
+The receive path, in softirq, puts data on the backlog while the msk is
+owned, and release_sock() calls mptcp_release_cb(), which passes the
+backlog to __mptcp_move_skbs(). But __mptcp_move_skbs() calls
+mptcp_check_data_fin(), which can move the msk to TCP_CLOSE, and by then
+the lock owner, here the worker, no longer looks at the state:
+
+    receive path, softirq             mptcp_worker()
+    =====================             ==============
+                                      not in TCP_CLOSE: no destroy
+    last data, with the DATA_FIN
+      the msk is owned: backlog
+                                      release_sock()
+                                        mptcp_release_cb()
+                                          __mptcp_move_skbs()
+                                            mptcp_check_data_fin()
+                                              TCP_CLOSE, never destroyed
+
+The fix used here is to queue the worker in __mptcp_move_skbs() if an
+orphaned msk has a DATA_FIN to handle, instead of calling
+mptcp_check_data_fin().
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch:
+200,000 connections in which the server accept()s and close()s, while
+the client reads the end of file, sends one byte, and closes. Without
+this patch, some MPTCP sockets of the server stayed in the CLOSE state
+for good, with their network namespace:
+
+  === connections so far : MPTCP sockets of the server in the state CLOSE: 200000:722,
+  [...]
+  RESULT [...] | left 300 s behind the end: slab_MPTCP=722 sockets_MPTCP=722 [...]
+  [...] | veth_end_left=1 slab_net_namespace_left=2 | [...]
+
+Fixes: bc68b0efa1bf ("mptcp: move the whole rx path under msk socket lock protection")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Commit message: how the issue was found, and its
+  symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+Note (Clashiko on v2): __mptcp_close_ssk() can still close an orphan
+outside the worker here: this is fixed by the next patch.
