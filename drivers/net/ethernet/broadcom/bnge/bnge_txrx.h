@@ -120,6 +120,9 @@ irqreturn_t bnge_msix(int irq, void *dev_instance);
 netdev_tx_t bnge_start_xmit(struct sk_buff *skb, struct net_device *dev);
 void bnge_reuse_rx_data(struct bnge_rx_ring_info *rxr, u16 cons, void *data);
 int bnge_napi_poll(struct napi_struct *napi, int budget);
+irqreturn_t bnge_nq0_msix(int irq, void *dev_instance);
+void bnge_nq0_poll(struct bnge_net *bn);
+void bnge_nq0_work(struct work_struct *work);
 netdev_features_t bnge_features_check(struct sk_buff *skb,
 				      struct net_device *dev,
 				      netdev_features_t features);
