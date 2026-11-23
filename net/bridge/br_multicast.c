@@ -1423,6 +1423,22 @@ br_multicast_new_group_src(struct net_bridge_port_group *pg, struct br_ip *src_i
 	return grp_src;
 }
 
+void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan, bool add)
+{
+	struct net_bridge_port *port = vlan->port;
+	struct net_bridge_port_group *pg;
+	struct net_bridge_dst dst;
+
+	ASSERT_RTNL();
+
+	dst = add ? br_vlan_to_dst(vlan) : br_port_to_dst(port);
+	spin_lock_bh(&port->br->multicast_lock);
+	hash_for_each_possible(port->mdb_vlan_hash, pg, vlan_node, vlan->vid)
+		if (pg->key.addr.vid == vlan->vid)
+			br_dst_write(&pg->dst, dst);
+	spin_unlock_bh(&port->br->multicast_lock);
+}
+
 struct net_bridge_port_group *br_multicast_new_port_group(
 			struct net_bridge_port *port,
 			const struct br_ip *group,
@@ -1433,8 +1449,11 @@ struct net_bridge_port_group *br_multicast_new_port_group(
 			u8 rt_protocol,
 			struct netlink_ext_ack *extack)
 {
+	struct net_bridge_vlan *vlan = NULL;
 	struct net_bridge_port_group *p;
 	int err;
+
+	lockdep_assert_held_once(&port->br->multicast_lock);
 
 	err = br_multicast_port_ngroups_inc(port, group, extack);
 	if (err)
@@ -1448,6 +1467,11 @@ struct net_bridge_port_group *br_multicast_new_port_group(
 
 	p->key.addr = *group;
 	p->key.port = port;
+	rcu_read_lock();
+	if (group->vid)
+		vlan = br_vlan_find(nbp_vlan_group_rcu(port), group->vid);
+	br_dst_write(&p->dst, vlan ? br_vlan_to_dst(vlan) : br_port_to_dst(port));
+	rcu_read_unlock();
 	p->flags = flags;
 	p->filter_mode = filter_mode;
 	p->rt_protocol = rt_protocol;

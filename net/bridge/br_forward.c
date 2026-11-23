@@ -353,17 +353,15 @@ void br_flood(struct net_bridge *br, struct net_bridge_vlan *v,
 }
 
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
-static void maybe_deliver_addr(struct net_bridge_port *p, struct sk_buff *skb,
+static void maybe_deliver_addr(struct br_fwd_dst *fwd, struct sk_buff *skb,
 			       const unsigned char *addr, bool local_orig)
 {
 	struct net_device *dev = BR_INPUT_SKB_CB(skb)->brdev;
 	const unsigned char *src = eth_hdr(skb)->h_source;
-	struct br_fwd_dst fwd = {
-		.port = p,
-	};
+	struct net_bridge_port *p = fwd->port;
 	struct sk_buff *nskb;
 
-	if (!should_deliver(&fwd, skb))
+	if (!should_deliver(fwd, skb))
 		return;
 
 	/* Even with hairpin, no soliloquies - prevent breaking IPv6 DAD */
@@ -383,7 +381,7 @@ static void maybe_deliver_addr(struct net_bridge_port *p, struct sk_buff *skb,
 	if (!is_broadcast_ether_addr(addr))
 		memcpy(eth_hdr(skb)->h_dest, addr, ETH_ALEN);
 
-	__br_forward(&fwd, skb, local_orig);
+	__br_forward(fwd, skb, local_orig);
 }
 
 /* called with rcu_read_lock */
@@ -421,10 +419,11 @@ void br_multicast_flood(struct net_bridge_mdb_entry *mdst,
 
 		if ((unsigned long)lport > (unsigned long)rport) {
 			port = lport;
+			br_dst_decode(br_dst_read(&p->dst), &fwd.port, &fwd.vlan);
 
 			if (test_bit(BR_MULTICAST_TO_UNICAST_BIT,
 				     &port->flags)) {
-				maybe_deliver_addr(lport, skb, p->eth_addr,
+				maybe_deliver_addr(&fwd, skb, p->eth_addr,
 						   local_orig);
 				goto delivered;
 			}
@@ -435,6 +434,9 @@ void br_multicast_flood(struct net_bridge_mdb_entry *mdst,
 		} else {
 			port = rport;
 			fwd.vlan = rpmctx->vlan;
+			if (!fwd.vlan && lport == rport)
+				br_dst_decode(br_dst_read(&p->dst),
+					      &fwd.port, &fwd.vlan);
 		}
 
 		fwd.port = port;

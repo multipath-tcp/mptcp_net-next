@@ -377,6 +377,7 @@ struct net_bridge_port_group_sg_key {
 struct net_bridge_port_group {
 	struct net_bridge_port_group __rcu *next;
 	struct net_bridge_port_group_sg_key key;
+	struct net_bridge_dst		dst;
 	unsigned char			eth_addr[ETH_ALEN] __aligned(2);
 	unsigned char			flags;
 	unsigned char			filter_mode;
@@ -1211,6 +1212,7 @@ void br_multicast_port_ctx_init(struct net_bridge_port *port,
 				struct net_bridge_vlan *vlan,
 				struct net_bridge_mcast_port *pmctx);
 void br_multicast_port_ctx_deinit(struct net_bridge_mcast_port *pmctx);
+void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan, bool add);
 void br_multicast_update_vlan_mcast_ctx(struct net_bridge_vlan *v, u8 state);
 void br_multicast_toggle_one_vlan(struct net_bridge_vlan *vlan, bool on);
 int br_multicast_toggle_vlan_snooping(struct net_bridge *br, bool on,
@@ -1679,6 +1681,11 @@ static inline void br_multicast_port_ctx_init(struct net_bridge_port *port,
 }
 
 static inline void br_multicast_port_ctx_deinit(struct net_bridge_mcast_port *pmctx)
+{
+}
+
+static inline void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan,
+						bool add)
 {
 }
 
