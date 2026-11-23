@@ -589,6 +589,17 @@ struct sk_buff *napi_build_skb(void *data, unsigned int frag_size)
 }
 EXPORT_SYMBOL(napi_build_skb);
 
+static __always_inline size_t kmalloc_reserve_size(unsigned int size, gfp_t flags)
+{
+	size_t obj_size = SKB_HEAD_ALIGN(size);
+
+	if (obj_size <= SKB_SMALL_HEAD_CACHE_SIZE &&
+	    !(flags & KMALLOC_NOT_NORMAL_BITS))
+		return 0;
+
+	return kmalloc_size_roundup(obj_size);
+}
+
 static void *kmalloc_pfmemalloc(size_t obj_size, gfp_t flags, int node)
 {
 	if (!gfp_pfmemalloc_allowed(flags))
@@ -612,9 +623,8 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 	size_t obj_size;
 	void *obj;
 
-	obj_size = SKB_HEAD_ALIGN(*size);
-	if (obj_size <= SKB_SMALL_HEAD_CACHE_SIZE &&
-	    !(flags & KMALLOC_NOT_NORMAL_BITS)) {
+	obj_size = kmalloc_reserve_size(*size, flags);
+	if (!obj_size) {
 		obj = kmem_cache_alloc_node(net_hotdata.skb_small_head_cache,
 				flags | __GFP_NOMEMALLOC | __GFP_NOWARN,
 				node);
@@ -627,7 +637,6 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 		return kmalloc_pfmemalloc(0, flags, node);
 	}
 
-	obj_size = kmalloc_size_roundup(obj_size);
 	/* The following cast might truncate high-order bits of obj_size, this
 	 * is harmless because kmalloc(obj_size >= 2^32) will fail anyway.
 	 */
@@ -649,6 +658,16 @@ static void *kmalloc_reserve(unsigned int *size, gfp_t flags, int node,
 	obj = kmalloc_pfmemalloc(obj_size, flags, node);
 out:
 	return obj;
+}
+
+unsigned int skb_head_truesize(unsigned int size, gfp_t flags)
+{
+	size_t obj_size = kmalloc_reserve_size(size, flags);
+
+	if (!obj_size)
+		obj_size = SKB_SMALL_HEAD_CACHE_SIZE;
+
+	return obj_size + SKB_DATA_ALIGN(sizeof(struct sk_buff));
 }
 
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
