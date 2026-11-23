@@ -2254,11 +2254,11 @@ static netdev_tx_t bcmgenet_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (ring->free_bds <= ring->stop_thld)
 		netif_tx_stop_queue(txq);
 
+out:
+	/* A dropped frame can end an xmit_more batch */
 	if (!netdev_xmit_more() || netif_xmit_stopped(txq))
-		/* Packets are ready, update producer index */
 		bcmgenet_tdma_ring_writel(priv, ring->index,
 					  ring->prod_index, TDMA_PROD_INDEX);
-out:
 	spin_unlock(&ring->lock);
 
 	return ret;
