@@ -215,6 +215,10 @@ static void mptcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 		return;
 
 	mptcp_diag_fill_info(msk, info);
+
+	info->mptcpi_write_seq = 0;
+	info->mptcpi_snd_una = 0;
+	info->mptcpi_rcv_nxt = 0;
 }
 
 static const struct inet_diag_handler mptcp_diag_handler = {
