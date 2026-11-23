@@ -12,8 +12,7 @@
 
 #include "nhc.h"
 
-static const struct lowpan_nhc *lowpan_nexthdr_nhcs[NEXTHDR_MAX + 1];
-static DEFINE_SPINLOCK(lowpan_nhc_lock);
+static const struct lowpan_nhc __rcu *lowpan_nexthdr_nhcs[NEXTHDR_MAX + 1];
 
 static const struct lowpan_nhc *lowpan_nhc_by_nhcid(struct sk_buff *skb)
 {
@@ -27,7 +26,7 @@ static const struct lowpan_nhc *lowpan_nhc_by_nhcid(struct sk_buff *skb)
 	id = *skb->data;
 
 	for (i = 0; i < NEXTHDR_MAX + 1; i++) {
-		nhc = lowpan_nexthdr_nhcs[i];
+		nhc = rcu_dereference(lowpan_nexthdr_nhcs[i]);
 		if (!nhc)
 			continue;
 
@@ -44,13 +43,13 @@ int lowpan_nhc_check_compression(struct sk_buff *skb,
 	const struct lowpan_nhc *nhc;
 	int ret = 0;
 
-	spin_lock_bh(&lowpan_nhc_lock);
+	rcu_read_lock();
 
-	nhc = lowpan_nexthdr_nhcs[hdr->nexthdr];
+	nhc = rcu_dereference(lowpan_nexthdr_nhcs[hdr->nexthdr]);
 	if (!(nhc && nhc->compress))
 		ret = -ENOENT;
 
-	spin_unlock_bh(&lowpan_nhc_lock);
+	rcu_read_unlock();
 
 	return ret;
 }
@@ -61,9 +60,9 @@ int lowpan_nhc_do_compression(struct sk_buff *skb, const struct ipv6hdr *hdr,
 	int ret;
 	const struct lowpan_nhc *nhc;
 
-	spin_lock_bh(&lowpan_nhc_lock);
+	rcu_read_lock();
 
-	nhc = lowpan_nexthdr_nhcs[hdr->nexthdr];
+	nhc = rcu_dereference(lowpan_nexthdr_nhcs[hdr->nexthdr]);
 	/* check if the nhc module was removed in unlocked part.
 	 * TODO: this is a workaround we should prevent unloading
 	 * of nhc modules while unlocked part, this will always drop
@@ -93,7 +92,7 @@ int lowpan_nhc_do_compression(struct sk_buff *skb, const struct ipv6hdr *hdr,
 	skb_pull(skb, nhc->nexthdrlen);
 
 out:
-	spin_unlock_bh(&lowpan_nhc_lock);
+	rcu_read_unlock();
 
 	return ret;
 }
@@ -105,64 +104,50 @@ int lowpan_nhc_do_uncompression(struct sk_buff *skb,
 	const struct lowpan_nhc *nhc;
 	int ret;
 
-	spin_lock_bh(&lowpan_nhc_lock);
+	rcu_read_lock();
 
 	nhc = lowpan_nhc_by_nhcid(skb);
-	if (nhc) {
-		if (nhc->uncompress) {
-			ret = nhc->uncompress(skb, sizeof(struct ipv6hdr) +
-					      nhc->nexthdrlen);
-			if (ret < 0) {
-				spin_unlock_bh(&lowpan_nhc_lock);
-				return ret;
-			}
-		} else {
-			netdev_warn(dev, "received nhc id for %s which is not implemented.\n",
-				    nhc->name);
-			spin_unlock_bh(&lowpan_nhc_lock);
-			return -ENOTSUPP;
-		}
-	} else {
-		spin_unlock_bh(&lowpan_nhc_lock);
+	if (!nhc) {
 		netdev_warn(dev, "received unknown nhc id which was not found.\n");
-		return -ENOENT;
+		ret = -ENOENT;
+		goto out;
 	}
+
+	if (!nhc->uncompress) {
+		netdev_warn(dev, "received nhc id for %s which is not implemented.\n",
+			    nhc->name);
+		ret = -ENOTSUPP;
+		goto out;
+	}
+
+	ret = nhc->uncompress(skb, sizeof(struct ipv6hdr) + nhc->nexthdrlen);
+	if (ret < 0)
+		goto out;
 
 	hdr->nexthdr = nhc->nexthdr;
 	skb_reset_transport_header(skb);
 	raw_dump_table(__func__, "raw transport header dump",
 		       skb_transport_header(skb), nhc->nexthdrlen);
 
-	spin_unlock_bh(&lowpan_nhc_lock);
+out:
+	rcu_read_unlock();
 
-	return 0;
+	return ret;
 }
 
 int lowpan_nhc_add(const struct lowpan_nhc *nhc)
 {
-	int ret = 0;
+	if (cmpxchg(&lowpan_nexthdr_nhcs[nhc->nexthdr], NULL,
+		    RCU_INITIALIZER(nhc)))
+		return -EEXIST;
 
-	spin_lock_bh(&lowpan_nhc_lock);
-
-	if (lowpan_nexthdr_nhcs[nhc->nexthdr]) {
-		ret = -EEXIST;
-		goto out;
-	}
-
-	lowpan_nexthdr_nhcs[nhc->nexthdr] = nhc;
-out:
-	spin_unlock_bh(&lowpan_nhc_lock);
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(lowpan_nhc_add);
 
 void lowpan_nhc_del(const struct lowpan_nhc *nhc)
 {
-	spin_lock_bh(&lowpan_nhc_lock);
-
-	lowpan_nexthdr_nhcs[nhc->nexthdr] = NULL;
-
-	spin_unlock_bh(&lowpan_nhc_lock);
+	RCU_INIT_POINTER(lowpan_nexthdr_nhcs[nhc->nexthdr], NULL);
 
 	synchronize_net();
 }
