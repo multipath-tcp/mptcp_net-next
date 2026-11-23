@@ -190,12 +190,12 @@ static struct sk_buff *virtio_transport_build_skb(void *opaque)
 	return skb;
 }
 
-void virtio_transport_deliver_tap_pkt(struct sk_buff *skb)
+void virtio_transport_deliver_tap_pkt(struct sk_buff *skb, struct net *net)
 {
 	if (virtio_vsock_skb_tap_delivered(skb))
 		return;
 
-	vsock_deliver_tap(virtio_transport_build_skb, skb);
+	vsock_deliver_tap(virtio_transport_build_skb, skb, net);
 	virtio_vsock_skb_set_tap_delivered(skb);
 }
 EXPORT_SYMBOL_GPL(virtio_transport_deliver_tap_pkt);
