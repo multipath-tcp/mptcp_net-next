@@ -60,6 +60,8 @@ struct stmmac_desc_ops {
 	u16 (*get_rx_vlan_tci)(struct dma_desc *p);
 	/* Get the valid status of descriptor */
 	bool (*get_rx_vlan_valid)(struct dma_desc *p);
+	/* Get the vlan tag proto from the descriptor */
+	u16 (*get_rx_vlan_proto)(struct dma_desc *p);
 	/* Return the transmit status looking at the TDES1 */
 	int (*tx_status)(struct stmmac_extra_stats *x,
 			 struct dma_desc *p, void __iomem *ioaddr);
