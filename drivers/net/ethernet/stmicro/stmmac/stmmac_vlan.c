@@ -209,8 +209,12 @@ static void vlan_rx_hw(struct mac_device_info *hw,
 {
 	if (hw->desc->get_rx_vlan_valid(rx_desc)) {
 		u16 vid = hw->desc->get_rx_vlan_tci(rx_desc);
+		u16 proto = ETH_P_8021Q;
 
-		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vid);
+		if (hw->desc->get_rx_vlan_proto)
+			proto = hw->desc->get_rx_vlan_proto(rx_desc);
+
+		__vlan_hwaccel_put_tag(skb, htons(proto), vid);
 	}
 }
 

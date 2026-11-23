@@ -293,7 +293,9 @@ enum ovs_vport_type {
  * packets sent or received through the vport.
  * @OVS_VPORT_ATTR_IFINDEX: Provides the ifindex of a vport, or sets the desired
  * ifindex while creating a new vport with type %OVS_VPORT_TYPE_INTERNAL.
- * @OVS_VPORT_ATTR_NETNSID: Provides the netns id of the vport if it's not local.
+ * @OVS_VPORT_ATTR_NETNSID: Provides the netns id of the vport if it's not
+ * local, as a signed 32-bit value.  The value is -1 when the identifier could
+ * not be assigned.
  * @OVS_VPORT_ATTR_UPCALL_STATS: Provides upcall statistics for a vport.
  * Contains nested %OVS_VPORT_UPCALL_ATTR_* attributes.
  *
@@ -303,12 +305,14 @@ enum ovs_vport_type {
  * For %OVS_VPORT_CMD_NEW requests, the %OVS_VPORT_ATTR_TYPE and
  * %OVS_VPORT_ATTR_NAME attributes are required.  %OVS_VPORT_ATTR_PORT_NO is
  * optional; if not specified a free port number is automatically selected.
- * Whether %OVS_VPORT_ATTR_OPTIONS is required or optional depends on the type
- * of vport.  None of currently supported vport types support options.
+ * None of currently supported vport types support options, so
+ * %OVS_VPORT_ATTR_OPTIONS is ignored in a %OVS_VPORT_CMD_NEW request and
+ * rejected with -EOPNOTSUPP in a %OVS_VPORT_CMD_SET request.
  *
- * For other requests, if %OVS_VPORT_ATTR_NAME is specified then it is used to
- * look up the vport to operate on; otherwise dp_idx from the &struct
- * ovs_header plus %OVS_VPORT_ATTR_PORT_NO determine the vport.
+ * For requests other than new and dump, if %OVS_VPORT_ATTR_NAME is specified
+ * then it is used to look up the vport to operate on; otherwise dp_ifindex
+ * from the &struct ovs_header plus %OVS_VPORT_ATTR_PORT_NO determine the
+ * vport.
  */
 enum ovs_vport_attr {
 	/* private: */
@@ -624,24 +628,32 @@ struct ovs_nsh_key_md1 {
 /**
  * enum ovs_flow_attr - attributes for %OVS_FLOW_* commands.
  * @OVS_FLOW_ATTR_KEY: Nested %OVS_KEY_ATTR_* attributes specifying the flow
- * key.  Always present in notifications.  Required for all requests (except
- * dumps).
+ * key.  Present in replies and notifications, except for a flow identified
+ * by a ufid when the request asked for the key to be left out.  A get, set
+ * or del may carry a ufid instead of a key; a get and a set need one of the
+ * two, and a set that replaces the actions needs a key.  A new request needs
+ * a key, including one that finds an existing flow and replaces its
+ * actions.  A del carrying neither a key nor a ufid flushes the data path,
+ * as does one carrying no key and a ufid longer than 16 octets.
  * @OVS_FLOW_ATTR_ACTIONS: Nested %OVS_ACTION_ATTR_* attributes specifying
- * the actions to take for packets that match the key.  Always present in
- * notifications.  Required for %OVS_FLOW_CMD_NEW requests, optional for
+ * the actions to take for packets that match the key.  Present in replies
+ * and notifications, except when the request asked for the actions to be
+ * left out, and in a dump when they do not fit in the message.  Required
+ * for %OVS_FLOW_CMD_NEW requests, optional for
  * %OVS_FLOW_CMD_SET requests.  An %OVS_FLOW_CMD_SET without
  * %OVS_FLOW_ATTR_ACTIONS will not modify the actions.  To clear the actions,
  * an %OVS_FLOW_ATTR_ACTIONS without any nested attributes must be given.
  * @OVS_FLOW_ATTR_STATS: &struct ovs_flow_stats giving statistics for this
- * flow.  Present in notifications if the stats would be nonzero.  Ignored in
- * requests.
+ * flow.  Present in replies and notifications if the stats would be nonzero.
+ * Ignored in requests.
  * @OVS_FLOW_ATTR_TCP_FLAGS: An 8-bit value giving the OR'd value of all of the
- * TCP flags seen on packets in this flow.  Only present in notifications for
- * TCP flows, and only if it would be nonzero.  Ignored in requests.
+ * TCP flags seen on packets in this flow.  Only present in replies and
+ * notifications for TCP flows, and only if it would be nonzero.  Ignored in
+ * requests.
  * @OVS_FLOW_ATTR_USED: A 64-bit integer giving the time, in milliseconds on
  * the system monotonic clock, at which a packet was last processed for this
- * flow.  Only present in notifications if a packet has been processed for this
- * flow.  Ignored in requests.
+ * flow.  Only present in replies and notifications if a packet has been
+ * processed for this flow.  Ignored in requests.
  * @OVS_FLOW_ATTR_CLEAR: If present in a %OVS_FLOW_CMD_SET request, clears the
  * last-used time, accumulated TCP flags, and statistics for this flow.
  * Otherwise ignored in requests.  Never present in notifications.
@@ -655,9 +667,10 @@ struct ovs_nsh_key_md1 {
  * should be suppressed.
  * @OVS_FLOW_ATTR_UFID: A value between 1-16 octets specifying a unique
  * identifier for the flow. Causes the flow to be indexed by this value rather
- * than the value of the %OVS_FLOW_ATTR_KEY attribute. Optional for all
- * requests. Present in notifications if the flow was created with this
- * attribute.
+ * than the value of the %OVS_FLOW_ATTR_KEY attribute. A value longer than 16
+ * octets is treated as if the attribute were absent, so a new flow is indexed
+ * by its key. Optional for all requests. Present in replies and notifications
+ * if the flow was created with this attribute.
  * @OVS_FLOW_ATTR_UFID_FLAGS: A 32-bit value of OR'd %OVS_UFID_F_*
  * flags that provide alternative semantics for flow installation and
  * retrieval. Optional for all requests.
