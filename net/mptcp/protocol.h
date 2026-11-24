@@ -1365,8 +1365,10 @@ static inline bool mptcp_try_fallback(struct sock *ssk, int fb_mib)
 	if (!__mptcp_try_fallback(msk, fb_mib))
 		return false;
 
-	/* no FIN before new data: see mptcp_check_send_data_fin() */
-	if (READ_ONCE(msk->snd_data_fin_enable) &&
+	/* no FIN before new data: see mptcp_check_send_data_fin(), and the
+	 * release in __mptcp_wr_shutdown()
+	 */
+	if (smp_load_acquire(&msk->snd_data_fin_enable) &&
 	    !before64(READ_ONCE(msk->snd_nxt) + 1, READ_ONCE(msk->write_seq)) &&
 	    !(ssk->sk_shutdown & SEND_SHUTDOWN)) {
 		gfp_t saved_allocation = ssk->sk_allocation;
