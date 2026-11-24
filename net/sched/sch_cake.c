@@ -1679,7 +1679,7 @@ static struct cake_tin_data *cake_select_tin(struct Qdisc *sch,
 {
 	struct cake_sched_data *qd = qdisc_priv(sch);
 	struct cake_sched_config *q = qd->config;
-	u32 tin, mark;
+	u32 tin, mark, handle;
 	bool wash;
 	u8 dscp;
 
@@ -1689,6 +1689,8 @@ static struct cake_tin_data *cake_select_tin(struct Qdisc *sch,
 	 */
 	mark = (skb->mark & q->fwmark_mask) >> q->fwmark_shft;
 	wash = !!(q->rate_flags & CAKE_FLAG_WASH);
+	handle = q->is_shared ? TC_H_MAJ(sch->parent) : sch->handle;
+
 	if (wash)
 		dscp = cake_handle_diffserv(skb, wash);
 
@@ -1698,7 +1700,7 @@ static struct cake_tin_data *cake_select_tin(struct Qdisc *sch,
 	else if (mark && mark <= qd->tin_cnt)
 		tin = qd->tin_order[mark - 1];
 
-	else if (TC_H_MAJ(skb->priority) == sch->handle &&
+	else if (TC_H_MAJ(skb->priority) == handle &&
 		 TC_H_MIN(skb->priority) > 0 &&
 		 TC_H_MIN(skb->priority) <= qd->tin_cnt)
 		tin = qd->tin_order[TC_H_MIN(skb->priority) - 1];
