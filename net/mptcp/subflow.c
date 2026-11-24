@@ -1072,7 +1072,8 @@ enum mapping_status {
 	MAPPING_DATA_FIN,
 	MAPPING_DUMMY,
 	MAPPING_BAD_CSUM,
-	MAPPING_NODSS
+	MAPPING_NODSS,
+	MAPPING_INFINITE
 };
 
 static void dbg_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
@@ -1242,7 +1243,7 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 	if (data_len == 0) {
 		pr_debug("infinite mapping received\n");
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_INFINITEMAPRX);
-		return MAPPING_INVALID;
+		return MAPPING_INFINITE;
 	}
 
 	if (mpext->data_fin == 1) {
@@ -1453,6 +1454,22 @@ static void subflow_update_dsn_base(struct mptcp_subflow_context *subflow)
 		subflow->dsn_end = end;
 }
 
+/* RFC 8684, 3.7: no fallback once a DATA_ACK acked our data, except MP_FAIL */
+static bool subflow_nodss_is_fatal(struct mptcp_sock *msk,
+				   const struct mptcp_subflow_context *subflow)
+{
+	bool fatal;
+
+	if (!subflow->dss_confirmed)
+		return false;
+
+	/* before a fallback, only an MP_FAIL clears allow_subflows */
+	spin_lock_bh(&msk->fallback_lock);
+	fatal = msk->allow_subflows;
+	spin_unlock_bh(&msk->fallback_lock);
+	return fatal;
+}
+
 static bool subflow_check_data_avail(struct sock *ssk)
 {
 	struct mptcp_subflow_context *subflow = mptcp_subflow_ctx(ssk);
@@ -1473,7 +1490,9 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		status = get_mapping_status(ssk, msk);
 		trace_subflow_check_data_avail(status, skb_peek(&ssk->sk_receive_queue));
 		if (unlikely(status == MAPPING_INVALID || status == MAPPING_DUMMY ||
-			     status == MAPPING_BAD_CSUM || status == MAPPING_NODSS))
+			     status == MAPPING_BAD_CSUM ||
+			     status == MAPPING_NODSS ||
+			     status == MAPPING_INFINITE))
 			goto fallback;
 
 		if (status != MAPPING_OK)
@@ -1523,7 +1542,9 @@ fallback:
 			return true;
 		}
 
-		if (!mptcp_try_fallback(ssk, MPTCP_MIB_DSSFALLBACK)) {
+		if (((status == MAPPING_NODSS || status == MAPPING_INVALID) &&
+		     subflow_nodss_is_fatal(msk, subflow)) ||
+		    !mptcp_try_fallback(ssk, MPTCP_MIB_DSSFALLBACK)) {
 			/* fatal protocol error, reset the subflow and let the
 			 * worker close it
 			 */

@@ -21,7 +21,8 @@
 		{ 3, "MAPPING_DATA_FIN" },				\
 		{ 4, "MAPPING_DUMMY" },					\
 		{ 5, "MAPPING_BAD_CSUM" },				\
-		{ 6, "MAPPING_NODSS" })
+		{ 6, "MAPPING_NODSS" },					\
+		{ 7, "MAPPING_INFINITE" })
 
 TRACE_EVENT(mptcp_subflow_get_send,
 
