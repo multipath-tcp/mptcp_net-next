@@ -128,9 +128,11 @@ static inline bool mlx5e_ptpsq_metadata_freelist_empty(struct mlx5e_ptpsq *ptpsq
 
 int mlx5e_ptp_open(struct mlx5e_priv *priv, struct mlx5e_params *params,
 		   u8 lag_port, struct mlx5e_ptp **cp);
+void mlx5e_ptp_close_pre_sync(struct mlx5e_ptp *c);
 void mlx5e_ptp_close(struct mlx5e_ptp *c);
 void mlx5e_ptp_activate_channel(struct mlx5e_ptp *c);
-void mlx5e_ptp_deactivate_channel(struct mlx5e_ptp *c);
+void mlx5e_ptp_deactivate_channel_pre_sync(struct mlx5e_ptp *c);
+void mlx5e_ptp_deactivate_channel_post_sync(struct mlx5e_ptp *c);
 int mlx5e_ptp_get_rqn(struct mlx5e_ptp *c, u32 *rqn);
 int mlx5e_ptp_alloc_rx_fs(struct mlx5e_flow_steering *fs,
 			  const struct mlx5e_profile *profile);
