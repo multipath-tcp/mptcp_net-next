@@ -170,6 +170,7 @@ struct slave {
 	       inactive:1, /* indicates inactive slave */
 	       rx_disabled:1, /* indicates whether slave's Rx is disabled */
 	       should_notify:1, /* indicates whether the state changed */
+	       should_notify_rx:1, /* indicates whether the Rx state changed */
 	       should_notify_link:1; /* indicates whether the link changed */
 	u8     duplex;
 	u32    original_mtu;
@@ -399,6 +400,21 @@ static inline void bond_set_slave_state(struct slave *slave,
 	}
 }
 
+static inline void bond_set_slave_rx_disabled(struct slave *slave,
+					      bool rx_disabled, bool notify)
+{
+	if (slave->rx_disabled == rx_disabled)
+		return;
+
+	slave->rx_disabled = rx_disabled;
+	if (notify) {
+		bond_lower_state_changed(slave);
+		slave->should_notify_rx = 0;
+	} else {
+		slave->should_notify_rx = 1;
+	}
+}
+
 static inline void bond_slave_state_change(struct bonding *bond)
 {
 	struct list_head *iter;
@@ -418,9 +434,10 @@ static inline void bond_slave_state_notify(struct bonding *bond)
 	struct slave *tmp;
 
 	bond_for_each_slave(bond, tmp, iter) {
-		if (tmp->should_notify) {
+		if (tmp->should_notify || tmp->should_notify_rx) {
 			bond_lower_state_changed(tmp);
 			tmp->should_notify = 0;
+			tmp->should_notify_rx = 0;
 		}
 	}
 }
@@ -573,7 +590,7 @@ static inline void bond_set_slave_inactive_flags(struct slave *slave,
 	if (!slave->bond->params.all_slaves_active)
 		slave->inactive = 1;
 	if (BOND_MODE(slave->bond) == BOND_MODE_8023AD)
-		slave->rx_disabled = 1;
+		bond_set_slave_rx_disabled(slave, true, notify);
 }
 
 static inline void bond_set_slave_tx_disabled_flags(struct slave *slave,
@@ -588,14 +605,14 @@ static inline void bond_set_slave_active_flags(struct slave *slave,
 	bond_set_slave_state(slave, BOND_STATE_ACTIVE, notify);
 	slave->inactive = 0;
 	if (BOND_MODE(slave->bond) == BOND_MODE_8023AD)
-		slave->rx_disabled = 0;
+		bond_set_slave_rx_disabled(slave, false, notify);
 }
 
 static inline void bond_set_slave_rx_enabled_flags(struct slave *slave,
 					       bool notify)
 {
 	slave->inactive = 0;
-	slave->rx_disabled = 0;
+	bond_set_slave_rx_disabled(slave, false, notify);
 }
 
 static inline bool bond_is_slave_inactive(struct slave *slave)
