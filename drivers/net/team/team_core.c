@@ -88,6 +88,7 @@ static void team_lower_state_changed(struct team_port *port)
 
 	info.link_up = port->linkup;
 	info.tx_enabled = team_port_tx_enabled(port);
+	info.rx_enabled = info.tx_enabled;
 	netdev_lower_state_changed(port->dev, &info);
 }
 
