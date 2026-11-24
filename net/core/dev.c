@@ -1749,8 +1749,10 @@ static int __dev_open(struct net_device *dev, struct netlink_ext_ack *extack)
 
 	ret = call_netdevice_notifiers_extack(NETDEV_PRE_UP, dev, extack);
 	ret = notifier_to_errno(ret);
-	if (ret)
+	if (ret) {
+		netpoll_poll_enable(dev);
 		return ret;
+	}
 
 	set_bit(__LINK_STATE_START, &dev->state);
 
@@ -4236,6 +4238,15 @@ static struct sk_buff *validate_xmit_skb(struct sk_buff *skb, struct net_device 
 		     skb_is_gso(skb) &&
 		     !(skb_shinfo(skb)->gso_type & SKB_GSO_FRAGLIST)))
 		skb->ip_summed = CHECKSUM_NONE;
+
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		if (skb->encapsulation)
+			skb_set_inner_transport_header(skb,
+						       skb_checksum_start_offset(skb));
+		else
+			skb_set_transport_header(skb,
+						 skb_checksum_start_offset(skb));
+	}
 
 	features = netif_skb_features(skb);
 	skb = validate_xmit_vlan(skb, features);
