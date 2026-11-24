@@ -3239,7 +3239,8 @@ struct netdev_lag_upper_info {
 
 struct netdev_lag_lower_state_info {
 	u8 link_up : 1,
-	   tx_enabled : 1;
+	   tx_enabled : 1,
+	   rx_enabled : 1;
 };
 
 #include <linux/notifier.h>
