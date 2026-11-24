@@ -118,6 +118,7 @@
 #define MPTCP_WORK_CLOSE_SUBFLOW 3
 #define MPTCP_RTX_ENABLED	4
 #define MPTCP_ORPHAN_COUNTED	5
+#define MPTCP_JOINED		6
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
@@ -648,6 +649,7 @@ struct mptcp_subflow_context {
 	int     cached_sndbuf;	    /* sndbuf size when last synced with the msk sndbuf,
 				     * protected by the msk socket lock
 				     */
+	u32	opt_ack_seq;	    /* highest TCP ack_seq with MPTCP opts */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
