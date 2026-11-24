@@ -1988,6 +1988,19 @@ static void subflow_state_change(struct sock *sk)
 
 	__subflow_state_change(sk);
 
+	/* simult connect: not finished by subflow_finish_connect() */
+	if (unlikely(!subflow->conn_finished &&
+		     sk->sk_state == TCP_ESTABLISHED &&
+		     inet_sk_state_load(parent) == TCP_SYN_SENT &&
+		     mptcp_check_fallback(sk))) {
+		subflow->rel_write_seq = 1;
+		subflow->conn_finished = 1;
+		/* It looks like MPTCP is blocked, while TCP is not */
+		if (subflow->mpc_drop)
+			mptcp_active_disable(parent);
+		mptcp_propagate_state(parent, sk, subflow, NULL);
+	}
+
 	/* Rx queue processing is unneeded, error reporting will take place at
 	 * __mptcp_close_ssk() time and subflow reset can't happen in case of
 	 * fallback: subflow_sched_work_if_closed() would be a no-op.
