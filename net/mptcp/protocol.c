@@ -2707,6 +2707,18 @@ static void mptcp_cleanup_ssk_backlog(struct sock *sk, struct sock *ssk)
 
 static void mptcp_check_fastclose(struct mptcp_sock *msk);
 
+/* After the close, a pending DATA_FIN or MP_FASTCLOSE would be ignored */
+static void mptcp_check_rcv_close(struct sock *sk)
+{
+	/* process the DATA_FIN after the data still in the backlog */
+	if (READ_ONCE(mptcp_sk(sk)->rcv_data_fin)) {
+		mptcp_move_skbs(sk);
+		mptcp_check_data_fin(sk);
+	}
+
+	mptcp_check_fastclose(mptcp_sk(sk));
+}
+
 /* subflow sockets can be either outgoing (connect) or incoming
  * (accept).
  *
@@ -2819,9 +2831,7 @@ out:
 			mptcp_schedule_work(sk);
 		} else if (sk->sk_state != TCP_ESTABLISHED ||
 			   msk->in_accept_queue) {
-			/* After the close, an MP_FASTCLOSE would be ignored */
-			mptcp_check_fastclose(msk);
-
+			mptcp_check_rcv_close(sk);
 			mptcp_set_state(sk, TCP_CLOSE);
 			WRITE_ONCE(sk->sk_shutdown,
 				   sk->sk_shutdown | SEND_SHUTDOWN);
