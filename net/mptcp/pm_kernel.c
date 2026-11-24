@@ -915,7 +915,14 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	if (!err)
 		mptcp_event_pm_listener(ssk, MPTCP_EVENT_LISTENER_CREATED);
 	release_sock(ssk);
-	return err;
+	if (err) {
+		/* the subflow is back in TCP_CLOSE: like in mptcp_listen() */
+		inet_sk_state_store(newsk, TCP_CLOSE);
+		return err;
+	}
+
+	sock_prot_inuse_add(sock_net(newsk), newsk->sk_prot, 1);
+	return 0;
 }
 
 static int mptcp_pm_kernel_get_local_id(struct mptcp_sock *msk,
