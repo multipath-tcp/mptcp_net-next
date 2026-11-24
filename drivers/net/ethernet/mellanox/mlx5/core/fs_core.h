@@ -125,6 +125,11 @@ enum mlx5_flow_steering_capabilty {
 	MLX5_FLOW_STEERING_CAP_DUPLICATE_MATCH = 1UL << 3,
 };
 
+struct mlx5_transport_manager_ns {
+	struct mlx5_flow_root_namespace **root_ns;
+	int vports;
+};
+
 struct mlx5_flow_steering {
 	struct mlx5_core_dev *dev;
 	enum   mlx5_flow_steering_mode	mode;
@@ -141,10 +146,9 @@ struct mlx5_flow_steering {
 	struct mlx5_flow_root_namespace	*rdma_tx_root_ns;
 	struct mlx5_flow_root_namespace	*egress_root_ns;
 	struct mlx5_flow_root_namespace	*port_sel_root_ns;
-	struct mlx5_flow_root_namespace **rdma_transport_rx_root_ns;
-	struct mlx5_flow_root_namespace **rdma_transport_tx_root_ns;
-	int rdma_transport_rx_vports;
-	int rdma_transport_tx_vports;
+	struct mlx5_transport_manager_ns rdma_transport_rx;
+	struct mlx5_transport_manager_ns rdma_transport_tx;
+	struct mlx5_transport_manager_ns nic_rx_class;
 };
 
 struct fs_node {
@@ -417,7 +421,8 @@ int mlx5_fs_get_packet_reformat_id(struct mlx5_pkt_reformat *pkt_reformat,
 	(type == FS_FT_FDB_TX) ? MLX5_CAP_ESW_FLOWTABLE_FDB(mdev, cap) :      \
 	(type == FS_FT_RDMA_TRANSPORT_RX) ? MLX5_CAP_FLOWTABLE_RDMA_TRANSPORT_RX(mdev, cap) :      \
 	(type == FS_FT_RDMA_TRANSPORT_TX) ? MLX5_CAP_FLOWTABLE_RDMA_TRANSPORT_TX(mdev, cap) :      \
-	(BUILD_BUG_ON_ZERO(FS_FT_RDMA_TRANSPORT_TX != FS_FT_MAX_TYPE))\
+	(type == FS_FT_NIC_RX_CLASS) ? MLX5_CAP_FLOWTABLE_NIC_RX_CLASS(mdev, cap) :      \
+	(BUILD_BUG_ON_ZERO(FS_FT_NIC_RX_CLASS != FS_FT_MAX_TYPE))\
 	)
 
 #endif
