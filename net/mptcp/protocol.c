@@ -1901,10 +1901,7 @@ void __mptcp_push_pending(struct sock *sk, unsigned int flags)
 
 				ret = __subflow_push_pending(sk, ssk, &info);
 				if (ret <= 0) {
-					if (ret != -EAGAIN ||
-					    (1 << ssk->sk_state) &
-					     (TCPF_FIN_WAIT1 | TCPF_FIN_WAIT2 | TCPF_CLOSE))
-						push_count--;
+					push_count--;
 					continue;
 				}
 				copied = true;
@@ -1961,6 +1958,9 @@ static void __mptcp_subflow_push_pending(struct sock *sk, struct sock *ssk, bool
 				keep_pushing = false;
 			else
 				copied += ret;
+		} else {
+			/* a BPF scheduler might not pick any subflow */
+			keep_pushing = false;
 		}
 
 		mptcp_for_each_subflow(msk, subflow) {
