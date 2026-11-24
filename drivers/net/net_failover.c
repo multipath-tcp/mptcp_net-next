@@ -451,6 +451,7 @@ static void net_failover_lower_state_changed(struct net_device *slave_dev,
 		else
 			info.tx_enabled = true;
 	}
+	info.rx_enabled = info.tx_enabled;
 
 	netdev_lower_state_changed(slave_dev, &info);
 }
