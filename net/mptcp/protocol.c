@@ -4705,6 +4705,8 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		if (unlikely(inet_sk_state_load(msk->first) == TCP_CLOSE)) {
 			if (unlikely(list_is_singular(&msk->conn_list))) {
 				mptcp_check_rcv_close(newsk);
+				/* not reported in the accept queue */
+				__mptcp_error_report(newsk);
 				mptcp_set_state(newsk, TCP_CLOSE);
 			}
 			mptcp_close_ssk(newsk, msk->first,
