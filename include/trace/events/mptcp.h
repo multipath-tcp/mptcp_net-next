@@ -19,7 +19,9 @@
 		{ 1, "MAPPING_INVALID" },				\
 		{ 2, "MAPPING_EMPTY" },					\
 		{ 3, "MAPPING_DATA_FIN" },				\
-		{ 4, "MAPPING_DUMMY" })
+		{ 4, "MAPPING_DUMMY" },					\
+		{ 5, "MAPPING_BAD_CSUM" },				\
+		{ 6, "MAPPING_NODSS" })
 
 TRACE_EVENT(mptcp_subflow_get_send,
 
