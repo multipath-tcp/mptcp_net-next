@@ -3828,6 +3828,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 
 	mptcp_check_listen_stop(sk);
 	mptcp_set_state(sk, TCP_CLOSE);
+	inet_clear_bit(DEFER_CONNECT, sk);
 
 	/* The later subflow close can not kick again the tout timer,
 	 * as the msk is already in closed status.
