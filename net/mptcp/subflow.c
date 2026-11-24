@@ -1242,6 +1242,10 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 			bool updated = mptcp_update_rcv_data_fin(msk, mpext->data_seq,
 								 mpext->dsn64);
 			pr_debug("DATA_FIN with no payload seq=%llu\n", mpext->data_seq);
+			/* The current mapping can be old, and then not moved */
+			if (updated)
+				mptcp_schedule_work((struct sock *)msk);
+
 			if (subflow->map_valid) {
 				/* A DATA_FIN might arrive in a DSS
 				 * option before the previous mapping
@@ -1251,9 +1255,6 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 				skb_ext_del(skb, SKB_EXT_MPTCP);
 				return MAPPING_OK;
 			}
-
-			if (updated)
-				mptcp_schedule_work((struct sock *)msk);
 
 			return MAPPING_DATA_FIN;
 		}
@@ -1266,7 +1267,9 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 		if (!mpext->dsn64)
 			data_fin_seq &= GENMASK_ULL(31, 0);
 
-		mptcp_update_rcv_data_fin(msk, data_fin_seq, mpext->dsn64);
+		/* The mapped data can be old, and then not moved to the msk */
+		if (mptcp_update_rcv_data_fin(msk, data_fin_seq, mpext->dsn64))
+			mptcp_schedule_work((struct sock *)msk);
 		pr_debug("DATA_FIN with mapping seq=%llu dsn64=%d\n",
 			 data_fin_seq, mpext->dsn64);
 
