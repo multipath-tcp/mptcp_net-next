@@ -156,16 +156,14 @@ static int tn40_swnodes_register(struct tn40_priv *priv)
 void tn40_swnodes_cleanup(struct tn40_priv *priv)
 {
 	/* cleanup of swnodes is only needed for AQR105-based cards */
-	if (priv->pdev->device == PCI_DEVICE_ID_TEHUTI_TN9510) {
-		fwnode_handle_put(dev_fwnode(&priv->mdio->dev));
-		device_remove_software_node(&priv->mdio->dev);
+	if (priv->pdev->device == PCI_DEVICE_ID_TEHUTI_TN9510)
 		software_node_unregister_node_group(priv->nodes.group);
-	}
 }
 
 int tn40_mdiobus_init(struct tn40_priv *priv)
 {
 	struct pci_dev *pdev = priv->pdev;
+	struct fwnode_handle *fwnode;
 	struct mii_bus *bus;
 	int ret;
 
@@ -191,13 +189,8 @@ int tn40_mdiobus_init(struct tn40_priv *priv)
 			return ret;
 		}
 
-		ret = device_add_software_node(&bus->dev,
-					       priv->nodes.group[SWNODE_MDIO]);
-		if (ret) {
-			dev_err(&pdev->dev,
-				"device_add_software_node failed: %d\n", ret);
-			goto err_swnodes_unregister;
-		}
+		fwnode = software_node_fwnode(priv->nodes.group[SWNODE_MDIO]);
+		bus->dev.fwnode = fwnode;
 	}
 
 	tn40_mdio_set_speed(priv, TN40_MDIO_SPEED_6MHZ);
@@ -209,9 +202,6 @@ int tn40_mdiobus_init(struct tn40_priv *priv)
 	}
 	return 0;
 
-err_swnodes_unregister:
-	software_node_unregister_node_group(priv->nodes.group);
-	return ret;
 err_swnodes_cleanup:
 	tn40_swnodes_cleanup(priv);
 	return ret;
