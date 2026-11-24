@@ -16,8 +16,10 @@ int mlx5e_open_xsk(struct mlx5e_priv *priv, struct mlx5e_params *params,
 		   struct mlx5e_channel_param *cparam,
 		   struct xsk_buff_pool *pool,
 		   struct mlx5e_channel *c);
+void mlx5e_close_xsk_queues(struct mlx5e_channel *c);
 void mlx5e_close_xsk(struct mlx5e_channel *c);
 void mlx5e_activate_xsk(struct mlx5e_channel *c);
+void mlx5e_deactivate_xsk_pre_sync(struct mlx5e_channel *c);
 void mlx5e_deactivate_xsk(struct mlx5e_channel *c);
 
 #endif /* __MLX5_EN_XSK_SETUP_H__ */
