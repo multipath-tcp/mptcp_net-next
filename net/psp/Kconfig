@@ -5,6 +5,7 @@
 config INET_PSP
 	bool "PSP Security Protocol support"
 	depends on INET
+	depends on BQL
 	select SKB_DECRYPTED
 	select SKB_EXTENSIONS
 	select SOCK_VALIDATE_XMIT
