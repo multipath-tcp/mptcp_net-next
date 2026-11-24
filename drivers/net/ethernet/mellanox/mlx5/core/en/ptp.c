@@ -928,10 +928,17 @@ err_free:
 	return err;
 }
 
+void mlx5e_ptp_close_pre_sync(struct mlx5e_ptp *c)
+{
+	/* NAPI is disabled and synced, or was never enabled. */
+	mlx5e_ptp_close_queues(c);
+	__netif_napi_del_locked(&c->napi);
+}
+
 void mlx5e_ptp_close(struct mlx5e_ptp *c)
 {
-	mlx5e_ptp_close_queues(c);
-	netif_napi_del_locked(&c->napi);
+	mlx5e_ptp_close_pre_sync(c);
+	synchronize_net(); /* Sync with NAPI and page pool readers. */
 
 	kvfree(c);
 }
@@ -954,18 +961,28 @@ void mlx5e_ptp_activate_channel(struct mlx5e_ptp *c)
 	mlx5e_trigger_napi_sched(&c->napi);
 }
 
-void mlx5e_ptp_deactivate_channel(struct mlx5e_ptp *c)
+void mlx5e_ptp_deactivate_channel_pre_sync(struct mlx5e_ptp *c)
 {
 	int tc;
 
 	if (test_bit(MLX5E_PTP_STATE_RX, c->state)) {
 		netif_queue_set_napi(c->netdev, c->rq.ix, NETDEV_QUEUE_TYPE_RX, NULL);
-		mlx5e_deactivate_rq(&c->rq);
+		mlx5e_deactivate_rq_pre_sync(&c->rq);
 	}
 
 	if (test_bit(MLX5E_PTP_STATE_TX, c->state)) {
 		for (tc = 0; tc < c->num_tc; tc++)
-			mlx5e_deactivate_txqsq(&c->ptpsq[tc].txqsq);
+			mlx5e_deactivate_txqsq_pre_sync(&c->ptpsq[tc].txqsq);
+	}
+}
+
+void mlx5e_ptp_deactivate_channel_post_sync(struct mlx5e_ptp *c)
+{
+	int tc;
+
+	if (test_bit(MLX5E_PTP_STATE_TX, c->state)) {
+		for (tc = 0; tc < c->num_tc; tc++)
+			mlx5e_deactivate_txqsq_post_sync(&c->ptpsq[tc].txqsq);
 	}
 
 	napi_disable_locked(&c->napi);
