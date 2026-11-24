@@ -1028,7 +1028,8 @@ void __mptcp_error_report(struct sock *sk);
 bool mptcp_update_rcv_data_fin(struct mptcp_sock *msk, u64 data_fin_seq, bool use_64bit);
 static inline bool mptcp_data_fin_enabled(const struct mptcp_sock *msk)
 {
-	return READ_ONCE(msk->snd_data_fin_enable) &&
+	/* pairs with the release in __mptcp_wr_shutdown() */
+	return smp_load_acquire(&msk->snd_data_fin_enable) &&
 	       READ_ONCE(msk->write_seq) == READ_ONCE(msk->snd_nxt);
 }
 
