@@ -2738,6 +2738,10 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 		subflow->lent_mem_frag = 0;
 	}
 
+	/* also before accept(), not to reset again in inet_child_forget() */
+	if (subflow->send_fastclose && ssk->sk_state != TCP_CLOSE)
+		tcp_set_state(ssk, TCP_CLOSE);
+
 	/* If the first subflow moved to a close state before accept, e.g. due
 	 * to an incoming reset or listener shutdown, the subflow socket is
 	 * already deleted by inet_child_forget() and the mptcp socket can't
@@ -2755,9 +2759,6 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	dispose_it = msk->free_first || ssk != msk->first;
 	if (dispose_it)
 		list_del(&subflow->node);
-
-	if (subflow->send_fastclose && ssk->sk_state != TCP_CLOSE)
-		tcp_set_state(ssk, TCP_CLOSE);
 
 	need_push = (flags & MPTCP_CF_PUSH) && __mptcp_retransmit_pending_data(sk);
 	if (!dispose_it) {
@@ -3268,10 +3269,7 @@ static void mptcp_do_fastclose(struct sock *sk)
 	mptcp_backlog_purge(sk);
 	msk->fastclosing = 1;
 
-	/* Explicitly send the fastclose reset as need */
-	if (__mptcp_check_fallback(msk))
-		return;
-
+	/* Explicitly send the fastclose reset, a plain one after a fallback */
 	mptcp_for_each_subflow_safe(msk, subflow, tmp) {
 		struct sock *ssk = mptcp_subflow_tcp_sock(subflow);
 
