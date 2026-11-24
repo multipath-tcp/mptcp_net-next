@@ -1401,8 +1401,7 @@ gve_adminq_configure_flow_rule(struct gve_priv *priv,
 			sizeof(struct gve_adminq_configure_flow_rule),
 			flow_rule_cmd);
 
-	if (!err)
-		priv->flow_rules_cache.rules_cache_synced = false;
+	priv->flow_rules_cache.rules_cache_synced = false;
 
 	return err;
 }
