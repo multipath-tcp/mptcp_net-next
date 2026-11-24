@@ -518,6 +518,56 @@ static void mptcp_close_wake_up(struct sock *sk)
 		sk_wake_async(sk, SOCK_WAKE_WAITD, POLL_IN);
 }
 
+/* Mirror the tcp_reset() error propagation */
+static int mptcp_reset_err(const struct sock *sk)
+{
+	int err;
+
+	switch (sk->sk_state) {
+	case TCP_SYN_SENT:
+		err = ECONNREFUSED;
+		break;
+	case TCP_CLOSE_WAIT:
+		err = EPIPE;
+		break;
+	default:
+		err = ECONNRESET;
+	}
+
+	return err;
+}
+
+/* No more data can be exchanged: report it, as tcp_done_with_error() does */
+static void mptcp_close_err(struct sock *sk, int err)
+{
+	WRITE_ONCE(sk->sk_err, err);
+	/* This barrier is coupled with smp_rmb() in mptcp_poll() */
+	smp_wmb();
+	WRITE_ONCE(sk->sk_shutdown, SHUTDOWN_MASK);
+	mptcp_set_state(sk, TCP_CLOSE);
+	if (sock_flag(sk, SOCK_DEAD))
+		return;
+
+	mptcp_close_wake_up(sk);
+	sk_error_report(sk);
+}
+
+/* As TCP: the error of the last subflow, e.g. ETIMEDOUT, but after a reset
+ * (EBADMSG: by MPTCP) or without error, it depends on the msk state
+ */
+static void mptcp_close_last_err(struct sock *sk, int err)
+{
+	switch (err) {
+	case 0:
+	case ECONNREFUSED:
+	case ECONNRESET:
+	case EPIPE:
+	case EBADMSG:
+		err = mptcp_reset_err(sk);
+	}
+	mptcp_close_err(sk, err);
+}
+
 static void mptcp_shutdown_subflows(struct mptcp_sock *msk)
 {
 	struct mptcp_subflow_context *subflow;
@@ -983,7 +1033,7 @@ static bool __mptcp_subflow_error_report(struct sock *sk, struct sock *ssk)
 	if (ssk_state == TCP_CLOSE && !sock_flag(sk, SOCK_DEAD)) {
 		/* This barrier is coupled with smp_rmb() in mptcp_poll() */
 		smp_wmb();
-		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | SEND_SHUTDOWN);
+		WRITE_ONCE(sk->sk_shutdown, SHUTDOWN_MASK);
 		mptcp_set_state(sk, ssk_state);
 	}
 	report = true;
@@ -2809,7 +2859,7 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 {
 	struct mptcp_sock *msk = mptcp_sk(sk);
 	bool dispose_it, need_push = false;
-	int fwd_remaining;
+	int fwd_remaining, ssk_err;
 
 	/* Do not pass RX data to the msk, even if the subflow socket is not
 	 * going to be freed (i.e. even for the first subflow on graceful
@@ -2817,6 +2867,8 @@ static void __mptcp_close_ssk(struct sock *sk, struct sock *ssk,
 	 */
 	lock_sock_nested(ssk, SINGLE_DEPTH_NESTING);
 	subflow->closing = 1;
+	/* in case it is the last subflow: before its disconnect or dispose */
+	ssk_err = READ_ONCE(ssk->sk_err);
 
 	if (flags & MPTCP_CF_PUSH)
 		mptcp_cleanup_ssk_backlog(sk, ssk);
@@ -2905,13 +2957,15 @@ out:
 			mptcp_set_close_tout(sk, tcp_jiffies32 -
 					     (mptcp_close_timeout(sk) + 1));
 			mptcp_schedule_work(sk);
+		} else if (sk->sk_state == TCP_CLOSE) {
+			mptcp_close_wake_up(sk);
 		} else if (sk->sk_state != TCP_ESTABLISHED ||
 			   msk->in_accept_queue) {
 			mptcp_check_rcv_close(sk);
-			mptcp_set_state(sk, TCP_CLOSE);
-			WRITE_ONCE(sk->sk_shutdown,
-				   sk->sk_shutdown | SEND_SHUTDOWN);
-			mptcp_close_wake_up(sk);
+			if (sk->sk_state == TCP_CLOSE)
+				mptcp_close_wake_up(sk);
+			else
+				mptcp_close_last_err(sk, ssk_err);
 		} else {
 			mptcp_start_tout_timer(sk);
 		}
@@ -3108,20 +3162,10 @@ static void mptcp_check_fastclose(struct mptcp_sock *msk)
 		unlock_sock_fast(tcp_sk, slow);
 	}
 
-	/* Mirror the tcp_reset() error propagation */
-	switch (sk->sk_state) {
-	case TCP_SYN_SENT:
-		WRITE_ONCE(sk->sk_err, ECONNREFUSED);
-		break;
-	case TCP_CLOSE_WAIT:
-		WRITE_ONCE(sk->sk_err, EPIPE);
-		break;
-	case TCP_CLOSE:
+	if (sk->sk_state == TCP_CLOSE)
 		return;
-	default:
-		WRITE_ONCE(sk->sk_err, ECONNRESET);
-	}
 
+	WRITE_ONCE(sk->sk_err, mptcp_reset_err(sk));
 	mptcp_set_state(sk, TCP_CLOSE);
 	WRITE_ONCE(sk->sk_shutdown, SHUTDOWN_MASK);
 	smp_mb__before_atomic(); /* SHUTDOWN must be visible first */
@@ -3441,8 +3485,7 @@ static void mptcp_worker(struct work_struct *work)
 		mptcp_do_fastclose(sk);
 		mptcp_for_each_subflow_safe(msk, subflow, tmp)
 			__mptcp_close_ssk(sk, subflow->tcp_sock, subflow, 0);
-		WRITE_ONCE(sk->sk_shutdown, sk->sk_shutdown | SEND_SHUTDOWN);
-		mptcp_close_wake_up(sk);
+		mptcp_close_err(sk, ETIMEDOUT);
 	}
 
 	if (sock_flag(sk, SOCK_DEAD) && sk->sk_state == TCP_CLOSE) {
@@ -4795,10 +4838,13 @@ static int mptcp_stream_accept(struct socket *sock, struct socket *newsock,
 		 */
 		if (unlikely(inet_sk_state_load(msk->first) == TCP_CLOSE)) {
 			if (unlikely(list_is_singular(&msk->conn_list))) {
+				int err = READ_ONCE(msk->first->sk_err);
+
 				mptcp_check_rcv_close(newsk);
 				/* not reported in the accept queue */
 				__mptcp_error_report(newsk);
-				mptcp_set_state(newsk, TCP_CLOSE);
+				if (newsk->sk_state != TCP_CLOSE)
+					mptcp_close_last_err(newsk, err);
 			}
 			mptcp_close_ssk(newsk, msk->first,
 					mptcp_subflow_ctx(msk->first));
