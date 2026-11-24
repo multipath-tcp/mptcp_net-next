@@ -182,6 +182,10 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 		return -EINVAL;
 	}
 
+	/* as the default scheduler: the rtx timer needs an interval */
+	if (msk->sched && msk->sched != &mptcp_sched_default)
+		mptcp_set_timeout((struct sock *)msk);
+
 	mptcp_for_each_subflow(msk, subflow) {
 		if (READ_ONCE(subflow->scheduled))
 			return 0;
@@ -189,6 +193,7 @@ int mptcp_sched_get_send(struct mptcp_sock *msk)
 
 	if (msk->sched == &mptcp_sched_default || !msk->sched)
 		return mptcp_sched_default_get_send(msk);
+
 	return msk->sched->get_send(msk);
 }
 
