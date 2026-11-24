@@ -28,9 +28,10 @@ void mlx5e_reset_qdisc(struct net_device *dev, u16 qid);
 
 int mlx5e_qos_open_queues(struct mlx5e_priv *priv, struct mlx5e_channels *chs);
 void mlx5e_qos_activate_queues(struct mlx5e_priv *priv);
-void mlx5e_qos_deactivate_queues(struct mlx5e_channel *c);
+void mlx5e_qos_deactivate_queues_pre_sync(struct mlx5e_channel *c);
+void mlx5e_qos_deactivate_queues_post_sync(struct mlx5e_channel *c);
 void mlx5e_qos_deactivate_all_queues(struct mlx5e_channels *chs);
-void mlx5e_qos_close_queues(struct mlx5e_channel *c);
+void mlx5e_qos_close_queues(struct mlx5e_channel *c, bool sync_needed);
 void mlx5e_qos_close_all_queues(struct mlx5e_channels *chs);
 int mlx5e_qos_alloc_queues(struct mlx5e_priv *priv, struct mlx5e_channels *chs);
 
