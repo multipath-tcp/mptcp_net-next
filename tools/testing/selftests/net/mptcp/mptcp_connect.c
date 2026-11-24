@@ -643,6 +643,26 @@ static void shut_wr(int fd)
 	shutdown(fd, SHUT_WR);
 }
 
+/* the data still queued would be dropped by a reset: wait for its ack */
+static void wait_for_ack(int fd)
+{
+	struct pollfd pfd = { .fd = fd };
+	int i, queued;
+
+	for (i = 0; poll_timeout < 0 || i < poll_timeout; i += 10) {
+		if (quit || ioctl(fd, SIOCOUTQ, &queued) < 0 || queued <= 0)
+			return;
+
+		/* e.g. reset: the data will not be acked */
+		if (poll(&pfd, 1, 0) > 0 && (pfd.revents & POLLERR))
+			return;
+
+		usleep(10000);
+	}
+
+	fprintf(stderr, "timeout while waiting for the data to be acked\n");
+}
+
 static int copyfd_io_poll(int infd, int peerfd, int outfd,
 			  bool *in_closed_after_out, struct wstate *winfo)
 {
@@ -768,8 +788,10 @@ static int copyfd_io_poll(int infd, int peerfd, int outfd,
 		}
 
 		if (cfg_truncate > 0 && total_wlen >= cfg_truncate &&
-		    total_rlen >= cfg_truncate)
+		    total_rlen >= cfg_truncate) {
+			wait_for_ack(peerfd);
 			break;
+		}
 	}
 
 	/* leave some time for late join/announce */
