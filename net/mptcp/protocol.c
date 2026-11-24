@@ -2871,6 +2871,32 @@ static bool mptcp_close_tout_expired(const struct sock *sk)
 		  inet_csk(sk)->icsk_mtup.probe_timestamp + mptcp_close_timeout(sk));
 }
 
+/* Would TCP abort this subflow if it were an orphan probing a zero window? */
+static bool mptcp_subflow_probe_timed_out(struct sock *ssk)
+{
+	u8 retries2 = READ_ONCE(sock_net(ssk)->ipv4.sysctl_tcp_retries2);
+	struct inet_connection_sock *icsk = inet_csk(ssk);
+	const struct tcp_sock *tp = tcp_sk(ssk);
+	unsigned long limit;
+	bool slow, ret;
+	u64 when;
+
+	slow = lock_sock_fast_nested(ssk);
+	limit = tcp_rto_max(ssk);
+	if (tp->packets_out) {
+		ret = !tp->snd_wnd && icsk->icsk_rto >= limit;
+	} else {
+		if (icsk->icsk_backoff < retries2)
+			limit *= 2;
+		/* a shift of 32 already exceeds the limit */
+		when = (u64)icsk->icsk_rto << min_t(u8, icsk->icsk_backoff, 32);
+		ret = tcp_send_head(ssk) && when >= limit;
+	}
+	unlock_sock_fast(ssk, slow);
+
+	return ret;
+}
+
 /* Before its DATA_FIN, keep an orphan while a subflow can send its data */
 static bool mptcp_orphan_keep(struct sock *sk)
 {
@@ -2886,7 +2912,8 @@ static bool mptcp_orphan_keep(struct sock *sk)
 		/* a live peer acks at least the probes, every TCP_RTO_MAX */
 		if (__mptcp_subflow_active(subflow) &&
 		    tcp_jiffies32 - READ_ONCE(tcp_sk(ssk)->rcv_tstamp) <
-		    2 * TCP_RTO_MAX)
+		    2 * TCP_RTO_MAX &&
+		    !mptcp_subflow_probe_timed_out(ssk))
 			return true;
 	}
 
