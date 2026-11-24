@@ -1929,6 +1929,7 @@ static bool check_conflicting_actions(const struct mlx5_flow_act *act1,
 		return false;
 
 	if (xored_actions & (MLX5_FLOW_CONTEXT_ACTION_DROP  |
+			     MLX5_FLOW_CONTEXT_ACTION_ALLOW |
 			     MLX5_FLOW_CONTEXT_ACTION_PACKET_REFORMAT |
 			     MLX5_FLOW_CONTEXT_ACTION_DECAP |
 			     MLX5_FLOW_CONTEXT_ACTION_MOD_HDR  |
@@ -2816,20 +2817,28 @@ mlx5_get_flow_vport_namespace(struct mlx5_core_dev *dev,
 		else
 			return NULL;
 	case MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_RX:
-		if (vport_idx >= steering->rdma_transport_rx_vports)
+		if (vport_idx >= steering->rdma_transport_rx.vports)
 			return NULL;
-		if (steering->rdma_transport_rx_root_ns &&
-		    steering->rdma_transport_rx_root_ns[vport_idx])
-			return &steering->rdma_transport_rx_root_ns[vport_idx]->ns;
+		if (steering->rdma_transport_rx.root_ns &&
+		    steering->rdma_transport_rx.root_ns[vport_idx])
+			return &steering->rdma_transport_rx.root_ns[vport_idx]->ns;
 		else
 			return NULL;
 	case MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_TX:
-		if (vport_idx >= steering->rdma_transport_tx_vports)
+		if (vport_idx >= steering->rdma_transport_tx.vports)
 			return NULL;
 
-		if (steering->rdma_transport_tx_root_ns &&
-		    steering->rdma_transport_tx_root_ns[vport_idx])
-			return &steering->rdma_transport_tx_root_ns[vport_idx]->ns;
+		if (steering->rdma_transport_tx.root_ns &&
+		    steering->rdma_transport_tx.root_ns[vport_idx])
+			return &steering->rdma_transport_tx.root_ns[vport_idx]->ns;
+		else
+			return NULL;
+	case MLX5_FLOW_NAMESPACE_NIC_RX_CLASS:
+		if (vport_idx >= steering->nic_rx_class.vports)
+			return NULL;
+		if (steering->nic_rx_class.root_ns &&
+		    steering->nic_rx_class.root_ns[vport_idx])
+			return &steering->nic_rx_class.root_ns[vport_idx]->ns;
 		else
 			return NULL;
 	default:
@@ -3243,7 +3252,9 @@ out_err:
 }
 
 static int
-init_rdma_transport_rx_root_ns_one(struct mlx5_flow_steering *steering,
+init_transport_manager_root_ns_one(struct mlx5_flow_steering *steering,
+				   struct mlx5_flow_root_namespace **root_ns_arr,
+				   enum fs_flow_table_type ft_type,
 				   int vport_idx)
 {
 	struct mlx5_flow_root_namespace *root_ns;
@@ -3251,43 +3262,11 @@ init_rdma_transport_rx_root_ns_one(struct mlx5_flow_steering *steering,
 	int ret;
 	int i;
 
-	steering->rdma_transport_rx_root_ns[vport_idx] =
-		create_root_ns(steering, FS_FT_RDMA_TRANSPORT_RX);
-	if (!steering->rdma_transport_rx_root_ns[vport_idx])
+	root_ns_arr[vport_idx] = create_root_ns(steering, ft_type);
+	if (!root_ns_arr[vport_idx])
 		return -ENOMEM;
 
-	root_ns = steering->rdma_transport_rx_root_ns[vport_idx];
-
-	for (i = 0; i < MLX5_RDMA_TRANSPORT_BYPASS_PRIO; i++) {
-		prio = fs_create_prio(&root_ns->ns, i, 1);
-		if (IS_ERR(prio)) {
-			ret = PTR_ERR(prio);
-			goto err;
-		}
-	}
-	set_prio_attrs(root_ns);
-	return 0;
-
-err:
-	cleanup_root_ns(root_ns);
-	return ret;
-}
-
-static int
-init_rdma_transport_tx_root_ns_one(struct mlx5_flow_steering *steering,
-				   int vport_idx)
-{
-	struct mlx5_flow_root_namespace *root_ns;
-	struct fs_prio *prio;
-	int ret;
-	int i;
-
-	steering->rdma_transport_tx_root_ns[vport_idx] =
-		create_root_ns(steering, FS_FT_RDMA_TRANSPORT_TX);
-	if (!steering->rdma_transport_tx_root_ns[vport_idx])
-		return -ENOMEM;
-
-	root_ns = steering->rdma_transport_tx_root_ns[vport_idx];
+	root_ns = root_ns_arr[vport_idx];
 
 	for (i = 0; i < MLX5_RDMA_TRANSPORT_BYPASS_PRIO; i++) {
 		prio = fs_create_prio(&root_ns->ns, i, 1);
@@ -3326,12 +3305,16 @@ int mlx5_fs_set_root_dev(struct mlx5_core_dev *dev,
 
 	switch (table_type) {
 	case FS_FT_RDMA_TRANSPORT_TX:
-		root = dev->priv.steering->rdma_transport_tx_root_ns;
-		total_vports = dev->priv.steering->rdma_transport_tx_vports;
+		root = dev->priv.steering->rdma_transport_tx.root_ns;
+		total_vports = dev->priv.steering->rdma_transport_tx.vports;
 		break;
 	case FS_FT_RDMA_TRANSPORT_RX:
-		root = dev->priv.steering->rdma_transport_rx_root_ns;
-		total_vports = dev->priv.steering->rdma_transport_rx_vports;
+		root = dev->priv.steering->rdma_transport_rx.root_ns;
+		total_vports = dev->priv.steering->rdma_transport_rx.vports;
+		break;
+	case FS_FT_NIC_RX_CLASS:
+		root = dev->priv.steering->nic_rx_class.root_ns;
+		total_vports = dev->priv.steering->nic_rx_class.vports;
 		break;
 	default:
 		WARN_ON_ONCE(true);
@@ -3360,7 +3343,10 @@ err:
 }
 EXPORT_SYMBOL(mlx5_fs_set_root_dev);
 
-static int init_rdma_transport_rx_root_ns(struct mlx5_flow_steering *steering)
+static int
+init_transport_manager_root_ns(struct mlx5_flow_steering *steering,
+			       struct mlx5_transport_manager_ns *tm,
+			       enum fs_flow_table_type ft_type)
 {
 	struct mlx5_core_dev *dev = steering->dev;
 	int total_vports;
@@ -3370,79 +3356,40 @@ static int init_rdma_transport_rx_root_ns(struct mlx5_flow_steering *steering)
 	/* In case eswitch not supported and working in legacy mode */
 	total_vports = mlx5_eswitch_get_total_vports(dev) ?: 1;
 
-	steering->rdma_transport_rx_root_ns =
-			kzalloc_objs(*steering->rdma_transport_rx_root_ns,
-				     total_vports);
-	if (!steering->rdma_transport_rx_root_ns)
+	tm->root_ns = kzalloc_objs(*tm->root_ns, total_vports);
+	if (!tm->root_ns)
 		return -ENOMEM;
 
 	for (i = 0; i < total_vports; i++) {
-		err = init_rdma_transport_rx_root_ns_one(steering, i);
+		err = init_transport_manager_root_ns_one(steering, tm->root_ns,
+							 ft_type, i);
 		if (err)
 			goto cleanup_root_ns;
 	}
-	steering->rdma_transport_rx_vports = total_vports;
+	tm->vports = total_vports;
 	return 0;
 
 cleanup_root_ns:
 	while (i--)
-		cleanup_root_ns(steering->rdma_transport_rx_root_ns[i]);
-	kfree(steering->rdma_transport_rx_root_ns);
-	steering->rdma_transport_rx_root_ns = NULL;
+		cleanup_root_ns(tm->root_ns[i]);
+	kfree(tm->root_ns);
+	tm->root_ns = NULL;
 	return err;
 }
 
-static int init_rdma_transport_tx_root_ns(struct mlx5_flow_steering *steering)
-{
-	struct mlx5_core_dev *dev = steering->dev;
-	int total_vports;
-	int err;
-	int i;
-
-	/* In case eswitch not supported and working in legacy mode */
-	total_vports = mlx5_eswitch_get_total_vports(dev) ?: 1;
-
-	steering->rdma_transport_tx_root_ns =
-			kzalloc_objs(*steering->rdma_transport_tx_root_ns,
-				     total_vports);
-	if (!steering->rdma_transport_tx_root_ns)
-		return -ENOMEM;
-
-	for (i = 0; i < total_vports; i++) {
-		err = init_rdma_transport_tx_root_ns_one(steering, i);
-		if (err)
-			goto cleanup_root_ns;
-	}
-	steering->rdma_transport_tx_vports = total_vports;
-	return 0;
-
-cleanup_root_ns:
-	while (i--)
-		cleanup_root_ns(steering->rdma_transport_tx_root_ns[i]);
-	kfree(steering->rdma_transport_tx_root_ns);
-	steering->rdma_transport_tx_root_ns = NULL;
-	return err;
-}
-
-static void cleanup_rdma_transport_roots_ns(struct mlx5_flow_steering *steering)
+static void
+cleanup_transport_manager_root_ns(struct mlx5_transport_manager_ns *tm)
 {
 	int i;
 
-	if (steering->rdma_transport_rx_root_ns) {
-		for (i = 0; i < steering->rdma_transport_rx_vports; i++)
-			cleanup_root_ns(steering->rdma_transport_rx_root_ns[i]);
+	if (!tm->root_ns)
+		return;
 
-		kfree(steering->rdma_transport_rx_root_ns);
-		steering->rdma_transport_rx_root_ns = NULL;
-	}
+	for (i = 0; i < tm->vports; i++)
+		cleanup_root_ns(tm->root_ns[i]);
 
-	if (steering->rdma_transport_tx_root_ns) {
-		for (i = 0; i < steering->rdma_transport_tx_vports; i++)
-			cleanup_root_ns(steering->rdma_transport_tx_root_ns[i]);
-
-		kfree(steering->rdma_transport_tx_root_ns);
-		steering->rdma_transport_tx_root_ns = NULL;
-	}
+	kfree(tm->root_ns);
+	tm->root_ns = NULL;
 }
 
 /* FT and tc chains are stored in the same array so we can re-use the
@@ -3870,7 +3817,9 @@ void mlx5_fs_core_cleanup(struct mlx5_core_dev *dev)
 	cleanup_root_ns(steering->rdma_rx_root_ns);
 	cleanup_root_ns(steering->rdma_tx_root_ns);
 	cleanup_root_ns(steering->egress_root_ns);
-	cleanup_rdma_transport_roots_ns(steering);
+	cleanup_transport_manager_root_ns(&steering->rdma_transport_rx);
+	cleanup_transport_manager_root_ns(&steering->rdma_transport_tx);
+	cleanup_transport_manager_root_ns(&steering->nic_rx_class);
 
 	devl_params_unregister(priv_to_devlink(dev), mlx5_fs_params,
 			       ARRAY_SIZE(mlx5_fs_params));
@@ -3941,13 +3890,25 @@ int mlx5_fs_core_init(struct mlx5_core_dev *dev)
 	}
 
 	if (MLX5_CAP_FLOWTABLE_RDMA_TRANSPORT_RX(dev, ft_support)) {
-		err = init_rdma_transport_rx_root_ns(steering);
+		err = init_transport_manager_root_ns(steering,
+						     &steering->rdma_transport_rx,
+						     FS_FT_RDMA_TRANSPORT_RX);
 		if (err)
 			goto err;
 	}
 
 	if (MLX5_CAP_FLOWTABLE_RDMA_TRANSPORT_TX(dev, ft_support)) {
-		err = init_rdma_transport_tx_root_ns(steering);
+		err = init_transport_manager_root_ns(steering,
+						     &steering->rdma_transport_tx,
+						     FS_FT_RDMA_TRANSPORT_TX);
+		if (err)
+			goto err;
+	}
+
+	if (MLX5_CAP_FLOWTABLE_NIC_RX_CLASS(dev, ft_support)) {
+		err = init_transport_manager_root_ns(steering,
+						     &steering->nic_rx_class,
+						     FS_FT_NIC_RX_CLASS);
 		if (err)
 			goto err;
 	}
@@ -4108,7 +4069,8 @@ mlx5_get_root_namespace(struct mlx5_core_dev *dev, enum mlx5_flow_namespace_type
 	if (ns_type == MLX5_FLOW_NAMESPACE_ESW_EGRESS ||
 	    ns_type == MLX5_FLOW_NAMESPACE_ESW_INGRESS ||
 	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_TX ||
-	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_RX)
+	    ns_type == MLX5_FLOW_NAMESPACE_RDMA_TRANSPORT_RX ||
+	    ns_type == MLX5_FLOW_NAMESPACE_NIC_RX_CLASS)
 		ns = mlx5_get_flow_vport_namespace(dev, ns_type, 0);
 	else
 		ns = mlx5_get_flow_namespace(dev, ns_type);
