@@ -4515,11 +4515,26 @@ err_col_port_disable:
 	return err;
 }
 
+static int mlxsw_sp_port_lag_col_enable(struct mlxsw_sp_port *mlxsw_sp_port)
+{
+	int err;
+
+	err = mlxsw_sp_lag_dist_port_remove(mlxsw_sp_port,
+					    mlxsw_sp_port->lag_id);
+	if (err)
+		return err;
+
+	return mlxsw_sp_lag_col_port_enable(mlxsw_sp_port,
+					    mlxsw_sp_port->lag_id);
+}
+
 static int mlxsw_sp_port_lag_changed(struct mlxsw_sp_port *mlxsw_sp_port,
 				     struct netdev_lag_lower_state_info *info)
 {
 	if (info->tx_enabled)
 		return mlxsw_sp_port_lag_col_dist_enable(mlxsw_sp_port);
+	else if (info->rx_enabled)
+		return mlxsw_sp_port_lag_col_enable(mlxsw_sp_port);
 	else
 		return mlxsw_sp_port_lag_col_dist_disable(mlxsw_sp_port);
 }
