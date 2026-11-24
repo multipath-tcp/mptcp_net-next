@@ -2417,10 +2417,21 @@ new_measure:
 	msk->rcvq_space.time = mstamp;
 }
 
+/* The ACKs of the data put in the backlog carried the previous DATA_ACK */
+static void mptcp_subflow_schedule_ack(struct sock *ssk)
+{
+	bool slow = lock_sock_fast(ssk);
+
+	if (tcp_can_send_ack(ssk) && !inet_csk_ack_scheduled(ssk))
+		tcp_send_delayed_ack(ssk);
+	unlock_sock_fast(ssk, slow);
+}
+
 static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delta)
 {
 	struct sk_buff *skb = list_first_entry(skbs, struct sk_buff, list);
 	struct mptcp_sock *msk = mptcp_sk(sk);
+	struct sock *ssk = NULL;
 	bool moved = false;
 
 	while (1) {
@@ -2428,6 +2439,9 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 		list_del(&skb->list);
 		*delta += skb->truesize;
 
+		/* NULL if the subflow has been closed */
+		if (skb->sk)
+			ssk = skb->sk;
 		moved |= __mptcp_move_skb(sk, skb);
 		if (list_empty(skbs))
 			break;
@@ -2438,6 +2452,9 @@ static bool __mptcp_move_skbs(struct sock *sk, struct list_head *skbs, u32 *delt
 	__mptcp_ofo_queue(msk);
 	if (!moved)
 		return false;
+
+	if (ssk && !__mptcp_check_fallback(msk))
+		mptcp_subflow_schedule_ack(ssk);
 
 	/* Only the worker can close an orphan, as it must then destroy it */
 	if (!sock_flag(sk, SOCK_DEAD))
