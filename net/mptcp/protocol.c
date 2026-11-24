@@ -2897,6 +2897,16 @@ static bool mptcp_subflow_probe_timed_out(struct sock *ssk)
 	return ret;
 }
 
+/* As TCP orphans: limited in number and memory */
+static bool mptcp_orphan_oom(struct sock *sk)
+{
+	if (!tcp_check_oom(sk, 0))
+		return false;
+
+	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPABORTONMEMORY);
+	return true;
+}
+
 /* Before its DATA_FIN, keep an orphan while a subflow can send its data */
 static bool mptcp_orphan_keep(struct sock *sk)
 {
@@ -2914,7 +2924,7 @@ static bool mptcp_orphan_keep(struct sock *sk)
 		    tcp_jiffies32 - READ_ONCE(tcp_sk(ssk)->rcv_tstamp) <
 		    2 * TCP_RTO_MAX &&
 		    !mptcp_subflow_probe_timed_out(ssk))
-			return true;
+			return !mptcp_orphan_oom(sk);
 	}
 
 	return false;
@@ -3547,6 +3557,9 @@ static void __mptcp_destroy_sock(struct sock *sk)
 	sk_stream_kill_queues(sk);
 	xfrm_sk_free_policy(sk);
 
+	if (test_and_clear_bit(MPTCP_ORPHAN_COUNTED, &msk->flags))
+		tcp_orphan_count_dec();
+
 	sock_put(sk);
 }
 
@@ -3636,8 +3649,15 @@ cleanup:
 	/* all the subflows are closed, only timeout can change the msk
 	 * state, let's not keep resources busy for no reasons
 	 */
-	if (subflows_alive == 0)
+	if (subflows_alive == 0) {
 		mptcp_set_state(sk, TCP_CLOSE);
+	} else if (sk->sk_state != TCP_CLOSE) {
+		/* as TCP orphans: counted, and limited */
+		tcp_orphan_count_inc();
+		set_bit(MPTCP_ORPHAN_COUNTED, &msk->flags);
+		if (mptcp_orphan_oom(sk))
+			mptcp_do_fastclose(sk);
+	}
 
 	sock_hold(sk);
 	pr_debug("msk=%p state=%d\n", sk, sk->sk_state);
