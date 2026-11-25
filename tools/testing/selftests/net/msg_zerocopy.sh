@@ -31,6 +31,8 @@ if [[ "$#" -eq "0" ]]; then
 	$0 6 tcp -t 1 || ret=1
 	$0 4 udp -t 1 || ret=1
 	$0 6 udp -t 1 || ret=1
+	$0 4 mptcp -t 1 || ret=1
+	$0 6 mptcp -t 1 || ret=1
 
 	[[ "$ret" == "0" ]] && echo "OK. All tests passed"
 	exit $ret
@@ -38,7 +40,7 @@ fi
 
 # Argument parsing
 if [[ "$#" -lt "2" ]]; then
-	echo "Usage: $0 [4|6] [tcp|udp|raw|raw_hdrincl|packet|packet_dgram] <args>"
+	echo "Usage: $0 [4|6] [tcp|udp|mptcp|raw|raw_hdrincl|packet|packet_dgram] <args>"
 	exit 1
 fi
 
@@ -143,8 +145,8 @@ do_test() {
 		-S "${SADDR}" -D "${DADDR}" ${ARGS} "${TXMODE}" -Z 0 || ret=1
 	wait
 
-	# next test is unconnected tx to dummy0, cannot exercise with tcp
-	[[ "${TXMODE}" == "tcp" ]] && return
+	# next test is unconnected tx to dummy0, cannot exercise with tcp/mptcp
+	[[ "${TXMODE}" == "tcp" || "${TXMODE}" == "mptcp" ]] && return
 
 	# tx-only test: send out dummy0
 	# packets leaving the host are not copied,

@@ -74,6 +74,10 @@
 #define MSG_ZEROCOPY	0x4000000
 #endif
 
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP	262
+#endif
+
 static int  cfg_cork;
 static bool cfg_cork_mixed;
 static int  cfg_cpu		= -1;		/* default: pin to last cpu */
@@ -816,6 +820,8 @@ int main(int argc, char **argv)
 		do_test(cfg_family, SOCK_RAW, IPPROTO_RAW);
 	else if (!strcmp(cfg_test, "tcp"))
 		do_test(cfg_family, SOCK_STREAM, 0);
+	else if (!strcmp(cfg_test, "mptcp"))
+		do_test(cfg_family, SOCK_STREAM, IPPROTO_MPTCP);
 	else if (!strcmp(cfg_test, "udp"))
 		do_test(cfg_family, SOCK_DGRAM, 0);
 	else if (!strcmp(cfg_test, "rds"))
