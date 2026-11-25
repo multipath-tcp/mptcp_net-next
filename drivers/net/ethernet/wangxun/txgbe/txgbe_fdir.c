@@ -606,7 +606,7 @@ static void txgbe_fdir_filter_restore(struct wx *wx)
 
 			/* Map the ring onto the absolute queue index */
 			if (!vf)
-				queue = wx->rx_ring[ring]->reg_idx;
+				queue = rtnl_dereference(wx->rx_ring[ring])->reg_idx;
 			else
 				queue = ((vf - 1) * wx->num_rx_queues_per_pool) + ring;
 		}

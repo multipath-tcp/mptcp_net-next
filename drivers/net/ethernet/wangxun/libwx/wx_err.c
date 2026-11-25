@@ -199,14 +199,21 @@ EXPORT_SYMBOL(wx_init_err_task);
 
 static bool wx_ring_tx_pending(struct wx *wx)
 {
+	int num_tx_queues = READ_ONCE(wx->num_tx_queues);
 	int i;
 
-	for (i = 0; i < wx->num_tx_queues; i++) {
-		struct wx_ring *tx_ring = wx->tx_ring[i];
+	rcu_read_lock();
+	for (i = 0; i < num_tx_queues; i++) {
+		struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
 
-		if (tx_ring->next_to_use != tx_ring->next_to_clean)
+		if (!tx_ring)
+			continue;
+		if (tx_ring->next_to_use != tx_ring->next_to_clean) {
+			rcu_read_unlock();
 			return true;
+		}
 	}
+	rcu_read_unlock();
 
 	return false;
 }
@@ -255,6 +262,7 @@ static void wx_watchdog_flush_tx(struct wx *wx)
 
 static void wx_detect_tx_hang(struct wx *wx)
 {
+	int num_tx_queues;
 	int i;
 
 	/* If we're down or resetting, just bail */
@@ -264,8 +272,15 @@ static void wx_detect_tx_hang(struct wx *wx)
 
 	/* Force detection of hung controller */
 	if (netif_carrier_ok(wx->netdev)) {
-		for (i = 0; i < wx->num_tx_queues; i++)
-			set_bit(WX_TX_DETECT_HANG, wx->tx_ring[i]->state);
+		num_tx_queues = READ_ONCE(wx->num_tx_queues);
+		rcu_read_lock();
+		for (i = 0; i < num_tx_queues; i++) {
+			struct wx_ring *tx_ring = rcu_dereference(wx->tx_ring[i]);
+
+			if (tx_ring)
+				set_bit(WX_TX_DETECT_HANG, tx_ring->state);
+		}
+		rcu_read_unlock();
 	}
 }
 
