@@ -7,8 +7,8 @@ Intro
 =====
 
 The MSG_ZEROCOPY flag enables copy avoidance for socket send calls.
-The feature is currently implemented for TCP, UDP and VSOCK (with
-virtio transport) sockets.
+The feature is currently implemented for TCP, MPTCP, UDP and VSOCK
+(with virtio transport) sockets.
 
 
 Opportunity and Caveats
