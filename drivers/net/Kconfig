@@ -607,6 +607,7 @@ config NETDEVSIM
 	depends on INET
 	depends on PSAMPLE || PSAMPLE=n
 	depends on PTP_1588_CLOCK_MOCK || PTP_1588_CLOCK_MOCK=n
+	depends on TLS || TLS=n
 	select NET_DEVLINK
 	select PAGE_POOL
 	select NET_SHAPER
