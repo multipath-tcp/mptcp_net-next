@@ -1360,8 +1360,16 @@ struct wx {
 	u32 tx_ring_count;
 	u32 rx_ring_count;
 
-	struct wx_ring *tx_ring[64] ____cacheline_aligned_in_smp;
-	struct wx_ring *rx_ring[64];
+	/* Ring pointers are published and cleared by the interrupt scheme
+	 * setup and teardown paths with RCU pointer operations. Control-path
+	 * readers use rtnl_dereference() while holding RTNL. Lockless readers
+	 * (such as xmit, stats, and watchdog paths) must use rcu_dereference()
+	 * inside an RCU read-side critical section and NULL-check the result.
+	 * RCU protects pointer lifetime; fields initialized after publication
+	 * need their own ordering guarantees.
+	 */
+	struct wx_ring __rcu *tx_ring[64] ____cacheline_aligned_in_smp;
+	struct wx_ring __rcu *rx_ring[64];
 	struct wx_q_vector *q_vector[64];
 	int num_rx_pools;
 	int num_rx_queues_per_pool;
