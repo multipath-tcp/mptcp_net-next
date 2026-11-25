@@ -509,7 +509,8 @@ static bool tipc_msg_bundle(struct sk_buff *bskb, struct tipc_msg *msg,
 	if (unlikely(max < (offset + msz)))
 		return false;
 
-	skb_put(bskb, pad + msz);
+	skb_put_zero(bskb, pad);
+	skb_put(bskb, msz);
 	skb_copy_to_linear_data_offset(bskb, offset, msg, msz);
 	msg_set_size(bmsg, offset + msz);
 	msg_set_msgcnt(bmsg, msg_msgcnt(bmsg) + 1);
