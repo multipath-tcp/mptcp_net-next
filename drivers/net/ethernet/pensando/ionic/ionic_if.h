@@ -280,12 +280,14 @@ union ionic_drv_identity {
  * @IONIC_DEV_CAP_DISC_CMB:    Device supports CMB discovery operations
  * @IONIC_DEV_CAP_HWMON:       Device supports hardware monitoring
  * @IONIC_DEV_CAP_EXTRA_STATS: Device supports extra stats schema
+ * @IONIC_DEV_CAP_CMD_TIMEOUT: Device supports the command timeout attribute
  */
 enum ionic_dev_capability {
 	IONIC_DEV_CAP_VF_CTRL        = BIT(0),
 	IONIC_DEV_CAP_DISC_CMB       = BIT(1),
 	IONIC_DEV_CAP_HWMON          = BIT(3),
 	IONIC_DEV_CAP_EXTRA_STATS    = BIT(4),
+	IONIC_DEV_CAP_CMD_TIMEOUT    = BIT(5),
 };
 
 /**
@@ -1784,11 +1786,13 @@ enum ionic_dev_state {
  * @IONIC_DEV_ATTR_STATE:     Device state attribute
  * @IONIC_DEV_ATTR_NAME:      Device name attribute
  * @IONIC_DEV_ATTR_FEATURES:  Device feature attributes
+ * @IONIC_DEV_ATTR_CMD_TIMEOUT: Command timeout
  */
 enum ionic_dev_attr {
 	IONIC_DEV_ATTR_STATE    = 0,
 	IONIC_DEV_ATTR_NAME     = 1,
 	IONIC_DEV_ATTR_FEATURES = 2,
+	IONIC_DEV_ATTR_CMD_TIMEOUT = 3,
 };
 
 /**
@@ -1799,6 +1803,7 @@ enum ionic_dev_attr {
  * @state:      Device state (enum ionic_dev_state)
  * @name:       The bus info, e.g. PCI slot-device-function, 0 terminated
  * @features:   Device features
+ * @cmd_timeout: Command timeout in seconds, 0 for the default
  * @rsvd2:      reserved byte(s)
  */
 struct ionic_dev_setattr_cmd {
@@ -1809,6 +1814,7 @@ struct ionic_dev_setattr_cmd {
 		u8      state;
 		char    name[IONIC_IFNAMSIZ];
 		__le64  features;
+		u8      cmd_timeout;
 		u8      rsvd2[60];
 	} __packed;
 };
@@ -1848,6 +1854,7 @@ struct ionic_dev_getattr_cmd {
  * @status:     Status of the command (enum ionic_status_code)
  * @rsvd:       reserved byte(s)
  * @features:   Device features
+ * @cmd_timeout: Command timeout in seconds, 0 for the default
  * @rsvd2:      reserved byte(s)
  * @color:      Color bit
  */
@@ -1856,6 +1863,7 @@ struct ionic_dev_getattr_comp {
 	u8     rsvd[3];
 	union {
 		__le64  features;
+		u8      cmd_timeout;
 		u8      rsvd2[11];
 	} __packed;
 	u8     color;
