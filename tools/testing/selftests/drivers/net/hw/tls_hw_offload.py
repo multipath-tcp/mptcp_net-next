@@ -125,6 +125,9 @@ def read_nic_stats(cfg):
     # before/after-delta caveat as read_tls_stats(): these are device-wide,
     # so concurrent kTLS traffic on this NIC would perturb the deltas.
     stats = defaultdict(int)
+    # netdevsim has no ethtool -S, and the NIC counters below are optional
+    if cfg.get_local_nsim_dev():
+        return stats
     output = cmd(f"ethtool -S {cfg.ifname}").stdout
     for line in output.strip().split('\n'):
         key, sep, val = line.partition(':')
@@ -307,7 +310,7 @@ def test_tls_offload_record_type(cfg, record_type):
 
 def main() -> None:
     """Set up the DUT/peer environment and run the offload test suites."""
-    with NetDrvEpEnv(__file__, nsim_test=False) as cfg:
+    with NetDrvEpEnv(__file__) as cfg:
         cfg.bin_local = cfg.test_dir / "tls_hw_offload"
         cfg.bin_remote = None
         cfg.tls_skip_reason = None
