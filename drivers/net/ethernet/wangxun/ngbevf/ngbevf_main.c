@@ -53,8 +53,8 @@ static const struct net_device_ops ngbevf_netdev_ops = {
 static void ngbevf_set_num_queues(struct wx *wx)
 {
 	/* Start with base case */
-	wx->num_rx_queues = 1;
-	wx->num_tx_queues = 1;
+	WRITE_ONCE(wx->num_rx_queues, 1);
+	WRITE_ONCE(wx->num_tx_queues, 1);
 }
 
 static int ngbevf_sw_init(struct wx *wx)
