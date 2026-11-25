@@ -175,8 +175,11 @@ void wx_configure_tx_vf(struct wx *wx)
 	u32 i;
 
 	/* Setup the HW Tx Head and Tail descriptor pointers */
-	for (i = 0; i < wx->num_tx_queues; i++)
-		wx_configure_tx_ring_vf(wx, wx->tx_ring[i]);
+	for (i = 0; i < wx->num_tx_queues; i++) {
+		struct wx_ring *tx_ring = rtnl_dereference(wx->tx_ring[i]);
+
+		wx_configure_tx_ring_vf(wx, tx_ring);
+	}
 }
 
 static void wx_configure_srrctl_vf(struct wx *wx, struct wx_ring *ring,
