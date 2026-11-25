@@ -61,9 +61,9 @@ static int txgbe_set_ringparam(struct net_device *netdev,
 
 	if (!netif_running(wx->netdev)) {
 		for (i = 0; i < wx->num_tx_queues; i++)
-			wx->tx_ring[i]->count = new_tx_count;
+			rtnl_dereference(wx->tx_ring[i])->count = new_tx_count;
 		for (i = 0; i < wx->num_rx_queues; i++)
-			wx->rx_ring[i]->count = new_rx_count;
+			rtnl_dereference(wx->rx_ring[i])->count = new_rx_count;
 		wx->tx_ring_count = new_tx_count;
 		wx->rx_ring_count = new_rx_count;
 
@@ -366,7 +366,7 @@ static int txgbe_add_ethtool_fdir_entry(struct txgbe *txgbe,
 
 		/* Map the ring onto the absolute queue index */
 		if (!vf)
-			queue = wx->rx_ring[ring]->reg_idx;
+			queue = rtnl_dereference(wx->rx_ring[ring])->reg_idx;
 		else
 			queue = ((vf - 1) * wx->num_rx_queues_per_pool) + ring;
 	}
