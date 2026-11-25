@@ -75,7 +75,7 @@ static int ionic_fw_status_long_wait(struct ionic *ionic,
 	do {
 		mutex_lock(&ionic->dev_cmd_lock);
 		ionic_dev_cmd_go(&ionic->idev, &cmd);
-		err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+		err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 		mutex_unlock(&ionic->dev_cmd_lock);
 
 		msleep(20);
@@ -135,7 +135,7 @@ int ionic_firmware_update(struct ionic_lif *lif, const struct firmware *fw,
 		ionic_dev_cmd_firmware_download(idev,
 						offsetof(union ionic_dev_cmd_regs, data),
 						offset, copy_sz);
-		err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+		err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 		mutex_unlock(&ionic->dev_cmd_lock);
 		if (err) {
 			netdev_err(netdev,
@@ -155,7 +155,7 @@ int ionic_firmware_update(struct ionic_lif *lif, const struct firmware *fw,
 
 	mutex_lock(&ionic->dev_cmd_lock);
 	ionic_dev_cmd_firmware_install(idev);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	ionic_dev_cmd_comp(idev, (union ionic_dev_cmd_comp *)&comp);
 	fw_slot = comp.fw_control.slot;
 	mutex_unlock(&ionic->dev_cmd_lock);
@@ -176,7 +176,7 @@ int ionic_firmware_update(struct ionic_lif *lif, const struct firmware *fw,
 
 	mutex_lock(&ionic->dev_cmd_lock);
 	ionic_dev_cmd_firmware_activate(idev, fw_slot);
-	err = ionic_dev_cmd_wait(ionic, DEVCMD_TIMEOUT);
+	err = ionic_dev_cmd_wait(ionic, ionic->cmd_timeout);
 	mutex_unlock(&ionic->dev_cmd_lock);
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to start firmware select");
