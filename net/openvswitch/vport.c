@@ -4,6 +4,7 @@
  */
 
 #include <linux/etherdevice.h>
+#include <linux/hash.h>
 #include <linux/if.h>
 #include <linux/if_vlan.h>
 #include <linux/jhash.h>
@@ -53,7 +54,8 @@ void ovs_vport_exit(void)
 
 static struct hlist_head *hash_bucket(const struct net *net, const char *name)
 {
-	unsigned int hash = jhash(name, strlen(name), (unsigned long) net);
+	u32 hash = jhash(name, strlen(name), hash_64(net->net_cookie, 32));
+
 	return &dev_table[hash & (VPORT_HASH_BUCKETS - 1)];
 }
 
