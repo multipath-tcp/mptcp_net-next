@@ -56,6 +56,19 @@ struct nsim_ipsec {
 	u32 tx;
 };
 
+struct nsim_tls {
+	struct list_head conns;
+	spinlock_t lock;	/* protects conns */
+	struct dentry *dfile;
+	u32 count;
+	u32 tx_conn;
+	u32 rx_conn;
+	atomic64_t tx_packets;
+	atomic64_t tx_bytes;
+	atomic64_t rx_packets;
+	atomic64_t rx_bytes;
+};
+
 #define NSIM_MACSEC_MAX_SECY_COUNT 3
 #define NSIM_MACSEC_MAX_RXSC_COUNT 1
 struct nsim_rxsc {
@@ -143,6 +156,7 @@ struct netdevsim {
 	bool bpf_map_accept;
 	struct nsim_ipsec ipsec;
 	struct nsim_macsec macsec;
+	struct nsim_tls tls;
 	struct nsim_vlan vlan;
 	struct {
 		u32 inject_error;
@@ -433,6 +447,26 @@ static inline void nsim_ipsec_teardown(struct netdevsim *ns)
 static inline bool nsim_ipsec_tx(struct netdevsim *ns, struct sk_buff *skb)
 {
 	return true;
+}
+#endif
+
+#if IS_ENABLED(CONFIG_TLS_DEVICE)
+void nsim_tls_init(struct netdevsim *ns);
+void nsim_tls_teardown(struct netdevsim *ns);
+void nsim_do_tls(struct sk_buff *skb, struct netdevsim *ns,
+		 struct netdevsim *peer_ns);
+#else
+static inline void nsim_tls_init(struct netdevsim *ns)
+{
+}
+
+static inline void nsim_tls_teardown(struct netdevsim *ns)
+{
+}
+
+static inline void nsim_do_tls(struct sk_buff *skb, struct netdevsim *ns,
+			       struct netdevsim *peer_ns)
+{
 }
 #endif
 
