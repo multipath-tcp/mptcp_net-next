@@ -53,8 +53,8 @@ static void txgbevf_set_num_queues(struct wx *wx)
 	int ret = 0;
 
 	/* Start with base case */
-	wx->num_rx_queues = 1;
-	wx->num_tx_queues = 1;
+	WRITE_ONCE(wx->num_rx_queues, 1);
+	WRITE_ONCE(wx->num_tx_queues, 1);
 
 	spin_lock_bh(&wx->mbx.mbx_lock);
 	/* fetch queue configuration from the PF */
@@ -66,15 +66,15 @@ static void txgbevf_set_num_queues(struct wx *wx)
 
 	/* we need as many queues as traffic classes */
 	if (num_tcs > 1) {
-		wx->num_rx_queues = num_tcs;
+		WRITE_ONCE(wx->num_rx_queues, num_tcs);
 	} else {
 		rss = min_t(u16, num_online_cpus(), TXGBEVF_MAX_RSS_NUM);
 		queue = min_t(u16, wx->mac.max_rx_queues, wx->mac.max_tx_queues);
 		rss = min_t(u16, queue, rss);
 
 		if (wx->vfinfo->vf_api >= wx_mbox_api_13) {
-			wx->num_rx_queues = rss;
-			wx->num_tx_queues = rss;
+			WRITE_ONCE(wx->num_rx_queues, rss);
+			WRITE_ONCE(wx->num_tx_queues, rss);
 		}
 	}
 }

@@ -103,6 +103,7 @@ static int mlx5_data_direct_set_dma_caps(struct pci_dev *pdev)
 	}
 
 	dma_set_max_seg_size(&pdev->dev, SZ_2G);
+	dma_set_seg_boundary(&pdev->dev, ULONG_MAX);
 	return 0;
 }
 
