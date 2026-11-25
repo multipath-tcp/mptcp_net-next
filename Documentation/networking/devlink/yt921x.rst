@@ -1,0 +1,37 @@
+.. SPDX-License-Identifier: GPL-2.0
+
+=======================
+yt921x devlink support
+=======================
+
+This document describes the devlink features implemented by the ``yt921x``
+device driver.
+
+Info versions
+=============
+
+The ``yt921x`` driver reports the following devlink info versions.
+
+.. list-table:: devlink info versions implemented
+
+   * - Name
+     - Description
+   * - ``asic.id``
+     - ASIC model name as reported by the driver.
+
+Resources
+=========
+
+The ``yt921x`` driver exposes the following devlink resources to monitor
+hardware occupancy.
+
+.. list-table:: Driver-specific resources implemented
+   :widths: 5 95
+
+   * - Name
+     - Description
+   * - ``ACL``
+     - TCAM entries available for ACL rules, 384 entries in total, organized
+       as 48 blocks of 8 entries.
+   * - ``meters``
+     - Meters available for ACL rules to police matching flows, 64 in total.
