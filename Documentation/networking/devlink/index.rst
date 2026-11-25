@@ -104,4 +104,5 @@ parameters, info versions, and other features it supports.
    sfc
    stmmac
    ti-cpsw-switch
+   yt921x
    zl3073x

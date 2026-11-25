@@ -51,6 +51,69 @@ static int ionic_dl_info_get(struct devlink *dl, struct devlink_info_req *req,
 	return err;
 }
 
+enum ionic_devlink_param_id {
+	IONIC_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
+	IONIC_DEVLINK_PARAM_ID_CMD_TIMEOUT,
+};
+
+static int ionic_dl_cmd_timeout_get(struct devlink *dl, u32 id,
+				    struct devlink_param_gset_ctx *ctx,
+				    struct netlink_ext_ack *extack)
+{
+	struct ionic *ionic = devlink_priv(dl);
+	int val;
+
+	val = READ_ONCE(ionic->cmd_timeout_param);
+	if (val < 0)
+		return val;
+
+	ctx->val.vu8 = val;
+
+	return 0;
+}
+
+static int ionic_dl_cmd_timeout_set(struct devlink *dl, u32 id,
+				    struct devlink_param_gset_ctx *ctx,
+				    struct netlink_ext_ack *extack)
+{
+	struct ionic *ionic = devlink_priv(dl);
+
+	if (test_bit(IONIC_LIF_F_FW_RESET, ionic->lif->state))
+		return -EBUSY;
+
+	return ionic_set_cmd_timeout(ionic, ctx->val.vu8);
+}
+
+static int ionic_dl_cmd_timeout_validate(struct devlink *dl, u32 id,
+					 union devlink_param_value *val,
+					 struct netlink_ext_ack *extack)
+{
+	struct ionic *ionic = devlink_priv(dl);
+	int cur;
+
+	cur = READ_ONCE(ionic->cmd_timeout_param);
+	if (cur < 0)
+		return cur;
+
+	if (val->vu8 && val->vu8 < IONIC_CMD_TIMEOUT_DEF) {
+		NL_SET_ERR_MSG_FMT_MOD(extack,
+				       "cmd_timeout must be 0 or at least %d seconds",
+				       IONIC_CMD_TIMEOUT_DEF);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static const struct devlink_param ionic_dl_params[] = {
+	DEVLINK_PARAM_DRIVER(IONIC_DEVLINK_PARAM_ID_CMD_TIMEOUT,
+			     "cmd_timeout", DEVLINK_PARAM_TYPE_U8,
+			     BIT(DEVLINK_PARAM_CMODE_PERMANENT),
+			     ionic_dl_cmd_timeout_get,
+			     ionic_dl_cmd_timeout_set,
+			     ionic_dl_cmd_timeout_validate),
+};
+
 static const struct devlink_ops ionic_dl_ops = {
 	.info_get	= ionic_dl_info_get,
 	.flash_update	= ionic_dl_flash_update,
@@ -88,6 +151,17 @@ int ionic_devlink_register(struct ionic *ionic)
 		return err;
 	}
 
+	if (!ionic->pdev->is_virtfn) {
+		err = devlink_params_register(dl, ionic_dl_params,
+					      ARRAY_SIZE(ionic_dl_params));
+		if (err) {
+			dev_err(ionic->dev,
+				"devlink_params_register failed: %d\n", err);
+			devlink_port_unregister(&ionic->dl_port);
+			return err;
+		}
+	}
+
 	SET_NETDEV_DEVLINK_PORT(ionic->lif->netdev, &ionic->dl_port);
 	devlink_register(dl);
 	return 0;
@@ -98,5 +172,8 @@ void ionic_devlink_unregister(struct ionic *ionic)
 	struct devlink *dl = priv_to_devlink(ionic);
 
 	devlink_unregister(dl);
+	if (!ionic->pdev->is_virtfn)
+		devlink_params_unregister(dl, ionic_dl_params,
+					  ARRAY_SIZE(ionic_dl_params));
 	devlink_port_unregister(&ionic->dl_port);
 }
