@@ -203,15 +203,20 @@ static const struct net_device_ops netdev_ops = {
 	.ndo_tx_timeout = spl2sw_ethernet_tx_timeout,
 };
 
+static bool spl2sw_is_sunplus_oui(u8 b0, u8 b1, u8 b2)
+{
+	return (b0 == 0xfc && b1 == 0x4b && b2 == 0xbc) ||
+	       (b0 == 0x1c && b1 == 0x50 && b2 == 0x1e);
+}
+
 static void spl2sw_check_mac_vendor_id_and_convert(u8 *mac_addr)
 {
-	/* Byte order of MAC address of some samples are reversed.
-	 * Check vendor id and convert byte order if it is wrong.
-	 * OUI of Sunplus: fc:4b:bc
+	/* Some chips have the byte order of the MAC address reversed.
+	 * Check for the Sunplus OUIs (fc:4b:bc, 1c:50:1e) and fix the
+	 * byte order if it is.
 	 */
-	if (mac_addr[5] == 0xfc && mac_addr[4] == 0x4b && mac_addr[3] == 0xbc &&
-	    (mac_addr[0] != 0xfc || mac_addr[1] != 0x4b || mac_addr[2] != 0xbc)) {
-
+	if (spl2sw_is_sunplus_oui(mac_addr[5], mac_addr[4], mac_addr[3]) &&
+	    !spl2sw_is_sunplus_oui(mac_addr[0], mac_addr[1], mac_addr[2])) {
 		swap(mac_addr[0], mac_addr[5]);
 		swap(mac_addr[1], mac_addr[4]);
 		swap(mac_addr[2], mac_addr[3]);
