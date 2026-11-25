@@ -170,6 +170,7 @@ static int eic7700_dwmac_probe(struct platform_device *pdev)
 	struct plat_stmmacenet_data *plat_dat;
 	struct stmmac_resources stmmac_res;
 	struct eic7700_qos_priv *dwc_priv;
+	unsigned int hsp_args[3];
 	u32 delay_ps, val;
 	int i, ret;
 
@@ -254,33 +255,18 @@ static int eic7700_dwmac_probe(struct platform_device *pdev)
 	}
 
 	dwc_priv->eic7700_hsp_regmap =
-			syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-							"eswin,hsp-sp-csr");
+		syscon_regmap_lookup_by_phandle_args(pdev->dev.of_node,
+						     "eswin,hsp-sp-csr",
+						     ARRAY_SIZE(hsp_args),
+						     hsp_args);
 	if (IS_ERR(dwc_priv->eic7700_hsp_regmap))
 		return dev_err_probe(&pdev->dev,
 				PTR_ERR(dwc_priv->eic7700_hsp_regmap),
 				"Failed to get hsp-sp-csr regmap\n");
 
-	ret = of_property_read_u32_index(pdev->dev.of_node,
-					 "eswin,hsp-sp-csr",
-					 1, &dwc_priv->eth_phy_ctrl_offset);
-	if (ret)
-		return dev_err_probe(&pdev->dev, ret,
-				     "can't get eth_phy_ctrl_offset\n");
-
-	ret = of_property_read_u32_index(pdev->dev.of_node,
-					 "eswin,hsp-sp-csr",
-					 2, &dwc_priv->eth_axi_lp_ctrl_offset);
-	if (ret)
-		return dev_err_probe(&pdev->dev, ret,
-				     "can't get eth_axi_lp_ctrl_offset\n");
-
-	ret = of_property_read_u32_index(pdev->dev.of_node,
-					 "eswin,hsp-sp-csr",
-					 3, &dwc_priv->eth_clk_offset);
-	if (ret)
-		return dev_err_probe(&pdev->dev, ret,
-				     "can't get eth_clk_offset\n");
+	dwc_priv->eth_phy_ctrl_offset = hsp_args[0];
+	dwc_priv->eth_axi_lp_ctrl_offset = hsp_args[1];
+	dwc_priv->eth_clk_offset = hsp_args[2];
 
 	ret = of_property_read_u32_index(pdev->dev.of_node,
 					 "eswin,hsp-sp-csr",
