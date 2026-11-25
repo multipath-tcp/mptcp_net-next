@@ -1143,11 +1143,10 @@ static ssize_t enabled_store(struct config_item *item,
 		 */
 		mutex_lock(&target_cleanup_list_lock);
 		spin_lock_irqsave(&target_list_lock, flags);
+		/* An interface event may have stopped and released it */
+		if (nt->state == STATE_ENABLED)
+			list_move(&nt->list, &target_cleanup_list);
 		nt->state = STATE_DISABLED;
-		/* Remove the target from the list, while holding
-		 * target_list_lock
-		 */
-		list_move(&nt->list, &target_cleanup_list);
 		spin_unlock_irqrestore(&target_list_lock, flags);
 		mutex_unlock(&target_cleanup_list_lock);
 		netconsole_unregister_console(nt);
