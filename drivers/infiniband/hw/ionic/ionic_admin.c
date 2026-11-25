@@ -18,8 +18,6 @@
 #define IONIC_ADMIN_BUSY_RETRY_COUNT	2000
 #define IONIC_ADMIN_BUSY_RETRY_MS	1
 
-/* admin queue will be considered failed if a command takes longer */
-#define IONIC_ADMIN_TIMEOUT	(HZ * 2)
 #define IONIC_ADMIN_WARN	(HZ / 8)
 
 /* will poll for admin cq to tolerate and report from missed event */
@@ -27,6 +25,11 @@
 
 /* work queue for polling the event queue and admin cq */
 struct workqueue_struct *ionic_evt_workq;
+
+static unsigned long ionic_admin_timeout(struct ionic_ibdev *dev)
+{
+	return HZ * ionic_cmd_timeout(dev->lif_cfg.lif);
+}
 
 static void ionic_admin_timedout(struct ionic_aq *aq)
 {
@@ -294,7 +297,7 @@ static void ionic_admin_dwork(struct work_struct *ws)
 		}
 
 		if (time_is_after_eq_jiffies(aq->stamp +
-					     IONIC_ADMIN_TIMEOUT)) {
+					     ionic_admin_timeout(dev))) {
 			/* Timeout threshold not met */
 			ibdev_dbg(&dev->ibdev, "no progress after %ums\n",
 				  (u32)jiffies_to_msecs(jiffies - aq->stamp));

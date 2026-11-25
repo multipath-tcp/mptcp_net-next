@@ -87,6 +87,14 @@ int ionic_error_to_errno(enum ionic_status_code code);
 void ionic_request_rdma_reset(struct ionic_lif *lif);
 
 /**
+ * ionic_cmd_timeout - Get the device and admin queue command timeout
+ * @lif:        Logical interface
+ *
+ * Return: the command timeout in seconds
+ */
+u8 ionic_cmd_timeout(struct ionic_lif *lif);
+
+/**
  * ionic_intr_alloc - Reserve a device interrupt
  * @lif:        Logical interface
  * @intr:       Reserved ionic interrupt structure
