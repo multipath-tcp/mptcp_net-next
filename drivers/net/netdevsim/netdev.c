@@ -155,6 +155,8 @@ static netdev_tx_t nsim_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (dr)
 		goto out_drop_free;
 
+	nsim_do_tls(skb, ns, peer_ns);
+
 	rxq = skb_get_queue_mapping(skb);
 	if (rxq >= peer_dev->num_rx_queues)
 		rxq = rxq % peer_dev->num_rx_queues;
@@ -1097,10 +1099,11 @@ static int nsim_init_netdevsim(struct netdevsim *ns)
 
 	nsim_macsec_init(ns);
 	nsim_ipsec_init(ns);
+	nsim_tls_init(ns);
 
 	err = register_netdevice(ns->netdev);
 	if (err)
-		goto err_ipsec_teardown;
+		goto err_teardown;
 	rtnl_unlock();
 
 	err = nsim_psp_init(ns);
@@ -1123,7 +1126,8 @@ err_unregister_netdev:
 		RCU_INIT_POINTER(peer->peer, NULL);
 	RCU_INIT_POINTER(ns->peer, NULL);
 	unregister_netdevice(ns->netdev);
-err_ipsec_teardown:
+err_teardown:
+	nsim_tls_teardown(ns);
 	nsim_ipsec_teardown(ns);
 	nsim_macsec_teardown(ns);
 	nsim_bpf_uninit(ns);
@@ -1226,6 +1230,7 @@ void nsim_destroy(struct netdevsim *ns)
 	RCU_INIT_POINTER(ns->peer, NULL);
 	unregister_netdevice(dev);
 	if (nsim_dev_port_is_pf(ns->nsim_dev_port)) {
+		nsim_tls_teardown(ns);
 		nsim_macsec_teardown(ns);
 		nsim_ipsec_teardown(ns);
 		nsim_bpf_uninit(ns);
