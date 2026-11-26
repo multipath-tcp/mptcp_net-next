@@ -31,7 +31,9 @@ static DEFINE_MUTEX(pse_pw_d_mutex);
  * @list: list entry for the pcdev's PSE controller list
  * @id: ID of the PSE line in the PSE controller device
  * @refcnt: Number of gets of this pse_control
- * @attached_phydev: PHY device pointer attached by the PSE control
+ * @attached_phydev: PHY device pointer attached by the PSE control, or NULL
+ *                   when several PHYs share the PI. Read it only under
+ *                   pse_list_mutex.
  */
 struct pse_control {
 	struct pse_controller_dev *pcdev;
@@ -45,16 +47,17 @@ struct pse_control {
 /**
  * struct pse_power_domain - a PSE power domain
  * @id: ID of the power domain
- * @supply: Power supply the Power Domain
  * @refcnt: Number of gets of this pse_power_domain
  * @budget_eval_strategy: Current power budget evaluation strategy of the
  *			  power domain
+ * @pis: PIs that use the power domain, under pse_pw_d_mutex. The supply
+ *	 handles of their regulators all point at the same supply.
  */
 struct pse_power_domain {
 	int id;
-	struct regulator *supply;
 	struct kref refcnt;
 	u32 budget_eval_strategy;
+	struct list_head pis;
 };
 
 static int of_load_single_pse_pi_pairset(struct device_node *node,
@@ -145,6 +148,11 @@ static void pse_release_pis(struct pse_controller_dev *pcdev)
 		of_node_put(pcdev->pi[i].np);
 	}
 	kfree(pcdev->pi);
+}
+
+static void devm_pse_release_pis(void *data)
+{
+	pse_release_pis(data);
 }
 
 /**
@@ -238,24 +246,22 @@ out:
  * @pcdev: a pointer to the PSE
  * @id: index of the PSE control
  *
- * Return: pse_control pointer or NULL. The device returned has had a
- *	   reference added and the pointer is safe until the user calls
- *	   pse_control_put() to indicate they have finished with it.
+ * Must be called with pse_list_mutex held. No reference is taken: the
+ * pointer is only valid until pse_list_mutex is released.
+ *
+ * Return: pse_control pointer or NULL.
  */
 static struct pse_control *
 pse_control_find_by_id(struct pse_controller_dev *pcdev, int id)
 {
 	struct pse_control *psec;
 
-	mutex_lock(&pse_list_mutex);
+	lockdep_assert_held(&pse_list_mutex);
+
 	list_for_each_entry(psec, &pcdev->pse_control_head, list) {
-		if (psec->id == id) {
-			kref_get(&psec->refcnt);
-			mutex_unlock(&pse_list_mutex);
+		if (psec->id == id)
 			return psec;
-		}
 	}
-	mutex_unlock(&pse_list_mutex);
 	return NULL;
 }
 
@@ -263,11 +269,14 @@ pse_control_find_by_id(struct pse_controller_dev *pcdev, int id)
  * pse_control_get_netdev - Return netdev associated to a PSE control
  * @psec: PSE control pointer
  *
- * Return: netdev pointer or NULL
+ * Must be called with rtnl and pse_list_mutex held.
+ *
+ * Return: netdev pointer, or NULL if no single PHY is attached
  */
 static struct net_device *pse_control_get_netdev(struct pse_control *psec)
 {
 	ASSERT_RTNL();
+	lockdep_assert_held(&pse_list_mutex);
 
 	if (!psec || !psec->attached_phydev)
 		return NULL;
@@ -412,12 +421,7 @@ static bool pse_pw_d_is_sw_pw_control(struct pse_controller_dev *pcdev,
 static int pse_pi_is_enabled(struct regulator_dev *rdev)
 {
 	struct pse_controller_dev *pcdev = rdev_get_drvdata(rdev);
-	const struct pse_controller_ops *ops;
 	int id, ret;
-
-	ops = pcdev->ops;
-	if (!ops->pi_get_admin_state)
-		return -EOPNOTSUPP;
 
 	id = rdev_get_id(rdev);
 	mutex_lock(&pcdev->lock);
@@ -443,7 +447,7 @@ static void pse_pi_deallocate_pw_budget(struct pse_pi *pi)
 	if (!pi->pw_d || !pi->pw_allocated_mW)
 		return;
 
-	regulator_free_power_budget(pi->pw_d->supply, pi->pw_allocated_mW);
+	regulator_free_power_budget(pi->rdev->supply, pi->pw_allocated_mW);
 	pi->pw_allocated_mW = 0;
 }
 
@@ -556,7 +560,8 @@ pse_pi_allocate_pw_budget_static_prio(struct pse_controller_dev *pcdev, int id,
 	int ret, _prio;
 
 	_prio = pcdev->nr_lines;
-	while (regulator_request_power_budget(pi->pw_d->supply, pw_req) == -ERANGE) {
+	while (regulator_request_power_budget(pi->rdev->supply, pw_req) ==
+	       -ERANGE) {
 		if (_prio <= pi->prio) {
 			NL_SET_ERR_MSG_FMT(extack,
 					   "PI %d: not enough power budget available",
@@ -618,6 +623,13 @@ static int _pse_pi_delivery_power_sw_pw_ctrl(struct pse_controller_dev *pcdev,
 	struct pse_pi *pi = &pcdev->pi[id];
 	int ret, pw_req;
 
+	/* pse_isr(), a priority change and the retry after a disable all
+	 * power a PI through here, so stop them here once unregistering
+	 * has started.
+	 */
+	if (pcdev->unregistering)
+		return -ENODEV;
+
 	if (!ops->pi_get_pw_req) {
 		/* No power allocation management */
 		ret = ops->pi_enable(pcdev, id);
@@ -674,6 +686,11 @@ static int pse_pi_enable(struct regulator_dev *rdev)
 
 	id = rdev_get_id(rdev);
 	mutex_lock(&pcdev->lock);
+	if (pcdev->unregistering) {
+		mutex_unlock(&pcdev->lock);
+		return -ENODEV;
+	}
+
 	if (pse_pw_d_is_sw_pw_control(pcdev, pcdev->pi[id].pw_d)) {
 		/* Manage enabled status by software.
 		 * Real enable process will happen if a port is connected.
@@ -877,15 +894,40 @@ devm_pse_pi_regulator_register(struct pse_controller_dev *pcdev,
 	return 0;
 }
 
-static void __pse_pw_d_release(struct kref *kref)
+/* Release for a put made with pse_pw_d_mutex already held. */
+static void pse_pw_d_release(struct kref *kref)
 {
 	struct pse_power_domain *pw_d = container_of(kref,
 						     struct pse_power_domain,
 						     refcnt);
 
-	regulator_put(pw_d->supply);
+	lockdep_assert_held(&pse_pw_d_mutex);
 	xa_erase(&pse_pw_d_map, pw_d->id);
-	mutex_unlock(&pse_pw_d_mutex);
+	kfree(pw_d);
+}
+
+/* Clear pi[id].pw_d before the domain's reference is dropped. The PI
+ * regulator ops and pse_isr() hold pcdev->lock while they use it.
+ */
+static struct pse_power_domain *
+pse_pi_take_pw_d(struct pse_controller_dev *pcdev, int id)
+{
+	struct pse_power_domain *pw_d;
+
+	mutex_lock(&pcdev->lock);
+	pw_d = pcdev->pi[id].pw_d;
+	pcdev->pi[id].pw_d = NULL;
+	mutex_unlock(&pcdev->lock);
+
+	return pw_d;
+}
+
+/* Drop @pi from @pw_d, with pse_pw_d_mutex held */
+static void pse_pw_d_leave(struct pse_power_domain *pw_d, struct pse_pi *pi)
+{
+	lockdep_assert_held(&pse_pw_d_mutex);
+	list_del(&pi->pw_d_node);
+	kref_put(&pw_d->refcnt, pse_pw_d_release);
 }
 
 /**
@@ -897,38 +939,40 @@ static void pse_flush_pw_ds(struct pse_controller_dev *pcdev)
 	struct pse_power_domain *pw_d;
 	int i;
 
+	mutex_lock(&pse_pw_d_mutex);
 	for (i = 0; i < pcdev->nr_lines; i++) {
-		if (!pcdev->pi[i].pw_d)
-			continue;
-
-		pw_d = xa_load(&pse_pw_d_map, pcdev->pi[i].pw_d->id);
-		if (!pw_d)
-			continue;
-
-		kref_put_mutex(&pw_d->refcnt, __pse_pw_d_release,
-			       &pse_pw_d_mutex);
+		pw_d = pse_pi_take_pw_d(pcdev, i);
+		if (pw_d)
+			pse_pw_d_leave(pw_d, &pcdev->pi[i]);
 	}
+	mutex_unlock(&pse_pw_d_mutex);
 }
 
 /**
- * devm_pse_alloc_pw_d - allocate a new PSE power domain for a device
- * @dev: device that is registering this PSE power domain
+ * pse_alloc_pw_d - allocate a new PSE power domain
+ *
+ * A power domain is shared by every controller whose PIs sit on the same
+ * supply, so it must not be tied to the lifetime of the controller that
+ * happened to create it. It is freed by pse_pw_d_release() on the last
+ * kref_put().
  *
  * Return: Pointer to the newly allocated PSE power domain or error pointers
  */
-static struct pse_power_domain *devm_pse_alloc_pw_d(struct device *dev)
+static struct pse_power_domain *pse_alloc_pw_d(void)
 {
 	struct pse_power_domain *pw_d;
 	int index, ret;
 
-	pw_d = devm_kzalloc_obj(dev, *pw_d);
+	pw_d = kzalloc_obj(*pw_d);
 	if (!pw_d)
 		return ERR_PTR(-ENOMEM);
 
 	ret = xa_alloc(&pse_pw_d_map, &index, pw_d, XA_LIMIT(1, PSE_PW_D_LIMIT),
 		       GFP_KERNEL);
-	if (ret)
+	if (ret) {
+		kfree(pw_d);
 		return ERR_PTR(ret);
+	}
 
 	kref_init(&pw_d->refcnt);
 	pw_d->id = index;
@@ -949,7 +993,6 @@ static int pse_register_pw_ds(struct pse_controller_dev *pcdev)
 	for (i = 0; i < pcdev->nr_lines; i++) {
 		struct regulator_dev *rdev = pcdev->pi[i].rdev;
 		struct pse_power_domain *pw_d;
-		struct regulator *supply;
 		bool present = false;
 		unsigned long index;
 
@@ -960,10 +1003,15 @@ static int pse_register_pw_ds(struct pse_controller_dev *pcdev)
 			continue;
 
 		xa_for_each(&pse_pw_d_map, index, pw_d) {
+			struct pse_pi *pi = list_first_entry(&pw_d->pis,
+							     struct pse_pi,
+							     pw_d_node);
+
 			/* Power supply already registered as a PSE power
 			 * domain.
 			 */
-			if (regulator_is_equal(pw_d->supply, rdev->supply)) {
+			if (regulator_is_equal(pi->rdev->supply,
+					       rdev->supply)) {
 				present = true;
 				pcdev->pi[i].pw_d = pw_d;
 				break;
@@ -971,32 +1019,34 @@ static int pse_register_pw_ds(struct pse_controller_dev *pcdev)
 		}
 		if (present) {
 			kref_get(&pw_d->refcnt);
+			list_add_tail(&pcdev->pi[i].pw_d_node, &pw_d->pis);
 			continue;
 		}
 
-		pw_d = devm_pse_alloc_pw_d(pcdev->dev);
+		pw_d = pse_alloc_pw_d();
 		if (IS_ERR(pw_d)) {
 			ret = PTR_ERR(pw_d);
 			goto out;
 		}
 
-		supply = regulator_get(&rdev->dev, rdev->supply_name);
-		if (IS_ERR(supply)) {
-			xa_erase(&pse_pw_d_map, pw_d->id);
-			ret = PTR_ERR(supply);
-			goto out;
-		}
-
-		pw_d->supply = supply;
 		if (pcdev->supp_budget_eval_strategies)
 			pw_d->budget_eval_strategy = pcdev->supp_budget_eval_strategies;
 		else
 			pw_d->budget_eval_strategy = PSE_BUDGET_EVAL_STRAT_DISABLED;
 		kref_init(&pw_d->refcnt);
+		INIT_LIST_HEAD(&pw_d->pis);
+		list_add_tail(&pcdev->pi[i].pw_d_node, &pw_d->pis);
 		pcdev->pi[i].pw_d = pw_d;
 	}
 
 out:
+	/* Undo this call's domains before another controller can find them */
+	while (ret && i--) {
+		struct pse_power_domain *pw_d = pse_pi_take_pw_d(pcdev, i);
+
+		if (pw_d)
+			pse_pw_d_leave(pw_d, &pcdev->pi[i]);
+	}
 	mutex_unlock(&pse_pw_d_mutex);
 	return ret;
 }
@@ -1019,13 +1069,18 @@ static void pse_send_ntf_worker(struct work_struct *work)
 		struct net_device *netdev;
 		struct pse_control *psec;
 
-		psec = pse_control_find_by_id(pcdev, ntf.id);
+		/* pse_control_put() frees the pse_control under
+		 * pse_list_mutex before its PHY is freed, so the mutex
+		 * keeps attached_phydev valid.
+		 */
 		rtnl_lock();
+		mutex_lock(&pse_list_mutex);
+		psec = pse_control_find_by_id(pcdev, ntf.id);
 		netdev = pse_control_get_netdev(psec);
 		if (netdev)
 			ethnl_pse_send_ntf(netdev, ntf.notifs);
+		mutex_unlock(&pse_list_mutex);
 		rtnl_unlock();
-		pse_control_put(psec);
 	}
 }
 
@@ -1043,31 +1098,42 @@ int pse_controller_register(struct pse_controller_dev *pcdev)
 	mutex_init(&pcdev->lock);
 	INIT_LIST_HEAD(&pcdev->pse_control_head);
 	spin_lock_init(&pcdev->ntf_fifo_lock);
-	ret = kfifo_alloc(&pcdev->ntf_fifo, pcdev->nr_lines, GFP_KERNEL);
+
+	if (!pcdev->nr_lines)
+		pcdev->nr_lines = 1;
+
+	/* kfifo_alloc() rejects a size that rounds up to less than 2 */
+	ret = kfifo_alloc(&pcdev->ntf_fifo, max(pcdev->nr_lines, 2U),
+			  GFP_KERNEL);
 	if (ret) {
 		dev_err(pcdev->dev, "failed to allocate kfifo notifications\n");
 		return ret;
 	}
 	INIT_WORK(&pcdev->ntf_work, pse_send_ntf_worker);
 
-	if (!pcdev->nr_lines)
-		pcdev->nr_lines = 1;
-
 	if (!pcdev->ops->pi_get_admin_state ||
 	    !pcdev->ops->pi_get_pw_status) {
 		dev_err(pcdev->dev,
 			"Mandatory status report callbacks are missing");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto free_kfifo;
 	}
 
 	ret = of_load_pse_pis(pcdev);
 	if (ret)
-		return ret;
+		goto free_kfifo;
+
+	/* The PI regulator ops use pcdev->pi until devres unregisters the
+	 * regulators, so free it from devres too, after them.
+	 */
+	ret = devm_add_action_or_reset(pcdev->dev, devm_pse_release_pis, pcdev);
+	if (ret)
+		goto free_kfifo;
 
 	if (pcdev->ops->setup_pi_matrix) {
 		ret = pcdev->ops->setup_pi_matrix(pcdev);
 		if (ret)
-			return ret;
+			goto free_kfifo;
 	}
 
 	/* Each regulator name len is pcdev dev name + 7 char +
@@ -1084,26 +1150,33 @@ int pse_controller_register(struct pse_controller_dev *pcdev)
 			continue;
 
 		reg_name = devm_kzalloc(pcdev->dev, reg_name_len, GFP_KERNEL);
-		if (!reg_name)
-			return -ENOMEM;
+		if (!reg_name) {
+			ret = -ENOMEM;
+			goto free_kfifo;
+		}
 
 		snprintf(reg_name, reg_name_len, "pse-%s_pi%d",
 			 dev_name(pcdev->dev), i);
 
 		ret = devm_pse_pi_regulator_register(pcdev, reg_name, i);
 		if (ret)
-			return ret;
+			goto free_kfifo;
 	}
 
 	ret = pse_register_pw_ds(pcdev);
 	if (ret)
-		return ret;
+		goto free_kfifo;
 
 	mutex_lock(&pse_list_mutex);
 	list_add(&pcdev->list, &pse_controller_list);
 	mutex_unlock(&pse_list_mutex);
 
 	return 0;
+
+free_kfifo:
+	cancel_work_sync(&pcdev->ntf_work);
+	kfifo_free(&pcdev->ntf_fifo);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(pse_controller_register);
 
@@ -1113,15 +1186,28 @@ EXPORT_SYMBOL_GPL(pse_controller_register);
  */
 void pse_controller_unregister(struct pse_controller_dev *pcdev)
 {
-	pse_flush_pw_ds(pcdev);
-	pse_release_pis(pcdev);
+	/* From now on the PSE core must not power a PI, so nothing queues
+	 * a new notification once the worker is drained below.
+	 */
+	mutex_lock(&pcdev->lock);
+	pcdev->unregistering = true;
+	mutex_unlock(&pcdev->lock);
+
+	/* Stop the IRQ and the notification worker first: pse_isr() uses
+	 * pcdev->pi and the power domains that pse_flush_pw_ds() drops,
+	 * and the worker reads the kfifo that is freed below.
+	 */
 	if (pcdev->irq)
 		disable_irq(pcdev->irq);
-	cancel_work_sync(&pcdev->ntf_work);
-	kfifo_free(&pcdev->ntf_fifo);
+	/* Unlink before the PI array is freed: of_pse_control_get() walks
+	 * the list and reads pcdev->pi[].
+	 */
 	mutex_lock(&pse_list_mutex);
 	list_del(&pcdev->list);
 	mutex_unlock(&pse_list_mutex);
+	cancel_work_sync(&pcdev->ntf_work);
+	pse_flush_pw_ds(pcdev);
+	kfifo_free(&pcdev->ntf_fifo);
 }
 EXPORT_SYMBOL_GPL(pse_controller_unregister);
 
@@ -1221,7 +1307,9 @@ static int pse_set_config_isr(struct pse_controller_dev *pcdev, int id,
 		struct netlink_ext_ack extack;
 
 		pcdev->pi[id].isr_pd_detected = true;
-		if (pcdev->pi[id].admin_state_enabled) {
+		/* Powering a PI fails once unregister started, do not try */
+		if (pcdev->pi[id].admin_state_enabled &&
+		    !pcdev->unregistering) {
 			ret = _pse_pi_delivery_power_sw_pw_ctrl(pcdev, id,
 								&extack);
 			if (ret == -ERANGE)
@@ -1343,14 +1431,20 @@ int devm_pse_irq_helper(struct pse_controller_dev *pcdev, int irq,
 	if (!h->notifs_mask)
 		return -ENOMEM;
 
+	/* pse_isr() can run as soon as the IRQ is enabled, and
+	 * pse_pw_d_is_sw_pw_control() reads pcdev->irq.
+	 */
+	pcdev->irq = irq;
 	ret = devm_request_threaded_irq(dev, irq, NULL, pse_isr,
 					IRQF_ONESHOT | irq_flags,
 					irq_name, h);
-	if (ret)
+	if (ret) {
+		pcdev->irq = 0;
 		dev_err(pcdev->dev, "Failed to request IRQ %d\n", irq);
+		return ret;
+	}
 
-	pcdev->irq = irq;
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(devm_pse_irq_helper);
 
@@ -1406,6 +1500,14 @@ pse_control_get_internal(struct pse_controller_dev *pcdev, unsigned int index,
 
 	list_for_each_entry(psec, &pcdev->pse_control_head, list) {
 		if (psec->id == index) {
+			if (psec->attached_phydev &&
+			    psec->attached_phydev != phydev) {
+				dev_warn(pcdev->dev,
+					 "PI %u shared by several PHYs, not reporting its events\n",
+					 index);
+				psec->attached_phydev = NULL;
+			}
+
 			kref_get(&psec->refcnt);
 			return psec;
 		}
@@ -1420,18 +1522,13 @@ pse_control_get_internal(struct pse_controller_dev *pcdev, unsigned int index,
 		goto free_psec;
 	}
 
-	if (!pcdev->ops->pi_get_admin_state) {
-		ret = -EOPNOTSUPP;
-		goto free_psec;
-	}
-
 	/* Initialize admin_state_enabled before the regulator_get. This
 	 * aims to have the right value reported in the first is_enabled
 	 * call in case of control managed by software.
 	 */
 	ret = pse_pi_is_hw_enabled(pcdev, index);
 	if (ret < 0)
-		goto free_psec;
+		goto put_module;
 
 	pcdev->pi[index].admin_state_enabled = ret;
 	psec->ps = regulator_get_exclusive(pcdev->dev,
@@ -1798,28 +1895,41 @@ EXPORT_SYMBOL_GPL(pse_ethtool_set_config);
  * @pcdev: a pointer to the PSE controller device
  * @id: index of the PSE PI
  * @pw_req: power requested
+ * @updated: set to true if the budget was changed
  * @extack: extack for reporting useful error messages
  *
- * Return: Previous power allocated on success and failure value on error
+ * Return: Power allocated before the update, or a negative error code.
+ *	   0 is also returned when the budget was not changed, so callers
+ *	   check @updated before they roll back.
  */
 static int pse_pi_update_pw_budget(struct pse_controller_dev *pcdev, int id,
-				   const unsigned int pw_req,
+				   const unsigned int pw_req, bool *updated,
 				   struct netlink_ext_ack *extack)
 {
 	struct pse_pi *pi = &pcdev->pi[id];
 	int previous_pw_allocated;
 	int pw_diff, ret = 0;
 
+	*updated = false;
+
 	/* We don't want pw_allocated_mW value change in the middle of an
 	 * power budget update
 	 */
 	mutex_lock(&pcdev->lock);
+	/* Only a PI under software power control that is enabled and has a
+	 * PD detected gets a budget. Check this here, as pse_isr() changes
+	 * it under the same lock.
+	 */
+	if (!pse_pw_d_is_sw_pw_control(pcdev, pi->pw_d) ||
+	    !pi->admin_state_enabled || !pi->isr_pd_detected)
+		goto out;
+
 	previous_pw_allocated = pi->pw_allocated_mW;
 	pw_diff = pw_req - previous_pw_allocated;
 	if (!pw_diff) {
 		goto out;
 	} else if (pw_diff > 0) {
-		ret = regulator_request_power_budget(pi->pw_d->supply, pw_diff);
+		ret = regulator_request_power_budget(pi->rdev->supply, pw_diff);
 		if (ret) {
 			NL_SET_ERR_MSG_FMT(extack,
 					   "PI %d: not enough power budget available",
@@ -1828,9 +1938,10 @@ static int pse_pi_update_pw_budget(struct pse_controller_dev *pcdev, int id,
 		}
 
 	} else {
-		regulator_free_power_budget(pi->pw_d->supply, -pw_diff);
+		regulator_free_power_budget(pi->rdev->supply, -pw_diff);
 	}
 	pi->pw_allocated_mW = pw_req;
+	*updated = true;
 	ret = previous_pw_allocated;
 
 out:
@@ -1851,6 +1962,7 @@ int pse_ethtool_set_pw_limit(struct pse_control *psec,
 			     const unsigned int pw_limit)
 {
 	int uV, uA, ret, previous_pw_allocated = 0;
+	bool updated;
 	s64 tmp_64;
 
 	if (pw_limit > MAX_PI_PW)
@@ -1875,23 +1987,19 @@ int pse_ethtool_set_pw_limit(struct pse_control *psec,
 	uA = DIV_ROUND_CLOSEST_ULL(tmp_64, uV);
 
 	/* Update power budget only in software power control case and
-	 * if a Power Device is powered.
+	 * if the PI is enabled and has a PD detected.
 	 */
-	if (pse_pw_d_is_sw_pw_control(psec->pcdev,
-				      psec->pcdev->pi[psec->id].pw_d) &&
-	    psec->pcdev->pi[psec->id].admin_state_enabled &&
-	    psec->pcdev->pi[psec->id].isr_pd_detected) {
-		ret = pse_pi_update_pw_budget(psec->pcdev, psec->id,
-					      pw_limit, extack);
-		if (ret < 0)
-			return ret;
-		previous_pw_allocated = ret;
-	}
+	ret = pse_pi_update_pw_budget(psec->pcdev, psec->id, pw_limit,
+				      &updated, extack);
+	if (ret < 0)
+		return ret;
+	previous_pw_allocated = ret;
 
 	ret = regulator_set_current_limit(psec->ps, 0, uA);
-	if (ret < 0 && previous_pw_allocated) {
+	if (ret < 0 && updated) {
 		pse_pi_update_pw_budget(psec->pcdev, psec->id,
-					previous_pw_allocated, extack);
+					previous_pw_allocated, &updated,
+					extack);
 	}
 
 	return ret;
@@ -1915,15 +2023,16 @@ int pse_ethtool_set_prio(struct pse_control *psec,
 	const struct pse_controller_ops *ops;
 	int ret = 0;
 
-	if (!pcdev->pi[psec->id].pw_d) {
-		NL_SET_ERR_MSG(extack, "no power domain attached");
-		return -EOPNOTSUPP;
-	}
-
 	/* We don't want priority change in the middle of an
 	 * enable/disable call or a priority mode change
 	 */
 	mutex_lock(&pcdev->lock);
+	if (!pcdev->pi[psec->id].pw_d) {
+		NL_SET_ERR_MSG(extack, "no power domain attached");
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
 	switch (pcdev->pi[psec->id].pw_d->budget_eval_strategy) {
 	case PSE_BUDGET_EVAL_STRAT_STATIC:
 		if (prio >= pcdev->nr_lines) {
