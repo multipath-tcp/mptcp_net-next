@@ -1055,6 +1055,15 @@ pd692x0_req_managers_pw_budget(struct pd692x0_priv *priv)
 		struct regulator *supply = priv->manager_reg[i]->supply;
 		int pw_budget;
 
+		/* The regulator core registers the manager regulator even
+		 * when its vmain supply cannot be resolved yet and retries
+		 * later, leaving ->supply NULL until then.
+		 */
+		if (!supply)
+			return dev_err_probe(&priv->client->dev, -EPROBE_DEFER,
+					     "manager %d: vmain supply not resolved\n",
+					     i);
+
 		pw_budget = regulator_get_unclaimed_power_budget(supply);
 		if (!pw_budget)
 			/* Do nothing if no power budget */
@@ -1223,8 +1232,9 @@ static void pd692x0_of_put_managers(struct pd692x0_priv *priv,
 	}
 }
 
-static void pd692x0_managers_free_pw_budget(struct pd692x0_priv *priv)
+static void pd692x0_managers_free_pw_budget(void *data)
 {
+	struct pd692x0_priv *priv = data;
 	int i;
 
 	for (i = 0; i < PD692X0_MAX_MANAGERS; i++) {
@@ -1278,31 +1288,39 @@ static int pd692x0_setup_pi_matrix(struct pse_controller_dev *pcdev)
 	if (ret)
 		goto err_of_managers;
 
+	/* Frees whatever pd692x0_req_managers_pw_budget() manages to
+	 * request, on any later probe failure and on unbind. Added after
+	 * the manager regulators so that it runs before devres unregisters
+	 * them and their supply goes away.
+	 */
+	ret = devm_add_action_or_reset(&priv->client->dev,
+				       pd692x0_managers_free_pw_budget, priv);
+	if (ret)
+		goto err_of_managers;
+
 	ret = pd692x0_req_managers_pw_budget(priv);
 	if (ret)
 		goto err_of_managers;
 
 	ret = pd692x0_set_ports_matrix(priv, manager);
 	if (ret)
-		goto err_managers_req_pw;
+		goto err_of_managers;
 
 	/* Do not init the conf if it is already saved */
 	if (!priv->cfg_saved) {
 		ret = pd692x0_hw_conf_init(priv);
 		if (ret)
-			goto err_managers_req_pw;
+			goto err_of_managers;
 
 		ret = pd692x0_save_user_byte(priv);
 		if (ret)
-			goto err_managers_req_pw;
+			goto err_of_managers;
 	}
 
 	pd692x0_of_put_managers(priv, manager);
 	kfree(manager);
 	return 0;
 
-err_managers_req_pw:
-	pd692x0_managers_free_pw_budget(priv);
 err_of_managers:
 	pd692x0_of_put_managers(priv, manager);
 err_free_manager:
@@ -1854,7 +1872,6 @@ static void pd692x0_i2c_remove(struct i2c_client *client)
 {
 	struct pd692x0_priv *priv = i2c_get_clientdata(client);
 
-	pd692x0_managers_free_pw_budget(priv);
 	firmware_upload_unregister(priv->fwl);
 }
 
