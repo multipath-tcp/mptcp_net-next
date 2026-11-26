@@ -383,6 +383,7 @@ static int __vlan_add(struct net_bridge_vlan *v, u16 flags,
 	br_multicast_toggle_one_vlan(v, true);
 
 	if (p) {
+		br_multicast_update_vlan_dst(v, true);
 		br_vlan_rebuild_port_array(masterv, br_vlan_num_ports(masterv));
 		nbp_vlan_set_vlan_dev_state(p, v->vid);
 	}
@@ -424,6 +425,7 @@ static void __vlan_unpublish(struct net_bridge_vlan_group *vg,
 		rhashtable_remove_fast(&vg->vlan_hash, &v->vnode,
 				       br_vlan_rht_params);
 		__vlan_del_list(v);
+		br_multicast_update_vlan_dst(v, false);
 		/* -1 because br_vlan_put_master() is called later */
 		br_vlan_rebuild_port_array(masterv,
 					   br_vlan_num_ports(masterv) - 1);
