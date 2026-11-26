@@ -449,6 +449,7 @@ struct ring_stats {
 			u64 non_reuse_pg;
 			u64 frag_alloc_err;
 			u64 frag_alloc;
+			u64 rx_oom_cnt;
 		};
 		__le16 csum;
 	};
@@ -585,6 +586,8 @@ struct hns3_nic_priv {
 	struct hns3_enet_tqp_vector *tqp_vector;
 	u16 vector_num;
 	u8 max_non_tso_bd_num;
+	struct delayed_work oom_task;
+	unsigned long *rx_ring_oom_bm;
 
 	u64 tx_timeout_count;
 
@@ -710,6 +713,21 @@ static inline unsigned int hns3_page_order(struct hns3_enet_ring *ring)
 
 #define hns3_rl_usec_to_reg(int_rl) ((int_rl) >> 2)
 #define hns3_rl_round_down(int_rl) round_down(int_rl, 4)
+
+static inline void hns3_ring_set_oom_state(struct hns3_enet_ring *ring)
+{
+	struct hns3_nic_priv *priv = netdev_priv(ring_to_netdev(ring));
+
+	hns3_ring_stats_update(ring, rx_oom_cnt);
+	set_bit(ring->queue_index, priv->rx_ring_oom_bm);
+}
+
+static inline bool hns3_ring_is_oom_state(struct hns3_enet_ring *ring)
+{
+	struct hns3_nic_priv *priv = netdev_priv(ring_to_netdev(ring));
+
+	return test_bit(ring->queue_index, priv->rx_ring_oom_bm);
+}
 
 void hns3_ethtool_set_ops(struct net_device *netdev);
 int hns3_set_channels(struct net_device *netdev,
