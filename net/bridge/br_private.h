@@ -18,6 +18,7 @@
 #include <net/pkt_cls.h>
 #include <linux/if_vlan.h>
 #include <linux/rhashtable.h>
+#include <linux/hashtable.h>
 #include <linux/refcount.h>
 
 #define BR_HASH_BITS 8
@@ -29,6 +30,7 @@
 #define BR_MAX_PORTS	(1<<BR_PORT_BITS)
 
 #define BR_MULTICAST_DEFAULT_HASH_MAX 4096
+#define BR_MDB_VLAN_HASH_BITS 6
 #define BR_MULTICAST_QUERY_INTVL_MIN msecs_to_jiffies(1000)
 #define BR_MULTICAST_STARTUP_QUERY_INTVL_MIN BR_MULTICAST_QUERY_INTVL_MIN
 #define BR_MULTICAST_QUERY_INTVL_MAX msecs_to_jiffies(86400000) /* 24 hours */
@@ -375,6 +377,7 @@ struct net_bridge_port_group_sg_key {
 struct net_bridge_port_group {
 	struct net_bridge_port_group __rcu *next;
 	struct net_bridge_port_group_sg_key key;
+	struct net_bridge_dst		dst;
 	unsigned char			eth_addr[ETH_ALEN] __aligned(2);
 	unsigned char			flags;
 	unsigned char			filter_mode;
@@ -386,6 +389,7 @@ struct net_bridge_port_group {
 	struct timer_list		timer;
 	struct timer_list		rexmit_timer;
 	struct hlist_node		mglist;
+	struct hlist_node		vlan_node;
 	struct rb_root			eht_set_tree;
 	struct rb_root			eht_host_tree;
 
@@ -449,6 +453,7 @@ struct net_bridge_port {
 	u32				multicast_eht_hosts_limit;
 	u32				multicast_eht_hosts_cnt;
 	struct hlist_head		mglist;
+	DECLARE_HASHTABLE(mdb_vlan_hash, BR_MDB_VLAN_HASH_BITS);
 #endif
 
 #ifdef CONFIG_SYSFS
@@ -1207,6 +1212,7 @@ void br_multicast_port_ctx_init(struct net_bridge_port *port,
 				struct net_bridge_vlan *vlan,
 				struct net_bridge_mcast_port *pmctx);
 void br_multicast_port_ctx_deinit(struct net_bridge_mcast_port *pmctx);
+void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan, bool add);
 void br_multicast_update_vlan_mcast_ctx(struct net_bridge_vlan *v, u8 state);
 void br_multicast_toggle_one_vlan(struct net_bridge_vlan *vlan, bool on);
 int br_multicast_toggle_vlan_snooping(struct net_bridge *br, bool on,
@@ -1244,24 +1250,15 @@ br_multicast_get_first_rport_node(struct net_bridge_mcast *brmctx,
 	return rcu_dereference(hlist_first_rcu(&brmctx->ip4_mc_router_list));
 }
 
-static inline struct net_bridge_port *
-br_multicast_rport_from_node_skb(struct hlist_node *rp, struct sk_buff *skb)
+static inline struct net_bridge_mcast_port *
+br_multicast_rport_ctx_from_node_skb(struct hlist_node *rp, struct sk_buff *skb)
 {
-	struct net_bridge_mcast_port *mctx;
-
 #if IS_ENABLED(CONFIG_IPV6)
 	if (skb->protocol == htons(ETH_P_IPV6))
-		mctx = hlist_entry_safe(rp, struct net_bridge_mcast_port,
-					ip6_rlist);
-	else
+		return hlist_entry_safe(rp, struct net_bridge_mcast_port,
+				       ip6_rlist);
 #endif
-		mctx = hlist_entry_safe(rp, struct net_bridge_mcast_port,
-					ip4_rlist);
-
-	if (mctx)
-		return mctx->port;
-	else
-		return NULL;
+	return hlist_entry_safe(rp, struct net_bridge_mcast_port, ip4_rlist);
 }
 
 static inline bool br_ip4_multicast_is_router(struct net_bridge_mcast *brmctx)
@@ -1684,6 +1681,11 @@ static inline void br_multicast_port_ctx_init(struct net_bridge_port *port,
 }
 
 static inline void br_multicast_port_ctx_deinit(struct net_bridge_mcast_port *pmctx)
+{
+}
+
+static inline void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan,
+						bool add)
 {
 }
 
