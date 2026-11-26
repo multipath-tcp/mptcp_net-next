@@ -181,6 +181,15 @@ static u32 lan969x_port_dev_mapping(struct sparx5 *sparx5, int port)
 		}
 	}
 
+	if (lan969x_port_is_rgmii(port)) {
+		switch (port) {
+		case 28:
+			return 0;
+		case 29:
+			return 1;
+		}
+	}
+
 	/* 2g5 port */
 	return port;
 }
@@ -348,6 +357,7 @@ static const struct sparx5_ops lan969x_ops = {
 	.fdma_deinit             = &lan969x_fdma_deinit,
 	.fdma_poll               = &lan969x_fdma_napi_poll,
 	.fdma_xmit               = &lan969x_fdma_xmit,
+	.fdma_resize             = &lan969x_fdma_resize,
 };
 
 const struct sparx5_match_data lan969x_desc = {
