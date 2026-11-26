@@ -826,6 +826,7 @@ static void __br_multicast_del_pg(struct net_bridge_mdb_entry *mp,
 	 * and deleting other groups of the same port must not truncate it.
 	 */
 	hlist_del_init_rcu(&pg->mglist);
+	hash_del(&pg->vlan_node);
 	br_multicast_eht_clean_sets(pg);
 	hlist_for_each_entry_safe(ent, tmp, &pg->src_list, node)
 		br_multicast_del_group_src(ent, false);
@@ -1422,6 +1423,22 @@ br_multicast_new_group_src(struct net_bridge_port_group *pg, struct br_ip *src_i
 	return grp_src;
 }
 
+void br_multicast_update_vlan_dst(struct net_bridge_vlan *vlan, bool add)
+{
+	struct net_bridge_port *port = vlan->port;
+	struct net_bridge_port_group *pg;
+	struct net_bridge_dst dst;
+
+	ASSERT_RTNL();
+
+	dst = add ? br_vlan_to_dst(vlan) : br_port_to_dst(port);
+	spin_lock_bh(&port->br->multicast_lock);
+	hash_for_each_possible(port->mdb_vlan_hash, pg, vlan_node, vlan->vid)
+		if (pg->key.addr.vid == vlan->vid)
+			br_dst_write(&pg->dst, dst);
+	spin_unlock_bh(&port->br->multicast_lock);
+}
+
 struct net_bridge_port_group *br_multicast_new_port_group(
 			struct net_bridge_port *port,
 			const struct br_ip *group,
@@ -1432,8 +1449,11 @@ struct net_bridge_port_group *br_multicast_new_port_group(
 			u8 rt_protocol,
 			struct netlink_ext_ack *extack)
 {
+	struct net_bridge_vlan *vlan = NULL;
 	struct net_bridge_port_group *p;
 	int err;
+
+	lockdep_assert_held_once(&port->br->multicast_lock);
 
 	err = br_multicast_port_ngroups_inc(port, group, extack);
 	if (err)
@@ -1447,6 +1467,11 @@ struct net_bridge_port_group *br_multicast_new_port_group(
 
 	p->key.addr = *group;
 	p->key.port = port;
+	rcu_read_lock();
+	if (group->vid)
+		vlan = br_vlan_find(nbp_vlan_group_rcu(port), group->vid);
+	br_dst_write(&p->dst, vlan ? br_vlan_to_dst(vlan) : br_port_to_dst(port));
+	rcu_read_unlock();
 	p->flags = flags;
 	p->filter_mode = filter_mode;
 	p->rt_protocol = rt_protocol;
@@ -1472,6 +1497,7 @@ struct net_bridge_port_group *br_multicast_new_port_group(
 
 	RCU_INIT_POINTER(p->next, next);
 	hlist_add_head_rcu(&p->mglist, &port->mglist);
+	hash_add(port->mdb_vlan_hash, &p->vlan_node, group->vid);
 
 	return p;
 
@@ -1488,6 +1514,7 @@ void br_multicast_del_port_group(struct net_bridge_port_group *p)
 	__u16 vid = p->key.addr.vid;
 
 	hlist_del_init_rcu(&p->mglist);
+	hash_del(&p->vlan_node);
 	if (!br_multicast_is_star_g(&p->key.addr))
 		rhashtable_remove_fast(&port->br->sg_port_tbl, &p->rhnode,
 				       br_sg_port_rht_params);
@@ -2105,7 +2132,8 @@ void br_multicast_port_ctx_init(struct net_bridge_port *port,
 		u32 n = 0;
 
 		spin_lock_bh(&port->br->multicast_lock);
-		hlist_for_each_entry(pg, &port->mglist, mglist)
+		hash_for_each_possible(port->mdb_vlan_hash, pg, vlan_node,
+				       vlan->vid)
 			if (pg->key.addr.vid == vlan->vid)
 				n++;
 		WRITE_ONCE(pmctx->mdb_n_entries, n);
@@ -2138,6 +2166,7 @@ int br_multicast_add_port(struct net_bridge_port *port)
 {
 	int err;
 
+	hash_init(port->mdb_vlan_hash);
 	port->multicast_eht_hosts_limit = BR_MCAST_DEFAULT_EHT_HOSTS_LIMIT;
 	br_multicast_port_ctx_init(port, NULL, &port->multicast_ctx);
 
