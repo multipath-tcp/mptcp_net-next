@@ -29,6 +29,9 @@ enum sparx5_tas_link_speed {
 /* Maximum supported cycle time in nanoseconds */
 #define TAS_MAX_CYCLE_TIME_NS ((1 * NSEC_PER_SEC) - 1) /* 999.999.999 nsec */
 
+/* HSCH_TAS_QMAXSDU_CFG.QMAXSDU_VAL, the guard band, counts 64 byte units */
+#define TAS_QMAXSDU_UNIT 64
+
 /* STARTUP_TIME in units of 256 ns, must be non-zero for a list to start */
 #define TAS_STARTUP_TIME_DEFAULT 8
 
@@ -48,8 +51,8 @@ enum sparx5_tas_link_speed {
  * We use 1 TAS profile per port, shared by both of its lists:
  * index = portno;
  *
- * We do not yet support frame preemption and the default guard band
- * of 1536 bytes is always used on all queues.
+ * We do not yet support frame preemption. All queues of all ports use a
+ * guard band that fits the largest frame that can be forwarded.
  *
  * The gate mask of each entry is written as is to the port's 8 queues,
  * where bit n gates queue (QoS class) n. The mqprio parameters of the
@@ -718,6 +721,40 @@ int sparx5_tas_disable(struct sparx5_port *port)
 	return err;
 }
 
+/* Size the guard band of all ports for a frame of the largest MTU of all
+ * ports, as a port can transmit frames forwarded from any port.
+ */
+void sparx5_tas_gb_update(struct sparx5 *sparx5)
+{
+	u32 max_mtu = 0, gb;
+	int i, tc;
+
+	for (i = 0; i < sparx5->data->consts->n_ports; i++) {
+		if (sparx5->ports[i])
+			max_mtu = max_t(u32, max_mtu,
+					READ_ONCE(sparx5->ports[i]->ndev->mtu));
+	}
+
+	gb = DIV_ROUND_UP(SPX5_HW_MTU(max_mtu) + 2 * VLAN_HLEN,
+			  TAS_QMAXSDU_UNIT);
+
+	mutex_lock(&sparx5->tas_lock);
+
+	/* Each port uses the TAS profile of its own number */
+	for (i = 0; i < sparx5->data->consts->n_ports; i++) {
+		if (!sparx5->ports[i])
+			continue;
+
+		for (tc = 0; tc < SPX5_PRIOS; tc++)
+			spx5_rmw(HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL_SET(gb),
+				 HSCH_TAS_QMAXSDU_CFG_QMAXSDU_VAL,
+				 sparx5,
+				 HSCH_TAS_QMAXSDU_CFG(i, tc));
+	}
+
+	mutex_unlock(&sparx5->tas_lock);
+}
+
 int sparx5_tas_init(struct sparx5 *sparx5)
 {
 	const struct sparx5_consts *consts = sparx5->data->consts;
@@ -763,6 +800,8 @@ int sparx5_tas_init(struct sparx5 *sparx5)
 				 HSCH_TAS_PROFILE_CONFIG(i));
 		}
 	}
+
+	sparx5_tas_gb_update(sparx5);
 
 	return 0;
 }
