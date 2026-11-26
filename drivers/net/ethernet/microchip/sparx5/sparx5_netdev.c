@@ -250,6 +250,44 @@ static int sparx5_port_hwtstamp_set(struct net_device *dev,
 	return sparx5_ptp_hwtstamp_set(sparx5_port, cfg, extack);
 }
 
+static int sparx5_port_change_mtu(struct net_device *dev, int new_mtu)
+{
+	struct sparx5_port *port = netdev_priv(dev);
+	struct sparx5 *sparx5 = port->sparx5;
+	bool resize = new_mtu > dev->mtu;
+	int err;
+
+	/* Register based extraction sizes its skbs from the MTU at the time
+	 * a frame is read, so it cannot handle frames queued before an MTU
+	 * decrease.
+	 */
+	if (sparx5->fdma_irq <= 0)
+		return -EOPNOTSUPP;
+
+	/* Never let the MAC accept frames larger than the RX buffers */
+	if (!resize)
+		sparx5_port_max_len_set(sparx5, port, SPX5_HW_MTU(new_mtu));
+
+	err = sparx5->data->ops->fdma_resize(sparx5, port, new_mtu);
+	if (err) {
+		if (resize)
+			return err;
+
+		/* The current, larger, buffers still fit all frames */
+		netdev_warn(dev, "Failed to resize FDMA buffers: %d\n", err);
+	}
+
+	WRITE_ONCE(dev->mtu, new_mtu);
+
+	sparx5_port_wm_update(sparx5, port);
+	sparx5_tas_gb_update(sparx5);
+
+	if (resize)
+		sparx5_port_max_len_set(sparx5, port, SPX5_HW_MTU(new_mtu));
+
+	return 0;
+}
+
 static const struct net_device_ops sparx5_port_netdev_ops = {
 	.ndo_open               = sparx5_port_open,
 	.ndo_stop               = sparx5_port_stop,
@@ -257,6 +295,7 @@ static const struct net_device_ops sparx5_port_netdev_ops = {
 	.ndo_set_rx_mode_async  = sparx5_set_rx_mode,
 	.ndo_get_phys_port_name = sparx5_port_get_phys_port_name,
 	.ndo_set_mac_address    = sparx5_set_mac_address,
+	.ndo_change_mtu         = sparx5_port_change_mtu,
 	.ndo_validate_addr      = eth_validate_addr,
 	.ndo_get_stats64        = sparx5_get_stats64,
 	.ndo_get_port_parent_id = sparx5_get_port_parent_id,
@@ -306,7 +345,14 @@ int sparx5_register_netdevs(struct sparx5 *sparx5)
 
 	for (portno = 0; portno < sparx5->data->consts->n_ports; portno++)
 		if (sparx5->ports[portno]) {
-			err = register_netdev(sparx5->ports[portno]->ndev);
+			struct net_device *ndev = sparx5->ports[portno]->ndev;
+
+			/* The MTU can only be changed when FDMA is used */
+			if (sparx5->fdma_irq > 0)
+				ndev->max_mtu = SPX5_MAX_FRAME_LEN - ETH_HLEN -
+						ETH_FCS_LEN;
+
+			err = register_netdev(ndev);
 			if (err) {
 				dev_err(sparx5->dev,
 					"port: %02u: netdev registration failed\n",
