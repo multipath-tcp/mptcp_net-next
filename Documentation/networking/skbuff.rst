@@ -21,7 +21,7 @@ to as shared skbs (see skb_shared()).
 
 skb_clone() allows for fast duplication of skbs. None of the data buffers
 get copied, but caller gets a new metadata struct (struct sk_buff).
-&skb_shared_info.refcount indicates the number of skbs pointing at the same
+``skb_shared_info.dataref`` indicates the number of skbs pointing at the same
 packet data (i.e. clones).
 
 dataref and headerless skbs
