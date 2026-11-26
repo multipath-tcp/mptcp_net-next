@@ -659,7 +659,6 @@ int zerocopy_fill_skb_from_iter(struct sk_buff *skb,
 
 		skb->data_len += copied;
 		skb->len += copied;
-		skb->truesize += PAGE_ALIGN(copied + start);
 
 		head = compound_head(pages[n]);
 		order = compound_order(head);
@@ -680,6 +679,13 @@ int zerocopy_fill_skb_from_iter(struct sk_buff *skb,
 
 				if (head == skb_frag_page(last) &&
 				    start == skb_frag_off(last) + skb_frag_size(last)) {
+					/* A chunk starting a page accounts it.
+					 * Otherwise account the bytes only: the
+					 * frag might not have been built here,
+					 * and might not have paid for the page.
+					 */
+					skb->truesize += offset_in_page(start) ?
+							 size : PAGE_SIZE;
 					skb_frag_size_add(last, size);
 					/* We combined this page, we need to release
 					 * a reference. Since compound pages refcount
@@ -695,6 +701,7 @@ int zerocopy_fill_skb_from_iter(struct sk_buff *skb,
 				page_ref_sub(last_head, refs);
 				refs = 0;
 			}
+			skb->truesize += PAGE_SIZE;
 			skb_fill_page_desc_noacc(skb, frag++, head, start, size);
 		}
 		if (refs)
