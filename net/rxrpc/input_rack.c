@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-/* RACK-TLP [RFC8958] Implementation
+/* RACK-TLP [RFC8985] Implementation
  *
  * Copyright (C) 2024 Red Hat, Inc. All Rights Reserved.
  * Written by David Howells (dhowells@redhat.com)
@@ -57,7 +57,7 @@ static unsigned long rxrpc_tq_nacks(const struct rxrpc_txqueue *tq)
 
 /*
  * Update the RACK state for the most recently sent packet that has been
- * delivered [RFC8958 6.2 Step 2].
+ * delivered [RFC8985 6.2 Step 2].
  */
 static void rxrpc_rack_update(struct rxrpc_call *call,
 			      struct rxrpc_ack_summary *summary,
@@ -98,7 +98,7 @@ static void rxrpc_rack_update(struct rxrpc_call *call,
 }
 
 /*
- * Detect data segment reordering [RFC8958 6.2 Step 3].
+ * Detect data segment reordering [RFC8985 6.2 Step 3].
  */
 static void rxrpc_rack_detect_reordering(struct rxrpc_call *call,
 					 struct rxrpc_ack_summary *summary,
@@ -143,7 +143,7 @@ void rxrpc_input_rack(struct rxrpc_call *call,
 }
 
 /*
- * Update the reordering window [RFC8958 6.2 Step 4].  Returns the updated
+ * Update the reordering window [RFC8985 6.2 Step 4].  Returns the updated
  * duration of the reordering window.
  *
  * Note that the Rx protocol doesn't have a 'DSACK option' per se, but ACKs can
@@ -192,7 +192,7 @@ static ktime_t rxrpc_rack_update_reo_wnd(struct rxrpc_call *call,
 }
 
 /*
- * Detect losses [RFC8958 6.2 Step 5].
+ * Detect losses [RFC8985 6.2 Step 5].
  */
 static ktime_t rxrpc_rack_detect_loss(struct rxrpc_call *call,
 				      struct rxrpc_ack_summary *summary)
@@ -239,7 +239,7 @@ static ktime_t rxrpc_rack_detect_loss(struct rxrpc_call *call,
 }
 
 /*
- * Detect losses and set a timer to retry the detection [RFC8958 6.2 Step 5].
+ * Detect losses and set a timer to retry the detection [RFC8985 6.2 Step 5].
  */
 void rxrpc_rack_detect_loss_and_arm_timer(struct rxrpc_call *call,
 					  struct rxrpc_ack_summary *summary)
@@ -255,7 +255,7 @@ void rxrpc_rack_detect_loss_and_arm_timer(struct rxrpc_call *call,
 }
 
 /*
- * Handle RACK-TLP RTO expiration [RFC8958 6.3].
+ * Handle RACK-TLP RTO expiration [RFC8985 6.3].
  */
 static void rxrpc_rack_mark_losses_on_rto(struct rxrpc_call *call)
 {
@@ -285,7 +285,7 @@ static void rxrpc_rack_mark_losses_on_rto(struct rxrpc_call *call)
 }
 
 /*
- * Calculate the TLP loss probe timeout (PTO) [RFC8958 7.2].
+ * Calculate the TLP loss probe timeout (PTO) [RFC8985 7.2].
  */
 ktime_t rxrpc_tlp_calc_pto(struct rxrpc_call *call, ktime_t now)
 {
@@ -309,7 +309,7 @@ ktime_t rxrpc_tlp_calc_pto(struct rxrpc_call *call, ktime_t now)
 }
 
 /*
- * Send a TLP loss probe on PTO expiration [RFC8958 7.3].
+ * Send a TLP loss probe on PTO expiration [RFC8985 7.3].
  */
 void rxrpc_tlp_send_probe(struct rxrpc_call *call)
 {
@@ -356,7 +356,7 @@ void rxrpc_tlp_send_probe(struct rxrpc_call *call)
 }
 
 /*
- * Detect losses using the ACK of a TLP loss probe [RFC8958 7.4].
+ * Detect losses using the ACK of a TLP loss probe [RFC8985 7.4].
  */
 void rxrpc_tlp_process_ack(struct rxrpc_call *call, struct rxrpc_ack_summary *summary)
 {
