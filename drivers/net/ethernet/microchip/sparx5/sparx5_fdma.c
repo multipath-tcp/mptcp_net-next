@@ -18,8 +18,16 @@
 #include "sparx5_main.h"
 #include "sparx5_port.h"
 
-#define FDMA_XTR_BUFFER_SIZE		2048
 #define FDMA_WEIGHT			4
+#define SPX5_FDMA_STOP_SLEEP_US		500
+#define SPX5_FDMA_STOP_TIMEOUT_US	10000
+#define SPX5_FDMA_TX_DRAIN_SLEEP_US	10
+#define SPX5_FDMA_TX_DRAIN_TIMEOUT_US	5000
+#define SPX5_FDMA_XTR_DRAIN_SLEEP_US	100
+#define SPX5_FDMA_XTR_DRAIN_TIMEOUT_US	100000
+
+/* Base of the QRES resources tracking memory per destination port */
+#define SPX5_QRES_DST_MEM		2048
 
 static int sparx5_fdma_tx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 				     u64 *dataptr)
@@ -33,8 +41,7 @@ static int sparx5_fdma_tx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 static int sparx5_fdma_rx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 				     u64 *dataptr)
 {
-	struct sparx5 *sparx5 = fdma->priv;
-	struct sparx5_rx *rx = &sparx5->rx;
+	struct sparx5_rx *rx = container_of(fdma, struct sparx5_rx, fdma);
 	struct sk_buff *skb;
 
 	skb = __netdev_alloc_skb(rx->ndev, fdma->db_size, GFP_ATOMIC);
@@ -86,10 +93,6 @@ static void sparx5_fdma_rx_deactivate(struct sparx5 *sparx5, struct sparx5_rx *r
 {
 	struct fdma *fdma = &rx->fdma;
 
-	/* Deactivate the RX channel */
-	spx5_rmw(0, BIT(fdma->channel_id) & FDMA_CH_ACTIVATE_CH_ACTIVATE,
-		 sparx5, FDMA_CH_ACTIVATE);
-
 	/* Disable RX channel DB interrupt */
 	spx5_rmw(0, BIT(fdma->channel_id) & FDMA_INTR_DB_ENA_INTR_DB_ENA,
 		 sparx5, FDMA_INTR_DB_ENA);
@@ -125,9 +128,9 @@ static void sparx5_fdma_tx_activate(struct sparx5 *sparx5, struct sparx5_tx *tx)
 
 static void sparx5_fdma_tx_deactivate(struct sparx5 *sparx5, struct sparx5_tx *tx)
 {
-	/* Disable the channel */
-	spx5_rmw(0, BIT(tx->fdma.channel_id) & FDMA_CH_ACTIVATE_CH_ACTIVATE,
-		 sparx5, FDMA_CH_ACTIVATE);
+	/* Stop TX fdma */
+	spx5_rmw(FDMA_PORT_CTRL_INJ_STOP_SET(1), FDMA_PORT_CTRL_INJ_STOP,
+		 sparx5, FDMA_PORT_CTRL(0));
 }
 
 void sparx5_fdma_reload(struct sparx5 *sparx5, struct fdma *fdma)
@@ -149,6 +152,10 @@ static bool sparx5_fdma_rx_get_frame(struct sparx5 *sparx5, struct sparx5_rx *rx
 	if (unlikely(!fdma_db_is_done(db_hw)))
 		return false;
 	skb = rx->skb[fdma->dcb_index][fdma->db_index];
+
+	/* The skb leaves the ring here, so clear its slot */
+	rx->skb[fdma->dcb_index][fdma->db_index] = NULL;
+
 	skb_put(skb, fdma_db_len_get(db_hw));
 	/* Now do the normal processing of the skb */
 	sparx5_ifh_parse(sparx5, (u32 *)skb->data, &fi);
@@ -223,6 +230,10 @@ int sparx5_fdma_xmit(struct sparx5 *sparx5, u32 *ifh, struct sk_buff *skb,
 	struct fdma *fdma = &tx->fdma;
 	void *virt_addr;
 
+	/* Drop frames that do not fit in the TX buffers */
+	if (unlikely(IFH_LEN * 4 + skb->len + ETH_FCS_LEN > fdma->db_size))
+		return -EMSGSIZE;
+
 	if (!fdma_db_is_done(fdma_db_get(fdma, fdma->dcb_index, 0)))
 		return -EINVAL;
 
@@ -247,9 +258,23 @@ int sparx5_fdma_xmit(struct sparx5 *sparx5, u32 *ifh, struct sk_buff *skb,
 	return NETDEV_TX_OK;
 }
 
-static int sparx5_fdma_rx_alloc(struct sparx5 *sparx5)
+/* Free the RX skbs owned by the driver, and the RX DCBs */
+static void sparx5_fdma_rx_free(struct sparx5_rx *rx)
 {
-	struct sparx5_rx *rx = &sparx5->rx;
+	struct fdma *fdma = &rx->fdma;
+
+	for (int i = 0; i < fdma->n_dcbs; i++) {
+		for (int j = 0; j < fdma->n_dbs; j++) {
+			consume_skb(rx->skb[i][j]);
+			rx->skb[i][j] = NULL;
+		}
+	}
+
+	fdma_free_phys(fdma);
+}
+
+static int sparx5_fdma_rx_alloc(struct sparx5_rx *rx)
+{
 	struct fdma *fdma = &rx->fdma;
 	int err;
 
@@ -257,15 +282,16 @@ static int sparx5_fdma_rx_alloc(struct sparx5 *sparx5)
 	if (err)
 		return err;
 
-	fdma_dcbs_init(fdma, FDMA_DCB_INFO_DATAL(fdma->db_size),
-		       FDMA_DCB_STATUS_INTR);
+	err = fdma_dcbs_init(fdma, FDMA_DCB_INFO_DATAL(fdma->db_size),
+			     FDMA_DCB_STATUS_INTR);
+	if (err)
+		sparx5_fdma_rx_free(rx);
 
-	return 0;
+	return err;
 }
 
-static int sparx5_fdma_tx_alloc(struct sparx5 *sparx5)
+static int sparx5_fdma_tx_alloc(struct sparx5_tx *tx)
 {
-	struct sparx5_tx *tx = &sparx5->tx;
 	struct fdma *fdma = &tx->fdma;
 	int err;
 
@@ -279,8 +305,40 @@ static int sparx5_fdma_tx_alloc(struct sparx5 *sparx5)
 	return 0;
 }
 
+/* Get the size of the largest frame, including IFH and VLAN tags, that can be
+ * received on any of the ports. If a port is given, its MTU is taken to be
+ * new_mtu instead of its current MTU, as the MTU is only updated once the
+ * buffers have been resized.
+ */
+u32 sparx5_fdma_get_max_frame(struct sparx5 *sparx5,
+			      struct sparx5_port *port, int new_mtu)
+{
+	u32 max_mtu = 0;
+
+	for (int i = 0; i < sparx5->data->consts->n_ports; i++) {
+		struct sparx5_port *p = sparx5->ports[i];
+
+		if (!p)
+			continue;
+
+		max_mtu = max_t(u32, max_mtu, p == port ?
+				new_mtu : READ_ONCE(p->ndev->mtu));
+	}
+
+	return SPX5_HW_MTU(max_mtu) + IFH_LEN * sizeof(u32) + VLAN_HLEN * 2;
+}
+
+/* Get the DB size needed to hold the largest frame. The DB size must be a
+ * multiple of 128 bytes.
+ */
+static u32 sparx5_fdma_get_db_size(struct sparx5 *sparx5,
+				   struct sparx5_port *port, int new_mtu)
+{
+	return ALIGN(sparx5_fdma_get_max_frame(sparx5, port, new_mtu), 128);
+}
+
 static void sparx5_fdma_rx_init(struct sparx5 *sparx5,
-				struct sparx5_rx *rx, int channel)
+				struct sparx5_rx *rx, int channel, u32 db_size)
 {
 	struct fdma *fdma = &rx->fdma;
 	int idx;
@@ -289,8 +347,8 @@ static void sparx5_fdma_rx_init(struct sparx5 *sparx5,
 	fdma->n_dcbs = FDMA_DCB_MAX;
 	fdma->n_dbs = FDMA_RX_DCB_MAX_DBS;
 	fdma->priv = sparx5;
-	fdma->db_size = ALIGN(FDMA_XTR_BUFFER_SIZE, PAGE_SIZE);
-	fdma->size = fdma_get_size(&sparx5->rx.fdma);
+	fdma->db_size = db_size;
+	fdma->size = fdma_get_size(fdma);
 	fdma->ops.dataptr_cb = &sparx5_fdma_rx_dataptr_cb;
 	fdma->ops.nextptr_cb = &fdma_nextptr_cb;
 	/* Fetch a netdev for SKB and NAPI use, any will do */
@@ -305,7 +363,7 @@ static void sparx5_fdma_rx_init(struct sparx5 *sparx5,
 }
 
 static void sparx5_fdma_tx_init(struct sparx5 *sparx5,
-				struct sparx5_tx *tx, int channel)
+				struct sparx5_tx *tx, int channel, u32 db_size)
 {
 	struct fdma *fdma = &tx->fdma;
 
@@ -313,8 +371,8 @@ static void sparx5_fdma_tx_init(struct sparx5 *sparx5,
 	fdma->n_dcbs = FDMA_DCB_MAX;
 	fdma->n_dbs = FDMA_TX_DCB_MAX_DBS;
 	fdma->priv = sparx5;
-	fdma->db_size = ALIGN(FDMA_XTR_BUFFER_SIZE, PAGE_SIZE);
-	fdma->size = fdma_get_size_contiguous(&sparx5->tx.fdma);
+	fdma->db_size = db_size;
+	fdma->size = fdma_get_size_contiguous(fdma);
 	fdma->ops.dataptr_cb = &sparx5_fdma_tx_dataptr_cb;
 	fdma->ops.nextptr_cb = &fdma_nextptr_cb;
 }
@@ -408,6 +466,7 @@ void sparx5_fdma_injection_mode(struct sparx5 *sparx5)
 
 int sparx5_fdma_init(struct sparx5 *sparx5)
 {
+	u32 db_size;
 	int err;
 
 	/* Reset FDMA state */
@@ -424,15 +483,17 @@ int sparx5_fdma_init(struct sparx5 *sparx5)
 		 sparx5, CPU_PROC_CTRL);
 
 	sparx5_fdma_injection_mode(sparx5);
-	sparx5_fdma_rx_init(sparx5, &sparx5->rx, FDMA_XTR_CHANNEL);
-	sparx5_fdma_tx_init(sparx5, &sparx5->tx, FDMA_INJ_CHANNEL);
-	err = sparx5_fdma_rx_alloc(sparx5);
+	db_size = sparx5_fdma_get_db_size(sparx5, NULL, 0);
+	sparx5_fdma_rx_init(sparx5, &sparx5->rx, FDMA_XTR_CHANNEL, db_size);
+	sparx5_fdma_tx_init(sparx5, &sparx5->tx, FDMA_INJ_CHANNEL, db_size);
+	err = sparx5_fdma_rx_alloc(&sparx5->rx);
 	if (err) {
 		dev_err(sparx5->dev, "Could not allocate RX buffers: %d\n", err);
 		return err;
 	}
-	err = sparx5_fdma_tx_alloc(sparx5);
+	err = sparx5_fdma_tx_alloc(&sparx5->tx);
 	if (err) {
+		sparx5_fdma_rx_free(&sparx5->rx);
 		dev_err(sparx5->dev, "Could not allocate TX buffers: %d\n", err);
 		return err;
 	}
@@ -442,7 +503,7 @@ int sparx5_fdma_init(struct sparx5 *sparx5)
 int sparx5_fdma_deinit(struct sparx5 *sparx5)
 {
 	sparx5_fdma_stop(sparx5);
-	fdma_free_phys(&sparx5->rx.fdma);
+	sparx5_fdma_rx_free(&sparx5->rx);
 	fdma_free_phys(&sparx5->tx.fdma);
 
 	return 0;
@@ -451,6 +512,11 @@ int sparx5_fdma_deinit(struct sparx5 *sparx5)
 static u32 sparx5_fdma_port_ctrl(struct sparx5 *sparx5)
 {
 	return spx5_rd(sparx5, FDMA_PORT_CTRL(0));
+}
+
+static u32 sparx5_fdma_ch_active(struct sparx5 *sparx5)
+{
+	return spx5_rd(sparx5, FDMA_CH_ACTIVE);
 }
 
 int sparx5_fdma_start(struct sparx5 *sparx5)
@@ -474,20 +540,210 @@ int sparx5_fdma_start(struct sparx5 *sparx5)
 
 int sparx5_fdma_stop(struct sparx5 *sparx5)
 {
+	u32 channels = BIT(sparx5->rx.fdma.channel_id) |
+		       BIT(sparx5->tx.fdma.channel_id);
 	struct sparx5_rx *rx = &sparx5->rx;
 	struct sparx5_tx *tx = &sparx5->tx;
 	u32 val;
 
 	napi_disable(&rx->napi);
 
-	/* Stop the fdma and channel interrupts */
+	/* Disable the channels, and wait for them to finish the current DCB */
+	spx5_wr(FDMA_CH_DISABLE_CH_DISABLE_SET(channels), sparx5,
+		FDMA_CH_DISABLE);
+
+	if (read_poll_timeout(sparx5_fdma_ch_active,
+			      val,
+			      !(FDMA_CH_ACTIVE_CH_ACTIVE_GET(val) & channels),
+			      SPX5_FDMA_STOP_SLEEP_US,
+			      SPX5_FDMA_STOP_TIMEOUT_US,
+			      false,
+			      sparx5))
+		dev_warn(sparx5->dev, "Failed to stop FDMA channels\n");
+
+	/* Stop the fdma and the RX channel interrupt */
 	sparx5_fdma_rx_deactivate(sparx5, rx);
 	sparx5_fdma_tx_deactivate(sparx5, tx);
 
-	/* Wait for the RX channel to stop */
-	read_poll_timeout(sparx5_fdma_port_ctrl, val,
-			  FDMA_PORT_CTRL_XTR_BUF_IS_EMPTY_GET(val) == 0,
-			  500, 10000, 0, sparx5);
+	/* Wait for the extraction buffer to be empty */
+	read_poll_timeout(sparx5_fdma_port_ctrl,
+			  val,
+			  FDMA_PORT_CTRL_XTR_BUF_IS_EMPTY_GET(val),
+			  SPX5_FDMA_STOP_SLEEP_US,
+			  SPX5_FDMA_STOP_TIMEOUT_US,
+			  false,
+			  sparx5);
 
 	return 0;
+}
+
+/* Check if any TX DB is still waiting to be transmitted */
+static bool sparx5_fdma_tx_busy(struct fdma *fdma)
+{
+	for (int i = 0; i < fdma->n_dcbs; i++)
+		if (!fdma_db_is_done(fdma_db_get(fdma, i, 0)))
+			return true;
+
+	return false;
+}
+
+/* Enable or disable the forwarding of frames to the CPU ports */
+static void sparx5_fdma_cpu_fwd_set(struct sparx5 *sparx5, bool ena)
+{
+	for (int cpu = SPX5_PORT_CPU_0; cpu <= SPX5_PORT_CPU_1; cpu++) {
+		int portno = sparx5_get_internal_port(sparx5, cpu);
+
+		spx5_rmw(QFWD_SWITCH_PORT_MODE_PORT_ENA_SET(ena),
+			 QFWD_SWITCH_PORT_MODE_PORT_ENA,
+			 sparx5,
+			 QFWD_SWITCH_PORT_MODE(portno));
+	}
+}
+
+/* Get the memory used by the frames queued to the CPU ports */
+static u32 sparx5_fdma_cpu_queue_use(struct sparx5 *sparx5)
+{
+	u32 use = 0;
+
+	for (int cpu = SPX5_PORT_CPU_0; cpu <= SPX5_PORT_CPU_1; cpu++) {
+		int portno = sparx5_get_internal_port(sparx5, cpu);
+		u32 base;
+
+		base = SPX5_QRES_DST_MEM + SPX5_PRIOS * portno;
+		for (int prio = 0; prio < SPX5_PRIOS; prio++)
+			use += QRES_RES_STAT_CUR_INUSE_GET(spx5_rd(sparx5,
+					QRES_RES_STAT_CUR(base + prio)));
+	}
+
+	return use;
+}
+
+/* Stop the port TX queues and the FDMA, and reset the FDMA, so that the FDMA
+ * buffers can be replaced.
+ */
+void sparx5_fdma_pause(struct sparx5 *sparx5)
+{
+	bool busy;
+	u32 use;
+
+	/* Only ports that are up have TX queues to stop */
+	for (int i = 0; i < sparx5->data->consts->n_ports; i++) {
+		struct sparx5_port *port = sparx5->ports[i];
+
+		if (port && netif_running(port->ndev))
+			netif_tx_disable(port->ndev);
+	}
+
+	/* Give the frames already handed to the FDMA a chance to be sent, as
+	 * they are lost when the FDMA is reset.
+	 */
+	if (read_poll_timeout(sparx5_fdma_tx_busy,
+			      busy,
+			      !busy,
+			      SPX5_FDMA_TX_DRAIN_SLEEP_US,
+			      SPX5_FDMA_TX_DRAIN_TIMEOUT_US,
+			      false,
+			      &sparx5->tx.fdma))
+		dev_warn(sparx5->dev, "FDMA TX not drained, frames dropped\n");
+
+	/* Stop the switch core from forwarding frames to the CPU, and let the
+	 * FDMA extract the frames already queued, so that the FDMA is not
+	 * stopped and reset while the switch core is still sending it frames.
+	 */
+	sparx5_fdma_cpu_fwd_set(sparx5, false);
+	if (read_poll_timeout(sparx5_fdma_cpu_queue_use,
+			      use,
+			      !use,
+			      SPX5_FDMA_XTR_DRAIN_SLEEP_US,
+			      SPX5_FDMA_XTR_DRAIN_TIMEOUT_US,
+			      false,
+			      sparx5))
+		dev_warn(sparx5->dev,
+			 "CPU queue not drained, frames dropped\n");
+
+	sparx5_fdma_stop(sparx5);
+
+	/* Reset FDMA state */
+	spx5_wr(FDMA_CTRL_NRESET_SET(0), sparx5, FDMA_CTRL);
+	spx5_wr(FDMA_CTRL_NRESET_SET(1), sparx5, FDMA_CTRL);
+
+	/* Discard frames queued for the CPU, as they may not fit the new
+	 * buffers.
+	 */
+	sparx5_xtr_flush(sparx5, XTR_QUEUE);
+}
+
+/* Restart the FDMA and the port TX queues after sparx5_fdma_pause() */
+void sparx5_fdma_resume(struct sparx5 *sparx5)
+{
+	struct sparx5_rx *rx = &sparx5->rx;
+	struct sparx5_tx *tx = &sparx5->tx;
+
+	/* Enable NAPI before the RX interrupt is enabled, as the interrupt
+	 * handler schedules NAPI, as in sparx5_fdma_start().
+	 */
+	napi_enable(&rx->napi);
+
+	sparx5_fdma_rx_activate(sparx5, rx);
+	sparx5_fdma_tx_activate(sparx5, tx);
+
+	/* Forward frames to the CPU again, now the FDMA can extract them */
+	sparx5_fdma_cpu_fwd_set(sparx5, true);
+
+	for (int i = 0; i < sparx5->data->consts->n_ports; i++) {
+		struct sparx5_port *port = sparx5->ports[i];
+
+		if (port && netif_running(port->ndev))
+			netif_tx_wake_all_queues(port->ndev);
+	}
+}
+
+int sparx5_fdma_resize(struct sparx5 *sparx5, struct sparx5_port *port,
+		       int new_mtu)
+{
+	struct sparx5_rx *rx = &sparx5->rx;
+	struct sparx5_tx *tx = &sparx5->tx;
+	struct sparx5_tx tx_new = {};
+	struct sparx5_rx *rx_new;
+	u32 db_size;
+	int err;
+
+	db_size = sparx5_fdma_get_db_size(sparx5, port, new_mtu);
+	if (db_size == rx->fdma.db_size)
+		return 0;
+
+	rx_new = kzalloc_obj(*rx_new);
+	if (!rx_new)
+		return -ENOMEM;
+
+	sparx5_fdma_rx_init(sparx5, rx_new, FDMA_XTR_CHANNEL, db_size);
+	sparx5_fdma_tx_init(sparx5, &tx_new, FDMA_INJ_CHANNEL, db_size);
+
+	err = sparx5_fdma_rx_alloc(rx_new);
+	if (err)
+		goto out;
+
+	err = sparx5_fdma_tx_alloc(&tx_new);
+	if (err) {
+		sparx5_fdma_rx_free(rx_new);
+		goto out;
+	}
+
+	sparx5_fdma_pause(sparx5);
+
+	/* The FDMA is stopped and reset, and NAPI and the TX queues are
+	 * disabled, so nothing uses the buffers until sparx5_fdma_resume().
+	 */
+	sparx5_fdma_rx_free(rx);
+	fdma_free_phys(&tx->fdma);
+
+	rx->fdma = rx_new->fdma;
+	memcpy(rx->skb, rx_new->skb, sizeof(rx->skb));
+	tx->fdma = tx_new.fdma;
+
+	sparx5_fdma_resume(sparx5);
+out:
+	kfree(rx_new);
+
+	return err;
 }
