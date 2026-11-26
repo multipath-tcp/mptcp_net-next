@@ -247,6 +247,7 @@ struct pse_pi_pairset {
  * @rdev: regulator represented by the PSE PI
  * @admin_state_enabled: PI enabled state
  * @pw_d: Power domain of the PSE PI
+ * @pw_d_node: entry in the list of PIs that use @pw_d
  * @prio: Priority of the PSE PI. Used in static budget evaluation strategy
  * @isr_pd_detected: PSE PI detection status managed by the interruption
  *		     handler. This variable is relevant when the power enabled
@@ -261,6 +262,7 @@ struct pse_pi {
 	struct regulator_dev *rdev;
 	bool admin_state_enabled;
 	struct pse_power_domain *pw_d;
+	struct list_head pw_d_node;
 	int prio;
 	bool isr_pd_detected;
 	int pw_allocated_mW;
@@ -298,6 +300,8 @@ struct pse_ntf {
  * @ntf_work: workqueue for PSE notification management
  * @ntf_fifo: PSE notifications FIFO
  * @ntf_fifo_lock: protect @ntf_fifo writer
+ * @unregistering: set under @lock when unregistering starts; the PSE
+ *		   core switches no PI on after that
  */
 struct pse_controller_dev {
 	const struct pse_controller_ops *ops;
@@ -317,6 +321,7 @@ struct pse_controller_dev {
 	struct work_struct ntf_work;
 	DECLARE_KFIFO_PTR(ntf_fifo, struct pse_ntf);
 	spinlock_t ntf_fifo_lock; /* Protect @ntf_fifo writer */
+	bool unregistering;
 };
 
 /**
