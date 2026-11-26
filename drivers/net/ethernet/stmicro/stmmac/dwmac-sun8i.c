@@ -5,6 +5,7 @@
  * Copyright (C) 2017 Corentin Labbe <clabbe.montjoie@gmail.com>
  */
 
+#include <linux/bitfield.h>
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
@@ -202,6 +203,11 @@ static const struct emac_variant emac_variant_h616_emac1 = {
 #define EMAC_RX_TH_64		(0x1 << 4)
 #define EMAC_RX_TH_96		(0x2 << 4)
 #define EMAC_RX_TH_128		(0x3 << 4)
+#define EMAC_RX_FLOW_CTL_TH_ACT	GENMASK(21, 20)
+#define EMAC_RX_FLOW_CTL_TH_DEACT	GENMASK(23, 22)
+#define EMAC_RX_FLOW_CTL_TH_2K	0x1
+#define EMAC_RX_FLOW_CTL_TH_4K	0x3
+#define EMAC_RX_FIFO_FLOW_CTL	BIT(24)
 #define EMAC_RX_DMA_EN  BIT(30)
 #define EMAC_RX_DMA_START       BIT(31)
 
@@ -226,6 +232,8 @@ static const struct emac_variant emac_variant_h616_emac1 = {
 
 /* Used in EMAC_TX_FLOW_CTL */
 #define EMAC_TX_FLOW_CTL_EN             BIT(0)
+#define EMAC_TX_FLOW_CTL_ZQP_FRM_EN	BIT(1)
+#define EMAC_TX_FLOW_CTL_PAUSE_TIME	GENMASK(19, 4)
 
 /* Used in EMAC_INT_STA */
 #define EMAC_TX_INT             BIT(0)
@@ -760,17 +768,29 @@ static void sun8i_dwmac_flow_ctrl(struct mac_device_info *hw,
 	u32 v;
 
 	v = readl(ioaddr + EMAC_RX_CTL0);
-	if (fc == FLOW_AUTO)
+	if (fc & FLOW_RX)
 		v |= EMAC_RX_FLOW_CTL_EN;
 	else
 		v &= ~EMAC_RX_FLOW_CTL_EN;
 	writel(v, ioaddr + EMAC_RX_CTL0);
 
+	v = readl(ioaddr + EMAC_RX_CTL1);
+	v &= ~(EMAC_RX_FIFO_FLOW_CTL | EMAC_RX_FLOW_CTL_TH_ACT |
+	       EMAC_RX_FLOW_CTL_TH_DEACT);
+	if (fc & FLOW_TX)
+		v |= EMAC_RX_FIFO_FLOW_CTL |
+		     FIELD_PREP(EMAC_RX_FLOW_CTL_TH_ACT,
+				EMAC_RX_FLOW_CTL_TH_2K) |
+		     FIELD_PREP(EMAC_RX_FLOW_CTL_TH_DEACT,
+				EMAC_RX_FLOW_CTL_TH_4K);
+	writel(v, ioaddr + EMAC_RX_CTL1);
+
 	v = readl(ioaddr + EMAC_TX_FLOW_CTL);
-	if (fc == FLOW_AUTO)
-		v |= EMAC_TX_FLOW_CTL_EN;
-	else
-		v &= ~EMAC_TX_FLOW_CTL_EN;
+	v &= ~(EMAC_TX_FLOW_CTL_EN | EMAC_TX_FLOW_CTL_ZQP_FRM_EN |
+	       EMAC_TX_FLOW_CTL_PAUSE_TIME);
+	if (fc & FLOW_TX)
+		v |= EMAC_TX_FLOW_CTL_EN | EMAC_TX_FLOW_CTL_ZQP_FRM_EN |
+		     FIELD_PREP(EMAC_TX_FLOW_CTL_PAUSE_TIME, pause_time);
 	writel(v, ioaddr + EMAC_TX_FLOW_CTL);
 }
 

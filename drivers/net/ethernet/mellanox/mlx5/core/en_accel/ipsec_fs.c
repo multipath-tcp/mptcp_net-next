@@ -2163,6 +2163,8 @@ err_add_cnt:
 err_pkt_reformat:
 	if (flow_act.modify_hdr)
 		mlx5_modify_header_dealloc(mdev, flow_act.modify_hdr);
+	if (!attrs->drop && rx == ipsec->rx_esw)
+		mlx5_esw_ipsec_rx_id_mapping_remove(sa_entry);
 err_mod_header:
 	kvfree(spec);
 err_alloc:
