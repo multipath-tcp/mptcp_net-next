@@ -1016,7 +1016,8 @@ static int mptcp_rm_addr_len(const struct mptcp_rm_list *rm_list)
 }
 
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			     struct mptcp_rm_list *rm_list, int *size)
+			     struct mptcp_rm_list *rm_list, int *size,
+			     bool size_only)
 {
 	int ret = false, len;
 	u8 rm_addr;
@@ -1037,9 +1038,12 @@ bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
 		goto out_unlock;
 
 	*size = len;
+	ret = true;
+	if (size_only)
+		goto out_unlock;
+
 	*rm_list = msk->pm.rm_list_tx;
 	WRITE_ONCE(msk->pm.addr_signal, rm_addr);
-	ret = true;
 
 out_unlock:
 	spin_unlock_bh(&msk->pm.lock);
