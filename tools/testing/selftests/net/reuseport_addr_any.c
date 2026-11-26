@@ -155,6 +155,8 @@ static int receive_once(int epfd, int proto)
 	i = epoll_wait(epfd, &ev, 1, 3);
 	if (i < 0)
 		error(1, errno, "epoll_wait failed");
+	if (i == 0)
+		error(1, 0, "epoll_wait timed out waiting for packet");
 
 	if (proto == SOCK_STREAM) {
 		fd = accept(ev.data.fd, NULL, NULL);
