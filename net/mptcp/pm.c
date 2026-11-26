@@ -843,17 +843,30 @@ void mptcp_pm_rm_addr_received(struct mptcp_sock *msk,
 			       const struct mptcp_rm_list *rm_list)
 {
 	struct mptcp_pm_data *pm = &msk->pm;
+	bool drop = false;
 	u8 i;
 
 	pr_debug("msk=%p remote_ids_nr=%d\n", msk, rm_list->nr);
 
-	for (i = 0; i < rm_list->nr; i++)
-		mptcp_event_addr_removed(msk, rm_list->ids[i]);
-
 	spin_lock_bh(&pm->lock);
 	if (mptcp_pm_schedule_work(msk, MPTCP_PM_RM_ADDR_RECEIVED))
-		pm->rm_list_rx = *rm_list;
-	else
+		pm->rm_list_rx.nr = 0;
+
+	/* the worker may not have got to the previous RM_ADDR yet */
+	for (i = 0; i < rm_list->nr; i++) {
+		u8 id = rm_list->ids[i];
+
+		if (!memchr(pm->rm_list_rx.ids, id, pm->rm_list_rx.nr)) {
+			if (pm->rm_list_rx.nr == MPTCP_RM_IDS_MAX) {
+				drop = true;
+				continue;
+			}
+			pm->rm_list_rx.ids[pm->rm_list_rx.nr++] = id;
+		}
+		/* not for the dropped ids, and before the worker acts */
+		mptcp_event_addr_removed(msk, id);
+	}
+	if (drop)
 		__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_RMADDRDROP);
 	spin_unlock_bh(&pm->lock);
 }
