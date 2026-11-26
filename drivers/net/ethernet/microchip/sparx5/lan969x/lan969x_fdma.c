@@ -25,7 +25,7 @@ static int lan969x_fdma_tx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 static int lan969x_fdma_rx_dataptr_cb(struct fdma *fdma, int dcb, int db,
 				      u64 *dataptr)
 {
-	struct sparx5_rx *rx = &FDMA_PRIV(fdma)->rx;
+	struct sparx5_rx *rx = container_of(fdma, struct sparx5_rx, fdma);
 	struct page *page;
 
 	page = page_pool_dev_alloc_pages(rx->page_pool);
@@ -67,13 +67,13 @@ static void lan969x_fdma_tx_clear_buf(struct sparx5 *sparx5, int weight)
 		if (!fdma_db_is_done(fdma_db_get(fdma, i, 0)))
 			continue;
 
-		db->dev->stats.tx_bytes += db->skb->len;
+		db->dev->stats.tx_bytes += db->len;
 		db->dev->stats.tx_packets++;
 		sparx5->tx.packets++;
 
 		dma_unmap_single(sparx5->dev,
 				 db->dma_addr,
-				 db->skb->len,
+				 db->len,
 				 DMA_TO_DEVICE);
 
 		if (!db->ptp)
@@ -90,10 +90,22 @@ static void lan969x_fdma_free_pages(struct sparx5_rx *rx)
 	struct fdma *fdma = &rx->fdma;
 
 	for (int i = 0; i < fdma->n_dcbs; ++i) {
-		for (int j = 0; j < fdma->n_dbs; ++j)
+		for (int j = 0; j < fdma->n_dbs; ++j) {
+			if (!rx->page[i][j])
+				continue;
+
 			page_pool_put_full_page(rx->page_pool,
 						rx->page[i][j], false);
+			rx->page[i][j] = NULL;
+		}
 	}
+}
+
+static void lan969x_fdma_rx_free(struct sparx5 *sparx5, struct sparx5_rx *rx)
+{
+	lan969x_fdma_free_pages(rx);
+	fdma_free_coherent(sparx5->dev, &rx->fdma);
+	page_pool_destroy(rx->page_pool);
 }
 
 static struct sk_buff *lan969x_fdma_rx_get_frame(struct sparx5 *sparx5,
@@ -110,6 +122,9 @@ static struct sk_buff *lan969x_fdma_rx_get_frame(struct sparx5 *sparx5,
 	db = &fdma->dcbs[fdma->dcb_index].db[fdma->db_index];
 	page = rx->page[fdma->dcb_index][fdma->db_index];
 
+	/* The page leaves the ring here, so clear its slot */
+	rx->page[fdma->dcb_index][fdma->db_index] = NULL;
+
 	sparx5_ifh_parse(sparx5, page_address(page), &fi);
 	port = fi.src_port < consts->n_ports ? sparx5->ports[fi.src_port] :
 					       NULL;
@@ -119,7 +134,7 @@ static struct sk_buff *lan969x_fdma_rx_get_frame(struct sparx5 *sparx5,
 		goto free_page;
 	}
 
-	skb = build_skb(page_address(page), fdma->db_size);
+	skb = build_skb(page_address(page), PAGE_SIZE << rx->page_order);
 	if (unlikely(!skb))
 		goto free_page;
 
@@ -149,22 +164,29 @@ free_page:
 	return NULL;
 }
 
-static int lan969x_fdma_rx_alloc(struct sparx5 *sparx5)
+/* Get the page order needed for a page to hold the largest frame */
+static u8 lan969x_fdma_get_page_order(struct sparx5 *sparx5,
+				      struct sparx5_port *port, int new_mtu)
 {
-	struct sparx5_rx *rx = &sparx5->rx;
+	return get_order(ALIGN(sparx5_fdma_get_max_frame(sparx5, port, new_mtu),
+			       128) +
+			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+}
+
+static int lan969x_fdma_rx_alloc(struct sparx5 *sparx5, struct sparx5_rx *rx)
+{
 	struct fdma *fdma = &rx->fdma;
 	int err;
 
 	struct page_pool_params pp_params = {
-		.order = 0,
+		.order = rx->page_order,
 		.flags = PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV,
 		.pool_size = fdma->n_dcbs * fdma->n_dbs,
 		.nid = NUMA_NO_NODE,
 		.dev = sparx5->dev,
 		.dma_dir = DMA_FROM_DEVICE,
 		.offset = 0,
-		.max_len = fdma->db_size -
-			   SKB_DATA_ALIGN(sizeof(struct skb_shared_info)),
+		.max_len = fdma->db_size,
 	};
 
 	rx->page_pool = page_pool_create(&pp_params);
@@ -172,14 +194,18 @@ static int lan969x_fdma_rx_alloc(struct sparx5 *sparx5)
 		return PTR_ERR(rx->page_pool);
 
 	err = fdma_alloc_coherent(sparx5->dev, fdma);
-	if (err)
+	if (err) {
+		page_pool_destroy(rx->page_pool);
 		return err;
+	}
 
-	fdma_dcbs_init(fdma,
-		       FDMA_DCB_INFO_DATAL(fdma->db_size),
-		       FDMA_DCB_STATUS_INTR);
+	err = fdma_dcbs_init(fdma,
+			     FDMA_DCB_INFO_DATAL(fdma->db_size),
+			     FDMA_DCB_STATUS_INTR);
+	if (err)
+		lan969x_fdma_rx_free(sparx5, rx);
 
-	return 0;
+	return err;
 }
 
 static int lan969x_fdma_tx_alloc(struct sparx5 *sparx5)
@@ -205,16 +231,58 @@ static int lan969x_fdma_tx_alloc(struct sparx5 *sparx5)
 	return 0;
 }
 
-static void lan969x_fdma_rx_init(struct sparx5 *sparx5)
+/* Release the TX buffers that are still in flight. The two-step PTP skbs are
+ * owned by the port tx_skbs list, so they are only unmapped.
+ */
+static void lan969x_fdma_tx_release(struct sparx5 *sparx5)
 {
-	struct fdma *fdma = &sparx5->rx.fdma;
+	struct sparx5_tx *tx = &sparx5->tx;
+	struct sparx5_tx_buf *db;
+
+	for (int i = 0; i < tx->fdma.n_dcbs; ++i) {
+		db = &tx->dbs[i];
+
+		if (!db->used)
+			continue;
+
+		db->dev->stats.tx_dropped++;
+		tx->dropped++;
+
+		dma_unmap_single(sparx5->dev,
+				 db->dma_addr,
+				 db->len,
+				 DMA_TO_DEVICE);
+
+		if (!db->ptp)
+			dev_kfree_skb_any(db->skb);
+
+		db->used = false;
+	}
+}
+
+static void lan969x_fdma_tx_free(struct sparx5 *sparx5)
+{
+	struct sparx5_tx *tx = &sparx5->tx;
+
+	lan969x_fdma_tx_release(sparx5);
+	fdma_free_coherent(sparx5->dev, &tx->fdma);
+	kfree(tx->dbs);
+}
+
+static void lan969x_fdma_rx_init(struct sparx5 *sparx5, struct sparx5_rx *rx)
+{
+	struct fdma *fdma = &rx->fdma;
 
 	fdma->channel_id = FDMA_XTR_CHANNEL;
 	fdma->n_dcbs = FDMA_DCB_MAX;
 	fdma->n_dbs = 1;
 	fdma->priv = sparx5;
 	fdma->size = fdma_get_size(fdma);
-	fdma->db_size = PAGE_SIZE;
+	/* Keep the FDMA from writing into the skb_shared_info at the end of
+	 * the page. The DB size must be a multiple of 128 bytes.
+	 */
+	fdma->db_size = SKB_WITH_OVERHEAD(PAGE_SIZE << rx->page_order);
+	fdma->db_size = ALIGN_DOWN(fdma->db_size, 128);
 	fdma->ops.dataptr_cb = &lan969x_fdma_rx_dataptr_cb;
 	fdma->ops.nextptr_cb = &fdma_nextptr_cb;
 
@@ -223,7 +291,7 @@ static void lan969x_fdma_rx_init(struct sparx5 *sparx5)
 		struct sparx5_port *port = sparx5->ports[idx];
 
 		if (port && port->ndev) {
-			sparx5->rx.ndev = port->ndev;
+			rx->ndev = port->ndev;
 			break;
 		}
 	}
@@ -331,6 +399,7 @@ int lan969x_fdma_xmit(struct sparx5 *sparx5, u32 *ifh, struct sk_buff *skb,
 
 	db_buf->dev = dev;
 	db_buf->skb = skb;
+	db_buf->len = skb->len;
 	db_buf->ptp = false;
 	db_buf->used = true;
 
@@ -357,7 +426,8 @@ int lan969x_fdma_init(struct sparx5 *sparx5)
 	struct sparx5_rx *rx = &sparx5->rx;
 	int err;
 
-	lan969x_fdma_rx_init(sparx5);
+	rx->page_order = lan969x_fdma_get_page_order(sparx5, NULL, 0);
+	lan969x_fdma_rx_init(sparx5, rx);
 	lan969x_fdma_tx_init(sparx5);
 	sparx5_fdma_injection_mode(sparx5);
 
@@ -367,7 +437,7 @@ int lan969x_fdma_init(struct sparx5 *sparx5)
 		return err;
 	}
 
-	err = lan969x_fdma_rx_alloc(sparx5);
+	err = lan969x_fdma_rx_alloc(sparx5, rx);
 	if (err) {
 		dev_err(sparx5->dev, "Failed to allocate RX buffers: %d\n",
 			err);
@@ -376,7 +446,7 @@ int lan969x_fdma_init(struct sparx5 *sparx5)
 
 	err = lan969x_fdma_tx_alloc(sparx5);
 	if (err) {
-		fdma_free_coherent(sparx5->dev, &rx->fdma);
+		lan969x_fdma_rx_free(sparx5, rx);
 		dev_err(sparx5->dev, "Failed to allocate TX buffers: %d\n",
 			err);
 		return err;
@@ -392,13 +462,74 @@ int lan969x_fdma_init(struct sparx5 *sparx5)
 int lan969x_fdma_deinit(struct sparx5 *sparx5)
 {
 	struct sparx5_rx *rx = &sparx5->rx;
-	struct sparx5_tx *tx = &sparx5->tx;
 
 	sparx5_fdma_stop(sparx5);
-	fdma_free_coherent(sparx5->dev, &tx->fdma);
-	fdma_free_coherent(sparx5->dev, &rx->fdma);
-	lan969x_fdma_free_pages(rx);
-	page_pool_destroy(rx->page_pool);
+	lan969x_fdma_tx_free(sparx5);
+	lan969x_fdma_rx_free(sparx5, rx);
 
 	return 0;
+}
+
+/* Release the TX buffers that were in flight when the FDMA was reset, and
+ * initialize the TX DCBs again.
+ */
+static void lan969x_fdma_tx_reset(struct sparx5 *sparx5)
+{
+	struct fdma *fdma = &sparx5->tx.fdma;
+
+	/* Complete the frames that were transmitted before the reset. BHs are
+	 * disabled as tx_clear_buf() expects to run from NAPI.
+	 */
+	local_bh_disable();
+	lan969x_fdma_tx_clear_buf(sparx5, 0);
+	local_bh_enable();
+
+	lan969x_fdma_tx_release(sparx5);
+
+	fdma_dcbs_init(fdma,
+		       FDMA_DCB_INFO_DATAL(fdma->db_size),
+		       FDMA_DCB_STATUS_DONE);
+}
+
+int lan969x_fdma_resize(struct sparx5 *sparx5, struct sparx5_port *port,
+			int new_mtu)
+{
+	struct sparx5_rx *rx = &sparx5->rx;
+	struct sparx5_rx *rx_new;
+	u8 page_order;
+	int err;
+
+	page_order = lan969x_fdma_get_page_order(sparx5, port, new_mtu);
+	if (page_order == rx->page_order)
+		return 0;
+
+	rx_new = kzalloc_obj(*rx_new);
+	if (!rx_new)
+		return -ENOMEM;
+
+	rx_new->page_order = page_order;
+	lan969x_fdma_rx_init(sparx5, rx_new);
+
+	err = lan969x_fdma_rx_alloc(sparx5, rx_new);
+	if (err)
+		goto out;
+
+	sparx5_fdma_pause(sparx5);
+
+	/* The FDMA is stopped and reset, and NAPI and the TX queues are
+	 * disabled, so nothing uses the buffers until sparx5_fdma_resume().
+	 */
+	lan969x_fdma_tx_reset(sparx5);
+	lan969x_fdma_rx_free(sparx5, rx);
+
+	rx->fdma = rx_new->fdma;
+	rx->page_pool = rx_new->page_pool;
+	rx->page_order = rx_new->page_order;
+	memcpy(rx->page, rx_new->page, sizeof(rx->page));
+
+	sparx5_fdma_resume(sparx5);
+out:
+	kfree(rx_new);
+
+	return err;
 }
