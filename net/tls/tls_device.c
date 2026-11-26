@@ -1349,9 +1349,7 @@ static int tls_device_down(struct net_device *netdev)
 	}
 	spin_unlock_irqrestore(&tls_device_lock, flags);
 
-	list_for_each_entry_safe(ctx, tmp, &list, list)	{
-		bool free_ctx;
-
+	list_for_each_entry(ctx, &list, list) {
 		/* Stop offloaded TX and switch to the fallback.
 		 * tls_is_skb_tx_device_offloaded will return false.
 		 */
@@ -1364,12 +1362,17 @@ static int tls_device_down(struct net_device *netdev)
 
 		/* Start skipping the RX resync logic completely. */
 		set_bit(TLS_RX_DEV_DEGRADED, &ctx->flags);
+	}
 
-		/* Sync with inflight packets. After this point:
-		 * TX: no non-encrypted packets will be passed to the driver.
-		 * RX: resync requests from the driver will be ignored.
-		 */
+	/* Sync with inflight packets, once for all contexts. After this point:
+	 * TX: no non-encrypted packets will be passed to the driver.
+	 * RX: resync requests from the driver will be ignored.
+	 */
+	if (!list_empty(&list))
 		synchronize_net();
+
+	list_for_each_entry_safe(ctx, tmp, &list, list)	{
+		bool free_ctx;
 
 		/* Release the offload context on the driver side. */
 		if (ctx->tx_conf == TLS_HW)
