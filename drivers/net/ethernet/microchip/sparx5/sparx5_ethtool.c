@@ -809,7 +809,7 @@ static const struct ethtool_rmon_hist_range sparx5_rmon_ranges[] = {
 	{  256,   511 },
 	{  512,  1023 },
 	{ 1024,  1518 },
-	{ 1519, 10239 },
+	{ 1519, SPX5_MAX_FRAME_LEN + 2 * VLAN_HLEN },
 	{}
 };
 
