@@ -389,6 +389,12 @@ static const char * const dim_state_str[] = { "START", "IN_PROG", "APPLY" };
 static const char * const
 dim_tune_stat_str[] = { "ON_TOP", "TIRED", "RIGHT", "LEFT" };
 
+static bool hns3_dbg_is_device_busy(struct hns3_nic_priv *priv)
+{
+	return !test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
+	       test_bit(HNS3_NIC_STATE_RESETTING, &priv->state);
+}
+
 static void hns3_get_coal_info(struct hns3_enet_tqp_vector *tqp_vector,
 			       struct seq_file *s, int i, bool is_tx)
 {
@@ -434,7 +440,7 @@ static void hns3_get_coal_info(struct hns3_enet_tqp_vector *tqp_vector,
 	}
 }
 
-static void hns3_dump_coal_info(struct seq_file *s, bool is_tx)
+static int hns3_dump_coal_info(struct seq_file *s, bool is_tx)
 {
 	struct hnae3_handle *h = hnae3_seq_file_to_handle(s);
 	struct hns3_enet_tqp_vector *tqp_vector;
@@ -448,18 +454,34 @@ static void hns3_dump_coal_info(struct seq_file *s, bool is_tx)
 	seq_puts(s, "HW_GL  HW_QL\n");
 
 	for (i = 0; i < priv->vector_num; i++) {
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv))
+			return -EBUSY;
+
 		tqp_vector = &priv->tqp_vector[i];
 		hns3_get_coal_info(tqp_vector, s, i, is_tx);
 	}
+
+	return 0;
 }
 
 static int hns3_dbg_coal_info(struct seq_file *s, void *data)
 {
-	hns3_dump_coal_info(s, true);
-	seq_puts(s, "\n");
-	hns3_dump_coal_info(s, false);
+	struct hnae3_handle *h = hnae3_seq_file_to_handle(s);
+	struct hns3_nic_priv *priv = h->priv;
+	int ret;
 
-	return 0;
+	mutex_lock(&priv->ae_handle->dbg_mutex);
+	ret = hns3_dump_coal_info(s, true);
+	if (ret)
+		goto unlock;
+
+	seq_puts(s, "\n");
+	ret = hns3_dump_coal_info(s, false);
+
+unlock:
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
+	return ret;
 }
 
 static void hns3_dump_rx_queue_info(struct hns3_enet_ring *ring,
@@ -504,27 +526,22 @@ static int hns3_dbg_rx_queue_info(struct seq_file *s, void *data)
 	struct hns3_enet_ring *ring;
 	u32 i;
 
-	if (!priv->ring) {
-		dev_err(&h->pdev->dev, "priv->ring is NULL\n");
-		return -EFAULT;
-	}
-
+	mutex_lock(&priv->ae_handle->dbg_mutex);
 	seq_puts(s, "QUEUE_ID  BD_NUM  BD_LEN  TAIL  HEAD  FBDNUM  ");
 	seq_puts(s, "PKTNUM     COPYBREAK  RING_EN  RX_RING_EN  BASE_ADDR\n");
 
 	for (i = 0; i < h->kinfo.num_tqps; i++) {
-		/* Each cycle needs to determine whether the instance is reset,
-		 * to prevent reference to invalid memory. And need to ensure
-		 * that the following code is executed within 100ms.
-		 */
-		if (!test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
-		    test_bit(HNS3_NIC_STATE_RESETTING, &priv->state))
-			return -EPERM;
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv)) {
+			mutex_unlock(&priv->ae_handle->dbg_mutex);
+			return -EBUSY;
+		}
 
 		ring = &priv->ring[(u32)(i + h->kinfo.num_tqps)];
 		hns3_dump_rx_queue_info(ring, s, i);
 	}
 
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
 	return 0;
 }
 
@@ -569,27 +586,22 @@ static int hns3_dbg_tx_queue_info(struct seq_file *s, void *data)
 	struct hns3_enet_ring *ring;
 	u32 i;
 
-	if (!priv->ring) {
-		dev_err(&h->pdev->dev, "priv->ring is NULL\n");
-		return -EFAULT;
-	}
-
+	mutex_lock(&priv->ae_handle->dbg_mutex);
 	seq_puts(s, "QUEUE_ID  BD_NUM  TC  TAIL  HEAD  FBDNUM  OFFSET  ");
 	seq_puts(s, "PKTNUM     RING_EN  TX_RING_EN  BASE_ADDR\n");
 
 	for (i = 0; i < h->kinfo.num_tqps; i++) {
-		/* Each cycle needs to determine whether the instance is reset,
-		 * to prevent reference to invalid memory. And need to ensure
-		 * that the following code is executed within 100ms.
-		 */
-		if (!test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
-		    test_bit(HNS3_NIC_STATE_RESETTING, &priv->state))
-			return -EPERM;
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv)) {
+			mutex_unlock(&priv->ae_handle->dbg_mutex);
+			return -EBUSY;
+		}
 
 		ring = &priv->ring[i];
 		hns3_dump_tx_queue_info(ring, s, i);
 	}
 
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
 	return 0;
 }
 
@@ -604,14 +616,23 @@ static int hns3_dbg_queue_map(struct seq_file *s, void *data)
 
 	seq_puts(s, "local_queue_id  global_queue_id  vector_id\n");
 
+	mutex_lock(&priv->ae_handle->dbg_mutex);
 	for (i = 0; i < h->kinfo.num_tqps; i++) {
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv)) {
+			mutex_unlock(&priv->ae_handle->dbg_mutex);
+			return -EBUSY;
+		}
+
 		if (!priv->ring || !priv->ring[i].tqp_vector)
 			continue;
+
 		seq_printf(s, "%-16u%-17u%d\n", i,
 			   h->ae_algo->ops->get_global_queue_id(h, i),
 			   priv->ring[i].tqp_vector->vector_irq);
 	}
 
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
 	return 0;
 }
 
@@ -661,8 +682,11 @@ static int hns3_dbg_rx_bd_info(struct seq_file *s, void *private)
 
 	ring = &priv->ring[data->qid + data->handle->kinfo.num_tqps];
 	for (i = 0; i < ring->desc_num; i++) {
-		desc = &ring->desc[i];
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv))
+			return -EBUSY;
 
+		desc = &ring->desc[i];
 		hns3_dump_rx_bd_info(priv, desc, s, i);
 	}
 
@@ -706,8 +730,11 @@ static int hns3_dbg_tx_bd_info(struct seq_file *s, void *private)
 
 	ring = &priv->ring[data->qid];
 	for (i = 0; i < ring->desc_num; i++) {
-		desc = &ring->desc[i];
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv))
+			return -EBUSY;
 
+		desc = &ring->desc[i];
 		hns3_dump_tx_bd_info(desc, s, i);
 	}
 
@@ -779,6 +806,11 @@ static int hns3_dbg_dev_info(struct seq_file *s, void *data)
 static void hns3_dump_page_pool_info(struct hns3_enet_ring *ring,
 				     struct seq_file *s, u32 index)
 {
+	if (!ring->page_pool) {
+		seq_printf(s, "%-10u %s\n", index, "page pool not initialized");
+		return;
+	}
+
 	seq_printf(s, "%-10u%-14u%-14d%-21u%-7u%-9d%uK\n",
 		   index,
 		   READ_ONCE(ring->page_pool->pages_state_hold_cnt),
@@ -796,28 +828,27 @@ static int hns3_dbg_page_pool_info(struct seq_file *s, void *data)
 	struct hns3_enet_ring *ring;
 	u32 i;
 
+	mutex_lock(&priv->ae_handle->dbg_mutex);
 	if (!priv->ring) {
-		dev_err(&h->pdev->dev, "priv->ring is NULL\n");
-		return -EFAULT;
-	}
-
-	if (!priv->ring[h->kinfo.num_tqps].page_pool) {
-		dev_err(&h->pdev->dev, "page pool is not initialized\n");
-		return -EFAULT;
+		mutex_unlock(&priv->ae_handle->dbg_mutex);
+		return -EBUSY;
 	}
 
 	seq_puts(s, "QUEUE_ID  ALLOCATE_CNT  FREE_CNT      ");
 	seq_puts(s, "POOL_SIZE(PAGE_NUM)  ORDER  NUMA_ID  MAX_LEN\n");
 
 	for (i = 0; i < h->kinfo.num_tqps; i++) {
-		if (!test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
-		    test_bit(HNS3_NIC_STATE_RESETTING, &priv->state))
-			return -EPERM;
+		/* Per-iteration check bounds reset latency to one iteration. */
+		if (hns3_dbg_is_device_busy(priv)) {
+			mutex_unlock(&priv->ae_handle->dbg_mutex);
+			return -EBUSY;
+		}
 
 		ring = &priv->ring[(u32)(i + h->kinfo.num_tqps)];
 		hns3_dump_page_pool_info(ring, s, i);
 	}
 
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
 	return 0;
 }
 
@@ -826,17 +857,23 @@ static int hns3_dbg_bd_info_show(struct seq_file *s, void *private)
 	struct hns3_dbg_data *data = s->private;
 	struct hnae3_handle *h = data->handle;
 	struct hns3_nic_priv *priv = h->priv;
+	int ret;
 
-	if (!test_bit(HNS3_NIC_STATE_INITED, &priv->state) ||
-	    test_bit(HNS3_NIC_STATE_RESETTING, &priv->state))
+	mutex_lock(&priv->ae_handle->dbg_mutex);
+	if (hns3_dbg_is_device_busy(priv)) {
+		mutex_unlock(&priv->ae_handle->dbg_mutex);
 		return -EBUSY;
+	}
 
 	if (data->cmd == HNAE3_DBG_CMD_TX_BD)
-		return hns3_dbg_tx_bd_info(s, private);
+		ret = hns3_dbg_tx_bd_info(s, private);
 	else if (data->cmd == HNAE3_DBG_CMD_RX_BD)
-		return hns3_dbg_rx_bd_info(s, private);
+		ret = hns3_dbg_rx_bd_info(s, private);
+	else
+		ret = -EOPNOTSUPP;
 
-	return -EOPNOTSUPP;
+	mutex_unlock(&priv->ae_handle->dbg_mutex);
+	return ret;
 }
 DEFINE_SHOW_ATTRIBUTE(hns3_dbg_bd_info);
 
