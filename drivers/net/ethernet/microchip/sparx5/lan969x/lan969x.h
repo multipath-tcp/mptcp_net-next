@@ -78,5 +78,7 @@ int lan969x_fdma_deinit(struct sparx5 *sparx5);
 int lan969x_fdma_napi_poll(struct napi_struct *napi, int weight);
 int lan969x_fdma_xmit(struct sparx5 *sparx5, u32 *ifh, struct sk_buff *skb,
 		      struct net_device *dev);
+int lan969x_fdma_resize(struct sparx5 *sparx5, struct sparx5_port *port,
+			int new_mtu);
 
 #endif
