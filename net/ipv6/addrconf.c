@@ -1902,8 +1902,10 @@ int ipv6_dev_get_saddr(struct net *net, const struct net_device *dst_dev,
 							    master, &dst,
 							    scores, hiscore_idx);
 
-			if (scores[hiscore_idx].ifa &&
-			    scores[hiscore_idx].scopedist >= 0)
+			hiscore = &scores[hiscore_idx];
+			if (hiscore->ifa &&
+			    __ipv6_addr_src_scope(hiscore->addr_type) >=
+			    dst.scope)
 				goto out;
 		}
 
