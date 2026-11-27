@@ -1379,9 +1379,6 @@ static void subflow_sched_work_if_closed(struct mptcp_sock *msk, struct sock *ss
 	if (!skb_queue_empty(&ssk->sk_receive_queue))
 		return;
 
-	if (!test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
-		mptcp_schedule_work(sk);
-
 	/* when the fallback subflow closes the rx side, trigger a 'dummy'
 	 * ingress data fin, so that the msk state will follow along
 	 */
@@ -1389,6 +1386,10 @@ static void subflow_sched_work_if_closed(struct mptcp_sock *msk, struct sock *ss
 	    msk->first == ssk &&
 	    mptcp_update_rcv_data_fin(msk, subflow->map_seq +
 				      subflow->map_data_len, true))
+		mptcp_schedule_work(sk);
+
+	/* after the 'dummy' data fin: mptcp_close_ssk() checks it */
+	if (!test_and_set_bit(MPTCP_WORK_CLOSE_SUBFLOW, &msk->flags))
 		mptcp_schedule_work(sk);
 }
 
