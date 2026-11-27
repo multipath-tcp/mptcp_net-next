@@ -14,7 +14,7 @@ TESTS="unregister down carrier nexthop suppress ipv6_notify ipv4_notify \
        ipv4_mpath_list ipv6_mpath_list ipv4_mpath_balance ipv6_mpath_balance \
        ipv4_mpath_balance_preferred ipv4_mpath_oif ipv4_mpath_oif_nh \
        ipv4_mpath_oif_vrf ipv6_mpath_oif ipv6_mpath_oif_nh ipv6_mpath_oif_vrf \
-       fib6_ra_to_static fib6_temp_addr_renewal"
+       ipv6_saddr_vrf fib6_ra_to_static fib6_temp_addr_renewal"
 
 VERBOSE=0
 PAUSE_ON_FAIL=no
@@ -3228,6 +3228,50 @@ ipv6_mpath_oif_vrf_test()
 	cleanup
 }
 
+ipv6_saddr_vrf_check()
+{
+	local saddr="$1"
+	local desc="$2"
+	local route_get="$IP -6 route get 2001:db8:10::1 vrf vrf-123"
+
+	run_cmd "$route_get | grep -q 'src $saddr '"
+	log_test $? 0 "$desc"
+}
+
+ipv6_saddr_vrf_test()
+{
+	echo
+	echo "IPv6 source address selection with VRF test"
+
+	setup
+
+	if ! $IP link add name vrf-123 up type vrf table 123 &> /dev/null; then
+		echo "SKIP: Could not add a VRF device."
+		cleanup
+		return
+	fi
+
+	set -e
+	$NS_EXEC sysctl -qw net.ipv6.conf.all.keep_addr_on_down=1
+	$IP link set dev dummy0 master vrf-123
+	$IP link add dummy1 up master vrf-123 type dummy
+	$IP -6 route add 2001:db8:10::/64 vrf vrf-123 dev dummy1
+	set +e
+
+	ipv6_saddr_vrf_check "2001:db8:1::1" \
+		"Output device with a link-local address only"
+
+	$IP address add 2001:db8:100::1/128 dev vrf-123 nodad
+	ipv6_saddr_vrf_check "2001:db8:100::1" \
+		"Address of the VRF device before those of other devices"
+
+	$IP address add 2001:db8:2::1/64 dev dummy1 nodad
+	ipv6_saddr_vrf_check "2001:db8:2::1" \
+		"Address of the output device first"
+
+	cleanup
+}
+
 ################################################################################
 # usage
 
@@ -3320,6 +3364,7 @@ do
 	ipv6_mpath_oif)			ipv6_mpath_oif_test;;
 	ipv6_mpath_oif_nh)		ipv6_mpath_oif_nh_test;;
 	ipv6_mpath_oif_vrf)		ipv6_mpath_oif_vrf_test;;
+	ipv6_saddr_vrf)			ipv6_saddr_vrf_test;;
 	fib6_ra_to_static)		fib6_ra_to_static;;
 	fib6_temp_addr_renewal)		fib6_temp_addr_renewal;;
 
