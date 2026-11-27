@@ -1,2 +1,47 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-charge-a-shared-page-twice-at-accept
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: don't charge a shared page twice at accept()
+
+accept() of an MPTCP connection that has already received data can leak
+one page of memory cgroup charge, and the leaked charges can get the
+server OOM killed.
+
+At accept(), __inet_accept() charges the MPTCP socket (msk) for the
+memory that it holds, rounded up to whole pages, and
+mptcp_graft_subflows() does the same for each subflow. A page is
+uncharged only once, when the socket that holds it releases it, so
+rounding up each socket on its own is only correct while each page
+belongs to one socket. But for each skb that the msk takes over from a
+subflow, it borrows skb->truesize bytes from the pages that the subflow
+reserved, so the two can share a page:
+
+    reserved by the subflow      4096 bytes  1 page
+      now held by the msk         896 bytes  charged for 1 page
+      still held by the subflow  3200 bytes  charged for 1 page
+
+The fix used here is to keep a running sum of what the msk and its
+subflows hold, and to let the new mptcp_charge_subflow() charge each
+subflow only for the pages that it adds to the rounded-up sum.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch:
+an MPTCP server in a memory cgroup, the first byte of the client
+arriving before accept(). Without this patch, 4096 bytes stayed charged
+to the memory cgroup for each connection, after its end:
+
+  SNAP label=after-1000 rounds=1000 sockets_left_in_srv=0 [...] c_sock=4096000 [...]
+  SNAP label=after-5000 rounds=5000 sockets_left_in_srv=0 [...] c_sock=20480000 [...]
+
+With a memory limit, the original version of this patch reported that
+the server was killed by the OOM killer after about 14,400 connections.
+
+Fixes: 9db5b3cec4ec ("mptcp: borrow forward memory from subflow")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Commit message: how the issue was found, and its
+  symptoms. ]
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v4: comment: similar to __sk_charge() (Mat)
+
+Note (Clashiko on v2): the backlog can still be charged twice here: this
+is fixed by the next patch.
