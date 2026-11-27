@@ -1,2 +1,39 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reset-the-subflow-on-abort-after-fallback
+Subject: [PATCH] mptcp: reset the subflow on abort after fallback
+
+After a fallback to TCP, closing an MPTCP socket with unread data did
+not reset the connection as TCP does: the data still in the MPTCP send
+queue was dropped, and the subflow was closed with a FIN. The peer then
+got a truncated stream, followed by EOF, without error.
+
+mptcp_do_fastclose() sends a reset on each subflow, except after a
+fallback: send it in this case too. No MPTCP option is added after a
+fallback: this is a plain TCP reset. In the other cases using it, with
+SO_LINGER set to 0, on disconnect() and when the close timeout of an
+orphan expires, the subflow was already reset after a fallback, via
+tcp_disconnect(), in most states: the reset is now sent as without a
+fallback, also in LAST_ACK or CLOSING, while TCP does not send one there
+once everything has been sent.
+
+When a listener is closed, its MPTCP sockets not accepted yet then got a
+second reset from tcp_disconnect(), as already without fallback since
+the commit below: move their subflow to TCP_CLOSE after the first reset
+too, as done for the other subflows. This has been found by an AI code
+review agent (Clashiko), and confirmed with Packetdrill, by counting the
+resets: two in both cases, one with TCP.
+
+This issue has been found by an AI code review agent, while reviewing
+another fix, and confirmed with a new Packetdrill test: an MPTCP client
+falls back to TCP, receives data, and closes the socket without reading
+it. Without this patch, a FIN was sent instead of a reset:
+
+  v1_connect_tcpfallback_close_unread_data.pkt:19: error handling packet: live packet field tcp_fin: expected: 0 (0x0) vs actual: 1 (0x1)
+
+Fixes: ae155060247b ("mptcp: fix duplicate reset on fastclose")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent
+v3: no second reset for the children of a closed listener, also without
+    fallback (Clashiko)
+v4: commit msg: a reset was already sent with SO_LINGER set to 0, and
+    now also in LAST_ACK or CLOSING (Clashiko)
