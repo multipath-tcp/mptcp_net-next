@@ -110,7 +110,7 @@ static int lan966x_ptp_del_trap(struct lan966x_port *port,
 
 	vrule = vcap_get_rule(lan966x->vcap_ctrl, rule_id);
 	if (IS_ERR(vrule))
-		return -EEXIST;
+		return PTR_ERR(vrule) == -ENOENT ? 0 : PTR_ERR(vrule);
 
 	vcap_rule_get_key_u32(vrule, VCAP_KF_IF_IGR_PORT_MASK, &value, &mask);
 	mask |= BIT(port->chip_port);
