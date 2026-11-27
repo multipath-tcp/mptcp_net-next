@@ -1,2 +1,38 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-start-close-timeout-on-initial-sf-shutdown
+Subject: [PATCH] mptcp: start close timeout on initial sf shutdown
+
+When the initial subflow is closed while it is not in TCP_CLOSE, e.g.
+after a FIN without DATA_FIN from the peer, it is only shut down, and
+stays in the connection list. The check for an MPTCP socket without
+subflows then missed it: it only looks for an initial subflow in
+TCP_CLOSE, and when this subflow reaches this state later on,
+mptcp_close_ssk() ignores it, as it has already been processed. A
+socket still owned by the application then stayed without any usable
+subflow, without close timeout nor error, and with blocked send() or
+recv() calls, for good.
+
+When only this shut down initial subflow remains, start the close
+timeout, if it is not running yet.
+
+This issue has been found by an AI code review agent, while reviewing a
+similar fix, and also reported by Sashiko. It has been confirmed with a
+new Packetdrill test: the peer closes the only subflow with a FIN,
+without DATA_FIN. Without this patch, send() stayed blocked:
+
+  subflow_fin_blocked_send.pkt:26: runtime error: exiting while a blocking system call is in progress
+
+The check only looks at TCP_CLOSE since the commit below, and
+mptcp_close_ssk() ignores this subflow in this state since commit
+d82809b6c5f2 ("mptcp: avoid duplicated SUB_CLOSED events"), which is in
+all the stable versions having the commit below.
+
+Fixes: 27e5ccc2d5a5 ("mptcp: fix dangling connection hang-up")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent, and Sashiko
+
+Note (Clashiko on v2): in the accept queue, a new subflow can still join
+during the timeout, and the first subflow is then disconnected, as after
+an MP_FASTCLOSE received before accept(): checked with Packetdrill, no
+warning. In the other states, the subflow is only shut down: it can
+still receive data and the DATA_FIN.
