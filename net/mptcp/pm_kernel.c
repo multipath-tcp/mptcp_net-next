@@ -411,7 +411,9 @@ subflow:
 		/* Special case for ID0: set the correct ID */
 		if (local.addr.id == msk->mpc_endpoint_id)
 			local.addr.id = 0;
-		else /* local_addr_used is not decr for ID 0 */
+
+		/* local_addr_used is not decr for ID 0 */
+		if (local.addr.id)
 			msk->pm.local_addr_used++;
 
 		nr = fill_remote_addresses_vec(msk, &local.addr, fullmesh,
@@ -432,7 +434,7 @@ exit:
 	 * case. This avoids issues later when removing the endpoint and calling
 	 * __mark_subflow_endp_available(), which expects the increment here.
 	 */
-	if (signal_and_subflow && local.addr.id != msk->mpc_endpoint_id)
+	if (signal_and_subflow && local.addr.id)
 		msk->pm.local_addr_used++;
 
 	mptcp_pm_nl_check_work_pending(msk);
@@ -915,7 +917,14 @@ static int mptcp_pm_nl_create_listen_socket(struct sock *sk,
 	if (!err)
 		mptcp_event_pm_listener(ssk, MPTCP_EVENT_LISTENER_CREATED);
 	release_sock(ssk);
-	return err;
+	if (err) {
+		/* the subflow is back in TCP_CLOSE: like in mptcp_listen() */
+		inet_sk_state_store(newsk, TCP_CLOSE);
+		return err;
+	}
+
+	sock_prot_inuse_add(sock_net(newsk), newsk->sk_prot, 1);
+	return 0;
 }
 
 int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk,
