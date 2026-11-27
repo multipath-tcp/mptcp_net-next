@@ -1,2 +1,64 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-pm-kernel-count-endpoint-listeners-as-sockets-in-use
+Subject: [PATCH] mptcp: pm: kernel: count endpoint listeners as sockets in use
+
+The listener that the in-kernel path manager creates for a "signal"
+endpoint with a port is not counted in the "sockets" column of the MPTCP
+or MPTCPv6 row of /proc/net/protocols, but it is uncounted when it is
+closed. Each removal of such an endpoint then hides one MPTCP socket of
+the same family from this column, for the lifetime of the netns.
+
+mptcp_check_listen_stop() decrements this counter for any MPTCP socket
+closed in TCP_LISTEN state, and mptcp_listen() increments it when
+listen() succeeds. But mptcp_pm_nl_create_listen_socket() sets its MPTCP
+socket in TCP_LISTEN state without incrementing it. This socket is
+closed when the endpoint is deleted or flushed, when adding the endpoint
+fails after the creation of the listener, e.g. because its ID is already
+used, and when the netns is dismantled.
+
+Nothing depends on this counter, it is only displayed. But it is wrong
+once such an endpoint has been added: its listener is not counted while
+"ss -Ml" lists it, and after its removal, the total is one below the
+number of MPTCP sockets of the same family in use, a negative total
+being displayed as 0 by sock_prot_inuse_get().
+
+The counter was introduced by commit c558246ee73e ("mptcp: add
+statistics for mptcp socket in use"), when only the subflow of this
+socket was in TCP_LISTEN state. Commit 57fc0f1ceaa4 ("mptcp: ensure
+listener is unhashed before updating the sk status") then set this
+socket in TCP_LISTEN state too, without counting it.
+
+The fix used here is to increment the counter when __inet_listen_sk()
+succeeds, as mptcp_listen() does. If it fails, the subflow is back in
+TCP_CLOSE: move this socket back to this state too, also as
+mptcp_listen() does. It was left in TCP_LISTEN, which triggered a
+warning when it was released, e.g. after a socket in TCP repair mode
+had been bound to the same address and port in between, as reported by
+Sashiko:
+
+  WARNING: net/mptcp/protocol.c:3542 at mptcp_check_listen_stop.part.0+0x4f/0xb0, CPU#0: ip/2816
+  Call Trace:
+   __mptcp_close+0x2bf/0x310
+   mptcp_close+0x23/0x80
+   inet_release+0x43/0x80
+   sock_release+0x24/0x70
+   mptcp_pm_nl_add_addr_doit+0x266/0x3b0
+
+This issue has been found by an AI code review agent, while reviewing
+the code of the commit "mptcp: pm: don't let listeners pin their netns",
+and confirmed with a new Packetdrill test, and with a shell script
+adding and flushing such an endpoint 3 times in a new netns, then
+creating 3 MPTCP listeners. Without this patch:
+
+  kernel_listener_inuse.pkt:15: error executing `test $(awk '/^MPTCP/ { n += $3 } END { print n }' /proc/net/protocols) -eq 2` command: non-zero status 1
+
+  inuse: endpoint 1 present: 0 (expected 1)
+  [...]
+  inuse: 3 user listeners: 0 (expected 3)
+
+Fixes: 57fc0f1ceaa4 ("mptcp: ensure listener is unhashed before updating the sk status")
+Reported-by: Kyuwon Cho <kyuwoncho18@gmail.com>
+Closes: https://lore.kernel.org/mptcp/179502042942.2742790.17887994424282536144@gmail.com
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: count the listener once listen() succeeded, and restore TCP_CLOSE
+    otherwise, to avoid a warning (Sashiko, then reported by Kyuwon Cho)
