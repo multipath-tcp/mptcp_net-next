@@ -5,6 +5,7 @@
  *
  * PF_INET/PF_INET6
  * - SOCK_STREAM
+ * - SOCK_STREAM with IPPROTO_MPTCP
  * - SOCK_DGRAM
  * - SOCK_DGRAM with UDP_CORK
  * - SOCK_RAW
@@ -72,6 +73,10 @@
 
 #ifndef MSG_ZEROCOPY
 #define MSG_ZEROCOPY	0x4000000
+#endif
+
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP	262
 #endif
 
 static int  cfg_cork;
@@ -798,6 +803,24 @@ static void parse_opts(int argc, char **argv)
 		usage(argv[0]);
 }
 
+static void check_mptcp_support(int family, bool zerocopy)
+{
+	int fd = socket(family, SOCK_STREAM, IPPROTO_MPTCP);
+	int val = 1;
+
+	if (fd == -1)
+		exit(1);
+	if (zerocopy) {
+		if (setsockopt(fd, SOL_SOCKET, SO_ZEROCOPY,
+			       &val, sizeof(val))) {
+			close(fd);
+			exit(1);
+		}
+	}
+	close(fd);
+	exit(0);
+}
+
 int main(int argc, char **argv)
 {
 	const char *cfg_test;
@@ -820,6 +843,10 @@ int main(int argc, char **argv)
 		do_test(cfg_family, SOCK_DGRAM, 0);
 	else if (!strcmp(cfg_test, "rds"))
 		do_test(PF_RDS, SOCK_SEQPACKET, 0);
+	else if (!strcmp(cfg_test, "check"))
+		check_mptcp_support(cfg_family, cfg_zerocopy);
+	else if (!strcmp(cfg_test, "mptcp"))
+		do_test(cfg_family, SOCK_STREAM, IPPROTO_MPTCP);
 	else
 		error(1, 0, "unknown cfg_test %s", cfg_test);
 
