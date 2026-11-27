@@ -1,2 +1,77 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-continue-the-last-mapping-after-a-fallback
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: continue the last mapping after a fallback
+
+An established MPTCP connection that falls back to TCP after a zero
+window probe or a reinjection can stall in one direction, so that recv()
+returns neither the remaining data nor end of file.
+
+After a fallback, subflow_check_data_avail() gives each skb a dummy
+mapping, at the data sequence number (DSN) iasn + SSN - 1, where iasn is
+the DSN of the peer's first byte and SSN is the subflow sequence number.
+This is right only as long as DSNs and SSNs advance together, but a zero
+window probe or a reinjection maps old data a second time, which takes
+new SSNs and no new DSN. Each later dummy mapping is then too high, so
+__mptcp_move_skb() treats all further data as out of order:
+
+    data    SSN 1 to 1000    DSN iasn to iasn + 999
+    probe   SSN 1001         DSN iasn + 999, dropped
+    ack_seq                  iasn + 1000, the next DSN expected
+    dummy   SSN 1002         DSN iasn + 1001
+
+The fix used here is to:
+- keep in the new member dsn_base of the subflow context the first DSN
+  of the peer's last mapping, minus its first SSN, plus 1
+- compute the DSN of a dummy mapping as dsn_base + SSN - 1
+- keep in the new member dsn_end the highest end of a mapping of the
+  peer so far
+- make mptcp_try_fallback() fail while the peer's last mapping ends
+  below dsn_end, so that the caller resets the subflow
+
+32 bits are enough for both: the dummy mapping only takes the lower 32
+bits of its DSN, see __mptcp_expand_seq(), and the end of a mapping
+stays within a window of dsn_end.
+
+One case is left: if only the receiver falls back after a zero window
+probe or a reinjection, it now delivers data resent at the MPTCP level
+as new data, until the sender resets the subflow, as Linux does at its
+next resend since "mptcp: don't resend data acked without MPTCP opts",
+but not older versions or other implementations. Without this patch, the
+receiver stalled instead.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch,
+and with a new Packetdrill test: between two unmodified Linux hosts,
+nftables removing the MPTCP options after a zero window probe, a DSS
+checksum failure, or a failed MP_JOIN. Without this patch, the reader
+stalled for good, the data staying in the out-of-order queue:
+
+  receiver  22.764: READ-TOTAL outcome ii-right-so-far-then-nothing bytes 2670592 of 8388608 [...]
+  [...] end: hang: no data and no end of file for 20 s
+  RESULT [...] R: DssFallback=1 [...] OFOQueue=204 NoDSSInWindow=145 [...]
+
+And with the Packetdrill test:
+
+  dss_fallback_after_probe_server.pkt:25: runtime error in read call: Expected result 2000 but got 1000 with errno 22 (Invalid argument)
+
+Fixes: 2834f8edd74d ("mptcp: cleanup fallback dummy mapping generation")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ dsn_base and dsn_end on 32 bits: struct mptcp_subflow_context grows by
+  8 bytes instead of 16, and lent_mem_frag stays in the same cacheline.
+  Shorter comments. Moved after "mptcp: stop resending data to a peer
+  that fell back": alone, this patch turns a stall into data delivered
+  twice, when only the receiver falls back after a probe or a
+  reinjection. Commit message: mention the remaining case + how the
+  issue was found, and its symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: msg: the sender now resets in the remaining case (Clashiko)
+v4: msg: the remaining case depends on the sender's version (Clashiko)
+
+Note (Sashiko): the remaining case, when only the receiver falls back,
+needs a sender not resetting the subflow, e.g. with an older kernel: the
+data is then delivered twice, instead of a stall before this patch. The
+RFC at the end of this series resets instead of falling back.
+
+Note (Clashiko on v2): a reinjection of old data with a bad checksum is
+reset one RTT later, after the MP_FAIL: theoretical, it needs DSS
+checksums, a reinjection and a corruption.
