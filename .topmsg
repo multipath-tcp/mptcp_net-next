@@ -1,2 +1,39 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-process-pending-close-events-at-accept
+Subject: [PATCH] mptcp: process pending close events at accept()
+
+When the only subflow of a new MPTCP socket has been closed before
+accept(), e.g. reset by the peer, mptcp_stream_accept() moves this
+socket to the CLOSE state, then closes the subflow. A DATA_FIN or an
+MP_FASTCLOSE received before, but not processed yet by the worker, was
+then ignored: the code processing them before closing an MPTCP socket
+without subflows, and the worker, skip a socket already closed.
+
+recv() then returned ENOTCONN after the data, instead of EOF after a
+DATA_FIN, or ECONNRESET after an MP_FASTCLOSE alone, as TCP does.
+
+This race has been found by a review agent, and confirmed with
+Packetdrill scripts and a debug patch delaying the worker of the MPTCP
+sockets in the accept queue: data, a DATA_FIN or not, then a reset with
+an MP_FASTCLOSE are received before accept(). Without this patch, the
+second read() returned ENOTCONN in both cases:
+
+  With DATA_FIN: runtime error in read call: Expected result 0 but got -1 with errno 107 (Transport endpoint is not connected)
+  Without DATA_FIN: runtime error in read call: Expected errno 104 (Connection reset by peer) but got 107 (Transport endpoint is not connected)
+
+To fix this, process them before moving to the CLOSE state, with
+mptcp_check_rcv_close(), as done when closing the MPTCP socket without
+subflows.
+
+Note for the backports: before v6.19, this helper, added by the previous
+commit, is not available, and mptcp_stream_accept() closes the subflow
+before moving to the CLOSE state.
+
+Fixes: 63740448a32e ("mptcp: fix accept vs worker race")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent
+
+Note (Clashiko on v2): after a fallback, a reset received before
+accept() was not reported when the worker processed it before accept():
+pre-existing, fixed by the next patch.
