@@ -529,7 +529,7 @@ int mptcp_pm_remove_addr(struct mptcp_sock *msk, const struct mptcp_rm_list *rm_
 
 	pr_debug("msk=%p, rm_list_nr=%d\n", msk, rm_list->nr);
 
-	if (rm_addr) {
+	if (mptcp_pm_should_rm_signal(msk)) {
 		MPTCP_ADD_STATS(sock_net((struct sock *)msk),
 				MPTCP_MIB_RMADDRTXDROP, rm_list->nr);
 		return -EINVAL;
