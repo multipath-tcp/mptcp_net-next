@@ -1912,8 +1912,6 @@ static int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	/* on flags based fastopen the mptcp is supposed to create the
 	 * first subflow right now. Otherwise we are in the defer_connect
 	 * path, and the first subflow must be already present.
-	 * Since the defer_connect flag is cleared after the first succsful
-	 * fastopen attempt, no need to check for additional subflow status.
 	 */
 	if (msg->msg_flags & MSG_FASTOPEN) {
 		ssk = __mptcp_nmpc_sk(msk);
@@ -1926,6 +1924,19 @@ static int mptcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg,
 	ssk = msk->first;
 
 	lock_sock(ssk);
+
+	/* subflow aborted or disconnected: its error report may be deferred.
+	 * With MSG_FASTOPEN, the socket is disconnected below, as with TCP.
+	 */
+	if (unlikely(!(msg->msg_flags & MSG_FASTOPEN) &&
+		     inet_test_bit(DEFER_CONNECT, sk) &&
+		     !inet_test_bit(DEFER_CONNECT, ssk))) {
+		inet_clear_bit(DEFER_CONNECT, sk);
+		__mptcp_subflow_error_report(sk, ssk);
+		release_sock(ssk);
+		return 0;
+	}
+
 	msg->msg_flags |= MSG_DONTWAIT;
 	msk->fastopening = 1;
 	ret = tcp_sendmsg_fastopen(ssk, msg, copied_syn, len, NULL);
