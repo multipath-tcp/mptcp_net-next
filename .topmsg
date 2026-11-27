@@ -1,2 +1,42 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-charge-a-subflow-twice-when-it-joins-during-accept
+Subject: [PATCH] mptcp: don't charge a subflow twice when it joins during accept()
+
+A subflow that joins an MPTCP connection while accept() runs can be
+charged twice to the memory cgroup of the server, for the memory that
+it already holds when accept() charges it. Nothing removes this extra
+charge.
+
+At accept(), __inet_accept() gives the MPTCP socket (msk) the memory
+cgroup of the caller, then sets its sk_socket. From then on,
+mptcp_finish_join() gives this memory cgroup to a joining subflow, via
+mptcp_sock_check_graft(), and each page that the subflow reserves is
+charged. Because accept() owns the msk, such a subflow is added to the
+join list, which mptcp_graft_subflows() moves to the subflow list
+before charging each subflow for the memory that it holds. A subflow
+that joined in between is then charged a second time for this memory,
+which will be uncharged only once.
+
+The window is short: from the end of __inet_accept() to the start of
+mptcp_graft_subflows(). And the extra charge is not zero only if data
+was received on the new subflow before mptcp_graft_subflows() gets to
+it, while a peer must not send data on it before the fourth ACK
+(RFC 8684, section 3.2).
+
+The fix used here is to skip, in mptcp_graft_subflows(), the subflows
+that already have a memory cgroup: they got it when they joined, and
+their memory has been charged since then.
+
+This issue has been found by an AI code review agent, while reviewing
+the code of the commit "mptcp: don't charge a shared page twice at
+accept()". It cannot be triggered on demand: the window is too narrow.
+It has been reproduced with a 500 ms sleep added after __inet_accept(),
+to widen it, and a Packetdrill script sending 1000 bytes on a subflow
+joining during accept(). Without this patch, a page stayed charged to
+the memory cgroup once all the sockets were freed, and none with it:
+
+  memcg sock: 4096 bytes
+
+Fixes: 6228efe0cc01 ("mptcp: leverage the backlog for RX packet processing")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: update a comment (Clashiko)
