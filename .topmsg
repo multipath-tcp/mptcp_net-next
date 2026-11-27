@@ -1,2 +1,94 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-do-not-fallback-while-old-data-is-in-flight
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: do not fallback while old data is in flight
+
+If an established MPTCP connection falls back to TCP while a zero window
+probe or reinjected data is queued or in flight, recv() can return data
+twice with no error, so the stream is silently corrupted.
+
+After a fallback mptcp_established_options() writes a DSS option only
+for an infinite mapping, so an skb that mptcp_sendmsg_frag() queued with
+a mapping to data sequence numbers (DSN) is sent without that mapping.
+The receiver treats the bytes of the subflow, in sequence order, as the
+rest of the stream, so a fallback is only correct if the subflow carries
+each byte of the stream once. But allow_infinite_fallback, the flag that
+permits a fallback, stays set in two cases in which old data is queued
+again on the only subflow.
+
+First, a zero window probe is a copy of the next unsent byte, mapped to
+the last acknowledged DSN so that the peer drops it as a duplicate.
+Second, when a subflow whose MP_JOIN handshake has failed is closed,
+__mptcp_retransmit_pending_data() marks all data that has no DATA_ACK
+yet as unsent, although no second subflow has joined. If the sender
+falls back while such bytes are queued, they are sent without their
+mapping and the receiver delivers them as new data, as here for a probe:
+
+    sender                            receiver
+    ======                            ========
+    queue a probe, a copy of byte N
+    get data with no DSS, fall back
+                                      read, open the window
+    send the probe with no DSS
+                                      no DSS: fall back
+                                      deliver byte N
+    send byte N as data
+                                      deliver byte N again /* corrupt */
+
+The fix used here is to refuse the fallback while old data is in flight:
+- when mptcp_sendmsg_frag() maps bytes to a DSN below snd_nxt of the
+  MPTCP socket, set the new bit old_data_pending of the subflow, and
+  store the TCP sequence number after these bytes in its new member
+  old_data_end
+- clear the bit in mptcp_incoming_options() when a segment with a DSS,
+  other than an infinite mapping, acknowledges that sequence number
+- make mptcp_try_fallback() fail while the bit is set, so that its
+  callers reset the subflow
+- delay the infinite mapping that answers an MP_FAIL, and the fallback
+  that comes with it, to the first data that is queued with the bit
+  clear, and send plain mappings until then
+- after a fallback, skip data below snd_nxt in mptcp_sendmsg_frag(): a
+  reinjection that has not reached the subflow yet does not set the bit
+
+This only prevents a fallback of this side: if a middlebox removes the
+DSS of these old bytes, the peer can still fall back on its own, and
+deliver them as new data, as it cannot tell that they are old. The next
+commits limit this case, but cannot prevent it entirely.
+
+A consequence: if the old data reached the peer with its mapping, but
+the DSS acknowledging it is still on its way back, or lost its options,
+a fallback attempted meanwhile resets the subflow, although it would
+have been safe. This window lasts about one round trip, or as long as
+the acknowledgments lose their options.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch:
+between two unmodified Linux hosts, nftables removing the MPTCP options,
+e.g. while a zero window probe is pending, or after a failed MP_JOIN.
+Without this patch, the reader got some data twice, with a regular end
+of file: the stream was silently corrupted:
+
+  receiver   4.692: READ-TOTAL outcome iii-repeat-or-gap bytes 8388609 of 8388608 missing 0 twice 1 [...] end: eof
+  [...]
+  receiver   8.611: READ-TOTAL outcome iii-repeat-or-gap bytes 26000 of 14000 missing 0 twice 12000 [...] end: eof
+
+Note for the backports: this patch depends on commit 119d51e225fe
+("mptcp: fallback when MPTCP opts are dropped after 1st data") and
+commit f8a1d9b18c5e ("mptcp: make fallback action and fallback decision
+atomic"), two fixes which may have already been backported: they allowed
+the fallback in the reproduced cases, once data has been acknowledged
+without checksums, and after a failed MP_JOIN.
+
+Fixes: 1e39e5a32ad7 ("mptcp: infinite mapping sending")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comments. Move old_data_end to an existing hole, after
+  subflow_id. Commit message: mention the reset that can now replace a
+  safe fallback + how the issue was found, and its symptoms + note for
+  the backports. Moved before "mptcp: continue the last mapping after a
+  fallback". Commit message: the peer can still fall back alone. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: commit message: the peer can still fall back alone (Clashiko). Only
+    clamp to one MSS when sending the infinite mapping (Sashiko)
+
+Note (Sashiko on v1): an infinite mapping can stay pending, but nothing
+waits for it: an MP_FAIL is only accepted before any join or MPTCP-level
+retransmission, so TCP retransmits the data in flight.
