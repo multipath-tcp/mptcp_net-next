@@ -1,2 +1,44 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-reclaim-forward-memory-after-coalescing-skbs
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: reclaim forward memory after coalescing skbs
+
+If MPTCP sockets receive many small segments whose data stays queued,
+TCP can stall on the whole host, and an MPTCP server can be OOM killed
+in its memory cgroup, although almost no memory is in use.
+
+When the MPTCP socket (msk) takes over an skb from a subflow,
+mptcp_borrow_fwdmem() adds skb->truesize to the sk_forward_alloc of the
+msk, and the subflow reserves new memory for the next skb. Both
+sk_forward_alloc and sk_rmem_alloc count against tcp_mem and the memory
+cgroup, but only sk_rmem_alloc has a limit, sk_rcvbuf, so what queueing
+the skb does not move to sk_rmem_alloc has to be released. But
+mptcp_try_coalesce() moves only the increase in truesize of the skb that
+receives the data, and skb_condense() in mptcp_data_queue_ofo() can
+lower skb->truesize, so the rest piles up in sk_forward_alloc.
+
+The fix used here is to return every whole page of sk_forward_alloc with
+sk_mem_reclaim(), in mptcp_try_coalesce() once the merged skb is freed,
+and in mptcp_data_queue_ofo() once the skb is queued.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch:
+a remote peer sends 33000 segments of one byte after a hole in the data
+sequence, which are merged in the out-of-order queue. Without this
+patch, the memory forward-allocated by the MPTCP socket -- msk_f -- grew
+with each merged segment, above 29 MB, versus 3200 bytes with it:
+
+  SNAP label=stage1-1-connections tcp_mem_pages=7168 [...] msk_f=29445248 [...]
+  [...] OFOQueue=33000 OFOMerge=32862 [...]
+
+With more connections, the original version of this patch reported that
+the TCP memory went above tcp_mem[2], stalling the other TCP
+connections, or that the memory cgroup went above its limit.
+
+Fixes: 9db5b3cec4ec ("mptcp: borrow forward memory from subflow")
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ Shorter comment. Commit message: the rest of the borrowed amount has
+  to be released + how the issue was found, and its symptoms. ]
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+Note (Clashiko on v2): with an owned skb, the new reclaim is a no-op,
+sock_rfree() having already reclaimed: the comment is for the borrowed
+skbs, the ones needing it.
