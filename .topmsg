@@ -1,2 +1,57 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-report-sf-aborts-during-deferred-connect
+Subject: [PATCH] mptcp: report sf aborts during deferred connect
+
+With TCP_FASTOPEN_CONNECT, connect() on an MPTCP socket only sets
+DEFER_CONNECT on the first subflow and on the msk, and the first write()
+sends the SYN with data via mptcp_sendmsg_fastopen().
+
+If the first subflow is aborted by tcp_abort(), e.g. via a sock_diag
+destroy request or the bpf_sock_destroy() kfunc, while mptcp_sendmsg()
+already owns the msk socket and is waiting for the subflow lock:
+
+- tcp_abort() clears DEFER_CONNECT on the subflow, and moves it to
+  TCP_CLOSE;
+- subflow_error_report() can only set MPTCP_ERROR_REPORT, because the
+  msk is owned by the user: the msk stays in SYN_SENT, with
+  DEFER_CONNECT still set.
+
+tcp_sendmsg_fastopen() then skips tcp_connect(), and calls
+__inet_stream_connect() with the msk socket, the first subflow being
+grafted to it. Because DEFER_CONNECT is set on the msk, -EISCONN is
+returned to userspace, on a connection that has just been aborted.
+
+Detect this case once the subflow lock is held: if DEFER_CONNECT is set
+on the msk, but no longer on the subflow, the subflow has been aborted,
+or disconnected. Propagate the subflow error to the msk directly,
+instead of waiting for the msk release callback. mptcp_sendmsg() will
+then report this error via sk_stream_wait_connect(), like plain TCP
+after tcp_abort(), e.g. -ECONNABORTED. The deferred error report is then
+a no-op, so the error is not reported twice.
+
+Without the race, the msk is already in TCP_CLOSE with the error set:
+the same check also avoids going through tcp_sendmsg_fastopen() and
+__inet_stream_connect() in this case, except with MSG_FASTOPEN. As TCP
+does, write() then reports the error without disconnecting the socket.
+With MSG_FASTOPEN, the socket has to be disconnected, as with TCP, for
+the next sendto() to connect again, and the race cannot happen:
+__mptcp_nmpc_sk() requires an msk in TCP_CLOSE.
+
+Clearing DEFER_CONNECT on the msk from tcp_abort_override() instead
+would not be enough: tcp_abort() is called on the subflow without the
+msk lock, and mptcp_sendmsg() checks the msk bit before taking the
+subflow lock. The abort can then happen in between, and write() would
+return -EALREADY, followed by a disconnect of the msk dropping the
+deferred error. In this path, only mptcp_sendmsg_fastopen() holds both
+the msk and the subflow locks, and sees a consistent state.
+
+This issue has been reported by Sashiko, while reviewing the commit
+below. It has not been reproduced: the abort has to happen while write()
+owns the msk socket, and waits for the subflow lock.
+
+Fixes: 93723db43e51 ("tcp: Clear DEFER_CONNECT before tcp_connect() and in tcp_abort().")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue spotted by Sashiko
+v3: comment and msg: also after a disconnect, and what write() does
+    without the race (Clashiko)
