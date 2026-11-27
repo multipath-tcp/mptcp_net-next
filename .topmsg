@@ -1,2 +1,20 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-clear-sk_err-on-connect-as-TCP-does
+Subject: [PATCH] mptcp: clear sk_err on connect(), as TCP does
+
+After a disconnect with connect(AF_UNSPEC), an error from the previous
+connection, e.g. a reset not reported yet to the application, was still
+reported for the next connection, by poll(), SO_ERROR, and the first
+send() or recv(). TCP clears it in tcp_connect_init(): do the same,
+once the subflow connect() succeeded, so an early failure keeps it.
+
+This issue has been found by an AI code review agent, while reviewing
+other fixes, and confirmed with a reproducer: the peer resets the
+connection, the error is not read, then the socket is disconnected and
+connected again. SO_ERROR then reported ECONNRESET each time, while TCP
+reported no error, as MPTCP now does.
+
+Fixes: 3d1d6d66e156 ("mptcp: implement support for user-space disconnect")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent
