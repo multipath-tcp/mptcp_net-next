@@ -65,6 +65,21 @@ netc_get_tag_protocol(struct dsa_switch *ds, int port,
 	return DSA_TAG_PROTO_NETC;
 }
 
+static int netc_connect_tag_protocol(struct dsa_switch *ds,
+				     enum dsa_tag_protocol proto)
+{
+	struct netc_tagger_data *tagger_data;
+
+	if (proto != DSA_TAG_PROTO_NETC)
+		return -EPROTONOSUPPORT;
+
+	tagger_data = ds->tagger_data;
+	tagger_data->txtstamp_handler = netc_port_txtstamp_handler;
+	tagger_data->onestep_sync_enqueue = netc_port_onestep_sync_enqueue;
+
+	return 0;
+}
+
 static void netc_port_rmw(struct netc_port *np, u32 reg,
 			  u32 mask, u32 val)
 {
@@ -80,7 +95,7 @@ static void netc_port_rmw(struct netc_port *np, u32 reg,
 	netc_port_wr(np, reg, new);
 }
 
-static void netc_mac_port_wr(struct netc_port *np, u32 reg, u32 val)
+void netc_mac_port_wr(struct netc_port *np, u32 reg, u32 val)
 {
 	if (is_netc_pseudo_port(np))
 		return;
@@ -131,14 +146,16 @@ static void netc_port_get_capability(struct netc_port *np)
 }
 
 static int netc_port_get_info_from_dt(struct netc_port *np,
-				      struct device_node *node,
+				      struct dsa_port *dp,
 				      struct device *dev)
 {
+	struct device_node *node = dp->dn;
+
 	if (of_find_property(node, "clock-names", NULL)) {
-		np->ref_clk = devm_get_clk_from_child(dev, node, "ref");
+		np->ref_clk = of_clk_get_by_name(node, "ref");
 		if (IS_ERR(np->ref_clk)) {
 			dev_err(dev, "Port %d cannot get reference clock\n",
-				np->dp->index);
+				dp->index);
 			return PTR_ERR(np->ref_clk);
 		}
 	}
@@ -146,7 +163,25 @@ static int netc_port_get_info_from_dt(struct netc_port *np,
 	return 0;
 }
 
-static int netc_port_create_emdio_bus(struct netc_port *np,
+static void netc_port_free_emdio_bus(struct netc_port *np)
+{
+	struct device *dev = np->switch_priv->dev;
+	struct enetc_mdio_priv *mdio_priv;
+	struct enetc_hw *hw;
+
+	if (!np->emdio)
+		return;
+
+	mdio_priv = np->emdio->priv;
+	hw = mdio_priv->hw;
+
+	mdiobus_unregister(np->emdio);
+	mdiobus_free(np->emdio);
+	devm_kfree(dev, hw);
+	np->emdio = NULL;
+}
+
+static int netc_port_create_emdio_bus(struct netc_port *np, int port,
 				      struct device_node *node)
 {
 	struct netc_switch *priv = np->switch_priv;
@@ -161,9 +196,11 @@ static int netc_port_create_emdio_bus(struct netc_port *np,
 		return dev_err_probe(dev, PTR_ERR(hw),
 				     "Failed to allocate enetc_hw\n");
 
-	bus = devm_mdiobus_alloc_size(dev, sizeof(*mdio_priv));
-	if (!bus)
-		return -ENOMEM;
+	bus = mdiobus_alloc_size(sizeof(*mdio_priv));
+	if (!bus) {
+		err = -ENOMEM;
+		goto free_enetc_hw;
+	}
 
 	bus->name = "NXP NETC switch external MDIO Bus";
 	bus->read = enetc_mdio_read_c22;
@@ -175,27 +212,36 @@ static int netc_port_create_emdio_bus(struct netc_port *np,
 	mdio_priv->hw = hw;
 	mdio_priv->mdio_base = NETC_EMDIO_BASE;
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-p%d-emdio",
-		 dev_name(dev), np->dp->index);
+		 dev_name(dev), port);
 
-	err = devm_of_mdiobus_register(dev, bus, node);
-	if (err)
-		return dev_err_probe(dev, err,
-				     "Cannot register EMDIO bus\n");
+	err = of_mdiobus_register(bus, node);
+	if (err) {
+		dev_err_probe(dev, err, "Cannot register EMDIO bus\n");
+		goto free_mdiobus;
+	}
 
 	np->emdio = bus;
 
 	return 0;
+
+free_mdiobus:
+	mdiobus_free(bus);
+free_enetc_hw:
+	devm_kfree(dev, hw);
+
+	return err;
 }
 
 static int netc_port_create_mdio_bus(struct netc_port *np,
-				     struct device_node *node)
+				     struct dsa_port *dp)
 {
+	struct device_node *node = dp->dn;
 	struct device_node *mdio_node;
 	int err;
 
 	mdio_node = of_get_child_by_name(node, "mdio");
 	if (mdio_node) {
-		err = netc_port_create_emdio_bus(np, mdio_node);
+		err = netc_port_create_emdio_bus(np, dp->index, mdio_node);
 		of_node_put(mdio_node);
 		if (err)
 			return err;
@@ -238,6 +284,38 @@ static void netc_get_switch_capabilities(struct netc_switch *priv)
 	priv->num_bp = FIELD_GET(BPCAPR_NUM_BP, val);
 }
 
+static void netc_free_all_ports(struct netc_switch *priv)
+{
+	if (!priv->ports)
+		return;
+
+	for (int i = 0; i < priv->info->num_ports; i++) {
+		struct netc_port *np = priv->ports[i];
+
+		if (!np)
+			continue;
+
+		if (np->dp && dsa_port_is_user(np->dp)) {
+			disable_delayed_work_sync(&np->tstamp_timeout_work);
+			netc_port_purge_tstamp_queue(np);
+		}
+
+		netc_port_free_emdio_bus(np);
+
+		if (!IS_ERR_OR_NULL(np->ref_clk)) {
+			clk_put(np->ref_clk);
+			np->ref_clk = NULL;
+		}
+
+		kfree(np);
+		priv->ports[i] = NULL;
+	}
+
+	kfree(priv->ports);
+	priv->ports = NULL;
+	priv->port_bitmap = 0;
+}
+
 static int netc_init_all_ports(struct netc_switch *priv)
 {
 	struct device *dev = priv->dev;
@@ -246,8 +324,7 @@ static int netc_init_all_ports(struct netc_switch *priv)
 	int ett_offset = 0;
 	int err;
 
-	priv->ports = devm_kzalloc_objs(dev, struct netc_port *,
-					priv->info->num_ports);
+	priv->ports = kzalloc_objs(*priv->ports, priv->info->num_ports);
 	if (!priv->ports)
 		return -ENOMEM;
 
@@ -259,36 +336,60 @@ static int netc_init_all_ports(struct netc_switch *priv)
 	 * difficult for us to cover.
 	 */
 	for (int i = 0; i < priv->info->num_ports; i++) {
-		np = devm_kzalloc_obj(dev, *np);
-		if (!np)
-			return -ENOMEM;
+		np = kzalloc_obj(*np);
+		if (!np) {
+			err = -ENOMEM;
+			goto free_all_ports;
+		}
 
 		np->switch_priv = priv;
 		np->iobase = priv->regs.port + PORT_IOBASE(i);
+		/* The ipft_hf_eid is initialized to an invalid entry
+		 * ID because the host flood rule (IPFT entry) has not
+		 * been created.
+		 */
+		np->ipft_hf_eid = NTMP_NULL_ENTRY_ID;
+		/* Initialize to invalid entry IDs */
+		for (int j = 0; j < NETC_PTP_MAX; j++)
+			np->ptp_ipft_eid[j] = NTMP_NULL_ENTRY_ID;
+
 		netc_port_get_capability(np);
 		priv->ports[i] = np;
 	}
 
 	dsa_switch_for_each_available_port(dp, priv->ds) {
 		np = priv->ports[dp->index];
-		np->dp = dp;
 		np->ett_offset = ett_offset++;
 		priv->port_bitmap |= BIT(dp->index);
 
-		err = netc_port_get_info_from_dt(np, dp->dn, dev);
+		err = netc_port_get_info_from_dt(np, dp, dev);
 		if (err)
-			return err;
+			goto free_all_ports;
 
 		if (dsa_port_is_user(dp)) {
-			err = netc_port_create_mdio_bus(np, dp->dn);
+			err = netc_port_create_mdio_bus(np, dp);
 			if (err) {
 				dev_err(dev, "Failed to create MDIO bus\n");
-				return err;
+				goto free_all_ports;
 			}
+
+			/* Only the user port needs to support PTP feature, so
+			 * PTP-related resources, such as tstamp_queue,
+			 * tstamp_lock, etc., are initialized only for the user
+			 * port.
+			 */
+			netc_port_ptp_init(np);
 		}
+
+		np->dp = dp;
 	}
 
 	return 0;
+
+free_all_ports:
+	netc_free_all_ports(priv);
+
+	return err;
 }
 
 static void netc_init_ntmp_tbl_versions(struct netc_switch *priv)
@@ -307,8 +408,7 @@ static int netc_init_all_cbdrs(struct netc_switch *priv)
 
 	ntmp->cbdr_num = NETC_CBDR_NUM;
 	ntmp->dev = priv->dev;
-	ntmp->ring = devm_kzalloc_objs(ntmp->dev, struct netc_cbdr,
-				       ntmp->cbdr_num);
+	ntmp->ring = kzalloc_objs(*ntmp->ring, ntmp->cbdr_num);
 	if (!ntmp->ring)
 		return -ENOMEM;
 
@@ -334,6 +434,9 @@ free_cbdrs:
 	for (i--; i >= 0; i--)
 		ntmp_free_cbdr(&ntmp->ring[i]);
 
+	kfree(ntmp->ring);
+	ntmp->ring = NULL;
+
 	return err;
 }
 
@@ -343,6 +446,9 @@ static void netc_remove_all_cbdrs(struct netc_switch *priv)
 
 	for (int i = 0; i < NETC_CBDR_NUM; i++)
 		ntmp_free_cbdr(&ntmp->ring[i]);
+
+	kfree(ntmp->ring);
+	ntmp->ring = NULL;
 }
 
 static u32 netc_num_available_ports(struct netc_switch *priv)
@@ -546,6 +652,12 @@ static void netc_port_fixed_config(struct netc_port *np)
 	/* Enable L2 and L3 DOS */
 	netc_port_rmw(np, NETC_PCR, PCR_L2DOSE | PCR_L3DOSE,
 		      PCR_L2DOSE | PCR_L3DOSE);
+
+	/* Enable ingress port filter table lookup, if no match is found,
+	 * the frame is allowed and passed to the next frame processing
+	 * function.
+	 */
+	netc_port_wr(np, NETC_PIPFCR, PIPFCR_EN);
 
 	/* Set the quanta value of TX PAUSE frame */
 	netc_mac_port_wr(np, NETC_PM_PAUSE_QUANTA(0), NETC_PAUSE_QUANTA);
@@ -840,30 +952,83 @@ static void netc_ipv_to_buffer_pool_mapping(struct netc_switch *priv)
 	}
 }
 
+static void netc_switch_free_bpt_list(struct netc_switch *priv)
+{
+	kfree(priv->bpt_list);
+	priv->bpt_list = NULL;
+}
+
 static int netc_switch_bpt_default_config(struct netc_switch *priv)
 {
+	int err;
+
 	if (priv->num_bp < priv->info->num_ports)
 		return -EINVAL;
 
-	priv->bpt_list = devm_kzalloc_objs(priv->dev, struct bpt_cfge_data,
-					   priv->num_bp);
+	priv->bpt_list = kzalloc_objs(*priv->bpt_list, priv->num_bp);
 	if (!priv->bpt_list)
 		return -ENOMEM;
 
 	/* Initialize the maximum threshold of each buffer pool entry */
 	for (int i = 0; i < priv->num_bp; i++) {
 		struct bpt_cfge_data *cfge = &priv->bpt_list[i];
-		int err;
 
 		cfge->max_thresh = cpu_to_le16(NETC_BP_THRESH);
 		err = ntmp_bpt_update_entry(&priv->ntmp, i, cfge);
 		if (err)
-			return err;
+			goto free_bpt_list;
 	}
 
 	netc_ipv_to_buffer_pool_mapping(priv);
 
 	return 0;
+
+free_bpt_list:
+	netc_switch_free_bpt_list(priv);
+
+	return err;
+}
+
+static int netc_switch_reset(struct netc_switch *priv)
+{
+	struct pci_dev *pdev = priv->pdev;
+	int err;
+
+	if (!priv->configured) {
+		/* The hardware will be configured after netc_switch_reset()
+		 * is called, so set priv->configured to true.
+		 */
+		priv->configured = true;
+		return 0;
+	}
+
+	/* Block user space config access and other PCI resets, which take
+	 * pci_cfg_access_lock() via pci_dev_lock(), during the FLR.
+	 */
+	pci_cfg_access_lock(pdev);
+	err = pci_save_state(pdev);
+	if (err)
+		goto unlock_cfg_access;
+
+	err = pcie_flr(pdev);
+	if (err)
+		dev_err(priv->dev, "FLR failed: %pe\n", ERR_PTR(err));
+
+	pci_restore_state(pdev);
+
+unlock_cfg_access:
+	pci_cfg_access_unlock(pdev);
+
+	return err;
+}
+
+static struct pci_dev *netc_get_ptp_timer(struct netc_switch *priv)
+{
+	struct pci_bus *bus = priv->pdev->bus;
+	u32 devfn = priv->info->tmr_devfn;
+
+	return pci_get_domain_bus_and_slot(pci_domain_nr(bus),
+					   bus->number, devfn);
 }
 
 static int netc_setup(struct dsa_switch *ds)
@@ -872,19 +1037,33 @@ static int netc_setup(struct dsa_switch *ds)
 	struct dsa_port *dp;
 	int err;
 
+	err = netc_switch_reset(priv);
+	if (err)
+		return err;
+
 	err = netc_init_switch_id(priv);
 	if (err)
 		return err;
 
 	netc_get_switch_capabilities(priv);
 
+	/* The PTP timer sits on the same PCI bus as the switch. PCI creates
+	 * every function's pci_dev during bus enumeration, before any driver
+	 * probes, so we can grab the timer's pci_dev here even if the timer
+	 * driver has not probed yet.
+	 */
+	priv->tmr_dev = netc_get_ptp_timer(priv);
+	if (!priv->tmr_dev)
+		dev_info(priv->dev,
+			 "PTP timer PCI device not found\n");
+
 	err = netc_init_all_ports(priv);
 	if (err)
-		return err;
+		goto put_ptp_timer;
 
 	err = netc_init_ntmp_user(priv);
 	if (err)
-		return err;
+		goto free_all_ports;
 
 	INIT_HLIST_HEAD(&priv->fdb_list);
 	mutex_init(&priv->fdbt_lock);
@@ -907,22 +1086,27 @@ static int netc_setup(struct dsa_switch *ds)
 
 	err = netc_add_standalone_vlan_entry(priv);
 	if (err)
-		goto free_lock_and_ntmp_user;
+		goto free_bpt_list;
 
 	err = netc_add_standalone_fdb_bcast_entry(priv);
 	if (err)
-		goto free_lock_and_ntmp_user;
+		goto free_bpt_list;
 
 	return 0;
 
+free_bpt_list:
+	netc_switch_free_bpt_list(priv);
 free_lock_and_ntmp_user:
-	/* No need to clear the hardware state, netc_setup() is only called
-	 * when the driver is bound, and FLR will be performed to reset the
-	 * hardware state.
+	/* No need to clear the hardware state. netc_setup() resets the
+	 * hardware via FLR, so the next setup starts from a clean state.
 	 */
 	mutex_destroy(&priv->fdbt_lock);
 	mutex_destroy(&priv->vft_lock);
 	netc_free_ntmp_user(priv);
+free_all_ports:
+	netc_free_all_ports(priv);
+put_ptp_timer:
+	pci_dev_put(priv->tmr_dev);
 
 	return err;
 }
@@ -935,31 +1119,16 @@ static void netc_destroy_all_lists(struct netc_switch *priv)
 	mutex_destroy(&priv->vft_lock);
 }
 
-static void netc_free_host_flood_rules(struct netc_switch *priv)
-{
-	struct dsa_port *dp;
-
-	dsa_switch_for_each_user_port(dp, priv->ds) {
-		struct netc_port *np = priv->ports[dp->index];
-
-		/* No need to clear the hardware IPFT entry. Because PCIe
-		 * FLR will be performed when the switch is re-registered,
-		 * it will reset hardware state. So only need to free the
-		 * memory to avoid memory leak.
-		 */
-		kfree(np->host_flood);
-		np->host_flood = NULL;
-	}
-}
-
 static void netc_teardown(struct dsa_switch *ds)
 {
 	struct netc_switch *priv = ds->priv;
 
 	disable_delayed_work_sync(&priv->fdbt_ageing_work);
 	netc_destroy_all_lists(priv);
-	netc_free_host_flood_rules(priv);
 	netc_free_ntmp_user(priv);
+	netc_switch_free_bpt_list(priv);
+	netc_free_all_ports(priv);
+	pci_dev_put(priv->tmr_dev);
 }
 
 static bool netc_port_is_emdio_consumer(struct device_node *node)
@@ -1042,7 +1211,10 @@ static int netc_switch_pci_init(struct pci_dev *pdev)
 	void __iomem *base;
 	int err;
 
-	pcie_flr(pdev);
+	err = pcie_flr(pdev);
+	if (err)
+		return dev_err_probe(dev, err, "FLR failed\n");
+
 	err = pcim_enable_device(pdev);
 	if (err)
 		return dev_err_probe(dev, err, "Failed to enable device\n");
@@ -1531,6 +1703,7 @@ static void netc_port_disable(struct dsa_switch *ds, int port)
 	if (!np->enable)
 		return;
 
+	netc_port_disable_onestep(np);
 	clk_disable_unprepare(np->ref_clk);
 	np->enable = false;
 }
@@ -1716,14 +1889,8 @@ static int netc_port_add_host_flood_rule(struct netc_port *np,
 	u32 cfg;
 	int err;
 
-	if (!uc && !mc) {
-		/* Disable ingress port filter table lookup */
-		netc_port_wr(np, NETC_PIPFCR, 0);
-		np->uc = false;
-		np->mc = false;
-
+	if (!uc && !mc)
 		return 0;
-	}
 
 	host_flood = kzalloc_obj(*host_flood);
 	if (!host_flood)
@@ -1756,48 +1923,48 @@ static int netc_port_add_host_flood_rule(struct netc_port *np,
 	cfge->cfg = cpu_to_le32(cfg);
 
 	err = ntmp_ipft_add_entry(&priv->ntmp, host_flood);
-	if (err) {
-		kfree(host_flood);
-		return err;
-	}
+	if (err)
+		goto free_host_flood;
 
 	np->uc = uc;
 	np->mc = mc;
-	np->host_flood = host_flood;
-	/* Enable ingress port filter table lookup */
-	netc_port_wr(np, NETC_PIPFCR, PIPFCR_EN);
+	np->ipft_hf_eid = host_flood->entry_id;
 
-	return 0;
-}
-
-static void netc_port_remove_host_flood(struct netc_port *np,
-					struct ipft_entry_data *host_flood)
-{
-	struct netc_switch *priv = np->switch_priv;
-	bool disable_host_flood = false;
-
-	if (!host_flood)
-		return;
-
-	if (np->host_flood == host_flood)
-		disable_host_flood = true;
-
-	ntmp_ipft_delete_entry(&priv->ntmp, host_flood->entry_id);
+free_host_flood:
 	kfree(host_flood);
 
-	if (disable_host_flood) {
-		np->host_flood = NULL;
-		np->uc = false;
-		np->mc = false;
-		netc_port_wr(np, NETC_PIPFCR, 0);
-	}
+	return err;
+}
+
+static int netc_port_remove_host_flood(struct netc_port *np)
+{
+	struct netc_switch *priv = np->switch_priv;
+	u32 entry_id = np->ipft_hf_eid;
+	int err;
+
+	if (entry_id == NTMP_NULL_ENTRY_ID)
+		return 0;
+
+	/* The command BD ring is always enabled here, with the ring
+	 * enabled, the hardware completes a command well within 1 ms,
+	 * so -ETIMEDOUT cannot happen here. Any error therefore means
+	 * that the entry has not been deleted, so keep tracking it.
+	 */
+	err = ntmp_ipft_delete_entry(&priv->ntmp, entry_id);
+	if (err)
+		return err;
+
+	np->ipft_hf_eid = NTMP_NULL_ENTRY_ID;
+	np->uc = false;
+	np->mc = false;
+
+	return 0;
 }
 
 static void netc_port_set_host_flood(struct dsa_switch *ds, int port,
 				     bool uc, bool mc)
 {
 	struct netc_port *np = NETC_PORT(ds, port);
-	struct ipft_entry_data *old_host_flood;
 
 	/* Do not add host flood rule to ingress port filter table when
 	 * the port has joined a bridge. Otherwise, the ingress frames
@@ -1805,7 +1972,12 @@ static void netc_port_set_host_flood(struct dsa_switch *ds, int port,
 	 * will be redirected directly to the CPU port.
 	 */
 	if (dsa_port_bridge_dev_get(np->dp)) {
-		netc_port_remove_host_flood(np, np->host_flood);
+		if (!netc_port_remove_host_flood(np))
+			return;
+
+		dev_err(ds->dev,
+			"Failed to delete host flood rule on bridge port %d\n",
+			port);
 
 		return;
 	}
@@ -1814,21 +1986,26 @@ static void netc_port_set_host_flood(struct dsa_switch *ds, int port,
 		return;
 
 	/* IPFT does not support in-place updates to the KEYE element,
-	 * we need to add a new entry and then delete the old one. So
-	 * save the old entry first.
+	 * we need to delete the old one and then add the new rule. If
+	 * the deletion fails, return immediately.
 	 */
-	old_host_flood = np->host_flood;
-	np->host_flood = NULL;
-
-	if (netc_port_add_host_flood_rule(np, uc, mc)) {
-		np->host_flood = old_host_flood;
-		dev_err(ds->dev, "Failed to add host flood rule on port %d\n",
+	if (netc_port_remove_host_flood(np)) {
+		dev_err(ds->dev,
+			"Failed to delete old host flood rule on port %d\n",
 			port);
+
 		return;
 	}
 
-	/* Remove the old host flood entry */
-	netc_port_remove_host_flood(np, old_host_flood);
+	/* Restoring the previous configuration is pointless because
+	 * .port_set_host_flood() returns void, so the upper layer cannot
+	 * detect the error and the RX flags have changed. Furthermore, we
+	 * cannot guarantee that we can successfully restore the previous
+	 * state.
+	 */
+	if (netc_port_add_host_flood_rule(np, uc, mc))
+		dev_err(ds->dev,
+			"Failed to add host flood rule on port %d\n", port);
 }
 
 static int netc_single_vlan_aware_bridge(struct dsa_switch *ds,
@@ -1993,6 +2170,8 @@ static int netc_port_bridge_join(struct dsa_switch *ds, int port,
 	struct netc_port *np = NETC_PORT(ds, port);
 	struct netc_switch *priv = ds->priv;
 	u16 vlan_unaware_pvid;
+	bool uc = np->uc;
+	bool mc = np->mc;
 	int err;
 
 	if (!bridge.num) {
@@ -2003,6 +2182,12 @@ static int netc_port_bridge_join(struct dsa_switch *ds, int port,
 	err = netc_single_vlan_aware_bridge(ds, extack);
 	if (err)
 		return err;
+
+	err = netc_port_remove_host_flood(np);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to delete host flood rule");
+		return err;
+	}
 
 	netc_port_set_mlo(np, MLO_NOT_OVERRIDE);
 
@@ -2017,8 +2202,6 @@ static int netc_port_bridge_join(struct dsa_switch *ds, int port,
 	netc_port_set_pvid(np, vlan_unaware_pvid);
 
 out:
-	netc_port_remove_host_flood(np, np->host_flood);
-
 	if (atomic_inc_return(&priv->br_cnt) == 1)
 		schedule_delayed_work(&priv->fdbt_ageing_work,
 				      READ_ONCE(priv->fdbt_ageing_delay));
@@ -2027,6 +2210,11 @@ out:
 
 disable_mlo:
 	netc_port_set_mlo(np, MLO_DISABLE);
+
+	if (netc_port_add_host_flood_rule(np, uc, mc))
+		dev_err(ds->dev,
+			"Failed to restore host flood rule on port %d\n",
+			port);
 
 	return err;
 }
@@ -2376,6 +2564,7 @@ static void netc_mac_link_up(struct phylink_config *config,
 	netc_port_set_rx_pause(np, rx_pause);
 	netc_port_mac_tx_enable(np);
 	netc_port_mac_rx_enable(np);
+	netc_port_enable_onestep(np);
 }
 
 static void netc_mac_link_down(struct phylink_config *config,
@@ -2386,6 +2575,7 @@ static void netc_mac_link_down(struct phylink_config *config,
 	struct netc_port *np;
 
 	np = NETC_PORT(dp->ds, dp->index);
+	netc_port_disable_onestep(np);
 	netc_port_mac_rx_graceful_stop(np);
 	netc_port_mac_tx_graceful_stop(np);
 	netc_port_remove_dynamic_entries(np);
@@ -2399,6 +2589,7 @@ static const struct phylink_mac_ops netc_phylink_mac_ops = {
 
 static const struct dsa_switch_ops netc_switch_ops = {
 	.get_tag_protocol		= netc_get_tag_protocol,
+	.connect_tag_protocol		= netc_connect_tag_protocol,
 	.setup				= netc_setup,
 	.teardown			= netc_teardown,
 	.phylink_get_caps		= netc_phylink_get_caps,
@@ -2427,6 +2618,11 @@ static const struct dsa_switch_ops netc_switch_ops = {
 	.get_sset_count			= netc_port_get_sset_count,
 	.get_strings			= netc_port_get_strings,
 	.get_ethtool_stats		= netc_port_get_ethtool_stats,
+	.get_ts_info			= netc_get_ts_info,
+	.port_hwtstamp_set		= netc_port_hwtstamp_set,
+	.port_hwtstamp_get		= netc_port_hwtstamp_get,
+	.port_rxtstamp			= netc_port_rxtstamp,
+	.port_txtstamp			= netc_port_txtstamp,
 };
 
 static int netc_switch_probe(struct pci_dev *pdev,
