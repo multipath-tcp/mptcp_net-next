@@ -117,6 +117,8 @@
 #define MPTCP_FALLBACK_DONE	2
 #define MPTCP_WORK_CLOSE_SUBFLOW 3
 #define MPTCP_RTX_ENABLED	4
+#define MPTCP_ORPHAN_COUNTED	5
+#define MPTCP_JOINED		6
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
@@ -392,7 +394,6 @@ struct mptcp_sock {
 
 	struct list_head backlog_list;	/* protected by the data lock */
 	u32		backlog_len;
-	u32		backlog_unaccounted;
 };
 
 #define mptcp_data_lock(sk) spin_lock_bh(&(sk)->sk_lock.slock)
@@ -579,6 +580,8 @@ struct mptcp_subflow_context {
 	__wsum	map_data_csum;
 	u32	map_csum_len;
 	u32	prev_rtt_seq;
+	u32	dsn_base;	    /* MPC: DSN - SSN + 1 of peer's last map */
+	u32	dsn_end;	    /* MPC: highest end of the peer's maps */
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_join : 1,   /* send MP_JOIN */
 		request_bkup : 1,
@@ -602,7 +605,9 @@ struct mptcp_subflow_context {
 		is_mptfo : 1,	    /* subflow is doing TFO */
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		resetting : 1,	    /* subflow is resetting */
-		__unused : 9;
+		old_data_pending : 1, /* old data not acked with MPTCP opts */
+		map_old : 1,	    /* MPC: peer's last map is below dsn_end */
+		__unused : 7;
 	bool	data_avail;
 	bool	scheduled;
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
@@ -630,6 +635,7 @@ struct mptcp_subflow_context {
 				     */
 
 	u32	subflow_id;
+	u32	old_data_end;	    /* TCP write_seq after the last old data */
 
 	unsigned long	fail_tout;
 
@@ -643,6 +649,7 @@ struct mptcp_subflow_context {
 	int     cached_sndbuf;	    /* sndbuf size when last synced with the msk sndbuf,
 				     * protected by the msk socket lock
 				     */
+	u32	opt_ack_seq;	    /* highest TCP ack_seq with MPTCP opts */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -1341,6 +1348,15 @@ static inline bool mptcp_try_fallback(struct sock *ssk, int fb_mib)
 	struct mptcp_sock *msk;
 
 	msk = mptcp_sk(sk);
+
+	/* the peer might still be resending old data */
+	if (subflow->map_old && !__mptcp_check_fallback(msk))
+		return false;
+
+	/* queued old data would be sent without mapping after a fallback */
+	if (subflow->old_data_pending && !__mptcp_check_fallback(msk))
+		return false;
+
 	if (!__mptcp_try_fallback(msk, fb_mib))
 		return false;
 
