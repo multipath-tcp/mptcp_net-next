@@ -638,7 +638,7 @@ int lan966x_fdma_xmit_xdpf(struct lan966x_port *port, void *ptr, u32 len)
 		xdpf = ptr;
 
 		if (xdpf->headroom < IFH_LEN_BYTES) {
-			ret = NETDEV_TX_OK;
+			ret = -EINVAL;
 			goto out;
 		}
 
@@ -652,7 +652,7 @@ int lan966x_fdma_xmit_xdpf(struct lan966x_port *port, void *ptr, u32 len)
 					  xdpf->len + IFH_LEN_BYTES,
 					  DMA_TO_DEVICE);
 		if (dma_mapping_error(lan966x->dma_dev, dma_addr)) {
-			ret = NETDEV_TX_OK;
+			ret = -ENOMEM;
 			goto out;
 		}
 
