@@ -4404,6 +4404,8 @@ static int mptcp_connect(struct sock *sk, struct sockaddr_unsized *uaddr,
 	if (err < 0)
 		goto out;
 
+	/* as tcp_connect_init(): drop an error from a previous connection */
+	WRITE_ONCE(sk->sk_err, 0);
 	inet_assign_bit(DEFER_CONNECT, sk, inet_test_bit(DEFER_CONNECT, ssk));
 
 out:
