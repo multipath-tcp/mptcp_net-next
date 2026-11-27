@@ -14,6 +14,7 @@ TEST_PROGS := \
 	mptcp_connect_splice.sh \
 	mptcp_join.sh \
 	mptcp_sockopt.sh \
+	msg_zerocopy.sh \
 	pm_netlink.sh \
 	simult_flows.sh \
 	userspace_pm.sh \
@@ -24,6 +25,7 @@ TEST_GEN_FILES := \
 	mptcp_diag \
 	mptcp_inq \
 	mptcp_sockopt \
+	msg_zerocopy \
 	pm_nl_ctl \
 # end of TEST_GEN_FILES
 
@@ -32,8 +34,11 @@ TEST_FILES := \
 	settings \
 # end of TEST_FILES
 
-TEST_INCLUDES := ../lib.sh $(wildcard ../lib/sh/*.sh)
+TEST_INCLUDES := ../lib.sh ../msg_zerocopy.sh $(wildcard ../lib/sh/*.sh)
 
 EXTRA_CLEAN := *.pcap
 
 include ../../lib.mk
+
+$(OUTPUT)/msg_zerocopy: ../msg_zerocopy.c
+	$(LINK.c) $^ $(LDLIBS) -o $@
