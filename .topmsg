@@ -1,2 +1,31 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-keep-room-for-infinite-map-after-fallback
+Subject: [PATCH] mptcp: keep room for infinite map after fallback
+
+After an MP_FAIL, the infinite mapping is sent with the next data. If
+the MPTCP socket falls back to TCP in the meantime, e.g. after having
+received data without DSS, the size of the next skb is computed without
+room for the DSS option, as no MPTCP options are sent after a fallback.
+But this skb still carries the infinite mapping, with its DSS option:
+its segments are then bigger than the MTU, and dropped, while the next
+ones wait for them. The connection then stalls.
+
+Keep room for the DSS option while the infinite mapping is still to be
+sent, when computing the MSS. This room is only kept until the skb
+carrying the infinite mapping is created, not until it is acked: an MSS
+decrease in between, e.g. after a PMTU drop, is unlikely right after an
+MP_FAIL, and this connection would then stall as with a PMTU black hole.
+
+This issue has been found by Sashiko, while reviewing "mptcp: send the
+infinite map in a single segment", and confirmed with a new Packetdrill
+test: an MP_FAIL is received before any data, then data without DSS.
+Without this patch, the infinite mapping was never sent:
+
+  dss_infinite_map_after_fallback_server.pkt:27: error handling packet: Timed out waiting for packet
+
+Fixes: 1e39e5a32ad7 ("mptcp: infinite mapping sending")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue spotted by Sashiko
+v3: commit msg: why an MSS decrease before the infinite mapping is
+    acked is not handled (Clashiko)
+v4: update the comment about the MSS from the previous commit (Clashiko)
